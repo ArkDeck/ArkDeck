@@ -1,0 +1,673 @@
+<title>ArkDeck 交互原型 v0.1</title>
+<style>
+:root{
+  --ground:#F5F6F8; --panel:#FFFFFF; --panel2:#EDEFF2; --ink:#23272E; --ink2:#5A6270;
+  --line:#DDE1E6; --accent:#0E7C86; --accent-weak:#0E7C8618; --ok:#2F855A; --warn:#B7791F;
+  --danger:#C0392B; --danger-weak:#C0392B14; --planned:#6D5BD0; --sim:#B7791F;
+  --shadow:0 1px 3px rgba(20,24,30,.10),0 8px 24px rgba(20,24,30,.08);
+  --chrome:#E7E9EC; --sel:#0E7C8612; --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root{
+  --ground:#1E2126; --panel:#262A31; --panel2:#2D323A; --ink:#E8EAED; --ink2:#9AA3AF;
+  --line:#3A4049; --accent:#4CC4CF; --accent-weak:#4CC4CF1E; --ok:#5BBF8A; --warn:#D9A34A;
+  --danger:#E0685C; --danger-weak:#E0685C1A; --planned:#9D8DF0; --sim:#D9A34A;
+  --shadow:0 1px 3px rgba(0,0,0,.4),0 10px 28px rgba(0,0,0,.35); --chrome:#2B2F36; --sel:#4CC4CF1C;
+}}
+:root[data-theme="dark"]{
+  --ground:#1E2126; --panel:#262A31; --panel2:#2D323A; --ink:#E8EAED; --ink2:#9AA3AF;
+  --line:#3A4049; --accent:#4CC4CF; --accent-weak:#4CC4CF1E; --ok:#5BBF8A; --warn:#D9A34A;
+  --danger:#E0685C; --danger-weak:#E0685C1A; --planned:#9D8DF0; --sim:#D9A34A;
+  --shadow:0 1px 3px rgba(0,0,0,.4),0 10px 28px rgba(0,0,0,.35); --chrome:#2B2F36; --sel:#4CC4CF1C;
+}
+:root[data-theme="light"]{
+  --ground:#F5F6F8; --panel:#FFFFFF; --panel2:#EDEFF2; --ink:#23272E; --ink2:#5A6270;
+  --line:#DDE1E6; --accent:#0E7C86; --accent-weak:#0E7C8618; --ok:#2F855A; --warn:#B7791F;
+  --danger:#C0392B; --danger-weak:#C0392B14; --planned:#6D5BD0; --sim:#B7791F;
+  --shadow:0 1px 3px rgba(20,24,30,.10),0 8px 24px rgba(20,24,30,.08); --chrome:#E7E9EC; --sel:#0E7C8612;
+}
+*{box-sizing:border-box;margin:0}
+body{background:var(--ground);color:var(--ink);
+  font:14px/1.5 -apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",Arial,"PingFang SC","Hiragino Sans GB",sans-serif;
+  padding:24px 16px;display:flex;flex-direction:column;align-items:center;gap:12px}
+.note{max-width:1180px;width:100%;color:var(--ink2);font-size:12px}
+.note b{color:var(--ink)}
+.window{width:100%;max-width:1180px;height:760px;background:var(--panel);border:1px solid var(--line);
+  border-radius:12px;box-shadow:var(--shadow);display:flex;flex-direction:column;overflow:hidden}
+.titlebar{display:flex;align-items:center;gap:10px;background:var(--chrome);border-bottom:1px solid var(--line);
+  padding:9px 14px;flex:none}
+.lights{display:flex;gap:7px}.lights i{width:12px;height:12px;border-radius:50%;display:block}
+.lights i:nth-child(1){background:#FF5F57}.lights i:nth-child(2){background:#FEBC2E}.lights i:nth-child(3){background:#28C840}
+.titlebar .t{flex:1;text-align:center;font-size:13px;font-weight:600;color:var(--ink2)}
+.titlebar .tools{display:flex;gap:8px}
+.acbtn{font-size:11px;border:1px solid var(--line);background:var(--panel);color:var(--ink2);
+  border-radius:6px;padding:3px 9px;cursor:pointer}
+.acbtn.on{border-color:var(--accent);color:var(--accent);background:var(--accent-weak)}
+.main{flex:1;display:flex;min-height:0}
+.sidebar{width:230px;flex:none;background:var(--panel2);border-right:1px solid var(--line);
+  padding:12px 10px;overflow-y:auto;display:flex;flex-direction:column;gap:14px}
+.sec{font-size:11px;font-weight:600;letter-spacing:.06em;color:var(--ink2);text-transform:uppercase;padding:0 8px}
+.dev{display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:8px;cursor:pointer;border:1px solid transparent}
+.dev:hover{background:var(--sel)}
+.dev.on{background:var(--sel);border-color:var(--accent)}
+.dot{width:8px;height:8px;border-radius:50%;flex:none}
+.dot.ok{background:var(--ok)}.dot.warn{background:var(--warn)}.dot.off{background:var(--ink2)}
+.dev .dn{flex:1;min-width:0}.dev .dn b{display:block;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dev .dn span{font-size:11px;color:var(--ink2)}
+.tag{font-size:10px;border:1px solid var(--line);border-radius:4px;padding:1px 5px;color:var(--ink2);flex:none}
+.addlink{font-size:12px;color:var(--accent);padding:2px 8px;cursor:pointer;background:none;border:none;text-align:left}
+.nav{display:flex;flex-direction:column;gap:2px}
+.nav button{display:flex;align-items:center;gap:9px;padding:7px 10px;border-radius:8px;border:none;background:none;
+  color:var(--ink);font-size:13.5px;cursor:pointer;text-align:left;width:100%}
+.nav button:hover{background:var(--sel)}
+.nav button.on{background:var(--accent-weak);color:var(--accent);font-weight:600}
+.nav .ic{width:17px;text-align:center;flex:none}
+.content{flex:1;display:flex;flex-direction:column;min-width:0}
+.page{flex:1;overflow-y:auto;padding:20px 24px;display:flex;flex-direction:column;gap:16px}
+h1{font-size:19px;font-weight:700;letter-spacing:-.01em}
+h2{font-size:13px;font-weight:600;color:var(--ink2);display:flex;align-items:center;gap:8px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:10px;position:relative}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:900px){.grid2{grid-template-columns:1fr}}
+.kv{display:grid;grid-template-columns:120px 1fr;gap:4px 14px;font-size:12.5px}
+.kv dt{color:var(--ink2)}.kv dd{font-family:var(--mono);font-size:11.5px;word-break:break-all}
+.chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;border-radius:5px;padding:2px 8px;border:1px solid}
+.chip.ok{color:var(--ok);border-color:var(--ok);background:transparent}
+.chip.warn{color:var(--warn);border-color:var(--warn)}
+.chip.danger{color:var(--danger);border-color:var(--danger)}
+.chip.dim{color:var(--ink2);border-color:var(--line)}
+.chip.planned{color:var(--planned);border-color:var(--planned)}
+.chip.sim{color:var(--sim);border-color:var(--sim);border-style:dashed}
+.btn{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:7px;
+  padding:5px 14px;font-size:13px;cursor:pointer}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.pri:hover{opacity:.9}
+.btn.danger{background:var(--danger);border-color:var(--danger);color:#fff}
+.btn:disabled{opacity:.45;cursor:not-allowed;pointer-events:none}
+.btn:focus-visible,.nav button:focus-visible,.acbtn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th{font-size:11px;color:var(--ink2);text-align:left;font-weight:600;padding:5px 8px;border-bottom:1px solid var(--line)}
+td{padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:none}
+tr.sel-row{background:var(--sel)}
+.mono{font-family:var(--mono);font-size:11.5px}
+.banner{background:var(--danger-weak);border:1px solid var(--danger);border-radius:10px;padding:12px 16px;
+  display:flex;flex-direction:column;gap:10px}
+.banner header{display:flex;align-items:center;gap:8px;font-weight:700;color:var(--danger)}
+.ritem{display:flex;align-items:flex-start;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+.ritem .ri{flex:1}.ritem .ri b{font-size:13px}.ritem .ri p{font-size:12px;color:var(--ink2);margin-top:2px}
+.ritem .ra{display:flex;gap:8px;flex-none;align-items:center}
+.radio{display:flex;flex-direction:column;gap:6px}
+.radio label{display:flex;gap:8px;align-items:flex-start;font-size:13px;cursor:pointer}
+.radio input{margin-top:3px;accent-color:var(--accent)}
+.radio .rd{color:var(--ink2);font-size:12px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{border:none;background:var(--panel);padding:6px 16px;font-size:13px;cursor:pointer;color:var(--ink)}
+.seg button.on{background:var(--accent);color:#fff;font-weight:600}
+.drawer{flex:none;border-top:1px solid var(--line);background:var(--panel2)}
+.drawer .bar{display:flex;align-items:center;gap:12px;padding:8px 16px;cursor:pointer;font-size:12.5px}
+.drawer .bar .st{flex:1;color:var(--ink2)}
+.drawer .body{max-height:0;overflow:hidden;transition:max-height .25s ease}
+.drawer.open .body{max-height:240px;overflow-y:auto}
+@media (prefers-reduced-motion:reduce){.drawer .body{transition:none}.pulse{animation:none}}
+.job{display:flex;flex-direction:column;gap:8px;padding:10px 16px;border-top:1px solid var(--line)}
+.job .jh{display:flex;align-items:center;gap:10px}
+.job .jh b{font-size:13px}
+.phases{display:flex;gap:4px;flex-wrap:wrap;font-size:11px}
+.ph{padding:2px 8px;border-radius:10px;border:1px solid var(--line);color:var(--ink2)}
+.ph.done{border-color:var(--ok);color:var(--ok)}
+.ph.run{border-color:var(--accent);color:var(--accent);font-weight:600}
+.pulse{animation:pu 1.2s ease-in-out infinite}
+@keyframes pu{50%{opacity:.45}}
+.logtail{font-family:var(--mono);font-size:11px;color:var(--ink2);background:var(--panel);
+  border:1px solid var(--line);border-radius:6px;padding:6px 10px;max-height:64px;overflow-y:auto;white-space:pre-wrap}
+.modal-bg{position:fixed;inset:0;background:rgba(15,18,22,.45);display:flex;align-items:center;justify-content:center;z-index:50;padding:20px}
+.modal{background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);
+  max-width:560px;width:100%;padding:20px 22px;display:flex;flex-direction:column;gap:14px;max-height:86vh;overflow-y:auto}
+.modal h3{font-size:16px;display:flex;gap:8px;align-items:center}
+.modal.dangerm h3{color:var(--danger)}
+.impact{border:1px solid var(--danger);background:var(--danger-weak);border-radius:8px;padding:10px 12px;font-size:12.5px;display:flex;flex-direction:column;gap:6px}
+.impact ul{margin-left:18px}
+.checks label{display:flex;gap:8px;font-size:13px;align-items:flex-start;cursor:pointer;margin-bottom:6px}
+.checks input{margin-top:3px;accent-color:var(--danger)}
+.mfoot{display:flex;justify-content:flex-end;gap:10px}
+.filters{display:flex;gap:6px;flex-wrap:wrap}
+.filters button{font-size:11.5px;border:1px solid var(--line);background:var(--panel);border-radius:12px;padding:3px 11px;cursor:pointer;color:var(--ink2)}
+.filters button.on{border-color:var(--accent);color:var(--accent);background:var(--accent-weak);font-weight:600}
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line)}
+.tabs button{border:none;background:none;padding:7px 16px;font-size:13px;cursor:pointer;color:var(--ink2);border-bottom:2px solid transparent}
+.tabs button.on{color:var(--accent);border-bottom-color:var(--accent);font-weight:600}
+.hint{font-size:12px;color:var(--ink2)}
+.warnbox{border:1px solid var(--warn);color:var(--warn);border-radius:8px;padding:8px 12px;font-size:12.5px;display:flex;gap:8px;align-items:flex-start}
+.effect{font-size:10.5px;font-weight:700;letter-spacing:.03em;border-radius:4px;padding:1px 6px;border:1px solid}
+.effect.host{color:var(--ink2);border-color:var(--line)}
+.effect.read{color:var(--ok);border-color:var(--ok)}
+.effect.mut{color:var(--warn);border-color:var(--warn)}
+.effect.destr{color:var(--danger);border-color:var(--danger)}
+.ac{display:none;position:absolute;top:-8px;right:8px;background:var(--planned);color:#fff;font-size:9.5px;
+  font-family:var(--mono);border-radius:4px;padding:1px 6px;z-index:5;box-shadow:var(--shadow)}
+.acmode .ac{display:inline-block}
+[data-acin]{position:relative}
+.acin{display:none;font-size:9.5px;font-family:var(--mono);color:var(--planned);border:1px dashed var(--planned);border-radius:4px;padding:0 4px;margin-left:6px;vertical-align:middle}
+.acmode .acin{display:inline-block}
+.two{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:14px}
+@media(max-width:940px){.two{grid-template-columns:1fr}}
+.tablewrap{overflow-x:auto}
+.empty{color:var(--ink2);font-size:12.5px;font-style:italic}
+</style>
+
+<p class="note"><b>ArkDeck macOS 交互原型 v0.1</b> — 与 <span class="mono">docs/design/macos-ux-interaction-spec.md</span> 同版本。工具栏「AC 标注」可叠加显示每个元素对应的规格验收编号;主题跟随系统/查看器切换。原型数据为演示假数据,不连接任何设备。</p>
+
+<div class="window" id="win">
+  <div class="titlebar">
+    <div class="lights"><i></i><i></i><i></i></div>
+    <div class="t">ArkDeck — OpenHarmony 设备工作台</div>
+    <div class="tools">
+      <button class="acbtn" id="acToggle" onclick="toggleAC()">AC 标注</button>
+    </div>
+  </div>
+  <div class="main">
+    <aside class="sidebar">
+      <div>
+        <div class="sec">设备</div>
+        <div id="devlist"></div>
+        <button class="addlink" onclick="alert('设计意图:TCP/UART 目标只能由用户显式添加,不扫描网络;断线后按 §5.1 重新确认。(REQ-DEV-004/005)')">＋ 添加 TCP / UART 目标…</button>
+      </div>
+      <div>
+        <div class="sec">功能</div>
+        <nav class="nav" id="nav"></nav>
+      </div>
+    </aside>
+    <div class="content">
+      <div class="page" id="page"></div>
+      <div class="drawer" id="drawer">
+        <div class="bar" onclick="toggleDrawer()">
+          <span id="drawerArrow">▸</span><b>任务</b>
+          <span class="st" id="drawerSt">没有运行中的任务</span>
+          <span class="ac">AC-UX-001-01</span>
+        </div>
+        <div class="body" id="drawerBody"></div>
+      </div>
+    </div>
+  </div>
+</div>
+<div id="modalHost"></div>
+
+<script>
+"use strict";
+/* ---------- state ---------- */
+const S = {
+  nav:"overview", device:"rk3568", acMode:false, drawerOpen:false,
+  recovery:{archived:false},
+  auth:{phase:"idle"},           // idle|polling|denied|ready
+  dump:{policy:"none", ran:false},
+  trace:{running:null},
+  flashMode:"execute", flashdConfirmed:false, flashJob:null, planSaved:false,
+  debugTab:"logs", histFilter:"all", histSel:null,
+  jobs:[], jobSeq:1
+};
+const DEVICES=[
+  {id:"rk3568", name:"rk3568-dev", tp:"USB", state:"ready",  build:"OpenHarmony 5.0.0.71", key:"150100469…"},
+  {id:"tab01",  name:"unknown-tablet", tp:"USB", state:"unauthorized", build:"—", key:"7f2e9d01…"}
+];
+const NAV=[["overview","◎","Overview"],["flash","⚡","Flash"],["debug","🐞","Debug"],
+  ["dump","🌲","UI Dump"],["trace","📈","Trace"],["history","🗂","History"],["settings","⚙","Settings"]];
+const HIST=[
+  {id:"S-0712-01", st:"succeeded", mode:"execute", dev:"rk3568-dev", what:"Trace · ArkUI 深度 15s", when:"07-12 14:02"},
+  {id:"S-0712-02", st:"planned",   mode:"planOnly", dev:"rk3568-dev", what:"Flash · rk3568-5.0-full(3 分区)", when:"07-12 15:40"},
+  {id:"S-0712-03", st:"simulated", mode:"simulated", dev:"SIM-fixture-a3", what:"Flash · 断连注入场景", when:"07-12 16:11"},
+  {id:"S-0711-04", st:"interrupted", mode:"execute", dev:"rk3568-dev", what:"Flash · system 分区(outcomeUnknown)", when:"07-11 23:47"},
+  {id:"S-0711-05", st:"failed",    mode:"execute", dev:"rk3568-dev", what:"UI Dump · elementTree(设备离线)", when:"07-11 20:15"}
+];
+const STCHIP={succeeded:'<span class="chip ok">✓ 成功</span>',failed:'<span class="chip danger">✕ 失败</span>',
+  planned:'<span class="chip planned">◇ PLANNED</span>',simulated:'<span class="chip sim">▤ SIMULATED</span>',
+  interrupted:'<span class="chip warn">⚠ 已中断 · 结果未知</span>'};
+
+/* ---------- helpers ---------- */
+const $=id=>document.getElementById(id);
+function esc(s){return s.replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
+function toggleAC(){S.acMode=!S.acMode;$("win").classList.toggle("acmode",S.acMode);$("acToggle").classList.toggle("on",S.acMode);}
+function toggleDrawer(){S.drawerOpen=!S.drawerOpen;$("drawer").classList.toggle("open",S.drawerOpen);$("drawerArrow").textContent=S.drawerOpen?"▾":"▸";}
+function go(nav){S.nav=nav;render();}
+function pickDevice(id){S.device=id;S.nav=(DEVICES.find(d=>d.id===id).state==="unauthorized")?"auth":S.nav==="auth"?"overview":S.nav;render();}
+
+/* ---------- jobs (drawer) ---------- */
+function addJob(j){j.id="J"+(S.jobSeq++);S.jobs.push(j);S.drawerOpen=true;$("drawer").classList.add("open");$("drawerArrow").textContent="▾";renderDrawer();return j;}
+function advanceJob(j){
+  if(j.cancelled&&j.phaseIdx<j.safeBoundary){j.log.push("— 已请求取消:等待安全边界 —");}
+  if(j.cancelled&&j.phaseIdx>=j.safeBoundary){j.state="cancelled";j.log.push("在安全边界停止;补偿动作已执行,参数已恢复。");renderDrawer();renderPageIf(["trace"]);return;}
+  j.phaseIdx++;
+  if(j.phaseIdx>=j.phases.length){j.state=j.terminal||"succeeded";j.log.push("完成:raw 产物 hash 已写入 manifest。");renderDrawer();renderPageIf(["trace","flash"]);return;}
+  j.log.push("→ "+j.phases[j.phaseIdx]);
+  renderDrawer();renderPageIf(["trace","flash"]);
+  j.timer=setTimeout(()=>advanceJob(j),j.tick);
+}
+function cancelJob(id){const j=S.jobs.find(x=>x.id===id);if(!j||j.state!=="running")return;
+  j.cancelled=true;j.log.push("用户请求取消(策略:atSafeBoundary)");renderDrawer();}
+function renderDrawer(){
+  const running=S.jobs.filter(j=>j.state==="running").length;
+  $("drawerSt").textContent=running?`${running} 个运行中 · ${S.jobs.length} 个本次会话任务`:S.jobs.length?`${S.jobs.length} 个任务(无运行中)`:"没有运行中的任务";
+  $("drawerBody").innerHTML=S.jobs.slice().reverse().map(j=>{
+    const chips={running:'<span class="chip warn pulse">运行中</span>',succeeded:'<span class="chip ok">✓ 成功</span>',
+      cancelled:'<span class="chip dim">已取消</span>',planned:'<span class="chip planned">◇ PLANNED</span>'}[j.state]||"";
+    const badge=j.mode==="planOnly"?'<span class="chip planned">◇ PLANNED</span>':j.mode==="simulated"?'<span class="chip sim">▤ SIMULATED · fixture-a3</span>':"";
+    return `<div class="job">
+      <div class="jh"><b>${esc(j.title)}</b>${badge}${j.state==="running"?"":chips}
+        <span style="flex:1"></span>
+        ${j.state==="running"?`<button class="btn" onclick="cancelJob('${j.id}')" ${j.cancelled?"disabled":""}>${j.cancelled?"等待安全边界…":"取消(在安全边界)"}</button>`:""}
+      </div>
+      <div class="phases">${j.phases.map((p,i)=>`<span class="ph ${i<j.phaseIdx?"done":i===j.phaseIdx&&j.state==="running"?"run pulse":""}">${p}</span>`).join("")}</div>
+      <div class="logtail">${j.log.slice(-4).map(esc).join("\n")}</div>
+    </div>`;}).join("")||'<div class="job empty">本次会话尚无任务。</div>';
+}
+function renderPageIf(navs){if(navs.includes(S.nav))renderPage();}
+
+/* ---------- modals ---------- */
+function closeModal(){$("modalHost").innerHTML="";}
+function modal(html){$("modalHost").innerHTML=`<div class="modal-bg" onclick="if(event.target===this)closeModal()">${html}</div>`;}
+
+/* ---------- recovery banner ---------- */
+function recoveryHTML(){
+  if(S.recovery.archived)return "";
+  return `<div class="banner" data-acin>
+    <header>⚠ 存在未完成的恢复项<span class="ac">REQ-UX-003</span></header>
+    <div class="ritem">
+      <div class="ri"><b>Flash · rk3568-dev · system 分区</b> <span class="chip warn">outcomeUnknown</span>
+        <p>上次会话在「Flash Steps · flashPartition(system)」写入 intent 后异常退出,未记录 outcome。设备最后处于 updater 模式。<br>
+        Provider 未声明 restartSafe —— <b>不提供自动续跑</b>,请按 RecoveryGuide 人工确认设备状态。</p></div>
+      <div class="ra">
+        <button class="btn" onclick="alert('打开 Provider RecoveryGuide(演示):检查设备是否停在 updater;确认 system 分区状态;必要时使用厂商恢复工具。')">恢复指引</button>
+        <button class="btn" disabled title="Provider 未声明 restartSafe,最后一步结果不明">从安全边界继续</button>
+        <button class="btn danger" onclick="archiveModal()">结束恢复并归档…</button>
+      </div>
+    </div>
+    <div class="ritem">
+      <div class="ri"><b>Trace · rk3568-dev</b> <span class="chip dim">waiting</span>
+        <p>等待设备重启回连(剩余 04:12)。回连后自动继续参数恢复。</p></div>
+      <div class="ra"><button class="btn" disabled title="仍在等待窗口内,归档不可用">结束恢复并归档…</button></div>
+    </div>
+  </div>`;
+}
+function archiveModal(){
+  modal(`<div class="modal dangerm" role="dialog" aria-modal="true">
+    <h3>⚠ 结束恢复并归档为「已中断」?</h3>
+    <div class="impact"><b>该动作只停止 ArkDeck 的跟踪。它不会:</b>
+      <ul><li>证明设备已经恢复正常</li><li>停止可能仍在设备上运行的远端任务</li><li>回滚已修改的 persist.* 参数或清理远端文件</li></ul>
+      归档后该 Session 永久保留 <b>outcomeUnknown</b> 与 needsAttention 标记;与其冲突的新任务将被 preflight 阻断。</div>
+    <div class="checks"><label><input type="checkbox" id="ck1" onchange="$('goArch').disabled=!this.checked"> 我已阅读恢复指引,并自行确认过设备状态</label></div>
+    <div class="mfoot"><button class="btn" onclick="closeModal()" autofocus>取消</button>
+      <button class="btn danger" id="goArch" disabled onclick="S.recovery.archived=true;closeModal();render()">归档为已中断</button></div>
+  </div>`);
+}
+
+/* ---------- pages ---------- */
+function pOverview(){
+  return recoveryHTML()+`
+  <h1>Overview <span class="acin">REQ-UX-002</span></h1>
+  <div class="grid2">
+    <div class="card" data-acin><span class="ac">AC-UX-002-01</span>
+      <h2>HDC 工具链</h2>
+      <dl class="kv">
+        <dt>来源</dt><dd>DevEco SDK(external)</dd>
+        <dt>路径</dt><dd>/Applications/DevEco-Studio.app/…/toolchains/hdc</dd>
+        <dt>client / server</dt><dd>3.1.0e / 3.1.0a <span class="chip warn">mismatchUnverified</span></dd>
+        <dt>endpoint</dt><dd>127.0.0.1:8710 · ownership: external</dd>
+        <dt>SHA-256</dt><dd>9f31…c2ae · 最近验证 07-13 09:12</dd>
+      </dl>
+      <p class="hint">版本字符串不一致:只读能力已探测降级可用;Flash 需命中已验证组合。ArkDeck 不会自动重启 external server。</p>
+    </div>
+    <div class="card" data-acin><span class="ac">REQ-HDC-008</span>
+      <h2>连接与通道保护</h2>
+      <dl class="kv">
+        <dt>rk3568-dev</dt><dd>USB · <span class="chip ok">已授权</span> <span class="chip warn">加密未验证</span></dd>
+        <dt>策略</dt><dd>无可靠加密证据 → 按未受保护通道处理;设备授权 ≠ 链路机密性</dd>
+      </dl>
+    </div>
+    <div class="card" data-acin><span class="ac">AC-DEV-007-01</span>
+      <h2>能力矩阵(rk3568-dev)</h2>
+      <div class="tablewrap"><table>
+        <tr><th>能力</th><th>状态</th><th></th></tr>
+        <tr><td>hidumper</td><td><span class="chip ok">可用</span></td><td class="mono">-w/-element/-lastpage 已确认</td></tr>
+        <tr><td>hitrace</td><td><span class="chip ok">可用</span></td><td class="mono">tag×11 · buffer ≤ 307200</td></tr>
+        <tr><td>bytrace</td><td><span class="chip dim">不存在</span></td><td></td></tr>
+        <tr><td>flashd</td><td><span class="chip warn">无法确认</span></td><td><button class="btn" onclick="alert('查看原始探测输出(演示)。未知 help 不猜测语义。')">查看 raw</button></td></tr>
+      </table></div>
+    </div>
+    <div class="card" data-acin><span class="ac">AC-UX-007-01</span>
+      <h2>设备访问诊断</h2>
+      <p class="hint">未发现 permissionDenied / driverUnavailable。若出现,将区别于 offline/unauthorized 展示,并给出由谁执行的最小权限修复步骤;ArkDeck 不会自动提权或写系统规则。</p>
+    </div>
+  </div>`;
+}
+function pAuth(){
+  const ph=S.auth.phase;
+  return `
+  <h1>设备授权 — unknown-tablet <span class="acin">REQ-HDC-007</span></h1>
+  <div class="card" style="max-width:640px" data-acin><span class="ac">AC-HDC-007-01/02</span>
+    <h2>此设备尚未信任本机(E000002)</h2>
+    <ol style="margin-left:20px;font-size:13.5px;display:flex;flex-direction:column;gap:6px">
+      <li>解锁设备屏幕;</li>
+      <li>在设备弹出的「是否信任此计算机?」中选择 <b>信任</b> 或 <b>始终信任</b>;</li>
+      <li>ArkDeck 将自动检测授权结果(有界轮询,不反复弹通知)。</li>
+    </ol>
+    ${ph==="polling"?'<div class="chip warn pulse">等待设备端确认… 02:47</div>':""}
+    ${ph==="denied"?'<div class="warnbox">⚠ 授权被拒绝或弹窗超时(E000003)。请检查设备调试开关后重试。若选择重启 HDC server,将影响 DevEco 与所有已连接设备,需要你显式确认——ArkDeck 不会静默执行。</div>':""}
+    ${ph==="ready"?'<div class="chip ok">✓ 已授权,设备 Ready</div>':""}
+    <div style="display:flex;gap:10px">
+      <button class="btn pri" onclick="S.auth.phase='polling';renderPage();setTimeout(()=>{if(S.auth.phase==='polling'){S.auth.phase='ready';DEVICES[1].state='ready';DEVICES[1].name='ohos-tablet';renderDevs();renderPage();}},2600)" ${ph==="polling"?"disabled":""}>开始等待授权</button>
+      <button class="btn" onclick="S.auth.phase='denied';renderPage()">模拟:用户拒绝(E000003)</button>
+    </div>
+  </div>`;
+}
+function pDump(){
+  const d=S.dump;
+  return recoveryHTML()+`
+  <h1>UI Dump <span class="acin">REQ-DUMP-*</span></h1>
+  <p class="hint">仅 ArkUI UI Dump(窗口/组件树/组件详情)。Fault/Crash Artifact 与整机诊断快照首版不支持。<span class="acin">scope 区分</span></p>
+  <div class="two">
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="card" data-acin><span class="ac">AC-DUMP-001-01</span>
+        <h2>窗口清单 <button class="btn" style="margin-left:auto" onclick="alert('重新执行 hidumper -s WindowManagerService -a -a(演示)。解析失败时保留 raw 输出并允许安全手输 ID。')">刷新</button></h2>
+        <div class="tablewrap"><table>
+          <tr><th>windowId</th><th>名称</th><th>焦点</th></tr>
+          <tr class="sel-row"><td class="mono">12</td><td>com.example.settings / MainAbility</td><td>●</td></tr>
+          <tr><td class="mono">8</td><td>com.ohos.launcher</td><td></td></tr>
+        </table></div>
+      </div>
+      <div class="card" data-acin><span class="ac">AC-DUMP-003-01</span>
+        <h2>Recipe</h2>
+        <div class="radio">
+          <label><input type="radio" name="rc" checked> elementTree — <span class="mono">-w 12 -element -c</span></label>
+          <label><input type="radio" name="rc"> nodeSummary — <span class="mono">-w 12 -default</span></label>
+          <label><input type="radio" name="rc"> fullDefaultTree — <span class="mono">-w 12 -default -all</span></label>
+          <label><input type="radio" name="rc"> componentDetail — <span class="mono">-w 12 -element -lastpage &lt;compId&gt;</span></label>
+        </div>
+      </div>
+      <div class="card" data-acin><span class="ac">AC-DUMP-004-01</span>
+        <h2>Debug 参数策略</h2>
+        <div class="radio">
+          <label><input type="radio" name="pp" checked onchange="S.dump.policy='none'"> 不改变参数<span class="rd">— 以设备当前状态采集</span></label>
+          <label><input type="radio" name="pp" onchange="S.dump.policy='temp'"> 临时开启,结束后恢复<span class="rd">— 仅当原值可读且可写回时可选</span></label>
+          <label><input type="radio" name="pp" onchange="S.dump.policy='keep'"> 保持开启<span class="rd">— 需要二次确认,状态栏持续提醒</span></label>
+        </div>
+        <button class="btn pri" style="align-self:flex-start" onclick="runDump()">采集</button>
+      </div>
+    </div>
+    <div class="card" data-acin><span class="ac">AC-DUMP-005-01</span>
+      <h2>产物</h2>
+      ${d.ran?`<div class="tablewrap"><table>
+        <tr><th>Artifact</th><th>来源</th><th>SHA-256</th></tr>
+        <tr><td class="mono">stdout.elementtree.txt</td><td>stdout</td><td class="mono">7d1a…90ff</td></tr>
+        <tr><td class="mono">sidecar.arkui.dump</td><td>remote sidecar</td><td class="mono">e33b…12c0</td></tr>
+        <tr><td class="mono">merged.elementtree.json</td><td>derived(可重建)</td><td class="mono">a1f4…77b3</td></tr>
+      </table></div>
+      <p class="hint">⚠ Dump 可能包含页面文本/包名/标识符,按敏感数据处理;导出前将提示。raw 永不原地修改。</p>`
+      :'<p class="empty">尚未采集。产物将按 stdout / remote sidecar / merged 派生分行列出并标注来源。</p>'}
+    </div>
+  </div>`;
+}
+function runDump(){
+  if(S.dump.policy==="keep"){
+    modal(`<div class="modal dangerm" role="dialog"><h3>⚠ 保持 Debug 参数开启?</h3>
+      <div class="impact">persist.ace.debug.enabled 等参数将<b>持久</b>保留在设备上,可能影响性能与后续测量;设备状态栏将持续显示提醒,且该变更计入审计。</div>
+      <div class="mfoot"><button class="btn" onclick="closeModal()">取消</button>
+      <button class="btn danger" onclick="closeModal();doDump()">确认保持开启</button></div></div>`);
+  } else doDump();
+}
+function doDump(){
+  const j=addJob({title:"UI Dump · elementTree · rk3568-dev",mode:"execute",state:"running",
+    phases:["Preflight","WindowInventory","SnapshotParam","Capture","Sidecars","Receive","Validate","RestoreParam","Complete"],
+    phaseIdx:0,safeBoundary:3,tick:420,log:["→ Preflight"],cancelled:false});
+  j.timer=setTimeout(()=>advanceJob(j),j.tick);
+  const t=setInterval(()=>{if(j.state!=="running"){clearInterval(t);S.dump.ran=true;renderPageIf(["dump"]);}},300);
+}
+function pTrace(){
+  const r=S.trace.running;
+  return recoveryHTML()+`
+  <h1>Trace <span class="acin">REQ-TRACE-*</span></h1>
+  <div class="two">
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="card">
+        <h2>Preset</h2>
+        <div class="tablewrap"><table>
+          <tr><th></th><th>Preset</th><th>tags</th></tr>
+          <tr class="sel-row"><td>●</td><td>ArkUI 深度</td><td class="mono">ace app ability graphic ohos sched freq sync</td></tr>
+          <tr><td></td><td>附件兼容 / 全景</td><td class="mono">sched freq ace app binder disk ohos graphic sync workq ability</td></tr>
+          <tr><td></td><td>渲染 / 动画</td><td class="mono">graphic ace app sched freq sync</td></tr>
+        </table></div>
+        <div style="display:flex;gap:14px;align-items:center;font-size:13px">
+          <span>duration <b>15s</b></span><span>buffer <b>307200</b></span>
+          <span class="chip dim">工具:hitrace(设备已确认)</span>
+        </div>
+        <div class="warnbox" data-acin>⚠ 附件兼容 preset 的 buffer 327680 超出该设备建议值,已按能力探测收敛到 307200。<span class="ac">buffer 资源警告</span></div>
+      </div>
+      <div class="card" data-acin><span class="ac">参数 diff · AC-TRACE(param)</span>
+        <h2>Debug 参数快照(before → desired)</h2>
+        <div class="tablewrap"><table>
+          <tr><th>参数</th><th>before</th><th>desired</th><th>恢复</th></tr>
+          <tr><td class="mono">persist.ace.trace.build.enabled</td><td class="mono">false</td><td class="mono">true</td><td><span class="chip ok">可恢复</span></td></tr>
+          <tr><td class="mono">persist.rosen.animationtrace.enabled</td><td class="mono">missing</td><td class="mono">1</td><td><span class="chip warn">不可自动回滚</span></td></tr>
+        </table></div>
+        <p class="hint">missing/unreadable 原值不承诺自动恢复:只允许「不改变」或显式确认的持久变更。本组合需要设备重启,预计断开 → 回连同一设备。</p>
+      </div>
+      <button class="btn pri" style="align-self:flex-start" onclick="startTrace()" ${r?"disabled":""}>应用参数并开始抓取</button>
+    </div>
+    <div class="card" data-acin><span class="ac">indeterminate 进度</span>
+      <h2>抓取状态</h2>
+      ${r?`<p class="hint">阶段进度见底部任务抽屉——设备端无可靠字节总量,<b>不显示百分比</b>,只显示阶段与不定进度。</p>`
+        :`<p class="empty">未在抓取。完成后产物:<span class="mono">*.raw.ftrace</span>(不可变)/ <span class="mono">*.filtered.ftrace</span>(派生)/ <span class="mono">capture.log</span> / <span class="mono">manifest.json</span>。</p>`}
+    </div>
+  </div>`;
+}
+function startTrace(){
+  S.trace.running=true;
+  const j=addJob({title:"Trace · ArkUI 深度 15s · rk3568-dev",mode:"execute",state:"running",
+    phases:["Preflight","SnapshotParams","Configure","Reboot","WaitReconnect","Capturing","Receiving","Validating","Restore","Complete"],
+    phaseIdx:0,safeBoundary:5,tick:600,log:["→ Preflight"],cancelled:false});
+  j.timer=setTimeout(()=>advanceJob(j),j.tick);
+  const t=setInterval(()=>{if(j.state!=="running"){clearInterval(t);S.trace.running=null;renderPageIf(["trace"]);}},300);
+  renderPage();
+}
+function pDebug(){
+  const tb=S.debugTab;
+  const tabs=[["logs","Logs"],["apps","Apps"],["net","Network"],["cmd","Commands"]];
+  let body="";
+  if(tb==="logs")body=`
+    <div class="card" data-acin><span class="ac">host 分片轮转</span>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <button class="btn pri">开始采集</button><button class="btn">暂停界面</button>
+        <span class="chip dim">过滤: level ≥ W · tag=ArkUI</span>
+        <span class="chip dim">host 轮转: 64MB/片 · 配额 1GB</span>
+        <span style="flex:1"></span>
+        <button class="btn danger" onclick="modal('<div class=\\'modal dangerm\\'><h3>⚠ 清空设备日志 buffer?</h3><div class=\\'impact\\'>hilog -r 是<b>全局且不可恢复</b>的设备端操作,会影响其他工具的采集;普通开始/停止绝不自动清空。该操作计入审计。</div><div class=\\'mfoot\\'><button class=\\'btn\\' onclick=\\'closeModal()\\'>取消</button><button class=\\'btn danger\\' onclick=\\'closeModal()\\'>清空设备 buffer</button></div></div>')">清空设备 buffer…</button>
+      </div>
+      <div class="logtail" style="max-height:190px">07-13 11:02:11.482 W ArkUI: [list_layout] measure retry, node 88
+07-13 11:02:11.490 W ArkUI: [render] flush delayed 22ms
+07-13 11:02:12.013 E AbilityMS: connect timeout, bundle=com.example.settings
+07-13 11:02:12.400 W ArkUI: [list_layout] measure retry, node 91</div>
+    </div>`;
+  if(tb==="apps")body=`<div class="card"><div class="tablewrap"><table>
+      <tr><th>包名</th><th>版本</th><th>状态</th><th></th></tr>
+      <tr><td class="mono">com.example.settings</td><td>1.2.0</td><td><span class="chip ok">运行中 · pid 2841</span></td>
+      <td><button class="btn">停止</button> <button class="btn">启动 Ability</button></td></tr>
+      <tr><td class="mono">com.demo.gallery</td><td>0.9.1</td><td><span class="chip dim">未运行</span></td>
+      <td><button class="btn">启动 Ability</button> <button class="btn danger">卸载…</button></td></tr>
+    </table></div><div style="display:flex;gap:8px"><button class="btn pri">安装 HAP…</button></div></div>`;
+  if(tb==="net")body=`<div class="card"><div class="tablewrap"><table>
+      <tr><th>类型</th><th>本机</th><th>设备</th><th></th></tr>
+      <tr><td>forward</td><td class="mono">tcp:9222</td><td class="mono">tcp:9222</td><td><button class="btn">删除</button></td></tr>
+    </table></div><button class="btn pri" style="align-self:flex-start">新建转发…</button></div>`;
+  if(tb==="cmd")body=`<div class="card" data-acin><span class="ac">一次性命令 ≠ 终端</span>
+      <div style="display:flex;gap:8px"><input style="flex:1;padding:6px 10px;border:1px solid var(--line);border-radius:7px;background:var(--panel);color:var(--ink);font-family:var(--mono);font-size:12px" value="bm dump -a" readonly><button class="btn pri">执行</button></div>
+      <div class="logtail">$ hdc -t 150100469… shell bm dump -a
+exit 0 · 812ms
+com.example.settings
+com.demo.gallery …</div>
+      <p class="hint">显示精确命令、退出码与耗时;完整交互终端(PTY)排入 v1.x,本面板不假装是终端。</p></div>`;
+  return recoveryHTML()+`
+  <h1>Debug 工作台 <span class="acin">REQ-DEBUG-*</span></h1>
+  <div class="tabs">${tabs.map(([k,l])=>`<button class="${tb===k?"on":""}" onclick="S.debugTab='${k}';renderPage()">${l}</button>`).join("")}</div>
+  ${body}`;
+}
+function pFlash(){
+  const m=S.flashMode, ok=S.flashdConfirmed;
+  const modeBadge=m==="planOnly"?'<span class="chip planned">◇ PLANNED — 不派发 deviceMutation/destructive</span>':m==="simulated"?'<span class="chip sim">▤ SIMULATED · fixture-a3 — 不接触真实设备</span>':"";
+  const planRows=[
+    ["1","enterUpdater","—","mut","deviceMutation"],
+    ["2","flashPartition","boot · boot.img · 64MB","destr","destructive"],
+    ["3","flashPartition","system · system.img · 2.1GB","destr","destructive"],
+    ["4","reboot + waitReconnect","binding revision + 强证据","mut","deviceMutation"],
+    ["5","postflight verify","版本/设备校验","read","readOnly"]
+  ].map(([n,s,a,c,e])=>`<tr><td class="mono">${n}</td><td class="mono">${s}</td><td class="mono">${a}</td>
+    <td><span class="effect ${c}">${e}</span></td><td>${m==="planOnly"?'<span class="chip planned">notExecuted(planned)</span>':""}</td></tr>`).join("");
+  return recoveryHTML()+`
+  <h1>Flash <span class="acin">REQ-FLASH-*</span></h1>
+  <div class="card" data-acin><span class="ac">REQ-UX-006 · AC-FLASH-004-01</span>
+    <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
+      <span class="seg">
+        <button class="${m==="execute"?"on":""}" onclick="S.flashMode='execute';renderPage()">Execute</button>
+        <button class="${m==="planOnly"?"on":""}" onclick="S.flashMode='planOnly';renderPage()">Plan only</button>
+        <button class="${m==="simulated"?"on":""}" onclick="S.flashMode='simulated';renderPage()">Simulated</button>
+      </span>${modeBadge}
+    </div>
+  </div>
+  <div class="two">
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="card"><h2>Profile / Image Set — rk3568-5.0-full</h2>
+        <div class="tablewrap"><table>
+          <tr><th>分区</th><th>镜像</th><th>大小</th><th>SHA-256</th></tr>
+          <tr><td class="mono">boot</td><td class="mono">boot.img</td><td class="mono">64MB</td><td class="mono">c9d2…41aa ✓</td></tr>
+          <tr><td class="mono">system</td><td class="mono">system.img</td><td class="mono">2.1GB</td><td class="mono">8b07…9e35 ✓</td></tr>
+        </table></div>
+        <p class="hint">镜像原地引用,不复制进 Session;GB 级流式 hash。</p>
+      </div>
+      <div class="card" data-acin><span class="ac">AC-FLASH-002-01</span>
+        <h2>Prerequisites</h2>
+        <div class="tablewrap"><table>
+          <tr><td>root-capable build</td><td><span class="chip ok">satisfied</span></td><td></td></tr>
+          <tr><td>进入 updater</td><td><span class="chip ok">satisfied</span></td><td></td></tr>
+          <tr><td>flashd 能力</td><td>${ok?'<span class="chip ok">satisfied</span>':'<span class="chip warn">unknown</span>'}</td>
+            <td>${ok?"":'<label style="font-size:12px;display:flex;gap:6px;align-items:center"><input type="checkbox" onchange="S.flashdConfirmed=this.checked;renderPage()">演示:已在升级模式实测确认</label>'}</td></tr>
+          <tr><td>稳定供电</td><td><span class="chip ok">satisfied</span></td><td></td></tr>
+        </table></div>
+      </div>
+    </div>
+    <div class="card" data-acin><span class="ac">AC-FLASH-005-01 · effect 分级</span>
+      <h2>Exact Plan</h2>
+      <div class="tablewrap"><table>
+        <tr><th>#</th><th>step</th><th>参数摘要</th><th>effect</th><th></th></tr>${planRows}
+      </table></div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        ${m==="execute"?`<button class="btn danger" onclick="flashConfirm()" ${ok?"":"disabled"} ${ok?"":'title="required prerequisite flashd 为 unknown,临界步骤前阻断"'}>刷写 rk3568-dev(2 个分区)…</button>
+          ${ok?"":'<span class="hint">⚠ flashd unknown → 执行分支被阻断(不能刷到一半才发现)</span>'}`:""}
+        ${m==="planOnly"?`<button class="btn pri" onclick="runPlanOnly()">生成完整计划(零设备写入)</button>${S.planSaved?'<span class="chip planned">◇ planned · plan artifact 已持久化</span>':""}`:""}
+        ${m==="simulated"?`<button class="btn pri" onclick="runSim()">运行模拟场景(断连注入)</button>`:""}
+      </div>
+      ${m==="execute"&&S.flashJob?`<div class="warnbox">⚠ 正在写入分区 —— <b>临界区不可中断</b>:取消只会停止后续步骤。请勿合盖、手动睡眠、断电或拔线(idle sleep 已由系统保持,但合盖无法被阻止)。</div>`:""}
+    </div>
+  </div>`;
+}
+function flashConfirm(){
+  modal(`<div class="modal dangerm" role="dialog" aria-modal="true">
+    <h3>⚠ 刷写 rk3568-dev 的 2 个分区</h3>
+    <div class="impact"><b>影响范围</b><ul>
+      <li>设备:rk3568-dev · serial 150100469… · binding rev 3(已确认)</li>
+      <li>写入:boot(64MB)、system(2.1GB)——将覆盖现有系统</li>
+      <li>失败可能导致设备无法启动,需使用厂商恢复工具;ArkDeck 不保证可自动恢复</li></ul></div>
+    <div class="checks">
+      <label><input type="checkbox" onchange="fck()"> 我确认目标设备与镜像匹配(rk3568 · OpenHarmony 5.0)</label>
+      <label><input type="checkbox" onchange="fck()"> 我已确认稳定供电与厂商恢复路径可用</label>
+    </div>
+    <div class="mfoot"><button class="btn" onclick="closeModal()" autofocus>取消</button>
+      <button class="btn danger" id="goFlash" disabled onclick="closeModal();runFlash()">刷写 rk3568-dev 的 2 个分区</button></div>
+  </div>`);
+  window.fck=()=>{const c=document.querySelectorAll(".checks input:checked").length;$("goFlash").disabled=c<2;};
+}
+function runFlash(){
+  const j=addJob({title:"Flash · rk3568-5.0-full · rk3568-dev",mode:"execute",state:"running",
+    phases:["Preflight","EnterUpdater","Re-identify","flash boot","flash system","Verify","Reboot","Postflight","Complete"],
+    phaseIdx:0,safeBoundary:5,tick:700,log:["→ Preflight","已获取 CriticalActivityLease(idle sleep 保持)"],cancelled:false});
+  S.flashJob=j;j.timer=setTimeout(()=>advanceJob(j),j.tick);
+  const t=setInterval(()=>{if(j.state!=="running"){clearInterval(t);S.flashJob=null;renderPageIf(["flash"]);}},300);
+  renderPage();
+}
+function runPlanOnly(){
+  S.planSaved=true;
+  addJob({title:"Flash(plan-only)· rk3568-5.0-full",mode:"planOnly",state:"planned",
+    phases:["Preflight","Validate","makePlan","Persist plan","planned"],phaseIdx:5,safeBoundary:0,tick:0,
+    log:["完整计划含 2 个 destructive 步骤,全部 notExecuted(planned);mutation dispatch = 0。"],cancelled:false});
+  renderPage();
+}
+function runSim(){
+  const j=addJob({title:"Flash(simulated)· fixture-a3 断连注入",mode:"simulated",state:"running",
+    phases:["Preflight","EnterUpdater","flash boot","注入断连","reconcile","Complete"],
+    phaseIdx:0,safeBoundary:2,tick:550,log:["→ Preflight(合成设备,无真实 connectKey)"],cancelled:false});
+  j.timer=setTimeout(()=>advanceJob(j),j.tick);
+}
+function pHistory(){
+  const f=S.histFilter;
+  const rows=HIST.filter(h=>f==="all"||h.st===f);
+  const sel=HIST.find(h=>h.id===S.histSel);
+  return recoveryHTML()+`
+  <h1>History <span class="acin">REQ-UX-004</span></h1>
+  <div class="filters" data-acin><span class="ac">AC-UX-004-01</span>
+    ${[["all","全部"],["succeeded","成功"],["failed","失败"],["planned","planned"],["simulated","simulated"],["interrupted","已中断"]]
+      .map(([k,l])=>`<button class="${f===k?"on":""}" onclick="S.histFilter='${k}';renderPage()">${l}</button>`).join("")}
+  </div>
+  <div class="two">
+    <div class="card"><div class="tablewrap"><table>
+      <tr><th>Session</th><th>状态</th><th>设备</th><th>内容</th><th>时间</th></tr>
+      ${rows.map(h=>`<tr class="${S.histSel===h.id?"sel-row":""}" style="cursor:pointer" onclick="S.histSel='${h.id}';renderPage()">
+        <td class="mono">${h.id}</td><td>${STCHIP[h.st]}</td><td class="mono">${esc(h.dev)}</td><td>${esc(h.what)}</td><td class="mono">${h.when}</td></tr>`).join("")||'<tr><td colspan="5" class="empty">无匹配项</td></tr>'}
+    </table></div></div>
+    <div class="card">
+      <h2>Session 详情</h2>
+      ${sel?`<dl class="kv">
+        <dt>状态</dt><dd>${STCHIP[sel.st]}</dd>
+        <dt>executionMode</dt><dd>${sel.mode}${sel.st==="simulated"?" · fixture-a3":""}</dd>
+        <dt>设备</dt><dd>${esc(sel.dev)} · binding rev 3</dd>
+        <dt>manifest</dt><dd class="mono">schema 1.0 · 9 steps · SHA e0a1…88f2</dd>
+        ${sel.st==="interrupted"?'<dt>审计</dt><dd>outcomeUnknown @ flashPartition(system) · needsAttention · 未执行补偿:restoreParam×2</dd>':""}
+      </dl>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn">在访达中显示</button>
+        <button class="btn" onclick="alert('导出前提示:产物可能含页面文本/包名/标识符;connectKey 可脱敏。(演示)')">导出…</button>
+      </div>`:'<p class="empty">选择左侧 Session 查看 manifest、Artifact 与审计详情。planned/simulated 标识在历史与导出中永久保留。</p>'}
+    </div>
+  </div>`;
+}
+function pSettings(){
+  return `
+  <h1>Settings</h1>
+  <div class="grid2">
+    <div class="card"><h2>HDC 工具</h2>
+      <div class="radio">
+        <label><input type="radio" name="hdc" checked> DevEco SDK — <span class="mono">…/toolchains/hdc · 3.1.0e</span></label>
+        <label><input type="radio" name="hdc"> 手动选择… <span class="rd">(切换不影响运行中的 Job:工具在 Job 创建时固化)</span></label>
+      </div></div>
+    <div class="card"><h2>输出与保留</h2>
+      <dl class="kv"><dt>输出根目录</dt><dd>~/Library/Application Support/ArkDeck</dd>
+      <dt>历史配额</dt><dd>20GB · 保留 90 天 · pinned 除外</dd></dl></div>
+    <div class="card" data-acin><span class="ac">AC-DIAG-002-01</span><h2>诊断</h2>
+      <p class="hint">诊断包由你主动导出,默认<b>不含</b>设备 raw 产物,导出前可预览勾选;无自动上传。</p>
+      <button class="btn" style="align-self:flex-start">导出诊断包…</button></div>
+  </div>`;
+}
+
+/* ---------- render ---------- */
+const PAGES={overview:pOverview,auth:pAuth,dump:pDump,trace:pTrace,debug:pDebug,flash:pFlash,history:pHistory,settings:pSettings};
+function renderDevs(){
+  $("devlist").innerHTML=DEVICES.map(d=>`
+    <div class="dev ${S.device===d.id?"on":""}" onclick="pickDevice('${d.id}')">
+      <span class="dot ${d.state==="ready"?"ok":d.state==="unauthorized"?"warn":"off"}"></span>
+      <span class="dn"><b>${esc(d.name)}</b><span>${d.state==="unauthorized"?"未授权 — 点击处理":esc(d.build)}</span></span>
+      <span class="tag">${d.tp}</span>
+    </div>`).join("");
+}
+function renderNav(){
+  $("nav").innerHTML=NAV.map(([k,ic,l])=>`<button class="${S.nav===k?"on":""}" onclick="go('${k}')"><span class="ic">${ic}</span>${l}</button>`).join("");
+}
+function renderPage(){$("page").innerHTML=PAGES[S.nav]();}
+function render(){renderDevs();renderNav();renderPage();renderDrawer();}
+render();
+</script>
