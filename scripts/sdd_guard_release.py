@@ -692,7 +692,148 @@ def _binding_is_valid(
     )
 
 
-def _pce_guard(root: Path, errors: list[str], context: Mapping[str, Any]) -> None:
+def _capability_scope_guard(
+    root: Path, errors: list[str], context: Mapping[str, Any]
+) -> dict[str, Any]:
+    """Validate the capability registry and every release subject's scope.
+
+    Staged/iterative releases declare their exact capability scope in the
+    release subject's ``includedCapabilities``. This guard proves:
+
+    1. the registry covers exactly the ``openspec/specs/<capability>``
+       directories (no phantom or missing capabilities);
+    2. every registry entry has a valid release class and known, acyclic
+       ``requires`` dependencies;
+    3. every release subject includes all ``release: required`` capabilities
+       and is dependency-closed.
+
+    Returns the acceptance-scoping context used by :func:`_pce_guard`. On any
+    registry defect the returned ``registry_ok`` is False so verified release
+    claims fail closed instead of falling back to guessed applicability.
+    """
+
+    acceptance = context["acceptance"]
+    specs_root = root / "openspec/specs"
+    spec_capabilities = sorted(
+        entry.name
+        for entry in specs_root.iterdir()
+        if entry.is_dir() and (entry / "spec.md").is_file()
+    ) if specs_root.is_dir() else []
+
+    capability_of_acceptance: dict[str, str] = {}
+    for acceptance_id, paths in acceptance.items():
+        parts = support.ruby_array(paths)
+        if parts:
+            segments = str(parts[0]).split("/")
+            if len(segments) >= 3 and segments[0] == "openspec" and segments[1] == "specs":
+                capability_of_acceptance[acceptance_id] = segments[2]
+
+    registry_ok = True
+    required: set[str] = set()
+    requires: dict[str, set[str]] = {}
+    registry_path = root / "openspec/contracts/capability-registry.yaml"
+    if not registry_path.is_file():
+        errors.append("capability registry is missing: openspec/contracts/capability-registry.yaml")
+        registry_ok = False
+    else:
+        registry = _yaml(registry_path)
+        entries = support.ruby_array(registry.get("capabilities"))
+        registry_ids = [support.ruby_to_s(entry.get("id")) for entry in entries]
+        if sorted(registry_ids) != spec_capabilities or len(set(registry_ids)) != len(registry_ids):
+            errors.append(
+                "capability registry does not exactly cover openspec/specs capabilities"
+            )
+            registry_ok = False
+        for entry in entries:
+            entry_id = support.ruby_to_s(entry.get("id"))
+            release_class = support.ruby_to_s(entry.get("release"))
+            if release_class not in ("required", "optional"):
+                errors.append(
+                    f"capability registry entry {entry_id} has invalid release class: "
+                    f"{release_class or '(missing)'}"
+                )
+                registry_ok = False
+            if release_class == "required":
+                required.add(entry_id)
+            entry_requires = {
+                support.ruby_to_s(item) for item in support.ruby_array(entry.get("requires"))
+            }
+            unknown_requires = sorted(entry_requires.difference(registry_ids))
+            if unknown_requires:
+                errors.append(
+                    f"capability registry entry {entry_id} requires unknown capabilities: "
+                    + ", ".join(unknown_requires)
+                )
+                registry_ok = False
+            if entry_id in entry_requires:
+                errors.append(f"capability registry entry {entry_id} requires itself")
+                registry_ok = False
+            requires[entry_id] = entry_requires
+        # Reject dependency cycles: repeatedly peel entries whose requirements
+        # are all already peeled; anything left participates in a cycle.
+        remaining = dict(requires)
+        peeled: set[str] = set()
+        while True:
+            leaves = [name for name, deps in remaining.items() if deps <= peeled]
+            if not leaves:
+                break
+            for name in leaves:
+                peeled.add(name)
+                del remaining[name]
+        if remaining:
+            errors.append(
+                "capability registry has a dependency cycle involving: "
+                + ", ".join(sorted(remaining))
+            )
+            registry_ok = False
+
+    for path in _glob_files(root, "openspec/platforms/release-subjects/*.json"):
+        record = _json(path)
+        rel = support.relative(path, root)
+        included_raw = support.ruby_array(record.get("includedCapabilities"))
+        included = [support.ruby_to_s(item) for item in included_raw]
+        if not included:
+            errors.append(f"release subject {rel} declares no includedCapabilities")
+            continue
+        if len(set(included)) != len(included):
+            errors.append(f"release subject {rel} has duplicate includedCapabilities")
+        unknown = sorted(set(included).difference(spec_capabilities))
+        if unknown:
+            errors.append(
+                f"release subject {rel} includes unknown capabilities: " + ", ".join(unknown)
+            )
+        if registry_ok:
+            missing_required = sorted(required.difference(included))
+            if missing_required:
+                errors.append(
+                    f"release subject {rel} omits required capabilities: "
+                    + ", ".join(missing_required)
+                )
+            for capability in included:
+                missing_deps = sorted(
+                    requires.get(capability, set()).difference(included)
+                )
+                if missing_deps:
+                    errors.append(
+                        f"release subject {rel} violates capability dependency closure: "
+                        f"{capability} requires " + ", ".join(missing_deps)
+                    )
+
+    return {
+        "registry_ok": registry_ok,
+        "spec_capabilities": spec_capabilities,
+        "required": required,
+        "requires": requires,
+        "capability_of_acceptance": capability_of_acceptance,
+    }
+
+
+def _pce_guard(
+    root: Path,
+    errors: list[str],
+    context: Mapping[str, Any],
+    capability_scope: Mapping[str, Any],
+) -> None:
     platform_lock = context["platform_lock"]
     if not platform_lock:
         return
@@ -1015,7 +1156,27 @@ def _pce_guard(root: Path, errors: list[str], context: Mapping[str, Any]) -> Non
             results_by_acceptance = {
                 result.get("acceptanceId"): result for result in acceptance_results
             }
-            exact_acceptance = sorted(acceptance_ids) == sorted(acceptance.keys())
+            # Staged-release scoping: a verified PCE must cover exactly the
+            # acceptance IDs of the release subject's includedCapabilities.
+            # An invalid registry or an empty/undeclared scope fails closed —
+            # applicability is never guessed from the full Core AC set.
+            included_capabilities = {
+                support.ruby_to_s(item)
+                for item in support.ruby_array(
+                    release_subject.get("includedCapabilities")
+                )
+            }
+            capability_of_acceptance = capability_scope["capability_of_acceptance"]
+            scoped_acceptance = sorted(
+                scoped_id
+                for scoped_id, capability in capability_of_acceptance.items()
+                if capability in included_capabilities
+            )
+            exact_acceptance = (
+                bool(capability_scope["registry_ok"])
+                and bool(scoped_acceptance)
+                and sorted(acceptance_ids) == scoped_acceptance
+            )
             support_by_id = {cell.get("cellId"): cell for cell in matrix}
             for result in acceptance_results:
                 definition = core_case_definitions.get(result.get("acceptanceId"), {})
@@ -1437,7 +1598,8 @@ def run_release_guard(
     try:
         _identity_and_ledger_guard(root, errors, context)
         _accepted_axis_approvals(root, errors, context)
-        _pce_guard(root, errors, context)
+        capability_scope = _capability_scope_guard(root, errors, context)
+        _pce_guard(root, errors, context, capability_scope)
         _platform_and_conformance_ratification(root, errors, context)
     except (AttributeError, KeyError, TypeError, ValueError, OSError) as exc:
         errors.append(

@@ -8,7 +8,7 @@ hash_algorithm: sha256
 
 file_manifest:
   path: openspec/baselines/CORE-1.0.0.files.yaml
-  sha256: c39c31735539af848fa4e7a66a7de6095fa7ab1520d2c9a98b2752cf60c752cd
+  sha256: 235962f862666e03b207d9bd113d261cc6e52ab73d696baa9a586f1f5b109432
 
 content_summary:
   core_spec_count: 9

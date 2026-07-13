@@ -12,6 +12,7 @@
     "coreBaseline",
     "conformanceSuiteSha256",
     "integrationLockSha256",
+    "includedCapabilities",
     "supportMatrix",
     "createdAt",
     "approvalId"
@@ -43,6 +44,13 @@
     },
     "conformanceSuiteSha256": { "$ref": "#/$defs/sha256" },
     "integrationLockSha256": { "$ref": "#/$defs/sha256" },
+    "includedCapabilities": {
+      "description": "Exact staged-release capability scope. Must contain every capability the capability registry marks release: required, be dependency-closed over requires, and match a capability directory under openspec/specs for every entry. A verified PCE must cover exactly the acceptance IDs of these capabilities.",
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]+$" }
+    },
     "supportMatrix": {
       "type": "array",
       "minItems": 1,

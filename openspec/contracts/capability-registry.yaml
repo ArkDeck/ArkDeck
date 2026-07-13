@@ -1,0 +1,55 @@
+registry: CAPABILITY-REGISTRY-1.0.0
+status: candidate
+core_baseline: CORE-1.0.0
+
+# Canonical release-scoping registry for staged/iterative delivery.
+#
+# Every capability ID must correspond 1:1 to a directory under
+# `openspec/specs/<capability>/spec.md`; the guard fails closed when the two
+# sets differ. A platform release subject (`platform-release-subject.schema.json`)
+# must declare `includedCapabilities`; the guard requires that set to
+#   1. contain every capability whose `release` class is `required`,
+#   2. be dependency-closed over `requires`,
+#   3. exactly determine the acceptance IDs a verified PCE must cover.
+# Capabilities left out of a release are thereby excluded from support claims;
+# their user-facing entry points must follow the "not supported" behavior their
+# specs already require. Changing a capability's release class or dependencies
+# is a governance change: this file is part of the protected set.
+
+capabilities:
+  - id: toolchain-hdc-server
+    release: required
+    requires: []
+    rationale: Shared HDC server supervision underlies every device operation.
+  - id: device-targeting-auth
+    release: required
+    requires: []
+    rationale: Device identity, binding and authorization gate all mutations.
+  - id: workflow-journal-recovery
+    release: required
+    requires: []
+    rationale: Typed steps, journal and recovery are the safety backbone.
+  - id: session-artifact-storage
+    release: required
+    requires: []
+    rationale: Sessions, manifests and storage coordination hold all evidence.
+  - id: desktop-ux-observability
+    release: required
+    requires: []
+    rationale: Danger confirmations, diagnostics and i18n apply to every build.
+  - id: ui-dump
+    release: optional
+    requires: []
+    rationale: Stageable feature; foundations are covered by required set.
+  - id: trace
+    release: optional
+    requires: []
+    rationale: Stageable feature; foundations are covered by required set.
+  - id: debug-workbench
+    release: optional
+    requires: []
+    rationale: Stageable feature; foundations are covered by required set.
+  - id: flashing
+    release: optional
+    requires: []
+    rationale: Stageable feature; additionally gated by real hardware evidence.

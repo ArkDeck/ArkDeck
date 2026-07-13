@@ -123,6 +123,25 @@ def drop_acceptance_index_entry(root: Path) -> None:
     path.write_text("".join(lines), encoding="utf-8")
 
 
+def drop_capability_registry_entry(root: Path) -> None:
+    path = root / "openspec/contracts/capability-registry.yaml"
+    text = path.read_text(encoding="utf-8")
+    start = text.index("  - id: trace\n")
+    end = text.index("  - id: ", start + 1)
+    path.write_text(text[:start] + text[end:], encoding="utf-8")
+
+
+def write_release_subject(root: Path, included: list[str]) -> None:
+    directory = root / "openspec/platforms/release-subjects"
+    directory.mkdir(parents=True, exist_ok=True)
+    capabilities = ", ".join(f'"{item}"' for item in included)
+    (directory / "PRS-SELFTEST.json").write_text(
+        '{\n  "schemaVersion": "1.0.0",\n  "releaseId": "PRS-SELFTEST",\n'
+        f'  "includedCapabilities": [{capabilities}]\n}}\n',
+        encoding="utf-8",
+    )
+
+
 CASES = (
     Case(
         name="tamper-protected-content",
@@ -197,6 +216,38 @@ CASES = (
         mutation=lambda root: append_text(
             root / "openspec/platforms/linux/profile.md", "\n<!-- tampered -->\n"
         ),
+    ),
+    Case(
+        name="capability-registry-drops-spec",
+        expected_error=re.compile(
+            r"capability registry does not exactly cover openspec/specs capabilities"
+        ),
+        mutation=drop_capability_registry_entry,
+    ),
+    Case(
+        name="release-subject-unknown-capability",
+        expected_error=re.compile(
+            r"release subject .*PRS-SELFTEST\.json includes unknown capabilities: zzz-phantom"
+        ),
+        mutation=lambda root: write_release_subject(
+            root,
+            [
+                "toolchain-hdc-server",
+                "device-targeting-auth",
+                "workflow-journal-recovery",
+                "session-artifact-storage",
+                "desktop-ux-observability",
+                "zzz-phantom",
+            ],
+        ),
+    ),
+    Case(
+        name="release-subject-omits-required-capability",
+        expected_error=re.compile(
+            r"release subject .*PRS-SELFTEST\.json omits required capabilities: "
+            r".*workflow-journal-recovery"
+        ),
+        mutation=lambda root: write_release_subject(root, ["ui-dump"]),
     ),
 )
 

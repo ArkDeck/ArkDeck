@@ -106,6 +106,7 @@ SDD_PROTECTED_PATTERNS: tuple[str, ...] = (
     "openspec/contracts/*.schema.json",
     "openspec/contracts/provider-contracts.md",
     "openspec/contracts/workflow-step-registry.yaml",
+    "openspec/contracts/capability-registry.yaml",
     "openspec/contracts/catalogs/remote-operations.yaml",
     "openspec/verification/policy.md",
     "openspec/verification/acceptance-index.txt",

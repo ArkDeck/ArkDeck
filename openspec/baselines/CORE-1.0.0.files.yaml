@@ -3,7 +3,7 @@ baseline: CORE-1.0.0
 status: candidate
 generated_at: '2026-07-13'
 hash_algorithm: sha256
-file_count: 92
+file_count: 93
 files:
 - path: .python-version
   sha256: 3a55324cbeddc91df012407d051dad08c88624c95a82fbdb856728729fbd14ab
@@ -27,6 +27,8 @@ files:
   sha256: 059d695f9586a829f5de0a4a4c33e82f8245388920347aa6e28dcf1595444735
 - path: openspec/contracts/approval.schema.json
   sha256: b13224f69cf7d64a72320e8ce91143569832331ff41d18808100d638735f485b
+- path: openspec/contracts/capability-registry.yaml
+  sha256: 6772a5c7068cfb92106086a5831c7be7d30e150ce2717832f3342a49ef594b07
 - path: openspec/contracts/catalogs/remote-operations.yaml
   sha256: 8d6b8f6fafcabf0367450db6cd1fcdfc39b707bbc8f026ff9f20ca1ffb69018d
 - path: openspec/contracts/change-supersession-barrier.schema.json
@@ -52,7 +54,7 @@ files:
 - path: openspec/contracts/platform-conformance-evidence.schema.json
   sha256: c82b2aafe4d6755137978c3450f6f01ad6907a74e7f33fc154d27693f1cc0a0e
 - path: openspec/contracts/platform-release-subject.schema.json
-  sha256: 230066ce393a4c10b791dcbed3b2a1a90a5a7de3e12449dc65b221194ff96d91
+  sha256: 1bac4a45d8e87b4492d771a8084b9956b0c36f363808b098ad3fffc9357ec577
 - path: openspec/contracts/pre-archive-verification.schema.json
   sha256: b95b8c39b0ea2c6ef60fd3c9774d73acb60dcfc575e6845d287f3074aee5501f
 - path: openspec/contracts/provider-contracts.md
@@ -72,7 +74,7 @@ files:
 - path: openspec/contracts/workflow-step.schema.json
   sha256: 624d61071070ec1f873a811307fe7eb39f7697c37a68ed3ef8fad774522d1688
 - path: openspec/governance/enforcement.md
-  sha256: 8ee7b8b8efa0c74585e1dcfce2c164633d13ae9b1124e824be3fff0f28170f54
+  sha256: 583a3534500b08efa34911a01688243cea695b3ead25b5ec8dab2d7022f22bb0
 - path: openspec/governance/trust-policy.yaml
   sha256: 137d10ba0b9c038b968f96e8d600cdd0ae61cfb9708d8302add05a140f6d7b1e
 - path: openspec/governance/trust-root-bundle.example.yaml
@@ -166,7 +168,7 @@ files:
 - path: openspec/verification/acceptance-index.txt
   sha256: 69b43018a1449880171dcb5fc9c05e863f354a8ed81e24c51b5cdfd09ac05b9c
 - path: openspec/verification/policy.md
-  sha256: 70c30ad420e1ad2dca4e26e1d697c53606b60aecfd77fc4f99a23b949371a393
+  sha256: e876692df12d42e5db9f13e4f2ac0426980b3ca9c43bd81c1ccf09cdb599abe7
 - path: scripts/check-json.py
   sha256: a285e2666a463b3ff083d346cd1117d630ca3ef52cc3cdb235f194aab2905262
 - path: scripts/check-sdd.sh
@@ -174,7 +176,7 @@ files:
 - path: scripts/check_sdd.py
   sha256: 4fcd9092db7f366caa0df83c90b06c91ce9ced4bf2cb4996af75b848958d75c3
 - path: scripts/guard_selftest.py
-  sha256: e3867201845897f3bbdc9cee3a60899f58d0f4555070ba0efb210eab606cf30d
+  sha256: f62e70672be2154907d0fc8be53f472acaa8d681d53ff4672947b4d6ed2fda2f
 - path: scripts/relock_baseline.py
   sha256: 0143eb0a1c6de8005197d63b2267f7e3aac66fd4732ee4273b9ca3ddec5437ab
 - path: scripts/requirements-sdd.txt
@@ -184,8 +186,8 @@ files:
 - path: scripts/sdd_guard_lifecycle.py
   sha256: da8e684e260846766cd6ffb97ebac6c54161ca39a05c54c95832f6cca42a4d36
 - path: scripts/sdd_guard_release.py
-  sha256: 20ad8f38f5d8962fa16553d93673bcfe45039b509fe6b736086d2df663840f71
+  sha256: 7d2aa97cc12e55c0d74d4f612c247adc1167f776dc33185139ffd49bace668d6
 - path: scripts/sdd_guard_support.py
   sha256: 45a817a31b06bde1be7c9dea3ebb37dfcc6c770b7dd2bf5e20e810064989ebfb
 - path: scripts/sdd_protected_set.py
-  sha256: bfe9cb336cdc753177f2bf36a30aaf8714cdb29bf14ed9ea77deee8bcc9fa6b0
+  sha256: 3a475df66030512d1764bfe0136031369d4c1be68e673bf25f7a85ed9a107780
