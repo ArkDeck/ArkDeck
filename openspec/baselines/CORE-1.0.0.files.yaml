@@ -3,8 +3,12 @@ baseline: CORE-1.0.0
 status: candidate
 generated_at: '2026-07-13'
 hash_algorithm: sha256
-file_count: 93
+file_count: 95
 files:
+- path: .github/CODEOWNERS
+  sha256: 13795d68780b7a05011da603d6799561e98480ee643059dd2e341fd3472c0dce
+- path: .github/workflows/sdd-guard.yml
+  sha256: 0bf8b65f45e58921c42c578f2aadd132c7d5ddc1f944e90e37681a7fa395008c
 - path: .python-version
   sha256: 3a55324cbeddc91df012407d051dad08c88624c95a82fbdb856728729fbd14ab
 - path: AGENTS.md
@@ -74,7 +78,7 @@ files:
 - path: openspec/contracts/workflow-step.schema.json
   sha256: 624d61071070ec1f873a811307fe7eb39f7697c37a68ed3ef8fad774522d1688
 - path: openspec/governance/enforcement.md
-  sha256: 583a3534500b08efa34911a01688243cea695b3ead25b5ec8dab2d7022f22bb0
+  sha256: 553ebcb4eec4e3421a1369c5378ee062c29b9c2521774a869a2a428ceeea099f
 - path: openspec/governance/trust-policy.yaml
   sha256: 137d10ba0b9c038b968f96e8d600cdd0ae61cfb9708d8302add05a140f6d7b1e
 - path: openspec/governance/trust-root-bundle.example.yaml
@@ -190,4 +194,4 @@ files:
 - path: scripts/sdd_guard_support.py
   sha256: 45a817a31b06bde1be7c9dea3ebb37dfcc6c770b7dd2bf5e20e810064989ebfb
 - path: scripts/sdd_protected_set.py
-  sha256: 3a475df66030512d1764bfe0136031369d4c1be68e673bf25f7a85ed9a107780
+  sha256: 1e7b88e61364e2d58abcef197e6929e5a19191605528919093c306fdd9f2ca04

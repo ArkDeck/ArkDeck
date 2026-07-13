@@ -1,0 +1,39 @@
+name: SDD Guard
+
+# Governance gate: every push and PR must pass both the guard and its
+# adversarial self-test. Branch protection requires the `guard` job, so a red
+# guard blocks merging into main. The toolchain fails closed unless the
+# interpreter matches .python-version and PyYAML matches
+# scripts/requirements-sdd.txt (see openspec/governance/enforcement.md).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          # Exact pin comes from the protected .python-version file; the
+          # runtime gate rejects any other CPython build.
+          python-version-file: ".python-version"
+
+      - name: Install pinned SDD dependencies
+        run: python -m pip install -r scripts/requirements-sdd.txt
+
+      - name: SDD guard
+        env:
+          ARKDECK_PYTHON: python
+        run: ./scripts/check-sdd.sh
+
+      - name: Guard adversarial self-test
+        run: python scripts/guard_selftest.py

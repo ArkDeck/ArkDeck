@@ -91,6 +91,8 @@ def require_sdd_runtime() -> None:
 # modification requires a candidate relock before ratification and an approved
 # Core change afterwards.
 SDD_PROTECTED_PATTERNS: tuple[str, ...] = (
+    ".github/CODEOWNERS",
+    ".github/workflows/sdd-guard.yml",
     ".python-version",
     "AGENTS.md",
     "openspec/README.md",
