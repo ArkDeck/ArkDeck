@@ -1,0 +1,204 @@
+{
+  "schemaVersion": "1.0.0",
+  "taskId": "TASK-M1-005",
+  "revision": 1,
+  "status": "draft",
+  "changeId": "CHG-2026-002-macos-m1-infrastructure",
+  "changeRevision": 1,
+  "approvalId": null,
+  "coreBaseline": {
+    "id": "CORE",
+    "version": "1.0.0",
+    "sha256": null
+  },
+  "platformProfile": {
+    "id": "PLATFORM-MACOS",
+    "version": "0.1.0",
+    "sha256": "54bd9b295799cb8d93bf397eeb585f24828463f4f1fce1e59a0693f65369d0bf"
+  },
+  "integrationProfiles": [
+    {
+      "id": "OPENHARMONY-TOOLS",
+      "version": "0.1.0",
+      "sha256": "679874cf44234a00b7e5d8f920e81c6b52ff489df2a2c8dd6f03b540c87a11e1"
+    }
+  ],
+  "conformanceSuite": {
+    "id": "CORE-CONFORMANCE-1.0.0",
+    "sha256": "015bcf9343ff91df9f66bdfec418287757f2d1a43c217bf0e9d430a8f99a4ba9"
+  },
+  "baseRevision": null,
+  "platform": "macos",
+  "objective": "Implement the Session/Artifact store, manifest pipeline and host-volume storage coordination.",
+  "requirementRefs": [
+    "POL-ARTIFACT-001",
+    "POL-STORAGE-001",
+    "PORT-STORAGE-001",
+    "PORT-VOLUME-001",
+    "REQ-ART-001",
+    "REQ-ART-002",
+    "REQ-ART-003",
+    "REQ-ART-004",
+    "REQ-ART-005",
+    "REQ-ART-006",
+    "REQ-STO-001",
+    "REQ-STO-002",
+    "REQ-STO-003",
+    "REQ-STO-004",
+    "REQ-STO-005"
+  ],
+  "acceptanceRefs": [
+    "AC-ART-001-01",
+    "AC-ART-002-01",
+    "AC-ART-003-01",
+    "AC-ART-004-01",
+    "AC-ART-005-01",
+    "AC-ART-006-01",
+    "AC-ART-006-02",
+    "AC-STO-001-01",
+    "AC-STO-002-01",
+    "AC-STO-003-01",
+    "AC-STO-004-01",
+    "AC-STO-005-01",
+    "MAC-M1-STORE-001"
+  ],
+  "dependsOn": [
+    "TASK-M1-001",
+    "TASK-M1-003"
+  ],
+  "allowedPaths": [
+    "Packages/ArkDeckKit/Sources/ArkDeckStorage/**",
+    "Packages/ArkDeckKit/Tests/ArkDeckStorageTests/**",
+    "openspec/changes/chg-2026-002-macos-m1-infrastructure/evidence/**"
+  ],
+  "forbiddenPaths": [
+    "openspec/constitution.md",
+    "openspec/specs/**",
+    "openspec/contracts/**",
+    "openspec/baselines/**"
+  ],
+  "exclusiveResources": [
+    "arkdeck-resource:host-volume:m1-fixture-volume"
+  ],
+  "risk": "high",
+  "executionEnvironment": "standardAgent",
+  "runtimeCapabilities": [
+    "repositoryProcess"
+  ],
+  "hardwareRequirement": "none",
+  "deliverables": [
+    "Session directory/manifest store with immutable raw artifacts and rebuildable derived artifacts.",
+    "Per-volume admission with metadata headroom, heavy-writer serialization and claim accounting.",
+    "ENOSPC and volume-removal handling that finalizes partial state without fabricating success."
+  ],
+  "verification": [
+    {
+      "acceptanceId": "AC-ART-001-01",
+      "testId": "TEST-AC-ART-001-01",
+      "method": "artifactContract",
+      "expectedEvidence": "Every GIVEN/WHEN/THEN/AND clause of openspec/specs/session-artifact-storage/spec.md#AC-ART-001-01 is observed and recorded without restatement or weakening.",
+      "minimumEvidence": "contract",
+      "fixtureRefs": []
+    },
+    {
+      "acceptanceId": "AC-ART-002-01",
+      "testId": "TEST-AC-ART-002-01",
+      "method": "artifactProperty",
+      "expectedEvidence": "Every GIVEN/WHEN/THEN/AND clause of openspec/specs/session-artifact-storage/spec.md#AC-ART-002-01 is observed and recorded without restatement or weakening.",
+      "minimumEvidence": "contract",
+      "fixtureRefs": []
+    },
+    {
+      "acceptanceId": "AC-ART-003-01",
+      "testId": "TEST-AC-ART-003-01",
+      "method": "faultInjection",
+      "expectedEvidence": "Every GIVEN/WHEN/THEN/AND clause of openspec/specs/session-artifact-storage/spec.md#AC-ART-003-01 is observed and recorded without restatement or weakening.",
+      "minimumEvidence": "contract",
+      "fixtureRefs": []
+    },
+    {
+      "acceptanceId": "AC-ART-004-01",
+      "testId": "TEST-AC-ART-004-01",
+      "method": "manifestSchemaContract",
+      "expectedEvidence": "Every GIVEN/WHEN/THEN/AND clause of openspec/specs/session-artifact-storage/spec.md#AC-ART-004-01 is observed and recorded without restatement or weakening.",
+      "minimumEvidence": "contract",
+      "fixtureRefs": []
+    },
+    {
+      "acceptanceId": "AC-ART-005-01",
+      "testId": "TEST-AC-ART-005-01",
+      "method": "storageContract",
+      "expectedEvidence": "Every GIVEN/WHEN/THEN/AND clause of openspec/specs/session-artifact-storage/spec.md#AC-ART-005-01 is observed and recorded without restatement or weakening.",
+      "minimumEvidence": "contract",
+      "fixtureRefs": []
+    },
+    {
+      "acceptanceId": "AC-ART-006-01",
+      "testId": "TEST-AC-ART-006-01",
+      "method": "privacyExportContract",
+      "expectedEvidence": "Every GIVEN/WHEN/THEN/AND clause of openspec/specs/session-artifact-storage/spec.md#AC-ART-006-01 is observed and recorded without restatement or weakening.",
+      "minimumEvidence": "platform",
+      "fixtureRefs": []
+    },
+    {
+      "acceptanceId": "AC-ART-006-02",
+      "testId": "TEST-AC-ART-006-02",
+      "method": "retentionPinContract",
+      "expectedEvidence": "Every GIVEN/WHEN/THEN/AND clause of openspec/specs/session-artifact-storage/spec.md#AC-ART-006-02 is observed and recorded without restatement or weakening.",
+      "minimumEvidence": "contract",
+      "fixtureRefs": []
+    },
+    {
+      "acceptanceId": "AC-STO-001-01",
+      "testId": "TEST-AC-STO-001-01",
+      "method": "volumeIdentityContract",
+      "expectedEvidence": "Every GIVEN/WHEN/THEN/AND clause of openspec/specs/session-artifact-storage/spec.md#AC-STO-001-01 is observed and recorded without restatement or weakening.",
+      "minimumEvidence": "platform",
+      "fixtureRefs": []
+    },
+    {
+      "acceptanceId": "AC-STO-002-01",
+      "testId": "TEST-AC-STO-002-01",
+      "method": "storageFaultInjection",
+      "expectedEvidence": "Every GIVEN/WHEN/THEN/AND clause of openspec/specs/session-artifact-storage/spec.md#AC-STO-002-01 is observed and recorded without restatement or weakening.",
+      "minimumEvidence": "contract",
+      "fixtureRefs": []
+    },
+    {
+      "acceptanceId": "AC-STO-003-01",
+      "testId": "TEST-AC-STO-003-01",
+      "method": "admissionConcurrencyProperty",
+      "expectedEvidence": "Every GIVEN/WHEN/THEN/AND clause of openspec/specs/session-artifact-storage/spec.md#AC-STO-003-01 is observed and recorded without restatement or weakening.",
+      "minimumEvidence": "contract",
+      "fixtureRefs": []
+    },
+    {
+      "acceptanceId": "AC-STO-004-01",
+      "testId": "TEST-AC-STO-004-01",
+      "method": "enospcFaultInjection",
+      "expectedEvidence": "Every GIVEN/WHEN/THEN/AND clause of openspec/specs/session-artifact-storage/spec.md#AC-STO-004-01 is observed and recorded without restatement or weakening.",
+      "minimumEvidence": "platform",
+      "fixtureRefs": []
+    },
+    {
+      "acceptanceId": "AC-STO-005-01",
+      "testId": "TEST-AC-STO-005-01",
+      "method": "volumeRecoveryFaultInjection",
+      "expectedEvidence": "Every GIVEN/WHEN/THEN/AND clause of openspec/specs/session-artifact-storage/spec.md#AC-STO-005-01 is observed and recorded without restatement or weakening.",
+      "minimumEvidence": "platform",
+      "fixtureRefs": []
+    },
+    {
+      "acceptanceId": "MAC-M1-STORE-001",
+      "testId": "TEST-MAC-M1-STORE-001",
+      "method": "Volume identity, storage admission and ENOSPC injection suite.",
+      "expectedEvidence": "Same-volume different-path claims share one budget, the second heavy writer waits or is rejected, metadata headroom survives external disk pressure, and runtime ENOSPC finalizes completed shards and fails closed.",
+      "minimumEvidence": "platform",
+      "fixtureRefs": []
+    }
+  ],
+  "stopConditions": [
+    "A raw artifact can be modified in place after publication.",
+    "Two heavy writers are admitted to one volume in MVP mode."
+  ]
+}

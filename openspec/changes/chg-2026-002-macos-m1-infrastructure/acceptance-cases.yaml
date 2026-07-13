@@ -1,0 +1,59 @@
+---
+schema_version: 1.0.0
+change_id: CHG-2026-002-macos-m1-infrastructure
+change_revision: 1
+platform: macos
+evidence_classes:
+- contract
+- parserGolden
+- platform
+- realHardware
+- manualReview
+cases:
+- acceptance_id: MAC-M1-DIAG-001
+  test_id: TEST-MAC-M1-DIAG-001
+  method: Unified Logging categories and bounded diagnostics export skeleton.
+  expected_source: openspec/changes/chg-2026-002-macos-m1-infrastructure/verification.md#MAC-M1-DIAG-001
+  minimum_evidence: platform
+  expected_result: Logs are categorized and redacted, structured diagnostics stay within their
+    rotation bounds, and the export bundle contains no device raw artifacts by default.
+- acceptance_id: MAC-M1-HDC-001
+  test_id: TEST-MAC-M1-HDC-001
+  method: Supervisor matrix against fake hdc executables as real child processes.
+  expected_source: openspec/changes/chg-2026-002-macos-m1-infrastructure/verification.md#MAC-M1-HDC-001
+  minimum_evidence: platform
+  expected_result: External/unknown server automatic lifecycle call count is 0, ownership/generation
+    transitions match the contract, endpoint isolation holds, and global server failure fans
+    out to every affected coordinator exactly once.
+- acceptance_id: MAC-M1-JOURNAL-001
+  test_id: TEST-MAC-M1-JOURNAL-001
+  method: Crash-window fault injection matrix on the macOS filesystem.
+  expected_source: openspec/changes/chg-2026-002-macos-m1-infrastructure/verification.md#MAC-M1-JOURNAL-001
+  minimum_evidence: platform
+  expected_result: Process kills before intent, after durable intent, after side effect and
+    before finalize each reconcile to the defined state; no destructive replay and every unknown
+    outcome is preserved as outcomeUnknown.
+- acceptance_id: MAC-M1-PORTS-001
+  test_id: TEST-MAC-M1-PORTS-001
+  method: macOS runtime Port contract suite (instance, activation, power, clocks, sleep/wake).
+  expected_source: openspec/changes/chg-2026-002-macos-m1-infrastructure/verification.md#MAC-M1-PORTS-001
+  minimum_evidence: platform
+  expected_result: 'Every Port case passes: exactly one writer, activation without lock takeover,
+    reference-counted power release on all terminal paths, sleep-aware clock semantics proven
+    by contract tests, and sleep/wake triggers journal plus reconcile.'
+- acceptance_id: MAC-M1-SIM-001
+  test_id: TEST-MAC-M1-SIM-001
+  method: SimulatedFlashProvider end-to-end orchestration run.
+  expected_source: openspec/changes/chg-2026-002-macos-m1-infrastructure/verification.md#MAC-M1-SIM-001
+  minimum_evidence: platform
+  expected_result: A simulated flash Job exercises journal, cancellation and reconcile with
+    zero real connectKey, zero external tool launches, and its manifest/evidence is persistently
+    classified simulated.
+- acceptance_id: MAC-M1-STORE-001
+  test_id: TEST-MAC-M1-STORE-001
+  method: Volume identity, storage admission and ENOSPC injection suite.
+  expected_source: openspec/changes/chg-2026-002-macos-m1-infrastructure/verification.md#MAC-M1-STORE-001
+  minimum_evidence: platform
+  expected_result: Same-volume different-path claims share one budget, the second heavy writer
+    waits or is rejected, metadata headroom survives external disk pressure, and runtime ENOSPC
+    finalizes completed shards and fails closed.

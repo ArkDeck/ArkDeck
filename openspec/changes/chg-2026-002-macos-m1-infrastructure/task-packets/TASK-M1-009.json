@@ -1,0 +1,109 @@
+{
+  "schemaVersion": "1.0.0",
+  "taskId": "TASK-M1-009",
+  "revision": 1,
+  "status": "draft",
+  "changeId": "CHG-2026-002-macos-m1-infrastructure",
+  "changeRevision": 1,
+  "approvalId": null,
+  "coreBaseline": {
+    "id": "CORE",
+    "version": "1.0.0",
+    "sha256": null
+  },
+  "platformProfile": {
+    "id": "PLATFORM-MACOS",
+    "version": "0.1.0",
+    "sha256": "54bd9b295799cb8d93bf397eeb585f24828463f4f1fce1e59a0693f65369d0bf"
+  },
+  "integrationProfiles": [
+    {
+      "id": "OPENHARMONY-TOOLS",
+      "version": "0.1.0",
+      "sha256": "679874cf44234a00b7e5d8f920e81c6b52ff489df2a2c8dd6f03b540c87a11e1"
+    }
+  ],
+  "conformanceSuite": {
+    "id": "CORE-CONFORMANCE-1.0.0",
+    "sha256": "015bcf9343ff91df9f66bdfec418287757f2d1a43c217bf0e9d430a8f99a4ba9"
+  },
+  "baseRevision": null,
+  "platform": "macos",
+  "objective": "Implement the diagnostics skeleton: categorized redacted logging and the bounded local diagnostics export.",
+  "requirementRefs": [
+    "PORT-LOGGING-001",
+    "REQ-DIAG-001",
+    "REQ-DIAG-002"
+  ],
+  "acceptanceRefs": [
+    "AC-DIAG-001-01",
+    "AC-DIAG-001-02",
+    "AC-DIAG-002-01",
+    "MAC-M1-DIAG-001"
+  ],
+  "dependsOn": [
+    "TASK-M1-001"
+  ],
+  "allowedPaths": [
+    "Packages/ArkDeckKit/Sources/ArkDeckRuntime/**",
+    "Packages/ArkDeckKit/Sources/ArkDeckStorage/**",
+    "Packages/ArkDeckKit/Tests/ArkDeckRuntimeTests/**",
+    "openspec/changes/chg-2026-002-macos-m1-infrastructure/evidence/**"
+  ],
+  "forbiddenPaths": [
+    "openspec/constitution.md",
+    "openspec/specs/**",
+    "openspec/contracts/**",
+    "openspec/baselines/**"
+  ],
+  "exclusiveResources": [],
+  "risk": "medium",
+  "executionEnvironment": "standardAgent",
+  "runtimeCapabilities": [
+    "repositoryProcess"
+  ],
+  "hardwareRequirement": "none",
+  "deliverables": [
+    "Unified Logging categories with privacy redaction for device IDs, paths and business strings.",
+    "Bounded, rotating structured diagnostics correlated to Job/Session.",
+    "User-triggered local export that excludes device raw artifacts by default."
+  ],
+  "verification": [
+    {
+      "acceptanceId": "AC-DIAG-001-01",
+      "testId": "TEST-AC-DIAG-001-01",
+      "method": "platformLogContract",
+      "expectedEvidence": "Every GIVEN/WHEN/THEN/AND clause of openspec/specs/desktop-ux-observability/spec.md#AC-DIAG-001-01 is observed and recorded without restatement or weakening.",
+      "minimumEvidence": "platform",
+      "fixtureRefs": []
+    },
+    {
+      "acceptanceId": "AC-DIAG-001-02",
+      "testId": "TEST-AC-DIAG-001-02",
+      "method": "diagnosticsRedactionContract",
+      "expectedEvidence": "Every GIVEN/WHEN/THEN/AND clause of openspec/specs/desktop-ux-observability/spec.md#AC-DIAG-001-02 is observed and recorded without restatement or weakening.",
+      "minimumEvidence": "platform",
+      "fixtureRefs": []
+    },
+    {
+      "acceptanceId": "AC-DIAG-002-01",
+      "testId": "TEST-AC-DIAG-002-01",
+      "method": "platformPrivacyContract",
+      "expectedEvidence": "Every GIVEN/WHEN/THEN/AND clause of openspec/specs/desktop-ux-observability/spec.md#AC-DIAG-002-01 is observed and recorded without restatement or weakening.",
+      "minimumEvidence": "platform",
+      "fixtureRefs": []
+    },
+    {
+      "acceptanceId": "MAC-M1-DIAG-001",
+      "testId": "TEST-MAC-M1-DIAG-001",
+      "method": "Unified Logging categories and bounded diagnostics export skeleton.",
+      "expectedEvidence": "Logs are categorized and redacted, structured diagnostics stay within their rotation bounds, and the export bundle contains no device raw artifacts by default.",
+      "minimumEvidence": "platform",
+      "fixtureRefs": []
+    }
+  ],
+  "stopConditions": [
+    "Any log or export path can leak an unredacted sensitive field.",
+    "Diagnostics storage can grow without bound."
+  ]
+}

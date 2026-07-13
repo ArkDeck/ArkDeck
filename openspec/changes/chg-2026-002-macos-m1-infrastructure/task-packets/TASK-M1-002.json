@@ -1,0 +1,92 @@
+{
+  "schemaVersion": "1.0.0",
+  "taskId": "TASK-M1-002",
+  "revision": 1,
+  "status": "draft",
+  "changeId": "CHG-2026-002-macos-m1-infrastructure",
+  "changeRevision": 1,
+  "approvalId": null,
+  "coreBaseline": {
+    "id": "CORE",
+    "version": "1.0.0",
+    "sha256": null
+  },
+  "platformProfile": {
+    "id": "PLATFORM-MACOS",
+    "version": "0.1.0",
+    "sha256": "54bd9b295799cb8d93bf397eeb585f24828463f4f1fce1e59a0693f65369d0bf"
+  },
+  "integrationProfiles": [
+    {
+      "id": "OPENHARMONY-TOOLS",
+      "version": "0.1.0",
+      "sha256": "679874cf44234a00b7e5d8f920e81c6b52ff489df2a2c8dd6f03b540c87a11e1"
+    }
+  ],
+  "conformanceSuite": {
+    "id": "CORE-CONFORMANCE-1.0.0",
+    "sha256": "015bcf9343ff91df9f66bdfec418287757f2d1a43c217bf0e9d430a8f99a4ba9"
+  },
+  "baseRevision": null,
+  "platform": "macos",
+  "objective": "Implement the production ProcessExecutor with semantic result classification and bounded streaming.",
+  "requirementRefs": [
+    "PORT-PROCESS-001",
+    "REQ-JOB-005",
+    "REQ-NFR-002"
+  ],
+  "acceptanceRefs": [
+    "AC-JOB-005-01",
+    "AC-NFR-002-01"
+  ],
+  "dependsOn": [
+    "TASK-M1-001"
+  ],
+  "allowedPaths": [
+    "Packages/ArkDeckKit/Sources/ArkDeckProcess/**",
+    "Packages/ArkDeckKit/Tests/ArkDeckProcessTests/**",
+    "Packages/ArkDeckKit/Tests/Fixtures/**",
+    "openspec/changes/chg-2026-002-macos-m1-infrastructure/evidence/**"
+  ],
+  "forbiddenPaths": [
+    "openspec/constitution.md",
+    "openspec/specs/**",
+    "openspec/contracts/**",
+    "openspec/baselines/**"
+  ],
+  "exclusiveResources": [],
+  "risk": "medium",
+  "executionEnvironment": "standardAgent",
+  "runtimeCapabilities": [
+    "repositoryProcess",
+    "externalToolExecution"
+  ],
+  "hardwareRequirement": "none",
+  "deliverables": [
+    "argv-array process launch with streamed, byte-safe stdout/stderr and timeout/cancel policies.",
+    "Semantic result layer that never equates exit 0 with success for known failure text.",
+    "Streaming large-output fixtures with bounded memory assertions."
+  ],
+  "verification": [
+    {
+      "acceptanceId": "AC-JOB-005-01",
+      "testId": "TEST-AC-JOB-005-01",
+      "method": "processContract",
+      "expectedEvidence": "Every GIVEN/WHEN/THEN/AND clause of openspec/specs/workflow-journal-recovery/spec.md#AC-JOB-005-01 is observed and recorded without restatement or weakening.",
+      "minimumEvidence": "contract",
+      "fixtureRefs": []
+    },
+    {
+      "acceptanceId": "AC-NFR-002-01",
+      "testId": "TEST-AC-NFR-002-01",
+      "method": "boundedMemoryContract",
+      "expectedEvidence": "Every GIVEN/WHEN/THEN/AND clause of openspec/specs/workflow-journal-recovery/spec.md#AC-NFR-002-01 is observed and recorded without restatement or weakening.",
+      "minimumEvidence": "platform",
+      "fixtureRefs": []
+    }
+  ],
+  "stopConditions": [
+    "Any code path builds a host shell command string.",
+    "Output handling loads an unbounded stream into memory."
+  ]
+}

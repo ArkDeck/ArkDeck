@@ -1,0 +1,164 @@
+{
+  "schemaVersion": "1.0.0",
+  "taskId": "TASK-M1-001",
+  "revision": 1,
+  "status": "draft",
+  "changeId": "CHG-2026-002-macos-m1-infrastructure",
+  "changeRevision": 1,
+  "approvalId": null,
+  "coreBaseline": {
+    "id": "CORE",
+    "version": "1.0.0",
+    "sha256": null
+  },
+  "platformProfile": {
+    "id": "PLATFORM-MACOS",
+    "version": "0.1.0",
+    "sha256": "54bd9b295799cb8d93bf397eeb585f24828463f4f1fce1e59a0693f65369d0bf"
+  },
+  "integrationProfiles": [
+    {
+      "id": "OPENHARMONY-TOOLS",
+      "version": "0.1.0",
+      "sha256": "679874cf44234a00b7e5d8f920e81c6b52ff489df2a2c8dd6f03b540c87a11e1"
+    }
+  ],
+  "conformanceSuite": {
+    "id": "CORE-CONFORMANCE-1.0.0",
+    "sha256": "015bcf9343ff91df9f66bdfec418287757f2d1a43c217bf0e9d430a8f99a4ba9"
+  },
+  "baseRevision": null,
+  "platform": "macos",
+  "objective": "Implement ArkDeckCore domain models, the closed typed-step registry decode and the Job state machines with property tests.",
+  "requirementRefs": [
+    "POL-SAFETY-001",
+    "POL-WORKFLOW-001",
+    "REQ-WF-001",
+    "REQ-WF-002",
+    "REQ-JOB-001",
+    "REQ-JOB-003",
+    "REQ-JOB-004"
+  ],
+  "acceptanceRefs": [
+    "AC-WF-001-01",
+    "AC-WF-002-01",
+    "AC-JOB-001-01",
+    "AC-JOB-001-02",
+    "AC-JOB-001-03",
+    "AC-JOB-001-04",
+    "AC-JOB-001-05",
+    "AC-JOB-001-06",
+    "AC-JOB-003-01",
+    "AC-JOB-004-01"
+  ],
+  "dependsOn": [],
+  "allowedPaths": [
+    "Packages/ArkDeckKit/Sources/ArkDeckCore/**",
+    "Packages/ArkDeckKit/Tests/ArkDeckCoreTests/**",
+    "openspec/changes/chg-2026-002-macos-m1-infrastructure/evidence/**"
+  ],
+  "forbiddenPaths": [
+    "openspec/constitution.md",
+    "openspec/specs/**",
+    "openspec/contracts/**",
+    "openspec/baselines/**"
+  ],
+  "exclusiveResources": [],
+  "risk": "medium",
+  "executionEnvironment": "standardAgent",
+  "runtimeCapabilities": [
+    "repositoryProcess"
+  ],
+  "hardwareRequirement": "none",
+  "deliverables": [
+    "Closed WorkflowStep decode that rejects unknown kinds as destructive/unsupported.",
+    "Job/terminal state machines with the exact Core transition graph and property tests.",
+    "Compensation ordering that preserves the original failure classification."
+  ],
+  "verification": [
+    {
+      "acceptanceId": "AC-WF-001-01",
+      "testId": "TEST-AC-WF-001-01",
+      "method": "workflowSchemaContract",
+      "expectedEvidence": "Every GIVEN/WHEN/THEN/AND clause of openspec/specs/workflow-journal-recovery/spec.md#AC-WF-001-01 is observed and recorded without restatement or weakening.",
+      "minimumEvidence": "contract",
+      "fixtureRefs": []
+    },
+    {
+      "acceptanceId": "AC-WF-002-01",
+      "testId": "TEST-AC-WF-002-01",
+      "method": "effectLatticeProperty",
+      "expectedEvidence": "Every GIVEN/WHEN/THEN/AND clause of openspec/specs/workflow-journal-recovery/spec.md#AC-WF-002-01 is observed and recorded without restatement or weakening.",
+      "minimumEvidence": "contract",
+      "fixtureRefs": []
+    },
+    {
+      "acceptanceId": "AC-JOB-001-01",
+      "testId": "TEST-AC-JOB-001-01",
+      "method": "stateMachineProperty",
+      "expectedEvidence": "Every GIVEN/WHEN/THEN/AND clause of openspec/specs/workflow-journal-recovery/spec.md#AC-JOB-001-01 is observed and recorded without restatement or weakening.",
+      "minimumEvidence": "contract",
+      "fixtureRefs": []
+    },
+    {
+      "acceptanceId": "AC-JOB-001-02",
+      "testId": "TEST-AC-JOB-001-02",
+      "method": "stateMachineProperty",
+      "expectedEvidence": "Every GIVEN/WHEN/THEN/AND clause of openspec/specs/workflow-journal-recovery/spec.md#AC-JOB-001-02 is observed and recorded without restatement or weakening.",
+      "minimumEvidence": "contract",
+      "fixtureRefs": []
+    },
+    {
+      "acceptanceId": "AC-JOB-001-03",
+      "testId": "TEST-AC-JOB-001-03",
+      "method": "recoveryFaultInjection",
+      "expectedEvidence": "Every GIVEN/WHEN/THEN/AND clause of openspec/specs/workflow-journal-recovery/spec.md#AC-JOB-001-03 is observed and recorded without restatement or weakening.",
+      "minimumEvidence": "contract",
+      "fixtureRefs": []
+    },
+    {
+      "acceptanceId": "AC-JOB-001-04",
+      "testId": "TEST-AC-JOB-001-04",
+      "method": "stateMachineProperty",
+      "expectedEvidence": "Every GIVEN/WHEN/THEN/AND clause of openspec/specs/workflow-journal-recovery/spec.md#AC-JOB-001-04 is observed and recorded without restatement or weakening.",
+      "minimumEvidence": "contract",
+      "fixtureRefs": []
+    },
+    {
+      "acceptanceId": "AC-JOB-001-05",
+      "testId": "TEST-AC-JOB-001-05",
+      "method": "recoveryFaultInjection",
+      "expectedEvidence": "Every GIVEN/WHEN/THEN/AND clause of openspec/specs/workflow-journal-recovery/spec.md#AC-JOB-001-05 is observed and recorded without restatement or weakening.",
+      "minimumEvidence": "contract",
+      "fixtureRefs": []
+    },
+    {
+      "acceptanceId": "AC-JOB-001-06",
+      "testId": "TEST-AC-JOB-001-06",
+      "method": "cancellationContract",
+      "expectedEvidence": "Every GIVEN/WHEN/THEN/AND clause of openspec/specs/workflow-journal-recovery/spec.md#AC-JOB-001-06 is observed and recorded without restatement or weakening.",
+      "minimumEvidence": "contract",
+      "fixtureRefs": []
+    },
+    {
+      "acceptanceId": "AC-JOB-003-01",
+      "testId": "TEST-AC-JOB-003-01",
+      "method": "criticalCancellationContract",
+      "expectedEvidence": "Every GIVEN/WHEN/THEN/AND clause of openspec/specs/workflow-journal-recovery/spec.md#AC-JOB-003-01 is observed and recorded without restatement or weakening.",
+      "minimumEvidence": "contract",
+      "fixtureRefs": []
+    },
+    {
+      "acceptanceId": "AC-JOB-004-01",
+      "testId": "TEST-AC-JOB-004-01",
+      "method": "compensationFaultInjection",
+      "expectedEvidence": "Every GIVEN/WHEN/THEN/AND clause of openspec/specs/workflow-journal-recovery/spec.md#AC-JOB-004-01 is observed and recorded without restatement or weakening.",
+      "minimumEvidence": "contract",
+      "fixtureRefs": []
+    }
+  ],
+  "stopConditions": [
+    "Any typed-step kind can be decoded below its Core minimum effect.",
+    "A terminal state can be re-entered or folded into another terminal state."
+  ]
+}

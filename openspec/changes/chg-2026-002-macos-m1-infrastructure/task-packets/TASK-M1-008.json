@@ -1,0 +1,90 @@
+{
+  "schemaVersion": "1.0.0",
+  "taskId": "TASK-M1-008",
+  "revision": 1,
+  "status": "draft",
+  "changeId": "CHG-2026-002-macos-m1-infrastructure",
+  "changeRevision": 1,
+  "approvalId": null,
+  "coreBaseline": {
+    "id": "CORE",
+    "version": "1.0.0",
+    "sha256": null
+  },
+  "platformProfile": {
+    "id": "PLATFORM-MACOS",
+    "version": "0.1.0",
+    "sha256": "54bd9b295799cb8d93bf397eeb585f24828463f4f1fce1e59a0693f65369d0bf"
+  },
+  "integrationProfiles": [
+    {
+      "id": "OPENHARMONY-TOOLS",
+      "version": "0.1.0",
+      "sha256": "679874cf44234a00b7e5d8f920e81c6b52ff489df2a2c8dd6f03b540c87a11e1"
+    }
+  ],
+  "conformanceSuite": {
+    "id": "CORE-CONFORMANCE-1.0.0",
+    "sha256": "015bcf9343ff91df9f66bdfec418287757f2d1a43c217bf0e9d430a8f99a4ba9"
+  },
+  "baseRevision": null,
+  "platform": "macos",
+  "objective": "Implement the SimulatedFlashProvider harness with strict isolation and persistent simulated classification.",
+  "requirementRefs": [
+    "POL-MODE-001",
+    "REQ-FLASH-006"
+  ],
+  "acceptanceRefs": [
+    "AC-FLASH-006-01",
+    "MAC-M1-SIM-001"
+  ],
+  "dependsOn": [
+    "TASK-M1-003",
+    "TASK-M1-007"
+  ],
+  "allowedPaths": [
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/**",
+    "Packages/ArkDeckKit/Tests/ArkDeckWorkflowsTests/**",
+    "openspec/changes/chg-2026-002-macos-m1-infrastructure/evidence/**"
+  ],
+  "forbiddenPaths": [
+    "openspec/constitution.md",
+    "openspec/specs/**",
+    "openspec/contracts/**",
+    "openspec/baselines/**"
+  ],
+  "exclusiveResources": [],
+  "risk": "medium",
+  "executionEnvironment": "standardAgent",
+  "runtimeCapabilities": [
+    "repositoryProcess"
+  ],
+  "hardwareRequirement": "none",
+  "deliverables": [
+    "Synthetic-device provider with configurable delay/failure/disconnect/outcomeUnknown scenarios.",
+    "Isolation proofs: no real connectKey acceptance and no external tool launches.",
+    "Simulated evidence classification that can never enter the hardware support matrix."
+  ],
+  "verification": [
+    {
+      "acceptanceId": "AC-FLASH-006-01",
+      "testId": "TEST-AC-FLASH-006-01",
+      "method": "simulationIsolationContract",
+      "expectedEvidence": "Every GIVEN/WHEN/THEN/AND clause of openspec/specs/flashing/spec.md#AC-FLASH-006-01 is observed and recorded without restatement or weakening.",
+      "minimumEvidence": "contract",
+      "fixtureRefs": []
+    },
+    {
+      "acceptanceId": "MAC-M1-SIM-001",
+      "testId": "TEST-MAC-M1-SIM-001",
+      "method": "SimulatedFlashProvider end-to-end orchestration run.",
+      "expectedEvidence": "A simulated flash Job exercises journal, cancellation and reconcile with zero real connectKey, zero external tool launches, and its manifest/evidence is persistently classified simulated.",
+      "minimumEvidence": "platform",
+      "fixtureRefs": []
+    }
+  ],
+  "stopConditions": [
+    "The simulated provider can receive a real binding or process executor.",
+    "A simulated run is recordable as real-hardware evidence."
+  ]
+}

@@ -1,0 +1,229 @@
+{
+  "schemaVersion": "1.0.0",
+  "taskId": "TASK-M1-006",
+  "revision": 1,
+  "status": "draft",
+  "changeId": "CHG-2026-002-macos-m1-infrastructure",
+  "changeRevision": 1,
+  "approvalId": null,
+  "coreBaseline": {
+    "id": "CORE",
+    "version": "1.0.0",
+    "sha256": null
+  },
+  "platformProfile": {
+    "id": "PLATFORM-MACOS",
+    "version": "0.1.0",
+    "sha256": "54bd9b295799cb8d93bf397eeb585f24828463f4f1fce1e59a0693f65369d0bf"
+  },
+  "integrationProfiles": [
+    {
+      "id": "OPENHARMONY-TOOLS",
+      "version": "0.1.0",
+      "sha256": "679874cf44234a00b7e5d8f920e81c6b52ff489df2a2c8dd6f03b540c87a11e1"
+    }
+  ],
+  "conformanceSuite": {
+    "id": "CORE-CONFORMANCE-1.0.0",
+    "sha256": "015bcf9343ff91df9f66bdfec418287757f2d1a43c217bf0e9d430a8f99a4ba9"
+  },
+  "baseRevision": null,
+  "platform": "macos",
+  "objective": "Implement the host-wide HDC server supervisor, endpoint isolation, authorization workflow and channel-protection independence against fake hdc executables.",
+  "requirementRefs": [
+    "POL-HDC-001",
+    "REQ-HDC-001",
+    "REQ-HDC-002",
+    "REQ-HDC-003",
+    "REQ-HDC-004",
+    "REQ-HDC-005",
+    "REQ-HDC-006",
+    "REQ-HDC-007",
+    "REQ-HDC-008",
+    "REQ-HDC-009",
+    "REQ-HDC-010"
+  ],
+  "acceptanceRefs": [
+    "AC-HDC-001-01",
+    "AC-HDC-001-02",
+    "AC-HDC-002-01",
+    "AC-HDC-003-01",
+    "AC-HDC-003-02",
+    "AC-HDC-004-01",
+    "AC-HDC-005-01",
+    "AC-HDC-006-01",
+    "AC-HDC-007-01",
+    "AC-HDC-007-02",
+    "AC-HDC-008-01",
+    "AC-HDC-009-01",
+    "AC-HDC-010-01",
+    "AC-HDC-010-02",
+    "AC-HDC-010-03",
+    "MAC-M1-HDC-001"
+  ],
+  "dependsOn": [
+    "TASK-M1-002",
+    "TASK-M1-003"
+  ],
+  "allowedPaths": [
+    "Packages/ArkDeckKit/Sources/ArkDeckOpenHarmony/**",
+    "Packages/ArkDeckKit/Tests/ArkDeckOpenHarmonyTests/**",
+    "Packages/ArkDeckKit/Tests/Fixtures/**",
+    "openspec/changes/chg-2026-002-macos-m1-infrastructure/evidence/**"
+  ],
+  "forbiddenPaths": [
+    "openspec/constitution.md",
+    "openspec/specs/**",
+    "openspec/contracts/**",
+    "openspec/baselines/**"
+  ],
+  "exclusiveResources": [
+    "arkdeck-resource:hdc-server:m1-fake-endpoint"
+  ],
+  "risk": "high",
+  "executionEnvironment": "standardAgent",
+  "runtimeCapabilities": [
+    "repositoryProcess",
+    "externalToolExecution"
+  ],
+  "hardwareRequirement": "none",
+  "deliverables": [
+    "Supervisor with ownership/generation model that never auto-kills external/unknown servers.",
+    "Unauthorized-device workflow with bounded polling and no implicit server restart.",
+    "Authorization/channel-protection independence and version mismatchUnverified handling."
+  ],
+  "verification": [
+    {
+      "acceptanceId": "AC-HDC-001-01",
+      "testId": "TEST-AC-HDC-001-01",
+      "method": "toolchainContract",
+      "expectedEvidence": "Every GIVEN/WHEN/THEN/AND clause of openspec/specs/toolchain-hdc-server/spec.md#AC-HDC-001-01 is observed and recorded without restatement or weakening.",
+      "minimumEvidence": "contract",
+      "fixtureRefs": []
+    },
+    {
+      "acceptanceId": "AC-HDC-001-02",
+      "testId": "TEST-AC-HDC-001-02",
+      "method": "toolchainDiagnosticsContract",
+      "expectedEvidence": "Every GIVEN/WHEN/THEN/AND clause of openspec/specs/toolchain-hdc-server/spec.md#AC-HDC-001-02 is observed and recorded without restatement or weakening.",
+      "minimumEvidence": "platform",
+      "fixtureRefs": []
+    },
+    {
+      "acceptanceId": "AC-HDC-002-01",
+      "testId": "TEST-AC-HDC-002-01",
+      "method": "supervisorContract",
+      "expectedEvidence": "Every GIVEN/WHEN/THEN/AND clause of openspec/specs/toolchain-hdc-server/spec.md#AC-HDC-002-01 is observed and recorded without restatement or weakening.",
+      "minimumEvidence": "contract",
+      "fixtureRefs": []
+    },
+    {
+      "acceptanceId": "AC-HDC-003-01",
+      "testId": "TEST-AC-HDC-003-01",
+      "method": "lifecycleCallCounter",
+      "expectedEvidence": "Every GIVEN/WHEN/THEN/AND clause of openspec/specs/toolchain-hdc-server/spec.md#AC-HDC-003-01 is observed and recorded without restatement or weakening.",
+      "minimumEvidence": "contract",
+      "fixtureRefs": []
+    },
+    {
+      "acceptanceId": "AC-HDC-003-02",
+      "testId": "TEST-AC-HDC-003-02",
+      "method": "ownershipEvidenceContract",
+      "expectedEvidence": "Every GIVEN/WHEN/THEN/AND clause of openspec/specs/toolchain-hdc-server/spec.md#AC-HDC-003-02 is observed and recorded without restatement or weakening.",
+      "minimumEvidence": "contract",
+      "fixtureRefs": []
+    },
+    {
+      "acceptanceId": "AC-HDC-004-01",
+      "testId": "TEST-AC-HDC-004-01",
+      "method": "endpointIsolationContract",
+      "expectedEvidence": "Every GIVEN/WHEN/THEN/AND clause of openspec/specs/toolchain-hdc-server/spec.md#AC-HDC-004-01 is observed and recorded without restatement or weakening.",
+      "minimumEvidence": "platform",
+      "fixtureRefs": []
+    },
+    {
+      "acceptanceId": "AC-HDC-005-01",
+      "testId": "TEST-AC-HDC-005-01",
+      "method": "adapterGolden",
+      "expectedEvidence": "Every GIVEN/WHEN/THEN/AND clause of openspec/specs/toolchain-hdc-server/spec.md#AC-HDC-005-01 is observed and recorded without restatement or weakening.",
+      "minimumEvidence": "parserGolden",
+      "fixtureRefs": []
+    },
+    {
+      "acceptanceId": "AC-HDC-006-01",
+      "testId": "TEST-AC-HDC-006-01",
+      "method": "platformFileAccessContract",
+      "expectedEvidence": "Every GIVEN/WHEN/THEN/AND clause of openspec/specs/toolchain-hdc-server/spec.md#AC-HDC-006-01 is observed and recorded without restatement or weakening.",
+      "minimumEvidence": "platform",
+      "fixtureRefs": []
+    },
+    {
+      "acceptanceId": "AC-HDC-007-01",
+      "testId": "TEST-AC-HDC-007-01",
+      "method": "authorizationWorkflowContract",
+      "expectedEvidence": "Every GIVEN/WHEN/THEN/AND clause of openspec/specs/toolchain-hdc-server/spec.md#AC-HDC-007-01 is observed and recorded without restatement or weakening.",
+      "minimumEvidence": "contract",
+      "fixtureRefs": []
+    },
+    {
+      "acceptanceId": "AC-HDC-007-02",
+      "testId": "TEST-AC-HDC-007-02",
+      "method": "authorizationFaultInjection",
+      "expectedEvidence": "Every GIVEN/WHEN/THEN/AND clause of openspec/specs/toolchain-hdc-server/spec.md#AC-HDC-007-02 is observed and recorded without restatement or weakening.",
+      "minimumEvidence": "contract",
+      "fixtureRefs": []
+    },
+    {
+      "acceptanceId": "AC-HDC-008-01",
+      "testId": "TEST-AC-HDC-008-01",
+      "method": "securityStateContract",
+      "expectedEvidence": "Every GIVEN/WHEN/THEN/AND clause of openspec/specs/toolchain-hdc-server/spec.md#AC-HDC-008-01 is observed and recorded without restatement or weakening.",
+      "minimumEvidence": "contract",
+      "fixtureRefs": []
+    },
+    {
+      "acceptanceId": "AC-HDC-009-01",
+      "testId": "TEST-AC-HDC-009-01",
+      "method": "subserverCallCounter",
+      "expectedEvidence": "Every GIVEN/WHEN/THEN/AND clause of openspec/specs/toolchain-hdc-server/spec.md#AC-HDC-009-01 is observed and recorded without restatement or weakening.",
+      "minimumEvidence": "contract",
+      "fixtureRefs": []
+    },
+    {
+      "acceptanceId": "AC-HDC-010-01",
+      "testId": "TEST-AC-HDC-010-01",
+      "method": "lifecycleCriticalGateContract",
+      "expectedEvidence": "Every GIVEN/WHEN/THEN/AND clause of openspec/specs/toolchain-hdc-server/spec.md#AC-HDC-010-01 is observed and recorded without restatement or weakening.",
+      "minimumEvidence": "contract",
+      "fixtureRefs": []
+    },
+    {
+      "acceptanceId": "AC-HDC-010-02",
+      "testId": "TEST-AC-HDC-010-02",
+      "method": "lifecycleAuditContract",
+      "expectedEvidence": "Every GIVEN/WHEN/THEN/AND clause of openspec/specs/toolchain-hdc-server/spec.md#AC-HDC-010-02 is observed and recorded without restatement or weakening.",
+      "minimumEvidence": "contract",
+      "fixtureRefs": []
+    },
+    {
+      "acceptanceId": "AC-HDC-010-03",
+      "testId": "TEST-AC-HDC-010-03",
+      "method": "lifecycleRaceFaultInjection",
+      "expectedEvidence": "Every GIVEN/WHEN/THEN/AND clause of openspec/specs/toolchain-hdc-server/spec.md#AC-HDC-010-03 is observed and recorded without restatement or weakening.",
+      "minimumEvidence": "contract",
+      "fixtureRefs": []
+    },
+    {
+      "acceptanceId": "MAC-M1-HDC-001",
+      "testId": "TEST-MAC-M1-HDC-001",
+      "method": "Supervisor matrix against fake hdc executables as real child processes.",
+      "expectedEvidence": "External/unknown server automatic lifecycle call count is 0, ownership/generation transitions match the contract, endpoint isolation holds, and global server failure fans out to every affected coordinator exactly once.",
+      "minimumEvidence": "platform",
+      "fixtureRefs": []
+    }
+  ],
+  "stopConditions": [
+    "Any automatic path issues kill/kill -r/start -r/killall-sub against an external server.",
+    "Authorization success is presented as channel encryption."
+  ]
+}
