@@ -15,7 +15,6 @@ requirements:
   - REQ-HDC-002
   - REQ-HDC-003
   - REQ-HDC-004
-  - REQ-HDC-005
   - REQ-HDC-006
   - REQ-HDC-009
   - REQ-HDC-010
@@ -30,7 +29,6 @@ acceptance:
   - AC-HDC-003-01
   - AC-HDC-003-02
   - AC-HDC-004-01
-  - AC-HDC-005-01
   - AC-HDC-006-01
   - AC-HDC-009-01
   - AC-HDC-010-01

@@ -2,14 +2,14 @@
   "schemaVersion": "1.0.0",
   "taskId": "TASK-M0A-006",
   "revision": 1,
-  "status": "draft",
+  "status": "ready",
   "changeId": "CHG-2026-001-macos-m0a",
   "changeRevision": 1,
-  "approvalId": null,
+  "approvalId": "APR-TASK-M0A-006-R1",
   "coreBaseline": {
     "id": "CORE",
     "version": "1.0.0",
-    "sha256": null
+    "sha256": "adc03fa950c2eb4758d14c63985ce0b318b00dbbcb91006e0d18b0400b73252a"
   },
   "platformProfile": {
     "id": "PLATFORM-MACOS",
@@ -27,7 +27,7 @@
     "id": "CORE-CONFORMANCE-1.0.0",
     "sha256": "2e5a51bf78afc2e15a8cd989c9381fcc2ac2b7cce370c2bc545767df06419aa2"
   },
-  "baseRevision": null,
+  "baseRevision": "e56fea2983192a96e394783021bf2026b75527db",
   "platform": "macos",
   "objective": "Produce the M0A distribution ADR from complete, hash-indexed evidence without changing Core behavior.",
   "requirementRefs": [

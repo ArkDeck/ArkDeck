@@ -1,0 +1,18 @@
+{
+ "schemaVersion": "1.0.0",
+ "approvalId": "APR-CHANGE-CHG-2026-001-MACOS-M0A-R1",
+ "subjectType": "change",
+ "subjectId": "CHG-2026-001-macos-m0a",
+ "subjectRevision": 1,
+ "subjectSha256": "057cc566072a02b932a04c98a936321b6a779f50fe32ccf64ca47b7a2dbc84d4",
+ "baseRevision": "e56fea2983192a96e394783021bf2026b75527db",
+ "decision": "approved",
+ "approver": {
+  "kind": "human",
+  "id": "lvye"
+ },
+ "approvedAt": "2026-07-13T06:49:45Z",
+ "mechanism": "detachedSignature",
+ "approvalRef": "arkdeck-trust:ORG-ARKDECK-ROOT-1:APR-CHANGE-CHG-2026-001-MACOS-M0A-R1",
+ "signature": "-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgWPCFmreJKa9U6soBBqsG4sOGV2\na++nxEurCvWqlZr7oAAAAQYXJrZGVjay1hcHByb3ZhbAAAAAAAAAAGc2hhNTEyAAAAUwAA\nAAtzc2gtZWQyNTUxOQAAAEB66bXAdu40+wTrObQRm/LFlihy4Qnw5gbb5VZLnrTX3o8nbZ\nIZ3Nz21bZ5hEun5KT3hcxmPjiu3JOXYo6F5uwL\n-----END SSH SIGNATURE-----\n"
+}

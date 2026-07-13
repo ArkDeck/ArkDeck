@@ -1,0 +1,18 @@
+{
+ "schemaVersion": "1.0.0",
+ "approvalId": "APR-TASK-M0A-003-R1",
+ "subjectType": "taskPacket",
+ "subjectId": "TASK-M0A-003",
+ "subjectRevision": 1,
+ "subjectSha256": "4a56e969c10f813d9665a7fd2d4728b56558eca06359cdbaa8835c30247fd0d1",
+ "baseRevision": "e56fea2983192a96e394783021bf2026b75527db",
+ "decision": "approved",
+ "approver": {
+  "kind": "human",
+  "id": "lvye"
+ },
+ "approvedAt": "2026-07-13T06:49:46Z",
+ "mechanism": "detachedSignature",
+ "approvalRef": "arkdeck-trust:ORG-ARKDECK-ROOT-1:APR-TASK-M0A-003-R1",
+ "signature": "-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgWPCFmreJKa9U6soBBqsG4sOGV2\na++nxEurCvWqlZr7oAAAAQYXJrZGVjay1hcHByb3ZhbAAAAAAAAAAGc2hhNTEyAAAAUwAA\nAAtzc2gtZWQyNTUxOQAAAECfe1RiH8KT0qnTY1DzehWEh22xG3qlNlNwwpSlbFsELNWy4x\nKgLHdC9I96yOrSnwFfZRU+ag4fxa4RYEBVW8EO\n-----END SSH SIGNATURE-----\n"
+}

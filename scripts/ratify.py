@@ -230,6 +230,29 @@ def cmd_axes(trust: Path, approver: str) -> None:
                    revision=1, base=base, approver=approver)
 
 
+def canonical_urn(kind: str, *parts: str) -> str:
+    """Canonical exclusive-resource URN per architecture/exclusive-resources.md."""
+    seed = {"hdc-server": "arkdeck-hdc-server-v1",
+            "device-binding": "arkdeck-device-binding-v1",
+            "host-volume": "arkdeck-host-volume-v1"}[kind]
+    digest = hashlib.sha256("\x00".join((seed, *parts)).encode("utf-8")).hexdigest()
+    return f"arkdeck-resource:{kind}:{digest}"
+
+
+# Ready packets must carry canonical sha256 URNs for shared host resources.
+# The canonical inputs (endpoint+generation / stable device identity+revision /
+# volume identity) are recorded here and must be reused verbatim by the claim
+# service when it issues the matching resourceIdentitySet attestation.
+CANONICAL_RESOURCES = {
+    "arkdeck-resource:hdc-server:isolated-m0a": canonical_urn("hdc-server", "127.0.0.1:19710", "1"),
+    "arkdeck-resource:hdc-server:m0a-trust-matrix": canonical_urn("hdc-server", "127.0.0.1:29710", "1"),
+    "arkdeck-resource:hdc-server:m0a-lab-endpoint": canonical_urn("hdc-server", "127.0.0.1:8710", "1"),
+    "arkdeck-resource:device-binding:m0a-usb-uart-tcp-hardware": canonical_urn("device-binding", "m0a-lab-device", "1"),
+    "arkdeck-resource:host-volume:m0a-trust-output": canonical_urn("host-volume", "m0a-trust-output-volume"),
+    "arkdeck-resource:host-volume:m0a-output-volume": canonical_urn("host-volume", "m0a-lab-output-volume"),
+}
+
+
 def cmd_change(trust: Path, approver: str, change_dir: str, base: str) -> None:
     change_root = ROOT / "openspec/changes" / change_dir
     change_id = change_dir.replace("chg-", "CHG-", 1)
@@ -259,6 +282,9 @@ def cmd_change(trust: Path, approver: str, change_dir: str, base: str) -> None:
         for pin in packet["integrationProfiles"]:
             pin["sha256"] = integration_hash[pin["id"]]
         packet["conformanceSuite"]["sha256"] = conformance_sha
+        packet["exclusiveResources"] = [
+            CANONICAL_RESOURCES.get(item, item) for item in packet["exclusiveResources"]
+        ]
         packet_path.write_text(json.dumps(packet, indent=2, ensure_ascii=False) + "\n",
                                encoding="utf-8")
 
@@ -268,7 +294,7 @@ def cmd_change(trust: Path, approver: str, change_dir: str, base: str) -> None:
         f"change_id: {change_id}",
         "revision: 1",
         "status: approved",
-        f"approval_id: APR-CHANGE-{change_id}-R1",
+        f"approval_id: APR-CHANGE-{change_id.upper()}-R1",
         "hash_algorithm: sha256",
         "files:",
     ]
@@ -280,7 +306,7 @@ def cmd_change(trust: Path, approver: str, change_dir: str, base: str) -> None:
     change_lock = change_root / "change-lock.yaml"
     change_lock.write_text("\n".join(lock_lines) + "\n", encoding="utf-8")
 
-    write_approval(trust, approval_id=f"APR-CHANGE-{change_id}-R1", subject=change_lock,
+    write_approval(trust, approval_id=f"APR-CHANGE-{change_id.upper()}-R1", subject=change_lock,
                    subject_type="change", subject_id=change_id, revision=1,
                    base=base, approver=approver)
     for packet_path in packets:

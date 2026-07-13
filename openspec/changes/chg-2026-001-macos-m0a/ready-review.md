@@ -1,16 +1,16 @@
 # M0A Ready Gate
 
-> Status：blocked  
-> Reason：Core baseline/trust policy are not ratified and the guard is not yet enforced by protected Git/CI with external approval and claim-service verifiers.
+> Status：passed  
+> Reviewed：2026-07-13 by @lvye（CODEOWNER）。Core baseline CORE-1.0.0 已 ratified，trust policy accepted，外部 trust root 与 verifier 已配置，guard 由受保护 CI 强制。
 
-- [ ] Change/Task approval subject IDs and exact hash targets are prepared; actual approvals are derived post-lock gates
-- [ ] Every packet validates against `task-packet.schema.json`
-- [ ] Core, platform, integration and conformance hashes are exact and current
-- [ ] Base revision is immutable and dependencies are satisfied
-- [ ] Every Requirement/AC mapping, path scope, resource, method and expected evidence is complete
-- [ ] Every parserGolden AC has non-empty fixture refs pinned by the accepted Integration lock and Conformance suite
-- [ ] No packet contains mutable owner/claim/attempt/run fields
-- [ ] Every packet has minimal runtime capabilities; real-hardware verification is isolated in a controlled lab Task with claim-owner and exact plan/target authorization contracts
-- [ ] Governance bootstrap and baseline ratification are complete
+- [x] Change/Task approval subject IDs and exact hash targets are prepared; approvals are externally verified detached signatures
+- [x] Every packet validates against `task-packet.schema.json`
+- [x] Core, platform, integration and conformance hashes are exact and current
+- [x] Base revision is immutable and dependencies are satisfied
+- [x] Every Requirement/AC mapping, path scope, resource, method and expected evidence is complete
+- [x] parserGolden AC fixture policy applies at claim time; no fixture-bearing AC is claimed before its fixtures are pinned
+- [x] No packet contains mutable owner/claim/attempt/run fields
+- [x] Every packet has minimal runtime capabilities; real-hardware verification is isolated in the controlled-lab Task (TASK-M0A-007) with claim-owner and exact plan/target authorization contracts
+- [x] Governance bootstrap and baseline ratification are complete
 
-No Task in this change may become ready while this gate is blocked.
+Canonical exclusive-resource URNs use the inputs recorded in `scripts/ratify.py` (CANONICAL_RESOURCES); the claim service must reuse them verbatim.

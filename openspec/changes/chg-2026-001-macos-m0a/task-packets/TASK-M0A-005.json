@@ -2,14 +2,14 @@
   "schemaVersion": "1.0.0",
   "taskId": "TASK-M0A-005",
   "revision": 1,
-  "status": "draft",
+  "status": "ready",
   "changeId": "CHG-2026-001-macos-m0a",
   "changeRevision": 1,
-  "approvalId": null,
+  "approvalId": "APR-TASK-M0A-005-R1",
   "coreBaseline": {
     "id": "CORE",
     "version": "1.0.0",
-    "sha256": null
+    "sha256": "adc03fa950c2eb4758d14c63985ce0b318b00dbbcb91006e0d18b0400b73252a"
   },
   "platformProfile": {
     "id": "PLATFORM-MACOS",
@@ -27,7 +27,7 @@
     "id": "CORE-CONFORMANCE-1.0.0",
     "sha256": "2e5a51bf78afc2e15a8cd989c9381fcc2ac2b7cce370c2bc545767df06419aa2"
   },
-  "baseRevision": null,
+  "baseRevision": "e56fea2983192a96e394783021bf2026b75527db",
   "platform": "macos",
   "objective": "Build the Sandbox/non-Sandbox prototypes, execute the host and clean-VM trust matrix, and freeze the exact read-only hardware-lab handoff plan.",
   "requirementRefs": [
@@ -71,8 +71,8 @@
   "exclusiveResources": [
     "arkdeck-resource:vm-snapshot:clean-macos-m0a",
     "arkdeck-resource:fixture:quarantined-hdc-m0a",
-    "arkdeck-resource:hdc-server:m0a-trust-matrix",
-    "arkdeck-resource:host-volume:m0a-trust-output"
+    "arkdeck-resource:hdc-server:ea9abc6f5b57e3f47bc1d423e8297e9bad47499d1dd620ae2b33bb8ba28135d3",
+    "arkdeck-resource:host-volume:68ff19f38d7818cfb3a00bcd729deb15d77e8c499e4731547ed095e524a2bcec"
   ],
   "risk": "high",
   "executionEnvironment": "standardAgent",

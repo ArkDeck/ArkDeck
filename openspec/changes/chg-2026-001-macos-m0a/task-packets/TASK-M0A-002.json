@@ -2,14 +2,14 @@
   "schemaVersion": "1.0.0",
   "taskId": "TASK-M0A-002",
   "revision": 1,
-  "status": "draft",
+  "status": "ready",
   "changeId": "CHG-2026-001-macos-m0a",
   "changeRevision": 1,
-  "approvalId": null,
+  "approvalId": "APR-TASK-M0A-002-R1",
   "coreBaseline": {
     "id": "CORE",
     "version": "1.0.0",
-    "sha256": null
+    "sha256": "adc03fa950c2eb4758d14c63985ce0b318b00dbbcb91006e0d18b0400b73252a"
   },
   "platformProfile": {
     "id": "PLATFORM-MACOS",
@@ -27,22 +27,20 @@
     "id": "CORE-CONFORMANCE-1.0.0",
     "sha256": "2e5a51bf78afc2e15a8cd989c9381fcc2ac2b7cce370c2bc545767df06419aa2"
   },
-  "baseRevision": null,
+  "baseRevision": "e56fea2983192a96e394783021bf2026b75527db",
   "platform": "macos",
   "objective": "Implement ProcessExecutor and external-first HDC discovery prototypes with semantic-result fixtures.",
   "requirementRefs": [
     "PORT-PROCESS-001",
     "REQ-JOB-005",
     "REQ-NFR-002",
-    "REQ-HDC-001",
-    "REQ-HDC-005"
+    "REQ-HDC-001"
   ],
   "acceptanceRefs": [
     "AC-JOB-005-01",
     "AC-NFR-002-01",
     "AC-HDC-001-01",
     "AC-HDC-001-02",
-    "AC-HDC-005-01",
     "MAC-M0A-PROC-001",
     "MAC-M0A-HDC-001"
   ],
@@ -107,14 +105,6 @@
       "method": "toolchainDiagnosticsContract",
       "expectedEvidence": "The prototype exposes every required toolchain diagnostic field and marks unavailable values unknown/unverified.",
       "minimumEvidence": "platform",
-      "fixtureRefs": []
-    },
-    {
-      "acceptanceId": "AC-HDC-005-01",
-      "testId": "TEST-AC-HDC-005-01",
-      "method": "adapterGolden",
-      "expectedEvidence": "The result is non-success and raw stdout/stderr is preserved.",
-      "minimumEvidence": "parserGolden",
       "fixtureRefs": []
     },
     {

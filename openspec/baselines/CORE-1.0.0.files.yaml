@@ -192,7 +192,7 @@ files:
 - path: scripts/ledger_snapshot.py
   sha256: 9eeabcd08af797a3598a8f9973fe957050db7aa7e0178cfb2433f8432f158f1f
 - path: scripts/ratify.py
-  sha256: ddf5c4b69af07645b69bf066ec7a92b2266c3b1d7fbfed27cafac69ce23fd8f5
+  sha256: 068f5f60deea746712d1443bc5e2eb5f7b9b674e1c16e735a12331f2a0b191b7
 - path: scripts/relock_baseline.py
   sha256: 0143eb0a1c6de8005197d63b2267f7e3aac66fd4732ee4273b9ca3ddec5437ab
 - path: scripts/requirements-sdd.txt

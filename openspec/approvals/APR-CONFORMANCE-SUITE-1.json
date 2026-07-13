@@ -5,13 +5,13 @@
  "subjectId": "CORE-CONFORMANCE-1.0.0",
  "subjectRevision": 1,
  "subjectSha256": "2e5a51bf78afc2e15a8cd989c9381fcc2ac2b7cce370c2bc545767df06419aa2",
- "baseRevision": "1aea225914bc4b2cbe559dec50503e3dc71bc486",
+ "baseRevision": "e56fea2983192a96e394783021bf2026b75527db",
  "decision": "approved",
  "approver": {
   "kind": "human",
   "id": "lvye"
  },
- "approvedAt": "2026-07-13T06:42:00Z",
+ "approvedAt": "2026-07-13T06:49:45Z",
  "mechanism": "detachedSignature",
  "approvalRef": "arkdeck-trust:ORG-ARKDECK-ROOT-1:APR-CONFORMANCE-SUITE-1",
  "signature": "-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgWPCFmreJKa9U6soBBqsG4sOGV2\na++nxEurCvWqlZr7oAAAAQYXJrZGVjay1hcHByb3ZhbAAAAAAAAAAGc2hhNTEyAAAAUwAA\nAAtzc2gtZWQyNTUxOQAAAEBX8VOa1yPEAmQOxYlRI46BV7hBRGY6//sMEaTkQzbg8IRpgX\nfTlHGmQpH7YshOySCO6djdYcsiZpAN0SHTX9oL\n-----END SSH SIGNATURE-----\n"
