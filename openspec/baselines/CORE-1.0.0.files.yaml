@@ -3,8 +3,10 @@ baseline: CORE-1.0.0
 status: candidate
 generated_at: '2026-07-13'
 hash_algorithm: sha256
-file_count: 86
+file_count: 92
 files:
+- path: .python-version
+  sha256: 3a55324cbeddc91df012407d051dad08c88624c95a82fbdb856728729fbd14ab
 - path: AGENTS.md
   sha256: 77a39f090196d4c74222bc0f51a8c78c570857a69825e78368051c48e6658222
 - path: openspec/README.md
@@ -70,7 +72,7 @@ files:
 - path: openspec/contracts/workflow-step.schema.json
   sha256: 624d61071070ec1f873a811307fe7eb39f7697c37a68ed3ef8fad774522d1688
 - path: openspec/governance/enforcement.md
-  sha256: 8800e945bc99d09061efa953721acdf5e2657427b28ebc7e1fb83e3c724f5d5e
+  sha256: 8ee7b8b8efa0c74585e1dcfce2c164633d13ae9b1124e824be3fff0f28170f54
 - path: openspec/governance/trust-policy.yaml
   sha256: 137d10ba0b9c038b968f96e8d600cdd0ae61cfb9708d8302add05a140f6d7b1e
 - path: openspec/governance/trust-root-bundle.example.yaml
@@ -166,14 +168,24 @@ files:
 - path: openspec/verification/policy.md
   sha256: 70c30ad420e1ad2dca4e26e1d697c53606b60aecfd77fc4f99a23b949371a393
 - path: scripts/check-json.py
-  sha256: 697cb022fba0e260d1a181818b4e76d520cb65000e704ed98d633583463d9ef1
-- path: scripts/check-sdd.rb
-  sha256: 2037e24427b8bcf1dc186f1764fa2543b065b514ceff37323d9ccc2a859dab5c
+  sha256: a285e2666a463b3ff083d346cd1117d630ca3ef52cc3cdb235f194aab2905262
 - path: scripts/check-sdd.sh
-  sha256: 3fd03af736a6def51dd8744581b516c4cb79c8e30fb60fcd2900bf66c4ae9485
-- path: scripts/guard-selftest.rb
-  sha256: d5ac34233839b81e0025610f6ffd50da0f63d618ba32f07b78e8542a1a69ae0c
-- path: scripts/relock-baseline.rb
-  sha256: fe12d2df273aaf71aab5d0dfdf5817af1e72a13c4507e5b770198b7a232b64d0
-- path: scripts/sdd-protected-set.rb
-  sha256: 4f99cc3c7094bf1fa8730ceaa75503a75a6787833967d26ba97349b652672885
+  sha256: 74eb493c0e0eec2a61e80885edeae94aefede6eec4747935b8314a654cd9bfe1
+- path: scripts/check_sdd.py
+  sha256: 4fcd9092db7f366caa0df83c90b06c91ce9ced4bf2cb4996af75b848958d75c3
+- path: scripts/guard_selftest.py
+  sha256: e3867201845897f3bbdc9cee3a60899f58d0f4555070ba0efb210eab606cf30d
+- path: scripts/relock_baseline.py
+  sha256: 0143eb0a1c6de8005197d63b2267f7e3aac66fd4732ee4273b9ca3ddec5437ab
+- path: scripts/requirements-sdd.txt
+  sha256: 0969da99a0bc2a1b71ed50584560f4588a37567ac63af3ddbaf3c4617ca5621a
+- path: scripts/sdd_guard_core.py
+  sha256: bb57a3e6b6b8fcabc660e8fc09f165bc7e420aa62dc4a0f0296eb0362b8bc2a5
+- path: scripts/sdd_guard_lifecycle.py
+  sha256: da8e684e260846766cd6ffb97ebac6c54161ca39a05c54c95832f6cca42a4d36
+- path: scripts/sdd_guard_release.py
+  sha256: 20ad8f38f5d8962fa16553d93673bcfe45039b509fe6b736086d2df663840f71
+- path: scripts/sdd_guard_support.py
+  sha256: 45a817a31b06bde1be7c9dea3ebb37dfcc6c770b7dd2bf5e20e810064989ebfb
+- path: scripts/sdd_protected_set.py
+  sha256: bfe9cb336cdc753177f2bf36a30aaf8714cdb29bf14ed9ea77deee8bcc9fa6b0

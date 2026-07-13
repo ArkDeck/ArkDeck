@@ -10,6 +10,12 @@ import sys
 from datetime import datetime
 from typing import Any
 
+from sdd_protected_set import require_sdd_runtime
+
+# The structural checks below only use the standard library, but the whole
+# SDD toolchain fails closed on an unpinned runtime (enforcement.md).
+require_sdd_runtime()
+
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 errors: list[str] = []
 RFC3339_DATE_TIME = re.compile(

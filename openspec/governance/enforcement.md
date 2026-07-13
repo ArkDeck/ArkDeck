@@ -46,12 +46,12 @@ Git 仓库已在 2026-07-13 的 one-time governance bootstrap 中初始化，`.g
 
 ## Candidate relock and guard self-test
 
-候选期（baseline 未 accepted、execution gate closed）内，protected 文件的任何编辑都必须随后运行 `scripts/relock-baseline.rb` 重生成 file manifest 并重钉 lock 内的 manifest hash，保证 `scripts/check-sdd.sh` 在每个 commit 上保持绿色；带着 hash mismatch 的树不得作为任何后续工作的基础。规则：
+候选期（baseline 未 accepted、execution gate closed）内，protected 文件的任何编辑都必须随后运行 `python3.14 scripts/relock_baseline.py` 重生成 file manifest 并重钉 lock 内的 manifest hash，保证 `scripts/check-sdd.sh` 在每个 commit 上保持绿色；带着 hash mismatch 的树不得作为任何后续工作的基础。规则：
 
-- protected 集合的唯一定义是 `scripts/sdd-protected-set.rb`，guard 与 relock 工具共同消费；两处各自维护清单是被禁止的。
+- protected 集合的唯一定义是 `scripts/sdd_protected_set.py`，guard 与 relock 工具共同消费；两处各自维护清单是被禁止的。SDD 工具链固定使用 `.python-version` 声明的 CPython 精确版本与 `scripts/requirements-sdd.txt` 固定的依赖版本，版本不匹配时 fail closed；这两个文件是 pin 的唯一来源，工具代码不得另行硬编码版本。本机/CI 建议 `python3.14 -m venv .venv-sdd && .venv-sdd/bin/pip install -r scripts/requirements-sdd.txt`；`scripts/check-sdd.sh` 的解释器解析顺序为 `ARKDECK_PYTHON` 显式覆盖 → 仓库内 `.venv-sdd` → PATH 上的 `python3.14`，无论选中哪个都仍由 runtime gate 二次校验。
 - relock 工具只对候选 baseline 生效：lock `status: accepted`、`accepted_at` 非空、`approval_ref` 已设置或 execution gate 已 open 时必须拒绝运行。ratification 之后的任何变化都走 approved Core change 和新的 `CORE-x.y.z`，永不原地重写。
 - relock 输出 added/removed/changed 漂移报告；提交前人工审查该报告，确认漂移只包含本次有意的编辑。
-- `scripts/guard-selftest.rb` 是 guard 的对抗性自测：在隔离副本上逐项注入违规（protected 内容篡改、未登记 protected 文件、manifest 篡改/乱序、acceptance index 缺失/未知 ID、重复 AC、无 Scenario 的 Requirement、Task packet 状态自提升、platform profile 篡改），断言 guard 逐项报错，并验证 relock 的修复与拒绝行为。CI 必须同时要求 `check-sdd.sh` 与 `guard-selftest.rb` 通过；guard 语义的任何修改都必须先补充能证明新检查会失败的自测用例。
+- `scripts/guard_selftest.py` 是 guard 的对抗性自测：在隔离副本上逐项注入违规（protected 内容篡改、未登记 protected 文件、manifest 篡改/乱序、acceptance index 缺失/未知 ID、重复 AC、无 Scenario 的 Requirement、Task packet 状态自提升、platform profile 篡改），断言 guard 逐项报错，并验证 relock 的修复与拒绝行为。CI 必须同时要求 `scripts/check-sdd.sh` 与 `python3.14 scripts/guard_selftest.py` 通过；guard 语义的任何修改都必须先补充能证明新检查会失败的自测用例。
 
 ## One-time governance bootstrap
 
@@ -82,7 +82,7 @@ Git 仓库已在 2026-07-13 的 one-time governance bootstrap 中初始化，`.g
 - current specs、Core contracts、verification policy/index/cases、baseline locks；
 - Integration、Platform Profile 与 Core conformance 各自的 lock/manifest 和独立 approval；
 - approval/claim/run-record schemas。
-- `scripts/check-sdd.rb`、`scripts/check-sdd.sh`、`scripts/check-json.py`、`scripts/sdd-protected-set.rb`、`scripts/relock-baseline.rb` 与 `scripts/guard-selftest.rb`。
+- `scripts/check_sdd.py`、`scripts/sdd_guard_core.py`、`scripts/sdd_guard_lifecycle.py`、`scripts/sdd_guard_release.py`、`scripts/sdd_guard_support.py`、`scripts/check-sdd.sh`、`scripts/check-json.py`、`scripts/sdd_protected_set.py`、`scripts/relock_baseline.py`、`scripts/guard_selftest.py`、`.python-version` 与 `scripts/requirements-sdd.txt`。
 
 ## Task claim
 

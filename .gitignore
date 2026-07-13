@@ -1,8 +1,12 @@
 # Generated / local-only artifacts. Nothing governance-relevant may be ignored:
-# the protected set (scripts/sdd-protected-set.rb) must always be committed.
+# the protected set (scripts/sdd_protected_set.py) must always be committed.
 __pycache__/
 *.pyc
 .DS_Store
+
+# Local pinned-runtime virtualenv for the SDD toolchain (see
+# scripts/requirements-sdd.txt); never committed, recreated per machine.
+.venv*/
 
 # Local assistant/session state (not part of the SDD or the product)
 .claude/
