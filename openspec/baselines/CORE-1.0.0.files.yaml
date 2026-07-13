@@ -10,7 +10,7 @@ files:
 - path: .github/workflows/agent-pr.yml
   sha256: c9a62276fad0f8faea64b440be788d50ede83f220f7724bccdf9b75067d3ef63
 - path: .github/workflows/sdd-guard.yml
-  sha256: bbaf37826760b92c7009bfb8ffe5a6c01584f9f89aab816e7deaf173e06ea9db
+  sha256: 85757657794f0c7e081d00533d5326a45dda14c544369908f44a22e3d23a0ba3
 - path: .python-version
   sha256: 3a55324cbeddc91df012407d051dad08c88624c95a82fbdb856728729fbd14ab
 - path: AGENTS.md
