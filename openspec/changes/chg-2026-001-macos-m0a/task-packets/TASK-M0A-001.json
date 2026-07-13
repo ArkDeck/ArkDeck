@@ -1,0 +1,76 @@
+{
+  "schemaVersion": "1.0.0",
+  "taskId": "TASK-M0A-001",
+  "revision": 1,
+  "status": "draft",
+  "changeId": "CHG-2026-001-macos-m0a",
+  "changeRevision": 1,
+  "approvalId": null,
+  "coreBaseline": {
+    "id": "CORE",
+    "version": "1.0.0",
+    "sha256": null
+  },
+  "platformProfile": {
+    "id": "PLATFORM-MACOS",
+    "version": "0.1.0",
+    "sha256": "54bd9b295799cb8d93bf397eeb585f24828463f4f1fce1e59a0693f65369d0bf"
+  },
+  "integrationProfiles": [
+    {
+      "id": "OPENHARMONY-TOOLS",
+      "version": "0.1.0",
+      "sha256": "679874cf44234a00b7e5d8f920e81c6b52ff489df2a2c8dd6f03b540c87a11e1"
+    }
+  ],
+  "conformanceSuite": {
+    "id": "CORE-CONFORMANCE-1.0.0",
+    "sha256": "015bcf9343ff91df9f66bdfec418287757f2d1a43c217bf0e9d430a8f99a4ba9"
+  },
+  "baseRevision": null,
+  "platform": "macos",
+  "objective": "Bootstrap the signed SwiftUI application shell and separated Swift package/test targets without implementing a device feature.",
+  "requirementRefs": [],
+  "acceptanceRefs": [
+    "MAC-M0A-SHELL-001"
+  ],
+  "dependsOn": [],
+  "allowedPaths": [
+    "ArkDeck.xcodeproj/**",
+    "ArkDeckApp/**",
+    "Packages/ArkDeckKit/**",
+    "openspec/changes/chg-2026-001-macos-m0a/evidence/**"
+  ],
+  "forbiddenPaths": [
+    "openspec/constitution.md",
+    "openspec/specs/**",
+    "openspec/contracts/**",
+    "openspec/baselines/**"
+  ],
+  "exclusiveResources": [],
+  "risk": "low",
+  "executionEnvironment": "standardAgent",
+  "runtimeCapabilities": [
+    "repositoryProcess"
+  ],
+  "hardwareRequirement": "none",
+  "deliverables": [
+    "Signed minimal SwiftUI app target and separated ArkDeckKit package targets.",
+    "Unit/contract test targets and zh-Hans/en String Catalog skeleton.",
+    "Clean-build and launch evidence for the exact Xcode/toolchain version."
+  ],
+  "verification": [
+    {
+      "acceptanceId": "MAC-M0A-SHELL-001",
+      "testId": "TEST-MAC-M0A-SHELL-001",
+      "method": "Clean build, signature inspection and clean-user launch smoke.",
+      "expectedEvidence": "The signed app launches and the App/Core/Process/Runtime/OpenHarmony/Workflow/Storage target boundaries remain separate.",
+      "minimumEvidence": "platform",
+      "fixtureRefs": []
+    }
+  ],
+  "stopConditions": [
+    "Full Xcode is unavailable or the selected toolchain cannot produce a signed launchable app.",
+    "The shell requires a Core behavior, contract or entitlement decision not present in the approved platform profile."
+  ]
+}

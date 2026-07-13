@@ -1,0 +1,161 @@
+{
+  "schemaVersion": "1.0.0",
+  "taskId": "TASK-M0A-003",
+  "revision": 1,
+  "status": "draft",
+  "changeId": "CHG-2026-001-macos-m0a",
+  "changeRevision": 1,
+  "approvalId": null,
+  "coreBaseline": {
+    "id": "CORE",
+    "version": "1.0.0",
+    "sha256": null
+  },
+  "platformProfile": {
+    "id": "PLATFORM-MACOS",
+    "version": "0.1.0",
+    "sha256": "54bd9b295799cb8d93bf397eeb585f24828463f4f1fce1e59a0693f65369d0bf"
+  },
+  "integrationProfiles": [
+    {
+      "id": "OPENHARMONY-TOOLS",
+      "version": "0.1.0",
+      "sha256": "679874cf44234a00b7e5d8f920e81c6b52ff489df2a2c8dd6f03b540c87a11e1"
+    }
+  ],
+  "conformanceSuite": {
+    "id": "CORE-CONFORMANCE-1.0.0",
+    "sha256": "015bcf9343ff91df9f66bdfec418287757f2d1a43c217bf0e9d430a8f99a4ba9"
+  },
+  "baseRevision": null,
+  "platform": "macos",
+  "objective": "Prototype the host-wide HDC supervisor, ownership/endpoint model and audited lifecycle safety gate.",
+  "requirementRefs": [
+    "REQ-HDC-002",
+    "REQ-HDC-003",
+    "REQ-HDC-004",
+    "REQ-HDC-009",
+    "REQ-HDC-010"
+  ],
+  "acceptanceRefs": [
+    "AC-HDC-002-01",
+    "AC-HDC-003-01",
+    "AC-HDC-003-02",
+    "AC-HDC-004-01",
+    "AC-HDC-009-01",
+    "AC-HDC-010-01",
+    "AC-HDC-010-02",
+    "AC-HDC-010-03",
+    "MAC-M0A-HDC-002"
+  ],
+  "dependsOn": [
+    "TASK-M0A-002"
+  ],
+  "allowedPaths": [
+    "Packages/ArkDeckKit/Sources/ArkDeckOpenHarmony/**",
+    "Packages/ArkDeckKit/Tests/ArkDeckOpenHarmonyTests/**",
+    "Packages/ArkDeckKit/Tests/Fixtures/HDCServer/**",
+    "openspec/changes/chg-2026-001-macos-m0a/evidence/**"
+  ],
+  "forbiddenPaths": [
+    "openspec/constitution.md",
+    "openspec/specs/**",
+    "openspec/contracts/**",
+    "openspec/baselines/**"
+  ],
+  "exclusiveResources": [
+    "arkdeck-resource:hdc-server:isolated-m0a",
+    "arkdeck-resource:fixture:hdc-server-lifecycle-m0a"
+  ],
+  "risk": "high",
+  "executionEnvironment": "standardAgent",
+  "runtimeCapabilities": [
+    "repositoryProcess",
+    "externalToolExecution"
+  ],
+  "hardwareRequirement": "optional",
+  "deliverables": [
+    "Single host-wide supervisor prototype with endpoint, ownership and generation state.",
+    "Managed-ownership proof and zero-automatic-kill call counters for external/unknown servers.",
+    "Typed lifecycle impact, confirmation, critical-Job block, stale-confirmation and audit fixture coverage."
+  ],
+  "verification": [
+    {
+      "acceptanceId": "AC-HDC-002-01",
+      "testId": "TEST-AC-HDC-002-01",
+      "method": "supervisorContract",
+      "expectedEvidence": "Both coordinators and Jobs receive one host-wide event.",
+      "minimumEvidence": "contract",
+      "fixtureRefs": []
+    },
+    {
+      "acceptanceId": "AC-HDC-003-01",
+      "testId": "TEST-AC-HDC-003-01",
+      "method": "lifecycleCallCounter",
+      "expectedEvidence": "Automatic stop/restart/kill call count remains zero.",
+      "minimumEvidence": "contract",
+      "fixtureRefs": []
+    },
+    {
+      "acceptanceId": "AC-HDC-003-02",
+      "testId": "TEST-AC-HDC-003-02",
+      "method": "ownershipEvidenceContract",
+      "expectedEvidence": "Managed ownership is emitted only after all evidence is verified.",
+      "minimumEvidence": "contract",
+      "fixtureRefs": []
+    },
+    {
+      "acceptanceId": "AC-HDC-004-01",
+      "testId": "TEST-AC-HDC-004-01",
+      "method": "endpointIsolationContract",
+      "expectedEvidence": "Only child processes receive the endpoint and the user environment is unchanged.",
+      "minimumEvidence": "platform",
+      "fixtureRefs": []
+    },
+    {
+      "acceptanceId": "AC-HDC-009-01",
+      "testId": "TEST-AC-HDC-009-01",
+      "method": "subserverCallCounter",
+      "expectedEvidence": "Capability is visible and automatic spawn/migration/killall-sub calls remain zero.",
+      "minimumEvidence": "contract",
+      "fixtureRefs": []
+    },
+    {
+      "acceptanceId": "AC-HDC-010-01",
+      "testId": "TEST-AC-HDC-010-01",
+      "method": "lifecycleCriticalGateContract",
+      "expectedEvidence": "Lifecycle dispatch is zero and the blocking Job/Step is shown.",
+      "minimumEvidence": "contract",
+      "fixtureRefs": []
+    },
+    {
+      "acceptanceId": "AC-HDC-010-02",
+      "testId": "TEST-AC-HDC-010-02",
+      "method": "lifecycleAuditContract",
+      "expectedEvidence": "Preview, confirmation, revalidation, intent/outcome and all affected coordinators contain the same generation-bound impact.",
+      "minimumEvidence": "contract",
+      "fixtureRefs": []
+    },
+    {
+      "acceptanceId": "AC-HDC-010-03",
+      "testId": "TEST-AC-HDC-010-03",
+      "method": "lifecycleRaceFaultInjection",
+      "expectedEvidence": "The old confirmation expires and lifecycle process count is zero.",
+      "minimumEvidence": "contract",
+      "fixtureRefs": []
+    },
+    {
+      "acceptanceId": "MAC-M0A-HDC-002",
+      "testId": "TEST-MAC-M0A-HDC-002",
+      "method": "Isolated-endpoint HDC supervisor contract suite.",
+      "expectedEvidence": "Global propagation, ownership, critical gate and stale-confirmation cases pass with external automatic kill count zero.",
+      "minimumEvidence": "platform",
+      "fixtureRefs": []
+    }
+  ],
+  "stopConditions": [
+    "A test design requires killing or mutating an uncontrolled external/unknown server.",
+    "The critical-Job gate, endpoint or generation cannot be determined before lifecycle dispatch.",
+    "The isolated endpoint or lifecycle fixture cannot prevent impact to a user's existing HDC clients."
+  ]
+}

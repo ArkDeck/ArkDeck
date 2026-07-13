@@ -1,0 +1,868 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://arkdeck.dev/schemas/manifest-1.0.0.json",
+  "title": "ArkDeck Session Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "appVersion",
+    "coreSpecBaseline",
+    "platformProfile",
+    "sessionId",
+    "jobId",
+    "status",
+    "executionMode",
+    "executionAuthority",
+    "outcomeCertainty",
+    "sessionDisposition",
+    "createdAt",
+    "completedAt",
+    "archivedAt",
+    "originalTarget",
+    "bindingHistory",
+    "toolchain",
+    "workflow",
+    "steps",
+    "parameters",
+    "compensations",
+    "confirmations",
+    "artifacts",
+    "warnings",
+    "failure",
+    "recovery"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "appVersion": { "type": "string", "minLength": 1 },
+    "coreSpecBaseline": { "type": "string", "pattern": "^CORE-[0-9]+\\.[0-9]+\\.[0-9]+$" },
+    "platformProfile": { "type": "string", "minLength": 1 },
+    "sessionId": { "$ref": "#/$defs/id" },
+    "jobId": { "$ref": "#/$defs/id" },
+    "status": {
+      "enum": ["planned", "succeeded", "failed", "cancelled", "interrupted"]
+    },
+    "executionMode": {
+      "enum": ["execute", "planOnly", "simulated"]
+    },
+    "executionAuthority": {
+      "enum": ["interactiveUser", "standardAgent", "controlledHardwareLab"]
+    },
+    "outcomeCertainty": {
+      "enum": ["confirmed", "outcomeUnknown", "mixed"]
+    },
+    "sessionDisposition": {
+      "enum": ["finalized", "archived"]
+    },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "completedAt": { "type": "string", "format": "date-time" },
+    "archivedAt": { "type": ["string", "null"], "format": "date-time" },
+    "originalTarget": { "$ref": "#/$defs/target" },
+    "bindingHistory": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/binding" }
+    },
+    "toolchain": { "$ref": "#/$defs/toolchain" },
+    "workflow": { "$ref": "#/$defs/workflow" },
+    "steps": {
+      "type": "array",
+      "items": {
+        "$ref": "https://arkdeck.dev/schemas/workflow-step-1.0.0.json#/$defs/executionRecord"
+      }
+    },
+    "parameters": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/parameter" }
+    },
+    "compensations": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/compensationRecord" }
+    },
+    "confirmations": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/confirmation" }
+    },
+    "artifacts": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/artifact" }
+    },
+    "warnings": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "failure": {
+      "oneOf": [
+        { "$ref": "#/$defs/failure" },
+        { "type": "null" }
+      ]
+    },
+    "recovery": {
+      "oneOf": [
+        { "$ref": "#/$defs/recovery" },
+        { "type": "null" }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "executionAuthority": { "const": "standardAgent" } },
+        "required": ["executionAuthority"]
+      },
+      "then": {
+        "properties": {
+          "steps": {
+            "items": {
+              "if": {
+                "properties": { "effect": { "const": "destructive" } },
+                "required": ["effect"]
+              },
+              "then": {
+                "properties": {
+                  "disposition": { "enum": ["notExecuted(planned)", "skipped"] },
+                  "outcomeCertainty": { "const": "notApplicable" },
+                  "semanticResult": { "const": "notRun" }
+                }
+              }
+            }
+          },
+          "compensations": {
+            "items": {
+              "if": {
+                "properties": {
+                  "descriptor": {
+                    "properties": { "effect": { "const": "destructive" } },
+                    "required": ["effect"]
+                  }
+                },
+                "required": ["descriptor"]
+              },
+              "then": {
+                "properties": {
+                  "disposition": { "const": "notRun" },
+                  "outcomeCertainty": { "const": "notApplicable" },
+                  "result": { "const": "notRun" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "allOf": [
+          {
+            "properties": {
+              "executionAuthority": { "const": "standardAgent" },
+              "executionMode": { "const": "execute" }
+            },
+            "required": ["executionAuthority", "executionMode"]
+          },
+          {
+            "properties": {
+              "steps": {
+                "contains": {
+                  "properties": { "effect": { "const": "destructive" } },
+                  "required": ["effect"]
+                }
+              }
+            },
+            "required": ["steps"]
+          }
+        ]
+      },
+      "then": {
+        "properties": { "status": { "not": { "const": "succeeded" } } }
+      }
+    },
+    {
+      "if": {
+        "properties": { "executionMode": { "const": "simulated" } },
+        "required": ["executionMode"]
+      },
+      "then": {
+        "properties": {
+          "originalTarget": {
+            "allOf": [
+              { "$ref": "#/$defs/target" },
+              {
+                "properties": {
+                  "kind": { "const": "synthetic" },
+                  "transport": { "const": "synthetic" },
+                  "connectKey": { "type": "null" }
+                }
+              }
+            ]
+          },
+          "bindingHistory": {
+            "items": {
+              "allOf": [
+                { "$ref": "#/$defs/binding" },
+                {
+                  "properties": {
+                    "connectKey": { "type": "null" },
+                    "transport": { "const": "synthetic" },
+                    "confirmedBy": { "const": "simulation" },
+                    "channelProtection": { "const": "notApplicable" }
+                  }
+                }
+              ]
+            }
+          },
+          "toolchain": {
+            "allOf": [
+              { "$ref": "#/$defs/toolchain" },
+              { "properties": { "kind": { "const": "none" } } }
+            ]
+          },
+          "workflow": {
+            "allOf": [
+              { "$ref": "#/$defs/workflow" },
+              {
+                "required": ["fixtureIdentity", "scenarioIdentity"],
+                "properties": {
+                  "fixtureIdentity": { "type": "string", "minLength": 1 },
+                  "scenarioIdentity": { "type": "string", "minLength": 1 }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "originalTarget": {
+            "allOf": [
+              { "$ref": "#/$defs/target" },
+              {
+                "properties": {
+                  "kind": { "const": "real" },
+                  "transport": { "enum": ["usb", "tcp", "uart"] },
+                  "connectKey": { "type": "string", "minLength": 1 }
+                }
+              }
+            ]
+          },
+          "bindingHistory": {
+            "items": {
+              "allOf": [
+                { "$ref": "#/$defs/binding" },
+                {
+                  "properties": {
+                    "connectKey": { "type": "string", "minLength": 1 },
+                    "transport": { "enum": ["usb", "tcp", "uart"] },
+                    "confirmedBy": { "enum": ["corePolicy", "user"] },
+                    "channelProtection": { "enum": ["encryptedVerified", "unverifiedAssumeUnprotected"] }
+                  }
+                }
+              ]
+            }
+          },
+          "toolchain": {
+            "allOf": [
+              { "$ref": "#/$defs/toolchain" },
+              { "properties": { "kind": { "const": "hdc" } } }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "executionMode": { "const": "planOnly" } },
+        "required": ["executionMode"]
+      },
+      "then": {
+        "properties": {
+          "status": { "not": { "const": "succeeded" } },
+          "steps": {
+            "items": {
+              "if": {
+                "properties": { "effect": { "enum": ["deviceMutation", "destructive"] } },
+                "required": ["effect"]
+              },
+              "then": {
+                "properties": {
+                  "disposition": { "enum": ["notExecuted(planned)", "skipped"] },
+                  "outcomeCertainty": { "const": "notApplicable" },
+                  "semanticResult": { "const": "notRun" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "status": { "const": "planned" } },
+        "required": ["status"]
+      },
+      "then": {
+        "properties": {
+          "executionMode": { "const": "planOnly" },
+          "outcomeCertainty": { "const": "confirmed" },
+          "failure": { "type": "null" },
+          "recovery": { "type": "null" },
+          "steps": {
+            "items": {
+              "allOf": [
+                {
+                  "properties": {
+                    "disposition": { "not": { "const": "outcomeUnknown" } },
+                    "outcomeCertainty": { "not": { "const": "outcomeUnknown" } }
+                  }
+                },
+                {
+                  "if": {
+                    "properties": { "effect": { "enum": ["deviceMutation", "destructive"] } },
+                    "required": ["effect"]
+                  },
+                  "then": {
+                    "properties": {
+                      "disposition": { "enum": ["notExecuted(planned)", "skipped"] },
+                      "outcomeCertainty": { "const": "notApplicable" },
+                      "semanticResult": { "const": "notRun" }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "status": { "const": "succeeded" } },
+        "required": ["status"]
+      },
+      "then": {
+        "properties": {
+          "outcomeCertainty": { "const": "confirmed" },
+          "failure": { "type": "null" },
+          "recovery": { "type": "null" },
+          "steps": {
+            "items": {
+              "allOf": [
+                {
+                  "properties": {
+                    "disposition": { "not": { "const": "outcomeUnknown" } },
+                    "outcomeCertainty": { "not": { "const": "outcomeUnknown" } }
+                  }
+                },
+                {
+                  "not": {
+                    "properties": { "semanticResult": { "enum": ["failed", "unknown"] } },
+                    "required": ["semanticResult"]
+                  }
+                }
+              ]
+            }
+          },
+          "compensations": {
+            "items": {
+              "not": {
+                "properties": { "result": { "enum": ["failed", "unknown"] } },
+                "required": ["result"]
+              }
+            }
+          },
+          "parameters": {
+            "items": {
+              "not": {
+                "properties": { "restoreDisposition": { "enum": ["failed", "outcomeUnknown"] } },
+                "required": ["restoreDisposition"]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "status": { "const": "failed" } },
+        "required": ["status"]
+      },
+      "then": {
+        "properties": {
+          "outcomeCertainty": { "const": "confirmed" },
+          "failure": { "$ref": "#/$defs/failure" },
+          "steps": {
+            "items": {
+              "properties": {
+                "disposition": { "not": { "const": "outcomeUnknown" } },
+                "outcomeCertainty": { "not": { "const": "outcomeUnknown" } },
+                "semanticResult": { "not": { "const": "unknown" } }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "status": { "const": "cancelled" } },
+        "required": ["status"]
+      },
+      "then": {
+        "properties": {
+          "outcomeCertainty": { "const": "confirmed" },
+          "failure": { "type": "null" },
+          "steps": {
+            "items": {
+              "properties": {
+                "disposition": { "not": { "const": "outcomeUnknown" } },
+                "outcomeCertainty": { "not": { "const": "outcomeUnknown" } },
+                "semanticResult": { "not": { "const": "unknown" } }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "status": { "const": "interrupted" } },
+        "required": ["status"]
+      },
+      "then": {
+        "properties": {
+          "recovery": {
+            "allOf": [
+              { "$ref": "#/$defs/recovery" },
+              {
+                "required": ["interruptedReason", "abandonAuditEventIds", "userConfirmation"],
+                "properties": {
+                  "interruptedReason": { "type": "string", "minLength": 1 },
+                  "needsAttention": { "const": true },
+                  "abandonAuditEventIds": { "minItems": 1 },
+                  "userConfirmation": { "$ref": "#/$defs/abandonConfirmation" }
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "sessionDisposition": { "const": "archived" } },
+        "required": ["sessionDisposition"]
+      },
+      "then": {
+        "properties": { "archivedAt": { "type": "string", "format": "date-time" } }
+      },
+      "else": {
+        "properties": { "archivedAt": { "type": "null" } }
+      }
+    }
+  ],
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-fA-F0-9]{64}$"
+    },
+    "relativePath": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024,
+      "pattern": "^(?!/)(?![A-Za-z]:)(?!\\.\\.?(?:/|$))(?!.*\\/\\.\\.?(?:/|$))(?!.*[. ](?:/|$))[^\\u0000-\\u001F\\u007F<>:\"/\\\\|?*]+(?:/[^\\u0000-\\u001F\\u007F<>:\"/\\\\|?*]+)*$"
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "connectKey", "transport", "identitySnapshot"],
+      "properties": {
+        "kind": { "enum": ["real", "synthetic"] },
+        "connectKey": { "type": ["string", "null"] },
+        "transport": { "enum": ["usb", "tcp", "uart", "synthetic"] },
+        "identitySnapshot": {
+          "type": "object",
+          "minProperties": 1
+        }
+      }
+    },
+    "binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["revision", "connectKey", "transport", "identitySnapshot", "evidence", "confirmedBy", "channelProtection"],
+      "properties": {
+        "revision": { "type": "integer", "minimum": 1 },
+        "connectKey": { "type": ["string", "null"] },
+        "transport": { "enum": ["usb", "tcp", "uart", "synthetic"] },
+        "identitySnapshot": {
+          "type": "object",
+          "minProperties": 1
+        },
+        "evidence": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "confirmedBy": { "enum": ["corePolicy", "user", "simulation"] },
+        "channelProtection": { "enum": ["encryptedVerified", "unverifiedAssumeUnprotected", "notApplicable"] }
+      }
+    },
+    "toolchain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": {
+        "kind": { "enum": ["hdc", "none"] },
+        "source": { "type": "string", "minLength": 1 },
+        "path": { "type": "string", "minLength": 1 },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "clientVersion": { "type": "string", "minLength": 1 },
+        "serverVersion": { "type": "string", "minLength": 1 },
+        "daemonVersion": { "type": ["string", "null"] },
+        "endpoint": { "type": "string", "minLength": 1 },
+        "serverGeneration": { "type": "integer", "minimum": 0 },
+        "serverOwnership": { "enum": ["external", "arkDeckManaged", "unknown"] }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "kind": { "const": "hdc" } },
+            "required": ["kind"]
+          },
+          "then": {
+            "required": [
+              "source",
+              "path",
+              "sha256",
+              "clientVersion",
+              "serverVersion",
+              "endpoint",
+              "serverGeneration",
+              "serverOwnership"
+            ]
+          },
+          "else": {
+            "properties": {
+              "source": false,
+              "path": false,
+              "sha256": false,
+              "clientVersion": false,
+              "serverVersion": false,
+              "daemonVersion": false,
+              "endpoint": false,
+              "serverGeneration": false,
+              "serverOwnership": false
+            }
+          }
+        }
+      ]
+    },
+    "workflow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "profileVersion", "providerIdentity"],
+      "properties": {
+        "kind": { "type": "string", "minLength": 1 },
+        "profileVersion": { "type": "string", "minLength": 1 },
+        "providerIdentity": { "type": "string", "minLength": 1 },
+        "fixtureIdentity": { "type": ["string", "null"] },
+        "scenarioIdentity": { "type": ["string", "null"] }
+      }
+    },
+    "parameterState": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["state"],
+          "properties": { "state": { "const": "missing" } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["state", "reason"],
+          "properties": {
+            "state": { "const": "unreadable" },
+            "reason": { "type": "string", "minLength": 1 }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["state", "value"],
+          "properties": {
+            "state": { "const": "value" },
+            "value": { "type": "string", "maxLength": 4096 }
+          }
+        }
+      ]
+    },
+    "parameter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "beforeState", "desiredState", "afterState", "restoreState", "restoreDisposition"],
+      "properties": {
+        "name": { "type": "string", "pattern": "^[A-Za-z0-9_.-]{1,255}$" },
+        "beforeState": { "$ref": "#/$defs/parameterState" },
+        "desiredState": {
+          "allOf": [
+            { "$ref": "#/$defs/parameterState" },
+            { "properties": { "state": { "const": "value" } } }
+          ]
+        },
+        "afterState": { "$ref": "#/$defs/parameterState" },
+        "restoreState": { "$ref": "#/$defs/parameterState" },
+        "restoreDisposition": {
+          "enum": ["notRequired", "restored", "persistentChangeAccepted", "failed", "outcomeUnknown"]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "restoreDisposition": { "const": "restored" } },
+            "required": ["restoreDisposition"]
+          },
+          "then": {
+            "properties": {
+              "beforeState": { "properties": { "state": { "const": "value" } } },
+              "restoreState": { "properties": { "state": { "const": "value" } } }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "beforeState": {
+                "properties": { "state": { "enum": ["missing", "unreadable"] } },
+                "required": ["state"]
+              }
+            },
+            "required": ["beforeState"]
+          },
+          "then": {
+            "properties": { "restoreDisposition": { "not": { "const": "restored" } } }
+          }
+        }
+      ]
+    },
+    "failure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stage", "code", "summary"],
+      "properties": {
+        "stage": { "type": "string", "minLength": 1 },
+        "code": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+        "summary": { "type": "string", "minLength": 1 }
+      }
+    },
+    "compensationRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["descriptor", "sourceStepId", "disposition", "outcomeCertainty", "result", "failure", "journalEventIds"],
+      "properties": {
+        "descriptor": {
+          "$ref": "https://arkdeck.dev/schemas/workflow-step-1.0.0.json#/$defs/compensationDescriptor"
+        },
+        "sourceStepId": { "$ref": "#/$defs/id" },
+        "disposition": { "enum": ["executed", "notRun", "outcomeUnknown"] },
+        "outcomeCertainty": { "enum": ["confirmed", "outcomeUnknown", "notApplicable"] },
+        "result": { "enum": ["succeeded", "failed", "notRun", "unknown"] },
+        "failure": {
+          "oneOf": [
+            { "$ref": "#/$defs/failure" },
+            { "type": "null" }
+          ]
+        },
+        "journalEventIds": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/id" }
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "result": { "const": "failed" } }, "required": ["result"] },
+          "then": { "properties": { "failure": { "$ref": "#/$defs/failure" }, "outcomeCertainty": { "const": "confirmed" } } }
+        },
+        {
+          "if": { "properties": { "result": { "const": "unknown" } }, "required": ["result"] },
+          "then": { "properties": { "disposition": { "const": "outcomeUnknown" }, "outcomeCertainty": { "const": "outcomeUnknown" } } }
+        },
+        {
+          "if": { "properties": { "result": { "const": "notRun" } }, "required": ["result"] },
+          "then": { "properties": { "disposition": { "const": "notRun" }, "outcomeCertainty": { "const": "notApplicable" }, "failure": { "type": "null" } } }
+        }
+      ]
+    },
+    "confirmation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["confirmationId", "kind", "scopeHash", "decision", "actor", "decidedAt", "relatedStepIds"],
+      "properties": {
+        "confirmationId": { "$ref": "#/$defs/id" },
+        "kind": { "enum": ["deviceMutation", "destructive", "serverLifecycle", "recoveryAbandon", "securityBoundary"] },
+        "scopeHash": { "$ref": "#/$defs/sha256" },
+        "decision": { "enum": ["accepted", "rejected"] },
+        "actor": { "const": "user" },
+        "decidedAt": { "type": "string", "format": "date-time" },
+        "relatedStepIds": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/id" }
+        }
+      }
+    },
+    "deviceMode": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["state"],
+          "properties": { "state": { "const": "unknown" } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["state", "value", "evidence"],
+          "properties": {
+            "state": { "const": "known" },
+            "value": { "type": "string", "minLength": 1, "maxLength": 128 },
+            "evidence": { "type": "string", "minLength": 1 }
+          }
+        }
+      ]
+    },
+    "hazard": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "summary", "severity", "outcomeCertainty"],
+      "properties": {
+        "code": { "$ref": "#/$defs/id" },
+        "summary": { "type": "string", "minLength": 1 },
+        "severity": { "enum": ["warning", "blocking", "possibleBrick"] },
+        "outcomeCertainty": { "enum": ["confirmed", "outcomeUnknown"] }
+      }
+    },
+    "recoveryGuide": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["providerIdentity", "automaticRecoveryAvailable", "summary", "steps"],
+      "properties": {
+        "providerIdentity": { "type": "string", "minLength": 1 },
+        "automaticRecoveryAvailable": { "type": "boolean" },
+        "summary": { "type": "string", "minLength": 1 },
+        "steps": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "abandonConfirmation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["confirmationId", "actor", "decision", "confirmedAt"],
+      "properties": {
+        "confirmationId": { "$ref": "#/$defs/id" },
+        "actor": { "const": "user" },
+        "decision": { "const": "archiveInterrupted" },
+        "confirmedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "recovery": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "needsAttention",
+        "interruptedReason",
+        "deviceHazards",
+        "abandonAuditEventIds",
+        "lastConfirmedStepId",
+        "lastDeviceMode",
+        "managedHostProcessState",
+        "recoveryGuide",
+        "unexecutedCompensations",
+        "userConfirmation",
+        "recoveryOfSessionId",
+        "recoveryOfJobId"
+      ],
+      "properties": {
+        "needsAttention": { "type": "boolean" },
+        "interruptedReason": { "type": ["string", "null"] },
+        "deviceHazards": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/hazard" }
+        },
+        "abandonAuditEventIds": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/id" }
+        },
+        "lastConfirmedStepId": {
+          "oneOf": [
+            { "$ref": "#/$defs/id" },
+            { "type": "null" }
+          ]
+        },
+        "lastDeviceMode": { "$ref": "#/$defs/deviceMode" },
+        "managedHostProcessState": {
+          "enum": ["notStarted", "notRunning", "stoppedAtSafeBoundary", "stillRunningUnknown", "notApplicable"]
+        },
+        "recoveryGuide": { "$ref": "#/$defs/recoveryGuide" },
+        "unexecutedCompensations": {
+          "type": "array",
+          "items": {
+            "$ref": "https://arkdeck.dev/schemas/workflow-step-1.0.0.json#/$defs/compensationDescriptor"
+          }
+        },
+        "userConfirmation": {
+          "oneOf": [
+            { "$ref": "#/$defs/abandonConfirmation" },
+            { "type": "null" }
+          ]
+        },
+        "recoveryOfSessionId": {
+          "oneOf": [
+            { "$ref": "#/$defs/id" },
+            { "type": "null" }
+          ]
+        },
+        "recoveryOfJobId": {
+          "oneOf": [
+            { "$ref": "#/$defs/id" },
+            { "type": "null" }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "abandonAuditEventIds": { "minItems": 1 } },
+            "required": ["abandonAuditEventIds"]
+          },
+          "then": { "properties": { "userConfirmation": { "$ref": "#/$defs/abandonConfirmation" } } }
+        }
+      ]
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "role", "origin", "relativePath", "size", "sha256"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "role": { "enum": ["raw", "derived", "log", "plan", "diagnostic", "partial"] },
+        "origin": { "type": "string", "minLength": 1 },
+        "relativePath": { "$ref": "#/$defs/relativePath" },
+        "size": { "type": "integer", "minimum": 0 },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "mediaType": { "type": ["string", "null"] },
+        "derivedFrom": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/id" }
+        }
+      }
+    }
+  }
+}

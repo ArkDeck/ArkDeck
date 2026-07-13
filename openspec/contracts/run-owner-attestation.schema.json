@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://arkdeck.dev/schemas/run-owner-attestation-1.0.0.json",
+  "title": "ArkDeck Protected Run Owner Attestation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "attestationId",
+    "subjectType",
+    "claimAttestationId",
+    "claimId",
+    "runId",
+    "runSha256",
+    "taskId",
+    "attempt",
+    "executedBy",
+    "finalizedAt",
+    "mechanism",
+    "issuer",
+    "attestationRef"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "attestationId": { "type": "string", "pattern": "^RUNAUTH-[A-Z0-9._-]+$" },
+    "subjectType": { "const": "taskRunLease" },
+    "claimAttestationId": { "type": "string", "pattern": "^CLAIMAUTH-[A-Z0-9._-]+$" },
+    "claimId": { "type": "string", "minLength": 1 },
+    "runId": { "type": "string", "minLength": 1 },
+    "runSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "taskId": { "type": "string", "pattern": "^TASK-[A-Z0-9-]+$" },
+    "attempt": { "type": "integer", "minimum": 1 },
+    "executedBy": { "type": "string", "minLength": 1 },
+    "finalizedAt": { "type": "string", "format": "date-time" },
+    "mechanism": { "const": "protectedClaimService" },
+    "issuer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id"],
+      "properties": {
+        "kind": { "const": "service" },
+        "id": { "type": "string", "minLength": 1 }
+      }
+    },
+    "attestationRef": { "type": "string", "minLength": 1 }
+  }
+}

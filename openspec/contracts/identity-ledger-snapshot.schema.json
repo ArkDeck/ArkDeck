@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://arkdeck.dev/schemas/identity-ledger-snapshot-1.0.0.json",
+  "title": "ArkDeck Protected Immutable Identity Ledger Snapshot",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "subjectType",
+    "ledgerId",
+    "revision",
+    "previousSnapshotSha256",
+    "repositoryId",
+    "repositoryRevision",
+    "generatedAt",
+    "entries",
+    "decision",
+    "mechanism",
+    "issuer",
+    "verificationRef"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "subjectType": { "const": "identityLedger" },
+    "ledgerId": { "type": "string", "pattern": "^IDLEDGER-[A-Z0-9._-]+$" },
+    "revision": { "type": "integer", "minimum": 1 },
+    "previousSnapshotSha256": {
+      "oneOf": [
+        { "type": "null" },
+        { "$ref": "#/$defs/sha256" }
+      ]
+    },
+    "repositoryId": { "type": "string", "minLength": 1 },
+    "repositoryRevision": { "type": "string", "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$" },
+    "generatedAt": { "type": "string", "format": "date-time" },
+    "entries": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "id", "revision", "sha256"],
+        "properties": {
+          "kind": {
+            "enum": [
+              "taskPacket",
+              "claim",
+              "run",
+              "attestation",
+              "approval",
+              "approvedSubject",
+              "changeLock",
+              "archiveLock",
+              "evidenceRecord",
+              "releaseSubject",
+              "acceptedBaseline"
+            ]
+          },
+          "id": { "type": "string", "minLength": 1 },
+          "revision": { "type": "string", "minLength": 1 },
+          "sha256": { "$ref": "#/$defs/sha256" }
+        }
+      }
+    },
+    "decision": { "const": "approved" },
+    "mechanism": { "const": "protectedIdentityLedger" },
+    "issuer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id"],
+      "properties": {
+        "kind": { "const": "service" },
+        "id": { "type": "string", "minLength": 1 }
+      }
+    },
+    "verificationRef": { "type": "string", "minLength": 1 }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+  }
+}

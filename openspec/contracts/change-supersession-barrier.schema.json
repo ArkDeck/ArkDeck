@@ -1,0 +1,118 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://arkdeck.dev/schemas/change-supersession-barrier-1.0.0.json",
+  "title": "ArkDeck Protected Change Supersession Barrier",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "attestationId",
+    "subjectType",
+    "predecessor",
+    "successor",
+    "ledger",
+    "claimCount",
+    "claims",
+    "closedAt",
+    "mechanism",
+    "issuer",
+    "attestationRef"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "attestationId": { "type": "string", "pattern": "^CHGSUPAUTH-[A-Z0-9._-]+$" },
+    "subjectType": { "const": "changeSupersessionBarrier" },
+    "predecessor": { "$ref": "#/$defs/changeLockBinding" },
+    "successor": { "$ref": "#/$defs/changeLockBinding" },
+    "ledger": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ledgerId", "revision", "lineageSequence"],
+      "properties": {
+        "ledgerId": { "type": "string", "pattern": "^ARKDECK-CLAIM-LEDGER-[A-Z0-9._-]+$" },
+        "revision": { "type": "integer", "minimum": 1 },
+        "lineageSequence": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "claimCount": { "type": "integer", "minimum": 0 },
+    "claims": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/closedClaim" }
+    },
+    "closedAt": { "type": "string", "format": "date-time" },
+    "mechanism": { "const": "protectedClaimService" },
+    "issuer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id"],
+      "properties": {
+        "kind": { "const": "service" },
+        "id": { "type": "string", "minLength": 1 }
+      }
+    },
+    "attestationRef": { "type": "string", "minLength": 1 }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "changeId": { "type": "string", "pattern": "^CHG-[0-9]{4}-[0-9]{3}(?:-[A-Za-z0-9-]+)?$" },
+    "approvalId": { "type": "string", "pattern": "^APR-[A-Z0-9._-]+$" },
+    "evidencePath": {
+      "type": "string",
+      "pattern": "^openspec/changes/(?:chg-[a-z0-9-]+|archive/[0-9]{4}-[0-9]{2}-[0-9]{2}-chg-[a-z0-9-]+)/evidence/runs/[^/]+/attempt-[0-9]{3}/[^/]+\\.json$"
+    },
+    "changeLockBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["changeId", "revision", "changeLockSha256", "changeApprovalId"],
+      "properties": {
+        "changeId": { "$ref": "#/$defs/changeId" },
+        "revision": { "const": 1 },
+        "changeLockSha256": { "$ref": "#/$defs/sha256" },
+        "changeApprovalId": { "$ref": "#/$defs/approvalId" }
+      }
+    },
+    "closedClaim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "claimId",
+        "taskId",
+        "attempt",
+        "claimPath",
+        "claimSha256",
+        "claimOwnerAttestationId",
+        "claimOwnerAttestationPath",
+        "claimOwnerAttestationSha256",
+        "runId",
+        "terminalStatus",
+        "runPath",
+        "runSha256",
+        "runOwnerAttestationId",
+        "runOwnerAttestationPath",
+        "runOwnerAttestationSha256",
+        "claimedAt",
+        "terminalAt"
+      ],
+      "properties": {
+        "claimId": { "type": "string", "minLength": 1 },
+        "taskId": { "type": "string", "pattern": "^TASK-[A-Z0-9-]+$" },
+        "attempt": { "type": "integer", "minimum": 1 },
+        "claimPath": { "$ref": "#/$defs/evidencePath" },
+        "claimSha256": { "$ref": "#/$defs/sha256" },
+        "claimOwnerAttestationId": { "type": "string", "pattern": "^CLAIMAUTH-[A-Z0-9._-]+$" },
+        "claimOwnerAttestationPath": { "$ref": "#/$defs/evidencePath" },
+        "claimOwnerAttestationSha256": { "$ref": "#/$defs/sha256" },
+        "runId": { "type": "string", "minLength": 1 },
+        "terminalStatus": { "enum": ["done", "blocked", "interrupted", "superseded"] },
+        "runPath": { "$ref": "#/$defs/evidencePath" },
+        "runSha256": { "$ref": "#/$defs/sha256" },
+        "runOwnerAttestationId": { "type": "string", "pattern": "^RUNAUTH-[A-Z0-9._-]+$" },
+        "runOwnerAttestationPath": { "$ref": "#/$defs/evidencePath" },
+        "runOwnerAttestationSha256": { "$ref": "#/$defs/sha256" },
+        "claimedAt": { "type": "string", "format": "date-time" },
+        "terminalAt": { "type": "string", "format": "date-time" }
+      }
+    }
+  }
+}

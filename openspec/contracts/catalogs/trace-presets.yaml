@@ -1,0 +1,27 @@
+schema_version: 1.0.0
+catalog: trace-presets
+
+presets:
+  - id: attachmentPanorama
+    tags: [sched, freq, ace, app, binder, disk, ohos, graphic, sync, workq, ability]
+    historical_buffer_value: 327680
+    buffer_unit: adapter-must-confirm
+    resource_warning: true
+  - id: arkuiDeep
+    tags: [ace, app, ability, graphic, ohos, sched, freq, sync]
+  - id: renderAnimation
+    tags: [graphic, ace, app, sched, freq, sync]
+  - id: schedulingIpc
+    tags: [sched, freq, workq, binder, sync]
+  - id: io
+    tags: [disk, sched, workq, binder]
+  - id: custom
+    tags: user-selected-from-probed-capabilities
+
+runtime_rule: >-
+  A preset is a logical request. The adapter must resolve it against capabilities
+  proven by the current device/tool help, show the exact unsupported/removed tag
+  diff, and require explicit user acceptance of the resolved configuration or fail
+  preflight. It must not silently intersect tags or guess support.
+
+behavior_spec: openspec/specs/trace/spec.md

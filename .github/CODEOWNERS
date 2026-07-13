@@ -1,0 +1,11 @@
+# ArkDeck CODEOWNERS — governance bootstrap placeholder.
+#
+# PENDING HUMAN ACTION: replace the placeholder below with the maintainer's
+# real GitHub handle before this repository is pushed to a protected remote.
+# Per openspec/governance/enforcement.md, approvals are only valid when given
+# by a configured human CODEOWNER on a protected branch/PR (or an equivalent
+# externally verifiable mechanism). Until then every execution and
+# ratification gate stays closed.
+#
+# All governance-protected paths require human owner review:
+* @ARKDECK-OWNER-TBD

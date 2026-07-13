@@ -1,0 +1,12 @@
+schema_version: 1.0.0
+change_id: CHG-YYYY-NNN-short-name
+change_revision: 1
+platform: replace-with-macos-windows-or-linux
+evidence_classes: [contract, parserGolden, platform, realHardware, manualReview]
+
+# Add exactly the platform-local cases referenced by scope.yaml and Task packets.
+# Leave this list empty when the change uses only existing Core AC. Platform cases
+# may strengthen evidence but may not reuse or override an AC-* Core identity. Each
+# case fixes a binary expected_result; an identically named release case must carry
+# the exact same Test/method/evidence/capability/expected-result contract.
+cases: []

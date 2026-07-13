@@ -1,0 +1,38 @@
+# Format example only. This repository copy is never a trust root and must never
+# be passed to ARKDECK_TRUST_ROOT_BUNDLE.
+root_id: ORG-ARKDECK-ROOT-1
+repository_id: ORG-ARKDECK-REPOSITORY-1
+trust_policy_sha256: 0000000000000000000000000000000000000000000000000000000000000000
+external_verifiers:
+  - id: ORG-PROTECTED-REVIEW-VERIFIER
+    mechanisms: [protectedGitReview]
+    subject_types:
+      - trustPolicy
+      - baseline
+      - integrationLock
+      - platformLock
+      - platformReleaseSubject
+      - conformanceSuite
+      - change
+      - taskPacket
+      - taskRun
+      - taskSupersession
+      - labExecutionAuthorization
+      - platformConformance
+      - changeVerification
+      - evidence
+      - hardwareEvidence
+      - archiveSourceVerification
+      - archive
+    executable_path: /absolute/path/outside/repository/to/verifier
+    sha256: 0000000000000000000000000000000000000000000000000000000000000000
+  - id: ORG-PROTECTED-CLAIM-SERVICE-VERIFIER
+    mechanisms: [protectedClaimService]
+    subject_types: [taskClaim, taskRunLease, resourceIdentitySet, changeSupersessionBarrier]
+    executable_path: /absolute/path/outside/repository/to/claim-service-verifier
+    sha256: 0000000000000000000000000000000000000000000000000000000000000000
+  - id: ORG-PROTECTED-IDENTITY-LEDGER-VERIFIER
+    mechanisms: [protectedIdentityLedger]
+    subject_types: [identityLedger]
+    executable_path: /absolute/path/outside/repository/to/identity-ledger-verifier
+    sha256: 0000000000000000000000000000000000000000000000000000000000000000

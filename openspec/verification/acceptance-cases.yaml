@@ -1,0 +1,136 @@
+registry: CORE-ACCEPTANCE-CASES-1.0.0
+status: review
+expected_result_rule: >-
+  expected_source identifies the normative Scenario block; all GIVEN/WHEN/THEN/AND
+  clauses in that block are the binary expected result and may not be restated or
+  weakened by a platform test.
+evidence_classes:
+  contract: deterministic unit/property/schema/contract evidence
+  parserGolden: versioned parser fixture plus contract evidence
+  platform: platform Port/UI/distribution evidence on the target OS
+  realHardware: externally approved hardware-evidence JSON plus controlled artifact; fake/simulation is forbidden
+
+cases:
+  - { acceptance_id: AC-ART-001-01, test_id: TEST-AC-ART-001-01, method: artifactContract, expected_source: openspec/specs/session-artifact-storage/spec.md#AC-ART-001-01, minimum_evidence: contract }
+  - { acceptance_id: AC-ART-002-01, test_id: TEST-AC-ART-002-01, method: artifactProperty, expected_source: openspec/specs/session-artifact-storage/spec.md#AC-ART-002-01, minimum_evidence: contract }
+  - { acceptance_id: AC-ART-003-01, test_id: TEST-AC-ART-003-01, method: faultInjection, expected_source: openspec/specs/session-artifact-storage/spec.md#AC-ART-003-01, minimum_evidence: contract }
+  - { acceptance_id: AC-ART-004-01, test_id: TEST-AC-ART-004-01, method: manifestSchemaContract, expected_source: openspec/specs/session-artifact-storage/spec.md#AC-ART-004-01, minimum_evidence: contract }
+  - { acceptance_id: AC-ART-005-01, test_id: TEST-AC-ART-005-01, method: storageContract, expected_source: openspec/specs/session-artifact-storage/spec.md#AC-ART-005-01, minimum_evidence: contract }
+  - { acceptance_id: AC-ART-006-01, test_id: TEST-AC-ART-006-01, method: privacyExportContract, expected_source: openspec/specs/session-artifact-storage/spec.md#AC-ART-006-01, minimum_evidence: platform }
+  - { acceptance_id: AC-ART-006-02, test_id: TEST-AC-ART-006-02, method: retentionPinContract, expected_source: openspec/specs/session-artifact-storage/spec.md#AC-ART-006-02, minimum_evidence: contract }
+
+  - { acceptance_id: AC-DEBUG-001-01, test_id: TEST-AC-DEBUG-001-01, method: workflowIntegration, expected_source: openspec/specs/debug-workbench/spec.md#AC-DEBUG-001-01, minimum_evidence: contract }
+  - { acceptance_id: AC-DEBUG-002-01, test_id: TEST-AC-DEBUG-002-01, method: effectGateContract, expected_source: openspec/specs/debug-workbench/spec.md#AC-DEBUG-002-01, minimum_evidence: contract }
+  - { acceptance_id: AC-DEBUG-003-01, test_id: TEST-AC-DEBUG-003-01, method: multiDeviceContract, expected_source: openspec/specs/debug-workbench/spec.md#AC-DEBUG-003-01, minimum_evidence: contract }
+  - { acceptance_id: AC-DEBUG-004-01, test_id: TEST-AC-DEBUG-004-01, method: inputValidationContract, expected_source: openspec/specs/debug-workbench/spec.md#AC-DEBUG-004-01, minimum_evidence: contract }
+  - { acceptance_id: AC-DEBUG-005-01, test_id: TEST-AC-DEBUG-005-01, method: processContract, expected_source: openspec/specs/debug-workbench/spec.md#AC-DEBUG-005-01, minimum_evidence: contract }
+  - { acceptance_id: AC-DEBUG-006-01, test_id: TEST-AC-DEBUG-006-01, method: capabilityGateContract, expected_source: openspec/specs/debug-workbench/spec.md#AC-DEBUG-006-01, minimum_evidence: contract }
+  - { acceptance_id: AC-DEBUG-007-01, test_id: TEST-AC-DEBUG-007-01, method: storageFaultInjection, expected_source: openspec/specs/debug-workbench/spec.md#AC-DEBUG-007-01, minimum_evidence: contract }
+
+  - { acceptance_id: AC-DEV-001-01, test_id: TEST-AC-DEV-001-01, method: bindingStateContract, expected_source: openspec/specs/device-targeting-auth/spec.md#AC-DEV-001-01, minimum_evidence: contract }
+  - { acceptance_id: AC-DEV-002-01, test_id: TEST-AC-DEV-002-01, method: bindingDispatchContract, expected_source: openspec/specs/device-targeting-auth/spec.md#AC-DEV-002-01, minimum_evidence: contract }
+  - { acceptance_id: AC-DEV-002-02, test_id: TEST-AC-DEV-002-02, method: multiDeviceProperty, expected_source: openspec/specs/device-targeting-auth/spec.md#AC-DEV-002-02, minimum_evidence: contract }
+  - { acceptance_id: AC-DEV-003-01, test_id: TEST-AC-DEV-003-01, method: rebindPolicyContract, expected_source: openspec/specs/device-targeting-auth/spec.md#AC-DEV-003-01, minimum_evidence: contract }
+  - { acceptance_id: AC-DEV-003-02, test_id: TEST-AC-DEV-003-02, method: rebindPolicyContract, expected_source: openspec/specs/device-targeting-auth/spec.md#AC-DEV-003-02, minimum_evidence: contract }
+  - { acceptance_id: AC-DEV-004-01, test_id: TEST-AC-DEV-004-01, method: transportRecoveryContract, expected_source: openspec/specs/device-targeting-auth/spec.md#AC-DEV-004-01, minimum_evidence: contract }
+  - { acceptance_id: AC-DEV-005-01, test_id: TEST-AC-DEV-005-01, method: transportRecoveryContract, expected_source: openspec/specs/device-targeting-auth/spec.md#AC-DEV-005-01, minimum_evidence: contract }
+  - { acceptance_id: AC-DEV-006-01, test_id: TEST-AC-DEV-006-01, method: effectGateProperty, expected_source: openspec/specs/device-targeting-auth/spec.md#AC-DEV-006-01, minimum_evidence: contract }
+  - { acceptance_id: AC-DEV-007-01, test_id: TEST-AC-DEV-007-01, method: adapterGolden, expected_source: openspec/specs/device-targeting-auth/spec.md#AC-DEV-007-01, minimum_evidence: parserGolden }
+  - { acceptance_id: AC-DEV-008-01, test_id: TEST-AC-DEV-008-01, method: concurrencyProperty, expected_source: openspec/specs/device-targeting-auth/spec.md#AC-DEV-008-01, minimum_evidence: contract }
+
+  - { acceptance_id: AC-DIAG-001-01, test_id: TEST-AC-DIAG-001-01, method: platformLogContract, expected_source: openspec/specs/desktop-ux-observability/spec.md#AC-DIAG-001-01, minimum_evidence: platform }
+  - { acceptance_id: AC-DIAG-001-02, test_id: TEST-AC-DIAG-001-02, method: diagnosticsRedactionContract, expected_source: openspec/specs/desktop-ux-observability/spec.md#AC-DIAG-001-02, minimum_evidence: platform }
+  - { acceptance_id: AC-DIAG-002-01, test_id: TEST-AC-DIAG-002-01, method: platformPrivacyContract, expected_source: openspec/specs/desktop-ux-observability/spec.md#AC-DIAG-002-01, minimum_evidence: platform }
+
+  - { acceptance_id: AC-DUMP-001-01, test_id: TEST-AC-DUMP-001-01, method: viewModelContract, expected_source: openspec/specs/ui-dump/spec.md#AC-DUMP-001-01, minimum_evidence: contract }
+  - { acceptance_id: AC-DUMP-002-01, test_id: TEST-AC-DUMP-002-01, method: adapterGolden, expected_source: openspec/specs/ui-dump/spec.md#AC-DUMP-002-01, minimum_evidence: parserGolden }
+  - { acceptance_id: AC-DUMP-003-01, test_id: TEST-AC-DUMP-003-01, method: recipeSchemaContract, expected_source: openspec/specs/ui-dump/spec.md#AC-DUMP-003-01, minimum_evidence: contract }
+  - { acceptance_id: AC-DUMP-004-01, test_id: TEST-AC-DUMP-004-01, method: parameterFaultInjection, expected_source: openspec/specs/ui-dump/spec.md#AC-DUMP-004-01, minimum_evidence: contract }
+  - { acceptance_id: AC-DUMP-005-01, test_id: TEST-AC-DUMP-005-01, method: artifactContract, expected_source: openspec/specs/ui-dump/spec.md#AC-DUMP-005-01, minimum_evidence: contract }
+  - { acceptance_id: AC-DUMP-006-01, test_id: TEST-AC-DUMP-006-01, method: ownershipCleanupContract, expected_source: openspec/specs/ui-dump/spec.md#AC-DUMP-006-01, minimum_evidence: contract }
+  - { acceptance_id: AC-DUMP-007-01, test_id: TEST-AC-DUMP-007-01, method: sidecarFaultInjection, expected_source: openspec/specs/ui-dump/spec.md#AC-DUMP-007-01, minimum_evidence: contract }
+  - { acceptance_id: AC-DUMP-008-01, test_id: TEST-AC-DUMP-008-01, method: privacyExportContract, expected_source: openspec/specs/ui-dump/spec.md#AC-DUMP-008-01, minimum_evidence: platform }
+
+  - { acceptance_id: AC-FLASH-001-01, test_id: TEST-AC-FLASH-001-01, method: providerContract, expected_source: openspec/specs/flashing/spec.md#AC-FLASH-001-01, minimum_evidence: contract }
+  - { acceptance_id: AC-FLASH-002-01, test_id: TEST-AC-FLASH-002-01, method: prerequisiteGateContract, expected_source: openspec/specs/flashing/spec.md#AC-FLASH-002-01, minimum_evidence: contract }
+  - { acceptance_id: AC-FLASH-003-01, test_id: TEST-AC-FLASH-003-01, method: imageValidationContract, expected_source: openspec/specs/flashing/spec.md#AC-FLASH-003-01, minimum_evidence: contract }
+  - { acceptance_id: AC-FLASH-004-01, test_id: TEST-AC-FLASH-004-01, method: manifestSchemaContract, expected_source: openspec/specs/flashing/spec.md#AC-FLASH-004-01, minimum_evidence: contract }
+  - { acceptance_id: AC-FLASH-005-01, test_id: TEST-AC-FLASH-005-01, method: zeroDispatchProperty, expected_source: openspec/specs/flashing/spec.md#AC-FLASH-005-01, minimum_evidence: contract }
+  - { acceptance_id: AC-FLASH-005-02, test_id: TEST-AC-FLASH-005-02, method: finalizationFaultInjection, expected_source: openspec/specs/flashing/spec.md#AC-FLASH-005-02, minimum_evidence: contract }
+  - { acceptance_id: AC-FLASH-006-01, test_id: TEST-AC-FLASH-006-01, method: simulationIsolationContract, expected_source: openspec/specs/flashing/spec.md#AC-FLASH-006-01, minimum_evidence: contract }
+  - { acceptance_id: AC-FLASH-007-01, test_id: TEST-AC-FLASH-007-01, method: confirmationGateContract, expected_source: openspec/specs/flashing/spec.md#AC-FLASH-007-01, minimum_evidence: contract }
+  - { acceptance_id: AC-FLASH-008-01, test_id: TEST-AC-FLASH-008-01, method: criticalCancellationFaultInjection, expected_source: openspec/specs/flashing/spec.md#AC-FLASH-008-01, minimum_evidence: contract }
+  - { acceptance_id: AC-FLASH-009-01, test_id: TEST-AC-FLASH-009-01, method: powerSleepFaultInjection, expected_source: openspec/specs/flashing/spec.md#AC-FLASH-009-01, minimum_evidence: platform }
+  - { acceptance_id: AC-FLASH-010-01, test_id: TEST-AC-FLASH-010-01, method: transportRecoveryContract, expected_source: openspec/specs/flashing/spec.md#AC-FLASH-010-01, minimum_evidence: contract }
+  - { acceptance_id: AC-FLASH-011-01, test_id: TEST-AC-FLASH-011-01, method: progressContract, expected_source: openspec/specs/flashing/spec.md#AC-FLASH-011-01, minimum_evidence: contract }
+  - { acceptance_id: AC-FLASH-012-01, test_id: TEST-AC-FLASH-012-01, method: semanticPostflightContract, expected_source: openspec/specs/flashing/spec.md#AC-FLASH-012-01, minimum_evidence: contract }
+  - { acceptance_id: AC-FLASH-013-01, test_id: TEST-AC-FLASH-013-01, method: recoveryFaultInjection, expected_source: openspec/specs/flashing/spec.md#AC-FLASH-013-01, minimum_evidence: contract }
+  - { acceptance_id: AC-FLASH-014-01, test_id: TEST-AC-FLASH-014-01, method: realHardwareMatrix, expected_source: openspec/specs/flashing/spec.md#AC-FLASH-014-01, minimum_evidence: realHardware, hardware_capability: flash }
+  - { acceptance_id: AC-FLASH-015-01, test_id: TEST-AC-FLASH-015-01, method: agentExecutionPolicyContract, expected_source: openspec/specs/flashing/spec.md#AC-FLASH-015-01, minimum_evidence: contract }
+  - { acceptance_id: AC-FLASH-015-02, test_id: TEST-AC-FLASH-015-02, method: labAuthorizationContract, expected_source: openspec/specs/flashing/spec.md#AC-FLASH-015-02, minimum_evidence: contract }
+
+  - { acceptance_id: AC-HDC-001-01, test_id: TEST-AC-HDC-001-01, method: toolchainContract, expected_source: openspec/specs/toolchain-hdc-server/spec.md#AC-HDC-001-01, minimum_evidence: contract }
+  - { acceptance_id: AC-HDC-001-02, test_id: TEST-AC-HDC-001-02, method: toolchainDiagnosticsContract, expected_source: openspec/specs/toolchain-hdc-server/spec.md#AC-HDC-001-02, minimum_evidence: platform }
+  - { acceptance_id: AC-HDC-002-01, test_id: TEST-AC-HDC-002-01, method: supervisorContract, expected_source: openspec/specs/toolchain-hdc-server/spec.md#AC-HDC-002-01, minimum_evidence: contract }
+  - { acceptance_id: AC-HDC-003-01, test_id: TEST-AC-HDC-003-01, method: lifecycleCallCounter, expected_source: openspec/specs/toolchain-hdc-server/spec.md#AC-HDC-003-01, minimum_evidence: contract }
+  - { acceptance_id: AC-HDC-003-02, test_id: TEST-AC-HDC-003-02, method: ownershipEvidenceContract, expected_source: openspec/specs/toolchain-hdc-server/spec.md#AC-HDC-003-02, minimum_evidence: contract }
+  - { acceptance_id: AC-HDC-004-01, test_id: TEST-AC-HDC-004-01, method: endpointIsolationContract, expected_source: openspec/specs/toolchain-hdc-server/spec.md#AC-HDC-004-01, minimum_evidence: platform }
+  - { acceptance_id: AC-HDC-005-01, test_id: TEST-AC-HDC-005-01, method: adapterGolden, expected_source: openspec/specs/toolchain-hdc-server/spec.md#AC-HDC-005-01, minimum_evidence: parserGolden }
+  - { acceptance_id: AC-HDC-006-01, test_id: TEST-AC-HDC-006-01, method: platformFileAccessContract, expected_source: openspec/specs/toolchain-hdc-server/spec.md#AC-HDC-006-01, minimum_evidence: platform }
+  - { acceptance_id: AC-HDC-007-01, test_id: TEST-AC-HDC-007-01, method: authorizationWorkflowContract, expected_source: openspec/specs/toolchain-hdc-server/spec.md#AC-HDC-007-01, minimum_evidence: contract }
+  - { acceptance_id: AC-HDC-007-02, test_id: TEST-AC-HDC-007-02, method: authorizationFaultInjection, expected_source: openspec/specs/toolchain-hdc-server/spec.md#AC-HDC-007-02, minimum_evidence: contract }
+  - { acceptance_id: AC-HDC-008-01, test_id: TEST-AC-HDC-008-01, method: securityStateContract, expected_source: openspec/specs/toolchain-hdc-server/spec.md#AC-HDC-008-01, minimum_evidence: contract }
+  - { acceptance_id: AC-HDC-009-01, test_id: TEST-AC-HDC-009-01, method: subserverCallCounter, expected_source: openspec/specs/toolchain-hdc-server/spec.md#AC-HDC-009-01, minimum_evidence: contract }
+  - { acceptance_id: AC-HDC-010-01, test_id: TEST-AC-HDC-010-01, method: lifecycleCriticalGateContract, expected_source: openspec/specs/toolchain-hdc-server/spec.md#AC-HDC-010-01, minimum_evidence: contract }
+  - { acceptance_id: AC-HDC-010-02, test_id: TEST-AC-HDC-010-02, method: lifecycleAuditContract, expected_source: openspec/specs/toolchain-hdc-server/spec.md#AC-HDC-010-02, minimum_evidence: contract }
+  - { acceptance_id: AC-HDC-010-03, test_id: TEST-AC-HDC-010-03, method: lifecycleRaceFaultInjection, expected_source: openspec/specs/toolchain-hdc-server/spec.md#AC-HDC-010-03, minimum_evidence: contract }
+
+  - { acceptance_id: AC-I18N-001-01, test_id: TEST-AC-I18N-001-01, method: platformLocalizationContract, expected_source: openspec/specs/desktop-ux-observability/spec.md#AC-I18N-001-01, minimum_evidence: platform }
+
+  - { acceptance_id: AC-JOB-001-01, test_id: TEST-AC-JOB-001-01, method: stateMachineProperty, expected_source: openspec/specs/workflow-journal-recovery/spec.md#AC-JOB-001-01, minimum_evidence: contract }
+  - { acceptance_id: AC-JOB-001-02, test_id: TEST-AC-JOB-001-02, method: stateMachineProperty, expected_source: openspec/specs/workflow-journal-recovery/spec.md#AC-JOB-001-02, minimum_evidence: contract }
+  - { acceptance_id: AC-JOB-001-03, test_id: TEST-AC-JOB-001-03, method: recoveryFaultInjection, expected_source: openspec/specs/workflow-journal-recovery/spec.md#AC-JOB-001-03, minimum_evidence: contract }
+  - { acceptance_id: AC-JOB-001-04, test_id: TEST-AC-JOB-001-04, method: stateMachineProperty, expected_source: openspec/specs/workflow-journal-recovery/spec.md#AC-JOB-001-04, minimum_evidence: contract }
+  - { acceptance_id: AC-JOB-001-05, test_id: TEST-AC-JOB-001-05, method: recoveryFaultInjection, expected_source: openspec/specs/workflow-journal-recovery/spec.md#AC-JOB-001-05, minimum_evidence: contract }
+  - { acceptance_id: AC-JOB-001-06, test_id: TEST-AC-JOB-001-06, method: cancellationContract, expected_source: openspec/specs/workflow-journal-recovery/spec.md#AC-JOB-001-06, minimum_evidence: contract }
+  - { acceptance_id: AC-JOB-002-01, test_id: TEST-AC-JOB-002-01, method: journalFaultInjection, expected_source: openspec/specs/workflow-journal-recovery/spec.md#AC-JOB-002-01, minimum_evidence: contract }
+  - { acceptance_id: AC-JOB-003-01, test_id: TEST-AC-JOB-003-01, method: criticalCancellationContract, expected_source: openspec/specs/workflow-journal-recovery/spec.md#AC-JOB-003-01, minimum_evidence: contract }
+  - { acceptance_id: AC-JOB-004-01, test_id: TEST-AC-JOB-004-01, method: compensationFaultInjection, expected_source: openspec/specs/workflow-journal-recovery/spec.md#AC-JOB-004-01, minimum_evidence: contract }
+  - { acceptance_id: AC-JOB-005-01, test_id: TEST-AC-JOB-005-01, method: processContract, expected_source: openspec/specs/workflow-journal-recovery/spec.md#AC-JOB-005-01, minimum_evidence: contract }
+  - { acceptance_id: AC-JOB-006-01, test_id: TEST-AC-JOB-006-01, method: crashWindowFaultInjection, expected_source: openspec/specs/workflow-journal-recovery/spec.md#AC-JOB-006-01, minimum_evidence: contract }
+  - { acceptance_id: AC-JOB-007-01, test_id: TEST-AC-JOB-007-01, method: abandonJournalFaultInjection, expected_source: openspec/specs/workflow-journal-recovery/spec.md#AC-JOB-007-01, minimum_evidence: contract }
+  - { acceptance_id: AC-JOB-007-02, test_id: TEST-AC-JOB-007-02, method: hazardGateContract, expected_source: openspec/specs/workflow-journal-recovery/spec.md#AC-JOB-007-02, minimum_evidence: contract }
+  - { acceptance_id: AC-JOB-008-01, test_id: TEST-AC-JOB-008-01, method: platformInstanceContract, expected_source: openspec/specs/workflow-journal-recovery/spec.md#AC-JOB-008-01, minimum_evidence: platform }
+
+  - { acceptance_id: AC-NFR-001-01, test_id: TEST-AC-NFR-001-01, method: clockContract, expected_source: openspec/specs/workflow-journal-recovery/spec.md#AC-NFR-001-01, minimum_evidence: platform }
+  - { acceptance_id: AC-NFR-001-02, test_id: TEST-AC-NFR-001-02, method: sleepClockContract, expected_source: openspec/specs/workflow-journal-recovery/spec.md#AC-NFR-001-02, minimum_evidence: platform }
+  - { acceptance_id: AC-NFR-001-03, test_id: TEST-AC-NFR-001-03, method: sleepClockContract, expected_source: openspec/specs/workflow-journal-recovery/spec.md#AC-NFR-001-03, minimum_evidence: platform }
+  - { acceptance_id: AC-NFR-001-04, test_id: TEST-AC-NFR-001-04, method: restartClockFaultInjection, expected_source: openspec/specs/workflow-journal-recovery/spec.md#AC-NFR-001-04, minimum_evidence: platform }
+  - { acceptance_id: AC-NFR-002-01, test_id: TEST-AC-NFR-002-01, method: boundedMemoryContract, expected_source: openspec/specs/workflow-journal-recovery/spec.md#AC-NFR-002-01, minimum_evidence: platform }
+
+  - { acceptance_id: AC-STO-001-01, test_id: TEST-AC-STO-001-01, method: volumeIdentityContract, expected_source: openspec/specs/session-artifact-storage/spec.md#AC-STO-001-01, minimum_evidence: platform }
+  - { acceptance_id: AC-STO-002-01, test_id: TEST-AC-STO-002-01, method: storageFaultInjection, expected_source: openspec/specs/session-artifact-storage/spec.md#AC-STO-002-01, minimum_evidence: contract }
+  - { acceptance_id: AC-STO-003-01, test_id: TEST-AC-STO-003-01, method: admissionConcurrencyProperty, expected_source: openspec/specs/session-artifact-storage/spec.md#AC-STO-003-01, minimum_evidence: contract }
+  - { acceptance_id: AC-STO-004-01, test_id: TEST-AC-STO-004-01, method: enospcFaultInjection, expected_source: openspec/specs/session-artifact-storage/spec.md#AC-STO-004-01, minimum_evidence: platform }
+  - { acceptance_id: AC-STO-005-01, test_id: TEST-AC-STO-005-01, method: volumeRecoveryFaultInjection, expected_source: openspec/specs/session-artifact-storage/spec.md#AC-STO-005-01, minimum_evidence: platform }
+
+  - { acceptance_id: AC-TRACE-001-01, test_id: TEST-AC-TRACE-001-01, method: adapterGolden, expected_source: openspec/specs/trace/spec.md#AC-TRACE-001-01, minimum_evidence: parserGolden }
+  - { acceptance_id: AC-TRACE-002-01, test_id: TEST-AC-TRACE-002-01, method: capabilityConfigurationContract, expected_source: openspec/specs/trace/spec.md#AC-TRACE-002-01, minimum_evidence: contract }
+  - { acceptance_id: AC-TRACE-003-01, test_id: TEST-AC-TRACE-003-01, method: parameterStateContract, expected_source: openspec/specs/trace/spec.md#AC-TRACE-003-01, minimum_evidence: contract }
+  - { acceptance_id: AC-TRACE-004-01, test_id: TEST-AC-TRACE-004-01, method: parameterFaultInjection, expected_source: openspec/specs/trace/spec.md#AC-TRACE-004-01, minimum_evidence: contract }
+  - { acceptance_id: AC-TRACE-005-01, test_id: TEST-AC-TRACE-005-01, method: transportRecoveryContract, expected_source: openspec/specs/trace/spec.md#AC-TRACE-005-01, minimum_evidence: contract }
+  - { acceptance_id: AC-TRACE-006-01, test_id: TEST-AC-TRACE-006-01, method: receiveFaultInjection, expected_source: openspec/specs/trace/spec.md#AC-TRACE-006-01, minimum_evidence: contract }
+  - { acceptance_id: AC-TRACE-007-01, test_id: TEST-AC-TRACE-007-01, method: artifactProperty, expected_source: openspec/specs/trace/spec.md#AC-TRACE-007-01, minimum_evidence: parserGolden }
+  - { acceptance_id: AC-TRACE-008-01, test_id: TEST-AC-TRACE-008-01, method: progressContract, expected_source: openspec/specs/trace/spec.md#AC-TRACE-008-01, minimum_evidence: contract }
+  - { acceptance_id: AC-TRACE-009-01, test_id: TEST-AC-TRACE-009-01, method: artifactValidationContract, expected_source: openspec/specs/trace/spec.md#AC-TRACE-009-01, minimum_evidence: contract }
+
+  - { acceptance_id: AC-UX-001-01, test_id: TEST-AC-UX-001-01, method: platformViewModelContract, expected_source: openspec/specs/desktop-ux-observability/spec.md#AC-UX-001-01, minimum_evidence: platform }
+  - { acceptance_id: AC-UX-002-01, test_id: TEST-AC-UX-002-01, method: platformDiagnosticsContract, expected_source: openspec/specs/desktop-ux-observability/spec.md#AC-UX-002-01, minimum_evidence: platform }
+  - { acceptance_id: AC-UX-003-01, test_id: TEST-AC-UX-003-01, method: recoveryViewModelContract, expected_source: openspec/specs/desktop-ux-observability/spec.md#AC-UX-003-01, minimum_evidence: platform }
+  - { acceptance_id: AC-UX-004-01, test_id: TEST-AC-UX-004-01, method: historySchemaContract, expected_source: openspec/specs/desktop-ux-observability/spec.md#AC-UX-004-01, minimum_evidence: contract }
+  - { acceptance_id: AC-UX-005-01, test_id: TEST-AC-UX-005-01, method: platformAccessibilityContract, expected_source: openspec/specs/desktop-ux-observability/spec.md#AC-UX-005-01, minimum_evidence: platform }
+  - { acceptance_id: AC-UX-006-01, test_id: TEST-AC-UX-006-01, method: manifestViewModelContract, expected_source: openspec/specs/desktop-ux-observability/spec.md#AC-UX-006-01, minimum_evidence: platform }
+  - { acceptance_id: AC-UX-007-01, test_id: TEST-AC-UX-007-01, method: deviceAccessPlatformContract, expected_source: openspec/specs/desktop-ux-observability/spec.md#AC-UX-007-01, minimum_evidence: platform }
+
+  - { acceptance_id: AC-WF-001-01, test_id: TEST-AC-WF-001-01, method: workflowSchemaContract, expected_source: openspec/specs/workflow-journal-recovery/spec.md#AC-WF-001-01, minimum_evidence: contract }
+  - { acceptance_id: AC-WF-002-01, test_id: TEST-AC-WF-002-01, method: effectLatticeProperty, expected_source: openspec/specs/workflow-journal-recovery/spec.md#AC-WF-002-01, minimum_evidence: contract }

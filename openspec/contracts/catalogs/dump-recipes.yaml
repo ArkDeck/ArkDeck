@@ -1,0 +1,48 @@
+schema_version: 1.0.0
+catalog: arkui-ui-dump
+
+recipes:
+  - id: nodeSummary
+    tool: hidumper
+    arguments: ["-w", "{windowId}", "-default"]
+    required_inputs: [windowId]
+    effect_policy: output-mode-resolved
+  - id: elementTree
+    tool: hidumper
+    arguments: ["-w", "{windowId}", "-element", "-c"]
+    required_inputs: [windowId]
+    effect_policy: output-mode-resolved
+  - id: fullDefaultTree
+    tool: hidumper
+    arguments: ["-w", "{windowId}", "-default", "-all"]
+    required_inputs: [windowId]
+    effect_policy: output-mode-resolved
+  - id: componentDetail
+    tool: hidumper
+    arguments: ["-w", "{windowId}", "-element", "-lastpage", "{componentId}"]
+    required_inputs: [windowId, componentId]
+    effect_policy: output-mode-resolved
+
+legacy_fallbacks:
+  - id: renderTreeLegacy
+    arguments: ["-w", "{windowId}", "-render", "-c"]
+    availability: probe-required
+    default_visible: false
+
+input_rules:
+  windowId: validated-identifier
+  componentId: validated-identifier
+
+behavior_spec: openspec/specs/ui-dump/spec.md
+
+execution_variants:
+  stdout_only:
+    step_kind: captureRemoteStdout
+    minimum_effect: readOnly
+  creates_or_overwrites_sidecar:
+    step_kind: captureRemoteFile
+    minimum_effect: deviceMutation
+  unknown_output_behavior:
+    action: unsupported-fail-closed
+
+lane_requirement: exclusive-device-lane

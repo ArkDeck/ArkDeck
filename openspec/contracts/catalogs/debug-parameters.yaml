@@ -1,0 +1,27 @@
+schema_version: 1.0.0
+catalog: attachment-debug-profile
+
+profiles:
+  - id: attachmentArkuiGraphicDebug
+    availability: per-device-probe-required
+    reboot_policy: adapter-and-device-profile
+    parameters:
+      - { name: persist.ace.trace.syntax.enabled, value: "true" }
+      - { name: persist.ace.trace.layout.enabled, value: "true" }
+      - { name: persist.ace.trace.build.enabled, value: "true" }
+      - { name: persist.ace.trace.measure.debug.enabled, value: "true" }
+      - { name: persist.ace.trace.sync.debug.enabled, value: "true" }
+      - { name: persist.ace.debug.enabled, value: "1" }
+      - { name: persist.ace.performance.monitor.enabled, value: "true" }
+      - { name: persist.sys.graphic.openDebugTrace, value: "1" }
+      - { name: persist.rosen.animationtrace.enabled, value: "1" }
+
+rules:
+  snapshot_state: "missing | unreadable | value(String)"
+  set_requires_readback: true
+  temporary_restore_requires_original_value: true
+  missing_must_not_restore_as_false_or_zero: true
+
+behavior_specs:
+  - openspec/specs/ui-dump/spec.md
+  - openspec/specs/trace/spec.md

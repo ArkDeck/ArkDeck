@@ -1,0 +1,14 @@
+# Generated / local-only artifacts. Nothing governance-relevant may be ignored:
+# the protected set (scripts/sdd-protected-set.rb) must always be committed.
+__pycache__/
+*.pyc
+.DS_Store
+
+# Local assistant/session state (not part of the SDD or the product)
+.claude/
+
+# Xcode / SwiftPM (for the future macOS implementation)
+.build/
+DerivedData/
+xcuserdata/
+*.xcuserstate

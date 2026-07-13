@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://arkdeck.dev/schemas/pre-archive-verification-1.0.0.json",
+  "title": "ArkDeck Protected Pre-Archive Semantic Verification",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "verificationId",
+    "subjectType",
+    "changeId",
+    "changeRevision",
+    "sourceRevision",
+    "sourceChangeLockSha256",
+    "guardContract",
+    "result",
+    "invariants",
+    "validatedFiles",
+    "validatedAt",
+    "approvalId"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "verificationId": { "type": "string", "pattern": "^PREARCHIVE-[A-Z0-9._-]+$" },
+    "subjectType": { "const": "archiveSourceVerification" },
+    "changeId": { "type": "string", "pattern": "^CHG-[0-9]{4}-[0-9]{3}(?:-[A-Za-z0-9-]+)?$" },
+    "changeRevision": { "type": "integer", "minimum": 1 },
+    "sourceRevision": { "type": "string", "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$" },
+    "sourceChangeLockSha256": { "$ref": "#/$defs/sha256" },
+    "guardContract": { "const": "ARKDECK-ARCHIVE-SEMANTICS-1" },
+    "result": { "const": "passed" },
+    "invariants": {
+      "type": "array",
+      "minItems": 9,
+      "maxItems": 9,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "task-packet-ready-and-pins",
+          "atomic-claim-owner-and-lease",
+          "canonical-resource-identity",
+          "controlled-lab-pre-dispatch-authorization",
+          "typed-plan-to-execution-binding",
+          "hardware-evidence-provenance",
+          "approval-chronology",
+          "git-diff-and-result-ancestry",
+          "acceptance-and-change-verification"
+        ]
+      }
+    },
+    "validatedFiles": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "sha256"],
+        "properties": {
+          "path": { "type": "string", "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\u0000]+$" },
+          "sha256": { "$ref": "#/$defs/sha256" }
+        }
+      }
+    },
+    "validatedAt": { "type": "string", "format": "date-time" },
+    "approvalId": { "type": "string", "pattern": "^APR-[A-Z0-9._-]+$" }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+  }
+}

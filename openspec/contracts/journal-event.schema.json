@@ -1,0 +1,759 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://arkdeck.dev/schemas/journal-event-1.0.0.json",
+  "title": "ArkDeck Journal Event",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "eventId",
+    "sequence",
+    "sessionId",
+    "jobId",
+    "timestamp",
+    "kind",
+    "payload"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "eventId": { "type": "string", "minLength": 1 },
+    "sequence": { "type": "integer", "minimum": 0 },
+    "sessionId": { "type": "string", "minLength": 1 },
+    "jobId": { "type": "string", "minLength": 1 },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "accumulatedElapsedDurationNanoseconds": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "accumulatedActiveDurationNanoseconds": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "kind": { "$ref": "#/$defs/eventKind" },
+    "stepId": { "type": ["string", "null"], "minLength": 1 },
+    "attempt": { "type": ["integer", "null"], "minimum": 1 },
+    "bindingRevision": { "type": ["integer", "null"], "minimum": 1 },
+    "argumentsHash": {
+      "type": ["string", "null"],
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "payload": { "type": "object" }
+  },
+  "oneOf": [
+    { "$ref": "#/$defs/jobCreatedEvent" },
+    { "$ref": "#/$defs/stateTransitionEvent" },
+    { "$ref": "#/$defs/stepIntentEvent" },
+    { "$ref": "#/$defs/stepOutcomeEvent" },
+    { "$ref": "#/$defs/compensationIntentEvent" },
+    { "$ref": "#/$defs/compensationOutcomeEvent" },
+    { "$ref": "#/$defs/bindingCandidateEvent" },
+    { "$ref": "#/$defs/bindingConfirmedEvent" },
+    { "$ref": "#/$defs/bindingRejectedEvent" },
+    { "$ref": "#/$defs/serverGenerationChangedEvent" },
+    { "$ref": "#/$defs/sleepEvent" },
+    { "$ref": "#/$defs/wakeEvent" },
+    { "$ref": "#/$defs/reconcileStartedEvent" },
+    { "$ref": "#/$defs/reconcileOutcomeEvent" },
+    { "$ref": "#/$defs/abandonIntentEvent" },
+    { "$ref": "#/$defs/abandonOutcomeEvent" },
+    { "$ref": "#/$defs/warningEvent" },
+    { "$ref": "#/$defs/errorEvent" },
+    { "$ref": "#/$defs/finalizedEvent" }
+  ],
+  "$defs": {
+    "eventKind": {
+      "enum": [
+        "jobCreated",
+        "stateTransition",
+        "stepIntent",
+        "stepOutcome",
+        "compensationIntent",
+        "compensationOutcome",
+        "bindingCandidate",
+        "bindingConfirmed",
+        "bindingRejected",
+        "serverGenerationChanged",
+        "sleep",
+        "wake",
+        "reconcileStarted",
+        "reconcileOutcome",
+        "abandonIntent",
+        "abandonOutcome",
+        "warning",
+        "error",
+        "finalized"
+      ]
+    },
+    "jobState": {
+      "enum": [
+        "queued",
+        "preflight",
+        "running",
+        "waitingForDevice",
+        "awaitingRebindConfirmation",
+        "planning",
+        "cancelRequested",
+        "cancellingAtSafeBoundary",
+        "waitingForRecovery",
+        "reconciling",
+        "resumeAtConfirmedSafeBoundary",
+        "userAbandonRequested",
+        "finalizing",
+        "planned",
+        "succeeded",
+        "failed",
+        "cancelled",
+        "interrupted"
+      ]
+    },
+    "stateTransitionPair": {
+      "oneOf": [
+        { "properties": { "from": { "const": "queued" }, "to": { "enum": ["preflight", "cancelRequested", "finalizing"] } }, "required": ["from", "to"] },
+        { "properties": { "from": { "const": "preflight" }, "to": { "enum": ["running", "planning", "cancelRequested", "finalizing", "waitingForRecovery"] } }, "required": ["from", "to"] },
+        { "properties": { "from": { "const": "running" }, "to": { "enum": ["waitingForDevice", "cancelRequested", "finalizing", "waitingForRecovery"] } }, "required": ["from", "to"] },
+        { "properties": { "from": { "const": "waitingForDevice" }, "to": { "enum": ["running", "awaitingRebindConfirmation", "cancelRequested", "finalizing", "waitingForRecovery"] } }, "required": ["from", "to"] },
+        { "properties": { "from": { "const": "awaitingRebindConfirmation" }, "to": { "enum": ["waitingForDevice", "cancelRequested", "finalizing", "waitingForRecovery"] } }, "required": ["from", "to"] },
+        { "properties": { "from": { "const": "planning" }, "to": { "enum": ["cancelRequested", "finalizing"] } }, "required": ["from", "to"] },
+        { "properties": { "from": { "const": "cancelRequested" }, "to": { "enum": ["cancellingAtSafeBoundary", "finalizing", "waitingForRecovery"] } }, "required": ["from", "to"] },
+        { "properties": { "from": { "const": "cancellingAtSafeBoundary" }, "to": { "enum": ["cancelled", "finalizing", "waitingForRecovery"] } }, "required": ["from", "to"] },
+        { "properties": { "from": { "const": "waitingForRecovery" }, "to": { "enum": ["reconciling", "userAbandonRequested"] } }, "required": ["from", "to"] },
+        { "properties": { "from": { "const": "reconciling" }, "to": { "enum": ["resumeAtConfirmedSafeBoundary", "finalizing", "waitingForRecovery"] } }, "required": ["from", "to"] },
+        { "properties": { "from": { "const": "resumeAtConfirmedSafeBoundary" }, "to": { "enum": ["running", "planning"] } }, "required": ["from", "to"] },
+        { "properties": { "from": { "const": "userAbandonRequested" }, "to": { "enum": ["interrupted", "waitingForRecovery"] } }, "required": ["from", "to"] },
+        { "properties": { "from": { "const": "finalizing" }, "to": { "enum": ["planned", "succeeded", "failed"] } }, "required": ["from", "to"] }
+      ]
+    },
+    "outcomeCertainty": {
+      "enum": ["confirmed", "outcomeUnknown"]
+    },
+    "transport": {
+      "enum": ["usb", "tcp", "uart", "synthetic"]
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scope", "targetId", "connectKey", "identitySnapshotHash"],
+      "properties": {
+        "scope": { "enum": ["host", "server", "device"] },
+        "targetId": { "type": "string", "minLength": 1 },
+        "connectKey": { "type": ["string", "null"], "minLength": 1 },
+        "identitySnapshotHash": {
+          "type": ["string", "null"],
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "stepIntentPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["step", "target"],
+      "properties": {
+        "step": { "$ref": "https://arkdeck.dev/schemas/workflow-step-1.0.0.json#/$defs/workflowStep" },
+        "target": { "$ref": "#/$defs/target" }
+      }
+    },
+    "stepOutcomePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["correlatesToIntentEventId", "result", "outcomeCertainty"],
+      "properties": {
+        "correlatesToIntentEventId": { "type": "string", "minLength": 1 },
+        "result": { "enum": ["succeeded", "failed", "cancelled", "timedOut"] },
+        "outcomeCertainty": { "$ref": "#/$defs/outcomeCertainty" },
+        "semanticCode": { "type": ["string", "null"] },
+        "summary": { "type": ["string", "null"] }
+      }
+    },
+    "compensationIntentPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["compensationOfStepId", "descriptor", "target"],
+      "properties": {
+        "compensationOfStepId": { "type": "string", "minLength": 1 },
+        "descriptor": { "$ref": "https://arkdeck.dev/schemas/workflow-step-1.0.0.json#/$defs/compensationDescriptor" },
+        "target": { "$ref": "#/$defs/target" }
+      }
+    },
+    "compensationOutcomePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "compensationOfStepId",
+        "descriptorId",
+        "correlatesToIntentEventId",
+        "result",
+        "outcomeCertainty"
+      ],
+      "properties": {
+        "compensationOfStepId": { "type": "string", "minLength": 1 },
+        "descriptorId": { "type": "string", "minLength": 1 },
+        "correlatesToIntentEventId": { "type": "string", "minLength": 1 },
+        "result": { "enum": ["succeeded", "failed", "cancelled", "timedOut"] },
+        "outcomeCertainty": { "$ref": "#/$defs/outcomeCertainty" },
+        "semanticCode": { "type": ["string", "null"] },
+        "summary": { "type": ["string", "null"] }
+      }
+    },
+    "bindingSnapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "connectKey",
+        "transport",
+        "identitySnapshot",
+        "evidence",
+        "confirmedBy",
+        "channelProtection"
+      ],
+      "properties": {
+        "connectKey": { "type": ["string", "null"] },
+        "transport": { "$ref": "#/$defs/transport" },
+        "identitySnapshot": { "type": "object", "minProperties": 1 },
+        "evidence": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "confirmedBy": { "enum": ["corePolicy", "user", "simulation"] },
+        "channelProtection": {
+          "enum": ["encryptedVerified", "unverifiedAssumeUnprotected", "notApplicable"]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "transport": { "const": "synthetic" } },
+            "required": ["transport"]
+          },
+          "then": {
+            "properties": {
+              "connectKey": { "type": "null" },
+              "confirmedBy": { "const": "simulation" },
+              "channelProtection": { "const": "notApplicable" }
+            }
+          },
+          "else": {
+            "properties": {
+              "connectKey": { "type": "string", "minLength": 1 },
+              "confirmedBy": { "enum": ["corePolicy", "user"] },
+              "channelProtection": { "enum": ["encryptedVerified", "unverifiedAssumeUnprotected"] }
+            }
+          }
+        }
+      ]
+    },
+    "jobCreatedEvent": {
+      "properties": {
+        "kind": { "const": "jobCreated" },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["executionMode", "executionAuthority", "initialState", "coreBaseline"],
+          "properties": {
+            "executionMode": { "enum": ["execute", "planOnly", "simulated"] },
+            "executionAuthority": { "enum": ["interactiveUser", "standardAgent", "controlledHardwareLab"] },
+            "initialState": { "const": "queued" },
+            "coreBaseline": {
+              "type": "string",
+              "pattern": "^CORE-[0-9]+\\.[0-9]+\\.[0-9]+$"
+            }
+          }
+        }
+      }
+    },
+    "stateTransitionEvent": {
+      "properties": {
+        "kind": { "const": "stateTransition" },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["from", "to", "reason"],
+          "properties": {
+            "from": { "$ref": "#/$defs/jobState" },
+            "to": { "$ref": "#/$defs/jobState" },
+            "reason": { "type": "string", "minLength": 1 },
+            "triggerEventId": { "type": ["string", "null"] }
+          },
+          "allOf": [{ "$ref": "#/$defs/stateTransitionPair" }]
+        }
+      }
+    },
+    "stepIntentEvent": {
+      "required": ["stepId", "attempt", "bindingRevision", "argumentsHash"],
+      "properties": {
+        "kind": { "const": "stepIntent" },
+        "stepId": { "type": "string", "minLength": 1 },
+        "attempt": { "type": "integer", "minimum": 1 },
+        "bindingRevision": { "type": ["integer", "null"], "minimum": 1 },
+        "argumentsHash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "payload": { "$ref": "#/$defs/stepIntentPayload" }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "payload": {
+                "properties": {
+                  "step": {
+                    "properties": { "bindingRequirement": { "const": "confirmedDevice" } },
+                    "required": ["bindingRequirement"]
+                  }
+                },
+                "required": ["step"]
+              }
+            },
+            "required": ["payload"]
+          },
+          "then": {
+            "properties": {
+              "bindingRevision": { "type": "integer", "minimum": 1 },
+              "payload": {
+                "properties": {
+                  "target": {
+                    "properties": {
+                      "scope": { "const": "device" },
+                      "connectKey": { "type": "string", "minLength": 1 },
+                      "identitySnapshotHash": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "else": {
+            "properties": { "bindingRevision": { "type": "null" } }
+          }
+        }
+      ]
+    },
+    "stepOutcomeEvent": {
+      "required": ["stepId", "attempt"],
+      "properties": {
+        "kind": { "const": "stepOutcome" },
+        "stepId": { "type": "string", "minLength": 1 },
+        "attempt": { "type": "integer", "minimum": 1 },
+        "payload": { "$ref": "#/$defs/stepOutcomePayload" }
+      }
+    },
+    "compensationIntentEvent": {
+      "required": ["stepId", "attempt", "bindingRevision", "argumentsHash"],
+      "properties": {
+        "kind": { "const": "compensationIntent" },
+        "stepId": { "type": "string", "minLength": 1 },
+        "attempt": { "type": "integer", "minimum": 1 },
+        "bindingRevision": { "type": ["integer", "null"], "minimum": 1 },
+        "argumentsHash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "payload": { "$ref": "#/$defs/compensationIntentPayload" }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "payload": {
+                "properties": {
+                  "descriptor": {
+                    "properties": { "bindingRequirement": { "const": "confirmedDevice" } },
+                    "required": ["bindingRequirement"]
+                  }
+                },
+                "required": ["descriptor"]
+              }
+            },
+            "required": ["payload"]
+          },
+          "then": {
+            "properties": {
+              "bindingRevision": { "type": "integer", "minimum": 1 },
+              "payload": {
+                "properties": {
+                  "target": {
+                    "properties": {
+                      "scope": { "const": "device" },
+                      "connectKey": { "type": "string", "minLength": 1 },
+                      "identitySnapshotHash": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "else": {
+            "properties": { "bindingRevision": { "type": "null" } }
+          }
+        }
+      ]
+    },
+    "compensationOutcomeEvent": {
+      "required": ["stepId", "attempt"],
+      "properties": {
+        "kind": { "const": "compensationOutcome" },
+        "stepId": { "type": "string", "minLength": 1 },
+        "attempt": { "type": "integer", "minimum": 1 },
+        "payload": { "$ref": "#/$defs/compensationOutcomePayload" }
+      }
+    },
+    "bindingCandidateEvent": {
+      "properties": {
+        "kind": { "const": "bindingCandidate" },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "candidateId",
+            "connectKey",
+            "transport",
+            "identitySnapshot",
+            "evidence",
+            "ambiguity"
+          ],
+          "properties": {
+            "candidateId": { "type": "string", "minLength": 1 },
+            "connectKey": { "type": ["string", "null"] },
+            "transport": { "$ref": "#/$defs/transport" },
+            "identitySnapshot": { "type": "object", "minProperties": 1 },
+            "evidence": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 }
+            },
+            "ambiguity": { "enum": ["unambiguous", "ambiguous"] }
+          }
+        }
+      }
+    },
+    "bindingConfirmedEvent": {
+      "required": ["bindingRevision"],
+      "properties": {
+        "kind": { "const": "bindingConfirmed" },
+        "bindingRevision": { "type": "integer", "minimum": 1 },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["candidateEventId", "binding"],
+          "properties": {
+            "candidateEventId": { "type": "string", "minLength": 1 },
+            "binding": { "$ref": "#/$defs/bindingSnapshot" }
+          }
+        }
+      }
+    },
+    "bindingRejectedEvent": {
+      "properties": {
+        "kind": { "const": "bindingRejected" },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["candidateEventId", "reason", "evidence"],
+          "properties": {
+            "candidateEventId": { "type": "string", "minLength": 1 },
+            "reason": {
+              "enum": [
+                "identityMismatch",
+                "userRejected",
+                "ambiguous",
+                "staleCandidate",
+                "serverGenerationChanged",
+                "policyBlocked"
+              ]
+            },
+            "evidence": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 }
+            }
+          }
+        }
+      }
+    },
+    "serverGenerationChangedEvent": {
+      "properties": {
+        "kind": { "const": "serverGenerationChanged" },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["endpoint", "previousGeneration", "currentGeneration", "ownership", "reason"],
+          "properties": {
+            "endpoint": { "type": "string", "minLength": 1 },
+            "previousGeneration": { "type": "integer", "minimum": 0 },
+            "currentGeneration": { "type": "integer", "minimum": 0 },
+            "ownership": { "enum": ["external", "arkDeckManaged", "unknown"] },
+            "reason": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    },
+    "sleepEvent": {
+      "properties": {
+        "kind": { "const": "sleep" },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["elapsedDurationNanoseconds", "activeDurationNanoseconds"],
+          "properties": {
+            "elapsedDurationNanoseconds": { "type": "integer", "minimum": 0 },
+            "activeDurationNanoseconds": { "type": "integer", "minimum": 0 }
+          }
+        }
+      }
+    },
+    "wakeEvent": {
+      "properties": {
+        "kind": { "const": "wake" },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "sleepEventId",
+            "elapsedDurationNanoseconds",
+            "activeDurationNanoseconds",
+            "throughputSegmentReset"
+          ],
+          "properties": {
+            "sleepEventId": { "type": "string", "minLength": 1 },
+            "elapsedDurationNanoseconds": { "type": "integer", "minimum": 0 },
+            "activeDurationNanoseconds": { "type": "integer", "minimum": 0 },
+            "throughputSegmentReset": { "const": true }
+          }
+        }
+      }
+    },
+    "reconcileStartedEvent": {
+      "properties": {
+        "kind": { "const": "reconcileStarted" },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["recoveryAttemptId", "sourceState", "lastDurableSequence", "trigger"],
+          "properties": {
+            "recoveryAttemptId": { "type": "string", "minLength": 1 },
+            "sourceState": { "$ref": "#/$defs/jobState" },
+            "lastDurableSequence": { "type": "integer", "minimum": 0 },
+            "trigger": { "enum": ["startup", "manual", "deviceReturned", "providerRecovery"] }
+          }
+        }
+      }
+    },
+    "reconcileOutcomeEvent": {
+      "required": ["bindingRevision"],
+      "properties": {
+        "kind": { "const": "reconcileOutcome" },
+        "bindingRevision": { "type": ["integer", "null"], "minimum": 1 },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "recoveryAttemptId",
+            "result",
+            "nextState",
+            "outcomeCertainty",
+            "safeBoundaryConfirmed",
+            "evidence"
+          ],
+          "properties": {
+            "recoveryAttemptId": { "type": "string", "minLength": 1 },
+            "result": {
+              "enum": [
+                "resumeAtConfirmedSafeBoundary",
+                "waitingForRecovery",
+                "finalizeConfirmedFailure",
+                "noAction"
+              ]
+            },
+            "nextState": { "$ref": "#/$defs/jobState" },
+            "outcomeCertainty": { "$ref": "#/$defs/outcomeCertainty" },
+            "safeBoundaryConfirmed": { "type": "boolean" },
+            "evidence": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 }
+            }
+          },
+          "oneOf": [
+            {
+              "properties": {
+                "result": { "const": "resumeAtConfirmedSafeBoundary" },
+                "nextState": { "const": "resumeAtConfirmedSafeBoundary" },
+                "outcomeCertainty": { "const": "confirmed" },
+                "safeBoundaryConfirmed": { "const": true }
+              },
+              "required": ["result", "nextState", "outcomeCertainty", "safeBoundaryConfirmed"]
+            },
+            {
+              "properties": {
+                "result": { "const": "waitingForRecovery" },
+                "nextState": { "const": "waitingForRecovery" }
+              },
+              "required": ["result", "nextState"]
+            },
+            {
+              "properties": {
+                "result": { "const": "finalizeConfirmedFailure" },
+                "nextState": { "const": "finalizing" },
+                "outcomeCertainty": { "const": "confirmed" },
+                "safeBoundaryConfirmed": { "const": true }
+              },
+              "required": ["result", "nextState", "outcomeCertainty", "safeBoundaryConfirmed"]
+            },
+            {
+              "properties": {
+                "result": { "const": "noAction" },
+                "nextState": { "const": "waitingForRecovery" }
+              },
+              "required": ["result", "nextState"]
+            }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "payload": {
+                "properties": { "result": { "const": "resumeAtConfirmedSafeBoundary" } },
+                "required": ["result"]
+              }
+            },
+            "required": ["payload"]
+          },
+          "then": {
+            "properties": {
+              "bindingRevision": { "type": "integer", "minimum": 1 },
+              "payload": {
+                "properties": {
+                  "nextState": { "const": "resumeAtConfirmedSafeBoundary" },
+                  "outcomeCertainty": { "const": "confirmed" },
+                  "safeBoundaryConfirmed": { "const": true }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "abandonIntentEvent": {
+      "properties": {
+        "kind": { "const": "abandonIntent" },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "userConfirmationId",
+            "lastConfirmedStep",
+            "outcomeCertainty",
+            "managedProcessState",
+            "deviceHazards"
+          ],
+          "properties": {
+            "userConfirmationId": { "type": "string", "minLength": 1 },
+            "lastConfirmedStep": { "type": ["string", "null"], "minLength": 1 },
+            "outcomeCertainty": { "$ref": "#/$defs/outcomeCertainty" },
+            "managedProcessState": {
+              "enum": [
+                "notRunning",
+                "runningInterruptible",
+                "criticalAwaitingSafeBoundary",
+                "unknown"
+              ]
+            },
+            "deviceHazards": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 }
+            }
+          }
+        }
+      }
+    },
+    "abandonOutcomeEvent": {
+      "properties": {
+        "kind": { "const": "abandonOutcome" },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "correlatesToAbandonIntentEventId",
+            "result",
+            "releaseAuthorized",
+            "unresolvedHazards"
+          ],
+          "properties": {
+            "correlatesToAbandonIntentEventId": { "type": "string", "minLength": 1 },
+            "result": { "enum": ["archivedInterrupted", "deferred", "failed"] },
+            "releaseAuthorized": { "type": "boolean" },
+            "unresolvedHazards": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 }
+            }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": { "result": { "const": "archivedInterrupted" } },
+                "required": ["result"]
+              },
+              "then": {
+                "properties": { "releaseAuthorized": { "const": true } }
+              },
+              "else": {
+                "properties": { "releaseAuthorized": { "const": false } }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "diagnosticPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "message", "details"],
+      "properties": {
+        "code": { "type": "string", "minLength": 1 },
+        "message": { "type": "string", "minLength": 1 },
+        "details": { "type": "object" }
+      }
+    },
+    "warningEvent": {
+      "properties": {
+        "kind": { "const": "warning" },
+        "payload": { "$ref": "#/$defs/diagnosticPayload" }
+      }
+    },
+    "errorEvent": {
+      "properties": {
+        "kind": { "const": "error" },
+        "payload": { "$ref": "#/$defs/diagnosticPayload" }
+      }
+    },
+    "finalizedEvent": {
+      "properties": {
+        "kind": { "const": "finalized" },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["terminalStatus", "manifestSha256", "outcomeCertainty"],
+          "properties": {
+            "terminalStatus": {
+              "enum": ["planned", "succeeded", "failed", "cancelled", "interrupted"]
+            },
+            "manifestSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+            "outcomeCertainty": {
+              "enum": ["confirmed", "outcomeUnknown", "mixed"]
+            }
+          },
+          "oneOf": [
+            {
+              "properties": {
+                "terminalStatus": { "const": "interrupted" },
+                "outcomeCertainty": { "enum": ["confirmed", "outcomeUnknown", "mixed"] }
+              },
+              "required": ["terminalStatus", "outcomeCertainty"]
+            },
+            {
+              "properties": {
+                "terminalStatus": { "enum": ["planned", "succeeded", "failed", "cancelled"] },
+                "outcomeCertainty": { "const": "confirmed" }
+              },
+              "required": ["terminalStatus", "outcomeCertainty"]
+            }
+          ]
+        }
+      }
+    }
+  }
+}

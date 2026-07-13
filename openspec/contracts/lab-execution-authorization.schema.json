@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://arkdeck.dev/schemas/lab-execution-authorization-1.0.0.json",
+  "title": "ArkDeck Controlled Hardware Lab Execution Authorization",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "authorizationId",
+    "claimId",
+    "claimSha256",
+    "claimOwnerAttestationSha256",
+    "taskId",
+    "taskPacketSha256",
+    "operatorId",
+    "platform",
+    "runtimeCapabilities",
+    "planFile",
+    "planSha256",
+    "authorizedStepKinds",
+    "target",
+    "physicalTargetConfirmation",
+    "validFrom",
+    "validUntil",
+    "approvalId"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "authorizationId": { "type": "string", "pattern": "^LABAUTH-[A-Z0-9._-]+$" },
+    "claimId": { "type": "string", "minLength": 1 },
+    "claimSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "claimOwnerAttestationSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "taskId": { "type": "string", "pattern": "^TASK-[A-Z0-9-]+$" },
+    "taskPacketSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "operatorId": { "type": "string", "minLength": 1 },
+    "platform": { "enum": ["macos", "windows", "linux"] },
+    "runtimeCapabilities": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "repositoryProcess",
+          "externalToolExecution",
+          "deviceNetworkAccess",
+          "internetAccess",
+          "realDeviceRead",
+          "realDeviceMutation",
+          "destructiveDeviceMutation",
+          "hostPackageInstall",
+          "hostPrivilegeElevation",
+          "externalFilesystemWrite"
+        ]
+      }
+    },
+    "planFile": { "const": "lab-execution-plan.json" },
+    "planSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "authorizedStepKinds": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "https://arkdeck.dev/schemas/workflow-step-1.0.0.json#/$defs/kind" }
+    },
+    "target": { "$ref": "https://arkdeck.dev/schemas/lab-execution-plan-1.0.0.json#/$defs/target" },
+    "physicalTargetConfirmation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["confirmed", "confirmedBy", "confirmedAt"],
+      "properties": {
+        "confirmed": { "const": true },
+        "confirmedBy": { "type": "string", "minLength": 1 },
+        "confirmedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "validFrom": { "type": "string", "format": "date-time" },
+    "validUntil": { "type": "string", "format": "date-time" },
+    "approvalId": { "type": "string", "pattern": "^APR-[A-Z0-9._-]+$" }
+  }
+}

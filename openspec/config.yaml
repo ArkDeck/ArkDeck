@@ -1,0 +1,41 @@
+schema: arkdeck-behavior
+current_core_baseline: CORE-1.0.0
+declared_target_platforms: [macos, windows, linux]
+
+context: |
+  ArkDeck is governed by AGENTS.md and openspec/constitution.md.
+  openspec/specs is the current behavioral source of truth.
+  For an approved change, the effective spec is the pinned Core baseline plus only
+  the explicitly approved scoped delta; the delta wins only for listed IDs.
+  Core requirements and acceptance criteria are platform-neutral.
+  Platform profiles may implement or strengthen Core requirements, never override or relax them.
+  Every requirement uses a stable REQ-ID and at least one testable Given/When/Then scenario.
+  Changes to accepted Core behavior require explicit human approval and a baseline version update.
+  Task completion does not imply verification; evidence is mandatory.
+
+rules:
+  proposal:
+    - Classify the change as core, capability, integration, platform, or implementation-only.
+    - List affected Requirement and Acceptance IDs and whether a Core baseline update is required.
+    - Include safety, privacy, compatibility, rollback, and macOS/Windows/Linux impact with an explicit revalidation disposition for every declared target platform.
+  specs:
+    - Use SHALL, SHALL NOT, or MUST for normative behavior.
+    - Every Requirement must include at least one binary Given/When/Then Scenario.
+    - Every distinct normative clause must be covered by at least one Scenario; one token Scenario may not leave independent SHALL clauses unverified.
+    - Do not include platform API or UI toolkit details in cross-platform specs.
+    - Do not add platform overrides or relaxations.
+  design:
+    - Map every design component to Requirement and Acceptance IDs.
+    - Separate shared architecture, integration adapter, and platform port details.
+    - Record new durable technical choices as ADRs.
+  verification:
+    - Map every acceptance ID to a binary method, expected evidence, and platform applicability.
+    - Simulation and fake evidence must be classified and must not satisfy hardware acceptance.
+  review:
+    - Fail the gate on missing approval, Core override, untestable acceptance, or incomplete traceability.
+  tasks:
+    - Every task must pin the Core baseline and approved change revision.
+    - Every task must pin integration profile version/hash, platform profile version/hash, Core conformance suite/hash, and base commit/revision.
+    - Every executable task requires an atomic claim and a valid human approval reference.
+    - Every task must list requirements, acceptance scenarios, dependencies, allowed paths, forbidden paths, verification, and stop conditions.
+    - A checked task is not verified until evidence is recorded.

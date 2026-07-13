@@ -1,0 +1,101 @@
+---
+schema_version: 1.0.0
+change_id: CHG-2026-001-macos-m0a
+change_revision: 1
+platform: macos
+evidence_classes:
+- contract
+- parserGolden
+- platform
+- realHardware
+- manualReview
+cases:
+- acceptance_id: MAC-M0A-DIST-001
+  test_id: TEST-MAC-M0A-DIST-001
+  method: ADR lint plus independent signed review.
+  expected_source: openspec/changes/chg-2026-001-macos-m0a/verification.md#MAC-M0A-DIST-001
+  minimum_evidence: manualReview
+  expected_result: Exactly one distribution path, entitlement set, rejected alternatives,
+    risks and revalidation triggers are recorded.
+- acceptance_id: MAC-M0A-HDC-001
+  test_id: TEST-MAC-M0A-HDC-001
+  method: Installed-tool discovery and semantic-failure matrix.
+  expected_source: openspec/changes/chg-2026-001-macos-m0a/verification.md#MAC-M0A-HDC-001
+  minimum_evidence: platform
+  expected_result: Every candidate reports path, version and hash; semantic failures
+    are non-success.
+- acceptance_id: MAC-M0A-HDC-002
+  test_id: TEST-MAC-M0A-HDC-002
+  method: Isolated-endpoint HDC supervisor contract suite.
+  expected_source: openspec/changes/chg-2026-001-macos-m0a/verification.md#MAC-M0A-HDC-002
+  minimum_evidence: platform
+  expected_result: External server automatic kill count is zero and every ownership/generation
+    case reaches its defined result.
+- acceptance_id: MAC-M0A-JOURNAL-001
+  test_id: TEST-MAC-M0A-JOURNAL-001
+  method: Filesystem durability and torn-write fault matrix.
+  expected_source: openspec/changes/chg-2026-001-macos-m0a/verification.md#MAC-M0A-JOURNAL-001
+  minimum_evidence: platform
+  expected_result: A failed durable intent prevents external command dispatch and
+    recovery detects the incomplete record.
+- acceptance_id: MAC-M0A-POWER-001
+  test_id: TEST-MAC-M0A-POWER-001
+  method: Reference-counted activity tests and idle-sleep observation.
+  expected_source: openspec/changes/chg-2026-001-macos-m0a/verification.md#MAC-M0A-POWER-001
+  minimum_evidence: platform
+  expected_result: The assertion exists only in critical scope and is released on
+    every terminal/error path.
+- acceptance_id: MAC-M0A-PROC-001
+  test_id: TEST-MAC-M0A-PROC-001
+  method: ProcessExecutor Port contract suite.
+  expected_source: openspec/changes/chg-2026-001-macos-m0a/verification.md#MAC-M0A-PROC-001
+  minimum_evidence: platform
+  expected_result: argv/no-shell, stream, timeout, cancel and process-tree cases pass.
+- acceptance_id: MAC-M0A-RUNTIME-001
+  test_id: TEST-MAC-M0A-RUNTIME-001
+  method: Two-process single-instance contract test.
+  expected_source: openspec/changes/chg-2026-001-macos-m0a/verification.md#MAC-M0A-RUNTIME-001
+  minimum_evidence: platform
+  expected_result: Exactly one writer owns the lock and the loser produces zero device/session
+    side effects.
+- acceptance_id: MAC-M0A-SANDBOX-001
+  test_id: TEST-MAC-M0A-SANDBOX-001
+  method: End-to-end selected file/key/output and USB/UART/TCP matrix.
+  expected_source: openspec/changes/chg-2026-001-macos-m0a/verification.md#MAC-M0A-SANDBOX-001
+  minimum_evidence: realHardware
+  hardware_capability: hdcConnectivity
+  expected_result: Every prototype and resource cell has an observed allow/deny result
+    and no undeclared access.
+- acceptance_id: MAC-M0A-SHELL-001
+  test_id: TEST-MAC-M0A-SHELL-001
+  method: Clean build, signature inspection and clean-user launch smoke.
+  expected_source: openspec/changes/chg-2026-001-macos-m0a/verification.md#MAC-M0A-SHELL-001
+  minimum_evidence: platform
+  expected_result: The signed app launches and module boundaries remain separated.
+- acceptance_id: MAC-M0A-TRUST-001
+  test_id: TEST-MAC-M0A-TRUST-001
+  method: Clean-VM HDC provenance/path/key/server/file matrix.
+  expected_source: openspec/changes/chg-2026-001-macos-m0a/verification.md#MAC-M0A-TRUST-001
+  minimum_evidence: platform
+  expected_result: Every matrix cell is passed, failed or blocked with exact tool
+    hash and none is unclassified.
+- acceptance_id: MAC-M0A-TRUST-002
+  test_id: TEST-MAC-M0A-TRUST-002
+  method: Clean-VM execution of quarantined downloaded HDC.
+  expected_source: openspec/changes/chg-2026-001-macos-m0a/verification.md#MAC-M0A-TRUST-002
+  minimum_evidence: platform
+  expected_result: System block or explicit system user allow is reported; ArkDeck
+    quarantine mutation count is zero.
+- acceptance_id: MAC-M0A-TRUST-003
+  test_id: TEST-MAC-M0A-TRUST-003
+  method: Bit-identical no-quarantine control.
+  expected_source: openspec/changes/chg-2026-001-macos-m0a/verification.md#MAC-M0A-TRUST-003
+  minimum_evidence: platform
+  expected_result: The control isolates Gatekeeper from Sandbox and file-access failures.
+- acceptance_id: MAC-M0A-TRUST-004
+  test_id: TEST-MAC-M0A-TRUST-004
+  method: Safari download and Archive Utility extraction on restored VM.
+  expected_source: openspec/changes/chg-2026-001-macos-m0a/verification.md#MAC-M0A-TRUST-004
+  minimum_evidence: platform
+  expected_result: Quarantine propagation and assessment are captured without xattr
+    mutation.

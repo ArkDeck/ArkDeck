@@ -1,0 +1,63 @@
+schema_version: 1.0.0
+registry: arkdeck-workflow-steps
+
+machine_contracts:
+  workflow_plan: workflow-step.schema.json#/$defs/workflowStep
+  execution_record: workflow-step.schema.json#/$defs/executionRecord
+  compensation_descriptor: workflow-step.schema.json#/$defs/compensationDescriptor
+
+rules:
+  unknown_kind: reject-as-destructive
+  provider_may_lower_effect: false
+  provider_may_relax_cancellation: false
+  provider_may_remove_binding_requirement: false
+  raw_hdc_or_remote_command_profile_step: forbidden
+
+steps:
+  - { kind: probeHostTool, minimum_effect: hostOnly, cancellation: immediate, binding: none, profile_exposable: false }
+  - { kind: probeHDCServer, minimum_effect: hostOnly, cancellation: immediate, binding: none, profile_exposable: false }
+  - { kind: mutateHDCServerLifecycle, minimum_effect: destructive, cancellation: atSafeBoundary, binding: none, binding_exact: true, profile_exposable: false }
+  - { kind: probeDevice, minimum_effect: readOnly, cancellation: immediate, binding: confirmedDevice, profile_exposable: false }
+  - { kind: captureRemoteStdout, minimum_effect: readOnly, cancellation: immediate, binding: confirmedDevice, profile_exposable: true }
+  - { kind: captureRemoteFile, minimum_effect: deviceMutation, cancellation: atSafeBoundary, binding: confirmedDevice, profile_exposable: true }
+  - { kind: stopRemoteCapture, minimum_effect: deviceMutation, cancellation: atSafeBoundary, binding: confirmedDevice, profile_exposable: false }
+  - { kind: sendFile, minimum_effect: deviceMutation, cancellation: atSafeBoundary, binding: confirmedDevice, profile_exposable: true }
+  - { kind: receiveFile, minimum_effect: readOnly, cancellation: immediate, binding: confirmedDevice, profile_exposable: true }
+  - { kind: snapshotParameter, minimum_effect: readOnly, cancellation: immediate, binding: confirmedDevice, profile_exposable: true }
+  - { kind: setParameter, minimum_effect: deviceMutation, cancellation: atSafeBoundary, binding: confirmedDevice, profile_exposable: true }
+  - { kind: restoreParameter, minimum_effect: deviceMutation, cancellation: atSafeBoundary, binding: confirmedDevice, profile_exposable: false }
+  - { kind: waitForDisconnect, minimum_effect: readOnly, cancellation: immediate, binding: confirmedDevice, profile_exposable: false }
+  - { kind: waitForReconnect, minimum_effect: readOnly, cancellation: immediate, binding: confirmedDevice, profile_exposable: false }
+  - { kind: verifyRemoteState, minimum_effect: readOnly, cancellation: immediate, binding: confirmedDevice, profile_exposable: false }
+  - { kind: verifyArtifact, minimum_effect: hostOnly, cancellation: immediate, binding: none, profile_exposable: false }
+  - { kind: preflightHostStorage, minimum_effect: hostOnly, cancellation: immediate, binding: none, profile_exposable: false }
+  - { kind: preflightDeviceStorage, minimum_effect: readOnly, cancellation: immediate, binding: confirmedDevice, profile_exposable: false }
+  - { kind: hashFile, minimum_effect: hostOnly, cancellation: immediate, binding: none, profile_exposable: false }
+  - { kind: postprocessArtifact, minimum_effect: hostOnly, cancellation: immediate, binding: none, profile_exposable: false }
+  - { kind: cleanupOwnedRemotePath, minimum_effect: deviceMutation, cancellation: atSafeBoundary, binding: confirmedDevice, profile_exposable: false }
+  - { kind: requestConfirmation, minimum_effect: hostOnly, cancellation: immediate, binding: none, profile_exposable: false }
+  - { kind: installPackage, minimum_effect: deviceMutation, cancellation: atSafeBoundary, binding: confirmedDevice, profile_exposable: true }
+  - { kind: uninstallPackage, minimum_effect: deviceMutation, cancellation: atSafeBoundary, binding: confirmedDevice, profile_exposable: true }
+  - { kind: startApplication, minimum_effect: deviceMutation, cancellation: atSafeBoundary, binding: confirmedDevice, profile_exposable: true }
+  - { kind: stopApplication, minimum_effect: deviceMutation, cancellation: atSafeBoundary, binding: confirmedDevice, profile_exposable: true }
+  - { kind: createPortForward, minimum_effect: deviceMutation, cancellation: atSafeBoundary, binding: confirmedDevice, profile_exposable: true }
+  - { kind: removePortForward, minimum_effect: deviceMutation, cancellation: atSafeBoundary, binding: confirmedDevice, profile_exposable: true }
+  - { kind: clearLogBuffer, minimum_effect: deviceMutation, cancellation: atSafeBoundary, binding: confirmedDevice, profile_exposable: false }
+  - { kind: resizeLogBuffer, minimum_effect: deviceMutation, cancellation: atSafeBoundary, binding: confirmedDevice, profile_exposable: false }
+  - { kind: startDeviceLogPersist, minimum_effect: deviceMutation, cancellation: atSafeBoundary, binding: confirmedDevice, profile_exposable: false }
+  - { kind: runApprovedRemoteRead, minimum_effect: readOnly, cancellation: immediate, binding: confirmedDevice, profile_exposable: true }
+  - { kind: runApprovedRemoteMutation, minimum_effect: deviceMutation, cancellation: atSafeBoundary, binding: confirmedDevice, profile_exposable: true }
+  - { kind: rebootDevice, minimum_effect: deviceMutation, cancellation: atSafeBoundary, binding: confirmedDevice, profile_exposable: true }
+  - { kind: enterUpdater, minimum_effect: deviceMutation, cancellation: atSafeBoundary, binding: confirmedDevice, profile_exposable: true }
+  - { kind: flashPartition, minimum_effect: destructive, cancellation: criticalNonInterruptible, binding: confirmedDevice, profile_exposable: true }
+  - { kind: updatePackage, minimum_effect: destructive, cancellation: criticalNonInterruptible, binding: confirmedDevice, profile_exposable: true }
+  - { kind: erasePartition, minimum_effect: destructive, cancellation: criticalNonInterruptible, binding: confirmedDevice, profile_exposable: true }
+  - { kind: formatPartition, minimum_effect: destructive, cancellation: criticalNonInterruptible, binding: confirmedDevice, profile_exposable: true }
+  - { kind: unlockDevice, minimum_effect: destructive, cancellation: criticalNonInterruptible, binding: confirmedDevice, profile_exposable: true }
+  - { kind: finalizeSession, minimum_effect: hostOnly, cancellation: atSafeBoundary, binding: none, profile_exposable: false }
+
+adapter_rule: >-
+  Adapters may translate a registered typed kind into HDC/tool argv only after
+  validation against the machine contract. Profiles cannot expose raw
+  runHDC/runRemoteTool wrappers, executable/shell/argv payloads, or select a lower
+  effect, weaker cancellation policy, or missing binding requirement.

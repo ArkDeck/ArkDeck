@@ -1,0 +1,262 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://arkdeck.dev/schemas/task-run-1.0.0.json",
+  "title": "ArkDeck Task Run Record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "runId",
+    "approvalId",
+    "claimId",
+    "taskPacketSha256",
+    "taskId",
+    "taskRevision",
+    "attempt",
+    "coreBaseline",
+    "coreBaselineSha256",
+    "changeId",
+    "changeRevision",
+    "platformProfileSha256",
+    "integrationProfileSha256s",
+    "conformanceSuiteSha256",
+    "platform",
+    "baseRevision",
+    "executedBy",
+    "executionPlanSha256",
+    "labAuthorizationId",
+    "supersededByTaskId",
+    "supersessionApprovalId",
+    "supersessionReason",
+    "realDeviceDispatchCount",
+    "firstRealDeviceDispatchAt",
+    "lastRealDeviceDispatchAt",
+    "startedAt",
+    "status",
+    "modifiedFiles",
+    "commands",
+    "workflowExecutionRecords",
+    "acceptanceResults",
+    "evidence",
+    "remainingRisk",
+    "handoff"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "runId": { "type": "string", "minLength": 1 },
+    "approvalId": {
+      "oneOf": [
+        { "type": "string", "pattern": "^APR-[A-Z0-9._-]+$" },
+        { "type": "null" }
+      ]
+    },
+    "claimId": { "type": "string", "minLength": 1 },
+    "taskPacketSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "taskId": { "type": "string", "pattern": "^TASK-[A-Z0-9-]+$" },
+    "taskRevision": { "type": "integer", "minimum": 1 },
+    "attempt": { "type": "integer", "minimum": 1 },
+    "coreBaseline": { "type": "string", "pattern": "^CORE-[0-9]+\\.[0-9]+\\.[0-9]+$" },
+    "coreBaselineSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "changeId": { "type": "string", "pattern": "^CHG-[0-9]{4}-[0-9]{3}(?:-[A-Za-z0-9-]+)?$" },
+    "changeRevision": { "type": "integer", "minimum": 1 },
+    "platformProfileSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "integrationProfileSha256s": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+    },
+    "conformanceSuiteSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "platform": { "enum": ["macos", "windows", "linux"] },
+    "baseRevision": { "type": "string", "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$" },
+    "executedBy": { "type": "string", "minLength": 1 },
+    "executionPlanSha256": {
+      "oneOf": [
+        { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        { "type": "null" }
+      ]
+    },
+    "labAuthorizationId": {
+      "oneOf": [
+        { "type": "string", "pattern": "^LABAUTH-[A-Z0-9._-]+$" },
+        { "type": "null" }
+      ]
+    },
+    "supersededByTaskId": {
+      "oneOf": [
+        { "type": "string", "pattern": "^TASK-[A-Z0-9-]+$" },
+        { "type": "null" }
+      ]
+    },
+    "supersessionApprovalId": {
+      "oneOf": [
+        { "type": "string", "pattern": "^APR-[A-Z0-9._-]+$" },
+        { "type": "null" }
+      ]
+    },
+    "supersessionReason": { "type": ["string", "null"], "minLength": 1 },
+    "realDeviceDispatchCount": { "type": "integer", "minimum": 0 },
+    "firstRealDeviceDispatchAt": { "type": ["string", "null"], "format": "date-time" },
+    "lastRealDeviceDispatchAt": { "type": ["string", "null"], "format": "date-time" },
+    "resultRevision": { "type": ["string", "null"], "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$" },
+    "startedAt": { "type": "string", "format": "date-time" },
+    "endedAt": { "type": ["string", "null"], "format": "date-time" },
+    "status": { "enum": ["done", "blocked", "interrupted", "superseded"] },
+    "modifiedFiles": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+    "commands": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["command", "exitCode", "summary"],
+        "properties": {
+          "command": { "type": "string", "minLength": 1 },
+          "exitCode": { "type": ["integer", "null"] },
+          "summary": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "workflowExecutionRecords": {
+      "type": "array",
+      "items": { "$ref": "https://arkdeck.dev/schemas/workflow-step-1.0.0.json#/$defs/executionRecord" }
+    },
+    "acceptanceResults": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["acceptanceId", "testId", "method", "result", "evidenceIds", "fixtureRefs", "hardwareMatrixRefs"],
+        "properties": {
+          "acceptanceId": { "$ref": "#/$defs/acceptanceId" },
+          "testId": { "type": "string", "pattern": "^[A-Z][A-Z0-9-]+$" },
+          "method": { "type": "string", "minLength": 1 },
+          "result": { "enum": ["passed", "failed", "blocked", "notRun"] },
+          "evidenceIds": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+          "fixtureRefs": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+          "hardwareMatrixRefs": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": { "result": { "enum": ["passed", "failed"] } },
+              "required": ["result"]
+            },
+            "then": { "properties": { "evidenceIds": { "minItems": 1 } } }
+          }
+        ]
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["evidenceId", "classification", "platform", "sha256", "locationKind", "location", "verificationRef", "summary"],
+        "properties": {
+          "evidenceId": { "type": "string", "minLength": 1 },
+          "classification": {
+            "enum": ["simulation", "fake", "unit", "contract", "parserGolden", "platform", "realDevice", "realHardware", "manualReview"]
+          },
+          "platform": { "enum": ["shared", "macos", "windows", "linux"] },
+          "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "locationKind": { "enum": ["repository", "controlledExternal"] },
+          "location": { "type": "string", "minLength": 1 },
+          "verificationRef": { "type": ["string", "null"], "minLength": 1 },
+          "summary": { "type": "string", "minLength": 1 }
+        },
+        "allOf": [
+          {
+            "if": { "properties": { "locationKind": { "const": "repository" } }, "required": ["locationKind"] },
+            "then": {
+              "properties": {
+                "location": { "type": "string", "pattern": "^repo:(?!/)(?!\\.\\.(?:/|$))(?!.*(?:/)\\.\\.(?:/|$)).+$" },
+                "verificationRef": { "type": "null" }
+              }
+            },
+            "else": {
+              "properties": {
+                "location": { "type": "string", "pattern": "^controlledExternal:.+$" },
+                "verificationRef": { "type": "string", "minLength": 1 }
+              }
+            }
+          }
+        ]
+      }
+    },
+    "deviations": { "type": "array", "items": { "type": "string" } },
+    "remainingRisk": { "type": "array", "items": { "type": "string" } },
+    "handoff": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["safeRecoveryPoint", "nextAction"],
+      "properties": {
+        "safeRecoveryPoint": { "type": "string", "minLength": 1 },
+        "nextAction": { "type": "string", "minLength": 1 }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "status": { "const": "superseded" } },
+        "required": ["status"]
+      },
+      "then": {
+        "properties": {
+          "supersededByTaskId": { "type": "string", "pattern": "^TASK-[A-Z0-9-]+$" },
+          "supersessionApprovalId": { "type": "string", "pattern": "^APR-[A-Z0-9._-]+$" },
+          "supersessionReason": { "type": "string", "minLength": 1 }
+        }
+      },
+      "else": {
+        "properties": {
+          "supersededByTaskId": { "type": "null" },
+          "supersessionApprovalId": { "type": "null" },
+          "supersessionReason": { "type": "null" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "status": { "const": "done" } },
+        "required": ["status"]
+      },
+      "then": {
+        "properties": {
+          "endedAt": { "type": "string", "format": "date-time" },
+          "resultRevision": { "type": "string", "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$" },
+          "approvalId": { "type": "string", "pattern": "^APR-[A-Z0-9._-]+$" },
+          "modifiedFiles": { "minItems": 1 },
+          "commands": { "minItems": 1 },
+          "acceptanceResults": {
+            "minItems": 1,
+            "items": {
+              "properties": {
+                "result": { "const": "passed" },
+                "evidenceIds": { "minItems": 1 }
+              }
+            }
+          },
+          "evidence": { "minItems": 1 }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "status": { "enum": ["done", "blocked", "interrupted", "superseded"] } },
+        "required": ["status"]
+      },
+      "then": {
+        "properties": {
+          "endedAt": { "type": "string", "format": "date-time" },
+          "resultRevision": { "type": "string", "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$" }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "acceptanceId": {
+      "type": "string",
+      "pattern": "^(?:AC-[A-Z]+-[0-9]{3}-[0-9]{2}|[A-Z]+-M[0-9]+[A-Z]*-[A-Z0-9]+(?:-[A-Z0-9]+)*-[0-9]{3})$"
+    }
+  }
+}

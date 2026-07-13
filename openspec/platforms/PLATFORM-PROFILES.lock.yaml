@@ -1,0 +1,69 @@
+lock: PLATFORM-PROFILES-0.1.0
+revision: 1
+status: review
+execution_gate: closed
+generated_at: 2026-07-12
+accepted_at: null
+hash_algorithm: sha256
+previous_lock: null
+current_delivery_platforms: [macos]
+not_started_platforms: [windows, linux]
+ratification:
+  status: pending-protected-human-review
+  approval_ref: null
+
+profiles:
+  - id: PLATFORM-LINUX
+    platform: linux
+    version: 0.1.0
+    profile_path: openspec/platforms/linux/profile.md
+    profile_sha256: e04312b05a7a588e3e1a565a6520aaa8478edcc87b9ee066625345cb2c1af5c8
+    verification_path: openspec/platforms/linux/verification.md
+    verification_sha256: 5a436de2a52fac4743407ec102f374eb58ba87c7e5b221c233c76d730fe3f268
+    case_manifest_path: openspec/platforms/linux/conformance-cases.yaml
+    case_manifest_sha256: 18a08466e17094e02216d6db07cf4a64489ab1e9447f4f45cc43ff97f10b38d6
+    release_subject: { path: null, sha256: null, approval_id: null }
+    conformance_status: notStarted
+    last_verified: { profile_sha256: null, verification_sha256: null, case_manifest_sha256: null, core_baseline: null, core_baseline_sha256: null, conformance_suite_sha256: null, integration_lock_sha256: null, release_subject_path: null, release_subject_sha256: null, release_subject_approval_id: null, support_matrix_sha256: null, valid_until: null, evidence_path: null, evidence_sha256: null, approval_id: null }
+  - id: PLATFORM-MACOS
+    platform: macos
+    version: 0.1.0
+    profile_path: openspec/platforms/macos/profile.md
+    profile_sha256: 54bd9b295799cb8d93bf397eeb585f24828463f4f1fce1e59a0693f65369d0bf
+    verification_path: openspec/platforms/macos/verification.md
+    verification_sha256: 0e3de8749ec5e974ed96ceed1760ee7e049a92eecb052c2cfb47658390ca7072
+    case_manifest_path: openspec/platforms/macos/conformance-cases.yaml
+    case_manifest_sha256: 0502fb2d7a2807f3d99c61b4db90f5e8f7963a80cc6a225f541cfe7f8613178b
+    release_subject: { path: null, sha256: null, approval_id: null }
+    conformance_status: notStarted
+    last_verified: { profile_sha256: null, verification_sha256: null, case_manifest_sha256: null, core_baseline: null, core_baseline_sha256: null, conformance_suite_sha256: null, integration_lock_sha256: null, release_subject_path: null, release_subject_sha256: null, release_subject_approval_id: null, support_matrix_sha256: null, valid_until: null, evidence_path: null, evidence_sha256: null, approval_id: null }
+  - id: PLATFORM-WINDOWS
+    platform: windows
+    version: 0.1.0
+    profile_path: openspec/platforms/windows/profile.md
+    profile_sha256: fddf171364559210fa0e28a12e21556c26b134b2a08d05947942801b5389cbbd
+    verification_path: openspec/platforms/windows/verification.md
+    verification_sha256: b7d7b9544543c097ad86f0a8c0b79303a7829903fdc732f33f89ab7c4b481571
+    case_manifest_path: openspec/platforms/windows/conformance-cases.yaml
+    case_manifest_sha256: e2a768a24ab5f6472e2e41e1f57cb1883ad7a859e07d1004362f6e078a250aff
+    release_subject: { path: null, sha256: null, approval_id: null }
+    conformance_status: notStarted
+    last_verified: { profile_sha256: null, verification_sha256: null, case_manifest_sha256: null, core_baseline: null, core_baseline_sha256: null, conformance_suite_sha256: null, integration_lock_sha256: null, release_subject_path: null, release_subject_sha256: null, release_subject_approval_id: null, support_matrix_sha256: null, valid_until: null, evidence_path: null, evidence_sha256: null, approval_id: null }
+
+change_rule: >-
+  An approved platform change may issue a new PLATFORM-PROFILES lock revision
+  without changing Core behavior or CORE-x.y.z. Tasks still pin the exact profile
+  hash. Delivery/not-started lifecycle is versioned on this Platform axis and does
+  not rewrite the Core baseline or Core conformance suite. A profile that changes
+  Core semantics is invalid and requires a Core change.
+  A verified entry is valid only for its last_verified profile, verification,
+  platform case manifest, implementation revision/release artifact/environment,
+  Core, Integration and Conformance hashes plus structured approved evidence.
+  A changed pin forces needsReverification until new evidence exists. Revision 2+
+  must hash-pin its accepted predecessor in history; verified history cannot reset.
+  `verified` is scoped only to the exact passed supportMatrix tuples and release
+  artifact hashes in its approved PCE; any other build, OS/arch/package tuple or
+  expired validity window is unverified and requires a new lock revision/evidence.
+  The entry's protected release_subject is the only current release object; a
+  new commit/package changes that pin and forces needsReverification until its
+  exact per-cell PCE passes.

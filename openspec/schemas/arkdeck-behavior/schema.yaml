@@ -1,0 +1,67 @@
+name: arkdeck-behavior
+version: 1
+description: ArkDeck behavior/Core change with delta, verification, and review gates
+artifacts:
+  - id: proposal
+    generates: proposal.md
+    description: Why, scope, impact, and approval target
+    template: proposal.md
+    instruction: Create a proposal without claiming approval.
+    requires: []
+  - id: scope
+    generates: scope.yaml
+    description: Exact immutable Requirement and Acceptance scope
+    template: scope.yaml
+    instruction: Declare the exact Requirement/AC union that all Task packets must cover.
+    requires: [proposal]
+  - id: specs
+    generates: specs/**/*.md
+    description: Complete V1 ADDED/MODIFIED delta specs; removals/renames fail closed
+    template: spec.md
+    instruction: Create complete ADDED/MODIFIED Requirement replacements with stable IDs and complete Scenario sets; V1 rejects REMOVED/RENAMED and removal of an old AC.
+    requires: [proposal, scope]
+  - id: design
+    generates: design.md
+    description: Technical design mapped to requirements
+    template: design.md
+    instruction: Design without overriding the approved spec overlay.
+    requires: [proposal, scope, specs]
+  - id: verification
+    generates: verification.md
+    description: Acceptance methods and evidence plan/results
+    template: verification.md
+    instruction: Map every AC to binary verification and evidence.
+    requires: [specs, design]
+  - id: acceptance_cases
+    generates: acceptance-cases.yaml
+    description: Change-local canonical cases for every changed Acceptance ID
+    template: acceptance-cases.yaml
+    instruction: Exactly cover the delta-touched AC set; bind every case to its exact delta Scenario path, anchor and block hash.
+    requires: [specs, verification]
+  - id: review
+    generates: review.md
+    description: Pre-task specification, design, and verification review
+    template: review.md
+    instruction: Fail on invalid approval, Core override, gaps, or untestable AC.
+    requires: [specs, design, verification, acceptance_cases]
+  - id: tasks
+    generates: tasks.md
+    description: Immutable executable task packets; runtime claims are sidecars
+    template: tasks.md
+    instruction: Create task packets only; do not mark ready without valid approval.
+    requires: [specs, design, verification, acceptance_cases, review]
+  - id: ready_review
+    generates: ready-review.md
+    description: Pre-approval structural, pinning, and execution-readiness review
+    template: ready-review.md
+    instruction: Review immutable packet structure, planned approval subjects, pins and verification mappings without claiming that post-lock approvals already exist.
+    requires: [tasks, review]
+  - id: change_lock
+    generates: change-lock.yaml
+    description: Immutable hash manifest for normative change inputs
+    template: change-lock.yaml
+    instruction: Hash proposal, scope, deltas, design, verification, change-local acceptance cases, review and ready-review; exclude the task index and independently approved Task packets; do not claim approval.
+    requires: [tasks, review, ready_review]
+apply:
+  requires: [tasks, review, ready_review, change_lock, verification, acceptance_cases]
+  tracks: tasks.md

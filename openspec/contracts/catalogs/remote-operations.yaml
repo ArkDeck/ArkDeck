@@ -1,0 +1,44 @@
+schema_version: 1.0.0
+catalog: arkdeck-remote-operations
+version: 1.0.0
+
+rules:
+  unknown_operation: reject-as-destructive
+  raw_command_fields: forbidden
+  adapter_mapping: exact-operation-id-only
+  parameter_policy: reject-undeclared-or-unvalidated
+
+operations:
+  - id: deviceSummary
+    step_kind: runApprovedRemoteRead
+    minimum_effect: readOnly
+    cancellation: immediate
+    binding: confirmedDevice
+  - id: systemProperties
+    step_kind: runApprovedRemoteRead
+    minimum_effect: readOnly
+    cancellation: immediate
+    binding: confirmedDevice
+  - id: processList
+    step_kind: runApprovedRemoteRead
+    minimum_effect: readOnly
+    cancellation: immediate
+    binding: confirmedDevice
+  - id: packageInfo
+    step_kind: runApprovedRemoteRead
+    minimum_effect: readOnly
+    cancellation: immediate
+    binding: confirmedDevice
+  - id: storageUsage
+    step_kind: runApprovedRemoteRead
+    minimum_effect: readOnly
+    cancellation: immediate
+    binding: confirmedDevice
+  - id: requestRootMode
+    step_kind: runApprovedRemoteMutation
+    minimum_effect: deviceMutation
+    cancellation: atSafeBoundary
+    binding: confirmedDevice
+    confirmation: required
+
+behavior_spec: openspec/specs/debug-workbench/spec.md

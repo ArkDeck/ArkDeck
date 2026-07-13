@@ -1,0 +1,241 @@
+suite: CORE-CONFORMANCE-1.0.0
+revision: 1
+status: review
+core_baseline: CORE-1.0.0
+execution_gate: closed
+
+acceptance_index:
+  path: openspec/verification/acceptance-index.txt
+  sha256: 69b43018a1449880171dcb5fc9c05e863f354a8ed81e24c51b5cdfd09ac05b9c
+  count: 110
+  selector: all-current-core-acceptance-ids
+
+acceptance_cases:
+  path: openspec/verification/acceptance-cases.yaml
+  sha256: 3e701bcdfe5bd49c8c1dcde1dc459a07707ec1a16ba1b6c33c3effa833f2c06f
+  count: 110
+  expected_result: normative-scenario-then-and-clauses
+
+applicability:
+  default_platforms: [macos, windows, linux]
+  platform_overrides: []
+  rule: >-
+    A platform may add stronger platform tests but may not remove an acceptance ID,
+    change its expected result, or declare it not applicable. Any applicability
+    change requires a Core change and a new conformance-suite version. Inclusion
+    here is a target obligation, not a support claim; only a verified/releasable
+    Platform Profile may be advertised.
+
+shared_inputs:
+  integration_lock:
+    id: INTEGRATION-PROFILES-0.1.0
+    path: openspec/integrations/INTEGRATION-PROFILES.lock.yaml
+    sha256: 054f5c79b8770cfca9d99e6a5f5c5dc94756256e7739863a4b0efc9d9f62c95f
+  integration_profiles:
+    - id: OPENHARMONY-TOOLS
+      version: 0.1.0
+      path: openspec/integrations/openharmony/profile.md
+      sha256: 679874cf44234a00b7e5d8f920e81c6b52ff489df2a2c8dd6f03b540c87a11e1
+  catalogs:
+    - path: openspec/contracts/catalogs/remote-operations.yaml
+      version: 1.0.0
+      sha256: 8d6b8f6fafcabf0367450db6cd1fcdfc39b707bbc8f026ff9f20ca1ffb69018d
+    - path: openspec/contracts/catalogs/dump-recipes.yaml
+      version: 1.0.0
+      sha256: 5d477ef767edf8d6e7a0f48bf9f4fac3999ed1a1604dc8341cb618f38f0a477b
+    - path: openspec/contracts/catalogs/trace-presets.yaml
+      version: 1.0.0
+      sha256: 12c0f0502cb17832f66223670a124b6fe48e903883a01c44a9cc4340fc2628cf
+    - path: openspec/contracts/catalogs/debug-parameters.yaml
+      version: 1.0.0
+      sha256: 10ee4c38c4728a344a39b98b56759adae50323c260ad52345eaf4d5e4f978acc
+  contracts:
+    - path: openspec/contracts/provider-contracts.md
+      version: 1.0.0
+      sha256: a562fd490322cfdcb2c61916ce97783fd39fbef88bd8b7d1c46d4d71b7fad596
+    - path: openspec/contracts/workflow-step.schema.json
+      version: 1.0.0
+      sha256: 624d61071070ec1f873a811307fe7eb39f7697c37a68ed3ef8fad774522d1688
+    - path: openspec/contracts/workflow-step-registry.yaml
+      version: 1.0.0
+      sha256: 2ee47057b157a745f45d85f109735a9e10ea8cab3661cfa192043bbc7ac394f3
+    - path: openspec/contracts/manifest.schema.json
+      version: 1.0.0
+      sha256: 52be768697e75fc98a00a386345162af2e1a8ca3607b86f755adb766cf0ad489
+    - path: openspec/contracts/journal-event.schema.json
+      version: 1.0.0
+      sha256: caefd7909d7f270251cefa76c9fcc49416e66ade8d8a66c2b20598043ff6e962
+  fixtures: []
+
+fixture_policy:
+  status: notImplemented
+  rule: >-
+    A case whose minimum evidence is parserGolden cannot pass until every fixture
+    it uses is versioned and hash-pinned here through an approved integration change.
+    Empty fixture inputs never mean pass.
+
+evidence_policy:
+  source: openspec/verification/acceptance-cases.yaml
+  classes: [contract, parserGolden, platform, realHardware]
+  simulation_and_fake_are_classified: true
+  simulation_satisfies_hardware_claim: false
+  real_hardware_required:
+    - AC-FLASH-014-01
+  hardware_claim_rule: >-
+    Any real-device support statement additionally requires a matching, unexpired
+    externally approved hardware-evidence record for device, firmware, HDC,
+    transport, privilege and Provider, plus its controlled evidence artifact.
+
+safety_coverage:
+  - invariants: [POL-HDC-001]
+    requirements: [REQ-HDC-002, REQ-HDC-003, REQ-HDC-010]
+    normal:
+      - AC-HDC-003-02
+      - AC-HDC-010-02
+    refusal_or_failure:
+      - AC-HDC-003-01
+      - AC-HDC-010-01
+      - AC-HDC-010-03
+    recovery_or_restart:
+      - AC-HDC-002-01
+
+  - invariants: [POL-TARGET-001]
+    requirements:
+      - REQ-HDC-008
+      - REQ-DEV-001
+      - REQ-DEV-002
+      - REQ-DEV-003
+      - REQ-DEV-004
+      - REQ-DEV-005
+      - REQ-DEV-006
+    normal:
+      - AC-DEV-001-01
+      - AC-DEV-002-01
+      - AC-DEV-002-02
+      - AC-DEV-003-01
+    refusal_or_failure:
+      - AC-HDC-008-01
+      - AC-DEV-003-02
+      - AC-DEV-006-01
+    recovery_or_restart:
+      - AC-DEV-004-01
+      - AC-DEV-005-01
+      - AC-FLASH-010-01
+
+  - invariants: [POL-WORKFLOW-001, POL-RECOVERY-001]
+    requirements:
+      - REQ-WF-001
+      - REQ-WF-002
+      - REQ-JOB-001
+      - REQ-JOB-002
+      - REQ-JOB-003
+      - REQ-JOB-006
+      - REQ-JOB-007
+    normal:
+      - AC-WF-001-01
+      - AC-WF-002-01
+      - AC-JOB-001-01
+      - AC-JOB-001-06
+    refusal_or_failure:
+      - AC-JOB-001-02
+      - AC-JOB-001-04
+      - AC-JOB-002-01
+      - AC-JOB-003-01
+    recovery_or_restart:
+      - AC-JOB-001-03
+      - AC-JOB-001-05
+      - AC-JOB-006-01
+      - AC-JOB-007-01
+      - AC-JOB-007-02
+
+  - invariants: [POL-MODE-001]
+    requirements: [REQ-ART-004, REQ-FLASH-004, REQ-FLASH-005, REQ-FLASH-006]
+    normal:
+      - AC-FLASH-004-01
+      - AC-FLASH-005-01
+      - AC-FLASH-006-01
+      - AC-ART-004-01
+    refusal_or_failure:
+      - AC-FLASH-005-02
+    recovery_or_restart:
+      not_applicable_reason: >-
+        Mode identity is immutable persisted data; restart behavior is exercised by
+        AC-ART-004-01 and no mode transition is permitted during recovery.
+
+  - invariants: [POL-STORAGE-001, POL-ARTIFACT-001]
+    requirements:
+      - REQ-ART-002
+      - REQ-ART-003
+      - REQ-STO-001
+      - REQ-STO-002
+      - REQ-STO-003
+      - REQ-STO-004
+      - REQ-STO-005
+    normal:
+      - AC-ART-002-01
+      - AC-STO-001-01
+      - AC-STO-003-01
+    refusal_or_failure:
+      - AC-STO-002-01
+      - AC-STO-004-01
+    recovery_or_restart:
+      - AC-ART-003-01
+      - AC-STO-005-01
+
+  - invariants: [POL-SAFETY-001]
+    requirements:
+      - REQ-FLASH-002
+      - REQ-FLASH-003
+      - REQ-FLASH-007
+      - REQ-FLASH-008
+      - REQ-FLASH-009
+      - REQ-FLASH-010
+      - REQ-FLASH-012
+      - REQ-FLASH-013
+      - REQ-FLASH-014
+      - REQ-UX-007
+    normal:
+      - AC-FLASH-002-01
+      - AC-FLASH-003-01
+      - AC-FLASH-007-01
+      - AC-FLASH-014-01
+    refusal_or_failure:
+      - AC-FLASH-008-01
+      - AC-FLASH-012-01
+      - AC-UX-007-01
+    recovery_or_restart:
+      - AC-FLASH-009-01
+      - AC-FLASH-010-01
+      - AC-FLASH-013-01
+
+  - invariants: [POL-PRIVACY-001]
+    requirements: [REQ-ART-006, REQ-DUMP-008, REQ-DIAG-001, REQ-DIAG-002]
+    normal:
+      - AC-ART-006-01
+      - AC-ART-006-02
+      - AC-DUMP-008-01
+      - AC-DIAG-001-01
+      - AC-DIAG-001-02
+    refusal_or_failure:
+      - AC-DIAG-002-01
+    recovery_or_restart:
+      not_applicable_reason: >-
+        This invariant prohibits automatic upload and controls explicit export;
+        it has no state-machine recovery transition.
+
+  - invariants: [POL-AGENT-002]
+    requirements: [REQ-FLASH-005, REQ-FLASH-006, REQ-FLASH-015]
+    normal:
+      - AC-FLASH-005-01
+      - AC-FLASH-006-01
+    refusal_or_failure:
+      - AC-FLASH-015-01
+      - AC-FLASH-015-02
+    recovery_or_restart:
+      not_applicable_reason: >-
+        The standard Agent/CI gate blocks before destructive dispatch and hands
+        off to a separately approved lab; no device-side recovery is created.
+
+ratification:
+  approval_ref: null
+  note: Candidate suite; hashes and execution gate must be finalized with the Core baseline.

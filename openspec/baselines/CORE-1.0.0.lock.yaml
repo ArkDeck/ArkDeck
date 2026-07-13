@@ -1,0 +1,74 @@
+baseline: CORE-1.0.0
+revision: 1
+status: review
+generated_at: 2026-07-13
+accepted_at: null
+source_plan: docs/PLAN.md@Historical-v0.3
+hash_algorithm: sha256
+
+file_manifest:
+  path: openspec/baselines/CORE-1.0.0.files.yaml
+  sha256: 0de4f1558f2fcd9c9149a0ecd9357253cdd8c134a0570cce641726456698607b
+
+content_summary:
+  core_spec_count: 9
+  requirement_count: 90
+  acceptance_count: 110
+  workflow_step_kind_count: 41
+  applicability: all-conforming-desktop-platforms
+  declared_target_platforms: [macos, windows, linux]
+  separately_pinned_axes: [integration, platform, conformance]
+
+platform_revalidation:
+  macos:
+    disposition: reverifyRequired
+    owner: arkdeck-maintainer
+    milestone: M0A
+  windows:
+    disposition: deferred
+    owner: arkdeck-maintainer
+    milestone: W0
+  linux:
+    disposition: deferred
+    owner: arkdeck-maintainer
+    milestone: L0
+
+platform_revalidation_context:
+  platform_lock: PLATFORM-PROFILES-0.1.0
+  revision: 1
+  sha256: 829124c22f848ba936071dcc6d5015b2499471d528d45dc853b5c1323dba150e
+  current_delivery_platforms: [macos]
+
+ratification:
+  status: pending-protected-human-review
+  approval_ref: null
+  execution_gate: closed
+  note: >-
+    This is a generated candidate. It cannot authorize implementation until the
+    external trust policy, protected review and human approval mechanism verify
+    this exact lock and open the gate.
+
+excluded_from_core_manifest:
+  - openspec/baselines/**
+  - openspec/integrations/**
+  - openspec/platforms/**
+  - openspec/changes/**
+  - openspec/delivery/**
+  - openspec/planning/**
+  - openspec/references/**
+  - openspec/MIGRATION_MAP.md
+  - openspec/verification/traceability.md
+  - openspec/verification/hardware-matrix.md
+  - openspec/verification/hardware-evidence/**
+  - openspec/verification/core-conformance.yaml
+  - openspec/contracts/catalogs/debug-parameters.yaml
+  - openspec/contracts/catalogs/dump-recipes.yaml
+  - openspec/contracts/catalogs/trace-presets.yaml
+  - docs/**
+  - implementation source and tests
+
+change_rule: >-
+  A review candidate may be regenerated while the execution gate is closed.
+  After acceptance, never rewrite this baseline or its file manifest in place.
+  A semantic change requires an approved Core change, updated conformance
+  evidence and a new CORE-x.y.z baseline.
