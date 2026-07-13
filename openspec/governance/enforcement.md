@@ -45,7 +45,7 @@ Git 仓库已在 2026-07-13 的 one-time governance bootstrap 中初始化；同
 - `CORE-1.0.0` 当前是 review candidate，execution gate closed；
 - `chg-2026-001-macos-m0a` 与 `chg-2026-002-macos-m1-infrastructure` 保持 proposed，Task 保持 draft；
 - Agent 可以继续审查/修正规格，但不能宣称 approved/ready 或开始产品实现；
-- 单人维护者注意：受保护分支上作者不能批准自己的 PR。AI 起草的变更应以独立身份（如 GitHub App/bot）开 PR，由 `@lvye` 以 CODEOWNER 身份 review 批准；维护者本人的治理提交在 trust-root 就绪前经 admin 路径合入并留痕。
+- 单人维护者注意：受保护分支上作者不能批准自己的 PR。AI 起草的变更推送 `agent/**` 分支，`agent-pr` workflow 以 `github-actions[bot]` 身份开 PR（PR 作者与 reviewer 由此解耦），必需的 `guard` 状态由分支 push 事件按 head commit SHA 产生；`@lvye` 以 CODEOWNER 身份 review 批准。维护者本人的治理提交在 trust-root 就绪前经 admin 路径合入并留痕。
 
 ## Candidate relock and guard self-test
 
@@ -86,7 +86,7 @@ Git 仓库已在 2026-07-13 的 one-time governance bootstrap 中初始化；同
 - Integration、Platform Profile 与 Core conformance 各自的 lock/manifest 和独立 approval；
 - approval/claim/run-record schemas。
 - `scripts/check_sdd.py`、`scripts/sdd_guard_core.py`、`scripts/sdd_guard_lifecycle.py`、`scripts/sdd_guard_release.py`、`scripts/sdd_guard_support.py`、`scripts/check-sdd.sh`、`scripts/check-json.py`、`scripts/sdd_protected_set.py`、`scripts/relock_baseline.py`、`scripts/guard_selftest.py`、`.python-version` 与 `scripts/requirements-sdd.txt`；
-- `.github/CODEOWNERS` 与 `.github/workflows/sdd-guard.yml`（审批与 CI 强制的载体）。
+- `.github/CODEOWNERS`、`.github/workflows/sdd-guard.yml` 与 `.github/workflows/agent-pr.yml`（审批、CI 强制与 PR 身份解耦的载体）。
 
 ## Task claim
 

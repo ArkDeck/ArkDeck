@@ -8,7 +8,10 @@ name: SDD Guard
 
 on:
   push:
-    branches: [main]
+    # agent/** is included so the required `guard` check is produced by the
+    # branch push itself: PRs opened by github-actions[bot] cannot trigger
+    # workflows, but required status checks are evaluated per head commit SHA.
+    branches: [main, "agent/**"]
   pull_request:
 
 permissions:

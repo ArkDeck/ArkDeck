@@ -92,6 +92,7 @@ def require_sdd_runtime() -> None:
 # Core change afterwards.
 SDD_PROTECTED_PATTERNS: tuple[str, ...] = (
     ".github/CODEOWNERS",
+    ".github/workflows/agent-pr.yml",
     ".github/workflows/sdd-guard.yml",
     ".python-version",
     "AGENTS.md",

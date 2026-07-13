@@ -1,0 +1,44 @@
+name: Agent PR
+
+# Independent PR authorship for AI-drafted work (enforcement.md, bootstrap
+# state): an agent pushes an agent/** branch with the maintainer's
+# credentials, and this workflow opens the pull request as
+# github-actions[bot]. GitHub forbids only the PR *author* from approving,
+# so the human CODEOWNER (@lvye) can then review and approve the change.
+#
+# The required `guard` status is produced by the sdd-guard workflow on the
+# branch push (per-SHA), because pull requests created with GITHUB_TOKEN do
+# not trigger workflows themselves.
+
+on:
+  push:
+    branches: ["agent/**"]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  open-pr:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Open pull request as github-actions[bot]
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          set -eu
+          if gh pr list --repo "$GITHUB_REPOSITORY" --head "$BRANCH" --state open --json number --jq 'length' | grep -qv '^0$'; then
+            echo "PR already open for $BRANCH"
+            exit 0
+          fi
+          TITLE=$(git log -1 --pretty=%s)
+          gh pr create \
+            --repo "$GITHUB_REPOSITORY" \
+            --head "$BRANCH" \
+            --base main \
+            --title "$TITLE" \
+            --body "$(printf 'Agent-drafted change from `%s`.\n\n- Review per AGENTS.md authority order; approval by the human CODEOWNER constitutes the governance decision.\n- Required `guard` status is attached to the head commit by the sdd-guard workflow.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)' "$BRANCH")"
