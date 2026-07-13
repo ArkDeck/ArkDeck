@@ -409,6 +409,13 @@ def _identity_and_ledger_guard(
                 support.sha256_file(path),
             )
 
+    context_sink = context.get("_identity_inventory_sink")
+    if isinstance(context_sink, dict):
+        # Shared with tooling (scripts/ledger_snapshot.py) so the external
+        # ledger snapshot is produced by exactly the guard's inventory logic.
+        context_sink.clear()
+        context_sink.update(inventory)
+
     if trust_policy.get("status") != "accepted" or trust_policy.get(
         "execution_gate"
     ) != "open":

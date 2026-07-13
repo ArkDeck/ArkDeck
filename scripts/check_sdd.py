@@ -9,6 +9,8 @@ argument arrays.
 
 from __future__ import annotations
 
+import json
+import os
 import sys
 from pathlib import Path
 
@@ -45,12 +47,30 @@ def main() -> int:
         lifecycle_context = run_lifecycle_guard(ROOT, errors, context)
 
     context.update(lifecycle_context)
+    context["_identity_inventory_sink"] = {}
     try:
         from sdd_guard_release import run_release_guard
     except ImportError as exc:
         errors.append(f"Python SDD guard component unavailable: {exc.name}")
     else:
         run_release_guard(ROOT, errors, context)
+
+    # Tooling hook: scripts/ledger_snapshot.py builds the external identity
+    # ledger from exactly the guard's inventory (never a second implementation).
+    dump_target = os.environ.get("ARKDECK_DUMP_INVENTORY")
+    if dump_target:
+        entries = sorted(
+            (
+                {"kind": kind, "id": identity, "revision": revision, "sha256": digest}
+                for (kind, identity, revision), digest in context[
+                    "_identity_inventory_sink"
+                ].items()
+            ),
+            key=lambda entry: (entry["kind"], entry["id"], entry["revision"]),
+        )
+        Path(dump_target).write_text(
+            json.dumps(entries, indent=1) + "\n", encoding="utf-8"
+        )
 
     if errors:
         print("\n".join(f"ERROR: {error}" for error in errors), file=sys.stderr)

@@ -1,13 +1,13 @@
 lock: INTEGRATION-PROFILES-0.1.0
 revision: 1
-status: review
+status: accepted
 generated_at: 2026-07-12
-accepted_at: null
+accepted_at: 2026-07-13
 hash_algorithm: sha256
-execution_gate: closed
+execution_gate: open
 ratification:
-  status: pending-protected-human-review
-  approval_ref: null
+  status: accepted
+  approval_ref: APR-INTEGRATION-LOCK-1
 
 profiles:
   - id: OPENHARMONY-TOOLS

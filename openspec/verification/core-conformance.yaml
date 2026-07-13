@@ -1,8 +1,8 @@
 suite: CORE-CONFORMANCE-1.0.0
 revision: 1
-status: review
+status: accepted
 core_baseline: CORE-1.0.0
-execution_gate: closed
+execution_gate: open
 
 acceptance_index:
   path: openspec/verification/acceptance-index.txt
@@ -30,7 +30,7 @@ shared_inputs:
   integration_lock:
     id: INTEGRATION-PROFILES-0.1.0
     path: openspec/integrations/INTEGRATION-PROFILES.lock.yaml
-    sha256: 054f5c79b8770cfca9d99e6a5f5c5dc94756256e7739863a4b0efc9d9f62c95f
+    sha256: 95be398bab8b89f272f90cdfc21cc9ba2a76422c58e9224660197491cc185472
   integration_profiles:
     - id: OPENHARMONY-TOOLS
       version: 0.1.0
@@ -237,5 +237,5 @@ safety_coverage:
         off to a separately approved lab; no device-side recovery is created.
 
 ratification:
-  approval_ref: null
+  approval_ref: APR-CONFORMANCE-SUITE-1
   note: Candidate suite; hashes and execution gate must be finalized with the Core baseline.

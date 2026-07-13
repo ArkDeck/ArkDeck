@@ -1,12 +1,52 @@
 policy: ARKDECK-TRUST-1.0.0
 revision: 1
-status: unconfigured
-execution_gate: closed
-bootstrap_root_id: null
+status: accepted
+execution_gate: open
+bootstrap_root_id: ORG-ARKDECK-ROOT-1
 ratification:
-  approval_ref: null
+  approval_ref: APR-TRUST-POLICY-1
 
-external_verifiers: []
+external_verifiers:
+- id: ORG-PROTECTED-REVIEW-VERIFIER
+  mechanisms:
+  - detachedSignature
+  subject_types:
+  - trustPolicy
+  - baseline
+  - integrationLock
+  - platformLock
+  - platformReleaseSubject
+  - conformanceSuite
+  - change
+  - taskPacket
+  - taskRun
+  - taskSupersession
+  - labExecutionAuthorization
+  - platformConformance
+  - changeVerification
+  - evidence
+  - hardwareEvidence
+  - archiveSourceVerification
+  - archive
+  executable_path: /Users/Shared/arkdeck-trust/verifiers/verify-approval.py
+  sha256: 181cd8203f15791c2cb860dcb285e7d9c2d4c1cc43ca45b62fb1e4ec6a496f91
+- id: ORG-PROTECTED-CLAIM-SERVICE-VERIFIER
+  mechanisms:
+  - protectedClaimService
+  subject_types:
+  - taskClaim
+  - taskRunLease
+  - resourceIdentitySet
+  - changeSupersessionBarrier
+  executable_path: /Users/Shared/arkdeck-trust/verifiers/verify-claim-service.py
+  sha256: 0f3b2786c74fc1feb82027adff434205102a006f5c65ac038224f2074024ce2a
+- id: ORG-PROTECTED-IDENTITY-LEDGER-VERIFIER
+  mechanisms:
+  - protectedIdentityLedger
+  subject_types:
+  - identityLedger
+  executable_path: /Users/Shared/arkdeck-trust/verifiers/verify-identity-ledger.py
+  sha256: c485602b9791a05addb8c6591a6e3fd186befad902c0bf19b3c89bfb5437bb4f
 
 rules:
   - A repository-local file or status field never proves human approval.

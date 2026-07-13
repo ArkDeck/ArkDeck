@@ -3,14 +3,14 @@ baseline: CORE-1.0.0
 status: candidate
 generated_at: '2026-07-13'
 hash_algorithm: sha256
-file_count: 96
+file_count: 101
 files:
 - path: .github/CODEOWNERS
   sha256: 13795d68780b7a05011da603d6799561e98480ee643059dd2e341fd3472c0dce
 - path: .github/workflows/agent-pr.yml
   sha256: c9a62276fad0f8faea64b440be788d50ede83f220f7724bccdf9b75067d3ef63
 - path: .github/workflows/sdd-guard.yml
-  sha256: 8c43e6f505d7791b2a38099469e1077ab908a8ab2ffc5e8b8f5bb92569f65dd0
+  sha256: bbaf37826760b92c7009bfb8ffe5a6c01584f9f89aab816e7deaf173e06ea9db
 - path: .python-version
   sha256: 3a55324cbeddc91df012407d051dad08c88624c95a82fbdb856728729fbd14ab
 - path: AGENTS.md
@@ -82,9 +82,15 @@ files:
 - path: openspec/governance/enforcement.md
   sha256: 7ede88052bae6fbc7aebd6464478ffbd6ddedea0b425a9ec8216ec429ad7d755
 - path: openspec/governance/trust-policy.yaml
-  sha256: 137d10ba0b9c038b968f96e8d600cdd0ae61cfb9708d8302add05a140f6d7b1e
+  sha256: b62235ea0d5c0043ea4ab78e8e9f1d9ca1b06b6d32dedddce918c78a061ce522
 - path: openspec/governance/trust-root-bundle.example.yaml
   sha256: 119cbff676a2da66e3417cedc95a78382465a445c2ccc2ee60ab393c0b900dc5
+- path: openspec/governance/verifiers/verify-approval.py
+  sha256: 181cd8203f15791c2cb860dcb285e7d9c2d4c1cc43ca45b62fb1e4ec6a496f91
+- path: openspec/governance/verifiers/verify-claim-service.py
+  sha256: 0f3b2786c74fc1feb82027adff434205102a006f5c65ac038224f2074024ce2a
+- path: openspec/governance/verifiers/verify-identity-ledger.py
+  sha256: c485602b9791a05addb8c6591a6e3fd186befad902c0bf19b3c89bfb5437bb4f
 - path: openspec/project.md
   sha256: 4cc7118135cec22a79deeb13eeadb870ba6d84fe730249e77034e1a9b6d61a21
 - path: openspec/schemas/arkdeck-behavior/schema.yaml
@@ -180,9 +186,13 @@ files:
 - path: scripts/check-sdd.sh
   sha256: 74eb493c0e0eec2a61e80885edeae94aefede6eec4747935b8314a654cd9bfe1
 - path: scripts/check_sdd.py
-  sha256: 4fcd9092db7f366caa0df83c90b06c91ce9ced4bf2cb4996af75b848958d75c3
+  sha256: a5ca03cae14f02cb5ea4f4439ee67d218391174e8dca9767b0b465ad960a271c
 - path: scripts/guard_selftest.py
-  sha256: f62e70672be2154907d0fc8be53f472acaa8d681d53ff4672947b4d6ed2fda2f
+  sha256: 4f217120f6519b2e80feb21f039f7d9215dedf57fceba85541bee9c3be316068
+- path: scripts/ledger_snapshot.py
+  sha256: 9eeabcd08af797a3598a8f9973fe957050db7aa7e0178cfb2433f8432f158f1f
+- path: scripts/ratify.py
+  sha256: ddf5c4b69af07645b69bf066ec7a92b2266c3b1d7fbfed27cafac69ce23fd8f5
 - path: scripts/relock_baseline.py
   sha256: 0143eb0a1c6de8005197d63b2267f7e3aac66fd4732ee4273b9ca3ddec5437ab
 - path: scripts/requirements-sdd.txt
@@ -192,8 +202,8 @@ files:
 - path: scripts/sdd_guard_lifecycle.py
   sha256: da8e684e260846766cd6ffb97ebac6c54161ca39a05c54c95832f6cca42a4d36
 - path: scripts/sdd_guard_release.py
-  sha256: 7d2aa97cc12e55c0d74d4f612c247adc1167f776dc33185139ffd49bace668d6
+  sha256: 1a814a5883a663c8986e0704724ba511442d1b56efa83bbff05d0e1e25d83b57
 - path: scripts/sdd_guard_support.py
   sha256: 45a817a31b06bde1be7c9dea3ebb37dfcc6c770b7dd2bf5e20e810064989ebfb
 - path: scripts/sdd_protected_set.py
-  sha256: 30a29b7ed9fd2136cd13a211f22e4d019467bcdafc94233ddbc7d20a9caf4c62
+  sha256: 5c2c8b41bddf4d0f07670c2e30c85a9b73a4cb24b5e0b33c28800cc9701ac6f5

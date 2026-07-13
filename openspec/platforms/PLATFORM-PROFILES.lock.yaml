@@ -1,16 +1,16 @@
 lock: PLATFORM-PROFILES-0.1.0
 revision: 1
-status: review
-execution_gate: closed
+status: accepted
+execution_gate: open
 generated_at: 2026-07-12
-accepted_at: null
+accepted_at: 2026-07-13
 hash_algorithm: sha256
 previous_lock: null
 current_delivery_platforms: [macos]
 not_started_platforms: [windows, linux]
 ratification:
-  status: pending-protected-human-review
-  approval_ref: null
+  status: accepted
+  approval_ref: APR-PLATFORM-LOCK-1
 
 profiles:
   - id: PLATFORM-LINUX

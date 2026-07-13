@@ -1,14 +1,14 @@
 baseline: CORE-1.0.0
 revision: 1
-status: review
+status: accepted
 generated_at: 2026-07-13
-accepted_at: null
+accepted_at: 2026-07-13
 source_plan: docs/PLAN.md@Historical-v0.3
 hash_algorithm: sha256
 
 file_manifest:
   path: openspec/baselines/CORE-1.0.0.files.yaml
-  sha256: b915a617154cf5882e4be53ca15c054565c1cffab555276278f4870a03e228cb
+  sha256: d4f5cf9c49ac0675932c57aa746f7b618ff8f3b35dd5a30fdf52a5565e97aaae
 
 content_summary:
   core_spec_count: 9
@@ -36,13 +36,13 @@ platform_revalidation:
 platform_revalidation_context:
   platform_lock: PLATFORM-PROFILES-0.1.0
   revision: 1
-  sha256: 829124c22f848ba936071dcc6d5015b2499471d528d45dc853b5c1323dba150e
+  sha256: 58fb445d9204b776e14bf14df9211a6da9c8ce0106c4a72d958925a4260fa20a
   current_delivery_platforms: [macos]
 
 ratification:
-  status: pending-protected-human-review
-  approval_ref: null
-  execution_gate: closed
+  status: accepted
+  approval_ref: APR-BASELINE-CORE-1.0.0
+  execution_gate: open
   note: >-
     This is a generated candidate. It cannot authorize implementation until the
     external trust policy, protected review and human approval mechanism verify

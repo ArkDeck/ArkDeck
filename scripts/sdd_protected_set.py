@@ -123,6 +123,8 @@ SDD_PROTECTED_PATTERNS: tuple[str, ...] = (
     "scripts/sdd_guard_support.py",
     "scripts/sdd_protected_set.py",
     "scripts/relock_baseline.py",
+    "scripts/ratify.py",
+    "scripts/ledger_snapshot.py",
     "scripts/guard_selftest.py",
     "scripts/requirements-sdd.txt",
 )

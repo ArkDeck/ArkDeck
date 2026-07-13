@@ -1,0 +1,18 @@
+{
+ "schemaVersion": "1.0.0",
+ "approvalId": "APR-TRUST-POLICY-1",
+ "subjectType": "trustPolicy",
+ "subjectId": "ARKDECK-TRUST-1.0.0",
+ "subjectRevision": 1,
+ "subjectSha256": "b62235ea0d5c0043ea4ab78e8e9f1d9ca1b06b6d32dedddce918c78a061ce522",
+ "baseRevision": "1aea225914bc4b2cbe559dec50503e3dc71bc486",
+ "decision": "approved",
+ "approver": {
+  "kind": "human",
+  "id": "lvye"
+ },
+ "approvedAt": "2026-07-13T06:42:00Z",
+ "mechanism": "detachedSignature",
+ "approvalRef": "arkdeck-trust:ORG-ARKDECK-ROOT-1:APR-TRUST-POLICY-1",
+ "signature": "-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgWPCFmreJKa9U6soBBqsG4sOGV2\na++nxEurCvWqlZr7oAAAAQYXJrZGVjay1hcHByb3ZhbAAAAAAAAAAGc2hhNTEyAAAAUwAA\nAAtzc2gtZWQyNTUxOQAAAEAhsJqhCeU3r2D6B81/M6X5btbZUAVE1Z/QNSI5kz9Jb+uKbq\n0CUpdsz986EdFZnDzKItm3NPm2sesGZPgWI90A\n-----END SSH SIGNATURE-----\n"
+}

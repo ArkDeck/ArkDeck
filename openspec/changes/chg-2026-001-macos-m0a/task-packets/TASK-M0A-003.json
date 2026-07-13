@@ -25,7 +25,7 @@
   ],
   "conformanceSuite": {
     "id": "CORE-CONFORMANCE-1.0.0",
-    "sha256": "015bcf9343ff91df9f66bdfec418287757f2d1a43c217bf0e9d430a8f99a4ba9"
+    "sha256": "2e5a51bf78afc2e15a8cd989c9381fcc2ac2b7cce370c2bc545767df06419aa2"
   },
   "baseRevision": null,
   "platform": "macos",
