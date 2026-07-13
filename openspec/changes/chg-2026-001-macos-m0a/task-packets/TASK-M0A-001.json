@@ -9,7 +9,7 @@
   "coreBaseline": {
     "id": "CORE",
     "version": "1.0.0",
-    "sha256": "adc03fa950c2eb4758d14c63985ce0b318b00dbbcb91006e0d18b0400b73252a"
+    "sha256": "50b68917cb2aa011ab67d0a8a2469913b1f14b3c8c57f2ef53f7c0301a088a79"
   },
   "platformProfile": {
     "id": "PLATFORM-MACOS",
@@ -27,7 +27,7 @@
     "id": "CORE-CONFORMANCE-1.0.0",
     "sha256": "2e5a51bf78afc2e15a8cd989c9381fcc2ac2b7cce370c2bc545767df06419aa2"
   },
-  "baseRevision": "e56fea2983192a96e394783021bf2026b75527db",
+  "baseRevision": "28e20c57ed77cec9460cb1fb34518d240b02d66e",
   "platform": "macos",
   "objective": "Bootstrap the signed SwiftUI application shell and separated Swift package/test targets without implementing a device feature.",
   "requirementRefs": [],

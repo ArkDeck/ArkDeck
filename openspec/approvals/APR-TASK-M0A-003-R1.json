@@ -4,15 +4,15 @@
  "subjectType": "taskPacket",
  "subjectId": "TASK-M0A-003",
  "subjectRevision": 1,
- "subjectSha256": "4a56e969c10f813d9665a7fd2d4728b56558eca06359cdbaa8835c30247fd0d1",
- "baseRevision": "e56fea2983192a96e394783021bf2026b75527db",
+ "subjectSha256": "8b8c9a63b7b9de5b6ce94b740e6445f45de121a93b49c657f7904be941e53343",
+ "baseRevision": "28e20c57ed77cec9460cb1fb34518d240b02d66e",
  "decision": "approved",
  "approver": {
   "kind": "human",
   "id": "lvye"
  },
- "approvedAt": "2026-07-13T06:49:46Z",
+ "approvedAt": "2026-07-13T06:56:59Z",
  "mechanism": "detachedSignature",
  "approvalRef": "arkdeck-trust:ORG-ARKDECK-ROOT-1:APR-TASK-M0A-003-R1",
- "signature": "-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgWPCFmreJKa9U6soBBqsG4sOGV2\na++nxEurCvWqlZr7oAAAAQYXJrZGVjay1hcHByb3ZhbAAAAAAAAAAGc2hhNTEyAAAAUwAA\nAAtzc2gtZWQyNTUxOQAAAECfe1RiH8KT0qnTY1DzehWEh22xG3qlNlNwwpSlbFsELNWy4x\nKgLHdC9I96yOrSnwFfZRU+ag4fxa4RYEBVW8EO\n-----END SSH SIGNATURE-----\n"
+ "signature": "-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgWPCFmreJKa9U6soBBqsG4sOGV2\na++nxEurCvWqlZr7oAAAAQYXJrZGVjay1hcHByb3ZhbAAAAAAAAAAGc2hhNTEyAAAAUwAA\nAAtzc2gtZWQyNTUxOQAAAEARO51kX6DoxBU+/sRtVS6/LlHfhW6VAisF3g9Q6md2VG+vlW\nJVAt4V3lRj8OOTagH+D3vEXgHGQSkoNwGWppwC\n-----END SSH SIGNATURE-----\n"
 }
