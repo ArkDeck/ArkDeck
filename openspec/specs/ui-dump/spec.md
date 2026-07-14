@@ -44,6 +44,8 @@ MVP SHALL 提供以下 typed Recipe；legacy `-render -c` 只有能力 probe 明
 | `fullDefaultTree` | `-w <windowId> -default -all` |
 | `componentDetail` | `-w <windowId> -element -lastpage <componentId>` |
 
+表中参数为候选映射；实际 HiDumper 调用包装（例如是否需要 `-s WindowManagerService -a` 前缀）SHALL 在 M0B 真机验证后经 integration change 固定，验证前不得据此宣称兼容性。
+
 #### Scenario: AC-DUMP-003-01 Component ID 校验
 
 - GIVEN用户选择 componentDetail

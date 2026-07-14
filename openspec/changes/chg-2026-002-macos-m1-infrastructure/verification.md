@@ -3,10 +3,10 @@
 > Status：planned  
 > Change：CHG-2026-002-macos-m1-infrastructure@r1  
 > Core baseline：CORE-1.0.0
-> Core conformance：CORE-CONFORMANCE-1.0.0@sha256:015bcf9343ff91df9f66bdfec418287757f2d1a43c217bf0e9d430a8f99a4ba9  
-> Integration：OPENHARMONY-TOOLS@0.1.0+sha256:679874cf44234a00b7e5d8f920e81c6b52ff489df2a2c8dd6f03b540c87a11e1
+> Core conformance：CORE-CONFORMANCE-1.0.0  
+> Integration：OPENHARMONY-TOOLS@0.1.0
 
-本文件是 immutable verification plan；`planned`/`pending` 标签在批准后不回写。实际结果由 Task run/evidence 记录，并最终汇总到外部批准的 `verification-result.json`。
+实际结果由 evidence/ 下的 run 记录承载;整体结论经维护者在 PR 中确认(V2 治理)。
 
 ## Core acceptance coverage
 

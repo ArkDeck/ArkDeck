@@ -1,20 +1,11 @@
 ---
 id: CHG-YYYY-NNN
-revision: 1
-status: proposed
-supersedes_change_id: null # approved predecessor only; approval revokes its claim eligibility after all claims are terminal
-supersession_barrier_attestation_id: null # successor preallocates CHGSUPAUTH-*; null when supersedes_change_id is null
+status: proposed # proposed | approved | implementing | verified | archived | rejected;经维护者批准的 PR 修改
 class: core | capability | integration | platform | implementation-only
-schema: arkdeck-behavior | arkdeck-platform
-core_change_level: none | patch | minor | major # arkdeck-behavior is minor/major only in V1
+core_change_level: none | minor | major
 owner: human-owner
 core_baseline: CORE-1.0.0
-platforms: [shared]
-# Required when core_change_level is minor/major:
-# platform_revalidation:
-#   macos: { disposition: reverifyRequired, owner: owner-id, milestone: Mx }
-#   windows: { disposition: deferred, owner: owner-id, milestone: Wx }
-#   linux: { disposition: deferred, owner: owner-id, milestone: Lx }
+platforms: [macos]
 ---
 
 # Change title
@@ -29,25 +20,16 @@ platforms: [shared]
 - Out of scope
 - Observable behavior before/after
 
-## Impacted specifications
+## Scope(涉及的 Requirement/AC)
 
-- Requirement IDs
-- Acceptance IDs
-- Contracts/schemas
-- ADR/platform profiles
-- 是否需要 Core baseline bump
+- Requirements:REQ-...
+- Acceptance:AC-...
+- Contracts/schemas:
+- 是否需要 Core baseline bump:
 
 ## Safety, privacy, and compatibility
 
 - Failure modes
 - Data/schema compatibility
-- macOS impact
-- Windows impact
-- Linux impact
+- 平台影响(已启动平台给出 reverify 结论;未启动平台一句带过)
 - Rollback/migration
-
-## Approval
-
-- Human decision：pending
-- Approved revision：—
-- Notes：—

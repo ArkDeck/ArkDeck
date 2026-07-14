@@ -5,9 +5,9 @@
 > Declared target platforms：macOS、Windows、Linux（同一 Core，不另建产品规则）  
 > Delivery/support lifecycle source：`platforms/PLATFORM-PROFILES.lock.yaml`
 
-平台的 current delivery、not started、conformance 与支持声明状态只由当前 accepted `PLATFORM-PROFILES` lock 决定，不写入 Core baseline 或 Core conformance suite。新增平台实现或推进既有端口只能发布新的 Platform lock revision、Platform HOW 与平台 evidence，并继承相同 Core Requirement、AC 和 release gate。
+平台的 current delivery、not started 与 conformance 状态记录在 `platforms/PLATFORM-PROFILES.lock.yaml`，不写入 Core baseline。新增平台实现或推进既有端口发布新的 Platform 状态与平台 evidence，并继承相同 Core Requirement、AC 和 release gate。
 
-Platform 的 `verified` 不是对整个 OS 家族的概括声明，只覆盖 lock 所固定、外部批准的 `platformReleaseSubject` 与 PCE 中 exact source revision、release artifact hash、有效期和全部 support-matrix cells。发布新 commit/package 必须先更新 release subject；它与旧 PCE 不一致时状态自动进入 needsReverification。未列出的 OS/architecture/package tuple、不同构建产物或过期证据一律视为未验证。
+Platform 的 `verified` 不是对整个 OS 家族的概括声明，只覆盖实际验证过的 OS/architecture/构建产物组合与证据有效期。发布新构建而无新证据时，状态回到 needsReverification；未验证的组合一律不得声称支持。
 
 ## 产品定位
 

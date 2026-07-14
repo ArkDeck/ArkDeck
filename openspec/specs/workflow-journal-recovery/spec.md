@@ -43,7 +43,7 @@ execute:
                         ├→ finalizing → succeeded
                         └→ waitingForRecovery
 
-  any execute nonterminal except userAbandonRequested/finalizing
+  any execute nonterminal except userAbandonRequested/finalizing/waitingForRecovery
     --confirmed failure--> finalizing → failed
   any active execute nonterminal --external outcome/identity unknown--> waitingForRecovery
   any cancellable execute nonterminal → cancelRequested

@@ -26,18 +26,18 @@
 hidumper -s WindowManagerService -a '-a'
 ```
 
-Recipe 数据位于 `contracts/catalogs/dump-recipes.yaml`。Adapter 必须处理 stdout、sidecar、固定旧文件名和 unknown output family，禁止全局 `/data` cleanup。
+Recipe 数据位于 `openspec/contracts/catalogs/dump-recipes.yaml`。Adapter 必须处理 stdout、sidecar、固定旧文件名和 unknown output family，禁止全局 `/data` cleanup。
 
 ## Trace tools
 
 - 分别 probe hitrace/bytrace 的存在、help/list、duration、buffer、output、begin/finish 和 tag；
-- logical preset 位于 `contracts/catalogs/trace-presets.yaml`；
+- logical preset 位于 `openspec/contracts/catalogs/trace-presets.yaml`；
 - remote path 使用 Job UUID 隔离，推荐 `/data/local/tmp/arkdeck/<jobUUID>/`，但设备权限/Profile 可选择等价 owned path；
 - raw ftrace 由 host 后处理；固定删除前两行被禁止，除非 parser 证明是 chatter。
 
 ## Parameters
 
-附件 Debug Profile 位于 `contracts/catalogs/debug-parameters.yaml`。Adapter 逐项 probe、读写、read-back，并遵守 missing/unreadable/value 与恢复 contract。
+附件 Debug Profile 位于 `openspec/contracts/catalogs/debug-parameters.yaml`。Adapter 逐项 probe、读写、read-back，并遵守 missing/unreadable/value 与恢复 contract。
 
 ## HiLog
 

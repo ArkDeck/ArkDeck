@@ -1,13 +1,9 @@
 ---
 id: CHG-2026-002-macos-m1-infrastructure
-revision: 1
 status: proposed
-supersedes_change_id: null
-supersession_barrier_attestation_id: null
 class: platform
-schema: arkdeck-platform
 core_change_level: none
-owner: pending-human-owner
+owner: lvye
 core_baseline: CORE-1.0.0
 platforms: [macos]
 ---
@@ -29,11 +25,11 @@ M0A 只交付可行性原型与分发决策。所有分阶段功能（UI Dump、
 
 ### Out of scope
 
-- 任何真实设备/真机证据（REQ-DEV-007、REQ-HDC 真机授权 UX 等 parserGolden/realHardware 留给后续 change 与受控 lab task）；
+- 任何真实设备/真机证据（realHardware 一律留给后续由人类执行的硬件任务）；parserGolden 仅限本 change 内以仓库 fixture 落地的 case（如 AC-HDC-005-01，经 TASK-M1-006 交付），其余 parser family 留给后续 integration change；
 - UI Dump/Trace/Debug/Flash 功能工作流与其 UI；
 - desktop-ux-observability 的导航/History/i18n（REQ-UX-*、REQ-I18N-001）；
 - 修改任何 Core Requirement/AC/contract；
-- 宣称任何 capability 达到可发布状态——发布范围由 release subject 的 `includedCapabilities` 另行声明。
+- 宣称任何 capability 达到可发布状态——发布范围在 M5 release change 中另行声明。
 
 ## Impacted specifications
 

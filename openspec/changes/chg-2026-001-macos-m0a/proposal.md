@@ -1,13 +1,9 @@
 ---
 id: CHG-2026-001-macos-m0a
-revision: 1
-status: proposed
-supersedes_change_id: null
-supersession_barrier_attestation_id: null
+status: approved # 2026-07-13 由维护者批准(V1 签名审批作废后按人类真实意图保留;见 planning/postmortem-2026-07-governance.md)
 class: platform
-schema: arkdeck-platform
 core_change_level: none
-owner: pending-human-owner
+owner: lvye
 core_baseline: CORE-1.0.0
 platforms: [macos]
 ---
@@ -50,7 +46,3 @@ ArkDeck 尚无 Xcode 工程或运行代码。外部 HDC、共享 server、App Sa
 - 不执行真实 Flash/destructive step；
 - Sandbox 不可行时记录 non-conformance 并选择非 Sandbox prototype，而非放宽 Core。
 
-## Approval
-
-- Human decision：pending
-- Approved revision：—
