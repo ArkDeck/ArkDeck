@@ -1,18 +1,14 @@
 suite: CORE-CONFORMANCE-1.0.0
-revision: 1
-status: accepted
+status: candidate
 core_baseline: CORE-1.0.0
-execution_gate: open
 
 acceptance_index:
   path: openspec/verification/acceptance-index.txt
-  sha256: 69b43018a1449880171dcb5fc9c05e863f354a8ed81e24c51b5cdfd09ac05b9c
   count: 110
   selector: all-current-core-acceptance-ids
 
 acceptance_cases:
   path: openspec/verification/acceptance-cases.yaml
-  sha256: 3e701bcdfe5bd49c8c1dcde1dc459a07707ec1a16ba1b6c33c3effa833f2c06f
   count: 110
   expected_result: normative-scenario-then-and-clauses
 
@@ -28,43 +24,32 @@ applicability:
 
 shared_inputs:
   integration_lock:
-    id: INTEGRATION-PROFILES-0.1.0
+    id: INTEGRATION-PROFILES-0.2.0
     path: openspec/integrations/INTEGRATION-PROFILES.lock.yaml
-    sha256: 95be398bab8b89f272f90cdfc21cc9ba2a76422c58e9224660197491cc185472
   integration_profiles:
     - id: OPENHARMONY-TOOLS
       version: 0.1.0
       path: openspec/integrations/openharmony/profile.md
-      sha256: 679874cf44234a00b7e5d8f920e81c6b52ff489df2a2c8dd6f03b540c87a11e1
   catalogs:
     - path: openspec/contracts/catalogs/remote-operations.yaml
       version: 1.0.0
-      sha256: 8d6b8f6fafcabf0367450db6cd1fcdfc39b707bbc8f026ff9f20ca1ffb69018d
     - path: openspec/contracts/catalogs/dump-recipes.yaml
       version: 1.0.0
-      sha256: 5d477ef767edf8d6e7a0f48bf9f4fac3999ed1a1604dc8341cb618f38f0a477b
     - path: openspec/contracts/catalogs/trace-presets.yaml
       version: 1.0.0
-      sha256: 12c0f0502cb17832f66223670a124b6fe48e903883a01c44a9cc4340fc2628cf
     - path: openspec/contracts/catalogs/debug-parameters.yaml
       version: 1.0.0
-      sha256: 10ee4c38c4728a344a39b98b56759adae50323c260ad52345eaf4d5e4f978acc
   contracts:
     - path: openspec/contracts/provider-contracts.md
       version: 1.0.0
-      sha256: a562fd490322cfdcb2c61916ce97783fd39fbef88bd8b7d1c46d4d71b7fad596
     - path: openspec/contracts/workflow-step.schema.json
       version: 1.0.0
-      sha256: 624d61071070ec1f873a811307fe7eb39f7697c37a68ed3ef8fad774522d1688
     - path: openspec/contracts/workflow-step-registry.yaml
       version: 1.0.0
-      sha256: 2ee47057b157a745f45d85f109735a9e10ea8cab3661cfa192043bbc7ac394f3
     - path: openspec/contracts/manifest.schema.json
       version: 1.0.0
-      sha256: 52be768697e75fc98a00a386345162af2e1a8ca3607b86f755adb766cf0ad489
     - path: openspec/contracts/journal-event.schema.json
       version: 1.0.0
-      sha256: caefd7909d7f270251cefa76c9fcc49416e66ade8d8a66c2b20598043ff6e962
   fixtures: []
 
 fixture_policy:
@@ -83,8 +68,8 @@ evidence_policy:
     - AC-FLASH-014-01
   hardware_claim_rule: >-
     Any real-device support statement additionally requires a matching, unexpired
-    externally approved hardware-evidence record for device, firmware, HDC,
-    transport, privilege and Provider, plus its controlled evidence artifact.
+    hardware-evidence record for device, firmware, HDC, transport, privilege and
+    Provider, produced by a human operator (see governance/enforcement.md).
 
 safety_coverage:
   - invariants: [POL-HDC-001]
@@ -234,8 +219,4 @@ safety_coverage:
     recovery_or_restart:
       not_applicable_reason: >-
         The standard Agent/CI gate blocks before destructive dispatch and hands
-        off to a separately approved lab; no device-side recovery is created.
-
-ratification:
-  approval_ref: APR-CONFORMANCE-SUITE-1
-  note: Candidate suite; hashes and execution gate must be finalized with the Core baseline.
+        off to human execution; no device-side recovery is created.

@@ -1,38 +1,27 @@
-lock: INTEGRATION-PROFILES-0.1.0
-revision: 1
-status: accepted
-generated_at: 2026-07-12
-accepted_at: 2026-07-13
-hash_algorithm: sha256
-execution_gate: open
-ratification:
-  status: accepted
-  approval_ref: APR-INTEGRATION-LOCK-1
+# Integration adapter 输入的版本登记(V2:不再逐文件 hash pin;历史对比用 git)
+lock: INTEGRATION-PROFILES-0.2.0
+status: current
+updated_at: 2026-07-14
 
 profiles:
   - id: OPENHARMONY-TOOLS
     version: 0.1.0
     path: openspec/integrations/openharmony/profile.md
-    sha256: 679874cf44234a00b7e5d8f920e81c6b52ff489df2a2c8dd6f03b540c87a11e1
 
 catalogs:
   - id: arkui-ui-dump
     version: 1.0.0
     path: openspec/contracts/catalogs/dump-recipes.yaml
-    sha256: 5d477ef767edf8d6e7a0f48bf9f4fac3999ed1a1604dc8341cb618f38f0a477b
   - id: trace-presets
     version: 1.0.0
     path: openspec/contracts/catalogs/trace-presets.yaml
-    sha256: 12c0f0502cb17832f66223670a124b6fe48e903883a01c44a9cc4340fc2628cf
   - id: attachment-debug-profile
     version: 1.0.0
     path: openspec/contracts/catalogs/debug-parameters.yaml
-    sha256: 10ee4c38c4728a344a39b98b56759adae50323c260ad52345eaf4d5e4f978acc
 
 fixtures: []
 
 change_rule: >-
   Parser families, adapter mappings, catalogs and golden fixtures evolve through
-  an approved Integration change and a new lock revision. They must not change
-  Core Requirement/AC semantics. Conformance suites and Tasks pin the exact lock
-  and inputs they execute.
+  an approved integration change and a version bump here. They must not change
+  Core Requirement/AC semantics.

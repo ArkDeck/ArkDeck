@@ -1,0 +1,13 @@
+# Core baseline 版本记录(V2:ratification = 维护者批准声明 ratified 的 PR;
+# 漂移检测靠 CI 的 ID/结构校验 + git diff,不再维护逐文件 hash manifest)
+baseline: CORE-1.0.0
+status: candidate
+scope: >-
+  openspec/specs/** 全部 9 个 capability spec、openspec/contracts/ 的产品契约
+  (manifest / journal-event / workflow-step (+registry) / hardware-evidence /
+  capability-registry / provider-contracts / catalogs)、
+  verification/acceptance-index.txt 与 acceptance-cases.yaml 登记的 110 条 Core AC。
+notes: >-
+  2026-07-13 的 V1 ratification 因治理事故与内容矛盾作废
+  (见 planning/postmortem-2026-07-governance.md);待 REQ-JOB-001 等
+  评审修正合入后由维护者经 PR 重新 ratify。

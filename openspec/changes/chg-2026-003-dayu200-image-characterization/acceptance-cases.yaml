@@ -1,0 +1,38 @@
+---
+schema_version: 1.0.0
+change_id: CHG-2026-003-dayu200-image-characterization
+change_revision: 1
+platform: macos
+evidence_classes:
+- contract
+- platform
+cases:
+- acceptance_id: CHAR-M0-DAYU200-IMAGE-001
+  test_id: TEST-CHAR-M0-DAYU200-IMAGE-001
+  method: Streaming read-only scan of the pinned archive plus hazard-vector rejection suite.
+  expected_source: openspec/changes/chg-2026-003-dayu200-image-characterization/verification.md#CHAR-M0-DAYU200-IMAGE-001
+  minimum_evidence: platform
+  expected_result: Archive identity equals the pinned size and SHA-256; the ordered
+    member inventory lists every member with path, size and per-member SHA-256 without
+    extracting to disk; every hazard fixture is rejected with its fixed error code
+    before any classification runs.
+- acceptance_id: CHAR-M0-DAYU200-CLASSIFICATION-001
+  test_id: TEST-CHAR-M0-DAYU200-CLASSIFICATION-001
+  method: Closed decision rule over the verified inventory with branch-complete unit tests.
+  expected_source: openspec/changes/chg-2026-003-dayu200-image-characterization/verification.md#CHAR-M0-DAYU200-CLASSIFICATION-001
+  minimum_evidence: contract
+  expected_result: The classification is rockchipRawImageSet only when all six ordered
+    path/kind/size conditions of the fixed-archive-only rule hold, otherwise unknown;
+    unit tests cover every condition positively and negatively; classification receives
+    only path, regular kind and size; the result is non-authoritative, records Provider
+    and compatibility as unknown and readiness as candidateNonExecutable, and receives
+    no archive locator, archive basename, payload, archive/member hash or marketing/model
+    text.
+- acceptance_id: CHAR-M0-DAYU200-NODISPATCH-001
+  test_id: TEST-CHAR-M0-DAYU200-NODISPATCH-001
+  method: Process/file audit of the scan run.
+  expected_source: openspec/changes/chg-2026-003-dayu200-image-characterization/verification.md#CHAR-M0-DAYU200-NODISPATCH-001
+  minimum_evidence: contract
+  expected_result: The run opens the archive read-only, writes only the five allowed
+    evidence outputs and lifecycle sidecars, launches no subprocess, and network, HDC,
+    flashd, vendor-tool, USB/UART/TCP and device mutation dispatch counts are zero.

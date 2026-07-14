@@ -97,26 +97,18 @@ Rules:
 - Success requires semantic output validation and postflight, not exit code alone.
 - RecoveryGuide is guidance, not a claim that automatic recovery is possible.
 - A destructive dispatch requires durable `executionAuthority`. `standardAgent`
-  always refuses real destructive steps; `controlledHardwareLab` additionally
-  requires a still-valid, externally approved `lab-execution-authorization`
-  whose operator, immutable Task/claim, exact canonical plan hash, authorized
-  Step kinds, runtime capabilities, device identity + binding revision,
-  firmware, transport, HDC hash/version, Provider and physical-target
-  confirmation all match the pending dispatch. The executor SHALL revalidate
-  those fields immediately before the first real-device Step. The plan is the
-  exact UTF-8 bytes of a `lab-execution-plan.schema.json` instance with
-  serialization ID `arkdeck-plan-json-bytes-v1`; its parsed Step-kind set and
-  target SHALL exactly equal the authorization, and its Step effects SHALL map
-  exactly to the Task's real-device runtime capabilities. Human approval and
-  physical confirmation SHALL precede `firstRealDeviceDispatchAt`; both first
-  and last real-device dispatch timestamps SHALL lie inside the authorization
-  window. The executor SHALL stop when the token expires or any field drifts;
-  a run record or after-the-fact evidence
-  cannot retroactively authorize dispatch. `interactiveUser`
-  follows normal product confirmation but cannot mint support-matrix evidence.
-  Authority is issued by the trusted host entry point and journaled at Job
-  creation; a Profile, CLI argument, Task payload or imported Manifest cannot
-  promote `standardAgent` to either stronger authority.
+  always refuses real destructive steps; `controlledHardwareLab` means a human
+  operator personally executes against a plan they confirmed: device identity +
+  binding revision, firmware, transport, HDC, Provider and the Step-kind set of
+  the pending dispatch SHALL match the human-confirmed plan, and the executor
+  SHALL revalidate them immediately before the first real-device Step. Human
+  confirmation SHALL precede the first dispatch; the executor SHALL stop when
+  any field drifts, and a run record or after-the-fact evidence cannot
+  retroactively authorize dispatch. `interactiveUser` follows normal product
+  confirmation but cannot mint support-matrix evidence. Authority is issued by
+  the trusted host entry point and journaled at Job creation; a Profile, CLI
+  argument, Task payload or imported Manifest cannot promote `standardAgent`
+  to either stronger authority.
 
 ## Platform ports
 

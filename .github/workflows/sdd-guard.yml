@@ -1,10 +1,7 @@
 name: SDD Guard
 
-# Governance gate: every push and PR must pass both the guard and its
-# adversarial self-test. The trust host is materialized outside the checkout
-# (verifier sources are hash-pinned by the secret trust-root bundle); the
-# identity-ledger snapshot is generated per run by the guard's own inventory
-# and signed with the ledger service key.
+# V2 git-native 治理:CI 只做只读一致性校验(specs/AC 索引/changes/locks)。
+# 授权语义由受保护 main + CODEOWNER PR review 承担;本 workflow 不持有任何 secret。
 
 on:
   push:
@@ -14,51 +11,21 @@ on:
 permissions:
   contents: read
 
-env:
-  ARKDECK_TRUST_DIR: /Users/Shared/arkdeck-trust
-
 jobs:
   guard:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-        with:
-          # Full history: approval baseRevision ancestry cannot be proven on a
-          # shallow clone.
-          fetch-depth: 0
 
       - uses: actions/setup-python@v5
         with:
-          python-version-file: ".python-version"
+          python-version: "3.x"
 
-      - name: Install pinned SDD dependencies
+      - name: Install dependencies
         run: python -m pip install -r scripts/requirements-sdd.txt
 
-      - name: Materialize trust host outside the repository
-        env:
-          TRUST_BUNDLE: ${{ secrets.ARKDECK_TRUST_BUNDLE }}
-          LEDGER_KEY: ${{ secrets.ARKDECK_LEDGER_KEY }}
-        run: |
-          set -eu
-          sudo mkdir -p "$ARKDECK_TRUST_DIR"
-          sudo chown "$(id -u):$(id -g)" "$ARKDECK_TRUST_DIR"
-          mkdir -p "$ARKDECK_TRUST_DIR/keys" "$ARKDECK_TRUST_DIR/verifiers" "$ARKDECK_TRUST_DIR/ledger"
-          install -m 0755 openspec/governance/verifiers/*.py "$ARKDECK_TRUST_DIR/verifiers/"
-          printf '%s' "$TRUST_BUNDLE" > "$ARKDECK_TRUST_DIR/bundle.yaml"
-          printf '%s\n' "$LEDGER_KEY" > "$ARKDECK_TRUST_DIR/keys/identity-ledger"
-          chmod 600 "$ARKDECK_TRUST_DIR/keys/identity-ledger"
-
-      - name: Generate signed identity-ledger snapshot
-        run: |
-          SNAPSHOT=$(python scripts/ledger_snapshot.py --trust-dir "$ARKDECK_TRUST_DIR")
-          echo "ARKDECK_IDENTITY_LEDGER_SNAPSHOT=$SNAPSHOT" >> "$GITHUB_ENV"
-          echo "ARKDECK_TRUST_ROOT_BUNDLE=$ARKDECK_TRUST_DIR/bundle.yaml" >> "$GITHUB_ENV"
-
-      - name: SDD guard
+      - name: SDD consistency check
         env:
           ARKDECK_PYTHON: python
         run: ./scripts/check-sdd.sh
-
-      - name: Guard adversarial self-test
-        run: python scripts/guard_selftest.py

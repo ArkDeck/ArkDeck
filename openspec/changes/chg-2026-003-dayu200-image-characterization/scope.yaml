@@ -1,0 +1,14 @@
+schema: arkdeck-change-scope-1
+change_id: CHG-2026-003-dayu200-image-characterization
+revision: 1
+requirements:
+  - PLATFORM-MACOS@0.1.0
+  - POL-AGENT-002
+  - POL-ARTIFACT-001
+  - POL-SAFETY-001
+  - POL-VERIFY-001
+  - REQ-NFR-002
+acceptance:
+  - CHAR-M0-DAYU200-CLASSIFICATION-001
+  - CHAR-M0-DAYU200-IMAGE-001
+  - CHAR-M0-DAYU200-NODISPATCH-001

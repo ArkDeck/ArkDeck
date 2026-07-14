@@ -4,13 +4,13 @@ Open question 不得以聊天记忆留存。每项记录默认决策、阻塞范
 
 ## DEC-001 First supported hardware
 
-- Status：open
+- Status：open（评估中:DAYU200 / RK3568 为当前候选,CHG-2026-003 正在产出其镜像特征化证据作为决策输入）
 - Owner：product/hardware owner
 - Question：首批必须支持哪些设备/开发板、芯片、OpenHarmony build/API？
 - Default：无支持声明
 - Blocks：M0B、真实 Flash、hardware verification
 - Affected：REQ-FLASH-001/002/014、hardware matrix
-- Work allowed：M0A、通用 M1、simulation、parser fixtures
+- Work allowed：M0A、通用 M1、simulation、parser fixtures、离线镜像特征化（CHG-2026-003）
 
 ## DEC-002 First flashing protocol
 

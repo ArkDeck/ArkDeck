@@ -5,8 +5,8 @@
 
 ## Current repository state
 
-- SDD baseline exists；
-- Git repository initialized via the one-time governance bootstrap (2026-07-13)；protected review/CI and external trust root remain unconfigured, so all execution gates stay closed；
+- SDD baseline exists (candidate)；V2 git-native 治理已于 2026-07-14 生效(见 planning/postmortem-2026-07-governance.md)；
+- GitHub 仓库、受保护 main、CODEOWNERS 与 agent-pr/sdd-guard workflow 已配置；Agent 受限凭据分离仍是待办人类动作；
 - no Xcode/Windows/Linux solution or product code；
 - local Swift 6.3.2 is visible, but `xcode-select` currently points to Command Line Tools；
 - no real device/support matrix has been supplied。
