@@ -1,0 +1,314 @@
+schema_version: draft-1
+status: nonAuthorizingCandidate
+source_decision:
+  token: APPROVE-RECOVERY-BOOTSTRAP
+  recorded_at: '2026-07-14'
+  permits:
+    - draft_planning_artifacts
+    - read_public_repository_state
+    - read_public_signed_ledger_records
+    - compute_hashes_and_collision_inventory
+    - run_no_side_effect_static_tests
+  forbids:
+    - private_key_read_or_use
+    - external_secret_or_branch_protection_change
+    - signature_or_approval_generation
+    - claim_or_run_generation
+    - protected_repository_mutation
+    - execution_gate_change
+    - product_implementation
+    - real_device_or_hardware_access
+
+analysis_source:
+  repository_revision: e39ab29397068069c5f20ea0529ca8cc6a14e9f4
+  source_core_baseline: CORE-1.0.0
+  source_ledger_id: ARKDECK-LEDGER-1
+  source_snapshot_first_revision: 1
+  source_snapshot_last_revision: 10
+  incident_observations_path: openspec/planning/recovery-bootstrap/incident-observations.json
+  incident_observations_status: observedNonAuthorizing
+
+incident_boundary:
+  severity: P0
+  execution_gate: closedQuarantined
+  known_minimum_collision_group_count: 31
+  formal_collision_group_count: pendingGate2CompletenessVerification
+  collision_identity_key:
+    - repositoryId
+    - kind
+    - id
+    - revision
+  source_epoch_disposition: presumedCompromisedNonAuthorizing
+  key_classes_requiring_rotation:
+    - humanApproval
+    - claimService
+    - identityLedger
+  preserve_without_rewrite:
+    - signed_snapshots_1_through_10
+    - snapshot_signatures_and_chain_records
+    - repository_approvals
+    - change_and_baseline_locks
+    - task_packets
+    - git_objects_refs_and_workflow_run_metadata
+  quarantine_rules:
+    - every_direct_collision_identity_is_permanent_tombstone
+    - every_legacy_identity_is_permanently_reserved_even_without_collision
+    - exposed_trust_epoch_is_non_authorizing
+    - transitive_references_to_quarantined_authority_are_ineligible
+    - no_observed_hash_is_selected_as_the_repaired_identity
+
+product_invariance:
+  default_rule: >-
+    Expand the complete protected set and CORE-1.0.0 manifest at B. Every byte is
+    frozen unless an exact regular-file path is named in the approved governance
+    delta manifest or a later externally approved per-stage transition manifest;
+    no directory glob grants write authority.
+  discovery_path_sets_expanded_to_exact_files_at_B:
+    - openspec/specs/**
+    - openspec/architecture/**
+    - openspec/integrations/openharmony/**
+    - openspec/contracts/catalogs/**
+    - openspec/platforms/macos/profile.md
+    - openspec/platforms/macos/verification.md
+    - openspec/platforms/macos/conformance-cases.yaml
+    - openspec/platforms/windows/profile.md
+    - openspec/platforms/windows/verification.md
+    - openspec/platforms/windows/conformance-cases.yaml
+    - openspec/platforms/linux/profile.md
+    - openspec/platforms/linux/verification.md
+    - openspec/platforms/linux/conformance-cases.yaml
+    - openspec/verification/acceptance-cases.yaml
+    - openspec/verification/acceptance-index.txt
+  default_frozen_contract_set:
+    include: openspec/contracts/**
+    exact_allowed_add_paths_source: approvedGovernanceDeltaManifest
+    rule: >-
+      Every contract file present at B is frozen. Only a new regular-file path
+      absent at B and explicitly listed as an allowed governance contract add may
+      be added; no existing product or Safety contract may be replaced.
+  projection_extraction_contract:
+    version: exact-byte-segments-v1
+    projection_entry_exact_fields:
+      - path
+      - projection_id
+      - ordered_segments
+      - projection_sha256
+    segment_exact_fields:
+      - start_marker
+      - end_marker
+      - start_occurrence
+      - end_occurrence
+      - include_markers
+      - raw_sha256
+    canonical_bytes: >-
+      Concatenate each exact LF byte segment in declared order, prefixed by its
+      eight-byte unsigned big-endian length. Missing, duplicated, reordered or
+      overlapping markers fail; semantic parsing or approximate matching is
+      forbidden.
+  projection_frozen_paths:
+    - path: .github/CODEOWNERS
+      projection: human_governance_owner_coverage
+      sha256: pendingExactBProjectionHash
+    - path: AGENTS.md
+      projection: agent_prohibitions_platform_port_rules_and_execution_rules
+      sha256: pendingExactBProjectionHash
+    - path: openspec/constitution.md
+      projection: every_POL_block
+      sha256: pendingExactBProjectionHash
+    - path: openspec/project.md
+      projection: product_scope_non_goals_terms_defaults_and_spec_implementation_boundary
+      sha256: pendingExactBProjectionHash
+    - path: openspec/verification/policy.md
+      projection: >-
+        verification layers, Core invariants, Ready/Done rules, hardware limits,
+        evidence rules and every stop condition
+      sha256: pendingExactBProjectionHash
+    - path: openspec/governance/enforcement.md
+      projection: >-
+        human approval independence, immutable identity, Agent non-approval,
+        fail-closed, hardware authorization and owner/claim restrictions
+      sha256: pendingExactBProjectionHash
+    - path: openspec/governance/trust-policy.yaml
+      projection: >-
+        every_existing_human_independence_external_verifier_agent_isolation
+        immutable_identity_failclosed_and_nonselfapproval_rule
+      sha256: pendingExactBProjectionHash
+    - path: openspec/config.yaml
+      projection: schema_declared_platforms_context_and_rules_excluding_current_core_baseline
+      sha256: pendingExactBProjectionHash
+    - path: openspec/changes/README.md
+      projection: >-
+        immutable Change/Task identity, no self-approval, no product-delta
+        bypass, exact diff and protected publication restrictions
+      sha256: pendingExactBProjectionHash
+    - path: openspec/verification/core-conformance.yaml
+      projection: acceptance_inputs_applicability_shared_payload_evidence_and_safety_coverage
+      sha256: pendingExactBProjectionHash
+    - path: openspec/integrations/INTEGRATION-PROFILES.lock.yaml
+      projection: profile_catalog_fixture_payload_excluding_fresh_identity_pin_and_approval_metadata
+      sha256: pendingExactBProjectionHash
+    - path: openspec/platforms/PLATFORM-PROFILES.lock.yaml
+      projection: profile_case_and_support_payload_excluding_fresh_identity_pin_and_approval_metadata
+      sha256: pendingExactBProjectionHash
+  publication_mutable_projections:
+    - path: openspec/config.yaml
+      transition: S_to_T
+      mutable_json_pointers:
+        - /current_core_baseline
+      mutable_projection_ids: []
+      frozen_rule: everyOtherParsedValueKeyOrderCommentAndRawByteSegmentIsExact
+    - path: openspec/governance/trust-policy.yaml
+      transition: T_to_P
+      mutable_json_pointers:
+        - /policy
+        - /revision
+        - /status
+        - /execution_gate
+        - /bootstrap_root_id
+        - /ratification/approval_ref
+        - /external_verifiers
+      mutable_projection_ids:
+        - append_new_stronger_governance_rules_after_all_frozen_existing_rules
+        - replace_bootstrap_note_with_recovered_epoch_note
+      frozen_rule: >-
+        Every pre-existing rule remains exact and in order; only the listed
+        metadata/verifier fields and named complementary projections may change.
+    - path: openspec/verification/core-conformance.yaml
+      transition: S_to_T
+      mutable_json_pointers:
+        - /suite
+        - /revision
+        - /status
+        - /core_baseline
+        - /execution_gate
+        - /shared_inputs/integration_lock/id
+        - /shared_inputs/integration_lock/sha256
+        - /ratification/approval_ref
+        - /ratification/note
+      mutable_projection_ids: []
+      frozen_rule: acceptanceApplicabilitySharedPayloadEvidenceAndSafetyCoverageAreExact
+    - path: openspec/integrations/INTEGRATION-PROFILES.lock.yaml
+      transition: S_to_T
+      mutable_json_pointers:
+        - /lock
+        - /revision
+        - /status
+        - /generated_at
+        - /accepted_at
+        - /execution_gate
+        - /previous_lock
+        - /ratification/status
+        - /ratification/approval_ref
+      mutable_projection_ids: []
+      frozen_rule: profilesCatalogsFixturesAndChangeRuleAreExact
+    - path: openspec/platforms/PLATFORM-PROFILES.lock.yaml
+      transition: S_to_T
+      mutable_json_pointers:
+        - /lock
+        - /revision
+        - /status
+        - /execution_gate
+        - /generated_at
+        - /accepted_at
+        - /previous_lock
+        - /ratification/status
+        - /ratification/approval_ref
+      mutable_projection_ids: []
+      frozen_rule: >-
+        Delivery sets, profile payloads, support status, conformance status,
+        last-verified payload and change rule are exact.
+  publication_mutable_projection_rules:
+    - pointers_are_exact_and_additional_pointer_change_is_failure
+    - absent_new_metadata_field_may_be_added_only_when_listed
+    - identity_status_gate_timestamp_pin_and_approval_metadata_only
+    - no_product_integration_platform_or_conformance_behavior_change
+  preserved_history_paths:
+    - openspec/baselines/CORE-1.0.0.lock.yaml
+    - openspec/baselines/CORE-1.0.0.files.yaml
+    - openspec/approvals/**
+    - openspec/changes/chg-2026-001-macos-m0a/**
+    - every_file_named_by_the_formal_quarantine_manifest
+  formalization_rules:
+    - expand_every_path_set_to_sorted_exact_regular_files
+    - materialize_every_projection_marker_range_and_hash_in_formal_scope
+    - hash_every_full_file_or_named_projection_from_B
+    - additional_or_missing_projection_is_failure
+    - mixed_file_non_governance_projection_must_be_byte_identical
+    - B_through_P_may_not_replace_delete_or_move_preserved_history
+  forbidden_deltas:
+    - product_requirement
+    - product_acceptance_scenario
+    - safety_invariant
+    - agent_authority_relaxation
+    - governance_failclosed_relaxation
+    - human_approval_independence_relaxation
+    - device_or_hardware_support
+    - platform_conformance_claim
+    - integration_behavior
+
+candidate_target:
+  governance_schema: arkdeck-governance@1
+  governance_mode: recovery-bootstrap
+  bootstrap_only: true
+  recovery_epoch: 1
+  core_change_level: major
+  result_core_baseline_provisional: CORE-2.0.0
+  result_core_baseline_identity_state: proposedUnallocated
+  identity_allocation_rule: >-
+    The recovery authority must prove CORE-2.0.0 globally unused and allocate
+    that exact candidate ID. If it cannot, this candidate is invalid and must be
+    revised and re-reviewed; no Agent may silently choose another ID.
+  product_behavior_delta: none
+  trust_epoch: pending_external_allocation
+  ledger_id: pending_external_allocation
+  conformance_subject: pending_external_allocation
+  platform_lock_subject: pending_external_allocation
+  integration_lock_subject: pending_external_allocation
+
+candidate_protected_output_classes:
+  - governance_schema_and_templates
+  - recovery_authorization_and_result_contracts
+  - identity_quarantine_and_ledger_v2_contracts
+  - guard_routes_and_adversarial_tests
+  - secret_free_diagnostic_ci
+  - protected_external_publication_workflow
+  - consistent_constitution_project_enforcement_and_trust_statements
+  - quarantined_history_registry
+
+later_stage_output_classes:
+  R_to_S:
+    - governance_recovery_result_mirror
+  S_to_T:
+    - recovery_prepublication_proof
+    - fresh_core_baseline_manifest_and_lock
+    - fresh_conformance_platform_integration_subjects
+    - current_config_pin
+  T_to_P:
+    - exact_baseline_axis_and_recovery_approval_mirrors
+    - governance_publication_metadata
+
+publication_constraints:
+  - exact_file_allowlist_without_globs
+  - exact_base_sha256_for_every_modified_path
+  - exact_result_sha256_for_every_added_or_modified_path
+  - canonical_full_base_and_result_git_oids
+  - protected_operator_identity_and_external_recovery_authorization
+  - candidate_guard_cannot_approve_or_verify_itself
+  - no_standard_task_packet_or_standard_agent_claim
+  - no_authoritative_staging_before_external_approval
+  - no_gate_open_before_independent_recovery_result_approval
+  - gate5_authorization_has_no_direct_operational_authority
+  - only_latest_rollback_resistant_activation_head_current_creates_authority
+  - current_and_abort_compete_on_one_expected_activation_head_CAS
+  - every_claim_allocation_and_commit_rechecks_and_binds_latest_activation_head
+  - every_post_R_transition_requires_external_parent_child_exact_diff_authorization
+  - no_post_R_bytes_hashes_or_commit_oids_are_locked_or_predicted_at_R
+
+reauthorization_boundary:
+  old_core_baseline: preserveAndQuarantine
+  old_m0a_change_and_tasks: preserveAndNeverClaim
+  chg_003:
+    structural_decision: preservedNonAuthorizing
+    approval: requiredAfterRecovery
+    fresh_pins: required
+    automatic_ready: false

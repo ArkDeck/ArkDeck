@@ -1,0 +1,238 @@
+name: arkdeck-governance
+version: 1
+status: draftNonAuthorizing
+description: >-
+  Single-use, externally rooted governance recovery schema. It cannot change
+  product behavior and cannot be used as a general governance bypass.
+
+proposal_contract:
+  id: externallyAllocatedFreshRecoveryChangeId
+  class: governance
+  schema: arkdeck-governance
+  governance_mode: recovery-bootstrap
+  bootstrap_only: true
+  recovery_epoch: 1
+  core_change_level: major
+  product_behavior_delta: none
+  supersedes_change_id: null
+  supersession_barrier_attestation_id: null
+  source_core_baseline: CORE-1.0.0
+  source_core_baseline_role: historicalBytesOnlyNonAuthorizing
+  result_core_baseline: CORE-2.0.0
+  result_core_baseline_state: proposedUnallocatedUntilExternalRecoveryApproval
+
+artifacts:
+  - id: proposal
+    generates: proposal.md
+    requires: []
+    locked: true
+  - id: artifact_contracts
+    generates: artifact-contracts.yaml
+    requires: [proposal]
+    locked: true
+  - id: scope
+    generates: scope.yaml
+    requires: [proposal, artifact_contracts]
+    locked: true
+  - id: incident_inventory
+    generates: incident-inventory.yaml
+    requires: [proposal]
+    locked: true
+  - id: quarantine_manifest
+    generates: quarantine-manifest.yaml
+    requires: [incident_inventory]
+    locked: true
+  - id: core_safety_impact
+    generates: core-safety-impact.md
+    requires: [scope, incident_inventory, quarantine_manifest]
+    locked: true
+  - id: threat_model
+    generates: threat-model.md
+    requires: [incident_inventory, quarantine_manifest]
+    locked: true
+  - id: governance_delta_sources
+    generates: governance-delta/**
+    requires: [scope, core_safety_impact, threat_model]
+    locked: true
+  - id: governance_delta
+    generates: governance-delta-manifest.yaml
+    requires: [governance_delta_sources]
+    locked: true
+  - id: external_transition
+    generates: external-transition.yaml
+    requires: [incident_inventory, quarantine_manifest, threat_model]
+    locked: true
+  - id: design
+    generates: design.md
+    requires: [governance_delta, external_transition]
+    locked: true
+  - id: verification
+    generates: verification.md
+    requires: [design, incident_inventory, quarantine_manifest]
+    locked: true
+  - id: acceptance_cases
+    generates: acceptance-cases.yaml
+    requires: [verification]
+    locked: true
+  - id: review
+    generates: review.md
+    requires:
+      - scope
+      - incident_inventory
+      - quarantine_manifest
+      - core_safety_impact
+      - threat_model
+      - governance_delta
+      - external_transition
+      - design
+      - verification
+      - acceptance_cases
+    locked: true
+  - id: publication_plan
+    generates: publication-plan.yaml
+    requires: [review]
+    locked: true
+  - id: ready_review
+    generates: ready-review.md
+    requires: [publication_plan, review]
+    locked: true
+  - id: recovery_lock
+    generates: recovery-lock.yaml
+    requires: [ready_review]
+    locked: false
+
+recovery_lock_exact_inputs:
+  - proposal.md
+  - artifact-contracts.yaml
+  - scope.yaml
+  - incident-inventory.yaml
+  - quarantine-manifest.yaml
+  - core-safety-impact.md
+  - threat-model.md
+  - governance-delta-manifest.yaml
+  - external-transition.yaml
+  - design.md
+  - verification.md
+  - acceptance-cases.yaml
+  - review.md
+  - publication-plan.yaml
+  - ready-review.md
+
+recovery_lock_dynamic_inputs:
+  sources:
+    - governance-delta-manifest.yaml
+  rule: >-
+    Expand every governance-delta manifest entry to its exact referenced regular
+    source blob, sort by repository-relative path and include all those bytes in
+    the lock. An unreferenced or missing file under governance-delta is an error;
+    a glob string is never stored as a lock entry. Later R-to-S, S-to-T and T-to-P
+    bytes do not exist at R and therefore can never be recovery-lock inputs.
+
+execution_model:
+  ordinary_task_packets: forbidden
+  standard_agent_claim: forbidden
+  controlled_hardware_lab: forbidden
+  executor: protectedGovernanceWorkflow
+  authorization_subject: governanceRecoveryBootstrap
+  result_subject: governanceRecoveryResult
+  post_R_transition_subject: governanceRecoveryStageAuthorization
+  final_publication_result_subject: governanceRecoveryPublicationResult
+  gate_open_authorization_subject: recoveryGateOpenAuthorization
+  gate_open_result_bundle: recoveryGateOpenResultBundle
+  operational_authority_anchor: independentlyFetchedLatestRecoveryActivationHeadStateCurrent
+  agent_role: draftAndTestCandidateOnly
+  external_operator_role: applyExactApprovedCandidate
+
+delta_contract:
+  source_directory: governance-delta
+  manifest: governance-delta-manifest.yaml
+  operations: [add, replace]
+  delete_operation: forbiddenInV1
+  path_globs: forbidden
+  symlinks: forbidden
+  each_entry_requires:
+    - path
+    - operation
+    - base_sha256_or_null_for_add
+    - result_sha256
+    - locked_source_blob_path
+  actual_diff_rule: exactManifestEquality
+
+stage_transition_contract:
+  kind: externallyAuthorizedPerStageTransition
+  source_directory: none
+  manifest: externalStageTransitionManifest
+  operations: [add, replace]
+  delete_operation: forbiddenInV1
+  path_globs: forbidden
+  allowed_transitions:
+    - R_to_S
+    - S_to_T
+    - T_to_P
+  generation_rule: >-
+    A transition manifest is generated only after both its source and isolated
+    target commits exist. It binds both full OIDs and exact target blob hashes,
+    is signed outside the repository and is never an input to R's recovery lock.
+  permitted_roles:
+    - governance_recovery_result_mirror
+    - recovery_prepublication_proof
+    - fresh_core_baseline_lock_or_manifest
+    - fresh_conformance_subject
+    - fresh_platform_lock_subject
+    - fresh_integration_lock_subject
+    - current_config_pin
+    - governance_publication_metadata
+    - exact_recovery_approval_mirror
+    - exact_baseline_or_axis_approval_mirror
+  actual_diff_rule: exactManifestEquality
+  required_role_cardinality_rule: >-
+    R fixes one sorted closed table of exact rows {stage, publication_role,
+    required_count}, unique by stage/role with positive counts. Every transition
+    binds the full-table JCS hash, then its actual role counts equal exactly the
+    rows filtered by stage == transition.
+
+guard_invariants:
+  - exactly_one_recovery_bootstrap_ever_enforced_by_fixed_external_slot
+  - governance_mode_and_recovery_epoch_are_constants
+  - no_specs_delta_or_spec_impact_artifact
+  - no_product_requirement_or_acceptance_id
+  - product_specs_and_core_acceptance_are_byte_identical
+  - constitution_policy_blocks_are_byte_identical
+  - capability_and_workflow_step_registries_are_byte_identical
+  - quarantined_identity_is_never_authority_or_eligibility_input
+  - repository_local_trust_root_or_verifier_is_never_authoritative
+  - agent_readable_signer_is_invalid
+  - candidate_guard_cannot_verify_itself_without_external_verifier
+  - fresh_baseline_and_authorization_identities_are_required
+  - source_core_baseline_bytes_are_never_rewritten
+  - all_three_declared_platforms_have_revalidation_disposition
+  - pre_gate5_component_bundles_have_zero_authority
+  - publication_manifest_and_gate_repeated_pins_are_exact_equal_and_bijective
+  - current_and_abort_are_one_expected_activation_head_CAS_race
+  - claim_allocation_and_commit_recheck_latest_activation_head
+
+publication_model:
+  B: externally_authorized_full_base_commit
+  R: exact_protected_candidate_result
+  S: metadata_only_recovery_result_and_external_approval
+  T: >-
+    isolated publication staging with prepublication proof, fresh Core baseline
+    and required Conformance/Platform/Integration transition subjects; it never
+    moves, replaces or deletes quarantined V1 evidence
+  P: metadata_only_exact_approval_mirrors_and_publication_metadata
+  authority_rule: >-
+    No B/R/S/T/P revision becomes authoritative until the external recovery
+    authorization, B/R result, every parent/child stage authorization, final
+    publication result, fresh baseline approvals and persistent ledger candidate
+    component all verify against the exact bytes, and one independently fetched
+    latest rollback-resistant activation head is signed with `state=current` and
+    references the exact ready result bundle. Gate authorization or any pre-Gate5
+    bundle alone has no authority. Post-R authorization bytes are never predicted
+    at R or mirrored into their own target commits.
+
+retirement_rule: >-
+  The external fixed slot `(repositoryId, arkdeck-governance, recoveryEpoch=1)`
+  is consumed before Gate 1 and is never deleted or reset, whether recovery
+  succeeds or permanently aborts. After that consumption arkdeck-governance@1
+  rejects every new bootstrap proposal. A future general governance schema
+  requires a separately approved design; this escape hatch cannot be reused.

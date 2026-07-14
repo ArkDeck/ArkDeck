@@ -1,0 +1,52 @@
+schema_version: draft-1
+status: templateNonAuthorizing
+hash_algorithm: sha256
+product_behavior_delta: none
+entries: []
+
+entry_contract:
+  exact_fields:
+    - path
+    - operation
+    - base_sha256
+    - result_sha256
+    - mode
+    - object_type
+    - locked_source_blob_path
+  operations:
+    - add
+    - replace
+  path_rule: normalizedRepositoryRelativeFileWithoutGlobTraversalOrSymlink
+  base_sha256_rule: nullOnlyForAddOtherwiseExactBBlobHash
+  result_sha256_rule: exactLockedSourceBlobHash
+  mode_values:
+    - regular_0644
+    - executable_0755
+  object_type: regularFileOnly
+
+manifest_rules:
+  - entries_are_nonempty_sorted_and_unique_by_path_before_authorization
+  - actual_B_to_R_name_status_mode_type_and_blob_hashes_equal_entries
+  - scope_extra_output_is_failure
+  - delete_rename_copy_directory_and_symlink_are_forbidden_in_v1
+  - fully_frozen_paths_cannot_appear
+  - projection_frozen_mixed_files_may_appear_only_when_every_frozen_projection_hash_is_unchanged
+  - source_CORE_1_0_0_lock_manifest_and_approval_bytes_cannot_appear
+  - every_locked_source_blob_is_inside_the_recovery_candidate
+  - no_secret_private_key_or_external_sensitive_value
+  - formal_authorization_requires_result_R_to_have_exactly_one_parent_equal_to_B
+  - merge_commit_replace_parent_graft_or_additional_parent_is_failure
+
+required_output_categories:
+  - arkdeck_governance_schema_and_templates
+  - governance_recovery_authorization_result_and_quarantine_contracts
+  - identity_ledger_v2_schema_and_external_verifier_interface
+  - guard_routes_and_adversarial_selftests
+  - secret_free_diagnostic_ci_and_protected_publication_client
+  - governance_candidate_state_documents_with_gate_closed
+  - immutable_quarantine_and_history_commitment_mirrors
+
+completion_rule: >-
+  This template must be replaced by a fully populated exact manifest in an
+  isolated candidate commit before governanceRecoveryBootstrap approval. Empty
+  or pending fields always fail the external authorization gate.

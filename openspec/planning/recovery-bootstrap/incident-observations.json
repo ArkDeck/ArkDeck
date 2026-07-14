@@ -1,0 +1,833 @@
+{
+  "schemaVersion": "draft-1",
+  "status": "observedNonAuthorizing",
+  "analysisBaseRevision": "e39ab29397068069c5f20ea0529ca8cc6a14e9f4",
+  "repositoryId": "ORG-ARKDECK-REPOSITORY-1",
+  "sourceLedgerId": "ARKDECK-LEDGER-1",
+  "sourceSnapshots": [
+    {
+      "revision": 1,
+      "repositoryRevision": "1aea225914bc4b2cbe559dec50503e3dc71bc486",
+      "previousSnapshotSha256": null,
+      "ledgerId": "ARKDECK-LEDGER-1",
+      "entryCount": 0,
+      "snapshotSha256": "dd973f28337f27708e1b62d5a59b8fd23f9fdfbdd8a9ef53adcc6a46af34157f"
+    },
+    {
+      "revision": 2,
+      "repositoryRevision": "1aea225914bc4b2cbe559dec50503e3dc71bc486",
+      "previousSnapshotSha256": "dd973f28337f27708e1b62d5a59b8fd23f9fdfbdd8a9ef53adcc6a46af34157f",
+      "ledgerId": "ARKDECK-LEDGER-1",
+      "entryCount": 0,
+      "snapshotSha256": "d3fa0ccdcec05688670d0c0bf8046dd8179b70c47119955b0f08f4a22f5b5961"
+    },
+    {
+      "revision": 3,
+      "repositoryRevision": "1aea225914bc4b2cbe559dec50503e3dc71bc486",
+      "previousSnapshotSha256": "d3fa0ccdcec05688670d0c0bf8046dd8179b70c47119955b0f08f4a22f5b5961",
+      "ledgerId": "ARKDECK-LEDGER-1",
+      "entryCount": 11,
+      "snapshotSha256": "84fa0f4f32f47ba1112ed089696b086968daa3a8885c718317b35a84fd1c0a35"
+    },
+    {
+      "revision": 4,
+      "repositoryRevision": "e56fea2983192a96e394783021bf2026b75527db",
+      "previousSnapshotSha256": "84fa0f4f32f47ba1112ed089696b086968daa3a8885c718317b35a84fd1c0a35",
+      "ledgerId": "ARKDECK-LEDGER-1",
+      "entryCount": 35,
+      "snapshotSha256": "8cb7d21a1aae16a7a3cdf39bf5c0f7642c8185db392046aa54b05c96e130083f"
+    },
+    {
+      "revision": 5,
+      "repositoryRevision": "e56fea2983192a96e394783021bf2026b75527db",
+      "previousSnapshotSha256": "8cb7d21a1aae16a7a3cdf39bf5c0f7642c8185db392046aa54b05c96e130083f",
+      "ledgerId": "ARKDECK-LEDGER-1",
+      "entryCount": 35,
+      "snapshotSha256": "5370ada58023052a8531409b0b9d84302d8f79e59d5ec1b3216a3a8ba86f80b3"
+    },
+    {
+      "revision": 6,
+      "repositoryRevision": "e56fea2983192a96e394783021bf2026b75527db",
+      "previousSnapshotSha256": "5370ada58023052a8531409b0b9d84302d8f79e59d5ec1b3216a3a8ba86f80b3",
+      "ledgerId": "ARKDECK-LEDGER-1",
+      "entryCount": 35,
+      "snapshotSha256": "10825a969bda542357bc7d53606905b16c3d8b11c41fc5536db57da5a2dc930d"
+    },
+    {
+      "revision": 7,
+      "repositoryRevision": "e56fea2983192a96e394783021bf2026b75527db",
+      "previousSnapshotSha256": "10825a969bda542357bc7d53606905b16c3d8b11c41fc5536db57da5a2dc930d",
+      "ledgerId": "ARKDECK-LEDGER-1",
+      "entryCount": 35,
+      "snapshotSha256": "4b55b763459f62dd71234ff49b6b42e8e04157ae8957d63a4fececa802cb2ff1"
+    },
+    {
+      "revision": 8,
+      "repositoryRevision": "d02b20284fca713f991e21ced5152dce47062ac1",
+      "previousSnapshotSha256": "4b55b763459f62dd71234ff49b6b42e8e04157ae8957d63a4fececa802cb2ff1",
+      "ledgerId": "ARKDECK-LEDGER-1",
+      "entryCount": 35,
+      "snapshotSha256": "9d3a05bf053932e5f968caf572f1e173fd1cb6ed37e5aeae38339d70e9df5d53"
+    },
+    {
+      "revision": 9,
+      "repositoryRevision": "d02b20284fca713f991e21ced5152dce47062ac1",
+      "previousSnapshotSha256": "9d3a05bf053932e5f968caf572f1e173fd1cb6ed37e5aeae38339d70e9df5d53",
+      "ledgerId": "ARKDECK-LEDGER-1",
+      "entryCount": 35,
+      "snapshotSha256": "ec424d9c27e598db70e413e00af49b7c20d1f27b2365cb4364bc6045101978b7"
+    },
+    {
+      "revision": 10,
+      "repositoryRevision": "28e20c57ed77cec9460cb1fb34518d240b02d66e",
+      "previousSnapshotSha256": "ec424d9c27e598db70e413e00af49b7c20d1f27b2365cb4364bc6045101978b7",
+      "ledgerId": "ARKDECK-LEDGER-1",
+      "entryCount": 35,
+      "snapshotSha256": "047f899caefb08821493c8874ac79174f39788f6c4670f72edef16942656eff4"
+    }
+  ],
+  "findings": {
+    "schemaViolations": [
+      "source ledgerId does not match the current IDLEDGER-* schema pattern",
+      "snapshots 1 and 2 have zero entries although the current schema requires at least one"
+    ],
+    "collisionKey": [
+      "repositoryId",
+      "kind",
+      "id",
+      "revision"
+    ],
+    "collisionGroupsByKind": {
+      "acceptedBaseline": 1,
+      "approval": 13,
+      "approvedSubject": 9,
+      "changeLock": 1,
+      "taskPacket": 7
+    },
+    "collisionGroups": [
+      {
+        "kind": "acceptedBaseline",
+        "id": "CORE-1.0.0",
+        "revision": "1",
+        "observedHashes": [
+          "4b7a772a5b937bc17ad27493882219cb2123a64a409022c5a4b202dea944307e",
+          "50b68917cb2aa011ab67d0a8a2469913b1f14b3c8c57f2ef53f7c0301a088a79",
+          "adc03fa950c2eb4758d14c63985ce0b318b00dbbcb91006e0d18b0400b73252a"
+        ]
+      },
+      {
+        "kind": "approval",
+        "id": "APR-BASELINE-CORE-1.0.0",
+        "revision": "1",
+        "observedHashes": [
+          "6c921f3d026a00125f3b3c39f66153d2f6dfbba0576bcd0aee5116e15cbcaa5a",
+          "9cf5374aad41f729d82189515848fd26c6fa20943dfbb41161d98ff5a6ee0d7f",
+          "e7244f32f3ab504b248c49fc26ded022df2d971be3b96c8e589e506fddecf135"
+        ]
+      },
+      {
+        "kind": "approval",
+        "id": "APR-CHANGE-CHG-2026-001-MACOS-M0A-R1",
+        "revision": "1",
+        "observedHashes": [
+          "2974961e8263be07950842feb28a0e4cc7e3597b3668185f807f9e85a695d887",
+          "3f7726c6f4353e1e7ad0350967e7ea3513476b7cc0021b415f20334c3a2f2387",
+          "6347a52fd11dbad39b26b03e5807afd99d2ee8bf829a253756192f2685088a75",
+          "ea7bb002e96f6574a36d207c25fe375d71f78c738a054d0c5fee36a03806d29a"
+        ]
+      },
+      {
+        "kind": "approval",
+        "id": "APR-CONFORMANCE-SUITE-1",
+        "revision": "1",
+        "observedHashes": [
+          "21c5c19ee08c48588b0881bc4e3cc20c2fea37a67583968753129e3e9ad35a87",
+          "4d3fe5d4bc9b5112069471f8396bcad8220ca1bdcdebd813a7658279116a454e",
+          "f58f00e0c9df400a530dfc7664b6f37c95ef8990bb0f49fc2382ddd51e40e260"
+        ]
+      },
+      {
+        "kind": "approval",
+        "id": "APR-INTEGRATION-LOCK-1",
+        "revision": "1",
+        "observedHashes": [
+          "a2a7af8271064ba650dc3c12976296ba366783a88a4b79516d1e874d63288bf0",
+          "e6f4dabd4fabc8ce548e444614f431c117cfc7e9e8d8c61fc268ce08def4bb4c",
+          "f9a33d8be6736b0afd8f30423deb2c1419a7c1ea4cd8757e0d6fb25b317e7261"
+        ]
+      },
+      {
+        "kind": "approval",
+        "id": "APR-PLATFORM-LOCK-1",
+        "revision": "1",
+        "observedHashes": [
+          "0f6dca958ca0986d57b8356eaa1654bebd43346ed409e9a3281b0e9bb9123c26",
+          "569979b39b823a7e1789a4d7e74ac3ec989df91aeb3286586c745f51b162b03b",
+          "d5054007f5c1ab0d8c0a6bbf4b272c9b326b53388ca11fd5f6ce77b221067420"
+        ]
+      },
+      {
+        "kind": "approval",
+        "id": "APR-TASK-M0A-001-R1",
+        "revision": "1",
+        "observedHashes": [
+          "12d346ecef7ebbc33d7a7e3185e70da9d20c3ebfb732ead7e73b728b5853272e",
+          "26600c2793e820f2039cecaa6ab814657cb0c28b8023663433e0da4e0be68f6d",
+          "558f608e4d156e6b614743af41a0b6540ab86db8b992abcbb4bd6c0aad7991f4",
+          "5c213d059d51f31ed1ac59a71ee63bcc00f8be49608b395540e72ae2b3c511b5",
+          "aae0b0ed476147e86b856349a3d3e642a8a713866e634722153bd5c8bc070224"
+        ]
+      },
+      {
+        "kind": "approval",
+        "id": "APR-TASK-M0A-002-R1",
+        "revision": "1",
+        "observedHashes": [
+          "0a83db6f150b82871368d96d0c550179b1d7e3af789fbdc517ddfec6c4342504",
+          "3cb45e1bc7581e797a4a8972081464b127a6da902a2e4b4ef22f024929fd0442",
+          "67acdb84020cfa2c49ec760d66da96a27e0c7d6db473093e19d5101cc0689f9a",
+          "dbeda7472da4657042f2c322622dcb428704717250fd3826a82fa8cc684f5994",
+          "f82a981f876a309ede3e1ad328fc8f557f6c4d6a9cfc5bff3658a7e3c0d75c8e"
+        ]
+      },
+      {
+        "kind": "approval",
+        "id": "APR-TASK-M0A-003-R1",
+        "revision": "1",
+        "observedHashes": [
+          "8046e52836cb53913db3d329baa1a80f2bbb07de410c48e6feae558a8982f533",
+          "b981213ce4c7f0a684e02f5acdfa4e05a7c2d524691123ab784d377973bad2a4",
+          "c274ba0be2ab45629a3c8b9164bb943f15cb7050a8395d28164dc006a29a96b2",
+          "d03bd80a3f08c9772c06fbcb529e63c1d88254ed1bccbfcb6c4c3cc19d82f7fe",
+          "da62ee0435375d53399ba5ac377509b758be4338d29abbfcdf9b2768919557d8"
+        ]
+      },
+      {
+        "kind": "approval",
+        "id": "APR-TASK-M0A-004-R1",
+        "revision": "1",
+        "observedHashes": [
+          "174e91a60c3e84876b4a4536a0989b31afe2cc4dc49505ec574f809a9b07b2d2",
+          "99aef93bba3e3ee5ba0f665c92ab5d7eac5e0fcb2486d3a8ea614a7153458697",
+          "c646cbcdb9bbfb8aee4e450c17214fd2c3c169d37e148db3d57a87d217799b17",
+          "c8c369c4b3ff3bd34a4eece85bfd02f9d4f2e3d953f3c82f691de7514f0e0b5a",
+          "d2018f9531c679252b4edcffd2dd825d81985ab38e53f6c12e168891d5ee29f9"
+        ]
+      },
+      {
+        "kind": "approval",
+        "id": "APR-TASK-M0A-005-R1",
+        "revision": "1",
+        "observedHashes": [
+          "22d5e93ea501de2755de0c4592896e22f6e1baa829bfe993b16fc98cd7204756",
+          "61dde85cb730ff73fef8a8653aea386ad09d36897c796b0f6dbefdb0fe029f4c",
+          "8c0eb5e7b7529fe907acb7d1f66a30e7b404495d2bb86ba70ab035aae697aa1f",
+          "a28afde5b25e24ff9b25dca4dc9de7da78e323a636d5f3e8ce4ad8475e559ed3",
+          "d8499cebe0b471e015ca37218d1b86e70fa96ed8d4d8996137298c49b5e62ce6"
+        ]
+      },
+      {
+        "kind": "approval",
+        "id": "APR-TASK-M0A-006-R1",
+        "revision": "1",
+        "observedHashes": [
+          "0c3e863b79f0bb79beaa090d74acb0035cac232da05656c296ee2600767c29c5",
+          "74cfd4119b4d6e6b598198ce16f08ac74568858275f88ed3cfba112015698543",
+          "b16c8dfd1568c18461e43e46ac6a3cac8b95d3f38433070bc042ec5147187405",
+          "bfedce1fdfee76bb537f673ba363794356db931d3b6f93a6b677bdc4839166e5",
+          "f5eb2e88a2edf75f04719456da6cd3202dce0091d52e4df7f72f42edf6666f41"
+        ]
+      },
+      {
+        "kind": "approval",
+        "id": "APR-TASK-M0A-007-R1",
+        "revision": "1",
+        "observedHashes": [
+          "1731e369cf1f51ef3b1bbe5c2db57cd39119d63ec6e3518b428a467a6cb510df",
+          "7725d6ebecd5d5a95ffd48d555899d83170f81e6397a58be4c9044c12b591ad3",
+          "8a3fdfe7445d461565ae75eaa6e2b0f30d2140f882a960a90b7898acd6d2407b",
+          "aa94f53f71dbaa39f61eae90f5701f69e725513b5750acdc5d6d96e53a249d76",
+          "ec3ffdf1aaa26139ca4a918b7717a9387da0eb5b997ddbe37119bb4330d023dd"
+        ]
+      },
+      {
+        "kind": "approval",
+        "id": "APR-TRUST-POLICY-1",
+        "revision": "1",
+        "observedHashes": [
+          "53bb33c2c4807c3d6b674637449f3a96bb1beee5289b100f3820583e5f63af0e",
+          "b25a66a7636a06adb1625d05f9eb6764a96cfd4847605992988f02f7bc0a8e18",
+          "fcff3fb5689033b7cda9fa614ae289b18704cb311f179afaaa25499fb4cbf4b5"
+        ]
+      },
+      {
+        "kind": "approvedSubject",
+        "id": "baseline:CORE-1.0.0",
+        "revision": "1",
+        "observedHashes": [
+          "4b7a772a5b937bc17ad27493882219cb2123a64a409022c5a4b202dea944307e",
+          "50b68917cb2aa011ab67d0a8a2469913b1f14b3c8c57f2ef53f7c0301a088a79",
+          "adc03fa950c2eb4758d14c63985ce0b318b00dbbcb91006e0d18b0400b73252a"
+        ]
+      },
+      {
+        "kind": "approvedSubject",
+        "id": "change:CHG-2026-001-macos-m0a",
+        "revision": "1",
+        "observedHashes": [
+          "057cc566072a02b932a04c98a936321b6a779f50fe32ccf64ca47b7a2dbc84d4",
+          "6b2d617452d5dc8637b76ebc225d655ed8c1f9f5bd4d0f2f93631f498dd3a8de",
+          "b1d1a16f911eaeab374e23a0550b26010a52c88cfd3f9e8f784e946106d79874",
+          "be91a3fb758ce21b94ed2ae3c1891d6e5a9530337651dee7439e845344f4302a"
+        ]
+      },
+      {
+        "kind": "approvedSubject",
+        "id": "taskPacket:TASK-M0A-001",
+        "revision": "1",
+        "observedHashes": [
+          "0124c98495070f262da7ba4372c0ff787b7d2177e95dd925107c72df16b0fc13",
+          "0266a5cb1ee1635a7e3c91af9f1f5d357b56c25fc197d4724cd2730994f1a22f",
+          "2a638a88038a3a279fa2792d745680009c45a2ce872aa22ac71eac3465434694"
+        ]
+      },
+      {
+        "kind": "approvedSubject",
+        "id": "taskPacket:TASK-M0A-002",
+        "revision": "1",
+        "observedHashes": [
+          "27c9e3f6bd571145b2c28ce13ba0416914edff51856efd236392cf86e2e67c6b",
+          "76f1e77a53ee2e184d232e153689767bd31b8e1f1cdc1cbceb8059737a2e616a",
+          "b56f52e1fd9e075a68ecb49a67d76b10ecf7439cc0b095040054bb5f118b0701"
+        ]
+      },
+      {
+        "kind": "approvedSubject",
+        "id": "taskPacket:TASK-M0A-003",
+        "revision": "1",
+        "observedHashes": [
+          "4a56e969c10f813d9665a7fd2d4728b56558eca06359cdbaa8835c30247fd0d1",
+          "7b48ed47746a70741d5a1670b7f753951cb304a9321590b83cb4a307e4a53dfa",
+          "8b8c9a63b7b9de5b6ce94b740e6445f45de121a93b49c657f7904be941e53343",
+          "ce72619335186f274aa9d1e028cbf86d42905c5708030875227370d257598b71"
+        ]
+      },
+      {
+        "kind": "approvedSubject",
+        "id": "taskPacket:TASK-M0A-004",
+        "revision": "1",
+        "observedHashes": [
+          "a704ebd2d73f719d50d1ab379a0808db2eff65de59fdb58f2dc577d0ea8e9db2",
+          "ccda4289d5a077591991d806411d638b51bed10cc0f1785e5cc0bd874d827000",
+          "fcfa430709e72fed26cc1a51fa0b322b81c1131b20c5095db509f6344e232b61"
+        ]
+      },
+      {
+        "kind": "approvedSubject",
+        "id": "taskPacket:TASK-M0A-005",
+        "revision": "1",
+        "observedHashes": [
+          "20c8048408008f56c53b702c39e0f8ff8e473e210e3356cedbacb212b007e4d2",
+          "3444afd099ffcf3cfddd642cd92c30d1e98d52a0daa5286512caa3bd2e99dd7a",
+          "999bc82e307cdedf732620febc41b74e70a712c73d30246ef5e8ca2c0dc50b12",
+          "d6cdda3d33ed1172a2ef8536e8ef95185baacbb28765af62bfd2225838cf65ec"
+        ]
+      },
+      {
+        "kind": "approvedSubject",
+        "id": "taskPacket:TASK-M0A-006",
+        "revision": "1",
+        "observedHashes": [
+          "60bfbb0b8865724530c5947a91a9c8b5a81b77a7ff98bc634470e4975960b371",
+          "97e78292717312f0fd0eb82ef894150fd98a09ea4622f133c09817906cc06554",
+          "ce40f1588d8be3f53c3e1170dd662e178e94d5de3b3c4ba6ebbd5858d0b8e465"
+        ]
+      },
+      {
+        "kind": "approvedSubject",
+        "id": "taskPacket:TASK-M0A-007",
+        "revision": "1",
+        "observedHashes": [
+          "346f82762e0728bb5fa196ca19568e03ee0b5617eb912c49e20792dce1fde05f",
+          "348adc48b9ed345b938a90676afaa3cf55d2bd1849dedbbe714767053d70abfd",
+          "6f87bbde251d4eddb3e01543426b3fbe8ff33f33f8745de892afb87cb7ef1ed4",
+          "a35df047826cd977f2450af3841788047715052881f695706ec0d098b961fe9d"
+        ]
+      },
+      {
+        "kind": "changeLock",
+        "id": "CHG-2026-001-macos-m0a",
+        "revision": "1",
+        "observedHashes": [
+          "057cc566072a02b932a04c98a936321b6a779f50fe32ccf64ca47b7a2dbc84d4",
+          "6b2d617452d5dc8637b76ebc225d655ed8c1f9f5bd4d0f2f93631f498dd3a8de",
+          "b1d1a16f911eaeab374e23a0550b26010a52c88cfd3f9e8f784e946106d79874",
+          "be91a3fb758ce21b94ed2ae3c1891d6e5a9530337651dee7439e845344f4302a"
+        ]
+      },
+      {
+        "kind": "taskPacket",
+        "id": "TASK-M0A-001",
+        "revision": "1",
+        "observedHashes": [
+          "0124c98495070f262da7ba4372c0ff787b7d2177e95dd925107c72df16b0fc13",
+          "0266a5cb1ee1635a7e3c91af9f1f5d357b56c25fc197d4724cd2730994f1a22f",
+          "2a638a88038a3a279fa2792d745680009c45a2ce872aa22ac71eac3465434694"
+        ]
+      },
+      {
+        "kind": "taskPacket",
+        "id": "TASK-M0A-002",
+        "revision": "1",
+        "observedHashes": [
+          "27c9e3f6bd571145b2c28ce13ba0416914edff51856efd236392cf86e2e67c6b",
+          "76f1e77a53ee2e184d232e153689767bd31b8e1f1cdc1cbceb8059737a2e616a",
+          "b56f52e1fd9e075a68ecb49a67d76b10ecf7439cc0b095040054bb5f118b0701"
+        ]
+      },
+      {
+        "kind": "taskPacket",
+        "id": "TASK-M0A-003",
+        "revision": "1",
+        "observedHashes": [
+          "4a56e969c10f813d9665a7fd2d4728b56558eca06359cdbaa8835c30247fd0d1",
+          "7b48ed47746a70741d5a1670b7f753951cb304a9321590b83cb4a307e4a53dfa",
+          "8b8c9a63b7b9de5b6ce94b740e6445f45de121a93b49c657f7904be941e53343",
+          "ce72619335186f274aa9d1e028cbf86d42905c5708030875227370d257598b71"
+        ]
+      },
+      {
+        "kind": "taskPacket",
+        "id": "TASK-M0A-004",
+        "revision": "1",
+        "observedHashes": [
+          "a704ebd2d73f719d50d1ab379a0808db2eff65de59fdb58f2dc577d0ea8e9db2",
+          "ccda4289d5a077591991d806411d638b51bed10cc0f1785e5cc0bd874d827000",
+          "fcfa430709e72fed26cc1a51fa0b322b81c1131b20c5095db509f6344e232b61"
+        ]
+      },
+      {
+        "kind": "taskPacket",
+        "id": "TASK-M0A-005",
+        "revision": "1",
+        "observedHashes": [
+          "20c8048408008f56c53b702c39e0f8ff8e473e210e3356cedbacb212b007e4d2",
+          "3444afd099ffcf3cfddd642cd92c30d1e98d52a0daa5286512caa3bd2e99dd7a",
+          "999bc82e307cdedf732620febc41b74e70a712c73d30246ef5e8ca2c0dc50b12",
+          "d6cdda3d33ed1172a2ef8536e8ef95185baacbb28765af62bfd2225838cf65ec"
+        ]
+      },
+      {
+        "kind": "taskPacket",
+        "id": "TASK-M0A-006",
+        "revision": "1",
+        "observedHashes": [
+          "60bfbb0b8865724530c5947a91a9c8b5a81b77a7ff98bc634470e4975960b371",
+          "97e78292717312f0fd0eb82ef894150fd98a09ea4622f133c09817906cc06554",
+          "ce40f1588d8be3f53c3e1170dd662e178e94d5de3b3c4ba6ebbd5858d0b8e465"
+        ]
+      },
+      {
+        "kind": "taskPacket",
+        "id": "TASK-M0A-007",
+        "revision": "1",
+        "observedHashes": [
+          "346f82762e0728bb5fa196ca19568e03ee0b5617eb912c49e20792dce1fde05f",
+          "348adc48b9ed345b938a90676afaa3cf55d2bd1849dedbbe714767053d70abfd",
+          "6f87bbde251d4eddb3e01543426b3fbe8ff33f33f8745de892afb87cb7ef1ed4",
+          "a35df047826cd977f2450af3841788047715052881f695706ec0d098b961fe9d"
+        ]
+      }
+    ],
+    "observedCollisionGroupCount": 31,
+    "knownMinimumCollisionGroupCount": 31,
+    "formalCollisionGroupCount": "pendingGate2CompletenessVerification",
+    "knownLegacyIdentityKeyCount": 36,
+    "knownLegacyIdentitySet": [
+      {
+        "kind": "acceptedBaseline",
+        "id": "CORE-1.0.0",
+        "revision": "1",
+        "observedHashes": [
+          "4b7a772a5b937bc17ad27493882219cb2123a64a409022c5a4b202dea944307e",
+          "50b68917cb2aa011ab67d0a8a2469913b1f14b3c8c57f2ef53f7c0301a088a79",
+          "adc03fa950c2eb4758d14c63985ce0b318b00dbbcb91006e0d18b0400b73252a"
+        ]
+      },
+      {
+        "kind": "approval",
+        "id": "APR-BASELINE-CORE-1.0.0",
+        "revision": "1",
+        "observedHashes": [
+          "6c921f3d026a00125f3b3c39f66153d2f6dfbba0576bcd0aee5116e15cbcaa5a",
+          "9cf5374aad41f729d82189515848fd26c6fa20943dfbb41161d98ff5a6ee0d7f",
+          "e7244f32f3ab504b248c49fc26ded022df2d971be3b96c8e589e506fddecf135"
+        ]
+      },
+      {
+        "kind": "approval",
+        "id": "APR-CHANGE-CHG-2026-001-MACOS-M0A-R1",
+        "revision": "1",
+        "observedHashes": [
+          "2974961e8263be07950842feb28a0e4cc7e3597b3668185f807f9e85a695d887",
+          "3f7726c6f4353e1e7ad0350967e7ea3513476b7cc0021b415f20334c3a2f2387",
+          "6347a52fd11dbad39b26b03e5807afd99d2ee8bf829a253756192f2685088a75",
+          "ea7bb002e96f6574a36d207c25fe375d71f78c738a054d0c5fee36a03806d29a"
+        ]
+      },
+      {
+        "kind": "approval",
+        "id": "APR-CHANGE-CHG-2026-001-macos-m0a-R1",
+        "revision": "1",
+        "observedHashes": [
+          "48b2f23900f2122faa9150a801150c6f46e7b38fd236b0220602f069aa8557df"
+        ]
+      },
+      {
+        "kind": "approval",
+        "id": "APR-CONFORMANCE-SUITE-1",
+        "revision": "1",
+        "observedHashes": [
+          "21c5c19ee08c48588b0881bc4e3cc20c2fea37a67583968753129e3e9ad35a87",
+          "4d3fe5d4bc9b5112069471f8396bcad8220ca1bdcdebd813a7658279116a454e",
+          "f58f00e0c9df400a530dfc7664b6f37c95ef8990bb0f49fc2382ddd51e40e260"
+        ]
+      },
+      {
+        "kind": "approval",
+        "id": "APR-INTEGRATION-LOCK-1",
+        "revision": "1",
+        "observedHashes": [
+          "a2a7af8271064ba650dc3c12976296ba366783a88a4b79516d1e874d63288bf0",
+          "e6f4dabd4fabc8ce548e444614f431c117cfc7e9e8d8c61fc268ce08def4bb4c",
+          "f9a33d8be6736b0afd8f30423deb2c1419a7c1ea4cd8757e0d6fb25b317e7261"
+        ]
+      },
+      {
+        "kind": "approval",
+        "id": "APR-PLATFORM-LOCK-1",
+        "revision": "1",
+        "observedHashes": [
+          "0f6dca958ca0986d57b8356eaa1654bebd43346ed409e9a3281b0e9bb9123c26",
+          "569979b39b823a7e1789a4d7e74ac3ec989df91aeb3286586c745f51b162b03b",
+          "d5054007f5c1ab0d8c0a6bbf4b272c9b326b53388ca11fd5f6ce77b221067420"
+        ]
+      },
+      {
+        "kind": "approval",
+        "id": "APR-TASK-M0A-001-R1",
+        "revision": "1",
+        "observedHashes": [
+          "12d346ecef7ebbc33d7a7e3185e70da9d20c3ebfb732ead7e73b728b5853272e",
+          "26600c2793e820f2039cecaa6ab814657cb0c28b8023663433e0da4e0be68f6d",
+          "558f608e4d156e6b614743af41a0b6540ab86db8b992abcbb4bd6c0aad7991f4",
+          "5c213d059d51f31ed1ac59a71ee63bcc00f8be49608b395540e72ae2b3c511b5",
+          "aae0b0ed476147e86b856349a3d3e642a8a713866e634722153bd5c8bc070224"
+        ]
+      },
+      {
+        "kind": "approval",
+        "id": "APR-TASK-M0A-002-R1",
+        "revision": "1",
+        "observedHashes": [
+          "0a83db6f150b82871368d96d0c550179b1d7e3af789fbdc517ddfec6c4342504",
+          "3cb45e1bc7581e797a4a8972081464b127a6da902a2e4b4ef22f024929fd0442",
+          "67acdb84020cfa2c49ec760d66da96a27e0c7d6db473093e19d5101cc0689f9a",
+          "dbeda7472da4657042f2c322622dcb428704717250fd3826a82fa8cc684f5994",
+          "f82a981f876a309ede3e1ad328fc8f557f6c4d6a9cfc5bff3658a7e3c0d75c8e"
+        ]
+      },
+      {
+        "kind": "approval",
+        "id": "APR-TASK-M0A-003-R1",
+        "revision": "1",
+        "observedHashes": [
+          "8046e52836cb53913db3d329baa1a80f2bbb07de410c48e6feae558a8982f533",
+          "b981213ce4c7f0a684e02f5acdfa4e05a7c2d524691123ab784d377973bad2a4",
+          "c274ba0be2ab45629a3c8b9164bb943f15cb7050a8395d28164dc006a29a96b2",
+          "d03bd80a3f08c9772c06fbcb529e63c1d88254ed1bccbfcb6c4c3cc19d82f7fe",
+          "da62ee0435375d53399ba5ac377509b758be4338d29abbfcdf9b2768919557d8"
+        ]
+      },
+      {
+        "kind": "approval",
+        "id": "APR-TASK-M0A-004-R1",
+        "revision": "1",
+        "observedHashes": [
+          "174e91a60c3e84876b4a4536a0989b31afe2cc4dc49505ec574f809a9b07b2d2",
+          "99aef93bba3e3ee5ba0f665c92ab5d7eac5e0fcb2486d3a8ea614a7153458697",
+          "c646cbcdb9bbfb8aee4e450c17214fd2c3c169d37e148db3d57a87d217799b17",
+          "c8c369c4b3ff3bd34a4eece85bfd02f9d4f2e3d953f3c82f691de7514f0e0b5a",
+          "d2018f9531c679252b4edcffd2dd825d81985ab38e53f6c12e168891d5ee29f9"
+        ]
+      },
+      {
+        "kind": "approval",
+        "id": "APR-TASK-M0A-005-R1",
+        "revision": "1",
+        "observedHashes": [
+          "22d5e93ea501de2755de0c4592896e22f6e1baa829bfe993b16fc98cd7204756",
+          "61dde85cb730ff73fef8a8653aea386ad09d36897c796b0f6dbefdb0fe029f4c",
+          "8c0eb5e7b7529fe907acb7d1f66a30e7b404495d2bb86ba70ab035aae697aa1f",
+          "a28afde5b25e24ff9b25dca4dc9de7da78e323a636d5f3e8ce4ad8475e559ed3",
+          "d8499cebe0b471e015ca37218d1b86e70fa96ed8d4d8996137298c49b5e62ce6"
+        ]
+      },
+      {
+        "kind": "approval",
+        "id": "APR-TASK-M0A-006-R1",
+        "revision": "1",
+        "observedHashes": [
+          "0c3e863b79f0bb79beaa090d74acb0035cac232da05656c296ee2600767c29c5",
+          "74cfd4119b4d6e6b598198ce16f08ac74568858275f88ed3cfba112015698543",
+          "b16c8dfd1568c18461e43e46ac6a3cac8b95d3f38433070bc042ec5147187405",
+          "bfedce1fdfee76bb537f673ba363794356db931d3b6f93a6b677bdc4839166e5",
+          "f5eb2e88a2edf75f04719456da6cd3202dce0091d52e4df7f72f42edf6666f41"
+        ]
+      },
+      {
+        "kind": "approval",
+        "id": "APR-TASK-M0A-007-R1",
+        "revision": "1",
+        "observedHashes": [
+          "1731e369cf1f51ef3b1bbe5c2db57cd39119d63ec6e3518b428a467a6cb510df",
+          "7725d6ebecd5d5a95ffd48d555899d83170f81e6397a58be4c9044c12b591ad3",
+          "8a3fdfe7445d461565ae75eaa6e2b0f30d2140f882a960a90b7898acd6d2407b",
+          "aa94f53f71dbaa39f61eae90f5701f69e725513b5750acdc5d6d96e53a249d76",
+          "ec3ffdf1aaa26139ca4a918b7717a9387da0eb5b997ddbe37119bb4330d023dd"
+        ]
+      },
+      {
+        "kind": "approval",
+        "id": "APR-TRUST-POLICY-1",
+        "revision": "1",
+        "observedHashes": [
+          "53bb33c2c4807c3d6b674637449f3a96bb1beee5289b100f3820583e5f63af0e",
+          "b25a66a7636a06adb1625d05f9eb6764a96cfd4847605992988f02f7bc0a8e18",
+          "fcff3fb5689033b7cda9fa614ae289b18704cb311f179afaaa25499fb4cbf4b5"
+        ]
+      },
+      {
+        "kind": "approvedSubject",
+        "id": "baseline:CORE-1.0.0",
+        "revision": "1",
+        "observedHashes": [
+          "4b7a772a5b937bc17ad27493882219cb2123a64a409022c5a4b202dea944307e",
+          "50b68917cb2aa011ab67d0a8a2469913b1f14b3c8c57f2ef53f7c0301a088a79",
+          "adc03fa950c2eb4758d14c63985ce0b318b00dbbcb91006e0d18b0400b73252a"
+        ]
+      },
+      {
+        "kind": "approvedSubject",
+        "id": "change:CHG-2026-001-macos-m0a",
+        "revision": "1",
+        "observedHashes": [
+          "057cc566072a02b932a04c98a936321b6a779f50fe32ccf64ca47b7a2dbc84d4",
+          "6b2d617452d5dc8637b76ebc225d655ed8c1f9f5bd4d0f2f93631f498dd3a8de",
+          "b1d1a16f911eaeab374e23a0550b26010a52c88cfd3f9e8f784e946106d79874",
+          "be91a3fb758ce21b94ed2ae3c1891d6e5a9530337651dee7439e845344f4302a"
+        ]
+      },
+      {
+        "kind": "approvedSubject",
+        "id": "conformanceSuite:CORE-CONFORMANCE-1.0.0",
+        "revision": "1",
+        "observedHashes": [
+          "2e5a51bf78afc2e15a8cd989c9381fcc2ac2b7cce370c2bc545767df06419aa2"
+        ]
+      },
+      {
+        "kind": "approvedSubject",
+        "id": "integrationLock:INTEGRATION-PROFILES-0.1.0",
+        "revision": "1",
+        "observedHashes": [
+          "95be398bab8b89f272f90cdfc21cc9ba2a76422c58e9224660197491cc185472"
+        ]
+      },
+      {
+        "kind": "approvedSubject",
+        "id": "platformLock:PLATFORM-PROFILES-0.1.0",
+        "revision": "1",
+        "observedHashes": [
+          "58fb445d9204b776e14bf14df9211a6da9c8ce0106c4a72d958925a4260fa20a"
+        ]
+      },
+      {
+        "kind": "approvedSubject",
+        "id": "taskPacket:TASK-M0A-001",
+        "revision": "1",
+        "observedHashes": [
+          "0124c98495070f262da7ba4372c0ff787b7d2177e95dd925107c72df16b0fc13",
+          "0266a5cb1ee1635a7e3c91af9f1f5d357b56c25fc197d4724cd2730994f1a22f",
+          "2a638a88038a3a279fa2792d745680009c45a2ce872aa22ac71eac3465434694"
+        ]
+      },
+      {
+        "kind": "approvedSubject",
+        "id": "taskPacket:TASK-M0A-002",
+        "revision": "1",
+        "observedHashes": [
+          "27c9e3f6bd571145b2c28ce13ba0416914edff51856efd236392cf86e2e67c6b",
+          "76f1e77a53ee2e184d232e153689767bd31b8e1f1cdc1cbceb8059737a2e616a",
+          "b56f52e1fd9e075a68ecb49a67d76b10ecf7439cc0b095040054bb5f118b0701"
+        ]
+      },
+      {
+        "kind": "approvedSubject",
+        "id": "taskPacket:TASK-M0A-003",
+        "revision": "1",
+        "observedHashes": [
+          "4a56e969c10f813d9665a7fd2d4728b56558eca06359cdbaa8835c30247fd0d1",
+          "7b48ed47746a70741d5a1670b7f753951cb304a9321590b83cb4a307e4a53dfa",
+          "8b8c9a63b7b9de5b6ce94b740e6445f45de121a93b49c657f7904be941e53343",
+          "ce72619335186f274aa9d1e028cbf86d42905c5708030875227370d257598b71"
+        ]
+      },
+      {
+        "kind": "approvedSubject",
+        "id": "taskPacket:TASK-M0A-004",
+        "revision": "1",
+        "observedHashes": [
+          "a704ebd2d73f719d50d1ab379a0808db2eff65de59fdb58f2dc577d0ea8e9db2",
+          "ccda4289d5a077591991d806411d638b51bed10cc0f1785e5cc0bd874d827000",
+          "fcfa430709e72fed26cc1a51fa0b322b81c1131b20c5095db509f6344e232b61"
+        ]
+      },
+      {
+        "kind": "approvedSubject",
+        "id": "taskPacket:TASK-M0A-005",
+        "revision": "1",
+        "observedHashes": [
+          "20c8048408008f56c53b702c39e0f8ff8e473e210e3356cedbacb212b007e4d2",
+          "3444afd099ffcf3cfddd642cd92c30d1e98d52a0daa5286512caa3bd2e99dd7a",
+          "999bc82e307cdedf732620febc41b74e70a712c73d30246ef5e8ca2c0dc50b12",
+          "d6cdda3d33ed1172a2ef8536e8ef95185baacbb28765af62bfd2225838cf65ec"
+        ]
+      },
+      {
+        "kind": "approvedSubject",
+        "id": "taskPacket:TASK-M0A-006",
+        "revision": "1",
+        "observedHashes": [
+          "60bfbb0b8865724530c5947a91a9c8b5a81b77a7ff98bc634470e4975960b371",
+          "97e78292717312f0fd0eb82ef894150fd98a09ea4622f133c09817906cc06554",
+          "ce40f1588d8be3f53c3e1170dd662e178e94d5de3b3c4ba6ebbd5858d0b8e465"
+        ]
+      },
+      {
+        "kind": "approvedSubject",
+        "id": "taskPacket:TASK-M0A-007",
+        "revision": "1",
+        "observedHashes": [
+          "346f82762e0728bb5fa196ca19568e03ee0b5617eb912c49e20792dce1fde05f",
+          "348adc48b9ed345b938a90676afaa3cf55d2bd1849dedbbe714767053d70abfd",
+          "6f87bbde251d4eddb3e01543426b3fbe8ff33f33f8745de892afb87cb7ef1ed4",
+          "a35df047826cd977f2450af3841788047715052881f695706ec0d098b961fe9d"
+        ]
+      },
+      {
+        "kind": "approvedSubject",
+        "id": "trustPolicy:ARKDECK-TRUST-1.0.0",
+        "revision": "1",
+        "observedHashes": [
+          "b62235ea0d5c0043ea4ab78e8e9f1d9ca1b06b6d32dedddce918c78a061ce522"
+        ]
+      },
+      {
+        "kind": "changeLock",
+        "id": "CHG-2026-001-macos-m0a",
+        "revision": "1",
+        "observedHashes": [
+          "057cc566072a02b932a04c98a936321b6a779f50fe32ccf64ca47b7a2dbc84d4",
+          "6b2d617452d5dc8637b76ebc225d655ed8c1f9f5bd4d0f2f93631f498dd3a8de",
+          "b1d1a16f911eaeab374e23a0550b26010a52c88cfd3f9e8f784e946106d79874",
+          "be91a3fb758ce21b94ed2ae3c1891d6e5a9530337651dee7439e845344f4302a"
+        ]
+      },
+      {
+        "kind": "taskPacket",
+        "id": "TASK-M0A-001",
+        "revision": "1",
+        "observedHashes": [
+          "0124c98495070f262da7ba4372c0ff787b7d2177e95dd925107c72df16b0fc13",
+          "0266a5cb1ee1635a7e3c91af9f1f5d357b56c25fc197d4724cd2730994f1a22f",
+          "2a638a88038a3a279fa2792d745680009c45a2ce872aa22ac71eac3465434694"
+        ]
+      },
+      {
+        "kind": "taskPacket",
+        "id": "TASK-M0A-002",
+        "revision": "1",
+        "observedHashes": [
+          "27c9e3f6bd571145b2c28ce13ba0416914edff51856efd236392cf86e2e67c6b",
+          "76f1e77a53ee2e184d232e153689767bd31b8e1f1cdc1cbceb8059737a2e616a",
+          "b56f52e1fd9e075a68ecb49a67d76b10ecf7439cc0b095040054bb5f118b0701"
+        ]
+      },
+      {
+        "kind": "taskPacket",
+        "id": "TASK-M0A-003",
+        "revision": "1",
+        "observedHashes": [
+          "4a56e969c10f813d9665a7fd2d4728b56558eca06359cdbaa8835c30247fd0d1",
+          "7b48ed47746a70741d5a1670b7f753951cb304a9321590b83cb4a307e4a53dfa",
+          "8b8c9a63b7b9de5b6ce94b740e6445f45de121a93b49c657f7904be941e53343",
+          "ce72619335186f274aa9d1e028cbf86d42905c5708030875227370d257598b71"
+        ]
+      },
+      {
+        "kind": "taskPacket",
+        "id": "TASK-M0A-004",
+        "revision": "1",
+        "observedHashes": [
+          "a704ebd2d73f719d50d1ab379a0808db2eff65de59fdb58f2dc577d0ea8e9db2",
+          "ccda4289d5a077591991d806411d638b51bed10cc0f1785e5cc0bd874d827000",
+          "fcfa430709e72fed26cc1a51fa0b322b81c1131b20c5095db509f6344e232b61"
+        ]
+      },
+      {
+        "kind": "taskPacket",
+        "id": "TASK-M0A-005",
+        "revision": "1",
+        "observedHashes": [
+          "20c8048408008f56c53b702c39e0f8ff8e473e210e3356cedbacb212b007e4d2",
+          "3444afd099ffcf3cfddd642cd92c30d1e98d52a0daa5286512caa3bd2e99dd7a",
+          "999bc82e307cdedf732620febc41b74e70a712c73d30246ef5e8ca2c0dc50b12",
+          "d6cdda3d33ed1172a2ef8536e8ef95185baacbb28765af62bfd2225838cf65ec"
+        ]
+      },
+      {
+        "kind": "taskPacket",
+        "id": "TASK-M0A-006",
+        "revision": "1",
+        "observedHashes": [
+          "60bfbb0b8865724530c5947a91a9c8b5a81b77a7ff98bc634470e4975960b371",
+          "97e78292717312f0fd0eb82ef894150fd98a09ea4622f133c09817906cc06554",
+          "ce40f1588d8be3f53c3e1170dd662e178e94d5de3b3c4ba6ebbd5858d0b8e465"
+        ]
+      },
+      {
+        "kind": "taskPacket",
+        "id": "TASK-M0A-007",
+        "revision": "1",
+        "observedHashes": [
+          "346f82762e0728bb5fa196ca19568e03ee0b5617eb912c49e20792dce1fde05f",
+          "348adc48b9ed345b938a90676afaa3cf55d2bd1849dedbbe714767053d70abfd",
+          "6f87bbde251d4eddb3e01543426b3fbe8ff33f33f8745de892afb87cb7ef1ed4",
+          "a35df047826cd977f2450af3841788047715052881f695706ec0d098b961fe9d"
+        ]
+      }
+    ]
+  },
+  "exposedPublicKeyFingerprints": {
+    "approval": "SHA256:H7/+HTUs74HjBmr4SEtVESe3IJFrEkJLvEc+YHQdDvE",
+    "claimService": "SHA256:n7IDCpj8n6LprkQU0QQlZOjbmIqSA6Q6hNbeCufxZFs",
+    "identityLedger": "SHA256:yFCUcu4S8QCkMD7LRdKlT5Iwh1HGV3f9vJoLSUwg5mY"
+  },
+  "interpretation": {
+    "keyCompromiseProven": false,
+    "keyExposurePresumed": true,
+    "oldTrustEpochAuthorizing": false,
+    "requiredDisposition": "preserveAllBytesPermanentlyReserveEveryLegacyIdentityTombstoneEveryCollisionAndQuarantineTheExposedTrustEpoch"
+  }
+}
