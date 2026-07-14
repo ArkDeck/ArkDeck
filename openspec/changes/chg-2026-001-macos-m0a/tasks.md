@@ -5,7 +5,7 @@
 
 ## TASK-M0A-001 — 签名 SwiftUI 应用壳与分离的 package/test targets
 
-- Status:ready
+- Status:done
 - Requirements/AC:MAC-M0A-SHELL-001
 - Depends on:none
 - Allowed paths:`ArkDeck.xcodeproj/**`、`ArkDeckApp/**`、`Packages/ArkDeckKit/**`、本 change `evidence/**`
