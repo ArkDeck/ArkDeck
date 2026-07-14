@@ -86,3 +86,12 @@ Review of this run produced three fixes, re-verified in the same environment:
 Evidence run records now follow the template added at
 `openspec/templates/change/evidence-run.md`. The AC conclusion is unchanged:
 `MAC-M0A-SHELL-001` remains pending on the clean-user launch smoke.
+
+## Addendum — 2026-07-14 clean-user launch smoke
+
+The maintainer performed the outstanding clean-user launch smoke and reported
+it passed (recorded on the maintainer's instruction; under V2 governance the
+maintainer's merge of this update is the attestation). With clean build,
+signature inspection, package-boundary tests, the current-user smoke and the
+clean-user smoke all complete, `MAC-M0A-SHELL-001` is **passed** and
+TASK-M0A-001 is done.
