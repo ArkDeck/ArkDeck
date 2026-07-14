@@ -1,5 +1,5 @@
 registry: CORE-ACCEPTANCE-CASES-1.0.0
-status: review
+status: accepted  # 随 CORE-1.0.0 ratification
 expected_result_rule: >-
   expected_source identifies the normative Scenario block; all GIVEN/WHEN/THEN/AND
   clauses in that block are the binary expected result and may not be restated or

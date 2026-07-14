@@ -1,6 +1,6 @@
 # Exclusive Resource Identity
 
-> Status：candidate  
+> Status：in baseline CORE-1.0.0（ratification 状态见 `openspec/baselines/CORE-1.0.0.yaml`）  
 > Applicability：产品运行时的共享资源协调(HDC server、device binding、host volume);V1 的 task claim 互斥机制已废止
 
 Task/claim 互斥资源使用受保护、规范化的 URN，而不是自由文本：

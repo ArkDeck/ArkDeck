@@ -2,7 +2,7 @@
 
 > ID：OPENHARMONY-TOOLS  
 > Version：0.1.0  
-> Status：review candidate / version-probed at runtime  
+> Status：in baseline CORE-1.0.0（ratification 状态见 `openspec/baselines/CORE-1.0.0.yaml`） / version-probed at runtime  
 > Core baseline：CORE-1.0.0
 
 本文件记录当前 OpenHarmony/HDC 工具语义和 Adapter 输入。它不是平台 Profile，也不得覆盖 Core；任何具体命令都必须经当前 tool/device probe 证实。每个执行 Task SHALL 固定本文件的 version 与 SHA-256；parser family、命令映射或 capability 判断变化必须走 integration change。

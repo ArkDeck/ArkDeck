@@ -1,7 +1,7 @@
 # ArkDeck Project Context
 
-> Product spec candidate：1.0.0  
-> Core baseline candidate：CORE-1.0.0  
+> Product spec：1.0.0  
+> Core baseline：CORE-1.0.0（ratification 状态见 `openspec/baselines/CORE-1.0.0.yaml`）  
 > Declared target platforms：macOS、Windows、Linux（同一 Core，不另建产品规则）  
 > Delivery/support lifecycle source：`platforms/PLATFORM-PROFILES.lock.yaml`
 

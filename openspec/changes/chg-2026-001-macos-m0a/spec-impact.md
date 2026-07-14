@@ -1,7 +1,7 @@
 # Spec Impact
 
 > Change：CHG-2026-001-macos-m0a@r1  
-> Core baseline：CORE-1.0.0 (review candidate)
+> Core baseline：CORE-1.0.0（ratification 状态见 `openspec/baselines/CORE-1.0.0.yaml`）
 > Exact affected scope：`scope.yaml`
 
 This platform feasibility change does not add, modify, remove, or rename any Core/capability Requirement, Acceptance Scenario, or contract.

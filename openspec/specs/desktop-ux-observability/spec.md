@@ -1,7 +1,7 @@
 # Desktop UX, History, and Observability Specification
 
 > Version：1.0.0  
-> Status：review candidate  
+> Status：in baseline CORE-1.0.0（ratification 状态见 `openspec/baselines/CORE-1.0.0.yaml`）  
 > MVP：yes  
 > Applicability：all platforms
 

@@ -1,7 +1,7 @@
 # ArkDeck Spec-Driven Development
 
 > 模型:Living Specs + Change Packages(V2 git-native 治理)
-> 状态:Candidate baseline CORE-1.0.0
+> 状态:Core baseline CORE-1.0.0(ratification 状态见 `baselines/CORE-1.0.0.yaml`)
 > 日期:2026-07-14
 
 ArkDeck 使用一种工具中立的 SDD 结构:
