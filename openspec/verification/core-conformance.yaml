@@ -1,5 +1,5 @@
 suite: CORE-CONFORMANCE-1.0.0
-status: candidate
+status: accepted  # 随 CORE-1.0.0 ratification;单一事实源为 openspec/baselines/CORE-1.0.0.yaml
 core_baseline: CORE-1.0.0
 
 acceptance_index:

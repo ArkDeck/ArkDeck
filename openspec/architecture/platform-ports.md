@@ -1,6 +1,6 @@
 # Platform Port Contract
 
-> Status：review candidate  
+> Status：in baseline CORE-1.0.0（ratification 状态见 `openspec/baselines/CORE-1.0.0.yaml`）  
 > Applicability：all desktop platforms
 
 平台实现必须提供以下行为端口。具体类名和 API 属于平台设计，但语义由 Core specs 固定。

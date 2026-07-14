@@ -1,7 +1,7 @@
 # Workflow, Journal, and Recovery Specification
 
 > Version：1.0.0  
-> Status：review candidate  
+> Status：in baseline CORE-1.0.0（ratification 状态见 `openspec/baselines/CORE-1.0.0.yaml`）  
 > Baseline：CORE-1.0.0  
 > Applicability：all platforms
 

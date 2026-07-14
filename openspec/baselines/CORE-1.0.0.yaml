@@ -1,13 +1,19 @@
-# Core baseline 版本记录(V2:ratification = 维护者批准声明 ratified 的 PR;
-# 漂移检测靠 CI 的 ID/结构校验 + git diff,不再维护逐文件 hash manifest)
+# Core baseline 版本记录 —— ratification 状态的单一事实源。
+# V2 治理:ratification = 维护者批准包含本状态变更的 PR 并合入受保护 main;
+# 漂移检测靠 CI 的 ID/结构校验 + git diff,不维护逐文件 hash manifest。
 baseline: CORE-1.0.0
-status: candidate
+status: ratified
+ratified_at: 2026-07-14
+ratified_by: lvye (CODEOWNER PR review)
 scope: >-
   openspec/specs/** 全部 9 个 capability spec、openspec/contracts/ 的产品契约
   (manifest / journal-event / workflow-step (+registry) / hardware-evidence /
   capability-registry / provider-contracts / catalogs)、
   verification/acceptance-index.txt 与 acceptance-cases.yaml 登记的 110 条 Core AC。
+change_rule: >-
+  ratified 后对 scope 内文件的语义修改必须走 approved change delta,
+  经 archive PR 合入 current specs 并升版 CORE-x.y.z;不原地改写本记录。
 notes: >-
   2026-07-13 的 V1 ratification 因治理事故与内容矛盾作废
-  (见 planning/postmortem-2026-07-governance.md);待 REQ-JOB-001 等
-  评审修正合入后由维护者经 PR 重新 ratify。
+  (见 planning/postmortem-2026-07-governance.md);2026-07-14 经全面评审修正
+  (REQ-JOB-001 状态机、REQ-FLASH-015/REQ-DUMP-003 等,PR #2)后按 V2 治理重新 ratify。
