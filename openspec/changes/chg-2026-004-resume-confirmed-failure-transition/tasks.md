@@ -1,18 +1,18 @@
 # Tasks — CHG-2026-004 recovery-marker exits
 
-> This approval PR carries candidate `status: approved`, but the status is not
-> effective before maintainer review and merge. This file does not authorize
-> execution; task readiness is updated only after that merge.
+> CHG-2026-004 was approved by maintainer review and merge of PR #16 at
+> `d09c722ad54bfc73070de0b9dfe3758a34e48ec4`. `ready` authorizes only the scoped
+> implementation task; it does not mean done or verified.
 
 ## TASK-C4-001 — Align the Core graph, journal contract, and state machine
 
-- Status:blocked
-- Blocker:等待 change approval
+- Status:ready
+- Approval gate:satisfied by maintainer-approved PR #16
 - Platform:core conformance; macOS candidate implementation
 - Requirements:REQ-JOB-001; POL-SAFETY-001; POL-RECOVERY-001; POL-WORKFLOW-001
 - Acceptance:AC-JOB-001-01…07
-- Depends on:maintainer approval of CHG-2026-004
-- Allowed paths after approval:
+- Depends on:none（change approval satisfied）
+- Allowed paths:
   - `openspec/changes/chg-2026-004-resume-confirmed-failure-transition/**`
   - `openspec/contracts/journal-event.schema.json`
   - `Packages/ArkDeckKit/Sources/ArkDeckCore/JobStateMachine.swift`
@@ -74,7 +74,8 @@ Swift state machine 和 conformance tests 对同一二值 decision model 达成�
 
 ### Notes / handoff
 
-- Do not change this task to `ready` until maintainer approval is merged。
+- TASK-C4-001 became eligible for `ready` only after PR #16 merged；this readiness
+  update does not execute the task or create implementation evidence。
 - Do not mark the change `verified` until every AC has reviewable evidence and the
   maintainer confirms it in PR review。
 - Do not unblock `TASK-M1-001` merely because this proposal is complete; it remains

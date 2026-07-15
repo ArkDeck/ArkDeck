@@ -1,7 +1,7 @@
 # Workflow, Journal, and Recovery Specification Delta
 
 > Change：`CHG-2026-004-resume-confirmed-failure-transition`
-> Status：approval candidate; authoritative only after maintainer merge
+> Status：approved delta via maintainer-reviewed PR #16
 > Baseline：`CORE-1.0.0`
 > Proposed baseline：`CORE-2.0.0`
 
