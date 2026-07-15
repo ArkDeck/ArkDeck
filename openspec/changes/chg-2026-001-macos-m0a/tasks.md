@@ -45,7 +45,7 @@
 
 > 2026-07-15 由维护者决定从原 TASK-M0A-005 拆分:本任务承载无需 clean-VM/Developer ID 前提的交付物;拆分经本 PR review 合入生效。
 
-- Status:ready
+- Status:done
 - Requirements/AC:AC-HDC-001-01 等(Sandboxed prototype 部分);为 TASK-M0A-007 提供冻结计划
 - Depends on:TASK-M0A-001、TASK-M0A-002、TASK-M0A-003
 - Allowed paths:`ArkDeck.xcodeproj/**`、`ArkDeckApp/**`、`Configurations/**`、`docs/adr/**`、本 change `evidence/**`
