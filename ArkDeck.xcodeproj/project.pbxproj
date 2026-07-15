@@ -16,6 +16,7 @@
 		A10000000000000000000020 /* ArkDeckApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArkDeckApp.swift; sourceTree = "<group>"; };
 		A10000000000000000000021 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		A10000000000000000000022 /* ArkDeck.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ArkDeck.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A10000000000000000000023 /* ArkDeckApp.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ArkDeckApp.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -43,6 +44,7 @@
 			children = (
 				A10000000000000000000032 /* App */,
 				A10000000000000000000034 /* Resources */,
+				A10000000000000000000023 /* ArkDeckApp.entitlements */,
 			);
 			path = ArkDeckApp;
 			sourceTree = "<group>";
@@ -187,6 +189,7 @@
 		A10000000000000000000072 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = ArkDeckApp/ArkDeckApp.entitlements;
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Manual;
 				CODE_SIGNING_ALLOWED = YES;
@@ -213,7 +216,9 @@
 		A10000000000000000000073 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = ArkDeckApp/ArkDeckApp.entitlements;
 				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Manual;
 				CODE_SIGNING_ALLOWED = YES;
 				CODE_SIGNING_REQUIRED = YES;
