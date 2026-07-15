@@ -33,7 +33,7 @@ Result: `check_sdd: 0 error(s), 0 warning(s), 110 acceptance IDs`.
 | --- | --- | --- |
 | `AC-JOB-008-01` / `MAC-M0A-RUNTIME-001` | passed: one kernel-backed writer; the verified losing-process fixture has no HDC or Session path. | local two-process contract test |
 | `AC-JOB-002-01` / `MAC-M0A-JOURNAL-001` | passed: unsuccessful durable intent prevents the external operation; incomplete records require recovery; outcome precedes checkpoint. | local fault-injection/contract test |
-| `PORT-POWER-001` / `MAC-M0A-POWER-001` | blocked: all automated ref-count and terminal-path tests pass, but the verification plan also requires a manual idle-sleep observation. That observation was not performed or claimed. | local unit test; human observation outstanding |
+| `PORT-POWER-001` / `MAC-M0A-POWER-001` | passed: automated ref-count and terminal-path tests pass, and the manual idle-sleep observation (record below) confirmed the production assertion is created under the declared reason and released on lease end. | local unit test + maintainer-observed host assertion |
 
 ## Manual idle-sleep observation runbook
 
@@ -58,8 +58,37 @@ The following is a human-executed host observation, not a hardware workflow. Use
 
 4. Append the command output, human operator, time, macOS build and pass/fail result to this run record; only then may `MAC-M0A-POWER-001` be reconsidered.
 
+## Manual idle-sleep observation record — 2026-07-15
+
+- Operator: the repository maintainer observed and captured both `pmset`
+  outputs in a separate terminal. The harness itself was started by the Agent
+  at the maintainer's direction (`ARKDECK_POWER_OBSERVATION=1`,
+  `ARKDECK_POWER_OBSERVATION_SECONDS=180`); the Agent verified the harness
+  process identity and clean exit but performed no `pmset` observation.
+- Host: macOS 26.5.1 (25F80), arm64.
+- During the harness window, `pmset -g assertions` (filtered per the runbook)
+  showed, alongside unrelated `powerd`/`sharingd` assertions:
+
+  ```text
+  pid 71213(xctest): [0x001b9ecf00019fc2] 00:00:51 PreventUserIdleSystemSleep named: "ArkDeck M0A manual power observation"
+  ```
+
+  `pid 71213` matched the running harness
+  (`xctest … testManualIdleSleepObservationHarness`), which later exited
+  cleanly (`Executed 1 test, with 0 failures … in 180.107s`).
+- After the harness exited, the same command showed no assertion bearing the
+  ArkDeck reason; only the unrelated `powerd` ("Prevent sleep while display is
+  on") and `sharingd` ("Handoff") entries remained, and they are not
+  attributed to ArkDeck.
+- Result: **pass**. The production `ProcessInfo` lease creates exactly one
+  `PreventUserIdleSystemSleep` assertion under the declared reason and
+  releases it when the lease ends. Per `PORT-POWER-001`, this covers idle
+  sleep only; no claim is made about lid closure or explicit user sleep.
+
 ## Residual risk and handoff
 
-M004 remains `blocked`, not `done`, until a human performs and records the required idle-sleep observation while a production `ProcessInfo` lease is active. This run is not hardware evidence and does not establish HDC/device support.
+The idle-sleep observation is recorded above, so M004 is drafted as `done`
+(effective on maintainer merge). This run is not hardware evidence and does
+not establish HDC/device support.
 
 The journal prototype intentionally does not yet enforce monotonic sequences, recovery reads the complete journal into memory, and `WriteAheadIntentGate` presents the normalized `intentNotDurable` error rather than its underlying I/O detail. `Foundation.Process` is used only by the two-process test fixture, not by product source.
