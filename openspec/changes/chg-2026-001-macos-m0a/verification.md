@@ -23,7 +23,7 @@
 | MAC-M0A-TRUST-002 | PORT-TOOL-TRUST-001 | clean VM | quarantined HDC is either system-blocked with non-bypass guidance or user-allowed by the system; ArkDeck xattr mutation count is 0 | blocked(evidence/runs/TASK-M0A-005/run.md; clean-VM 与 Developer ID 前提缺失,维护者 2026-07-15 接受 blocked 入 TASK-M0A-006 汇总) |
 | MAC-M0A-TRUST-003 | PORT-TOOL-TRUST-001 | clean VM | the bit-identical no-quarantine control isolates Gatekeeper from Sandbox/file-access errors | blocked(evidence/runs/TASK-M0A-005/run.md; clean-VM 与 Developer ID 前提缺失,维护者 2026-07-15 接受 blocked 入 TASK-M0A-006 汇总) |
 | MAC-M0A-TRUST-004 | PORT-TOOL-TRUST-001 | clean VM | Safari→Archive Utility quarantine propagation and resulting assessment are captured from a restored snapshot without xattr modification | blocked(evidence/runs/TASK-M0A-005/run.md; clean-VM 与 Developer ID 前提缺失,维护者 2026-07-15 接受 blocked 入 TASK-M0A-006 汇总) |
-| MAC-M0A-SANDBOX-001 | PORT-FILE-ACCESS-001 | end-to-end | every prototype × image/key/output × USB/UART/TCP cell has an observed allowed/blocked result and diagnostic evidence | pending |
+| MAC-M0A-SANDBOX-001 | PORT-FILE-ACCESS-001 | end-to-end | every prototype × image/key/output × USB/UART/TCP cell has an observed allowed/blocked result and diagnostic evidence | blocked(tasks.md TASK-M0A-007 blocker; M0A 壳无 supervised 探测面,维护者 2026-07-15 接受,矩阵移交 M1 重测) |
 | MAC-M0A-DIST-001 | PLATFORM-MACOS@0.1.0 | signed entitlement/log + ADR review | ADR selects exactly one v1 distribution, lists exact entitlements, evidence, rejected alternatives, residual risks and revalidation triggers without a Core delta | pending |
 
 ## Gate

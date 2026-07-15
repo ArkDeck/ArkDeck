@@ -66,17 +66,18 @@
 
 - Status:ready
 - Requirements/AC:MAC-M0A-DIST-001
-- Depends on:TASK-M0A-002…004、TASK-M0A-005A、TASK-M0A-007(TASK-M0A-005B 的矩阵行以 blocked 状态入汇总,不构成完成依赖;ADR 须声明由此缺失的证据基础)
+- Depends on:TASK-M0A-002…004、TASK-M0A-005A(TASK-M0A-005B 与 TASK-M0A-007 的矩阵行以 blocked 状态入汇总,不构成完成依赖;ADR 须声明由此缺失的证据基础)
 - Allowed paths:`docs/adr/**`、本 change `evidence/**`
 - Risk:low;Hardware:no
 - Deliverables:选择 Sandbox 或非 Sandbox Developer ID 分发的 ADR(含被拒方案与复验触发);全部矩阵行 passed/failed/blocked 的证据汇总;下一版 macOS profile/verification 修订草案(作为 evidence 提交,另行批准)。
 
 ## TASK-M0A-007 — 真机只读 USB/UART/TCP 与持久文件访问矩阵
 
-- Status:ready
+- Status:blocked
 - Requirements/AC:MAC-M0A-SANDBOX-001(minimum evidence:realHardware)
 - Depends on:TASK-M0A-005A
 - Allowed paths:本 change `evidence/**`
 - Risk:medium(真机只读);Hardware:**yes,由人类操作者亲自执行**
 - Deliverables:按 TASK-M0A-005A 冻结的只读计划,由人类在真实设备上执行签名原型的 USB/UART/TCP 与文件访问矩阵;非 Sandbox Developer ID 原型的矩阵列因 TASK-M0A-005B blocked 而记录为 blocked,不得伪造;evidence 记录操作者、设备身份/固件/transport、执行时间与逐格结果;destructive dispatch 恒为 0。
 - 注:V2 治理下不再需要 lab-authorization JSON;人类执行 + evidence 记录 + PR review 即构成授权链(见 `governance/enforcement.md`)。
+- Blocker:M0A 应用壳没有 supervised 只读探测面(TASK-M0A-001 有意设计为纯静态导航;005A 冻结计划第 5 条前置明确"集成不存在时相关格记 blocked,Terminal 直跑 hdc 不能替代")。按计划执行只会产出全 blocked 矩阵,维护者 2026-07-15 决定不执行该形式化真机运行;矩阵移交 M1(chg-2026-002)补齐探测面后以新 change 重测。解封条件:app 提供 supervised 只读探测集成。
