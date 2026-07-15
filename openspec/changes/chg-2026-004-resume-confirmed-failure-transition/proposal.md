@@ -1,6 +1,6 @@
 ---
 id: CHG-2026-004-resume-confirmed-failure-transition
-status: approved
+status: verified
 class: core
 core_change_level: major
 owner: lvye
@@ -107,3 +107,17 @@ authorities 无法共同表达结果。实现不得伪造一次 `running`/`plann
 `d09c722ad54bfc73070de0b9dfe3758a34e48ec4`。因此 `status: approved` 已生效，
 本 change 的语义决策获得人类批准。批准不等于 TASK-C4-001 已执行、done 或 change
 verified；任务 readiness 由批准后的独立 PR 更新。
+
+## Verification closure
+
+`TASK-C4-001` 的 contract/synthetic evidence、完整 Swift regression、Draft 2020-12
+journal fixtures 与 SDD guard 已在 PR #19 提交。维护者 `lvye` 于 2026-07-16 对 head
+commit `c8d256b4cf8158630d1fd80d7b5da47d4945411e` 提交 approving review；该 PR
+随后合入受保护 `main`，merge commit 为
+`478ef98fb5363b69d7cbdabe7e871d974c4cd7ca`。
+
+该 review/merge 构成 `verification.md` 所要求的 maintainer verification
+confirmation。本文件中的 `status: verified` 仅在包含本状态变更的 verification
+closure PR 经维护者 review 并合入 `main` 后生效；archive、current spec/global
+acceptance registry 更新与 `CORE-2.0.0` ratification 仍必须由后续独立 archive PR
+完成。
