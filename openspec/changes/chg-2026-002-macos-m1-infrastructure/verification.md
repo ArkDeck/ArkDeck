@@ -10,7 +10,7 @@
 
 ## Core acceptance coverage
 
-本 change 的 61 个 Core AC 全部使用 `openspec/verification/acceptance-cases.yaml` 的 canonical method/Test ID/minimum evidence；expected result 是各 AC 规范 Scenario block 的全部 GIVEN/WHEN/THEN/AND 子句，不得转述或弱化。逐 AC 分配见各 immutable Task packet 的 `verification` 数组；packet union 与 `scope.yaml` 精确相等。
+本 change 的 61 个 Core AC 全部使用 `openspec/verification/acceptance-cases.yaml` 的 canonical method/Test ID/minimum evidence；expected result 是各 AC 规范 Scenario block 的全部 GIVEN/WHEN/THEN/AND 子句，不得转述或弱化。逐 AC 分配见 `tasks.md` 各任务的 Verification 段(V2:原 immutable task packets 已废止);全部任务分配的并集与 `scope.yaml` 精确相等。
 
 ## Platform acceptance matrix
 

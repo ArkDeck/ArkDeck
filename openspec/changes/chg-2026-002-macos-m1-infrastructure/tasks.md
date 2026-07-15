@@ -1,10 +1,10 @@
 # Tasks — CHG-2026-002 macOS M1 shared infrastructure
 
-> V2 治理:本文件是任务的唯一事实源。change 尚为 proposed;approved 前任务不可执行。
+> V2 治理:本文件是任务的唯一事实源;状态经 PR review 合入生效。change 已于 2026-07-15 经 PR 合并 approved(见 review.md)。
 
 ## TASK-M1-001 — ArkDeckCore 域模型、封闭 typed-step registry 与 Job 状态机
 
-- Status:ready(待 change approved)
+- Status:ready
 - Requirements/AC:AC-WF-001-01、AC-WF-002-01 等
 - Depends on:none
 - Allowed paths:`Packages/ArkDeckKit/Sources/ArkDeckCore/**`、对应 Tests、本 change `evidence/**`
@@ -12,7 +12,7 @@
 
 ## TASK-M1-002 — 生产级 ProcessExecutor(语义结果分类、有界流)
 
-- Status:ready(待 change approved)
+- Status:ready
 - Requirements/AC:AC-JOB-005-01、AC-NFR-002-01 等
 - Depends on:TASK-M1-001
 - Allowed paths:`.../ArkDeckProcess/**`、对应 Tests 与 Fixtures、本 change `evidence/**`
@@ -20,7 +20,7 @@
 
 ## TASK-M1-003 — write-ahead journal、snapshot、崩溃 reconcile 与审计放弃
 
-- Status:ready(待 change approved)
+- Status:ready
 - Requirements/AC:AC-JOB-002-01、AC-JOB-006-01 等
 - Depends on:TASK-M1-001
 - Allowed paths:`.../ArkDeckStorage/**`、`.../ArkDeckWorkflows/**`、对应 Tests、本 change `evidence/**`
@@ -28,35 +28,35 @@
 
 ## TASK-M1-004 — macOS runtime ports:单实例、激活、电源、双时钟、睡眠观察
 
-- Status:ready(待 change approved)
+- Status:ready
 - Requirements/AC:AC-JOB-008-01、AC-NFR-001-01 等
 - Depends on:TASK-M1-001
 - Allowed paths:`.../ArkDeckRuntime/**`、对应 Tests、本 change `evidence/**`
 
 ## TASK-M1-005 — Session/Artifact store、manifest 管线与 host-volume 协调
 
-- Status:ready(待 change approved)
+- Status:ready
 - Requirements/AC:AC-ART-001-01、AC-ART-002-01、AC-STO-* 等
 - Depends on:TASK-M1-001、TASK-M1-003
 - Allowed paths:`.../ArkDeckStorage/**`、对应 Tests、本 change `evidence/**`
 
 ## TASK-M1-006 — HDC supervisor、endpoint 隔离、授权工作流与 fake-hdc 对抗
 
-- Status:ready(待 change approved)
+- Status:ready
 - Requirements/AC:AC-HDC-001-01/02、AC-HDC-005-01(parserGolden,fixture 在本 change 落地)等
 - Depends on:TASK-M1-002、TASK-M1-003
 - Allowed paths:`.../ArkDeckOpenHarmony/**`、对应 Tests 与 Fixtures、本 change `evidence/**`
 
 ## TASK-M1-007 — device binding revision、transport 重绑定边界与 per-device mutation lane
 
-- Status:ready(待 change approved)
+- Status:ready
 - Requirements/AC:AC-DEV-001-01、AC-DEV-002-01 等
 - Depends on:TASK-M1-006
 - Allowed paths:`.../ArkDeckOpenHarmony/**`、`.../ArkDeckWorkflows/**`、对应 Tests、本 change `evidence/**`
 
 ## TASK-M1-008 — SimulatedFlashProvider 隔离 harness
 
-- Status:ready(待 change approved)
+- Status:ready
 - Requirements/AC:AC-FLASH-006-01、MAC-M1-SIM-001
 - Depends on:TASK-M1-003、TASK-M1-007
 - Allowed paths:`.../ArkDeckWorkflows/**`、对应 Tests、本 change `evidence/**`
@@ -64,7 +64,7 @@
 
 ## TASK-M1-009 — 诊断骨架:分类脱敏日志与有界本地诊断导出
 
-- Status:ready(待 change approved)
+- Status:ready
 - Requirements/AC:AC-DIAG-001-01/02 等
 - Depends on:TASK-M1-001
 - Allowed paths:`.../ArkDeckRuntime/**`、`.../ArkDeckStorage/**`、对应 Tests、本 change `evidence/**`

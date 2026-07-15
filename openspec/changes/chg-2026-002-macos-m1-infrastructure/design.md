@@ -19,7 +19,7 @@ ArkDeckWorkflows     orchestration + reconcile + SimulatedFlashProvider(TASK-M1-
 
 ## Execution order and staging
 
-Task 依赖图即 roadmap 依赖序：Core(001) → Process(002)/Journal(003)/Runtime(004)/Diagnostics(009) → Storage(005)/HDC(006) → Binding(007) → Simulation(008)。每个 Task 是一个可独立评审的 PR，交付物、验证方法与停止条件都冻结在对应 immutable packet 中。
+Task 依赖图即 roadmap 依赖序：Core(001) → Process(002)/Journal(003)/Runtime(004)/Diagnostics(009) → Storage(005)/HDC(006) → Binding(007) → Simulation(008)。每个 Task 是一个可独立评审的 PR，交付物、验证方法与停止条件记录在 `tasks.md` 对应任务段(V2 单一事实源,经 PR review 修改)。
 
 ## Evidence strategy
 

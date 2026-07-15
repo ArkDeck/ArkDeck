@@ -1,6 +1,6 @@
 ---
 id: CHG-2026-002-macos-m1-infrastructure
-status: proposed
+status: approved # 2026-07-15 经本 PR 合并由维护者批准(V2:合并即批准);前置见 review.md
 class: platform
 core_change_level: none
 owner: lvye
