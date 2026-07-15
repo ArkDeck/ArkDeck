@@ -1,8 +1,8 @@
 # Verification Plan
 
 > Change：CHG-2026-004-resume-confirmed-failure-transition
-> Change status：approved via maintainer-reviewed PR #16
-> Verification status：implementation passed；TASK-C4-001 evidence recorded，等待 maintainer verification confirmation 与 archive flow
+> Change status：candidate `verified`；本 verification closure PR 合入后生效
+> Verification status：passed；maintainer `lvye` 已通过 PR #19 approving review 与 merge 确认，archive flow 仍待执行
 
 ## Environment
 
@@ -96,6 +96,16 @@ finalization action 不计为 marker 状态的普通 Workflow Step dispatch。
   transition pair 均通过验证。
 - Contract/synthetic evidence 不报告为 real hardware evidence。
 
+## Maintainer confirmation
+
+- Review：PR #19，`lvye`，state `APPROVED`，2026-07-16（Asia/Shanghai）。
+- Reviewed head：`c8d256b4cf8158630d1fd80d7b5da47d4945411e`。
+- Merge commit：`478ef98fb5363b69d7cbdabe7e871d974c4cd7ca`。
+- Confirmation scope：`TASK-C4-001` implementation、`AC-JOB-001-01…07` evidence、
+  deviations 与 no-hardware/no-support-claim boundary。
+- 本 confirmation 满足 verified gate；不构成 archive 或 `CORE-2.0.0`
+  ratification。
+
 ## Result gate
 
 - [x] Maintainer-approved delta selects both direct marker exits and their precedence。
@@ -107,4 +117,4 @@ finalization action 不计为 marker 状态的普通 Workflow Step dispatch。
 - [x] Existing `AC-JOB-001-01…06` regressions pass with reviewable evidence。
 - [x] macOS/Windows/Linux dispositions above are recorded without a premature support
   claim。
-- [ ] Maintainer confirms verification in PR review before any `verified` status change。
+- [x] Maintainer confirms verification in PR review before any `verified` status change。
