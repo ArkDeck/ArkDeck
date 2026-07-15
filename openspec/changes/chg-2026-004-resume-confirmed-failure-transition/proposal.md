@@ -102,7 +102,8 @@ authorities 无法共同表达结果。实现不得伪造一次 `running`/`plann
 
 ## Approval
 
-本审批 PR 起草 `status: approved`，但分支上的字段本身不构成批准，也不授权执行
-`TASK-C4-001`。只有维护者 review 并合入本 PR 后，`approved` 才生效并满足 change
-approval gate；在合入前，TASK-C4-001 继续因“等待 change approval”保持 blocked。
-合入后的任务 readiness 状态通过后续 PR 更新，不在本审批 PR 中提前解锁。
+维护者 `lvye` 于 2026-07-15 在 PR #16 提交 approving review；该 PR 随后合入受保护
+的 `main`，merge commit 为
+`d09c722ad54bfc73070de0b9dfe3758a34e48ec4`。因此 `status: approved` 已生效，
+本 change 的语义决策获得人类批准。批准不等于 TASK-C4-001 已执行、done 或 change
+verified；任务 readiness 由批准后的独立 PR 更新。

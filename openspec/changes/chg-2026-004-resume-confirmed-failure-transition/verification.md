@@ -1,7 +1,7 @@
 # Verification Plan
 
 > Change：CHG-2026-004-resume-confirmed-failure-transition
-> Change status：approval candidate; effective `approved` only after maintainer merge
+> Change status：approved via maintainer-reviewed PR #16
 > Verification status：planned; no TASK-C4-001 evidence collected
 
 ## Environment
