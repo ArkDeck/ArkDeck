@@ -1,6 +1,6 @@
 ---
 id: CHG-2026-001-macos-m0a
-status: approved # 2026-07-13 由维护者批准(V1 签名审批作废后按人类真实意图保留;见 planning/postmortem-2026-07-governance.md)
+status: verified # 2026-07-15 M0A 收官:矩阵 5 passed/8 blocked,阻断经 PR #10/#12 维护者接受,verification gate 的"显式 platform blocker 被接受"条款满足;汇总见 evidence/runs/TASK-M0A-006/rollup.md;经本 PR 合并确认
 class: platform
 core_change_level: none
 owner: lvye
