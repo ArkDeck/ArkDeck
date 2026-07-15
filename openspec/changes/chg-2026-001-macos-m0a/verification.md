@@ -13,8 +13,8 @@
 | Evidence ID | Requirement/Port | Method | Expected result | Status |
 | --- | --- | --- | --- | --- |
 | MAC-M0A-SHELL-001 | App/package boundary | build + clean launch smoke | signed app launches; targets remain separated | passed(evidence/runs/TASK-M0A-001/run.md) |
-| MAC-M0A-PROC-001 | REQ-JOB-005、REQ-NFR-002；AC-JOB-005-01、AC-NFR-002-01 | contract fixture | argv/no-shell/stream/timeout/cancel pass | pending |
-| MAC-M0A-HDC-001 | REQ-HDC-001；AC-HDC-001-01、AC-HDC-001-02 | fake + installed tools | complete toolchain diagnostics and semantic failure correctly shown | pending |
+| MAC-M0A-PROC-001 | REQ-JOB-005、REQ-NFR-002；AC-JOB-005-01、AC-NFR-002-01 | contract fixture | argv/no-shell/stream/timeout/cancel pass | passed(evidence/runs/TASK-M0A-002/run.md) |
+| MAC-M0A-HDC-001 | REQ-HDC-001；AC-HDC-001-01、AC-HDC-001-02 | fake + installed tools | complete toolchain diagnostics and semantic failure correctly shown | blocked(evidence/runs/TASK-M0A-002/run.md; installed `hdc version` can mutate host-wide server lifecycle before TASK-M0A-003 ownership guard exists) |
 | MAC-M0A-HDC-002 | REQ-HDC-002、REQ-HDC-003、REQ-HDC-004、REQ-HDC-009、REQ-HDC-010；AC-HDC-002-01、AC-HDC-003-01、AC-HDC-003-02、AC-HDC-004-01、AC-HDC-009-01、AC-HDC-010-01、AC-HDC-010-02、AC-HDC-010-03 | server fixture | global event, endpoint isolation, subserver no-call, critical-job block, stale-confirmation rejection and external automatic kill count 0 | pending |
 | MAC-M0A-RUNTIME-001 | REQ-JOB-008、AC-JOB-008-01 | two-process test | exactly one writer | pending |
 | MAC-M0A-JOURNAL-001 | REQ-JOB-002、AC-JOB-002-01 | fault injection | failed durable intent prevents command | pending |
