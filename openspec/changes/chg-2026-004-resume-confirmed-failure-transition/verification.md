@@ -2,7 +2,7 @@
 
 > Change：CHG-2026-004-resume-confirmed-failure-transition
 > Change status：approved via maintainer-reviewed PR #16
-> Verification status：planned; no TASK-C4-001 evidence collected
+> Verification status：implementation passed；TASK-C4-001 evidence recorded，等待 maintainer verification confirmation 与 archive flow
 
 ## Environment
 
@@ -90,17 +90,21 @@ finalization action 不计为 marker 状态的普通 Workflow Step dispatch。
 
 ## Deviations
 
-None planned。Contract/synthetic evidence cannot be reported as real hardware evidence。
+- AJV Draft 2020-12 validation 未加载可选 `ajv-formats` plugin，故明确忽略
+  `date-time` format assertion；两个 synthetic timestamp 自身为 ISO 8601 UTC，本
+  change 的 graph oracle 不依赖该 format。结构、external schema reference 与两个新
+  transition pair 均通过验证。
+- Contract/synthetic evidence 不报告为 real hardware evidence。
 
 ## Result gate
 
-- [ ] Maintainer-approved delta selects both direct marker exits and their precedence。
-- [ ] TASK-C4-001 was unblocked only after approval and all applicable tests passed。
-- [ ] Journal pair schema、semantic validator and Swift state machine agree on both new
+- [x] Maintainer-approved delta selects both direct marker exits and their precedence。
+- [x] TASK-C4-001 was unblocked only after approval and all applicable tests passed。
+- [x] Journal pair schema、semantic validator and Swift state machine agree on both new
   exits。
-- [ ] `AC-JOB-001-07` C/U-I/U-O rows are binary and all zero-dispatch/no-fake-state
+- [x] `AC-JOB-001-07` C/U-I/U-O rows are binary and all zero-dispatch/no-fake-state
   counters pass。
-- [ ] Existing `AC-JOB-001-01…06` regressions pass with reviewable evidence。
-- [ ] macOS/Windows/Linux dispositions above are recorded without a premature support
+- [x] Existing `AC-JOB-001-01…06` regressions pass with reviewable evidence。
+- [x] macOS/Windows/Linux dispositions above are recorded without a premature support
   claim。
 - [ ] Maintainer confirms verification in PR review before any `verified` status change。

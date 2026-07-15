@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "1.0.0",
+  "eventId": "c4-marker-to-finalizing",
+  "sequence": 41,
+  "sessionId": "session-c4",
+  "jobId": "job-c4-confirmed",
+  "timestamp": "2026-07-15T15:54:46Z",
+  "kind": "stateTransition",
+  "payload": {
+    "from": "resumeAtConfirmedSafeBoundary",
+    "to": "finalizing",
+    "reason": "confirmed recovery failure with confirmed identity and outcomes",
+    "triggerEventId": "c4-confirmed-evaluation"
+  }
+}

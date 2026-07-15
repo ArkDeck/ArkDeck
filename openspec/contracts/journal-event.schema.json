@@ -118,7 +118,7 @@
         { "properties": { "from": { "const": "cancellingAtSafeBoundary" }, "to": { "enum": ["cancelled", "finalizing", "waitingForRecovery"] } }, "required": ["from", "to"] },
         { "properties": { "from": { "const": "waitingForRecovery" }, "to": { "enum": ["reconciling", "userAbandonRequested"] } }, "required": ["from", "to"] },
         { "properties": { "from": { "const": "reconciling" }, "to": { "enum": ["resumeAtConfirmedSafeBoundary", "finalizing", "waitingForRecovery"] } }, "required": ["from", "to"] },
-        { "properties": { "from": { "const": "resumeAtConfirmedSafeBoundary" }, "to": { "enum": ["running", "planning"] } }, "required": ["from", "to"] },
+        { "properties": { "from": { "const": "resumeAtConfirmedSafeBoundary" }, "to": { "enum": ["running", "planning", "finalizing", "waitingForRecovery"] } }, "required": ["from", "to"] },
         { "properties": { "from": { "const": "userAbandonRequested" }, "to": { "enum": ["interrupted", "waitingForRecovery"] } }, "required": ["from", "to"] },
         { "properties": { "from": { "const": "finalizing" }, "to": { "enum": ["planned", "succeeded", "failed"] } }, "required": ["from", "to"] }
       ]
