@@ -43,12 +43,13 @@
 
 ## TASK-M0A-005 — Sandbox/非 Sandbox 原型、干净 VM 信任矩阵与只读硬件测试计划
 
-- Status:ready
+- Status:blocked
 - Requirements/AC:AC-HDC-001-01、AC-HDC-003-01、AC-HDC-006-01 等
 - Depends on:TASK-M0A-001、TASK-M0A-002、TASK-M0A-003
 - Allowed paths:`ArkDeck.xcodeproj/**`、`ArkDeckApp/**`、`Configurations/**`、`docs/adr/**`、本 change `evidence/**`
 - Risk:medium(外部工具与网络);Hardware:no
 - Deliverables:两种签名原型与真实 entitlement dump;干净 VM Gatekeeper/quarantine 矩阵;供 TASK-M0A-007 使用的只读 USB/UART/TCP 测试计划与目标先决条件。本任务不声称真机证据。
+- Blocker:执行环境没有可用的 clean macOS VM snapshot/控制器，且 `security find-identity -v -p codesigning` 返回 `0 valid identities found`；工程当前仅配置 ad-hoc (`CODE_SIGN_IDENTITY = -`) 签名且未启用 Hardened Runtime。缺少这些前提时不得伪造 Gatekeeper/quarantine、真实 entitlement 或两种签名 prototype 证据；详见 `evidence/runs/TASK-M0A-005/run.md`。
 
 ## TASK-M0A-006 — M0A 分发 ADR 与 hash 索引的证据汇总
 
