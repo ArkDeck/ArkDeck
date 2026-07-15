@@ -1,0 +1,20 @@
+---
+schema_version: 1.0.0
+change_id: CHG-2026-004-resume-confirmed-failure-transition
+change_revision: 2
+platform: core
+evidence_classes:
+  - contract
+cases:
+  - acceptance_id: AC-JOB-001-07
+    test_id: TEST-AC-JOB-001-07
+    method: recoveryDecisionJournalStateMachineContract
+    expected_source: openspec/changes/chg-2026-004-resume-confirmed-failure-transition/specs/workflow-journal-recovery/spec.md#AC-JOB-001-07
+    minimum_evidence: contract
+    expected_result: >-
+      From resumeAtConfirmedSafeBoundary, the confirmed vector takes the exact
+      finalizing-to-failed path, unknown identity or any unknown external-effect
+      outcome takes the exact waitingForRecovery exit, both new journal transition
+      pairs match their semantic evidence guards, every vector has zero ordinary
+      Workflow Step dispatch while in the marker, and confirmed/unknown handling
+      records no intermediate running or planning transition.

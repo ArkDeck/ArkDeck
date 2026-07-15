@@ -1,0 +1,16 @@
+schema: arkdeck-change-scope-1
+change_id: CHG-2026-004-resume-confirmed-failure-transition
+revision: 2
+requirements:
+  - POL-RECOVERY-001
+  - POL-SAFETY-001
+  - POL-WORKFLOW-001
+  - REQ-JOB-001
+acceptance:
+  - AC-JOB-001-01
+  - AC-JOB-001-02
+  - AC-JOB-001-03
+  - AC-JOB-001-04
+  - AC-JOB-001-05
+  - AC-JOB-001-06
+  - AC-JOB-001-07
