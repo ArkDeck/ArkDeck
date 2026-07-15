@@ -24,7 +24,7 @@
 
 ## TASK-M0A-003 — host-wide HDC supervisor 与 ownership/lifecycle 安全门
 
-- Status:ready
+- Status:done
 - Requirements/AC:AC-HDC-002-01、AC-HDC-003-01/02、AC-HDC-010-* 等
 - Depends on:TASK-M0A-002
 - Allowed paths:`Packages/ArkDeckKit/Sources/ArkDeckOpenHarmony/**`、对应 Tests 与 `Fixtures/HDCServer/**`、本 change `evidence/**`

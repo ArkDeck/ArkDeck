@@ -280,3 +280,444 @@ final class ProcessAndHDCContractTests: XCTestCase {
     }
 
 }
+
+private actor RecordingHDCServerLifecycleExecutor: HDCServerLifecycleExecutor {
+    private let result: HDCServerLifecycleExecutionOutcome
+    private var recordedSteps: [HDCServerLifecycleStep] = []
+
+    init(result: HDCServerLifecycleExecutionOutcome) {
+        self.result = result
+    }
+
+    func execute(_ step: HDCServerLifecycleStep) async -> HDCServerLifecycleExecutionOutcome {
+        recordedSteps.append(step)
+        return result
+    }
+
+    func steps() -> [HDCServerLifecycleStep] { recordedSteps }
+}
+
+/// Reproduces updates from a real asynchronous audit sink: while the
+/// supervisor is suspended durably recording intent, the audit actor calls
+/// back into the supervisor to change the critical gate or server generation.
+private actor IntentMutatingHDCServerLifecycleAuditStore: HDCServerLifecycleAuditStore {
+    enum Mutation: Sendable {
+        case critical(recipient: HDCServerRecipient, state: HDCServerCriticalState)
+        case replacement(HDCExistingServerObservation)
+    }
+
+    private let mutation: Mutation
+    private var supervisor: HDCServerSupervisor?
+    private var didMutate = false
+    private var entries: [HDCServerLifecycleAuditEvent] = []
+
+    init(mutation: Mutation) {
+        self.mutation = mutation
+    }
+
+    func attach(to supervisor: HDCServerSupervisor) {
+        self.supervisor = supervisor
+    }
+
+    func append(_ event: HDCServerLifecycleAuditEvent) async throws {
+        entries.append(event)
+        guard case .intent = event, !didMutate, let supervisor else { return }
+        didMutate = true
+        switch mutation {
+        case .critical(let recipient, let state):
+            await supervisor.updateCriticalState(state, for: recipient)
+        case .replacement(let observation):
+            await supervisor.observeExistingServer(observation, reason: "audit-store probe replaced server")
+        }
+    }
+
+    func events() -> [HDCServerLifecycleAuditEvent] { entries }
+}
+
+final class HDCServerSupervisorContractTests: XCTestCase {
+    func testGenerationChangeBroadcastsOneHostWideEventToAllAffectedRecipients() async throws {
+        let audit = InMemoryHDCServerLifecycleAuditStore()
+        let supervisor = HDCServerSupervisor(auditStore: audit)
+        await supervisor.register(HDCServerFixtures.deviceA)
+        await supervisor.register(HDCServerFixtures.deviceB)
+        await supervisor.register(HDCServerFixtures.job)
+        await supervisor.register(HDCServerFixtures.isolatedDevice)
+
+        await supervisor.observeExistingServer(HDCServerFixtures.externalServer(generation: 4), reason: "initial attach")
+        await supervisor.observeExistingServer(HDCServerFixtures.externalServer(generation: 5), reason: "health probe detected replacement")
+
+        let deviceAEvents = await supervisor.takeDeliveredEvents(for: HDCServerFixtures.deviceA)
+        let deviceBEvents = await supervisor.takeDeliveredEvents(for: HDCServerFixtures.deviceB)
+        let jobEvents = await supervisor.takeDeliveredEvents(for: HDCServerFixtures.job)
+        let isolatedEvents = await supervisor.takeDeliveredEvents(for: HDCServerFixtures.isolatedDevice)
+
+        XCTAssertEqual(deviceAEvents, deviceBEvents)
+        XCTAssertEqual(deviceAEvents, jobEvents)
+        XCTAssertTrue(isolatedEvents.isEmpty)
+        XCTAssertEqual(deviceAEvents.count, 1)
+        guard case .generationChanged(let event) = try XCTUnwrap(deviceAEvents.first) else {
+            return XCTFail("the shared endpoint must publish a server event, not a device fault")
+        }
+        XCTAssertEqual(event.endpoint, HDCServerFixtures.sharedEndpoint)
+        XCTAssertEqual(event.previousGeneration, 4)
+        XCTAssertEqual(event.currentGeneration, 5)
+        XCTAssertEqual(event.ownership, .external)
+        XCTAssertEqual(event.reason, "health probe detected replacement")
+    }
+
+    func testHealthFailureBroadcastsOneHostWideEventToAllAffectedRecipients() async throws {
+        let supervisor = HDCServerSupervisor(auditStore: InMemoryHDCServerLifecycleAuditStore())
+        await supervisor.register(HDCServerFixtures.deviceA)
+        await supervisor.register(HDCServerFixtures.deviceB)
+        await supervisor.register(HDCServerFixtures.job)
+        await supervisor.register(HDCServerFixtures.isolatedDevice)
+        await supervisor.observeExistingServer(HDCServerFixtures.externalServer(generation: 4), reason: "initial attach")
+        await supervisor.observeExistingServer(HDCServerFixtures.unavailableExternalServer(generation: 4), reason: "health probe failed")
+
+        let deviceAEvents = await supervisor.takeDeliveredEvents(for: HDCServerFixtures.deviceA)
+        let deviceBEvents = await supervisor.takeDeliveredEvents(for: HDCServerFixtures.deviceB)
+        let jobEvents = await supervisor.takeDeliveredEvents(for: HDCServerFixtures.job)
+        let isolatedEvents = await supervisor.takeDeliveredEvents(for: HDCServerFixtures.isolatedDevice)
+        XCTAssertEqual(deviceAEvents, deviceBEvents)
+        XCTAssertEqual(deviceAEvents, jobEvents)
+        XCTAssertTrue(isolatedEvents.isEmpty)
+        guard case .healthChanged(let event) = try XCTUnwrap(deviceAEvents.first) else {
+            return XCTFail("a shared server health failure must not be reported as a device fault")
+        }
+        XCTAssertEqual(event.endpoint, HDCServerFixtures.sharedEndpoint)
+        XCTAssertEqual(event.generation, 4)
+        XCTAssertEqual(event.previousHealth, .healthy)
+        XCTAssertEqual(event.currentHealth, .unavailable)
+        XCTAssertEqual(event.reason, "health probe failed")
+    }
+
+    func testExternalAndUnknownAutomaticFailuresLeaveNoLifecycleAuditAndDoNotRewriteState() async {
+        for observation in [HDCServerFixtures.externalServer(generation: 3), HDCServerFixtures.unknownServer(generation: 3)] {
+            let audit = InMemoryHDCServerLifecycleAuditStore()
+            let supervisor = HDCServerSupervisor(auditStore: audit)
+            await supervisor.observeExistingServer(observation, reason: "fixture attach")
+            let stateBefore = await supervisor.state(for: HDCServerFixtures.sharedEndpoint)
+            await supervisor.recordAutomaticDiagnosticFailure(
+                endpoint: HDCServerFixtures.sharedEndpoint,
+                reason: "authorization rejected"
+            )
+
+            let stateAfter = await supervisor.state(for: HDCServerFixtures.sharedEndpoint)
+            let auditEvents = await audit.events()
+            XCTAssertEqual(stateAfter, stateBefore)
+            XCTAssertFalse(
+                auditEvents.contains { event in
+                    if case .intent = event { return true }
+                    if case .outcome = event { return true }
+                    return false
+                }
+            )
+        }
+    }
+
+    func testManagedStartUsesItsDedicatedAbsentEndpointPrecondition() async {
+        let supervisor = HDCServerSupervisor(auditStore: InMemoryHDCServerLifecycleAuditStore())
+        let result = await supervisor.createImpactPreview(
+            action: .startManaged,
+            endpoint: HDCServerFixtures.sharedEndpoint
+        )
+        XCTAssertEqual(result, .blocked(.startManagedRequiresAbsentEndpointPrecondition))
+    }
+
+    func testManagedOwnershipRequiresAbsentEndpointAndVerifiedPidToolAndEndpointEvidence() async throws {
+        let supervisor = HDCServerSupervisor(auditStore: InMemoryHDCServerLifecycleAuditStore())
+        let firstAuthorizationValue = await supervisor.authorizeManagedStart(at: HDCServerFixtures.sharedEndpoint)
+        let firstAuthorization = try XCTUnwrap(firstAuthorizationValue)
+        let mismatchedEvidence = HDCManagedServerLaunchEvidence(
+            endpoint: HDCServerFixtures.isolatedEndpoint,
+            pid: 910,
+            toolPath: URL(fileURLWithPath: "/usr/bin/printf"),
+            generation: 1,
+            version: .known("5.0.0")
+        )
+
+        let mismatchedStartAccepted = await supervisor.recordManagedStart(authorization: firstAuthorization, evidence: mismatchedEvidence)
+        XCTAssertFalse(mismatchedStartAccepted)
+        let unverifiedState = await supervisor.state(for: HDCServerFixtures.sharedEndpoint)
+        XCTAssertNil(unverifiedState)
+
+        let secondAuthorizationValue = await supervisor.authorizeManagedStart(at: HDCServerFixtures.sharedEndpoint)
+        let secondAuthorization = try XCTUnwrap(secondAuthorizationValue)
+        let verifiedEvidence = HDCManagedServerLaunchEvidence(
+            endpoint: HDCServerFixtures.sharedEndpoint,
+            pid: 910,
+            toolPath: URL(fileURLWithPath: "/usr/bin/printf"),
+            generation: 1,
+            version: .known("5.0.0")
+        )
+        let verifiedStartAccepted = await supervisor.recordManagedStart(authorization: secondAuthorization, evidence: verifiedEvidence)
+        XCTAssertTrue(verifiedStartAccepted)
+
+        let stateValue = await supervisor.state(for: HDCServerFixtures.sharedEndpoint)
+        let state = try XCTUnwrap(stateValue)
+        XCTAssertEqual(state.ownership, .arkDeckManaged)
+        XCTAssertEqual(state.generation, 1)
+        XCTAssertEqual(state.health, .healthy)
+        let duplicateAuthorization = await supervisor.authorizeManagedStart(at: HDCServerFixtures.sharedEndpoint)
+        XCTAssertNil(duplicateAuthorization)
+    }
+
+    func testCriticalJobBlocksConfirmedRestartAndNamesSafeBoundary() async throws {
+        let audit = InMemoryHDCServerLifecycleAuditStore()
+        let supervisor = HDCServerSupervisor(auditStore: audit)
+        let executor = RecordingHDCServerLifecycleExecutor(result: .succeeded(resultingGeneration: 9))
+        await supervisor.register(HDCServerFixtures.deviceA)
+        await supervisor.register(HDCServerFixtures.deviceB)
+        await supervisor.register(HDCServerFixtures.job)
+        await supervisor.observeExistingServer(HDCServerFixtures.externalServer(generation: 8), reason: "fixture attach")
+        await supervisor.setOtherClientDetection(.detected(["DevEco IDE"]), for: HDCServerFixtures.sharedEndpoint)
+
+        let preview = try readyPreview(
+            await supervisor.createImpactPreview(action: .restartConfirmedGeneration, endpoint: HDCServerFixtures.sharedEndpoint)
+        )
+        let confirmation = try acceptedConfirmation(await supervisor.confirm(preview.id))
+        await supervisor.updateCriticalState(
+            .criticalNonInterruptible(stepID: "flash-system", safeBoundaryAction: "wait for flash checkpoint"),
+            for: HDCServerFixtures.job
+        )
+
+        let result = await supervisor.dispatch(confirmationID: confirmation.id, using: executor)
+        guard case .blocked(.criticalJobs(let blockers)) = result else {
+            return XCTFail("a critical shared Job must block lifecycle dispatch")
+        }
+        XCTAssertEqual(
+            blockers,
+            [HDCServerCriticalJob(jobID: "job-flash-a", stepID: "flash-system", safeBoundaryAction: "wait for flash checkpoint")]
+        )
+        let dispatchedSteps = await executor.steps()
+        XCTAssertTrue(dispatchedSteps.isEmpty)
+        let auditEvents = await audit.events()
+        XCTAssertEqual(auditEvents.count, 2, "blocked dispatch must not write lifecycle intent/outcome")
+    }
+
+    func testCriticalGateIsRecheckedAfterIntentPersistenceBeforeExecutorDispatch() async throws {
+        let audit = IntentMutatingHDCServerLifecycleAuditStore(
+            mutation: .critical(
+                recipient: HDCServerFixtures.job,
+                state: .criticalNonInterruptible(stepID: "flash-system", safeBoundaryAction: "wait for flash checkpoint")
+            )
+        )
+        let supervisor = HDCServerSupervisor(auditStore: audit)
+        await audit.attach(to: supervisor)
+        let executor = RecordingHDCServerLifecycleExecutor(result: .succeeded(resultingGeneration: 10))
+        await supervisor.register(HDCServerFixtures.job)
+        await supervisor.observeExistingServer(HDCServerFixtures.externalServer(generation: 9), reason: "fixture attach")
+        let preview = try readyPreview(
+            await supervisor.createImpactPreview(action: .restartConfirmedGeneration, endpoint: HDCServerFixtures.sharedEndpoint)
+        )
+        let confirmation = try acceptedConfirmation(await supervisor.confirm(preview.id))
+
+        let result = await supervisor.dispatch(confirmationID: confirmation.id, using: executor)
+        guard case .blocked(.criticalJobs(let blockers)) = result else {
+            return XCTFail("a critical state set while intent is persisted must still block dispatch")
+        }
+        XCTAssertEqual(
+            blockers,
+            [HDCServerCriticalJob(jobID: "job-flash-a", stepID: "flash-system", safeBoundaryAction: "wait for flash checkpoint")]
+        )
+        let dispatchedSteps = await executor.steps()
+        XCTAssertTrue(dispatchedSteps.isEmpty)
+        let auditEvents = await audit.events()
+        guard case .intent(let intent) = auditEvents.dropFirst(2).first,
+              case .outcome(let outcomeStepID, let outcomeAuditID, let outcome) = auditEvents.last
+        else {
+            return XCTFail("a post-intent block must persist both intent and failed outcome")
+        }
+        XCTAssertEqual(outcomeStepID, intent.id)
+        XCTAssertEqual(outcomeAuditID, intent.auditID)
+        XCTAssertEqual(outcome, .failed(reason: "blocked after intent persistence"))
+    }
+
+    func testGenerationIsRecheckedAfterIntentPersistenceBeforeExecutorDispatch() async throws {
+        let audit = IntentMutatingHDCServerLifecycleAuditStore(
+            mutation: .replacement(HDCServerFixtures.externalServer(generation: 12))
+        )
+        let supervisor = HDCServerSupervisor(auditStore: audit)
+        await audit.attach(to: supervisor)
+        let executor = RecordingHDCServerLifecycleExecutor(result: .succeeded(resultingGeneration: 12))
+        await supervisor.observeExistingServer(HDCServerFixtures.externalServer(generation: 11), reason: "fixture attach")
+        let preview = try readyPreview(
+            await supervisor.createImpactPreview(action: .restartConfirmedGeneration, endpoint: HDCServerFixtures.sharedEndpoint)
+        )
+        let confirmation = try acceptedConfirmation(await supervisor.confirm(preview.id))
+
+        let result = await supervisor.dispatch(confirmationID: confirmation.id, using: executor)
+        guard case .blocked(.confirmationStale(let replacementPreview)) = result else {
+            return XCTFail("generation drift during intent persistence must block dispatch and require a new preview")
+        }
+        XCTAssertEqual(replacementPreview.snapshot.generation, 12)
+        let dispatchedSteps = await executor.steps()
+        XCTAssertTrue(dispatchedSteps.isEmpty)
+        let auditEvents = await audit.events()
+        guard case .intent(let intent) = auditEvents.dropFirst(2).first,
+              case .outcome(let outcomeStepID, let outcomeAuditID, let outcome) = auditEvents.last
+        else {
+            return XCTFail("generation drift after intent must close the audit with a failed outcome")
+        }
+        XCTAssertEqual(outcomeStepID, intent.id)
+        XCTAssertEqual(outcomeAuditID, intent.auditID)
+        XCTAssertEqual(outcome, .failed(reason: "blocked after intent persistence"))
+    }
+
+    func testConfirmedExternalRestartUsesTypedStepAuditsAndBroadcastsTheSameOutcome() async throws {
+        let audit = InMemoryHDCServerLifecycleAuditStore()
+        let supervisor = HDCServerSupervisor(auditStore: audit)
+        let executor = RecordingHDCServerLifecycleExecutor(result: .succeeded(resultingGeneration: 21))
+        await supervisor.register(HDCServerFixtures.deviceA)
+        await supervisor.register(HDCServerFixtures.deviceB)
+        await supervisor.register(HDCServerFixtures.job)
+        await supervisor.register(HDCServerFixtures.isolatedDevice)
+        await supervisor.observeExistingServer(HDCServerFixtures.externalServer(generation: 20), reason: "fixture attach")
+        await supervisor.setOtherClientDetection(.detected(["DevEco IDE", "terminal hdc"]), for: HDCServerFixtures.sharedEndpoint)
+
+        let preview = try readyPreview(
+            await supervisor.createImpactPreview(action: .restartConfirmedGeneration, endpoint: HDCServerFixtures.sharedEndpoint)
+        )
+        XCTAssertEqual(preview.snapshot.endpoint, HDCServerFixtures.sharedEndpoint)
+        XCTAssertEqual(preview.snapshot.generation, 20)
+        XCTAssertEqual(preview.snapshot.ownership, .external)
+        XCTAssertEqual(preview.snapshot.affectedDeviceCoordinators, ["device-a", "device-b"])
+        XCTAssertEqual(preview.snapshot.affectedJobs, ["job-flash-a"])
+        XCTAssertEqual(preview.snapshot.otherClientDetection, .detected(["DevEco IDE", "terminal hdc"]))
+        XCTAssertEqual(preview.snapshot.expectedInterruption, "HDC requests using this endpoint will be interrupted.")
+        XCTAssertEqual(preview.snapshot.recoveryPath, "Re-probe the shared endpoint and reconcile every affected Job.")
+
+        let confirmation = try acceptedConfirmation(await supervisor.confirm(preview.id))
+        let result = await supervisor.dispatch(confirmationID: confirmation.id, using: executor)
+        XCTAssertEqual(result, .completed(.succeeded(resultingGeneration: 21)))
+
+        let steps = await executor.steps()
+        let step = try XCTUnwrap(steps.first)
+        XCTAssertEqual(steps.count, 1)
+        XCTAssertEqual(step.action, .restartConfirmedGeneration)
+        XCTAssertEqual(step.endpoint, HDCServerFixtures.sharedEndpoint)
+        XCTAssertEqual(step.expectedGeneration, 20)
+        XCTAssertEqual(step.expectedOwnership, .external)
+        XCTAssertEqual(step.impactSnapshotHash, preview.snapshot.scopeHash)
+        XCTAssertEqual(step.confirmationID, confirmation.id)
+        XCTAssertEqual(step.auditID, confirmation.auditID)
+
+        let stateValue = await supervisor.state(for: HDCServerFixtures.sharedEndpoint)
+        let state = try XCTUnwrap(stateValue)
+        XCTAssertEqual(state.generation, 21)
+        XCTAssertEqual(state.ownership, .external, "manual confirmation must not transfer ownership")
+
+        let deviceAEvents = await supervisor.takeDeliveredEvents(for: HDCServerFixtures.deviceA)
+        let deviceBEvents = await supervisor.takeDeliveredEvents(for: HDCServerFixtures.deviceB)
+        let jobEvents = await supervisor.takeDeliveredEvents(for: HDCServerFixtures.job)
+        let isolatedEvents = await supervisor.takeDeliveredEvents(for: HDCServerFixtures.isolatedDevice)
+        XCTAssertEqual(deviceAEvents, deviceBEvents)
+        XCTAssertEqual(deviceAEvents, jobEvents)
+        XCTAssertTrue(isolatedEvents.isEmpty)
+        guard case .lifecycleOutcome(let broadcast) = try XCTUnwrap(deviceAEvents.first) else {
+            return XCTFail("affected recipients must receive the lifecycle result")
+        }
+        XCTAssertEqual(broadcast.stepID, step.id)
+        XCTAssertEqual(broadcast.auditID, step.auditID)
+        XCTAssertEqual(broadcast.outcome, .succeeded(resultingGeneration: 21))
+        XCTAssertFalse(broadcast.requiresReconcile)
+
+        let auditEvents = await audit.events()
+        XCTAssertEqual(auditEvents.count, 4)
+        guard case .impactPreview(let auditedPreview) = auditEvents[0],
+              case .confirmation(let auditedConfirmation) = auditEvents[1],
+              case .intent(let auditedStep) = auditEvents[2],
+              case .outcome(let outcomeStepID, let outcomeAuditID, let outcome) = auditEvents[3]
+        else {
+            return XCTFail("preview, confirmation, intent, and outcome must be appended in order")
+        }
+        XCTAssertEqual(auditedPreview, preview)
+        XCTAssertEqual(auditedConfirmation, confirmation)
+        XCTAssertEqual(auditedStep, step)
+        XCTAssertEqual(outcomeStepID, step.id)
+        XCTAssertEqual(outcomeAuditID, step.auditID)
+        XCTAssertEqual(outcome, .succeeded(resultingGeneration: 21))
+    }
+
+    func testGenerationDriftInvalidatesConfirmationAndCreatesANewPreviewWithoutDispatch() async throws {
+        let audit = InMemoryHDCServerLifecycleAuditStore()
+        let supervisor = HDCServerSupervisor(auditStore: audit)
+        let executor = RecordingHDCServerLifecycleExecutor(result: .succeeded(resultingGeneration: 2))
+        await supervisor.register(HDCServerFixtures.deviceA)
+        await supervisor.observeExistingServer(HDCServerFixtures.externalServer(generation: 1), reason: "fixture attach")
+
+        let preview = try readyPreview(
+            await supervisor.createImpactPreview(action: .restartConfirmedGeneration, endpoint: HDCServerFixtures.sharedEndpoint)
+        )
+        let confirmation = try acceptedConfirmation(await supervisor.confirm(preview.id))
+        await supervisor.observeExistingServer(HDCServerFixtures.externalServer(generation: 2), reason: "server replacement")
+
+        let result = await supervisor.dispatch(confirmationID: confirmation.id, using: executor)
+        guard case .blocked(.confirmationStale(let replacementPreview)) = result else {
+            return XCTFail("a generation change must force a fresh preview and confirmation")
+        }
+        XCTAssertEqual(replacementPreview.snapshot.generation, 2)
+        XCTAssertEqual(replacementPreview.snapshot.action, .restartConfirmedGeneration)
+        XCTAssertNotEqual(replacementPreview.snapshot.scopeHash, preview.snapshot.scopeHash)
+        let steps = await executor.steps()
+        XCTAssertTrue(steps.isEmpty)
+    }
+
+    func testConfirmationPermitsOnlyOneLifecycleDispatchAttempt() async throws {
+        let supervisor = HDCServerSupervisor(auditStore: InMemoryHDCServerLifecycleAuditStore())
+        let executor = RecordingHDCServerLifecycleExecutor(result: .failed(reason: "server refused restart"))
+        await supervisor.observeExistingServer(HDCServerFixtures.externalServer(generation: 7), reason: "fixture attach")
+        let preview = try readyPreview(
+            await supervisor.createImpactPreview(action: .restartConfirmedGeneration, endpoint: HDCServerFixtures.sharedEndpoint)
+        )
+        let confirmation = try acceptedConfirmation(await supervisor.confirm(preview.id))
+
+        let firstResult = await supervisor.dispatch(confirmationID: confirmation.id, using: executor)
+        let secondResult = await supervisor.dispatch(confirmationID: confirmation.id, using: executor)
+        XCTAssertEqual(firstResult, .completed(.failed(reason: "server refused restart")))
+        XCTAssertEqual(secondResult, .blocked(.confirmationNotFound))
+        let steps = await executor.steps()
+        XCTAssertEqual(steps.count, 1)
+    }
+
+    func testUnreliableImpactStateFailsClosedBeforePreviewOrDispatch() async {
+        let supervisor = HDCServerSupervisor(auditStore: InMemoryHDCServerLifecycleAuditStore())
+        await supervisor.observeExistingServer(HDCServerFixtures.externalServer(generation: 6), reason: "fixture attach")
+        await supervisor.setImpactReliability(false, for: HDCServerFixtures.sharedEndpoint)
+
+        let result = await supervisor.createImpactPreview(
+            action: .restartConfirmedGeneration,
+            endpoint: HDCServerFixtures.sharedEndpoint
+        )
+        XCTAssertEqual(result, .blocked(.impactCannotBeReliablyDetermined))
+    }
+
+    private func readyPreview(
+        _ result: HDCServerImpactPreviewResult,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) throws -> HDCServerLifecycleImpactPreview {
+        guard case .ready(let preview) = result else {
+            XCTFail("expected an impact preview, got \(result)", file: file, line: line)
+            throw PreviewExpectationError.notReady
+        }
+        return preview
+    }
+
+    private func acceptedConfirmation(
+        _ result: HDCServerConfirmationResult,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) throws -> HDCServerLifecycleConfirmation {
+        guard case .accepted(let confirmation) = result else {
+            XCTFail("expected a confirmation, got \(result)", file: file, line: line)
+            throw PreviewExpectationError.notConfirmed
+        }
+        return confirmation
+    }
+}
+
+private enum PreviewExpectationError: Error {
+    case notReady
+    case notConfirmed
+}
