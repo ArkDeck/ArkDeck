@@ -33,12 +33,13 @@
 
 ## TASK-M0A-004 — 单实例、durable journal intent 与电源活动原型
 
-- Status:ready
+- Status:blocked
 - Requirements/AC:AC-JOB-002-01、AC-JOB-008-01 等
 - Depends on:TASK-M0A-001
 - Allowed paths:`Packages/ArkDeckKit/Sources/ArkDeckRuntime/**`、`.../ArkDeckStorage/**`、对应 Tests、本 change `evidence/**`
 - Risk:low;Hardware:no
 - Deliverables:kernel-backed 单写者守卫与第二实例零副作用 fixture;append-only journal intent/checkpoint 原型与故障注入;引用计数电源活动租约(成功/失败/取消/throw 全释放)。
+- Blocker:`MAC-M0A-POWER-001` 规定的人工 idle-sleep observation 尚未执行；自动化 contract/unit evidence 见 `evidence/runs/TASK-M0A-004/run.md`，不得将其替代为人工观察。
 
 ## TASK-M0A-005 — Sandbox/非 Sandbox 原型、干净 VM 信任矩阵与只读硬件测试计划
 
