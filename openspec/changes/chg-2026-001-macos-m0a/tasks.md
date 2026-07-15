@@ -41,21 +41,32 @@
 - Deliverables:kernel-backed 单写者守卫与第二实例零副作用 fixture;append-only journal intent/checkpoint 原型与故障注入;引用计数电源活动租约(成功/失败/取消/throw 全释放)。
 - Note:人工 idle-sleep observation 已于 2026-07-15 由维护者执行并记录于 `evidence/runs/TASK-M0A-004/run.md`（观察记录段）。
 
-## TASK-M0A-005 — Sandbox/非 Sandbox 原型、干净 VM 信任矩阵与只读硬件测试计划
+## TASK-M0A-005A — Sandboxed 原型、entitlement dump 与只读硬件测试计划
+
+> 2026-07-15 由维护者决定从原 TASK-M0A-005 拆分:本任务承载无需 clean-VM/Developer ID 前提的交付物;拆分经本 PR review 合入生效。
+
+- Status:ready
+- Requirements/AC:AC-HDC-001-01 等(Sandboxed prototype 部分);为 TASK-M0A-007 提供冻结计划
+- Depends on:TASK-M0A-001、TASK-M0A-002、TASK-M0A-003
+- Allowed paths:`ArkDeck.xcodeproj/**`、`ArkDeckApp/**`、`Configurations/**`、`docs/adr/**`、本 change `evidence/**`
+- Risk:low;Hardware:no
+- Deliverables:Sandboxed 签名原型(含 App Sandbox entitlement 与真实 entitlement dump;签名等级如实披露,ad-hoc 可接受并注明与 Developer ID 的差异);供 TASK-M0A-007 使用的只读 USB/UART/TCP 测试计划与目标先决条件。本任务不声称真机、Gatekeeper 或分发证据。
+
+## TASK-M0A-005B — Developer ID 原型与干净 VM 信任矩阵
 
 - Status:blocked
-- Requirements/AC:AC-HDC-001-01、AC-HDC-003-01、AC-HDC-006-01 等
+- Requirements/AC:AC-HDC-003-01、AC-HDC-006-01 等;MAC-M0A-TRUST-001…004
 - Depends on:TASK-M0A-001、TASK-M0A-002、TASK-M0A-003
 - Allowed paths:`ArkDeck.xcodeproj/**`、`ArkDeckApp/**`、`Configurations/**`、`docs/adr/**`、本 change `evidence/**`
 - Risk:medium(外部工具与网络);Hardware:no
-- Deliverables:两种签名原型与真实 entitlement dump;干净 VM Gatekeeper/quarantine 矩阵;供 TASK-M0A-007 使用的只读 USB/UART/TCP 测试计划与目标先决条件。本任务不声称真机证据。
-- Blocker:执行环境没有可用的 clean macOS VM snapshot/控制器，且 `security find-identity -v -p codesigning` 返回 `0 valid identities found`；工程当前仅配置 ad-hoc (`CODE_SIGN_IDENTITY = -`) 签名且未启用 Hardened Runtime。缺少这些前提时不得伪造 Gatekeeper/quarantine、真实 entitlement 或两种签名 prototype 证据；详见 `evidence/runs/TASK-M0A-005/run.md`。
+- Deliverables:非 Sandbox Developer ID + Hardened Runtime 原型与真实 entitlement dump;干净 VM Gatekeeper/quarantine 矩阵(TRUST-001…004)。
+- Blocker:无 clean macOS VM snapshot/控制器;`security find-identity -v -p codesigning` 为 `0 valid identities found`(见 `evidence/runs/TASK-M0A-005/run.md`)。维护者于 2026-07-15 决定暂不补齐前提;相关矩阵行以 blocked 状态进入 TASK-M0A-006 汇总,解封需要维护者提供 clean VM 与 Developer ID 证书。
 
 ## TASK-M0A-006 — M0A 分发 ADR 与 hash 索引的证据汇总
 
 - Status:ready
 - Requirements/AC:MAC-M0A-DIST-001
-- Depends on:TASK-M0A-002…005、TASK-M0A-007
+- Depends on:TASK-M0A-002…004、TASK-M0A-005A、TASK-M0A-007(TASK-M0A-005B 的矩阵行以 blocked 状态入汇总,不构成完成依赖;ADR 须声明由此缺失的证据基础)
 - Allowed paths:`docs/adr/**`、本 change `evidence/**`
 - Risk:low;Hardware:no
 - Deliverables:选择 Sandbox 或非 Sandbox Developer ID 分发的 ADR(含被拒方案与复验触发);全部矩阵行 passed/failed/blocked 的证据汇总;下一版 macOS profile/verification 修订草案(作为 evidence 提交,另行批准)。
@@ -64,8 +75,8 @@
 
 - Status:ready
 - Requirements/AC:MAC-M0A-SANDBOX-001(minimum evidence:realHardware)
-- Depends on:TASK-M0A-005
+- Depends on:TASK-M0A-005A
 - Allowed paths:本 change `evidence/**`
 - Risk:medium(真机只读);Hardware:**yes,由人类操作者亲自执行**
-- Deliverables:按 TASK-M0A-005 冻结的只读计划,由人类在真实设备上执行两种签名原型的 USB/UART/TCP 与文件访问矩阵;evidence 记录操作者、设备身份/固件/transport、执行时间与逐格结果;destructive dispatch 恒为 0。
+- Deliverables:按 TASK-M0A-005A 冻结的只读计划,由人类在真实设备上执行签名原型的 USB/UART/TCP 与文件访问矩阵;非 Sandbox Developer ID 原型的矩阵列因 TASK-M0A-005B blocked 而记录为 blocked,不得伪造;evidence 记录操作者、设备身份/固件/transport、执行时间与逐格结果;destructive dispatch 恒为 0。
 - 注:V2 治理下不再需要 lab-authorization JSON;人类执行 + evidence 记录 + PR review 即构成授权链(见 `governance/enforcement.md`)。

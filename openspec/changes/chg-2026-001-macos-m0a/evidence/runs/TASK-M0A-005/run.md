@@ -71,3 +71,14 @@ not such an integration.
 The task state is drafted as `blocked` on this agent branch. It takes effect
 only after maintainer review and merge; the Agent does not mark any change or
 acceptance case verified.
+
+## Maintainer decision — 2026-07-15
+
+After reviewing this record, the maintainer split the original task through
+the same reviewed PR: `TASK-M0A-005A` (Sandboxed prototype with honest
+signing-level disclosure, plus the frozen read-only plan for `TASK-M0A-007`)
+is executable now; `TASK-M0A-005B` (Developer ID + Hardened Runtime prototype
+and the clean-VM trust matrix) stays blocked, and the maintainer chose not to
+provision the missing prerequisites for now. `MAC-M0A-TRUST-001…004` enter
+the `TASK-M0A-006` rollup as blocked rows; the distribution ADR must state
+the evidence basis lost to this blocker.
