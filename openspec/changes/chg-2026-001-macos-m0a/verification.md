@@ -16,9 +16,9 @@
 | MAC-M0A-PROC-001 | REQ-JOB-005、REQ-NFR-002；AC-JOB-005-01、AC-NFR-002-01 | contract fixture | argv/no-shell/stream/timeout/cancel pass | passed(evidence/runs/TASK-M0A-002/run.md) |
 | MAC-M0A-HDC-001 | REQ-HDC-001；AC-HDC-001-01、AC-HDC-001-02 | fake + installed tools | complete toolchain diagnostics and semantic failure correctly shown | blocked(evidence/runs/TASK-M0A-002/run.md; installed `hdc version` can mutate host-wide server lifecycle before TASK-M0A-003 ownership guard exists) |
 | MAC-M0A-HDC-002 | REQ-HDC-002、REQ-HDC-003、REQ-HDC-004、REQ-HDC-009、REQ-HDC-010；AC-HDC-002-01、AC-HDC-003-01、AC-HDC-003-02、AC-HDC-004-01、AC-HDC-009-01、AC-HDC-010-01、AC-HDC-010-02、AC-HDC-010-03 | server fixture | global event, endpoint isolation, subserver no-call, critical-job block, stale-confirmation rejection and external automatic kill count 0 | pending |
-| MAC-M0A-RUNTIME-001 | REQ-JOB-008、AC-JOB-008-01 | two-process test | exactly one writer | pending |
-| MAC-M0A-JOURNAL-001 | REQ-JOB-002、AC-JOB-002-01 | fault injection | failed durable intent prevents command | pending |
-| MAC-M0A-POWER-001 | PORT-POWER-001 | unit + manual idle-sleep observation | activity is held only in the critical scope, released on success/failure/cancel/throw, and limits for lid/explicit sleep are stated | pending |
+| MAC-M0A-RUNTIME-001 | REQ-JOB-008、AC-JOB-008-01 | two-process test | exactly one writer | passed(evidence/runs/TASK-M0A-004/run.md) |
+| MAC-M0A-JOURNAL-001 | REQ-JOB-002、AC-JOB-002-01 | fault injection | failed durable intent prevents command | passed(evidence/runs/TASK-M0A-004/run.md) |
+| MAC-M0A-POWER-001 | PORT-POWER-001 | unit + manual idle-sleep observation | activity is held only in the critical scope, released on success/failure/cancel/throw, and limits for lid/explicit sleep are stated | blocked(evidence/runs/TASK-M0A-004/run.md; manual idle-sleep observation outstanding) |
 | MAC-M0A-TRUST-001 | REQ-HDC-001、REQ-HDC-003、REQ-HDC-006；PORT-TOOL-TRUST-001 | clean VM | every DevEco path/version/server/file/key matrix cell has exact tool hash and one result: passed, failed or blocked; none is unclassified | pending |
 | MAC-M0A-TRUST-002 | PORT-TOOL-TRUST-001 | clean VM | quarantined HDC is either system-blocked with non-bypass guidance or user-allowed by the system; ArkDeck xattr mutation count is 0 | pending |
 | MAC-M0A-TRUST-003 | PORT-TOOL-TRUST-001 | clean VM | the bit-identical no-quarantine control isolates Gatekeeper from Sandbox/file-access errors | pending |
