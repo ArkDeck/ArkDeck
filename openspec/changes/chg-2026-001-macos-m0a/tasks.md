@@ -64,7 +64,8 @@
 
 ## TASK-M0A-006 — M0A 分发 ADR 与 hash 索引的证据汇总
 
-- Status:ready
+- Status:done
+- Note:交付物见 `docs/adr/0001-macos-v1-distribution.md` 与 `evidence/runs/TASK-M0A-006/`;MAC-M0A-DIST-001 保持 blocked(选定分发的签名产物与 clean-VM 证据不存在),不因任务完成升级。
 - Requirements/AC:MAC-M0A-DIST-001
 - Depends on:TASK-M0A-002…004、TASK-M0A-005A(TASK-M0A-005B 与 TASK-M0A-007 的矩阵行以 blocked 状态入汇总,不构成完成依赖;ADR 须声明由此缺失的证据基础)
 - Allowed paths:`docs/adr/**`、本 change `evidence/**`
