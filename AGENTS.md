@@ -50,3 +50,10 @@
 - Windows/Linux 是同一产品的未来平台端口(现状 not started):平台实现不得改变 HDC server 保护、device binding 边界、Job 状态机/journal/recovery 语义、typed step 与 effect 等级、Artifact/隐私规则。
 
 详细流程见 `openspec/verification/policy.md` 与 `openspec/changes/README.md`。
+
+## 工具环境约定
+
+- 本项目的 GitHub CLI(`gh`)凭据在 filesystem sandbox 外可用。若 sandbox 内的
+  `gh auth status` 报告未登录或 token 无效,Agent SHALL 使用受控的
+  `require_escalated` 在 sandbox 外重新检查并执行必要的 `gh` 操作,不得据此要求
+  维护者重复登录。
