@@ -79,6 +79,36 @@ public struct RecoveryResumeEvidence: Equatable, Sendable {
   }
 }
 
+public enum ResumeMarkerDeviceIdentityEvidence: String, Codable, Sendable {
+  case confirmed
+  case unknown
+}
+
+public enum ResumeMarkerExternalEffectOutcomesEvidence: String, Codable, Sendable {
+  case allConfirmed
+  case containsUnknown
+}
+
+public struct ResumeMarkerDecisionEvidence: Equatable, Sendable, Codable {
+  public let deviceIdentity: ResumeMarkerDeviceIdentityEvidence
+  public let externalEffectOutcomes: ResumeMarkerExternalEffectOutcomesEvidence
+  public let detectedFailure: WorkflowFailure?
+
+  public init(
+    deviceIdentity: ResumeMarkerDeviceIdentityEvidence,
+    externalEffectOutcomes: ResumeMarkerExternalEffectOutcomesEvidence,
+    detectedFailure: WorkflowFailure?
+  ) {
+    self.deviceIdentity = deviceIdentity
+    self.externalEffectOutcomes = externalEffectOutcomes
+    self.detectedFailure = detectedFailure
+  }
+
+  public var hasUnknownIdentityOrOutcome: Bool {
+    deviceIdentity == .unknown || externalEffectOutcomes == .containsUnknown
+  }
+}
+
 public enum RecoveryDecision: Equatable, Sendable {
   case resume(RecoveryResumeEvidence)
   case confirmedFailure(WorkflowFailure)
@@ -105,6 +135,10 @@ public enum JobEvent: Equatable, Sendable {
   case safeBoundaryReached
   case recoveryRequested
   case recoveryEvaluated(RecoveryDecision)
+  case resumeMarkerEvaluated(
+    evidence: ResumeMarkerDecisionEvidence,
+    requestedDestination: JobState
+  )
   case resumeConfirmed
   case abandonmentRequested
   case abandonmentPersisted
@@ -133,6 +167,43 @@ public struct JobStateTransition: Equatable, Sendable {
   }
 }
 
+public enum ResumeMarkerSemanticValidationError: Error, Equatable, Sendable {
+  case invalidSource(JobState)
+  case destinationMismatch(expected: JobState, actual: JobState)
+}
+
+public enum ResumeMarkerSemanticValidator {
+  public static func requiredDestination(
+    for evidence: ResumeMarkerDecisionEvidence,
+    mode: JobExecutionMode
+  ) -> JobState {
+    if evidence.hasUnknownIdentityOrOutcome {
+      return .waitingForRecovery
+    }
+    if evidence.detectedFailure != nil {
+      return .finalizing
+    }
+    return mode == .execute ? .running : .planning
+  }
+
+  public static func validate(
+    transition: JobStateTransition,
+    evidence: ResumeMarkerDecisionEvidence,
+    mode: JobExecutionMode
+  ) throws {
+    guard transition.from == .resumeAtConfirmedSafeBoundary else {
+      throw ResumeMarkerSemanticValidationError.invalidSource(transition.from)
+    }
+    let expected = requiredDestination(for: evidence, mode: mode)
+    guard transition.to == expected else {
+      throw ResumeMarkerSemanticValidationError.destinationMismatch(
+        expected: expected,
+        actual: transition.to
+      )
+    }
+  }
+}
+
 public struct JobStateMachineOutcome: Equatable, Sendable {
   public let transition: JobStateTransition
   public let directives: Set<JobStateMachineDirective>
@@ -152,6 +223,7 @@ public enum JobInvariantViolationKind: String, Codable, Sendable {
   case activeStepMismatch
   case activeStepStillRunning
   case invalidRecoverySource
+  case resumeMarkerEvidenceMismatch
 }
 
 public struct JobInvariantViolation: Equatable, Sendable {
@@ -270,12 +342,26 @@ public struct JobStateMachine: Sendable {
       pendingFinalization = .success
       return outcome
     case .confirmedFailure(let failure):
+      if state == .resumeAtConfirmedSafeBoundary {
+        try rejectResumeMarkerEvidence(
+          to: .finalizing,
+          detail:
+            "resume marker failure requires identity and external-effect outcome evidence"
+        )
+      }
       let outcome = try transition(to: .finalizing)
       activeStep = nil
       originalFailure = failure
       pendingFinalization = .failure
       return outcome
     case .externalOutcomeOrIdentityUnknown:
+      if state == .resumeAtConfirmedSafeBoundary {
+        try rejectResumeMarkerEvidence(
+          to: .waitingForRecovery,
+          detail:
+            "resume marker uncertainty requires explicit identity or external-effect outcome evidence"
+        )
+      }
       return try transition(
         to: .waitingForRecovery,
         additionalDirectives: [.dispatchNoUnknownStep, .preserveOutcomeUnknown]
@@ -318,8 +404,20 @@ public struct JobStateMachine: Sendable {
         pendingFinalization = .failure
         return outcome
       }
+    case .resumeMarkerEvaluated(let evidence, let requestedDestination):
+      return try handleResumeMarkerEvaluation(
+        evidence: evidence,
+        requestedDestination: requestedDestination
+      )
     case .resumeConfirmed:
-      return try transition(to: mode == .execute ? .running : .planning)
+      return try handleResumeMarkerEvaluation(
+        evidence: ResumeMarkerDecisionEvidence(
+          deviceIdentity: .confirmed,
+          externalEffectOutcomes: .allConfirmed,
+          detectedFailure: nil
+        ),
+        requestedDestination: mode == .execute ? .running : .planning
+      )
     case .abandonmentRequested:
       return try transition(to: .userAbandonRequested)
     case .abandonmentPersisted:
@@ -469,9 +567,9 @@ public struct JobStateMachine: Sendable {
     case (_, .reconciling):
       [.resumeAtConfirmedSafeBoundary, .finalizing, .waitingForRecovery]
     case (.execute, .resumeAtConfirmedSafeBoundary):
-      [.running]
+      [.running, .finalizing, .waitingForRecovery]
     case (.planOnly, .resumeAtConfirmedSafeBoundary):
-      [.planning]
+      [.planning, .finalizing, .waitingForRecovery]
     case (_, .userAbandonRequested):
       [.interrupted, .waitingForRecovery]
     case (.execute, .finalizing):
@@ -512,6 +610,59 @@ public struct JobStateMachine: Sendable {
     return JobStateMachineOutcome(transition: transition, directives: directives)
   }
 
+  private mutating func handleResumeMarkerEvaluation(
+    evidence: ResumeMarkerDecisionEvidence,
+    requestedDestination: JobState
+  ) throws -> JobStateMachineOutcome {
+    guard state == .resumeAtConfirmedSafeBoundary else {
+      try rejectTransition(
+        to: requestedDestination,
+        detail: "resume marker evaluation requires resumeAtConfirmedSafeBoundary"
+      )
+    }
+
+    let proposedTransition = JobStateTransition(from: state, to: requestedDestination)
+    do {
+      try ResumeMarkerSemanticValidator.validate(
+        transition: proposedTransition,
+        evidence: evidence,
+        mode: mode
+      )
+    } catch {
+      try rejectResumeMarkerEvidence(
+        to: requestedDestination,
+        detail: "resume marker evidence does not authorize requested pair: \(error)"
+      )
+    }
+
+    switch requestedDestination {
+    case .finalizing:
+      guard let failure = evidence.detectedFailure else {
+        try rejectResumeMarkerEvidence(
+          to: requestedDestination,
+          detail: "resume marker finalizing transition requires a detected failure"
+        )
+      }
+      let outcome = try transition(to: .finalizing)
+      activeStep = nil
+      originalFailure = failure
+      pendingFinalization = .failure
+      return outcome
+    case .waitingForRecovery:
+      return try transition(
+        to: .waitingForRecovery,
+        additionalDirectives: [.dispatchNoUnknownStep, .preserveOutcomeUnknown]
+      )
+    case .running, .planning:
+      return try transition(to: requestedDestination)
+    default:
+      try rejectResumeMarkerEvidence(
+        to: requestedDestination,
+        detail: "resume marker evaluation selected a non-recovery destination"
+      )
+    }
+  }
+
   private mutating func rejectTransition(
     to newState: JobState,
     detail: String? = nil
@@ -535,6 +686,20 @@ public struct JobStateMachine: Sendable {
       kind: kind,
       state: state,
       attemptedState: nil,
+      detail: detail
+    )
+    invariantViolations.append(violation)
+    throw JobStateMachineError.invariantViolation(violation)
+  }
+
+  private mutating func rejectResumeMarkerEvidence(
+    to newState: JobState,
+    detail: String
+  ) throws -> Never {
+    let violation = JobInvariantViolation(
+      kind: .resumeMarkerEvidenceMismatch,
+      state: state,
+      attemptedState: newState,
       detail: detail
     )
     invariantViolations.append(violation)

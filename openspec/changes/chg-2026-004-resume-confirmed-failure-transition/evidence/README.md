@@ -1,10 +1,10 @@
-# Evidence placeholder
+# Evidence index
 
-No implementation evidence has been collected. CHG-2026-004 was approved by
-maintainer review and merge of PR #16 at
-`d09c722ad54bfc73070de0b9dfe3758a34e48ec4`. The follow-up readiness update does
-not execute TASK-C4-001 and is not implementation evidence.
+- `runs/TASK-C4-001/run.md`：approved Core graph、journal pair、semantic validator、
+  Swift state machine 与 `AC-JOB-001-01…07` contract/synthetic run。
+- `runs/TASK-C4-001/fixtures/`：两个新增 transition pair 的完整 synthetic journal
+  event fixtures。
 
-After approval, store only redacted commands/results and contract or synthetic
-evidence under `runs/TASK-C4-001/`. No real-device operation is part of this
-change.
+CHG-2026-004 由 maintainer review 并合入 PR #16 批准。上述 evidence 不构成
+realHardware、platform support、change verified 或 `CORE-2.0.0` ratification claim；
+后两者仍需 maintainer verification confirmation 与 archive flow。

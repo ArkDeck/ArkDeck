@@ -1,12 +1,13 @@
 # Tasks — CHG-2026-004 recovery-marker exits
 
 > CHG-2026-004 was approved by maintainer review and merge of PR #16 at
-> `d09c722ad54bfc73070de0b9dfe3758a34e48ec4`. `ready` authorizes only the scoped
-> implementation task; it does not mean done or verified.
+> `d09c722ad54bfc73070de0b9dfe3758a34e48ec4`. `done` records completed scoped
+> implementation evidence；it does not mean the change is verified or archived.
 
 ## TASK-C4-001 — Align the Core graph, journal contract, and state machine
 
-- Status:ready
+- Status:done
+- Completion evidence:`evidence/runs/TASK-C4-001/run.md`（contract/synthetic；change verification 仍等待 maintainer review）
 - Approval gate:satisfied by maintainer-approved PR #16
 - Platform:core conformance; macOS candidate implementation
 - Requirements:REQ-JOB-001; POL-SAFETY-001; POL-RECOVERY-001; POL-WORKFLOW-001

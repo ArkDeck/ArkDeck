@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "1.0.0",
+  "eventId": "c4-marker-to-waiting-for-recovery",
+  "sequence": 42,
+  "sessionId": "session-c4",
+  "jobId": "job-c4-unknown",
+  "timestamp": "2026-07-15T15:54:46Z",
+  "kind": "stateTransition",
+  "payload": {
+    "from": "resumeAtConfirmedSafeBoundary",
+    "to": "waitingForRecovery",
+    "reason": "device identity or external-effect outcome remains unknown",
+    "triggerEventId": "c4-unknown-evaluation"
+  }
+}

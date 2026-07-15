@@ -81,6 +81,63 @@ final class JobStateMachineTests: XCTestCase {
     XCTAssertEqual(swiftPairs, contractPairs)
   }
 
+  func testResumeMarkerDestinationSetsIncludeBothApprovedSafetyExits() {
+    XCTAssertEqual(
+      JobStateMachine.allowedDestinations(
+        from: .resumeAtConfirmedSafeBoundary,
+        mode: .execute
+      ),
+      [.running, .finalizing, .waitingForRecovery]
+    )
+    XCTAssertEqual(
+      JobStateMachine.allowedDestinations(
+        from: .resumeAtConfirmedSafeBoundary,
+        mode: .planOnly
+      ),
+      [.planning, .finalizing, .waitingForRecovery]
+    )
+  }
+
+  func testJournalContractContainsBothApprovedResumeMarkerPairsAndOldReaderRejectsThem() throws {
+    let contractPairs = try loadContractTransitionPairs()
+    let newPairs: Set<StateTransitionPair> = [
+      .init(from: .resumeAtConfirmedSafeBoundary, to: .finalizing),
+      .init(from: .resumeAtConfirmedSafeBoundary, to: .waitingForRecovery),
+    ]
+
+    XCTAssertTrue(newPairs.isSubset(of: contractPairs))
+    for (index, pair) in newPairs.sorted(by: { $0.to.rawValue < $1.to.rawValue }).enumerated() {
+      let fixture = JournalStateTransitionFixture(
+        schemaVersion: "1.0.0",
+        eventId: "marker-transition-\(index)",
+        sequence: index,
+        sessionId: "session-c4",
+        jobId: "job-c4",
+        timestamp: "2026-07-15T15:53:38Z",
+        kind: "stateTransition",
+        payload: .init(
+          from: pair.from,
+          to: pair.to,
+          reason: "TASK-C4-001 contract fixture",
+          triggerEventId: nil
+        )
+      )
+      let decoded = try JSONDecoder().decode(
+        JournalStateTransitionFixture.self,
+        from: JSONEncoder().encode(fixture)
+      )
+      XCTAssertEqual(decoded, fixture)
+      XCTAssertTrue(
+        contractPairs.contains(.init(from: decoded.payload.from, to: decoded.payload.to))
+      )
+    }
+
+    let oldReaderPairs = contractPairs.subtracting(newPairs)
+    for pair in newPairs {
+      XCTAssertFalse(oldReaderPairs.contains(pair))
+    }
+  }
+
   func testExecutionModesRejectEachOthersExclusiveStates() {
     let executeExclusiveStates: Set<JobState> = [
       .running, .waitingForDevice, .awaitingRebindConfirmation,
@@ -105,6 +162,20 @@ final class JobStateMachineTests: XCTestCase {
     XCTAssertTrue(
       JobStateMachine.allowedDestinations(from: .planning, mode: .execute).isEmpty
     )
+  }
+
+  func testNormalResumeConfirmationSelectsOnlyTheModeCorrectExecutionPhase() throws {
+    for mode in JobExecutionMode.allCases {
+      var machine = try makeResumeMarkerMachine(mode: mode)
+      let outcome = try machine.handle(.resumeConfirmed)
+      XCTAssertEqual(
+        outcome.transition,
+        .init(
+          from: .resumeAtConfirmedSafeBoundary,
+          to: mode == .execute ? .running : .planning
+        )
+      )
+    }
   }
 
   func testModeExclusiveIllegalEdgeRecordsInvariantViolation() throws {
@@ -289,6 +360,174 @@ final class JobStateMachineTests: XCTestCase {
     XCTAssertEqual(unknownStepDispatchCount, 0)
   }
 
+  // TEST-AC-JOB-001-07 / recoveryDecisionJournalStateMachineContract
+  func testTEST_AC_JOB_001_07_ResumeMarkerUsesBinaryConfirmedOrUnknownDecision() throws {
+    let failure = WorkflowFailure(
+      classification: .recovery,
+      code: "confirmed-recovery-failure",
+      summary: "failure and all external effects are confirmed"
+    )
+    let vectors: [ResumeMarkerDecisionVector] = [
+      .init(
+        name: "confirmed",
+        evidence: .init(
+          deviceIdentity: .confirmed,
+          externalEffectOutcomes: .allConfirmed,
+          detectedFailure: failure
+        ),
+        expectedDestination: .finalizing
+      ),
+      .init(
+        name: "unknown identity",
+        evidence: .init(
+          deviceIdentity: .unknown,
+          externalEffectOutcomes: .allConfirmed,
+          detectedFailure: failure
+        ),
+        expectedDestination: .waitingForRecovery
+      ),
+      .init(
+        name: "unknown outcome",
+        evidence: .init(
+          deviceIdentity: .confirmed,
+          externalEffectOutcomes: .containsUnknown,
+          detectedFailure: failure
+        ),
+        expectedDestination: .waitingForRecovery
+      ),
+    ]
+
+    let contractPairs = try loadContractTransitionPairs()
+    for mode in JobExecutionMode.allCases {
+      for vector in vectors {
+        var machine = try makeResumeMarkerMachine(mode: mode)
+        let ordinaryStepDispatchCount = try assertResumeMarkerRejectsOrdinaryDispatch(
+          machine: &machine,
+          context: "\(mode.rawValue) / \(vector.name)"
+        )
+
+        let decision = try machine.handle(
+          .resumeMarkerEvaluated(
+            evidence: vector.evidence,
+            requestedDestination: vector.expectedDestination
+          ))
+        var recordedTransitions = [decision.transition]
+        XCTAssertEqual(
+          decision.transition,
+          .init(from: .resumeAtConfirmedSafeBoundary, to: vector.expectedDestination)
+        )
+        XCTAssertTrue(
+          contractPairs.contains(
+            .init(from: .resumeAtConfirmedSafeBoundary, to: vector.expectedDestination)
+          )
+        )
+
+        if vector.expectedDestination == .finalizing {
+          XCTAssertEqual(machine.originalFailure, failure)
+          let terminal = try machine.handle(.finalizationCompleted)
+          recordedTransitions.append(terminal.transition)
+          XCTAssertEqual(
+            recordedTransitions,
+            [
+              .init(from: .resumeAtConfirmedSafeBoundary, to: .finalizing),
+              .init(from: .finalizing, to: .failed),
+            ]
+          )
+          XCTAssertEqual(machine.state, .failed)
+        } else {
+          XCTAssertEqual(machine.state, .waitingForRecovery)
+          XCTAssertNil(
+            machine.originalFailure,
+            "unknown evidence must not become confirmed failure"
+          )
+          XCTAssertTrue(decision.directives.contains(.dispatchNoUnknownStep))
+          XCTAssertTrue(decision.directives.contains(.preserveOutcomeUnknown))
+        }
+
+        XCTAssertEqual(ordinaryStepDispatchCount, 0)
+        XCTAssertEqual(
+          recordedTransitions.filter { [.running, .planning].contains($0.to) }.count,
+          0,
+          "\(mode.rawValue) / \(vector.name) forged an execution-phase transition"
+        )
+      }
+    }
+  }
+
+  func testResumeMarkerSemanticValidatorRejectsMismatchedEvidenceAndPair() throws {
+    let failure = WorkflowFailure(
+      classification: .recovery,
+      code: "marker-mismatch",
+      summary: "semantic mismatch fixture"
+    )
+
+    for mode in JobExecutionMode.allCases {
+      let executionPhase: JobState = mode == .execute ? .running : .planning
+      let mismatches: [(ResumeMarkerDecisionEvidence, JobState)] = [
+        (
+          .init(
+            deviceIdentity: .confirmed,
+            externalEffectOutcomes: .allConfirmed,
+            detectedFailure: failure
+          ),
+          .waitingForRecovery
+        ),
+        (
+          .init(
+            deviceIdentity: .unknown,
+            externalEffectOutcomes: .allConfirmed,
+            detectedFailure: failure
+          ),
+          .finalizing
+        ),
+        (
+          .init(
+            deviceIdentity: .confirmed,
+            externalEffectOutcomes: .containsUnknown,
+            detectedFailure: failure
+          ),
+          .finalizing
+        ),
+        (
+          .init(
+            deviceIdentity: .confirmed,
+            externalEffectOutcomes: .allConfirmed,
+            detectedFailure: failure
+          ),
+          executionPhase
+        ),
+      ]
+
+      for (evidence, requestedDestination) in mismatches {
+        var machine = try makeResumeMarkerMachine(mode: mode)
+        XCTAssertThrowsError(
+          try machine.handle(
+            .resumeMarkerEvaluated(
+              evidence: evidence,
+              requestedDestination: requestedDestination
+            ))
+        )
+        XCTAssertEqual(machine.state, .resumeAtConfirmedSafeBoundary)
+        XCTAssertEqual(machine.invariantViolations.last?.kind, .resumeMarkerEvidenceMismatch)
+        XCTAssertEqual(machine.invariantViolations.last?.attemptedState, requestedDestination)
+      }
+
+      var legacyFailureEvent = try makeResumeMarkerMachine(mode: mode)
+      XCTAssertThrowsError(try legacyFailureEvent.handle(.confirmedFailure(failure)))
+      XCTAssertEqual(
+        legacyFailureEvent.invariantViolations.last?.kind,
+        .resumeMarkerEvidenceMismatch
+      )
+
+      var legacyUnknownEvent = try makeResumeMarkerMachine(mode: mode)
+      XCTAssertThrowsError(try legacyUnknownEvent.handle(.externalOutcomeOrIdentityUnknown))
+      XCTAssertEqual(
+        legacyUnknownEvent.invariantViolations.last?.kind,
+        .resumeMarkerEvidenceMismatch
+      )
+    }
+  }
+
   // TEST-AC-JOB-001-06 / cancellationContract
   func testTEST_AC_JOB_001_06_NormalCancellationUsesTheSafeBoundaryPath() throws {
     var machine = try makeRunningMachine()
@@ -468,6 +707,73 @@ final class JobStateMachineTests: XCTestCase {
     return machine
   }
 
+  private func makeResumeMarkerMachine(mode: JobExecutionMode) throws -> JobStateMachine {
+    var machine = try JobStateMachine(
+      mode: mode,
+      recoveringFrom: mode == .execute ? .running : .planning,
+      finding: .requiresReconciliation
+    )
+    try machine.handle(
+      .recoveryEvaluated(
+        .resume(
+          .init(
+            restartSafe: true,
+            safeBoundaryConfirmed: true,
+            outcomeConfirmed: true,
+            bindingConfirmed: true
+          ))))
+    XCTAssertEqual(machine.state, .resumeAtConfirmedSafeBoundary)
+    return machine
+  }
+
+  private func assertResumeMarkerRejectsOrdinaryDispatch(
+    machine: inout JobStateMachine,
+    context: String
+  ) throws -> Int {
+    var dispatchCount = 0
+    let ordinarySteps = try [
+      makeHostStep(id: "marker-host"),
+      makeReadOnlyStep(),
+      makeMutationStep(),
+      makeFlashStep(),
+    ]
+    for step in ordinarySteps {
+      do {
+        _ = try machine.authorizeDispatch(of: step)
+        dispatchCount += 1
+        XCTFail("\(context) authorized \(step.effect.rawValue) step at resume marker")
+      } catch {
+        XCTAssertEqual(
+          machine.invariantViolations.last?.kind,
+          .dispatchNotAllowedInState,
+          context
+        )
+      }
+    }
+
+    let unknownKind = Data(
+      #"""
+      {
+        "id": "unknown",
+        "kind": "provider.rawCommand",
+        "effect": "hostOnly",
+        "cancellation": "immediate",
+        "bindingRequirement": "none",
+        "arguments": {},
+        "compensationDescriptors": []
+      }
+      """#.utf8
+    )
+    XCTAssertThrowsError(try WorkflowStepDecoder.decodeCoreOrProviderStep(unknownKind)) { error in
+      XCTAssertEqual(
+        error as? WorkflowStepValidationError,
+        .unsupportedKind(rawKind: "provider.rawCommand", assumedEffect: .destructive),
+        context
+      )
+    }
+    return dispatchCount
+  }
+
   private func makeWaitingForRecoveryMachine() throws -> JobStateMachine {
     var machine = try makeRunningMachine()
     let outcome = try machine.handle(.externalOutcomeOrIdentityUnknown)
@@ -555,6 +861,37 @@ final class JobStateMachineTests: XCTestCase {
     )
   }
 
+  private func makeReadOnlyStep() throws -> WorkflowStep {
+    try WorkflowStep(
+      id: "marker-read-only",
+      kind: .captureRemoteStdout,
+      declaredEffect: .readOnly,
+      declaredCancellation: .immediate,
+      declaredBindingRequirement: .confirmedDevice,
+      arguments: [
+        "catalogId": .string("arkui-ui-dump"),
+        "actionId": .string("nodeSummary"),
+        "parameters": .object([:]),
+        "artifactId": .string("marker-artifact"),
+      ]
+    )
+  }
+
+  private func makeMutationStep() throws -> WorkflowStep {
+    try WorkflowStep(
+      id: "marker-mutation",
+      kind: .setParameter,
+      declaredEffect: .deviceMutation,
+      declaredCancellation: .atSafeBoundary,
+      declaredBindingRequirement: .confirmedDevice,
+      arguments: [
+        "name": .string("persist.arkdeck.marker"),
+        "value": .string("1"),
+        "readbackPolicy": .string("required"),
+      ]
+    )
+  }
+
   private func makeFlashStep() throws -> WorkflowStep {
     try WorkflowStep(
       id: "flash-system",
@@ -629,8 +966,32 @@ final class JobStateMachineTests: XCTestCase {
     return pairs
   }
 
-  private struct StateTransitionPair: Hashable {
+  private struct StateTransitionPair: Hashable, Codable {
     let from: JobState
     let to: JobState
+  }
+
+  private struct JournalStateTransitionFixture: Codable, Equatable {
+    let schemaVersion: String
+    let eventId: String
+    let sequence: Int
+    let sessionId: String
+    let jobId: String
+    let timestamp: String
+    let kind: String
+    let payload: JournalStateTransitionPayload
+  }
+
+  private struct JournalStateTransitionPayload: Codable, Equatable {
+    let from: JobState
+    let to: JobState
+    let reason: String
+    let triggerEventId: String?
+  }
+
+  private struct ResumeMarkerDecisionVector {
+    let name: String
+    let evidence: ResumeMarkerDecisionEvidence
+    let expectedDestination: JobState
   }
 }
