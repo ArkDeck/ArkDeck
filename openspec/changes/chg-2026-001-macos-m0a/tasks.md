@@ -15,7 +15,7 @@
 
 ## TASK-M0A-002 — ProcessExecutor 与 external-first HDC discovery 原型
 
-- Status:ready
+- Status:done
 - Requirements/AC:AC-JOB-005-01、AC-NFR-002-01 等(见 verification.md)
 - Depends on:TASK-M0A-001
 - Allowed paths:`Packages/ArkDeckKit/Sources/ArkDeckProcess/**`、`.../ArkDeckOpenHarmony/**`、对应 Tests 与 Fixtures、本 change `evidence/**`
