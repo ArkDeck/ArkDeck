@@ -1,6 +1,6 @@
 # TASK-M0A-005A run record — 2026-07-15
 
-- Evidence class: `localBuild` + `planOnly`; no hardware, no HDC invocation
+- Evidence class: `platform` + `plan`; no hardware, no HDC invocation
 - Core baseline: `CORE-1.0.0`
 - Integration profile: `OPENHARMONY-TOOLS@0.1.0`
 - Prototype: Release Sandboxed app, built locally with an ad-hoc signature
@@ -18,7 +18,8 @@
 
 - Added `ArkDeckApp/ArkDeckApp.entitlements`, selected by both Xcode target
   configurations. The Sandboxed prototype requests only App Sandbox, USB,
-  serial, user-selected read-write file access, and network-client access.
+  serial, app-scoped bookmarks, user-selected read-write file access, and
+  network-client access.
 - Release disables `CODE_SIGN_INJECT_BASE_ENTITLEMENTS`, so Xcode does not add
   `com.apple.security.get-task-allow` to the distribution-like prototype.
 - Frozen the human-only, read-only USB/UART/TCP and user-selected file-access
@@ -29,10 +30,11 @@
 | Command | Result |
 | --- | --- |
 | `plutil -lint ArkDeckApp/ArkDeckApp.entitlements` | Passed. |
-| `xcodebuild -project ArkDeck.xcodeproj -scheme ArkDeck -configuration Debug -derivedDataPath /private/tmp/arkdeck-m0a-005a-derived build` | Passed; Debug evidence only. Xcode injected `com.apple.security.get-task-allow`, so this artifact is not the plan's distribution-like artifact. |
-| `xcodebuild -project ArkDeck.xcodeproj -scheme ArkDeck -configuration Release -derivedDataPath /private/tmp/arkdeck-m0a-005a-derived build` | Passed after the Release base-entitlement correction. |
+| `xcodebuild -project ArkDeck.xcodeproj -scheme ArkDeck -configuration Debug -derivedDataPath /private/tmp/arkdeck-m0a-005a-derived build` | Passed with the app-scoped bookmark entitlement. Debug evidence only: Xcode injected `com.apple.security.get-task-allow`, so this artifact is not the plan's distribution-like artifact. |
+| `xcodebuild -project ArkDeck.xcodeproj -scheme ArkDeck -configuration Release -derivedDataPath /private/tmp/arkdeck-m0a-005a-derived build` | Passed after the Release base-entitlement correction and app-scoped bookmark addition. |
 | `codesign --verify --deep --strict <Release ArkDeck.app>` | Passed. |
 | `codesign -dvv --entitlements :- <Release ArkDeck.app>` | Captured below. |
+| `open -n -g <Release ArkDeck.app>` followed by `ps` | Passed: the locally built app started as PID 453 from the recorded artifact path, then was terminated after observation and confirmed exited. |
 | `swift test` in `Packages/ArkDeckKit` | Passed: 36 executed, 1 expected manual-observation skip, 0 failures. |
 | `xcrun stapler validate <Debug ArkDeck.app>` | Not validated: the local ad-hoc artifact has no notarization ticket. This is not a Gatekeeper or clean-VM result. |
 
@@ -41,7 +43,7 @@
 The ephemeral local artifact was
 `/private/tmp/arkdeck-m0a-005a-derived/Build/Products/Release/ArkDeck.app`.
 Its executable SHA-256 was
-`b1cd6ccbc7965f17c20021c7362c0e644cfd672b25464d204294eab399ad0e80`.
+`f9478493480c715b7610fa4aafd58e280798e6ebdc82d4d10491ddcdafb8242a`.
 It is a universal `x86_64` + `arm64` Mach-O.
 
 `codesign -dvv` reported `Signature=adhoc`, `TeamIdentifier=not set`, and no
@@ -59,6 +61,7 @@ The actual Release entitlement dump was:
   <key>com.apple.security.app-sandbox</key><true/>
   <key>com.apple.security.device.serial</key><true/>
   <key>com.apple.security.device.usb</key><true/>
+  <key>com.apple.security.files.bookmarks.app-scope</key><true/>
   <key>com.apple.security.files.user-selected.read-write</key><true/>
   <key>com.apple.security.network.client</key><true/>
 </dict>
@@ -69,6 +72,23 @@ The actual Release entitlement dump was:
 first Release build exposed that Xcode had injected it despite its absence from
 the source file; adding `CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO` and rebuilding
 produced the dump above. No additional entitlement was added to resolve it.
+
+## Launch and enforcement observation
+
+No ArkDeck process was present before the observation. `open -n -g` launched
+the exact Release artifact above; the process table then reported PID 453 with
+the executable path
+`/private/tmp/arkdeck-m0a-005a-derived/Build/Products/Release/ArkDeck.app/Contents/MacOS/ArkDeck`.
+That temporary instance was terminated after the observation, and a subsequent
+PID lookup returned no process.
+
+The enforced configuration observable in this environment is the signed
+entitlement dump above: it includes both
+`com.apple.security.files.user-selected.read-write` and
+`com.apple.security.files.bookmarks.app-scope`. Starting the app only proves
+that this local signed artifact launched; it is not an allowed/blocked
+file-access, USB/UART/TCP, Gatekeeper, or hardware result. Those decisions
+remain in the human TASK-M0A-007 matrix.
 
 ## AC conclusion and residual risk
 
