@@ -80,19 +80,79 @@ public final class DeterministicRecoveryReconciler: @unchecked Sendable {
     provider: ProviderRecoveryEvidence,
     binding: RecoveryBindingEvidence
   ) throws -> ReconciliationResult {
+    if let pending = session.replay.pendingReconcileTransition {
+      let transition = try JournalEvent.stateTransition(
+        eventID: audit.nextEventID(),
+        sequence: session.nextSequence,
+        sessionID: session.descriptor.sessionID,
+        jobID: session.descriptor.jobID,
+        timestamp: audit.timestamp(),
+        from: .reconciling,
+        to: pending.nextState,
+        reason: "complete durable reconcile outcome after restart",
+        triggerEventID: pending.outcomeEventID
+      )
+      try journal.appendAndSynchronize(transition)
+      return ReconciliationResult(
+        state: pending.nextState,
+        outcomeCertainty: session.replay.lastReconcileOutcomeCertainty ?? .outcomeUnknown,
+        durableEventSequences: [transition.sequence],
+        destructiveDispatchCount: 0,
+        destructiveReplayCount: 0,
+        guessCompensationCount: 0)
+    }
+    guard session.state == .waitingForRecovery else {
+      throw DurableFileError.sequenceViolation(
+        "reconcile requires a waitingForRecovery session")
+    }
+
+    var sequence = session.nextSequence
+    var durableSequences: [Int] = []
+    if let durableState = session.replay.currentState, durableState != .waitingForRecovery {
+      let recoveredWaiting = try JournalEvent.stateTransition(
+        eventID: audit.nextEventID(),
+        sequence: sequence,
+        sessionID: session.descriptor.sessionID,
+        jobID: session.descriptor.jobID,
+        timestamp: audit.timestamp(),
+        from: durableState,
+        to: .waitingForRecovery,
+        reason: "durably record fail-closed launch recovery state"
+      )
+      try journal.appendAndSynchronize(recoveredWaiting)
+      durableSequences.append(recoveredWaiting.sequence)
+      sequence += 1
+    }
+
+    let enteredReconciling = try JournalEvent.stateTransition(
+      eventID: audit.nextEventID(),
+      sequence: sequence,
+      sessionID: session.descriptor.sessionID,
+      jobID: session.descriptor.jobID,
+      timestamp: audit.timestamp(),
+      from: .waitingForRecovery,
+      to: .reconciling,
+      reason: "begin deterministic recovery reconciliation"
+    )
+    try journal.appendAndSynchronize(enteredReconciling)
+    durableSequences.append(enteredReconciling.sequence)
+    sequence += 1
+
     let attemptID = audit.nextEventID()
     let started = try JournalEvent.reconcileStarted(
       eventID: audit.nextEventID(),
-      sequence: session.nextSequence,
+      sequence: sequence,
       sessionID: session.descriptor.sessionID,
       jobID: session.descriptor.jobID,
       timestamp: audit.timestamp(),
       recoveryAttemptID: attemptID,
-      sourceState: session.state,
-      lastDurableSequence: session.replay.lastDurableSequence ?? 0,
+      sourceState: .waitingForRecovery,
+      lastDurableSequence: enteredReconciling.sequence,
       trigger: "startup"
     )
     try journal.appendAndSynchronize(started)
+    durableSequences.append(started.sequence)
+    sequence += 1
 
     let result: String
     let state: JobState
@@ -102,6 +162,7 @@ public final class DeterministicRecoveryReconciler: @unchecked Sendable {
     let hasUnknownIntent =
       session.outcomeCertainty == .outcomeUnknown
       || !session.replay.outstandingIntents.isEmpty
+      || !session.replay.unknownOutcomes.isEmpty
     let confirmedBinding = binding.confirmed && binding.revision.map({ $0 > 0 }) == true
 
     if hasUnknownIntent {
@@ -131,7 +192,7 @@ public final class DeterministicRecoveryReconciler: @unchecked Sendable {
       default:
         result = "waitingForRecovery"
         state = .waitingForRecovery
-        certainty = provider.outcomeCertainty
+        certainty = .outcomeUnknown
         safeBoundary = false
         revision = nil
       }
@@ -139,7 +200,7 @@ public final class DeterministicRecoveryReconciler: @unchecked Sendable {
 
     let outcome = try JournalEvent.reconcileOutcome(
       eventID: audit.nextEventID(),
-      sequence: session.nextSequence + 1,
+      sequence: sequence,
       sessionID: session.descriptor.sessionID,
       jobID: session.descriptor.jobID,
       timestamp: audit.timestamp(),
@@ -152,10 +213,26 @@ public final class DeterministicRecoveryReconciler: @unchecked Sendable {
       evidence: provider.evidence + binding.evidence
     )
     try journal.appendAndSynchronize(outcome)
+    durableSequences.append(outcome.sequence)
+    sequence += 1
+
+    let decisionTransition = try JournalEvent.stateTransition(
+      eventID: audit.nextEventID(),
+      sequence: sequence,
+      sessionID: session.descriptor.sessionID,
+      jobID: session.descriptor.jobID,
+      timestamp: audit.timestamp(),
+      from: .reconciling,
+      to: state,
+      reason: "persist deterministic reconcile decision",
+      triggerEventID: outcome.eventID
+    )
+    try journal.appendAndSynchronize(decisionTransition)
+    durableSequences.append(decisionTransition.sequence)
     return ReconciliationResult(
       state: state,
       outcomeCertainty: certainty,
-      durableEventSequences: [started.sequence, outcome.sequence],
+      durableEventSequences: durableSequences,
       destructiveDispatchCount: 0,
       destructiveReplayCount: 0,
       guessCompensationCount: 0
@@ -175,12 +252,29 @@ public protocol ManagedProcessStopping: Sendable {
   func stopForRecoveryAbandonment() throws -> ManagedProcessStopResult
 }
 
+public enum ResourceReleaseDisposition: Equatable, Sendable {
+  case releasedNow
+  case alreadyReleased
+}
+
 public protocol DeviceLaneReleasing: Sendable {
-  func releaseDeviceLane() throws
+  /// Idempotently confirms that the device lane is released.
+  func ensureDeviceLaneReleased() throws -> ResourceReleaseDisposition
 }
 
 public protocol StorageClaimReleasing: Sendable {
-  func releaseStorageClaim() throws
+  /// Idempotently confirms that the storage claim is released.
+  func ensureStorageClaimReleased() throws -> ResourceReleaseDisposition
+}
+
+public enum RecoveryResourceReleaseError: Error, Equatable, Sendable {
+  case releaseNotDurablyAuthorized
+}
+
+public enum RecoveryAbandonmentContinuationError: Error, Equatable, Sendable {
+  case noPendingAbandonment
+  case identityMismatch
+  case confirmationMismatch
 }
 
 public struct RecoveryAbandonmentRequest: Equatable, Sendable {
@@ -219,6 +313,9 @@ public struct RecoveryAbandonmentResult: Equatable, Sendable {
   public let durableEventSequences: [Int]
   public let laneReleaseCount: Int
   public let claimReleaseCount: Int
+  public let laneReleased: Bool
+  public let claimReleased: Bool
+  public let resourceReleasePending: Bool
 }
 
 public final class AuditedRecoveryAbandonmentCoordinator: @unchecked Sendable {
@@ -274,56 +371,84 @@ public final class AuditedRecoveryAbandonmentCoordinator: @unchecked Sendable {
       )
       try journal.appendAndSynchronize(requested)
       durableSequences.append(requested.sequence)
-
-      let stopResult: ManagedProcessStopResult
-      do { stopResult = try stopper.stopForRecoveryAbandonment() } catch {
-        return rollback(
-          request, intentID: intentID, durableSequences: durableSequences,
-          sequence: request.nextSequence + 2, result: "failed")
-      }
-      guard stopResult.permitsAbandonment else {
-        return rollback(
-          request, intentID: intentID, durableSequences: durableSequences,
-          sequence: request.nextSequence + 2, result: "deferred")
-      }
-
-      let outcome = try JournalEvent.abandonOutcome(
-        eventID: audit.nextEventID(),
-        sequence: request.nextSequence + 2,
-        sessionID: request.sessionID,
-        jobID: request.jobID,
-        timestamp: audit.timestamp(),
-        correlatesToAbandonIntentEventID: intentID,
-        result: "archivedInterrupted",
-        releaseAuthorized: true,
-        unresolvedHazards: request.deviceHazards
-      )
-      try journal.appendAndSynchronize(outcome)
-      durableSequences.append(outcome.sequence)
-
-      let terminal = try JournalEvent.stateTransition(
-        eventID: audit.nextEventID(),
-        sequence: request.nextSequence + 3,
-        sessionID: request.sessionID,
-        jobID: request.jobID,
-        timestamp: audit.timestamp(),
-        from: .userAbandonRequested,
-        to: .interrupted,
-        reason: "durable abandon outcome authorizes terminal transition",
-        triggerEventID: outcome.eventID
-      )
-      try journal.appendAndSynchronize(terminal)
-      durableSequences.append(terminal.sequence)
-      try laneReleaser.releaseDeviceLane()
-      try claimReleaser.releaseStorageClaim()
-      return RecoveryAbandonmentResult(
-        state: .interrupted, durableEventSequences: durableSequences,
-        laneReleaseCount: 1, claimReleaseCount: 1)
+      return finishRequestedAbandonment(
+        request, intentID: intentID, sequence: request.nextSequence + 2,
+        durableSequences: durableSequences)
     } catch {
       return RecoveryAbandonmentResult(
         state: .waitingForRecovery, durableEventSequences: durableSequences,
-        laneReleaseCount: 0, claimReleaseCount: 0)
+        laneReleaseCount: 0, claimReleaseCount: 0,
+        laneReleased: false, claimReleased: false, resourceReleasePending: false)
     }
+  }
+
+  public func resumeAbandonment(
+    _ request: RecoveryAbandonmentRequest,
+    from replay: JournalReplay
+  ) throws -> RecoveryAbandonmentResult {
+    guard let pending = replay.pendingAbandonment else {
+      throw RecoveryAbandonmentContinuationError.noPendingAbandonment
+    }
+    guard let first = replay.events.first,
+      first.sessionID == request.sessionID, first.jobID == request.jobID
+    else {
+      throw RecoveryAbandonmentContinuationError.identityMismatch
+    }
+    guard let durableIntent = replay.events.first(where: { $0.eventID == pending.intentEventID }),
+      durableIntent.payload.string("userConfirmationId") == request.userConfirmationID
+    else {
+      throw RecoveryAbandonmentContinuationError.confirmationMismatch
+    }
+
+    var sequence = (replay.lastDurableSequence ?? -1) + 1
+    var durableSequences: [Int] = []
+    switch pending.phase {
+    case .intentDurable:
+      let requested = try JournalEvent.stateTransition(
+        eventID: audit.nextEventID(), sequence: sequence,
+        sessionID: request.sessionID, jobID: request.jobID, timestamp: audit.timestamp(),
+        from: .waitingForRecovery, to: .userAbandonRequested,
+        reason: "resume durable recovery abandonment intent after restart",
+        triggerEventID: pending.intentEventID)
+      try journal.appendAndSynchronize(requested)
+      durableSequences.append(requested.sequence)
+      sequence += 1
+      return finishRequestedAbandonment(
+        request, intentID: pending.intentEventID, sequence: sequence,
+        durableSequences: durableSequences)
+    case .requested:
+      return finishRequestedAbandonment(
+        request, intentID: pending.intentEventID, sequence: sequence,
+        durableSequences: durableSequences)
+    case .outcomeDurable:
+      guard let outcomeEventID = pending.outcomeEventID,
+        let releaseAuthorized = pending.releaseAuthorized
+      else {
+        throw RecoveryAbandonmentContinuationError.noPendingAbandonment
+      }
+      let nextState: JobState = releaseAuthorized ? .interrupted : .waitingForRecovery
+      let completed = try JournalEvent.stateTransition(
+        eventID: audit.nextEventID(), sequence: sequence,
+        sessionID: request.sessionID, jobID: request.jobID, timestamp: audit.timestamp(),
+        from: .userAbandonRequested, to: nextState,
+        reason: "complete durable abandon outcome after restart",
+        triggerEventID: outcomeEventID)
+      try journal.appendAndSynchronize(completed)
+      durableSequences.append(completed.sequence)
+      if releaseAuthorized {
+        return releaseAuthorizedResources(durableEventSequences: durableSequences)
+      }
+      return waitingResult(durableEventSequences: durableSequences)
+    }
+  }
+
+  public func retryAuthorizedResourceRelease(
+    from replay: JournalReplay
+  ) throws -> RecoveryAbandonmentResult {
+    guard replay.resourceReleaseAuthorized, replay.currentState == .interrupted else {
+      throw RecoveryResourceReleaseError.releaseNotDurablyAuthorized
+    }
+    return releaseAuthorizedResources(durableEventSequences: [])
   }
 
   private func rollback(
@@ -355,6 +480,91 @@ public final class AuditedRecoveryAbandonmentCoordinator: @unchecked Sendable {
     }
     return RecoveryAbandonmentResult(
       state: .waitingForRecovery, durableEventSequences: sequences,
-      laneReleaseCount: 0, claimReleaseCount: 0)
+      laneReleaseCount: 0, claimReleaseCount: 0,
+      laneReleased: false, claimReleased: false, resourceReleasePending: false)
+  }
+
+  private func finishRequestedAbandonment(
+    _ request: RecoveryAbandonmentRequest,
+    intentID: String,
+    sequence: Int,
+    durableSequences: [Int]
+  ) -> RecoveryAbandonmentResult {
+    let stopResult: ManagedProcessStopResult
+    do { stopResult = try stopper.stopForRecoveryAbandonment() } catch {
+      return rollback(
+        request, intentID: intentID, durableSequences: durableSequences,
+        sequence: sequence, result: "failed")
+    }
+    guard stopResult.permitsAbandonment else {
+      return rollback(
+        request, intentID: intentID, durableSequences: durableSequences,
+        sequence: sequence, result: "deferred")
+    }
+
+    var sequences = durableSequences
+    do {
+      let outcome = try JournalEvent.abandonOutcome(
+        eventID: audit.nextEventID(), sequence: sequence,
+        sessionID: request.sessionID, jobID: request.jobID, timestamp: audit.timestamp(),
+        correlatesToAbandonIntentEventID: intentID, result: "archivedInterrupted",
+        releaseAuthorized: true, unresolvedHazards: request.deviceHazards)
+      try journal.appendAndSynchronize(outcome)
+      sequences.append(outcome.sequence)
+      let terminal = try JournalEvent.stateTransition(
+        eventID: audit.nextEventID(), sequence: sequence + 1,
+        sessionID: request.sessionID, jobID: request.jobID, timestamp: audit.timestamp(),
+        from: .userAbandonRequested, to: .interrupted,
+        reason: "durable abandon outcome authorizes terminal transition",
+        triggerEventID: outcome.eventID)
+      try journal.appendAndSynchronize(terminal)
+      sequences.append(terminal.sequence)
+      return releaseAuthorizedResources(durableEventSequences: sequences)
+    } catch {
+      return waitingResult(durableEventSequences: sequences)
+    }
+  }
+
+  private func waitingResult(
+    durableEventSequences: [Int]
+  ) -> RecoveryAbandonmentResult {
+    RecoveryAbandonmentResult(
+      state: .waitingForRecovery, durableEventSequences: durableEventSequences,
+      laneReleaseCount: 0, claimReleaseCount: 0,
+      laneReleased: false, claimReleased: false, resourceReleasePending: false)
+  }
+
+  private func releaseAuthorizedResources(
+    durableEventSequences: [Int]
+  ) -> RecoveryAbandonmentResult {
+    var laneReleaseCount = 0
+    var claimReleaseCount = 0
+    var laneReleased = false
+    var claimReleased = false
+
+    do {
+      let disposition = try laneReleaser.ensureDeviceLaneReleased()
+      laneReleaseCount = disposition == .releasedNow ? 1 : 0
+      laneReleased = true
+    } catch {
+      laneReleased = false
+    }
+
+    do {
+      let disposition = try claimReleaser.ensureStorageClaimReleased()
+      claimReleaseCount = disposition == .releasedNow ? 1 : 0
+      claimReleased = true
+    } catch {
+      claimReleased = false
+    }
+
+    return RecoveryAbandonmentResult(
+      state: .interrupted,
+      durableEventSequences: durableEventSequences,
+      laneReleaseCount: laneReleaseCount,
+      claimReleaseCount: claimReleaseCount,
+      laneReleased: laneReleased,
+      claimReleased: claimReleased,
+      resourceReleasePending: !laneReleased || !claimReleased)
   }
 }

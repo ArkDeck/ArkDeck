@@ -7,7 +7,7 @@ import XCTest
 
 final class JournalRecoveryContractTests: XCTestCase {
   func testLockedJournalContractCoversEveryClosedEventKind() throws {
-    let data = try Data(contentsOf: fixtureURL("all-event-kinds.jsonl"))
+    let data = try JournalRecoveryFixtures.data(named: "all-event-kinds.jsonl")
     let lines = data.split(separator: 0x0A)
     let events = try lines.map { try JournalEventCodec.decode(Data($0)) }
     XCTAssertEqual(Set(events.map(\.kind)), Set(JournalEventKind.allCases))
@@ -18,17 +18,17 @@ final class JournalRecoveryContractTests: XCTestCase {
 
   func testClosedCodecRejectsUnknownDuplicateMalformedAndHashMismatchVectors() throws {
     XCTAssertThrowsError(
-      try JournalEventCodec.decode(Data(contentsOf: fixtureURL("unknown-kind.json"))))
+      try JournalEventCodec.decode(JournalRecoveryFixtures.data(named: "unknown-kind.json")))
     XCTAssertThrowsError(
-      try JournalEventCodec.decode(Data(contentsOf: fixtureURL("duplicate-member.json")))
+      try JournalEventCodec.decode(JournalRecoveryFixtures.data(named: "duplicate-member.json"))
     ) { error in
       guard case .duplicateMemberName = error as? StrictJSONError else {
         return XCTFail("duplicate member must be identified: \(error)")
       }
     }
 
-    let lines = try String(
-      contentsOf: fixtureURL("all-event-kinds.jsonl"), encoding: .utf8
+    let lines = String(
+      decoding: try JournalRecoveryFixtures.data(named: "all-event-kinds.jsonl"), as: UTF8.self
     ).split(separator: "\n")
     let warningWithUnknown = lines[16].replacingOccurrences(
       of: "\"details\":{}", with: "\"details\":{},\"future\":true")
@@ -71,6 +71,22 @@ final class JournalRecoveryContractTests: XCTestCase {
     let third = try FileDurableJournal(url: directory.appending(path: "orphan-outcome.jsonl"))
     try third.appendAndSynchronize(try makeJobCreated(sequence: 0))
     XCTAssertThrowsError(try third.appendAndSynchronize(makeOutcome(sequence: 1)))
+
+    let missingCreatedURL = directory.appending(path: "missing-created.jsonl")
+    let transition = try JournalEvent.stateTransition(
+      eventID: "not-created", sequence: 0, sessionID: "session-1", jobID: "job-1",
+      timestamp: timestamp, from: .queued, to: .preflight, reason: "untrusted fixture")
+    try (JournalEventCodec.encode(transition) + Data("\n".utf8)).write(to: missingCreatedURL)
+    XCTAssertThrowsError(try DurableJournalRecovery.inspect(url: missingCreatedURL))
+
+    let wrongInitialSequenceURL = directory.appending(path: "created-at-one.jsonl")
+    let createdAtOne = try makeJobCreated(sequence: 1)
+    try (JournalEventCodec.encode(createdAtOne) + Data("\n".utf8)).write(
+      to: wrongInitialSequenceURL)
+    XCTAssertThrowsError(try DurableJournalRecovery.inspect(url: wrongInitialSequenceURL))
+
+    let emptyAppend = try FileDurableJournal(url: directory.appending(path: "append-gate.jsonl"))
+    XCTAssertThrowsError(try emptyAppend.appendAndSynchronize(transition))
   }
 
   func testTornTailIsIgnoredButForcesExplicitRecovery() throws {
@@ -97,15 +113,28 @@ final class JournalRecoveryContractTests: XCTestCase {
     for point in points {
       let directory = try temporaryDirectory()
       defer { try? FileManager.default.removeItem(at: directory) }
+      let journalURL = directory.appending(path: "journal.jsonl")
+      let seedJournal = try FileDurableJournal(url: journalURL)
+      try seedJournal.appendAndSynchronize(try makeJobCreated(sequence: 0))
+      try seedJournal.appendAndSynchronize(
+        JournalEvent.stateTransition(
+          eventID: "fault-to-preflight", sequence: 1,
+          sessionID: "session-1", jobID: "job-1", timestamp: timestamp,
+          from: .queued, to: .preflight, reason: "fault fixture"))
+      var faultWasInjected = false
       let journal = try FileDurableJournal(
-        url: directory.appending(path: "journal.jsonl"),
+        url: journalURL,
         faultInjector: DurabilityFaultInjector { observed in
-          if observed == point { throw TestFault.injected(point) }
+          if observed == point {
+            faultWasInjected = true
+            throw TestFault.injected(point)
+          }
         })
       let gate = WriteAheadIntentGate(journal: journal)
       var dispatchCount = 0
       XCTAssertThrowsError(
-        try gate.dispatch(intent: makeFlashIntent(sequence: 0)) { dispatchCount += 1 })
+        try gate.dispatch(intent: makeFlashIntent(sequence: 2)) { dispatchCount += 1 })
+      XCTAssertTrue(faultWasInjected)
       XCTAssertEqual(dispatchCount, 0, "failed \(point.rawValue) must block dispatch")
       print("M1_JOURNAL_FAULT point=\(point.rawValue) external_dispatch_count=\(dispatchCount)")
     }
@@ -202,9 +231,146 @@ final class JournalRecoveryContractTests: XCTestCase {
     XCTAssertEqual(result.destructiveDispatchCount, 0)
     XCTAssertEqual(result.destructiveReplayCount, 0)
     XCTAssertEqual(result.guessCompensationCount, 0)
+    XCTAssertEqual(result.durableEventSequences.count, 5)
+    let reconciled = try DurableJournalRecovery.inspect(url: descriptor.journalURL)
+    XCTAssertEqual(reconciled.currentState, .waitingForRecovery)
+    XCTAssertEqual(
+      reconciled.events.suffix(5).map(\.kind),
+      [.stateTransition, .stateTransition, .reconcileStarted, .reconcileOutcome, .stateTransition])
     print(
       "M1_RECONCILE state=\(result.state.rawValue) certainty=\(result.outcomeCertainty.rawValue) "
         + "dispatch=0 replay=0 compensation=0")
+  }
+
+  func testDurableUnknownStepAndCompensationOutcomesForceFailClosedRecovery() throws {
+    let stepDirectory = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: stepDirectory) }
+    let stepDescriptor = try writeRunningFlashJournal(
+      in: stepDirectory, includeOutcome: true, outcomeCertainty: .outcomeUnknown)
+    let stepReplay = try DurableJournalRecovery.inspect(url: stepDescriptor.journalURL)
+    let stepSession = try XCTUnwrap(SessionRecoveryScanner().scan(stepDescriptor))
+    XCTAssertTrue(stepReplay.outstandingIntents.isEmpty)
+    XCTAssertEqual(stepReplay.unknownOutcomes.map(\.correlatedIntentEventID), ["flash-intent"])
+    XCTAssertEqual(stepSession.state, .waitingForRecovery)
+    XCTAssertEqual(stepSession.outcomeCertainty, .outcomeUnknown)
+    let failClosedGate = WriteAheadIntentGate(
+      journal: try FileDurableJournal(url: stepDescriptor.journalURL))
+    var dispatchCount = 0
+    XCTAssertThrowsError(
+      try failClosedGate.dispatch(
+        intent: makeFlashIntent(
+          sequence: 5, eventID: "next-flash-intent", stepID: "next-flash-step")
+      ) {
+        dispatchCount += 1
+      })
+    XCTAssertEqual(dispatchCount, 0)
+
+    let compensationDirectory = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: compensationDirectory) }
+    let compensationDescriptor = descriptor(in: compensationDirectory)
+    let journal = try FileDurableJournal(url: compensationDescriptor.journalURL)
+    let fixtureLines = String(
+      decoding: try JournalRecoveryFixtures.data(named: "all-event-kinds.jsonl"), as: UTF8.self
+    ).split(separator: "\n")
+    for line in fixtureLines.prefix(5) {
+      try journal.appendAndSynchronize(try JournalEventCodec.decode(Data(line.utf8)))
+    }
+    let unknownCompensation = String(fixtureLines[5]).replacingOccurrences(
+      of: "\"outcomeCertainty\":\"confirmed\"",
+      with: "\"outcomeCertainty\":\"outcomeUnknown\"")
+    try journal.appendAndSynchronize(
+      try JournalEventCodec.decode(Data(unknownCompensation.utf8)))
+
+    let compensationReplay = try DurableJournalRecovery.inspect(
+      url: compensationDescriptor.journalURL)
+    let compensationSession = try XCTUnwrap(
+      SessionRecoveryScanner().scan(compensationDescriptor))
+    XCTAssertTrue(compensationReplay.outstandingIntents.isEmpty)
+    XCTAssertEqual(compensationReplay.unknownOutcomes.count, 1)
+    XCTAssertTrue(try XCTUnwrap(compensationReplay.unknownOutcomes.first).isCompensation)
+    XCTAssertEqual(compensationSession.state, .waitingForRecovery)
+    XCTAssertEqual(compensationSession.outcomeCertainty, .outcomeUnknown)
+  }
+
+  func testReconcileOutcomeSurvivesCrashBeforeDecisionTransition() throws {
+    let directory = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let descriptor = try writeRunningFlashJournal(in: directory, includeOutcome: true)
+    let journal = try FileDurableJournal(url: descriptor.journalURL)
+    try journal.appendAndSynchronize(
+      JournalEvent.stateTransition(
+        eventID: "to-reconciling", sequence: 6, sessionID: "session-1", jobID: "job-1",
+        timestamp: timestamp, from: .waitingForRecovery, to: .reconciling,
+        reason: "fixture reconcile"))
+    try journal.appendAndSynchronize(
+      JournalEvent.reconcileStarted(
+        eventID: "reconcile-started", sequence: 7, sessionID: "session-1", jobID: "job-1",
+        timestamp: timestamp, recoveryAttemptID: "attempt-1",
+        sourceState: .waitingForRecovery, lastDurableSequence: 6, trigger: "startup"))
+    let outcome = try JournalEvent.reconcileOutcome(
+      eventID: "reconcile-outcome", sequence: 8, sessionID: "session-1", jobID: "job-1",
+      timestamp: timestamp, bindingRevision: 1, recoveryAttemptID: "attempt-1",
+      result: "resumeAtConfirmedSafeBoundary", nextState: .resumeAtConfirmedSafeBoundary,
+      outcomeCertainty: .confirmed, safeBoundaryConfirmed: true, evidence: ["fixture"])
+    try journal.appendAndSynchronize(outcome)
+
+    let replayAfterCrash = try DurableJournalRecovery.inspect(url: descriptor.journalURL)
+    XCTAssertEqual(replayAfterCrash.currentState, .resumeAtConfirmedSafeBoundary)
+    let scanned = try XCTUnwrap(SessionRecoveryScanner().scan(descriptor))
+    let resumed = try DeterministicRecoveryReconciler(
+      journal: FileDurableJournal(url: descriptor.journalURL)
+    ).reconcile(
+      session: scanned,
+      provider: ProviderRecoveryEvidence(
+        disposition: .uncertain, restartSafe: false, safeBoundaryConfirmed: false,
+        outcomeCertainty: .outcomeUnknown, evidence: []),
+      binding: RecoveryBindingEvidence(confirmed: false, revision: nil, evidence: []))
+    XCTAssertEqual(resumed.state, .resumeAtConfirmedSafeBoundary)
+    XCTAssertEqual(resumed.durableEventSequences, [9])
+    XCTAssertEqual(
+      try DurableJournalRecovery.inspect(url: descriptor.journalURL).currentState,
+      .resumeAtConfirmedSafeBoundary)
+  }
+
+  func testReconcileRestartsAfterCrashInReconciling() throws {
+    for crashAfterStarted in [false, true] {
+      let directory = try temporaryDirectory()
+      defer { try? FileManager.default.removeItem(at: directory) }
+      let descriptor = try writeRunningFlashJournal(in: directory, includeOutcome: true)
+      let journal = try FileDurableJournal(url: descriptor.journalURL)
+      try journal.appendAndSynchronize(
+        JournalEvent.stateTransition(
+          eventID: "old-to-reconciling", sequence: 6,
+          sessionID: "session-1", jobID: "job-1", timestamp: timestamp,
+          from: .waitingForRecovery, to: .reconciling, reason: "crash fixture"))
+      if crashAfterStarted {
+        try journal.appendAndSynchronize(
+          JournalEvent.reconcileStarted(
+            eventID: "old-reconcile-start", sequence: 7,
+            sessionID: "session-1", jobID: "job-1", timestamp: timestamp,
+            recoveryAttemptID: "old-attempt", sourceState: .waitingForRecovery,
+            lastDurableSequence: 6, trigger: "startup"))
+      }
+
+      let scanned = try XCTUnwrap(SessionRecoveryScanner().scan(descriptor))
+      XCTAssertEqual(scanned.state, .waitingForRecovery)
+      XCTAssertEqual(scanned.outcomeCertainty, .confirmed)
+      let resumed = try DeterministicRecoveryReconciler(
+        journal: FileDurableJournal(url: descriptor.journalURL)
+      ).reconcile(
+        session: scanned,
+        provider: ProviderRecoveryEvidence(
+          disposition: .resume, restartSafe: true, safeBoundaryConfirmed: true,
+          outcomeCertainty: .confirmed, evidence: ["provider"]),
+        binding: RecoveryBindingEvidence(
+          confirmed: true, revision: 1, evidence: ["binding"]))
+      XCTAssertEqual(resumed.state, .resumeAtConfirmedSafeBoundary)
+      XCTAssertEqual(resumed.outcomeCertainty, .confirmed)
+      let replay = try DurableJournalRecovery.inspect(url: descriptor.journalURL)
+      XCTAssertEqual(replay.currentState, .resumeAtConfirmedSafeBoundary)
+      XCTAssertEqual(replay.events[scanned.nextSequence].stateTransition?.from, .reconciling)
+      XCTAssertEqual(replay.events[scanned.nextSequence].stateTransition?.to, .waitingForRecovery)
+    }
   }
 
   func testConfirmedRecoveryRequiresEveryResumeCondition() throws {
@@ -348,12 +514,101 @@ final class JournalRecoveryContractTests: XCTestCase {
     XCTAssertEqual(success.state, .interrupted)
     XCTAssertEqual(successResources.laneReleaseCount, 1)
     XCTAssertEqual(successResources.claimReleaseCount, 1)
+    XCTAssertTrue(success.laneReleased)
+    XCTAssertTrue(success.claimReleased)
+    XCTAssertFalse(success.resourceReleasePending)
     XCTAssertEqual(
       successJournal.events.map(\.kind),
       [
         .abandonIntent, .stateTransition, .abandonOutcome, .stateTransition,
       ])
     print("M1_ABANDON case=success durable=\(success.durableEventSequences) lane=1 claim=1")
+  }
+
+  func testAbandonmentResumesEveryAuditedCrashWindow() throws {
+    for phase in RecoveryAbandonmentPhase.allCases {
+      let directory = try temporaryDirectory()
+      defer { try? FileManager.default.removeItem(at: directory) }
+      let descriptor = try writeRunningFlashJournal(in: directory, includeOutcome: true)
+      let journal = try FileDurableJournal(url: descriptor.journalURL)
+      let request = abandonmentRequest(nextSequence: 6)
+      let intent = try JournalEvent.abandonIntent(
+        eventID: "abandon-intent", sequence: 6,
+        sessionID: request.sessionID, jobID: request.jobID, timestamp: timestamp,
+        userConfirmationID: request.userConfirmationID,
+        lastConfirmedStep: request.lastConfirmedStepID,
+        outcomeCertainty: request.outcomeCertainty,
+        managedProcessState: request.managedProcessState,
+        deviceHazards: request.deviceHazards)
+      try journal.appendAndSynchronize(intent)
+      if phase != .intentDurable {
+        try journal.appendAndSynchronize(
+          JournalEvent.stateTransition(
+            eventID: "abandon-requested", sequence: 7,
+            sessionID: request.sessionID, jobID: request.jobID, timestamp: timestamp,
+            from: .waitingForRecovery, to: .userAbandonRequested,
+            reason: "fixture", triggerEventID: intent.eventID))
+      }
+      if phase == .outcomeDurable {
+        try journal.appendAndSynchronize(
+          JournalEvent.abandonOutcome(
+            eventID: "abandon-outcome", sequence: 8,
+            sessionID: request.sessionID, jobID: request.jobID, timestamp: timestamp,
+            correlatesToAbandonIntentEventID: intent.eventID,
+            result: "archivedInterrupted", releaseAuthorized: true,
+            unresolvedHazards: request.deviceHazards))
+      }
+
+      let replay = try DurableJournalRecovery.inspect(url: descriptor.journalURL)
+      XCTAssertEqual(replay.pendingAbandonment?.phase, phase)
+      let scanned = try XCTUnwrap(SessionRecoveryScanner().scan(descriptor))
+      XCTAssertEqual(scanned.state, .waitingForRecovery)
+      let resources = ResourceCounters()
+      let coordinator = AuditedRecoveryAbandonmentCoordinator(
+        journal: try FileDurableJournal(url: descriptor.journalURL),
+        stopper: FakeStopper(.notRunning), laneReleaser: resources,
+        claimReleaser: resources)
+      let resumed = try coordinator.resumeAbandonment(request, from: replay)
+      XCTAssertEqual(resumed.state, .interrupted)
+      XCTAssertFalse(resumed.resourceReleasePending)
+      XCTAssertEqual(resources.laneReleaseCount, 1)
+      XCTAssertEqual(resources.claimReleaseCount, 1)
+      let completed = try DurableJournalRecovery.inspect(url: descriptor.journalURL)
+      XCTAssertNil(completed.pendingAbandonment)
+      XCTAssertTrue(completed.resourceReleaseAuthorized)
+      XCTAssertEqual(completed.currentState, .interrupted)
+    }
+  }
+
+  func testPartialAuthorizedReleaseIsAccurateAndIdempotentlyRecoverable() throws {
+    let directory = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let descriptor = try writeRunningFlashJournal(in: directory, includeOutcome: true)
+    let resources = ResourceCounters(claimFailures: 1)
+    let coordinator = AuditedRecoveryAbandonmentCoordinator(
+      journal: try FileDurableJournal(url: descriptor.journalURL),
+      stopper: FakeStopper(.notRunning), laneReleaser: resources,
+      claimReleaser: resources)
+    let first = coordinator.abandon(abandonmentRequest(nextSequence: 6))
+    XCTAssertEqual(first.state, .interrupted)
+    XCTAssertEqual(first.laneReleaseCount, 1)
+    XCTAssertEqual(first.claimReleaseCount, 0)
+    XCTAssertTrue(first.laneReleased)
+    XCTAssertFalse(first.claimReleased)
+    XCTAssertTrue(first.resourceReleasePending)
+
+    let replay = try DurableJournalRecovery.inspect(url: descriptor.journalURL)
+    XCTAssertEqual(replay.currentState, .interrupted)
+    XCTAssertTrue(replay.resourceReleaseAuthorized)
+    let retry = try coordinator.retryAuthorizedResourceRelease(from: replay)
+    XCTAssertEqual(retry.state, .interrupted)
+    XCTAssertEqual(retry.laneReleaseCount, 0)
+    XCTAssertEqual(retry.claimReleaseCount, 1)
+    XCTAssertTrue(retry.laneReleased)
+    XCTAssertTrue(retry.claimReleased)
+    XCTAssertFalse(retry.resourceReleasePending)
+    XCTAssertEqual(resources.laneReleaseCount, 1)
+    XCTAssertEqual(resources.claimReleaseCount, 1)
   }
 
   func testHazardGateExhaustsProviderUserAndDurableAuditTruthTable() {
@@ -445,11 +700,6 @@ final class JournalRecoveryContractTests: XCTestCase {
 
   private let timestamp = "2026-07-16T00:00:00Z"
 
-  private func fixtureURL(_ name: String) -> URL {
-    URL(fileURLWithPath: #filePath).deletingLastPathComponent()
-      .appending(path: "Fixtures/JournalRecovery/\(name)")
-  }
-
   private func temporaryDirectory() throws -> URL {
     let url = FileManager.default.temporaryDirectory.appending(
       path: "arkdeck-task-m1-003-\(UUID().uuidString)")
@@ -470,9 +720,13 @@ final class JournalRecoveryContractTests: XCTestCase {
       timestamp: timestamp, executionMode: "execute")
   }
 
-  private func makeFlashIntent(sequence: Int) throws -> JournalEvent {
+  private func makeFlashIntent(
+    sequence: Int,
+    eventID: String = "flash-intent",
+    stepID: String = "flash-step"
+  ) throws -> JournalEvent {
     let step = try WorkflowStep(
-      id: "flash-step", kind: .flashPartition, declaredEffect: .destructive,
+      id: stepID, kind: .flashPartition, declaredEffect: .destructive,
       declaredCancellation: .criticalNonInterruptible,
       declaredBindingRequirement: .confirmedDevice,
       arguments: [
@@ -485,7 +739,7 @@ final class JournalRecoveryContractTests: XCTestCase {
         "safeBoundaryId": .string("boundary-1"),
       ])
     return try JournalEvent.stepIntent(
-      eventID: "flash-intent", sequence: sequence, sessionID: "session-1", jobID: "job-1",
+      eventID: eventID, sequence: sequence, sessionID: "session-1", jobID: "job-1",
       timestamp: timestamp, step: step,
       target: JournalTarget(
         scope: "device", targetID: "device-1", connectKey: "fixture-only",
@@ -493,12 +747,15 @@ final class JournalRecoveryContractTests: XCTestCase {
       attempt: 1, bindingRevision: 1)
   }
 
-  private func makeOutcome(sequence: Int) throws -> JournalEvent {
+  private func makeOutcome(
+    sequence: Int,
+    outcomeCertainty: JournalOutcomeCertainty = .confirmed
+  ) throws -> JournalEvent {
     try JournalEvent.stepOutcome(
       eventID: "flash-outcome-\(sequence)", sequence: sequence,
       sessionID: "session-1", jobID: "job-1", timestamp: timestamp,
       stepID: "flash-step", attempt: 1, correlatesToIntentEventID: "flash-intent",
-      result: "succeeded", outcomeCertainty: .confirmed)
+      result: "succeeded", outcomeCertainty: outcomeCertainty)
   }
 
   private func checkpoint(sequence: Int, state: JobState) throws -> JournalCheckpoint {
@@ -509,7 +766,8 @@ final class JournalRecoveryContractTests: XCTestCase {
 
   private func writeRunningFlashJournal(
     in directory: URL,
-    includeOutcome: Bool
+    includeOutcome: Bool,
+    outcomeCertainty: JournalOutcomeCertainty = .confirmed
   ) throws -> UnfinishedSessionDescriptor {
     let descriptor = descriptor(in: directory)
     let journal = try FileDurableJournal(url: descriptor.journalURL)
@@ -524,19 +782,22 @@ final class JournalRecoveryContractTests: XCTestCase {
         timestamp: timestamp, from: .preflight, to: .running, reason: "fixture"))
     try journal.appendAndSynchronize(makeFlashIntent(sequence: 3))
     if includeOutcome {
-      try journal.appendAndSynchronize(makeOutcome(sequence: 4))
       try journal.appendAndSynchronize(
-        JournalEvent.stateTransition(
-          eventID: "to-recovery", sequence: 5, sessionID: "session-1", jobID: "job-1",
-          timestamp: timestamp, from: .running, to: .waitingForRecovery,
-          reason: "identity requires explicit recovery"))
+        makeOutcome(sequence: 4, outcomeCertainty: outcomeCertainty))
+      if outcomeCertainty == .confirmed {
+        try journal.appendAndSynchronize(
+          JournalEvent.stateTransition(
+            eventID: "to-recovery", sequence: 5, sessionID: "session-1", jobID: "job-1",
+            timestamp: timestamp, from: .running, to: .waitingForRecovery,
+            reason: "identity requires explicit recovery"))
+      }
     }
     return descriptor
   }
 
-  private func abandonmentRequest() -> RecoveryAbandonmentRequest {
+  private func abandonmentRequest(nextSequence: Int = 10) -> RecoveryAbandonmentRequest {
     RecoveryAbandonmentRequest(
-      sessionID: "session-1", jobID: "job-1", nextSequence: 10,
+      sessionID: "session-1", jobID: "job-1", nextSequence: nextSequence,
       userConfirmationID: "confirmation-1", lastConfirmedStepID: "step-1",
       outcomeCertainty: .outcomeUnknown, managedProcessState: "runningInterruptible",
       deviceHazards: ["remote-task-unknown"])
@@ -620,18 +881,32 @@ private final class ResourceCounters: DeviceLaneReleasing, StorageClaimReleasing
   @unchecked Sendable
 {
   private let lock = NSLock()
+  private var claimFailuresRemaining: Int
+  private var laneReleased = false
+  private var claimReleased = false
   private(set) var laneReleaseCount = 0
   private(set) var claimReleaseCount = 0
+  init(claimFailures: Int = 0) { claimFailuresRemaining = claimFailures }
   var totalReleaseCount: Int { laneReleaseCount + claimReleaseCount }
-  func releaseDeviceLane() throws {
+  func ensureDeviceLaneReleased() throws -> ResourceReleaseDisposition {
     lock.lock()
+    defer { lock.unlock() }
+    if laneReleased { return .alreadyReleased }
+    laneReleased = true
     laneReleaseCount += 1
-    lock.unlock()
+    return .releasedNow
   }
-  func releaseStorageClaim() throws {
+  func ensureStorageClaimReleased() throws -> ResourceReleaseDisposition {
     lock.lock()
+    defer { lock.unlock() }
+    if claimFailuresRemaining > 0 {
+      claimFailuresRemaining -= 1
+      throw TestFault.journal
+    }
+    if claimReleased { return .alreadyReleased }
+    claimReleased = true
     claimReleaseCount += 1
-    lock.unlock()
+    return .releasedNow
   }
 }
 
