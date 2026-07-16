@@ -208,13 +208,16 @@
 
 ## TASK-M1-004 — macOS runtime ports:单实例、激活、电源、双时钟、睡眠观察
 
-- Status:blocked
+- Status:done
 - Implementation + observation evidence:`evidence/runs/TASK-M1-004/run.md`（自动化 contract/macOS
   platform vectors 与 human-operated attempt 3 已通过；不构成真实硬件、完整 platform
   conformance 或 release claim）
 - Completion gate:satisfied。`@lvye` 执行的 production `ContinuousClock`/`SuspendingClock` +
-  NSWorkspace bounded manual sleep/wake attempt 3 已通过，clock deltas、通知序列、counters 与二值
-  结论已回填；`blocked→done` 由独立状态 PR 执行，本实现 PR 不翻转状态。
+  NSWorkspace bounded manual sleep/wake attempt 3 已通过（2026-07-16 20:22–20:23 Asia/Shanghai，
+  elapsed delta=39,913,733,041 ns、active delta=6,955,170,000 ns、suspended delta=32,958,563,041 ns、
+  sequence=`sleep,wake`、counters=`1/1/1`），clock deltas、通知序列、counters 与二值结论已回填
+  run.md；`blocked→done` 由本独立状态 PR 草拟，仅在维护者 review/merge 后生效，不改变实现、
+  evidence 正文或任何 conformance/release 状态。
 - Readiness amendment:本任务包的精确范围与 verification gate 仅在维护者 review/merge
   后生效；本 readiness PR 不执行 TASK-M1-004、不产生实现 evidence，也不改变任何 Core、
   contract、platform conformance、release claim 或其他 Task 状态。
