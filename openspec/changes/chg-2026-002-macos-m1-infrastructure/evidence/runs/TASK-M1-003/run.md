@@ -81,7 +81,13 @@ profile。
   `confirmed`。
 - Reconcile 的历史 `outcomeUnknown` 决定可被后续全新且 confirmed 的
   Provider/binding evidence 取代；真实 step/compensation unknown 仍是硬阻断。已落盘 outcome
-  到 decision transition 补齐前，`requiresRecovery` 持续为 true。
+  到 decision transition 补齐前，`requiresRecovery` 持续为 true。若最近一次 reconcile 仍为
+  `outcomeUnknown`，abandonment context、直接 append 与不可信 replay 均禁止把其 certainty 提升为
+  `confirmed`；只有后续完整 confirmed reconcile 才能取代该最近决定。
+- Journal append/replay 现在以 `jobCreated.executionMode` 校验每条 state transition；`planOnly`
+  不能进入 `running` 等 execute-only 状态，且即使处于合法 `planning` 也不能 durable 写入或派发
+  `deviceMutation`/`destructive` intent。`finalizeConfirmedFailure` 语义校验同时要求正数
+  confirmed binding revision，缺失或 `null` 均 fail closed。
 - 实现 manifest recovery/hazard locked-shape codec 和 unresolved-hazard preflight gate；只有
   Provider allow、user override、durable audit 三者齐备才解除 gate,且 gate 自身不派发设备 Step。
 - 增加 dedicated `ArkDeckJournalCrashFixture`,通过 absolute executable + argument array 启动；
@@ -92,8 +98,8 @@ profile。
 | Command | Result |
 | --- | --- |
 | `swift format lint <TASK-M1-003 changed Swift files>` | passed;0 diagnostics |
-| `swift test --package-path Packages/ArkDeckKit --filter JournalRecoveryContractTests` | passed;26 tests,0 failures,0 skips |
-| `swift test --package-path Packages/ArkDeckKit` | passed;105 tests,0 failures;1 unrelated opt-in M0A manual idle-sleep observation skipped by design |
+| `swift test --package-path Packages/ArkDeckKit --filter JournalRecoveryContractTests` | passed;29 tests,0 failures,0 skips |
+| `swift test --package-path Packages/ArkDeckKit` | passed;108 tests,0 failures;1 unrelated opt-in M0A manual idle-sleep observation skipped by design |
 | `scripts/check-sdd.sh` | passed;0 errors,0 warnings,111 acceptance IDs |
 | `git diff --check` | passed |
 
@@ -145,6 +151,9 @@ profile。
 | unresolved flash + caller abandon certainty=`confirmed` | journal context forces durable abandon intent certainty=`outcomeUnknown`;direct forged intent is rejected | 0 |
 | audited interrupted + unresolved/missing or durable-unknown outcome | `finalized.outcomeCertainty=confirmed` is rejected;`outcomeUnknown` remains durable and valid | 0 |
 | missing/late `jobCreated` | replay and append both reject recovery input | 0 |
+| `planOnly` + execute-only transition or destructive intent | append and untrusted replay apply the locked mode graph;intent gate rejects before dispatch | 0 |
+| latest reconcile=`outcomeUnknown` + abandon caller=`confirmed` | journal context forces unknown;direct append and forged replay reject the certainty upgrade | 0 |
+| `finalizeConfirmedFailure` without positive binding revision | constructor/codec semantic validation rejects the reconcile outcome | 0 |
 
 ### macOS crash-window matrix (`TEST-MAC-M1-JOURNAL-001`)
 
@@ -160,7 +169,7 @@ profile。
 | Test ID | Evidence class | Binary conclusion |
 | --- | --- | --- |
 | `TEST-AC-JOB-002-01` | contract | passed:任一 intent durability gate 失败时 external dispatch=0；outcome 未 durable 时 checkpoint 不前进；checkpoint fault 恢复 journal-first。 |
-| `TEST-AC-JOB-006-01` | contract | passed:任意 effect 的 missing outcome 与 durable-unknown destructive/compensation outcome 均只得到 `waitingForRecovery/outcomeUnknown`;normal terminal/finalized 不能隐藏 outstanding intent；当前进程和重启后的 dispatch/replay/compensation 均为 0；torn tail durable 修复后 reconcile 可续作；reconcile 全状态迁移 durable 且三个 crash window 可续作；16 组 resume 条件只有四项全真时允许 marker。 |
+| `TEST-AC-JOB-006-01` | contract | passed:任意 effect 的 missing outcome 与 durable-unknown destructive/compensation outcome 均只得到 `waitingForRecovery/outcomeUnknown`;normal terminal/finalized 不能隐藏 outstanding intent；当前进程和重启后的 dispatch/replay/compensation 均为 0；torn tail durable 修复后 reconcile 可续作；reconcile 全状态迁移 durable 且三个 crash window 可续作；最近 unknown reconcile 不能被 abandon 提升；confirmed failure 必须携带正数 binding revision；16 组 resume 条件只有四项全真时允许 marker。 |
 | `TEST-AC-JOB-007-01` | contract | passed:四类前置失败 release 均为 0；三个 abandon crash phase 使用既有 audit 续作；首次与续作均保留 journal-derived device hazards/certainty；只有 durable outcome + matching interrupted transition 后释放；interrupted finalized 不得把 unresolved/unknown 改写为 confirmed；部分 release 准确报告并幂等重试。 |
 | `TEST-AC-JOB-007-02` | contract | passed:Provider allow × user override × durable audit 的 8 组真值组合已穷举；只有三者全真解除 gate,device dispatch 恒为 0,并保留 audit event ID。 |
 | `TEST-MAC-M1-JOURNAL-001` | platform | passed:四个真实 macOS 子进程 kill window 的 restart scan 如上；未知结果不重放,fixture device/destructive dispatch 恒为 0。 |

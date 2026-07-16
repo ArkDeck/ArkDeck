@@ -200,9 +200,13 @@ public enum DurableJournalRecovery {
         guard let currentState = state else {
           throw DurableFileError.sequenceViolation("transition precedes jobCreated")
         }
-        guard transition.from == currentState else {
+        guard transition.from == currentState,
+          let mode = stateMachineMode(for: executionMode),
+          JobStateMachine.isAllowedTransition(
+            from: transition.from, to: transition.to, mode: mode)
+        else {
           throw DurableFileError.sequenceViolation(
-            "transition source \(transition.from.rawValue) does not match \(currentState.rawValue)")
+            "transition is inconsistent with the current state or execution mode")
         }
         if let pending = pendingReconcileTransition {
           guard transition.from == .reconciling, transition.to == pending.nextState,
@@ -260,18 +264,22 @@ public enum DurableJournalRecovery {
         state = transition.to
       case .stepIntent:
         guard state?.permitsJournalIntent == true,
-          let stepID = event.stepID, let attempt = event.attempt, let effect = event.stepEffect
+          let stepID = event.stepID, let attempt = event.attempt, let effect = event.stepEffect,
+          executionMode != JobExecutionMode.planOnly.rawValue || effect < .deviceMutation
         else {
-          throw DurableFileError.sequenceViolation("intent is missing typed step data")
+          throw DurableFileError.sequenceViolation(
+            "intent is inconsistent with the current state or execution mode")
         }
         intents[event.eventID] = OutstandingJournalIntent(
           eventID: event.eventID, stepID: stepID, attempt: attempt, effect: effect,
           bindingRevision: event.bindingRevision)
       case .compensationIntent:
         guard state?.permitsJournalIntent == true,
-          let stepID = event.stepID, let attempt = event.attempt
+          let stepID = event.stepID, let attempt = event.attempt,
+          executionMode != JobExecutionMode.planOnly.rawValue
         else {
-          throw DurableFileError.sequenceViolation("compensation intent is incomplete")
+          throw DurableFileError.sequenceViolation(
+            "compensation intent is inconsistent with the current state or execution mode")
         }
         intents[event.eventID] = OutstandingJournalIntent(
           eventID: event.eventID, stepID: stepID, attempt: attempt, effect: .deviceMutation,
@@ -330,6 +338,7 @@ public enum DurableJournalRecovery {
       case .abandonIntent:
         let requiresOutcomeUnknown =
           hasUnknownOutcome
+          || lastReconcileOutcomeCertainty == .outcomeUnknown
           || intents.values.contains { !completedIntentIDs.contains($0.eventID) }
         guard state == .waitingForRecovery, activeAbandonIntentID == nil,
           abandonIntentIDs.insert(event.eventID).inserted,
@@ -451,6 +460,7 @@ struct JournalAppendValidationState {
   private var lastSequence: Int?
   private var sessionID: String?
   private var jobID: String?
+  private var executionMode: String?
   private var eventIDs: Set<String>
   private var currentState: JobState?
   private var outstanding: [String: OutstandingJournalIntent]
@@ -460,6 +470,7 @@ struct JournalAppendValidationState {
   private var recoveryAttempts: Set<String>
   private var completedRecoveryAttempts: Set<String>
   private var pendingReconcileTransition: PendingReconcileTransition?
+  private var lastReconcileOutcomeCertainty: JournalOutcomeCertainty?
   private var abandonIntents: Set<String>
   private var completedAbandonIntents: Set<String>
   private var activeAbandonIntentID: String?
@@ -478,6 +489,7 @@ struct JournalAppendValidationState {
     lastSequence = replay.lastDurableSequence
     sessionID = replay.events.last?.sessionID
     jobID = replay.events.last?.jobID
+    executionMode = replay.executionMode
     eventIDs = Set(replay.events.map(\.eventID))
     pendingReconcileTransition = replay.pendingReconcileTransition
     currentState = pendingReconcileTransition == nil ? replay.currentState : .reconciling
@@ -492,6 +504,7 @@ struct JournalAppendValidationState {
     completedRecoveryAttempts = Set(
       replay.events.filter { $0.kind == .reconcileOutcome }
         .compactMap { $0.payload.string("recoveryAttemptId") })
+    lastReconcileOutcomeCertainty = replay.lastReconcileOutcomeCertainty
     abandonIntents = Set(replay.events.filter { $0.kind == .abandonIntent }.map(\.eventID))
     completedAbandonIntents = Set(
       replay.events.filter { $0.kind == .abandonOutcome }
@@ -516,7 +529,8 @@ struct JournalAppendValidationState {
   var abandonmentContext: JournalAbandonmentContext {
     JournalAbandonmentContext(
       requiredHazards: unresolvedDeviceHazards.sorted(),
-      requiresOutcomeUnknown: !outstanding.isEmpty || hasUnknownOutcome)
+      requiresOutcomeUnknown: !outstanding.isEmpty || hasUnknownOutcome
+        || lastReconcileOutcomeCertainty == .outcomeUnknown)
   }
 
   func validate(_ event: JournalEvent) throws {
@@ -575,9 +589,13 @@ struct JournalAppendValidationState {
       }
     case .stateTransition:
       guard let transition = event.stateTransition, let current = currentState,
-        transition.from == current
+        transition.from == current,
+        let mode = stateMachineMode(for: executionMode),
+        JobStateMachine.isAllowedTransition(
+          from: transition.from, to: transition.to, mode: mode)
       else {
-        throw DurableFileError.sequenceViolation("transition source is not current state")
+        throw DurableFileError.sequenceViolation(
+          "transition is inconsistent with the current state or execution mode")
       }
       if let pending = pendingReconcileTransition {
         guard transition.from == .reconciling, transition.to == pending.nextState,
@@ -622,10 +640,23 @@ struct JournalAppendValidationState {
             "unresolved intent cannot enter finalization or terminal state")
         }
       }
-    case .stepIntent, .compensationIntent:
+    case .stepIntent:
       guard currentState?.permitsJournalIntent == true else {
         throw DurableFileError.sequenceViolation(
           "current Job state does not permit external-effect intent")
+      }
+      if executionMode == JobExecutionMode.planOnly.rawValue,
+        event.stepEffect.map({ $0 >= .deviceMutation }) != false
+      {
+        throw DurableFileError.sequenceViolation(
+          "planOnly journal cannot contain device-mutating intent")
+      }
+    case .compensationIntent:
+      guard currentState?.permitsJournalIntent == true,
+        executionMode != JobExecutionMode.planOnly.rawValue
+      else {
+        throw DurableFileError.sequenceViolation(
+          "planOnly journal cannot contain device-mutating compensation intent")
       }
     case .stepOutcome, .compensationOutcome:
       guard let correlation = event.correlatedIntentEventID,
@@ -658,7 +689,9 @@ struct JournalAppendValidationState {
           "reconcile start must follow waitingForRecovery to reconciling")
       }
     case .abandonIntent:
-      let requiresOutcomeUnknown = !outstanding.isEmpty || hasUnknownOutcome
+      let requiresOutcomeUnknown =
+        !outstanding.isEmpty || hasUnknownOutcome
+        || lastReconcileOutcomeCertainty == .outcomeUnknown
       guard currentState == .waitingForRecovery, activeAbandonIntentID == nil,
         let hazards = event.payload.journalStringArray("deviceHazards"),
         let certaintyRaw = event.payload.string("outcomeCertainty"),
@@ -712,6 +745,7 @@ struct JournalAppendValidationState {
     switch event.kind {
     case .jobCreated:
       currentState = .queued
+      executionMode = event.payload.string("executionMode")
     case .stateTransition:
       if event.stateTransition?.to == .interrupted,
         pendingAbandonNextState == .interrupted,
@@ -772,6 +806,8 @@ struct JournalAppendValidationState {
         recoveryAttempts.insert(attempt)
       }
     case .reconcileOutcome:
+      lastReconcileOutcomeCertainty = event.payload.string("outcomeCertainty")
+        .flatMap { JournalOutcomeCertainty(rawValue: $0) }
       if let attempt = event.payload.string("recoveryAttemptId"),
         let nextStateRaw = event.payload.string("nextState"),
         let nextState = JobState(rawValue: nextStateRaw)
@@ -799,6 +835,17 @@ struct JournalAppendValidationState {
     default:
       break
     }
+  }
+}
+
+private func stateMachineMode(for executionMode: String?) -> JobExecutionMode? {
+  switch executionMode {
+  case JobExecutionMode.execute.rawValue, "simulated":
+    .execute
+  case JobExecutionMode.planOnly.rawValue:
+    .planOnly
+  default:
+    nil
   }
 }
 

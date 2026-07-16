@@ -328,7 +328,9 @@ enum JournalEventSemanticValidator {
         certainty == "confirmed" || certainty == "outcomeUnknown"
       else { throw payload(event, "waiting result is inconsistent") }
     case "finalizeConfirmedFailure":
-      guard nextState == "finalizing", certainty == "confirmed", safe else {
+      guard nextState == "finalizing", certainty == "confirmed", safe,
+        event.bindingRevision.map({ $0 > 0 }) == true
+      else {
         throw payload(event, "confirmed failure result is inconsistent")
       }
     case "noAction":
