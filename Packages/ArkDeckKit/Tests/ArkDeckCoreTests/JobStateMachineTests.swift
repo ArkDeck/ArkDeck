@@ -343,7 +343,6 @@ final class JobStateMachineTests: XCTestCase {
     XCTAssertEqual(machine.state, .resumeAtConfirmedSafeBoundary)
     try machine.handle(.resumeConfirmed)
     XCTAssertEqual(machine.state, .running)
-
   }
 
   // TEST-AC-JOB-001-07 / recoveryDecisionJournalStateMachineContract
