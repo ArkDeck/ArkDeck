@@ -47,6 +47,8 @@
 - 每个任务开始前确认:所属 change 已 approved、依赖任务已完成、验证方法明确、所需工具/硬件可得;缺任一项即 blocked。
 - 每个任务结束时在 change 的 `evidence/` 下追加简短 run 记录(做了什么、命令、结果、AC 结论、偏差与遗留风险),并更新 tasks.md 状态;PR review 是对记录真实性的把关。
 - 任务完成 ≠ 验证通过:change 的 verified 状态需要 `verification.md` 中全部 AC 有可复查证据,并由维护者在 PR 中确认。
+- 一任务一实现 PR:任务实现不得混入 readiness、remediation 或状态 PR;PR 标题与描述必须如实覆盖其全部内容,超出声明范围的内容一律拆分成独立 PR。
+- 起草 change `verified` 翻转时,该 PR 只做状态翻转与 evidence 引用,不夹带实现;验证依据必须指向具体 run/复验记录,而非"实现 PR 已被 review"。
 - Windows/Linux 是同一产品的未来平台端口(现状 not started):平台实现不得改变 HDC server 保护、device binding 边界、Job 状态机/journal/recovery 语义、typed step 与 effect 等级、Artifact/隐私规则。
 
 详细流程见 `openspec/verification/policy.md` 与 `openspec/changes/README.md`。
