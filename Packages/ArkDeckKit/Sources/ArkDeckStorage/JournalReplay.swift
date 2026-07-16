@@ -46,6 +46,7 @@ public struct JournalReplay: Equatable, Sendable {
   public let lastDurableSequence: Int?
   public let outstandingIntents: [OutstandingJournalIntent]
   public let unknownOutcomes: [UnknownJournalOutcome]
+  public let requiredAbandonmentHazards: [String]
   public let latestBindingRevision: Int?
   public let lastConfirmedStepID: String?
   public let lastReconcileOutcomeCertainty: JournalOutcomeCertainty?
@@ -73,6 +74,7 @@ public enum DurableJournalRecovery {
       return JournalReplay(
         events: [], hasTornTail: false, executionMode: nil, currentState: nil,
         lastDurableSequence: nil, outstandingIntents: [], unknownOutcomes: [],
+        requiredAbandonmentHazards: [],
         latestBindingRevision: nil, lastConfirmedStepID: nil,
         lastReconcileOutcomeCertainty: nil, resourceReleaseAuthorized: false,
         pendingAbandonment: nil, finalized: false, pendingReconcileTransition: nil)
@@ -310,10 +312,16 @@ public enum DurableJournalRecovery {
       case .abandonIntent:
         guard state == .waitingForRecovery, activeAbandonIntentID == nil,
           abandonIntentIDs.insert(event.eventID).inserted,
-          let hazards = event.payload.journalStringArray("deviceHazards")
+          let hazards = event.payload.journalStringArray("deviceHazards"),
+          Set(hazards).isSuperset(
+            of: Set(
+              derivedAbandonmentHazards(
+                intents: intents.values.filter {
+                  !completedIntentIDs.contains($0.eventID)
+                }, unknownOutcomes: unknownOutcomes)))
         else {
           throw DurableFileError.sequenceViolation(
-            "abandon intent must start from waitingForRecovery")
+            "abandon intent must start from waitingForRecovery and preserve device hazards")
         }
         activeAbandonIntentID = event.eventID
         activeAbandonHazards = hazards
@@ -332,11 +340,21 @@ public enum DurableJournalRecovery {
         pendingAbandonNextState = releaseAuthorized ? .interrupted : .waitingForRecovery
       case .finalized:
         guard pendingReconcileTransition == nil, pendingAbandonOutcomeID == nil,
-          let state, state.isTerminal,
-          event.payload.string("terminalStatus") == state.rawValue,
-          !intents.values.contains(where: { intent in
-            !completedIntentIDs.contains(intent.eventID) && intent.effect >= .deviceMutation
-          }) || state == .interrupted && resourceReleaseAuthorized
+          let state, state.isTerminal
+        else {
+          throw DurableFileError.sequenceViolation(
+            "finalized record does not match a completed terminal lifecycle")
+        }
+        guard event.payload.string("terminalStatus") == state.rawValue else {
+          throw DurableFileError.sequenceViolation(
+            "finalized terminalStatus does not match the durable Job state")
+        }
+        let hasOutstandingExternalIntent = intents.values.contains { intent in
+          !completedIntentIDs.contains(intent.eventID) && intent.effect >= .deviceMutation
+        }
+        guard
+          !hasOutstandingExternalIntent
+            || (state == .interrupted && resourceReleaseAuthorized)
         else {
           throw DurableFileError.sequenceViolation(
             "finalized record does not match a completed terminal lifecycle")
@@ -351,6 +369,8 @@ public enum DurableJournalRecovery {
       .filter { !completedIntentIDs.contains($0.eventID) }
       .sorted { lhs, rhs in lhs.eventID < rhs.eventID }
     unknownOutcomes.sort { lhs, rhs in lhs.eventID < rhs.eventID }
+    let requiredAbandonmentHazards = derivedAbandonmentHazards(
+      intents: outstanding, unknownOutcomes: unknownOutcomes)
     let pendingAbandonment: PendingRecoveryAbandonment?
     if let intentEventID = activeAbandonIntentID {
       if let outcomeEventID = pendingAbandonOutcomeID {
@@ -379,6 +399,7 @@ public enum DurableJournalRecovery {
       lastDurableSequence: previousSequence,
       outstandingIntents: outstanding,
       unknownOutcomes: unknownOutcomes,
+      requiredAbandonmentHazards: requiredAbandonmentHazards,
       latestBindingRevision: latestBindingRevision,
       lastConfirmedStepID: lastConfirmedStepID,
       lastReconcileOutcomeCertainty: lastReconcileOutcomeCertainty,
@@ -397,6 +418,7 @@ struct JournalAppendValidationState {
   private var eventIDs: Set<String>
   private var currentState: JobState?
   private var outstanding: [String: OutstandingJournalIntent]
+  private var unresolvedDeviceHazards: Set<String>
   private var hasUnknownOutcome: Bool
   private var latestBindingRevision: Int?
   private var recoveryAttempts: Set<String>
@@ -423,6 +445,7 @@ struct JournalAppendValidationState {
     currentState = pendingReconcileTransition == nil ? replay.currentState : .reconciling
     outstanding = Dictionary(
       uniqueKeysWithValues: replay.outstandingIntents.map { ($0.eventID, $0) })
+    unresolvedDeviceHazards = Set(replay.requiredAbandonmentHazards)
     hasUnknownOutcome = !replay.unknownOutcomes.isEmpty
     latestBindingRevision = replay.latestBindingRevision
     recoveryAttempts = Set(
@@ -448,6 +471,10 @@ struct JournalAppendValidationState {
     }
     resourceReleaseAuthorized = replay.resourceReleaseAuthorized
     finalized = replay.finalized
+  }
+
+  var requiredAbandonmentHazards: [String] {
+    unresolvedDeviceHazards.sorted()
   }
 
   func validate(_ event: JournalEvent) throws {
@@ -584,9 +611,12 @@ struct JournalAppendValidationState {
           "reconcile start must follow waitingForRecovery to reconciling")
       }
     case .abandonIntent:
-      guard currentState == .waitingForRecovery, activeAbandonIntentID == nil else {
+      guard currentState == .waitingForRecovery, activeAbandonIntentID == nil,
+        let hazards = event.payload.journalStringArray("deviceHazards"),
+        Set(hazards).isSuperset(of: unresolvedDeviceHazards)
+      else {
         throw DurableFileError.sequenceViolation(
-          "abandon intent must start from waitingForRecovery")
+          "abandon intent must start from waitingForRecovery and preserve device hazards")
       }
     case .abandonOutcome:
       guard let correlation = event.payload.string("correlatesToAbandonIntentEventId"),
@@ -598,11 +628,22 @@ struct JournalAppendValidationState {
         Set(unresolvedHazards).isSuperset(of: Set(activeAbandonHazards))
       else { throw DurableFileError.sequenceViolation("abandon outcome has no durable intent") }
     case .finalized:
-      guard let state = currentState,
-        state.rawValue == event.payload.string("terminalStatus"),
-        !outstanding.values.contains(where: { $0.effect >= .deviceMutation })
-          || state == .interrupted && resourceReleaseAuthorized
-      else { throw DurableFileError.sequenceViolation("finalized status does not match Job state") }
+      guard let state = currentState, state.isTerminal else {
+        throw DurableFileError.sequenceViolation("finalized requires a terminal Job state")
+      }
+      guard state.rawValue == event.payload.string("terminalStatus") else {
+        throw DurableFileError.sequenceViolation("finalized status does not match Job state")
+      }
+      let hasOutstandingExternalIntent = outstanding.values.contains {
+        $0.effect >= .deviceMutation
+      }
+      guard
+        !hasOutstandingExternalIntent
+          || (state == .interrupted && resourceReleaseAuthorized)
+      else {
+        throw DurableFileError.sequenceViolation(
+          "finalized cannot hide an unresolved external-effect intent")
+      }
     default:
       break
     }
@@ -633,18 +674,31 @@ struct JournalAppendValidationState {
       pendingAbandonNextState = nil
     case .stepIntent:
       if let stepID = event.stepID, let attempt = event.attempt, let effect = event.stepEffect {
-        outstanding[event.eventID] = OutstandingJournalIntent(
+        let intent = OutstandingJournalIntent(
           eventID: event.eventID, stepID: stepID, attempt: attempt, effect: effect,
           bindingRevision: event.bindingRevision)
+        outstanding[event.eventID] = intent
+        if effect >= .deviceMutation {
+          unresolvedDeviceHazards.insert(derivedAbandonmentHazard(for: intent))
+        }
       }
     case .compensationIntent:
       if let stepID = event.stepID, let attempt = event.attempt {
-        outstanding[event.eventID] = OutstandingJournalIntent(
+        let intent = OutstandingJournalIntent(
           eventID: event.eventID, stepID: stepID, attempt: attempt, effect: .deviceMutation,
           bindingRevision: event.bindingRevision)
+        outstanding[event.eventID] = intent
+        unresolvedDeviceHazards.insert(derivedAbandonmentHazard(for: intent))
       }
     case .stepOutcome, .compensationOutcome:
-      if let correlation = event.correlatedIntentEventID {
+      if let correlation = event.correlatedIntentEventID,
+        let intent = outstanding[correlation]
+      {
+        if event.payload.string("outcomeCertainty")
+          == JournalOutcomeCertainty.confirmed.rawValue
+        {
+          unresolvedDeviceHazards.remove(derivedAbandonmentHazard(for: intent))
+        }
         outstanding.removeValue(forKey: correlation)
       }
       if event.payload.string("outcomeCertainty")
@@ -697,6 +751,37 @@ extension JobState {
       true
     }
   }
+}
+
+private func derivedAbandonmentHazard(for intent: OutstandingJournalIntent) -> String {
+  derivedAbandonmentHazard(
+    eventID: intent.eventID, stepID: intent.stepID, effect: intent.effect)
+}
+
+private func derivedAbandonmentHazard(
+  eventID: String,
+  stepID: String,
+  effect: WorkflowEffect
+) -> String {
+  "unresolved-\(effect.rawValue)-intent:\(stepID):\(eventID)"
+}
+
+private func derivedAbandonmentHazards(
+  intents: [OutstandingJournalIntent],
+  unknownOutcomes: [UnknownJournalOutcome]
+) -> [String] {
+  var hazards = Set(
+    intents.filter { $0.effect >= .deviceMutation }.map {
+      derivedAbandonmentHazard(for: $0)
+    })
+  hazards.formUnion(
+    unknownOutcomes.filter { $0.effect >= .deviceMutation }.map {
+      derivedAbandonmentHazard(
+        eventID: $0.correlatedIntentEventID,
+        stepID: $0.stepID,
+        effect: $0.effect)
+    })
+  return hazards.sorted()
 }
 
 extension Dictionary where Key == String, Value == JSONValue {

@@ -31,6 +31,7 @@ public enum DurableFileError: Error, Equatable, Sendable {
   case symbolicLinkRejected(String)
   case openFailed(path: String, errno: Int32)
   case writeFailed(path: String, errno: Int32)
+  case truncateFailed(path: String, errno: Int32)
   case syncFailed(path: String, errno: Int32)
   case replaceFailed(path: String, errno: Int32)
   case malformedCompletedRecord(line: Int)
@@ -42,6 +43,7 @@ public enum DurableFileError: Error, Equatable, Sendable {
 
 public protocol DurableJournalAppending: Sendable {
   func appendAndSynchronize(_ event: JournalEvent) throws
+  func requiredAbandonmentHazards() throws -> [String]
 }
 
 public final class FileDurableJournal: DurableJournalAppending, @unchecked Sendable {
@@ -67,8 +69,26 @@ public final class FileDurableJournal: DurableJournalAppending, @unchecked Senda
       try DurableFilePrimitives.fullSync(descriptor, path: url.path)
       try DurableFilePrimitives.syncDirectory(url.deletingLastPathComponent())
     }
-    appendState = try JournalAppendValidationState(
-      replay: DurableJournalRecovery.inspect(url: url))
+    var replay = try DurableJournalRecovery.inspect(url: url)
+    if replay.hasTornTail {
+      guard replay.events.first?.kind == .jobCreated else {
+        throw DurableFileError.sequenceViolation(
+          "cannot repair a torn journal without a durable jobCreated record")
+      }
+      try DurableFilePrimitives.discardTornTail(
+        at: url, descriptor: descriptor, durableRecordCount: replay.events.count)
+      replay = try DurableJournalRecovery.inspect(url: url)
+    }
+    appendState = try JournalAppendValidationState(replay: replay)
+  }
+
+  public func requiredAbandonmentHazards() throws -> [String] {
+    lock.lock()
+    defer { lock.unlock() }
+    guard !poisoned else {
+      throw DurableFileError.sequenceViolation("journal writer is poisoned after a failed append")
+    }
+    return appendState.requiredAbandonmentHazards
   }
 
   public func appendAndSynchronize(_ event: JournalEvent) throws {
@@ -311,6 +331,33 @@ enum DurableFilePrimitives {
     guard Darwin.fcntl(descriptor, F_FULLFSYNC) == 0 else {
       throw DurableFileError.syncFailed(path: path, errno: errno)
     }
+  }
+
+  static func discardTornTail(
+    at url: URL,
+    descriptor: Int32,
+    durableRecordCount: Int
+  ) throws {
+    let data = try Data(contentsOf: url)
+    var newlineCount = 0
+    var durableLength: Int?
+    for index in data.indices where data[index] == 0x0A {
+      newlineCount += 1
+      if newlineCount == durableRecordCount {
+        durableLength = data.distance(
+          from: data.startIndex, to: data.index(after: index))
+        break
+      }
+    }
+    guard let durableLength else {
+      throw DurableFileError.sequenceViolation(
+        "torn journal does not contain every replayed durable record")
+    }
+    guard Darwin.ftruncate(descriptor, off_t(durableLength)) == 0 else {
+      throw DurableFileError.truncateFailed(path: url.path, errno: errno)
+    }
+    try fullSync(descriptor, path: url.path)
+    try syncDirectory(url.deletingLastPathComponent())
   }
 
   static func syncDirectory(_ url: URL) throws {

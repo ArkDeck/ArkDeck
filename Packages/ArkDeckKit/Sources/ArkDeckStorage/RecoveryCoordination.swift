@@ -343,26 +343,37 @@ public final class AuditedRecoveryAbandonmentCoordinator: @unchecked Sendable {
     var durableSequences: [Int] = []
     let intentID = audit.nextEventID()
     do {
-      let intent = try JournalEvent.abandonIntent(
-        eventID: intentID,
-        sequence: request.nextSequence,
+      let durableRequest = RecoveryAbandonmentRequest(
         sessionID: request.sessionID,
         jobID: request.jobID,
-        timestamp: audit.timestamp(),
+        nextSequence: request.nextSequence,
         userConfirmationID: request.userConfirmationID,
-        lastConfirmedStep: request.lastConfirmedStepID,
+        lastConfirmedStepID: request.lastConfirmedStepID,
         outcomeCertainty: request.outcomeCertainty,
         managedProcessState: request.managedProcessState,
-        deviceHazards: request.deviceHazards
+        deviceHazards: Array(
+          Set(request.deviceHazards).union(try journal.requiredAbandonmentHazards())
+        ).sorted())
+      let intent = try JournalEvent.abandonIntent(
+        eventID: intentID,
+        sequence: durableRequest.nextSequence,
+        sessionID: durableRequest.sessionID,
+        jobID: durableRequest.jobID,
+        timestamp: audit.timestamp(),
+        userConfirmationID: durableRequest.userConfirmationID,
+        lastConfirmedStep: durableRequest.lastConfirmedStepID,
+        outcomeCertainty: durableRequest.outcomeCertainty,
+        managedProcessState: durableRequest.managedProcessState,
+        deviceHazards: durableRequest.deviceHazards
       )
       try journal.appendAndSynchronize(intent)
       durableSequences.append(intent.sequence)
 
       let requested = try JournalEvent.stateTransition(
         eventID: audit.nextEventID(),
-        sequence: request.nextSequence + 1,
-        sessionID: request.sessionID,
-        jobID: request.jobID,
+        sequence: durableRequest.nextSequence + 1,
+        sessionID: durableRequest.sessionID,
+        jobID: durableRequest.jobID,
         timestamp: audit.timestamp(),
         from: .waitingForRecovery,
         to: .userAbandonRequested,
@@ -372,7 +383,7 @@ public final class AuditedRecoveryAbandonmentCoordinator: @unchecked Sendable {
       try journal.appendAndSynchronize(requested)
       durableSequences.append(requested.sequence)
       return finishRequestedAbandonment(
-        request, intentID: intentID, sequence: request.nextSequence + 2,
+        durableRequest, intentID: intentID, sequence: durableRequest.nextSequence + 2,
         durableSequences: durableSequences)
     } catch {
       return RecoveryAbandonmentResult(
