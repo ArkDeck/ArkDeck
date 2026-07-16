@@ -37,10 +37,64 @@
 ## TASK-M1-002 — 生产级 ProcessExecutor(语义结果分类、有界流)
 
 - Status:ready
-- Requirements/AC:AC-JOB-005-01、AC-NFR-002-01 等
-- Depends on:TASK-M1-001
-- Allowed paths:`.../ArkDeckProcess/**`、对应 Tests 与 Fixtures、本 change `evidence/**`
-- Deliverables:argv 启动、byte-safe 流、timeout/cancel;exit-0 ≠ 成功的语义层;大输出 fixture 与有界内存断言。
+- Readiness amendment:本任务包的精确范围与 verification gate 仅在维护者 review/merge
+  后生效；readiness PR 不执行 TASK-M1-002、不产生实现 evidence，也不改变任何 Core、
+  contract、platform conformance 或 release claim。
+- Objective:将 M0A ProcessExecutor prototype 收敛为 `PORT-PROCESS-001` 的生产级
+  macOS 实现，并以二值 contract/platform evidence 证明 shell-free argv、byte-safe
+  bounded streaming、受控 timeout/cancel 与独立语义结果分类。
+- Requirements/AC:`REQ-JOB-005`、`REQ-NFR-002`、`PORT-PROCESS-001`；
+  `AC-JOB-005-01`、`AC-NFR-002-01`
+- Depends on:`TASK-M1-001`（done；PR #23 merge commit
+  `ffb7e50657e3cc208a4bbc9c5774fcf66acaffd9`）
+- In scope:absolute executable URL + argument array；不经过 host shell；stdout/stderr
+  原始 bytes 独立流式消费；invalid UTF-8 无损保留；有界内存 capture；launch、exit、
+  signal、timeout、cancel 与 process-group descendant 结果；Adapter semantic result
+  独立于 exit code，exit 0 不自动等于成功。
+- Out of scope:HDC discovery/supervisor/parser family、device binding、journal/reconcile、
+  Artifact store、UI、真实设备、网络、任何 device/destructive dispatch，以及修改 Core
+  Requirement/AC/contract/baseline。
+- Allowed paths:
+  - `Packages/ArkDeckKit/Sources/ArkDeckProcess/**`
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/ArkDeckContractTests.swift`（仅迁移或
+    收敛既有 ProcessExecutor cases）
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/ProcessExecutorContractTests.swift`
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ProcessExecutor/**`
+  - `openspec/changes/chg-2026-002-macos-m1-infrastructure/evidence/runs/TASK-M1-002/**`
+- Forbidden paths:`openspec/specs/**`、`openspec/contracts/**`、`openspec/baselines/**`、
+  `Packages/ArkDeckKit/Sources/ArkDeckCore/**`、`.../ArkDeckRuntime/**`、
+  `.../ArkDeckStorage/**`、`.../ArkDeckOpenHarmony/**`、`.../ArkDeckWorkflows/**`、
+  `Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/**` 与
+  `.../Fixtures/HDCServer/**`。
+- Risk:medium（真实 host child process、timeout/cancel 与 resource-pressure contract；
+  无 HDC、网络、设备或 destructive side effect）
+- Hardware required:no
+- Required environment:macOS + 仓库声明的 Swift/Xcode toolchain 与仓库内/系统只读
+  process fixtures；不下载依赖，不要求外部服务。
+- Deliverables:生产级 ProcessExecutor；argv/no-shell 与 process group 门禁；byte-safe
+  stdout/stderr 流及每流 64 KiB 默认 retained-capture 上限；semantic evaluator；
+  1 GiB logical sparse/generated fixture 与 peak-memory/process-tree fault tests。
+- Verification:
+  - `TEST-AC-JOB-005-01` / `processContract`（minimum evidence:`contract`）:包含
+    空格、中文与 shell metacharacter 的
+    路径/参数逐元素原样到达 argv probe；shell spawn 与 expansion sentinel count 均为
+    0；stdout/stderr 分离；invalid UTF-8 bytes round-trip；exit-0 semantic-failure fixture
+    结论仍为 failure；timeout/cancel 终止受控 process group 且无 surviving descendant。
+  - `TEST-AC-NFR-002-01` / `boundedMemoryContract`（minimum evidence:`platform`）:
+    至少 1 GiB logical sparse/generated fixture 经 streaming consumer 完整计数；
+    每流 retained capture 不超过配置的
+    64 KiB，执行进程 peak RSS delta 不超过 64 MiB，fixture logical size 增长不形成线性
+    内存聚合；记录 logical/allocated size、byte count 与 peak RSS。
+  - `PORT-PROCESS-001` contract（minimum evidence:`platform`）:绝对 executable、
+    argument array、独立 byte streams、timeout/cancel、no-shell 五项全部通过；相对
+    executable、NUL argv/env 与非法 timeout 在 spawn 前拒绝，child launch count 为 0。
+  - Commands:`swift format lint <TASK-M1-002 changed Swift files>`；
+    `swift test --package-path Packages/ArkDeckKit --filter ProcessExecutorContractTests`；
+    `swift test --package-path Packages/ArkDeckKit`；`scripts/check-sdd.sh`。
+- Evidence gate:在
+  `evidence/runs/TASK-M1-002/run.md` 记录 base revision、环境、锁定输入 hash、命令与
+  结果、fixture logical/allocated size、byte/dispatch/process-tree counters、peak RSS、
+  两个 AC 和 Port 的二值结论、偏差与遗留风险；缺任一项不得标记 `done`。
 
 ## TASK-M1-003 — write-ahead journal、snapshot、崩溃 reconcile 与审计放弃
 
