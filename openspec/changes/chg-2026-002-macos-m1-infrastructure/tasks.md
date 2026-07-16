@@ -1,10 +1,14 @@
 # Tasks — CHG-2026-002 macOS M1 shared infrastructure
 
-> V2 治理:本文件是任务的唯一事实源;状态经 PR review 合入生效。change r1 已于 2026-07-15 经 PR #14 合入 approved。r2 的 CORE-2.0.0 重定向与以下状态修正仅在本修订 PR 经维护者 review 合入后生效；本 PR 不执行任务。
+> V2 治理:本文件是任务的唯一事实源;状态经 PR review 合入生效。change r1 已于
+> 2026-07-15 经 PR #14 合入 approved；r2 的 CORE-2.0.0 重定向已于 2026-07-16 经
+> PR #22 合入生效。以下 TASK-M1-001 closure 状态仅在维护者 review/merge 后生效。
 
 ## TASK-M1-001 — ArkDeckCore 域模型、封闭 typed-step registry 与 Job 状态机
 
-- Status:ready
+- Status:done
+- Completion evidence:`evidence/runs/TASK-M1-001/core-2.0.0-closure.md`（contract；
+  CORE-2.0.0 closure，状态变更仅在维护者 review/merge 后生效，不构成 change verified）
 - Readiness gate:`CHG-2026-004` 已分别经 PR #19 实现、PR #20 验证，并经
   PR #21 archive 到 ratified `CORE-2.0.0`；current spec、journal contract、Swift
   state machine 与 `CORE-CONFORMANCE-2.0.0` 对两个 resume-marker 出口已一致。
@@ -13,9 +17,8 @@
 - Depends on:none
 - Allowed paths:`Packages/ArkDeckKit/Sources/ArkDeckCore/**`、对应 Tests、本 change `evidence/**`
 - Deliverables:未知 kind 按 destructive/unsupported 拒绝的封闭 WorkflowStep decode;精确 Core 迁移图的 Job/终态状态机与 property tests;保持原始失败分类的补偿顺序。
-- Completion gate:在本 change 的 `evidence/runs/TASK-M1-001/` 追加
-  CORE-2.0.0 closure run，二值覆盖 `AC-JOB-001-07` 与全量回归；未追加前不得
-  标记 `done`。
+- Completion gate:satisfied；已在本 change 的 `evidence/runs/TASK-M1-001/` 追加
+  CORE-2.0.0 closure run，二值覆盖 `AC-JOB-001-07` 与全量回归。
 
 ## TASK-M1-001R — 非冲突安全复审修复
 
