@@ -13,6 +13,7 @@ let package = Package(
     .library(name: "ArkDeckWorkflows", targets: ["ArkDeckWorkflows"]),
     .library(name: "ArkDeckStorage", targets: ["ArkDeckStorage"]),
     .executable(name: "ArkDeckJournalCrashFixture", targets: ["ArkDeckJournalCrashFixture"]),
+    .executable(name: "ArkDeckRuntimePortFixture", targets: ["ArkDeckRuntimePortFixture"]),
   ],
   targets: [
     .target(name: "ArkDeckCore"),
@@ -25,6 +26,11 @@ let package = Package(
       name: "ArkDeckJournalCrashFixture",
       dependencies: ["ArkDeckCore", "ArkDeckStorage"],
       path: "Tests/ArkDeckJournalCrashFixture"
+    ),
+    .executableTarget(
+      name: "ArkDeckRuntimePortFixture",
+      dependencies: ["ArkDeckRuntime"],
+      path: "Tests/ArkDeckRuntimePortFixture"
     ),
     .testTarget(name: "ArkDeckCoreTests", dependencies: ["ArkDeckCore"]),
     .testTarget(
