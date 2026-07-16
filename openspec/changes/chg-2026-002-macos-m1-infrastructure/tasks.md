@@ -36,7 +36,10 @@
 
 ## TASK-M1-002 — 生产级 ProcessExecutor(语义结果分类、有界流)
 
-- Status:ready
+- Status:done
+- Completion evidence:`evidence/runs/TASK-M1-002/run.md`（contract + platform；状态变更
+  仅在维护者 review/merge 后生效，不构成 change verified、platform conformance 或
+  release claim）
 - Readiness amendment:本任务包的精确范围与 verification gate 仅在维护者 review/merge
   后生效；readiness PR 不执行 TASK-M1-002、不产生实现 evidence，也不改变任何 Core、
   contract、platform conformance 或 release claim。
