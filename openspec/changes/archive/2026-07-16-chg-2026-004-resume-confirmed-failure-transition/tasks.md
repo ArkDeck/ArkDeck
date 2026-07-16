@@ -2,7 +2,7 @@
 
 > CHG-2026-004 was approved by maintainer review and merge of PR #16 at
 > `d09c722ad54bfc73070de0b9dfe3758a34e48ec4`. `done` records completed scoped
-> implementation evidence；it does not mean the change is verified or archived.
+> implementation evidence；verification and archive are separate maintainer-reviewed gates.
 
 ## TASK-C4-001 — Align the Core graph, journal contract, and state machine
 
@@ -21,6 +21,7 @@
   - journal contract/semantic-validator tests under the corresponding ArkDeckKit test target
   - `openspec/verification/**`（global registry/conformance update only in the approved archive flow）
   - `openspec/baselines/**`（candidate `CORE-2.0.0` ratification/archive flow only）
+  - `openspec/config.yaml`（archive PR 仅将 `current_core_baseline` 选择器切换为 ratified `CORE-2.0.0`）
   - `openspec/specs/workflow-journal-recovery/spec.md`（archive PR only）
 - Forbidden paths:
   - `openspec/constitution.md`

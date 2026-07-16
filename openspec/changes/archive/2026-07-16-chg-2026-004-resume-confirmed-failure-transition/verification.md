@@ -1,7 +1,7 @@
 # Verification Plan
 
 > Change：CHG-2026-004-resume-confirmed-failure-transition
-> Change status：candidate `verified`；本 verification closure PR 合入后生效
+> Change status：`verified`；由维护者已批准并合入的 verification closure PR 生效
 > Verification status：passed；maintainer `lvye` 已通过 PR #19 approving review 与 merge 确认，archive flow 仍待执行
 
 ## Environment
