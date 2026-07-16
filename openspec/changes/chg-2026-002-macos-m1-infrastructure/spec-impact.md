@@ -1,7 +1,7 @@
 # Spec Impact
 
-> Change：CHG-2026-002-macos-m1-infrastructure@r1  
-> Core baseline：CORE-1.0.0（ratification 状态见 `openspec/baselines/CORE-1.0.0.yaml`）
+> Change：CHG-2026-002-macos-m1-infrastructure@r2
+> Core baseline：CORE-2.0.0（ratification 状态见 `openspec/baselines/CORE-2.0.0.yaml`）
 > Exact affected scope：`scope.yaml`
 
 This shared-infrastructure implementation change does not add, modify, remove, or rename any Core/capability Requirement, Acceptance Scenario, or contract. It implements a host-verifiable subset of the existing baseline.

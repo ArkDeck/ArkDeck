@@ -1,16 +1,16 @@
 # M1 Verification Plan
 
 > Status：planned  
-> Change：CHG-2026-002-macos-m1-infrastructure@r1  
-> Core baseline：CORE-1.0.0
-> Core conformance：CORE-CONFORMANCE-1.0.0  
+> Change：CHG-2026-002-macos-m1-infrastructure@r2
+> Core baseline：CORE-2.0.0
+> Core conformance：CORE-CONFORMANCE-2.0.0
 > Integration：OPENHARMONY-TOOLS@0.1.0
 
 实际结果由 evidence/ 下的 run 记录承载;整体结论经维护者在 PR 中确认(V2 治理)。
 
 ## Core acceptance coverage
 
-本 change 的 61 个 Core AC 全部使用 `openspec/verification/acceptance-cases.yaml` 的 canonical method/Test ID/minimum evidence；expected result 是各 AC 规范 Scenario block 的全部 GIVEN/WHEN/THEN/AND 子句，不得转述或弱化。逐 AC 分配见 `tasks.md` 各任务的 Verification 段(V2:原 immutable task packets 已废止);全部任务分配的并集与 `scope.yaml` 精确相等。
+本 change 的 62 个 Core AC 全部使用 `openspec/verification/acceptance-cases.yaml` 的 canonical method/Test ID/minimum evidence；expected result 是各 AC 规范 Scenario block 的全部 GIVEN/WHEN/THEN/AND 子句，不得转述或弱化。逐 AC 分配见 `tasks.md` 各任务的 Verification 段(V2:原 immutable task packets 已废止);全部任务分配的并集与 `scope.yaml` 精确相等。`AC-JOB-001-07` 由 `TASK-M1-001` 的 CORE-2.0.0 closure run 覆盖，不借用另一 change 的 evidence 直接宣称本 platform task 完成。
 
 ## Platform acceptance matrix
 
@@ -25,4 +25,4 @@
 
 ## Gate
 
-本 change 不产生任何真实硬件或发布声明。它成为 `verified` 的前提是：全部 61 个 Core AC 与 6 个 platform AC 有可复查证据、fake/simulated 证据未被记为真机、且没有任何 Core/AC/contract 变更混入实现。发布范围（capability 组合）由后续 release subject 的 `includedCapabilities` 按 `capability-registry.yaml` 另行声明与验证。
+本 change 不产生任何真实硬件或发布声明。它成为 `verified` 的前提是：全部 62 个 Core AC 与 6 个 platform AC 有可复查证据、fake/simulated 证据未被记为真机、且没有任何 Core/AC/contract 变更混入实现。发布范围（capability 组合）由后续 release subject 的 `includedCapabilities` 按 `capability-registry.yaml` 另行声明与验证。macOS 在本 r2 重定向后仍保持 `conformance_status: notStarted`，不是 `needsReverification`。

@@ -1,10 +1,10 @@
 ---
 id: CHG-2026-002-macos-m1-infrastructure
-status: approved # 2026-07-15 经本 PR 合并由维护者批准(V2:合并即批准);前置见 review.md
+status: approved # r1 已由 PR #14 批准;r2 CORE-2.0.0 重定向在本修订 PR 合入后生效
 class: platform
 core_change_level: none
 owner: lvye
-core_baseline: CORE-1.0.0
+core_baseline: CORE-2.0.0
 platforms: [macos]
 ---
 
@@ -18,7 +18,7 @@ M0A 只交付可行性原型与分发决策。所有分阶段功能（UI Dump、
 
 ### In scope
 
-- 按 CORE-1.0.0 实现五个 foundation capability 的 host 侧可验行为：workflow-journal-recovery、session-artifact-storage、toolchain-hdc-server（fake-hdc 矩阵）、device-targeting-auth（binding/lanes）与 desktop-ux-observability 的 diagnostics 子集；
+- 按 CORE-2.0.0 实现五个 foundation capability 的 host 侧可验行为：workflow-journal-recovery、session-artifact-storage、toolchain-hdc-server（fake-hdc 矩阵）、device-targeting-auth（binding/lanes）与 desktop-ux-observability 的 diagnostics 子集；
 - 实现全部 M1 runtime/storage/logging/clock platform ports 并通过 Port contract tests；
 - 实现 `SimulatedFlashProvider` 隔离 harness（REQ-FLASH-006）；
 - 交付 crash-window、ENOSPC、fake-hdc、单实例与 clock 语义的 fault-injection/contract 证据。
@@ -48,5 +48,12 @@ M0A 只交付可行性原型与分发决策。所有分阶段功能（UI Dump、
 
 ## Approval
 
-- Human decision：pending
-- Approved revision：—
+- Initial approval：维护者 `lvye` review 并合入 PR #14，merge commit
+  `df9e088`，r1 的 `status: approved` 由此生效。
+- r2 retarget：PR #21 已将 CHG-2026-004 archive 并 ratify
+  `CORE-2.0.0`（merge commit `7e3998c`）。本修订将实现目标改钉
+  `CORE-2.0.0`，把 `AC-JOB-001-07` 加入精确 scope，并解除
+  `TASK-M1-001` 的旧 authority-conflict blocker。
+- Effective gate：r2 scope 与 task state 只在维护者 review 并合入本修订
+  PR 后生效；本 PR 不执行 `TASK-M1-001`、不产生新实现证据，也不改变
+  macOS `conformance_status: notStarted`。

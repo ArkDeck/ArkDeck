@@ -1,8 +1,8 @@
 # macOS M1 Shared Infrastructure Design
 
 > Status：draft  
-> Proposal：CHG-2026-002-macos-m1-infrastructure@r1  
-> Core baseline：CORE-1.0.0
+> Proposal：CHG-2026-002-macos-m1-infrastructure@r2
+> Core baseline：CORE-2.0.0
 
 ## Components
 
