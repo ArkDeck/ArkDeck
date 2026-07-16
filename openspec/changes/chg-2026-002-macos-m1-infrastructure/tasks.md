@@ -209,9 +209,132 @@
 ## TASK-M1-004 — macOS runtime ports:单实例、激活、电源、双时钟、睡眠观察
 
 - Status:ready
-- Requirements/AC:AC-JOB-008-01、AC-NFR-001-01 等
-- Depends on:TASK-M1-001
-- Allowed paths:`.../ArkDeckRuntime/**`、对应 Tests、本 change `evidence/**`
+- Readiness amendment:本任务包的精确范围与 verification gate 仅在维护者 review/merge
+  后生效；本 readiness PR 不执行 TASK-M1-004、不产生实现 evidence，也不改变任何 Core、
+  contract、platform conformance、release claim 或其他 Task 状态。
+- Objective:将 M0A 的单实例与电源租约 prototype 收敛为生产级 macOS runtime ports，并
+  补齐 activation、双单调时钟、restart-safe 时间快照与 sleep/wake orchestration；以二值
+  platform evidence 证明第二实例零 HDC/Session/Job 副作用、idle-sleep lease 全路径释放、
+  wall-clock 跳变不污染进程内时间判断、系统休眠期间 elapsed/active 语义分离，以及 wake
+  后的 journal/reconcile/速率分段触发。
+- Requirements/AC:`REQ-JOB-008`、`REQ-NFR-001`；`PORT-INSTANCE-001`、
+  `PORT-ACTIVATION-001`、`PORT-POWER-001`、`PORT-CLOCK-ELAPSED-001`、
+  `PORT-CLOCK-ACTIVE-001`、`PORT-SLEEP-WAKE-001`；`AC-JOB-008-01`、
+  `AC-NFR-001-01`、`AC-NFR-001-02`、`AC-NFR-001-03`、`AC-NFR-001-04`；
+  `MAC-M1-PORTS-001`。
+- Depends on:
+  - `TASK-M1-001`（done；PR #23 merge commit
+    `ffb7e50657e3cc208a4bbc9c5774fcf66acaffd9`）
+  - `TASK-M1-003`（done；PR #27 merge commit
+    `c5c82b757d9baa91164fe5feae65d5806089f8df`；提供锁定 journal/reconcile 边界，本任务
+    不修改其 durability 或 recovery 语义）
+- In scope:
+  - 固定 per-user/product Application Support lock path；以 kernel-backed、non-blocking lock
+    在任何 HDC、Session 或 Job writer 初始化前完成 single-writer admission；正常竞争只把
+    losing process 导向 bounded activation request 后退出，lock path、filesystem 或 locking
+    reliability 不可确认时 fail closed 到 read-only diagnostics，三类非 writer 路径的
+    HDC/Session/Job side-effect count 均为 0；
+  - profile-compatible 的 macOS activation request/listener；激活只请求持锁主实例展示/聚焦，
+    不以 process list、notification delivery 或 endpoint presence 替代 single-writer lock，
+    request 失败也不得取得 writer 权限；
+  - `PowerActivityController` 的单一 production backend、引用计数 lease 与幂等 release；仅在
+    critical scope 阻止 idle system sleep，success/failure/cancel/throw/deinit 全路径释放最后
+    一个 lease，明确不宣称阻止合盖或用户主动 sleep；
+  - 可注入的 wall/audit clock、elapsed/continuous monotonic clock 与
+    active-work/suspending monotonic clock；deadline/timeout 只使用 elapsed clock，active
+    duration、throughput 与 ETA sample 只使用 active clock，`Date`/UTC 只用于审计与
+    restart-safe 判断；
+  - restart-safe timing snapshot 只携带 accumulated elapsed/active duration、配置的
+    deadline/timeout 与对应 UTC wall timestamp，不序列化或跨进程比较 monotonic instant/
+    tick origin；新进程遇到 wall-clock 回退、缺失字段或无法证明剩余 deadline 时统一
+    fail safe 为 expired；
+  - `SleepWakeObserver` 的 start/stop 生命周期、typed sleep/wake event、重复/乱序通知去抖，
+    以及注入式 lifecycle sink；每个有效 wake 记录锁定 `journal-event-1.0.0` 所需 elapsed/
+    active duration 与 `throughputSegmentReset=true`，并各触发一次 ETA/throughput segment
+    reset、reconnect evaluation 和 reconcile request；本任务只交付触发 contract，不直接
+    访问 HDC 或改变 recovery 决策；
+  - deterministic fake clocks/notification source、真实双进程 fixture 与 bounded manual
+    macOS sleep/wake observation harness；测试不得修改系统 wall clock，Agent 不得自动执行
+    host sleep，实际 sleep/wake observation 由人类维护者执行并记录。
+- Out of scope:journal codec/durability、reconcile 状态机或 recovery decision 的修改
+  （TASK-M1-003）；HDC reconnect 实现、device binding 与 mutation lane（TASK-M1-006/007）；
+  diagnostics logging/export（TASK-M1-009）；App UI/composition、真实设备、网络、任何 device
+  或 destructive dispatch；自动执行 host sleep、修改 host wall clock；以及修改 Core
+  Requirement/AC、locked contract、baseline、platform/integration profile 或 conformance/
+  release 状态。
+- Allowed paths:
+  - `Packages/ArkDeckKit/Sources/ArkDeckRuntime/**`
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/RuntimeAndStorageContractTests.swift`
+    （仅迁移/收敛既有 runtime prototype cases）
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/RuntimePortContractTests.swift`
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/Runtime/**`
+  - `Packages/ArkDeckKit/Tests/ArkDeckRuntimePortFixture/**`
+  - `Packages/ArkDeckKit/Package.swift`（仅注册/连接 dedicated runtime port fixture）
+  - `openspec/changes/chg-2026-002-macos-m1-infrastructure/evidence/runs/TASK-M1-004/**`
+  - `openspec/changes/chg-2026-002-macos-m1-infrastructure/tasks.md`（仅更新本任务状态与
+    completion evidence）
+- Forbidden paths:`openspec/specs/**`、`openspec/contracts/**`、`openspec/baselines/**`、
+  `openspec/platforms/**`、`openspec/integrations/**`、`ArkDeckApp/**`、
+  `Packages/ArkDeckKit/Sources/ArkDeckCore/**`、`.../ArkDeckProcess/**`、
+  `.../ArkDeckStorage/**`、`.../ArkDeckOpenHarmony/**`、`.../ArkDeckWorkflows/**`、
+  上述清单以外的 Tests/Fixtures、其他 task/change evidence 与其他 Task 状态。
+- Risk:medium（per-user/product writer admission、local activation、power assertion 与 sleep-aware
+  time/restart semantics；验证仅使用本地 lock/IPC、fake clocks/notifications、测试子进程及
+  维护者执行的 host sleep observation，不触达 HDC、网络、设备或 destructive operation）
+- Hardware required:no
+- Required environment:macOS 14+、仓库声明的 Swift/Xcode toolchain、Application Support
+  目录、kernel file lock、AppKit/NSWorkspace 与 `ContinuousClock`/`SuspendingClock` 或经
+  contract 证明等价的系统 API；不下载依赖、不要求外部服务。production 双时钟与
+  NSWorkspace notification 的平台结论另需维护者完成一次 bounded manual sleep/wake
+  observation；若该观察环境不可得，任务不得标记 `done`。
+- Deliverables:生产级 single-instance admission + activation service；引用计数 power
+  controller；可注入的 audit/elapsed/active clocks、deadline evaluator、restart-safe timing
+  snapshot 与 throughput segment tracker；sleep/wake observer + lifecycle sink；dedicated
+  双进程 fixture、fake-clock/notification contract suite 与人工平台观察 harness/runbook。
+  不得在本 Task 引入新的持久 schema 或绕开 profile 的 runtime 技术选择；若实现发现必须
+  改变产品行为、安全语义或 locked contract，须停止并先修订 Task/平台设计或走独立 change。
+- Verification:
+  - `TEST-AC-JOB-008-01` / `platformInstanceContract`（minimum evidence:`platform`）:
+    dedicated 两进程 fixture 证明恰有一个 writer；losing process 只发一次 activation request
+    后退出，Job/HDC/Session open/write count 全为 0；activation delivery 失败不接管 lock；
+    lock path symlink/permission/unreliable vectors 进入 read-only diagnostics，副作用计数仍为 0。
+  - `PORT-ACTIVATION-001` contract（minimum evidence:`platform`）:主实例 listener 只处理匹配
+    product/user 的 bounded request，每个 request 至多激活一次；重复 delivery 可去重，且
+    activation success/failure 均不改变 lock ownership 或 writer count。
+  - `PORT-POWER-001` contract（minimum evidence:`platform`）:并发/嵌套 lease 只建立一个
+    underlying idle-sleep activity；success、failure、cancel、throw、显式 end、deinit 与
+    controller teardown 后 begin/end count 精确平衡，重复 release 不 double-end。
+  - `TEST-AC-NFR-001-01` / `clockContract`（minimum evidence:`platform`）:对 wall clock
+    前跳/回退 vectors，elapsed timeout 与 active duration 仅随各自注入 monotonic clock 变化，
+    deadline/duration 结果与未跳变 control 完全相同。
+  - `TEST-AC-NFR-001-02` / `sleepClockContract`（minimum evidence:`platform`）:virtual sleep
+    60 s 且原 overall deadline 剩余 30 s 时 elapsed 增加 60 s、deadline expired、active 增量
+    为 0；维护者 observation 另证明 production clock pair 在一次真实 macOS sleep/wake 窗口
+    中保持同一语义，Agent 不执行 sleep command。
+  - `TEST-AC-NFR-001-03` / `sleepClockContract`（minimum evidence:`platform`）:有效 wake
+    恰好创建一个新 throughput/ETA segment，首个新 sample 不读取 sleep duration 或旧 segment
+    瞬时速率；重复/乱序 wake 的 journal、reset、reconnect-evaluation、reconcile count 不增加。
+  - `TEST-AC-NFR-001-04` / `restartClockFaultInjection`（minimum evidence:`platform`）:
+    新进程只读取 accumulated durations、configured deadline/timeout 与 UTC timestamp；snapshot
+    不含 monotonic instant/tick origin；wall-clock 回退、缺失/损坏 timing evidence 与无法证明
+    deadline 未到期 vectors 全部得到 expired，旧 tick read/compare count 为 0。
+  - `TEST-MAC-M1-PORTS-001` / macOS runtime Port matrix（minimum evidence:`platform`）:
+    汇总 instance、activation、power、clock、sleep/wake 全部上述 vectors；每个有效 sleep/wake
+    的 journal event shape 可由锁定 contract 校验，wake 的 segment reset 与 reconcile trigger
+    各一次；人工 observation 记录 production clock deltas 和 NSWorkspace event sequence。
+  - Commands:`swift format lint <TASK-M1-004 changed Swift files>`；
+    `swift test --package-path Packages/ArkDeckKit --filter RuntimePortContractTests`；
+    `swift test --package-path Packages/ArkDeckKit`；`scripts/check-sdd.sh`；
+    `git diff --check`；静态检查确认 deadline/duration 不以 `Date`/wall clock 计算、Runtime
+    production source 不直接访问 HDC/Session 且 fixture 不使用 host shell 字符串拼接。
+- Evidence gate:在 `evidence/runs/TASK-M1-004/run.md` 记录 base revision、OS/architecture/
+  Swift toolchain、锁定 baseline/conformance/spec/journal/ports/platform/change 输入 hash、全部
+  命令与结果；逐 vector 记录 writer/activation/Job/HDC/Session、power begin/end、wall/
+  elapsed/active/deadline、old-tick read、sleep/wake/journal/reset/reconnect/reconcile counters；
+  restart snapshot 字段与 fail-safe 结论；人工 observation 的操作者、时间、macOS build、
+  production clock deltas、NSWorkspace sequence 与 pass/fail；六个 Test ID 与六个 Port 的二值结论、
+  evidence class、偏差与遗留风险。缺任一项不得标记 `done`；本 evidence 不是 hardware、
+  platform conformance 或 release claim。
 
 ## TASK-M1-005 — Session/Artifact store、manifest 管线与 host-volume 协调
 
