@@ -102,10 +102,106 @@
 ## TASK-M1-003 — write-ahead journal、snapshot、崩溃 reconcile 与审计放弃
 
 - Status:ready
-- Requirements/AC:AC-JOB-002-01、AC-JOB-006-01 等
-- Depends on:TASK-M1-001
-- Allowed paths:`.../ArkDeckStorage/**`、`.../ArkDeckWorkflows/**`、对应 Tests、本 change `evidence/**`
-- Deliverables:append-only intent/outcome journal、原子 snapshot 替换、torn-tail 检测;intent-without-outcome → outcomeUnknown 且永不重放 destructive;审计化放弃与设备 hazard 保留。
+- Readiness amendment:本任务包的精确范围与 verification gate 仅在维护者 review/merge
+  后生效；本 readiness PR 不执行 TASK-M1-003、不产生实现 evidence，也不改变任何
+  Core、contract、platform conformance、release claim 或其他 Task 状态。
+- Objective:将 M0A durable-journal prototype 收敛为 CORE-2.0.0 的生产级 journal、
+  checkpoint、reconcile 与 recovery-abandonment 基础设施，并以 contract + macOS
+  crash-window evidence 证明外部副作用前的 durable intent、outcome 后的 snapshot
+  发布、未知结果零重放，以及未完成审计时资源与 hazard 不被释放。
+- Requirements/AC:`REQ-JOB-002`、`REQ-JOB-006`、`REQ-JOB-007`；
+  `AC-JOB-002-01`、`AC-JOB-006-01`、`AC-JOB-007-01`、`AC-JOB-007-02`；
+  `MAC-M1-JOURNAL-001`；继承 `POL-WORKFLOW-001`、`POL-RECOVERY-001` 与
+  `POL-SAFETY-001`，不重复认领 TASK-M1-001 已覆盖的 Job 状态机 AC。
+- Depends on:`TASK-M1-001`（done；PR #23 merge commit
+  `ffb7e50657e3cc208a4bbc9c5774fcf66acaffd9`）
+- In scope:
+  - 锁定 `journal-event-1.0.0` 的封闭 event vocabulary、严格 encode/decode 与 append-only
+    JSONL；event/sequence/correlation、typed step/compensation、binding revision、arguments
+    hash、reconcile 与 abandon payload 必须保持 contract 形状，未知 kind、未知字段、
+    duplicate member、非法 transition payload 与 malformed completed record fail closed；
+  - journal write/file sync/directory-entry durability、outcome-before-checkpoint、同目录临时文件
+    + atomic replace + sync 的 checkpoint 发布，以及 torn tail/旧 checkpoint/完整 journal
+    的恢复优先级；任一关键持久化失败阻止 dispatch 或 snapshot advancement；
+  - 以可注入 Session catalog、Provider recovery evidence、binding evidence、managed-process
+    stopper、device-lane/storage-claim releaser 与 fault point 实现启动扫描和 reconcile；仅在
+    restartSafe、安全边界、确定 outcome 与已确认 binding 全部成立时选择已批准的安全
+    恢复路径，intent-without-outcome 一律 `outcomeUnknown → waitingForRecovery`，destructive
+    dispatch/replay/guess-compensation count 恒为 0；
+  - `waitingForRecovery → userAbandonRequested` 的审计顺序：durable abandon intent → 按
+    policy 停止 managed host process/等待 critical safe boundary → durable abandon outcome
+    → 才允许 terminal transition 与 lane/claim release；未成功持久化 terminal outcome 时
+    保持 waitingForRecovery 且 release count 为 0；
+  - interrupted recovery record 中的 unresolved device hazard 保留；冲突 Job 默认 preflight
+    failure，只有 Provider 明确允许、用户显式 risk override 与 durable audit 三者同时存在
+    才可解除 gate。本 Task 只交付 gate/decision contract，不派发后续设备 Step。
+- Out of scope:完整 Session/Artifact/manifest store 与 host-volume admission（TASK-M1-005）；
+  HDC/device binding 实现（TASK-M1-006/007）；runtime clocks/sleep-wake（TASK-M1-004）；
+  UI、真实设备、网络、任何真实 device/destructive dispatch；以及修改 Core Requirement、
+  AC、`journal-event.schema.json`、`manifest.schema.json`、workflow-step contract 或 baseline。
+- Allowed paths:
+  - `Packages/ArkDeckKit/Sources/ArkDeckStorage/**`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/**`
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/RuntimeAndStorageContractTests.swift`（仅迁移
+    或收敛既有 journal/checkpoint prototype cases）
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/JournalRecoveryContractTests.swift`
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/JournalRecovery/**`
+  - `Packages/ArkDeckKit/Tests/ArkDeckJournalCrashFixture/**`
+  - `Packages/ArkDeckKit/Package.swift`（仅注册/连接 dedicated journal crash fixture）
+  - `openspec/changes/chg-2026-002-macos-m1-infrastructure/evidence/runs/TASK-M1-003/**`
+- Forbidden paths:`openspec/specs/**`、`openspec/contracts/**`、`openspec/baselines/**`、
+  `Packages/ArkDeckKit/Sources/ArkDeckCore/**`、
+  `Packages/ArkDeckKit/Sources/ArkDeckProcess/**`、
+  `Packages/ArkDeckKit/Sources/ArkDeckRuntime/**`、
+  `Packages/ArkDeckKit/Sources/ArkDeckOpenHarmony/**`、
+  `Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/**`、
+  `Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDCServer/**`、
+  `Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ProcessExecutor/**`，以及其他
+  change 的 evidence。
+- Risk:high（Safety-critical durable ordering、crash recovery、unknown destructive outcome、
+  audited release 与 hazard gate；验证仅使用本地临时目录、fake/injected side effect 与测试
+  子进程，不触达 HDC、网络、设备或真实 destructive operation）
+- Hardware required:no
+- Required environment:macOS + 仓库声明的 Swift/Xcode toolchain；本地文件系统须支持
+  production 实现使用的 sync/atomic-replace primitives；所有 crash fixture 固定仓库来源，
+  以 absolute executable + argument array 启动，不下载依赖、不要求外部服务。
+- Deliverables:生产级 closed journal codec/store；durable intent/outcome gate；原子且可恢复的
+  checkpoint store；未 finalize Session scanner 与 deterministic reconciler；四窗口 crash
+  fixture；audited abandonment coordinator；unresolved-hazard preflight gate；对应 fault
+  injection/property/contract tests。不得在本 Task 引入新的持久技术选择；若实现发现必须
+  新增 ADR、产品行为或安全语义，须停止并先修订 Task 或走独立 change proposal。
+- Verification:
+  - Locked-contract suite:对 `journal-event.schema.json` 的全部 event kind 与相关
+    `manifest.schema.json` recovery/hazard 形状做 encode/decode vector；unknown/duplicate/
+    malformed/torn/sequence-correlation invalid vectors 全部拒绝，raw journal 只追加且恢复
+    不信任较旧或超前 checkpoint。
+  - `TEST-AC-JOB-002-01` / `journalFaultInjection`（minimum evidence:`contract`）:分别在
+    append、write、file sync、directory sync、outcome append 与 checkpoint publication
+    注入失败；intent 未 durable 时 external dispatch count 为 0，outcome 未 durable 时
+    snapshot sequence 不前进，所有 case 进入明确 failure/recovery 结论。
+  - `TEST-AC-JOB-006-01` / `crashWindowFaultInjection`（minimum evidence:`contract`）:
+    destructive intent durable 后、outcome 前的每个 vector 均恢复为
+    `waitingForRecovery/outcomeUnknown`，destructive dispatch/replay/compensation count 为 0；
+    confirmed outcome vector 只能按锁定 Job transition 与 recovery evidence 进入已批准路径。
+  - `TEST-AC-JOB-007-01` / `abandonJournalFaultInjection`（minimum evidence:`contract`）:
+    覆盖 abandon intent 失败、managed-process stop/safe-boundary 未确认、terminal outcome
+    sync 失败与成功；前三类保持 waitingForRecovery 且 lane/claim release count 为 0，只有
+    durable terminal outcome 成功后各释放一次。
+  - `TEST-AC-JOB-007-02` / `hazardGateContract`（minimum evidence:`contract`）:对 Provider
+    allow、user override、durable audit 的真值组合做穷举；任一缺失时冲突 preflight 与
+    device dispatch 分别为 failed/0，三者齐备时只解除 gate 并保留完整 audit linkage。
+  - `TEST-MAC-M1-JOURNAL-001` / macOS crash-window matrix（minimum evidence:`platform`）:
+    dedicated 子进程在 intent 前、durable intent 后、side effect 后 outcome 前、durable
+    outcome 后 finalize 前四处被 kill；重启扫描逐 case 记录 durable event sequence、state、
+    outcome certainty、dispatch/replay/compensation/release counters，证明未知结果保持
+    `outcomeUnknown`、零 destructive replay，且 fixture 自身 device/destructive dispatch 为 0。
+  - Commands:`swift format lint <TASK-M1-003 changed Swift files>`；
+    `swift test --package-path Packages/ArkDeckKit --filter JournalRecoveryContractTests`；
+    `swift test --package-path Packages/ArkDeckKit`；`scripts/check-sdd.sh`；`git diff --check`。
+- Evidence gate:在 `evidence/runs/TASK-M1-003/run.md` 记录 base revision、环境、锁定
+  baseline/conformance/spec/journal/manifest/provider/platform/change 输入 hash、命令与结果、
+  每个 fault/crash window 的 durable sequence 与所有 side-effect/replay/release counters、
+  五个 Test ID 的二值结论、evidence class、偏差与遗留风险；缺任一项不得标记 `done`。
 
 ## TASK-M1-004 — macOS runtime ports:单实例、激活、电源、双时钟、睡眠观察
 
