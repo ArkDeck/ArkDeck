@@ -19,21 +19,12 @@ final class WorkflowStepContractTests: XCTestCase {
       }
       """#.utf8
     )
-    var externalProcessInvocationCount = 0
-
     XCTAssertThrowsError(try WorkflowStepDecoder.decodeProfileStep(data)) { error in
       XCTAssertEqual(
         error as? WorkflowStepValidationError,
         .unsupportedKind(rawKind: "hostCommand", assumedEffect: .destructive)
       )
     }
-    XCTAssertEqual(externalProcessInvocationCount, 0)
-
-    // A dispatcher can only be reached with a successfully decoded WorkflowStep.
-    if (try? WorkflowStepDecoder.decodeProfileStep(data)) != nil {
-      externalProcessInvocationCount += 1
-    }
-    XCTAssertEqual(externalProcessInvocationCount, 0)
   }
 
   func testTEST_AC_WF_001_01_RegisteredStepCannotHideAShellSurfaceInOptions() {
@@ -197,7 +188,6 @@ final class WorkflowStepContractTests: XCTestCase {
   }
 
   func testProfileExposureCoversEveryCompensationDescriptor() throws {
-    var deviceDispatchCount = 0
     let internalCompensationKinds: [WorkflowStepKind] = [
       .stopRemoteCapture, .restoreParameter, .cleanupOwnedRemotePath,
     ]
@@ -209,7 +199,6 @@ final class WorkflowStepContractTests: XCTestCase {
 
       do {
         _ = try WorkflowStepDecoder.decodeProfileStep(data)
-        deviceDispatchCount += 1
         XCTFail("Profile decoded internal compensation kind \(kind.rawValue)")
       } catch {
         XCTAssertEqual(
@@ -228,8 +217,6 @@ final class WorkflowStepContractTests: XCTestCase {
       XCTAssertGreaterThanOrEqual(
         trustedCompensation.bindingRequirement, metadata.minimumBindingRequirement)
     }
-    XCTAssertEqual(deviceDispatchCount, 0)
-
     let exposedCompensation = try makeCompensationDescriptor(kind: .stopApplication)
     let legalProfile = try makeProfileStep(compensationDescriptors: [exposedCompensation])
     XCTAssertNoThrow(
@@ -416,11 +403,9 @@ final class WorkflowStepContractTests: XCTestCase {
       ),
     ]
 
-    var externalDispatchCount = 0
     for fixture in fixtures {
       do {
         _ = try WorkflowStepDecoder.decodeCoreOrProviderStep(fixture.data)
-        externalDispatchCount += 1
         XCTFail("decoded duplicate JSON member fixture: \(fixture.name)")
       } catch {
         XCTAssertEqual(
@@ -430,7 +415,6 @@ final class WorkflowStepContractTests: XCTestCase {
         )
       }
     }
-    XCTAssertEqual(externalDispatchCount, 0)
   }
 
   func testJSONMemberNamesRemainCaseSensitiveBeforeReservedKeyValidation() {

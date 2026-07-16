@@ -7,7 +7,6 @@ final class JobStateMachineTests: XCTestCase {
   // TEST-AC-JOB-001-01 / stateMachineProperty
   func testTEST_AC_JOB_001_01_PlannedIsDistinctFromHardwareSuccess() throws {
     var machine = JobStateMachine(mode: .planOnly)
-    var hardwareSuccessCount = 0
 
     try machine.handle(.startPreflight)
     try machine.handle(.preflightPassed)
@@ -16,12 +15,6 @@ final class JobStateMachineTests: XCTestCase {
 
     XCTAssertEqual(machine.state, .planned)
     XCTAssertNotEqual(machine.state, .succeeded)
-    XCTAssertEqual(hardwareSuccessCount, 0)
-
-    if machine.state == .succeeded {
-      hardwareSuccessCount += 1
-    }
-    XCTAssertEqual(hardwareSuccessCount, 0)
   }
 
   // TEST-AC-JOB-001-02 / stateMachineProperty
@@ -247,7 +240,6 @@ final class JobStateMachineTests: XCTestCase {
 
   // TEST-AC-JOB-001-03 / recoveryFaultInjection
   func testTEST_AC_JOB_001_03_MissingDestructiveOutcomeCanOnlyWaitForRecovery() throws {
-    var flashDispatchCount = 0
     var machine = try JobStateMachine(
       mode: .execute,
       recoveringFrom: .running,
@@ -259,12 +251,10 @@ final class JobStateMachineTests: XCTestCase {
     XCTAssertEqual(machine.state, .waitingForRecovery)
     do {
       _ = try machine.authorizeDispatch(of: makeFlashStep())
-      flashDispatchCount += 1
       XCTFail("outcomeUnknown recovery state authorized destructive dispatch")
     } catch {
       XCTAssertEqual(machine.invariantViolations.last?.kind, .dispatchNotAllowedInState)
     }
-    XCTAssertEqual(flashDispatchCount, 0)
   }
 
   func testRecoveryStatesRejectNormalWorkflowDispatch() throws {
@@ -316,8 +306,6 @@ final class JobStateMachineTests: XCTestCase {
 
   // TEST-AC-JOB-001-05 / recoveryFaultInjection
   func testTEST_AC_JOB_001_05_RecoveryRequiresEveryResumePrecondition() throws {
-    let unknownStepDispatchCount = 0
-
     let incompleteEvidenceVectors = [
       RecoveryResumeEvidence(
         restartSafe: false, safeBoundaryConfirmed: true, outcomeConfirmed: true,
@@ -341,7 +329,6 @@ final class JobStateMachineTests: XCTestCase {
       XCTAssertTrue(rejectedResume.directives.contains(.dispatchNoUnknownStep))
       XCTAssertThrowsError(try rejectedMachine.authorizeDispatch(of: makeFlashStep()))
       XCTAssertEqual(rejectedMachine.invariantViolations.last?.kind, .dispatchNotAllowedInState)
-      XCTAssertEqual(unknownStepDispatchCount, 0)
     }
 
     var machine = try makeWaitingForRecoveryMachine()
@@ -357,7 +344,6 @@ final class JobStateMachineTests: XCTestCase {
     try machine.handle(.resumeConfirmed)
     XCTAssertEqual(machine.state, .running)
 
-    XCTAssertEqual(unknownStepDispatchCount, 0)
   }
 
   // TEST-AC-JOB-001-07 / recoveryDecisionJournalStateMachineContract
@@ -401,7 +387,7 @@ final class JobStateMachineTests: XCTestCase {
     for mode in JobExecutionMode.allCases {
       for vector in vectors {
         var machine = try makeResumeMarkerMachine(mode: mode)
-        let ordinaryStepDispatchCount = try assertResumeMarkerRejectsOrdinaryDispatch(
+        try assertResumeMarkerRejectsOrdinaryDispatch(
           machine: &machine,
           context: "\(mode.rawValue) / \(vector.name)"
         )
@@ -411,7 +397,6 @@ final class JobStateMachineTests: XCTestCase {
             evidence: vector.evidence,
             requestedDestination: vector.expectedDestination
           ))
-        var recordedTransitions = [decision.transition]
         XCTAssertEqual(
           decision.transition,
           .init(from: .resumeAtConfirmedSafeBoundary, to: vector.expectedDestination)
@@ -425,9 +410,8 @@ final class JobStateMachineTests: XCTestCase {
         if vector.expectedDestination == .finalizing {
           XCTAssertEqual(machine.originalFailure, failure)
           let terminal = try machine.handle(.finalizationCompleted)
-          recordedTransitions.append(terminal.transition)
           XCTAssertEqual(
-            recordedTransitions,
+            [decision.transition, terminal.transition],
             [
               .init(from: .resumeAtConfirmedSafeBoundary, to: .finalizing),
               .init(from: .finalizing, to: .failed),
@@ -444,12 +428,6 @@ final class JobStateMachineTests: XCTestCase {
           XCTAssertTrue(decision.directives.contains(.preserveOutcomeUnknown))
         }
 
-        XCTAssertEqual(ordinaryStepDispatchCount, 0)
-        XCTAssertEqual(
-          recordedTransitions.filter { [.running, .planning].contains($0.to) }.count,
-          0,
-          "\(mode.rawValue) / \(vector.name) forged an execution-phase transition"
-        )
       }
     }
   }
@@ -558,7 +536,6 @@ final class JobStateMachineTests: XCTestCase {
   // TEST-AC-JOB-003-01 / criticalCancellationContract
   func testTEST_AC_JOB_003_01_CriticalCancellationNeverForceTerminatesCurrentProcess() throws {
     var machine = try makeRunningMachine()
-    var forcedTerminationCount = 0
     let flash = try makeFlashStep()
     _ = try machine.authorizeDispatch(of: flash)
     XCTAssertEqual(machine.activeStep?.cancellation, .criticalNonInterruptible)
@@ -571,12 +548,6 @@ final class JobStateMachineTests: XCTestCase {
     XCTAssertTrue(requested.directives.contains(.persistCancellationRequest))
     XCTAssertTrue(requested.directives.contains(.waitForProviderSafeBoundary))
     XCTAssertTrue(requested.directives.contains(.mustNotForceTerminateCurrentProcess))
-    XCTAssertEqual(forcedTerminationCount, 0)
-
-    if !requested.directives.contains(.mustNotForceTerminateCurrentProcess) {
-      forcedTerminationCount += 1
-    }
-    XCTAssertEqual(forcedTerminationCount, 0)
 
     try machine.handle(.cancellationAcknowledged)
     XCTAssertEqual(machine.state, .cancellingAtSafeBoundary)
@@ -729,8 +700,7 @@ final class JobStateMachineTests: XCTestCase {
   private func assertResumeMarkerRejectsOrdinaryDispatch(
     machine: inout JobStateMachine,
     context: String
-  ) throws -> Int {
-    var dispatchCount = 0
+  ) throws {
     let ordinarySteps = try [
       makeHostStep(id: "marker-host"),
       makeReadOnlyStep(),
@@ -740,7 +710,6 @@ final class JobStateMachineTests: XCTestCase {
     for step in ordinarySteps {
       do {
         _ = try machine.authorizeDispatch(of: step)
-        dispatchCount += 1
         XCTFail("\(context) authorized \(step.effect.rawValue) step at resume marker")
       } catch {
         XCTAssertEqual(
@@ -771,7 +740,6 @@ final class JobStateMachineTests: XCTestCase {
         context
       )
     }
-    return dispatchCount
   }
 
   private func makeWaitingForRecoveryMachine() throws -> JobStateMachine {
