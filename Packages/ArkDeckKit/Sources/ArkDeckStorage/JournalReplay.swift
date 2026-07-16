@@ -35,6 +35,7 @@ public struct PendingRecoveryAbandonment: Equatable, Sendable {
   public let phase: RecoveryAbandonmentPhase
   public let outcomeEventID: String?
   public let releaseAuthorized: Bool?
+  public let deviceHazards: [String]
 }
 
 public struct JournalReplay: Equatable, Sendable {
@@ -58,6 +59,7 @@ public struct JournalReplay: Equatable, Sendable {
       || lastReconcileOutcomeCertainty == .outcomeUnknown
       || currentState == .waitingForRecovery || currentState == .reconciling
       || currentState == .userAbandonRequested
+      || pendingReconcileTransition != nil
   }
 
   public var destructiveReplayCount: Int { 0 }
@@ -116,6 +118,7 @@ public enum DurableJournalRecovery {
     var abandonIntentIDs: Set<String> = []
     var completedAbandonIntentIDs: Set<String> = []
     var activeAbandonIntentID: String?
+    var activeAbandonHazards: [String]?
     var pendingAbandonOutcomeID: String?
     var pendingAbandonNextState: JobState?
     var resourceReleaseAuthorized = false
@@ -205,6 +208,7 @@ public enum DurableJournalRecovery {
           }
           if nextState == .interrupted { resourceReleaseAuthorized = true }
           activeAbandonIntentID = nil
+          activeAbandonHazards = nil
           pendingAbandonOutcomeID = nil
           pendingAbandonNextState = nil
         } else if transition.from == .userAbandonRequested {
@@ -221,6 +225,17 @@ public enum DurableJournalRecovery {
         } else if activeAbandonIntentID != nil, transition.from == .waitingForRecovery {
           throw DurableFileError.sequenceViolation(
             "durable abandon intent must transition to userAbandonRequested")
+        }
+        let hasOutstandingExternalIntent = intents.values.contains { intent in
+          !completedIntentIDs.contains(intent.eventID) && intent.effect >= .deviceMutation
+        }
+        if hasOutstandingExternalIntent,
+          transition.to == .finalizing || transition.to.isTerminal
+        {
+          guard transition.to == .interrupted, resourceReleaseAuthorized else {
+            throw DurableFileError.sequenceViolation(
+              "unresolved external-effect intent cannot enter finalization or terminal state")
+          }
         }
         state = transition.to
       case .stepIntent:
@@ -294,26 +309,34 @@ public enum DurableJournalRecovery {
         }
       case .abandonIntent:
         guard state == .waitingForRecovery, activeAbandonIntentID == nil,
-          abandonIntentIDs.insert(event.eventID).inserted
+          abandonIntentIDs.insert(event.eventID).inserted,
+          let hazards = event.payload.journalStringArray("deviceHazards")
         else {
           throw DurableFileError.sequenceViolation(
             "abandon intent must start from waitingForRecovery")
         }
         activeAbandonIntentID = event.eventID
+        activeAbandonHazards = hazards
       case .abandonOutcome:
         guard let correlation = event.payload.string("correlatesToAbandonIntentEventId"),
           abandonIntentIDs.contains(correlation),
           completedAbandonIntentIDs.insert(correlation).inserted,
           correlation == activeAbandonIntentID,
           state == .userAbandonRequested,
-          let releaseAuthorized = event.payload.bool("releaseAuthorized")
+          let releaseAuthorized = event.payload.bool("releaseAuthorized"),
+          let unresolvedHazards = event.payload.journalStringArray("unresolvedHazards"),
+          let activeAbandonHazards,
+          Set(unresolvedHazards).isSuperset(of: Set(activeAbandonHazards))
         else { throw DurableFileError.sequenceViolation("orphan abandon outcome") }
         pendingAbandonOutcomeID = event.eventID
         pendingAbandonNextState = releaseAuthorized ? .interrupted : .waitingForRecovery
       case .finalized:
         guard pendingReconcileTransition == nil, pendingAbandonOutcomeID == nil,
           let state, state.isTerminal,
-          event.payload.string("terminalStatus") == state.rawValue
+          event.payload.string("terminalStatus") == state.rawValue,
+          !intents.values.contains(where: { intent in
+            !completedIntentIDs.contains(intent.eventID) && intent.effect >= .deviceMutation
+          }) || state == .interrupted && resourceReleaseAuthorized
         else {
           throw DurableFileError.sequenceViolation(
             "finalized record does not match a completed terminal lifecycle")
@@ -335,13 +358,15 @@ public enum DurableJournalRecovery {
           intentEventID: intentEventID,
           phase: .outcomeDurable,
           outcomeEventID: outcomeEventID,
-          releaseAuthorized: pendingAbandonNextState == .interrupted)
+          releaseAuthorized: pendingAbandonNextState == .interrupted,
+          deviceHazards: activeAbandonHazards ?? [])
       } else {
         pendingAbandonment = PendingRecoveryAbandonment(
           intentEventID: intentEventID,
           phase: state == .userAbandonRequested ? .requested : .intentDurable,
           outcomeEventID: nil,
-          releaseAuthorized: nil)
+          releaseAuthorized: nil,
+          deviceHazards: activeAbandonHazards ?? [])
       }
     } else {
       pendingAbandonment = nil
@@ -380,8 +405,10 @@ struct JournalAppendValidationState {
   private var abandonIntents: Set<String>
   private var completedAbandonIntents: Set<String>
   private var activeAbandonIntentID: String?
+  private var activeAbandonHazards: [String]?
   private var pendingAbandonOutcomeID: String?
   private var pendingAbandonNextState: JobState?
+  private var resourceReleaseAuthorized: Bool
   private var finalized: Bool
 
   init(replay: JournalReplay) throws {
@@ -396,9 +423,7 @@ struct JournalAppendValidationState {
     currentState = pendingReconcileTransition == nil ? replay.currentState : .reconciling
     outstanding = Dictionary(
       uniqueKeysWithValues: replay.outstandingIntents.map { ($0.eventID, $0) })
-    hasUnknownOutcome =
-      !replay.unknownOutcomes.isEmpty
-      || replay.lastReconcileOutcomeCertainty == .outcomeUnknown
+    hasUnknownOutcome = !replay.unknownOutcomes.isEmpty
     latestBindingRevision = replay.latestBindingRevision
     recoveryAttempts = Set(
       replay.events.filter { $0.kind == .reconcileStarted }
@@ -411,6 +436,7 @@ struct JournalAppendValidationState {
       replay.events.filter { $0.kind == .abandonOutcome }
         .compactMap { $0.payload.string("correlatesToAbandonIntentEventId") })
     activeAbandonIntentID = replay.pendingAbandonment?.intentEventID
+    activeAbandonHazards = replay.pendingAbandonment?.deviceHazards
     if let pending = replay.pendingAbandonment, pending.phase == .outcomeDurable {
       pendingAbandonOutcomeID = pending.outcomeEventID
       pendingAbandonNextState =
@@ -420,6 +446,7 @@ struct JournalAppendValidationState {
       pendingAbandonOutcomeID = nil
       pendingAbandonNextState = nil
     }
+    resourceReleaseAuthorized = replay.resourceReleaseAuthorized
     finalized = replay.finalized
   }
 
@@ -506,6 +533,21 @@ struct JournalAppendValidationState {
         throw DurableFileError.sequenceViolation(
           "durable abandon intent must transition to userAbandonRequested")
       }
+      let hasOutstandingExternalIntent = outstanding.values.contains {
+        $0.effect >= .deviceMutation
+      }
+      if hasOutstandingExternalIntent,
+        transition.to == .finalizing || transition.to.isTerminal
+      {
+        let authorizesInterrupted =
+          transition.to == .interrupted
+          && pendingAbandonNextState == .interrupted
+          && event.payload.string("triggerEventId") == pendingAbandonOutcomeID
+        guard authorizesInterrupted else {
+          throw DurableFileError.sequenceViolation(
+            "unresolved external-effect intent cannot enter finalization or terminal state")
+        }
+      }
     case .stepIntent, .compensationIntent:
       guard currentState?.permitsJournalIntent == true else {
         throw DurableFileError.sequenceViolation(
@@ -550,11 +592,16 @@ struct JournalAppendValidationState {
       guard let correlation = event.payload.string("correlatesToAbandonIntentEventId"),
         abandonIntents.contains(correlation), !completedAbandonIntents.contains(correlation),
         correlation == activeAbandonIntentID,
-        currentState == .userAbandonRequested
+        currentState == .userAbandonRequested,
+        let unresolvedHazards = event.payload.journalStringArray("unresolvedHazards"),
+        let activeAbandonHazards,
+        Set(unresolvedHazards).isSuperset(of: Set(activeAbandonHazards))
       else { throw DurableFileError.sequenceViolation("abandon outcome has no durable intent") }
     case .finalized:
       guard let state = currentState,
-        state.rawValue == event.payload.string("terminalStatus")
+        state.rawValue == event.payload.string("terminalStatus"),
+        !outstanding.values.contains(where: { $0.effect >= .deviceMutation })
+          || state == .interrupted && resourceReleaseAuthorized
       else { throw DurableFileError.sequenceViolation("finalized status does not match Job state") }
     default:
       break
@@ -570,8 +617,15 @@ struct JournalAppendValidationState {
     case .jobCreated:
       currentState = .queued
     case .stateTransition:
+      if event.stateTransition?.to == .interrupted,
+        pendingAbandonNextState == .interrupted,
+        event.payload.string("triggerEventId") == pendingAbandonOutcomeID
+      {
+        resourceReleaseAuthorized = true
+      }
       if event.stateTransition?.from == .userAbandonRequested {
         activeAbandonIntentID = nil
+        activeAbandonHazards = nil
       }
       currentState = event.stateTransition?.to
       pendingReconcileTransition = nil
@@ -616,6 +670,7 @@ struct JournalAppendValidationState {
     case .abandonIntent:
       abandonIntents.insert(event.eventID)
       activeAbandonIntentID = event.eventID
+      activeAbandonHazards = event.payload.journalStringArray("deviceHazards")
     case .abandonOutcome:
       if let correlation = event.payload.string("correlatesToAbandonIntentEventId") {
         completedAbandonIntents.insert(correlation)
@@ -641,6 +696,19 @@ extension JobState {
     default:
       true
     }
+  }
+}
+
+extension Dictionary where Key == String, Value == JSONValue {
+  fileprivate func journalStringArray(_ key: String) -> [String]? {
+    guard case .array(let values)? = self[key] else { return nil }
+    var result: [String] = []
+    result.reserveCapacity(values.count)
+    for value in values {
+      guard case .string(let string) = value else { return nil }
+      result.append(string)
+    }
+    return result
   }
 }
 

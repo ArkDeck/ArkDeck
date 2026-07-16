@@ -62,8 +62,16 @@ profile。
   `reconciling` 后的两处 crash window 可 durable 回退后重试，outcome 后、decision transition 前
   的 crash 会补齐既有决定，不重新猜测 Provider 结果。
 - Abandonment 现在可从既有 durable intent、`userAbandonRequested`、durable outcome 三个阶段续作；
+  续作时以 durable intent 中的 `deviceHazards` 为权威，replay/append validator 均拒绝
+  outcome 缩减已审计 hazard。
   lane/claim release port 改为可幂等确认，部分成功时准确报告，并可从 durable terminal
   authorization 只重试尚未确认的 release。
+- 未完成的 `deviceMutation`/`destructive` intent 现在禁止进入 `finalizing`、terminal
+  或写入 `finalized`；唯一例外是已 durable 审计的 abandon `interrupted` 路径，保证 scanner
+  不会因伪造终态跳过 unknown external effect。
+- Reconcile 的历史 `outcomeUnknown` 决定可被后续全新且 confirmed 的
+  Provider/binding evidence 取代；真实 step/compensation unknown 仍是硬阻断。已落盘 outcome
+  到 decision transition 补齐前，`requiresRecovery` 持续为 true。
 - 实现 manifest recovery/hazard locked-shape codec 和 unresolved-hazard preflight gate；只有
   Provider allow、user override、durable audit 三者齐备才解除 gate,且 gate 自身不派发设备 Step。
 - 增加 dedicated `ArkDeckJournalCrashFixture`,通过 absolute executable + argument array 启动；
@@ -74,8 +82,8 @@ profile。
 | Command | Result |
 | --- | --- |
 | `swift format lint <TASK-M1-003 changed Swift files>` | passed;0 diagnostics |
-| `swift test --package-path Packages/ArkDeckKit --filter JournalRecoveryContractTests` | passed;18 tests,0 failures,0 skips |
-| `swift test --package-path Packages/ArkDeckKit` | passed;97 tests,0 failures;1 unrelated opt-in M0A manual idle-sleep observation skipped by design |
+| `swift test --package-path Packages/ArkDeckKit --filter JournalRecoveryContractTests` | passed;20 tests,0 failures,0 skips |
+| `swift test --package-path Packages/ArkDeckKit` | passed;99 tests,0 failures;1 unrelated opt-in M0A manual idle-sleep observation skipped by design |
 | `scripts/check-sdd.sh` | passed;0 errors,0 warnings,111 acceptance IDs |
 | `git diff --check` | passed |
 
@@ -116,7 +124,10 @@ profile。
 | crash after entering `reconciling` | durable `reconciling → waitingForRecovery`,then a new correlated attempt | 0 |
 | crash after `reconcileStarted` | incomplete attempt retained for audit;durable rollback and new attempt complete | 0 |
 | crash after `reconcileOutcome` | original outcome determines state;missing correlated transition is appended | 0 |
-| abandon crash after intent/request/outcome | existing audit IDs are resumed;no duplicate abandon intent | 0 |
+| pending reconcile decision transition | `requiresRecovery=true` until the correlated transition is durable | 0 |
+| later confirmed reconcile after historical unknown | fresh confirmed Provider/binding evidence permits resume;actual step/compensation unknown remains blocking | 0 |
+| abandon crash after intent/request/outcome | existing audit IDs and durable hazards are resumed;new request cannot clear audited hazards | 0 |
+| outstanding external-effect intent with forged terminal/finalized tail | replay and append reject terminal hiding;scanner remains recovery-visible | 0 |
 | missing/late `jobCreated` | replay and append both reject recovery input | 0 |
 
 ### macOS crash-window matrix (`TEST-MAC-M1-JOURNAL-001`)
@@ -140,12 +151,15 @@ profile。
 
 ## Deviations and residual risk
 
-- Deviations:none。
+- Presentation deviation:`Packages/ArkDeckKit/Package.swift` 曾由 `swift format` 整文件重排；其唯一
+  semantic delta 是注册/连接 `ArkDeckJournalCrashFixture`，仍在任务显式允许范围内。
 - 本 run 是 local contract/platform evidence,不是 realHardware；未改变 macOS
   `conformance_status:notStarted`,也不构成 capability/release claim。
 - directory-sync fault 后 replacement bytes 可能可见但未获得 publication success；实现通过
   journal sequence/state/correlation 复核 fail closed,不会把可见性误当 durability guarantee。
+- `syncDirectory` 在 Darwin 上对 directory fd 使用 `fsync` 作为 namespace-entry durability
+  barrier；`F_FULLFSYNC` 仅用于 regular-file contents，不假设它支持 directory descriptor。
 - 原 3 个 JSON fixture 已收敛为 test target 内编译的 Swift fixture；SwiftPM 不再报告
-  unhandled resource warning，未扩大 `Package.swift` 的 allowed-path 例外。
+  unhandled resource warning；`Package.swift` 的实质改动仅限于该 fixture 的注册/连接。
 - `tasks.md` 的 `done` 仅为本分支的 closure 草案；只有维护者 review/merge 后生效,change 仍未
   `verified`。

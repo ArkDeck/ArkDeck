@@ -317,6 +317,8 @@ enum DurableFilePrimitives {
     let descriptor = Darwin.open(url.path, O_RDONLY | O_DIRECTORY | O_CLOEXEC)
     guard descriptor >= 0 else { throw DurableFileError.openFailed(path: url.path, errno: errno) }
     defer { Darwin.close(descriptor) }
+    // Darwin fsync on the directory fd is the namespace-entry durability barrier. F_FULLFSYNC is
+    // reserved here for regular-file contents and is not assumed to support directory descriptors.
     guard Darwin.fsync(descriptor) == 0 else {
       throw DurableFileError.syncFailed(path: url.path, errno: errno)
     }

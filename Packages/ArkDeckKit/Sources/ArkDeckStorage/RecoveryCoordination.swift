@@ -160,7 +160,7 @@ public final class DeterministicRecoveryReconciler: @unchecked Sendable {
     let safeBoundary: Bool
     let revision: Int?
     let hasUnknownIntent =
-      session.outcomeCertainty == .outcomeUnknown
+      session.replay.hasTornTail
       || !session.replay.outstandingIntents.isEmpty
       || !session.replay.unknownOutcomes.isEmpty
     let confirmedBinding = binding.confirmed && binding.revision.map({ $0 > 0 }) == true
@@ -399,6 +399,15 @@ public final class AuditedRecoveryAbandonmentCoordinator: @unchecked Sendable {
     else {
       throw RecoveryAbandonmentContinuationError.confirmationMismatch
     }
+    let durableRequest = RecoveryAbandonmentRequest(
+      sessionID: request.sessionID,
+      jobID: request.jobID,
+      nextSequence: request.nextSequence,
+      userConfirmationID: request.userConfirmationID,
+      lastConfirmedStepID: request.lastConfirmedStepID,
+      outcomeCertainty: request.outcomeCertainty,
+      managedProcessState: request.managedProcessState,
+      deviceHazards: pending.deviceHazards)
 
     var sequence = (replay.lastDurableSequence ?? -1) + 1
     var durableSequences: [Int] = []
@@ -414,11 +423,11 @@ public final class AuditedRecoveryAbandonmentCoordinator: @unchecked Sendable {
       durableSequences.append(requested.sequence)
       sequence += 1
       return finishRequestedAbandonment(
-        request, intentID: pending.intentEventID, sequence: sequence,
+        durableRequest, intentID: pending.intentEventID, sequence: sequence,
         durableSequences: durableSequences)
     case .requested:
       return finishRequestedAbandonment(
-        request, intentID: pending.intentEventID, sequence: sequence,
+        durableRequest, intentID: pending.intentEventID, sequence: sequence,
         durableSequences: durableSequences)
     case .outcomeDurable:
       guard let outcomeEventID = pending.outcomeEventID,
