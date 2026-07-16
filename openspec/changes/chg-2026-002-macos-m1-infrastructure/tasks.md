@@ -248,3 +248,66 @@
 - Requirements/AC:AC-DIAG-001-01/02 等
 - Depends on:TASK-M1-001
 - Allowed paths:`.../ArkDeckRuntime/**`、`.../ArkDeckStorage/**`、对应 Tests、本 change `evidence/**`
+
+## TASK-M1-010 — M1 复审修复:证据计数、测试信号与语义词汇收敛
+
+- Status:ready
+- Readiness gate:本任务范围与 `ready` 状态仅在维护者 review/merge 本 readiness PR 后
+  生效；readiness PR 只修改本任务条目，不执行实现、不生成 evidence、不修改其他任务状态，
+  也不改变 Core、contract、platform conformance 或 release claim。
+- Objective:在不改变任何产品行为或验收 pass/fail 的前提下，修复 TASK-M1-002 证据表
+  将测试回显字面量误写为运行期度量的问题，删除 M1-001 测试中的套套逻辑计数器，统一
+  Process/HDC 第三态词汇，并收敛 M0A 与 M1-002 重复的 ProcessExecutor 测试。
+- Requirements/AC:`REQ-WF-001`、`REQ-JOB-001`、`REQ-JOB-003`、`REQ-JOB-005`、
+  `REQ-NFR-002`、`REQ-HDC-005`；仅回归既有 `AC-WF-001-01`、`AC-JOB-001-01`、
+  `AC-JOB-001-05`、`AC-JOB-003-01`、`AC-JOB-005-01`、`AC-NFR-002-01` 与
+  `AC-HDC-005-01`，不新增、修改或重新认领 AC。
+- Depends on:`TASK-M1-001`、`TASK-M1-002`、`TASK-M1-003`（均 done）
+- In scope:
+  - 将 `ProcessExecutorContractTests` 的证据输出改为由本次测试实际观测的值生成，或删除
+    不能由测试直接测量的回显；在 `TASK-M1-002/run.md` 原正文之后追加 addendum，明确
+    区分原表中的测试回显与运行期实测值，并保留原记录正文不变；
+  - 删除 `JobStateMachineTests` 与 `WorkflowStepContractTests` 中前置断言已证明不可达后
+    又通过常量或重复 decode 构造的零计数装饰；保留直接验证状态、directive、错误类型与
+    invariant violation 的有效断言；
+  - 将公开 `ProcessSemanticResult` 第三态从 `indeterminate` 重命名为 `unknownOutput`，与
+    `HDCCommandSemanticResult` 及 journal 的 `outcomeUnknown` 语义族收敛；只在
+    `HDCSemanticOutputParser` 留下注释，声明 M1-006 将采用 `ProcessSemanticEvaluating`
+    协议，本任务不提前执行 M1-006 接线；实现 PR 描述必须声明该公开 API 变更；
+  - 删除 `ArkDeckContractTests.swift` 中由 M0A 遗留、已被 M1-002 dedicated suite 重复覆盖
+    的六个 `testProcessExecutor*` prototype cases；为 `ProcessExecutorContractTests` 测试名
+    增加 canonical `TEST-AC-*` 锚点。
+- Out of scope:ProcessExecutor、Job 状态机、WorkflowStep decoder 或 HDC parser 的行为变化；
+  M1-006 HDC supervisor/parser 接线；新增 parser family/fixture；Core Requirement/AC、schema、
+  contract、baseline、platform/integration profile、conformance/release 状态；真实设备、网络或
+  任何 destructive/device dispatch。
+- Allowed paths:
+  - `Packages/ArkDeckKit/Sources/ArkDeckProcess/ArkDeckProcess.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckOpenHarmony/ArkDeckOpenHarmony.swift`
+  - `Packages/ArkDeckKit/Tests/ArkDeckCoreTests/JobStateMachineTests.swift`
+  - `Packages/ArkDeckKit/Tests/ArkDeckCoreTests/WorkflowStepContractTests.swift`
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/ArkDeckContractTests.swift`
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/ProcessExecutorContractTests.swift`
+  - `openspec/changes/chg-2026-002-macos-m1-infrastructure/evidence/runs/TASK-M1-002/run.md`
+    （仅在原正文之后追加 evidence-integrity addendum）
+  - `openspec/changes/chg-2026-002-macos-m1-infrastructure/evidence/runs/TASK-M1-010/**`
+  - `openspec/changes/chg-2026-002-macos-m1-infrastructure/tasks.md`（仅更新本任务状态与
+    completion evidence）
+- Forbidden paths:`openspec/specs/**`、`openspec/contracts/**`、`openspec/baselines/**`、
+  `openspec/platforms/**`、`openspec/integrations/**`、上述清单以外的源码、测试与 evidence。
+- Risk:medium（公开 Swift enum case 重命名 + contract test/evidence 修复；验证仅使用本地
+  child process、临时目录和生成 fixture，无 HDC、网络、设备或 destructive side effect）
+- Hardware required:no
+- Required environment:macOS + 仓库声明的 Swift/Xcode toolchain；仅使用仓库内 fixture 与
+  系统只读 process 工具，不下载依赖、不要求外部服务。
+- Deliverables:运行期生成或删除的 Process 计数回显；不改写历史正文的 evidence addendum；
+  删除套套逻辑与重复 M0A process cases；带 AC 锚点的 dedicated process tests；统一的
+  `unknownOutput` API 及 M1-006 migration comment；实现 PR 的公开 API 变更声明。
+- Verification:`swift format lint` 全部变更 Swift 文件；
+  `swift test --package-path Packages/ArkDeckKit --filter ProcessExecutorContractTests`；
+  `swift test --package-path Packages/ArkDeckKit`；`scripts/check-sdd.sh`；`git diff --check`；
+  静态检查确认原型 `testProcessExecutor*`、`.indeterminate` 及指定常量/不可达计数器均已清除。
+- Evidence gate:在 `evidence/runs/TASK-M1-010/run.md` 记录 base revision、环境、命令与结果、
+  回显/实测分类、测试数变化、API rename 与 migration boundary、关联 AC 的回归结论、evidence
+  class、偏差和遗留风险；同时在 `TASK-M1-002/run.md` 原正文之后追加 addendum。缺任一项不得
+  标记 `done`。
