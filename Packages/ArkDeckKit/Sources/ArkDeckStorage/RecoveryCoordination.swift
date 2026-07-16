@@ -343,16 +343,20 @@ public final class AuditedRecoveryAbandonmentCoordinator: @unchecked Sendable {
     var durableSequences: [Int] = []
     let intentID = audit.nextEventID()
     do {
+      let journalContext = try journal.abandonmentContext()
+      let durableCertainty: JournalOutcomeCertainty =
+        journalContext.requiresOutcomeUnknown || request.outcomeCertainty == .outcomeUnknown
+        ? .outcomeUnknown : .confirmed
       let durableRequest = RecoveryAbandonmentRequest(
         sessionID: request.sessionID,
         jobID: request.jobID,
         nextSequence: request.nextSequence,
         userConfirmationID: request.userConfirmationID,
         lastConfirmedStepID: request.lastConfirmedStepID,
-        outcomeCertainty: request.outcomeCertainty,
+        outcomeCertainty: durableCertainty,
         managedProcessState: request.managedProcessState,
         deviceHazards: Array(
-          Set(request.deviceHazards).union(try journal.requiredAbandonmentHazards())
+          Set(request.deviceHazards).union(journalContext.requiredHazards)
         ).sorted())
       let intent = try JournalEvent.abandonIntent(
         eventID: intentID,
@@ -416,7 +420,7 @@ public final class AuditedRecoveryAbandonmentCoordinator: @unchecked Sendable {
       nextSequence: request.nextSequence,
       userConfirmationID: request.userConfirmationID,
       lastConfirmedStepID: request.lastConfirmedStepID,
-      outcomeCertainty: request.outcomeCertainty,
+      outcomeCertainty: pending.outcomeCertainty,
       managedProcessState: request.managedProcessState,
       deviceHazards: pending.deviceHazards)
 

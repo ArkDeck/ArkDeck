@@ -67,13 +67,18 @@ profile。
   续作时以 durable intent 中的 `deviceHazards` 为权威，replay/append validator 均拒绝
   outcome 缩减已审计 hazard。首次 abandonment 还会从 outstanding 或 durable-unknown 的
   `deviceMutation`/`destructive` intent 派生 canonical hazard；coordinator 自动合并，journal
-  validator 拒绝调用方遗漏这些风险。
+  validator 拒绝调用方遗漏这些风险。Journal abandonment context 同时从任意 outstanding intent
+  或 durable unknown outcome 派生 `requiresOutcomeUnknown`；调用方传入 `confirmed` 不能覆盖该
+  fail-closed certainty，续作也固定沿用 durable abandon intent 的 certainty。
   lane/claim release port 改为可幂等确认，部分成功时准确报告，并可从 durable terminal
   authorization 只重试尚未确认的 release。
-- 未完成的 `deviceMutation`/`destructive` intent 现在禁止进入 `finalizing`、terminal
+- 任意未完成 intent（包括 `hostOnly` finalizeSession 与 `readOnly`）现在禁止进入
+  `finalizing`、terminal
   或写入 `finalized`；唯一例外是已 durable 审计的 abandon `interrupted` 路径，保证 scanner
   不会因伪造终态跳过 unknown external effect。`finalized.terminalStatus` 的状态匹配与该例外分开
-  校验，授权 interrupted 也不能接受其他 terminal status。
+  校验，授权 interrupted 也不能接受其他 terminal status；abandon intent 的 `outcomeUnknown`
+  requirement 会跨 terminal transition 保留，`finalized` 不得再把 outstanding/unknown 表述为
+  `confirmed`。
 - Reconcile 的历史 `outcomeUnknown` 决定可被后续全新且 confirmed 的
   Provider/binding evidence 取代；真实 step/compensation unknown 仍是硬阻断。已落盘 outcome
   到 decision transition 补齐前，`requiresRecovery` 持续为 true。
@@ -87,8 +92,8 @@ profile。
 | Command | Result |
 | --- | --- |
 | `swift format lint <TASK-M1-003 changed Swift files>` | passed;0 diagnostics |
-| `swift test --package-path Packages/ArkDeckKit --filter JournalRecoveryContractTests` | passed;23 tests,0 failures,0 skips |
-| `swift test --package-path Packages/ArkDeckKit` | passed;102 tests,0 failures;1 unrelated opt-in M0A manual idle-sleep observation skipped by design |
+| `swift test --package-path Packages/ArkDeckKit --filter JournalRecoveryContractTests` | passed;26 tests,0 failures,0 skips |
+| `swift test --package-path Packages/ArkDeckKit` | passed;105 tests,0 failures;1 unrelated opt-in M0A manual idle-sleep observation skipped by design |
 | `scripts/check-sdd.sh` | passed;0 errors,0 warnings,111 acceptance IDs |
 | `git diff --check` | passed |
 
@@ -136,6 +141,9 @@ profile。
 | authorized interrupted + mismatched `finalized.terminalStatus` | append and untrusted replay both reject the inconsistent terminal record | 0 |
 | scanner-visible torn tail | writer durably truncates only the incomplete record;reconcile and audited abandonment both append successfully | 0 |
 | initial abandon with empty caller hazards and unresolved destructive intent | coordinator derives `unresolved-destructive-intent:<step>:<event>`;direct omission is rejected and outcome preserves it | 0 |
+| outstanding `hostOnly` finalizeSession or `readOnly` intent | normal `finalizing → terminal → finalized` path is rejected by append and untrusted replay | 0 |
+| unresolved flash + caller abandon certainty=`confirmed` | journal context forces durable abandon intent certainty=`outcomeUnknown`;direct forged intent is rejected | 0 |
+| audited interrupted + unresolved/missing or durable-unknown outcome | `finalized.outcomeCertainty=confirmed` is rejected;`outcomeUnknown` remains durable and valid | 0 |
 | missing/late `jobCreated` | replay and append both reject recovery input | 0 |
 
 ### macOS crash-window matrix (`TEST-MAC-M1-JOURNAL-001`)
@@ -152,8 +160,8 @@ profile。
 | Test ID | Evidence class | Binary conclusion |
 | --- | --- | --- |
 | `TEST-AC-JOB-002-01` | contract | passed:任一 intent durability gate 失败时 external dispatch=0；outcome 未 durable 时 checkpoint 不前进；checkpoint fault 恢复 journal-first。 |
-| `TEST-AC-JOB-006-01` | contract | passed:missing 或 durable-unknown destructive/compensation outcome 均只得到 `waitingForRecovery/outcomeUnknown`;当前进程和重启后的 dispatch/replay/compensation 均为 0；torn tail durable 修复后 reconcile 可续作；reconcile 全状态迁移 durable 且三个 crash window 可续作；16 组 resume 条件只有四项全真时允许 marker。 |
-| `TEST-AC-JOB-007-01` | contract | passed:四类前置失败 release 均为 0；三个 abandon crash phase 使用既有 audit 续作；首次与续作均保留 journal-derived device hazards；只有 durable outcome + matching interrupted transition 后释放，部分 release 准确报告并幂等重试。 |
+| `TEST-AC-JOB-006-01` | contract | passed:任意 effect 的 missing outcome 与 durable-unknown destructive/compensation outcome 均只得到 `waitingForRecovery/outcomeUnknown`;normal terminal/finalized 不能隐藏 outstanding intent；当前进程和重启后的 dispatch/replay/compensation 均为 0；torn tail durable 修复后 reconcile 可续作；reconcile 全状态迁移 durable 且三个 crash window 可续作；16 组 resume 条件只有四项全真时允许 marker。 |
+| `TEST-AC-JOB-007-01` | contract | passed:四类前置失败 release 均为 0；三个 abandon crash phase 使用既有 audit 续作；首次与续作均保留 journal-derived device hazards/certainty；只有 durable outcome + matching interrupted transition 后释放；interrupted finalized 不得把 unresolved/unknown 改写为 confirmed；部分 release 准确报告并幂等重试。 |
 | `TEST-AC-JOB-007-02` | contract | passed:Provider allow × user override × durable audit 的 8 组真值组合已穷举；只有三者全真解除 gate,device dispatch 恒为 0,并保留 audit event ID。 |
 | `TEST-MAC-M1-JOURNAL-001` | platform | passed:四个真实 macOS 子进程 kill window 的 restart scan 如上；未知结果不重放,fixture device/destructive dispatch 恒为 0。 |
 

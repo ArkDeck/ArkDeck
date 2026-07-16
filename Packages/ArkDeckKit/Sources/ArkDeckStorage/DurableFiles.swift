@@ -41,9 +41,19 @@ public enum DurableFileError: Error, Equatable, Sendable {
   case outcomeNotDurable
 }
 
+public struct JournalAbandonmentContext: Equatable, Sendable {
+  public let requiredHazards: [String]
+  public let requiresOutcomeUnknown: Bool
+
+  public init(requiredHazards: [String], requiresOutcomeUnknown: Bool) {
+    self.requiredHazards = requiredHazards
+    self.requiresOutcomeUnknown = requiresOutcomeUnknown
+  }
+}
+
 public protocol DurableJournalAppending: Sendable {
   func appendAndSynchronize(_ event: JournalEvent) throws
-  func requiredAbandonmentHazards() throws -> [String]
+  func abandonmentContext() throws -> JournalAbandonmentContext
 }
 
 public final class FileDurableJournal: DurableJournalAppending, @unchecked Sendable {
@@ -82,13 +92,13 @@ public final class FileDurableJournal: DurableJournalAppending, @unchecked Senda
     appendState = try JournalAppendValidationState(replay: replay)
   }
 
-  public func requiredAbandonmentHazards() throws -> [String] {
+  public func abandonmentContext() throws -> JournalAbandonmentContext {
     lock.lock()
     defer { lock.unlock() }
     guard !poisoned else {
       throw DurableFileError.sequenceViolation("journal writer is poisoned after a failed append")
     }
-    return appendState.requiredAbandonmentHazards
+    return appendState.abandonmentContext
   }
 
   public func appendAndSynchronize(_ event: JournalEvent) throws {
