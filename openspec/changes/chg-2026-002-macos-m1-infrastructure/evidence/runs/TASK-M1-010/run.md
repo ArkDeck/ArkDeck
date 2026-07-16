@@ -24,7 +24,7 @@
   `WorkflowStepContractTests`.
 - Renamed the public source API case
   `ProcessSemanticResult.indeterminate` to `ProcessSemanticResult.unknownOutput`.
-  This is an intentional source-compatible-name break for callers of that public enum;
+  This is an intentional source-breaking API rename for callers of that public enum;
   the case's third-state behavior is unchanged. It now aligns with existing
   `HDCCommandSemanticResult.unknownOutput` and the journal `outcomeUnknown` family.
 - Left `HDCSemanticOutputParser` behavior and executor wiring unchanged. Its sole
