@@ -101,7 +101,10 @@
 
 ## TASK-M1-003 — write-ahead journal、snapshot、崩溃 reconcile 与审计放弃
 
-- Status:ready
+- Status:done
+- Completion evidence:`evidence/runs/TASK-M1-003/run.md`（contract + macOS platform；
+  状态变更仅在维护者 review/merge 后生效，不构成 change verified、platform conformance、
+  release claim 或真实硬件 evidence）
 - Readiness amendment:本任务包的精确范围与 verification gate 仅在维护者 review/merge
   后生效；本 readiness PR 不执行 TASK-M1-003、不产生实现 evidence，也不改变任何
   Core、contract、platform conformance、release claim 或其他 Task 状态。

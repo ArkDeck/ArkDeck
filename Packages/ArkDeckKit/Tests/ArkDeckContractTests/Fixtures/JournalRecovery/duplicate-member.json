@@ -1,0 +1,1 @@
+{"schemaVersion":"1.0.0","eventId":"duplicate","eventId":"duplicate-again","sequence":0,"sessionId":"session-1","jobId":"job-1","timestamp":"2026-07-16T00:00:00Z","kind":"warning","payload":{"code":"fixture.warning","message":"fixture","details":{}}}
