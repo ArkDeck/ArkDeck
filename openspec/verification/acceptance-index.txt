@@ -1,4 +1,4 @@
-# CORE-CONFORMANCE-1.0.0 acceptance IDs; sorted, one ID per line.
+# CORE-CONFORMANCE-2.0.0 acceptance IDs; sorted, one ID per line.
 AC-ART-001-01
 AC-ART-002-01
 AC-ART-003-01
@@ -73,6 +73,7 @@ AC-JOB-001-03
 AC-JOB-001-04
 AC-JOB-001-05
 AC-JOB-001-06
+AC-JOB-001-07
 AC-JOB-002-01
 AC-JOB-003-01
 AC-JOB-004-01

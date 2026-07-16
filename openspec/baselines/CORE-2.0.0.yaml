@@ -1,0 +1,25 @@
+# Core baseline 版本记录 —— ratification 状态的单一事实源。
+# V2 治理:ratification = 维护者批准包含本状态变更的 archive PR 并合入受保护 main;
+# 本文件在该 PR 合入前仅是待批准的 ratification 声明。
+baseline: CORE-2.0.0
+status: ratified
+ratified_at: 2026-07-16
+ratified_by: lvye (CODEOWNER review and merge of the archive PR)
+supersedes: CORE-1.0.0
+change: CHG-2026-004-resume-confirmed-failure-transition
+core_change_level: major
+scope: >-
+  继承 CORE-1.0.0 的全部未变 scope，并纳入 CHG-2026-004 对
+  openspec/specs/workflow-journal-recovery/spec.md 中 REQ-JOB-001 的完整替换、
+  openspec/contracts/journal-event.schema.json 的两个 resume marker transition pair，
+  以及 verification/acceptance-index.txt 与 acceptance-cases.yaml 登记的 111 条 Core AC。
+change_rule: >-
+  ratified 后对 scope 内文件的语义修改必须走 approved change delta,
+  经 archive PR 合入 current specs 并升版 CORE-x.y.z;不原地改写本记录。
+platform_disposition: >-
+  macOS conformance_status 保持 notStarted，不是 needsReverification；CHG-2026-002 后续必须
+  针对 CORE-2.0.0 重新验证。Windows/Linux 保持 deferred/not started，不产生支持声明。
+notes: >-
+  合入 CHG-2026-004 已批准且已验证的恢复标记二值决策：confirmed failure
+  直接进入 finalizing 再 failed，unknown identity/outcome 直接进入 waitingForRecovery；
+  两者在 marker 状态的普通 Workflow Step dispatch 均为 0，且不伪造 running/planning。

@@ -1,6 +1,6 @@
 ---
 id: CHG-2026-004-resume-confirmed-failure-transition
-status: verified
+status: archived
 class: core
 core_change_level: major
 owner: lvye
@@ -117,7 +117,16 @@ commit `c8d256b4cf8158630d1fd80d7b5da47d4945411e` 提交 approving review；该 
 `478ef98fb5363b69d7cbdabe7e871d974c4cd7ca`。
 
 该 review/merge 构成 `verification.md` 所要求的 maintainer verification
-confirmation。本文件中的 `status: verified` 仅在包含本状态变更的 verification
-closure PR 经维护者 review 并合入 `main` 后生效；archive、current spec/global
-acceptance registry 更新与 `CORE-2.0.0` ratification 仍必须由后续独立 archive PR
-完成。
+confirmation，并使 verification closure PR 中的 `status: verified` 生效。
+
+## Archive and CORE-2.0.0 ratification
+
+本 archive PR 将 approved delta 精确合入 current
+`workflow-journal-recovery` spec，把 `AC-JOB-001-07` 加入全局 acceptance
+index/cases 与 `CORE-CONFORMANCE-2.0.0`，并新增 `CORE-2.0.0` baseline 记录。
+
+本文件中的 `status: archived` 和 baseline 记录中的 `status: ratified`
+在维护者 `lvye` review 并将该 archive PR 合入受保护 `main` 后同时生效；
+未合入前仍只是待批准的 archive/ratification 声明。该合入不改变任何
+platform conformance claim：macOS 保持 `notStarted`，Windows/Linux 保持
+deferred/not started。

@@ -1,4 +1,4 @@
-current_core_baseline: CORE-1.0.0
+current_core_baseline: CORE-2.0.0
 declared_target_platforms: [macos, windows, linux]
 current_delivery_platforms: [macos]
 

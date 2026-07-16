@@ -1,5 +1,5 @@
-registry: CORE-ACCEPTANCE-CASES-1.0.0
-status: accepted  # 随 CORE-1.0.0 ratification
+registry: CORE-ACCEPTANCE-CASES-2.0.0
+status: accepted  # 随 CORE-2.0.0 ratification
 expected_result_rule: >-
   expected_source identifies the normative Scenario block; all GIVEN/WHEN/THEN/AND
   clauses in that block are the binary expected result and may not be restated or
@@ -93,6 +93,7 @@ cases:
   - { acceptance_id: AC-JOB-001-04, test_id: TEST-AC-JOB-001-04, method: stateMachineProperty, expected_source: openspec/specs/workflow-journal-recovery/spec.md#AC-JOB-001-04, minimum_evidence: contract }
   - { acceptance_id: AC-JOB-001-05, test_id: TEST-AC-JOB-001-05, method: recoveryFaultInjection, expected_source: openspec/specs/workflow-journal-recovery/spec.md#AC-JOB-001-05, minimum_evidence: contract }
   - { acceptance_id: AC-JOB-001-06, test_id: TEST-AC-JOB-001-06, method: cancellationContract, expected_source: openspec/specs/workflow-journal-recovery/spec.md#AC-JOB-001-06, minimum_evidence: contract }
+  - { acceptance_id: AC-JOB-001-07, test_id: TEST-AC-JOB-001-07, method: recoveryDecisionJournalStateMachineContract, expected_source: openspec/specs/workflow-journal-recovery/spec.md#AC-JOB-001-07, minimum_evidence: contract }
   - { acceptance_id: AC-JOB-002-01, test_id: TEST-AC-JOB-002-01, method: journalFaultInjection, expected_source: openspec/specs/workflow-journal-recovery/spec.md#AC-JOB-002-01, minimum_evidence: contract }
   - { acceptance_id: AC-JOB-003-01, test_id: TEST-AC-JOB-003-01, method: criticalCancellationContract, expected_source: openspec/specs/workflow-journal-recovery/spec.md#AC-JOB-003-01, minimum_evidence: contract }
   - { acceptance_id: AC-JOB-004-01, test_id: TEST-AC-JOB-004-01, method: compensationFaultInjection, expected_source: openspec/specs/workflow-journal-recovery/spec.md#AC-JOB-004-01, minimum_evidence: contract }

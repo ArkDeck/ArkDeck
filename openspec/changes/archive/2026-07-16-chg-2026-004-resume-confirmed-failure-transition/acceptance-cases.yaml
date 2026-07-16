@@ -9,7 +9,7 @@ cases:
   - acceptance_id: AC-JOB-001-07
     test_id: TEST-AC-JOB-001-07
     method: recoveryDecisionJournalStateMachineContract
-    expected_source: openspec/changes/chg-2026-004-resume-confirmed-failure-transition/specs/workflow-journal-recovery/spec.md#AC-JOB-001-07
+    expected_source: openspec/changes/archive/2026-07-16-chg-2026-004-resume-confirmed-failure-transition/specs/workflow-journal-recovery/spec.md#AC-JOB-001-07
     minimum_evidence: contract
     expected_result: >-
       From resumeAtConfirmedSafeBoundary, the confirmed vector takes the exact

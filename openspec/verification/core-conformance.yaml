@@ -1,15 +1,15 @@
-suite: CORE-CONFORMANCE-1.0.0
-status: accepted  # 随 CORE-1.0.0 ratification;单一事实源为 openspec/baselines/CORE-1.0.0.yaml
-core_baseline: CORE-1.0.0
+suite: CORE-CONFORMANCE-2.0.0
+status: accepted  # 随 CORE-2.0.0 ratification;单一事实源为 openspec/baselines/CORE-2.0.0.yaml
+core_baseline: CORE-2.0.0
 
 acceptance_index:
   path: openspec/verification/acceptance-index.txt
-  count: 110
+  count: 111
   selector: all-current-core-acceptance-ids
 
 acceptance_cases:
   path: openspec/verification/acceptance-cases.yaml
-  count: 110
+  count: 111
   expected_result: normative-scenario-then-and-clauses
 
 applicability:
@@ -129,6 +129,7 @@ safety_coverage:
     recovery_or_restart:
       - AC-JOB-001-03
       - AC-JOB-001-05
+      - AC-JOB-001-07
       - AC-JOB-006-01
       - AC-JOB-007-01
       - AC-JOB-007-02
