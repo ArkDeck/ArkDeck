@@ -246,6 +246,7 @@ public final class FoundationProcessExecutor: @unchecked Sendable {
     let spawned = try spawn(request)
     let capture = OutputCapture(limit: captureLimit, onOutput: onOutput)
     let drain = PipeDrain()
+    control.attach(drain: drain)
     installReader(for: spawned.stdout, stream: .stdout, capture: capture, drain: drain)
     installReader(for: spawned.stderr, stream: .stderr, capture: capture, drain: drain)
     control.attach(processIdentifier: spawned.processIdentifier)
@@ -253,7 +254,6 @@ public final class FoundationProcessExecutor: @unchecked Sendable {
     defer { timeoutTask?.cancel() }
 
     let waitResult = await waitForExit(of: spawned.processIdentifier)
-    control.markFinished(processIdentifier: spawned.processIdentifier)
     await drain.waitUntilFinished()
     let groupTermination = await control.waitForProcessGroupTermination()
     return ProcessExecutionResult(
@@ -370,7 +370,24 @@ public final class FoundationProcessExecutor: @unchecked Sendable {
         drain.leave()
       }
       var buffer = [UInt8](repeating: 0, count: 64 * 1024)
-      while true {
+      var pollDescriptor = pollfd(
+        fd: descriptor,
+        events: Int16(POLLIN | POLLHUP | POLLERR),
+        revents: 0
+      )
+      while !drain.isCancelled {
+        pollDescriptor.revents = 0
+        let pollResult = Darwin.poll(&pollDescriptor, 1, 25)
+        if pollResult == -1 {
+          if errno == EINTR {
+            continue
+          }
+          return
+        }
+        if pollResult == 0 {
+          continue
+        }
+        guard !drain.isCancelled else { return }
         let byteCount = buffer.withUnsafeMutableBytes { bytes in
           Darwin.read(descriptor, bytes.baseAddress, bytes.count)
         }
@@ -494,8 +511,8 @@ private final class ProcessControl: @unchecked Sendable {
   private let lock = NSLock()
   private let processGroupCleanup = DispatchGroup()
   private var processIdentifier: pid_t?
+  private var drain: PipeDrain?
   private var stopped = false
-  private var finished = false
   private var cleanupStarted = false
   private var storedTermination: ProcessTermination?
   private var groupTermination: ProcessGroupTerminationResult = .notRequested
@@ -512,6 +529,16 @@ private final class ProcessControl: @unchecked Sendable {
     return storedTermination
   }
 
+  func attach(drain: PipeDrain) {
+    lock.lock()
+    self.drain = drain
+    let shouldCancel = stopped
+    lock.unlock()
+    if shouldCancel {
+      drain.cancel()
+    }
+  }
+
   func attach(processIdentifier: pid_t) {
     lock.lock()
     self.processIdentifier = processIdentifier
@@ -524,10 +551,6 @@ private final class ProcessControl: @unchecked Sendable {
 
   func stop(reason: ProcessTermination) {
     lock.lock()
-    guard !finished else {
-      lock.unlock()
-      return
-    }
     guard !stopped else {
       lock.unlock()
       return
@@ -535,19 +558,13 @@ private final class ProcessControl: @unchecked Sendable {
     stopped = true
     storedTermination = reason
     let processIdentifier = processIdentifier
+    let drain = drain
     let shouldStartCleanup = prepareCleanupIfNeeded()
     lock.unlock()
+    drain?.cancel()
     if shouldStartCleanup, let processIdentifier {
       terminateProcessGroup(processIdentifier)
     }
-  }
-
-  func markFinished(processIdentifier: pid_t) {
-    lock.lock()
-    if self.processIdentifier == processIdentifier {
-      finished = true
-    }
-    lock.unlock()
   }
 
   func waitForProcessGroupTermination() async -> ProcessGroupTerminationResult {
@@ -677,6 +694,19 @@ private final class PipeDrain: @unchecked Sendable {
   private let group = DispatchGroup()
   private let lock = NSLock()
   private var unfinishedStreams = 0
+  private var cancelled = false
+
+  var isCancelled: Bool {
+    lock.lock()
+    defer { lock.unlock() }
+    return cancelled
+  }
+
+  func cancel() {
+    lock.lock()
+    cancelled = true
+    lock.unlock()
+  }
 
   func enter() {
     lock.lock()

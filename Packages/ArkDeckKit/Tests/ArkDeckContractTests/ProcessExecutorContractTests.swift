@@ -190,6 +190,36 @@ final class ProcessExecutorContractTests: XCTestCase {
     try assertRecordedProcessTreeHasNoSurvivors(result.stdout.data)
   }
 
+  func testTimeoutStillControlsGroupAfterLeaderExitWhileDescendantHoldsPipes() async throws {
+    let startedAt = Date()
+    let result = try await executeLeaderExitWithPipeHoldingChild(using: executor, timeout: 0.2)
+    let elapsed = Date().timeIntervalSince(startedAt)
+
+    XCTAssertEqual(result.termination, .timedOut)
+    XCTAssertEqual(result.processGroupTermination, .noSurvivingMembers(forcedKill: true))
+    XCTAssertLessThan(elapsed, 1.5)
+    try assertRecordedProcessTreeHasNoSurvivors(result.stdout.data)
+    print("M1_LEADER_EXIT timeout_elapsed_seconds=\(elapsed)")
+  }
+
+  func testCancellationStillControlsGroupAfterLeaderExitWhileDescendantHoldsPipes() async throws {
+    let executor = FoundationProcessExecutor()
+    let task = Task {
+      try await executeLeaderExitWithPipeHoldingChild(using: executor, timeout: nil)
+    }
+    try await Task.sleep(nanoseconds: 300_000_000)
+    let cancelledAt = Date()
+    task.cancel()
+    let result = try await task.value
+    let elapsedAfterCancellation = Date().timeIntervalSince(cancelledAt)
+
+    XCTAssertEqual(result.termination, .cancelled)
+    XCTAssertEqual(result.processGroupTermination, .noSurvivingMembers(forcedKill: true))
+    XCTAssertLessThan(elapsedAfterCancellation, 1.5)
+    try assertRecordedProcessTreeHasNoSurvivors(result.stdout.data)
+    print("M1_LEADER_EXIT cancellation_elapsed_seconds=\(elapsedAfterCancellation)")
+  }
+
   func testOneGiBSparseFixtureUsesBoundedCaptureAndMemory() async throws {
     let directory = try makeTemporaryDirectory()
     defer { try? FileManager.default.removeItem(at: directory) }
@@ -420,6 +450,32 @@ private func executeIgnoringProcessTree(
     }
     print "parent=$$ child=$child\n";
     sleep 30;
+    """#
+  return try await executor.execute(
+    ProcessRequest(executable: perl, arguments: ["-e", program], timeout: timeout)
+  )
+}
+
+private func executeLeaderExitWithPipeHoldingChild(
+  using executor: FoundationProcessExecutor,
+  timeout: TimeInterval?
+) async throws -> ProcessExecutionResult {
+  let perl = URL(fileURLWithPath: "/usr/bin/perl")
+  guard FileManager.default.isExecutableFile(atPath: perl.path) else {
+    throw POSIXTestError(operation: "missing /usr/bin/perl fixture", code: ENOENT)
+  }
+  let program = #"""
+    $| = 1;
+    my $child = fork();
+    die "fork failed" unless defined $child;
+    if ($child == 0) {
+        $SIG{TERM} = 'IGNORE';
+        print "child=$$\n";
+        sleep 3;
+        exit 0;
+    }
+    print "leader=$$ child=$child\n";
+    exit 0;
     """#
   return try await executor.execute(
     ProcessRequest(executable: perl, arguments: ["-e", program], timeout: timeout)

@@ -41,27 +41,49 @@ implementation PR drafts its `done` status.
   Timeout/cancel sends `SIGTERM` to the dedicated process group, escalates to `SIGKILL`
   after a bounded grace period, and reports confirmed or unconfirmed group cleanup
   separately from the leader's result.
+- Kept timeout/cancel active through pipe drain even after the process-group leader has
+  exited. Pipe readers use a 25 ms `poll` interval and close their read descriptors when
+  control is stopped, so drain has an explicit bounded cancellation path rather than
+  depending only on descendant pipe EOF.
 - Added a streaming Adapter semantic-evaluator contract. It consumes every raw chunk
   before capture truncation and returns a semantic result independently from exit code.
 - Tightened spawn preflight for relative/non-file executables, NUL executable/argv/env,
   invalid environment keys, and zero/negative/non-finite timeout values.
 - Added deterministic argv/no-shell, byte-stream, invalid UTF-8, exit-zero semantic
-  failure, signal, timeout/cancel process-tree, and 1 GiB sparse-fixture contract tests.
+  failure, signal, timeout/cancel process-tree, leader-exit/descendant-pipe, and 1 GiB
+  sparse-fixture contract tests.
+
+## P1 review reproduction and remediation
+
+The review report was reproduced before the fix with
+`swift test --package-path Packages/ArkDeckKit --filter LeaderExitWhileDescendantHoldsPipes`:
+
+| Pre-fix case | Observed |
+| --- | --- |
+| leader exits immediately; child holds pipes for 3 s; request timeout 0.2 s | Failed after 3.006 s with `exited(0)` / `notRequested` instead of `timedOut`. |
+| leader exits immediately; child holds pipes for 3 s; caller cancels after 0.3 s | Failed 2.705 s after cancellation with `exited(0)` / `notRequested` instead of `cancelled`. |
+
+Root cause: `waitpid` called `markFinished` before pipe drain, and `ProcessControl.stop`
+discarded timeout/cancel after that marker. The correction removes the leader-exit gate,
+keeps the control alive until drain and process-group cleanup complete, and makes each
+pipe reader observe cancellation through bounded `poll` waits. The same two regression
+cases pass after the correction with the metrics below.
 
 ## Commands and results
 
 | Command | Result |
 | --- | --- |
 | `swift format lint Packages/ArkDeckKit/Sources/ArkDeckProcess/ArkDeckProcess.swift Packages/ArkDeckKit/Tests/ArkDeckContractTests/ProcessExecutorContractTests.swift Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ProcessExecutor/ProcessExecutorFixtures.swift` | Passed, exit 0, no diagnostics. |
-| `swift test --package-path Packages/ArkDeckKit --filter ProcessExecutorContractTests` | Passed: 8 tests, 0 failures, 0 skipped. |
-| `swift test --package-path Packages/ArkDeckKit` | Passed: 81 tests, 0 failures; 1 unrelated pre-existing manual power-observation harness skipped because `ARKDECK_POWER_OBSERVATION` was not set. |
+| `swift test --package-path Packages/ArkDeckKit --filter LeaderExitWhileDescendantHoldsPipes` (before fix) | Expected reproduction failure: 2 tests, 6 assertions failed; confirmed `exited(0)` / `notRequested` and approximately 3 s pipe-EOF delay. |
+| `swift test --package-path Packages/ArkDeckKit --filter ProcessExecutorContractTests` | Passed after fix: 10 tests, 0 failures, 0 skipped. |
+| `swift test --package-path Packages/ArkDeckKit` | Passed after fix: 83 tests, 0 failures; 1 unrelated pre-existing manual power-observation harness skipped because `ARKDECK_POWER_OBSERVATION` was not set. |
 | `scripts/check-sdd.sh` | Passed: 0 errors, 0 warnings, 111 acceptance IDs. |
 | `git diff --check` | Passed. |
 
 ## Contract counters and resource metrics
 
 Canonical metrics below are from the final filtered
-`ProcessExecutorContractTests` run at 2026-07-16 10:04 local time.
+`ProcessExecutorContractTests` run at 2026-07-16 10:32 local time.
 
 | Metric | Observed |
 | --- | ---: |
@@ -77,13 +99,21 @@ Canonical metrics below are from the final filtered
 | cancellation fixture recorded process-group members | 2 |
 | cancellation surviving recorded members | 0 |
 | cancellation forced-kill count | 1 |
+| leader-exit timeout recorded process-group members | 2 |
+| leader-exit timeout surviving recorded members | 0 |
+| leader-exit timeout forced-kill count | 1 |
+| leader-exit timeout elapsed duration | 0.519161 s |
+| leader-exit cancellation recorded process-group members | 2 |
+| leader-exit cancellation surviving recorded members | 0 |
+| leader-exit cancellation forced-kill count | 1 |
+| leader-exit elapsed duration after cancellation | 0.313267 s |
 | sparse fixture logical size | 1,073,741,824 bytes |
 | sparse fixture allocated size | 0 bytes |
 | stdout bytes consumed by streaming callback | 1,073,741,824 |
-| stdout callback dispatches | 57,620 |
+| stdout callback dispatches | 31,952 |
 | retained stdout capture | 65,536 bytes |
 | retained stderr capture | 0 bytes |
-| sampled peak RSS delta | 311,296 bytes |
+| sampled peak RSS delta | 327,680 bytes |
 | allowed peak RSS delta | 67,108,864 bytes |
 | RSS sampling failures | 0 |
 
@@ -96,9 +126,9 @@ high-water mark.
 
 | Requirement / Port | Acceptance / gate | Test evidence | Conclusion |
 | --- | --- | --- | --- |
-| `REQ-JOB-005` | `AC-JOB-005-01` / `TEST-AC-JOB-005-01` | `ProcessExecutorContractTests`: special executable path and argv round-trip; expansion sentinel; separated streams; invalid UTF-8; exit-zero semantic failure; signal/timeout/cancel/process-tree cases | **passed** (`contract`) |
-| `REQ-NFR-002` | `AC-NFR-002-01` / `TEST-AC-NFR-002-01` | 1 GiB sparse generated fixture; exact callback byte count; 64 KiB retained capture; sampled 311,296-byte peak RSS delta | **passed** (`platform`) |
-| `PORT-PROCESS-001` | absolute executable, argument array, independent byte streams, timeout/cancel, no shell, invalid preflight | Dedicated 8-case suite plus zero-launch and zero-survivor counters | **passed** (`platform`) |
+| `REQ-JOB-005` | `AC-JOB-005-01` / `TEST-AC-JOB-005-01` | `ProcessExecutorContractTests`: special executable path and argv round-trip; expansion sentinel; separated streams; invalid UTF-8; exit-zero semantic failure; signal/timeout/cancel/process-tree cases, including leader exit before descendant pipe EOF | **passed** (`contract`) |
+| `REQ-NFR-002` | `AC-NFR-002-01` / `TEST-AC-NFR-002-01` | 1 GiB sparse generated fixture; exact callback byte count; 64 KiB retained capture; sampled 327,680-byte peak RSS delta | **passed** (`platform`) |
+| `PORT-PROCESS-001` | absolute executable, argument array, independent byte streams, timeout/cancel, no shell, invalid preflight | Dedicated 10-case suite plus zero-launch, bounded-drain, and zero-survivor counters | **passed** (`platform`) |
 
 ## Deviations and residual risk
 
