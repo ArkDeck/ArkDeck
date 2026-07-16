@@ -18,6 +18,8 @@
 - **合并进 main = 人类批准**。change 的 approved、任务的 ready、baseline 的 ratified 都通过维护者批准对应 PR 生效。
 - 状态写在文档 front matter/正文中(如 proposal.md 的 `status:`),经 PR 修改;Agent 在自己的分支上可以起草状态变化,但只有维护者合并后才生效。
 - Git revision 引用一律使用完整 commit OID;branch、tag 名、缩写不构成固定引用。
+- **PR 载体与内容一致(一任务一实现 PR)**:每个任务的实现以该任务命名的独立 PR 交付;readiness、remediation 或状态 PR 不得携带超出其标题/描述所声明范围的实现内容。"合并即批准"的前提是维护者知道自己批准的是什么——载体与内容不符会使批准失真,发现后须在 evidence 或 postmortem 中记录。
+- **验证确认与实现分离**:change 的 `verified` 翻转不得只依附实现 PR 的 review;翻转 `verified` 的 PR 应只包含状态与 evidence 引用(run 记录、复验记录),使验证判断可与实现批准分开追溯。
 
 ## CI 校验(sdd-guard)
 
