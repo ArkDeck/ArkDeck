@@ -6,7 +6,7 @@ import XCTest
 final class ProcessExecutorContractTests: XCTestCase {
   private let executor = FoundationProcessExecutor()
 
-  func testAbsoluteExecutableAndArgumentsArriveWithoutShellExpansion() async throws {
+  func testTEST_AC_JOB_005_01_ArgumentArrayAvoidsShellExpansion() async throws {
     let directory = try makeTemporaryDirectory()
     defer { try? FileManager.default.removeItem(at: directory) }
 
@@ -32,16 +32,20 @@ final class ProcessExecutorContractTests: XCTestCase {
 
     XCTAssertEqual(result.termination, .exited(0))
     XCTAssertEqual(result.processGroupTermination, .notRequested)
-    XCTAssertEqual(
-      String(decoding: result.stdout.data, as: UTF8.self), arguments.joined(separator: separator))
+    let deliveredArguments = String(decoding: result.stdout.data, as: UTF8.self)
+      .components(separatedBy: separator)
+    XCTAssertEqual(deliveredArguments, arguments)
     XCTAssertEqual(result.stderr.totalByteCount, 0)
-    XCTAssertFalse(FileManager.default.fileExists(atPath: expansionSentinel.path))
+    let expansionSentinelCount =
+      FileManager.default.fileExists(atPath: expansionSentinel.path) ? 1 : 0
+    XCTAssertEqual(expansionSentinelCount, 0)
     print(
-      "M1_PROCESS argv_elements=4 direct_child_launch_count=1 shell_spawn_count=0 expansion_sentinel_count=0"
+      "M1_PROCESS payload_argv_elements=\(deliveredArguments.count) "
+        + "expansion_sentinel_count=\(expansionSentinelCount)"
     )
   }
 
-  func testPreflightRejectsInvalidRequestsBeforeChildLaunch() async throws {
+  func testTEST_AC_JOB_005_01_PreflightRejectsInvalidRequestsBeforeChildLaunch() async throws {
     let directory = try makeTemporaryDirectory()
     defer { try? FileManager.default.removeItem(at: directory) }
     let launchSentinel = directory.appendingPathComponent("launched")
@@ -96,10 +100,9 @@ final class ProcessExecutorContractTests: XCTestCase {
     }
 
     XCTAssertFalse(FileManager.default.fileExists(atPath: launchSentinel.path))
-    print("M1_PROCESS rejected_preflight_cases=9 child_launch_count=0")
   }
 
-  func testLaunchExitAndSignalHaveIndependentClassifications() async throws {
+  func testTEST_AC_JOB_005_01_LaunchExitAndSignalHaveIndependentClassifications() async throws {
     let nonzeroExit = try await executor.execute(
       ProcessRequest(executable: URL(fileURLWithPath: "/usr/bin/false"))
     )
@@ -126,7 +129,7 @@ final class ProcessExecutorContractTests: XCTestCase {
     }
   }
 
-  func testStreamsRemainSeparatedAndInvalidUTF8RoundTrips() async throws {
+  func testTEST_AC_JOB_005_01_StreamsRemainSeparatedAndInvalidUTF8RoundTrips() async throws {
     let bytes = LockedStreamBytes()
     let invalidUTF8 = try await executor.execute(
       ProcessRequest(
@@ -153,7 +156,7 @@ final class ProcessExecutorContractTests: XCTestCase {
     XCTAssertEqual(String(decoding: split.stderr.data, as: UTF8.self), "stderr-marker")
   }
 
-  func testExitZeroCanStillBeASemanticFailure() async throws {
+  func testTEST_AC_JOB_005_01_ExitZeroCanStillBeASemanticFailure() async throws {
     let directory = try makeTemporaryDirectory()
     defer { try? FileManager.default.removeItem(at: directory) }
     let fixture = directory.appendingPathComponent("semantic-exit-zero-failure.fixture")
@@ -170,15 +173,18 @@ final class ProcessExecutorContractTests: XCTestCase {
     XCTAssertEqual(result.semantic, .failure("fixture-declared-failure"))
   }
 
-  func testTimeoutTerminatesTheControlledProcessGroup() async throws {
+  func testTEST_AC_JOB_005_01_TimeoutTerminatesTheControlledProcessGroup() async throws {
     let result = try await executeIgnoringProcessTree(using: executor, timeout: 0.5)
 
     XCTAssertEqual(result.termination, .timedOut)
     XCTAssertEqual(result.processGroupTermination, .noSurvivingMembers(forcedKill: true))
-    try assertRecordedProcessTreeHasNoSurvivors(result.stdout.data)
+    try assertRecordedProcessTreeHasNoSurvivors(
+      result.stdout.data,
+      processGroupTermination: result.processGroupTermination
+    )
   }
 
-  func testCancellationTerminatesTheControlledProcessGroup() async throws {
+  func testTEST_AC_JOB_005_01_CancellationTerminatesTheControlledProcessGroup() async throws {
     let executor = FoundationProcessExecutor()
     let task = Task { try await executeIgnoringProcessTree(using: executor, timeout: nil) }
     try await Task.sleep(nanoseconds: 200_000_000)
@@ -187,10 +193,13 @@ final class ProcessExecutorContractTests: XCTestCase {
 
     XCTAssertEqual(result.termination, .cancelled)
     XCTAssertEqual(result.processGroupTermination, .noSurvivingMembers(forcedKill: true))
-    try assertRecordedProcessTreeHasNoSurvivors(result.stdout.data)
+    try assertRecordedProcessTreeHasNoSurvivors(
+      result.stdout.data,
+      processGroupTermination: result.processGroupTermination
+    )
   }
 
-  func testTimeoutStillControlsGroupAfterLeaderExitWhileDescendantHoldsPipes() async throws {
+  func testTEST_AC_JOB_005_01_TimeoutSurvivesLeaderExit() async throws {
     let startedAt = Date()
     let result = try await executeLeaderExitWithPipeHoldingChild(using: executor, timeout: 0.2)
     let elapsed = Date().timeIntervalSince(startedAt)
@@ -198,11 +207,14 @@ final class ProcessExecutorContractTests: XCTestCase {
     XCTAssertEqual(result.termination, .timedOut)
     XCTAssertEqual(result.processGroupTermination, .noSurvivingMembers(forcedKill: true))
     XCTAssertLessThan(elapsed, 1.5)
-    try assertRecordedProcessTreeHasNoSurvivors(result.stdout.data)
+    try assertRecordedProcessTreeHasNoSurvivors(
+      result.stdout.data,
+      processGroupTermination: result.processGroupTermination
+    )
     print("M1_LEADER_EXIT timeout_elapsed_seconds=\(elapsed)")
   }
 
-  func testCancellationStillControlsGroupAfterLeaderExitWhileDescendantHoldsPipes() async throws {
+  func testTEST_AC_JOB_005_01_CancellationSurvivesLeaderExit() async throws {
     let executor = FoundationProcessExecutor()
     let task = Task {
       try await executeLeaderExitWithPipeHoldingChild(using: executor, timeout: nil)
@@ -216,11 +228,14 @@ final class ProcessExecutorContractTests: XCTestCase {
     XCTAssertEqual(result.termination, .cancelled)
     XCTAssertEqual(result.processGroupTermination, .noSurvivingMembers(forcedKill: true))
     XCTAssertLessThan(elapsedAfterCancellation, 1.5)
-    try assertRecordedProcessTreeHasNoSurvivors(result.stdout.data)
+    try assertRecordedProcessTreeHasNoSurvivors(
+      result.stdout.data,
+      processGroupTermination: result.processGroupTermination
+    )
     print("M1_LEADER_EXIT cancellation_elapsed_seconds=\(elapsedAfterCancellation)")
   }
 
-  func testOneGiBSparseFixtureUsesBoundedCaptureAndMemory() async throws {
+  func testTEST_AC_NFR_002_01_OneGiBSparseFixtureUsesBoundedCaptureAndMemory() async throws {
     let directory = try makeTemporaryDirectory()
     defer { try? FileManager.default.removeItem(at: directory) }
     let sparseFixture = directory.appendingPathComponent("one-gib-sparse.fixture")
@@ -268,6 +283,7 @@ final class ProcessExecutorContractTests: XCTestCase {
 
   private func assertRecordedProcessTreeHasNoSurvivors(
     _ data: Data,
+    processGroupTermination: ProcessGroupTerminationResult,
     file: StaticString = #filePath,
     line: UInt = #line
   ) throws {
@@ -285,9 +301,17 @@ final class ProcessExecutorContractTests: XCTestCase {
     )
 
     for _ in 0..<100 {
-      if identifiers.allSatisfy({ Darwin.kill($0, 0) == -1 && errno == ESRCH }) {
+      let survivors = identifiers.filter { Darwin.kill($0, 0) == 0 || errno != ESRCH }
+      if survivors.isEmpty {
+        let forcedKillObserved: Bool
+        switch processGroupTermination {
+        case .notRequested:
+          forcedKillObserved = false
+        case .noSurvivingMembers(let forcedKill), .unconfirmed(let forcedKill):
+          forcedKillObserved = forcedKill
+        }
         print(
-          "M1_PROCESS_TREE recorded_pids=\(identifiers.count) surviving_descendants=0 forced_kill_count=1"
+          "M1_PROCESS_TREE recorded_pids=\(identifiers.count) surviving_recorded_processes=\(survivors.count) forced_kill_observed=\(forcedKillObserved ? 1 : 0)"
         )
         return
       }
@@ -334,7 +358,7 @@ private struct FailureMarkerEvaluator: ProcessSemanticEvaluating {
     if foundFailure {
       return .failure("fixture-declared-failure")
     }
-    return execution.termination == .exited(0) ? .success : .indeterminate
+    return execution.termination == .exited(0) ? .success : .unknownOutput
   }
 }
 

@@ -84,7 +84,7 @@ public struct ProcessExecutionResult: Sendable, Equatable {
 public enum ProcessSemanticResult<Failure: Sendable & Equatable>: Sendable, Equatable {
   case success
   case failure(Failure)
-  case indeterminate
+  case unknownOutput
 }
 
 /// Streaming semantic classification supplied by a tool Adapter. Evaluators

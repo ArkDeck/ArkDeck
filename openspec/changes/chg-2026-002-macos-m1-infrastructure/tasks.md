@@ -251,7 +251,11 @@
 
 ## TASK-M1-010 — M1 复审修复:证据计数、测试信号与语义词汇收敛
 
-- Status:ready
+- Status:done
+- Completion evidence:`evidence/runs/TASK-M1-010/run.md`，并已在
+  `evidence/runs/TASK-M1-002/run.md` 原正文之后追加 evidence-integrity addendum；状态仅在
+  维护者 review/merge 后生效，不构成 change verified、platform conformance、release claim 或
+  真实硬件 evidence。
 - Readiness gate:本任务范围与 `ready` 状态仅在维护者 review/merge 本 readiness PR 后
   生效；readiness PR 只修改本任务条目，不执行实现、不生成 evidence、不修改其他任务状态，
   也不改变 Core、contract、platform conformance 或 release claim。

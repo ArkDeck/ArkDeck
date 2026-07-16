@@ -150,3 +150,44 @@ high-water mark.
 All TASK-M1-002 deliverables and its evidence gate are satisfied. The drafted `done`
 state becomes authoritative only after maintainer review and merge; this record does
 not mark the change verified or alter macOS conformance/release status.
+
+## Evidence-integrity addendum — TASK-M1-010 (2026-07-16)
+
+This addendum preserves the original TASK-M1-002 body above unchanged. Its purpose is
+to correct the classification of the original `ProcessExecutorContractTests` console
+echoes; it does not change TASK-M1-002's implementation, AC results, evidence class,
+or any Core/product behavior.
+
+### Classification correction
+
+The original table's `argv elements`, `direct child launches`, `host-shell spawns`,
+`invalid preflight cases`, `child launches`, and `forced-kill count` values were test
+source literals or fixture cardinalities echoed to stdout. They were asserted by the
+tests' surrounding behavior, but were not independently instrumented runtime metrics.
+They must therefore not be read as direct runtime measurements.
+
+TASK-M1-010 removes the echoes that cannot be directly observed and changes the
+remaining console output to report values from this run:
+
+| Current output | Classification | How observed |
+| --- | --- | --- |
+| `payload_argv_elements=3` | runtime test observation | split from the direct probe's captured stdout |
+| `expansion_sentinel_count=0` | runtime test observation | filesystem lookup after the process completes |
+| `recorded_pids=2`, `surviving_recorded_processes=0` | runtime test observation | PIDs parsed from fixture stdout and then probed with `kill(pid, 0)` |
+| `forced_kill_observed=1` | runtime executor result | `ProcessGroupTerminationResult.noSurvivingMembers(forcedKill:)`; this is a Boolean, not a signal-invocation count |
+| leader-exit elapsed time, sparse logical/allocated sizes, streamed byte count, dispatch count, retained captures, sampled RSS delta | runtime test observation | current test execution, filesystem metadata, stream callback, retained capture, and Mach RSS sampling |
+
+The prior `argv elements delivered to direct probe = 4` combined the printf format
+argument with three payload arguments. The replacement reports the three payload
+arguments actually recovered from stdout. No direct child-launch or host-shell-spawn
+counter exists in the executor, so those values are deliberately no longer emitted.
+
+### Integrity re-run
+
+On macOS 26.5.2 (25F84), arm64, with Xcode 26.6 (17F113) and Swift 6.3.3,
+TASK-M1-010 ran `swift test --package-path Packages/ArkDeckKit --filter
+ProcessExecutorContractTests`: 10 tests passed, 0 failures. The final full suite ran
+102 tests with 0 failures and 1 unrelated manual power-observation harness skipped.
+Current emitted values are recorded in
+`evidence/runs/TASK-M1-010/run.md`; they are local contract/platform evidence only,
+not hardware, HDC ownership, network, destructive-operation, or release evidence.

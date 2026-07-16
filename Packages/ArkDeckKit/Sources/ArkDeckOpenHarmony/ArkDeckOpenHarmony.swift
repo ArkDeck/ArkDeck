@@ -185,6 +185,8 @@ public enum HDCCommandFailure: Sendable, Equatable {
 /// A bounded streaming parser for the currently declared fixture family. An
 /// exit status of zero is necessary but deliberately insufficient for success.
 /// Future output families must be added through an integration-profile change.
+/// TASK-M1-006 will adopt `ProcessSemanticEvaluating`; this task deliberately
+/// leaves that parser/executor wiring unchanged.
 public struct HDCSemanticOutputParser: Sendable {
     private static let failureMarkers: [[UInt8]] = [
         Array("unauthorized".utf8),
