@@ -1,0 +1,12 @@
+schema: arkdeck-change-scope-1
+change_id: CHG-2026-005-hdc-parser-golden-registration
+revision: 2
+requirements:
+  - OPENHARMONY-TOOLS@0.1.0
+  - POL-HDC-001
+  - REQ-HDC-001
+  - REQ-HDC-002
+  - REQ-HDC-003
+  - REQ-HDC-005
+acceptance:
+  - AC-HDC-005-01

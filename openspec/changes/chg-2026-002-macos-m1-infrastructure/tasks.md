@@ -347,14 +347,117 @@
 
 ## TASK-M1-005 — Session/Artifact store、manifest 管线与 host-volume 协调
 
-- Status:ready
-- Requirements/AC:AC-ART-001-01、AC-ART-002-01、AC-STO-* 等
-- Depends on:TASK-M1-001、TASK-M1-003
-- Allowed paths:`.../ArkDeckStorage/**`、对应 Tests、本 change `evidence/**`
+- Status:blocked
+- Blocker:原条目只有占位标题、笼统 AC 与 allowed path，未满足 Definition of Ready，也未
+  承诺 M1-006 所需的 durable audit/manifest seam。本 r3 修订补齐完整 task contract；只有
+  维护者合入后，再由独立 readiness/status PR 核对依赖、接口形状与验证环境，才能恢复
+  `ready`。在此之前不得执行源码或生成 implementation evidence。
+- Readiness amendment:本段只定义 M1-005 自身的完整范围与 production seam，不执行任务、
+  不产生 evidence，也不把其状态改成 `done`；仅在维护者 review/merge 后生效。
+- Objective:在 M1-003 已锁定 journal/recovery 语义之上交付 production Session layout、
+  Artifact/manifest publication、host-volume admission/retention，以及供上层 workflow 使用的
+  通用 durable Session audit 与 manifest publisher；Storage 不依赖 HDC/UI，也不铸造执行
+  authority。
+- Requirements/AC:`REQ-ART-001`…`REQ-ART-006`、`REQ-STO-001`…`REQ-STO-005`，
+  `AC-ART-001-01`、`AC-ART-002-01`、`AC-ART-003-01`、`AC-ART-004-01`、
+  `AC-ART-005-01`、`AC-ART-006-01`、`AC-ART-006-02`、`AC-STO-001-01`、
+  `AC-STO-002-01`、`AC-STO-003-01`、`AC-STO-004-01`、`AC-STO-005-01`；
+  `MAC-M1-STORE-001`。
+- Depends on:
+  - `TASK-M1-001`（done；提供 typed step/Job/confirmation vocabulary）
+  - `TASK-M1-003`（done；提供 locked journal codec、`DurableJournalAppending` 与 recovery
+    durability primitives；本任务不改变其 schema/replay 语义）
+- In scope:
+  - 按规范建立每 Job 独立 Session layout，保留 journal/snapshot、command/event audit、
+    raw/derived、partial 与 final manifest；失败/cancel/interrupted 不伪装 success；
+  - 流式 Artifact hash/write、`.part` + validation + atomic publication、immutable raw 与 derived
+    lineage、默认受控引用而非复制大镜像、privacy export 与 pinned retention；
+  - volume identity、metadata/finalization headroom、并发 admission、运行期 ENOSPC 与重挂
+    identity fail-closed；
+  - 公开通用 `DurableSessionAuditAppending` production seam：接受有界、canonical、typed
+    `SessionAuditRecord`（至少含 schema/record/audit/correlation/session/job IDs、category、
+    timestamp 与结构化 details），`appendAndSynchronize` 仅在 durable 后返回；支持关闭重开
+    后按 correlation replay，写失败显式抛错，不以 actor 内存状态替代 durability；
+  - 公开 `SessionManifestPublishing` production seam：按 locked `manifest.schema.json` 原子
+    发布，支持既有 `confirmations[]` 中的 `serverLifecycle` kind 与 related Step IDs；manifest
+    只是 durable record，不产生或扩大 confirmation/step authority；
+  - audit/manifest seam 保持 Storage-neutral，不 import ArkDeckOpenHarmony/SwiftUI，不解释
+    HDC output，不执行进程；M1-006 负责把 HDC preview/confirmation/intent/actual argv/outcome
+    映射为上述通用 record 并验证 host-wide correlation。
+- Out of scope:修改 locked journal/manifest/workflow-step contract 或 Core AC；HDC-specific
+  mapping/supervisor/UI、device binding、真实设备/网络、任何 device/destructive dispatch；
+  通用 History UI 与 release/conformance 状态。
+- Allowed paths:
+  - `Packages/ArkDeckKit/Sources/ArkDeckStorage/**`
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/SessionArtifactStorageContractTests.swift`
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/SessionStorage/**`
+  - `openspec/changes/chg-2026-002-macos-m1-infrastructure/evidence/runs/TASK-M1-005/**`
+  - `openspec/changes/chg-2026-002-macos-m1-infrastructure/tasks.md`（仅更新本任务状态与
+    completion evidence）
+- Forbidden paths:`openspec/specs/**`、`openspec/contracts/**`、`openspec/baselines/**`、
+  `openspec/platforms/**`、`openspec/integrations/**`、除 ArkDeckStorage 外的所有 Sources、
+  上述清单以外的 Tests/Fixtures、其他 task/change evidence 与其他 Task 状态。
+- Risk:high（durable publication、ENOSPC、volume identity、并发额度与 retention；全部验证
+  使用临时目录/sparse fixture/fault injection，无设备、HDC、外联网络或 destructive side
+  effect）
+- Hardware required:no
+- Deliverables:production Session/Artifact/volume store；`DurableSessionAuditAppending` +
+  reopen/replay implementation；`SessionManifestPublishing` + locked-schema atomic publisher；
+  12 个 canonical `TEST-AC-ART/STO-*` 与 `TEST-MAC-M1-STORE-001` dedicated tests；run evidence。
+- Verification:
+  - `TEST-AC-ART-001-01`…`TEST-AC-ART-006-02` 按 acceptance registry 的
+    artifactContract/property/faultInjection/manifestSchema/privacyExport/retention methods
+    覆盖完整 Scenario；
+  - `TEST-AC-STO-001-01`…`TEST-AC-STO-005-01` 按 volume identity、headroom、concurrency、
+    ENOSPC 与 remount fault methods 覆盖完整 Scenario；
+  - `TEST-MAC-M1-STORE-001` 汇总同卷共享 budget、第二 heavy writer wait/reject、metadata
+    headroom、runtime ENOSPC finalize 与不同 volume identity 拒绝；
+  - seam contract:preview/confirmation/intent/outcome 类别的 generic audit record 分别
+    append+sync，关闭并重开后 record bytes/order/correlation 完整；注入 intent/confirmation
+    write failure 时调用方收到 failure，不能得到“durable”成功；manifest 的
+    `serverLifecycle` confirmation 与 related Step IDs round-trip，unknown/extra/partial 文件
+    fail closed；
+  - Commands:`swift format lint <TASK-M1-005 changed Swift files>`；
+    `swift test --package-path Packages/ArkDeckKit --filter SessionArtifactStorageContractTests`；
+    `swift test --package-path Packages/ArkDeckKit`；`scripts/check-sdd.sh`；
+    `git diff --check`。
+- Evidence gate:run 记录 base revision、输入 hash、volume/filesystem/toolchain、全部命令与
+  结果、fault window、logical/allocated bytes、claims/headroom、audit fsync/reopen/replay、
+  manifest hash/round-trip 与全部 13 个 Test ID 的二值结论。缺任一项不得标记 `done`；
+  evidence 不包含 HDC capability、真实硬件、platform conformance 或 release claim。
 
 ## TASK-M1-006 — HDC supervisor、endpoint 隔离、授权工作流与 fake-hdc 对抗
 
-- Status:ready
+- Status:blocked
+- Blockers:
+  - Change-design gate:CHG-002 r2 design 明确排除“任何功能 UI”，与本任务认领的 HDC UI
+    Scenario 冲突。本 r3 proposal/design/spec-impact/verification 修订必须先由维护者合入；
+    tasks.md 不得单方面覆盖原 design。
+  - Semantic fixture gate:`AC-HDC-005-01` 的 minimum evidence 是 `parserGolden`，且
+    fake-hdc matrix 还需要 success/healthy/version 等被 adapter 当成已支持的 semantic
+    output。accepted `CORE-CONFORMANCE-2.0.0` 与 `INTEGRATION-PROFILES-0.2.0` 仍均
+    声明 `fixtures: []`；CHG-005 r1 草案也只登记 failure bytes，r2 虽已补入完整 gate，
+    但 success/healthy/version provenance 仍未提供且 change 尚未 approved。必须先由 approved
+    `CHG-2026-005-hdc-parser-golden-registration` 对 M1-006 使用的每个 supported raw
+    output family 提供可审查 provenance、version/hash pin 与 profile mapping；缺少
+    success/healthy/version 任一项时保持 blocked。M1-006 不得自行制造 golden 后判 pass。
+  - UI gate:本任务认领全部 15 个 HDC AC，其中 `AC-HDC-001-02`、
+    `AC-HDC-006-01`、`AC-HDC-007-02`、`AC-HDC-008-01` 与
+    `AC-HDC-010-01` 含明确 UI 结果；`AC-HDC-003-01` 还要求向用户提供诊断与确认式
+    恢复选项，`AC-HDC-009-01` 要求 capability 可显示，`REQ-HDC-010` 要求 lifecycle
+    impact preview 在 UI 展示。原 task 禁止 `ArkDeckApp/**`，纯 domain/contract 测试无法
+    证明完整 Scenario。本 r3 修订在 change-level design 中纳入最小 HDC UI surface，并为
+    macOS XCUITest 补入精确 allowed paths；仅在维护者 review/merge 后生效。
+  - Durable-audit gate:`AC-HDC-010-02` 要求 durable host-wide audit，但当前 production
+    只有 `InMemoryHDCServerLifecycleAuditStore`；M1-005 原占位条目也未承诺任何可依赖
+    writer。本 r3 修订先把 M1-005 标记 blocked 并明确
+    `DurableSessionAuditAppending`/`SessionManifestPublishing` contract。只有该 task 经独立
+    readiness、实现为 `done` 且 reopen/replay/confirmation tests 有证据后，M1-006 才能
+    依赖；不得把未来接口当成当前事实。
+- Unblock gate:CHG-002 r3 design amendment 已合入；CHG-005 的 failure +
+  success/healthy/version fixture/profile 登记已合入；`TASK-M1-005` 已 `done` 且上述两个
+  seam 有可复查 evidence；随后由独立 readiness/status PR 重算全部输入，才能恢复
+  `ready`。在此之前不执行源码、测试或 implementation evidence 改动。
 - Readiness amendment:本任务包的精确范围与 verification gate 仅在维护者 review/merge
   后生效；本 readiness PR 不执行 TASK-M1-006、不产生实现 evidence，也不改变任何 Core、
   contract、platform conformance、release claim 或其他 Task 状态。
@@ -367,7 +470,8 @@
   fan-out、critical gate 与过期确认按 contract 阻断。
 - Requirements/AC:`REQ-HDC-001`…`REQ-HDC-010`（继承 `POL-HDC-001`）；
   `AC-HDC-001-01`、`AC-HDC-001-02`、`AC-HDC-002-01`、`AC-HDC-003-01`、`AC-HDC-003-02`、
-  `AC-HDC-004-01`、`AC-HDC-005-01`（adapterGolden，fixture 在本 change 落地）、
+  `AC-HDC-004-01`、`AC-HDC-005-01`（adapterGolden，只读消费 CHG-2026-005
+  登记并 hash-pin 的 fixture）、
   `AC-HDC-006-01`、`AC-HDC-007-01`、`AC-HDC-007-02`、`AC-HDC-008-01`、`AC-HDC-009-01`、
   `AC-HDC-010-01`、`AC-HDC-010-02`、`AC-HDC-010-03`；`MAC-M1-HDC-001`。本 change 内
   HDC 域 AC 全部由本任务认领，不与 TASK-M1-007（REQ-DEV）重叠。
@@ -378,6 +482,9 @@
   - `TASK-M1-003`（done；PR #27 merge commit
     `c5c82b757d9baa91164fe5feae65d5806089f8df`；提供 journal/audit durability 边界，本任务
     只经既有接口写 lifecycle audit，不改 durability 或 recovery 语义）
+  - `TASK-M1-005`（当前 blocked/not done；只有按 r3 task contract 交付并验证 production
+    `DurableSessionAuditAppending`、`SessionManifestPublishing` 后，本任务才能通过其公开
+    边界做 lifecycle audit adapter；不得预设占位任务会提供接口）
   - `TASK-M1-010`（done；PR #30 merge commit
     `6725bb375e0fee1b261efa9e2adc6cd1e95e6237`；统一 `unknownOutput` 语义族并声明本任务
     执行 parser/executor 接线）
@@ -389,7 +496,16 @@
     server generation/健康变化对共享 endpoint 的全部 recipient 恰好一次 fan-out；
   - `mutateHDCServerLifecycle` typed-step 门禁收敛：impact preview、精确 generation/action
     确认、dispatch 前重验证、critical-Job 阻断、过期确认失效与 host-wide audit/broadcast
-    按 REQ-HDC-010 三个 Scenario 落地；audit 只经 TASK-M1-003 既有 journal/audit 接口；
+    按 REQ-HDC-010 三个 Scenario 落地；audit 只经 TASK-M1-005 已交付并验证的
+    durable Session audit/manifest seam（其内部复用 M1-003 durability primitive）；
+  - Production durable audit adapter:在 `ArkDeckWorkflows` 组合
+    `HDCServerLifecycleAuditStore`、TASK-M1-005 `DurableSessionAuditAppending` 与
+    `SessionManifestPublishing`；impact snapshot、user confirmation、typed-step intent、实际
+    executable/argv/endpoint、outcome、generation 变化与 affected Job/coordinator IDs 使用同一
+    step/audit correlation 持久化。intent/confirmation 未 durable 时 lifecycle executor dispatch
+    为 0；outcome 持久失败时保留 `outcomeUnknown` 并对全部 recipient 广播
+    reconcile；关闭并重开 durable store 后必须可复查完整 audit，不得以内存
+    actor state 充当证据；
   - Toolchain snapshot 与诊断：external-first 候选发现固定 absolute path、来源、hash、
     client/server/daemon version、endpoint 与 server generation 进 Job intent；不可探测字段
     显式 unknown/unverified，不省略、不猜测；`PATH` 顺序变化不得让运行中 Job 静默换工具；
@@ -400,94 +516,147 @@
     区分 ready/denied/timedOut），不为重新弹窗 kill server；key 只记录公钥指纹与诊断，
     不复制/删除/上传私钥、不硬编码 key 路径；授权状态与 channel protection 独立建模，
     `encryptedVerified` 需版本化 evidence，否则 `unverifiedAssumeUnprotected`；
+  - 最小 HDC UI 闭环：实际 macOS UI 只消费已验证 presentation/use-case
+    state，展示 toolchain 全部诊断字段与 unknown/unverified、key 权限错误、
+    denied/timedOut + 非破坏重试路径、authorization/channel protection 独立状态及
+    不受保护 TCP 警告、external/unknown ownership 的诊断与仅用户确认的恢复选项、
+    subserver capability/unknown 的只读展示、critical Job/Step/safe-boundary 阻断说明，以及 lifecycle
+    action/endpoint/generation/ownership/affected devices+Jobs/other-client uncertainty/
+    interruption/recovery impact preview。UI 不直接执行进程，不从文案或按钮铸造
+    authority；输入只来自上述 domain/use-case state；
   - Parser/semantic 收敛：`HDCSemanticOutputParser` 经 `ProcessSemanticEvaluating` 接入
-    executor；`AC-HDC-005-01` 的 exit-0 + `[Fail]`/错误码/Unauthorized/Offline golden
-    fixture 在仓库落地，raw stdout/stderr 可查；未知 output family 保持 unsupported/raw，
-    不得放宽 marker/正则（增加 family 属于 integration change）；
-  - fake-hdc 对抗 fixture：dedicated 可执行 target 以真实子进程模拟已声明 output family
-    （healthy、version mismatch、unauthorized E000002/E000003、`[Fail]`、offline、hang/slow、
-    garbage/oversized），驱动 supervisor/授权/parser 全矩阵（`MAC-M1-HDC-001`）；fixture
-    仅使用 loopback ephemeral endpoint 与本地进程/文件通信，不 bind 固定保留端口。
+    executor；只读消费 CHG-2026-005 登记的 success/healthy/version 与
+    `AC-HDC-005-01` exit-0 + `[Fail]`/错误码/Unauthorized/Offline golden fixture，raw
+    stdout/stderr 可查；只接受 profile 声明且 pinned 的 family，未知 output 保持
+    unsupported/raw，不得改写 pinned fixture 或放宽 marker/正则（增加 family 属于
+    integration change）；
+  - fake-hdc 对抗 fixture：dedicated 可执行 target 以真实子进程回放 CHG-005
+    approved/pinned semantic raw bytes（success/healthy/version、unauthorized E000002/E000003、
+    `[Fail]`、offline）并提供 hang/slow/crash/oversized 等 process fault vectors，驱动
+    supervisor/授权/parser 全矩阵（`MAC-M1-HDC-001`）。未登记 raw family 一律
+    unknown/unsupported；hang/slow/crash/oversized 只证明 process/fault behavior，不冒充
+    semantic golden。fixture 仅使用 loopback ephemeral endpoint 与本地进程/文件通信，
+    不 bind 固定保留端口。
 - Out of scope:device binding revision、transport 重绑定与 per-device mutation lane
   （TASK-M1-007）；SimulatedFlashProvider（TASK-M1-008）；journal codec/durability 或
   recovery 语义修改（TASK-M1-003）；执行任何已安装真实 `hdc`（`hdc version` 会隐式拉起
   host server——M0A 结论，探测一律走 fake-hdc fixture）；真实 server kill/restart、真实
   设备、loopback 之外的网络、任何 device/destructive dispatch；`MAC-M0A-HDC-001` blocked
   行的状态处理（独立治理动作）；以及修改 Core Requirement/AC、locked contract、baseline、
-  platform/integration profile 或 conformance/release 状态。
+  platform/integration profile 或 conformance/release 状态。HDC Scenario 明确要求之外的通用
+  navigation、History、UI Dump/Trace/Debug/Flash UI 与 `REQ-I18N-001` 整体验收仍不在本任务。
 - Allowed paths:
   - `Packages/ArkDeckKit/Sources/ArkDeckOpenHarmony/**`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/HDCServerLifecycleJournalAdapter.swift`
   - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/ArkDeckContractTests.swift`
     （仅迁移/收敛既有 `ProcessAndHDCContractTests` 与 `HDCServerSupervisorContractTests`
     cases）
   - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/HDCSupervisorContractTests.swift`
     （dedicated suite，可含多个 XCTestCase class）
-  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/**`
   - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDCServer/**`
   - `Packages/ArkDeckKit/Tests/ArkDeckFakeHDCFixture/**`
-  - `Packages/ArkDeckKit/Package.swift`（仅注册/连接 dedicated fake-hdc fixture target）
+  - `ArkDeckApp/App/ArkDeckApp.swift`（仅接入 HDC diagnostics/lifecycle surface）
+  - `ArkDeckApp/Features/HDC/**`
+  - `ArkDeckApp/Resources/Localizable.xcstrings`（仅新增本任务 HDC UI key，不认领
+    `REQ-I18N-001`）
+  - `ArkDeckAppUITests/HDC/**`
+  - `ArkDeck.xcodeproj/project.pbxproj`（仅连接 ArkDeckOpenHarmony/Workflows products
+    与注册 HDC UI-test target/files）
+  - `ArkDeck.xcodeproj/xcshareddata/xcschemes/ArkDeck.xcscheme`（仅注册 HDC UI tests）
+  - `Packages/ArkDeckKit/Package.swift`（仅注册/连接 dedicated fake-hdc fixture target，
+    以及将 `ArkDeckWorkflows` 连接到 `ArkDeckOpenHarmony`/`ArkDeckStorage` 以提供
+    production lifecycle journal/manifest adapter；Golden resource declaration 由 I5-001
+    独占，本任务不得修改）
   - `openspec/changes/chg-2026-002-macos-m1-infrastructure/evidence/runs/TASK-M1-006/**`
   - `openspec/changes/chg-2026-002-macos-m1-infrastructure/tasks.md`（仅更新本任务状态与
     completion evidence）
 - Forbidden paths:`openspec/specs/**`、`openspec/contracts/**`、`openspec/baselines/**`、
-  `openspec/platforms/**`、`openspec/integrations/**`、`ArkDeckApp/**`、
+  `openspec/verification/**`、
+  `openspec/platforms/**`、`openspec/integrations/**`、
   `Packages/ArkDeckKit/Sources/ArkDeckCore/**`、`.../ArkDeckProcess/**`、
-  `.../ArkDeckRuntime/**`、`.../ArkDeckStorage/**`、`.../ArkDeckWorkflows/**`、
-  上述清单以外的 Tests/Fixtures、其他 task/change evidence 与其他 Task 状态。
-- Risk:medium（host-wide supervisor 并发 contract + 真实本地 fake-hdc 子进程矩阵；验证
+  `.../ArkDeckRuntime/**`、`.../ArkDeckStorage/**`、除上述精确列出的
+  `HDCServerLifecycleJournalAdapter.swift` 之外的 `.../ArkDeckWorkflows/**`、
+  `Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Golden/**`、
+  上述清单以外的 App/UI tests/Tests/Fixtures、其他 task/change evidence 与其他
+  Task 状态。
+- Risk:high（host-wide supervisor 并发 contract + durable lifecycle audit/confirmation 接线 +
+  安全阻断 UI + 真实本地 fake-hdc 子进程矩阵；验证
   仅使用仓库 fixture 可执行档、loopback ephemeral endpoint、临时目录与既有 audit 接口，
   无真实 hdc、设备、外联网络或 destructive side effect）
 - Hardware required:no
 - Required environment:macOS + 仓库声明的 Swift/Xcode toolchain；仅使用仓库内 fixture，
   不要求安装 HDC/DevEco、不下载依赖、不要求外部服务；测试不得执行已安装真实 `hdc`，
-  fixture 网络仅限 loopback ephemeral port。锁定 `OPENHARMONY-TOOLS@0.1.0` profile 的
-  version 与 SHA-256 作为 run 输入。
+  fixture 网络仅限 loopback ephemeral port。锁定 CHG-005 合入后的
+  `OPENHARMONY-TOOLS` successor profile version/SHA-256 与完整 Golden resource registry
+  作为 run 输入；当前 0.1.0/空 registry 不满足执行门禁。
 - Deliverables:接入 ProcessExecutor/`ProcessSemanticEvaluating` 的生产级 supervisor 与
   discovery/toolchain snapshot；endpoint 隔离解析器；授权工作流 + channel-protection 状态
-  机；`AC-HDC-005-01` golden fixtures；dedicated fake-hdc fixture target 与全矩阵 contract
-  suite；带 `TEST-AC-HDC-*` 锚点的 dedicated tests；实现 PR 必须声明公开 API 变更（若有）。
+  机；经 I5-001 建立的 `Bundle.module` resource contract 只读消费 approved/pinned
+  HDC golden fixtures；dedicated fake-hdc
+  fixture target 与全矩阵 contract suite；production lifecycle Session audit/manifest adapter 与
+  restart/reopen durability tests；覆盖全部 user-visible HDC Scenario 的最小 macOS UI +
+  XCUITest suite；带 `TEST-AC-HDC-*` 锚点的 dedicated tests；实现 PR 必须声明公开
+  API 变更（若有）。
   自动 lifecycle/subserver 调用计数等证据输出必须是仪表化 hook 实测值而非分支常量
   （TASK-M1-010/004 准则）；若实现发现必须改变产品行为、安全语义或 locked contract，
   须停止并先修订 Task/设计或走独立 change。
 - Verification:
   - `TEST-AC-HDC-001-01` / `toolchainContract`（contract）与 `TEST-AC-HDC-001-02` /
     `toolchainDiagnosticsContract`（platform）:Job intent 固定 path/hash/version/endpoint/
-    generation，后续设置变化不影响该 Job；诊断字段完整或显式 unknown/unverified；
+    generation，后续设置变化不影响该 Job；持久化诊断与 macOS XCUITest
+    均显示全部字段或显式 unknown/unverified；纯 domain snapshot 测试不单独判定
+    `AC-HDC-001-02` passed；
   - `TEST-AC-HDC-002-01` / `supervisorContract`（contract）:同 endpoint 两 recipient 对
     generation/健康变化各收到同一 host-wide 事件恰好一次，不误报单设备故障；
   - `TEST-AC-HDC-003-01` / `lifecycleCallCounter`（contract）与 `TEST-AC-HDC-003-02` /
     `ownershipEvidenceContract`（contract）:external server 探测/授权失败/版本不匹配下
-    自动 stop 调用计数恒 0；`arkDeckManaged` 仅凭启动证据建立；
+    自动 stop 调用计数恒 0；macOS XCUITest 同时显示 ownership/generation/diagnostics 与
+    仅经用户确认进入 lifecycle impact preview 的恢复选项；`arkDeckManaged` 仅凭启动证据建立；
   - `TEST-AC-HDC-004-01` / `endpointIsolationContract`（platform）:显式 endpoint 只进子
     进程 env，用户全局环境前后不变；
-  - `TEST-AC-HDC-005-01` / `adapterGolden`（parserGolden）:golden fixture 证明 exit 0 +
-    失败 marker 非 success 且 raw 可查；
+  - `TEST-AC-HDC-005-01` / `adapterGolden`（parserGolden）:测试只经 `Bundle.module` 读取
+    registry-pinned golden，证明 exit 0 + 失败 marker 非 success 且 raw 可查；不得使用
+    `#filePath`/checkout-relative fallback；
   - `TEST-AC-HDC-006-01` / `platformFileAccessContract`（platform）:key 不可访问时给出
-    可诊断错误，不删 key、不重置目录、不自动重启共享 server；
+    可诊断错误，macOS XCUITest 证明 UI 显示该错误；不删 key、不重置目录、
+    不自动重启共享 server；
   - `TEST-AC-HDC-007-01` / `authorizationWorkflowContract`（contract）与
     `TEST-AC-HDC-007-02` / `authorizationFaultInjection`（contract）:信任完成迁移 ready
-    且身份匹配时 Job 继续；拒绝/超时区分 denied/timedOut，无 server lifecycle mutation；
+    且身份匹配时 Job 继续；拒绝/超时区分 denied/timedOut，macOS XCUITest
+    显示对应结果与非破坏性重试路径，server lifecycle mutation 计数为 0；
   - `TEST-AC-HDC-008-01` / `securityStateContract`（contract）:已授权 TCP 无协商证据时
-    显示 channel protection unverified，不从授权/版本/env 推断加密；
-  - `TEST-AC-HDC-009-01` / `subserverCallCounter`（contract）:subserver 能力只读探测，
+    domain 保持 channel protection unverified，macOS XCUITest 同时显示 authorized、
+    protection unverified 与只在可信隔离网络使用的警告，不从授权/版本/env
+    推断加密；
+  - `TEST-AC-HDC-009-01` / `subserverCallCounter`（contract + macOS UI closure）:subserver
+    能力只读探测，macOS XCUITest 显示 supported/unsupported/unknown capability 与只读语义，
     自动 spawn-sub/killall-sub 调用计数恒 0；
   - `TEST-AC-HDC-010-01` / `lifecycleCriticalGateContract`、`TEST-AC-HDC-010-02` /
     `lifecycleAuditContract`、`TEST-AC-HDC-010-03` / `lifecycleRaceFaultInjection`
-    （均 contract）:critical Step 阻断 dispatch 且计数 0；impact 确认记录完整并 dispatch
-    前重验证、audit/broadcast host-wide 持久化；generation/受影响 Job 变化使确认失效并
-    要求重新预览；
+    （contract + macOS UI/platform closure）:critical Step 阻断 dispatch 且计数 0，XCUITest
+    显示阻断 Job、Step 与 safe-boundary recovery action；impact preview UI 展示 Core
+    要求的全部字段后才能确认；dispatch 前重验证；preview/confirmation/
+    intent/actual argv+endpoint/outcome/generation/affected Jobs 按同一 correlation durable
+    持久化，关闭重开 store 后可复查，broadcast host-wide；generation/受影响 Job
+    变化使确认失效并要求重新预览；内存 audit fake 不单独计为
+    `AC-HDC-010-02` evidence；
   - `TEST-MAC-M1-HDC-001` / fake-hdc real-child-process supervisor matrix（platform）:
     汇总上述全部向量于真实子进程矩阵；external/unknown 自动 lifecycle 调用计数 0、
     ownership/generation 迁移精确、endpoint 隔离成立、global failure 恰好一次 fan-out；
   - Commands:`swift format lint <TASK-M1-006 changed Swift files>`；
     `swift test --package-path Packages/ArkDeckKit --filter HDCSupervisorContractTests`；
-    `swift test --package-path Packages/ArkDeckKit`；`scripts/check-sdd.sh`；
+    `swift test --package-path Packages/ArkDeckKit`；
+    `xcodebuild test -project ArkDeck.xcodeproj -scheme ArkDeck -destination 'platform=macOS'`；
+    `scripts/check-sdd.sh`；
     `git diff --check`；静态检查确认无真实 `hdc` 执行路径、无用户全局环境写入、fixture
     无 host shell、lifecycle/subserver 计数为仪表化实测而非分支常量。
 - Evidence gate:在 `evidence/runs/TASK-M1-006/run.md` 记录 base revision、环境、锁定
   baseline/conformance/spec/integration profile/change 输入 hash、全部命令与结果；逐向量
-  记录 automatic lifecycle/subserver 调用、fan-out、env 隔离、授权轮询与 generation/确认
-  重验证 counters，并按 TASK-M1-010/004 准则标注仪表化实测与结构性推导的分类边界；
+  记录 automatic lifecycle/subserver 调用、external/unknown recovery option 与 subserver
+  capability UI assertion、fan-out、env 隔离、授权轮询与 generation/确认
+  重验证 counters、durable audit 文件 hash/重开 replay 结果、manifest confirmation
+  关联、actual argv/endpoint 与 macOS XCUITest 逐界面断言，并按 TASK-M1-010/004
+  准则标注仪表化实测与结构性推导的分类边界；
   15 个 `TEST-AC-HDC-*` 与 `TEST-MAC-M1-HDC-001` 的二值结论、evidence class、偏差与遗留
   风险。缺任一项不得标记 `done`；本 evidence 不是真实硬件、platform conformance 或
   release claim，也不解除 `MAC-M0A-HDC-001` 的 blocked 状态。
