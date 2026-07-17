@@ -347,13 +347,27 @@
 
 ## TASK-M1-005 — Session/Artifact store、manifest 管线与 host-volume 协调
 
-- Status:blocked
-- Blocker:原条目只有占位标题、笼统 AC 与 allowed path，未满足 Definition of Ready，也未
-  承诺 M1-006 所需的 durable audit/manifest seam。本 r3 修订补齐完整 task contract；只有
-  维护者合入后，再由独立 readiness/status PR 核对依赖、接口形状与验证环境，才能恢复
-  `ready`。在此之前不得执行源码或生成 implementation evidence。
-- Readiness amendment:本段只定义 M1-005 自身的完整范围与 production seam，不执行任务、
-  不产生 evidence，也不把其状态改成 `done`；仅在维护者 review/merge 后生效。
+- Status:ready
+- Readiness review(2026-07-17,独立 readiness/status PR):r3 task contract 已由维护者经
+  PR #35 合入(main `11eb5cbe69bc9089fd870d6397f698f4c93dd299`),原 blocker(占位条目未满足
+  Definition of Ready)解除。独立复核结论:
+  - 依赖:`TASK-M1-001` done;`TASK-M1-003` done(PR #27 merge commit
+    `c5c82b757d9baa91164fe5feae65d5806089f8df`),`DurableJournalAppending` 等 durability
+    primitives 存在于 `ArkDeckStorage`(`RecoveryCoordination.swift`、`DurableFiles.swift`);
+  - 接口形状:locked `manifest.schema.json` 的 confirmation 定义已含 `serverLifecycle`
+    kind 与 required `relatedStepIds`;本任务两个 production seam 均无需修改任何 locked
+    contract/schema;
+  - 验证输入:12 个 `AC-ART/STO-*` 与 `MAC-M1-STORE-001` 在 canonical acceptance registry
+    与 `scope.yaml` 中精确存在,registry method 与本任务 Verification 声明一致;
+  - 环境:base `11eb5cb` 上 `swift build --package-path Packages/ArkDeckKit --build-tests`
+    通过;dedicated `SessionArtifactStorageContractTests` 与 `Fixtures/SessionStorage/**`
+    尚不存在,由实现按 allowed paths 新建;
+  - 路径冲突:allowed paths 与 blocked 的 TASK-I5-001/I5-002、TASK-M1-006 无交集;
+    `TASK-M1-009` 占位条目的 allowed paths 含 `ArkDeckStorage/**`,按既有约束两任务不得
+    同时实现,M1-009 实现前须先完成自身 readiness 扩写并与本任务错开。
+- Readiness gate:本 readiness/status PR 只将本任务从 `blocked` 恢复为 `ready`,不执行
+  TASK-M1-005、不产生 implementation evidence,也不改变其他 Task 状态或任何 Core、
+  contract、platform conformance、release claim;`ready` 仅在维护者 review/merge 后生效。
 - Objective:在 M1-003 已锁定 journal/recovery 语义之上交付 production Session layout、
   Artifact/manifest publication、host-volume admission/retention，以及供上层 workflow 使用的
   通用 durable Session audit 与 manifest publisher；Storage 不依赖 HDC/UI，也不铸造执行
