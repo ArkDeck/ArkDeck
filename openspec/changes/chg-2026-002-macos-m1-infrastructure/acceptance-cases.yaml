@@ -1,7 +1,7 @@
 ---
 schema_version: 1.0.0
 change_id: CHG-2026-002-macos-m1-infrastructure
-change_revision: 3
+change_revision: 4
 platform: macos
 evidence_classes:
 - contract
@@ -19,18 +19,21 @@ cases:
     rotation bounds, and the export bundle contains no device raw artifacts by default.
 - acceptance_id: MAC-M1-HDC-001
   test_id: TEST-MAC-M1-HDC-001
-  method: Approved-pinned-golden fake-hdc real-child-process matrix, durable Session audit
-    reopen/replay, and macOS XCUITest closure for every user-visible HDC result.
+  method: Approved-pinned-golden fake-hdc real-child-process matrix, descriptor-bound launch,
+    durable Session audit reopen/replay, and signed Sandbox macOS XCUITest closure for every
+    user-visible HDC result.
   expected_source: openspec/changes/chg-2026-002-macos-m1-infrastructure/verification.md#MAC-M1-HDC-001
   minimum_evidence: platform
   expected_result: Every accepted HDC semantic family is backed by an approved version/hash-pinned
-    golden; external/unknown automatic lifecycle call count is 0 while diagnostics and only
-    user-confirmed recovery options are shown; subserver capability is displayed read-only and
-    spawn/killall-sub count is 0; ownership/generation transitions and endpoint isolation match
-    the contract; global failure fans out to every affected coordinator exactly once; lifecycle
-    preview, confirmation, intent, actual argv/endpoint, outcome, generation and affected Jobs
-    share one durable correlation and survive store reopen; macOS XCUITest asserts every HDC
-    Scenario user-visible result.
+    golden; durable Job intent and the actual descriptor/inode/hash/argv remain bound, and path
+    substitution starts 0 children; external/unknown automatic lifecycle call count is 0 while
+    diagnostics and only user-confirmed recovery options are shown; subserver capability is
+    displayed read-only and spawn/killall-sub count is 0; ownership/generation transitions and
+    endpoint isolation match the contract; global failure fans out to every affected coordinator
+    exactly once; lifecycle preview, confirmation, intent, actual argv/endpoint, outcome,
+    generation and affected Jobs share one durable correlation and survive store reopen; macOS
+    XCUITest asserts every HDC Scenario user-visible result through the signed Sandbox test build
+    without changing the v1 distribution claim.
 - acceptance_id: MAC-M1-JOURNAL-001
   test_id: TEST-MAC-M1-JOURNAL-001
   method: Crash-window fault injection matrix on the macOS filesystem.
