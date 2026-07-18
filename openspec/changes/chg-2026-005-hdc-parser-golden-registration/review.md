@@ -1,8 +1,10 @@
 # CHG-2026-005 Pre-Task Review Gate
 
-> Status：pending r2 maintainer review
-> Approval semantics：only merge to protected `main` after CODEOWNER review approves this change;
-> this draft records no approval, fixture provenance acceptance or readiness result.
+> Status：r2 scope approved — approval is constituted by the maintainer's review/merge of the
+> independent approve PR that flips `proposal.md` to `approved`（precedent #14）. Provenance
+> acceptance and the I5-001/I5-002 implementation gates below remain open;`TASK-I5-001` stays
+> blocked until the maintainer accepts the standalone success、healthy/checkserver、version raw
+> inputs' provenance.
 
 - [x] Change class is integration and Core change level is none.
 - [x] `scope.yaml` revision 2 is the single exact impacted Requirement/AC/Policy/Profile set.
@@ -15,7 +17,8 @@
 - [x] I5-001 and I5-002 may update only their own status/completion evidence in this `tasks.md`.
 - [x] M1-006 remains blocked until complete supported-family closure, M1-005 durable seams and
   CHG-002 r3 design/UI/audit paths are approved and evidenced.
-- [ ] Maintainer has approved CHG-005 r2 scope and the exact SwiftPM resource access mode.
+- [x] Maintainer has approved CHG-005 r2 scope and the exact SwiftPM resource access mode
+  (approval takes effect on maintainer merge of the independent approve PR).
 - [ ] Maintainer has accepted provenance/raw inputs for standalone success、healthy/checkserver and
   version families.
 - [ ] TASK-I5-001 implementation and its independent TASK-I5-002 readiness restoration have each

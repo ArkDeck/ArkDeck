@@ -5,8 +5,8 @@
 
 ## TASK-I5-001 — 提升并登记完整 HDC semantic golden fixture pack
 
-- Status:blocked(等待 change approved，且 success/healthy/checkserver/version raw input 的
-  provenance 经维护者认可)
+- Status:blocked(change 已 approved;仅余 success/healthy/checkserver/version raw input 的
+  provenance 经维护者认可——缺任一 family 时保持 blocked,不得开始登记)
 - Requirements/AC:`REQ-HDC-001`、`REQ-HDC-002`、`REQ-HDC-003`、`REQ-HDC-005`；
   `AC-HDC-005-01`(仅 fixture prerequisite，其他 family 仅为 platform matrix input)
 - Depends on:none；但缺任一 required raw input/provenance 时 fail closed，不得开始登记
@@ -70,7 +70,8 @@
 
 ## TASK-I5-002 — 恢复 TASK-M1-006 readiness
 
-- Status:blocked(等待 `TASK-I5-001` 与 `TASK-M1-005` done 并合入 main)
+- Status:blocked(等待 `TASK-I5-001` done 并合入 main;`TASK-M1-005` 已 done——实现 PR #37
+  main `9e1f1da`、状态 PR #38 main `0e7aa8e`)
 - Requirements/AC:`REQ-HDC-001`、`REQ-HDC-002`、`REQ-HDC-003`、`REQ-HDC-005`；
   `AC-HDC-005-01`(只读 fixture dependency)
 - Depends on:`TASK-I5-001`、`TASK-M1-005`；且 M1-006 的 UI/durable-audit readiness
