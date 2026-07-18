@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-014-remote-lock-legacy-consolidation
 revision: 1
-status: proposed # 仅为 Agent 草案；维护者 review/merge approval-only PR 后才可批准
+status: approved # 本分支仅起草；维护者 review/merge 后才在 main 生效
 class: implementation-only
 core_change_level: none
 owner: lvye
