@@ -41,6 +41,53 @@ public enum DurableFileError: Error, Equatable, Sendable {
   case outcomeNotDurable
 }
 
+enum SessionTerminalPublicationLock {
+  private static let lockName = SessionLayout.manifestLockFileName
+
+  static func withExclusive<T>(in directory: URL, _ body: () throws -> T) throws -> T {
+    let lockURL = directory.appending(path: lockName)
+    try DurableFilePrimitives.rejectSymbolicLink(lockURL)
+    var priorMetadata = stat()
+    let mayNeedDurabilityBarrier = lstat(lockURL.path, &priorMetadata) != 0 && errno == ENOENT
+    let descriptor = Darwin.open(
+      lockURL.path, O_RDWR | O_CREAT | O_CLOEXEC | O_NOFOLLOW, 0o600)
+    guard descriptor >= 0 else {
+      throw DurableFileError.openFailed(path: lockURL.path, errno: errno)
+    }
+    defer { Darwin.close(descriptor) }
+    var metadata = stat()
+    guard fstat(descriptor, &metadata) == 0,
+      metadata.st_mode & S_IFMT == S_IFREG,
+      metadata.st_uid == geteuid(), metadata.st_nlink == 1,
+      metadata.st_mode & (S_IWGRP | S_IWOTH) == 0
+    else {
+      throw DurableFileError.sequenceViolation("unsafe terminal publication lock")
+    }
+    if mayNeedDurabilityBarrier {
+      try DurableFilePrimitives.fullSync(descriptor, path: lockURL.path)
+      try DurableFilePrimitives.syncDirectory(directory)
+    }
+    while flock(descriptor, LOCK_EX) != 0 {
+      if errno == EINTR { continue }
+      throw DurableFileError.openFailed(path: lockURL.path, errno: errno)
+    }
+    defer { flock(descriptor, LOCK_UN) }
+    var lockedMetadata = stat()
+    var pathMetadata = stat()
+    guard fstat(descriptor, &lockedMetadata) == 0,
+      lstat(lockURL.path, &pathMetadata) == 0,
+      lockedMetadata.st_mode & S_IFMT == S_IFREG,
+      lockedMetadata.st_uid == geteuid(), lockedMetadata.st_nlink == 1,
+      lockedMetadata.st_mode & (S_IWGRP | S_IWOTH) == 0,
+      lockedMetadata.st_dev == pathMetadata.st_dev,
+      lockedMetadata.st_ino == pathMetadata.st_ino
+    else {
+      throw DurableFileError.sequenceViolation("terminal publication lock path changed")
+    }
+    return try body()
+  }
+}
+
 public struct JournalAbandonmentContext: Equatable, Sendable {
   public let requiredHazards: [String]
   public let requiresOutcomeUnknown: Bool
@@ -62,34 +109,67 @@ public final class FileDurableJournal: DurableJournalAppending, @unchecked Senda
   private let faultInjector: DurabilityFaultInjector
   private var appendState: JournalAppendValidationState
   private var poisoned = false
+  private let boundDevice: dev_t
+  private let boundInode: ino_t
 
   public init(url: URL, faultInjector: DurabilityFaultInjector = .none) throws {
     try DurableFilePrimitives.requireAbsoluteFileURL(url)
     self.url = url
     self.faultInjector = faultInjector
     try DurableFilePrimitives.createDirectoryIfNeeded(url.deletingLastPathComponent())
-    try DurableFilePrimitives.rejectSymbolicLink(url)
-
-    let existed = FileManager.default.fileExists(atPath: url.path)
-    let descriptor = Darwin.open(
-      url.path, O_WRONLY | O_APPEND | O_CREAT | O_CLOEXEC | O_NOFOLLOW, 0o600)
-    guard descriptor >= 0 else { throw DurableFileError.openFailed(path: url.path, errno: errno) }
-    defer { Darwin.close(descriptor) }
-    if !existed {
-      try DurableFilePrimitives.fullSync(descriptor, path: url.path)
-      try DurableFilePrimitives.syncDirectory(url.deletingLastPathComponent())
-    }
-    var replay = try DurableJournalRecovery.inspect(url: url)
-    if replay.hasTornTail {
-      guard replay.events.first?.kind == .jobCreated else {
-        throw DurableFileError.sequenceViolation(
-          "cannot repair a torn journal without a durable jobCreated record")
+    let inspection = try SessionTerminalPublicationLock.withExclusive(
+      in: url.deletingLastPathComponent()
+    ) {
+      try DurableFilePrimitives.rejectSymbolicLink(url)
+      var pathMetadata = stat()
+      let existed: Bool
+      if lstat(url.path, &pathMetadata) == 0 {
+        existed = true
+      } else if errno == ENOENT {
+        existed = false
+      } else {
+        throw DurableFileError.openFailed(path: url.path, errno: errno)
       }
-      try DurableFilePrimitives.discardTornTail(
-        at: url, descriptor: descriptor, durableRecordCount: replay.events.count)
-      replay = try DurableJournalRecovery.inspect(url: url)
+      if !existed, try Self.terminalManifestExists(beside: url) {
+        throw DurableFileError.sequenceViolation(
+          "cannot create a journal after terminal Manifest publication")
+      }
+      let descriptor = Darwin.open(
+        url.path, O_RDWR | O_APPEND | O_CREAT | O_CLOEXEC | O_NOFOLLOW, 0o600)
+      guard descriptor >= 0 else {
+        throw DurableFileError.openFailed(path: url.path, errno: errno)
+      }
+      defer { Darwin.close(descriptor) }
+      if !existed {
+        try DurableFilePrimitives.fullSync(descriptor, path: url.path)
+        try DurableFilePrimitives.syncDirectory(url.deletingLastPathComponent())
+      }
+      var inspection = try DurableJournalRecovery.inspect(
+        openFileDescriptor: descriptor, path: url.path)
+      if inspection.replay.hasTornTail {
+        guard try !Self.terminalManifestExists(beside: url) else {
+          throw DurableFileError.sequenceViolation(
+            "cannot repair a torn journal after terminal Manifest publication")
+        }
+        guard inspection.replay.events.first?.kind == .jobCreated else {
+          throw DurableFileError.sequenceViolation(
+            "cannot repair a torn journal without a durable jobCreated record")
+        }
+        try DurableFilePrimitives.discardTornTail(
+          at: url, descriptor: descriptor,
+          durableRecordCount: inspection.replay.events.count)
+        inspection = try DurableJournalRecovery.inspect(
+          openFileDescriptor: descriptor, path: url.path)
+      }
+      return inspection
     }
-    appendState = try JournalAppendValidationState(replay: replay)
+    appendState = try JournalAppendValidationState(replay: inspection.replay)
+    // Pin the writer to the durable journal inode it opened. External replacement of the file
+    // (unlink+recreate, rename-over) must fail attributably at the next operation instead of
+    // silently re-deriving state from a rewritten history. Cooperating writers on the same
+    // inode (including in-place torn-tail repair) remain valid.
+    boundDevice = inspection.metadata.st_dev
+    boundInode = inspection.metadata.st_ino
   }
 
   public func abandonmentContext() throws -> JournalAbandonmentContext {
@@ -98,6 +178,20 @@ public final class FileDurableJournal: DurableJournalAppending, @unchecked Senda
     guard !poisoned else {
       throw DurableFileError.sequenceViolation("journal writer is poisoned after a failed append")
     }
+    let inspection = try SessionTerminalPublicationLock.withExclusive(
+      in: url.deletingLastPathComponent()
+    ) {
+      let descriptor = Darwin.open(
+        url.path, O_RDONLY | O_NONBLOCK | O_CLOEXEC | O_NOFOLLOW)
+      guard descriptor >= 0 else {
+        throw DurableFileError.openFailed(path: url.path, errno: errno)
+      }
+      defer { Darwin.close(descriptor) }
+      return try DurableJournalRecovery.inspect(
+        openFileDescriptor: descriptor, path: url.path)
+    }
+    try requireBoundJournal(inspection.metadata)
+    appendState = try JournalAppendValidationState(replay: inspection.replay)
     return appendState.abandonmentContext
   }
 
@@ -112,25 +206,58 @@ public final class FileDurableJournal: DurableJournalAppending, @unchecked Senda
     guard !poisoned else {
       throw DurableFileError.sequenceViolation("journal writer is poisoned after a failed append")
     }
-    try appendState.validate(event)
+    var mutationStarted = false
     do {
-      let descriptor = Darwin.open(url.path, O_WRONLY | O_APPEND | O_CLOEXEC | O_NOFOLLOW)
-      guard descriptor >= 0 else {
-        throw DurableFileError.openFailed(path: url.path, errno: errno)
+      try SessionTerminalPublicationLock.withExclusive(in: url.deletingLastPathComponent()) {
+        guard try !Self.terminalManifestExists(beside: url) else {
+          throw DurableFileError.sequenceViolation(
+            "journal append follows terminal Manifest publication")
+        }
+        let descriptor = Darwin.open(
+          url.path, O_RDWR | O_APPEND | O_CLOEXEC | O_NOFOLLOW)
+        guard descriptor >= 0 else {
+          throw DurableFileError.openFailed(path: url.path, errno: errno)
+        }
+        defer { Darwin.close(descriptor) }
+        let inspection = try DurableJournalRecovery.inspect(
+          openFileDescriptor: descriptor, path: url.path)
+        try requireBoundJournal(inspection.metadata)
+        var currentState = try JournalAppendValidationState(replay: inspection.replay)
+        try currentState.validate(event)
+        mutationStarted = true
+        try faultInjector.check(.journalWrite)
+        try DurableFilePrimitives.writeAll(data, descriptor: descriptor, path: url.path)
+        try faultInjector.check(.journalFileSync)
+        try DurableFilePrimitives.fullSync(descriptor, path: url.path)
+        try faultInjector.check(.journalDirectorySync)
+        try DurableFilePrimitives.syncDirectory(url.deletingLastPathComponent())
+        currentState.accept(event)
+        appendState = currentState
       }
-      defer { Darwin.close(descriptor) }
-      try faultInjector.check(.journalWrite)
-      try DurableFilePrimitives.writeAll(data, descriptor: descriptor, path: url.path)
-      try faultInjector.check(.journalFileSync)
-      try DurableFilePrimitives.fullSync(descriptor, path: url.path)
-      try faultInjector.check(.journalDirectorySync)
-      try DurableFilePrimitives.syncDirectory(url.deletingLastPathComponent())
-      appendState.accept(event)
     } catch {
-      poisoned = true
+      if mutationStarted { poisoned = true }
       throw error
     }
   }
+
+  private func requireBoundJournal(_ metadata: stat) throws {
+    guard metadata.st_dev == boundDevice, metadata.st_ino == boundInode else {
+      throw DurableFileError.sequenceViolation(
+        "journal path no longer identifies the writer's bound durable journal")
+    }
+  }
+
+  private static func terminalManifestExists(beside journalURL: URL) throws -> Bool {
+    let manifestURL = journalURL.deletingLastPathComponent()
+      .appending(path: SessionLayout.manifestFileName)
+    var metadata = stat()
+    if lstat(manifestURL.path, &metadata) == 0 { return true }
+    guard errno == ENOENT else {
+      throw DurableFileError.openFailed(path: manifestURL.path, errno: errno)
+    }
+    return false
+  }
+
 }
 
 public final class WriteAheadIntentGate: @unchecked Sendable {

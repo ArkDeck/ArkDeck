@@ -116,7 +116,7 @@ public struct RecoveryManifestAbandonConfirmation: Codable, Equatable, Sendable 
 
   public init(confirmationID: String, confirmedAt: String) throws {
     guard confirmationID.matchesManifestID,
-      ISO8601DateFormatter().date(from: confirmedAt) != nil
+      (try? SessionStorageValidation.timestamp(confirmedAt, field: "confirmedAt")) != nil
     else { throw RecoveryManifestContractError.invalidField("userConfirmation") }
     self.confirmationID = confirmationID
     actor = "user"
@@ -208,6 +208,23 @@ public struct RecoveryManifestRecord: Codable, Equatable, Sendable {
 
   public init(from decoder: any Decoder) throws {
     let container = try decoder.strictContainer(keyedBy: CodingKeys.self)
+    let rawCompensations = try container.decode(
+      [JSONValue].self, forKey: .unexecutedCompensations)
+    let typedCompensations = try container.decode(
+      [CompensationDescriptor].self, forKey: .unexecutedCompensations)
+    guard rawCompensations.count == typedCompensations.count else {
+      throw RecoveryManifestContractError.invalidField("unexecutedCompensations")
+    }
+    for (raw, typed) in zip(rawCompensations, typedCompensations) {
+      guard case .object(let object) = raw,
+        object["effect"] == .string(typed.effect.rawValue),
+        object["cancellation"] == .string(typed.cancellation.rawValue),
+        object["bindingRequirement"] == .string(typed.bindingRequirement.rawValue)
+      else {
+        throw RecoveryManifestContractError.invalidField(
+          "unexecutedCompensations.policy")
+      }
+    }
     try self.init(
       needsAttention: container.decode(Bool.self, forKey: .needsAttention),
       interruptedReason: container.decodeIfPresent(String.self, forKey: .interruptedReason),
@@ -217,8 +234,7 @@ public struct RecoveryManifestRecord: Codable, Equatable, Sendable {
       lastDeviceMode: container.decode(RecoveryManifestDeviceMode.self, forKey: .lastDeviceMode),
       managedHostProcessState: container.decode(String.self, forKey: .managedHostProcessState),
       recoveryGuide: container.decode(RecoveryManifestGuide.self, forKey: .recoveryGuide),
-      unexecutedCompensations: container.decode(
-        [CompensationDescriptor].self, forKey: .unexecutedCompensations),
+      unexecutedCompensations: typedCompensations,
       userConfirmation: container.decodeIfPresent(
         RecoveryManifestAbandonConfirmation.self, forKey: .userConfirmation),
       recoveryOfSessionID: container.decodeIfPresent(String.self, forKey: .recoveryOfSessionID),
