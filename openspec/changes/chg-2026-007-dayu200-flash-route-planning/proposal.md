@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-007-dayu200-flash-route-planning
 revision: 1
-status: approved # r1 proposal 经 #62 合入;批准由本 approval-only PR 的维护者 review/merge 构成
+status: verified # 2026-07-18 verification closure(先例 #20/#48):四 PLAN-DAYU200-* AC 经 document review PASS;经本 PR 维护者 review/merge 生效
 class: platform
 core_change_level: none
 owner: lvye
@@ -69,7 +69,24 @@ Provider 代码。
 ## Approval
 
 - Proposal 经 PR #62 合入 main(`f3961cc`,2026-07-18,status:proposed)。
-- 正式批准:2026-07-18 由本 approval-only PR(先例 #14/#40/#55)将本 change 置为
-  `approved`;批准由维护者 review/merge 本 PR 构成(V2 git-native 治理)。本批准
-  不产生任务执行:TASK-RB-001 仍须独立 readiness/status PR 转 ready 后方可开工;
-  plan-only 边界不因批准改变(零设备命令、零 Provider 代码)。
+- 正式批准:2026-07-18 由 approval-only PR #64 合入 main(`36df85e`)将本 change
+  置为 `approved`(先例 #14/#40/#55);TASK-RB-001 经 readiness PR #65(`bc4967e`)
+  转 ready。
+
+## Verification closure(2026-07-18)
+
+- 交付物 `evidence/route-b-plan.md` + `evidence/runs/TASK-RB-001/run.md` 经
+  PR #66 合入 main(`7c68710`);TASK-RB-001 经状态 PR #67 合入 main(`c98d2b6`)
+  翻转 done。四个 change-local AC(`TEST-PLAN-DAYU200-PARTITION-001`、
+  `TEST-PLAN-DAYU200-ADDRESSES-001`、`TEST-PLAN-DAYU200-PROTOCOL-001`、
+  `TEST-PLAN-DAYU200-RECOVERY-001`)在 run.md 以 document review 二值 PASS;
+  plan-only gate 自证(#66 仅新增 markdown,零命令执行)。
+- 上述 PR 的维护者 review/merge 构成 `verification.md` acceptance matrix 所
+  要求的 verification confirmation。本文件的 `status: verified` 仅在包含本状态
+  变更的 verification closure PR 经维护者 review 并合入 `main` 后生效;verified
+  不改变计划的边界——计划不解除任何 `GAP-DAYU200-*`、不改变 DEC-002 状态、
+  不构成任何后续执行型 change 的执行授权(每个执行型 change 仍须单独立项/
+  approve);RECOVERY-PATH 先行硬序与只读/写设备分级规则继续对全部 Route-B
+  后续步骤生效。本 change 暂不 archive:route-b-plan.md 仍是 Route-B 在途步骤
+  (③演练、④第二阶段、④b)的活跃硬序依据,archive 留待 Route-B 收官后独立
+  PR 裁量(先例 #21/#49)。
