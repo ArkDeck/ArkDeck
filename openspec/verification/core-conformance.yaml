@@ -24,11 +24,11 @@ applicability:
 
 shared_inputs:
   integration_lock:
-    id: INTEGRATION-PROFILES-0.2.0
+    id: INTEGRATION-PROFILES-0.3.0
     path: openspec/integrations/INTEGRATION-PROFILES.lock.yaml
   integration_profiles:
     - id: OPENHARMONY-TOOLS
-      version: 0.1.0
+      version: 0.2.0
       path: openspec/integrations/openharmony/profile.md
   catalogs:
     - path: openspec/contracts/catalogs/remote-operations.yaml
@@ -50,7 +50,27 @@ shared_inputs:
       version: 1.0.0
     - path: openspec/contracts/journal-event.schema.json
       version: 1.0.0
-  fixtures: []
+  fixtures:
+    - id: hdc-golden-failure-unauthorized
+      version: 1.0.0
+      path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Golden/1.0.0/failure-unauthorized/stdout.bin
+      sha256: 5e73a89bfec57338a129ec0d22bbf805c9b633849db0571d70c6f2f24b5340d8
+    - id: hdc-golden-failure-offline
+      version: 1.0.0
+      path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Golden/1.0.0/failure-offline/stdout.bin
+      sha256: d06b9e806721c00ebe771cc4b29e89145937d7162211b66e44ca7d0e5bffa38f
+    - id: hdc-golden-success-uninstall
+      version: 1.0.0
+      path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Golden/1.0.0/success-uninstall/stdout.bin
+      sha256: c690501211bc9c7a6a3b37704dd2cd58bdcf03e49771ffee10adf205a589d353
+    - id: hdc-golden-healthy-checkserver
+      version: 1.0.0
+      path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Golden/1.0.0/healthy-checkserver/stdout.bin
+      sha256: 50e8dfe03cb770dfade5b91198523b964fd3bd6fd8855b541ceb46201f0d014a
+    - id: hdc-golden-version
+      version: 1.0.0
+      path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Golden/1.0.0/version/stdout.bin
+      sha256: 906d35a917937ecbb33d8dc3bbb6b3e1783bd2996a6201ab7227fb406d474ed9
 
 fixture_policy:
   status: notImplemented
