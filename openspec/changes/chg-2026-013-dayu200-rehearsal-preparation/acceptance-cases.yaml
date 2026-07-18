@@ -1,0 +1,34 @@
+---
+schema_version: 1.0.0
+change_id: CHG-2026-013-dayu200-rehearsal-preparation
+change_revision: 1
+platform: macos
+evidence_classes:
+- platform
+cases:
+- acceptance_id: PREP-DAYU200-TOOLING-001
+  test_id: TEST-PREP-DAYU200-TOOLING-001
+  method: Evidence review and per-command record audit of the host-only tool build and no-device smoke.
+  expected_source: openspec/changes/chg-2026-013-dayu200-rehearsal-preparation/verification.md#PREP-DAYU200-TOOLING-001
+  minimum_evidence: platform
+  expected_result: rkdeveloptool is built on the rehearsal host from the
+    official repository source with the source URL, commit hash and artifact
+    SHA-256 on record; the -v version string is recorded truthfully and meets
+    the >=1.32 constraint; the no-device ld output is captured byte-exact and
+    shows the no-devices form with zero device enumeration lines; every
+    executed command stays within the closed whitelist with argv/output/exit
+    recorded per command; success is judged from output markers, never from
+    exit codes alone; the DAYU200 stays disconnected throughout.
+- acceptance_id: PREP-DAYU200-MATERIALS-001
+  test_id: TEST-PREP-DAYU200-MATERIALS-001
+  method: Evidence review and hash audit of the recovery-material verification and the rehearsal record template.
+  expected_source: openspec/changes/chg-2026-013-dayu200-rehearsal-preparation/verification.md#PREP-DAYU200-MATERIALS-001
+  minimum_evidence: platform
+  expected_result: The pinned archive identity (732948803 bytes, SHA-256
+    fc7637...5280) is recomputed in full and matches; every recovery-material
+    member has its full SHA-256 recomputed and tabulated against the archived
+    member-inventory.json with any mismatch recorded truthfully as FAIL; no
+    material bytes enter the git repository; the rehearsal record template
+    contains per-command argv/stdout/stderr/exit/timestamp/checkpoint fields,
+    the abort-criteria section quoting playbook section 5 verbatim, and the
+    seven-item checklist sign-off page.
