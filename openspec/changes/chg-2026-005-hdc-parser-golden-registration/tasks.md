@@ -5,9 +5,10 @@
 
 ## TASK-I5-001 — 提升并登记完整 HDC semantic golden fixture pack
 
-- Status:blocked(change 已 approved;success/healthy/checkserver/version 的 raw input 已由
-  维护者受控采集并随本实现 PR 提交——维护者 review/merge 本实现 PR 即构成对 provenance 与
-  登记的正式认可;done 翻转由独立状态 PR 执行)
+- Status:done(实现经维护者 review 以 PR #41 合入 main `4ac288c`,2026-07-18——该 merge
+  同时构成对 success/healthy/checkserver/version provenance 与全部登记的正式认可;
+  `blocked→done` 由本独立状态 PR 执行,仅在维护者 review/merge 后生效,不改变实现、
+  evidence 正文或任何 conformance/release 状态,不将 `AC-HDC-005-01` 标记为 passed)
 - Completion evidence:`evidence/runs/TASK-I5-001/run.md`(五 fixture 三方一致登记、
   Bundle.module 资源测试 3/0、全量 172/0、guard 0 error、零 dispatch;含真实 3.2.0d 无
   `[success]` 标记的实测披露——parser 接线属 M1-006)
