@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-005-hdc-parser-golden-registration
 revision: 2
-status: proposed
+status: approved
 class: integration
 core_change_level: none
 owner: lvye
