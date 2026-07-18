@@ -6,12 +6,13 @@
 
 ## TASK-RR-001 — 演练准备:工具构建+物料复核+记录模板
 
-- Status:ready(change 经 approval-only PR #91 approved;本 readiness PR 复核
-  前置后转 ready,仅在维护者 review/merge 后生效——**须在 #91 之后 merge**。
-  前置复核:TASK-RP-001 done(archived 预案 §6 为目标定义)、TASK-FP-001 done
-  (版本约束事实来源)——均满足;不依赖 TASK-PD-001;与在途 M1-006/PD-001
-  无路径交集;执行前提:全程 DAYU200 不在场,由操作者在执行时书面确认并记录
-  于 run.md)
+- Status:done(交付物经 PR #93 合入 main `30cca61`,2026-07-18;两个 PREP-*
+  Test ID 均 PASS(见 evidence/runs/TASK-RR-001/run.md);设备不在场
+  attestation 在案,全部命令在封闭白名单内,判定按输出标记。本翻转仅在维护者
+  review/merge 本状态 PR 后生效。完成使 archived 预案 §6 检查单第 1/2 项与第
+  6 项模板部分**具备打勾 evidence**;打勾动作属未来演练 change 立项时;不勾
+  第 3(PD-001)/4(风险确认)/5(时间窗)项,不立项演练、不构成演练执行
+  授权;不解除任何 gap;DEC-002 保持 open)
 - Requirements/AC:`PREP-DAYU200-TOOLING-001`、`PREP-DAYU200-MATERIALS-001`
   (见 acceptance-cases.yaml)
 - Depends on:CHG-2026-010 TASK-RP-001 done(已满足,archived 预案 §6 检查单
