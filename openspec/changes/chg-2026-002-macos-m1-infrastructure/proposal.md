@@ -1,6 +1,6 @@
 ---
 id: CHG-2026-002-macos-m1-infrastructure
-status: approved # r1 已由 PR #14 批准;r2 CORE-2.0.0 重定向已生效;r3 HDC readiness/design 修订仅在对应 PR 合入后生效
+status: approved # r1/r2/r3 已批准;r4 execution-boundary scope/dependency amendment 仅在对应 PR 合入后生效
 class: platform
 core_change_level: none
 owner: lvye
@@ -23,6 +23,14 @@ M0A 只交付可行性原型与分发决策。所有分阶段功能（UI Dump、
   diagnostics/safety presentation：toolchain/authorization/channel diagnostics、external/unknown
   server 的确认式恢复入口、subserver capability 只读展示、critical gate 与 lifecycle impact
   preview；该 surface 只消费 use-case state，不扩展到任何产品功能工作流；
+- 收拢 M1-006 的 toolchain execution boundary：Core 持有 durable Job toolchain intent，
+  Process 以原子 launch gate 将已核验 descriptor/inode 与实际执行绑定，Workflows 封闭组合
+  Core typed Step、OpenHarmony Adapter、durable executor/outcome/finalizer，App 只依赖 Core 与
+  Workflows 的 use-case/presentation API；
+- 只读消费 verified OpenHarmony integration profile 已登记的 identity、authorization、
+  server-health/version 与 subserver capability probe，并在 macOS platform profile 精确映射
+  其平台 access/diagnostics；以实际签名的 Sandbox test build + XCUITest 闭合 UI/权限诊断；
+  该路径只使用仓库 fake fixture，不是 v1 分发路径；
 - 实现全部 M1 runtime/storage/logging/clock platform ports 并通过 Port contract tests；
 - 实现 `SimulatedFlashProvider` 隔离 harness（REQ-FLASH-006）；
 - 交付 crash-window、ENOSPC、fake-hdc、单实例与 clock 语义的 fault-injection/contract 证据。
@@ -36,6 +44,8 @@ M0A 只交付可行性原型与分发决策。所有分阶段功能（UI Dump、
   通用功能 UI；
 - desktop-ux-observability 的导航/History/i18n（REQ-UX-*、REQ-I18N-001）；
 - 修改任何 Core Requirement/AC/contract；
+- 变更 ADR-0001 选定的非 Sandbox v1 分发路径，或把签名 Sandbox/XCUITest 证据解释为
+  Developer ID、公证、真机、platform conformance 或 release evidence；
 - 宣称任何 capability 达到可发布状态——发布范围在 M5 release change 中另行声明。
 
 ## Impacted specifications
@@ -51,6 +61,8 @@ M0A 只交付可行性原型与分发决策。所有分阶段功能（UI Dump、
 - Supervisor 实现继承「不自动 kill external/unknown server」并以 call-counter 证明;
 - SimulatedFlashProvider 不接受真实 connectKey、不启动外部工具,其证据永久分类为 simulated;
 - journal/reconcile 在 destructive outcomeUnknown 上 fail closed,不自动重放;
+- tool path/hash/identity 与实际启动对象不一致时 child launch count 为 0；App、UI 与 profile
+  均不能绕过 Core typed Step 和 durable intent/outcome/finalization 链；
 - 诊断与日志按 privacy redaction 落地,导出默认不含设备 raw。
 
 ## Approval
@@ -68,5 +80,9 @@ M0A 只交付可行性原型与分发决策。所有分阶段功能（UI Dump、
 - r3 HDC readiness/design amendment：将 HDC AC 明文要求的最小 UI 从原 design 的
   blanket UI non-goal 中精确移入 scope，补齐 M1-005 durable audit/manifest seam 的任务
   contract，并把 M1-006 使用的全部 semantic output family 置于 approved/pinned fixture
-  gate 后。r3 仅在维护者 review/merge 后生效；本修订不执行 M1-005/M1-006、不产生实现
-  evidence、不修改 Core/contract/platform conformance 或 release claim。
+  gate 后；已由维护者 review 并经 PR #35 合入，merge commit
+  `11eb5cbe69bc9089fd870d6397f698f4c93dd299`。
+- r4 execution-boundary amendment：只修订 M1-006 的 scope、allowed/forbidden paths、模块与
+  Task 依赖和相应验证门禁；不修改任何源码、profile、Core/AC/contract、任务状态、platform
+  conformance、ADR 或 release claim。r4 新增授权仅在维护者 review/merge 后生效；实现 PR
+  必须基于该合入 revision，不能从本草案自行推断授权。

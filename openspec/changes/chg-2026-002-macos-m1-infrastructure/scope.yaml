@@ -1,6 +1,6 @@
 schema: arkdeck-change-scope-1
 change_id: CHG-2026-002-macos-m1-infrastructure
-revision: 3
+revision: 4
 requirements:
   - PLATFORM-MACOS@0.1.0
   - POL-ARTIFACT-001
@@ -14,12 +14,15 @@ requirements:
   - PORT-ACTIVATION-001
   - PORT-CLOCK-ACTIVE-001
   - PORT-CLOCK-ELAPSED-001
+  - PORT-DEVICE-ACCESS-001
+  - PORT-FILE-ACCESS-001
   - PORT-INSTANCE-001
   - PORT-LOGGING-001
   - PORT-POWER-001
   - PORT-PROCESS-001
   - PORT-SLEEP-WAKE-001
   - PORT-STORAGE-001
+  - PORT-TOOL-TRUST-001
   - PORT-VOLUME-001
   - REQ-ART-001
   - REQ-ART-002

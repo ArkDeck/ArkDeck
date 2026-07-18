@@ -1,8 +1,9 @@
 # M1 Change Review Gate
 
-> Status：r1 passed；r2 passed；r3 HDC readiness/design amendment pending maintainer review
+> Status：r1/r2/r3 passed；r4 execution-boundary scope/dependency amendment pending maintainer review
 > Reviewed：r1 于 2026-07-15 由维护者经 PR #14 合入；r2 于 2026-07-16 经 PR #22
-> 合入，merge commit `eb9b9dc64ab422a51a518066f70b728e9ff5ba24`。V2 语义为合并即批准。
+> 合入，merge commit `eb9b9dc64ab422a51a518066f70b728e9ff5ba24`；r3 经 PR #35
+> 合入，merge commit `11eb5cbe69bc9089fd870d6397f698f4c93dd299`。V2 语义为合并即批准。
 > 原 r1 blocked 理由已全部解除:CORE-1.0.0 已 ratify(main `c76a492`,PR #3);
 > V1 approval/claim guard 已由 V2 git-native 治理取代(受保护 main + sdd-guard,
 > 见 `governance/enforcement.md`);M0A 分发决策已交付
@@ -36,8 +37,28 @@
   capability display 已加入 XCUITest/platform closure，不再只验证零 lifecycle counter。
 - [x] r3 draft 不执行 M1-005/M1-006，不产生 implementation evidence，不修改 Core/contract、
   platform conformance 或 release claim。
-- [ ] 维护者已 review 并合入 r3；在此之前 r3 scope、task contract 与 readiness gate 不生效，
-  M1-005/M1-006 均保持 blocked。
+- [x] 维护者已 review 并合入 r3（PR #35）；r3 scope 与 task contract 已生效。
+
+## r4 review gate
+
+- [x] amendment 只修改 CHG-002 治理 artifacts；无 Swift、Xcode、entitlement、profile、lock、
+  fixture、contract、Core spec、evidence 或任务状态修改。
+- [x] `scope.yaml` 只新增既有 `PORT-FILE-ACCESS-001`、`PORT-TOOL-TRUST-001`、
+  `PORT-DEVICE-ACCESS-001`；Core/platform AC 集合与 pass/fail 语义不变。
+- [x] package dependency closure 精确为 App → Core/Workflows、Workflows →
+  Core/OpenHarmony/Storage、OpenHarmony → Core/Process；App/Workflows 均不能绕过 Adapter
+  直接调用 Process。
+- [x] `ArkDeckContractTests.swift` 的未来实现授权仅限 dependency table、App import contract
+  与必要机械格式化；既有 HDC/Process cases 不在该文件内迁移或改写。
+- [x] Core/Process cross-deliverable scope 分别只允许 durable Job toolchain intent 与原子
+  descriptor/inode-bound launch gate；Requirement/AC/schema/contract 与其他 Process 行为不变。
+- [x] verified integration profile/lock 是只读依赖；platform profile scope 只允许映射其中
+  identity、authorization、health/version、subserver capability 等 side-effect-classified
+  read-only probe 及机械 platform-lock 元数据；integration mapping、golden、mutating probe、
+  conformance/release 状态均禁止修改。
+- [x] signed Sandbox/XCUITest 是仓库 fake/read-only platform evidence；不运行真实 HDC/设备，
+  不替代 Developer ID、公证、真机、完整 platform conformance 或 ADR-0001 分发结论。
+- [ ] 维护者已 review 并合入 r4；在此之前 r4 新增 paths/dependencies 不构成 M1-006 实现授权。
 
 任务状态以 `tasks.md` 为唯一事实源(V2:原 immutable task packets 已废止)。本文件记录历史与
-r3 review gate，不替代维护者 review/merge。
+r4 review gate，不替代维护者 review/merge。
