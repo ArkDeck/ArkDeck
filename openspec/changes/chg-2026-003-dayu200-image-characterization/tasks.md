@@ -1,13 +1,26 @@
 # Tasks — CHG-2026-003 DAYU200 image characterization
 
-> V2 治理:本文件是任务的唯一事实源。change 已于 2026-07-18 经 approval-only PR
-> approved(先例 #14/#40,批准由维护者 review/merge 构成);任务状态变更仅在
-> 维护者 review/merge 后生效。
+> V2 治理:本文件是任务的唯一事实源。change 已于 2026-07-18 经维护者 merge
+> approved(先例 #14/#40,批准由维护者 review/merge 构成;approval commit 与实现
+> commit 经 PR #44 squash 合入 main `6c1ba7b`,手工堆叠 PR #45/#46 因与 #44 重复
+> 已关闭);任务状态变更仅在维护者 review/merge 后生效。
 
 ## TASK-DAYU200-CHAR-001 — 只读流式扫描器与 DAYU200 镜像特征化
 
-- Status:ready(change approved;执行与 `ready→done` 分别经独立 PR 由维护者
-  review/merge 生效)
+- Status:done
+- Completion evidence:`evidence/runs/TASK-DAYU200-CHAR-001/run.md`(实现与全部
+  evidence 已由维护者经 PR #44 合入 main `6c1ba7b`,2026-07-18。pinned identity
+  二值命中;17 成员物理序 inventory 全 root-level regular 含逐成员 SHA-256;
+  16 个 hazard 向量实测全部在分类前拒绝;六条件全真 →
+  `imagePackageFamily: rockchipRawImageSet`,固定轴保持
+  `fixedArchiveOnly`/`authoritative: false`/Provider 与 compatibility `unknown`/
+  `candidateNonExecutable`;四个 gap(分区语义、烧写地址、协议、恢复路径)全
+  `unknown` 已登记为 DEC-002 与 Route-B CLI 输入;tests 36/36、check-sdd 0 error。
+  三个 AC(`TEST-CHAR-M0-DAYU200-IMAGE-001`、`TEST-CHAR-M0-DAYU200-CLASSIFICATION-001`、
+  `TEST-CHAR-M0-DAYU200-NODISPATCH-001`)二值 passed。`ready→done` 由本独立状态 PR
+  起草,仅在维护者 review/merge 后生效,不改变实现或 evidence 正文,不构成
+  change verified、DEC-001/DEC-002 结论、M0B、硬件支持或任何 platform
+  conformance/release claim)
 - Requirements/AC:CHAR-M0-DAYU200-IMAGE-001…(见 acceptance-cases.yaml,ARC001..ARC009)
 - Depends on:none
 - Allowed paths:`scripts/archive_characterization/**`、本 change `evidence/`(archive-identity.json、member-inventory.json、package-classification.json、process-audit.json、gaps 列表)
