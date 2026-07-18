@@ -1,11 +1,13 @@
 # CHG-2026-014 evidence
 
-当前无执行 evidence。change 仍为 `proposed`，`TASK-RLC-001` 为 `blocked`。
+CHG-2026-014 已 approved，TASK-RLC-001 的 headless consolidation implementation 已执行；
+任务保持 `in_progress`，等待独立 source-task disposition governance PR 与维护者 review。
 
-批准与 readiness 后，预期产物：
+当前产物：
 
-- `legacy-import-manifest.md`；
-- `runs/TASK-RLC-001/run.md`；
+- `legacy-import-manifest.md`：三个固定 OID、34 个路径/blob disposition、未关闭 AC、
+  runtime reachability 与 rollback；
+- `runs/TASK-RLC-001/run.md`：四个 change-local Test ID 的二值结果与 headless 命令；
 - 仅包含 headless fake/loopback/contract 结果，不包含真实 HDC、设备、GUI、硬件或 release
   evidence。
 
