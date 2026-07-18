@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-008-ui-dump-hidumper-wrapper
 revision: 1
-status: proposed
+status: approved # r1 proposal 经 #63 合入;批准由本 approval-only PR 的维护者 review/merge 构成
 class: platform
 core_change_level: none
 owner: lvye
@@ -70,5 +70,8 @@ M0B 递延的 hidumper capture golden 登记与脱敏政策。
 
 ## Approval
 
-- 本 proposal PR 合入即 status:proposed;正式批准须另行 approval-only PR
-  (先例 #14/#40/#55)。批准后任务仍保持 blocked 直至 M1-006 done。
+- Proposal 经 PR #63 合入 main(`a94b434`,2026-07-18,status:proposed)。
+- 正式批准:2026-07-18 由本 approval-only PR(先例 #14/#40/#55)将本 change 置为
+  `approved`;批准由维护者 review/merge 本 PR 构成。本批准不产生任务执行:
+  TASK-UD-001 保持 blocked 直至 `TASK-M1-006` done 合入 main(`Packages/**`
+  独占解除),解除另需独立 readiness/status PR 复核。
