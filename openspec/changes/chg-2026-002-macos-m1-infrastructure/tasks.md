@@ -453,7 +453,19 @@
 
 ## TASK-M1-006 — HDC supervisor、endpoint 隔离、授权工作流与 fake-hdc 对抗
 
-- Status:ready
+- Status:blocked
+- Blocking evidence:`evidence/runs/TASK-M1-006/run.md`（review-remediation addendum 14）。
+  当前 verified integration profile 未声明本任务要求的 server identity/generation、
+  selected-device authorization/binding、key-access 与 subserver capability 的精确只读
+  probe/argv/effect/raw family；依本任务 stop condition 必须先走独立 integration change。
+  此外当前 revision 的 signed macOS XCUITest 因本机 Developer Mode 未启用而在 runner
+  initialization 前失败；启用该持久系统授权须由操作者明确批准后再复验。此状态草案仅在
+  维护者 review/merge 后生效，不构成 task completion、change verified、platform conformance
+  或 release claim。
+- Legacy disposition（2026-07-19）:按维护者指示，本任务作为遗留项保留；`blocked` 是合法
+  状态，遗留标记不等同于 `done`、不解除任何 AC/verification gate，也不允许依赖它的
+  `TASK-M1-007`/`TASK-M1-008` 越过 dependency gate。后续修复须由独立 integration change
+  登记所缺 probe，并在可交互 Developer Tools 环境补做当前 revision 的 signed XCUITest。
 - Scope/dependency amendment r4:r3 的 `ready` 状态不变；本修订只补齐完成既有 HDC AC
   所需的 Core durable toolchain intent、Process 原子 launch gate、Workflows/App 封闭组合、
   profile read-only probe 与 signed Sandbox/XCUITest 范围。r4 新增路径在维护者合入前不构成

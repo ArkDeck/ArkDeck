@@ -1,4 +1,5 @@
 import ArkDeckCore
+import CryptoKit
 import Darwin
 import Foundation
 
@@ -129,6 +130,147 @@ public struct ProcessRequest: Sendable, Equatable {
   }
 }
 
+/// Expected immutable executable identity supplied by a durable Job intent.
+/// The Process port reopens and hashes the file itself; this value is not an
+/// authorization merely because a caller constructed it.
+public struct ProcessIdentityBoundRequest: Sendable, Equatable {
+  public let process: ProcessRequest
+  public let expectedSHA256: String
+
+  public init(process: ProcessRequest, expectedSHA256: String) {
+    self.process = process
+    self.expectedSHA256 = expectedSHA256
+  }
+}
+
+/// Identity of the descriptor that was actually handed to `posix_spawn`.
+/// `authorizedPath` is diagnostic provenance; device/inode/hash identify the
+/// opened executable object and never come from a caller-provided snapshot.
+public struct ProcessExecutableIdentityReceipt: Sendable, Equatable, Codable {
+  public let authorizedPath: String
+  public let inodeLaunchPath: String
+  public let device: UInt64
+  public let inode: UInt64
+  public let fileSize: Int64
+  public let mode: UInt32
+  public let sha256: String
+
+  public init(
+    authorizedPath: String,
+    inodeLaunchPath: String,
+    device: UInt64,
+    inode: UInt64,
+    fileSize: Int64,
+    mode: UInt32,
+    sha256: String
+  ) {
+    self.authorizedPath = authorizedPath
+    self.inodeLaunchPath = inodeLaunchPath
+    self.device = device
+    self.inode = inode
+    self.fileSize = fileSize
+    self.mode = mode
+    self.sha256 = sha256
+  }
+}
+
+public struct ProcessIdentityBoundExecutionResult: Sendable, Equatable {
+  public let execution: ProcessExecutionResult
+  public let executableIdentity: ProcessExecutableIdentityReceipt
+
+  public init(
+    execution: ProcessExecutionResult,
+    executableIdentity: ProcessExecutableIdentityReceipt
+  ) {
+    self.execution = execution
+    self.executableIdentity = executableIdentity
+  }
+}
+
+public struct SemanticallyEvaluatedIdentityBoundProcessResult<SemanticResult: Sendable>: Sendable {
+  public let execution: ProcessExecutionResult
+  public let semantic: SemanticResult
+  public let executableIdentity: ProcessExecutableIdentityReceipt
+
+  public init(
+    execution: ProcessExecutionResult,
+    semantic: SemanticResult,
+    executableIdentity: ProcessExecutableIdentityReceipt
+  ) {
+    self.execution = execution
+    self.semantic = semantic
+    self.executableIdentity = executableIdentity
+  }
+}
+
+extension SemanticallyEvaluatedIdentityBoundProcessResult: Equatable
+where SemanticResult: Equatable {}
+
+/// One-shot state gate shared with the package-owned Supervisor. Invalidation
+/// and the `posix_spawn` syscall use the same lock, so a state change cannot
+/// land between final gate validation and the kernel launch attempt.
+package final class ProcessAtomicLaunchGate: @unchecked Sendable {
+  private let lock = NSLock()
+  private var invalidated = false
+  private var consumed = false
+
+  package init() {}
+
+  package func invalidate() {
+    lock.withLock { invalidated = true }
+  }
+
+  fileprivate func consume<T>(_ launch: () throws -> T) throws -> T {
+    try lock.withLock {
+      guard !invalidated, !consumed else {
+        throw ProcessExecutionError.launchAuthorizationInvalidated
+      }
+      consumed = true
+      return try launch()
+    }
+  }
+}
+
+/// Package-owned, one-shot authorization retaining the exact verified
+/// executable descriptors between durable receipt persistence and spawn.
+/// Callers can inspect the receipt but cannot construct or reuse the token.
+package final class ProcessPreparedIdentityBoundLaunch: @unchecked Sendable {
+  package let request: ProcessIdentityBoundRequest
+  package let executableIdentity: ProcessExecutableIdentityReceipt
+  fileprivate let executable: VerifiedExecutableDescriptor
+  private let lock = NSLock()
+  private var consumed = false
+
+  fileprivate init(
+    request: ProcessIdentityBoundRequest,
+    executable: VerifiedExecutableDescriptor
+  ) {
+    self.request = request
+    self.executableIdentity = executable.receipt
+    self.executable = executable
+  }
+
+  fileprivate func consume() throws {
+    try lock.withLock {
+      guard !consumed else {
+        throw ProcessExecutionError.launchAuthorizationInvalidated
+      }
+      consumed = true
+    }
+  }
+
+  package func close() {
+    executable.close()
+  }
+
+  deinit { executable.close() }
+}
+
+package enum ProcessIdentityBoundLaunchFault: Sendable {
+  case none
+  case closeDescriptorBeforeSpawn
+}
+
 public enum ProcessExecutionError: Error, Equatable, LocalizedError {
   case executableMustBeAbsolute(String)
   case invalidExecutableContainsNUL
@@ -136,6 +278,16 @@ public enum ProcessExecutionError: Error, Equatable, LocalizedError {
   case invalidEnvironmentKey(String)
   case invalidEnvironmentValue(String)
   case invalidTimeout(TimeInterval)
+  case invalidExpectedSHA256
+  case executableOpenFailed(String, Int32)
+  case executableMustNotBeSymlink
+  case executableMustBeRegularFile
+  case executableMustBeExecutable
+  case executableIdentityChanged
+  case executableInodePathUnavailable
+  case executableHashMismatch(expected: String, actual: String)
+  case executableDescriptorInvalid
+  case launchAuthorizationInvalidated
   case launchFailed(String)
 
   public var errorDescription: String? {
@@ -152,6 +304,26 @@ public enum ProcessExecutionError: Error, Equatable, LocalizedError {
       "Process environment value contains a NUL byte for key: \(key)"
     case .invalidTimeout(let timeout):
       "Process timeout must be finite and positive: \(timeout)"
+    case .invalidExpectedSHA256:
+      "Expected executable SHA-256 must be 64 lowercase hexadecimal characters"
+    case .executableOpenFailed(let path, let code):
+      "Process executable could not be opened without following links: \(path) (errno \(code))"
+    case .executableMustNotBeSymlink:
+      "Process executable must not be a symbolic link"
+    case .executableMustBeRegularFile:
+      "Process executable descriptor must identify a regular file"
+    case .executableMustBeExecutable:
+      "Process executable does not have an executable mode"
+    case .executableIdentityChanged:
+      "Process executable path or descriptor identity changed before spawn"
+    case .executableInodePathUnavailable:
+      "Process executable cannot be addressed by a stable device/inode path on this volume"
+    case .executableHashMismatch(let expected, let actual):
+      "Process executable hash mismatch: expected \(expected), observed \(actual)"
+    case .executableDescriptorInvalid:
+      "Process executable descriptor became invalid before spawn"
+    case .launchAuthorizationInvalidated:
+      "Process launch authorization was invalidated or already consumed"
     case .launchFailed(let message):
       "Process could not start: \(message)"
     }
@@ -167,35 +339,40 @@ public typealias ProcessOutputHandler = @Sendable (ProcessOutputChunk) -> Void
 /// spawned process group, which also prevents a descendant from surviving the
 /// parent process.
 public final class FoundationProcessExecutor: @unchecked Sendable {
-  public init() {}
+  private let identityBoundPreSpawnHook: @Sendable (ProcessExecutableIdentityReceipt) throws -> Void
+  private let identityBoundFinalLaunchHook:
+    @Sendable (ProcessExecutableIdentityReceipt) async throws -> Void
+  private let launchObserver: @Sendable (pid_t) -> Void
+  private let identityBoundLaunchFault: ProcessIdentityBoundLaunchFault
+
+  public init() {
+    identityBoundPreSpawnHook = { _ in }
+    identityBoundFinalLaunchHook = { _ in }
+    launchObserver = { _ in }
+    identityBoundLaunchFault = .none
+  }
+
+  package init(
+    identityBoundPreSpawnHook:
+      @escaping @Sendable (ProcessExecutableIdentityReceipt) throws
+      -> Void,
+    identityBoundFinalLaunchHook:
+      @escaping @Sendable (ProcessExecutableIdentityReceipt) async throws -> Void = { _ in },
+    launchObserver: @escaping @Sendable (pid_t) -> Void,
+    identityBoundLaunchFault: ProcessIdentityBoundLaunchFault = .none
+  ) {
+    self.identityBoundPreSpawnHook = identityBoundPreSpawnHook
+    self.identityBoundFinalLaunchHook = identityBoundFinalLaunchHook
+    self.launchObserver = launchObserver
+    self.identityBoundLaunchFault = identityBoundLaunchFault
+  }
 
   public func execute(
     _ request: ProcessRequest,
     captureLimit: Int = 64 * 1024,
     onOutput: @escaping ProcessOutputHandler = { _ in }
   ) async throws -> ProcessExecutionResult {
-    guard request.executable.isFileURL, request.executable.path.hasPrefix("/") else {
-      throw ProcessExecutionError.executableMustBeAbsolute(request.executable.path)
-    }
-    guard !request.executable.path.contains("\0"),
-      !request.executable.absoluteString.localizedCaseInsensitiveContains("%00")
-    else {
-      throw ProcessExecutionError.invalidExecutableContainsNUL
-    }
-    guard request.timeout.map({ $0.isFinite && $0 > 0 }) ?? true else {
-      throw ProcessExecutionError.invalidTimeout(request.timeout ?? 0)
-    }
-    guard !request.arguments.contains(where: { $0.contains("\0") }) else {
-      throw ProcessExecutionError.invalidArgumentContainsNUL
-    }
-    for (key, value) in request.environment {
-      guard !key.isEmpty, !key.contains("="), !key.contains("\0") else {
-        throw ProcessExecutionError.invalidEnvironmentKey(key)
-      }
-      guard !value.contains("\0") else {
-        throw ProcessExecutionError.invalidEnvironmentValue(key)
-      }
-    }
+    try validate(request)
 
     let control = ProcessControl()
     return try await withTaskCancellationHandler(
@@ -233,6 +410,195 @@ public final class FoundationProcessExecutor: @unchecked Sendable {
     )
   }
 
+  /// Opens without following symlinks, validates the descriptor identity and
+  /// hash, rechecks the pathname, then executes Darwin's stable
+  /// `/.vol/<device>/<inode>` name while retaining the same descriptor through
+  /// the `posix_spawn` syscall.
+  public func executeIdentityBound(
+    _ request: ProcessIdentityBoundRequest,
+    captureLimit: Int = 64 * 1024,
+    onOutput: @escaping ProcessOutputHandler = { _ in }
+  ) async throws -> ProcessIdentityBoundExecutionResult {
+    try await executeIdentityBoundImpl(
+      request, gate: nil, captureLimit: captureLimit, onOutput: onOutput)
+  }
+
+  package func executeIdentityBound(
+    _ request: ProcessIdentityBoundRequest,
+    gate: ProcessAtomicLaunchGate,
+    captureLimit: Int = 64 * 1024,
+    onOutput: @escaping ProcessOutputHandler = { _ in }
+  ) async throws -> ProcessIdentityBoundExecutionResult {
+    try await executeIdentityBoundImpl(
+      request, gate: gate, captureLimit: captureLimit, onOutput: onOutput)
+  }
+
+  public func executeIdentityBound<Evaluator: ProcessSemanticEvaluating>(
+    _ request: ProcessIdentityBoundRequest,
+    evaluating evaluator: Evaluator,
+    captureLimit: Int = 64 * 1024,
+    onOutput: @escaping ProcessOutputHandler = { _ in }
+  ) async throws -> SemanticallyEvaluatedIdentityBoundProcessResult<Evaluator.SemanticResult> {
+    let evaluation = SemanticEvaluationBox(evaluator)
+    let result = try await executeIdentityBound(request, captureLimit: captureLimit) { chunk in
+      evaluation.consume(chunk)
+      onOutput(chunk)
+    }
+    return SemanticallyEvaluatedIdentityBoundProcessResult(
+      execution: result.execution,
+      semantic: evaluation.finish(execution: result.execution),
+      executableIdentity: result.executableIdentity)
+  }
+
+  package func executeIdentityBound<Evaluator: ProcessSemanticEvaluating>(
+    _ request: ProcessIdentityBoundRequest,
+    gate: ProcessAtomicLaunchGate,
+    evaluating evaluator: Evaluator,
+    captureLimit: Int = 64 * 1024,
+    onOutput: @escaping ProcessOutputHandler = { _ in }
+  ) async throws -> SemanticallyEvaluatedIdentityBoundProcessResult<Evaluator.SemanticResult> {
+    let evaluation = SemanticEvaluationBox(evaluator)
+    let result = try await executeIdentityBound(
+      request, gate: gate, captureLimit: captureLimit
+    ) { chunk in
+      evaluation.consume(chunk)
+      onOutput(chunk)
+    }
+    return SemanticallyEvaluatedIdentityBoundProcessResult(
+      execution: result.execution,
+      semantic: evaluation.finish(execution: result.execution),
+      executableIdentity: result.executableIdentity)
+  }
+
+  package func prepareIdentityBoundLaunch(
+    _ request: ProcessIdentityBoundRequest
+  ) throws -> ProcessPreparedIdentityBoundLaunch {
+    try validate(request.process)
+    guard Self.isValidSHA256(request.expectedSHA256) else {
+      throw ProcessExecutionError.invalidExpectedSHA256
+    }
+    let executable = try VerifiedExecutableDescriptor.open(
+      path: request.process.executable, expectedSHA256: request.expectedSHA256)
+    do {
+      try identityBoundPreSpawnHook(executable.receipt)
+      if identityBoundLaunchFault == .closeDescriptorBeforeSpawn {
+        executable.close()
+      }
+      try executable.revalidate(path: request.process.executable)
+      return ProcessPreparedIdentityBoundLaunch(request: request, executable: executable)
+    } catch {
+      executable.close()
+      throw error
+    }
+  }
+
+  package func executePreparedIdentityBoundLaunch<Evaluator: ProcessSemanticEvaluating>(
+    _ prepared: ProcessPreparedIdentityBoundLaunch,
+    evaluating evaluator: Evaluator,
+    captureLimit: Int = 64 * 1024,
+    onOutput: @escaping ProcessOutputHandler = { _ in }
+  ) async throws -> SemanticallyEvaluatedIdentityBoundProcessResult<Evaluator.SemanticResult> {
+    let evaluation = SemanticEvaluationBox(evaluator)
+    let result = try await executePreparedIdentityBoundLaunchImpl(
+      prepared, gate: nil, captureLimit: captureLimit
+    ) { chunk in
+      evaluation.consume(chunk)
+      onOutput(chunk)
+    }
+    return SemanticallyEvaluatedIdentityBoundProcessResult(
+      execution: result.execution,
+      semantic: evaluation.finish(execution: result.execution),
+      executableIdentity: result.executableIdentity)
+  }
+
+  package func executePreparedIdentityBoundLaunch<Evaluator: ProcessSemanticEvaluating>(
+    _ prepared: ProcessPreparedIdentityBoundLaunch,
+    gate: ProcessAtomicLaunchGate,
+    evaluating evaluator: Evaluator,
+    captureLimit: Int = 64 * 1024,
+    onOutput: @escaping ProcessOutputHandler = { _ in }
+  ) async throws -> SemanticallyEvaluatedIdentityBoundProcessResult<Evaluator.SemanticResult> {
+    let evaluation = SemanticEvaluationBox(evaluator)
+    let result = try await executePreparedIdentityBoundLaunchImpl(
+      prepared, gate: gate, captureLimit: captureLimit
+    ) { chunk in
+      evaluation.consume(chunk)
+      onOutput(chunk)
+    }
+    return SemanticallyEvaluatedIdentityBoundProcessResult(
+      execution: result.execution,
+      semantic: evaluation.finish(execution: result.execution),
+      executableIdentity: result.executableIdentity)
+  }
+
+  private func executeIdentityBoundImpl(
+    _ request: ProcessIdentityBoundRequest,
+    gate: ProcessAtomicLaunchGate?,
+    captureLimit: Int,
+    onOutput: @escaping ProcessOutputHandler
+  ) async throws -> ProcessIdentityBoundExecutionResult {
+    let prepared = try prepareIdentityBoundLaunch(request)
+    return try await executePreparedIdentityBoundLaunchImpl(
+      prepared, gate: gate, captureLimit: captureLimit, onOutput: onOutput)
+  }
+
+  private func executePreparedIdentityBoundLaunchImpl(
+    _ prepared: ProcessPreparedIdentityBoundLaunch,
+    gate: ProcessAtomicLaunchGate?,
+    captureLimit: Int,
+    onOutput: @escaping ProcessOutputHandler
+  ) async throws -> ProcessIdentityBoundExecutionResult {
+    let control = ProcessControl()
+    return try await withTaskCancellationHandler(
+      operation: {
+        guard !Task.isCancelled else {
+          throw ProcessExecutionError.launchAuthorizationInvalidated
+        }
+        return try await startPreparedIdentityBound(
+          prepared,
+          gate: gate,
+          captureLimit: max(0, captureLimit),
+          control: control,
+          onOutput: onOutput)
+      },
+      onCancel: {
+        control.stop(reason: .cancelled)
+      })
+  }
+
+  private func validate(_ request: ProcessRequest) throws {
+    guard request.executable.isFileURL, request.executable.path.hasPrefix("/") else {
+      throw ProcessExecutionError.executableMustBeAbsolute(request.executable.path)
+    }
+    guard !request.executable.path.contains("\0"),
+      !request.executable.absoluteString.localizedCaseInsensitiveContains("%00")
+    else {
+      throw ProcessExecutionError.invalidExecutableContainsNUL
+    }
+    guard request.timeout.map({ $0.isFinite && $0 > 0 }) ?? true else {
+      throw ProcessExecutionError.invalidTimeout(request.timeout ?? 0)
+    }
+    guard !request.arguments.contains(where: { $0.contains("\0") }) else {
+      throw ProcessExecutionError.invalidArgumentContainsNUL
+    }
+    for (key, value) in request.environment {
+      guard !key.isEmpty, !key.contains("="), !key.contains("\0") else {
+        throw ProcessExecutionError.invalidEnvironmentKey(key)
+      }
+      guard !value.contains("\0") else {
+        throw ProcessExecutionError.invalidEnvironmentValue(key)
+      }
+    }
+  }
+
+  private static func isValidSHA256(_ value: String) -> Bool {
+    value.count == 64
+      && value.utf8.allSatisfy {
+        (UInt8(ascii: "0")...UInt8(ascii: "9")).contains($0)
+          || (UInt8(ascii: "a")...UInt8(ascii: "f")).contains($0)
+      }
+  }
+
   private func start(
     _ request: ProcessRequest,
     captureLimit: Int,
@@ -244,6 +610,60 @@ public final class FoundationProcessExecutor: @unchecked Sendable {
     }
 
     let spawned = try spawn(request)
+    return await collectExecution(
+      of: spawned,
+      request: request,
+      captureLimit: captureLimit,
+      control: control,
+      onOutput: onOutput)
+  }
+
+  private func startPreparedIdentityBound(
+    _ prepared: ProcessPreparedIdentityBoundLaunch,
+    gate: ProcessAtomicLaunchGate?,
+    captureLimit: Int,
+    control: ProcessControl,
+    onOutput: @escaping ProcessOutputHandler
+  ) async throws -> ProcessIdentityBoundExecutionResult {
+    guard !control.hasStopRequest else {
+      throw ProcessExecutionError.launchAuthorizationInvalidated
+    }
+    try prepared.consume()
+    defer { prepared.close() }
+    let executable = prepared.executable
+    try executable.revalidate(path: prepared.request.process.executable)
+    try await identityBoundFinalLaunchHook(executable.receipt)
+    guard !control.hasStopRequest else {
+      throw ProcessExecutionError.launchAuthorizationInvalidated
+    }
+
+    let launch = {
+      try executable.revalidate(path: prepared.request.process.executable)
+      guard !control.hasStopRequest else {
+        throw ProcessExecutionError.launchAuthorizationInvalidated
+      }
+      return try self.spawn(
+        prepared.request.process,
+        executablePath: executable.inodeLaunchPath)
+    }
+    let spawned = try gate.map { try $0.consume(launch) } ?? launch()
+    let execution = await collectExecution(
+      of: spawned,
+      request: prepared.request.process,
+      captureLimit: captureLimit,
+      control: control,
+      onOutput: onOutput)
+    return ProcessIdentityBoundExecutionResult(
+      execution: execution, executableIdentity: executable.receipt)
+  }
+
+  private func collectExecution(
+    of spawned: SpawnedProcess,
+    request: ProcessRequest,
+    captureLimit: Int,
+    control: ProcessControl,
+    onOutput: @escaping ProcessOutputHandler
+  ) async -> ProcessExecutionResult {
     let capture = OutputCapture(limit: captureLimit, onOutput: onOutput)
     let drain = PipeDrain()
     control.attach(drain: drain)
@@ -264,7 +684,10 @@ public final class FoundationProcessExecutor: @unchecked Sendable {
     )
   }
 
-  private func spawn(_ request: ProcessRequest) throws -> SpawnedProcess {
+  private func spawn(
+    _ request: ProcessRequest,
+    executablePath: String? = nil
+  ) throws -> SpawnedProcess {
     var arguments = try makeCStringVector([request.executable.path] + request.arguments)
     defer { freeCStringVector(arguments) }
     var environment = try makeCStringVector(
@@ -326,7 +749,7 @@ public final class FoundationProcessExecutor: @unchecked Sendable {
     var processIdentifier: pid_t = 0
     let spawnResult = arguments.withUnsafeMutableBufferPointer { argumentBuffer in
       environment.withUnsafeMutableBufferPointer { environmentBuffer in
-        request.executable.path.withCString { executablePath in
+        (executablePath ?? request.executable.path).withCString { executablePath in
           posix_spawn(
             &processIdentifier,
             executablePath,
@@ -346,6 +769,7 @@ public final class FoundationProcessExecutor: @unchecked Sendable {
     guard spawnResult == 0 else {
       throw ProcessExecutionError.launchFailed(String(cString: strerror(spawnResult)))
     }
+    launchObserver(processIdentifier)
     let stdout = stdoutDescriptors[0]
     stdoutDescriptors[0] = -1
     let stderr = stderrDescriptors[0]
@@ -460,6 +884,197 @@ public final class FoundationProcessExecutor: @unchecked Sendable {
       guard !Task.isCancelled else { return }
       control.stop(reason: .timedOut)
     }
+  }
+}
+
+private final class VerifiedExecutableDescriptor {
+  private(set) var fileDescriptor: Int32
+  private var hashDescriptor: Int32
+  let receipt: ProcessExecutableIdentityReceipt
+  private let expectedSHA256: String
+  private let openedDevice: dev_t
+  private let openedInode: ino_t
+
+  var inodeLaunchPath: String { receipt.inodeLaunchPath }
+
+  private init(
+    fileDescriptor: Int32,
+    hashDescriptor: Int32,
+    receipt: ProcessExecutableIdentityReceipt,
+    expectedSHA256: String,
+    openedDevice: dev_t,
+    openedInode: ino_t
+  ) {
+    self.fileDescriptor = fileDescriptor
+    self.hashDescriptor = hashDescriptor
+    self.receipt = receipt
+    self.expectedSHA256 = expectedSHA256
+    self.openedDevice = openedDevice
+    self.openedInode = openedInode
+  }
+
+  static func open(path: URL, expectedSHA256: String) throws -> VerifiedExecutableDescriptor {
+    var pathMetadata = stat()
+    guard path.path.withCString({ lstat($0, &pathMetadata) }) == 0 else {
+      throw ProcessExecutionError.executableOpenFailed(path.path, errno)
+    }
+    guard (pathMetadata.st_mode & mode_t(S_IFMT)) != mode_t(S_IFLNK) else {
+      throw ProcessExecutionError.executableMustNotBeSymlink
+    }
+
+    let descriptor = Darwin.open(path.path, O_EXEC | O_NOFOLLOW)
+    guard descriptor >= 0 else {
+      if errno == ELOOP {
+        throw ProcessExecutionError.executableMustNotBeSymlink
+      }
+      throw ProcessExecutionError.executableOpenFailed(path.path, errno)
+    }
+    let hashDescriptor = Darwin.open(path.path, O_RDONLY | O_NOFOLLOW)
+    guard hashDescriptor >= 0 else {
+      let openError = errno
+      Darwin.close(descriptor)
+      throw ProcessExecutionError.executableOpenFailed(path.path, openError)
+    }
+    do {
+      guard fcntl(descriptor, F_SETFD, FD_CLOEXEC) == 0,
+        fcntl(hashDescriptor, F_SETFD, FD_CLOEXEC) == 0
+      else {
+        throw ProcessExecutionError.executableDescriptorInvalid
+      }
+      var descriptorMetadata = stat()
+      var hashDescriptorMetadata = stat()
+      guard fstat(descriptor, &descriptorMetadata) == 0 else {
+        throw ProcessExecutionError.executableDescriptorInvalid
+      }
+      guard fstat(hashDescriptor, &hashDescriptorMetadata) == 0,
+        hashDescriptorMetadata.st_dev == descriptorMetadata.st_dev,
+        hashDescriptorMetadata.st_ino == descriptorMetadata.st_ino
+      else {
+        throw ProcessExecutionError.executableIdentityChanged
+      }
+      guard (descriptorMetadata.st_mode & mode_t(S_IFMT)) == mode_t(S_IFREG) else {
+        throw ProcessExecutionError.executableMustBeRegularFile
+      }
+      let executableBits = mode_t(S_IXUSR | S_IXGRP | S_IXOTH)
+      guard descriptorMetadata.st_mode & executableBits != 0,
+        path.path.withCString({ access($0, X_OK) }) == 0
+      else {
+        throw ProcessExecutionError.executableMustBeExecutable
+      }
+      guard pathMetadata.st_dev == descriptorMetadata.st_dev,
+        pathMetadata.st_ino == descriptorMetadata.st_ino
+      else {
+        throw ProcessExecutionError.executableIdentityChanged
+      }
+
+      let sha256 = try hash(fileDescriptor: hashDescriptor)
+      guard sha256 == expectedSHA256 else {
+        throw ProcessExecutionError.executableHashMismatch(
+          expected: expectedSHA256, actual: sha256)
+      }
+      let device = UInt64(UInt32(bitPattern: descriptorMetadata.st_dev))
+      let inode = UInt64(descriptorMetadata.st_ino)
+      let inodeLaunchPath = "/.vol/\(device)/\(inode)"
+      var inodePathMetadata = stat()
+      guard inodeLaunchPath.withCString({ lstat($0, &inodePathMetadata) }) == 0,
+        inodePathMetadata.st_dev == descriptorMetadata.st_dev,
+        inodePathMetadata.st_ino == descriptorMetadata.st_ino,
+        (inodePathMetadata.st_mode & mode_t(S_IFMT)) == mode_t(S_IFREG)
+      else {
+        throw ProcessExecutionError.executableInodePathUnavailable
+      }
+      let receipt = ProcessExecutableIdentityReceipt(
+        authorizedPath: path.path,
+        inodeLaunchPath: inodeLaunchPath,
+        device: device,
+        inode: inode,
+        fileSize: descriptorMetadata.st_size,
+        mode: UInt32(descriptorMetadata.st_mode),
+        sha256: sha256)
+      return VerifiedExecutableDescriptor(
+        fileDescriptor: descriptor,
+        hashDescriptor: hashDescriptor,
+        receipt: receipt,
+        expectedSHA256: expectedSHA256,
+        openedDevice: descriptorMetadata.st_dev,
+        openedInode: descriptorMetadata.st_ino)
+    } catch {
+      Darwin.close(descriptor)
+      Darwin.close(hashDescriptor)
+      throw error
+    }
+  }
+
+  func revalidate(path: URL) throws {
+    guard fileDescriptor >= 0, hashDescriptor >= 0 else {
+      throw ProcessExecutionError.executableDescriptorInvalid
+    }
+    var descriptorMetadata = stat()
+    var hashDescriptorMetadata = stat()
+    guard fstat(fileDescriptor, &descriptorMetadata) == 0,
+      fstat(hashDescriptor, &hashDescriptorMetadata) == 0,
+      descriptorMetadata.st_dev == openedDevice,
+      descriptorMetadata.st_ino == openedInode,
+      hashDescriptorMetadata.st_dev == openedDevice,
+      hashDescriptorMetadata.st_ino == openedInode,
+      (descriptorMetadata.st_mode & mode_t(S_IFMT)) == mode_t(S_IFREG)
+    else {
+      throw ProcessExecutionError.executableDescriptorInvalid
+    }
+
+    var pathMetadata = stat()
+    guard path.path.withCString({ lstat($0, &pathMetadata) }) == 0,
+      (pathMetadata.st_mode & mode_t(S_IFMT)) != mode_t(S_IFLNK),
+      pathMetadata.st_dev == openedDevice,
+      pathMetadata.st_ino == openedInode
+    else {
+      throw ProcessExecutionError.executableIdentityChanged
+    }
+    var inodePathMetadata = stat()
+    guard inodeLaunchPath.withCString({ lstat($0, &inodePathMetadata) }) == 0,
+      inodePathMetadata.st_dev == openedDevice,
+      inodePathMetadata.st_ino == openedInode,
+      (inodePathMetadata.st_mode & mode_t(S_IFMT)) == mode_t(S_IFREG)
+    else {
+      throw ProcessExecutionError.executableInodePathUnavailable
+    }
+    let finalHash = try Self.hash(fileDescriptor: hashDescriptor)
+    guard finalHash == expectedSHA256 else {
+      throw ProcessExecutionError.executableHashMismatch(
+        expected: expectedSHA256, actual: finalHash)
+    }
+  }
+
+  func close() {
+    if fileDescriptor >= 0 {
+      Darwin.close(fileDescriptor)
+      fileDescriptor = -1
+    }
+    if hashDescriptor >= 0 {
+      Darwin.close(hashDescriptor)
+      hashDescriptor = -1
+    }
+  }
+
+  deinit { close() }
+
+  private static func hash(fileDescriptor: Int32) throws -> String {
+    var hasher = SHA256()
+    var offset: off_t = 0
+    var buffer = [UInt8](repeating: 0, count: 64 * 1024)
+    while true {
+      let count = buffer.withUnsafeMutableBytes { bytes in
+        pread(fileDescriptor, bytes.baseAddress, bytes.count, offset)
+      }
+      if count == 0 { break }
+      if count < 0 {
+        if errno == EINTR { continue }
+        throw ProcessExecutionError.executableDescriptorInvalid
+      }
+      hasher.update(data: Data(buffer.prefix(count)))
+      offset += off_t(count)
+    }
+    return hasher.finalize().map { String(format: "%02x", $0) }.joined()
   }
 }
 

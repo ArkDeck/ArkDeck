@@ -14,13 +14,16 @@ let package = Package(
     .library(name: "ArkDeckStorage", targets: ["ArkDeckStorage"]),
     .executable(name: "ArkDeckJournalCrashFixture", targets: ["ArkDeckJournalCrashFixture"]),
     .executable(name: "ArkDeckRuntimePortFixture", targets: ["ArkDeckRuntimePortFixture"]),
+    .executable(name: "ArkDeckFakeHDCFixture", targets: ["ArkDeckFakeHDCFixture"]),
   ],
   targets: [
     .target(name: "ArkDeckCore"),
     .target(name: "ArkDeckProcess", dependencies: ["ArkDeckCore"]),
     .target(name: "ArkDeckRuntime", dependencies: ["ArkDeckCore"]),
     .target(name: "ArkDeckOpenHarmony", dependencies: ["ArkDeckCore", "ArkDeckProcess"]),
-    .target(name: "ArkDeckWorkflows", dependencies: ["ArkDeckCore"]),
+    .target(
+      name: "ArkDeckWorkflows",
+      dependencies: ["ArkDeckCore", "ArkDeckOpenHarmony", "ArkDeckStorage"]),
     .target(name: "ArkDeckStorage", dependencies: ["ArkDeckCore"]),
     .executableTarget(
       name: "ArkDeckJournalCrashFixture",
@@ -32,6 +35,10 @@ let package = Package(
       dependencies: ["ArkDeckRuntime"],
       path: "Tests/ArkDeckRuntimePortFixture"
     ),
+    .executableTarget(
+      name: "ArkDeckFakeHDCFixture",
+      path: "Tests/ArkDeckFakeHDCFixture"
+    ),
     .testTarget(name: "ArkDeckCoreTests", dependencies: ["ArkDeckCore"]),
     .testTarget(
       name: "ArkDeckContractTests",
@@ -42,6 +49,7 @@ let package = Package(
         "ArkDeckOpenHarmony",
         "ArkDeckWorkflows",
         "ArkDeckStorage",
+        "ArkDeckFakeHDCFixture",
       ],
       resources: [
         // Golden resource declaration is owned by TASK-I5-001 (CHG-2026-005). `.copy` preserves
