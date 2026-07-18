@@ -1,7 +1,7 @@
 ---
 schema_version: 1.0.0
 change_id: CHG-2026-009-dayu200-partition-decode
-change_revision: 1
+change_revision: 2
 platform: macos
 evidence_classes:
 - contract
@@ -13,15 +13,35 @@ cases:
   expected_source: openspec/changes/chg-2026-009-dayu200-partition-decode/verification.md#DECODE-DAYU200-PARTITION-001
   minimum_evidence: platform
   expected_result: The decoder refuses any archive not matching the CHG-2026-003
-    pinned identity; parameter.txt is located and read by streaming without
-    extraction to disk and without reading other member contents; the
+    pinned identity; parameter.txt is located and read without extraction to
+    disk; bytes in preceding member bodies may be consumed only to advance the
+    single gzip/tar stream, in chunks no larger than 1 MiB, and are immediately
+    discarded without parsing, hashing, returning, logging, persisting or
+    retention across chunks; reading stops after the target; raw identity/gzip
+    pass bytes and tar header/body counts and bytes are exactly audited; the
     mtdparts/CMDLINE grammar is closed with unknown forms failing explicitly
     rather than guessed; the evidence records the partition-name to
     offset/size/attribute mapping with S2 source citations and member hash
     references, contains no parameter.txt raw text and no archive locator, is
     annotated as valid only for the pinned image, and unit tests cover every
     grammar branch positively and negatively with a static audit proving zero
-    subprocess/network/device access.
+    subprocess/network/device-mutation dispatch.
+- acceptance_id: DECODE-DAYU200-INPUT-BOUNDARY-001
+  test_id: TEST-DECODE-DAYU200-INPUT-BOUNDARY-001
+  method: Static call-target audit, descriptor-first negative tests and macOS sandbox broker evidence review.
+  expected_source: openspec/changes/chg-2026-009-dayu200-partition-decode/verification.md#DECODE-DAYU200-INPUT-BOUNDARY-001
+  minimum_evidence: platform
+  expected_result: The production decoder accepts only a pre-opened read-only
+    file descriptor or equivalent capability and contains no path-based open;
+    before its first read it fstats the descriptor and rejects every non-regular
+    mode with zero bytes read. The descriptor is supplied by a separately signed
+    and verified macOS sandbox broker whose closed entitlements and policy exclude
+    every character/block device-node namespace, including USB, serial and raw
+    disks, and whose descriptor-transfer chain is recorded. Existing app sandbox
+    status or a caller assertion alone is
+    insufficient, and missing broker, policy, signing or transfer evidence fails
+    closed. Device-mode negative tests use synthetic or mocked descriptor metadata
+    and never open a real device node.
 - acceptance_id: DECODE-DAYU200-RECONCILE-001
   test_id: TEST-DECODE-DAYU200-RECONCILE-001
   method: Reconciliation of the decoded mapping against the archived 17-member inventory.
