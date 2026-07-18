@@ -697,6 +697,19 @@
 ## TASK-M1-009 — 诊断骨架:分类脱敏日志与有界本地诊断导出
 
 - Status:ready
+- Review remediation(2026-07-18,round 4):任务继续保持 `ready`；需将 writer lock 路径
+  持续绑定到已加锁 inode，并以稳定目录 inode lock 阻止 lock-file replacement 后的第二
+  writer；journal summary 必须与 manifest 的 Session/Job/executionMode 完全一致。
+- Review remediation(2026-07-18,round 3):任务继续保持 `ready`；需证明 rename 后名称
+  `ENOENT` 时 staging inode 已解除链接，否则返回 `exportOutcomeUnknown`，并为预发布文件
+  复验增加 non-blocking FIFO 拒绝向量；维护者 re-review 前不得起草 completion。
+- Review remediation(2026-07-18,round 2):任务继续保持 `ready`；需补齐写入点封闭
+  catalog/opaque correlation、preview 父目录身份绑定、导出诊断语义保留、manifest 配额
+  边界与 rename 后失败清理，并经复验和维护者 re-review 后方可另行起草 completion。
+- Review remediation(2026-07-18):implementation review 要求补齐不可伪造/导出边界二次
+  脱敏、preview bytes 单次绑定、父目录 descriptor/inode 锚定和 owner-only 权限向量；
+  修复与复验完成前不得再次起草 `ready→done`。初始 run 只作为待 remediation 的执行记录，
+  不构成 completion evidence。
 - Readiness review(2026-07-18,独立 readiness PR):
   - 依赖:`TASK-M1-001` done(typed vocabulary);`TASK-M1-004` done(`ArkDeckRuntime`
     平台端口惯例,main `9b58f2d`);`TASK-M1-005` done(实现 PR #37 main `9e1f1da`、
