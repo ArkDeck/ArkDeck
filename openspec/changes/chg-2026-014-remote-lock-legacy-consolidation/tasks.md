@@ -5,8 +5,34 @@
 
 ## TASK-RLC-001 — 汇入固定锁屏遗留实现并建立非阻塞 ledger
 
-- Status:blocked(change 仍为 proposed；只有 approval-only PR 与后续独立 readiness PR
-  均由维护者 review/merge 后才可转 ready)
+- Status:ready（本分支只起草 readiness；仅在维护者 review/merge 本独立 PR 后生效）
+- Readiness review（2026-07-19；不执行 TASK-RLC-001、不产生 implementation evidence）：
+  - Change gate:satisfied。CHG-2026-014 已由维护者经 PR #107 批准并合入 `main`
+    `4b4e0b37c82bf03ccfa1317058f06834d68273f5`；Core baseline 仍为 `CORE-2.0.0`，
+    本 readiness 不修改 Requirement、AC、contract、schema、baseline 或 verification plan。
+  - Source identity gate:satisfied。三个 proposal-pinned OID 均可读取；M1-006 source
+    `ae708518ce6cc8bbd5ad39943d948b2d81209f03` 仍由 GitHub PR #105 的只读 head ref
+    精确定位，并与已合入 squash commit
+    `21c2e218973c301e7ac6c43659d8918828f2c39e` 具有相同 parent
+    `0db5f22c0878d059697d32a3022fa260c83e2798`、相同 tree
+    `eb3df103b87c898edb24d3143cbd165244e9abea` 和零 tree diff；PD-001 implementation
+    `0076e44dcaed45605c1cccefc093a82b246a4ef5` 与 blocked record
+    `0db5f22c0878d059697d32a3022fa260c83e2798` 均为当前 `main` 祖先。
+  - Source-state/dependency gate:satisfied for this task only。权威 `main` 中
+    `TASK-M1-006` 与 `TASK-PD-001` 均保持 `blocked`/非 `done`，其 blocker 与 AC debt
+    不变；source completion 按已批准范围不是本任务依赖。M1-007/M1-008/M0B-002/
+    UD-001/FA-001 的既有 dependency 未改写；其中任何未满足原依赖的任务仍不得执行，
+    本 readiness 不为 consumer 铸造 authority。
+  - Environment gate:satisfied。clean `main` 上可用 Swift 6.3.3、`swift-format` 6.3.0、
+    Xcode 26.6（17F113）与 CPython 3.14.6；仓库 fake-HDC executable 与 server fixture
+    在场。`swift test --package-path Packages/ArkDeckKit --filter
+    HDCSupervisorContractTests` 在 headless shell 通过 36 tests / 0 failures；编译仅有三个
+    既有 redundant-`await` warning。本机存在已安装真实 `hdc`，但它是本任务 forbidden/
+    unused 输入；实现与验证必须显式绑定仓库 fake executable，发现真实 HDC、真实设备、
+    GUI、非 loopback 网络或系统授权需求即 fail closed。
+  - Review boundary:本 PR 只草拟 `blocked→ready` 与上述可复查审计，不导入/修改源码，
+    不写 TASK-RLC-001 run/manifest，不更新来源 Task，不改变 conformance、hardware、
+    support 或 release claim；实现仍须在后续独立 TASK-RLC-001 PR 闭环。
 - Objective:以 proposal 固定的三个 commit OID 为输入，在不改变任何 Requirement/AC 的
   前提下，将可安全合并的 M1-006 遗留实现收敛到 main，并把 M1-006/PD-001 的交互验证债
   统一登记；完成只代表 headless fail-closed integration，不代表来源 Task 完成。
