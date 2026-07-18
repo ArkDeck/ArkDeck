@@ -1,6 +1,6 @@
 # Spec Impact
 
-> Change：CHG-2026-002-macos-m1-infrastructure@r4
+> Change：CHG-2026-002-macos-m1-infrastructure@r5
 > Core baseline：CORE-2.0.0（ratification 状态见 `openspec/baselines/CORE-2.0.0.yaml`）
 > Exact affected scope：`scope.yaml`
 
@@ -16,6 +16,10 @@ profile and lock remain read-only M1-006 inputs. Platform-profile edits are limi
 mapping of those versioned, side-effect-classified read-only probes and mechanical platform-lock
 metadata; any integration mapping or mutating probe change still requires a separate approved
 integration change.
+
+r5 changes no specification, acceptance result, evidence class or platform mapping. It only permits
+two legacy package-test expectations to align with the already-approved r4 ownership-evidence and
+terminal-reconciliation requirements so the unchanged full-suite gate is internally consistent.
 
 Deliberately excluded from this change (later changes must cover them before any release includes
 their capability): `AC-DEV-007-01` (parserGolden capability probing), all realHardware acceptance,

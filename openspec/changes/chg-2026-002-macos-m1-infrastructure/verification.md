@@ -1,7 +1,7 @@
 # M1 Verification Plan
 
 > Status：planned  
-> Change：CHG-2026-002-macos-m1-infrastructure@r4
+> Change：CHG-2026-002-macos-m1-infrastructure@r5
 > Core baseline：CORE-2.0.0
 > Core conformance：CORE-CONFORMANCE-2.0.0
 > Integration base：OPENHARMONY-TOOLS@0.2.0
@@ -18,6 +18,11 @@ r4 不新增 Core AC；它将 `PORT-FILE-ACCESS-001`、`PORT-TOOL-TRUST-001` 与
 durable Core toolchain intent、descriptor/inode-bound atomic launch、封闭 Workflows
 executor/finalizer 组合和实际签名 Sandbox XCUITest。SwiftPM/domain 测试不能替代签名 App
 路径，签名 Sandbox 也不能替代真实硬件、Developer ID/公证或 release evidence。
+
+r5 不改变 acceptance method、expected result 或 evidence class。它只要求 full package gate
+中的两个 legacy case 不再与同一 gate 的 r4 safety assertions 相反：fabricated PID evidence
+必须被拒绝，successful lifecycle audit 必须断言 terminal reconciliation；positive ownership
+仍由 dedicated process-backed `ownershipEvidenceContract` 提供。
 
 ## Platform acceptance matrix
 

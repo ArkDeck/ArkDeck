@@ -1,9 +1,10 @@
 # M1 Change Review Gate
 
-> Status：r1/r2/r3 passed；r4 execution-boundary scope/dependency amendment pending maintainer review
+> Status：r1-r4 passed；r5 legacy-contract safety-alignment amendment pending maintainer review
 > Reviewed：r1 于 2026-07-15 由维护者经 PR #14 合入；r2 于 2026-07-16 经 PR #22
 > 合入，merge commit `eb9b9dc64ab422a51a518066f70b728e9ff5ba24`；r3 经 PR #35
-> 合入，merge commit `11eb5cbe69bc9089fd870d6397f698f4c93dd299`。V2 语义为合并即批准。
+> 合入，merge commit `11eb5cbe69bc9089fd870d6397f698f4c93dd299`；r4 经 main
+> `87a3a99` 合入。V2 语义为合并即批准。
 > 原 r1 blocked 理由已全部解除:CORE-1.0.0 已 ratify(main `c76a492`,PR #3);
 > V1 approval/claim guard 已由 V2 git-native 治理取代(受保护 main + sdd-guard,
 > 见 `governance/enforcement.md`);M0A 分发决策已交付
@@ -58,7 +59,21 @@
   conformance/release 状态均禁止修改。
 - [x] signed Sandbox/XCUITest 是仓库 fake/read-only platform evidence；不运行真实 HDC/设备，
   不替代 Developer ID、公证、真机、完整 platform conformance 或 ADR-0001 分发结论。
-- [ ] 维护者已 review 并合入 r4；在此之前 r4 新增 paths/dependencies 不构成 M1-006 实现授权。
+- [x] 维护者已 review 并合入 r4（main `87a3a99`）；r4 paths/dependencies 已生效。
+
+## r5 review gate
+
+- [x] amendment 只修改 CHG-002 的八个治理 artifacts；无 Swift、Xcode、profile、lock、fixture、
+  evidence、Core spec/contract、任务状态或 platform conformance 修改。
+- [x] Core/AC、platform matrix、evidence class、full-suite command 与产品实现范围完全不变；
+  `scope.yaml`/`acceptance-cases.yaml` 只机械递增 revision。
+- [x] `ArkDeckContractTests.swift` 新增授权只覆盖两个具名 legacy HDC case 及其直接 private
+  helper/import 编译适配；其他既有 Process/HDC cases 仍禁止迁移、删除、重命名或改写。
+- [x] managed ownership case 只能把构造 PID evidence 改为拒绝；positive acceptance 必须由
+  dedicated process-backed evidence 提供，不能引入 test-only production bypass。
+- [x] lifecycle audit case 必须新增 terminal reconciliation 断言，不能通过隐藏、丢弃或从
+  legacy `events()` 过滤 reconciliation 来维持旧计数。
+- [ ] 维护者已 review 并合入 r5；在此之前 r5 的两个 case 修改授权不生效。
 
 任务状态以 `tasks.md` 为唯一事实源(V2:原 immutable task packets 已废止)。本文件记录历史与
-r4 review gate，不替代维护者 review/merge。
+r5 review gate，不替代维护者 review/merge。
