@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-006-dayu200-m0b-bringup
-revision: 1
-status: approved
+revision: 2
+status: approved # r1 经 #55 批准;r2(AUTH-001 双分支修订)仅在对应 revision PR 由维护者 review/merge 后生效
 class: platform
 core_change_level: none
 owner: lvye
@@ -28,8 +28,12 @@ matrix 行,不构成任何支持声明。
 
 - 人类操作的真机 bring-up runbook 与受控采集脚本(agent 起草,人类执行):
   1. USB transport 下的 `hdc list targets [-v]` 发现与稳定 device identity 记录;
-  2. 授权工作流观察:unauthorized → 设备端人工信任确认 → ready;至少一条
-     denied/timeout 负路径观察或如实记录不可复现原因;
+  2. 授权工作流观察(r2 双分支):设备呈现信任 UI 时,unauthorized → 设备端
+     人工信任确认 → ready 迁移被捕获,至少一条 denied/timeout 负路径观察或如实
+     记录不可复现原因;设备族无信任 UI 时(首例:EVD-M0B-DAYU200-20260718-001
+     的 DAYU200 build),operator 明确记录新鲜枚举(重插)前后均无信任提示、
+     `list targets` 字节可比对地呈现稳定 authorized 态,并如实记录负路径不可
+     复现原因;
   3. toolchain/设备事实:hdc client/server/daemon version、tool path/hash、实际
      观察到的设备 OpenHarmony build/API 信息(以设备为准,不从镜像文件名推断);
   4. device-family raw output(list targets、含设备的 checkserver 等)分 stream
@@ -92,3 +96,10 @@ matrix 行,不构成任何支持声明。
   不产生任务执行或任何真机 evidence:TASK-M0B-001 的执行另需物理 DAYU200 在场与
   维护者时间窗,TASK-M0B-002 保持 blocked(待 TASK-M1-006 done + M0B-001 done +
   独立 readiness PR)。
+- Revision r2(2026-07-18):按 TASK-M0B-001 真机事实
+  (EVD-M0B-DAYU200-20260718-001:该 DAYU200 build 无 on-device 信任 UI,
+  unauthorized 态不可观察)将 `HW-M0B-DAYU200-AUTH-001` 修订为双分支
+  (有信任 UI / 无信任 UI 设备族)。本修订不追溯改变已按 r1 记录的结论
+  (该 evidence 的 AUTH-001 FAIL as written 保持有效);如需按 r2 重新评定,
+  须以独立的维护者 review evidence 步骤进行。修订经本 revision PR 由维护者
+  review/merge 后生效(先例:CHG-002 r3 / PR #35)。
