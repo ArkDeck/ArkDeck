@@ -1,0 +1,32 @@
+---
+schema_version: 1.0.0
+change_id: CHG-2026-011-dayu200-flash-protocol-research
+change_revision: 1
+platform: macos
+evidence_classes:
+- platform
+cases:
+- acceptance_id: PROTOCOL-DAYU200-CHANNELS-001
+  test_id: TEST-PROTOCOL-DAYU200-CHANNELS-001
+  method: Document review of the flash-protocol facts against the five mandatory sections.
+  expected_source: openspec/changes/chg-2026-011-dayu200-flash-protocol-research/verification.md#PROTOCOL-DAYU200-CHANNELS-001
+  minimum_evidence: platform
+  expected_result: The facts document enumerates the candidate flash channels
+    (RockUSB/maskrom-loader, OpenHarmony flashd/hdc upgrade path, others) with
+    document-level definitions and applicable states, their entry conditions and
+    USB transport identification (VID/PID from docs, with TCP/UART explicitly out
+    of scope), and the host-tool mapping (rkdeveloptool/upgrade_tool/RKDevTool/
+    hdc) with macOS availability and version constraints; every claim carries a
+    graded S2/S3 citation and every S3-dependent conclusion is marked unconfirmed
+    pending real-device verification; the document states it makes no
+    compatibility claim and closes no gap.
+- acceptance_id: PROTOCOL-DAYU200-OBSERVATION-PLAN-001
+  test_id: TEST-PROTOCOL-DAYU200-OBSERVATION-PLAN-001
+  method: Document review of the read-only observation-surface draft for read/write classification.
+  expected_source: openspec/changes/chg-2026-011-dayu200-flash-protocol-research/verification.md#PROTOCOL-DAYU200-OBSERVATION-PLAN-001
+  minimum_evidence: platform
+  expected_result: The observation-surface draft lists candidate first-phase
+    commands each classified read-only, and classifies every candidate that
+    involves a mode switch or device write as second-phase device-write requiring
+    RECOVERY-PATH closure first; the draft is a design only and states that its
+    execution belongs to a separate future change, authorizing no execution here.
