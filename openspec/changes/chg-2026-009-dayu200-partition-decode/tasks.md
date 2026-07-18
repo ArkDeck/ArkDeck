@@ -5,12 +5,20 @@
 
 ## TASK-PD-001 — parameter.txt 只读解码器 + 映射/对账 evidence
 
-- Status:ready(r2 revision 已由维护者合入 `main`
+- Status:blocked(r2 revision 已由维护者合入 `main`
   `1f7c10e4fe266c27866e7cec79be8160c1e5ce53`;r1 implementation + FAILED/
   BLOCKED evidence 已合入 `main`
   `45f2b605d0b70b4ea1e20928613fab1153b84563`,不得追溯重判或复用为 passing
-  evidence。本 readiness/status PR 固定下述 remediation scope 后转 ready,
-  仅在维护者 review/merge 后生效)
+  evidence。r2 implementation 已合入 `main`
+  `0076e44dcaed45605c1cccefc093a82b246a4ef5`;2026-07-19 fresh rerun 时远程
+  macOS host 锁屏,签名 broker 的 NSOpenPanel/PowerBox 无法取得人工文件选择,
+  collector 在 create-only publication 前安全取消,三项 AC 均无 fresh evidence。
+  此外该合入版仍将强制 DEFLATE sliding history 记为 literal cross-chunk
+  retention blocker并生成 `partitionAcceptanceSatisfied:false`;在 r2 AC 对该 codec
+  state 的边界经维护者批准澄清/修订、且解锁 host 完成 fresh collector 前不得
+  标记 `done`。见
+  `evidence/runs/TASK-PD-001/r2-fresh-attempt-2026-07-19.md`;本 blocked 状态仅在
+  维护者 review/merge 后生效)
 - Objective:在不改变 r2 AC 的前提下，将 decoder 改为只接受预打开的只读普通
   文件 descriptor，并以独立、最小权限的 macOS App Sandbox broker 建立和直接
   传递该 descriptor；随后对 pinned archive 重新生成映射/对账与全部三项 fresh
