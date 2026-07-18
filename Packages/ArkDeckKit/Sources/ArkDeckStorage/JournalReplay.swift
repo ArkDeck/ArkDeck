@@ -1,4 +1,5 @@
 import ArkDeckCore
+import Darwin
 import Foundation
 
 public struct OutstandingJournalIntent: Equatable, Sendable {
@@ -71,7 +72,51 @@ public struct JournalReplay: Equatable, Sendable {
 
 public enum DurableJournalRecovery {
   public static func inspect(url: URL) throws -> JournalReplay {
-    let data = try Data(contentsOf: url)
+    let descriptor = Darwin.open(
+      url.path, O_RDONLY | O_NONBLOCK | O_CLOEXEC | O_NOFOLLOW)
+    guard descriptor >= 0 else {
+      throw DurableFileError.openFailed(path: url.path, errno: errno)
+    }
+    defer { Darwin.close(descriptor) }
+    return try inspect(openFileDescriptor: descriptor, path: url.path).replay
+  }
+
+  static func inspect(
+    openFileDescriptor descriptor: Int32,
+    path: String
+  ) throws -> (replay: JournalReplay, metadata: stat) {
+    var initialMetadata = stat()
+    guard fstat(descriptor, &initialMetadata) == 0,
+      initialMetadata.st_mode & S_IFMT == S_IFREG,
+      initialMetadata.st_size >= 0,
+      UInt64(initialMetadata.st_size) <= UInt64(Int.max)
+    else {
+      throw DurableFileError.sequenceViolation("journal snapshot must be a bounded regular file")
+    }
+    var data = Data(count: Int(initialMetadata.st_size))
+    var offset = 0
+    while offset < data.count {
+      let count = data.withUnsafeMutableBytes { buffer in
+        Darwin.pread(
+          descriptor, buffer.baseAddress!.advanced(by: offset), buffer.count - offset,
+          off_t(offset))
+      }
+      if count < 0, errno == EINTR { continue }
+      guard count > 0 else {
+        throw DurableFileError.openFailed(path: path, errno: count < 0 ? errno : EIO)
+      }
+      offset += count
+    }
+    var finalMetadata = stat()
+    guard fstat(descriptor, &finalMetadata) == 0,
+      sameJournalSnapshot(initialMetadata, finalMetadata)
+    else {
+      throw DurableFileError.sequenceViolation("journal changed while its snapshot was replayed")
+    }
+    return (try inspect(data: data), finalMetadata)
+  }
+
+  static func inspect(data: Data) throws -> JournalReplay {
     guard !data.isEmpty else {
       return JournalReplay(
         events: [], hasTornTail: false, executionMode: nil, currentState: nil,
@@ -97,6 +142,14 @@ public enum DurableJournalRecovery {
       }
     }
     return try validate(events: events, hasTornTail: !hasTerminatingNewline)
+  }
+
+  private static func sameJournalSnapshot(_ lhs: stat, _ rhs: stat) -> Bool {
+    lhs.st_dev == rhs.st_dev && lhs.st_ino == rhs.st_ino && lhs.st_gen == rhs.st_gen
+      && lhs.st_size == rhs.st_size && lhs.st_mtimespec.tv_sec == rhs.st_mtimespec.tv_sec
+      && lhs.st_mtimespec.tv_nsec == rhs.st_mtimespec.tv_nsec
+      && lhs.st_ctimespec.tv_sec == rhs.st_ctimespec.tv_sec
+      && lhs.st_ctimespec.tv_nsec == rhs.st_ctimespec.tv_nsec
   }
 
   private static func validate(events: [JournalEvent], hasTornTail: Bool) throws -> JournalReplay {
@@ -669,7 +722,8 @@ struct JournalAppendValidationState {
       else { throw DurableFileError.sequenceViolation("binding revision did not increase") }
     case .reconcileOutcome:
       guard let attempt = event.payload.string("recoveryAttemptId"),
-        recoveryAttempts.contains(attempt), !completedRecoveryAttempts.contains(attempt),
+        recoveryAttempts.contains(attempt),
+        !completedRecoveryAttempts.contains(attempt),
         currentState == .reconciling,
         let nextStateRaw = event.payload.string("nextState"),
         let nextState = JobState(rawValue: nextStateRaw),

@@ -348,6 +348,13 @@
 ## TASK-M1-005 — Session/Artifact store、manifest 管线与 host-volume 协调
 
 - Status:ready
+- Completion evidence:`evidence/runs/TASK-M1-005/run.md`（2026-07-18 review closeout:全部验证命令
+  已在有执行能力的主机实测——dedicated 58/0 failures、JournalRecovery 29/0、full-suite 169/0
+  failures(1 项既有 opt-in 手动 sleep/wake skip)、format lint 0 diagnostics、`check-sdd` 0 error、
+  diff check 通过；此前 remediation 中两项从未执行过的 test fixture 缺陷已修正,并按 review 修复清单
+  完成 mechanism-freeze 收口(marker 终态出口、export manifest 身份校验、journal inode 绑定、shard 锁
+  post-flock 复验等,详见 run.md Deviations)。状态变更仅在维护者 review/merge 后生效,不构成 change
+  verified、完整 platform conformance、release claim 或真实设备 evidence）
 - Readiness review(2026-07-17,独立 readiness/status PR):r3 task contract 已由维护者经
   PR #35 合入(main `11eb5cbe69bc9089fd870d6397f698f4c93dd299`),原 blocker(占位条目未满足
   Definition of Ready)解除。独立复核结论:
