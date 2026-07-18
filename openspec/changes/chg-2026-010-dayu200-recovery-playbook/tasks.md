@@ -5,10 +5,16 @@
 
 ## TASK-RP-001 — 恢复/救砖预案文档
 
-- Status:ready(change 经 approval-only PR #73 approved;本 readiness PR 复核
-  前置后转 ready,仅在维护者 review/merge 后生效——**须在 #73 之后 merge**。
-  前置复核:TASK-RB-001 done(计划第②步)——满足;与 TASK-PD-001 并行无路径
-  交集;doc-only 边界不变)
+- Status:done
+- Completion evidence:`evidence/recovery-playbook.md` +
+  `evidence/runs/TASK-RP-001/run.md`(经 PR #75 由维护者 review/merge 合入 main
+  `a1572d0`,2026-07-18)。两个 Test ID(`TEST-RECOVERY-DAYU200-PLAYBOOK-001`/
+  `-READINESS-001`)以 document review 全 PASS;doc-only gate 自证(交付 PR 仅
+  两个 markdown,零设备命令、零工具执行、零二进制下载)。预案未经演练,**不关闭
+  `GAP-DAYU200-RECOVERY-PATH`、DEC-002 保持 open**;S3 依赖细节全标【待演练确证】;
+  真机演练(第③步)须独立立项/approve,并以 §6 检查单+维护者风险明示确认为
+  前置 gate。`ready→done` 由本独立状态 PR 执行,仅在维护者 review/merge 后生效。
+  (门链:approve #73 → readiness #74 → 交付 #75)
 - Requirements/AC:`RECOVERY-DAYU200-PLAYBOOK-001`、
   `RECOVERY-DAYU200-READINESS-001`(见 acceptance-cases.yaml)
 - Depends on:CHG-2026-007 TASK-RB-001 done(已满足,计划第②步);不依赖
