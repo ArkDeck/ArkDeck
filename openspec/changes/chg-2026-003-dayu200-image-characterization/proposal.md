@@ -1,6 +1,6 @@
 ---
 id: CHG-2026-003-dayu200-image-characterization
-status: proposed
+status: approved
 class: implementation-only
 core_change_level: none
 owner: lvye
@@ -80,4 +80,6 @@ classification inputs. The result is fixed-archive-only and non-authoritative.
 ## Approval
 
 - 2026-07-14 交互决策接受了六条件分类器、ARC001..ARC009、evidence 边界与单任务范围(结构性决策,非批准)。
-- 正式批准:待维护者批准将本 change 置为 `approved` 的 PR(V2 治理,见 `governance/enforcement.md`)。
+- 正式批准:2026-07-18 由 approval-only PR(先例 #14/#40)将本 change 置为
+  `approved`;批准由维护者 review/merge 该 PR 构成(V2 git-native 治理)。本批准
+  不产生任务执行 evidence,也不改变任何 Core、contract、conformance 或 release 状态。
