@@ -1,7 +1,8 @@
 # DAYU200 archive characterization scanner
 
-CHG-2026-003 / TASK-DAYU200-CHAR-001. Offline, read-only research tooling;
-Python 3 stdlib only (repository-pinned CPython, see `.python-version`).
+CHG-2026-003 / TASK-DAYU200-CHAR-001 (executed and archived 2026-07-18).
+Offline, read-only research tooling; Python 3 stdlib only (repository-pinned
+CPython, see `.python-version`).
 
 - `scan.py` — production scanner/CLI. Fixed identity gate (732948803 bytes,
   SHA-256 `fc7637f34a8394847b1b6c7e7ff2750863d18c6dc05e184abaf5aed70ec75280`),
@@ -19,8 +20,13 @@ Usage (the caller supplies the external archive locator at execution time):
 ```
 python3 scripts/archive_characterization/scan.py \
   --archive /path/to/vendor-archive.tar.gz \
-  --out-dir openspec/changes/chg-2026-003-dayu200-image-characterization/evidence
+  --out-dir /path/to/evidence-out-dir
 ```
+
+The executed CHG-2026-003 run's evidence lives (immutable) under
+`openspec/changes/archive/2026-07-18-chg-2026-003-dayu200-image-characterization/evidence/`;
+do not write new output there. A rerun only produces governed evidence inside
+the `evidence/` directory of whatever open change sanctions it.
 
 Run tests:
 
