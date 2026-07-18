@@ -97,6 +97,10 @@ unknown/unsupported。
 
 ## Deviations and residual risk
 
+- Byte-integrity incident(已修复):首次 commit 时全局 `core.autocrlf=input` 把含 CRLF 的
+  success fixture blob 归一化为 LF(76 字节,hash 漂移),工作区原件未受影响。已在
+  `Golden/1.0.0/.gitattributes` 以 `*.bin binary` 钉死并 renormalize 重存,复验 blob 与登记
+  hash 逐字节一致;`.gitattributes` 随 `.copy` 进入 bundle,资源测试的精确集期望显式包含它。
 - 首轮 install 采集字节含用户路径,按红线整批弃用重采;弃用字节未进入任何登记。
 - 真实 3.2.0d 无 `[success]` 标记的发现意味着 M1-006 接线时必须按 profile 0.2.0 的登记
   形态扩展 parser marker;在此之前 fake-hdc 中自造的 `[success]` 字节不得再被当作真实

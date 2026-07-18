@@ -71,7 +71,10 @@ final class HDCGoldenResourceContractTests: XCTestCase {
       let relative = url.path.replacingOccurrences(of: root.path + "/", with: "")
       packagedFiles.insert(relative)
     }
-    let expected = Set(registry.entries.map(\.path)).union(["1.0.0/registry.json"])
+    // `.gitattributes` pins the raw fixture bytes as binary so eol/text normalization can
+    // never rewrite them; `.copy` packages it alongside the fixtures.
+    let expected = Set(registry.entries.map(\.path))
+      .union(["1.0.0/registry.json", "1.0.0/.gitattributes"])
     XCTAssertEqual(
       packagedFiles, expected,
       "the packaged Golden tree must contain exactly the registered fixtures plus the registry")
