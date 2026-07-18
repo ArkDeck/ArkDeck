@@ -1,0 +1,36 @@
+---
+schema_version: 1.0.0
+change_id: CHG-2026-012-dayu200-flash-addresses-research
+change_revision: 1
+platform: macos
+evidence_classes:
+- platform
+cases:
+- acceptance_id: ADDR-DAYU200-MAPPING-001
+  test_id: TEST-ADDR-DAYU200-MAPPING-001
+  method: Document review of the flash-address facts against the five mandatory sections.
+  expected_source: openspec/changes/chg-2026-012-dayu200-flash-addresses-research/verification.md#ADDR-DAYU200-MAPPING-001
+  minimum_evidence: platform
+  expected_result: The facts document covers the addressing semantics of each
+    host tool (rkdeveloptool wl-by-LBA-offset / wlx-by-partition-name with its
+    device-side partition-table precondition, gpt/prm partition-table writes,
+    upgrade_tool and RKDevTool config.cfg addressing and write order), a
+    per-partition target-address mapping table whose every numeric row is
+    anchored to the merged TASK-PD-001 partition-decode evidence with no
+    self-derived and no image-member-derived values and partitions not covered
+    by PD-001 explicitly marked unknown, and a reconciliation-method design
+    against parameter.txt/GPT semantics; every claim carries a graded S2/S3
+    citation and every S3-or-inference-dependent conclusion is marked
+    unconfirmed pending real-device verification; the document states it makes
+    no compatibility claim and closes no gap.
+- acceptance_id: ADDR-DAYU200-OBSERVATION-PLAN-001
+  test_id: TEST-ADDR-DAYU200-OBSERVATION-PLAN-001
+  method: Document review of the read-only observation-surface draft for read/write classification.
+  expected_source: openspec/changes/chg-2026-012-dayu200-flash-addresses-research/verification.md#ADDR-DAYU200-OBSERVATION-PLAN-001
+  minimum_evidence: platform
+  expected_result: The observation-surface draft lists candidate first-phase
+    commands each classified read-only with its preconditions, and classifies
+    every candidate that involves a mode switch or device write as second-phase
+    device-write requiring RECOVERY-PATH closure first; the draft states that
+    both its execution and any capture-whitelist extension belong to separate
+    future changes, authorizing no execution here.
