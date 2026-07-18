@@ -4,11 +4,18 @@ Open question 不得以聊天记忆留存。每项记录默认决策、阻塞范
 
 ## DEC-001 First supported hardware
 
-- Status：open（DAYU200 / RK3568 为当前候选;CHG-2026-003 镜像特征化证据已于
-  2026-07-18 产出、verified 并归档,登记为本决策输入,见下）
+- Status：decided（2026-07-18;决策由 owner review/merge 本 decision PR 构成,
+  V2 治理,决策路径见 #52 登记）
 - Owner：product/hardware owner
-- Question：首批必须支持哪些设备/开发板、芯片、OpenHarmony build/API？
-- Default：无支持声明
+- Question（历史）：首批必须支持哪些设备/开发板、芯片、OpenHarmony build/API？
+- Decision：首个目标设备/开发板选定为 **DAYU200（RK3568 SoC）**;其固定镜像输入
+  锚定为 CHG-2026-003 pinned vendor archive（`732948803` bytes,SHA-256
+  `fc7637f3…ec75280`,归档 evidence 见下）。OpenHarmony build/API 的正式支持范围
+  不在本决策预先声明,由 M0B bring-up 与后续 DAYU200 Integration change 依真实
+  设备 evidence 确定。
+- Boundary：本决策是**目标选定,不是支持声明**——hardware matrix 仍无任何
+  supported 行;任何硬件支持、兼容性或 flash 能力声明仍须 M0B 真实设备 evidence
+  与 hardware verification;simulated/特征化 evidence 永不进入硬件支持矩阵。
 - Evidence input（2026-07-18,CHG-2026-003 archived）：
   - 位置:`openspec/changes/archive/2026-07-18-chg-2026-003-dayu200-image-characterization/evidence/`
     （四份 schema 校验 JSON + summary.md + run.md,#44/#47/#48/#49 全链 merge）;
@@ -20,11 +27,12 @@ Open question 不得以聊天记忆留存。每项记录默认决策、阻塞范
     均 `unknown`,`imageProfileReadiness: candidateNonExecutable`;该证据支持
     "候选镜像包结构完好、可作为 M0B bring-up 目标"的判断,不构成硬件支持、
     兼容性或 M0B 结论。
-- Decision path：选定 DAYU200 为首个目标须由 owner 以独立 decision PR 翻转本条
-  Status（V2:merge 即决策）;任何硬件支持声明另需 M0B 真实设备 evidence。
-- Blocks：M0B、真实 Flash、hardware verification
+- Unblocked by this decision：M0B（DAYU200 bring-up）与 DAYU200 Integration
+  change 的立项/规划;各自执行仍受独立 change proposal、readiness 与 evidence
+  门禁,DEC-002 未决前不实现任何 Flash Provider。
+- Reopen rule：更换或新增首批设备、变更 pinned 镜像输入、或将目标选定提升为
+  支持声明,均须经 governance PR 重开/修订本条（后者另需 M0B evidence）。
 - Affected：REQ-FLASH-001/002/014、hardware matrix
-- Work allowed：M0A、通用 M1、simulation、parser fixtures、离线镜像特征化（CHG-2026-003,已完成并归档）
 
 ## DEC-002 First flashing protocol
 
