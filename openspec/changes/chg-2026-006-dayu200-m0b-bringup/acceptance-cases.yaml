@@ -1,0 +1,62 @@
+---
+schema_version: 1.0.0
+change_id: CHG-2026-006-dayu200-m0b-bringup
+change_revision: 1
+platform: macos
+evidence_classes:
+- realHardware
+cases:
+- acceptance_id: HW-M0B-DAYU200-DISCOVERY-001
+  test_id: TEST-HW-M0B-DAYU200-DISCOVERY-001
+  method: Human-operated read-only discovery/toolchain capture against the physical DAYU200 over USB.
+  expected_source: openspec/changes/chg-2026-006-dayu200-m0b-bringup/verification.md#HW-M0B-DAYU200-DISCOVERY-001
+  minimum_evidence: realHardware
+  expected_result: The physical DAYU200 is discovered via `hdc list targets [-v]`;
+    a stable device identity, hdc client/server/daemon versions, tool path/hash and
+    the actually observed device OpenHarmony build are recorded; every executed
+    command is on the closed read-only allowlist with argv/exit code logged; zero
+    flash, device-mutation or out-of-allowlist dispatch; the evidence record
+    validates against hardware-evidence.schema.json with provider none and
+    supports at most an `observed` matrix row.
+- acceptance_id: HW-M0B-DAYU200-AUTH-001
+  test_id: TEST-HW-M0B-DAYU200-AUTH-001
+  method: Human-operated authorization workflow observation on the physical device.
+  expected_source: openspec/changes/chg-2026-006-dayu200-m0b-bringup/verification.md#HW-M0B-DAYU200-AUTH-001
+  minimum_evidence: realHardware
+  expected_result: The unauthorized state is observed before on-device trust; after
+    the human confirms trust on the device screen the target transitions to ready
+    and the transition is captured in `list targets` states; at least one
+    denied/timeout negative path is observed or its non-reproducibility is
+    truthfully recorded; no server kill/restart occurs and no key material is
+    copied, uploaded or persisted into the repository.
+- acceptance_id: HW-M0B-DAYU200-RAWCAPTURE-001
+  test_id: TEST-HW-M0B-DAYU200-RAWCAPTURE-001
+  method: Per-stream byte-exact controlled capture of device-family raw outputs.
+  expected_source: openspec/changes/chg-2026-006-dayu200-m0b-bringup/verification.md#HW-M0B-DAYU200-RAWCAPTURE-001
+  minimum_evidence: realHardware
+  expected_result: Device-family raw outputs (list targets, device-present
+    checkserver) are captured per stream with exact argv, exit codes and SHA-256;
+    serial-bearing bytes stay in the maintainer-controlled location outside the
+    repository while the run record pins their hashes; no capture is edited or
+    registered as a repository golden fixture by this change.
+- acceptance_id: HW-M0B-DAYU200-UIDUMP-PROBE-001
+  test_id: TEST-HW-M0B-DAYU200-UIDUMP-PROBE-001
+  method: Read-only hidumper probe capture for the ui-dump wrapper facts.
+  expected_source: openspec/changes/chg-2026-006-dayu200-m0b-bringup/verification.md#HW-M0B-DAYU200-UIDUMP-PROBE-001
+  minimum_evidence: realHardware
+  expected_result: The runbook-fixed read-only hidumper queries are captured with
+    argv/exit code/streams so the later integration change can fix the HiDumper
+    call wrapper per the ui-dump spec; no compatibility claim is made and no
+    wrapper is fixed by this change.
+- acceptance_id: HW-M0B-DAYU200-SUPERVISOR-001
+  test_id: TEST-HW-M0B-DAYU200-SUPERVISOR-001
+  method: Human-launched ArkDeck production supervisor read-only observation with the real device present.
+  expected_source: openspec/changes/chg-2026-006-dayu200-m0b-bringup/verification.md#HW-M0B-DAYU200-SUPERVISOR-001
+  minimum_evidence: realHardware
+  expected_result: With the physical DAYU200 present, the production supervisor
+    classifies the externally started host server as external ownership with
+    instrumented automatic lifecycle/subserver call counts of zero, endpoint
+    isolation keeps explicit endpoints in ArkDeck child-process environment only,
+    and device appearance/disappearance fan-out is observed; no device mutation,
+    no server kill/restart, and the observation adds columns to the existing
+    observed matrix row only.
