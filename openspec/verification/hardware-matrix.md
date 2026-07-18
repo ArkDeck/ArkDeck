@@ -27,7 +27,7 @@
 
 | Evidence ID | Device / build | HDC / transport | Capability / Provider | AC coverage | Status | Date |
 | --- | --- | --- | --- | --- | --- | --- |
-| `EVD-M0B-DAYU200-20260718-001` | DAYU200(RK3568)/ OpenHarmony 7.0.0.34、API 26.0.0(operator 设备屏观察) | hdc 3.2.0d(client+server),binary sha256 `48395ba8…d260` / USB | discovery+authorization observation+raw capture+hidumper probe;Provider `none`;无 UI Dump/Trace/Debug/Flash capability 事实 | `HW-M0B-DAYU200-DISCOVERY-001` PASS、`HW-M0B-DAYU200-RAWCAPTURE-001` PASS、`HW-M0B-DAYU200-UIDUMP-PROBE-001` PASS、`HW-M0B-DAYU200-AUTH-001` FAIL(as written:该 build 无授权 UI,未授权态不可观察,详见 run.md) | observed | 2026-07-18 |
+| `EVD-M0B-DAYU200-20260718-001` | DAYU200(RK3568)/ OpenHarmony 7.0.0.34、API 26.0.0(operator 设备屏观察) | hdc 3.2.0d(client+server),binary sha256 `48395ba8…d260` / USB | discovery+authorization observation+raw capture+hidumper probe;Provider `none`;无 UI Dump/Trace/Debug/Flash capability 事实 | `HW-M0B-DAYU200-DISCOVERY-001` PASS、`HW-M0B-DAYU200-RAWCAPTURE-001` PASS、`HW-M0B-DAYU200-UIDUMP-PROBE-001` PASS、`HW-M0B-DAYU200-AUTH-001` PASS(r2 分支 B:无信任 UI 设备族;r1 as-written FAIL 保持在案,重评见 run.md Addendum) | observed | 2026-07-18 |
 
 ## Status rules
 
