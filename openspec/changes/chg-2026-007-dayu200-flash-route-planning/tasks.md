@@ -5,8 +5,10 @@
 
 ## TASK-RB-001 — Route-B/Integration 四 gap 关闭路径研究计划
 
-- Status:blocked(等待本 change 经 approval-only PR 置为 approved;approve 后
-  经独立 readiness/status PR 转 ready)
+- Status:ready(change 已于 2026-07-18 经 approval-only PR #64 approved,main
+  `36df85e`;本 readiness PR 复核前置后转 ready,仅在维护者 review/merge 后生效。
+  前置复核:DEC-001 decided、CHG-2026-003 四 gap archived、M0B observed 事实已
+  合入——三项均满足;plan-only 边界不变,执行零设备命令)
 - Requirements/AC:`PLAN-DAYU200-PARTITION-001`、`PLAN-DAYU200-ADDRESSES-001`、
   `PLAN-DAYU200-PROTOCOL-001`、`PLAN-DAYU200-RECOVERY-001`(见
   acceptance-cases.yaml)
