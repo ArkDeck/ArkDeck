@@ -5,10 +5,13 @@
 
 ## TASK-FP-001 — 烧写协议事实清单(文档研究)
 
-- Status:ready(change 经 approval-only PR #78 approved;本 readiness PR 复核
-  前置后转 ready,仅在维护者 review/merge 后生效——**须在 #78 之后 merge**。
-  前置复核:TASK-RB-001 done(计划第④步只读阶段)——满足;不依赖 TASK-PD-001
-  (协议不依赖分区偏移),与其并行无路径交集;doc-only 边界不变)
+- Status:done(交付物经 PR #80 合入 main `67bfa01`,2026-07-18;两个
+  PROTOCOL-* Test ID 均以 document review 判 PASS(见 evidence/runs/
+  TASK-FP-001/run.md);doc-only gate 自证:#80 仅新增两个 markdown,零命令
+  执行。本翻转仅在维护者 review/merge 本状态 PR 后生效。完成不解除
+  `GAP-DAYU200-FLASH-PROTOCOL`、不构成兼容性/支持声明、不构成任何执行授权:
+  §4 只读观察面为设计草案,其执行须独立立项;写设备候选受 RECOVERY 先行
+  硬序约束;DEC-002 保持 open)
 - Requirements/AC:`PROTOCOL-DAYU200-CHANNELS-001`、
   `PROTOCOL-DAYU200-OBSERVATION-PLAN-001`(见 acceptance-cases.yaml)
 - Depends on:CHG-2026-007 TASK-RB-001 done(已满足,计划第④步只读阶段);
