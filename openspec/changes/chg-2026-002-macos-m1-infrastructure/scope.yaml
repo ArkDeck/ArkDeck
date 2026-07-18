@@ -1,6 +1,6 @@
 schema: arkdeck-change-scope-1
 change_id: CHG-2026-002-macos-m1-infrastructure
-revision: 4
+revision: 5
 requirements:
   - PLATFORM-MACOS@0.1.0
   - POL-ARTIFACT-001

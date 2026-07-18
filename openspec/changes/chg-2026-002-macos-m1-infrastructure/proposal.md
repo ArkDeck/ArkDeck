@@ -1,6 +1,6 @@
 ---
 id: CHG-2026-002-macos-m1-infrastructure
-status: approved # r1/r2/r3 已批准;r4 execution-boundary scope/dependency amendment 仅在对应 PR 合入后生效
+status: approved # r1-r4 已批准；r5 legacy-contract safety-alignment amendment 仅在对应 PR 合入后生效
 class: platform
 core_change_level: none
 owner: lvye
@@ -84,5 +84,9 @@ M0A 只交付可行性原型与分发决策。所有分阶段功能（UI Dump、
   `11eb5cbe69bc9089fd870d6397f698f4c93dd299`。
 - r4 execution-boundary amendment：只修订 M1-006 的 scope、allowed/forbidden paths、模块与
   Task 依赖和相应验证门禁；不修改任何源码、profile、Core/AC/contract、任务状态、platform
-  conformance、ADR 或 release claim。r4 新增授权仅在维护者 review/merge 后生效；实现 PR
-  必须基于该合入 revision，不能从本草案自行推断授权。
+  conformance、ADR 或 release claim；已由维护者 review 并经 main `87a3a99` 合入生效。
+- r5 legacy-contract safety-alignment amendment：只解除 r4“不得改写既有 cases”与 required
+  full-suite gate 的两个精确冲突，授权两个具名 legacy HDC case 及其直接 private helper/import
+  按 r4 已批准的 live-process ownership evidence 与 terminal reconciliation 语义对齐；不改变
+  Core/AC/contract、产品实现范围、任务状态或任何其他既有 case。r5 仅在维护者 review/merge
+  后生效，不能由本草案自行产生实现授权。

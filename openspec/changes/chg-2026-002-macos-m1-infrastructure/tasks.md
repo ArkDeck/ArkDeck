@@ -2,8 +2,9 @@
 
 > V2 治理:本文件是任务的唯一事实源;状态经 PR review 合入生效。change r1 已于
 > 2026-07-15 经 PR #14 合入 approved；r2 的 CORE-2.0.0 重定向已于 2026-07-16 经
-> PR #22 合入生效；r3 已于 PR #35 合入。r4 只修订 TASK-M1-006 的 scope 与依赖，
-> 新增授权仅在维护者 review/merge 后生效，不包含任何实现或任务状态变化。
+> PR #22 合入生效；r3 已于 PR #35 合入；r4 已于 main `87a3a99` 合入。r5 只修订
+> TASK-M1-006 两个 legacy contract 的精确 safety-alignment 授权，仅在维护者 review/merge
+> 后生效，不包含任何实现、evidence 或任务状态变化。
 
 ## TASK-M1-001 — ArkDeckCore 域模型、封闭 typed-step registry 与 Job 状态机
 
@@ -457,6 +458,12 @@
   所需的 Core durable toolchain intent、Process 原子 launch gate、Workflows/App 封闭组合、
   profile read-only probe 与 signed Sandbox/XCUITest 范围。r4 新增路径在维护者合入前不构成
   实现授权；本 PR 不执行 TASK-M1-006、不产生 evidence、不修改源码/profile/任务状态。
+- Legacy-contract safety-alignment amendment r5:r4 的 `ready`、产品实现范围与 verification
+  gate 不变。恢复 main 中既有 HDC cases 后，独立复验发现两个旧断言与 r4 已批准 safety
+  语义直接冲突：构造 PID `910` 被期待建立 managed ownership；successful lifecycle 被期待
+  只有四条 audit、排除 terminal reconciliation。r5 只授权下述具名 case 与直接 private
+  helper/import 做精确对齐；维护者合入前不构成实现授权，本治理 PR 不修改 Swift/Xcode、
+  不产生 evidence、不改变任务状态。
 - Readiness restoration（2026-07-18，TASK-I5-002 独立 readiness/status PR；`ready` 仅在
   维护者 review/merge 后生效）:原四项 blocker 逐项复核解除——
   - Change-design gate:resolved。CHG-002 r3（最小 HDC UI surface 入 scope、XCUITest
@@ -628,8 +635,15 @@
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/**`（仅 Core typed Step 到 OpenHarmony
     Adapter、durable intent/outcome 与 terminal finalizer 的封闭 production composition）
   - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/ArkDeckContractTests.swift`
-    （仅 dependency table、App import contract 与必要机械格式化；不得迁移、删除或改写
-    该文件中的既有 Process/HDC cases）
+    （仅 dependency table、App import contract、必要机械格式化，以及下列两个具名 legacy
+    HDC case 的 safety-alignment；不得迁移、删除、重命名或改写其他既有 Process/HDC cases：
+    `testManagedOwnershipRequiresAbsentEndpointAndVerifiedPidToolAndEndpointEvidence` 必须拒绝
+    构造 PID/path/endpoint 字段形状，不能再期待其建立 `arkDeckManaged`，positive evidence
+    由 dedicated process-backed `ownershipEvidenceContract` 覆盖；
+    `testConfirmedExternalRestartUsesTypedStepAuditsAndBroadcastsTheSameOutcome` 必须把 terminal
+    reconciliation 作为第五条相关 audit 并断言其 historical/outward outcome、scope 与
+    `requiresReconcile`。仅允许为这两个 case 编译所需的直接 private executor/audit fake
+    signature 与 `@testable`/package import 机械适配；不得借此增加 production bypass）
   - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/ProcessExecutorContractTests.swift`
     （仅 atomic launch/descriptor/inode substitution vectors）
   - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/HDCSupervisorContractTests.swift`
