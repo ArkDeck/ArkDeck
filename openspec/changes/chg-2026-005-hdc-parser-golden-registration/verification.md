@@ -1,6 +1,9 @@
 # CHG-2026-005 Verification Plan
 
-> Status:planned
+> Status:passed;maintainer confirmation 见文末,candidate `verified` 在
+> verification closure PR 合入后生效(acceptance matrix 的 Status 列保持起草期
+> `pending` 不改写,七项 gate 实际结论以 TASK-I5-001/TASK-I5-002 run.md 为准:
+> 全部 satisfied;`AC-HDC-005-01` 不在本 confirmation 范围,仍待 M1-006)
 > Change:CHG-2026-005-hdc-parser-golden-registration@r2
 > Core baseline:CORE-2.0.0
 > Integration input:OPENHARMONY-TOOLS@0.1.0
@@ -46,3 +49,19 @@
   `TEST-AC-HDC-005-01` parserGolden run 二值验证；
 - 任务实现、状态恢复与验证结论分属独立 PR，不得由本 proposal
   的批准替代。
+
+## Maintainer confirmation(2026-07-18)
+
+- Approval:PR #40,维护者 `lvye` merge,merge commit `3a4d45c`。
+- 实现+登记(provenance 认可):PR #41,维护者 `lvye` merge,merge commit
+  `4ac288c`。
+- TASK-I5-001 `→done`:PR #42,merge commit `8162004`;TASK-I5-002(M1-006
+  readiness 恢复+自身 done):PR #43,merge commit `e29462c`。
+- Confirmation scope:七项 `I5-HDC-*` gate 的 run.md 结论(全部 satisfied,
+  含三方 hash 1/1/1 两次独立复核、`.copy` 资源契约 3/0、零 dispatch)、真实
+  3.2.0d 无 `[success]` 标记的登记披露,以及 Result gate 边界——本 change 仅
+  证明 fixture prerequisite registered,`AC-HDC-005-01` 不在 confirmation 范围,
+  仍待 `TASK-M1-006` parserGolden 实证。
+- 本 confirmation 满足 verified gate;不构成 archive。本 change 暂不归档:
+  M1-006 在途会话仍以本 change 的 registry/evidence 路径为只读依据,archive
+  留待 M1-006 done 后独立 PR 裁量(先例 #21/#49)。

@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-005-hdc-parser-golden-registration
 revision: 2
-status: approved
+status: verified # 2026-07-18 verification closure(先例 #20/#48):七项 I5-HDC-* gate 全 satisfied;AC-HDC-005-01 仍待 M1-006 parserGolden 实证;经本 PR 维护者 review/merge 生效
 class: integration
 core_change_level: none
 owner: lvye
@@ -98,3 +98,28 @@ blocked；不得由 Agent 猜测真实 HDC 输出或执行已安装 `hdc` 取得
 fixture/profile/lock 实现合入且经独立 readiness/status PR 确认全部 family hash、M1-005
 durable seam 依赖与 M1-006 r3 design/UI/audit 权限全部就绪后，`TASK-M1-006` 才能恢复
 `ready`。
+
+## Verification closure(2026-07-18)
+
+- 批准:approval-only PR #40 合入 main(`3a4d45c`,先例 #14);I5-001 实现+登记
+  经 PR #41 合入 main(`4ac288c`,merge 即维护者对 provenance 与登记的正式认可);
+  TASK-I5-001 done 经状态 PR #42(`8162004`);TASK-I5-002(恢复 M1-006
+  readiness+自身 done)经 PR #43(`e29462c`,严格后于 #42 merge)。
+- 七项 `I5-HDC-*` gate 的实际结论以 `evidence/runs/TASK-I5-001/run.md` 与
+  `evidence/runs/TASK-I5-002/run.md` 为准,全部 satisfied:failure 字节 M0A 血统
+  `cmp`/契约测试逐字节相等(FIXTURE-001);success/healthy/version 均出自维护者
+  2026-07-18 受控采集,零 Agent 执行 hdc(FIXTURE-002);五 family closure、未登记
+  family 维持 unknown/unsupported(FIXTURE-003);registry/lock/conformance 三方
+  SHA-256 独立重算 1/1/1,I5-001 与 I5-002 两次独立复核(FIXTURE-004);guard 绿
+  且 M1-006 经 #43 依 readiness 条款恢复 ready(FIXTURE-005);`.copy` 构建无
+  unhandled-file warning、Bundle.module 精确集 3/0 测试(RESOURCE-001);零
+  dispatch 边界 held(NODISPATCH-001)。
+- 上述 PR 的维护者 review/merge 构成 verification confirmation;本文件的
+  `status: verified` 仅在包含本状态变更的 verification closure PR 经维护者
+  review 并合入 `main` 后生效。verified 不改变 Result gate:本 change 只证明
+  fixture/profile/lock prerequisite 已登记且 pinned,**`AC-HDC-005-01` 仍未
+  passed**,须由 `TASK-M1-006` 的 canonical `TEST-AC-HDC-005-01` parserGolden run
+  二值验证;真实 3.2.0d 无 `[success]` 标记的披露(profile 0.2.0)对 M1-006 接线
+  持续有效。本 change 暂不 archive:M1-006 在途会话仍以本 change 的 registry/
+  evidence 路径为只读依据,archive 留待 M1-006 done 后独立 PR 裁量(先例
+  #21/#49)。
