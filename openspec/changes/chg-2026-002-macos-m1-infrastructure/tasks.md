@@ -702,9 +702,92 @@
 ## TASK-M1-009 — 诊断骨架:分类脱敏日志与有界本地诊断导出
 
 - Status:ready
-- Requirements/AC:AC-DIAG-001-01/02 等
-- Depends on:TASK-M1-001
-- Allowed paths:`.../ArkDeckRuntime/**`、`.../ArkDeckStorage/**`、对应 Tests、本 change `evidence/**`
+- Readiness review(2026-07-18,独立 readiness PR):
+  - 依赖:`TASK-M1-001` done(typed vocabulary);`TASK-M1-004` done(`ArkDeckRuntime`
+    平台端口惯例,main `9b58f2d`);`TASK-M1-005` done(实现 PR #37 main `9e1f1da`、
+    状态 PR #38 main `0e7aa8e`:SessionDiagnosticExporter 脱敏引擎、manifest/journal 摘要
+    来源与 claim 门控导出均已交付);
+  - 验证输入:`AC-DIAG-001-01`、`AC-DIAG-001-02`、`AC-DIAG-002-01` 在 `scope.yaml`
+    精确存在;`MAC-M1-DIAG-001` 在 canonical acceptance registry(`acceptance-cases.yaml`
+    r3)与 `verification.md`(binding `REQ-DIAG-001`、`REQ-DIAG-002`、`PORT-LOGGING-001`,
+    minimum evidence `platform`)一致;
+  - 接口形状:`PORT-LOGGING-001` `SystemLogger` 端口在 `platform-ports.md` 定义为
+    "有界、可脱敏、可导出的 App 自身诊断";本任务无 locked contract/schema 需要修改;
+  - 环境:base main `0e7aa8e` 上 `swift build --package-path Packages/ArkDeckKit
+    --build-tests` 通过;dedicated `DiagnosticsContractTests` 与 `Fixtures/Diagnostics/**`
+    尚不存在,由实现按 allowed paths 新建;
+  - 路径冲突:与 blocked 的 `TASK-M1-006`(ArkDeckOpenHarmony/App/HDC tests)与
+    `TASK-I5-001/002`(integrations、`Fixtures/HDC/Golden/**`、`Package.swift`)无交集;
+    本任务不得修改 `Package.swift`(Golden resource declaration 由 I5-001 独占;新源码
+    文件无需 manifest 变更);M1-005 已 done,原"勿同时实现"约束解除,但本任务对
+    `ArkDeckStorage/**` 原则上仅新增文件,修改 M1-005 已交付文件须按 M1-005 先例在
+    run.md 作跨 deliverable 披露且不得改变其公开语义。
+- Readiness gate:本 readiness PR 只扩写本任务条目为完整 task contract,不执行
+  TASK-M1-009、不产生 implementation evidence,也不改变其他 Task 状态或任何 Core、
+  contract、platform conformance、release claim;扩写后的 `ready` 仅在维护者 review/merge
+  后生效。
+- Objective:交付 App 自身诊断骨架——`PORT-LOGGING-001` `SystemLogger` 的 macOS
+  production 实现(app/hdcServer/workflow/storage/ui 分类、写入时 redaction、correlation
+  ID)、有界结构化诊断存储(配额内轮转/清理),以及仅由用户显式触发的本地诊断包
+  导出(复用 M1-005 脱敏导出机制,默认排除设备 raw);骨架不含遥测,不存在任何自动
+  上传路径。
+- Requirements/AC:`REQ-DIAG-001`、`REQ-DIAG-002`;`AC-DIAG-001-01`、`AC-DIAG-001-02`、
+  `AC-DIAG-002-01`;`MAC-M1-DIAG-001`(binding 含 `PORT-LOGGING-001`)。
+- Depends on:
+  - `TASK-M1-001`(done;typed vocabulary 与 correlation 语义)
+  - `TASK-M1-004`(done;`ArkDeckRuntime` 平台端口惯例)
+  - `TASK-M1-005`(done;脱敏导出引擎、manifest/journal 摘要来源与 Session layout)
+- In scope:
+  - `SystemLogger` production 端口:canonical 类别(app/hdcServer/workflow/storage/ui)+
+    correlation ID;敏感值(设备标识、用户路径、业务字符串)在写入点按 redaction policy
+    脱敏,原始敏感字符串不进入默认日志与诊断包;平台系统日志(Unified Logging)与
+    结构化诊断文件双通道,后者为导出与测试断言的 durable 来源;
+  - 有界结构化诊断存储:按配额轮转/清理,长期运行不无限增长;轮转不破坏正在写入的
+    记录,torn-tail 语义与 Storage 既有模式一致;
+  - 用户触发的本地诊断包导出骨架:app/build/platform 信息、脱敏后的 HDC/tool/server
+    信息占位、最近 Job 的 journal/manifest 摘要、App 日志;设备 raw 默认排除;导出仅经
+    显式 API 调用发生;
+  - 无自动上传:crash/Job 失败路径不触发任何导出;骨架不引入任何网络 API。
+- Out of scope:遥测/上传通道与 opt-in 机制;诊断 UI(M1-006 与后续 UX 任务);真实
+  HDC/tool/server 信息采集(M1-006);修改 locked contract/schema 或 Core Requirement/AC;
+  真实设备、网络、任何 device/destructive dispatch;改变 M1-005 已交付文件的公开语义。
+- Allowed paths:
+  - `Packages/ArkDeckKit/Sources/ArkDeckRuntime/**`
+  - `Packages/ArkDeckKit/Sources/ArkDeckStorage/**`(原则上仅新增诊断骨架文件;修改
+    既有文件须在 run.md 作跨 deliverable 披露)
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/DiagnosticsContractTests.swift`
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/Diagnostics/**`
+  - `openspec/changes/chg-2026-002-macos-m1-infrastructure/evidence/runs/TASK-M1-009/**`
+  - `openspec/changes/chg-2026-002-macos-m1-infrastructure/tasks.md`(仅更新本任务状态与
+    completion evidence)
+- Forbidden paths:`openspec/specs/**`、`openspec/contracts/**`、`openspec/baselines/**`、
+  `openspec/platforms/**`、`openspec/integrations/**`、`openspec/verification/**`、
+  `Packages/ArkDeckKit/Package.swift`、除 ArkDeckRuntime/ArkDeckStorage 外的所有 Sources、
+  上述清单以外的 Tests/Fixtures、其他 task/change evidence 与其他 Task 状态。
+- Risk:medium(本地文件轮转、redaction 与导出组合;全部验证使用临时目录与生成
+  fixture,无设备、HDC、网络或 destructive side effect)
+- Hardware required:no
+- Deliverables:`SystemLogger` production port + 分类/脱敏/correlation 实现;有界结构化
+  诊断存储与轮转;用户触发的诊断包导出骨架;dedicated `TEST-AC-DIAG-*` 与
+  `TEST-MAC-M1-DIAG-001` tests;run evidence。
+- Verification:
+  - `TEST-AC-DIAG-001-01`:写入超过配额,断言轮转/清理发生、总量有界,长期运行不
+    无限增长;
+  - `TEST-AC-DIAG-001-02`:含设备标识/用户路径/业务字符串的事件经五类 logger 写入并
+    导出,断言类别与 correlation ID 保留、敏感值按 policy 脱敏、原始敏感字符串不出现
+    在默认日志与诊断包字节中;
+  - `TEST-AC-DIAG-002-01`:模拟 crash/Job 失败路径,断言无导出发生且骨架无网络调用
+    路径;导出仅在显式用户 API 调用后产生;
+  - `TEST-MAC-M1-DIAG-001`:平台汇总——Unified Logging 类别接线、bounded rotation 与
+    导出包默认排除设备 raw;
+  - Commands:`swift format lint <TASK-M1-009 changed Swift files>`;
+    `swift test --package-path Packages/ArkDeckKit --filter DiagnosticsContractTests`;
+    `swift test --package-path Packages/ArkDeckKit`;`scripts/check-sdd.sh`;
+    `git diff --check`。
+- Evidence gate:run 记录 base revision、输入 hash、全部命令与结果、rotation 配额与实测
+  字节、redaction 前后对照(脱敏值不含原文)、导出包 entry 清单与全部 4 个 Test ID 的
+  二值结论;缺任一项不得标记 `done`;evidence 不包含真实 HDC/设备、platform
+  conformance 或 release claim。
 
 ## TASK-M1-010 — M1 复审修复:证据计数、测试信号与语义词汇收敛
 
