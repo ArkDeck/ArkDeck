@@ -1,6 +1,6 @@
 ---
 id: CHG-2026-003-dayu200-image-characterization
-status: verified
+status: archived
 class: implementation-only
 core_change_level: none
 owner: lvye
@@ -103,3 +103,14 @@ verification closure PR 经维护者 review 并合入 `main` 后生效;verified 
 evidence 的固定边界——分类结论仍为 fixedArchiveOnly、非权威,不构成 DEC-001/
 DEC-002 结论、M0B、硬件支持或任何 platform conformance/release claim。archive
 仍必须由后续独立 archive PR 完成(先例 #21)。
+
+## Archive
+
+本 change 于 2026-07-18 verified(见上节)后经本独立 archive PR 归档:目录整体
+移入 `openspec/changes/archive/2026-07-18-chg-2026-003-dayu200-image-characterization/`,
+`status: archived` 仅在维护者 review/merge 本 PR 后生效(先例 #21)。本 change
+class 为 implementation-only、`core_change_level: none`:归档不涉及任何 spec/
+contract/baseline/conformance 变更,无 ratification 成分。evidence 与 gaps 清单
+(分区语义、烧写地址、协议、恢复路径,全 `unknown`)自归档位置继续作为 DEC-001/
+DEC-002 与 Route-B CLI plan-only 工作的只读输入;其 fixedArchiveOnly、非权威边界
+不因归档改变。
