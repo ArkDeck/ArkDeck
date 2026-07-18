@@ -1,0 +1,105 @@
+{
+  "boundary": "read-only capture; observed-only; not a support/compatibility claim; classified controlledHumanCapture — a realHardware classification of record can only be made by the human-attested hardware-evidence record; serial-bearing bytes remain in this controlled non-repository location; no capture is registered as a repository golden fixture by this change",
+  "change": "CHG-2026-006-dayu200-m0b-bringup",
+  "commands": [
+    {
+      "argv": [
+        "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/toolchains/hdc",
+        "-t",
+        "<connectkey>",
+        "shell",
+        "hidumper",
+        "--help"
+      ],
+      "commandId": "hidumper-help",
+      "durationMs": 458,
+      "exitCode": 0,
+      "purpose": "read-only hidumper usage for the ui-dump wrapper facts",
+      "selfCheck": {
+        "passed": true,
+        "stderr": {
+          "keyMaterialFound": false,
+          "passed": true,
+          "serialPresent": false,
+          "userPathFound": false
+        },
+        "stdout": {
+          "keyMaterialFound": false,
+          "passed": true,
+          "serialPresent": false,
+          "userPathFound": false
+        }
+      },
+      "stderr": {
+        "bytes": 0,
+        "file": "00-hidumper-help.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "truncated": false
+      },
+      "stdout": {
+        "bytes": 34,
+        "file": "00-hidumper-help.stdout",
+        "sha256": "a4904901becfb1a15517c14c51f6fa26524162008578bab3dc64f1c7baa006e5",
+        "truncated": false
+      },
+      "timedOut": false
+    },
+    {
+      "argv": [
+        "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/toolchains/hdc",
+        "-t",
+        "<connectkey>",
+        "shell",
+        "hidumper",
+        "-ls"
+      ],
+      "commandId": "hidumper-services",
+      "durationMs": 184,
+      "exitCode": 0,
+      "purpose": "read-only hidumper service list for the ui-dump wrapper facts",
+      "selfCheck": {
+        "passed": true,
+        "stderr": {
+          "keyMaterialFound": false,
+          "passed": true,
+          "serialPresent": false,
+          "userPathFound": false
+        },
+        "stdout": {
+          "keyMaterialFound": false,
+          "passed": true,
+          "serialPresent": false,
+          "userPathFound": false
+        }
+      },
+      "stderr": {
+        "bytes": 0,
+        "file": "01-hidumper-services.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "truncated": false
+      },
+      "stdout": {
+        "bytes": 3121,
+        "file": "01-hidumper-services.stdout",
+        "sha256": "351fc59ea33de263a6123c6030624e1a1fcd17ae0eb5dab6d67ffba09ec07a4b",
+        "truncated": false
+      },
+      "timedOut": false
+    }
+  ],
+  "evidenceClass": "controlledHumanCapture",
+  "host": {
+    "arch": "arm64",
+    "os": "Darwin",
+    "osVersion": "26.5.2"
+  },
+  "schema": "arkdeck-m0b-capture-redacted-1.0.0",
+  "selfCheckPassed": true,
+  "targetConnectkeyProvided": true,
+  "task": "TASK-M0B-001",
+  "toolchain": {
+    "hdcPath": "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/toolchains/hdc",
+    "hdcSha256": "48395ba8d87115dffca47df2a640a6c868bc9a2bd4eb49611e4138ff88d8d260",
+    "transport": "usb"
+  }
+}
