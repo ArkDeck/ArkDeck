@@ -696,20 +696,34 @@
 
 ## TASK-M1-009 — 诊断骨架:分类脱敏日志与有界本地诊断导出
 
-- Status:ready
-- Review remediation(2026-07-18,round 4):任务继续保持 `ready`；需将 writer lock 路径
+- Status:done
+- Completion evidence:`evidence/runs/TASK-M1-009/run.md`(含四轮 remediation 记录与
+  post-rebase addendum)。实现经四轮人类 review remediation(round 1-4 各 blocker 见下)
+  与独立复审会话逐机制代码复核后,由维护者 `lvye` 经 PR #50 squash 合入 main
+  `15697e85444fdacab81779a588c0e290c2f47125`(2026-07-18)——该 review/merge 即构成下方
+  各 remediation gate 所要求的"维护者 re-review"。复验结果(rebase 到 `6c92aa5` 后):
+  dedicated `DiagnosticsContractTests` 16/0、全量 188/0(1 项既有 opt-in 手动 sleep/wake
+  skip)、`swift format lint --strict` 0 diagnostics、`check-sdd` 0 error、
+  `git diff --check` 通过、生产文件静态无网络/进程扫描零命中;四个 Test ID
+  (`TEST-AC-DIAG-001-01/02`、`TEST-AC-DIAG-002-01`、`TEST-MAC-M1-DIAG-001`)二值 PASS
+  (`platform`)。M1-005 文件零修改(跨 deliverable 披露:无),`Package.swift` 未动,
+  骨架无遥测、无任何自动上传路径。`ready→done` 由本独立状态 PR 执行,仅在维护者
+  review/merge 后生效,不改变实现、evidence 正文或任何状态语义,不构成 change
+  verified、完整 platform conformance、release claim 或真实设备 evidence。
+- Review remediation(2026-07-18,round 4,已闭环):任务当时保持 `ready`;需将 writer lock 路径
   持续绑定到已加锁 inode，并以稳定目录 inode lock 阻止 lock-file replacement 后的第二
   writer；journal summary 必须与 manifest 的 Session/Job/executionMode 完全一致。
-- Review remediation(2026-07-18,round 3):任务继续保持 `ready`；需证明 rename 后名称
+- Review remediation(2026-07-18,round 3,已闭环):任务当时保持 `ready`;需证明 rename 后名称
   `ENOENT` 时 staging inode 已解除链接，否则返回 `exportOutcomeUnknown`，并为预发布文件
   复验增加 non-blocking FIFO 拒绝向量；维护者 re-review 前不得起草 completion。
-- Review remediation(2026-07-18,round 2):任务继续保持 `ready`；需补齐写入点封闭
+- Review remediation(2026-07-18,round 2,已闭环):任务当时保持 `ready`;需补齐写入点封闭
   catalog/opaque correlation、preview 父目录身份绑定、导出诊断语义保留、manifest 配额
   边界与 rename 后失败清理，并经复验和维护者 re-review 后方可另行起草 completion。
-- Review remediation(2026-07-18):implementation review 要求补齐不可伪造/导出边界二次
-  脱敏、preview bytes 单次绑定、父目录 descriptor/inode 锚定和 owner-only 权限向量；
-  修复与复验完成前不得再次起草 `ready→done`。初始 run 只作为待 remediation 的执行记录，
-  不构成 completion evidence。
+- Review remediation(2026-07-18,round 1,已闭环):implementation review 要求补齐不可伪造/
+  导出边界二次脱敏、preview bytes 单次绑定、父目录 descriptor/inode 锚定和 owner-only
+  权限向量;修复与复验完成前不得再次起草 `ready→done`。初始 run 只作为待 remediation 的
+  执行记录,不构成 completion evidence。四轮 gate 均已由 PR #50 的维护者 review/merge
+  闭环(见 Completion evidence)。
 - Readiness review(2026-07-18,独立 readiness PR):
   - 依赖:`TASK-M1-001` done(typed vocabulary);`TASK-M1-004` done(`ArkDeckRuntime`
     平台端口惯例,main `9b58f2d`);`TASK-M1-005` done(实现 PR #37 main `9e1f1da`、
