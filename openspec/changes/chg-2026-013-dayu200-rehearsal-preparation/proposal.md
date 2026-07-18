@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-013-dayu200-rehearsal-preparation
 revision: 1
-status: approved # r1 proposal 经 #90 合入;批准由本 approval-only PR 的维护者 review/merge 构成
+status: verified # 2026-07-18 verification closure(先例 #20/#48):两 PREP-* AC PASS;经本 PR 维护者 review/merge 生效
 class: platform
 core_change_level: none
 owner: lvye
@@ -91,7 +91,22 @@ DAYU200 必须不连接演练主机**(负向硬前提),不勾检查单第 3/4/5 
 ## Approval
 
 - Proposal 经 PR #90 合入 main(`09e7c55`,2026-07-18,status:proposed)。
-- 正式批准:2026-07-18 由本 approval-only PR(先例 #14/#40/#55)将本 change 置为
-  `approved`;批准由维护者 review/merge 本 PR 构成。本批准不产生任务执行:
-  TASK-RR-001 另需独立 readiness/status PR 转 ready(无其它前置——不依赖
-  TASK-PD-001);host-only 边界与设备不在场硬前提不因批准改变。
+- 正式批准:2026-07-18 由 approval-only PR #91 合入 main(`cfb86e7`)将本 change
+  置为 `approved`(先例 #14/#40/#55);TASK-RR-001 经 readiness PR #92
+  (`5eb8062`)转 ready。
+
+## Verification closure(2026-07-18)
+
+- 交付物 `evidence/prep-record.md` + `evidence/rehearsal-record-template.md` +
+  `evidence/runs/TASK-RR-001/run.md` 经 PR #93 合入 main(`30cca61`);
+  TASK-RR-001 经状态 PR #94 合入 main(`b71f7b0`)翻转 done。两个 change-local
+  AC(`TEST-PREP-DAYU200-TOOLING-001`、`TEST-PREP-DAYU200-MATERIALS-001`)在
+  run.md 二值 PASS;设备不在场 attestation 在案,全部命令在封闭白名单内,
+  判定按输出标记(`ld` 无设备 exit=1 如实记录)。
+- 上述 PR 的维护者 review/merge 构成 `verification.md` acceptance matrix 所
+  要求的 verification confirmation。本文件的 `status: verified` 仅在包含本状态
+  变更的 verification closure PR 经维护者 review 并合入 `main` 后生效;verified
+  不改变边界——本 change 只为 archived 预案 §6 检查单第 1/2 项与第 6 项模板
+  部分提供打勾 evidence,打勾动作属未来演练 change 立项时;第 3/4/5 项保持
+  open;不构成演练执行授权;不解除任何 gap;DEC-002 保持 open。archive 由
+  后续独立 archive PR 完成(先例 #21/#49)。
