@@ -7,8 +7,19 @@
 
 ## TASK-M0B-001 — 人类真机发现/授权/工具链特征化与受控采集
 
-- Status:ready(change approved;执行需物理 DAYU200 在场与维护者时间窗,执行与
-  `ready→done` 分别经独立 PR 由维护者 review/merge 生效)
+- Status:done
+- Completion evidence:`evidence/runs/TASK-M0B-001/run.md`
+  (`EVD-M0B-DAYU200-20260718-001`;操作者 fuhanfeng 于 2026-07-18 亲自对物理
+  DAYU200(RK3568)执行 runbook 全部 11 条白名单命令,Agent 零真实 `hdc` 执行;
+  evidence 与 hardware-matrix 首条 `observed` 行经 PR #58 由维护者 review/merge
+  合入 main `f8817d9`)。四个 Test ID 均已执行并二值记录:
+  `TEST-HW-M0B-DAYU200-DISCOVERY-001` PASS、`TEST-HW-M0B-DAYU200-RAWCAPTURE-001`
+  PASS、`TEST-HW-M0B-DAYU200-UIDUMP-PROBE-001` PASS、`TEST-HW-M0B-DAYU200-AUTH-001`
+  **FAIL(as written)**——该 DAYU200 build 无 on-device 信任 UI,未授权态不可
+  观察,负路径不可重现性已按 AC 条款如实记录(run.md D1/R2);AC 前提修订留给
+  后续 change,本 done 不覆盖该 FAIL 也不构成 AUTH-001 通过。evidence JSON 经
+  schema 2.0.0 校验(provider `none`);evidence 仅支持 `observed`,不构成支持
+  声明。`ready→done` 由本独立状态 PR 执行,仅在维护者 review/merge 后生效。
 - Requirements/AC:`HW-M0B-DAYU200-DISCOVERY-001`、`HW-M0B-DAYU200-AUTH-001`、
   `HW-M0B-DAYU200-RAWCAPTURE-001`、`HW-M0B-DAYU200-UIDUMP-PROBE-001`
   (见 acceptance-cases.yaml)
