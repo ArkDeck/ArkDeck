@@ -122,6 +122,25 @@ wrapper、不做兼容性声明。观察到的 wrapper 关键事实:
 - R4:GAP-DAYU200-RECOVERY-PATH 等四 gap 保持 unknown,DEC-002 保持 open;本
   run 零写设备,未触碰恢复路径。
 
+## Addendum — r2 重评(2026-07-18,CHG-2026-006 r2 生效后)
+
+CHG-2026-006 r2(PR #60,main `b77690b`)将 `HW-M0B-DAYU200-AUTH-001` 修订为
+双分支。按 verification.md r2 注记要求,本节为独立重评步骤(维护者 review/merge
+本 addendum PR 即构成裁决),**仅引用本记录已合入的采集事实,零新增 `hdc` 执行**:
+
+| r2 分支 B 条款 | 已合入事实(出处) |
+| --- | --- |
+| operator 明确记录新鲜枚举(重插)前后均无信任提示 | operator 现场观察"该 build 不弹信任 UI(手机才弹)";negative 目录为 USB 重插后即时采集(本记录 AUTH-001 节) |
+| `list targets` 字节可比对地呈现稳定 authorized 态 | pre-auth/negative/post-auth 三次采集 stdout SHA-256 逐字节相同(`2035c078…`/`d8816e41…`),verbose 全程 USB/Connected(命令合规表) |
+| 负路径记录为不可复现并给出原因 | 无信任 UI、无未授权态可进入(AUTH-001 节;D1) |
+| 零 server kill;key 材料不复制/不入仓库 | 命令合规表(0 kill/restart);self-check 全 true;capture-hashes.md |
+
+- 结论:`TEST-HW-M0B-DAYU200-AUTH-001` 按 **r2 分支 B 判 PASS**。
+- 原 r1 结论不改写:上文"FAIL(as written)"按 r1 保持有效(verification.md r2
+  注记的非追溯条款);本节是新增的独立评定,非对 r1 记录的修改。
+- 本 addendum 未执行任何设备命令,无新增 capture;matrix 行 AC coverage 随本
+  addendum 同 PR 更新。
+
 ## Boundary
 
 read-only capture;observed-only;不构成支持/兼容性声明;不解除任何
