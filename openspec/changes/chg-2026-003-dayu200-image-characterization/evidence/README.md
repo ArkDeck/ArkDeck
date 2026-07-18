@@ -1,10 +1,12 @@
-# Evidence placeholder
+# Evidence
 
-No Task verification evidence has been collected. Drafting-time archive
-observations are Change design input only and cannot satisfy a Task run,
-verification or hardware claim.
+TASK-DAYU200-CHAR-001 已于 2026-07-18 执行:evidence 由维护者经 PR #44 合入
+main `6c1ba7b`,任务 `ready→done` 经 PR #47 合入 main `02f4258`。本目录现含
+下列五个 allowed outputs 与 `runs/TASK-DAYU200-CHAR-001/run.md`(V2 轻量格式,
+含全部命令、hash 与三个 AC 的二值 passed 结论)。Drafting-time archive
+observations 仍仅为 Change design input,不构成 evidence。
 
-A later approved run may produce only:
+An approved run may produce only:
 
 - archive-identity.json;
 - member-inventory.json;
@@ -28,5 +30,7 @@ compatibility remain unknown, Image Profile readiness remains
 candidateNonExecutable, and no evidence in this directory may claim DEC-002,
 M0B or hardware support.
 
-Do not add run or result records before the change is approved by the
-maintainer (V2: maintainer-approved PR; see governance/enforcement.md).
+The approval gate above was satisfied on 2026-07-18 (approval constituted by
+maintainer merge; see proposal.md "Approval" and "Verification closure").
+Existing evidence files are never overwritten; any future re-run requires a
+new change/task authorization.
