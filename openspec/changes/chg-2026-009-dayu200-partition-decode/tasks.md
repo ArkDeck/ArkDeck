@@ -5,11 +5,15 @@
 
 ## TASK-PD-001 — parameter.txt 只读解码器 + 映射/对账 evidence
 
-- Status:ready(change 经 approval-only PR #70 approved;本 readiness PR 复核
-  前置后转 ready,仅在维护者 review/merge 后生效——**须在 #70 之后 merge**。
-  前置复核:TASK-RB-001 done(main `c98d2b6`,计划第①步)、CHG-2026-003
-  archived(pinned identity + 17 成员清单)——均满足;只读硬边界不变,执行需
-  本地 pinned 镜像在场)
+- Status:blocked(2026-07-18 execution review:accepted AC 要求流式定位
+  `parameter.txt` 且“不读取其他成员内容”,但 pinned 输入是单一 gzip/DEFLATE
+  tar stream，目标位于第 8 个成员；定位其 header 必须消费前 7 个成员字节。
+  当前 candidate 如实记录读后丢弃 178168731 bytes，故 AC 不通过。若批准意图
+  是“允许流式解压/丢弃但不解析、不保留、不落盘”,须独立 governance PR
+  澄清/修订 AC。另因 CLI 接受 path，`lstat→open` 无法排除替换为 device 后先
+  open、再由 fstat 拒绝的竞态，故也不能静态证明 absolute zero device access；
+  需治理定义可信 fd/OS sandbox/threat model 后重新 ready。本 blocked 起草仅在
+  维护者 review/merge 后生效)
 - Requirements/AC:`DECODE-DAYU200-PARTITION-001`、`DECODE-DAYU200-RECONCILE-001`
   (见 acceptance-cases.yaml)
 - Depends on:CHG-2026-007 TASK-RB-001 done(已满足,计划第①步)、
