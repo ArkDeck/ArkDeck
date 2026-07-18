@@ -75,8 +75,13 @@
 
 ## TASK-I5-002 — 恢复 TASK-M1-006 readiness
 
-- Status:blocked(等待 `TASK-I5-001` done 并合入 main;`TASK-M1-005` 已 done——实现 PR #37
-  main `9e1f1da`、状态 PR #38 main `0e7aa8e`)
+- Status:done(本任务即本独立 readiness/status PR:全部门禁复核通过——`TASK-I5-001` 登记
+  已合入 main `4ac288c` 且 done 翻转经独立状态 PR;`TASK-M1-005` 已 done(#37/#38);M1-006
+  的 r3 UI/durable-audit amendment 已随 PR #35 生效——并将 `TASK-M1-006` 恢复为 `ready`。
+  状态仅在维护者 review/merge 后生效,不带实现或 parserGolden pass evidence)
+- Completion evidence:`evidence/runs/TASK-I5-002/run.md`(main 上五 fixture hash 独立重算
+  三方 1/1/1、success blob 78 字节完好、Package.swift 声明核对、M1-005 seam evidence 复核、
+  M1-006 四 blocker 逐项解除结论)
 - Requirements/AC:`REQ-HDC-001`、`REQ-HDC-002`、`REQ-HDC-003`、`REQ-HDC-005`；
   `AC-HDC-005-01`(只读 fixture dependency)
 - Depends on:`TASK-I5-001`、`TASK-M1-005`；且 M1-006 的 UI/durable-audit readiness
