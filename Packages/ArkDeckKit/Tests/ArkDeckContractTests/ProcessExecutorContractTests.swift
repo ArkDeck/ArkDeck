@@ -1,4 +1,5 @@
 import ArkDeckProcess
+import CryptoKit
 import Darwin
 import Foundation
 import XCTest
@@ -281,6 +282,151 @@ final class ProcessExecutorContractTests: XCTestCase {
     )
   }
 
+  func testIdentityBoundLaunchExecutesTheVerifiedDescriptorAndReturnsItsReceipt() async throws {
+    let directory = try makeTemporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let executable = URL(fileURLWithPath: "/usr/bin/printf")
+    let expectedHash = try sha256(of: executable)
+    let launches = LockedLaunchCounter()
+    let executor = FoundationProcessExecutor(
+      identityBoundPreSpawnHook: { _ in },
+      launchObserver: { _ in launches.recordLaunch() })
+
+    let result = try await executor.executeIdentityBound(
+      ProcessIdentityBoundRequest(
+        process: ProcessRequest(executable: executable, arguments: ["descriptor-bound"]),
+        expectedSHA256: expectedHash))
+
+    XCTAssertEqual(result.execution.termination, .exited(0))
+    XCTAssertEqual(
+      String(decoding: result.execution.stdout.data, as: UTF8.self), "descriptor-bound")
+    XCTAssertEqual(result.executableIdentity.authorizedPath, executable.path)
+    XCTAssertEqual(result.executableIdentity.sha256, expectedHash)
+    XCTAssertGreaterThan(result.executableIdentity.inode, 0)
+    XCTAssertEqual(launches.count, 1)
+  }
+
+  func testIdentityBoundLaunchRejectsPathSubstitutionBeforeAnyChildStarts() async throws {
+    let directory = try makeTemporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let executable = try copyExecutable("/usr/bin/printf", into: directory, named: "candidate")
+    let expectedHash = try sha256(of: executable)
+    let launchSentinel = directory.appending(path: "substituted-child-launched")
+    let launches = LockedLaunchCounter()
+    let executor = FoundationProcessExecutor(
+      identityBoundPreSpawnHook: { _ in
+        try FileManager.default.removeItem(at: executable)
+        try FileManager.default.copyItem(
+          at: URL(fileURLWithPath: "/usr/bin/touch"), to: executable)
+      },
+      launchObserver: { _ in launches.recordLaunch() })
+
+    do {
+      _ = try await executor.executeIdentityBound(
+        ProcessIdentityBoundRequest(
+          process: ProcessRequest(executable: executable, arguments: [launchSentinel.path]),
+          expectedSHA256: expectedHash))
+      XCTFail("path substitution must fail before spawn")
+    } catch let error as ProcessExecutionError {
+      XCTAssertEqual(error, .executableIdentityChanged)
+    }
+    XCTAssertEqual(launches.count, 0)
+    XCTAssertFalse(FileManager.default.fileExists(atPath: launchSentinel.path))
+  }
+
+  func testIdentityBoundLaunchRejectsSameInodeByteMutationBeforeAnyChildStarts() async throws {
+    let directory = try makeTemporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let executable = try copyExecutable("/usr/bin/printf", into: directory, named: "candidate")
+    let expectedHash = try sha256(of: executable)
+    let launches = LockedLaunchCounter()
+    let executor = FoundationProcessExecutor(
+      identityBoundPreSpawnHook: { _ in
+        let handle = try FileHandle(forWritingTo: executable)
+        try handle.seek(toOffset: 0)
+        try handle.write(contentsOf: Data([0]))
+        try handle.synchronize()
+        try handle.close()
+      },
+      launchObserver: { _ in launches.recordLaunch() })
+
+    do {
+      _ = try await executor.executeIdentityBound(
+        ProcessIdentityBoundRequest(
+          process: ProcessRequest(executable: executable), expectedSHA256: expectedHash))
+      XCTFail("same-inode byte mutation must fail before spawn")
+    } catch let error as ProcessExecutionError {
+      guard case .executableHashMismatch(let expected, let actual) = error else {
+        return XCTFail("unexpected identity-bound error: \(error)")
+      }
+      XCTAssertEqual(expected, expectedHash)
+      XCTAssertNotEqual(actual, expectedHash)
+    }
+    XCTAssertEqual(launches.count, 0)
+  }
+
+  func testIdentityBoundLaunchRejectsSymlinkAndInvalidDescriptorBeforeSpawn() async throws {
+    let directory = try makeTemporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let symlink = directory.appending(path: "linked-tool")
+    try FileManager.default.createSymbolicLink(
+      at: symlink, withDestinationURL: URL(fileURLWithPath: "/usr/bin/printf"))
+    let expectedHash = try sha256(of: URL(fileURLWithPath: "/usr/bin/printf"))
+    let launches = LockedLaunchCounter()
+    let symlinkExecutor = FoundationProcessExecutor(
+      identityBoundPreSpawnHook: { _ in },
+      launchObserver: { _ in launches.recordLaunch() })
+
+    do {
+      _ = try await symlinkExecutor.executeIdentityBound(
+        ProcessIdentityBoundRequest(
+          process: ProcessRequest(executable: symlink), expectedSHA256: expectedHash))
+      XCTFail("symlink executable must fail before spawn")
+    } catch let error as ProcessExecutionError {
+      XCTAssertEqual(error, .executableMustNotBeSymlink)
+    }
+
+    let executable = try copyExecutable("/usr/bin/printf", into: directory, named: "closed-fd")
+    let invalidDescriptorExecutor = FoundationProcessExecutor(
+      identityBoundPreSpawnHook: { _ in },
+      launchObserver: { _ in launches.recordLaunch() },
+      identityBoundLaunchFault: .closeDescriptorBeforeSpawn)
+    do {
+      _ = try await invalidDescriptorExecutor.executeIdentityBound(
+        ProcessIdentityBoundRequest(
+          process: ProcessRequest(executable: executable),
+          expectedSHA256: try sha256(of: executable)))
+      XCTFail("invalidated descriptor must fail before spawn")
+    } catch let error as ProcessExecutionError {
+      XCTAssertEqual(error, .executableDescriptorInvalid)
+    }
+    XCTAssertEqual(launches.count, 0)
+  }
+
+  func testAtomicLaunchGateInvalidationWinsBeforePosixSpawn() async throws {
+    let directory = try makeTemporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let executable = try copyExecutable("/usr/bin/printf", into: directory, named: "gated-tool")
+    let gate = ProcessAtomicLaunchGate()
+    let launches = LockedLaunchCounter()
+    let executor = FoundationProcessExecutor(
+      identityBoundPreSpawnHook: { _ in },
+      identityBoundFinalLaunchHook: { _ in gate.invalidate() },
+      launchObserver: { _ in launches.recordLaunch() })
+
+    do {
+      _ = try await executor.executeIdentityBound(
+        ProcessIdentityBoundRequest(
+          process: ProcessRequest(executable: executable),
+          expectedSHA256: try sha256(of: executable)),
+        gate: gate)
+      XCTFail("invalidated launch gate must fail before posix_spawn")
+    } catch let error as ProcessExecutionError {
+      XCTAssertEqual(error, .launchAuthorizationInvalidated)
+    }
+    XCTAssertEqual(launches.count, 0)
+  }
+
   private func assertRecordedProcessTreeHasNoSurvivors(
     _ data: Data,
     processGroupTermination: ProcessGroupTerminationResult,
@@ -335,6 +481,34 @@ final class ProcessExecutorContractTests: XCTestCase {
       XCTAssertEqual(error, expected, file: file, line: line)
     }
   }
+}
+
+private final class LockedLaunchCounter: @unchecked Sendable {
+  private let lock = NSLock()
+  private var storedCount = 0
+
+  func recordLaunch() {
+    lock.withLock { storedCount += 1 }
+  }
+
+  var count: Int {
+    lock.withLock { storedCount }
+  }
+}
+
+private func copyExecutable(_ source: String, into directory: URL, named name: String) throws -> URL
+{
+  let destination = directory.appending(path: name)
+  try FileManager.default.copyItem(at: URL(fileURLWithPath: source), to: destination)
+  guard chmod(destination.path, 0o755) == 0 else {
+    throw POSIXTestError(operation: "chmod", code: errno)
+  }
+  return destination
+}
+
+private func sha256(of executable: URL) throws -> String {
+  SHA256.hash(data: try Data(contentsOf: executable))
+    .map { String(format: "%02x", $0) }.joined()
 }
 
 private struct FailureMarkerEvaluator: ProcessSemanticEvaluating {
