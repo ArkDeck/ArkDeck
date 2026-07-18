@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-013-dayu200-rehearsal-preparation
 revision: 1
-status: verified # 2026-07-18 verification closure(先例 #20/#48):两 PREP-* AC PASS;经本 PR 维护者 review/merge 生效
+status: archived
 class: platform
 core_change_level: none
 owner: lvye
@@ -110,3 +110,18 @@ DAYU200 必须不连接演练主机**(负向硬前提),不勾检查单第 3/4/5 
   部分提供打勾 evidence,打勾动作属未来演练 change 立项时;第 3/4/5 项保持
   open;不构成演练执行授权;不解除任何 gap;DEC-002 保持 open。archive 由
   后续独立 archive PR 完成(先例 #21/#49)。
+
+## Archive
+
+本 change 于 2026-07-18 verified(PR #95,main `b061bb0`)后经本独立 archive PR
+归档:目录整体移入
+`openspec/changes/archive/2026-07-18-chg-2026-013-dayu200-rehearsal-preparation/`,
+`status: archived` 仅在维护者 review/merge 本 PR 后生效(先例 #21/#49)。本
+change class 为 platform、`core_change_level: none`:归档不涉及任何 spec/
+contract/baseline/conformance 变更,无 ratification 成分。
+`evidence/prep-record.md`(工具/物料 hash 锚点、F1 PATH 陷阱)与
+`evidence/rehearsal-record-template.md` 自归档位置继续作为未来演练 change 的
+前置输入——演练 change 立项时自归档路径复制模板并引用 prep-record 的产物
+hash 作 P1/P2 前置比对基准,该义务不因归档改变;host 侧持久物仍在
+`~/dayu200-rehearsal/`(字节不入仓)。检查单第 3/4/5 项保持 open;非演练
+授权;`GAP-DAYU200-RECOVERY-PATH` 保持 unknown;DEC-002 保持 open。
