@@ -1,0 +1,31 @@
+---
+schema_version: 1.0.0
+change_id: CHG-2026-008-ui-dump-hidumper-wrapper
+change_revision: 1
+platform: macos
+evidence_classes:
+- contract
+- platform
+cases:
+- acceptance_id: INT-UD-WRAPPER-001
+  test_id: TEST-INT-UD-WRAPPER-001
+  method: Contract tests over the fixed wrapper with adversarial fake hidumper outputs.
+  expected_source: openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/verification.md#INT-UD-WRAPPER-001
+  minimum_evidence: contract
+  expected_result: The wrapper pins one fixed argv form per ui-dump recipe;
+    success is judged by output markers, never by exit code; the observed
+    error-style outputs (e.g. "option ... missed" with exit 0, per
+    EVD-M0B-DAYU200-20260718-001) are classified as explicit failures; marker
+    absence yields unknownOutput rather than silent success; adversarial fake
+    outputs cover every branch and no test invokes real hdc.
+- acceptance_id: INT-UD-GOLDEN-001
+  test_id: TEST-INT-UD-GOLDEN-001
+  method: Human-captured, redacted hidumper golden fixtures registered with pinned hashes.
+  expected_source: openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/verification.md#INT-UD-GOLDEN-001
+  minimum_evidence: platform
+  expected_result: Golden fixtures originate from a human-operated allowlisted
+    capture, are redacted (no serial, no user path), are pinned byte-exact with
+    .gitattributes set before commit, are registered consistently across the
+    integration profile/lock and test resources, and no capture byte is edited
+    to fit expectations; the registration makes no compatibility or support
+    claim.
