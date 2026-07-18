@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-013-dayu200-rehearsal-preparation
 revision: 1
-status: proposed
+status: approved # r1 proposal 经 #90 合入;批准由本 approval-only PR 的维护者 review/merge 构成
 class: platform
 core_change_level: none
 owner: lvye
@@ -90,6 +90,8 @@ DAYU200 必须不连接演练主机**(负向硬前提),不勾检查单第 3/4/5 
 
 ## Approval
 
-- 本 proposal PR 合入即 status:proposed;正式批准须另行 approval-only PR
-  (先例 #14/#40/#55)。批准前 TASK-RR-001 保持 blocked;approve 后经独立
-  readiness/status PR 转 ready(无其它前置——不依赖 TASK-PD-001)。
+- Proposal 经 PR #90 合入 main(`09e7c55`,2026-07-18,status:proposed)。
+- 正式批准:2026-07-18 由本 approval-only PR(先例 #14/#40/#55)将本 change 置为
+  `approved`;批准由维护者 review/merge 本 PR 构成。本批准不产生任务执行:
+  TASK-RR-001 另需独立 readiness/status PR 转 ready(无其它前置——不依赖
+  TASK-PD-001);host-only 边界与设备不在场硬前提不因批准改变。
