@@ -33,6 +33,9 @@ read-only `hidumper` probe for the ui-dump wrapper. It is **not** a flash, does
    | `hidumper-help` | `hdc [-t KEY] shell hidumper --help` | ui-dump wrapper facts |
    | `hidumper-services` | `hdc [-t KEY] shell hidumper -ls` | ui-dump wrapper facts |
 
+   This table mirrors `COMMAND_SPECS` in `capture.py` (the authoritative
+   definition); `test_capture.py` asserts the two stay in sync.
+
 2. **Do not run anything else by hand.** No `install`/`uninstall`, no
    `file send/recv`, no `reboot`/`boot`, no `tmode`/`tconn`, no
    `kill`/`start`/`kill -r`/`start -r`/`killall-sub`, no flash/fastboot/vendor
@@ -45,7 +48,9 @@ read-only `hidumper` probe for the ui-dump wrapper. It is **not** a flash, does
    receives hashes and the redacted manifest. Do not paste raw capture bytes
    into the repo.
 5. The capture also implicitly starts a local hdc host server; leave it running
-   (external ownership) — do not kill it.
+   (external ownership) — do not kill it. `capture.py` stops draining a
+   command's pipes ~2 s after the client exits, so the auto-started server
+   holding the inherited pipe ends cannot stall or distort a capture.
 
 ## Steps
 
@@ -63,6 +68,7 @@ read-only `hidumper` probe for the ui-dump wrapper. It is **not** a flash, does
      --out-dir ~/m0b-capture/2026-07-xx/pre-auth \
      --commands hdc-version-flag,hdc-version-word,hdc-checkserver,hdc-list-targets,hdc-list-targets-verbose
    ```
+   The first command may auto-start the hdc host server; that is expected.
    Record what `list targets` shows in the **unauthorized** state (often
    `[Empty]` or an unauthorized marker). This is the AUTH-001 "before" state.
 
@@ -100,11 +106,29 @@ read-only `hidumper` probe for the ui-dump wrapper. It is **not** a flash, does
 
 ## After capture
 
-Each output directory contains, for every command: `NN-<id>.stdout`,
-`NN-<id>.stderr` (byte-exact, owner-only), plus `manifest.json` (full, with real
-paths/connectkey — controlled location only) and `redacted-manifest.json`
-(hashes + counts, home path and connectkey masked — safe to reference from the
-repo).
+Each output directory (created `0o700`, files `0o600`) contains, for every
+command: `NN-<id>.stdout`, `NN-<id>.stderr` (byte-exact up to a 4 MiB per-stream
+retained cap; overflow is recorded in the `truncated` flag), plus
+`manifest.json` (full, with real paths/connectkey — controlled location only)
+and `redacted-manifest.json` (hashes + counts, home path and connectkey masked,
+re-checked by an output-side redaction gate before it is written — safe to
+reference from the repo).
+
+Exit codes: `0` capture ok and self-check passed; `1` capture ran but the
+self-check failed; `2` usage/harness error (refused location, existing output
+file, unexecutable hdc, failed redaction gate — the run is not evidence).
+
+Manifest semantics worth knowing when drafting evidence:
+
+- `exitCode` is the verbatim subprocess return code (negative = killed by that
+  signal); it is `null` when the command timed out (`timedOut: true`) — timeout
+  is its own channel, never an exit-code value.
+- `selfCheck.*.serialPresent` is `null` on runs without `--target` (discovery):
+  the connectkey is not yet known there, so **treat discovery-run streams as
+  serial-bearing regardless**.
+- `evidenceClass` is `controlledHumanCapture`. A `realHardware` classification
+  of record can only be made by the human-attested hardware-evidence record,
+  never by this tool's manifests.
 
 - Confirm `selfCheckPassed: true` in each manifest. If it is `false`, the output
   contained a user path or key material — investigate before proceeding and do
@@ -112,11 +136,12 @@ repo).
 - Hand the maintainer a note of: hdc path/SHA-256/version, macOS build, the
   device build/API you observed **on the device** (not from an image filename),
   the connectkey, and per-command exit codes + SHA-256.
-- The Agent then drafts `evidence/runs/TASK-M0B-001/run.md` and the
-  `hardware-evidence.schema.json` record (provider `none`) from the redacted
-  manifests plus your notes, and the `observed` hardware-matrix row — for your
-  review/merge. Raw serial-bearing captures are referenced by hash only and stay
-  in your controlled location.
+- The Agent then drafts
+  `openspec/changes/chg-2026-006-dayu200-m0b-bringup/evidence/runs/TASK-M0B-001/run.md`
+  and the `hardware-evidence.schema.json` record (provider `none`) from the
+  redacted manifests plus your notes, and the `observed` hardware-matrix row —
+  for your review/merge. Raw serial-bearing captures are referenced by hash only
+  and stay in your controlled location.
 
 Nothing here promotes the row past `observed`, resolves any `GAP-DAYU200-*`, or
 makes a support claim; DEC-002 stays open.
