@@ -1,0 +1,68 @@
+{
+  "allowedEvidenceOutputs": [
+    "partition-mapping.json",
+    "member-reconciliation.json",
+    "process-audit.json",
+    "summary.md"
+  ],
+  "archiveOpenModes": [
+    "rb"
+  ],
+  "archivePassCount": 2,
+  "archiveSourceKind": "regularFile",
+  "configuredMaxReadChunkBytes": 1048576,
+  "counterProvenance": {
+    "dispatchCounters": "subprocess/network/transport/device-mutation structural zeros are asserted by strict import and call-target allowlists; absolute device open exclusion is explicitly not claimed",
+    "nonParameterContent": "non-target member contents are read to position the single gzip/tar stream, then discarded without parsing, retaining or writing",
+    "readMetrics": "identity hash and gzip receive _AuditedRawStream wrappers; every compressed byte returned by read/readinto is assigned to one pass",
+    "sourceType": "lstat rejects known non-regular paths before open; path-based os.open uses O_NOFOLLOW|O_NONBLOCK|O_CLOEXEC and fstat rejects replacement before read, but a device may already have been opened in that race"
+  },
+  "decompressedBytesStreamedThroughLocator": 178174740,
+  "dispatchCounters": {
+    "childProcess": 0,
+    "deviceMutation": 0,
+    "flashd": 0,
+    "hdc": 0,
+    "network": 0,
+    "tcp": 0,
+    "uart": 0,
+    "usb": 0,
+    "vendorTool": 0
+  },
+  "gzipPassRawBytesRead": 17956874,
+  "identityPassRawBytesRead": 732948803,
+  "maxObservedReadChunkBytes": 1048576,
+  "memberExtractionToDiskCount": 0,
+  "nonParameterMemberContentBytesReadAndDiscarded": 178168731,
+  "nonParameterMemberContentRetainedBytes": 0,
+  "nonParameterMemberContentReturnedToDecoderCount": 0,
+  "nonParameterMemberContentsRead": 7,
+  "nonParameterMemberSpansStreamDiscarded": 7,
+  "parameterBytesReturnedToDecoder": 788,
+  "partitionAcceptanceBlockingReasons": [
+    "gzip stream positioning consumed non-target member contents; current AC requires zero reads of other member contents",
+    "path-based os.open has an lstat/open replacement race; absolute zero device access is not statically proven"
+  ],
+  "partitionAcceptanceSatisfied": false,
+  "pathReplacementDeviceOpenRaceExcluded": false,
+  "potentialDeviceOpenPathCount": 1,
+  "pythonVersion": "3.14.6",
+  "rawBytesRead": 750905677,
+  "regularFileGateChecks": 4,
+  "regularFileGatePassed": true,
+  "schema": "arkdeck-dayu200-partition-decode-audit-1.0.0",
+  "scope": {
+    "archiveLocatorIncluded": false,
+    "authoritative": false,
+    "compatibilityClaim": false,
+    "flashAddressDerived": false,
+    "flashProtocolClaim": false,
+    "hardwareSupportClaim": false,
+    "nonAuthoritative": true,
+    "parameterRawTextIncluded": false,
+    "validOnlyForPinnedArchive": true
+  },
+  "tarHeadersInspected": 8,
+  "writesOutsideAllowedOutputs": 0,
+  "zeroDeviceAccessStaticProofSatisfied": false
+}
