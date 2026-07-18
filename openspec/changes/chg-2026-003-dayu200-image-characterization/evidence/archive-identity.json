@@ -1,0 +1,12 @@
+{
+  "expected": {
+    "sha256": "fc7637f34a8394847b1b6c7e7ff2750863d18c6dc05e184abaf5aed70ec75280",
+    "sizeBytes": 732948803
+  },
+  "identityMatch": true,
+  "observed": {
+    "sha256": "fc7637f34a8394847b1b6c7e7ff2750863d18c6dc05e184abaf5aed70ec75280",
+    "sizeBytes": 732948803
+  },
+  "schema": "arkdeck-char-archive-identity-1.0.0"
+}

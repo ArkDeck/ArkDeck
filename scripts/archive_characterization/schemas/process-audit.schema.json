@@ -1,0 +1,85 @@
+{
+  "$id": "arkdeck-char-process-audit-1.0.0",
+  "type": "object",
+  "required": [
+    "schema",
+    "pythonVersion",
+    "configuredMaxReadChunkBytes",
+    "maxObservedReadChunkBytes",
+    "rawBytesRead",
+    "uncompressedBytesRead",
+    "archiveOpenModes",
+    "hazardVectorsExecuted",
+    "allowedEvidenceOutputs",
+    "writesOutsideAllowedOutputs",
+    "memberExtractionToDiskCount",
+    "memberExecutionCount",
+    "dispatchCounters",
+    "counterProvenance"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "arkdeck-char-process-audit-1.0.0" },
+    "pythonVersion": { "type": "string", "pattern": "^3\\.[0-9]+\\.[0-9]+$" },
+    "configuredMaxReadChunkBytes": { "const": 1048576 },
+    "maxObservedReadChunkBytes": { "type": "integer", "minimum": 0 },
+    "rawBytesRead": { "type": "integer", "minimum": 0 },
+    "uncompressedBytesRead": { "type": "integer", "minimum": 0 },
+    "archiveOpenModes": {
+      "type": "array",
+      "items": { "enum": ["rb", "memory-ro"] }
+    },
+    "hazardVectorsExecuted": { "type": "integer", "minimum": 0 },
+    "allowedEvidenceOutputs": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "archive-identity.json",
+          "member-inventory.json",
+          "package-classification.json",
+          "process-audit.json",
+          "summary.md"
+        ]
+      }
+    },
+    "writesOutsideAllowedOutputs": { "const": 0 },
+    "memberExtractionToDiskCount": { "const": 0 },
+    "memberExecutionCount": { "const": 0 },
+    "dispatchCounters": {
+      "type": "object",
+      "required": [
+        "childProcess",
+        "network",
+        "hdc",
+        "flashd",
+        "vendorTool",
+        "usb",
+        "uart",
+        "tcp",
+        "deviceMutation"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "childProcess": { "const": 0 },
+        "network": { "const": 0 },
+        "hdc": { "const": 0 },
+        "flashd": { "const": 0 },
+        "vendorTool": { "const": 0 },
+        "usb": { "const": 0 },
+        "uart": { "const": 0 },
+        "tcp": { "const": 0 },
+        "deviceMutation": { "const": 0 }
+      }
+    },
+    "counterProvenance": {
+      "type": "object",
+      "required": ["readMetrics", "writeMetrics", "dispatchCounters"],
+      "additionalProperties": false,
+      "properties": {
+        "readMetrics": { "type": "string" },
+        "writeMetrics": { "type": "string" },
+        "dispatchCounters": { "type": "string" }
+      }
+    }
+  }
+}

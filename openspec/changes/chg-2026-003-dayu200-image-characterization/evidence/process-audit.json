@@ -1,0 +1,38 @@
+{
+  "allowedEvidenceOutputs": [
+    "archive-identity.json",
+    "member-inventory.json",
+    "package-classification.json",
+    "process-audit.json",
+    "summary.md"
+  ],
+  "archiveOpenModes": [
+    "rb"
+  ],
+  "configuredMaxReadChunkBytes": 1048576,
+  "counterProvenance": {
+    "dispatchCounters": "structural-zero: no such code path exists in this tool; asserted by the static import/AST audit in test_scan.py",
+    "readMetrics": "instrumented at the scanner I/O choke points",
+    "writeMetrics": "instrumented at the single evidence write choke point"
+  },
+  "dispatchCounters": {
+    "childProcess": 0,
+    "deviceMutation": 0,
+    "flashd": 0,
+    "hdc": 0,
+    "network": 0,
+    "tcp": 0,
+    "uart": 0,
+    "usb": 0,
+    "vendorTool": 0
+  },
+  "hazardVectorsExecuted": 16,
+  "maxObservedReadChunkBytes": 1048576,
+  "memberExecutionCount": 0,
+  "memberExtractionToDiskCount": 0,
+  "pythonVersion": "3.14.6",
+  "rawBytesRead": 732948803,
+  "schema": "arkdeck-char-process-audit-1.0.0",
+  "uncompressedBytesRead": 4150712320,
+  "writesOutsideAllowedOutputs": 0
+}
