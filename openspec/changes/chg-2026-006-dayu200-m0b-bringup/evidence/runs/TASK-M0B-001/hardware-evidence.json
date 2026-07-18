@@ -1,0 +1,71 @@
+{
+  "schemaVersion": "2.0.0",
+  "evidenceId": "EVD-M0B-DAYU200-20260718-001",
+  "operator": "fuhanfeng",
+  "physicalTargetConfirmation": {
+    "confirmedDeviceIdentity": "DAYU200 (RK3568), serial 150100424a544434520325874bbf4900",
+    "confirmedAt": "2026-07-18T07:52:26Z"
+  },
+  "device": {
+    "model": "DAYU200 (RK3568)",
+    "serial": "150100424a544434520325874bbf4900",
+    "firmware": "OpenHarmony 7.0.0.34 (API 26.0.0, operator-observed on device About screen)"
+  },
+  "toolchain": {
+    "hdcVersion": "Ver: 3.2.0d (client and server, checkserver-observed)",
+    "hdcPath": "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/toolchains/hdc",
+    "other": {
+      "hdcSha256": "48395ba8d87115dffca47df2a640a6c868bc9a2bd4eb49611e4138ff88d8d260",
+      "hostOs": "macOS 26.5.2 (25F84), arm64",
+      "captureTool": "scripts/m0b_capture/capture.py @ main 4960c10"
+    }
+  },
+  "transport": "usb",
+  "provider": "none",
+  "stepKinds": [
+    "discovery",
+    "toolchain-probe",
+    "authorization-observation",
+    "raw-capture",
+    "hidumper-probe"
+  ],
+  "acceptanceIds": [
+    "HW-M0B-DAYU200-DISCOVERY-001",
+    "HW-M0B-DAYU200-AUTH-001",
+    "HW-M0B-DAYU200-RAWCAPTURE-001",
+    "HW-M0B-DAYU200-UIDUMP-PROBE-001"
+  ],
+  "executedAt": "2026-07-18T07:39:59Z",
+  "artifacts": [
+    {
+      "path": "openspec/changes/chg-2026-006-dayu200-m0b-bringup/evidence/runs/TASK-M0B-001/redacted-manifests/pre-auth.redacted-manifest.json",
+      "sha256": "10abbfa44348e34e1b9cd0901fc5140bc5cdaa33fae9f9a674fc7cb0cc030111",
+      "note": "repo-safe redacted capture manifest for the pre-auth run; raw serial-bearing streams remain in the maintainer-controlled location, pinned by capture-hashes.md"
+    },
+    {
+      "path": "openspec/changes/chg-2026-006-dayu200-m0b-bringup/evidence/runs/TASK-M0B-001/redacted-manifests/negative.redacted-manifest.json",
+      "sha256": "7c90789cfe7c1a03de9f4a9bce1aad2e69575da1498d5f9c64238c667208cb40",
+      "note": "repo-safe redacted capture manifest for the negative run; raw serial-bearing streams remain in the maintainer-controlled location, pinned by capture-hashes.md"
+    },
+    {
+      "path": "openspec/changes/chg-2026-006-dayu200-m0b-bringup/evidence/runs/TASK-M0B-001/redacted-manifests/post-auth.redacted-manifest.json",
+      "sha256": "7c90789cfe7c1a03de9f4a9bce1aad2e69575da1498d5f9c64238c667208cb40",
+      "note": "repo-safe redacted capture manifest for the post-auth run; raw serial-bearing streams remain in the maintainer-controlled location, pinned by capture-hashes.md"
+    },
+    {
+      "path": "openspec/changes/chg-2026-006-dayu200-m0b-bringup/evidence/runs/TASK-M0B-001/redacted-manifests/hidumper.redacted-manifest.json",
+      "sha256": "14e0ce82eaccbd92b8755417104f8c0a57a8aa313db4566d19db3d5a83f1811f",
+      "note": "repo-safe redacted capture manifest for the hidumper run; raw serial-bearing streams remain in the maintainer-controlled location, pinned by capture-hashes.md"
+    },
+    {
+      "path": "openspec/changes/chg-2026-006-dayu200-m0b-bringup/evidence/runs/TASK-M0B-001/capture-hashes.md",
+      "sha256": "d03dc40b89db5dd8a2d66d5af795f644f92f6477707942d117335ff2142eb6f1",
+      "note": "SHA-256 pin list for every controlled-location capture file (20 files across 4 runs)"
+    }
+  ],
+  "deviations": [
+    "TEST-HW-M0B-DAYU200-AUTH-001 recorded FAIL as written: no observable unauthorized state on this DAYU200 build (no on-device trust UI; trust persisted from the earlier I5-001 window); denied/timeout negative path non-reproducibility truthfully recorded per the AC clause. See run.md.",
+    "Written physical-target confirmation recorded at 07:52:26Z, after the first capture at 07:39:59Z; the operator was physically present operating the device throughout. See run.md D3."
+  ],
+  "notes": "Read-only M0B capture; observed-only, no support/compatibility claim. Binary per-AC conclusions: DISCOVERY-001 PASS, AUTH-001 FAIL (as written), RAWCAPTURE-001 PASS, UIDUMP-PROBE-001 PASS — see run.md. Revalidation trigger: any change of device firmware or hdc version. hidumper fact for the later ui-dump integration change: '--help' yields a single error-style line with exit 0; '-ls' lists 32 lines of system abilities."
+}
