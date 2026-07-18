@@ -1,0 +1,32 @@
+---
+schema_version: 1.0.0
+change_id: CHG-2026-010-dayu200-recovery-playbook
+change_revision: 1
+platform: macos
+evidence_classes:
+- platform
+cases:
+- acceptance_id: RECOVERY-DAYU200-PLAYBOOK-001
+  test_id: TEST-RECOVERY-DAYU200-PLAYBOOK-001
+  method: Document review of the recovery playbook against the seven mandatory sections.
+  expected_source: openspec/changes/chg-2026-010-dayu200-recovery-playbook/verification.md#RECOVERY-DAYU200-PLAYBOOK-001
+  minimum_evidence: platform
+  expected_result: The playbook contains all seven mandatory sections (forced-entry
+    methods with mode discrimination features, recovery tools with macOS
+    availability conclusions, recovery materials mapped to the pinned image
+    members by hash reference, the full unbootable-to-bootable step sequence with
+    per-step preconditions and checkpoints, per-step risk and abort criteria, the
+    rehearsal-precondition checklist, and graded S2/S3 source citations); every
+    step that depends on an S3 source is explicitly marked as unconfirmed pending
+    rehearsal; the playbook explicitly states that it closes no gap and
+    authorizes no execution until the separate rehearsal change.
+- acceptance_id: RECOVERY-DAYU200-READINESS-001
+  test_id: TEST-RECOVERY-DAYU200-READINESS-001
+  method: Document review of the rehearsal-precondition checklist for gate completeness.
+  expected_source: openspec/changes/chg-2026-010-dayu200-recovery-playbook/verification.md#RECOVERY-DAYU200-READINESS-001
+  minimum_evidence: platform
+  expected_result: The checklist enumerates every condition the rehearsal change
+    must verify before proposal (local recovery materials and tools present,
+    maintainer's explicit residual-risk acceptance, time window, fallback/abort
+    plan), is binary-checkable item by item, and states that the rehearsal change
+    must quote this checklist verbatim as its precondition gate.
