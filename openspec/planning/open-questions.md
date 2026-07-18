@@ -113,3 +113,31 @@ Open question 不得以聊天记忆留存。每项记录默认决策、阻塞范
 - Discovery rule：L0 不被本 decision 阻断；L0 Task 必须预先固定有限的 distro/desktop/architecture/package 候选，只能产出 feasibility evidence 与 decision proposal，不得声称支持
 - Blocks：L1 implementation、任何 Linux release claim，以及把候选矩阵提升为 supported matrix
 - Affected：PLATFORM-LINUX@0.1.0、Platform verification/hardware matrix
+
+## RISK-001 DAYU200 恢复演练残余风险接受(检查单第 4 项)
+
+- Status：accepted（2026-07-18;**本记录经维护者 review/merge 本 PR 即构成
+  archived CHG-2026-010 预案 §6 检查单第 4 项所要求的"维护者书面确认",
+  merge 即确认,先例 DEC-001 #53**）
+- Owner / 确认人：维护者 `lvye`（fuhanfeng）
+- Statement（确认内容）：本人已阅读 archived CHG-2026-010
+  `recovery-playbook.md` 的 §4 恢复步骤序列、§5 风险点与中止准则、§6 前置
+  检查单,以及 archived CHG-2026-013 `prep-record.md` 的准备结论与 F1-F3
+  发现。本人确认:**接受 DAYU200 恢复演练期间设备变砖乃至不可恢复的残余
+  风险**;知悉"MaskRom 为芯片固化态、理论上始终可重入"这一风险兜底论断
+  本身尚待演练确证,不将其视为承诺;知悉演练是全链条第一个写设备操作。
+- Scope（适用范围）：仅覆盖按下列全部条件执行的恢复演练——
+  1. 演练 change 独立立项/approve,立项时自归档路径原文引用 §6 检查单且
+     七项全部打勾;
+  2. 步骤遵循 archived 预案 §4、记录使用 archived CHG-2026-013 模板
+     (含 P1-P6 前置检查),分区偏移仅取自 TASK-PD-001 合入 main 的解码
+     evidence;
+  3. §5 四项中止准则任一命中即停手。
+- Invalidation（失效条件）：archived 预案或演练步骤发生 revision 后,本
+  确认自动失效,须以新的 RISK 记录重新确认;本确认不可被引用于演练以外的
+  任何写设备操作。
+- Boundary：本确认**不构成演练执行授权**,不勾检查单其余项——第 3 项
+  (TASK-PD-001 evidence)与第 5 项(明确时间窗、窗口内无其他设备操作并行)
+  仍须在演练 change 立项时分别满足;`GAP-DAYU200-RECOVERY-PATH` 保持
+  unknown,DEC-002 保持 open。
+- Consumer：未来演练 change 立项时,检查单第 4 项引用本记录打勾。
