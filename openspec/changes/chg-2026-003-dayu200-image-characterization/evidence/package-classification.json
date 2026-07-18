@@ -1,0 +1,72 @@
+{
+  "authoritative": false,
+  "classificationScope": "fixedArchiveOnly",
+  "classifierInput": {
+    "memberCount": 17,
+    "projectionFields": [
+      "path",
+      "kind",
+      "size"
+    ]
+  },
+  "conditions": [
+    {
+      "id": "PKG-RK-ROOT-REGULAR-NONEMPTY",
+      "passed": true
+    },
+    {
+      "id": "PKG-RK-PARAMETER",
+      "passed": true
+    },
+    {
+      "id": "PKG-RK-MINILOADER",
+      "passed": true
+    },
+    {
+      "id": "PKG-RK-UBOOT",
+      "passed": true
+    },
+    {
+      "id": "PKG-RK-EXTRA-IMAGES",
+      "passed": true
+    },
+    {
+      "id": "PKG-RK-ALLOWLIST",
+      "passed": true
+    }
+  ],
+  "deviceFlashProvider": "unknown",
+  "executableProfile": false,
+  "failedConditionIds": [],
+  "gaps": [
+    {
+      "area": "partition semantics",
+      "id": "GAP-DAYU200-PARTITION-SEMANTICS",
+      "note": "parameter.txt partition table semantics are not interpreted; member bytes are hashed but never decoded.",
+      "status": "unknown"
+    },
+    {
+      "area": "flash addresses",
+      "id": "GAP-DAYU200-FLASH-ADDRESSES",
+      "note": "no flash offset/address mapping is derived from any member.",
+      "status": "unknown"
+    },
+    {
+      "area": "flash protocol",
+      "id": "GAP-DAYU200-FLASH-PROTOCOL",
+      "note": "no flashd/rockusb/USB/UART/TCP protocol fact is established.",
+      "status": "unknown"
+    },
+    {
+      "area": "recovery path",
+      "id": "GAP-DAYU200-RECOVERY-PATH",
+      "note": "no recovery/rescue path for an interrupted flash is established.",
+      "status": "unknown"
+    }
+  ],
+  "hardwareSupportClaim": false,
+  "imagePackageFamily": "rockchipRawImageSet",
+  "imageProfileReadiness": "candidateNonExecutable",
+  "schema": "arkdeck-char-package-classification-1.0.0",
+  "targetCompatibility": "unknown"
+}

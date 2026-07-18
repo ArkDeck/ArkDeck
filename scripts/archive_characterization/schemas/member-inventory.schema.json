@@ -1,0 +1,73 @@
+{
+  "$id": "arkdeck-char-member-inventory-1.0.0",
+  "type": "object",
+  "required": ["schema", "archiveSha256", "memberCount", "members", "hazardSuite"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "arkdeck-char-member-inventory-1.0.0" },
+    "archiveSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "memberCount": { "type": "integer", "minimum": 0 },
+    "members": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["index", "path", "kind", "sizeBytes", "sha256"],
+        "additionalProperties": false,
+        "properties": {
+          "index": { "type": "integer", "minimum": 0 },
+          "path": { "type": "string", "pattern": "^[^\\\\]+$" },
+          "kind": { "const": "regular" },
+          "sizeBytes": { "type": "integer", "minimum": 0 },
+          "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+        }
+      }
+    },
+    "hazardSuite": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "vector",
+          "expectedCode",
+          "observedCode",
+          "classifierCalls",
+          "rejectedBeforeClassification",
+          "passed"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "vector": { "type": "string" },
+          "expectedCode": {
+            "enum": [
+              "ARC001_IDENTITY_MISMATCH",
+              "ARC002_ARCHIVE_INVALID",
+              "ARC003_PATH_ABSOLUTE",
+              "ARC004_PATH_TRAVERSAL",
+              "ARC005_PATH_INVALID",
+              "ARC006_PATH_DUPLICATE",
+              "ARC007_LINK_UNSUPPORTED",
+              "ARC008_MEMBER_TYPE_UNSUPPORTED",
+              "ARC009_MEMBER_SIZE_MISMATCH"
+            ]
+          },
+          "observedCode": {
+            "enum": [
+              "ARC001_IDENTITY_MISMATCH",
+              "ARC002_ARCHIVE_INVALID",
+              "ARC003_PATH_ABSOLUTE",
+              "ARC004_PATH_TRAVERSAL",
+              "ARC005_PATH_INVALID",
+              "ARC006_PATH_DUPLICATE",
+              "ARC007_LINK_UNSUPPORTED",
+              "ARC008_MEMBER_TYPE_UNSUPPORTED",
+              "ARC009_MEMBER_SIZE_MISMATCH"
+            ]
+          },
+          "classifierCalls": { "const": 0 },
+          "rejectedBeforeClassification": { "const": true },
+          "passed": { "const": true }
+        }
+      }
+    }
+  }
+}

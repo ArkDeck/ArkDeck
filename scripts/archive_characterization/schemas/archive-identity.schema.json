@@ -1,0 +1,28 @@
+{
+  "$id": "arkdeck-char-archive-identity-1.0.0",
+  "type": "object",
+  "required": ["schema", "expected", "observed", "identityMatch"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "arkdeck-char-archive-identity-1.0.0" },
+    "expected": {
+      "type": "object",
+      "required": ["sizeBytes", "sha256"],
+      "additionalProperties": false,
+      "properties": {
+        "sizeBytes": { "type": "integer", "minimum": 0 },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    },
+    "observed": {
+      "type": "object",
+      "required": ["sizeBytes", "sha256"],
+      "additionalProperties": false,
+      "properties": {
+        "sizeBytes": { "type": "integer", "minimum": 0 },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    },
+    "identityMatch": { "const": true }
+  }
+}

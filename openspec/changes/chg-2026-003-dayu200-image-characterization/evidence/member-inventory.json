@@ -1,0 +1,256 @@
+{
+  "archiveSha256": "fc7637f34a8394847b1b6c7e7ff2750863d18c6dc05e184abaf5aed70ec75280",
+  "hazardSuite": [
+    {
+      "classifierCalls": 0,
+      "expectedCode": "ARC001_IDENTITY_MISMATCH",
+      "observedCode": "ARC001_IDENTITY_MISMATCH",
+      "passed": true,
+      "rejectedBeforeClassification": true,
+      "vector": "arc001-identity-mismatch"
+    },
+    {
+      "classifierCalls": 0,
+      "expectedCode": "ARC002_ARCHIVE_INVALID",
+      "observedCode": "ARC002_ARCHIVE_INVALID",
+      "passed": true,
+      "rejectedBeforeClassification": true,
+      "vector": "arc002-not-gzip"
+    },
+    {
+      "classifierCalls": 0,
+      "expectedCode": "ARC002_ARCHIVE_INVALID",
+      "observedCode": "ARC002_ARCHIVE_INVALID",
+      "passed": true,
+      "rejectedBeforeClassification": true,
+      "vector": "arc002-header-checksum"
+    },
+    {
+      "classifierCalls": 0,
+      "expectedCode": "ARC002_ARCHIVE_INVALID",
+      "observedCode": "ARC002_ARCHIVE_INVALID",
+      "passed": true,
+      "rejectedBeforeClassification": true,
+      "vector": "arc002-missing-end-marker"
+    },
+    {
+      "classifierCalls": 0,
+      "expectedCode": "ARC002_ARCHIVE_INVALID",
+      "observedCode": "ARC002_ARCHIVE_INVALID",
+      "passed": true,
+      "rejectedBeforeClassification": true,
+      "vector": "arc002-trailer-garbage"
+    },
+    {
+      "classifierCalls": 0,
+      "expectedCode": "ARC002_ARCHIVE_INVALID",
+      "observedCode": "ARC002_ARCHIVE_INVALID",
+      "passed": true,
+      "rejectedBeforeClassification": true,
+      "vector": "arc002-raw-trailing-garbage"
+    },
+    {
+      "classifierCalls": 0,
+      "expectedCode": "ARC003_PATH_ABSOLUTE",
+      "observedCode": "ARC003_PATH_ABSOLUTE",
+      "passed": true,
+      "rejectedBeforeClassification": true,
+      "vector": "arc003-absolute-path"
+    },
+    {
+      "classifierCalls": 0,
+      "expectedCode": "ARC004_PATH_TRAVERSAL",
+      "observedCode": "ARC004_PATH_TRAVERSAL",
+      "passed": true,
+      "rejectedBeforeClassification": true,
+      "vector": "arc004-traversal"
+    },
+    {
+      "classifierCalls": 0,
+      "expectedCode": "ARC005_PATH_INVALID",
+      "observedCode": "ARC005_PATH_INVALID",
+      "passed": true,
+      "rejectedBeforeClassification": true,
+      "vector": "arc005-backslash"
+    },
+    {
+      "classifierCalls": 0,
+      "expectedCode": "ARC006_PATH_DUPLICATE",
+      "observedCode": "ARC006_PATH_DUPLICATE",
+      "passed": true,
+      "rejectedBeforeClassification": true,
+      "vector": "arc006-duplicate"
+    },
+    {
+      "classifierCalls": 0,
+      "expectedCode": "ARC007_LINK_UNSUPPORTED",
+      "observedCode": "ARC007_LINK_UNSUPPORTED",
+      "passed": true,
+      "rejectedBeforeClassification": true,
+      "vector": "arc007-symlink"
+    },
+    {
+      "classifierCalls": 0,
+      "expectedCode": "ARC008_MEMBER_TYPE_UNSUPPORTED",
+      "observedCode": "ARC008_MEMBER_TYPE_UNSUPPORTED",
+      "passed": true,
+      "rejectedBeforeClassification": true,
+      "vector": "arc008-directory"
+    },
+    {
+      "classifierCalls": 0,
+      "expectedCode": "ARC009_MEMBER_SIZE_MISMATCH",
+      "observedCode": "ARC009_MEMBER_SIZE_MISMATCH",
+      "passed": true,
+      "rejectedBeforeClassification": true,
+      "vector": "arc009-short-body"
+    },
+    {
+      "classifierCalls": 0,
+      "expectedCode": "ARC004_PATH_TRAVERSAL",
+      "observedCode": "ARC004_PATH_TRAVERSAL",
+      "passed": true,
+      "rejectedBeforeClassification": true,
+      "vector": "precedence-member-order"
+    },
+    {
+      "classifierCalls": 0,
+      "expectedCode": "ARC004_PATH_TRAVERSAL",
+      "observedCode": "ARC004_PATH_TRAVERSAL",
+      "passed": true,
+      "rejectedBeforeClassification": true,
+      "vector": "precedence-numeric-within-member"
+    },
+    {
+      "classifierCalls": 0,
+      "expectedCode": "ARC002_ARCHIVE_INVALID",
+      "observedCode": "ARC002_ARCHIVE_INVALID",
+      "passed": true,
+      "rejectedBeforeClassification": true,
+      "vector": "precedence-framing-after-members"
+    }
+  ],
+  "memberCount": 17,
+  "members": [
+    {
+      "index": 0,
+      "kind": "regular",
+      "path": "boot_linux.img",
+      "sha256": "390c2cf2bf59f8bedc99a9622a1263410c6132341aece6a1b9c30ed5567a9523",
+      "sizeBytes": 67108864
+    },
+    {
+      "index": 1,
+      "kind": "regular",
+      "path": "chip_ckm.img",
+      "sha256": "b60b62747679659c337eef737ea5064bbcea68b9fc219f62a076c06d05a6c81a",
+      "sizeBytes": 33554432
+    },
+    {
+      "index": 2,
+      "kind": "regular",
+      "path": "chip_prod.img",
+      "sha256": "6d009c6b685f65f91bd77ceb201916f07dde8668fde4432ee534bb04e0b6cbad",
+      "sizeBytes": 52428800
+    },
+    {
+      "index": 3,
+      "kind": "regular",
+      "path": "config.cfg",
+      "sha256": "4d06d303faff1d3e530a9d2c9bb22073427b0b498bb4bb438b5177897d86f33c",
+      "sizeBytes": 10399
+    },
+    {
+      "index": 4,
+      "kind": "regular",
+      "path": "daily_build.log",
+      "sha256": "5823dd263cab3168dbd3ee098c5b5045b82b8393548b9da9f095de2883a2a0e9",
+      "sizeBytes": 24496219
+    },
+    {
+      "index": 5,
+      "kind": "regular",
+      "path": "manifest_tag.xml",
+      "sha256": "fd458507b4bb63f372049a0bb9a2cd779af426e2d27de43134ace05e5884ff74",
+      "sizeBytes": 114913
+    },
+    {
+      "index": 6,
+      "kind": "regular",
+      "path": "MiniLoaderAll.bin",
+      "sha256": "1cdd418032195210f191445ed96e2da5ea83d2cfe880c912ebec635839d76542",
+      "sizeBytes": 455104
+    },
+    {
+      "index": 7,
+      "kind": "regular",
+      "path": "parameter.txt",
+      "sha256": "35464e3f0b883a8a043dd45ae7ab2342c86b7aa27f24aa1e5a0ccfb6f442d048",
+      "sizeBytes": 788
+    },
+    {
+      "index": 8,
+      "kind": "regular",
+      "path": "ramdisk.img",
+      "sha256": "cc6f7c3d9568cbb3f810edd67ebe0015a04734605ca4f21c065ce94f88ec3b07",
+      "sizeBytes": 2385465
+    },
+    {
+      "index": 9,
+      "kind": "regular",
+      "path": "resource.img",
+      "sha256": "161cf158f6f256e7794568b1307581e4656da1a8d8d3d2612da73195d3eda06e",
+      "sizeBytes": 5652480
+    },
+    {
+      "index": 10,
+      "kind": "regular",
+      "path": "sys_prod.img",
+      "sha256": "8dfb72cfa61dc748f62f3d766214ab579c857f3b8a62e6890a8abc7ae0ac1062",
+      "sizeBytes": 52428800
+    },
+    {
+      "index": 11,
+      "kind": "regular",
+      "path": "system.img",
+      "sha256": "aef65124a814fcce8345dbfbdf049aaa862bd76786d099095c6951b4561ba1bb",
+      "sizeBytes": 2147483648
+    },
+    {
+      "index": 12,
+      "kind": "regular",
+      "path": "uboot.img",
+      "sha256": "c1c801e45cbb92ee63e14df3dda5d819792e02295525bd53dbf750efb645916d",
+      "sizeBytes": 4194304
+    },
+    {
+      "index": 13,
+      "kind": "regular",
+      "path": "updater_binary",
+      "sha256": "84659f9fd5a13b8293904f9ad7531ee9637523efffb90e74a49443f9f8ef5cd5",
+      "sizeBytes": 3248612
+    },
+    {
+      "index": 14,
+      "kind": "regular",
+      "path": "updater.img",
+      "sha256": "5f70d2f79cbcda267a20aff98c187ffdaac2ce1f693ae6f7dbdc2bec7b1c5494",
+      "sizeBytes": 20692486
+    },
+    {
+      "index": 15,
+      "kind": "regular",
+      "path": "userdata.img",
+      "sha256": "715e7998ebd47653a0ec2e062964224684762ab8686330c6b69b8d5f1f55886c",
+      "sizeBytes": 1468006400
+    },
+    {
+      "index": 16,
+      "kind": "regular",
+      "path": "vendor.img",
+      "sha256": "61e0c9adda4420417d88bcc1f4d725558b75e41046f528100a584c8dc466cd41",
+      "sizeBytes": 268431360
+    }
+  ],
+  "schema": "arkdeck-char-member-inventory-1.0.0"
+}

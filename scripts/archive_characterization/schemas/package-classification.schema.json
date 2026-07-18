@@ -1,0 +1,91 @@
+{
+  "$id": "arkdeck-char-package-classification-1.0.0",
+  "type": "object",
+  "required": [
+    "schema",
+    "classifierInput",
+    "conditions",
+    "failedConditionIds",
+    "imagePackageFamily",
+    "classificationScope",
+    "authoritative",
+    "deviceFlashProvider",
+    "targetCompatibility",
+    "imageProfileReadiness",
+    "executableProfile",
+    "hardwareSupportClaim",
+    "gaps"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "arkdeck-char-package-classification-1.0.0" },
+    "classifierInput": {
+      "type": "object",
+      "required": ["memberCount", "projectionFields"],
+      "additionalProperties": false,
+      "properties": {
+        "memberCount": { "type": "integer", "minimum": 0 },
+        "projectionFields": {
+          "type": "array",
+          "items": { "enum": ["path", "kind", "size"] }
+        }
+      }
+    },
+    "conditions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "passed"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "enum": [
+              "PKG-RK-ROOT-REGULAR-NONEMPTY",
+              "PKG-RK-PARAMETER",
+              "PKG-RK-MINILOADER",
+              "PKG-RK-UBOOT",
+              "PKG-RK-EXTRA-IMAGES",
+              "PKG-RK-ALLOWLIST"
+            ]
+          },
+          "passed": { "type": "boolean" }
+        }
+      }
+    },
+    "failedConditionIds": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "PKG-RK-ROOT-REGULAR-NONEMPTY",
+          "PKG-RK-PARAMETER",
+          "PKG-RK-MINILOADER",
+          "PKG-RK-UBOOT",
+          "PKG-RK-EXTRA-IMAGES",
+          "PKG-RK-ALLOWLIST"
+        ]
+      }
+    },
+    "imagePackageFamily": { "enum": ["rockchipRawImageSet", "unknown"] },
+    "classificationScope": { "const": "fixedArchiveOnly" },
+    "authoritative": { "const": false },
+    "deviceFlashProvider": { "const": "unknown" },
+    "targetCompatibility": { "const": "unknown" },
+    "imageProfileReadiness": { "const": "candidateNonExecutable" },
+    "executableProfile": { "const": false },
+    "hardwareSupportClaim": { "const": false },
+    "gaps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "area", "status", "note"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "pattern": "^GAP-DAYU200-[A-Z-]+$" },
+          "area": { "type": "string" },
+          "status": { "const": "unknown" },
+          "note": { "type": "string" }
+        }
+      }
+    }
+  }
+}
