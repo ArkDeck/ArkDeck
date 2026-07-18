@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-009-dayu200-partition-decode
 revision: 1
-status: proposed
+status: approved # r1 proposal 经 #69 合入;批准由本 approval-only PR 的维护者 review/merge 构成
 class: implementation-only
 core_change_level: none
 owner: lvye
@@ -69,5 +69,8 @@ pinned identity 之上补上这一步。
 
 ## Approval
 
-- 本 proposal PR 合入即 status:proposed;正式批准须另行 approval-only PR
-  (先例 #14/#40/#55)。批准前 TASK-PD-001 保持 blocked。
+- Proposal 经 PR #69 合入 main(`a7f885e`,2026-07-18,status:proposed)。
+- 正式批准:2026-07-18 由本 approval-only PR(先例 #14/#40/#55)将本 change 置为
+  `approved`;批准由维护者 review/merge 本 PR 构成。本批准不产生任务执行:
+  TASK-PD-001 另需独立 readiness/status PR 转 ready 后方可开工;只读硬边界不因
+  批准改变。
