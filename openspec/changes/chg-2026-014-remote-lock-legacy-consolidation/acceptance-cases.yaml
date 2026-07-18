@@ -1,0 +1,47 @@
+---
+schema_version: 1.0.0
+change_id: CHG-2026-014-remote-lock-legacy-consolidation
+change_revision: 1
+platform: macos
+evidence_classes:
+- contract
+- platform
+cases:
+- acceptance_id: RLC-LEGACY-IMPORT-001
+  test_id: TEST-RLC-LEGACY-IMPORT-001
+  method: Git object, path, hash and provenance-manifest review against fixed full commit OIDs.
+  expected_source: openspec/changes/chg-2026-014-remote-lock-legacy-consolidation/verification.md#RLC-LEGACY-IMPORT-001
+  minimum_evidence: platform
+  expected_result: Every legacy input is identified by source task and full commit
+    OID, its parent/base and path/hash inventory exactly match the reviewed git
+    objects, every path has an imported/already-in-main/rejected disposition and
+    unresolved acceptance debt, and neither a branch name nor an uncommitted
+    worktree is treated as authority.
+- acceptance_id: RLC-FAIL-CLOSED-001
+  test_id: TEST-RLC-FAIL-CLOSED-001
+  method: Static reachability audit plus repository-fake and loopback-only contract and fault tests.
+  expected_source: openspec/changes/chg-2026-014-remote-lock-legacy-consolidation/verification.md#RLC-FAIL-CLOSED-001
+  minimum_evidence: contract
+  expected_result: The consolidated tree exposes no unverified path that can mint
+    process, HDC or device authority; installed-real-HDC, real-device,
+    non-loopback, automatic lifecycle, subserver and device-migration dispatch
+    counts are all zero, and the interactive partition collector is not run.
+- acceptance_id: RLC-NONBLOCKING-001
+  test_id: TEST-RLC-NONBLOCKING-001
+  method: Source-task, consumer-dependency and verification-gate document review.
+  expected_source: openspec/changes/chg-2026-014-remote-lock-legacy-consolidation/verification.md#RLC-NONBLOCKING-001
+  minimum_evidence: platform
+  expected_result: Source tasks remain non-done with their current status and all
+    original acceptance debt recorded truthfully; source completion is not a
+    dependency of the consolidation task, but no consumer dependency changes
+    automatically and no source acceptance, conformance, hardware, support or
+    release gate is weakened or represented as passed.
+- acceptance_id: RLC-AUDIT-ROLLBACK-001
+  test_id: TEST-RLC-AUDIT-ROLLBACK-001
+  method: Single-task PR diff review, secret/privacy scan and independent rollback review.
+  expected_source: openspec/changes/chg-2026-014-remote-lock-legacy-consolidation/verification.md#RLC-AUDIT-ROLLBACK-001
+  minimum_evidence: platform
+  expected_result: One TASK-RLC-001 implementation PR contains the complete
+    consolidation delta and provenance manifest, can be reverted without deleting
+    or rewriting source evidence, and contains no secret, private key, archive
+    locator, raw sensitive artifact or unsupported completion claim.
