@@ -1,6 +1,6 @@
 ---
 id: CHG-2026-003-dayu200-image-characterization
-status: approved
+status: verified
 class: implementation-only
 core_change_level: none
 owner: lvye
@@ -80,6 +80,26 @@ classification inputs. The result is fixed-archive-only and non-authoritative.
 ## Approval
 
 - 2026-07-14 交互决策接受了六条件分类器、ARC001..ARC009、evidence 边界与单任务范围(结构性决策,非批准)。
-- 正式批准:2026-07-18 由 approval-only PR(先例 #14/#40)将本 change 置为
-  `approved`;批准由维护者 review/merge 该 PR 构成(V2 git-native 治理)。本批准
+- 正式批准:2026-07-18 由 approval-only commit(先例 #14/#40)将本 change 置为
+  `approved`;批准由维护者 review/merge 构成(V2 git-native 治理;approval commit
+  实际经 PR #44 squash 合入 main `6c1ba7b`,手工堆叠 PR #45/#46 因重复关闭)。本批准
   不产生任务执行 evidence,也不改变任何 Core、contract、conformance 或 release 状态。
+
+## Verification closure
+
+`TASK-DAYU200-CHAR-001` 的实现(scanner/schemas/fixtures/tests)与全部 evidence
+(四个 JSON、summary.md、run.md)由维护者 `lvye` 于 2026-07-18 11:40(Asia/Shanghai)
+merge PR #44 合入受保护 `main`,merge commit
+`6c1ba7b1d8856143fa673ec9e73010aa3e658de9`;任务 `ready→done` 状态由独立 status
+PR #47 于同日 11:48 合入,merge commit
+`02f42580f003d00a36f9cef7523c74ab26eda2f7`。三个 change-local AC
+(`TEST-CHAR-M0-DAYU200-IMAGE-001`、`TEST-CHAR-M0-DAYU200-CLASSIFICATION-001`、
+`TEST-CHAR-M0-DAYU200-NODISPATCH-001`)在
+`evidence/runs/TASK-DAYU200-CHAR-001/run.md` 二值 passed。
+
+该 review/merge 构成 `verification.md` acceptance matrix 所要求的维护者
+verification confirmation。本文件的 `status: verified` 仅在包含本状态变更的
+verification closure PR 经维护者 review 并合入 `main` 后生效;verified 不改变
+evidence 的固定边界——分类结论仍为 fixedArchiveOnly、非权威,不构成 DEC-001/
+DEC-002 结论、M0B、硬件支持或任何 platform conformance/release claim。archive
+仍必须由后续独立 archive PR 完成(先例 #21)。
