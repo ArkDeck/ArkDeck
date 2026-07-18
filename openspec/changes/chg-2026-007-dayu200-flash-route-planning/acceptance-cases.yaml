@@ -1,0 +1,47 @@
+---
+schema_version: 1.0.0
+change_id: CHG-2026-007-dayu200-flash-route-planning
+change_revision: 1
+platform: macos
+evidence_classes:
+- platform
+cases:
+- acceptance_id: PLAN-DAYU200-PARTITION-001
+  test_id: TEST-PLAN-DAYU200-PARTITION-001
+  method: Document review of the GAP-DAYU200-PARTITION-SEMANTICS plan section.
+  expected_source: openspec/changes/chg-2026-007-dayu200-flash-route-planning/verification.md#PLAN-DAYU200-PARTITION-001
+  minimum_evidence: platform
+  expected_result: The plan section states the reviewable closure fact for
+    parameter.txt partition-table semantics, grades candidate fact sources by
+    trustworthiness, designs the acquisition method with an explicit read-only
+    versus device-write classification, states the safety boundary, defines the
+    evidence form with its minimum evidence class, and explicitly declares that
+    the plan itself authorizes no execution.
+- acceptance_id: PLAN-DAYU200-ADDRESSES-001
+  test_id: TEST-PLAN-DAYU200-ADDRESSES-001
+  method: Document review of the GAP-DAYU200-FLASH-ADDRESSES plan section.
+  expected_source: openspec/changes/chg-2026-007-dayu200-flash-route-planning/verification.md#PLAN-DAYU200-ADDRESSES-001
+  minimum_evidence: platform
+  expected_result: The plan section covers the same five fixed elements for the
+    flash offset/address mapping gap, never derives addresses from member bytes
+    inside this change, and explicitly declares that the plan itself authorizes
+    no execution.
+- acceptance_id: PLAN-DAYU200-PROTOCOL-001
+  test_id: TEST-PLAN-DAYU200-PROTOCOL-001
+  method: Document review of the GAP-DAYU200-FLASH-PROTOCOL plan section.
+  expected_source: openspec/changes/chg-2026-007-dayu200-flash-route-planning/verification.md#PLAN-DAYU200-PROTOCOL-001
+  minimum_evidence: platform
+  expected_result: The plan section covers the five fixed elements for the
+    flashd/rockusb/transport protocol gap, classifies every candidate future
+    observation as read-only or device-write, and explicitly declares that the
+    plan itself authorizes no execution.
+- acceptance_id: PLAN-DAYU200-RECOVERY-001
+  test_id: TEST-PLAN-DAYU200-RECOVERY-001
+  method: Document review of the GAP-DAYU200-RECOVERY-PATH plan section and the cross-gap ordering rule.
+  expected_source: openspec/changes/chg-2026-007-dayu200-flash-route-planning/verification.md#PLAN-DAYU200-RECOVERY-001
+  minimum_evidence: platform
+  expected_result: The plan section covers the five fixed elements for the
+    recovery/unbrick path gap, and the plan document states the hard ordering
+    rule that GAP-DAYU200-RECOVERY-PATH must be closed before any flash-class
+    observation of the other gaps is executed, with device-write operations
+    forbidden until then.
