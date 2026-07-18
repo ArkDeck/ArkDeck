@@ -5,8 +5,10 @@
 
 ## TASK-RP-001 — 恢复/救砖预案文档
 
-- Status:blocked(等待本 change 经 approval-only PR 置为 approved;approve 后
-  经独立 readiness/status PR 转 ready)
+- Status:ready(change 经 approval-only PR #73 approved;本 readiness PR 复核
+  前置后转 ready,仅在维护者 review/merge 后生效——**须在 #73 之后 merge**。
+  前置复核:TASK-RB-001 done(计划第②步)——满足;与 TASK-PD-001 并行无路径
+  交集;doc-only 边界不变)
 - Requirements/AC:`RECOVERY-DAYU200-PLAYBOOK-001`、
   `RECOVERY-DAYU200-READINESS-001`(见 acceptance-cases.yaml)
 - Depends on:CHG-2026-007 TASK-RB-001 done(已满足,计划第②步);不依赖
