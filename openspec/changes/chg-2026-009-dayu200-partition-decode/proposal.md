@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-009-dayu200-partition-decode
-revision: 2
-status: approved # r1 经 #70 批准;r2(stream-discard+trusted-fd/sandbox 修订)仅在 revision PR 由维护者 review/merge 后生效
+revision: 3
+status: approved # r1 经 #70 批准;r2 已合入;r3 opaque codec-state 边界仅在本 revision PR 由维护者 review/merge 后生效
 class: platform
 core_change_level: none
 owner: lvye
@@ -26,6 +26,13 @@ stream 的第 8 个成员,定位它必须消费前 7 个成员内容；同时 pa
 r2 将前者明确为有界 stream-discard,并把后者提升为 trusted-fd + macOS OS
 sandbox broker 的平台边界；缺 broker/policy evidence 时 fail closed。
 
+r2 implementation/revalidation 随后证明“不得跨 chunk retention”的字面规则仍
+无法由任何顺序 DEFLATE decoder 满足:DEFLATE 允许后续 block 引用最多 32 KiB
+之前的输出,解码器必须在内部保留对应的 opaque history。这个算法状态不同于
+应用取得、解析或二次利用非目标 member 明文,但 r2 没有划定二者边界,所以现有
+实现正确地保持 blocked。r3 只关闭这个 change-local pass/fail 歧义,不放宽
+trusted-fd/sandbox、零设备、零网络、零 subprocess、无落盘或无二次利用门禁。
+
 ## What changes
 
 ### In scope
@@ -34,9 +41,10 @@ sandbox broker 的平台边界；缺 broker/policy evidence 时 fail closed。
   1. 固定输入门:archive 必须命中 CHG-2026-003 pinned identity
      (732948803 bytes / SHA-256 `fc7637…5280`),不匹配即拒绝;
   2. 流式定位并读取 `parameter.txt`:允许为推进单一 gzip/tar stream 而消费
-     目标前的成员 body,但只允许固定上限 chunk 的立即丢弃；不得解析、hash、
-     返回、记录、持久化或跨 chunk 保留非目标 body,取得目标后立即停止；审计
-     精确记录 raw identity/gzip 两遍、tar header、前置 body count/bytes;
+     目标前的成员 body,但只允许固定上限 chunk；应用层在下一 chunk 前释放
+     上一非目标明文 chunk 的全部引用,不得解析、hash、返回、记录、持久化或
+     复制该明文,取得目标后立即停止；审计精确记录 raw identity/gzip 两遍、
+     tar header、前置 body count/bytes 与 application-visible retention counter;
   3. 按 Rockchip mtdparts/CMDLINE 语法逐字段解析:`0x偏移@0x起点(名称[:属性])`,
      封闭文法、未知形态显式 fail(不猜测);
   4. 与 CHG-2026-003 成员清单对账:每个 img 成员映射到哪个分区、孤儿成员/
@@ -53,6 +61,14 @@ sandbox broker 的平台边界；缺 broker/policy evidence 时 fail closed。
   character/block device-node namespace(含 USB/serial/raw disk),并以 descriptor
   传递给 decoder。现有 ArkDeckApp 含 USB/serial entitlement,不得仅凭已有
   App Sandbox 声明充当本 broker。
+- opaque codec-state boundary(r3):只允许 RFC 1951/zlib 顺序解码必需的
+  DEFLATE history,固定 DEFLATE base window bits 为 15、最大 history window
+  32768 bytes(zlib gzip wrapper 参数为 `wbits=16+15=31`)；该 state 必须封装在
+  codec 内,应用不得取得 history/body view、复制/导出 state、使用 preset
+  dictionary/codec clone,或对其 parse/hash/log/persist/return。
+  compressed input remainder 单独限制为 65536 bytes；目标 body 取得后立即销毁
+  codec 与 remainder。这个封闭例外不允许任何应用可见的非目标解压明文跨
+  chunk 保留,也不声称对 allocator residue 做 forensic zeroization。
 - evidence 结论显式标注"仅对该 pinned 镜像成立",non-authoritative。
 
 ### Out of scope
@@ -69,7 +85,7 @@ sandbox broker 的平台边界；缺 broker/policy evidence 时 fail closed。
 ## Impacted specifications
 
 - Core behavior:none · Core baseline update:no
-- Change-local AC/pass-fail:r2 修订；不改 current specs/contracts
+- Change-local AC/pass-fail:r3 修订；不改 current specs/contracts
 - Platform Profile / Integration lock / hardware matrix:unchanged
 
 ## Platform impact and revalidation
@@ -88,7 +104,8 @@ sandbox broker 的平台边界；缺 broker/policy evidence 时 fail closed。
 - 威胁模型覆盖恶意 archive bytes、symlink/FIFO/device path 与 capability 建立前
   的并发替换；信任 macOS kernel/code-signing/sandbox enforcement,不声称抵御
   compromised kernel/root。仅 trusted fd 而无 sandbox broker evidence 不通过;
-- stream-discard 只解决顺序压缩格式的物理定位,不授权解析/保留非目标内容；
+- stream-discard 只解决顺序压缩格式的物理定位,不授权应用解析/保留非目标
+  明文；r3 的 32 KiB codec history 例外只覆盖算法必需且应用不可见的内部 state;
 - archive locator 不写入 evidence(CHG-2026-003 先例);parameter.txt 原文不入
   仓库;
 - 解码失败(未知文法)是合法结果:显式 fail 并如实记录,不得为凑表而猜测。
@@ -106,3 +123,10 @@ sandbox broker 的平台边界；缺 broker/policy evidence 时 fail closed。
   trusted-fd/sandbox broker gate。本 revision PR 只修订治理/设计/验证,不包含
   implementation、readiness 或 r1 evidence 重判；r1 结论保持 FAILED/BLOCKED。
   r2 仅在维护者 review/merge 后生效(先例:CHG-2026-006 r2 / PR #60)。
+- Revision r3(2026-07-19):按 r2 implementation 与 blocked fresh-attempt evidence,
+  将 application-visible non-target plaintext retention 与 DEFLATE 必需的 opaque
+  32 KiB history 明确分离,同时新增 codec configuration/lifecycle 的封闭 evidence
+  gate。本 revision PR 只修改 change-local proposal/design/verification/AC 与 blocked
+  task 注记；不包含实现、fresh evidence、readiness、任务状态或既有 evidence
+  重判。r3 仅在维护者 review/merge 后生效；合入后仍须独立 readiness PR 才能
+  恢复 TASK-PD-001。

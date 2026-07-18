@@ -19,6 +19,12 @@
   标记 `done`。见
   `evidence/runs/TASK-PD-001/r2-fresh-attempt-2026-07-19.md`;本 blocked 状态仅在
   维护者 review/merge 后生效)
+- Revision r3 draft(2026-07-19):仅澄清 application-visible non-target plaintext
+  retention 与 gzip-DEFLATE 必需的 opaque 32 KiB codec history 边界；本 revision
+  PR 不包含 implementation、fresh evidence、readiness、状态翻转或既有 evidence
+  重判。r3 仅在维护者 review/merge 后生效，TASK-PD-001 继续保持 `blocked`；合入
+  后仍须独立 readiness PR 固定最小 remediation 与 fresh 三项 AC rerun，且 collector
+  运行时 host 必须处于可交互解锁状态。
 - Objective:在不改变 r2 AC 的前提下，将 decoder 改为只接受预打开的只读普通
   文件 descriptor，并以独立、最小权限的 macOS App Sandbox broker 建立和直接
   传递该 descriptor；随后对 pinned archive 重新生成映射/对账与全部三项 fresh
