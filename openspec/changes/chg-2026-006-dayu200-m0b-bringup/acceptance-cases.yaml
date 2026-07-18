@@ -1,7 +1,7 @@
 ---
 schema_version: 1.0.0
 change_id: CHG-2026-006-dayu200-m0b-bringup
-change_revision: 1
+change_revision: 2
 platform: macos
 evidence_classes:
 - realHardware
@@ -23,12 +23,20 @@ cases:
   method: Human-operated authorization workflow observation on the physical device.
   expected_source: openspec/changes/chg-2026-006-dayu200-m0b-bringup/verification.md#HW-M0B-DAYU200-AUTH-001
   minimum_evidence: realHardware
-  expected_result: The unauthorized state is observed before on-device trust; after
-    the human confirms trust on the device screen the target transitions to ready
-    and the transition is captured in `list targets` states; at least one
-    denied/timeout negative path is observed or its non-reproducibility is
-    truthfully recorded; no server kill/restart occurs and no key material is
-    copied, uploaded or persisted into the repository.
+  expected_result: The authorization workflow is observed and truthfully recorded
+    via exactly one of two branches. Branch A (device presents an on-device trust
+    UI) — the unauthorized state is observed before trust; after the human
+    confirms trust on the device screen the target transitions to ready and the
+    transition is captured in `list targets` states; at least one denied/timeout
+    negative path is observed or its non-reproducibility is truthfully recorded.
+    Branch B (device family presents no on-device trust UI; first observed on the
+    DAYU200 build in EVD-M0B-DAYU200-20260718-001) — the human operator
+    explicitly records the absence of any trust prompt across a fresh USB
+    enumeration (replug), `list targets` captures are byte-comparable and show
+    the stable authorized state, and the denied/timeout negative path is recorded
+    as not reproducible with the reason. Both branches — no server kill/restart
+    occurs and no key material is copied, uploaded or persisted into the
+    repository.
 - acceptance_id: HW-M0B-DAYU200-RAWCAPTURE-001
   test_id: TEST-HW-M0B-DAYU200-RAWCAPTURE-001
   method: Per-stream byte-exact controlled capture of device-family raw outputs.
