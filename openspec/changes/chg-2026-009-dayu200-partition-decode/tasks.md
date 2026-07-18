@@ -5,8 +5,11 @@
 
 ## TASK-PD-001 — parameter.txt 只读解码器 + 映射/对账 evidence
 
-- Status:blocked(等待本 change 经 approval-only PR 置为 approved;approve 后
-  经独立 readiness/status PR 转 ready)
+- Status:ready(change 经 approval-only PR #70 approved;本 readiness PR 复核
+  前置后转 ready,仅在维护者 review/merge 后生效——**须在 #70 之后 merge**。
+  前置复核:TASK-RB-001 done(main `c98d2b6`,计划第①步)、CHG-2026-003
+  archived(pinned identity + 17 成员清单)——均满足;只读硬边界不变,执行需
+  本地 pinned 镜像在场)
 - Requirements/AC:`DECODE-DAYU200-PARTITION-001`、`DECODE-DAYU200-RECONCILE-001`
   (见 acceptance-cases.yaml)
 - Depends on:CHG-2026-007 TASK-RB-001 done(已满足,计划第①步)、
