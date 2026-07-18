@@ -1,7 +1,7 @@
 ---
 schema_version: 1.0.0
 change_id: CHG-2026-009-dayu200-partition-decode
-change_revision: 2
+change_revision: 3
 platform: macos
 evidence_classes:
 - contract
@@ -15,12 +15,21 @@ cases:
   expected_result: The decoder refuses any archive not matching the CHG-2026-003
     pinned identity; parameter.txt is located and read without extraction to
     disk; bytes in preceding member bodies may be consumed only to advance the
-    single gzip/tar stream, in chunks no larger than 1 MiB, and are immediately
-    discarded without parsing, hashing, returning, logging, persisting or
-    retention across chunks; reading stops after the target; raw identity/gzip
-    pass bytes and tar header/body counts and bytes are exactly audited; the
-    mtdparts/CMDLINE grammar is closed with unknown forms failing explicitly
-    rather than guessed; the evidence records the partition-name to
+    single gzip/tar stream, in plaintext chunks no larger than 1 MiB; every
+    application-owned reference, view or copy of the preceding non-target
+    plaintext chunk is released before the next chunk is requested, and those
+    bytes are never parsed, hashed, returned, logged or persisted. The only
+    cross-call content-derived state permitted is one gzip-DEFLATE codec-owned
+    opaque history configured with 15 DEFLATE base window bits (zlib wbits 31
+    for the gzip wrapper) and bounded to 32768 bytes; the application cannot
+    obtain a history/body view, clone, export, parse, hash, log, persist or
+    return that state. Application-held compressed input remainder is bounded
+    to 65536 bytes. The codec and remainder are destroyed immediately after
+    the target or on failure/cancellation; reading stops
+    after the target; raw identity/gzip pass bytes, tar header/body counts and
+    bytes, application-visible retention and codec lifecycle are exactly
+    audited; the mtdparts/CMDLINE grammar is closed with unknown forms failing
+    explicitly rather than guessed; the evidence records the partition-name to
     offset/size/attribute mapping with S2 source citations and member hash
     references, contains no parameter.txt raw text and no archive locator, is
     annotated as valid only for the pinned image, and unit tests cover every
