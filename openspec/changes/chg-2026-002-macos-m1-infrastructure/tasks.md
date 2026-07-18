@@ -451,36 +451,31 @@
 
 ## TASK-M1-006 — HDC supervisor、endpoint 隔离、授权工作流与 fake-hdc 对抗
 
-- Status:blocked
-- Blockers:
-  - Change-design gate:CHG-002 r2 design 明确排除“任何功能 UI”，与本任务认领的 HDC UI
-    Scenario 冲突。本 r3 proposal/design/spec-impact/verification 修订必须先由维护者合入；
-    tasks.md 不得单方面覆盖原 design。
-  - Semantic fixture gate:`AC-HDC-005-01` 的 minimum evidence 是 `parserGolden`，且
-    fake-hdc matrix 还需要 success/healthy/version 等被 adapter 当成已支持的 semantic
-    output。accepted `CORE-CONFORMANCE-2.0.0` 与 `INTEGRATION-PROFILES-0.2.0` 仍均
-    声明 `fixtures: []`；CHG-005 r1 草案也只登记 failure bytes，r2 虽已补入完整 gate，
-    但 success/healthy/version provenance 仍未提供且 change 尚未 approved。必须先由 approved
-    `CHG-2026-005-hdc-parser-golden-registration` 对 M1-006 使用的每个 supported raw
-    output family 提供可审查 provenance、version/hash pin 与 profile mapping；缺少
-    success/healthy/version 任一项时保持 blocked。M1-006 不得自行制造 golden 后判 pass。
-  - UI gate:本任务认领全部 15 个 HDC AC，其中 `AC-HDC-001-02`、
-    `AC-HDC-006-01`、`AC-HDC-007-02`、`AC-HDC-008-01` 与
-    `AC-HDC-010-01` 含明确 UI 结果；`AC-HDC-003-01` 还要求向用户提供诊断与确认式
-    恢复选项，`AC-HDC-009-01` 要求 capability 可显示，`REQ-HDC-010` 要求 lifecycle
-    impact preview 在 UI 展示。原 task 禁止 `ArkDeckApp/**`，纯 domain/contract 测试无法
-    证明完整 Scenario。本 r3 修订在 change-level design 中纳入最小 HDC UI surface，并为
-    macOS XCUITest 补入精确 allowed paths；仅在维护者 review/merge 后生效。
-  - Durable-audit gate:`AC-HDC-010-02` 要求 durable host-wide audit，但当前 production
-    只有 `InMemoryHDCServerLifecycleAuditStore`；M1-005 原占位条目也未承诺任何可依赖
-    writer。本 r3 修订先把 M1-005 标记 blocked 并明确
-    `DurableSessionAuditAppending`/`SessionManifestPublishing` contract。只有该 task 经独立
-    readiness、实现为 `done` 且 reopen/replay/confirmation tests 有证据后，M1-006 才能
-    依赖；不得把未来接口当成当前事实。
-- Unblock gate:CHG-002 r3 design amendment 已合入；CHG-005 的 failure +
-  success/healthy/version fixture/profile 登记已合入；`TASK-M1-005` 已 `done` 且上述两个
-  seam 有可复查 evidence；随后由独立 readiness/status PR 重算全部输入，才能恢复
-  `ready`。在此之前不执行源码、测试或 implementation evidence 改动。
+- Status:ready
+- Readiness restoration（2026-07-18，TASK-I5-002 独立 readiness/status PR；`ready` 仅在
+  维护者 review/merge 后生效）:原四项 blocker 逐项复核解除——
+  - Change-design gate:resolved。CHG-002 r3（最小 HDC UI surface 入 scope、XCUITest
+    allowed paths）已由维护者经 PR #35 合入（main `11eb5cbe69bc9089fd870d6397f698f4c93dd299`）。
+  - Semantic fixture gate:resolved。CHG-2026-005 已 approve（PR #40，main `3a4d45c`），
+    TASK-I5-001 登记已合入（PR #41，main `4ac288c`）:failure（unauthorized/offline）+
+    success/healthy/version 五 fixture 在 `Golden/1.0.0/registry.json`、
+    `INTEGRATION-PROFILES-0.3.0` 与 `core-conformance.yaml` 三方 hash 一致（I5-002 于 main
+    独立重算逐项 1/1/1）；`OPENHARMONY-TOOLS@0.2.0` 逐 family probe/semantic mapping 在案。
+    实测披露:真实 hdc 3.2.0d 成功输出不含 M0A parser 假设的 `[success]` 标记（profile
+    0.2.0 与 `HDCGoldenResourceContractTests` 已钉死）——本任务接线 parser 必须按登记形态
+    扩展 marker，不得静默放宽正则或绕过登记形态。
+  - UI gate:resolved。r3 已为本任务授予 `ArkDeckApp/App`、`Features/HDC`、
+    Localizable 与 macOS XCUITest 的精确 allowed paths（随 PR #35 生效），UI Scenario 有
+    可交付验证面。
+  - Durable-audit gate:resolved。TASK-M1-005 已 done（实现 PR #37 main `9e1f1da`、状态
+    PR #38 main `0e7aa8e`），production `DurableSessionAuditAppending`（append+full-sync、
+    关闭重开 replay、torn-tail 截断）与 `SessionManifestPublishing`（write-once、
+    `serverLifecycle` confirmation + relatedStepIds round-trip）的 evidence 在
+    `evidence/runs/TASK-M1-005/run.md`。
+  - Pinned golden 只读约束:`Fixtures/HDC/Golden/1.0.0/**` 与其 resource declaration 对
+    本任务只读，仅经 `Bundle.module` 消费；不得重写/新增 fixture、修改 registry/lock/
+    conformance 登记或 resource declaration 后自行判 pass（变更须走新的 approved
+    integration change）。
 - Readiness amendment:本任务包的精确范围与 verification gate 仅在维护者 review/merge
   后生效；本 readiness PR 不执行 TASK-M1-006、不产生实现 evidence，也不改变任何 Core、
   contract、platform conformance、release claim 或其他 Task 状态。
@@ -505,9 +500,9 @@
   - `TASK-M1-003`（done；PR #27 merge commit
     `c5c82b757d9baa91164fe5feae65d5806089f8df`；提供 journal/audit durability 边界，本任务
     只经既有接口写 lifecycle audit，不改 durability 或 recovery 语义）
-  - `TASK-M1-005`（当前 blocked/not done；只有按 r3 task contract 交付并验证 production
-    `DurableSessionAuditAppending`、`SessionManifestPublishing` 后，本任务才能通过其公开
-    边界做 lifecycle audit adapter；不得预设占位任务会提供接口）
+  - `TASK-M1-005`（done；实现 PR #37 main `9e1f1da`、状态 PR #38 main `0e7aa8e`；production
+    `DurableSessionAuditAppending`、`SessionManifestPublishing` 已交付并有 reopen/replay/
+    confirmation evidence，本任务经其公开边界做 lifecycle audit adapter，不改其语义）
   - `TASK-M1-010`（done；PR #30 merge commit
     `6725bb375e0fee1b261efa9e2adc6cd1e95e6237`；统一 `unknownOutput` 语义族并声明本任务
     执行 parser/executor 接线）
