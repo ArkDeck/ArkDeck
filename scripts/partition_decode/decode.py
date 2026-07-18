@@ -1,4 +1,4 @@
-"""Read-only DAYU200 ``parameter.txt`` partition decoder.
+"""FD-only DAYU200 ``parameter.txt`` partition decoder.
 
 CHG-2026-009 / TASK-PD-001. Python standard library only. The production
 entry point accepts exactly the archive identity characterized by archived
@@ -7,27 +7,34 @@ checks that member's archived size/hash, parses a closed CMDLINE/mtdparts
 grammar, and reconciles decoded partition names with the archived 17-member
 inventory.
 
-The decoder has no process, network, HDC, vendor-tool or transport code path.
-Its path-based archive open cannot prove absolute zero device access across an
-adversarial lstat/open replacement race; that accepted boundary remains
-blocked. Non-parameter member spans needed to reach the target tar header are
-stream-discarded without being returned to the text decoder or retained. The
-archive locator and the original parameter text never enter evidence.
+The production entry point accepts only a pre-opened read-only regular-file
+descriptor. It performs ``fstat`` and ``F_GETFL`` gates before the first read,
+duplicates the descriptor without resolving a path, and never accepts or opens
+an archive pathname. Descriptor acquisition is owned by the separately signed
+macOS sandbox broker in ``macos_input_broker``.
+
+The decoder has no process, network, HDC, vendor-tool, transport, archive-path
+open or device-dispatch code path. Non-parameter member spans needed to reach
+the target tar header are consumed in bounded chunks and immediately discarded
+without parsing, hashing, returning, logging or persistence. Application chunk
+references are released before the next read; mandatory opaque DEFLATE history
+inside zlib is reported separately and leaves literal cross-chunk retention
+acceptance blocked. The archive locator and original parameter text never enter
+evidence.
 """
 
 from __future__ import annotations
 
-import argparse
 import dataclasses
-import gzip
+import fcntl
 import hashlib
 import io
-import json
 import os
 import re
 import stat
 import sys
-from typing import BinaryIO, List, NamedTuple, Optional, Sequence, Union
+import zlib
+from typing import BinaryIO, List, NamedTuple, Optional
 
 
 EXPECTED_RAW_SIZE = 732948803
@@ -43,14 +50,15 @@ EXPECTED_INVENTORY_SHA256 = (
 MAX_READ_CHUNK = 1048576
 TAR_BLOCK = 512
 PARAMETER_MEMBER = "parameter.txt"
-SOURCE_OPEN_FLAGS = os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW | os.O_CLOEXEC
 EXPECTED_PYTHON_VERSION = "3.14.6"
 EXPECTED_DECOMPRESSED_BYTES_TO_PARAMETER = 178174740
 EXPECTED_TAR_HEADERS_INSPECTED = 8
 EXPECTED_NON_PARAMETER_SPANS_DISCARDED = 7
 EXPECTED_NON_PARAMETER_CONTENT_BYTES_READ = 178168731
-EXPECTED_GZIP_PASS_RAW_BYTES_READ = 17956874
+EXPECTED_GZIP_PASS_RAW_BYTES_READ = 17956864
 EXPECTED_REGULAR_FILE_GATE_CHECKS = 4
+COMPRESSED_READ_CHUNK = 65536
+EXPECTED_GZIP_COMPRESSED_BYTES_BUFFERED_AT_STOP = 39869
 
 PD001_IDENTITY_MISMATCH = "PD001_IDENTITY_MISMATCH"
 PD002_ARCHIVE_INVALID = "PD002_ARCHIVE_INVALID"
@@ -64,6 +72,7 @@ PD009_PARTITION_INVALID = "PD009_PARTITION_INVALID"
 PD010_PARTITION_DUPLICATE = "PD010_PARTITION_DUPLICATE"
 PD011_INVENTORY_INVALID = "PD011_INVENTORY_INVALID"
 PD012_SOURCE_NOT_STABLE_REGULAR_FILE = "PD012_SOURCE_NOT_STABLE_REGULAR_FILE"
+PD013_DESCRIPTOR_NOT_READ_ONLY = "PD013_DESCRIPTOR_NOT_READ_ONLY"
 
 FAILURE_CODES = (
     PD001_IDENTITY_MISMATCH,
@@ -78,21 +87,13 @@ FAILURE_CODES = (
     PD010_PARTITION_DUPLICATE,
     PD011_INVENTORY_INVALID,
     PD012_SOURCE_NOT_STABLE_REGULAR_FILE,
+    PD013_DESCRIPTOR_NOT_READ_ONLY,
 )
 
-EVIDENCE_OUTPUTS = (
-    "partition-mapping.json",
-    "member-reconciliation.json",
-    "process-audit.json",
-    "summary.md",
-)
-
-_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 _INVENTORY_RELATIVE = (
     "openspec/changes/archive/2026-07-18-chg-2026-003-dayu200-image-"
     "characterization/evidence/member-inventory.json"
 )
-_INVENTORY_PATH = os.path.join(_REPO_ROOT, _INVENTORY_RELATIVE)
 _ROUTE_PLAN_REFERENCE = (
     "openspec/changes/chg-2026-007-dayu200-flash-route-planning/evidence/"
     "route-b-plan.md#gap-dayu200-partition-semantics分区表语义"
@@ -160,7 +161,7 @@ _PARTITION = re.compile(
     r"(?::(?P<attribute>[A-Za-z][A-Za-z0-9._-]*))?\)"
 )
 _ALLOWED_ATTRIBUTES = frozenset({"bootable", "grow"})
-_GZIP_ERRORS = (OSError, EOFError, gzip.BadGzipFile)
+_GZIP_ERRORS = (OSError, EOFError, zlib.error)
 
 
 class DecodeFailure(Exception):
@@ -198,8 +199,11 @@ class DecodeAudit:
     archive_source_kind: Optional[str] = None
     source_stat_snapshot: Optional[tuple] = None
     regular_file_gate_checks: int = 0
-    evidence_files_written: List[str] = dataclasses.field(default_factory=list)
-    writes_outside_allowed_outputs: int = 0
+    read_only_descriptor_gate_checks: int = 0
+    pre_read_fstat_passed: bool = False
+    pre_read_read_only_gate_passed: bool = False
+    first_read_after_descriptor_gates: bool = False
+    gzip_compressed_bytes_buffered_at_stop: int = 0
 
 
 class PartitionRow(NamedTuple):
@@ -213,9 +217,6 @@ class PartitionRow(NamedTuple):
     grammar_branch: str
 
 
-Source = Union[str, os.PathLike, io.BytesIO]
-
-
 class _AuditedRawStream:
     """Count every compressed byte returned by one named archive pass."""
 
@@ -227,6 +228,16 @@ class _AuditedRawStream:
         self._pass_name = pass_name
 
     def _record(self, amount: int) -> None:
+        if amount and not (
+            self._audit.pre_read_fstat_passed
+            and self._audit.pre_read_read_only_gate_passed
+        ):
+            raise DecodeFailure(
+                PD012_SOURCE_NOT_STABLE_REGULAR_FILE,
+                "read attempted before descriptor gates",
+            )
+        if amount:
+            self._audit.first_read_after_descriptor_gates = True
         self._audit.raw_bytes_read += amount
         if self._pass_name == "identity":
             self._audit.identity_pass_raw_bytes_read += amount
@@ -261,6 +272,58 @@ class _AuditedRawStream:
         return self._stream.fileno()
 
 
+class _BoundedGzipStream:
+    """Gzip decoder that never produces bytes beyond the caller's exact request.
+
+    ``zlib.decompressobj.decompress(..., max_length)`` prevents the hidden
+    post-target decompressed buffering performed by higher-level buffered gzip
+    readers. Unconsumed input remains compressed and is dropped with this object
+    immediately after the target body is returned.
+    """
+
+    def __init__(self, raw_stream: _AuditedRawStream):
+        self._raw_stream = raw_stream
+        self._decompressor = zlib.decompressobj(16 + zlib.MAX_WBITS)
+        self._compressed_pending = b""
+
+    @property
+    def compressed_pending_bytes(self) -> int:
+        return len(self._compressed_pending)
+
+    def read_exact(self, amount: int, audit: DecodeAudit) -> bytes:
+        if amount < 0 or amount > MAX_READ_CHUNK:
+            raise DecodeFailure(PD002_ARCHIVE_INVALID, "unbounded gzip read")
+        parts = []
+        remaining = amount
+        while remaining > 0:
+            if not self._compressed_pending:
+                self._compressed_pending = self._raw_stream.read(COMPRESSED_READ_CHUNK)
+                if not self._compressed_pending:
+                    raise DecodeFailure(PD002_ARCHIVE_INVALID, "short gzip stream")
+            before = len(self._compressed_pending)
+            try:
+                produced = self._decompressor.decompress(
+                    self._compressed_pending, remaining
+                )
+            except zlib.error:
+                raise DecodeFailure(PD002_ARCHIVE_INVALID, "gzip framing") from None
+            self._compressed_pending = self._decompressor.unconsumed_tail
+            consumed = before - len(self._compressed_pending)
+            if produced:
+                parts.append(produced)
+                remaining -= len(produced)
+            if self._decompressor.eof and remaining:
+                raise DecodeFailure(PD002_ARCHIVE_INVALID, "short gzip stream")
+            if not produced and consumed == 0:
+                raise DecodeFailure(PD002_ARCHIVE_INVALID, "gzip made no progress")
+        payload = b"".join(parts)
+        audit.decompressed_bytes_streamed += len(payload)
+        audit.max_observed_read_chunk = max(
+            audit.max_observed_read_chunk, len(payload)
+        )
+        return payload
+
+
 def _is_regular_file_mode(mode: int) -> bool:
     return stat.S_ISREG(mode)
 
@@ -276,74 +339,76 @@ def _stat_snapshot(file_stat) -> tuple:
     )
 
 
-def _open_source(src: Source, audit: DecodeAudit) -> BinaryIO:
-    if isinstance(src, io.BytesIO):
-        src.seek(0)
-        audit.archive_open_modes.append("memory-ro")
-        audit.archive_source_kind = "memoryFixture"
-        return src
-
-    locator = os.fspath(src)
+def _descriptor_flags(descriptor: int, audit: DecodeAudit) -> int:
     try:
-        before_open = os.lstat(locator)
+        flags = fcntl.fcntl(descriptor, fcntl.F_GETFL)
+    except OSError:
+        raise DecodeFailure(PD013_DESCRIPTOR_NOT_READ_ONLY) from None
+    audit.read_only_descriptor_gate_checks += 1
+    return flags
+
+
+def _validate_read_only(flags: int) -> None:
+    if flags & os.O_ACCMODE != os.O_RDONLY:
+        raise DecodeFailure(PD013_DESCRIPTOR_NOT_READ_ONLY)
+
+
+def _open_descriptor_stream(descriptor: int, audit: DecodeAudit) -> BinaryIO:
+    """Duplicate a caller-owned fd after pre-read regular/read-only gates."""
+    if isinstance(descriptor, bool) or not isinstance(descriptor, int) or descriptor < 0:
+        raise DecodeFailure(PD012_SOURCE_NOT_STABLE_REGULAR_FILE)
+    try:
+        initial = os.fstat(descriptor)
     except OSError:
         raise DecodeFailure(PD012_SOURCE_NOT_STABLE_REGULAR_FILE) from None
     audit.regular_file_gate_checks += 1
-    if not _is_regular_file_mode(before_open.st_mode):
+    if not _is_regular_file_mode(initial.st_mode):
         raise DecodeFailure(PD012_SOURCE_NOT_STABLE_REGULAR_FILE)
+    audit.pre_read_fstat_passed = True
+    flags = _descriptor_flags(descriptor, audit)
+    _validate_read_only(flags)
+    audit.pre_read_read_only_gate_passed = True
+    snapshot = _stat_snapshot(initial)
 
-    descriptor = None
+    duplicate = None
     try:
-        descriptor = os.open(locator, SOURCE_OPEN_FLAGS)
-        after_open = os.fstat(descriptor)
+        duplicate = os.dup(descriptor)
+        duplicate_stat = os.fstat(duplicate)
         audit.regular_file_gate_checks += 1
-        if (
-            not _is_regular_file_mode(after_open.st_mode)
-            or _stat_snapshot(after_open) != _stat_snapshot(before_open)
-        ):
+        if not _is_regular_file_mode(duplicate_stat.st_mode):
             raise DecodeFailure(PD012_SOURCE_NOT_STABLE_REGULAR_FILE)
-        handle = os.fdopen(descriptor, "rb", closefd=True)
-        descriptor = None
+        if _stat_snapshot(duplicate_stat) != snapshot:
+            raise DecodeFailure(PD012_SOURCE_NOT_STABLE_REGULAR_FILE)
+        _validate_read_only(_descriptor_flags(duplicate, audit))
+        handle = os.fdopen(duplicate, "rb", closefd=True)
+        duplicate = None
     except DecodeFailure:
-        if descriptor is not None:
-            os.close(descriptor)
+        if duplicate is not None:
+            os.close(duplicate)
         raise
     except OSError:
-        if descriptor is not None:
-            os.close(descriptor)
+        if duplicate is not None:
+            os.close(duplicate)
         raise DecodeFailure(PD012_SOURCE_NOT_STABLE_REGULAR_FILE) from None
-    audit.archive_open_modes.append("rb")
-    audit.archive_source_kind = "regularFile"
-    audit.source_stat_snapshot = _stat_snapshot(after_open)
+    audit.archive_open_modes.append("preopened-read-only-fd")
+    audit.archive_source_kind = "preopenedReadOnlyRegularFileDescriptor"
+    audit.source_stat_snapshot = snapshot
     return handle
 
 
 def _assert_source_stable(stream: BinaryIO, audit: DecodeAudit) -> None:
-    if audit.archive_source_kind == "memoryFixture":
-        return
     try:
         current = os.fstat(stream.fileno())
     except OSError:
         raise DecodeFailure(PD012_SOURCE_NOT_STABLE_REGULAR_FILE) from None
     audit.regular_file_gate_checks += 1
+    flags = _descriptor_flags(stream.fileno(), audit)
     if (
         not _is_regular_file_mode(current.st_mode)
         or _stat_snapshot(current) != audit.source_stat_snapshot
     ):
         raise DecodeFailure(PD012_SOURCE_NOT_STABLE_REGULAR_FILE)
-
-
-def _read_bounded(stream: BinaryIO, amount: int, audit: DecodeAudit) -> bytes:
-    parts = []
-    remaining = amount
-    while remaining > 0:
-        chunk = stream.read(min(remaining, MAX_READ_CHUNK))
-        if not chunk:
-            break
-        audit.max_observed_read_chunk = max(audit.max_observed_read_chunk, len(chunk))
-        remaining -= len(chunk)
-        parts.append(chunk)
-    return b"".join(parts)
+    _validate_read_only(flags)
 
 
 def _hash_raw(stream: BinaryIO, audit: DecodeAudit) -> tuple[int, str]:
@@ -359,22 +424,20 @@ def _hash_raw(stream: BinaryIO, audit: DecodeAudit) -> tuple[int, str]:
     return total, digest.hexdigest()
 
 
-def _read_gzip_exact(gz: gzip.GzipFile, amount: int, audit: DecodeAudit) -> bytes:
-    try:
-        payload = _read_bounded(gz, amount, audit)
-    except _GZIP_ERRORS:
-        raise DecodeFailure(PD002_ARCHIVE_INVALID, "gzip framing") from None
-    audit.decompressed_bytes_streamed += len(payload)
-    if len(payload) != amount:
-        raise DecodeFailure(PD002_ARCHIVE_INVALID, "short tar span")
-    return payload
+def _read_gzip_exact(
+    gz: _BoundedGzipStream, amount: int, audit: DecodeAudit
+) -> bytes:
+    return gz.read_exact(amount, audit)
 
 
-def _discard_gzip_exact(gz: gzip.GzipFile, amount: int, audit: DecodeAudit) -> None:
+def _discard_gzip_exact(
+    gz: _BoundedGzipStream, amount: int, audit: DecodeAudit
+) -> None:
     remaining = amount
     while remaining > 0:
-        chunk = _read_gzip_exact(gz, min(remaining, MAX_READ_CHUNK), audit)
-        remaining -= len(chunk)
+        discard_size = min(remaining, MAX_READ_CHUNK)
+        _read_gzip_exact(gz, discard_size, audit)
+        remaining -= discard_size
 
 
 def _parse_tar_octal(field: bytes) -> int:
@@ -407,7 +470,7 @@ def _tar_name(header: bytes) -> str:
         raise DecodeFailure(PD002_ARCHIVE_INVALID, "non-UTF-8 tar member name") from None
 
 
-def _read_parameter_member(gz: gzip.GzipFile, audit: DecodeAudit) -> bytes:
+def _read_parameter_member(gz: _BoundedGzipStream, audit: DecodeAudit) -> bytes:
     while True:
         header = _read_gzip_exact(gz, TAR_BLOCK, audit)
         if header == b"\x00" * TAR_BLOCK:
@@ -431,6 +494,9 @@ def _read_parameter_member(gz: gzip.GzipFile, audit: DecodeAudit) -> bytes:
                 raise DecodeFailure(PD004_PARAMETER_MEMBER_INVALID, "size mismatch")
             if hashlib.sha256(payload).hexdigest() != EXPECTED_PARAMETER_SHA256:
                 raise DecodeFailure(PD004_PARAMETER_MEMBER_INVALID, "hash mismatch")
+            audit.gzip_compressed_bytes_buffered_at_stop = (
+                gz.compressed_pending_bytes
+            )
             return payload
 
         span = size + ((TAR_BLOCK - size % TAR_BLOCK) % TAR_BLOCK)
@@ -528,13 +594,12 @@ def parse_parameter(payload: bytes) -> tuple[str, List[PartitionRow]]:
 
 
 def decode_archive(
-    src: Source, audit: Optional[DecodeAudit] = None
+    descriptor: int, audit: Optional[DecodeAudit] = None
 ) -> tuple[dict, str, List[PartitionRow], DecodeAudit]:
-    """Decode only the single production-pinned archive identity."""
+    """Decode the pinned archive from a caller-owned read-only descriptor only."""
     audit = audit if audit is not None else DecodeAudit()
-    source_stream = _open_source(src, audit)
-    close_stream = not isinstance(src, io.BytesIO)
-    try:
+    source_stream = _open_descriptor_stream(descriptor, audit)
+    with source_stream:
         identity_stream = _AuditedRawStream(source_stream, audit, "identity")
         observed_size, observed_sha256 = _hash_raw(identity_stream, audit)
         _assert_source_stable(identity_stream, audit)
@@ -546,17 +611,13 @@ def decode_archive(
         identity_stream.seek(0)
         try:
             gzip_stream = _AuditedRawStream(source_stream, audit, "gzip")
-            gz = gzip.GzipFile(fileobj=gzip_stream, mode="rb")
-            with gz:
-                payload = _read_parameter_member(gz, audit)
+            gz = _BoundedGzipStream(gzip_stream)
+            payload = _read_parameter_member(gz, audit)
             _assert_source_stable(gzip_stream, audit)
         except DecodeFailure:
             raise
         except _GZIP_ERRORS:
             raise DecodeFailure(PD002_ARCHIVE_INVALID, "gzip open/read") from None
-    finally:
-        if close_stream:
-            source_stream.close()
     device, partitions = parse_parameter(payload)
     identity = {
         "sizeBytes": observed_size,
@@ -564,26 +625,6 @@ def decode_archive(
         "identityMatch": True,
     }
     return identity, device, partitions, audit
-
-
-def _serialize(document: dict) -> bytes:
-    return (
-        json.dumps(document, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
-    ).encode("utf-8")
-
-
-def load_archived_inventory() -> tuple[dict, str]:
-    with open(_INVENTORY_PATH, "rb") as handle:
-        payload = handle.read()
-    digest = hashlib.sha256(payload).hexdigest()
-    if digest != EXPECTED_INVENTORY_SHA256:
-        raise DecodeFailure(PD011_INVENTORY_INVALID, "evidence hash mismatch")
-    try:
-        document = json.loads(payload.decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError):
-        raise DecodeFailure(PD011_INVENTORY_INVALID, "evidence JSON invalid") from None
-    _validate_inventory(document, require_pinned_count=True)
-    return document, digest
 
 
 def _validate_inventory(document: dict, require_pinned_count: bool = False) -> None:
@@ -785,10 +826,11 @@ def _reconciliation_document(reconciliation: dict, inventory_sha256: str) -> dic
 
 def _audit_document(audit: DecodeAudit) -> dict:
     return {
-        "schema": "arkdeck-dayu200-partition-decode-audit-1.0.0",
+        "schema": "arkdeck-dayu200-partition-decode-audit-2.0.0",
         "scope": _scope(),
         "pythonVersion": "%d.%d.%d" % sys.version_info[:3],
         "configuredMaxReadChunkBytes": MAX_READ_CHUNK,
+        "configuredCompressedInputChunkBytes": COMPRESSED_READ_CHUNK,
         "maxObservedReadChunkBytes": audit.max_observed_read_chunk,
         "rawBytesRead": audit.raw_bytes_read,
         "identityPassRawBytesRead": audit.identity_pass_raw_bytes_read,
@@ -804,29 +846,50 @@ def _audit_document(audit: DecodeAudit) -> dict:
             audit.non_parameter_member_content_bytes_read
         ),
         "nonParameterMemberContentReturnedToDecoderCount": 0,
-        "nonParameterMemberContentRetainedBytes": 0,
+        "applicationChunkReferenceRetainedAcrossNextReadBytes": 0,
+        "deflateInternalHistoryRetention": (
+            "required by DEFLATE; opaque zlib state may retain prior body bytes"
+        ),
+        "deflateWindowUpperBoundBytes": 32768,
+        "crossChunkRetentionAcceptanceSatisfied": False,
+        "gzipCompressedBytesBufferedAtStop": (
+            audit.gzip_compressed_bytes_buffered_at_stop
+        ),
+        "postTargetDecompressedBytesProduced": 0,
+        "highLevelGzipPrefetchUsed": False,
+        "nonParameterBodyLifecycle": (
+            "application-visible output chunks are counted and discarded before the "
+            "next read; zlib necessarily retains DEFLATE sliding history internally"
+        ),
+        "stoppedImmediatelyAfterParameterBody": True,
         "partitionAcceptanceSatisfied": False,
         "partitionAcceptanceBlockingReasons": [
             (
-                "gzip stream positioning consumed non-target member contents; current "
-                "AC requires zero reads of other member contents"
-            ),
-            (
-                "path-based os.open has an lstat/open replacement race; absolute zero "
-                "device access is not statically proven"
-            ),
+                "r2 forbids non-target body retention across chunks but does not state "
+                "whether the mandatory DEFLATE sliding history is exempt; the decoder "
+                "therefore cannot prove the literal zero-retention boundary"
+            )
         ],
         "archiveSourceKind": audit.archive_source_kind,
-        "regularFileGatePassed": audit.archive_source_kind == "regularFile",
+        "regularFileGatePassed": (
+            audit.archive_source_kind == "preopenedReadOnlyRegularFileDescriptor"
+        ),
         "regularFileGateChecks": audit.regular_file_gate_checks,
+        "readOnlyDescriptorGatePassed": audit.pre_read_read_only_gate_passed,
+        "readOnlyDescriptorGateChecks": audit.read_only_descriptor_gate_checks,
+        "fstatCompletedBeforeFirstRead": audit.pre_read_fstat_passed,
+        "firstReadOccurredOnlyAfterDescriptorGates": (
+            audit.first_read_after_descriptor_gates
+        ),
         "archiveOpenModes": sorted(set(audit.archive_open_modes)),
         "archivePassCount": 2,
-        "potentialDeviceOpenPathCount": 1,
-        "pathReplacementDeviceOpenRaceExcluded": False,
-        "zeroDeviceAccessStaticProofSatisfied": False,
+        "archivePathAcceptedByDecoder": False,
+        "archivePathOpenCallCount": 0,
+        "potentialDeviceOpenPathCount": 0,
+        "pathReplacementRaceOutsideDecoderBoundary": True,
+        "decoderDescriptorBoundarySatisfied": True,
+        "workflowZeroDeviceClaimRequiresBrokerEvidence": True,
         "memberExtractionToDiskCount": 0,
-        "allowedEvidenceOutputs": list(EVIDENCE_OUTPUTS),
-        "writesOutsideAllowedOutputs": audit.writes_outside_allowed_outputs,
         "dispatchCounters": {
             "childProcess": 0,
             "network": 0,
@@ -844,18 +907,20 @@ def _audit_document(audit: DecodeAudit) -> dict:
                 "compressed byte returned by read/readinto is assigned to one pass"
             ),
             "sourceType": (
-                "lstat rejects known non-regular paths before open; path-based os.open "
-                "uses O_NOFOLLOW|O_NONBLOCK|O_CLOEXEC and fstat rejects replacement "
-                "before read, but a device may already have been opened in that race"
+                "production API accepts only an integer descriptor; fstat and F_GETFL "
+                "prove regular/read-only state before the first read; os.dup preserves "
+                "the capability without resolving an archive path"
             ),
             "nonParameterContent": (
-                "non-target member contents are read to position the single gzip/tar "
-                "stream, then discarded without parsing, retaining or writing"
+                "application-visible non-target chunks are consumed only to position "
+                "the single gzip/tar stream and are dropped before the next call; zlib "
+                "max_length prevents post-target output but its required DEFLATE sliding "
+                "history makes literal zero cross-chunk retention unproven"
             ),
             "dispatchCounters": (
                 "subprocess/network/transport/device-mutation structural zeros are "
-                "asserted by strict import and call-target allowlists; absolute device "
-                "open exclusion is explicitly not claimed"
+                "asserted by strict production-source import and call-target allowlists; "
+                "workflow device exclusion is separately proved by broker policy"
             ),
         },
     }
@@ -877,16 +942,25 @@ def _expected_audit_document() -> dict:
         non_parameter_member_content_bytes_read=(
             EXPECTED_NON_PARAMETER_CONTENT_BYTES_READ
         ),
-        archive_open_modes=["rb"],
-        archive_source_kind="regularFile",
+        archive_open_modes=["preopened-read-only-fd"],
+        archive_source_kind="preopenedReadOnlyRegularFileDescriptor",
         regular_file_gate_checks=EXPECTED_REGULAR_FILE_GATE_CHECKS,
+        read_only_descriptor_gate_checks=EXPECTED_REGULAR_FILE_GATE_CHECKS,
+        pre_read_fstat_passed=True,
+        pre_read_read_only_gate_passed=True,
+        first_read_after_descriptor_gates=True,
+        gzip_compressed_bytes_buffered_at_stop=(
+            EXPECTED_GZIP_COMPRESSED_BYTES_BUFFERED_AT_STOP
+        ),
     )
     document = _audit_document(audit)
     document["pythonVersion"] = EXPECTED_PYTHON_VERSION
     return document
 
 
-def validate_evidence(name: str, document: dict) -> None:
+def validate_evidence(
+    name: str, document: dict, inventory_document: dict, inventory_sha256: str
+) -> None:
     try:
         scope = document["scope"]
         scope_valid = scope == _scope()
@@ -902,9 +976,8 @@ def validate_evidence(name: str, document: dict) -> None:
             )
             valid = document == expected
         elif name == "member-reconciliation.json":
-            inventory, inventory_sha256 = load_archived_inventory()
             expected = _reconciliation_document(
-                reconcile_members(_expected_partition_rows(), inventory),
+                reconcile_members(_expected_partition_rows(), inventory_document),
                 inventory_sha256,
             )
             valid = document == expected
@@ -919,7 +992,9 @@ def validate_evidence(name: str, document: dict) -> None:
         raise EvidenceValidationError(f"closed evidence validation failed: {name}")
 
 
-def validate_evidence_bundle(documents: dict) -> None:
+def validate_evidence_bundle(
+    documents: dict, inventory_document: dict, inventory_sha256: str
+) -> None:
     expected_names = {
         "partition-mapping.json",
         "member-reconciliation.json",
@@ -928,7 +1003,9 @@ def validate_evidence_bundle(documents: dict) -> None:
     if set(documents) != expected_names:
         raise EvidenceValidationError("evidence bundle has missing/unexpected documents")
     for name in sorted(documents):
-        validate_evidence(name, documents[name])
+        validate_evidence(
+            name, documents[name], inventory_document, inventory_sha256
+        )
 
     mapping_rows = documents["partition-mapping.json"]["partitions"]
     reconciliation = documents["member-reconciliation.json"]
@@ -952,162 +1029,3 @@ def validate_evidence_bundle(documents: dict) -> None:
     }
     if mapped_members != mapped_partitions:
         raise EvidenceValidationError("member/partition mappings are not symmetric")
-
-
-def _write_evidence(out_dir: str, name: str, payload: bytes, audit: DecodeAudit) -> None:
-    if name not in EVIDENCE_OUTPUTS:
-        audit.writes_outside_allowed_outputs += 1
-        raise DecodeToolError(f"refusing non-allowlisted output: {name}")
-    target = os.path.join(out_dir, name)
-    try:
-        with open(target, "xb") as handle:
-            handle.write(payload)
-    except FileExistsError:
-        raise DecodeToolError(f"refusing to overwrite evidence: {name}") from None
-    audit.evidence_files_written.append(name)
-
-
-def _write_evidence_set(
-    out_dir: str, payloads: dict, audit: DecodeAudit
-) -> None:
-    """Preflight the complete create-only set before writing the first byte."""
-    if tuple(payloads) != EVIDENCE_OUTPUTS:
-        audit.writes_outside_allowed_outputs += 1
-        raise DecodeToolError("evidence payload set/order does not match allowlist")
-    os.makedirs(out_dir, exist_ok=True)
-    conflicts = [
-        name for name in EVIDENCE_OUTPUTS if os.path.lexists(os.path.join(out_dir, name))
-    ]
-    if conflicts:
-        raise DecodeToolError(
-            "refusing mixed/partial evidence write; existing output: "
-            + ", ".join(conflicts)
-        )
-    for name, payload in payloads.items():
-        _write_evidence(out_dir, name, payload, audit)
-
-
-def _summary(mapping: dict, reconciliation: dict, payloads: dict) -> bytes:
-    lines = [
-        "# DAYU200 pinned-image partition decode summary",
-        "",
-        "**Verification status: BLOCKED / partition acceptance not satisfied.**",
-        "Reaching `parameter.txt` in the single gzip/tar stream consumed seven",
-        "non-target member bodies. The accepted AC requires zero reads of other member",
-        "contents. In addition, path-based `lstat` then `open` cannot exclude a device",
-        "replacement race before `fstat`; absolute zero device access is not statically",
-        "proven. Changing either boundary requires separately approved governance. The",
-        "mapping below is failure evidence, not a passing acceptance claim.",
-        "",
-        "Non-authoritative evidence valid only for the pinned archive identity",
-        f"`{EXPECTED_RAW_SHA256}`. The original `parameter.txt` text and archive",
-        "locator are omitted. Encoded offsets are decoded table fields only: no flash",
-        "address, protocol, compatibility, executable profile or hardware support is",
-        "derived or claimed.",
-        "",
-        "| Evidence file | SHA-256 |",
-        "| --- | --- |",
-    ]
-    for name in ("partition-mapping.json", "member-reconciliation.json", "process-audit.json"):
-        lines.append(f"| `{name}` | `{hashlib.sha256(payloads[name]).hexdigest()}` |")
-    lines += [
-        "",
-        "## Decoded mapping",
-        "",
-        "| Partition | Size token | Offset token | Attribute |",
-        "| --- | ---: | ---: | --- |",
-    ]
-    for row in mapping["partitions"]:
-        attribute = row["attribute"] if row["attribute"] is not None else "none"
-        lines.append(
-            f"| `{row['name']}` | `{row['size']['encoded']}` | "
-            f"`{row['offset']['encoded']}` | `{attribute}` |"
-        )
-    lines += [
-        "",
-        "## Image-member reconciliation",
-        "",
-        f"- Inventory members reviewed: {reconciliation['inventoryMemberCount']}.",
-        f"- `.img` members: {reconciliation['imageMemberCount']}; mapped by exact stem: "
-        f"{reconciliation['mappedImageCount']}; explicit image orphans: "
-        f"{reconciliation['orphanImageCount']}.",
-        f"- Explicit partitions without an exact image member: "
-        f"{reconciliation['orphanPartitionCount']}.",
-        "- Match rule is deliberately exact and case-sensitive; punctuation aliases and",
-        "  similarity guesses are not promoted to facts.",
-        "",
-        "| Image member | Result | Partition |",
-        "| --- | --- | --- |",
-    ]
-    for row in reconciliation["members"]:
-        if row["role"] != "partitionImage":
-            continue
-        partition = row["partition"] if row["partition"] is not None else "—"
-        lines.append(f"| `{row['path']}` | `{row['status']}` | `{partition}` |")
-    lines += [
-        "",
-        "## S2 citations",
-        "",
-        f"Source-selection policy: `{_ROUTE_PLAN_REFERENCE}`.",
-        "",
-    ]
-    for source in S2_SOURCE_CITATIONS:
-        lines.append(f"- [{source['title']}]({source['url']}) — {source['scope']}.")
-    lines += ["", "All S2 citations are contextual; decoded values come only from the pinned member.", ""]
-    return "\n".join(lines).encode("utf-8")
-
-
-def build_evidence(src: Source, out_dir: str) -> DecodeAudit:
-    """Production evidence path: pinned identities/inventory have no overrides."""
-    identity, device, partitions, audit = decode_archive(src)
-    inventory_document, inventory_sha256 = load_archived_inventory()
-    reconciliation = reconcile_members(partitions, inventory_document)
-    documents = {
-        "partition-mapping.json": _partition_document(identity, device, partitions),
-        "member-reconciliation.json": _reconciliation_document(
-            reconciliation, inventory_sha256
-        ),
-        "process-audit.json": _audit_document(audit),
-    }
-    validate_evidence_bundle(documents)
-    payloads = {}
-    for name, document in documents.items():
-        payloads[name] = _serialize(document)
-    payloads["summary.md"] = _summary(
-        documents["partition-mapping.json"], reconciliation, payloads
-    )
-    _write_evidence_set(out_dir, payloads, audit)
-    return audit
-
-
-def build_arg_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        prog="decode.py",
-        description="Decode DAYU200 parameter.txt for the single pinned archive.",
-    )
-    parser.add_argument("--archive", required=True, help="external pinned archive path")
-    parser.add_argument("--out-dir", required=True, help="governed evidence directory")
-    return parser
-
-
-def main(argv: Optional[Sequence[str]] = None) -> int:
-    arguments = build_arg_parser().parse_args(argv)
-    try:
-        audit = build_evidence(arguments.archive, arguments.out_dir)
-    except DecodeFailure as failure:
-        print(f"decode failed: {failure.code}", file=sys.stderr)
-        return 1
-    except (DecodeToolError, EvidenceValidationError) as error:
-        print(f"tool error: {error}", file=sys.stderr)
-        return 2
-    print(
-        "decode blocked: evidence written; current AC forbids the observed non-target "
-        "member reads and absolute zero device access is not statically proven:",
-        ", ".join(audit.evidence_files_written),
-        file=sys.stderr,
-    )
-    return 3
-
-
-if __name__ == "__main__":
-    sys.exit(main())

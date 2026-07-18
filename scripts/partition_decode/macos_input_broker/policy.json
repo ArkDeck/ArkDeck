@@ -1,0 +1,31 @@
+{
+  "allowedEntitlements": {
+    "com.apple.security.app-sandbox": true,
+    "com.apple.security.files.user-selected.read-only": true,
+    "com.apple.security.temporary-exception.files.absolute-path.read-only": [
+      "/opt/homebrew/opt/python@3.14/Frameworks/Python.framework/"
+    ]
+  },
+  "archiveAcquisition": "NSOpenPanel user selection only",
+  "archiveDescriptorOpenFlags": [
+    "O_RDONLY",
+    "O_NONBLOCK",
+    "O_NOFOLLOW",
+    "O_CLOEXEC"
+  ],
+  "archivePathPassedToDecoder": false,
+  "deviceNamespacePathPolicy": "reject standardized /dev and /dev/** before archive open",
+  "deniedCapabilities": [
+    "character/block device namespace /dev",
+    "network",
+    "process execution",
+    "USB entitlement",
+    "serial entitlement",
+    "raw-disk entitlement"
+  ],
+  "descriptorTransfer": "same-process CPython C API integer fd",
+  "existingArkDeckAppParticipates": false,
+  "osPolicyBoundary": "signed App Sandbox plus absent USB/serial/network entitlements and runtime sandbox_check inspection",
+  "threatModel": "macOS kernel/code-signing/App Sandbox trusted; compromised kernel/root excluded",
+  "schema": "arkdeck-dayu200-input-broker-policy-1.0.0"
+}
