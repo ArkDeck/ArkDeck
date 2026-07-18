@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-007-dayu200-flash-route-planning
 revision: 1
-status: proposed
+status: approved # r1 proposal 经 #62 合入;批准由本 approval-only PR 的维护者 review/merge 构成
 class: platform
 core_change_level: none
 owner: lvye
@@ -68,6 +68,8 @@ Provider 代码。
 
 ## Approval
 
-- 本 proposal PR 合入即 status:proposed;正式批准须另行 approval-only PR
-  (先例 #14/#40/#55),由维护者 review/merge 构成。批准前 TASK-RB-001 保持
-  blocked。
+- Proposal 经 PR #62 合入 main(`f3961cc`,2026-07-18,status:proposed)。
+- 正式批准:2026-07-18 由本 approval-only PR(先例 #14/#40/#55)将本 change 置为
+  `approved`;批准由维护者 review/merge 本 PR 构成(V2 git-native 治理)。本批准
+  不产生任务执行:TASK-RB-001 仍须独立 readiness/status PR 转 ready 后方可开工;
+  plan-only 边界不因批准改变(零设备命令、零 Provider 代码)。
