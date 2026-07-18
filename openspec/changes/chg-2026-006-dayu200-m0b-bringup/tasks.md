@@ -1,12 +1,14 @@
 # Tasks — CHG-2026-006 DAYU200 M0B bring-up
 
-> V2 治理:本文件是任务的唯一事实源。change 尚为 proposed;approved 前任务不可
-> 执行,不得产出任何真机 evidence。全部真机操作由人类维护者执行,Agent 不执行
-> 真实 `hdc`。
+> V2 治理:本文件是任务的唯一事实源。change 已于 2026-07-18 经 approval-only PR
+> approved(先例 #14/#40/#45,批准由维护者 review/merge 构成);任务状态变更仅在
+> 维护者 review/merge 后生效。全部真机操作由人类维护者执行,Agent 不执行真实
+> `hdc`。
 
 ## TASK-M0B-001 — 人类真机发现/授权/工具链特征化与受控采集
 
-- Status:ready(待 change approved;执行需物理 DAYU200 与维护者时间窗)
+- Status:ready(change approved;执行需物理 DAYU200 在场与维护者时间窗,执行与
+  `ready→done` 分别经独立 PR 由维护者 review/merge 生效)
 - Requirements/AC:`HW-M0B-DAYU200-DISCOVERY-001`、`HW-M0B-DAYU200-AUTH-001`、
   `HW-M0B-DAYU200-RAWCAPTURE-001`、`HW-M0B-DAYU200-UIDUMP-PROBE-001`
   (见 acceptance-cases.yaml)

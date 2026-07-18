@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-006-dayu200-m0b-bringup
 revision: 1
-status: proposed
+status: approved
 class: platform
 core_change_level: none
 owner: lvye
@@ -86,6 +86,9 @@ matrix 行,不构成任何支持声明。
 
 ## Approval
 
-- 正式批准:待维护者以 approval-only PR(先例 #14/#40/#45)将本 change 置为
-  `approved`;批准由维护者 review/merge 构成(V2 git-native 治理)。approved 前
-  任务不可执行,也不得产出任何真机 evidence。
+- Proposal 经 PR #54 合入 main(`f4cfc8f`,2026-07-18,status:proposed)。
+- 正式批准:2026-07-18 由本 approval-only PR(先例 #14/#40/#45)将本 change 置为
+  `approved`;批准由维护者 review/merge 本 PR 构成(V2 git-native 治理)。本批准
+  不产生任务执行或任何真机 evidence:TASK-M0B-001 的执行另需物理 DAYU200 在场与
+  维护者时间窗,TASK-M0B-002 保持 blocked(待 TASK-M1-006 done + M0B-001 done +
+  独立 readiness PR)。
