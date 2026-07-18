@@ -1,0 +1,69 @@
+{
+  "schemaVersion": "1.0.0",
+  "packVersion": "1.0.0",
+  "integrationProfile": "OPENHARMONY-TOOLS@0.2.0",
+  "registeredBy": "CHG-2026-005-hdc-parser-golden-registration/TASK-I5-001",
+  "entries": [
+    {
+      "id": "hdc-golden-failure-unauthorized",
+      "family": "failure",
+      "path": "1.0.0/failure-unauthorized/stdout.bin",
+      "stream": "stdout",
+      "exitCode": 0,
+      "expectedSemanticClassification": "failure.unauthorized",
+      "sha256": "5e73a89bfec57338a129ec0d22bbf805c9b633849db0571d70c6f2f24b5340d8",
+      "sizeBytes": 46,
+      "evidenceClass": "m0aCandidate",
+      "sourceLineage": "Byte-exact extraction of HDCFixtures.exitZeroFailure (M0A candidate bytes, Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/HDCFixtures.swift)."
+    },
+    {
+      "id": "hdc-golden-failure-offline",
+      "family": "failure",
+      "path": "1.0.0/failure-offline/stdout.bin",
+      "stream": "stdout",
+      "exitCode": 0,
+      "expectedSemanticClassification": "failure.offline",
+      "sha256": "d06b9e806721c00ebe771cc4b29e89145937d7162211b66e44ca7d0e5bffa38f",
+      "sizeBytes": 30,
+      "evidenceClass": "m0aCandidate",
+      "sourceLineage": "Byte-exact extraction of HDCFixtures.largeOutputFailureTail (M0A candidate bytes, Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/HDCFixtures.swift)."
+    },
+    {
+      "id": "hdc-golden-success-uninstall",
+      "family": "success",
+      "path": "1.0.0/success-uninstall/stdout.bin",
+      "stream": "stdout",
+      "exitCode": 0,
+      "expectedSemanticClassification": "success",
+      "currentParserClassification": "unknownOutput",
+      "sha256": "c690501211bc9c7a6a3b37704dd2cd58bdcf03e49771ffee10adf205a589d353",
+      "sizeBytes": 78,
+      "evidenceClass": "controlledHumanCapture",
+      "sourceLineage": "Maintainer-captured 2026-07-18 10:42:18 CST by fuhanfeng on macOS 26.5.2 (25F84): `hdc uninstall com.example.waterflowdemo` (exit 0) against a connected OpenHarmony device; hdc binary /Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/toolchains/hdc sha256 48395ba8d87115dffca47df2a640a6c868bc9a2bd4eb49611e4138ff88d8d260, client/server Ver: 3.2.0d. Real 3.2.0d success output carries `[Info]... msg:uninstall bundle successfully.` + `AppMod finish` and does NOT contain the M0A `[success]` marker; parser adoption of this registered shape is TASK-M1-006 scope."
+    },
+    {
+      "id": "hdc-golden-healthy-checkserver",
+      "family": "healthy",
+      "path": "1.0.0/healthy-checkserver/stdout.bin",
+      "stream": "stdout",
+      "exitCode": 0,
+      "expectedSemanticClassification": "healthy",
+      "sha256": "50e8dfe03cb770dfade5b91198523b964fd3bd6fd8855b541ceb46201f0d014a",
+      "sizeBytes": 55,
+      "evidenceClass": "controlledHumanCapture",
+      "sourceLineage": "Maintainer-captured 2026-07-18 10:42:18 CST by fuhanfeng on macOS 26.5.2 (25F84): `hdc checkserver` (exit 0); hdc binary sha256 48395ba8d87115dffca47df2a640a6c868bc9a2bd4eb49611e4138ff88d8d260. Client/server version pair report `Client version:Ver: 3.2.0d, server version:Ver: 3.2.0d`."
+    },
+    {
+      "id": "hdc-golden-version",
+      "family": "version",
+      "path": "1.0.0/version/stdout.bin",
+      "stream": "stdout",
+      "exitCode": 0,
+      "expectedSemanticClassification": "version",
+      "sha256": "906d35a917937ecbb33d8dc3bbb6b3e1783bd2996a6201ab7227fb406d474ed9",
+      "sizeBytes": 12,
+      "evidenceClass": "controlledHumanCapture",
+      "sourceLineage": "Maintainer-captured 2026-07-18 10:42:18 CST by fuhanfeng on macOS 26.5.2 (25F84): `hdc -v` (exit 0); hdc binary sha256 48395ba8d87115dffca47df2a640a6c868bc9a2bd4eb49611e4138ff88d8d260. Output `Ver: 3.2.0d`."
+    }
+  ]
+}

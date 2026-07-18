@@ -1,11 +1,12 @@
-# Integration adapter 输入的版本登记(V2:不再逐文件 hash pin;历史对比用 git)
-lock: INTEGRATION-PROFILES-0.2.0
+# Integration adapter 输入的版本登记(V2:不再逐文件 hash pin;历史对比用 git;
+# golden fixture 例外:按 fixture_policy 逐文件 SHA-256 pin)
+lock: INTEGRATION-PROFILES-0.3.0
 status: current
-updated_at: 2026-07-14
+updated_at: 2026-07-18
 
 profiles:
   - id: OPENHARMONY-TOOLS
-    version: 0.1.0
+    version: 0.2.0
     path: openspec/integrations/openharmony/profile.md
 
 catalogs:
@@ -19,7 +20,27 @@ catalogs:
     version: 1.0.0
     path: openspec/contracts/catalogs/debug-parameters.yaml
 
-fixtures: []
+fixtures:
+  - id: hdc-golden-failure-unauthorized
+    version: 1.0.0
+    path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Golden/1.0.0/failure-unauthorized/stdout.bin
+    sha256: 5e73a89bfec57338a129ec0d22bbf805c9b633849db0571d70c6f2f24b5340d8
+  - id: hdc-golden-failure-offline
+    version: 1.0.0
+    path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Golden/1.0.0/failure-offline/stdout.bin
+    sha256: d06b9e806721c00ebe771cc4b29e89145937d7162211b66e44ca7d0e5bffa38f
+  - id: hdc-golden-success-uninstall
+    version: 1.0.0
+    path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Golden/1.0.0/success-uninstall/stdout.bin
+    sha256: c690501211bc9c7a6a3b37704dd2cd58bdcf03e49771ffee10adf205a589d353
+  - id: hdc-golden-healthy-checkserver
+    version: 1.0.0
+    path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Golden/1.0.0/healthy-checkserver/stdout.bin
+    sha256: 50e8dfe03cb770dfade5b91198523b964fd3bd6fd8855b541ceb46201f0d014a
+  - id: hdc-golden-version
+    version: 1.0.0
+    path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Golden/1.0.0/version/stdout.bin
+    sha256: 906d35a917937ecbb33d8dc3bbb6b3e1783bd2996a6201ab7227fb406d474ed9
 
 change_rule: >-
   Parser families, adapter mappings, catalogs and golden fixtures evolve through

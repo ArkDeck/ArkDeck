@@ -1,0 +1,2 @@
+# TASK-I5-001:golden fixture 原始字节不得被 eol/text 归一化改写
+*.bin binary

@@ -5,8 +5,12 @@
 
 ## TASK-I5-001 — 提升并登记完整 HDC semantic golden fixture pack
 
-- Status:blocked(change 已 approved;仅余 success/healthy/checkserver/version raw input 的
-  provenance 经维护者认可——缺任一 family 时保持 blocked,不得开始登记)
+- Status:blocked(change 已 approved;success/healthy/checkserver/version 的 raw input 已由
+  维护者受控采集并随本实现 PR 提交——维护者 review/merge 本实现 PR 即构成对 provenance 与
+  登记的正式认可;done 翻转由独立状态 PR 执行)
+- Completion evidence:`evidence/runs/TASK-I5-001/run.md`(五 fixture 三方一致登记、
+  Bundle.module 资源测试 3/0、全量 172/0、guard 0 error、零 dispatch;含真实 3.2.0d 无
+  `[success]` 标记的实测披露——parser 接线属 M1-006)
 - Requirements/AC:`REQ-HDC-001`、`REQ-HDC-002`、`REQ-HDC-003`、`REQ-HDC-005`；
   `AC-HDC-005-01`(仅 fixture prerequisite，其他 family 仅为 platform matrix input)
 - Depends on:none；但缺任一 required raw input/provenance 时 fail closed，不得开始登记
