@@ -1,7 +1,7 @@
 # M1 Verification Plan
 
 > Status：planned  
-> Change：CHG-2026-002-macos-m1-infrastructure@r6
+> Change：CHG-2026-002-macos-m1-infrastructure@r7
 > Core baseline：CORE-2.0.0
 > Core conformance：CORE-CONFORMANCE-2.0.0
 > Integration base：OPENHARMONY-TOOLS@0.2.0
@@ -31,6 +31,15 @@ consolidated-interface boundary。`AC-DEV-001-01`、`AC-DEV-002-01/02`、
 `AC-DEV-008-01` 全部保持 canonical `contract`；其同一 implementation revision 的
 binding/rebind/effect/lane contract/property evidence 可在锁屏 headless host 二值执行。
 这不满足或降级 M1-006 HDC cases、`MAC-M1-HDC-001` 或任何 platform/hardware claim。
+
+r7 同样不改变 acceptance method、expected result、minimum evidence 或 evidence class。
+它只补全 TASK-M1-008 的执行边界并在 TASK-M1-007 尚未 done 时撤回旧的提前 `ready`。
+`TEST-AC-FLASH-006-01` 仍是 canonical `contract`；`TEST-MAC-M1-SIM-001` 仍是 `platform`，
+但其 approved method 只要求实际 macOS 本地 Session/journal/manifest 的 simulated end-to-end
+run，可在锁屏 headless host 二值执行，不要求 GUI、签名 App、HDC、真实设备或系统授权。
+两项必须绑定同一 implementation revision，并同时证明 persistent simulated classification、
+hardware-support verified writer count 0、real connectKey count 0 与 external tool launch count 0；
+该 platform evidence 不得升级为 realHardware、compatibility、support、conformance 或 release。
 
 ## Platform acceptance matrix
 

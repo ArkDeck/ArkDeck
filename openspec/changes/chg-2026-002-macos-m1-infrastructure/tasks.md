@@ -4,7 +4,10 @@
 > 2026-07-15 经 PR #14 合入 approved；r2 的 CORE-2.0.0 重定向已于 2026-07-16 经
 > PR #22 合入生效；r3 已于 PR #35 合入；r4 已于 main `87a3a99` 合入。r5 只修订
 > TASK-M1-006 两个 legacy contract 的精确 safety-alignment 授权，仅在维护者 review/merge
-> 后生效，不包含任何实现、evidence 或任务状态变化。
+> 后生效，不包含任何实现、evidence 或任务状态变化。r6 已经 PR #117 合入 `main`
+> `4e0c4f94d12e0ab55902580e43bd6dd61c4e6e79` 并使 TASK-M1-007 headless readiness
+> 生效；r7 只补全 TASK-M1-008 task contract 并恢复依赖 fail-closed，不执行实现或生成
+> evidence。
 
 ## TASK-M1-001 — ArkDeckCore 域模型、封闭 typed-step registry 与 Job 状态机
 
@@ -925,11 +928,93 @@
 
 ## TASK-M1-008 — SimulatedFlashProvider 隔离 harness
 
-- Status:ready
-- Requirements/AC:AC-FLASH-006-01、MAC-M1-SIM-001
-- Depends on:TASK-M1-003、TASK-M1-007
-- Allowed paths:`.../ArkDeckWorkflows/**`、对应 Tests、本 change `evidence/**`
-- Deliverables:可配置延迟/失败/断连/outcomeUnknown 的合成设备 provider;不接受真实 connectKey、不启动外部工具的隔离证明;simulated 证据永不进入硬件支持矩阵。
+- Status:blocked（r7 task-definition candidate；历史简写条目在 TASK-M1-007 未 done 时
+  提前标为 `ready`，不满足 Definition of Ready。仅 r7 经维护者 review/merge 后恢复
+  fail-closed；本 revision PR 不执行 TASK-M1-008、不生成 evidence，也不使任务 ready）
+- Historical disposition:r1-r6 的 `Status:ready` 未附完整 readiness review，且声明依赖
+  TASK-M1-007；TASK-M1-007 当前仅 `ready`、尚无 merged implementation/done 状态。没有
+  TASK-M1-008 implementation/evidence 可复用或重判。
+- Objective:在锁屏 macOS headless host 上，以纯 Swift simulated provider 和既有 locked
+  journal/reconcile/manifest seams 运行确定性的 synthetic Flash orchestration；覆盖 success、
+  delay、failure、disconnect、outcomeUnknown 与 cancellation，永久保持 simulated 分类、零真实
+  binding/connectKey、零外部工具/网络/设备 dispatch、零 hardware-support verified mutation。
+- Requirements/AC:`REQ-FLASH-006`、`POL-MODE-001`；
+  `AC-FLASH-006-01` (`TEST-AC-FLASH-006-01`,method:`simulationIsolationContract`,
+  minimum evidence:`contract`)；`MAC-M1-SIM-001` (`TEST-MAC-M1-SIM-001`,method:
+  `SimulatedFlashProvider end-to-end orchestration run`,minimum evidence:`platform`)。
+- Depends on:
+  - TASK-M1-003 done（locked journal、reconcile 与 durable Session/Manifest boundary；已满足）；
+  - TASK-M1-007 implementation、独立 `done` 状态 PR 均已由维护者合入 `main`（未满足）；
+  - CHG-2026-002@r7 经维护者合入并保持 `approved`；
+  - 依赖满足后的独立 TASK-M1-008 readiness PR 固定 M1-007 implementation OID、两个新
+    Swift 文件、toolchain、test surface 与 headless run path。
+- In scope:
+  1. `SimulatedFlashProvider` production API 只接受不可转换为
+     `CurrentDeviceBinding`/real connectKey 的 synthetic fixture identity 与封闭 scenario；
+     不暴露 executable、argv、ProcessExecutor、HDC Adapter、path/device/network handle；
+  2. 可注入 deterministic virtual delay、step failure、pre/post-step disconnect、
+     outcomeUnknown 与 cancellation；所有正常/错误/取消路径释放 task/continuation，
+     outcomeUnknown durable 后保持 waiting-for-recovery 且不得自动 replay；
+  3. 使用既有 typed Step、TASK-M1-003 locked journal/reconcile 与 Session manifest validator
+     完成 intent/outcome/cancel/reconcile/finalization/reopen，不新增或放宽 schema；缺失、矛盾、
+     非 simulated mode、非 synthetic target 或非法 transition 均在 publication 前 fail closed；
+  4. evidence receipt 与持久 Manifest 都显式为 `simulated`/`executionMode:simulated`，target
+     为 synthetic、connectKey 为 null、toolchain 为 none、fixture/scenario identity 非空；
+     hardware-support eligibility 永远 false，verified-record writer 调用计数为 0；
+  5. exhaustive/fault tests 覆盖全部配置分支、取消时点、reconcile/reopen、receipt/manifest
+     tamper 与 repeated-run determinism；production/dedicated tests 的 external process、network、
+     HDC、device/destructive dispatch count 均为 0。
+- Out of scope:真实/仿真 connectKey string 输入、`CurrentDeviceBinding`、ProcessExecutor/
+  HDC/OpenHarmony adapter、fake/real external child、device node、网络、GUI/XCUITest/系统授权、
+  Flash 产品 workflow/UI、硬件支持矩阵写入、realHardware evidence、compatibility/conformance/
+  support/release claim；修改 accepted specs/contracts/schema/platform/integration；TASK-M1-003/
+  M1-007 evidence 或状态重判。required full-suite MAY 运行既有显式 fixture 路径绑定的 fake-HDC
+  regression，但其结果必须单独分类且不属于本任务 AC evidence。
+- Allowed paths:
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/SimulatedFlashProvider.swift`
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/SimulatedFlashProviderContractTests.swift`
+  - `openspec/changes/chg-2026-002-macos-m1-infrastructure/evidence/runs/TASK-M1-008/**`
+  - 本 `tasks.md`（implementation PR 只追加 run/completion evidence 引用,不标 `done`）
+- Read-only inputs:`Packages/ArkDeckKit/Sources/ArkDeckCore/WorkflowStep.swift`、
+  `JobStateMachine.swift`、TASK-M1-007 合入后的 `DeviceTargeting.swift` 与
+  `DeviceBindingJournalAdapter.swift`；ArkDeckStorage `JournalEvent`/
+  `JournalEventValidation`/`FileDurableJournal`/`JournalReplay`/`RecoveryCoordination`/
+  `SessionManifest` public seams；accepted flashing spec、constitution、provider/manifest contracts
+  与 canonical acceptance registry。
+- Forbidden paths:`Package.swift`、所有既有 production/test source 修改、ArkDeckApp/Xcode、
+  ArkDeckProcess/Runtime/OpenHarmony、HDC fixture/golden/profile/integration lock、accepted specs/
+  contracts/baselines/platforms/verification、其他 task/change evidence；真实或 fake HDC、真实
+  device/connectKey、GUI、网络、外部 process/device/destructive dispatch。
+- Risk:high（simulation/execute mode confusion、outcomeUnknown replay 或 hardware evidence
+  升级会破坏 Safety/verification 边界；以 type-level isolation、durable mode validation、
+  fault/tamper matrix 与零 dispatch/writer counter fail closed）。
+- Hardware required:no。
+- Required environment:锁屏 macOS headless shell；Swift 6.3.3、SwiftPM、swift-format 6.3.0、
+  本地 temporary Session directory 与 deterministic synthetic fixtures/virtual clock。不得要求
+  网络下载、GUI、签名、系统授权、HDC 或真实设备。
+- Deliverables:一个 production source 文件；一个 dedicated contract/platform test 文件；
+  `evidence/runs/TASK-M1-008/run.md`，记录 base/M1-007 OID、环境、输入/输出 hash、命令、
+  fault/cancel/reconcile/reopen counters、两个 Test ID/evidence class、Manifest simulated
+  classification、hardware-support writer 与 real connectKey/external process/network/HDC/device/
+  destructive dispatch count `0`、full-suite fake-child 独立分类、偏差与遗留风险。
+- Verification:
+  - `TEST-AC-FLASH-006-01`:successful synthetic Job 生成的 receipt/Manifest 只为
+    simulated，tamper 为 execute/real target/non-null connectKey/toolchain 时 fail；hardware-support
+    eligibility false 且 verified-record writer count 0；
+  - `TEST-MAC-M1-SIM-001`:同一 macOS implementation revision 的本地 Session run 覆盖
+    journal intent/outcome、delay/cancel、failure/disconnect/outcomeUnknown、reconcile/finalize/
+    reopen；unknown 零 replay，real connectKey 与 external tool launch count 0，持久 evidence
+    仍为 simulated；
+  - dedicated `swift test --package-path Packages/ArkDeckKit --filter
+    SimulatedFlashProviderContractTests`；`swift test --package-path Packages/ArkDeckKit`；
+    `xcrun swift-format lint --strict` 全部变更 Swift；`scripts/check-sdd.sh`；
+    `git diff --check`；allowed-path 与 import/call-target/dispatch/static mode audit。
+- Evidence gate:两个 canonical Test ID 必须在同一 implementation revision 分别以 contract/
+  macOS platform evidence 二值 PASS；dedicated/full suite/format/SDD/diff/scope 全通过，所有
+  禁止 dispatch/writer counter 为 0，才可另起 status PR 起草 `done`。该结论不改变 M1-006、
+  Flash compatibility、hardware matrix、platform conformance、support 或 release 状态。
+- PR boundary:r7 是一个 governance-only task-definition PR；依赖满足后另开 readiness PR，
+  再以一个独立 TASK-M1-008 implementation + evidence PR 交付；`ready→done` 另开状态 PR。
 
 ## TASK-M1-009 — 诊断骨架:分类脱敏日志与有界本地诊断导出
 
