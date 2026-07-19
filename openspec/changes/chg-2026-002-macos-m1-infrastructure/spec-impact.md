@@ -1,6 +1,6 @@
 # Spec Impact
 
-> Change：CHG-2026-002-macos-m1-infrastructure@r6
+> Change：CHG-2026-002-macos-m1-infrastructure@r7
 > Core baseline：CORE-2.0.0（ratification 状态见 `openspec/baselines/CORE-2.0.0.yaml`）
 > Exact affected scope：`scope.yaml`
 
@@ -25,6 +25,12 @@ r6 changes no specification, acceptance result, evidence class, exact scope or p
 It only applies the verified CHG-2026-014 consumer rule to TASK-M1-007:the nine in-scope
 `AC-DEV-*` cases remain canonical contract evidence, while M1-006's unresolved probe/XCUITest/
 platform evidence and all HDC/support/conformance claims remain explicitly outside M1-007.
+
+r7 changes no specification, acceptance result, evidence class, exact scope or platform mapping.
+It expands TASK-M1-008's historical shorthand into a complete headless task contract and restores
+its dependency gate while TASK-M1-007 is not done. `AC-FLASH-006-01` remains contract evidence and
+`MAC-M1-SIM-001` remains macOS platform evidence; the latter is a local simulated orchestration run,
+not GUI, real-hardware, compatibility, support, conformance or release evidence.
 
 Deliberately excluded from this change (later changes must cover them before any release includes
 their capability): `AC-DEV-007-01` (parserGolden capability probing), all realHardware acceptance,

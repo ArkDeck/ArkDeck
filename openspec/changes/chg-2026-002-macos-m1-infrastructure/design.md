@@ -1,7 +1,7 @@
 # macOS M1 Shared Infrastructure Design
 
 > Status：draft  
-> Proposal：CHG-2026-002-macos-m1-infrastructure@r6
+> Proposal：CHG-2026-002-macos-m1-infrastructure@r7
 > Core baseline：CORE-2.0.0
 
 ## Components
@@ -63,6 +63,26 @@ authorization/probe 实现,不读取 integration golden,不运行真实或 fake 
 既有结果不属于 M1-007 AC evidence。将来把该 typed command 接到真实 HDC execution 仍须
 独立 consumer/integration readiness,不能由 M1-007 contract evidence推断。
 
+r7 不解锁或执行 M1-008；它把历史简写 contract 补成以下两轴均可锁屏执行、但必须绑定
+同一 implementation revision 的 headless task：
+
+| M1-008 evidence axis | canonical gate | interactive/real-device dependency | conclusion |
+| --- | --- | --- | --- |
+| simulation isolation contract | `AC-FLASH-006-01` / `TEST-AC-FLASH-006-01` (`contract`) | none | synthetic success evidence 永久为 simulated，hardware-support verified writer call count 0 |
+| macOS orchestration | `MAC-M1-SIM-001` / `TEST-MAC-M1-SIM-001` (`platform`) | local macOS filesystem only | journal/cancel/reconcile/reopen 可 headless 二值验证，real connectKey 与 external-tool launch count 0 |
+
+`platform` 在这里表示实际 macOS storage/runtime seam 的可复查运行，不表示 signed App、GUI、
+HDC、真实设备或 hardware evidence。Provider API 只暴露 synthetic fixture identity 与封闭 fault
+scenario；它不接收 `CurrentDeviceBinding`、connectKey 或 ProcessExecutor。Workflows 通过
+TASK-M1-003 的 locked journal/reconcile、Session manifest validator 和 TASK-M1-007 合入后的
+synthetic identity/effect boundary 组合成功、delay、failure、disconnect、outcomeUnknown 与
+cancellation。所有结果都持久化 `executionMode:simulated`；outcomeUnknown 不自动重放，任何
+simulation receipt 都没有升级 hardware support 的路径。
+
+因此 M1-008 的旧 `ready` 在 TASK-M1-007 未 done 时不满足 Definition of Ready。r7 只把它
+置回 `blocked` 并固定两个新 Swift 文件、run path 和验证矩阵；TASK-M1-007 implementation/
+done 合入后，另一个 readiness PR 才能固定实际 dependency OID、toolchain 与 baseline tests。
+
 ## Evidence strategy
 
 - Core AC 全部采用 canonical acceptance-cases 的 method/Test ID；expected evidence 直接指向规范 Scenario block，禁止转述；
@@ -70,6 +90,11 @@ authorization/probe 实现,不读取 integration golden,不运行真实或 fake 
   durable monotonic revision、exact `-t` target、USB threshold、TCP/UART reconfirmation、
   ambiguous effect rejection 与 per-device lane invariants；测试只用 synthetic identity/
   connectKey,M1-007 dedicated 真实 HDC/device/network/process dispatch count 为 0；
+- M1-008 的两个 canonical Test ID 必须来自同一 headless implementation revision：
+  contract test 覆盖 simulated evidence classification 与 hardware-support writer 零调用；
+  macOS platform test 使用本地临时 Session/journal/manifest 覆盖 success/cancel/failure/
+  disconnect/outcomeUnknown、reconcile 与 reopen，且 dedicated real connectKey、external process、
+  network、HDC/device dispatch count 全为 0；
 - fake hdc 是仓库内确定性可执行 fixture,作为真实子进程运行以覆盖 supervisor/process
   边界,但绝不触达真实设备或默认端口之外的网络；任何被 parser/probe 当成已支持语义的
   raw output 都必须来自 approved integration change 登记的 version/hash-pinned golden，

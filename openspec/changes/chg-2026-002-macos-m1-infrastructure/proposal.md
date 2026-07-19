@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-002-macos-m1-infrastructure
-revision: 6
-status: approved # r1-r5 已批准；r6 M1-007 headless consumer/readiness amendment 仅在对应 PR 合入后生效
+revision: 7
+status: approved # r1-r6 已批准；r7 M1-008 headless task-definition amendment 仅在对应 PR 合入后生效
 class: platform
 core_change_level: none
 owner: lvye
@@ -34,6 +34,10 @@ M0A 只交付可行性原型与分发决策。所有分阶段功能（UI Dump、
   该路径只使用仓库 fake fixture，不是 v1 分发路径；
 - 实现全部 M1 runtime/storage/logging/clock platform ports 并通过 Port contract tests；
 - 实现 `SimulatedFlashProvider` 隔离 harness（REQ-FLASH-006）；
+- 将 TASK-M1-008 固定为锁屏可执行的纯 simulated orchestration task：同一 headless
+  implementation revision 关闭 `AC-FLASH-006-01` contract 与 `MAC-M1-SIM-001` macOS
+  platform evidence，同时把旧的提前 `ready` fail closed 为等待 TASK-M1-007 done 后另行
+  readiness；
 - 按 CHG-2026-014 已验证的 consumer rule,将 TASK-M1-007 的 implementation scheduling
   dependency 从未完成的 TASK-M1-006 platform AC 改为已合入的 TASK-RLC-001 package
   interfaces；device binding/rebind/lane 只使用纯 value/policy/journal/typed-command seam 与
@@ -55,6 +59,9 @@ M0A 只交付可行性原型与分发决策。所有分阶段功能（UI Dump、
 - 以 TASK-M1-007 contract PASS 推进 TASK-M1-006、`MAC-M1-HDC-001`、HDC compatibility、
   platform conformance、hardware/support/release claim,或在该任务运行真实 HDC/device、
   非 loopback 网络、GUI/XCUITest/系统授权。
+- 以 r7 governance PR 执行 TASK-M1-008、生成 simulation evidence 或使其 `ready/done`；
+  在 M1-008 中接受真实 binding/connectKey、导入 process/HDC adapter、启动外部工具、访问
+  网络/设备、写硬件支持矩阵，或把 simulated platform evidence 解释为 realHardware/support。
 
 ## Impacted specifications
 
@@ -75,6 +82,11 @@ M0A 只交付可行性原型与分发决策。所有分阶段功能（UI Dump、
 - TASK-M1-007 只接收 synthetic identity/connectKey/evidence 并以 contract/property tests
   证明 revision、rebind、exact-target argv、effect gate 与 lane；未确认/缺字段/歧义时真实
   process/device dispatch count 恒为 0,且任何 fake/synthetic 结果不升级为平台或硬件证据。
+- TASK-M1-008 只接收不可转换为真实 binding 的 synthetic fixture identity，并通过既有
+  journal/manifest seam 持久化 `executionMode:simulated`；delay/failure/disconnect/
+  outcomeUnknown/cancellation 全部分支的外部 tool/network/device dispatch 和 hardware-support
+  verified-record mutation count 恒为 0。其 macOS platform evidence 只证明本地 orchestration，
+  不证明 Flash compatibility、真实设备、硬件支持、conformance 或 release。
 
 ## Approval
 
@@ -106,4 +118,12 @@ M0A 只交付可行性原型与分发决策。所有分阶段功能（UI Dump、
   `AC-DEV-*` 的 canonical Test ID/method/minimum evidence/expected Scenario 全部不变,不修改
   Core/spec/contract、M1-006 状态/evidence、platform profile、integration lock 或任何支持结论。
   本 governance PR 不修改 Swift、不执行 TASK-M1-007、不产生 acceptance evidence；r6 与
-  TASK-M1-007 的有效 readiness 仅在维护者 review/merge 后生效。
+  TASK-M1-007 的有效 readiness 仅在维护者 review/merge 后生效。r6 已由维护者 review 并经
+  PR #117 合入 `main`，merge commit
+  `4e0c4f94d12e0ab55902580e43bd6dd61c4e6e79`。
+- r7 M1-008 headless task-definition amendment：不改变 `REQ-FLASH-006`、
+  `POL-MODE-001`、`AC-FLASH-006-01` 或 `MAC-M1-SIM-001` 的 method、expected result、
+  minimum evidence 与 platform mapping；只把历史简写 task 扩成可评审的完整
+  objective/scope/path/verification/evidence contract，并因 TASK-M1-007 尚未 done 将旧
+  `ready` 改为 `blocked`。本 governance PR 不修改 Swift、不执行 TASK-M1-008、不产生或
+  重判 evidence；r7 仅在维护者 review/merge 后生效，后续仍须在依赖满足后独立 readiness。
