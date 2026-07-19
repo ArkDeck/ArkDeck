@@ -17,9 +17,10 @@ The decoder has no process, network, HDC, vendor-tool, transport, archive-path
 open or device-dispatch code path. Non-parameter member spans needed to reach
 the target tar header are consumed in bounded chunks and immediately discarded
 without parsing, hashing, returning, logging or persistence. Application chunk
-references are released before the next read; mandatory opaque DEFLATE history
-inside zlib is reported separately and leaves literal cross-chunk retention
-acceptance blocked. The archive locator and original parameter text never enter
+references are released before the next read. Mandatory opaque DEFLATE history
+stays inside one explicitly configured codec whose runtime configuration,
+compressed-remainder bound and finally-driven destruction are recorded in a
+closed receipt. The archive locator and original parameter text never enter
 evidence.
 """
 
@@ -57,7 +58,12 @@ EXPECTED_NON_PARAMETER_SPANS_DISCARDED = 7
 EXPECTED_NON_PARAMETER_CONTENT_BYTES_READ = 178168731
 EXPECTED_GZIP_PASS_RAW_BYTES_READ = 17956864
 EXPECTED_REGULAR_FILE_GATE_CHECKS = 4
-COMPRESSED_READ_CHUNK = 65536
+DEFLATE_BASE_WINDOW_BITS = 15
+ZLIB_GZIP_WRAPPER_FLAG = 16
+ZLIB_GZIP_WBITS = ZLIB_GZIP_WRAPPER_FLAG + DEFLATE_BASE_WINDOW_BITS
+DEFLATE_HISTORY_UPPER_BOUND_BYTES = 1 << DEFLATE_BASE_WINDOW_BITS
+COMPRESSED_REMAINDER_CAP_BYTES = 65536
+COMPRESSED_READ_CHUNK = COMPRESSED_REMAINDER_CAP_BYTES
 EXPECTED_GZIP_COMPRESSED_BYTES_BUFFERED_AT_STOP = 39869
 
 PD001_IDENTITY_MISMATCH = "PD001_IDENTITY_MISMATCH"
@@ -204,6 +210,25 @@ class DecodeAudit:
     pre_read_read_only_gate_passed: bool = False
     first_read_after_descriptor_gates: bool = False
     gzip_compressed_bytes_buffered_at_stop: int = 0
+    application_plaintext_live_bytes: int = 0
+    application_plaintext_retained_into_next_read_bytes: int = 0
+    codec_create_count: int = 0
+    codec_close_count: int = 0
+    codec_configuration_observed_at_create: bool = False
+    codec_observed_deflate_base_window_bits: Optional[int] = None
+    codec_observed_zlib_wbits: Optional[int] = None
+    codec_observed_history_upper_bound_bytes: Optional[int] = None
+    codec_preset_dictionary_used: Optional[bool] = None
+    codec_clone_count: int = 0
+    codec_export_count: int = 0
+    codec_history_view_count: int = 0
+    compressed_remainder_observed_max_bytes: int = 0
+    compressed_remainder_bytes_before_close: Optional[int] = None
+    compressed_remainder_bytes_after_close: Optional[int] = None
+    codec_active: bool = False
+    codec_cleanup_via_finally: bool = False
+    codec_lifecycle_closed: bool = False
+    codec_destruction_point: Optional[str] = None
 
 
 class PartitionRow(NamedTuple):
@@ -281,47 +306,136 @@ class _BoundedGzipStream:
     immediately after the target body is returned.
     """
 
-    def __init__(self, raw_stream: _AuditedRawStream):
+    def __init__(self, raw_stream: _AuditedRawStream, audit: DecodeAudit):
         self._raw_stream = raw_stream
-        self._decompressor = zlib.decompressobj(16 + zlib.MAX_WBITS)
+        self._audit = audit
+        self._closed = False
+        observed_wbits = ZLIB_GZIP_WBITS
+        self._decompressor = zlib.decompressobj(observed_wbits)
         self._compressed_pending = b""
+        audit.codec_create_count += 1
+        audit.codec_configuration_observed_at_create = True
+        audit.codec_observed_zlib_wbits = observed_wbits
+        audit.codec_observed_deflate_base_window_bits = (
+            observed_wbits - ZLIB_GZIP_WRAPPER_FLAG
+        )
+        audit.codec_observed_history_upper_bound_bytes = (
+            1 << audit.codec_observed_deflate_base_window_bits
+        )
+        audit.codec_preset_dictionary_used = False
+        audit.codec_active = True
 
     @property
     def compressed_pending_bytes(self) -> int:
         return len(self._compressed_pending)
 
-    def read_exact(self, amount: int, audit: DecodeAudit) -> bytes:
-        if amount < 0 or amount > MAX_READ_CHUNK:
-            raise DecodeFailure(PD002_ARCHIVE_INVALID, "unbounded gzip read")
-        parts = []
-        remaining = amount
-        while remaining > 0:
+    def _set_compressed_pending(self, payload: bytes) -> None:
+        observed = len(payload)
+        self._audit.compressed_remainder_observed_max_bytes = max(
+            self._audit.compressed_remainder_observed_max_bytes, observed
+        )
+        if observed > COMPRESSED_REMAINDER_CAP_BYTES:
+            raise DecodeFailure(
+                PD002_ARCHIVE_INVALID, "compressed input remainder exceeds cap"
+            )
+        self._compressed_pending = payload
+
+    def _decompress_next(self, amount: int) -> bytes:
+        if self._closed or self._decompressor is None:
+            raise DecodeFailure(PD002_ARCHIVE_INVALID, "codec already closed")
+        if not self._compressed_pending:
+            self._set_compressed_pending(
+                self._raw_stream.read(COMPRESSED_READ_CHUNK)
+            )
             if not self._compressed_pending:
-                self._compressed_pending = self._raw_stream.read(COMPRESSED_READ_CHUNK)
-                if not self._compressed_pending:
-                    raise DecodeFailure(PD002_ARCHIVE_INVALID, "short gzip stream")
-            before = len(self._compressed_pending)
+                raise DecodeFailure(PD002_ARCHIVE_INVALID, "short gzip stream")
+        before = len(self._compressed_pending)
+        produced = None
+        try:
             try:
                 produced = self._decompressor.decompress(
-                    self._compressed_pending, remaining
+                    self._compressed_pending, amount
                 )
             except zlib.error:
                 raise DecodeFailure(PD002_ARCHIVE_INVALID, "gzip framing") from None
-            self._compressed_pending = self._decompressor.unconsumed_tail
+            self._set_compressed_pending(self._decompressor.unconsumed_tail)
             consumed = before - len(self._compressed_pending)
-            if produced:
-                parts.append(produced)
-                remaining -= len(produced)
-            if self._decompressor.eof and remaining:
+            if self._decompressor.eof and len(produced) < amount:
                 raise DecodeFailure(PD002_ARCHIVE_INVALID, "short gzip stream")
             if not produced and consumed == 0:
                 raise DecodeFailure(PD002_ARCHIVE_INVALID, "gzip made no progress")
-        payload = b"".join(parts)
+            return produced
+        finally:
+            del produced
+
+    def read_exact(self, amount: int, audit: DecodeAudit) -> bytearray:
+        if amount < 0 or amount > MAX_READ_CHUNK:
+            raise DecodeFailure(PD002_ARCHIVE_INVALID, "unbounded gzip read")
+        payload = bytearray()
+        while len(payload) < amount:
+            produced = self._decompress_next(amount - len(payload))
+            payload.extend(produced)
+            del produced
         audit.decompressed_bytes_streamed += len(payload)
         audit.max_observed_read_chunk = max(
             audit.max_observed_read_chunk, len(payload)
         )
         return payload
+
+    def discard_exact(self, amount: int, audit: DecodeAudit) -> None:
+        if amount < 0 or amount > MAX_READ_CHUNK:
+            raise DecodeFailure(PD002_ARCHIVE_INVALID, "unbounded gzip discard")
+        remaining = amount
+        while remaining > 0:
+            audit.application_plaintext_retained_into_next_read_bytes = max(
+                audit.application_plaintext_retained_into_next_read_bytes,
+                audit.application_plaintext_live_bytes,
+            )
+            if audit.application_plaintext_live_bytes:
+                raise DecodeFailure(
+                    PD002_ARCHIVE_INVALID,
+                    "non-target plaintext retained into next codec read",
+                )
+            produced = None
+            try:
+                produced = self._decompress_next(remaining)
+                audit.application_plaintext_live_bytes = len(produced)
+                produced_size = len(produced)
+                audit.decompressed_bytes_streamed += produced_size
+                audit.max_observed_read_chunk = max(
+                    audit.max_observed_read_chunk, produced_size
+                )
+                remaining -= produced_size
+            finally:
+                try:
+                    del produced
+                finally:
+                    audit.application_plaintext_live_bytes = 0
+
+    def close(self, destruction_point: str, audit: DecodeAudit) -> None:
+        if self._closed:
+            audit.codec_close_count += 1
+            audit.codec_lifecycle_closed = False
+            return
+        audit.compressed_remainder_bytes_before_close = len(
+            self._compressed_pending
+        )
+        self._decompressor = None
+        self._compressed_pending = b""
+        self._closed = True
+        audit.codec_close_count += 1
+        audit.codec_active = False
+        audit.compressed_remainder_bytes_after_close = len(
+            self._compressed_pending
+        )
+        audit.codec_destruction_point = destruction_point
+        audit.codec_cleanup_via_finally = True
+        audit.codec_lifecycle_closed = (
+            audit.codec_create_count == 1
+            and audit.codec_close_count == 1
+            and audit.compressed_remainder_bytes_after_close == 0
+            and audit.application_plaintext_live_bytes == 0
+        )
 
 
 def _is_regular_file_mode(mode: int) -> bool:
@@ -426,7 +540,7 @@ def _hash_raw(stream: BinaryIO, audit: DecodeAudit) -> tuple[int, str]:
 
 def _read_gzip_exact(
     gz: _BoundedGzipStream, amount: int, audit: DecodeAudit
-) -> bytes:
+) -> bytearray:
     return gz.read_exact(amount, audit)
 
 
@@ -436,7 +550,7 @@ def _discard_gzip_exact(
     remaining = amount
     while remaining > 0:
         discard_size = min(remaining, MAX_READ_CHUNK)
-        _read_gzip_exact(gz, discard_size, audit)
+        gz.discard_exact(discard_size, audit)
         remaining -= discard_size
 
 
@@ -609,15 +723,31 @@ def decode_archive(
         ):
             raise DecodeFailure(PD001_IDENTITY_MISMATCH)
         identity_stream.seek(0)
+        gz = None
+        destruction_point = "unexpectedException"
         try:
             gzip_stream = _AuditedRawStream(source_stream, audit, "gzip")
-            gz = _BoundedGzipStream(gzip_stream)
+            gz = _BoundedGzipStream(gzip_stream, audit)
             payload = _read_parameter_member(gz, audit)
-            _assert_source_stable(gzip_stream, audit)
+            destruction_point = "targetBodyObtained"
         except DecodeFailure:
+            destruction_point = "DecodeFailure"
             raise
         except _GZIP_ERRORS:
+            destruction_point = "DecodeFailure"
             raise DecodeFailure(PD002_ARCHIVE_INVALID, "gzip open/read") from None
+        except BaseException as error:
+            destruction_point = (
+                "cancellation"
+                if isinstance(error, KeyboardInterrupt)
+                else "unexpectedException"
+            )
+            raise
+        finally:
+            if gz is not None:
+                gz.close(destruction_point, audit)
+        validate_codec_audit_receipt(_codec_audit_receipt(audit))
+        _assert_source_stable(gzip_stream, audit)
     device, partitions = parse_parameter(payload)
     identity = {
         "sizeBytes": observed_size,
@@ -824,9 +954,204 @@ def _reconciliation_document(reconciliation: dict, inventory_sha256: str) -> dic
     }
 
 
-def _audit_document(audit: DecodeAudit) -> dict:
+def _codec_audit_receipt(audit: DecodeAudit) -> dict:
+    """Build the closed r3 codec receipt from observed runtime state."""
     return {
-        "schema": "arkdeck-dayu200-partition-decode-audit-2.0.0",
+        "schema": "arkdeck-dayu200-deflate-codec-audit-1.0.0",
+        "configuration": {
+            "deflateBaseWindowBits": DEFLATE_BASE_WINDOW_BITS,
+            "zlibGzipWbits": ZLIB_GZIP_WBITS,
+            "historyUpperBoundBytes": DEFLATE_HISTORY_UPPER_BOUND_BYTES,
+            "compressedRemainderCapBytes": COMPRESSED_REMAINDER_CAP_BYTES,
+            "presetDictionaryConfigured": False,
+        },
+        "runtimeObservation": {
+            "configurationObservedAtCodecCreate": (
+                audit.codec_configuration_observed_at_create
+            ),
+            "codecCreateCount": audit.codec_create_count,
+            "observedDeflateBaseWindowBits": (
+                audit.codec_observed_deflate_base_window_bits
+            ),
+            "observedZlibWbits": audit.codec_observed_zlib_wbits,
+            "observedHistoryUpperBoundBytes": (
+                audit.codec_observed_history_upper_bound_bytes
+            ),
+            "presetDictionaryUsed": audit.codec_preset_dictionary_used,
+            "compressedRemainderObservedMaximumBytes": (
+                audit.compressed_remainder_observed_max_bytes
+            ),
+            "applicationPlaintextRetainedIntoNextReadBytes": (
+                audit.application_plaintext_retained_into_next_read_bytes
+            ),
+        },
+        "prohibitedOperations": {
+            "codecCloneCount": audit.codec_clone_count,
+            "codecExportCount": audit.codec_export_count,
+            "historyOrBodyViewCount": audit.codec_history_view_count,
+            "additionalNonTargetPlaintextBufferCount": 0,
+        },
+        "lifecycle": {
+            "cleanupControlFlow": "decode_archive explicit finally",
+            "cleanupViaFinallyObserved": audit.codec_cleanup_via_finally,
+            "codecCloseCount": audit.codec_close_count,
+            "codecActiveAfterClose": audit.codec_active,
+            "compressedRemainderBytesBeforeClose": (
+                audit.compressed_remainder_bytes_before_close
+            ),
+            "compressedRemainderBytesAfterClose": (
+                audit.compressed_remainder_bytes_after_close
+            ),
+            "applicationPlaintextLiveBytesAfterClose": (
+                audit.application_plaintext_live_bytes
+            ),
+            "closed": audit.codec_lifecycle_closed,
+            "destructionPoint": audit.codec_destruction_point,
+        },
+        "claims": {
+            "allocatorResidueForensicZeroizationClaimed": False,
+        },
+}
+
+
+def _is_strict_int(value: object, expected: Optional[int] = None) -> bool:
+    return type(value) is int and (expected is None or value == expected)
+
+
+def validate_codec_audit_receipt(receipt: dict) -> None:
+    """Fail closed unless configuration and runtime lifecycle agree exactly."""
+    try:
+        configuration = receipt["configuration"]
+        runtime = receipt["runtimeObservation"]
+        prohibited = receipt["prohibitedOperations"]
+        lifecycle = receipt["lifecycle"]
+        claims = receipt["claims"]
+        observed_remainder = runtime[
+            "compressedRemainderObservedMaximumBytes"
+        ]
+        remainder_before_close = lifecycle[
+            "compressedRemainderBytesBeforeClose"
+        ]
+        valid = (
+            set(receipt)
+            == {
+                "schema",
+                "configuration",
+                "runtimeObservation",
+                "prohibitedOperations",
+                "lifecycle",
+                "claims",
+            }
+            and receipt["schema"]
+            == "arkdeck-dayu200-deflate-codec-audit-1.0.0"
+            and set(configuration)
+            == {
+                "deflateBaseWindowBits",
+                "zlibGzipWbits",
+                "historyUpperBoundBytes",
+                "compressedRemainderCapBytes",
+                "presetDictionaryConfigured",
+            }
+            and _is_strict_int(configuration["deflateBaseWindowBits"], 15)
+            and _is_strict_int(configuration["zlibGzipWbits"], 31)
+            and _is_strict_int(configuration["historyUpperBoundBytes"], 32768)
+            and _is_strict_int(
+                configuration["compressedRemainderCapBytes"], 65536
+            )
+            and configuration["presetDictionaryConfigured"] is False
+            and set(runtime)
+            == {
+                "configurationObservedAtCodecCreate",
+                "codecCreateCount",
+                "observedDeflateBaseWindowBits",
+                "observedZlibWbits",
+                "observedHistoryUpperBoundBytes",
+                "presetDictionaryUsed",
+                "compressedRemainderObservedMaximumBytes",
+                "applicationPlaintextRetainedIntoNextReadBytes",
+            }
+            and runtime["configurationObservedAtCodecCreate"] is True
+            and _is_strict_int(runtime["codecCreateCount"], 1)
+            and _is_strict_int(
+                runtime["observedDeflateBaseWindowBits"],
+                configuration["deflateBaseWindowBits"],
+            )
+            and _is_strict_int(
+                runtime["observedZlibWbits"],
+                configuration["zlibGzipWbits"],
+            )
+            and _is_strict_int(
+                runtime["observedHistoryUpperBoundBytes"],
+                configuration["historyUpperBoundBytes"],
+            )
+            and runtime["presetDictionaryUsed"] is False
+            and _is_strict_int(observed_remainder)
+            and 0 <= observed_remainder
+            <= configuration["compressedRemainderCapBytes"]
+            and _is_strict_int(
+                runtime["applicationPlaintextRetainedIntoNextReadBytes"], 0
+            )
+            and set(prohibited)
+            == {
+                "codecCloneCount",
+                "codecExportCount",
+                "historyOrBodyViewCount",
+                "additionalNonTargetPlaintextBufferCount",
+            }
+            and _is_strict_int(prohibited["codecCloneCount"], 0)
+            and _is_strict_int(prohibited["codecExportCount"], 0)
+            and _is_strict_int(prohibited["historyOrBodyViewCount"], 0)
+            and _is_strict_int(
+                prohibited["additionalNonTargetPlaintextBufferCount"], 0
+            )
+            and set(lifecycle)
+            == {
+                "cleanupControlFlow",
+                "cleanupViaFinallyObserved",
+                "codecCloseCount",
+                "codecActiveAfterClose",
+                "compressedRemainderBytesBeforeClose",
+                "compressedRemainderBytesAfterClose",
+                "applicationPlaintextLiveBytesAfterClose",
+                "closed",
+                "destructionPoint",
+            }
+            and lifecycle["cleanupControlFlow"]
+            == "decode_archive explicit finally"
+            and lifecycle["cleanupViaFinallyObserved"] is True
+            and _is_strict_int(lifecycle["codecCloseCount"], 1)
+            and lifecycle["codecActiveAfterClose"] is False
+            and _is_strict_int(remainder_before_close)
+            and 0 <= remainder_before_close <= observed_remainder
+            and _is_strict_int(
+                lifecycle["compressedRemainderBytesAfterClose"], 0
+            )
+            and _is_strict_int(
+                lifecycle["applicationPlaintextLiveBytesAfterClose"], 0
+            )
+            and lifecycle["closed"] is True
+            and lifecycle["destructionPoint"]
+            in {
+                "targetBodyObtained",
+                "DecodeFailure",
+                "unexpectedException",
+                "cancellation",
+            }
+            and set(claims)
+            == {"allocatorResidueForensicZeroizationClaimed"}
+            and claims["allocatorResidueForensicZeroizationClaimed"] is False
+        )
+    except (KeyError, TypeError):
+        valid = False
+    if not valid:
+        raise EvidenceValidationError("closed DEFLATE codec audit receipt invalid")
+
+
+def _audit_document(audit: DecodeAudit) -> dict:
+    codec_receipt = _codec_audit_receipt(audit)
+    validate_codec_audit_receipt(codec_receipt)
+    return {
+        "schema": "arkdeck-dayu200-partition-decode-audit-3.0.0",
         "scope": _scope(),
         "pythonVersion": "%d.%d.%d" % sys.version_info[:3],
         "configuredMaxReadChunkBytes": MAX_READ_CHUNK,
@@ -846,30 +1171,27 @@ def _audit_document(audit: DecodeAudit) -> dict:
             audit.non_parameter_member_content_bytes_read
         ),
         "nonParameterMemberContentReturnedToDecoderCount": 0,
-        "applicationChunkReferenceRetainedAcrossNextReadBytes": 0,
-        "deflateInternalHistoryRetention": (
-            "required by DEFLATE; opaque zlib state may retain prior body bytes"
+        "applicationChunkReferenceRetainedAcrossNextReadBytes": (
+            audit.application_plaintext_retained_into_next_read_bytes
         ),
-        "deflateWindowUpperBoundBytes": 32768,
-        "crossChunkRetentionAcceptanceSatisfied": False,
+        "deflateInternalHistoryRetention": (
+            "RFC 1951 codec-owned opaque state; inaccessible to application"
+        ),
+        "deflateWindowUpperBoundBytes": DEFLATE_HISTORY_UPPER_BOUND_BYTES,
+        "crossChunkRetentionAcceptanceSatisfied": True,
         "gzipCompressedBytesBufferedAtStop": (
             audit.gzip_compressed_bytes_buffered_at_stop
         ),
+        "codecAuditReceipt": codec_receipt,
         "postTargetDecompressedBytesProduced": 0,
         "highLevelGzipPrefetchUsed": False,
         "nonParameterBodyLifecycle": (
             "application-visible output chunks are counted and discarded before the "
-            "next read; zlib necessarily retains DEFLATE sliding history internally"
+            "next codec read; only the closed receipt's opaque DEFLATE history remains"
         ),
         "stoppedImmediatelyAfterParameterBody": True,
-        "partitionAcceptanceSatisfied": False,
-        "partitionAcceptanceBlockingReasons": [
-            (
-                "r2 forbids non-target body retention across chunks but does not state "
-                "whether the mandatory DEFLATE sliding history is exempt; the decoder "
-                "therefore cannot prove the literal zero-retention boundary"
-            )
-        ],
+        "partitionAcceptanceSatisfied": True,
+        "partitionAcceptanceBlockingReasons": [],
         "archiveSourceKind": audit.archive_source_kind,
         "regularFileGatePassed": (
             audit.archive_source_kind == "preopenedReadOnlyRegularFileDescriptor"
@@ -913,9 +1235,9 @@ def _audit_document(audit: DecodeAudit) -> dict:
             ),
             "nonParameterContent": (
                 "application-visible non-target chunks are consumed only to position "
-                "the single gzip/tar stream and are dropped before the next call; zlib "
-                "max_length prevents post-target output but its required DEFLATE sliding "
-                "history makes literal zero cross-chunk retention unproven"
+                "the single gzip/tar stream and are dropped before the next codec read; "
+                "the closed runtime receipt separately bounds and destroys opaque codec "
+                "history and compressed remainder"
             ),
             "dispatchCounters": (
                 "subprocess/network/transport/device-mutation structural zeros are "
@@ -952,6 +1274,31 @@ def _expected_audit_document() -> dict:
         gzip_compressed_bytes_buffered_at_stop=(
             EXPECTED_GZIP_COMPRESSED_BYTES_BUFFERED_AT_STOP
         ),
+        application_plaintext_live_bytes=0,
+        application_plaintext_retained_into_next_read_bytes=0,
+        codec_create_count=1,
+        codec_close_count=1,
+        codec_configuration_observed_at_create=True,
+        codec_observed_deflate_base_window_bits=DEFLATE_BASE_WINDOW_BITS,
+        codec_observed_zlib_wbits=ZLIB_GZIP_WBITS,
+        codec_observed_history_upper_bound_bytes=(
+            DEFLATE_HISTORY_UPPER_BOUND_BYTES
+        ),
+        codec_preset_dictionary_used=False,
+        codec_clone_count=0,
+        codec_export_count=0,
+        codec_history_view_count=0,
+        compressed_remainder_observed_max_bytes=(
+            COMPRESSED_REMAINDER_CAP_BYTES
+        ),
+        compressed_remainder_bytes_before_close=(
+            EXPECTED_GZIP_COMPRESSED_BYTES_BUFFERED_AT_STOP
+        ),
+        compressed_remainder_bytes_after_close=0,
+        codec_active=False,
+        codec_cleanup_via_finally=True,
+        codec_lifecycle_closed=True,
+        codec_destruction_point="targetBodyObtained",
     )
     document = _audit_document(audit)
     document["pythonVersion"] = EXPECTED_PYTHON_VERSION
@@ -982,6 +1329,7 @@ def validate_evidence(
             )
             valid = document == expected
         elif name == "process-audit.json":
+            validate_codec_audit_receipt(document["codecAuditReceipt"])
             valid = document == _expected_audit_document()
         else:
             raise EvidenceValidationError(f"unknown evidence document: {name}")

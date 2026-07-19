@@ -1,4 +1,4 @@
-# DAYU200 pinned-image partition decoder — r2
+# DAYU200 pinned-image partition decoder — r3 codec boundary
 
 CHG-2026-009 / TASK-PD-001. Offline, read-only research tooling. The result is
 non-authoritative and valid only for pinned archive identity
@@ -50,11 +50,21 @@ target body. The target size/hash is pinned before the closed CMDLINE/mtdparts
 grammar is parsed; every unknown form fails explicitly.
 
 DEFLATE decoding necessarily keeps opaque sliding history inside zlib across
-calls. Revision r2 does not say whether that mandatory codec state is exempt
-from “not retained across chunks”. The implementation therefore records the
-application-visible lifecycle separately and marks the partition AC/task
-`BLOCKED` pending governance clarification; it does not report literal zero
-cross-chunk retention or a passing three-AC result.
+calls. The r3 boundary permits exactly one gzip-wrapped DEFLATE codec with base
+window bits 15 (`wbits=31`), a maximum 32768-byte codec-owned history, no preset
+dictionary, clone, export or history/body view, and at most 65536 bytes of
+application-held compressed remainder. Configuration and runtime observation
+are separate receipt sections: constants alone cannot establish acceptance.
+
+The codec and compressed remainder are released by an explicit `finally` after
+the target body, `DecodeFailure`, unexpected exception or cancellation. The
+closed receipt requires one create/close pair, records the observed remainder
+maximum and destruction point, and requires zero remainder plus zero live
+non-target plaintext after close. Every numeric receipt field requires an exact
+JSON integer type and every boolean requires an exact JSON boolean; bool/int or
+float/int equality cannot establish acceptance. Missing, contradictory, over-cap
+or incomplete-cleanup fields fail closed. This is an application-reference
+lifecycle claim, not allocator-residue forensic zeroization.
 
 The original parameter text and archive locator never enter evidence.
 
@@ -82,9 +92,24 @@ The receipt binds the running bundle identifier/CDHash to the three exact core
 JSON hashes. In the same collector process, `evidence.py` revalidates the
 receipt, current reviewed-source hashes, signed manifest, platform evidence and
 core bytes together, then publishes six create-only files (three core JSON
-files, runtime receipt, platform evidence and blocked summary) into a new run
+files, runtime receipt, platform evidence and summary) into a new run
 directory. There is no standalone staging/publication CLI; caller-supplied
 artifacts, receipts, core outputs and PASS assertions are not accepted.
+
+## Headless contract versus platform acceptance
+
+`TASK-PD-001` may establish only
+`TEST-DECODE-DAYU200-HEADLESS-001`: synthetic unit/fault/static tests prove the
+r3 codec receipt and fail-closed validator without running the collector or
+reading the pinned archive. A PASS for that headless contract does not satisfy,
+downgrade or reinterpret any platform acceptance case.
+
+`TEST-DECODE-DAYU200-PARTITION-001`,
+`TEST-DECODE-DAYU200-INPUT-BOUNDARY-001` and
+`TEST-DECODE-DAYU200-RECONCILE-001` remain pending until `TASK-PD-002` runs one
+fresh collector on an interactively unlocked console, through the signed broker
+and pinned archive, against the merged implementation identity. Unit/static
+results and earlier r1/r2 evidence cannot substitute for that run.
 
 Tests:
 
