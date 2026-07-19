@@ -5,44 +5,55 @@
 
 ## TASK-PD-001 — parameter.txt 只读解码器 + 映射/对账 evidence
 
-- Status:blocked(r2 revision 已由维护者合入 `main`
-  `1f7c10e4fe266c27866e7cec79be8160c1e5ce53`;r1 implementation + FAILED/
-  BLOCKED evidence 已合入 `main`
-  `45f2b605d0b70b4ea1e20928613fab1153b84563`,不得追溯重判或复用为 passing
-  evidence。r2 implementation 已合入 `main`
-  `0076e44dcaed45605c1cccefc093a82b246a4ef5`;2026-07-19 fresh rerun 时远程
-  macOS host 锁屏,签名 broker 的 NSOpenPanel/PowerBox 无法取得人工文件选择,
-  collector 在 create-only publication 前安全取消,三项 AC 均无 fresh evidence。
-  此外该合入版仍将强制 DEFLATE sliding history 记为 literal cross-chunk
-  retention blocker并生成 `partitionAcceptanceSatisfied:false`;在 r2 AC 对该 codec
-  state 的边界经维护者批准澄清/修订、且解锁 host 完成 fresh collector 前不得
-  标记 `done`。见
-  `evidence/runs/TASK-PD-001/r2-fresh-attempt-2026-07-19.md`;本 blocked 状态仅在
-  维护者 review/merge 后生效)
-- Revision r3 draft(2026-07-19):仅澄清 application-visible non-target plaintext
-  retention 与 gzip-DEFLATE 必需的 opaque 32 KiB codec history 边界；本 revision
-  PR 不包含 implementation、fresh evidence、readiness、状态翻转或既有 evidence
-  重判。r3 仅在维护者 review/merge 后生效，TASK-PD-001 继续保持 `blocked`；合入
-  后仍须独立 readiness PR 固定最小 remediation 与 fresh 三项 AC rerun，且 collector
-  运行时 host 必须处于可交互解锁状态。
-- Objective:在不改变 r2 AC 的前提下，将 decoder 改为只接受预打开的只读普通
-  文件 descriptor，并以独立、最小权限的 macOS App Sandbox broker 建立和直接
-  传递该 descriptor；随后对 pinned archive 重新生成映射/对账与全部三项 fresh
-  evidence。
+- Status:ready（r3 revision 已由维护者经 PR #109 合入 `main`
+  `b4bf696019e114e0f3fc605f679e3f1b3e6aeeb3`；本分支只起草 readiness，只有
+  维护者 review/merge 本独立 PR 后才生效）
+- Readiness review（2026-07-19；不执行 TASK-PD-001、不产生或重判 acceptance
+  evidence）：
+  - Change/dependency gate:satisfied。CHG-2026-009@r3 已批准；CHG-2026-007
+    TASK-RB-001 done、CHG-2026-003 archived identity/inventory、r2 implementation
+    `0076e44dcaed45605c1cccefc093a82b246a4ef5` 与 blocked rerun record
+    `0db5f22c0878d059697d32a3022fa260c83e2798` 均为当前 `main` 祖先。r1/r2
+    FAILED/BLOCKED evidence 不得追溯重判或复用为 passing evidence。
+  - AC/scope gate:satisfied。r3 已封闭 application-visible plaintext retention 与
+    opaque DEFLATE state 边界；三项 AC、fail-closed gate 和 fresh platform evidence
+    方法均明确。最小 remediation 源码只涉及下述四个固定文件，不修改已签名
+    sandbox broker/collector、accepted spec/contract/profile 或其他 task。
+  - Toolchain gate:satisfied。clean `main` 上确认 macOS 26.5.2(25F84) arm64、
+    Xcode 26.6(17F113)、Swift 6.3.3、CPython 3.14.6 与 codesign 在场；现有
+    `test_decode.py` 35 tests / 0 failures，SDD 0 errors / 0 warnings / 111 AC。
+    这些是 readiness audit，不是 r3 acceptance evidence。
+  - Interactive execution gate:collector 仍必须由人类在可交互解锁的 console
+    session 中经 NSOpenPanel/PowerBox 选择 pinned archive。readiness 起草时只读
+    host flag 为 `CGSSessionScreenIsLocked=Yes`，故不得在本 PR 启动 collector；
+    后续 implementation PR 须先确认解锁，锁屏/取消/无法选择时在 create-only
+    publication 前 fail closed，且不得用旧 output 代替 fresh 三项 evidence。
+  - Review boundary:本 PR 只起草 `blocked→ready` 与任务精确范围，不修改源码，
+    不创建 run/evidence，不改变 gap/DEC-002、产品集成、compatibility、support、
+    hardware 或 release claim；实现与 fresh evidence 仍须后续独立 TASK-PD-001 PR。
+- Objective:在不改变 r3 AC、fd-only decoder 和既有签名 sandbox broker/collector
+  边界的前提下，以最小修改移除仅针对 r2 歧义的硬编码 blocker，建立 fail-closed、
+  可验证的 opaque codec configuration/lifecycle audit；随后在解锁 host 上对 pinned
+  archive 同一次 fresh rerun 生成映射、对账与全部三项 platform evidence。
 - In scope:
-  1. fd-only decoder + ≤1 MiB bounded stream-discard、封闭文法、deterministic
-     evidence 与 r1 正/负分支回归；production decoder 不接受/解析 archive path，
-     首次 read 前 `fstat`，非普通或不可验证只读状态的 fd 零 read fail closed；
-  2. 独立 artifact `scripts/partition_decode/macos_input_broker/**`：单独的 macOS
-     App Sandbox broker target、closed entitlements/policy、签名/验证脚本与
-     descriptor-transfer harness。broker 只经系统用户文件选择取得 archive，
-     entitlement 不含 USB/serial/raw-disk/network；descriptor 以同一进程内直接
-     调用传给 decoder，不得以 path、subprocess、socket/network 或 caller assertion
-     代替；现有 `ArkDeckApp` 不参与该 trust boundary；
-  3. 对 pinned archive fresh rerun，重新生成 mapping/reconciliation/process audit/
-     summary/run；签名 identity、签后 entitlement/policy、artifact hash、OS/arch/
-     Xcode/Swift/Python 与 descriptor-transfer chain 均写入 platform evidence。
-- Out of scope:r1 evidence 重判；任何真实/模拟设备访问；任何 subprocess、网络、
+  1. `decode.py` 将 audit schema 升为 r3 语义并精确记录：gzip-DEFLATE base window
+     bits 15(zlib `wbits=31`)、history upper bound 32768 bytes、无 preset dictionary/
+     clone/export/history view、application-held compressed remainder configured/实际
+     最大值均不超过 65536 bytes、application plaintext retained into next read 为 0；
+  2. codec/remainder 在取得 target 以及任一 DecodeFailure、异常或取消路径均通过
+     显式 `finally` lifecycle 关闭，receipt 能证明 destroy 已发生且关闭后 remainder
+     为 0；缺失、越界或矛盾 receipt 必须令 `partitionAcceptanceSatisfied:false`，
+     不允许把配置常量本身当作运行结果，也不声称 allocator forensic zeroization；
+  3. `evidence.py`/`test_decode.py`/`README.md` 删除仅针对 r2 歧义的固定 BLOCKED
+     结论，改为由上述封闭 receipt 与既有 identity/stream/grammar/reconciliation/
+     zero-dispatch gate 共同判定；增加成功、failure/cancellation cleanup、字段篡改、
+     cap 越界与静态无二次 plaintext buffer/codec clone/export 的正负测试；
+  4. 使用未修改的签名 broker/collector 对 pinned archive fresh rerun，重新生成
+     mapping/reconciliation/process audit/summary/run；同一次 run 记录 signing
+     identity、签后 entitlement/policy、artifact hash、OS/arch/Xcode/Swift/Python、
+     descriptor-transfer chain 与全部三项 AC 结论。
+- Out of scope:r1/r2 evidence 重判；修改 sandbox broker/collector source、policy、
+  entitlement 或 descriptor trust boundary；任何真实/模拟设备访问；任何网络、
   HDC/vendor tool 或 device mutation；产品集成、烧写地址推导、gap/DEC-002/支持或
   兼容性状态变更；修改 accepted specs/contracts/profile/lock/hardware matrix。
 - Requirements/AC:`DECODE-DAYU200-PARTITION-001`、
@@ -50,15 +61,17 @@
   (见 acceptance-cases.yaml；三项均须 fresh evidence)
 - Depends on:CHG-2026-007 TASK-RB-001 done(已满足,计划第①步)、
   CHG-2026-003 archived(pinned identity 与成员清单,已满足)、r1 FAILED/BLOCKED
-  evidence 与 r2 revision 均已合入 `main`(已满足)
-- Allowed paths:`scripts/partition_decode/**`(broker 仅位于固定子树
-  `macos_input_broker/**`)、本 change `evidence/**`、本 change `tasks.md`
-  (仅本任务状态/完成 evidence 引用)
-- Forbidden paths:现有 `ArkDeckApp/**`、`ArkDeck.xcodeproj/**`、产品代码、
-  `Packages/**`、`openspec/specs/**`、
+  evidence、r2 implementation/blocked record 与 r3 revision 均已合入 `main`(已满足)
+- Allowed paths:`scripts/partition_decode/README.md`、
+  `scripts/partition_decode/decode.py`、`scripts/partition_decode/evidence.py`、
+  `scripts/partition_decode/test_decode.py`、本 change `evidence/**`、本 change
+  `tasks.md`(仅本任务状态/完成 evidence 引用)
+- Forbidden paths:`scripts/partition_decode/macos_input_broker/**`、现有
+  `ArkDeckApp/**`、`ArkDeck.xcodeproj/**`、产品代码、`Packages/**`、
+  `openspec/specs/**`、
   `openspec/contracts/**`、`openspec/planning/**`、hardware matrix、其他
   change/task evidence
-- Risk:medium(离线只读,但 broker 是 r2 的零设备安全边界；任何 entitlement/
+- Risk:medium(离线只读,但 broker 是 r3 保留的零设备安全边界；任何 entitlement/
   policy/signing/descriptor chain 不明确即 fail closed。取消/异常不得接受 partial
   governed evidence；输入只读且输出确定,清理临时输出后可安全重跑。解码结论
   被误用为烧写依据的风险继续由 non-authoritative/不推导地址边界覆盖)
@@ -67,16 +80,16 @@
   arm64、Xcode 26.6、Swift 6.3.3、CPython 3.14.6 与 codesign。当前无 certificate
   identity，broker 使用并如实记录独立 ad-hoc signature(`Signature=adhoc`)；它仅
   是本地 sandbox/platform evidence，不构成 release signing/support claim。
-- Deliverables:fd-only decoder + 单元/descriptor 负测 + 静态零 path-open/
-  subprocess/network/device-dispatch 审计；独立 broker source/target/entitlements/
-  policy/sign/verify/transfer harness；fresh 映射表/对账表/process audit/summary/
-  run 与 signing/platform evidence。
-- Verification:按 acceptance-cases.yaml 三个 Test ID fresh 执行；broker artifact
-  必须 `codesign --verify --strict` 通过，签后 entitlement/policy 与 source
-  allowlist 精确一致，descriptor chain 可复查；设备类负测只用 synthetic/mock
-  metadata。缺任一项、出现 path fallback/子进程/网络/设备访问或 r1 evidence
-  复用，任务整体不得标记 `done`。结论仅对 pinned 镜像成立，不构成烧写依据、
-  产品集成、兼容或支持声明。
+- Deliverables:r3 codec configuration/lifecycle audit + fail-closed validator/summary；
+  cleanup/cap/tamper/static branch-complete tests；fresh 映射表/对账表/process audit/
+  summary/run 与既有签名 broker 的 signing/platform/runtime-binding evidence。
+- Verification:先运行 branch-complete unit/static tests，再由未修改的 broker artifact
+  完成 `codesign --verify --strict`、签后 entitlement/policy/source allowlist 与
+  descriptor chain 复核；只有解锁 host 上同一次 fresh collector 的三个 Test ID
+  全部 PASS 才可起草完成。缺任一 codec receipt、cleanup/cap fault、出现 path
+  fallback/网络/设备访问/production child-process dispatch、复用 r1/r2 output 或
+  archive locator/raw parameter 泄露，任务整体不得标记 `done`。结论仅对 pinned
+  镜像成立，不构成烧写依据、产品集成、兼容或支持声明。
 - PR boundary:后续 remediation implementation + fresh evidence 在一个独立
   `TASK-PD-001` PR 闭环；本 readiness PR 不携带任何 implementation/evidence
   重判，后续 `ready→done` 仍须独立 status PR。
