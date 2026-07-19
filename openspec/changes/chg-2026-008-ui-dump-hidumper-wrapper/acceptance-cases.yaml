@@ -28,7 +28,11 @@ cases:
     -t internally; operator, default-target, stale, mismatch, or substituted
     connect-key paths have intent/request/process counts zero. A human-attested
     hardware-evidence.json names this acceptance ID, contains the same positive
-    device.bindingRevision, and passes schema plus semantic validation.
+    device.bindingRevision, canonical model/serial, and physical-target
+    confirmation. Its physical receipt identity hash equals the binding and all
+    intents, and confirmation validity covers execution. Schema plus semantic
+    validation checks these fields; operator authenticity remains a maintainer
+    review attestation rather than an automated proof.
 - acceptance_id: INT-UD-CAPTURE-MUT-001
   test_id: TEST-INT-UD-CAPTURE-MUT-001
   method: Human-authorized Phase A first target-build deviceMutation capture of R1 through R3.
@@ -45,7 +49,12 @@ cases:
     intent loads the fixed positive CurrentDeviceBinding revision from the
     production durable store and revalidates the pinned server generation before
     and after dispatch. Confirmation covers binding, server, fixture, exact argv,
-    path, inventory, receive, and cleanup. Pre-existing or unowned paths are
+    path, inventory, receive, and cleanup. Canonical physical model/serial and
+    identitySnapshotHash match the physical-target receipt, binding, hardware
+    record, and every intent. The accepted actor=user confirmation is unexpired,
+    its scope hash is recomputed, and its related intent set is exact. Different
+    device, stale, substituted, missing, extra, or scope-mismatched receipts have
+    dispatch zero. Pre-existing or unowned paths are
     never overwritten or removed; stdout, stderr, and optional sidecar origins
     stay separate outside git; cleanup targets only the proven owned path; global
     search, wildcard, and recursive deletion are forbidden. The human-attested
@@ -60,16 +69,21 @@ cases:
   expected_source: openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/verification.md#INT-UD-HWE-SEM-001
   minimum_evidence: contract
   expected_result: Before any real-device task becomes ready, approved schemas
-    define binding, server, and device-intent receipts. The verifier source and
-    test paths, commit OID, file SHA-256 values, fixed Python executable, and
-    exact CLI are pinned. It requires a human operator, a positive binding
-    revision equal across hardware evidence, binding receipt, and every device
-    intent, and an identical server endpoint, ownership, and generation across
-    the Job snapshot and pre/post receipts. It also verifies exact task,
-    acceptance, and step-kind values, resolvable repository artifact hashes,
-    and that sensitive raw paths remain outside git. Missing, extra, unknown,
-    or mismatched values exit nonzero. Negative tests include schema-valid but
-    semantically inconsistent documents and invoke no HDC, device, server, or
+    define binding, server, device-intent, physical-target confirmation, and
+    task-applicable confirmation receipts. Capture intents require an accepted
+    unexpired kind=deviceMutation entry; preflight uses only its registered
+    physical or binding confirmation kind. The verifier source and test paths, commit
+    OID, file SHA-256 values, fixed Python executable, and exact CLI including
+    both confirmation inputs are pinned. It requires canonical model and serial
+    plus identitySnapshotHash equality across hardware evidence, physical receipt,
+    binding receipt, and every intent; confirmation time windows must be current,
+    and the recomputed scope hash and related intent set must be exact. It also
+    validates positive binding revision, stable server tuple, exact task,
+    acceptance, step-kind and artifact hashes, claimed-operator and attestation
+    field equality, and raw-outside-git. It does not prove that a claimed name is
+    a human; authenticity depends on maintainer PR review. Missing, extra,
+    expired, unknown, or mismatched values exit nonzero. Negative tests include
+    schema-valid semantic inconsistencies and invoke no HDC, device, server, or
     network operation. Schema validation alone never passes this case.
 - acceptance_id: INT-UD-CAPTURE-R4-001
   test_id: TEST-INT-UD-CAPTURE-R4-001
@@ -85,10 +99,28 @@ cases:
     file, regex-only, first-ID, zero-match, multiple-match, stale, and foreign
     token paths have request and process dispatch counts zero. With a separate
     human deviceMutation confirmation, R4 then uses the exact one-element
-    payload and the same durable binding, stable server generation, registered
+    payload and the same physical model/serial/identity receipt, unexpired exact-
+    scope confirmation, durable binding, stable server generation, registered
     exact-path inventory, ownership, receive, cleanup, raw privacy, schema, and
     pinned semantic-verifier gates as Phase A. Destructive and Agent dispatch
     counts are zero. This case claims no canonical AC-DUMP PASS.
+- acceptance_id: INT-UD-REDACTOR-001
+  test_id: TEST-INT-UD-REDACTOR-001
+  method: Offline deterministic and fail-closed UI Dump derived-golden redaction contract.
+  expected_source: openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/verification.md#INT-UD-REDACTOR-001
+  minimum_evidence: contract
+  expected_result: Before TASK-UD-001 becomes ready, an independent task pins
+    the uidump-derived-redaction-v1 source, algorithm manifest, exact structural
+    safe-literal allowlist, receipt schema, tests, source commit OID, every file
+    hash, fixed Python executable, and exact replay CLI. The CLI initially writes
+    derived bytes and its receipt outside git. Synthetic adversarial and property
+    tests reject invalid UTF-8, control and bidi characters, confusables, package,
+    ability, path, serial, window, component, page text, unknown token or line,
+    resource overflow, and every manifest, allowlist, source, or input hash drift.
+    Repeated accepted inputs are byte-deterministic and contain only reviewed
+    structural literals and typed placeholders. No real capture raw, HDC, device,
+    server, or network operation is used. This case does not close canonical
+    AC-DUMP-008-01.
 - acceptance_id: INT-UD-WRAPPER-001
   test_id: TEST-INT-UD-WRAPPER-001
   method: Contract tests over the fixed wrapper with adversarial fake hidumper outputs.
@@ -113,9 +145,11 @@ cases:
   minimum_evidence: platform
   expected_result: Each repository golden is explicitly derived, never raw,
     from a human-operated approved Recipe capture whose whole-stream raw hash is
-    recorded while its sensitive bytes remain outside git. A controlled replay
-    of uidump-derived-redaction-v1 produces the registered derived hash. Its
-    receipt binds the algorithm/source and safe-literal allowlist hashes, raw
+    recorded while its sensitive bytes remain outside git. TASK-UD-REDACTOR-001
+    is already done; TASK-UD-001 read-only replays its pinned exact CLI and may
+    not change the redactor, algorithm manifest, or safe-literal allowlist. The
+    controlled replay produces the registered derived hash. Its receipt binds
+    the algorithm/source/manifest and safe-literal allowlist hashes, raw
     and derived hashes, replacement counts, and human privacy review. Unknown
     tokens or lines fail closed; the repository contains no raw UI bytes or
     sensitive page text, package, ability, window, component, path, or user

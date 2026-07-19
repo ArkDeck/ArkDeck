@@ -48,8 +48,11 @@ endpoint/ownership/generation，再由 Core workflow durable 创建 CurrentDevic
 registered exact remote-path inventory/ownership/cleanup 与 pinned semantic verifier 全部关闭后才可能
 ready。R4 被拆为 `TASK-UD-CAP-R4-001`，必须等待 R2 target output family 与 versioned typed
 component-tree extractor/selection receipt 获批后才能执行；十进制校验或人工选择不构成 component
-provenance。采集只产生事实输入，不会自行定义 Recipe success marker；此前实现草案 PR #126 仅
-保留为不可合并的审计记录。
+provenance。realHardware semantic verifier 还必须绑定 physical model/serial/identity、binding/intents
+与未过期 confirmation scope；它只能检查 claimed operator/attestation 字段一致性，不能证明真人。
+此外新增独立 `TASK-UD-REDACTOR-001`，在 golden task ready 前固定 transform source、algorithm
+manifest、safe-literal allowlist、receipt schema 与 replay CLI。采集只产生事实输入，不会自行定义
+Recipe success marker；此前实现草案 PR #126 仅保留为不可合并的审计记录。
 
 ## What changes
 
@@ -66,11 +69,11 @@ provenance。采集只产生事实输入，不会自行定义 Recipe success mar
 - r3 治理修订只做以下 remediation：把 TASK-UD-001 恢复为 `blocked`；新增
   `capture-runbook.md`，在任何真机执行前固定候选 argv boundary、supervised existing-server
   sequence、durable binding materialization、保守 effect、hardware-evidence 与 raw/derived 隐私链；
-  新增 blocked preflight、offline hardware-evidence semantic verifier、R1-R3 deviceMutation capture
-  与后置 R4 capture tasks；增加 CHG-2026-014 逐
+  新增 blocked preflight、offline hardware-evidence semantic verifier、deterministic redactor、R1-R3
+  deviceMutation capture 与后置 R4 capture tasks；增加 CHG-2026-014 逐
   deliverable consumer dependency 表；将 `REQ-DUMP-003` / `AC-DUMP-003-01` /
   `TEST-AC-DUMP-003-01` 纳入验证闭环；固定 PyYAML 解释器 preflight。r3 merge 后没有 ready
-  real-device task。TASK-UD-001 只有在 verifier 与三个 realHardware 前置 task 完成且后续独立
+  real-device task。TASK-UD-001 只有在 verifier、redactor 与三个 realHardware 前置 task 完成且后续独立
   decision/readiness revision
   关闭全部 blocker 后才能再次起草 `blocked→ready`。
 
@@ -87,12 +90,15 @@ provenance。采集只产生事实输入，不会自行定义 Recipe success mar
 - 在 R2 output family、typed component-tree extractor OID/hash、deterministic zero/one/many selection
   rule 未获批时执行 R4，或从 operator/CLI/env/file 取得 component ID。
 - 只凭 generic hardware JSON schema 起草 realHardware PASS；semantic verifier 的 source/test path、
-  commit OID/hash、input schemas 或 exact CLI 未固定时执行真机 task。
+  commit OID/hash、binding/server/intent/physical-target/confirmation input schemas 或 exact CLI 未固定
+  时执行真机 task；只比较 operator 字符串后声称已证明操作者为人类。
 - 由操作者提供 connect key、复用 M0B endpoint、使用 HDC 默认目标，或在 durable binding
   revision/server generation 缺失、不匹配、unknown/drift 时启动进程；隐式启动、停止、重启、
   接管或重新配置 HDC server。
 - 将 raw UI Dump bytes、片段、页面文本、包/组件/窗口标识符或用户路径提交进仓库；把 derived
   golden 错标为 raw，或声称 raw/derived byte-exact equality。
+- 在 `TASK-UD-REDACTOR-001 done` 前让 TASK-UD-001 ready/读取 raw，或由 golden 实现者临时决定
+  redactor algorithm/safe literals/replay CLI；在 TASK-UD-001 内修改已固定 redaction toolchain。
 - 将 `TASK-M1-006` 标为 done/verified，重判其任何 HDC/XCUITest evidence，或把本依赖
   解耦解释为 HDC compatibility、platform conformance、hardware/support/release claim。
 
@@ -133,6 +139,11 @@ provenance。采集只产生事实输入，不会自行定义 Recipe success mar
   selection 后 `bindingCandidate`/`bindingConfirmed` 先写入 locked Session journal，capture
   harness 只接受 receipt ID + fixed revision 并经 production loader replay；operator/default/
   stale/mismatch source 的 intent/request/process count 均为 `0`；
+- physical-target receipt 的 canonical model/serial、binding revision 与 identitySnapshotHash 必须和
+  hardware evidence、binding receipt、每个 device intent 精确相等且未过期；mutation confirmation
+  manifest 的 accepted `actor=user` entry 必须覆盖 exact related intents，scope hash 从 physical
+  identity、binding/server、fixture、argv、path/inventory/receive/cleanup 重算。different device、
+  stale/substituted/scope mismatch 时 dispatch `0`；
 - Phase A mutation task 在 dedicated non-sensitive fixture、registered typed window inventory、
   registered exact-path sidecar inventory operation、durable human confirmation、exact pre/post
   receipt、remote ownership 与 exact cleanup 全部固定前 R1-R3 dispatch count 为 `0`；现有 catalog
@@ -143,13 +154,16 @@ provenance。采集只产生事实输入，不会自行定义 Recipe success mar
 - component ID preflight 必须在任何 `ProcessRequest` materialization 和 dispatch 之前；
   缺失、空值、非法格式及 shell/argument injection 输入的 request/dispatch count 均为 `0`；
 - UI Dump raw 默认敏感并留在 repo 外；仓库 evidence 只含 whole-stream hash/metadata，golden
-  仅能是确定性 redaction 的 derived output，并以 algorithm/source/allowlist/raw/derived hash、
-  replacement counts 与 human privacy review receipt 闭环；
-- 三个 future realHardware task 都必须提交 schema 2.0.0 `hardware-evidence.json`，记录人类
+  仅能在 `TASK-UD-REDACTOR-001 done` 后只读重放 pinned exact CLI 生成 derived output，并以
+  algorithm/source/manifest/allowlist/raw/derived/replay hashes、replacement counts 与 human privacy
+  review receipt 闭环；TASK-UD-001 不得选择或修改 safe literals；
+- 三个 future realHardware task 都必须提交 schema 2.0.0 `hardware-evidence.json`，记录 claimed
   operator、physical identity/serial、firmware/toolchain、positive binding revision、执行时间、
   exact acceptance/step kinds 与 artifact hashes，并通过固定 validator + semantic equality check；
   semantic verifier 必须先以独立 host-only task 固定 input schemas、source/test path、commit OID/
-  hashes、fixed Python 与 exact CLI，并以 schema-valid semantic mismatch negative tests 证明；
+  hashes、fixed Python 与 exact CLI，并以 schema-valid physical identity/confirmation/scope mismatch
+  negative tests 证明字段一致性。operator 的现实真实性仍仅由维护者 PR review/merge attestation
+  保证，自动化不得扩大 claim；
 - 本 r3 治理 PR 本身零 HDC/device dispatch；merge 后仍没有 ready real-device task。所有 future
   capture 的 destructive/Agent dispatch count 为 `0`，且不解除任何 `GAP-DAYU200-*`。
 
@@ -166,7 +180,8 @@ provenance。采集只产生事实输入，不会自行定义 Recipe success mar
   environment gate 不充分。
 - r3 review remediation 只修订本 change 的 proposal/tasks/verification/acceptance metadata
   并新增 plan-only `capture-runbook.md`，恢复 TASK-UD-001 `blocked`、声明 blocked preflight、
-  verifier 与两阶段 capture tasks，
+  verifier、redactor 与两阶段 capture tasks，
   且不包含 harness 实现、fixture、profile/lock 或 task evidence。r3 仅在维护者 review/merge
-  对应治理 PR 后生效；本 revision 明确拆分 Phase A/R4、登记 operation/extractor/verifier blockers 与
-  canonical AC ownership boundary。该 merge 不执行任何 capture/TASK-UD-001，也不使 CHG-008 verified。
+  对应治理 PR 后生效；本 revision 明确拆分 Phase A/R4、登记 operation/extractor/verifier/redactor
+  blockers、physical-target/confirmation linkage、operator attestation boundary 与 canonical AC
+  ownership boundary。该 merge 不执行任何 capture/TASK-UD-001，也不使 CHG-008 verified。
