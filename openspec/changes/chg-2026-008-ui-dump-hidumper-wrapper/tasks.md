@@ -10,10 +10,12 @@
   Core device-targeting workflow 证明 existing-server endpoint/ownership/generation，创建并 reopen
   一个 durable `CurrentDeviceBinding` revision，供后续 capture harness 按 revision 读取；操作者
   永远不提供 connect key。
-- Requirements/AC:`REQ-HDC-001`、`REQ-HDC-002`、`REQ-HDC-003`、`REQ-HDC-004`、
-  `REQ-HDC-005`、`REQ-DEV-001`、`REQ-DEV-002`、`REQ-DEV-006`；
-  `INT-UD-PREFLIGHT-001` / `TEST-INT-UD-PREFLIGHT-001`。
+- Change-local closure:`INT-UD-PREFLIGHT-001` / `TEST-INT-UD-PREFLIGHT-001`。
+- Canonical Safety/source inputs:`REQ-HDC-001/002/003/004/005` 与
+  `REQ-DEV-001/002/006`；本 task 不认领其 canonical AC/Test PASS，逐项 ownership 见下表。
 - Blocking dependencies/gates:
+  - `TASK-UD-HWE-SEM-001 done`，且其 receipt/intent input schemas、source/test OID/hash、fixed
+    interpreter 与 exact CLI 已由后续 readiness revision 重验；schema-only 路径不可执行；
   - `TASK-M1-006 done`，其 production `HDCServerSupervisor` source AC/evidence 可消费；本
     preflight 明确依赖真实 endpoint/ownership/generation behavior，不能以 CHG-2026-014 的
     consolidated bytes/interface provenance 替代（当前未满足）；
@@ -52,14 +54,70 @@
 - Forbidden now:implementation、task evidence 起草、installed HDC、device/server/network dispatch、
   binding creation、GUI/系统授权、server lifecycle/subserver、connect key 读取/记录。
 
-## TASK-UD-CAP-MUT-001 — 四 Recipe 首次 target-build 人工 deviceMutation 采集
+### TASK-UD-PREFLIGHT-001 canonical dependency boundary
 
-- Status:blocked（`R1`、`R2`、`R3`、`R4` 和 ad-hoc `INV-1` dispatch count 必须为 `0`）
-- Requirements/AC:`INT-UD-CAPTURE-MUT-001` / `TEST-INT-UD-CAPTURE-MUT-001`。
-- Depends on:`TASK-UD-PREFLIGHT-001 done`；后续独立 readiness revision 关闭下列全部 gate。
+| Canonical Requirement | Canonical AC / Test | 本 task disposition |
+| --- | --- | --- |
+| `REQ-HDC-001` | `AC-HDC-001-01` / `TEST-AC-HDC-001-01`；`AC-HDC-001-02` / `TEST-AC-HDC-001-02` | read-only Safety/source dependency；由 source implementation task 按 contract/platform evidence 关闭，本 task 只验证已关闭 interface 的 capture-specific composition |
+| `REQ-HDC-002` | `AC-HDC-002-01` / `TEST-AC-HDC-002-01` | read-only Safety/source dependency；不得用本 task 的 realHardware receipt 替代 `supervisorContract` |
+| `REQ-HDC-003` | `AC-HDC-003-01` / `TEST-AC-HDC-003-01`；`AC-HDC-003-02` / `TEST-AC-HDC-003-02` | read-only Safety/source dependency；lifecycle call counter/ownership contract 仍由 source task 关闭 |
+| `REQ-HDC-004` | `AC-HDC-004-01` / `TEST-AC-HDC-004-01` | read-only Safety/source dependency；本 task 不关闭 platform endpoint-isolation evidence |
+| `REQ-HDC-005` | `AC-HDC-005-01` / `TEST-AC-HDC-005-01` | read-only Safety/source dependency；本 task 不定义 adapter output family |
+| `REQ-DEV-001` | `AC-DEV-001-01` / `TEST-AC-DEV-001-01` | read-only Safety/source dependency；必须在 M1-007/source task 已 PASS 后消费 durable binding interface |
+| `REQ-DEV-002` | `AC-DEV-002-01` / `TEST-AC-DEV-002-01`；`AC-DEV-002-02` / `TEST-AC-DEV-002-02` | read-only Safety/source dependency；本 task 的 receipt equality 不能替代 binding dispatch contract/property |
+| `REQ-DEV-006` | `AC-DEV-006-01` / `TEST-AC-DEV-006-01` | read-only Safety/source dependency；本 task 只加严 identity gate，不关闭 canonical effect-gate property |
+
+只有上述 canonical evidence 由其 source owner 合入 PASS，且 local
+`TEST-INT-UD-PREFLIGHT-001` 单独通过时，preflight 才可能起草完成；两类 evidence 不互相替代。
+
+## TASK-UD-HWE-SEM-001 — UI Dump hardware evidence 离线语义 verifier
+
+- Status:blocked（当前 schema-only 验证不足；不存在获批 executable verifier，任何 realHardware
+  PASS 均不得只凭 generic JSON schema 起草）
+- Objective:在真机 task ready 前，实现并审查一个纯 host/offline、fail-closed semantic verifier，
+  交叉验证 hardware evidence、durable binding receipt、device intent manifest 与 server receipt。
+- Change-local closure:`INT-UD-HWE-SEM-001` / `TEST-INT-UD-HWE-SEM-001`；不认领任何
+  canonical Core AC PASS。
+- Blocking dependencies/gates:
+  - 独立 approved contract/integration revision 先固定 repo-safe binding receipt、server receipt 与
+    device intent manifest 的 schema path/version，以及 canonical serialization/hash linkage；当前只存在
+    generic `hardware-evidence.schema.json`，不足以定义 cross-document equality；
+  - 后续 readiness revision 固定 source commit OID、下列两个文件各自 SHA-256、fixed Python
+    executable path/version/hash 与 exact CLI；hash 未产生前本 task 不能 ready；
+  - exact CLI shape 必须为
+    `<FIXED_PYTHON> scripts/ui_dump_capture/verify_hardware_evidence.py --evidence <hardware-evidence.json> --binding-receipt <binding-receipt.json> --intent-manifest <intent-manifest.json> --server-receipt <server-receipt.json> --repository-root <ARKDECK_ROOT> --expected-task-id <TASK_ID> --expected-acceptance-id <AC_ID>`；
+    所有输入均为 path token，不得接受 raw JSON、connect key、serial override 或网络来源；
+  - verifier 必须检查 human operator、`bindingRevision > 0` 且等于 binding receipt 和全部 device
+    intents、server endpoint/ownership/generation 与 Job snapshot/全部 pre/post receipt 相等、task/AC/
+    step kinds 精确、repo artifact path/hash 可解析、敏感 raw 不在 git；unknown/missing/extra/mismatch
+    一律 nonzero；
+  - offline negative tests 至少覆盖 missing/zero binding revision、receipt/intent revision mismatch、
+    server generation/endpoint/ownership drift、wrong task/AC、Agent operator、artifact hash/path mismatch、
+    raw 路径落入 git、schema-valid 但语义不一致；不得只测试 schema-invalid JSON。
+- Future allowed paths（仅在上述 input contracts 合入后的独立 readiness revision 生效）：
+  - `scripts/ui_dump_capture/verify_hardware_evidence.py`
+  - `scripts/ui_dump_capture/test_verify_hardware_evidence.py`
+  - `openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/evidence/runs/TASK-UD-HWE-SEM-001/**`
+  - 本 `tasks.md`（仅该 task 的独立 status/evidence 更新）
+- Read-only inputs:未来固定的 receipt/intent schemas；`openspec/contracts/hardware-evidence.schema.json`；
+  `openspec/verification/acceptance-cases.yaml`；git index/repository root。
+- Hardware required:no；tests 必须只用 synthetic offline fixtures/temp directories，installed HDC、
+  device/server/network dispatch 均为 `0`。
+- Forbidden now:创建 verifier/evidence、选择 receipt schema、填入占位 hash、联网安装 dependency，
+  或用 schema-valid JSON 声称 semantic PASS。
+
+## TASK-UD-CAP-MUT-001 — R1-R3 首次 target-build 人工 deviceMutation 采集
+
+- Status:blocked（`R1`、`R2`、`R3` 和 ad-hoc `INV-1` dispatch count 必须为 `0`；本 task
+  不含 `R4`）
+- Change-local closure:`INT-UD-CAPTURE-MUT-001` / `TEST-INT-UD-CAPTURE-MUT-001`。
+- Canonical Safety inputs:`REQ-DUMP-002/005/006/007/008`；本 task 不认领其 canonical
+  AC/Test PASS，逐项 ownership 见下表。
+- Depends on:`TASK-UD-PREFLIGHT-001 done`、`TASK-UD-HWE-SEM-001 done`；后续独立
+  readiness revision 关闭下列全部 gate。
 - Blocking gates:
   - R1/R3 的 official source 只作静态 routing hint，不是 DAYU200 firmware output-mode evidence；
-    四 Recipe 首次 target execution 全部提高为 `captureRemoteFile/deviceMutation`，不得存在
+    R1-R3 首次 target execution 全部提高为 `captureRemoteFile/deviceMutation`，不得存在
     stdout-only/readOnly 分支；
   - 固定 dedicated disposable non-sensitive fixture HAP tuple：artifact hash、bundle、ability、
     静态页面内容、window rule，以及 install/start/stop/cleanup 的 typed effect/argv；另行批准
@@ -69,13 +127,26 @@
     每个 intent 前后重放/revalidate binding 与 server；
   - human `deviceMutation` confirmation scope hash 覆盖 Recipe、binding revision/identity、server
     tuple、fixture、exact argv、remote path、pre/post inventory、receive 与 cleanup；
-  - 固定一个 exact remote sidecar path 且 pre-inventory 证明不存在；禁止全局 `/data` search、
-    wildcard、递归删除或覆盖既有文件；R1/R3 也执行同一保守 inventory，不得先运行再观察；
+  - 另一个 approved contract/integration change 必须先在 `remote-operations.yaml`、
+    `workflow-step-registry.yaml`/schema 与 platform adapter/profile/lock 中登记 exact-path sidecar
+    pre/post inventory typed operation；当前 catalog **不存在**该 operation，generic
+    `verifyRemoteState(probeId, expectedState)` 也没有 exact path/argv/output family/adapter binding，
+    因而不可使用；
+  - 该 registration 必须固定 operation ID、typed arguments、minimum effect、exact argv array、
+    output family/parser、adapter OID/hash、literal remote path、existence/type/size/mtime/ownership
+    receipt、timeout/cancellation，并禁止 shell/raw command；readiness revision 只引用 merged entry
+    OID/hash，不得由 harness/operator 临时选择命令；
+  - 固定一个 exact remote sidecar path，且由上述 registered operation 的 pre-receipt 证明不存在；
+    禁止全局 `/data` search、wildcard、symlink follow、递归删除或覆盖既有文件；R1/R3 也执行同一
+    保守 inventory，不得先运行再观察；
   - post-inventory 证明 exact new path 属于本 task，stdout/sidecar 分立 raw origin/hash，cleanup
-    仅允许 `cleanupOwnedRemotePath` 作用于该 exact path；ownership 不明则保留，cleanup failure
-    记录 `needsAttention`；
-  - `R4` component ID 只来自同一 run 的受控 `R2` 输出并通过 strict validator；若 UI-state
-    mutation 仍可能，须在 `R4` 前取得独立 confirmation scope。
+    仅允许 `cleanupOwnedRemotePath(remotePath, ownershipEvidenceId)` 消费同一 path 的 registered
+    pre/post receipts 所产生的 ownership evidence ID；ownership/identity 不明则保留，cleanup
+    failure 记录 `needsAttention`；
+  - inventory/ownership negative tests 至少覆盖 pre-existing path、missing post path、非 regular
+    file/symlink、unchanged/stale identity、mtime/size/identity ambiguity、unexpected extra output、
+    parser unknown、binding/server drift，以及无 ownership evidence 的 receive/cleanup；对应
+    Recipe/receive/cleanup dispatch 必须按 gate 为 `0`。
 - Future allowed paths（仅在 readiness revision 合入后生效并由其重新固定 executable entrypoint）：
   - closed durable-binding/server-aware harness source与 offline fault tests（具体路径当前未批准）
   - `openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/evidence/runs/TASK-UD-CAP-MUT-001/**`
@@ -87,16 +158,66 @@
   `hardware-evidence.json`。hardware record 的 `device.bindingRevision` 必填且与 preflight receipt /
   每个 intent 相等；`toolchain.other` 记录 endpoint/ownership/generation 与 receipt hashes；raw 保持
   repo 外。
-- Schema/semantic validation（两个 realHardware task 均强制）：
+- Schema/semantic validation（三个 realHardware task 均强制）：
   `/opt/homebrew/anaconda3/bin/jsonschema` version `4.17.3`，SHA-256
   `672885a523b0d538e4d734a9009d1678827facd27f2e634093e3bfc838392de7`；执行
   `/opt/homebrew/anaconda3/bin/jsonschema -i <task-evidence>/hardware-evidence.json openspec/contracts/hardware-evidence.schema.json`，
-  再运行 future harness 的 offline semantic verifier，检查 operator human、positive exact
-  binding revision、acceptance IDs、artifact hashes/privacy。validator 漂移或联网安装需求即 blocked。
-- Deliverables/verification:见 `capture-runbook.md`；未来必须对 R1-R4 证明 exact one-element
+  再运行已完成 `TASK-UD-HWE-SEM-001` 的 pinned offline verifier；其 source/test OID/hash、exact CLI
+  或 input schema 任一漂移即 blocked。validator 漂移或联网安装需求也 blocked。
+- Deliverables/verification:见 `capture-runbook.md`；未来必须对 R1-R3 证明 exact one-element
   payload、durable binding materialization、same-generation server pre/post、confirmation、exact-path
   inventory、separate raw origins、owned cleanup、hardware schema/semantic validation 与 raw/derived
   privacy chain，且 destructive/Agent dispatch count `0`。未关闭前不得起草 PASS/done。
+
+### Capture task canonical Safety boundary
+
+| Canonical Requirement | Canonical AC / Test | Capture task disposition |
+| --- | --- | --- |
+| `REQ-DUMP-002` | `AC-DUMP-002-01` / `TEST-AC-DUMP-002-01` | read-only Safety input；window ID 必须来自另行登记的 typed inventory，但本真机 task 不关闭 `adapterGolden` |
+| `REQ-DUMP-005` | `AC-DUMP-005-01` / `TEST-AC-DUMP-005-01` | 强制执行 stdout/sidecar 分离；仅贡献事实 evidence，不替代 canonical `artifactContract` |
+| `REQ-DUMP-006` | `AC-DUMP-006-01` / `TEST-AC-DUMP-006-01` | 强制 owned-only cleanup；不替代 canonical `ownershipCleanupContract` |
+| `REQ-DUMP-007` | `AC-DUMP-007-01` / `TEST-AC-DUMP-007-01` | 强制 stale/unknown fail closed；不替代 canonical `sidecarFaultInjection` |
+| `REQ-DUMP-008` | `AC-DUMP-008-01` / `TEST-AC-DUMP-008-01` | 仅作 raw/derived/privacy Safety 输入；本 task 不执行 diagnostic export，也不关闭 platform evidence |
+
+## TASK-UD-CAP-R4-001 — R4 componentDetail 后置人工 deviceMutation 采集
+
+- Status:blocked（`R4` dispatch count 必须为 `0`；十进制格式校验不构成 component provenance）
+- Change-local closure:`INT-UD-CAPTURE-R4-001` / `TEST-INT-UD-CAPTURE-R4-001`。
+- Canonical Safety inputs:`REQ-DUMP-003` → `AC-DUMP-003-01` →
+  `TEST-AC-DUMP-003-01`；`REQ-DUMP-005` → `AC-DUMP-005-01` →
+  `TEST-AC-DUMP-005-01`；`REQ-DUMP-006` → `AC-DUMP-006-01` →
+  `TEST-AC-DUMP-006-01`；`REQ-DUMP-007` → `AC-DUMP-007-01` →
+  `TEST-AC-DUMP-007-01`；`REQ-DUMP-008` → `AC-DUMP-008-01` →
+  `TEST-AC-DUMP-008-01`。`AC-DUMP-003-01` 仍由 `TASK-UD-001` 的 canonical contract test
+  关闭，其余 disposition 与上表相同；本 task 不认领任何 canonical PASS。
+- Depends on:`TASK-UD-CAP-MUT-001 done`；后续 approved R2 output-family/extractor decision；
+  `TASK-UD-HWE-SEM-001 done`。
+- Blocking gates:
+  - R2 target capture 完成后，独立 approved decision revision 先登记 R2 success/failure/unknown
+    output family 与 parser；unknown/truncated/failure R2 不可进入 extraction；
+  - 同一 decision/contract chain 必须登记 versioned typed component-tree extractor：source/resource
+    path、input family/version、parser/adapter OID 与 SHA-256、typed component-ID output schema、
+    deterministic fixture selector 和 exact zero/one/many rule。不得以 regex/十进制校验、第一项、
+    最小值、操作者选择或自由文本替代；zero 或 multiple match 均阻断 R4 request/process dispatch；
+  - extractor receipt 必须绑定同一 R2 raw-origin hash、fixture hash/window token、parser OID/hash、
+    selected component token 与 selection proof；R4 harness 只接受该 receipt ID，不接受
+    `COMPONENT_ID` CLI/env/file/manual input；
+  - 继承 R1-R3 的 durable binding/server、dedicated fixture、registered exact-path inventory、
+    ownership/receive/cleanup、raw/privacy 与 semantic verifier gates，并取得覆盖 R4 exact scope 的
+    独立 human `deviceMutation` confirmation。
+- Future allowed paths:必须由 extractor/operation/verifier dependencies 完成后的独立 readiness
+  revision 固定；在此之前只保留未来 evidence path
+  `openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/evidence/runs/TASK-UD-CAP-R4-001/**`
+  与本 `tasks.md` 的独立 status/evidence 更新。
+- Hardware required:yes, human only；当前未 ready。
+- Required evidence（未来）：R2 extractor receipt、`run.md`、`redacted-manifest.json`、
+  `capture-hashes.md`、`hardware-evidence.json`；raw 继续留在 repo 外。
+- Verification（未来）：R4 exact one-element payload 中 component token 与 extractor receipt 相等；
+  altered/stale/foreign R2 hash、parser drift、zero/multiple selection、manual token、binding/server/path
+  drift 的 R4 request/process dispatch 均为 `0`；schema + pinned semantic verifier 均 PASS；
+  destructive/Agent dispatch `0`。
+- Forbidden now:component parser/extractor 发明或实现、R4 capture/evidence、manual component ID、
+  installed HDC/device/server/network dispatch。
 
 ## TASK-UD-001 — 固定 HiDumper 调用包装 + golden 登记 + 对抗测试
 
@@ -163,11 +284,17 @@ interface 自行替代。
   - `TASK-UD-PREFLIGHT-001 done`：human evidence 证明 existing server 的 exact endpoint/
     ownership/generation 和 durable CurrentDeviceBinding positive revision；capture harness 只经
     production loader/replay materialize `-t`，没有 operator/default/stale connect-key path；
-  - `TASK-UD-CAP-MUT-001 done`：人类维护者只按 `capture-runbook.md` 的封闭候选矩阵执行四条
-    `deviceMutation` Recipe，逐条记录 one-element `-a` payload、same binding/server generation、
-    separate raw origins、exit/timeout/hash、confirmation/inventory/cleanup；raw UI bytes 留在受控
-    位置，不进入仓库；两个 realHardware task 均有 schema-valid `hardware-evidence.json`，其中
-    `device.bindingRevision` 与 durable receipt/intents 精确相等；
+  - `TASK-UD-HWE-SEM-001 done`：offline verifier 的 input schemas、source/test path、commit OID、
+    SHA-256 与 exact CLI 均已固定，schema-valid 但 binding/server/intent/artifact 语义不一致的
+    negative fixtures 全部 fail closed；
+  - `TASK-UD-CAP-MUT-001 done`：人类维护者只按 `capture-runbook.md` 的封闭 Phase A 矩阵执行
+    R1-R3 `deviceMutation` Recipe，逐条记录 one-element `-a` payload、same binding/server generation、
+    separate raw origins、exit/timeout/hash、registered inventory/ownership/cleanup；raw UI bytes留在
+    受控位置，不进入仓库；
+  - `TASK-UD-CAP-R4-001 done`：只在 R2 output family 与 versioned typed extractor 获批后执行 R4；
+    component token 由同一 R2 raw hash 的 extractor receipt 唯一产生，manual/ambiguous/stale path
+    均不可达；三个 realHardware task 均有 schema-valid 且 semantic-valid
+    `hardware-evidence.json`，其中 `device.bindingRevision` 与 durable receipt/intents 精确相等；
   - 每个拟支持 Recipe 至少有一份真实成功输出；若目标 build 无法成功，平台结论必须如实为
     blocked/nonConformant，不得由 fake 补齐。后续 approved decision revision 逐 Recipe 固定精确
     argv 以及 success/failure/unknown family（文本 marker、结构锚点或 byte fingerprint 采用哪种
@@ -209,7 +336,7 @@ interface 自行替代。
 - Risk:medium（把人类受控 raw 经 deterministic redaction 登记为 derived fixture，并固定新的
   argv/output-family 语义；必须闭环 raw/derived receipt 与隐私审查，并以 fake 对抗测试覆盖
   exit-0 陷阱）
-- Hardware required:no for TASK-UD-001；真机输入只来自两个具名前置 tasks 的已合入
+- Hardware required:no for TASK-UD-001；真机输入只来自三个具名前置 realHardware tasks 的已合入
   evidence。本实现/contract verification 必须 headless、无设备。
 - Required environment:锁屏 macOS headless shell；Swift 6.3.3、`xcrun swift-format` 6.3.0、
   SwiftPM；固定 Python executable

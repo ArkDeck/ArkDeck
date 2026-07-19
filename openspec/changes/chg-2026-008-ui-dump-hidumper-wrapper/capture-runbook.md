@@ -10,7 +10,9 @@
 This runbook fixes the candidate Recipe payload boundary and the fail-closed prerequisites. It does
 not create missing production authority. A later readiness revision may make a human task executable
 only after it pins the registered server/device observations, durable binding loader, dedicated
-fixture and exact remote paths listed below.
+fixture, exact-path inventory operation and semantic verifier listed below. Phase A may capture only
+R1-R3. R4 is a separate Phase B task that cannot become ready until approved R2 output-family and
+typed component-extractor decisions exist.
 
 The reviewed OpenHarmony source is useful only for static routing analysis:
 
@@ -105,26 +107,55 @@ Every row below is a process argv array materialized only from a durable binding
 no host shell. The payload after the final `-a` is one array element containing spaces; quote
 characters are not part of it. Split-token/quoted-string fallbacks are forbidden.
 
-`WINDOW_ID` and `COMPONENT_ID` are strict ASCII-decimal typed values produced by the same approved
-dedicated-fixture run, not operator text. The future readiness revision must also register the
-typed window-inventory operation that produces `WINDOW_ID`; the current ad-hoc `INV-1` command is
-not in `dump-recipes.yaml` and is not executable.
+`WINDOW_ID` is a strict ASCII-decimal typed value produced by an approved typed window-inventory
+operation in the dedicated-fixture run, not operator text. The future readiness revision must
+register that operation; the current ad-hoc `INV-1` command is not in `dump-recipes.yaml` and is not
+executable.
+
+### Phase A — TASK-UD-CAP-MUT-001 (R1-R3 only)
 
 | ID | Recipe | Exact host argv after durable materialization | First-target typed mode/effect |
 | --- | --- | --- | --- |
 | `R1` | `nodeSummary` | `[HDC, "-t", BINDING[REVISION].connectKey, "shell", "hidumper", "-s", "WindowManagerService", "-a", "-w WINDOW_ID -default"]` | conservative conditional-sidecar `captureRemoteFile` / `deviceMutation` |
 | `R2` | `elementTree` | `[HDC, "-t", BINDING[REVISION].connectKey, "shell", "hidumper", "-s", "WindowManagerService", "-a", "-w WINDOW_ID -element -c"]` | possible sidecar/UI-state change `captureRemoteFile` / `deviceMutation` |
 | `R3` | `fullDefaultTree` | `[HDC, "-t", BINDING[REVISION].connectKey, "shell", "hidumper", "-s", "WindowManagerService", "-a", "-w WINDOW_ID -default -all"]` | conservative conditional-sidecar `captureRemoteFile` / `deviceMutation` |
+
+### Phase B — TASK-UD-CAP-R4-001 (blocked after R2 decision)
+
+| ID | Recipe | Exact host argv after durable materialization | First-target typed mode/effect |
+| --- | --- | --- | --- |
 | `R4` | `componentDetail` | `[HDC, "-t", BINDING[REVISION].connectKey, "shell", "hidumper", "-s", "WindowManagerService", "-a", "-w WINDOW_ID -element -lastpage COMPONENT_ID"]` | possible sidecar/UI-state change `captureRemoteFile` / `deviceMutation` |
+
+Phase B cannot accept a manually supplied or merely decimal-looking `COMPONENT_ID`. After Phase A,
+an approved decision revision must first register R2 success/failure/unknown output families and a
+versioned typed component-tree extractor. The extractor registration pins source/resource path,
+accepted input family, parser/adapter OID and SHA-256, typed output schema, deterministic fixture
+selector and an exact zero/one/many rule. Its receipt binds the same R2 raw-origin hash, fixture/
+window identity, parser hash and selection proof. Zero, multiple, unknown, truncated, stale or
+foreign results stop before R4 request/process materialization. First/lowest-ID choice, regex-only
+decimal validation, operator selection and `COMPONENT_ID` CLI/env/file inputs are forbidden.
 
 For every row, the future task must pin a dedicated disposable non-sensitive fixture HAP and one
 literal owned remote sidecar path. A durable human `deviceMutation` confirmation scope covers the
 Recipe, binding revision/identity, server endpoint/ownership/generation, fixture hash/bundle/
 ability/static screen, exact argv, exact remote path, pre/post inventory, receive and cleanup.
-Before each Recipe the exact path must be absent; after it, stdout/stderr and optional sidecar are
-separate raw origins. Only a newly observed exact owned path may be received and then removed by
-`cleanupOwnedRemotePath`. No global search, wildcard, recursive removal, overwrite or ownership
-inference is allowed. R4 requires a second scope if UI-state mutation remains possible.
+
+The current `arkdeck-remote-operations` catalog has no exact-path sidecar inventory action, and
+generic `verifyRemoteState(probeId, expectedState)` does not bind a remote path, exact argv, output
+family or adapter. Therefore it is not an executable substitute. Before either phase can be ready,
+an independent approved contract/integration change must register the closed operation across the
+remote-operation catalog, workflow-step schema/registry and platform adapter/profile/lock. Its entry
+must fix operation ID, typed arguments, minimum effect, exact argv array, output family/parser,
+adapter OID/hash, literal path, existence/type/size/mtime/ownership receipt, timeout and cancellation;
+shell/raw commands are forbidden. The readiness revision may only cite that merged entry OID/hash.
+
+Before each Recipe the registered pre-receipt must prove the exact path absent. After it, the
+registered post-receipt must distinguish a newly created regular file from pre-existing, stale,
+unchanged, symlink or ambiguous identity, and stdout/stderr/optional sidecar remain separate raw
+origins. Only a new exact owned path may be received and then removed by
+`cleanupOwnedRemotePath(remotePath, ownershipEvidenceId)` using the ownership evidence produced by
+the matching receipts. No global search, wildcard, symlink following, recursive removal, overwrite
+or ownership inference is allowed. Phase B always has its own confirmation scope.
 
 ## Result decision rules
 
@@ -143,7 +174,8 @@ counts, truncation flags and SHA-256. It never retries using another boundary.
 
 ## Required real-hardware evidence
 
-Every human real-device task (`TASK-UD-PREFLIGHT-001` and `TASK-UD-CAP-MUT-001`) must contain:
+Every human real-device task (`TASK-UD-PREFLIGHT-001`, `TASK-UD-CAP-MUT-001` and
+`TASK-UD-CAP-R4-001`) must contain:
 
 - `run.md`;
 - `redacted-manifest.json` and whole-stream `capture-hashes.md` where applicable;
@@ -165,9 +197,16 @@ The evidence PR must run:
 /opt/homebrew/anaconda3/bin/jsonschema -i <task-evidence>/hardware-evidence.json openspec/contracts/hardware-evidence.schema.json
 ```
 
-It must also run the task's offline semantic verifier to prove positive binding-revision equality,
-operator is human, acceptance IDs are exact, artifact hashes resolve and raw sensitive bytes remain
-outside git. Validator path/version/hash drift blocks execution; no network installation is allowed.
+Schema validation is necessary but never sufficient. Before a real-device task becomes ready,
+`TASK-UD-HWE-SEM-001` must be done and the readiness revision must pin the verifier implementation
+at `scripts/ui_dump_capture/verify_hardware_evidence.py`, its tests at
+`scripts/ui_dump_capture/test_verify_hardware_evidence.py`, both file SHA-256 values, source commit
+OID, fixed Python executable and the exact CLI declared in `tasks.md`. It cross-checks the hardware
+record against versioned binding/server receipts and every device intent for positive exact binding
+revision, stable server tuple, human operator, exact task/acceptance/step kinds, resolvable artifact
+hashes and raw-outside-git privacy. Missing/extra/unknown/mismatch is nonzero. Schema-valid but
+semantically inconsistent negative fixtures are mandatory. Any source/test/input-schema/CLI/
+interpreter hash drift blocks execution; no network installation is allowed.
 
 ## Sensitive raw → repository-derived chain
 
@@ -191,6 +230,10 @@ Unclassified content fails closed. Raw/derived equality is neither expected nor 
   under these blocked tasks;
 - starting/stopping/restarting/adopting a server or using an HDC command to test server absence;
 - operator-provided connect key, default HDC target, stale M0B endpoint or unfixed binding revision;
-- execution of R1-R4 as readOnly, ad-hoc window inventory, split `-a` payload or fallback argv;
+- execution of R1-R4 as readOnly, ad-hoc window/sidecar inventory, split `-a` payload or fallback argv;
+- R4 before approved R2 family/extractor registration, decimal-only/manual component ID, or ambiguous
+  extractor selection;
+- schema-only hardware PASS, unpinned semantic verifier, or receipt/intent/server equality inferred by
+  a human reviewer;
 - sidecar search/overwrite, unowned cleanup, recursive delete or raw sensitive bytes in git;
 - PASS/done, compatibility, conformance, hardware-support or release claims from plan/source/fake.

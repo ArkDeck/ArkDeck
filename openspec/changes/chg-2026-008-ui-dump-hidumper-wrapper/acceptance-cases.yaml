@@ -31,15 +31,17 @@ cases:
     device.bindingRevision, and passes schema plus semantic validation.
 - acceptance_id: INT-UD-CAPTURE-MUT-001
   test_id: TEST-INT-UD-CAPTURE-MUT-001
-  method: Human-authorized first target-build deviceMutation capture of all four Recipes.
+  method: Human-authorized Phase A first target-build deviceMutation capture of R1 through R3.
   expected_source: openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/verification.md#INT-UD-CAPTURE-MUT-001
   minimum_evidence: realHardware
   expected_result: This case is not executable until the supervised preflight
     task is done and a later approved readiness revision fixes a dedicated
-    non-sensitive fixture, registered typed window inventory, exact owned remote
-    path, and durable confirmation scope. Official source does not prove target
-    output mode, so first target executions R1 through R4 are all
-    captureRemoteFile/deviceMutation; no readOnly Recipe branch exists. Every
+    non-sensitive fixture, registered typed window inventory, registered
+    exact-path sidecar inventory operation, exact owned remote path, completed
+    semantic verifier, and durable confirmation scope. Generic
+    verifyRemoteState and raw commands are not substitutes. Official source
+    does not prove target output mode, so first target executions R1 through R3
+    are captureRemoteFile/deviceMutation; no readOnly Recipe branch exists. Every
     intent loads the fixed positive CurrentDeviceBinding revision from the
     production durable store and revalidates the pinned server generation before
     and after dispatch. Confirmation covers binding, server, fixture, exact argv,
@@ -49,8 +51,44 @@ cases:
     search, wildcard, and recursive deletion are forbidden. The human-attested
     hardware-evidence.json records the same binding revision, server tuple,
     exact acceptance/step kinds, and artifact hashes and passes schema plus
-    semantic validation. Until all gates close, R1 through R4 and ad-hoc INV-1
-    dispatch counts are zero; destructive and Agent dispatch counts remain zero.
+    semantic validation through the pinned verifier. Until all gates close, R1
+    through R3 and ad-hoc INV-1 dispatch counts are zero; destructive and Agent
+    dispatch counts remain zero. This case claims no canonical AC-DUMP PASS.
+- acceptance_id: INT-UD-HWE-SEM-001
+  test_id: TEST-INT-UD-HWE-SEM-001
+  method: Offline semantic cross-validation of UI Dump real-hardware evidence and receipts.
+  expected_source: openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/verification.md#INT-UD-HWE-SEM-001
+  minimum_evidence: contract
+  expected_result: Before any real-device task becomes ready, approved schemas
+    define binding, server, and device-intent receipts. The verifier source and
+    test paths, commit OID, file SHA-256 values, fixed Python executable, and
+    exact CLI are pinned. It requires a human operator, a positive binding
+    revision equal across hardware evidence, binding receipt, and every device
+    intent, and an identical server endpoint, ownership, and generation across
+    the Job snapshot and pre/post receipts. It also verifies exact task,
+    acceptance, and step-kind values, resolvable repository artifact hashes,
+    and that sensitive raw paths remain outside git. Missing, extra, unknown,
+    or mismatched values exit nonzero. Negative tests include schema-valid but
+    semantically inconsistent documents and invoke no HDC, device, server, or
+    network operation. Schema validation alone never passes this case.
+- acceptance_id: INT-UD-CAPTURE-R4-001
+  test_id: TEST-INT-UD-CAPTURE-R4-001
+  method: Extractor-bound human-authorized Phase B componentDetail deviceMutation capture.
+  expected_source: openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/verification.md#INT-UD-CAPTURE-R4-001
+  minimum_evidence: realHardware
+  expected_result: This case remains blocked until Phase A is done and an
+    approved decision registers the R2 output families, versioned typed
+    component-tree extractor, deterministic fixture selector, and exact
+    zero-one-many rule. The extractor receipt binds the same R2 raw-origin hash,
+    fixture and window, parser OID and hash, selected component token, and
+    selection proof. R4 accepts only that receipt; operator, CLI, environment,
+    file, regex-only, first-ID, zero-match, multiple-match, stale, and foreign
+    token paths have request and process dispatch counts zero. With a separate
+    human deviceMutation confirmation, R4 then uses the exact one-element
+    payload and the same durable binding, stable server generation, registered
+    exact-path inventory, ownership, receive, cleanup, raw privacy, schema, and
+    pinned semantic-verifier gates as Phase A. Destructive and Agent dispatch
+    counts are zero. This case claims no canonical AC-DUMP PASS.
 - acceptance_id: INT-UD-WRAPPER-001
   test_id: TEST-INT-UD-WRAPPER-001
   method: Contract tests over the fixed wrapper with adversarial fake hidumper outputs.
