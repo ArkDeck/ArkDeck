@@ -1,6 +1,6 @@
 # Spec Impact
 
-> Change：CHG-2026-002-macos-m1-infrastructure@r5
+> Change：CHG-2026-002-macos-m1-infrastructure@r6
 > Core baseline：CORE-2.0.0（ratification 状态见 `openspec/baselines/CORE-2.0.0.yaml`）
 > Exact affected scope：`scope.yaml`
 
@@ -20,6 +20,11 @@ integration change.
 r5 changes no specification, acceptance result, evidence class or platform mapping. It only permits
 two legacy package-test expectations to align with the already-approved r4 ownership-evidence and
 terminal-reconciliation requirements so the unchanged full-suite gate is internally consistent.
+
+r6 changes no specification, acceptance result, evidence class, exact scope or platform mapping.
+It only applies the verified CHG-2026-014 consumer rule to TASK-M1-007:the nine in-scope
+`AC-DEV-*` cases remain canonical contract evidence, while M1-006's unresolved probe/XCUITest/
+platform evidence and all HDC/support/conformance claims remain explicitly outside M1-007.
 
 Deliberately excluded from this change (later changes must cover them before any release includes
 their capability): `AC-DEV-007-01` (parserGolden capability probing), all realHardware acceptance,

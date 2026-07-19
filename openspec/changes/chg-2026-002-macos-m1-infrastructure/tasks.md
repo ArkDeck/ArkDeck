@@ -807,10 +807,121 @@
 
 ## TASK-M1-007 — device binding revision、transport 重绑定边界与 per-device mutation lane
 
-- Status:ready
-- Requirements/AC:AC-DEV-001-01、AC-DEV-002-01 等
-- Depends on:TASK-M1-006
-- Allowed paths:`.../ArkDeckOpenHarmony/**`、`.../ArkDeckWorkflows/**`、对应 Tests、本 change `evidence/**`
+- Status:ready（r6 consumer-dependency/readiness amendment candidate；只有维护者
+  review/merge 本 governance PR 后生效。本 PR 不执行 TASK-M1-007、不产生
+  implementation/acceptance evidence）
+- Readiness review（2026-07-19；锁屏 headless,零真实 HDC/device/network dispatch）：
+  - Change gate:satisfied on merge。CHG-2026-002 r1-r5 已批准；r6 只修订本任务
+    dependency、完整 task contract 与 readiness,不修改 Core Requirement/AC/contract、
+    acceptance method/minimum evidence、platform profile 或 integration lock。
+  - Consolidation gate:satisfied。TASK-RLC-001 implementation/done 与 CHG-2026-014
+    verified 已分别由 PR #110/#113/#114 合入；固定 M1-006 package bytes/interfaces 已在
+    `main`,原 package 会话排他占用解除。该结论不提供 M1-006 source AC evidence。
+  - Consumer-independence gate:satisfied。OriginalTargetSnapshot/CurrentDeviceBinding、
+    typed device argv、generic locked journal/manifest/audit adapter、rebind/effect/lane policy
+    均不消费
+    M1-006 缺失的 server identity/generation、selected-device authorization/key access、
+    subserver probe、signed XCUITest 或 `MAC-M1-HDC-001`。M1-007 dedicated tests 不启动
+    HDC/process；后续真实 adapter 接线仍需独立 readiness。
+  - AC gate:satisfied。九项 in-scope `AC-DEV-*` 在 canonical acceptance registry 中均为
+    `minimum_evidence:contract`,且 expected result 直接由 accepted spec Scenario 定义；
+    无 platform/realHardware case 被转移或降级。
+  - Environment gate:satisfied。clean `main`
+    `919868b50c299bb0873a9e8ea0df95746311f24c` 上 Swift 6.3.3、SwiftPM 与
+    swift-format 6.3.0 可用；`swift test --package-path Packages/ArkDeckKit` 为
+    233 tests / 0 failures / 1 个既有 opt-in manual sleep/wake skip。实现只需新 Swift
+    源码/测试文件、仓库既有 generic audit seam 与本地临时目录。
+  - Path/concurrency gate:satisfied。本任务固定的新文件不修改 `HDCProduction.swift`、
+    `ArkDeckOpenHarmony.swift`、`Package.swift`、App/Xcode 或 TASK-UD-001 的
+    `HiDumperWrapper.swift`/golden/profile/lock 路径。
+  - Review boundary:本 governance PR 只更新本 change 的 revision metadata/design/task，
+    不修改 Swift、不运行真实 HDC/device；readiness full-suite 只运行仓库既有显式路径绑定的
+    fake-HDC regression,不把其结果记为 M1-007 evidence；不改变 M1-006/TASK-UD-001/
+    M1-008 状态或 evidence,不产生 conformance/hardware/support/release claim。
+- Objective:以纯 Swift value/policy/actor 与既有 locked journal/manifest/audit seams 实现不可变 original
+  target、单调 CurrentDeviceBinding revision、每次 device command 的 exact durable binding、
+  USB/TCP/UART rebind fail-closed policy、identity effect gate 与 per-device exclusive mutation
+  lane；所有 evidence 均为 synthetic headless contract/property tests。
+- Requirements/AC:`REQ-DEV-001`、`REQ-DEV-002`、`REQ-DEV-003`、`REQ-DEV-004`、
+  `REQ-DEV-005`、`REQ-DEV-006`、`REQ-DEV-008`；`AC-DEV-001-01`、
+  `AC-DEV-002-01`、`AC-DEV-002-02`、`AC-DEV-003-01`、`AC-DEV-003-02`、
+  `AC-DEV-004-01`、`AC-DEV-005-01`、`AC-DEV-006-01`、`AC-DEV-008-01`。
+- Depends on:
+  - TASK-M1-001 done（typed step/effect/binding vocabulary 与 Job state machine）；
+  - TASK-M1-003 done（locked `bindingConfirmed`/step-intent/reconcile journal boundary）；
+  - TASK-M1-005 done（generic manifest binding-history 与 `DurableSessionAuditAppending` seam）；
+  - TASK-RLC-001 done + CHG-2026-014 verified（只证明固定 package interfaces 已合入）；
+  - 本 r6 consumer-dependency/readiness amendment 经维护者合入。
+  - TASK-M1-006 completion 明确不是本任务依赖；本任务不得消费其未关闭 AC/evidence。
+- In scope:
+  1. immutable/codable/equatable `OriginalTargetSnapshot` 与 `CurrentDeviceBinding`,revision
+     从 1 单调递增,old/new connectKey、identity/evidence、confirmedBy 与 channel protection
+     可 durable round-trip；UI selection/settings 变化不能改写 snapshot/binding；
+  2. device-scoped typed HDC command builder 只能从指定 durable revision materialize exact
+     `-t <connectKey>` argument array；missing/mismatch/default-target/cross-device revision 在
+     executor seam 前拒绝且 dispatch counter 为 0；
+  3. USB auto-rebind 只在 expected mode、唯一候选、serial/daemon fingerprint、USB topology
+     与 Core minimum evidence 全满足时 eligible；profile 只能加严。TCP endpoint 必须显式
+     添加且断线后人工确认；UART node/adapter 变化必须人工确认；
+  4. identity 未确认、候选歧义、revision 未 durable 或 binding mismatch 时 deviceMutation/
+     destructive effect gate 拒绝；只经既有 locked `bindingConfirmed`/step-intent/reconcile
+     journal event、manifest binding history 与 generic Session audit seam durable 记录,不新增或
+     放宽 schema；
+  5. actor-isolated per-device lane coordinator：同设备 mutation lane 永远 `≤1`,第二请求
+     queued/`deviceLaneBusy`,cancel/throw/terminal 全路径释放；不同 synthetic device 可并行；
+  6. exhaustive/property/fault tests 覆盖正常、缺字段、歧义、重连、并发、取消与 reopen。
+- Out of scope:M1-006 server lifecycle/probe/authorization/key/subserver/UI/XCUITest；M1-007
+  production/dedicated tests 触发真实或 fake HDC child（required full-suite MAY 运行既有、
+  显式 fixture 路径绑定的 fake-HDC regression,但不构成本任务 evidence）；真实 connectKey/
+  device/network；device discovery/capability probing
+  (`REQ-DEV-007`)；Flash/UI Dump/Trace product workflow；修改 locked journal/manifest schema、
+  accepted spec/contract/profile/integration；platform conformance/hardware/support/release claim。
+- Allowed paths:
+  - `Packages/ArkDeckKit/Sources/ArkDeckCore/DeviceTargeting.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckOpenHarmony/HDCDeviceCommand.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DeviceBindingJournalAdapter.swift`
+  - `Packages/ArkDeckKit/Tests/ArkDeckCoreTests/DeviceTargetingContractTests.swift`
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/DeviceBindingContractTests.swift`
+  - `openspec/changes/chg-2026-002-macos-m1-infrastructure/evidence/runs/TASK-M1-007/**`
+  - 本 `tasks.md`（implementation PR 只追加 run/completion evidence 引用,不标 `done`）
+- Read-only inputs:`Packages/ArkDeckKit/Sources/ArkDeckCore/WorkflowStep.swift`、
+  `JobStateMachine.swift`、ArkDeckStorage `JournalEvent`/`FileDurableJournal`/`JournalReplay`/
+  `SessionManifest`/generic Session audit seams、现有 ArkDeckOpenHarmony/Workflows public/module
+  boundary、CHG-2026-014 provenance、accepted device-targeting-auth spec 与 canonical
+  acceptance registry。
+- Forbidden paths:`Package.swift`、现有 Core/OpenHarmony/Workflows/Storage source 修改、
+  ArkDeckProcess/Runtime/App/Xcode、HDC fixtures/integration/profile/lock、accepted specs/contracts/
+  baselines/platforms/verification、其他 task/change evidence；已安装真实 HDC、真实设备、
+  GUI/系统授权、非 loopback 网络、external process/device/destructive dispatch。
+- Risk:high（device identity/revision 与 mutation lane 是 Safety gate；任何不确定、缺失或
+  concurrency race 必须在 process/device seam 前 fail closed,不能以 synthetic PASS 推断平台）。
+- Hardware required:no。
+- Required environment:锁屏 macOS headless shell；Swift 6.3.3、SwiftPM、swift-format 6.3.0、
+  本地 temporary directory 与 deterministic synthetic identities/connectKeys。不得要求网络
+  下载、GUI、真实 HDC/device 或新系统授权。
+- Deliverables:三个 production source 文件；两个 dedicated contract test 文件；
+  `evidence/runs/TASK-M1-007/run.md`，记录 base OID、输入/输出 hash、命令、九项 Test ID、
+  exhaustive/property counters、reopen/cleanup 结果、偏差/风险、M1-007 dedicated 真实 HDC/
+  device/network/external process dispatch count `0`,以及 full-suite 既有 fake-child 结果的
+  独立分类。
+- Verification:
+  - `TEST-AC-DEV-001-01`:snapshot/binding revision 1 durable round-trip,selection mutation 无效；
+  - `TEST-AC-DEV-002-01/02`:rebind revision 2 exact `-t` argv；default/cross-device/mismatch
+    dispatch 0；
+  - `TEST-AC-DEV-003-01/02`:USB threshold truth table、multi-candidate/profile-relaxation fail；
+  - `TEST-AC-DEV-004-01`/`TEST-AC-DEV-005-01`:TCP/UART reconnect 必须显式确认；
+  - `TEST-AC-DEV-006-01`:ambiguous identity 的 mutation/destructive dispatch 0 且 audit durable；
+  - `TEST-AC-DEV-008-01`:并发操作序列中 same-device lane max 1,queued/cancel/release exact；
+  - `xcrun swift-format lint --strict` 全部变更 Swift；dedicated Core/Contract tests；
+    `swift test --package-path Packages/ArkDeckKit`；`scripts/check-sdd.sh`；`git diff --check`；
+    import/process/network/真实 connectKey 与 allowed-path 静态审计。
+- Evidence gate:九项 canonical Test ID 必须在同一 implementation revision 全部 PASS,
+  full suite/format/SDD/diff/scope 均通过且 M1-007 dedicated 禁止 dispatch counter 全为 0,
+  才可另起 status PR
+  起草 `done`。结论只覆盖 contract evidence,不改变 M1-006、M1-008、change verified、
+  platform conformance、hardware/support/release 状态。
+- PR boundary:一个独立 TASK-M1-007 implementation + evidence PR；`ready→done` 另开
+  status PR,不得混入 TASK-M1-006/M1-008/TASK-UD-001 或产品功能实现。
 
 ## TASK-M1-008 — SimulatedFlashProvider 隔离 harness
 

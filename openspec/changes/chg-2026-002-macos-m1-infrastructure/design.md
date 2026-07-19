@@ -1,7 +1,7 @@
 # macOS M1 Shared Infrastructure Design
 
 > Status：draft  
-> Proposal：CHG-2026-002-macos-m1-infrastructure@r5
+> Proposal：CHG-2026-002-macos-m1-infrastructure@r6
 > Core baseline：CORE-2.0.0
 
 ## Components
@@ -42,9 +42,34 @@ PID/path/endpoint 字段形状不能建立 `arkDeckManaged` ownership，positive
 留在 dedicated process-backed contract；successful lifecycle 的 audit 断言必须包含 terminal
 reconciliation。相应修改不得删除、迁移或重命名旧 case，也不得改变其他旧 case 的断言。
 
+r6 只解耦 M1-007 的 implementation scheduling。CHG-2026-014 已证明固定 M1-006 package
+bytes/interfaces 在 `main` 且原 package 会话排他占用解除；M1-007 的九项 `AC-DEV-*` 在
+canonical registry 中全部是 contract evidence,不要求 M1-006 的 server identity/generation、
+authorization/key-access/subserver probe、signed Sandbox XCUITest 或 `MAC-M1-HDC-001`。
+
+consumer 逐项边界如下：
+
+| M1-007 deliverable | 使用的 consolidated interface | 需要 M1-006 source AC | 结论 |
+| --- | --- | --- | --- |
+| OriginalTargetSnapshot / CurrentDeviceBinding value + revision policy | ArkDeckCore/module boundary；不使用 HDC probe | no | may proceed headless |
+| device-scoped typed HDC argv materialization | ArkDeckOpenHarmony target 与 typed value seam；不启动 process/server | no | may proceed headless |
+| durable binding/rebind/step-intent adapter | TASK-M1-003 locked journal binding events + TASK-M1-005 generic manifest/audit seams | no | may proceed headless |
+| USB/TCP/UART rebind policy、effect gate、per-device lane | Core/Workflows actor + synthetic identity/evidence | no | may proceed headless |
+
+M1-007 dedicated implementation/tests 不调用 `HDCProduction` 的 server lifecycle/
+authorization/probe 实现,不读取 integration golden,不运行真实或 fake HDC child。它只生成
+完整参数数组并交给测试 counter；缺 binding、revision mismatch、歧义或未确认时 counter
+为 0。required full-suite regression MAY 运行既有、显式路径绑定的 fake-HDC tests,但这些
+既有结果不属于 M1-007 AC evidence。将来把该 typed command 接到真实 HDC execution 仍须
+独立 consumer/integration readiness,不能由 M1-007 contract evidence推断。
+
 ## Evidence strategy
 
 - Core AC 全部采用 canonical acceptance-cases 的 method/Test ID；expected evidence 直接指向规范 Scenario block，禁止转述；
+- M1-007 的九项 `AC-DEV-*` 以 pure contract/property/fault tests 覆盖 immutable snapshot、
+  durable monotonic revision、exact `-t` target、USB threshold、TCP/UART reconfirmation、
+  ambiguous effect rejection 与 per-device lane invariants；测试只用 synthetic identity/
+  connectKey,M1-007 dedicated 真实 HDC/device/network/process dispatch count 为 0；
 - fake hdc 是仓库内确定性可执行 fixture,作为真实子进程运行以覆盖 supervisor/process
   边界,但绝不触达真实设备或默认端口之外的网络；任何被 parser/probe 当成已支持语义的
   raw output 都必须来自 approved integration change 登记的 version/hash-pinned golden，
