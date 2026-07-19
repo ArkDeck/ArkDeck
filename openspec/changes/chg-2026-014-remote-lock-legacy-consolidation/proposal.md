@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-014-remote-lock-legacy-consolidation
 revision: 1
-status: approved # 本分支仅起草；维护者 review/merge 后才在 main 生效
+status: verified # 2026-07-19 verification closure candidate；四项 RLC gate PASS；仅在本 PR 维护者 review/merge 后生效
 class: implementation-only
 core_change_level: none
 owner: lvye
@@ -118,3 +118,26 @@ platforms: [macos]
 - rollback 是 revert `TASK-RLC-001` implementation PR；原 Task/evidence 不随回滚删除；
 - 本 proposal 的 merge 只创建 `proposed` change，不批准 change、不使 Task ready，也不
   允许合入遗留实现。批准和 readiness 必须分别由后续独立 PR 完成。
+
+## Verification closure（2026-07-19）
+
+- Approval/readiness：CHG-2026-014 经 PR #107 合入 `main`
+  `4b4e0b37c82bf03ccfa1317058f06834d68273f5` 置为 `approved`；TASK-RLC-001 经
+  PR #108 合入 `main` `840e8306e0f8539072c3931384a21a80269d9027` 置为 `ready`。
+- Implementation/evidence：TASK-RLC-001 implementation PR #110 已由维护者合入
+  `main` `f7c334857ae5735077254ccbdf3dafac8c8ad83b`；完整 OID/path/blob disposition、
+  runtime reachability、零禁止 dispatch counters、测试与 rollback 分别记录在
+  `evidence/legacy-import-manifest.md` 与 `evidence/runs/TASK-RLC-001/run.md`。
+- Governance/completion：独立 source-task disposition PR #112 已合入 `main`
+  `e9689e54d12d8e9baa21c7d7747c2fff9be15be4`；TASK-RLC-001 `→done` 状态 PR #113
+  已合入 `main` `e67568e56c53389090958c7aedb9b0681d6f2816`。
+- 四项 `TEST-RLC-*` 在同一 implementation revision 的 run 中均为二值 PASS；来源 Task
+  继续非 `done`（当前 TASK-M1-006 为 `blocked`、TASK-PD-001 为 `ready`），全部未关闭
+  AC/evidence gate 与 consumer dependency 仍显式存在；不构成 conformance、hardware、
+  support 或 release claim。
+- 上述历史与 evidence 构成本 verification closure PR 的确认范围；本文件的
+  `status: verified` 只有在维护者 review/merge 本 PR 后才生效，不自行批准验证结论。
+  verified 只证明 CHG-2026-014 的 consolidation 机制按批准范围闭环，不验证来源 Task、
+  macOS platform、HDC compatibility、DAYU200 或任何 release capability。本 change 暂不
+  archive；其 ledger 仍是后续独立 consumer dependency revision 的活跃审计输入，archive
+  留待后续独立 PR 裁量。
