@@ -116,9 +116,11 @@ Open question 不得以聊天记忆留存。每项记录默认决策、阻塞范
 
 ## RISK-001 DAYU200 恢复演练残余风险接受(检查单第 4 项)
 
-- Status：accepted（2026-07-18;**本记录经维护者 review/merge 本 PR 即构成
-  archived CHG-2026-010 预案 §6 检查单第 4 项所要求的"维护者书面确认",
-  merge 即确认,先例 DEC-001 #53**）
+- Revision：r2 evidence-owner correction candidate；仅维护者 review/merge 本 PR 后生效
+- Status：accepted（r1 于 2026-07-18 经 PR #97、merge
+  `c3134f05d97591c6cd875dfe12ee2854b5151a0d` 形成 archived CHG-2026-010
+  预案 §6 检查单第 4 项所要求的"维护者书面确认"；r2 不改变该风险接受，
+  只在维护者合入后修正检查单第 3 项的 current evidence owner）
 - Owner / 确认人：维护者 `lvye`（fuhanfeng）
 - Statement（确认内容）：本人已阅读 archived CHG-2026-010
   `recovery-playbook.md` 的 §4 恢复步骤序列、§5 风险点与中止准则、§6 前置
@@ -127,17 +129,30 @@ Open question 不得以聊天记忆留存。每项记录默认决策、阻塞范
   风险**;知悉"MaskRom 为芯片固化态、理论上始终可重入"这一风险兜底论断
   本身尚待演练确证,不将其视为承诺;知悉演练是全链条第一个写设备操作。
 - Scope（适用范围）：仅覆盖按下列全部条件执行的恢复演练——
-  1. 演练 change 独立立项/approve,立项时自归档路径原文引用 §6 检查单且
-     七项全部打勾;
+  1. 演练 change 独立立项/approve,立项时自归档路径原文引用 §6 检查单、同时引用
+     本 RISK-001@r2 supersession，且七项全部打勾;
   2. 步骤遵循 archived 预案 §4、记录使用 archived CHG-2026-013 模板
-     (含 P1-P6 前置检查),分区偏移仅取自 TASK-PD-001 合入 main 的解码
-     evidence;
+     (含 P1-P6 前置检查)。归档预案/模板中的 `TASK-PD-001 解码 evidence` 字样保持
+     immutable historical text，不再构成 current evidence-owner authority；对应检查项只有在
+     TASK-PD-002 `done` 状态、同一次 fresh signed-broker platform mapping/reconciliation
+     evidence 与其绑定的 TASK-PD-001 implementation identity 全部合入 `main` 后才满足，
+     分区偏移只能取自该 TASK-PD-002 mapping evidence;
   3. §5 四项中止准则任一命中即停手。
 - Invalidation（失效条件）：archived 预案或演练步骤发生 revision 后,本
   确认自动失效,须以新的 RISK 记录重新确认;本确认不可被引用于演练以外的
-  任何写设备操作。
+  任何写设备操作。r2 只修正 upstream task decomposition 后的 evidence owner，未修改
+  archived bytes、步骤序列、风险点或中止准则；未来再次改变 evidence owner 仍须新的
+  maintainer-reviewed RISK revision。
 - Boundary：本确认**不构成演练执行授权**,不勾检查单其余项——第 3 项
-  (TASK-PD-001 evidence)与第 5 项(明确时间窗、窗口内无其他设备操作并行)
+  (TASK-PD-002 `done` + fresh platform mapping evidence)与第 5 项(明确时间窗、窗口内无
+  其他设备操作并行)
   仍须在演练 change 立项时分别满足;`GAP-DAYU200-RECOVERY-PATH` 保持
   unknown,DEC-002 保持 open。
 - Consumer：未来演练 change 立项时,检查单第 4 项引用本记录打勾。
+- Revision r2 provenance：CHG-2026-009@r4 经 PR #116 合入 `main`
+  `7585603d459ae26ad566b9aaeecc953f9c26bd98`，将 headless codec remediation 与
+  fresh platform mapping/reconciliation 分配给 TASK-PD-001/TASK-PD-002；CHG-2026-012@r2
+  经 PR #120 合入 `main` `3a9d91f347cb1ebb4c8626017f8004cc6a036a09`，已把下游
+  TASK-FA-001 的数值锚点同步到 TASK-PD-002。本 revision 不运行 collector、不读取 archive、
+  不访问设备、不生成/rejudge evidence，也不改变 gap/DEC-002、兼容性、支持、硬件或 release
+  状态。
