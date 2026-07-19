@@ -104,6 +104,12 @@
   TASK-PD-002 readiness 之外的 platform/compatibility/support/release claim。
 - PR boundary:remediation implementation + headless contract evidence 一个独立
   `TASK-PD-001` PR；`ready→done` 仍为后续独立 status PR。
+- Implementation run（2026-07-19）：
+  `evidence/runs/TASK-PD-001/r4-headless/run.md` 仅记录
+  `TEST-DECODE-DAYU200-HEADLESS-001` contract PASS、完整源码 hash、43 项
+  unit/fault/static 回归与零 collector/archive/device/network/production subprocess
+  dispatch；原三项 platform Test ID 保持 pending。本 implementation PR 不将任务标为
+  `done`，仍须后续独立 status PR。
 
 ## TASK-PD-002 — signed broker fresh platform verification
 

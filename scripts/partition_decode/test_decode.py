@@ -1,4 +1,4 @@
-"""Branch-complete and r2 safety-boundary tests for TASK-PD-001."""
+"""Branch-complete r3 codec and r2 safety-boundary tests for TASK-PD-001."""
 
 from __future__ import annotations
 
@@ -14,6 +14,7 @@ import os
 import plistlib
 import re
 import stat
+import sys
 import tempfile
 import types
 import unittest
@@ -92,31 +93,181 @@ class DescriptorAndStreamingTests(unittest.TestCase):
             before_span + decode.TAR_BLOCK + case.parameter_size,
         )
         self.assertGreater(audit.gzip_compressed_bytes_buffered_at_stop, 0)
+        self.assertTrue(audit.codec_lifecycle_closed)
+        self.assertEqual(audit.codec_destruction_point, "targetBodyObtained")
+        self.assertEqual(audit.compressed_remainder_bytes_after_close, 0)
+        decode.validate_codec_audit_receipt(decode._codec_audit_receipt(audit))
 
     def test_discard_releases_application_chunk_before_next_read(self):
         events = []
 
         class TrackedChunk:
-            def __init__(self, index):
+            def __init__(self, index, size):
                 self.index = index
+                self.size = size
+
+            def __len__(self):
+                return self.size
 
             def __del__(self):
                 events.append(f"del{self.index}")
 
         calls = 0
 
-        def tracked_read(gz, amount, audit):
+        def tracked_decompress(amount):
             nonlocal calls
-            del gz, amount, audit
             calls += 1
             events.append(f"call{calls}")
-            return TrackedChunk(calls)
+            return TrackedChunk(calls, amount)
 
-        with mock.patch.object(decode, "_read_gzip_exact", side_effect=tracked_read):
+        gzip_stream = object.__new__(decode._BoundedGzipStream)
+        with mock.patch.object(
+            gzip_stream, "_decompress_next", side_effect=tracked_decompress
+        ):
             decode._discard_gzip_exact(
-                object(), decode.MAX_READ_CHUNK + 1, decode.DecodeAudit()
+                gzip_stream, decode.MAX_READ_CHUNK + 1, decode.DecodeAudit()
             )
         self.assertEqual(events, ["call1", "del1", "call2", "del2"])
+
+    def test_runtime_codec_constructor_observes_exact_wbits_without_dictionary(self):
+        case = fixtures.archive()
+        audit = decode.DecodeAudit()
+        with mock.patch.object(
+            decode.zlib, "decompressobj", wraps=decode.zlib.decompressobj
+        ) as constructor:
+            _decode_case(case, audit)
+        constructor.assert_called_once_with(31)
+        self.assertTrue(audit.codec_configuration_observed_at_create)
+        self.assertEqual(audit.codec_observed_deflate_base_window_bits, 15)
+        self.assertEqual(audit.codec_observed_zlib_wbits, 31)
+        self.assertEqual(audit.codec_observed_history_upper_bound_bytes, 32768)
+        self.assertIs(audit.codec_preset_dictionary_used, False)
+
+    def _assert_termination_cleanup(self, error, destruction_point):
+        case = fixtures.archive()
+        audit = decode.DecodeAudit()
+
+        def terminate_after_codec_read(gzip_stream, runtime_audit):
+            gzip_stream.read_exact(1, runtime_audit)
+            raise error
+
+        with mock.patch.object(
+            decode,
+            "_read_parameter_member",
+            side_effect=terminate_after_codec_read,
+        ):
+            with self.assertRaises(type(error)):
+                _decode_case(case, audit)
+        self.assertGreater(audit.compressed_remainder_bytes_before_close, 0)
+        self.assertEqual(audit.compressed_remainder_bytes_after_close, 0)
+        self.assertFalse(audit.codec_active)
+        self.assertTrue(audit.codec_cleanup_via_finally)
+        self.assertTrue(audit.codec_lifecycle_closed)
+        self.assertEqual(audit.codec_destruction_point, destruction_point)
+        decode.validate_codec_audit_receipt(decode._codec_audit_receipt(audit))
+
+    def test_decode_failure_closes_codec_and_remainder_in_finally(self):
+        self._assert_termination_cleanup(
+            decode.DecodeFailure(decode.PD002_ARCHIVE_INVALID),
+            "DecodeFailure",
+        )
+
+    def test_unexpected_exception_closes_codec_and_remainder_in_finally(self):
+        self._assert_termination_cleanup(RuntimeError("fault injection"), "unexpectedException")
+
+    def test_cancellation_closes_codec_and_remainder_in_finally(self):
+        case = fixtures.archive()
+        audit = decode.DecodeAudit()
+        discard_lines, discard_start = inspect.getsourcelines(
+            decode._BoundedGzipStream.discard_exact
+        )
+        interrupt_line = next(
+            discard_start + index
+            for index, line in enumerate(discard_lines)
+            if "produced_size = len(produced)" in line
+        )
+        caught = None
+        live_bytes_at_interrupt = None
+
+        def cancel_with_live_discard_chunk(gzip_stream, runtime_audit):
+            previous_trace = sys.gettrace()
+
+            def interrupt_discard(frame, event, argument):
+                nonlocal live_bytes_at_interrupt
+                del argument
+                if (
+                    event == "line"
+                    and frame.f_code
+                    is decode._BoundedGzipStream.discard_exact.__code__
+                    and frame.f_lineno == interrupt_line
+                ):
+                    live_bytes_at_interrupt = (
+                        runtime_audit.application_plaintext_live_bytes
+                    )
+                    sys.settrace(None)
+                    raise KeyboardInterrupt()
+                return interrupt_discard
+
+            sys.settrace(interrupt_discard)
+            try:
+                gzip_stream.discard_exact(1, runtime_audit)
+            finally:
+                sys.settrace(previous_trace)
+
+        with mock.patch.object(
+            decode,
+            "_read_parameter_member",
+            side_effect=cancel_with_live_discard_chunk,
+        ):
+            try:
+                _decode_case(case, audit)
+            except KeyboardInterrupt as error:
+                caught = error
+        self.assertIsNotNone(caught)
+        traceback = caught.__traceback__
+        discard_frame_seen = False
+        while traceback is not None:
+            if (
+                traceback.tb_frame.f_code
+                is decode._BoundedGzipStream.discard_exact.__code__
+            ):
+                discard_frame_seen = True
+                self.assertNotIn("produced", traceback.tb_frame.f_locals)
+            traceback = traceback.tb_next
+        self.assertTrue(discard_frame_seen)
+        self.assertEqual(live_bytes_at_interrupt, 1)
+        self.assertEqual(audit.application_plaintext_live_bytes, 0)
+        self.assertTrue(audit.codec_lifecycle_closed)
+        self.assertEqual(audit.codec_destruction_point, "cancellation")
+        self.assertEqual(audit.compressed_remainder_bytes_after_close, 0)
+        receipt = decode._codec_audit_receipt(audit)
+        self.assertEqual(
+            receipt["lifecycle"]["applicationPlaintextLiveBytesAfterClose"], 0
+        )
+        decode.validate_codec_audit_receipt(receipt)
+
+    def test_runtime_compressed_remainder_cap_is_enforced(self):
+        audit = decode.DecodeAudit(
+            pre_read_fstat_passed=True,
+            pre_read_read_only_gate_passed=True,
+        )
+        raw_stream = mock.Mock()
+        raw_stream.read.return_value = b"x" * (
+            decode.COMPRESSED_REMAINDER_CAP_BYTES + 1
+        )
+        gzip_stream = decode._BoundedGzipStream(raw_stream, audit)
+        try:
+            with self.assertRaises(decode.DecodeFailure) as caught:
+                gzip_stream.read_exact(1, audit)
+        finally:
+            gzip_stream.close("DecodeFailure", audit)
+        self.assertEqual(caught.exception.code, decode.PD002_ARCHIVE_INVALID)
+        self.assertEqual(
+            audit.compressed_remainder_observed_max_bytes,
+            decode.COMPRESSED_REMAINDER_CAP_BYTES + 1,
+        )
+        with self.assertRaises(decode.EvidenceValidationError):
+            decode.validate_codec_audit_receipt(decode._codec_audit_receipt(audit))
 
     def test_raw_stream_wrapper_counts_read_and_readinto_by_pass(self):
         audit = decode.DecodeAudit(
@@ -514,14 +665,131 @@ class EvidencePipelineTests(unittest.TestCase):
         self.assertNotIn("--staging-dir", source)
         self.assertNotIn('if __name__ == "__main__"', source)
 
-    def test_blocked_audit_does_not_claim_literal_zero_retention_pass(self):
+    def test_r3_audit_accepts_only_closed_opaque_codec_state(self):
         audit = decode._expected_audit_document()
         self.assertEqual(
             audit["applicationChunkReferenceRetainedAcrossNextReadBytes"], 0
         )
-        self.assertIn("DEFLATE", audit["deflateInternalHistoryRetention"])
-        self.assertFalse(audit["crossChunkRetentionAcceptanceSatisfied"])
-        self.assertFalse(audit["partitionAcceptanceSatisfied"])
+        self.assertIn("opaque", audit["deflateInternalHistoryRetention"])
+        self.assertTrue(audit["crossChunkRetentionAcceptanceSatisfied"])
+        self.assertTrue(audit["partitionAcceptanceSatisfied"])
+        self.assertEqual(audit["partitionAcceptanceBlockingReasons"], [])
+        decode.validate_codec_audit_receipt(audit["codecAuditReceipt"])
+
+    def test_codec_receipt_rejects_missing_tampered_over_cap_or_unclean_state(self):
+        receipt = decode._expected_audit_document()["codecAuditReceipt"]
+        mutations = (
+            (("configuration", "zlibGzipWbits"), 30),
+            (("runtimeObservation", "configurationObservedAtCodecCreate"), False),
+            (("runtimeObservation", "observedDeflateBaseWindowBits"), 14),
+            (("runtimeObservation", "observedZlibWbits"), 30),
+            (("runtimeObservation", "observedHistoryUpperBoundBytes"), 16384),
+            (("runtimeObservation", "presetDictionaryUsed"), True),
+            (
+                (
+                    "runtimeObservation",
+                    "compressedRemainderObservedMaximumBytes",
+                ),
+                65537,
+            ),
+            (("runtimeObservation", "applicationPlaintextRetainedIntoNextReadBytes"), 1),
+            (("prohibitedOperations", "codecCloneCount"), 1),
+            (("prohibitedOperations", "codecExportCount"), 1),
+            (("prohibitedOperations", "historyOrBodyViewCount"), 1),
+            (("prohibitedOperations", "additionalNonTargetPlaintextBufferCount"), 1),
+            (("lifecycle", "cleanupViaFinallyObserved"), False),
+            (("lifecycle", "codecCloseCount"), 2),
+            (("lifecycle", "codecActiveAfterClose"), True),
+            (("lifecycle", "compressedRemainderBytesBeforeClose"), 65537),
+            (("lifecycle", "compressedRemainderBytesAfterClose"), 1),
+            (("lifecycle", "applicationPlaintextLiveBytesAfterClose"), 1),
+            (("lifecycle", "closed"), False),
+            (("claims", "allocatorResidueForensicZeroizationClaimed"), True),
+        )
+        for path, value in mutations:
+            with self.subTest(path=path, value=value):
+                tampered = json.loads(json.dumps(receipt))
+                tampered[path[0]][path[1]] = value
+                with self.assertRaises(decode.EvidenceValidationError):
+                    decode.validate_codec_audit_receipt(tampered)
+
+        missing = json.loads(json.dumps(receipt))
+        del missing["runtimeObservation"]["observedZlibWbits"]
+        with self.assertRaises(decode.EvidenceValidationError):
+            decode.validate_codec_audit_receipt(missing)
+
+        unexpected = json.loads(json.dumps(receipt))
+        unexpected["runtimeObservation"]["configuredConstantOnly"] = 31
+        with self.assertRaises(decode.EvidenceValidationError):
+            decode.validate_codec_audit_receipt(unexpected)
+
+    def test_codec_receipt_and_bundle_reject_bool_float_type_confusion(self):
+        documents, _, inventory, inventory_sha256 = self._valid_bundle()
+        typed_mutations = (
+            (("configuration", "deflateBaseWindowBits"), 15.0),
+            (("configuration", "zlibGzipWbits"), 31.0),
+            (("configuration", "historyUpperBoundBytes"), 32768.0),
+            (("configuration", "compressedRemainderCapBytes"), 65536.0),
+            (("configuration", "presetDictionaryConfigured"), 0),
+            (("runtimeObservation", "configurationObservedAtCodecCreate"), 1),
+            (("runtimeObservation", "codecCreateCount"), True),
+            (("runtimeObservation", "observedDeflateBaseWindowBits"), 15.0),
+            (("runtimeObservation", "observedZlibWbits"), 31.0),
+            (("runtimeObservation", "observedHistoryUpperBoundBytes"), 32768.0),
+            (("runtimeObservation", "presetDictionaryUsed"), 0),
+            (
+                (
+                    "runtimeObservation",
+                    "compressedRemainderObservedMaximumBytes",
+                ),
+                65536.0,
+            ),
+            (
+                (
+                    "runtimeObservation",
+                    "applicationPlaintextRetainedIntoNextReadBytes",
+                ),
+                False,
+            ),
+            (("prohibitedOperations", "codecCloneCount"), False),
+            (("prohibitedOperations", "codecExportCount"), False),
+            (("prohibitedOperations", "historyOrBodyViewCount"), False),
+            (
+                (
+                    "prohibitedOperations",
+                    "additionalNonTargetPlaintextBufferCount",
+                ),
+                False,
+            ),
+            (("lifecycle", "cleanupViaFinallyObserved"), 1),
+            (("lifecycle", "codecCloseCount"), True),
+            (("lifecycle", "codecActiveAfterClose"), 0),
+            (("lifecycle", "compressedRemainderBytesBeforeClose"), 39869.0),
+            (("lifecycle", "compressedRemainderBytesAfterClose"), False),
+            (("lifecycle", "applicationPlaintextLiveBytesAfterClose"), False),
+            (("lifecycle", "closed"), 1),
+            (("claims", "allocatorResidueForensicZeroizationClaimed"), 0),
+        )
+        for path, value in typed_mutations:
+            with self.subTest(path=path, value=value):
+                tampered_receipt = json.loads(
+                    json.dumps(documents["process-audit.json"]["codecAuditReceipt"])
+                )
+                tampered_receipt[path[0]][path[1]] = value
+                with self.assertRaises(decode.EvidenceValidationError):
+                    decode.validate_codec_audit_receipt(tampered_receipt)
+
+                tampered_audit = json.loads(
+                    json.dumps(documents["process-audit.json"])
+                )
+                tampered_audit["codecAuditReceipt"][path[0]][path[1]] = value
+                with self.assertRaises(decode.EvidenceValidationError):
+                    decode.validate_evidence(
+                        "process-audit.json",
+                        tampered_audit,
+                        inventory,
+                        inventory_sha256,
+                    )
 
 
 class StaticProductionAuditTests(unittest.TestCase):
@@ -748,6 +1016,63 @@ class StaticProductionAuditTests(unittest.TestCase):
             self.assertEqual(
                 observed_module_calls, self.ALLOWED_MODULE_CALLS[filename], filename
             )
+
+    def test_codec_configuration_and_cleanup_surface_is_closed(self):
+        self.assertEqual(decode.DEFLATE_BASE_WINDOW_BITS, 15)
+        self.assertEqual(decode.ZLIB_GZIP_WBITS, 31)
+        self.assertEqual(decode.DEFLATE_HISTORY_UPPER_BOUND_BYTES, 32768)
+        self.assertEqual(decode.COMPRESSED_REMAINDER_CAP_BYTES, 65536)
+
+        tree = self._tree("decode.py")
+        constructor_calls = [
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and self._call_target(node.func) == "zlib.decompressobj"
+        ]
+        self.assertEqual(len(constructor_calls), 1)
+        self.assertEqual(len(constructor_calls[0].args), 1)
+        self.assertEqual(ast.unparse(constructor_calls[0].args[0]), "observed_wbits")
+        self.assertEqual(constructor_calls[0].keywords, [])
+
+        codec_source = inspect.getsource(decode._BoundedGzipStream)
+        for forbidden in (
+            "inflateCopy",
+            ".copy(",
+            "zdict",
+            "unused_data",
+            "history_view",
+            "pickle",
+        ):
+            self.assertNotIn(forbidden, codec_source)
+
+        discard_source = inspect.getsource(decode._BoundedGzipStream.discard_exact)
+        for forbidden in ("bytearray", ".append(", ".extend(", "hashlib", "return produced"):
+            self.assertNotIn(forbidden, discard_source)
+        self.assertIn("finally:", discard_source)
+        self.assertIn("del produced", discard_source)
+        self.assertNotIn(
+            "_read_gzip_exact", inspect.getsource(decode._discard_gzip_exact)
+        )
+
+        decode_function = next(
+            node
+            for node in tree.body
+            if isinstance(node, ast.FunctionDef) and node.name == "decode_archive"
+        )
+        finally_close_calls = []
+        for node in ast.walk(decode_function):
+            if not isinstance(node, ast.Try):
+                continue
+            for final_node in node.finalbody:
+                for candidate in ast.walk(final_node):
+                    if (
+                        isinstance(candidate, ast.Call)
+                        and isinstance(candidate.func, ast.Attribute)
+                        and candidate.func.attr == "close"
+                    ):
+                        finally_close_calls.append(candidate)
+        self.assertEqual(len(finally_close_calls), 1)
 
     def test_collector_subprocess_targets_are_fixed_argv_and_never_shell(self):
         tree = self._tree("macos_input_broker/collect_platform_evidence.py")
