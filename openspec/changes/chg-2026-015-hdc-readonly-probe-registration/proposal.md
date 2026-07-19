@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-015-hdc-readonly-probe-registration
 revision: 1
-status: proposed # 本 PR 只起草 change；维护者后续 approval-only PR 合入前不得执行 TASK-I15-001
+status: approved # r1 proposal 经 PR #121 合入；批准由本 approval-only PR 的维护者 review/merge 构成
 class: integration
 core_change_level: none
 owner: lvye
@@ -119,7 +119,9 @@ probe、不修改 M1-006 源码，也不声称任何 HDC AC 已通过。
 
 ## Approval gate
 
-本 proposal 的 merge 只创建 `proposed` change。维护者必须以独立 approval-only PR 将其置为
-`approved`，随后独立 readiness PR 还须确认四类 authoritative capture/receipt 输入可得，
-TASK-I15-001 才能开始。缺任一 family provenance 时任务保持 blocked，不允许部分注册后宣称
-M1-006 blocker 已解除。
+- Proposal 经 PR #121 合入 `main`
+  (`93ab61450ef74237c2e586e8512090a1857c51ce`，2026-07-19，`status: proposed`)。
+- 正式批准由维护者 review/merge 本 approval-only PR 构成。本批准不产生任务执行：
+  `TASK-I15-001` 继续保持 `blocked`；只有独立 readiness PR 确认四类 authoritative
+  capture/receipt 输入可得且 provenance 已获维护者认可后，任务才能转为 `ready`。缺任一
+  family provenance 时不得开始部分注册，也不得宣称 M1-006 blocker 已解除。
