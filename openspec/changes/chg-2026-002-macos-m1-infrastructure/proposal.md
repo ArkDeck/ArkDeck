@@ -1,6 +1,7 @@
 ---
 id: CHG-2026-002-macos-m1-infrastructure
-status: approved # r1-r4 已批准；r5 legacy-contract safety-alignment amendment 仅在对应 PR 合入后生效
+revision: 6
+status: approved # r1-r5 已批准；r6 M1-007 headless consumer/readiness amendment 仅在对应 PR 合入后生效
 class: platform
 core_change_level: none
 owner: lvye
@@ -33,6 +34,10 @@ M0A 只交付可行性原型与分发决策。所有分阶段功能（UI Dump、
   该路径只使用仓库 fake fixture，不是 v1 分发路径；
 - 实现全部 M1 runtime/storage/logging/clock platform ports 并通过 Port contract tests；
 - 实现 `SimulatedFlashProvider` 隔离 harness（REQ-FLASH-006）；
+- 按 CHG-2026-014 已验证的 consumer rule,将 TASK-M1-007 的 implementation scheduling
+  dependency 从未完成的 TASK-M1-006 platform AC 改为已合入的 TASK-RLC-001 package
+  interfaces；device binding/rebind/lane 只使用纯 value/policy/journal/typed-command seam 与
+  synthetic contract evidence,不消费 M1-006 缺失的 probe、XCUITest 或 HDC platform 结论；
 - 交付 crash-window、ENOSPC、fake-hdc、单实例与 clock 语义的 fault-injection/contract 证据。
 
 ### Out of scope
@@ -47,6 +52,9 @@ M0A 只交付可行性原型与分发决策。所有分阶段功能（UI Dump、
 - 变更 ADR-0001 选定的非 Sandbox v1 分发路径，或把签名 Sandbox/XCUITest 证据解释为
   Developer ID、公证、真机、platform conformance 或 release evidence；
 - 宣称任何 capability 达到可发布状态——发布范围在 M5 release change 中另行声明。
+- 以 TASK-M1-007 contract PASS 推进 TASK-M1-006、`MAC-M1-HDC-001`、HDC compatibility、
+  platform conformance、hardware/support/release claim,或在该任务运行真实 HDC/device、
+  非 loopback 网络、GUI/XCUITest/系统授权。
 
 ## Impacted specifications
 
@@ -64,6 +72,9 @@ M0A 只交付可行性原型与分发决策。所有分阶段功能（UI Dump、
 - tool path/hash/identity 与实际启动对象不一致时 child launch count 为 0；App、UI 与 profile
   均不能绕过 Core typed Step 和 durable intent/outcome/finalization 链；
 - 诊断与日志按 privacy redaction 落地,导出默认不含设备 raw。
+- TASK-M1-007 只接收 synthetic identity/connectKey/evidence 并以 contract/property tests
+  证明 revision、rebind、exact-target argv、effect gate 与 lane；未确认/缺字段/歧义时真实
+  process/device dispatch count 恒为 0,且任何 fake/synthetic 结果不升级为平台或硬件证据。
 
 ## Approval
 
@@ -88,5 +99,11 @@ M0A 只交付可行性原型与分发决策。所有分阶段功能（UI Dump、
 - r5 legacy-contract safety-alignment amendment：只解除 r4“不得改写既有 cases”与 required
   full-suite gate 的两个精确冲突，授权两个具名 legacy HDC case 及其直接 private helper/import
   按 r4 已批准的 live-process ownership evidence 与 terminal reconciliation 语义对齐；不改变
-  Core/AC/contract、产品实现范围、任务状态或任何其他既有 case。r5 仅在维护者 review/merge
-  后生效，不能由本草案自行产生实现授权。
+  Core/AC/contract、产品实现范围、任务状态或任何其他既有 case。r5 已由维护者 review 并经
+  PR #103 合入 `main`（merge `b01cab60a405704ee59f9f2b11e6eba102b4fa9f`）生效。
+- r6 M1-007 headless consumer/readiness amendment：只按 CHG-2026-014 的 verified consumer
+  rule 修订 TASK-M1-007 dependency、完整 task contract 与 headless readiness；九项
+  `AC-DEV-*` 的 canonical Test ID/method/minimum evidence/expected Scenario 全部不变,不修改
+  Core/spec/contract、M1-006 状态/evidence、platform profile、integration lock 或任何支持结论。
+  本 governance PR 不修改 Swift、不执行 TASK-M1-007、不产生 acceptance evidence；r6 与
+  TASK-M1-007 的有效 readiness 仅在维护者 review/merge 后生效。
