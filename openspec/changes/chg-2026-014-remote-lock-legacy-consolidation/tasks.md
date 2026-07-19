@@ -5,7 +5,12 @@
 
 ## TASK-RLC-001 — 汇入固定锁屏遗留实现并建立非阻塞 ledger
 
-- Status:ready（本分支只起草 readiness；仅在维护者 review/merge 本独立 PR 后生效）
+- Status:in_progress（headless implementation/四项 RLC Test 已完成；等待本实现 PR 的维护者
+  review，以及按 approved PR boundary 独立提交 M1-006/PD-001 consolidation disposition，
+  两者完成前不草拟 `done`）
+- Implementation evidence:`evidence/legacy-import-manifest.md`、
+  `evidence/runs/TASK-RLC-001/run.md`。source tasks remain non-done and all unresolved gates
+  remain explicit; no conformance/hardware/support/release claim。
 - Readiness review（2026-07-19；不执行 TASK-RLC-001、不产生 implementation evidence）：
   - Change gate:satisfied。CHG-2026-014 已由维护者经 PR #107 批准并合入 `main`
     `4b4e0b37c82bf03ccfa1317058f06834d68273f5`；Core baseline 仍为 `CORE-2.0.0`，
