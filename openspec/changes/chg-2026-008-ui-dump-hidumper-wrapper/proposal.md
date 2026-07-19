@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-008-ui-dump-hidumper-wrapper
-revision: 1
-status: approved # r1 proposal 经 #63 合入;批准由本 approval-only PR 的维护者 review/merge 构成
+revision: 2
+status: approved # r1 经 #68 批准；r2 dependency/readiness revision 仅在本治理 PR 由维护者 review/merge 后生效
 class: platform
 core_change_level: none
 owner: lvye
@@ -28,6 +28,14 @@ M0B 真机事实现已合入(EVD-M0B-DAYU200-20260718-001):
 本 change 即该 integration change:固定包装调用形态与输出判定策略,并落地
 M0B 递延的 hidumper capture golden 登记与脱敏政策。
 
+r1 把全部执行硬阻塞在 `TASK-M1-006 done`，目的是避免两个任务同时修改
+`Packages/**`。此后 CHG-2026-014 已把固定 M1-006 implementation bytes 以
+`TASK-RLC-001` 汇入并登记，且该 consolidation change 已 verified。TASK-UD-001 只需要
+已经进入 `main` 的 package/tool 接口与独立的 M0B HiDumper capture；它不消费 M1-006
+仍缺失的 HDC integration probe、signed Sandbox XCUITest、source-task AC、platform
+conformance 或 support evidence。r2 因此只解耦 implementation scheduling dependency，
+不改变 M1-006 的 blocked/非 done 结论或任何验收债务。
+
 ## What changes
 
 ### In scope
@@ -39,12 +47,18 @@ M0B 递延的 hidumper capture golden 登记与脱敏政策。
   `Packages/**` 测试资源,`.gitattributes` 先行钉死二进制);
 - 对应 contract 测试(fake 输出对抗:标记缺失/错误样输出/exit-0 陷阱);
 - integration profile/lock 相应更新。
+- 经 CHG-2026-014 允许的独立 consumer dependency revision，将 TASK-UD-001 的
+  “package bytes/interfaces 已进入 main、`Packages/**` 排他占用已解除”前置从
+  `TASK-M1-006 done` 改为 `TASK-RLC-001 done` + CHG-2026-014 verified；补全任务 DoR
+  并在同一治理 PR 起草 `blocked→ready`。
 
 ### Out of scope
 
 - 兼容性/支持声明、matrix 行推进(真机复核属未来 M0B-002 之后的观察);
 - Flash/Trace/Debug capability;Agent 执行真实 `hdc`(golden 采集由人类按
   runbook 先例执行)。
+- 将 `TASK-M1-006` 标为 done/verified，重判其任何 HDC/XCUITest evidence，或把本依赖
+  解耦解释为 HDC compatibility、platform conformance、hardware/support/release claim。
 
 ## Impacted specifications
 
@@ -63,15 +77,22 @@ M0B 递延的 hidumper capture golden 登记与脱敏政策。
 
 ## Safety, evidence and compatibility
 
-- 执行硬门:`Packages/**` 当前由 TASK-M1-006 会话独占,本 change 全部执行
-  blocked 于 M1-006 done 合入 main(见 tasks.md);proposal/approve 可先行;
+- r2 implementation scheduling gate:`TASK-RLC-001` 已 done，CHG-2026-014 已 verified，
+  固定 M1-006 bytes/interfaces 已进入 `main` 且原 `Packages/**` 会话排他占用解除；
+  TASK-UD-001 不得消费 M1-006 尚缺的 HDC probe/XCUITest/AC evidence，也不得据此推进
+  M1-006 或任何支持声明；
 - golden 采集沿用只读白名单与受控位置/脱敏先例;序列号字节不入仓库;
 - 零设备写操作;不解除任何 `GAP-DAYU200-*`。
 
 ## Approval
 
-- Proposal 经 PR #63 合入 main(`a94b434`,2026-07-18,status:proposed)。
-- 正式批准:2026-07-18 由本 approval-only PR(先例 #14/#40/#55)将本 change 置为
-  `approved`;批准由维护者 review/merge 本 PR 构成。本批准不产生任务执行:
-  TASK-UD-001 保持 blocked 直至 `TASK-M1-006` done 合入 main(`Packages/**`
-  独占解除),解除另需独立 readiness/status PR 复核。
+- Proposal 经 PR #63 合入 `main`
+  `a94b4348e0bf0e7cd0030d0a383ca65633c10b31`（2026-07-18，status:`proposed`）。
+- r1 正式批准：PR #68 合入 `main`
+  `ee13ba1b64f73d94395549f126b422c49d4ebd6e` 将本 change 置为 `approved`；批准由
+  维护者 review/merge 该 approval-only PR 构成。
+- r2 dependency/readiness revision:CHG-2026-014/TASK-RLC-001 的 implementation、done 与
+  verified 分别由 PR #110、#113、#114 合入；本治理 PR 只修订 CHG-008 的 execution
+  dependency、verification environment 与 TASK-UD-001 DoR/status，不修改实现、fixture、
+  profile/lock 或 acceptance evidence。r2 与 `TASK-UD-001 ready` 只有在维护者
+  review/merge 本 PR 后生效；该 merge 不执行 TASK-UD-001，也不使 CHG-008 verified。
