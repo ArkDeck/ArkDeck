@@ -1,7 +1,7 @@
 ---
 schema_version: 1.0.0
 change_id: CHG-2026-008-ui-dump-hidumper-wrapper
-change_revision: 2
+change_revision: 3
 platform: macos
 evidence_classes:
 - contract
@@ -12,20 +12,27 @@ cases:
   method: Contract tests over the fixed wrapper with adversarial fake hidumper outputs.
   expected_source: openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/verification.md#INT-UD-WRAPPER-001
   minimum_evidence: contract
-  expected_result: The wrapper pins one fixed argv form per ui-dump recipe;
-    success is judged by output markers, never by exit code; the observed
-    error-style outputs (e.g. "option ... missed" with exit 0, per
-    EVD-M0B-DAYU200-20260718-001) are classified as explicit failures; marker
-    absence yields unknownOutput rather than silent success; adversarial fake
-    outputs cover every branch and no test invokes real hdc.
+  expected_result: After an approved target-build Recipe capture and decision
+    revision have declared the exact argv boundary and registered success,
+    failure, and unknown output families, the wrapper pins one fixed argv form
+    per ui-dump recipe. The implementation must not invent a marker or use a
+    self-authored fake as target-build evidence. Success is judged only by the
+    registered output family, never by exit code; observed error-style outputs
+    such as "option ... missed" with exit 0 are explicit failures; an
+    unregistered or marker-absent output is unknownOutput. Contract tests cover
+    every declared family and invoke no real hdc. REQ-DUMP-003 and canonical
+    TEST-AC-DUMP-003-01 additionally require missing, empty, malformed, and
+    injection-shaped component IDs to fail before ProcessRequest creation,
+    with request and dispatch counts both zero.
 - acceptance_id: INT-UD-GOLDEN-001
   test_id: TEST-INT-UD-GOLDEN-001
   method: Human-captured, redacted hidumper golden fixtures registered with pinned hashes.
   expected_source: openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/verification.md#INT-UD-GOLDEN-001
   minimum_evidence: platform
-  expected_result: Golden fixtures originate from a human-operated allowlisted
-    capture, are redacted (no serial, no user path), are pinned byte-exact with
-    .gitattributes set before commit, are registered consistently across the
-    integration profile/lock and test resources, and no capture byte is edited
-    to fit expectations; the registration makes no compatibility or support
-    claim.
+  expected_result: Golden fixtures originate from human-operated, allowlisted
+    executions of all four canonical Recipes on the declared target build;
+    help and service-list output cannot substitute for Recipe output. They are
+    redacted (no serial, no user path), pinned byte-exact with .gitattributes
+    set before commit, registered consistently across the integration
+    profile/lock and test resources, and no capture byte is edited to fit
+    expectations; the registration makes no compatibility or support claim.
