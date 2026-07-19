@@ -1,0 +1,74 @@
+---
+schema_version: 1.0.0
+change_id: CHG-2026-015-hdc-readonly-probe-registration
+change_revision: 1
+platform: macos
+evidence_classes:
+- contract
+- platform
+cases:
+- acceptance_id: I15-HDC-SERVER-IDENTITY-001
+  test_id: TEST-I15-HDC-SERVER-IDENTITY-001
+  method: Closed registry review, controlled platform receipt and identity-substitution contract vectors.
+  expected_source: openspec/changes/chg-2026-015-hdc-readonly-probe-registration/verification.md#I15-HDC-SERVER-IDENTITY-001
+  minimum_evidence: platform
+  expected_result: A registered observation binds an already-existing server process/start
+    identity, executable identity and exact endpoint and supports the same post-dispatch
+    observation; PID shape, endpoint reuse, checkserver, caller generation, substitution
+    and absent-server states cannot establish identity or ownership and cause zero command
+    or server-start dispatch when their preconditions fail.
+- acceptance_id: I15-HDC-AUTH-BINDING-001
+  test_id: TEST-I15-HDC-AUTH-BINDING-001
+  method: Exact argv/raw provenance review and stale, mismatch, ambiguous, timeout and cancellation vectors.
+  expected_source: openspec/changes/chg-2026-015-hdc-readonly-probe-registration/verification.md#I15-HDC-AUTH-BINDING-001
+  minimum_evidence: platform
+  expected_result: Only a registered selected-device observation may be classified and it
+    must match an already durable identity and binding revision; the probe cannot select a
+    default target, mint or revise a binding or infer channel protection, and every unknown,
+    denied, stale, mismatch, timeout or cancellation result fails closed with zero lifecycle
+    or device-mutation dispatch.
+- acceptance_id: I15-HDC-KEY-ACCESS-001
+  test_id: TEST-I15-HDC-KEY-ACCESS-001
+  method: Platform file-access receipt review, synthetic permission vectors and privacy scan.
+  expected_source: openspec/changes/chg-2026-015-hdc-readonly-probe-registration/verification.md#I15-HDC-KEY-ACCESS-001
+  minimum_evidence: platform
+  expected_result: The probe uses only a configured or user-approved locator and reports
+    bounded missing, denied or public-readable diagnostics and an optional public-key
+    fingerprint; private-key reads, hashes, copies, deletion, chmod, upload and raw key or
+    path logging counts are zero, and absent authority fails closed.
+- acceptance_id: I15-HDC-SUBSERVER-001
+  test_id: TEST-I15-HDC-SUBSERVER-001
+  method: Exact argv/raw/effect provenance review and mutation-name, version-only and unknown-family vectors.
+  expected_source: openspec/changes/chg-2026-015-hdc-readonly-probe-registration/verification.md#I15-HDC-SUBSERVER-001
+  minimum_evidence: platform
+  expected_result: Only a registered client-local help or capability family proven to have
+    zero server-lifecycle and device-migration effect may be supported; spawn-sub,
+    killall-sub, mutation aliases, version-only inference and unknown output remain
+    unsupported and every mutation counter is zero.
+- acceptance_id: I15-HDC-PROVENANCE-001
+  test_id: TEST-I15-HDC-PROVENANCE-001
+  method: Authoritative-source lineage, immutable hash, evidence-class and privacy review.
+  expected_source: openspec/changes/chg-2026-015-hdc-readonly-probe-registration/verification.md#I15-HDC-PROVENANCE-001
+  minimum_evidence: platform
+  expected_result: Every supported production entry has authoritative documentation or a
+    maintainer-approved controlled-human capture or receipt with exact tool, command,
+    platform and hash context; fake inputs remain control-only and no sensitive raw input,
+    device identifier, private key, user path or secret enters the repository.
+- acceptance_id: I15-HDC-REGISTRY-001
+  test_id: TEST-I15-HDC-REGISTRY-001
+  method: YAML and resource contract plus independent profile, registry, lock and fixture hash closure.
+  expected_source: openspec/changes/chg-2026-015-hdc-readonly-probe-registration/verification.md#I15-HDC-REGISTRY-001
+  minimum_evidence: contract
+  expected_result: All four families have a supported or unsupported entry and IDs,
+    versions, paths, effects, fixture or receipt IDs and hashes agree across resources,
+    the OpenHarmony profile, the structured registry and the Integration lock; partial,
+    duplicate or unknown entries fail and old consumers gain no new authority.
+- acceptance_id: I15-HDC-NODISPATCH-001
+  test_id: TEST-I15-HDC-NODISPATCH-001
+  method: Command log and static plus instrumented installed-HDC, process, network and device dispatch audit.
+  expected_source: openspec/changes/chg-2026-015-hdc-readonly-probe-registration/verification.md#I15-HDC-NODISPATCH-001
+  minimum_evidence: contract
+  expected_result: Registration executes no installed HDC, real device, non-loopback
+    network, server lifecycle, subserver, device migration or destructive action; all
+    counters are zero, a pre-existing HDC server is not stopped, restarted, adopted or
+    reconfigured, and no M1-006, source-AC, conformance, support or release state changes.
