@@ -6,7 +6,40 @@ platform: macos
 evidence_classes:
 - contract
 - platform
+- realHardware
 cases:
+- acceptance_id: INT-UD-CAPTURE-RO-001
+  test_id: TEST-INT-UD-CAPTURE-RO-001
+  method: Human-operated target capture of the approved stdout-only candidate matrix.
+  expected_source: openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/verification.md#INT-UD-CAPTURE-RO-001
+  minimum_evidence: realHardware
+  expected_result: Only the merged closed harness may execute the exact INV-1,
+    R1, and R3 argv arrays from capture-runbook.md, with the final HiDumper -a
+    payload represented as one array element. The human confirms the fixed
+    target/tool tuple and a fresh device binding before dispatch. Stdout and
+    stderr raw bytes remain in the controlled directory outside git; the
+    repository records exact redacted argv, whole-stream hashes, sizes, exits,
+    timeouts, and deviations. Capture completion does not declare Recipe
+    success and exit zero alone cannot do so. An unexpected sidecar, path
+    marker, or device-state difference stops the remaining matrix as
+    outcomeUnknown. R2, R4, deviceMutation, destructive, and Agent device
+    dispatch counts are all zero.
+- acceptance_id: INT-UD-CAPTURE-MUT-001
+  test_id: TEST-INT-UD-CAPTURE-MUT-001
+  method: Human-authorized target capture of approved sidecar or UI-state mutation candidates.
+  expected_source: openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/verification.md#INT-UD-CAPTURE-MUT-001
+  minimum_evidence: realHardware
+  expected_result: This case is not executable until a later approved readiness
+    revision fixes a dedicated non-sensitive fixture, fresh confirmed binding,
+    durable deviceMutation confirmation scope, one exact remote sidecar path,
+    pre- and post-inventory, ownership, exact cleanup, and R4 component
+    provenance. Once ready, only the closed R2 and R4 arrays may run; stdout and
+    sidecar raw origins and hashes stay separate and outside git; a pre-existing
+    or unowned path is never overwritten or removed; cleanup targets only the
+    proven owned path; global search, wildcard or recursive deletion are
+    forbidden; destructive and Agent device dispatch counts are zero. Until all
+    gates close, R2 and R4 dispatch counts are zero and no PASS or done evidence
+    may be drafted.
 - acceptance_id: INT-UD-WRAPPER-001
   test_id: TEST-INT-UD-WRAPPER-001
   method: Contract tests over the fixed wrapper with adversarial fake hidumper outputs.
@@ -26,13 +59,18 @@ cases:
     with request and dispatch counts both zero.
 - acceptance_id: INT-UD-GOLDEN-001
   test_id: TEST-INT-UD-GOLDEN-001
-  method: Human-captured, redacted hidumper golden fixtures registered with pinned hashes.
+  method: Deterministic derived hidumper golden fixtures registered from controlled human capture hashes.
   expected_source: openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/verification.md#INT-UD-GOLDEN-001
   minimum_evidence: platform
-  expected_result: Golden fixtures originate from human-operated, allowlisted
-    executions of all four canonical Recipes on the declared target build;
-    help and service-list output cannot substitute for Recipe output. They are
-    redacted (no serial, no user path), pinned byte-exact with .gitattributes
-    set before commit, registered consistently across the integration
-    profile/lock and test resources, and no capture byte is edited to fit
-    expectations; the registration makes no compatibility or support claim.
+  expected_result: Each repository golden is explicitly derived, never raw,
+    from a human-operated approved Recipe capture whose whole-stream raw hash is
+    recorded while its sensitive bytes remain outside git. A controlled replay
+    of uidump-derived-redaction-v1 produces the registered derived hash. Its
+    receipt binds the algorithm/source and safe-literal allowlist hashes, raw
+    and derived hashes, replacement counts, and human privacy review. Unknown
+    tokens or lines fail closed; the repository contains no raw UI bytes or
+    sensitive page text, package, ability, window, component, path, or user
+    identifiers. The derived bytes are pinned byte-exact with .gitattributes
+    before commit and match registry, integration profile/lock, and Bundle
+    resources. No raw/derived byte equality, compatibility, or support claim is
+    made; help and service-list outputs cannot substitute for Recipe output.
