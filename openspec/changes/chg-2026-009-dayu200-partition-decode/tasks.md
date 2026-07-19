@@ -25,6 +25,15 @@
   重判。r3 仅在维护者 review/merge 后生效，TASK-PD-001 继续保持 `blocked`；合入
   后仍须独立 readiness PR 固定最小 remediation 与 fresh 三项 AC rerun，且 collector
   运行时 host 必须处于可交互解锁状态。
+- Consolidated by TASK-RLC-001（2026-07-19）:固定 r2 implementation OID
+  `0076e44dcaed45605c1cccefc093a82b246a4ef5` 与 blocked-attempt record OID
+  `0db5f22c0878d059697d32a3022fa260c83e2798` 已登记于 CHG-2026-014 provenance
+  manifest；TASK-RLC-001 implementation PR #110 已合入
+  `f7c334857ae5735077254ccbdf3dafac8c8ad83b`。独立 r3 澄清已合入
+  `b4bf696019e114e0f3fc605f679e3f1b3e6aeeb3`，但此 disposition 不运行 collector、
+  不重判旧 evidence、也不提供 fresh AC 结论；本任务继续保持 `blocked`/非 `done`，仍须
+  在可交互解锁 host 上经独立 readiness 后 fresh 执行三项 AC，不构成烧写、产品集成、
+  conformance、hardware、support 或 release claim。
 - Objective:在不改变 r2 AC 的前提下，将 decoder 改为只接受预打开的只读普通
   文件 descriptor，并以独立、最小权限的 macOS App Sandbox broker 建立和直接
   传递该 descriptor；随后对 pinned archive 重新生成映射/对账与全部三项 fresh
