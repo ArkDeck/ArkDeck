@@ -31,6 +31,15 @@
   - Review boundary:本 PR 只起草 `blocked→ready` 与任务精确范围，不修改源码，
     不创建 run/evidence，不改变 gap/DEC-002、产品集成、compatibility、support、
     hardware 或 release claim；实现与 fresh evidence 仍须后续独立 TASK-PD-001 PR。
+- Consolidated by TASK-RLC-001（2026-07-19）:固定 r2 implementation OID
+  `0076e44dcaed45605c1cccefc093a82b246a4ef5` 与 blocked-attempt record OID
+  `0db5f22c0878d059697d32a3022fa260c83e2798` 已登记于 CHG-2026-014 provenance
+  manifest；TASK-RLC-001 implementation PR #110 已合入
+  `f7c334857ae5735077254ccbdf3dafac8c8ad83b`。独立 r3 澄清已合入
+  `b4bf696019e114e0f3fc605f679e3f1b3e6aeeb3`，但此 disposition 不运行 collector、
+  不重判旧 evidence、也不提供 fresh AC 结论；本任务保持 `ready`/非 `done`，仍须在
+  可交互解锁 host 上执行独立 TASK-PD-001 implementation 与 fresh 三项 AC，不构成烧写、
+  产品集成、conformance、hardware、support 或 release claim。
 - Objective:在不改变 r3 AC、fd-only decoder 和既有签名 sandbox broker/collector
   边界的前提下，以最小修改移除仅针对 r2 歧义的硬编码 blocker，建立 fail-closed、
   可验证的 opaque codec configuration/lifecycle audit；随后在解锁 host 上对 pinned

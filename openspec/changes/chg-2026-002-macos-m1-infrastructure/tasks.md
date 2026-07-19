@@ -466,6 +466,14 @@
   状态，遗留标记不等同于 `done`、不解除任何 AC/verification gate，也不允许依赖它的
   `TASK-M1-007`/`TASK-M1-008` 越过 dependency gate。后续修复须由独立 integration change
   登记所缺 probe，并在可交互 Developer Tools 环境补做当前 revision 的 signed XCUITest。
+- Consolidated by TASK-RLC-001（2026-07-19）:固定 implementation OID
+  `ae708518ce6cc8bbd5ad39943d948b2d81209f03` 与已由维护者合入的等价 squash
+  `21c2e218973c301e7ac6c43659d8918828f2c39e` 已登记于 CHG-2026-014 provenance manifest；
+  TASK-RLC-001 implementation PR #110 已合入
+  `f7c334857ae5735077254ccbdf3dafac8c8ad83b`。此 disposition 只表示固定遗留 bytes 与
+  审计 ledger 已收拢；本任务继续保持 `blocked`/非 `done`，上述 blocker、全部 AC/evidence
+  gate 与 consumer dependency 均不变，不构成 conformance、hardware、support 或 release
+  claim。
 - Scope/dependency amendment r4:r3 的 `ready` 状态不变；本修订只补齐完成既有 HDC AC
   所需的 Core durable toolchain intent、Process 原子 launch gate、Workflows/App 封闭组合、
   profile read-only probe 与 signed Sandbox/XCUITest 范围。r4 新增路径在维护者合入前不构成
