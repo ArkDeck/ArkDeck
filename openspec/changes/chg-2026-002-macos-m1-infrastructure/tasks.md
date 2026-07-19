@@ -813,6 +813,10 @@
 - Status:ready（r6 consumer-dependency/readiness amendment candidate；只有维护者
   review/merge 本 governance PR 后生效。本 PR 不执行 TASK-M1-007、不产生
   implementation/acceptance evidence）
+- Implementation evidence:`evidence/runs/TASK-M1-007/run.md`（contract；同一 working-tree
+  implementation 的九项 canonical Test ID、fault/reopen/property counters、unresolved mutation
+  outcome recovery/lane-retention 与确定性 queue signal 复验、full-suite/format/SDD/scope 结果和
+  dedicated 零真实 dispatch 记录；本引用不将任务标为 `done`）。
 - Readiness review（2026-07-19；锁屏 headless,零真实 HDC/device/network dispatch）：
   - Change gate:satisfied on merge。CHG-2026-002 r1-r5 已批准；r6 只修订本任务
     dependency、完整 task contract 与 readiness,不修改 Core Requirement/AC/contract、
