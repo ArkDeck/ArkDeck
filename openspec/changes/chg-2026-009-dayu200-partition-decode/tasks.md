@@ -1,104 +1,132 @@
 # Tasks — CHG-2026-009 DAYU200 partition decode(read-only)
 
-> V2 治理:本文件是任务的唯一事实源;任务状态变更仅在维护者 review/merge 后
-> 生效。本 change 零设备操作、零网络、零 subprocess。
+> V2 治理:本文件是任务的唯一事实源;任务状态变化只有经维护者 review/merge 后
+> 生效。本 change 零设备操作、零网络、零 production subprocess。r4 只拆分
+> implementation 与 interactive platform evidence,不改变 r3 codec/trusted-fd 语义。
 
-## TASK-PD-001 — parameter.txt 只读解码器 + 映射/对账 evidence
+## TASK-PD-001 — r3 codec audit headless remediation + contract evidence
 
-- Status:ready（r3 revision 已由维护者经 PR #109 合入 `main`
-  `b4bf696019e114e0f3fc605f679e3f1b3e6aeeb3`；本分支只起草 readiness，只有
-  维护者 review/merge 本独立 PR 后才生效）
-- Readiness review（2026-07-19；不执行 TASK-PD-001、不产生或重判 acceptance
-  evidence）：
-  - Change/dependency gate:satisfied。CHG-2026-009@r3 已批准；CHG-2026-007
-    TASK-RB-001 done、CHG-2026-003 archived identity/inventory、r2 implementation
-    `0076e44dcaed45605c1cccefc093a82b246a4ef5` 与 blocked rerun record
-    `0db5f22c0878d059697d32a3022fa260c83e2798` 均为当前 `main` 祖先。r1/r2
-    FAILED/BLOCKED evidence 不得追溯重判或复用为 passing evidence。
-  - AC/scope gate:satisfied。r3 已封闭 application-visible plaintext retention 与
-    opaque DEFLATE state 边界；三项 AC、fail-closed gate 和 fresh platform evidence
-    方法均明确。最小 remediation 源码只涉及下述四个固定文件，不修改已签名
-    sandbox broker/collector、accepted spec/contract/profile 或其他 task。
-  - Toolchain gate:satisfied。clean `main` 上确认 macOS 26.5.2(25F84) arm64、
-    Xcode 26.6(17F113)、Swift 6.3.3、CPython 3.14.6 与 codesign 在场；现有
-    `test_decode.py` 35 tests / 0 failures，SDD 0 errors / 0 warnings / 111 AC。
-    这些是 readiness audit，不是 r3 acceptance evidence。
-  - Interactive execution gate:collector 仍必须由人类在可交互解锁的 console
-    session 中经 NSOpenPanel/PowerBox 选择 pinned archive。readiness 起草时只读
-    host flag 为 `CGSSessionScreenIsLocked=Yes`，故不得在本 PR 启动 collector；
-    后续 implementation PR 须先确认解锁，锁屏/取消/无法选择时在 create-only
-    publication 前 fail closed，且不得用旧 output 代替 fresh 三项 evidence。
-  - Review boundary:本 PR 只起草 `blocked→ready` 与任务精确范围，不修改源码，
-    不创建 run/evidence，不改变 gap/DEC-002、产品集成、compatibility、support、
-    hardware 或 release claim；实现与 fresh evidence 仍须后续独立 TASK-PD-001 PR。
-- Consolidated by TASK-RLC-001（2026-07-19）:固定 r2 implementation OID
-  `0076e44dcaed45605c1cccefc093a82b246a4ef5` 与 blocked-attempt record OID
-  `0db5f22c0878d059697d32a3022fa260c83e2798` 已登记于 CHG-2026-014 provenance
-  manifest；TASK-RLC-001 implementation PR #110 已合入
-  `f7c334857ae5735077254ccbdf3dafac8c8ad83b`。独立 r3 澄清已合入
-  `b4bf696019e114e0f3fc605f679e3f1b3e6aeeb3`，但此 disposition 不运行 collector、
-  不重判旧 evidence、也不提供 fresh AC 结论；本任务保持 `ready`/非 `done`，仍须在
-  可交互解锁 host 上执行独立 TASK-PD-001 implementation 与 fresh 三项 AC，不构成烧写、
-  产品集成、conformance、hardware、support 或 release claim。
-- Objective:在不改变 r3 AC、fd-only decoder 和既有签名 sandbox broker/collector
-  边界的前提下，以最小修改移除仅针对 r2 歧义的硬编码 blocker，建立 fail-closed、
-  可验证的 opaque codec configuration/lifecycle audit；随后在解锁 host 上对 pinned
-  archive 同一次 fresh rerun 生成映射、对账与全部三项 platform evidence。
+- Status:blocked（r4 decomposition candidate；本 revision PR 只重建 task boundary,
+  不执行实现、不生成 evidence、也不使本任务 ready。r4 经维护者合入后仍须独立
+  readiness PR）
+- Historical disposition:r3 readiness PR #111 已合入 `main`
+  `82a9ac791e86e2092dad08297e15cd47f1cdc914`；当时的 `ready` 同时绑定 implementation
+  与 fresh platform run。r4 变更该执行范围,因此在新的 readiness 前 fail closed。
+  r1/r2 FAILED/BLOCKED run 与 top-level evidence 保持 immutable,不得复用、复制或重判。
+  r2 implementation `0076e44dcaed45605c1cccefc093a82b246a4ef5` 与 blocked-attempt
+  record `0db5f22c0878d059697d32a3022fa260c83e2798` 只作为 provenance/read-only 输入。
+- Objective:在锁屏 headless shell 中,以最小源码修改把现有 r2 固定 blocker 改为
+  r3 fail-closed codec configuration/lifecycle audit,完成 branch-complete contract/fault/
+  static 回归；不运行 collector、不读取 pinned archive、不产生任何原 platform AC 结论。
+- Requirements/AC:`DECODE-DAYU200-HEADLESS-001`
+  (`TEST-DECODE-DAYU200-HEADLESS-001`,minimum evidence:`contract`)。
+  原 `DECODE-DAYU200-PARTITION-001`、`DECODE-DAYU200-INPUT-BOUNDARY-001`、
+  `DECODE-DAYU200-RECONCILE-001` 不属于本任务 completion evidence,保持 pending。
+- Depends on:
+  - CHG-2026-009@r4 经维护者合入并保持 `approved`；
+  - r2 implementation/blocked record、r3 revision/readiness 与 CHG-2026-014
+    consolidation/verification 均为 `main` 历史（已满足）；
+  - 本任务独立 readiness PR 固定 source/test/evidence path 与 headless toolchain。
 - In scope:
-  1. `decode.py` 将 audit schema 升为 r3 语义并精确记录：gzip-DEFLATE base window
-     bits 15(zlib `wbits=31`)、history upper bound 32768 bytes、无 preset dictionary/
-     clone/export/history view、application-held compressed remainder configured/实际
-     最大值均不超过 65536 bytes、application plaintext retained into next read 为 0；
-  2. codec/remainder 在取得 target 以及任一 DecodeFailure、异常或取消路径均通过
-     显式 `finally` lifecycle 关闭，receipt 能证明 destroy 已发生且关闭后 remainder
-     为 0；缺失、越界或矛盾 receipt 必须令 `partitionAcceptanceSatisfied:false`，
-     不允许把配置常量本身当作运行结果，也不声称 allocator forensic zeroization；
-  3. `evidence.py`/`test_decode.py`/`README.md` 删除仅针对 r2 歧义的固定 BLOCKED
-     结论，改为由上述封闭 receipt 与既有 identity/stream/grammar/reconciliation/
-     zero-dispatch gate 共同判定；增加成功、failure/cancellation cleanup、字段篡改、
-     cap 越界与静态无二次 plaintext buffer/codec clone/export 的正负测试；
-  4. 使用未修改的签名 broker/collector 对 pinned archive fresh rerun，重新生成
-     mapping/reconciliation/process audit/summary/run；同一次 run 记录 signing
-     identity、签后 entitlement/policy、artifact hash、OS/arch/Xcode/Swift/Python、
-     descriptor-transfer chain 与全部三项 AC 结论。
-- Out of scope:r1/r2 evidence 重判；修改 sandbox broker/collector source、policy、
-  entitlement 或 descriptor trust boundary；任何真实/模拟设备访问；任何网络、
-  HDC/vendor tool 或 device mutation；产品集成、烧写地址推导、gap/DEC-002/支持或
-  兼容性状态变更；修改 accepted specs/contracts/profile/lock/hardware matrix。
+  1. process audit schema 精确记录 DEFLATE base window bits `15`、zlib gzip
+     `wbits=31`、history upper bound `32768` bytes、无 preset dictionary、无 codec
+     clone/export/history view、compressed remainder configured/observed maximum 均
+     `≤65536` bytes、application plaintext retained into next read 为 `0`；
+  2. codec 与 compressed remainder 在成功取得 target、`DecodeFailure`、其他异常与
+     cancellation 全部路径通过显式 `finally` 关闭；receipt 证明 lifecycle closed 且
+     close 后 remainder 为 `0`；
+  3. receipt 缺字段、矛盾、cap 越界或 cleanup 未完成时 fail closed；配置常量不能
+     代替 runtime observation；不声称 allocator residue forensic zeroization；
+  4. 删除仅针对 r2 歧义的固定 blocker；增加 success/failure/exception/cancellation
+     cleanup、receipt missing/tamper、history/remainder cap、preset dictionary、clone/
+     export/history view、额外 plaintext buffer 与原有所有正负分支回归；
+  5. README 如实区分 headless contract PASS 与尚未执行的 platform AC。
+- Allowed paths:
+  - `scripts/partition_decode/README.md`
+  - `scripts/partition_decode/decode.py`
+  - `scripts/partition_decode/evidence.py`
+  - `scripts/partition_decode/test_decode.py`
+  - `openspec/changes/chg-2026-009-dayu200-partition-decode/evidence/runs/TASK-PD-001/r4-headless/**`
+  - 本 `tasks.md`（implementation PR 只追加 run/completion evidence 引用,不标 `done`）
+- Read-only inputs:
+  - `scripts/partition_decode/macos_input_broker/**`
+  - 本 change 既有 `evidence/**`（仅 provenance/negative-history review）
+  - archived CHG-2026-003 inventory/identity evidence
+- Forbidden paths:`scripts/partition_decode/macos_input_broker/**` 写入、ArkDeckApp、
+  Packages、Xcode project、accepted specs/contracts/platform/integration lock、其他
+  change/task/evidence；pinned archive、NSOpenPanel/PowerBox、collector、真实/模拟设备、
+  HDC/vendor tool、网络、production child-process/device-mutation dispatch。
+- Risk:medium（离线纯 Python remediation,但 receipt 若把配置误当 runtime 或 cleanup
+  漏分支会制造虚假平台前提；以 tamper/fault tests 与零 dispatch audit fail closed）。
+- Hardware required:no。
+- Required environment:锁屏 macOS headless shell；仓库 CPython/stdlib、synthetic fixtures
+  与本地临时目录。不得要求 GUI、系统授权、网络下载、pinned archive 或签名 broker runtime。
+- Deliverables:r3 codec configuration/lifecycle implementation；fail-closed receipt validator；
+  branch-complete tests；README contract/platform 边界；
+  `evidence/runs/TASK-PD-001/r4-headless/run.md`（命令、环境、结果、唯一 headless Test ID、
+  偏差/风险、collector/archive/HDC/device/network/production subprocess dispatch count `0`）。
+- Verification:
+  - 完整 `scripts/partition_decode/test_decode.py` 全通过；
+  - synthetic archive characterization regression 与全部既有正负分支通过；
+  - static audit 证明 production decoder 零 path open、subprocess、network、device mutation,
+    且无额外 plaintext buffer、preset dictionary、codec clone/export/history view；
+  - `scripts/check-sdd.sh` 为 0 errors/0 warnings；`git diff --check` 通过；
+  - diff 只含本任务 allowed paths,broker/collector blob hash 与 base 一致。
+- Evidence gate:仅 `TEST-DECODE-DAYU200-HEADLESS-001` 有同一 implementation revision
+  的可复查 PASS evidence 才能另起 status PR 起草本任务 `done`。该结论不得用于
+  TASK-PD-002 readiness 之外的 platform/compatibility/support/release claim。
+- PR boundary:remediation implementation + headless contract evidence 一个独立
+  `TASK-PD-001` PR；`ready→done` 仍为后续独立 status PR。
+
+## TASK-PD-002 — signed broker fresh platform verification
+
+- Status:blocked（等待 TASK-PD-001 done/merged implementation identity、可交互解锁
+  console 与独立 readiness PR；本 r4 revision 不运行 collector、不产生 evidence）
+- Objective:不修改 decoder 或 broker source,在解锁 macOS console 上由人类经未修改的
+  签名 sandbox broker/NSOpenPanel 选择 pinned archive,把已合入 TASK-PD-001 完整
+  implementation commit 绑定到同一次 create-only fresh 三项 platform run。
 - Requirements/AC:`DECODE-DAYU200-PARTITION-001`、
-  `DECODE-DAYU200-INPUT-BOUNDARY-001`、`DECODE-DAYU200-RECONCILE-001`
-  (见 acceptance-cases.yaml；三项均须 fresh evidence)
-- Depends on:CHG-2026-007 TASK-RB-001 done(已满足,计划第①步)、
-  CHG-2026-003 archived(pinned identity 与成员清单,已满足)、r1 FAILED/BLOCKED
-  evidence、r2 implementation/blocked record 与 r3 revision 均已合入 `main`(已满足)
-- Allowed paths:`scripts/partition_decode/README.md`、
-  `scripts/partition_decode/decode.py`、`scripts/partition_decode/evidence.py`、
-  `scripts/partition_decode/test_decode.py`、本 change `evidence/**`、本 change
-  `tasks.md`(仅本任务状态/完成 evidence 引用)
-- Forbidden paths:`scripts/partition_decode/macos_input_broker/**`、现有
-  `ArkDeckApp/**`、`ArkDeck.xcodeproj/**`、产品代码、`Packages/**`、
-  `openspec/specs/**`、
-  `openspec/contracts/**`、`openspec/planning/**`、hardware matrix、其他
-  change/task evidence
-- Risk:medium(离线只读,但 broker 是 r3 保留的零设备安全边界；任何 entitlement/
-  policy/signing/descriptor chain 不明确即 fail closed。取消/异常不得接受 partial
-  governed evidence；输入只读且输出确定,清理临时输出后可安全重跑。解码结论
-  被误用为烧写依据的风险继续由 non-authoritative/不推导地址边界覆盖)
-- Hardware required:no；禁止以真实 device node 做负测。需要本地 pinned 镜像
-  在场并重新通过 size/SHA-256 identity gate；readiness host 已具备 macOS 26.5.2
-  arm64、Xcode 26.6、Swift 6.3.3、CPython 3.14.6 与 codesign。当前无 certificate
-  identity，broker 使用并如实记录独立 ad-hoc signature(`Signature=adhoc`)；它仅
-  是本地 sandbox/platform evidence，不构成 release signing/support claim。
-- Deliverables:r3 codec configuration/lifecycle audit + fail-closed validator/summary；
-  cleanup/cap/tamper/static branch-complete tests；fresh 映射表/对账表/process audit/
-  summary/run 与既有签名 broker 的 signing/platform/runtime-binding evidence。
-- Verification:先运行 branch-complete unit/static tests，再由未修改的 broker artifact
-  完成 `codesign --verify --strict`、签后 entitlement/policy/source allowlist 与
-  descriptor chain 复核；只有解锁 host 上同一次 fresh collector 的三个 Test ID
-  全部 PASS 才可起草完成。缺任一 codec receipt、cleanup/cap fault、出现 path
-  fallback/网络/设备访问/production child-process dispatch、复用 r1/r2 output 或
-  archive locator/raw parameter 泄露，任务整体不得标记 `done`。结论仅对 pinned
-  镜像成立，不构成烧写依据、产品集成、兼容或支持声明。
-- PR boundary:后续 remediation implementation + fresh evidence 在一个独立
-  `TASK-PD-001` PR 闭环；本 readiness PR 不携带任何 implementation/evidence
-  重判，后续 `ready→done` 仍须独立 status PR。
+  `DECODE-DAYU200-INPUT-BOUNDARY-001`、`DECODE-DAYU200-RECONCILE-001`；三项 expected
+  result、minimum evidence 与 Test ID 保持 r3 不变。
+- Depends on:
+  - TASK-PD-001 `done` 状态 PR 与其 implementation commit 均已合入 `main`；
+  - 完整 commit OID、decoder/validator blob hash 与未修改 broker source/artifact hash 可固定；
+  - macOS console 由用户人工解锁且 `CGSSessionScreenIsLocked` 不为 `Yes`；
+  - pinned archive 可由用户在 NSOpenPanel 中选择并重新通过 size/SHA identity gate；
+  - 独立 readiness PR 确认签名、entitlement/policy、toolchain 与 create-only output path。
+- In scope:构建/验证未修改 broker artifact；记录 signing identity、签后 entitlement/policy、
+  OS/arch/Xcode/Swift/Python、descriptor-transfer/runtime binding；由同一次 fresh run 生成
+  mapping、reconciliation、process audit、summary 与 run；三个 Test ID 全部二值判定。
+- Allowed paths:
+  - `openspec/changes/chg-2026-009-dayu200-partition-decode/evidence/runs/TASK-PD-002/**`
+  - 本 `tasks.md`（evidence PR 只追加 run/completion evidence 引用,不标 `done`）
+- Read-only inputs:
+  - `scripts/partition_decode/**`
+  - archived CHG-2026-003 inventory/identity evidence
+  - TASK-PD-001 merged implementation commit 与 headless run
+- Forbidden paths:全部 source、broker/collector/policy/entitlement 写入；本 change 既有
+  r1/r2/top-level evidence 修改或重判；accepted specs/contracts/platform/integration lock、
+  其他 change/task/evidence；archive locator、parameter.txt 原文、真实设备、HDC/vendor
+  tool、网络、device mutation/destructive dispatch。
+- Risk:medium（只读 platform evidence,但 sandbox/signing/descriptor/implementation binding
+  任一不明确即 fail closed；取消、锁屏、picker/identity/AC failure 不得发布 partial output）。
+- Hardware required:no；禁止以真实 device node 做负测。
+- Required environment:可交互解锁的 macOS console；用户本人操作 NSOpenPanel；pinned archive
+  本地在场；仓库既有 CPython/Xcode/Swift/codesign。当前无 certificate identity 时只可如实
+  记录 ad-hoc signature,不构成 release signing/support claim。
+- Deliverables:一个新建的 run 目录,含 fresh mapping/reconciliation/process audit/summary/
+  run 与 signing/platform/runtime-binding evidence；不修改任何旧 evidence。
+- Verification:
+  - collector 启动前与 publication 前均确认 console 未锁；取消/锁屏/failure 零 governed
+    partial output；
+  - `codesign --verify --strict`、签后 entitlement/policy/source allowlist、descriptor chain、
+    artifact/runtime/source OID/hash 全部一致；
+  - 同一次 fresh run 的 `TEST-DECODE-DAYU200-PARTITION-001`、
+    `TEST-DECODE-DAYU200-INPUT-BOUNDARY-001`、`TEST-DECODE-DAYU200-RECONCILE-001`
+    全部 PASS；任一不可二值化即整体 blocked；
+  - `scripts/check-sdd.sh`、`git diff --check` 与 allowed-path diff audit 通过。
+- Evidence gate:三项 platform Test ID 全部由同一次 fresh run PASS 后,才能另起状态 PR
+  起草 TASK-PD-002 `done`；该状态仍不自动改变 gap/DEC-002、change verified、compatibility、
+  hardware、support 或 release claim。
+- PR boundary:一个 evidence-only `TASK-PD-002` PR；任何 source 修复必须回到新的
+  TASK-PD-001 remediation revision,不得在 platform run PR 内夹带。

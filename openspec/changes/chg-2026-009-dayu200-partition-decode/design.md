@@ -1,7 +1,7 @@
-# CHG-2026-009 r3 design — streaming, codec state and trusted input boundary
+# CHG-2026-009 r4 design — streaming, codec state and split verification boundary
 
-> Change:CHG-2026-009-dayu200-partition-decode@r3
-> Status:candidate;only the maintainer-reviewed revision PR merge makes r3 effective
+> Change:CHG-2026-009-dayu200-partition-decode@r4
+> Status:candidate;only the maintainer-reviewed revision PR merge makes r4 effective
 
 ## Decision 1:bounded stream-discard
 
@@ -89,6 +89,36 @@ prevents device acquisition, and the decoder has no path open and performs zero 
 on non-regular descriptors. A trusted-fd assertion without broker evidence proves
 only decoder behavior and does not pass r3.
 
+## Decision 3:headless implementation and interactive platform evidence are separate tasks
+
+The codec remediation is deterministic Python source plus synthetic unit/static/fault
+tests and can be reviewed on a locked headless host. The three existing acceptance cases
+are platform-class because they also require the pinned archive, the signed sandbox
+broker, PowerBox descriptor acquisition and one fresh reconciliation run. Treating the
+absence of an unlocked console as a reason to keep source bytes unreviewed conflates two
+different conclusions; treating headless tests as platform evidence would be equally
+incorrect.
+
+r4 therefore uses the CHG-2026-014 two-axis pattern without adding a task status:
+
+| Task | Owns | Does not own |
+| --- | --- | --- |
+| `TASK-PD-001` | codec remediation, branch-complete unit/static/fault tests, headless receipt contract | pinned archive output, signed broker runtime receipt, any of the three existing platform AC |
+| `TASK-PD-002` | one fresh signed-broker run for the three existing platform AC | decoder/broker implementation changes or reinterpretation of headless evidence |
+
+`TASK-PD-001` is complete only when its new contract-class acceptance case has reproducible
+evidence. That completion says the implementation bytes and fail-closed receipt validator
+are reviewable; it does not satisfy or downgrade any original platform case. `TASK-PD-002`
+must consume a full merged implementation commit OID, record the artifact hashes produced
+from that revision, and fail closed if source bytes, signing inputs or runtime binding differ.
+Branch names, an uncommitted worktree and r1/r2 evidence are not implementation identity.
+
+The task split preserves create-only publication. Cancellation, lock transition, picker
+failure, archive mismatch or any non-binary gate leaves no governed partial output. All
+three original Test IDs must still be decided by the same fresh run. The evidence-only
+platform task cannot repair source or broker bytes; any required code change returns to a
+new headless remediation revision and invalidates the pending platform attempt.
+
 ## Rejected alternatives
 
 - `lstat → open → fstat`:the device may already be opened before `fstat` rejects it.
@@ -101,12 +131,18 @@ only decoder behavior and does not pass r3.
   fixed 15-bit DEFLATE window and closed lifecycle above.
 - a DEFLATE seek index:may reduce work but does not prove non-target bytes were never
   consumed and adds a new derived artifact/trust problem.
+- marking the headless implementation task done against the original platform AC:missing
+  signed broker/pinned archive evidence, violating POL-VERIFY-001.
+- allowing the platform evidence task to patch source:collapses the review boundary and
+  makes the tested implementation identity ambiguous.
 
 ## Revision and readiness
 
-r3 approval changes only the change-local design and acceptance boundary. It does not
-reinterpret r1/r2 evidence, change the merged implementation, generate fresh evidence,
-or make TASK-PD-001 ready/done. After r3 is approved on `main`, a separate readiness PR
-must pin the minimal codec-state remediation and fresh three-AC rerun before execution
-resumes. The interactive PowerBox requirement and all r2 trusted-fd/sandbox gates remain
-unchanged.
+r4 approval changes only change-local task ownership and adds one headless contract case;
+it does not reinterpret r1/r2 evidence, change implementation bytes, generate fresh
+evidence or make either task ready/done. After r4 is approved on `main`, a separate
+readiness PR must pin TASK-PD-001's four source files, test surface and headless run path.
+TASK-PD-002 remains blocked until TASK-PD-001 is done, its implementation commit is merged,
+the pinned archive is available and the console is interactively unlocked. The r3 codec
+semantics, interactive PowerBox requirement, same-run three-AC rule and all r2 trusted-fd/
+sandbox gates remain unchanged.
