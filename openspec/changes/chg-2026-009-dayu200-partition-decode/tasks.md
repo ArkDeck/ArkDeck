@@ -6,9 +6,36 @@
 
 ## TASK-PD-001 — r3 codec audit headless remediation + contract evidence
 
-- Status:blocked（r4 decomposition candidate；本 revision PR 只重建 task boundary,
-  不执行实现、不生成 evidence、也不使本任务 ready。r4 经维护者合入后仍须独立
-  readiness PR）
+- Status:ready（r4 headless readiness candidate；仅本 readiness PR 经维护者
+  review/merge 后生效。本 PR 不执行实现、不生成或重判 evidence）
+- Readiness review（2026-07-19；不执行 TASK-PD-001、不启动 collector）：
+  - Change gate:satisfied。CHG-2026-009@r4 已由维护者批准并经 PR #116 合入
+    `main` merge commit `7585603d459ae26ad566b9aaeecc953f9c26bd98`；change 保持
+    `approved`，唯一 task truth source 已把 headless implementation 与 interactive
+    platform evidence 拆为 TASK-PD-001/TASK-PD-002。
+  - Dependency gate:satisfied。r2 implementation/blocked record、r3 revision/readiness
+    均在 `main` 保持 immutable provenance；CHG-2026-014 为 `verified`、TASK-RLC-001
+    为 `done`。本任务不继承、复制或重判 r1/r2 evidence。
+  - Contract gate:satisfied。execution 仅消费
+    `DECODE-DAYU200-HEADLESS-001` / `TEST-DECODE-DAYU200-HEADLESS-001`
+    (`minimum_evidence:contract`)；原三项 platform AC 保持 pending，且明确归
+    TASK-PD-002 所有。
+  - Scope gate:satisfied。可写源码固定为本任务 `Allowed paths` 中四个
+    `scripts/partition_decode/` 文件；新 run 固定写入
+    `evidence/runs/TASK-PD-001/r4-headless/**`，本 `tasks.md` 只可追加 run/completion
+    引用且不得在 implementation PR 中标 `done`。broker/collector、其他 product/spec/
+    change/evidence 均保持只读或禁止。
+  - Environment gate:satisfied。macOS 26.5.2 (25F84)、CPython 3.14.6/stdlib；
+    `env PYTHONWARNINGS=error python3 scripts/partition_decode/test_decode.py` 在
+    readiness base `4e0c4f94d12e0ab55902580e43bd6dd61c4e6e79` 为 35 tests、0 failures。
+    这是现状基线，不是 headless AC evidence 或 r2 blocker 的重判。
+  - Headless boundary:satisfied。console 观测为 `CGSSessionScreenIsLocked=Yes`；该状态
+    阻止 TASK-PD-002，但不阻止本任务。readiness 未请求 GUI/PowerBox，未运行 broker/
+    collector，未读取 pinned archive，未访问设备/HDC/vendor tool/网络，未产生 mapping、
+    reconciliation 或任何 platform Test ID 结论。
+  - Execution boundary:后续仅一个 TASK-PD-001 implementation + fresh headless contract
+    evidence PR；实现完成后仍须独立 `ready→done` 状态 PR。任何原三项 platform AC
+    二值验证均留给满足其独立 readiness 的 TASK-PD-002。
 - Historical disposition:r3 readiness PR #111 已合入 `main`
   `82a9ac791e86e2092dad08297e15cd47f1cdc914`；当时的 `ready` 同时绑定 implementation
   与 fresh platform run。r4 变更该执行范围,因此在新的 readiness 前 fail closed。
