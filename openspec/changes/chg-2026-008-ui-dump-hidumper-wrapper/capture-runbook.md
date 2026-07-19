@@ -1,172 +1,196 @@
 # CHG-2026-008 HiDumper Recipe capture runbook
 
-> Status:plan-only; becomes executable only after the r3 governance PR is reviewed/merged.
+> Status:plan-only and non-executable. No real-device task in this change is `ready` at r3.
 >
-> Real-device operator:human maintainer only. An Agent may implement and offline-test the closed
-> harness, but SHALL NOT execute installed `hdc` or any device step.
+> Real-device operator:human maintainer only. An Agent SHALL NOT execute installed `hdc`, create a
+> real binding or run any device step.
 
 ## Purpose and authority boundary
 
-This runbook fixes the candidate argv matrix **before** target capture and separates candidates by
-their approved output/effect mode. It does not declare any candidate compatible or successful.
-Capture completion proves only that the approved command was executed and recorded faithfully;
-success/failure/unknown output families are fixed later by a separate approved decision revision.
+This runbook fixes the candidate Recipe payload boundary and the fail-closed prerequisites. It does
+not create missing production authority. A later readiness revision may make a human task executable
+only after it pins the registered server/device observations, durable binding loader, dedicated
+fixture and exact remote paths listed below.
 
-The output-mode split is based on a pinned WindowManager routing input plus the same behavior in two
-pinned OpenHarmony ArkUI source inputs:
+The reviewed OpenHarmony source is useful only for static routing analysis:
 
-- OpenHarmony `window_window_manager` master commit
-  `b5df00fb15aa99734c2ec8f73cfd0219389314c6`, where `GetSessionDumpInfo` returns inventory/detail
-  text through the dump response and forwards the Recipe tail to the session/ArkUI dump path;
-- `OpenHarmony-v6.0-Release` commit
-  `4b074c8d79421c948dd2ab2510c691371fd0f8ff`;
-- ArkUI master commit `30c7d1ee12fbedf0fabece54291d75897e2ad44f`.
+- [`window_window_manager`](https://gitee.com/openharmony/window_window_manager/blob/b5df00fb15aa99734c2ec8f73cfd0219389314c6/window_scene/session_manager/src/scene_session_manager.cpp)
+  routes window detail tails into the session/ArkUI dump path;
+- [`pipeline_context.cpp`](https://gitee.com/openharmony/arkui_ace_engine/blob/30c7d1ee12fbedf0fabece54291d75897e2ad44f/frameworks/core/pipeline_ng/pipeline_context.cpp)
+  routes `-default` to default output and `-element` through size/scroll branches;
+- [`dump_log.cpp`](https://gitee.com/openharmony/arkui_ace_engine/blob/30c7d1ee12fbedf0fabece54291d75897e2ad44f/frameworks/base/log/dump_log.cpp)
+  can create `<application-data-dir>/arkui.dump` from its size-based path.
 
-In both, `-default` routes to `DumpLog::OutPutDefault` while `-element` routes to
-`DumpLog::OutPutBySize`; the latter creates `<application-data-dir>/arkui.dump` when the output is
-large or the target is a UI extension. The `-element -lastpage ...` path can also enter ArkUI scroll
-handling, and the reviewed parameter-count branch means the `-element -c` candidate cannot be
-treated as state-neutral either. These source pins are integration design inputs, not proof that
-the target firmware has the same behavior; an unexpected target result remains `outcomeUnknown`
-and cannot broaden the allowlist.
-
-The reviewed source locations are the official OpenHarmony repositories
-[`window_window_manager`](https://gitee.com/openharmony/window_window_manager/blob/b5df00fb15aa99734c2ec8f73cfd0219389314c6/window_scene/session_manager/src/scene_session_manager.cpp),
-[`pipeline_context.cpp`](https://gitee.com/openharmony/arkui_ace_engine/blob/30c7d1ee12fbedf0fabece54291d75897e2ad44f/frameworks/core/pipeline_ng/pipeline_context.cpp),
-and
-[`dump_log.cpp`](https://gitee.com/openharmony/arkui_ace_engine/blob/30c7d1ee12fbedf0fabece54291d75897e2ad44f/frameworks/base/log/dump_log.cpp).
+Those commits are not a byte-traceable source mapping for the DAYU200 target firmware. They cannot
+prove target output mode or lower an effect. Under `dump-recipes.yaml`, unresolved output behavior
+is `unsupported-fail-closed`. Therefore the **first target execution of every Recipe R1-R4 is
+conservatively `deviceMutation`**. There is no stdout-only/readOnly Recipe capture in r3.
 
 ## Fixed target/tool tuple
 
-- Device:`DAYU200 (RK3568)`, OpenHarmony `7.0.0.34`, API `26.0.0`, USB; the human must physically
-  confirm the same target and a fresh confirmed binding immediately before dispatch.
+- Device candidate:`DAYU200 (RK3568)`, OpenHarmony `7.0.0.34`, API `26.0.0`, USB. This is only the
+  expected physical tuple; it is not a current binding.
 - HDC executable:
   `/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/toolchains/hdc`.
 - Expected HDC SHA-256:
   `48395ba8d87115dffca47df2a640a6c868bc9a2bd4eb49611e4138ff88d8d260`.
-- Expected HDC version:`Ver: 3.2.0d`, taken from the already merged M0B evidence. The capture task
-  must re-hash the executable without running it; a mismatch stops the run and requires a new
-  revision.
+- Expected HDC version:`Ver: 3.2.0d`. These facts come only from merged M0B evidence and must be
+  revalidated without invoking HDC before a later task can use them.
 - Raw output root:a new operator-controlled `0o700` directory outside every git repository. Raw
   files are `0o600` and never enter ArkDeck git history.
 
-`<CONNECT_KEY>` is populated only from the fresh confirmed binding. `<WINDOW_ID>` and
-`<COMPONENT_ID>` are populated only from outputs captured in the same task run. Each is one ASCII
-decimal token (`^[0-9]+$`), is range-checked by the harness, and is inserted only in its declared
-slot. The operator cannot provide free-form text or add/remove arguments.
+The old M0B connect key is never reused. There is no operator-supplied `<CONNECT_KEY>` placeholder,
+CLI flag, environment variable or editable config field in this runbook.
 
-## Closed candidate argv matrix
+## Mandatory existing-server preflight
 
-Every row below is a process argv array. There is no host shell. In every Recipe row the payload
-after the final `-a` is **one array element containing spaces**; quote characters are not part of
-that element. Split-token or quoted-string fallbacks are not candidates and SHALL NOT be tried.
+HDC client commands can implicitly start a host server. No HDC command, including `-v`,
+`checkserver`, device discovery or a Recipe, may be used to learn whether the server precondition is
+safe. The preflight is a closed typed sequence owned by `TASK-UD-PREFLIGHT-001`:
 
-| ID | Logical operation | Exact host argv after substitution | Payload boundary | Approved mode / typed step | Owning task |
-| --- | --- | --- | --- | --- | --- |
-| `INV-1` | window inventory | `[HDC, "-t", CONNECT_KEY, "shell", "hidumper", "-s", "WindowManagerService", "-a", "-a"]` | final `-a` payload is one element | stdout-only / `captureRemoteStdout` / `readOnly` | `TASK-UD-CAP-001` |
-| `R1` | `nodeSummary` | `[HDC, "-t", CONNECT_KEY, "shell", "hidumper", "-s", "WindowManagerService", "-a", "-w <WINDOW_ID> -default"]` | Recipe payload is one element | stdout-only / `captureRemoteStdout` / `readOnly` | `TASK-UD-CAP-001` |
-| `R2` | `elementTree` | `[HDC, "-t", CONNECT_KEY, "shell", "hidumper", "-s", "WindowManagerService", "-a", "-w <WINDOW_ID> -element -c"]` | Recipe payload is one element | possible sidecar/UI-state change / `captureRemoteFile` / `deviceMutation` | `TASK-UD-CAP-MUT-001` |
-| `R3` | `fullDefaultTree` | `[HDC, "-t", CONNECT_KEY, "shell", "hidumper", "-s", "WindowManagerService", "-a", "-w <WINDOW_ID> -default -all"]` | Recipe payload is one element | stdout-only / `captureRemoteStdout` / `readOnly` | `TASK-UD-CAP-001` |
-| `R4` | `componentDetail` | `[HDC, "-t", CONNECT_KEY, "shell", "hidumper", "-s", "WindowManagerService", "-a", "-w <WINDOW_ID> -element -lastpage <COMPONENT_ID>"]` | Recipe payload is one element | possible sidecar/UI-state change / `captureRemoteFile` / `deviceMutation` | `TASK-UD-CAP-MUT-001` |
+| ID | Typed operation | Required durable result | Dispatch gate |
+| --- | --- | --- | --- |
+| `SP-0` | commandless registered `serverIdentityGeneration` platform observation through the host-wide `HDCServerSupervisor` | exact endpoint, process/start identity, executable identity, client/server version, ownership and generation | absent server, `unknown` ownership, unknown generation/version/endpoint, unregistered receipt or identity ambiguity => all HDC dispatch `0` |
+| `SP-1` | durable Job toolchain snapshot | HDC path/hash/version plus exactly the `SP-0` endpoint, ownership and generation | snapshot write/reopen mismatch => all HDC dispatch `0` |
+| `SP-2` | same registered platform observation immediately before every HDC intent | byte/semantic equality with the pinned Job snapshot | absent/unknown/generation or ownership drift => intent/process dispatch `0` |
+| `SP-3` | same registered platform observation immediately after every HDC outcome | same endpoint/process/start identity/ownership/generation | drift or observation failure => current outcome `outcomeUnknown`, remaining dispatch `0` |
 
-`TASK-UD-CAP-001` may implement and execute only `INV-1`, `R1`, and `R3`. `R2` and `R4` are
-structurally absent from its executable allowlist. `TASK-UD-CAP-MUT-001` remains blocked and no
-harness path may expose those rows until its dedicated readiness revision is merged.
+`serverIdentityGeneration` is an approved family name in CHG-2026-015 design, but no completed
+registration/adoption currently makes it executable. A future readiness revision must pin its
+literal registry/profile version, entry hash, platform receipt schema and production adapter OID.
+Until then `TASK-UD-PREFLIGHT-001` is blocked.
+
+This change never starts, stops, restarts, adopts or reconfigures an HDC server. If `SP-0` observes
+no existing server, the run stops. Establishing a server would require a separate approved
+host-wide lifecycle task; chat confirmation or running a diagnostic command is not a substitute.
+External ownership is permitted only as an observed stable value and automatic lifecycle/subserver
+dispatch remains `0`.
+
+## Mandatory durable CurrentDeviceBinding
+
+After the server precondition is proven, `TASK-UD-PREFLIGHT-001` must create the initial binding
+through the completed production device-targeting workflow, never through operator text input:
+
+1. a registered no-server-start device discovery observation produces candidates while the `SP-0`
+   server generation remains current. The family must be approved separately; the current
+   `selectedDeviceAuthorizationBinding` family cannot mint an initial binding;
+2. the human physically selects/confirms the exact DAYU200 identity. The M1-007 production
+   `CurrentDeviceBinding` workflow appends `bindingCandidate` and `bindingConfirmed` to the
+   repo-external locked Session journal before any device-scoped command. Revision starts at `1`,
+   contains the selected connect key, identity snapshot/evidence, `confirmedBy:user` and channel
+   protection, and survives close/reopen;
+3. a registered `selectedDeviceAuthorizationBinding` observation is then materialized from that
+   durable revision and must match its identity, authorization and revision. It cannot create or
+   revise the binding;
+4. a repo-safe binding receipt records `sessionId`, `jobId`, revision, candidate/confirmation event
+   IDs, canonical binding-event hash, identity-snapshot hash, evidence IDs, toolchain snapshot hash,
+   endpoint/ownership/generation and the external Session/journal locator ID. It contains neither
+   connect key nor serial. The serial appears only in the required hardware-evidence record.
+
+The capture harness accepts only the receipt ID plus the **fixed expected binding revision**. It
+opens the exact Session through the production durable store/loader, replays the locked journal,
+verifies the binding-event hash and current revision, and materializes `-t <connectKey>` internally
+from that revision. Before every device command it also appends a durable typed step intent whose
+binding revision, target identity and arguments hash match the loaded binding. Missing Session,
+stale/current-revision mismatch, candidate ambiguity, identity drift, loader substitution or
+connect-key input from any other source yields intent/request/process dispatch `0`.
+
+M1-007 is currently not `done`, its real-device adapter is out of that task's scope, and the needed
+registered discovery/selected-device adoption is not complete. Consequently the durable binding
+cannot currently be produced and all capture tasks remain blocked.
+
+## Candidate Recipe argv matrix (non-executable at r3)
+
+Every row below is a process argv array materialized only from a durable binding revision. There is
+no host shell. The payload after the final `-a` is one array element containing spaces; quote
+characters are not part of it. Split-token/quoted-string fallbacks are forbidden.
+
+`WINDOW_ID` and `COMPONENT_ID` are strict ASCII-decimal typed values produced by the same approved
+dedicated-fixture run, not operator text. The future readiness revision must also register the
+typed window-inventory operation that produces `WINDOW_ID`; the current ad-hoc `INV-1` command is
+not in `dump-recipes.yaml` and is not executable.
+
+| ID | Recipe | Exact host argv after durable materialization | First-target typed mode/effect |
+| --- | --- | --- | --- |
+| `R1` | `nodeSummary` | `[HDC, "-t", BINDING[REVISION].connectKey, "shell", "hidumper", "-s", "WindowManagerService", "-a", "-w WINDOW_ID -default"]` | conservative conditional-sidecar `captureRemoteFile` / `deviceMutation` |
+| `R2` | `elementTree` | `[HDC, "-t", BINDING[REVISION].connectKey, "shell", "hidumper", "-s", "WindowManagerService", "-a", "-w WINDOW_ID -element -c"]` | possible sidecar/UI-state change `captureRemoteFile` / `deviceMutation` |
+| `R3` | `fullDefaultTree` | `[HDC, "-t", BINDING[REVISION].connectKey, "shell", "hidumper", "-s", "WindowManagerService", "-a", "-w WINDOW_ID -default -all"]` | conservative conditional-sidecar `captureRemoteFile` / `deviceMutation` |
+| `R4` | `componentDetail` | `[HDC, "-t", BINDING[REVISION].connectKey, "shell", "hidumper", "-s", "WindowManagerService", "-a", "-w WINDOW_ID -element -lastpage COMPONENT_ID"]` | possible sidecar/UI-state change `captureRemoteFile` / `deviceMutation` |
+
+For every row, the future task must pin a dedicated disposable non-sensitive fixture HAP and one
+literal owned remote sidecar path. A durable human `deviceMutation` confirmation scope covers the
+Recipe, binding revision/identity, server endpoint/ownership/generation, fixture hash/bundle/
+ability/static screen, exact argv, exact remote path, pre/post inventory, receive and cleanup.
+Before each Recipe the exact path must be absent; after it, stdout/stderr and optional sidecar are
+separate raw origins. Only a newly observed exact owned path may be received and then removed by
+`cleanupOwnedRemotePath`. No global search, wildcard, recursive removal, overwrite or ownership
+inference is allowed. R4 requires a second scope if UI-state mutation remains possible.
 
 ## Result decision rules
 
-For each attempted row, the harness records exact argv, stdout/stderr bytes separately, exit or
-signal/timeout, duration, byte counts, truncation flags, and SHA-256. It never retries using another
-boundary or a broader command.
+For each attempted row, the future harness records exact redacted argv, binding revision, server
+generation, stdout/stderr separately, optional sidecar origin, exit/signal/timeout, duration, byte
+counts, truncation flags and SHA-256. It never retries using another boundary.
 
 - Exit code `0` alone is not success.
 - Existing observed `option ... missed` output is explicit failure.
-- Until a later approved revision registers a Recipe-specific success family, every other completed
-  Recipe output is `unknownOutput`; the capture itself may still be valid evidence.
-- Any unexpected sidecar/path marker or device-state difference during the read-only task yields
-  `outcomeUnknown`, stops all remaining commands, and opens a Safety review. It is not silently
-  reclassified after execution.
-- Timeout, cancellation, target/binding drift, executable hash mismatch, invalid identifiers or
-  truncation stop the affected run. No fallback argv is allowed.
+- Until an approved decision revision registers a Recipe-specific success family, every other
+  completed Recipe output is `unknownOutput`; capture completion is not Recipe success.
+- Server/binding drift, output truncation, unowned/pre-existing path, unexpected extra path or
+  cleanup uncertainty stops the run and preserves `outcomeUnknown`/`needsAttention` as applicable.
+- The conservative deviceMutation classification is never lowered after execution. Target evidence
+  may support a later output-mode decision only through a separately approved revision.
 
-## TASK-UD-CAP-001 execution protocol (ready on r3 merge)
+## Required real-hardware evidence
 
-The task has two PR-separated phases:
+Every human real-device task (`TASK-UD-PREFLIGHT-001` and `TASK-UD-CAP-MUT-001`) must contain:
 
-1. Harness implementation PR:implement `scripts/ui_dump_capture/**` from this immutable matrix.
-   Offline tests must prove closed command IDs, exact array equality, one-element payload boundary,
-   identifier validation, no shell API, external controlled output, per-stream hashing, bounded
-   capture, privacy gates and structural absence of `R2`/`R4`. This PR contains no evidence/status
-   change and is merged before any real-device execution.
-2. Human evidence PR:the maintainer executes the merged harness against the fixed tuple. Run
-   `INV-1`, select one window ID from that same raw capture, then run `R1` and `R3` once each. No
-   command may start unless the physical target, binding, executable hash and fresh output directory
-   match. The Agent never performs this phase. Evidence/status is a separate PR.
+- `run.md`;
+- `redacted-manifest.json` and whole-stream `capture-hashes.md` where applicable;
+- a repo-safe binding/server receipt for the preflight task;
+- `hardware-evidence.json` conforming to
+  `openspec/contracts/hardware-evidence.schema.json` version `2.0.0`.
 
-The task evidence location is:
+The hardware record must name the human operator, physical target/serial, firmware, toolchain,
+transport, execution time, exact task acceptance ID, artifact paths/hashes and actual step kinds.
+`device.bindingRevision` is mandatory for these tasks despite being optional in the generic schema;
+it must be a positive integer equal to the durable binding receipt and every device intent. The
+server endpoint/ownership/generation and receipt hashes are recorded under `toolchain.other`.
 
-- `evidence/runs/TASK-UD-CAP-001/run.md`;
-- `evidence/runs/TASK-UD-CAP-001/redacted-manifest.json`;
-- `evidence/runs/TASK-UD-CAP-001/capture-hashes.md`.
+The declared host validator is `/opt/homebrew/anaconda3/bin/jsonschema` version `4.17.3`, executable
+SHA-256 `672885a523b0d538e4d734a9009d1678827facd27f2e634093e3bfc838392de7`.
+The evidence PR must run:
 
-The repository records operator/time, physical target and binding revision, redacted argv,
-effect/typed step, output sizes/hashes, outcome classification and deviations. It contains no raw
-UI bytes or content excerpts.
+```text
+/opt/homebrew/anaconda3/bin/jsonschema -i <task-evidence>/hardware-evidence.json openspec/contracts/hardware-evidence.schema.json
+```
 
-## TASK-UD-CAP-MUT-001 gate (currently blocked)
-
-Before a later revision may set this task ready, it must fix all of the following without
-operator choice:
-
-1. a dedicated disposable, non-sensitive fixture HAP tuple (artifact SHA-256, bundle, ability,
-   declared static screen text, window selection rule) and the approved install/start/stop/cleanup
-   steps that establish it;
-2. a fresh confirmed device binding revision and durable human `deviceMutation` confirmation whose
-   scope hash covers the exact candidate, fixture tuple, remote path, inventory and cleanup steps;
-3. one exact expected remote sidecar path. A pre-inventory of that exact path must prove absence;
-   global `/data` search, recursive deletion, wildcard paths and ownership inference are forbidden;
-4. post-inventory proving that the exact new path belongs to the current task, separate stdout and
-   sidecar raw origins/hashes, and `cleanupOwnedRemotePath` for that exact path only. Missing ownership
-   leaves the file untouched; cleanup failure records `needsAttention` and never hides the primary
-   result;
-5. component ID selection from the same run's controlled `R2` output, strict validation and a second
-   confirmation scope before `R4` if its UI-state effect is still possible.
-
-Its future evidence location is `evidence/runs/TASK-UD-CAP-MUT-001/**`. Until the readiness revision
-closes all five gates, `R2`/`R4` dispatch count is `0`.
+It must also run the task's offline semantic verifier to prove positive binding-revision equality,
+operator is human, acceptance IDs are exact, artifact hashes resolve and raw sensitive bytes remain
+outside git. Validator path/version/hash drift blocks execution; no network installation is allowed.
 
 ## Sensitive raw → repository-derived chain
 
-All UI Dump raw output is sensitive by default (page text, package/window/page names, tree values and
-identifiers). Raw stdout, stderr and sidecar bytes remain only in the controlled directory; even a
-successful capture contributes only whole-stream hashes and metadata to the repository.
+All UI Dump raw output is sensitive by default. Raw stdout, stderr and sidecar bytes remain only in
+the controlled directory. Repository golden fixtures are later produced as `derived`, never raw,
+by `uidump-derived-redaction-v1`:
 
-Repository golden fixtures are later produced as `derived`, never mislabeled `raw`, by the following
-replayable `uidump-derived-redaction-v1` chain:
+1. verify controlled raw SHA-256 against the merged capture manifest and decode UTF-8 strictly;
+2. normalize line endings and tokenize through a versioned redactor and approved safe-literal list;
+3. retain only allowlisted structural literals; replace IDs, package/ability/page/window/path/text
+   and every unrecognized value with deterministic typed ordinal placeholders;
+4. record algorithm/source/allowlist/raw/derived hashes, replacement counts and human privacy review;
+5. commit only the derived fixture and receipt, pinned by `.gitattributes`, profile/lock and Bundle
+   resource hashes.
 
-1. verify the controlled raw SHA-256 against the merged capture manifest and decode UTF-8 strictly;
-   non-UTF-8 input fails closed and produces no repository fixture;
-2. normalize CRLF/CR to LF and tokenize using a versioned redactor plus a versioned safe-literal
-   allowlist approved by the later output-family decision revision;
-3. preserve only allowlisted, non-sensitive structural/semantic literals. Replace window/component/
-   process IDs by stable first-seen typed placeholders; replace package, ability, page, window,
-   path, text and every unrecognized field/line by deterministic typed ordinal placeholders. No raw
-   value or content-derived digest is copied into the derived bytes;
-4. write a transformation receipt containing algorithm version and source hash, safe-literal
-   allowlist hash, raw whole-stream hash, derived fixture hash, replacement counts and human privacy
-   review. The controlled operator replays the transform and attests hash equality;
-5. commit only the derived fixture + receipt. `.gitattributes`, profile/lock and Bundle resource
-   hashes pin the derived bytes. CI verifies the committed side of the chain; it never needs access
-   to sensitive raw.
+Unclassified content fails closed. Raw/derived equality is neither expected nor claimed.
 
-If the redactor cannot classify a token/line or a human review finds sensitive content, no derived
-fixture is committed. Raw/derived byte equality is neither expected nor claimed.
+## Prohibited actions at r3
 
-## Prohibited actions
-
-- Agent execution of installed HDC or any real-device command;
-- operator-composed command strings, split `-a` payload fallback, command retries with broader argv;
-- execution of `R2`/`R4` while `TASK-UD-CAP-MUT-001` is blocked;
-- global sidecar search, overwrite of a pre-existing sidecar, unowned cleanup, recursive delete;
-- raw UI bytes, excerpts, page text, package/window names, identifiers or user paths in git;
-- compatibility/conformance/hardware-support/release claims from these captures.
+- any implementation, installed-HDC invocation, device discovery, binding creation or device command
+  under these blocked tasks;
+- starting/stopping/restarting/adopting a server or using an HDC command to test server absence;
+- operator-provided connect key, default HDC target, stale M0B endpoint or unfixed binding revision;
+- execution of R1-R4 as readOnly, ad-hoc window inventory, split `-a` payload or fallback argv;
+- sidecar search/overwrite, unowned cleanup, recursive delete or raw sensitive bytes in git;
+- PASS/done, compatibility, conformance, hardware-support or release claims from plan/source/fake.

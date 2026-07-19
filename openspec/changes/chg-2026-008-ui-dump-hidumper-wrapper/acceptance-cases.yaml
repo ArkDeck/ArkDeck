@@ -8,38 +8,49 @@ evidence_classes:
 - platform
 - realHardware
 cases:
-- acceptance_id: INT-UD-CAPTURE-RO-001
-  test_id: TEST-INT-UD-CAPTURE-RO-001
-  method: Human-operated target capture of the approved stdout-only candidate matrix.
-  expected_source: openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/verification.md#INT-UD-CAPTURE-RO-001
+- acceptance_id: INT-UD-PREFLIGHT-001
+  test_id: TEST-INT-UD-PREFLIGHT-001
+  method: Human-operated supervised existing-server and durable CurrentDeviceBinding preflight.
+  expected_source: openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/verification.md#INT-UD-PREFLIGHT-001
   minimum_evidence: realHardware
-  expected_result: Only the merged closed harness may execute the exact INV-1,
-    R1, and R3 argv arrays from capture-runbook.md, with the final HiDumper -a
-    payload represented as one array element. The human confirms the fixed
-    target/tool tuple and a fresh device binding before dispatch. Stdout and
-    stderr raw bytes remain in the controlled directory outside git; the
-    repository records exact redacted argv, whole-stream hashes, sizes, exits,
-    timeouts, and deviations. Capture completion does not declare Recipe
-    success and exit zero alone cannot do so. An unexpected sidecar, path
-    marker, or device-state difference stops the remaining matrix as
-    outcomeUnknown. R2, R4, deviceMutation, destructive, and Agent device
-    dispatch counts are all zero.
+  expected_result: The production host-wide supervisor first proves an already
+    existing HDC server through the pinned commandless server-identity and
+    generation observation. Exact endpoint, process/start identity, executable,
+    versions, ownership, and generation are durably stored and revalidated;
+    absent or unknown server state and any drift produce zero HDC dispatch and
+    no lifecycle action. A registered no-start discovery produces candidates,
+    the human physically selects the device, and the production Core workflow
+    durably appends bindingCandidate and bindingConfirmed before any
+    device-scoped command. The repo-safe receipt pins session/job, a positive
+    binding revision, binding event/hash, identity hash, and server/toolchain
+    snapshot without connect key or serial. The harness accepts only receipt ID
+    plus fixed revision, replays the production durable store, and materializes
+    -t internally; operator, default-target, stale, mismatch, or substituted
+    connect-key paths have intent/request/process counts zero. A human-attested
+    hardware-evidence.json names this acceptance ID, contains the same positive
+    device.bindingRevision, and passes schema plus semantic validation.
 - acceptance_id: INT-UD-CAPTURE-MUT-001
   test_id: TEST-INT-UD-CAPTURE-MUT-001
-  method: Human-authorized target capture of approved sidecar or UI-state mutation candidates.
+  method: Human-authorized first target-build deviceMutation capture of all four Recipes.
   expected_source: openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/verification.md#INT-UD-CAPTURE-MUT-001
   minimum_evidence: realHardware
-  expected_result: This case is not executable until a later approved readiness
-    revision fixes a dedicated non-sensitive fixture, fresh confirmed binding,
-    durable deviceMutation confirmation scope, one exact remote sidecar path,
-    pre- and post-inventory, ownership, exact cleanup, and R4 component
-    provenance. Once ready, only the closed R2 and R4 arrays may run; stdout and
-    sidecar raw origins and hashes stay separate and outside git; a pre-existing
-    or unowned path is never overwritten or removed; cleanup targets only the
-    proven owned path; global search, wildcard or recursive deletion are
-    forbidden; destructive and Agent device dispatch counts are zero. Until all
-    gates close, R2 and R4 dispatch counts are zero and no PASS or done evidence
-    may be drafted.
+  expected_result: This case is not executable until the supervised preflight
+    task is done and a later approved readiness revision fixes a dedicated
+    non-sensitive fixture, registered typed window inventory, exact owned remote
+    path, and durable confirmation scope. Official source does not prove target
+    output mode, so first target executions R1 through R4 are all
+    captureRemoteFile/deviceMutation; no readOnly Recipe branch exists. Every
+    intent loads the fixed positive CurrentDeviceBinding revision from the
+    production durable store and revalidates the pinned server generation before
+    and after dispatch. Confirmation covers binding, server, fixture, exact argv,
+    path, inventory, receive, and cleanup. Pre-existing or unowned paths are
+    never overwritten or removed; stdout, stderr, and optional sidecar origins
+    stay separate outside git; cleanup targets only the proven owned path; global
+    search, wildcard, and recursive deletion are forbidden. The human-attested
+    hardware-evidence.json records the same binding revision, server tuple,
+    exact acceptance/step kinds, and artifact hashes and passes schema plus
+    semantic validation. Until all gates close, R1 through R4 and ad-hoc INV-1
+    dispatch counts are zero; destructive and Agent dispatch counts remain zero.
 - acceptance_id: INT-UD-WRAPPER-001
   test_id: TEST-INT-UD-WRAPPER-001
   method: Contract tests over the fixed wrapper with adversarial fake hidumper outputs.
