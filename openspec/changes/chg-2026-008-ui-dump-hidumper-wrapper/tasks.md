@@ -5,9 +5,12 @@
 
 ## TASK-UD-001 — 固定 HiDumper 调用包装 + golden 登记 + 对抗测试
 
-- Status:ready（r2 dependency/readiness revision candidate；仅在本治理 PR 由维护者
-  review/merge 后生效。本 PR 不执行 TASK-UD-001、不产生 implementation/acceptance
-  evidence，也不使 CHG-008 verified）
+- Status:done（candidate；implementation revision
+  `1ef6d6ae6db44cdea82cd64f91c6edc5ad6b266b` 上两个 change-local Test ID 均有二值 PASS
+  evidence；仅在维护者 review/merge 本 TASK-UD-001 PR 后生效，不使 CHG-008 verified）
+- Completion evidence:`evidence/runs/TASK-UD-001/run.md`（7 项 wrapper tests、4 项 Golden
+  resource tests、244 项全量 tests、guard/format/diff/integrity/privacy/scope audit 全通过；
+  真实 HDC/device/capture/collector/non-loopback/device mutation/destructive dispatch 为 `0`）
 - Readiness review（2026-07-19；只读审计，零真实 HDC/device dispatch）：
   - Change/revision gate:satisfied on merge。CHG-008 r1 已经维护者批准；本 r2 只替换
     implementation scheduling dependency、补全 DoR 与起草 `blocked→ready`，不修改任何
