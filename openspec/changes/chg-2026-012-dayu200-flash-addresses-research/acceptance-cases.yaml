@@ -1,7 +1,7 @@
 ---
 schema_version: 1.0.0
 change_id: CHG-2026-012-dayu200-flash-addresses-research
-change_revision: 1
+change_revision: 2
 platform: macos
 evidence_classes:
 - platform
@@ -16,9 +16,10 @@ cases:
     device-side partition-table precondition, gpt/prm partition-table writes,
     upgrade_tool and RKDevTool config.cfg addressing and write order), a
     per-partition target-address mapping table whose every numeric row is
-    anchored to the merged TASK-PD-001 partition-decode evidence with no
+    anchored to the merged TASK-PD-002 fresh signed-broker platform mapping
+    evidence, bound to its merged TASK-PD-001 implementation identity, with no
     self-derived and no image-member-derived values and partitions not covered
-    by PD-001 explicitly marked unknown, and a reconciliation-method design
+    by PD-002 explicitly marked unknown, and a reconciliation-method design
     against parameter.txt/GPT semantics; every claim carries a graded S2/S3
     citation and every S3-or-inference-dependent conclusion is marked
     unconfirmed pending real-device verification; the document states it makes
