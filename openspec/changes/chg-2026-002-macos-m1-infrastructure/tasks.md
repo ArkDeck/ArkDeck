@@ -950,12 +950,41 @@
 
 ## TASK-M1-008 — SimulatedFlashProvider 隔离 harness
 
-- Status:blocked（r7 task-definition candidate；历史简写条目在 TASK-M1-007 未 done 时
-  提前标为 `ready`，不满足 Definition of Ready。仅 r7 经维护者 review/merge 后恢复
-  fail-closed；本 revision PR 不执行 TASK-M1-008、不生成 evidence，也不使任务 ready）
+- Status:ready（readiness candidate；仅在维护者 review/merge 本 readiness PR 后生效。
+  本 PR 不执行 TASK-M1-008、不产生 implementation/acceptance evidence）
 - Historical disposition:r1-r6 的 `Status:ready` 未附完整 readiness review，且声明依赖
-  TASK-M1-007；TASK-M1-007 当前仅 `ready`、尚无 merged implementation/done 状态。没有
-  TASK-M1-008 implementation/evidence 可复用或重判。
+  TASK-M1-007；r7（PR #119）恢复 fail-closed blocked。没有 TASK-M1-008
+  implementation/evidence 可复用或重判。r7 依赖已于 2026-07-20 全部满足，本 readiness
+  按 r7"依赖满足后的独立 readiness PR"条款起草。
+- Readiness review（2026-07-20；锁屏 headless，零真实 HDC/device/network dispatch）：
+  - Change gate:satisfied。CHG-2026-002@r7 已批准（PR #119）并保持 `approved`；本
+    readiness 不修改任务契约、Core Requirement/AC、acceptance method/minimum evidence、
+    platform profile 或 integration lock。
+  - Dependency gate:satisfied。TASK-M1-003 done；TASK-M1-007 implementation PR #127
+    （`main` squash `8998d9b`）与独立 `done` 状态 PR #134（`main` `c541f4f`）均已由
+    维护者 review/merge 合入。M1-007 implementation OID 据此固定为 `8998d9b`，其
+    `DeviceTargeting.swift`/`DeviceBindingJournalAdapter.swift` 只作只读输入。
+  - Contract gate:satisfied。`AC-FLASH-006-01`/`TEST-AC-FLASH-006-01` 在 canonical
+    registry（`openspec/verification/acceptance-cases.yaml`,method
+    `simulationIsolationContract`,`minimum_evidence:contract`）；`MAC-M1-SIM-001`/
+    `TEST-MAC-M1-SIM-001` 在本 change `verification.md` Acceptance matrix（platform,
+    pending）。expected result 均由 accepted flashing spec Scenario 定义；无
+    platform/realHardware case 被转移或降级。
+  - Environment gate:satisfied。clean `main` `c541f4f` 上 Swift 6.3.3、SwiftPM 与
+    swift-format 6.3.0 可用；`swift test --package-path Packages/ArkDeckKit` 为
+    249 tests / 1 个既有 opt-in manual sleep/wake skip / 0 failures（实测于代码树等同的
+    `2e2a389`,#134 为 governance-only diff）。实现只需两个新 Swift 源/测试文件、仓库
+    既有 locked journal/reconcile/manifest seams 与本地临时 Session 目录。
+  - Path/concurrency gate:satisfied。`SimulatedFlashProvider.swift` 与
+    `SimulatedFlashProviderContractTests.swift` 在 `main` 与全部 open PR（当前为 0）中
+    均不存在；`Package.swift` 无需修改（ArkDeckWorkflows target 既有，
+    ArkDeckContractTests 已依赖 Workflows/Storage）；不触碰 M1-006 保留产码、HDC
+    fixtures/golden、TASK-UD 路径或其他任务 evidence。
+  - Review boundary:本 readiness PR 只更新本 `tasks.md` 的 M1-008 状态与 readiness
+    记录，不含实现、不运行真实或 fake HDC child、不改变 M1-006/TASK-UD/其他任务状态，
+    不产生 conformance/hardware/support/release claim。headless run path=锁屏 macOS
+    shell + `swift test`（dedicated `--filter SimulatedFlashProviderContractTests` 与
+    full suite），按任务 Verification 节执行。
 - Objective:在锁屏 macOS headless host 上，以纯 Swift simulated provider 和既有 locked
   journal/reconcile/manifest seams 运行确定性的 synthetic Flash orchestration；覆盖 success、
   delay、failure、disconnect、outcomeUnknown 与 cancellation，永久保持 simulated 分类、零真实
@@ -966,10 +995,12 @@
   `SimulatedFlashProvider end-to-end orchestration run`,minimum evidence:`platform`)。
 - Depends on:
   - TASK-M1-003 done（locked journal、reconcile 与 durable Session/Manifest boundary；已满足）；
-  - TASK-M1-007 implementation、独立 `done` 状态 PR 均已由维护者合入 `main`（未满足）；
-  - CHG-2026-002@r7 经维护者合入并保持 `approved`；
+  - TASK-M1-007 implementation、独立 `done` 状态 PR 均已由维护者合入 `main`（已满足:
+    #127 `8998d9b` + #134 `c541f4f`）；
+  - CHG-2026-002@r7 经维护者合入并保持 `approved`（已满足）；
   - 依赖满足后的独立 TASK-M1-008 readiness PR 固定 M1-007 implementation OID、两个新
-    Swift 文件、toolchain、test surface 与 headless run path。
+    Swift 文件、toolchain、test surface 与 headless run path（即本 readiness PR，pins
+    见上方 Readiness review）。
 - In scope:
   1. `SimulatedFlashProvider` production API 只接受不可转换为
      `CurrentDeviceBinding`/real connectKey 的 synthetic fixture identity 与封闭 scenario；
