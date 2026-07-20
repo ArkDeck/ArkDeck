@@ -81,8 +81,16 @@ subserver commands (`kill`, `start`, `spawn-sub`, `killall-sub` and equivalents)
 | ID | Step | Required recorded result | Stop condition |
 | --- | --- | --- | --- |
 | `HP-0` | verify HDC executable hash + `hdc version` | binary SHA-256 and reported version equal the pinned M0B values (drift recorded and run stops) | hash/version mismatch |
-| `HP-1` | `hdc list targets` | exactly one expected DAYU200 target in `Connected` state; output recorded (redacted per capture conventions) | zero, multiple or ambiguous targets |
-| `HP-2` | re-run `hdc list targets` immediately before `INV-1` and before each `Rn` (four times in a full Phase A session) | same single target, same connect key | any drift |
+| `HP-1` | `hdc list targets -v` | exactly one expected DAYU200 target in `Connected` state; output recorded (redacted per capture conventions) | zero, multiple or ambiguous targets |
+| `HP-2` | re-run `hdc list targets -v` immediately before `INV-1` and before each `Rn` (four times in a full Phase A session) | same single target, same connect key | any drift |
+
+> r7 correction (2026-07-20): `HP-1`/`HP-2` are pinned to the **verbose** form. Merged M0B
+> evidence is dispositive on the output shapes for this device family: plain `list targets`
+> returns only the 32-char serial + newline (33 bytes, no state column), while `list targets -v`
+> (58 bytes) carries the `USB / Connected` state the HP stop conditions check
+> (chg-2026-006 TASK-M0B-001 run.md capture table and binary conclusions). The r4/r6 rows'
+> plain form could never satisfy their own `Connected` requirement; adversarial review of the
+> harness implementation (PR #143) surfaced this before any device execution.
 
 The connect key is taken by the operator only from the same-session `HP-1`/`HP-2` output. Every
 device command carries an explicit `-t <connectKey>`; the HDC default-target form is forbidden. The

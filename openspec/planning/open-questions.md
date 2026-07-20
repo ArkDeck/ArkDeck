@@ -51,6 +51,22 @@ Open question 不得以聊天记忆留存。每项记录默认决策、阻塞范
 - Resolution vehicle：四个 gap 须由后续独立 change 解决（DAYU200 Integration
   change / Route-B CLI plan-only 特征化;按 backlog 规则不得并入既有 Task,
   CHG-2026-003 evidence 明确不能满足本决策）;在此之前本决策保持 Default。
+- Registered evidence inputs（2026-07-20 登记,先例 #52;登记≠gap 关闭,DEC-002 保持
+  open、Default 不变）：
+  - `GAP-DAYU200-FLASH-PROTOCOL`:archived CHG-2026-011
+    `flash-protocol-facts.md`（文档面已建立:DAYU200 官方烧录仅 Windows
+    RockUSB/RKDevTool,flashd 端到端与任何 macOS 烧写路径均无官方文档;flashd 进入
+    命令、MaskRom/Loader 依 bcdUSB 判别、VID/PID 事实、rkdeveloptool ≥1.32 macOS 可
+    构建）。剩余=第二阶段真机模式确认（写设备,RECOVERY 先行,Route-B ④）。
+  - `GAP-DAYU200-RECOVERY-PATH`:archived CHG-2026-010 恢复预案（macOS 恢复路径=
+    rkdeveloptool,S3 细节标注待演练确证）+ archived CHG-2026-013 演练准备
+    （rkdeveloptool 1.32 已构建、物料 pinned）+ RISK-001 风险接受在案。剩余=恢复演练
+    本身（device-gated,检查单第 3 项待 TASK-PD-002、第 5 项待时间窗）。
+  - `GAP-DAYU200-PARTITION-SEMANTICS`:预期载体=TASK-PD-002 fresh platform
+    mapping/reconciliation evidence（已 ready,#139;TASK-PD-001 headless done 仅提供
+    implementation identity,不含分区数值）。产出后另行登记。
+  - `GAP-DAYU200-FLASH-ADDRESSES`:预期载体=TASK-FA-001（CHG-2026-012 approved,
+    blocked 于 PD-002 evidence）。产出后另行登记。
 - Blocks：M4 Provider implementation/verification
 - Affected：flashing spec、Provider contract
 
