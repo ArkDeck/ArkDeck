@@ -1,0 +1,59 @@
+=== RH-001 rehearsal transcript  Mon Jul 20 19:52:58 CST 2026  host 26.5.2/arm64
+
+=== Phase 0: 首写前 hash 门(漂移即停)
+rkdeveloptool sha256: 038a8a0ea26ef7eb77451789f310c0c9fbeaf43a78af1d6146e02311a9c23611
+--- 17 物料 hash vs member-inventory.json:
+MATCH boot_linux.img
+MATCH chip_ckm.img
+MATCH chip_prod.img
+MATCH config.cfg
+MATCH daily_build.log
+MATCH manifest_tag.xml
+MATCH MiniLoaderAll.bin
+MATCH parameter.txt
+MATCH ramdisk.img
+MATCH resource.img
+MATCH sys_prod.img
+MATCH system.img
+MATCH uboot.img
+MATCH updater_binary
+MATCH updater.img
+MATCH userdata.img
+MATCH vendor.img
+GATE PASS
+Phase 0 通过。
+
+=== Phase 1: 进态前只读观察(设备此刻可未连/未进态)
+
+--- [pre-ld] argv: <HOME>/dayu200-rehearsal/rkdeveloptool/rkdeveloptool ld
+DevNo=1	Vid=0x2207,Pid=0x5000,LocationID=2	Maskrom
+--- [pre-ld] exit=0 (判定按输出标记,非退出码——playbook §4)
+--- USB 枚举(只读):
+>>> 现在按 DAYU200 按键序列进入 MaskRom(playbook §1),连好 USB,然后继续 [回车继续 / Ctrl-C 中止] 
+--- [maskrom-ld] argv: <HOME>/dayu200-rehearsal/rkdeveloptool/rkdeveloptool ld
+DevNo=1	Vid=0x2207,Pid=0x5000,LocationID=2	Maskrom
+--- [maskrom-ld] exit=0 (判定按输出标记,非退出码——playbook §4)
+>>> 上面 ld 是否显示 Maskrom 设备? 输入 y 继续,其他中止: 
+=== Phase 2: 写设备(每步失败即停手,勿自动重试——§5)
+>>> 确认开始写设备?这将永久改写 DAYU200 输入 y 继续,其他中止: >>> W1: db MiniLoaderAll.bin(注入 loader)? 输入 y 继续,其他中止: 
+--- [W1-db] argv: <HOME>/dayu200-rehearsal/rkdeveloptool/rkdeveloptool db <HOME>/dayu200-rehearsal/materials/MiniLoaderAll.bin
+[30;41mCreating Comm Object failed![0m
+--- [W1-db] exit=1 (判定按输出标记,非退出码——playbook §4)
+>>> W1 是否报成功且设备转入可写态(ld 显 Loader)? 输入 y 继续,其他中止: >>> W2: 写分区表。parameter.txt 是 mtdparts 格式,默认用 prm。
+>>> 用 prm(默认,回车)还是 gpt?输入 gpt 改用 gpt: 
+--- [W2-prm] argv: <HOME>/dayu200-rehearsal/rkdeveloptool/rkdeveloptool prm <HOME>/dayu200-rehearsal/materials/parameter.txt
+[30;41mCreating Comm Object failed![0m
+--- [W2-prm] exit=1 (判定按输出标记,非退出码——playbook §4)
+>>> W2(prm)是否报成功(分区表就位)? 输入 y 继续,其他中止: 
+--- [ppt-after-table] argv: <HOME>/dayu200-rehearsal/rkdeveloptool/rkdeveloptool ppt
+[30;41mCreating Comm Object failed![0m
+[30;41mCreating Comm Object failed![0m
+Not found any partition table!
+--- [ppt-after-table] exit=1 (判定按输出标记,非退出码——playbook §4)
+>>> W3: wlx uboot uboot.img? 输入 y 继续,其他中止: 
+--- [W3-uboot] argv: <HOME>/dayu200-rehearsal/rkdeveloptool/rkdeveloptool wlx uboot <HOME>/dayu200-rehearsal/materials/uboot.img
+Not found any partition table!
+--- [W3-uboot] exit=1 (判定按输出标记,非退出码——playbook §4)
+>>> 若上面报 'No found uboot partition' 或等价失败,可用回退 wl(扇区取 FA-001 §2 PD-002 值):
+    <HOME>/dayu200-rehearsal/rkdeveloptool/rkdeveloptool wl 8192 <HOME>/dayu200-rehearsal/materials/uboot.img   (BeginSec=8192,零手算)
+>>> W3 uboot 是否报成功?(失败且需回退请先中止本脚本,手动跑上面 wl 一次再重启脚本从下一分区) 输入 y 继续,其他中止: 
