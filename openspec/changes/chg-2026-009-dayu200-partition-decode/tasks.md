@@ -187,16 +187,35 @@
 
 ## TASK-PD-002 — signed broker fresh platform verification
 
-- Status:blocked(r5 fail-closed 回退;仅在维护者 review/merge 本 r5 revision PR 后
-  生效。2026-07-20 首次 fresh platform run 的 preflight 全部通过(11 个 pinned source
-  hash、archive size/SHA identity、console 解锁),但合入版 collector 的 receipt 布尔
-  校验缺陷使三项 platform AC 在当前 pinned source 上不可能 PASS——根因与诊断见
-  TASK-PD-001 r5 amendment 与
-  `evidence/runs/TASK-PD-002/platform-attempt-2026-07-20.md`;attempt 零 partial
-  output,fail-closed 行为本身符合设计。前置=TASK-PD-001 r5 remediation `done`;
-  之后由独立 readiness amendment 重钉 `main.m`/`collect_platform_evidence.py`/新测试
-  文件 SHA-256(r4 readiness 的 archive identity/console/操作者/decoder 四文件 pins
-  保持有效)并恢复 `ready`。在此之前 collector/broker/archive dispatch 均为 0)
+- Status:ready(r5 readiness amendment candidate;仅在维护者 review/merge 本
+  amendment PR 后生效。本 PR 不运行 collector/broker、不读取 archive、不产生
+  evidence;实际执行仍需用户人工解锁 console 并本人操作 NSOpenPanel,不需要
+  DAYU200 设备)
+- r5 readiness amendment(2026-07-20;host-only,零 collector/broker/archive/设备
+  访问;r5 gate 规定形态):
+  - Unblock gate:satisfied。r5 fail-closed 回退的前置 TASK-PD-001 r5 remediation
+    `done` 已满足——implementation PR #160(squash `33aff46`)、done 状态 PR #161
+    (`946ebfd`)均已由维护者 review/merge;2026-07-20 blocked attempt 的根因
+    (receipt 布尔装箱+collector `is True`)已修,collector 校验现为逐项具名报错。
+  - Broker-source re-pin gate:satisfied。r5 涉及的三文件以 `main` `946ebfd` 实测
+    重钉(执行前必须复算一致,漂移即 blocked;下列值取代 r4 Broker-source gate 中
+    对应两行,新测试文件为新增 pin):
+    - `scripts/partition_decode/macos_input_broker/main.m`
+      `4bb1e1cad4329d9d807a0a98744e5de04efe812360cb01a19a7b01522bc94e22`
+    - `scripts/partition_decode/macos_input_broker/collect_platform_evidence.py`
+      `b78aca7d86b12cf7afb94e43ad5a8e3ebb7c848ba5cfc46ba917b485da3e3a72`
+    - `scripts/partition_decode/macos_input_broker/test_collect_receipt_validation.py`
+      `b240c845a1b3df284ecde8b04bb4b13c94b7cb33371aa2b2eab48c7d6370b160`
+  - Unchanged-pin gate:satisfied。其余 r4 pins 于 `main` `946ebfd` 实测零漂移,
+    保持有效:Broker-source gate 其余五文件(Broker.entitlements `27bcfa03…`、
+    Info.plist `fe574559…`、README.md `ab3960e9…`、build_and_sign.zsh `ecf749f0…`、
+    policy.json `ee3fe577…`)、Source-identity gate 四个 decoder 文件(r5 明文
+    Out-of-scope,零字节改动)、Archive gate(size `732948803`/SHA
+    `fc7637f3…5280`)、Environment/console gate 与操作者规则。
+  - Review boundary:本 amendment 只翻转本任务状态并重钉上述 pins;三项 platform
+    AC 的 expected result/minimum evidence/同一次 fresh run 规则不变;merge 后即可
+    重跑 fresh platform run(blocked attempt record 保持 immutable,新 run 使用新的
+    create-only out-dir)。
 - Objective:不修改 decoder 或 broker source,在解锁 macOS console 上由人类经未修改的
   签名 sandbox broker/NSOpenPanel 选择 pinned archive,把已合入 TASK-PD-001 完整
   implementation commit 绑定到同一次 create-only fresh 三项 platform run。
