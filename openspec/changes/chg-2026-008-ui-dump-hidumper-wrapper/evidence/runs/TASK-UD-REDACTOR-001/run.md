@@ -102,6 +102,12 @@ classified as capture, privacy attestation, platform evidence, or hardware.
 
 ### Synthetic transform and receipt chain
 
+*(superseded at the hash facts below — this section records the initial-run
+chain; its receipt-embedded source/input hashes predate the hardening commit
+and no longer match `main` bytes. The authoritative current chain, with source
+`938cc117…` and the full six-file table, is recorded in
+`review-remediation-2026-07-20.md`.)*
+
 The approved algorithm manifest bytes were copied to a temporary synthetic
 input (not real UI raw), then transformed twice with the exact task CLI:
 
