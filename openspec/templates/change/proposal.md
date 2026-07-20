@@ -4,7 +4,7 @@ status: proposed # proposed | approved | implementing | verified | archived | re
 class: core | capability | integration | platform | implementation-only
 core_change_level: none | minor | major
 owner: human-owner
-core_baseline: CORE-1.0.0
+core_baseline: CORE-2.0.0
 platforms: [macos]
 ---
 

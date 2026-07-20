@@ -1,6 +1,6 @@
 # Baseline Traceability Index
 
-> Core baseline：CORE-1.0.0  
+> Core baseline：CORE-2.0.0  
 > Status：requirements and AC defined; implementation/tests pending
 
 每个 Requirement 的 Scenario 位于同一 `spec.md`，是验收事实源。本索引只记录验证套件和平台状态，不复制 AC 文本。

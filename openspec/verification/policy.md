@@ -1,7 +1,7 @@
 # Verification and Agent Execution Policy
 
 > Version:2.0.0
-> Baseline:CORE-1.0.0(ratification 状态见 `openspec/baselines/CORE-1.0.0.yaml`)
+> Baseline:CORE-2.0.0(ratification 状态见 `openspec/baselines/CORE-2.0.0.yaml`)
 
 ## Verification layers
 
