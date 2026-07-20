@@ -1,0 +1,57 @@
+---
+schema_version: 1.0.0
+change_id: CHG-2026-016-dayu200-recovery-rehearsal
+change_revision: 1
+platform: macos
+evidence_classes:
+- realHardware
+cases:
+- acceptance_id: RH-DAYU200-RECOVERY-001
+  test_id: TEST-RH-DAYU200-RECOVERY-001
+  method: Maintainer-executed recovery rehearsal on the physical DAYU200 following the archived playbook sequence.
+  expected_source: openspec/changes/chg-2026-016-dayu200-recovery-rehearsal/verification.md#RH-DAYU200-RECOVERY-001
+  minimum_evidence: realHardware
+  expected_result: The device is taken through the full recovery path in one
+    named window — MaskRom or Loader entry, loader injection via db, partition
+    table write via gpt or prm, per-partition writes of exactly the nine
+    PD-002-mapped images in the design write order, then reset — and boots back
+    into the normal system where the read-only postcheck via the existing
+    m0b_capture allowlist shows a Connected target again. Every command records
+    argv, full output and the pass or fail judgement of its checkpoint; a run
+    aborted under the section-5 rules is recorded honestly as a blocked attempt
+    and is not a failure of this case.
+- acceptance_id: RH-DAYU200-MODE-001
+  test_id: TEST-RH-DAYU200-MODE-001
+  method: Read-only mode observation piggybacked on the same window.
+  expected_source: openspec/changes/chg-2026-016-dayu200-recovery-rehearsal/verification.md#RH-DAYU200-MODE-001
+  minimum_evidence: realHardware
+  expected_result: ld output form and USB VID and PID are recorded before
+    MaskRom entry, in MaskRom or Loader state and after loader injection,
+    grounding the CHG-2026-011 unconfirmed items (RK3568 PID value and the
+    MaskRom versus Loader display forms) as observed facts; observations are
+    recorded verbatim and never alter the rehearsal flow.
+- acceptance_id: RH-DAYU200-TABLE-001
+  test_id: TEST-RH-DAYU200-TABLE-001
+  method: Device partition-table read-back compared row by row against the FA-001 baseline.
+  expected_source: openspec/changes/chg-2026-016-dayu200-recovery-rehearsal/verification.md#RH-DAYU200-TABLE-001
+  minimum_evidence: realHardware
+  expected_result: ppt output in Loader state is captured (before the table
+    write when readable, and after it) and compared row by row against the
+    FA-001 section-2 baseline anchored to PD-002; every row is classified
+    match, mismatch, absent or extra with the raw values retained; differences
+    are recorded without on-site interpretation and marked for later analysis;
+    the baseline itself is never modified.
+- acceptance_id: RH-DAYU200-SAFETY-001
+  test_id: TEST-RH-DAYU200-SAFETY-001
+  method: Closed-surface and privacy compliance audit over the whole window.
+  expected_source: openspec/changes/chg-2026-016-dayu200-recovery-rehearsal/verification.md#RH-DAYU200-SAFETY-001
+  minimum_evidence: realHardware
+  expected_result: Every executed device command belongs to the design
+    closed command surface with counts recorded; all material and tool hashes
+    were re-verified before the first write; no numeric address was hand-derived
+    on site (the wl fallback, if used, cites the FA-001 PD-002 sector column
+    verbatim and records the reason); the userdata write happened only after an
+    explicit on-site confirmation or is recorded as skipped; orphan images and
+    memberless partitions were not written; serial bytes appear only in the
+    hardware-evidence device identity field and raw transcripts stay outside
+    the repository; the abort rules were obeyed whenever triggered.
