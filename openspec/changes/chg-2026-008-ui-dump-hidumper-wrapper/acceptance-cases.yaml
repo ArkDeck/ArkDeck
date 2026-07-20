@@ -1,31 +1,129 @@
 ---
 schema_version: 1.0.0
 change_id: CHG-2026-008-ui-dump-hidumper-wrapper
-change_revision: 2
+change_revision: 3
 platform: macos
 evidence_classes:
 - contract
 - platform
+- realHardware
 cases:
+- acceptance_id: INT-UD-CAPTURE-MUT-001
+  test_id: TEST-INT-UD-CAPTURE-MUT-001
+  method: Human-operated runbook Phase A first target-build deviceMutation capture of R1 through R3.
+  expected_source: openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/verification.md#INT-UD-CAPTURE-MUT-001
+  minimum_evidence: realHardware
+  expected_result: This case is not executable until r3 and an independent
+    readiness PR are merged fixing the dedicated non-sensitive fixture HAP tuple,
+    the literal INV-1 window-inventory command, the single exact remote sidecar
+    path, and the device/time window. The human maintainer personally executes
+    the closed runbook command list. HP-0 through HP-2 preflight records match
+    the pinned M0B HDC hash/version and prove exactly one expected DAYU200
+    target; every device command carries an explicit -t whose connect key comes
+    only from the same-session list-targets output; the default-target form is
+    never used. Official source does not prove target output mode, so first
+    target executions R1 through R3 are captureRemoteFile/deviceMutation with no
+    readOnly branch and no post-hoc downgrade. Each -a payload is one array
+    element; failed attempts are never retried with another boundary. The
+    exact-path inventory proves the sidecar path absent before and classifies it
+    after each Recipe; only a proven-owned new file is received and removed;
+    global search, wildcards, recursive deletion, and overwriting are forbidden;
+    unclear ownership is preserved as needsAttention. Stdout, stderr, and
+    optional sidecar are separate raw origins with per-stream SHA-256, and all
+    raw bytes stay outside git. The evidence set is run.md,
+    redacted-manifest.json, capture-hashes.md, and schema-valid
+    hardware-evidence.json; the validating tool path/version is recorded at
+    execution time. Claimed-operator truth is attested by maintainer review and
+    merge of the evidence PR. Exit 0 alone is never success; "option ... missed"
+    is explicit failure; other outputs remain unknownOutput until a decision
+    revision registers families. Destructive and Agent dispatch counts are zero.
+    This case claims no canonical AC-DUMP PASS.
+- acceptance_id: INT-UD-CAPTURE-R4-001
+  test_id: TEST-INT-UD-CAPTURE-R4-001
+  method: Decision-bound human runbook Phase B componentDetail deviceMutation capture.
+  expected_source: openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/verification.md#INT-UD-CAPTURE-R4-001
+  minimum_evidence: realHardware
+  expected_result: This case remains blocked until Phase A is done and an
+    approved R2 output-family decision revision registers the R2
+    success/failure/unknown families and records the selected component token,
+    the location and basis of that selection inside the R2 derived output, and
+    the R2 raw-origin hash. Unknown, truncated, or failed R2 output cannot enter
+    selection; zero candidates or ambiguity keeps R4 blocked; COMPONENT_ID is
+    never taken from CLI, environment, file, or ad-hoc typing. R4 then uses the
+    exact one-element payload with the same HP preflight, explicit -t,
+    conservative deviceMutation classification, exact-path inventory,
+    owned-only cleanup, separate raw origins, and raw-outside-git privacy gates
+    as Phase A, with the same evidence set plus the decision reference and
+    selected token record, and schema-valid hardware-evidence.json whose
+    operator truth is attested by maintainer PR review. Destructive and Agent
+    dispatch counts are zero. This case claims no canonical AC-DUMP PASS.
+- acceptance_id: INT-UD-REDACTOR-001
+  test_id: TEST-INT-UD-REDACTOR-001
+  method: Offline deterministic and fail-closed UI Dump derived-golden redaction contract.
+  expected_source: openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/verification.md#INT-UD-REDACTOR-001
+  minimum_evidence: contract
+  expected_result: Before TASK-UD-001 becomes ready, an independent host-only
+    task implements and fixes the uidump-derived-redaction-v1 transform source,
+    versioned algorithm manifest, maintainer-approved safe-literal allowlist,
+    redaction-receipt schema, tests, and README under scripts/ui_dump_redaction.
+    The transform accepts only path tokens, rejects input whose measured SHA-256
+    differs from --expected-input-sha256, opens raw read-only and never modifies
+    it, and requires output and receipt to not pre-exist. The algorithm manifest
+    fixes strict UTF-8, line-ending normalization, token/line grammar, typed
+    ordinal placeholders, ordering, escaping, duplicate handling, resource
+    limits, and error codes; unknown, invalid-UTF-8, control, bidi, confusable,
+    or unclassified tokens and lines fail closed. Every safe literal is
+    individually maintainer-approved structural syntax; package, ability, page,
+    window, component, path, user or device identifiers, and page text can never
+    enter the allowlist by pattern, prefix, or heuristic. An output-side
+    sensitive-literal scan hard-fails before producing derived output. The
+    receipt records algorithm/manifest/allowlist hashes, raw and derived
+    hash/size, replacement counts, the replay command line, and completedAt.
+    Synthetic adversarial and property tests cover the negative matrix and
+    byte-determinism of repeated runs without touching real raw, HDC, device,
+    or network. Source hashes are recorded in evidence at execution time. This
+    case does not close canonical AC-DUMP-008-01.
 - acceptance_id: INT-UD-WRAPPER-001
   test_id: TEST-INT-UD-WRAPPER-001
   method: Contract tests over the fixed wrapper with adversarial fake hidumper outputs.
   expected_source: openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/verification.md#INT-UD-WRAPPER-001
   minimum_evidence: contract
-  expected_result: The wrapper pins one fixed argv form per ui-dump recipe;
-    success is judged by output markers, never by exit code; the observed
-    error-style outputs (e.g. "option ... missed" with exit 0, per
-    EVD-M0B-DAYU200-20260718-001) are classified as explicit failures; marker
-    absence yields unknownOutput rather than silent success; adversarial fake
-    outputs cover every branch and no test invokes real hdc.
+  expected_result: After the two human capture tasks and the decision revision
+    have declared the exact argv boundary and registered success, failure, and
+    unknown output families, the wrapper pins one fixed argv form per ui-dump
+    recipe. The implementation must not invent a marker or use a self-authored
+    fake as target-build evidence. Success is judged only by the registered
+    output family, never by exit code; observed error-style outputs such as
+    "option ... missed" with exit 0 are explicit failures; an unregistered or
+    marker-absent output is unknownOutput. Only text-marker or
+    structural-parser families with repo-safe synthetic/derived positive
+    fixtures may be registered; raw byte-fingerprint/digest families are
+    rejected. Contract tests cover every permitted declared family in a clean
+    checkout through the exact production semantic-evaluator path and invoke no
+    real hdc. REQ-DUMP-003 and canonical TEST-AC-DUMP-003-01 additionally
+    require missing, empty, malformed, and injection-shaped component IDs to
+    fail before ProcessRequest creation, with request and dispatch counts both
+    zero.
 - acceptance_id: INT-UD-GOLDEN-001
   test_id: TEST-INT-UD-GOLDEN-001
-  method: Human-captured, redacted hidumper golden fixtures registered with pinned hashes.
+  method: Deterministic derived hidumper golden fixtures registered from controlled human capture hashes.
   expected_source: openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/verification.md#INT-UD-GOLDEN-001
   minimum_evidence: platform
-  expected_result: Golden fixtures originate from a human-operated allowlisted
-    capture, are redacted (no serial, no user path), are pinned byte-exact with
-    .gitattributes set before commit, are registered consistently across the
-    integration profile/lock and test resources, and no capture byte is edited
-    to fit expectations; the registration makes no compatibility or support
-    claim.
+  expected_result: Each repository golden is explicitly derived, never raw, from
+    a human-operated approved Recipe capture whose whole-stream raw hash is
+    recorded while its sensitive bytes remain outside git. TASK-UD-REDACTOR-001
+    is already done; TASK-UD-001 cannot read raw and cannot modify the redaction
+    toolchain. Every committed golden carries its redaction receipt, where the
+    committed bytes' SHA-256 equals the receipt's derived hash, the receipt's
+    raw hash equals the corresponding capture-manifest whole-stream hash, and
+    the algorithm/manifest/allowlist hashes match the TASK-UD-REDACTOR-001
+    evidence. The maintainer reads the exact derived bytes in the golden PR;
+    merge of that PR is the privacy-review attestation. The derived bytes are
+    pinned byte-exact with .gitattributes before commit and match registry,
+    integration profile/lock, and Bundle resources; a sensitive-literal scan
+    over committed fixtures finds zero hits. A missing receipt, a broken hash
+    link, or unreviewed derived bytes fails the case. Unknown tokens or lines
+    fail closed; the repository contains no raw UI bytes or sensitive page
+    text, package, ability, window, component, path, or user identifiers. No
+    raw/derived byte equality, compatibility, or support claim is made; help
+    and service-list outputs cannot substitute for Recipe output.

@@ -469,6 +469,15 @@
   状态，遗留标记不等同于 `done`、不解除任何 AC/verification gate，也不允许依赖它的
   `TASK-M1-007`/`TASK-M1-008` 越过 dependency gate。后续修复须由独立 integration change
   登记所缺 probe，并在可交互 Developer Tools 环境补做当前 revision 的 signed XCUITest。
+- Dependency-model correction（2026-07-20）:上一条中"依赖它的 `TASK-M1-007`/
+  `TASK-M1-008`"的表述自 r6/r7 起已过时，原文按惯例保留不改写——r6（PR #117，
+  `4e0c4f94d12e0ab55902580e43bd6dd61c4e6e79`）已把 TASK-M1-006 completion 从
+  TASK-M1-007 的依赖中移除（M1-007 改以 consumer-independence gate 证明不消费本任务
+  未关闭 evidence）；r7（PR #119，`4dcb16fc09b237225e3aca95617b645d4006976b`）定义
+  TASK-M1-008 依赖 TASK-M1-007 而非本任务。本任务自身的 `blocked` 状态、全部 AC/
+  verification gate 与 stop condition 不变。上一条要求的"独立 integration change"已立项为
+  CHG-2026-015（propose PR #121 / approve PR #123），其 TASK-I15-001 保持 `blocked`
+  待 authoritative capture provenance 与独立 readiness。
 - Consolidated by TASK-RLC-001（2026-07-19）:固定 implementation OID
   `ae708518ce6cc8bbd5ad39943d948b2d81209f03` 与已由维护者合入的等价 squash
   `21c2e218973c301e7ac6c43659d8918828f2c39e` 已登记于 CHG-2026-014 provenance manifest；

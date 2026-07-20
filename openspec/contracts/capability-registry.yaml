@@ -1,6 +1,6 @@
 registry: CAPABILITY-REGISTRY-1.0.0
-status: accepted  # 随 CORE-1.0.0 ratification
-core_baseline: CORE-1.0.0
+status: accepted  # 随 CORE-1.0.0 ratification 接受;CORE-2.0.0(2026-07-16)继承未变
+core_baseline: CORE-2.0.0
 
 # Canonical release-scoping registry for staged/iterative delivery.
 #

@@ -2,7 +2,7 @@
 
 > ID：ARK-CONSTITUTION  
 > Version：1.0.0  
-> Status：in baseline CORE-1.0.0（ratification 状态见 `openspec/baselines/CORE-1.0.0.yaml`）
+> Status：in baseline CORE-2.0.0（ratification 状态见 `openspec/baselines/CORE-2.0.0.yaml`）
 
 ## POL-SPEC-001 Specification is the source of truth
 

@@ -141,3 +141,14 @@ platforms: [macos]
   macOS platform、HDC compatibility、DAYU200 或任何 release capability。本 change 暂不
   archive；其 ledger 仍是后续独立 consumer dependency revision 的活跃审计输入，archive
   留待后续独立 PR 裁量。
+
+> Post-verification status note（2026-07-20，随账本对齐 PR 合入，原文不改写）：本文
+> "In scope"节与上方 closure 段对来源 Task 状态的现在时陈述均为各自起草时点的快照，
+> 且两处互相矛盾（前者称 PD-001 `blocked`/M1-006 在权威 main 仍 `ready`，后者称
+> M1-006 `blocked`/TASK-PD-001 `ready`）。来源 Task 的 current 状态一律以各自 change
+> 的 tasks.md 与 git 账本为准：closure（PR #114）时点为 M1-006 `blocked`、TASK-PD-001
+> `ready`；2026-07-19 起 TASK-PD-001 已 `done`（implementation PR #124 `110071c1`、
+> 状态 PR #125），其 headless/platform 拆分由 PR #116 生效——本 ledger 中"来源 Task
+> 保持非 `done`"等表述自该时点起不再是 current 事实。后续 consumer dependency
+> revision 引用本 ledger 时须以来源 tasks.md current 状态复核。本注记不改变 verified
+> 结论、manifest bytes 或任何 evidence。

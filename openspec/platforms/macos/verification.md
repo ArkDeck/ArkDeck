@@ -1,7 +1,7 @@
 # macOS Verification Profile
 
 > Status：draft  
-> Core baseline：CORE-1.0.0
+> Core baseline：CORE-2.0.0
 > Shared inputs：由每个 Task 固定 accepted Integration lock、profile 与 Core conformance hash
 
 ## M0A exit criteria

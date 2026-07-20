@@ -1,15 +1,17 @@
 # Delivery Roadmap
 
 > Overall estimate：TBD / pending real hardware confirmation  
-> Core baseline：CORE-1.0.0
+> Core baseline：CORE-2.0.0
 
 ## Current repository state
 
-- SDD baseline exists (candidate)；V2 git-native 治理已于 2026-07-14 生效(见 planning/postmortem-2026-07-governance.md)；
+> 2026-07-20 对齐；此前条目为 2026-07-14 时点快照，见 git 历史。
+
+- SDD baseline：CORE-2.0.0 已于 2026-07-16 ratify（CHG-2026-004）；V2 git-native 治理自 2026-07-14 生效(见 planning/postmortem-2026-07-governance.md)；
 - GitHub 仓库、受保护 main、CODEOWNERS 与 agent-pr/sdd-guard workflow 已配置；Agent 受限凭据分离仍是待办人类动作；
-- no Xcode/Windows/Linux solution or product code；
-- local Swift 6.3.2 is visible, but `xcode-select` currently points to Command Line Tools；
-- no real device/support matrix has been supplied。
+- macOS 产品代码已存在：ArkDeck.xcodeproj/ArkDeckApp shell 与 Packages/ArkDeckKit（M0A verified；M1 即 chg-2026-002 的 001-005/009/010 done、006 blocked 遗留、007/008 状态见其 tasks.md）；Windows/Linux 仍未开始；
+- 工具链：Swift 6.3.3 / SwiftPM / swift-format 6.3.0（M1 readiness 记录）；
+- 硬件：DEC-001 已选定 DAYU200/RK3568；hardware-matrix 有首条 observed 行（EVD-M0B-DAYU200-20260718-001，OH 7.0.0.34/API 26），supported 行仍为零；Route-B 恢复预案/演练准备已归档，恢复演练 device-gated。
 
 ## Milestones
 

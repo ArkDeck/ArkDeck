@@ -1,7 +1,9 @@
 # CHG-2026-014 evidence
 
-CHG-2026-014 已 approved，TASK-RLC-001 的 headless consolidation implementation 已执行；
-任务保持 `in_progress`，等待独立 source-task disposition governance PR 与维护者 review。
+CHG-2026-014 已 `verified`（PR #114）；TASK-RLC-001 implementation 经 PR #110 合入、
+source-task dispositions 经 PR #112 记录、`done` 经 PR #113 翻转。
+（2026-07-20 对齐：本段原文写于 implementation 之后、dispositions 之前，曾称"任务保持
+`in_progress`"；时序以 git 历史为准。）
 
 当前产物：
 

@@ -6,8 +6,15 @@
 
 ## TASK-PD-001 — r3 codec audit headless remediation + contract evidence
 
-- Status:ready（r4 headless readiness candidate；仅本 readiness PR 经维护者
-  review/merge 后生效。本 PR 不执行实现、不生成或重判 evidence）
+- Status:done（TASK-PD-001 implementation PR #124 已由维护者 review/merge 合入
+  `main` merge commit `110071c1003ecc06eb4106d2e8ea5b554029329a`；本独立状态 PR
+  依据下列 completion evidence 起草 `ready→done`，仅在维护者 review/merge 后生效。
+  本状态只关闭 headless implementation contract，不改变原三项 platform AC、
+  TASK-PD-002、change verification、gap/DEC-002、compatibility、support 或 release 状态）
+- Completion evidence:`evidence/runs/TASK-PD-001/r4-headless/run.md`（同一 implementation
+  revision 的 `TEST-DECODE-DAYU200-HEADLESS-001` contract PASS；43 项 unit/fault/static
+  回归与 archive characterization 36 项回归通过，SDD 0 errors/0 warnings；collector、
+  pinned archive、device、network 与 production subprocess dispatch 均为 0）
 - Readiness review（2026-07-19；不执行 TASK-PD-001、不启动 collector）：
   - Change gate:satisfied。CHG-2026-009@r4 已由维护者批准并经 PR #116 合入
     `main` merge commit `7585603d459ae26ad566b9aaeecc953f9c26bd98`；change 保持
@@ -104,6 +111,12 @@
   TASK-PD-002 readiness 之外的 platform/compatibility/support/release claim。
 - PR boundary:remediation implementation + headless contract evidence 一个独立
   `TASK-PD-001` PR；`ready→done` 仍为后续独立 status PR。
+- Implementation run（2026-07-19）：
+  `evidence/runs/TASK-PD-001/r4-headless/run.md` 仅记录
+  `TEST-DECODE-DAYU200-HEADLESS-001` contract PASS、完整源码 hash、43 项
+  unit/fault/static 回归与零 collector/archive/device/network/production subprocess
+  dispatch；原三项 platform Test ID 保持 pending。本 implementation PR 不将任务标为
+  `done`，仍须后续独立 status PR。
 
 ## TASK-PD-002 — signed broker fresh platform verification
 
