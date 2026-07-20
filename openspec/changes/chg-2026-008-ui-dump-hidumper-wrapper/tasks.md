@@ -237,8 +237,23 @@ r3 合入时本 change 有 4 个任务,全部 `blocked`;r6 增设 capture harnes
 
 ## TASK-UD-REDACTOR-001 — deterministic derived-golden redactor 前置
 
-- Status:ready(r5 readiness candidate;仅在维护者 review/merge 本 readiness PR 后
-  生效。本 PR 不含实现、不产生 evidence、不接触真实 raw)
+- Status:done(TASK-UD-REDACTOR-001 implementation + evidence PR #144 已由维护者
+  review/merge 合入 `main`(squash `3019e8e`);本独立状态 PR 依据下列 completion
+  evidence 起草 `ready→done`,仅在维护者 review/merge 后生效。本状态只关闭 redactor
+  的 host-only synthetic contract evidence,不改变 TASK-UD-001(blocked;其 ready
+  前置之一由本 done 满足,其余前置不变)、CAP-MUT/CAP-R4、change approved、canonical
+  platform(`AC-DUMP-008-01` 不被认领)、hardware/support/release 状态;
+  `safe-literals-v1.txt` 保持空 allowlist,任何未来保留字仍须在实现 PR review 中逐项
+  维护者批准)
+- Completion evidence:`evidence/runs/TASK-UD-REDACTOR-001/run.md` 与
+  `review-remediation-2026-07-20.md`(merged squash `3019e8e`;remediation 表六文件
+  SHA-256 与 `main` 逐一相符——redact.py `938cc117…`、test_redact.py `0543f70e…`、
+  algorithm-v1.json `a75778fd…`、safe-literals-v1.txt `e3b0c44…`(空)、receipt
+  schema `f4bffe70…`、README `18befd7c…`;合前两项建议均已纳入合入版:
+  `allow_abbrev=False` 与 run.md SUPERSEDED 标注,第 21 个测试即前者的回归;零真实
+  raw/HDC/device/network dispatch)。状态 PR 复核(2026-07-20,当前 `main`
+  `ba4b75b`):21 tests/0 failures 与六文件 hash 相符均复现——该复核只确认 evidence
+  在现基线可复现,不构成新的 acceptance 结论。
 - Objective:在 `TASK-UD-001` ready 前,以独立 host-only task 实现并固定 fail-closed
   `uidump-derived-redaction-v1`:确定性 transform 把受控 raw 转为可入仓 derived bytes,
   并产出记录完整 hash 链的 redaction receipt;golden 实现 PR 不能决定保留哪些 UI 文本。
