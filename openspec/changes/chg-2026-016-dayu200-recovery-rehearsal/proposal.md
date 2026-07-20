@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-016-dayu200-recovery-rehearsal
 revision: 1
-status: proposed # merge 只落 proposal;approve 须另行 approval-only PR(先例 #55/#89)
+status: approved # r1 proposal 经 PR #170 合入;批准由本 approval-only PR 的维护者 review/merge 构成(先例 #55/#89)
 class: platform
 core_change_level: none
 owner: lvye
@@ -75,10 +75,12 @@ RECOVERY gap 与 DEC-002。
 
 ## Approval
 
-- 本 proposal PR merge 只将 change 置为 `proposed`,不产生任务执行。
-- 正式批准:另行 approval-only PR(维护者 review/merge 即批准,先例 #55/#89);
-  批准后 `TASK-RH-001` 仍为 `blocked`,须独立 readiness PR(§6 第 4/5 项打勾+
-  执行时 pins 复核)转 `ready`,执行仍需具名设备窗口。
+- r1 proposal 经 PR #170 合入 main(status:proposed)。
+- 正式批准:2026-07-20 由本 approval-only PR(先例 #55/#89)将本 change 置为
+  `approved`;批准由维护者 review/merge 本 PR 构成。本批准不产生任务执行:
+  `TASK-RH-001` 保持 `blocked`,须独立 readiness PR(§6 第 4/5 项打勾——书面风险
+  确认+具名时间窗——与执行时 pins 复核)转 `ready`,执行仍需在具名设备窗口内由
+  维护者亲手进行。
 
 ## Risk and boundary
 
