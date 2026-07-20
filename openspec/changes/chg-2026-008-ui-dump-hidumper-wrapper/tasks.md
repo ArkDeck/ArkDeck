@@ -45,6 +45,7 @@
 - Hardware required:yes, human only；当前未 ready。
 - Required evidence（未来）:`run.md`、repo-safe `binding-server-receipt.json`、
   `physical-target-confirmation-receipt.json`、`confirmation-manifest.json`、
+  `confirmation-event-receipt.json`、`journal-authorization-receipt.json`、
   `hardware-evidence.json`。durable Session/journal 留在 repo 外；binding/server receipt 只记录
   session/job ID、positive binding revision、binding event/hash、identity hash、endpoint/ownership/
   generation 与 toolchain snapshot hash，不含 connect key/serial。physical-target receipt 与 hardware
@@ -52,7 +53,9 @@
   operator/attestation 字段关联；repo-safe exposure 边界由前置 contract revision 固定。
 - Verification（未来）：capture harness 只能接收 receipt ID + fixed revision，经 production loader
   replay exact Session/journal，revision/hash/current identity 任一不符时 intent/request/process `0`；
-  每次 HDC intent 前后 revalidate same server generation；hardware evidence 必须按下述固定 validator
+  task-applicable confirmation 必须由 trusted host entry point 先 durable append 为同一 Session/Job 的
+  typed journal event，且其 sequence/append-chain receipt 严格早于每个 covered intent；`decidedAt` 或事后
+  evidence 不能单独授权。每次 HDC intent 前后 revalidate same server generation；hardware evidence 必须按下述固定 validator
   过 schema；pinned verifier 必须证明 device model/serial/physical confirmation、identitySnapshotHash、
   `device.bindingRevision`、server tuple 与 durable receipt/全部 device intents/confirmation scope 的
   字段与 hash 一致。claimed operator 的现实真实性只由维护者 PR review attestation 判定。
@@ -81,15 +84,17 @@
   PASS 均不得只凭 generic JSON schema 起草）
 - Objective:在真机 task ready 前，实现并审查一个纯 host/offline、fail-closed semantic verifier，
   交叉验证 hardware evidence、durable binding receipt、device intent manifest、server receipt、
-  physical-target confirmation receipt 与 task-applicable confirmation manifest 的字段、时间和 hash
-  一致性；
+  physical-target confirmation receipt、task-applicable confirmation manifest、confirmation-event receipt
+  与 durable journal authorization receipt 的字段、顺序和 hash 一致性；
   它不声称证明操作者的现实身份。
 - Change-local closure:`INT-UD-HWE-SEM-001` / `TEST-INT-UD-HWE-SEM-001`；不认领任何
   canonical Core AC PASS。
 - Blocking dependencies/gates:
   - 独立 approved contract/integration revision 先固定 repo-safe binding receipt、server receipt、
-    device intent manifest、physical-target confirmation receipt 与 task-applicable confirmation manifest 的
-    schema path/version，以及 canonical serialization/hash linkage；当前 generic
+    device intent manifest、physical-target confirmation receipt、task-applicable confirmation manifest、
+    confirmation-event receipt 与 journal-authorization receipt 的 schema path/version，以及 canonical
+    serialization/hash linkage；当前 `journal-event.schema.json` 没有与 manifest confirmation/execution
+    authority 关联的 task-applicable event kind 或 append-chain 字段，generic
     `hardware-evidence.schema.json` 的 `operator` 是字符串，`physicalTargetConfirmation` 也没有 receipt/
     identity/scope linkage，不足以定义 cross-document equality 或操作者真实性；
   - physical-target receipt schema 必须固定 canonical model+serial serialization、claimed operator、
@@ -104,13 +109,28 @@
     cleanup；capture task 的相关 deviceMutation intent 必须全部且只能被同一未过期
     `kind=deviceMutation` confirmation 覆盖；preflight 则只允许 schema 登记的 physical/binding
     confirmation kind 与 exact related events，不得伪造 mutation entry；
+  - 上述 contract revision 必须新增由 trusted host entry point 写入 production locked Session journal 的
+    typed accepted-confirmation/authorization event；repo-safe `confirmation-event-receipt` 至少绑定 journal/
+    Session/Job ID、confirmation ID、event ID、strictly monotonic sequence、canonical event-payload hash、
+    previous append hash 与 append hash。`journal-authorization-receipt` 必须绑定同一 journal identity/head、
+    从该 confirmation event 到全部 related intent 的无缺口 ordered slice，并为每个 intent 固定 event ID、
+    sequence、payload/arguments hash、previous/append hash；不得包含 connect key 或 raw UI bytes；
+  - production harness 必须从 durable store 读取该 event/chain，而不是从 CLI/imported manifest mint
+    authority；对每个 planned intent，harness 必须在同一 serialized journal lane 下确认 confirmation event
+    已 durable append/current，随后 append+fsync 该 intent 并证明其 sequence 更大，之后才 dispatch；最终
+    journal-authorization receipt 再投影 confirmation→全部 related intents 的完整 slice。wall-clock
+    `decidedAt`/`confirmedAt` 只作有效期检查，不能证明先后；
+    missing event、chain gap、hash/head/session/job mismatch、sequence reuse/non-monotonic、confirmation event
+    不早于任一 intent 时，intent/request/process dispatch 均为 `0`，事后 receipt/evidence 不得补权；
   - 后续 readiness revision 固定 source commit OID、下列两个文件各自 SHA-256、fixed Python
     executable path/version/hash 与 exact CLI；hash 未产生前本 task 不能 ready；
   - exact CLI shape 必须为
-    `<FIXED_PYTHON> scripts/ui_dump_capture/verify_hardware_evidence.py --evidence <hardware-evidence.json> --binding-receipt <binding-receipt.json> --intent-manifest <intent-manifest.json> --server-receipt <server-receipt.json> --physical-target-receipt <physical-target-confirmation-receipt.json> --confirmation-manifest <confirmation-manifest.json> --repository-root <ARKDECK_ROOT> --expected-task-id <TASK_ID> --expected-acceptance-id <AC_ID>`；
+    `<FIXED_PYTHON> scripts/ui_dump_capture/verify_hardware_evidence.py --evidence <hardware-evidence.json> --binding-receipt <binding-receipt.json> --intent-manifest <intent-manifest.json> --server-receipt <server-receipt.json> --physical-target-receipt <physical-target-confirmation-receipt.json> --confirmation-manifest <confirmation-manifest.json> --confirmation-event-receipt <confirmation-event-receipt.json> --journal-authorization-receipt <journal-authorization-receipt.json> --repository-root <ARKDECK_ROOT> --expected-task-id <TASK_ID> --expected-acceptance-id <AC_ID>`；
     所有输入均为 path token，不得接受 raw JSON、connect key、serial override 或网络来源；
   - verifier 必须检查 claimed operator 字符串/attestation 字段跨文件精确相等、confirmation
     `actor=user`/accepted/time window、physical model/serial/identity hash/scope hash linkage、
+    confirmation ID/event payload hash 与 durable journal receipt 精确相等、append chain 无缺口且
+    confirmation event sequence 严格小于每个 related intent sequence、
     `bindingRevision > 0` 且等于 binding receipt 和全部 device intents、server endpoint/ownership/
     generation 与 Job snapshot/全部 pre/post receipt 相等、task/AC/step kinds 精确、repo artifact
     path/hash 可解析、敏感 raw 不在 git；unknown/missing/extra/mismatch/expired 一律 nonzero；
@@ -119,15 +139,18 @@
   - offline negative tests 至少覆盖 missing/zero binding revision、receipt/intent revision mismatch、
     physical model/serial/identity mismatch、stale/expired/substituted physical confirmation、scope hash/
     related intent/arguments mismatch、server generation/endpoint/ownership drift、wrong task/AC、
-    claimed-operator/attestation mismatch、confirmation actor/decision mismatch、artifact hash/path
-    mismatch、raw 路径落入 git、schema-valid 但语义不一致；不得把 `operator="human-name"` positive
+    claimed-operator/attestation mismatch、confirmation actor/decision mismatch、伪造更早 `decidedAt` 但
+    confirmation event sequence 晚于 intent、missing/duplicate event、sequence reuse/non-monotonic、journal/
+    Session/Job/head mismatch、append-chain gap/hash mismatch、intent payload/arguments hash mismatch、artifact
+    hash/path mismatch、raw 路径落入 git、schema-valid 但语义不一致；不得把 `operator="human-name"` positive
     fixture 描述为真人身份证明，也不得只测试 schema-invalid JSON。
 - Future allowed paths（仅在上述 input contracts 合入后的独立 readiness revision 生效）：
   - `scripts/ui_dump_capture/verify_hardware_evidence.py`
   - `scripts/ui_dump_capture/test_verify_hardware_evidence.py`
   - `openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/evidence/runs/TASK-UD-HWE-SEM-001/**`
   - 本 `tasks.md`（仅该 task 的独立 status/evidence 更新）
-- Read-only inputs:未来固定的 binding/server/intent/physical-target/confirmation schemas；
+- Read-only inputs:未来固定的 binding/server/intent/physical-target/confirmation/confirmation-event/
+  journal-authorization schemas；
   `openspec/contracts/hardware-evidence.schema.json`；`openspec/verification/acceptance-cases.yaml`；
   git index/repository root。
 - Hardware required:no；tests 必须只用 synthetic offline fixtures/temp directories，installed HDC、
@@ -164,6 +187,11 @@
     binding revision/identitySnapshotHash、server tuple、fixture、exact argv/arguments hashes、remote
     path、pre/post inventory、receive 与 cleanup；related step/intent ID 集合必须 exact，任一缺失、
     extra、stale 或 substituted confirmation 时对应 dispatch `0`；
+  - 同一 confirmation 必须先由 trusted host entry point durable append 为 production Session/Job typed
+    journal event；harness 只从 locked journal replay 授权。其 confirmation-event receipt 与 journal-
+    authorization receipt 必须证明 event ID/payload hash/append hash 相等、chain 无缺口且 confirmation
+    sequence 严格小于全部 related intent sequence；时间字段、manifest 或事后 evidence 单独出现时
+    dispatch `0`；
   - 另一个 approved contract/integration change 必须先在 `remote-operations.yaml`、
     `workflow-step-registry.yaml`/schema 与 platform adapter/profile/lock 中登记 exact-path sidecar
     pre/post inventory typed operation；当前 catalog **不存在**该 operation，generic
@@ -193,7 +221,8 @@
 - Hardware required:yes, human only；当前未 ready。
 - Required evidence（未来）：`run.md`、`redacted-manifest.json`、`capture-hashes.md`、
   `hardware-evidence.json`、repo-safe `physical-target-confirmation-receipt.json` 与
-  `confirmation-manifest.json`。hardware record 的 model/serial/physical confirmation、
+  `confirmation-manifest.json`、`confirmation-event-receipt.json`、
+  `journal-authorization-receipt.json`。hardware record 的 model/serial/physical confirmation、
   `device.bindingRevision`、identitySnapshotHash linkage 必须与 preflight receipt/全部 intent 相等；
   `toolchain.other` 记录 endpoint/ownership/generation 与 receipt hashes；raw 保持 repo 外。
 - Schema/semantic validation（三个 realHardware task 均强制）：
@@ -251,6 +280,7 @@
 - Hardware required:yes, human only；当前未 ready。
 - Required evidence（未来）：R2 extractor receipt、`run.md`、`redacted-manifest.json`、
   `capture-hashes.md`、`physical-target-confirmation-receipt.json`、`confirmation-manifest.json`、
+  `confirmation-event-receipt.json`、`journal-authorization-receipt.json`、
   `hardware-evidence.json`；raw 继续留在 repo 外。
 - Verification（未来）：R4 exact one-element payload 中 component token 与 extractor receipt 相等；
   altered/stale/foreign R2 hash、parser drift、zero/multiple selection、manual token、binding/server/path
@@ -274,8 +304,22 @@
     source、safe-literal allowlist、receipt schema 与 tests；完成时固定 source commit OID、每个文件
     SHA-256、fixed Python path/version/hash 与 exact replay CLI，任一 hash 未知时不得 `done`；
   - exact CLI shape 必须为
-    `<FIXED_PYTHON> scripts/ui_dump_redaction/redact.py --algorithm-manifest scripts/ui_dump_redaction/algorithm-v1.json --safe-literals scripts/ui_dump_redaction/safe-literals-v1.txt --input <CONTROLLED_RAW_PATH> --expected-input-sha256 <RAW_SHA256> --output <REPO_EXTERNAL_DERIVED_PATH> --receipt <REPO_EXTERNAL_RECEIPT_PATH>`；
-    output/receipt 初始位置必须在 repo 外，tool 不得直接写 git worktree；
+    `<FIXED_PYTHON> scripts/ui_dump_redaction/redact.py --algorithm-manifest scripts/ui_dump_redaction/algorithm-v1.json --safe-literals scripts/ui_dump_redaction/safe-literals-v1.txt --controlled-root <CONTROLLED_ROOT> --input <CONTROLLED_RAW_PATH> --expected-input-sha256 <RAW_SHA256> --output <REPO_EXTERNAL_DERIVED_PATH> --receipt <REPO_EXTERNAL_RECEIPT_PATH> --repository-root <ARKDECK_ROOT>`；
+    三个 data path 只能是 token，不得接受 stdin/raw bytes/network；
+  - tool 必须先以无 shell 的固定 git argv 枚举 `<ARKDECK_ROOT>` 的全部 registered worktree，并固定
+    inventory hash；还须沿 retained descriptor ancestor walk 拒绝任何 repository 的 `.git` worktree
+    marker。`CONTROLLED_ROOT` 必须是 owner-only `0o700` real directory，位于全部 detected/registered git
+    worktree 外且没有 symlink path component。三个 data path 都必须位于该 root 下，其 path components/
+    parent directories 由 retained directory descriptors 固定且 owner-only。input 必须为 owner-only
+    `0o600` regular file、`st_nlink == 1`，只能以 read-only/no-follow descriptor 读取；创建前的
+    `(parent device+inode, basename)` 与创建后的 file descriptor device+inode 对 input/output/receipt
+    必须分别 pairwise distinct；
+  - output/receipt 必须事先不存在，并通过逐 component no-follow directory descriptors 加
+    `O_CREAT|O_EXCL|O_NOFOLLOW`（或语义等价的 platform primitive）以 `0o600` 创建；禁止 truncate、replace、
+    symlink/hardlink 与 path re-resolution 后穿透 worktree。tool 必须在读前、写后从 retained descriptors
+    复验 controlled-root/parent/file device+inode、mode、link count 与全部 worktree containment，并证明 raw
+    identity/size/mtime/hash 未变化；任一 alias、existing target、parent swap、inventory drift 或 identity
+    drift 都 nonzero，不能覆盖 raw，也不能产出可提交 fixture；
   - algorithm manifest 必须逐字固定 strict UTF-8、line-ending normalization、token/line grammar、typed
     ordinal placeholder format、ordering、escaping、duplicate handling、resource limits、error codes 与
     whole-stream hashing。未知/invalid UTF-8/control/bidi/confusable/unclassified token 或 line 必须
@@ -285,10 +329,16 @@
     fallback 或“看似无害”启发式进入 allowlist。后续 TASK-UD-001 只读消费，不得修改；
   - receipt schema 必须绑定 algorithm/source/manifest/allowlist OID 与 hashes、raw/derived whole-stream
     hashes、byte counts、replacement counts by typed category、error/disposition 与 replay command hash；
+    还必须记录 worktree inventory hash、controlled-root 与 input pre/post descriptor identity、output/receipt
+    identity、open/create policy、mode/link count 与 containment result，且 receipt 自身不能通过 symlink/
+    hardlink/alias 指回 raw、derived 或任一 worktree；
   - offline adversarial/property tests 只用 synthetic bytes，至少覆盖 invalid UTF-8、CRLF/CR、NUL/
     control/bidi/confusable、Unicode normalization、package/ability/path/serial/window/component/长数字、
     页面文本、未知 token/line、overlong input、ordering/duplicate、allowlist/source/manifest/hash drift、
-    deterministic repeat 与零敏感 literal byte search；任何 unclassified input 必须 nonzero 且不产出
+    output=input、receipt=input、output=receipt、lexical/canonical alias、`..`、symlink leaf/parent、raw
+    hardlink/link-count > 1、existing target、worktree-target symlink、parent-swap race、raw identity/mtime/size
+    mutation、worktree inventory drift、wrong mode，以及 deterministic repeat 与零敏感 literal byte search；
+    任何 unclassified/unsafe-path input 必须 nonzero 且不覆盖 raw、不产出
     可提交 derived fixture。
 - Future allowed paths（仅在独立 readiness revision 合入后生效）：
   - `scripts/ui_dump_redaction/README.md`
@@ -322,7 +372,7 @@
     `deviceMutation`。`TASK-UD-PREFLIGHT-001` 因 production server identity/generation、durable
     binding 与 registered discovery/adoption 缺失而 blocked，mutation task 也 blocked；后续
     decision revision 尚未登记任何 target-build success/failure/unknown family。执行者不得选择
-    fallback argv、marker、fingerprint 或结构锚点，再用自造 fake/golden 自证通过。
+    fallback argv、marker 或结构锚点，再用自造 fake/golden 自证通过。
   - Consumer-dependency blocker：r2 未按 CHG-2026-014 提供逐 deliverable dependency 表。
     本 r3 在下表完成审查，但由于 capture/decision 尚未满足，每一项结论仍是
     `remains blocked`；后续 readiness revision 必须重新确认表内结论。
@@ -375,7 +425,9 @@ interface 自行替代。
     production loader/replay materialize `-t`，没有 operator/default/stale connect-key path；
   - `TASK-UD-HWE-SEM-001 done`：offline verifier 的 input schemas、source/test path、commit OID、
     SHA-256 与 exact CLI 均已固定，schema-valid 但 physical model/serial/identity、binding/server/
-    intent/confirmation scope/artifact 语义不一致或过期的 negative fixtures 全部 fail closed；operator
+    intent/confirmation scope/journal ordering/artifact 语义不一致或过期的 negative fixtures 全部 fail closed；
+    confirmation event 的 durable append sequence/chain 必须严格早于全部 related intents，时间字段或事后
+    evidence 不得补权；operator
     自动校验只认领 claimed-field/attestation 一致性，现实人类身份仍由维护者 PR review 保证；
   - `TASK-UD-CAP-MUT-001 done`：人类维护者只按 `capture-runbook.md` 的封闭 Phase A 矩阵执行
     R1-R3 `deviceMutation` Recipe，逐条记录 one-element `-a` payload、same binding/server generation、
@@ -388,14 +440,17 @@ interface 自行替代。
     receipt/intents/unexpired confirmation scope 精确相等；
   - 每个拟支持 Recipe 至少有一份真实成功输出；若目标 build 无法成功，平台结论必须如实为
     blocked/nonConformant，不得由 fake 补齐。后续 approved decision revision 逐 Recipe 固定精确
-    argv 以及 success/failure/unknown family（文本 marker、结构锚点或 byte fingerprint 采用哪种
-    必须显式声明），并说明 precedence/chunk boundary；
+    argv 以及 success/failure/unknown family；本 change 只允许可由 repo-safe synthetic/derived fixture
+    正向覆盖的文本 marker 或结构 parser family，并说明 precedence/chunk boundary。raw byte-fingerprint/
+    digest family 明确 unsupported/out of scope，不得由 decision revision 登记；若未来需要，必须另起
+    approved change 先固定 privacy-safe、复用 production stream→digest 实现路径的 conformance seam；
   - `TASK-RLC-001 done` + CHG-2026-014 verified 继续只作为 package bytes/interfaces provenance；
     不提供 M1-006 source AC，且上表经后续 revision 复核仍无 `yes`；
   - `TASK-UD-REDACTOR-001 done`：`uidump-derived-redaction-v1` 的 source/algorithm manifest/
     safe-literal allowlist/receipt schema/tests、commit OID 与逐文件 SHA-256 已合入，fixed replay CLI
-    和 synthetic adversarial/property evidence PASS；TASK-UD-001 只读重放这些 pins，禁止修改算法或
-    allowlist。缺任一 pin 时不得起草 ready；
+    和 synthetic adversarial/property evidence PASS；其 controlled-root/worktree inventory、no-follow、
+    exclusive-create、pairwise file identity/raw immutability gates 及负例全部 PASS。TASK-UD-001 只读重放
+    这些 pins，禁止修改算法或 allowlist。缺任一 pin 时不得起草 ready；
   - 固定 SDD Python executable 的 path/version/hash 重新 preflight 通过；r3 与后续 readiness
     revision 均经维护者 review/merge。
   - Agent 不得执行上述真实 `hdc`/device capture，也不得以公开文档、simulation 或 fake
@@ -449,7 +504,8 @@ interface 自行替代。
     argv/`ProcessRequest` 前失败，recording request/dispatch count 均为 `0`；
   - 只依 approved decision revision 登记的 output family 做 success/failure/unknownOutput
     classification；exit code 0 不能单独成功，`option ... missed` 明确失败，未登记/marker 缺失
-    fail closed；实现者不得新增自己的 success marker；
+    fail closed；实现者不得新增自己的 success marker；仅支持 repo-safe fixture 可正向复验的文本
+    marker/结构 parser family，raw byte-fingerprint/digest family 必须拒绝登记；
   - byte-exact **derived** HiDumper golden pack、registry/hash/provenance、`.gitattributes` 与
     Bundle.module resource contract；raw 永不入仓，只能按 `TASK-UD-REDACTOR-001` 固定 CLI 只读
     重放 pinned `uidump-derived-redaction-v1`，receipt 绑定 raw、algorithm/source/manifest/allowlist、
@@ -465,8 +521,10 @@ interface 自行替代。
     argv/request materialization count `0`，recording dispatch count `0`；合法 token positive control
     只证明能 materialize，不启动真实 HDC；
   - `TEST-INT-UD-WRAPPER-001`：四 Recipe 对 approved decision 的 argv exact equality；每个已登记
-    success/failure/unknown family、exit-0 trap、marker absence、chunk boundary、stdout/stderr
-    precedence 与无 shell composition 的 fake/adversarial branches 全覆盖；
+    文本 marker/结构 parser success/failure/unknown family 均由 repo-safe synthetic/derived fixture
+    通过 exact production semantic-evaluator path 正向覆盖；raw byte-fingerprint/digest registration 被
+    拒绝；exit-0 trap、marker absence、chunk
+    boundary、stdout/stderr precedence 与无 shell composition 的 fake/adversarial branches 全覆盖；
   - `TEST-INT-UD-GOLDEN-001`：受控 raw hash 与 capture manifest 一致；controlled replay 的
     pinned exact CLI/algorithm/source/manifest/allowlist hashes 与 `TASK-UD-REDACTOR-001` evidence
     一致并产生已登记 derived hash；任一 pin 漂移、unknown token/line 或 receipt mismatch fail closed；

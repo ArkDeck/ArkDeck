@@ -31,7 +31,11 @@ cases:
     device.bindingRevision, canonical model/serial, and physical-target
     confirmation. Its physical receipt identity hash equals the binding and all
     intents, and confirmation validity covers execution. Schema plus semantic
-    validation checks these fields; operator authenticity remains a maintainer
+    validation also requires the trusted host entry point to have durably
+    appended the typed confirmation event to the same Session/Job journal, with
+    a gap-free append receipt whose sequence precedes every covered intent;
+    timestamps or later evidence cannot authorize dispatch. Operator authenticity
+    remains a maintainer
     review attestation rather than an automated proof.
 - acceptance_id: INT-UD-CAPTURE-MUT-001
   test_id: TEST-INT-UD-CAPTURE-MUT-001
@@ -52,7 +56,8 @@ cases:
     path, inventory, receive, and cleanup. Canonical physical model/serial and
     identitySnapshotHash match the physical-target receipt, binding, hardware
     record, and every intent. The accepted actor=user confirmation is unexpired,
-    its scope hash is recomputed, and its related intent set is exact. Different
+    its scope hash is recomputed, its related intent set is exact, and its typed
+    durable journal event/append chain precedes every related intent. Different
     device, stale, substituted, missing, extra, or scope-mismatched receipts have
     dispatch zero. Pre-existing or unowned paths are
     never overwritten or removed; stdout, stderr, and optional sidecar origins
@@ -69,15 +74,20 @@ cases:
   expected_source: openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/verification.md#INT-UD-HWE-SEM-001
   minimum_evidence: contract
   expected_result: Before any real-device task becomes ready, approved schemas
-    define binding, server, device-intent, physical-target confirmation, and
-    task-applicable confirmation receipts. Capture intents require an accepted
+    define receipts for binding, server, device intent, physical-target
+    confirmation, task-applicable confirmation, confirmation event, and journal
+    authorization. Capture intents require an accepted
     unexpired kind=deviceMutation entry; preflight uses only its registered
     physical or binding confirmation kind. The verifier source and test paths, commit
     OID, file SHA-256 values, fixed Python executable, and exact CLI including
-    both confirmation inputs are pinned. It requires canonical model and serial
+    physical-target, confirmation-manifest, confirmation-event, and journal-
+    authorization inputs are pinned. It requires canonical model and serial
     plus identitySnapshotHash equality across hardware evidence, physical receipt,
     binding receipt, and every intent; confirmation time windows must be current,
-    and the recomputed scope hash and related intent set must be exact. It also
+    and the recomputed scope hash and related intent set must be exact. The
+    confirmation event ID/payload hash/session/job must match a gap-free durable
+    append chain, and its sequence must be strictly lower than every related
+    intent; a backdated decidedAt or post-dispatch receipt exits nonzero. It also
     validates positive binding revision, stable server tuple, exact task,
     acceptance, step-kind and artifact hashes, claimed-operator and attestation
     field equality, and raw-outside-git. It does not prove that a claimed name is
@@ -100,7 +110,8 @@ cases:
     token paths have request and process dispatch counts zero. With a separate
     human deviceMutation confirmation, R4 then uses the exact one-element
     payload and the same physical model/serial/identity receipt, unexpired exact-
-    scope confirmation, durable binding, stable server generation, registered
+    scope confirmation whose durable journal event precedes every related intent,
+    durable binding, stable server generation, registered
     exact-path inventory, ownership, receive, cleanup, raw privacy, schema, and
     pinned semantic-verifier gates as Phase A. Destructive and Agent dispatch
     counts are zero. This case claims no canonical AC-DUMP PASS.
@@ -112,11 +123,19 @@ cases:
   expected_result: Before TASK-UD-001 becomes ready, an independent task pins
     the uidump-derived-redaction-v1 source, algorithm manifest, exact structural
     safe-literal allowlist, receipt schema, tests, source commit OID, every file
-    hash, fixed Python executable, and exact replay CLI. The CLI initially writes
-    derived bytes and its receipt outside git. Synthetic adversarial and property
+    hash, fixed Python executable, and exact replay CLI. The CLI requires an owner-only
+    controlled root outside every detected/registered git worktree, including
+    `.git` ancestors from other repositories; all three data paths and their
+    owner-only parents stay beneath it. Raw input is read-only,
+    regular, link-count-one, and immutable before/after. Input, output, and receipt
+    are pairwise distinct by path and descriptor identity; output and receipt are
+    absent and created no-follow/exclusive, never truncated or replaced. Synthetic
+    adversarial and property
     tests reject invalid UTF-8, control and bidi characters, confusables, package,
     ability, path, serial, window, component, page text, unknown token or line,
-    resource overflow, and every manifest, allowlist, source, or input hash drift.
+    resource overflow, every manifest, allowlist, source, or input hash drift,
+    aliases, existing targets, symlink/hardlink, parent races, raw mutation, and
+    worktree breakout without overwriting raw or producing a committable fixture.
     Repeated accepted inputs are byte-deterministic and contain only reviewed
     structural literals and typed placeholders. No real capture raw, HDC, device,
     server, or network operation is used. This case does not close canonical
@@ -133,8 +152,11 @@ cases:
     self-authored fake as target-build evidence. Success is judged only by the
     registered output family, never by exit code; observed error-style outputs
     such as "option ... missed" with exit 0 are explicit failures; an
-    unregistered or marker-absent output is unknownOutput. Contract tests cover
-    every declared family and invoke no real hdc. REQ-DUMP-003 and canonical
+    unregistered or marker-absent output is unknownOutput. Only text-marker or
+    structural-parser families with repo-safe synthetic/derived positive fixtures
+    may be registered; raw byte-fingerprint/digest families are rejected. Contract
+    tests cover every permitted declared family in a clean checkout through the
+    exact production semantic-evaluator path and invoke no real hdc. REQ-DUMP-003 and canonical
     TEST-AC-DUMP-003-01 additionally require missing, empty, malformed, and
     injection-shaped component IDs to fail before ProcessRequest creation,
     with request and dispatch counts both zero.

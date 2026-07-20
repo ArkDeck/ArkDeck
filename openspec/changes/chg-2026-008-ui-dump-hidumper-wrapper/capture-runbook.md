@@ -10,9 +10,9 @@
 This runbook fixes the candidate Recipe payload boundary and the fail-closed prerequisites. It does
 not create missing production authority. A later readiness revision may make a human task executable
 only after it pins the registered server/device observations, durable binding loader, dedicated
-fixture, exact-path inventory operation and semantic verifier listed below. Phase A may capture only
-R1-R3. R4 is a separate Phase B task that cannot become ready until approved R2 output-family and
-typed component-extractor decisions exist.
+fixture, exact-path inventory operation, journaled pre-dispatch authorization and semantic verifier
+listed below. Phase A may capture only R1-R3. R4 is a separate Phase B task that cannot become ready
+until approved R2 output-family and typed component-extractor decisions exist.
 
 The reviewed OpenHarmony source is useful only for static routing analysis:
 
@@ -91,6 +91,12 @@ through the completed production device-targeting workflow, never through operat
    canonical model/serial, claimed operator/attestation fields, `confirmedAt`/`validUntil`, binding
    revision and identitySnapshotHash; the serial also appears in the required hardware-evidence record.
 
+The physical/binding confirmation applicable to any device intent must itself be a typed event written
+by the trusted host entry point to that same locked Session/Job journal before the intent. The current
+`journal-event.schema.json` has no task-applicable event kind linked to Manifest confirmation/execution
+authority and no append-chain fields, so an independent approved contract revision must add them
+before this task can become ready. A time string or imported receipt/manifest cannot mint authority.
+
 The capture harness accepts only the receipt ID plus the **fixed expected binding revision**. It
 opens the exact Session through the production durable store/loader, replays the locked journal,
 verifies the binding-event hash and current revision, and materializes `-t <connectKey>` internally
@@ -98,6 +104,17 @@ from that revision. Before every device command it also appends a durable typed 
 binding revision, target identity and arguments hash match the loaded binding. Missing Session,
 stale/current-revision mismatch, candidate ambiguity, identity drift, loader substitution or
 connect-key input from any other source yields intent/request/process dispatch `0`.
+
+For every task-applicable confirmation, the production store emits a repo-safe confirmation-event
+receipt and journal-authorization receipt. Together they bind journal/Session/Job identity,
+confirmation/event IDs, canonical payload hash, strictly monotonic sequence, previous/append hashes,
+the journal head, and the gap-free ordered slice through every related intent. Before each dispatch,
+the harness uses the same serialized journal lane to validate the durable/current confirmation event,
+append and fsync that planned intent, and prove its sequence is greater; the final journal receipt then
+projects the complete confirmation-to-intents slice for offline verification. `decidedAt`/`confirmedAt`
+is only an expiry input. Missing events, chain gaps, hash/head/session/job mismatch, sequence reuse/
+non-monotonicity, or a confirmation event at/after an intent yields dispatch `0`. Later evidence cannot
+repair or retroactively authorize that dispatch.
 
 Before the first and every later device intent, the physical-target receipt must be current. Its
 canonical model/serial must equal hardware evidence `physicalTargetConfirmation` and `device`, and
@@ -153,6 +170,12 @@ and cleanup. The verifier recomputes its canonical scope hash and requires its r
 set to be exact. Missing, extra, stale, substituted or scope-mismatched confirmation yields dispatch
 `0`; a matching operator-name string is not treated as proof of a human actor.
 
+The manifest entry is not authorization by itself. The trusted host entry point must first append the
+matching typed accepted-confirmation event to the same production Session/Job journal. The pinned
+confirmation-event and journal-authorization receipts must prove a gap-free append chain whose
+confirmation sequence is strictly lower than every related intent. A backdated `decidedAt`, imported
+manifest, run note, or evidence file cannot substitute for that pre-dispatch journal order.
+
 The current `arkdeck-remote-operations` catalog has no exact-path sidecar inventory action, and
 generic `verifyRemoteState(probeId, expectedState)` does not bind a remote path, exact argv, output
 family or adapter. Therefore it is not an executable substitute. Before either phase can be ready,
@@ -180,6 +203,11 @@ counts, truncation flags and SHA-256. It never retries using another boundary.
 - Existing observed `option ... missed` output is explicit failure.
 - Until an approved decision revision registers a Recipe-specific success family, every other
   completed Recipe output is `unknownOutput`; capture completion is not Recipe success.
+- This change permits only text-marker or structural-parser families that have privacy-safe
+  synthetic/derived positive conformance fixtures. A raw byte-fingerprint/digest family is
+  unsupported and cannot be registered by the later decision revision. Enabling one requires a
+  separate approved change that first pins a privacy-safe seam through the production stream-to-digest
+  path.
 - Server/binding drift, output truncation, unowned/pre-existing path, unexpected extra path or
   cleanup uncertainty stops the run and preserves `outcomeUnknown`/`needsAttention` as applicable.
 - The conservative deviceMutation classification is never lowered after execution. Target evidence
@@ -194,6 +222,8 @@ Every human real-device task (`TASK-UD-PREFLIGHT-001`, `TASK-UD-CAP-MUT-001` and
 - `redacted-manifest.json` and whole-stream `capture-hashes.md` where applicable;
 - a repo-safe binding/server receipt for the preflight task;
 - schema-validated `physical-target-confirmation-receipt.json` and `confirmation-manifest.json`;
+- schema-validated `confirmation-event-receipt.json` and `journal-authorization-receipt.json` proving
+  the durable pre-intent append order;
 - `hardware-evidence.json` conforming to
   `openspec/contracts/hardware-evidence.schema.json` version `2.0.0`.
 
@@ -218,10 +248,12 @@ Schema validation is necessary but never sufficient. Before a real-device task b
 `TASK-UD-HWE-SEM-001` must be done and the readiness revision must pin the verifier implementation
 at `scripts/ui_dump_capture/verify_hardware_evidence.py`, its tests at
 `scripts/ui_dump_capture/test_verify_hardware_evidence.py`, both file SHA-256 values, source commit
-OID, fixed Python executable and the exact CLI declared in `tasks.md`, including physical-target and
-confirmation-manifest inputs. It cross-checks canonical model/serial/identity hash, positive exact
-binding revision, unexpired physical and task-applicable confirmations, recomputed scope hash/related intent
-set, stable server tuple, claimed-operator/attestation field equality, exact task/acceptance/step kinds,
+OID, fixed Python executable and the exact CLI declared in `tasks.md`, including physical-target,
+confirmation-manifest, confirmation-event and journal-authorization inputs. It cross-checks canonical
+model/serial/identity hash, positive exact binding revision, unexpired physical and task-applicable
+confirmations, recomputed scope hash/related intent set, confirmation/event/payload hash equality, a
+gap-free append chain and confirmation sequence strictly before every related intent, stable server
+tuple, claimed-operator/attestation field equality, exact task/acceptance/step kinds,
 resolvable artifact hashes and raw-outside-git privacy. It does not prove a person is human.
 Missing/extra/unknown/mismatch/expired is nonzero. Schema-valid but semantically inconsistent negative
 fixtures are mandatory. Any source/test/input-schema/CLI/interpreter hash drift blocks execution; no
@@ -244,8 +276,21 @@ fixtures are later produced as `derived`, never raw, only by replaying those pin
    resource hashes.
 
 The exact replay CLI is the one declared in `tasks.md`; its output and receipt first land outside git.
-`TASK-UD-001` may only verify the merged pins/receipt and copy the approved derived bytes into its
-fixture path. It cannot edit the redactor, manifest or allowlist. Unclassified content fails closed.
+Before any bytes are read, it must enumerate and hash all registered ArkDeck worktree roots without a
+shell, reject any repository's `.git` worktree marker found by descriptor-based ancestor walk, validate
+an owner-only `0o700` controlled root outside every detected/registered git worktree, and walk every
+path component with no-follow directory descriptors. All three data paths and their owner-only parents
+remain beneath that root. Raw input is an owner-only `0o600` regular file with link count one, opened
+read-only. Before creation their retained-parent identity plus basename, and after creation their file
+descriptor identities, are pairwise distinct. Output and receipt must not exist and are created `0o600`
+with exclusive-create/no-follow
+semantics—never truncate or replace. Retained descriptors are revalidated after writing for root/
+parent/file identity, mode, link count and worktree containment, while raw identity, size, mtime and
+hash must remain unchanged. Alias, `..`, symlink/hardlink, existing target, parent swap, inventory
+drift or any worktree breakout fails closed without overwriting raw or producing a committable fixture.
+The receipt records those identities, open/create policy and inventory hash in addition to content
+hashes. `TASK-UD-001` may only verify the merged pins/receipt and copy the approved derived bytes into
+its fixture path. It cannot edit the redactor, manifest or allowlist. Unclassified content fails closed.
 Raw/derived equality is neither expected nor claimed.
 
 ## Prohibited actions at r3
@@ -258,10 +303,14 @@ Raw/derived equality is neither expected nor claimed.
 - R4 before approved R2 family/extractor registration, decimal-only/manual component ID, or ambiguous
   extractor selection;
 - schema-only hardware PASS, unpinned semantic verifier, missing/expired physical-target or mutation
-  confirmation, or identity/model/serial/scope/intent equality inferred rather than checked;
+  confirmation, missing/late/broken journal authorization chain, backdated confirmation used as
+  authority, or identity/model/serial/scope/intent equality inferred rather than checked;
 - claiming that operator-string validation proves a human actor; authenticity comes only from
   maintainer PR review/merge;
 - TASK-UD-001 ready or raw access before `TASK-UD-REDACTOR-001 done`, or changing its pinned source,
-  manifest, allowlist, receipt schema or replay CLI inside the golden implementation task;
+  manifest, allowlist, receipt schema or replay CLI inside the golden implementation task; redactor
+  input/output/receipt aliases, overwrite, symlink/hardlink, parent-race or git-worktree breakout;
+- registering a raw byte-fingerprint/digest output family without a separate approved privacy-safe
+  production-stream conformance seam;
 - sidecar search/overwrite, unowned cleanup, recursive delete or raw sensitive bytes in git;
 - PASS/done, compatibility, conformance, hardware-support or release claims from plan/source/fake.
