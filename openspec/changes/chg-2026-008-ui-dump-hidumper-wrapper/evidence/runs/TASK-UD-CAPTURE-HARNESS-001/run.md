@@ -3,6 +3,8 @@
 - Evidence class: `hostOnlyContract` (`fakeRunner` + synthetic local files)
 - Core baseline: `CORE-2.0.0`
 - Change: `CHG-2026-008-ui-dump-hidumper-wrapper@r6` (`approved`)
+  *(superseded — the change was already at r7 when PR #143 merged; see the
+  r7 alignment addendum below)*
 - Implementation base: `48efe9733b63d72a4b79896563fda0d544e1f5f1`
 - Harness source revision: `9977ab6c2b04cd89a9b9635d64df784b3fb57e26`
 - Branch: `agent/task-ud-capture-harness-001`
@@ -94,7 +96,7 @@ shell keyword, shell API, or network import in `capture.py`.
 
 | Evidence requirement | Conclusion |
 | --- | --- |
-| Closed allowlist and README/runbook argv parity | **PASS** |
+| Closed allowlist and README/runbook argv parity | **PASS** *(superseded — true against the pre-r7 runbook only; see r7 alignment addendum)* |
 | Strong placeholder/path/same-session HDC identity validation | **PASS** |
 | No shell; fake runner only for capture pipeline; no network import | **PASS** |
 | Separate O_EXCL streams/sidecar, whole-stream hash, 4 MiB cap, timeout channel | **PASS** |
@@ -139,7 +141,10 @@ remain the historical first run. The current PR source is superseded by:
 
 ### Addressed findings
 
-1. **Phase A target-list output shape (advisory):** the approved runbook and
+1. **Phase A target-list output shape (advisory)** *(superseded — the runbook
+   was already pinned to `list targets -v` by the r7 correction (PR #145),
+   merged before this addendum's source; see the r7 alignment addendum)*:
+   the approved runbook and
    harness use plain `hdc list targets`, while target binding requires a row with
    the connect key as its first token and a later `Connected` field. Some HDC
    versions may emit only a bare serial unless `-v` is used. Before any Phase A
@@ -167,7 +172,7 @@ remain the historical first run. The current PR source is superseded by:
 
 | Command | Result |
 | --- | --- |
-| `PYTHONDONTWRITEBYTECODE=1 <fixed-python> scripts/ud_capture/test_capture.py` | Passed: 49 unittest methods, 0 failures/skips. |
+| `PYTHONDONTWRITEBYTECODE=1 <fixed-python> scripts/ud_capture/test_capture.py` | Passed: 49 unittest methods, 0 failures/skips. *(superseded — not reproducible against the r7 runbook on `main` after merge: the runbook-literal sync test fails; see r7 alignment addendum)* |
 | focused HP drain rejection + drain manifest/summary + missing-sequence + CLI status cases | Passed: 4 tests, 0 failures. |
 | `ARKDECK_PYTHON=<fixed-python> scripts/check-sdd.sh` | Passed: 0 errors, 0 warnings, 111 acceptance IDs. |
 | `git diff --check` | Passed. |
@@ -175,5 +180,79 @@ remain the historical first run. The current PR source is superseded by:
 
 `TEST-INT-UD-HARNESS-001` remains **PASS** at remediation source revision
 `c7f8ce81a4ee2bc3481ad9b26945cc02adc12063`, subject to maintainer review/merge.
-This addendum does not change the independent `ready → done` status-PR boundary
-or make any real-device/output-family/compatibility claim.
+*(superseded — that revision predates the r7 runbook correction and its suite
+fails on post-merge `main`; the current PASS claim lives in the r7 alignment
+addendum below)* This addendum does not change the independent `ready → done`
+status-PR boundary or make any real-device/output-family/compatibility claim.
+
+## r7 alignment addendum — 2026-07-20
+
+PR #143 merged after the r7 runbook correction (PR #145) without adopting it:
+the merged harness still pinned the plain `list targets` HP form, its
+runbook-literal sync test failed on post-merge `main` (49 tests, 1 failure),
+and adversarial-review finding B1 (connect-key gate unsatisfiable on real
+hardware) plus M1 (sidecar bytes exempt from the sensitive self-check) were
+unresolved. This addendum records the alignment implementation.
+
+- Change: `CHG-2026-008-ui-dump-hidumper-wrapper@r7` (`approved`)
+- Alignment source revision: `21029d7cbc20ca7d5c9722e484bd5f13da3b2baa`
+- Evidence class remains `hostOnlyContract`; installed HDC, device, network
+  and destructive dispatch counts remain `0`.
+
+| Current source file | SHA-256 |
+| --- | --- |
+| `scripts/ud_capture/README.md` | `0a479a4ba790c66f9a48034318b6dcf142cbbce047775a7409e46eb67c5ae2ed` |
+| `scripts/ud_capture/capture.py` | `2cc168b413c4ed204f6fde015bd44c902c5db42cc89167608427cc6d4f408f0b` |
+| `scripts/ud_capture/test_capture.py` | `e83011baa5442b6446ef8dce524a1a6bef796257aea7f6178b21d25913c24ae9` |
+
+### Alignment changes
+
+1. **Verbose HP surface (B1):** `HP-1`/`HP-2` `COMMAND_SPECS` tokens and the
+   same-session HP manifest argv pin move to `list targets -v`, matching the
+   r7 runbook rows. Merged M0B evidence
+   (`openspec/changes/chg-2026-006-dayu200-m0b-bringup/evidence/runs/TASK-M0B-001/run.md`
+   capture table) is dispositive on the two output shapes: plain form =
+   33 bytes, bare 32-char serial + newline, no state column
+   (`2035c0783fe1b2fb…`); verbose form = 58 bytes carrying `USB`/`Connected`/
+   `localhost` fields (`d8816e413776d80e…`). The token-level gate parsing in
+   `_require_same_session_connect_key` is unchanged (first field equals the
+   connect key, a later field equals `Connected` case-insensitively) and is
+   now regression-locked against both shapes: a 33-byte plain-form fixture
+   must fail target binding, and a 58-byte verbose-form fixture (byte-length
+   asserted) must bind. Test fixtures no longer use the synthetic
+   `key\tConnected` plain row that masked B1.
+2. **Sidecar sensitive self-check (M1):** SC-2's received sidecar bytes now
+   run the same fail-closed sensitive self-check as stdout/stderr, with a
+   64 MiB complete-scan cap; a larger or size-drifted file fails the check.
+   The full/redacted manifests record `selfCheck.sidecar`, and
+   `selfCheckPassed` includes it. A key-material sidecar fixture asserts the
+   fail-closed path; the positive SC-2 test asserts a complete passing scan.
+3. **Runbook/README sync:** the runbook-literal test now requires
+   `` `hdc list targets -v` `` at least twice and zero occurrences of the
+   plain `` `hdc list targets` `` literal; the README command table and
+   Enforced-inputs section are rewritten to the r7 facts (the previous
+   "approved runbook assumes plain…" paragraph described the pre-r7 state).
+
+Deliberately not included: pinned-hash comparison for `HP-0` (hdc binary) and
+`FX-1` (fixture HAP) inside the harness. The r7 runbook assigns those
+comparisons to the human preflight rows with recorded stop conditions; adding
+a new tool-internal gate is left to an explicit maintainer decision rather
+than being introduced during an alignment fix.
+
+### Alignment commands and results
+
+| Command | Result |
+| --- | --- |
+| `PYTHONDONTWRITEBYTECODE=1 python3 scripts/ud_capture/test_capture.py` (system 3.14) | Passed: 52 unittest methods, 0 failures/skips. |
+| `PYTHONDONTWRITEBYTECODE=1 <fixed-python> scripts/ud_capture/test_capture.py` (readiness-pinned `.venv-sdd`, Python 3.14.6) | Passed: 52 unittest methods, 0 failures/skips. |
+| `ARKDECK_PYTHON=<fixed-python> scripts/check-sdd.sh` | Passed: 0 errors, 0 warnings, 111 acceptance IDs. |
+| `git diff --check` | Passed. |
+| `shasum -a 256 scripts/ud_capture/{README.md,capture.py,test_capture.py}` | Passed; current values recorded above. |
+| sensitive-literal scan over this run record (home/serial/key-marker patterns) | Passed: zero matches. |
+
+`TEST-INT-UD-HARNESS-001` is **PASS** at alignment source revision
+`21029d7cbc20ca7d5c9722e484bd5f13da3b2baa` against the r7 runbook, subject to
+maintainer review/merge. Per the task's PR boundary this alignment PR does not
+edit `tasks.md`; `ready → done` remains a later independent status PR, after
+which `TASK-UD-CAP-MUT-001` may be restored to `ready` referencing the merged
+alignment OID and the file hashes above.

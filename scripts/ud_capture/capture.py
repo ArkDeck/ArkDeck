@@ -47,6 +47,7 @@ CHANGE_ID = "CHG-2026-008-ui-dump-hidumper-wrapper"
 TASK_ID = "TASK-UD-CAPTURE-HARNESS-001"
 
 MAX_STREAM_BYTES = 4 * 1_024 * 1_024
+SIDECAR_SELF_CHECK_MAX_BYTES = 64 * 1_024 * 1_024
 DEFAULT_TIMEOUT_SECONDS = 120
 PIPE_DRAIN_GRACE_SECONDS = 2.0
 
@@ -88,8 +89,8 @@ class CommandSpec:
 # Phase-B task remains blocked on an output-family/component provenance revision.
 COMMAND_SPECS: tuple[CommandSpec, ...] = (
     CommandSpec("HP-0", ("version",), "HDC version preflight"),
-    CommandSpec("HP-1", ("list", "targets"), "same-session target inventory"),
-    CommandSpec("HP-2", ("list", "targets"), "pre-dispatch target recheck"),
+    CommandSpec("HP-1", ("list", "targets", "-v"), "same-session target inventory"),
+    CommandSpec("HP-2", ("list", "targets", "-v"), "pre-dispatch target recheck"),
     CommandSpec(
         "INV-1",
         ("-t", CONNECT_KEY, "shell", "hidumper", "-s", "WindowManagerService", "-a", "-a"),
@@ -570,7 +571,7 @@ def _latest_hp_payload(
         not isinstance(toolchain, dict)
         or toolchain.get("hdcPath") != expected_hdc_path
         or toolchain.get("hdcSha256") != expected_hdc_sha256
-        or manifest.get("argv") != [expected_hdc_path, "list", "targets"]
+        or manifest.get("argv") != [expected_hdc_path, "list", "targets", "-v"]
     ):
         raise CaptureError("latest same-session HP capture used a different HDC identity")
 
@@ -777,6 +778,34 @@ def _sidecar_record(path: str, command_may_be_partial: bool) -> dict:
     }
 
 
+def _sidecar_self_check(
+    path: str,
+    expected_bytes: int,
+    connect_key: Optional[str],
+    local_paths: tuple[str, ...],
+) -> dict:
+    """Run the stream sensitive self-check over the received sidecar bytes.
+
+    The scan is complete only when the whole file fits the scan cap and still
+    matches the byte count recorded for it; any shortfall fails closed exactly
+    like a truncated stdout/stderr stream.
+    """
+    try:
+        with open(path, "rb") as handle:
+            data = handle.read(SIDECAR_SELF_CHECK_MAX_BYTES + 1)
+    except OSError as error:
+        raise CaptureError(
+            f"cannot self-check reserved sidecar destination: {error}"
+        ) from None
+    complete = len(data) <= SIDECAR_SELF_CHECK_MAX_BYTES and len(data) == expected_bytes
+    return self_check(
+        data[:SIDECAR_SELF_CHECK_MAX_BYTES],
+        connect_key,
+        local_paths,
+        complete=complete,
+    )
+
+
 def _redacted_manifest(
     manifest: dict,
     prepared: PreparedInputs,
@@ -938,7 +967,6 @@ def capture_command(
         prepared.local_paths,
         complete=not result.stderr.truncated and not result.stderr.drain_incomplete,
     )
-    self_check_passed = stdout_check["passed"] and stderr_check["passed"]
     capture_complete = (
         not result.timed_out
         and not result.stdout.truncated
@@ -950,9 +978,11 @@ def capture_command(
         "stdout": _stream_record(stdout_name, result.stdout),
         "stderr": _stream_record(stderr_name, result.stderr),
     }
+    sidecar_check: Optional[dict] = None
     if LOCAL_SIDECAR_DEST in prepared.actual:
+        sidecar_path = prepared.actual[LOCAL_SIDECAR_DEST]
         streams["sidecar"] = _sidecar_record(
-            prepared.actual[LOCAL_SIDECAR_DEST],
+            sidecar_path,
             command_may_be_partial=(
                 result.timed_out
                 or result.exit_code != 0
@@ -960,6 +990,20 @@ def capture_command(
                 or result.stderr.drain_incomplete
             ),
         )
+        sidecar_check = _sidecar_self_check(
+            sidecar_path,
+            streams["sidecar"]["bytes"],
+            connect_key,
+            prepared.local_paths,
+        )
+    self_check_passed = (
+        stdout_check["passed"]
+        and stderr_check["passed"]
+        and (sidecar_check is None or sidecar_check["passed"])
+    )
+    self_check_records = {"stdout": stdout_check, "stderr": stderr_check}
+    if sidecar_check is not None:
+        self_check_records["sidecar"] = sidecar_check
 
     manifest = {
         "schema": MANIFEST_SCHEMA,
@@ -987,10 +1031,7 @@ def capture_command(
         },
         "inputs": prepared.metadata,
         "streams": streams,
-        "selfCheck": {
-            "stdout": stdout_check,
-            "stderr": stderr_check,
-        },
+        "selfCheck": self_check_records,
         "selfCheckPassed": self_check_passed,
         "boundary": (
             "human-operated controlled capture; raw bytes and full manifest remain outside "

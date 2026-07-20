@@ -101,8 +101,13 @@ def _read(path):
         return handle.read()
 
 
+def _verbose_target_row(key):
+    """Mirror the merged M0B `list targets -v` row structure for one target."""
+    return key + "\t\tUSB\tConnected\tlocalhost\n"
+
+
 def _seed_hp(tmp, out_dir, hdc, key="SERIAL123", ident="HP-1"):
-    runner, _ = _fake_runner(_result(out=(key + "\tConnected\n").encode("ascii")))
+    runner, _ = _fake_runner(_result(out=_verbose_target_row(key).encode("ascii")))
     return capture.capture_command(
         hdc_path=hdc,
         out_dir=out_dir,
@@ -148,8 +153,8 @@ def _approved_literal(spec):
 class AllowlistContractTests(unittest.TestCase):
     EXPECTED = {
         "HP-0": ("version",),
-        "HP-1": ("list", "targets"),
-        "HP-2": ("list", "targets"),
+        "HP-1": ("list", "targets", "-v"),
+        "HP-2": ("list", "targets", "-v"),
         "INV-1": (
             "-t", "CONNECT_KEY", "shell", "hidumper", "-s",
             "WindowManagerService", "-a", "-a",
@@ -205,7 +210,8 @@ class AllowlistContractTests(unittest.TestCase):
     def test_runbook_literals_match_allowlist(self):
         runbook = _read(_RUNBOOK)
         self.assertIn("`hdc version`", runbook)
-        self.assertGreaterEqual(runbook.count("`hdc list targets`"), 2)
+        self.assertGreaterEqual(runbook.count("`hdc list targets -v`"), 2)
+        self.assertEqual(runbook.count("`hdc list targets`"), 0)
         for spec in capture.COMMAND_SPECS:
             if spec.ident not in {"HP-0", "HP-1", "HP-2"}:
                 self.assertIn(_approved_literal(spec), runbook, spec.ident)
@@ -287,8 +293,8 @@ class InputValidationTests(unittest.TestCase):
 
     def test_status_word_or_disconnected_target_is_not_a_connect_key(self):
         for supplied, line in (
-            ("Connected", "SERIAL123\tConnected"),
-            ("SERIAL123", "SERIAL123\tOffline"),
+            ("Connected", "SERIAL123\t\tUSB\tConnected\tlocalhost"),
+            ("SERIAL123", "SERIAL123\t\tUSB\tOffline\tlocalhost"),
         ):
             with self.subTest(supplied=supplied, line=line):
                 with tempfile.TemporaryDirectory() as tmp:
@@ -309,6 +315,58 @@ class InputValidationTests(unittest.TestCase):
                             os.path.realpath(hdc),
                             capture._sha256_file(hdc)[0],
                         )
+
+    def test_m0b_plain_serial_only_hp_output_fails_target_binding(self):
+        # Merged M0B evidence (chg-2026-006 TASK-M0B-001): plain `list targets`
+        # returns only the 32-char serial + newline with no state column. Such
+        # output must leave every targeted command fail-closed.
+        key = "AB12CD34EF56AB78CD90EF12AB34CD56"
+        self.assertEqual(len(key), 32)
+        with tempfile.TemporaryDirectory() as tmp:
+            out_dir = os.path.join(tmp, "session")
+            hdc = _fake_hdc(tmp)
+            payload = (key + "\n").encode("ascii")
+            self.assertEqual(len(payload), 33)
+            runner, _ = _fake_runner(_result(out=payload))
+            capture.capture_command(
+                hdc_path=hdc,
+                out_dir=out_dir,
+                spec=capture.SPECS_BY_ID["HP-1"],
+                runner=runner,
+                home=tmp,
+            )
+            with self.assertRaises(capture.CaptureError):
+                capture._require_same_session_connect_key(
+                    out_dir,
+                    key,
+                    os.path.realpath(hdc),
+                    capture._sha256_file(hdc)[0],
+                )
+
+    def test_m0b_verbose_connected_row_shape_binds_the_target(self):
+        # Byte-for-byte shape of the merged M0B `list targets -v` capture:
+        # 32-char key, double tab, USB, Connected, localhost, newline = 58 bytes.
+        key = "AB12CD34EF56AB78CD90EF12AB34CD56"
+        payload = _verbose_target_row(key).encode("ascii")
+        self.assertEqual(len(payload), 58)
+        with tempfile.TemporaryDirectory() as tmp:
+            out_dir = os.path.join(tmp, "session")
+            hdc = _fake_hdc(tmp)
+            runner, _ = _fake_runner(_result(out=payload))
+            capture.capture_command(
+                hdc_path=hdc,
+                out_dir=out_dir,
+                spec=capture.SPECS_BY_ID["HP-1"],
+                runner=runner,
+                home=tmp,
+            )
+            sequence = capture._require_same_session_connect_key(
+                out_dir,
+                key,
+                os.path.realpath(hdc),
+                capture._sha256_file(hdc)[0],
+            )
+            self.assertEqual(sequence, 0)
 
     def test_latest_hp_recheck_supersedes_older_inventory(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -347,7 +405,8 @@ class InputValidationTests(unittest.TestCase):
             out_dir = os.path.join(tmp, "session")
             hdc = _fake_hdc(tmp)
             incomplete = _stream(
-                b"SERIAL123\tConnected\n", drain_incomplete=True
+                _verbose_target_row("SERIAL123").encode("ascii"),
+                drain_incomplete=True,
             )
             runner, _ = _fake_runner(_result(stdout=incomplete))
             capture.capture_command(
@@ -646,9 +705,40 @@ class StreamAndManifestTests(unittest.TestCase):
             self.assertEqual(sidecar["origin"], "remoteSidecar")
             self.assertEqual(sidecar["sha256"], hashlib.sha256(b"sidecar-bytes").hexdigest())
             self.assertFalse(sidecar["possiblyPartial"])
+            sidecar_check = manifest["selfCheck"]["sidecar"]
+            self.assertTrue(sidecar_check["completeStreamScanned"])
+            self.assertTrue(sidecar_check["passed"])
+            self.assertTrue(manifest["selfCheckPassed"])
             summary = _read(os.path.join(out_dir, "capture-hashes.md"))
             self.assertIn("01-SC-2.sidecar", summary)
             self.assertIn(sidecar["sha256"], summary)
+
+    def test_sc2_sidecar_sensitive_bytes_fail_the_self_check(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            out_dir = os.path.join(tmp, "session")
+            hdc = _fake_hdc(tmp)
+            _seed_hp(tmp, out_dir, hdc)
+            destination = os.path.join(out_dir, "01-SC-2.sidecar")
+
+            def runner(_argv, _timeout):
+                with open(destination, "wb") as handle:
+                    handle.write(b"dump with -----BEGIN PRIVATE KEY----- inside")
+                return _result(out=b"recv complete")
+
+            manifest = capture.capture_command(
+                hdc_path=hdc,
+                out_dir=out_dir,
+                spec=capture.SPECS_BY_ID["SC-2"],
+                connect_key="SERIAL123",
+                local_sidecar_dest=destination,
+                runner=runner,
+                home=tmp,
+            )
+            sidecar_check = manifest["selfCheck"]["sidecar"]
+            self.assertTrue(sidecar_check["keyMaterialFound"])
+            self.assertFalse(sidecar_check["passed"])
+            self.assertFalse(manifest["selfCheckPassed"])
+            self.assertTrue(manifest["captureComplete"])
 
     def test_exclusive_create_refuses_collision(self):
         with tempfile.TemporaryDirectory() as tmp:
