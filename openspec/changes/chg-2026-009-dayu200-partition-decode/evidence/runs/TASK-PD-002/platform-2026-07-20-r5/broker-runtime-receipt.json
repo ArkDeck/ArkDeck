@@ -1,0 +1,53 @@
+{
+  "appSandboxPolicyVerified" : true,
+  "archiveAcquisition" : "NSOpenPanel user selection",
+  "archiveDescriptorOpenFlags" : [
+    "O_RDONLY",
+    "O_NONBLOCK",
+    "O_NOFOLLOW",
+    "O_CLOEXEC"
+  ],
+  "archivePathPassedToDecoder" : false,
+  "coreOutputSha256" : {
+    "member-reconciliation.json" : "55c3515667ff6b1bd8cc922721b0c46a649eee9203a6f8a40c23397765b2d4ad",
+    "partition-mapping.json" : "965e3bf3bd926c76a646a1bc02ce1f3f4ba855b4e09a7e61b48872195c131347",
+    "process-audit.json" : "aa0606b30f3d91fbef957129faafa0ffd570f7ba209352b9c5016a14989d43d2"
+  },
+  "decoderOutputs" : [
+    "partition-mapping.json",
+    "member-reconciliation.json",
+    "process-audit.json"
+  ],
+  "descriptorTransfer" : "same-process CPython C API call with integer fd only",
+  "deviceNamespacePathRejectedBeforeOpen" : true,
+  "embeddedPythonVersion" : "3.14.6",
+  "existingArkDeckAppUsed" : false,
+  "policyChecks" : {
+    "\/dev\/cu.usbserial-synthetic" : {
+      "readDenied" : true,
+      "writeDenied" : true
+    },
+    "\/dev\/disk0" : {
+      "readDenied" : true,
+      "writeDenied" : true
+    },
+    "\/dev\/rdisk0" : {
+      "readDenied" : true,
+      "writeDenied" : true
+    },
+    "\/dev\/tty.usbserial-synthetic" : {
+      "readDenied" : true,
+      "writeDenied" : true
+    },
+    "network-outbound" : true,
+    "process-exec" : true
+  },
+  "realDeviceNodeOpenedForVerification" : false,
+  "runningCode" : {
+    "codeDirectoryHash" : "9a86497889efda13167cf6dfb9f7585c57c46265",
+    "identifier" : "io.arkdeck.partition-decode-broker"
+  },
+  "schema" : "arkdeck-dayu200-input-broker-runtime-1.0.0",
+  "socketOrNetworkUsed" : false,
+  "subprocessUsed" : false
+}

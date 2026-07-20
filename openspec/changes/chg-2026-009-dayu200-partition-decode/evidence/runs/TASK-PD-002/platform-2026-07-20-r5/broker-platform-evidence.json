@@ -1,0 +1,176 @@
+{
+  "environment": {
+    "architecture": "arm64",
+    "osBuildVersion": "25F84",
+    "osProductVersion": "26.5.2",
+    "pythonVersion": "3.14.6",
+    "pythonVersionProvenance": "sys.version_info in verified embedded CPython child",
+    "swiftVersion": "swift-driver version: 1.148.6 Apple Swift version 6.3.3 (swiftlang-6.3.3.1.3 clang-2100.1.1.101)\nTarget: arm64-apple-macosx26.0",
+    "xcodeVersion": "Xcode 26.6\nBuild version 17F113"
+  },
+  "evidenceClass": "platform",
+  "freshCollector": {
+    "artifactBuiltFromReviewedSource": true,
+    "artifactVerifiedBeforeAndAfterRun": true,
+    "callerSuppliedArtifact": false,
+    "callerSuppliedCoreOutputs": false,
+    "callerSuppliedRuntimeReceipt": false,
+    "runtimeReceiptCapturedFromVerifiedChildStdoutPipe": true
+  },
+  "runtimeBinding": {
+    "coreOutputSha256": {
+      "member-reconciliation.json": "55c3515667ff6b1bd8cc922721b0c46a649eee9203a6f8a40c23397765b2d4ad",
+      "partition-mapping.json": "965e3bf3bd926c76a646a1bc02ce1f3f4ba855b4e09a7e61b48872195c131347",
+      "process-audit.json": "aa0606b30f3d91fbef957129faafa0ffd570f7ba209352b9c5016a14989d43d2"
+    },
+    "receiptSha256": "6784abe5bce6e319d876e4c0109382ecd21e37bc99e7abe885107e5638c58aee",
+    "runningCodeDirectoryHash": "9a86497889efda13167cf6dfb9f7585c57c46265",
+    "runningCodeIdentifier": "io.arkdeck.partition-decode-broker"
+  },
+  "sandboxBroker": {
+    "artifact": {
+      "bundleIdentifier": "io.arkdeck.partition-decode-broker",
+      "bundleTreeHashMethod": "SHA-256 over sorted relative-path NUL size NUL file-SHA256 LF rows",
+      "bundleTreeSha256": "8eaf2e0c21f6317aef20ab782d789671514adb6ebf7f07192608524c90d622d4",
+      "candidateCodeDirectoryHashFull": "9a86497889efda13167cf6dfb9f7585c57c462655f5383f7c9c1d4908e682e93",
+      "codeDirectoryHash": "9a86497889efda13167cf6dfb9f7585c57c46265",
+      "executableSha256": "a2cf12bf45e59d5baaf5961f3dd65fcd04763bddcdfa02dbc565773259882a9d",
+      "fileManifest": [
+        {
+          "path": "Contents/Info.plist",
+          "sha256": "fe57455975dea024fbdb9f4a01bea26b9ce30a1f6b305575136ff18d31d2fc0d",
+          "sizeBytes": 875
+        },
+        {
+          "path": "Contents/MacOS/ArkDeckPartitionDecodeBroker",
+          "sha256": "a2cf12bf45e59d5baaf5961f3dd65fcd04763bddcdfa02dbc565773259882a9d",
+          "sizeBytes": 75728
+        },
+        {
+          "path": "Contents/Resources/Broker.entitlements",
+          "sha256": "27bcfa03139b7ae405bd62099fe7d2660b4ae7148e1b722451cfc04618aed787",
+          "sizeBytes": 515
+        },
+        {
+          "path": "Contents/Resources/broker_entry.py",
+          "sha256": "0d7bd4408e16d6101b30dda079db0bbe3e21f46b74ffc8eddc9a465f9a3aa47f",
+          "sizeBytes": 1074
+        },
+        {
+          "path": "Contents/Resources/decode.py",
+          "sha256": "a413defecd8658462a821ab14c7be4326ee42ae77673325c691daf6f653fb493",
+          "sizeBytes": 54865
+        },
+        {
+          "path": "Contents/Resources/evidence.py",
+          "sha256": "aa97e86c5957fe4b722e99b5988b067f86d09199edbc3138a088028e87247e64",
+          "sizeBytes": 23876
+        },
+        {
+          "path": "Contents/Resources/main.m",
+          "sha256": "4bb1e1cad4329d9d807a0a98744e5de04efe812360cb01a19a7b01522bc94e22",
+          "sizeBytes": 12138
+        },
+        {
+          "path": "Contents/Resources/member-inventory.json",
+          "sha256": "429763e6fabcaaa2f7323eab862fdb8c65d63ecc88afb441a36073ee5c35818c",
+          "sizeBytes": 7476
+        },
+        {
+          "path": "Contents/Resources/policy.json",
+          "sha256": "ee3fe577f74a094f121ad9937540f29a9a8098ef12b907ad388cc8062b9adaaf",
+          "sizeBytes": 1170
+        },
+        {
+          "path": "Contents/_CodeSignature/CodeResources",
+          "sha256": "354bebb55aee4b347d61ac050b30dc2aeb978ce43d17c0447f57be66d4f57ab8",
+          "sizeBytes": 3842
+        }
+      ],
+      "linkedLibraries": [
+        "/opt/homebrew/opt/python@3.14/Frameworks/Python.framework/Versions/3.14/Python",
+        "/usr/lib/libSystem.B.dylib",
+        "/usr/lib/libsandbox.1.dylib",
+        "/System/Library/Frameworks/AppKit.framework/Versions/C/AppKit",
+        "/System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation",
+        "/System/Library/Frameworks/Foundation.framework/Versions/C/Foundation",
+        "/System/Library/Frameworks/Security.framework/Versions/A/Security",
+        "/usr/lib/libobjc.A.dylib"
+      ],
+      "signatureIdentity": "adhoc",
+      "signatureVerifiedStrict": true,
+      "signedEntitlements": {
+        "com.apple.security.app-sandbox": true,
+        "com.apple.security.files.user-selected.read-only": true,
+        "com.apple.security.temporary-exception.files.absolute-path.read-only": [
+          "/opt/homebrew/opt/python@3.14/Frameworks/Python.framework/"
+        ]
+      },
+      "sourceSha256": {
+        "Broker.entitlements": "27bcfa03139b7ae405bd62099fe7d2660b4ae7148e1b722451cfc04618aed787",
+        "Info.plist": "fe57455975dea024fbdb9f4a01bea26b9ce30a1f6b305575136ff18d31d2fc0d",
+        "broker_entry.py": "0d7bd4408e16d6101b30dda079db0bbe3e21f46b74ffc8eddc9a465f9a3aa47f",
+        "decode.py": "a413defecd8658462a821ab14c7be4326ee42ae77673325c691daf6f653fb493",
+        "evidence.py": "aa97e86c5957fe4b722e99b5988b067f86d09199edbc3138a088028e87247e64",
+        "main.m": "4bb1e1cad4329d9d807a0a98744e5de04efe812360cb01a19a7b01522bc94e22",
+        "member-inventory.json": "429763e6fabcaaa2f7323eab862fdb8c65d63ecc88afb441a36073ee5c35818c",
+        "policy.json": "ee3fe577f74a094f121ad9937540f29a9a8098ef12b907ad388cc8062b9adaaf"
+      }
+    },
+    "descriptorTransfer": {
+      "archiveAcquisition": "NSOpenPanel user selection",
+      "archiveDescriptorOpenFlags": [
+        "O_RDONLY",
+        "O_NONBLOCK",
+        "O_NOFOLLOW",
+        "O_CLOEXEC"
+      ],
+      "archivePathPassedToDecoder": false,
+      "decoderInvocation": "same-process CPython C API call with integer fd only",
+      "existingArkDeckAppUsed": false,
+      "realDeviceNodeOpenedForVerification": false,
+      "socketOrNetworkUsed": false,
+      "subprocessUsedByBrokerRuntime": false
+    },
+    "policy": {
+      "appSandboxPolicyVerified": true,
+      "deviceChecks": {
+        "/dev/cu.usbserial-synthetic": {
+          "readDenied": true,
+          "writeDenied": true
+        },
+        "/dev/disk0": {
+          "readDenied": true,
+          "writeDenied": true
+        },
+        "/dev/rdisk0": {
+          "readDenied": true,
+          "writeDenied": true
+        },
+        "/dev/tty.usbserial-synthetic": {
+          "readDenied": true,
+          "writeDenied": true
+        },
+        "network-outbound": true,
+        "process-exec": true
+      },
+      "deviceNamespace": "/dev",
+      "deviceNamespacePathRejectedBeforeOpen": true,
+      "networkDenied": true,
+      "processExecDenied": true,
+      "sha256": "ee3fe577f74a094f121ad9937540f29a9a8098ef12b907ad388cc8062b9adaaf"
+    }
+  },
+  "schema": "arkdeck-dayu200-input-broker-platform-2.0.0",
+  "scope": {
+    "archiveLocatorIncluded": false,
+    "authoritative": false,
+    "compatibilityClaim": false,
+    "flashAddressDerived": false,
+    "flashProtocolClaim": false,
+    "hardwareSupportClaim": false,
+    "nonAuthoritative": true,
+    "parameterRawTextIncluded": false,
+    "validOnlyForPinnedArchive": true
+  }
+}

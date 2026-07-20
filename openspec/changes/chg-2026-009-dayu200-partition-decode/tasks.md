@@ -191,6 +191,12 @@
   amendment PR 后生效。本 PR 不运行 collector/broker、不读取 archive、不产生
   evidence;实际执行仍需用户人工解锁 console 并本人操作 NSOpenPanel,不需要
   DAYU200 设备)
+- Implementation + evidence candidate:`evidence/runs/TASK-PD-002/run.md` 与
+  `platform-2026-07-20-r5/**`(2026-07-20 16:58 维护者亲手 fresh run,collector
+  exit 0,create-only publication 成功;三项 platform Test ID 同一次 run 全部
+  PASS;六文件 hash 经独立复算与 summary/receipt/platform-evidence 三方绑定一致;
+  敏感扫描零命中。本 evidence PR 保持 `ready`,`ready→done` 仍须独立状态 PR 经
+  维护者 review/merge)
 - r5 readiness amendment(2026-07-20;host-only,零 collector/broker/archive/设备
   访问;r5 gate 规定形态):
   - Unblock gate:satisfied。r5 fail-closed 回退的前置 TASK-PD-001 r5 remediation
