@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-017-guard-scope-coverage
 revision: 1
-status: proposed # merge 只落 proposal;approve 须另行 approval-only PR(先例 #55/#89)
+status: approved # r1 proposal 经 PR #180 合入;批准由本 approval-only PR 的维护者 review/merge 构成(先例 #55/#89)
 class: implementation-only
 core_change_level: none
 owner: lvye
@@ -50,9 +50,10 @@ guard 以自动拦截该类断链,把"人肉双开发现"变为机器侧 fail-cl
 
 ## Approval
 
-- 本 proposal PR merge 只将 change 置为 `proposed`,不产生任务执行。
-- 正式批准:另行 approval-only PR(维护者 review/merge 即批准,先例 #55/#89);批准后
-  `TASK-GUARD-001` 仍 `blocked`,须独立 readiness PR 转 `ready`。
+- r1 proposal 经 PR #180 合入 main(`status: proposed`)。
+- 正式批准:2026-07-20 由本 approval-only PR(先例 #55/#89)将本 change 置为
+  `approved`;批准由维护者 review/merge 本 PR 构成。本批准不产生任务执行:
+  `TASK-GUARD-001` 保持 `blocked`,须再经独立 readiness PR 转 `ready`。
 
 ## Risk and boundary
 
