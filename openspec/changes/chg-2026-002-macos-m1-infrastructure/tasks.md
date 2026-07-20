@@ -819,13 +819,22 @@
 
 ## TASK-M1-007 — device binding revision、transport 重绑定边界与 per-device mutation lane
 
-- Status:ready（r6 consumer-dependency/readiness amendment candidate；只有维护者
-  review/merge 本 governance PR 后生效。本 PR 不执行 TASK-M1-007、不产生
-  implementation/acceptance evidence）
-- Implementation evidence:`evidence/runs/TASK-M1-007/run.md`（contract；同一 working-tree
-  implementation 的九项 canonical Test ID、fault/reopen/property counters、unresolved mutation
-  outcome recovery/lane-retention 与确定性 queue signal 复验、full-suite/format/SDD/scope 结果和
-  dedicated 零真实 dispatch 记录；本引用不将任务标为 `done`）。
+- Status:done（TASK-M1-007 implementation + evidence PR #127 已由维护者 review/merge
+  合入 `main` squash commit `8998d9b`；本独立状态 PR 依据下列 completion evidence 起草
+  `ready→done`,仅在维护者 review/merge 后生效。本状态只关闭 M1-007 的 contract
+  evidence,不改变 TASK-M1-006（blocked）、TASK-M1-008（blocked,其解锁由自身
+  readiness 流程处理）、change verified、platform conformance、hardware/support 或
+  release 状态）
+- Completion evidence:`evidence/runs/TASK-M1-007/run.md`（contract；base
+  `8c1311b8be74c0393c2d490f72c63ffa39b3cdb6`,九项 canonical `TEST-AC-DEV-*` Test ID 于
+  同一 implementation revision 全部 PASS,fault/reopen/property counters、unresolved
+  mutation outcome recovery/lane-retention 与确定性 queue signal 复验、full-suite/
+  format/SDD/scope 结果和 dedicated 真实 HDC/device/network/external-process dispatch
+  count `0` 均在案）。状态 PR 复核（2026-07-20,当前 `main` `2e2a389`,即 #126
+  revert/#133 之后基线）:dedicated 两个测试文件 16 tests/0 failures,全量 249 tests/
+  1 known opt-in skip/0 failures（0 unexpected）,`scripts/check-sdd.sh` 0 errors/
+  0 warnings/111 acceptance IDs——该复核只确认 evidence 在现基线仍可复现,不构成新的
+  acceptance 结论。
 - Readiness review（2026-07-19；锁屏 headless,零真实 HDC/device/network dispatch）：
   - Change gate:satisfied on merge。CHG-2026-002 r1-r5 已批准；r6 只修订本任务
     dependency、完整 task contract 与 readiness,不修改 Core Requirement/AC/contract、
