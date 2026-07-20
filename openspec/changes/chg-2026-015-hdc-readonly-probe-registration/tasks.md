@@ -21,7 +21,10 @@
   需独立设备窗口;维护者按计划采集后,capture record 经 evidence PR 合入
   `evidence/provenance/**` 即构成认可；其中 `subserverCapability` 的 documentation
   provenance 已由 PR #141 合入 `evidence/provenance/subserver-capability-doc.md`,
-  1/4 family 已满足,其余三类仍 pending——2026-07-20 账本对齐补记）；独立 readiness PR merged（未满足）
+  1/4 family 已满足——2026-07-20 账本对齐补记;同日 `serverIdentityGeneration` 与
+  `keyAccessDiagnostics` 的 host-only capture record 随 evidence PR 合入
+  `evidence/provenance/host-only-capture-2026-07-20.md`(merge 即认可),3/4 已满足,
+  仅余 `selectedDeviceAuthorizationBinding` 待独立设备窗口）；独立 readiness PR merged（未满足）
 - Allowed paths:
   - `openspec/integrations/openharmony/profile.md`
   - `openspec/integrations/openharmony/readonly-probes.yaml`（可新建）
