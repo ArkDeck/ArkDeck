@@ -1,19 +1,23 @@
 # Tasks — CHG-2026-015 HDC read-only probe registration
 
-> This change is `proposed`. No task may execute until a maintainer approves the change and an
+> This change is `approved`（approval-only PR #123 已由维护者 review/merge 合入 `main`
+> `9f08c9421a24beb5c670452ec42af7c0bbdef5b1`，2026-07-19）。No task may execute until an
 > independent readiness PR confirms all four authoritative input families are available.
 
 ## TASK-I15-001 — register four closed production read-only probe families
 
-- Status:blocked(change approval and authoritative input/readiness pending)
+- Status:blocked(authoritative input capture 与独立 readiness PR pending；change approval
+  已由 PR #123 满足，2026-07-20 状态同步——#123 只更新了 proposal.md，本行与上方 banner
+  据此对齐，不改变任务语义或解除任何 gate)
 - Platform:macos integration input;Windows/Linux deferred
 - Requirements:`REQ-HDC-001`、`REQ-HDC-002`、`REQ-HDC-003`、`REQ-HDC-006`、
   `REQ-HDC-007`、`REQ-HDC-009`、`REQ-HDC-010`
 - Acceptance:`I15-HDC-SERVER-IDENTITY-001`、`I15-HDC-AUTH-BINDING-001`、
   `I15-HDC-KEY-ACCESS-001`、`I15-HDC-SUBSERVER-001`、`I15-HDC-PROVENANCE-001`、
   `I15-HDC-REGISTRY-001`、`I15-HDC-NODISPATCH-001`
-- Depends on:CHG-2026-015 approved；四类 authoritative/controlled-human raw or platform
-  receipt inputs 可读取且 provenance 已由维护者认可；独立 readiness PR merged
+- Depends on:CHG-2026-015 approved（已满足:PR #123）；四类 authoritative/controlled-human
+  raw or platform receipt inputs 可读取且 provenance 已由维护者认可（未满足）；独立
+  readiness PR merged（未满足）
 - Allowed paths:
   - `openspec/integrations/openharmony/profile.md`
   - `openspec/integrations/openharmony/readonly-probes.yaml`（可新建）
