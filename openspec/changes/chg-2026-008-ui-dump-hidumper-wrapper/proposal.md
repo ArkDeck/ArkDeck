@@ -1,6 +1,6 @@
 ---
 id: CHG-2026-008-ui-dump-hidumper-wrapper
-revision: 4
+revision: 5
 status: approved # r1 经 #68 批准;后续 revision 仅在对应治理 PR 由维护者 review/merge 后生效
 class: platform
 core_change_level: none
@@ -176,4 +176,10 @@ verifier 与 7 任务链;全文见 PR 提交历史 `a613b76`)。经维护者 202
   `SC-1` 清单命令、fixture 生命周期 `FX-1..FX-4` 字面 argv、操作者与时间窗规则),并把
   该任务起草为 `ready`;不改 scope/AC/spec、不含实现或 evidence、不改变其他任务状态。
   仅在维护者 review/merge 对应 readiness PR 后生效;merge 即构成五项输入的批准。实际
-  采集另需维护者确认的设备时间窗,执行与 evidence 按 runbook/task 契约进行。
+  采集另需维护者确认的设备时间窗,执行与 evidence 按 runbook/task 契约进行。r4 已经
+  PR #132 合入。
+- r5 readiness-only revision:固定 `TASK-UD-REDACTOR-001` 的实现范围与 base 规则
+  (6 个 `scripts/ui_dump_redaction/` 文件、stdlib-only、无采集前置、fixed interpreter
+  实测)并把该任务起草为 `ready`;不改 scope/AC/spec、不含实现或 evidence、不改变
+  其他任务状态、不接触真实 raw。仅在维护者 review/merge 对应 readiness PR 后生效。
+  `safe-literals-v1.txt` 逐项批准仍发生在实现 PR 的维护者 review 中。
