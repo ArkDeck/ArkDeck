@@ -33,21 +33,33 @@ static BOOL VerifyClosedAppSandboxPolicy(NSDictionary **checksOut) {
                                        ArkSandboxFilterPath, path.fileSystemRepresentation);
         int writeResult = sandbox_check(getpid(), "file-write-data",
                                         ArkSandboxFilterPath, path.fileSystemRepresentation);
+        NSNumber *readDenied = @NO;
+        if (readResult != 0) {
+            readDenied = @YES;
+        }
+        NSNumber *writeDenied = @NO;
+        if (writeResult != 0) {
+            writeDenied = @YES;
+        }
         checks[path] = @{
-            @"readDenied": @(readResult != 0),
-            @"writeDenied": @(writeResult != 0)
+            @"readDenied": readDenied,
+            @"writeDenied": writeDenied
         };
         if (readResult == 0 || writeResult == 0) {
             fprintf(stderr, "broker policy self-check failed\n");
             return NO;
         }
     }
-    checks[@"network-outbound"] = @(
-        sandbox_check(getpid(), "network-outbound", ArkSandboxFilterNone) != 0
-    );
-    checks[@"process-exec"] = @(
-        sandbox_check(getpid(), "process-exec", ArkSandboxFilterNone) != 0
-    );
+    NSNumber *networkOutboundDenied = @NO;
+    if (sandbox_check(getpid(), "network-outbound", ArkSandboxFilterNone) != 0) {
+        networkOutboundDenied = @YES;
+    }
+    checks[@"network-outbound"] = networkOutboundDenied;
+    NSNumber *processExecDenied = @NO;
+    if (sandbox_check(getpid(), "process-exec", ArkSandboxFilterNone) != 0) {
+        processExecDenied = @YES;
+    }
+    checks[@"process-exec"] = processExecDenied;
     if (![checks[@"network-outbound"] boolValue] ||
         ![checks[@"process-exec"] boolValue]) {
         fprintf(stderr, "broker non-device policy self-check failed\n");

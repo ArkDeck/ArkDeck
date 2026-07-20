@@ -329,6 +329,29 @@ def _launch_verified_broker(app_path: str, preflight: dict) -> tuple[dict, bytes
     return receipt, receipt_payload, output_dir
 
 
+class _MissingReceiptField:
+    """Sentinel for an absent receipt field; repr keeps error messages readable."""
+
+    def __repr__(self) -> str:
+        return "<missing>"
+
+
+_MISSING = _MissingReceiptField()
+
+
+def _require_receipt_term(name: str, ok: bool, observed) -> None:
+    """Fail closed on one named validation term, reporting the observed value.
+
+    The runtime receipt carries no archive locator, parameter text, serial or
+    user path, so the observed value is safe to include verbatim.
+    """
+    if not ok:
+        raise CollectionError(
+            "runtime receipt failed closed validation: "
+            f"{name} observed {observed!r}"
+        )
+
+
 def _validate_runtime_receipt(
     receipt: dict, receipt_payload: bytes, output_dir: str, artifact: dict
 ) -> dict[str, bytes]:
@@ -338,40 +361,88 @@ def _validate_runtime_receipt(
         "/dev/cu.usbserial-synthetic",
         "/dev/tty.usbserial-synthetic",
     )
-    try:
-        device_checks = receipt["policyChecks"]
-        core_hashes = receipt["coreOutputSha256"]
-        valid = (
-            receipt["schema"] == "arkdeck-dayu200-input-broker-runtime-1.0.0"
-            and receipt["appSandboxPolicyVerified"] is True
-            and receipt["deviceNamespacePathRejectedBeforeOpen"] is True
-            and all(
-                device_checks[path] == {"readDenied": True, "writeDenied": True}
-                for path in expected_device_paths
-            )
-            and device_checks["network-outbound"] is True
-            and device_checks["process-exec"] is True
-            and receipt["archiveAcquisition"] == "NSOpenPanel user selection"
-            and receipt["archiveDescriptorOpenFlags"]
-            == ["O_RDONLY", "O_NONBLOCK", "O_NOFOLLOW", "O_CLOEXEC"]
-            and receipt["descriptorTransfer"]
-            == "same-process CPython C API call with integer fd only"
-            and receipt["archivePathPassedToDecoder"] is False
-            and receipt["subprocessUsed"] is False
-            and receipt["socketOrNetworkUsed"] is False
-            and receipt["realDeviceNodeOpenedForVerification"] is False
-            and receipt["existingArkDeckAppUsed"] is False
-            and receipt["runningCode"]["identifier"] == artifact["bundleIdentifier"]
-            and receipt["runningCode"]["codeDirectoryHash"]
-            == artifact["codeDirectoryHash"]
-            and receipt["embeddedPythonVersion"] == EXPECTED_PYTHON_VERSION
-            and set(core_hashes) == set(CORE_OUTPUTS)
-            and all(re.fullmatch(r"[0-9a-f]{64}", value) for value in core_hashes.values())
+
+    value = receipt.get("schema", _MISSING)
+    _require_receipt_term(
+        "schema", value == "arkdeck-dayu200-input-broker-runtime-1.0.0", value
+    )
+    for key in ("appSandboxPolicyVerified", "deviceNamespacePathRejectedBeforeOpen"):
+        value = receipt.get(key, _MISSING)
+        _require_receipt_term(key, value is True, value)
+
+    device_checks = receipt.get("policyChecks", _MISSING)
+    _require_receipt_term(
+        "policyChecks", isinstance(device_checks, dict), device_checks
+    )
+    for path in expected_device_paths:
+        value = device_checks.get(path, _MISSING)
+        ok = (
+            isinstance(value, dict)
+            and set(value) == {"readDenied", "writeDenied"}
+            and value["readDenied"] is True
+            and value["writeDenied"] is True
         )
-    except (KeyError, TypeError):
-        valid = False
-    if not valid:
-        raise CollectionError("runtime receipt failed closed validation")
+        _require_receipt_term(f"policyChecks[{path}]", ok, value)
+    for key in ("network-outbound", "process-exec"):
+        value = device_checks.get(key, _MISSING)
+        _require_receipt_term(f"policyChecks[{key}]", value is True, value)
+
+    value = receipt.get("archiveAcquisition", _MISSING)
+    _require_receipt_term(
+        "archiveAcquisition", value == "NSOpenPanel user selection", value
+    )
+    value = receipt.get("archiveDescriptorOpenFlags", _MISSING)
+    _require_receipt_term(
+        "archiveDescriptorOpenFlags",
+        value == ["O_RDONLY", "O_NONBLOCK", "O_NOFOLLOW", "O_CLOEXEC"],
+        value,
+    )
+    value = receipt.get("descriptorTransfer", _MISSING)
+    _require_receipt_term(
+        "descriptorTransfer",
+        value == "same-process CPython C API call with integer fd only",
+        value,
+    )
+    for key in (
+        "archivePathPassedToDecoder",
+        "subprocessUsed",
+        "socketOrNetworkUsed",
+        "realDeviceNodeOpenedForVerification",
+        "existingArkDeckAppUsed",
+    ):
+        value = receipt.get(key, _MISSING)
+        _require_receipt_term(key, value is False, value)
+
+    running = receipt.get("runningCode", _MISSING)
+    _require_receipt_term("runningCode", isinstance(running, dict), running)
+    value = running.get("identifier", _MISSING)
+    _require_receipt_term(
+        "runningCode.identifier", value == artifact["bundleIdentifier"], value
+    )
+    value = running.get("codeDirectoryHash", _MISSING)
+    _require_receipt_term(
+        "runningCode.codeDirectoryHash",
+        value == artifact["codeDirectoryHash"],
+        value,
+    )
+    value = receipt.get("embeddedPythonVersion", _MISSING)
+    _require_receipt_term(
+        "embeddedPythonVersion", value == EXPECTED_PYTHON_VERSION, value
+    )
+
+    core_hashes = receipt.get("coreOutputSha256", _MISSING)
+    _require_receipt_term(
+        "coreOutputSha256",
+        isinstance(core_hashes, dict) and set(core_hashes) == set(CORE_OUTPUTS),
+        sorted(core_hashes) if isinstance(core_hashes, dict) else core_hashes,
+    )
+    for name, digest in core_hashes.items():
+        _require_receipt_term(
+            f"coreOutputSha256[{name}]",
+            isinstance(digest, str)
+            and re.fullmatch(r"[0-9a-f]{64}", digest) is not None,
+            digest,
+        )
 
     receipt_file = os.path.join(output_dir, RUNTIME_RECEIPT)
     if _read(receipt_file) != receipt_payload:

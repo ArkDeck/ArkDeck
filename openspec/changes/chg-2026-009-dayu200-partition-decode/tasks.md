@@ -53,6 +53,13 @@
     `collect_platform_evidence.py`/新测试文件 SHA-256(r4 readiness 其余 pins——
     archive identity、console、操作者、decoder 四文件——保持有效)并恢复 `ready`,
     再行重跑 fresh platform run。
+- r5 implementation + evidence candidate:`evidence/runs/TASK-PD-001/r5-broker-receipt/run.md`
+  (source revision `b81922d9901a0319d5425737f262e82e4a6a5b6a`;
+  `TEST-DECODE-DAYU200-RECEIPT-CONTRACT-001` contract PASS——新套件 14/0、
+  `test_decode.py` 只读重跑 43/0 零回归、clang -fsyntax-only -Werror 通过、
+  check-sdd 0/0/111;broker/GUI/archive/device/network dispatch 均 0。本
+  implementation PR 保持 `ready`,`ready→done` 仍须独立状态 PR 经维护者
+  review/merge)
 - Historical disposition(r4,closed):r4 headless remediation 已完成——implementation
   PR #124(merge `110071c1003ecc06eb4106d2e8ea5b554029329a`)、done 状态 PR #125;
   completion evidence `evidence/runs/TASK-PD-001/r4-headless/run.md`
