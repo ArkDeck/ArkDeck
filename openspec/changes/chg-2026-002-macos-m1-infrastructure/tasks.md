@@ -958,6 +958,13 @@
 
 - Status:ready（readiness candidate；仅在维护者 review/merge 本 readiness PR 后生效。
   本 PR 不执行 TASK-M1-008、不产生 implementation/acceptance evidence）
+- Implementation + evidence candidate:`evidence/runs/TASK-M1-008/run.md`（同一组
+  production/test output hash 下 `TEST-AC-FLASH-006-01` contract 与
+  `TEST-MAC-M1-SIM-001` macOS simulated-platform evidence 均 PASS；dedicated 12/0、
+  full suite 261/0 且 1 项既有 opt-in skip、全部禁止 dispatch/writer counter 为 0；P1
+  review 的 duplicate JSON member 与 reopen receipt 全字段绑定回归也已覆盖并 PASS。
+  本 implementation PR 保持 `ready`，不构成 `done`、change verified、hardware/support/
+  conformance/release claim；`ready→done` 仍须独立状态 PR 经维护者 review/merge）
 - Historical disposition:r1-r6 的 `Status:ready` 未附完整 readiness review，且声明依赖
   TASK-M1-007；r7（PR #119）恢复 fail-closed blocked。没有 TASK-M1-008
   implementation/evidence 可复用或重判。r7 依赖已于 2026-07-20 全部满足，本 readiness
