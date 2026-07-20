@@ -5,22 +5,39 @@
 
 ## TASK-GUARD-001 — check_sdd per-change scope 覆盖校验 + 测试
 
-- Status:blocked(PR #183 已作废 readiness。2026-07-20 实现前精确基线证明
-  r1 解析规则会对现有 scope 产生 35 个错误,违反零 false-positive gate;
-  实现 dispatch 保持 0)
-- Readiness invalidation(2026-07-20;host-only/offline):
+- Status:ready(readiness restoration candidate;仅在维护者 review/merge 本独立
+  status PR 后生效。本 PR 不含实现、evidence 或测试新增)
+- Readiness restoration review(2026-07-20;host-only/offline,零设备、零网络):
+  - Approval/grammar gate:satisfied。CHG-2026-017 r2 精确 acceptance-ID grammar
+    已经 PR #184 由维护者合入 main `d568800`。
+  - Traceability gate:satisfied。PR #185 已由维护者合入 main
+    `32ab471`;r2 精确基线复跑结果为 M0A scope=28/missing=0、
+    M1 scope=68/missing=0、CHG-005 scope=1/missing=0、M0B scope=5/missing=0。
+    复核记录见本 change 的
+    `evidence/runs/TASK-GUARD-001/traceability-remediation-2026-07-20.md`。
+  - Contract/verification gate:satisfied。r2 已固定不透明 ID 动态精确匹配、
+    `AC-*`/`MAC-*`/`HW-*` 正例、具名断链、标识符边界、简写拒绝、
+    跳过与真实基线断言,无阻塞性 TBD。
+  - Environment gate:satisfied。`<MAIN_CHECKOUT>/.venv-sdd/bin/python` 实测
+    Python 3.14.6 + PyYAML 6.0.3;`scripts/check-sdd.sh` 为 0 errors /
+    0 warnings / 111 acceptance IDs。
+  - Scope/risk gate:satisfied。allowed/forbidden paths、low-risk false-positive/
+    false-negative 边界、hardware required=no 与独立 PR 闭环已明确;
+    实现仅需固定 Python、stdlib、PyYAML 与本地临时目录。
+  - Review boundary:本 PR 只起草 `blocked→ready` 并记录 DoR 复核;
+    implementation + evidence 必须使用独立 TASK-GUARD-001 PR,
+    `ready→done` 仍需另一独立状态 PR。
+- Closed readiness invalidation(2026-07-20;host-only/offline):
   - Exact preflight:按 design §2 的 `AC-[A-Z0-9]+-\d+-\d+` 与续行规则
     执行,CHG-001 缺 20、CHG-002 缺 10、CHG-005 缺 0、CHG-006 缺 5;
     具名记录见 `evidence/runs/TASK-GUARD-001/preflight-blocker-2026-07-20.md`。
   - Conflict:proposal/design/verification 要求四个现有 `scope.yaml` change 零
     false positive,但 design 精确 token 语法无法解析已有 `MAC-*`/`HW-*`
     acceptance,也不展开 `…`/`*`/`01/02`/`等` 简写;两者不能同时满足。
-  - Grammar gate:r2 修订以 scope 中不透明 acceptance ID 动态精确匹配,
-    覆盖 `AC-*`/`MAC-*`/`HW-*`,并拒绝从简写推断;仅在维护者
-    review/merge 本独立 governance revision PR 后满足。
-  - Re-entry gate:grammar r2 合入后,仍须独立 traceability remediation 将旧
-    change 认领改为显式完整 token;两者合入 main 后另起 readiness PR
-    复核,未满足前不得实现。
+  - Grammar gate:closed by PR #184;r2 以 scope 中不透明 acceptance ID
+    动态精确匹配,覆盖 `AC-*`/`MAC-*`/`HW-*`,并拒绝从简写推断。
+  - Re-entry gate:closed by PR #185 + 本 readiness 复跑;旧 change 认领已
+    显式化,四个 scoped change 均 missing=0。
 - Superseded readiness review(2026-07-20;PR #182 合入时的历史快照;
   已被上述 exact preflight 作废):
   - Approval gate:satisfied。CHG-2026-017 approved(approval-only PR #181 已由维护者
