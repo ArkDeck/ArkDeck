@@ -1,7 +1,9 @@
 # CHG-2026-015 design — closed read-only probe registry
 
 > Change:CHG-2026-015-hdc-readonly-probe-registration@r1
-> Status:candidate;only maintainer approval makes this design executable
+> Status:approved with the change (maintainer review/merge of approval-only PR #123,
+> `9f08c9421a24beb5c670452ec42af7c0bbdef5b1`, 2026-07-19); task execution still requires the
+> independent readiness PR — see tasks.md
 
 ## Decision 1:registry entries are capabilities, not suggestions
 

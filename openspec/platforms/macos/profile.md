@@ -3,7 +3,7 @@
 > ID：PLATFORM-MACOS  
 > Version：0.1.0  
 > Status：review（M0A 后决定 Sandbox/distribution）  
-> Core baseline：CORE-1.0.0  
+> Core baseline：CORE-2.0.0  
 > Core strategy：native-conforming-shared-contract-vector-suite  
 > Shared inputs：由每个 Task 固定 accepted Integration lock、profile 与 Core conformance hash  
 > Minimum target：macOS 14

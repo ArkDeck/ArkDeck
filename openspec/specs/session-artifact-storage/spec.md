@@ -1,8 +1,8 @@
 # Session, Artifact, and Host Storage Specification
 
 > Version：1.0.0  
-> Status：in baseline CORE-1.0.0（ratification 状态见 `openspec/baselines/CORE-1.0.0.yaml`）  
-> Baseline：CORE-1.0.0  
+> Status：in baseline CORE-2.0.0（ratification 状态见 `openspec/baselines/CORE-2.0.0.yaml`）  
+> Baseline：CORE-2.0.0  
 > Applicability：all platforms
 
 ## Purpose
