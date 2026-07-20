@@ -1,7 +1,7 @@
 ---
 schema_version: 1.0.0
 change_id: CHG-2026-008-ui-dump-hidumper-wrapper
-change_revision: 7
+change_revision: 8
 platform: macos
 evidence_classes:
 - contract
@@ -58,7 +58,7 @@ cases:
     unclear ownership is preserved as needsAttention. Stdout, stderr, and
     optional sidecar are separate raw origins with per-stream SHA-256, and all
     raw bytes stay outside git. The evidence set is run.md,
-    redacted-manifest.json, capture-hashes.md, and schema-valid
+    the per-command redacted-manifests/ copies, capture-hashes.md, and schema-valid
     hardware-evidence.json; the validating tool path/version is recorded at
     execution time. Claimed-operator truth is attested by maintainer review and
     merge of the evidence PR. Exit 0 alone is never success; "option ... missed"
