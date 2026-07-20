@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-012-dayu200-flash-addresses-research
 revision: 2
-status: approved # r1 经 #89 批准；r2 upstream evidence-owner correction 仅在对应 revision PR 合入后生效
+status: verified # 2026-07-20 verification closure PR;r1 经 #89 批准,r2 已合入
 class: platform
 core_change_level: none
 owner: lvye
@@ -98,3 +98,17 @@ reconciliation evidence**——该 evidence 绑定已合入 TASK-PD-001 codec im
   method/minimum evidence、任何地址数值或未知项处理，不执行 TASK-FA-001、不生成/rejudge
   evidence、不改变 gap/DEC-002/compatibility/support/hardware/release 状态，也不使任务 ready。
   r2 仅在维护者 review/merge 本 revision PR 后生效。
+
+## Verification closure(2026-07-20)
+
+- 两项 change-local AC 全 `passed`:`ADDR-DAYU200-MAPPING-001` 与
+  `ADDR-DAYU200-OBSERVATION-PLAN-001`——TASK-FA-001 done(research/evidence PR #167
+  `f9b74cc`、状态 PR #168 `03e975b`),`flash-address-facts.md` 五节 document review
+  二值 PASS(§2 15 数值行逐行锚定 TASK-PD-002 partition-mapping.json,PD-002 未覆盖项
+  显式 unknown,S2/S3 分级,§4 写设备候选标第二阶段 RECOVERY 先行)。
+- 上述 PR 的维护者 review/merge 构成 verification.md acceptance matrix 所要求的
+  confirmation。本文件的 `status: verified` 仅在包含本状态变更的 verification closure
+  PR 经维护者 review/merge 后生效;verified 不改变 evidence 边界——事实清单为 doc-only
+  结论、non-authoritative,不解除 `GAP-DAYU200-FLASH-ADDRESSES`、不改变 DEC-002,
+  不构成兼容性/支持/release 声明或执行授权。archive 由后续独立 archive PR 完成
+  (先例 #49)。
