@@ -125,6 +125,7 @@
       "bindingMatches": true,
       "authorityPresent": true,
       "rawFamilyKnown": false,
+      "deniedObservation": true,
       "effectProven": true,
       "cancelled": false,
       "timedOut": false,

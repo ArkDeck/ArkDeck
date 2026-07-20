@@ -78,12 +78,14 @@ Parser/Adapter 只支持声明并有 golden fixture 或真实 evidence 的 outpu
 
 ## Production read-only probe registry（pack 1.0.0，registered by CHG-2026-015/TASK-I15-001）
 
-结构化允许列表：`openspec/integrations/openharmony/readonly-probes.yaml`
+结构化允许列表（`json-compatible-yaml-1.2`：文件使用 JSON object syntax，属于合法
+YAML 1.2；Swift contract tests 以 `JSONDecoder` 读取）：
+`openspec/integrations/openharmony/readonly-probes.yaml`
 （registry `OPENHARMONY-HDC-READONLY-PROBES@1.0.0`，SHA-256
-`3c0a252b20e96d2ad3b92436725391e7bd1119588db684f42bbe26dbcb7ebcde`）。SwiftPM
+`9014c480c3df61b5a6db7e54e52f29e89d7c93431e91d0856cf5710c22466b9d`）。SwiftPM
 资源包：`Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Probes/1.0.0/`
 （manifest `resources.json`，SHA-256
-`6f09b841237bb36e1a6a72bbf55a714a61622c60508446d0ee6d6295cd89bf22`）。registry、资源
+`d93fcc2668006f7e23e3355a0855b5a7f07515baa95413aaa31777dced74ac02`）。registry、资源
 manifest、逐 receipt/control resource 与 `INTEGRATION-PROFILES-0.4.0` 形成 hash closure；
 resource 内的 `registry.yaml` 与 integration registry 字节相同。
 

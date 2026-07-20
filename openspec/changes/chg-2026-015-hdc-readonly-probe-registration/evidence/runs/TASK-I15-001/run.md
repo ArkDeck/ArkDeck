@@ -3,7 +3,7 @@
 - Change:`CHG-2026-015-hdc-readonly-probe-registration@r2`
 - Task:`TASK-I15-001`
 - Classification:`contract + platform receipt review`; no real-hardware acceptance claim
-- Executed:2026-07-20 15:35–15:43 CST by Codex Agent
+- Executed:2026-07-20 15:35–16:22 CST by Codex Agent
 - Base revision:`5751f5ffc9379819a2a58f9ea370694f3e469048`
   (`main`, readiness PR #157 merged)
 - Branch:`agent/i15-001-readonly-probe-registration`
@@ -44,15 +44,34 @@ Key output hashes:
 
 | Artifact | SHA-256 |
 | --- | --- |
-| `openspec/integrations/openharmony/profile.md` | `03893f36c62e738b34a2e2aef6b0c0cd8fdd1bf3f386bcef7179686d4af4007d` |
-| `openspec/integrations/openharmony/readonly-probes.yaml` | `3c0a252b20e96d2ad3b92436725391e7bd1119588db684f42bbe26dbcb7ebcde` |
-| `openspec/integrations/INTEGRATION-PROFILES.lock.yaml` | `4de73676f1ad735a73ce9b69a304290e9a8a161003d4180a0c1a99ebeaefe6cd` |
-| `Fixtures/HDC/Probes/1.0.0/resources.json` | `6f09b841237bb36e1a6a72bbf55a714a61622c60508446d0ee6d6295cd89bf22` |
-| `HDCProbeRegistryContractTests.swift` | `bd63f83d3e1da59b47ca1493bf5c527488a71480cd998a6213b480d3acd9ca3d` |
+| `openspec/integrations/openharmony/profile.md` | `48ad9ecc31cad2fbb9a05bb3bb552153ad0ade3a629de5280ce8eef06165401a` |
+| `openspec/integrations/openharmony/readonly-probes.yaml` | `9014c480c3df61b5a6db7e54e52f29e89d7c93431e91d0856cf5710c22466b9d` |
+| `openspec/integrations/INTEGRATION-PROFILES.lock.yaml` | `9f007455204bcbc8a0309413cbeb9c6882e45afdc0dc9def0bab4dd948d2acb0` |
+| `Fixtures/HDC/Probes/1.0.0/resources.json` | `d93fcc2668006f7e23e3355a0855b5a7f07515baa95413aaa31777dced74ac02` |
+| `HDCProbeRegistryContractTests.swift` | `596df232f43ac7b7177f7c5bfb6150d3c5fc85b346fd2ce4ca47c15b49a34343` |
 | `Packages/ArkDeckKit/Package.swift` | `ccdcc3861b02dfe2c4e6c184d7ade5d0820c70a0011a8c5003038f44cb27f821` |
 
 The resource manifest pins its registry snapshot, four derived receipts, control-only vector pack
 and `.gitattributes`; the Integration lock pins that manifest plus the same seven resources.
+
+## Review remediation
+
+- The duplicate registry mutation now keeps the entry count at four by replacing the final entry
+  with the first. The test asserts `.duplicateEntry` specifically; partial, unknown-family and
+  unknown-probe mutations likewise assert their exact `RegistryValidationError` cases.
+- Resource-manifest closure now asserts both entry-count equality and exact entry-ID set equality
+  against the validated registry before per-entry field/hash checks.
+- Both registry copies declare `serializationFormat: json-compatible-yaml-1.2`; the manifest and
+  Swift tests pin that value, and the profile states that the `.yaml` uses JSON object syntax valid
+  under YAML 1.2 and is decoded by `JSONDecoder`.
+- The subserver receipt now uses the same split `serverStart`/`serverStop`/`serverRestart`/
+  `serverAdoption` counters as the other receipts; the resource contract asserts the identical
+  eight-key, all-zero counter schema for each receipt that carries dispatch counters.
+- The denied authorization vector carries an explicit `deniedObservation` model input and exercises
+  its own fail-closed branch; it is no longer field-identical to the generic unknown-output vector.
+- `origin/main` advanced through PR #158 and PR #160 only in CHG-009/partition-decode paths. Those
+  paths have zero overlap with this task, so the task branch was not rebased or merged with unrelated
+  main changes; GitHub reports the PR mergeable.
 
 ## Verification commands and results
 

@@ -27,7 +27,10 @@
     "reason": "No exact-target-revision, client-local observation family with proven zero server-lifecycle and device-migration effects is available for 3.2.0d."
   },
   "dispatchCounters": {
-    "serverLifecycle": 0,
+    "serverStart": 0,
+    "serverStop": 0,
+    "serverRestart": 0,
+    "serverAdoption": 0,
     "subserverLifecycle": 0,
     "deviceMigration": 0,
     "deviceMutation": 0,

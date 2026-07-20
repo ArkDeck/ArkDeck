@@ -1,5 +1,6 @@
 {
   "schemaVersion": "1.0.0",
+  "serializationFormat": "json-compatible-yaml-1.2",
   "registryId": "OPENHARMONY-HDC-READONLY-PROBES",
   "registryVersion": "1.0.0",
   "integrationProfile": "OPENHARMONY-TOOLS@0.3.0",
@@ -278,7 +279,7 @@
         "exitCode": null,
         "receiptId": "i15-receipt-subserver-capability",
         "receiptPath": "1.0.0/receipts/subserver-capability.json",
-        "receiptSHA256": "c5d98f377b96e18c3ec1f84b62bd1e019c6038fbf67591311f140f5475f096c1"
+        "receiptSHA256": "565beee8a8d0ca84e026968db13a12ea5ebcb419428423dd2ee7dcd1165734ea"
       },
       "semanticMappings": [
         {"input": "versionOnlyOrMutationNameOrUnknown", "result": "unsupported"}

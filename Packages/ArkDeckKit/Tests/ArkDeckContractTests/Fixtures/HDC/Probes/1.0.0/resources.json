@@ -1,6 +1,7 @@
 {
   "schemaVersion": "1.0.0",
   "packVersion": "1.0.0",
+  "registrySerializationFormat": "json-compatible-yaml-1.2",
   "registryId": "OPENHARMONY-HDC-READONLY-PROBES",
   "registryVersion": "1.0.0",
   "integrationProfile": "OPENHARMONY-TOOLS@0.3.0",
@@ -39,8 +40,8 @@
     {
       "id": "i15-probe-registry-snapshot",
       "path": "1.0.0/registry.yaml",
-      "sha256": "3c0a252b20e96d2ad3b92436725391e7bd1119588db684f42bbe26dbcb7ebcde",
-      "sizeBytes": 12498,
+      "sha256": "9014c480c3df61b5a6db7e54e52f29e89d7c93431e91d0856cf5710c22466b9d",
+      "sizeBytes": 12551,
       "evidenceClass": "contract"
     },
     {
@@ -67,15 +68,15 @@
     {
       "id": "i15-receipt-subserver-capability",
       "path": "1.0.0/receipts/subserver-capability.json",
-      "sha256": "c5d98f377b96e18c3ec1f84b62bd1e019c6038fbf67591311f140f5475f096c1",
-      "sizeBytes": 1338,
+      "sha256": "565beee8a8d0ca84e026968db13a12ea5ebcb419428423dd2ee7dcd1165734ea",
+      "sizeBytes": 1404,
       "evidenceClass": "maintainerAcceptedDocumentReviewDerivedReceipt"
     },
     {
       "id": "i15-fail-closed-control-vectors",
       "path": "1.0.0/controls/fail-closed-vectors.json",
-      "sha256": "d0e8e6ad28817c9e7fb939081c8426b4403c89d57cf38a20002fda4bd658fa5a",
-      "sizeBytes": 8420,
+      "sha256": "68c4aa48eb293d22d3531091fcd5dfce89ec73700674bfb6532584a94672726f",
+      "sizeBytes": 8453,
       "evidenceClass": "fakeControlOnly"
     },
     {

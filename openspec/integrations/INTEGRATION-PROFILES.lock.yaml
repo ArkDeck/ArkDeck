@@ -47,17 +47,17 @@ probe_registries:
     version: 1.0.0
     profile: OPENHARMONY-TOOLS@0.3.0
     path: openspec/integrations/openharmony/readonly-probes.yaml
-    sha256: 3c0a252b20e96d2ad3b92436725391e7bd1119588db684f42bbe26dbcb7ebcde
+    sha256: 9014c480c3df61b5a6db7e54e52f29e89d7c93431e91d0856cf5710c22466b9d
 
 probe_resources:
   - id: i15-probe-resources-manifest
     version: 1.0.0
     path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Probes/1.0.0/resources.json
-    sha256: 6f09b841237bb36e1a6a72bbf55a714a61622c60508446d0ee6d6295cd89bf22
+    sha256: d93fcc2668006f7e23e3355a0855b5a7f07515baa95413aaa31777dced74ac02
   - id: i15-probe-registry-snapshot
     version: 1.0.0
     path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Probes/1.0.0/registry.yaml
-    sha256: 3c0a252b20e96d2ad3b92436725391e7bd1119588db684f42bbe26dbcb7ebcde
+    sha256: 9014c480c3df61b5a6db7e54e52f29e89d7c93431e91d0856cf5710c22466b9d
   - id: i15-receipt-server-identity-generation
     version: 1.0.0
     path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Probes/1.0.0/receipts/server-identity-generation.json
@@ -73,11 +73,11 @@ probe_resources:
   - id: i15-receipt-subserver-capability
     version: 1.0.0
     path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Probes/1.0.0/receipts/subserver-capability.json
-    sha256: c5d98f377b96e18c3ec1f84b62bd1e019c6038fbf67591311f140f5475f096c1
+    sha256: 565beee8a8d0ca84e026968db13a12ea5ebcb419428423dd2ee7dcd1165734ea
   - id: i15-fail-closed-control-vectors
     version: 1.0.0
     path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Probes/1.0.0/controls/fail-closed-vectors.json
-    sha256: d0e8e6ad28817c9e7fb939081c8426b4403c89d57cf38a20002fda4bd658fa5a
+    sha256: 68c4aa48eb293d22d3531091fcd5dfce89ec73700674bfb6532584a94672726f
   - id: i15-probe-resource-attributes
     version: 1.0.0
     path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Probes/1.0.0/.gitattributes

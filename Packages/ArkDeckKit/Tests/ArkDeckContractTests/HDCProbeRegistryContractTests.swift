@@ -8,6 +8,7 @@ import XCTest
 final class HDCProbeRegistryContractTests: XCTestCase {
   private struct ProbeRegistry: Decodable {
     let schemaVersion: String
+    let serializationFormat: String
     let registryId: String
     let registryVersion: String
     let integrationProfile: String
@@ -103,6 +104,7 @@ final class HDCProbeRegistryContractTests: XCTestCase {
   private struct ResourceManifest: Decodable {
     let schemaVersion: String
     let packVersion: String
+    let registrySerializationFormat: String
     let registryId: String
     let registryVersion: String
     let integrationProfile: String
@@ -134,6 +136,7 @@ final class HDCProbeRegistryContractTests: XCTestCase {
     let family: String
     let evidenceClass: String
     let source: Source
+    let dispatchCounters: [String: Int]?
 
     struct Source: Decodable {
       let path: String
@@ -159,6 +162,7 @@ final class HDCProbeRegistryContractTests: XCTestCase {
       let bindingMatches: Bool
       let authorityPresent: Bool
       let rawFamilyKnown: Bool
+      let deniedObservation: Bool?
       let effectProven: Bool
       let cancelled: Bool
       let timedOut: Bool
@@ -167,7 +171,7 @@ final class HDCProbeRegistryContractTests: XCTestCase {
     }
   }
 
-  private enum RegistryValidationError: Error {
+  private enum RegistryValidationError: Error, Equatable {
     case invalidHeader
     case incompleteFamilySet
     case duplicateEntry
@@ -226,6 +230,7 @@ final class HDCProbeRegistryContractTests: XCTestCase {
 
   private func validate(_ registry: ProbeRegistry) throws {
     guard registry.schemaVersion == "1.0.0",
+      registry.serializationFormat == "json-compatible-yaml-1.2",
       registry.registryId == "OPENHARMONY-HDC-READONLY-PROBES",
       registry.registryVersion == "1.0.0",
       registry.integrationProfile == "OPENHARMONY-TOOLS@0.3.0",
@@ -323,6 +328,7 @@ final class HDCProbeRegistryContractTests: XCTestCase {
     if vector.cancelled { return "cancelled" }
     if vector.timedOut { return "timedOut" }
     guard vector.preconditionValid, vector.authorityPresent else { return "unavailable" }
+    if vector.deniedObservation == true { return "unknown" }
     guard vector.provenanceValid, vector.effectProven, vector.rawFamilyKnown,
       vector.identityMatches, vector.bindingMatches
     else {
@@ -348,6 +354,7 @@ final class HDCProbeRegistryContractTests: XCTestCase {
     let manifest = try loadResourceManifest()
     XCTAssertEqual(manifest.schemaVersion, "1.0.0")
     XCTAssertEqual(manifest.packVersion, "1.0.0")
+    XCTAssertEqual(manifest.registrySerializationFormat, "json-compatible-yaml-1.2")
     XCTAssertEqual(manifest.integrationProfile, "OPENHARMONY-TOOLS@0.3.0")
     XCTAssertEqual(Set(manifest.resources.map(\.id)).count, manifest.resources.count)
     XCTAssertEqual(Set(manifest.resources.map(\.path)).count, manifest.resources.count)
@@ -382,11 +389,15 @@ final class HDCProbeRegistryContractTests: XCTestCase {
     XCTAssertEqual(registry.registryVersion, manifest.registryVersion)
     XCTAssertEqual(registry.integrationProfile, manifest.integrationProfile)
     XCTAssertEqual(registry.registeredBy, manifest.registeredBy)
+    XCTAssertEqual(manifest.entries.count, registry.entries.count)
+    XCTAssertEqual(Set(manifest.entries.map(\.id)), Set(registry.entries.map(\.id)))
 
     let registryByID = Dictionary(uniqueKeysWithValues: registry.entries.map { ($0.id, $0) })
+    let manifestByID = Dictionary(uniqueKeysWithValues: manifest.entries.map { ($0.id, $0) })
     let resourcesByID = Dictionary(uniqueKeysWithValues: manifest.resources.map { ($0.id, $0) })
-    for summary in manifest.entries {
-      let entry = try XCTUnwrap(registryByID[summary.id])
+    for entry in registry.entries {
+      let summary = try XCTUnwrap(manifestByID[entry.id])
+      XCTAssertEqual(registryByID[summary.id]?.id, entry.id)
       XCTAssertEqual(entry.family, summary.family)
       XCTAssertEqual(entry.status, summary.status)
       XCTAssertEqual(entry.effectClassification, summary.effectClassification)
@@ -402,6 +413,18 @@ final class HDCProbeRegistryContractTests: XCTestCase {
       XCTAssertEqual(receipt.source.path, entry.provenance.sourcePath)
       XCTAssertEqual(receipt.source.sha256, entry.provenance.sourceSHA256)
       XCTAssertEqual(receipt.source.acceptedBy, entry.provenance.acceptedBy)
+      if receipt.family == "keyAccessDiagnostics" {
+        XCTAssertNil(receipt.dispatchCounters)
+      } else {
+        let counters = try XCTUnwrap(receipt.dispatchCounters)
+        XCTAssertEqual(
+          Set(counters.keys),
+          [
+            "serverStart", "serverStop", "serverRestart", "serverAdoption",
+            "subserverLifecycle", "deviceMigration", "deviceMutation", "destructive",
+          ])
+        XCTAssertTrue(counters.values.allSatisfy { $0 == 0 })
+      }
     }
   }
 
@@ -459,20 +482,30 @@ final class HDCProbeRegistryContractTests: XCTestCase {
 
   func testPartialDuplicateAndUnknownRegistriesFailValidation() throws {
     let partial = try mutatedRegistry { $0.removeLast() }
-    XCTAssertThrowsError(try validate(partial))
+    XCTAssertThrowsError(try validate(partial)) { error in
+      XCTAssertEqual(error as? RegistryValidationError, .incompleteFamilySet)
+    }
 
-    let duplicate = try mutatedRegistry { entries in entries.append(try XCTUnwrap(entries.first)) }
-    XCTAssertThrowsError(try validate(duplicate))
+    let duplicate = try mutatedRegistry { entries in
+      entries[entries.count - 1] = try XCTUnwrap(entries.first)
+    }
+    XCTAssertThrowsError(try validate(duplicate)) { error in
+      XCTAssertEqual(error as? RegistryValidationError, .duplicateEntry)
+    }
 
     let unknown = try mutatedRegistry { entries in
       entries[0]["family"] = "futureUnregisteredFamily"
     }
-    XCTAssertThrowsError(try validate(unknown))
+    XCTAssertThrowsError(try validate(unknown)) { error in
+      XCTAssertEqual(error as? RegistryValidationError, .unknownFamily)
+    }
 
     let unknownProbeKind = try mutatedRegistry { entries in
       entries[0]["probeKind"] = "arbitraryCommand"
     }
-    XCTAssertThrowsError(try validate(unknownProbeKind))
+    XCTAssertThrowsError(try validate(unknownProbeKind)) { error in
+      XCTAssertEqual(error as? RegistryValidationError, .unknownProbeKind)
+    }
   }
 
   func testControlVectorsFailClosedWithZeroExternalDispatch() throws {
@@ -483,6 +516,10 @@ final class HDCProbeRegistryContractTests: XCTestCase {
     XCTAssertEqual(controls.evidenceClass, "fakeControlOnly")
     XCTAssertTrue(controls.boundary.contains("not production provenance"))
     XCTAssertEqual(Set(controls.vectors.map(\.id)).count, controls.vectors.count)
+    let vectorsByID = Dictionary(uniqueKeysWithValues: controls.vectors.map { ($0.id, $0) })
+    XCTAssertNil(vectorsByID["authorization-unknown-output"]?.deniedObservation)
+    XCTAssertEqual(
+      vectorsByID["authorization-denied-output-unregistered"]?.deniedObservation, true)
 
     for vector in controls.vectors {
       XCTAssertEqual(
