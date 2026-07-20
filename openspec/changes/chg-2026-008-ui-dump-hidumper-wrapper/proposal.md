@@ -1,6 +1,6 @@
 ---
 id: CHG-2026-008-ui-dump-hidumper-wrapper
-revision: 7
+revision: 8
 status: approved # r1 经 #68 批准;后续 revision 仅在对应治理 PR 由维护者 review/merge 后生效
 class: platform
 core_change_level: none
@@ -200,3 +200,10 @@ verifier 与 7 任务链;全文见 PR 提交历史 `a613b76`)。经维护者 202
   该缺陷由 harness 实现 PR #143 的对抗审查在任何设备执行前发现。runbook HP 表与
   CAP-MUT gates 同步;harness 实现须随本 r7 更新 HP specs 与 gate 解析后再合入。仅在
   维护者 review/merge 对应治理 PR 后生效;不改其他命令行、不含实现或 evidence。
+- r8 errata revision:清理 r7 修正遗漏的两处纯形式残句——capture-runbook.md Prohibited
+  actions 的 same-session `list targets` 引用与 verification.md Readiness environment 的
+  重新观察句,均改为 `list targets -v`;把 acceptance-cases 中 CAP-MUT evidence set 的
+  单数 redacted-manifest.json 表述对齐 r6 确立的 `redacted-manifests/` 复数惯例;同步
+  verification.md 对 harness/redactor 任务的状态叙述(两任务已经 #149/#150 done)。零
+  命令语义/gate/AC method/minimum evidence 变更。仅在维护者 review/merge 对应治理 PR
+  后生效;不含实现或 evidence。

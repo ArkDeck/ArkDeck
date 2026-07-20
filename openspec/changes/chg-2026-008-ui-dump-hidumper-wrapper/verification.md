@@ -1,7 +1,7 @@
 # CHG-2026-008 Verification Plan
 
 > Status:planned
-> Change:CHG-2026-008-ui-dump-hidumper-wrapper@r7
+> Change:CHG-2026-008-ui-dump-hidumper-wrapper@r8
 > Core baseline:CORE-2.0.0
 
 本文件是 r3 review-remediation verification plan(经 2026-07-20 维护者裁剪决定收敛,
@@ -13,7 +13,12 @@
 项 pins 保持有效),同步补全 runbook 的 canonical 执行序列、`SC-2`/`SC-3` 字面 argv、
 `HP-2` 粒度、truncation/timeout 政策与 abort 规则。`TASK-UD-CAP-R4-001` 与
 `TASK-UD-001` 保持 `blocked`;任何 installed-HDC/device 执行或基于未批准 argv/output
-family、自造 fake/golden 的既有 PASS 都无效。
+family、自造 fake/golden 的既有 PASS 都无效。r7(PR #145)把 `HP-1`/`HP-2` 钉为 verbose
+`list targets -v`(M0B merged evidence dispositive);harness 实现经 PR #143 合入、PR #148
+完成 r7 对齐,任务於 PR #149 done,redactor 任务於 PR #144/#150 done。r8 为 errata
+revision:清理 r7 的两处纯形式残句(runbook Prohibited actions 行与本文件的重新观察句),
+把 CAP-MUT evidence set 的单数 redacted-manifest 表述对齐 r6 确立的 `redacted-manifests/`
+复数惯例,并同步本文件的任务状态叙述;零命令语义/gate/AC method 变更。
 
 ## Readiness environment
 
@@ -21,7 +26,7 @@ family、自造 fake/golden 的既有 PASS 都无效。
   package bytes/interfaces provenance,不提供 M1-006 source AC;TASK-UD-001 的逐
   deliverable consumer dependency 表还须在未来 readiness revision 复核且没有 `yes` 行。
 - 当前 M0B manifest 只含 `hidumper --help` 和 `hidumper -ls`,不是四 Recipe capture。其
-  旧 connect key 不得假设仍有效,必须在采集会话内经 `hdc list targets` 重新观察。
+  旧 connect key 不得假设仍有效,必须在采集会话内经 `hdc list targets -v` 重新观察。
 - `capture-runbook.md` 固定 one-element `-a` candidate boundary、人工 preflight
   (`HP-0..HP-2`)、exact-path 清单与结果判定规则。official source 没有 DAYU200
   target-build source/binary mapping,不能证明 output mode;R1-R4 首次 target capture
@@ -36,7 +41,8 @@ family、自造 fake/golden 的既有 PASS 都无效。
   执行(byte-exact 流分离/掩码/敏感终检/manifest,禁止 shell 重定向),harness done 后
   由独立 status PR 恢复 `ready` 并引用其 OID/hash。执行仍须维护者在具名窗口内亲手
   进行;窗口外或输入漂移时 R1-R3/`INV-1` dispatch `0`。
-- `TASK-UD-CAPTURE-HARNESS-001`(r6 新增,`ready`):host-only、stdlib-only、fake-runner
+- `TASK-UD-CAPTURE-HARNESS-001`(r6 新增;2026-07-20 已 done——实现 PR #143、r7 对齐
+  PR #148、状态 PR #149):host-only、stdlib-only、fake-runner
   测试零真实 hdc;实现范围=`scripts/ud_capture/` 三文件,白名单与 runbook argv 行逐字
   一致,source OID/hash 执行时记录;与在飞 `scripts/ui_dump_redaction/` 零交集。
 - R4 已拆为 `TASK-UD-CAP-R4-001`,另需 approved R2 output-family decision revision 记录
@@ -46,8 +52,8 @@ family、自造 fake/golden 的既有 PASS 都无效。
   `scripts/ui_dump_redaction/{redact.py,test_redact.py,algorithm-v1.json,safe-literals-v1.txt,redaction-receipt.schema.json,README.md}`,
   transform 确定性、unknown token fail closed、输出侧敏感终检、safe literals 逐项
   维护者批准;source hash 在 evidence 执行时记录。其 readiness(实现范围/base/
-  stdlib-only/interpreter 实测)已由 r5 固定,任务 `ready`,无采集前置,可与 Phase A
-  并行执行。
+  stdlib-only/interpreter 实测)已由 r5 固定;任务已於 2026-07-20 done(实现 PR #144、
+  状态 PR #150),无采集前置。
 - derived golden 的隐私复核载体 = TASK-UD-001 golden PR 的维护者逐字审读(merge =
   attestation);`TEST-INT-UD-GOLDEN-001` 负责 hash 链与敏感字面量扫描的机器侧闭环。
 - 后续 output-family decision 只允许有 repo-safe synthetic/derived positive fixture 的

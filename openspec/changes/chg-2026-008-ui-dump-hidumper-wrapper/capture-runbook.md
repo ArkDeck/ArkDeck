@@ -281,7 +281,7 @@ is neither expected nor claimed.
 - any implementation, installed-HDC invocation, device discovery or device command under these
   blocked tasks;
 - explicit server lifecycle/subserver commands, or using drift/ambiguity as a reason to improvise;
-- HDC default-target form, connect key from anywhere but the same-session `list targets` output,
+- HDC default-target form, connect key from anywhere but the same-session `list targets -v` output,
   or committing connect-key/serial bytes;
 - execution of R1-R4 as readOnly, ad-hoc window/sidecar inventory outside the fixed commands,
   split `-a` payload or fallback argv;
