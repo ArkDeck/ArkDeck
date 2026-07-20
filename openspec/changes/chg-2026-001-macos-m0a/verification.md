@@ -1,6 +1,8 @@
 # M0A Verification Plan
 
-> Status：planned
+> Status：passed（2026-07-20 账本对齐追溯修正:本 change 已於 2026-07-15 verified,
+> rollup 5 passed/8 blocked,三个长期 blocked 行已移交 M1;本 header 原停留在
+> planned,仅同步账本,不构成新的验证结论）
 > Change：CHG-2026-001-macos-m0a
 > Core baseline：CORE-1.0.0
 > Core conformance：CORE-CONFORMANCE-1.0.0

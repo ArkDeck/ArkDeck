@@ -1,7 +1,12 @@
 # Baseline Traceability Index
 
 > Core baseline：CORE-2.0.0  
-> Status：requirements and AC defined; implementation/tests pending
+> Status：requirements and AC defined; per-change evidence tracked in change ledgers
+>
+> 更新规则（2026-07-20 成文,账本对齐 PR）:平台列仅在对应平台 change 达到 change 级
+> `verified` 时翻转;单任务 done/单 AC passed 的证据由各 change 的 verification.md
+> acceptance matrix 与 evidence/ 承载,不提前汇入本表。CORE-2.0.0 下尚无平台 change
+> verified,故各平台列 `notStarted` 如实保持。
 
 每个 Requirement 的 Scenario 位于同一 `spec.md`，是验收事实源。本索引只记录验证套件和平台状态，不复制 AC 文本。
 

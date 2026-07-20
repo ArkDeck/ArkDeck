@@ -19,7 +19,9 @@
   raw or platform receipt inputs 可读取且 provenance 已由维护者认可（未满足——采集面已由
   r2 `capture-plan.md` 固定:三类 host-only 可随时采集、`selectedDeviceAuthorizationBinding`
   需独立设备窗口;维护者按计划采集后,capture record 经 evidence PR 合入
-  `evidence/provenance/**` 即构成认可）；独立 readiness PR merged（未满足）
+  `evidence/provenance/**` 即构成认可；其中 `subserverCapability` 的 documentation
+  provenance 已由 PR #141 合入 `evidence/provenance/subserver-capability-doc.md`,
+  1/4 family 已满足,其余三类仍 pending——2026-07-20 账本对齐补记）；独立 readiness PR merged（未满足）
 - Allowed paths:
   - `openspec/integrations/openharmony/profile.md`
   - `openspec/integrations/openharmony/readonly-probes.yaml`（可新建）

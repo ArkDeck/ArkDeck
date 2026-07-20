@@ -1,6 +1,6 @@
 # CHG-2026-015 Verification Plan
 
-> Change:CHG-2026-015-hdc-readonly-probe-registration@r1
+> Change:CHG-2026-015-hdc-readonly-probe-registration@r2
 > Status:planned
 > Core baseline:CORE-2.0.0
 > Integration input:OPENHARMONY-TOOLS@0.2.0 / INTEGRATION-PROFILES-0.3.0
