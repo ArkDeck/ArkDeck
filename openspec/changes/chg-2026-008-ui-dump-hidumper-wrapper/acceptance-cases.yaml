@@ -1,13 +1,40 @@
 ---
 schema_version: 1.0.0
 change_id: CHG-2026-008-ui-dump-hidumper-wrapper
-change_revision: 5
+change_revision: 6
 platform: macos
 evidence_classes:
 - contract
 - platform
 - realHardware
 cases:
+- acceptance_id: INT-UD-HARNESS-001
+  test_id: TEST-INT-UD-HARNESS-001
+  method: Offline fake-runner contract over the closed UD capture harness.
+  expected_source: openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/verification.md#INT-UD-HARNESS-001
+  minimum_evidence: contract
+  expected_result: Before any Phase A/B device execution, a host-only task
+    delivers scripts/ud_capture (README, capture.py, test_capture.py) replicating
+    the M0B capture.py trust chain onto the runbook command surface. The closed
+    allowlist mirrors the runbook argv rows verbatim for HP-0 through HP-2,
+    INV-1, R1 through R3, R4, SC-1 through SC-3 and FX-1 through FX-4; unknown
+    ids are rejected by identity-checked argv building; CONNECT_KEY is accepted
+    only as a same-session HP output value, WINDOW_ID only as strict ASCII
+    decimal, and local paths only outside every git repository. Execution uses
+    argv arrays with no host shell. Streams are written byte-exact with
+    exclusive-create and 0o600, hashed per stream, capped at 4 MiB retained
+    bytes with an explicit truncated flag, and every command carries a recorded
+    default-120s timeout channel. Connect-key and home-path masking, one
+    redacted manifest per command under the arkdeck-ud-capture-redacted-1.0.0
+    schema with deterministic serialization, a fail-closed output-side
+    sensitive-literal scan, and NN-id stream naming with a capture-hashes
+    summary are all enforced. Fake-runner tests cover positive and negative
+    paths for every command id, placeholder validation failures, masking and
+    scan negatives, manifest byte parity, allowlist-README sync, and an AST
+    audit proving no shell or network use; tests execute zero real hdc. Source
+    commit OID and per-file SHA-256 are recorded in evidence at execution time.
+    This case claims no canonical AC-DUMP PASS and does not execute any device
+    capture.
 - acceptance_id: INT-UD-CAPTURE-MUT-001
   test_id: TEST-INT-UD-CAPTURE-MUT-001
   method: Human-operated runbook Phase A first target-build deviceMutation capture of R1 through R3.

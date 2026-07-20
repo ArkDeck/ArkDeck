@@ -1,8 +1,9 @@
 # CHG-2026-008 HiDumper Recipe capture runbook
 
-> Status:Phase A (`TASK-UD-CAP-MUT-001`) becomes executable once the r4 readiness revision is
-> merged and the maintainer confirms the device window; Phase B and all other tasks remain
-> blocked.
+> Status:Phase A (`TASK-UD-CAP-MUT-001`) becomes executable only after
+> `TASK-UD-CAPTURE-HARNESS-001` is done, its ready-restore status PR is merged (r6), and the
+> maintainer confirms the device window; Phase B and all other tasks remain blocked. The r4
+> readiness pins (fixture/INV-1/sidecar/operator/window) stay approved and unchanged.
 >
 > Real-device operator:human maintainer only. An Agent SHALL NOT execute installed `hdc`, create a
 > real device session or run any device step.
@@ -48,6 +49,29 @@ classification is never lowered after execution.
 - Raw output root:a new operator-controlled `0o700` directory outside every git repository. Raw
   files are `0o600` and never enter ArkDeck git history.
 
+## Capture instrument (r6)
+
+Every device command in this runbook (`HP-*`, `INV-1`, `R1-R4`, `SC-*`, `FX-*`) is executed only
+through the pinned harness `scripts/ud_capture/capture.py` (delivered by
+`TASK-UD-CAPTURE-HARNESS-001`; its merged OID and per-file hashes are cited by the ready-restore
+status PR and recorded in `hardware-evidence.json` `toolchain.other` — the same trust chain M0B
+established with `m0b_capture/capture.py`). The harness owns:
+
+- the closed command allowlist mirroring this runbook's argv rows verbatim (unknown ids rejected;
+  `CONNECT_KEY` accepted only from the same-session `HP` output, `WINDOW_ID` strict ASCII decimal,
+  local paths validated outside every git repository);
+- argv-array execution with **no host shell** — manual shell redirection (`>`/`2>`) is forbidden:
+  it would re-introduce shell parsing of the one-element `-a` payload and defeats byte-exactness;
+- per-stream byte-exact capture (exclusive-create, `0o600`), per-stream SHA-256, a retained-byte
+  cap of 4 MiB per stream with an explicit `truncated` flag, and a per-command timeout channel
+  (default 120 s, recorded, never disabled);
+- connect-key/home-path masking, one redacted manifest per command (schema
+  `arkdeck-ud-capture-redacted-1.0.0`, deterministic serialization), a fail-closed output-side
+  sensitive scan, and `NN-<id>.<stream>` controlled-file naming with a `capture-hashes` summary.
+
+If the harness refuses a command or its sensitive scan fails, the run stops; hand-composing the
+command is never the fallback.
+
 ## Human preflight (per session and per Recipe batch)
 
 The operator is a human maintainer. HDC client commands may implicitly start the host server (known
@@ -58,7 +82,7 @@ subserver commands (`kill`, `start`, `spawn-sub`, `killall-sub` and equivalents)
 | --- | --- | --- | --- |
 | `HP-0` | verify HDC executable hash + `hdc version` | binary SHA-256 and reported version equal the pinned M0B values (drift recorded and run stops) | hash/version mismatch |
 | `HP-1` | `hdc list targets` | exactly one expected DAYU200 target in `Connected` state; output recorded (redacted per capture conventions) | zero, multiple or ambiguous targets |
-| `HP-2` | re-run `hdc list targets` immediately before each Recipe batch | same single target, same connect key | any drift |
+| `HP-2` | re-run `hdc list targets` immediately before `INV-1` and before each `Rn` (four times in a full Phase A session) | same single target, same connect key | any drift |
 
 The connect key is taken by the operator only from the same-session `HP-1`/`HP-2` output. Every
 device command carries an explicit `-t <connectKey>`; the HDC default-target form is forbidden. The
@@ -145,20 +169,36 @@ device-default main user assumption; if the target build differs, the pre/post i
 honestly record absent/absent, the sidecar is simply not collected, stdout capture is unaffected,
 and switching to a global search is still forbidden (residual risk disclosed in the readiness).
 
-The inventory command, fixed at r4:
+The inventory, receive and removal commands, fixed at r4/r6:
 
 | ID | Purpose | Exact host argv |
 | --- | --- | --- |
 | `SC-1` | pre/post existence + identity check | `[HDC, "-t", CONNECT_KEY, "shell", "ls", "-l", "/data/app/el2/100/base/com.example.waterflowdemo/haps/entry/files/arkui.dump"]` |
+| `SC-2` | receive an owned new sidecar (r6) | `[HDC, "-t", CONNECT_KEY, "file", "recv", "/data/app/el2/100/base/com.example.waterflowdemo/haps/entry/files/arkui.dump", LOCAL_SIDECAR_DEST]` (`LOCAL_SIDECAR_DEST` inside the controlled root, harness-validated, exclusive-create) |
+| `SC-3` | remove the owned sidecar (r6) | `[HDC, "-t", CONNECT_KEY, "shell", "rm", "/data/app/el2/100/base/com.example.waterflowdemo/haps/entry/files/arkui.dump"]` (exact path only; no `-r`/`-f`/wildcards) |
 
-Before each Recipe, the operator runs `SC-1` and records the output proving the path is absent
-(error/nonzero exit). After the Recipe, the same command must distinguish a newly created regular
-file (type/size/mtime recorded) from pre-existing, unchanged, symlink or ambiguous results. Only a
-new file at the exact path proven to originate from this run may be received (`hdc file recv`) and
-then removed; removal targets only that exact path. Global `/data` search, wildcards, symlink
-following, recursive deletion and overwriting existing files are forbidden. If ownership is
-unclear, the file is left in place and recorded as `needsAttention`. R1/R3 follow the same
-conservative inventory even though a sidecar may not be expected.
+`SC-1` pre/post brackets **every** device dump command — `INV-1` and each `Rn` alike (conservative;
+one extra command per bracket). `SC-2`/`SC-3` run only when the `SC-1` post result proves a newly
+created regular file owned by this run, in the fixed order `SC-1 post → SC-2 → SC-3 → SC-1
+re-check (absent again)`. Pre-existing, unchanged, symlink or ambiguous results forbid both
+`SC-2` and `SC-3`: the file is left in place and recorded as `needsAttention`. Global `/data`
+search, wildcards, symlink following, recursive deletion and overwriting existing files are
+forbidden. `FX-4` (uninstall) additionally removes the app data directory as final teardown; it is
+not a substitute for the per-Recipe `SC-3` accounting, and any sidecar not yet received before
+`FX-4` is lost — hence `FX-3`/`FX-4` run only after the last `SC-2`.
+
+## Canonical execution sequence (r6)
+
+The full Phase A session, in order; no step may be reordered or skipped, and any stop condition
+ends device dispatch per the abort rule in Result decision rules:
+
+1. `HP-0` HDC hash/version check; 2. physical device confirmation; 3. `HP-1` single-target
+inventory (connect key read from this output); 4. fixture HAP hash recomputation; 5. `FX-1`
+install; 6. `FX-2` start + confirm the fixture window is foreground; 7. `HP-2`; 8. `SC-1` pre;
+9. `INV-1` (read `WINDOW_ID` per the window rule); 10. `SC-1` post (+ `SC-2`/`SC-3` if owned new
+file); 11. for each Recipe `R1`→`R2`→`R3`: `HP-2` → `SC-1` pre → `Rn` → `SC-1` post → (`SC-2` →
+`SC-3` → `SC-1` re-check, only if owned new file); 12. `FX-3` stop; 13. `FX-4` uninstall;
+14. evidence assembly (run.md, manifests, hashes, hardware-evidence) and sensitive scan.
 
 ## Result decision rules
 
@@ -175,16 +215,27 @@ SHA-256. A failed attempt is never retried with another boundary.
   unsupported and cannot be registered by the later decision revision; enabling one requires a
   separate approved change that first pins a privacy-safe seam through the production
   stream-to-digest path.
-- Target drift (`HP-2`), output truncation, unowned/pre-existing path, unexpected extra path or
-  cleanup uncertainty stops the run and preserves `outcomeUnknown`/`needsAttention` as applicable.
+- `unknownOutput` is the **expected recorded terminal state** of every completed Recipe at this
+  stage — it is not a stop condition and not a reason to abort; record and continue (r6
+  clarification).
+- Stop conditions: target drift (`HP-2`), output truncation, unowned/pre-existing path, unexpected
+  extra path, cleanup uncertainty, or a harness refusal/sensitive-scan failure. On any stop:
+  no further Recipe dispatch. If the stop is an identity/target condition (`HP` drift,
+  multi-target), all device commands halt including teardown, and the state is recorded
+  `needsAttention`; for other stops, `FX-3`/`FX-4` teardown may still run and is recorded as
+  cleanup (r6 abort rule).
 
 ## Required real-hardware evidence
 
 Each human capture task must contain in its evidence directory:
 
-- `run.md` — commands, observed outputs (redacted), decisions, deviations, dispatch counts;
-- `redacted-manifest.json` — per-stream metadata with connect-key placeholder and no user paths;
-- `capture-hashes.md` — whole-stream SHA-256 per raw stream;
+- `run.md` — commands, observed outputs (redacted), decisions, deviations, dispatch counts, the
+  harness OID/hash identity, fixture hash recomputation, `WINDOW_ID` provenance, per-command
+  `SC-1` classification table and `SC-2`/`SC-3` records;
+- `redacted-manifests/` — one harness-generated manifest per command (schema
+  `arkdeck-ud-capture-redacted-1.0.0`; connect-key placeholder, no user paths; plural directory,
+  M0B precedent);
+- `capture-hashes.md` — whole-stream SHA-256 per raw stream (`NN-<id>.<stream>` naming);
 - `hardware-evidence.json` conforming to `openspec/contracts/hardware-evidence.schema.json`
   version `2.0.0` (provider `none`), stating claimed operator, physical target/serial, firmware,
   toolchain, transport, execution time, the task's exact acceptance ID, actual step kinds and
@@ -226,6 +277,8 @@ is neither expected nor claimed.
   or committing connect-key/serial bytes;
 - execution of R1-R4 as readOnly, ad-hoc window/sidecar inventory outside the fixed commands,
   split `-a` payload or fallback argv;
+- any device command outside the pinned harness, shell redirection capture, or hand-composed
+  recv/removal commands (r6: only `SC-2`/`SC-3` as pinned);
 - R4 before the approved R2 decision, or a manually chosen component ID;
 - global search, wildcard or recursive remote cleanup, or touching any path other than the fixed
   literal sidecar path;
