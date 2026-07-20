@@ -11,7 +11,9 @@
      requires 闭包无未知项、无环;
   5. changes:必需 artifact 存在;proposal front matter 的 status/class 合法;
      tasks.md 的任务状态行合法;
-  6. platform/integration lock 与 core-conformance 引用的路径存在,
+  6. 含 scope.yaml 的 change 中,每个 acceptance ID 均被 tasks.md 的
+     Requirements/AC 认领面精确认领;
+  7. platform/integration lock 与 core-conformance 引用的路径存在,
      safety_coverage 引用的 AC 存在。
 
 退出码:0 = 通过(允许 warning);1 = 存在 error。
@@ -246,6 +248,8 @@ def check_capability_registry():
 CHANGE_STATUSES = {"proposed", "approved", "implementing", "verified", "archived", "rejected"}
 CHANGE_CLASSES = {"core", "capability", "integration", "platform", "implementation-only"}
 TASK_STATUS_RE = re.compile(r"^- Status[::]\s*(ready|in_progress|done|blocked)")
+REQUIREMENTS_AC_PREFIX = "- Requirements/AC:"
+IDENTIFIER_BOUNDARY_CHARS = r"A-Za-z0-9_-"
 
 
 def check_changes():
@@ -282,7 +286,93 @@ def check_changes():
                 err(tasks, f"{task_count} tasks but only {status_count} legal Status lines")
 
 
-# ------------------------------------------------ 6. locks and conformance
+# ----------------------------------------------------- 6. change scope coverage
+def requirements_ac_claim_surfaces(tasks_text: str) -> list[str]:
+    """Return top-level Requirements/AC bullets and their indented continuations."""
+    lines = tasks_text.splitlines()
+    surfaces: list[str] = []
+    index = 0
+    while index < len(lines):
+        line = lines[index]
+        if not line.startswith(REQUIREMENTS_AC_PREFIX):
+            index += 1
+            continue
+
+        surface = [line]
+        index += 1
+        while index < len(lines) and not lines[index].startswith("- "):
+            continuation = lines[index]
+            if continuation.startswith((" ", "\t")):
+                surface.append(continuation)
+            index += 1
+        surfaces.append("\n".join(surface))
+    return surfaces
+
+
+def claimed_acceptance_ids(
+    scope_ids: set[str], tasks_text: str
+) -> set[str]:
+    """Match opaque scope IDs exactly within Requirements/AC claim surfaces."""
+    claim_text = "\n".join(requirements_ac_claim_surfaces(tasks_text))
+    claimed = set()
+    for acceptance_id in scope_ids:
+        pattern = re.compile(
+            rf"(?<![{IDENTIFIER_BOUNDARY_CHARS}])"
+            rf"{re.escape(acceptance_id)}"
+            rf"(?![{IDENTIFIER_BOUNDARY_CHARS}])"
+        )
+        if pattern.search(claim_text):
+            claimed.add(acceptance_id)
+    return claimed
+
+
+def check_change_scope_coverage(changes_dir: Path | None = None):
+    """Require each scoped acceptance ID to have an exact task claim."""
+    changes_dir = changes_dir or OPENSPEC / "changes"
+    for change in sorted(changes_dir.glob("chg-*")):
+        if not change.is_dir():
+            continue
+        scope = change / "scope.yaml"
+        if not scope.is_file():
+            continue
+
+        data = load_yaml(scope)
+        if data is None:
+            continue
+        if not isinstance(data, dict):
+            err(scope, "scope document must be a mapping")
+            continue
+        raw_ids = data.get("acceptance")
+        if not isinstance(raw_ids, list):
+            err(scope, "acceptance must be a list of non-empty strings")
+            continue
+
+        scope_ids: set[str] = set()
+        invalid_ids = False
+        for acceptance_id in raw_ids:
+            if not isinstance(acceptance_id, str) or not acceptance_id:
+                invalid_ids = True
+                continue
+            scope_ids.add(acceptance_id)
+        if invalid_ids:
+            err(scope, "acceptance must contain only non-empty strings")
+
+        tasks = change / "tasks.md"
+        if not tasks.is_file():
+            # check_changes already reports the missing required artifact.
+            continue
+        claimed = claimed_acceptance_ids(
+            scope_ids, tasks.read_text(encoding="utf-8")
+        )
+        for acceptance_id in sorted(scope_ids - claimed):
+            err(
+                scope,
+                f"scope acceptance {acceptance_id} "
+                "未被任何任务 Requirements/AC 行认领",
+            )
+
+
+# ------------------------------------------------ 7. locks and conformance
 def check_locks_and_conformance(spec_acs):
     for lock_path, keys in (
         (OPENSPEC / "platforms" / "PLATFORM-PROFILES.lock.yaml",
@@ -332,6 +422,7 @@ def main():
     check_acceptance(spec_acs)
     check_capability_registry()
     check_changes()
+    check_change_scope_coverage()
     check_locks_and_conformance(spec_acs)
 
     for w in warnings:
