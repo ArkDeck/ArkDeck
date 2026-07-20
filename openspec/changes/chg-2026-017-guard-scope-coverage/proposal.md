@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-017-guard-scope-coverage
 revision: 2
-status: approved # r1 经 PR #181 批准;r2 acceptance-ID grammar 修订仅在维护者 review/merge 本 governance PR 后生效
+status: verified # 2026-07-21 verification closure candidate;仅在维护者 review/merge 本独立状态 PR 后生效
 class: implementation-only
 core_change_level: none
 owner: lvye
@@ -73,3 +73,34 @@ guard 以自动拦截该类断链,把"人肉双开发现"变为机器侧 fail-cl
 - class `implementation-only`、`core_change_level: none`:仅改 guard 工具与新增测试,
   零 spec/contract/baseline/conformance/product 变更,无 ratification 成分。
 - 不改变任何既有 change 的状态或 AC;增强生效后现状 guard 仍 `0/0/111`。
+
+## Verification closure candidate(2026-07-21)
+
+- Approval/grammar:r1 approval-only PR #181 由维护者合入 `main`
+  `d55b25fcfeff18f664fd8cf681a91c4591520c63`;r2 精确 acceptance-ID grammar
+  PR #184 合入 `d568800d49775482a5cc7ac8efc098c7587a7fb4`。
+- Traceability/readiness:旧 change 显式认领补齐 PR #185 合入
+  `32ab471112f0cd7a998c709c45eaac8e439fc4d4`;TASK-GUARD-001 readiness
+  restoration PR #186 合入 `f2edf9d69658e38d92080617ba62c9c91cd058e1`。
+- Implementation/evidence:TASK-GUARD-001 implementation + evidence PR #187 由
+  维护者 `lvye` approve/review 并合入 `main`
+  `5c2079c996aea74e3fbef6a510a68f99477263f0`;run 记录为
+  `evidence/runs/TASK-GUARD-001/run.md`。实现 PR 只改 guard、测试与该
+  run evidence。
+- Completion:TASK-GUARD-001 独立 `ready→done` PR #188 由维护者
+  `lvye` approve/review 并合入 `main`
+  `e03b5c5cc533f04b5460205108b2a641d846cb9c`;本 change 仅一个任务且已
+  `done`。
+- Binary evidence:`TEST-GUARD-SCOPE-COVERAGE-001` 在合入版 `main`
+  复验 7 tests/0 failures;聚焦断链 fixture 证明未认领
+  `AC-X-003-01` 时恰一条具名 error,恢复后零 error。四个真实
+  scoped change 分别 scope=28/68/1/5 且 missing 全为 0;增强后
+  `scripts/check-sdd.sh` 仍为 0 errors/0 warnings/111 acceptance IDs。
+- Boundary:验证全程 host-only/offline,设备/网络/destructive dispatch 均为
+  0;零 spec/contract/baseline/product/platform/conformance 变更。
+
+上述链路与 evidence 构成本 verification closure PR 的确认范围。
+`status: verified` 只在维护者 review/merge 本 PR 后生效;它只证明
+CHG-2026-017 的 implementation-only guard 增强按 r2 批准边界闭环,不构成
+任何产品能力、平台合规、硬件、支持或发布声明。本 PR 不归档;
+archive 须在 verified 生效后使用独立 PR。
