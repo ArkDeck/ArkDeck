@@ -1,6 +1,6 @@
 # CHG-2026-009 Verification Plan
 
-> Status:planned
+> Status:passed;maintainer confirmation 见 proposal.md Verification closure(2026-07-20)
 > Change:CHG-2026-009-dayu200-partition-decode@r5
 > Core baseline:CORE-2.0.0
 

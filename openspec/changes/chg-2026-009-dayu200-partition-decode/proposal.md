@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-009-dayu200-partition-decode
 revision: 5
-status: approved # r1 经 #70 批准;r2/r3/r4 已合入;r5 broker-receipt boolean remediation 仅在对应 revision PR 由维护者 review/merge 后生效
+status: verified # 2026-07-20 verification closure PR;r1 经 #70 批准,r2-r5 已合入
 class: platform
 core_change_level: none
 owner: lvye
@@ -160,3 +160,21 @@ run、签名 broker 与全部 support/release gate 原样保留。
   r4 合入后 TASK-PD-001 仍须独立 readiness PR；TASK-PD-002 只有在 TASK-PD-001 done、
   implementation commit 已合入且 console 可交互解锁后才可 readiness。原三项 platform
   AC 的 expected result 与 minimum evidence 不变。
+
+- Revision r5(2026-07-20):broker receipt 布尔装箱缺陷 remediation(main.m 显式 BOOL
+  装箱、collector 逐项校验)+ blocked-attempt record;新增 change-local
+  `DECODE-DAYU200-RECEIPT-CONTRACT-001`。仅在对应 revision PR 由维护者 review/merge
+  后生效。
+
+## Verification closure(2026-07-20)
+
+- 全部 acceptance matrix 行 `passed`:`DECODE-DAYU200-HEADLESS-001`(TASK-PD-001 r4
+  headless done,#124/#125)、`DECODE-DAYU200-RECEIPT-CONTRACT-001`(TASK-PD-001 r5
+  done,#160/#161)、`DECODE-DAYU200-PARTITION-001`/`INPUT-BOUNDARY-001`/`RECONCILE-001`
+  (TASK-PD-002 done,同一次 fresh signed-broker platform run,evidence #164、状态 #165)。
+- 上述 PR 的维护者 review/merge 构成 verification.md acceptance matrix 所要求的
+  confirmation。本文件的 `status: verified` 仅在包含本状态变更的 verification closure
+  PR 经维护者 review/merge 后生效;verified 不改变 evidence 边界——三项 platform 结论
+  为 non-authoritative、仅对 pinned archive identity 成立,不推导烧写地址/协议,不解除
+  任何 gap,不构成兼容性/支持/release 声明,DEC-002 保持 open。archive 由后续独立
+  archive PR 完成(先例 #49)。
