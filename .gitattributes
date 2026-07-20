@@ -1,0 +1,2 @@
+# TASK-UD-001: HiDumper golden streams are immutable byte-exact evidence.
+Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HiDumper/Golden/**/*.bin binary
