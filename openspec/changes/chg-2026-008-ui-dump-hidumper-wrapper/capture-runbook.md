@@ -270,9 +270,9 @@ network installation is allowed.
 
 All UI Dump raw output is sensitive by default. Raw stdout, stderr and sidecar bytes remain only in
 the controlled directory. Before `TASK-UD-001` can become ready, `TASK-UD-REDACTOR-001` must be done
-and pin `uidump-derived-redaction-v1` transform/finalizer sources, algorithm manifest, safe-literal
-allowlist, transform/privacy-review receipt schemas, tests, commit OID, every file hash, fixed Python,
-fixed Git and both exact CLIs. Repository golden fixtures are later produced as `derived`, never raw,
+and pin `uidump-derived-redaction-v1` transform/finalizer/importer sources, algorithm manifest, safe-literal
+allowlist, transform/privacy-review receipt schemas, descriptor-bound importer, tests, commit OID, every
+file hash, fixed Python, fixed Git and all three exact CLIs. Repository golden fixtures are later produced as `derived`, never raw,
 through a human-only two-stage task:
 
 1. verify controlled raw SHA-256 against the merged capture manifest and decode UTF-8 strictly;
@@ -282,14 +282,18 @@ through a human-only two-stage task:
 4. exclusive-create an immutable transform receipt recording algorithm/source/allowlist/raw/derived
    hashes, replacement counts, tool/path identities and transform completion time; it contains no
    reviewer/decision and is never edited;
-5. a human reviews the exact derived bytes, then the pinned finalizer exclusive-creates a separate
-   privacy-review receipt referencing the transform receipt hash, same derived hash, reviewer claim,
-   approved/rejected decision, later review time and exact repository destination;
-6. only `approvedForRepository` chains may be handed to TASK-UD-001, which copies the derived fixture
-   and both repo-safe receipts under `.gitattributes`, profile/lock and Bundle resource hashes.
+5. a human reviews the exact derived bytes, then the pinned finalizer reads the exact manifest blob from
+   an approved full decision commit OID/blob/entry plus canonical entry hash, derives Recipe/output-family/raw-origin and the exact
+   derived/transform-receipt/privacy-review-receipt destinations, records its own UTC `recordedAt`, and
+   exclusive-creates a separate review receipt. The caller cannot override destinations; the receipt must
+   satisfy `completedAt < reviewedAt <= recordedAt` and recording delay `<=300s`;
+6. only `approvedForRepository` chains may be handed to TASK-UD-001. Its pinned importer opens the external
+   derived and two receipts once with no-follow retained descriptors, validates the same decision blob/entry/hash,
+   streams each reviewed derived byte once while hashing, and creates all three exact repository targets
+   through retained parents with no-follow/exclusive-create. Manual copy, path reopen and overwrite are forbidden.
 
 The exact CLIs are those declared in `tasks.md`; transform derived/receipt and review receipt first land
-outside git. Before any bytes are read, both tools must validate `/usr/bin/git`, version
+outside git. Before any bytes are read, all three tools must validate `/usr/bin/git`, version
 `git version 2.50.1 (Apple Git-155)`, SHA-256
 `179301dcb41ea78accc3fa0048a7e6f6710d891945a751a34addd622020c1818`, then use only
 `[/usr/bin/git, "-C", ARKDECK_ROOT, "worktree", "list", "--porcelain", "-z"]` without PATH, alias,
@@ -306,9 +310,16 @@ parent/file identity, mode, link count and worktree containment, while raw ident
 hash must remain unchanged. Alias, `..`, symlink/hardlink, existing target, parent swap, inventory
 drift or any worktree breakout fails closed without overwriting raw or producing a committable fixture.
 The transform receipt records those identities, pinned Git identity, open/create policy and inventory
-hash in addition to content hashes. `TASK-UD-PRIVACY-REVIEW-001` owns real-raw transform and human
-review; `TASK-UD-001` may only verify immutable transform + separate approved review receipts and copy
-the approved derived bytes. It cannot read raw, run either tool, edit receipts, or change redactor/
+hash in addition to content hashes. The finalizer/importer obtain decision bytes only through pinned
+`git cat-file` argument arrays from the approved full commit OID; working-tree manifests, refs and abbreviated
+OIDs are forbidden. The importer reads JSON/hash bytes from retained receipt descriptors and streams derived
+from one retained source descriptor while hashing the exact copied bytes. It never follows a source symlink or
+reopens a checked path. Each destination must be absent, within the decision entry's fixed allowed roots and
+created via retained parent descriptor with `O_CREAT|O_EXCL|O_NOFOLLOW` (or equivalent); after write it fsyncs,
+rehashes and revalidates source/parent/target identities. A path swap, mutation, existing target, symlink, race,
+partial write or mismatch fails closed and may clean only the exact inode created by this invocation.
+`TASK-UD-PRIVACY-REVIEW-001` owns real-raw transform and human review; `TASK-UD-001` may only run the pinned
+importer. It cannot read raw, run transform/finalizer, edit receipts, select destinations, or change redactor/
 manifest/allowlist. Unclassified content fails closed. Raw/derived equality is neither expected nor claimed.
 
 ## Prohibited actions at r3
@@ -333,6 +344,10 @@ manifest/allowlist. Unclassified content fails closed. Raw/derived equality is n
 - PATH/alias/unpinned Git inventory; writing reviewer/decision into transform receipt; missing,
   rejected, duplicate or mismatched separate privacy-review receipt; TASK-UD-001 raw access or
   transform/finalizer execution before `TASK-UD-PRIVACY-REVIEW-001 done`;
+- finalizer destination/Recipe/output-family override, working-tree/ref/abbreviated-OID decision source,
+  caller-supplied `recordedAt`, future/non-UTC/stale `reviewedAt`, or unbounded review-to-record delay;
+- manual/path-reopen fixture copy, source symlink/path swap, hash-then-reopen TOCTOU, existing/symlink target,
+  non-exclusive creation, rename-overwrite, parent race, or importer cleanup of an inode it did not create;
 - registering a raw byte-fingerprint/digest output family without a separate approved privacy-safe
   production-stream conformance seam;
 - sidecar search/overwrite, unowned cleanup, recursive delete or raw sensitive bytes in git;

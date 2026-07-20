@@ -127,12 +127,12 @@ cases:
   expected_source: openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/verification.md#INT-UD-REDACTOR-001
   minimum_evidence: contract
   expected_result: Before TASK-UD-001 becomes ready, an independent task pins
-    the uidump-derived-redaction-v1 transform/finalizer sources, algorithm manifest,
+    the uidump-derived-redaction-v1 transform/finalizer/importer sources, algorithm manifest,
     exact structural safe-literal allowlist, immutable transform and separate
     privacy-review receipt schemas, tests, source commit OID, every file hash,
-    fixed Python, fixed /usr/bin/git identity, and both exact CLIs. The transform
+    fixed Python, fixed /usr/bin/git identity, and all three exact CLIs. The transform
     receipt contains no reviewer or decision and cannot be modified after creation.
-    Both CLIs reject PATH/alias Git substitution, missing/hash/version-mismatched
+    All CLIs reject PATH/alias Git substitution, missing/hash/version-mismatched
     executable, and malformed/truncated/incomplete worktree inventory before any
     data input. They require an owner-only
     controlled root outside every detected/registered git worktree, including
@@ -147,9 +147,19 @@ cases:
     resource overflow, every manifest, allowlist, source, or input hash drift,
     aliases, existing targets, symlink/hardlink, parent races, raw mutation, and
     worktree breakout without overwriting raw or producing a committable fixture.
-    Finalizer tests reject transform-receipt mutation, derived mismatch, missing/
-    duplicate review, empty reviewer, rejected/invalid decision, review-before-
-    transform, and destination traversal. Synthetic tests do not claim a human
+    The finalizer accepts no destination, Recipe, or output-family override. It
+    reads the exact decision-manifest blob/entry from a pinned full approved commit
+    OID plus canonical entry hash, binds Recipe, output family, raw origin and three repository destinations,
+    records its own UTC recordedAt, and enforces completedAt < reviewedAt <=
+    recordedAt with at most 300 seconds recording delay. Future, stale, non-UTC,
+    working-tree/ref/abbreviated-OID, wrong blob/entry/mapping and clock rollback
+    cases fail. The importer opens external derived/receipt sources once with
+    no-follow retained descriptors, parses/hashes those same bytes, streams derived
+    once while hashing the copied bytes, and creates all three decision-derived
+    repository targets through retained parents with no-follow/exclusive-create.
+    Source symlink/path swap/mutation/truncation, destination existing/symlink/race,
+    parent drift, single-pass hash mismatch, partial write/fsync failure and cleanup
+    of an unowned inode fail without overwrite. Synthetic tests do not claim a human
     review occurred.
     Repeated accepted inputs are byte-deterministic and contain only reviewed
     structural literals and typed placeholders. No real capture raw, HDC, device,
@@ -167,11 +177,14 @@ cases:
     derived, algorithm, allowlist, Git inventory, path identities, and completedAt,
     and contains no reviewer or decision. The human then reviews the exact derived
     hash and invokes the pinned finalizer with claimed reviewer, decision, reviewedAt,
-    and fixed repository destination. It exclusive-creates a separate privacy-
-    review receipt referencing the immutable transform-receipt hash and same
-    derived hash. Only approvedForRepository with reviewedAt after completedAt and
-    exact destination may proceed; rejected, missing, duplicate, mutated, stale,
-    or mismatched chains block TASK-UD-001. Automation checks field consistency,
+    and the fixed full decision commit OID/blob/entry/canonical entry hash, but no destination override.
+    It derives Recipe/output-family/raw-origin and all three destinations from that
+    approved blob, records its own UTC recordedAt, and exclusive-creates a separate
+    privacy-review receipt referencing the immutable transform-receipt and derived
+    hashes. Only approvedForRepository with completedAt < reviewedAt <= recordedAt,
+    at most 300 seconds recording delay and exact mapping may proceed; rejected,
+    future, non-UTC, stale, missing, duplicate, mutated or mismatched chains block
+    TASK-UD-001. Automation checks field consistency,
     while actual human review is attested by maintainer PR review. Agent raw,
     review, transform, finalizer, HDC, device, server, and network counts are zero.
 - acceptance_id: INT-UD-WRAPPER-001
@@ -203,11 +216,17 @@ cases:
     from a human-operated approved Recipe capture whose whole-stream raw hash is
     recorded while its sensitive bytes remain outside git. TASK-UD-REDACTOR-001
     and TASK-UD-PRIVACY-REVIEW-001 are already done; TASK-UD-001 cannot read raw,
-    run transform/finalizer, or modify the redactor/receipts. It only copies a
-    derived file whose immutable transform receipt binds algorithm/source/manifest/
+    run transform/finalizer, modify receipts, select destinations or manually copy.
+    It runs only the pinned importer against a derived file whose immutable transform receipt binds algorithm/source/manifest/
     allowlist/Git/raw/derived/replay hashes and replacement counts, and whose
     separate approved privacy-review receipt binds that transform-receipt hash,
-    same derived hash, reviewer claim, later review time, and exact destination. Unknown
+    same derived hash, reviewer claim, bounded reviewedAt/recordedAt and the approved
+    decision full commit/blob/entry/canonical entry hash for Recipe/output family/raw origin/three destinations.
+    The importer opens all external sources once with no-follow retained descriptors,
+    streams the derived bytes once while hashing, and creates the three exact repository
+    targets through retained parents with no-follow/exclusive-create. Source replacement,
+    mutation, symlink, target-exists/symlink/race, parent swap, partial write or any
+    hash/identity/mapping mismatch exits nonzero without overwrite. Unknown
     tokens or lines fail closed; the repository contains no raw UI bytes or
     sensitive page text, package, ability, window, component, path, or user
     identifiers. The derived bytes are pinned byte-exact with .gitattributes
