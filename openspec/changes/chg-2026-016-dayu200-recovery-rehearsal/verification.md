@@ -14,14 +14,19 @@ blocked-attempt,不是 fail(先例 #104)。
 > 路线仍 rkdeveloptool RockUSB。四 AC 的 expected result 不变;TASK-RH-001 保持
 > `ready` 待下一窗口按 r2 脚本重执行。
 
+> Status update(2026-07-20,随 r1-attempt #173 + r2 #177):approve(#171)/readiness
+> (#172)已合入,TASK-RH-001 为 `ready`;首窗口 attempt(#173)blocked-attempt 记录在案
+> (RockUSB 未达成,MODE partial/SAFETY pass);r2(#177)修正进态序列+mode-gate+sudo。
+> 下表 Status 据此同步。本更新只同步账本,不构成新验证结论;change 级仍 `planned`。
+
 ## Acceptance matrix
 
 | Evidence ID | Method | Expected result | Status |
 | --- | --- | --- | --- |
-| RH-DAYU200-RECOVERY-001 | maintainer-executed rehearsal(archived playbook §4 序列) | 一个具名窗口内完成 进态→db→gpt/prm→九个 PD-002 mapped 分区按序写入→复位;设备回正常系统,postcheck(m0b_capture 既有白名单)重现 Connected;逐命令 argv/输出/判定在案;§5 中止=诚实 blocked-attempt | blocked(待 approve+readiness+窗口) |
-| RH-DAYU200-MODE-001 | 同窗口只读模式观察 | 进 Maskrom 前/态中/db 后各记 `ld` 输出形态与 USB VID:PID;CHG-2026-011 待确证项(RK3568 PID、Maskrom/Loader 判别字样)落为 observed 事实;只记录不改流程 | blocked(同上) |
-| RH-DAYU200-TABLE-001 | `ppt` 读回 vs FA-001 §2 基线逐行比对 | Loader 态 `ppt`(表写入前可读则读、写入后必读)逐行 match/mismatch/absent/extra 分类,原始值保留;差异不现场解释,标待后续分析;基线零改写 | blocked(同上) |
-| RH-DAYU200-SAFETY-001 | 封闭面与隐私合规审计(全窗口) | 全部设备命令属封闭面且计数在案;首写前物料/工具 hash 全部复核;零现场手算地址(wl 回退逐值引 FA-001 PD-002 扇区列并记原因);userdata 显式确认或如实记跳过;orphan 镜像与无成员分区零写入;序列号仅入 hardware-evidence identity,raw 留仓库外;中止准则触发即遵守 | blocked(同上) |
+| RH-DAYU200-RECOVERY-001 | maintainer-executed rehearsal(archived playbook §4 序列) | 一个具名窗口内完成 进态→db→gpt/prm→九个 PD-002 mapped 分区按序写入→复位;设备回正常系统,postcheck(m0b_capture 既有白名单)重现 Connected;逐命令 argv/输出/判定在案;§5 中止=诚实 blocked-attempt | attempt#1 blocked(#173:RockUSB 未达成,db 建 comm 失败);TASK-RH-001 ready,待下窗口按 r2 修正脚本重执行 |
+| RH-DAYU200-MODE-001 | 同窗口只读模式观察 | 进 Maskrom 前/态中/db 后各记 `ld` 输出形态与 USB VID:PID;CHG-2026-011 待确证项(RK3568 PID、Maskrom/Loader 判别字样)落为 observed 事实;只记录不改流程 | partial observed(#173:进态实测 2207:5000 updater-hdc);待下窗口补全 0x350a 态观察 |
+| RH-DAYU200-TABLE-001 | `ppt` 读回 vs FA-001 §2 基线逐行比对 | Loader 态 `ppt`(表写入前可读则读、写入后必读)逐行 match/mismatch/absent/extra 分类,原始值保留;差异不现场解释,标待后续分析;基线零改写 | blocked(#173:ppt 无分区表未达成);待下窗口 |
+| RH-DAYU200-SAFETY-001 | 封闭面与隐私合规审计(全窗口) | 全部设备命令属封闭面且计数在案;首写前物料/工具 hash 全部复核;零现场手算地址(wl 回退逐值引 FA-001 PD-002 扇区列并记原因);userdata 显式确认或如实记跳过;orphan 镜像与无成员分区零写入;序列号仅入 hardware-evidence identity,raw 留仓库外;中止准则触发即遵守 | attempt#1 PASS(#173:封闭面全遵守、零字节写入、正确中止);待下窗口全流程复评 |
 
 ## Gate
 
