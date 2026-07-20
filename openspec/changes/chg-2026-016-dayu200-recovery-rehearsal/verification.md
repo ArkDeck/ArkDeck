@@ -1,13 +1,18 @@
 # CHG-2026-016 Verification Plan
 
 > Status:planned
-> Change:CHG-2026-016-dayu200-recovery-rehearsal@r1
+> Change:CHG-2026-016-dayu200-recovery-rehearsal@r2
 > Core baseline:CORE-2.0.0
 
 本 change 是首次授权的写设备活动:唯一授权面 = design.md 封闭命令面,唯一执行者 =
 维护者本人,唯一窗口 = readiness 具名的时间窗。任何超出命令面的设备命令、任何现场
 手算地址、任何未复核 hash 的写入,出现即整体 fail。中止(§5 准则)如实记录为
 blocked-attempt,不是 fail(先例 #104)。
+
+> Revision r2(2026-07-20):RH-001 blocked-attempt(#173)后修正 design 进态序列
+> (Oniro 权威原文)+ mode-gate(写前 `ld` 须 `0x350a`,`0x5000` STOP)+ sudo;恢复
+> 路线仍 rkdeveloptool RockUSB。四 AC 的 expected result 不变;TASK-RH-001 保持
+> `ready` 待下一窗口按 r2 脚本重执行。
 
 ## Acceptance matrix
 

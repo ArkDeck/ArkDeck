@@ -1,7 +1,7 @@
 ---
 schema_version: 1.0.0
 change_id: CHG-2026-016-dayu200-recovery-rehearsal
-change_revision: 1
+change_revision: 2
 platform: macos
 evidence_classes:
 - realHardware
