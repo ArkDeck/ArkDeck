@@ -462,15 +462,40 @@
 
 ## TASK-M1-006 — HDC supervisor、endpoint 隔离、授权工作流与 fake-hdc 对抗
 
-- Status:blocked
-- Blocking evidence:`evidence/runs/TASK-M1-006/run.md`（review-remediation addendum 14）。
-  当前 verified integration profile 未声明本任务要求的 server identity/generation、
-  selected-device authorization/binding、key-access 与 subserver capability 的精确只读
-  probe/argv/effect/raw family；依本任务 stop condition 必须先走独立 integration change。
-  此外当前 revision 的 signed macOS XCUITest 因本机 Developer Mode 未启用而在 runner
-  initialization 前失败；启用该持久系统授权须由操作者明确批准后再复验。此状态草案仅在
-  维护者 review/merge 后生效，不构成 task completion、change verified、platform conformance
-  或 release claim。
+- Status:ready(readiness restoration candidate;仅在维护者 review/merge 本独立状态
+  PR 后生效。本 PR 不含实现、不产生 evidence、不执行任何 hdc/device/XCUITest)
+- Readiness restoration(2026-07-20;addendum-14 两项 blocker 逐项复核解除):
+  - Probe-registry blocker:resolved。所缺四个只读 probe family 已由独立 integration
+    change CHG-2026-015 TASK-I15-001 完成注册并 `done`(实现 PR #159 squash
+    `7c77672`,经合入版独立深度审计零 blocker 零 major;done 状态 PR #163
+    `3e2d6d4`):`OPENHARMONY-TOOLS@0.3.0` + `readonly-probes.yaml`(SHA-256
+    `9014c480c3df61b5a6db7e54e52f29e89d7c93431e91d0856cf5710c22466b9d`)+
+    `INTEGRATION-PROFILES-0.4.0` lock(SHA-256
+    `9f007455204bcbc8a0309413cbeb9c6882e45afdc0dc9def0bab4dd948d2acb0`)+
+    profile.md(SHA-256
+    `48ad9ecc31cad2fbb9a05bb3bb552153ad0ade3a629de5280ce8eef06165401a`),四 family
+    二值结论=serverIdentityGeneration/selectedDeviceAuthorizationBinding supported、
+    keyAccessDiagnostics/subserverCapability unsupported,全部绑定维护者认可的一手
+    provenance(#141/#155/#156)。**Adoption 授权(本 restoration 的新增授权面)**:
+    M1-006 实现按 profile.md `adoption_boundary` 采用 0.3.0——只读消费
+    `readonly-probes.yaml` registry、`Fixtures/HDC/Probes/1.0.0/**` 与其 control
+    vectors(production 分类器须绑定同一 hash-pinned 向量集,unsupported family 在
+    production 面呈现为 fail-closed/不可用),**不得改写** registry/fixtures/lock/
+    profile(变更须走新的 integration change);既有 `Golden/1.0.0/**`(I5-001,
+    0.2.0 语义面)pins 保持只读有效,两者并存不冲突(`adoption_boundary` 明文保留
+    0.2.0 consumer 边界)。
+  - Developer-Mode blocker:resolved。维护者已于 2026-07-20 亲手启用该持久系统
+    授权;本机实测 `DevToolsSecurity -status` = "Developer mode is currently
+    enabled."。当前 revision 的 signed macOS XCUITest 复验(addendum-14 所要求)
+    归入实现收尾,在实现/evidence PR 中执行并记录。
+  - 先前已 resolved 的四项 readiness gate(Change-design/Semantic fixture/UI/
+    Durable-audit,见下方 Readiness restoration 2026-07-18 块)与 pinned golden
+    只读约束保持有效,不重判;CHG-2026-014 固化的遗留 bytes 状态不变。
+  - Review boundary:本 restoration 只翻转状态并记录 blocker 解除与 adoption
+    授权;实现仍须满足本任务全部 AC/verification gate(fake-hdc 对抗矩阵、signed
+    Sandbox XCUITest、audit 闭合、`MAC-M1-HDC-001` 行保持 blocked 直至 done);
+    `ready→done` 另用独立状态 PR。不构成 task completion、change verified、
+    platform conformance 或 release claim。
 - Legacy disposition（2026-07-19）:按维护者指示，本任务作为遗留项保留；`blocked` 是合法
   状态，遗留标记不等同于 `done`、不解除任何 AC/verification gate，也不允许依赖它的
   `TASK-M1-007`/`TASK-M1-008` 越过 dependency gate。后续修复须由独立 integration change
