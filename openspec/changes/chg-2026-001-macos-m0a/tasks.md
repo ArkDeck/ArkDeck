@@ -2,6 +2,10 @@
 
 > V2 治理:本文件是任务的唯一事实源(原 immutable task packets 已废止,历史见 git)。
 > 状态经 PR review 合入生效。AC-HDC-005-01(parserGolden)已移出本 change 范围,fixture 由本 change 产出、后续 change 认领。
+> 2026-07-20 traceability remediation:依既有 verification matrix 与 run evidence,
+> 将 `…`/`*`/`01/02`/`等` 简写替换为 scope 中的显式完整 acceptance ID,
+> 作为 CHG-2026-017 r2 精确覆盖校验的基线输入;不改变任务状态、归属、evidence
+> 或验证结论。
 
 ## TASK-M0A-001 — 签名 SwiftUI 应用壳与分离的 package/test targets
 
@@ -16,7 +20,8 @@
 ## TASK-M0A-002 — ProcessExecutor 与 external-first HDC discovery 原型
 
 - Status:done
-- Requirements/AC:AC-JOB-005-01、AC-NFR-002-01 等(见 verification.md)
+- Requirements/AC:AC-HDC-001-01、AC-HDC-001-02、AC-JOB-005-01、
+  AC-NFR-002-01、MAC-M0A-PROC-001、MAC-M0A-HDC-001(见 verification.md)
 - Depends on:TASK-M0A-001
 - Allowed paths:`Packages/ArkDeckKit/Sources/ArkDeckProcess/**`、`.../ArkDeckOpenHarmony/**`、对应 Tests 与 Fixtures、本 change `evidence/**`
 - Risk:low;Hardware:no
@@ -25,7 +30,9 @@
 ## TASK-M0A-003 — host-wide HDC supervisor 与 ownership/lifecycle 安全门
 
 - Status:done
-- Requirements/AC:AC-HDC-002-01、AC-HDC-003-01/02、AC-HDC-010-* 等
+- Requirements/AC:AC-HDC-002-01、AC-HDC-003-01、AC-HDC-003-02、
+  AC-HDC-004-01、AC-HDC-009-01、AC-HDC-010-01、AC-HDC-010-02、
+  AC-HDC-010-03、MAC-M0A-HDC-002
 - Depends on:TASK-M0A-002
 - Allowed paths:`Packages/ArkDeckKit/Sources/ArkDeckOpenHarmony/**`、对应 Tests 与 `Fixtures/HDCServer/**`、本 change `evidence/**`
 - Risk:low;Hardware:no
@@ -34,7 +41,8 @@
 ## TASK-M0A-004 — 单实例、durable journal intent 与电源活动原型
 
 - Status:done
-- Requirements/AC:AC-JOB-002-01、AC-JOB-008-01 等
+- Requirements/AC:AC-JOB-002-01、AC-JOB-008-01、MAC-M0A-RUNTIME-001、
+  MAC-M0A-JOURNAL-001、MAC-M0A-POWER-001
 - Depends on:TASK-M0A-001
 - Allowed paths:`Packages/ArkDeckKit/Sources/ArkDeckRuntime/**`、`.../ArkDeckStorage/**`、对应 Tests、本 change `evidence/**`
 - Risk:low;Hardware:no
@@ -46,7 +54,8 @@
 > 2026-07-15 由维护者决定从原 TASK-M0A-005 拆分:本任务承载无需 clean-VM/Developer ID 前提的交付物;拆分经本 PR review 合入生效。
 
 - Status:done
-- Requirements/AC:AC-HDC-001-01 等(Sandboxed prototype 部分);为 TASK-M0A-007 提供冻结计划
+- Requirements/AC:AC-HDC-001-01(Sandboxed prototype 部分);为 TASK-M0A-007
+  提供冻结计划
 - Depends on:TASK-M0A-001、TASK-M0A-002、TASK-M0A-003
 - Allowed paths:`ArkDeck.xcodeproj/**`、`ArkDeckApp/**`、`Configurations/**`、`docs/adr/**`、本 change `evidence/**`
 - Risk:low;Hardware:no
@@ -55,7 +64,8 @@
 ## TASK-M0A-005B — Developer ID 原型与干净 VM 信任矩阵
 
 - Status:blocked
-- Requirements/AC:AC-HDC-003-01、AC-HDC-006-01 等;MAC-M0A-TRUST-001…004
+- Requirements/AC:AC-HDC-003-01、AC-HDC-006-01、MAC-M0A-TRUST-001、
+  MAC-M0A-TRUST-002、MAC-M0A-TRUST-003、MAC-M0A-TRUST-004
 - Depends on:TASK-M0A-001、TASK-M0A-002、TASK-M0A-003
 - Allowed paths:`ArkDeck.xcodeproj/**`、`ArkDeckApp/**`、`Configurations/**`、`docs/adr/**`、本 change `evidence/**`
 - Risk:medium(外部工具与网络);Hardware:no

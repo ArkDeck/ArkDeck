@@ -18,13 +18,17 @@
   PR #21 archive 到 ratified `CORE-2.0.0`；current spec、journal contract、Swift
   state machine 与 `CORE-CONFORMANCE-2.0.0` 对两个 resume-marker 出口已一致。
 - Requirements/AC:REQ-WF-001、REQ-WF-002、REQ-JOB-001、REQ-JOB-003、REQ-JOB-004；
-  AC-WF-001-01、AC-WF-002-01、AC-JOB-001-01…07、AC-JOB-003-01、AC-JOB-004-01
+  AC-WF-001-01、AC-WF-002-01、AC-JOB-001-01、AC-JOB-001-02、
+  AC-JOB-001-03、AC-JOB-001-04、AC-JOB-001-05、AC-JOB-001-06、
+  AC-JOB-001-07、AC-JOB-003-01、AC-JOB-004-01
 - Traceability correction（2026-07-20）:REQ-JOB-003/004 与 AC-JOB-003-01/004-01 自始由
   本任务实现并在 `evidence/runs/TASK-M1-001/run.md` 二值 PASS
   （`criticalCancellationContract`、`compensationFaultInjection`），但历届修订未把它们
   写入上方 Requirements/AC 行，致使 verification.md 的"任务分配并集与 scope.yaml 精确
   相等"不变式失真。本注记为追溯归属修复：不改变任何 evidence、结论或任务状态；
   M1-010 对 `AC-JOB-003-01` 的引用仍为回归性质、不认领所有权。
+  同日 CHG-2026-017 r2 remediation 将既有 `AC-JOB-001-01…07` 简写
+  展开为上方七个显式 ID;归属、evidence 与结论不变。
 - Depends on:none
 - Allowed paths:`Packages/ArkDeckKit/Sources/ArkDeckCore/**`、对应 Tests、本 change `evidence/**`
 - Deliverables:未知 kind 按 destructive/unsupported 拒绝的封闭 WorkflowStep decode;精确 Core 迁移图的 Job/终态状态机与 property tests;保持原始失败分类的补偿顺序。
