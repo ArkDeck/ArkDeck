@@ -5,8 +5,19 @@
 
 ## TASK-GUARD-001 — check_sdd per-change scope 覆盖校验 + 测试
 
-- Status:ready(readiness restoration candidate;仅在维护者 review/merge 本独立
-  status PR 后生效。本 PR 不含实现、evidence 或测试新增)
+- Status:done(TASK-GUARD-001 implementation + evidence PR #187 已由维护者
+  `lvye` approve/review 并合入 `main` squash commit
+  `5c2079c996aea74e3fbef6a510a68f99477263f0`;本独立状态 PR 依据下列
+  completion evidence 起草 `ready→done`,仅在维护者 review/merge 后生效。
+  本状态只关闭 scope-coverage guard 交付,不构成 CHG-2026-017 `verified`
+  或任何 product/platform/hardware/support/release 声明)
+- Completion evidence:`evidence/runs/TASK-GUARD-001/run.md`(实现范围仅
+  `scripts/check_sdd.py`、`scripts/test_check_sdd.py` 与本任务 run evidence;
+  合入版 `main` `5c2079c996aea74e3fbef6a510a68f99477263f0` 独立复验为合成+真实
+  baseline 7 tests/0 failures、guard 0 errors/0 warnings/111 acceptance IDs;四个
+  scoped change 分别 scope=28/68/1/5 且 missing 全为 0。具名断链、标识符
+  边界、干扰行、简写拒绝、无 scope 跳过与单向校验均有可复查断言;
+  零设备/网络/destructive dispatch,零 spec/contract/baseline/product 变更)
 - Readiness restoration review(2026-07-20;host-only/offline,零设备、零网络):
   - Approval/grammar gate:satisfied。CHG-2026-017 r2 精确 acceptance-ID grammar
     已经 PR #184 由维护者合入 main `d568800`。
