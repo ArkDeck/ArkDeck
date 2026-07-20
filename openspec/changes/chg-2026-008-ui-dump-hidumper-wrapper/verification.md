@@ -1,7 +1,7 @@
 # CHG-2026-008 Verification Plan
 
 > Status:planned
-> Change:CHG-2026-008-ui-dump-hidumper-wrapper@r6
+> Change:CHG-2026-008-ui-dump-hidumper-wrapper@r7
 > Core baseline:CORE-2.0.0
 
 本文件是 r3 review-remediation verification plan(经 2026-07-20 维护者裁剪决定收敛,

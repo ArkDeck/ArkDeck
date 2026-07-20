@@ -153,12 +153,15 @@ r3 合入时本 change 有 4 个任务,全部 `blocked`;r6 增设 capture harnes
 - Runbook gates(全文见 `capture-runbook.md`,要点):
   - 全部设备命令与流采集必须经 pinned harness(`scripts/ud_capture/capture.py`)以
     argv 数组执行;禁止 shell 重定向或任何 harness 之外的手工采集(r6);
-  - 人工 preflight:`hdc version`/`hdc list targets` 输出记录并与 M0B pinned
+  - 人工 preflight:`hdc version`/`hdc list targets -v` 输出记录并与 M0B pinned
     hash/version 对照;恰一台预期 DAYU200 Connected,缺失/多台/歧义即停;`HP-2` 在
     `INV-1` 与每个 `Rn` 前各复查一次,漂移即停。不执行任何显式 server lifecycle/
-    subserver 命令(与 M0B 同);
-  - connect key 只取自同一会话 `list targets` 输出,每条设备命令显式 `-t`,禁止默认
-    目标;key/serial 字节不入仓库(redacted manifest 用占位符,serial 只入
+    subserver 命令(与 M0B 同)。(r7:HP-1/HP-2 钉为 verbose 形式——M0B evidence
+    证明纯 `list targets` 只输出序列号无状态列,`Connected` 状态仅在 `-v` 输出中,
+    r4/r6 的纯形式无法满足自身 stop condition;由 PR #143 对抗审查在任何设备执行前
+    发现);
+  - connect key 只取自同一会话 `list targets -v` 输出,每条设备命令显式 `-t`,禁止
+    默认目标;key/serial 字节不入仓库(redacted manifest 用占位符,serial 只入
     hardware-evidence 的 device identity 字段,先例 M0B);
   - R1-R3 首次 target execution 全部保守分类 `captureRemoteFile/deviceMutation`,无
     stdout-only/readOnly 分支,事后不得降级;

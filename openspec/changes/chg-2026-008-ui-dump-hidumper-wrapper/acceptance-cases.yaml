@@ -1,7 +1,7 @@
 ---
 schema_version: 1.0.0
 change_id: CHG-2026-008-ui-dump-hidumper-wrapper
-change_revision: 6
+change_revision: 7
 platform: macos
 evidence_classes:
 - contract
