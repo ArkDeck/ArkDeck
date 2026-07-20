@@ -1,7 +1,7 @@
 ---
 schema_version: 1.0.0
 change_id: CHG-2026-009-dayu200-partition-decode
-change_revision: 4
+change_revision: 5
 platform: macos
 evidence_classes:
 - contract
@@ -24,6 +24,22 @@ cases:
     dispatch remain zero. This contract evidence uses only synthetic fixtures and
     local temporary files, does not run the collector or read the pinned archive,
     and does not satisfy or downgrade any platform acceptance case.
+- acceptance_id: DECODE-DAYU200-RECEIPT-CONTRACT-001
+  test_id: TEST-DECODE-DAYU200-RECEIPT-CONTRACT-001
+  method: Synthetic runtime-receipt vector matrix over the collector closed validation plus source-literal pinning of the broker boolean boxing.
+  expected_source: openspec/changes/chg-2026-009-dayu200-partition-decode/verification.md#DECODE-DAYU200-RECEIPT-CONTRACT-001
+  minimum_evidence: contract
+  expected_result: The collector validates the runtime receipt term by term and
+    reports each failure with the exact field name and observed value; strictness
+    is not relaxed, so JSON boolean fields must be genuine booleans and integer
+    0/1 substitutes are rejected naming the field. A canonical all-true synthetic
+    receipt passes every term; an integer-boxed variant fails closed naming the
+    field; per-term missing and tampered vectors each produce their named error.
+    A source-literal assertion pins the explicit BOOL boxing form in main.m for
+    every sandbox_check-derived policy field. Headless only, with no broker
+    launch, no GUI, no pinned archive, no device and no network; the three
+    platform acceptance cases stay owned by TASK-PD-002 and are neither satisfied
+    nor downgraded by this contract evidence.
 - acceptance_id: DECODE-DAYU200-PARTITION-001
   test_id: TEST-DECODE-DAYU200-PARTITION-001
   method: Identity-gated streaming decode of parameter.txt with a closed grammar and branch-complete unit tests.
