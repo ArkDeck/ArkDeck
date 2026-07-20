@@ -3,9 +3,9 @@
 ## Scope and classification
 
 - Evidence class:`contract` / host-only / synthetic-only.
-- Base:`48cbcaffa889c22e6f91cd0be5dcf69b9a1d026d` (`main`, r5 readiness).
+- Base:`5ce615513c6ee5d6ee619168de4b4aeabf2d8d97` (`origin/main` after rebase).
 - Acceptance:`INT-UD-REDACTOR-001` / `TEST-INT-UD-REDACTOR-001`.
-- This run addresses four supplied implementation-review findings. It performs
+- This run addresses six supplied implementation-review findings. It performs
   no GitHub thread/review write and does not resolve or reply to review threads.
 - Real UI raw, installed HDC, device, network, GUI, redactor external process,
   device mutation, destructive dispatch, and hardware evidence count:`0` each.
@@ -61,13 +61,28 @@ Tests add 100 independently to each receipt statistic, mutate a built receipt in
 place to prove it does not alias `TransformResult` dictionaries, and provide an
 internally inconsistent result; every vector now fails `MANIFEST_INVALID`.
 
+### Follow-up — exact CLI option spelling
+
+The parser now sets `allow_abbrev=False`, so receipt replay arguments are
+accepted only with their recorded full option spellings. A subprocess regression
+replaces `--input` with `--inp` and confirms argparse exit `2`, unchanged raw
+bytes, and no derived or receipt artifact.
+
+### Follow-up — stale initial evidence facts
+
+The initial `run.md` retains its historical bytes and byte-determinism conclusion,
+but every row of its obsolete candidate-hash table now carries `SUPERSEDED`.
+The three-safe-literal assertion and 18-test result are also marked
+`SUPERSEDED` at the facts themselves, preventing the initial record from being
+mistaken for the current candidate.
+
 ## Current reviewed-source candidate hashes
 
 | File | SHA-256 |
 | --- | --- |
 | `scripts/ui_dump_redaction/README.md` | `18befd7c720226019b47f4dbf6a43e12b60a077b9a37c75221c15de8677cc528` |
-| `scripts/ui_dump_redaction/redact.py` | `ff12537c7c9832f410bdb0ed370e7fd810b2e18eda3c58d7123eea14e4a70dc7` |
-| `scripts/ui_dump_redaction/test_redact.py` | `78f80b86a0ff030b74811cd816582eb710f99beecefd57d2760d50eaae341952` |
+| `scripts/ui_dump_redaction/redact.py` | `938cc117da97304b5ede66ff55c84dd9ce0a987600d4a1ecec2c3e01351f53e1` |
+| `scripts/ui_dump_redaction/test_redact.py` | `0543f70e024baee3960bfe173a33050ad072cdd6d13186f1c8f5bfbd5ac3af6c` |
 | `scripts/ui_dump_redaction/algorithm-v1.json` | `a75778fdf525050c4c0bcf11579e5f09f99a6fa70697bcf79026656a71f20185` |
 | `scripts/ui_dump_redaction/safe-literals-v1.txt` | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` |
 | `scripts/ui_dump_redaction/redaction-receipt.schema.json` | `f4bffe70a51dc3f6228f24d41b814dc47cc2d6f0cde5f00445070f86cd1ec4b6` |
@@ -83,13 +98,14 @@ them.
   -m unittest -v scripts/ui_dump_redaction/test_redact.py
 ```
 
-Result:`PASS` — 20 tests, 0 failures, 0 skips, 0.662 seconds in the final recorded
+Result:`PASS` — 21 tests, 0 failures, 0 skips, 0.616 seconds in the final recorded
 run.
 
 Besides the original negative/property matrix, this run includes repository-root
 exclusion for all data paths, empty-allowlist booleans/null, six quoted escaped
 control vectors, eight independently altered receipt statistics, inconsistent
-result totals, symlink/FIFO nonblocking rejection, and deterministic replay.
+result totals, abbreviated CLI option rejection, symlink/FIFO nonblocking
+rejection, and deterministic replay.
 
 ## Remediated synthetic hash chain
 
@@ -115,15 +131,16 @@ Both invocations exited `0`; the replay used distinct
 | synthetic input | 3024 | `a75778fdf525050c4c0bcf11579e5f09f99a6fa70697bcf79026656a71f20185` |
 | derived output | 2828 | `473ab3d630364563172658691670a9afb2eedc61c783525d7596d3b2f337d125` |
 | replayed derived output | 2828 | `473ab3d630364563172658691670a9afb2eedc61c783525d7596d3b2f337d125` |
-| first receipt | — | `74d781ee6754da8a4b042fd8e4a5ec03fa5fde490b62b93c974f6a674b76ca57` |
-| replay receipt | — | `360cc7240313ddb346338056a1dd6aa5463d56cced86c4dc6fcfb69f728d2b35` |
+| first receipt | — | `ccb48c1ed7eec616286ac1341c10d61b2e41e20b8509651c0ac6ff6ff762d957` |
+| replay receipt | — | `ccb48c1ed7eec616286ac1341c10d61b2e41e20b8509651c0ac6ff6ff762d957` |
 
 Receipt facts:source hash
-`ff12537c7c9832f410bdb0ed370e7fd810b2e18eda3c58d7123eea14e4a70dc7`;
+`938cc117da97304b5ede66ff55c84dd9ce0a987600d4a1ecec2c3e01351f53e1`;
 manifest/allowlist/schema hashes equal the table above; raw 3024 bytes, derived
 2828 bytes; 86 lines / 343 tokens; 156 replacements / 140 unique; output-side
-check passed over 140 sensitive literals. Receipts differ only in run metadata,
-while the two derived hashes are byte-identical.
+check passed over 140 sensitive literals. Both invocations completed in the same
+recorded second, so their normalized receipts as well as their derived bytes are
+byte-identical. The derived hash is unchanged from the preceding remediation.
 
 ## Repository checks
 
@@ -149,11 +166,12 @@ six approved redactor files and two records in the approved task evidence path.
 
 ## Conclusion and residual boundary
 
-All four supplied findings are closed by code plus negative regression vectors.
+All six supplied findings are closed by code, evidence annotations, and negative
+regression vectors.
 The remediation preserves the task's offline/stdlib-only/no-overwrite contract
 and tightens it:all data paths are repository-external, no input literal is
 allowlisted, quoted controls cannot use the physical-line exception, and receipt
-statistics are result-bound.
+statistics are result-bound. Replay option names also require exact spelling.
 
 Actual DAYU200 raw grammar compatibility, future golden privacy review,
 canonical diagnostic export, hardware support, task `done`, and change

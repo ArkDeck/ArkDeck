@@ -57,6 +57,7 @@ class RedactorContractTests(unittest.TestCase):
         raw: bytes,
         *,
         expected_hash: str | None = None,
+        input_flag: str = "--input",
         input_path: pathlib.Path | None = None,
         output_path: pathlib.Path | None = None,
         receipt_path: pathlib.Path | None = None,
@@ -75,7 +76,7 @@ class RedactorContractTests(unittest.TestCase):
             str(manifest_path),
             "--safe-literals",
             str(safe_literals_path),
-            "--input",
+            input_flag,
             str(source),
             "--expected-input-sha256",
             expected_hash or sha256(raw),
@@ -92,6 +93,15 @@ class RedactorContractTests(unittest.TestCase):
             check=False,
         )
         return completed, source, output, receipt
+
+    def test_cli_rejects_abbreviated_option_names_without_outputs(self):
+        raw = b"text=secret\n"
+        with tempfile.TemporaryDirectory(prefix="ud-redactor-argv-") as temporary:
+            completed, source, output, receipt = self.invoke(
+                pathlib.Path(temporary), raw, input_flag="--inp"
+            )
+            self.assert_failure_without_artifacts(completed, output, receipt, 2)
+            self.assertEqual(source.read_bytes(), raw)
 
     def assert_failure_without_artifacts(
         self, completed, output: pathlib.Path, receipt: pathlib.Path, code: int

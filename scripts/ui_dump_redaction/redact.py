@@ -961,7 +961,8 @@ def run(args: argparse.Namespace) -> None:
 
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Create a deterministic, redacted UI Dump derived artifact and receipt."
+        description="Create a deterministic, redacted UI Dump derived artifact and receipt.",
+        allow_abbrev=False,
     )
     parser.add_argument("--algorithm-manifest", required=True)
     parser.add_argument("--safe-literals", required=True)

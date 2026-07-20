@@ -4,6 +4,8 @@
 > current source/hash chain are closed in
 > `review-remediation-2026-07-20.md`; its hashes supersede this file's candidate
 > hashes for implementation review.
+> Every stale source-hash row, three-safe-literal assertion, and 18-test total
+> below is also marked `SUPERSEDED` at the fact itself.
 
 ## Classification and scope
 
@@ -43,23 +45,26 @@ performed:
 The redactor itself imports Python stdlib only. PyYAML was used only by the
 repository SDD guard.
 
-## Reviewed-source candidate hashes
+## SUPERSEDED — Reviewed-source candidate hashes
 
-These hashes were measured after the implementation and final targeted test run:
+**SUPERSEDED:** These hashes described the initial candidate only.
 
-| File | SHA-256 |
-| --- | --- |
-| `scripts/ui_dump_redaction/README.md` | `7dbd5857bc7cd5be25ddeb9d6339cc840e501963d99088e796220aedb543d790` |
-| `scripts/ui_dump_redaction/redact.py` | `c9b70916cdd1153bcf18dbf15dc4a1b932c0cd47dbc553c10450296a4dbd8e92` |
-| `scripts/ui_dump_redaction/test_redact.py` | `87acd45294f8fb7cbdf0464ffade7b6893a03496cc0427bd7dc9ed95390f4137` |
-| `scripts/ui_dump_redaction/algorithm-v1.json` | `727eb15a79082de8400f22cb6d68e76286870c87a4f9195e6e48cf6faf5d2e26` |
-| `scripts/ui_dump_redaction/safe-literals-v1.txt` | `3296a1c8a3690ff05d7bf80295c001c80f13b7698d7049211a7d131c3cd16f2a` |
-| `scripts/ui_dump_redaction/redaction-receipt.schema.json` | `f4bffe70a51dc3f6228f24d41b814dc47cc2d6f0cde5f00445070f86cd1ec4b6` |
+| File | SHA-256 | Status |
+| --- | --- | --- |
+| `scripts/ui_dump_redaction/README.md` | `7dbd5857bc7cd5be25ddeb9d6339cc840e501963d99088e796220aedb543d790` | `SUPERSEDED` |
+| `scripts/ui_dump_redaction/redact.py` | `c9b70916cdd1153bcf18dbf15dc4a1b932c0cd47dbc553c10450296a4dbd8e92` | `SUPERSEDED` |
+| `scripts/ui_dump_redaction/test_redact.py` | `87acd45294f8fb7cbdf0464ffade7b6893a03496cc0427bd7dc9ed95390f4137` | `SUPERSEDED` |
+| `scripts/ui_dump_redaction/algorithm-v1.json` | `727eb15a79082de8400f22cb6d68e76286870c87a4f9195e6e48cf6faf5d2e26` | `SUPERSEDED` |
+| `scripts/ui_dump_redaction/safe-literals-v1.txt` | `3296a1c8a3690ff05d7bf80295c001c80f13b7698d7049211a7d131c3cd16f2a` | `SUPERSEDED` |
+| `scripts/ui_dump_redaction/redaction-receipt.schema.json` | `f4bffe70a51dc3f6228f24d41b814dc47cc2d6f0cde5f00445070f86cd1ec4b6` | `SUPERSEDED` |
 
-`algorithm-v1.json` pins the latter two policy-file hashes. The candidate safe
-literal set is exactly three sorted, exact-match structural values: `false`,
-`null`, and `true`. Their approval is intentionally deferred to maintainer
-review of the implementation PR; this run does not self-approve them.
+**SUPERSEDED:** `algorithm-v1.json` pinned the two initial policy-file hashes.
+
+**SUPERSEDED:** The initial candidate safe-literal set contained exactly three
+sorted, exact-match values: `false`, `null`, and `true`.
+
+**SUPERSEDED:** The initial run deferred review of those three literals; the
+remediated candidate retains none of them.
 
 ## Commands and results
 
@@ -70,7 +75,8 @@ review of the implementation PR; this run does not self-approve them.
   -m unittest -v scripts/ui_dump_redaction/test_redact.py
 ```
 
-Result:`PASS` — 18 tests, 0 failures, 0 skips, 0.470 seconds in the final run.
+**SUPERSEDED:** Result:`PASS` — 18 tests, 0 failures, 0 skips, 0.470 seconds in
+the initial run.
 
 The binary negative matrix covered:
 
