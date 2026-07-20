@@ -1,7 +1,7 @@
 ---
 schema_version: 1.0.0
 change_id: CHG-2026-017-guard-scope-coverage
-change_revision: 1
+change_revision: 2
 platform: macos
 evidence_classes:
 - contract
@@ -12,17 +12,21 @@ cases:
   expected_source: openspec/changes/chg-2026-017-guard-scope-coverage/verification.md#GUARD-SCOPE-COVERAGE-001
   minimum_evidence: contract
   expected_result: For every change carrying a scope.yaml, the guard verifies
-    that each acceptance ID in scope.yaml is claimed by at least one task's
-    Requirements/AC line (including its indented continuation lines), and emits
+    that each opaque, case-sensitive acceptance ID in scope.yaml is present as
+    a complete identifier in at least one task's Requirements/AC claim surface
+    (the line plus its indented continuation lines), and emits
     a named error identifying the exact unclaimed acceptance ID when one is not
     covered; the check is one-directional (scope acceptance is a subset of the
     claimed union, tasks may reference extra out-of-scope read-only inputs), and
     changes without a scope.yaml are skipped. Synthetic fixtures prove the
-    positive path (full coverage, zero error, across backtick / delimiter /
-    continuation-line variants), the core negative path (one unclaimed scope AC
-    yields exactly one named error), the parsing boundaries, and the skip case;
-    a real-baseline assertion proves the four current scope.yaml changes
-    (M0A, M1, CHG-005, M0B) have zero scope-coverage error so the enhancement
-    introduces no false positive and keeps check-sdd at 0 errors / 0 warnings /
-    111 acceptance IDs. The change touches only the guard tool and its test,
-    with no spec, contract, baseline, product or device change.
+    positive path for AC-*, MAC-* and HW-* identifiers (full coverage, zero
+    error, across backtick / delimiter / continuation-line variants), the core
+    negative path (one unclaimed scope ID yields exactly one named error),
+    identifier-boundary rejection, and the rule that ellipsis, wildcard,
+    slash shorthand and natural-language "etc." never expand into unstated
+    claims, plus the skip case. After separate explicit legacy traceability
+    remediation, a real-baseline assertion proves the four current scope.yaml
+    changes (M0A, M1, CHG-005, M0B) have zero scope-coverage error so the
+    enhancement introduces no false positive and keeps check-sdd at 0 errors /
+    0 warnings / 111 acceptance IDs. The change touches only the guard tool and
+    its test, with no spec, contract, baseline, product or device change.

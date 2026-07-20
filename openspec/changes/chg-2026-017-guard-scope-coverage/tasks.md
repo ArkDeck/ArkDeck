@@ -5,9 +5,9 @@
 
 ## TASK-GUARD-001 — check_sdd per-change scope 覆盖校验 + 测试
 
-- Status:blocked(readiness invalidation candidate;仅在维护者 review/merge 本独立
-  status PR 后生效。2026-07-20 实现前精确基线证明已批准解析规则会对
-  现有 scope 产生 35 个错误,违反零 false-positive gate;实现 dispatch 保持 0)
+- Status:blocked(PR #183 已作废 readiness。2026-07-20 实现前精确基线证明
+  r1 解析规则会对现有 scope 产生 35 个错误,违反零 false-positive gate;
+  实现 dispatch 保持 0)
 - Readiness invalidation(2026-07-20;host-only/offline):
   - Exact preflight:按 design §2 的 `AC-[A-Z0-9]+-\d+-\d+` 与续行规则
     执行,CHG-001 缺 20、CHG-002 缺 10、CHG-005 缺 0、CHG-006 缺 5;
@@ -15,9 +15,12 @@
   - Conflict:proposal/design/verification 要求四个现有 `scope.yaml` change 零
     false positive,但 design 精确 token 语法无法解析已有 `MAC-*`/`HW-*`
     acceptance,也不展开 `…`/`*`/`01/02`/`等` 简写;两者不能同时满足。
-  - Re-entry gate:须先经独立 governance revision 固定全部 acceptance ID
-    语法,再经独立 traceability remediation 将旧 change 认领改为显式 token;
-    两者合入 main 后另起 readiness PR 复核,未满足前不得实现。
+  - Grammar gate:r2 修订以 scope 中不透明 acceptance ID 动态精确匹配,
+    覆盖 `AC-*`/`MAC-*`/`HW-*`,并拒绝从简写推断;仅在维护者
+    review/merge 本独立 governance revision PR 后满足。
+  - Re-entry gate:grammar r2 合入后,仍须独立 traceability remediation 将旧
+    change 认领改为显式完整 token;两者合入 main 后另起 readiness PR
+    复核,未满足前不得实现。
 - Superseded readiness review(2026-07-20;PR #182 合入时的历史快照;
   已被上述 exact preflight 作废):
   - Approval gate:satisfied。CHG-2026-017 approved(approval-only PR #181 已由维护者
@@ -51,12 +54,14 @@
 - Hardware required:no。
 - Required environment:`<ARKDECK_ROOT>/.venv-sdd/bin/python`(guard 既有环境);
   实现/测试仅用 stdlib+PyYAML 与本地临时目录。
-- Deliverables:`check_sdd.py` scope 覆盖校验 + `test_check_sdd.py` + `run.md`
+- Deliverables:`check_sdd.py` 全 acceptance ID scope 覆盖校验 +
+  `test_check_sdd.py` + `run.md`
   (base OID、实现前 current-main 四 scope.yaml change 零 scope-coverage err 基线、
   测试计数、check-sdd 增强后 0/0/111、偏差)。
 - Verification:
-  - `GUARD-SCOPE-COVERAGE-001` 二值——`test_check_sdd.py` 正例/反例(核心断链具名
-    err)/解析边界/跳过/真实基线全 PASS;
+  - `GUARD-SCOPE-COVERAGE-001` 二值——`test_check_sdd.py` 覆盖
+    `AC-*`/`MAC-*`/`HW-*` 精确认领正例、核心断链具名 err、标识符边界、
+    简写拒绝、跳过与真实基线全 PASS;
   - 实现前后 `scripts/check-sdd.sh` 均 `0 errors / 0 warnings / 111 acceptance IDs`
     (增强不引入 false positive);
   - `<ARKDECK_PYTHON> scripts/test_check_sdd.py`;`git diff --check`;
