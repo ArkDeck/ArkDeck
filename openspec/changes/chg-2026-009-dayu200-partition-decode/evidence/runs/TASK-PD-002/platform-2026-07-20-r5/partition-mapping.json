@@ -1,0 +1,297 @@
+{
+  "archiveIdentity": {
+    "identityMatch": true,
+    "sha256": "fc7637f34a8394847b1b6c7e7ff2750863d18c6dc05e184abaf5aed70ec75280",
+    "sizeBytes": 732948803
+  },
+  "citationBoundary": "S2 citations document grammar/tooling context only; every value below is a read-only observation of the pinned parameter member.",
+  "device": "rk29xxnand",
+  "grammar": {
+    "allowedAttributes": [
+      "bootable",
+      "grow"
+    ],
+    "envelope": "CMDLINE:mtdparts=<device>:<partition>[,<partition>...]",
+    "grammarBranches": [
+      "fixed",
+      "fixedBootable",
+      "remainderGrow"
+    ],
+    "numericUnit": "sourceEncodedUnitUnconverted",
+    "partition": "(<hex-size>|-)@<hex-offset>(<name>[:<attribute>])",
+    "remainderConstraint": "remainderGrow must be the final partition"
+  },
+  "parameterMemberReference": {
+    "path": "parameter.txt",
+    "sha256": "35464e3f0b883a8a043dd45ae7ab2342c86b7aa27f24aa1e5a0ccfb6f442d048",
+    "sizeBytes": 788,
+    "sourceInventory": "openspec/changes/archive/2026-07-18-chg-2026-003-dayu200-image-characterization/evidence/member-inventory.json"
+  },
+  "partitionCount": 15,
+  "partitions": [
+    {
+      "attribute": null,
+      "grammarBranch": "fixed",
+      "index": 0,
+      "name": "uboot",
+      "offset": {
+        "encoded": "0x00002000",
+        "value": 8192
+      },
+      "size": {
+        "encoded": "0x00002000",
+        "kind": "fixed",
+        "value": 8192
+      }
+    },
+    {
+      "attribute": null,
+      "grammarBranch": "fixed",
+      "index": 1,
+      "name": "misc",
+      "offset": {
+        "encoded": "0x00004000",
+        "value": 16384
+      },
+      "size": {
+        "encoded": "0x00002000",
+        "kind": "fixed",
+        "value": 8192
+      }
+    },
+    {
+      "attribute": null,
+      "grammarBranch": "fixed",
+      "index": 2,
+      "name": "bootctrl",
+      "offset": {
+        "encoded": "0x00006000",
+        "value": 24576
+      },
+      "size": {
+        "encoded": "0x00001000",
+        "kind": "fixed",
+        "value": 4096
+      }
+    },
+    {
+      "attribute": null,
+      "grammarBranch": "fixed",
+      "index": 3,
+      "name": "resource",
+      "offset": {
+        "encoded": "0x00007000",
+        "value": 28672
+      },
+      "size": {
+        "encoded": "0x00003000",
+        "kind": "fixed",
+        "value": 12288
+      }
+    },
+    {
+      "attribute": "bootable",
+      "grammarBranch": "fixedBootable",
+      "index": 4,
+      "name": "boot_linux",
+      "offset": {
+        "encoded": "0x0000A000",
+        "value": 40960
+      },
+      "size": {
+        "encoded": "0x00030000",
+        "kind": "fixed",
+        "value": 196608
+      }
+    },
+    {
+      "attribute": null,
+      "grammarBranch": "fixed",
+      "index": 5,
+      "name": "ramdisk",
+      "offset": {
+        "encoded": "0x0003A000",
+        "value": 237568
+      },
+      "size": {
+        "encoded": "0x00002000",
+        "kind": "fixed",
+        "value": 8192
+      }
+    },
+    {
+      "attribute": null,
+      "grammarBranch": "fixed",
+      "index": 6,
+      "name": "system",
+      "offset": {
+        "encoded": "0x0003C000",
+        "value": 245760
+      },
+      "size": {
+        "encoded": "0x00400000",
+        "kind": "fixed",
+        "value": 4194304
+      }
+    },
+    {
+      "attribute": null,
+      "grammarBranch": "fixed",
+      "index": 7,
+      "name": "vendor",
+      "offset": {
+        "encoded": "0x0043C000",
+        "value": 4440064
+      },
+      "size": {
+        "encoded": "0x00200000",
+        "kind": "fixed",
+        "value": 2097152
+      }
+    },
+    {
+      "attribute": null,
+      "grammarBranch": "fixed",
+      "index": 8,
+      "name": "sys-prod",
+      "offset": {
+        "encoded": "0x0063C000",
+        "value": 6537216
+      },
+      "size": {
+        "encoded": "0x00019000",
+        "kind": "fixed",
+        "value": 102400
+      }
+    },
+    {
+      "attribute": null,
+      "grammarBranch": "fixed",
+      "index": 9,
+      "name": "chip-prod",
+      "offset": {
+        "encoded": "0x00655000",
+        "value": 6639616
+      },
+      "size": {
+        "encoded": "0x00019000",
+        "kind": "fixed",
+        "value": 102400
+      }
+    },
+    {
+      "attribute": null,
+      "grammarBranch": "fixed",
+      "index": 10,
+      "name": "updater",
+      "offset": {
+        "encoded": "0x0066E000",
+        "value": 6742016
+      },
+      "size": {
+        "encoded": "0x00010000",
+        "kind": "fixed",
+        "value": 65536
+      }
+    },
+    {
+      "attribute": null,
+      "grammarBranch": "fixed",
+      "index": 11,
+      "name": "eng_system",
+      "offset": {
+        "encoded": "0x0067E000",
+        "value": 6807552
+      },
+      "size": {
+        "encoded": "0x00008000",
+        "kind": "fixed",
+        "value": 32768
+      }
+    },
+    {
+      "attribute": null,
+      "grammarBranch": "fixed",
+      "index": 12,
+      "name": "eng_chipset",
+      "offset": {
+        "encoded": "0x00686000",
+        "value": 6840320
+      },
+      "size": {
+        "encoded": "0x00008000",
+        "kind": "fixed",
+        "value": 32768
+      }
+    },
+    {
+      "attribute": null,
+      "grammarBranch": "fixed",
+      "index": 13,
+      "name": "chip_ckm",
+      "offset": {
+        "encoded": "0x0069E000",
+        "value": 6938624
+      },
+      "size": {
+        "encoded": "0x00020000",
+        "kind": "fixed",
+        "value": 131072
+      }
+    },
+    {
+      "attribute": "grow",
+      "grammarBranch": "remainderGrow",
+      "index": 14,
+      "name": "userdata",
+      "offset": {
+        "encoded": "0x01308000",
+        "value": 19955712
+      },
+      "size": {
+        "encoded": "-",
+        "kind": "remainder",
+        "value": null
+      }
+    }
+  ],
+  "s2SourceCitations": [
+    {
+      "id": "S2-LINUX-CMDLINEPART",
+      "scope": "mtdparts size/offset/name grammar background",
+      "title": "Linux kernel command-line partition parser",
+      "url": "https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/drivers/mtd/parsers/cmdlinepart.c"
+    },
+    {
+      "id": "S2-ROCKCHIP-RKBIN",
+      "scope": "Rockchip image-package and parameter context",
+      "title": "Rockchip official rkbin repository",
+      "url": "https://github.com/rockchip-linux/rkbin"
+    },
+    {
+      "id": "S2-ROCKCHIP-RKDEVELOPTOOL",
+      "scope": "Rockchip partition/tooling context; no write behavior inferred",
+      "title": "Rockchip official rkdeveloptool repository",
+      "url": "https://github.com/rockchip-linux/rkdeveloptool"
+    },
+    {
+      "id": "S2-OPENHARMONY-DOCS",
+      "scope": "DAYU200/OpenHarmony device-porting context",
+      "title": "OpenHarmony official device-development documentation repository",
+      "url": "https://gitcode.com/openharmony/docs"
+    }
+  ],
+  "schema": "arkdeck-dayu200-partition-mapping-1.0.0",
+  "scope": {
+    "archiveLocatorIncluded": false,
+    "authoritative": false,
+    "compatibilityClaim": false,
+    "flashAddressDerived": false,
+    "flashProtocolClaim": false,
+    "hardwareSupportClaim": false,
+    "nonAuthoritative": true,
+    "parameterRawTextIncluded": false,
+    "validOnlyForPinnedArchive": true
+  },
+  "sourcePolicyReference": "openspec/changes/chg-2026-007-dayu200-flash-route-planning/evidence/route-b-plan.md#gap-dayu200-partition-semantics分区表语义"
+}

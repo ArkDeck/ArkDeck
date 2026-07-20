@@ -1,0 +1,285 @@
+{
+  "imageMemberCount": 11,
+  "inventoryMemberCount": 17,
+  "inventoryReference": {
+    "archiveSha256": "fc7637f34a8394847b1b6c7e7ff2750863d18c6dc05e184abaf5aed70ec75280",
+    "memberCount": 17,
+    "path": "openspec/changes/archive/2026-07-18-chg-2026-003-dayu200-image-characterization/evidence/member-inventory.json",
+    "sha256": "429763e6fabcaaa2f7323eab862fdb8c65d63ecc88afb441a36073ee5c35818c"
+  },
+  "mappedImageCount": 9,
+  "mappingRule": "case-sensitive filename stem == decoded partition name; no alias, punctuation normalization, similarity matching or address inference",
+  "members": [
+    {
+      "index": 0,
+      "partition": "boot_linux",
+      "path": "boot_linux.img",
+      "reason": "exact case-sensitive filename stem match",
+      "role": "partitionImage",
+      "sha256Reference": "390c2cf2bf59f8bedc99a9622a1263410c6132341aece6a1b9c30ed5567a9523",
+      "status": "mapped"
+    },
+    {
+      "index": 1,
+      "partition": "chip_ckm",
+      "path": "chip_ckm.img",
+      "reason": "exact case-sensitive filename stem match",
+      "role": "partitionImage",
+      "sha256Reference": "b60b62747679659c337eef737ea5064bbcea68b9fc219f62a076c06d05a6c81a",
+      "status": "mapped"
+    },
+    {
+      "index": 2,
+      "partition": null,
+      "path": "chip_prod.img",
+      "reason": "no exact partition-name match; alias inference is forbidden",
+      "role": "partitionImage",
+      "sha256Reference": "6d009c6b685f65f91bd77ceb201916f07dde8668fde4432ee534bb04e0b6cbad",
+      "status": "orphan"
+    },
+    {
+      "index": 3,
+      "partition": null,
+      "path": "config.cfg",
+      "reason": "not an .img partition member",
+      "role": "packageMetadata",
+      "sha256Reference": "4d06d303faff1d3e530a9d2c9bb22073427b0b498bb4bb438b5177897d86f33c",
+      "status": "notApplicable"
+    },
+    {
+      "index": 4,
+      "partition": null,
+      "path": "daily_build.log",
+      "reason": "not an .img partition member",
+      "role": "packageMetadata",
+      "sha256Reference": "5823dd263cab3168dbd3ee098c5b5045b82b8393548b9da9f095de2883a2a0e9",
+      "status": "notApplicable"
+    },
+    {
+      "index": 5,
+      "partition": null,
+      "path": "manifest_tag.xml",
+      "reason": "not an .img partition member",
+      "role": "packageMetadata",
+      "sha256Reference": "fd458507b4bb63f372049a0bb9a2cd779af426e2d27de43134ace05e5884ff74",
+      "status": "notApplicable"
+    },
+    {
+      "index": 6,
+      "partition": null,
+      "path": "MiniLoaderAll.bin",
+      "reason": "not an .img partition member",
+      "role": "loaderBinary",
+      "sha256Reference": "1cdd418032195210f191445ed96e2da5ea83d2cfe880c912ebec635839d76542",
+      "status": "notApplicable"
+    },
+    {
+      "index": 7,
+      "partition": null,
+      "path": "parameter.txt",
+      "reason": "not an .img partition member",
+      "role": "partitionMetadata",
+      "sha256Reference": "35464e3f0b883a8a043dd45ae7ab2342c86b7aa27f24aa1e5a0ccfb6f442d048",
+      "status": "notApplicable"
+    },
+    {
+      "index": 8,
+      "partition": "ramdisk",
+      "path": "ramdisk.img",
+      "reason": "exact case-sensitive filename stem match",
+      "role": "partitionImage",
+      "sha256Reference": "cc6f7c3d9568cbb3f810edd67ebe0015a04734605ca4f21c065ce94f88ec3b07",
+      "status": "mapped"
+    },
+    {
+      "index": 9,
+      "partition": "resource",
+      "path": "resource.img",
+      "reason": "exact case-sensitive filename stem match",
+      "role": "partitionImage",
+      "sha256Reference": "161cf158f6f256e7794568b1307581e4656da1a8d8d3d2612da73195d3eda06e",
+      "status": "mapped"
+    },
+    {
+      "index": 10,
+      "partition": null,
+      "path": "sys_prod.img",
+      "reason": "no exact partition-name match; alias inference is forbidden",
+      "role": "partitionImage",
+      "sha256Reference": "8dfb72cfa61dc748f62f3d766214ab579c857f3b8a62e6890a8abc7ae0ac1062",
+      "status": "orphan"
+    },
+    {
+      "index": 11,
+      "partition": "system",
+      "path": "system.img",
+      "reason": "exact case-sensitive filename stem match",
+      "role": "partitionImage",
+      "sha256Reference": "aef65124a814fcce8345dbfbdf049aaa862bd76786d099095c6951b4561ba1bb",
+      "status": "mapped"
+    },
+    {
+      "index": 12,
+      "partition": "uboot",
+      "path": "uboot.img",
+      "reason": "exact case-sensitive filename stem match",
+      "role": "partitionImage",
+      "sha256Reference": "c1c801e45cbb92ee63e14df3dda5d819792e02295525bd53dbf750efb645916d",
+      "status": "mapped"
+    },
+    {
+      "index": 13,
+      "partition": null,
+      "path": "updater_binary",
+      "reason": "not an .img partition member",
+      "role": "updateHelper",
+      "sha256Reference": "84659f9fd5a13b8293904f9ad7531ee9637523efffb90e74a49443f9f8ef5cd5",
+      "status": "notApplicable"
+    },
+    {
+      "index": 14,
+      "partition": "updater",
+      "path": "updater.img",
+      "reason": "exact case-sensitive filename stem match",
+      "role": "partitionImage",
+      "sha256Reference": "5f70d2f79cbcda267a20aff98c187ffdaac2ce1f693ae6f7dbdc2bec7b1c5494",
+      "status": "mapped"
+    },
+    {
+      "index": 15,
+      "partition": "userdata",
+      "path": "userdata.img",
+      "reason": "exact case-sensitive filename stem match",
+      "role": "partitionImage",
+      "sha256Reference": "715e7998ebd47653a0ec2e062964224684762ab8686330c6b69b8d5f1f55886c",
+      "status": "mapped"
+    },
+    {
+      "index": 16,
+      "partition": "vendor",
+      "path": "vendor.img",
+      "reason": "exact case-sensitive filename stem match",
+      "role": "partitionImage",
+      "sha256Reference": "61e0c9adda4420417d88bcc1f4d725558b75e41046f528100a584c8dc466cd41",
+      "status": "mapped"
+    }
+  ],
+  "orphanImageCount": 2,
+  "orphanImageMembers": [
+    "chip_prod.img",
+    "sys_prod.img"
+  ],
+  "orphanPartitionCount": 6,
+  "orphanPartitions": [
+    "misc",
+    "bootctrl",
+    "sys-prod",
+    "chip-prod",
+    "eng_system",
+    "eng_chipset"
+  ],
+  "partitions": [
+    {
+      "imageMember": "uboot.img",
+      "index": 0,
+      "partition": "uboot",
+      "status": "mapped"
+    },
+    {
+      "imageMember": null,
+      "index": 1,
+      "partition": "misc",
+      "status": "orphan"
+    },
+    {
+      "imageMember": null,
+      "index": 2,
+      "partition": "bootctrl",
+      "status": "orphan"
+    },
+    {
+      "imageMember": "resource.img",
+      "index": 3,
+      "partition": "resource",
+      "status": "mapped"
+    },
+    {
+      "imageMember": "boot_linux.img",
+      "index": 4,
+      "partition": "boot_linux",
+      "status": "mapped"
+    },
+    {
+      "imageMember": "ramdisk.img",
+      "index": 5,
+      "partition": "ramdisk",
+      "status": "mapped"
+    },
+    {
+      "imageMember": "system.img",
+      "index": 6,
+      "partition": "system",
+      "status": "mapped"
+    },
+    {
+      "imageMember": "vendor.img",
+      "index": 7,
+      "partition": "vendor",
+      "status": "mapped"
+    },
+    {
+      "imageMember": null,
+      "index": 8,
+      "partition": "sys-prod",
+      "status": "orphan"
+    },
+    {
+      "imageMember": null,
+      "index": 9,
+      "partition": "chip-prod",
+      "status": "orphan"
+    },
+    {
+      "imageMember": "updater.img",
+      "index": 10,
+      "partition": "updater",
+      "status": "mapped"
+    },
+    {
+      "imageMember": null,
+      "index": 11,
+      "partition": "eng_system",
+      "status": "orphan"
+    },
+    {
+      "imageMember": null,
+      "index": 12,
+      "partition": "eng_chipset",
+      "status": "orphan"
+    },
+    {
+      "imageMember": "chip_ckm.img",
+      "index": 13,
+      "partition": "chip_ckm",
+      "status": "mapped"
+    },
+    {
+      "imageMember": "userdata.img",
+      "index": 14,
+      "partition": "userdata",
+      "status": "mapped"
+    }
+  ],
+  "schema": "arkdeck-dayu200-member-reconciliation-1.0.0",
+  "scope": {
+    "archiveLocatorIncluded": false,
+    "authoritative": false,
+    "compatibilityClaim": false,
+    "flashAddressDerived": false,
+    "flashProtocolClaim": false,
+    "hardwareSupportClaim": false,
+    "nonAuthoritative": true,
+    "parameterRawTextIncluded": false,
+    "validOnlyForPinnedArchive": true
+  }
+}

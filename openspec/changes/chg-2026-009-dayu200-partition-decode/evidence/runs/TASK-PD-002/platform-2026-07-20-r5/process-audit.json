@@ -1,0 +1,114 @@
+{
+  "applicationChunkReferenceRetainedAcrossNextReadBytes": 0,
+  "archiveOpenModes": [
+    "preopened-read-only-fd"
+  ],
+  "archivePassCount": 2,
+  "archivePathAcceptedByDecoder": false,
+  "archivePathOpenCallCount": 0,
+  "archiveSourceKind": "preopenedReadOnlyRegularFileDescriptor",
+  "codecAuditReceipt": {
+    "claims": {
+      "allocatorResidueForensicZeroizationClaimed": false
+    },
+    "configuration": {
+      "compressedRemainderCapBytes": 65536,
+      "deflateBaseWindowBits": 15,
+      "historyUpperBoundBytes": 32768,
+      "presetDictionaryConfigured": false,
+      "zlibGzipWbits": 31
+    },
+    "lifecycle": {
+      "applicationPlaintextLiveBytesAfterClose": 0,
+      "cleanupControlFlow": "decode_archive explicit finally",
+      "cleanupViaFinallyObserved": true,
+      "closed": true,
+      "codecActiveAfterClose": false,
+      "codecCloseCount": 1,
+      "compressedRemainderBytesAfterClose": 0,
+      "compressedRemainderBytesBeforeClose": 39869,
+      "destructionPoint": "targetBodyObtained"
+    },
+    "prohibitedOperations": {
+      "additionalNonTargetPlaintextBufferCount": 0,
+      "codecCloneCount": 0,
+      "codecExportCount": 0,
+      "historyOrBodyViewCount": 0
+    },
+    "runtimeObservation": {
+      "applicationPlaintextRetainedIntoNextReadBytes": 0,
+      "codecCreateCount": 1,
+      "compressedRemainderObservedMaximumBytes": 65536,
+      "configurationObservedAtCodecCreate": true,
+      "observedDeflateBaseWindowBits": 15,
+      "observedHistoryUpperBoundBytes": 32768,
+      "observedZlibWbits": 31,
+      "presetDictionaryUsed": false
+    },
+    "schema": "arkdeck-dayu200-deflate-codec-audit-1.0.0"
+  },
+  "configuredCompressedInputChunkBytes": 65536,
+  "configuredMaxReadChunkBytes": 1048576,
+  "counterProvenance": {
+    "dispatchCounters": "subprocess/network/transport/device-mutation structural zeros are asserted by strict production-source import and call-target allowlists; workflow device exclusion is separately proved by broker policy",
+    "nonParameterContent": "application-visible non-target chunks are consumed only to position the single gzip/tar stream and are dropped before the next codec read; the closed runtime receipt separately bounds and destroys opaque codec history and compressed remainder",
+    "readMetrics": "identity hash and gzip receive _AuditedRawStream wrappers; every compressed byte returned by read/readinto is assigned to one pass",
+    "sourceType": "production API accepts only an integer descriptor; fstat and F_GETFL prove regular/read-only state before the first read; os.dup preserves the capability without resolving an archive path"
+  },
+  "crossChunkRetentionAcceptanceSatisfied": true,
+  "decoderDescriptorBoundarySatisfied": true,
+  "decompressedBytesStreamedThroughLocator": 178174740,
+  "deflateInternalHistoryRetention": "RFC 1951 codec-owned opaque state; inaccessible to application",
+  "deflateWindowUpperBoundBytes": 32768,
+  "dispatchCounters": {
+    "childProcess": 0,
+    "deviceMutation": 0,
+    "flashd": 0,
+    "hdc": 0,
+    "network": 0,
+    "tcp": 0,
+    "uart": 0,
+    "usb": 0,
+    "vendorTool": 0
+  },
+  "firstReadOccurredOnlyAfterDescriptorGates": true,
+  "fstatCompletedBeforeFirstRead": true,
+  "gzipCompressedBytesBufferedAtStop": 39869,
+  "gzipPassRawBytesRead": 17956864,
+  "highLevelGzipPrefetchUsed": false,
+  "identityPassRawBytesRead": 732948803,
+  "maxObservedReadChunkBytes": 1048576,
+  "memberExtractionToDiskCount": 0,
+  "nonParameterBodyLifecycle": "application-visible output chunks are counted and discarded before the next codec read; only the closed receipt's opaque DEFLATE history remains",
+  "nonParameterMemberContentBytesReadAndDiscarded": 178168731,
+  "nonParameterMemberContentReturnedToDecoderCount": 0,
+  "nonParameterMemberContentsRead": 7,
+  "nonParameterMemberSpansStreamDiscarded": 7,
+  "parameterBytesReturnedToDecoder": 788,
+  "partitionAcceptanceBlockingReasons": [],
+  "partitionAcceptanceSatisfied": true,
+  "pathReplacementRaceOutsideDecoderBoundary": true,
+  "postTargetDecompressedBytesProduced": 0,
+  "potentialDeviceOpenPathCount": 0,
+  "pythonVersion": "3.14.6",
+  "rawBytesRead": 750905667,
+  "readOnlyDescriptorGateChecks": 4,
+  "readOnlyDescriptorGatePassed": true,
+  "regularFileGateChecks": 4,
+  "regularFileGatePassed": true,
+  "schema": "arkdeck-dayu200-partition-decode-audit-3.0.0",
+  "scope": {
+    "archiveLocatorIncluded": false,
+    "authoritative": false,
+    "compatibilityClaim": false,
+    "flashAddressDerived": false,
+    "flashProtocolClaim": false,
+    "hardwareSupportClaim": false,
+    "nonAuthoritative": true,
+    "parameterRawTextIncluded": false,
+    "validOnlyForPinnedArchive": true
+  },
+  "stoppedImmediatelyAfterParameterBody": true,
+  "tarHeadersInspected": 8,
+  "workflowZeroDeviceClaimRequiresBrokerEvidence": true
+}
