@@ -23,8 +23,10 @@
   provenance 已由 PR #141 合入 `evidence/provenance/subserver-capability-doc.md`,
   1/4 family 已满足——2026-07-20 账本对齐补记;同日 `serverIdentityGeneration` 与
   `keyAccessDiagnostics` 的 host-only capture record 随 evidence PR 合入
-  `evidence/provenance/host-only-capture-2026-07-20.md`(merge 即认可),3/4 已满足,
-  仅余 `selectedDeviceAuthorizationBinding` 待独立设备窗口）；独立 readiness PR merged（未满足）
+  `evidence/provenance/host-only-capture-2026-07-20.md`(merge 即认可),3/4 已满足;
+  同日 `selectedDeviceAuthorizationBinding` 经独立设备窗口采集,capture record 随
+  evidence PR 合入 `evidence/provenance/device-window-capture-2026-07-20.md`
+  (merge 即认可),**4/4 全部满足**——剩余前置仅为独立 readiness PR）；独立 readiness PR merged（未满足）
 - Allowed paths:
   - `openspec/integrations/openharmony/profile.md`
   - `openspec/integrations/openharmony/readonly-probes.yaml`（可新建）
