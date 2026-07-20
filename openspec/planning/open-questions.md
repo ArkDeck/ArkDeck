@@ -57,16 +57,37 @@ Open question 不得以聊天记忆留存。每项记录默认决策、阻塞范
     `flash-protocol-facts.md`（文档面已建立:DAYU200 官方烧录仅 Windows
     RockUSB/RKDevTool,flashd 端到端与任何 macOS 烧写路径均无官方文档;flashd 进入
     命令、MaskRom/Loader 依 bcdUSB 判别、VID/PID 事实、rkdeveloptool ≥1.32 macOS 可
-    构建）。剩余=第二阶段真机模式确认（写设备,RECOVERY 先行,Route-B ④）。
+    构建）。**真机确认（2026-07-20,RH-001 PR #173）**:DAYU200 的 recovery/updater
+    进态实测 `2207:5000`（updater-hdc,落实 CHG-011 待确证 PID）,rkdeveloptool
+    RockUSB 无法驱动该模式——真机侧印证"macOS 烧写实际走 hdc/flashd 而非
+    rkdeveloptool RockUSB"。剩余=第二阶段真机模式确认（写设备,RECOVERY 先行,
+    Route-B ④）。
   - `GAP-DAYU200-RECOVERY-PATH`:archived CHG-2026-010 恢复预案（macOS 恢复路径=
     rkdeveloptool,S3 细节标注待演练确证）+ archived CHG-2026-013 演练准备
     （rkdeveloptool 1.32 已构建、物料 pinned）+ RISK-001 风险接受在案。剩余=恢复演练
     本身（device-gated,检查单第 3 项待 TASK-PD-002、第 5 项待时间窗）。
-  - `GAP-DAYU200-PARTITION-SEMANTICS`:预期载体=TASK-PD-002 fresh platform
-    mapping/reconciliation evidence（已 ready,#139;TASK-PD-001 headless done 仅提供
-    implementation identity,不含分区数值）。产出后另行登记。
-  - `GAP-DAYU200-FLASH-ADDRESSES`:预期载体=TASK-FA-001（CHG-2026-012 approved,
-    blocked 于 PD-002 evidence）。产出后另行登记。
+    **真机 attempt 发现（2026-07-20 登记,CHG-2026-016 TASK-RH-001 blocked-attempt
+    PR #173 `bbf8ddf`）**:恢复演练首窗口证明 **rkdeveloptool RockUSB 路径对 DAYU200
+    不通**——Maskrom-按键路径产出 `Vid=0x2207,Pid=0x5000`（updater-hdc,非 RockUSB
+    `0x350a`）,`ld` 能枚举但 `db` 建 comm 即失败（sudo 复测同样失败,排除特权）;
+    一手推翻预案的 rkdeveloptool 主路径假设,指向 DAYU200 恢复/烧写实际通道为
+    **hdc/flashd**（与 GAP-FLASH-PROTOCOL 的 CHG-011 缺席结论一致）。设备零字节写入、
+    经重启完整恢复到正常态（有限 recovery 事实）。剩余=恢复路线重定向研究（rkdeveloptool
+    真 Maskrom `0x350a` 物理进态 vs hdc/flashd）+ 重约窗口;`GAP-DAYU200-RECOVERY-PATH`
+    **保持 open**。
+  - `GAP-DAYU200-PARTITION-SEMANTICS`:**已登记（2026-07-20）**=TASK-PD-002 done
+    （evidence PR #164 `6f26ca3`、状态 PR #165 `e20a832`）的 fresh signed-broker
+    platform `partition-mapping.json`（SHA-256 `965e3bf3…`）+ `member-reconciliation.json`
+    （`55c3515…`）:15 分区语义解读（offset/size 源编码值、grammarBranch、
+    mapped/orphan 对账,仅对 pinned archive identity `fc7637f3…5280` 成立,
+    non-authoritative）。剩余=真机分区表实际布局确证（GPT vs parameter,Route-B ④
+    第二阶段）。
+  - `GAP-DAYU200-FLASH-ADDRESSES`:**已登记（2026-07-20）**=TASK-FA-001 done
+    （research PR #167 `f9b74cc`、状态 PR #168 `03e975b`）的 `flash-address-facts.md`
+    （SHA-256 `e1c09d16…`）:15 分区目标地址映射表（逐行锚定 PD-002 扇区列,字节列
+    S2 ×512 派生）+ 各 host 工具寻址语义（`wl` 按 LBA 扇区、`wlx` 按名靠设备侧分区
+    表、`db`/`ul` loader 非扇区）+ PD-002 未覆盖项显式 unknown。剩余=真机 `ppt`/GPT
+    dump 对地址表的逐行确证（Route-B ④ 第二阶段）。
 - Blocks：M4 Provider implementation/verification
 - Affected：flashing spec、Provider contract
 
