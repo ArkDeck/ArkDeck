@@ -5,9 +5,21 @@
 
 ## TASK-GUARD-001 — check_sdd per-change scope 覆盖校验 + 测试
 
-- Status:ready(readiness candidate;仅在维护者 review/merge 本独立 readiness PR
-  后生效。本 PR 不含实现、evidence 或测试新增)
-- Readiness review(2026-07-20;host-only/offline,零设备、零网络):
+- Status:blocked(readiness invalidation candidate;仅在维护者 review/merge 本独立
+  status PR 后生效。2026-07-20 实现前精确基线证明已批准解析规则会对
+  现有 scope 产生 35 个错误,违反零 false-positive gate;实现 dispatch 保持 0)
+- Readiness invalidation(2026-07-20;host-only/offline):
+  - Exact preflight:按 design §2 的 `AC-[A-Z0-9]+-\d+-\d+` 与续行规则
+    执行,CHG-001 缺 20、CHG-002 缺 10、CHG-005 缺 0、CHG-006 缺 5;
+    具名记录见 `evidence/runs/TASK-GUARD-001/preflight-blocker-2026-07-20.md`。
+  - Conflict:proposal/design/verification 要求四个现有 `scope.yaml` change 零
+    false positive,但 design 精确 token 语法无法解析已有 `MAC-*`/`HW-*`
+    acceptance,也不展开 `…`/`*`/`01/02`/`等` 简写;两者不能同时满足。
+  - Re-entry gate:须先经独立 governance revision 固定全部 acceptance ID
+    语法,再经独立 traceability remediation 将旧 change 认领改为显式 token;
+    两者合入 main 后另起 readiness PR 复核,未满足前不得实现。
+- Superseded readiness review(2026-07-20;PR #182 合入时的历史快照;
+  已被上述 exact preflight 作废):
   - Approval gate:satisfied。CHG-2026-017 approved(approval-only PR #181 已由维护者
     合入 main `d55b25f`)。
   - Dependencies:satisfied。backlog 增强项已在 main 登记;AC-JOB-003/004 追溯
