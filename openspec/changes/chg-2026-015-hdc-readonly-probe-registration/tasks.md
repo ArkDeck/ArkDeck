@@ -6,13 +6,32 @@
 
 ## TASK-I15-001 — register four closed production read-only probe families
 
-- Status:ready(PR #157 已由维护者 review/merge 生效；registration implementation +
-  evidence candidate 见 `evidence/runs/TASK-I15-001/run.md`。依本 change 的 PR boundary，
-  实现 PR 合入后仍须使用独立状态 PR 提议 `ready→done`)
-- Completion evidence candidate:`evidence/runs/TASK-I15-001/run.md`（四 family 二值登记、
-  Bundle.module contract 7/0、全量 268/0/1 known opt-in skip、guard 0/0/111、零真实
-  HDC/device/network/server mutation dispatch；仅待实现 PR 的维护者 review/merge 与独立
-  done 状态 PR）
+- Status:done(TASK-I15-001 registration implementation + evidence PR #159 已由维护者
+  review/merge 合入 `main` squash commit `7c77672`;本独立状态 PR 依据下列 completion
+  evidence 起草 `ready→done`,仅在维护者 review/merge 后生效。本状态只关闭 probe
+  registration 的 integration inputs,不将任何 `AC-HDC-*`、TASK-M1-006、macOS
+  conformance、hardware/support/release 标记为 passed/done;M1-006 adoption 依
+  profile.md `adoption_boundary` 须独立 task)
+- Completion evidence:`evidence/runs/TASK-I15-001/run.md`(四 family 二值登记——
+  serverIdentityGeneration/selectedDeviceAuthorizationBinding = supported、
+  keyAccessDiagnostics/subserverCapability = unsupported,全部绑定 #141/#155/#156
+  维护者认可的一手 provenance;Bundle.module contract 7/0、全量 268/1 known opt-in
+  skip/0、guard 0/0/111、零真实 HDC/device/network/server-mutation dispatch)。状态
+  PR 复核(2026-07-20,合入版 `main` `7c77672` 独立深度审计):scope 逐文件对照
+  Allowed paths 零越界;四 family 结论与 provenance 记录逐条绑定、hash 全部独立
+  重算命中(19 文件 closure,registry=fixture 副本 `cmp` 字节相同);**测试经三组
+  变异证伪为真实断言**(receipt 改字节→hash closure 红、substitution 期望改
+  observed→control 模型红、subserver 改 supported→validate 抛错红,各有绿色对照);
+  filtered 7/0 与全量 268/1/0 复现;fixtures 敏感扫描零命中(零 32-hex serial
+  形态/零用户路径/零 key 标记);OPENHARMONY-TOOLS 0.3.0/lock 0.4.0 四处一致,
+  `adoption_boundary` 保留 0.2.0 consumer 边界。该复核只确认 evidence 可复现与
+  合入版一致性,不构成新的 acceptance 结论。
+- Known non-blocking residuals(状态 PR 如实记录,均不触及 verification gate):
+  ①denied 向量与 rawFamilyKnown:false 过约束,denied 分支非唯一可检(minor);
+  ②bundle 路径剥离在 symlink 根下有可移植性隐患,主树/CI 不受影响(minor);
+  ③隐私扫描面不含 resources.json 自身(内容已人工核清白且被 lock hash pin,info);
+  ④两个 unsupported entry 的 serverAbsentDisposition 用词不一(info)。收紧留待
+  后续 change 或 M1-006 adoption task 裁量。
 - Readiness review(2026-07-20;host-only,零 HDC/device/network dispatch):
   - Change gate:satisfied。CHG-2026-015 approved(PR #123,main `9f08c942`);r2
     capture plan(PR #140)固定采集面;revision 标记三方一致 2/@r2(#152 同步)。
