@@ -3,11 +3,11 @@
 > V2 治理:本文件是任务的唯一事实源;状态经 PR review 合入生效。change r1 已于
 > 2026-07-15 经 PR #14 合入 approved；r2 的 CORE-2.0.0 重定向已于 2026-07-16 经
 > PR #22 合入生效；r3 已于 PR #35 合入；r4 已于 main `87a3a99` 合入。r5 只修订
-> TASK-M1-006 两个 legacy contract 的精确 safety-alignment 授权，仅在维护者 review/merge
-> 后生效，不包含任何实现、evidence 或任务状态变化。r6 已经 PR #117 合入 `main`
+> TASK-M1-006 两个 legacy contract 的精确 safety-alignment 授权（已随 main `d78ad9a`
+> 合入生效，2026-07-20 追溯补记）。r6 已经 PR #117 合入 `main`
 > `4e0c4f94d12e0ab55902580e43bd6dd61c4e6e79` 并使 TASK-M1-007 headless readiness
-> 生效；r7 只补全 TASK-M1-008 task contract 并恢复依赖 fail-closed，不执行实现或生成
-> evidence。
+> 生效；r7 只补全 TASK-M1-008 task contract 并恢复依赖 fail-closed（已经 PR #119 合入
+> `main` `4dcb16fc09b237225e3aca95617b645d4006976b`，2026-07-20 追溯补记）。
 
 ## TASK-M1-001 — ArkDeckCore 域模型、封闭 typed-step registry 与 Job 状态机
 
@@ -17,8 +17,14 @@
 - Readiness gate:`CHG-2026-004` 已分别经 PR #19 实现、PR #20 验证，并经
   PR #21 archive 到 ratified `CORE-2.0.0`；current spec、journal contract、Swift
   state machine 与 `CORE-CONFORMANCE-2.0.0` 对两个 resume-marker 出口已一致。
-- Requirements/AC:REQ-WF-001、REQ-WF-002、REQ-JOB-001；AC-WF-001-01、
-  AC-WF-002-01、AC-JOB-001-01…07
+- Requirements/AC:REQ-WF-001、REQ-WF-002、REQ-JOB-001、REQ-JOB-003、REQ-JOB-004；
+  AC-WF-001-01、AC-WF-002-01、AC-JOB-001-01…07、AC-JOB-003-01、AC-JOB-004-01
+- Traceability correction（2026-07-20）:REQ-JOB-003/004 与 AC-JOB-003-01/004-01 自始由
+  本任务实现并在 `evidence/runs/TASK-M1-001/run.md` 二值 PASS
+  （`criticalCancellationContract`、`compensationFaultInjection`），但历届修订未把它们
+  写入上方 Requirements/AC 行，致使 verification.md 的"任务分配并集与 scope.yaml 精确
+  相等"不变式失真。本注记为追溯归属修复：不改变任何 evidence、结论或任务状态；
+  M1-010 对 `AC-JOB-003-01` 的引用仍为回归性质、不认领所有权。
 - Depends on:none
 - Allowed paths:`Packages/ArkDeckKit/Sources/ArkDeckCore/**`、对应 Tests、本 change `evidence/**`
 - Deliverables:未知 kind 按 destructive/unsupported 拒绝的封闭 WorkflowStep decode;精确 Core 迁移图的 Job/终态状态机与 property tests;保持原始失败分类的补偿顺序。
