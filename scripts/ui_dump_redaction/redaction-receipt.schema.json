@@ -1,0 +1,129 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://arkdeck.local/schemas/ui-dump-redaction-receipt-1.0.0.json",
+  "title": "ArkDeck UI Dump derived-redaction receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "algorithm",
+    "raw",
+    "derived",
+    "replacements",
+    "normalization",
+    "outputSideCheck",
+    "replay",
+    "completedAt"
+  ],
+  "properties": {
+    "schema": {
+      "const": "arkdeck-ui-dump-redaction-receipt-1.0.0"
+    },
+    "algorithm": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "version",
+        "sourceSha256",
+        "manifestSha256",
+        "safeLiteralsSha256",
+        "receiptSchemaSha256"
+      ],
+      "properties": {
+        "id": { "const": "uidump-derived-redaction-v1" },
+        "version": { "const": 1 },
+        "sourceSha256": { "$ref": "#/$defs/sha256" },
+        "manifestSha256": { "$ref": "#/$defs/sha256" },
+        "safeLiteralsSha256": { "$ref": "#/$defs/sha256" },
+        "receiptSchemaSha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "raw": { "$ref": "#/$defs/artifact" },
+    "derived": { "$ref": "#/$defs/artifact" },
+    "replacements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["total", "unique", "byType", "uniqueByType"],
+      "properties": {
+        "total": { "type": "integer", "minimum": 1 },
+        "unique": { "type": "integer", "minimum": 1 },
+        "byType": { "$ref": "#/$defs/typeCounts" },
+        "uniqueByType": { "$ref": "#/$defs/typeCounts" }
+      }
+    },
+    "normalization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["lineEndings", "lineCount", "tokenCount"],
+      "properties": {
+        "lineEndings": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["lf", "crlf", "cr"],
+          "properties": {
+            "lf": { "type": "integer", "minimum": 0 },
+            "crlf": { "type": "integer", "minimum": 0 },
+            "cr": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "lineCount": { "type": "integer", "minimum": 1 },
+        "tokenCount": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "outputSideCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["passed", "checkedSensitiveLiterals"],
+      "properties": {
+        "passed": { "const": true },
+        "checkedSensitiveLiterals": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "replay": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["argv"],
+      "properties": {
+        "argv": {
+          "type": "array",
+          "minItems": 14,
+          "maxItems": 14,
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "completedAt": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sha256", "size"],
+      "properties": {
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "size": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "typeCounts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ID", "NU", "PA", "PK", "QU", "TX"],
+      "properties": {
+        "ID": { "type": "integer", "minimum": 0 },
+        "NU": { "type": "integer", "minimum": 0 },
+        "PA": { "type": "integer", "minimum": 0 },
+        "PK": { "type": "integer", "minimum": 0 },
+        "QU": { "type": "integer", "minimum": 0 },
+        "TX": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}
