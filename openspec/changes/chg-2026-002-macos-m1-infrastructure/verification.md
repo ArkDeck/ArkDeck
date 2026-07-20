@@ -51,7 +51,7 @@ hardware-support verified writer count 0、real connectKey count 0 与 external 
 | MAC-M1-JOURNAL-001 | REQ-JOB-002、REQ-JOB-006、REQ-JOB-007 | crash-window fault injection matrix | kills before intent / after durable intent / after side effect / before finalize each reconcile to the defined state; zero destructive replay; outcomeUnknown preserved | passed（TASK-M1-003 done；`evidence/runs/TASK-M1-003/run.md`） |
 | MAC-M1-STORE-001 | REQ-STO-001…005、PORT-VOLUME-001、PORT-STORAGE-001 | volume identity + admission + ENOSPC injection | same-volume claims share one budget; second heavy writer waits/rejected; metadata headroom survives external pressure; runtime ENOSPC finalizes shards and fails closed | passed（TASK-M1-005 done，PR #37/#38；`evidence/runs/TASK-M1-005/run.md`） |
 | MAC-M1-HDC-001 | REQ-HDC-001…010；PORT-PROCESS-001、PORT-FILE-ACCESS-001、PORT-TOOL-TRUST-001、PORT-DEVICE-ACCESS-001 | pinned-golden fake-hdc real-child-process matrix + descriptor-bound launch + durable reopen/replay + signed Sandbox macOS XCUITest | only approved/pinned read-only semantic families are accepted; durable intent and actual descriptor/inode/hash/argv stay bound; path substitution launches zero children; external/unknown automatic lifecycle count 0 while diagnostics and confirmed recovery options are shown; subserver capability is shown read-only with spawn/killall count 0; ownership/generation and endpoint isolation are exact; global failure fans out once; lifecycle preview/confirmation/intent/actual argv/outcome survive reopen with one correlation; every HDC UI result is asserted through the signed Sandbox test build | blocked（TASK-M1-006 遗留：所缺只读 probe registry 属 CHG-2026-015，signed XCUITest 另待 Developer Mode 操作者授权；`evidence/runs/TASK-M1-006/run.md`） |
-| MAC-M1-SIM-001 | REQ-FLASH-006、POL-MODE-001 | simulated end-to-end orchestration run | journal/cancel/reconcile exercised with zero real connectKey and zero external tool launches; evidence persistently classified simulated | pending |
+| MAC-M1-SIM-001 | REQ-FLASH-006、POL-MODE-001 | simulated end-to-end orchestration run | journal/cancel/reconcile exercised with zero real connectKey and zero external tool launches; evidence persistently classified simulated | passed（TASK-M1-008 done，PR #147；`evidence/runs/TASK-M1-008/run.md`；evidence 分类 simulated） |
 | MAC-M1-DIAG-001 | REQ-DIAG-001、REQ-DIAG-002、PORT-LOGGING-001 | logging/diagnostics skeleton suite | categorized redacted logs; bounded rotation; export bundle excludes device raw by default | passed（TASK-M1-009 done，PR #50/#51；`evidence/runs/TASK-M1-009/run.md`） |
 
 > Status update（2026-07-20，随追溯修复 PR 合入）:上表四行 `passed` 依各 owning task 的
@@ -59,6 +59,12 @@ hardware-support verified writer count 0、real connectKey count 0 与 external 
 > 遗留，解锁=CHG-2026-015 probe registry + Developer Mode XCUITest）；`MAC-M1-SIM-001`
 > 保持 pending 归 TASK-M1-008。本更新只同步账本，不构成新的验证结论，也不改变
 > change 级 `Status:planned`。
+>
+> Status update（2026-07-20，随 TASK-M1-008 `ready→done` 独立状态 PR 合入）:
+> `MAC-M1-SIM-001` 依 TASK-M1-008 merged `done`（implementation PR #147 squash
+> `0a06bd6`）与 `evidence/runs/TASK-M1-008/run.md` 翻转 `passed`，evidence 分类保持
+> `simulated`。同上，本更新只同步账本；`MAC-M1-HDC-001` 仍 `blocked`（M1-006 遗留），
+> change 级 `Status:planned` 不变。
 
 ## Gate
 
