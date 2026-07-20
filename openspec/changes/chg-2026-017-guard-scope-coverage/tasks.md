@@ -5,8 +5,24 @@
 
 ## TASK-GUARD-001 — check_sdd per-change scope 覆盖校验 + 测试
 
-- Status:blocked(双前置:①本 change 经 approval-only PR 置为 `approved`(未满足);
-  ②独立 readiness PR 转 `ready`(未满足)。两前置齐备后才可实现)
+- Status:ready(readiness candidate;仅在维护者 review/merge 本独立 readiness PR
+  后生效。本 PR 不含实现、evidence 或测试新增)
+- Readiness review(2026-07-20;host-only/offline,零设备、零网络):
+  - Approval gate:satisfied。CHG-2026-017 approved(approval-only PR #181 已由维护者
+    合入 main `d55b25f`)。
+  - Dependencies:satisfied。backlog 增强项已在 main 登记;AC-JOB-003/004 追溯
+    修复 PR #138 已合入 main `48efe97`,固定当前基线输入。
+  - Contract/verification gate:satisfied。`GUARD-SCOPE-COVERAGE-001`、design 解析
+    规则、正反 fixture、真实基线断言与二值 evidence 要求已固定,
+    无阻塞性 TBD;本任务 allowed/forbidden paths、low-risk 边界与独立
+    PR 闭环已明确。
+  - Environment gate:satisfied。`<MAIN_CHECKOUT>/.venv-sdd/bin/python` 实测
+    Python 3.14.6 + PyYAML 6.0.3;`scripts/check-sdd.sh` 为 0 errors / 0 warnings /
+    111 acceptance IDs;实现/测试仅需该环境、stdlib 与本地临时目录,
+    hardware required=no。
+  - Review boundary:本 PR 只起草 `blocked→ready` 并记录 DoR 复核;实现+
+    evidence 须使用独立 TASK-GUARD-001 PR,`ready→done` 仍需另一独立
+    状态 PR。
 - Requirements/AC:`GUARD-SCOPE-COVERAGE-001`(见 acceptance-cases.yaml)
 - Depends on:backlog 已登记本增强(`openspec/planning/backlog.md`);深度 review
   AC-JOB-003/004 断链发现与追溯修复 PR #138(已合入 main,作为现状基线依据)。
