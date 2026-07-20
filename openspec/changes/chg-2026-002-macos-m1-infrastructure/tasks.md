@@ -956,15 +956,23 @@
 
 ## TASK-M1-008 — SimulatedFlashProvider 隔离 harness
 
-- Status:ready（readiness candidate；仅在维护者 review/merge 本 readiness PR 后生效。
-  本 PR 不执行 TASK-M1-008、不产生 implementation/acceptance evidence）
-- Implementation + evidence candidate:`evidence/runs/TASK-M1-008/run.md`（同一组
-  production/test output hash 下 `TEST-AC-FLASH-006-01` contract 与
+- Status:done（TASK-M1-008 implementation + evidence PR #147 已由维护者 review/merge
+  合入 `main` squash commit `0a06bd6`；本独立状态 PR 依据下列 completion evidence 起草
+  `ready→done`，仅在维护者 review/merge 后生效。本状态只关闭 M1-008 的 simulated
+  contract/platform evidence，evidence 分类保持 `simulated`，不改变 TASK-M1-006
+  （blocked）、change verified、hardware/support/conformance/release 状态，不构成任何
+  真机 flash 能力 claim）
+- Completion evidence:`evidence/runs/TASK-M1-008/run.md`（implementation base
+  `5ce6155`，merged squash `0a06bd6`；两个 Swift 交付物的 output SHA-256
+  （`4c57fdf1…`/`ffefc53e…`）与 `main` 合入版逐字节一致，run.md evidence 经该 hash
+  绑定对 merged OID 有效；同一组 output hash 下 `TEST-AC-FLASH-006-01` contract 与
   `TEST-MAC-M1-SIM-001` macOS simulated-platform evidence 均 PASS；dedicated 12/0、
   full suite 261/0 且 1 项既有 opt-in skip、全部禁止 dispatch/writer counter 为 0；P1
-  review 的 duplicate JSON member 与 reopen receipt 全字段绑定回归也已覆盖并 PASS。
-  本 implementation PR 保持 `ready`，不构成 `done`、change verified、hardware/support/
-  conformance/release claim；`ready→done` 仍须独立状态 PR 经维护者 review/merge）
+  review 的 duplicate JSON member 与 reopen receipt 全字段绑定回归已覆盖并 PASS）。
+  状态 PR 复核（2026-07-20，当前 `main` `ba4b75b`，#148 之后基线，零 Swift 变更）:
+  dedicated 12 tests/0 failures，全量 261 tests/1 known opt-in skip/0 failures
+  （0 unexpected），check-sdd 0/0/111——该复核只确认 evidence 在现基线仍可复现，
+  不构成新的 acceptance 结论。
 - Historical disposition:r1-r6 的 `Status:ready` 未附完整 readiness review，且声明依赖
   TASK-M1-007；r7（PR #119）恢复 fail-closed blocked。没有 TASK-M1-008
   implementation/evidence 可复用或重判。r7 依赖已于 2026-07-20 全部满足，本 readiness
