@@ -1,6 +1,8 @@
 # CHG-2026-008 HiDumper Recipe capture runbook
 
-> Status:plan-only and non-executable. No real-device task in this change is `ready` at r3.
+> Status:Phase A (`TASK-UD-CAP-MUT-001`) becomes executable once the r4 readiness revision is
+> merged and the maintainer confirms the device window; Phase B and all other tasks remain
+> blocked.
 >
 > Real-device operator:human maintainer only. An Agent SHALL NOT execute installed `hdc`, create a
 > real device session or run any device step.
@@ -75,9 +77,18 @@ is one array element containing spaces; quote characters are not part of it. Spl
 quoted-string fallbacks are forbidden, and a failed attempt is never retried with another boundary.
 
 `WINDOW_ID` is a strict ASCII-decimal value read from the recorded output of the window-inventory
-command `INV-1`. The readiness PR must fix the literal `INV-1` argv before Phase A; its first
-execution is classified conservatively like the Recipes and its output is recorded as a separate
-stream.
+command `INV-1`, fixed at r4 as:
+
+| ID | Purpose | Exact host argv | First-target typed mode/effect |
+| --- | --- | --- | --- |
+| `INV-1` | all-window inventory (WinId source) | `[HDC, "-t", CONNECT_KEY, "shell", "hidumper", "-s", "WindowManagerService", "-a", "-a"]` | conservative `deviceMutation` (first execution; output family unregistered) |
+
+Official hidumper documentation confirms the `-a` payload prints full window information including
+`WinId`. The window rule: select the unique foreground window whose entry corresponds to the
+fixture bundle/ability (`com.example.waterflowdemo` / `EntryAbility`); zero or multiple candidates
+stop the run. `INV-1` output is recorded as its own separate stream pair and remains
+`unknownOutput` as a family until a decision revision registers it; only the `WinId` field is read
+under the window rule.
 
 ### Phase A — TASK-UD-CAP-MUT-001 (R1-R3 only)
 
@@ -98,21 +109,56 @@ must record the selected component token, the location/basis of that selection i
 derived output, and the R2 raw-origin hash. Zero candidates, ambiguity, or an unknown/truncated/
 failed R2 output keeps R4 blocked. CLI/env/file/manual component input is forbidden.
 
-For every row, the readiness PR pins a dedicated disposable non-sensitive fixture HAP (artifact
-hash, bundle, ability, static screen content, window rule) and one literal owned remote sidecar
-path. The fixture is installed/started/stopped/cleaned only by the human operator with each action
-recorded.
+## Fixture HAP (pinned at r4)
+
+- Artifact:`entry-default-signed.hap`, SHA-256
+  `9453a396e81d55abfb05b4d7f9a512dea139e5843462051a6e1cc3586849fac8` (maintainer-built DevEco
+  sample; the local path stays out of the repository and is recorded in `run.md` with a fresh hash
+  recomputation before install).
+- bundleName `com.example.waterflowdemo`; mainElement/ability `EntryAbility`; versionCode
+  `1000000`; compileSdkVersion `26.0.0.25`; debug-signed (read from the artifact's `module.json`).
+- Static screen content:WaterFlow layout sample with synthetic list data; no user or sensitive
+  content.
+
+Fixture lifecycle commands (human-executed, each recorded; first executions conservatively
+`deviceMutation`):
+
+| ID | Action | Exact host argv |
+| --- | --- | --- |
+| `FX-1` | install | `[HDC, "-t", CONNECT_KEY, "install", LOCAL_HAP_PATH]` (`LOCAL_HAP_PATH` = the pinned-hash artifact; path recorded in run.md) |
+| `FX-2` | start | `[HDC, "-t", CONNECT_KEY, "shell", "aa", "start", "-b", "com.example.waterflowdemo", "-a", "EntryAbility"]` |
+| `FX-3` | stop | `[HDC, "-t", CONNECT_KEY, "shell", "aa", "force-stop", "com.example.waterflowdemo"]` |
+| `FX-4` | uninstall (cleanup) | `[HDC, "-t", CONNECT_KEY, "uninstall", "com.example.waterflowdemo"]` (M0B precedent) |
 
 ## Exact-path sidecar inventory
 
-Before each Recipe, the operator runs the runbook-fixed inventory command against the single
-literal sidecar path and records the output proving the path is absent. After the Recipe, the same
-command must distinguish a newly created regular file from pre-existing, unchanged, symlink or
-ambiguous results. Only a new file at the exact path proven to originate from this run may be
-received (`hdc file recv`) and then removed; removal targets only that exact path. Global `/data`
-search, wildcards, symlink following, recursive deletion and overwriting existing files are
-forbidden. If ownership is unclear, the file is left in place and recorded as `needsAttention`.
-R1/R3 follow the same conservative inventory even though a sidecar may not be expected.
+The single literal owned remote sidecar path, pinned at r4:
+
+```text
+/data/app/el2/100/base/com.example.waterflowdemo/haps/entry/files/arkui.dump
+```
+
+Basis:ArkUI `dump_log.cpp` creates `<application-data-dir>/arkui.dump`, and official
+documentation retrieves the component tree via `hdc file recv` from exactly this
+`/data/app/el2/100/base/<bundle>/haps/entry/files/arkui.dump` pattern. `userId=100` is the
+device-default main user assumption; if the target build differs, the pre/post inventory will
+honestly record absent/absent, the sidecar is simply not collected, stdout capture is unaffected,
+and switching to a global search is still forbidden (residual risk disclosed in the readiness).
+
+The inventory command, fixed at r4:
+
+| ID | Purpose | Exact host argv |
+| --- | --- | --- |
+| `SC-1` | pre/post existence + identity check | `[HDC, "-t", CONNECT_KEY, "shell", "ls", "-l", "/data/app/el2/100/base/com.example.waterflowdemo/haps/entry/files/arkui.dump"]` |
+
+Before each Recipe, the operator runs `SC-1` and records the output proving the path is absent
+(error/nonzero exit). After the Recipe, the same command must distinguish a newly created regular
+file (type/size/mtime recorded) from pre-existing, unchanged, symlink or ambiguous results. Only a
+new file at the exact path proven to originate from this run may be received (`hdc file recv`) and
+then removed; removal targets only that exact path. Global `/data` search, wildcards, symlink
+following, recursive deletion and overwriting existing files are forbidden. If ownership is
+unclear, the file is left in place and recorded as `needsAttention`. R1/R3 follow the same
+conservative inventory even though a sidecar may not be expected.
 
 ## Result decision rules
 

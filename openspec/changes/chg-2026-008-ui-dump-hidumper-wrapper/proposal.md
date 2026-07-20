@@ -1,6 +1,6 @@
 ---
 id: CHG-2026-008-ui-dump-hidumper-wrapper
-revision: 3
+revision: 4
 status: approved # r1 经 #68 批准;后续 revision 仅在对应治理 PR 由维护者 review/merge 后生效
 class: platform
 core_change_level: none
@@ -169,4 +169,11 @@ verifier 与 7 任务链;全文见 PR 提交历史 `a613b76`)。经维护者 202
   fixture、profile/lock 或 task evidence。r3 初稿(`a613b76`,含 JAUTH/receipt-chain
   模型)经维护者 2026-07-20 review 裁剪为本版本;裁剪对照见 tasks.md"裁剪任务记录"。
   r3 仅在维护者 review/merge 对应治理 PR 后生效;该 merge 同时构成裁剪决定的批准,
-  不执行任何 capture/TASK-UD-001,也不使 CHG-008 verified。
+  不执行任何 capture/TASK-UD-001,也不使 CHG-008 verified。r3 已经 PR #131 合入
+  `main` `d99ba58`。
+- r4 readiness-only revision:固定 `TASK-UD-CAP-MUT-001` 的五项 readiness 输入
+  (fixture HAP 元组含 artifact SHA-256、`INV-1` 字面 argv、唯一 literal sidecar path 与
+  `SC-1` 清单命令、fixture 生命周期 `FX-1..FX-4` 字面 argv、操作者与时间窗规则),并把
+  该任务起草为 `ready`;不改 scope/AC/spec、不含实现或 evidence、不改变其他任务状态。
+  仅在维护者 review/merge 对应 readiness PR 后生效;merge 即构成五项输入的批准。实际
+  采集另需维护者确认的设备时间窗,执行与 evidence 按 runbook/task 契约进行。

@@ -1,14 +1,15 @@
 # CHG-2026-008 Verification Plan
 
 > Status:planned
-> Change:CHG-2026-008-ui-dump-hidumper-wrapper@r3
+> Change:CHG-2026-008-ui-dump-hidumper-wrapper@r4
 > Core baseline:CORE-2.0.0
 
 本文件是 r3 review-remediation verification plan(经 2026-07-20 维护者裁剪决定收敛,
-初稿见 PR 提交历史 `a613b76`)。r3 merge 本身不执行任何 task,merge 后没有 real-device
-task 为 `ready`。`TASK-UD-CAP-MUT-001`、`TASK-UD-CAP-R4-001`、`TASK-UD-REDACTOR-001` 与
-`TASK-UD-001` 均保持 `blocked`;任何 installed-HDC/device 执行或基于未批准 argv/output
-family、自造 fake/golden 的既有 PASS 都无效。
+初稿见 PR #128 提交历史 `a613b76`;r3 已经 PR #131 合入)。r4 为 readiness-only
+revision:固定 `TASK-UD-CAP-MUT-001` 的五项 readiness 输入并把它起草为 `ready`(仅在
+维护者 review/merge 后生效,实际执行另需具名设备窗口)。`TASK-UD-CAP-R4-001`、
+`TASK-UD-REDACTOR-001` 与 `TASK-UD-001` 均保持 `blocked`;任何 installed-HDC/device
+执行或基于未批准 argv/output family、自造 fake/golden 的既有 PASS 都无效。
 
 ## Readiness environment
 
@@ -24,9 +25,10 @@ family、自造 fake/golden 的既有 PASS 都无效。
 - 采集授权模型 = M0B 先例:runbook + 人类维护者亲手执行 + 维护者对 evidence PR 的
   review/merge attestation。production supervisor/binding 栈、journal 授权链与 offline
   receipt verifier 均不是本 change 前置(JAUTH 候选项见 backlog)。
-- `TASK-UD-CAP-MUT-001` 的 readiness PR 必须固定 dedicated non-sensitive fixture HAP
-  tuple、字面 `INV-1` inventory 命令、唯一 exact remote sidecar path 与设备/时间窗;任一
-  缺失时 R1-R3/`INV-1` dispatch `0`。
+- `TASK-UD-CAP-MUT-001` 的五项 readiness 输入已由 r4 固定(fixture HAP 元组含
+  SHA-256、`INV-1`/`SC-1`/`FX-1..FX-4` 字面 argv、唯一 literal sidecar path、操作者与
+  时间窗规则;见 tasks.md Readiness review 与 runbook)。执行仍须维护者在具名窗口内
+  亲手进行;窗口外或输入漂移时 R1-R3/`INV-1` dispatch `0`。
 - R4 已拆为 `TASK-UD-CAP-R4-001`,另需 approved R2 output-family decision revision 记录
   选定 component token 及其依据;十进制校验、first/lowest/manual selection 均不构成
   provenance;任一缺失时 R4 dispatch `0`。
