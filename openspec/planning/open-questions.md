@@ -149,6 +149,10 @@ Open question 不得以聊天记忆留存。每项记录默认决策、阻塞范
   仍须在演练 change 立项时分别满足;`GAP-DAYU200-RECOVERY-PATH` 保持
   unknown,DEC-002 保持 open。
 - Consumer：未来演练 change 立项时,检查单第 4 项引用本记录打勾。
+- Clarification（2026-07-20,随账本对齐 PR 合入）：archived CHG-2026-013 proposal 中
+  "第 4 项尚未满足"为其立项时点快照(immutable historical text),该项已由本记录
+  r1(`c3134f0`)满足；当前未满足项仅剩第 3 项与第 5 项(见 Boundary)。本条为澄清
+  注记,不改变 r1/r2 的接受范围、owner、Scope 或失效条件。
 - Revision r2 provenance：CHG-2026-009@r4 经 PR #116 合入 `main`
   `7585603d459ae26ad566b9aaeecc953f9c26bd98`，将 headless codec remediation 与
   fresh platform mapping/reconciliation 分配给 TASK-PD-001/TASK-PD-002；CHG-2026-012@r2

@@ -46,3 +46,11 @@ ArkDeck 尚无 Xcode 工程或运行代码。外部 HDC、共享 server、App Sa
 - 不执行真实 Flash/destructive step；
 - Sandbox 不可行时记录 non-conformance 并选择非 Sandbox prototype，而非放宽 Core。
 
+## Archive deferral（2026-07-20 注记）
+
+本 change 自 2026-07-15 起 `verified`，暂不 archive：M0A 移交的 blocked 验证行
+（`MAC-M0A-HDC-001`、`TRUST-001..004`、`SANDBOX-001`）与 ADR-0001 分发决策仍被
+CHG-2026-002（M1）作为活跃输入引用。archive 时点＝上述移交项随 CHG-2026-002 收口
+处置后，由独立 archive PR 裁量（先例 #21/#49/#87/#88）。本注记不改变 verified 结论
+与任何 evidence。
+
