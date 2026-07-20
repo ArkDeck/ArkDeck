@@ -43,6 +43,7 @@ def _stream(
     data=b"",
     *,
     truncated=False,
+    drain_incomplete=False,
     total_bytes=None,
     whole_bytes=None,
 ):
@@ -53,6 +54,7 @@ def _stream(
         truncated=truncated,
         total_bytes=total,
         sha256=hashlib.sha256(digest_source).hexdigest(),
+        drain_incomplete=drain_incomplete,
     )
 
 
@@ -340,6 +342,34 @@ class InputValidationTests(unittest.TestCase):
                     capture._sha256_file(hdc)[0],
                 )
 
+    def test_targeted_command_rejects_drain_incomplete_hp_capture(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            out_dir = os.path.join(tmp, "session")
+            hdc = _fake_hdc(tmp)
+            incomplete = _stream(
+                b"SERIAL123\tConnected\n", drain_incomplete=True
+            )
+            runner, _ = _fake_runner(_result(stdout=incomplete))
+            capture.capture_command(
+                hdc_path=hdc,
+                out_dir=out_dir,
+                spec=capture.SPECS_BY_ID["HP-1"],
+                runner=runner,
+                home=tmp,
+            )
+            targeted_runner, calls = _fake_runner()
+            with self.assertRaises(capture.CaptureError):
+                capture.capture_command(
+                    hdc_path=hdc,
+                    out_dir=out_dir,
+                    spec=capture.SPECS_BY_ID["R1"],
+                    connect_key="SERIAL123",
+                    window_id="1",
+                    runner=targeted_runner,
+                    home=tmp,
+                )
+            self.assertEqual(calls, [])
+
     def test_targeted_command_rejects_different_hdc_identity(self):
         with tempfile.TemporaryDirectory() as tmp:
             out_dir = os.path.join(tmp, "session")
@@ -523,6 +553,8 @@ class StreamAndManifestTests(unittest.TestCase):
             summary = _read(os.path.join(out_dir, "capture-hashes.md"))
             self.assertIn(stdout["sha256"], summary)
             self.assertIn(stderr["sha256"], summary)
+            self.assertFalse(stdout["drainIncomplete"])
+            self.assertEqual(stdout["sha256Scope"], "wholeStream")
             self.assertEqual(manifest["exitCode"], 7)
             self.assertTrue(manifest["captureComplete"])
 
@@ -547,6 +579,28 @@ class StreamAndManifestTests(unittest.TestCase):
             self.assertTrue(record["truncated"])
             self.assertFalse(manifest["captureComplete"])
             self.assertFalse(manifest["selfCheckPassed"])
+
+    def test_drain_incomplete_is_explicit_and_fails_capture_and_scan(self):
+        incomplete = _stream(b"observed", drain_incomplete=True)
+        with tempfile.TemporaryDirectory() as tmp:
+            runner, _ = _fake_runner(_result(stdout=incomplete))
+            out_dir = os.path.join(tmp, "session")
+            manifest = capture.capture_command(
+                hdc_path=_fake_hdc(tmp),
+                out_dir=out_dir,
+                spec=capture.SPECS_BY_ID["HP-0"],
+                runner=runner,
+                home=tmp,
+            )
+            record = manifest["streams"]["stdout"]
+            self.assertTrue(record["drainIncomplete"])
+            self.assertEqual(record["sha256Scope"], "observedBeforeDrainCutoff")
+            self.assertFalse(record["truncated"])
+            self.assertFalse(manifest["captureComplete"])
+            self.assertFalse(manifest["selfCheckPassed"])
+            summary = _read(os.path.join(out_dir, "capture-hashes.md"))
+            self.assertIn("observedBeforeDrainCutoff", summary)
+            self.assertIn("`true`", summary)
 
     def test_inconsistent_fake_stream_metadata_is_rejected(self):
         bad = capture.CapturedStream(
@@ -635,6 +689,14 @@ class StreamAndManifestTests(unittest.TestCase):
             self.assertEqual(redacted_bytes, capture._json_bytes(redacted))
             self.assertEqual(manifest["evidenceClass"], "controlledHumanCapture")
 
+    def test_hash_summary_wraps_missing_sequence_as_capture_error(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            stray = os.path.join(tmp, "99-HP-0.redacted-manifest.json")
+            with open(stray, "wb") as handle:
+                handle.write(capture._json_bytes({"schema": capture.REDACTED_SCHEMA}))
+            with self.assertRaisesRegex(capture.CaptureError, "missing sequence"):
+                capture._capture_hashes_bytes(tmp)
+
 
 class SensitiveBoundaryTests(unittest.TestCase):
     def test_stream_user_path_key_and_local_path_fail_closed(self):
@@ -711,7 +773,7 @@ class SensitiveBoundaryTests(unittest.TestCase):
                 return redacted
 
             with unittest.mock.patch.object(capture, "_redacted_manifest", broken):
-                with self.assertRaises(capture.CaptureError):
+                with self.assertRaises(capture.StopRequired):
                     capture.capture_command(
                         hdc_path=hdc,
                         out_dir=out_dir,
@@ -743,6 +805,8 @@ class SubprocessRunnerTests(unittest.TestCase):
         self.assertEqual(result.stdout.data, b"out")
         self.assertEqual(result.stderr.data, b"err")
         self.assertEqual(result.stdout.sha256, hashlib.sha256(b"out").hexdigest())
+        self.assertFalse(result.stdout.drain_incomplete)
+        self.assertFalse(result.stderr.drain_incomplete)
 
     def test_signal_death_is_not_timeout(self):
         result = capture.subprocess_runner(
@@ -783,6 +847,8 @@ class SubprocessRunnerTests(unittest.TestCase):
         elapsed = time.monotonic() - started
         self.assertEqual(result.exit_code, 0)
         self.assertIn(b"client-done", result.stdout.data)
+        self.assertTrue(result.stdout.drain_incomplete)
+        self.assertTrue(result.stderr.drain_incomplete)
         self.assertLess(elapsed, 10)
 
 
@@ -825,6 +891,21 @@ class StaticSafetyTests(unittest.TestCase):
 
 
 class CliAndSerializerTests(unittest.TestCase):
+    def test_cli_distinguishes_post_dispatch_stop_from_harness_refusal(self):
+        argv = ["--hdc", "/x", "--out-dir", "/y", "--command", "HP-0"]
+        with unittest.mock.patch.object(
+            capture, "capture_command", side_effect=capture.StopRequired("redaction leak")
+        ):
+            stderr = io.StringIO()
+            with contextlib.redirect_stderr(stderr):
+                self.assertEqual(capture.main(argv), 1)
+            self.assertIn("capture stop required", stderr.getvalue())
+        with unittest.mock.patch.object(
+            capture, "capture_command", side_effect=capture.CaptureError("bad input")
+        ):
+            with contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(capture.main(argv), 2)
+
     def test_cli_default_timeout_is_120_and_nonpositive_is_rejected(self):
         parser = capture.build_arg_parser()
         args = parser.parse_args(

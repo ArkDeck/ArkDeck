@@ -46,6 +46,13 @@ must explicitly update the pinned harness before Phase B can dispatch anything.
   option prefix. More importantly, it must occur as an exact token in the latest
   untruncated, self-check-passing `HP-1` or `HP-2` raw capture in the same session
   directory. A command-line value alone is never trusted.
+- The approved runbook assumes plain `hdc list targets` emits a row whose first
+  token is the connect key and whose later fields contain `Connected`. Some HDC
+  versions may emit only a bare serial unless `-v` is used. Before any Phase A
+  targeted dispatch, the human maintainer must inspect HP-1 and confirm this
+  shape. A bare-serial result intentionally leaves every targeted command
+  fail-closed; adding `-v` requires an approved runbook + harness revision and is
+  never improvised at capture time.
 - `WINDOW_ID` is ASCII decimal digits only. Provenance and unique foreground
   selection remain the human rule in `capture-runbook.md`.
 - `LOCAL_HAP_PATH` must resolve to an existing regular file outside every git
@@ -90,11 +97,20 @@ Each invocation exclusive-creates owner-only files named
 `NN-<id>.stdout`, `NN-<id>.stderr`, `NN-<id>.manifest.json`, and
 `NN-<id>.redacted-manifest.json`; SC-2 additionally owns
 `NN-SC-2.sidecar`. Streams are drained independently; at most
-4 MiB per stream is retained while the whole drained stream is counted and
-SHA-256 hashed. Overflow sets `truncated: true`, fails the complete-stream
-sensitive scan, and requires the run to stop. Timeout is recorded separately
-from exit code (`exitCode: null`, `timedOut: true`). Exit code zero is never
-interpreted as Recipe success.
+4 MiB per stream is retained while observed bytes are counted and SHA-256
+hashed. If a pipe reader has not reached EOF after the two-second post-client
+drain grace, `drainIncomplete: true` and
+`sha256Scope: observedBeforeDrainCutoff` make the incomplete accounting explicit;
+the capture fails closed even when the client exited zero. A complete reader records
+`sha256Scope: wholeStream`. Overflow sets `truncated: true`; either condition
+fails the complete-stream sensitive scan and requires the run to stop. Timeout
+is recorded separately from exit code (`exitCode: null`, `timedOut: true`). Exit
+code zero is never interpreted as Recipe success.
+
+CLI status `1` means a command ran but timeout, truncation, incomplete drain,
+stream self-check, or output-side redaction requires STOP. Status `2` is reserved
+for pre-dispatch usage/harness refusal. A redaction leak keeps raw/full controlled
+artifacts for investigation but withholds repository-facing output.
 
 The harness rebuilds `capture-hashes.md` from redacted manifests after every
 successful redaction gate. Full manifests, raw streams, connect keys, window ids,

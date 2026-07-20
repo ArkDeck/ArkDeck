@@ -17,9 +17,10 @@ metadata only.  They are serialized deterministically and pass a final
 output-side sensitive-data gate before being made available for repository
 evidence.
 
-Exit codes: 0 = capture completed without timeout/truncation and the sensitive
-gate passed; 1 = capture ran but timeout, truncation, or a stream self-check
-requires the human run to stop; 2 = usage/harness refusal.
+Exit codes: 0 = capture completed without timeout/truncation/incomplete drain and
+the sensitive gate passed; 1 = capture ran but timeout, truncation, incomplete
+pipe drain, stream self-check, or output-side redaction requires the human run to
+stop; 2 = pre-dispatch usage or harness refusal.
 """
 
 from __future__ import annotations
@@ -162,17 +163,22 @@ SPECS_BY_ID = {spec.ident: spec for spec in COMMAND_SPECS}
 
 
 class CaptureError(Exception):
-    """A usage or harness-integrity error, not a captured command result."""
+    """A usage or harness-integrity error."""
+
+
+class StopRequired(CaptureError):
+    """A post-dispatch fail-closed condition that maps to CLI exit status 1."""
 
 
 @dataclasses.dataclass(frozen=True)
 class CapturedStream:
-    """Retained bytes plus whole-stream accounting from the runner."""
+    """Retained bytes plus observed-stream accounting from the runner."""
 
     data: bytes
     total_bytes: int
     sha256: str
     truncated: bool
+    drain_incomplete: bool = False
 
     @classmethod
     def from_bytes(
@@ -182,10 +188,17 @@ class CapturedStream:
         truncated: bool = False,
         total_bytes: Optional[int] = None,
         sha256: Optional[str] = None,
+        drain_incomplete: bool = False,
     ) -> "CapturedStream":
         total = len(data) if total_bytes is None else total_bytes
         digest = hashlib.sha256(data).hexdigest() if sha256 is None else sha256
-        return cls(data=data, total_bytes=total, sha256=digest, truncated=truncated)
+        return cls(
+            data=data,
+            total_bytes=total,
+            sha256=digest,
+            truncated=truncated,
+            drain_incomplete=drain_incomplete,
+        )
 
 
 @dataclasses.dataclass(frozen=True)
@@ -230,7 +243,7 @@ def _drain_pipe(stream, sink: dict) -> None:
         return
 
 
-def _freeze_sink(sink: dict) -> CapturedStream:
+def _freeze_sink(sink: dict, *, drain_incomplete: bool) -> CapturedStream:
     with sink["lock"]:
         sink["accept"] = False
         data = b"".join(sink["chunks"])
@@ -241,6 +254,7 @@ def _freeze_sink(sink: dict) -> CapturedStream:
         total_bytes=total,
         sha256=digest,
         truncated=total > len(data),
+        drain_incomplete=drain_incomplete,
     )
 
 
@@ -254,13 +268,13 @@ def subprocess_runner(argv: list[str], timeout: int) -> RunnerResult:
         stdin=subprocess.DEVNULL,
     )
     sinks: dict[str, dict] = {}
-    readers: list[tuple[threading.Thread, object, dict]] = []
+    readers: list[tuple[str, threading.Thread, object, dict]] = []
     for name, stream in (("stdout", process.stdout), ("stderr", process.stderr)):
         sink = _new_sink()
         reader = threading.Thread(target=_drain_pipe, args=(stream, sink), daemon=True)
         reader.start()
         sinks[name] = sink
-        readers.append((reader, stream, sink))
+        readers.append((name, reader, stream, sink))
 
     timed_out = False
     try:
@@ -271,13 +285,19 @@ def subprocess_runner(argv: list[str], timeout: int) -> RunnerResult:
         process.wait()
 
     drain_deadline = time.monotonic() + PIPE_DRAIN_GRACE_SECONDS
-    for reader, stream, _sink in readers:
+    drain_incomplete: dict[str, bool] = {}
+    for name, reader, stream, _sink in readers:
         reader.join(timeout=max(0.0, drain_deadline - time.monotonic()))
-        if not reader.is_alive():
+        drain_incomplete[name] = reader.is_alive()
+        if not drain_incomplete[name]:
             stream.close()
 
-    stdout = _freeze_sink(sinks["stdout"])
-    stderr = _freeze_sink(sinks["stderr"])
+    stdout = _freeze_sink(
+        sinks["stdout"], drain_incomplete=drain_incomplete["stdout"]
+    )
+    stderr = _freeze_sink(
+        sinks["stderr"], drain_incomplete=drain_incomplete["stderr"]
+    )
     return RunnerResult(
         exit_code=None if timed_out else process.returncode,
         timed_out=timed_out,
@@ -384,7 +404,7 @@ def _assert_redacted_clean(
     if any(marker.decode("ascii") in payload_text for marker in _KEY_MARKERS):
         leaks.append("key material marker")
     if leaks:
-        raise CaptureError(
+        raise StopRequired(
             "redaction gate failed (" + ", ".join(leaks)
             + "); redacted manifest and capture-hashes summary were not published"
         )
@@ -560,8 +580,14 @@ def _latest_hp_payload(
         raise CaptureError("latest same-session HP manifest has no streams")
     for stream_name in ("stdout", "stderr"):
         record = streams.get(stream_name)
-        if not isinstance(record, dict) or record.get("truncated") is not False:
-            raise CaptureError("latest same-session HP stream is missing or truncated")
+        if (
+            not isinstance(record, dict)
+            or record.get("truncated") is not False
+            or record.get("drainIncomplete") is not False
+        ):
+            raise CaptureError(
+                "latest same-session HP stream is missing, truncated, or drain-incomplete"
+            )
         filename = record.get("file")
         expected_filename = f"{sequence:02d}-{command_id}.{stream_name}"
         if filename != expected_filename or os.path.basename(filename) != filename:
@@ -688,6 +714,8 @@ def _validate_stream(stream: CapturedStream, label: str) -> None:
         raise CaptureError(f"runner returned invalid {label} total byte count")
     if stream.truncated != (stream.total_bytes > len(stream.data)):
         raise CaptureError(f"runner returned inconsistent {label} truncation metadata")
+    if not isinstance(stream.drain_incomplete, bool):
+        raise CaptureError(f"runner returned invalid {label} drain state")
     if not re.fullmatch(r"[0-9a-f]{64}", stream.sha256):
         raise CaptureError(f"runner returned invalid {label} whole-stream SHA-256")
     if not stream.truncated and stream.sha256 != hashlib.sha256(stream.data).hexdigest():
@@ -715,10 +743,14 @@ def _stream_record(filename: str, stream: CapturedStream) -> dict:
     return {
         "file": filename,
         "sha256": stream.sha256,
+        "sha256Scope": (
+            "observedBeforeDrainCutoff" if stream.drain_incomplete else "wholeStream"
+        ),
         "retainedSha256": hashlib.sha256(stream.data).hexdigest(),
         "bytes": stream.total_bytes,
         "retainedBytes": len(stream.data),
         "truncated": stream.truncated,
+        "drainIncomplete": stream.drain_incomplete,
     }
 
 
@@ -735,10 +767,12 @@ def _sidecar_record(path: str, command_may_be_partial: bool) -> dict:
         "file": os.path.basename(path),
         "origin": "remoteSidecar",
         "sha256": digest,
+        "sha256Scope": "wholeFile",
         "retainedSha256": digest,
         "bytes": size,
         "retainedBytes": size,
         "truncated": False,
+        "drainIncomplete": False,
         "possiblyPartial": command_may_be_partial,
     }
 
@@ -769,30 +803,52 @@ def _redacted_manifest(
 
 
 def _capture_hashes_bytes(out_dir: str) -> bytes:
-    manifests: list[dict] = []
+    manifests: list[tuple[int, str, dict]] = []
     for name in sorted(os.listdir(out_dir)):
-        if re.fullmatch(r"[0-9]{2,}-[A-Z0-9-]+\.redacted-manifest\.json", name):
-            document = _load_json(os.path.join(out_dir, name))
-            if document.get("schema") != REDACTED_SCHEMA:
-                raise CaptureError(f"unexpected redacted manifest schema in {name}")
-            manifests.append(document)
+        match = re.fullmatch(
+            r"([0-9]{2,})-[A-Z0-9-]+\.redacted-manifest\.json", name
+        )
+        if not match:
+            continue
+        document = _load_json(os.path.join(out_dir, name))
+        if document.get("schema") != REDACTED_SCHEMA:
+            raise CaptureError(f"unexpected redacted manifest schema in {name}")
+        sequence = document.get("sequence")
+        if type(sequence) is not int or sequence < 0 or sequence != int(match.group(1)):
+            raise CaptureError(f"invalid or missing sequence in redacted manifest {name}")
+        streams = document.get("streams")
+        if not isinstance(streams, dict) or not {"stdout", "stderr"} <= streams.keys():
+            raise CaptureError(f"invalid or missing streams in redacted manifest {name}")
+        manifests.append((sequence, name, document))
     lines = [
-        "# UD capture whole-stream hashes",
+        "# UD capture stream hashes",
         "",
         f"Schema: `{REDACTED_SCHEMA}`",
         "",
-        "| Stream | SHA-256 (whole stream) | Bytes | Retained bytes | Truncated |",
-        "| --- | --- | ---: | ---: | --- |",
+        "| Stream | SHA-256 | Scope | Bytes | Retained bytes | Truncated | Drain incomplete |",
+        "| --- | --- | --- | ---: | ---: | --- | --- |",
     ]
-    for manifest in sorted(manifests, key=lambda item: item["sequence"]):
+    for _sequence, name, manifest in sorted(manifests):
         stream_names = ["stdout", "stderr"]
         if "sidecar" in manifest["streams"]:
             stream_names.append("sidecar")
         for stream_name in stream_names:
             stream = manifest["streams"][stream_name]
+            if not isinstance(stream, dict):
+                raise CaptureError(f"invalid {stream_name} record in redacted manifest {name}")
+            required = {
+                "file", "sha256", "sha256Scope", "bytes", "retainedBytes",
+                "truncated", "drainIncomplete",
+            }
+            if not required <= stream.keys():
+                raise CaptureError(
+                    f"incomplete {stream_name} record in redacted manifest {name}"
+                )
             lines.append(
-                f"| `{stream['file']}` | `{stream['sha256']}` | {stream['bytes']} | "
-                f"{stream['retainedBytes']} | `{str(stream['truncated']).lower()}` |"
+                f"| `{stream['file']}` | `{stream['sha256']}` | "
+                f"`{stream['sha256Scope']}` | {stream['bytes']} | "
+                f"{stream['retainedBytes']} | `{str(stream['truncated']).lower()}` | "
+                f"`{str(stream['drainIncomplete']).lower()}` |"
             )
     return ("\n".join(lines) + "\n").encode("utf-8")
 
@@ -874,19 +930,21 @@ def capture_command(
         result.stdout.data,
         connect_key,
         prepared.local_paths,
-        complete=not result.stdout.truncated,
+        complete=not result.stdout.truncated and not result.stdout.drain_incomplete,
     )
     stderr_check = self_check(
         result.stderr.data,
         connect_key,
         prepared.local_paths,
-        complete=not result.stderr.truncated,
+        complete=not result.stderr.truncated and not result.stderr.drain_incomplete,
     )
     self_check_passed = stdout_check["passed"] and stderr_check["passed"]
     capture_complete = (
         not result.timed_out
         and not result.stdout.truncated
         and not result.stderr.truncated
+        and not result.stdout.drain_incomplete
+        and not result.stderr.drain_incomplete
     )
     streams = {
         "stdout": _stream_record(stdout_name, result.stdout),
@@ -895,7 +953,12 @@ def capture_command(
     if LOCAL_SIDECAR_DEST in prepared.actual:
         streams["sidecar"] = _sidecar_record(
             prepared.actual[LOCAL_SIDECAR_DEST],
-            command_may_be_partial=(result.timed_out or result.exit_code != 0),
+            command_may_be_partial=(
+                result.timed_out
+                or result.exit_code != 0
+                or result.stdout.drain_incomplete
+                or result.stderr.drain_incomplete
+            ),
         )
 
     manifest = {
@@ -1009,13 +1072,20 @@ def main(argv: Optional[list[str]] = None) -> int:
             local_sidecar_dest=arguments.local_sidecar_dest,
             timeout=arguments.timeout,
         )
+    except StopRequired as error:
+        print(f"capture stop required: {error}", file=sys.stderr)
+        return 1
     except CaptureError as error:
         print(f"capture error: {error}", file=sys.stderr)
         return 2
     safe = manifest["selfCheckPassed"] and manifest["captureComplete"]
     print(
         f"capture {manifest['commandId']} complete; "
-        + ("checks PASSED" if safe else "STOP REQUIRED (timeout/truncation/sensitive check)" )
+        + (
+            "checks PASSED"
+            if safe
+            else "STOP REQUIRED (timeout/truncation/drain/sensitive check)"
+        )
     )
     print("controlled output:", os.path.abspath(arguments.out_dir))
     return 0 if safe else 1
