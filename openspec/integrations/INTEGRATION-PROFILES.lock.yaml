@@ -1,12 +1,12 @@
 # Integration adapter 输入的版本登记(V2:不再逐文件 hash pin;历史对比用 git;
 # golden fixture 例外:按 fixture_policy 逐文件 SHA-256 pin)
-lock: INTEGRATION-PROFILES-0.4.0
+lock: INTEGRATION-PROFILES-0.3.0
 status: current
-updated_at: 2026-07-19
+updated_at: 2026-07-18
 
 profiles:
   - id: OPENHARMONY-TOOLS
-    version: 0.3.0
+    version: 0.2.0
     path: openspec/integrations/openharmony/profile.md
 
 catalogs:
@@ -41,22 +41,6 @@ fixtures:
     version: 1.0.0
     path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Golden/1.0.0/version/stdout.bin
     sha256: 906d35a917937ecbb33d8dc3bbb6b3e1783bd2996a6201ab7227fb406d474ed9
-  - id: hidumper-golden-help-stdout
-    version: 1.0.0
-    path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HiDumper/Golden/1.0.0/help/stdout.bin
-    sha256: a4904901becfb1a15517c14c51f6fa26524162008578bab3dc64f1c7baa006e5
-  - id: hidumper-golden-help-stderr
-    version: 1.0.0
-    path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HiDumper/Golden/1.0.0/help/stderr.bin
-    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
-  - id: hidumper-golden-services-stdout
-    version: 1.0.0
-    path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HiDumper/Golden/1.0.0/services/stdout.bin
-    sha256: 351fc59ea33de263a6123c6030624e1a1fcd17ae0eb5dab6d67ffba09ec07a4b
-  - id: hidumper-golden-services-stderr
-    version: 1.0.0
-    path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HiDumper/Golden/1.0.0/services/stderr.bin
-    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
 
 change_rule: >-
   Parser families, adapter mappings, catalogs and golden fixtures evolve through

@@ -1,8 +1,8 @@
 # OpenHarmony Tool Integration Profile
 
 > ID：OPENHARMONY-TOOLS  
-> Version：0.3.0
-> Status：in baseline CORE-2.0.0（ratification 状态见 `openspec/baselines/CORE-2.0.0.yaml`） / version-probed at runtime
+> Version：0.2.0
+> Status：in baseline CORE-2.0.0（ratification 状态见 `openspec/baselines/CORE-2.0.0.yaml`） / version-probed at runtime  
 > Core baseline：CORE-2.0.0
 
 本文件记录当前 OpenHarmony/HDC 工具语义和 Adapter 输入。它不是平台 Profile，也不得覆盖 Core；任何具体命令都必须经当前 tool/device probe 证实。每个执行 Task SHALL 固定本文件的 version 与 SHA-256；parser family、命令映射或 capability 判断变化必须走 integration change。
@@ -20,23 +20,11 @@
 
 ## HiDumper
 
-CHG-2026-008/TASK-UD-001 固定 WindowManagerService wrapper。下列均为 remote executable
-`hidumper` 的 argv 数组，不是 host shell command；`-a` 后的 service argument 是单一 argv
-元素，只能由固定 token 与通过 `validated-identifier` 规则的 window/component ID 组成：
+窗口 inventory 样本：
 
-| Operation | Fixed argv |
-| --- | --- |
-| window inventory | `["-s", "WindowManagerService", "-a", "-a"]` |
-| `nodeSummary` | `["-s", "WindowManagerService", "-a", "-w <windowId> -default"]` |
-| `elementTree` | `["-s", "WindowManagerService", "-a", "-w <windowId> -element -c"]` |
-| `fullDefaultTree` | `["-s", "WindowManagerService", "-a", "-w <windowId> -default -all"]` |
-| `componentDetail` | `["-s", "WindowManagerService", "-a", "-w <windowId> -element -lastpage <componentId>"]` |
-
-M0B 登记的只读 service-list probe argv 为 `["-ls"]`，其 stdout success marker 仅为
-`System ability list:`。`hidumper: option <token> missed...` 是显式 failure marker，即使 exit
-code 为 0 也必须失败；缺少所选 family 的登记 marker 时为 `unknownOutput`。当前未登记四个
-Recipe 的成功输出 family，因此 Recipe 输出不得借用 service-list marker 或凭 exit code/非空
-输出判成功；增加 Recipe success family 仍须新的批准 integration change 与 byte-pinned golden。
+```text
+hidumper -s WindowManagerService -a '-a'
+```
 
 Recipe 数据位于 `openspec/contracts/catalogs/dump-recipes.yaml`。Adapter 必须处理 stdout、sidecar、固定旧文件名和 unknown output family，禁止全局 `/data` cleanup。
 
@@ -83,22 +71,6 @@ capture 2026-07-18；failure 字节为 M0A 候选原样提取）。
 对该 fixture 判 `unknownOutput`（由 `HDCGoldenResourceContractTests` 钉死）。按登记形态接线
 parser 属于 TASK-M1-006，不得以放宽正则或静默改标记的方式提前采用；未登记 output family
 一律维持 unknown/unsupported，exit 0 单独不构成 success。
-
-## HiDumper golden fixture families（pack 1.0.0，registered by CHG-2026-008/TASK-UD-001）
-
-Fixture pack：`Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HiDumper/Golden/1.0.0/`
-（registry：`registry.json`；通过 SwiftPM `.copy("Fixtures/HiDumper")` 以
-`Bundle.module/HiDumper/Golden/1.0.0/` 暴露）。来源为维护者在 2026-07-18 以只读白名单命令
-完成的 M0B controlled human capture `EVD-M0B-DAYU200-20260718-001`；redacted manifest
-self-check 通过。登记保持 observed-only，不构成 Recipe、兼容性、conformance、hardware
-support 或 release claim。
-
-| Fixture ID | Command/stream | Bytes | SHA-256 | Registered semantic role |
-| --- | --- | ---: | --- | --- |
-| `hidumper-golden-help-stdout` | `hidumper --help` / stdout | 34 | `a4904901becfb1a15517c14c51f6fa26524162008578bab3dc64f1c7baa006e5` | exit-0 `failure.explicitFailureMarker` |
-| `hidumper-golden-help-stderr` | `hidumper --help` / stderr | 0 | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` | empty |
-| `hidumper-golden-services-stdout` | `hidumper -ls` / stdout | 3121 | `351fc59ea33de263a6123c6030624e1a1fcd17ae0eb5dab6d67ffba09ec07a4b` | `success.systemAbilityList` |
-| `hidumper-golden-services-stderr` | `hidumper -ls` / stderr | 0 | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` | empty |
 
 ## Supported family rule
 
