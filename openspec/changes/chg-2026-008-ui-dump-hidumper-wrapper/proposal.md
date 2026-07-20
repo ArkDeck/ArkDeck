@@ -1,6 +1,6 @@
 ---
 id: CHG-2026-008-ui-dump-hidumper-wrapper
-revision: 5
+revision: 6
 status: approved # r1 经 #68 批准;后续 revision 仅在对应治理 PR 由维护者 review/merge 后生效
 class: platform
 core_change_level: none
@@ -182,4 +182,15 @@ verifier 与 7 任务链;全文见 PR 提交历史 `a613b76`)。经维护者 202
   (6 个 `scripts/ui_dump_redaction/` 文件、stdlib-only、无采集前置、fixed interpreter
   实测)并把该任务起草为 `ready`;不改 scope/AC/spec、不含实现或 evidence、不改变
   其他任务状态、不接触真实 raw。仅在维护者 review/merge 对应 readiness PR 后生效。
-  `safe-literals-v1.txt` 逐项批准仍发生在实现 PR 的维护者 review 中。
+  `safe-literals-v1.txt` 逐项批准仍发生在实现 PR 的维护者 review 中。r5 已经 PR #136
+  合入。
+- r6 remediation revision:依 2026-07-20 桌面推演审计(结论:Phase A 缺少入库采集
+  harness 即无法产出合规 evidence——`m0b_capture/capture.py` 白名单不含 Phase A 命令,
+  shell 重定向破坏 payload 边界与 byte-exact/自检保证)新增 host-only
+  `TASK-UD-CAPTURE-HARNESS-001`(`ready`,交付 `scripts/ud_capture/` 采集 harness,
+  M0B 信任链复制),并将 `TASK-UD-CAP-MUT-001` fail-closed 回退为 `blocked`(唯一剩余
+  前置=harness done;r4 五项 pins 保持有效,harness done 后独立 status PR 恢复
+  ready)。同步修订 runbook:capture instrument 章节、canonical 执行序列、`SC-2`/
+  `SC-3` 字面 argv、`HP-2` 粒度定义、`unknownOutput` 澄清、truncation/timeout 政策、
+  abort 规则与 `redacted-manifests/` 复数惯例。仅在维护者 review/merge 对应治理 PR 后
+  生效;不含实现或 evidence。
