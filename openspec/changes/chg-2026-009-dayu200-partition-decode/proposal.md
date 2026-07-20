@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-009-dayu200-partition-decode
-revision: 4
-status: approved # r1 经 #70 批准;r2/r3 已合入;r4 headless/platform task decomposition 仅在本 revision PR 由维护者 review/merge 后生效
+revision: 5
+status: approved # r1 经 #70 批准;r2/r3/r4 已合入;r5 broker-receipt boolean remediation 仅在对应 revision PR 由维护者 review/merge 后生效
 class: platform
 core_change_level: none
 owner: lvye

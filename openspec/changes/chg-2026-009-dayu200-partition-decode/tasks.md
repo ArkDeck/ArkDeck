@@ -6,15 +6,60 @@
 
 ## TASK-PD-001 — r3 codec audit headless remediation + contract evidence
 
-- Status:done（TASK-PD-001 implementation PR #124 已由维护者 review/merge 合入
-  `main` merge commit `110071c1003ecc06eb4106d2e8ea5b554029329a`；本独立状态 PR
-  依据下列 completion evidence 起草 `ready→done`，仅在维护者 review/merge 后生效。
-  本状态只关闭 headless implementation contract，不改变原三项 platform AC、
-  TASK-PD-002、change verification、gap/DEC-002、compatibility、support 或 release 状态）
-- Completion evidence:`evidence/runs/TASK-PD-001/r4-headless/run.md`（同一 implementation
-  revision 的 `TEST-DECODE-DAYU200-HEADLESS-001` contract PASS；43 项 unit/fault/static
-  回归与 archive characterization 36 项回归通过，SDD 0 errors/0 warnings；collector、
-  pinned archive、device、network 与 production subprocess dispatch 均为 0）
+- Status:ready(r5 broker-receipt remediation candidate;仅在维护者 review/merge 本
+  r5 revision PR 后生效。本 PR 不含实现、不产生 evidence、不运行 broker/collector)
+- r5 remediation amendment(2026-07-20;本块为 r5 执行的唯一权威 scope,下方 r4 各块
+  保留为历史记录不再授权执行):
+  - Motivation:TASK-PD-002 首次 fresh platform run(2026-07-20,preflight 全过)被
+    collector `_validate_runtime_receipt` fail-closed 拒绝,零 partial output。零侵入
+    诊断(复用未修改 collector 的 build→inspect→launch 管线+逐项校验,维护者亲跑)
+    实锤根因:`main.m` 以 `@(expr != 0)` 装箱 sandbox_check 结果产生 NSNumber(int),
+    NSJSONSerialization 序列化为 JSON `1` 而非 `true`;collector 对 `network-outbound`/
+    `process-exec` 用 `is True` 身份检查,`1 is not True` 恒 FAIL;四个 device 路径的
+    dict 相等比较因 Python `1 == True` 意外通过。sandbox 策略本身全部真实 denied;
+    其余 16 项校验全部 PASS。CDHash 嫌疑已以独立 ad-hoc 探针证伪(kSecCodeInfoUnique
+    = 20 字节截断,与 `codesign -d` 的 `CDHash=` 行逐字一致)。本 signed-broker 管线
+    为首次端到端运行(r1 失败/r2 锁屏/r4 headless),缺陷因此从未暴露。attempt
+    record 见 `evidence/runs/TASK-PD-002/platform-attempt-2026-07-20.md`。
+  - In scope(最小修复,三项):
+    1. `main.m`:policyChecks 全部 sandbox_check 派生字段改显式 BOOL 装箱
+       (`(expr != 0) ? @YES : @NO`),receipt 布尔字段序列化为 JSON true/false;
+    2. `collect_platform_evidence.py`:`_validate_runtime_receipt` 合取拆为逐项判定,
+       每项失败以字段名+实际值报错(receipt 无敏感字段);严格性不放宽——`is True`
+       与精确 dict 相等保持,布尔语义修正后 device 路径由 `1 == True` 的意外通过
+       收敛为真布尔相等;
+    3. 新建 `test_collect_receipt_validation.py`(headless,零 broker/GUI):合成
+       receipt 向量矩阵——canonical true 版全项通过、int-boxed 版被拒且报出字段、
+       逐项缺失/篡改各有具名错误;并以 source-literal 断言钉住 `main.m` 的显式
+       BOOL 装箱形态(README/runbook 字面同步测试先例)。
+  - Out of scope:`decode.py`/`evidence.py`/`README.md`/`test_decode.py`(r4 四文件
+    保持 r4-done 字节,TASK-PD-002 对其 pins 不因 r5 漂移);三项 platform AC 判定
+    (仍归 TASK-PD-002);任何 entitlement/policy/sandbox 语义变更。
+  - Requirements/AC(r5):`DECODE-DAYU200-RECEIPT-CONTRACT-001`
+    (`TEST-DECODE-DAYU200-RECEIPT-CONTRACT-001`,minimum evidence:`contract`)。
+    `DECODE-DAYU200-HEADLESS-001` 保持 r4 done 已闭不重判;原三项 platform AC 保持
+    pending 归 TASK-PD-002。
+  - Allowed paths(r5):
+    - `scripts/partition_decode/macos_input_broker/main.m`
+    - `scripts/partition_decode/macos_input_broker/collect_platform_evidence.py`
+    - `scripts/partition_decode/macos_input_broker/test_collect_receipt_validation.py`(新建)
+    - `openspec/changes/chg-2026-009-dayu200-partition-decode/evidence/runs/TASK-PD-001/r5-broker-receipt/**`
+    - 本 `tasks.md`(implementation PR 只追加 run/completion 引用,不标 `done`)
+  - Verification(r5):新测试文件全部 PASS;`test_decode.py` 既有回归只读重跑不回归;
+    `scripts/check-sdd.sh`;`git diff --check`;broker 启动/collector 发布/pinned
+    archive/GUI/设备/网络 dispatch 均为 0(纯 headless 合成向量)。
+  - Evidence gate:同一 revision 全部 PASS 后另起独立状态 PR 起草 `done`;done 后
+    TASK-PD-002 经独立 readiness amendment 以 r5 合入后字节重钉 `main.m`/
+    `collect_platform_evidence.py`/新测试文件 SHA-256(r4 readiness 其余 pins——
+    archive identity、console、操作者、decoder 四文件——保持有效)并恢复 `ready`,
+    再行重跑 fresh platform run。
+- Historical disposition(r4,closed):r4 headless remediation 已完成——implementation
+  PR #124(merge `110071c1003ecc06eb4106d2e8ea5b554029329a`)、done 状态 PR #125;
+  completion evidence `evidence/runs/TASK-PD-001/r4-headless/run.md`
+  (`TEST-DECODE-DAYU200-HEADLESS-001` contract PASS;43 项 unit/fault/static 回归、
+  archive characterization 36 项回归、SDD 0/0;collector/pinned archive/device/
+  network/production subprocess dispatch 均 0)保持 immutable 且不被 r5 重判。r5 只
+  覆盖 broker receipt 布尔语义与 collector 可诊断性,不触碰 r4 四个 decoder 文件。
 - Readiness review（2026-07-19；不执行 TASK-PD-001、不启动 collector）：
   - Change gate:satisfied。CHG-2026-009@r4 已由维护者批准并经 PR #116 合入
     `main` merge commit `7585603d459ae26ad566b9aaeecc953f9c26bd98`；change 保持
@@ -120,9 +165,16 @@
 
 ## TASK-PD-002 — signed broker fresh platform verification
 
-- Status:ready（readiness candidate；仅在维护者 review/merge 本 readiness PR 后生效。
-  本 PR 不运行 collector/broker、不读取 archive、不产生 evidence；实际执行另需用户
-  人工解锁 console 并本人操作 NSOpenPanel——不需要 DAYU200 设备）
+- Status:blocked(r5 fail-closed 回退;仅在维护者 review/merge 本 r5 revision PR 后
+  生效。2026-07-20 首次 fresh platform run 的 preflight 全部通过(11 个 pinned source
+  hash、archive size/SHA identity、console 解锁),但合入版 collector 的 receipt 布尔
+  校验缺陷使三项 platform AC 在当前 pinned source 上不可能 PASS——根因与诊断见
+  TASK-PD-001 r5 amendment 与
+  `evidence/runs/TASK-PD-002/platform-attempt-2026-07-20.md`;attempt 零 partial
+  output,fail-closed 行为本身符合设计。前置=TASK-PD-001 r5 remediation `done`;
+  之后由独立 readiness amendment 重钉 `main.m`/`collect_platform_evidence.py`/新测试
+  文件 SHA-256(r4 readiness 的 archive identity/console/操作者/decoder 四文件 pins
+  保持有效)并恢复 `ready`。在此之前 collector/broker/archive dispatch 均为 0)
 - Objective:不修改 decoder 或 broker source,在解锁 macOS console 上由人类经未修改的
   签名 sandbox broker/NSOpenPanel 选择 pinned archive,把已合入 TASK-PD-001 完整
   implementation commit 绑定到同一次 create-only fresh 三项 platform run。
