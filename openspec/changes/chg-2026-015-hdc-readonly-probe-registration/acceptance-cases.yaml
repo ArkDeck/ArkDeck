@@ -1,7 +1,7 @@
 ---
 schema_version: 1.0.0
 change_id: CHG-2026-015-hdc-readonly-probe-registration
-change_revision: 1
+change_revision: 2
 platform: macos
 evidence_classes:
 - contract

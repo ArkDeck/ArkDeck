@@ -152,3 +152,13 @@ platforms: [macos]
 > 保持非 `done`"等表述自该时点起不再是 current 事实。后续 consumer dependency
 > revision 引用本 ledger 时须以来源 tasks.md current 状态复核。本注记不改变 verified
 > 结论、manifest bytes 或任何 evidence。
+
+> Byte-currency note（2026-07-20，随账本对齐 PR 合入，原文不改写）：
+> `evidence/legacy-import-manifest.md` 的"来源路径与 r2 实现 byte-identical"陈述同为
+> closure 时点快照。TASK-PD-001 r4 headless remediation（approved implementation PR
+> #124 `110071c1`）已改动 PD inventory 中 4 个文件（`scripts/partition_decode/` 下
+> `README.md`、`decode.py`、`evidence.py`、`test_decode.py`），其当前 `main` blob OID
+> 已不等于 ledger 记载值（例:`decode.py` ledger `51722922…` → 现 `586be8d3…`）；
+> M1-006 inventory 13 项经 #126 误合与 #133 逐字节 revert 后净漂移为零。本 ledger 是
+> 活跃审计输入,消费者引用其字节恒等声明时须按 `git rev-parse HEAD:<path>` 对当前
+> `main` 复核。本注记不改变 verified 结论、manifest bytes 或任何 evidence。
