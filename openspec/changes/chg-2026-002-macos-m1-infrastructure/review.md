@@ -1,6 +1,9 @@
 # M1 Change Review Gate
 
-> Status：r1-r4 passed；r5 legacy-contract safety-alignment amendment pending maintainer review
+> Status：r1-r7 均已由维护者 review/merge 合入生效（V2 语义为合并即批准）。
+> Currency note（2026-07-20 追溯补记）:r5 已随 main `d78ad9a` 合入；r6 经 PR #117、
+> r7 经 PR #119 合入。下文 r5 段的"pending maintainer review"与未勾选框为其起草时点
+> 快照，以本注记与 tasks.md 头部为准。
 > Reviewed：r1 于 2026-07-15 由维护者经 PR #14 合入；r2 于 2026-07-16 经 PR #22
 > 合入，merge commit `eb9b9dc64ab422a51a518066f70b728e9ff5ba24`；r3 经 PR #35
 > 合入，merge commit `11eb5cbe69bc9089fd870d6397f698f4c93dd299`；r4 经 main
