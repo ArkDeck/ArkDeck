@@ -1,0 +1,60 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "i15-receipt-selected-device-authorization-binding",
+  "version": "1.0.0",
+  "family": "selectedDeviceAuthorizationBinding",
+  "evidenceClass": "controlledHumanCaptureDerivedReceipt",
+  "source": {
+    "path": "openspec/changes/chg-2026-015-hdc-readonly-probe-registration/evidence/provenance/device-window-capture-2026-07-20.md",
+    "sha256": "a06cc98999adb1067448ab879870c77e88740988cbc3905dff933a98fb7ae887",
+    "acceptedBy": "maintainer review and merge of PR #156"
+  },
+  "context": {
+    "platform": "macos",
+    "osVersion": "26.5.2 (25F84)",
+    "architecture": "arm64",
+    "toolReportedVersion": "3.2.0d",
+    "toolExecutableSHA256": "48395ba8d87115dffca47df2a640a6c868bc9a2bd4eb49611e4138ff88d8d260",
+    "transport": "usb"
+  },
+  "observation": {
+    "exactArgv": ["list", "targets", "-v"],
+    "existingServerRequired": true,
+    "rawStream": "stdout",
+    "rawExitCode": 0,
+    "rawBytes": 58,
+    "rawSHA256": "d8816e413776d80e6e577b78f6abbf8c114bfd570b3627f7a007c97681af9c48",
+    "redactedShape": "<redacted-connect-key>\\t\\tUSB\\tConnected\\tlocalhost\\n",
+    "processAndListenerStableAcrossBracket": true,
+    "generationEventCount": 0
+  },
+  "dispatchCounters": {
+    "serverStart": 0,
+    "serverStop": 0,
+    "serverRestart": 0,
+    "serverAdoption": 0,
+    "subserverLifecycle": 0,
+    "deviceMigration": 0,
+    "deviceMutation": 0,
+    "destructive": 0
+  },
+  "authorityLimit": {
+    "mayEstablish": [
+      "a registered authorization-state row for a device identity that already has a durable binding",
+      "whether the observed identity matches the expected durable binding identity and revision"
+    ],
+    "neverEstablish": [
+      "a default target selection",
+      "creation or revision of a durable binding",
+      "channel protection",
+      "identity from connectKey shape or exit code alone"
+    ]
+  },
+  "privacy": {
+    "containsDeviceIdentifier": false,
+    "containsUserPath": false,
+    "containsPrivateKeyMaterial": false,
+    "containsSecret": false,
+    "rawIdentifierBearingBytesStoredOutsideRepository": true
+  }
+}

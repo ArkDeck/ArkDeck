@@ -1,0 +1,312 @@
+{
+  "schemaVersion": "1.0.0",
+  "serializationFormat": "json-compatible-yaml-1.2",
+  "registryId": "OPENHARMONY-HDC-READONLY-PROBES",
+  "registryVersion": "1.0.0",
+  "integrationProfile": "OPENHARMONY-TOOLS@0.3.0",
+  "registeredBy": "CHG-2026-015-hdc-readonly-probe-registration/TASK-I15-001",
+  "unknownFamilyDisposition": "unsupported",
+  "toolContext": {
+    "platform": "macos",
+    "reportedVersion": "3.2.0d",
+    "executableSHA256": "48395ba8d87115dffca47df2a640a6c868bc9a2bd4eb49611e4138ff88d8d260"
+  },
+  "entries": [
+    {
+      "id": "openharmony-hdc-server-identity-generation-3.2.0d-macos",
+      "family": "serverIdentityGeneration",
+      "status": "supported",
+      "probeKind": "platformProcessObservation",
+      "platform": "macos",
+      "toolReportedVersion": "3.2.0d",
+      "executableIdentityPolicy": {
+        "required": true,
+        "sha256": "48395ba8d87115dffca47df2a640a6c868bc9a2bd4eb49611e4138ff88d8d260",
+        "pathSource": "selectedToolchainSnapshot",
+        "replacementInvalidatesReceipt": true
+      },
+      "exactArgv": [],
+      "invocationAllowed": false,
+      "preconditions": [
+        "selectedToolchainSnapshotPinned",
+        "exactEndpointKnown",
+        "exactlyOneExistingServerProcess",
+        "listenerOwnedByObservedProcess"
+      ],
+      "endpointPolicy": {
+        "requiresExactEndpoint": true,
+        "existingServerRequired": true,
+        "serverAbsentDisposition": "unavailable"
+      },
+      "effectClassification": "readOnly",
+      "forbiddenEffects": [
+        "serverStart",
+        "serverStop",
+        "serverRestart",
+        "serverAdoption",
+        "subserverLifecycle",
+        "deviceMigration",
+        "deviceMutation",
+        "destructive"
+      ],
+      "inputContract": {
+        "rawFamily": "redactedPlatformReceipt",
+        "stream": "none",
+        "exitCode": null,
+        "receiptId": "i15-receipt-server-identity-generation",
+        "receiptPath": "1.0.0/receipts/server-identity-generation.json",
+        "receiptSHA256": "6f71af96bcd6c25a8a7c900538e01c1aff6144ee85e6c928a37fbc654c003a69"
+      },
+      "semanticMappings": [
+        {"input": "identityTupleMatchesPriorReceipt", "result": "observed.sameGeneration"},
+        {"input": "identityTupleDiffersFromPriorReceipt", "result": "observed.generationChanged"},
+        {"input": "missingOrAmbiguousOrSubstituted", "result": "unknown"}
+      ],
+      "authorityLimit": {
+        "mayEstablish": [
+          "existing process and start identity",
+          "selected executable identity",
+          "exact listener endpoint",
+          "same or changed identity tuple relative to an earlier valid receipt"
+        ],
+        "mustMatch": ["selected toolchain snapshot", "exact endpoint"],
+        "neverEstablish": [
+          "ownership from PID shape, endpoint reuse, checkserver output, or caller assertion",
+          "caller-provided generation",
+          "server-start safety without the existing-server precondition"
+        ]
+      },
+      "timeout": {"milliseconds": 1000, "resultOnExpiry": "timedOut"},
+      "cancellation": {
+        "result": "cancelled",
+        "mayTerminateOwnedObservation": true,
+        "mayKillHDCServer": false,
+        "cleanup": "release observation handles only"
+      },
+      "provenance": {
+        "evidenceClass": "controlledHumanCapture",
+        "sourcePath": "openspec/changes/chg-2026-015-hdc-readonly-probe-registration/evidence/provenance/host-only-capture-2026-07-20.md",
+        "sourceSHA256": "7949d8a2f813b7f2f6b7d8ba45d37cca84d57167f0e319e4761b5f50e53493d8",
+        "acceptedBy": "maintainer review and merge of PR #155"
+      },
+      "unsupportedReason": null
+    },
+    {
+      "id": "openharmony-hdc-selected-device-authorization-binding-3.2.0d",
+      "family": "selectedDeviceAuthorizationBinding",
+      "status": "supported",
+      "probeKind": "hdcCommand",
+      "platform": "macos",
+      "toolReportedVersion": "3.2.0d",
+      "executableIdentityPolicy": {
+        "required": true,
+        "sha256": "48395ba8d87115dffca47df2a640a6c868bc9a2bd4eb49611e4138ff88d8d260",
+        "pathSource": "selectedToolchainSnapshot",
+        "replacementInvalidatesReceipt": true
+      },
+      "exactArgv": ["list", "targets", "-v"],
+      "invocationAllowed": true,
+      "preconditions": [
+        "selectedToolchainSnapshotPinned",
+        "validServerIdentityGenerationReceipt",
+        "exactEndpointKnown",
+        "durableBindingIdentityAndRevisionProvided"
+      ],
+      "endpointPolicy": {
+        "requiresExactEndpoint": true,
+        "existingServerRequired": true,
+        "serverAbsentDisposition": "unavailable"
+      },
+      "effectClassification": "readOnlyExistingServerOnly",
+      "forbiddenEffects": [
+        "serverStart",
+        "serverStop",
+        "serverRestart",
+        "serverAdoption",
+        "subserverLifecycle",
+        "deviceMigration",
+        "deviceMutation",
+        "destructive"
+      ],
+      "inputContract": {
+        "rawFamily": "listTargetsVerbose.singleUSBRow.connected.3.2.0d",
+        "stream": "stdout",
+        "exitCode": 0,
+        "rawSHA256": "d8816e413776d80e6e577b78f6abbf8c114bfd570b3627f7a007c97681af9c48",
+        "rawStorage": "operatorControlledOutsideRepository",
+        "receiptId": "i15-receipt-selected-device-authorization-binding",
+        "receiptPath": "1.0.0/receipts/selected-device-authorization-binding.json",
+        "receiptSHA256": "ea8257eb7c8404805521963307f06a94634341ad1470ccf13118f7f9028e0383"
+      },
+      "semanticMappings": [
+        {"input": "exactRegisteredConnectedRowAndDurableBindingMatch", "result": "observed.ready"},
+        {"input": "staleMismatchAmbiguousOrUnknown", "result": "unknown"}
+      ],
+      "authorityLimit": {
+        "mayEstablish": [
+          "registered authorization state for an identity already named by a durable binding",
+          "whether the row identity matches the expected durable binding identity and revision"
+        ],
+        "mustMatch": ["durable binding identity", "durable binding revision", "exact endpoint"],
+        "neverEstablish": [
+          "default device selection",
+          "creation or revision of a binding",
+          "channel protection",
+          "identity from connectKey shape, exit code, or caller assertion"
+        ]
+      },
+      "timeout": {"milliseconds": 2000, "resultOnExpiry": "timedOut"},
+      "cancellation": {
+        "result": "cancelled",
+        "mayTerminateOwnedObservation": true,
+        "mayKillHDCServer": false,
+        "cleanup": "terminate only the owned client observation process"
+      },
+      "provenance": {
+        "evidenceClass": "controlledHumanCapture",
+        "sourcePath": "openspec/changes/chg-2026-015-hdc-readonly-probe-registration/evidence/provenance/device-window-capture-2026-07-20.md",
+        "sourceSHA256": "a06cc98999adb1067448ab879870c77e88740988cbc3905dff933a98fb7ae887",
+        "acceptedBy": "maintainer review and merge of PR #156"
+      },
+      "unsupportedReason": null
+    },
+    {
+      "id": "openharmony-hdc-key-access-diagnostics-3.2.0d-macos",
+      "family": "keyAccessDiagnostics",
+      "status": "unsupported",
+      "probeKind": "platformFileAccess",
+      "platform": "macos",
+      "toolReportedVersion": "3.2.0d",
+      "executableIdentityPolicy": {
+        "required": true,
+        "sha256": "48395ba8d87115dffca47df2a640a6c868bc9a2bd4eb49611e4138ff88d8d260",
+        "pathSource": "selectedToolchainSnapshot",
+        "replacementInvalidatesReceipt": true
+      },
+      "exactArgv": [],
+      "invocationAllowed": false,
+      "preconditions": ["configuredOrUserApprovedLocatorRequired"],
+      "endpointPolicy": {
+        "requiresExactEndpoint": false,
+        "existingServerRequired": false,
+        "serverAbsentDisposition": "notApplicable"
+      },
+      "effectClassification": "noneUnsupported",
+      "forbiddenEffects": [
+        "privateKeyRead",
+        "privateKeyHash",
+        "privateKeyCopy",
+        "keyDelete",
+        "chmod",
+        "upload",
+        "rawKeyOrPathLogging",
+        "serverStart",
+        "serverStop",
+        "serverRestart",
+        "deviceMutation",
+        "destructive"
+      ],
+      "inputContract": {
+        "rawFamily": "noneRegistered",
+        "stream": "none",
+        "exitCode": null,
+        "receiptId": "i15-receipt-key-access-diagnostics",
+        "receiptPath": "1.0.0/receipts/key-access-diagnostics.json",
+        "receiptSHA256": "a87c2cf3754cd380699939060b2250b4bf0e406f1920cb8a69b930c9a23839e5"
+      },
+      "semanticMappings": [
+        {"input": "any", "result": "unsupported"}
+      ],
+      "authorityLimit": {
+        "mayEstablish": [],
+        "mustMatch": ["configured or user-approved locator authority"],
+        "neverEstablish": [
+          "authority from a conventional default path",
+          "private-key contents or fingerprint",
+          "permission repair or server recovery"
+        ]
+      },
+      "timeout": {"milliseconds": 0, "resultOnExpiry": "unsupported"},
+      "cancellation": {
+        "result": "unsupported",
+        "mayTerminateOwnedObservation": false,
+        "mayKillHDCServer": false,
+        "cleanup": "none; dispatch is prohibited"
+      },
+      "provenance": {
+        "evidenceClass": "controlledHumanCapture",
+        "sourcePath": "openspec/changes/chg-2026-015-hdc-readonly-probe-registration/evidence/provenance/host-only-capture-2026-07-20.md",
+        "sourceSHA256": "7949d8a2f813b7f2f6b7d8ba45d37cca84d57167f0e319e4761b5f50e53493d8",
+        "acceptedBy": "maintainer review and merge of PR #155"
+      },
+      "unsupportedReason": "No configured or user-approved HDC key locator was identified; the captured conventional-path absence cannot grant production path authority."
+    },
+    {
+      "id": "openharmony-hdc-subserver-capability-3.2.0d",
+      "family": "subserverCapability",
+      "status": "unsupported",
+      "probeKind": "hdcCommand",
+      "platform": "macos",
+      "toolReportedVersion": "3.2.0d",
+      "executableIdentityPolicy": {
+        "required": true,
+        "sha256": "48395ba8d87115dffca47df2a640a6c868bc9a2bd4eb49611e4138ff88d8d260",
+        "pathSource": "selectedToolchainSnapshot",
+        "replacementInvalidatesReceipt": true
+      },
+      "exactArgv": [],
+      "invocationAllowed": false,
+      "preconditions": ["exactTargetRevisionEffectFreeClientLocalProbeRequired"],
+      "endpointPolicy": {
+        "requiresExactEndpoint": false,
+        "existingServerRequired": false,
+        "serverAbsentDisposition": "unsupported"
+      },
+      "effectClassification": "noneUnsupported",
+      "forbiddenEffects": [
+        "serverStart",
+        "serverStop",
+        "serverRestart",
+        "serverAdoption",
+        "subserverLifecycle",
+        "deviceMigration",
+        "deviceMutation",
+        "destructive"
+      ],
+      "inputContract": {
+        "rawFamily": "noneRegistered",
+        "stream": "none",
+        "exitCode": null,
+        "receiptId": "i15-receipt-subserver-capability",
+        "receiptPath": "1.0.0/receipts/subserver-capability.json",
+        "receiptSHA256": "565beee8a8d0ca84e026968db13a12ea5ebcb419428423dd2ee7dcd1165734ea"
+      },
+      "semanticMappings": [
+        {"input": "versionOnlyOrMutationNameOrUnknown", "result": "unsupported"}
+      ],
+      "authorityLimit": {
+        "mayEstablish": [],
+        "mustMatch": ["exact target tool revision", "proven zero-effect client-local family"],
+        "neverEstablish": [
+          "capability from version alone",
+          "capability from spawn-sub, killall-sub, aliases, or other mutation commands",
+          "permission for subserver lifecycle or device migration"
+        ]
+      },
+      "timeout": {"milliseconds": 0, "resultOnExpiry": "unsupported"},
+      "cancellation": {
+        "result": "unsupported",
+        "mayTerminateOwnedObservation": false,
+        "mayKillHDCServer": false,
+        "cleanup": "none; dispatch is prohibited"
+      },
+      "provenance": {
+        "evidenceClass": "documentReview",
+        "sourcePath": "openspec/changes/chg-2026-015-hdc-readonly-probe-registration/evidence/provenance/subserver-capability-doc.md",
+        "sourceSHA256": "6bb63426ecee6e0e86f4027bd7d9b6034db56e116663494885fd69aa89618013",
+        "acceptedBy": "maintainer review and merge of PR #141"
+      },
+      "unsupportedReason": "The reviewed upstream source is 3.2.0b rather than the exact 3.2.0d target and proves no client-local, zero-lifecycle/device-migration observation command for the target revision."
+    }
+  ]
+}

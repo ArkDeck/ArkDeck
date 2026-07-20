@@ -1,0 +1,39 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "i15-receipt-subserver-capability",
+  "version": "1.0.0",
+  "family": "subserverCapability",
+  "evidenceClass": "maintainerAcceptedDocumentReviewDerivedReceipt",
+  "source": {
+    "path": "openspec/changes/chg-2026-015-hdc-readonly-probe-registration/evidence/provenance/subserver-capability-doc.md",
+    "sha256": "6bb63426ecee6e0e86f4027bd7d9b6034db56e116663494885fd69aa89618013",
+    "acceptedBy": "maintainer review and merge of PR #141"
+  },
+  "context": {
+    "upstreamRepository": "gitee.com/openharmony/developtools_hdc",
+    "upstreamCommit": "fb114f4ee99136bc4c7587777b80973ef3972d6a",
+    "reviewedSourceReportedVersion": "3.2.0b",
+    "targetToolReportedVersion": "3.2.0d"
+  },
+  "observation": {
+    "spawnSubPresent": false,
+    "killallSubPresent": false,
+    "subserverLiteralPresent": false,
+    "exactTargetRevisionLocated": false,
+    "effectFreeClientLocalProbeProvenForTargetVersion": false
+  },
+  "registrationConclusion": {
+    "status": "unsupported",
+    "reason": "No exact-target-revision, client-local observation family with proven zero server-lifecycle and device-migration effects is available for 3.2.0d."
+  },
+  "dispatchCounters": {
+    "serverStart": 0,
+    "serverStop": 0,
+    "serverRestart": 0,
+    "serverAdoption": 0,
+    "subserverLifecycle": 0,
+    "deviceMigration": 0,
+    "deviceMutation": 0,
+    "destructive": 0
+  }
+}

@@ -6,8 +6,13 @@
 
 ## TASK-I15-001 — register four closed production read-only probe families
 
-- Status:ready(readiness candidate;仅在维护者 review/merge 本 readiness PR 后生效。
-  本 PR 不含实现、不产生 evidence、不执行任何 hdc/device 命令)
+- Status:ready(PR #157 已由维护者 review/merge 生效；registration implementation +
+  evidence candidate 见 `evidence/runs/TASK-I15-001/run.md`。依本 change 的 PR boundary，
+  实现 PR 合入后仍须使用独立状态 PR 提议 `ready→done`)
+- Completion evidence candidate:`evidence/runs/TASK-I15-001/run.md`（四 family 二值登记、
+  Bundle.module contract 7/0、全量 268/0/1 known opt-in skip、guard 0/0/111、零真实
+  HDC/device/network/server mutation dispatch；仅待实现 PR 的维护者 review/merge 与独立
+  done 状态 PR）
 - Readiness review(2026-07-20;host-only,零 HDC/device/network dispatch):
   - Change gate:satisfied。CHG-2026-015 approved(PR #123,main `9f08c942`);r2
     capture plan(PR #140)固定采集面;revision 标记三方一致 2/@r2(#152 同步)。
@@ -66,7 +71,8 @@
   `evidence/provenance/host-only-capture-2026-07-20.md`(merge 即认可),3/4 已满足;
   同日 `selectedDeviceAuthorizationBinding` 经独立设备窗口采集,capture record 随
   evidence PR 合入 `evidence/provenance/device-window-capture-2026-07-20.md`
-  (merge 即认可),**4/4 全部满足**——剩余前置仅为独立 readiness PR）；独立 readiness PR merged（未满足）
+  (merge 即认可),**4/4 全部满足**——剩余前置仅为独立 readiness PR）；独立 readiness
+  PR #157 已由维护者 review/merge（已满足）
 - Allowed paths:
   - `openspec/integrations/openharmony/profile.md`
   - `openspec/integrations/openharmony/readonly-probes.yaml`（可新建）
