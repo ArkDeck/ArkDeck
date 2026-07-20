@@ -119,3 +119,61 @@ after maintainer review/merge of this source and evidence.
   does not prove target-build output families, device behavior, HDC compatibility,
   or real-hardware support. The later human capture tasks retain all runbook,
   physical-target, ownership, privacy, and hardware-evidence gates.
+
+## Review-remediation addendum — 2026-07-20
+
+PR #143 review identified one concrete Phase A advisory and three harness
+accounting/error-channel issues. The original source revision and results above
+remain the historical first run. The current PR source is superseded by:
+
+- Remediation source revision:
+  `c7f8ce81a4ee2bc3481ad9b26945cc02adc12063`.
+- Evidence class remains `hostOnlyContract`; installed HDC, device, network and
+  destructive dispatch counts remain `0`.
+
+| Current source file | SHA-256 |
+| --- | --- |
+| `scripts/ud_capture/README.md` | `00c68f9dc386da41c751dadc710e75211a990cd94abaddb57f892a12458f3b99` |
+| `scripts/ud_capture/capture.py` | `c86ad5f278cd81dc742fac7bfb47d5efb581720c6cbd2a13f102801adc0b53a2` |
+| `scripts/ud_capture/test_capture.py` | `752fd342926e48b4fb70885be9bf4e43aa7457c98ca1c7f991784c0f4e3f215a` |
+
+### Addressed findings
+
+1. **Phase A target-list output shape (advisory):** the approved runbook and
+   harness use plain `hdc list targets`, while target binding requires a row with
+   the connect key as its first token and a later `Connected` field. Some HDC
+   versions may emit only a bare serial unless `-v` is used. Before any Phase A
+   targeted dispatch, the human maintainer must inspect HP-1 and confirm the
+   approved shape. Bare-serial output intentionally keeps all targeted commands
+   fail-closed with runner dispatch `0`; adding `-v` requires an approved runbook
+   + harness revision and must not be improvised during capture. This host-only
+   task does not resolve the real-device output-shape risk.
+2. **Inherited pipe accounting:** each captured stream now records
+   `drainIncomplete`. If its reader has not reached EOF after the two-second
+   grace, the manifest records `sha256Scope: observedBeforeDrainCutoff`, complete
+   stream scanning and `captureComplete` fail, the CLI returns STOP status `1`,
+   and the summary exposes the incomplete drain. Complete streams retain
+   `sha256Scope: wholeStream`. The daemonized-grandchild test now asserts the
+   flag rather than proving only non-stall behavior.
+3. **Redaction exit semantics:** output-side redaction failures raise the
+   post-dispatch `StopRequired` channel and map to CLI status `1`; pre-dispatch
+   usage/harness refusal remains status `2`.
+4. **Malformed summary input:** a matching redacted-manifest filename with a
+   missing/invalid `sequence` now raises `CaptureError` with file context instead
+   of leaking a raw `KeyError`; stream structure is validated before summary
+   rendering as well.
+
+### Remediation commands and results
+
+| Command | Result |
+| --- | --- |
+| `PYTHONDONTWRITEBYTECODE=1 <fixed-python> scripts/ud_capture/test_capture.py` | Passed: 49 unittest methods, 0 failures/skips. |
+| focused HP drain rejection + drain manifest/summary + missing-sequence + CLI status cases | Passed: 4 tests, 0 failures. |
+| `ARKDECK_PYTHON=<fixed-python> scripts/check-sdd.sh` | Passed: 0 errors, 0 warnings, 111 acceptance IDs. |
+| `git diff --check` | Passed. |
+| `shasum -a 256 scripts/ud_capture/{README.md,capture.py,test_capture.py}` | Passed; current values recorded above. |
+
+`TEST-INT-UD-HARNESS-001` remains **PASS** at remediation source revision
+`c7f8ce81a4ee2bc3481ad9b26945cc02adc12063`, subject to maintainer review/merge.
+This addendum does not change the independent `ready → done` status-PR boundary
+or make any real-device/output-family/compatibility claim.
