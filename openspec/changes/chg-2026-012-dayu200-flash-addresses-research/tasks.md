@@ -6,8 +6,25 @@
 
 ## TASK-FA-001 — 烧写地址映射事实清单(文档研究)
 
-- Status:ready(readiness candidate;仅在维护者 review/merge 本 readiness PR 后
-  生效。本 PR 不执行研究、不产生 evidence、零设备/工具操作)
+- Status:done(TASK-FA-001 research + evidence PR #167 已由维护者 review/merge 合入
+  `main` squash commit `f9b74cc`;本独立状态 PR 依据下列 completion evidence 起草
+  `ready→done`,仅在维护者 review/merge 后生效。本状态只关闭烧写地址映射事实清单的
+  document-review evidence,non-authoritative——不解除 `GAP-DAYU200-FLASH-ADDRESSES`、
+  不改变 DEC-002 状态、无兼容性/支持声明、非执行授权)
+- Completion evidence:`evidence/flash-address-facts.md`
+  (SHA-256 `e1c09d169264ce1f774f306bc275435768bfbd37448574bc6f280900ed29c2c2`)与
+  `evidence/runs/TASK-FA-001/run.md`
+  (SHA-256 `75fef5ffd185c5854bbee20572166d2983c0ce99ed4be3289066986993d80c82`):
+  五节齐备;两个 Test ID document review PASS——`TEST-ADDR-DAYU200-MAPPING-001`
+  (§2 全 15 数值行锚定 TASK-PD-002 `partition-mapping.json`,字节列显式标 S2 ×512
+  派生非 PD-002 数值,PD-002 未覆盖项全 unknown+【待真机确证】,零 alias/镜像字节
+  推导)与 `TEST-ADDR-DAYU200-OBSERVATION-PLAN-001`(§4 逐条只读+前提,全部模式切换/
+  写设备候选标【第二阶段·写设备·RECOVERY 先行】,零执行授权);doc-only(仅两
+  markdown,零命令执行),check-sdd 0/0/111,敏感扫描零命中。状态 PR 复核
+  (2026-07-20,当前 `main` `f9b74cc`):两文件 hash 与合入版逐字节一致——该复核只
+  确认 evidence 在案,不构成新的验证结论。merge 本 PR 后:`GAP-DAYU200-FLASH-ADDRESSES`
+  与 DEC-002 保持不变,本文档作为其后续决策的 grounded 输入;CHG-2026-013 演练检查单
+  第 3 项(TASK-PD-002 mapping)已随 PD-002 done 满足。
 - Readiness review(2026-07-20;doc-only,零设备/工具/采集 dispatch):
   - Change gate:satisfied。CHG-2026-012 approved(PR #89,`4455737`);r2 upstream
     evidence-owner 修正已合入,revision 标记三方一致 2/@r2;本 readiness 不修改两项

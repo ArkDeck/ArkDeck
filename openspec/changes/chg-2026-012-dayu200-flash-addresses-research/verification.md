@@ -13,8 +13,14 @@ minimum evidence、五节内容或 pass/fail 标准。零设备/工具执行;evi
 
 | Evidence ID | Method | Expected result | Status |
 | --- | --- | --- | --- |
-| ADDR-DAYU200-MAPPING-001 | document review | 五节齐备(寻址方式语义/地址映射表/对账方法/只读观察草案/S2-S3 分级);映射表零自行推导、任何数值行均有 TASK-PD-002 同一次 fresh platform mapping evidence 锚点,PD-002 未覆盖分区显式 unknown;S3/推断结论标【待真机确证】;显式不解除 gap、无兼容性声明 | pending |
-| ADDR-DAYU200-OBSERVATION-PLAN-001 | document review | 只读观察草案逐条标只读与前提;凡模式切换/写设备候选标【第二阶段·写设备·RECOVERY 先行】;声明执行与白名单扩展均属后续 change,不构成执行授权 | pending |
+| ADDR-DAYU200-MAPPING-001 | document review | 五节齐备(寻址方式语义/地址映射表/对账方法/只读观察草案/S2-S3 分级);映射表零自行推导、任何数值行均有 TASK-PD-002 同一次 fresh platform mapping evidence 锚点,PD-002 未覆盖分区显式 unknown;S3/推断结论标【待真机确证】;显式不解除 gap、无兼容性声明 | passed(TASK-FA-001 done,PR #167;`evidence/flash-address-facts.md` §2 15 行锚定 PD-002) |
+| ADDR-DAYU200-OBSERVATION-PLAN-001 | document review | 只读观察草案逐条标只读与前提;凡模式切换/写设备候选标【第二阶段·写设备·RECOVERY 先行】;声明执行与白名单扩展均属后续 change,不构成执行授权 | passed(TASK-FA-001 done,PR #167;`evidence/flash-address-facts.md` §4 全写设备候选标第二阶段 RECOVERY 先行) |
+
+> Status update(2026-07-20,随 TASK-FA-001 `ready→done` 独立状态 PR 合入):两项
+> `ADDR-DAYU200-*` 依 TASK-FA-001 merged `done`(research/evidence PR #167 squash
+> `f9b74cc`,document review PASS)翻转 `passed`。本更新只同步账本,不构成新的验证
+> 结论,不解除 `GAP-DAYU200-FLASH-ADDRESSES`、不改变 DEC-002 或 change 级
+> `Status:planned`;change 级 verify/archive 另行独立 PR(先例 #48/#49)。
 
 ## Gate
 
