@@ -83,7 +83,7 @@ Open question 不得以聊天记忆留存。每项记录默认决策、阻塞范
     non-authoritative）。剩余=真机分区表实际布局确证（GPT vs parameter,Route-B ④
     第二阶段）。
   - `GAP-DAYU200-FLASH-ADDRESSES`:**已登记（2026-07-20）**=TASK-FA-001 done
-    （research PR #167 `f9b74cc`、状态 PR #168 `03e975b`）的 `flash-address-facts.md`
+    （research PR #167 `f9b74cc`、状态 PR #168 `03e975b`;change 于 2026-07-20 archived）的 `flash-address-facts.md`
     （SHA-256 `e1c09d16…`）:15 分区目标地址映射表（逐行锚定 PD-002 扇区列,字节列
     S2 ×512 派生）+ 各 host 工具寻址语义（`wl` 按 LBA 扇区、`wlx` 按名靠设备侧分区
     表、`db`/`ul` loader 非扇区）+ PD-002 未覆盖项显式 unknown。剩余=真机 `ppt`/GPT

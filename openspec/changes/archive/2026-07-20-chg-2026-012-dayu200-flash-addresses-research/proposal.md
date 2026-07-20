@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-012-dayu200-flash-addresses-research
 revision: 2
-status: verified # 2026-07-20 verification closure PR;r1 经 #89 批准,r2 已合入
+status: archived # 2026-07-20 archive PR;verified 于同日 verification closure PR
 class: platform
 core_change_level: none
 owner: lvye
@@ -112,3 +112,14 @@ reconciliation evidence**——该 evidence 绑定已合入 TASK-PD-001 codec im
   结论、non-authoritative,不解除 `GAP-DAYU200-FLASH-ADDRESSES`、不改变 DEC-002,
   不构成兼容性/支持/release 声明或执行授权。archive 由后续独立 archive PR 完成
   (先例 #49)。
+
+## Archive
+
+本 change 于 2026-07-20 verified(verification closure PR,#176)后经本独立 archive
+PR 归档:目录整体移入
+`openspec/changes/archive/2026-07-20-chg-2026-012-dayu200-flash-addresses-research/`,
+`status: archived` 仅在维护者 review/merge 本 PR 后生效(先例 #49/#88)。本 change
+class 为 platform、`core_change_level: none`:归档不涉及任何 spec/contract/baseline/
+conformance 变更,无 ratification 成分。`evidence/flash-address-facts.md` 自归档位置
+继续作为 DEC-002 决策与 Route-B 地址研究的只读输入;non-authoritative 边界与
+`GAP-DAYU200-FLASH-ADDRESSES`(保持 open)不变。
