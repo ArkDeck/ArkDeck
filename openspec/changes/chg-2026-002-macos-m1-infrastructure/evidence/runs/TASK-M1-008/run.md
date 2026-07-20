@@ -53,8 +53,8 @@ passed. This was an environment precondition failure, not an SDD or product-test
 
 | Output | SHA-256 |
 | --- | --- |
-| `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/SimulatedFlashProvider.swift` | `6f025b796d1e82945de8ee7034fa5851e2b4bf59761ca9d6d4799ba45ef4578a` |
-| `Packages/ArkDeckKit/Tests/ArkDeckContractTests/SimulatedFlashProviderContractTests.swift` | `73df8e1ecdf0f55d90f3e11e0283581cb8b5aa7183499aea8556d8863fd9b9c6` |
+| `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/SimulatedFlashProvider.swift` | `4c57fdf1e82bd32aeb6040ef7ed6232ac466f80f7602fb1b8e3e5201c6b1b102` |
+| `Packages/ArkDeckKit/Tests/ArkDeckContractTests/SimulatedFlashProviderContractTests.swift` | `ffefc53ee4871b01e2b1c9ec18c7d1d12775343ec8b1a76ce0138c49c06aa33e` |
 
 ## Implementation result
 
@@ -72,7 +72,9 @@ passed. This was an environment precondition failure, not an SDD or product-test
   so Foundation's last-member-wins decoder cannot bypass duplicate-member validation. Receipt
   validation covers `evidenceClass:simulated`, `executionMode:simulated`, synthetic target, null
   connect key, toolchain `none`, nonempty fixture/scenario identity, hardware-support eligibility
-  `false`, and terminal/hash consistency.
+  `false`, and terminal/hash consistency. Exact `{valid-object},"junk":null` vectors are rejected
+  because the strict Session audit envelope refuses unknown sibling keys; regression tests lock this
+  single-value boundary for both fixture and receipt entry points.
 - Reopen requires exactly the expected intent/outcome records and detail keys, then binds schema,
   fixture/scenario identity, journal fixture identity, replay terminal state, Manifest identity/hash,
   planned step kinds, and every persisted isolation counter. Missing, extra, cross-record-mismatched,
@@ -90,10 +92,10 @@ passed. This was an environment precondition failure, not an SDD or product-test
 | failure | 3/3 phases | current phase `failed`, later phases `notRun`, terminal Manifest `failed`/simulated |
 | disconnect | 3 phases x before/after = 6 | one `waitingForDevice→running` cycle per case; terminal `succeeded`/simulated |
 | outcomeUnknown | 3/3 phases | durable unknown, reconcile returns `waitingForRecovery`, reopen preserves unknown, no Manifest published |
-| cancellation | pre-first-phase + suspended virtual delay = 2 | terminal `cancelled`; checked continuation count returns to 0 |
+| cancellation | pre-first-phase + suspended virtual delay = 2 | both use a blocking virtual-delay gate before cancellation; terminal `cancelled`; checked continuation count returns to 0 |
 | repeated run | 2 independent Session roots | journal, Session audit, Manifest, receipt, phase outcomes, and counters byte/value identical |
 | receipt tamper | 9 vectors | execute/real/non-null-connect-key/HDC/hardware-eligible/empty identity/invalid state/hash/extra authority rejected |
-| duplicate JSON member | fixture identity + receipt | raw duplicate member names, including `simulated` then `execute` execution modes, rejected before typed decode |
+| strict JSON member boundary | duplicate + trailing-sibling vectors for fixture identity and receipt | raw duplicate member names, including `simulated` then `execute`, and exact `{valid-object},"junk":null` bytes are rejected before typed decode |
 | reopen receipt tamper | schema/fixture/scenario/terminal/nonzero and incomplete isolation + reported combined vector | all rejected against exact receipt shape and journal/intent/Manifest/replay bindings |
 | Manifest tamper | 4 vectors | execute mode, real target, non-null connect key, and HDC toolchain rejected before publication |
 | invalid input/reuse | identity decode, control character, timestamp, oversized delay, completed Session reuse | all fail closed before unsafe publication or dispatch |
@@ -111,6 +113,23 @@ All dedicated cases observed these instrumented forbidden-operation counters:
 | destructive dispatch | 0 |
 | outcomeUnknown destructive replay | 0 |
 | outcomeUnknown guess compensation | 0 |
+
+The forbidden counters are intentionally structural canaries and persisted attestation fields: the
+current provider has no production call site that can increment them. Their zero values therefore
+do not stand alone as dispatch-isolation proof. The independent structural evidence is the static
+import/call-target audit below; the counters are retained to detect future wiring regressions.
+
+## Review remediation
+
+- The reported trailing-sibling JSON vector was reproduced byte-for-byte and was already rejected
+  by the exact-key Session audit envelope. Dedicated tests now lock this behavior for fixture and
+  receipt inputs rather than claiming a production bypass.
+- The pre-first-phase cancellation test now waits on `BlockingVirtualDelayer` before cancelling, so
+  scheduling delay cannot allow the run to finish before the cancellation assertion.
+- Both `waitingForRecovery` and terminal branches now record the receipt audit attempt before taking
+  the isolation snapshot supplied to the durable receipt.
+- A future approved storage task may replace the private envelope adapter with a public
+  ArkDeckStorage strict-object decode seam; that API expansion is outside TASK-M1-008 allowed paths.
 
 ## Commands and results
 

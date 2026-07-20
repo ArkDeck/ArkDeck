@@ -104,11 +104,14 @@ final class SimulatedFlashProviderContractTests: XCTestCase {
     }
   }
 
-  func testStrictJSONEntryPointsRejectDuplicateMemberNames() throws {
+  func testStrictJSONEntryPointsRejectDuplicateAndTrailingSiblingMembers() throws {
     let identity = try SimulatedFlashFixtureIdentity(
       fixtureIdentity: "fixture", syntheticDeviceIdentity: "device")
     XCTAssertEqual(
       try SimulatedFlashFixtureIdentity(data: JSONEncoder().encode(identity)), identity)
+    var tailInjectedFixture = try JSONEncoder().encode(identity)
+    tailInjectedFixture.append(Data(#","junk":null"#.utf8))
+    XCTAssertThrowsError(try SimulatedFlashFixtureIdentity(data: tailInjectedFixture))
     let duplicateFixture = Data(
       #"{"fixtureIdentity":"fixture","fixtureIdentity":"other","syntheticDeviceIdentity":"device"}"#
         .utf8)
@@ -118,6 +121,9 @@ final class SimulatedFlashProviderContractTests: XCTestCase {
       #"{"schemaVersion":"1.0.0","evidenceClass":"simulated","executionMode":"simulated","targetKind":"synthetic","connectKey":null,"toolchainKind":"none","fixtureIdentity":"fixture","scenarioIdentity":"success-delay-0","hardwareSupportEligible":false,"terminalState":"waitingForRecovery","manifestSha256":null}"#
         .utf8)
     XCTAssertEqual(try SimulatedFlashEvidenceReceipt(data: validReceipt).executionMode, "simulated")
+    var tailInjectedReceipt = validReceipt
+    tailInjectedReceipt.append(Data(#","junk":null"#.utf8))
+    XCTAssertThrowsError(try SimulatedFlashEvidenceReceipt(data: tailInjectedReceipt))
     let duplicateReceipt = Data(
       #"{"schemaVersion":"1.0.0","evidenceClass":"simulated","executionMode":"simulated","executionMode":"execute","targetKind":"synthetic","connectKey":null,"toolchainKind":"none","fixtureIdentity":"fixture","scenarioIdentity":"success-delay-0","hardwareSupportEligible":false,"terminalState":"waitingForRecovery","manifestSha256":null}"#
         .utf8)
@@ -271,17 +277,22 @@ final class SimulatedFlashProviderContractTests: XCTestCase {
   func testTEST_MAC_M1_SIM_001_PreCancelledRunFinalizesAndReleasesAllWork() async throws {
     let fixture = try makeFixture(label: "pre-cancel")
     defer { try? FileManager.default.removeItem(at: fixture.container) }
-    let provider = SimulatedFlashProvider()
-    let runRequest = try request(layout: fixture.layout, scenario: .success())
+    let delayer = BlockingVirtualDelayer()
+    let provider = SimulatedFlashProvider(delayer: delayer)
+    let runRequest = try request(
+      layout: fixture.layout, scenario: .success(delayNanoseconds: 1))
     let task = Task {
       try await provider.run(runRequest)
     }
+    await delayer.waitUntilStarted()
     task.cancel()
     let receipt = try await task.value
 
     XCTAssertEqual(receipt.evidence.terminalState, .cancelled)
     XCTAssertEqual(receipt.phaseOutcomes.first?.result, .cancelled)
     XCTAssertTrue(receipt.phaseOutcomes.dropFirst().allSatisfy { $0.result == .notRun })
+    let pendingContinuationCount = await delayer.pendingContinuationCount()
+    XCTAssertEqual(pendingContinuationCount, 0)
     assertIsolation(receipt.isolation)
     let reopened = try SimulatedFlashProvider.reopen(fixture.layout)
     XCTAssertEqual(reopened.replay.currentState, .cancelled)

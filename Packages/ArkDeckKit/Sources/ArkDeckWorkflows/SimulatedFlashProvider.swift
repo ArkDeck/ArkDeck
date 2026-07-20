@@ -711,13 +711,13 @@ public struct SimulatedFlashProvider: Sendable {
       for _ in reconciliation?.durableEventSequences ?? [] {
         await monitor.record(.journalAppend)
       }
-      let isolation = await monitor.snapshot()
       let evidence = SimulatedFlashEvidenceReceipt(
         fixtureIdentity: request.fixture.fixtureIdentity,
         scenarioIdentity: request.scenario.identity,
         terminalState: .waitingForRecovery,
         manifestSHA256: nil)
       await monitor.record(.sessionAuditAppend)
+      let isolation = await monitor.snapshot()
       try auditStore.appendAndSynchronize(
         try receiptAuditRecord(
           evidence: evidence, isolation: isolation, request: request,
