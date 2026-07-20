@@ -4,6 +4,28 @@
 > 任何设备命令一律禁止;写序、判定点与中止准则对操作者有约束力。全部步骤由人类
 > 维护者亲手执行;Agent 零设备命令,只做脚本起草、事后核验与 evidence 起草
 > (M0B/PD-002 先例)。
+>
+> **r2 修正(2026-07-20,基于 RH-001 真机 blocked-attempt #173 + Oniro/HiHope 官方
+> 文档)**:r1 假定按键即进 RockUSB Maskrom,真机实测得 `2207:5000`(updater-hdc),
+> rkdeveloptool RockUSB 不通。r2 修正=① §0 精确进态序列(权威原文)+ mode-gate;
+> ② 全部 rkdeveloptool 设备命令加 `sudo`(macOS USB 接口 claim 需特权,Radxa/社区
+> 一致,r1 脚本漏);③ 写前硬门:`ld` 必须显 `0x350a`(RockUSB),显 `0x5000`
+> (updater-hdc)即 STOP 重进。恢复路线仍为 rkdeveloptool RockUSB,未转 hdc/flashd。
+
+## 0. 进态序列与 mode-gate(r2 新增;权威原文,硬门)
+
+**精确进态序列**(Oniro/HiHope HH-SCDAYU200 官方文档,逐字):
+"Press and hold `VOL/RECOVERY` then `RESET` buttons. Release `RESET` button."
+即:① 按住 `VOL/RECOVERY` 不放 → ② 保持按住,按一下 `RESET` → ③ 松开 `RESET`,
+`VOL/RECOVERY` 继续按住约 2-3 秒再松开。
+
+**mode-gate(写设备前的绝对前提)**:进态后 `sudo rkdeveloptool ld` 必须输出
+`Vid=0x2207,Pid=0x350a`(RockUSB download gadget,权威文档确认 = 可烧写态)。
+- 显 `0x350a` → 允许进入 §2 写序;
+- 显 `0x5000`(updater-hdc,= 进了 OH recovery/updater 而非 RockUSB)或无设备 →
+  **STOP,断电重进 §0 序列**,不得对 `0x5000` 设备尝试任何写命令(rkdeveloptool
+  RockUSB 无法驱动,r1 已实证);
+- 连续 2 次进不到 `0x350a` → 按 §5 中止,记录并结束窗口。
 
 ## 1. 物料与工具身份(执行前逐项复核,漂移即停)
 
@@ -16,6 +38,9 @@
 | 解包目录 | 仓库外受控目录(`0700`,先例 `~/dayu200-rehearsal/`),解包仅限本演练物料 | RR-001 先例 |
 
 ## 2. 封闭命令面(白名单;argv 逐字面)
+
+> **r2:全部 `rkdeveloptool` 设备命令以 `sudo` 前缀执行**(macOS USB 接口 claim 需
+> root;`ld` 枚举可无 sudo 但为一致性统一加)。argv 主体不变。
 
 **读类(只读,可多次):**
 

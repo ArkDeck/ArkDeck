@@ -1,6 +1,6 @@
 ---
 id: CHG-2026-016-dayu200-recovery-rehearsal
-revision: 1
+revision: 2
 status: approved # r1 proposal 经 PR #170 合入;批准由本 approval-only PR 的维护者 review/merge 构成(先例 #55/#89)
 class: platform
 core_change_level: none
@@ -81,6 +81,17 @@ RECOVERY gap 与 DEC-002。
   `TASK-RH-001` 保持 `blocked`,须独立 readiness PR(§6 第 4/5 项打勾——书面风险
   确认+具名时间窗——与执行时 pins 复核)转 `ready`,执行仍需在具名设备窗口内由
   维护者亲手进行。
+
+## Revision r2(2026-07-20)
+
+RH-001 首窗口 blocked-attempt(#173)真机推翻 r1 的进态假设:按键得 `2207:5000`
+(updater-hdc),rkdeveloptool RockUSB 不通。经 Oniro/HiHope 官方文档研究确认
+**RockUSB Maskrom(`2207:350a`)可达**——r1 进态序列/时序不精确 + 脚本缺 sudo 是根因,
+**非恢复路线错误**。r2 修正 design:§0 精确进态序列(权威原文)+ mode-gate(写前
+`ld` 必须 `0x350a`,`0x5000` 即 STOP 重进)、§2 全部 rkdeveloptool 命令加 sudo。恢复
+路线仍 rkdeveloptool RockUSB。TASK-RH-001 保持 `ready`(approve/readiness 与风险确认/
+窗口不变),下一窗口按 r2 修正后的脚本重执行;#173 blocked-attempt 保持 immutable。
+仅在维护者 review/merge 本 revision PR 后生效;不含实现/evidence/设备命令。
 
 ## Risk and boundary
 

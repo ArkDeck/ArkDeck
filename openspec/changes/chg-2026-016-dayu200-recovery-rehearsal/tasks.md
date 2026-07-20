@@ -33,6 +33,12 @@
   - Review boundary:本 readiness 只翻转状态并打勾 §6 第 4/5 项、记录 pins;实现
     仍须满足全部 AC/verification gate(封闭命令面、写序、§5 中止、隐私、observed 行
     边界);`ready→done` 另用独立状态 PR;执行由维护者亲手进行,Agent 零设备命令。
+- r1 attempt + r2 correction(2026-07-20):首窗口执行(#173)为 blocked-attempt——
+  按键得 `2207:5000`(updater-hdc),rkdeveloptool RockUSB `db` 建 comm 失败;设备零
+  字节写入、经重启完整恢复。经 Oniro/HiHope 官方文档确认 RockUSB Maskrom(`0x350a`)
+  可达,r2 修正 design 进态序列+mode-gate+sudo(见 design §0/§2 与 proposal r2)。
+  TASK-RH-001 保持 `ready`(approve #171/readiness #172 的风险确认与窗口不变),下一
+  窗口按 r2 修正后脚本重执行;#173 blocked-attempt record 保持 immutable。
 - Requirements/AC:`RH-DAYU200-RECOVERY-001`、`RH-DAYU200-MODE-001`、
   `RH-DAYU200-TABLE-001`、`RH-DAYU200-SAFETY-001`(见 acceptance-cases.yaml)
 - Depends on:CHG-2026-010 恢复预案 archived(§4 步骤/§5 中止/§6 检查单,已满足);
