@@ -20,6 +20,8 @@
 - Git revision 引用一律使用完整 commit OID;branch、tag 名、缩写不构成固定引用。
 - **PR 载体与内容一致(一任务一实现 PR)**:每个任务的实现以该任务命名的独立 PR 交付;readiness、remediation 或状态 PR 不得携带超出其标题/描述所声明范围的实现内容。"合并即批准"的前提是维护者知道自己批准的是什么——载体与内容不符会使批准失真,发现后须在 evidence 或 postmortem 中记录。
 - **验证确认与实现分离**:change 的 `verified` 翻转不得只依附实现 PR 的 review;翻转 `verified` 的 PR 应只包含状态与 evidence 引用(run 记录、复验记录),使验证判断可与实现批准分开追溯。
+- **作废 PR 立即 close**:被治理裁定作废或被后续 PR 取代的 open PR(如被 supersede 的 remediation 草案、失效的实现尝试),维护者应在裁定生效时立即 close,并在取代 PR 的描述中记录取代关系;"body 里写着 do-not-merge"不构成防线——open 列表中的作废 PR 是误合事故隐患(2026-07-20 #126 误合、#133 revert 教训)。
+- **merge 载体可核验**:维护者合并 PR 时应使用 GitHub squash merge(commit subject 携带 `(#N)`),或在本地 merge 后于 commit subject 补记 `(#N)`,使 git 账本单独可核验每次合并的 PR 关联。当 git 历史中出现无 `(#N)` 的合并时,审计者不得仅凭 git 账本断言"绕过信任根",必须先以 `gh pr view <n> --json reviews,mergedBy` 核验 GitHub 侧的 review/merge 元数据再下结论(2026-07-19 #117-#123 窗口曾致三个独立审查者误判)。
 
 ## CI 校验(sdd-guard)
 
