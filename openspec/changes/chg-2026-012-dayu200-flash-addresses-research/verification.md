@@ -1,6 +1,6 @@
 # CHG-2026-012 Verification Plan
 
-> Status:planned
+> Status:passed;maintainer confirmation 见 proposal.md Verification closure(2026-07-20)
 > Change:CHG-2026-012-dayu200-flash-addresses-research@r2
 > Core baseline:CORE-2.0.0
 
