@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-015-hdc-readonly-probe-registration
-revision: 1
-status: approved # r1 proposal 经 PR #121 合入；批准由本 approval-only PR 的维护者 review/merge 构成
+revision: 2
+status: approved # r1 proposal 经 PR #121 合入；批准由 approval-only PR #123 的维护者 review/merge 构成；r2 为 plan-only revision（capture-plan.md），仅在对应治理 PR 合入后生效
 class: integration
 core_change_level: none
 owner: lvye

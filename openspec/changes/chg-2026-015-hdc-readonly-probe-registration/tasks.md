@@ -16,8 +16,10 @@
   `I15-HDC-KEY-ACCESS-001`、`I15-HDC-SUBSERVER-001`、`I15-HDC-PROVENANCE-001`、
   `I15-HDC-REGISTRY-001`、`I15-HDC-NODISPATCH-001`
 - Depends on:CHG-2026-015 approved（已满足:PR #123）；四类 authoritative/controlled-human
-  raw or platform receipt inputs 可读取且 provenance 已由维护者认可（未满足）；独立
-  readiness PR merged（未满足）
+  raw or platform receipt inputs 可读取且 provenance 已由维护者认可（未满足——采集面已由
+  r2 `capture-plan.md` 固定:三类 host-only 可随时采集、`selectedDeviceAuthorizationBinding`
+  需独立设备窗口;维护者按计划采集后,capture record 经 evidence PR 合入
+  `evidence/provenance/**` 即构成认可）；独立 readiness PR merged（未满足）
 - Allowed paths:
   - `openspec/integrations/openharmony/profile.md`
   - `openspec/integrations/openharmony/readonly-probes.yaml`（可新建）
