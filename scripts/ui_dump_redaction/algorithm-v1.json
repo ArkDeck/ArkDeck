@@ -1,0 +1,86 @@
+{
+  "schema": "arkdeck-ui-dump-redaction-algorithm-1.0.0",
+  "algorithmId": "uidump-derived-redaction-v1",
+  "version": 1,
+  "encoding": {
+    "input": "UTF-8",
+    "invalidInput": "reject",
+    "output": "ASCII"
+  },
+  "pathPolicy": {
+    "repositoryRoot": "resolved-redactor-source-two-level-ancestor",
+    "input": "regular-read-only-no-follow-nonblocking-outside-repository",
+    "output": "exclusive-create-outside-repository",
+    "receipt": "exclusive-create-outside-repository",
+    "conflicts": "resolved-input-output-receipt-paths-must-be-distinct"
+  },
+  "normalization": {
+    "unicode": "require-NFC",
+    "acceptedLineEndings": ["LF", "CRLF", "CR"],
+    "outputLineEnding": "LF",
+    "terminalLineEnding": "exactly-one-LF",
+    "rejectedUnicodeCategories": ["Cc", "Cf", "Cn", "Co", "Cs"],
+    "rejectedConfusableNamePrefixes": [
+      "ARMENIAN ",
+      "CHEROKEE ",
+      "CYRILLIC ",
+      "FULLWIDTH ",
+      "GREEK ",
+      "MATHEMATICAL ",
+      "SMALL "
+    ],
+    "bidiControls": "reject-via-Unicode-category-Cf"
+  },
+  "grammar": {
+    "whitespace": "ASCII-space-runs-collapse-to-one;tabs-and-other-controls-reject",
+    "blankLines": "preserve-order-and-count",
+    "punctuation": ["(", ")", ",", ":", "<", "=", ">", "[", "]", "{", "}"],
+    "quotedStrings": "JSON-double-quoted;validate-escapes;reject-all-decoded-Cc;redact-decoded-value;preserve-quotes",
+    "safeLiteralMatch": "v1-allowlist-empty;no-input-token-retained",
+    "tokenClassesOrdered": ["PA", "PK", "NU", "ID", "TX"],
+    "tokenClassRules": {
+      "PA": "contains-forward-or-backslash-or-leading-tilde",
+      "PK": "three-or-more-dot-separated-ASCII-identifiers",
+      "NU": "signed-decimal-float-exponent-hex-or-dimension-number",
+      "ID": "ASCII-identifier-with-dot-dash-underscore-tail",
+      "TX": "remaining-valid-nonempty-Unicode-token",
+      "QU": "decoded-valid-JSON-double-quoted-token"
+    },
+    "unknownTokenOrLine": "reject"
+  },
+  "placeholders": {
+    "format": "@R-{TYPE}-{ORDINAL_6_DECIMAL}@",
+    "types": ["ID", "NU", "PA", "PK", "QU", "TX"],
+    "ordinalScope": "per-type-first-occurrence",
+    "duplicates": "reuse-first-placeholder-for-identical-type-and-decoded-token",
+    "ordering": "preserve-input-line-and-token-order"
+  },
+  "limits": {
+    "inputBytes": 8388608,
+    "derivedBytes": 16777216,
+    "safeLiteralBytes": 65536,
+    "lines": 100000,
+    "tokens": 1000000,
+    "tokenBytes": 4096,
+    "tokensPerLine": 16384
+  },
+  "errorCodes": {
+    "MANIFEST_INVALID": 20,
+    "ALLOWLIST_INVALID": 21,
+    "PATH_CONFLICT": 22,
+    "OUTPUT_EXISTS": 23,
+    "INPUT_HASH_MISMATCH": 24,
+    "INPUT_TOO_LARGE": 25,
+    "INVALID_UTF8": 26,
+    "INVALID_UNICODE": 27,
+    "INVALID_LINE": 28,
+    "INVALID_TOKEN": 29,
+    "RESOURCE_LIMIT": 30,
+    "SENSITIVE_OUTPUT": 31,
+    "IO_ERROR": 32
+  },
+  "hashPins": {
+    "safeLiteralsSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "receiptSchemaSha256": "f4bffe70a51dc3f6228f24d41b814dc47cc2d6f0cde5f00445070f86cd1ec4b6"
+  }
+}
