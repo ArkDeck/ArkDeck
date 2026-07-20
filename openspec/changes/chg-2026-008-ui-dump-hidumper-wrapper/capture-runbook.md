@@ -14,6 +14,12 @@ fixture, exact-path inventory operation, journaled pre-dispatch authorization an
 listed below. Phase A may capture only R1-R3. R4 is a separate Phase B task that cannot become ready
 until approved R2 output-family and typed component-extractor decisions exist.
 
+Journaled confirmation/append-chain dispatch authority is not defined by this runbook or CHG-008.
+It changes accepted Core schema and Safety pass/fail, so it first requires a separately approved Core
+MAJOR change with production task `TASK-JAUTH-CORE-001`, migration/recovery and cross-platform
+conformance evidence, verified/archive closure and `CORE-3.0.0` ratification. CHG-008 must then retarget
+that baseline. An offline receipt/verifier cannot substitute for production authority.
+
 The reviewed OpenHarmony source is useful only for static routing analysis:
 
 - [`window_window_manager`](https://gitee.com/openharmony/window_window_manager/blob/b5df00fb15aa99734c2ec8f73cfd0219389314c6/window_scene/session_manager/src/scene_session_manager.cpp)
@@ -94,8 +100,9 @@ through the completed production device-targeting workflow, never through operat
 The physical/binding confirmation applicable to any device intent must itself be a typed event written
 by the trusted host entry point to that same locked Session/Job journal before the intent. The current
 `journal-event.schema.json` has no task-applicable event kind linked to Manifest confirmation/execution
-authority and no append-chain fields, so an independent approved contract revision must add them
-before this task can become ready. A time string or imported receipt/manifest cannot mint authority.
+authority and no append-chain fields, so the external Core MAJOR's `TASK-JAUTH-CORE-001` must add the
+approved delta, production store/entrypoint/gate and conformance evidence before this task can become
+ready. A time string or imported receipt/manifest cannot mint authority.
 
 The capture harness accepts only the receipt ID plus the **fixed expected binding revision**. It
 opens the exact Session through the production durable store/loader, replays the locked journal,
@@ -263,21 +270,31 @@ network installation is allowed.
 
 All UI Dump raw output is sensitive by default. Raw stdout, stderr and sidecar bytes remain only in
 the controlled directory. Before `TASK-UD-001` can become ready, `TASK-UD-REDACTOR-001` must be done
-and pin `uidump-derived-redaction-v1` source, algorithm manifest, safe-literal allowlist, receipt
-schema, tests, commit OID, every file hash, fixed Python and exact replay CLI. Repository golden
-fixtures are later produced as `derived`, never raw, only by replaying those pins:
+and pin `uidump-derived-redaction-v1` transform/finalizer sources, algorithm manifest, safe-literal
+allowlist, transform/privacy-review receipt schemas, tests, commit OID, every file hash, fixed Python,
+fixed Git and both exact CLIs. Repository golden fixtures are later produced as `derived`, never raw,
+through a human-only two-stage task:
 
 1. verify controlled raw SHA-256 against the merged capture manifest and decode UTF-8 strictly;
 2. normalize line endings and tokenize through a versioned redactor and approved safe-literal list;
 3. retain only allowlisted structural literals; replace IDs, package/ability/page/window/path/text
    and every unrecognized value with deterministic typed ordinal placeholders;
-4. record algorithm/source/allowlist/raw/derived hashes, replacement counts and human privacy review;
-5. commit only the derived fixture and receipt, pinned by `.gitattributes`, profile/lock and Bundle
-   resource hashes.
+4. exclusive-create an immutable transform receipt recording algorithm/source/allowlist/raw/derived
+   hashes, replacement counts, tool/path identities and transform completion time; it contains no
+   reviewer/decision and is never edited;
+5. a human reviews the exact derived bytes, then the pinned finalizer exclusive-creates a separate
+   privacy-review receipt referencing the transform receipt hash, same derived hash, reviewer claim,
+   approved/rejected decision, later review time and exact repository destination;
+6. only `approvedForRepository` chains may be handed to TASK-UD-001, which copies the derived fixture
+   and both repo-safe receipts under `.gitattributes`, profile/lock and Bundle resource hashes.
 
-The exact replay CLI is the one declared in `tasks.md`; its output and receipt first land outside git.
-Before any bytes are read, it must enumerate and hash all registered ArkDeck worktree roots without a
-shell, reject any repository's `.git` worktree marker found by descriptor-based ancestor walk, validate
+The exact CLIs are those declared in `tasks.md`; transform derived/receipt and review receipt first land
+outside git. Before any bytes are read, both tools must validate `/usr/bin/git`, version
+`git version 2.50.1 (Apple Git-155)`, SHA-256
+`179301dcb41ea78accc3fa0048a7e6f6710d891945a751a34addd622020c1818`, then use only
+`[/usr/bin/git, "-C", ARKDECK_ROOT, "worktree", "list", "--porcelain", "-z"]` without PATH, alias,
+override or shell. They record raw/parsed inventory hashes, reject malformed/truncated/incomplete output,
+reject any repository's `.git` worktree marker found by descriptor-based ancestor walk, and validate
 an owner-only `0o700` controlled root outside every detected/registered git worktree, and walk every
 path component with no-follow directory descriptors. All three data paths and their owner-only parents
 remain beneath that root. Raw input is an owner-only `0o600` regular file with link count one, opened
@@ -288,10 +305,11 @@ semantics—never truncate or replace. Retained descriptors are revalidated afte
 parent/file identity, mode, link count and worktree containment, while raw identity, size, mtime and
 hash must remain unchanged. Alias, `..`, symlink/hardlink, existing target, parent swap, inventory
 drift or any worktree breakout fails closed without overwriting raw or producing a committable fixture.
-The receipt records those identities, open/create policy and inventory hash in addition to content
-hashes. `TASK-UD-001` may only verify the merged pins/receipt and copy the approved derived bytes into
-its fixture path. It cannot edit the redactor, manifest or allowlist. Unclassified content fails closed.
-Raw/derived equality is neither expected nor claimed.
+The transform receipt records those identities, pinned Git identity, open/create policy and inventory
+hash in addition to content hashes. `TASK-UD-PRIVACY-REVIEW-001` owns real-raw transform and human
+review; `TASK-UD-001` may only verify immutable transform + separate approved review receipts and copy
+the approved derived bytes. It cannot read raw, run either tool, edit receipts, or change redactor/
+manifest/allowlist. Unclassified content fails closed. Raw/derived equality is neither expected nor claimed.
 
 ## Prohibited actions at r3
 
@@ -305,11 +323,16 @@ Raw/derived equality is neither expected nor claimed.
 - schema-only hardware PASS, unpinned semantic verifier, missing/expired physical-target or mutation
   confirmation, missing/late/broken journal authorization chain, backdated confirmation used as
   authority, or identity/model/serial/scope/intent equality inferred rather than checked;
+- treating journal authority as contract/integration-only, or proceeding before external Core MAJOR
+  `TASK-JAUTH-CORE-001`, migration/recovery/conformance, archive and `CORE-3.0.0` ratification close;
 - claiming that operator-string validation proves a human actor; authenticity comes only from
   maintainer PR review/merge;
-- TASK-UD-001 ready or raw access before `TASK-UD-REDACTOR-001 done`, or changing its pinned source,
-  manifest, allowlist, receipt schema or replay CLI inside the golden implementation task; redactor
+- privacy-review raw access or TASK-UD-001 readiness before `TASK-UD-REDACTOR-001 done`, or changing its pinned source,
+  manifest, allowlist, receipt schemas or transform/finalizer CLIs inside the golden implementation task; redactor
   input/output/receipt aliases, overwrite, symlink/hardlink, parent-race or git-worktree breakout;
+- PATH/alias/unpinned Git inventory; writing reviewer/decision into transform receipt; missing,
+  rejected, duplicate or mismatched separate privacy-review receipt; TASK-UD-001 raw access or
+  transform/finalizer execution before `TASK-UD-PRIVACY-REVIEW-001 done`;
 - registering a raw byte-fingerprint/digest output family without a separate approved privacy-safe
   production-stream conformance seam;
 - sidecar search/overwrite, unowned cleanup, recursive delete or raw sensitive bytes in git;

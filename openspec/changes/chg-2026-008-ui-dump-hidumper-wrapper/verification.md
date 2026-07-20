@@ -6,7 +6,8 @@
 
 本文件是 r3 review-remediation verification plan。r3 merge 本身不执行任何 task，且 merge 后
 没有 real-device task 为 `ready`。`TASK-UD-PREFLIGHT-001`、`TASK-UD-HWE-SEM-001`、
-`TASK-UD-REDACTOR-001`、`TASK-UD-CAP-MUT-001`、`TASK-UD-CAP-R4-001` 与 `TASK-UD-001`
+`TASK-UD-REDACTOR-001`、`TASK-UD-PRIVACY-REVIEW-001`、`TASK-UD-CAP-MUT-001`、
+`TASK-UD-CAP-R4-001` 与 `TASK-UD-001`
 均保持 `blocked`；任何
 installed-HDC/device/binding/server-lifecycle 执行或基于未批准 argv/output family、自造
 fake/golden 的既有 PASS 都无效。
@@ -32,14 +33,20 @@ fake/golden 的既有 PASS 都无效。
 - initial binding 由人类 physical selection 触发，production workflow 先 durable append
   `bindingCandidate`/`bindingConfirmed`；harness 只以 receipt ID + fixed positive revision 通过
   production loader/replay 取得 connect key。operator/default/stale/other-source path 均不可达。
+- journaled confirmation/append-chain/dispatch authority 属于 external Core MAJOR，不是本 change 的
+  contract/integration detail。必须由独立 `class:core` / `core_change_level:major` change 的具名
+  `TASK-JAUTH-CORE-001` 同时交付 Requirement/AC delta、Core schemas/validator、macOS production
+  store/trusted-entrypoint/dispatch gate、existing journal/checkpoint migration、crash/restart/recovery/
+  rollback fault tests、language-neutral conformance vectors与三平台 disposition；该 task done、change
+  verified/archived、`CORE-3.0.0` ratified且 CHG-008 retarget 前，offline verifier/preflight 都不得 ready。
 - `TASK-UD-HWE-SEM-001` 必须在真机 task ready 前完成。未来 revision 先固定 binding receipt、
   server receipt、device-intent manifest、physical-target confirmation receipt 与 task-applicable confirmation
   manifest、confirmation-event receipt、journal-authorization receipt schemas，再实现
   `scripts/ui_dump_capture/verify_hardware_evidence.py` 与对应 test path，并钉死 source commit OID、
   file hashes、fixed Python 与 exact CLI；generic JSON schema 通过不能替代 cross-document semantic
   equality。当前 journal contract 没有与 Manifest confirmation/execution authority 关联的 task-applicable
-  event 或 append-chain 字段，必须由
-  独立 approved contract revision 先补齐；trusted host entry point 的 confirmation event 必须 durable
+  event 或 append-chain 字段，必须由上述 Core MAJOR/TASK-JAUTH-CORE-001 先补齐并形成 production
+  evidence；trusted host entry point 的 confirmation event 必须 durable
   append 到同一 Session/Job 且 sequence/append chain 严格早于全部 related intents，时间戳/事后 evidence
   不能补权。verifier 必须重算 model/serial/identity/scope/intent/journal linkage，但只能检查 claimed
   operator/attestation 字段一致性；现实人类身份由维护者 PR review/merge 保证。
@@ -51,12 +58,17 @@ fake/golden 的既有 PASS 都无效。
   versioned typed component-tree extractor/receipt；十进制校验、first/lowest/manual selection 均不
   构成 provenance。任一缺失时 R4 request/process dispatch `0`。
 - `TASK-UD-REDACTOR-001` 必须在 TASK-UD-001 ready 前完成并固定
-  `scripts/ui_dump_redaction/{redact.py,algorithm-v1.json,safe-literals-v1.txt,redaction-receipt.schema.json}`、
-  tests/README、commit OID/逐文件 hash、fixed Python 与 exact replay CLI。其 CLI 必须证明 controlled
+  `scripts/ui_dump_redaction/{redact.py,record_privacy_review.py,algorithm-v1.json,safe-literals-v1.txt,redaction-receipt.schema.json,privacy-review-receipt.schema.json}`、
+  tests/README、commit OID/逐文件 hash、fixed Python、fixed `/usr/bin/git` version/hash/closed argv 与
+  transform/finalizer exact CLIs。transform receipt 不含 reviewer/decision且不可变；其 CLIs 必须证明 controlled
   root 位于全部 worktree 外，三个 data path/owner-only parents 均位于该 root 下且 pairwise distinct，
   raw read-only/link-count-one/pre-post identity 不变，output/receipt no-follow exclusive-create 且无
   symlink/hardlink/parent-race/worktree
-  breakout；TASK-UD-001 只读重放，不得在 golden PR 中选择 safe literals 或修改 transform。
+  breakout；PATH poisoning、Git missing/hash/version/output drift 必须在读取 input 前失败。
+- `TASK-UD-PRIVACY-REVIEW-001` 必须由人类在 transform 后检查 exact derived bytes，再用 pinned
+  finalizer exclusive-create separate review receipt。只有 receipt 引用 immutable transform receipt hash、
+  same derived hash/destination，`decision=approvedForRepository` 且 reviewedAt > completedAt 才能交给
+  TASK-UD-001；后者不读取 raw、运行 transform/finalizer或补写 receipts。
 - 后续 output-family decision 只允许有 repo-safe synthetic/derived positive fixture 的文本 marker 或
   结构 parser family。raw byte-fingerprint/digest family 在本 change 中 unsupported/out of scope；若未来
   需要，须先由独立 approved change 固定复用 production stream→digest 路径的 privacy-safe conformance seam。
@@ -72,7 +84,8 @@ fake/golden 的既有 PASS 都无效。
 | --- | --- | --- | --- |
 | capture-specific supervised preflight | `INT-UD-PREFLIGHT-001` | `TEST-INT-UD-PREFLIGHT-001` / human supervised preflight | already-PASS production HDC/device interfaces + stable existing-server snapshot + durable binding receipt/reopen + hardware evidence |
 | UI Dump hardware evidence semantic linkage | `INT-UD-HWE-SEM-001` | `TEST-INT-UD-HWE-SEM-001` / offline cross-document fault injection | pinned source/test/OID/hashes/CLI + durable confirmation-event/journal ordering + schema-valid semantic mismatch rejection |
-| UI Dump derived-golden privacy transform | `INT-UD-REDACTOR-001` | `TEST-INT-UD-REDACTOR-001` / offline adversarial/property redaction | pinned algorithm/source/manifest/allowlist/schema/replay CLI + raw immutability/path-containment contract + deterministic fail-closed synthetic evidence |
+| UI Dump derived-golden privacy transform | `INT-UD-REDACTOR-001` | `TEST-INT-UD-REDACTOR-001` / offline adversarial/property redaction | pinned transform/finalizer + two receipt schemas/CLIs + fixed Python/Git + raw immutability/path-containment contract + deterministic fail-closed synthetic evidence |
+| UI Dump human privacy review finalization | `INT-UD-PRIVACY-REVIEW-001` | `TEST-INT-UD-PRIVACY-REVIEW-001` / human exact-derived review + receipt-chain verification | immutable transform receipt + separate approved privacy-review receipt + same derived hash/destination |
 | r3 conservative Phase A capture | `INT-UD-CAPTURE-MUT-001` | `TEST-INT-UD-CAPTURE-MUT-001` / human-authorized deviceMutation capture | R1-R3 exact arrays + binding/server/confirmation/registered inventory/cleanup + hardware evidence |
 | r3 conservative Phase B R4 capture | `INT-UD-CAPTURE-R4-001` | `TEST-INT-UD-CAPTURE-R4-001` / extractor-bound human deviceMutation capture | R2 family/extractor receipt + R4 exact array + binding/server/inventory/cleanup + hardware evidence |
 | `REQ-DUMP-003` | `AC-DUMP-003-01` | `TEST-AC-DUMP-003-01` / `recipeSchemaContract` | invalid component ID preflight + zero argv/request/dispatch |
@@ -88,6 +101,7 @@ inputs and ownership are explicit:
 | `TASK-UD-CAP-MUT-001` | `REQ-DUMP-002/005/006/007/008` → `AC-DUMP-002-01/005-01/006-01/007-01/008-01` → matching `TEST-AC-DUMP-*` | read-only Safety inputs; capture enforces them but does not close parserGolden/contract/platform cases |
 | `TASK-UD-CAP-R4-001` | `REQ-DUMP-003/005/006/007/008` → `AC-DUMP-003-01/005-01/006-01/007-01/008-01` → matching `TEST-AC-DUMP-*` | read-only Safety inputs; `AC-DUMP-003-01` closes only in `TASK-UD-001`; the capture task claims no canonical PASS |
 | `TASK-UD-REDACTOR-001` | `REQ-DUMP-008` → `AC-DUMP-008-01` → `TEST-AC-DUMP-008-01` | read-only privacy Safety input; synthetic redactor contract does not execute diagnostic export or close canonical platform evidence |
+| `TASK-UD-PRIVACY-REVIEW-001` | `REQ-DUMP-008` → `AC-DUMP-008-01` → `TEST-AC-DUMP-008-01` | read-only privacy Safety input; human derived review is change-local evidence and does not close canonical diagnostic-export platform evidence |
 
 ## Acceptance matrix
 
@@ -95,12 +109,13 @@ inputs and ownership are explicit:
 | --- | --- | --- | --- |
 | INT-UD-PREFLIGHT-001 | human supervised existing-server + durable binding preflight | commandless registered supervisor observation proves existing endpoint/process-start identity/executable/version/ownership/generation and durable Job snapshot; human selection produces reopenable bindingCandidate/bindingConfirmed positive revision plus physical-target receipt; canonical model/serial/identity hash and validity match hardware/binding/intents; task-applicable confirmation event/append chain precedes every device intent; registered selected-device observation matches; harness has receipt-ID/fixed-revision loader only; mismatch paths dispatch 0 | blocked |
 | INT-UD-HWE-SEM-001 | offline cross-document semantic fault injection | fixed source/test paths and hashes plus exact CLI validate physical model/serial/identity and unexpired confirmation scope across hardware/binding/intents/receipts, positive binding revision, stable server tuple, claimed-operator/attestation field equality, exact task/AC/step kinds, artifact hashes and raw-outside-git; confirmation event/session/job/payload/sequence/append-chain exactly match the durable journal receipt and precede every related intent; it makes no human-authenticity claim; backdated/late/broken-chain and other schema-valid semantic mismatches exit nonzero; no HDC/device/network | blocked |
-| INT-UD-REDACTOR-001 | offline deterministic redaction adversarial/property contract | fixed source/algorithm manifest/safe-literal allowlist/receipt schema/test hashes and exact replay CLI; synthetic invalid UTF-8/control/bidi/confusable/identifier/path/page-text/unknown/drift cases plus alias/existing-target/symlink/hardlink/parent-race/worktree-breakout/raw-mutation cases fail closed without overwrite; retained descriptors prove pairwise file identity, raw immutability and exclusive-create containment; repeats are byte-deterministic and contain only approved structural literals/placeholders; no real raw/HDC/device/network | blocked |
+| INT-UD-REDACTOR-001 | offline deterministic redaction/finalizer adversarial/property contract | fixed transform/finalizer source、algorithm manifest、allowlist、two receipt schemas/tests/CLIs、Python and `/usr/bin/git` identities；transform receipt immutable and reviewer/decision-free；PATH/Git identity/inventory drift、content/privacy/path alias/symlink/hardlink/parent-race/raw-mutation、receipt mutation/derived mismatch/rejected or invalid review/destination cases fail closed without overwrite；repeats deterministic；no real raw/human-review/HDC/device/network | blocked |
+| INT-UD-PRIVACY-REVIEW-001 | human exact-derived privacy review and immutable receipt finalization | pinned transform produces immutable transform receipt without reviewer/decision; human review occurs afterward; pinned finalizer records separate receipt referencing exact transform-receipt/derived hashes, approved decision, reviewer claim, later review time and exact destination; rejected/missing/duplicate/mutated/mismatched chain blocks commit; Agent raw/review/finalizer count 0 | blocked |
 | INT-UD-CAPTURE-MUT-001 | human-authorized Phase A first target-build deviceMutation capture | no readOnly Recipe branch; R1-R3 exact one-element payloads materialize only from durable binding; physical model/serial/identity receipt and unexpired recomputed confirmation scope match all intents; confirmation event/append chain precedes every intent; same server generation verified before/after; dedicated fixture, typed window inventory, registered exact-path operation, separate raw origins, ownership evidence and exact cleanup; schema + pinned semantic verifier match receipts/intents/artifact hashes; destructive/Agent dispatch 0 | blocked |
 | INT-UD-CAPTURE-R4-001 | extractor-bound human-authorized Phase B deviceMutation capture | approved R2 family/parser produces exactly one fixture-selected component through pinned extractor receipt; manual/regex-only/zero/multiple/stale/foreign source paths dispatch 0; R4 exact one-element payload and the same physical identity/unexpired confirmation whose journal event precedes its intent, binding/server/inventory/ownership/privacy/semantic gates pass; destructive/Agent dispatch 0 | blocked |
 | AC-DUMP-003-01 | canonical `recipeSchemaContract` | componentDetail missing、empty、非法格式/字符、leading option、whitespace/newline、shell metacharacter 与 argument injection 全部在 argv/ProcessRequest 前失败；argv/request/recording-dispatch count 均为 0；合法 token positive control 不启动真实 HDC | blocked with TASK-UD-001 |
 | INT-UD-WRAPPER-001 | adversarial contract tests | 每 Recipe 与 approved decision exact argv equality；success 只来自登记且有 repo-safe positive fixture 的文本 marker/结构 parser family，不依退出码；raw byte-fingerprint/digest registration 被拒绝；错误样 exit-0 显式失败；未登记/marker 缺失为 unknownOutput；chunk/stream precedence 与无 shell composition 全覆盖；零真实 HDC | blocked with TASK-UD-001 |
-| INT-UD-GOLDEN-001 | deterministic derived-golden registration review | `TASK-UD-REDACTOR-001 done` 且 controlled raw hashes 与 capture manifest 一致；TASK-UD-001 只读重放 pinned source/algorithm manifest/allowlist/schema/exact CLI，raw 不入 git；receipt 固定 algorithm/source/manifest/allowlist/raw/derived/replay hashes、replacement counts 与 human privacy review；repo 无 sensitive literal；`.gitattributes`、profile/lock、registry 和 Bundle resource 一致；不声称 raw/derived equality 或 compatibility | blocked with TASK-UD-001 |
+| INT-UD-GOLDEN-001 | deterministic derived-golden registration review | `TASK-UD-REDACTOR-001`/`TASK-UD-PRIVACY-REVIEW-001 done`；transform receipt raw hash 与 capture manifest 一致且不可变，separate approved privacy-review receipt 引用 its hash + same derived hash/destination；TASK-UD-001 raw/transform/finalizer count 0，只复制 approved derived；repo 无 sensitive literal；`.gitattributes`、profile/lock、registry 和 Bundle resource 一致；不声称 raw/derived equality 或 compatibility | blocked with TASK-UD-001 |
 
 ## Real-hardware evidence gate
 
@@ -156,11 +171,16 @@ operator 是真人；真实性只由维护者 PR review/merge attestation 保证
   registration/implementation/pinning 之前所有 Recipe dispatch `0`，不得用 raw command 或人工复核
   代替。
 - typed confirmation journal event/append-chain contract 未合入，或 confirmation event 不严格早于全部
-  related intents 时，所有相关 dispatch `0`；manifest、wall-clock 或事后 evidence 不得补发 authority。
+  related intents 时，所有相关 dispatch `0`；该 contract 只能来自 verified/archived Core MAJOR 与
+  `TASK-JAUTH-CORE-001` production evidence，manifest、wall-clock 或事后 evidence 不得补发 authority。
 - `TASK-UD-REDACTOR-001` 未 `done` 或任一 source/manifest/allowlist/schema/test/replay pin 漂移时，
-  或 raw/output/receipt file-identity/no-follow/exclusive-create/worktree-containment gate 未闭合时，
-  TASK-UD-001 不得 ready/读取 raw；golden task 不得修改该 toolchain。
-- TASK-UD-001 只有在 preflight/verifier/redactor/两阶段 capture task `done`、每个拟支持 Recipe 有真实成功 provenance，
+  fixed Git identity/argv 漂移，或 raw/output/receipt file-identity/no-follow/exclusive-create/worktree-
+  containment gate 未闭合时，
+  privacy-review task 不得读取 raw，TASK-UD-001 不得 ready；golden task 不得修改该 toolchain。
+- `TASK-UD-PRIVACY-REVIEW-001` 未由人类完成，或 separate review receipt missing/rejected/mutated/
+  mismatched 时，TASK-UD-001 不得 ready；transform receipt 不得事后写入 reviewer/decision。
+- TASK-UD-001 只有在 external Core MAJOR、preflight/verifier/redactor/privacy-review/两阶段 capture task
+  `done`、每个拟支持 Recipe 有真实成功 provenance，
   且后续 approved decision/readiness revision 固定 exact argv 与 success/failure/unknown family 后
   才可从 `blocked` 起草为 `ready`。fake 只能验证已批准规则，不能定义规则或证明目标 build。
 - raw byte-fingerprint/digest output family 不得在本 change 登记；干净 checkout 的 contract tests 必须

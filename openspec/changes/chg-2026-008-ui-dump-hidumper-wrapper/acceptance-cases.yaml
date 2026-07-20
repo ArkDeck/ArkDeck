@@ -13,7 +13,9 @@ cases:
   method: Human-operated supervised existing-server and durable CurrentDeviceBinding preflight.
   expected_source: openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/verification.md#INT-UD-PREFLIGHT-001
   minimum_evidence: realHardware
-  expected_result: The production host-wide supervisor first proves an already
+  expected_result: This case remains blocked until external Core MAJOR task
+    TASK-JAUTH-CORE-001 is done, its change is verified/archived, CORE-3.0.0 is
+    ratified, and CHG-008 retargets that baseline. The production host-wide supervisor first proves an already
     existing HDC server through the pinned commandless server-identity and
     generation observation. Exact endpoint, process/start identity, executable,
     versions, ownership, and generation are durably stored and revalidated;
@@ -73,7 +75,11 @@ cases:
   method: Offline semantic cross-validation of UI Dump real-hardware evidence and receipts.
   expected_source: openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/verification.md#INT-UD-HWE-SEM-001
   minimum_evidence: contract
-  expected_result: Before any real-device task becomes ready, approved schemas
+  expected_result: This offline case cannot become ready until a separate Core
+    MAJOR change completes named production task TASK-JAUTH-CORE-001, verifies
+    and archives its Requirement/AC, journal schema, production authority gate,
+    migration/recovery and cross-platform conformance evidence, and ratifies
+    CORE-3.0.0. After CHG-008 retargets that baseline, approved schemas
     define receipts for binding, server, device intent, physical-target
     confirmation, task-applicable confirmation, confirmation event, and journal
     authorization. Capture intents require an accepted
@@ -121,9 +127,14 @@ cases:
   expected_source: openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/verification.md#INT-UD-REDACTOR-001
   minimum_evidence: contract
   expected_result: Before TASK-UD-001 becomes ready, an independent task pins
-    the uidump-derived-redaction-v1 source, algorithm manifest, exact structural
-    safe-literal allowlist, receipt schema, tests, source commit OID, every file
-    hash, fixed Python executable, and exact replay CLI. The CLI requires an owner-only
+    the uidump-derived-redaction-v1 transform/finalizer sources, algorithm manifest,
+    exact structural safe-literal allowlist, immutable transform and separate
+    privacy-review receipt schemas, tests, source commit OID, every file hash,
+    fixed Python, fixed /usr/bin/git identity, and both exact CLIs. The transform
+    receipt contains no reviewer or decision and cannot be modified after creation.
+    Both CLIs reject PATH/alias Git substitution, missing/hash/version-mismatched
+    executable, and malformed/truncated/incomplete worktree inventory before any
+    data input. They require an owner-only
     controlled root outside every detected/registered git worktree, including
     `.git` ancestors from other repositories; all three data paths and their
     owner-only parents stay beneath it. Raw input is read-only,
@@ -136,10 +147,33 @@ cases:
     resource overflow, every manifest, allowlist, source, or input hash drift,
     aliases, existing targets, symlink/hardlink, parent races, raw mutation, and
     worktree breakout without overwriting raw or producing a committable fixture.
+    Finalizer tests reject transform-receipt mutation, derived mismatch, missing/
+    duplicate review, empty reviewer, rejected/invalid decision, review-before-
+    transform, and destination traversal. Synthetic tests do not claim a human
+    review occurred.
     Repeated accepted inputs are byte-deterministic and contain only reviewed
     structural literals and typed placeholders. No real capture raw, HDC, device,
     server, or network operation is used. This case does not close canonical
     AC-DUMP-008-01.
+- acceptance_id: INT-UD-PRIVACY-REVIEW-001
+  test_id: TEST-INT-UD-PRIVACY-REVIEW-001
+  method: Human exact-derived privacy review with immutable two-receipt finalization.
+  expected_source: openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/verification.md#INT-UD-PRIVACY-REVIEW-001
+  minimum_evidence: platform
+  expected_result: After capture, output-family decision, and redactor tasks are
+    done, a human maintainer uses the pinned transform CLI on each selected repo-
+    external raw origin. Raw remains immutable; derived bytes and a transform
+    receipt are exclusive-created outside git. The transform receipt binds raw,
+    derived, algorithm, allowlist, Git inventory, path identities, and completedAt,
+    and contains no reviewer or decision. The human then reviews the exact derived
+    hash and invokes the pinned finalizer with claimed reviewer, decision, reviewedAt,
+    and fixed repository destination. It exclusive-creates a separate privacy-
+    review receipt referencing the immutable transform-receipt hash and same
+    derived hash. Only approvedForRepository with reviewedAt after completedAt and
+    exact destination may proceed; rejected, missing, duplicate, mutated, stale,
+    or mismatched chains block TASK-UD-001. Automation checks field consistency,
+    while actual human review is attested by maintainer PR review. Agent raw,
+    review, transform, finalizer, HDC, device, server, and network counts are zero.
 - acceptance_id: INT-UD-WRAPPER-001
   test_id: TEST-INT-UD-WRAPPER-001
   method: Contract tests over the fixed wrapper with adversarial fake hidumper outputs.
@@ -168,11 +202,12 @@ cases:
   expected_result: Each repository golden is explicitly derived, never raw,
     from a human-operated approved Recipe capture whose whole-stream raw hash is
     recorded while its sensitive bytes remain outside git. TASK-UD-REDACTOR-001
-    is already done; TASK-UD-001 read-only replays its pinned exact CLI and may
-    not change the redactor, algorithm manifest, or safe-literal allowlist. The
-    controlled replay produces the registered derived hash. Its receipt binds
-    the algorithm/source/manifest and safe-literal allowlist hashes, raw
-    and derived hashes, replacement counts, and human privacy review. Unknown
+    and TASK-UD-PRIVACY-REVIEW-001 are already done; TASK-UD-001 cannot read raw,
+    run transform/finalizer, or modify the redactor/receipts. It only copies a
+    derived file whose immutable transform receipt binds algorithm/source/manifest/
+    allowlist/Git/raw/derived/replay hashes and replacement counts, and whose
+    separate approved privacy-review receipt binds that transform-receipt hash,
+    same derived hash, reviewer claim, later review time, and exact destination. Unknown
     tokens or lines fail closed; the repository contains no raw UI bytes or
     sensitive page text, package, ability, window, component, path, or user
     identifiers. The derived bytes are pinned byte-exact with .gitattributes

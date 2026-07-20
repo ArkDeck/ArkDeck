@@ -3,6 +3,30 @@
 > V2 治理:本文件是任务的唯一事实源;任务状态变更仅在维护者 review/merge 后
 > 生效。全部真机采集由人类维护者执行,Agent 不执行真实 `hdc`。
 
+## External Core MAJOR prerequisite — journaled execution authority
+
+CHG-008 保持 `class:platform` / `core_change_level:none`，不得在本 change 内新增 journal event、
+append-chain contract 或改变 dispatch authority。该行为会收紧 accepted schema 与 pre-dispatch Safety
+结果，按 Constitution 属于 Core MAJOR。以下全部是外部 blocker，不是本 change 的 approved delta：
+
+- 另起独立 Core change，声明 `class:core`、`core_change_level:major`、
+  `platforms:[macos, windows, linux]` 与 candidate `CORE-3.0.0`，并由维护者单独批准；
+- owning Core change 必须声明稳定 production implementation task ID `TASK-JAUTH-CORE-001`。该 task
+  同时修改 approved Requirement/AC delta、`journal-event.schema.json`、Manifest/semantic validator、
+  language-neutral conformance vectors，以及 macOS production locked journal/store、trusted host entry
+  point 与 dispatch gate；offline receipt/verifier task 不能替代它；
+- `TASK-JAUTH-CORE-001` 必须覆盖旧/new journal reader/writer compatibility、existing Session/checkpoint
+  migration、torn-tail/crash-window recovery、restart/reconcile、rollback/downgrade refusal、sequence/hash-
+  chain corruption 与 after-the-fact authority fault tests；任一 unknown/missing authority 的真实 dispatch
+  count 为 `0`；
+- owning Core proposal 必须逐平台给出 disposition。当前 macOS/Windows/Linux 都是 `notStarted`，因此
+  macOS production port 必须跑新 Core contract/property/recovery suite，Windows/Linux 记录
+  `deferred/notStarted` 并消费同一 language-neutral vectors；三者均不得产生支持/release claim；
+- 只有 `TASK-JAUTH-CORE-001 done`、owning Core change `verified` 且 archive/ratification PR 已把 delta
+  合入 current specs/contracts、把新 AC 加入 global registry/conformance、ratify `CORE-3.0.0` 后，
+  CHG-008 才能另起 revision 把 `core_baseline` 从 `CORE-2.0.0` 重定向到 `CORE-3.0.0`。在此之前
+  `TASK-UD-HWE-SEM-001` 也不得 ready/done；schema-only/offline evidence 不能铸造 production authority。
+
 ## TASK-UD-PREFLIGHT-001 — supervised server + durable binding 人工前置
 
 - Status:blocked（r3 不存在可执行的 real-device task；所有 installed-HDC/device dispatch 为 `0`）
@@ -14,6 +38,8 @@
 - Canonical Safety/source inputs:`REQ-HDC-001/002/003/004/005` 与
   `REQ-DEV-001/002/006`；本 task 不认领其 canonical AC/Test PASS，逐项 ownership 见下表。
 - Blocking dependencies/gates:
+  - 上述 external Core MAJOR 已完整关闭：`TASK-JAUTH-CORE-001 done`、owning change verified/archived、
+    `CORE-3.0.0` ratified，且本 change 已由后续 revision 明确 retarget；当前未满足；
   - `TASK-UD-HWE-SEM-001 done`，且其 receipt/intent input schemas、source/test OID/hash、fixed
     interpreter 与 exact CLI 已由后续 readiness revision 重验；schema-only 路径不可执行；
   - `TASK-M1-006 done`，其 production `HDCServerSupervisor` source AC/evidence 可消费；本
@@ -90,11 +116,15 @@
 - Change-local closure:`INT-UD-HWE-SEM-001` / `TEST-INT-UD-HWE-SEM-001`；不认领任何
   canonical Core AC PASS。
 - Blocking dependencies/gates:
-  - 独立 approved contract/integration revision 先固定 repo-safe binding receipt、server receipt、
-    device intent manifest、physical-target confirmation receipt、task-applicable confirmation manifest、
-    confirmation-event receipt 与 journal-authorization receipt 的 schema path/version，以及 canonical
-    serialization/hash linkage；当前 `journal-event.schema.json` 没有与 manifest confirmation/execution
-    authority 关联的 task-applicable event kind 或 append-chain 字段，generic
+  - 上述 external Core MAJOR prerequisite 必须先完整关闭；`TASK-JAUTH-CORE-001` 的 production
+    implementation/conformance evidence、owning change verified/archive evidence 与 ratified
+    `CORE-3.0.0` baseline 缺一不可。当前 `journal-event.schema.json` 没有与 manifest confirmation/
+    execution authority 关联的 task-applicable event kind 或 append-chain 字段，故本 offline task 当前
+    不得 ready，也不得自行定义 Core fields/dispatch rule；
+  - Core MAJOR 关闭后，另一个独立 approved integration/receipt revision 才可固定 repo-safe binding
+    receipt、server receipt、device intent manifest、physical-target confirmation receipt、task-applicable
+    confirmation manifest，以及 Core 已定义的 confirmation-event/journal-authorization receipt projection
+    的 schema path/version 与 canonical serialization/hash linkage；generic
     `hardware-evidence.schema.json` 的 `operator` 是字符串，`physicalTargetConfirmation` 也没有 receipt/
     identity/scope linkage，不足以定义 cross-document equality 或操作者真实性；
   - physical-target receipt schema 必须固定 canonical model+serial serialization、claimed operator、
@@ -109,7 +139,7 @@
     cleanup；capture task 的相关 deviceMutation intent 必须全部且只能被同一未过期
     `kind=deviceMutation` confirmation 覆盖；preflight 则只允许 schema 登记的 physical/binding
     confirmation kind 与 exact related events，不得伪造 mutation entry；
-  - 上述 contract revision 必须新增由 trusted host entry point 写入 production locked Session journal 的
+  - owning Core MAJOR 必须定义由 trusted host entry point 写入 production locked Session journal 的
     typed accepted-confirmation/authorization event；repo-safe `confirmation-event-receipt` 至少绑定 journal/
     Session/Job ID、confirmation ID、event ID、strictly monotonic sequence、canonical event-payload hash、
     previous append hash 与 append hash。`journal-authorization-receipt` 必须绑定同一 journal identity/head、
@@ -292,22 +322,42 @@
 ## TASK-UD-REDACTOR-001 — deterministic derived-golden redactor/allowlist 前置
 
 - Status:blocked（`uidump-derived-redaction-v1` 当前只有名称与高层步骤，没有获批 source、
-  safe-literal allowlist、receipt schema、replay CLI 或 adversarial tests；不得接触真实 raw）
+  safe-literal allowlist、两阶段 receipt schemas/CLIs、pinned Git inventory executable 或 adversarial
+  tests；不得接触真实 raw）
 - Objective:在 `TASK-UD-001` ready 前，以独立 host-only task 实现、审查并固定 fail-closed
-  `uidump-derived-redaction-v1`，使后续执行者只能重放已批准算法与 safe-literal allowlist，不能在
-  golden 实现 PR 中决定保留哪些 UI 文本。
+  `uidump-derived-redaction-v1` transform 与独立 privacy-review finalizer，使后续人类任务只能重放
+  已批准算法/allowlist 并在不可变 transform receipt 之后生成另一份 review receipt；golden 实现 PR
+  不能决定保留哪些 UI 文本或补写任一 receipt。
 - Change-local closure:`INT-UD-REDACTOR-001` / `TEST-INT-UD-REDACTOR-001`。
 - Canonical Safety input:`REQ-DUMP-008` → `AC-DUMP-008-01` → `TEST-AC-DUMP-008-01`；本 task
   不执行 diagnostic export、不认领 canonical platform PASS，只对 derived-golden 输入加严隐私边界。
 - Blocking dependencies/gates:
   - 独立 approved readiness/implementation revision 仅在下列 exact paths 内定义 algorithm manifest、
-    source、safe-literal allowlist、receipt schema 与 tests；完成时固定 source commit OID、每个文件
-    SHA-256、fixed Python path/version/hash 与 exact replay CLI，任一 hash 未知时不得 `done`；
+    transform/finalizer source、safe-literal allowlist、transform/privacy-review receipt schemas 与 tests；
+    完成时固定 source commit OID、每个文件 SHA-256、fixed Python/Git path/version/hash 与两个 exact
+    CLIs，任一 hash 未知时不得 `done`；
   - exact CLI shape 必须为
     `<FIXED_PYTHON> scripts/ui_dump_redaction/redact.py --algorithm-manifest scripts/ui_dump_redaction/algorithm-v1.json --safe-literals scripts/ui_dump_redaction/safe-literals-v1.txt --controlled-root <CONTROLLED_ROOT> --input <CONTROLLED_RAW_PATH> --expected-input-sha256 <RAW_SHA256> --output <REPO_EXTERNAL_DERIVED_PATH> --receipt <REPO_EXTERNAL_RECEIPT_PATH> --repository-root <ARKDECK_ROOT>`；
     三个 data path 只能是 token，不得接受 stdin/raw bytes/network；
-  - tool 必须先以无 shell 的固定 git argv 枚举 `<ARKDECK_ROOT>` 的全部 registered worktree，并固定
-    inventory hash；还须沿 retained descriptor ancestor walk 拒绝任何 repository 的 `.git` worktree
+  - transform CLI **只能**生成不可变 derived bytes 与 `redaction-receipt`；该 schema 不得包含
+    reviewer/decision，也不得在 human review 后修改。receipt 固定 `completedAt`、algorithm/source/
+    manifest/allowlist OID+hash、raw/derived hashes+sizes、replacement counts、path/file identities、Git
+    inventory 与 replay-command hash；
+  - privacy-review finalization exact CLI 必须为
+    `<FIXED_PYTHON> scripts/ui_dump_redaction/record_privacy_review.py --transform-receipt <IMMUTABLE_TRANSFORM_RECEIPT> --expected-transform-receipt-sha256 <TRANSFORM_RECEIPT_SHA256> --derived <DERIVED_PATH> --expected-derived-sha256 <DERIVED_SHA256> --reviewer <CLAIMED_HUMAN_REVIEWER> --decision <approvedForRepository|rejected> --reviewed-at <RFC3339> --repository-destination <GOLDEN_REPO_RELATIVE_PATH> --output <PRIVACY_REVIEW_RECEIPT_PATH> --repository-root <ARKDECK_ROOT>`；
+    finalizer 必须只读打开 transform receipt/derived，重算 hashes，绝不读取 raw 或修改 transform
+    receipt；review output 初始不存在并 no-follow/exclusive-create。`privacy-review-receipt` schema 固定
+    reviewer claim、decision、reviewedAt、transform receipt ID/hash、derived hash/size、algorithm/
+    allowlist hashes、destination 与 checklist version；`reviewedAt` 必须晚于 transform `completedAt`。
+    automation 只证明字段/顺序一致，现实人工复核由具名 human task 与维护者 PR review attestation；
+  - worktree inventory executable 固定为绝对路径 `/usr/bin/git`，version
+    `git version 2.50.1 (Apple Git-155)`，SHA-256
+    `179301dcb41ea78accc3fa0048a7e6f6710d891945a751a34addd622020c1818`；不得使用 `PATH`、
+    `/opt/homebrew/bin/git`、alias、env/config/CLI override 或 shell。两个 CLIs 必须在读取任何 data input/
+    创建任何 output 前验证 executable regular-file identity/hash 与 exact version，并仅以 argument array
+    `[/usr/bin/git, "-C", <ARKDECK_ROOT>, "worktree", "list", "--porcelain", "-z"]` 枚举全部
+    registered worktree，记录 raw stdout hash/parsed inventory hash；
+  - tool 还须沿 retained descriptor ancestor walk 拒绝任何 repository 的 `.git` worktree
     marker。`CONTROLLED_ROOT` 必须是 owner-only `0o700` real directory，位于全部 detected/registered git
     worktree 外且没有 symlink path component。三个 data path 都必须位于该 root 下，其 path components/
     parent directories 由 retained directory descriptors 固定且 owner-only。input 必须为 owner-only
@@ -327,36 +377,94 @@
   - `safe-literals-v1.txt` 的每个保留字必须在该 task 的维护者 review 中逐项批准，只允许结构语法；
     package/ability/page/window/component/path、用户/设备标识与任意页面文本不得通过 pattern、prefix、
     fallback 或“看似无害”启发式进入 allowlist。后续 TASK-UD-001 只读消费，不得修改；
-  - receipt schema 必须绑定 algorithm/source/manifest/allowlist OID 与 hashes、raw/derived whole-stream
-    hashes、byte counts、replacement counts by typed category、error/disposition 与 replay command hash；
-    还必须记录 worktree inventory hash、controlled-root 与 input pre/post descriptor identity、output/receipt
-    identity、open/create policy、mode/link count 与 containment result，且 receipt 自身不能通过 symlink/
-    hardlink/alias 指回 raw、derived 或任一 worktree；
+  - transform receipt 还必须记录 pinned Git path/version/hash、worktree raw-output/inventory hashes、
+    controlled-root 与 input pre/post descriptor identity、output/receipt identity、open/create policy、mode/
+    link count 与 containment result；两份 receipts 都不能通过 symlink/hardlink/alias 指回 raw、derived、
+    对方或任一 worktree；
   - offline adversarial/property tests 只用 synthetic bytes，至少覆盖 invalid UTF-8、CRLF/CR、NUL/
     control/bidi/confusable、Unicode normalization、package/ability/path/serial/window/component/长数字、
     页面文本、未知 token/line、overlong input、ordering/duplicate、allowlist/source/manifest/hash drift、
     output=input、receipt=input、output=receipt、lexical/canonical alias、`..`、symlink leaf/parent、raw
     hardlink/link-count > 1、existing target、worktree-target symlink、parent-swap race、raw identity/mtime/size
-    mutation、worktree inventory drift、wrong mode，以及 deterministic repeat 与零敏感 literal byte search；
+    mutation、worktree inventory drift、wrong mode、PATH poisoning、Git missing/not-regular/hash/version
+    mismatch、malformed/truncated/duplicate/incomplete `--porcelain -z` inventory、Git nonzero/timeout、
+    transform receipt mutation、derived mismatch、missing/duplicate review receipt、empty reviewer、invalid/
+    rejected decision、review-before-transform、destination traversal/absolute path，以及 deterministic repeat
+    与零敏感 literal byte search；
     任何 unclassified/unsafe-path input 必须 nonzero 且不覆盖 raw、不产出
     可提交 derived fixture。
 - Future allowed paths（仅在独立 readiness revision 合入后生效）：
   - `scripts/ui_dump_redaction/README.md`
   - `scripts/ui_dump_redaction/redact.py`
   - `scripts/ui_dump_redaction/test_redact.py`
+  - `scripts/ui_dump_redaction/record_privacy_review.py`
+  - `scripts/ui_dump_redaction/test_record_privacy_review.py`
   - `scripts/ui_dump_redaction/algorithm-v1.json`
   - `scripts/ui_dump_redaction/safe-literals-v1.txt`
   - `scripts/ui_dump_redaction/redaction-receipt.schema.json`
+  - `scripts/ui_dump_redaction/privacy-review-receipt.schema.json`
   - `openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/evidence/runs/TASK-UD-REDACTOR-001/**`
   - 本 `tasks.md`（仅该 task 的独立 status/evidence 更新）
 - Read-only inputs:`openspec/specs/ui-dump/spec.md`、`openspec/contracts/hardware-evidence.schema.json`、
   本 change 的 privacy boundary；不读取真实 capture raw。
 - Hardware required:no；installed HDC、device/server/network dispatch 与真实 UI raw input 均为 `0`。
+- Required environment（未来 implementation）：固定 Python 与 SDD task 相同；固定 inventory executable
+  仅为上述 `/usr/bin/git` path/version/hash。任一 identity/version/hash 漂移即 blocked，不能从 PATH
+  fallback、联网安装或由执行者换 Git。
 - Required evidence（未来）：`run.md` 记录 source/manifest/allowlist/schema/test hashes、exact CLI、
-  synthetic fixture hashes、binary negative outcomes、deterministic replay hash 与 repo sensitive-literal
-  audit；不得声称 synthetic tests 是 raw capture 或 canonical `AC-DUMP-008-01` PASS。
+  fixed Python/Git identities、synthetic transform/review receipt chain hashes、binary negative outcomes、
+  deterministic replay hash 与 repo sensitive-literal audit；不得声称 synthetic tests 是 raw capture、
+  现实人工 privacy review 或 canonical `AC-DUMP-008-01` PASS。
 - Forbidden now:创建/修改上述实现文件、选择 safe literals、读取/复制真实 raw、生成 derived golden、
-  起草 PASS/done 或把人工隐私 review 替换成自动化真实性声明。
+  起草 PASS/done、从 PATH 选择 Git、把 reviewer/decision 写回 transform receipt，或把人工 privacy
+  review 替换成自动化真实性声明。
+
+## TASK-UD-PRIVACY-REVIEW-001 — human derived-golden privacy review/finalization
+
+- Status:blocked（真实 raw/derived 的 transform 与人工 privacy review 尚无获批 executable two-stage
+  chain；Agent raw access 与 finalization count 必须为 `0`）
+- Objective:在 golden implementation 前，由人类维护者对 decision revision 选定的每个 repo-external
+  raw origin 重放 pinned transform，检查 exact derived bytes，再用 pinned finalizer 生成独立不可变
+  `privacy-review-receipt`；transform receipt 永不补写 reviewer/decision。
+- Change-local closure:`INT-UD-PRIVACY-REVIEW-001` / `TEST-INT-UD-PRIVACY-REVIEW-001`。
+- Canonical Safety input:`REQ-DUMP-008` → `AC-DUMP-008-01` → `TEST-AC-DUMP-008-01`；本 task
+  不执行 diagnostic export、不认领 canonical platform PASS，只提供 change-local human review evidence。
+- Depends on:
+  - `TASK-UD-REDACTOR-001 done`，其 transform/finalizer source、两个 receipt schemas、tests、commit
+    OID/逐文件 hashes、fixed Python/Git identities 与 exact CLIs 已合入且无 drift；
+  - `TASK-UD-CAP-MUT-001 done`、`TASK-UD-CAP-R4-001 done`，以及后续 approved decision revision
+    已逐 golden 固定 source raw-origin/hash、Recipe/output family 与 repository destination；
+  - future readiness revision 固定 human-only execution entrypoint、repo-external controlled-root locator
+    IDs 与 evidence allowed paths；任一缺失时不得读取 raw 或创建 derived/review receipt。
+- Fixed two-stage procedure（未来）：
+  1. 人类操作者按 `TASK-UD-REDACTOR-001` exact transform CLI 生成新的 derived + immutable transform
+     receipt；raw identity/size/mtime/hash 前后不变，Git/path containment 全部 PASS；
+  2. 人类对 exact derived hash 对应的完整 bytes 做 privacy review；package/ability/page/window/component/
+     path/user/device identifiers、页面文本或未知 literal 任一残留都选择 `rejected`，不得进入 golden；
+  3. review 后才调用 exact `record_privacy_review.py` CLI，显式提供 claimed reviewer、decision、reviewedAt
+     与 fixed repository destination；finalizer 只读验证 immutable transform receipt/derived hash，并
+     exclusive-create separate review receipt；
+  4. 只有 `decision=approvedForRepository`、reviewedAt > transform completedAt、receipt chain/destination/
+     hashes 全部一致的 derived 才能交给 TASK-UD-001。rejected/missing/multiple/mutated/mismatched review
+     receipt 一律阻断；不得重跑 finalizer 覆盖既有 decision。
+- Future allowed paths:必须由 dependencies 完成后的独立 readiness revision 固定；当前只保留
+  `openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/evidence/runs/TASK-UD-PRIVACY-REVIEW-001/**`
+  与本 `tasks.md` 独立 status/evidence path。`scripts/ui_dump_redaction/**` 全部只读。
+- Read-only inputs（未来）：pinned redactor/finalizer toolchain；capture/decision repo-safe manifests；
+  decision 固定的 repo-external raw origins。receipt 不得包含 raw/derived bytes、absolute user path、serial、
+  package/ability/page/window/component literal；只记录 logical locator ID、hash/size 与 review metadata。
+- Hardware required:no；human only for sensitive raw/review。installed HDC、device/server/network dispatch
+  均为 `0`；Agent 不读取 raw/derived，不填写 reviewer/decision。
+- Verification（未来）：每个拟提交 golden 恰有一条 immutable transform receipt → exact derived hash →
+  approved separate privacy-review receipt → exact repository destination 链；reviewer/decision/time 字段只
+  自动检查一致性，现实人工复核由维护者对该 evidence PR 的 attestation 保证。负例至少覆盖 receipt
+  mutation/replacement、derived drift、review before transform、rejected/unknown decision、empty reviewer、
+  duplicate/missing review、destination traversal/mismatch、Git/toolchain/path identity drift 与 raw mutation。
+- Required evidence（未来）：`run.md`、repo-safe transform/privacy-review receipts、两者 SHA-256、derived
+  hash/size 清单、claimed human reviewer/decision/time、fixed destination 与 privacy checklist disposition；
+  raw/derived bytes 保持 repo 外，直到 TASK-UD-001 只复制已批准 derived fixture。
+- Forbidden now:读取真实 raw/derived、运行 transform/finalizer、起草 reviewer/decision、生成 receipt/
+  golden、使用 GUI/网络/设备/HDC，或把本 task 标为 ready/done。
 
 ## TASK-UD-001 — 固定 HiDumper 调用包装 + golden 登记 + 对抗测试
 
@@ -392,7 +500,7 @@
 | typed Recipe、window/component token validator 与 argv materializer | 纯 ArkDeckOpenHarmony typed value；不调用 M1-006 probe/lifecycle/authorization | no | remains blocked：candidate matrix 已固定，但 target capture/decision 尚未完成 |
 | success/failure/unknown semantic evaluator | `ArkDeckProcess.ProcessOutputChunk`、`ProcessExecutionResult`、`ProcessSemanticEvaluating`、`ProcessSemanticResult` | no | remains blocked：四 Recipe output family/marker 未登记 |
 | Process/HDC preflight-to-request seam 与零 launch 证明 | `ArkDeckProcess.ProcessRequest` recording factory/dispatch counter；明确不使用 `HDCProduction`、`HDCProcessCommandRunner` 或真实 child | no | remains blocked：Core negative matrix 尚未在获批实现 revision 二值执行 |
-| derived golden fixture 与 SwiftPM resource contract | `Bundle.module` resource seam；不消费 M1-006 source behavior/evidence | no | remains blocked：capture + 独立 `TASK-UD-REDACTOR-001` pinned source/manifest/allowlist/replay receipt 尚未闭环 |
+| derived golden fixture 与 SwiftPM resource contract | `Bundle.module` resource seam；不消费 M1-006 source behavior/evidence | no | remains blocked：capture + `TASK-UD-REDACTOR-001` immutable transform contract + `TASK-UD-PRIVACY-REVIEW-001` separate approved review receipt 尚未闭环 |
 | OpenHarmony profile / Integration lock 登记 | integration registry/schema；不消费 M1-006 source AC | no | remains blocked：argv 与 output family decision 尚不存在 |
 
 所有 `no` 仅表示该 deliverable 不需要 M1-006 source AC，不等于当前可执行。TASK-UD-001
@@ -412,7 +520,7 @@ interface 自行替代。
 | --- | --- | --- | --- |
 | `REQ-DUMP-003` | `AC-DUMP-003-01` | `TEST-AC-DUMP-003-01` / `recipeSchemaContract` | 缺失、空、非法、注入型 component ID；零 argv/request/dispatch |
 | CHG-008 wrapper integration | `INT-UD-WRAPPER-001` | `TEST-INT-UD-WRAPPER-001` / adversarial contract | 获批 argv exact equality；仅登记 family 可成功；exit-0/unknown fail closed |
-| CHG-008 golden registration | `INT-UD-GOLDEN-001` | `TEST-INT-UD-GOLDEN-001` / golden registration | controlled raw hash → deterministic derived receipt；privacy、profile/lock/resource 一致 |
+| CHG-008 golden registration | `INT-UD-GOLDEN-001` | `TEST-INT-UD-GOLDEN-001` / golden registration | capture raw hash → immutable transform receipt → approved privacy-review receipt → derived fixture；profile/lock/resource 一致 |
 
 - Objective:仅在 approved target-build Recipe capture 与后续 decision/readiness revision 固定
   精确 argv/output family 后，实现四个 canonical ArkUI Recipe wrapper、Core component ID
@@ -420,6 +528,8 @@ interface 自行替代。
 - Requirements/AC:`REQ-DUMP-003` / `AC-DUMP-003-01`，以及 change-local
   `INT-UD-WRAPPER-001`、`INT-UD-GOLDEN-001`。
 - Unblock prerequisites（全部满足后另起 governance revision，不能由实现 PR 顺带改写）：
+  - external Core MAJOR prerequisite 完整关闭：`TASK-JAUTH-CORE-001 done`、owning change
+    verified/archived、`CORE-3.0.0` ratified，且本 change 已 retarget 新 baseline；
   - `TASK-UD-PREFLIGHT-001 done`：human evidence 证明 existing server 的 exact endpoint/
     ownership/generation 和 durable CurrentDeviceBinding positive revision；capture harness 只经
     production loader/replay materialize `-t`，没有 operator/default/stale connect-key path；
@@ -447,10 +557,14 @@ interface 自行替代。
   - `TASK-RLC-001 done` + CHG-2026-014 verified 继续只作为 package bytes/interfaces provenance；
     不提供 M1-006 source AC，且上表经后续 revision 复核仍无 `yes`；
   - `TASK-UD-REDACTOR-001 done`：`uidump-derived-redaction-v1` 的 source/algorithm manifest/
-    safe-literal allowlist/receipt schema/tests、commit OID 与逐文件 SHA-256 已合入，fixed replay CLI
-    和 synthetic adversarial/property evidence PASS；其 controlled-root/worktree inventory、no-follow、
-    exclusive-create、pairwise file identity/raw immutability gates 及负例全部 PASS。TASK-UD-001 只读重放
-    这些 pins，禁止修改算法或 allowlist。缺任一 pin 时不得起草 ready；
+    safe-literal allowlist、transform/finalizer sources、两个 receipt schemas/tests、commit OID 与逐文件
+    SHA-256 已合入，fixed Python/Git identities、两个 exact CLIs 和 synthetic adversarial/property evidence
+    PASS；其 controlled-root/worktree inventory、no-follow、exclusive-create、pairwise file identity/raw
+    immutability gates 及负例全部 PASS。TASK-UD-001 只读验证这些 pins，禁止运行/修改 toolchain；
+  - `TASK-UD-PRIVACY-REVIEW-001 done`：每个 selected raw origin 已由人类完成 exact transform + derived
+    privacy review；不可变 transform receipt 与 separate `decision=approvedForRepository` review receipt
+    绑定同一 derived hash/destination，reviewedAt 晚于 transform completedAt。TASK-UD-001 不读取 raw、
+    不填 reviewer/decision、不生成或修改两份 receipts；缺任一 approved chain 时不得 ready；
   - 固定 SDD Python executable 的 path/version/hash 重新 preflight 通过；r3 与后续 readiness
     revision 均经维护者 review/merge。
   - Agent 不得执行上述真实 `hdc`/device capture，也不得以公开文档、simulation 或 fake
@@ -474,21 +588,23 @@ interface 自行替代。
   - 本 change `capture-runbook.md` 与 preflight/capture task 的已合入 repo-safe evidence
   - `openspec/changes/chg-2026-006-dayu200-m0b-bringup/evidence/runs/TASK-M0B-001/**`
   - `openspec/changes/chg-2026-014-remote-lock-legacy-consolidation/**`
-  - preflight/capture manifests 记录、且由后续 readiness revision 固定的 exact repo-external raw
-    paths（只允许读取/重算 hash/执行 approved deterministic transform；不得原地修改）
-  - `scripts/ui_dump_redaction/README.md`、`redact.py`、`algorithm-v1.json`、
-    `safe-literals-v1.txt`、`redaction-receipt.schema.json` 及 `TASK-UD-REDACTOR-001` 已合入 evidence
-    （只读重放；不得由本 task 修改）
+  - preflight/capture manifests 与 `TASK-UD-PRIVACY-REVIEW-001` 固定的 repo-external **derived** paths、
+    immutable transform receipts、approved privacy-review receipts（只允许按 hash 读取/复制 approved
+    derived；raw path/bytes 对本 task 不可达）
+  - `scripts/ui_dump_redaction/README.md`、`redact.py`、`record_privacy_review.py`、`algorithm-v1.json`、
+    `safe-literals-v1.txt`、`redaction-receipt.schema.json`、`privacy-review-receipt.schema.json` 与两个
+    prerequisite tasks 的已合入 evidence（只读验证 pins；本 task 不执行或修改）
 - Forbidden paths:
   - `openspec/constitution.md`、`openspec/specs/**`、`openspec/contracts/**`、
     `openspec/baselines/**`、`openspec/platforms/**`、hardware matrix
   - TASK-M1-006 源码/任务/evidence 与其他 change/task evidence
   - `scripts/ui_dump_redaction/**` 的任何修改（该目录只由 `TASK-UD-REDACTOR-001` owning task 管理）
+  - 任何真实 raw path/bytes、transform/finalizer execution、reviewer/decision input 或 receipt rewrite
   - 上述 Allowed paths 以外的 App/Package source、tests、fixtures 或 integration inputs
   - 已安装真实 `hdc`、真实设备、capture/collector、非 loopback 网络、GUI/系统授权、
     device mutation/destructive dispatch
-- Risk:medium（把人类受控 raw 经 deterministic redaction 登记为 derived fixture，并固定新的
-  argv/output-family 语义；必须闭环 raw/derived receipt 与隐私审查，并以 fake 对抗测试覆盖
+- Risk:medium（只复制已经 human-reviewed 的 derived fixture，并固定新的 argv/output-family 语义；
+  必须闭环 immutable transform + separate privacy-review receipts，并以 fake 对抗测试覆盖
   exit-0 陷阱）
 - Hardware required:no for TASK-UD-001；真机输入只来自三个具名前置 realHardware tasks 的已合入
   evidence。本实现/contract verification 必须 headless、无设备。
@@ -507,10 +623,12 @@ interface 自行替代。
     fail closed；实现者不得新增自己的 success marker；仅支持 repo-safe fixture 可正向复验的文本
     marker/结构 parser family，raw byte-fingerprint/digest family 必须拒绝登记；
   - byte-exact **derived** HiDumper golden pack、registry/hash/provenance、`.gitattributes` 与
-    Bundle.module resource contract；raw 永不入仓，只能按 `TASK-UD-REDACTOR-001` 固定 CLI 只读
-    重放 pinned `uidump-derived-redaction-v1`，receipt 绑定 raw、algorithm/source/manifest/allowlist、
-    derived 与 replay-command hashes、replacement counts 及 human privacy review；不得修改算法/
-    allowlist、把 derived 标为 raw 或由未登记 transform 生成 fixture；
+    Bundle.module resource contract；raw 永不入仓且本 task 不读取 raw/运行 transform。每个 fixture
+    只从 `TASK-UD-PRIVACY-REVIEW-001` approved chain 复制：immutable transform receipt 绑定 raw hash、
+    algorithm/source/manifest/allowlist、derived/replay-command hashes 与 replacement counts；separate
+    privacy-review receipt 绑定该 transform receipt hash、same derived hash、claimed reviewer、
+    `approvedForRepository` decision、reviewedAt 与 exact destination。不得补写/合并 receipt、修改
+    algorithm/allowlist、把 derived 标为 raw 或由未登记 transform 生成 fixture；
   - OpenHarmony profile 与 Integration lock 版本化、一致登记；未登记 family 保持
     unknown/unsupported；
   - fake/adversarial tests 与 `evidence/runs/TASK-UD-001/run.md`，记录 base revision、
@@ -525,10 +643,12 @@ interface 自行替代。
     通过 exact production semantic-evaluator path 正向覆盖；raw byte-fingerprint/digest registration 被
     拒绝；exit-0 trap、marker absence、chunk
     boundary、stdout/stderr precedence 与无 shell composition 的 fake/adversarial branches 全覆盖；
-  - `TEST-INT-UD-GOLDEN-001`：受控 raw hash 与 capture manifest 一致；controlled replay 的
-    pinned exact CLI/algorithm/source/manifest/allowlist hashes 与 `TASK-UD-REDACTOR-001` evidence
-    一致并产生已登记 derived hash；任一 pin 漂移、unknown token/line 或 receipt mismatch fail closed；
-    repo 不含 raw/sensitive literals；receipt、registry/profile/lock/Bundle.module resource path/hash
+  - `TEST-INT-UD-GOLDEN-001`：transform receipt 的 raw hash 与 capture manifest 一致，source/algorithm/
+    manifest/allowlist/Git/replay pins 与 `TASK-UD-REDACTOR-001` evidence 一致；separate privacy-review
+    receipt hash 引用该 immutable transform receipt，same derived hash、`approvedForRepository`、review
+    time/destination 与 `TASK-UD-PRIVACY-REVIEW-001` evidence 一致。任一 pin/receipt/decision/time/hash/
+    destination 漂移或 missing/duplicate/rejected review fail closed；本 task raw-access/transform/finalizer
+    count 为 `0`；repo 不含 raw/sensitive literals，receipts、registry/profile/lock/Bundle.module path/hash
     一致；
   - Commands:`xcrun swift-format lint` 变更 Swift 文件；
     `swift test --package-path Packages/ArkDeckKit --filter HiDumperWrapperContractTests`；
