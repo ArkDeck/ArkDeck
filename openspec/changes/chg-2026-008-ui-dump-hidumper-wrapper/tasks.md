@@ -115,12 +115,16 @@ r3 合入时本 change 有 4 个任务,全部 `blocked`;r6 增设 capture harnes
 
 ## TASK-UD-CAP-MUT-001 — R1-R3 首次 target-build 人工 deviceMutation 采集
 
-- Status:blocked(r6 fail-closed 回退;仅在维护者 review/merge 本 r6 PR 后生效。
-  2026-07-20 桌面推演审计裁定 Phase A 缺少入库采集 harness 即无法产出合规 evidence,
-  唯一剩余前置=`TASK-UD-CAPTURE-HARNESS-001 done`。r4 五项 readiness 输入(fixture/
-  INV-1/sidecar/操作者与窗口规则)保持已批准有效、无需重做;harness done 后由独立
-  status PR 恢复 `ready` 并引用其 merged OID/逐文件 hash。在此之前 installed-HDC/
-  device dispatch 均为 `0`)
+- Status:ready(harness-done 恢复;仅在维护者 review/merge 本独立状态 PR 后生效。
+  r6 fail-closed 回退的唯一剩余前置 `TASK-UD-CAPTURE-HARNESS-001 done` 已满足:
+  实现 PR #143(squash `7978fa7`)+ r7 alignment 修复 PR #148(squash `ba4b75b`)+
+  状态翻转 PR #149(squash `0b44d59`)均已由维护者 review/merge。Phase A 全部设备
+  命令与流采集必须经该 pinned harness 执行,其三文件 SHA-256(r7 alignment addendum
+  记录,与当前 `main` 逐一相符)=README `0a479a4b…`、capture.py `2cc168b4…`、
+  test_capture.py `e83011ba…`。r4 五项 readiness 输入(fixture/INV-1/sidecar/操作者
+  与窗口规则)保持已批准有效、无需重做。执行仍须维护者确认的具名设备窗口并在
+  run.md 记录实际日期/窗口;窗口外或输入漂移时 installed-HDC/device dispatch 均为
+  `0`)
 - Objective:由人类维护者按 `capture-runbook.md` Phase A 在 DAYU200 真机上首次执行
   R1-R3 三个 Recipe 的受控采集,记录逐流 byte-exact raw(仓库外)、redacted manifest 与
   hardware evidence,为后续 argv/output-family decision 提供事实输入。
