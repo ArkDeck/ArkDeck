@@ -33,8 +33,23 @@ r3 合入时本 change 有 4 个任务,全部 `blocked`;r6 增设 capture harnes
 
 ## TASK-UD-CAPTURE-HARNESS-001 — Phase A/B 受控采集 harness 前置
 
-- Status:ready(r6 readiness candidate;仅在维护者 review/merge 本 r6 PR 后生效。
-  本 PR 不含实现、不产生 evidence、不执行任何 hdc)
+- Status:done(TASK-UD-CAPTURE-HARNESS-001 implementation + evidence PR #143 与其
+  r7 alignment 修复 PR #148 已由维护者 review/merge 合入 `main`(squash `7978fa7`、
+  `ba4b75b`);本独立状态 PR 依据下列 completion evidence 起草 `ready→done`,仅在
+  维护者 review/merge 后生效。本状态只关闭 harness 的 host-only contract evidence,
+  不改变 TASK-UD-CAP-MUT-001(blocked;其恢复 `ready` 须另起独立状态 PR,引用本
+  done 与 merged OID/逐文件 hash,r4 五项 readiness 输入保持有效)、
+  TASK-UD-CAP-R4-001/TASK-UD-001(blocked)、change approved、platform/hardware/
+  support/release 状态,不构成任何真机、output-family 或 compatibility claim)
+- Completion evidence:`evidence/runs/TASK-UD-CAPTURE-HARNESS-001/run.md`(r7
+  alignment addendum;alignment source `21029d7cbc20ca7d5c9722e484bd5f13da3b2baa`,
+  merged squash `ba4b75b`;三文件 SHA-256 在 addendum 表内且与 `main` 逐一相符——
+  README `0a479a4b…`、capture.py `2cc168b4…`、test_capture.py `e83011ba…`;
+  `TEST-INT-UD-HARNESS-001` 52 tests/0 failures 于系统解释器与 readiness-pinned
+  `.venv-sdd` 双绿,check-sdd 0/0/111,run 记录敏感扫描零命中;安装态 HDC/device/
+  network/destructive dispatch count 全为 `0`)。状态 PR 复核(2026-07-20,当前
+  `main` `ba4b75b`):52 tests/0 failures 与三文件 hash 相符均复现——该复核只确认
+  evidence 在现基线可复现,不构成新的 acceptance 结论。
 - Objective:在任何 Phase A/B 设备执行前,交付入库、有测试、可按 OID/hash 引用的
   采集 harness——把 M0B `capture.py` 的信任链(封闭白名单、argv 数组无 shell、
   byte-exact 流分离、掩码、输出侧敏感终检、确定性 manifest)复制到 UD 采集命令面。
