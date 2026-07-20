@@ -6,8 +6,23 @@
 
 ## TASK-PD-001 — r3 codec audit headless remediation + contract evidence
 
-- Status:ready(r5 broker-receipt remediation candidate;仅在维护者 review/merge 本
-  r5 revision PR 后生效。本 PR 不含实现、不产生 evidence、不运行 broker/collector)
+- Status:done(TASK-PD-001 r5 implementation + evidence PR #160 已由维护者
+  review/merge 合入 `main` squash commit `33aff46`;本独立状态 PR 依据下列
+  completion evidence 起草 `ready→done`,仅在维护者 review/merge 后生效。本状态
+  只关闭 r5 broker-receipt remediation 的 contract evidence(r4 headless done 此前
+  已闭),不改变三项 platform AC(仍归 TASK-PD-002)、change verification、
+  gap/DEC-002、compatibility、support 或 release 状态)
+- r5 completion evidence:`evidence/runs/TASK-PD-001/r5-broker-receipt/run.md`
+  (source revision `b81922d9901a0319d5425737f262e82e4a6a5b6a`;三文件 SHA-256 与
+  `main` 合入版逐字节一致——main.m `4bb1e1ca…`、collect_platform_evidence.py
+  `b78aca7d…`、test_collect_receipt_validation.py `b240c845…`;
+  `TEST-DECODE-DAYU200-RECEIPT-CONTRACT-001` contract PASS——新套件 14/0、
+  `test_decode.py` 只读重跑 43/0 零回归、clang -fsyntax-only -Werror 通过、
+  check-sdd 0/0/111、broker/GUI/archive/device/network dispatch 均 0)。状态 PR
+  复核(2026-07-20,当前 `main` `7c77672`,#159 之后基线,零 partition_decode
+  变更):14/0 与 43/0 复现、三文件 hash 相符——该复核只确认 evidence 在现基线
+  可复现,不构成新的 acceptance 结论。merge 本 PR 后,TASK-PD-002 依 r5 gate 经
+  独立 readiness amendment 重钉三个 broker 文件 hash 并恢复 `ready`。
 - r5 remediation amendment(2026-07-20;本块为 r5 执行的唯一权威 scope,下方 r4 各块
   保留为历史记录不再授权执行):
   - Motivation:TASK-PD-002 首次 fresh platform run(2026-07-20,preflight 全过)被
