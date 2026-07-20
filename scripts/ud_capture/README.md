@@ -21,8 +21,8 @@ payload after the final `-a` remains one argv element.
 | id | exact argv array | purpose |
 | --- | --- | --- |
 | `HP-0` | `[HDC, "version"]` | HDC version preflight (the harness also hashes the executable) |
-| `HP-1` | `[HDC, "list", "targets"]` | same-session target inventory |
-| `HP-2` | `[HDC, "list", "targets"]` | immediate target recheck |
+| `HP-1` | `[HDC, "list", "targets", "-v"]` | same-session target inventory |
+| `HP-2` | `[HDC, "list", "targets", "-v"]` | immediate target recheck |
 | `INV-1` | `[HDC, "-t", CONNECT_KEY, "shell", "hidumper", "-s", "WindowManagerService", "-a", "-a"]` | all-window inventory |
 | `R1` | `[HDC, "-t", CONNECT_KEY, "shell", "hidumper", "-s", "WindowManagerService", "-a", "-w WINDOW_ID -default"]` | `nodeSummary` candidate |
 | `R2` | `[HDC, "-t", CONNECT_KEY, "shell", "hidumper", "-s", "WindowManagerService", "-a", "-w WINDOW_ID -element -c"]` | `elementTree` candidate |
@@ -46,13 +46,15 @@ must explicitly update the pinned harness before Phase B can dispatch anything.
   option prefix. More importantly, it must occur as an exact token in the latest
   untruncated, self-check-passing `HP-1` or `HP-2` raw capture in the same session
   directory. A command-line value alone is never trusted.
-- The approved runbook assumes plain `hdc list targets` emits a row whose first
-  token is the connect key and whose later fields contain `Connected`. Some HDC
-  versions may emit only a bare serial unless `-v` is used. Before any Phase A
-  targeted dispatch, the human maintainer must inspect HP-1 and confirm this
-  shape. A bare-serial result intentionally leaves every targeted command
-  fail-closed; adding `-v` requires an approved runbook + harness revision and is
-  never improvised at capture time.
+- Per the r7 runbook correction, `HP-1`/`HP-2` are pinned to the verbose form
+  `hdc list targets -v`. Merged M0B evidence is dispositive for this device
+  family: plain `list targets` returns only the bare 32-char serial with no
+  state column, while the verbose row carries the `Connected` state that the
+  same-session gate checks. Target binding parses the recorded HP output at
+  token level (first token equals the connect key, a later field equals
+  `Connected`); a bare-serial or non-`Connected` row leaves every targeted
+  command fail-closed. Any further output-shape change requires an approved
+  runbook + harness revision and is never improvised at capture time.
 - `WINDOW_ID` is ASCII decimal digits only. Provenance and unique foreground
   selection remain the human rule in `capture-runbook.md`.
 - `LOCAL_HAP_PATH` must resolve to an existing regular file outside every git
@@ -61,7 +63,10 @@ must explicitly update the pinned harness before Phase B can dispatch anything.
   directory with an owner-only existing parent, and must use the next controlled
   name `NN-SC-2.sidecar`. The harness exclusive-creates that file at `0o600`
   before dispatch, then verifies it remains a single regular file and hashes its
-  post-command bytes; command failure remains a captured fact.
+  post-command bytes; command failure remains a captured fact. The received
+  sidecar bytes also pass the same fail-closed sensitive self-check as
+  stdout/stderr (complete scan up to 64 MiB; a larger or size-drifted file
+  fails the check).
 - Inputs not used by the selected command are rejected, as are unknown command
   ids, forged `CommandSpec` objects, nonpositive timeouts, unsafe output modes,
   pre-existing controlled artifacts, and output-side redaction leaks.
