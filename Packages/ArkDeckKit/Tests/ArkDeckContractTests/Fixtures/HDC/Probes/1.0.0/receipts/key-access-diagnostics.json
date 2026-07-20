@@ -1,0 +1,41 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "i15-receipt-key-access-diagnostics",
+  "version": "1.0.0",
+  "family": "keyAccessDiagnostics",
+  "evidenceClass": "controlledHumanCaptureDerivedReceipt",
+  "source": {
+    "path": "openspec/changes/chg-2026-015-hdc-readonly-probe-registration/evidence/provenance/host-only-capture-2026-07-20.md",
+    "sha256": "7949d8a2f813b7f2f6b7d8ba45d37cca84d57167f0e319e4761b5f50e53493d8",
+    "acceptedBy": "maintainer review and merge of PR #155"
+  },
+  "context": {
+    "platform": "macos",
+    "osVersion": "26.5.2 (25F84)",
+    "architecture": "arm64",
+    "toolReportedVersion": "3.2.0d"
+  },
+  "observation": {
+    "configuredOrUserApprovedLocatorIdentified": false,
+    "hdcKeyMaterialObserved": false,
+    "publicKeyFingerprintObserved": false,
+    "privateKeyReadCount": 0,
+    "privateKeyHashCount": 0,
+    "privateKeyCopyCount": 0,
+    "deleteCount": 0,
+    "chmodCount": 0,
+    "uploadCount": 0,
+    "rawKeyOrPathLogCount": 0
+  },
+  "registrationConclusion": {
+    "status": "unsupported",
+    "reason": "The accepted capture proves key-material absence but identifies no configured or user-approved HDC key locator. A conventional path observation cannot grant production path authority."
+  },
+  "privacy": {
+    "containsDeviceIdentifier": false,
+    "containsUserPath": false,
+    "containsPrivateKeyMaterial": false,
+    "containsPrivateKeyHash": false,
+    "containsSecret": false
+  }
+}

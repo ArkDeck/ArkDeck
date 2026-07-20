@@ -1,0 +1,59 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "i15-receipt-server-identity-generation",
+  "version": "1.0.0",
+  "family": "serverIdentityGeneration",
+  "evidenceClass": "controlledHumanCaptureDerivedReceipt",
+  "source": {
+    "path": "openspec/changes/chg-2026-015-hdc-readonly-probe-registration/evidence/provenance/host-only-capture-2026-07-20.md",
+    "sha256": "7949d8a2f813b7f2f6b7d8ba45d37cca84d57167f0e319e4761b5f50e53493d8",
+    "acceptedBy": "maintainer review and merge of PR #155"
+  },
+  "context": {
+    "platform": "macos",
+    "osVersion": "26.5.2 (25F84)",
+    "architecture": "arm64",
+    "toolReportedVersion": "3.2.0d",
+    "toolExecutableSHA256": "48395ba8d87115dffca47df2a640a6c868bc9a2bd4eb49611e4138ff88d8d260"
+  },
+  "observation": {
+    "existingServerCandidateCount": 1,
+    "exactEndpoint": "127.0.0.1:8710",
+    "processAndStartIdentityStableAcrossBracket": true,
+    "listenerStableAcrossBracket": true,
+    "generationEventCount": 0,
+    "processObservationRawSHA256": "99975e21f6965b26a6c104dca1d30c47e2f7479541c36199223d00e609e2147a",
+    "listenerObservationRawSHA256": "87ada8f8dcd8de2f381150d3ca2362f864cc9c5407725a40b298b16cfa4bbf67",
+    "correlatedCheckserverStdoutSHA256": "50e8dfe03cb770dfade5b91198523b964fd3bd6fd8855b541ceb46201f0d014a",
+    "correlatedCheckserverExitCode": 0
+  },
+  "dispatchCounters": {
+    "serverStart": 0,
+    "serverStop": 0,
+    "serverRestart": 0,
+    "serverAdoption": 0,
+    "subserverLifecycle": 0,
+    "deviceMigration": 0,
+    "deviceMutation": 0,
+    "destructive": 0
+  },
+  "authorityLimit": {
+    "mayEstablish": [
+      "an existing process/start identity",
+      "the executable identity associated with the selected toolchain snapshot",
+      "the exact listener endpoint",
+      "whether a later receipt matches or differs from the prior identity tuple"
+    ],
+    "neverEstablish": [
+      "server ownership from PID shape, endpoint reuse, checkserver output, or caller assertion",
+      "a caller-provided generation",
+      "that checkserver cannot start a server when the existing-server precondition is absent"
+    ]
+  },
+  "privacy": {
+    "containsDeviceIdentifier": false,
+    "containsUserPath": false,
+    "containsPrivateKeyMaterial": false,
+    "containsSecret": false
+  }
+}

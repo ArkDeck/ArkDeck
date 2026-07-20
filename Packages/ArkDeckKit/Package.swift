@@ -55,7 +55,8 @@ let package = Package(
         // Golden resource declaration is owned by TASK-I5-001 (CHG-2026-005). `.copy` preserves
         // the versioned `Golden/<version>/...` directory tree inside Bundle.module so registry
         // paths stay valid and future pack versions cannot collide.
-        .copy("Fixtures/HDC/Golden")
+        .copy("Fixtures/HDC/Golden"),
+        .copy("Fixtures/HDC/Probes")
       ]
     ),
   ]
