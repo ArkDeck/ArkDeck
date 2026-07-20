@@ -120,20 +120,71 @@
 
 ## TASK-PD-002 — signed broker fresh platform verification
 
-- Status:blocked（等待 TASK-PD-001 done/merged implementation identity、可交互解锁
-  console 与独立 readiness PR；本 r4 revision 不运行 collector、不产生 evidence）
+- Status:ready（readiness candidate；仅在维护者 review/merge 本 readiness PR 后生效。
+  本 PR 不运行 collector/broker、不读取 archive、不产生 evidence；实际执行另需用户
+  人工解锁 console 并本人操作 NSOpenPanel——不需要 DAYU200 设备）
 - Objective:不修改 decoder 或 broker source,在解锁 macOS console 上由人类经未修改的
   签名 sandbox broker/NSOpenPanel 选择 pinned archive,把已合入 TASK-PD-001 完整
   implementation commit 绑定到同一次 create-only fresh 三项 platform run。
 - Requirements/AC:`DECODE-DAYU200-PARTITION-001`、
   `DECODE-DAYU200-INPUT-BOUNDARY-001`、`DECODE-DAYU200-RECONCILE-001`；三项 expected
   result、minimum evidence 与 Test ID 保持 r3 不变。
+- Readiness review（2026-07-20；host-only,零 collector/broker/archive/设备访问）:
+  - Change gate:satisfied。CHG-2026-009@r4 保持 `approved`（#116）;本 readiness 只
+    翻转本任务状态并固定 identity pins,不改三项 platform AC 的 expected result/
+    minimum evidence/Test ID。
+  - Dependency gate:satisfied。TASK-PD-001 implementation PR #124 已合入 `main`
+    merge commit `110071c1003ecc06eb4106d2e8ea5b554029329a`,`done` 状态 PR #125 已
+    合入（`3f3752d6daaf96aac8d6aa3139e1300dd74d7457`）。
+  - Source-identity gate:satisfied。2026-07-20 于 `main` `48efe97` 实测,四个 decoder/
+    validator 文件与 r4-headless run.md 记录零漂移,pinned SHA-256:
+    - `scripts/partition_decode/decode.py`
+      `a413defecd8658462a821ab14c7be4326ee42ae77673325c691daf6f653fb493`
+    - `scripts/partition_decode/evidence.py`
+      `aa97e86c5957fe4b722e99b5988b067f86d09199edbc3138a088028e87247e64`
+    - `scripts/partition_decode/README.md`
+      `3c518ec1be658cb2975b2123cd3d412ab2b02a2a592c855653a965a5cbe8609e`
+    - `scripts/partition_decode/test_decode.py`
+      `6c8b7f0a61f061b1551f9ad369273bd7b0fbf32675fb1fc4cd2834c9c323634e`
+  - Broker-source gate:satisfied。`scripts/partition_decode/macos_input_broker/` 七个
+    源文件 pinned SHA-256（执行前必须复算一致,漂移即 blocked）:
+    - `Broker.entitlements`
+      `27bcfa03139b7ae405bd62099fe7d2660b4ae7148e1b722451cfc04618aed787`
+    - `Info.plist`
+      `fe57455975dea024fbdb9f4a01bea26b9ce30a1f6b305575136ff18d31d2fc0d`
+    - `README.md`
+      `ab3960e9e814b7eb501607b3ee31ceb88bac14df7dfb805bcab97b8b9b6ed4c1`
+    - `build_and_sign.zsh`
+      `ecf749f05f38f0e176d19c0e341627054b2cf8c0547fbf5ad1abcee8bf239bbd`
+    - `collect_platform_evidence.py`
+      `ae5ab75c7d9efb583983ca894b0e1c6deebc038c7563d4cb01058c3bebdce056`
+    - `main.m`
+      `060331823ff36a373847bcf50d5873051bd1fdec6d33c92ad585961420c2eb8a`
+    - `policy.json`
+      `ee3fe577f74a094f121ad9937540f29a9a8098ef12b907ad388cc8062b9adaaf`
+    broker artifact 由用户执行时以 `build_and_sign.zsh` 从上述未修改 source 新构建;
+    artifact hash、signing identity（无 certificate 时如实记录 ad-hoc）、
+    `codesign --verify --strict` 结果与签后 entitlement/policy 均在 run evidence 记录。
+  - Archive gate:satisfied。pinned archive identity 引自 archived CHG-2026-003
+    evidence:size `732948803` bytes、SHA-256
+    `fc7637f34a8394847b1b6c7e7ff2750863d18c6dc05e184abaf5aed70ec75280`;本地在场性由
+    用户执行时确认,NSOpenPanel 选择后须重新通过 size/SHA identity gate,locator/
+    basename/host 目录不入 evidence。
+  - Environment/console gate:执行时要求可交互解锁 console
+    （`CGSSessionScreenIsLocked` 不为 `Yes`,collector 启动前与 publication 前各确认
+    一次）;操作者=维护者本人;OS/arch/Xcode/Swift/Python 版本在 run evidence 执行时
+    记录。
+  - Review boundary:本 readiness PR 只更新本 `tasks.md` 该任务段,不触碰
+    `scripts/partition_decode/**`、broker、archive、任何 evidence 或其他任务状态。
 - Depends on:
-  - TASK-PD-001 `done` 状态 PR 与其 implementation commit 均已合入 `main`；
-  - 完整 commit OID、decoder/validator blob hash 与未修改 broker source/artifact hash 可固定；
-  - macOS console 由用户人工解锁且 `CGSSessionScreenIsLocked` 不为 `Yes`；
-  - pinned archive 可由用户在 NSOpenPanel 中选择并重新通过 size/SHA identity gate；
-  - 独立 readiness PR 确认签名、entitlement/policy、toolchain 与 create-only output path。
+  - TASK-PD-001 `done` 状态 PR 与其 implementation commit 均已合入 `main`（已满足:
+    #124 `110071c1`、#125）;
+  - 完整 commit OID、decoder/validator blob hash 与未修改 broker source hash 已由本
+    readiness 固定（artifact hash 执行时记录）;
+  - macOS console 由用户人工解锁且 `CGSSessionScreenIsLocked` 不为 `Yes`（执行时）;
+  - pinned archive 可由用户在 NSOpenPanel 中选择并重新通过 size/SHA identity gate
+    （执行时）;
+  - 本 readiness PR 经维护者 review/merge（merge 即上述 pins 的批准）。
 - In scope:构建/验证未修改 broker artifact；记录 signing identity、签后 entitlement/policy、
   OS/arch/Xcode/Swift/Python、descriptor-transfer/runtime binding；由同一次 fresh run 生成
   mapping、reconciliation、process audit、summary 与 run；三个 Test ID 全部二值判定。
