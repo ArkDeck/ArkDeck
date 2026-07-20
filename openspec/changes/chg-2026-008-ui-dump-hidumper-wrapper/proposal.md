@@ -1,6 +1,6 @@
 ---
 id: CHG-2026-008-ui-dump-hidumper-wrapper
-revision: 6
+revision: 7
 status: approved # r1 经 #68 批准;后续 revision 仅在对应治理 PR 由维护者 review/merge 后生效
 class: platform
 core_change_level: none
@@ -194,3 +194,9 @@ verifier 与 7 任务链;全文见 PR 提交历史 `a613b76`)。经维护者 202
   `SC-3` 字面 argv、`HP-2` 粒度定义、`unknownOutput` 澄清、truncation/timeout 政策、
   abort 规则与 `redacted-manifests/` 复数惯例。仅在维护者 review/merge 对应治理 PR 后
   生效;不含实现或 evidence。
+- r7 correction revision:HP-1/HP-2 由纯 `list targets` 改钉 verbose `list targets -v`。
+  依据=M0B merged evidence(纯形式输出 33 字节仅序列号无状态列,`Connected` 状态仅在
+  `-v` 的 58 字节输出中),r4/r6 的纯形式无法满足自身"恰一 Connected"stop condition;
+  该缺陷由 harness 实现 PR #143 的对抗审查在任何设备执行前发现。runbook HP 表与
+  CAP-MUT gates 同步;harness 实现须随本 r7 更新 HP specs 与 gate 解析后再合入。仅在
+  维护者 review/merge 对应治理 PR 后生效;不改其他命令行、不含实现或 evidence。
