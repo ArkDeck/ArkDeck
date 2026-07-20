@@ -6,10 +6,33 @@
 
 ## TASK-RH-001 — 恢复演练执行(首次授权写设备;含模式/分区表观察搭载)
 
-- Status:blocked(双前置:①本 change 经 approval-only PR 置为 `approved`(未满足);
-  ②独立 readiness PR 完成 §6 检查单第 4/5 项打勾(书面风险确认+具名时间窗)并复核
-  执行时 pins(未满足)。两前置齐备后任务转 `ready`;执行仍须在具名设备窗口内由
-  维护者亲手进行,窗口外任何写设备 dispatch 均为 `0`)
+- Status:ready(readiness candidate;仅在维护者 review/merge 本独立 readiness PR
+  后生效。本 PR 不执行演练、零设备命令、零 evidence)
+- Readiness review(2026-07-20;host-only,零设备/写命令 dispatch;§6 检查单双前置
+  与执行时 pins 逐项复核):
+  - Approve gate:satisfied。CHG-2026-016 approved(approval-only PR #171 合入
+    main `cfb2040`);design.md 封闭命令面/写序/中止准则、版本后果与 4 个
+    realHardware AC 均随批准生效。
+  - §6 检查单第 4 项(书面风险确认):**satisfied**。维护者 2026-07-20 书面确认,
+    逐字记录:「我确认接受演练期间设备变砖乃至不可恢复的残余风险」(RISK-001
+    风险接受在案之上的本演练具体确认;载体=本 readiness PR 的维护者 review/merge)。
+  - §6 检查单第 5 项(具名时间窗):satisfied。维护者授权时间窗 = 「随时」——即
+    approve 后由维护者自选的首个连续设备窗口,窗口内无其他设备操作并行(design §5
+    同型规则);执行前在 run.md 记录实际日期/时段。
+  - Execution-time pins(本 readiness 于 main `cfb2040` 实测复核):
+    - `rkdeveloptool`:`~/dayu200-rehearsal/rkdeveloptool/rkdeveloptool` SHA-256
+      `038a8a0ea26ef7eb77451789f310c0c9fbeaf43a78af1d6146e02311a9c23611`(与
+      TASK-RR-001 pinned 值一致)、`-v` = `rkdeveloptool ver 1.32`;
+    - 物料:`~/dayu200-rehearsal/materials/` 17/17 成员逐文件全量 SHA-256 vs
+      archived `member-inventory.json` = **17 MATCH / 0 FAIL / 0 MISSING**;
+    - Developer Mode:`DevToolsSecurity -status` = enabled(M1-006 线已启用,演练
+      不依赖但如实记录环境);
+    - 分区地址基线:FA-001 §2 表(15 行锚定 PD-002 `partition-mapping.json`
+      `965e3bf3…`)于 main 在案,不改写。
+    执行时须在首写前对上述工具/物料 hash **再复核一次**(design §1);任一漂移即停。
+  - Review boundary:本 readiness 只翻转状态并打勾 §6 第 4/5 项、记录 pins;实现
+    仍须满足全部 AC/verification gate(封闭命令面、写序、§5 中止、隐私、observed 行
+    边界);`ready→done` 另用独立状态 PR;执行由维护者亲手进行,Agent 零设备命令。
 - Requirements/AC:`RH-DAYU200-RECOVERY-001`、`RH-DAYU200-MODE-001`、
   `RH-DAYU200-TABLE-001`、`RH-DAYU200-SAFETY-001`(见 acceptance-cases.yaml)
 - Depends on:CHG-2026-010 恢复预案 archived(§4 步骤/§5 中止/§6 检查单,已满足);
