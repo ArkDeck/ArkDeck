@@ -187,10 +187,21 @@
 
 ## TASK-PD-002 — signed broker fresh platform verification
 
-- Status:ready(r5 readiness amendment candidate;仅在维护者 review/merge 本
-  amendment PR 后生效。本 PR 不运行 collector/broker、不读取 archive、不产生
-  evidence;实际执行仍需用户人工解锁 console 并本人操作 NSOpenPanel,不需要
-  DAYU200 设备)
+- Status:done(TASK-PD-002 evidence PR #164 已由维护者 review/merge 合入 `main`
+  squash commit `6f26ca3`;本独立状态 PR 依据下列 completion evidence 起草
+  `ready→done`,仅在维护者 review/merge 后生效。本状态只关闭三项 platform AC 的
+  fresh evidence,保持 non-authoritative——不改变 gap/DEC-002、change verification、
+  烧写地址/协议、compatibility、hardware/support 或 release 状态)
+- Completion evidence:`evidence/runs/TASK-PD-002/run.md` 与
+  `platform-2026-07-20-r5/**`(2026-07-20 16:58 维护者亲手 fresh signed-broker
+  run,preflight 12/12 pins+archive identity+console 全过,collector exit 0,
+  create-only publication 成功;三项 platform Test ID 同一次 run 全部 PASS;六文件
+  SHA-256 经独立复算与 summary/receipt/platform-evidence 三方绑定一致;敏感扫描
+  零命中;r5 修复端到端实证——receipt 全字段真 JSON 布尔)。状态 PR 复核
+  (2026-07-20,当前 `main` `6f26ca3`):合入版六文件 hash 与运行产出逐字节相同
+  (merge 前已验)——该复核只确认 evidence 在案,不构成新的 acceptance 结论。
+  merge 本 PR 后:TASK-FA-001(CHG-2026-012)双前置齐备,待其独立 readiness PR;
+  CHG-2026-013 演练检查单第 3 项满足。
 - Implementation + evidence candidate:`evidence/runs/TASK-PD-002/run.md` 与
   `platform-2026-07-20-r5/**`(2026-07-20 16:58 维护者亲手 fresh run,collector
   exit 0,create-only publication 成功;三项 platform Test ID 同一次 run 全部
