@@ -2,7 +2,7 @@
 
 > ID：PLATFORM-MACOS  
 > Version：0.2.0
-> Status：review（M0A 后决定 Sandbox/distribution）  
+> Status：review（M0A 后决定 Sandbox/distribution）  (distribution 面已于 2026-07-21 经 DEC-004 #261/ADR-0002 决定,见下各节 dated 注记)
 > Core baseline：CORE-2.0.0  
 > Core strategy：native-conforming-shared-contract-vector-suite  
 > Shared inputs：由每个 Task 固定 accepted Integration lock、profile 与 Core conformance hash  
@@ -129,9 +129,19 @@ com.apple.security.get-task-allow
 
 首版候选分发为 Developer ID 签名、Hardened Runtime、公证的 DMG/ZIP。若 Sandbox 阻断 HDC/USB/Provider，选择非 Sandbox 站外分发而不是放宽 Core。
 
-## Auto-update backlog
+**已决定(2026-07-21,DEC-004 #261 / ADR-0002,supersede ADR-0001)**:v1 分发 =
+**Sandboxed** + Developer ID + Hardened Runtime + 公证**单一 DMG**、公开直接分发;
+ZIP/MAS/双构建排除。"若 Sandbox 阻断"分支未发生——M0B 真机 USB 采集与
+M1-006/CHG-2026-019 signed Sandbox XCUITest 证明现行六 entitlement 形态可用,
+entitlement 集以 ADR-0002 声明为准。release gates(DevID identity、Sandboxed 形态
+clean-VM/clean-host 矩阵、自动更新 change verified)见 ADR-0002,未满足前 release
+保持 blocked。
 
-自动更新不是 MVP。若未来采用 Sparkle：HTTPS、Developer ID/公证、archive EdDSA 签名和私钥隔离是基础；Sparkle 2.9+ signed feed 需同时启用 `SURequireSignedFeed` 与 `SUVerifyUpdateBeforeExtraction`，属于附加保护。
+## Auto-update(2026-07-21 起纳入 v1)
+
+**2026-07-21 经 DEC-004 #261/ADR-0002 纳入 v1 更新渠道**,载体 = CHG-2026-023
+(选型/XPC/签名链/隐私由其两任务评估落地;verified 前手动公证 DMG 过渡)。下段
+安全基线保持为该 change 的输入。原注: 自动更新不是 MVP。若未来采用 Sparkle：HTTPS、Developer ID/公证、archive EdDSA 签名和私钥隔离是基础；Sparkle 2.9+ signed feed 需同时启用 `SURequireSignedFeed` 与 `SUVerifyUpdateBeforeExtraction`，属于附加保护。
 
 ## macOS UI mapping
 
