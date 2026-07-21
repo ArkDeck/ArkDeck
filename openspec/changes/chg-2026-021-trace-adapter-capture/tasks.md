@@ -129,7 +129,51 @@
 
 ## TASK-TR-002R — remediate trace host-contract fail-closed gates
 
-- Status:blocked(r2 amendment 尚未经维护者 review/merge，且独立 readiness 未完成)
+- Status:ready(readiness;仅在维护者 review/merge 本独立状态 PR 后生效；本 PR 只修改
+  `tasks.md`，不含实现/evidence，不执行 device/HDC/network/external-process)
+- Readiness review(2026-07-22;host-only,零设备命令):
+  - Approve gate:satisfied。r2 amendment PR #276 已由维护者 `lvye` APPROVED 并合入
+    `main` merge commit
+    `6e85a784579809b0b79a95bb117d48033892fdf4`；本 readiness 以该完整 OID 为 base。
+  - 待改 source blob pins(实现时任一漂移即停并重做 readiness):
+    `TraceCatalogContracts.swift` = `95fe72b406c615f6d99b381a4c08c770d6279c00`、
+    `TraceParameterContracts.swift` = `e1e2a8b692e71c78bf66195b645335b1ba122840`、
+    `TraceWorkflowContracts.swift` = `f6cbec4bb9fe8f441d83c54931b8c378c106f06d`；
+    唯一测试文件 `TraceWorkflowContractTests.swift` =
+    `553cd7d436b83ea732adb072d258151734cdc745`。
+  - 只读 seam pins(不得在本任务修改):`ArtifactStorage.swift` =
+    `635f4da53094305dc52dff6ebdb26e1ccb026ea1`、`SessionLayout.swift` =
+    `ed48f90a96ee239769e86727ae9272017fea72f7`、`SessionStorageTypes.swift` =
+    `04aa1c185defc6bdc5da0c041b20d5c538e167f2`、`HostStorage.swift` =
+    `e052657f08c6ef98fa1019269541a1ad5deb7000`、`DeviceTargeting.swift` =
+    `13a052ba2359e90bfe86fed4884b10fa1f4dd5cf`、`Package.swift` =
+    `a47bccf05a0c044ef506ddd015fe8c0ecaaa89e2`。
+    `ArkDeckWorkflows` 已依赖 `ArkDeckStorage`；现有 public
+    `SessionArtifactStore.publish(from:request:claim:) -> PublishedArtifact`、
+    `SessionLayout.partialDirectory`、`SessionStorageFaultInjector`/publication fault
+    points 与 `DurableCurrentDeviceBinding`/`DeviceBindingReference` 足以在四个 allowed
+    文件内闭环。若实现证明不足，任务必须停回 blocked 并先做 scope amendment。
+  - 实现序与二值门:
+    ① expected target + pre-reboot revision + exact selected candidate 创建 rebind context，
+    wrong target、same/older/skipped revision、connect key/transport/identity drift 全部
+    capture dispatch=0，只有 exact `revision + 1` receipt 产生携带新 binding reference 的
+    capture authorization/plan；② receive 只写 `artifacts/partial/*.part`，调用真实 store
+    publication，并且只有匹配 `PublishedArtifact` 才能产生 remote-cleanup authority；对
+    write/source validation/file sync/validation/rename/final+partial directory sync/recovery
+    fault 逐项注入，cleanup dispatch 恒为 0；③ parameter capability receipt 固定 durable
+    binding + 参数名 + disposition，缺失/unsupported/permissionDenied/
+    needsDeveloperMode/unknown/stale/wrong-name 全阻断，persistent 另需显式 capability +
+    confirmation；④ reliable-total receipt 只能由当前 adapter capability=true factory
+    产生，false/缺失/drift/非法 total 均保持 indeterminate + elapsed。
+  - 基线(Apple Swift 6.3.3、Xcode 26.6/17F113):`swift build --build-tests` PASS
+    (仅既有 no-async-await warnings)；`TraceWorkflowContractTests` 14/0；
+    `SessionArtifactStorageContractTests` 58/0；Swift 全量 316 tests/1 个既有 opt-in
+    skip/0 failures；`check-sdd` 0 errors/0 warnings/111 acceptance IDs。
+  - 竞争/隐私边界:readiness 审计时 open PR=0；工作树既有未追踪 fixture/log/branch
+    snapshot 均在 allowed paths 外并保持不动。本任务不得读取或记录真实设备标识、
+    用户路径、secret 或 raw Artifact；所有新测试仅使用 synthetic identity 和临时目录。
+  - Review boundary:本 PR 只翻转 `blocked→ready` 并登记 pins/测试矩阵；实现+evidence、
+    `ready→done` 与 change `verified` 仍分别使用独立 PR，且均须维护者 review/merge。
 - Platform:macos
 - Objective:修复 TASK-TR-002 post-merge review 的四个缺口：reboot durable binding
   continuity、SessionArtifactStore atomic-publication → remote-cleanup authority、typed
