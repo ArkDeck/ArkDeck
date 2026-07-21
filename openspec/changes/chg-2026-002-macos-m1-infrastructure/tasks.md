@@ -466,10 +466,11 @@
 
 ## TASK-M1-006 — HDC supervisor、endpoint 隔离、授权工作流与 fake-hdc 对抗
 
-- Status:ready(readiness restoration candidate;仅在维护者 review/merge 本独立状态
-  PR 后生效。本 PR 不含实现、不产生 evidence、不执行任何 hdc/device/XCUITest)
-- Completion evidence candidate remains withdrawn(2026-07-21 review addendum):
-  `evidence/runs/TASK-M1-006/run.md` addendum 22。电脑解锁后，当前 revision 的 signed
+- Status:blocked(post-implementation closeout candidate;仅在维护者 review/merge 本独立
+  docs-only 状态 PR 后生效。实现 PR #191 已合入，但下列 owning AC/production feed 仍无
+  可复查 evidence；本 PR 不含实现、不执行任何 hdc/device/XCUITest，也不翻转 `done`)
+- Completion evidence candidate remains withdrawn(2026-07-21 post-merge audit):
+  `evidence/runs/TASK-M1-006/run.md` addendum 23。电脑解锁后，当前 revision 的 signed
   Sandbox XCUITest 已实际执行 9 个方法并全部通过（0 failure）；LocalAuthentication /
   `System authentication is running` 环境 blocker 已解除。显式 launch/support executable
   现优先于旧 bookmark，且不删除 bookmark capability；UI accessibility waiter 只接受 exact
@@ -499,6 +500,20 @@
   journal/storage change。授权 `.ready` 只覆盖 registry `rawSHA256` 登记的完整 stdout capture；
   即使另一 device row 与 durable binding 匹配仍为 unavailable，任意设备支持须另立 approved
   integration change 注册参数化 raw family。
+- Post-merge closeout audit(2026-07-21):维护者 `@lvye` 已 APPROVE 实现 PR #191，GitHub
+  squash `c61e10e3548031f68b7f83c21584ce8b9b615cf4` 合入 `main`；该 tree 与 reviewed head
+  `fd98f90a9080d6d8a0d77cec16de2e0c5f9985c7` 逐字节无 diff，合入版 dedicated 52/0、
+  full suite 284/1 existing opt-in skip/0 failures。实现批准不替代 completion evidence；本
+  status PR 如实收敛为 `blocked`，因为：(1) production App 仍传入 unavailable
+  participant/critical-state inventory，真实 App-root lifecycle/critical gate 没有 production
+  feed；(2) registry 将 `keyAccessDiagnostics` 标为 unsupported，缺
+  `TEST-AC-HDC-006-01` 所要求的 signed platform file-access denial path；(3) registry 将
+  `subserverCapability` 标为 unsupported，缺 `TEST-AC-HDC-009-01` 所要求的 supported
+  capability observation。两项 capability/probe 扩展及 production inventory 接线须由
+  后续 approved change 明确授权；现有 fail-closed negative tests 不得替代。change-level
+  `verification.md` 仍含 0.2.0/旧 Developer Mode blocker，同步不在 M1-006 当前 allowed
+  paths，须独立 governance amendment。上述缺口解除并产生同一 revision 的可复查 evidence
+  前，不得起草 `ready→done` 或 change `verified`。
 - Readiness restoration(2026-07-20;addendum-14 两项 blocker 逐项复核解除):
   - Probe-registry blocker:resolved。所缺四个只读 probe family 已由独立 integration
     change CHG-2026-015 TASK-I15-001 完成注册并 `done`(实现 PR #159 squash
