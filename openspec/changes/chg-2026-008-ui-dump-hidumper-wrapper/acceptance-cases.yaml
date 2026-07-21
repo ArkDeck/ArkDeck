@@ -1,7 +1,7 @@
 ---
 schema_version: 1.0.0
 change_id: CHG-2026-008-ui-dump-hidumper-wrapper
-change_revision: 9
+change_revision: 10
 platform: macos
 evidence_classes:
 - contract
@@ -16,8 +16,9 @@ cases:
   expected_result: Before any Phase A/B device execution, a host-only task
     delivers scripts/ud_capture (README, capture.py, test_capture.py) replicating
     the M0B capture.py trust chain onto the runbook command surface. The closed
-    allowlist mirrors the runbook argv rows verbatim for HP-0 through HP-2,
-    INV-1, R1 through R3, R4, SC-1 through SC-3 and FX-1 through FX-4; unknown
+    allowlist mirrors the Phase A runbook argv rows verbatim for HP-0 through HP-2,
+    INV-1, R1 through R3, SC-1 through SC-3 and FX-1 through FX-4; R4 remains
+    intentionally absent until TASK-UD-R2-R4-SEAM-001 is independently ready; unknown
     ids are rejected by identity-checked argv building; CONNECT_KEY is accepted
     only as a same-session HP output value, WINDOW_ID only as strict ASCII
     decimal, and local paths only outside every git repository. Execution uses
@@ -40,8 +41,8 @@ cases:
   method: Offline synthetic fake-runner contract over the exact FX-1 typed-path echo policy.
   expected_source: openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/verification.md#INT-UD-HARNESS-ECHO-001
   minimum_evidence: contract
-  expected_result: After r9 is merged, a host-only task updates the future full
-    and redacted capture manifest schemas to
+  expected_result: The merged r9 host-only task updates the full and redacted
+    capture manifest schemas to
     arkdeck-ud-capture-manifest-1.1.0 and
     arkdeck-ud-capture-redacted-1.1.0. The policy accepts a validated
     LOCAL_HAP_PATH echo only in FX-1 stdout when the stream is complete,
@@ -92,25 +93,76 @@ cases:
     is explicit failure; other outputs remain unknownOutput until a decision
     revision registers families. Destructive and Agent dispatch counts are zero.
     This case claims no canonical AC-DUMP PASS.
+- acceptance_id: INT-UD-R2-DECISION-001
+  test_id: TEST-INT-UD-R2-DECISION-001
+  method: Human-offline deterministic R2 derived-fixture output-family decision review.
+  expected_source: openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/verification.md#INT-UD-R2-DECISION-001
+  minimum_evidence: realHardware
+  expected_result: The human maintainer processes only the proven-owned Phase A
+    R2 sidecar whose whole-file SHA-256 is fixed by PR 248, using the merged
+    uidump-derived-redaction-v1 transform and its fixed empty safe-literal
+    allowlist. The raw is opened read-only outside every repository, while the
+    derived fixture and receipt are exclusive-created and their raw-to-receipt-
+    to-derived hash chain, schema, policy hashes, byte parity, replacement
+    counts, and repository-sensitive scan all pass. Before commit, the
+    maintainer reads the exact derived bytes and attests privacy and semantic
+    meaning by PR review. A positive decision records the approved R2 argv,
+    target tuple, raw/derived/receipt hashes, structural success family,
+    explicit-failure precedence, otherwise-unknown rule, and deterministic
+    placeholder locator/basis requiring exactly one component candidate. It
+    records and reuses no exact Phase A component token. Redactor failure,
+    privacy failure, absence of a repo-safe positive fixture, or zero/multiple/
+    ambiguous candidates produces a truthful negative decision and leaves the
+    selector seam and R4 blocked. Agent raw-read and HDC, device, network, GUI,
+    and destructive dispatch counts are zero. This case claims no canonical
+    AC-DUMP PASS.
+- acceptance_id: INT-UD-R2-R4-SEAM-001
+  test_id: TEST-INT-UD-R2-R4-SEAM-001
+  method: Offline synthetic adversarial contract for same-session selection bundle and R4 harness materialization.
+  expected_source: openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/verification.md#INT-UD-R2-R4-SEAM-001
+  minimum_evidence: contract
+  expected_result: After a positive R2 decision is independently done and a
+    separate readiness PR fixes the schemas and implementation boundary, a
+    stdlib-only selector reads only a fresh, proven-owned, complete same-session
+    R2 raw origin and applies the approved structural family and locator. It
+    requires exactly one format-valid candidate and exclusive-creates a private
+    0o600 bundle outside every repository containing the exact token, a 256-bit
+    random nonce, decision id, raw hash, and session/window binding. A repo-safe
+    receipt records only hashes, locator/cardinality, bundle SHA-256, and
+    validation facts and contains neither token nor nonce. The capture harness
+    adds R4 only through a typed bundle reference consisting of path and expected
+    SHA-256, validates schema, no-follow path, mode, content hash, decision,
+    fresh raw origin, session/window, and token format, then materializes
+    the exact one-element -a payload internally. CLI, environment, manual token,
+    and ordinary untyped-file inputs are rejected. Synthetic tests cover valid,
+    zero/multiple, stale Phase A, wrong decision/raw/window/session, tamper,
+    symlink/mode/path, injection, timeout/truncation, and all output-leak paths;
+    every negative has zero request, process, HDC, device, and network dispatch.
+    This case claims no canonical AC-DUMP PASS.
 - acceptance_id: INT-UD-CAPTURE-R4-001
   test_id: TEST-INT-UD-CAPTURE-R4-001
   method: Decision-bound human runbook Phase B componentDetail deviceMutation capture.
   expected_source: openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/verification.md#INT-UD-CAPTURE-R4-001
   minimum_evidence: realHardware
-  expected_result: This case remains blocked until Phase A is done and an
-    approved R2 output-family decision revision registers the R2
-    success/failure/unknown families and records the selected component token,
-    the location and basis of that selection inside the R2 derived output, and
-    the R2 raw-origin hash. Unknown, truncated, or failed R2 output cannot enter
-    selection; zero candidates or ambiguity keeps R4 blocked; COMPONENT_ID is
-    never taken from CLI, environment, file, or ad-hoc typing. R4 then uses the
-    exact one-element payload with the same HP preflight, explicit -t,
-    conservative deviceMutation classification, exact-path inventory,
-    owned-only cleanup, separate raw origins, and raw-outside-git privacy gates
-    as Phase A, with the same evidence set plus the decision reference and
-    selected token record, and schema-valid hardware-evidence.json whose
-    operator truth is attested by maintainer PR review. Destructive and Agent
-    dispatch counts are zero. This case claims no canonical AC-DUMP PASS.
+  expected_result: This case remains blocked until Phase A is done, a positive
+    R2 decision has registered success/failure/unknown structural families and
+    a deterministic candidate locator, the same-session selector/R4 harness
+    seam is done, and an independent R4 readiness PR is merged. A fresh Phase B
+    session runs R2, selects exactly one candidate into the private bundle, and
+    executes R4 without restarting or reinstalling the fixture, mutating UI
+    state, or issuing an unlisted device command between R2 and R4. The Phase A
+    token is never reused, and COMPONENT_ID is never accepted from CLI,
+    environment, ad-hoc typing, or an ordinary file. Unknown, truncated,
+    failed, zero/multiple, drifted, or tampered selection keeps R4 dispatch at
+    zero. R4 uses the exact one-element payload with the same HP preflight,
+    explicit -t, conservative deviceMutation classification, exact-path
+    inventory, owned-only cleanup, separate raw origins, and raw-outside-git
+    privacy gates as Phase A. Evidence adds the decision/seam OIDs and hashes,
+    fresh R2 raw hash, repo-safe selection receipt, and private-bundle SHA-256;
+    exact token, nonce, and bundle bytes do not enter git. Schema-valid
+    hardware-evidence.json operator truth is attested by maintainer PR review.
+    Destructive and Agent dispatch counts are zero. This case claims no
+    canonical AC-DUMP PASS.
 - acceptance_id: INT-UD-REDACTOR-001
   test_id: TEST-INT-UD-REDACTOR-001
   method: Offline deterministic and fail-closed UI Dump derived-golden redaction contract.

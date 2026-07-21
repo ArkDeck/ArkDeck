@@ -1,6 +1,6 @@
 ---
 id: CHG-2026-008-ui-dump-hidumper-wrapper
-revision: 9
+revision: 10
 status: approved # r1 经 #68 批准;后续 revision 仅在对应治理 PR 由维护者 review/merge 后生效
 class: platform
 core_change_level: none
@@ -43,7 +43,7 @@ r3 是 review remediation:恢复 `TASK-UD-001 blocked`,补齐 consumer dependenc
 execution 全部保守归为 `deviceMutation`(official source 不能证明 target output mode,
 不存在可批准的 stdout-only Recipe 采集)。真机采集拆为两个人类任务:
 `TASK-UD-CAP-MUT-001`(Phase A,R1-R3)与 `TASK-UD-CAP-R4-001`(Phase B,R4,等待
-approved R2 output-family decision 记录选定 component token);另设
+approved R2 structural decision、same-session selector seam 与独立 readiness);另设
 `TASK-UD-REDACTOR-001` 在 golden 入仓前固定确定性脱敏 transform 与 redaction receipt。
 
 r3 初稿曾提出 journaled execution-authority(JAUTH)模型(external Core MAJOR
@@ -66,6 +66,19 @@ r9 是独立 remediation/readiness revision:新增 host-only
 中的 local path、key material、截断/不完整流和 repository-facing literal 仍 fail closed。
 旧 #219 raw/session/evidence 不复用、不重判;remediation done 后仍须独立 status PR 才能
 恢复 `TASK-UD-CAP-MUT-001 ready` 并从 fresh session 重跑。
+
+r10 是 Phase A 完成后的 R2/R4 provenance remediation/readiness revision。Phase A evidence
+PR #248 与独立 done status PR #251 已由维护者合入;其事实是 R2 完整采集但仍为
+`unknownOutput`,且 fixture 已 stop/uninstall。现行文本一面要求 decision revision 记录
+exact component token,另一面禁止 component identifier 入仓;同时 pinned capture harness
+明确不含 R4。更关键的是,ArkUI source 只显示 node id 由运行时 unique-id 路径创建,不能
+证明 Phase A token 跨 fixture/window 生命周期稳定。r10 因此禁止复用旧 token,改为
+**Phase B 同会话 R2 → private selector bundle → R4**:仓库只登记 derived structural
+family、selection locator/basis 与 bundle/receipt provenance,exact token 与随机 nonce 只留
+仓库外 `0o600` bundle。r10 新增 `TASK-UD-R2-DECISION-001`(`ready`,人类维护者离线
+raw→derived/decision,Agent 不读 raw)与 `TASK-UD-R2-R4-SEAM-001`(`blocked`,等待前者
+done 后实现 selector + R4 harness seam);R4 仍 blocked。本 revision 不含 derived bytes、
+decision、selector/harness 实现或任何 HDC/device dispatch。
 
 ## What changes
 
@@ -94,6 +107,12 @@ r9 是独立 remediation/readiness revision:新增 host-only
   evidence 或设备执行,不恢复 CAP-MUT ready。允许面只覆盖 `FX-1` stdout 中 exact
   validated HAP path 的完整 span;generic user-path allowlist、substring/prefix/dirname/
   symlink/case-normalized match 均禁止。
+- r10 治理修订固定 Phase B 的 same-session provenance 模型并新增两个串行任务。R2
+  decision PR 只可提交经既有 redactor 转换、receipt/hash 链闭合且由维护者逐字审读的
+  derived fixture 与结构 decision;exact component token 不入仓。decision done 后另起
+  host-only seam implementation,由 selector 从同一 Phase B 会话的新 R2 raw 生成带随机
+  nonce 的 private bundle,并由 capture harness 验证 bundle/session/raw-origin binding 后
+  才 materialize R4 argv。implementation/done/R4 readiness 继续各自独立 PR。
 
 ### Out of scope
 
@@ -104,8 +123,9 @@ r9 是独立 remediation/readiness revision:新增 host-only
   success family;用自造 marker/fake 输出关闭验收;
 - 在采集任务仍 blocked 时执行任何 HDC/Recipe,或把 R1-R4 首次 target capture 降级为
   readOnly;偏离 runbook 固定命令做 ad-hoc 清单/清理、全局搜索或递归删除远端文件;
-- 在 approved R2 decision 未记录选定 component token 时执行 R4,或从
-  operator/CLI/env/file 现场取得 component ID;
+- 在 approved R2 decision 未固定 structural family/locator、same-session selector seam 未
+  done 或独立 R4 readiness 未合入时执行 R4;从 operator/CLI/env/普通 file 现场取得
+  component ID;
 - journal event/append-chain 字段、dispatch authority 变更或任何 Core delta(本 change
   保持 `class:platform` / `core_change_level:none`;JAUTH 属未来独立 Core MAJOR,见
   backlog,不是本 change 前置);
@@ -127,6 +147,10 @@ r9 是独立 remediation/readiness revision:新增 host-only
 - 对任意命令/stream 泛化 user-path 或 local-path allowance,允许 expected HAP path 之外
   的第二条用户路径,放宽 key-material/truncation/drain/repository-facing scan,或让 raw
   字节进入 redacted manifest/hash summary/仓库。
+- 从 Phase A R2 raw、derived fixture、hash、聊天或人工输入中复用/猜测 exact component
+  token;把 token/随机 nonce/private selector bundle 入仓;允许 CLI/env/ad-hoc token;
+  在 `TASK-UD-R2-DECISION-001 done` 与 `TASK-UD-R2-R4-SEAM-001 done`、独立 R4
+  ready-restore PR 全部合入前执行 Phase B R2/R4 或修改 harness 白名单。
 
 ## Impacted specifications
 
@@ -179,6 +203,16 @@ r9 是独立 remediation/readiness revision:新增 host-only
   redacted manifest 仍仅含 `<local-hap-path>`、hash/size 与布尔 policy facts。
   `_assert_redacted_clean` 对 home/connect key/window/local path/key material 的硬失败语义
   不变。任何其他 command/stream 或额外 path 仍 STOP。
+- r10 将 R2 family decision 与每次 R4 token materialization 分层:decision 只登记经
+  privacy-reviewed derived fixture 可复验的 structural family、failure/unknown precedence
+  和 deterministic locator/basis;每次 Phase B 必须在同一 fixture/window 生命周期重新
+  执行 R2。selector 只读本次 proven-owned R2 raw,exact token + 256-bit random nonce 进入
+  仓库外 private bundle;repo-facing receipt 只记录 decision id、fresh R2 raw hash、decision
+  derived-fixture/receipt hash、locator、candidate count、bundle SHA-256 与 validation
+  booleans,不含 token/nonce。R4 harness 仅从 path + expected SHA-256 组成的 typed private-
+  bundle reference materialize token,禁止 CLI/env/manual/file-without-schema 输入。
+  zero/multiple candidates、family mismatch、bundle/session/raw hash drift、token format failure
+  或任何 truncation/cleanup ambiguity 均使 R4 dispatch `0`。
 - 每个登记 output family 都必须能在干净 checkout 以 repo-safe synthetic/derived fixture
   走 production classifier 正向复验;本 change 禁止 raw byte-fingerprint/digest family;
 - 本 r3 治理 PR 本身零 HDC/device dispatch;merge 后仍没有 ready 的 real-device task。
@@ -247,3 +281,12 @@ r9 是独立 remediation/readiness revision:新增 host-only
   不含 `scripts/ud_capture/**` 实现、task evidence 或任何 HDC/device dispatch。仅在
   维护者 review/merge 后生效;merge 不会恢复 CAP-MUT ready,也不改变 original harness
   task 的历史 done/PASS。
+- Phase A 完成:evidence PR #248 已合入 `main`
+  `79b795b7916c863376b3c1f9c37456b0089283dd`,独立状态 PR #251 已合入
+  `d5aded75d30fbd7ae048005b692b7f4138b23055` 并使
+  `TASK-UD-CAP-MUT-001 done`;R1/R2/R3 仍为 `unknownOutput`,R4 dispatch `0`。
+- r10 R2/R4 same-session provenance revision:本 PR 只修改 proposal/tasks/verification/
+  acceptance metadata 与 runbook,新增一个 human-offline decision task 并起草 `ready`,
+  再声明一个 blocked host-only seam task;不读取/复制 controlled raw,不提交 derived/
+  receipt/decision,不修改 `scripts/**`,不执行 installed HDC/device/network/GUI/mutation/
+  destructive 操作。仅在维护者 review/merge 后生效;merge 不会使 R4 ready。
