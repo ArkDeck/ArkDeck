@@ -6,9 +6,29 @@
 
 ## TASK-OBS-001 — Kit 仪表化与分类面
 
-- Status:blocked(双前置:① CHG-2026-022 经 approval-only PR 批准;② 独立
-  readiness PR——须钉基线 OID、复核与 chg-021/chg-008 执行会话的竞争面、确认
-  M1-006 语义不变量测试基线)
+- Status:ready(readiness;仅在维护者 review/merge 本独立状态 PR 后生效。单文件、
+  不含实现、不产生 evidence)
+- Readiness review(2026-07-21;host-only,零设备命令):
+  - Approve gate:satisfied(#254 squash `1e4a7c4`);design §0 硬不变量与五
+    change-local AC 随批准生效。
+  - 基座 pins(于 main `1e4a7c4` 实测,= #250 深查四缺口事实成立时点锚定):
+    `HDCProduction.swift` blob `3f74aa37…`、`ArkDeckOpenHarmony.swift`
+    `2c529869…`、`HDCApplicationDiagnosticsFacade.swift` `1e37e674…`。实现开工
+    时任一漂移 → 重查缺口事实后再动工(并行会话防线)。
+  - 基线:Swift 全量 302/1 skip/0 failures、check-sdd 0/0/111(均于 `1e4a7c4`
+    实测);M1-006 语义不变量由既有全量套件承载,实现须零回归 + 新增门等价
+    diff 测试(OBS-OWNERSHIP-001)。
+  - 竞争面:复核时 open PR 为 0;**文件级分工**——本任务碰
+    `Sources/ArkDeckOpenHarmony/**` 与 `Sources/ArkDeckWorkflows` 的 HDC
+    supervisor/presentation 既有文件 + 新增测试,不新增/不触碰 `Trace*` 文件;
+    与 TASK-TR-002(只新增 Trace* 新文件)零文件交集,可并行执行;App 面属
+    OBS-002 不在本任务。
+  - 实现序:计数器(真实调用点 + 变异测试)→ ownership 三证据矩阵 + 门等价
+    测试 → endpoint source/child-env 暴露 → 只读设备 fan-out feed(有界缓冲)
+    → presentation 透出 → 四 AC contract 测试逐条 PASS → evidence run。
+  - Review boundary:本 readiness 只翻转状态并记录 pins/分工/序;实现仍须满足
+    全部 change-local AC/verification gate(任何门语义 diff 整体 fail);
+    `ready→done` 另用独立状态 PR。
 - Objective:supervisor 自动 lifecycle/subserver dispatch 计数器(真实调用点,
   变异可证伪)、ownership `.external` 判定(design §1 三证据,缺一保持 unknown)、
   endpoint source 与 child-env 注入清单暴露、只读设备 fan-out feed(有界环形
