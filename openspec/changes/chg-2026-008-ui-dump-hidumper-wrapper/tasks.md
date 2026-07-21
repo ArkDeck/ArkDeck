@@ -215,21 +215,29 @@ done、独立 ready-restore PR 合入且具名设备窗口内才可执行。
 
 ## TASK-UD-CAP-MUT-001 — R1-R3 首次 target-build 人工 deviceMutation 采集
 
-- Status:blocked(2026-07-21 首次人类 Phase A run 在 `FX-1` 后按 runbook fail-closed
-  中止;failure evidence/status 已经 PR #219 合入。`HP-0`/`HP-1` 通过且 fixture hash
-  与 pinned 值相符;`FX-1` HDC process exit `0`、流完整无截断,但 observed stdout 回显
-  exact local HAP path,触发 pinned harness `userPathFound=true`、
-  `localInputPathFound=true`、`selfCheckPassed=false` 与 CLI STOP。操作者未执行
-  `FX-2`/`HP-2`/`SC-*`/`INV-1`/`R1`-`R3`,仅按非身份类 abort rule 执行 `FX-3`/`FX-4`
-  cleanup(两者 exit `0`,complete,self-check PASS);Agent installed-HDC/device/
-  destructive dispatch `0/0/0`,R1-R3 dispatch `0/0/0`。证据见
-  `evidence/runs/TASK-UD-CAP-MUT-001/run.md`、五份 redacted manifest 与
-  `capture-hashes.md`;不生成 `hardware-evidence.json`,不认领
-  `INT-UD-CAPTURE-MUT-001`、canonical AC、Recipe success/compatibility/support PASS。
-  observed HDC family 回显 resolved local input path,换路径或重试不是合法 workaround;
-  恢复 ready 前须由独立 approved remediation task/revision 修复并验证 harness
-  sanitization/self-check evidence seam,随后另起状态 PR。既有 r4 readiness pins 与
-  harness source hash 仍保持历史事实,但不足以越过本次运行暴露的 blocker)
+- Status:ready(2026-07-21 独立 ready-restore status PR;仅在维护者 review/merge 后生效。
+  #219 合入的首次 Phase A failure evidence/status 保持 immutable,不复用、不重判:
+  当次 run 在 `FX-1` fail-closed 中止,未执行 `FX-2`/`HP-2`/`SC-*`/`INV-1`/`R1`-`R3`,
+  不生成 `hardware-evidence.json`,不认领 `INT-UD-CAPTURE-MUT-001`、canonical AC、
+  Recipe success/compatibility/support PASS。恢复依据如下:
+  (1) r4 readiness PR #132 的五项 pins 保持不变:fixture HAP tuple/hash、`INV-1`、
+  sidecar literal path/commands、`FX-1`…`FX-4` 与 operator/window;
+  (2) `TASK-UD-HARNESS-ECHO-001` implementation+evidence PR #228 已由维护者合入
+  `b38d028ff821900c7c191c2bccc5951c5c719e7b`,implementation source revision
+  `4049bb0de80160a696e6f8defabb3f70e4135d5a`,remediation done status PR #229 已合入
+  `3ac44f2d759bd8bec8f95405b85281d70f89cad0`;
+  (3) schema `1.1.0` 与三份 merged-main harness SHA-256 已固定:
+  `scripts/ud_capture/README.md`=
+  `6e5db1827176a0c16b5a4b21431efa9e4d4dab041f03801a357f74b3db2f2601`,
+  `scripts/ud_capture/capture.py`=
+  `b407aaa07260e3252428bdf00431f4d1e451c30f77c55f1f6b15a5d170d19492`,
+  `scripts/ud_capture/test_capture.py`=
+  `b29c15b8fdca755f26fdfe4f5156082a8bb4a6fd80d8ceecec178419d4690070`;
+  (4) #229 merged main 上复验 harness tests 63/63 PASS、SDD 0 error/0 warning/
+  111 acceptance IDs。此 status PR 的 installed-HDC/device/network/GUI/mutation/
+  destructive/fixture/Recipe dispatch 均为 `0`;合入后仅授权维护者在具名设备窗口按
+  runbook 从 fresh controlled session 的 `HP-0` 重新开始,不构成 hardware evidence、
+  compatibility/support/release 或任何 canonical AC PASS)
 - Objective:由人类维护者按 `capture-runbook.md` Phase A 在 DAYU200 真机上首次执行
   R1-R3 三个 Recipe 的受控采集,记录逐流 byte-exact raw(仓库外)、redacted manifest 与
   hardware evidence,为后续 argv/output-family decision 提供事实输入。
