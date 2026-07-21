@@ -76,7 +76,7 @@ M0A established the following facts:
   substitute.
 
 The evidence and its exact SHA-256 index are recorded under
-`openspec/changes/chg-2026-001-macos-m0a/evidence/runs/TASK-M0A-006/`.
+`openspec/changes/archive/2026-07-21-chg-2026-001-macos-m0a/evidence/runs/TASK-M0A-006/`(路径于 2026-07-21 CHG-001 归档时更新,evidence 字节未动).
 
 ## Rationale
 
