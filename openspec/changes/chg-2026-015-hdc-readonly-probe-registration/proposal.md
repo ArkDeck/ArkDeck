@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-015-hdc-readonly-probe-registration
 revision: 2
-status: approved # r1 proposal 经 PR #121 合入；批准由 approval-only PR #123 的维护者 review/merge 构成；r2 为 plan-only revision（capture-plan.md），仅在对应治理 PR 合入后生效
+status: verified # 2026-07-21 本 verification-closure PR(先例 #175/#176/#201/#208);approve 载体 #123;archive 另行(chg-002/019 账本引用其 registry/provenance,归档前须引用面收口)。原注: r1 proposal 经 PR #121 合入；批准由 approval-only PR #123 的维护者 review/merge 构成；r2 为 plan-only revision（capture-plan.md），仅在对应治理 PR 合入后生效
 class: integration
 core_change_level: none
 owner: lvye
@@ -125,3 +125,21 @@ probe、不修改 M1-006 源码，也不声称任何 HDC AC 已通过。
   `TASK-I15-001` 继续保持 `blocked`；只有独立 readiness PR 确认四类 authoritative
   capture/receipt 输入可得且 provenance 已获维护者认可后，任务才能转为 `ready`。缺任一
   family provenance 时不得开始部分注册，也不得宣称 M1-006 blocker 已解除。
+
+## Verification closure(2026-07-21)
+
+- 依据:TASK-I15-001 done(实现 PR #159 squash `7c77672`,done 状态 PR #163 squash
+  `3e2d6d4`,合入版独立深度审计零 blocker 零 major);七项 `I15-HDC-*` 验证面全部
+  satisfied——四 family 二值登记(serverIdentityGeneration/selectedDeviceAuthorizationBinding
+  = supported、keyAccessDiagnostics/subserverCapability = unsupported)逐条绑定
+  #141/#155/#156 维护者认可的一手 provenance;19 文件 hash closure 独立重算全命中;
+  测试经三组变异证伪为真实断言;fixtures 敏感扫描零命中;零真实
+  HDC/device/network/server-mutation dispatch。
+- 下游消费实证:registry 已被 M1-006(#191/#207)按 adoption_boundary 只读采用、被
+  ratified `CORE-CONFORMANCE-2.1.0`(CHG-2026-018/#203)引用为 integration_conditional
+  排除条件的唯一事实源,并经 CHG-2026-002 verified(#208)进入 M1 收官算术。
+- 已知 non-blocking residuals(四项 minor/info,tasks.md 在案)保持登记,不触及 gate。
+- 本 `verified` 由维护者 review/merge 本 PR 构成。不构成 platform conformance、
+  hardware/support 或 release claim。archive 另行:registry/provenance 被 chg-002/
+  chg-019 账本与 core-conformance manifest 精确引用,归档前须引用面收口(且
+  `openspec/integrations/**` 本体为 living 文件,不随本 change 归档)。
