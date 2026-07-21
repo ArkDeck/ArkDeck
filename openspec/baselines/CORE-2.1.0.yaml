@@ -1,0 +1,34 @@
+# Core baseline 版本记录 —— ratification 状态的单一事实源。
+# V2 治理:ratification = 维护者批准包含本状态变更的 archive PR 并合入受保护 main;
+# 本文件在 CHG-2026-018 archive PR 合入前仅是待批准的 ratification 声明(status: draft),
+# archive PR 将本行翻为 ratified 并填写 ratified_at/ratified_by。
+baseline: CORE-2.1.0
+status: draft
+ratified_at: null
+ratified_by: null
+supersedes: CORE-2.0.0
+change: CHG-2026-018-hdc-acceptance-applicability
+core_change_level: minor
+scope: >-
+  继承 CORE-2.0.0 的全部未变 scope(specs、contracts、acceptance index/cases 的 111 条
+  Core AC 均零变更),并纳入 CHG-2026-018 对 openspec/verification/core-conformance.yaml
+  的 additive 修订:integration_conditional 条件化适用性机制(仅 AC-HDC-006-01 与
+  AC-HDC-009-01 两条,排除仅当 pinned readonly-probes registry 以 maintainer-accepted
+  provenance 显式标 unsupported 时成立,沉默不构成排除)、applicability rule 的
+  fail-closed 补句,以及 shared_inputs 对 OPENHARMONY-TOOLS@0.3.0 profile、
+  OPENHARMONY-HDC-READONLY-PROBES@1.0.0 registry 与 INTEGRATION-PROFILES-0.4.0 lock
+  的 currency 补记。
+change_rule: >-
+  ratified 后对 scope 内文件的语义修改必须走 approved change delta,
+  经 archive PR 合入 current specs 并升版 CORE-x.y.z;不原地改写本记录。
+platform_disposition: >-
+  macOS conformance_status 保持 notStarted,不产生 needsReverification——本修订是
+  verification arithmetic 的收窄性排除而非放宽,109 条未受影响 AC 的既有 evidence 不重判;
+  被排除两条的 reactivation(registry 翻 supported)将使依赖排除的结论转
+  needsReverification。Windows/Linux 保持 deferred/not started,不产生支持声明。
+notes: >-
+  本 baseline 不改变任何 Requirement/Scenario 原文;REQ-HDC-006/REQ-HDC-009 的禁令义务
+  (零 key 复制/删除/上传/记录,零自动 spawn-sub/killall-sub/device-migration)全量保留,
+  且已由 TASK-M1-006 合入版(PR #191)的仪表化 contract evidence 背书。排除条件的唯一
+  事实源是 openspec/integrations/openharmony/readonly-probes.yaml 及其 provenance 链
+  (#141/#155/#156/#159/#163)。
