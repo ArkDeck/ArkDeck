@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-016-dayu200-recovery-rehearsal
-revision: 3
-status: approved # r1 经 #170/#171 批准;r2 经 #177;r3(W1 条件化+W2 GPT 主路径确认,基于 attempt #2/#213 真机事实)由本 r3 revision PR 的维护者 review/merge 构成
+revision: 4
+status: approved # r1 经 #170/#171 批准;r2 经 #177;r3 经 #214;r4(W2 条件化,基于 attempt #3/#215 真机事实:loader 命令子集拒 gpt 而现存表 15/15 match)由本 r4 revision PR 的维护者 review/merge 构成
 class: platform
 core_change_level: none
 owner: lvye

@@ -22,6 +22,17 @@
 > attempt #2 抢救读回 `ppt` 表头 `Partition Info(GPT)` 且 15/15 精确 match FA-001 §2,
 > GPT 分支实锤,W2 以 `gpt parameter.txt` 为确认主路径(`prm` 替代分支保留不删)。
 > 其余命令面、写序、判定点、§5 中止准则零变更。
+>
+> **r4 修正(2026-07-21,基于 RH-001 blocked-attempt #3/#215 真机事实)**:Loader 态
+> `gpt` 与 `db` 同族被拒(`The device does not support this operation!` ×2,零写入)——
+> 板上 U-Boot rockusb gadget 只实现命令子集(读类 `ld`/`ppt` 完好)。而写前 `ppt`
+> 两个窗口均 15/15 精确 match FA-001 §2:W2 判定点「设备侧分区表就位、为 `wlx` 建立
+> 解析前提」已被现存表满足(W2 要写的正是这张表)。r4 仅一点:**W2 条件化**——写前
+> `ppt` 与 FA-001 §2 逐行 15/15 精确 match(index/name/offset 全同)时,W2 判定点视为
+> 已满足,`gpt` 跳过并如实记录;任何一行不 match 时 `gpt` 仍必须执行(被拒即 §5 停,
+> Maskrom 裸态路径另立 revision)。**已知风险如实登记**:`wlx`/`wl` 可能同样在 loader
+> 命令子集之外;若下窗口两者均被拒,Loader 态恢复路线不可行,须另立 revision 探索
+> 真 Maskrom(BootROM)进态。其余零变更。
 
 ## 0. 进态序列与 mode-gate(r2 新增;权威原文,硬门)
 
@@ -68,7 +79,7 @@
 | 序 | 命令 | 判定点 |
 | ---: | --- | --- |
 | W1 | `rkdeveloptool db MiniLoaderAll.bin` | 报成功且设备转入可写态(`ld` 显示 Loader)。**r3 条件化:写序开始前 `ld` 已显 `0x350a`+`Loader` 时判定点视为已满足,`db` 跳过并如实记录;`0x350a`+`Maskrom` 时必须执行** |
-| W2 | `rkdeveloptool gpt parameter.txt` | 报成功(设备侧分区表就位;为 W3 `wlx` 建立解析前提)。若工具/设备形态要求 `prm`,以 `rkdeveloptool prm parameter.txt` 替代并如实记录——两者仅取其一 |
+| W2 | `rkdeveloptool gpt parameter.txt` | 报成功(设备侧分区表就位;为 W3 `wlx` 建立解析前提)。若工具/设备形态要求 `prm`,以 `rkdeveloptool prm parameter.txt` 替代并如实记录——两者仅取其一。**r4 条件化:写前 `ppt` 与 FA-001 §2 逐行 15/15 精确 match 时判定点视为已满足,`gpt` 跳过并如实记录;任何不 match 时必须执行** |
 | W3 | 逐分区 `rkdeveloptool wlx <PartitionName> <image>`(优先路径) | 每分区报成功;分区名↔镜像对取 §3 写序表 |
 | W3' | 回退路径(仅当 `wlx` 对某分区报 `No found partition` 或等价失败):`rkdeveloptool wl <BeginSec> <image>`,`<BeginSec>` **逐值取自 FA-001 §2 的 PD-002 扇区列,零现场手算**;使用回退即如实记录原因 | 报成功 |
 | W4 | `rkdeveloptool rd`(或手动 RESET) | 设备正常启动进系统;postcheck `list targets -v` 显示 `Connected` |
