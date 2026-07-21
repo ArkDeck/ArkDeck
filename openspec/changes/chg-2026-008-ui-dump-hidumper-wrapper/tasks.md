@@ -446,6 +446,9 @@ task 按 M0B 先例由人类直接使用 installed `hdc`,同样不消费 M1-006 
   - 本 change `capture-runbook.md` 与两个采集 task 的已合入 repo-safe evidence
   - `openspec/changes/chg-2026-006-dayu200-m0b-bringup/evidence/runs/TASK-M0B-001/**`
   - `openspec/changes/chg-2026-014-remote-lock-legacy-consolidation/**`
+    （2026-07-21 archive currency note:该 change 已 verified 后归档,目录现位于
+    `openspec/changes/archive/2026-07-21-chg-2026-014-remote-lock-legacy-consolidation/**`;
+    本行原文按惯例保留,引用按新路径解读,字节以 git 历史为证）
   - `scripts/ui_dump_redaction/**`(只读消费;修改属 TASK-UD-REDACTOR-001)
   - decision revision 固定的仓库外 derived paths 与 redaction receipts(golden PR 提交
     输入;raw path/bytes 对本 task 不可达)

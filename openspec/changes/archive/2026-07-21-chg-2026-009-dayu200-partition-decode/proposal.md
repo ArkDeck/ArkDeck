@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-009-dayu200-partition-decode
 revision: 5
-status: verified # 2026-07-20 verification closure PR;r1 经 #70 批准,r2-r5 已合入
+status: archived # 2026-07-21 archive PR(先例 #178;CHG-014 账本引用面已同 PR 内 dated note 收口);verified 于 2026-07-20 closure PR(#175)。原注: 2026-07-20 verification closure PR;r1 经 #70 批准,r2-r5 已合入
 class: platform
 core_change_level: none
 owner: lvye

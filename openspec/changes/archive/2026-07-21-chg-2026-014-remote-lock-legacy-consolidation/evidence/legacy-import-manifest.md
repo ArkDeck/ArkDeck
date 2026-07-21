@@ -177,3 +177,12 @@ intentional and is part of `RLC-AUDIT-ROLLBACK-001`.
 
 No secret, private key, archive locator, device identifier, raw sensitive Artifact, or local
 result-bundle path is recorded here.
+
+## Archive currency note(2026-07-21,随 CHG-2026-009 archive PR 追加;原文零改写)
+
+上表 Delta A/M 两行引用的 `openspec/changes/chg-2026-009-dayu200-partition-decode/...`
+已随 CHG-2026-009(verified,#175)归档移至
+`openspec/changes/archive/2026-07-21-chg-2026-009-dayu200-partition-decode/...`。
+本 ledger 钉定的是 blob OID(`6c991ab8…`/`2811808…`),不受目录移动影响,字节恒可由
+git 历史验证;路径列原文按审计惯例保留,按新位置解读。本注记只追加、不改写既有行
+(#152 byte-currency note 先例)。

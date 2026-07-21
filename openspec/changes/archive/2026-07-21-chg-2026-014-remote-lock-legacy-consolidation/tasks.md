@@ -76,6 +76,10 @@
   - `scripts/partition_decode/**`
   - `openspec/changes/chg-2026-002-macos-m1-infrastructure/evidence/runs/TASK-M1-006/**`
   - `openspec/changes/chg-2026-009-dayu200-partition-decode/evidence/runs/TASK-PD-001/**`
+    （2026-07-21 archive currency note:CHG-2026-009 已 verified(#175)后归档,本行与上方
+    allowed-paths 行的引用现位于
+    `openspec/changes/archive/2026-07-21-chg-2026-009-dayu200-partition-decode/**`;
+    原文按惯例保留,ledger 所钉 blob OID 不受目录移动影响,字节以 git 历史为证）
 - Forbidden paths:`openspec/constitution.md`、`openspec/specs/**`、
   `openspec/contracts/**`、`openspec/baselines/**`、`openspec/integrations/**`、
   `openspec/platforms/**`、`openspec/verification/**`、hardware matrix、其他 change/task

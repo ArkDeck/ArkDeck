@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-014-remote-lock-legacy-consolidation
 revision: 1
-status: verified # 2026-07-19 verification closure candidate；四项 RLC gate PASS；仅在本 PR 维护者 review/merge 后生效
+status: archived # 2026-07-21 archive PR(先例 #178;consolidation 账本的 active-audit-input 角色随 M1-006 done/#207 与 CHG-002 verified/#208 完成;chg-008 引用面同 PR 内 dated note 收口);verified 于 2026-07-19 closure PR。原注: 2026-07-19 verification closure candidate；四项 RLC gate PASS；仅在本 PR 维护者 review/merge 后生效
 class: implementation-only
 core_change_level: none
 owner: lvye
