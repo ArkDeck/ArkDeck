@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-018-hdc-acceptance-applicability
 revision: 1
-status: verified # 2026-07-21 本 verification-closure PR(先例 #175/#176);approve 载体 #195 `f2bde7b`;archive(=CORE-2.1.0 ratification)另行独立 PR
+status: archived # 2026-07-21 本 archive PR(=CORE-2.1.0 ratification 载体,先例 #178/#21);verified 于同日 #201 `aeed69d`
 class: core
 core_change_level: minor
 owner: lvye
