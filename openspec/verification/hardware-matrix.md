@@ -28,6 +28,7 @@
 | Evidence ID | Device / build | HDC / transport | Capability / Provider | AC coverage | Status | Date |
 | --- | --- | --- | --- | --- | --- | --- |
 | `EVD-M0B-DAYU200-20260718-001` | DAYU200(RK3568)/ OpenHarmony 7.0.0.34、API 26.0.0(operator 设备屏观察) | hdc 3.2.0d(client+server),binary sha256 `48395ba8…d260` / USB | discovery+authorization observation+raw capture+hidumper probe;Provider `none`;无 UI Dump/Trace/Debug/Flash capability 事实 | `HW-M0B-DAYU200-DISCOVERY-001` PASS、`HW-M0B-DAYU200-RAWCAPTURE-001` PASS、`HW-M0B-DAYU200-UIDUMP-PROBE-001` PASS、`HW-M0B-DAYU200-AUTH-001` PASS(r2 分支 B:无信任 UI 设备族;r1 as-written FAIL 保持在案,重评见 run.md Addendum) | observed | 2026-07-18 |
+| `EVD-RF001-DAYU200-20260721-001` | DAYU200(RK3568)/ pinned 参考镜像 7.0.0.33(CHG-2026-003 archive `fc7637f3…5280`) | rkdeveloptool 1.32,binary sha256 `038a8a0e…3611` / USB RockUSB(Loader `0x2207:0x350a`) | Flash 正向烧写九个 PD-002 mapped 分区(Loader 态 `wlx` over 既有分区表);Provider = Rockchip RockUSB(人工 crib `flash-forward.sh`;Swift `RockchipRockUSBFlashProvider` = TASK-RF-002);恢复路径 = CHG-2026-016 Loader `wlx` | `RF-REALFLASH-001` PASS;`AC-FLASH-003-01`/`AC-FLASH-015-01`/`AC-FLASH-015-02` 真机命令面/契约/人工执行边界面 PASS(完整 Flash Provider AC `AC-FLASH-001/002/007/008/012/013` 待 TASK-RF-002 真机验收) | observed | 2026-07-21 |
 
 ## Status rules
 

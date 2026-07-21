@@ -15,9 +15,19 @@
   (允许分区/orphan 禁写/逐成员 hash/写序地址锚定/prerequisites/命令面与 design §1/§2
   逐项一致)。`./scripts/check-sdd.sh` 0/0/111、`git diff --check` 干净。
 
-## Part 2 — 真机正向烧写(设备窗口,维护者执行后补入)
+## Part 2 — 真机正向烧写(SUCCESS,2026-07-21 设备窗口)
 
-- 状态:**待设备窗口**。执行形态:人类维护者按 `images-tar-contract.md` §4 命令面(=
+- 状态:**done**。详见 `forward-flash-2026-07-21.md`(SUCCESS):九个 PD-002 mapped 分区经
+  Loader 态 `wlx` 正向全部写入成功、`rd` 复位后重启进系统、postcheck 58B
+  `USB Connected localhost`;**RF-REALFLASH-001 PASS**。首验用 pinned 包(CHG-003
+  `fc7637f3…5280`,17 成员 hash MATCH),命令面与恢复演练 attempt #5 逐字同构。
+  hardware-matrix.md 新增 observed 行 `EVD-RF001-DAYU200-20260721-001`(完整 supported
+  行待 RF-002 Provider AC)。脱敏 transcript `transcript-forward-2026-07-21.txt`。
+  Agent installed-HDC/device/destructive dispatch `0/0/0`。
+
+### (历史)执行形态说明
+
+- 人类维护者按 `images-tar-contract.md` §4 命令面(=
   正向 crib,恢复演练 `rehearse-r4.sh` 的正向产品化:身份门/进态/mode-gate/ppt 前置/
   逐分区 wlx/rd/postflight + `images.tar.gz` 解包与逐成员 hash 校验)在 DAYU200 真机
   正向烧写 pinned `images.tar.gz`(CHG-003 17 成员,`fc7637f3…5280`)。

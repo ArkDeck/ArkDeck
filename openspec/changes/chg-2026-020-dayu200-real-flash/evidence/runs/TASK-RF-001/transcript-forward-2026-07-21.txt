@@ -1,0 +1,31 @@
+=== DAYU200 正向烧写(flash-forward)  2026-07-21 15:46:54 === (TASK-RF-001 part 2 — SUCCESS)
+RUN_DIR=<HOME>/dayu200-rehearsal/run-r4-20260721-154654
+[15:46:54] 工具版本复核: rkdeveloptool ver 1.32  EXIT 0 / 物料(pinned 包 materials/)17/17 身份门通过
+  (本次未设 ARKDECK_IMAGES_TAR,默认用已验证 pinned 包 = CHG-003 fc7637f3…5280 的 materials/;
+   契约 §1 首验形态:烧 pinned 包的九 mapped 分区)
+[15:46:57] OB[pre-entry] sudo <TOOL> ld
+  DevNo=1  Vid=0x2207,Pid=0x5000,LocationID=2  Maskrom  EXIT 0
+§0 进态序列执行确认: yes
+[15:47:19] mode-gate: sudo <TOOL> ld
+  DevNo=1  Vid=0x2207,Pid=0x350a,LocationID=2  Loader  EXIT 0  → MODE-GATE PASS
+[15:47:20] OB[entered] sudo <TOOL> ld  → 0x350a Loader (稳定)
+W1(条件化): ld=0x350a+Loader → SKIPPED-SATISFIED
+[15:47:20] ppt(写前): Partition Info(GPT) 15 行  → PPT-MATCH 15/15 vs FA-001 §2
+W2(条件化): 15/15 match → gpt SKIPPED-SATISFIED
+--- W3 逐分区 wlx(契约 §1.B 写序;每步 Write LBA from file (100%) / exit 0)---
+[15:47:20] wlx uboot      <- uboot.img       100%  EXIT 0  PASS
+[15:47:22] wlx resource   <- resource.img    100%  EXIT 0  PASS
+[15:47:25] wlx boot_linux <- boot_linux.img  100%  EXIT 0  PASS
+[15:47:31] wlx ramdisk    <- ramdisk.img     100%  EXIT 0  PASS
+[15:47:33] wlx system     <- system.img      100%  EXIT 0  PASS
+[15:55:14] wlx vendor     <- vendor.img      100%  EXIT 0  PASS  (sudo 超时重认证,操作者侧)
+[15:55:39] wlx updater    <- updater.img     100%  EXIT 0  PASS
+[15:55:43] wlx chip_ckm   <- chip_ckm.img    100%  EXIT 0  PASS
+W3 第 9 项 userdata: 操作者逐字输入 ERASE-USERDATA(显式强确认清数据)
+[15:56:02] wlx userdata   <- userdata.img    100%  EXIT 0  PASS
+明确不写: chip_prod/sys_prod(orphan)、6 无成员分区、两处扇区空洞(契约 §2)。
+[15:57:50] W4 rd 复位: Reset Device OK.  EXIT 0  → 设备重启进系统;操作者确认「已启动」yes
+postcheck(m0b 白名单,2 命令): capture complete, self-check PASSED
+  verbose stdout 58B: `<32-hex-key>\t\tUSB\tConnected\tlocalhost`  (USB Connected localhost)
+  plain stdout 33B: <32-hex-key>  (connect key/serial 留仓库外 out-dir,不入仓)
+=== 窗口完成 15:59:39 ——正向烧写达成 ===
