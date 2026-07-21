@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-024-hdc-device-snapshot-registration
-revision: 1
-status: approved # 2026-07-21 本 approval-only PR；r1 proposal 经 #272 合入 main `cdfc181`；批准由维护者 review/merge 本 PR 构成
+revision: 2
+status: approved # r1 经 approval-only PR #273 合入 main `1eeb516`；r2 仅固定 human-controlled capture execution plan，须由维护者 review/merge 对应治理 PR 后生效
 class: integration
 core_change_level: none
 owner: lvye
@@ -137,3 +137,13 @@ change `verified` 与 CHG-2026-022 adoption/readiness 均使用独立 PR。
   provenance 经独立 PR review/merge，并由独立 readiness PR 完整重钉 inputs、hashes、
   scope 与 test matrix 后才可转 `ready`。本批准不构成 HDC/设备支持、authorization、
   binding、hardware/release evidence，也不会使 CHG-2026-022 自动 ready。
+
+## Revision 2 — controlled capture execution plan
+
+- r2 只把 `capture-plan.md` 从概念矩阵收紧为可独立 review 的 human execution plan：
+  固定复用既有只读 allowlist harness、instrument blob/hash、C0–C5+C3R 顺序、每次
+  observation 的 server identity/endpoint bracket、repo-safe handoff 字段与 stop
+  conditions；不新增或修改 capture tool。
+- r2 不执行 installed HDC、不访问设备、不登记 registry/resource、不生成 provenance，
+  也不改变任何 task 状态。只有维护者 review/merge 本 r2 治理 PR 后，维护者本人才能
+  按该计划执行 capture；随后仍须独立 evidence PR 与 readiness PR。

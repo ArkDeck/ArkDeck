@@ -2,13 +2,15 @@
 
 ## TASK-I24-001 — register the parameterized device-observation snapshot family
 
-- Status:blocked(change approval、authoritative capture/provenance 与独立 readiness 均未完成)
+- Status:blocked(change approval 已满足；r2 capture plan 由维护者 review/merge 本 PR
+  生效；authoritative capture/provenance 与独立 readiness 未完成)
 - Platform:macos
 - Requirements/AC:change-local `I24-HDC-DEVICE-SNAPSHOT-001`/
   `I24-HDC-DEVICE-EMPTY-001`/`I24-HDC-DEVICE-PROVENANCE-001`/
   `I24-HDC-DEVICE-REGISTRY-001`/`I24-HDC-DEVICE-NODISPATCH-001`
-- Depends on:CHG-2026-022 r2 merged（已满足）；本 change approval、受控 capture、
-  readiness（未满足）
+- Depends on:CHG-2026-022 r2 merged（已满足）；本 change approval（PR #273，已满足）；
+  r2 capture plan（维护者 review/merge 本 PR 构成满足）、受控 capture/provenance、
+  readiness（后两项未满足）
 - Allowed paths after readiness:
   - `openspec/integrations/openharmony/profile.md`
   - `openspec/integrations/openharmony/device-observation-probes.yaml`
@@ -32,16 +34,19 @@
 
 ### Unblock prerequisites
 
-1. 本 change 经独立 approval-only PR 由维护者批准。
-2. 维护者控制的 exact 3.2.0d capture 覆盖 zero/one/many/stable/appeared/disappeared，
+1. 本 change 经独立 approval-only PR #273 由维护者批准并合入 main
+   `1eeb516875858031a6a6cc5a44d5e6199f7e2aa5`（已满足）。
+2. r2 `capture-plan.md` 经独立治理 PR 由维护者 review/merge；review/merge 本 PR 即构成
+   该门满足，在此之前不得执行计划。
+3. 维护者控制的 exact 3.2.0d capture 覆盖 zero/one/many/stable/appeared/disappeared，
    raw 留仓库外；每个来源 receipt/hash/accepted-by 经独立 evidence PR review/merge。
-3. capture 对每次 command 提供 stable pre/post server identity、exact endpoint、exit/
+4. capture 对每次 command 提供 stable pre/post server identity、exact endpoint、exit/
    stdout/stderr hash/length，以及 server lifecycle/adoption、subserver、device migration/
    mutation/destructive counter 全 0；缺一保持 blocked/unsupported。
-4. 独立 readiness PR 钉完整 main commit OID、所有输入/目标文件 Git blob OID 或完整
+5. 独立 readiness PR 钉完整 main commit OID、所有输入/目标文件 Git blob OID 或完整
    SHA-256、profile/registry/resource candidate version、allowed-path overlap、Swift/SDD
    环境和二值 test matrix。
-5. readiness 证明现有 readonly registry/resource/Core conformance pins保持 byte-identical；
+6. readiness 证明现有 readonly registry/resource/Core conformance pins保持 byte-identical；
    如需任何 Sources/Package.swift/Core 文件，先修订本 task scope，不能静默扩展。
 
 ### Deliverables
@@ -71,5 +76,6 @@
 
 ### PR boundary
 
-Proposal、approval、capture/provenance、readiness、registration implementation+evidence、
-`ready→done`、change `verified` 与 CHG-2026-022 adoption/readiness 分别使用独立 PR。
+Proposal、approval、capture-plan review、capture/provenance、readiness、registration
+implementation+evidence、`ready→done`、change `verified` 与 CHG-2026-022
+adoption/readiness 分别使用独立 PR。
