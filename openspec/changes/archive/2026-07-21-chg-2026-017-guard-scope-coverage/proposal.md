@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-017-guard-scope-coverage
 revision: 2
-status: verified # 2026-07-21 verification closure candidate;仅在维护者 review/merge 本独立状态 PR 后生效
+status: archived # 2026-07-21 archive candidate;verified 已经 PR #189 由维护者确认
 class: implementation-only
 core_change_level: none
 owner: lvye
@@ -104,3 +104,23 @@ guard 以自动拦截该类断链,把"人肉双开发现"变为机器侧 fail-cl
 CHG-2026-017 的 implementation-only guard 增强按 r2 批准边界闭环,不构成
 任何产品能力、平台合规、硬件、支持或发布声明。本 PR 不归档;
 archive 须在 verified 生效后使用独立 PR。
+
+## Archive
+
+本 change 于 2026-07-21 经 verification closure PR #189 由维护者
+`lvye` approve/review 并合入 `main`
+`1b1336ced6ea3000de7381cf3123d89b784f58ac` 后生效为 `verified`;本独立
+archive PR 将目录整体移入
+`openspec/changes/archive/2026-07-21-chg-2026-017-guard-scope-coverage/`,
+`status: archived` 仅在维护者 review/merge 本 PR 后生效。
+
+本 change 为 `implementation-only`、`core_change_level: none`,没有 delta 需要合入
+current specs,归档不修改 spec、contract、baseline、acceptance registry、
+product、platform 或 conformance。已实现的 `scripts/check_sdd.py` guard 与
+`scripts/test_check_sdd.py` 保留在当前工作树;本目录内 proposal/design/tasks/
+verification/evidence 作为历史审计记录整体保留。
+
+`openspec/planning/backlog.md` 中对该 guard 缺口的待办条目随本归档
+删除,因为 CHG-2026-017 r2 已实现并验证该能力;完整决策与证据历史
+由 git 账本与本归档目录保留。既有 M0A/M1 `tasks.md` 中的
+`CHG-2026-017` 显示 ID 仅是历史 provenance,无路径断链且不改写。
