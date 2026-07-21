@@ -1,11 +1,10 @@
 # Core baseline 版本记录 —— ratification 状态的单一事实源。
 # V2 治理:ratification = 维护者批准包含本状态变更的 archive PR 并合入受保护 main;
-# 本文件在 CHG-2026-018 archive PR 合入前仅是待批准的 ratification 声明(status: draft),
-# archive PR 将本行翻为 ratified 并填写 ratified_at/ratified_by。
+# 本文件的 ratified 状态由 CHG-2026-018 archive PR 的维护者 review/merge 构成。
 baseline: CORE-2.1.0
-status: draft
-ratified_at: null
-ratified_by: null
+status: ratified
+ratified_at: 2026-07-21
+ratified_by: lvye (CODEOWNER review and merge of the archive PR)
 supersedes: CORE-2.0.0
 change: CHG-2026-018-hdc-acceptance-applicability
 core_change_level: minor
