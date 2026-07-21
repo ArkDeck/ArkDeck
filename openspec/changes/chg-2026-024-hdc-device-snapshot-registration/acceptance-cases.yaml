@@ -1,0 +1,59 @@
+---
+schema_version: 1.0.0
+change_id: CHG-2026-024-hdc-device-snapshot-registration
+change_revision: 1
+platform: macos
+evidence_classes:
+- contract
+- platform
+cases:
+- acceptance_id: I24-HDC-DEVICE-SNAPSHOT-001
+  test_id: TEST-I24-HDC-DEVICE-SNAPSHOT-001
+  method: Parameterized complete-output snapshot grammar and adversarial contract.
+  expected_source: openspec/changes/chg-2026-024-hdc-device-snapshot-registration/verification.md#I24-HDC-DEVICE-SNAPSHOT-001
+  minimum_evidence: platform
+  expected_result: >-
+    Accepted controlled zero, one and many-row families define a bounded closed grammar.
+    A complete valid output yields a unique session-pseudonym set independent of row order;
+    malformed, duplicate, mixed, partial or unsupported output makes the entire snapshot
+    unknown and never emits a partial set.
+- acceptance_id: I24-HDC-DEVICE-EMPTY-001
+  test_id: TEST-I24-HDC-DEVICE-EMPTY-001
+  method: Successful-empty versus unknown, failure, timeout, cancellation and identity-drift matrix.
+  expected_source: openspec/changes/chg-2026-024-hdc-device-snapshot-registration/verification.md#I24-HDC-DEVICE-EMPTY-001
+  minimum_evidence: platform
+  expected_result: >-
+    Only the registered successful zero-row family under stable server identity and endpoint
+    yields observedEmpty. Stderr, nonzero exit, truncation, timeout, cancellation, malformed
+    output or bracket drift remains unavailable or unknown and cannot manufacture a
+    disappearance event.
+- acceptance_id: I24-HDC-DEVICE-PROVENANCE-001
+  test_id: TEST-I24-HDC-DEVICE-PROVENANCE-001
+  method: Controlled-human capture lineage, immutable hash, effect and privacy review.
+  expected_source: openspec/changes/chg-2026-024-hdc-device-snapshot-registration/verification.md#I24-HDC-DEVICE-PROVENANCE-001
+  minimum_evidence: platform
+  expected_result: >-
+    Exact macOS, tool, executable, argv, endpoint and stable pre/post server identity context
+    covers zero, one, many, stable, appeared and disappeared observations with all lifecycle,
+    adoption, subserver and device-mutation counters zero. Raw identifiers remain outside the
+    repository and fake inputs remain control-only.
+- acceptance_id: I24-HDC-DEVICE-REGISTRY-001
+  test_id: TEST-I24-HDC-DEVICE-REGISTRY-001
+  method: New registry, profile, lock, resource and macOS mapping hash closure with old-registry identity.
+  expected_source: openspec/changes/chg-2026-024-hdc-device-snapshot-registration/verification.md#I24-HDC-DEVICE-REGISTRY-001
+  minimum_evidence: contract
+  expected_result: >-
+    Candidate versions, IDs, paths, receipts and hashes agree across the new registry,
+    OpenHarmony profile, Integration lock, resource manifest and macOS mapping. Existing
+    OPENHARMONY-HDC-READONLY-PROBES@1.0.0 bytes and resources remain unchanged, and old
+    consumers acquire no device-enumeration authority.
+- acceptance_id: I24-HDC-DEVICE-NODISPATCH-001
+  test_id: TEST-I24-HDC-DEVICE-NODISPATCH-001
+  method: Static command-surface audit and instrumented forbidden-dispatch counters.
+  expected_source: openspec/changes/chg-2026-024-hdc-device-snapshot-registration/verification.md#I24-HDC-DEVICE-NODISPATCH-001
+  minimum_evidence: contract
+  expected_result: >-
+    Registration and Agent or CI execute no installed HDC, real device, non-loopback network,
+    server lifecycle or adoption, subserver, device mutation or destructive operation. Every
+    forbidden counter is zero, and the registry grants only an exact existing-server-only
+    observation input for a later independently approved consumer.
