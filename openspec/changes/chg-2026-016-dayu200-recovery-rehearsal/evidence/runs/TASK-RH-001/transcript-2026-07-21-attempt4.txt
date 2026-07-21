@@ -1,0 +1,56 @@
+=== DAYU200 恢复演练 r4  2026-07-21 14:17:46 ===
+RUN_DIR=<HOME>/dayu200-rehearsal/run-r4-20260721-141746
+[14:17:46] STEP: 工具版本复核(须 ver 1.32)
+CMD: <TOOL> -v
+rkdeveloptool ver 1.32
+EXIT: 0
+OK: 工具/物料身份门通过
+[14:17:50] STEP: OB[pre-entry] rkdeveloptool ld
+CMD: sudo <TOOL> ld
+DevNo=1	Vid=0x2207,Pid=0x5000,LocationID=2	Maskrom
+EXIT: 0
+§0 进态序列执行确认: yes
+[14:18:13] STEP: mode-gate: ld(必须 0x350a)
+CMD: sudo <TOOL> ld
+DevNo=1	Vid=0x2207,Pid=0x350a,LocationID=2	Loader
+EXIT: 0
+MODE-GATE PASS: 0x350a(RockUSB)
+[14:18:13] STEP: OB[entered] rkdeveloptool ld
+CMD: sudo <TOOL> ld
+DevNo=1	Vid=0x2207,Pid=0x350a,LocationID=2	Loader
+EXIT: 0
+W1(条件化):ld=0x350a+Loader,判定点已满足,db 跳过并记录
+JUDGE[W1]=SKIPPED-SATISFIED(conditional; ld=Loader)
+[14:18:13] STEP: ppt(写前,设备现行表)
+CMD: sudo <TOOL> ppt
+**********Partition Info(GPT)**********
+NO  LBA       Name
+00  00002000  uboot
+01  00004000  misc
+02  00006000  bootctrl
+03  00007000  resource
+04  0000A000  boot_linux
+05  0003A000  ramdisk
+06  0003C000  system
+07  0043C000  vendor
+08  0063C000  sys-prod
+09  00655000  chip-prod
+10  0066E000  updater
+11  0067E000  eng_system
+12  00686000  eng_chipset
+13  0069E000  chip_ckm
+14  01308000  userdata
+EXIT: 0
+W2(r4 条件化):写前 ppt 与 FA-001 §2 逐行 15/15 精确 match 比对…
+PPT-MISMATCH rows=0 expected=15   ← crib 脚本 bug(heredoc 占用 stdin,ppt 数据未传入 python;非设备事实。人工核对该表实为 15/15 精确 match)
+W2:写前表未 15/15 match(见上)——r4 规定必须执行 gpt   ← 因上述 bug 误入此分支
+[14:18:27] STEP: W2 gpt 分区表写入(attempt 1)
+CMD: sudo <TOOL> gpt <MATERIALS>/parameter.txt
+The device does not support this operation!
+EXIT: 1
+已复核线材/hash,重试一次: yes
+[14:18:30] STEP: W2 gpt 分区表写入(attempt 2)
+CMD: sudo <TOOL> gpt <MATERIALS>/parameter.txt
+The device does not support this operation!
+EXIT: 1
+!! §5 中止:[W2 gpt 分区表写入] 连续 2 次失败(§5)
