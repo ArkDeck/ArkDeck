@@ -1,0 +1,33 @@
+---
+schema_version: 1.0.0
+change_id: CHG-2026-019-hdc-app-root-participant-inventory
+change_revision: 1
+platform: macos
+evidence_classes:
+- contract
+- platform
+cases:
+- acceptance_id: PI-HDC-INVENTORY-001
+  test_id: TEST-PI-HDC-INVENTORY-001
+  method: Instrumented contract suite over the App-root participant registry composition.
+  expected_source: openspec/changes/chg-2026-019-hdc-app-root-participant-inventory/verification.md#PI-HDC-INVENTORY-001
+  minimum_evidence: contract
+  expected_result: >-
+    Completeness holds by construction — the App-reachable API surface has no
+    registration path outside the root registry (static assertion); an
+    empty-but-complete inventory yields participant reliability true while a
+    missing endpoint-identity receipt still blocks the preview; an injected
+    critical Flash Job appears in the preview with the named critical gate
+    blocking and an instrumented lifecycle child dispatch count of zero;
+    duplicate or cross-endpoint participants remain fail-closed.
+- acceptance_id: PI-HDC-INVENTORY-002
+  test_id: TEST-PI-HDC-INVENTORY-002
+  method: Signed Sandbox XCUITest over the production launch path.
+  expected_source: openspec/changes/chg-2026-019-hdc-app-root-participant-inventory/verification.md#PI-HDC-INVENTORY-002
+  minimum_evidence: platform
+  expected_result: >-
+    A production (non-fixture) launch no longer shows the
+    inventory-unavailable wording; the lifecycle recovery unavailable reason
+    converges to the server-identity/endpoint precondition; all existing
+    fixture-scenario assertions pass unchanged; signed artifact hashes and the
+    entitlement dump are recorded.
