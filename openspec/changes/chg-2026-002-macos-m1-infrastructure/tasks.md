@@ -466,9 +466,27 @@
 
 ## TASK-M1-006 — HDC supervisor、endpoint 隔离、授权工作流与 fake-hdc 对抗
 
-- Status:blocked(post-implementation closeout candidate;仅在维护者 review/merge 本独立
-  docs-only 状态 PR 后生效。实现 PR #191 已合入，但下列 owning AC/production feed 仍无
-  可复查 evidence；本 PR 不含实现、不执行任何 hdc/device/XCUITest，也不翻转 `done`)
+- Status:done(closeout 三缺口全部经批准载体解除后的 `blocked→done`;仅在维护者
+  review/merge 本独立 docs-only 状态 PR 后生效,且须在 TASK-PI-001 done 状态 PR #206 之后
+  合入。本 PR 不含实现、不执行任何 hdc/device/XCUITest)
+- Closeout resolution(2026-07-21;addendum 23 三缺口逐项解除):
+  - 缺口 ①(production App-root participant/critical-state inventory feed):resolved。
+    CHG-2026-019/TASK-PI-001 done(实现 PR #205 squash `394e4fa`、done 状态 PR #206):
+    `HDCApplicationParticipantRegistry` 构造性完备 feed 取代 facade 硬编码 `.unavailable`,
+    contract 55/0(含 registry critical-gate 阻断 + 子进程实测 0)、signed XCUITest 9/9,
+    evidence 在 `chg-2026-019/.../evidence/runs/TASK-PI-001/run.md`。
+  - 缺口 ②③(`TEST-AC-HDC-006-01` file-access denial 路径 / `TEST-AC-HDC-009-01`
+    capability observation):resolved。CHG-2026-018 经 archive PR #203(squash `b85d79e`)
+    ratify `CORE-2.1.0`/`CORE-CONFORMANCE-2.1.0`:两 AC 为 integration-conditional,pinned
+    registry 将对应 family 标 `unsupported` 期间 `notApplicable(integrationConditional)`,
+    合规结果 = registered fail-closed unsupported 诊断 + 零未授权 dispatch(本任务合入版
+    已仪表化证明);CHG-2026-002 Gate 算术已经 #204(squash `02d1223`)同步按 2.1.0 解读。
+  - 本任务自有 evidence 不重跑:`run.md` addenda 15–23(merged `c61e10e` 上 284/1skip/0、
+    HDC 52/0、signed Sandbox XCUITest 9/9、merged-main closeout audit 零树差)保持在案;
+    本 PR 起草时于 current main 复核全量 287/1skip/0(含 PI-001 面)与 check-sdd 0/0/111。
+  - 边界:done 只关闭本任务。change `verified` 另行独立 PR;`MAC-M0A-HDC-001` blocked 行
+    不受影响;不构成 platform conformance、真实硬件、Developer ID/公证、support 或
+    release claim,不改变 ADR-0001。
 - Completion evidence candidate remains withdrawn(2026-07-21 post-merge audit):
   `evidence/runs/TASK-M1-006/run.md` addendum 23。电脑解锁后，当前 revision 的 signed
   Sandbox XCUITest 已实际执行 9 个方法并全部通过（0 failure）；LocalAuthentication /
