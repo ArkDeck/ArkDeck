@@ -1,0 +1,38 @@
+=== DAYU200 恢复演练 r4  2026-07-21 14:36:50 === (attempt #5 — SUCCESS)
+RUN_DIR=<HOME>/dayu200-rehearsal/run-r4-20260721-143650
+[14:36:50] 工具版本复核: rkdeveloptool ver 1.32  EXIT 0 / 物料 17/17 身份门通过
+[14:36:53] OB[pre-entry] sudo <TOOL> ld
+  DevNo=1  Vid=0x2207,Pid=0x5000,LocationID=2  Maskrom  EXIT 0
+§0 进态序列执行确认: yes
+[14:37:17] mode-gate: sudo <TOOL> ld
+  DevNo=1  Vid=0x2207,Pid=0x350a,LocationID=2  Loader  EXIT 0  → MODE-GATE PASS
+[14:37:17] OB[entered] sudo <TOOL> ld
+  DevNo=1  Vid=0x2207,Pid=0x350a,LocationID=2  Loader  EXIT 0
+W1(条件化): ld=0x350a+Loader → JUDGE[W1]=SKIPPED-SATISFIED
+[14:37:17] ppt(写前): **********Partition Info(GPT)********** (15 行,略;逐字见下)
+W2(r4 条件化): PPT-MATCH 15/15 → JUDGE[W2]=SKIPPED-SATISFIED(ppt 15/15 match)
+[14:37:17] W3 wlx uboot      <- uboot.img       Write LBA from file (100%)  EXIT 0  PASS
+[14:37:29] W3 wlx resource   <- resource.img    Write LBA from file (100%)  EXIT 0  PASS
+[14:37:43] W3 wlx boot_linux <- boot_linux.img  Write LBA from file (100%)  EXIT 0  PASS
+[14:37:51] W3 wlx ramdisk    <- ramdisk.img     Write LBA from file (100%)  EXIT 0  PASS
+[14:37:53] W3 wlx system     <- system.img      Write LBA from file (100%)  EXIT 0  PASS
+[14:40:21] W3 wlx vendor     <- vendor.img      Write LBA from file (100%)  EXIT 0  PASS
+[14:40:42] W3 wlx updater    <- updater.img     Write LBA from file (100%)  EXIT 0  PASS
+[14:40:46] W3 wlx chip_ckm   <- chip_ckm.img    Write LBA from file (100%)  EXIT 0  PASS
+W3 第 9 项 userdata: 操作者逐字输入 ERASE-USERDATA(显式确认清数据)
+[14:41:08] W3 wlx userdata   <- userdata.img    Write LBA from file (100%)  EXIT 0  PASS
+明确不写: chip_prod/sys_prod(orphan)、6 个无成员分区、两处扇区空洞。
+[14:43:00] W4 rd 复位: Reset Device OK.  EXIT 0
+>> 设备重启进系统;操作者确认「设备已启动」yes
+postcheck(首跑): crib 参数 bug(capture.py 缺 --hdc / --out 应为 --out-dir)未跑成——脚本层缺陷,已修
+postcheck(补跑,修正参数): python3 scripts/m0b_capture/capture.py --hdc <hdc> --out-dir <OUT>/postcheck --commands hdc-list-targets-verbose
+  capture complete: 1 commands, 0 timed out, self-check PASSED
+  stdout 58 bytes / 5 列 tab / `USB  Connected  localhost` / exit 0 / stderr 0 bytes
+  (connect key/serial 留仓库外 out-dir,不入仓;redacted-manifest self-check PASSED,keyMaterialFound=false)
+
+写前 ppt 表(15/15 逐行 match FA-001 §2,与 attempt#2/#3/#4 逐字节一致):
+NO LBA name: 00 00002000 uboot / 01 00004000 misc / 02 00006000 bootctrl /
+03 00007000 resource / 04 0000A000 boot_linux / 05 0003A000 ramdisk /
+06 0003C000 system / 07 0043C000 vendor / 08 0063C000 sys-prod / 09 00655000 chip-prod /
+10 0066E000 updater / 11 0067E000 eng_system / 12 00686000 eng_chipset /
+13 0069E000 chip_ckm / 14 01308000 userdata
