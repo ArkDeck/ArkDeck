@@ -47,8 +47,31 @@
 
 ## TASK-M0B-002 — ArkDeck HDC supervisor 真机只读观察
 
-- Status:ready(readiness;仅在维护者 review/merge 本独立状态 PR 后生效。两依赖均
-  已 done 并经复核,单文件、不含实现、不产生 evidence)
+- Status:blocked(fail-closed 回退,2026-07-21 晚;仅在维护者 review/merge 本独立
+  状态 PR 后生效。#243 readiness 的"M1-006 实际交付形态与四观察点逐项对应"复核经
+  执行前深查(host-only 源码级取证路径核对)被证伪——四观察点中两点无只读取证
+  路径、一点语义落差、一点仅部分可观察,而任何补暴露面的修复均越本任务 forbidden
+  paths(`Packages/**`、`ArkDeckApp/**`),按本任务自身条款"若观察需要代码变更,
+  停止并走独立 change"回退。缺口清单:
+  ① **[硬]仪表化计数无载体**:产品无任何自动 lifecycle/subserver 调用计数器,
+  App/presentation/日志/导出均不暴露;现有保证是结构性的(supervisor 无自动
+  executor),而本任务 Verification 明文"计数为仪表化实测而非分支常量"——无法经
+  只读观察取证;
+  ② **[硬]设备出现/消失 fan-out 无生产 feed**:participant registry 生产恒
+  `.complete([])`、无设备 recipient 注册,App 无设备列表/事件流,`HDCServerEvent`
+  仅含 server 事件;
+  ③ **[语义]ownership 落差**:三条生产 observe 路径恒判 `unknown`(带 known
+  generation、从不 managed),`.external` 仅存在于 UI 夹具;acceptance 字面
+  "classifies … as external ownership"在生产面不可达;
+  ④ **[部分]endpoint 隔离不可视**:App 仅显示解析后 endpoint 字符串,不暴露
+  endpoint source 与子进程 env,"显式 endpoint 只进子进程环境"的隔离性无 App 面
+  证据;
+  另:M1-009 诊断导出未在 App 接线且日志目录无 HDC 事件,不能作取证载体。
+  解除前置(须独立 PR 逐项落实):(a) 独立 supervisor-observability change 立项
+  并 done——补仪表化计数暴露、设备 fan-out feed/展示、endpoint source 暴露,并
+  处置 ownership 语义(产品补 external 判定或经 CHG-006 revision 把 AC 双分支化,
+  AUTH-001 r2 先例,由维护者裁决);(b) 其后新 readiness PR 重钉交付形态与 pins。
+  原 #243 readiness 记录保留于下,作历史;其 pins(hdc 3.2.0d)不因本回退失效。)
 - Readiness review(2026-07-21;host-only,零设备命令):
   - 前置 ①:`TASK-M1-006` done(状态 PR #207 squash `466f42a`,实现 #191 squash
     `c61e10e`)。实际交付形态与本任务观察目标逐项对应:生产 supervisor
