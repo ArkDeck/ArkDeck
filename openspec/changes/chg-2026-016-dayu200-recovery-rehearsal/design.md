@@ -11,6 +11,17 @@
 > ② 全部 rkdeveloptool 设备命令加 `sudo`(macOS USB 接口 claim 需特权,Radxa/社区
 > 一致,r1 脚本漏);③ 写前硬门:`ld` 必须显 `0x350a`(RockUSB),显 `0x5000`
 > (updater-hdc)即 STOP 重进。恢复路线仍为 rkdeveloptool RockUSB,未转 hdc/flashd。
+>
+> **r3 修正(2026-07-21,基于 RH-001 blocked-attempt #2/#213 真机事实)**:r2 进态
+> 序列已实证有效——首次达成 `0x350a`,但设备**直接落在 Loader 态**(板上 miniloader
+> 已运行,`ld` 标签 `Loader`,三次读取稳定),而非 r2 假设的裸 Maskrom;该态下 W1
+> `db` 按协议被拒(`The device does not support this operation!`,两次,零写入)。
+> r3 修正仅两点:① **W1 条件化**——写序开始前 `ld` 显 `0x350a`+`Loader` 时,W1 的
+> 判定点「设备转入可写态(ld 显示 Loader)」视为已满足,`db` 跳过并如实记录;显
+> `0x350a`+`Maskrom` 时 W1 `db` 仍必须执行,判定点不变。② **W2 主路径确认**——
+> attempt #2 抢救读回 `ppt` 表头 `Partition Info(GPT)` 且 15/15 精确 match FA-001 §2,
+> GPT 分支实锤,W2 以 `gpt parameter.txt` 为确认主路径(`prm` 替代分支保留不删)。
+> 其余命令面、写序、判定点、§5 中止准则零变更。
 
 ## 0. 进态序列与 mode-gate(r2 新增;权威原文,硬门)
 
@@ -56,7 +67,7 @@
 
 | 序 | 命令 | 判定点 |
 | ---: | --- | --- |
-| W1 | `rkdeveloptool db MiniLoaderAll.bin` | 报成功且设备转入可写态(`ld` 显示 Loader) |
+| W1 | `rkdeveloptool db MiniLoaderAll.bin` | 报成功且设备转入可写态(`ld` 显示 Loader)。**r3 条件化:写序开始前 `ld` 已显 `0x350a`+`Loader` 时判定点视为已满足,`db` 跳过并如实记录;`0x350a`+`Maskrom` 时必须执行** |
 | W2 | `rkdeveloptool gpt parameter.txt` | 报成功(设备侧分区表就位;为 W3 `wlx` 建立解析前提)。若工具/设备形态要求 `prm`,以 `rkdeveloptool prm parameter.txt` 替代并如实记录——两者仅取其一 |
 | W3 | 逐分区 `rkdeveloptool wlx <PartitionName> <image>`(优先路径) | 每分区报成功;分区名↔镜像对取 §3 写序表 |
 | W3' | 回退路径(仅当 `wlx` 对某分区报 `No found partition` 或等价失败):`rkdeveloptool wl <BeginSec> <image>`,`<BeginSec>` **逐值取自 FA-001 §2 的 PD-002 扇区列,零现场手算**;使用回退即如实记录原因 | 报成功 |
