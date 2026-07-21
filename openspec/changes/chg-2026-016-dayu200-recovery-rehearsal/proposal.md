@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-016-dayu200-recovery-rehearsal
 revision: 4
-status: approved # r1 经 #170/#171 批准;r2 经 #177;r3 经 #214;r4(W2 条件化,基于 attempt #3/#215 真机事实:loader 命令子集拒 gpt 而现存表 15/15 match)由本 r4 revision PR 的维护者 review/merge 构成
+status: verified # 2026-07-21 本 verification-closure PR(先例 #175/#176/#201/#208);r1-r4 批准链 #170/#171/#177/#214/#216;须在 RH-001 done #221 与 gap-closure #223 之后合入;archive 另行
 class: platform
 core_change_level: none
 owner: lvye
@@ -106,3 +106,31 @@ RH-001 首窗口 blocked-attempt(#173)真机推翻 r1 的进态假设:按键得 
   `userdata` 写入会清用户数据,仅在演练现场显式确认后执行。
 - 本 change 不构成兼容性/支持/release 声明;不解除除 RECOVERY 外的任何 gap;
   gap 关闭登记与 DEC-002 input 登记均属后续独立 governance PR。
+
+## Verification closure(2026-07-21)
+
+依 verification.md Gate 逐项复核(V2:整体结论由维护者 review/merge 本 PR 确认;须在
+RH-001 done PR #221 与 gap-closure PR #223 之后合入):
+
+- **任务面**:TASK-RH-001 done(独立状态 PR #221,依据 success evidence PR #220
+  `3feacc3`)。演练经 #173/#213/#215/#217 四次 blocked-attempt + #218 研究,于 #220
+  attempt #5 成功。
+- **四 realHardware AC**(acceptance-cases.yaml 二值):
+  - `RH-DAYU200-RECOVERY-001` **PASS(首次)**——进态→W1/W2 条件跳过→九个 PD-002
+    mapped 分区经 Loader 态 `wlx` 全成功→`rd` OK→重启进系统→postcheck 58B
+    `USB Connected localhost`;逐命令 argv/输出/判定在案。
+  - `RH-DAYU200-MODE-001` observed——进态序列五窗口稳定(`0x5000 Maskrom`→`0x350a
+    Loader`)。
+  - `RH-DAYU200-TABLE-001`——写前 `ppt` 五窗口 15/15 精确 match FA-001 §2(逐字节
+    一致);`wlx` 写分区数据不改分区表。
+  - `RH-DAYU200-SAFETY-001` **PASS**——全部命令属 design §2 封闭面、pinned hash 复核、
+    零现场手算、`userdata` 经显式 `ERASE-USERDATA` 确认、orphan/无成员分区/空洞零写入、
+    序列号零入仓。
+- **写设备唯一授权面**:全程未超出 design.md §2 命令白名单 + §3 写序;§5 中止准则在
+  前四窗口正确执行。crib 脚本层缺陷(W2 heredoc 比对、postcheck 参数)如实入档且不
+  触及命令面。
+- **gap 关闭**:`GAP-DAYU200-RECOVERY-PATH` 经 PR #223 关闭并登记 DEC-002 input(真机
+  纠正 #173 的 hdc/flashd 推测——rkdeveloptool RockUSB Loader 态 `wlx` 可行)。
+- **边界**:本 `verified` 由维护者 review/merge 本 PR 构成。不构成 ArkDeck 产品 flash
+  能力、兼容性、hardware support 或 release 声明;hardware matrix 只可新增 observed 行;
+  正向全量烧写的 Provider 待 real-flash integration change 立项。archive 另行独立 PR。
