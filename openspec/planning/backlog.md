@@ -14,6 +14,8 @@
 - 完整源码级 ArkTS/C++ debugger；
 - 第三方可执行 Profile/plugin 信任和签名生态；
 - 组织级远程 Session/Artifact 存储；
+- 组织级脱敏策略层(MDM/managed-config 强制 redact、可插拔脱敏类别;DEC-006 决定
+  MVP 不设,启用须独立 change)；
 - Journaled execution authority(JAUTH):pre-dispatch 人工确认以 typed journal
   event/append-chain 承载并由 dispatch gate 强制。CHG-2026-008 r3 初稿(PR #128
   `a613b76`)曾将其设为采集前置,经维护者 2026-07-20 裁剪移出;若产品化需要,须另起
