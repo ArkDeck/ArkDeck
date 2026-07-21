@@ -31,8 +31,29 @@
 
 ## TASK-TR-002 — host contract 面(typed trace workflow,零设备)
 
-- Status:blocked(双前置:① approve;② 独立 readiness PR——须复核两 catalog
-  pins、竞争面与基线)
+- Status:ready(readiness;仅在维护者 review/merge 本独立状态 PR 后生效。单文件、
+  不含实现、不产生 evidence)
+- Readiness review(2026-07-21;host-only,零设备命令):
+  - Approve gate:satisfied(#253 squash `684c42c`);三任务 scope/design 约束/
+    认领面随批准生效。
+  - 基座 pins(于 main `1e4a7c4` 实测):catalog `trace-presets`@1.0.0
+    (`12c0f050…`)与 `attachment-debug-profile`@1.0.0(`10ee4c38…`)已登记
+    INTEGRATION-PROFILES.lock 0.4.0;所需 WorkflowStep kind 全部在 CORE-2.1.0
+    契约在案(design §1 映射)。实现时 catalog hash 漂移即停。
+  - 基线:Swift 全量 302/1 skip/0 failures、check-sdd 0/0/111(均于 `1e4a7c4`
+    实测)。
+  - 竞争面:复核时 open PR 为 0;**文件级分工**——本任务只在
+    `Sources/ArkDeckWorkflows` 新增 `Trace*` 前缀新文件 + 对应 Tests 新文件,
+    不触碰 `HDC*`/`Rockchip*`/`Simulated*` 既有文件;与 TASK-OBS-001
+    (CHG-2026-022,supervisor 既有文件面)零文件交集,可并行执行;与 chg-008
+    线零交集。
+  - 实现序:typed trace workflow(catalog 消费/capability 受限配置 → 参数
+    snapshot/set-readback/restore(catalog 绑定收紧,design §3)→ 隔离接收/
+    partial → progress/completeness → reboot/rebind 面)→ 7 条 contract AC 测试
+    逐条 PASS → evidence run。fake/fixture 一律显式标注,不冒充已登记 adapter
+    形态(TR-001 未 done,不实现任何真实输出解析)。
+  - Review boundary:本 readiness 只翻转状态并记录 pins/分工/序;实现仍须满足
+    全部认领 AC/verification gate;`ready→done` 另用独立状态 PR。
 - Objective:实现 typed trace workflow 的 host contract 面:capability 受限配置
   (trace-presets catalog)、参数 snapshot/set-readback/restore(绑定
   attachment-debug-profile,design §3 收紧)、隔离接收/partial、honest progress、
