@@ -244,22 +244,48 @@ public struct HDCJobToolchainSnapshot: Sendable, Equatable {
   public let source: HDCCandidateSource
   public let sha256: String
   public let endpoint: String
+  /// In-memory observation metadata. The durable Core toolchain intent keeps
+  /// the resolved endpoint while diagnostics also retain how it was selected
+  /// and which keys ArkDeck overlays on child processes only.
+  public let endpointSource: HDCServerEndpointSource?
+  public let childEnvironmentKeys: [String]
   public let platformTrust: HDCProbeValue<String>
   public let clientVersion: HDCProbeValue<String>
   public let serverVersion: HDCProbeValue<String>
   public let daemonVersion: HDCProbeValue<String>
   public let serverGeneration: HDCProbeValue<Int>
 
-  public init(candidate: HDCCandidate, endpoint: String, details: HDCProbeDetails) {
+  public init(
+    candidate: HDCCandidate,
+    endpoint: String,
+    endpointSource: HDCServerEndpointSource? = nil,
+    childEnvironmentKeys: [String] = [],
+    details: HDCProbeDetails
+  ) {
     self.path = candidate.path
     self.source = candidate.source
     self.sha256 = candidate.sha256
     self.endpoint = endpoint
+    self.endpointSource = endpointSource
+    self.childEnvironmentKeys = Array(Set(childEnvironmentKeys)).sorted()
     self.platformTrust = details.platformTrust
     self.clientVersion = details.clientVersion
     self.serverVersion = details.serverVersion
     self.daemonVersion = details.daemonVersion
     self.serverGeneration = details.serverGeneration
+  }
+
+  public init(
+    candidate: HDCCandidate,
+    endpointSelection: HDCServerEndpointSelection,
+    details: HDCProbeDetails
+  ) {
+    self.init(
+      candidate: candidate,
+      endpoint: endpointSelection.endpoint.rawValue,
+      endpointSource: endpointSelection.source,
+      childEnvironmentKeys: Array(endpointSelection.childEnvironment.keys),
+      details: details)
   }
 }
 
@@ -384,6 +410,74 @@ public enum HDCServerHealth: String, Sendable, Equatable {
   case unknown
 }
 
+public struct HDCAutomaticDispatchSnapshot: Sendable, Equatable {
+  public let automaticLifecycleDispatchCount: Int
+  public let automaticSubserverDispatchCount: Int
+
+  public init(
+    automaticLifecycleDispatchCount: Int,
+    automaticSubserverDispatchCount: Int
+  ) {
+    precondition(
+      automaticLifecycleDispatchCount >= 0 && automaticSubserverDispatchCount >= 0,
+      "HDC automatic dispatch counters cannot be negative")
+    self.automaticLifecycleDispatchCount = automaticLifecycleDispatchCount
+    self.automaticSubserverDispatchCount = automaticSubserverDispatchCount
+  }
+}
+
+package enum HDCAutomaticDispatchKind: Sendable, Equatable {
+  case lifecycle
+  case subserver
+}
+
+package actor HDCAutomaticDispatchInstrumentation {
+  private var automaticLifecycleDispatchCount = 0
+  private var automaticSubserverDispatchCount = 0
+
+  package init() {}
+
+  func record(_ kind: HDCAutomaticDispatchKind) {
+    switch kind {
+    case .lifecycle: automaticLifecycleDispatchCount += 1
+    case .subserver: automaticSubserverDispatchCount += 1
+    }
+  }
+
+  func snapshot() -> HDCAutomaticDispatchSnapshot {
+    HDCAutomaticDispatchSnapshot(
+      automaticLifecycleDispatchCount: automaticLifecycleDispatchCount,
+      automaticSubserverDispatchCount: automaticSubserverDispatchCount)
+  }
+}
+
+/// Evidence behind the external/unknown label. External is reachable only
+/// when all three approved observations are present; the basis is retained so
+/// presentation never needs to infer why a label was selected.
+public struct HDCServerOwnershipBasis: Sendable, Equatable {
+  public let preExistingServerReceipt: Bool
+  public let automaticLifecycleDispatchCount: Int?
+  public let generationMintedFromObservation: Bool
+
+  public init(
+    preExistingServerReceipt: Bool,
+    automaticLifecycleDispatchCount: Int?,
+    generationMintedFromObservation: Bool
+  ) {
+    precondition(
+      automaticLifecycleDispatchCount.map { $0 >= 0 } ?? true,
+      "HDC automatic lifecycle dispatch evidence cannot be negative")
+    self.preExistingServerReceipt = preExistingServerReceipt
+    self.automaticLifecycleDispatchCount = automaticLifecycleDispatchCount
+    self.generationMintedFromObservation = generationMintedFromObservation
+  }
+
+  public var establishesExternalOwnership: Bool {
+    preExistingServerReceipt && automaticLifecycleDispatchCount == 0
+      && generationMintedFromObservation
+  }
+}
+
 public struct HDCServerState: Sendable, Equatable {
   public let endpoint: HDCServerEndpoint
   public let health: HDCServerHealth
@@ -394,6 +488,7 @@ public struct HDCServerState: Sendable, Equatable {
   public let generation: Int
   public let generationEvidence: HDCProbeValue<Int>
   public let ownership: HDCServerOwnership
+  public let ownershipBasis: HDCServerOwnershipBasis?
 
   init(
     endpoint: HDCServerEndpoint,
@@ -401,7 +496,8 @@ public struct HDCServerState: Sendable, Equatable {
     version: HDCProbeValue<String>,
     generation: Int,
     generationEvidence: HDCProbeValue<Int>? = nil,
-    ownership: HDCServerOwnership
+    ownership: HDCServerOwnership,
+    ownershipBasis: HDCServerOwnershipBasis? = nil
   ) {
     precondition(generation >= 0, "A server generation must not be negative")
     self.endpoint = endpoint
@@ -410,6 +506,7 @@ public struct HDCServerState: Sendable, Equatable {
     self.generation = generation
     self.generationEvidence = generationEvidence ?? .known(generation)
     self.ownership = ownership
+    self.ownershipBasis = ownershipBasis
   }
 }
 
@@ -1089,10 +1186,61 @@ public struct HDCServerLifecycleBroadcast: Sendable, Equatable {
   }
 }
 
+public enum HDCDevicePresenceChange: String, Sendable, Equatable {
+  case appeared
+  case disappeared
+}
+
+/// A snapshot immediately irreversibly redacts device identifiers. The raw
+/// connect key is never retained in supervisor state, events, or presentation.
+public struct HDCReadOnlyDeviceSnapshot: Sendable, Equatable {
+  public let endpoint: HDCServerEndpoint
+  public let redactedDeviceIdentifiers: Set<String>
+  public let observedAt: Date
+
+  public init(
+    endpoint: HDCServerEndpoint,
+    sensitiveDeviceIdentifiers: [String],
+    observedAt: Date = Date()
+  ) {
+    self.endpoint = endpoint
+    redactedDeviceIdentifiers = Set(
+      sensitiveDeviceIdentifiers.filter { !$0.isEmpty }.map(Self.redact))
+    self.observedAt = observedAt
+  }
+
+  private static func redact(_ identifier: String) -> String {
+    let digest = SHA256.hash(data: Data(identifier.utf8))
+      .map { String(format: "%02x", $0) }
+      .joined()
+    return "redacted-device-\(digest.prefix(24))"
+  }
+}
+
+public struct HDCDeviceObservationEvent: Sendable, Equatable {
+  public let endpoint: HDCServerEndpoint
+  public let change: HDCDevicePresenceChange
+  public let redactedDeviceIdentifier: String
+  public let observedAt: Date
+
+  public init(
+    endpoint: HDCServerEndpoint,
+    change: HDCDevicePresenceChange,
+    redactedDeviceIdentifier: String,
+    observedAt: Date
+  ) {
+    self.endpoint = endpoint
+    self.change = change
+    self.redactedDeviceIdentifier = redactedDeviceIdentifier
+    self.observedAt = observedAt
+  }
+}
+
 public enum HDCServerEvent: Sendable, Equatable {
   case generationChanged(HDCServerGenerationChange)
   case healthChanged(HDCServerHealthChange)
   case lifecycleOutcome(HDCServerLifecycleBroadcast)
+  case devicePresenceChanged(HDCDeviceObservationEvent)
   case diagnostic(endpoint: HDCServerEndpoint, reason: String)
 }
 
@@ -1135,6 +1283,9 @@ struct HDCManagedStartAuthorization: Sendable, Equatable, Hashable {
 /// server. Manual mutation is gated by a typed step, impact snapshot,
 /// confirmation, revalidation, critical-job gate, and audit sink.
 public actor HDCServerSupervisor: HDCServerLifecycleDispatchLeaseValidating {
+  static let deviceObservationBufferLimit = 32
+
+  nonisolated let automaticDispatchInstrumentation: HDCAutomaticDispatchInstrumentation
   private let auditStore: any HDCServerLifecycleAuditStore
   private let managedProcessInspector: any HDCManagedServerProcessInspecting
   private var endpoints: [HDCServerEndpoint: HDCServerState] = [:]
@@ -1147,6 +1298,8 @@ public actor HDCServerSupervisor: HDCServerLifecycleDispatchLeaseValidating {
   private var confirmations: [UUID: HDCServerLifecycleConfirmation] = [:]
   private var managedStartAuthorizations: [UUID: HDCManagedStartAuthorization] = [:]
   private var activeDispatchLeases: [UUID: HDCServerLifecycleDispatchLease] = [:]
+  private var deviceSnapshots: [HDCServerEndpoint: Set<String>] = [:]
+  private var deviceObservationEvents: [HDCServerEndpoint: [HDCDeviceObservationEvent]] = [:]
   private let permitsImplicitTestFixtureReliability: Bool
 
   /// Legacy `@testable` module contracts predate the production participant
@@ -1154,6 +1307,7 @@ public actor HDCServerSupervisor: HDCServerLifecycleDispatchLeaseValidating {
   /// other normal package consumers from constructing a lifecycle-eligible
   /// Supervisor without an explicit production participant disposition.
   init(auditStore: any HDCServerLifecycleAuditStore) {
+    automaticDispatchInstrumentation = HDCAutomaticDispatchInstrumentation()
     self.auditStore = auditStore
     managedProcessInspector = SystemHDCManagedServerProcessInspector()
     permitsImplicitTestFixtureReliability = true
@@ -1164,6 +1318,7 @@ public actor HDCServerSupervisor: HDCServerLifecycleDispatchLeaseValidating {
     endpoint: HDCServerEndpoint,
     participantImpactReliable: Bool
   ) {
+    automaticDispatchInstrumentation = HDCAutomaticDispatchInstrumentation()
     self.auditStore = auditStore
     managedProcessInspector = SystemHDCManagedServerProcessInspector()
     permitsImplicitTestFixtureReliability = false
@@ -1221,6 +1376,42 @@ public actor HDCServerSupervisor: HDCServerLifecycleDispatchLeaseValidating {
 
   public func state(for endpoint: HDCServerEndpoint) -> HDCServerState? {
     endpoints[endpoint]
+  }
+
+  public func automaticDispatchSnapshot() async -> HDCAutomaticDispatchSnapshot {
+    await automaticDispatchInstrumentation.snapshot()
+  }
+
+  public func recentDeviceObservationEvents(
+    for endpoint: HDCServerEndpoint
+  ) -> [HDCDeviceObservationEvent] {
+    deviceObservationEvents[endpoint] ?? []
+  }
+
+  /// Consumes a snapshot already obtained through an approved read-only feed.
+  /// This method owns no process runner and cannot issue a device command.
+  public func observeReadOnlyDeviceSnapshot(_ snapshot: HDCReadOnlyDeviceSnapshot) {
+    let previous = deviceSnapshots[snapshot.endpoint] ?? []
+    let appeared = snapshot.redactedDeviceIdentifiers.subtracting(previous).sorted()
+    let disappeared = previous.subtracting(snapshot.redactedDeviceIdentifiers).sorted()
+    deviceSnapshots[snapshot.endpoint] = snapshot.redactedDeviceIdentifiers
+
+    for identifier in appeared {
+      appendDeviceObservationEvent(
+        HDCDeviceObservationEvent(
+          endpoint: snapshot.endpoint,
+          change: .appeared,
+          redactedDeviceIdentifier: identifier,
+          observedAt: snapshot.observedAt))
+    }
+    for identifier in disappeared {
+      appendDeviceObservationEvent(
+        HDCDeviceObservationEvent(
+          endpoint: snapshot.endpoint,
+          change: .disappeared,
+          redactedDeviceIdentifier: identifier,
+          observedAt: snapshot.observedAt))
+    }
   }
 
   public func takeDeliveredEvents(for recipient: HDCServerRecipient) -> [HDCServerEvent] {
@@ -1314,12 +1505,15 @@ public actor HDCServerSupervisor: HDCServerLifecycleDispatchLeaseValidating {
     health: HDCServerHealth,
     version: HDCProbeValue<String>,
     generation: Int,
+    ownershipBasis: HDCServerOwnershipBasis,
     reason: String
   ) -> HDCServerState {
+    let ownership: HDCServerOwnership =
+      ownershipBasis.establishesExternalOwnership ? .external : .unknown
     let next = HDCServerState(
       endpoint: endpoint, health: health, version: version,
       generation: generation, generationEvidence: .known(generation),
-      ownership: .unknown)
+      ownership: ownership, ownershipBasis: ownershipBasis)
     impactReliability[endpoint] = true
     observeExistingServer(HDCExistingServerObservation(state: next), reason: reason)
     return next
@@ -1621,7 +1815,8 @@ public actor HDCServerSupervisor: HDCServerLifecycleDispatchLeaseValidating {
           health: .healthy,
           version: current.version,
           generation: resultingGeneration,
-          ownership: current.ownership
+          ownership: current.ownership,
+          ownershipBasis: current.ownershipBasis
         )
       case .stopped:
         endpoints[step.endpoint] = HDCServerState(
@@ -1629,7 +1824,8 @@ public actor HDCServerSupervisor: HDCServerLifecycleDispatchLeaseValidating {
           health: .unavailable,
           version: .unknown(reason: "confirmed lifecycle stop"),
           generation: current.generation,
-          ownership: current.ownership
+          ownership: current.ownership,
+          ownershipBasis: current.ownershipBasis
         )
       case .failed, .outcomeUnknown:
         break
@@ -1857,6 +2053,16 @@ public actor HDCServerSupervisor: HDCServerLifecycleDispatchLeaseValidating {
     for recipient in recipients.keys where recipient.endpoint == endpoint {
       deliveredEvents[recipient, default: []].append(event)
     }
+  }
+
+  private func appendDeviceObservationEvent(_ event: HDCDeviceObservationEvent) {
+    var events = deviceObservationEvents[event.endpoint] ?? []
+    events.append(event)
+    if events.count > Self.deviceObservationBufferLimit {
+      events.removeFirst(events.count - Self.deviceObservationBufferLimit)
+    }
+    deviceObservationEvents[event.endpoint] = events
+    broadcast(.devicePresenceChanged(event), endpoint: event.endpoint)
   }
 
   private func invalidateDispatchLeases(for endpoint: HDCServerEndpoint) {

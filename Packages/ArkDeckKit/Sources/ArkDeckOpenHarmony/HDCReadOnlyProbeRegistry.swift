@@ -691,10 +691,16 @@ struct HDCSelectedDeviceAuthorizationRowParser {
 public struct HDCSelectedDeviceAuthorizationProbeResult: Sendable, Equatable {
   public let authorization: HDCAuthorizationState
   public let execution: ProcessExecutionResult?
+  public let deviceSnapshot: HDCReadOnlyDeviceSnapshot?
 
-  public init(authorization: HDCAuthorizationState, execution: ProcessExecutionResult? = nil) {
+  public init(
+    authorization: HDCAuthorizationState,
+    execution: ProcessExecutionResult? = nil,
+    deviceSnapshot: HDCReadOnlyDeviceSnapshot? = nil
+  ) {
     self.authorization = authorization
     self.execution = execution
+    self.deviceSnapshot = deviceSnapshot
   }
 }
 
@@ -765,7 +771,8 @@ public actor HDCSelectedDeviceAuthorizationProbe {
         HDCProcessCommand(
           toolchain: toolchain, endpoint: endpoint, arguments: entry.exactArguments,
           additionalChildEnvironment: additionalChildEnvironment,
-          timeout: TimeInterval(entry.timeoutMilliseconds) / 1_000))
+          timeout: TimeInterval(entry.timeoutMilliseconds) / 1_000,
+          dispatchOrigin: .readOnlyProbe))
       let after = await identityObserver.observe(
         endpoint: endpoint.endpoint, selectedToolchain: toolchain)
       guard after == .observed(serverIdentity) else {
@@ -797,11 +804,18 @@ public actor HDCSelectedDeviceAuthorizationProbe {
         forFamily: HDCReadOnlyProbeRegistry.Family.selectedDeviceAuthorizationBinding.rawValue,
         observation: .supportedObservation(
           bindingMatches: bindingMatches, rawFamilyKnown: rawKnown))
+      guard disposition == .observed, let row else {
+        return HDCSelectedDeviceAuthorizationProbeResult(
+          authorization: .unavailable(
+            reason: "authorization output is unknown or does not match the binding"),
+          execution: evaluated.execution)
+      }
       return HDCSelectedDeviceAuthorizationProbeResult(
-        authorization: disposition == .observed
-          ? .ready
-          : .unavailable(reason: "authorization output is unknown or does not match the binding"),
-        execution: evaluated.execution)
+        authorization: .ready,
+        execution: evaluated.execution,
+        deviceSnapshot: HDCReadOnlyDeviceSnapshot(
+          endpoint: endpoint.endpoint,
+          sensitiveDeviceIdentifiers: [row.connectKey]))
     } catch {
       return HDCSelectedDeviceAuthorizationProbeResult(
         authorization: .unavailable(reason: "authorization probe process could not run"))

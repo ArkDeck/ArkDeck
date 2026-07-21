@@ -94,6 +94,279 @@ final class HDCSupervisorContractTests: XCTestCase {
     XCTAssertTrue(controls.expectedDispatchCounters.values.allSatisfy { $0 == 0 })
   }
 
+  // TEST-OBS-COUNTER-001 / mutation-verified real dispatch instrumentation
+  func testTEST_OBS_COUNTER_001_AutomaticDispatchMutationChangesRealCountersAndPresentation()
+    async throws
+  {
+    let root = FileManager.default.temporaryDirectory.appending(
+      path: "arkdeck-obs-counter-\(UUID().uuidString)", directoryHint: .isDirectory)
+    defer { try? FileManager.default.removeItem(at: root) }
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    let invocationLog = root.appending(path: "invocations.log")
+    let endpoint = try HDCServerEndpointSelector.select(
+      explicitEndpoint: "127.0.0.1:18731")
+    let candidate = fixtureCandidate()
+    let supervisor = HDCServerSupervisor(auditStore: InMemoryHDCServerLifecycleAuditStore())
+    let runner = HDCProcessCommandRunner(
+      semanticProfile: fixtureSemanticProfile(candidate: candidate),
+      automaticDispatchInstrumentation: supervisor.automaticDispatchInstrumentation)
+    let diagnostics = HDCServerDiagnosticsUseCase(
+      supervisor: supervisor,
+      snapshot: HDCJobToolchainSnapshot(
+        candidate: candidate,
+        endpointSelection: endpoint,
+        details: HDCProbeDetails(
+          platformTrust: .unknown(reason: "fixture"),
+          clientVersion: .known("3.2.0d"),
+          serverVersion: .known("3.2.0d"),
+          daemonVersion: .unknown(reason: "not registered"),
+          serverGeneration: .unknown(reason: "not observed"))),
+      authorization: .unavailable(reason: "no selected device"),
+      channelProtection: .unverifiedAssumeUnprotected)
+
+    let green = await diagnostics.refresh()
+    XCTAssertEqual(
+      green.automaticDispatchSnapshot,
+      HDCAutomaticDispatchSnapshot(
+        automaticLifecycleDispatchCount: 0,
+        automaticSubserverDispatchCount: 0),
+      "the untouched production composition must expose instrumented zeroes")
+
+    for (arguments, origin) in [
+      (["kill"], HDCProcessDispatchOrigin.automaticLifecycle),
+      (["spawn-sub"], HDCProcessDispatchOrigin.automaticSubserver),
+    ] {
+      _ = try await runner.execute(
+        HDCProcessCommand(
+          toolchain: candidate,
+          endpoint: endpoint,
+          arguments: arguments,
+          additionalChildEnvironment: ["ARKDECK_FAKE_HDC_INVOCATION_LOG": invocationLog.path],
+          dispatchOrigin: origin))
+    }
+
+    let mutated = await supervisor.automaticDispatchSnapshot()
+    XCTAssertEqual(
+      mutated,
+      HDCAutomaticDispatchSnapshot(
+        automaticLifecycleDispatchCount: 1,
+        automaticSubserverDispatchCount: 1),
+      "a counter detached from the process dispatch boundary would leave this mutation green")
+    let mutatedPresentation = await diagnostics.refresh()
+    XCTAssertEqual(mutatedPresentation.automaticDispatchSnapshot, mutated)
+    XCTAssertEqual(
+      try String(contentsOf: invocationLog, encoding: .utf8)
+        .split(separator: "\n").map(String.init),
+      ["kill", "spawn-sub"],
+      "the mutation control must cross the fake process launch boundary")
+  }
+
+  // TEST-OBS-OWNERSHIP-001 / three-evidence matrix and production classification
+  func testTEST_OBS_OWNERSHIP_001_ExternalRequiresEveryEvidenceItemAndExposesBasis()
+    async throws
+  {
+    let endpoint = HDCServerEndpoint("127.0.0.1:18732")
+    let matrix: [(Bool, Int?, Bool, HDCServerOwnership)] = [
+      (true, 0, true, .external),
+      (false, 0, true, .unknown),
+      (true, nil, true, .unknown),
+      (true, 1, true, .unknown),
+      (true, 0, false, .unknown),
+    ]
+    for (preExisting, lifecycleCount, observedGeneration, expected) in matrix {
+      let supervisor = HDCServerSupervisor(auditStore: InMemoryHDCServerLifecycleAuditStore())
+      let basis = HDCServerOwnershipBasis(
+        preExistingServerReceipt: preExisting,
+        automaticLifecycleDispatchCount: lifecycleCount,
+        generationMintedFromObservation: observedGeneration)
+      let state = await supervisor.observeRegisteredServerIdentity(
+        endpoint: endpoint,
+        health: .healthy,
+        version: .known("3.2.0d"),
+        generation: 7,
+        ownershipBasis: basis,
+        reason: "OBS ownership evidence-matrix control")
+      XCTAssertEqual(state.ownership, expected)
+      XCTAssertEqual(state.ownershipBasis, basis)
+    }
+
+    let candidate = fixtureCandidate()
+    let selection = try HDCServerEndpointSelector.select(
+      explicitEndpoint: endpoint.rawValue)
+    let receipt = HDCServerProcessIdentityReceipt(
+      pid: 42,
+      startSeconds: 10,
+      startMicroseconds: 20,
+      executablePath: candidate.path.resolvingSymlinksInPath().standardizedFileURL,
+      executableSHA256: candidate.sha256,
+      endpoint: endpoint)
+    let supervisor = HDCServerSupervisor(auditStore: InMemoryHDCServerLifecycleAuditStore())
+    let processSupervisor = HDCServerProcessSupervisor(
+      supervisor: supervisor,
+      readOnlyProbeRegistry: fixtureReadOnlyProbeRegistry(candidate: candidate),
+      semanticProfile: fixtureSemanticProfile(candidate: candidate),
+      identityObserver: FixedHDCServerIdentityObserver(observation: .observed(receipt)))
+
+    let result = await processSupervisor.observeRegisteredExistingServer(
+      endpoint: selection, toolchain: candidate)
+    XCTAssertEqual(
+      result.classification,
+      .observed(generation: 10_000_020, serverVersion: "3.2.0d"))
+    let observedProductionState = await supervisor.state(for: endpoint)
+    let productionState = try XCTUnwrap(observedProductionState)
+    XCTAssertEqual(productionState.ownership, .external)
+    XCTAssertEqual(
+      productionState.ownershipBasis,
+      HDCServerOwnershipBasis(
+        preExistingServerReceipt: true,
+        automaticLifecycleDispatchCount: 0,
+        generationMintedFromObservation: true))
+    let diagnostics = HDCServerDiagnosticsUseCase(
+      supervisor: supervisor,
+      snapshot: HDCJobToolchainSnapshot(
+        candidate: candidate,
+        endpointSelection: selection,
+        details: HDCProbeDetails(
+          platformTrust: .unknown(reason: "fixture"),
+          clientVersion: .known("3.2.0d"),
+          serverVersion: .known("3.2.0d"),
+          daemonVersion: .unknown(reason: "not registered"),
+          serverGeneration: .known(10_000_020))),
+      authorization: .unavailable(reason: "no selected device"),
+      channelProtection: .unverifiedAssumeUnprotected)
+    let presentation = await diagnostics.refresh()
+    XCTAssertEqual(presentation.ownership, .external)
+    XCTAssertEqual(presentation.ownershipBasis, productionState.ownershipBasis)
+  }
+
+  // TEST-OBS-OWNERSHIP-001 / external and unknown lifecycle gate equivalence
+  func testTEST_OBS_OWNERSHIP_001_ExternalAndUnknownKeepEquivalentLifecycleAuthorizationGates()
+    async throws
+  {
+    let endpoint = HDCServerEndpoint("127.0.0.1:18733")
+    for expectedOwnership in [HDCServerOwnership.external, .unknown] {
+      let supervisor = HDCServerSupervisor(auditStore: InMemoryHDCServerLifecycleAuditStore())
+      let basis = HDCServerOwnershipBasis(
+        preExistingServerReceipt: true,
+        automaticLifecycleDispatchCount: expectedOwnership == .external ? 0 : 1,
+        generationMintedFromObservation: true)
+      _ = await supervisor.observeRegisteredServerIdentity(
+        endpoint: endpoint,
+        health: .healthy,
+        version: .known("3.2.0d"),
+        generation: 7,
+        ownershipBasis: basis,
+        reason: "OBS ownership gate-equivalence control")
+      guard
+        case .ready(let preview) = await supervisor.createImpactPreview(
+          action: .restartConfirmedGeneration, endpoint: endpoint
+        )
+      else {
+        return XCTFail("\(expectedOwnership) must reach the same explicit preview gate")
+      }
+      guard case .accepted(let confirmation) = await supervisor.confirm(preview.id) else {
+        return XCTFail("\(expectedOwnership) must reach the same explicit confirmation gate")
+      }
+      XCTAssertEqual(confirmation.ownership, expectedOwnership)
+    }
+  }
+
+  // TEST-OBS-ENDPOINT-001 / presentation source and child-only environment keys
+  func testTEST_OBS_ENDPOINT_001_PresentationExposesEveryEndpointSourceAndChildEnvironmentKey()
+    async throws
+  {
+    let parentBefore = ProcessInfo.processInfo.environment["OHOS_HDC_SERVER_PORT"]
+    let selections = [
+      try HDCServerEndpointSelector.select(
+        explicitEndpoint: "127.0.0.1:19731",
+        inheritedEnvironment: ["OHOS_HDC_SERVER_PORT": "19732"]),
+      try HDCServerEndpointSelector.select(
+        inheritedEnvironment: ["OHOS_HDC_SERVER_PORT": "19732"]),
+      try HDCServerEndpointSelector.select(inheritedEnvironment: [:]),
+    ]
+    XCTAssertEqual(selections.map(\.source), [.explicit, .inheritedEnvironment, .default])
+
+    for selection in selections {
+      let candidate = fixtureCandidate()
+      let diagnostics = HDCServerDiagnosticsUseCase(
+        supervisor: HDCServerSupervisor(auditStore: InMemoryHDCServerLifecycleAuditStore()),
+        snapshot: HDCJobToolchainSnapshot(
+          candidate: candidate,
+          endpointSelection: selection,
+          details: HDCProbeDetails(
+            platformTrust: .unknown(reason: "fixture"),
+            clientVersion: .known("3.2.0d"),
+            serverVersion: .known("3.2.0d"),
+            daemonVersion: .unknown(reason: "not registered"),
+            serverGeneration: .unknown(reason: "not observed"))),
+        authorization: .unavailable(reason: "no selected device"),
+        channelProtection: .unverifiedAssumeUnprotected)
+      let presentation = await diagnostics.refresh()
+      XCTAssertEqual(presentation.endpoint, selection.endpoint.rawValue)
+      XCTAssertEqual(presentation.endpointSource, selection.source)
+      XCTAssertEqual(presentation.childEnvironmentKeys, ["OHOS_HDC_SERVER_PORT"])
+    }
+    XCTAssertEqual(ProcessInfo.processInfo.environment["OHOS_HDC_SERVER_PORT"], parentBefore)
+  }
+
+  // TEST-OBS-FANOUT-001 / read-only snapshot diff and bounded presentation buffer
+  func testTEST_OBS_FANOUT_001_DeviceSnapshotDiffFansOutAndKeepsABoundedRedactedBuffer()
+    async throws
+  {
+    let endpoint = HDCServerEndpoint("127.0.0.1:18734")
+    let supervisor = HDCServerSupervisor(auditStore: InMemoryHDCServerLifecycleAuditStore())
+    let recipient = HDCServerRecipient(
+      id: "device-observation-recipient", kind: .deviceCoordinator, endpoint: endpoint)
+    await supervisor.register(recipient)
+    let rawIdentifier = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    let appearedAt = Date(timeIntervalSince1970: 1_700_000_000)
+    let disappearedAt = Date(timeIntervalSince1970: 1_700_000_001)
+
+    await supervisor.observeReadOnlyDeviceSnapshot(
+      HDCReadOnlyDeviceSnapshot(
+        endpoint: endpoint,
+        sensitiveDeviceIdentifiers: [rawIdentifier],
+        observedAt: appearedAt))
+    await supervisor.observeReadOnlyDeviceSnapshot(
+      HDCReadOnlyDeviceSnapshot(
+        endpoint: endpoint,
+        sensitiveDeviceIdentifiers: [rawIdentifier],
+        observedAt: appearedAt))
+    await supervisor.observeReadOnlyDeviceSnapshot(
+      HDCReadOnlyDeviceSnapshot(
+        endpoint: endpoint,
+        sensitiveDeviceIdentifiers: [],
+        observedAt: disappearedAt))
+
+    let fanout = await supervisor.takeDeliveredEvents(for: recipient)
+    XCTAssertEqual(fanout.count, 2, "an unchanged snapshot must not duplicate fan-out")
+    guard case .devicePresenceChanged(let appeared) = fanout[0],
+      case .devicePresenceChanged(let disappeared) = fanout[1]
+    else { return XCTFail("snapshot differences must use the host-wide event fan-out") }
+    XCTAssertEqual(appeared.change, .appeared)
+    XCTAssertEqual(disappeared.change, .disappeared)
+    XCTAssertEqual(appeared.redactedDeviceIdentifier, disappeared.redactedDeviceIdentifier)
+    XCTAssertFalse(appeared.redactedDeviceIdentifier.contains(rawIdentifier))
+
+    let manyIdentifiers = (0..<40).map { "fixture-device-\($0)" }
+    await supervisor.observeReadOnlyDeviceSnapshot(
+      HDCReadOnlyDeviceSnapshot(
+        endpoint: endpoint,
+        sensitiveDeviceIdentifiers: manyIdentifiers,
+        observedAt: disappearedAt))
+    let recent = await supervisor.recentDeviceObservationEvents(for: endpoint)
+    XCTAssertEqual(recent.count, HDCServerSupervisor.deviceObservationBufferLimit)
+    XCTAssertTrue(
+      recent.allSatisfy { $0.redactedDeviceIdentifier.hasPrefix("redacted-device-") })
+    let diagnostics = HDCServerDiagnosticsUseCase(
+      supervisor: supervisor,
+      snapshot: fixtureSnapshot(candidate: fixtureCandidate(), endpoint: endpoint),
+      authorization: .unavailable(reason: "no selected device"),
+      channelProtection: .unverifiedAssumeUnprotected)
+    let presentation = await diagnostics.refresh()
+    XCTAssertEqual(presentation.deviceObservationEvents, recent)
+  }
+
   func testRegisteredServerIdentityPreconditionRejectsFakeExecutableBeforeAnyChildLaunch()
     async throws
   {
@@ -195,7 +468,8 @@ final class HDCSupervisorContractTests: XCTestCase {
 
     let result = try await HDCProcessCommandRunner().execute(
       HDCProcessCommand(
-        toolchain: fixtureCandidate(), endpoint: selection, arguments: ["endpoint"], timeout: 2))
+        toolchain: fixtureCandidate(), endpoint: selection, arguments: ["endpoint"], timeout: 2,
+        dispatchOrigin: .testControl))
     XCTAssertEqual(result.execution.termination, .exited(0))
     XCTAssertEqual(
       String(decoding: result.execution.stdout.data, as: UTF8.self), "endpoint-port=19710\n")
@@ -250,7 +524,8 @@ final class HDCSupervisorContractTests: XCTestCase {
           toolchain: discovered,
           endpoint: try HDCServerEndpointSelector.select(explicitEndpoint: "127.0.0.1:18718"),
           arguments: ["checkserver"],
-          additionalChildEnvironment: ["ARKDECK_FAKE_HDC_INVOCATION_LOG": invocationLog.path]))
+          additionalChildEnvironment: ["ARKDECK_FAKE_HDC_INVOCATION_LOG": invocationLog.path],
+          dispatchOrigin: .readOnlyProbe))
       XCTFail("a candidate replaced at the same path must not be launched")
     } catch let error as ProcessExecutionError {
       guard case .executableHashMismatch(let expected, let actual) = error else {
@@ -1370,7 +1645,8 @@ final class HDCSupervisorContractTests: XCTestCase {
     for (arguments, semantic) in expected {
       let result = try await runner.execute(
         HDCProcessCommand(
-          toolchain: candidate, endpoint: endpoint, arguments: arguments, timeout: 2))
+          toolchain: candidate, endpoint: endpoint, arguments: arguments, timeout: 2,
+          dispatchOrigin: .testControl))
       XCTAssertEqual(result.execution.termination, .exited(0), arguments.description)
       XCTAssertEqual(result.semantic, semantic, arguments.description)
       if arguments.first == "uninstall" {
@@ -1383,7 +1659,8 @@ final class HDCSupervisorContractTests: XCTestCase {
 
     let crash = try await runner.execute(
       HDCProcessCommand(
-        toolchain: candidate, endpoint: endpoint, arguments: ["crash"], timeout: 2))
+        toolchain: candidate, endpoint: endpoint, arguments: ["crash"], timeout: 2,
+        dispatchOrigin: .testControl))
     XCTAssertEqual(crash.execution.termination, .exited(23))
     guard case .failure = crash.semantic else {
       return XCTFail("crash cannot be a semantic success")
@@ -1391,13 +1668,15 @@ final class HDCSupervisorContractTests: XCTestCase {
 
     let slow = try await runner.execute(
       HDCProcessCommand(
-        toolchain: candidate, endpoint: endpoint, arguments: ["slow"], timeout: 2))
+        toolchain: candidate, endpoint: endpoint, arguments: ["slow"], timeout: 2,
+        dispatchOrigin: .testControl))
     XCTAssertEqual(slow.execution.termination, .exited(0))
     XCTAssertEqual(slow.semantic, .failure(.offline))
 
     let hang = try await runner.execute(
       HDCProcessCommand(
-        toolchain: candidate, endpoint: endpoint, arguments: ["hang"], timeout: 0.2))
+        toolchain: candidate, endpoint: endpoint, arguments: ["hang"], timeout: 0.2,
+        dispatchOrigin: .testControl))
     XCTAssertEqual(hang.execution.termination, .timedOut)
     guard case .failure = hang.semantic else {
       return XCTFail("hang timeout cannot be a semantic success")
@@ -1405,7 +1684,8 @@ final class HDCSupervisorContractTests: XCTestCase {
 
     let oversized = try await runner.execute(
       HDCProcessCommand(
-        toolchain: candidate, endpoint: endpoint, arguments: ["oversized"], timeout: 5))
+        toolchain: candidate, endpoint: endpoint, arguments: ["oversized"], timeout: 5,
+        dispatchOrigin: .testControl))
     guard case .failure = oversized.semantic else {
       return XCTFail("oversized fault output must never become semantic success")
     }
@@ -1535,7 +1815,8 @@ final class HDCSupervisorContractTests: XCTestCase {
     ).execute(
       HDCProcessCommand(
         toolchain: candidate, endpoint: endpoint,
-        arguments: ["list", "targets", "-v"], timeout: 2))
+        arguments: ["list", "targets", "-v"], timeout: 2,
+        dispatchOrigin: .readOnlyProbe))
     XCTAssertEqual(evaluated.execution.termination, .exited(0))
     XCTAssertEqual(
       evaluated.semantic, .unknownOutput, "dynamic identity rows are not golden success")
@@ -1598,6 +1879,14 @@ final class HDCSupervisorContractTests: XCTestCase {
       durableBinding: durableBinding)
 
     XCTAssertEqual(result.authorization, .ready)
+    let deviceSnapshot = try XCTUnwrap(result.deviceSnapshot)
+    XCTAssertEqual(deviceSnapshot.endpoint, endpoint.endpoint)
+    XCTAssertEqual(deviceSnapshot.redactedDeviceIdentifiers.count, 1)
+    XCTAssertTrue(
+      deviceSnapshot.redactedDeviceIdentifiers.allSatisfy {
+        $0.hasPrefix("redacted-device-")
+          && !$0.contains("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+      })
     let observationCount = await observer.observationCount()
     XCTAssertEqual(observationCount, 2)
     XCTAssertEqual(

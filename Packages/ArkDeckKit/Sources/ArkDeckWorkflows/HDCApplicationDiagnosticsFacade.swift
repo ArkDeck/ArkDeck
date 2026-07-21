@@ -8,6 +8,7 @@ import Foundation
 public typealias HDCDiagnosticsPresentation = ArkDeckOpenHarmony.HDCDiagnosticsPresentation
 public typealias HDCServerOtherClientDetection =
   ArkDeckOpenHarmony.HDCServerOtherClientDetection
+public typealias HDCReadOnlyDeviceSnapshot = ArkDeckOpenHarmony.HDCReadOnlyDeviceSnapshot
 
 /// Closed diagnostics surface consumed by the App. It exposes presentation
 /// actions and user-selected configuration, but no process runner, argv,
@@ -20,6 +21,9 @@ public protocol HDCApplicationDiagnosticsProviding: Sendable {
   func dispatchConfirmedRecovery() async -> HDCDiagnosticsPresentation
   func refreshAuthorization(
     for durableBinding: DurableCurrentDeviceBinding
+  ) async -> HDCDiagnosticsPresentation
+  func applyReadOnlyDeviceSnapshot(
+    _ snapshot: HDCReadOnlyDeviceSnapshot
   ) async -> HDCDiagnosticsPresentation
   func selectUserConfiguredExecutable(_ url: URL) async throws -> HDCDiagnosticsPresentation
 }
@@ -97,6 +101,18 @@ private actor HDCProductionApplicationDiagnostics: HDCApplicationDiagnosticsProv
       serverIdentity: registeredServerIdentity,
       durableBinding: durableBinding)
     await sessionDiagnostics.applyRegisteredAuthorization(result.authorization)
+    if let deviceSnapshot = result.deviceSnapshot {
+      await sessionDiagnostics.applyReadOnlyDeviceSnapshot(deviceSnapshot)
+    }
+    return await provider.refresh()
+  }
+
+  func applyReadOnlyDeviceSnapshot(
+    _ snapshot: HDCReadOnlyDeviceSnapshot
+  ) async -> HDCDiagnosticsPresentation {
+    await attachSessionIfConfigured()
+    guard let sessionDiagnostics else { return await provider.refresh() }
+    await sessionDiagnostics.applyReadOnlyDeviceSnapshot(snapshot)
     return await provider.refresh()
   }
 
@@ -125,7 +141,7 @@ private actor HDCProductionApplicationDiagnostics: HDCApplicationDiagnosticsProv
 
     let snapshot = HDCJobToolchainSnapshot(
       candidate: candidate,
-      endpoint: endpoint.endpoint.rawValue,
+      endpointSelection: endpoint,
       details: HDCProbeDetails(
         platformTrust: .unknown(reason: "ToolTrustInspector has not run"),
         clientVersion: .unknown(
@@ -266,6 +282,12 @@ private actor HDCFixtureApplicationDiagnostics: HDCApplicationDiagnosticsProvidi
     presentation()
   }
 
+  func applyReadOnlyDeviceSnapshot(
+    _: HDCReadOnlyDeviceSnapshot
+  ) async -> HDCDiagnosticsPresentation {
+    presentation()
+  }
+
   func selectUserConfiguredExecutable(_: URL) async throws -> HDCDiagnosticsPresentation {
     presentation()
   }
@@ -291,9 +313,18 @@ private actor HDCFixtureApplicationDiagnostics: HDCApplicationDiagnosticsProvidi
       serverVersion: "3.2.0d",
       daemonVersion: "unknown (not exposed by checkserver)",
       endpoint: "127.0.0.1:18710",
+      endpointSource: .explicit,
+      childEnvironmentKeys: ["OHOS_HDC_SERVER_PORT"],
       serverHealth: .healthy,
       generation: "7",
       ownership: .external,
+      ownershipBasis: HDCServerOwnershipBasis(
+        preExistingServerReceipt: true,
+        automaticLifecycleDispatchCount: 0,
+        generationMintedFromObservation: true),
+      automaticDispatchSnapshot: HDCAutomaticDispatchSnapshot(
+        automaticLifecycleDispatchCount: 0,
+        automaticSubserverDispatchCount: 0),
       authorization: authorization,
       channelProtection: .unverifiedAssumeUnprotected,
       tcpUnprotectedWarning:

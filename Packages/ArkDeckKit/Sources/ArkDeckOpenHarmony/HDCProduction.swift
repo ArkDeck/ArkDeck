@@ -100,6 +100,22 @@ public enum HDCServerEndpointSelector {
 /// only by the confirmed executor. Legacy `checkserver`/`-v` entry points stay
 /// internal for package compatibility contracts.
 /// It intentionally has no fallback to PATH or a settings object.
+package enum HDCProcessDispatchOrigin: Sendable, Equatable {
+  case readOnlyProbe
+  case confirmedLifecycle
+  case automaticLifecycle
+  case automaticSubserver
+  case testControl
+
+  var automaticDispatchKind: HDCAutomaticDispatchKind? {
+    switch self {
+    case .automaticLifecycle: .lifecycle
+    case .automaticSubserver: .subserver
+    case .readOnlyProbe, .confirmedLifecycle, .testControl: nil
+    }
+  }
+}
+
 struct HDCProcessCommand: Sendable, Equatable {
   let toolchain: HDCCandidate
   let endpoint: HDCServerEndpointSelection
@@ -108,19 +124,25 @@ struct HDCProcessCommand: Sendable, Equatable {
   /// endpoint is always written last and cannot be overridden here.
   let additionalChildEnvironment: [String: String]
   let timeout: TimeInterval?
+  /// A closed, mandatory origin keeps future call sites from silently omitting
+  /// automatic instrumentation. Current production uses only read-only probes
+  /// and explicitly confirmed lifecycle dispatch.
+  let dispatchOrigin: HDCProcessDispatchOrigin
 
   init(
     toolchain: HDCCandidate,
     endpoint: HDCServerEndpointSelection,
     arguments: [String],
     additionalChildEnvironment: [String: String] = [:],
-    timeout: TimeInterval? = nil
+    timeout: TimeInterval? = nil,
+    dispatchOrigin: HDCProcessDispatchOrigin
   ) {
     self.toolchain = toolchain
     self.endpoint = endpoint
     self.arguments = arguments
     self.additionalChildEnvironment = additionalChildEnvironment
     self.timeout = timeout
+    self.dispatchOrigin = dispatchOrigin
   }
 
   var processRequest: ProcessRequest {
@@ -367,15 +389,18 @@ public struct HDCRegisteredSemanticEvaluator: ProcessSemanticEvaluating {
 private final class HDCPreparedProcessCommand: @unchecked Sendable {
   let process: ProcessPreparedIdentityBoundLaunch
   fileprivate let semanticBinding: HDCRegisteredSemanticBinding?
+  fileprivate let dispatchOrigin: HDCProcessDispatchOrigin
   private let securityScopedAccess: HDCSecurityScopedExecutableAccess
 
   init(
     process: ProcessPreparedIdentityBoundLaunch,
     semanticBinding: HDCRegisteredSemanticBinding?,
+    dispatchOrigin: HDCProcessDispatchOrigin,
     securityScopedAccess: HDCSecurityScopedExecutableAccess
   ) {
     self.process = process
     self.semanticBinding = semanticBinding
+    self.dispatchOrigin = dispatchOrigin
     self.securityScopedAccess = securityScopedAccess
   }
 
@@ -390,13 +415,17 @@ private final class HDCPreparedProcessCommand: @unchecked Sendable {
 package final class HDCProcessCommandRunner: @unchecked Sendable {
   private let executor: FoundationProcessExecutor
   private let semanticProfile: HDCRegisteredSemanticProfile
+  private let automaticDispatchInstrumentation: HDCAutomaticDispatchInstrumentation
 
   package init(
     executor: FoundationProcessExecutor = FoundationProcessExecutor(),
-    semanticProfile: HDCRegisteredSemanticProfile = .pinnedProduction
+    semanticProfile: HDCRegisteredSemanticProfile = .pinnedProduction,
+    automaticDispatchInstrumentation: HDCAutomaticDispatchInstrumentation =
+      HDCAutomaticDispatchInstrumentation()
   ) {
     self.executor = executor
     self.semanticProfile = semanticProfile
+    self.automaticDispatchInstrumentation = automaticDispatchInstrumentation
   }
 
   func execute(
@@ -409,6 +438,9 @@ package final class HDCProcessCommandRunner: @unchecked Sendable {
     if let launchGate {
       return try await executePrepared(
         prepared, launchGate: launchGate, onOutput: onOutput)
+    }
+    if let automaticDispatchKind = prepared.dispatchOrigin.automaticDispatchKind {
+      await automaticDispatchInstrumentation.record(automaticDispatchKind)
     }
     return try await executor.executePreparedIdentityBoundLaunch(
       prepared.process,
@@ -438,6 +470,7 @@ package final class HDCProcessCommandRunner: @unchecked Sendable {
       return HDCPreparedProcessCommand(
         process: prepared,
         semanticBinding: semanticBinding,
+        dispatchOrigin: command.dispatchOrigin,
         securityScopedAccess: access)
     } catch {
       access.stop()
@@ -450,7 +483,10 @@ package final class HDCProcessCommandRunner: @unchecked Sendable {
     launchGate: ProcessAtomicLaunchGate,
     onOutput: @escaping ProcessOutputHandler = { _ in }
   ) async throws -> SemanticallyEvaluatedIdentityBoundProcessResult<HDCCommandSemanticResult> {
-    try await executor.executePreparedIdentityBoundLaunch(
+    if let automaticDispatchKind = prepared.dispatchOrigin.automaticDispatchKind {
+      await automaticDispatchInstrumentation.record(automaticDispatchKind)
+    }
+    return try await executor.executePreparedIdentityBoundLaunch(
       prepared.process,
       gate: launchGate,
       evaluating: HDCRegisteredSemanticEvaluator(binding: prepared.semanticBinding),
@@ -536,7 +572,8 @@ actor HDCClientVersionProcessProbe {
       let evaluated = try await runner.execute(
         HDCProcessCommand(
           toolchain: toolchain, endpoint: endpoint, arguments: ["-v"],
-          additionalChildEnvironment: additionalChildEnvironment, timeout: 10))
+          additionalChildEnvironment: additionalChildEnvironment, timeout: 10,
+          dispatchOrigin: .readOnlyProbe))
       guard evaluated.execution.termination == .exited(0),
         evaluated.execution.stderr.totalByteCount == 0,
         evaluated.semantic == .success,
@@ -570,9 +607,11 @@ actor HDCClientVersionProcessProbe {
 }
 
 /// Process-backed observation adapter for the host-wide supervisor.  It only
-/// runs the registered, read-only `checkserver` probe. It can observe health,
-/// but without a process/server identity it can never claim external or
-/// managed ownership and can never automatically restart this endpoint.
+/// runs the registered, read-only `checkserver` probe. Health alone never
+/// establishes ownership; the bracketed pre-existing process/listener receipt
+/// can classify external only with zero automatic lifecycle dispatches and an
+/// observation-minted generation. This adapter cannot claim managed ownership
+/// or automatically restart the endpoint.
 public actor HDCServerProcessSupervisor {
   private let supervisor: HDCServerSupervisor
   private let runner: HDCProcessCommandRunner
@@ -588,7 +627,9 @@ public actor HDCServerProcessSupervisor {
   ) {
     self.supervisor = supervisor
     let semanticProfile = HDCRegisteredSemanticProfile.pinnedProduction
-    let runner = HDCProcessCommandRunner(semanticProfile: semanticProfile)
+    let runner = HDCProcessCommandRunner(
+      semanticProfile: semanticProfile,
+      automaticDispatchInstrumentation: supervisor.automaticDispatchInstrumentation)
     self.runner = runner
     clientVersionProbe = HDCClientVersionProcessProbe(
       runner: runner, additionalChildEnvironment: additionalChildEnvironment)
@@ -606,7 +647,9 @@ public actor HDCServerProcessSupervisor {
     identityObserver: any HDCServerProcessIdentityObserving
   ) {
     self.supervisor = supervisor
-    let runner = HDCProcessCommandRunner(semanticProfile: semanticProfile)
+    let runner = HDCProcessCommandRunner(
+      semanticProfile: semanticProfile,
+      automaticDispatchInstrumentation: supervisor.automaticDispatchInstrumentation)
     self.runner = runner
     clientVersionProbe = HDCClientVersionProcessProbe(
       runner: runner, additionalChildEnvironment: additionalChildEnvironment)
@@ -633,7 +676,8 @@ public actor HDCServerProcessSupervisor {
         HDCProcessCommand(
           toolchain: toolchain, endpoint: endpoint,
           arguments: endpoint.argumentsForEndpointSensitiveProbe(["checkserver"]),
-          additionalChildEnvironment: additionalChildEnvironment, timeout: 10))
+          additionalChildEnvironment: additionalChildEnvironment, timeout: 10,
+          dispatchOrigin: .readOnlyProbe))
       let classification = classifyCheckserver(evaluated.execution, semantic: evaluated.semantic)
       switch classification {
       case .healthy(let serverVersion):
@@ -722,7 +766,8 @@ public actor HDCServerProcessSupervisor {
         HDCProcessCommand(
           toolchain: toolchain, endpoint: endpoint,
           arguments: endpoint.argumentsForEndpointSensitiveProbe(["checkserver"]),
-          additionalChildEnvironment: additionalChildEnvironment, timeout: 10))
+          additionalChildEnvironment: additionalChildEnvironment, timeout: 10,
+          dispatchOrigin: .readOnlyProbe))
     } catch {
       await supervisor.recordUnverifiedServerProbeFailure(
         endpoint: endpoint.endpoint, reason: "registered checkserver process could not run")
@@ -772,9 +817,15 @@ public actor HDCServerProcessSupervisor {
           reason: "server process start identity cannot be represented as a generation"),
         identity: afterReceipt, execution: evaluated.execution)
     }
+    let dispatchSnapshot = await supervisor.automaticDispatchSnapshot()
+    let ownershipBasis = HDCServerOwnershipBasis(
+      preExistingServerReceipt: true,
+      automaticLifecycleDispatchCount: dispatchSnapshot.automaticLifecycleDispatchCount,
+      generationMintedFromObservation: true)
     await supervisor.observeRegisteredServerIdentity(
       endpoint: endpoint.endpoint, health: .healthy, version: .known(serverVersion),
       generation: generation,
+      ownershipBasis: ownershipBasis,
       reason: "OPENHARMONY-TOOLS@0.3.0 bracketed process/listener observation")
     return HDCRegisteredServerObservationResult(
       classification: .observed(generation: generation, serverVersion: serverVersion),
@@ -1008,7 +1059,9 @@ package actor HDCProcessLifecycleExecutor: HDCServerLifecycleExecutor {
     supervisor: HDCServerSupervisor,
     postDispatchProbe: @escaping PostDispatchProbe
   ) {
-    runner = HDCProcessCommandRunner(semanticProfile: semanticProfile)
+    runner = HDCProcessCommandRunner(
+      semanticProfile: semanticProfile,
+      automaticDispatchInstrumentation: supervisor.automaticDispatchInstrumentation)
     self.toolchain = toolchain
     self.endpointSelection = endpointSelection
     self.additionalChildEnvironment = additionalChildEnvironment
@@ -1066,7 +1119,8 @@ package actor HDCProcessLifecycleExecutor: HDCServerLifecycleExecutor {
 
     let command = HDCProcessCommand(
       toolchain: toolchain, endpoint: endpointSelection, arguments: arguments,
-      additionalChildEnvironment: additionalChildEnvironment, timeout: 15)
+      additionalChildEnvironment: additionalChildEnvironment, timeout: 15,
+      dispatchOrigin: .confirmedLifecycle)
     let prepared: HDCPreparedProcessCommand
     do {
       prepared = try runner.prepare(command)
@@ -1566,9 +1620,14 @@ public struct HDCDiagnosticsPresentation: Sendable, Equatable {
   public let serverVersion: String
   public let daemonVersion: String
   public let endpoint: String
+  public let endpointSource: HDCServerEndpointSource?
+  public let childEnvironmentKeys: [String]
   public let serverHealth: HDCServerHealth
   public let generation: String
   public let ownership: HDCServerOwnership
+  public let ownershipBasis: HDCServerOwnershipBasis?
+  public let automaticDispatchSnapshot: HDCAutomaticDispatchSnapshot?
+  public let deviceObservationEvents: [HDCDeviceObservationEvent]
   public let authorization: HDCAuthorizationState
   public let channelProtection: HDCChannelProtectionState
   /// Nil unless the verified presentation identifies the connection as TCP
@@ -1591,9 +1650,14 @@ public struct HDCDiagnosticsPresentation: Sendable, Equatable {
     serverVersion: String,
     daemonVersion: String,
     endpoint: String,
+    endpointSource: HDCServerEndpointSource? = nil,
+    childEnvironmentKeys: [String] = [],
     serverHealth: HDCServerHealth = .unknown,
     generation: String,
     ownership: HDCServerOwnership,
+    ownershipBasis: HDCServerOwnershipBasis? = nil,
+    automaticDispatchSnapshot: HDCAutomaticDispatchSnapshot? = nil,
+    deviceObservationEvents: [HDCDeviceObservationEvent] = [],
     authorization: HDCAuthorizationState,
     channelProtection: HDCChannelProtectionState,
     tcpUnprotectedWarning: String? = nil,
@@ -1611,9 +1675,14 @@ public struct HDCDiagnosticsPresentation: Sendable, Equatable {
     self.serverVersion = serverVersion
     self.daemonVersion = daemonVersion
     self.endpoint = endpoint
+    self.endpointSource = endpointSource
+    self.childEnvironmentKeys = Array(Set(childEnvironmentKeys)).sorted()
     self.serverHealth = serverHealth
     self.generation = generation
     self.ownership = ownership
+    self.ownershipBasis = ownershipBasis
+    self.automaticDispatchSnapshot = automaticDispatchSnapshot
+    self.deviceObservationEvents = deviceObservationEvents
     self.authorization = authorization
     self.channelProtection = channelProtection
     self.tcpUnprotectedWarning = tcpUnprotectedWarning
@@ -1676,7 +1745,7 @@ public actor HDCReadOnlyDiagnosticsUseCase: HDCDiagnosticsStateProviding {
     let report = HDCExternalFirstDiscovery.discover(discoveryRequest)
     guard let candidate = report.candidates.first else {
       return unavailablePresentation(
-        endpoint: endpoint.endpoint.rawValue,
+        endpointSelection: endpoint,
         reason: "No user-configured or SDK HDC candidate is available for diagnostics")
     }
     return HDCDiagnosticsPresentation(
@@ -1685,7 +1754,10 @@ public actor HDCReadOnlyDiagnosticsUseCase: HDCDiagnosticsStateProviding {
       clientVersion: "unknown (version probe has not run)",
       serverVersion: "unknown (checkserver has not run)",
       daemonVersion: "unknown (not exposed by a registered probe)",
-      endpoint: endpoint.endpoint.rawValue, serverHealth: .unknown,
+      endpoint: endpoint.endpoint.rawValue,
+      endpointSource: endpoint.source,
+      childEnvironmentKeys: Array(endpoint.childEnvironment.keys),
+      serverHealth: .unknown,
       generation: "unknown (server supervisor has not run)", ownership: .unknown,
       authorization: .unavailable(reason: "authorization probe requires a selected device"),
       channelProtection: .unverifiedAssumeUnprotected,
@@ -1709,13 +1781,17 @@ public actor HDCReadOnlyDiagnosticsUseCase: HDCDiagnosticsStateProviding {
   }
 
   private func unavailablePresentation(
-    endpoint: String = "unknown",
+    endpointSelection: HDCServerEndpointSelection? = nil,
     reason: String
   ) -> HDCDiagnosticsPresentation {
     HDCDiagnosticsPresentation(
       absolutePath: "unknown (no configured candidate)", source: "unknown", hash: "unverified",
       platformTrust: "unverified", clientVersion: "unknown", serverVersion: "unknown",
-      daemonVersion: "unknown", endpoint: endpoint, serverHealth: .unknown,
+      daemonVersion: "unknown",
+      endpoint: endpointSelection?.endpoint.rawValue ?? "unknown",
+      endpointSource: endpointSelection?.source,
+      childEnvironmentKeys: endpointSelection.map { Array($0.childEnvironment.keys) } ?? [],
+      serverHealth: .unknown,
       generation: "unknown", ownership: .unknown,
       authorization: .unavailable(reason: reason),
       channelProtection: .unverifiedAssumeUnprotected,
@@ -1891,13 +1967,26 @@ public actor HDCServerDiagnosticsUseCase: HDCDiagnosticsStateProviding {
     authorization = state
   }
 
+  /// The caller supplies a snapshot from an approved read-only observer. The
+  /// diagnostics use case only forwards it into the supervisor's diff/fan-out
+  /// surface and has no command or process capability of its own.
+  package func applyReadOnlyDeviceSnapshot(_ snapshot: HDCReadOnlyDeviceSnapshot) async {
+    guard snapshot.endpoint.rawValue == self.snapshot.endpoint else { return }
+    await supervisor.observeReadOnlyDeviceSnapshot(snapshot)
+  }
+
   private var currentLifecycleRecoveryUnavailableReason: String? {
     configuredLifecycleRecoveryUnavailableReason ?? runtimeLifecycleRecoveryRequiredReason
   }
 
   private func presentation() async -> HDCDiagnosticsPresentation {
     let endpoint = HDCServerEndpoint(snapshot.endpoint)
-    let state = await supervisor.state(for: endpoint)
+    async let currentState = supervisor.state(for: endpoint)
+    async let automaticDispatchSnapshot = supervisor.automaticDispatchSnapshot()
+    async let deviceObservationEvents = supervisor.recentDeviceObservationEvents(for: endpoint)
+    let (state, dispatchSnapshot, deviceEvents) = await (
+      currentState, automaticDispatchSnapshot, deviceObservationEvents
+    )
     let serverVersion =
       state.map { diagnosticText($0.version) } ?? diagnosticText(snapshot.serverVersion)
     return HDCDiagnosticsPresentation(
@@ -1905,10 +1994,16 @@ public actor HDCServerDiagnosticsUseCase: HDCDiagnosticsStateProviding {
       platformTrust: diagnosticText(snapshot.platformTrust),
       clientVersion: diagnosticText(snapshot.clientVersion), serverVersion: serverVersion,
       daemonVersion: diagnosticText(snapshot.daemonVersion), endpoint: snapshot.endpoint,
+      endpointSource: snapshot.endpointSource,
+      childEnvironmentKeys: snapshot.childEnvironmentKeys,
       serverHealth: state?.health ?? .unknown,
       generation: state.map { diagnosticText($0.generationEvidence) }
         ?? diagnosticText(snapshot.serverGeneration),
-      ownership: state?.ownership ?? .unknown, authorization: authorization,
+      ownership: state?.ownership ?? .unknown,
+      ownershipBasis: state?.ownershipBasis,
+      automaticDispatchSnapshot: dispatchSnapshot,
+      deviceObservationEvents: deviceEvents,
+      authorization: authorization,
       channelProtection: channelProtection,
       tcpUnprotectedWarning: channelProtection == .unverifiedAssumeUnprotected
         ? "Channel protection is unverified. Use TCP only on a trusted, isolated network."
