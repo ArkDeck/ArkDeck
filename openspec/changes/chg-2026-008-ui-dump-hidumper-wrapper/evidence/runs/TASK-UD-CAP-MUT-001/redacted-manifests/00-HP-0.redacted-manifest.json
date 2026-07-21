@@ -1,0 +1,71 @@
+{
+  "argv": [
+    "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/toolchains/hdc",
+    "version"
+  ],
+  "boundary": "human-operated controlled capture; raw bytes and full manifest remain outside git; no Recipe success, compatibility, support, or canonical AC PASS is claimed",
+  "captureComplete": true,
+  "change": "CHG-2026-008-ui-dump-hidumper-wrapper",
+  "commandId": "HP-0",
+  "durationMs": 20,
+  "evidenceClass": "controlledHumanCapture",
+  "exitCode": 0,
+  "host": {
+    "arch": "arm64",
+    "os": "Darwin",
+    "osVersion": "26.5.2"
+  },
+  "inputs": {},
+  "purpose": "HDC version preflight",
+  "schema": "arkdeck-ud-capture-redacted-1.0.0",
+  "selfCheck": {
+    "stderr": {
+      "completeStreamScanned": true,
+      "keyMaterialFound": false,
+      "localInputPathFound": false,
+      "passed": true,
+      "serialPresent": null,
+      "userPathFound": false
+    },
+    "stdout": {
+      "completeStreamScanned": true,
+      "keyMaterialFound": false,
+      "localInputPathFound": false,
+      "passed": true,
+      "serialPresent": null,
+      "userPathFound": false
+    }
+  },
+  "selfCheckPassed": true,
+  "sequence": 0,
+  "streams": {
+    "stderr": {
+      "bytes": 0,
+      "drainIncomplete": false,
+      "file": "00-HP-0.stderr",
+      "retainedBytes": 0,
+      "retainedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sha256Scope": "wholeStream",
+      "truncated": false
+    },
+    "stdout": {
+      "bytes": 12,
+      "drainIncomplete": false,
+      "file": "00-HP-0.stdout",
+      "retainedBytes": 12,
+      "retainedSha256": "906d35a917937ecbb33d8dc3bbb6b3e1783bd2996a6201ab7227fb406d474ed9",
+      "sha256": "906d35a917937ecbb33d8dc3bbb6b3e1783bd2996a6201ab7227fb406d474ed9",
+      "sha256Scope": "wholeStream",
+      "truncated": false
+    }
+  },
+  "task": "TASK-UD-CAPTURE-HARNESS-001",
+  "timedOut": false,
+  "timeoutSeconds": 120,
+  "toolchain": {
+    "hdcBytes": 6401152,
+    "hdcPath": "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/toolchains/hdc",
+    "hdcSha256": "48395ba8d87115dffca47df2a640a6c868bc9a2bd4eb49611e4138ff88d8d260"
+  }
+}

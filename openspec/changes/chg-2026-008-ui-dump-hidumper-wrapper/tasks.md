@@ -115,16 +115,21 @@ r3 合入时本 change 有 4 个任务,全部 `blocked`;r6 增设 capture harnes
 
 ## TASK-UD-CAP-MUT-001 — R1-R3 首次 target-build 人工 deviceMutation 采集
 
-- Status:ready(harness-done 恢复;仅在维护者 review/merge 本独立状态 PR 后生效。
-  r6 fail-closed 回退的唯一剩余前置 `TASK-UD-CAPTURE-HARNESS-001 done` 已满足:
-  实现 PR #143(squash `7978fa7`)+ r7 alignment 修复 PR #148(squash `ba4b75b`)+
-  状态翻转 PR #149(squash `0b44d59`)均已由维护者 review/merge。Phase A 全部设备
-  命令与流采集必须经该 pinned harness 执行,其三文件 SHA-256(r7 alignment addendum
-  记录,与当前 `main` 逐一相符)=README `0a479a4b…`、capture.py `2cc168b4…`、
-  test_capture.py `e83011ba…`。r4 五项 readiness 输入(fixture/INV-1/sidecar/操作者
-  与窗口规则)保持已批准有效、无需重做。执行仍须维护者确认的具名设备窗口并在
-  run.md 记录实际日期/窗口;窗口外或输入漂移时 installed-HDC/device dispatch 均为
-  `0`)
+- Status:blocked(2026-07-21 首次人类 Phase A run 在 `FX-1` 后按 runbook fail-closed
+  中止;本状态草案仅在维护者 review/merge 后生效。`HP-0`/`HP-1` 通过且 fixture hash
+  与 pinned 值相符;`FX-1` HDC process exit `0`、流完整无截断,但 observed stdout 回显
+  exact local HAP path,触发 pinned harness `userPathFound=true`、
+  `localInputPathFound=true`、`selfCheckPassed=false` 与 CLI STOP。操作者未执行
+  `FX-2`/`HP-2`/`SC-*`/`INV-1`/`R1`-`R3`,仅按非身份类 abort rule 执行 `FX-3`/`FX-4`
+  cleanup(两者 exit `0`,complete,self-check PASS);Agent installed-HDC/device/
+  destructive dispatch `0/0/0`,R1-R3 dispatch `0/0/0`。证据见
+  `evidence/runs/TASK-UD-CAP-MUT-001/run.md`、五份 redacted manifest 与
+  `capture-hashes.md`;不生成 `hardware-evidence.json`,不认领
+  `INT-UD-CAPTURE-MUT-001`、canonical AC、Recipe success/compatibility/support PASS。
+  observed HDC family 回显 resolved local input path,换路径或重试不是合法 workaround;
+  恢复 ready 前须由独立 approved remediation task/revision 修复并验证 harness
+  sanitization/self-check evidence seam,随后另起状态 PR。既有 r4 readiness pins 与
+  harness source hash 仍保持历史事实,但不足以越过本次运行暴露的 blocker)
 - Objective:由人类维护者按 `capture-runbook.md` Phase A 在 DAYU200 真机上首次执行
   R1-R3 三个 Recipe 的受控采集,记录逐流 byte-exact raw(仓库外)、redacted manifest 与
   hardware evidence,为后续 argv/output-family decision 提供事实输入。
