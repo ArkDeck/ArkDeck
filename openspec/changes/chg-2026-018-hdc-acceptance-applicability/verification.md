@@ -1,6 +1,6 @@
 # CHG-2026-018 Verification Plan
 
-> Status:planned
+> Status:passed;maintainer confirmation 见 proposal.md Verification closure(2026-07-21)
 > Change:CHG-2026-018-hdc-acceptance-applicability@r1
 > Core baseline:CORE-2.0.0(目标 CORE-2.1.0)
 

@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-018-hdc-acceptance-applicability
 revision: 1
-status: approved # r1 proposal 经 PR #194 合入(main `0f87bd7`);批准由本 approval-only PR 的维护者 review/merge 构成(先例 #55/#89/#171)
+status: verified # 2026-07-21 本 verification-closure PR(先例 #175/#176);approve 载体 #195 `f2bde7b`;archive(=CORE-2.1.0 ratification)另行独立 PR
 class: core
 core_change_level: minor
 owner: lvye
@@ -97,3 +97,16 @@ V2 治理:本 propose PR 合入仅登记提案;批准须独立 approval-only PR(
   base revision 与 registry/provenance pins 无漂移)转 `ready`;实现后 `done` 翻转与
   archive PR(=ratification)各为独立 PR。本批准不翻转 TASK-M1-006 状态(缺口 ① 仍在),
   不构成 CHG-2026-002 verified、platform conformance、hardware/support 或 release claim。
+
+## Verification closure(2026-07-21)
+
+- 依据:TASK-CA-001 done(实现 PR #197 squash `3e85073` 与 review head 零树差;done
+  状态 PR #199 squash `e8584b6`);change-local acceptance matrix 两行
+  `CA-HDC-APPLICABILITY-001/002` 均 `passed`,evidence 在
+  `evidence/runs/TASK-CA-001/run.md`。
+- Gate 复核:两个 Evidence ID 均 PASS 且有 run 记录 ✓;`CORE-2.1.0.yaml` baseline 草案
+  在案(status: draft)✓;canonical 111 与 specs 零变更 ✓;`check-sdd` 0/0/111 ✓。
+- 本 `verified` 由维护者 review/merge 本 PR 构成(先例 #175/#176)。它不构成
+  ratification——archive PR 另行(移目录入 archive + baseline `draft→ratified`);也不
+  翻转 TASK-M1-006 状态,不构成 CHG-2026-002 verified、platform conformance、
+  hardware/support 或 release claim。macOS `conformance_status` 保持 `notStarted`。
