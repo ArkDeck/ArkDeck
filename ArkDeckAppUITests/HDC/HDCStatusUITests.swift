@@ -128,7 +128,9 @@ final class HDCStatusUITests: XCTestCase {
   }
 
   // TEST-AC-HDC-003-01 / productionSessionCompositionUI
-  func testNormalLaunchUsesDurableSessionDiagnosticsAndFailsClosedWithoutHostInventory() {
+  // TASK-PI-001 / TEST-PI-HDC-INVENTORY-002:registry-fed 空-完备 inventory 满足
+  // participant 门,unavailable 理由收敛为 server-identity/endpoint 前置。
+  func testNormalLaunchUsesDurableSessionDiagnosticsWithRegistryFedInventory() {
     let app = launch(
       arguments: [
         "--ui-test-reset-hdc-selection",
@@ -139,14 +141,22 @@ final class HDCStatusUITests: XCTestCase {
 
     let configuredPath = app.staticTexts["hdc.toolchain.path"]
     assertDisplayedValue(configuredPath, equals: "/usr/bin/true")
+    assertDisplayedValue(
+      app.staticTexts["hdc.lifecycle.recoveryUnavailable"],
+      equals: "No recovery impact preview has been requested",
+      timeout: 15)
     let request = app.buttons["hdc.lifecycle.requestImpactPreview"]
     XCTAssertTrue(request.exists)
     request.tap()
+    // participant 门已由 App-root registry 的空-完备 inventory 满足;剩余阻断
+    // 只能来自 server-identity/endpoint 前置(/usr/bin/true 非 pinned 3.2.0d)。
     assertDisplayedValue(
-      app.staticTexts["hdc.lifecycle.recoveryUnavailable"],
-      equals:
-        "Lifecycle mutation is unavailable because no complete App-root HDC Job/Device critical-state inventory is attached.",
+      app.staticTexts["hdc.lifecycle.recoveryBlocked"],
+      equals: "impactCannotBeReliablyDetermined",
       timeout: 5)
+    XCTAssertFalse(
+      app.staticTexts["hdc.lifecycle.recoveryUnavailable"].exists,
+      "the inventory-unavailable wording must be gone from the production launch path")
   }
 
   // M1-006 safety gate: a non-pinned fake cannot be executed merely because

@@ -1967,6 +1967,162 @@ final class HDCSupervisorContractTests: XCTestCase {
     XCTAssertFalse(publisher.wasPublishCalled())
   }
 
+  // TASK-PI-001 / TEST-PI-HDC-INVENTORY-001:App-root registry 构造性完备 feed。
+  func testAppRootRegistryEmptyCompleteInventoryEnablesParticipantReliability() async throws {
+    let root = try temporarySessionRoot()
+    defer { try? FileManager.default.removeItem(at: root.deletingLastPathComponent()) }
+    let candidate = fixtureCandidate()
+    let endpoint = HDCServerEndpoint("127.0.0.1:18716")
+    let registry = HDCApplicationParticipantRegistry()
+    let inventory = await registry.inventory(for: endpoint)
+    XCTAssertEqual(inventory, .complete([]))
+
+    let composition = try await HDCApplicationDiagnosticsHost().compose(
+      sessionRoot: root, sessionID: "pi-registry-empty-session",
+      jobID: "pi-registry-empty-job", toolchain: candidate,
+      semanticProfile: fixtureSemanticProfile(candidate: candidate),
+      snapshot: fixtureSnapshot(candidate: candidate, endpoint: endpoint),
+      authorization: .ready,
+      impactInventory: inventory,
+      postDispatchProbe: { _ in .generation(8) })
+
+    // 空-完备 inventory 满足 participant receipt,但 endpoint-identity receipt
+    // 缺失时 preview 仍必须 blocked——registry 不能替代身份可靠性。
+    let withoutIdentity = await composition.supervisor.createImpactPreview(
+      action: .restartConfirmedGeneration, endpoint: endpoint)
+    XCTAssertEqual(withoutIdentity, .blocked(.impactCannotBeReliablyDetermined))
+
+    await composition.supervisor.observeExistingServer(
+      HDCExistingServerObservation(
+        state: HDCServerState(
+          endpoint: endpoint, health: .healthy, version: .known("3.2.0d"), generation: 7,
+          ownership: .external)),
+      reason: "fixture verified identity")
+    await composition.supervisor.setImpactReliability(true, for: endpoint)
+    guard
+      case .ready = await composition.supervisor.createImpactPreview(
+        action: .restartConfirmedGeneration, endpoint: endpoint)
+    else {
+      return XCTFail(
+        "registry-fed empty-but-complete inventory must satisfy the participant receipt")
+    }
+  }
+
+  func testAppRootRegistryRegisteredCriticalFlashJobBlocksDispatchWithZeroChildInvocation()
+    async throws
+  {
+    let root = try temporarySessionRoot()
+    defer { try? FileManager.default.removeItem(at: root.deletingLastPathComponent()) }
+    let candidate = fixtureCandidate()
+    let endpoint = HDCServerEndpoint("127.0.0.1:18716")
+    let registry = HDCApplicationParticipantRegistry()
+    await registry.register(
+      HDCServerRecipient(id: "pi-flash-job", kind: .job, endpoint: endpoint),
+      criticalState: .none)
+    await registry.updateCriticalState(
+      .criticalNonInterruptible(
+        stepID: "flash-system", safeBoundaryAction: "wait for flash checkpoint"),
+      for: HDCServerRecipient(id: "pi-flash-job", kind: .job, endpoint: endpoint))
+    // 另一 endpoint 的 participant 不进入本 endpoint 的 impact scope。
+    await registry.register(
+      HDCServerRecipient(
+        id: "pi-other-endpoint-job", kind: .job, endpoint: HDCServerEndpoint("127.0.0.1:18717")),
+      criticalState: .none)
+
+    let invocationLog = root.appending(path: "pi-registry-invocations.log")
+    let composition = try await HDCApplicationDiagnosticsHost().compose(
+      sessionRoot: root, sessionID: "pi-registry-critical-session",
+      jobID: "pi-registry-critical-job", toolchain: candidate,
+      semanticProfile: fixtureSemanticProfile(candidate: candidate),
+      snapshot: fixtureSnapshot(candidate: candidate, endpoint: endpoint),
+      authorization: .ready,
+      additionalChildEnvironment: ["ARKDECK_FAKE_HDC_INVOCATION_LOG": invocationLog.path],
+      impactInventory: await registry.inventory(for: endpoint),
+      postDispatchProbe: { _ in .generation(8) })
+    await composition.supervisor.observeExistingServer(
+      HDCExistingServerObservation(
+        state: HDCServerState(
+          endpoint: endpoint, health: .healthy, version: .known("3.2.0d"), generation: 7,
+          ownership: .external)),
+      reason: "fixture verified identity")
+    await composition.supervisor.setImpactReliability(true, for: endpoint)
+    guard
+      case .ready(let preview) = await composition.supervisor.createImpactPreview(
+        action: .restartConfirmedGeneration, endpoint: endpoint),
+      case .accepted(let confirmation) = await composition.supervisor.confirm(preview.id)
+    else {
+      return XCTFail("registry-fed complete inventory must produce an exact impact scope")
+    }
+    XCTAssertEqual(
+      preview.snapshot.affectedJobs, ["pi-flash-job", "pi-registry-critical-job"])
+
+    let result = await (try XCTUnwrap(composition.lifecycle)).dispatch(
+      confirmation: confirmation)
+    XCTAssertEqual(
+      result,
+      .blocked(
+        .criticalJobs([
+          HDCServerCriticalJob(
+            jobID: "pi-flash-job", stepID: "flash-system",
+            safeBoundaryAction: "wait for flash checkpoint")
+        ])))
+    XCTAssertFalse(
+      FileManager.default.fileExists(atPath: invocationLog.path),
+      "registry-registered critical Job must block before any lifecycle child dispatch")
+  }
+
+  func testAppRootRegistryDuplicateOrUnknownRegistrationFailsClosed() async throws {
+    let root = try temporarySessionRoot()
+    defer { try? FileManager.default.removeItem(at: root.deletingLastPathComponent()) }
+    let candidate = fixtureCandidate()
+    let endpoint = HDCServerEndpoint("127.0.0.1:18716")
+    let registry = HDCApplicationParticipantRegistry()
+    let recipient = HDCServerRecipient(id: "pi-duplicate-job", kind: .job, endpoint: endpoint)
+    await registry.register(recipient, criticalState: .none)
+    await registry.register(recipient, criticalState: .none)
+
+    let inventory = await registry.inventory(for: endpoint)
+    guard case .unavailable(let reason) = inventory else {
+      return XCTFail("a duplicate registration must invalidate the completeness claim")
+    }
+
+    let unknownRegistry = HDCApplicationParticipantRegistry()
+    await unknownRegistry.updateCriticalState(
+      .none, for: HDCServerRecipient(id: "pi-never-registered", kind: .job, endpoint: endpoint))
+    guard case .unavailable = await unknownRegistry.inventory(for: endpoint) else {
+      return XCTFail("an unknown-recipient update must invalidate the completeness claim")
+    }
+
+    let composition = try await HDCApplicationDiagnosticsHost().compose(
+      sessionRoot: root, sessionID: "pi-registry-duplicate-session",
+      jobID: "pi-registry-duplicate-job", toolchain: candidate,
+      semanticProfile: fixtureSemanticProfile(candidate: candidate),
+      snapshot: fixtureSnapshot(candidate: candidate, endpoint: endpoint),
+      authorization: .ready,
+      impactInventory: inventory,
+      postDispatchProbe: { _ in .generation(8) })
+    await composition.supervisor.observeExistingServer(
+      HDCExistingServerObservation(
+        state: HDCServerState(
+          endpoint: endpoint, health: .healthy, version: .known("3.2.0d"), generation: 7,
+          ownership: .external)),
+      reason: "fixture verified identity")
+    await composition.supervisor.setImpactReliability(true, for: endpoint)
+    let presentation = await composition.diagnostics.requestRecoveryImpactPreview()
+    XCTAssertEqual(presentation.lifecycleRecovery, .unavailable(reason: reason))
+  }
+
+  private func fixtureSnapshot(
+    candidate: HDCCandidate, endpoint: HDCServerEndpoint
+  ) -> HDCJobToolchainSnapshot {
+    HDCJobToolchainSnapshot(
+      candidate: candidate, endpoint: endpoint.rawValue,
+      details: HDCProbeDetails(
+        platformTrust: .unknown(reason: "fixture"), clientVersion: .known("3.2.0d"),
+        serverVersion: .known("3.2.0d"), daemonVersion: .unknown(reason: "not registered"),
+        serverGeneration: .known(7)))
+  }
+
   private func fixtureCandidate() -> HDCCandidate {
     let url = fixtureExecutable()
     let bytes = (try? Data(contentsOf: url)) ?? Data()
