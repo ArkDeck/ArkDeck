@@ -215,29 +215,33 @@ done、独立 ready-restore PR 合入且具名设备窗口内才可执行。
 
 ## TASK-UD-CAP-MUT-001 — R1-R3 首次 target-build 人工 deviceMutation 采集
 
-- Status:ready(2026-07-21 独立 ready-restore status PR;仅在维护者 review/merge 后生效。
-  #219 合入的首次 Phase A failure evidence/status 保持 immutable,不复用、不重判:
-  当次 run 在 `FX-1` fail-closed 中止,未执行 `FX-2`/`HP-2`/`SC-*`/`INV-1`/`R1`-`R3`,
-  不生成 `hardware-evidence.json`,不认领 `INT-UD-CAPTURE-MUT-001`、canonical AC、
-  Recipe success/compatibility/support PASS。恢复依据如下:
-  (1) r4 readiness PR #132 的五项 pins 保持不变:fixture HAP tuple/hash、`INV-1`、
-  sidecar literal path/commands、`FX-1`…`FX-4` 与 operator/window;
-  (2) `TASK-UD-HARNESS-ECHO-001` implementation+evidence PR #228 已由维护者合入
-  `b38d028ff821900c7c191c2bccc5951c5c719e7b`,implementation source revision
-  `4049bb0de80160a696e6f8defabb3f70e4135d5a`,remediation done status PR #229 已合入
-  `3ac44f2d759bd8bec8f95405b85281d70f89cad0`;
-  (3) schema `1.1.0` 与三份 merged-main harness SHA-256 已固定:
-  `scripts/ud_capture/README.md`=
-  `6e5db1827176a0c16b5a4b21431efa9e4d4dab041f03801a357f74b3db2f2601`,
-  `scripts/ud_capture/capture.py`=
-  `b407aaa07260e3252428bdf00431f4d1e451c30f77c55f1f6b15a5d170d19492`,
-  `scripts/ud_capture/test_capture.py`=
-  `b29c15b8fdca755f26fdfe4f5156082a8bb4a6fd80d8ceecec178419d4690070`;
-  (4) #229 merged main 上复验 harness tests 63/63 PASS、SDD 0 error/0 warning/
-  111 acceptance IDs。此 status PR 的 installed-HDC/device/network/GUI/mutation/
-  destructive/fixture/Recipe dispatch 均为 `0`;合入后仅授权维护者在具名设备窗口按
-  runbook 从 fresh controlled session 的 `HP-0` 重新开始,不构成 hardware evidence、
-  compatibility/support/release 或任何 canonical AC PASS)
+- Status:done(TASK-UD-CAP-MUT-001 Phase A evidence PR #248 已由维护者 review/merge
+  合入 `main` `79b795b7916c863376b3c1f9c37456b0089283dd`;本独立状态 PR 依据下列
+  completion evidence 起草 `ready→done`,仅在维护者 review/merge 后生效。本状态只关闭
+  `INT-UD-CAPTURE-MUT-001` 的单一 DAYU200 / OpenHarmony 7.0.0.34 / API 26.0.0 /
+  HDC 3.2.0d / USB 人工受控采集 protocol。R1/R2/R3 均保持 `unknownOutput`,不认领
+  Recipe success、任何 canonical `AC-DUMP-*`、compatibility/support/conformance/release
+  PASS;R4 dispatch 保持 `0`,`TASK-UD-CAP-R4-001` 仍 blocked 并等待独立 approved R2
+  output-family/component-token decision)
+- Completion evidence:
+  `evidence/runs/TASK-UD-CAP-MUT-001/attempt-3-complete-20260721/run.md`、
+  `hardware-evidence.json`、`capture-hashes.md` 与 `redacted-manifests/`(evidence ID
+  `EVD-UD-CAP-MUT-DAYU200-20260721-003`;25 个 schema `1.1.0` harness invocations 全部
+  exit `0`、complete/untruncated/non-drain-incomplete/self-check PASS;共 `51` 个分立
+  whole-stream/whole-file origin;同会话 target binding 与每次 explicit `-t` gate 通过;
+  R1/R2/R3 各 dispatch `1`,分类均为 `unknownOutput`;R2 在 absent pre-state 后新建 regular
+  sidecar,SC-2 接收并扫描 `866256` bytes,SC-3 exact-path 删除且 SC-1 复查 absent;R1/R3
+  post-state absent;FX-3/FX-4 teardown 完成;Agent installed-HDC/device/destructive dispatch
+  `0/0/0`)。hardware evidence 通过 schema `2.0.0`,其 `26/26` artifact SHA-256 与仓库
+  文件一致,repository-sensitive/path scan PASS;claimed operator/physical target 与 run
+  叙述真实性由 #248 review/merge attestation 保证。前序
+  `attempt-2-reflash-abort-20260721/run.md` 保持 **ABORTED / NOT REUSABLE / NOT PASS**:
+  人类刷机使当次 state 失效,没有任何 key/window/artifact 被 attempt 3 复用;exact flash
+  command/image digest/time 不可得的偏差与聊天中 transient window id/有限 stdout 摘录的
+  privacy deviation 均已如实记录且原值未进入 repository evidence。状态 PR 在 #248
+  merged `main` 上复验 evidence validator、artifact hash、敏感扫描、hardware schema、
+  harness `63/63`、SDD `0/0/111` 与 `git diff --check` 全部 PASS;本状态 PR 新增 device/
+  network/GUI/mutation/destructive/fixture/Recipe dispatch 均为 `0`。
 - Objective:由人类维护者按 `capture-runbook.md` Phase A 在 DAYU200 真机上首次执行
   R1-R3 三个 Recipe 的受控采集,记录逐流 byte-exact raw(仓库外)、redacted manifest 与
   hardware evidence,为后续 argv/output-family decision 提供事实输入。
