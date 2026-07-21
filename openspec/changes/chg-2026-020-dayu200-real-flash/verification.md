@@ -1,6 +1,6 @@
 # CHG-2026-020 Verification Plan
 
-> Status:planned
+> Status:passed;maintainer confirmation 见 proposal.md Verification closure(2026-07-21)
 > Change:CHG-2026-020-dayu200-real-flash@r1
 > Core baseline:CORE-2.0.0(零 Core 变更;认领 flashing REQ-FLASH-* 的 DAYU200 面)
 
