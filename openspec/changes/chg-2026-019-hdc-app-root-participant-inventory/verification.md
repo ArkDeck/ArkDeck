@@ -1,6 +1,6 @@
 # CHG-2026-019 Verification Plan
 
-> Status:planned
+> Status:passed;maintainer confirmation 见 proposal.md Verification closure(2026-07-21)
 > Change:CHG-2026-019-hdc-app-root-participant-inventory@r1
 > Core baseline:CORE-2.0.0(零 Core 变更)
 
