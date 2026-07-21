@@ -1,6 +1,6 @@
 # CHG-2026-016 Verification Plan
 
-> Status:planned
+> Status:passed;maintainer confirmation 见 proposal.md Verification closure(2026-07-21)
 > Change:CHG-2026-016-dayu200-recovery-rehearsal@r4
 > Core baseline:CORE-2.0.0
 
