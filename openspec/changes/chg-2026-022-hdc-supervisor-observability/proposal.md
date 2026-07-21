@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-022-hdc-supervisor-observability
 revision: 1
-status: proposed # 本 propose PR 合入仅登记提案;批准须独立 approval-only PR(先例 #55/#89/#171/#195/#226)
+status: approved # 2026-07-21 本 approval-only PR(先例 #55/#89/#171/#195/#226);r1 proposal 经 #252 合入 main `bb67f22`;批准由维护者 review/merge 本 PR 构成
 class: platform
 core_change_level: none
 owner: lvye
@@ -71,3 +71,23 @@ V2 治理:本 propose PR 合入仅登记提案;批准须独立 approval-only PR;
 独立 readiness/实现/done PR(OBS-002 依赖 OBS-001 done)。本 change done 后:
 TASK-M0B-002 以新 readiness PR 重钉交付形态与 pins(#250 记录的解除前置 (b)),
 再约设备窗口。
+
+## Approval
+
+- r1 proposal 经 PR #252 合入 main(squash `bb67f22`,status:proposed)。
+- 正式批准:2026-07-21 由本 approval-only PR(先例 #55/#89/#171/#195/#226)将本
+  change 置为 `approved`;批准由维护者 review/merge 本 PR 构成。merge 即批准:
+  - **两任务分期 scope 与边界**:TASK-OBS-001(Kit 仪表化与分类面)与
+    TASK-OBS-002(App 观察面 + signed XCUITest,依赖 OBS-001)的 objective/scope/
+    allowed-paths;
+  - **design §0 硬不变量**:纯可观察性——零 lifecycle/授权门语义变更
+    (external/unknown 门等价性本身为测试用例)、仪表化真实性(计数器落真实调用
+    点、变异可证伪、拒绝分支常量)、ownership 三证据矩阵判 external 缺一保持
+    unknown 的 fail-closed 方向、零新增设备 mutation 路径;
+  - **验收面**:五条 change-local contract AC(OBS-COUNTER/OWNERSHIP/ENDPOINT/
+    FANOUT/APPFACE-001);canonical Core AC 零认领;不改写 CHG-2026-006
+    acceptance;M1-009 导出接线明确 out of scope。
+- 本批准不产生任务执行:两任务保持 `blocked`,各须独立 readiness PR 转 `ready`
+  (OBS-002 另需 OBS-001 done);本 change done 后 TASK-M0B-002 以新 readiness PR
+  重钉交付形态(#250 解除前置 (b)),真机观察仍属 M0B-002 + 设备窗口 + 维护者
+  执行。
