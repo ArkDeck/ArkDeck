@@ -1,3 +1,4 @@
+import AppKit
 import XCTest
 
 @MainActor
@@ -34,16 +35,18 @@ final class HDCStatusUITests: XCTestCase {
     )
   }
 
-  // TEST-AC-HDC-006-01 / platformFileAccessContract
-  func testKeyAccessDeniedRemainsADiagnosticWithoutLifecycleControl() {
+  // OPENHARMONY-HDC-READONLY-PROBES@1.0.0 unsupported key-family disposition.
+  func testUnsupportedKeyAccessRemainsADiagnosticWithoutLifecycleControl() {
     let app = launch(arguments: ["--ui-test-hdc-key-access-denied"])
 
     XCTAssertTrue(app.staticTexts["hdc.authorization"].waitForExistence(timeout: 5))
     assertDisplayedValue(
       app.staticTexts["hdc.authorization"],
-      equals: "key access denied — The current HDC process cannot access its managed key")
+      equals:
+        "unavailable — key access diagnostics unsupported without a user-approved locator")
     assertDisplayedValue(
-      app.staticTexts["hdc.keyAccessError"], equals: "HDC key access denied by platform permissions"
+      app.staticTexts["hdc.keyAccessError"],
+      equals: "Key access diagnostics are unsupported; no key path was read or modified."
     )
     XCTAssertFalse(app.buttons["hdc.lifecycle.dispatch"].exists)
   }
@@ -65,8 +68,8 @@ final class HDCStatusUITests: XCTestCase {
     XCTAssertFalse(app.buttons["hdc.lifecycle.dispatch"].exists)
   }
 
-  // TEST-AC-HDC-008-01 / securityStateContract and
-  // TEST-AC-HDC-009-01 / subserverCallCounter
+  // TEST-AC-HDC-008-01 / securityStateContract plus the registered
+  // unsupported subserver-family disposition (not AC-HDC-009 capability evidence).
   func testAuthorizedTCPStillShowsUnverifiedProtectionWarningAndReadOnlySubserver() {
     let app = launch(arguments: [])
 
@@ -78,7 +81,7 @@ final class HDCStatusUITests: XCTestCase {
       equals: "Channel protection is unverified. Use TCP only on a trusted, isolated network.")
     assertDisplayedValue(
       app.staticTexts["hdc.subserver"],
-      equals: "supported (read-only; no automatic spawn or migration)")
+      equals: "unsupported")
     XCTAssertFalse(app.buttons["hdc.subserver.spawn"].exists)
     XCTAssertFalse(app.buttons["hdc.subserver.killall"].exists)
   }
@@ -125,9 +128,13 @@ final class HDCStatusUITests: XCTestCase {
   }
 
   // TEST-AC-HDC-003-01 / productionSessionCompositionUI
-  func testNormalLaunchUsesDurableSessionDiagnosticsForAnExplicitCandidate() {
+  func testNormalLaunchUsesDurableSessionDiagnosticsAndFailsClosedWithoutHostInventory() {
     let app = launch(
-      arguments: ["--arkdeck-hdc-user-configured-path", "/usr/bin/true"],
+      arguments: [
+        "--ui-test-reset-hdc-selection",
+        "--arkdeck-hdc-user-configured-path",
+        "/usr/bin/true",
+      ],
       fixture: false)
 
     let configuredPath = app.staticTexts["hdc.toolchain.path"]
@@ -135,9 +142,68 @@ final class HDCStatusUITests: XCTestCase {
     let request = app.buttons["hdc.lifecycle.requestImpactPreview"]
     XCTAssertTrue(request.exists)
     request.tap()
+    assertDisplayedValue(
+      app.staticTexts["hdc.lifecycle.recoveryUnavailable"],
+      equals:
+        "Lifecycle mutation is unavailable because no complete App-root HDC Job/Device critical-state inventory is attached.",
+      timeout: 5)
+  }
+
+  // M1-006 safety gate: a non-pinned fake cannot be executed merely because
+  // it was explicitly selected. The commandless registry precondition wins.
+  func testProductionSandboxRejectsRepositoryFakeBeforeAnyHDCProbe() {
+    let fakeExecutable = repositoryFakeHDCExecutable()
+    let app = launch(
+      arguments: [
+        "--ui-test-reset-hdc-selection", "--arkdeck-hdc-user-configured-path",
+        fakeExecutable.path,
+      ], fixture: false)
+
+    assertDisplayedValue(
+      app.staticTexts["hdc.toolchain.path"], equals: fakeExecutable.path, timeout: 15)
+    assertDisplayedValue(
+      app.staticTexts["hdc.toolchain.clientVersion"],
+      equals: "unknown (registered client probe requires an existing server identity)",
+      timeout: 15)
+  }
+
+  // PORT-FILE-ACCESS-001 / signed Sandbox picker and bookmark reopen.
+  func testUserPickerPersistsBookmarkAcrossRelaunch() throws {
+    let pickerExecutable = pickerFakeHDCExecutable()
+    let fakeExecutable = pickerExecutable.resolvingSymlinksInPath().standardizedFileURL
+    let repositoryFake = repositoryFakeHDCExecutable()
     XCTAssertTrue(
-      app.staticTexts["hdc.lifecycle.recoveryBlocked"].waitForExistence(timeout: 5),
-      "the normal App path must reach the Session-backed supervisor, not the read-only fixture")
+      FileManager.default.isExecutableFile(atPath: fakeExecutable.path),
+      "swift test must build the repository fake before the signed UI gate")
+    XCTAssertEqual(
+      try Data(contentsOf: pickerExecutable), try Data(contentsOf: repositoryFake),
+      "the visible picker fixture must be byte-identical to the repository fake")
+
+    let app = launch(arguments: ["--ui-test-reset-hdc-selection"], fixture: false)
+    let choose = app.buttons["hdc.toolchain.chooseExecutable"]
+    XCTAssertTrue(choose.waitForExistence(timeout: 5))
+    choose.tap()
+
+    let openPanel = app.sheets.firstMatch
+    XCTAssertTrue(openPanel.waitForExistence(timeout: 5), "Open panel must become interactive")
+    app.typeKey("g", modifierFlags: [.command, .shift])
+    let pathField = openPanel.textFields.firstMatch
+    XCTAssertTrue(pathField.waitForExistence(timeout: 5), "Open panel must expose Go to Folder")
+    pathField.click()
+    pathField.typeKey("a", modifierFlags: [.command])
+    try withTemporaryGeneralPasteboardString(pickerExecutable.path) {
+      pathField.typeKey("v", modifierFlags: [.command])
+    }
+    pathField.typeKey(.return, modifierFlags: [])
+    app.typeKey(.return, modifierFlags: [])
+
+    assertDisplayedValue(
+      app.staticTexts["hdc.toolchain.path"], equals: fakeExecutable.path, timeout: 15)
+    app.terminate()
+
+    let reopened = launch(arguments: [], fixture: false)
+    assertDisplayedValue(
+      reopened.staticTexts["hdc.toolchain.path"], equals: fakeExecutable.path, timeout: 15)
   }
 
   private func launch(arguments: [String], fixture: Bool = true) -> XCUIApplication {
@@ -160,6 +226,13 @@ final class HDCStatusUITests: XCTestCase {
     }
     app.launch()
     app.activate()
+    if !app.windows.firstMatch.waitForExistence(timeout: 2) {
+      // A fresh macOS launch can restore an intentionally empty window set
+      // even with state restoration disabled. Exercise the standard
+      // WindowGroup command instead of treating that OS state as an HDC
+      // composition failure.
+      app.typeKey("n", modifierFlags: .command)
+    }
     XCTAssertTrue(
       app.windows.firstMatch.waitForExistence(timeout: 5), "ArkDeck must create a test window")
     XCTAssertTrue(
@@ -186,13 +259,69 @@ final class HDCStatusUITests: XCTestCase {
     }
     let expectation = expectation(for: displayedValue, evaluatedWith: element)
     let result = XCTWaiter.wait(for: [expectation], timeout: timeout)
-    XCTAssertEqual(
-      result, .completed,
+    let finalValues = displayedValues(for: element)
+    XCTAssertTrue(
+      result == .completed || finalValues.contains(expectedText),
       "Expected exact displayed value \(expectedText), got: \(displayedText(for: element))",
       file: file, line: line)
   }
 
   private func displayedValues(for element: XCUIElement) -> [String] {
     [element.label, element.value as? String].compactMap { $0 }
+  }
+
+  private func pickerFakeHDCExecutable() -> URL {
+    if let explicit = ProcessInfo.processInfo.environment["ARKDECK_FAKE_HDC_EXECUTABLE"] {
+      return URL(fileURLWithPath: explicit).standardizedFileURL
+    }
+    let root = repositoryRoot()
+    let visibleHardLink = root.appending(path: "ArkDeckFakeHDCFixture-M1-006")
+    if FileManager.default.fileExists(atPath: visibleHardLink.path) {
+      return visibleHardLink
+    }
+    return
+      root
+      .appending(path: "Packages/ArkDeckKit/.build/debug/ArkDeckFakeHDCFixture")
+      .standardizedFileURL
+  }
+
+  private func repositoryRoot() -> URL {
+    URL(fileURLWithPath: #filePath)
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+  }
+
+  private func repositoryFakeHDCExecutable() -> URL {
+    repositoryRoot()
+      .appending(path: "Packages/ArkDeckKit/.build/debug/ArkDeckFakeHDCFixture")
+      .resolvingSymlinksInPath().standardizedFileURL
+  }
+
+  private func withTemporaryGeneralPasteboardString(
+    _ value: String,
+    perform: () -> Void
+  ) throws {
+    let pasteboard = NSPasteboard.general
+    let savedItems = pasteboard.pasteboardItems?.map { item in
+      let copy = NSPasteboardItem()
+      for type in item.types {
+        if let data = item.data(forType: type) {
+          copy.setData(data, forType: type)
+        }
+      }
+      return copy
+    }
+    pasteboard.clearContents()
+    guard pasteboard.setString(value, forType: .string) else {
+      throw CocoaError(.fileWriteUnknown)
+    }
+    defer {
+      pasteboard.clearContents()
+      if let savedItems {
+        pasteboard.writeObjects(savedItems)
+      }
+    }
+    perform()
   }
 }

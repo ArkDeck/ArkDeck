@@ -20,6 +20,7 @@ enum FixtureMode: String {
   case healthyFailureStderr
   case mismatch
   case managedServer
+  case selectedDeviceReady
 }
 
 let suppliedArguments = Array(CommandLine.arguments.dropFirst())
@@ -49,6 +50,8 @@ if suppliedArguments.first == "uninstall" {
   mode = .managedServer
 } else if endpointBoundArguments == ["-v"] {
   mode = .version
+} else if endpointBoundArguments == ["list", "targets", "-v"] {
+  mode = .selectedDeviceReady
 } else if suppliedArguments.contains("kill") {
   // Lifecycle success is established only by the post-dispatch probe, never
   // by treating arbitrary command output as a registered semantic family.
@@ -85,6 +88,14 @@ case .mismatch:
     Data("Client version:Ver: 3.2.0d, server version:Ver: 3.1.0d\n".utf8))
 case .version:
   FileHandle.standardOutput.write(Data("Ver: 3.2.0d\n".utf8))
+case .selectedDeviceReady:
+  // Synthetic parser control only. The identifier is deliberately fake and
+  // cannot provide production provenance or device/hardware evidence.
+  let row =
+    ProcessInfo.processInfo.environment["ARKDECK_FAKE_HDC_SELECTED_DEVICE_ROW"]
+    ?? "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\t\tUSB\tConnected\tlocalhost\n"
+  FileHandle.standardOutput.write(
+    Data(row.utf8))
 case .unauthorized:
   FileHandle.standardOutput.write(Data("[Fail] ErrorCode: E000003 Unauthorized device\n".utf8))
 case .offline:

@@ -1,7 +1,7 @@
 # macOS Platform Profile
 
 > ID：PLATFORM-MACOS  
-> Version：0.1.0  
+> Version：0.2.0
 > Status：review（M0A 后决定 Sandbox/distribution）  
 > Core baseline：CORE-2.0.0  
 > Core strategy：native-conforming-shared-contract-vector-suite  
@@ -52,6 +52,26 @@ Packages/ArkDeckKit/
 | ActiveWorkClock | `SuspendingClock` 或经 contract test 证明睡眠期间暂停的等价时钟；wake 后重置 throughput/ETA segment |
 | SleepWakeObserver | `NSWorkspace` sleep/wake notification 或经 contract test 验证的等价系统通知；wake 后触发 journal reconcile、重连评估和 ETA segment reset |
 | PlatformFileRevealer | Finder reveal |
+
+## M1 HDC read-only probe mapping
+
+M1-006 consumes the exact `OPENHARMONY-TOOLS@0.3.0` registry at
+`openspec/integrations/openharmony/readonly-probes.yaml` (SHA-256
+`9014c480c3df61b5a6db7e54e52f29e89d7c93431e91d0856cf5710c22466b9d`). macOS maps
+the four registered families as follows:
+
+| Probe family | macOS access / diagnostic mapping |
+| --- | --- |
+| `serverIdentityGeneration` | Supported through commandless platform process observation: exact executable identity, exact loopback listener endpoint, PID start identity, and bracketed pre/post observation. A child command cannot establish ownership. |
+| `selectedDeviceAuthorizationBinding` | Supported only for the registered `list targets -v` argv and only after a stable existing-server identity receipt. Strict parsing must match the selected device's durable connect-key and serial binding, and the complete stdout bytes must equal the registry's captured `rawSHA256` family. The current family therefore establishes `.ready` only for that registered capture; a different device row remains unavailable even when it matches a durable binding. Supporting arbitrary devices requires a separately approved integration change that registers a parameterized raw family. |
+| `keyAccessDiagnostics` | Unsupported. The registered profile grants no key path or file-read dispatch authority; UI reports the capability unavailable without guessing a path or touching key material. |
+| `subserverCapability` | Unsupported. The registered profile grants no child command; UI reports unavailable and spawn-sub, killall-sub, and device-migration call counts remain zero. |
+
+The production classifier is bound to the registry plus its hash-pinned resource manifest and
+control vectors. Missing, mismatched, or unregistered evidence fails closed. The signed Sandbox
+test path uses a user-selected executable with a security-scoped bookmark and repository
+`ArkDeckFakeHDCFixture`; it never executes an installed HDC, accesses a real device, or mutates a
+server.
 
 ## Session location
 

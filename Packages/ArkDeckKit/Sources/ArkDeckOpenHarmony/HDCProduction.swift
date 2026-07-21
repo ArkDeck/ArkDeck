@@ -95,8 +95,10 @@ public enum HDCServerEndpointSelector {
 }
 
 /// Module-internal process request. The public HDC surface never exposes an
-/// argv-bearing command: callers use the fixed `checkserver` and `-v` probe
-/// APIs, while lifecycle argv is assembled only by the confirmed executor.
+/// argv-bearing command: production callers use only registered probes with
+/// their required identity preconditions, while lifecycle argv is assembled
+/// only by the confirmed executor. Legacy `checkserver`/`-v` entry points stay
+/// internal for package compatibility contracts.
 /// It intentionally has no fallback to PATH or a settings object.
 struct HDCProcessCommand: Sendable, Equatable {
   let toolchain: HDCCandidate
@@ -137,6 +139,7 @@ struct HDCProcessCommand: Sendable, Equatable {
 
 enum HDCProcessCommandError: Error, Sendable, Equatable {
   case toolchainIdentityChanged(path: String)
+  case registeredSemanticProfileMismatch
 }
 
 /// The command family is selected before a process starts.  A successful
@@ -145,6 +148,7 @@ public enum HDCRegisteredCommandFamily: Sendable, Equatable {
   case uninstall
   case checkserver
   case version
+  case selectedDeviceAuthorization
   /// Lifecycle output has no registered success byte family. A successful
   /// mutation is proved only by the post-dispatch server observation.
   case lifecycleRestart
@@ -172,6 +176,112 @@ enum HDCRegisteredGoldenFingerprint {
   }
 }
 
+/// A semantic family is authority-bearing only as one complete integration
+/// profile binding. Production fixes this value to the executable identity
+/// registered by OPENHARMONY-TOOLS@0.3.0. Tests that execute the repository
+/// fixture must opt in to the explicitly named fake profile rather than
+/// teaching the production classifier to trust the fixture's SHA.
+package struct HDCRegisteredSemanticProfile: Sendable, Equatable {
+  package enum Authority: Sendable, Equatable {
+    case pinnedProduction
+    case testOnlyFake
+  }
+
+  package static let pinnedProduction = HDCRegisteredSemanticProfile(
+    authority: .pinnedProduction,
+    integrationProfile: HDCReadOnlyProbeRegistry.integrationProfile,
+    toolVersion: HDCReadOnlyProbeRegistry.targetToolVersion,
+    targetExecutableSHA256: HDCReadOnlyProbeRegistry.targetExecutableSHA256,
+    selectedDeviceAuthorizationSHA256: HDCReadOnlyProbeRegistry.pinnedProduction
+      .entry(for: .selectedDeviceAuthorizationBinding).rawSHA256)
+
+  package let authority: Authority
+  package let integrationProfile: String
+  package let toolVersion: String
+  package let targetExecutableSHA256: String
+
+  private let uninstallSuccessSHA256: String
+  private let checkserverHealthySHA256: String
+  private let versionSHA256: String
+  private let selectedDeviceAuthorizationSHA256: String?
+
+  private init(
+    authority: Authority,
+    integrationProfile: String,
+    toolVersion: String,
+    targetExecutableSHA256: String,
+    selectedDeviceAuthorizationSHA256: String?
+  ) {
+    self.authority = authority
+    self.integrationProfile = integrationProfile
+    self.toolVersion = toolVersion
+    self.targetExecutableSHA256 = targetExecutableSHA256
+    uninstallSuccessSHA256 = HDCRegisteredGoldenFingerprint.uninstallSuccessSHA256
+    checkserverHealthySHA256 = HDCRegisteredGoldenFingerprint.checkserverHealthySHA256
+    versionSHA256 = HDCRegisteredGoldenFingerprint.versionSHA256
+    self.selectedDeviceAuthorizationSHA256 = selectedDeviceAuthorizationSHA256
+  }
+
+  /// Available to package contract composition only. Production initializers
+  /// never select this authority and always use `pinnedProduction`.
+  package static func testOnlyFake(
+    executableSHA256: String,
+    selectedDeviceAuthorizationSHA256: String
+  ) -> Self {
+    HDCRegisteredSemanticProfile(
+      authority: .testOnlyFake,
+      integrationProfile: HDCReadOnlyProbeRegistry.integrationProfile,
+      toolVersion: HDCReadOnlyProbeRegistry.targetToolVersion,
+      targetExecutableSHA256: executableSHA256,
+      selectedDeviceAuthorizationSHA256: selectedDeviceAuthorizationSHA256)
+  }
+
+  package func matchesSelectedDeviceAuthorizationRawSHA256(_ sha256: String?) -> Bool {
+    selectedDeviceAuthorizationSHA256 == sha256
+  }
+
+  fileprivate func binding(
+    descriptorSHA256: String,
+    commandFamily: HDCRegisteredCommandFamily
+  ) -> HDCRegisteredSemanticBinding? {
+    guard integrationProfile == HDCReadOnlyProbeRegistry.integrationProfile,
+      toolVersion == HDCReadOnlyProbeRegistry.targetToolVersion,
+      descriptorSHA256 == targetExecutableSHA256,
+      commandFamily != .unregistered
+    else { return nil }
+
+    let expectedStdoutSHA256: String?
+    switch commandFamily {
+    case .uninstall:
+      expectedStdoutSHA256 = uninstallSuccessSHA256
+    case .checkserver:
+      expectedStdoutSHA256 = checkserverHealthySHA256
+    case .version:
+      expectedStdoutSHA256 = versionSHA256
+    case .selectedDeviceAuthorization:
+      expectedStdoutSHA256 = selectedDeviceAuthorizationSHA256
+    case .lifecycleRestart, .lifecycleStop:
+      expectedStdoutSHA256 = nil
+    case .unregistered:
+      return nil
+    }
+    return HDCRegisteredSemanticBinding(
+      integrationProfile: integrationProfile,
+      toolVersion: toolVersion,
+      executableSHA256: descriptorSHA256,
+      commandFamily: commandFamily,
+      expectedStdoutSHA256: expectedStdoutSHA256)
+  }
+}
+
+private struct HDCRegisteredSemanticBinding: Sendable, Equatable {
+  let integrationProfile: String
+  let toolVersion: String
+  let executableSHA256: String
+  let commandFamily: HDCRegisteredCommandFamily
+  let expectedStdoutSHA256: String?
+}
+
 /// Integration-profile-registered command-result evaluator. It preserves the
 /// legacy parser's conservative failure precedence, then accepts success only
 /// for the registered uninstall command's byte-exact stdout capture. Marker
@@ -179,13 +289,30 @@ enum HDCRegisteredGoldenFingerprint {
 public struct HDCRegisteredSemanticEvaluator: ProcessSemanticEvaluating {
   public typealias SemanticResult = HDCCommandSemanticResult
 
-  private let commandFamily: HDCRegisteredCommandFamily
+  private let binding: HDCRegisteredSemanticBinding?
   private var legacy = HDCSemanticOutputParser()
   private var stdoutHasher = SHA256()
   private var containsStderr = false
 
   public init(commandFamily: HDCRegisteredCommandFamily = .unregistered) {
-    self.commandFamily = commandFamily
+    // A command-family label supplied without the registered executable,
+    // profile version, argv shape, and raw family is deliberately untrusted.
+    // Keep this public compatibility initializer fail-closed.
+    binding = nil
+  }
+
+  fileprivate init(binding: HDCRegisteredSemanticBinding?) {
+    self.binding = binding
+  }
+
+  package init(
+    semanticProfile: HDCRegisteredSemanticProfile,
+    descriptorSHA256: String,
+    arguments: [String]
+  ) {
+    binding = semanticProfile.binding(
+      descriptorSHA256: descriptorSHA256,
+      commandFamily: hdcRegisteredCommandFamily(arguments: arguments))
   }
 
   public mutating func consume(_ chunk: ProcessOutputChunk) {
@@ -211,22 +338,24 @@ public struct HDCRegisteredSemanticEvaluator: ProcessSemanticEvaluating {
     let legacyResult = legacy.finish(exitCode: code)
     if case .failure = legacyResult { return legacyResult }
     guard code == 0 else { return .failure(.nonZeroExit(code)) }
-    switch commandFamily {
+    guard let binding else { return .unknownOutput }
+    switch binding.commandFamily {
     case .uninstall:
       return !containsStderr
         && HDCRegisteredGoldenFingerprint.matches(
           stdoutHasher.finalize().map { String(format: "%02x", $0) }.joined(),
-          sha256: HDCRegisteredGoldenFingerprint.uninstallSuccessSHA256)
+          sha256: binding.expectedStdoutSHA256 ?? "")
         ? .success
         : .unknownOutput
     case .version:
       return !containsStderr
         && HDCRegisteredGoldenFingerprint.matches(
           stdoutHasher.finalize().map { String(format: "%02x", $0) }.joined(),
-          sha256: HDCRegisteredGoldenFingerprint.versionSHA256)
+          sha256: binding.expectedStdoutSHA256 ?? "")
         ? .success
         : .unknownOutput
-    case .checkserver, .lifecycleRestart, .lifecycleStop, .unregistered:
+    case .checkserver, .selectedDeviceAuthorization, .lifecycleRestart, .lifecycleStop,
+      .unregistered:
       return .unknownOutput
     }
   }
@@ -237,16 +366,16 @@ public struct HDCRegisteredSemanticEvaluator: ProcessSemanticEvaluating {
 /// redacts, or overwrites them.
 private final class HDCPreparedProcessCommand: @unchecked Sendable {
   let process: ProcessPreparedIdentityBoundLaunch
-  let commandFamily: HDCRegisteredCommandFamily
+  fileprivate let semanticBinding: HDCRegisteredSemanticBinding?
   private let securityScopedAccess: HDCSecurityScopedExecutableAccess
 
   init(
     process: ProcessPreparedIdentityBoundLaunch,
-    commandFamily: HDCRegisteredCommandFamily,
+    semanticBinding: HDCRegisteredSemanticBinding?,
     securityScopedAccess: HDCSecurityScopedExecutableAccess
   ) {
     self.process = process
-    self.commandFamily = commandFamily
+    self.semanticBinding = semanticBinding
     self.securityScopedAccess = securityScopedAccess
   }
 
@@ -260,9 +389,14 @@ private final class HDCPreparedProcessCommand: @unchecked Sendable {
 
 package final class HDCProcessCommandRunner: @unchecked Sendable {
   private let executor: FoundationProcessExecutor
+  private let semanticProfile: HDCRegisteredSemanticProfile
 
-  package init(executor: FoundationProcessExecutor = FoundationProcessExecutor()) {
+  package init(
+    executor: FoundationProcessExecutor = FoundationProcessExecutor(),
+    semanticProfile: HDCRegisteredSemanticProfile = .pinnedProduction
+  ) {
     self.executor = executor
+    self.semanticProfile = semanticProfile
   }
 
   func execute(
@@ -278,7 +412,7 @@ package final class HDCProcessCommandRunner: @unchecked Sendable {
     }
     return try await executor.executePreparedIdentityBoundLaunch(
       prepared.process,
-      evaluating: HDCRegisteredSemanticEvaluator(commandFamily: prepared.commandFamily),
+      evaluating: HDCRegisteredSemanticEvaluator(binding: prepared.semanticBinding),
       onOutput: onOutput)
   }
 
@@ -293,9 +427,17 @@ package final class HDCProcessCommandRunner: @unchecked Sendable {
       let prepared = try executor.prepareIdentityBoundLaunch(
         ProcessIdentityBoundRequest(
           process: command.processRequest, expectedSHA256: command.toolchain.sha256))
+      let commandFamily = command.registeredCommandFamily
+      let semanticBinding = semanticProfile.binding(
+        descriptorSHA256: prepared.executableIdentity.sha256,
+        commandFamily: commandFamily)
+      guard commandFamily == .unregistered || semanticBinding != nil else {
+        prepared.close()
+        throw HDCProcessCommandError.registeredSemanticProfileMismatch
+      }
       return HDCPreparedProcessCommand(
         process: prepared,
-        commandFamily: command.registeredCommandFamily,
+        semanticBinding: semanticBinding,
         securityScopedAccess: access)
     } catch {
       access.stop()
@@ -311,29 +453,35 @@ package final class HDCProcessCommandRunner: @unchecked Sendable {
     try await executor.executePreparedIdentityBoundLaunch(
       prepared.process,
       gate: launchGate,
-      evaluating: HDCRegisteredSemanticEvaluator(commandFamily: prepared.commandFamily),
+      evaluating: HDCRegisteredSemanticEvaluator(binding: prepared.semanticBinding),
       onOutput: onOutput)
   }
 }
 
 extension HDCProcessCommand {
   fileprivate var registeredCommandFamily: HDCRegisteredCommandFamily {
-    guard let first = arguments.first else { return .unregistered }
-    switch first {
-    case "uninstall": return .uninstall
-    case "checkserver": return .checkserver
-    case "-v" where arguments.count == 1: return .version
-    case "-s":
-      guard arguments.count >= 3, !arguments[1].isEmpty else {
-        return .unregistered
-      }
-      if arguments.count == 3, arguments[2] == "checkserver" { return .checkserver }
-      guard arguments[2] == "kill" else { return .unregistered }
-      if arguments.count == 4, arguments[3] == "-r" { return .lifecycleRestart }
-      if arguments.count == 3 { return .lifecycleStop }
+    hdcRegisteredCommandFamily(arguments: arguments)
+  }
+}
+
+private func hdcRegisteredCommandFamily(arguments: [String]) -> HDCRegisteredCommandFamily {
+  guard let first = arguments.first else { return .unregistered }
+  switch first {
+  case "uninstall" where arguments.count == 2 && !arguments[1].isEmpty: return .uninstall
+  case "checkserver" where arguments.count == 1: return .checkserver
+  case "-v" where arguments.count == 1: return .version
+  case "list" where arguments == ["list", "targets", "-v"]:
+    return .selectedDeviceAuthorization
+  case "-s":
+    guard arguments.count >= 3, !arguments[1].isEmpty else {
       return .unregistered
-    default: return .unregistered
     }
+    if arguments.count == 3, arguments[2] == "checkserver" { return .checkserver }
+    guard arguments[2] == "kill" else { return .unregistered }
+    if arguments.count == 4, arguments[3] == "-r" { return .lifecycleRestart }
+    if arguments.count == 3 { return .lifecycleStop }
+    return .unregistered
+  default: return .unregistered
   }
 }
 
@@ -344,37 +492,28 @@ public enum HDCServerProbeClassification: Sendable, Equatable {
   case unknown(reason: String)
 }
 
-public struct HDCServerProcessProbeResult: Sendable, Equatable {
-  public let classification: HDCServerProbeClassification
-  public let execution: ProcessExecutionResult
-
-  public init(classification: HDCServerProbeClassification, execution: ProcessExecutionResult) {
-    self.classification = classification
-    self.execution = execution
-  }
+struct HDCServerProcessProbeResult: Sendable, Equatable {
+  let classification: HDCServerProbeClassification
+  let execution: ProcessExecutionResult
 }
 
 /// A ProcessExecutor-backed client version observation. The value is known
 /// only when the exact pinned `hdc -v` stdout family, exit status, and stderr
 /// contract all match; callers can use it when building a toolchain snapshot.
-public struct HDCClientVersionProcessProbeResult: Sendable, Equatable {
-  public let clientVersion: HDCProbeValue<String>
-  public let execution: ProcessExecutionResult
-
-  public init(clientVersion: HDCProbeValue<String>, execution: ProcessExecutionResult) {
-    self.clientVersion = clientVersion
-    self.execution = execution
-  }
+struct HDCClientVersionProcessProbeResult: Sendable, Equatable {
+  let clientVersion: HDCProbeValue<String>
+  let execution: ProcessExecutionResult
 }
 
-/// Read-only client identity probe which is independent of a server
-/// observation. Production Session bootstrap uses this before constructing
-/// the immutable job toolchain snapshot.
-public actor HDCClientVersionProcessProbe {
+/// Legacy 0.2.0 client-version parser exercised only by package contracts.
+/// It is intentionally not public: `hdc -v` may start a shared server, so a
+/// production caller must first satisfy the 0.3.0 commandless existing-server
+/// identity precondition through `observeRegisteredExistingServer`.
+actor HDCClientVersionProcessProbe {
   private let runner: HDCProcessCommandRunner
   private let additionalChildEnvironment: [String: String]
 
-  public init(
+  init(
     additionalChildEnvironment: [String: String] = [:]
   ) {
     runner = HDCProcessCommandRunner()
@@ -389,7 +528,7 @@ public actor HDCClientVersionProcessProbe {
     self.additionalChildEnvironment = additionalChildEnvironment
   }
 
-  public func probe(
+  func probe(
     endpoint: HDCServerEndpointSelection,
     toolchain: HDCCandidate
   ) async -> HDCClientVersionProcessProbeResult {
@@ -439,24 +578,56 @@ public actor HDCServerProcessSupervisor {
   private let runner: HDCProcessCommandRunner
   private let clientVersionProbe: HDCClientVersionProcessProbe
   private let additionalChildEnvironment: [String: String]
+  private let readOnlyProbeRegistry: HDCReadOnlyProbeRegistry
+  private let semanticProfile: HDCRegisteredSemanticProfile
+  private let identityObserver: any HDCServerProcessIdentityObserving
 
   public init(
     supervisor: HDCServerSupervisor,
     additionalChildEnvironment: [String: String] = [:]
   ) {
     self.supervisor = supervisor
-    let runner = HDCProcessCommandRunner()
+    let semanticProfile = HDCRegisteredSemanticProfile.pinnedProduction
+    let runner = HDCProcessCommandRunner(semanticProfile: semanticProfile)
     self.runner = runner
     clientVersionProbe = HDCClientVersionProcessProbe(
       runner: runner, additionalChildEnvironment: additionalChildEnvironment)
     self.additionalChildEnvironment = additionalChildEnvironment
+    readOnlyProbeRegistry = .pinnedProduction
+    self.semanticProfile = semanticProfile
+    identityObserver = SystemHDCServerProcessIdentityObserver()
+  }
+
+  init(
+    supervisor: HDCServerSupervisor,
+    additionalChildEnvironment: [String: String] = [:],
+    readOnlyProbeRegistry: HDCReadOnlyProbeRegistry,
+    semanticProfile: HDCRegisteredSemanticProfile,
+    identityObserver: any HDCServerProcessIdentityObserving
+  ) {
+    self.supervisor = supervisor
+    let runner = HDCProcessCommandRunner(semanticProfile: semanticProfile)
+    self.runner = runner
+    clientVersionProbe = HDCClientVersionProcessProbe(
+      runner: runner, additionalChildEnvironment: additionalChildEnvironment)
+    self.additionalChildEnvironment = additionalChildEnvironment
+    self.readOnlyProbeRegistry = readOnlyProbeRegistry
+    self.semanticProfile = semanticProfile
+    self.identityObserver = identityObserver
   }
 
   @discardableResult
-  public func observeExistingServer(
+  func observeExistingServer(
     endpoint: HDCServerEndpointSelection,
     toolchain: HDCCandidate
   ) async -> HDCServerProcessProbeResult {
+    guard registeredExecutableMatches(toolchain) else {
+      let reason = "selected executable is outside the registered semantic profile"
+      await supervisor.recordUnverifiedServerProbeFailure(
+        endpoint: endpoint.endpoint, reason: reason)
+      return HDCServerProcessProbeResult(
+        classification: .unknown(reason: reason), execution: unavailableExecution())
+    }
     do {
       let evaluated = try await runner.execute(
         HDCProcessCommand(
@@ -498,11 +669,172 @@ public actor HDCServerProcessSupervisor {
   /// Runs the registered read-only `hdc -v` probe through the process port.
   /// This is deliberately separate from `checkserver`: client identity is not
   /// inferred from a caller-built snapshot or server stdout.
-  public func probeClientVersion(
+  func probeClientVersion(
     endpoint: HDCServerEndpointSelection,
     toolchain: HDCCandidate
   ) async -> HDCClientVersionProcessProbeResult {
-    await clientVersionProbe.probe(endpoint: endpoint, toolchain: toolchain)
+    guard registeredExecutableMatches(toolchain) else {
+      return HDCClientVersionProcessProbeResult(
+        clientVersion: .unknown(
+          reason: "selected executable is outside the registered semantic profile"),
+        execution: unavailableExecution())
+    }
+    return await clientVersionProbe.probe(endpoint: endpoint, toolchain: toolchain)
+  }
+
+  /// Applies the 0.3.0 commandless existing-server identity precondition
+  /// before `checkserver`, then repeats it after the command. No HDC child is
+  /// launched when the selected executable, exact loopback endpoint, or
+  /// exactly-one-existing-listener precondition is missing.
+  @discardableResult
+  public func observeRegisteredExistingServer(
+    endpoint: HDCServerEndpointSelection,
+    toolchain: HDCCandidate
+  ) async -> HDCRegisteredServerObservationResult {
+    let entry = readOnlyProbeRegistry.entry(for: .serverIdentityGeneration)
+    guard entry.status == .supported, entry.probeKind == .platformProcessObservation,
+      !entry.invocationAllowed, entry.exactArguments.isEmpty
+    else {
+      return HDCRegisteredServerObservationResult(
+        classification: .unsupported(reason: "server identity family is not registered"))
+    }
+    guard toolchain.sha256 == readOnlyProbeRegistry.targetExecutableSHA256 else {
+      return HDCRegisteredServerObservationResult(
+        classification: .unsupported(
+          reason: "selected executable is outside OPENHARMONY-TOOLS@0.3.0"))
+    }
+    guard registeredExecutableMatches(toolchain) else {
+      return HDCRegisteredServerObservationResult(
+        classification: .unsupported(
+          reason: "semantic profile does not match the complete read-only registry"))
+    }
+
+    let before = await observeIdentity(
+      endpoint: endpoint.endpoint, toolchain: toolchain,
+      timeoutMilliseconds: entry.timeoutMilliseconds)
+    guard case .observed(let beforeReceipt) = before else {
+      return identityFailureResult(before)
+    }
+
+    let evaluated: SemanticallyEvaluatedIdentityBoundProcessResult<HDCCommandSemanticResult>
+    do {
+      evaluated = try await runner.execute(
+        HDCProcessCommand(
+          toolchain: toolchain, endpoint: endpoint,
+          arguments: endpoint.argumentsForEndpointSensitiveProbe(["checkserver"]),
+          additionalChildEnvironment: additionalChildEnvironment, timeout: 10))
+    } catch {
+      await supervisor.recordUnverifiedServerProbeFailure(
+        endpoint: endpoint.endpoint, reason: "registered checkserver process could not run")
+      return HDCRegisteredServerObservationResult(
+        classification: .unknown(reason: "registered checkserver process could not run"),
+        identity: beforeReceipt)
+    }
+
+    let classification = classifyCheckserver(
+      evaluated.execution, semantic: evaluated.semantic)
+    guard case .healthy(let serverVersion) = classification else {
+      await supervisor.recordUnverifiedServerProbeFailure(
+        endpoint: endpoint.endpoint, reason: String(describing: classification))
+      return HDCRegisteredServerObservationResult(
+        classification: .unknown(reason: "registered checkserver family did not establish health"),
+        identity: beforeReceipt, execution: evaluated.execution)
+    }
+
+    let after = await observeIdentity(
+      endpoint: endpoint.endpoint, toolchain: toolchain,
+      timeoutMilliseconds: entry.timeoutMilliseconds)
+    guard case .observed(let afterReceipt) = after else {
+      await supervisor.recordUnverifiedServerProbeFailure(
+        endpoint: endpoint.endpoint,
+        reason: "server identity was not available after checkserver")
+      let failure = identityFailureResult(after)
+      return HDCRegisteredServerObservationResult(
+        classification: failure.classification, identity: beforeReceipt,
+        execution: evaluated.execution)
+    }
+    guard beforeReceipt == afterReceipt else {
+      await supervisor.recordUnverifiedServerProbeFailure(
+        endpoint: endpoint.endpoint,
+        reason: "server identity changed across the checkserver observation")
+      return HDCRegisteredServerObservationResult(
+        classification: .unknown(
+          reason: "server identity changed across the checkserver observation"),
+        identity: afterReceipt, execution: evaluated.execution)
+    }
+
+    guard let generation = afterReceipt.stableGeneration else {
+      await supervisor.recordUnverifiedServerProbeFailure(
+        endpoint: endpoint.endpoint,
+        reason: "server process start identity cannot be represented as a generation")
+      return HDCRegisteredServerObservationResult(
+        classification: .unknown(
+          reason: "server process start identity cannot be represented as a generation"),
+        identity: afterReceipt, execution: evaluated.execution)
+    }
+    await supervisor.observeRegisteredServerIdentity(
+      endpoint: endpoint.endpoint, health: .healthy, version: .known(serverVersion),
+      generation: generation,
+      reason: "OPENHARMONY-TOOLS@0.3.0 bracketed process/listener observation")
+    return HDCRegisteredServerObservationResult(
+      classification: .observed(generation: generation, serverVersion: serverVersion),
+      identity: afterReceipt, execution: evaluated.execution)
+  }
+
+  private func observeIdentity(
+    endpoint: HDCServerEndpoint,
+    toolchain: HDCCandidate,
+    timeoutMilliseconds: Int
+  ) async -> HDCServerProcessIdentityRawObservation {
+    await withTaskGroup(of: HDCServerProcessIdentityRawObservation.self) { group in
+      group.addTask {
+        await self.identityObserver.observe(
+          endpoint: endpoint, selectedToolchain: toolchain)
+      }
+      group.addTask {
+        do {
+          try await Task.sleep(for: .milliseconds(timeoutMilliseconds))
+          return .timedOut
+        } catch {
+          return .cancelled
+        }
+      }
+      let result = await group.next() ?? .unknown(reason: "identity observation produced no result")
+      group.cancelAll()
+      return result
+    }
+  }
+
+  private func identityFailureResult(
+    _ observation: HDCServerProcessIdentityRawObservation
+  ) -> HDCRegisteredServerObservationResult {
+    switch observation {
+    case .observed:
+      HDCRegisteredServerObservationResult(
+        classification: .unknown(reason: "unexpected identity observation state"))
+    case .unavailable(let reason):
+      HDCRegisteredServerObservationResult(classification: .unavailable(reason: reason))
+    case .unknown(let reason):
+      HDCRegisteredServerObservationResult(classification: .unknown(reason: reason))
+    case .timedOut:
+      HDCRegisteredServerObservationResult(classification: .timedOut)
+    case .cancelled:
+      HDCRegisteredServerObservationResult(classification: .cancelled)
+    }
+  }
+
+  private func registeredExecutableMatches(_ toolchain: HDCCandidate) -> Bool {
+    semanticProfile.integrationProfile == HDCReadOnlyProbeRegistry.integrationProfile
+      && semanticProfile.toolVersion == HDCReadOnlyProbeRegistry.targetToolVersion
+      && semanticProfile.targetExecutableSHA256 == readOnlyProbeRegistry.targetExecutableSHA256
+      && toolchain.sha256 == semanticProfile.targetExecutableSHA256
+  }
+
+  private func unavailableExecution() -> ProcessExecutionResult {
+    ProcessExecutionResult(
+      termination: .waitFailed(-1),
+      stdout: ProcessStreamCapture(data: Data(), totalByteCount: 0, wasTruncated: false),
+      stderr: ProcessStreamCapture(data: Data(), totalByteCount: 0, wasTruncated: false))
   }
 
   private func classifyCheckserver(
@@ -637,7 +969,7 @@ public enum HDCServerLifecyclePostDispatchObservation: Sendable, Equatable {
 /// performs no discovery or PATH lookup.
 package actor HDCProcessLifecycleExecutor: HDCServerLifecycleExecutor {
   package typealias PostDispatchProbe =
-    @Sendable (HDCServerEndpoint) async
+    @Sendable (HDCServerLifecycleStep) async
     -> HDCServerLifecyclePostDispatchObservation?
 
   private let runner: HDCProcessCommandRunner
@@ -649,15 +981,16 @@ package actor HDCProcessLifecycleExecutor: HDCServerLifecycleExecutor {
   private let postDispatchProbe: PostDispatchProbe
 
   init(
-    runner: HDCProcessCommandRunner = HDCProcessCommandRunner(),
+    runner: HDCProcessCommandRunner? = nil,
     toolchain: HDCCandidate,
+    semanticProfile: HDCRegisteredSemanticProfile = .pinnedProduction,
     endpointSelection: HDCServerEndpointSelection,
     additionalChildEnvironment: [String: String] = [:],
     durableAuthorization: any HDCServerLifecycleDispatchAuthorizing,
     dispatchLeaseValidator: any HDCServerLifecycleDispatchLeaseValidating,
     postDispatchProbe: @escaping PostDispatchProbe
   ) {
-    self.runner = runner
+    self.runner = runner ?? HDCProcessCommandRunner(semanticProfile: semanticProfile)
     self.toolchain = toolchain
     self.endpointSelection = endpointSelection
     self.additionalChildEnvironment = additionalChildEnvironment
@@ -668,13 +1001,14 @@ package actor HDCProcessLifecycleExecutor: HDCServerLifecycleExecutor {
 
   package init(
     toolchain: HDCCandidate,
+    semanticProfile: HDCRegisteredSemanticProfile = .pinnedProduction,
     endpointSelection: HDCServerEndpointSelection,
     additionalChildEnvironment: [String: String] = [:],
     durableAuthorization: any HDCServerLifecycleDispatchAuthorizing,
     supervisor: HDCServerSupervisor,
     postDispatchProbe: @escaping PostDispatchProbe
   ) {
-    runner = HDCProcessCommandRunner()
+    runner = HDCProcessCommandRunner(semanticProfile: semanticProfile)
     self.toolchain = toolchain
     self.endpointSelection = endpointSelection
     self.additionalChildEnvironment = additionalChildEnvironment
@@ -771,7 +1105,7 @@ package actor HDCProcessLifecycleExecutor: HDCServerLifecycleExecutor {
     do {
       let result = try await runner.executePrepared(
         prepared, launchGate: lease.launchGate)
-      let observation = await postDispatchProbe(step.endpoint)
+      let observation = await postDispatchProbe(step)
       guard result.execution.termination == .exited(0) else {
         return receipt(
           .outcomeUnknown(
@@ -824,7 +1158,7 @@ package actor HDCProcessLifecycleExecutor: HDCServerLifecycleExecutor {
           observation: observation)
       }
     } catch {
-      let observation = await postDispatchProbe(step.endpoint)
+      let observation = await postDispatchProbe(step)
       return receipt(
         .outcomeUnknown(
           reason:
@@ -1100,7 +1434,10 @@ public enum HDCApplicationDiagnosticsConfiguration {
     return HDCDiscoveryRequest(
       // Persisted absolute-path strings are display/migration metadata only;
       // after relaunch they cannot substitute for a sandbox capability.
-      userConfiguredPaths: restored.urls + absoluteURLs(explicitOverrides),
+      // An explicit support/automation override takes precedence over a
+      // previously persisted bookmark, but never discards that bookmark's
+      // capability metadata for later normal launches.
+      userConfiguredPaths: absoluteURLs(explicitOverrides) + restored.urls,
       devecoSDKPaths: paths(for: devecoSDKPathsPreferenceKey, userDefaults: userDefaults),
       openHarmonySDKPaths: paths(for: openHarmonySDKPathsPreferenceKey, userDefaults: userDefaults),
       securityScopedBookmarks: restored.bookmarksByPath)
@@ -1125,6 +1462,15 @@ public enum HDCApplicationDiagnosticsConfiguration {
       relativeTo: nil)
     userDefaults.set([bookmark], forKey: userConfiguredBookmarksPreferenceKey)
     userDefaults.set([url.path], forKey: userConfiguredPathsPreferenceKey)
+  }
+
+  /// Explicit UI-automation/support reset. It removes only ArkDeck's HDC
+  /// selection metadata and bookmark; it never touches the selected file.
+  public static func clearUserConfiguredExecutable(
+    userDefaults: UserDefaults = .standard
+  ) {
+    userDefaults.removeObject(forKey: userConfiguredBookmarksPreferenceKey)
+    userDefaults.removeObject(forKey: userConfiguredPathsPreferenceKey)
   }
 
   /// Command-line defaults provide a single string, while persisted settings
@@ -1345,7 +1691,9 @@ public actor HDCReadOnlyDiagnosticsUseCase: HDCDiagnosticsStateProviding {
       channelProtection: .unverifiedAssumeUnprotected,
       tcpUnprotectedWarning:
         "Channel protection is unverified. Use TCP only on a trusted, isolated network.",
-      subserverCapability: .unknown(reason: "subserver capability has not been probed"),
+      keyAccessError:
+        "Key access diagnostics are unsupported without a configured or user-approved locator.",
+      subserverCapability: .unsupported,
       lifecycleRecovery: .unavailable(
         reason: "Recovery requires a verified endpoint and a Session-backed durable audit"))
   }
@@ -1373,7 +1721,9 @@ public actor HDCReadOnlyDiagnosticsUseCase: HDCDiagnosticsStateProviding {
       channelProtection: .unverifiedAssumeUnprotected,
       tcpUnprotectedWarning:
         "Channel protection is unverified. Use TCP only on a trusted, isolated network.",
-      subserverCapability: .unknown(reason: "subserver capability has not been probed"),
+      keyAccessError:
+        "Key access diagnostics are unsupported without a configured or user-approved locator.",
+      subserverCapability: .unsupported,
       lifecycleRecovery: .unavailable(reason: reason))
   }
 }
@@ -1448,10 +1798,12 @@ public actor HDCApplicationDiagnosticsProvider: HDCDiagnosticsStateProviding {
 public actor HDCServerDiagnosticsUseCase: HDCDiagnosticsStateProviding {
   private let supervisor: HDCServerSupervisor
   private let snapshot: HDCJobToolchainSnapshot
-  private let authorization: HDCAuthorizationState
+  private var authorization: HDCAuthorizationState
   private let channelProtection: HDCChannelProtectionState
   private let keyAccessError: String?
   private let subserverCapability: HDCSubserverCapability
+  private let configuredLifecycleRecoveryUnavailableReason: String?
+  private var runtimeLifecycleRecoveryRequiredReason: String?
   private var lifecycleRecovery: HDCLifecycleRecoveryPresentation
 
   public init(
@@ -1460,8 +1812,8 @@ public actor HDCServerDiagnosticsUseCase: HDCDiagnosticsStateProviding {
     authorization: HDCAuthorizationState,
     channelProtection: HDCChannelProtectionState,
     keyAccessError: String? = nil,
-    subserverCapability: HDCSubserverCapability = .unknown(
-      reason: "subserver capability has not been probed")
+    subserverCapability: HDCSubserverCapability = .unsupported,
+    lifecycleRecoveryUnavailableReason: String? = nil
   ) {
     self.supervisor = supervisor
     self.snapshot = snapshot
@@ -1469,7 +1821,11 @@ public actor HDCServerDiagnosticsUseCase: HDCDiagnosticsStateProviding {
     self.channelProtection = channelProtection
     self.keyAccessError = keyAccessError
     self.subserverCapability = subserverCapability
-    lifecycleRecovery = .unavailable(reason: "No recovery impact preview has been requested")
+    configuredLifecycleRecoveryUnavailableReason = lifecycleRecoveryUnavailableReason
+    runtimeLifecycleRecoveryRequiredReason = nil
+    lifecycleRecovery = .unavailable(
+      reason: lifecycleRecoveryUnavailableReason
+        ?? "No recovery impact preview has been requested")
   }
 
   public func refresh() async -> HDCDiagnosticsPresentation {
@@ -1477,6 +1833,10 @@ public actor HDCServerDiagnosticsUseCase: HDCDiagnosticsStateProviding {
   }
 
   public func requestRecoveryImpactPreview() async -> HDCDiagnosticsPresentation {
+    if let lifecycleRecoveryUnavailableReason = currentLifecycleRecoveryUnavailableReason {
+      lifecycleRecovery = .unavailable(reason: lifecycleRecoveryUnavailableReason)
+      return await presentation()
+    }
     switch await supervisor.createImpactPreview(
       action: .restartConfirmedGeneration,
       endpoint: HDCServerEndpoint(snapshot.endpoint)
@@ -1488,6 +1848,10 @@ public actor HDCServerDiagnosticsUseCase: HDCDiagnosticsStateProviding {
   }
 
   public func confirmRecoveryImpactPreview() async -> HDCDiagnosticsPresentation {
+    if let lifecycleRecoveryUnavailableReason = currentLifecycleRecoveryUnavailableReason {
+      lifecycleRecovery = .unavailable(reason: lifecycleRecoveryUnavailableReason)
+      return await presentation()
+    }
     guard case .preview(let preview) = lifecycleRecovery else {
       lifecycleRecovery = .blocked(
         reason: "No current impact preview is available for confirmation")
@@ -1510,10 +1874,25 @@ public actor HDCServerDiagnosticsUseCase: HDCDiagnosticsStateProviding {
     case .completed(.failed(let reason)):
       lifecycleRecovery = .blocked(reason: reason)
     case .completed(.outcomeUnknown(let reason)):
+      runtimeLifecycleRecoveryRequiredReason = reason
+      lifecycleRecovery = .blocked(reason: reason)
+    case .blocked(.recoveryRequired(let reason)):
+      runtimeLifecycleRecoveryRequiredReason = reason
       lifecycleRecovery = .blocked(reason: reason)
     case .blocked(let block):
       lifecycleRecovery = .blocked(reason: String(describing: block))
     }
+  }
+
+  /// Applies only the result of the registered selected-device authorization
+  /// probe. Callers cannot set authorization from UI state or an unbound
+  /// device row.
+  package func applyRegisteredAuthorization(_ state: HDCAuthorizationState) {
+    authorization = state
+  }
+
+  private var currentLifecycleRecoveryUnavailableReason: String? {
+    configuredLifecycleRecoveryUnavailableReason ?? runtimeLifecycleRecoveryRequiredReason
   }
 
   private func presentation() async -> HDCDiagnosticsPresentation {

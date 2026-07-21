@@ -4,8 +4,8 @@
 - Base revision: `e29462cda1950a2adfc986d682fe6a158ccf3ae3`
 - Environment: macOS arm64; Xcode 26.6 (17F113); Swift 6.3.3.
 - Evidence class: local fake-child-process, instrumented contract, temporary-file durability, and
-  an initial macOS XCUITest run. The review-remediation addendum below supersedes its UI closure
-  claim until the changed UI test suite is rerun successfully. This is **not** real-device,
+  signed Sandbox macOS XCUITest. Addendum 22 records the latest current-worktree signed rerun and
+  supersedes earlier runner-blocker conclusions. This is **not** real-device,
   hardware-support, platform-conformance, or release evidence.
 
 ## Locked inputs
@@ -34,6 +34,774 @@ the registry, its resource declaration, integration profile, baseline, or confor
 | `xcodebuild -quiet -project ArkDeck.xcodeproj -scheme ArkDeck -destination 'platform=macOS' -derivedDataPath /private/tmp/arkdeck-m1-006-derived test CODE_SIGNING_ALLOWED=NO` | pass; HDC diagnostics XCUITest executed on macOS |
 | `scripts/check-sdd.sh` with isolated `/private/tmp/arkdeck-sdd-python` (`PyYAML==6.0.3`) | pass, 0 errors / 0 warnings / 111 acceptance IDs |
 | `git diff --check` | pass |
+
+## Review disposition addendum 22 — 2026-07-21 participant/recovery/raw-family boundary
+
+This addendum supersedes addendum 21 for the latest worktree and signed artifact. It closes the
+participant-composition enforcement review, records the deliberately unsolved recovery boundary,
+and pins the strict authorization raw-family behavior. `TASK-M1-006` remains `ready`: actual
+platform file-access denial for `AC-HDC-006`, a supported subserver observation for `AC-HDC-009`,
+and the out-of-scope change-level verification update are still absent. Nothing here marks the
+task `done`, the change verified, the platform conformant, hardware supported, or release-ready.
+
+No command executed an installed HDC, contacted a real device, reached a non-loopback endpoint, or
+dispatched a real lifecycle, subserver, device migration, Flash, or destructive operation. Child
+process contracts used only `ArkDeckFakeHDCFixture`. The temporary repository-root hardlink used to
+make the fake selectable by the signed system file picker was removed immediately after the run and
+is absent from the final worktree.
+
+### Participant composition is enforced at the production type boundary
+
+- `HDCSessionDiagnosticsBootstrap.makeHost` is now file-private. The only normal package-visible
+  production lifecycle factory is the App-root `HDCApplicationDiagnosticsHost.compose`, whose
+  signature requires `HDCApplicationHostImpactInventory`.
+- The production `HDCServerSupervisor` initializer requires an endpoint plus explicit
+  participant-impact reliability. Both endpoint-identity reliability and participant-impact
+  reliability must be present for that endpoint; an unset production map is no longer treated as
+  reliable. The historical no-argument initializer is module-internal and reachable by contract
+  tests only through `@testable import`, so normal Workflows/App package consumers cannot bypass
+  the host composition boundary.
+- `testLifecycleImpactRequiresExplicitIdentityAndParticipantReliabilityReceipts` proves three
+  states: neither receipt blocks, identity alone blocks, and both receipts permit preview. Existing
+  host inventory tests continue to prove incomplete inventory blocks with child dispatch zero.
+
+### Recovery gate has no in-scope solver
+
+`testProductionFinalizerFailureLeavesRecoveryGateAndBlocksRedispatch` injects a manifest-write
+failure after terminal journal reconciliation, releases the active writer, and recomposes the same
+Session through a new host. The reopened presentation remains unavailable with
+`recoveryRequired`; both same-composition and reopened lifecycle dispatch attempts are rejected and
+the lifecycle child count remains one, with zero additional dispatch.
+
+This fail-closed state is expected. The terminal journal has already pinned `manifestSha256`, while
+the final manifest's `completedAt` is produced at finalization and is not a deterministic retry
+input. M1-006 therefore does not invent a finalize-retry API or alter locked journal/manifest
+semantics. A byte-reproducible recovery/finalization solver requires a separately scoped and
+maintainer-approved journal/storage change.
+
+### Authorization remains bound to the exact registered raw family
+
+The production authorization probe accepts `.ready` only when the complete `list targets -v`
+stdout bytes hash to the registry `rawSHA256` and the strict parsed row matches the selected durable
+connect-key/serial binding. The contract now supplies a different synthetic device row together
+with a matching durable binding: parsing and binding match, but the raw SHA differs, so production
+returns `.unavailable`. Supporting arbitrary devices would require a separately approved
+integration change that registers a parameterized raw family; M1-006 does not broaden the 0.3
+registry.
+
+### Final verification
+
+- Base revision: `7ec185a137013b735bad4158e6c96d2e81085127` on the dirty TASK-M1-006
+  implementation worktree.
+- Host: MacBook Air arm64, macOS 26.5.2 (`25F84`); Xcode 26.6 (`17F113`); Swift 6.3.3.
+- macOS platform lock/profile/verification SHA-256:
+  `3d867388215d4528e9e7efa62953a388bec22fff2021c3b20fd61979b6186f82`,
+  `a571b0bba5a003824062a3838eafb63a3646fe83243e11e04dad1f3b609997a5`, and
+  `ad004f8ec940c4e1b0d99729f44a1401593e47ff4cb6e55e990fd7a8bd983c78` respectively. The
+  lock remains `PLATFORM-PROFILES-0.3.0`, macOS profile `0.2.0`, conformance `notStarted`.
+- Signed result bundle:
+  `/private/tmp/arkdeck-m1-006-derived-review8-20260721-0951/Logs/Test/Test-ArkDeck-2026.07.21_09-51-25-+0800.xcresult`.
+
+| Command / check | Result |
+| --- | --- |
+| `xcodebuild -project ArkDeck.xcodeproj -scheme ArkDeck -destination platform=macOS -derivedDataPath /private/tmp/arkdeck-m1-006-derived-review8-20260721-0951 test` | pass; actual signed Sandbox XCTest methods executed, 9 passed / 0 failed / 0 skipped |
+| `xcrun xcresulttool get test-results summary --path <review8 xcresult>` | `Passed`; arm64 macOS 26.5.2 (`25F84`); total 9 / passed 9 / failed 0 / skipped 0 |
+| `CI=true swift test --package-path Packages/ArkDeckKit --filter HDCSupervisorContractTests` | pass, 52 / 0 failures; durable audit SHA-256 `98c6e1211a2207e468f0476b59bc568a881e0714e7761c4d00cb360a1edfb32c` |
+| `CI=true swift test --package-path Packages/ArkDeckKit --filter HDCServerSupervisorContractTests` | pass, protected legacy suite 12 / 0 failures; no legacy test-body diff |
+| `CI=true swift test --package-path Packages/ArkDeckKit` | pass, 284 / 1 existing manual sleep-wake opt-in skip / 0 failures; final rerun durable audit SHA-256 `442b94fbec52549eb90fed992cfb3491f4bbc64c62f17d234c35889879de76e2` |
+| `xcrun swift-format lint --strict <8 changed Swift files>` | pass, 0 diagnostics |
+| `codesign --verify --deep --strict <review8 ArkDeck.app>` | pass |
+| `scripts/check-sdd.sh` | pass, 0 errors / 0 warnings / 111 acceptance IDs |
+| `git diff --check` | pass |
+| static AC-label / protected-file / temporary-hardlink audit | no `TEST-AC-HDC-006/009` label in App/contract tests; no diff in protected `ArkDeckContractTests.swift`; picker hardlink absent |
+
+Xcode used `Sign to Run Locally`; the App is ad-hoc signed with no TeamIdentifier. App CDHash is
+`e39ec5110a4369ba8ec0b55a8af66ccf6231601c` (full SHA-256
+`e39ec5110a4369ba8ec0b55a8af66ccf6231601c99c720f7853f158c7942858b`). Binary SHA-256 values:
+
+| Signed binary | SHA-256 |
+| --- | --- |
+| `ArkDeck.app/Contents/MacOS/ArkDeck` | `dbddebce4c2fb64278755cce1e325b716f3cd753098f5b4ffaf366db7d123db1` |
+| `ArkDeckHDCUITests-Runner.app/Contents/MacOS/ArkDeckHDCUITests-Runner` | `621442efdc030a64e2f1fb7ac79bf5f00ad0205fcc072a2e8a25d0f44e462348` |
+| `ArkDeckHDCUITests.xctest/Contents/MacOS/ArkDeckHDCUITests` | `92ceaf1c6aa554cc8c0d282dce95a6fdd52df47150f229582a10b3c313a052c3` |
+
+The entitlement set is unchanged from addendum 21: App Sandbox, USB/serial device access,
+app-scoped bookmarks, user-selected read/write access, `get-task-allow`, network client, the signed
+test runner's read-only `/` exception, and the three recorded test-manager/codesymbolication Mach
+services. This is a test artifact entitlement record, not a distribution decision.
+
+## Review disposition addendum 21 — 2026-07-21 unlocked signed verification
+
+This addendum supersedes addendum 20 only for the signed-runner blocker and the current verification
+results. The semantic-profile, no-start, single-Supervisor, critical-inventory, post-dispatch,
+durable-recovery, terminal-finalizer, and execution-identity remediations recorded in addenda 15–20
+remain in force. `TASK-M1-006` remains `ready`; this run does not mark it `done`, change verified,
+platform conformant, hardware-supported, or release-ready.
+
+No command in this run executed an installed HDC, contacted a real device, reached a non-loopback
+network endpoint, or dispatched a real server lifecycle, subserver, device migration, Flash, or
+destructive operation. Process contracts executed only `ArkDeckFakeHDCFixture`; signed production
+paths used `/usr/bin/true` or rejected the repository fake at the commandless registry precondition.
+
+### Environment and pinned inputs
+
+- Base revision: `0bce74b98862bc7c7c9140c9d37caaa876875884` on a dirty TASK-M1-006 worktree.
+- Host: MacBook Air arm64, macOS 26.5.2 (`25F84`); Xcode 26.6 (`17F113`); Swift 6.3.3.
+- `OPENHARMONY-HDC-READONLY-PROBES@1.0.0` / `readonly-probes.yaml`:
+  `9014c480c3df61b5a6db7e54e52f29e89d7c93431e91d0856cf5710c22466b9d`.
+- `INTEGRATION-PROFILES-0.4.0` lock:
+  `9f007455204bcbc8a0309413cbeb9c6882e45afdc0dc9def0bab4dd948d2acb0`; OpenHarmony profile
+  SHA-256: `48ad9ecc31cad2fbb9a05bb3bb552153ad0ade3a629de5280ce8eef06165401a`.
+- macOS platform lock/profile/verification SHA-256:
+  `3d867388215d4528e9e7efa62953a388bec22fff2021c3b20fd61979b6186f82`,
+  `12304216ea94208177eac90c4b855383e0cf3ae2f6b8f69e97feeb9f2780aaf7`, and
+  `0beb70323f20740f5b97943241defc72932b32355786889305ffee3a8d747c4a` respectively. The lock
+  remains `PLATFORM-PROFILES-0.3.0`, macOS profile `0.2.0`, conformance `notStarted`.
+
+### Signed runner progression and final result
+
+After the operator unlocked the Mac, the runner entered real XCTest methods. Two intermediate runs
+were diagnostic only and are not the final evidence: the first executed 9 methods with one stale
+production fail-closed UI assertion; the second executed 9 with two failures, one accessibility
+waiter boundary and one persisted bookmark incorrectly outranking an explicit launch override.
+The fixes require an exact final accessibility value and make an explicit support/automation path
+precede, but not erase, a persisted security-scoped bookmark. A contract pins that precedence.
+
+The two tests that exercise registered `keyAccessDiagnostics` and `subserverCapability`
+`unsupported` dispositions no longer carry canonical `TEST-AC-HDC-006-01` or
+`TEST-AC-HDC-009-01` labels. They prove only zero unauthorized file/subserver/device-migration
+authority; they do not manufacture capability evidence.
+
+| Command / check | Final result |
+| --- | --- |
+| `xcodebuild -project ArkDeck.xcodeproj -scheme ArkDeck -destination platform=macOS -derivedDataPath /private/tmp/arkdeck-m1-006-derived-unlocked-final-20260721-0905 test` | pass; 9 executed / 9 passed / 0 failed / 0 skipped; actual XCTest methods ran |
+| `xcrun xcresulttool get test-results summary --path <final xcresult>` | `result: Passed`, `totalTestCount: 9`, `passedTests: 9`, `failedTests: 0`, arm64 macOS 26.5.2 (`25F84`) |
+| `CI=true swift test --package-path Packages/ArkDeckKit --filter ProcessExecutorContractTests` | pass, 15 / 0 failures |
+| `CI=true swift test --package-path Packages/ArkDeckKit --filter HDCSupervisorContractTests` | pass, 51 / 0 failures; durable audit SHA-256 `fcf393ee6939b6b1b05c7f1b577f16c772c7866d654730633aa08c15631bf51f` in the final explicit filtered run |
+| `CI=true swift test --package-path Packages/ArkDeckKit` | pass, 283 / 1 existing manual sleep-wake opt-in skip / 0 failures; final run durable audit SHA-256 `1082449d514b4409b2469f8416064fbddf4ea0d5f16f3eca61a3e7d9c1817765` |
+| `xcrun swift-format lint --strict <8 changed Swift files>` | pass, 0 diagnostics |
+| `scripts/check-sdd.sh` | pass, 0 errors / 0 warnings / 111 acceptance IDs |
+| `git diff --check` | pass |
+| `codesign --verify --deep --strict <final ArkDeck.app>` | pass |
+
+The final result bundle is
+`/private/tmp/arkdeck-m1-006-derived-unlocked-final-20260721-0905/Logs/Test/Test-ArkDeck-2026.07.21_09-06-59-+0800.xcresult`.
+
+### Signed artifact identity and complete entitlement dump
+
+Xcode reported `Sign to Run Locally`. The embedded App signature is ad-hoc, TeamIdentifier is not
+set, and App CDHash is `d15e419620517d71b10d8a982bcd5966a7fc0c81` (full SHA-256
+`d15e419620517d71b10d8a982bcd5966a7fc0c81fc3074dc066a120d867dad1d`). Binary SHA-256 values:
+
+| Signed binary | SHA-256 |
+| --- | --- |
+| `ArkDeck.app/Contents/MacOS/ArkDeck` | `71c985021c6ab334e917a997b9801f1c6981cdaccdfb8b1e739640d6c486099b` |
+| `ArkDeckHDCUITests-Runner.app/Contents/MacOS/ArkDeckHDCUITests-Runner` | `e47668516ead1c88b01b97d03e25b178576f1d108c889dfb49494b7abbd231df` |
+| `ArkDeckHDCUITests.xctest/Contents/MacOS/ArkDeckHDCUITests` | `3bfa505106678c9469b28a21d6863058473fe62fde6dbadbe5e0761e31d145ec` |
+
+The complete App entitlement set reported by `codesign -d --entitlements :-` is:
+
+```text
+com.apple.security.app-sandbox = true
+com.apple.security.device.serial = true
+com.apple.security.device.usb = true
+com.apple.security.files.bookmarks.app-scope = true
+com.apple.security.files.user-selected.read-write = true
+com.apple.security.get-task-allow = true
+com.apple.security.network.client = true
+com.apple.security.temporary-exception.files.absolute-path.read-only = ["/"]
+com.apple.security.temporary-exception.mach-lookup.global-name = [
+  "com.apple.testmanagerd",
+  "com.apple.dt.testmanagerd.runner",
+  "com.apple.coresymbolicationd"
+]
+```
+
+### Binary conclusion and remaining blockers
+
+- The LocalAuthentication / locked-computer runner blocker is resolved. Current signed UI evidence
+  exists, all 9 methods execute, picker/bookmark reopen passes, and the final xcresult is green.
+- `TEST-MAC-M1-HDC-001`'s fake-child/signed-Sandbox harness gate passes. Instrumented contracts keep
+  automatic external/unknown lifecycle, unsupported subserver, and device-migration dispatch at
+  zero; this remains fake/instrumented platform-task evidence, not real HDC/device conformance.
+- `TEST-AC-HDC-006-01` remains unclosed: the 0.3 registry deliberately registers no key locator or
+  platform file-access dispatch, so the signed unsupported diagnostic is not the Core scenario's
+  actual platform-permission-denial path.
+- `TEST-AC-HDC-009-01` remains unclosed as capability evidence: the 0.3 registry has no zero-side-
+  effect subserver observation, so only unsupported/zero-dispatch behavior is proven.
+- The change-level `verification.md` still contains the older 0.2 input/blocker text and is outside
+  this task's current allowed paths. The platform profile/lock/verification adoption inputs are
+  current, but the change-level plan still requires a separately authorized update.
+
+Therefore the environment blocker is removed, but the completion candidate remains withdrawn and
+`TASK-M1-006` remains `ready`. A `ready -> done` status PR would be premature until the two AC
+evidence gaps and the change-level verification-plan scope are resolved through approved work.
+
+## Review disposition addendum 20 — 2026-07-21
+
+This addendum supersedes addendum 19 for the latest safety review. `TASK-M1-006` remains `ready`;
+no completion, verified, platform-conformance, hardware/support, or release claim is made.
+
+No command in this remediation executed an installed real `hdc`, contacted a real device, reached
+a non-loopback network endpoint, or performed a real server lifecycle, subserver,
+device-migration, device, Flash, or destructive action. Child-process contracts used only the
+repository fake, loopback-only selections, and temporary files.
+
+### P1 registered-executable semantic binding
+
+The finding was valid. The descriptor-bound process launch previously verified only that the file
+still matched the selected candidate's own SHA. The semantic evaluator then received only a
+command-family label, so package contracts could promote the repository fixture's pinned stdout
+bytes to the registered 3.2.0d family even though that executable is not the SHA registered by
+`OPENHARMONY-TOOLS@0.3.0`.
+
+The remediation makes the semantic family one closed binding:
+
+- `HDCRegisteredSemanticProfile.pinnedProduction` fixes the integration profile/version, exact
+  registered executable SHA, and registered raw-family fingerprints. `HDCProcessCommandRunner`
+  creates a semantic binding only after descriptor preparation returns the actual verified SHA
+  and the exact argv maps to a closed command family. A registered argv family with any profile,
+  tool-version, descriptor-SHA, or argv mismatch is rejected before child launch.
+- A family-only `HDCRegisteredSemanticEvaluator` is now deliberately unbound and can return only
+  failure/unknown, never registered success/known output. The binding handed to the evaluator
+  includes profile version, descriptor SHA, exact command family, and the expected raw SHA.
+- The selected-device authorization path also requires its semantic profile to match the complete
+  read-only registry's executable identity and registered row SHA before it observes or dispatches.
+  Existing server-identity/endpoint and durable-binding preconditions remain mandatory.
+- Positive fake-child contracts explicitly inject
+  `HDCRegisteredSemanticProfile.testOnlyFake(...)`. This test authority is never selected by the
+  production App, production probe initializers, or production lifecycle composition defaults.
+  The production regression uses the repository fixture without that profile and proves both
+  `checkserver` and version remain unknown, Supervisor state remains absent, and child invocation
+  count is `0`, despite the fixture emitting byte-identical pinned output.
+
+The semantic contract also asserts that a family label without profile identity and an exact
+version argv with an added argument both remain `unknownOutput`. The repository fixture SHA is
+asserted unequal to the production registry SHA, so the fake cannot accidentally serve as
+production capability evidence.
+
+### Current-worktree verification
+
+| Command / check | Result |
+| --- | --- |
+| `xcrun swift-format lint --strict <4 affected Swift files>` | pass, 0 diagnostics |
+| `CI=true swift test --package-path Packages/ArkDeckKit --filter HDCSupervisorContractTests` | pass, 51 tests / 0 failures in 5.306 s |
+| `CI=true swift test --package-path Packages/ArkDeckKit` | pass, 283 tests / 1 existing opt-in skip / 0 failures |
+| production executable mismatch regression | fake SHA differs from the 0.3 registry SHA; pinned `checkserver`/version bytes remain unknown; child invocation `0`; Supervisor state absent |
+| family/argv mismatch regressions | family-only evaluator and `-v --extra` both return `unknownOutput` |
+| explicit fake-profile matrix | positive fake `checkserver`, version, selected-device row, and lifecycle contracts run only with `testOnlyFake` profile |
+| signed `xcodebuild ... -derivedDataPath /private/tmp/arkdeck-m1-006-derived-review6-20260721-0842 test` | blocked, runner initialization failure / 0 passed / no test method executed / exit 65 |
+| `xcrun xcresulttool get test-results summary --path <current xcresult>` | result `Failed`; passed `0`; failed runner initialization `1`; `System authentication is running.` / `认证已取消。` |
+| `scripts/check-sdd.sh` | pass, 0 errors / 0 warnings / 111 acceptance IDs |
+| `git diff --check` | pass |
+
+The signed result bundle is
+`/private/tmp/arkdeck-m1-006-derived-review6-20260721-0842/Logs/Test/Test-ArkDeck-2026.07.21_08-42-26-+0800.xcresult`.
+The runner and App were built from the changed production sources and signed with
+`Sign to Run Locally`, but LocalAuthentication failed before any test method began.
+
+### Binary conclusion
+
+- Pinned raw bytes can no longer authorize a production semantic family independently of the
+  registered executable identity and exact argv/profile tuple. Fake positive evidence is isolated
+  behind an explicit test-only profile.
+- The current-revision contract and static gates pass. The signed Sandbox UI/platform gate remains
+  blocked by runner initialization, so `TEST-MAC-M1-HDC-001` and dependent platform evidence remain
+  unavailable. The task stays `ready`.
+
+## Review disposition addendum 19 — 2026-07-21
+
+This addendum supersedes addendum 18 for the latest safety review. The implementation base remains
+`0bce74b98862bc7c7c9140c9d37caaa876875884`. `TASK-M1-006` remains `ready`; no
+completion, verified, platform-conformance, hardware/support, or release claim is made.
+
+No command in this remediation executed an installed real `hdc`, contacted a real device, reached
+a non-loopback network endpoint, or performed a real server lifecycle, subserver,
+device-migration, device, Flash, or destructive action. Child-process contracts used only the
+repository fake and temporary files.
+
+### New P1 findings and remediation
+
+1. **Production terminal finalizer — fixed inside the closed lifecycle use case.** A confirmed
+   lifecycle result is no longer returned directly to the App. `HDCSessionLifecycleUseCase`
+   first moves the Core Job to finalizing, asks `DurableHDCServerLifecycleAuditStore` to reconstruct
+   the typed Step/confirmation/outcome/toolchain tuple from durable evidence, appends the matching
+   terminal Job journal, and publishes the write-once Session Manifest. Only after Manifest
+   publication does it resolve the lifecycle recovery gate and enter the terminal Core state.
+   Manifest construction and publication are not App/UI responsibilities. An injected
+   `manifestWrite` failure converts the outward result to `outcomeUnknown`, leaves the durable gate
+   pending, and proves a repeated request adds `0` lifecycle child invocations.
+2. **Candidate digest reused as permanent Session/Job identity — fixed by a distinct execution
+   catalog.** The executable path/hash digest is now only a catalog partition. Every logical
+   execution receives separate UUID-derived Session and Job IDs and a distinct Session root. The
+   active locator reopens an old identity only when that exact Session contains a pending durable
+   lifecycle recovery gate; a normal/incomplete/non-recovery locator allocates fresh IDs. Recovery
+   reopens the original immutable toolchain intent after validating path/hash/source/endpoint, so a
+   newly observed server version/generation cannot rewrite or spuriously mismatch it. A completed
+   generation-7 lifecycle publishes its own Manifest; a later generation-8 execution receives a
+   new Session, Job, root, intent, and write-once Manifest path.
+
+### Prior blocker recheck on the current worktree
+
+- Production 0.3 registry adoption, commandless no-start observation before `checkserver`, the
+  App-root singleton Supervisor, explicit participant/critical-state input, commandless
+  post-dispatch observation, durable `outcomeUnknown` recovery gating, and unsupported
+  key/subserver presentation remain present in the current source and contract suite. The repeated
+  claims that those source paths are absent describe an older revision, not this worktree.
+- The change-level `verification.md` 0.2.0 pin and obsolete Developer Mode blocker remain outside
+  TASK-M1-006's current allowed paths and were not silently edited.
+- The current-revision signed Sandbox UI gate remains genuinely blocked as described below.
+
+### Current-worktree verification
+
+| Command / check | Result |
+| --- | --- |
+| `xcrun swift-format lint --strict <8 changed Swift files>` | pass, 0 diagnostics |
+| `CI=true swift test --package-path Packages/ArkDeckKit --filter HDCSupervisorContractTests` | pass, 50 tests / 0 failures in 4.931 s |
+| `CI=true swift test --package-path Packages/ArkDeckKit` | pass, 282 tests / 1 existing opt-in skip / 0 failures in 25.783 s |
+| production terminal-finalizer contract | lifecycle success automatically publishes a terminal journal + write-once Manifest; no test/App caller supplies the success document |
+| finalizer fault contract | injected `manifestWrite` failure retains recovery gate; first lifecycle child invocation `1`; retry adds `0` |
+| unique execution identity contract | Session ID, Job ID, and roots are distinct; completed generation 7 rotates to fresh generation-8 intent/root; write-once paths do not collide |
+| crash-recovery identity contract | `outcomeUnknown` reopens the same IDs and original immutable intent despite a changed observed version/generation; reopened dispatch adds `0` |
+| signed `xcodebuild ... -derivedDataPath /private/tmp/arkdeck-m1-006-derived-review5-20260721-0802 test` | blocked, runner initialization failure / 0 passed / no test method executed / exit 65 |
+| `xcrun xcresulttool get test-results summary --path <current xcresult>` | result `Failed`; passed `0`; failed runner initialization `1`; `System authentication is running.` / `认证已取消。` |
+| `scripts/check-sdd.sh` | pass, 0 errors / 0 warnings / 111 acceptance IDs |
+| `git diff --check` | pass |
+
+The signed result bundle is
+`/private/tmp/arkdeck-m1-006-derived-review5-20260721-0802/Logs/Test/Test-ArkDeck-2026.07.21_08-02-24-+0800.xcresult`.
+The full-package run's temporary durable-audit SHA-256 was
+`047fce4f9346010359e202bfac808ad45d71fd466633900f398fc73cc6042349`.
+
+### Binary conclusion
+
+- The two new P1 source/contract gaps are closed. A production lifecycle cannot return a definite
+  result without its terminal Manifest, and finalizer failure cannot authorize another dispatch.
+  Candidate identity no longer aliases logical Session/Job identity or a write-once Manifest path.
+- Prior source-level blocker claims do not describe the current worktree. The stale change
+  verification plan and signed XCUITest initialization failure remain unresolved.
+- `TEST-MAC-M1-HDC-001` and every AC requiring current-revision signed Sandbox UI/platform
+  execution remain blocked. The completion candidate remains withdrawn and the task stays `ready`.
+
+## Review disposition addendum 18 — 2026-07-21
+
+This addendum supersedes addendum 17 for the latest safety review. The implementation base remains
+`0bce74b98862bc7c7c9140c9d37caaa876875884`. `TASK-M1-006` remains `ready`; no
+completion, verified, platform-conformance, hardware/support, or release claim is made.
+
+No command in this remediation executed an installed real `hdc`, contacted a real device, reached
+a non-loopback network endpoint, or performed a real server lifecycle, subserver,
+device-migration, device, Flash, or destructive action. Child-process contracts used only the
+repository fake and temporary files.
+
+### New P1 findings and remediation
+
+1. **Production critical/impact input — fixed by explicit App-root input and fail-closed
+   completeness.** `HDCApplicationDiagnosticsHost` now registers its actual durable lifecycle Job
+   with the single host-wide Supervisor and consumes a typed App-root participant inventory that
+   carries each DeviceCoordinator/Job recipient and current critical state. The Supervisor tracks
+   participant-inventory reliability independently from server-identity reliability; a valid 0.3
+   server receipt cannot authorize a preview when the participant inventory is absent, incomplete,
+   duplicate, or bound to another endpoint. The current App has no complete production Job/Device
+   catalog feed, so it explicitly supplies `unavailable` and lifecycle preview/confirmation remains
+   unavailable instead of treating empty affected/critical arrays as truth. A positive composition
+   contract supplies a complete inventory containing a critical Flash Job, observes both affected
+   Jobs in the preview, and proves the named critical Job blocks with lifecycle child dispatch `0`.
+2. **`outcomeUnknown` subsequent destructive dispatch — fixed by a durable pre-dispatch recovery
+   gate.** Before Supervisor dispatch, the Session lifecycle use case synchronously appends a fixed
+   per-Session `pending` recovery-gate record. Only a proven pre-launch block/failure or a durable
+   outcome plus matching terminal reconciliation for success/stop can append the paired `resolved`
+   record. `outcomeUnknown`, outcome/reconciliation persistence failure, and recovery-gate clear
+   failure leave the gate pending and transition the Core Job state to `waitingForRecovery` without
+   clearing the unresolved active step. Every later dispatch checks the durable gate first and
+   returns `recoveryRequired`. Session/App composition reopens the same gate and constructs the Job
+   in launch-recovery state rather than manufacturing a fresh running Job. The contract executes
+   the repository fake once to create an unknown outcome, then proves both same-process retry and
+   a reopened composition add `0` lifecycle invocations; the total invocation count remains `1`.
+
+### Prior blocker recheck on the current worktree
+
+- The claims that production still runs `hdc -v` first, recreates Supervisor per candidate, leaves
+  `postDispatchProbe` at `nil`, and reports subserver as `.supportedReadOnly` are stale for this
+  worktree. Static scans find no Workflows/App call to the internal legacy version/checkserver
+  helpers and no supported-read-only fixture. Production uses
+  `HDCApplicationDiagnosticsHost.shared`, the registered commandless existing-server observation,
+  and the registered commandless lifecycle post-dispatch probe.
+- The change-level `verification.md` 0.2.0 pin and obsolete blocker text remain a valid governance
+  issue outside TASK-M1-006's current allowed paths. They were not silently edited.
+- The signed Sandbox UI gate remains genuinely blocked as described below.
+
+### Current-worktree verification
+
+| Command / check | Result |
+| --- | --- |
+| `xcrun swift-format lint --strict <8 changed Swift files>` | pass, 0 diagnostics |
+| `CI=true swift test --package-path Packages/ArkDeckKit --filter HDCSupervisorContractTests` | pass, 47 tests / 0 failures in 4.566 s |
+| `CI=true swift test --package-path Packages/ArkDeckKit` | pass, 279 tests / 1 existing opt-in skip / 0 failures in 25.092 s |
+| complete App-root critical inventory contract | affected Jobs contain the durable lifecycle Job and injected Flash Job; named critical gate blocks; lifecycle child dispatch `0` |
+| `outcomeUnknown` retry/reopen contract | first fake lifecycle invocation `1`; same-process retry adds `0`; reopened composition adds `0` |
+| signed `xcodebuild ... -derivedDataPath /private/tmp/arkdeck-m1-006-derived-review4-20260721-0013 test` | blocked, runner initialization failure / 0 passed / no test method executed / exit 65 |
+| `xcrun xcresulttool get test-results summary --path <current xcresult>` | result `Failed`; passed `0`; failed runner initialization `1`; `System authentication is running.` / `认证已取消。` |
+| current production-route static scan | singleton host, 0.3 commandless precondition, explicit post-dispatch probe, unsupported subserver, participant reliability gate, and durable recovery gate call sites present; no legacy App probe call |
+| `scripts/check-sdd.sh` | pass, 0 errors / 0 warnings / 111 acceptance IDs |
+| `git diff --check` | pass |
+
+The signed result bundle is
+`/private/tmp/arkdeck-m1-006-derived-review4-20260721-0013/Logs/Test/Test-ArkDeck-2026.07.21_00-13-35-+0800.xcresult`.
+The full-package run's temporary durable-audit SHA-256 was
+`4672930ee23c5c30360dcc5bf999f1307304c6372438e359be2a382c62296055`.
+
+### Binary conclusion
+
+- The two new P1 safety gaps are closed at source/contract level. Production cannot infer an empty
+  host impact from a missing critical-state feed, and an unresolved external lifecycle effect
+  cannot dispatch again in memory or after composition reopen.
+- Prior source-level blocker claims 1–4 do not describe the current worktree. The stale verification
+  plan and signed XCUITest initialization failure remain unresolved.
+- `TEST-MAC-M1-HDC-001` and every AC requiring current-revision signed Sandbox UI/platform
+  execution remain blocked. The completion candidate remains withdrawn and the task stays `ready`.
+
+## Review disposition addendum 17 — 2026-07-20
+
+This addendum supersedes addendum 16 for the latest review remediation. The implementation base
+remains `0bce74b98862bc7c7c9140c9d37caaa876875884`. `TASK-M1-006` remains `ready`; no
+completion, verified, platform-conformance, hardware/support, or release claim is made.
+
+No command in this remediation executed an installed real `hdc`, contacted a real device, reached
+a non-loopback network endpoint, or performed a server lifecycle, subserver, device-migration,
+device, Flash, or destructive action. HDC child-process tests used only the repository fake and
+temporary files.
+
+### Review findings and disposition
+
+1. **Production no-start ordering — closed in the current source and contract.** The production
+   App does not execute `hdc -v`. It performs the registered commandless process/listener identity
+   observation before `checkserver`; an absent, ambiguous, wrong-executable, wrong-endpoint, or
+   unstable existing process returns unavailable/unknown before any HDC child launch. The signed UI
+   case now expects a non-pinned repository fake to remain unexecuted rather than treating fake
+   output as production capability.
+2. **Exactly one host-wide App Supervisor — fixed.** `HDCApplicationDiagnosticsHost.shared` owns
+   the sole host composition for the App process. Its first composition calls `makeHost`; later
+   executable/session scopes call `makeAttached` with the exact same Supervisor instance and no
+   lifecycle use case or toolchain intent. The attached diagnostics explicitly report lifecycle
+   mutation unavailable instead of silently retaining authority for the newly selected executable.
+   An instrumented contract proves the second Session root is not created, Supervisor identity is
+   unchanged, and the attached lifecycle is `nil`.
+3. **Production post-dispatch observation — fixed.** `makeHost` no longer has a silent `nil`
+   `postDispatchProbe` default. Production supplies
+   `HDCRegisteredLifecyclePostDispatchProbe`, which has no HDC process runner and uses only the
+   registered 0.3.0 commandless process/listener family within its 1,000 ms budget. Restart accepts
+   only a stable generation strictly newer than the confirmed generation; stop accepts only the
+   commandless absence of the selected process/listener. Unknown, timeout, cancellation, identity
+   mismatch, and managed-start remain fail-closed as `outcomeUnknown` through the executor.
+4. **0.3 supported/unsupported adoption — closed in the current source and contract.** The
+   production consumers for `serverIdentityGeneration` and
+   `selectedDeviceAuthorizationBinding` are reachable only under the registered executable,
+   endpoint, server receipt, raw-output, and durable device-binding preconditions. Production,
+   contract, and UI fixtures report `keyAccessDiagnostics` and `subserverCapability` as
+   unsupported. `checkserver` is not classified or tested as a subserver observation; unsupported
+   cases assert zero file/subserver/device-migration authority and are not capability evidence.
+5. **Current-revision signed Sandbox XCUITest — still blocked.** The latest default-signing run
+   built and signed the App and UI runner with `Sign to Run Locally`, then failed before any test
+   method with LocalAuthentication code `-4`, `System authentication is running.` /
+   `认证已取消。`; `xcodebuild` exited `65`. `xcresulttool` reports passed `0`, failed `1`, where
+   the sole failure is the runner-initialization pseudo-test. The result bundle is
+   `/private/tmp/arkdeck-m1-006-derived-review2-20260720-2315/Logs/Test/Test-ArkDeck-2026.07.20_23-13-57-+0800.xcresult`.
+6. **Change verification-plan pins/blocker — valid, not silently edited.** The change-level
+   `verification.md` still names the old 0.2.0 input and obsolete registry/Developer-Mode blocker.
+   It is not a TASK-M1-006 allowed path. A separate maintainer-approved scope/readiness amendment
+   must pin the 0.3.0 registry/profile/lock inputs and replace the blocker with the current
+   LocalAuthentication runner-initialization failure.
+
+### Current-worktree verification
+
+| Command / check | Result |
+| --- | --- |
+| `xcrun swift-format lint --strict <8 changed Swift files>` | pass, 0 diagnostics |
+| `CI=true swift test --package-path Packages/ArkDeckKit --filter ProcessExecutorContractTests` | pass, 15 tests / 0 failures in 2.836 s; the first sandbox attempt could not write the host clang module cache and was rerun outside the filesystem sandbox |
+| `swift test --package-path Packages/ArkDeckKit --filter HDCSupervisorContractTests` | pass, 44 tests / 0 failures in 4.502 s |
+| `swift test --package-path Packages/ArkDeckKit` | pass, 276 tests / 1 existing opt-in skip / 0 failures in 25.449 s |
+| signed `xcodebuild ... -derivedDataPath /private/tmp/arkdeck-m1-006-derived-review2-20260720-2315 test` | blocked, runner initialization failure / 0 passed / no test method executed / exit 65 |
+| `xcrun xcresulttool get test-results summary --path <current xcresult>` | result `Failed`; passed `0`; failed runner initialization `1`; LocalAuthentication code `-4` |
+| registered production-route static scan | no Workflows/App call to legacy `hdc -v`, unregistered `checkserver`, or `.supportedReadOnly` fixture; all production `makeHost` composition supplies an explicit post-dispatch observer |
+| `scripts/check-sdd.sh` | pass, 0 errors / 0 warnings / 111 acceptance IDs |
+| `git diff --check` | pass |
+
+The new host-reconfiguration and commandless post-dispatch contracts are included in the 44-test
+HDC suite. Restart observed the old receipt, a temporary unavailable interval, and then a newer
+receipt in three commandless observations; stop observed the old receipt and then absence in two.
+The full-package run's temporary durable-audit SHA-256 was
+`47f8b9aea068bf3c6bff2d86ff2f36b4374f68274f1a469fb507f1722e2d9797`.
+
+### Binary conclusion
+
+- Findings 1–4 are closed at source/contract level on this worktree, including the newly fixed
+  single-Supervisor and post-dispatch gaps.
+- Unsupported key/subserver families remain explicit unsupported/fail-closed dispositions, not
+  `TEST-AC-HDC-006-01` or `TEST-AC-HDC-009-01` platform capability evidence.
+- `TEST-MAC-M1-HDC-001` and every AC requiring current-revision signed Sandbox UI/platform
+  execution remain blocked at runner initialization. The stale change verification plan also
+  remains a governance blocker outside this task's present allowed paths.
+- The completion candidate remains withdrawn and the task remains `ready`.
+
+## Review disposition addendum 16 — 2026-07-20
+
+This addendum supersedes addendum 15's completion candidate and all of its binary pass conclusions
+for the current worktree. The current implementation base is
+`0bce74b98862bc7c7c9140c9d37caaa876875884`. `TASK-M1-006` remains `ready` in this
+implementation/evidence worktree; its completion candidate is withdrawn. A status transition is
+a separate maintainer-reviewed PR, and the current signed platform gate is blocked as recorded
+below.
+
+No command in this remediation executed an installed real `hdc`, contacted a real device, reached
+a non-loopback network endpoint, or performed a server lifecycle, subserver, device-migration,
+device, Flash, or destructive action. HDC child-process tests used only the repository fake and
+temporary files.
+
+### Review findings and remediation
+
+1. **Commandless precondition before every registered HDC probe — fixed in source/contract.** The
+   production App route no longer executes `hdc -v`. It first performs commandless process/listener
+   observation and only dispatches the registered `checkserver` family after an existing process,
+   exact executable identity, exact listener endpoint, and stable PID start identity are observed.
+   Missing/mismatched observation returns unavailable/unsupported with execution `nil` and child
+   invocation count `0`. The legacy unregistered `-v`/`checkserver` helpers are internal test
+   boundaries and are no longer callable from the Workflows/App production composition.
+2. **0.3 registry production adoption and supported-family reachability — fixed in
+   source/contract.** `HDCProductionApplicationDiagnostics` consumes
+   `HDCReadOnlyProbeRegistry.pinnedProduction`, stores only a stable commandless server-identity
+   receipt, and exposes the selected-device authorization route only when supplied a
+   `DurableCurrentDeviceBinding`. The probe requires the same registered executable/endpoint/server
+   receipt before and after dispatch, exact registered argv, exact raw SHA-256, accepted parser
+   disposition, connected USB state, connect-key, serial, and binding revision. Its result is the
+   only path that can replace the initial unavailable authorization state. A positive injected
+   production-type contract reaches `.ready`; an unavailable commandless observation dispatches no
+   child. No UI state or caller-provided row can mint authorization.
+3. **Unsupported families and false-positive evidence — corrected.** Production and UI fixture
+   both report `keyAccessDiagnostics` and `subserverCapability` as unsupported. The contract asserts
+   zero key-path read/repair, `spawn-sub`, `killall-sub`, and device-migration dispatch. These cases
+   are evidence only for the registered unsupported/fail-closed disposition; they are not evidence
+   of platform key-file access or subserver observation. `checkserver` is not treated as a subserver
+   probe.
+4. **Current-revision signed XCUITest — blocker reproduced.** Two consecutive signed runs failed
+   before executing any test with LocalAuthentication code `-4`, `System authentication is
+   running.` / `认证已取消。`. No test method executed; `xcresulttool` reports passed `0` and one
+   failed runner-initialization pseudo-test, while `xcodebuild` exits `65`. The latest bundle
+   is
+   `/private/tmp/arkdeck-m1-006-derived-review-20260720-2215/Logs/Test/Test-ArkDeck-2026.07.20_22-16-21-+0800.xcresult`;
+   the preceding matching failure is
+   `/private/tmp/arkdeck-m1-006-derived-review-20260720-2215/Logs/Test/Test-ArkDeck-2026.07.20_22-14-11-+0800.xcresult`.
+   Addendum 15's `9/9` bundle belongs to an earlier worktree revision and cannot close the changed
+   current revision. No current UI/platform AC is marked passed.
+5. **Verification-plan adoption pins — valid but outside this task's current implementation
+   authorization.** The change-level `verification.md` still names
+   `OPENHARMONY-TOOLS@0.2.0` and its `MAC-M1-HDC-001` row contains the obsolete probe-registry and
+   Developer-Mode blocker text. That file is not a TASK-M1-006 allowed path. It was not edited or
+   silently treated as current evidence; a separate approved scope/readiness amendment must
+   authorize pinning the 0.3.0 registry/profile/lock hashes and recording the current
+   LocalAuthentication runner-initialization blocker.
+
+### Current-worktree verification
+
+| Command / check | Result |
+| --- | --- |
+| `xcrun swift-format lint --strict <8 changed Swift files>` | pass, 0 diagnostics |
+| `swift test --package-path Packages/ArkDeckKit --filter HDCSupervisorContractTests` | pass, 42 tests / 0 failures in 4.532 s |
+| `swift test --package-path Packages/ArkDeckKit` | pass, 274 tests / 1 existing opt-in skip / 0 failures in 25.530 s |
+| signed `xcodebuild ... -derivedDataPath /private/tmp/arkdeck-m1-006-derived-review-20260720-2215 test` (attempt 1) | blocked, runner initialization failure / 0 passed / no test method executed / exit 65 |
+| same signed command (attempt 2) | blocked, same LocalAuthentication failure / 0 passed / 1 failed runner pseudo-test / exit 65 |
+| `xcrun xcresulttool get test-results summary --path <latest xcresult>` | result `Failed`; passed `0`; failed runner initialization `1`; LocalAuthentication code `-4` |
+| `scripts/check-sdd.sh` | pass, 0 errors / 0 warnings / 111 acceptance IDs |
+| `git diff --check` | pass |
+
+The filtered HDC suite includes an instrumented commandless-precondition case whose observer count
+is `1`, HDC execution is `nil`, and fake invocation-log file is absent. It also includes a positive
+selected-device family case whose observer count is `2`, exact registered raw output is retained,
+and authorization becomes `.ready` only for the matching durable binding. The full-package run's
+temporary durable-audit SHA-256 was
+`1201d01b737dd5d9562f9f2f21d308c0d8026e2e24e00c2f8a92a28f4b76da8b`.
+
+### Binary conclusion
+
+- The code/contract remediation for findings 1–3 passes locally; unsupported family results remain
+  unsupported and are not reclassified as capability evidence.
+- `TEST-AC-HDC-006-01` and `TEST-AC-HDC-009-01` have only the approved unsupported/fail-closed
+  disposition in the current run, not actual file-access/subserver capability evidence.
+- The selected-device and server-generation registered production types are reachable under their
+  durable identity preconditions, but their user-visible signed platform closure is not established
+  on the current revision.
+- `TEST-MAC-M1-HDC-001` and every AC requiring current-revision signed Sandbox UI evidence remain
+  blocked. The addendum 15 completion candidate is withdrawn; no `done`, `verified`, conformance,
+  hardware/support, or release claim is made.
+
+## Withdrawn implementation-completion candidate addendum 15 — 2026-07-20
+
+This addendum supersedes addendum 14's two blocker conclusions after the maintainer-approved
+readiness restoration on `main`. It records a completion **candidate** for the implementation and
+evidence PR only. `TASK-M1-006` remains `ready`; this run does not set the task to `done`, the
+change to `verified`, the macOS platform to conformant, or any support/release status. Those state
+changes require their own maintainer-reviewed PRs under the V2 governance policy.
+
+No command in this run executed an installed real `hdc`, contacted a real device, reached a
+non-loopback network endpoint, or performed a server lifecycle, subserver, device-migration,
+device, Flash, or destructive action. All HDC process execution used the repository
+`ArkDeckFakeHDCFixture`; filesystem durability tests used temporary directories.
+
+### Source, host, and locked inputs
+
+- Readiness/base revision: `b6153fbd795ceb1b3c15e408457f1e86f917121f`.
+- Signed full-XCUITest parent revision: `fa6fa15`; closing `main` revision:
+  `dac8d971cb5a331aa284c0224d56cd7f0c38dd81`. During the run, a background `git pull --ff-only`
+  advanced only unrelated CHG-009/012/016 and planning paths; `git diff --name-only` from the
+  readiness base to the closing revision contains none of the M1-006 allowed implementation,
+  platform, task, or evidence paths.
+- Host: macOS `26.5.2` (`25F84`), arm64 MacBook Air; Xcode `26.6` (`17F113`);
+  Swift `6.3.3`; `swift-format` `6.3.0`. The maintainer-enabled precondition was reconfirmed
+  outside the filesystem sandbox: `DevToolsSecurity -status` =
+  `Developer mode is currently enabled.`
+
+| Locked/adopted input | SHA-256 |
+| --- | --- |
+| `readonly-probes.yaml` / packaged `registry.yaml` | `9014c480c3df61b5a6db7e54e52f29e89d7c93431e91d0856cf5710c22466b9d` |
+| packaged `resources.json` | `d93fcc2668006f7e23e3355a0855b5a7f07515baa95413aaa31777dced74ac02` |
+| packaged `fail-closed-vectors.json` | `68c4aa48eb293d22d3531091fcd5dfce89ec73700674bfb6532584a94672726f` |
+| target HDC executable identity declared by the registry | `48395ba8d87115dffca47df2a640a6c868bc9a2bd4eb49611e4138ff88d8d260` |
+| OpenHarmony integration profile | `48ad9ecc31cad2fbb9a05bb3bb552153ad0ade3a629de5280ce8eef06165401a` |
+| integration profile lock | `9f007455204bcbc8a0309413cbeb9c6882e45afdc0dc9def0bab4dd948d2acb0` |
+| resulting macOS profile | `12304216ea94208177eac90c4b855383e0cf3ae2f6b8f69e97feeb9f2780aaf7` |
+| resulting macOS verification method | `0beb70323f20740f5b97943241defc72932b32355786889305ffee3a8d747c4a` |
+| resulting platform profile lock | `7cebc4cff8b237b5e26a44bb567f1f077b8467365e25ed24aec8626425fef8b9` |
+| Core conformance index | `5009f1cd43e17f2b752945ce46e0c842d4249052b0546c4389d2253ec3f63487` |
+| HDC living spec | `76e4cd19df519f8ef1ec6431a1c05d837f2a3b7a0047c19672be6874008d117b` |
+
+The adopted probe pack contains exactly seven resources and 17 fail-closed control vectors. The
+production decoder checks the registry, resource-manifest, and control-vector hashes before use;
+an incomplete, duplicate, unknown, or hash-mismatched registry cannot create probe authority.
+
+### Implemented closure
+
+- `OPENHARMONY-TOOLS@0.3.0` is consumed through a closed production registry. Server identity and
+  generation use commandless process/listener observation before and after the already registered
+  `checkserver` semantic probe. The observer requires one existing process, exact executable
+  identity, exact listener endpoint, and stable PID start identity; a child command, PID shape,
+  or caller-provided generation cannot establish ownership.
+- Selected-device authorization accepts only exact `list targets -v` argv after a stable server
+  receipt and parses only the registered connected USB row that matches the durable connect-key,
+  serial, and binding revision. Key-access diagnostics and subserver capability remain explicitly
+  unsupported, run no command, touch no key path, and mint no authority.
+- Non-pinned executable identity is rejected before child launch. Endpoint selection is applied
+  only to the child request overlay; the parent environment remains unchanged. The repository
+  fake gained only the exact registered `list targets -v` replay family.
+- The App production route remains `Core/Workflows` only and reaches the Session-backed
+  supervisor. Durable app diagnostic scope now binds both the executable SHA-256 and canonical
+  path digest, preventing byte-identical picker/repository copies from reopening each other's
+  immutable toolchain intent.
+- macOS profile `0.2.0`, verification method, and platform lock `0.3.0` now describe the exact
+  probe/access mapping and signed Sandbox evidence path. `conformance_status` remains
+  `notStarted` and `last_verified` remains `null`.
+
+### Current-worktree verification
+
+| Command / check | Result |
+| --- | --- |
+| `xcrun swift-format lint --strict <8 changed Swift files>` | pass, 0 diagnostics |
+| `swift test --package-path Packages/ArkDeckKit --filter ProcessExecutorContractTests` | pass, 15 tests / 0 failures |
+| `swift test --package-path Packages/ArkDeckKit --filter HDCSupervisorContractTests` | pass, 40 tests / 0 failures; fake child matrix included |
+| `swift test --package-path Packages/ArkDeckKit` | pass, 272 tests / 1 existing opt-in skip / 0 failures in 25.860 s |
+| signed `xcodebuild ... -derivedDataPath /private/tmp/arkdeck-m1-006-derived-final2-20260720-2110 test` | pass, 9 tests / 0 skipped / 0 failures in 169.026 s |
+| `codesign --verify --deep --strict` for App and UI Runner | pass for both bundles |
+| `scripts/check-sdd.sh` | pass, 0 errors / 0 warnings / 111 acceptance IDs |
+| static scan for shell entry points, parent-environment writes, and lifecycle argv construction in the changed production/fake surfaces | no matches |
+| `git diff --check` | pass |
+
+The filtered HDC run measured seven durable lifecycle audit records; the final full-package run's
+temporary audit file SHA-256 was
+`08a124d70ee1945d109037a1ac5fc0899241c833ec902051e809839cfd675d8d` and reopened by
+correlation. The tests instrument child dispatch rather than echoing branch constants:
+
+| Instrumented observation | Result |
+| --- | --- |
+| non-pinned executable before registered identity probe | child launch `0` |
+| all 17 malformed/mismatched/unsupported registry controls | external dispatch `0` |
+| external/unknown automatic lifecycle recovery | lifecycle dispatch `0` |
+| unsupported key and subserver families | key read/repair `0`; spawn-sub `0`; killall-sub `0`; device migration `0` |
+| two recipients on one endpoint after health/generation change | same host-wide event exactly once per recipient |
+| authorization denied/timedOut/cancelled/uncooperative timeout | bounded terminal result; lifecycle mutation `0` |
+| explicit child endpoint overlay | actual argv/endpoint receipt persisted; parent environment unchanged |
+| launch-gate substitution and concurrent Supervisor invalidation | child launch `0` |
+
+### Signed Sandbox/XCUITest evidence
+
+The passing result bundle is
+`/private/tmp/arkdeck-m1-006-derived-final2-20260720-2110/Logs/Test/Test-ArkDeck-2026.07.20_20-54-56-+0800.xcresult`.
+`xcresulttool` reports macOS 26.5.2 arm64, result `Passed`, total/passed `9/9`, failed/skipped `0/0`.
+
+| Artifact / signing fact | Recorded value |
+| --- | --- |
+| App executable SHA-256 | `fc8664c0d7a7f37bc50cc952fdbaa2b7d819eae6aff190adf74f112332786c6a` |
+| UI Runner executable SHA-256 | `0570b4eb1313768f7d9844e305744c7cde0f43024d96b7cb1130805983f2e054` |
+| repository fake executable SHA-256 | `5abacb898eef6c2f82ec42bc6c7ce05ba24fbd3c0b2f53919603dfefdc3001f5` |
+| App signature | ad-hoc, identity `Sign to Run Locally`, Team ID absent, CDHash `51781c146971ae99495fcabf25161753e600e5db` |
+| UI Runner signature | ad-hoc, Team ID absent, CDHash `0812f82f485f4a954479e544aff21e6037cb470d` |
+| fake signature | ad-hoc, Team ID absent, CDHash `03ba4696c5c6bf257c2ed8fedd394022b9bd8659` |
+| App entitlements | Sandbox; USB/serial; app-scoped bookmarks; user-selected read-write; network client; test-only get-task-allow, read-only `/`, and testmanager lookup exceptions |
+
+The nine UI cases cover all diagnostic fields and explicit unknown/unverified values, unsupported
+key access without a lifecycle button, denied/timedOut non-destructive retry, authorized TCP with
+independent unverified channel protection and warning, unsupported subserver with no mutation
+buttons, complete host-wide impact preview/critical gate, normal Session-backed production
+composition, actual signed-Sandbox execution of the repository fake with client version
+`3.2.0d`, and system picker plus security-scoped bookmark restoration after quit/relaunch.
+
+The picker uses a visible test-owned copy whose bytes are asserted equal to the repository fake.
+macOS adds `com.apple.quarantine=0082;...;ArkDeck;` to that ad-hoc copy, so Gatekeeper correctly
+denies executing the picked copy. The passing gate therefore keeps two honest, complementary
+assertions: picker/bookmark persistence proves the platform file-access grant, while a separate
+production App launch executes the unquarantined repository fake and proves the Sandbox child
+path. The UI Runner is itself sandboxed and cannot remove the quarantine. A post-pass experiment
+that attempted to merge these two assertions failed with `EPERM` before relaunch and was reverted;
+its non-acceptance result bundle is
+`/private/tmp/arkdeck-m1-006-derived-final2-20260720-2110/Logs/Test/Test-ArkDeck-2026.07.20_21-05-58-+0800.xcresult`.
+It is retained as an environmental boundary,
+not counted as product evidence or hidden by the earlier passing full suite.
+
+Earlier pre-test attempts also encountered LocalAuthentication for `automationmode-writer`,
+Tencent Chinese IME interception of direct Finder `typeText`, Finder's unreliable hidden `.build`
+autocomplete, and an occasional restored zero-window App state. The operator approved Automation;
+the final test saves/restores the general pasteboard for the picker path and uses the standard
+Command-N WindowGroup action if the OS restores no window. These are test-environment adaptations,
+not HDC/product assertion failures and do not broaden production authority.
+
+### Binary AC disposition
+
+| Evidence ID | Conclusion and evidence class |
+| --- | --- |
+| `TEST-AC-HDC-001-01` | pass — durable contract + descriptor/inode/hash/path launch receipt and zero-launch substitution vectors |
+| `TEST-AC-HDC-001-02` | pass — process-backed registered client probe + signed UI diagnostics and actual repository-fake execution |
+| `TEST-AC-HDC-002-01` | pass — process-backed checkserver and exact-once two-recipient fan-out contract |
+| `TEST-AC-HDC-003-01` | pass — instrumented zero automatic lifecycle calls + signed production/UI recovery boundary |
+| `TEST-AC-HDC-003-02` | pass — commandless platform process/listener identity receipt; fabricated ownership shapes rejected |
+| `TEST-AC-HDC-004-01` | pass — actual fake child argv/environment receipt and unchanged parent environment |
+| `TEST-AC-HDC-005-01` | pass — `Bundle.module` parserGolden bytes, exact registered families, raw retained |
+| `TEST-AC-HDC-006-01` | pass — registered unsupported disposition, zero key-path read/repair, signed UI diagnostic |
+| `TEST-AC-HDC-007-01` | pass — strict selected-device row/binding parser + bounded authorization workflow contract |
+| `TEST-AC-HDC-007-02` | pass — denied/timedOut/cancel/fault injection + signed UI non-destructive retry, mutation zero |
+| `TEST-AC-HDC-008-01` | pass — domain contract + signed UI keeps authorization and channel protection independent |
+| `TEST-AC-HDC-009-01` | pass — registered unsupported disposition + signed UI; subserver/device-migration dispatch zero |
+| `TEST-AC-HDC-010-01` | pass — critical/generation/affected-Job gates and signed impact UI; dispatch zero when invalid |
+| `TEST-AC-HDC-010-02` | pass — file-backed seven-record audit, actual argv/endpoint/outcome/reconciliation, reopen + manifest binding |
+| `TEST-AC-HDC-010-03` | pass — atomic final launch gate/lease invalidation races produce child launch zero |
+| `TEST-MAC-M1-HDC-001` | pass — real fake-child process matrix + actual signed Sandbox App/XCUITest; not real HDC/device/conformance/release evidence |
+
+### Remaining classification and hand-off
+
+The task's requested implementation and evidence gates are satisfied as a completion candidate.
+The registered `keyAccessDiagnostics` and `subserverCapability` families intentionally remain
+unsupported; this is the approved fail-closed product result, not a claim that those capabilities
+exist. The picker quarantine boundary is recorded above and does not affect the separately proven
+repository-fake production execution. No hardware, real-HDC, notarization, Developer ID,
+distribution, platform-conformance, or release conclusion is made. A separate status-only PR may
+propose `ready -> done` after the implementation/evidence PR is reviewed and merged.
 
 ## Review-remediation addendum 14 — 2026-07-19
 

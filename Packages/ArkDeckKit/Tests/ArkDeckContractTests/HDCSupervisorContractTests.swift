@@ -9,6 +9,180 @@ import XCTest
 @testable import ArkDeckWorkflows
 
 final class HDCSupervisorContractTests: XCTestCase {
+  func testApplicationDiagnosticsSessionScopeSeparatesByteIdenticalPaths() {
+    let hash = String(repeating: "a", count: 64)
+    let first = HDCCandidate(
+      path: URL(fileURLWithPath: "/tmp/sdk-a/hdc"), source: .userConfigured, sha256: hash)
+    let identical = HDCCandidate(
+      path: URL(fileURLWithPath: "/tmp/sdk-a/hdc"), source: .userConfigured, sha256: hash)
+    let copied = HDCCandidate(
+      path: URL(fileURLWithPath: "/tmp/sdk-b/hdc"), source: .userConfigured, sha256: hash)
+    let replaced = HDCCandidate(
+      path: URL(fileURLWithPath: "/tmp/sdk-a/hdc"), source: .userConfigured,
+      sha256: String(repeating: "b", count: 64))
+
+    XCTAssertEqual(
+      HDCApplicationDiagnosticsSessionScope.catalogIdentifier(for: first),
+      HDCApplicationDiagnosticsSessionScope.catalogIdentifier(for: identical))
+    XCTAssertNotEqual(
+      HDCApplicationDiagnosticsSessionScope.catalogIdentifier(for: first),
+      HDCApplicationDiagnosticsSessionScope.catalogIdentifier(for: copied))
+    XCTAssertNotEqual(
+      HDCApplicationDiagnosticsSessionScope.catalogIdentifier(for: first),
+      HDCApplicationDiagnosticsSessionScope.catalogIdentifier(for: replaced))
+  }
+
+  func testApplicationExecutionCatalogCreatesIndependentSessionAndJobIdentities() throws {
+    let catalogRoot = try temporarySessionRoot()
+    defer { try? FileManager.default.removeItem(at: catalogRoot.deletingLastPathComponent()) }
+    let catalog = HDCApplicationDiagnosticsExecutionCatalog(root: catalogRoot)
+    let candidate = fixtureCandidate()
+
+    let first = try catalog.select(for: candidate)
+    let second = try catalog.select(for: candidate)
+
+    XCTAssertFalse(first.isCrashRecovery)
+    XCTAssertFalse(second.isCrashRecovery)
+    XCTAssertNotEqual(first.sessionID, first.jobID)
+    XCTAssertNotEqual(first.sessionID, second.sessionID)
+    XCTAssertNotEqual(first.jobID, second.jobID)
+    XCTAssertNotEqual(first.sessionRoot, second.sessionRoot)
+    XCTAssertEqual(first.sessionRoot.lastPathComponent, first.sessionID)
+    XCTAssertEqual(second.sessionRoot.lastPathComponent, second.sessionID)
+  }
+
+  func testM1_006AdoptsPinnedReadOnlyProbeRegistryAndEveryFailClosedControlVector() throws {
+    let probesRoot = try XCTUnwrap(
+      Bundle.module.url(forResource: "Probes", withExtension: nil)
+    )
+    .appending(path: "1.0.0")
+    let registryData = try Data(contentsOf: probesRoot.appending(path: "registry.yaml"))
+    let resourceManifestData = try Data(
+      contentsOf: probesRoot.appending(path: "resources.json"))
+    let controlData = try Data(
+      contentsOf: probesRoot.appending(path: "controls/fail-closed-vectors.json"))
+
+    XCTAssertEqual(sha256Hex(registryData), HDCReadOnlyProbeRegistry.registrySHA256)
+    XCTAssertEqual(
+      sha256Hex(resourceManifestData), HDCReadOnlyProbeRegistry.resourceManifestSHA256)
+    XCTAssertEqual(sha256Hex(controlData), HDCReadOnlyProbeRegistry.controlVectorSHA256)
+    XCTAssertEqual(
+      try HDCReadOnlyProbeRegistry(registryData: registryData), .pinnedProduction)
+
+    let controls = try JSONDecoder().decode(M1_006ProbeControlPack.self, from: controlData)
+    XCTAssertEqual(controls.evidenceClass, "fakeControlOnly")
+    for vector in controls.vectors {
+      let observation = HDCReadOnlyProbeObservation(
+        provenanceValid: vector.provenanceValid,
+        preconditionValid: vector.preconditionValid,
+        identityMatches: vector.identityMatches,
+        bindingMatches: vector.bindingMatches,
+        authorityPresent: vector.authorityPresent,
+        rawFamilyKnown: vector.rawFamilyKnown,
+        deniedObservation: vector.deniedObservation ?? false,
+        effectProven: vector.effectProven,
+        cancelled: vector.cancelled,
+        timedOut: vector.timedOut,
+        mutationName: vector.mutationName)
+      XCTAssertEqual(
+        HDCReadOnlyProbeRegistry.pinnedProduction.disposition(
+          forFamily: vector.family, observation: observation
+        ).rawValue,
+        vector.expectedDisposition,
+        vector.id)
+    }
+    XCTAssertTrue(controls.expectedDispatchCounters.values.allSatisfy { $0 == 0 })
+  }
+
+  func testRegisteredServerIdentityPreconditionRejectsFakeExecutableBeforeAnyChildLaunch()
+    async throws
+  {
+    let root = FileManager.default.temporaryDirectory.appending(
+      path: "arkdeck-m1-006-registered-identity-\(UUID().uuidString)",
+      directoryHint: .isDirectory)
+    defer { try? FileManager.default.removeItem(at: root) }
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    let invocationLog = root.appending(path: "invocations.log")
+    let supervisor = HDCServerSupervisor(auditStore: InMemoryHDCServerLifecycleAuditStore())
+    let processSupervisor = HDCServerProcessSupervisor(
+      supervisor: supervisor,
+      additionalChildEnvironment: ["ARKDECK_FAKE_HDC_INVOCATION_LOG": invocationLog.path])
+    let result = await processSupervisor.observeRegisteredExistingServer(
+      endpoint: try HDCServerEndpointSelector.select(
+        explicitEndpoint: "127.0.0.1:18719"),
+      toolchain: fixtureCandidate())
+
+    guard case .unsupported = result.classification else {
+      return XCTFail("an executable outside the pinned 0.3.0 tuple must be unsupported")
+    }
+    XCTAssertNil(result.execution)
+    XCTAssertFalse(FileManager.default.fileExists(atPath: invocationLog.path))
+  }
+
+  func testProductionSemanticProfileRejectsFakePinnedBytesBeforeAnyChildLaunch() async throws {
+    let root = FileManager.default.temporaryDirectory.appending(
+      path: "arkdeck-m1-006-production-semantic-profile-\(UUID().uuidString)",
+      directoryHint: .isDirectory)
+    defer { try? FileManager.default.removeItem(at: root) }
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    let invocationLog = root.appending(path: "invocations.log")
+    let supervisor = HDCServerSupervisor(auditStore: InMemoryHDCServerLifecycleAuditStore())
+    let productionProbe = HDCServerProcessSupervisor(
+      supervisor: supervisor,
+      additionalChildEnvironment: ["ARKDECK_FAKE_HDC_INVOCATION_LOG": invocationLog.path])
+    let endpoint = try HDCServerEndpointSelector.select(
+      explicitEndpoint: "127.0.0.1:18719")
+    let candidate = fixtureCandidate()
+    XCTAssertNotEqual(candidate.sha256, HDCReadOnlyProbeRegistry.targetExecutableSHA256)
+
+    let health = await productionProbe.observeExistingServer(
+      endpoint: endpoint, toolchain: candidate)
+    XCTAssertEqual(
+      health.classification,
+      .unknown(reason: "selected executable is outside the registered semantic profile"))
+    let version = await productionProbe.probeClientVersion(
+      endpoint: endpoint, toolchain: candidate)
+    XCTAssertEqual(
+      version.clientVersion,
+      .unknown(reason: "selected executable is outside the registered semantic profile"))
+    let state = await supervisor.state(for: endpoint.endpoint)
+    XCTAssertNil(state)
+    XCTAssertFalse(
+      FileManager.default.fileExists(atPath: invocationLog.path),
+      "matching pinned stdout bytes cannot compensate for an unregistered executable SHA")
+  }
+
+  func testCommandlessUnavailableIdentityPreconditionRunsBeforeCheckserver() async throws {
+    let root = FileManager.default.temporaryDirectory.appending(
+      path: "arkdeck-m1-006-commandless-preflight-\(UUID().uuidString)",
+      directoryHint: .isDirectory)
+    defer { try? FileManager.default.removeItem(at: root) }
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    let invocationLog = root.appending(path: "invocations.log")
+    let candidate = fixtureCandidate()
+    let observer = FixedHDCServerIdentityObserver(
+      observation: .unavailable(reason: "no existing listener"))
+    let processSupervisor = HDCServerProcessSupervisor(
+      supervisor: HDCServerSupervisor(auditStore: InMemoryHDCServerLifecycleAuditStore()),
+      additionalChildEnvironment: ["ARKDECK_FAKE_HDC_INVOCATION_LOG": invocationLog.path],
+      readOnlyProbeRegistry: fixtureReadOnlyProbeRegistry(candidate: candidate),
+      semanticProfile: fixtureSemanticProfile(candidate: candidate),
+      identityObserver: observer)
+
+    let result = await processSupervisor.observeRegisteredExistingServer(
+      endpoint: try HDCServerEndpointSelector.select(
+        explicitEndpoint: "127.0.0.1:18719"),
+      toolchain: candidate)
+
+    XCTAssertEqual(result.classification, .unavailable(reason: "no existing listener"))
+    let observationCount = await observer.observationCount()
+    XCTAssertEqual(observationCount, 1)
+    XCTAssertNil(result.execution)
+    XCTAssertFalse(
+      FileManager.default.fileExists(atPath: invocationLog.path),
+      "neither hdc -v nor checkserver may run before commandless identity succeeds")
+  }
+
   // TEST-AC-HDC-004-01 / endpointIsolationContract
   func testTEST_AC_HDC_004_01_ExplicitEndpointOnlyOverlaysTheArkDeckChildEnvironment() async throws
   {
@@ -37,7 +211,7 @@ final class HDCSupervisorContractTests: XCTestCase {
     let selection = try HDCServerEndpointSelector.select(
       explicitEndpoint: "hdc.example.invalid:19711")
     let supervisor = HDCServerSupervisor(auditStore: InMemoryHDCServerLifecycleAuditStore())
-    let processSupervisor = HDCServerProcessSupervisor(
+    let processSupervisor = fixtureProcessSupervisor(
       supervisor: supervisor,
       additionalChildEnvironment: ["ARKDECK_FAKE_HDC_INVOCATION_LOG": invocationLog.path])
 
@@ -124,6 +298,23 @@ final class HDCSupervisorContractTests: XCTestCase {
     XCTAssertEqual(candidate.path, executable.standardizedFileURL)
     XCTAssertNotNil(candidate.securityScopedBookmark)
     XCTAssertTrue(HDCCandidateIdentityVerifier.matches(candidate))
+
+    let explicitExecutable = root.appending(path: "explicit-hdc")
+    try FileManager.default.copyItem(at: fixtureExecutable(), to: explicitExecutable)
+    let explicitRequest = HDCApplicationDiagnosticsConfiguration.discoveryRequest(
+      userDefaults: defaults,
+      arguments: [
+        HDCApplicationDiagnosticsConfiguration.userConfiguredPathLaunchArgument,
+        explicitExecutable.path,
+      ],
+      environment: [:])
+    XCTAssertEqual(
+      explicitRequest.userConfiguredPaths,
+      [explicitExecutable.standardizedFileURL, executable.standardizedFileURL],
+      "an explicit launch override must win over a bookmark left by an earlier App run")
+    XCTAssertNotNil(
+      explicitRequest.securityScopedBookmarks[executable.standardizedFileURL.path],
+      "override precedence must not erase the persisted security-scoped capability")
   }
 
   // TEST-AC-HDC-001-01 / toolchainContract
@@ -154,7 +345,7 @@ final class HDCSupervisorContractTests: XCTestCase {
     await supervisor.register(deviceA)
     await supervisor.register(deviceB)
 
-    let healthyProbe = HDCServerProcessSupervisor(supervisor: supervisor)
+    let healthyProbe = fixtureProcessSupervisor(supervisor: supervisor)
     let healthy = await healthyProbe.observeExistingServer(
       endpoint: endpoint, toolchain: fixtureCandidate())
     XCTAssertEqual(healthy.classification, .healthy(serverVersion: "3.2.0d"))
@@ -165,7 +356,7 @@ final class HDCSupervisorContractTests: XCTestCase {
       .unknown(reason: "checkserver does not provide a verifiable server identity or generation"))
     XCTAssertEqual(observedState?.ownership, .unknown)
 
-    let failedProbe = HDCServerProcessSupervisor(
+    let failedProbe = fixtureProcessSupervisor(
       supervisor: supervisor,
       additionalChildEnvironment: ["ARKDECK_FAKE_HDC_CHECKSERVER_MODE": "offline"])
     let failed = await failedProbe.observeExistingServer(
@@ -203,7 +394,7 @@ final class HDCSupervisorContractTests: XCTestCase {
     let invocationLog = root.appending(path: "fake-hdc-invocations.log")
     let endpoint = try HDCServerEndpointSelector.select(explicitEndpoint: "127.0.0.1:18716")
     let supervisor = HDCServerSupervisor(auditStore: InMemoryHDCServerLifecycleAuditStore())
-    let diagnosticSupervisor = HDCServerProcessSupervisor(
+    let diagnosticSupervisor = fixtureProcessSupervisor(
       supervisor: supervisor,
       additionalChildEnvironment: ["ARKDECK_FAKE_HDC_INVOCATION_LOG": invocationLog.path])
 
@@ -226,7 +417,7 @@ final class HDCSupervisorContractTests: XCTestCase {
   func testHealthyCheckserverReplacementNeverCreatesALifecycleEligibleGeneration() async throws {
     let endpoint = try HDCServerEndpointSelector.select(explicitEndpoint: "127.0.0.1:18717")
     let supervisor = HDCServerSupervisor(auditStore: InMemoryHDCServerLifecycleAuditStore())
-    let processSupervisor = HDCServerProcessSupervisor(supervisor: supervisor)
+    let processSupervisor = fixtureProcessSupervisor(supervisor: supervisor)
 
     _ = await processSupervisor.observeExistingServer(
       endpoint: endpoint, toolchain: fixtureCandidate())
@@ -251,7 +442,7 @@ final class HDCSupervisorContractTests: XCTestCase {
   func testCheckserverRejectsFailureStderrAndReportsVersionMismatchUnverified() async throws {
     let endpoint = try HDCServerEndpointSelector.select(explicitEndpoint: "127.0.0.1:18711")
     let supervisor = HDCServerSupervisor(auditStore: InMemoryHDCServerLifecycleAuditStore())
-    let failureProbe = HDCServerProcessSupervisor(
+    let failureProbe = fixtureProcessSupervisor(
       supervisor: supervisor,
       additionalChildEnvironment: ["ARKDECK_FAKE_HDC_CHECKSERVER_MODE": "stderr-failure"])
     let failure = await failureProbe.observeExistingServer(
@@ -260,7 +451,7 @@ final class HDCSupervisorContractTests: XCTestCase {
       return XCTFail("healthy-looking stdout with registered failure stderr must not be healthy")
     }
 
-    let mismatchProbe = HDCServerProcessSupervisor(
+    let mismatchProbe = fixtureProcessSupervisor(
       supervisor: supervisor,
       additionalChildEnvironment: ["ARKDECK_FAKE_HDC_CHECKSERVER_MODE": "mismatch"])
     let mismatch = await mismatchProbe.observeExistingServer(
@@ -279,7 +470,7 @@ final class HDCSupervisorContractTests: XCTestCase {
       endpoint: endpoint, toolchain: invalidIdentity)
     XCTAssertEqual(
       identityFailure.classification,
-      .unknown(reason: "checkserver process could not run"))
+      .unknown(reason: "selected executable is outside the registered semantic profile"))
     let identityFailureState = await supervisor.state(for: endpoint.endpoint)
     XCTAssertNil(identityFailureState)
   }
@@ -288,7 +479,7 @@ final class HDCSupervisorContractTests: XCTestCase {
   func testTEST_AC_HDC_001_02_ClientVersionUsesRegisteredPinnedProcessProbe() async throws {
     let endpoint = try HDCServerEndpointSelector.select(explicitEndpoint: "127.0.0.1:18711")
     let supervisor = HDCServerSupervisor(auditStore: InMemoryHDCServerLifecycleAuditStore())
-    let probe = HDCServerProcessSupervisor(supervisor: supervisor)
+    let probe = fixtureProcessSupervisor(supervisor: supervisor)
     let result = await probe.probeClientVersion(endpoint: endpoint, toolchain: fixtureCandidate())
     XCTAssertEqual(result.clientVersion, .known("3.2.0d"))
     XCTAssertEqual(result.execution.termination, .exited(0))
@@ -298,6 +489,8 @@ final class HDCSupervisorContractTests: XCTestCase {
   // TEST-AC-HDC-005-01 / adapterGolden
   func testTEST_AC_HDC_005_01_RegisteredGoldenBytesUseOnlyTheDeclaredSemanticFamilies() throws {
     let root = try XCTUnwrap(Bundle.module.url(forResource: "Golden", withExtension: nil))
+    let candidate = fixtureCandidate()
+    let fixtureProfile = fixtureSemanticProfile(candidate: candidate)
     let cases: [(String, HDCCommandSemanticResult)] = [
       ("1.0.0/failure-unauthorized/stdout.bin", .failure(.unauthorized)),
       ("1.0.0/failure-offline/stdout.bin", .failure(.offline)),
@@ -306,14 +499,20 @@ final class HDCSupervisorContractTests: XCTestCase {
       ("1.0.0/version/stdout.bin", .unknownOutput),
     ]
     for (path, expected) in cases {
-      var evaluator = HDCRegisteredSemanticEvaluator(commandFamily: .uninstall)
+      var evaluator = HDCRegisteredSemanticEvaluator(
+        semanticProfile: fixtureProfile,
+        descriptorSHA256: candidate.sha256,
+        arguments: ["uninstall", "com.example.waterflowdemo"])
       evaluator.consume(
         ProcessOutputChunk(stream: .stdout, bytes: try Data(contentsOf: root.appending(path: path)))
       )
       XCTAssertEqual(evaluator.finish(execution: exitedZero()), expected, path)
     }
 
-    var unknown = HDCRegisteredSemanticEvaluator(commandFamily: .uninstall)
+    var unknown = HDCRegisteredSemanticEvaluator(
+      semanticProfile: fixtureProfile,
+      descriptorSHA256: candidate.sha256,
+      arguments: ["uninstall", "com.example.waterflowdemo"])
     unknown.consume(
       ProcessOutputChunk(
         stream: .stdout,
@@ -328,12 +527,44 @@ final class HDCSupervisorContractTests: XCTestCase {
     splitSuccess.consume(ProcessOutputChunk(stream: .stdout, bytes: Data("Mod finish\r\n".utf8)))
     XCTAssertEqual(splitSuccess.finish(execution: exitedZero()), .unknownOutput)
 
-    var version = HDCRegisteredSemanticEvaluator(commandFamily: .version)
+    var version = HDCRegisteredSemanticEvaluator(
+      semanticProfile: fixtureProfile,
+      descriptorSHA256: candidate.sha256,
+      arguments: ["-v"])
     version.consume(
       ProcessOutputChunk(
         stream: .stdout,
         bytes: try Data(contentsOf: root.appending(path: "1.0.0/version/stdout.bin"))))
     XCTAssertEqual(version.finish(execution: exitedZero()), .success)
+
+    var productionRejected = HDCRegisteredSemanticEvaluator(
+      semanticProfile: .pinnedProduction,
+      descriptorSHA256: candidate.sha256,
+      arguments: ["-v"])
+    productionRejected.consume(
+      ProcessOutputChunk(
+        stream: .stdout,
+        bytes: try Data(contentsOf: root.appending(path: "1.0.0/version/stdout.bin"))))
+    XCTAssertEqual(productionRejected.finish(execution: exitedZero()), .unknownOutput)
+
+    var familyOnly = HDCRegisteredSemanticEvaluator(commandFamily: .version)
+    familyOnly.consume(
+      ProcessOutputChunk(
+        stream: .stdout,
+        bytes: try Data(contentsOf: root.appending(path: "1.0.0/version/stdout.bin"))))
+    XCTAssertEqual(
+      familyOnly.finish(execution: exitedZero()), .unknownOutput,
+      "a family label without profile/executable/argv binding cannot authorize known output")
+
+    var wrongArgv = HDCRegisteredSemanticEvaluator(
+      semanticProfile: fixtureProfile,
+      descriptorSHA256: candidate.sha256,
+      arguments: ["-v", "--extra"])
+    wrongArgv.consume(
+      ProcessOutputChunk(
+        stream: .stdout,
+        bytes: try Data(contentsOf: root.appending(path: "1.0.0/version/stdout.bin"))))
+    XCTAssertEqual(wrongArgv.finish(execution: exitedZero()), .unknownOutput)
   }
 
   // TEST-AC-HDC-003-01 / productionDiagnosticsUseCase
@@ -350,6 +581,8 @@ final class HDCSupervisorContractTests: XCTestCase {
           endpoint: endpoint, health: .healthy, version: .known("3.2.0d"), generation: 5,
           ownership: .external)),
       reason: "fixture verified checkserver state")
+    await supervisor.setImpactReliability(true, for: endpoint)
+    await supervisor.setParticipantImpactReliability(true, for: endpoint)
     let candidate = fixtureCandidate()
     let snapshot = HDCJobToolchainSnapshot(
       candidate: candidate, endpoint: endpoint.rawValue,
@@ -384,6 +617,34 @@ final class HDCSupervisorContractTests: XCTestCase {
     XCTAssertEqual(auditEventCount, 2)
   }
 
+  func testLifecycleImpactRequiresExplicitIdentityAndParticipantReliabilityReceipts() async {
+    let endpoint = HDCServerEndpoint("127.0.0.1:18713")
+    let supervisor = HDCServerSupervisor(
+      auditStore: InMemoryHDCServerLifecycleAuditStore(), endpoint: endpoint,
+      participantImpactReliable: false)
+    await supervisor.observeExistingServer(
+      HDCExistingServerObservation(
+        state: HDCServerState(
+          endpoint: endpoint, health: .healthy, version: .known("3.2.0d"), generation: 5,
+          ownership: .external)),
+      reason: "fixture state without reliability receipts")
+
+    let missingBoth = await supervisor.createImpactPreview(
+      action: .restartConfirmedGeneration, endpoint: endpoint)
+    XCTAssertEqual(missingBoth, .blocked(.impactCannotBeReliablyDetermined))
+    await supervisor.setImpactReliability(true, for: endpoint)
+    let missingParticipant = await supervisor.createImpactPreview(
+      action: .restartConfirmedGeneration, endpoint: endpoint)
+    XCTAssertEqual(missingParticipant, .blocked(.impactCannotBeReliablyDetermined))
+    await supervisor.setParticipantImpactReliability(true, for: endpoint)
+    guard
+      case .ready = await supervisor.createImpactPreview(
+        action: .restartConfirmedGeneration, endpoint: endpoint)
+    else {
+      return XCTFail("both explicit reliability receipts must be required")
+    }
+  }
+
   // TEST-AC-HDC-001-02 / productionDiagnosticsUseCase
   func testReadOnlyProductionDiagnosticsReportsConfigurationStateRatherThanUnprobed() async {
     let useCase = HDCReadOnlyDiagnosticsUseCase(
@@ -416,22 +677,26 @@ final class HDCSupervisorContractTests: XCTestCase {
     XCTAssertEqual(discovered.source, HDCCandidateSource.userConfigured.rawValue)
     XCTAssertEqual(discovered.endpoint, endpoint.rawValue)
 
-    let composition = try HDCSessionDiagnosticsBootstrap.makeHost(
+    let composition = try await HDCApplicationDiagnosticsHost().compose(
       sessionRoot: root, sessionID: "application-hdc", jobID: "application-hdc-job",
       toolchain: candidate,
+      semanticProfile: fixtureSemanticProfile(candidate: candidate),
       snapshot: HDCJobToolchainSnapshot(
         candidate: candidate, endpoint: endpoint.rawValue,
         details: HDCProbeDetails(
           platformTrust: .unknown(reason: "fixture"), clientVersion: .known("3.2.0d"),
           serverVersion: .known("3.2.0d"),
           daemonVersion: .unknown(reason: "not exposed"), serverGeneration: .known(4))),
-      authorization: .ready)
+      authorization: .ready,
+      impactInventory: .complete([]),
+      postDispatchProbe: { _ in nil })
     await composition.supervisor.observeExistingServer(
       HDCExistingServerObservation(
         state: HDCServerState(
           endpoint: endpoint, health: .healthy, version: .known("3.2.0d"), generation: 4,
           ownership: .external)),
       reason: "fixture verified session state")
+    await composition.supervisor.setImpactReliability(true, for: endpoint)
     await application.attachSessionDiagnostics(composition.diagnostics)
 
     let preview = await application.requestRecoveryImpactPreview()
@@ -464,15 +729,17 @@ final class HDCSupervisorContractTests: XCTestCase {
         serverVersion: .known("3.2.0d"),
         daemonVersion: .unknown(reason: "not exposed by registered profile"),
         serverGeneration: .known(7)))
-    let composition = try HDCSessionDiagnosticsBootstrap.makeHost(
+    let composition = try await HDCApplicationDiagnosticsHost().compose(
       sessionRoot: root,
       sessionID: "production-hdc-session",
       jobID: jobID,
       toolchain: candidate,
+      semanticProfile: fixtureSemanticProfile(candidate: candidate),
       snapshot: snapshot,
       authorization: .ready,
       additionalChildEnvironment: ["ARKDECK_FAKE_HDC_INVOCATION_LOG": invocationLog.path],
-      postDispatchProbe: { observed in observed == endpoint ? .generation(8) : nil })
+      impactInventory: .complete([]),
+      postDispatchProbe: { step in step.endpoint == endpoint ? .generation(8) : nil })
     let lifecycle = try XCTUnwrap(composition.lifecycle)
     let fixedIntent = try XCTUnwrap(composition.toolchainIntent)
     let reopenedIntent = try await lifecycle.reopenToolchainIntent()
@@ -488,6 +755,7 @@ final class HDCSupervisorContractTests: XCTestCase {
           endpoint: endpoint, health: .healthy, version: .known("3.2.0d"), generation: 7,
           ownership: .external)),
       reason: "fixture verified production composition state")
+    await composition.supervisor.setImpactReliability(true, for: endpoint)
     let previewPresentation = await composition.diagnostics.requestRecoveryImpactPreview()
     guard case .preview = previewPresentation.lifecycleRecovery else {
       return XCTFail("production diagnostics must create a durable preview")
@@ -531,21 +799,187 @@ final class HDCSupervisorContractTests: XCTestCase {
     let manifestConfirmation = try XCTUnwrap(restoredManifestConfirmation)
     let layout = try SessionLayout(
       sessionID: "production-hdc-session", jobID: jobID, root: root)
-    let hdcStep = HDCServerLifecycleStep(
-      id: try XCTUnwrap(UUID(uuidString: binding.step.id)),
-      auditID: confirmation.auditID,
-      action: confirmation.action,
-      endpoint: confirmation.endpoint,
-      expectedGeneration: confirmation.generation,
-      expectedOwnership: .external,
-      impactSnapshotHash: confirmation.scopeHash,
-      confirmationID: confirmation.id)
-    let manifest = try lifecycleManifest(
-      layout: layout, step: hdcStep, confirmation: manifestConfirmation)
-    try appendSuccessfulLifecycleJournal(layout: layout, manifest: manifest, step: hdcStep)
-    let published = try await lifecycle.publishFinalManifest(
-      manifest, auditID: confirmation.auditID)
-    XCTAssertEqual(published.sha256, manifest.sha256)
+    let manifest = try AtomicSessionManifestPublisher(layout: layout).load()
+    XCTAssertEqual(manifest.status, JobState.succeeded.rawValue)
+    XCTAssertEqual(manifest.sessionID, layout.sessionID)
+    XCTAssertEqual(manifest.jobID, layout.jobID)
+    XCTAssertEqual(
+      manifest.confirmations.map(\.confirmationID),
+      [manifestConfirmation.confirmationID])
+    let journal = try DurableJournalRecovery.inspect(url: layout.journalURL)
+    XCTAssertEqual(journal.currentState, .succeeded)
+    XCTAssertTrue(journal.finalized)
+    XCTAssertEqual(journal.events.last?.payload["manifestSha256"], .string(manifest.sha256))
+  }
+
+  func testCompletedLifecycleRotatesExecutionIdentityAcrossServerGenerationChange() async throws {
+    let catalogRoot = try temporarySessionRoot()
+    defer { try? FileManager.default.removeItem(at: catalogRoot.deletingLastPathComponent()) }
+    let candidate = fixtureCandidate()
+    let endpoint = HDCServerEndpoint("127.0.0.1:18719")
+    let catalog = HDCApplicationDiagnosticsExecutionCatalog(root: catalogRoot)
+    let firstIdentity = try catalog.select(for: candidate)
+    let firstSnapshot = HDCJobToolchainSnapshot(
+      candidate: candidate, endpoint: endpoint.rawValue,
+      details: HDCProbeDetails(
+        platformTrust: .known("fixture"), clientVersion: .known("3.2.0d"),
+        serverVersion: .known("3.2.0d"), daemonVersion: .unknown(reason: "not registered"),
+        serverGeneration: .known(7)))
+    let firstLayout = try SessionLayout(
+      sessionID: firstIdentity.sessionID,
+      jobID: firstIdentity.jobID,
+      root: firstIdentity.sessionRoot)
+    do {
+      let first = try await HDCApplicationDiagnosticsHost().compose(
+        sessionRoot: firstIdentity.sessionRoot,
+        sessionID: firstIdentity.sessionID,
+        jobID: firstIdentity.jobID,
+        toolchain: candidate,
+        semanticProfile: fixtureSemanticProfile(candidate: candidate),
+        snapshot: firstSnapshot,
+        authorization: .ready,
+        impactInventory: .complete([]),
+        postDispatchProbe: { _ in .generation(8) })
+      await first.supervisor.observeExistingServer(
+        HDCExistingServerObservation(
+          state: HDCServerState(
+            endpoint: endpoint, health: .healthy, version: .known("3.2.0d"), generation: 7,
+            ownership: .external)),
+        reason: "fixture verified first logical lifecycle Job")
+      await first.supervisor.setImpactReliability(true, for: endpoint)
+      guard
+        case .ready(let preview) = await first.supervisor.createImpactPreview(
+          action: .restartConfirmedGeneration, endpoint: endpoint),
+        case .accepted(let confirmation) = await first.supervisor.confirm(preview.id)
+      else {
+        return XCTFail("the first unique lifecycle Session must be confirmable")
+      }
+      let firstResult = await (try XCTUnwrap(first.lifecycle)).dispatch(
+        confirmation: confirmation)
+      XCTAssertEqual(firstResult, .completed(.succeeded(resultingGeneration: 8)))
+      XCTAssertEqual(
+        try AtomicSessionManifestPublisher(layout: firstLayout).load().status,
+        JobState.succeeded.rawValue)
+    }
+
+    let nextIdentity = try catalog.select(for: candidate)
+    XCTAssertFalse(nextIdentity.isCrashRecovery)
+    XCTAssertNotEqual(nextIdentity.sessionID, firstIdentity.sessionID)
+    XCTAssertNotEqual(nextIdentity.jobID, firstIdentity.jobID)
+    let nextSnapshot = HDCJobToolchainSnapshot(
+      candidate: candidate, endpoint: endpoint.rawValue,
+      details: HDCProbeDetails(
+        platformTrust: .known("fixture"), clientVersion: .known("3.2.1"),
+        serverVersion: .known("3.2.1"), daemonVersion: .unknown(reason: "not registered"),
+        serverGeneration: .known(8)))
+    let next = try await HDCApplicationDiagnosticsHost().compose(
+      sessionRoot: nextIdentity.sessionRoot,
+      sessionID: nextIdentity.sessionID,
+      jobID: nextIdentity.jobID,
+      toolchain: candidate,
+      semanticProfile: fixtureSemanticProfile(candidate: candidate),
+      snapshot: nextSnapshot,
+      authorization: .ready,
+      impactInventory: .complete([]),
+      postDispatchProbe: { _ in nil })
+    XCTAssertEqual(try XCTUnwrap(next.toolchainIntent).serverGeneration, .known(8))
+    XCTAssertNotEqual(
+      firstLayout.manifestURL, nextIdentity.sessionRoot.appending(path: "manifest.json"))
+  }
+
+  func testProductionFinalizerFailureLeavesRecoveryGateAndBlocksRedispatch() async throws {
+    let root = try temporarySessionRoot()
+    defer { try? FileManager.default.removeItem(at: root.deletingLastPathComponent()) }
+    let candidate = fixtureCandidate()
+    let endpoint = HDCServerEndpoint("127.0.0.1:18720")
+    let invocationLog = root.appending(path: "finalizer-failure-invocations.log")
+    let snapshot = HDCJobToolchainSnapshot(
+      candidate: candidate, endpoint: endpoint.rawValue,
+      details: HDCProbeDetails(
+        platformTrust: .known("fixture"), clientVersion: .known("3.2.0d"),
+        serverVersion: .known("3.2.0d"), daemonVersion: .unknown(reason: "not registered"),
+        serverGeneration: .known(7)))
+    var confirmationForReopen: HDCServerLifecycleConfirmation?
+    do {
+      let composition = try await HDCApplicationDiagnosticsHost().compose(
+        sessionRoot: root,
+        sessionID: "finalizer-failure-session",
+        jobID: "finalizer-failure-job",
+        toolchain: candidate,
+        semanticProfile: fixtureSemanticProfile(candidate: candidate),
+        snapshot: snapshot,
+        authorization: .ready,
+        additionalChildEnvironment: ["ARKDECK_FAKE_HDC_INVOCATION_LOG": invocationLog.path],
+        impactInventory: .complete([]),
+        manifestFaultInjector: SessionStorageFaultInjector { point in
+          guard point == .manifestWrite else { return }
+          throw SessionStorageError.invalidManifest("injected terminal finalizer failure")
+        },
+        postDispatchProbe: { _ in .generation(8) })
+      let layout = try SessionLayout(
+        sessionID: "finalizer-failure-session", jobID: "finalizer-failure-job", root: root)
+      await composition.supervisor.observeExistingServer(
+        HDCExistingServerObservation(
+          state: HDCServerState(
+            endpoint: endpoint, health: .healthy, version: .known("3.2.0d"), generation: 7,
+            ownership: .external)),
+        reason: "fixture verified finalizer-failure state")
+      await composition.supervisor.setImpactReliability(true, for: endpoint)
+      guard
+        case .ready(let preview) = await composition.supervisor.createImpactPreview(
+          action: .restartConfirmedGeneration, endpoint: endpoint),
+        case .accepted(let confirmation) = await composition.supervisor.confirm(preview.id)
+      else {
+        return XCTFail("the finalizer failure vector must reach lifecycle dispatch")
+      }
+      confirmationForReopen = confirmation
+      let lifecycle = try XCTUnwrap(composition.lifecycle)
+      let finalizerFailure = await lifecycle.dispatch(confirmation: confirmation)
+      XCTAssertEqual(
+        finalizerFailure,
+        .completed(
+          .outcomeUnknown(
+            reason: "Lifecycle result could not complete the durable terminal Session finalizer")))
+      XCTAssertEqual(try invocationLines(at: invocationLog).count, 1)
+      XCTAssertTrue(try DurableJournalRecovery.inspect(url: layout.journalURL).finalized)
+
+      guard
+        case .blocked(.recoveryRequired) = await lifecycle.dispatch(
+          confirmation: confirmation)
+      else {
+        return XCTFail("terminal finalizer failure must retain the durable recovery gate")
+      }
+      XCTAssertEqual(
+        try invocationLines(at: invocationLog).count, 1,
+        "a failed finalizer must block before any second lifecycle child dispatch")
+      XCTAssertFalse(FileManager.default.fileExists(atPath: layout.manifestURL.path))
+    }
+    let persistedConfirmation = try XCTUnwrap(confirmationForReopen)
+
+    let reopened = try await HDCApplicationDiagnosticsHost().compose(
+      sessionRoot: root,
+      sessionID: "finalizer-failure-session",
+      jobID: "finalizer-failure-job",
+      toolchain: candidate,
+      semanticProfile: fixtureSemanticProfile(candidate: candidate),
+      snapshot: snapshot,
+      authorization: .ready,
+      additionalChildEnvironment: ["ARKDECK_FAKE_HDC_INVOCATION_LOG": invocationLog.path],
+      impactInventory: .complete([]),
+      postDispatchProbe: { _ in .generation(8) })
+    let reopenedPresentation = await reopened.diagnostics.requestRecoveryImpactPreview()
+    XCTAssertEqual(
+      reopenedPresentation.lifecycleRecovery,
+      .unavailable(
+        reason: "A destructive HDC lifecycle dispatch may enter an external-effect window"))
+    let reopenedDispatch = await (try XCTUnwrap(reopened.lifecycle)).dispatch(
+      confirmation: persistedConfirmation)
+    guard case .blocked(.recoveryRequired) = reopenedDispatch else {
+      return XCTFail("manifestWrite recovery has no in-scope automatic finalizer retry")
+    }
+    XCTAssertEqual(
+      try invocationLines(at: invocationLog).count, 1,
+      "reopen must retain zero additional lifecycle dispatches")
   }
 
   // TEST-AC-HDC-002-01 / sharedHostSupervisorSessionComposition
@@ -560,10 +994,13 @@ final class HDCSupervisorContractTests: XCTestCase {
         platformTrust: .unknown(reason: "fixture"), clientVersion: .known("3.2.0d"),
         serverVersion: .known("3.2.0d"),
         daemonVersion: .unknown(reason: "not exposed"), serverGeneration: .known(3)))
-    let host = try HDCSessionDiagnosticsBootstrap.makeHost(
+    let host = try await HDCApplicationDiagnosticsHost().compose(
       sessionRoot: root, sessionID: "host-hdc", jobID: "host-hdc-job", toolchain: candidate,
+      semanticProfile: fixtureSemanticProfile(candidate: candidate),
       snapshot: snapshot,
-      authorization: .ready)
+      authorization: .ready,
+      impactInventory: .complete([]),
+      postDispatchProbe: { _ in nil })
     let attached = HDCSessionDiagnosticsBootstrap.makeAttached(
       supervisor: host.supervisor, snapshot: snapshot, authorization: .ready)
 
@@ -597,9 +1034,328 @@ final class HDCSupervisorContractTests: XCTestCase {
     XCTAssertEqual(event.currentGeneration, 4)
   }
 
+  func testApplicationHostReconfigurationAttachesWithoutCreatingAnotherSupervisor() async throws {
+    let firstRoot = try temporarySessionRoot()
+    let base = firstRoot.deletingLastPathComponent()
+    defer { try? FileManager.default.removeItem(at: base) }
+    let firstCandidate = fixtureCandidate()
+    let copiedExecutable = base.appending(path: "copied-hdc")
+    try FileManager.default.copyItem(at: firstCandidate.path, to: copiedExecutable)
+    let secondCandidate = try XCTUnwrap(
+      HDCExternalFirstDiscovery.discover(
+        HDCDiscoveryRequest(userConfiguredPaths: [copiedExecutable])
+      ).candidates.first)
+    let endpoint = HDCServerEndpoint("127.0.0.1:18716")
+    let host = HDCApplicationDiagnosticsHost()
+
+    func snapshot(_ candidate: HDCCandidate) -> HDCJobToolchainSnapshot {
+      HDCJobToolchainSnapshot(
+        candidate: candidate, endpoint: endpoint.rawValue,
+        details: HDCProbeDetails(
+          platformTrust: .unknown(reason: "fixture"),
+          clientVersion: .unknown(reason: "registered client family unavailable"),
+          serverVersion: .unknown(reason: "commandless observation has not completed"),
+          daemonVersion: .unknown(reason: "not registered"),
+          serverGeneration: .unknown(reason: "commandless observation has not completed")))
+    }
+
+    let firstSessionID = "first-application-session"
+    let firstJobID = "first-application-job"
+    let first = try await host.compose(
+      sessionRoot: firstRoot, sessionID: firstSessionID, jobID: firstJobID,
+      toolchain: firstCandidate,
+      semanticProfile: fixtureSemanticProfile(candidate: firstCandidate),
+      snapshot: snapshot(firstCandidate),
+      authorization: .unavailable(reason: "selected device required"),
+      impactInventory: .complete([]),
+      postDispatchProbe: { _ in nil })
+    let secondRoot = base.appending(path: "second-session", directoryHint: .isDirectory)
+    let second = try await host.compose(
+      sessionRoot: secondRoot,
+      sessionID: "second-application-session", jobID: "second-application-job",
+      toolchain: secondCandidate,
+      semanticProfile: fixtureSemanticProfile(candidate: secondCandidate),
+      snapshot: snapshot(secondCandidate),
+      authorization: .unavailable(reason: "selected device required"),
+      impactInventory: .complete([]),
+      postDispatchProbe: { _ in nil })
+
+    XCTAssertTrue(first.supervisor === second.supervisor)
+    XCTAssertNotNil(first.lifecycle)
+    XCTAssertNil(second.lifecycle)
+    XCTAssertFalse(
+      FileManager.default.fileExists(atPath: secondRoot.path),
+      "reselection must call makeAttached instead of creating another durable host composition")
+    await first.supervisor.observeExistingServer(
+      HDCExistingServerObservation(
+        state: HDCServerState(
+          endpoint: endpoint, health: .healthy, version: .known("3.2.0d"), generation: 7,
+          ownership: .external)),
+      reason: "fixture complete participant inventory")
+    await first.supervisor.setImpactReliability(true, for: endpoint)
+    let productionWiredPreview = await first.diagnostics.requestRecoveryImpactPreview()
+    guard case .preview(let preview) = productionWiredPreview.lifecycleRecovery else {
+      return XCTFail("App-root composition must register its durable lifecycle Job")
+    }
+    XCTAssertEqual(preview.snapshot.affectedJobs, [firstJobID])
+    let attachedPresentation = await second.diagnostics.requestRecoveryImpactPreview()
+    XCTAssertEqual(
+      attachedPresentation.lifecycleRecovery,
+      .unavailable(reason: HDCApplicationDiagnosticsHost.attachedLifecycleUnavailableReason))
+  }
+
+  func testApplicationHostFailsClosedWithoutCompleteCriticalStateInventory() async throws {
+    let root = try temporarySessionRoot()
+    defer { try? FileManager.default.removeItem(at: root.deletingLastPathComponent()) }
+    let candidate = fixtureCandidate()
+    let endpoint = HDCServerEndpoint("127.0.0.1:18716")
+    let snapshot = HDCJobToolchainSnapshot(
+      candidate: candidate, endpoint: endpoint.rawValue,
+      details: HDCProbeDetails(
+        platformTrust: .unknown(reason: "fixture"), clientVersion: .known("3.2.0d"),
+        serverVersion: .known("3.2.0d"), daemonVersion: .unknown(reason: "not registered"),
+        serverGeneration: .known(7)))
+    let unavailableReason =
+      "No complete production HDC Job/Device critical-state inventory is attached."
+    let composition = try await HDCApplicationDiagnosticsHost().compose(
+      sessionRoot: root, sessionID: "production-inventory-session",
+      jobID: "production-inventory-job", toolchain: candidate,
+      semanticProfile: fixtureSemanticProfile(candidate: candidate),
+      snapshot: snapshot, authorization: .ready,
+      impactInventory: .unavailable(reason: unavailableReason),
+      postDispatchProbe: { _ in .generation(8) })
+    await composition.supervisor.observeExistingServer(
+      HDCExistingServerObservation(
+        state: HDCServerState(
+          endpoint: endpoint, health: .healthy, version: .known("3.2.0d"), generation: 7,
+          ownership: .external)),
+      reason: "fixture verified identity")
+    await composition.supervisor.setImpactReliability(true, for: endpoint)
+
+    let presentation = await composition.diagnostics.requestRecoveryImpactPreview()
+    XCTAssertEqual(presentation.lifecycleRecovery, .unavailable(reason: unavailableReason))
+  }
+
+  func testApplicationHostConsumesCompleteCriticalStateInventoryBeforeLifecycleDispatch()
+    async throws
+  {
+    let root = try temporarySessionRoot()
+    defer { try? FileManager.default.removeItem(at: root.deletingLastPathComponent()) }
+    let candidate = fixtureCandidate()
+    let endpoint = HDCServerEndpoint("127.0.0.1:18716")
+    let snapshot = HDCJobToolchainSnapshot(
+      candidate: candidate, endpoint: endpoint.rawValue,
+      details: HDCProbeDetails(
+        platformTrust: .unknown(reason: "fixture"), clientVersion: .known("3.2.0d"),
+        serverVersion: .known("3.2.0d"), daemonVersion: .unknown(reason: "not registered"),
+        serverGeneration: .known(7)))
+    let criticalRecipient = HDCServerRecipient(
+      id: "production-flash-job", kind: .job, endpoint: endpoint)
+    let criticalState = HDCServerCriticalState.criticalNonInterruptible(
+      stepID: "flash-system", safeBoundaryAction: "wait for flash checkpoint")
+    let invocationLog = root.appending(path: "critical-inventory-invocations.log")
+    let composition = try await HDCApplicationDiagnosticsHost().compose(
+      sessionRoot: root, sessionID: "production-critical-session",
+      jobID: "production-critical-gate", toolchain: candidate,
+      semanticProfile: fixtureSemanticProfile(candidate: candidate),
+      snapshot: snapshot, authorization: .ready,
+      additionalChildEnvironment: ["ARKDECK_FAKE_HDC_INVOCATION_LOG": invocationLog.path],
+      impactInventory: .complete([
+        HDCApplicationHostImpactParticipant(
+          recipient: criticalRecipient, criticalState: criticalState)
+      ]),
+      postDispatchProbe: { _ in .generation(8) })
+    await composition.supervisor.observeExistingServer(
+      HDCExistingServerObservation(
+        state: HDCServerState(
+          endpoint: endpoint, health: .healthy, version: .known("3.2.0d"), generation: 7,
+          ownership: .external)),
+      reason: "fixture verified identity")
+    await composition.supervisor.setImpactReliability(true, for: endpoint)
+    guard
+      case .ready(let preview) = await composition.supervisor.createImpactPreview(
+        action: .restartConfirmedGeneration, endpoint: endpoint),
+      case .accepted(let confirmation) = await composition.supervisor.confirm(preview.id)
+    else {
+      return XCTFail("complete App-root inventory must produce an exact impact scope")
+    }
+    XCTAssertEqual(
+      preview.snapshot.affectedJobs,
+      ["production-critical-gate", "production-flash-job"])
+
+    let result = await (try XCTUnwrap(composition.lifecycle)).dispatch(
+      confirmation: confirmation)
+    XCTAssertEqual(
+      result,
+      .blocked(
+        .criticalJobs([
+          HDCServerCriticalJob(
+            jobID: "production-flash-job", stepID: "flash-system",
+            safeBoundaryAction: "wait for flash checkpoint")
+        ])))
+    XCTAssertFalse(
+      FileManager.default.fileExists(atPath: invocationLog.path),
+      "production critical-state inventory must block before lifecycle child dispatch")
+  }
+
+  func testRegisteredLifecyclePostDispatchProbeUsesOnlyCommandlessIdentityObservation()
+    async throws
+  {
+    let candidate = fixtureCandidate()
+    let endpoint = HDCServerEndpoint("127.0.0.1:18718")
+    let oldReceipt = HDCServerProcessIdentityReceipt(
+      pid: 41, startSeconds: 10, startMicroseconds: 20,
+      executablePath: candidate.path.resolvingSymlinksInPath().standardizedFileURL,
+      executableSHA256: candidate.sha256, endpoint: endpoint)
+    let newReceipt = HDCServerProcessIdentityReceipt(
+      pid: 42, startSeconds: 11, startMicroseconds: 30,
+      executablePath: candidate.path.resolvingSymlinksInPath().standardizedFileURL,
+      executableSHA256: candidate.sha256, endpoint: endpoint)
+    let registry = fixtureReadOnlyProbeRegistry(candidate: candidate)
+    let restartObserver = SequencedHDCServerIdentityObserver(
+      observations: [
+        .observed(oldReceipt), .unavailable(reason: "restart window"), .observed(newReceipt),
+      ])
+    let restartProbe = HDCRegisteredLifecyclePostDispatchProbe(
+      toolchain: candidate, registry: registry, identityObserver: restartObserver,
+      maximumAttempts: 3)
+    let restartStep = HDCServerLifecycleStep(
+      id: UUID(), auditID: UUID(), action: .restartConfirmedGeneration, endpoint: endpoint,
+      expectedGeneration: try XCTUnwrap(oldReceipt.stableGeneration),
+      expectedOwnership: .external, impactSnapshotHash: "fixture-scope",
+      confirmationID: UUID())
+
+    let restartResult = await restartProbe.observe(after: restartStep)
+    XCTAssertEqual(restartResult, .generation(try XCTUnwrap(newReceipt.stableGeneration)))
+    let restartObservationCount = await restartObserver.observationCount()
+    XCTAssertEqual(restartObservationCount, 3)
+
+    let stopObserver = SequencedHDCServerIdentityObserver(
+      observations: [.observed(oldReceipt), .unavailable(reason: "stopped")])
+    let stopProbe = HDCRegisteredLifecyclePostDispatchProbe(
+      toolchain: candidate, registry: registry, identityObserver: stopObserver,
+      maximumAttempts: 2)
+    let stopStep = HDCServerLifecycleStep(
+      id: UUID(), auditID: UUID(), action: .stopConfirmedGeneration, endpoint: endpoint,
+      expectedGeneration: try XCTUnwrap(oldReceipt.stableGeneration),
+      expectedOwnership: .external, impactSnapshotHash: "fixture-scope",
+      confirmationID: UUID())
+
+    let stopResult = await stopProbe.observe(after: stopStep)
+    XCTAssertEqual(stopResult, .unavailable)
+    let stopObservationCount = await stopObserver.observationCount()
+    XCTAssertEqual(stopObservationCount, 2)
+  }
+
+  func testOutcomeUnknownDurablyBlocksRetryAndReopenDispatch() async throws {
+    let catalogRoot = try temporarySessionRoot()
+    defer { try? FileManager.default.removeItem(at: catalogRoot.deletingLastPathComponent()) }
+    let candidate = fixtureCandidate()
+    let endpoint = HDCServerEndpoint("127.0.0.1:18716")
+    let initialSnapshot = HDCJobToolchainSnapshot(
+      candidate: candidate, endpoint: endpoint.rawValue,
+      details: HDCProbeDetails(
+        platformTrust: .unknown(reason: "fixture"), clientVersion: .known("3.2.0d"),
+        serverVersion: .known("3.2.0d"), daemonVersion: .unknown(reason: "not registered"),
+        serverGeneration: .known(7)))
+    let reopenedSnapshot = HDCJobToolchainSnapshot(
+      candidate: candidate, endpoint: endpoint.rawValue,
+      details: HDCProbeDetails(
+        platformTrust: .known("fixture-revalidated"), clientVersion: .known("3.2.1"),
+        serverVersion: .known("3.2.1"), daemonVersion: .unknown(reason: "not registered"),
+        serverGeneration: .known(8)))
+    let catalog = HDCApplicationDiagnosticsExecutionCatalog(root: catalogRoot)
+    let initialIdentity = try catalog.select(for: candidate)
+    let invocationLog = catalogRoot.appending(path: "unknown-retry-invocations.log")
+
+    func compose(
+      identity: HDCApplicationDiagnosticsExecutionIdentity,
+      snapshot: HDCJobToolchainSnapshot
+    ) async throws -> HDCSessionDiagnosticsComposition {
+      try await HDCApplicationDiagnosticsHost().compose(
+        sessionRoot: identity.sessionRoot,
+        sessionID: identity.sessionID,
+        jobID: identity.jobID,
+        toolchain: candidate,
+        semanticProfile: fixtureSemanticProfile(candidate: candidate),
+        snapshot: snapshot, authorization: .ready,
+        additionalChildEnvironment: ["ARKDECK_FAKE_HDC_INVOCATION_LOG": invocationLog.path],
+        impactInventory: .complete([]),
+        postDispatchProbe: { _ in nil })
+    }
+
+    func confirmedRecovery(
+      on composition: HDCSessionDiagnosticsComposition
+    ) async throws -> HDCServerLifecycleConfirmation {
+      await composition.supervisor.observeExistingServer(
+        HDCExistingServerObservation(
+          state: HDCServerState(
+            endpoint: endpoint, health: .healthy, version: .known("3.2.0d"), generation: 7,
+            ownership: .external)),
+        reason: "fixture verified state")
+      await composition.supervisor.setImpactReliability(true, for: endpoint)
+      guard
+        case .ready(let preview) = await composition.supervisor.createImpactPreview(
+          action: .restartConfirmedGeneration, endpoint: endpoint),
+        case .accepted(let confirmation) = await composition.supervisor.confirm(preview.id)
+      else {
+        throw HDCServerLifecycleAdapterError.durableLifecycleProofMissingOrMismatched
+      }
+      return confirmation
+    }
+
+    var first: HDCSessionDiagnosticsComposition? = try await compose(
+      identity: initialIdentity, snapshot: initialSnapshot)
+    var firstLifecycle: HDCSessionLifecycleUseCase? = try XCTUnwrap(first?.lifecycle)
+    let firstConfirmation = try await confirmedRecovery(on: try XCTUnwrap(first))
+    let fixedIntent = try XCTUnwrap(first?.toolchainIntent)
+    let firstResult = await (try XCTUnwrap(firstLifecycle)).dispatch(
+      confirmation: firstConfirmation)
+    guard case .completed(.outcomeUnknown) = firstResult else {
+      return XCTFail("missing post-dispatch evidence must become outcomeUnknown")
+    }
+    let invocationsAfterUnknown = try invocationLines(at: invocationLog)
+    XCTAssertEqual(invocationsAfterUnknown.count, 1)
+
+    let retryResult = await (try XCTUnwrap(firstLifecycle)).dispatch(
+      confirmation: try await confirmedRecovery(on: try XCTUnwrap(first)))
+    guard case .blocked(.recoveryRequired) = retryResult else {
+      return XCTFail("the in-memory Job must reject a second destructive lifecycle dispatch")
+    }
+    XCTAssertEqual(try invocationLines(at: invocationLog).count, 1)
+    firstLifecycle = nil
+    first = nil
+
+    let recoveredIdentity = try catalog.select(for: candidate)
+    XCTAssertTrue(recoveredIdentity.isCrashRecovery)
+    XCTAssertEqual(recoveredIdentity.sessionID, initialIdentity.sessionID)
+    XCTAssertEqual(recoveredIdentity.jobID, initialIdentity.jobID)
+    let reopened = try await compose(identity: recoveredIdentity, snapshot: reopenedSnapshot)
+    XCTAssertEqual(
+      try XCTUnwrap(reopened.toolchainIntent), fixedIntent,
+      "crash recovery must reopen the immutable original intent instead of comparing a new server generation to it"
+    )
+    let reopenedPresentation = await reopened.diagnostics.requestRecoveryImpactPreview()
+    XCTAssertEqual(
+      reopenedPresentation.lifecycleRecovery,
+      .unavailable(
+        reason: "A destructive HDC lifecycle dispatch may enter an external-effect window"))
+    let reopenedLifecycle = try XCTUnwrap(reopened.lifecycle)
+    let reopenedResult = await reopenedLifecycle.dispatch(
+      confirmation: firstConfirmation)
+    guard case .blocked(.recoveryRequired) = reopenedResult else {
+      return XCTFail("the durable recovery gate must survive App/Session composition reopen")
+    }
+    XCTAssertEqual(
+      try invocationLines(at: invocationLog).count, 1,
+      "outcomeUnknown must keep subsequent lifecycle child dispatch at zero after reopen")
+  }
+
   // TEST-MAC-M1-HDC-001 / fake-hdc real-child-process supervisor matrix
   func testTEST_MAC_M1_HDC_001_FakeHDCProcessFaultMatrixHasNoImplicitSuccess() async throws {
-    let runner = HDCProcessCommandRunner()
+    let candidate = fixtureCandidate()
+    let runner = HDCProcessCommandRunner(
+      semanticProfile: fixtureSemanticProfile(candidate: candidate))
     let endpoint = try HDCServerEndpointSelector.select(explicitEndpoint: "127.0.0.1:18710")
     let expected: [([String], HDCCommandSemanticResult)] = [
       (["uninstall", "com.example.waterflowdemo"], .success),
@@ -614,7 +1370,7 @@ final class HDCSupervisorContractTests: XCTestCase {
     for (arguments, semantic) in expected {
       let result = try await runner.execute(
         HDCProcessCommand(
-          toolchain: fixtureCandidate(), endpoint: endpoint, arguments: arguments, timeout: 2))
+          toolchain: candidate, endpoint: endpoint, arguments: arguments, timeout: 2))
       XCTAssertEqual(result.execution.termination, .exited(0), arguments.description)
       XCTAssertEqual(result.semantic, semantic, arguments.description)
       if arguments.first == "uninstall" {
@@ -627,7 +1383,7 @@ final class HDCSupervisorContractTests: XCTestCase {
 
     let crash = try await runner.execute(
       HDCProcessCommand(
-        toolchain: fixtureCandidate(), endpoint: endpoint, arguments: ["crash"], timeout: 2))
+        toolchain: candidate, endpoint: endpoint, arguments: ["crash"], timeout: 2))
     XCTAssertEqual(crash.execution.termination, .exited(23))
     guard case .failure = crash.semantic else {
       return XCTFail("crash cannot be a semantic success")
@@ -635,13 +1391,13 @@ final class HDCSupervisorContractTests: XCTestCase {
 
     let slow = try await runner.execute(
       HDCProcessCommand(
-        toolchain: fixtureCandidate(), endpoint: endpoint, arguments: ["slow"], timeout: 2))
+        toolchain: candidate, endpoint: endpoint, arguments: ["slow"], timeout: 2))
     XCTAssertEqual(slow.execution.termination, .exited(0))
     XCTAssertEqual(slow.semantic, .failure(.offline))
 
     let hang = try await runner.execute(
       HDCProcessCommand(
-        toolchain: fixtureCandidate(), endpoint: endpoint, arguments: ["hang"], timeout: 0.2))
+        toolchain: candidate, endpoint: endpoint, arguments: ["hang"], timeout: 0.2))
     XCTAssertEqual(hang.execution.termination, .timedOut)
     guard case .failure = hang.semantic else {
       return XCTFail("hang timeout cannot be a semantic success")
@@ -649,7 +1405,7 @@ final class HDCSupervisorContractTests: XCTestCase {
 
     let oversized = try await runner.execute(
       HDCProcessCommand(
-        toolchain: fixtureCandidate(), endpoint: endpoint, arguments: ["oversized"], timeout: 5))
+        toolchain: candidate, endpoint: endpoint, arguments: ["oversized"], timeout: 5))
     guard case .failure = oversized.semantic else {
       return XCTFail("oversized fault output must never become semantic success")
     }
@@ -729,16 +1485,18 @@ final class HDCSupervisorContractTests: XCTestCase {
     await gate.release()
   }
 
-  // TEST-AC-HDC-006-01 / platformFileAccessContract
-  func testTEST_AC_HDC_006_01_KeyAccessFailureIsDiagnostic() async {
-    let workflow = HDCAuthorizationWorkflow()
-    let result = await workflow.poll(policy: HDCAuthorizationPollingPolicy(maximumAttempts: 1)) {
-      _ in
-      .keyAccessDenied(reason: "fixture key permissions denied")
-    }
-
-    XCTAssertEqual(result, .keyAccessDenied(reason: "fixture key permissions denied"))
-    XCTAssertTrue(result.hasNonDestructiveRetry)
+  // Registered unsupported disposition only; this is not platform file-access evidence.
+  func testRegisteredUnsupportedKeyFamilyCannotReadOrRepairAPath() {
+    let entry = HDCReadOnlyProbeRegistry.pinnedProduction.entry(for: .keyAccessDiagnostics)
+    XCTAssertEqual(entry.status, .unsupported)
+    XCTAssertFalse(entry.invocationAllowed)
+    XCTAssertTrue(entry.exactArguments.isEmpty)
+    XCTAssertNotNil(entry.unsupportedReason)
+    XCTAssertEqual(
+      HDCReadOnlyProbeRegistry.pinnedProduction.disposition(
+        forFamily: HDCReadOnlyProbeRegistry.Family.keyAccessDiagnostics.rawValue,
+        observation: .supportedObservation()),
+      .unsupported)
   }
 
   // TEST-AC-HDC-008-01 / securityStateContract
@@ -750,27 +1508,152 @@ final class HDCSupervisorContractTests: XCTestCase {
     XCTAssertNotNil(presentation.tcpWarning)
   }
 
-  // TEST-AC-HDC-009-01 / subserverCallCounter
-  func testTEST_AC_HDC_009_ReadOnlySubserverObservationInvokesOnlyCheckserver() async throws {
+  // Registered unsupported disposition only; this is not subserver capability evidence.
+  func testRegisteredUnsupportedSubserverFamilyDispatchesNoCommand() throws {
     let root = FileManager.default.temporaryDirectory.appending(
       path: "arkdeck-m1-006-subserver-\(UUID().uuidString)", directoryHint: .isDirectory)
     defer { try? FileManager.default.removeItem(at: root) }
     try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
     let invocationLog = root.appending(path: "fake-hdc-invocations.log")
-    let endpoint = try HDCServerEndpointSelector.select(explicitEndpoint: "127.0.0.1:18712")
-    let supervisor = HDCServerSupervisor(auditStore: InMemoryHDCServerLifecycleAuditStore())
-    let processSupervisor = HDCServerProcessSupervisor(
-      supervisor: supervisor,
-      additionalChildEnvironment: ["ARKDECK_FAKE_HDC_INVOCATION_LOG": invocationLog.path])
+    let entry = HDCReadOnlyProbeRegistry.pinnedProduction.entry(for: .subserverCapability)
+    XCTAssertEqual(entry.status, .unsupported)
+    XCTAssertFalse(entry.invocationAllowed)
+    XCTAssertTrue(entry.exactArguments.isEmpty)
+    XCTAssertEqual(
+      HDCReadOnlyProbeRegistry.pinnedProduction.disposition(
+        forFamily: HDCReadOnlyProbeRegistry.Family.subserverCapability.rawValue,
+        observation: .supportedObservation()),
+      .unsupported)
+    XCTAssertFalse(FileManager.default.fileExists(atPath: invocationLog.path))
+  }
 
-    let result = await processSupervisor.observeExistingServer(
-      endpoint: endpoint, toolchain: fixtureCandidate())
-    XCTAssertEqual(result.classification, .healthy(serverVersion: "3.2.0d"))
-    let invocations = try String(contentsOf: invocationLog, encoding: .utf8)
-      .split(separator: "\n", omittingEmptySubsequences: true)
-      .map(String.init)
-    XCTAssertEqual(invocations, ["-s\u{1F}127.0.0.1:18712\u{1F}checkserver"])
-    XCTAssertFalse(invocations.contains { $0.contains("spawn-sub") || $0.contains("killall-sub") })
+  func testSelectedDeviceRegisteredRowParserBindsOnlyTheDurableUSBIdentity() async throws {
+    let endpoint = try HDCServerEndpointSelector.select(explicitEndpoint: "127.0.0.1:18720")
+    let candidate = fixtureCandidate()
+    let evaluated = try await HDCProcessCommandRunner(
+      semanticProfile: fixtureSemanticProfile(candidate: candidate)
+    ).execute(
+      HDCProcessCommand(
+        toolchain: candidate, endpoint: endpoint,
+        arguments: ["list", "targets", "-v"], timeout: 2))
+    XCTAssertEqual(evaluated.execution.termination, .exited(0))
+    XCTAssertEqual(
+      evaluated.semantic, .unknownOutput, "dynamic identity rows are not golden success")
+
+    let parser = HDCSelectedDeviceAuthorizationRowParser()
+    let row = try XCTUnwrap(parser.parse(evaluated.execution.stdout.data))
+    let identity = try DeviceIdentitySnapshot(
+      attributes: ["serial": .string("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")])
+    let binding = try CurrentDeviceBinding(
+      revision: 3, connectKey: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", transport: .usb,
+      identitySnapshot: identity, evidence: ["fake-control"], confirmedBy: .user,
+      channelProtection: .unverifiedAssumeUnprotected)
+    let durable = try DurableCurrentDeviceBinding(
+      reference: DeviceBindingReference(targetID: "fixture-device", revision: 3),
+      binding: binding)
+    XCTAssertTrue(parser.matches(row, durableBinding: durable))
+
+    let stale = try CurrentDeviceBinding(
+      revision: 4, connectKey: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", transport: .usb,
+      identitySnapshot: try DeviceIdentitySnapshot(
+        attributes: ["serial": .string("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")]),
+      evidence: ["fake-control"], confirmedBy: .user,
+      channelProtection: .unverifiedAssumeUnprotected)
+    XCTAssertFalse(
+      parser.matches(
+        row,
+        durableBinding: try DurableCurrentDeviceBinding(
+          reference: DeviceBindingReference(targetID: "fixture-device", revision: 4),
+          binding: stale)))
+    XCTAssertNil(parser.parse(Data("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\tUSB\tConnected\n".utf8)))
+  }
+
+  func testRegisteredSelectedDeviceAuthorizationIsReachableAfterStableServerIdentity()
+    async throws
+  {
+    let candidate = fixtureCandidate()
+    let endpoint = try HDCServerEndpointSelector.select(
+      explicitEndpoint: "127.0.0.1:18720")
+    let identityReceipt = HDCServerProcessIdentityReceipt(
+      pid: 42, startSeconds: 10, startMicroseconds: 20,
+      executablePath: candidate.path.resolvingSymlinksInPath().standardizedFileURL,
+      executableSHA256: candidate.sha256, endpoint: endpoint.endpoint)
+    let observer = FixedHDCServerIdentityObserver(observation: .observed(identityReceipt))
+    let probe = HDCSelectedDeviceAuthorizationProbe(
+      registry: fixtureReadOnlyProbeRegistry(candidate: candidate),
+      semanticProfile: fixtureSemanticProfile(candidate: candidate),
+      identityObserver: observer)
+    let binding = try CurrentDeviceBinding(
+      revision: 3, connectKey: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", transport: .usb,
+      identitySnapshot: DeviceIdentitySnapshot(
+        attributes: ["serial": .string("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")]),
+      evidence: ["fake-control"], confirmedBy: .user,
+      channelProtection: .unverifiedAssumeUnprotected)
+    let durableBinding = try DurableCurrentDeviceBinding(
+      reference: DeviceBindingReference(targetID: "fixture-device", revision: 3),
+      binding: binding)
+
+    let result = await probe.probe(
+      endpoint: endpoint, toolchain: candidate, serverIdentity: identityReceipt,
+      durableBinding: durableBinding)
+
+    XCTAssertEqual(result.authorization, .ready)
+    let observationCount = await observer.observationCount()
+    XCTAssertEqual(observationCount, 2)
+    XCTAssertEqual(
+      result.execution?.stdout.data,
+      Data("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\t\tUSB\tConnected\tlocalhost\n".utf8))
+
+    let differentDeviceCapturedBytes =
+      "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\t\tUSB\tConnected\tlocalhost\n"
+    let differentDeviceBinding = try DurableCurrentDeviceBinding(
+      reference: DeviceBindingReference(targetID: "fixture-device-b", revision: 1),
+      binding: CurrentDeviceBinding(
+        revision: 1, connectKey: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", transport: .usb,
+        identitySnapshot: DeviceIdentitySnapshot(
+          attributes: ["serial": .string("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")]),
+        evidence: ["fake-control"], confirmedBy: .user,
+        channelProtection: .unverifiedAssumeUnprotected))
+    let alteredObserver = FixedHDCServerIdentityObserver(observation: .observed(identityReceipt))
+    let alteredProbe = HDCSelectedDeviceAuthorizationProbe(
+      registry: fixtureReadOnlyProbeRegistry(candidate: candidate),
+      semanticProfile: fixtureSemanticProfile(candidate: candidate),
+      identityObserver: alteredObserver,
+      additionalChildEnvironment: [
+        "ARKDECK_FAKE_HDC_SELECTED_DEVICE_ROW": differentDeviceCapturedBytes
+      ])
+    let alteredResult = await alteredProbe.probe(
+      endpoint: endpoint, toolchain: candidate, serverIdentity: identityReceipt,
+      durableBinding: differentDeviceBinding)
+    XCTAssertTrue(
+      HDCSelectedDeviceAuthorizationRowParser().matches(
+        try XCTUnwrap(
+          HDCSelectedDeviceAuthorizationRowParser().parse(
+            Data(differentDeviceCapturedBytes.utf8))),
+        durableBinding: differentDeviceBinding),
+      "the control row must match the second device's durable binding")
+    XCTAssertEqual(
+      alteredResult.authorization,
+      .unavailable(reason: "authorization output is unknown or does not match the binding"),
+      "a binding match alone cannot replace the registry's exact captured raw SHA-256")
+
+    let diagnostics = HDCServerDiagnosticsUseCase(
+      supervisor: HDCServerSupervisor(auditStore: InMemoryHDCServerLifecycleAuditStore()),
+      snapshot: HDCJobToolchainSnapshot(
+        candidate: candidate, endpoint: endpoint.endpoint.rawValue,
+        details: HDCProbeDetails(
+          platformTrust: .unknown(reason: "fixture"),
+          clientVersion: .unknown(reason: "registered client family unavailable"),
+          serverVersion: .known("3.2.0d"),
+          daemonVersion: .unknown(reason: "not registered"),
+          serverGeneration: .known(10_000_020))),
+      authorization: .unavailable(reason: "authorization probe requires a selected device"),
+      channelProtection: .unverifiedAssumeUnprotected)
+    await diagnostics.applyRegisteredAuthorization(result.authorization)
+    let presentation = await diagnostics.refresh()
+    XCTAssertEqual(
+      presentation.authorization, .ready,
+      "the registered probe result must replace the bootstrap unavailable state")
   }
 
   // TEST-AC-HDC-010-02 / lifecycleAuditContract
@@ -826,6 +1709,7 @@ final class HDCSupervisorContractTests: XCTestCase {
       "-s\u{1F}127.0.0.1:18710\u{1F}kill\u{1F}-r\n")
     let resumedExecutor = HDCProcessLifecycleExecutor(
       toolchain: fixtureCandidate(),
+      semanticProfile: fixtureSemanticProfile(),
       endpointSelection: try HDCServerEndpointSelector.select(
         explicitEndpoint: step.endpoint.rawValue),
       additionalChildEnvironment: ["ARKDECK_FAKE_HDC_INVOCATION_LOG": invocationLog.path],
@@ -1090,6 +1974,30 @@ final class HDCSupervisorContractTests: XCTestCase {
     return HDCCandidate(path: url, source: .userConfigured, sha256: hash)
   }
 
+  private func fixtureSemanticProfile(
+    candidate: HDCCandidate? = nil
+  ) -> HDCRegisteredSemanticProfile {
+    let selectedDeviceRow = Data(
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\t\tUSB\tConnected\tlocalhost\n".utf8)
+    return HDCRegisteredSemanticProfile.testOnlyFake(
+      executableSHA256: (candidate ?? fixtureCandidate()).sha256,
+      selectedDeviceAuthorizationSHA256: sha256Hex(selectedDeviceRow))
+  }
+
+  private func fixtureProcessSupervisor(
+    supervisor: HDCServerSupervisor,
+    additionalChildEnvironment: [String: String] = [:]
+  ) -> HDCServerProcessSupervisor {
+    let candidate = fixtureCandidate()
+    return HDCServerProcessSupervisor(
+      supervisor: supervisor,
+      additionalChildEnvironment: additionalChildEnvironment,
+      readOnlyProbeRegistry: fixtureReadOnlyProbeRegistry(candidate: candidate),
+      semanticProfile: fixtureSemanticProfile(candidate: candidate),
+      identityObserver: FixedHDCServerIdentityObserver(
+        observation: .unknown(reason: "legacy fixture probe has no process identity")))
+  }
+
   private func fixtureExecutable() -> URL {
     let packageRoot = URL(fileURLWithPath: #filePath)
       .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
@@ -1145,11 +2053,12 @@ final class HDCSupervisorContractTests: XCTestCase {
 
     let executor = HDCProcessLifecycleExecutor(
       toolchain: fixtureCandidate(),
+      semanticProfile: fixtureSemanticProfile(),
       endpointSelection: try HDCServerEndpointSelector.select(explicitEndpoint: endpoint.rawValue),
       additionalChildEnvironment: ["ARKDECK_FAKE_HDC_INVOCATION_LOG": invocationLog.path],
       durableAuthorization: adapter,
       dispatchLeaseValidator: FixtureLifecycleLeaseValidator(),
-      postDispatchProbe: { observed in observed == endpoint ? .generation(8) : nil })
+      postDispatchProbe: { step in step.endpoint == endpoint ? .generation(8) : nil })
     let executionOutcome = await executor.execute(step, lease: fixtureLease(for: step))
     XCTAssertEqual(executionOutcome.outcome, .succeeded(resultingGeneration: 8))
     XCTAssertEqual(executionOutcome.postDispatchObservation, .generation(8))
@@ -1341,6 +2250,7 @@ final class HDCSupervisorContractTests: XCTestCase {
     let invocationLog = root.appending(path: "unauthorized-invocation.log")
     let executor = HDCProcessLifecycleExecutor(
       toolchain: fixtureCandidate(),
+      semanticProfile: fixtureSemanticProfile(),
       endpointSelection: try HDCServerEndpointSelector.select(explicitEndpoint: endpoint.rawValue),
       additionalChildEnvironment: ["ARKDECK_FAKE_HDC_INVOCATION_LOG": invocationLog.path],
       durableAuthorization: adapter,
@@ -1374,6 +2284,7 @@ final class HDCSupervisorContractTests: XCTestCase {
     let authorization = FixtureSingleUseLifecycleAuthorization()
     let executor = HDCProcessLifecycleExecutor(
       toolchain: fixtureCandidate(),
+      semanticProfile: fixtureSemanticProfile(),
       endpointSelection: try HDCServerEndpointSelector.select(explicitEndpoint: endpoint.rawValue),
       additionalChildEnvironment: ["ARKDECK_FAKE_HDC_INVOCATION_LOG": invocationLog.path],
       durableAuthorization: authorization,
@@ -1401,6 +2312,7 @@ final class HDCSupervisorContractTests: XCTestCase {
     let authorization = FixtureSingleUseLifecycleAuthorization()
     let executor = HDCProcessLifecycleExecutor(
       toolchain: fixtureCandidate(),
+      semanticProfile: fixtureSemanticProfile(),
       endpointSelection: try HDCServerEndpointSelector.select(explicitEndpoint: endpoint.rawValue),
       additionalChildEnvironment: [
         "ARKDECK_FAKE_HDC_INVOCATION_LOG": root.appending(path: "invocations.log").path
@@ -1440,6 +2352,8 @@ final class HDCSupervisorContractTests: XCTestCase {
           endpoint: endpoint, health: .healthy, version: .known("3.2.0d"), generation: 7,
           ownership: .external)),
       reason: "fixture verified state")
+    await supervisor.setImpactReliability(true, for: endpoint)
+    await supervisor.setParticipantImpactReliability(true, for: endpoint)
     guard
       case .ready(let preview) = await supervisor.createImpactPreview(
         action: .restartConfirmedGeneration, endpoint: endpoint),
@@ -1452,6 +2366,7 @@ final class HDCSupervisorContractTests: XCTestCase {
     let probeCounter = HDCProbeCounter()
     let executor = HDCProcessLifecycleExecutor(
       toolchain: fixtureCandidate(),
+      semanticProfile: fixtureSemanticProfile(),
       endpointSelection: try HDCServerEndpointSelector.select(explicitEndpoint: endpoint.rawValue),
       additionalChildEnvironment: [
         "ARKDECK_FAKE_HDC_INVOCATION_LOG": invocationLog.path,
@@ -1566,6 +2481,7 @@ final class HDCSupervisorContractTests: XCTestCase {
     let invocationLog = root.appending(path: "single-use-invocation.log")
     let executor = HDCProcessLifecycleExecutor(
       toolchain: fixtureCandidate(),
+      semanticProfile: fixtureSemanticProfile(),
       endpointSelection: try HDCServerEndpointSelector.select(explicitEndpoint: endpoint.rawValue),
       additionalChildEnvironment: ["ARKDECK_FAKE_HDC_INVOCATION_LOG": invocationLog.path],
       durableAuthorization: adapter,
@@ -1628,6 +2544,8 @@ final class HDCSupervisorContractTests: XCTestCase {
           endpoint: endpoint, health: .healthy, version: .known("3.2.0d"), generation: 7,
           ownership: .external)),
       reason: "fixture verified state")
+    await supervisor.setImpactReliability(true, for: endpoint)
+    await supervisor.setParticipantImpactReliability(true, for: endpoint)
     guard
       case .ready(let preview) = await supervisor.createImpactPreview(
         action: .restartConfirmedGeneration, endpoint: endpoint)
@@ -1642,6 +2560,7 @@ final class HDCSupervisorContractTests: XCTestCase {
     let leaseGate = BlockingDispatchLeaseValidator(supervisor: supervisor)
     let executor = HDCProcessLifecycleExecutor(
       toolchain: fixtureCandidate(),
+      semanticProfile: fixtureSemanticProfile(),
       endpointSelection: try HDCServerEndpointSelector.select(explicitEndpoint: endpoint.rawValue),
       additionalChildEnvironment: ["ARKDECK_FAKE_HDC_INVOCATION_LOG": invocationLog.path],
       durableAuthorization: adapter,
@@ -1743,6 +2662,8 @@ final class HDCSupervisorContractTests: XCTestCase {
           endpoint: endpoint, health: .healthy, version: .known("3.2.0d"), generation: 7,
           ownership: .external)),
       reason: "fixture verified state")
+    await supervisor.setImpactReliability(true, for: endpoint)
+    await supervisor.setParticipantImpactReliability(true, for: endpoint)
     guard
       case .ready(let preview) = await supervisor.createImpactPreview(
         action: .restartConfirmedGeneration, endpoint: endpoint),
@@ -1759,7 +2680,8 @@ final class HDCSupervisorContractTests: XCTestCase {
       launchObserver: { _ in launchCount.recordLaunch() })
     let invocationLog = root.appending(path: "atomic-launch-race-invocations.log")
     let executor = HDCProcessLifecycleExecutor(
-      runner: HDCProcessCommandRunner(executor: processExecutor),
+      runner: HDCProcessCommandRunner(
+        executor: processExecutor, semanticProfile: fixtureSemanticProfile()),
       toolchain: fixtureCandidate(),
       endpointSelection: try HDCServerEndpointSelector.select(
         explicitEndpoint: endpoint.rawValue),
@@ -1826,6 +2748,57 @@ final class HDCSupervisorContractTests: XCTestCase {
       stderr: ProcessStreamCapture(data: Data(), totalByteCount: 0, wasTruncated: false))
   }
 
+  private func invocationLines(at url: URL) throws -> [Substring] {
+    try String(contentsOf: url, encoding: .utf8)
+      .split(separator: "\n", omittingEmptySubsequences: true)
+  }
+
+  private func fixtureReadOnlyProbeRegistry(
+    candidate: HDCCandidate
+  ) -> HDCReadOnlyProbeRegistry {
+    let registeredFixtureRow = Data(
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\t\tUSB\tConnected\tlocalhost\n".utf8)
+    let entries = HDCReadOnlyProbeRegistry.pinnedProduction.entries.map { entry in
+      guard entry.family == .selectedDeviceAuthorizationBinding else { return entry }
+      return HDCReadOnlyProbeRegistry.Entry(
+        id: entry.id, family: entry.family, status: entry.status,
+        probeKind: entry.probeKind, exactArguments: entry.exactArguments,
+        invocationAllowed: entry.invocationAllowed,
+        timeoutMilliseconds: entry.timeoutMilliseconds, rawFamily: entry.rawFamily,
+        rawSHA256: sha256Hex(registeredFixtureRow), receiptID: entry.receiptID,
+        receiptSHA256: entry.receiptSHA256, unsupportedReason: entry.unsupportedReason)
+    }
+    return HDCReadOnlyProbeRegistry(
+      entries: entries, targetExecutableSHA256: candidate.sha256)
+  }
+
+}
+
+private func sha256Hex(_ data: Data) -> String {
+  SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+}
+
+private struct M1_006ProbeControlPack: Decodable {
+  let evidenceClass: String
+  let vectors: [Vector]
+  let expectedDispatchCounters: [String: Int]
+
+  struct Vector: Decodable {
+    let id: String
+    let family: String
+    let provenanceValid: Bool
+    let preconditionValid: Bool
+    let identityMatches: Bool
+    let bindingMatches: Bool
+    let authorityPresent: Bool
+    let rawFamilyKnown: Bool
+    let deniedObservation: Bool?
+    let effectProven: Bool
+    let cancelled: Bool
+    let timedOut: Bool
+    let mutationName: Bool
+    let expectedDisposition: String
+  }
 }
 
 private actor HDCProbeCounter {
@@ -1837,6 +2810,46 @@ private actor HDCProbeCounter {
   }
 
   func value() -> Int { count }
+}
+
+private actor FixedHDCServerIdentityObserver: HDCServerProcessIdentityObserving {
+  private let observation: HDCServerProcessIdentityRawObservation
+  private var count = 0
+
+  init(observation: HDCServerProcessIdentityRawObservation) {
+    self.observation = observation
+  }
+
+  func observe(
+    endpoint _: HDCServerEndpoint,
+    selectedToolchain _: HDCCandidate
+  ) -> HDCServerProcessIdentityRawObservation {
+    count += 1
+    return observation
+  }
+
+  func observationCount() -> Int { count }
+}
+
+private actor SequencedHDCServerIdentityObserver: HDCServerProcessIdentityObserving {
+  private let observations: [HDCServerProcessIdentityRawObservation]
+  private var index = 0
+
+  init(observations: [HDCServerProcessIdentityRawObservation]) {
+    precondition(!observations.isEmpty)
+    self.observations = observations
+  }
+
+  func observe(
+    endpoint _: HDCServerEndpoint,
+    selectedToolchain _: HDCCandidate
+  ) -> HDCServerProcessIdentityRawObservation {
+    let selected = observations[min(index, observations.count - 1)]
+    index += 1
+    return selected
+  }
+
+  func observationCount() -> Int { index }
 }
 
 private actor BlockingAuthorizationProbe {

@@ -32,6 +32,33 @@
 | SleepWakeObserver | sleep/wake 通知、重复通知去抖、wake 后 reconcile/reconnect/ETA segment reset | pending |
 | PlatformFileRevealer | Finder reveal 成功、文件缺失和无权限 fallback | pending |
 
+## M1 HDC evidence method
+
+TASK-M1-006 platform evidence fixes the source revision, registry/resource/control-vector hashes,
+OS/architecture/Xcode tuple, signed Sandbox App and executable hashes, signing identity, and full
+entitlement dump. Contract tests execute only the repository fake executable as a descriptor-bound
+child and assert the registered production classifier against every control vector. Signed
+XCUITest selects that fake through the system file picker, proves bookmark restoration after App
+relaunch, and checks supported/unsupported/unknown diagnostics without invoking a real HDC.
+
+Production composition must make the App-root host actor the only package-visible lifecycle
+factory, require a complete participant inventory at that boundary, and fail closed unless both
+endpoint identity and participant-impact reliability receipts exist. A terminal manifest-write
+failure intentionally remains durable `recoveryRequired` across composition reopen and permits no
+subsequent lifecycle dispatch. M1-006 supplies no finalize-retry solver: the terminal journal pins
+the manifest SHA while `completedAt` is generated at finalization, so byte-reproducible recovery
+requires a separately approved journal/storage change rather than an in-task retry guess.
+
+For `selectedDeviceAuthorizationBinding`, evidence must also prove exact equality with the
+registry-captured raw family. A newly observed device row is unavailable even if strict parsing
+matches its durable binding; parameterizing that family requires a separately approved integration
+change and cannot be inferred by this platform profile.
+
+The run must report automatic lifecycle, subserver, and device-migration dispatch counts and keep
+all three at zero for external/unknown or unsupported paths. Evidence is M1 task evidence only; it
+does not change the `notStarted` platform conformance state, ADR-0001 distribution decision, real
+hardware support, or release status.
+
 M0A 通过只说明平台 Port 可行，不证明真实 OpenHarmony 设备、Trace parser 或 Flash Provider 已支持。
 
 平台不得从 Core acceptance index 删除 AC 或自行声明 `notApplicable`；适用性变化只能通过 Core change 修改 conformance manifest。
