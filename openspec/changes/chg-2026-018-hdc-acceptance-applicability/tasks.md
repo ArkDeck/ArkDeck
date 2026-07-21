@@ -2,9 +2,16 @@
 
 ## TASK-CA-001 — conformance manifest 条件化适用性修订与 CORE-2.1.0 baseline 起草
 
-- Status:ready(readiness;仅在维护者 review/merge 本独立状态 PR 后生效。前置 ① 已满足:
-  approval-only PR #195 已合入 main squash `f2bde7b`(lvye review/merge);本 PR 即前置 ②,
-  单文件、不含实现、不产生 evidence、不执行任何修订)
+- Status:done(TASK-CA-001 implementation + evidence PR #197 已由维护者 review/merge
+  合入 main squash `3e85073`,与 review head `3e918a2` 零树差;本独立状态 PR 依据下列
+  completion evidence 起草 `ready→done`,仅在维护者 review/merge 后生效。done 只关闭本
+  任务:change `verified` 与 archive(=CORE-2.1.0 ratification)各为后续独立 PR,均不
+  构成 TASK-M1-006 状态变化、CHG-2026-002 verified、platform conformance、
+  hardware/support 或 release claim)
+- Done recheck(2026-07-21,于 main 合入版):`core-conformance.yaml` suite 已为
+  `CORE-CONFORMANCE-2.1.0` 且 `integration_conditional` 恰两条;`CORE-2.1.0.yaml`
+  baseline 草案(status: draft)在位;`./scripts/check-sdd.sh` 0 error/0 warning/111;
+  canonical acceptance index/cases 零变更。
 - Completion evidence candidate(2026-07-21,随实现 PR):
   `evidence/runs/TASK-CA-001/run.md`(base `63fb615`;两 Test ID 均 PASS;delta 与
   design 草案逐项对照、canonical 111 零变更证明、registry provenance 逐字引用在案)。
