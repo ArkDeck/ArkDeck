@@ -12,6 +12,7 @@ let package = Package(
     .library(name: "ArkDeckOpenHarmony", targets: ["ArkDeckOpenHarmony"]),
     .library(name: "ArkDeckWorkflows", targets: ["ArkDeckWorkflows"]),
     .library(name: "ArkDeckStorage", targets: ["ArkDeckStorage"]),
+    .executable(name: "arkdeck", targets: ["ArkDeckCLI"]),
     .executable(name: "ArkDeckJournalCrashFixture", targets: ["ArkDeckJournalCrashFixture"]),
     .executable(name: "ArkDeckRuntimePortFixture", targets: ["ArkDeckRuntimePortFixture"]),
     .executable(name: "ArkDeckFakeHDCFixture", targets: ["ArkDeckFakeHDCFixture"]),
@@ -25,6 +26,10 @@ let package = Package(
       name: "ArkDeckWorkflows",
       dependencies: ["ArkDeckCore", "ArkDeckOpenHarmony", "ArkDeckStorage"]),
     .target(name: "ArkDeckStorage", dependencies: ["ArkDeckCore"]),
+    .executableTarget(
+      name: "ArkDeckCLI",
+      dependencies: ["ArkDeckCore", "ArkDeckWorkflows"]
+    ),
     .executableTarget(
       name: "ArkDeckJournalCrashFixture",
       dependencies: ["ArkDeckCore", "ArkDeckStorage"],
