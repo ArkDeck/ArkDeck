@@ -1,0 +1,36 @@
+---
+schema_version: 1.0.0
+change_id: CHG-2026-018-hdc-acceptance-applicability
+change_revision: 1
+platform: macos
+evidence_classes:
+- documentReview
+cases:
+- acceptance_id: CA-HDC-APPLICABILITY-001
+  test_id: TEST-CA-HDC-APPLICABILITY-001
+  method: Document review of the core-conformance.yaml delta against the design.md normative draft.
+  expected_source: openspec/changes/chg-2026-018-hdc-acceptance-applicability/verification.md#CA-HDC-APPLICABILITY-001
+  minimum_evidence: documentReview
+  expected_result: >-
+    The amended manifest carries suite CORE-CONFORMANCE-2.1.0; the
+    integration_conditional list contains exactly AC-HDC-006-01 and
+    AC-HDC-009-01, each bound to its family, the readonly-probes registry path,
+    an excluded_while condition and a reactivation rule; the applicability rule
+    gains the fail-closed sentence that absence of a registry, a missing family,
+    a hash mismatch or untraceable provenance never establishes an exclusion;
+    shared_inputs additionally record the OPENHARMONY-TOOLS 0.3.0 profile, the
+    readonly-probes registry and the INTEGRATION-PROFILES-0.4.0 lock while the
+    existing 0.2.0 entries stay; every exclusion condition traces verbatim to
+    the registry unsupported reasons and their maintainer-accepted provenance
+    chain.
+- acceptance_id: CA-HDC-APPLICABILITY-002
+  test_id: TEST-CA-HDC-APPLICABILITY-002
+  method: Document review plus repository guard for the no-weakening invariant.
+  expected_source: openspec/changes/chg-2026-018-hdc-acceptance-applicability/verification.md#CA-HDC-APPLICABILITY-002
+  minimum_evidence: documentReview
+  expected_result: >-
+    The canonical acceptance index and acceptance-cases registry keep all 111
+    entries byte-identical; both affected acceptance IDs remain listed; no file
+    under openspec/specs changes; REQ-HDC-006 and REQ-HDC-009 obligation text is
+    untouched; check-sdd reports zero errors and warnings with 111 acceptance
+    IDs; the change diff stays inside the TASK-CA-001 allowed paths.
