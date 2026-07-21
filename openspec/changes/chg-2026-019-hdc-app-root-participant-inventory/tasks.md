@@ -2,9 +2,15 @@
 
 ## TASK-PI-001 — App-root participant registry 与 production inventory feed
 
-- Status:ready(readiness;仅在维护者 review/merge 本独立状态 PR 后生效。前置 ① 已满足:
-  approval-only PR #200 已合入 main squash `94fe6f8`(lvye review/merge);本 PR 即前置 ②,
-  单文件、不含实现、不产生 evidence)
+- Status:done(TASK-PI-001 implementation + evidence PR #205 已由维护者 review/merge
+  合入 main squash `394e4fa`;与 review head `4f180a4` 的树差经逐文件核对恰为先行合入的
+  #203/#204 治理面,本任务交付面零漂移。本独立状态 PR 依据下列 completion evidence 起草
+  `ready→done`,仅在维护者 review/merge 后生效。done 只关闭本任务:change `verified` 另行
+  独立 PR;TASK-M1-006 的 done/closeout 修订以本 done + CORE-2.1.0 ratification(#203)+
+  CHG-2026-002 gate sync(#204)为前置,另用独立状态 PR)
+- Done recheck(2026-07-21,于 main 合入版):全量 287 tests / 1 skip / 0 failures 复现;
+  `./scripts/check-sdd.sh` 0/0/111;registry/facade/contract/UI 四文件与 evidence 均在
+  main。
 - Completion evidence candidate(2026-07-21,随实现 PR):
   `evidence/runs/TASK-PI-001/run.md`(base `3325d42`;两 Test ID 均 PASS;contract 55/0、
   全量 287/1skip/0、signed XCUITest 9/9,attempt 1 的 picker 硬链环境失败如实在案)。
