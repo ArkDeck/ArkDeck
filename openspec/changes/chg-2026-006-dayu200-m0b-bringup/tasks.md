@@ -47,8 +47,37 @@
 
 ## TASK-M0B-002 — ArkDeck HDC supervisor 真机只读观察
 
-- Status:blocked(等待 `TASK-M1-006` done 合入 main,且 `TASK-M0B-001` done;
-  解除须独立 readiness/status PR 复核两依赖与 M1-006 实际交付形态后生效)
+- Status:ready(readiness;仅在维护者 review/merge 本独立状态 PR 后生效。两依赖均
+  已 done 并经复核,单文件、不含实现、不产生 evidence)
+- Readiness review(2026-07-21;host-only,零设备命令):
+  - 前置 ①:`TASK-M1-006` done(状态 PR #207 squash `466f42a`,实现 #191 squash
+    `c61e10e`)。实际交付形态与本任务观察目标逐项对应:生产 supervisor
+    (`HDCProduction.swift` 接线 ProcessExecutor/语义评估)+ readonly probe registry
+    0.3.0 采用(**server 观察仅对 pinned hdc 3.2.0d(sha256 `48395ba8…d260`)
+    supported,其他 build 一律 unsupported fail-closed**)+ participant registry feed
+    (CHG-2026-019 PI-001,#205/#206)+ endpoint 隔离与授权 probe 面——分别承载
+    ownership/generation 分类、lifecycle/subserver 仪表计数、endpoint 隔离、
+    设备出现/消失 fan-out 四个观察点。
+  - 前置 ②:`TASK-M0B-001` done(状态 PR #59 `b3414e5`,evidence #58 `f8817d9`):
+    设备/授权/工具链事实与 capture 先行已在案(DAYU200 OpenHarmony 7.0.0.34、
+    hdc 3.2.0d、AUTH-001 r2 分支 B 无信任 UI 设备族、matrix observed 行
+    `EVD-M0B-DAYU200-20260718-001`)。
+  - 执行时 pins(本 readiness 实测复核):hdc = DevEco toolchains 路径,SHA-256
+    `48395ba8d87115dffca47df2a640a6c868bc9a2bd4eb49611e4138ff88d8d260`、`Ver: 3.2.0d`
+    ——与 M0B/I15 pinned tuple 及 M1-006 registry 唯一 supported build 逐字一致;
+    执行前须再复核,任一漂移即停(registry 会将其他 build 判 unsupported,观察
+    无法产生 supported-family 事实)。
+  - 执行模型:物理 DAYU200 + USB,App 由人类维护者启动,Agent 零设备命令;观察
+    全程只读,supervisor 自动 lifecycle/subserver 调用计数须为仪表化实测 0(分支
+    常量不构成证据,M1-010/004 准则);外部启动的 host server 应分类为 external
+    ownership。设备窗口与其他设备任务(如 CHG-2026-008 Phase A)不得同窗口并行,
+    可同日先后;中止如实记录为 blocked-attempt。
+  - 竞争面:复核时仓库 open PR 为 0(除本批次两 PR);allowed paths(本 change
+    `evidence/**`、hardware-matrix 既有 observed 行 supervisor 观察列、本任务状态)
+    与任何活跃线零交集。
+  - Review boundary:本 readiness 只翻转状态并记录依赖/pins/执行模型;`ready→done`
+    须观察 evidence(逐观察点记录 + 仪表计数 + run.md)全部可判定后另用独立状态
+    PR;若观察需要任何代码变更,停止并走独立 change(allowed paths 约束不变)。
 - Requirements/AC:`HW-M0B-DAYU200-SUPERVISOR-001`(见 acceptance-cases.yaml)
 - Depends on:`TASK-M1-006`(CHG-2026-002;生产 supervisor/授权工作流/endpoint
   隔离)、`TASK-M0B-001`(设备/授权/工具链事实与 capture 先行)
