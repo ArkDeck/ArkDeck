@@ -6,8 +6,36 @@
 
 ## TASK-RF-001 — 阶段 A:契约/Profile 定义与人工真机正向烧写特征化
 
-- Status:blocked(双前置:① 本 change 经独立 approval-only PR 批准;② 独立 readiness PR
-  确认 Profile/契约、具名设备窗口、书面风险确认与执行时 pins。均须维护者 review/merge)
+- Status:ready(readiness;仅在维护者 review/merge 本独立状态 PR 后生效。前置 ① 已满足:
+  approval-only PR #226 已合入 main squash `7f5cb1b`(lvye review/merge);本 PR 即前置 ②,
+  单文件、不含实现、不产生 evidence、不执行真机)
+- Readiness review(2026-07-21;host-only,零设备/写命令 dispatch):
+  - Approve gate:satisfied。CHG-2026-020 approved(#226 squash `7f5cb1b`);DEC-002 正向
+    决策方向(Rockchip RockUSB Loader 态 `wlx`)、两阶段 scope 与 design §0 封闭命令面、
+    `images.tar.gz` 契约/`RockchipFlashProfile` 形态、REQ-FLASH-* 认领面均随批准生效。
+  - 书面风险确认(REQ-FLASH-015/RISK 先例):载体 = 维护者 review/merge 本 readiness PR。
+    残余风险 = 真机 destructive 写设备可能变砖;**风险显著降低**——恢复路径已经
+    CHG-2026-016 attempt #5(#220/#224 verified)真机验证可行(Loader 态 `wlx` over 既有
+    分区表),即使正向烧写失败亦可用同一路径恢复。`userdata` 清数据须执行时显式强确认。
+  - 具名设备窗口:维护者自选的首个连续设备窗口,窗口内无其他设备操作并行;执行前在
+    run.md 记录实际日期/时段。
+  - 执行时 pins(本 readiness 于 main `7f5cb1b` 实测复核):
+    - `rkdeveloptool`:SHA-256 `038a8a0ea26ef7eb77451789f310c0c9fbeaf43a78af1d6146e02311a9c23611`、
+      `-v` = `rkdeveloptool ver 1.32`(与 TASK-RR-001/CHG-016 pinned 一致);
+    - 首验 `images.tar.gz`:CHG-2026-003 archived pinned 包(size `732948803`、SHA-256
+      `fc7637f34a8394847b1b6c7e7ff2750863d18c6dc05e184abaf5aed70ec75280`,17 成员逐文件
+      hash vs archived `member-inventory.json`——阶段 A 首验刻意用已验证 pinned 包,
+      = 恢复演练的正向产品化,不引入未验证镜像);
+    - 恢复路径:CHG-2026-016 验证的 Loader 态 `wlx` 恢复路线(RecoveryGuide 依据);
+    - 地址/分区基线:FA-001 §2(15 行锚定 PD-002 `965e3bf3…`)、PD-002 mapped 9 分区,
+      于 main 在案不改写。
+  - 实现序:实现 PR 先定义 `images.tar.gz` 契约 + `RockchipFlashProfile`
+    (RF-CONTRACT-001 documentReview)→ 据此生成 exact plan → 人类维护者按 design §0
+    真机正向烧写(RF-REALFLASH-001,Agent 零设备命令、只起草 crib/核验/起草 evidence)→
+    `hardware-matrix.md` supported 行。REQ-FLASH-015 的 exact-plan 人工确认在执行时每个
+    真机 Step 前按 design §4 落地。执行前须再复核工具/包 hash(design §1),任一漂移即停。
+  - Review boundary:本 readiness 只翻转状态并记录风险确认载体/窗口/pins;实现仍须满足
+    全部认领 AC/verification gate;`ready→done` 另用独立状态 PR;真机由维护者亲手执行。
 - Objective:定义 `images.tar.gz` 输入契约与 `RockchipFlashProfile`(允许分区/hash/大小/
   写序),并由人类维护者按 design §0 封闭命令面在 DAYU200 真机正向烧写一个 pinned
   `images.tar.gz`,产出 realHardware evidence;`hardware-matrix.md` 新增 DAYU200/Rockchip
