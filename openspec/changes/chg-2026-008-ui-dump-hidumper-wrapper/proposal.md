@@ -1,6 +1,6 @@
 ---
 id: CHG-2026-008-ui-dump-hidumper-wrapper
-revision: 8
+revision: 9
 status: approved # r1 经 #68 批准;后续 revision 仅在对应治理 PR 由维护者 review/merge 后生效
 class: platform
 core_change_level: none
@@ -53,6 +53,20 @@ verifier 与 7 任务链;全文见 PR 提交历史 `a613b76`)。经维护者 202
 的 review/merge attestation;JAUTH 记入 backlog 候选,不作为本 change 前置。此前实现
 草案 PR #126 仅保留为不可合并的审计记录。
 
+首次 Phase A 人工运行经 PR #219 合入 evidence:`HP-0`/`HP-1` 与 fixture hash 均通过,
+但 `FX-1` 的 HDC stdout 回显 resolved local HAP path,使 pinned harness 同时记录
+`userPathFound=true`、`localInputPathFound=true`、`selfCheckPassed=false` 并 STOP。
+操作者按 abort rule 只执行 `FX-3`/`FX-4` cleanup,R1-R3 dispatch 均为 `0`;任务已回到
+`blocked`。该事实证明 r6 harness 把 controlled raw 中的已验证 typed-input echo 与
+repository-facing 泄漏合并成同一个 pass/fail gate,使当前 HDC family 无法越过 `FX-1`。
+
+r9 是独立 remediation/readiness revision:新增 host-only
+`TASK-UD-HARNESS-ECHO-001`,只为 `FX-1` stdout 的 exact validated `LOCAL_HAP_PATH` echo
+固定窄化 policy 与 versioned manifest evidence;任何额外/变体用户路径、stderr/其他命令
+中的 local path、key material、截断/不完整流和 repository-facing literal 仍 fail closed。
+旧 #219 raw/session/evidence 不复用、不重判;remediation done 后仍须独立 status PR 才能
+恢复 `TASK-UD-CAP-MUT-001 ready` 并从 fresh session 重跑。
+
 ## What changes
 
 ### In scope
@@ -75,6 +89,11 @@ verifier 与 7 任务链;全文见 PR 提交历史 `a613b76`)。经维护者 202
   `AC-DUMP-003-01` / `TEST-AC-DUMP-003-01` 纳入验证闭环;固定 PyYAML 解释器
   preflight。r3 merge 后没有 ready 的 real-device task。TASK-UD-001 只有在两个采集
   task、decision revision 与 redactor 完成后才能再次起草 `blocked→ready`。
+- r9 治理修订只声明 `TASK-UD-HARNESS-ECHO-001` 的 host-only 实现边界、
+  `INT-UD-HARNESS-ECHO-001` 验证和 future manifest schema `1.1.0`;不含 harness 实现、
+  evidence 或设备执行,不恢复 CAP-MUT ready。允许面只覆盖 `FX-1` stdout 中 exact
+  validated HAP path 的完整 span;generic user-path allowlist、substring/prefix/dirname/
+  symlink/case-normalized match 均禁止。
 
 ### Out of scope
 
@@ -102,6 +121,12 @@ verifier 与 7 任务链;全文见 PR 提交历史 `a613b76`)。经维护者 202
   conformance seam;
 - 将 `TASK-M1-006` 标为 done/verified,重判其任何 HDC/XCUITest evidence,或把本依赖
   解耦解释为 HDC compatibility、platform conformance、hardware/support/release claim。
+- 在 r9 remediation done 与独立 CAP-MUT ready-restore PR 合入前执行 installed HDC、
+  device、fixture 或 Recipe;读取/复制 #219 controlled raw/full manifest,追溯重判 #219
+  为 PASS,或用移动 HAP、shell wrapper、stdout filtering/丢弃等方式绕过 blocker。
+- 对任意命令/stream 泛化 user-path 或 local-path allowance,允许 expected HAP path 之外
+  的第二条用户路径,放宽 key-material/truncation/drain/repository-facing scan,或让 raw
+  字节进入 redacted manifest/hash summary/仓库。
 
 ## Impacted specifications
 
@@ -147,6 +172,13 @@ verifier 与 7 任务链;全文见 PR 提交历史 `a613b76`)。经维护者 202
   derived hash 链 + replay 命令),由 TASK-UD-001 golden PR 提交并接受维护者逐字审读,
   merge 即 privacy attestation;`TEST-INT-UD-GOLDEN-001` 机器侧复核 hash 链与敏感
   字面量零命中;
+- r9 将 controlled-raw self-check 与 repository-facing redaction gate 显式分层:future
+  schema `arkdeck-ud-capture-{manifest,redacted}-1.1.0` 可在 `FX-1` stdout 对 exact
+  validated `LOCAL_HAP_PATH` span 记录 `expectedLocalInputEchoFound=true` 且 policy
+  PASS,但必须同时证明 `unexpectedUserPathFound=false`;原始 path 只留 full manifest/raw,
+  redacted manifest 仍仅含 `<local-hap-path>`、hash/size 与布尔 policy facts。
+  `_assert_redacted_clean` 对 home/connect key/window/local path/key material 的硬失败语义
+  不变。任何其他 command/stream 或额外 path 仍 STOP。
 - 每个登记 output family 都必须能在干净 checkout 以 repo-safe synthetic/derived fixture
   走 production classifier 正向复验;本 change 禁止 raw byte-fingerprint/digest family;
 - 本 r3 治理 PR 本身零 HDC/device dispatch;merge 后仍没有 ready 的 real-device task。
@@ -207,3 +239,11 @@ verifier 与 7 任务链;全文见 PR 提交历史 `a613b76`)。经维护者 202
   verification.md 对 harness/redactor 任务的状态叙述(两任务已经 #149/#150 done)。零
   命令语义/gate/AC method/minimum evidence 变更。仅在维护者 review/merge 对应治理 PR
   后生效;不含实现或 evidence。
+- 首次 Phase A evidence/status PR #219 已由维护者合入 `main`
+  `95846eda3c634d4a445a970709e783743b071695`,使 `TASK-UD-CAP-MUT-001 blocked` 与
+  FX-1 echo blocker 成为当前事实。
+- r9 harness-echo remediation/readiness revision:本 PR 只修改 proposal/tasks/
+  verification/acceptance metadata 与 runbook,新增一个 host-only task 并起草 `ready`;
+  不含 `scripts/ud_capture/**` 实现、task evidence 或任何 HDC/device dispatch。仅在
+  维护者 review/merge 后生效;merge 不会恢复 CAP-MUT ready,也不改变 original harness
+  task 的历史 done/PASS。

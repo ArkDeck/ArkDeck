@@ -1,7 +1,7 @@
 ---
 schema_version: 1.0.0
 change_id: CHG-2026-008-ui-dump-hidumper-wrapper
-change_revision: 8
+change_revision: 9
 platform: macos
 evidence_classes:
 - contract
@@ -35,6 +35,33 @@ cases:
     commit OID and per-file SHA-256 are recorded in evidence at execution time.
     This case claims no canonical AC-DUMP PASS and does not execute any device
     capture.
+- acceptance_id: INT-UD-HARNESS-ECHO-001
+  test_id: TEST-INT-UD-HARNESS-ECHO-001
+  method: Offline synthetic fake-runner contract over the exact FX-1 typed-path echo policy.
+  expected_source: openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/verification.md#INT-UD-HARNESS-ECHO-001
+  minimum_evidence: contract
+  expected_result: After r9 is merged, a host-only task updates the future full
+    and redacted capture manifest schemas to
+    arkdeck-ud-capture-manifest-1.1.0 and
+    arkdeck-ud-capture-redacted-1.1.0. The policy accepts a validated
+    LOCAL_HAP_PATH echo only in FX-1 stdout when the stream is complete,
+    untruncated, and not drain-incomplete. Every generic user-path match byte
+    range must be wholly contained by an exact byte-for-byte allowed path span;
+    substring, prefix, dirname, sibling, case, Unicode, realpath or symlink
+    alias forms never match. Deterministic per-stream facts include the policy
+    id, expectedLocalInputEchoFound and unexpectedUserPathFound, while the
+    original path appears only in controlled raw/full artifacts and never in a
+    redacted manifest, summary, CLI text or repository evidence. A second or
+    variant user path, any stderr or non-FX-1 echo, key material, truncation,
+    drain incompleteness or broken redaction fails closed. Byte-exact raw
+    retention, whole-stream hashing, 0o600 exclusive creation, timeout gates
+    and the repository-facing sensitive-literal hard gate remain unchanged.
+    Synthetic adversarial tests cover the entire positive/negative matrix,
+    manifest byte parity and schema/README/runbook synchronization, and all 52
+    pre-existing harness tests continue to pass. The implementation reads no
+    PR 219 controlled raw or full manifest and executes zero installed HDC,
+    device, network or destructive actions. This case claims no canonical
+    AC-DUMP PASS and does not restore TASK-UD-CAP-MUT-001 readiness.
 - acceptance_id: INT-UD-CAPTURE-MUT-001
   test_id: TEST-INT-UD-CAPTURE-MUT-001
   method: Human-operated runbook Phase A first target-build deviceMutation capture of R1 through R3.
