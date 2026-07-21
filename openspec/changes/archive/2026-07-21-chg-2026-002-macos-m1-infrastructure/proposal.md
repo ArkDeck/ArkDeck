@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-002-macos-m1-infrastructure
 revision: 7
-status: verified # 2026-07-21 本 verification-closure PR(先例 #175/#176/#201);r1-r7 批准链在案;archive 另行独立 PR(evidence 引用面收口后)
+status: archived # 2026-07-21 archive PR(先例 #178/#235/#241/#242;引用面收口:唯一活跃路径引用 = chg-015 tasks.md 一处 evidence 指针,同 PR 更新为 archive 路径,先例 #210;archived CHG-005/014 字节与 docs/reviews 历史快照内引用不改写,断链接受并记录,先例 #211);verified 于 #208。原注: 2026-07-21 本 verification-closure PR(先例 #175/#176/#201);r1-r7 批准链在案;archive 另行独立 PR(evidence 引用面收口后)
 class: platform
 core_change_level: none
 owner: lvye
