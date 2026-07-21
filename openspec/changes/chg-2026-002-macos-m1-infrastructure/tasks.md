@@ -468,6 +468,37 @@
 
 - Status:ready(readiness restoration candidate;仅在维护者 review/merge 本独立状态
   PR 后生效。本 PR 不含实现、不产生 evidence、不执行任何 hdc/device/XCUITest)
+- Completion evidence candidate remains withdrawn(2026-07-21 review addendum):
+  `evidence/runs/TASK-M1-006/run.md` addendum 22。电脑解锁后，当前 revision 的 signed
+  Sandbox XCUITest 已实际执行 9 个方法并全部通过（0 failure）；LocalAuthentication /
+  `System authentication is running` 环境 blocker 已解除。显式 launch/support executable
+  现优先于旧 bookmark，且不删除 bookmark capability；UI accessibility waiter 只接受 exact
+  最终值。Production semantic family 继续整体绑定
+  `OPENHARMONY-TOOLS@0.3.0` profile/version、registered executable descriptor SHA、exact argv 与
+  raw family；family-only 或任一 mismatch 均为 unknown/unsupported，registered family 的
+  executable/profile mismatch 在 child launch 前拒绝。fake-hdc 正向合同仅显式注入
+  `testOnlyFake` profile；production 对相同 pinned output bytes 的 fake executable 保持 unknown、
+  Supervisor state 不建立、child dispatch 为 0。Production terminal finalizer 现位于封闭
+  lifecycle use case 内，Manifest publish 失败保持 recovery gate 且再次 lifecycle dispatch 为
+  0；candidate digest 只作 catalog 分区，每个逻辑执行使用独立 Session/Job UUID，仅 durable
+  recovery gate 会重开原 identity/immutable intent。App-root participant/critical-state inventory
+  缺完整 feed 时继续 fail closed；`outcomeUnknown` 同进程重试与 composition reopen 的新增
+  lifecycle dispatch 均为 0。`keyAccessDiagnostics` / `subserverCapability` 的负向测试已移除
+  canonical AC 标号，只证明 registry unsupported 与零未授权 dispatch，不冒充
+  `TEST-AC-HDC-006-01` 的实际 platform file-access denial 或 `TEST-AC-HDC-009-01` 的 capability
+  observation；这两项 AC evidence 仍未闭合。change-level `verification.md` 的 0.3.0 adoption
+  pins/真实 blocker 同步不在本任务当前 allowed paths；本
+  implementation/evidence 工作树保持 `ready`，不翻转状态，不构成 change verified、platform
+  conformance、hardware/support 或 release claim。Production lifecycle factory 已收口为
+  file-private bootstrap + package-visible App-root host actor，host composition 的类型入口必须
+  接受完整 participant inventory；production Supervisor 未收到 endpoint identity 与
+  participant-impact 两类显式 reliability receipt 时均 fail closed，legacy 无参构造只保留给
+  module-internal `@testable` regression。Manifest write 失败会跨 composition reopen 永久保持
+  `recoveryRequired` 且额外 lifecycle child dispatch 为 0；M1-006 不提供 finalize-retry solver，
+  因 terminal journal 固定 manifest SHA 而 `completedAt` 非重试确定值，解算须另立 approved
+  journal/storage change。授权 `.ready` 只覆盖 registry `rawSHA256` 登记的完整 stdout capture；
+  即使另一 device row 与 durable binding 匹配仍为 unavailable，任意设备支持须另立 approved
+  integration change 注册参数化 raw family。
 - Readiness restoration(2026-07-20;addendum-14 两项 blocker 逐项复核解除):
   - Probe-registry blocker:resolved。所缺四个只读 probe family 已由独立 integration
     change CHG-2026-015 TASK-I15-001 完成注册并 `done`(实现 PR #159 squash

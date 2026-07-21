@@ -1,4 +1,6 @@
+import ArkDeckCore
 import ArkDeckOpenHarmony
+import CryptoKit
 import Foundation
 
 /// App-facing aliases keep OpenHarmony implementation types behind the
@@ -16,6 +18,9 @@ public protocol HDCApplicationDiagnosticsProviding: Sendable {
   func requestRecoveryImpactPreview() async -> HDCDiagnosticsPresentation
   func confirmRecoveryImpactPreview() async -> HDCDiagnosticsPresentation
   func dispatchConfirmedRecovery() async -> HDCDiagnosticsPresentation
+  func refreshAuthorization(
+    for durableBinding: DurableCurrentDeviceBinding
+  ) async -> HDCDiagnosticsPresentation
   func selectUserConfiguredExecutable(_ url: URL) async throws -> HDCDiagnosticsPresentation
 }
 
@@ -24,6 +29,9 @@ public enum HDCApplicationDiagnosticsFacade {
     arguments: [String] = ProcessInfo.processInfo.arguments
   ) -> any HDCApplicationDiagnosticsProviding {
     guard arguments.contains("--ui-test-hdc-diagnostics") else {
+      if arguments.contains("--ui-test-reset-hdc-selection") {
+        HDCApplicationDiagnosticsConfiguration.clearUserConfiguredExecutable()
+      }
       return HDCProductionApplicationDiagnostics()
     }
     return HDCFixtureApplicationDiagnostics(arguments: arguments)
@@ -36,9 +44,15 @@ public enum HDCApplicationDiagnosticsFacade {
 private actor HDCProductionApplicationDiagnostics: HDCApplicationDiagnosticsProviding {
   nonisolated let lifecycleDispatchIsProductionComposed = true
   private let provider = HDCApplicationDiagnosticsProvider.shared
+  private let host = HDCApplicationDiagnosticsHost.shared
   private var attemptedSessionBootstrap = false
   private var sessionDiagnostics: HDCServerDiagnosticsUseCase?
   private var sessionLifecycle: HDCSessionLifecycleUseCase?
+  private var registeredToolchain: HDCCandidate?
+  private var registeredEndpoint: HDCServerEndpointSelection?
+  private var registeredServerIdentity: HDCServerProcessIdentityReceipt?
+  private var activeExecutionIdentity: HDCApplicationDiagnosticsExecutionIdentity?
+  private var activeCandidateCatalogID: String?
 
   func refresh() async -> HDCDiagnosticsPresentation {
     await attachSessionIfConfigured()
@@ -68,11 +82,30 @@ private actor HDCProductionApplicationDiagnostics: HDCApplicationDiagnosticsProv
     return await sessionDiagnostics.refresh()
   }
 
+  func refreshAuthorization(
+    for durableBinding: DurableCurrentDeviceBinding
+  ) async -> HDCDiagnosticsPresentation {
+    await attachSessionIfConfigured()
+    guard let sessionDiagnostics, let registeredToolchain, let registeredEndpoint,
+      let registeredServerIdentity
+    else {
+      return await provider.refresh()
+    }
+    let result = await HDCSelectedDeviceAuthorizationProbe().probe(
+      endpoint: registeredEndpoint,
+      toolchain: registeredToolchain,
+      serverIdentity: registeredServerIdentity,
+      durableBinding: durableBinding)
+    await sessionDiagnostics.applyRegisteredAuthorization(result.authorization)
+    return await provider.refresh()
+  }
+
   func selectUserConfiguredExecutable(_ url: URL) async throws -> HDCDiagnosticsPresentation {
     try HDCApplicationDiagnosticsConfiguration.persistUserConfiguredExecutable(url)
     attemptedSessionBootstrap = false
     sessionDiagnostics = nil
     sessionLifecycle = nil
+    clearRegisteredObservation()
     await provider.configure(
       discoveryRequest: HDCApplicationDiagnosticsConfiguration.discoveryRequest())
     await attachSessionIfConfigured()
@@ -90,29 +123,61 @@ private actor HDCProductionApplicationDiagnostics: HDCApplicationDiagnosticsProv
       return
     }
 
-    let version = await HDCClientVersionProcessProbe().probe(
-      endpoint: endpoint, toolchain: candidate)
     let snapshot = HDCJobToolchainSnapshot(
       candidate: candidate,
       endpoint: endpoint.endpoint.rawValue,
       details: HDCProbeDetails(
         platformTrust: .unknown(reason: "ToolTrustInspector has not run"),
-        clientVersion: version.clientVersion,
+        clientVersion: .unknown(
+          reason: "registered client probe requires an existing server identity"),
         serverVersion: .unknown(reason: "checkserver has not run"),
         daemonVersion: .unknown(reason: "not exposed by a registered probe"),
         serverGeneration: .unknown(reason: "checkserver has not run")))
+    let lifecyclePostDispatchProbe = HDCRegisteredLifecyclePostDispatchProbe(
+      toolchain: candidate)
 
     do {
-      let composition = try HDCSessionDiagnosticsBootstrap.makeHost(
-        sessionRoot: try sessionRoot(candidateHash: candidate.sha256),
-        sessionID: "app-hdc-\(candidate.sha256.prefix(12))",
-        jobID: "app-hdc-\(candidate.sha256.prefix(12))",
+      let candidateCatalogID = HDCApplicationDiagnosticsSessionScope.catalogIdentifier(
+        for: candidate)
+      let executionIdentity: HDCApplicationDiagnosticsExecutionIdentity
+      if activeCandidateCatalogID == candidateCatalogID, let activeExecutionIdentity {
+        executionIdentity = activeExecutionIdentity
+      } else {
+        executionIdentity = try HDCApplicationDiagnosticsExecutionCatalog(
+          root: try sessionCatalogRoot()
+        ).select(for: candidate)
+      }
+      let composition = try await host.compose(
+        sessionRoot: executionIdentity.sessionRoot,
+        sessionID: executionIdentity.sessionID,
+        jobID: executionIdentity.jobID,
         toolchain: candidate,
         snapshot: snapshot,
-        authorization: .unavailable(reason: "authorization probe requires a selected device"))
+        authorization: .unavailable(reason: "authorization probe requires a selected device"),
+        keyAccessError:
+          "Key access diagnostics are unsupported without a configured or user-approved locator.",
+        subserverCapability: .unsupported,
+        impactInventory: .unavailable(
+          reason:
+            "Lifecycle mutation is unavailable because no complete App-root HDC Job/Device critical-state inventory is attached."
+        ),
+        postDispatchProbe: { step in
+          await lifecyclePostDispatchProbe.observe(after: step)
+        })
+      activeExecutionIdentity = executionIdentity
+      activeCandidateCatalogID = candidateCatalogID
       let processSupervisor = HDCServerProcessSupervisor(supervisor: composition.supervisor)
-      _ = await processSupervisor.observeExistingServer(
+      let registeredObservation = await processSupervisor.observeRegisteredExistingServer(
         endpoint: endpoint, toolchain: candidate)
+      if case .observed = registeredObservation.classification,
+        let identity = registeredObservation.identity
+      {
+        registeredToolchain = candidate
+        registeredEndpoint = endpoint
+        registeredServerIdentity = identity
+      } else {
+        clearRegisteredObservation()
+      }
       sessionDiagnostics = composition.diagnostics
       sessionLifecycle = composition.lifecycle
       await provider.attachSessionDiagnostics(composition.diagnostics)
@@ -120,11 +185,18 @@ private actor HDCProductionApplicationDiagnostics: HDCApplicationDiagnosticsProv
       // A failed durable bootstrap cannot leave confirmation state reachable.
       sessionDiagnostics = nil
       sessionLifecycle = nil
+      clearRegisteredObservation()
       await provider.detachSessionDiagnostics()
     }
   }
 
-  private func sessionRoot(candidateHash: String) throws -> URL {
+  private func clearRegisteredObservation() {
+    registeredToolchain = nil
+    registeredEndpoint = nil
+    registeredServerIdentity = nil
+  }
+
+  private func sessionCatalogRoot() throws -> URL {
     guard
       let applicationSupport = FileManager.default.urls(
         for: .applicationSupportDirectory, in: .userDomainMask
@@ -133,8 +205,21 @@ private actor HDCProductionApplicationDiagnostics: HDCApplicationDiagnosticsProv
       throw CocoaError(.fileNoSuchFile)
     }
     return applicationSupport.appending(
-      path: "ArkDeck/HDC/app-diagnostics-session/\(candidateHash)",
+      path: "ArkDeck/HDC/app-diagnostics-session",
       directoryHint: .isDirectory)
+  }
+}
+
+enum HDCApplicationDiagnosticsSessionScope {
+  /// This stable digest is a catalog partition only. It is never reused as a
+  /// Session ID or Job ID; execution identities are unique UUIDs selected by
+  /// `HDCApplicationDiagnosticsExecutionCatalog`.
+  static func catalogIdentifier(for candidate: HDCCandidate) -> String {
+    let canonicalPath = candidate.path.resolvingSymlinksInPath().standardizedFileURL.path
+    let pathDigest = SHA256.hash(data: Data(canonicalPath.utf8))
+      .map { String(format: "%02x", $0) }
+      .joined()
+    return "app-hdc-\(candidate.sha256.prefix(24))-\(pathDigest.prefix(24))"
   }
 }
 
@@ -177,6 +262,12 @@ private actor HDCFixtureApplicationDiagnostics: HDCApplicationDiagnosticsProvidi
 
   func dispatchConfirmedRecovery() async -> HDCDiagnosticsPresentation { presentation() }
 
+  func refreshAuthorization(
+    for _: DurableCurrentDeviceBinding
+  ) async -> HDCDiagnosticsPresentation {
+    presentation()
+  }
+
   func selectUserConfiguredExecutable(_: URL) async throws -> HDCDiagnosticsPresentation {
     presentation()
   }
@@ -184,8 +275,8 @@ private actor HDCFixtureApplicationDiagnostics: HDCApplicationDiagnosticsProvidi
   private func presentation() -> HDCDiagnosticsPresentation {
     let authorization: HDCAuthorizationState
     if keyAccessDenied {
-      authorization = .keyAccessDenied(
-        reason: "The current HDC process cannot access its managed key")
+      authorization = .unavailable(
+        reason: "key access diagnostics unsupported without a user-approved locator")
     } else if denied {
       authorization = .denied(reason: "The device declined trust")
     } else if timedOut {
@@ -209,8 +300,9 @@ private actor HDCFixtureApplicationDiagnostics: HDCApplicationDiagnosticsProvidi
       channelProtection: .unverifiedAssumeUnprotected,
       tcpUnprotectedWarning:
         "Channel protection is unverified. Use TCP only on a trusted, isolated network.",
-      keyAccessError: keyAccessDenied ? "HDC key access denied by platform permissions" : nil,
-      subserverCapability: .supportedReadOnly,
+      keyAccessError: keyAccessDenied
+        ? "Key access diagnostics are unsupported; no key path was read or modified." : nil,
+      subserverCapability: .unsupported,
       lifecycleRecovery: recovery,
       criticalGateMessage: criticalGate
         ? "Blocked by Job job-hdc, Step flash-system. Wait for the flash checkpoint safe boundary."

@@ -1106,6 +1106,7 @@ public enum HDCServerLifecycleDispatchBlock: Sendable, Equatable {
   case criticalJobs([HDCServerCriticalJob])
   case invalidTypedStep
   case auditPersistenceFailed
+  case recoveryRequired(reason: String)
 }
 
 public enum HDCServerImpactPreviewResult: Sendable, Equatable {
@@ -1141,14 +1142,32 @@ public actor HDCServerSupervisor: HDCServerLifecycleDispatchLeaseValidating {
   private var deliveredEvents: [HDCServerRecipient: [HDCServerEvent]] = [:]
   private var otherClientDetection: [HDCServerEndpoint: HDCServerOtherClientDetection] = [:]
   private var impactReliability: [HDCServerEndpoint: Bool] = [:]
+  private var participantImpactReliability: [HDCServerEndpoint: Bool] = [:]
   private var previews: [UUID: HDCServerLifecycleImpactPreview] = [:]
   private var confirmations: [UUID: HDCServerLifecycleConfirmation] = [:]
   private var managedStartAuthorizations: [UUID: HDCManagedStartAuthorization] = [:]
   private var activeDispatchLeases: [UUID: HDCServerLifecycleDispatchLease] = [:]
+  private let permitsImplicitTestFixtureReliability: Bool
 
-  package init(auditStore: any HDCServerLifecycleAuditStore) {
+  /// Legacy `@testable` module contracts predate the production participant
+  /// inventory. Keeping that behavior module-internal prevents Workflows and
+  /// other normal package consumers from constructing a lifecycle-eligible
+  /// Supervisor without an explicit production participant disposition.
+  init(auditStore: any HDCServerLifecycleAuditStore) {
     self.auditStore = auditStore
     managedProcessInspector = SystemHDCManagedServerProcessInspector()
+    permitsImplicitTestFixtureReliability = true
+  }
+
+  package init(
+    auditStore: any HDCServerLifecycleAuditStore,
+    endpoint: HDCServerEndpoint,
+    participantImpactReliable: Bool
+  ) {
+    self.auditStore = auditStore
+    managedProcessInspector = SystemHDCManagedServerProcessInspector()
+    permitsImplicitTestFixtureReliability = false
+    participantImpactReliability[endpoint] = participantImpactReliable
   }
 
   public func register(_ recipient: HDCServerRecipient) {
@@ -1187,6 +1206,17 @@ public actor HDCServerSupervisor: HDCServerLifecycleDispatchLeaseValidating {
   func setImpactReliability(_ isReliable: Bool, for endpoint: HDCServerEndpoint) {
     invalidateDispatchLeases(for: endpoint)
     impactReliability[endpoint] = isReliable
+  }
+
+  /// App/runtime composition owns the completeness of the host-wide
+  /// DeviceCoordinator/Job inventory. A verified server identity cannot make
+  /// lifecycle impact reliable while that production participant feed is
+  /// absent or incomplete.
+  package func setParticipantImpactReliability(
+    _ isReliable: Bool, for endpoint: HDCServerEndpoint
+  ) {
+    invalidateDispatchLeases(for: endpoint)
+    participantImpactReliability[endpoint] = isReliable
   }
 
   public func state(for endpoint: HDCServerEndpoint) -> HDCServerState? {
@@ -1274,6 +1304,27 @@ public actor HDCServerSupervisor: HDCServerLifecycleDispatchLeaseValidating {
     return next
   }
 
+  /// Applies a commandless, bracketed process/start/listener identity receipt
+  /// from the registered 0.3.0 platform observer. The generation is minted by
+  /// the adapter from receipt equality/change; no caller-supplied generation
+  /// or `checkserver` text can reach this path on its own.
+  @discardableResult
+  func observeRegisteredServerIdentity(
+    endpoint: HDCServerEndpoint,
+    health: HDCServerHealth,
+    version: HDCProbeValue<String>,
+    generation: Int,
+    reason: String
+  ) -> HDCServerState {
+    let next = HDCServerState(
+      endpoint: endpoint, health: health, version: version,
+      generation: generation, generationEvidence: .known(generation),
+      ownership: .unknown)
+    impactReliability[endpoint] = true
+    observeExistingServer(HDCExistingServerObservation(state: next), reason: reason)
+    return next
+  }
+
   /// A tool identity error, launch failure, registered failure response, or
   /// unregistered output is a probe failure—not proof that a server is absent
   /// or external. Do not create endpoint state from it. If state already
@@ -1347,7 +1398,7 @@ public actor HDCServerSupervisor: HDCServerLifecycleDispatchLeaseValidating {
     }
     guard let snapshot = currentImpactSnapshot(action: action, endpoint: endpoint) else {
       return .blocked(
-        impactReliability[endpoint] == false
+        !impactIsReliable(for: endpoint)
           ? .impactCannotBeReliablyDetermined : .endpointStateUnknown)
     }
     return await persistPreview(snapshot)
@@ -1360,7 +1411,7 @@ public actor HDCServerSupervisor: HDCServerLifecycleDispatchLeaseValidating {
         action: preview.snapshot.action, endpoint: preview.snapshot.endpoint)
     else {
       return .blocked(
-        impactReliability[preview.snapshot.endpoint] == false
+        !impactIsReliable(for: preview.snapshot.endpoint)
           ? .impactCannotBeReliablyDetermined : .endpointStateUnknown)
     }
     guard snapshot.scopeHash == preview.snapshot.scopeHash else {
@@ -1421,7 +1472,7 @@ public actor HDCServerSupervisor: HDCServerLifecycleDispatchLeaseValidating {
         action: confirmation.action, endpoint: confirmation.endpoint)
     else {
       return .blocked(
-        impactReliability[confirmation.endpoint] == false
+        !impactIsReliable(for: confirmation.endpoint)
           ? .impactCannotBeReliablyDetermined : .endpointStateUnknown)
     }
     guard snapshot.scopeHash == confirmation.scopeHash else {
@@ -1458,7 +1509,7 @@ public actor HDCServerSupervisor: HDCServerLifecycleDispatchLeaseValidating {
         action: confirmation.action, endpoint: confirmation.endpoint)
     else {
       let block: HDCServerLifecycleDispatchBlock =
-        impactReliability[confirmation.endpoint] == false
+        !impactIsReliable(for: confirmation.endpoint)
         ? .impactCannotBeReliablyDetermined
         : .endpointStateUnknown
       return await recordPostIntentBlock(step: step, block: block)
@@ -1636,7 +1687,7 @@ public actor HDCServerSupervisor: HDCServerLifecycleDispatchLeaseValidating {
     action: HDCServerLifecycleAction,
     endpoint: HDCServerEndpoint
   ) -> HDCServerImpactSnapshot? {
-    guard impactReliability[endpoint] != false,
+    guard impactIsReliable(for: endpoint),
       let state = endpoints[endpoint],
       state.health == .healthy,
       case .known(let verifiedGeneration) = state.generationEvidence
@@ -1677,7 +1728,7 @@ public actor HDCServerSupervisor: HDCServerLifecycleDispatchLeaseValidating {
       otherClientDetection: otherClientDetection[endpoint]
         ?? .unavailableExternalClientsMayStillExist,
       criticalJobs: criticalJobs(for: endpoint),
-      impactReliable: impactReliability[endpoint] != false,
+      impactReliable: impactIsReliable(for: endpoint),
       scopeHash: currentImpactSnapshot(action: action, endpoint: endpoint)?.scopeHash
     )
   }
@@ -1745,6 +1796,12 @@ public actor HDCServerSupervisor: HDCServerLifecycleDispatchLeaseValidating {
         )
       }
     }.sorted { $0.jobID < $1.jobID }
+  }
+
+  private func impactIsReliable(for endpoint: HDCServerEndpoint) -> Bool {
+    let fallback = permitsImplicitTestFixtureReliability
+    return (impactReliability[endpoint] ?? fallback)
+      && (participantImpactReliability[endpoint] ?? fallback)
   }
 
   private func persistPreview(_ snapshot: HDCServerImpactSnapshot) async
