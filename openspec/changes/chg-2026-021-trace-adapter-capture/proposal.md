@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-021-trace-adapter-capture
 revision: 1
-status: proposed # 本 propose PR 合入仅登记提案;批准须独立 approval-only PR(先例 #55/#89/#171/#195/#226)
+status: approved # 2026-07-21 本 approval-only PR(先例 #55/#89/#171/#195/#226);r1 proposal 经 #249 合入 main `90f877d`;批准由维护者 review/merge 本 PR 构成
 class: platform
 core_change_level: none
 owner: lvye
@@ -78,3 +78,23 @@ V2 治理:本 propose PR 合入仅登记提案;批准须独立 approval-only PR;
 独立 readiness/实现/done PR。TR-002 可在 approve + readiness 后立即执行(零设备);
 TR-001 另需具名设备窗口;TR-003 待 TR-001 done。trace capability 为 release
 optional 且 `requires: []`,本 change 不影响 required capability 集与依赖闭合。
+
+## Approval
+
+- r1 proposal 经 PR #249 合入 main(squash `90f877d`,status:proposed)。
+- 正式批准:2026-07-21 由本 approval-only PR(先例 #55/#89/#171/#195/#226)将本
+  change 置为 `approved`;批准由维护者 review/merge 本 PR 构成。merge 即批准:
+  - **三任务分期 scope 与边界**:TASK-TR-001(hitrace/bytrace provenance 登记,
+    device-gated,CHG-2026-015/005 形态)、TASK-TR-002(host contract 面,认领
+    7 条 contract AC,零设备零 provenance 依赖)、TASK-TR-003(adapter golden 面,
+    认领 2 条 parserGolden AC,blocked 于 TR-001)的 objective/scope/allowed-paths;
+  - **design 约束**:§0 候选命令面的"TR-001 登记前不得实现 adapter/不得据散文固定
+    argv"、§3 参数 mutation 绑定 attachment-debug-profile catalog 的 workflow 层
+    收紧(零 Core 变更)、§4 provenance 登记形态(exact argv/成败 marker 非退出码/
+    hash closure/redacted manifests);
+  - **认领面**:`REQ-TRACE-001…009` 的 9 条 canonical AC + change-local
+    `TRACE-PROV-001`;trace capability 保持 release optional、requires:[]。
+- 本批准不产生任务执行:三任务保持 `blocked`,各须独立 readiness PR 转 `ready`;
+  TR-001 另需具名设备窗口 + 人工执行模型;TR-002 在 readiness 后即可 host-only
+  执行。本批准不构成任何固件族/设备兼容性或支持声明;fixture/fake 永不冒充真机
+  形态。
