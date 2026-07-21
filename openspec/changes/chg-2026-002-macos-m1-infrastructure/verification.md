@@ -4,8 +4,17 @@
 > Change：CHG-2026-002-macos-m1-infrastructure@r7
 > Core baseline：CORE-2.0.0
 > Core conformance：CORE-CONFORMANCE-2.0.0
-> Integration base：OPENHARMONY-TOOLS@0.2.0
-> M1-HDC execution input：CHG-2026-005 verified profile + pinned fixture pack
+> Integration base：OPENHARMONY-TOOLS@0.2.0（Golden parser pack，CHG-2026-005）；
+> OPENHARMONY-TOOLS@0.3.0（read-only probe registry，CHG-2026-015/TASK-I15-001；
+> `readonly-probes.yaml` SHA-256
+> `9014c480c3df61b5a6db7e54e52f29e89d7c93431e91d0856cf5710c22466b9d`、
+> `INTEGRATION-PROFILES-0.4.0` lock
+> `9f007455204bcbc8a0309413cbeb9c6882e45afdc0dc9def0bab4dd948d2acb0`、profile
+> `48ad9ecc31cad2fbb9a05bb3bb552153ad0ade3a629de5280ce8eef06165401a`；按
+> profile `adoption_boundary` 两者并存，0.2.0 consumer 边界保留——2026-07-21 amendment）
+> M1-HDC execution input：CHG-2026-005 verified profile + pinned fixture pack；
+> CHG-2026-015 readonly-probes registry 与 `Fixtures/HDC/Probes/1.0.0/**`（只读、
+> hash-pinned，M1-006 production 分类器绑定同一向量集——2026-07-21 amendment）
 
 实际结果由 evidence/ 下的 run 记录承载;整体结论经维护者在 PR 中确认(V2 治理)。
 
@@ -50,7 +59,7 @@ hardware-support verified writer count 0、real connectKey count 0 与 external 
 | MAC-M1-PORTS-001 | PORT-INSTANCE-001、PORT-ACTIVATION-001、PORT-POWER-001、PORT-CLOCK-ELAPSED-001、PORT-CLOCK-ACTIVE-001、PORT-SLEEP-WAKE-001；REQ-JOB-008、REQ-NFR-001 | macOS Port contract suite | exactly one writer; activation without lock takeover; power lease released on every terminal path; clock sleep semantics proven; sleep/wake triggers journal+reconcile | passed（TASK-M1-004 done，PR #32/#33；`evidence/runs/TASK-M1-004/run.md` 含人工 sleep/wake attempt 3） |
 | MAC-M1-JOURNAL-001 | REQ-JOB-002、REQ-JOB-006、REQ-JOB-007 | crash-window fault injection matrix | kills before intent / after durable intent / after side effect / before finalize each reconcile to the defined state; zero destructive replay; outcomeUnknown preserved | passed（TASK-M1-003 done；`evidence/runs/TASK-M1-003/run.md`） |
 | MAC-M1-STORE-001 | REQ-STO-001…005、PORT-VOLUME-001、PORT-STORAGE-001 | volume identity + admission + ENOSPC injection | same-volume claims share one budget; second heavy writer waits/rejected; metadata headroom survives external pressure; runtime ENOSPC finalizes shards and fails closed | passed（TASK-M1-005 done，PR #37/#38；`evidence/runs/TASK-M1-005/run.md`） |
-| MAC-M1-HDC-001 | REQ-HDC-001…010；PORT-PROCESS-001、PORT-FILE-ACCESS-001、PORT-TOOL-TRUST-001、PORT-DEVICE-ACCESS-001 | pinned-golden fake-hdc real-child-process matrix + descriptor-bound launch + durable reopen/replay + signed Sandbox macOS XCUITest | only approved/pinned read-only semantic families are accepted; durable intent and actual descriptor/inode/hash/argv stay bound; path substitution launches zero children; external/unknown automatic lifecycle count 0 while diagnostics and confirmed recovery options are shown; subserver capability is shown read-only with spawn/killall count 0; ownership/generation and endpoint isolation are exact; global failure fans out once; lifecycle preview/confirmation/intent/actual argv/outcome survive reopen with one correlation; every HDC UI result is asserted through the signed Sandbox test build | blocked（TASK-M1-006 遗留：所缺只读 probe registry 属 CHG-2026-015，signed XCUITest 另待 Developer Mode 操作者授权；`evidence/runs/TASK-M1-006/run.md`） |
+| MAC-M1-HDC-001 | REQ-HDC-001…010；PORT-PROCESS-001、PORT-FILE-ACCESS-001、PORT-TOOL-TRUST-001、PORT-DEVICE-ACCESS-001 | pinned-golden fake-hdc real-child-process matrix + descriptor-bound launch + durable reopen/replay + signed Sandbox macOS XCUITest | only approved/pinned read-only semantic families are accepted; durable intent and actual descriptor/inode/hash/argv stay bound; path substitution launches zero children; external/unknown automatic lifecycle count 0 while diagnostics and confirmed recovery options are shown; subserver capability is shown read-only with spawn/killall count 0; ownership/generation and endpoint isolation are exact; global failure fans out once; lifecycle preview/confirmation/intent/actual argv/outcome survive reopen with one correlation; every HDC UI result is asserted through the signed Sandbox test build | blocked（2026-07-21 currency：原两项 blocker——probe registry 缺失与 Developer Mode 授权——均已解除（CHG-2026-015/TASK-I15-001 done、DevTools 已启用）；TASK-M1-006 实现已经维护者 review 合入（PR #191 squash `c61e10e`，284/1skip/0 + signed Sandbox XCUITest 9/9 在案），PR #192 依 addendum 23 收口为 `blocked`。现行缺口：① production App-root participant/critical-state inventory feed 缺席，现行组合只能 fail-closed 阻断 lifecycle mutation，不能演示真实 App-root critical gate；② `TEST-AC-HDC-006-01` 要求的实际 signed Sandbox platform file-access denial 路径——registry 0.3.0 将 `keyAccessDiagnostics` 登记为 unsupported，零访问负向测试不构成该 AC evidence；③ `TEST-AC-HDC-009-01` 要求的 registered capability observation——`subserverCapability` 同为 unsupported。解锁须显式立项并批准的 follow-up change 与新 evidence；`evidence/runs/TASK-M1-006/run.md` addenda 15–23） |
 | MAC-M1-SIM-001 | REQ-FLASH-006、POL-MODE-001 | simulated end-to-end orchestration run | journal/cancel/reconcile exercised with zero real connectKey and zero external tool launches; evidence persistently classified simulated | passed（TASK-M1-008 done，PR #147；`evidence/runs/TASK-M1-008/run.md`；evidence 分类 simulated） |
 | MAC-M1-DIAG-001 | REQ-DIAG-001、REQ-DIAG-002、PORT-LOGGING-001 | logging/diagnostics skeleton suite | categorized redacted logs; bounded rotation; export bundle excludes device raw by default | passed（TASK-M1-009 done，PR #50/#51；`evidence/runs/TASK-M1-009/run.md`） |
 
@@ -65,6 +74,17 @@ hardware-support verified writer count 0、real connectKey count 0 与 external 
 > `0a06bd6`）与 `evidence/runs/TASK-M1-008/run.md` 翻转 `passed`，evidence 分类保持
 > `simulated`。同上，本更新只同步账本；`MAC-M1-HDC-001` 仍 `blocked`（M1-006 遗留），
 > change 级 `Status:planned` 不变。
+>
+> Status update（2026-07-21，独立治理 amendment——`run.md` addendum 23 指定本文件的
+> 0.3.0 adoption pins 与真实 blocker 同步超出 TASK-M1-006 allowed paths，故单独走本
+> PR）:同步 Integration base / execution input 的 CHG-2026-015 adoption pins，并把
+> `MAC-M1-HDC-001` 行的 blocked 理由从已解除的旧 blocker（registry 缺失、Developer
+> Mode）更新为 addendum 23 认定的三项现行缺口（production participant inventory feed、
+> `TEST-AC-HDC-006-01` 实际 file-access denial 路径、`TEST-AC-HDC-009-01` capability
+> observation）。本更新只同步账本：不改变任何 method、expected result、minimum
+> evidence、evidence class 或 Gate 条款，不翻转任何任务状态，`MAC-M1-HDC-001` 保持
+> `blocked`，change 级 `Status:planned` 不变，也不构成 change verified、platform
+> conformance、hardware/support 或 release claim。
 
 ## Gate
 
