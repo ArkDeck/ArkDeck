@@ -1,0 +1,57 @@
+---
+schema_version: 1.0.0
+change_id: CHG-2026-022-hdc-supervisor-observability
+change_revision: 1
+platform: macos
+evidence_classes:
+- contract
+cases:
+- acceptance_id: OBS-COUNTER-001
+  test_id: TEST-OBS-COUNTER-001
+  method: Mutation-verified instrumented counter contract.
+  expected_source: openspec/changes/chg-2026-022-hdc-supervisor-observability/verification.md#OBS-COUNTER-001
+  minimum_evidence: contract
+  expected_result: >-
+    Automatic lifecycle/subserver dispatch counters increment at the real
+    dispatch call sites - a test-injected automatic dispatch makes the count
+    strictly positive (red case) while the untouched production path snapshots
+    zero (green case); the presentation mirrors the snapshot; a branch constant
+    or structural-absence inference does not satisfy this case.
+- acceptance_id: OBS-OWNERSHIP-001
+  test_id: TEST-OBS-OWNERSHIP-001
+  method: Ownership evidence-matrix contract.
+  expected_source: openspec/changes/chg-2026-022-hdc-supervisor-observability/verification.md#OBS-OWNERSHIP-001
+  minimum_evidence: contract
+  expected_result: >-
+    With all three evidence items present (pre-existing server receipt, zero
+    lifecycle dispatch count, generation minted from observation) production
+    classifies external and exposes the basis; with any item absent it stays
+    unknown; an equivalence test proves the authorization gates treat external
+    and unknown identically before and after this change.
+- acceptance_id: OBS-ENDPOINT-001
+  test_id: TEST-OBS-ENDPOINT-001
+  method: Endpoint source and child-environment exposure contract.
+  expected_source: openspec/changes/chg-2026-022-hdc-supervisor-observability/verification.md#OBS-ENDPOINT-001
+  minimum_evidence: contract
+  expected_result: >-
+    The presentation exposes the endpoint source (explicit/inherited/default)
+    and the child-environment injection list; the existing guarantee that the
+    parent process environment is never modified keeps its assertions green.
+- acceptance_id: OBS-FANOUT-001
+  test_id: TEST-OBS-FANOUT-001
+  method: Read-only device fan-out contract.
+  expected_source: openspec/changes/chg-2026-022-hdc-supervisor-observability/verification.md#OBS-FANOUT-001
+  minimum_evidence: contract
+  expected_result: >-
+    Device snapshot diffs produce appeared/disappeared events into the
+    supervisor fan-out and a bounded presentation buffer; no new device command
+    is introduced (the read-only probe surface reuse is asserted).
+- acceptance_id: OBS-APPFACE-001
+  test_id: TEST-OBS-APPFACE-001
+  method: Signed XCUITest over the new observation fields.
+  expected_source: openspec/changes/chg-2026-022-hdc-supervisor-observability/verification.md#OBS-APPFACE-001
+  minimum_evidence: contract
+  expected_result: >-
+    The new fields (counters, endpoint source, ownership basis, device events)
+    are rendered as accessibility-readable static text with stable identifiers
+    and correct value shapes; the production path contains zero fixtures.
