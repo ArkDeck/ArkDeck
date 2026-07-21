@@ -56,8 +56,8 @@
 
 ## 边界与遗留
 
-- 本 run 只构成 contract 面结论;`AC-FLASH-001/002/007/008/012/013` 的真机验收面与
-  hardware-matrix `observed → supported` 升级待维护者设备窗口用 `arkdeck flash` 走
-  RF-001 人工执行模型(pinned 包已由 #233 真机背书,命令面逐字同构)。
+- 本 run 只构成 contract 面结论;真机验收已于 2026-07-21 设备窗口完成 = **SUCCESS**,
+  见 `acceptance-2026-07-21.md`(RF-ACCEPT PASS;hardware-matrix 新增 verified 行
+  `EVD-RF002-DAYU200-20260721-001`)。
 - 不改 Core spec/kind/状态机;复用 M1-008 seam 零语义变更;`ready → done` 另用独立状态
   PR。Agent 全程零设备命令、零 destructive dispatch。
