@@ -170,11 +170,39 @@ Open question 不得以聊天记忆留存。每项记录默认决策、阻塞范
 
 ## DEC-006 Retention and output policy
 
-- Status：open
-- Default：local-only、user-selected root、bounded quota/retention、pinned session protected
-- Question：默认输出位置、总配额、保留期和组织级脱敏要求？
-- Blocks：产品默认值，不阻塞 Storage contract
-- Affected：REQ-ART-006、platform profiles
+- Status：decided（2026-07-21;决策由 owner review/merge 本 decision PR 构成,V2 治理,
+  先例 DEC-001/DEC-002。机制事实依据 = M1-005/M1-009 已交付并验证的 retention/export
+  契约面(AC-ART-006-01/02、MAC-M1-DIAG-001 全 passed,机制完全参数化、仓内无产品默认
+  常量),本决策只填产品默认值层)
+- Owner：product owner
+- Question（历史）：默认输出位置、总配额、保留期和组织级脱敏要求？
+- Decision（四项产品默认;数值属产品设置层,用户可在 App 设置内调整,调整不构成本
+  决策 reopen）：
+  1. **默认输出位置** = `~/Library/Application Support/ArkDeck/Sessions/<year>/<month>/
+     <sessionUUID>/`(macOS profile 既列路径转为正式默认);用户可另选输出根,遵守
+     PersistentFileAccess(security-scoped bookmark)与 Core volume identity 规则。
+     不强制首次运行选根。
+  2. **总配额默认 20 GiB,安全余量 2 GiB**(`totalQuotaBytes`/`safetyMarginBytes`
+     的产品默认;依据:pinned 参考镜像单文件即 2 GiB 级、REQ-ART-005 大镜像默认引用
+     不复制、HiLog 另有 16 MiB 独立滚动配额与此无关)。
+  3. **保留期默认 90 天**(`expiresAt = completedAt + 90d` 逐 Session 赋值);淘汰序
+     沿用已验证语义 = expired-first → completedAt 升序,pinned 永不删;删尽普通
+     Session 仍超安全余量则阻止新的重写入 Job 并提示(AC-ART-006-02 语义,不越过 pin)。
+  4. **组织级脱敏:MVP 不设组织策略层**。默认已 fail-safe(导出
+     `deviceIdentifierPolicy = .redact`、`includeDeviceData = false`、诊断包强制
+     redact 且排除 raw/partial——均为已实现默认);org 强制/可插拔脱敏类别列入
+     backlog,启用须独立 change(MDM/managed-config 面)。
+- Boundary：本决策不修改任何 Storage 契约(REQ-ART/STO 面已 verified 且保持);
+  决策本身零代码变更——默认值 wiring(App 层输出根选择 UI、配额/保留设置、
+  RetentionController 调用点接线)须由后续独立实现 change 认领,当前仓内
+  `SessionRetentionController`/`SessionDiagnosticExporter` 仅被 storage 层与测试调用
+  的现状如实在案。
+- Unblocked by this decision：产品默认值 wiring change 的立项(M2/M5 范围);
+  App 设置面的输出/保留 UI 设计。
+- Reopen rule：改变四项默认的**结构**(如取消 pinned 保护、默认改为自动上传、引入
+  组织策略层)须经 governance PR 重开/修订本条;仅调数值(配额 GiB 数、保留天数)属
+  产品设置演进,不构成 reopen。
+- Affected：REQ-ART-006、platform profiles、backlog(org 脱敏策略层)
 
 ## DEC-007 Bundled HDC fallback
 
