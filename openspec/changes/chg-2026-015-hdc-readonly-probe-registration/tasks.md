@@ -105,6 +105,9 @@
 - Read-only inputs:
   - `openspec/changes/chg-2026-002-macos-m1-infrastructure/evidence/runs/TASK-M1-006/run.md`
   - `openspec/changes/chg-2026-005-hdc-parser-golden-registration/**`
+    （2026-07-21 archive currency note:该 change 已 verified 后归档,目录现位于
+    `openspec/changes/archive/2026-07-21-chg-2026-005-hdc-parser-golden-registration/**`;
+    本行原文按惯例保留,引用按新路径解读,字节以 git 历史为证）
   - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Golden/1.0.0/**`
   - 维护者认可的受控 capture/receipt（只读取；敏感 raw 不入仓）
 - Forbidden paths:
