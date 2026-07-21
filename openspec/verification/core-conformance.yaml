@@ -1,6 +1,6 @@
-suite: CORE-CONFORMANCE-2.0.0
-status: accepted  # 随 CORE-2.0.0 ratification;单一事实源为 openspec/baselines/CORE-2.0.0.yaml
-core_baseline: CORE-2.0.0
+suite: CORE-CONFORMANCE-2.1.0
+status: accepted  # 2.1.0 随 CHG-2026-018 archive PR ratify CORE-2.1.0 生效;单一事实源为 openspec/baselines/CORE-2.1.0.yaml
+core_baseline: CORE-2.1.0
 
 acceptance_index:
   path: openspec/verification/acceptance-index.txt
@@ -20,16 +20,54 @@ applicability:
     change its expected result, or declare it not applicable. Any applicability
     change requires a Core change and a new conformance-suite version. Inclusion
     here is a target obligation, not a support claim; only a verified/releasable
-    Platform Profile may be advertised.
+    Platform Profile may be advertised. Entries under integration_conditional are
+    the only sanctioned conditional exclusions; absence of a registry, a missing
+    family, a hash mismatch, or untraceable provenance never establishes an
+    exclusion — the acceptance ID then stays applicable and unmet.
+  integration_conditional:
+    # CHG-2026-018:仅下列两条;登记依据 = readonly-probes registry 的
+    # maintainer-accepted unsupported provenance(#141/#155/#156/#159/#163)。
+    - acceptance_id: AC-HDC-006-01
+      family: keyAccessDiagnostics
+      registry: openspec/integrations/openharmony/readonly-probes.yaml
+      excluded_while: >-
+        The pinned OPENHARMONY-TOOLS readonly-probes registry explicitly marks the
+        family unsupported with maintainer-accepted provenance. The conforming
+        platform result is then the registered fail-closed unsupported diagnostic
+        with zero key-path read/repair dispatch.
+      reactivation: >-
+        A future approved integration change marking the family supported makes
+        this acceptance ID immediately applicable again; any verified or
+        conformance conclusion that relied on the exclusion becomes
+        needsReverification.
+    - acceptance_id: AC-HDC-009-01
+      family: subserverCapability
+      registry: openspec/integrations/openharmony/readonly-probes.yaml
+      excluded_while: >-
+        Same registry condition; the conforming platform result is the registered
+        unsupported presentation with zero spawn-sub, killall-sub and
+        device-migration dispatch.
+      reactivation: >-
+        Same reactivation rule as AC-HDC-006-01.
 
 shared_inputs:
   integration_lock:
-    id: INTEGRATION-PROFILES-0.3.0
+    # CHG-2026-018 currency:lock 文件现行版本(V2 不逐文件 hash pin,历史对比用 git)
+    id: INTEGRATION-PROFILES-0.4.0
     path: openspec/integrations/INTEGRATION-PROFILES.lock.yaml
   integration_profiles:
+    # 0.2.0 Golden consumer 条目保留(adoption_boundary 保留其语义面);
+    # 0.3.0 为 CHG-2026-015 readonly-probes 采用面,additive 补记。
     - id: OPENHARMONY-TOOLS
       version: 0.2.0
       path: openspec/integrations/openharmony/profile.md
+    - id: OPENHARMONY-TOOLS
+      version: 0.3.0
+      path: openspec/integrations/openharmony/profile.md
+  registries:
+    - id: OPENHARMONY-HDC-READONLY-PROBES
+      version: 1.0.0
+      path: openspec/integrations/openharmony/readonly-probes.yaml
   catalogs:
     - path: openspec/contracts/catalogs/remote-operations.yaml
       version: 1.0.0

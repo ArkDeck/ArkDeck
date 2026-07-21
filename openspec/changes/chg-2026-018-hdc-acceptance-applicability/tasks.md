@@ -5,6 +5,12 @@
 - Status:ready(readiness;仅在维护者 review/merge 本独立状态 PR 后生效。前置 ① 已满足:
   approval-only PR #195 已合入 main squash `f2bde7b`(lvye review/merge);本 PR 即前置 ②,
   单文件、不含实现、不产生 evidence、不执行任何修订)
+- Completion evidence candidate(2026-07-21,随实现 PR):
+  `evidence/runs/TASK-CA-001/run.md`(base `63fb615`;两 Test ID 均 PASS;delta 与
+  design 草案逐项对照、canonical 111 零变更证明、registry provenance 逐字引用在案)。
+  本实现工作树不翻转 `ready`;`ready→done` 须实现 PR 经维护者 review/merge 后另用独立
+  状态 PR,ratification 另由 archive PR 构成,均不构成 TASK-M1-006 状态变化、CHG-2026-002
+  verified、platform conformance、hardware/support 或 release claim。
 - Readiness(2026-07-21,执行时 pins 于 main `f2bde7b` 逐项复核):
   - Approve 链:propose PR #194(squash `0f87bd7`)→ approval-only PR #195(squash
     `f2bde7b`);design.md normative 草案自批准以来零字节变更。
