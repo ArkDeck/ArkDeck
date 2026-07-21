@@ -129,8 +129,27 @@
 
 ## TASK-TR-002R — remediate trace host-contract fail-closed gates
 
-- Status:ready(readiness;仅在维护者 review/merge 本独立状态 PR 后生效；本 PR 只修改
-  `tasks.md`，不含实现/evidence，不执行 device/HDC/network/external-process)
+- Status:done(TASK-TR-002R implementation + evidence PR #278 已由维护者 `lvye`
+  APPROVED 并合入 `main` merge commit
+  `4bdad2f037cd62c76dbc483f0cfb4a35ae3af539`；implementation source commit
+  `089ff98c58e29d2082b67155cc3e560b7f258699`。本独立状态 PR 依据下列 completion
+  evidence 起草 `ready→done`，仅在维护者 review/merge 后生效。本状态只关闭
+  host-only remediation，不改变 TASK-TR-001(`ready`)、TASK-TR-003（仍须等待
+  TASK-TR-001 done 与本状态 PR 合入）、change `verified`、真实 adapter/provenance、
+  hardware/compatibility/support/conformance/release 状态)
+- Done recheck(2026-07-22；于合入版 `main`
+  `4bdad2f037cd62c76dbc483f0cfb4a35ae3af539`):
+  - implementation + evidence PR #278 的五个交付文件全部位于本任务 allowed paths；
+    实现 PR 未修改 `tasks.md`、accepted spec/Core/storage/catalog/integration、App/UI
+    或其他 task evidence。
+  - `swift build --build-tests` PASS；`TraceWorkflowContractTests` 18/0；
+    `SessionArtifactStorageContractTests` 58/0；Swift 全量 320 tests/1 个既有 opt-in
+    skip/0 failures；`check-sdd` 0 errors/0 warnings/111 acceptance IDs。
+  - 九项受影响 canonical AC/change-local evidence ID 的 PASS 结论与 13 个真实
+    `SessionArtifactStore.publish` fault barrier 可由
+    `evidence/runs/TASK-TR-002R/run.md` 复查；evidence class 保持 contract + storage
+    fault injection，identity/Artifact 均为 synthetic，真实 device/HDC/network/
+    external-process dispatch = 0，不构成 provenance、真机或支持声明。
 - Readiness review(2026-07-22;host-only,零设备命令):
   - Approve gate:satisfied。r2 amendment PR #276 已由维护者 `lvye` APPROVED 并合入
     `main` merge commit
