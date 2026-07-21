@@ -1,9 +1,11 @@
 # CHG-2026-008 controlled UI Dump capture harness
 
-`TASK-UD-CAPTURE-HARNESS-001`. **Human maintainer operated only.** Agents and CI
-must not invoke an installed `hdc`, discover a real device, or execute any command
-from this table. Tests use an injected fake runner (and the current Python
-interpreter for runner mechanics) and never touch HDC, a device, or the network.
+`TASK-UD-CAPTURE-HARNESS-001`, with the schema-1.1 exact-echo remediation from
+`TASK-UD-HARNESS-ECHO-001`. **Human maintainer operated only.** Agents and CI
+must not invoke an installed `hdc`, discover a real device, or execute any
+command from this table. Tests use an injected fake runner (and the current
+Python interpreter for runner mechanics) and never touch HDC, a device, or the
+network.
 
 This harness is the mandatory capture instrument for the later human Phase A
 run. It runs exactly one approved command per invocation so the maintainer can
@@ -116,6 +118,29 @@ CLI status `1` means a command ran but timeout, truncation, incomplete drain,
 stream self-check, or output-side redaction requires STOP. Status `2` is reserved
 for pre-dispatch usage/harness refusal. A redaction leak keeps raw/full controlled
 artifacts for investigation but withholds repository-facing output.
+
+Full and redacted manifests use schemas
+`arkdeck-ud-capture-manifest-1.1.0` and
+`arkdeck-ud-capture-redacted-1.1.0`. Schema 1.1 retains the original
+`userPathFound` and `localInputPathFound` facts and adds deterministic per-stream
+`policyId`, `expectedLocalInputEchoFound`, `unexpectedUserPathFound`, and
+`unexpectedLocalInputPathFound` facts.
+
+The only non-strict policy is `fx1-stdout-exact-local-hap-v1`. It is selected
+only by the registered `FX-1` identity for stdout when that stream is complete,
+untruncated, not drain-incomplete, and the command did not time out. Every
+generic user-path match must be wholly contained by a delimiter-bounded,
+byte-exact occurrence of the validated resolved `LOCAL_HAP_PATH`. Multiple exact
+occurrences are permitted. A second path, embedded/prefix/dirname/sibling path,
+case or Unicode-normalization variant, supplied symlink alias, stderr echo,
+other-command echo, key material, timeout, truncation, or incomplete drain still
+fails closed. All other streams use `strict-sensitive-output-v1`.
+
+This narrow controlled-raw policy does not weaken the repository-facing gate.
+The original local path is replaced by `<local-hap-path>` in redacted manifests,
+never appears in `capture-hashes.md` or CLI text, and `_assert_redacted_clean`
+still hard-fails operator home, connect key, window id, any local/user path, and
+key-material markers before repository-facing output is published.
 
 The harness rebuilds `capture-hashes.md` from redacted manifests after every
 successful redaction gate. Full manifests, raw streams, connect keys, window ids,
