@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-005-hdc-parser-golden-registration
 revision: 2
-status: verified # 2026-07-18 verification closure(先例 #20/#48):七项 I5-HDC-* gate 全 satisfied;AC-HDC-005-01 仍待 M1-006 parserGolden 实证;经本 PR 维护者 review/merge 生效
+status: archived # 2026-07-21 archive PR(先例 #178;M1-006 done/#207 与 CHG-002 verified/#208 后其只读输入引用面收口);verified 于 2026-07-18 closure PR。原注: 2026-07-18 verification closure(先例 #20/#48):七项 I5-HDC-* gate 全 satisfied;AC-HDC-005-01 仍待 M1-006 parserGolden 实证;经本 PR 维护者 review/merge 生效
 class: integration
 core_change_level: none
 owner: lvye
