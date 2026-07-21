@@ -23,10 +23,10 @@ blocked-attempt,不是 fail(先例 #104)。
 
 | Evidence ID | Method | Expected result | Status |
 | --- | --- | --- | --- |
-| RH-DAYU200-RECOVERY-001 | maintainer-executed rehearsal(archived playbook §4 序列) | 一个具名窗口内完成 进态→db→gpt/prm→九个 PD-002 mapped 分区按序写入→复位;设备回正常系统,postcheck(m0b_capture 既有白名单)重现 Connected;逐命令 argv/输出/判定在案;§5 中止=诚实 blocked-attempt | attempt#1 blocked(#173:RockUSB 未达成);attempt#2 blocked(#213:W1 db 按态被拒);attempt#3 blocked(#215:W1 条件跳过生效,W2 gpt 按 loader 命令子集被拒,零写入,§5 自动中止);TASK-RH-001 ready,待下窗口按 r4(W1+W2 条件化)从 W3 wlx 起执行 |
-| RH-DAYU200-MODE-001 | 同窗口只读模式观察 | 进 Maskrom 前/态中/db 后各记 `ld` 输出形态与 USB VID:PID;CHG-2026-011 待确证项(RK3568 PID、Maskrom/Loader 判别字样)落为 observed 事实;只记录不改流程 | observed 实质补全(#173:2207:5000 updater-hdc;#213:r2 序列→2207:350a Loader 稳定达成,进态路径实证);写序中 post-db 观察点随 r3 W1 条件化顺延 |
-| RH-DAYU200-TABLE-001 | `ppt` 读回 vs FA-001 §2 基线逐行比对 | Loader 态 `ppt`(表写入前可读则读、写入后必读)逐行 match/mismatch/absent/extra 分类,原始值保留;差异不现场解释,标待后续分析;基线零改写 | 写前读回达成(#213:Loader 态 ppt 读出 GPT 表,15 match/0 mismatch/0 absent/0 extra vs FA-001 §2,GPT 分支实锤);写后读回待下窗口 |
-| RH-DAYU200-SAFETY-001 | 封闭面与隐私合规审计(全窗口) | 全部设备命令属封闭面且计数在案;首写前物料/工具 hash 全部复核;零现场手算地址(wl 回退逐值引 FA-001 PD-002 扇区列并记原因);userdata 显式确认或如实记跳过;orphan 镜像与无成员分区零写入;序列号仅入 hardware-evidence identity,raw 留仓库外;中止准则触发即遵守 | attempt#1/#2 均 PASS(#173;#213:db/ld/ppt 全属封闭面、pinned hash 复核、零手算、零写入、§5 正确中止、序列号零入仓);待写入窗口全流程复评 |
+| RH-DAYU200-RECOVERY-001 | maintainer-executed rehearsal(archived playbook §4 序列) | 一个具名窗口内完成 进态→db→gpt/prm→九个 PD-002 mapped 分区按序写入→复位;设备回正常系统,postcheck(m0b_capture 既有白名单)重现 Connected;逐命令 argv/输出/判定在案;§5 中止=诚实 blocked-attempt | **PASS(attempt #5 SUCCESS,#220 `3feacc3`)** — 进态→W1/W2 条件跳过→九分区 Loader 态 `wlx` 全成功(`Write LBA from file (100%)`/exit 0)→`rd` OK→重启进系统→postcheck 58B `USB Connected localhost`;逐命令 argv/输出/判定在案。前序 blocked-attempt #173/#213/#215/#217 如实在案 |
+| RH-DAYU200-MODE-001 | 同窗口只读模式观察 | 进 Maskrom 前/态中/db 后各记 `ld` 输出形态与 USB VID:PID;CHG-2026-011 待确证项(RK3568 PID、Maskrom/Loader 判别字样)落为 observed 事实;只记录不改流程 | observed — 进态序列五窗口稳定(`0x5000 Maskrom`→`0x350a Loader`);attempt#5 印证板上 U-Boot Loader 升级态支持 wlx 写数据、拒 db/gpt(#220/#218) |
+| RH-DAYU200-TABLE-001 | `ppt` 读回 vs FA-001 §2 基线逐行比对 | Loader 态 `ppt`(表写入前可读则读、写入后必读)逐行 match/mismatch/absent/extra 分类,原始值保留;差异不现场解释,标待后续分析;基线零改写 | PASS — 写前 `ppt` 五窗口 15/15 精确 match FA-001 §2(逐字节一致);attempt#5 W2 跳过 gpt(表已正确)、wlx 写分区数据不改分区表,故表最终态 = 写前 15/15 |
+| RH-DAYU200-SAFETY-001 | 封闭面与隐私合规审计(全窗口) | 全部设备命令属封闭面且计数在案;首写前物料/工具 hash 全部复核;零现场手算地址(wl 回退逐值引 FA-001 PD-002 扇区列并记原因);userdata 显式确认或如实记跳过;orphan 镜像与无成员分区零写入;序列号仅入 hardware-evidence identity,raw 留仓库外;中止准则触发即遵守 | PASS(attempt #5 全流程,#220)— 全部命令属封闭面、pinned hash 复核、零现场手算、userdata 经显式 `ERASE-USERDATA` 确认、orphan/无成员分区/空洞零写入、`rd` 后正常启动、序列号零入仓 |
 
 ## Gate
 
@@ -52,3 +52,9 @@ blocked-attempt,不是 fail(先例 #104)。
 > 精确 match 即判定点满足、跳过并记录;不 match 才必须 gpt)。四 AC expected result
 > 不变;已知风险:`wlx`/`wl` 或同在子集外,两者均被拒则 Loader 路线不可行、Maskrom
 > 裸态进态另立 revision。TASK-RH-001 保持 `ready`,下窗口从 W3 起。
+
+> Status update(2026-07-21,随 TASK-RH-001 `ready→done` 独立状态 PR):上表四行依
+> attempt #5 SUCCESS evidence(#220 `3feacc3`)同步——RECOVERY-001 `PASS`(首次)、
+> MODE-001 observed、TABLE-001 写前 15/15、SAFETY-001 PASS。本更新只同步账本;gap 关闭
+> 登记与 DEC-002 input 登记走独立 governance PR(Gate 明确,先例 #146),change 级
+> verify 另行;不构成 conformance/hardware support/release claim。

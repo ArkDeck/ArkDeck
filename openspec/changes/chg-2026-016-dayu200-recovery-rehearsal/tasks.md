@@ -6,8 +6,19 @@
 
 ## TASK-RH-001 — 恢复演练执行(首次授权写设备;含模式/分区表观察搭载)
 
-- Status:ready(readiness candidate;仅在维护者 review/merge 本独立 readiness PR
-  后生效。本 PR 不执行演练、零设备命令、零 evidence)
+- Status:done(演练 attempt #5 SUCCESS,`ready→done`;仅在维护者 review/merge 本独立
+  状态 PR 后生效。依据:成功 evidence PR #220 已合入 `main` squash `3feacc3`,
+  `evidence/runs/TASK-RH-001/rehearsal-attempt-5-2026-07-21.md` 记录九分区 Loader 态
+  `wlx` 全成功→`rd` OK→重启进系统→postcheck 58B `USB Connected localhost`。四 Test ID:
+  RECOVERY-001 PASS(首次)、MODE-001 observed、TABLE-001 写前 15/15(wlx 不改表)、
+  SAFETY-001 PASS。done 只关闭本演练任务;gap 关闭登记与 DEC-002 input 登记按
+  verification Gate 走独立 governance PR(先例 #146),change 级 verify 另行独立 PR;
+  均不构成 ArkDeck 产品 flash 能力、兼容性、hardware support 或 release 声明,hardware
+  matrix 只可新增 observed 行)
+- Attempt 链(如实在案):#173 attempt#1 blocked(RockUSB 未达成)→ #213 attempt#2
+  blocked(W1 db 按态被拒,首达 0x350a Loader、ppt 15/15 写前基线)→ #215 attempt#3
+  blocked(W2 gpt 子集被拒)→ #217 attempt#4 blocked(crib W2 比对 bug + gpt 第二次拒)
+  → #218 loader-vs-maskrom 研究(预判 wlx 可行)→ **#220 attempt#5 SUCCESS**。
 - Readiness review(2026-07-20;host-only,零设备/写命令 dispatch;§6 检查单双前置
   与执行时 pins 逐项复核):
   - Approve gate:satisfied。CHG-2026-016 approved(approval-only PR #171 合入
