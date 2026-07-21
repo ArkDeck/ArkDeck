@@ -36,24 +36,46 @@ Open question 不得以聊天记忆留存。每项记录默认决策、阻塞范
 
 ## DEC-002 First flashing protocol
 
-- Status：open（CHG-2026-003 已把决策所缺证据显式化为四个 gap,登记为本决策的
-  required evidence input,见下）
+- Status：decided（2026-07-21;决策由 owner review/merge 本 decision PR 构成,V2 治理,
+  先例 DEC-001;登记路径 #52。四个 required-evidence gap 已全部关闭,见下)
 - Owner：hardware owner
-- Question：首批设备使用 HDC flashd、fastboot、upgrade_tool 还是厂商协议？镜像/分区清单是什么？
-- Default：仅设计 HDC/flashd Provider，不宣称已支持
+- Question（历史）：首批设备使用 HDC flashd、fastboot、upgrade_tool 还是厂商协议？镜像/分区清单是什么？
+- Decision：DAYU200 首个烧写协议 = **Rockchip RockUSB(rkdeveloptool ≥1.32,Loader 态
+  `wlx` over 既有分区表)**,**非** HDC/flashd、非 fastboot、非 upgrade_tool。命令面 =
+  CHG-2026-020 design §0 封闭面(进态 → `ld` mode-gate `0x2207:0x350a` Loader → `ppt`
+  前置比对 → 逐分区 `wlx` → `rd` → postflight;`db`/`gpt` 属 MaskRom/miniloader 阶段,
+  板上 U-Boot 升级态不实现)。镜像/分区清单 = CHG-2026-003 pinned 包 17 成员逐一
+  SHA-256 + PD-002 mapped 9 分区写序/FA-001 §2 地址(产品面为
+  `RockchipFlashProfile`@1.0.0,产品 Provider = `RockchipRockUSBFlashProvider`@1.0.0 +
+  `arkdeck flash`,CHG-2026-020 verified #239)。**三次真机背书**:恢复演练 attempt #5
+  (#220,CHG-2026-016 verified)、RF-001 正向首验(#233)、RF-002 `arkdeck flash`
+  产品验收(#237,hardware-matrix 首条 verified 行 `EVD-RF002-DAYU200-20260721-001`)。
+- Boundary：本决策限定 DAYU200 + pinned 镜像族 + rkdeveloptool 1.32 的精确组合,
+  不外推到其他设备/厂商协议/固件/工具版本(各须独立 change,REQ-FLASH-014);
+  原 Default(仅设计 HDC/flashd Provider)由本决策取代——hdc/flashd 推测已被 #220
+  真机推翻并在 #223 登记纠正。
+- Unblocked by this decision：M4 Provider implementation/verification 的 DAYU200 面已
+  随 CHG-2026-020 verified 落地;后续设备/协议扩展按 REQ-FLASH-014 独立立项。
+- Reopen rule：更换/新增烧写协议或设备族、变更 pinned 镜像输入、或把本决策外推为
+  超出 verified matrix 组合的支持声明,均须经 governance PR 重开/修订本条。
 - Required evidence（2026-07-18,来自 archived CHG-2026-003
   `package-classification.json.gaps[]`,全部 `unknown`）：
   - `GAP-DAYU200-PARTITION-SEMANTICS`:`parameter.txt` 分区表语义未解读（特征化
-    刻意不解码成员字节）;
-  - `GAP-DAYU200-FLASH-ADDRESSES`:未从任何成员推导烧写 offset/地址映射;
+    刻意不解码成员字节）;**（2026-07-21 已关闭——PD-002 解读 + 真机 `ppt` GPT dump
+    多窗口 15/15 逐行确证,见下 Registered inputs)**
+  - `GAP-DAYU200-FLASH-ADDRESSES`:未从任何成员推导烧写 offset/地址映射;**（2026-07-21
+    已关闭——FA-001 §2 地址表 + 真机逐行确证与 `wlx` 寻址语义实证,见下)**
   - `GAP-DAYU200-FLASH-PROTOCOL`:flashd/rockusb/USB/UART/TCP 协议事实未建立;
+    **（2026-07-21 已关闭——RockUSB Loader 态 `wlx` 三次真机背书 + CHG-2026-020
+    verified 正向产品化,见下)**
   - `GAP-DAYU200-RECOVERY-PATH`:烧写中断后的恢复/救砖路径未建立。**（2026-07-21
     已关闭——恢复演练 attempt #5 成功真机建立并验证恢复路径,见下 Registered inputs）**
 - Resolution vehicle：四个 gap 须由后续独立 change 解决（DAYU200 Integration
   change / Route-B CLI plan-only 特征化;按 backlog 规则不得并入既有 Task,
   CHG-2026-003 evidence 明确不能满足本决策）;在此之前本决策保持 Default。
-- Registered evidence inputs（2026-07-20 登记,先例 #52;登记≠gap 关闭,DEC-002 保持
-  open、Default 不变）：
+- Registered evidence inputs（2026-07-20 登记,先例 #52;登记≠gap 关闭,当时 DEC-002
+  保持 open、Default 不变——历史注记,2026-07-21 起四 gap 全关、本决策 decided,见上
+  Status/Decision）：
   - `GAP-DAYU200-FLASH-PROTOCOL`:archived CHG-2026-011
     `flash-protocol-facts.md`（文档面已建立:DAYU200 官方烧录仅 Windows
     RockUSB/RKDevTool,flashd 端到端与任何 macOS 烧写路径均无官方文档;flashd 进入
@@ -65,7 +87,10 @@ Open question 不得以聊天记忆留存。每项记录默认决策、阻塞范
     写入全成功、恢复达成。故 DAYU200 macOS 写设备实际通道 = **rkdeveloptool RockUSB
     Loader 态 `wlx`**（`db`/`gpt` 属 MaskRom/miniloader 阶段命令,板上 U-Boot 升级态
     不实现,#220/#218 实证),**非** hdc/flashd。剩余=正向全量烧写(vs 恢复)的 Provider
-    与命令面待 real-flash integration change 立项。
+    与命令面待 real-flash integration change 立项。**★ 剩余项已解决、gap 关闭
+    (2026-07-21)**:CHG-2026-020 verified(#239)交付正向 Provider =
+    `RockchipRockUSBFlashProvider` + `arkdeck flash`,命令面 = design §0 封闭面;
+    RF-001 正向首验(#233)与 RF-002 产品验收(#237)真机背书。
   - `GAP-DAYU200-RECOVERY-PATH`:archived CHG-2026-010 恢复预案（macOS 恢复路径=
     rkdeveloptool,S3 细节标注待演练确证）+ archived CHG-2026-013 演练准备
     （rkdeveloptool 1.32 已构建、物料 pinned）+ RISK-001 风险接受在案。剩余=恢复演练
@@ -92,6 +117,8 @@ Open question 不得以聊天记忆留存。每项记录默认决策、阻塞范
     15/15 逐行确证 `GAP-DAYU200-FLASH-ADDRESSES`/`GAP-DAYU200-PARTITION-SEMANTICS`
     的真机布局项(见各段)。DEC-002 整体保持 open(正向烧写 `arkdeck flash` 的 Provider
     选择待 real-flash integration change 立项),但恢复路径子问题已解决,Default 不变。
+    **★ 该"待立项"项亦已完成(2026-07-21)**:real-flash integration change =
+    CHG-2026-020,已 verified(#239);DEC-002 随之 decided(见上 Status/Decision)。
   - `GAP-DAYU200-PARTITION-SEMANTICS`:**已登记（2026-07-20）**=TASK-PD-002 done
     （evidence PR #164 `6f26ca3`、状态 PR #165 `e20a832`）的 fresh signed-broker
     platform `partition-mapping.json`（SHA-256 `965e3bf3…`）+ `member-reconciliation.json`
@@ -101,7 +128,9 @@ Open question 不得以聊天记忆留存。每项记录默认决策、阻塞范
     第二阶段）。**真机确证达成（2026-07-21,RH-001 attempt #5,#220）**:Loader 态
     `ppt` 读出设备现行分区表,表头 `Partition Info(GPT)` = **GPT 分支实锤**;15 行
     index/name/offset 逐行 15/15 精确 match PD-002 `partition-mapping.json`(五窗口
-    逐字节一致)——真机布局与解读一致,GPT vs parameter 待确证项落定为 GPT。
+    逐字节一致)——真机布局与解读一致,GPT vs parameter 待确证项落定为 GPT。**★ gap
+    关闭(2026-07-21)**:RF-001/RF-002 两窗口写前 `ppt` 再各 15/15 精确 match,累计
+    七窗口一致;剩余项无。
   - `GAP-DAYU200-FLASH-ADDRESSES`:**已登记（2026-07-20）**=TASK-FA-001 done
     （research PR #167 `f9b74cc`、状态 PR #168 `03e975b`;change 于 2026-07-20 archived）的 `flash-address-facts.md`
     （SHA-256 `e1c09d16…`）:15 分区目标地址映射表（逐行锚定 PD-002 扇区列,字节列
@@ -110,8 +139,12 @@ Open question 不得以聊天记忆留存。每项记录默认决策、阻塞范
     dump 对地址表的逐行确证（Route-B ④ 第二阶段）。**真机确证达成（2026-07-21,
     RH-001 attempt #5,#220）**:Loader 态 `ppt` GPT dump 的 15 行 offset(LBA)逐行
     15/15 精确 match FA-001 §2 地址表(锚定 PD-002 扇区列);且 `wlx <name>`(按名靠
-    设备侧分区表)九分区写入全成功,实证 FA-001 §1 的 `wlx` 寻址语义。
-- Blocks：M4 Provider implementation/verification
+    设备侧分区表)九分区写入全成功,实证 FA-001 §1 的 `wlx` 寻址语义。**★ gap 关闭
+    (2026-07-21)**:RF-001/RF-002 两窗口再各实证 `wlx` 九分区寻址(累计三窗口 27 次
+    分区写全中),FA-001 §2 地址作为 Profile `wl` 回退值随 CHG-2026-020 产品化;剩余
+    项无。
+- Blocks：（历史)M4 Provider implementation/verification——已随 CHG-2026-020
+  verified(#239)解除,DAYU200 面落地。
 - Affected：flashing spec、Provider contract
 
 ## DEC-003 Meaning of Debug
