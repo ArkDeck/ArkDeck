@@ -103,7 +103,7 @@
   - `openspec/changes/chg-2026-015-hdc-readonly-probe-registration/evidence/**`
   - 本 change `tasks.md`（仅本任务状态与 completion evidence）
 - Read-only inputs:
-  - `openspec/changes/chg-2026-002-macos-m1-infrastructure/evidence/runs/TASK-M1-006/run.md`
+  - `openspec/changes/archive/2026-07-21-chg-2026-002-macos-m1-infrastructure/evidence/runs/TASK-M1-006/run.md`(路径于 2026-07-21 CHG-002 归档时同 PR 更新,字节未动)
   - `openspec/changes/chg-2026-005-hdc-parser-golden-registration/**`
     （2026-07-21 archive currency note:该 change 已 verified 后归档,目录现位于
     `openspec/changes/archive/2026-07-21-chg-2026-005-hdc-parser-golden-registration/**`;
