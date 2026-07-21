@@ -2,8 +2,32 @@
 
 ## TASK-CA-001 — conformance manifest 条件化适用性修订与 CORE-2.1.0 baseline 起草
 
-- Status:blocked(双前置:① 本 change 经独立 approval-only PR 批准;② 独立 readiness PR
-  确认执行时 pins。二者均须维护者 review/merge 后生效;本 propose PR 不构成实现授权)
+- Status:ready(readiness;仅在维护者 review/merge 本独立状态 PR 后生效。前置 ① 已满足:
+  approval-only PR #195 已合入 main squash `f2bde7b`(lvye review/merge);本 PR 即前置 ②,
+  单文件、不含实现、不产生 evidence、不执行任何修订)
+- Readiness(2026-07-21,执行时 pins 于 main `f2bde7b` 逐项复核):
+  - Approve 链:propose PR #194(squash `0f87bd7`)→ approval-only PR #195(squash
+    `f2bde7b`);design.md normative 草案自批准以来零字节变更。
+  - 排除条件事实源零漂移:`readonly-probes.yaml` SHA-256
+    `9014c480c3df61b5a6db7e54e52f29e89d7c93431e91d0856cf5710c22466b9d`、
+    `INTEGRATION-PROFILES.lock.yaml`(0.4.0)
+    `9f007455204bcbc8a0309413cbeb9c6882e45afdc0dc9def0bab4dd948d2acb0`、
+    openharmony `profile.md`
+    `48ad9ecc31cad2fbb9a05bb3bb552153ad0ade3a629de5280ce8eef06165401a`——三者与
+    proposal/design 引用值逐字一致;`keyAccessDiagnostics`/`subserverCapability` 两条
+    unsupported reason 原文未变。
+  - 修订目标现状:`core-conformance.yaml` SHA-256
+    `5009f1cd43e17f2b752945ce46e0c842d4249052b0546c4389d2253ec3f63487`(与 TASK-M1-006
+    run.md addendum 15 锁定的 Core conformance index hash 一致,自 CORE-2.0.0 ratify 以来
+    零漂移);`suite: CORE-CONFORMANCE-2.0.0`、applicability rule 原文在位;canonical
+    acceptance-cases 111 条且 `AC-HDC-006-01`/`AC-HDC-009-01` 均在 index;
+    `./scripts/check-sdd.sh` 0 error/0 warning/111。
+  - 竞争面:复核时 open PR 数为 0;`openspec/baselines/` 仅 CORE-1.0.0/CORE-2.0.0,
+    `CORE-2.1.0.yaml` 目标路径无碰撞;无其他 active change 的 allowed paths 含
+    `core-conformance.yaml`。
+  - 实现序(不变):实现 PR(manifest delta + CORE-2.1.0 baseline 草案 + evidence run)→
+    `done` 独立状态 PR → archive PR(=ratification)。实现开工前若 main 前进,须先复核
+    上述四组 hash;任一漂移即停,readiness 作废须重新起草。
 - Objective:按 design.md normative 草案对 `openspec/verification/core-conformance.yaml`
   做一次 additive 修订(suite 升 `CORE-CONFORMANCE-2.1.0`,新增 `integration_conditional`
   机制并仅登记 `AC-HDC-006-01`/`AC-HDC-009-01` 两条,`shared_inputs` 补记 0.3.0/0.4.0
