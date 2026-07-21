@@ -1,3 +1,4 @@
+import ArkDeckCore
 import Foundation
 
 public struct TraceDebugParameterDefinition: Equatable, Sendable {
@@ -54,11 +55,83 @@ public struct TraceParameterModeAvailability: Equatable, Sendable {
   public let persistentChangeRequiresExplicitConfirmation: Bool
 }
 
+public enum TraceParameterProbeDisposition: String, Codable, CaseIterable, Equatable, Sendable {
+  case supported
+  case unsupported
+  case permissionDenied
+  case needsDeveloperMode
+  case unknown
+}
+
+public enum TraceParameterCapabilityError: Error, Equatable, Sendable {
+  case parameterOutsideAttachmentDebugProfile(String)
+  case persistentSupportRequiresSupportedDisposition
+}
+
+/// A typed per-device probe receipt. It can only be created from a durable binding receipt and
+/// a catalog member, so catalog membership by itself is never mutation authority.
+public struct TraceParameterCapabilityReceipt: Equatable, Sendable {
+  public let bindingReference: DeviceBindingReference
+  public let parameterName: String
+  public let disposition: TraceParameterProbeDisposition
+  public let persistentWriteSupported: Bool
+  fileprivate let durableBinding: DurableCurrentDeviceBinding
+
+  fileprivate init(
+    durableBinding: DurableCurrentDeviceBinding,
+    parameterName: String,
+    disposition: TraceParameterProbeDisposition,
+    persistentWriteSupported: Bool
+  ) {
+    bindingReference = durableBinding.reference
+    self.parameterName = parameterName
+    self.disposition = disposition
+    self.persistentWriteSupported = persistentWriteSupported
+    self.durableBinding = durableBinding
+  }
+
+  public func matches(
+    durableBinding: DurableCurrentDeviceBinding,
+    parameterName: String
+  ) -> Bool {
+    self.durableBinding == durableBinding && self.parameterName == parameterName
+  }
+}
+
+public enum TraceParameterCapabilityProbe {
+  public static func record(
+    durableBinding: DurableCurrentDeviceBinding,
+    parameterName: String,
+    disposition: TraceParameterProbeDisposition,
+    persistentWriteSupported: Bool = false
+  ) throws -> TraceParameterCapabilityReceipt {
+    guard TraceDebugParameterCatalog.definition(named: parameterName) != nil else {
+      throw TraceParameterCapabilityError.parameterOutsideAttachmentDebugProfile(parameterName)
+    }
+    guard disposition == .supported || !persistentWriteSupported else {
+      throw TraceParameterCapabilityError.persistentSupportRequiresSupportedDisposition
+    }
+    return TraceParameterCapabilityReceipt(
+      durableBinding: durableBinding,
+      parameterName: parameterName,
+      disposition: disposition,
+      persistentWriteSupported: persistentWriteSupported)
+  }
+}
+
 public enum TraceParameterPolicyError: Error, Equatable, Sendable {
   case parameterOutsideAttachmentDebugProfile(String)
   case duplicateParameter(String)
   case valueDoesNotMatchProfile(name: String, expected: String, actual: String)
   case temporaryRestoreUnavailable(TraceParameterSnapshotState)
+  case capabilityReceiptRequired(String)
+  case capabilityParameterMismatch(expected: String, actual: String)
+  case capabilityBindingMismatch(
+    expected: DeviceBindingReference,
+    actual: DeviceBindingReference
+  )
+  case capabilityNotSupported(String, TraceParameterProbeDisposition)
+  case persistentWriteUnsupported(String)
   case persistentConfirmationRequired
 }
 
@@ -78,15 +151,20 @@ public struct TraceParameterMutationRequest: Equatable, Sendable {
 public struct TraceAuthorizedParameterMutation: Equatable, Sendable {
   public let request: TraceParameterMutationRequest
   public let snapshot: TraceParameterSnapshotState
+  public let capability: TraceParameterCapabilityReceipt
+  public let bindingReference: DeviceBindingReference
   public let persistentConfirmationID: String?
 
   fileprivate init(
     request: TraceParameterMutationRequest,
     snapshot: TraceParameterSnapshotState,
+    capability: TraceParameterCapabilityReceipt,
     persistentConfirmationID: String?
   ) {
     self.request = request
     self.snapshot = snapshot
+    self.capability = capability
+    bindingReference = capability.bindingReference
     self.persistentConfirmationID = persistentConfirmationID
   }
 
@@ -98,18 +176,27 @@ public struct TraceAuthorizedParameterMutation: Equatable, Sendable {
 public enum TraceParameterPolicy {
   public static func availability(
     for name: String,
-    snapshot: TraceParameterSnapshotState
+    snapshot: TraceParameterSnapshotState,
+    capability: TraceParameterCapabilityReceipt?,
+    durableBinding: DurableCurrentDeviceBinding
   ) -> TraceParameterModeAvailability {
     let known = TraceDebugParameterCatalog.definition(named: name) != nil
+    let supported =
+      capability?.matches(durableBinding: durableBinding, parameterName: name) == true
+      && capability?.disposition == .supported
     return TraceParameterModeAvailability(
-      temporaryRestoreAvailable: known && snapshot.writableOriginalValue != nil,
-      persistentChangeAvailable: known,
-      persistentChangeRequiresExplicitConfirmation: known)
+      temporaryRestoreAvailable: known && supported && snapshot.writableOriginalValue != nil,
+      persistentChangeAvailable: known && supported
+        && capability?.persistentWriteSupported == true,
+      persistentChangeRequiresExplicitConfirmation: known && supported
+        && capability?.persistentWriteSupported == true)
   }
 
   public static func authorize(
     _ request: TraceParameterMutationRequest,
     snapshot: TraceParameterSnapshotState,
+    capability: TraceParameterCapabilityReceipt?,
+    durableBinding: DurableCurrentDeviceBinding,
     persistentConfirmationID: String? = nil
   ) throws -> TraceAuthorizedParameterMutation {
     guard let definition = TraceDebugParameterCatalog.definition(named: request.name) else {
@@ -119,6 +206,24 @@ public enum TraceParameterPolicy {
       throw TraceParameterPolicyError.valueDoesNotMatchProfile(
         name: request.name, expected: definition.profileValue, actual: request.value)
     }
+    guard let capability else {
+      throw TraceParameterPolicyError.capabilityReceiptRequired(request.name)
+    }
+    guard capability.parameterName == request.name else {
+      throw TraceParameterPolicyError.capabilityParameterMismatch(
+        expected: request.name,
+        actual: capability.parameterName)
+    }
+    guard capability.durableBinding == durableBinding else {
+      throw TraceParameterPolicyError.capabilityBindingMismatch(
+        expected: durableBinding.reference,
+        actual: capability.bindingReference)
+    }
+    guard capability.disposition == .supported else {
+      throw TraceParameterPolicyError.capabilityNotSupported(
+        request.name,
+        capability.disposition)
+    }
 
     switch request.mode {
     case .temporaryRestore:
@@ -126,8 +231,14 @@ public enum TraceParameterPolicy {
         throw TraceParameterPolicyError.temporaryRestoreUnavailable(snapshot)
       }
       return TraceAuthorizedParameterMutation(
-        request: request, snapshot: snapshot, persistentConfirmationID: nil)
+        request: request,
+        snapshot: snapshot,
+        capability: capability,
+        persistentConfirmationID: nil)
     case .persistentChange:
+      guard capability.persistentWriteSupported else {
+        throw TraceParameterPolicyError.persistentWriteUnsupported(request.name)
+      }
       guard
         let persistentConfirmationID,
         !persistentConfirmationID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -137,6 +248,7 @@ public enum TraceParameterPolicy {
       return TraceAuthorizedParameterMutation(
         request: request,
         snapshot: snapshot,
+        capability: capability,
         persistentConfirmationID: persistentConfirmationID)
     }
   }
