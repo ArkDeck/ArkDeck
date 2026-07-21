@@ -1,0 +1,44 @@
+---
+schema_version: 1.0.0
+change_id: CHG-2026-023-macos-auto-update
+change_revision: 1
+platform: macos
+evidence_classes:
+- documentReview
+- contract
+cases:
+- acceptance_id: AU-EVAL-001
+  test_id: TEST-AU-EVAL-001
+  method: Document review of the update-mechanism evaluation and selection record.
+  expected_source: openspec/changes/chg-2026-023-macos-auto-update/verification.md#AU-EVAL-001
+  minimum_evidence: documentReview
+  expected_result: >-
+    The evaluation grounds all five dimensions (sandbox/XPC compatibility with
+    the exact entitlement diff, supply-chain surface of a first third-party
+    dependency versus in-house maintenance, fail-closed signing chain,
+    failure/rollback honesty, privacy minimization) in traceable sources; the
+    selection is explicit with stated exclusion reasons for the untaken route;
+    no dependency is introduced and no third-party code is executed by the
+    evaluation itself.
+- acceptance_id: AU-CONTRACT-001
+  test_id: TEST-AU-CONTRACT-001
+  method: Offline fail-closed update verification contract.
+  expected_source: openspec/changes/chg-2026-023-macos-auto-update/verification.md#AU-CONTRACT-001
+  minimum_evidence: contract
+  expected_result: >-
+    The verification matrix is green with zero install actions on every
+    negative: broken or missing feed EdDSA signature, downloaded artifact
+    signed by a different Team identity or unsigned, interrupted or truncated
+    download - each yields an honest error and touches no installed bytes.
+    Installation requires explicit user consent (no silent path exists), and a
+    test asserts the built entitlement set equals the ADR-0002 declaration.
+- acceptance_id: AU-PRIVACY-001
+  test_id: TEST-AU-PRIVACY-001
+  method: Update-check request privacy allowlist contract.
+  expected_source: openspec/changes/chg-2026-023-macos-auto-update/verification.md#AU-PRIVACY-001
+  minimum_evidence: contract
+  expected_result: >-
+    The update-check request carries only the closed field allowlist (app
+    version, OS version, architecture) with zero device identifiers, user
+    paths or telemetry payloads (the DEC-008 boundary stays intact), and the
+    shipped disclosure text matches the actual fields.
