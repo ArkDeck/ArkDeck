@@ -52,8 +52,24 @@
 
 ## TASK-TR-002 — host contract 面(typed trace workflow,零设备)
 
-- Status:ready(readiness;仅在维护者 review/merge 本独立状态 PR 后生效。单文件、
-  不含实现、不产生 evidence)
+- Status:done(TASK-TR-002 implementation + evidence PR #270 已由维护者 review/merge
+  合入 `main` merge commit `cec2cc20c995471602cdd056ec5d9a2460b48ecc`;本独立状态
+  PR 依据下列 completion evidence 起草 `ready→done`,仅在维护者 review/merge 后生效。
+  本状态只关闭 host-only typed trace workflow contract 面,不改变 TASK-TR-001
+  (`ready`)、TASK-TR-003(`blocked`)、change `verified`、真实 adapter/provenance、
+  hardware/compatibility/support/conformance/release 状态)
+- Done recheck(2026-07-21;于合入版 `main` `cec2cc2`):
+  - implementation source `40cce74ec285a0049364ded00be97fbef1cac9b0`;六个交付文件
+    均在 allowed paths,不含 `tasks.md` 状态、真实 hitrace/bytrace argv/parser、CLI/UI、
+    Core/schema 或真实设备 dispatch。
+  - `TraceWorkflowContractTests` 14/0,七条 canonical AC PASS 行全部复现;Swift 全量
+    316 tests/1 个既有 opt-in skip/0 failures;`check-sdd` 0 errors/0 warnings/111
+    acceptance IDs。
+  - evidence class 保持 `contract`,全部 Trace 观察为 in-memory synthetic;真实
+    device/HDC/network/external-process dispatch = 0,不冒充 provenance 或真机证据。
+- Completion evidence:`evidence/runs/TASK-TR-002/run.md`(七条认领 AC 均 PASS;
+  catalog pins、scope、命令结果、偏差与 residual risk 可复查),并由
+  `evidence/summary.md` 限定 claim 边界。
 - Readiness review(2026-07-21;host-only,零设备命令):
   - Approve gate:satisfied(#253 squash `684c42c`);三任务 scope/design 约束/
     认领面随批准生效。
