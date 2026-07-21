@@ -1,0 +1,90 @@
+{
+  "argv": [
+    "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/toolchains/hdc",
+    "-t",
+    "<connectkey>",
+    "shell",
+    "ls",
+    "-l",
+    "/data/app/el2/100/base/com.example.waterflowdemo/haps/entry/files/arkui.dump"
+  ],
+  "boundary": "human-operated controlled capture; raw bytes and full manifest remain outside git; no Recipe success, compatibility, support, or canonical AC PASS is claimed",
+  "captureComplete": true,
+  "change": "CHG-2026-008-ui-dump-hidumper-wrapper",
+  "commandId": "SC-1",
+  "durationMs": 77,
+  "evidenceClass": "controlledHumanCapture",
+  "exitCode": 0,
+  "host": {
+    "arch": "arm64",
+    "os": "Darwin",
+    "osVersion": "26.5.2"
+  },
+  "inputs": {
+    "connectKey": {
+      "hpSequence": 4,
+      "source": "latestSameSessionHP",
+      "value": "<connectkey>"
+    }
+  },
+  "purpose": "exact-path sidecar identity check",
+  "schema": "arkdeck-ud-capture-redacted-1.1.0",
+  "selfCheck": {
+    "stderr": {
+      "completeStreamScanned": true,
+      "expectedLocalInputEchoFound": false,
+      "keyMaterialFound": false,
+      "localInputPathFound": false,
+      "passed": true,
+      "policyId": "strict-sensitive-output-v1",
+      "serialPresent": false,
+      "unexpectedLocalInputPathFound": false,
+      "unexpectedUserPathFound": false,
+      "userPathFound": false
+    },
+    "stdout": {
+      "completeStreamScanned": true,
+      "expectedLocalInputEchoFound": false,
+      "keyMaterialFound": false,
+      "localInputPathFound": false,
+      "passed": true,
+      "policyId": "strict-sensitive-output-v1",
+      "serialPresent": false,
+      "unexpectedLocalInputPathFound": false,
+      "unexpectedUserPathFound": false,
+      "userPathFound": false
+    }
+  },
+  "selfCheckPassed": true,
+  "sequence": 7,
+  "streams": {
+    "stderr": {
+      "bytes": 0,
+      "drainIncomplete": false,
+      "file": "07-SC-1.stderr",
+      "retainedBytes": 0,
+      "retainedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sha256Scope": "wholeStream",
+      "truncated": false
+    },
+    "stdout": {
+      "bytes": 108,
+      "drainIncomplete": false,
+      "file": "07-SC-1.stdout",
+      "retainedBytes": 108,
+      "retainedSha256": "7888abbd790ab35b4ac51da2465ca999447e8eaf312649d5b9d78778d5122eb3",
+      "sha256": "7888abbd790ab35b4ac51da2465ca999447e8eaf312649d5b9d78778d5122eb3",
+      "sha256Scope": "wholeStream",
+      "truncated": false
+    }
+  },
+  "task": "TASK-UD-CAPTURE-HARNESS-001",
+  "timedOut": false,
+  "timeoutSeconds": 120,
+  "toolchain": {
+    "hdcBytes": 6401152,
+    "hdcPath": "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/toolchains/hdc",
+    "hdcSha256": "48395ba8d87115dffca47df2a640a6c868bc9a2bd4eb49611e4138ff88d8d260"
+  }
+}

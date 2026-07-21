@@ -1,0 +1,174 @@
+{
+  "schemaVersion": "2.0.0",
+  "evidenceId": "EVD-UD-CAP-MUT-DAYU200-20260721-003",
+  "operator": "fuhanfeng",
+  "physicalTargetConfirmation": {
+    "confirmedDeviceIdentity": "DAYU200 (RK3568), serial 150100424a544434520325874bbf4900",
+    "confirmedAt": "2026-07-21T17:12:52+08:00"
+  },
+  "device": {
+    "model": "DAYU200 (RK3568)",
+    "serial": "150100424a544434520325874bbf4900",
+    "firmware": "OpenHarmony 7.0.0.34 (API 26.0.0, operator-confirmed after reflash)"
+  },
+  "toolchain": {
+    "hdcVersion": "Ver: 3.2.0d",
+    "hdcPath": "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/toolchains/hdc",
+    "other": {
+      "hdcSha256": "48395ba8d87115dffca47df2a640a6c868bc9a2bd4eb49611e4138ff88d8d260",
+      "hostOs": "macOS 26.5.2 (Darwin, arm64)",
+      "captureCheckoutObservedAtAssembly": "78c149ce68dbed82ae88a7992fe44be3266aff19",
+      "captureHarnessOriginalMerge": "7978fa761dcd8a38b7fea6ea040dac21147d1f2a",
+      "captureHarnessAlignmentMerge": "ba4b75b0c118a75af4415f9492f0c5e982ef138c",
+      "captureHarnessReadyRestoreMerge": "6b9dfe497fced8f8ce9fba171b04ce09dd8a187f",
+      "echoRemediationSource": "4049bb0de80160a696e6f8defabb3f70e4135d5a",
+      "echoRemediationMerge": "b38d028ff821900c7c191c2bccc5951c5c719e7b",
+      "echoRemediationDoneMerge": "3ac44f2d759bd8bec8f95405b85281d70f89cad0",
+      "capMutReadyRestoreMerge": "04e061e3328893b407d31ad83d19793973b02bd6",
+      "redactedManifestSchema": "arkdeck-ud-capture-redacted-1.1.0",
+      "harnessHashes": {
+        "scripts/ud_capture/README.md": "6e5db1827176a0c16b5a4b21431efa9e4d4dab041f03801a357f74b3db2f2601",
+        "scripts/ud_capture/capture.py": "b407aaa07260e3252428bdf00431f4d1e451c30f77c55f1f6b15a5d170d19492",
+        "scripts/ud_capture/test_capture.py": "b29c15b8fdca755f26fdfe4f5156082a8bb4a6fd80d8ceecec178419d4690070"
+      },
+      "fixture": {
+        "artifact": "entry-default-signed.hap",
+        "bytes": 1512003,
+        "sha256": "9453a396e81d55abfb05b4d7f9a512dea139e5843462051a6e1cc3586849fac8"
+      }
+    }
+  },
+  "transport": "usb",
+  "provider": "none",
+  "stepKinds": [
+    "toolchain-probe",
+    "target-inventory",
+    "fixture-install",
+    "fixture-start",
+    "window-inventory",
+    "sidecar-inventory",
+    "ui-dump-capture",
+    "remote-sidecar-capture",
+    "remote-sidecar-cleanup",
+    "fixture-stop",
+    "fixture-uninstall"
+  ],
+  "acceptanceIds": [
+    "INT-UD-CAPTURE-MUT-001"
+  ],
+  "executedAt": "2026-07-21T17:09:21+08:00",
+  "artifacts": [
+    {
+      "path": "openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/evidence/runs/TASK-UD-CAP-MUT-001/attempt-3-complete-20260721/capture-hashes.md",
+      "sha256": "2d5561b9ca720c82d6c437709e9c3b080a0bc52f3147b09ead458f49b4ed261b",
+      "note": "whole-stream/whole-file hash ledger for 50 streams plus the R2 sidecar; raw bytes remain outside git"
+    },
+    {
+      "path": "openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/evidence/runs/TASK-UD-CAP-MUT-001/attempt-3-complete-20260721/redacted-manifests/00-HP-0.redacted-manifest.json",
+      "sha256": "2fe045a2c3e2c1114aebc08672b968467570968d00c5429d9b130a8f1a51cab3"
+    },
+    {
+      "path": "openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/evidence/runs/TASK-UD-CAP-MUT-001/attempt-3-complete-20260721/redacted-manifests/01-HP-1.redacted-manifest.json",
+      "sha256": "5001056e981d4dba4997ebbd163ea3f2b8a5acbfd4a22e1a8bc803ee17e40f97"
+    },
+    {
+      "path": "openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/evidence/runs/TASK-UD-CAP-MUT-001/attempt-3-complete-20260721/redacted-manifests/02-FX-1.redacted-manifest.json",
+      "sha256": "45b917e30a41e2edbb24484e5324b2902864f470341679807a0a8def851fc830"
+    },
+    {
+      "path": "openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/evidence/runs/TASK-UD-CAP-MUT-001/attempt-3-complete-20260721/redacted-manifests/03-FX-2.redacted-manifest.json",
+      "sha256": "10a9d3e76e6e707b4b0ceef2a58979b4b707cb0c879983690b43607345cdead3"
+    },
+    {
+      "path": "openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/evidence/runs/TASK-UD-CAP-MUT-001/attempt-3-complete-20260721/redacted-manifests/04-HP-2.redacted-manifest.json",
+      "sha256": "a64b3a7c0ee0607026805bd46544de367acbceca72c22fa0e8c1876387888734"
+    },
+    {
+      "path": "openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/evidence/runs/TASK-UD-CAP-MUT-001/attempt-3-complete-20260721/redacted-manifests/05-SC-1.redacted-manifest.json",
+      "sha256": "e0c1c4211f73d86f3b0928a1d91d2605e26dd59bc4703be3bdc52b27d281b532"
+    },
+    {
+      "path": "openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/evidence/runs/TASK-UD-CAP-MUT-001/attempt-3-complete-20260721/redacted-manifests/06-INV-1.redacted-manifest.json",
+      "sha256": "e4f73304aa1fcf46937a4dba28455ead8a107dc47bfb506fe47f3aa75443c5b9"
+    },
+    {
+      "path": "openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/evidence/runs/TASK-UD-CAP-MUT-001/attempt-3-complete-20260721/redacted-manifests/07-SC-1.redacted-manifest.json",
+      "sha256": "c7d211e07468d54c38116f24ecc919e193c553751b38452b264f070f49d4054a"
+    },
+    {
+      "path": "openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/evidence/runs/TASK-UD-CAP-MUT-001/attempt-3-complete-20260721/redacted-manifests/08-HP-2.redacted-manifest.json",
+      "sha256": "cb336f3ae9633b28bcdbcb0e377704646f77f73845b028d5ea5a1c84df7b2320"
+    },
+    {
+      "path": "openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/evidence/runs/TASK-UD-CAP-MUT-001/attempt-3-complete-20260721/redacted-manifests/09-SC-1.redacted-manifest.json",
+      "sha256": "c47813b017e98331781c509b289b9cfc9932621a93d9b18339231cae5259e1b4"
+    },
+    {
+      "path": "openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/evidence/runs/TASK-UD-CAP-MUT-001/attempt-3-complete-20260721/redacted-manifests/10-R1.redacted-manifest.json",
+      "sha256": "7e19275c2ba73c2e14520b74674185bdc0ae1f6e80895ff608078bb2e184e7c8"
+    },
+    {
+      "path": "openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/evidence/runs/TASK-UD-CAP-MUT-001/attempt-3-complete-20260721/redacted-manifests/11-SC-1.redacted-manifest.json",
+      "sha256": "eeeac46816243ea2d265a83d16c44f2f580737fd7b7c081acc13c6729b7ae822"
+    },
+    {
+      "path": "openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/evidence/runs/TASK-UD-CAP-MUT-001/attempt-3-complete-20260721/redacted-manifests/12-HP-2.redacted-manifest.json",
+      "sha256": "83aa137b83148772f18ce57128cd189d23ea718538f048f63530755266aba597"
+    },
+    {
+      "path": "openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/evidence/runs/TASK-UD-CAP-MUT-001/attempt-3-complete-20260721/redacted-manifests/13-SC-1.redacted-manifest.json",
+      "sha256": "d1757a9f03c5098e81c8fd43716c89393b28a9b3211a249c562bf6ee9d12741a"
+    },
+    {
+      "path": "openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/evidence/runs/TASK-UD-CAP-MUT-001/attempt-3-complete-20260721/redacted-manifests/14-R2.redacted-manifest.json",
+      "sha256": "9eacb44e5402cf90593ffe426e6ce6d6e59329ed7e37f7ba0530e6842f07c0b5"
+    },
+    {
+      "path": "openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/evidence/runs/TASK-UD-CAP-MUT-001/attempt-3-complete-20260721/redacted-manifests/15-SC-1.redacted-manifest.json",
+      "sha256": "be7a49859d7219de442791557b8cacde6f2b307bebd5f1acea2fa4295abec8f7"
+    },
+    {
+      "path": "openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/evidence/runs/TASK-UD-CAP-MUT-001/attempt-3-complete-20260721/redacted-manifests/16-SC-2.redacted-manifest.json",
+      "sha256": "ef2958bd8a610121569eab23e0740444939cd3aa5b484bf7624a4afdd9c1fcd5",
+      "note": "repo-safe manifest for the owned R2 sidecar receive; sidecar raw bytes remain outside git"
+    },
+    {
+      "path": "openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/evidence/runs/TASK-UD-CAP-MUT-001/attempt-3-complete-20260721/redacted-manifests/17-SC-3.redacted-manifest.json",
+      "sha256": "0787c05aaa37eb3459210cab37f8d6867b1e540f5c6eac7a5e9447cd5421bb6a"
+    },
+    {
+      "path": "openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/evidence/runs/TASK-UD-CAP-MUT-001/attempt-3-complete-20260721/redacted-manifests/18-SC-1.redacted-manifest.json",
+      "sha256": "1ca10eaeac1f16a167af1bbeb2fe838d3ef3a4bf71851b5e03b4f7b25c718d20"
+    },
+    {
+      "path": "openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/evidence/runs/TASK-UD-CAP-MUT-001/attempt-3-complete-20260721/redacted-manifests/19-HP-2.redacted-manifest.json",
+      "sha256": "9e0e9a76b0ff64de7d465e99cf6ba7520d71a6a84d46c3752916e3391d1c07dd"
+    },
+    {
+      "path": "openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/evidence/runs/TASK-UD-CAP-MUT-001/attempt-3-complete-20260721/redacted-manifests/20-SC-1.redacted-manifest.json",
+      "sha256": "2364c0647ec4bd10e2ee05b6fa4628e318e031725553403467a1931ed0d75bdc"
+    },
+    {
+      "path": "openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/evidence/runs/TASK-UD-CAP-MUT-001/attempt-3-complete-20260721/redacted-manifests/21-R3.redacted-manifest.json",
+      "sha256": "76d052fa3b866627a0925d0819beb28a30f94d79a88caecb849ba0128d0aa96a"
+    },
+    {
+      "path": "openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/evidence/runs/TASK-UD-CAP-MUT-001/attempt-3-complete-20260721/redacted-manifests/22-SC-1.redacted-manifest.json",
+      "sha256": "f75ae7a17e20fc1dd71b80f7311b76cbb359b058ba8a9c2a6ef8021b01c558f3"
+    },
+    {
+      "path": "openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/evidence/runs/TASK-UD-CAP-MUT-001/attempt-3-complete-20260721/redacted-manifests/23-FX-3.redacted-manifest.json",
+      "sha256": "76aeeb068787909820ad1d31595ff1b57dc450d1c938f0b85023af48f8f1211e"
+    },
+    {
+      "path": "openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/evidence/runs/TASK-UD-CAP-MUT-001/attempt-3-complete-20260721/redacted-manifests/24-FX-4.redacted-manifest.json",
+      "sha256": "1810d7c9885be5ab22109b30de1f120824cf8fb99e52bd851b97181607f3e474"
+    }
+  ],
+  "deviations": [
+    "A preceding fresh session (attempt 2) was abandoned after sequence 10 when the human operator reflashed the device outside this runbook between 2026-07-21T16:37:15+08:00 and 2026-07-21T17:09:21+08:00. That destructive action invalidated target/window/fixture state; no attempt-2 artifact or key was reused, and attempt 3 restarted at HP-0.",
+    "The exact reflash command, image digest, and wall-clock instant were not captured by this harness. The operator identified the target as the same physical DAYU200 and confirmed the approved OpenHarmony 7.0.0.34 / API 26.0.0 tuple before attempt-3 HP-1; the recorded confirmedAt uses the immediately following HP-1 redacted-manifest file time as the written confirmation boundary.",
+    "During human-agent coordination, the operator pasted a transient window identifier and limited controlled stdout excerpts into the task conversation despite the instruction to keep them local. No connect key, device serial, local user path, full manifest, or sidecar bytes were pasted; those values are not reproduced in repository evidence, and all repository-facing harness self-checks passed."
+  ],
+  "notes": "Controlled Phase A capture completed on one hardware/firmware/toolchain tuple. INT-UD-CAPTURE-MUT-001 records the capture protocol PASS only: R1, R2, and R3 output families remain unknownOutput pending a separate decision revision. This record claims no Recipe success, canonical AC-DUMP PASS, compatibility, support, conformance, or release status. Human installed-HDC dispatches: 25; Agent installed-HDC/device/destructive dispatches: 0."
+}
