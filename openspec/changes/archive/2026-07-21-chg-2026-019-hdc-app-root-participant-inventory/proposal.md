@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-019-hdc-app-root-participant-inventory
 revision: 1
-status: verified # 2026-07-21 本 verification-closure PR(先例 #175/#176/#201);approve 载体 #200 `94fe6f8`;archive 另行(M1-006 closeout 引用其 evidence,归档前须引用面收口)
+status: archived # 2026-07-21 archive PR(先例 #178/#235/#241/#242;归档前扫描:目录外零精确路径引用——原暂缓理由"M1-006 closeout 引用其 evidence"经全仓扫描证实均为名称/PR 引用非路径引用,已解除);verified 于本日 verification-closure PR。原注: 2026-07-21 本 verification-closure PR(先例 #175/#176/#201);approve 载体 #200 `94fe6f8`;archive 另行(M1-006 closeout 引用其 evidence,归档前须引用面收口)
 class: implementation-only
 core_change_level: none
 owner: lvye
