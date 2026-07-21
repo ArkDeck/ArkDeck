@@ -1,8 +1,7 @@
 # CHG-2026-021 Tasks
 
-> 分期实现;三任务各自独立 readiness/实现/done PR。本 change 首 PR 只 proposal +
-> design,零实现、零真机、零 evidence。真机采集由人类维护者亲手执行,Agent 零设备
-> 命令。
+> r1 三任务分期实现；r2 新增 TASK-TR-002R remediation。每个任务各自独立
+> readiness/实现/done PR。真机采集由人类维护者亲手执行,Agent 零设备命令。
 
 ## TASK-TR-001 — trace 工具 provenance 登记(integration 面,device-gated)
 
@@ -112,12 +111,14 @@
 
 ## TASK-TR-003 — adapter golden 面(hitrace/bytrace 识别与 ftrace 过滤)
 
-- Status:blocked(三前置:① approve;② TASK-TR-001 done(golden fixture/registry
-  在案);③ 独立 readiness PR——须钉 TR-001 登记的 registry/fixture hash)
+- Status:blocked(四前置:① approve;② TASK-TR-001 done(golden fixture/registry
+  在案);③ TASK-TR-002R done;④ 独立 readiness PR——须钉 TR-001 登记的
+  registry/fixture hash)
 - Objective:实现 adapter 选择(help family 识别,未知 fail-closed)与 ftrace
   header 保留过滤,against TR-001 golden fixture;parserGolden 测试全绿。
 - Requirements/AC:认领 `AC-TRACE-001-01`/`AC-TRACE-007-01`(parserGolden)。
-- Depends on:approve、TASK-TR-001 done、TASK-TR-002 done(workflow 骨架)。
+- Depends on:approve、TASK-TR-001 done、TASK-TR-002 done(workflow 骨架)、
+  TASK-TR-002R done(host-contract remediation)。
 - In scope:adapter family 解析器 + golden 测试 + evidence run。
 - Out of scope:未登记 family 的任何支持声明;新固件族。
 - Allowed paths(approve/readiness 后细化):`Packages/ArkDeckKit/Sources/**`、
@@ -125,3 +126,61 @@
 - Risk:low(host-only,golden 驱动)。
 - Hardware required:no(fixture 已由 TR-001 登记)。
 - Verification:2 AC parserGolden 测试 PASS、fixture hash 与 registry closure 一致。
+
+## TASK-TR-002R — remediate trace host-contract fail-closed gates
+
+- Status:blocked(r2 amendment 尚未经维护者 review/merge，且独立 readiness 未完成)
+- Platform:macos
+- Objective:修复 TASK-TR-002 post-merge review 的四个缺口：reboot durable binding
+  continuity、SessionArtifactStore atomic-publication → remote-cleanup authority、typed
+  per-device parameter capability、capability-gated reliable progress total。
+- Requirements/AC:重新验证 `AC-TRACE-003-01`/`004-01`/`005-01`/`006-01`/
+  `008-01`；change-local `TRACE-REBIND-GATE-001`、`TRACE-ATOMIC-PUBLISH-001`、
+  `TRACE-PARAM-CAPABILITY-001`、`TRACE-PROGRESS-CAPABILITY-001`。
+- Depends on:r2 amendment approval、TASK-TR-002 done(已满足)、独立 readiness PR。
+- Allowed paths after readiness:
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/TraceCatalogContracts.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/TraceParameterContracts.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/TraceWorkflowContracts.swift`
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/TraceWorkflowContractTests.swift`
+  - `openspec/changes/chg-2026-021-trace-adapter-capture/evidence/**`
+  - 本 change `tasks.md`（仅本任务状态/evidence 引用）
+- Forbidden paths:
+  - `Packages/ArkDeckKit/Sources/ArkDeckCore/**`
+  - `Packages/ArkDeckKit/Sources/ArkDeckStorage/**`
+  - `openspec/specs/**`、`openspec/contracts/**`、`openspec/baselines/**`
+  - `openspec/contracts/catalogs/**`、`openspec/integrations/**`
+  - `ArkDeckApp/**`、`ArkDeckAppUITests/**`、`ArkDeck.xcodeproj/**`
+  - TASK-TR-001/002/003 的既有 evidence
+- Risk:high(host-only，但控制 device mutation、远端清理与身份绑定授权边界)。
+- Hardware required:no；只允许 deterministic contract/fault-injection，真实 device/HDC/
+  network/external-process dispatch 恒为 0。
+
+### Deliverables
+
+- reboot gate 验证 expected target/candidate 与 exact +1 durable revision，并将新 binding
+  reference 保留到 capture authorization/device steps；
+- receive flow 使用 `artifacts/partial/*.part`，由真实 `SessionArtifactStore.publish`
+  返回值生成 cleanup authority；发布成功前不存在 cleanup step；
+- 参数 mutation authorization 要求与当前 durable binding 匹配的 typed per-device probe
+  capability，persistent mode 另要求 persistent write supported + 显式确认；
+- reliable total 只能由 adapter capability-gated factory/receipt 生成；capability=false
+  即使提供 total 仍 indeterminate；
+- 四项 change-local tests 与五条受影响 canonical AC 的回归证据。
+
+### Verification
+
+- 定向运行 `TraceWorkflowContractTests`，覆盖 verification.md r2 matrix 的全部 positive/
+  negative/fault-injection branch；
+- `swift build --package-path Packages/ArkDeckKit --build-tests`；
+  `swift test --package-path Packages/ArkDeckKit --filter TraceWorkflowContractTests`；
+  `swift test --package-path Packages/ArkDeckKit`；`scripts/check-sdd.sh`；
+  `git diff --check`；allowed/forbidden-path 与 secret/privacy scan；
+- 在 `evidence/runs/TASK-TR-002R/run.md` 记录 pinned base/blob、完整命令与结果、九项
+  AC/evidence ID 二值结论、dispatch counters、偏差与 residual risk。
+
+### PR boundary
+
+r2 amendment、readiness、implementation+evidence、`ready→done` 与 change `verified`
+分别使用独立 PR。implementation PR 不改 accepted specs/Core/storage/catalog，也不改
+TASK-TR-002 历史记录。

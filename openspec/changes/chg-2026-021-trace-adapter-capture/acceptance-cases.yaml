@@ -1,10 +1,11 @@
 ---
 schema_version: 1.0.0
 change_id: CHG-2026-021-trace-adapter-capture
-change_revision: 1
+change_revision: 2
 platform: macos
 evidence_classes:
 - documentReview
+- contract
 cases:
 - acceptance_id: TRACE-PROV-001
   test_id: TEST-TRACE-PROV-001
@@ -22,3 +23,42 @@ cases:
     personally by the human maintainer with per-command argv, output and
     judgement on record, and an aborted window is recorded honestly as a
     blocked-attempt.
+- acceptance_id: TRACE-REBIND-GATE-001
+  test_id: TEST-TRACE-REBIND-GATE-001
+  method: Adversarial host contract matrix over expected rebind context and durable binding receipts.
+  expected_source: openspec/changes/chg-2026-021-trace-adapter-capture/verification.md#TRACE-REBIND-GATE-001
+  minimum_evidence: contract
+  expected_result: >-
+    Wrong target, stale or skipped revision, another candidate, and any binding
+    identity drift cannot authorize capture; only the exact selected candidate
+    persisted at prior revision plus one authorizes, and the new binding
+    reference is retained by capture authorization and device steps.
+- acceptance_id: TRACE-ATOMIC-PUBLISH-001
+  test_id: TEST-TRACE-ATOMIC-PUBLISH-001
+  method: SessionArtifactStore publication contract with failures injected at every publication barrier.
+  expected_source: openspec/changes/chg-2026-021-trace-adapter-capture/verification.md#TRACE-ATOMIC-PUBLISH-001
+  minimum_evidence: contract
+  expected_result: >-
+    Receive writes only an artifacts/partial/*.part state; no remote cleanup
+    step or dispatch authority exists until SessionArtifactStore returns a
+    matching PublishedArtifact, and every publication failure retains the owned
+    remote file with cleanup dispatch count zero.
+- acceptance_id: TRACE-PARAM-CAPABILITY-001
+  test_id: TEST-TRACE-PARAM-CAPABILITY-001
+  method: Per-device parameter capability authorization matrix bound to durable device revisions.
+  expected_source: openspec/changes/chg-2026-021-trace-adapter-capture/verification.md#TRACE-PARAM-CAPABILITY-001
+  minimum_evidence: contract
+  expected_result: >-
+    Catalog membership alone never authorizes a mutation; absent, unsupported,
+    permission-denied, developer-mode-required, unknown, stale-binding, or
+    wrong-parameter receipts block before mutation dispatch, while persistent
+    mutation additionally requires explicit persistent support and confirmation.
+- acceptance_id: TRACE-PROGRESS-CAPABILITY-001
+  test_id: TEST-TRACE-PROGRESS-CAPABILITY-001
+  method: Progress total construction and adapter-capability drift contract.
+  expected_source: openspec/changes/chg-2026-021-trace-adapter-capture/verification.md#TRACE-PROGRESS-CAPABILITY-001
+  minimum_evidence: contract
+  expected_result: >-
+    Caller-provided byte totals cannot mint reliable-total authority; false or
+    drifted adapter capability remains indeterminate with elapsed time, and only
+    a matching true-capability factory receipt permits percentage and ETA.

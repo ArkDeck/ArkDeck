@@ -1,6 +1,6 @@
 # CHG-2026-021 Design:hitrace/bytrace adapter 采集 MVP
 
-> Status:candidate(随 proposal r1;approve 前不构成实现授权)
+> Status:r1 approved;r2 remediation candidate(维护者 review/merge 前不构成新增实现授权)
 > Core baseline:CORE-2.1.0(零 Core 变更;认领 trace REQ-TRACE-* 的 macOS 面)
 
 ## 0. 采集命令面草案(候选;exact argv 由 TR-001 真机 provenance 固定)
@@ -59,3 +59,54 @@ closure + redacted manifests(序列号/用户路径不入仓)+ OPENHARMONY-TOOLS
 - hardware-matrix:本 change 不新增行(9 AC 无 realHardware 面);未来真机 trace
   capability 行须独立 evidence(REQ-TRACE 无此要求,不预设)。
 - Windows/Linux:not started 保持;平台不得改变 typed step/effect 语义(AGENTS 边界)。
+
+## 6. r2 host-contract remediation design
+
+### 6.1 Reboot binding continuity
+
+Reboot 前创建不可公开伪造的 expected-rebind context，至少固定原
+`DeviceBindingReference`、target ID 和选中的 `DeviceRebindCandidate`。capture gate
+只接受满足以下全部条件的 `DurableCurrentDeviceBinding`：reference target 与预期相同、
+revision 等于原 revision + 1、binding 的 transport/connect key/identity snapshot 与选中
+candidate 精确相同。错误 target、旧/跳号 revision、其他 candidate 或任一 identity
+drift 均以 dispatch=0 fail closed。成功时新的 reference 写入
+`TraceCaptureAuthorization`，workflow materialization 必须把它作为 device effect 的
+intended binding；不得只保留 `rebootRequired:Bool`。
+
+### 6.2 Receive publication as the cleanup authority
+
+接收目的地遵循既有 `SessionLayout.partialDirectory` / `artifacts/partial/*.part` 契约。
+pre-publication plan 只包含 capture、receive、validate/hash 和可选 postprocess；remote
+cleanup 不是静态预授权步骤。workflow publication coordinator 必须调用既有
+`SessionArtifactStore.publish(from:request:claim:)`，并从返回的 `PublishedArtifact`
+提取与当前 Job/artifact/request 一致的 typed cleanup authority。只有该 authority 才能
+materialize `cleanupOwnedRemotePath`。内存 tracker 状态、caller assertion、预计算 hash、
+文件存在或 process exit 0 均不能替代 store receipt。publish 抛错、fault injection、
+receipt/path/artifact mismatch 时 cleanup dispatch 恒为 0，owned remote file 保留。
+
+### 6.3 Per-device parameter capability
+
+catalog entry 只允许参数进入 probe 候选集。新增 typed per-device parameter capability
+receipt，固定 durable binding reference、参数名以及 probe disposition；至少区分
+supported、unsupported、permissionDenied、needsDeveloperMode 和 unknown。临时与持久
+mutation 均要求 matching supported receipt；persistent change 还要求该 receipt 显式
+声明 persistent write supported，并继续要求现有 confirmation。receipt 缺失、绑定过期、
+参数不匹配或 disposition 非 supported 时 mutation authorization 不可生成，不能等到
+set/readback 失败后才发现不支持。authorization 保留 capability/binding reference，供
+dispatch 前再次核对。
+
+### 6.4 Capability-gated reliable total
+
+移除 caller 直接构造 reliable-total authority 的路径。factory 同时消费当前
+`TraceAdapterCapabilities` 与正数 total；仅当 `reliableByteTotalAvailable == true` 时
+产生不可公开构造的 reliable-total receipt。progress report 接受 receipt 而非裸
+`.reliable(totalBytes)`；capability=false、receipt 缺失/不匹配或 total 非法均输出
+indeterminate + elapsed。capability=true 的 matching receipt 才允许百分比/ETA。
+
+### 6.5 Compatibility and task boundary
+
+上述收紧可能改变尚未发布的 Swift host-contract 调用点，但不改变 Core 或 storage
+schema。迁移限定在三份 `Trace*Contracts.swift` 与对应 contract tests；
+`ArkDeckCore`、`ArkDeckStorage` 实现、catalog YAML、accepted specs/contracts 均 forbidden。
+若现有 `SessionArtifactStore` 或 binding types 不足以闭环，TASK-TR-002R 必须保持
+blocked 并先经 scope amendment，不能在任务中扩写 Core/storage contract。
