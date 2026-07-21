@@ -1,9 +1,11 @@
 # CHG-2026-008 HiDumper Recipe capture runbook
 
-> Status:Phase A (`TASK-UD-CAP-MUT-001`) becomes executable only after
-> `TASK-UD-CAPTURE-HARNESS-001` is done, its ready-restore status PR is merged (r6), and the
-> maintainer confirms the device window; Phase B and all other tasks remain blocked. The r4
-> readiness pins (fixture/INV-1/sidecar/operator/window) stay approved and unchanged.
+> Status:Phase A (`TASK-UD-CAP-MUT-001`) is blocked after the #219 run stopped at `FX-1` with
+> exact local-HAP-path echo in stdout; R1-R3 dispatch was `0`. r9 only defines the host-only
+> `TASK-UD-HARNESS-ECHO-001` remediation boundary. No new Phase A session is executable until its
+> implementation and independent done status are merged, a separate CAP-MUT ready-restore PR is
+> merged, and the maintainer confirms a new device window. The r4 readiness pins
+> (fixture/INV-1/sidecar/operator/window) stay approved and unchanged; Phase B remains blocked.
 >
 > Real-device operator:human maintainer only. An Agent SHALL NOT execute installed `hdc`, create a
 > real device session or run any device step.
@@ -49,7 +51,7 @@ classification is never lowered after execution.
 - Raw output root:a new operator-controlled `0o700` directory outside every git repository. Raw
   files are `0o600` and never enter ArkDeck git history.
 
-## Capture instrument (r6)
+## Capture instrument (r6; r9 remediation gate)
 
 Every device command in this runbook (`HP-*`, `INV-1`, `R1-R4`, `SC-*`, `FX-*`) is executed only
 through the pinned harness `scripts/ud_capture/capture.py` (delivered by
@@ -65,12 +67,28 @@ established with `m0b_capture/capture.py`). The harness owns:
 - per-stream byte-exact capture (exclusive-create, `0o600`), per-stream SHA-256, a retained-byte
   cap of 4 MiB per stream with an explicit `truncated` flag, and a per-command timeout channel
   (default 120 s, recorded, never disabled);
-- connect-key/home-path masking, one redacted manifest per command (schema
+- connect-key/home-path masking, one redacted manifest per command (r6 schema
   `arkdeck-ud-capture-redacted-1.0.0`, deterministic serialization), a fail-closed output-side
   sensitive scan, and `NN-<id>.<stream>` controlled-file naming with a `capture-hashes` summary.
 
 If the harness refuses a command or its sensitive scan fails, the run stops; hand-composing the
 command is never the fallback.
+
+#219 is immutable failure evidence for schema `1.0.0`:its controlled raw/full manifest is not an
+input to remediation and is never copied, opened, reclassified or resumed. After r9 is merged,
+`TASK-UD-HARNESS-ECHO-001` may implement future full/redacted schema `1.1.0` using synthetic bytes
+only. The sole narrow allowance is a byte-exact validated `LOCAL_HAP_PATH` span in complete,
+untruncated, non-drain-incomplete `FX-1` stdout; every generic user-path match must be wholly
+contained by an exact allowed span. Deterministic manifest policy facts record at least a policy
+id, `expectedLocalInputEchoFound` and `unexpectedUserPathFound`, never the original path in
+repo-facing output. A second/variant path, dirname/prefix/sibling/case/Unicode/realpath/symlink
+alias, stderr or other-command echo, key material, truncation/drain incompleteness, or a
+repo-facing literal still fails closed. `_assert_redacted_clean` is not weakened.
+
+That `1.1.0` policy is non-executable for real hardware until the remediation implementation,
+its independent done status, and the separate CAP-MUT ready-restore status are all merged. The
+next human run then starts in a fresh controlled directory at `HP-0`; it cannot reuse any #219
+session state or artifact.
 
 ## Human preflight (per session and per Recipe batch)
 
@@ -145,8 +163,8 @@ failed R2 output keeps R4 blocked. CLI/env/file/manual component input is forbid
 
 - Artifact:`entry-default-signed.hap`, SHA-256
   `9453a396e81d55abfb05b4d7f9a512dea139e5843462051a6e1cc3586849fac8` (maintainer-built DevEco
-  sample; the local path stays out of the repository and is recorded in `run.md` with a fresh hash
-  recomputation before install).
+  sample; the local path stays out of the repository,while repo-facing `run.md` records only the
+  `<local-hap-path>` placeholder and a fresh hash recomputation before install).
 - bundleName `com.example.waterflowdemo`; mainElement/ability `EntryAbility`; versionCode
   `1000000`; compileSdkVersion `26.0.0.25`; debug-signed (read from the artifact's `module.json`).
 - Static screen content:WaterFlow layout sample with synthetic list data; no user or sensitive
@@ -232,6 +250,9 @@ SHA-256. A failed attempt is never retried with another boundary.
   multi-target), all device commands halt including teardown, and the state is recorded
   `needsAttention`; for other stops, `FX-3`/`FX-4` teardown may still run and is recorded as
   cleanup (r6 abort rule).
+- Only after all r9 remediation/restore gates are merged,an exact validated HAP-path echo in
+  complete `FX-1` stdout is an expected schema-`1.1.0` policy fact rather than a stop condition.
+  This exception does not cover any other path, stream, command or sensitive-scan result.
 
 ## Required real-hardware evidence
 
@@ -240,9 +261,10 @@ Each human capture task must contain in its evidence directory:
 - `run.md` — commands, observed outputs (redacted), decisions, deviations, dispatch counts, the
   harness OID/hash identity, fixture hash recomputation, `WINDOW_ID` provenance, per-command
   `SC-1` classification table and `SC-2`/`SC-3` records;
-- `redacted-manifests/` — one harness-generated manifest per command (schema
-  `arkdeck-ud-capture-redacted-1.0.0`; connect-key placeholder, no user paths; plural directory,
-  M0B precedent);
+- `redacted-manifests/` — one harness-generated manifest per command (the next fresh run requires
+  `arkdeck-ud-capture-redacted-1.1.0`; connect-key/local-path placeholders, no user-path literal,
+  deterministic r9 policy facts; plural directory, M0B precedent). Existing #219 `1.0.0`
+  manifests remain immutable historical failure evidence and cannot satisfy this gate;
 - `capture-hashes.md` — whole-stream SHA-256 per raw stream (`NN-<id>.<stream>` naming);
 - `hardware-evidence.json` conforming to `openspec/contracts/hardware-evidence.schema.json`
   version `2.0.0` (provider `none`), stating claimed operator, physical target/serial, firmware,
@@ -276,10 +298,14 @@ the controlled directory. Repository golden fixtures are later produced as `deri
 `TASK-UD-001` never reads raw and never modifies the redaction toolchain. Raw/derived byte equality
 is neither expected nor claimed.
 
-## Prohibited actions at r3
+## Prohibited actions at r9
 
 - any implementation, installed-HDC invocation, device discovery or device command under these
   blocked tasks;
+- continuing or replaying the #219 session,reading/copying its controlled raw/full manifest,
+  reclassifying it as PASS, or treating its schema-`1.0.0` evidence as a future fresh run;
+- bypassing the echo blocker by moving the HAP,shell wrapping,stdout filtering/discarding,or by
+  generalizing a user/local-path allowance beyond the exact r9 `FX-1` stdout policy;
 - explicit server lifecycle/subserver commands, or using drift/ambiguity as a reason to improvise;
 - HDC default-target form, connect key from anywhere but the same-session `list targets -v` output,
   or committing connect-key/serial bytes;
