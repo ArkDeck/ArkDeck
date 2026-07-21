@@ -1,6 +1,6 @@
 # M1 Verification Plan
 
-> Status：planned  
+> Status：passed;maintainer confirmation 见 proposal.md Verification closure(2026-07-21)
 > Change：CHG-2026-002-macos-m1-infrastructure@r7
 > Core baseline：CORE-2.0.0
 > Core conformance：CORE-CONFORMANCE-2.0.0

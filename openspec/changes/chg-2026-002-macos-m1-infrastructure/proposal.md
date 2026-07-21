@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-002-macos-m1-infrastructure
 revision: 7
-status: approved # r1-r6 已批准；r7 M1-008 headless task-definition amendment 仅在对应 PR 合入后生效
+status: verified # 2026-07-21 本 verification-closure PR(先例 #175/#176/#201);r1-r7 批准链在案;archive 另行独立 PR(evidence 引用面收口后)
 class: platform
 core_change_level: none
 owner: lvye
@@ -127,3 +127,35 @@ M0A 只交付可行性原型与分发决策。所有分阶段功能（UI Dump、
   objective/scope/path/verification/evidence contract，并因 TASK-M1-007 尚未 done 将旧
   `ready` 改为 `blocked`。本 governance PR 不修改 Swift、不执行 TASK-M1-008、不产生或
   重判 evidence；r7 仅在维护者 review/merge 后生效，后续仍须在依赖满足后独立 readiness。
+
+## Verification closure(2026-07-21)
+
+依 verification.md Gate 逐项复核(V2:整体结论由维护者 review/merge 本 PR 确认):
+
+- **任务面**:全部 11 个任务(M1-001/001R/002/003/004/005/006/007/008/009/010)均
+  `done`,各有 merged 实现 PR、独立 done 状态 PR 与 `evidence/runs/TASK-*/run.md`;
+  最后一项 TASK-M1-006 经 closeout resolution(#207,三缺口由 CHG-2026-019 PI-001 done
+  与 ratified CORE-2.1.0 逐项解除)关闭。
+- **Core AC 算术**(经 #204 同步按 ratified `CORE-CONFORMANCE-2.1.0` 解读):62 = 60 条
+  无条件 AC 全部有可复查 run evidence + `AC-HDC-006-01`/`AC-HDC-009-01` 两条
+  integration-conditional(pinned registry unsupported 期间 `notApplicable`,其合规
+  unsupported/零 dispatch 面已在 M1-006 evidence 内;registry 翻 supported 即
+  needsReverification)。
+- **Platform matrix**:六行全部 `passed`(PORTS/JOURNAL/STORE/HDC/SIM/DIAG),见上表
+  行内 evidence 注记。
+- **证据分类**:fake/simulated/instrumented evidence 全程按类登记(M1-008 persistent
+  simulated 分类、M1-006/PI-001 fake-child + signed Sandbox platform 类),未有任何一项
+  被记为真机;hardware matrix 无新增真机行。
+- **HDC semantic 可追溯**:全部被接受的 semantic output 绑定 CHG-2026-005 Golden
+  1.0.0 与 CHG-2026-015 readonly-probes registry 的 hash-pinned 形态(M1-006 semantic
+  profile 五元组绑定,fake 正向仅 testOnlyFake)。
+- **Signed Sandbox closure**:含用户可见结果的 HDC Scenario 均有 signed Sandbox
+  XCUITest evidence(M1-006 addendum 21 的 9/9 + PI-001 run 的 9/9,均 ad-hoc 签名
+  如实记录)。
+- **无 Core/AC/contract 变更混入实现**:执行期的两次 Core 变更各走独立 change 并
+  ratify(CHG-2026-004→CORE-2.0.0、CHG-2026-018→CORE-2.1.0),实现 PR 零 spec/契约
+  改写(各 task 的 forbidden-paths 审计在案)。
+- **边界**:本 `verified` 不构成 platform conformance(macOS `conformance_status` 保持
+  `notStarted`)、真实硬件、Developer ID/公证、support 或 release claim,不改变
+  ADR-0001;`MAC-M0A-HDC-001` blocked 行不受影响。archive 另行独立 PR——本 change 的
+  evidence 被多个 active ledger 精确路径引用,归档前须按 CHG-009 先例做引用面收口。
