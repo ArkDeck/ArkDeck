@@ -116,9 +116,23 @@ done、独立 ready-restore PR 合入且具名设备窗口内才可执行。
 
 ## TASK-UD-HARNESS-ECHO-001 — FX-1 exact typed-path echo remediation
 
-- Status:ready(r9 candidate;仅在维护者 review/merge 本治理/readiness PR 后生效。该
-  merge 只授权 host-only implementation,不恢复 `TASK-UD-CAP-MUT-001 ready`,不授权
-  installed HDC/device/fixture/Recipe dispatch,也不追溯重判 #219 evidence)
+- Status:done(TASK-UD-HARNESS-ECHO-001 implementation + evidence PR #228 已由维护者
+  review/merge 合入 `main` `b38d028ff821900c7c191c2bccc5951c5c719e7b`;本独立状态
+  PR 依据下列 completion evidence 起草 `ready→done`,仅在维护者 review/merge 后生效。
+  本状态只关闭 host-only `INT-UD-HARNESS-ECHO-001`,不恢复
+  `TASK-UD-CAP-MUT-001 ready`,不授权 installed HDC/device/fixture/Recipe dispatch,
+  不重判 #219,也不构成 canonical AC、hardware、compatibility/support/release claim)
+- Completion evidence:
+  `evidence/runs/TASK-UD-HARNESS-ECHO-001/run.md`(implementation source
+  `4049bb0de80160a696e6f8defabb3f70e4135d5a`;merged squash
+  `b38d028ff821900c7c191c2bccc5951c5c719e7b`;README/capture.py/test_capture.py
+  SHA-256 分别为 `6e5db182…`、`b407aaa0…`、`b29c15b8…`;schema `1.1.0`、exact
+  FX-1 stdout span policy 与 synthetic adversarial matrix `63/0` PASS,其中原 52 tests
+  全部保留;check-sdd `0/0/111`;AST no-shell/no-network、forbidden raw/user-literal 与
+  repository-facing redaction hard gate 审计 PASS;installed-HDC/device/network/GUI/
+  destructive dispatch 与 #219 controlled raw/full-manifest read count 均为 `0`)。
+  状态 PR 在合入后的 `main` `b38d028…` 复验 `63/0` 与 check-sdd `0/0/111`,三文件
+  hash 与 run.md 完全相符;该复验只确认 evidence currency,不授权 CAP-MUT。
 - Objective:修复 #219 暴露的 harness evidence-seam blocker——把 controlled raw 中
   `FX-1` stdout 对 exact validated `LOCAL_HAP_PATH` 的预期回显,与 repository-facing
   path 泄漏分成两个独立 gate;仅前者在窄化 policy 下 MAY 通过,后者及任何额外敏感
