@@ -1,0 +1,108 @@
+{
+  "schema": "arkdeck-ui-dump-r2-output-family-decision-1.0.0",
+  "decisionId": "r2-element-tree-v1",
+  "change": "CHG-2026-008-ui-dump-hidumper-wrapper",
+  "task": "TASK-UD-R2-DECISION-001",
+  "result": "negative",
+  "recordedAt": "2026-07-21T13:25:25Z",
+  "authority": {
+    "decisionMaker": "human maintainer fuhanfeng",
+    "attestation": "pending evidence-and-decision PR review/merge"
+  },
+  "provenance": {
+    "phaseACaptureEvidenceId": "EVD-UD-CAP-MUT-DAYU200-20260721-003",
+    "phaseACaptureMergeOid": "79b795b7916c863376b3c1f9c37456b0089283dd",
+    "phaseAStatusMergeOid": "d5aded75d30fbd7ae048005b692b7f4138b23055",
+    "commandId": "R2",
+    "recipeId": "elementTree",
+    "exactArgvTemplate": [
+      "<PINNED_HDC>",
+      "-t",
+      "<SAME_SESSION_CONNECT_KEY>",
+      "shell",
+      "hidumper",
+      "-s",
+      "WindowManagerService",
+      "-a",
+      "-w <ASCII_DECIMAL_WINDOW_ID> -element -c"
+    ],
+    "targetTuple": {
+      "device": "DAYU200 (RK3568)",
+      "firmware": "OpenHarmony 7.0.0.34",
+      "api": "26.0.0",
+      "hdcVersion": "3.2.0d",
+      "hdcSha256": "48395ba8d87115dffca47df2a640a6c868bc9a2bd4eb49611e4138ff88d8d260",
+      "transport": "USB"
+    },
+    "rawOrigin": {
+      "kind": "remoteSidecar",
+      "captureSequence": 16,
+      "sha256": "ec6663e6b7d42053ba089ccbfa89df74cb183a5a583f80a69f103b047014b077",
+      "size": 866256,
+      "complete": true,
+      "truncated": false,
+      "drainIncomplete": false,
+      "controlledPathRecorded": false,
+      "repositoryBytes": 0
+    }
+  },
+  "redaction": {
+    "algorithmId": "uidump-derived-redaction-v1",
+    "algorithmVersion": 1,
+    "sourceSha256": "938cc117da97304b5ede66ff55c84dd9ce0a987600d4a1ecec2c3e01351f53e1",
+    "manifestSha256": "a75778fdf525050c4c0bcf11579e5f09f99a6fa70697bcf79026656a71f20185",
+    "safeLiteralsSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "receiptSchemaSha256": "f4bffe70a51dc3f6228f24d41b814dc47cc2d6f0cde5f00445070f86cd1ec4b6",
+    "result": {
+      "classification": "stableFailure",
+      "errorName": "INVALID_UNICODE",
+      "exitCode": 27,
+      "derivedCreated": false,
+      "receiptCreated": false,
+      "derivedSha256": null,
+      "receiptSha256": null
+    }
+  },
+  "classification": {
+    "successStructuralFamilyRegistered": false,
+    "successStructuralFamily": null,
+    "positiveDerivedFixtureRegistered": false,
+    "failurePrecedence": [
+      {
+        "priority": 1,
+        "classification": "failure",
+        "condition": "complete stdout or stderr matches the option-missed error family",
+        "exitCodeIndependent": true
+      }
+    ],
+    "otherwise": "unknownOutput",
+    "exitCodeZeroIsSuccess": false,
+    "digestOnlySuccess": false
+  },
+  "selection": {
+    "locatorRegistered": false,
+    "locator": null,
+    "candidateCardinality": "notEvaluated",
+    "candidateFormat": null,
+    "sameSessionSelectionRequirementPreserved": true,
+    "phaseAExactTokenRecorded": false,
+    "phaseAExactTokenReusable": false
+  },
+  "privacy": {
+    "agentRawReadCount": 0,
+    "rawRepositoryBytes": 0,
+    "derivedRepositoryBytes": 0,
+    "exactComponentTokenRepositoryCount": 0,
+    "nonceRepositoryCount": 0,
+    "controlledRawPathRepositoryCount": 0,
+    "conversationPathDisclosureDeviationRecorded": true
+  },
+  "consequences": {
+    "taskClosure": "truthfulNegativeDecision",
+    "r2R4Seam": "blocked",
+    "r4Capture": "blocked",
+    "recipeSuccessClaim": false,
+    "canonicalAcceptanceClaim": false,
+    "compatibilitySupportConformanceReleaseClaim": false
+  }
+}
