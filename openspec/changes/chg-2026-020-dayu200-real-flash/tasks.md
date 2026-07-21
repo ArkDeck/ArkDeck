@@ -63,8 +63,32 @@
 
 ## TASK-RF-002 — 阶段 B:RockchipRockUSBFlashProvider 与 `arkdeck flash` 接入
 
-- Status:blocked(双前置:① 本 change 批准;② 独立 readiness PR;另须 TASK-RF-001 的
-  Profile/契约/命令面 evidence 作为实现基座。均须维护者 review/merge)
+- Status:ready(readiness;仅在维护者 review/merge 本独立状态 PR 后生效。前置 ① 已满足:
+  CHG-2026-020 approved(#226 squash `7f5cb1b`);基座已满足:TASK-RF-001 的 Profile/契约/
+  命令面 evidence 由 part 1 PR #230(squash `3ba7c2f`)提供(`images-tar-contract.md`、
+  RF-CONTRACT-001 PASS)。本 PR 即前置 ②,单文件、不含实现、不产生 evidence)
+- Readiness review(2026-07-21;host-only,零设备命令):
+  - Approve gate:satisfied(#226 `7f5cb1b`);DEC-002 正向决策方向、REQ-FLASH-* 认领面、
+    design §0 命令面与安全设计随批准生效。
+  - 基座 gate:satisfied。RF-001 part 1(#230)提供 `images.tar.gz` 契约 +
+    `RockchipFlashProfile`(9 mapped 分区/写序/地址/prerequisites/命令面);命令面另有
+    CHG-2026-016 verified 真机背书(Loader `wlx`,#220/#224)。RF-001 整体 done 不是本
+    task 的 Swift contract 面前置——真机验收沿用 RF-001 part 2 的人工执行模型。
+  - Depends(均 done/verified):M1-008(SimulatedFlashProvider seam:makePlan/WorkflowStep/
+    manifest,只复用不改语义)、M1-006(HDC/process/durable 边界)、CHG-2026-016(recovery
+    路径,RecoveryGuide 依据)。
+  - 环境:macOS + Swift 6.3.3 toolchain(实测)、`swift-format` 6.3.0;contract/simulated
+    面无设备/无网络;真机验收(REQ-FLASH-014 面)另需设备窗口 + 人类执行。
+  - 竞争面:复核时本任务 allowed paths(Sources/ArkDeckWorkflows Flash Provider、对应
+    Tests、App CLI、本 change evidence)与 RF-001 part 2(设备窗口 evidence)、他会话
+    chg-008 零交集。
+  - 实现序:Swift Provider contract 面(`probe`/`validate`/`makePlan`/`recover` + typed
+    FlashStep + destructive 确认/critical write/postflight/recovery/REQ-FLASH-015
+    Agent-gate + contract 测试,基于 part 1 契约与 M1-008 seam,不改 Core kind/状态机)→
+    `arkdeck flash` CLI 接入 → 真机验收(沿用 RF-001 人工执行模型,设备窗口)。Agent/CI
+    destructive dispatch 恒 0(仪表化);真机 flash 由人类维护者亲手执行。
+  - Review boundary:本 readiness 只翻转状态并记录基座/环境/序;实现仍须满足全部认领
+    AC/verification gate;`ready→done` 另用独立状态 PR;真机由维护者亲手执行。
 - Objective:实现 typed `RockchipRockUSBFlashProvider`(`probe`/`validate`/`makePlan`/
   `recover` + typed `FlashStep`),接入 `arkdeck flash images.tar.gz`;落地 destructive
   确认、critical write 安全边界、postflight 语义校验、bounded recovery 与 REQ-FLASH-015
