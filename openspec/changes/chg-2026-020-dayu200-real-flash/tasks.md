@@ -6,9 +6,20 @@
 
 ## TASK-RF-001 — 阶段 A:契约/Profile 定义与人工真机正向烧写特征化
 
-- Status:ready(readiness;仅在维护者 review/merge 本独立状态 PR 后生效。前置 ① 已满足:
-  approval-only PR #226 已合入 main squash `7f5cb1b`(lvye review/merge);本 PR 即前置 ②,
-  单文件、不含实现、不产生 evidence、不执行真机)
+- Status:done(阶段 A part 1 + part 2 均可判定,`ready→done`;仅在维护者 review/merge
+  本独立状态 PR 后生效。依据:契约/Profile 定义 PR #230(squash `3ba7c2f`,
+  RF-CONTRACT-001 documentReview PASS)+ 人工真机正向烧写 evidence PR #233(squash
+  `410598e`,RF-REALFLASH-001 realHardware PASS)均已合入。真机窗口(2026-07-21)九个
+  PD-002 mapped 分区经 Loader 态 `wlx` 正向全写入成功、`rd` 复位重启进系统、postcheck
+  58B `USB Connected localhost`;首验用 pinned 包(`fc7637f3…5280`,17 成员 hash MATCH),
+  命令面与 CHG-2026-016 attempt #5 逐字同构;Agent installed-HDC/device/destructive
+  dispatch `0/0/0`。done 只关闭阶段 A:`hardware-matrix.md` 已加 observed 行
+  `EVD-RF001-DAYU200-20260721-001`,完整 `supported/verified` 行须全部 required hardware
+  AC(含 TASK-RF-002 的 Provider AC `AC-FLASH-001/002/007/008/012/013`);change 级 verify
+  另行独立 PR。不构成 DAYU200 以外设备、hardware support、兼容性或 release 声明。)
+- Attempt 链:契约/Profile #230(part 1,RF-CONTRACT-001 PASS)→ 真机正向烧写 #233
+  (part 2,RF-REALFLASH-001 PASS,`forward-flash-2026-07-21.md`)。命令面沿用恢复演练
+  CHG-2026-016(#220/#224 verified)真机实证的 Loader `wlx` 路径。
 - Readiness review(2026-07-21;host-only,零设备/写命令 dispatch):
   - Approve gate:satisfied。CHG-2026-020 approved(#226 squash `7f5cb1b`);DEC-002 正向
     决策方向(Rockchip RockUSB Loader 态 `wlx`)、两阶段 scope 与 design §0 封闭命令面、
