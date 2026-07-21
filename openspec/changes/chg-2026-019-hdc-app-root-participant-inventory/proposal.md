@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-019-hdc-app-root-participant-inventory
 revision: 1
-status: proposed
+status: approved # r1 proposal 经 PR #198 合入(main `10f585e`);批准由本 approval-only PR 的维护者 review/merge 构成(先例 #55/#89/#171/#195)
 class: implementation-only
 core_change_level: none
 owner: lvye
@@ -70,3 +70,16 @@ registry 产生,registry 的枚举就**构造性完备**,现阶段可诚实喂 `
 V2 治理:本 propose PR 合入仅登记提案;批准须独立 approval-only PR;`TASK-PI-001` 在
 approve + readiness 双前置满足前保持 `blocked`。实现须 signed Sandbox XCUITest 环境
 (先例 M1-006:DevMode 已启用,解锁态执行)。
+
+## Approval
+
+- r1 proposal 经 PR #198 合入 main(squash `10f585e`,status:proposed)。
+- 正式批准:2026-07-21 由本 approval-only PR(先例 #55/#89/#171/#195)将本 change 置为
+  `approved`;批准由维护者 review/merge 本 PR 构成。merge 即批准 design.md 的方向裁决
+  (方案 C:App-root 单一 registry,完备性构造性成立;否决信任缺席 inventory 与硬编码
+  空数组)、TASK-PI-001 的 scope/allowed paths 边界,以及两个 change-local 验收面
+  (`PI-HDC-INVENTORY-001/002`)。
+- 本批准不产生任务执行:`TASK-PI-001` 保持 `blocked`,须独立 readiness PR(确认执行时
+  base revision、M1-006 相关文件无并行改动、signed 环境可用)转 `ready`;实现后 `done`
+  翻转为独立状态 PR。本批准不翻转 TASK-M1-006 状态,不构成 CHG-2026-002 verified、
+  platform conformance、hardware/support 或 release claim。
