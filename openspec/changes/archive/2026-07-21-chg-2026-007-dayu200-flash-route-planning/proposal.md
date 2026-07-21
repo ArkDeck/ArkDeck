@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-007-dayu200-flash-route-planning
 revision: 1
-status: verified # 2026-07-18 verification closure(先例 #20/#48):四 PLAN-DAYU200-* AC 经 document review PASS;经本 PR 维护者 review/merge 生效
+status: archived # 2026-07-21 archive PR(先例 #178/#235/#241;Route-B 收官解除暂缓:活跃面零精确路径引用;archived CHG-009 evidence 字节内 4 处路径引用属不可改写历史证据,断链接受并在 PR 记录,先例 #211);verified 于 #84。原注: 2026-07-18 verification closure(先例 #20/#48):四 PLAN-DAYU200-* AC 经 document review PASS;经本 PR 维护者 review/merge 生效
 class: platform
 core_change_level: none
 owner: lvye
