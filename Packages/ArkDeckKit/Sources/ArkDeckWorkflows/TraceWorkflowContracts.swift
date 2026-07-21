@@ -1,4 +1,5 @@
 import ArkDeckCore
+import ArkDeckStorage
 import CryptoKit
 import Foundation
 
@@ -41,10 +42,65 @@ public enum TraceRebootRecovery {
   }
 }
 
+/// The exact continuity claim established before reboot. Construction requires the durable
+/// pre-reboot binding receipt; arbitrary target/revision fields cannot be supplied separately.
+public struct TraceExpectedRebindContext: Equatable, Sendable {
+  public let preRebootBinding: DurableCurrentDeviceBinding
+  public let expectedTargetID: String
+  public let selectedCandidate: DeviceRebindCandidate
+  public let expectedConfirmation: DeviceBindingConfirmation
+
+  fileprivate init(
+    preRebootBinding: DurableCurrentDeviceBinding,
+    selectedCandidate: DeviceRebindCandidate,
+    expectedConfirmation: DeviceBindingConfirmation
+  ) {
+    self.preRebootBinding = preRebootBinding
+    expectedTargetID = preRebootBinding.reference.targetID
+    self.selectedCandidate = selectedCandidate
+    self.expectedConfirmation = expectedConfirmation
+  }
+}
+
+public enum TraceExpectedRebindContextFactory {
+  public static func make(
+    preRebootBinding: DurableCurrentDeviceBinding,
+    rebindContext: DeviceRebindContext,
+    selectedCandidate: DeviceRebindCandidate,
+    confirmedBy: DeviceBindingConfirmation
+  ) throws -> TraceExpectedRebindContext {
+    try DeviceRebindPolicy.authorizePersistence(
+      context: rebindContext,
+      selectedCandidate: selectedCandidate,
+      confirmedBy: confirmedBy)
+    return TraceExpectedRebindContext(
+      preRebootBinding: preRebootBinding,
+      selectedCandidate: selectedCandidate,
+      expectedConfirmation: confirmedBy)
+  }
+}
+
 public enum TraceRebootCaptureGate: Equatable, Sendable {
   case notRequired
   case pending(TraceRebootRecoveryEvaluation)
-  case bindingDurablyConfirmed(DurableCurrentDeviceBinding)
+  case bindingDurablyConfirmed(
+    context: TraceExpectedRebindContext,
+    binding: DurableCurrentDeviceBinding
+  )
+}
+
+public enum TraceRebootBindingMismatch: Equatable, Sendable {
+  case target(expected: String, actual: String)
+  case revision(expected: Int, actual: Int)
+  case revisionOverflow(previous: Int)
+  case connectKey(expected: String, actual: String?)
+  case transport(expected: DeviceTransport, actual: DeviceTransport)
+  case identitySnapshot
+  case evidence
+  case confirmation(
+    expected: DeviceBindingConfirmation,
+    actual: DeviceBindingConfirmation
+  )
 }
 
 public enum TraceCaptureBlockReason: Equatable, Sendable {
@@ -54,6 +110,7 @@ public enum TraceCaptureBlockReason: Equatable, Sendable {
   case parameterVerificationIncomplete(expectedCount: Int, verifiedCount: Int)
   case rebootRecoveryRequired
   case rebootRecoveryIncomplete(TraceRebootRecoveryEvaluation)
+  case rebootBindingMismatch(TraceRebootBindingMismatch)
 }
 
 /// Capability required to materialize capture/receive steps. Its initializer is private so a
@@ -63,17 +120,20 @@ public struct TraceCaptureAuthorization: Equatable, Sendable {
   public let verifiedParameterMutations: [TraceVerifiedParameterMutation]
   public let adapterCapabilities: TraceAdapterCapabilities
   public let rebootRequired: Bool
+  public let deviceBindingReference: DeviceBindingReference?
 
   fileprivate init(
     configuration: TraceExecutableConfiguration,
     verifiedParameterMutations: [TraceVerifiedParameterMutation],
     adapterCapabilities: TraceAdapterCapabilities,
-    rebootRequired: Bool
+    rebootRequired: Bool,
+    deviceBindingReference: DeviceBindingReference?
   ) {
     self.configuration = configuration
     self.verifiedParameterMutations = verifiedParameterMutations
     self.adapterCapabilities = adapterCapabilities
     self.rebootRequired = rebootRequired
+    self.deviceBindingReference = deviceBindingReference
   }
 }
 
@@ -155,15 +215,63 @@ public enum TraceCaptureGate {
           configuration: configuration,
           verifiedParameterMutations: verified,
           adapterCapabilities: adapterCapabilities,
-          rebootRequired: false))
-    case .bindingDurablyConfirmed:
+          rebootRequired: false,
+          deviceBindingReference: nil))
+    case .bindingDurablyConfirmed(let context, let binding):
+      if let mismatch = validate(binding: binding, against: context) {
+        return .blocked(
+          reason: .rebootBindingMismatch(mismatch),
+          deviceCaptureDispatchCount: 0)
+      }
       return .authorized(
         TraceCaptureAuthorization(
           configuration: configuration,
           verifiedParameterMutations: verified,
           adapterCapabilities: adapterCapabilities,
-          rebootRequired: true))
+          rebootRequired: true,
+          deviceBindingReference: binding.reference))
     }
+  }
+
+  private static func validate(
+    binding: DurableCurrentDeviceBinding,
+    against context: TraceExpectedRebindContext
+  ) -> TraceRebootBindingMismatch? {
+    guard binding.reference.targetID == context.expectedTargetID else {
+      return .target(
+        expected: context.expectedTargetID,
+        actual: binding.reference.targetID)
+    }
+    let (expectedRevision, overflow) =
+      context.preRebootBinding.reference.revision.addingReportingOverflow(1)
+    guard !overflow else {
+      return .revisionOverflow(previous: context.preRebootBinding.reference.revision)
+    }
+    guard binding.reference.revision == expectedRevision else {
+      return .revision(expected: expectedRevision, actual: binding.reference.revision)
+    }
+    guard binding.binding.connectKey == context.selectedCandidate.connectKey else {
+      return .connectKey(
+        expected: context.selectedCandidate.connectKey,
+        actual: binding.binding.connectKey)
+    }
+    guard binding.binding.transport == context.selectedCandidate.transport else {
+      return .transport(
+        expected: context.selectedCandidate.transport,
+        actual: binding.binding.transport)
+    }
+    guard binding.binding.identitySnapshot == context.selectedCandidate.identitySnapshot else {
+      return .identitySnapshot
+    }
+    guard binding.binding.evidence == context.selectedCandidate.evidence else {
+      return .evidence
+    }
+    guard binding.binding.confirmedBy == context.expectedConfirmation else {
+      return .confirmation(
+        expected: context.expectedConfirmation,
+        actual: binding.binding.confirmedBy)
+    }
+    return nil
   }
 }
 
@@ -236,19 +344,31 @@ public enum TraceParameterSnapshotPlanBuilder {
 /// modes. Capture remains a later phase until every set step has an exact read-back result.
 public struct TraceParameterSetupPlan: Equatable, Sendable {
   public let steps: [WorkflowStep]
+  public let deviceStepBindings: [TraceBoundDeviceStep]
 
-  public init(steps: [WorkflowStep]) {
+  fileprivate init(steps: [WorkflowStep], deviceStepBindings: [TraceBoundDeviceStep]) {
     self.steps = steps
+    self.deviceStepBindings = deviceStepBindings
   }
 }
 
 public enum TraceParameterSetupPlanBuilder {
   public static func makePlan(
-    mutations: [TraceAuthorizedParameterMutation]
+    mutations: [TraceAuthorizedParameterMutation],
+    durableBinding: DurableCurrentDeviceBinding
   ) throws -> TraceParameterSetupPlan {
     var steps: [WorkflowStep] = []
     var seen: Set<String> = []
     for mutation in mutations {
+      guard
+        mutation.capability.matches(
+          durableBinding: durableBinding,
+          parameterName: mutation.request.name)
+      else {
+        throw TraceParameterPolicyError.capabilityBindingMismatch(
+          expected: durableBinding.reference,
+          actual: mutation.bindingReference)
+      }
       guard seen.insert(mutation.request.name).inserted else {
         throw TraceParameterPolicyError.duplicateParameter(mutation.request.name)
       }
@@ -312,7 +432,11 @@ public enum TraceParameterSetupPlanBuilder {
           ],
           compensationDescriptors: compensations))
     }
-    return TraceParameterSetupPlan(steps: steps)
+    return TraceParameterSetupPlan(
+      steps: steps,
+      deviceStepBindings: steps.filter { $0.bindingRequirement == .confirmedDevice }.map {
+        TraceBoundDeviceStep(step: $0, intendedBinding: durableBinding.reference)
+      })
   }
 
   private static func argumentsHash(_ arguments: [String: JSONValue]) throws -> String {
@@ -398,14 +522,40 @@ public struct TraceWorkflowPlanRequest: Equatable, Sendable {
 }
 
 public struct TraceWorkflowPlan: Equatable, Sendable {
+  public let jobID: String
+  public let rawArtifactID: String
   public let steps: [WorkflowStep]
   public let ownedRemotePath: String
   public let hostPartialRelativePath: String
+  public let deviceBindingReference: DeviceBindingReference?
+  public let deviceStepBindings: [TraceBoundDeviceStep]
 
-  public init(steps: [WorkflowStep], ownedRemotePath: String, hostPartialRelativePath: String) {
+  fileprivate init(
+    jobID: String,
+    rawArtifactID: String,
+    steps: [WorkflowStep],
+    ownedRemotePath: String,
+    hostPartialRelativePath: String,
+    deviceBindingReference: DeviceBindingReference?,
+    deviceStepBindings: [TraceBoundDeviceStep]
+  ) {
+    self.jobID = jobID
+    self.rawArtifactID = rawArtifactID
     self.steps = steps
     self.ownedRemotePath = ownedRemotePath
     self.hostPartialRelativePath = hostPartialRelativePath
+    self.deviceBindingReference = deviceBindingReference
+    self.deviceStepBindings = deviceStepBindings
+  }
+}
+
+public struct TraceBoundDeviceStep: Equatable, Sendable {
+  public let step: WorkflowStep
+  public let intendedBinding: DeviceBindingReference
+
+  fileprivate init(step: WorkflowStep, intendedBinding: DeviceBindingReference) {
+    self.step = step
+    self.intendedBinding = intendedBinding
   }
 }
 
@@ -443,7 +593,7 @@ public enum TraceWorkflowPlanBuilder {
 
     let remoteDirectory = "/data/local/tmp/arkdeck/\(request.jobID)"
     let remotePath = "\(remoteDirectory)/raw.trace"
-    let partialPath = "artifacts/raw/\(request.rawArtifactID).partial"
+    let partialPath = "artifacts/partial/\(request.rawArtifactID).part"
     let captureStepID = "trace-capture"
     let stopArguments: [String: JSONValue] = [
       "captureStepId": .string(captureStepID),
@@ -538,21 +688,22 @@ public enum TraceWorkflowPlanBuilder {
             "parameters": .object(["preserveFtraceHeader": .bool(true)]),
           ]))
     }
-    steps.append(
-      try WorkflowStep(
-        id: "trace-cleanup-owned-remote",
-        kind: .cleanupOwnedRemotePath,
-        declaredEffect: .deviceMutation,
-        declaredCancellation: .atSafeBoundary,
-        declaredBindingRequirement: .confirmedDevice,
-        arguments: [
-          "remotePath": .string(remotePath),
-          "ownershipEvidenceId": .string(request.jobID),
-        ]))
     steps.append(contentsOf: normalRestoreSteps)
 
+    let deviceStepBindings =
+      authorization.deviceBindingReference.map { binding in
+        steps.filter { $0.bindingRequirement == .confirmedDevice }.map {
+          TraceBoundDeviceStep(step: $0, intendedBinding: binding)
+        }
+      } ?? []
     return TraceWorkflowPlan(
-      steps: steps, ownedRemotePath: remotePath, hostPartialRelativePath: partialPath)
+      jobID: request.jobID,
+      rawArtifactID: request.rawArtifactID,
+      steps: steps,
+      ownedRemotePath: remotePath,
+      hostPartialRelativePath: partialPath,
+      deviceBindingReference: authorization.deviceBindingReference,
+      deviceStepBindings: deviceStepBindings)
   }
 
   private static func argumentsHash(_ arguments: [String: JSONValue]) throws -> String {
@@ -580,32 +731,178 @@ public enum TraceOwnedRemoteState: Equatable, Sendable {
 public enum TraceReceiveTrackerError: Error, Equatable, Sendable {
   case receiveAlreadyStarted
   case receiveNotStarted
-  case artifactNotVerified
+  case publicationDoesNotMatchPartial(expected: String, actual: String)
   case cleanupNotEligible
 }
 
-public struct TraceReceiveValidation: Equatable, Sendable {
-  public let byteCount: UInt64
-  public let formatRecognized: Bool
-  public let checksumMatches: Bool
-  public let sha256: String
+public enum TraceArtifactPublicationError: Error, Equatable, Sendable {
+  case jobMismatch(expected: String, actual: String)
+  case sourceMustMatchPlannedPartial(expected: String, actual: String)
+  case bindingMismatch(expected: DeviceBindingReference, actual: DeviceBindingReference)
+  case storeReceiptMismatch
+}
+
+public struct TraceArtifactPublicationRequest: Sendable {
+  public let jobID: String
+  public let artifactID: String
+  public let partialRelativePath: String
+  public let ownedRemotePath: String
+  public let ownershipEvidenceID: String
+  public let publicationName: String
+  public let origin: String
+  public let mediaType: String?
+  public let expectedSHA256: String?
+  public let requiredPrefix: Data?
+  public let expectedBindingReference: DeviceBindingReference?
 
   public init(
-    byteCount: UInt64,
-    formatRecognized: Bool,
-    checksumMatches: Bool,
-    sha256: String
+    plan: TraceWorkflowPlan,
+    publicationName: String,
+    origin: String,
+    mediaType: String? = nil,
+    expectedSHA256: String? = nil,
+    requiredPrefix: Data? = nil
+  ) throws {
+    // Reuse ArkDeckStorage validation at the boundary; the actual request is rebuilt immediately
+    // before publication so no validation-only object can serve as a receipt.
+    _ = try ArtifactPublicationRequest(
+      artifactID: plan.rawArtifactID,
+      role: .raw,
+      publicationName: publicationName,
+      origin: origin,
+      mediaType: mediaType,
+      expectedSHA256: expectedSHA256,
+      requiredPrefix: requiredPrefix)
+    jobID = plan.jobID
+    artifactID = plan.rawArtifactID
+    partialRelativePath = plan.hostPartialRelativePath
+    ownedRemotePath = plan.ownedRemotePath
+    ownershipEvidenceID = plan.jobID
+    self.publicationName = publicationName
+    self.origin = origin
+    self.mediaType = mediaType
+    self.expectedSHA256 = expectedSHA256
+    self.requiredPrefix = requiredPrefix
+    expectedBindingReference = plan.deviceBindingReference
+  }
+}
+
+public struct TraceRemoteCleanupAuthority: Equatable, Sendable {
+  public let artifactID: String
+  public let publishedRelativePath: String
+  public let publishedSHA256: String
+  public let intendedBinding: DeviceBindingReference
+  fileprivate let remotePath: String
+  fileprivate let ownershipEvidenceID: String
+
+  fileprivate init(
+    artifact: PublishedArtifact,
+    remotePath: String,
+    ownershipEvidenceID: String,
+    intendedBinding: DeviceBindingReference
   ) {
-    self.byteCount = byteCount
-    self.formatRecognized = formatRecognized
-    self.checksumMatches = checksumMatches
-    self.sha256 = sha256
+    artifactID = artifact.record.id
+    publishedRelativePath = artifact.record.relativePath
+    publishedSHA256 = artifact.record.sha256
+    self.remotePath = remotePath
+    self.ownershipEvidenceID = ownershipEvidenceID
+    self.intendedBinding = intendedBinding
   }
 
-  public var isValid: Bool {
-    byteCount > 0 && formatRecognized && checksumMatches
-      && sha256.range(of: "^[a-f0-9]{64}$", options: .regularExpression)
-        == sha256.startIndex..<sha256.endIndex
+  public func makeCleanupStep() throws -> TraceBoundDeviceStep {
+    let step = try WorkflowStep(
+      id: "trace-cleanup-owned-remote",
+      kind: .cleanupOwnedRemotePath,
+      declaredEffect: .deviceMutation,
+      declaredCancellation: .atSafeBoundary,
+      declaredBindingRequirement: .confirmedDevice,
+      arguments: [
+        "remotePath": .string(remotePath),
+        "ownershipEvidenceId": .string(ownershipEvidenceID),
+      ])
+    return TraceBoundDeviceStep(step: step, intendedBinding: intendedBinding)
+  }
+}
+
+public struct TraceArtifactPublicationReceipt: Equatable, Sendable {
+  public let publishedArtifact: PublishedArtifact
+  public let sourcePartialRelativePath: String
+  public let cleanupAuthority: TraceRemoteCleanupAuthority
+
+  fileprivate init(
+    publishedArtifact: PublishedArtifact,
+    sourcePartialRelativePath: String,
+    cleanupAuthority: TraceRemoteCleanupAuthority
+  ) {
+    self.publishedArtifact = publishedArtifact
+    self.sourcePartialRelativePath = sourcePartialRelativePath
+    self.cleanupAuthority = cleanupAuthority
+  }
+}
+
+public struct TraceArtifactPublicationCoordinator: Sendable {
+  public let store: SessionArtifactStore
+
+  public init(store: SessionArtifactStore) {
+    self.store = store
+  }
+
+  public func publish(
+    from partialURL: URL,
+    request: TraceArtifactPublicationRequest,
+    claim: StorageClaim,
+    durableBinding: DurableCurrentDeviceBinding
+  ) throws -> TraceArtifactPublicationReceipt {
+    guard store.layout.jobID == request.jobID else {
+      throw TraceArtifactPublicationError.jobMismatch(
+        expected: store.layout.jobID,
+        actual: request.jobID)
+    }
+    let expectedPartialURL = store.layout.root.appending(path: request.partialRelativePath)
+    guard partialURL.standardizedFileURL == expectedPartialURL.standardizedFileURL else {
+      throw TraceArtifactPublicationError.sourceMustMatchPlannedPartial(
+        expected: request.partialRelativePath,
+        actual: partialURL.path)
+    }
+    if let expectedBindingReference = request.expectedBindingReference,
+      expectedBindingReference != durableBinding.reference
+    {
+      throw TraceArtifactPublicationError.bindingMismatch(
+        expected: expectedBindingReference,
+        actual: durableBinding.reference)
+    }
+
+    let storageRequest = try ArtifactPublicationRequest(
+      artifactID: request.artifactID,
+      role: .raw,
+      publicationName: request.publicationName,
+      origin: request.origin,
+      mediaType: request.mediaType,
+      expectedSHA256: request.expectedSHA256,
+      requiredPrefix: request.requiredPrefix)
+    let published = try store.publish(
+      from: partialURL,
+      request: storageRequest,
+      claim: claim)
+    let expectedRelativePath = "artifacts/raw/\(request.publicationName)"
+    let expectedPublishedURL = store.layout.rawDirectory.appending(path: request.publicationName)
+    guard published.record.id == request.artifactID,
+      published.record.role == .raw,
+      published.record.relativePath == expectedRelativePath,
+      published.url.standardizedFileURL == expectedPublishedURL.standardizedFileURL
+    else {
+      throw TraceArtifactPublicationError.storeReceiptMismatch
+    }
+
+    let cleanupAuthority = TraceRemoteCleanupAuthority(
+      artifact: published,
+      remotePath: request.ownedRemotePath,
+      ownershipEvidenceID: request.ownershipEvidenceID,
+      intendedBinding: durableBinding.reference)
+    return TraceArtifactPublicationReceipt(
+      publishedArtifact: published,
+      sourcePartialRelativePath: request.partialRelativePath,
+      cleanupAuthority: cleanupAuthority)
   }
 }
 
@@ -613,6 +910,7 @@ public struct TraceReceiveTracker: Equatable, Sendable {
   public private(set) var hostArtifactState: TraceHostArtifactState = .absent
   public private(set) var ownedRemoteState: TraceOwnedRemoteState = .ownedPresent
   public private(set) var diagnosticCodes: [String] = []
+  private var cleanupAuthority: TraceRemoteCleanupAuthority?
 
   public init() {}
 
@@ -632,42 +930,27 @@ public struct TraceReceiveTracker: Equatable, Sendable {
     ownedRemoteState = .ownedPresent
   }
 
-  @discardableResult
-  public mutating func verifyAndAtomicallyPublish(
-    finalRelativePath: String,
-    validation: TraceReceiveValidation
-  ) throws -> Bool {
-    guard case .partial = hostArtifactState else {
+  public mutating func recordPublication(_ receipt: TraceArtifactPublicationReceipt) throws {
+    guard case .partial(let relativePath) = hostArtifactState else {
       throw TraceReceiveTrackerError.receiveNotStarted
     }
-    guard validation.isValid else {
-      diagnosticCodes.append("trace-receive-validation-failed")
-      ownedRemoteState = .ownedPresent
-      return false
+    guard relativePath == receipt.sourcePartialRelativePath else {
+      throw TraceReceiveTrackerError.publicationDoesNotMatchPartial(
+        expected: relativePath,
+        actual: receipt.sourcePartialRelativePath)
     }
     hostArtifactState = .published(
-      relativePath: finalRelativePath,
-      sha256: validation.sha256)
+      relativePath: receipt.publishedArtifact.record.relativePath,
+      sha256: receipt.publishedArtifact.record.sha256)
     ownedRemoteState = .cleanupEligible
-    return true
+    cleanupAuthority = receipt.cleanupAuthority
   }
 
-  public func makeCleanupStep(remotePath: String, ownershipEvidenceID: String) throws
-    -> WorkflowStep
-  {
-    guard ownedRemoteState == .cleanupEligible else {
+  public func makeCleanupStep() throws -> TraceBoundDeviceStep {
+    guard ownedRemoteState == .cleanupEligible, let cleanupAuthority else {
       throw TraceReceiveTrackerError.cleanupNotEligible
     }
-    return try WorkflowStep(
-      id: "trace-cleanup-owned-remote",
-      kind: .cleanupOwnedRemotePath,
-      declaredEffect: .deviceMutation,
-      declaredCancellation: .atSafeBoundary,
-      declaredBindingRequirement: .confirmedDevice,
-      arguments: [
-        "remotePath": .string(remotePath),
-        "ownershipEvidenceId": .string(ownershipEvidenceID),
-      ])
+    return try cleanupAuthority.makeCleanupStep()
   }
 
   public mutating func recordCleanupSucceeded() throws {
@@ -675,6 +958,7 @@ public struct TraceReceiveTracker: Equatable, Sendable {
       throw TraceReceiveTrackerError.cleanupNotEligible
     }
     ownedRemoteState = .cleaned
+    cleanupAuthority = nil
   }
 }
 
@@ -691,11 +975,6 @@ public enum TraceWorkflowStage: String, CaseIterable, Codable, Equatable, Sendab
   case postprocess
   case cleanup
   case restore
-}
-
-public enum TraceProgressTotal: Equatable, Sendable {
-  case unknown
-  case reliable(totalBytes: UInt64)
 }
 
 public enum TraceProgressMeter: Equatable, Sendable {
@@ -715,15 +994,12 @@ public struct TraceProgressReport: Equatable, Sendable {
   public static func make(
     stage: TraceWorkflowStage,
     completedBytes: UInt64,
-    total: TraceProgressTotal,
+    reliableTotal: TraceReliableByteTotalReceipt?,
+    adapterCapabilities: TraceAdapterCapabilities,
     elapsedMilliseconds: UInt64
   ) -> TraceProgressReport {
-    switch total {
-    case .unknown:
-      return TraceProgressReport(
-        stage: stage,
-        meter: .indeterminate(elapsedMilliseconds: elapsedMilliseconds))
-    case .reliable(let totalBytes) where totalBytes > 0:
+    if let reliableTotal, reliableTotal.matches(adapterCapabilities) {
+      let totalBytes = reliableTotal.totalBytes
       let boundedCompleted = min(completedBytes, totalBytes)
       return TraceProgressReport(
         stage: stage,
@@ -732,12 +1008,10 @@ public struct TraceProgressReport: Equatable, Sendable {
           totalBytes: totalBytes,
           fractionComplete: Double(boundedCompleted) / Double(totalBytes),
           elapsedMilliseconds: elapsedMilliseconds))
-    case .reliable:
-      // A zero total is not reliable evidence of progress and cannot produce a percentage.
-      return TraceProgressReport(
-        stage: stage,
-        meter: .indeterminate(elapsedMilliseconds: elapsedMilliseconds))
     }
+    return TraceProgressReport(
+      stage: stage,
+      meter: .indeterminate(elapsedMilliseconds: elapsedMilliseconds))
   }
 
   public var percentage: Double? {

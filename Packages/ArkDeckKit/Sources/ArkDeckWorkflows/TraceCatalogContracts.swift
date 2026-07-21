@@ -166,6 +166,31 @@ public struct TraceAdapterCapabilities: Equatable, Sendable {
   }
 }
 
+/// Authority for determinate byte progress. The initializer is intentionally not public:
+/// callers can report an observed total, but only a capability observation that explicitly
+/// permits reliable byte totals can turn that observation into progress authority.
+public struct TraceReliableByteTotalReceipt: Equatable, Sendable {
+  public let totalBytes: UInt64
+  fileprivate let adapterCapabilities: TraceAdapterCapabilities
+
+  public func matches(_ currentCapabilities: TraceAdapterCapabilities) -> Bool {
+    adapterCapabilities == currentCapabilities
+      && currentCapabilities.reliableByteTotalAvailable
+  }
+}
+
+public enum TraceReliableByteTotalFactory {
+  public static func make(
+    observedTotalBytes: UInt64,
+    capabilities: TraceAdapterCapabilities
+  ) -> TraceReliableByteTotalReceipt? {
+    guard observedTotalBytes > 0, capabilities.reliableByteTotalAvailable else { return nil }
+    return TraceReliableByteTotalReceipt(
+      totalBytes: observedTotalBytes,
+      adapterCapabilities: capabilities)
+  }
+}
+
 public enum TraceConfigurationBlockReason: Equatable, Sendable {
   case bufferUnitUnconfirmed(requestedValue: Int)
 }
