@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-020-dayu200-real-flash
 revision: 1
-status: verified # 2026-07-21 本 verification-closure PR(先例 #175/#176/#201/#208/#224);批准链 #225/#226;须在 RF-001 done #234、RF-002 done #238 之后合入;archive 另行
+status: archived # 2026-07-21 archive PR(先例 #178/#235;目录外零精确路径引用,DEC-002/hardware-matrix 均名称引用不断链);verified 于 #239。原注: 2026-07-21 本 verification-closure PR(先例 #175/#176/#201/#208/#224);批准链 #225/#226;须在 RF-001 done #234、RF-002 done #238 之后合入;archive 另行
 class: platform
 core_change_level: none
 owner: lvye
