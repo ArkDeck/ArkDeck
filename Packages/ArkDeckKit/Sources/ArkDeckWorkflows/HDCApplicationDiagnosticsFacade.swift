@@ -157,10 +157,8 @@ private actor HDCProductionApplicationDiagnostics: HDCApplicationDiagnosticsProv
         keyAccessError:
           "Key access diagnostics are unsupported without a configured or user-approved locator.",
         subserverCapability: .unsupported,
-        impactInventory: .unavailable(
-          reason:
-            "Lifecycle mutation is unavailable because no complete App-root HDC Job/Device critical-state inventory is attached."
-        ),
+        impactInventory: await HDCApplicationParticipantRegistry.shared.inventory(
+          for: endpoint.endpoint),
         postDispatchProbe: { step in
           await lifecyclePostDispatchProbe.observe(after: step)
         })
