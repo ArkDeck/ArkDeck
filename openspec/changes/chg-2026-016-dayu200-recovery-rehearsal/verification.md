@@ -1,7 +1,7 @@
 # CHG-2026-016 Verification Plan
 
 > Status:planned
-> Change:CHG-2026-016-dayu200-recovery-rehearsal@r3
+> Change:CHG-2026-016-dayu200-recovery-rehearsal@r4
 > Core baseline:CORE-2.0.0
 
 本 change 是首次授权的写设备活动:唯一授权面 = design.md 封闭命令面,唯一执行者 =
@@ -23,7 +23,7 @@ blocked-attempt,不是 fail(先例 #104)。
 
 | Evidence ID | Method | Expected result | Status |
 | --- | --- | --- | --- |
-| RH-DAYU200-RECOVERY-001 | maintainer-executed rehearsal(archived playbook §4 序列) | 一个具名窗口内完成 进态→db→gpt/prm→九个 PD-002 mapped 分区按序写入→复位;设备回正常系统,postcheck(m0b_capture 既有白名单)重现 Connected;逐命令 argv/输出/判定在案;§5 中止=诚实 blocked-attempt | attempt#1 blocked(#173:RockUSB 未达成);attempt#2 blocked(#213:进态成功、0x350a Loader 达成,W1 db 按态被拒 mode-appropriate,零写入,§5 正确中止);TASK-RH-001 ready,待下窗口按 r3(W1 条件化)从 W2 起执行 |
+| RH-DAYU200-RECOVERY-001 | maintainer-executed rehearsal(archived playbook §4 序列) | 一个具名窗口内完成 进态→db→gpt/prm→九个 PD-002 mapped 分区按序写入→复位;设备回正常系统,postcheck(m0b_capture 既有白名单)重现 Connected;逐命令 argv/输出/判定在案;§5 中止=诚实 blocked-attempt | attempt#1 blocked(#173:RockUSB 未达成);attempt#2 blocked(#213:W1 db 按态被拒);attempt#3 blocked(#215:W1 条件跳过生效,W2 gpt 按 loader 命令子集被拒,零写入,§5 自动中止);TASK-RH-001 ready,待下窗口按 r4(W1+W2 条件化)从 W3 wlx 起执行 |
 | RH-DAYU200-MODE-001 | 同窗口只读模式观察 | 进 Maskrom 前/态中/db 后各记 `ld` 输出形态与 USB VID:PID;CHG-2026-011 待确证项(RK3568 PID、Maskrom/Loader 判别字样)落为 observed 事实;只记录不改流程 | observed 实质补全(#173:2207:5000 updater-hdc;#213:r2 序列→2207:350a Loader 稳定达成,进态路径实证);写序中 post-db 观察点随 r3 W1 条件化顺延 |
 | RH-DAYU200-TABLE-001 | `ppt` 读回 vs FA-001 §2 基线逐行比对 | Loader 态 `ppt`(表写入前可读则读、写入后必读)逐行 match/mismatch/absent/extra 分类,原始值保留;差异不现场解释,标待后续分析;基线零改写 | 写前读回达成(#213:Loader 态 ppt 读出 GPT 表,15 match/0 mismatch/0 absent/0 extra vs FA-001 §2,GPT 分支实锤);写后读回待下窗口 |
 | RH-DAYU200-SAFETY-001 | 封闭面与隐私合规审计(全窗口) | 全部设备命令属封闭面且计数在案;首写前物料/工具 hash 全部复核;零现场手算地址(wl 回退逐值引 FA-001 PD-002 扇区列并记原因);userdata 显式确认或如实记跳过;orphan 镜像与无成员分区零写入;序列号仅入 hardware-evidence identity,raw 留仓库外;中止准则触发即遵守 | attempt#1/#2 均 PASS(#173;#213:db/ld/ppt 全属封闭面、pinned hash 复核、零手算、零写入、§5 正确中止、序列号零入仓);待写入窗口全流程复评 |
@@ -46,3 +46,9 @@ blocked-attempt,不是 fail(先例 #104)。
 > `0x350a`+`Loader` 即判定点满足、跳过并记录;`Maskrom` 才必须 db)② W2 确认 `gpt`
 > 主路径(GPT 分支经 ppt 15/15 实锤)。四 AC 的 expected result 不变;上表 Status 依
 > #213 同步;TASK-RH-001 保持 `ready` 待下窗口按 r3 执行(从 W2 起)。
+
+> Revision r4(2026-07-21):基于 attempt #3(#215)——loader 命令子集拒 `gpt`(与 db
+> 同族),而写前 `ppt` 两窗口均 15/15 精确 match FA-001 §2。r4 仅 W2 条件化(写前表
+> 精确 match 即判定点满足、跳过并记录;不 match 才必须 gpt)。四 AC expected result
+> 不变;已知风险:`wlx`/`wl` 或同在子集外,两者均被拒则 Loader 路线不可行、Maskrom
+> 裸态进态另立 revision。TASK-RH-001 保持 `ready`,下窗口从 W3 起。
