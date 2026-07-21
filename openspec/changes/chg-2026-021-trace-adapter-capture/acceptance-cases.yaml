@@ -1,0 +1,24 @@
+---
+schema_version: 1.0.0
+change_id: CHG-2026-021-trace-adapter-capture
+change_revision: 1
+platform: macos
+evidence_classes:
+- documentReview
+cases:
+- acceptance_id: TRACE-PROV-001
+  test_id: TEST-TRACE-PROV-001
+  method: Document review of the registered trace probe/golden registry against design section 4.
+  expected_source: openspec/changes/chg-2026-021-trace-adapter-capture/verification.md#TRACE-PROV-001
+  minimum_evidence: documentReview
+  expected_result: >-
+    The versioned trace registry records, for every registered command, the
+    exact argv, authority, timeout and the success/failure judgement markers
+    (never exit code alone); help-family and minimal raw-ftrace-header samples
+    are registered as golden fixtures with a per-file SHA-256 closure and
+    binary-safe .gitattributes; redacted manifests keep device serials and user
+    paths out of the repository; the OPENHARMONY-TOOLS profile and
+    INTEGRATION-PROFILES.lock bumps are consistent; the capture was executed
+    personally by the human maintainer with per-command argv, output and
+    judgement on record, and an aborted window is recorded honestly as a
+    blocked-attempt.
