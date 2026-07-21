@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-019-hdc-app-root-participant-inventory
 revision: 1
-status: approved # r1 proposal 经 PR #198 合入(main `10f585e`);批准由本 approval-only PR 的维护者 review/merge 构成(先例 #55/#89/#171/#195)
+status: verified # 2026-07-21 本 verification-closure PR(先例 #175/#176/#201);approve 载体 #200 `94fe6f8`;archive 另行(M1-006 closeout 引用其 evidence,归档前须引用面收口)
 class: implementation-only
 core_change_level: none
 owner: lvye
@@ -83,3 +83,17 @@ approve + readiness 双前置满足前保持 `blocked`。实现须 signed Sandbo
   base revision、M1-006 相关文件无并行改动、signed 环境可用)转 `ready`;实现后 `done`
   翻转为独立状态 PR。本批准不翻转 TASK-M1-006 状态,不构成 CHG-2026-002 verified、
   platform conformance、hardware/support 或 release claim。
+
+## Verification closure(2026-07-21)
+
+- 依据:TASK-PI-001 done(实现 PR #205 squash `394e4fa`,交付面与 review head 零漂移经
+  逐文件核对;done 状态 PR #206 squash `f294787`);change-local acceptance matrix 两行
+  `PI-HDC-INVENTORY-001/002` 均 `passed`,evidence 在 `evidence/runs/TASK-PI-001/run.md`。
+- Gate 复核:两 Evidence ID 均 PASS 且有 run 记录 ✓;全量 contract/UI 套件零回归
+  (287/1skip/0、signed XCUITest 9/9)✓;实现 PR 经维护者 review/merge ✓。
+- 效果:TASK-M1-006 closeout 缺口 ① 的处置载体闭合,已被 M1-006 done(#207)与
+  CHG-2026-002 verified 引用。
+- 本 `verified` 由维护者 review/merge 本 PR 构成(先例 #175/#176/#201)。不构成 platform
+  conformance、hardware/support 或 release claim。archive 另行:本 change evidence 被
+  CHG-2026-002 的 M1-006 closeout 与 `MAC-M1-HDC-001` 行精确路径引用,归档前须引用面
+  收口(CHG-009 先例)。
