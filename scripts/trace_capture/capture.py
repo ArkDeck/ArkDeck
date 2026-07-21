@@ -20,24 +20,27 @@ owned file under /data/local/tmp on the device):
     are refused unless ``--allow-device-write`` is passed explicitly;
   * help-anchored capture gate — capture specs additionally require
     ``--gate-dir`` pointing at the *same-window* probe run's out-dir. The
-    harness re-reads those captured probe bytes and requires every flag token
-    used by the capture argv (``-t``, ``-b``, ``-o``) to appear in the captured
-    hitrace help output and the ``sched`` tag to appear in the captured tag
-    list. Missing evidence refuses the capture phase: the exact argv below is a
-    pre-declared candidate whose in-window execution is authorized only by the
-    device's own captured help surface, never by operator improvisation
-    (design §0: exact argv is fixed by TR-001 provenance, not by prose).
+    harness validates that manifest's exact HDC path/hash, target, closed
+    command sequence, per-stream byte hashes and self-check before requiring
+    every flag token used by the capture argv (``-t``, ``-b``, ``-o``) and the
+    ``sched`` tag. Missing or mismatched evidence refuses the capture phase: the
+    exact argv below is a pre-declared candidate whose in-window execution is
+    authorized only by the device's own captured help surface, never by
+    operator improvisation (design §0: exact argv is fixed by TR-001
+    provenance, not by prose).
 
-The remote paths are fixed literals owned by this run
-(``/data/local/tmp/arkdeck-trace/minimal.ftrace``); cleanup removes exactly
-that literal file and then the empty owned directory (``rmdir`` refuses a
-non-empty directory by design). No wildcard, recursive or discovered-path
-cleanup exists here (CHG-008 lesson).
+The harness generates a fresh UUID-isolated remote directory under
+``/data/local/tmp/arkdeck/<uuid>/``. Cleanup removes exactly that generated
+file and then the empty owned directory (``rmdir`` refuses a non-empty
+directory). No wildcard, recursive or discovered-path cleanup exists. If the
+received file is missing, empty, truncated or fails the sensitive self-check,
+cleanup is not dispatched and the manifest records the retained remote hazard.
 
-Exit codes: 0 = capture ok and self-check passed; 1 = capture ran but the
-sensitive-content self-check failed; 2 = usage or harness error (refused
-output location, existing output file, unexecutable hdc, failed redaction or
-capture gate).
+Exit codes: 0 = probe recorded, or capture reached non-empty verified receive
+and cleanup, with self-check passed; 1 = sensitive-content self-check failed or
+capture remained partial/cleanup-incomplete; 2 = usage or harness error
+(refused output location, pin drift, existing output file, unexecutable hdc,
+failed redaction or capture gate).
 """
 
 from __future__ import annotations
@@ -45,7 +48,6 @@ from __future__ import annotations
 import argparse
 import copy
 import dataclasses
-import glob
 import hashlib
 import json
 import os
@@ -55,27 +57,33 @@ import subprocess
 import sys
 import threading
 import time
+import uuid
 from typing import Callable, Optional
 
-MANIFEST_SCHEMA = "arkdeck-trace-capture-manifest-1.0.0"
-REDACTED_SCHEMA = "arkdeck-trace-capture-redacted-1.0.0"
+MANIFEST_SCHEMA = "arkdeck-trace-capture-manifest-1.1.0"
+REDACTED_SCHEMA = "arkdeck-trace-capture-redacted-1.1.0"
 
 MAX_STREAM_BYTES = 4 * 1_024 * 1_024
 DEFAULT_TIMEOUT_SECONDS = 60
 PIPE_DRAIN_GRACE_SECONDS = 2.0
 
-# Fixed owned remote surface (design §0; integration profile recommends the
-# /data/local/tmp/arkdeck/<job> shape — TR-001 uses a task-owned literal).
-REMOTE_TRACE_DIR = "/data/local/tmp/arkdeck-trace"
-REMOTE_TRACE_FILE = "/data/local/tmp/arkdeck-trace/minimal.ftrace"
+# The readiness pin is a dispatch gate, not merely metadata. Version is checked
+# from the same probe manifest before capture is allowed.
+PINNED_HDC_SHA256 = "48395ba8d87115dffca47df2a640a6c868bc9a2bd4eb49611e4138ff88d8d260"
+PINNED_HDC_VERSION_MARKER = b"Ver: 3.2.0d"
+
+# REQ-TRACE-006 requires a per-run UUID-isolated remote path. These sentinels
+# are replaced only by the harness with a freshly generated canonical UUID;
+# the operator cannot supply a remote path.
+REMOTE_TRACE_ROOT = "/data/local/tmp/arkdeck"
+REMOTE_TRACE_DIR_TOKEN = "{remoteTraceDir}"
+REMOTE_TRACE_FILE_TOKEN = "{remoteTraceFile}"
 RECV_LOCAL_NAME = "minimal.ftrace"
 
 # Tokens that must be evidenced by the same-window captured probe output before
 # the capture phase may run (see the capture gate above).
 GATE_HELP_TOKENS = (b"-t", b"-b", b"-o")
 GATE_TAG_TOKEN = b"sched"
-GATE_HELP_GLOB = "*hitrace-help*.stdout"
-GATE_TAG_GLOB = "*hitrace-tag-list*.stdout"
 
 
 @dataclasses.dataclass(frozen=True)
@@ -96,6 +104,9 @@ class CommandSpec:
 
 COMMAND_SPECS: tuple[CommandSpec, ...] = (
     # --- host/device discovery (M0B-proven read-only surface) ---
+    CommandSpec(
+        "hdc-version", ("-v",), False, False, False,
+        "pinned HDC client version"),
     CommandSpec(
         "hdc-list-targets", ("list", "targets"), False, False, False,
         "device discovery"),
@@ -121,35 +132,53 @@ COMMAND_SPECS: tuple[CommandSpec, ...] = (
     CommandSpec(
         "bytrace-tag-list", ("shell", "bytrace", "-l"), True, False, False,
         "bytrace tag/category list"),
-    # --- owned-path inventory (read-only, fixed literal) ---
+    # --- owned-path inventory (read-only, harness-generated UUID literal) ---
     CommandSpec(
-        "trace-remote-stat", ("shell", "ls", "-l", REMOTE_TRACE_FILE), True, False, False,
-        "owned trace file inventory (fixed literal path; pre/post capture)"),
+        "trace-remote-stat", ("shell", "ls", "-l", REMOTE_TRACE_FILE_TOKEN),
+        True, False, False,
+        "owned trace file inventory (harness-generated UUID path; pre/post capture)"),
     # --- capture phase (device_write; gated) ---
     CommandSpec(
-        "trace-remote-mkdir", ("shell", "mkdir", "-p", REMOTE_TRACE_DIR), True, True, False,
-        "create the owned remote trace directory (fixed literal)"),
+        "trace-remote-mkdir", ("shell", "mkdir", "-p", REMOTE_TRACE_DIR_TOKEN),
+        True, True, False,
+        "create the owned UUID-isolated remote trace directory"),
     CommandSpec(
         "hitrace-capture-minimal",
-        ("shell", "hitrace", "-t", "5", "-b", "2048", "sched", "-o", REMOTE_TRACE_FILE),
+        ("shell", "hitrace", "-t", "5", "-b", "2048", "sched", "-o",
+         REMOTE_TRACE_FILE_TOKEN),
         True, True, False,
         "minimal 5s sched-tag capture to the owned remote file (argv is the "
         "pre-declared candidate; execution requires the help-anchored gate)"),
     CommandSpec(
-        "trace-recv-minimal", ("file", "recv", REMOTE_TRACE_FILE), True, True, True,
+        "trace-recv-minimal", ("file", "recv", REMOTE_TRACE_FILE_TOKEN),
+        True, True, True,
         "receive the owned trace file into the controlled out-dir"),
     CommandSpec(
-        "trace-remote-rm", ("shell", "rm", REMOTE_TRACE_FILE), True, True, False,
-        "remove exactly the owned trace file (fixed literal; no wildcard)"),
+        "trace-remote-rm", ("shell", "rm", REMOTE_TRACE_FILE_TOKEN),
+        True, True, False,
+        "remove exactly the owned UUID-isolated trace file (no wildcard)"),
     CommandSpec(
-        "trace-remote-rmdir", ("shell", "rmdir", REMOTE_TRACE_DIR), True, True, False,
-        "remove the owned directory only when empty (rmdir refuses otherwise)"),
+        "trace-remote-rmdir", ("shell", "rmdir", REMOTE_TRACE_DIR_TOKEN),
+        True, True, False,
+        "remove the owned UUID directory only when empty (rmdir refuses otherwise)"),
 )
 
 SPECS_BY_ID = {spec.ident: spec for spec in COMMAND_SPECS}
 
-PROBE_COMMAND_IDS = tuple(
-    spec.ident for spec in COMMAND_SPECS if not spec.device_write)
+DISCOVERY_COMMAND_IDS = (
+    "hdc-version",
+    "hdc-list-targets",
+    "hdc-list-targets-verbose",
+)
+TRACE_PROBE_COMMAND_IDS = (
+    "hitrace-help-long",
+    "hitrace-help-short",
+    "hitrace-tag-list",
+    "bytrace-help-long",
+    "bytrace-help-short",
+    "bytrace-tag-list",
+)
+PROBE_COMMAND_IDS = DISCOVERY_COMMAND_IDS + TRACE_PROBE_COMMAND_IDS
 CAPTURE_COMMAND_IDS = tuple(
     spec.ident for spec in COMMAND_SPECS if spec.device_write)
 
@@ -226,6 +255,8 @@ def subprocess_runner(argv: list[str], timeout: int) -> RunnerResult:
 def build_argv(
     hdc_path: str, spec: CommandSpec, target: Optional[str],
     recv_local_path: Optional[str] = None,
+    remote_trace_dir: Optional[str] = None,
+    remote_trace_file: Optional[str] = None,
 ) -> list[str]:
     """Compose the argv for one allowlisted spec. The spec must BE the registered
     allowlist object (identity, not name). The connectkey goes only into the
@@ -237,7 +268,19 @@ def build_argv(
     argv = [hdc_path]
     if spec.needs_target and target:
         argv += ["-t", target]
-    argv += list(spec.tokens)
+    replacements = {
+        REMOTE_TRACE_DIR_TOKEN: remote_trace_dir,
+        REMOTE_TRACE_FILE_TOKEN: remote_trace_file,
+    }
+    for token in spec.tokens:
+        if token in replacements:
+            replacement = replacements[token]
+            if not replacement:
+                raise CaptureError(
+                    f"{spec.ident} requires a harness-generated UUID remote path")
+            argv.append(replacement)
+        else:
+            argv.append(token)
     if spec.recv_to_local:
         if not recv_local_path:
             raise CaptureError(f"{spec.ident} requires a harness-supplied local path")
@@ -334,42 +377,163 @@ def assert_outside_repository(path: str) -> None:
 # --- capture gate (help-anchored authorization of the capture phase) ----------
 
 
-def assert_capture_gate(gate_dir: str) -> dict:
-    """Mechanical in-window gate: the capture-phase argv may execute only when
-    the same-window probe run captured (a) a hitrace help output containing
-    every flag token the capture argv uses and (b) a hitrace tag list containing
-    the ``sched`` tag. The gate reads the probe run's byte-exact stdout files;
-    absence of either evidence refuses the capture phase (the runbook then
-    records a blocked-attempt instead of improvising argv)."""
+def assert_capture_gate(
+    gate_dir: str,
+    resolved_hdc: str,
+    hdc_sha256: str,
+    target: str,
+) -> dict:
+    """Bind capture authorization to one complete probe manifest.
 
-    def _read_matches(pattern: str) -> bytes:
-        joined = b""
-        for path in sorted(glob.glob(os.path.join(gate_dir, pattern))):
+    The exact HDC path/hash, target, closed probe sequence, self-check and each
+    stream's size/hash are revalidated before help/tag bytes can authorize a
+    device-write dispatch. Loose lookalike files or a probe for another target
+    therefore fail closed.
+    """
+
+    def _unique_object(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise CaptureError(
+                    f"capture gate failed: duplicate JSON member in probe manifest: {key}")
+            result[key] = value
+        return result
+
+    def _read_verified_stream(command: dict, stream_name: str) -> bytes:
+        stream = command.get(stream_name)
+        if not isinstance(stream, dict):
+            raise CaptureError(
+                f"capture gate failed: {command.get('commandId')} lacks {stream_name} metadata")
+        name = stream.get("file")
+        if not isinstance(name, str) or os.path.basename(name) != name:
+            raise CaptureError(
+                f"capture gate failed: invalid stream path for {command.get('commandId')}")
+        if stream.get("truncated") is not False:
+            raise CaptureError(
+                f"capture gate failed: truncated stream for {command.get('commandId')}")
+        path = os.path.join(gate_dir, name)
+        try:
             with open(path, "rb") as handle:
-                joined += handle.read()
-        return joined
+                data = handle.read(MAX_STREAM_BYTES + 1)
+        except OSError as error:
+            raise CaptureError(
+                f"capture gate failed: cannot read probe stream {name}: {error}") from None
+        if len(data) > MAX_STREAM_BYTES:
+            raise CaptureError(f"capture gate failed: oversized probe stream {name}")
+        if (
+            stream.get("bytes") != len(data)
+            or stream.get("sha256") != hashlib.sha256(data).hexdigest()
+        ):
+            raise CaptureError(
+                f"capture gate failed: probe stream size/hash mismatch for {name}")
+        return data
 
     if not os.path.isdir(gate_dir):
         raise CaptureError(f"--gate-dir is not a directory: {gate_dir}")
-    help_bytes = _read_matches(GATE_HELP_GLOB)
-    tag_bytes = _read_matches(GATE_TAG_GLOB)
-    if not help_bytes:
+    manifest_path = os.path.join(gate_dir, "manifest.json")
+    try:
+        with open(manifest_path, "rb") as handle:
+            manifest_bytes = handle.read(MAX_STREAM_BYTES + 1)
+        if len(manifest_bytes) > MAX_STREAM_BYTES:
+            raise CaptureError("capture gate failed: oversized probe manifest")
+        manifest = json.loads(manifest_bytes, object_pairs_hook=_unique_object)
+    except CaptureError:
+        raise
+    except (OSError, json.JSONDecodeError) as error:
         raise CaptureError(
-            "capture gate failed: no captured hitrace help stdout found in --gate-dir; "
-            "run the probe phase first in this same window")
-    missing = [token.decode() for token in GATE_HELP_TOKENS if token not in help_bytes]
+            f"capture gate failed: invalid or missing probe manifest: {error}") from None
+    if not isinstance(manifest, dict):
+        raise CaptureError("capture gate failed: probe manifest root is not an object")
+
+    expected_identity = {
+        "schema": MANIFEST_SCHEMA,
+        "change": "CHG-2026-021-trace-adapter-capture",
+        "task": "TASK-TR-001",
+        "evidenceClass": "controlledHumanCapture",
+        "deviceWriteEnabled": False,
+        "targetConnectkeyProvided": True,
+        "selfCheckPassed": True,
+    }
+    for key, expected in expected_identity.items():
+        if manifest.get(key) != expected:
+            raise CaptureError(
+                f"capture gate failed: probe manifest {key} is not {expected!r}")
+    toolchain = manifest.get("toolchain")
+    if not isinstance(toolchain, dict):
+        raise CaptureError("capture gate failed: probe manifest lacks toolchain identity")
+    if (
+        toolchain.get("hdcPath") != resolved_hdc
+        or toolchain.get("hdcSha256") != hdc_sha256
+    ):
+        raise CaptureError(
+            "capture gate failed: probe HDC path/hash does not match this invocation")
+
+    commands = manifest.get("commands")
+    if not isinstance(commands, list):
+        raise CaptureError("capture gate failed: probe manifest commands is not an array")
+    command_ids = [
+        command.get("commandId") for command in commands if isinstance(command, dict)
+    ]
+    if command_ids != list(PROBE_COMMAND_IDS) or len(commands) != len(PROBE_COMMAND_IDS):
+        raise CaptureError(
+            "capture gate failed: command sequence is not the closed 'probe' sequence")
+
+    streams: dict[str, bytes] = {}
+    for command, ident in zip(commands, PROBE_COMMAND_IDS):
+        if not isinstance(command, dict):
+            raise CaptureError("capture gate failed: malformed probe command entry")
+        expected_argv = build_argv(resolved_hdc, SPECS_BY_ID[ident], target)
+        if command.get("argv") != expected_argv:
+            raise CaptureError(
+                f"capture gate failed: probe argv/target mismatch for {ident}")
+        if command.get("timedOut") is not False:
+            raise CaptureError(f"capture gate failed: probe command timed out: {ident}")
+        command_self_check = command.get("selfCheck")
+        if (
+            not isinstance(command_self_check, dict)
+            or command_self_check.get("passed") is not True
+        ):
+            raise CaptureError(f"capture gate failed: probe self-check failed: {ident}")
+        streams[ident] = (
+            _read_verified_stream(command, "stdout")
+            + _read_verified_stream(command, "stderr")
+        )
+
+    version_lines = {line.strip() for line in streams["hdc-version"].splitlines()}
+    if PINNED_HDC_VERSION_MARKER not in version_lines:
+        raise CaptureError(
+            "capture gate failed: probe version does not match pinned Ver: 3.2.0d")
+    inventory_bytes = streams["hdc-list-targets"] + streams["hdc-list-targets-verbose"]
+    if target.encode("utf-8") not in re.split(rb"\s+", inventory_bytes):
+        raise CaptureError(
+            "capture gate failed: operator-confirmed target is absent from probe inventory")
+    help_bytes = streams["hitrace-help-long"] + streams["hitrace-help-short"]
+    tag_bytes = streams["hitrace-tag-list"]
+    def _has_exact_token(data: bytes, token: bytes) -> bool:
+        pattern = (
+            rb"(?<![A-Za-z0-9_-])" + re.escape(token) + rb"(?![A-Za-z0-9_-])")
+        return re.search(pattern, data) is not None
+
+    missing = [
+        token.decode() for token in GATE_HELP_TOKENS
+        if not _has_exact_token(help_bytes, token)
+    ]
     if missing:
         raise CaptureError(
             "capture gate failed: captured hitrace help does not evidence flag(s) "
             + ", ".join(missing)
-            + "; the pre-declared capture argv is not authorized on this build — "
-            "record a blocked-attempt, do not improvise argv")
-    if GATE_TAG_TOKEN not in tag_bytes:
+            + "; record a blocked-attempt, do not improvise argv")
+    if not _has_exact_token(tag_bytes, GATE_TAG_TOKEN):
         raise CaptureError(
             "capture gate failed: captured hitrace tag list does not evidence the "
             "'sched' tag; record a blocked-attempt, do not substitute another tag")
     return {
         "gateDir": gate_dir,
+        "probeManifestSha256": hashlib.sha256(manifest_bytes).hexdigest(),
+        "probeCommandCount": len(commands),
+        "probeTargetMatched": True,
+        "probeHdcSha256": hdc_sha256,
         "helpTokensEvidenced": [token.decode() for token in GATE_HELP_TOKENS],
         "tagEvidenced": GATE_TAG_TOKEN.decode(),
     }
@@ -424,15 +588,54 @@ def capture(
     home: Optional[str] = None,
     allow_device_write: bool = False,
     gate_dir: Optional[str] = None,
+    remote_run_id: Optional[str] = None,
 ) -> dict:
     _require_utf8("--hdc path", hdc_path)
     _require_utf8("--out-dir path", out_dir)
     if target is not None:
         _require_utf8("--target connectkey", target)
+    if gate_dir is not None:
+        _require_utf8("--gate-dir path", gate_dir)
     if timeout <= 0:
         raise CaptureError(f"--timeout must be a positive number of seconds, got {timeout}")
     assert_outside_repository(out_dir)
     home = home if home is not None else os.path.expanduser("~")
+
+    missing_target = [spec.ident for spec in selected if spec.needs_target and not target]
+    if missing_target:
+        raise CaptureError(
+            "target-bound command(s) require --target: " + ", ".join(missing_target))
+
+    resolved_hdc = os.path.realpath(hdc_path)
+    if not os.path.isfile(resolved_hdc) or not os.access(resolved_hdc, os.X_OK):
+        raise CaptureError(f"hdc binary is not an executable regular file: {resolved_hdc}")
+    hdc_hash = hashlib.sha256()
+    with open(resolved_hdc, "rb") as handle:
+        for block in iter(lambda: handle.read(1_048_576), b""):
+            hdc_hash.update(block)
+    hdc_sha256 = hdc_hash.hexdigest()
+    if hdc_sha256 != PINNED_HDC_SHA256:
+        raise CaptureError(
+            "pinned HDC SHA-256 mismatch; expected "
+            f"{PINNED_HDC_SHA256}, observed {hdc_sha256}; STOP this capture window")
+
+    needs_remote_path = any(
+        token in (REMOTE_TRACE_DIR_TOKEN, REMOTE_TRACE_FILE_TOKEN)
+        for spec in selected for token in spec.tokens)
+    normalized_run_id: Optional[str] = None
+    remote_trace_dir: Optional[str] = None
+    remote_trace_file: Optional[str] = None
+    if needs_remote_path:
+        candidate = remote_run_id or str(uuid.uuid4())
+        try:
+            parsed = uuid.UUID(candidate)
+        except (ValueError, AttributeError):
+            raise CaptureError("remote run id is not a canonical UUID") from None
+        normalized_run_id = str(parsed)
+        if candidate.lower() != normalized_run_id:
+            raise CaptureError("remote run id must use canonical UUID text")
+        remote_trace_dir = f"{REMOTE_TRACE_ROOT}/{normalized_run_id}"
+        remote_trace_file = f"{remote_trace_dir}/{RECV_LOCAL_NAME}"
 
     wants_write = [spec.ident for spec in selected if spec.device_write]
     gate_facts: Optional[dict] = None
@@ -446,18 +649,8 @@ def capture(
             raise CaptureError(
                 "capture-phase command(s) require --gate-dir pointing at this "
                 "window's probe run out-dir")
-        gate_facts = assert_capture_gate(gate_dir)
-        if not target:
-            raise CaptureError("capture-phase command(s) require --target")
-
-    resolved_hdc = os.path.realpath(hdc_path)
-    if not os.path.isfile(resolved_hdc) or not os.access(resolved_hdc, os.X_OK):
-        raise CaptureError(f"hdc binary is not an executable regular file: {resolved_hdc}")
-    hdc_hash = hashlib.sha256()
-    with open(resolved_hdc, "rb") as handle:
-        for block in iter(lambda: handle.read(1_048_576), b""):
-            hdc_hash.update(block)
-    hdc_sha256 = hdc_hash.hexdigest()
+        gate_facts = assert_capture_gate(
+            os.path.realpath(gate_dir), resolved_hdc, hdc_sha256, target)
 
     os.makedirs(out_dir, mode=0o700, exist_ok=True)
     recv_local_path = os.path.join(out_dir, RECV_LOCAL_NAME)
@@ -468,11 +661,22 @@ def capture(
 
     results: list[dict] = []
     overall_self_check_passed = True
+    received_artifact_verified = False
+    cleanup_attempts: list[dict] = []
+    sequence_stopped_reason: Optional[str] = None
+    cleanup_ids = {"trace-remote-rm", "trace-remote-rmdir"}
 
     for index, spec in enumerate(selected):
+        if spec.ident in cleanup_ids and not received_artifact_verified:
+            sequence_stopped_reason = (
+                "received artifact was not non-empty and self-check verified; "
+                "owned remote path retained")
+            break
         argv = build_argv(
             resolved_hdc, spec, target,
-            recv_local_path=recv_local_path if spec.recv_to_local else None)
+            recv_local_path=recv_local_path if spec.recv_to_local else None,
+            remote_trace_dir=remote_trace_dir,
+            remote_trace_file=remote_trace_file)
         try:
             result = runner(argv, timeout)
         except OSError as error:
@@ -502,6 +706,14 @@ def capture(
                     "selfCheck": file_check,
                 }
                 command_passed = command_passed and file_check["passed"]
+                received_artifact_verified = bool(
+                    file_bytes > 0
+                    and file_bytes <= MAX_STREAM_BYTES
+                    and command_passed
+                    and result.exit_code == 0
+                    and not result.timed_out
+                    and not result.stdout_truncated
+                    and not result.stderr_truncated)
             else:
                 received = {"file": RECV_LOCAL_NAME, "present": False}
         overall_self_check_passed = overall_self_check_passed and command_passed
@@ -529,6 +741,25 @@ def capture(
         if received is not None:
             entry["receivedFile"] = received
         results.append(entry)
+        if spec.ident in cleanup_ids:
+            cleanup_attempts.append({
+                "commandId": spec.ident,
+                "completed": bool(result.exit_code == 0 and not result.timed_out),
+            })
+
+    cleanup_complete = (
+        [attempt["commandId"] for attempt in cleanup_attempts]
+        == ["trace-remote-rm", "trace-remote-rmdir"]
+        and all(attempt["completed"] for attempt in cleanup_attempts)
+    )
+    if not wants_write:
+        capture_outcome = "probeCaptured"
+    elif not received_artifact_verified:
+        capture_outcome = "partialRemoteRetained"
+    elif cleanup_complete:
+        capture_outcome = "receivedNonEmptyCleanupComplete"
+    else:
+        capture_outcome = "receivedNonEmptyCleanupIncomplete"
 
     manifest = {
         "schema": MANIFEST_SCHEMA,
@@ -548,9 +779,20 @@ def capture(
         "targetConnectkeyProvided": bool(target),
         "deviceWriteEnabled": bool(wants_write),
         "captureGate": gate_facts,
+        "captureOutcome": capture_outcome,
         "remoteOwnedSurface": {
-            "directory": REMOTE_TRACE_DIR,
-            "file": REMOTE_TRACE_FILE,
+            "runId": normalized_run_id,
+            "directory": remote_trace_dir,
+            "file": remote_trace_file,
+        },
+        "receiveVerification": {
+            "nonEmptySelfChecked": received_artifact_verified,
+        },
+        "remoteCleanup": {
+            "eligible": received_artifact_verified,
+            "attempts": cleanup_attempts,
+            "complete": cleanup_complete,
+            "retainedReason": sequence_stopped_reason,
         },
         "commands": results,
         "selfCheckPassed": overall_self_check_passed,
@@ -626,8 +868,9 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "controlled output; masked in the redacted manifest)")
     parser.add_argument(
         "--commands", default="probe",
-        help="comma-separated command ids, 'probe' (default: all read-only probes) "
-        "or 'capture' (the gated device-write sequence). "
+        help="comma-separated command ids, 'discover' (HDC version/target inventory), "
+        "'probe' (default: pinned target trace probes), or 'capture' "
+        "(the gated device-write sequence). "
         f"ids: {', '.join(SPECS_BY_ID)}")
     parser.add_argument(
         "--allow-device-write", action="store_true",
@@ -656,6 +899,8 @@ CAPTURE_SEQUENCE = (
 
 def _select(commands: str) -> list[CommandSpec]:
     stripped = commands.strip()
+    if stripped == "discover":
+        return [SPECS_BY_ID[ident] for ident in DISCOVERY_COMMAND_IDS]
     if stripped == "probe":
         return [SPECS_BY_ID[ident] for ident in PROBE_COMMAND_IDS]
     if stripped == "capture":
@@ -683,23 +928,35 @@ def main(argv: Optional[list[str]] = None) -> int:
     except CaptureError as error:
         print(f"capture error: {error}", file=sys.stderr)
         return 2
-    ok = manifest["selfCheckPassed"]
+    capture_complete = (
+        not manifest["deviceWriteEnabled"]
+        or manifest["captureOutcome"] == "receivedNonEmptyCleanupComplete")
+    ok = manifest["selfCheckPassed"] and capture_complete
     commands = manifest["commands"]
     timed_out_count = sum(1 for command in commands if command["timedOut"])
     print(
-        "capture complete:",
+        "capture recorded:",
         f"{len(commands)} commands, {timed_out_count} timed out,",
-        "self-check PASSED" if ok else "self-check FAILED (user path or key material found)")
+        f"outcome={manifest['captureOutcome']},",
+        "self-check PASSED" if manifest["selfCheckPassed"]
+        else "self-check FAILED (user path or key material found)")
     print("full manifest + per-stream files:", os.path.abspath(arguments.out_dir))
     if timed_out_count == len(commands):
         print(
             "WARNING: every command timed out; this run captured nothing usable.",
             file=sys.stderr)
     if not ok:
-        print(
-            "WARNING: sensitive content found in captured output; do not copy raw bytes "
-            "into the repository — investigate before drafting evidence.",
-            file=sys.stderr)
+        if not manifest["selfCheckPassed"]:
+            print(
+                "WARNING: sensitive content found in captured output; do not copy raw bytes "
+                "into the repository — investigate before drafting evidence.",
+                file=sys.stderr)
+        if not capture_complete:
+            print(
+                "WARNING: capture did not reach verified receive + cleanup; the owned "
+                "remote path was retained or cleanup is incomplete. Record a blocked/partial "
+                "attempt and do not improvise cleanup.",
+                file=sys.stderr)
         return 1
     return 0
 
