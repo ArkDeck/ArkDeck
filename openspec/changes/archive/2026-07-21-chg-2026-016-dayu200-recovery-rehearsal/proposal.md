@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-016-dayu200-recovery-rehearsal
 revision: 4
-status: verified # 2026-07-21 本 verification-closure PR(先例 #175/#176/#201/#208);r1-r4 批准链 #170/#171/#177/#214/#216;须在 RH-001 done #221 与 gap-closure #223 之后合入;archive 另行
+status: archived # 2026-07-21 archive PR(先例 #178;目录外零精确路径引用,DEC-002/chg-020 均名称引用不断链);verified 于 #224。原注: 2026-07-21 本 verification-closure PR(先例 #175/#176/#201/#208);r1-r4 批准链 #170/#171/#177/#214/#216;须在 RH-001 done #221 与 gap-closure #223 之后合入;archive 另行
 class: platform
 core_change_level: none
 owner: lvye
