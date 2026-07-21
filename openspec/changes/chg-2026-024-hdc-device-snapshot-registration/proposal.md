@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-024-hdc-device-snapshot-registration
 revision: 1
-status: proposed # 本 proposal PR 合入只登记提案；批准与 task readiness 均须后续独立 PR
+status: approved # 2026-07-21 本 approval-only PR；r1 proposal 经 #272 合入 main `cdfc181`；批准由维护者 review/merge 本 PR 构成
 class: integration
 core_change_level: none
 owner: lvye
@@ -114,3 +114,26 @@ production App、不实现 fan-out、不改变 binding/authorization，也不执
 批准须独立 approval-only PR；TASK-I24-001 初始 blocked。维护者提供并 review 受控
 capture/provenance 后，另起 readiness PR；implementation+evidence、`ready→done`、
 change `verified` 与 CHG-2026-022 adoption/readiness 均使用独立 PR。
+
+## Approval
+
+- r1 proposal 经 PR #272 合入 main（squash `cdfc181`，`status: proposed`）。
+- 正式批准：2026-07-21 由本 approval-only PR（先例 #55/#89/#171/#195/#226/
+  #253/#254/#266）将本 change 置为 `approved`；批准由维护者 review/merge 本 PR
+  构成。merge 即批准：
+  - **单任务 scope 与边界**：TASK-I24-001 只登记独立、版本化的
+    `deviceObservationSnapshot` integration input、同步 profile/lock/macOS mapping 并
+    提供 contract/evidence closure；production producer、轮询 cadence、fan-out、
+    presentation 与 App UI 仍归 CHG-2026-022，既有 readonly registry、Core 与
+    production Sources 保持在 forbidden scope；
+  - **design 硬边界**：existing-server-only 与稳定 pre/post identity/endpoint bracket，
+    whole-output fail closed，successful empty/snapshot/unknown 严格区分且不发 partial
+    set；session-scoped keyed pseudonym、raw identifiers/streams 留仓库外；零 server
+    lifecycle/adoption、subserver/device/binding mutation 与 destructive effect；
+  - **验收面**：五条 change-local AC（I24-HDC-DEVICE-SNAPSHOT/EMPTY/PROVENANCE/
+    REGISTRY/NODISPATCH-001）；canonical Core AC 零认领、Core baseline 不升版，macOS
+    mapping 不产生 platform conformance transition。
+- 本批准不产生任务执行：TASK-I24-001 保持 `blocked`，仍须维护者受控 capture/
+  provenance 经独立 PR review/merge，并由独立 readiness PR 完整重钉 inputs、hashes、
+  scope 与 test matrix 后才可转 `ready`。本批准不构成 HDC/设备支持、authorization、
+  binding、hardware/release evidence，也不会使 CHG-2026-022 自动 ready。
