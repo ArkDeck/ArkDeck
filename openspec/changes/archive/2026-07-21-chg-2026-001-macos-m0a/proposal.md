@@ -1,6 +1,6 @@
 ---
 id: CHG-2026-001-macos-m0a
-status: verified # 2026-07-15 M0A 收官:矩阵 5 passed/8 blocked,阻断经 PR #10/#12 维护者接受,verification gate 的"显式 platform blocker 被接受"条款满足;汇总见 evidence/runs/TASK-M0A-006/rollup.md;经本 PR 合并确认
+status: archived # 2026-07-21 archive PR(先例 #178/#235/#241/#242;引用面收口:唯一活跃路径引用 = ADR-0001 一处 evidence 指针,同 PR 更新为 archive 路径;docs/reviews 历史快照与 archived CHG-017 字节内引用不改写,断链接受并记录,先例 #211;M0A 移交的 TRUST/SANDBOX 等 blocked 行已随 M1/CHG-018 各自处置)。原注: 2026-07-15 M0A 收官:矩阵 5 passed/8 blocked,阻断经 PR #10/#12 维护者接受,verification gate 的"显式 platform blocker 被接受"条款满足;汇总见 evidence/runs/TASK-M0A-006/rollup.md;经本 PR 合并确认
 class: platform
 core_change_level: none
 owner: lvye
