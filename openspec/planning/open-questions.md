@@ -156,11 +156,42 @@ Open question 不得以聊天记忆留存。每项记录默认决策、阻塞范
 
 ## DEC-004 Distribution and update channel
 
-- Status：partially open
-- Default：Developer ID signed/notarized direct distribution；M0A 决定 Sandbox feasibility；自动更新非 MVP
-- Question：内部工具、公开分发或 Mac App Store？
-- Blocks：最终 distribution profile、M5 release
-- Affected：macOS profile、diagnostics/privacy
+- Status：partially open(2026-07-21 登记 decision inputs,先例 #52;登记≠决策,
+  剩余待决面见下)
+- Default：Developer ID signed/notarized direct distribution;自动更新非 MVP
+- Question(收窄后):发布范围(内部工具先行 vs 直接公开)、ADR-0001 Sandbox 张力
+  处置、更新渠道确认。MAS 已被 ADR-0001 排除出 v1(重开须 reopen 该 ADR)。
+- Registered decision inputs(2026-07-21):
+  - **ADR-0001(2026-07-15,M0A)已定 v1 分发架构**:非 Sandbox、Developer ID +
+    Hardened Runtime、单一公证 DMG、macOS 14/arm64、**零 application entitlement**、
+    不捆绑 HDC;ZIP/MAS/双构建/未签名/ad-hoc 均排除。该 ADR 只选定架构,release 仍
+    blocked 于其 evidence gates(Developer ID identity + clean-VM 矩阵,即 M0A 移交
+    的 TRUST-001…004 blocked 行,至今未执行)。
+  - **★ 开发形态与 ADR 分发形态的张力(本次登记的核心输入)**:当前 App 构建实为
+    Sandboxed 原型形态(`ArkDeckApp.entitlements`:app-sandbox + device.usb/serial +
+    network.client + files.user-selected/bookmarks 六项),且 M0B 真机 USB 采集、
+    M1-006/CHG-019 signed Sandbox XCUITest、PersistentFileAccess(security-scoped
+    bookmark/PowerBox)均在该形态上验证。ADR-0001 自身条款"若实现证明需要任何
+    entitlement,须先 revisit 本决策"——其触发条件已被实现事实实质满足。两个处置
+    分支(成本对比,非倾向):
+    (a) 按 ADR 切换 = 独立 change:非 Sandbox 零 entitlement 构建 + 文件访问语义
+    重验(bookmark/PowerBox 在非 Sandbox 下语义不同)+ XCUITest 重跑 + clean-VM
+    矩阵;(b) reopen/supersede ADR-0001 = 改为 Sandboxed 分发:现有六 entitlement
+    集已被真机与 signed XCUITest 背书可用,但须重评 Hardened Runtime/公证组合与
+    ADR 的威胁面论证。
+  - 更新渠道:自动更新非 MVP(Sparkle 在 backlog);现行 Default = 公证 DMG 手动
+    更新。DEC-007(bundled HDC)deferred 与 ADR"不捆绑"一致,不阻塞渠道选择。
+  - M5 roadmap 面:signed/notarized package + clean-host smoke 是 M5 交付物;
+    diagnostics/privacy 面(M1-009 local-only、默认 redact)已 fail-safe,不构成
+    渠道约束。
+- Remaining open(须 owner 决策):① 发布范围:内部工具先行(仍需 DevID+公证,
+  Gatekeeper 在他机生效)vs 直接公开直发;② Sandbox 张力处置选 (a)/(b);③ 更新
+  渠道确认(维持手动 DMG,或把自动更新提前=backlog 变更)。
+- Decision path:owner 独立 decision PR,merge 即决策(先例 DEC-001/002/006);
+  若选 (b) 须同 PR 或先行 supersede ADR-0001(ADR 状态字段与 macos profile
+  distribution 节同步);若选 (a) 须同时立项切换 change。
+- Blocks:最终 distribution profile、M5 release
+- Affected:macOS profile、diagnostics/privacy、ADR-0001
 
 ## DEC-005 Embedded Trace viewer
 
