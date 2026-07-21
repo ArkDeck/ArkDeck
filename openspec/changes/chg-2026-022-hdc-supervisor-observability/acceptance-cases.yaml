@@ -1,7 +1,7 @@
 ---
 schema_version: 1.0.0
 change_id: CHG-2026-022-hdc-supervisor-observability
-change_revision: 1
+change_revision: 2
 platform: macos
 evidence_classes:
 - contract
@@ -12,22 +12,28 @@ cases:
   expected_source: openspec/changes/chg-2026-022-hdc-supervisor-observability/verification.md#OBS-COUNTER-001
   minimum_evidence: contract
   expected_result: >-
-    Automatic lifecycle/subserver dispatch counters increment at the real
-    dispatch call sites - a test-injected automatic dispatch makes the count
-    strictly positive (red case) while the untouched production path snapshots
-    zero (green case); the presentation mirrors the snapshot; a branch constant
-    or structural-absence inference does not satisfy this case.
+    Automatic lifecycle/subserver dispatch counters increment only after the
+    unique identity-bound posix_spawn hook succeeds. Origin is derived from a
+    sealed typed argv family plus an opaque Supervisor-minted confirmed or
+    managed permit; callers cannot provide an origin enum/string/flag or write
+    the monitor. A fake-process mutation that removes the permit must spawn
+    through the same hook and make each automatic counter positive, while the
+    untouched path remains zero; confirmed/managed dispatch is not counted as
+    automatic and presentation mirrors the snapshot.
 - acceptance_id: OBS-OWNERSHIP-001
   test_id: TEST-OBS-OWNERSHIP-001
   method: Ownership evidence-matrix contract.
   expected_source: openspec/changes/chg-2026-022-hdc-supervisor-observability/verification.md#OBS-OWNERSHIP-001
   minimum_evidence: contract
   expected_result: >-
-    With all three evidence items present (pre-existing server receipt, zero
-    lifecycle dispatch count, generation minted from observation) production
-    classifies external and exposes the basis; with any item absent it stays
-    unknown; an equivalence test proves the authorization gates treat external
-    and unknown identically before and after this change.
+    With all four evidence items present (pre-existing server receipt, zero
+    automatic lifecycle dispatch count, generation minted from observation,
+    and no active or unreconciled managed-launch provenance) production
+    classifies external and exposes the basis. Missing evidence stays unknown
+    or retains a live ArkDeck-managed claim; an existing managed claim cannot
+    transition directly to external before explicit reconcile or retirement.
+    An equivalence test proves external and unknown authorization gates remain
+    identical.
 - acceptance_id: OBS-ENDPOINT-001
   test_id: TEST-OBS-ENDPOINT-001
   method: Endpoint source and child-environment exposure contract.
@@ -43,9 +49,12 @@ cases:
   expected_source: openspec/changes/chg-2026-022-hdc-supervisor-observability/verification.md#OBS-FANOUT-001
   minimum_evidence: contract
   expected_result: >-
-    Device snapshot diffs produce appeared/disappeared events into the
-    supervisor fan-out and a bounded presentation buffer; no new device command
-    is introduced (the read-only probe surface reuse is asserted).
+    Device snapshots come from a separately approved and implemented
+    parameterized zero-to-many read-only integration family. Production
+    composition diffs appeared, unchanged and disappeared devices into the
+    Supervisor fan-out and bounded presentation buffer, distinguishes an empty
+    successful snapshot from unknown/failure, and issues no unregistered device
+    command. Test-only snapshot injection cannot satisfy this case by itself.
 - acceptance_id: OBS-APPFACE-001
   test_id: TEST-OBS-APPFACE-001
   method: Signed XCUITest over the new observation fields.

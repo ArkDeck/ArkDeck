@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-022-hdc-supervisor-observability
-revision: 1
-status: approved # 2026-07-21 本 approval-only PR(先例 #55/#89/#171/#195/#226);r1 proposal 经 #252 合入 main `bb67f22`;批准由维护者 review/merge 本 PR 构成
+revision: 2
+status: approved # r1 经 main `1e4a7c4027ecdd1142ceab2b80f4423eec586d6d` 批准;r2 review-remediation 仅在对应治理 PR 由维护者 review/merge 后生效
 class: platform
 core_change_level: none
 owner: lvye
@@ -10,6 +10,29 @@ platforms: [macos]
 ---
 
 # HDC supervisor 可观察性:仪表化计数、设备 fan-out 面、endpoint source 与 ownership 判定
+
+## Revision r2 review remediation
+
+TASK-OBS-001 r1 readiness(`f3c9685ea70b32099c20bf7fe022bbc9aa688709`)
+后的实现审查发现四个 prerequisite 缺口，prototype PR #265 因此只保留为 draft，
+不得作为实现或 evidence 合入：
+
+1. macOS profile 仅批准与既有 durable binding 精确匹配的 registered
+   `list targets -v` capture；它不是任意设备枚举，不能为真机插拔 fan-out 提供
+   生产快照。该能力必须先经独立 integration change 注册参数化 raw family。
+2. r1 的“防御性 automatic executor 入口”没有生产调用方；caller-supplied origin
+   也可伪造。r2 将计数语义收紧为：在 identity-bound `posix_spawn` 成功后的唯一
+   hook，根据 supervisor 铸造的 opaque permit 区分 confirmed/managed 与
+   unpermitted automatic dispatch；测试只能通过同一 spawn hook 的 mutation seam
+   证伪，不能直接调用 monitor。
+3. r1 三证据不能排除既有 `.arkDeckManaged` provenance。r2 增加 managed-provenance
+   disposition；既有 managed claim 未经显式 reconcile/retire 时不得被 bracketed
+   observation 直接改判 `.external`。
+4. r1 readiness 把 8-hex 文件 SHA-256 前缀误称为 blob pin。r2 记录完整 historical
+   commit/blob/SHA-256，并要求未来 readiness 对实际实现 base 重新给出完整 pin。
+
+本 r2 只修订治理、设计和验证并把 TASK-OBS-001 恢复为 `blocked`；不包含实现、
+不产生新的 AC evidence、不执行 HDC/设备命令。TASK-OBS-002 继续 blocked。
 
 ## Why
 
@@ -40,16 +63,20 @@ blocked(#250):执行前源码级深查证伪了四个观察点的取证路径—
 两任务分期,均 host-only(零设备、零真机;真机观察本身留在 TASK-M0B-002):
 
 - **TASK-OBS-001 — Kit 仪表化与分类面**(`Packages/ArkDeckKit`):
-  - 自动 lifecycle/subserver dispatch 计数器:在真实 dispatch 调用点计数(非分支
-    常量),快照可读,contract 测试以变异实验证伪(注入一次自动 dispatch → 计数
-    必须 >0 且测试红,绿对照在案);
-  - ownership 判定:在"observed pre-existing server + 本会话零 lifecycle
-    dispatch"证据下生产判 `.external`(证据不足保持 `.unknown`;判定升级零
-    lifecycle 语义变更、零安全门放宽——external/unknown 门语义同等保持);
+  - 自动 lifecycle/subserver dispatch 计数器:只在 identity-bound spawn 成功后
+    的唯一 hook 计数；origin 由 opaque supervisor permit 与 typed argv family
+    决定，普通 caller 不能传 enum/string 自报来源；confirmed/managed dispatch
+    单独计数且不得混入 automatic；
+  - ownership 判定:在"observed pre-existing server + 本会话零 automatic
+    lifecycle dispatch + observation-minted generation + 无 active/unreconciled
+    managed provenance"四项证据下生产判 `.external`；任一不足保持 `.unknown`
+    或保留经验证的 `.arkDeckManaged`，不得直接 managed → external；
   - endpoint source 暴露:presentation 增加 endpoint 来源(explicit/inherited/
     default)与子进程 env 注入状态(父进程 env 零修改的既有契约不变,仅暴露);
   - 设备 fan-out feed:只读 device-observation recipient(设备出现/消失事件进
-    supervisor fan-out 与 presentation;不引入任何设备 mutation 路径)。
+    supervisor fan-out 与 presentation;不引入任何设备 mutation 路径)；其生产
+    producer 必须来自先行 approved/done 的独立 OpenHarmony integration change，
+    不得把 selected-device authorization capture 当成任意设备枚举。
 - **TASK-OBS-002 — App 观察面**(`ArkDeckApp`,依赖 OBS-001):
   - HDCStatusView 增加计数快照、endpoint source、ownership 判定依据字段与设备
     事件列表(全部 static-text 可访问,Accessibility 可读、截图可取证);
@@ -72,18 +99,19 @@ V2 治理:本 propose PR 合入仅登记提案;批准须独立 approval-only PR;
 TASK-M0B-002 以新 readiness PR 重钉交付形态与 pins(#250 记录的解除前置 (b)),
 再约设备窗口。
 
-## Approval
+## Approval history and r2 effect
 
 - r1 proposal 经 PR #252 合入 main(squash `bb67f22`,status:proposed)。
-- 正式批准:2026-07-21 由本 approval-only PR(先例 #55/#89/#171/#195/#226)将本
-  change 置为 `approved`;批准由维护者 review/merge 本 PR 构成。merge 即批准:
+- r1 正式批准:2026-07-21 由 approval-only commit
+  `1e4a7c4027ecdd1142ceab2b80f4423eec586d6d` 将本 change 置为 `approved`:
   - **两任务分期 scope 与边界**:TASK-OBS-001(Kit 仪表化与分类面)与
     TASK-OBS-002(App 观察面 + signed XCUITest,依赖 OBS-001)的 objective/scope/
     allowed-paths;
   - **design §0 硬不变量**:纯可观察性——零 lifecycle/授权门语义变更
     (external/unknown 门等价性本身为测试用例)、仪表化真实性(计数器落真实调用
-    点、变异可证伪、拒绝分支常量)、ownership 三证据矩阵判 external 缺一保持
-    unknown 的 fail-closed 方向、零新增设备 mutation 路径;
+    点、变异可证伪、拒绝分支常量)、r1 ownership 三证据矩阵、零新增设备
+    mutation 路径。r2 review 已证明三证据与原调用点定义不足，合入后由本文件
+    r2 四证据/opaque-permit/successful-spawn 规则替换；
   - **验收面**:五条 change-local contract AC(OBS-COUNTER/OWNERSHIP/ENDPOINT/
     FANOUT/APPFACE-001);canonical Core AC 零认领;不改写 CHG-2026-006
     acceptance;M1-009 导出接线明确 out of scope。
@@ -91,3 +119,15 @@ TASK-M0B-002 以新 readiness PR 重钉交付形态与 pins(#250 记录的解除
   (OBS-002 另需 OBS-001 done);本 change done 后 TASK-M0B-002 以新 readiness PR
   重钉交付形态(#250 解除前置 (b)),真机观察仍属 M0B-002 + 设备窗口 + 维护者
   执行。
+- r2 是批准后 scope/design remediation；维护者 review/merge 本 r2 PR 即批准
+  收紧后的 AC 与 blocker，并使 TASK-OBS-001 的 `ready→blocked` 生效。它不恢复
+  readiness，也不批准 #265。
+
+## Revision history
+
+- r1 proposal 经 PR #252 合入 `bb67f22`，change 经
+  `1e4a7c4027ecdd1142ceab2b80f4423eec586d6d` 批准；TASK-OBS-001 readiness
+  经 `f3c9685ea70b32099c20bf7fe022bbc9aa688709` 生效。
+- r2(2026-07-21)依据 prototype review remediation 收紧 counter/ownership/fan-out
+  与 pin 规则，并把 TASK-OBS-001 恢复为 blocked。本 revision 仅在维护者
+  review/merge 对应治理 PR 后生效；#265 不构成实现完成或 acceptance evidence。
