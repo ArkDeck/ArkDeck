@@ -74,10 +74,22 @@
 
 ## TASK-RF-002 — 阶段 B:RockchipRockUSBFlashProvider 与 `arkdeck flash` 接入
 
-- Status:ready(readiness;仅在维护者 review/merge 本独立状态 PR 后生效。前置 ① 已满足:
-  CHG-2026-020 approved(#226 squash `7f5cb1b`);基座已满足:TASK-RF-001 的 Profile/契约/
-  命令面 evidence 由 part 1 PR #230(squash `3ba7c2f`)提供(`images-tar-contract.md`、
-  RF-CONTRACT-001 PASS)。本 PR 即前置 ②,单文件、不含实现、不产生 evidence)
+- Status:done(阶段 B contract 面 + 真机验收均可判定,`ready→done`;仅在维护者
+  review/merge 本独立状态 PR 后生效。依据:Swift 实现 PR #236(squash `32908a9`,
+  `RockchipRockUSBFlashProvider`/typed FlashStep/REQ-FLASH-015 授权门/critical write
+  边界/`arkdeck flash` CLI;认领 AC `AC-FLASH-001/002/004/007/008/012/013/015-01/015-02`
+  contract 全绿,15 contract 测试、全量 302/0)+ 真机验收 evidence PR #237(squash
+  `657f405`,RF-ACCEPT realHardware PASS:`arkdeck flash` 产品路径端到端——validate →
+  exact plan → 人工确认 gate(`FLASH <digest12>`+`ERASE-USERDATA`)→ 人工 handoff 九分区
+  `wlx` 全 100%/exit 0 → `rd` → postflight `succeeded/confirmed`;窗口内实测非 TTY
+  execute `policyBlocked`;operator lvye,2026-07-21)均已合入。`hardware-matrix.md`
+  首条 `verified` 行 `EVD-RF002-DAYU200-20260721-001` 已随 #237 登记。Agent/CI
+  destructive dispatch 全程 0(结构性 + 仪表化 + 真机窗口实测)。change 级 verify
+  (verification matrix status 统一登记)另行独立 PR。不构成 DAYU200 以外设备、其他
+  固件/工具版本的支持声明。)
+- Attempt 链:readiness #232 → Swift 实现 #236(contract 全绿)→ 真机验收 #237
+  (RF-ACCEPT PASS,`acceptance-2026-07-21.md`;postflight #1 的 crib observation 聚合
+  缺陷与修正已如实入档,产品语义门 fail-closed 行为得到真机侧双向验证)。
 - Readiness review(2026-07-21;host-only,零设备命令):
   - Approve gate:satisfied(#226 `7f5cb1b`);DEC-002 正向决策方向、REQ-FLASH-* 认领面、
     design §0 命令面与安全设计随批准生效。
