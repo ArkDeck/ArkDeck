@@ -47,7 +47,8 @@ Open question 不得以聊天记忆留存。每项记录默认决策、阻塞范
     刻意不解码成员字节）;
   - `GAP-DAYU200-FLASH-ADDRESSES`:未从任何成员推导烧写 offset/地址映射;
   - `GAP-DAYU200-FLASH-PROTOCOL`:flashd/rockusb/USB/UART/TCP 协议事实未建立;
-  - `GAP-DAYU200-RECOVERY-PATH`:烧写中断后的恢复/救砖路径未建立。
+  - `GAP-DAYU200-RECOVERY-PATH`:烧写中断后的恢复/救砖路径未建立。**（2026-07-21
+    已关闭——恢复演练 attempt #5 成功真机建立并验证恢复路径,见下 Registered inputs）**
 - Resolution vehicle：四个 gap 须由后续独立 change 解决（DAYU200 Integration
   change / Route-B CLI plan-only 特征化;按 backlog 规则不得并入既有 Task,
   CHG-2026-003 evidence 明确不能满足本决策）;在此之前本决策保持 Default。
@@ -57,11 +58,14 @@ Open question 不得以聊天记忆留存。每项记录默认决策、阻塞范
     `flash-protocol-facts.md`（文档面已建立:DAYU200 官方烧录仅 Windows
     RockUSB/RKDevTool,flashd 端到端与任何 macOS 烧写路径均无官方文档;flashd 进入
     命令、MaskRom/Loader 依 bcdUSB 判别、VID/PID 事实、rkdeveloptool ≥1.32 macOS 可
-    构建）。**真机确认（2026-07-20,RH-001 PR #173）**:DAYU200 的 recovery/updater
-    进态实测 `2207:5000`（updater-hdc,落实 CHG-011 待确证 PID）,rkdeveloptool
-    RockUSB 无法驱动该模式——真机侧印证"macOS 烧写实际走 hdc/flashd 而非
-    rkdeveloptool RockUSB"。剩余=第二阶段真机模式确认（写设备,RECOVERY 先行,
-    Route-B ④）。
+    构建）。**真机演进（#173→#220）**:#173 单窗口按键得 `2207:5000`（updater-hdc）、
+    `db` 失败,当时推测"macOS 烧写走 hdc/flashd 而非 rkdeveloptool RockUSB";**该推测
+    已被 RH-001 attempt #5（#220,2026-07-21）真机推翻**——精确进态序列达成 `0x350a`
+    Loader 态,rkdeveloptool RockUSB 的 **Loader 态 `wlx`**（over 既有分区表）九分区
+    写入全成功、恢复达成。故 DAYU200 macOS 写设备实际通道 = **rkdeveloptool RockUSB
+    Loader 态 `wlx`**（`db`/`gpt` 属 MaskRom/miniloader 阶段命令,板上 U-Boot 升级态
+    不实现,#220/#218 实证),**非** hdc/flashd。剩余=正向全量烧写(vs 恢复)的 Provider
+    与命令面待 real-flash integration change 立项。
   - `GAP-DAYU200-RECOVERY-PATH`:archived CHG-2026-010 恢复预案（macOS 恢复路径=
     rkdeveloptool,S3 细节标注待演练确证）+ archived CHG-2026-013 演练准备
     （rkdeveloptool 1.32 已构建、物料 pinned）+ RISK-001 风险接受在案。剩余=恢复演练
@@ -70,24 +74,43 @@ Open question 不得以聊天记忆留存。每项记录默认决策、阻塞范
     PR #173 `bbf8ddf`）**:恢复演练首窗口证明 **rkdeveloptool RockUSB 路径对 DAYU200
     不通**——Maskrom-按键路径产出 `Vid=0x2207,Pid=0x5000`（updater-hdc,非 RockUSB
     `0x350a`）,`ld` 能枚举但 `db` 建 comm 即失败（sudo 复测同样失败,排除特权）;
-    一手推翻预案的 rkdeveloptool 主路径假设,指向 DAYU200 恢复/烧写实际通道为
-    **hdc/flashd**（与 GAP-FLASH-PROTOCOL 的 CHG-011 缺席结论一致）。设备零字节写入、
-    经重启完整恢复到正常态（有限 recovery 事实）。剩余=恢复路线重定向研究（rkdeveloptool
-    真 Maskrom `0x350a` 物理进态 vs hdc/flashd）+ 重约窗口;`GAP-DAYU200-RECOVERY-PATH`
-    **保持 open**。
+    一手推翻预案的 rkdeveloptool 主路径假设,当时（#173 单窗口）推测 DAYU200 恢复通道
+    为 **hdc/flashd**。设备零字节写入、经重启完整恢复到正常态。当时 `GAP-DAYU200-
+    RECOVERY-PATH` 保持 open。
+    **★ 该 hdc/flashd 推测已被后续真机推翻;gap 关闭（2026-07-21,TASK-RH-001 done
+    PR #221 + success evidence #220 `3feacc3`,须在 #221 之后合入）**:恢复演练经
+    attempt #2–#4（#213/#215/#217）逐窗口修正进态序列与命令条件化,并经 #218
+    loader-vs-maskrom 研究预判,于 **attempt #5（#220）成功**——精确按键序列达成
+    `0x350a` **Loader** 态（#173 的 `0x5000` 系按键序列不精确所致,非 rkdeveloptool
+    不通）,九个 PD-002 mapped 分区经 **Loader 态 `wlx`**（over 既有分区表）全部写入
+    成功、`rd` 复位后设备重启进正常系统、postcheck 58B `USB Connected localhost`。
+    **结论(真机纠正 #173)**:DAYU200 macOS 恢复路径 = **rkdeveloptool RockUSB Loader
+    态 `wlx`**,**可行**,无需 hdc/flashd、无需硬件强制真 MaskRom;板上 U-Boot Loader
+    升级态支持 `wlx` 写数据而拒 `db`/`gpt`（改分区表类,#220/#218 实证）。
+    `GAP-DAYU200-RECOVERY-PATH` **关闭**。此结论亦更新下方 `GAP-DAYU200-FLASH-PROTOCOL`
+    的"macOS 烧写实际通道"推测(RockUSB 可行,非 hdc/flashd),并经 `ppt` GPT dump
+    15/15 逐行确证 `GAP-DAYU200-FLASH-ADDRESSES`/`GAP-DAYU200-PARTITION-SEMANTICS`
+    的真机布局项(见各段)。DEC-002 整体保持 open(正向烧写 `arkdeck flash` 的 Provider
+    选择待 real-flash integration change 立项),但恢复路径子问题已解决,Default 不变。
   - `GAP-DAYU200-PARTITION-SEMANTICS`:**已登记（2026-07-20）**=TASK-PD-002 done
     （evidence PR #164 `6f26ca3`、状态 PR #165 `e20a832`）的 fresh signed-broker
     platform `partition-mapping.json`（SHA-256 `965e3bf3…`）+ `member-reconciliation.json`
     （`55c3515…`）:15 分区语义解读（offset/size 源编码值、grammarBranch、
     mapped/orphan 对账,仅对 pinned archive identity `fc7637f3…5280` 成立,
     non-authoritative）。剩余=真机分区表实际布局确证（GPT vs parameter,Route-B ④
-    第二阶段）。
+    第二阶段）。**真机确证达成（2026-07-21,RH-001 attempt #5,#220）**:Loader 态
+    `ppt` 读出设备现行分区表,表头 `Partition Info(GPT)` = **GPT 分支实锤**;15 行
+    index/name/offset 逐行 15/15 精确 match PD-002 `partition-mapping.json`(五窗口
+    逐字节一致)——真机布局与解读一致,GPT vs parameter 待确证项落定为 GPT。
   - `GAP-DAYU200-FLASH-ADDRESSES`:**已登记（2026-07-20）**=TASK-FA-001 done
     （research PR #167 `f9b74cc`、状态 PR #168 `03e975b`;change 于 2026-07-20 archived）的 `flash-address-facts.md`
     （SHA-256 `e1c09d16…`）:15 分区目标地址映射表（逐行锚定 PD-002 扇区列,字节列
     S2 ×512 派生）+ 各 host 工具寻址语义（`wl` 按 LBA 扇区、`wlx` 按名靠设备侧分区
     表、`db`/`ul` loader 非扇区）+ PD-002 未覆盖项显式 unknown。剩余=真机 `ppt`/GPT
-    dump 对地址表的逐行确证（Route-B ④ 第二阶段）。
+    dump 对地址表的逐行确证（Route-B ④ 第二阶段）。**真机确证达成（2026-07-21,
+    RH-001 attempt #5,#220）**:Loader 态 `ppt` GPT dump 的 15 行 offset(LBA)逐行
+    15/15 精确 match FA-001 §2 地址表(锚定 PD-002 扇区列);且 `wlx <name>`(按名靠
+    设备侧分区表)九分区写入全成功,实证 FA-001 §1 的 `wlx` 寻址语义。
 - Blocks：M4 Provider implementation/verification
 - Affected：flashing spec、Provider contract
 
