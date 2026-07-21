@@ -6,9 +6,30 @@
 
 ## TASK-TR-001 — trace 工具 provenance 登记(integration 面,device-gated)
 
-- Status:blocked(双前置:① CHG-2026-021 经 approval-only PR 批准;② 独立
-  readiness PR——须记录采集 runbook/harness 选型、具名设备窗口、执行时 pins
-  (hdc/设备 build)复核)
+- Status:ready(readiness;仅在维护者 review/merge 本独立状态 PR 后生效。单文件、
+  不含实现、不产生 evidence、不执行真机)
+- Readiness review(2026-07-21;host-only,零设备命令):
+  - Approve gate:satisfied(#253 squash `684c42c`);design §0 候选命令面、§4
+    登记形态随批准生效。
+  - 执行时 pins(本 readiness 实测复核):hdc = DevEco toolchains 路径,SHA-256
+    `48395ba8d87115dffca47df2a640a6c868bc9a2bd4eb49611e4138ff88d8d260`、
+    `Ver: 3.2.0d`(与 M0B/I15 pinned tuple 逐字一致);设备 = DAYU200 OpenHarmony
+    7.0.0.34(M0B evidence `EVD-M0B-DAYU200-20260718-001`)。采集前须再复核,
+    任一漂移即停。
+  - runbook/harness:属本任务实现交付物(in scope 既列)——封闭白名单
+    (hitrace/bytrace 存在/help/tag-list 探测 + 最小 capture + recv)在实现 PR
+    起草并经维护者 review 后方可用于窗口;形态复用 m0b/ud harness 信任链
+    (argv 无 shell、分流 byte-exact、敏感自检、redacted manifests)与既有
+    redaction 工具链;白名单外命令零授权。
+  - 具名设备窗口:维护者自选的连续设备窗口,窗口内无其他设备操作并行(与
+    TASK-M0B-002、chg-008 Phase B 等互斥,可同日先后);执行前在 run.md 记录
+    实际日期/时段。
+  - 执行模型:维护者亲手跑 runbook,Agent 零设备命令、只起草/核验/起草
+    evidence;trace 采集含 deviceMutation 级 capture(非 destructive),参数
+    set/restore 若用须逐项确认+readback+恢复;中止如实记录 blocked-attempt。
+  - Review boundary:本 readiness 只翻转状态并记录 pins/窗口/执行模型;实现
+    (runbook+采集+登记)仍须满足 TRACE-PROV-001 与 verification gate;
+    `ready→done` 另用独立状态 PR。
 - Objective:在 DAYU200 真机受控采集 hitrace/bytrace 的存在/help/tag-list/最小
   capture 输出,登记版本化 trace probe/golden registry(design §4 形态),bump
   OPENHARMONY-TOOLS 与 INTEGRATION-PROFILES.lock。
