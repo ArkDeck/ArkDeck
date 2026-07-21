@@ -156,11 +156,21 @@ Open question 不得以聊天记忆留存。每项记录默认决策、阻塞范
 
 ## DEC-004 Distribution and update channel
 
-- Status：partially open(2026-07-21 登记 decision inputs,先例 #52;登记≠决策,
-  剩余待决面见下)
-- Default：Developer ID signed/notarized direct distribution;自动更新非 MVP
-- Question(收窄后):发布范围(内部工具先行 vs 直接公开)、ADR-0001 Sandbox 张力
-  处置、更新渠道确认。MAS 已被 ADR-0001 排除出 v1(重开须 reopen 该 ADR)。
+- Status：decided(2026-07-21;决策由 owner review/merge 本 decision PR 构成,
+  V2 治理,先例 DEC-001/002/006;decision inputs 于同日先行登记,见下)
+- Owner：product owner
+- Decision(三项,详细架构与论证见 **ADR-0002**(同 PR 新增,supersede ADR-0001)):
+  1. **发布范围 = 公开直接分发**(公证 DMG 公开下载;zh-Hans/en、accessibility
+     与支持面要求进入 M5 验收);
+  2. **分发形态 = Sandboxed + 现行六 entitlement 集**(ADR-0001 的 revisit 条款
+     已被实现事实触发,经 ADR-0002 supersede:全部已验证面建立在该形态上,
+     Sandbox 为直发的纵深防御加分;DevID + Hardened Runtime + 公证 DMG 不变;
+     MAS/ZIP/双构建仍排除);
+  3. **更新渠道 = 应用内自动更新纳入 v1**(框架候选 Sparkle 2 或等价;选型/XPC/
+     签名链/隐私披露/网络面由独立 change 评估落地,verified 前手动 DMG 过渡;
+     backlog 条目已同 PR 注记)。
+- Question(历史):内部工具、公开分发或 Mac App Store?ADR-0001 Sandbox 张力
+  处置?更新渠道?
 - Registered decision inputs(2026-07-21):
   - **ADR-0001(2026-07-15,M0A)已定 v1 分发架构**:非 Sandbox、Developer ID +
     Hardened Runtime、单一公证 DMG、macOS 14/arm64、**零 application entitlement**、
@@ -184,14 +194,18 @@ Open question 不得以聊天记忆留存。每项记录默认决策、阻塞范
   - M5 roadmap 面:signed/notarized package + clean-host smoke 是 M5 交付物;
     diagnostics/privacy 面(M1-009 local-only、默认 redact)已 fail-safe,不构成
     渠道约束。
-- Remaining open(须 owner 决策):① 发布范围:内部工具先行(仍需 DevID+公证,
-  Gatekeeper 在他机生效)vs 直接公开直发;② Sandbox 张力处置选 (a)/(b);③ 更新
-  渠道确认(维持手动 DMG,或把自动更新提前=backlog 变更)。
-- Decision path:owner 独立 decision PR,merge 即决策(先例 DEC-001/002/006);
-  若选 (b) 须同 PR 或先行 supersede ADR-0001(ADR 状态字段与 macos profile
-  distribution 节同步);若选 (a) 须同时立项切换 change。
-- Blocks:最终 distribution profile、M5 release
-- Affected:macOS profile、diagnostics/privacy、ADR-0001
+- Boundary:本决策选定渠道/形态/更新架构,**不断言产物可发布**——release gates
+  见 ADR-0002(DevID identity、Sandboxed 形态上的 clean-VM/clean-host 矩阵
+  (TRUST-001…004 + M5 smoke)、自动更新 change verified、macos profile
+  distribution 节同步),任一未满足 release 保持 blocked。
+- Unblocked by this decision:distribution-profile 工作项与自动更新 change 的
+  立项;M5 范围据此固定(公开直发 + 自动更新)。
+- Reopen rule:改变渠道(转 MAS/放弃公开)、放弃 Sandboxed 形态或撤回自动更新,
+  须经 governance PR 重开本条并相应 supersede/修订 ADR-0002。
+- Blocks(历史):最终 distribution profile、M5 release——决策面已解除,release
+  gates 仍在。
+- Affected:macOS profile、diagnostics/privacy、ADR-0001/0002、backlog(自动更新
+  条目)、roadmap M5 范围
 
 ## DEC-005 Embedded Trace viewer
 

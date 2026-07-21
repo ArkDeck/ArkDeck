@@ -10,7 +10,9 @@
 - HDC subserver 自动管理；
 - Fastboot、Rockchip/upgrade_tool 和厂商 Provider；
 - Remote crash upload / telemetry；
-- Sparkle 或其他自动更新；
+- Sparkle 或其他自动更新(**2026-07-21 经 DEC-004 决定纳入 v1 更新渠道**,
+  ADR-0002;进入开发仍须独立 change 评估框架/XPC/签名链/隐私披露/网络面,该
+  change verified 前手动公证 DMG 为过渡通道)；
 - 完整源码级 ArkTS/C++ debugger；
 - 第三方可执行 Profile/plugin 信任和签名生态；
 - 组织级远程 Session/Artifact 存储；

@@ -1,7 +1,8 @@
 # ADR-0001 — macOS v1 distribution
 
-- Status: proposed; effective only when this branch is reviewed and merged by
-  the maintainer
+- Status: superseded by ADR-0002(2026-07-21,DEC-004 decision PR;正文按惯例
+  保留不改写)。原注: proposed; effective only when this branch is reviewed and
+  merged by the maintainer
 - Date: 2026-07-15
 - Change: `CHG-2026-001-macos-m0a`
 - Decision owner: maintainer (`@lvye`)
