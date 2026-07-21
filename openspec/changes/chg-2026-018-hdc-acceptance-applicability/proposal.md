@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-018-hdc-acceptance-applicability
 revision: 1
-status: proposed
+status: approved # r1 proposal 经 PR #194 合入(main `0f87bd7`);批准由本 approval-only PR 的维护者 review/merge 构成(先例 #55/#89/#171)
 class: core
 core_change_level: minor
 owner: lvye
@@ -84,3 +84,16 @@ review 链(addenda 16-23)多轮否决。
 V2 治理:本 propose PR 合入仅登记提案;批准须独立 approval-only PR(先例 #55/#89/#171)。
 其后按「readiness PR → 实现(manifest+baseline 起草)PR → archive PR(=ratification)」
 推进;`TASK-CA-001` 在 approve + readiness 双前置满足前保持 `blocked`。
+
+## Approval
+
+- r1 proposal 经 PR #194 合入 main(squash `0f87bd7`,status:proposed)。
+- 正式批准:2026-07-21 由本 approval-only PR(先例 #55/#89/#171)将本 change 置为
+  `approved`;批准由维护者 review/merge 本 PR 构成。merge 即批准 design.md normative
+  草案所列 delta 形态:`integration_conditional` 机制及其 fail-closed 排除条件、仅
+  `AC-HDC-006-01`/`AC-HDC-009-01` 两条登记、reactivation/needsReverification 语义、
+  `CORE-CONFORMANCE-2.1.0` suite 升版与 `CORE-2.1.0` baseline 起草授权。
+- 本批准不产生任务执行:`TASK-CA-001` 保持 `blocked`,须独立 readiness PR(确认执行时
+  base revision 与 registry/provenance pins 无漂移)转 `ready`;实现后 `done` 翻转与
+  archive PR(=ratification)各为独立 PR。本批准不翻转 TASK-M1-006 状态(缺口 ① 仍在),
+  不构成 CHG-2026-002 verified、platform conformance、hardware/support 或 release claim。
