@@ -1,0 +1,57 @@
+=== DAYU200 恢复演练 r2  2026-07-21 11:09:56 ===
+RUN_DIR=<HOME>/dayu200-rehearsal/run-r2-20260721-110956
+--- 身份门:工具 ---
+[11:09:56] STEP: 工具版本复核(须 ver 1.32)
+CMD: <HOME>/dayu200-rehearsal/rkdeveloptool/rkdeveloptool -v
+rkdeveloptool ver 1.32
+EXIT: 0
+OK: rkdeveloptool 038a8a0ea26ef7eb77451789f310c0c9fbeaf43a78af1d6146e02311a9c23611 / ver 1.32
+--- 身份门:物料 17/17 vs archived member-inventory.json ---
+OK: 物料 17/17 MATCH
+OK: FA-001 §2 基线在位
+[11:10:00] STEP: OB[pre-entry] rkdeveloptool ld
+CMD: sudo <TOOL> ld
+DevNo=1	Vid=0x2207,Pid=0x5000,LocationID=2	Maskrom
+EXIT: 0
+§0 进态序列(Oniro/HiHope 官方原文)执行确认: yes
+[11:10:57] STEP: mode-gate: ld(必须 Vid=0x2207,Pid=0x350a)
+CMD: sudo <TOOL> ld
+DevNo=1	Vid=0x2207,Pid=0x350a,LocationID=2	Loader
+EXIT: 0
+MODE-GATE PASS: 0x350a(RockUSB)——允许进入写序
+[11:10:57] STEP: OB[maskrom] rkdeveloptool ld
+CMD: sudo <TOOL> ld
+DevNo=1	Vid=0x2207,Pid=0x350a,LocationID=2	Loader
+EXIT: 0
+[11:10:57] STEP: W1 db loader 注入(attempt 1)
+CMD: sudo <TOOL> db <MATERIALS>/MiniLoaderAll.bin
+The device does not support this operation!
+EXIT: 1
+已复核线材/hash,重试一次: yes
+[11:11:45] STEP: W1 db loader 注入(attempt 2)
+CMD: sudo <TOOL> db <MATERIALS>/MiniLoaderAll.bin
+The device does not support this operation!
+EXIT: 1
+(§5 两次失败中止触发;crib 脚本在中止文案处因 bash 3.2 多字节变量名解析缺陷报
+ "desc: unbound variable" 退出——中止语义已达成,缺陷仅在展示层,事后已修)
+--- 窗口内抢救(design §2 读类,只读,操作者手动执行 pinned 工具) ---
+CMD: sudo <TOOL> ld
+DevNo=1	Vid=0x2207,Pid=0x350a,LocationID=2	Loader
+CMD: sudo <TOOL> ppt
+**********Partition Info(GPT)**********
+NO  LBA       Name
+00  00002000  uboot
+01  00004000  misc
+02  00006000  bootctrl
+03  00007000  resource
+04  0000A000  boot_linux
+05  0003A000  ramdisk
+06  0003C000  system
+07  0043C000  vendor
+08  0063C000  sys-prod
+09  00655000  chip-prod
+10  0066E000  updater
+11  0067E000  eng_system
+12  00686000  eng_chipset
+13  0069E000  chip_ckm
+14  01308000  userdata
