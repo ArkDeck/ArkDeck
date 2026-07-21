@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-016-dayu200-recovery-rehearsal
-revision: 2
-status: approved # r1 proposal 经 PR #170 合入;批准由本 approval-only PR 的维护者 review/merge 构成(先例 #55/#89)
+revision: 3
+status: approved # r1 经 #170/#171 批准;r2 经 #177;r3(W1 条件化+W2 GPT 主路径确认,基于 attempt #2/#213 真机事实)由本 r3 revision PR 的维护者 review/merge 构成
 class: platform
 core_change_level: none
 owner: lvye
