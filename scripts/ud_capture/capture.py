@@ -38,13 +38,17 @@ import subprocess
 import sys
 import threading
 import time
+import unicodedata
 from typing import Callable, Optional
 
 
-MANIFEST_SCHEMA = "arkdeck-ud-capture-manifest-1.0.0"
-REDACTED_SCHEMA = "arkdeck-ud-capture-redacted-1.0.0"
+MANIFEST_SCHEMA = "arkdeck-ud-capture-manifest-1.1.0"
+REDACTED_SCHEMA = "arkdeck-ud-capture-redacted-1.1.0"
 CHANGE_ID = "CHG-2026-008-ui-dump-hidumper-wrapper"
 TASK_ID = "TASK-UD-CAPTURE-HARNESS-001"
+
+STRICT_SELF_CHECK_POLICY = "strict-sensitive-output-v1"
+FX1_LOCAL_HAP_ECHO_POLICY = "fx1-stdout-exact-local-hap-v1"
 
 MAX_STREAM_BYTES = 4 * 1_024 * 1_024
 SIDECAR_SELF_CHECK_MAX_BYTES = 64 * 1_024 * 1_024
@@ -332,8 +336,8 @@ def build_argv(hdc_path: str, spec: CommandSpec, values: dict[str, str]) -> list
 
 
 _USER_PATH_PATTERN = r"/(?:Users|home)/[^/\s\x00:]+|/var/root"
-_USER_PATH = re.compile(_USER_PATH_PATTERN.encode("ascii"))
-_USER_PATH_STR = re.compile(_USER_PATH_PATTERN)
+_USER_PATH = re.compile(_USER_PATH_PATTERN.encode("ascii"), re.IGNORECASE)
+_USER_PATH_STR = re.compile(_USER_PATH_PATTERN, re.IGNORECASE)
 _KEY_MARKERS = (
     b"-----BEGIN",
     b"PRIVATE KEY",
@@ -341,6 +345,134 @@ _KEY_MARKERS = (
     b"ssh-ed25519 ",
     b"PuTTY-User-Key",
 )
+
+_PATH_SPAN_DELIMITERS = frozenset(b" \t\r\n\"'`()[]{}<>,;=:")
+
+
+def _all_occurrences(payload: bytes, needle: bytes) -> list[tuple[int, int]]:
+    if not needle:
+        return []
+    spans: list[tuple[int, int]] = []
+    offset = 0
+    while True:
+        start = payload.find(needle, offset)
+        if start < 0:
+            return spans
+        end = start + len(needle)
+        spans.append((start, end))
+        offset = start + 1
+
+
+def _is_delimited_path_span(payload: bytes, start: int, end: int) -> bool:
+    before_ok = start == 0 or payload[start - 1] in _PATH_SPAN_DELIMITERS
+    after_ok = end == len(payload) or payload[end] in _PATH_SPAN_DELIMITERS
+    return before_ok and after_ok
+
+
+def _span_is_contained(
+    span: tuple[int, int], allowed_spans: tuple[tuple[int, int], ...]
+) -> bool:
+    return any(
+        allowed_start <= span[0] and span[1] <= allowed_end
+        for allowed_start, allowed_end in allowed_spans
+    )
+
+
+def _normalized_casefold(value: str) -> str:
+    return unicodedata.normalize("NFC", value).casefold()
+
+
+def _related_local_path_variant_found(
+    stream_bytes: bytes,
+    expected_path: str,
+    allowed_spans: tuple[tuple[int, int], ...],
+) -> bool:
+    """Detect path-shaped variants after removing every exact allowed span.
+
+    The expected path's parent catches dirname, prefix and sibling variants.
+    NFC + casefold catches Unicode-normalization and case variants. Exact
+    symlink aliases are supplied separately in ``local_paths`` and therefore
+    fail the ordinary outside-allowed-span check.
+    """
+    remainder = bytearray(stream_bytes)
+    for start, end in allowed_spans:
+        remainder[start:end] = b" " * (end - start)
+    remaining_bytes = bytes(remainder)
+    expected_bytes = expected_path.encode("utf-8")
+    dirname = os.path.dirname(expected_path.rstrip(os.sep)) or os.sep
+    dirname_bytes = dirname.encode("utf-8")
+    if expected_bytes in remaining_bytes:
+        return True
+    if dirname != os.sep and dirname_bytes in remaining_bytes:
+        return True
+    remaining_text = remaining_bytes.decode("utf-8", errors="ignore")
+    normalized = _normalized_casefold(remaining_text)
+    if _normalized_casefold(expected_path) in normalized:
+        return True
+    return dirname != os.sep and _normalized_casefold(dirname) in normalized
+
+
+def _self_check(
+    stream_bytes: bytes,
+    connect_key: Optional[str],
+    local_paths: tuple[str, ...],
+    *,
+    complete: bool,
+    expected_local_input_echo: Optional[str],
+) -> dict:
+    user_matches = tuple(
+        (match.start(), match.end()) for match in _USER_PATH.finditer(stream_bytes)
+    )
+    user_path = bool(user_matches)
+    key_material = any(marker in stream_bytes for marker in _KEY_MARKERS)
+    local_matches = tuple(
+        span
+        for path in local_paths
+        for span in _all_occurrences(stream_bytes, path.encode("utf-8"))
+    )
+    local_path = bool(local_matches)
+    serial_present = connect_key.encode("utf-8") in stream_bytes if connect_key else None
+
+    allowed_spans: tuple[tuple[int, int], ...] = ()
+    policy_id = STRICT_SELF_CHECK_POLICY
+    if expected_local_input_echo is not None:
+        policy_id = FX1_LOCAL_HAP_ECHO_POLICY
+        expected_bytes = expected_local_input_echo.encode("utf-8")
+        allowed_spans = tuple(
+            span
+            for span in _all_occurrences(stream_bytes, expected_bytes)
+            if _is_delimited_path_span(stream_bytes, *span)
+        )
+
+    unexpected_user_path = any(
+        not _span_is_contained(match, allowed_spans) for match in user_matches
+    )
+    unexpected_local_path = any(
+        not _span_is_contained(match, allowed_spans) for match in local_matches
+    )
+    if expected_local_input_echo is not None:
+        unexpected_local_path = unexpected_local_path or _related_local_path_variant_found(
+            stream_bytes, expected_local_input_echo, allowed_spans
+        )
+    expected_echo_found = bool(allowed_spans)
+    passed = (
+        complete
+        and not key_material
+        and not unexpected_user_path
+        and not unexpected_local_path
+    )
+    return {
+        "policyId": policy_id,
+        "expectedLocalInputEchoFound": expected_echo_found,
+        "unexpectedUserPathFound": unexpected_user_path,
+        "unexpectedLocalInputPathFound": unexpected_local_path,
+        "userPathFound": user_path,
+        "keyMaterialFound": key_material,
+        "localInputPathFound": local_path,
+        "serialPresent": serial_present,
+        "completeStreamScanned": complete,
+        "passed": passed,
+    }
 
 
 def self_check(
@@ -351,19 +483,43 @@ def self_check(
     complete: bool = True,
 ) -> dict:
     """Fail closed on user paths, key material, supplied local paths, or truncation."""
-    user_path = bool(_USER_PATH.search(stream_bytes))
-    key_material = any(marker in stream_bytes for marker in _KEY_MARKERS)
-    local_path = any(path.encode("utf-8") in stream_bytes for path in local_paths)
-    serial_present = connect_key.encode("utf-8") in stream_bytes if connect_key else None
-    passed = complete and not user_path and not key_material and not local_path
-    return {
-        "userPathFound": user_path,
-        "keyMaterialFound": key_material,
-        "localInputPathFound": local_path,
-        "serialPresent": serial_present,
-        "completeStreamScanned": complete,
-        "passed": passed,
-    }
+    return _self_check(
+        stream_bytes,
+        connect_key,
+        local_paths,
+        complete=complete,
+        expected_local_input_echo=None,
+    )
+
+
+def _stream_self_check(
+    stream_bytes: bytes,
+    connect_key: Optional[str],
+    local_paths: tuple[str, ...],
+    *,
+    spec: CommandSpec,
+    stream_name: str,
+    complete: bool,
+    timed_out: bool,
+    expected_local_hap_path: Optional[str],
+) -> dict:
+    """Select the narrow echo policy only from registered command identity."""
+    expected_echo = None
+    if (
+        SPECS_BY_ID.get(spec.ident) is spec
+        and spec.ident == "FX-1"
+        and stream_name == "stdout"
+        and complete
+        and not timed_out
+    ):
+        expected_echo = expected_local_hap_path
+    return _self_check(
+        stream_bytes,
+        connect_key,
+        local_paths,
+        complete=complete,
+        expected_local_input_echo=expected_echo,
+    )
 
 
 def _home_pattern(home: str) -> Optional[re.Pattern]:
@@ -477,14 +633,16 @@ def _sha256_file(path: str) -> tuple[str, int]:
     return digest.hexdigest(), size
 
 
-def _validate_hap_path(path: str) -> tuple[str, dict]:
+def _validate_hap_path(path: str) -> tuple[str, dict, tuple[str, ...]]:
     _require_utf8("--local-hap-path", path)
     assert_outside_repository(path)
+    supplied_absolute = os.path.abspath(path)
     resolved = os.path.realpath(path)
     if not os.path.isfile(resolved):
         raise CaptureError("--local-hap-path must resolve to an existing regular file")
     digest, size = _sha256_file(resolved)
-    return resolved, {"path": resolved, "sha256": digest, "bytes": size}
+    aliases = () if supplied_absolute == resolved else (supplied_absolute,)
+    return resolved, {"path": resolved, "sha256": digest, "bytes": size}, aliases
 
 
 def _validate_sidecar_dest(
@@ -688,10 +846,13 @@ def _prepare_inputs(
         actual[WINDOW_ID] = _validate_window_id(window_id or "")
         metadata["windowId"] = actual[WINDOW_ID]
     if LOCAL_HAP_PATH in spec.placeholders:
-        actual[LOCAL_HAP_PATH], metadata["localHap"] = _validate_hap_path(
-            local_hap_path or ""
-        )
+        (
+            actual[LOCAL_HAP_PATH],
+            metadata["localHap"],
+            supplied_aliases,
+        ) = _validate_hap_path(local_hap_path or "")
         local_paths.append(actual[LOCAL_HAP_PATH])
+        local_paths.extend(supplied_aliases)
     if LOCAL_SIDECAR_DEST in spec.placeholders:
         actual[LOCAL_SIDECAR_DEST], metadata["localSidecarDest"] = _validate_sidecar_dest(
             local_sidecar_dest or "", out_dir, f"{sequence:02d}-{spec.ident}.sidecar"
@@ -955,17 +1116,27 @@ def capture_command(
     _write_exclusive(os.path.join(resolved_out, stdout_name), result.stdout.data)
     _write_exclusive(os.path.join(resolved_out, stderr_name), result.stderr.data)
 
-    stdout_check = self_check(
+    stdout_complete = not result.stdout.truncated and not result.stdout.drain_incomplete
+    stderr_complete = not result.stderr.truncated and not result.stderr.drain_incomplete
+    stdout_check = _stream_self_check(
         result.stdout.data,
         connect_key,
         prepared.local_paths,
-        complete=not result.stdout.truncated and not result.stdout.drain_incomplete,
+        spec=spec,
+        stream_name="stdout",
+        complete=stdout_complete,
+        timed_out=result.timed_out,
+        expected_local_hap_path=prepared.actual.get(LOCAL_HAP_PATH),
     )
-    stderr_check = self_check(
+    stderr_check = _stream_self_check(
         result.stderr.data,
         connect_key,
         prepared.local_paths,
-        complete=not result.stderr.truncated and not result.stderr.drain_incomplete,
+        spec=spec,
+        stream_name="stderr",
+        complete=stderr_complete,
+        timed_out=result.timed_out,
+        expected_local_hap_path=prepared.actual.get(LOCAL_HAP_PATH),
     )
     capture_complete = (
         not result.timed_out

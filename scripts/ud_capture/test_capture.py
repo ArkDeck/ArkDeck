@@ -22,6 +22,7 @@ import stat
 import sys
 import tempfile
 import time
+import unicodedata
 import unittest
 import unittest.mock
 
@@ -786,6 +787,221 @@ class StreamAndManifestTests(unittest.TestCase):
                 handle.write(capture._json_bytes({"schema": capture.REDACTED_SCHEMA}))
             with self.assertRaisesRegex(capture.CaptureError, "missing sequence"):
                 capture._capture_hashes_bytes(tmp)
+
+
+class ExactLocalHapEchoPolicyTests(unittest.TestCase):
+    def _capture_fx1(self, tmp, hap_path, result):
+        out_dir = os.path.join(tmp, "session")
+        hdc = _fake_hdc(tmp)
+        _seed_hp(tmp, out_dir, hdc)
+        runner, _ = _fake_runner(result)
+        manifest = capture.capture_command(
+            hdc_path=hdc,
+            out_dir=out_dir,
+            spec=capture.SPECS_BY_ID["FX-1"],
+            connect_key="SERIAL123",
+            local_hap_path=hap_path,
+            runner=runner,
+            home=tmp,
+        )
+        return manifest, out_dir
+
+    def _new_hap(self, tmp, name="entry-default-signed.hap"):
+        path = os.path.join(tmp, name)
+        with open(path, "wb") as handle:
+            handle.write(b"synthetic fixture")
+        return path
+
+    def test_exact_user_path_spans_are_the_only_allowed_user_path_matches(self):
+        path = "/Users/alice/fixtures/entry-default-signed.hap"
+        payload = f"installing {path}\ninstalled {path}\n".encode()
+        result = capture._stream_self_check(
+            payload,
+            None,
+            (path,),
+            spec=capture.SPECS_BY_ID["FX-1"],
+            stream_name="stdout",
+            complete=True,
+            timed_out=False,
+            expected_local_hap_path=path,
+        )
+        self.assertEqual(result["policyId"], capture.FX1_LOCAL_HAP_ECHO_POLICY)
+        self.assertTrue(result["userPathFound"])
+        self.assertTrue(result["localInputPathFound"])
+        self.assertTrue(result["expectedLocalInputEchoFound"])
+        self.assertFalse(result["unexpectedUserPathFound"])
+        self.assertFalse(result["unexpectedLocalInputPathFound"])
+        self.assertTrue(result["passed"])
+
+    def test_fx1_stdout_exact_echo_passes_and_redacted_bytes_are_deterministic(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            hap = self._new_hap(tmp)
+            resolved = os.path.realpath(hap)
+            payload = f"installing {resolved}\ninstalled {resolved}\n".encode()
+            manifest, out_dir = self._capture_fx1(tmp, hap, _result(out=payload))
+            check = manifest["selfCheck"]["stdout"]
+            self.assertEqual(manifest["schema"], "arkdeck-ud-capture-manifest-1.1.0")
+            self.assertEqual(check["policyId"], capture.FX1_LOCAL_HAP_ECHO_POLICY)
+            self.assertTrue(check["expectedLocalInputEchoFound"])
+            self.assertFalse(check["unexpectedUserPathFound"])
+            self.assertFalse(check["unexpectedLocalInputPathFound"])
+            self.assertTrue(manifest["selfCheckPassed"])
+            redacted_path = os.path.join(
+                out_dir, "01-FX-1.redacted-manifest.json"
+            )
+            with open(redacted_path, "rb") as handle:
+                redacted_bytes = handle.read()
+            redacted = json.loads(redacted_bytes)
+            self.assertEqual(
+                redacted["schema"], "arkdeck-ud-capture-redacted-1.1.0"
+            )
+            self.assertEqual(redacted_bytes, capture._json_bytes(redacted))
+            self.assertNotIn(resolved.encode(), redacted_bytes)
+            self.assertIn(b"<local-hap-path>", redacted_bytes)
+
+    def test_fx1_exact_echo_plus_second_user_path_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            hap = self._new_hap(tmp)
+            payload = os.path.realpath(hap).encode() + b"\n/Users/mallory/secret\n"
+            manifest, _ = self._capture_fx1(tmp, hap, _result(out=payload))
+            check = manifest["selfCheck"]["stdout"]
+            self.assertTrue(check["expectedLocalInputEchoFound"])
+            self.assertTrue(check["unexpectedUserPathFound"])
+            self.assertFalse(check["passed"])
+
+    def test_fx1_path_variants_never_match_the_allowance(self):
+        variants = {
+            "dirname": lambda path: os.path.dirname(path),
+            "prefix": lambda path: path.removesuffix(".hap"),
+            "sibling": lambda path: os.path.join(os.path.dirname(path), "other.hap"),
+            "suffix": lambda path: path + ".backup",
+            "case": lambda path: path.swapcase(),
+            "unicode": lambda path: unicodedata.normalize("NFD", path),
+        }
+        for name, variant in variants.items():
+            with self.subTest(variant=name), tempfile.TemporaryDirectory() as tmp:
+                hap = self._new_hap(tmp, "café.hap")
+                payload = (variant(os.path.realpath(hap)) + "\n").encode("utf-8")
+                manifest, _ = self._capture_fx1(tmp, hap, _result(out=payload))
+                check = manifest["selfCheck"]["stdout"]
+                self.assertFalse(check["expectedLocalInputEchoFound"])
+                self.assertTrue(check["unexpectedLocalInputPathFound"])
+                self.assertFalse(check["passed"])
+
+    @unittest.skipUnless(hasattr(os, "symlink"), "symlink support required")
+    def test_supplied_symlink_alias_is_sensitive_but_never_allowed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            real_hap = self._new_hap(tmp, "real.hap")
+            alias = os.path.join(tmp, "alias.hap")
+            os.symlink(real_hap, alias)
+            manifest, _ = self._capture_fx1(
+                tmp, alias, _result(out=(alias + "\n").encode())
+            )
+            check = manifest["selfCheck"]["stdout"]
+            self.assertTrue(check["localInputPathFound"])
+            self.assertFalse(check["expectedLocalInputEchoFound"])
+            self.assertTrue(check["unexpectedLocalInputPathFound"])
+            self.assertFalse(check["passed"])
+
+    def test_fx1_stderr_echo_uses_strict_policy_and_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            hap = self._new_hap(tmp)
+            manifest, _ = self._capture_fx1(
+                tmp, hap, _result(out=b"install complete\n", err=hap.encode())
+            )
+            check = manifest["selfCheck"]["stderr"]
+            self.assertEqual(check["policyId"], capture.STRICT_SELF_CHECK_POLICY)
+            self.assertTrue(check["unexpectedLocalInputPathFound"])
+            self.assertFalse(check["passed"])
+
+    def test_non_fx1_identity_cannot_select_the_echo_policy(self):
+        path = "/Users/alice/fixture.hap"
+        result = capture._stream_self_check(
+            path.encode(),
+            None,
+            (path,),
+            spec=capture.SPECS_BY_ID["HP-0"],
+            stream_name="stdout",
+            complete=True,
+            timed_out=False,
+            expected_local_hap_path=path,
+        )
+        self.assertEqual(result["policyId"], capture.STRICT_SELF_CHECK_POLICY)
+        self.assertTrue(result["unexpectedUserPathFound"])
+        self.assertFalse(result["passed"])
+
+    def test_key_material_still_fails_beside_an_exact_echo(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            hap = self._new_hap(tmp)
+            payload = os.path.realpath(hap).encode() + b"\n-----BEGIN PRIVATE KEY-----\n"
+            manifest, _ = self._capture_fx1(tmp, hap, _result(out=payload))
+            check = manifest["selfCheck"]["stdout"]
+            self.assertTrue(check["expectedLocalInputEchoFound"])
+            self.assertTrue(check["keyMaterialFound"])
+            self.assertFalse(check["passed"])
+
+    def test_truncation_drain_and_timeout_disable_the_echo_policy(self):
+        for condition in ("truncated", "drain", "timeout"):
+            with self.subTest(condition=condition), tempfile.TemporaryDirectory() as tmp:
+                hap = self._new_hap(tmp)
+                payload = hap.encode()
+                if condition == "truncated":
+                    stream = _stream(
+                        payload,
+                        truncated=True,
+                        total_bytes=len(payload) + 1,
+                        whole_bytes=payload + b"x",
+                    )
+                    result = _result(stdout=stream)
+                elif condition == "drain":
+                    result = _result(stdout=_stream(payload, drain_incomplete=True))
+                else:
+                    result = _result(out=payload, timed_out=True, exit_code=None)
+                manifest, _ = self._capture_fx1(tmp, hap, result)
+                check = manifest["selfCheck"]["stdout"]
+                self.assertEqual(check["policyId"], capture.STRICT_SELF_CHECK_POLICY)
+                self.assertFalse(check["expectedLocalInputEchoFound"])
+                self.assertFalse(check["passed"])
+                self.assertFalse(manifest["captureComplete"])
+
+    def test_fx1_echo_does_not_weaken_repository_redaction_gate(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            hap = self._new_hap(tmp)
+            out_dir = os.path.join(tmp, "session")
+            hdc = _fake_hdc(tmp)
+            _seed_hp(tmp, out_dir, hdc)
+            runner, _ = _fake_runner(_result(out=os.path.realpath(hap).encode()))
+
+            def broken(manifest, _prepared, _argv, _home):
+                redacted = dict(manifest)
+                redacted["schema"] = capture.REDACTED_SCHEMA
+                return redacted
+
+            with unittest.mock.patch.object(capture, "_redacted_manifest", broken):
+                with self.assertRaises(capture.StopRequired):
+                    capture.capture_command(
+                        hdc_path=hdc,
+                        out_dir=out_dir,
+                        spec=capture.SPECS_BY_ID["FX-1"],
+                        connect_key="SERIAL123",
+                        local_hap_path=hap,
+                        runner=runner,
+                        home=tmp,
+                    )
+            self.assertTrue(os.path.exists(os.path.join(out_dir, "01-FX-1.manifest.json")))
+            self.assertFalse(
+                os.path.exists(os.path.join(out_dir, "01-FX-1.redacted-manifest.json"))
+            )
+
+    def test_schema_and_policy_documentation_match_runbook(self):
+        readme = _read(os.path.join(_MODULE_DIR, "README.md"))
+        runbook = _read(_RUNBOOK)
+        for value in (capture.MANIFEST_SCHEMA, capture.REDACTED_SCHEMA):
+            self.assertIn(value, readme)
+        self.assertIn(capture.REDACTED_SCHEMA, runbook)
+        self.assertIn(capture.FX1_LOCAL_HAP_ECHO_POLICY, readme)
+        self.assertIn("_assert_redacted_clean", readme)
+        self.assertIn("_assert_redacted_clean", runbook)
 
 
 class SensitiveBoundaryTests(unittest.TestCase):
