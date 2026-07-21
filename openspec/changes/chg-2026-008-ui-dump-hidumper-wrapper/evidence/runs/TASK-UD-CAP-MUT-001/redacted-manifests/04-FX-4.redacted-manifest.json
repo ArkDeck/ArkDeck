@@ -1,0 +1,80 @@
+{
+  "argv": [
+    "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/toolchains/hdc",
+    "-t",
+    "<connectkey>",
+    "uninstall",
+    "com.example.waterflowdemo"
+  ],
+  "boundary": "human-operated controlled capture; raw bytes and full manifest remain outside git; no Recipe success, compatibility, support, or canonical AC PASS is claimed",
+  "captureComplete": true,
+  "change": "CHG-2026-008-ui-dump-hidumper-wrapper",
+  "commandId": "FX-4",
+  "durationMs": 2521,
+  "evidenceClass": "controlledHumanCapture",
+  "exitCode": 0,
+  "host": {
+    "arch": "arm64",
+    "os": "Darwin",
+    "osVersion": "26.5.2"
+  },
+  "inputs": {
+    "connectKey": {
+      "hpSequence": 1,
+      "source": "latestSameSessionHP",
+      "value": "<connectkey>"
+    }
+  },
+  "purpose": "uninstall the pinned fixture",
+  "schema": "arkdeck-ud-capture-redacted-1.0.0",
+  "selfCheck": {
+    "stderr": {
+      "completeStreamScanned": true,
+      "keyMaterialFound": false,
+      "localInputPathFound": false,
+      "passed": true,
+      "serialPresent": false,
+      "userPathFound": false
+    },
+    "stdout": {
+      "completeStreamScanned": true,
+      "keyMaterialFound": false,
+      "localInputPathFound": false,
+      "passed": true,
+      "serialPresent": false,
+      "userPathFound": false
+    }
+  },
+  "selfCheckPassed": true,
+  "sequence": 4,
+  "streams": {
+    "stderr": {
+      "bytes": 0,
+      "drainIncomplete": false,
+      "file": "04-FX-4.stderr",
+      "retainedBytes": 0,
+      "retainedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sha256Scope": "wholeStream",
+      "truncated": false
+    },
+    "stdout": {
+      "bytes": 78,
+      "drainIncomplete": false,
+      "file": "04-FX-4.stdout",
+      "retainedBytes": 78,
+      "retainedSha256": "c690501211bc9c7a6a3b37704dd2cd58bdcf03e49771ffee10adf205a589d353",
+      "sha256": "c690501211bc9c7a6a3b37704dd2cd58bdcf03e49771ffee10adf205a589d353",
+      "sha256Scope": "wholeStream",
+      "truncated": false
+    }
+  },
+  "task": "TASK-UD-CAPTURE-HARNESS-001",
+  "timedOut": false,
+  "timeoutSeconds": 120,
+  "toolchain": {
+    "hdcBytes": 6401152,
+    "hdcPath": "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/toolchains/hdc",
+    "hdcSha256": "48395ba8d87115dffca47df2a640a6c868bc9a2bd4eb49611e4138ff88d8d260"
+  }
+}
