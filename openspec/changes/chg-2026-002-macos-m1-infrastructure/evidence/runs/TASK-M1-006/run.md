@@ -35,6 +35,54 @@ the registry, its resource declaration, integration profile, baseline, or confor
 | `scripts/check-sdd.sh` with isolated `/private/tmp/arkdeck-sdd-python` (`PyYAML==6.0.3`) | pass, 0 errors / 0 warnings / 111 acceptance IDs |
 | `git diff --check` | pass |
 
+## Review disposition addendum 23 — 2026-07-21 merged closeout audit
+
+This addendum records the post-merge status audit; it does not replace the implementation details
+or signed artifact identities in addendum 22. Human maintainer `@lvye` approved PR #191 at
+2026-07-21 02:07:39Z. GitHub squash-merged it into `main` at 02:10:14Z as full OID
+`c61e10e3548031f68b7f83c21584ce8b9b615cf4` with subject
+`feat(M1-006): adopt production HDC registry safeguards (#191)`.
+
+`git diff --exit-code fd98f90a9080d6d8a0d77cec16de2e0c5f9985c7
+c61e10e3548031f68b7f83c21584ce8b9b615cf4` produced no diff. The reviewed implementation head and
+merged `main` therefore have identical repository trees; addendum 22's signed Sandbox artifact and
+9/9 XCUITest result remain bound to the merged source bytes. This closeout run did not rerun
+XCUITest, execute an installed HDC, contact a real device or non-loopback endpoint, or dispatch any
+real lifecycle, subserver, device migration, Flash, or destructive operation.
+
+### Merged-main verification
+
+| Command / check | Result |
+| --- | --- |
+| `git diff --exit-code <reviewed head> <merged squash>` | pass; zero repository-tree diff |
+| `CI=true swift test --package-path Packages/ArkDeckKit --filter HDCSupervisorContractTests` | pass, 52 / 0 failures; durable audit SHA-256 `6cb93a05671a67814cec8999d82402e5e0114eeea24859a73c3438de4cc21f5f` |
+| `CI=true swift test --package-path Packages/ArkDeckKit` | pass, 284 / 1 existing manual sleep-wake opt-in skip / 0 failures; durable audit SHA-256 `253e1dc2ad8f5a5e65b8d3434321ecb35da9252ec2c75184c3788c409a8ad918` |
+
+### Binary closeout conclusion
+
+Implementation approval and green tests do not satisfy an absent acceptance path. The completion
+candidate remains withdrawn and the truthful post-implementation state is `blocked`, for three
+independent production/evidence gaps:
+
+1. `HDCProductionApplicationDiagnostics` still supplies an unavailable App-root participant and
+   critical-state inventory. This safely blocks lifecycle mutation, but it is not a production
+   participant feed and cannot demonstrate the real App-root critical gate.
+2. The adopted registry explicitly marks `keyAccessDiagnostics` unsupported. Negative zero-access
+   tests cannot satisfy `TEST-AC-HDC-006-01`, whose task method requires an actual signed Sandbox
+   platform file-access denial path and corresponding UI diagnostic.
+3. The registry explicitly marks `subserverCapability` unsupported. A zero-command unsupported
+   presentation cannot satisfy `TEST-AC-HDC-009-01`, whose task method requires a registered safe
+   capability observation plus supported/unsupported/unknown UI closure.
+
+The raw-family parameterization and manifest-finalizer retry solver documented in addendum 22 also
+remain intentional separate-change boundaries; they are not silently solved or reclassified here.
+Capability/probe expansion and the production inventory feed require explicitly scoped, approved
+follow-up changes and new evidence. The stale change-level `verification.md` 0.2.0/Developer Mode
+ledger is outside TASK-M1-006 allowed paths and requires a separate governance amendment.
+
+Accordingly, this addendum supports only a docs-only `ready` to `blocked` closeout status PR. It
+does not support `done`, change `verified`, platform conformance, hardware support, or release.
+
 ## Review disposition addendum 22 — 2026-07-21 participant/recovery/raw-family boundary
 
 This addendum supersedes addendum 21 for the latest worktree and signed artifact. It closes the
