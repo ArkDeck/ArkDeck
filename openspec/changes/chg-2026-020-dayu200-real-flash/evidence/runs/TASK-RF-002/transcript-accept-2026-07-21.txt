@@ -1,0 +1,73 @@
+=== TASK-RF-002 真机验收(arkdeck flash 产品路径)2026-07-21 16:48:51 — SUCCESS ===
+RUN_DIR=<HOME>/dayu200-rehearsal/run-rf002-20260721-164851  operator=lvye
+crib=accept-rf002.sh(窗口时 sha a8fa173e…;窗口后修 observation 聚合 → 18c09ee4…)
+
+--- P0 身份门(host-only)---
+repo HEAD: 32908a9 impl(chg-2026-020): TASK-RF-002 — … (#236)   [merge-base gate PASS]
+arkdeck(release)SHA-256 = 95c25873c8da0143c201451036db30632f62ec864a6147eb08cf80c3c5e6cd2a
+[16:48:51] rkdeveloptool -v → `rkdeveloptool ver 1.32` EXIT 0(binary sha256 = pin 038a8a0e…3611)
+images.tar.gz(<HOME>/Downloads/version-…dayu200_img.tar.gz)size=732948803、
+  sha256=fc7637f3…5280 → 整包身份门 PASS;materials/ 17 成员 hash 复验 17/17 MATCH
+
+--- P1 Agent 边界负样(host-only,AC-FLASH-015-01 产品面)---
+非 TTY `arkdeck flash execute … < /dev/null` → `Job marker: policyBlocked`、exit 3、
+  受控 handoff 已生成 → P1 PASS(destructive dispatch 0)
+
+--- P2 产品 planOnly ---
+`arkdeck flash plan --mode planOnly` → 流式全量 validate PASS、exit 0
+  plan digest 69c30d21…ec088 / step-set digest 075b52c4…8fdb
+  `terminal status: notExecuted(planOnly)`
+
+--- P3 进态 + mode-gate ---
+§0 按键序列执行确认: yes
+[16:49:10] sudo <TOOL> ld → `DevNo=1 Vid=0x2207,Pid=0x350a,LocationID=2 Loader` EXIT 0
+  → MODE-GATE PASS(AC-FLASH-001 真机面:0x350a+Loader 门先行,非该形态即阻断)
+--target-location-id 操作者输入 = `0x350a`(物理目标由上行 ld `LocationID=2` 佐证;
+  本机本窗口唯一 RockUSB 设备)
+
+--- P4 产品 execute(交互;pty 全程录屏 p4-authorized-tty.log)---
+(可选拒绝演示:操作者选 no,未执行;AC-007 canonical=contract 已 PASS)
+validate 全量复验 PASS → Exact plan (execute) 显示:
+  plan digest c85be3b34ae671ad213781619235a22dcb242d406850d4eb8cef8785487d6cff
+  step-set digest 075b52c4fc7dc71e422c76c9edd5e1cd26e7641c844fa4cfb4ae79f29d1c8fdb
+  data impact ×3(九分区覆盖/userdata 清数据/禁写面零触碰)+ 15 步 typed plan
+prerequisites 三问(AC-FLASH-002 真机面,destructive 确认前):
+  loader=yes(ld 实据)、recoveryPath=yes(CHG-016 路线+已验证物料在手)、unlocked=yes
+destructive 确认(AC-FLASH-007 真机面,exact plan 展示后):
+  逐字输入 `FLASH c85be3b34ae6` + 强确认 `ERASE-USERDATA`
+→ `Job marker: authorizedForHumanExecution`、handoff 生成 → P4 PASS
+  (plan 文档 sha fdacd940…;handoff sha bd4d6c0c…)
+
+--- P5 handoff 逐条(维护者亲手;判定门=attempt#5 同构)---
+[16:50:27] ppt(写前)15 行 GPT 表 EXIT 0 → PPT-MATCH 15/15 vs FA-001 §2
+[16:50:27] wlx uboot      <- uboot.img       Write LBA from file (100%)  EXIT 0  PASS
+[16:50:27] wlx resource   <- resource.img    Write LBA from file (100%)  EXIT 0  PASS
+[16:50:28] wlx boot_linux <- boot_linux.img  Write LBA from file (100%)  EXIT 0  PASS
+[16:50:32] wlx ramdisk    <- ramdisk.img     Write LBA from file (100%)  EXIT 0  PASS
+[16:50:32] wlx system     <- system.img      Write LBA from file (100%)  EXIT 0  PASS
+[16:52:39] wlx vendor     <- vendor.img      Write LBA from file (100%)  EXIT 0  PASS
+[16:52:55] wlx updater    <- updater.img     Write LBA from file (100%)  EXIT 0  PASS
+[16:52:56] wlx chip_ckm   <- chip_ckm.img    Write LBA from file (100%)  EXIT 0  PASS
+userdata 复确认 yes(arkdeck 侧已 ERASE-USERDATA 强确认)
+[17:00:44] wlx userdata   <- userdata.img    Write LBA from file (100%)  EXIT 0  PASS
+  (9 步 criticalNonInterruptible 全程连续执行无中断/无退出注入)
+明确不写:chip_prod/sys_prod(orphan)、6 无成员分区、两处扇区空洞。
+[17:02:10] rd → `Reset Device OK.` EXIT 0 → 设备重启进系统;操作者确认 yes
+
+--- P6 postcheck + 产品 postflight(AC-FLASH-012/013 真机面)---
+postcheck(m0b 白名单 2 命令):capture complete, self-check PASSED
+  verbose stdout 58B: `<32-hex-key>\t\tUSB\tConnected\tlocalhost`
+  plain stdout 33B: `<32-hex-key>`(connect key/serial 留仓库外 out-dir,不入仓)
+postflight #1(observation.json,sha 381fd0ae…):
+  `job state: waitingForRecovery / outcomeUnknown`、RecoveryGuide 全文打印、exit 5
+  → 根因 = crib observation 聚合缺陷:postcheck 全目录字母序拼接取尾 4000 字符,
+    manifest.json+redacted-manifest.json(6356B)排最后,把含 `Connected` 的 stdout
+    挤出窗口。设备/产品无缺陷;产品语义门正确 fail closed(输入无 marker 不判 succeeded)。
+  → 修正:聚合只取 `*.stdout` 探针流(crib 修正 sha 18c09ee4…)
+postflight #2(observation-corrected.json,sha a51e4fb2…;同一批真实 postcheck 产物重聚合):
+  `job state: succeeded / outcome certainty: confirmed`、exit 0 → P6 PASS
+
+=== 窗口完成 17:03:32 — RF-ACCEPT-001 SUCCESS ===
+Agent destructive dispatch = 0(全程维护者亲手;arkdeck 自身零设备命令、零外部进程)
+恢复路径:CHG-2026-016 Loader wlx 路线(handoff 内载;本次未触发)
+原始产物(含序列号)留仓库外 RUN_DIR;本文件为脱敏摘要(先例:RF-001 transcript)。
