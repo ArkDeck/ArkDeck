@@ -2,9 +2,25 @@
 
 ## TASK-PI-001 — App-root participant registry 与 production inventory feed
 
-- Status:blocked(双前置:① 本 change 经独立 approval-only PR 批准;② 独立 readiness PR
-  确认执行时 pins(base revision、M1-006 相关文件无并行改动、signed 环境可用)。二者均须
-  维护者 review/merge 后生效;本 propose PR 不构成实现授权)
+- Status:ready(readiness;仅在维护者 review/merge 本独立状态 PR 后生效。前置 ① 已满足:
+  approval-only PR #200 已合入 main squash `94fe6f8`(lvye review/merge);本 PR 即前置 ②,
+  单文件、不含实现、不产生 evidence)
+- Readiness(2026-07-21,执行时 pins 于 main `94fe6f8` 逐项复核):
+  - Approve 链:propose PR #198(squash `10f585e`)→ approval-only PR #200(squash
+    `94fe6f8`);design.md 自批准以来零字节变更。
+  - 目标代码面零并行改动:`ArkDeckWorkflows`/`ArkDeckContractTests`/`ArkDeckApp*` 的
+    最后触碰 commit 仍为 TASK-M1-006 实现合入 `c61e10e`(#191);#193-#200 仅动
+    openspec。design.md 引用的 API 基座(`HDCApplicationDiagnosticsHost.compose` 的
+    `impactInventory` 参数、`HDCApplicationHostImpactInventory`、facade 的
+    `.unavailable` feed)在位。
+  - 环境:`DevToolsSecurity -status` = "Developer mode is currently enabled.";signed
+    XCUITest 须解锁态执行(M1-006 addendum 21 先例);Swift 基线于 `94fe6f8` 实测
+    284 tests / 1 skip / 0 failures;`./scripts/check-sdd.sh` 0/0/111。
+  - 竞争面:复核时 open PR 仅 chg-018 治理文件(verify #201),与本任务 allowed paths
+    零交集。
+  - 实现序:实现 + evidence PR(经维护者 review/merge)→ `done` 独立状态 PR。开工前
+    若 main 前进且触及上述目标代码面,readiness 作废须重新起草;仅 openspec 前进则
+    复核 approve 链后继续。
 - Objective:按 design.md 交付 `HDCApplicationParticipantRegistry` 与 production inventory
   feed,使 `HDCApplicationDiagnosticsHost.compose` 在 production 收到构造性完备的
   `.complete` inventory(当前产品态为空但完备),关闭 TASK-M1-006 closeout 缺口 ①。
