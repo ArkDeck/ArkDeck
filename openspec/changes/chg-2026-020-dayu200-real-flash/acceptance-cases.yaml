@@ -1,0 +1,36 @@
+---
+schema_version: 1.0.0
+change_id: CHG-2026-020-dayu200-real-flash
+change_revision: 1
+platform: macos
+evidence_classes:
+- documentReview
+- realHardware
+cases:
+- acceptance_id: RF-CONTRACT-001
+  test_id: TEST-RF-CONTRACT-001
+  method: Document review of the images.tar.gz contract and RockchipFlashProfile against design.
+  expected_source: openspec/changes/chg-2026-020-dayu200-real-flash/verification.md#RF-CONTRACT-001
+  minimum_evidence: documentReview
+  expected_result: >-
+    The images.tar.gz input contract and RockchipFlashProfile match design
+    sections 1-2 item by item: the allowed partition set is exactly the nine
+    PD-002-mapped partitions; orphan (chip_prod/sys_prod), member-less
+    partitions and sector holes are forbidden to write; per-member SHA-256, the
+    write order, and the prerequisite declaration (loader / recoveryPath /
+    unlocked / stablePower) are present; every value is traceable to PD-002 and
+    FA-001.
+- acceptance_id: RF-REALFLASH-001
+  test_id: TEST-RF-REALFLASH-001
+  method: Maintainer-executed forward flash of a pinned images.tar.gz on the physical DAYU200.
+  expected_source: openspec/changes/chg-2026-020-dayu200-real-flash/verification.md#RF-REALFLASH-001
+  minimum_evidence: realHardware
+  expected_result: >-
+    A human maintainer flashes a pinned images.tar.gz through the design
+    section-0 closed command face — entry to 0x350a Loader, ppt precondition,
+    per-partition wlx, rd, and a postflight that reproduces Connected — with
+    every command's argv, output and judgement recorded, member hashes verified,
+    the destructive confirmation shown (userdata erase gated by an explicit
+    strong confirmation), and operator, named window and recovery path on
+    record. Agent destructive dispatch is zero; an aborted run is recorded
+    honestly as a blocked-attempt, not a failure of this case.
