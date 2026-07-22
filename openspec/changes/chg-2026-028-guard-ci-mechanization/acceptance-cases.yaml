@@ -1,0 +1,61 @@
+---
+schema_version: 1.0.0
+change_id: CHG-2026-028-guard-ci-mechanization
+change_revision: 1
+platform: macos
+evidence_classes:
+- documentReview
+- contract
+cases:
+- acceptance_id: MECH-CI-001
+  test_id: TEST-MECH-CI-001
+  method: Document review of the swift-ci workflow and its green/red run evidence.
+  expected_source: openspec/changes/chg-2026-028-guard-ci-mechanization/verification.md#MECH-CI-001
+  minimum_evidence: documentReview
+  expected_result: >-
+    The swift-ci workflow holds zero secrets with contents read-only
+    permissions; at least three real PR runs are green and one canary run on a
+    discarded branch with an injected always-failing test is red (the branch
+    is never merged), all linked in evidence; a docs-only PR passes within
+    seconds through path awareness; the job summary honestly states that the
+    App and XCUITest surfaces are not covered; the executed test count matches
+    the readiness-pinned baseline with no silent skip or forced-success
+    construct.
+- acceptance_id: MECH-REV-001
+  test_id: TEST-MECH-REV-001
+  method: Offline guard contract tests for three-way revision consistency.
+  expected_source: openspec/changes/chg-2026-028-guard-ci-mechanization/verification.md#MECH-REV-001
+  minimum_evidence: contract
+  expected_result: >-
+    A synthetic fixture with matching proposal revision, acceptance
+    change_revision and verification @rN passes; drifting any single one of
+    the three produces exactly one named error carrying all three actual
+    values; a missing or unparseable verification header is a named error; an
+    archived fixture is skipped; the real repository baseline stays at 0
+    errors, 0 warnings, 111 acceptance IDs before and after the enhancement.
+- acceptance_id: MECH-PIN-001
+  test_id: TEST-MECH-PIN-001
+  method: Offline guard contract tests for structured pins-block validation.
+  expected_source: openspec/changes/chg-2026-028-guard-ci-mechanization/verification.md#MECH-PIN-001
+  minimum_evidence: contract
+  expected_result: >-
+    A legal pins block with 40-hex blob and 64-hex sha256 values passes;
+    39-hex and 41-hex blob values, a 63-hex sha256, unparseable yaml and an
+    unknown key each produce a named error; documents without a pins block are
+    not validated and produce zero errors; archived directories are skipped;
+    the change template carries a pins-block example; the real baseline stays
+    at 0/0/111.
+- acceptance_id: MECH-PATH-001
+  test_id: TEST-MECH-PATH-001
+  method: Offline parser contract tests plus live canary and real-shape PR runs.
+  expected_source: openspec/changes/chg-2026-028-guard-ci-mechanization/verification.md#MECH-PATH-001
+  minimum_evidence: contract
+  expected_result: >-
+    A canary PR declaring a task while touching a path outside that task's
+    allowed paths turns the job red with the offending paths listed (the
+    canary is discarded, never merged); real-shape implementation, status and
+    propose PRs are green; a PR with no task declaration touching a sensitive
+    surface is red while a docs-only undeclared PR is green; a declared task
+    that does not exist, a missing allowed-paths line or a line yielding zero
+    path tokens each fail closed as a named error rather than silently
+    passing.
