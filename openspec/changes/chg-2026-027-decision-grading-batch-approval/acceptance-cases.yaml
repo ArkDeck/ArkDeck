@@ -1,0 +1,51 @@
+---
+schema_version: 1.0.0
+change_id: CHG-2026-027-decision-grading-batch-approval
+change_revision: 1
+platform: macos
+evidence_classes:
+- documentReview
+cases:
+- acceptance_id: BAP-GOV-001
+  test_id: TEST-BAP-GOV-001
+  method: Document review of the decision-grading and batch-approval governance sections.
+  expected_source: openspec/changes/chg-2026-027-decision-grading-batch-approval/verification.md#BAP-GOV-001
+  minimum_evidence: documentReview
+  expected_result: >-
+    enforcement.md 2.1.0 defines the decision grades operationally (D0 requires
+    all three conditions: the outcome is fully determined by already-merged
+    main state plus deterministic checks, the diff carries no new scope, no new
+    risk acceptance and no new authorization, and no authoritative document
+    changes semantics; D1 and D2 gate classes are closed enumerations), states
+    that a batch is merged strictly in the digest-declared order with every
+    merge remaining an individual per-PR approval, that the digest carries no
+    approval semantics, that a rejected item halts its dependency chain, and
+    that no auto-merge exists at any grade; AGENTS.md is synchronized with zero
+    conflict and the trust-root and authority-order text is unchanged.
+- acceptance_id: BAP-DRILL-001
+  test_id: TEST-BAP-DRILL-001
+  method: Document review of the first batch-approval drill evidence.
+  expected_source: openspec/changes/chg-2026-027-decision-grading-batch-approval/verification.md#BAP-DRILL-001
+  minimum_evidence: documentReview
+  expected_result: >-
+    The drill evidence shows at least two genuine D0 items (naturally produced
+    by in-flight lanes, not manufactured for the drill), each carrying an
+    independent pre-merge AI review APPROVE, entering the queue with a complete
+    digest; the maintainer reviews and merges each PR individually in the
+    declared order; the watch session resumes automatically based on merge-OID
+    detection rather than branch disappearance or elapsed-time guessing; the
+    batch contains zero implementation content beyond approved scope and zero
+    speculative work past a judgment gate; the runbook and digest template
+    match the actually executed flow, with deviations recorded honestly.
+- acceptance_id: BAP-CRED-001
+  test_id: TEST-BAP-CRED-001
+  method: Document review of the agent credential-separation evidence.
+  expected_source: openspec/changes/chg-2026-027-decision-grading-batch-approval/verification.md#BAP-CRED-001
+  minimum_evidence: documentReview
+  expected_result: >-
+    The agent runtime environment holds only credentials that can push
+    agent/** refs: positive evidence (a successful agent/** push) and negative
+    evidence (a rejected push to a non-agent/** ref) are both on record; the
+    maintainer's account credentials and approval actions are absent from
+    every process and keychain reachable by the agent; no credential value or
+    token appears in the repository, the evidence or any log.
