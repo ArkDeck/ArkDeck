@@ -1,6 +1,6 @@
 # Governance Enforcement
 
-> Version:2.0.0(git-native)
+> Version:2.1.0(git-native;2.1.0 = CHG-2026-027 TASK-BAP-001 于"批准语义"节 ADDED 决策分级与批次审批协议两小节,2026-07-22)
 > Status:current
 > 取代 V1 密码学治理链;背景与事故记录见 `openspec/planning/postmortem-2026-07-governance.md`。
 
@@ -22,6 +22,49 @@
 - **验证确认与实现分离**:change 的 `verified` 翻转不得只依附实现 PR 的 review;翻转 `verified` 的 PR 应只包含状态与 evidence 引用(run 记录、复验记录),使验证判断可与实现批准分开追溯。
 - **作废 PR 立即 close**:被治理裁定作废或被后续 PR 取代的 open PR(如被 supersede 的 remediation 草案、失效的实现尝试),维护者应在裁定生效时立即 close,并在取代 PR 的描述中记录取代关系;"body 里写着 do-not-merge"不构成防线——open 列表中的作废 PR 是误合事故隐患(2026-07-20 #126 误合、#133 revert 教训)。
 - **merge 载体可核验**:维护者合并 PR 时应使用 GitHub squash merge(commit subject 携带 `(#N)`),或在本地 merge 后于 commit subject 补记 `(#N)`,使 git 账本单独可核验每次合并的 PR 关联。当 git 历史中出现无 `(#N)` 的合并时,审计者不得仅凭 git 账本断言"绕过信任根",必须先以 `gh pr view <n> --json reviews,mergedBy` 核验 GitHub 侧的 review/merge 元数据再下结论(2026-07-19 #117-#123 窗口曾致三个独立审查者误判)。
+
+### 决策分级(D0/D1/D2)
+
+对每个待维护者合并的决策点分级(CHG-2026-027)。分级只决定该项在批次审批中的
+组织方式,**不改变"每个 PR 都需维护者 review/merge"这一事实**;D* 作用于
+PR/决策维度,与执行分级 E0/E1/E2(设备维度,CHG-2026-025)正交。分级记录在
+批次 digest 与 PR 注记中,不引入仓内状态字段。
+
+- **D0 — 机器可判定状态推进**,同时满足三条件:(a) 结论由 main 已合入状态 +
+  确定性检查(guard、测试套件、merged OID 复核、引用扫描、hash/pin 比对)
+  完全决定,不依赖新的人类判断;(b) diff 零新 scope、零新风险接受、零新
+  授权;(c) 不改变任何权威文件(constitution/specs/contracts/enforcement/
+  AGENTS.md)的语义。三条件缺一即非 D0;**拿不准按 D1**。典型:任务 done
+  翻转、change verify 翻转、archive、evidence rerun/复验记录、pins 无漂移
+  复核。
+- **D1 — 人类判断**(封闭列举,扩列须经治理 PR):change approval、readiness
+  (首次风险接受 + pins 锁定 + 窗口/边界确认)、DEC-* 产品决策、ADR、Core
+  delta 与 baseline ratification、proposal revision(r2+)、机制冻结例外、
+  postmortem 定性。
+- **D2 — 物理与授权**:设备窗口执行安排、standing authorization 的创建/修改/
+  吊销、E1 per-device capability evidence 的接受、凭据与权限配置变更。D2 项
+  通常伴随维护者仓外动作,digest 须写明该动作。
+
+### 批次审批协议
+
+- **队列载体 = GitHub issue**(命名 `batch-YYYYMMDD-N`)。审计正本永远是批次
+  合并产生的逐 PR merge 记录(`(#N)` subject 惯例);issue 只是导航,close
+  即归档,不承载任何批准语义。
+- **入队门(三条全过才入队)**:CI 绿;独立 AI 合前 review APPROVE(实现与
+  review 必须是不同会话,无 APPROVE 不入队);digest 字段完整(模板
+  `openspec/templates/batch-digest.md`,TASK-BAP-002 交付;交付前以
+  CHG-2026-027 design §2 字段面为准)。
+- **合并语义**:维护者按 digest 声明顺序逐 PR review/merge。**每次合并仍是
+  逐项批准;digest 无批准语义;任何等级(含 D0)不存在 auto-merge;
+  "CI 绿 ≠ 批准"不变**。
+- **遇拒停链**:批次内某 PR 被拒绝或要求修改,即停止其依赖链的合并(digest
+  声明依赖它的后续项本轮不合),被拒项回炉走正常修复流程;无依赖关系的其余
+  项可继续。
+- **宽度并行,零投机堆叠**:批次吞吐来自多 lane 并行;D1/D2 判断门之后的
+  成 PR 工作在该门合入前不得开工(门后唯一允许的预跑 = 不产生 PR 的采集/
+  勘察);D0 机械序列可同 lane 连续排入。
+- **fail closed**:守望会话对合并状态以 merge OID 确认(不以分支消失或时间
+  推断);无法确认即保持暂停,不猜测续跑。
 
 ## CI 校验(sdd-guard)
 
