@@ -6,6 +6,155 @@ import Foundation
 import XCTest
 
 final class JournalRecoveryContractTests: XCTestCase {
+  func testAuthorizedAgentV2JournalRoundTripsAndCorrelatesDestructiveIntentOutcome() throws {
+    let directory = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let reference = try authorizationReference()
+    let journalURL = directory.appending(path: "authorized-v2.jsonl")
+    let journal = try FileDurableJournal(url: journalURL)
+    let created = try JournalEvent.jobCreated(
+      eventID: "job-created", sequence: 0, sessionID: "session-1", jobID: "job-1",
+      timestamp: timestamp, executionMode: "execute", executionAuthority: "authorizedAgent",
+      schemaVersion: JournalEvent.authorizedAgentSchemaVersion,
+      authorizationRef: reference, usageReservationID: "reservation-1")
+    XCTAssertEqual(try JournalEventCodec.decode(JournalEventCodec.encode(created)), created)
+    try journal.appendAndSynchronize(created)
+    try journal.appendAndSynchronize(
+      JournalEvent.stateTransition(
+        eventID: "v2-preflight", sequence: 1, sessionID: "session-1", jobID: "job-1",
+        timestamp: timestamp, from: .queued, to: .preflight, reason: "fixture",
+        schemaVersion: JournalEvent.authorizedAgentSchemaVersion))
+    try journal.appendAndSynchronize(
+      JournalEvent.stateTransition(
+        eventID: "v2-running", sequence: 2, sessionID: "session-1", jobID: "job-1",
+        timestamp: timestamp, from: .preflight, to: .running, reason: "fixture",
+        schemaVersion: JournalEvent.authorizedAgentSchemaVersion))
+    try journal.appendAndSynchronize(
+      makeFlashIntent(
+        sequence: 3, schemaVersion: JournalEvent.authorizedAgentSchemaVersion,
+        authorizationRef: reference, usageReservationID: "reservation-1"))
+    try journal.appendAndSynchronize(
+      makeOutcome(
+        sequence: 4, schemaVersion: JournalEvent.authorizedAgentSchemaVersion,
+        authorizationRef: reference, usageReservationID: "reservation-1"))
+
+    let replay = try DurableJournalRecovery.inspect(url: journalURL)
+    XCTAssertEqual(replay.schemaVersion, "2.0.0")
+    XCTAssertEqual(replay.executionAuthority, "authorizedAgent")
+    XCTAssertEqual(replay.authorizationReference, reference)
+    XCTAssertEqual(replay.usageReservationID, "reservation-1")
+    XCTAssertTrue(replay.outstandingIntents.isEmpty)
+    print("TEST-AIN-CONTRACT-001 journal-v2=PASS device_dispatch=0 external_process=0")
+  }
+
+  func testAuthorizedAgentV2JournalRejectsMissingDriftGhostAndMixedVersionCorrelation() throws {
+    let reference = try authorizationReference()
+    let drifted = try AuthorizationReference(
+      authorizationID: "authorization-2", mainCommitOID: String(repeating: "a", count: 40),
+      authorizationBlobOID: String(repeating: "c", count: 40), approvalPRNumber: 299)
+
+    func seededJournal(_ suffix: String) throws -> FileDurableJournal {
+      let directory = try temporaryDirectory()
+      let journal = try FileDurableJournal(
+        url: directory.appending(path: "authorized-\(suffix).jsonl"))
+      try journal.appendAndSynchronize(
+        JournalEvent.jobCreated(
+          eventID: "job-created", sequence: 0, sessionID: "session-1", jobID: "job-1",
+          timestamp: timestamp, executionMode: "execute", executionAuthority: "authorizedAgent",
+          schemaVersion: JournalEvent.authorizedAgentSchemaVersion,
+          authorizationRef: reference, usageReservationID: "reservation-1"))
+      try journal.appendAndSynchronize(
+        JournalEvent.stateTransition(
+          eventID: "preflight", sequence: 1, sessionID: "session-1", jobID: "job-1",
+          timestamp: timestamp, from: .queued, to: .preflight, reason: "fixture",
+          schemaVersion: JournalEvent.authorizedAgentSchemaVersion))
+      try journal.appendAndSynchronize(
+        JournalEvent.stateTransition(
+          eventID: "running", sequence: 2, sessionID: "session-1", jobID: "job-1",
+          timestamp: timestamp, from: .preflight, to: .running, reason: "fixture",
+          schemaVersion: JournalEvent.authorizedAgentSchemaVersion))
+      return journal
+    }
+
+    let missing = try seededJournal("missing")
+    XCTAssertThrowsError(
+      try missing.appendAndSynchronize(
+        makeFlashIntent(
+          sequence: 3, schemaVersion: JournalEvent.authorizedAgentSchemaVersion)))
+
+    let drift = try seededJournal("drift")
+    XCTAssertThrowsError(
+      try drift.appendAndSynchronize(
+        makeFlashIntent(
+          sequence: 3, schemaVersion: JournalEvent.authorizedAgentSchemaVersion,
+          authorizationRef: drifted, usageReservationID: "reservation-1")))
+
+    let mixed = try seededJournal("mixed")
+    XCTAssertThrowsError(
+      try mixed.appendAndSynchronize(
+        JournalEvent.stateTransition(
+          eventID: "mixed", sequence: 3, sessionID: "session-1", jobID: "job-1",
+          timestamp: timestamp, from: .running, to: .waitingForRecovery,
+          reason: "forged v1")))
+
+    let outcomeDrift = try seededJournal("outcome-drift")
+    try outcomeDrift.appendAndSynchronize(
+      makeFlashIntent(
+        sequence: 3, schemaVersion: JournalEvent.authorizedAgentSchemaVersion,
+        authorizationRef: reference, usageReservationID: "reservation-1"))
+    XCTAssertThrowsError(
+      try outcomeDrift.appendAndSynchronize(
+        makeOutcome(
+          sequence: 4, schemaVersion: JournalEvent.authorizedAgentSchemaVersion,
+          authorizationRef: drifted, usageReservationID: "reservation-1")))
+
+    let standard = try FileDurableJournal(
+      url: try temporaryDirectory().appending(path: "standard-v2.jsonl"))
+    try standard.appendAndSynchronize(
+      JournalEvent.jobCreated(
+        eventID: "job-created", sequence: 0, sessionID: "session-1", jobID: "job-1",
+        timestamp: timestamp, executionMode: "execute", executionAuthority: "standardAgent",
+        schemaVersion: JournalEvent.authorizedAgentSchemaVersion))
+    try standard.appendAndSynchronize(
+      JournalEvent.stateTransition(
+        eventID: "preflight", sequence: 1, sessionID: "session-1", jobID: "job-1",
+        timestamp: timestamp, from: .queued, to: .preflight, reason: "fixture",
+        schemaVersion: JournalEvent.authorizedAgentSchemaVersion))
+    try standard.appendAndSynchronize(
+      JournalEvent.stateTransition(
+        eventID: "running", sequence: 2, sessionID: "session-1", jobID: "job-1",
+        timestamp: timestamp, from: .preflight, to: .running, reason: "fixture",
+        schemaVersion: JournalEvent.authorizedAgentSchemaVersion))
+    XCTAssertThrowsError(
+      try standard.appendAndSynchronize(
+        makeFlashIntent(
+          sequence: 3, schemaVersion: JournalEvent.authorizedAgentSchemaVersion)))
+
+    let simulated = try FileDurableJournal(
+      url: try temporaryDirectory().appending(path: "simulated-v2.jsonl"))
+    try simulated.appendAndSynchronize(
+      JournalEvent.jobCreated(
+        eventID: "job-created", sequence: 0, sessionID: "session-1", jobID: "job-1",
+        timestamp: timestamp, executionMode: "simulated", executionAuthority: "authorizedAgent",
+        schemaVersion: JournalEvent.authorizedAgentSchemaVersion,
+        authorizationRef: reference, usageReservationID: "reservation-1"))
+    try simulated.appendAndSynchronize(
+      JournalEvent.stateTransition(
+        eventID: "preflight", sequence: 1, sessionID: "session-1", jobID: "job-1",
+        timestamp: timestamp, from: .queued, to: .preflight, reason: "fixture",
+        schemaVersion: JournalEvent.authorizedAgentSchemaVersion))
+    try simulated.appendAndSynchronize(
+      JournalEvent.stateTransition(
+        eventID: "running", sequence: 2, sessionID: "session-1", jobID: "job-1",
+        timestamp: timestamp, from: .preflight, to: .running, reason: "fixture",
+        schemaVersion: JournalEvent.authorizedAgentSchemaVersion))
+    XCTAssertThrowsError(
+      try simulated.appendAndSynchronize(
+        makeFlashIntent(
+          sequence: 3, schemaVersion: JournalEvent.authorizedAgentSchemaVersion,
+          authorizationRef: reference, usageReservationID: "reservation-1")))
+  }
+
   func testLockedJournalContractCoversEveryClosedEventKind() throws {
     let data = try JournalRecoveryFixtures.data(named: "all-event-kinds.jsonl")
     let lines = data.split(separator: 0x0A)
@@ -1360,7 +1509,10 @@ final class JournalRecoveryContractTests: XCTestCase {
   private func makeFlashIntent(
     sequence: Int,
     eventID: String = "flash-intent",
-    stepID: String = "flash-step"
+    stepID: String = "flash-step",
+    schemaVersion: String = JournalEvent.schemaVersion,
+    authorizationRef: AuthorizationReference? = nil,
+    usageReservationID: String? = nil
   ) throws -> JournalEvent {
     let step = try WorkflowStep(
       id: stepID, kind: .flashPartition, declaredEffect: .destructive,
@@ -1381,18 +1533,30 @@ final class JournalRecoveryContractTests: XCTestCase {
       target: JournalTarget(
         scope: "device", targetID: "device-1", connectKey: "fixture-only",
         identitySnapshotHash: String(repeating: "b", count: 64)),
-      attempt: 1, bindingRevision: 1)
+      attempt: 1, bindingRevision: 1, schemaVersion: schemaVersion,
+      authorizationRef: authorizationRef, usageReservationID: usageReservationID)
   }
 
   private func makeOutcome(
     sequence: Int,
-    outcomeCertainty: JournalOutcomeCertainty = .confirmed
+    outcomeCertainty: JournalOutcomeCertainty = .confirmed,
+    schemaVersion: String = JournalEvent.schemaVersion,
+    authorizationRef: AuthorizationReference? = nil,
+    usageReservationID: String? = nil
   ) throws -> JournalEvent {
     try JournalEvent.stepOutcome(
       eventID: "flash-outcome-\(sequence)", sequence: sequence,
       sessionID: "session-1", jobID: "job-1", timestamp: timestamp,
       stepID: "flash-step", attempt: 1, correlatesToIntentEventID: "flash-intent",
-      result: "succeeded", outcomeCertainty: outcomeCertainty)
+      result: "succeeded", outcomeCertainty: outcomeCertainty,
+      schemaVersion: schemaVersion, authorizationRef: authorizationRef,
+      usageReservationID: usageReservationID)
+  }
+
+  private func authorizationReference() throws -> AuthorizationReference {
+    try AuthorizationReference(
+      authorizationID: "authorization-1", mainCommitOID: String(repeating: "a", count: 40),
+      authorizationBlobOID: String(repeating: "b", count: 40), approvalPRNumber: 299)
   }
 
   private func checkpoint(sequence: Int, state: JobState) throws -> JournalCheckpoint {
