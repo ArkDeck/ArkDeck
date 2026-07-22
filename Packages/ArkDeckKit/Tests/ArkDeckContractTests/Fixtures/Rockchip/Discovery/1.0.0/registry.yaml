@@ -1,0 +1,63 @@
+{
+  "schemaVersion": "1.0.0",
+  "serializationFormat": "json-compatible-yaml-1.2",
+  "registryId": "ROCKCHIP-ROCKUSB-DISCOVERY",
+  "registryVersion": "1.0.0",
+  "integrationProfile": "ROCKCHIP-ROCKUSB-DISCOVERY@1.0.0",
+  "registeredBy": "CHG-2026-026/TASK-RKFUI-001",
+  "unknownFamilyDisposition": "blocked",
+  "toolContext": {
+    "platform": "macos",
+    "reportedVersion": "rkdeveloptool ver 1.32",
+    "executableSHA256": "038a8a0ea26ef7eb77451789f310c0c9fbeaf43a78af1d6146e02311a9c23611",
+    "source": "rockchip-linux/rkdeveloptool",
+    "upstreamCommit": "304f073752fd25c854e1bcf05d8e7f925b1f4e14",
+    "pathSource": "userSelectedSecurityScopedBookmark",
+    "platformTrustRequired": true,
+    "quarantineAllowed": false
+  },
+  "operation": {
+    "id": "rockchip-rockusb-list-devices-1.32-macos",
+    "family": "rockusbListDevices",
+    "status": "supported",
+    "probeKind": "externalToolCommand",
+    "exactArgv": ["ld"],
+    "effectClassification": "readOnly",
+    "timeoutMilliseconds": 5000,
+    "maximumOutputBytes": 65536,
+    "maximumDeviceCount": 64,
+    "stdoutGrammar": "DevNo=<canonical-u32>\\tVid=0x<hex4>,Pid=0x<hex4>,LocationID=<canonical-u64>\\t<Loader|Maskrom>\\n",
+    "wholeOutputConsumed": true,
+    "duplicateDeviceNumberDisposition": "blocked",
+    "duplicateLocationIDDisposition": "blocked",
+    "unknownModeDisposition": "blocked",
+    "expectedProviderObservation": {
+      "usbVendorID": "0x2207",
+      "usbProductID": "0x350a",
+      "mode": "Loader"
+    },
+    "knownBlockedObservations": [
+      {"mode": "Maskrom", "reason": "providerDoesNotSupportMaskrom"},
+      {"deviceFamily": "not-0x2207:0x350a", "reason": "deviceNotExpectedRockUSB"}
+    ],
+    "accessDiagnostics": [
+      {"markers": ["permission denied", "operation not permitted", "libusb_error_access"], "result": "permissionDenied"},
+      {"markers": ["driver unavailable", "libusb_init failed", "no libusb backend"], "result": "driverUnavailable"},
+      {"condition": "exit0-and-empty-stdout-stderr", "result": "offline"},
+      {"marker": "unauthorized", "result": "unauthorized"}
+    ],
+    "forbiddenEffects": [
+      "shell",
+      "sudo",
+      "hostPrivilegeElevation",
+      "helperInstall",
+      "driverInstall",
+      "systemRuleWrite",
+      "groupOrACLMutation",
+      "globalDevicePermissionReduction",
+      "modeSwitch",
+      "deviceMutation",
+      "destructive"
+    ]
+  }
+}

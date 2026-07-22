@@ -71,7 +71,7 @@ final class RockchipDeviceDiscoveryContractTests: XCTestCase {
 
   func testRegistryPinsOneReadOnlyIdentityBoundLDOperationAndAllFixtureBytes() throws {
     let registry = try JSONDecoder().decode(
-      Registry.self, from: Data(contentsOf: canonicalRegistryURL()))
+      Registry.self, from: Data(contentsOf: bundledRegistryURL()))
     let profile = RockchipDiscoveryIntegrationProfile.pinnedProduction
 
     XCTAssertEqual(registry.schemaVersion, "1.0.0")
@@ -108,14 +108,18 @@ final class RockchipDeviceDiscoveryContractTests: XCTestCase {
     XCTAssertEqual(Set(registry.operation.forbiddenEffects), expectedForbiddenEffects)
 
     let manifest = try JSONDecoder().decode(
-      ResourceManifest.self, from: Data(contentsOf: resourceManifestURL()))
+      ResourceManifest.self, from: Data(contentsOf: bundledResourceManifestURL()))
     XCTAssertEqual(manifest.schemaVersion, "1.0.0")
     XCTAssertEqual(manifest.registryId, registry.registryId)
     XCTAssertEqual(manifest.registryVersion, registry.registryVersion)
     XCTAssertEqual(manifest.resources.count, 10)
     XCTAssertEqual(Set(manifest.resources.map(\.id)).count, manifest.resources.count)
+    let manifestPathPrefix =
+      "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/Rockchip/Discovery/1.0.0/"
     for resource in manifest.resources {
-      let bytes = try Data(contentsOf: repositoryRoot().appending(path: resource.path))
+      XCTAssertTrue(resource.path.hasPrefix(manifestPathPrefix), resource.id)
+      let relativePath = String(resource.path.dropFirst(manifestPathPrefix.count))
+      let bytes = try Data(contentsOf: fixtureRoot().appending(path: relativePath))
       XCTAssertEqual(bytes.count, resource.sizeBytes, resource.id)
       XCTAssertEqual(sha256(bytes), resource.sha256, resource.id)
       XCTAssertFalse(resource.evidenceClass.isEmpty)
@@ -310,20 +314,15 @@ final class RockchipDeviceDiscoveryContractTests: XCTestCase {
     try Data(contentsOf: fixtureRoot().appending(path: name))
   }
 
-  private func repositoryRoot() -> URL {
-    var root = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
-    for _ in 0..<4 { root.deleteLastPathComponent() }
-    return root
+  /// Bundled copies of the canonical `openspec/integrations/rockchip/rockusb-discovery/1.0.0/`
+  /// registry files; byte equality with the canonical originals is enforced by
+  /// `scripts/rockchip_e0_probe/test_probe.py`, so this suite never reads repository paths.
+  private func bundledRegistryURL() throws -> URL {
+    try fixtureRoot().appending(path: "registry.yaml")
   }
 
-  private func canonicalRegistryURL() -> URL {
-    repositoryRoot().appending(
-      path: "openspec/integrations/rockchip/rockusb-discovery/1.0.0/registry.yaml")
-  }
-
-  private func resourceManifestURL() -> URL {
-    repositoryRoot().appending(
-      path: "openspec/integrations/rockchip/rockusb-discovery/1.0.0/resources.json")
+  private func bundledResourceManifestURL() throws -> URL {
+    try fixtureRoot().appending(path: "resources.json")
   }
 
   private func sha256(_ data: Data) -> String {
