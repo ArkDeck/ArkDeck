@@ -41,7 +41,7 @@ change approved 前保持 blocked;approved 后每任务另需独立 readiness PR
 
 ## TASK-AIN-002 — hardware-evidence schema 3.0.0 定稿(host-only)
 
-- Status:blocked
+- Status:ready
 - Platform:macos
 - Requirements:REQ-FLASH-015(MODIFIED)的 evidence 字段面
 - Acceptance:change-local AIN-SCHEMA-001(v3 schema 对合法/非法实例的接受/拒绝行为二值可证)
@@ -69,6 +69,33 @@ change approved 前保持 blocked;approved 后每任务另需独立 readiness PR
 
 - archive PR 将定稿替换 `openspec/contracts/hardware-evidence.schema.json` 并同步
   `verification/core-conformance.yaml` 的 operator 注记。
+
+### Readiness pins(r1,2026-07-22)
+
+- Base:main `923e5023de76341297a4274584d3ec5e6a6aae72`(#281 merge,change
+  approved);guard 于 base 实测 0 error / 0 warning / 111 acceptance IDs。
+- 待定稿 blob:`contracts/hardware-evidence.schema.v3-draft.json`
+  `62fc3a733cf0ccdd94297568c9c34c8c2c2f6ae4`。
+- 只读 seam blob(零接触,漂移即重查):
+  - v2 正本 `openspec/contracts/hardware-evidence.schema.json`
+    `98443833b5bef36f4a1e0fdea9dbaaccf057f4d1`(archive PR 才替换);
+  - flashing delta `specs/flashing/spec.md`
+    `5fd7ed4df9574e52e822930eff0e824641c0bd5f`(evidence 字段语义依据:
+    executor/authorizationRef/目标读回)。
+- 工具可得性(base 上实测):`.venv-sdd` python 可得;`jsonschema` 第三方库
+  **缺失**——校验脚本 SHALL 以 stdlib 实现本 schema 所需的封闭断言集
+  (required/enum/pattern/条件 required),不引入第三方依赖、不装包、不联网;
+  脚本与正反例入 `evidence/runs/TASK-AIN-002/`。
+- 二值门(AIN-SCHEMA-001):正例集全 accept;反例集全 reject(至少含:
+  kind=agent 缺 authorizationRef、未知 kind、缺 physicalTargetConfirmation.method、
+  method 非法值、serial 疑似原始字节而非摘要的记录说明面);v2 历史实例
+  (EVD-RF001/RF002 族)不迁移不改写,兼容性以文字说明入 run 记录。
+- 边界确认:只写 change 目录 `contracts/**` 与 `evidence/**`;
+  `openspec/contracts/**` 正本零接触。
+- 并行边界:与 TASK-AIN-001(根治理文档)、TASK-AIN-003(`Packages/**`)零文件
+  交集,可并行;三 readiness PR 同改本 tasks.md 不同段,后合者如冲突需 rebase
+  (#255/#256 先例)。AIN-003 只读依赖本任务的 v3 形态:定稿若改变
+  `62fc3a73…` 的 executor/confirmation 字段语义,AIN-003 readiness 须重查。
 
 ## TASK-AIN-003 — ArkDeckKit 执行门 standing-authorization 路径
 
