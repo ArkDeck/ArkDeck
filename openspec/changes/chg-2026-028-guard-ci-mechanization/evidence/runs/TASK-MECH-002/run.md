@@ -70,29 +70,39 @@
   合计 13/13 全绿。
 - 校验只证明 revision 载体数值同步,不判断 revision 内容是否语义充分;
   CI 绿仍不构成批准。`archive/**` 继续全体豁免。
-- 本 PR 不翻 TASK-MECH-002 状态;实现须先由维护者 review/merge,随后另立
-  `ready→done` D0 状态 PR。TASK-MECH-003 继续等待 MECH-002 done 后重钉
-  同文件 blobs,不得基于本未合 PR 投机开工。
+- 本 evidence-only 后续 PR 不翻 TASK-MECH-002 状态;实现 #343 已由维护者
+  review/merge,但仍须先合入本 live evidence,随后另立 `ready→done` D0 状态
+  PR。TASK-MECH-003 继续等待 MECH-002 done 后重钉同文件 blobs,不得基于
+  未合 evidence 或未生效状态投机开工。
 
-## Live PR evidence(pre-final synchronize)
+## Live PR evidence
 
 - PR #343 初始 implementation head
   `c98eb5e858038129ec558afb8774c5db949f58c6`。push Swift run
   `29936036221` = **SUCCESS**:Apple Swift 6.3.3,全量 **358 tests /
   1 skipped / 0 failures**;push SDD Guard run `29936040282` = guard
   SUCCESS(`allowed-paths` 在 push event 正确 skipped,不冒充 PR diff check)。
-- 自动 PR-opened 的 Swift run `29936062954` = `action_required`,不是绿证据;
-  PR body edited 后真实 `pull_request` SDD Guard run `29936110570` = guard
-  SUCCESS + live `allowed-paths` SUCCESS。追加本段的 synchronize commit 将
-  触发 final-head PR Swift 与 SDD Guard;二者必须实际出现且绿色后才可入队。
+- 自动 PR-opened 的 Swift run `29936062954` 初始为 `action_required`,当时
+  不是绿证据;维护者批准 workflow run 后,同一真实 `pull_request` run 于
+  exact head **SUCCESS**(10s),路径感知判定零 Swift surface,Xcode/toolchain/
+  full test 步骤均明确 skipped,未冒充全量。PR SDD Guard run
+  `29936067155` = guard SUCCESS + live `allowed-paths` SUCCESS;body edited
+  触发的 `29936110570` 亦为 guard + live `allowed-paths` 双 SUCCESS。
+- `lvye` 于 exact head `c98eb5e858038129ec558afb8774c5db949f58c6`
+  提交 GitHub APPROVED review,随后合入 #343;merge OID =
+  `6f9e3df9ee29d792d7d5cfb85b035a425c03e19c`。CI 绿与 AI review 不构成
+  该批准,人类 review/merge 才使实现进入 protected main。
 - 不同 AI 会话对 implementation + 本 run evidence 前一版的 final commit
   `c98eb5e858038129ec558afb8774c5db949f58c6` 独立复核 = **APPROVE**;
   逐项重跑 13/13、12/12、0/0/111 与 diff check,核对 #341/#342 exact-head
   approval/merge、active revision 清单、allowed paths 与零状态翻转。reviewer
-  未在 GitHub approve/merge;本 evidence-only delta 仍须对新 final head 复核。
+  未在 GitHub approve/merge;本合后 evidence-only delta 仍须对新 final head
+  复核并取得其自身 PR checks,不得把 #343 的检查冒充本 PR 检查。
 
 ## AC conclusion(candidate)
 
-`MECH-REV-001`:本地 contract 与真实 baseline 面全部 PASS;实现 PR live
-CI、最终独立 AI review 与维护者 review/merge 尚未发生,故本记录仅为
-candidate evidence,不把 task 或 change 标为 done/verified。
+`MECH-REV-001`:contract、真实 baseline、implementation PR live CI、独立
+AI review 与维护者 exact-head review/merge 面全部 PASS;本合后 evidence
+尚待独立复核、PR checks 与维护者合入,其后仍需独立 `ready→done` 状态 PR。
+故本记录是 D0 状态候选 evidence,不在本 PR 把 task/change 标为
+done/verified。
