@@ -10,6 +10,7 @@ evidence/runs/TASK-RKFUI-001/run.md
 evidence/runs/TASK-RKFUI-001/sanitized-e0-receipt.json
 evidence/runs/TASK-RKFUI-001/diagnostic-alignment-2026-07-22.md
 evidence/runs/TASK-RKFUI-001/review-nits-2026-07-22.md
+evidence/runs/TASK-RKFUI-001/hermetic-contract-test-2026-07-22.md
 ```
 
 未来 run 位置：

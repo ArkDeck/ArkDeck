@@ -23,6 +23,9 @@ SWIFT_DISCOVERY = (
     ROOT.parent.parent
     / "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipDeviceDiscovery.swift"
 )
+CANONICAL_REGISTRY_ROOT = (
+    ROOT.parent.parent / "openspec/integrations/rockchip/rockusb-discovery/1.0.0"
+)
 
 
 def dictionary_key_paths(value: object, prefix: str = "") -> set[str]:
@@ -51,6 +54,17 @@ def swift_string_enum_raw_values(enum_name: str) -> set[str]:
 class RockchipE0ProbeTests(unittest.TestCase):
     def fixture(self, name: str) -> bytes:
         return (FIXTURES / name).read_bytes()
+
+    def test_bundled_registry_copies_match_canonical_openspec(self) -> None:
+        # The Swift contract suite reads only Bundle.module copies of these files;
+        # this assertion is what keeps those copies byte-identical to the canonical
+        # openspec registry, so a drifted copy fails here instead of passing silently.
+        for name in ("registry.yaml", "resources.json"):
+            with self.subTest(name=name):
+                self.assertEqual(
+                    (FIXTURES / name).read_bytes(),
+                    (CANONICAL_REGISTRY_ROOT / name).read_bytes(),
+                )
 
     def test_strict_success_and_multi(self) -> None:
         single = PROBE.parse_ld(
