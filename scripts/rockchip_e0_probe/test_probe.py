@@ -88,6 +88,16 @@ class RockchipE0ProbeTests(unittest.TestCase):
             "driverUnavailable",
         )
 
+    def test_combined_standard_output_and_error_must_fit_maximum_output_bytes(self) -> None:
+        stdout = b"A" * (63 * 1_024)
+        stderr = b"B" * (2 * 1_024)
+        self.assertLess(len(stdout), 65_536)
+        self.assertLess(len(stderr), 65_536)
+        self.assertEqual(
+            PROBE.parse_ld(stdout, stderr, "exited", 0),
+            {"verdict": "malformedOutput", "diagnostic": "outputTooLarge", "observations": []},
+        )
+
     def test_closed_command_and_entitlements(self) -> None:
         self.assertEqual(PROBE.EXACT_ARGUMENTS, ["ld"])
         self.assertNotIn("sudo", PROBE.EXACT_ARGUMENTS)
@@ -99,10 +109,16 @@ class RockchipE0ProbeTests(unittest.TestCase):
             PROBE.classify_preflight_failure("quarantinePresent"),
             {"verdict": "toolBlocked", "diagnostic": "quarantinePresent", "observations": []},
         )
-        self.assertEqual(
-            PROBE.classify_preflight_failure("securityScopedBookmarkStale")["verdict"],
-            "permissionDenied",
-        )
+        for failure in (
+            "securityScopedBookmarkStale",
+            "securityScopedBookmarkPathMismatch",
+            "bookmarkCreationOrResolutionFailed",
+        ):
+            with self.subTest(failure=failure):
+                self.assertEqual(
+                    PROBE.classify_preflight_failure(failure),
+                    {"verdict": "toolBlocked", "diagnostic": failure, "observations": []},
+                )
 
     def test_sanitized_receipt_schema_matches_committed_evidence(self) -> None:
         envelope = {

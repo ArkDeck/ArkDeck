@@ -14,6 +14,7 @@ hash-pinned `rkdeveloptool` build. It grants no generic Rockchip command authori
   commit `304f073752fd25c854e1bcf05d8e7f925b1f4e14`.
 - Exact argv: `ld`.
 - Effect: read-only observation.
+- `maximumOutputBytes` is the combined limit for stdout and stderr.
 - Unknown output, unknown mode, duplicate device number/location, stderr, identity drift,
   stale bookmark, rejected platform trust, timeout, or cancellation fails closed.
 - `Loader` and `Maskrom` are the only registered mode tokens. Only

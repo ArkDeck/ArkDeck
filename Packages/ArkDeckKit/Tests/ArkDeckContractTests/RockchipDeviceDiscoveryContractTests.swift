@@ -190,6 +190,17 @@ final class RockchipDeviceDiscoveryContractTests: XCTestCase {
         + "similar=blocked malformed=blocked duplicate=blocked unknown=blocked similar_dispatch=0")
   }
 
+  func testCombinedStandardOutputAndErrorMustFitMaximumOutputBytes() {
+    let stdout = Data(repeating: 0x41, count: 63 * 1_024)
+    let stderr = Data(repeating: 0x42, count: 2 * 1_024)
+
+    XCTAssertLessThan(stdout.count, RockchipLDOutputParser.maximumOutputBytes)
+    XCTAssertLessThan(stderr.count, RockchipLDOutputParser.maximumOutputBytes)
+    XCTAssertEqual(
+      RockchipLDOutputParser.parse(stdout: stdout, stderr: stderr),
+      .blocked(.outputTooLarge))
+  }
+
   // MARK: - TEST-AC-UX-007-01
 
   func testTEST_AC_UX_007_01_AccessAdvisorDistinguishesPermissionDriverAndOffline() throws {

@@ -81,7 +81,7 @@ def _sha256_file(path: pathlib.Path) -> str:
 
 
 def parse_ld(stdout: bytes, stderr: bytes, termination: str | None, exit_code: int | None) -> dict[str, Any]:
-    if len(stdout) > 65_536 or len(stderr) > 65_536:
+    if len(stdout) + len(stderr) > 65_536:
         return {"verdict": "malformedOutput", "diagnostic": "outputTooLarge", "observations": []}
     lowered = (stdout + stderr).lower()
     if any(marker in lowered for marker in PERMISSION_MARKERS):
@@ -158,9 +158,6 @@ def classify_preflight_failure(failure: str | None) -> dict[str, Any] | None:
         "securityScopedBookmarkStale",
         "securityScopedBookmarkPathMismatch",
         "bookmarkCreationOrResolutionFailed",
-    ):
-        verdict = "permissionDenied"
-    elif failure in (
         "executableHashMismatch",
         "signatureIntegrityInvalid",
         "quarantinePresent",

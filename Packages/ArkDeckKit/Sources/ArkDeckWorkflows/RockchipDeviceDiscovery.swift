@@ -170,7 +170,7 @@ public enum RockchipLDOutputParser {
     stderr: Data = Data(),
     termination: ProcessTermination = .exited(0)
   ) -> RockchipLDParseResult {
-    guard stdout.count <= maximumOutputBytes, stderr.count <= maximumOutputBytes else {
+    guard stdout.count + stderr.count <= maximumOutputBytes else {
       return .blocked(.outputTooLarge)
     }
 
