@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import datetime
 import hashlib
 import json
 import os
@@ -34,6 +35,29 @@ LINE_PATTERN = re.compile(
 )
 PERMISSION_MARKERS = (b"permission denied", b"operation not permitted", b"libusb_error_access")
 DRIVER_MARKERS = (b"driver unavailable", b"libusb_init failed", b"no libusb backend")
+SWIFT_DEVICE_ACCESS_RESPONSIBILITY_RAW_VALUES = frozenset(
+    {"user", "systemAdministrator", "deviceOrToolVendor"}
+)
+SWIFT_DEVICE_ACCESS_REMEDIATION_RAW_VALUES = frozenset(
+    {
+        "reconnectOrEnterLoader",
+        "reviewDevicePermissionOutsideArkDeck",
+        "repairDriverOutsideArkDeck",
+        "selectPinnedUserApprovedTool",
+        "chooseSupportedLoaderObservation",
+        "inspectControlledDiagnostics",
+    }
+)
+DEVICE_ACCESS_ADVICE = {
+    "accessible": ("user", "chooseSupportedLoaderObservation"),
+    "offlineOrUnauthorized": ("user", "reconnectOrEnterLoader"),
+    "permissionDenied": ("systemAdministrator", "reviewDevicePermissionOutsideArkDeck"),
+    "driverUnavailable": ("deviceOrToolVendor", "repairDriverOutsideArkDeck"),
+    "protocolBlocked": ("user", "chooseSupportedLoaderObservation"),
+    "toolBlocked": ("user", "selectPinnedUserApprovedTool"),
+    "malformedOutput": ("deviceOrToolVendor", "inspectControlledDiagnostics"),
+    "probeFailed": ("deviceOrToolVendor", "inspectControlledDiagnostics"),
+}
 
 
 class ProbeError(RuntimeError):
@@ -271,6 +295,123 @@ def _platform_trust(path: pathlib.Path) -> dict[str, Any]:
     }
 
 
+def _access_advice(verdict: str) -> tuple[str, str]:
+    try:
+        responsibility, remediation = DEVICE_ACCESS_ADVICE[verdict]
+    except KeyError as error:
+        raise ProbeError(f"unmapped device access verdict: {verdict}") from error
+    if responsibility not in SWIFT_DEVICE_ACCESS_RESPONSIBILITY_RAW_VALUES:
+        raise ProbeError(f"responsibility is not a Swift raw value: {responsibility}")
+    if remediation not in SWIFT_DEVICE_ACCESS_REMEDIATION_RAW_VALUES:
+        raise ProbeError(f"remediation is not a Swift raw value: {remediation}")
+    return responsibility, remediation
+
+
+def build_sanitized_receipt(
+    *,
+    envelope: dict[str, Any],
+    captured_at: str,
+    executor: str,
+    app_executable_sha256: str,
+    entitlements: dict[str, Any],
+    build_receipt: dict[str, Any],
+    selected_basename: str | None,
+    tool_hash: str | None,
+    trust: dict[str, Any],
+    stdout: bytes,
+    stderr: bytes,
+    parsed: dict[str, Any],
+    execute_readiness_passed: bool,
+) -> dict[str, Any]:
+    """Build the repository-safe receipt without I/O or device interaction."""
+
+    launch_attempted = bool(envelope.get("childLaunchAttempted"))
+    responsibility, remediation = _access_advice(parsed["verdict"])
+    if launch_attempted:
+        usb_access_result = (
+            "applicableLoaderObserved"
+            if execute_readiness_passed
+            else "attemptedWithoutApplicableLoader"
+        )
+        raw_artifacts = "operatorControlledOutsideRepository"
+    elif parsed["verdict"] == "toolBlocked":
+        usb_access_result = "notAttemptedBecauseToolTrustBlockedBeforeChildLaunch"
+        raw_artifacts = "emptyBecauseChildLaunchWasBlocked"
+    else:
+        usb_access_result = "notAttemptedBecausePreflightBlockedBeforeChildLaunch"
+        raw_artifacts = "emptyBecauseChildLaunchWasBlocked"
+
+    return {
+        "schemaVersion": "1.0.0",
+        "capturedAt": captured_at,
+        "evidenceClass": "realHardwareE0ReadOnly" if launch_attempted else "signedSandboxHostOnly",
+        "executor": executor,
+        "app": {
+            "bundleIdentifier": "dev.arkdeck.rockchip-e0-probe",
+            "executableSHA256": app_executable_sha256,
+            "signatureClass": build_receipt["signatureClass"],
+            "developerIDIdentityAvailable": build_receipt[
+                "developerIDIdentityAvailableAtBuild"
+            ],
+            "hardenedRuntime": build_receipt["hardenedRuntime"],
+            "codesignVerified": True,
+            "entitlements": entitlements,
+        },
+        "tool": {
+            "basename": selected_basename,
+            "pathSource": "userSelectedSecurityScopedBookmark",
+            "bookmarkCreated": envelope.get("bookmarkCreated"),
+            "securityScopeStarted": envelope.get("securityScopeStarted"),
+            "reportedVersion": PINNED_TOOL_VERSION,
+            "versionEvidence": "approvedRegistryPinBoundByExactExecutableSHA256",
+            "sha256": tool_hash,
+            "upstreamCommit": PINNED_UPSTREAM_COMMIT,
+            "platformTrust": {
+                "codeTrust": trust["codeTrust"],
+                "signatureIntegrityValid": trust["signatureIntegrityCheckExit"] == 0,
+                "quarantinePresent": trust["quarantinePresent"],
+                "gatekeeperAssessment": trust["gatekeeperAssessmentSummary"],
+            },
+        },
+        "invocation": {
+            "arguments": EXACT_ARGUMENTS,
+            "environmentOverrideCount": 0,
+            "preflightFailure": envelope.get("preflightFailure"),
+            "childLaunchAttempted": launch_attempted,
+            "termination": envelope.get("termination"),
+            "exitCode": envelope.get("exitCode"),
+            "stdout": {"sha256": _sha256(stdout), "sizeBytes": len(stdout)},
+            "stderr": {"sha256": _sha256(stderr), "sizeBytes": len(stderr)},
+        },
+        "deviceAccessAdvisor": {
+            "verdict": parsed["verdict"],
+            "diagnostic": parsed.get("diagnostic"),
+            "responsibility": responsibility,
+            "remediation": remediation,
+        },
+        "usbAccessResult": usb_access_result,
+        "executeReadinessGate": "passed" if execute_readiness_passed else "blocked",
+        "dispatchCounters": {
+            "ldReadOnly": 1 if launch_attempted else 0,
+            "versionDuringDeviceWindow": 0,
+            "hdcModeSwitch": 0,
+            "deviceMutation": 0,
+            "destructive": 0,
+            "sudoOrPrivilegeElevation": 0,
+            "helperOrDriverInstall": 0,
+            "systemRuleGroupOrACLMutation": 0,
+            "network": 0,
+        },
+        "privacy": {
+            "fullToolPathRecorded": False,
+            "rawQuarantinePayloadRecorded": False,
+            "deviceSerialRecorded": False,
+            "locationIDRecorded": False,
+            "rawArtifacts": raw_artifacts,
+        },
+    }
+
+
 def run_probe(
     app: pathlib.Path,
     initial_directory: pathlib.Path,
@@ -331,63 +472,28 @@ def run_probe(
         and trust["codeTrust"] in ("adHoc", "developerID")
         and trust["quarantinePresent"] is False
     )
-    launch_count = 1 if envelope.get("childLaunchAttempted") else 0
-    receipt = {
-        "schemaVersion": "1.0.0",
-        "evidenceClass": "realHardwareE0ReadOnly" if launch_count else "signedSandboxHostOnly",
-        "app": {
-            "bundleIdentifier": "dev.arkdeck.rockchip-e0-probe",
-            "executableSHA256": _sha256_file(executable),
-            "codesignVerified": True,
-            "entitlements": entitlements,
-            "signatureClass": json.loads((app.parent / "build-receipt.json").read_text())["signatureClass"],
-            "hardenedRuntime": json.loads((app.parent / "build-receipt.json").read_text())["hardenedRuntime"],
-        },
-        "tool": {
-            "pathSource": "userSelectedSecurityScopedBookmark",
-            "basename": selected_path.name if selected_path else None,
-            "reportedVersion": PINNED_TOOL_VERSION,
-            "versionEvidence": "approvedRegistryPinBoundByExactExecutableSHA256",
-            "sha256": tool_hash,
-            "upstreamCommit": PINNED_UPSTREAM_COMMIT,
-            "platformTrust": trust,
-            "bookmarkCreated": envelope.get("bookmarkCreated"),
-            "securityScopeStarted": envelope.get("securityScopeStarted"),
-        },
-        "invocation": {
-            "directChild": bool(launch_count),
-            "executableURLSelectedByUser": bool(selected_path),
-            "arguments": EXACT_ARGUMENTS,
-            "environmentOverrideCount": 0,
-            "preflightFailure": envelope.get("preflightFailure"),
-            "launchAttempted": bool(launch_count),
-            "termination": envelope.get("termination"),
-            "exitCode": envelope.get("exitCode"),
-            "launchErrorDomain": envelope.get("launchErrorDomain"),
-            "launchErrorCode": envelope.get("launchErrorCode"),
-            "stdout": {"sha256": _sha256(stdout), "sizeBytes": len(stdout)},
-            "stderr": {"sha256": _sha256(stderr), "sizeBytes": len(stderr)},
-        },
-        "deviceAccessAdvisor": parsed,
-        "executeReadinessGate": "passed" if identity_gate and exact_loader else "blocked",
-        "rawArtifacts": {
-            "storage": "operatorControlledOutsideRepository",
-            "root": "<CONTROLLED_LOCAL_ROOT>",
-            "stdout": "ld.stdout.bin",
-            "stderr": "ld.stderr.bin",
-        },
-        "dispatchCounters": {
-            "ldReadOnly": launch_count,
-            "versionDuringDeviceWindow": 0,
-            "hdcModeSwitch": 0,
-            "deviceMutation": 0,
-            "destructive": 0,
-            "sudoOrPrivilegeElevation": 0,
-            "helperOrDriverInstall": 0,
-            "systemRuleGroupOrACLMutation": 0,
-            "network": 0,
-        },
-    }
+    build_receipt = json.loads((app.parent / "build-receipt.json").read_text())
+    captured_at = (
+        datetime.datetime.now(datetime.timezone.utc)
+        .replace(microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
+    receipt = build_sanitized_receipt(
+        envelope=envelope,
+        captured_at=captured_at,
+        executor="agent",
+        app_executable_sha256=_sha256_file(executable),
+        entitlements=entitlements,
+        build_receipt=build_receipt,
+        selected_basename=selected_path.name if selected_path else None,
+        tool_hash=tool_hash,
+        trust=trust,
+        stdout=stdout,
+        stderr=stderr,
+        parsed=parsed,
+        execute_readiness_passed=identity_gate and exact_loader,
+    )
     receipt_path.parent.mkdir(parents=True, exist_ok=True)
     receipt_path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return receipt

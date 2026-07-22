@@ -55,7 +55,7 @@
     "verdict": "toolBlocked",
     "diagnostic": "quarantinePresent",
     "responsibility": "user",
-    "remediation": "reviewToolTrustOutsideArkDeckThenReprobe"
+    "remediation": "selectPinnedUserApprovedTool"
   },
   "usbAccessResult": "notAttemptedBecauseToolTrustBlockedBeforeChildLaunch",
   "executeReadinessGate": "blocked",

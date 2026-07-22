@@ -97,6 +97,10 @@ process added it.
 See `sanitized-e0-receipt.json`. No full path, xattr payload, serial, LocationID or raw device
 output is committed.
 
+No E0 was rerun for this correction: the current receipt was manually transcribed from the
+original envelope, its schema is aligned with direct `probe.py` output in this commit, and the
+next E0 device window will use `probe.py` to generate the receipt directly.
+
 | Counter / gate | Result |
 | --- | --- |
 | exact user selection + bookmark | PASS |

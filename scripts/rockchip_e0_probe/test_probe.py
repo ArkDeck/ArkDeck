@@ -1,5 +1,7 @@
 import importlib.util
+import json
 import pathlib
+import re
 import unittest
 
 
@@ -12,6 +14,38 @@ FIXTURES = (
     ROOT.parent.parent
     / "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/Rockchip/Discovery/1.0.0"
 )
+COMMITTED_RECEIPT = (
+    ROOT.parent.parent
+    / "openspec/changes/chg-2026-026-macos-rockchip-flash-ui/evidence/runs/"
+    "TASK-RKFUI-001/sanitized-e0-receipt.json"
+)
+SWIFT_DISCOVERY = (
+    ROOT.parent.parent
+    / "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipDeviceDiscovery.swift"
+)
+
+
+def dictionary_key_paths(value: object, prefix: str = "") -> set[str]:
+    paths: set[str] = set()
+    if not isinstance(value, dict):
+        return paths
+    for key, nested in value.items():
+        path = f"{prefix}.{key}" if prefix else str(key)
+        paths.add(path)
+        paths.update(dictionary_key_paths(nested, path))
+    return paths
+
+
+def swift_string_enum_raw_values(enum_name: str) -> set[str]:
+    source = SWIFT_DISCOVERY.read_text(encoding="utf-8")
+    match = re.search(
+        rf"public enum {re.escape(enum_name)}: String,.*?\{{(?P<body>.*?)\n\}}",
+        source,
+        re.DOTALL,
+    )
+    if match is None:
+        raise AssertionError(f"missing Swift enum {enum_name}")
+    return set(re.findall(r"^\s*case\s+([A-Za-z][A-Za-z0-9]*)\s*$", match["body"], re.MULTILINE))
 
 
 class RockchipE0ProbeTests(unittest.TestCase):
@@ -68,6 +102,59 @@ class RockchipE0ProbeTests(unittest.TestCase):
         self.assertEqual(
             PROBE.classify_preflight_failure("securityScopedBookmarkStale")["verdict"],
             "permissionDenied",
+        )
+
+    def test_sanitized_receipt_schema_matches_committed_evidence(self) -> None:
+        envelope = {
+            "bookmarkCreated": True,
+            "securityScopeStarted": True,
+            "preflightFailure": "quarantinePresent",
+            "childLaunchAttempted": False,
+            "termination": None,
+            "exitCode": None,
+        }
+        parsed = PROBE.classify_preflight_failure(envelope["preflightFailure"])
+        receipt = PROBE.build_sanitized_receipt(
+            envelope=envelope,
+            captured_at="2026-07-22T06:20:49Z",
+            executor="agent",
+            app_executable_sha256="a" * 64,
+            entitlements=PROBE.EXPECTED_ENTITLEMENTS,
+            build_receipt={
+                "signatureClass": "adHoc",
+                "developerIDIdentityAvailableAtBuild": False,
+                "hardenedRuntime": True,
+            },
+            selected_basename="rkdeveloptool",
+            tool_hash=PROBE.PINNED_TOOL_SHA256,
+            trust={
+                "codeTrust": "adHoc",
+                "signatureIntegrityCheckExit": 0,
+                "quarantinePresent": True,
+                "gatekeeperAssessmentExit": 3,
+                "gatekeeperAssessmentSummary": "rejected",
+            },
+            stdout=b"",
+            stderr=b"",
+            parsed=parsed,
+            execute_readiness_passed=False,
+        )
+        committed = json.loads(COMMITTED_RECEIPT.read_text(encoding="utf-8"))
+        self.assertEqual(dictionary_key_paths(receipt), dictionary_key_paths(committed))
+        self.assertNotIn("rawArtifacts", receipt)
+        self.assertEqual(
+            receipt["privacy"]["rawArtifacts"], "emptyBecauseChildLaunchWasBlocked"
+        )
+        responsibilities = swift_string_enum_raw_values("RockchipDeviceAccessResponsibility")
+        remediations = swift_string_enum_raw_values("RockchipDeviceAccessRemediation")
+        self.assertEqual(
+            set(PROBE.SWIFT_DEVICE_ACCESS_RESPONSIBILITY_RAW_VALUES), responsibilities
+        )
+        self.assertEqual(set(PROBE.SWIFT_DEVICE_ACCESS_REMEDIATION_RAW_VALUES), remediations)
+        self.assertIn(receipt["deviceAccessAdvisor"]["responsibility"], responsibilities)
+        self.assertIn(receipt["deviceAccessAdvisor"]["remediation"], remediations)
+        self.assertEqual(
+            receipt["deviceAccessAdvisor"]["remediation"], "selectPinnedUserApprovedTool"
         )
 
 
