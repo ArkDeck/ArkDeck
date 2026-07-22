@@ -6,10 +6,16 @@
 
 ## TASK-BAP-001 — 决策分级与批次审批协议入正本(host-only,docs)
 
-- Status:ready(2026-07-22 本 readiness PR;前置 ① 已满足 = approval #317
-  merge `bc4a68b4888d5018992fb5004f5fbd7216c12419`;状态仅在维护者
-  review/merge 本 PR 后生效)
-- Readiness(r1,base = main `c15814593ea3d46149e749d3a47121ea70af1cea`):
+- Status:done(2026-07-22 本独立状态 PR,仅在维护者 review/merge 后生效。
+  Done recheck:实现 PR #327 merge
+  `42cc63123738313d253b25c9de78220e1e6814b5`,合入版与实现分支
+  `git diff` 为空(逐字一致);enforcement.md 2.1.0 两小节 + AGENTS.md 批次
+  协作条在 main 在案;design §0 六不变量逐条对照与检查记录见
+  `evidence/runs/TASK-BAP-001/run.md`;check-sdd 于合入版 0/0/111。
+  边界注记:done ≠ change verified;BAP-002 仍 blocked 于本任务 done +
+  TASK-BAP-003 done 双前置,本翻转满足其一)
+- Readiness(r1,base = main `c15814593ea3d46149e749d3a47121ea70af1cea`;
+  历史记录,实现已于 #327 交付):
   - Governance chain:propose #315 merge
     `7a58b026646a3b1ed543cc5e941ddb1d1e02206f`;approval #317 merge
     `bc4a68b4888d5018992fb5004f5fbd7216c12419`(status:approved 生效)。
