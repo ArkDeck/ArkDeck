@@ -1,7 +1,8 @@
 # CHG-2026-029 Tasks
 
-> 本 change 仍为 proposed。本 PR 只登记任务，不执行任务、不产生 completion evidence，
-> 也不把任何 task 置 ready。正式批准与每项独立 readiness 合入前，三任务均保持 blocked。
+> Change approval 状态以 `proposal.md` 为唯一事实源。本文件只登记任务，不执行任务、
+> 不产生 completion evidence，也不把任何 task 置 ready；change approval 本身不解除
+> 各任务的独立 readiness 前置，三任务在对应 readiness 合入前均保持 blocked。
 
 ## TASK-AFP-001 — 建立非权威 Agent 失败模式手册
 
