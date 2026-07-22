@@ -1,6 +1,6 @@
 # CHG-2026-015 Verification Plan
 
-> Change:CHG-2026-015-hdc-readonly-probe-registration@r2
+> Change:CHG-2026-015-hdc-readonly-probe-registration@r3
 > Status:passed;maintainer confirmation 见 proposal.md Verification closure(2026-07-21)
 > Core baseline:CORE-2.0.0
 > Integration input:OPENHARMONY-TOOLS@0.2.0 / INTEGRATION-PROFILES-0.3.0
@@ -88,9 +88,34 @@ TASK-M1-006 or claim any source AC/conformance/support/release result.
 - one missing family/provenance/hash => whole registration task remains incomplete;
 - revert of the registration PR restores 0.2.0 inputs without deleting old evidence.
 
+## Archive relocation gate (r3)
+
+The later archive PR must satisfy all of the following without rerunning or rewriting the historical
+TASK-I15-001 evidence:
+
+- move this change exactly to
+  `openspec/changes/archive/2026-07-22-chg-2026-015-hdc-readonly-probe-registration/`;
+- replace only the four production `provenance.sourcePath` active-root values in the living
+  registry and its fixture mirror, while source bytes/SHA-256, `acceptedBy`, recipe, effect,
+  precondition, authority, versions and family closure remain unchanged;
+- independently recompute all four receipt hashes/sizes, the mirrored registry hash/size and
+  `resources.json` hash/size, then re-pin only the exact living consumers named by Decision 6;
+- prove the living registry and fixture registry are byte-identical and every resource hash/size
+  resolves to the bytes at its declared path;
+- normalized before/after comparison reports no semantic delta beyond the four path replacements
+  and their derivative hash/size closure; archived evidence and prior run hashes remain unchanged;
+- repository search finds no production provenance reference to the old active change root, while
+  historical archive-local records remain truthful; `HDCProbeRegistryContractTests`, the full Swift
+  suite, `scripts/check-sdd.sh` and `git diff --check` all pass.
+
+Failure of any item blocks the archive move. Passing this gate authorizes no HDC/device/network or
+mutation dispatch and changes no prior acceptance result.
+
 ## Result gate
 
 - All seven change-local Test IDs need same-revision reviewable evidence before TASK-I15-001 can
   be marked done and the change can later be proposed verified.
 - Passing this change only establishes integration inputs. M1-006 must separately adopt them and
   still complete signed Sandbox/XCUITest platform evidence.
+- The r3 archive-only gate preserves the existing passed result; it does not require or permit
+  reclassification of the seven historical acceptance results.
