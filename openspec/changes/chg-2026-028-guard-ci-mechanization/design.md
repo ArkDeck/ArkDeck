@@ -1,6 +1,7 @@
 # CHG-2026-028 Design:guard/CI 机械化
 
-> Status:candidate(随 proposal r1;approve 前不构成实现授权)
+> Status:candidate(r2 carrier namespace 修订;仅在维护者 review/merge 当前
+> revision PR 后生效,且不构成 TASK-MECH-003 readiness)
 > Core baseline:CORE-2.1.0(零 Core 变更)
 
 ## 0. 不变量
@@ -64,7 +65,7 @@
 - 约定:readiness/评估文档中的 pin 以 fenced block 表达——
 
   ~~~
-  ```yaml pins
+  ```yaml pin-example
   - path: Packages/.../File.swift
     blob: <40-hex git OID>
   - artifact: registry.yaml
@@ -72,16 +73,20 @@
   ```
   ~~~
 
-  guard 扫描 `openspec/changes/**`(非 archive)中带 `pins` info-string 的
-  fenced block:`blob`/`commit` 值必须恰 40 hex,`sha256` 必须恰 64 hex,
-  yaml 不可解析或长度非法即具名 err。
-- **opt-in 收紧**:无 pins block 的文档不校验、既有文档不追溯改写;新
-  readiness 采用 block 后,截断在该载体内机械不可能。推广面 = 本 change 改
-  `openspec/templates/change/` 相关模板加示例 + 注记"新 readiness 应使用
-  pins block"(模板非 ratified 文档,implementation-only 可改;先例 =
-  CHG-2026-025 TASK-AIN-001 改 change 模板)。
-- 测试:合法 block 正例;39/41 hex、sha256 63 hex、非 yaml、未知 key 反例;
-  无 block 文档跳过;archive 跳过。
+  上述 `yaml pin-example` 只展示 schema,不是 carrier。guard 只扫描
+  `openspec/changes/**`(非 archive)中 opening info string 精确为
+  `yaml pins` 的 fenced block:`blob`/`commit` 值必须恰 40 hex,`sha256`
+  必须恰 64 hex,yaml 不可解析、未知 key、长度非法或字面占位符均具名 err;
+  `yaml pins` 内不存在 placeholder 白名单。其他 info string(包括
+  `yaml pin-example`)不激活校验。
+- **opt-in 收紧**:无 `yaml pins` carrier 的文档不校验、既有文档不追溯
+  改写;新 readiness 采用 carrier 后,截断在该载体内机械不可能。推广面 = 本 change 改
+  `openspec/templates/change/` 相关模板加 `yaml pin-example` 示例 + 注记
+  "新 readiness 应把 info string 改为 `yaml pins` 并填入完整真实值"
+  (模板非 ratified 文档,implementation-only 可改;先例 = CHG-2026-025
+  TASK-AIN-001 改 change 模板)。
+- 测试:合法 `yaml pins` 正例;39/41 hex、sha256 63 hex、非 yaml、未知 key、
+  carrier 内字面占位符反例;`yaml pin-example` 与无 block 文档跳过;archive 跳过。
 
 ## 4. TASK-MECH-004:PR allowed-paths diff 校验
 
