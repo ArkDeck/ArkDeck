@@ -612,8 +612,15 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
 
 ## TASK-AIN-008 — Rockchip persistence and admission identity closure
 
-- Status:ready（仅在维护者 review/merge 本 scope-remediation/readiness PR 后生效；本 PR
-  不含 schema/code/test/evidence 实现，不授权任何 external/device/destructive dispatch）
+- Status:done
+- Done:2026-07-22；实现经 #312 合入 main（merge commit
+  `de988f19cf9d1200523370c797ed5f70718eda11`；reviewed head
+  `ea81120218b004ff9a3193fd7fa24a933a9d4bea`）；done recheck 于合入版复验：Swift 全量
+  346/1 skipped/0 failures，`TEST-AIN-ROCKCHIP-PERSISTENCE-001`、AIN-CONTRACT/FACT/USAGE
+  regression 全 PASS，两份 schema Draft 2020-12 正反例 1/19 与 1/3 全 PASS，guard
+  0/0/111；reviewed head 到 merge commit 全 tree diff = 0；host/fake-only、device/HDC/
+  rkdeveloptool/destructive dispatch = 0；evidence =
+  `evidence/runs/TASK-AIN-008/2026-07-22-rockchip-persistence-implementation.md`
 - Platform:macos
 - Requirements:REQ-FLASH-011/012/015、POL-WORKFLOW-001、POL-ARTIFACT-001、
   POL-PRIVACY-001
