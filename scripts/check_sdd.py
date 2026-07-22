@@ -13,7 +13,9 @@
      tasks.md 的任务状态行合法;
   6. 含 scope.yaml 的 change 中,每个 acceptance ID 均被 tasks.md 的
      Requirements/AC 认领面精确认领;
-  7. platform/integration lock 与 core-conformance 引用的路径存在,
+  7. active changes 的 proposal/acceptance/verification revision 保持同步,
+     archive/** 豁免;
+  8. platform/integration lock 与 core-conformance 引用的路径存在,
      safety_coverage 引用的 AC 存在。
 
 退出码:0 = 通过(允许 warning);1 = 存在 error。
@@ -250,6 +252,9 @@ CHANGE_CLASSES = {"core", "capability", "integration", "platform", "implementati
 TASK_STATUS_RE = re.compile(r"^- Status[::]\s*(ready|in_progress|done|blocked)")
 REQUIREMENTS_AC_PREFIX = "- Requirements/AC:"
 IDENTIFIER_BOUNDARY_CHARS = r"A-Za-z0-9_-"
+VERIFICATION_REVISION_RE = re.compile(
+    r"^> Change:[A-Za-z0-9][A-Za-z0-9-]*@r(?P<revision>[1-9][0-9]*)\s*$"
+)
 
 
 def check_changes():
@@ -286,7 +291,79 @@ def check_changes():
                 err(tasks, f"{task_count} tasks but only {status_count} legal Status lines")
 
 
-# ----------------------------------------------------- 6. change scope coverage
+# -------------------------------------------- 6. change revision consistency
+def _display_revision(value) -> str:
+    if isinstance(value, str) and value.startswith("<"):
+        return value
+    return repr(value)
+
+
+def _is_revision(value) -> bool:
+    return type(value) is int and value > 0
+
+
+def check_change_revision_consistency(changes_dir: Path | None = None):
+    """Require active change revision carriers to agree; archive is not scanned."""
+    changes_dir = changes_dir or OPENSPEC / "changes"
+    for change in sorted(changes_dir.glob("chg-*")):
+        if not change.is_dir():
+            continue
+
+        proposal = change / "proposal.md"
+        proposal_data = front_matter(proposal) if proposal.is_file() else None
+        if isinstance(proposal_data, dict):
+            proposal_revision = proposal_data.get("revision", "<missing>")
+        else:
+            proposal_revision = "<unparseable>"
+
+        acceptance = change / "acceptance-cases.yaml"
+        acceptance_present = acceptance.is_file()
+        if acceptance_present:
+            acceptance_data = load_yaml(acceptance)
+            if isinstance(acceptance_data, dict):
+                acceptance_revision = acceptance_data.get(
+                    "change_revision", "<missing>"
+                )
+            else:
+                acceptance_revision = "<unparseable>"
+        else:
+            acceptance_revision = "<not-present>"
+
+        verification = change / "verification.md"
+        verification_revision: int | str = "<missing>"
+        if verification.is_file():
+            header_lines = [
+                line
+                for line in verification.read_text(encoding="utf-8").splitlines()
+                if line.startswith("> Change:")
+            ]
+            if len(header_lines) == 1:
+                match = VERIFICATION_REVISION_RE.fullmatch(header_lines[0])
+                verification_revision = (
+                    int(match.group("revision"))
+                    if match is not None
+                    else "<unparseable>"
+                )
+            elif len(header_lines) > 1:
+                verification_revision = "<ambiguous>"
+
+        compared = [proposal_revision, verification_revision]
+        if acceptance_present:
+            compared.append(acceptance_revision)
+        if all(_is_revision(value) for value in compared) and len(set(compared)) == 1:
+            continue
+
+        err(
+            change,
+            "revision consistency failed: "
+            f"proposal revision={_display_revision(proposal_revision)}; "
+            "acceptance change_revision="
+            f"{_display_revision(acceptance_revision)}; "
+            f"verification @r={_display_revision(verification_revision)}",
+        )
+
+
+# ----------------------------------------------------- 7. change scope coverage
 def requirements_ac_claim_surfaces(tasks_text: str) -> list[str]:
     """Return top-level Requirements/AC bullets and their indented continuations."""
     lines = tasks_text.splitlines()
@@ -372,7 +449,7 @@ def check_change_scope_coverage(changes_dir: Path | None = None):
             )
 
 
-# ------------------------------------------------ 7. locks and conformance
+# ------------------------------------------------ 8. locks and conformance
 def check_locks_and_conformance(spec_acs):
     for lock_path, keys in (
         (OPENSPEC / "platforms" / "PLATFORM-PROFILES.lock.yaml",
@@ -422,6 +499,7 @@ def main():
     check_acceptance(spec_acs)
     check_capability_registry()
     check_changes()
+    check_change_revision_consistency()
     check_change_scope_coverage()
     check_locks_and_conformance(spec_acs)
 

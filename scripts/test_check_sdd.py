@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Offline tests for check_sdd per-change acceptance scope coverage."""
+"""Offline contract tests for check_sdd change-level validation."""
 
 from __future__ import annotations
 
@@ -161,7 +161,7 @@ class ScopeCoverageTests(unittest.TestCase):
             )
             self.assertEqual(self.scope_errors(root), [])
 
-    def test_real_baseline_has_four_covered_scopes_and_main_passes(self):
+    def test_real_baseline_has_active_covered_scope_and_main_passes(self):
         changes_dir = check_sdd.OPENSPEC / "changes"
         scoped_changes = {
             path.parent.name for path in changes_dir.glob("chg-*/scope.yaml")
@@ -169,9 +169,6 @@ class ScopeCoverageTests(unittest.TestCase):
         self.assertEqual(
             scoped_changes,
             {
-                "chg-2026-001-macos-m0a",
-                "chg-2026-002-macos-m1-infrastructure",
-                "chg-2026-005-hdc-parser-golden-registration",
                 "chg-2026-006-dayu200-m0b-bringup",
             },
         )
@@ -189,6 +186,168 @@ class ScopeCoverageTests(unittest.TestCase):
             "check_sdd: 0 error(s), 0 warning(s), 111 acceptance IDs",
             completed.stdout,
         )
+
+
+class RevisionConsistencyTests(unittest.TestCase):
+    def make_change(
+        self,
+        root: Path,
+        name: str,
+        proposal_revision: int | None = 1,
+        acceptance_revision: int | None = 1,
+        verification_revision: int | None = 1,
+        *,
+        include_acceptance: bool = True,
+        verification_header: str | None = None,
+    ) -> Path:
+        change = root / name
+        change.mkdir(parents=True)
+        change_id = name.upper()
+        proposal = {
+            "id": change_id,
+            "status": "approved",
+            "class": "implementation-only",
+        }
+        if proposal_revision is not None:
+            proposal["revision"] = proposal_revision
+        (change / "proposal.md").write_text(
+            "---\n"
+            + yaml.safe_dump(proposal, sort_keys=False)
+            + "---\n\n# Proposal\n",
+            encoding="utf-8",
+        )
+        if include_acceptance:
+            acceptance = {"change_id": change_id, "cases": []}
+            if acceptance_revision is not None:
+                acceptance["change_revision"] = acceptance_revision
+            (change / "acceptance-cases.yaml").write_text(
+                yaml.safe_dump(acceptance, sort_keys=False), encoding="utf-8"
+            )
+        if verification_header is None and verification_revision is not None:
+            verification_header = (
+                f"> Change:{change_id}@r{verification_revision}"
+            )
+        verification_lines = ["# Verification"]
+        if verification_header is not None:
+            verification_lines.extend(["", verification_header])
+        (change / "verification.md").write_text(
+            "\n".join(verification_lines) + "\n", encoding="utf-8"
+        )
+        return change
+
+    def revision_errors(self, changes_dir: Path) -> list[str]:
+        start = len(check_sdd.errors)
+        try:
+            check_sdd.check_change_revision_consistency(changes_dir)
+            return list(check_sdd.errors[start:])
+        finally:
+            del check_sdd.errors[start:]
+
+    def test_matching_three_way_and_two_way_fixtures_pass(self):
+        with tempfile.TemporaryDirectory(prefix="check-sdd-revision-match-") as temp:
+            root = Path(temp)
+            self.make_change(root, "chg-three-way")
+            self.make_change(root, "chg-two-way", include_acceptance=False)
+            self.assertEqual(self.revision_errors(root), [])
+
+    def test_each_single_carrier_drift_emits_one_error_with_all_values(self):
+        cases = (
+            ("proposal", 2, 1, 1),
+            ("acceptance", 1, 2, 1),
+            ("verification", 1, 1, 2),
+        )
+        for label, proposal, acceptance, verification in cases:
+            with self.subTest(label=label), tempfile.TemporaryDirectory(
+                prefix=f"check-sdd-revision-{label}-"
+            ) as temp:
+                root = Path(temp)
+                self.make_change(
+                    root,
+                    f"chg-{label}",
+                    proposal_revision=proposal,
+                    acceptance_revision=acceptance,
+                    verification_revision=verification,
+                )
+                failures = self.revision_errors(root)
+                self.assertEqual(len(failures), 1)
+                self.assertIn("revision consistency failed", failures[0])
+                self.assertIn(f"proposal revision={proposal}", failures[0])
+                self.assertIn(
+                    f"acceptance change_revision={acceptance}", failures[0]
+                )
+                self.assertIn(f"verification @r={verification}", failures[0])
+
+    def test_missing_and_unparseable_verification_headers_fail_closed(self):
+        cases = (
+            ("missing", None, "<missing>"),
+            ("unparseable", "> Change:CHG-BAD@rx", "<unparseable>"),
+        )
+        for label, header, expected in cases:
+            with self.subTest(label=label), tempfile.TemporaryDirectory(
+                prefix=f"check-sdd-revision-header-{label}-"
+            ) as temp:
+                root = Path(temp)
+                self.make_change(
+                    root,
+                    f"chg-{label}",
+                    verification_revision=None,
+                    verification_header=header,
+                )
+                failures = self.revision_errors(root)
+                self.assertEqual(len(failures), 1)
+                self.assertIn(f"verification @r={expected}", failures[0])
+
+    def test_missing_structured_revision_fields_fail_closed(self):
+        cases = (
+            ("proposal", None, 1, "proposal revision=<missing>"),
+            (
+                "acceptance",
+                1,
+                None,
+                "acceptance change_revision=<missing>",
+            ),
+        )
+        for label, proposal, acceptance, expected in cases:
+            with self.subTest(label=label), tempfile.TemporaryDirectory(
+                prefix=f"check-sdd-revision-field-{label}-"
+            ) as temp:
+                root = Path(temp)
+                self.make_change(
+                    root,
+                    f"chg-{label}",
+                    proposal_revision=proposal,
+                    acceptance_revision=acceptance,
+                )
+                failures = self.revision_errors(root)
+                self.assertEqual(len(failures), 1)
+                self.assertIn(expected, failures[0])
+
+    def test_two_way_mismatch_names_absent_acceptance_carrier(self):
+        with tempfile.TemporaryDirectory(prefix="check-sdd-revision-two-way-") as temp:
+            root = Path(temp)
+            self.make_change(
+                root,
+                "chg-two-way-drift",
+                verification_revision=2,
+                include_acceptance=False,
+            )
+            failures = self.revision_errors(root)
+            self.assertEqual(len(failures), 1)
+            self.assertIn("acceptance change_revision=<not-present>", failures[0])
+            self.assertIn("proposal revision=1", failures[0])
+            self.assertIn("verification @r=2", failures[0])
+
+    def test_archived_fixture_is_skipped(self):
+        with tempfile.TemporaryDirectory(prefix="check-sdd-revision-archive-") as temp:
+            root = Path(temp)
+            self.make_change(
+                root / "archive",
+                "chg-archived-drift",
+                proposal_revision=3,
+                acceptance_revision=2,
+                verification_revision=1,
+            )
+            self.assertEqual(self.revision_errors(root), [])
 
 
 if __name__ == "__main__":
