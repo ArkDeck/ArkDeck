@@ -54,6 +54,14 @@
   - Concurrency/review gate:satisfied。readiness 审计时 GitHub open PR = 0；本 PR 只修改本
     change 的 `proposal.md`/`tasks.md` 状态与 review record，不携带实现/evidence，也不改变
     其他任务状态。TASK-RKFUI-001 implementation+evidence 与后续 `ready→done` 各用独立 PR。
+- Readiness remediation r2（2026-07-22；allowed-paths only，仅在维护者 review/merge 本独立
+  governance PR 后生效）：PR #301 按已批准设计为 `ArkDeckWorkflows` 增加
+  `ArkDeckProcess` package dependency，但共享 contract test 的硬编码 target 依赖表仍是旧值，
+  导致 `testPackageTargetsImportOnlyDeclaredArkDeckModules` 失败。r2 只把该 contract test 文件
+  加入 Allowed paths，并仅授权同步这一张硬编码表，使 `ArkDeckWorkflows` 条目与已批准的
+  `Package.swift` 声明一致；不授权修改其他测试、源码、依赖、行为或 task status。本 remediation
+  PR 只修改治理文档；TASK-RKFUI-001 implementation PR 须在本 r2 合入后再承载该单行 Swift
+  表项修复。
 - Platform:macos
 - Requirements:`REQ-FLASH-001`、`REQ-UX-007`、`POL-WORKFLOW-001`
 - Acceptance:`AC-FLASH-001-01`、`AC-UX-007-01`
@@ -62,6 +70,9 @@
   - `openspec/integrations/rockchip/**`
   - `Packages/ArkDeckKit/Package.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipDeviceDiscovery.swift`
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/ArkDeckContractTests.swift`（仅更新
+    `declaredPackageDependencies` 的硬编码 target 依赖表，使 `ArkDeckWorkflows` 与已批准的
+    `Package.swift` 依赖声明一致；禁止其他修改）
   - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/RockchipDeviceDiscoveryContractTests.swift`
   - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/Rockchip/**`
   - `scripts/rockchip_e0_probe/**`
