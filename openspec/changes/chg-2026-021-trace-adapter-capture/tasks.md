@@ -134,9 +134,65 @@
 
 ## TASK-TR-003 — adapter golden 面(hitrace/bytrace 识别与 ftrace 过滤)
 
-- Status:blocked(四前置:① approve;② TASK-TR-001 done(golden fixture/registry
-  在案);③ TASK-TR-002R done;④ 独立 readiness PR——须钉 TR-001 登记的
-  registry/fixture hash)
+- Status:ready(readiness;仅在维护者 review/merge 本独立状态 PR 后生效;本 PR 只修改
+  `tasks.md`,不含实现/evidence,不执行 device/HDC/network/external-process)
+- Readiness review(2026-07-22;host-only,零设备命令):
+  - Approve/dependency gates:satisfied。change approval PR #253 merge
+    `684c42c92bf093c4c1e8d5844d2ad571c844c1ba`;TASK-TR-002 done PR #271 merge
+    `c29d71705b628591711236fa9eab1e2715f446f8`;TASK-TR-002R done PR #279 merge
+    `67f46093c3a2a2389f000e3066b1ff004b359cd9`;TASK-TR-001 implementation/evidence
+    PR #282 merge `171a269d981b996f4a65c3388d56c7acecc6239e` 且 done PR #286 merge
+    `54cc94487b42a6918217ba0f8929c0c1f60808ff`。本 readiness 以已 fetch 的
+    `main` `4621a73001e53277cfb5ca0d718c76145e8f4ac9` 为 base。
+  - Adoption pins(实现时任一 byte/hash 漂移即停并重做 readiness):完整采用
+    `OPENHARMONY-TOOLS@0.4.0` + `OPENHARMONY-TRACE-PROBES@1.0.0`;registry SHA-256
+    `0c093f98b57706b3723a68ae7552bef0db0731a675fb6cc023f69bbe21d6e566`,
+    `resources.json` SHA-256
+    `6b77b020b50921ef419720a434a186aba48c13e7284fa66598d4efd0c4f14879`。
+    七 resource closure = hitrace help
+    `9ab0718d7da1d5beb459c74548f89cc69775a931be7931686637d6e584d70e39`,
+    hitrace tags `ade3fdc4dd8231dc57e2a8e4ec9d38151a376d245b822f75687c207ead467e96`,
+    bytrace help `690ca26bbe14d6edd8ad163cce18c1f1a494e4984e8d86f1866f32b7f8bb94fd`,
+    bytrace tags `c37e017549ff634b5ffd03339fc7cbe50fd627a1140e84496eb6b68a56694810`,
+    hitrace capture markers
+    `6070bb0b3d804313449a43e92e570b5e34415cb731ec43ded91b4a3796d99723`,
+    raw ftrace header
+    `4b6433a1845d533dd466aeb3db965e273f4d4db582c94fe67cf1cb6e1a625ae0`,
+    `.gitattributes`
+    `98e891fbdca73bd8cfaaf860c0e5d5183385c256787cc03088990b1ae8c1f429`。
+  - Authority boundary:`hitrace.dayu200-oh7.text-v1` 仅在 registered help/tag/capture
+    形态下 eligible;`bytrace.dayu200-oh7.text-v1` 只有 help/tag provenance,保持
+    `probeOnlyNotCaptureEligible`;未知或漂移 family 一律 `unsupported`,raw help 保留,
+    tool name、firmware、相似输出或 exit 0 均不能产生 selection/capture authority。
+  - 实现文件面在既有 allowed paths 内细化为两个新文件:
+    `Sources/ArkDeckOpenHarmony/TraceProbeAdapter.swift` 与
+    `Tests/ArkDeckContractTests/TraceAdapterGoldenTests.swift`;二者在 base 均不存在。
+    只读 seam blob pins:`HDCReadOnlyProbeRegistry.swift` =
+    `da9d060b3107ee4891f6f67db89ba1741d4993d6`,`TraceCatalogContracts.swift` =
+    `121ada85ea49cb4823eac609796502456688102d`,`TraceParameterContracts.swift` =
+    `ab0b2c2b9b2542b0ca5225f111e2ae4ffe1aad3f`,`TraceWorkflowContracts.swift` =
+    `69d4b2e1e3580e3c18992ea1b54d28e2b055f776`,`Package.swift` =
+    `a47bccf05a0c044ef506ddd015fe8c0ecaaa89e2`;实现不得修改这些 seam、registry/
+    fixture/profile/lock、accepted Core/spec/contracts 或其他任务 evidence。实现 PR 另只可
+    追加本任务 `evidence/runs/TASK-TR-003/run.md`;若两新文件不足以闭环,停回 blocked
+    并先做 scope amendment/readiness,不得静默扩面。
+  - ParserGolden 二值门:`AC-TRACE-001-01` 覆盖 exact hitrace family、registry 允许的
+    首行时间戳 token 规范化、exact bytrace probe-only、同名 byte drift/marker 缺失/
+    未知 family fail-closed + raw bytes 可复查;`AC-TRACE-007-01` 覆盖 registered raw
+    ftrace header 首行/完整 header 保留、仅确认 chatter 才可过滤、derived 删除统计,
+    且处理前后 raw bytes/SHA-256 不变。测试须直接读取上述 TR-001 registry/resource
+    closure,不得复制、重写或发明 golden;输出两条 canonical `TEST-AC-* PASS` 行。
+  - 基线(Apple Swift 6.3.3、Xcode 26.6/17F113):trace registry tests 4/0;
+    `swift build --build-tests` PASS(仅既有 no-async-await warnings);
+    `TraceWorkflowContractTests` 18/0;Swift 全量 320 tests/1 个既有 opt-in skip/0
+    failures;`check-sdd` 0 errors/0 warnings/111 acceptance IDs。
+  - 竞争/隐私边界:readiness 审计时唯一 open PR #289 只改 CHG-2026-025
+    `tasks.md`,与本任务零文件交集。本任务只消费仓内已 redacted 的 14,939-byte fixture
+    closure,不得读取仓库外 full raw trace、connect key/serial-bearing inventory,不得执行
+    device/HDC/network/external process,不产生 hardware/compatibility/support/conformance/
+    release claim。
+  - Review boundary:本 PR 只翻转 `blocked→ready` 并登记 pins/测试矩阵;实现+evidence、
+    `ready→done` 与 change `verified` 仍分别使用独立 PR,且均须维护者 review/merge。
 - Objective:实现 adapter 选择(help family 识别,未知 fail-closed)与 ftrace
   header 保留过滤,against TR-001 golden fixture;parserGolden 测试全绿。
 - Requirements/AC:认领 `AC-TRACE-001-01`/`AC-TRACE-007-01`(parserGolden)。
