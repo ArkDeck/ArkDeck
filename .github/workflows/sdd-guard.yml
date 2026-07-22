@@ -29,3 +29,24 @@ jobs:
         env:
           ARKDECK_PYTHON: python
         run: ./scripts/check-sdd.sh
+
+  allowed-paths:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: PR allowed-paths contract tests
+        run: python scripts/test_check_pr_paths.py
+
+      - name: Check PR diff against declared task
+        # Read untrusted title/body/head-ref from GitHub's JSON event file inside
+        # Python. Never interpolate those fields into the host shell.
+        run: python scripts/check_pr_paths.py --repo-root "$GITHUB_WORKSPACE" --event "$GITHUB_EVENT_PATH"
