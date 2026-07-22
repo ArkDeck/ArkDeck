@@ -6,9 +6,36 @@
 
 ## TASK-MECH-001 — macOS Swift build+test CI job
 
-- Status:blocked(双前置:① CHG-2026-028 经 approval-only PR 批准;② 独立
-  readiness PR——须钉 runner image、Swift 版本、当期全量测试基线数(含 skip/
-  已知环境性口径)、cache 策略与交付形态(design §5 凭据注记))
+- Status:ready(2026-07-22 本 readiness PR;前置 ① 已满足 = approval #318
+  merge `c15814593ea3d46149e749d3a47121ea70af1cea`;状态仅在维护者
+  review/merge 本 PR 后生效)
+- Readiness(r1,base = main `c15814593ea3d46149e749d3a47121ea70af1cea`):
+  - 本地全量基线(worktree @ base 实测,2026-07-22;toolchain = Apple Swift
+    6.3.3(swiftlang-6.3.3.1.3)/ Xcode 26.6(17F113)):**346 tests /
+    1 skipped / 2 failures(0 unexpected)**;该 2 失败为已知 `/private/tmp`
+    worktree 环境性族并逐名确认 =
+    `HDCGoldenResourceContractTests.testGoldenPackContainsExactRegisteredFixtureSetWithMatchingHashes`
+    与 `HDCProbeRegistryContractTests.testPackContainsExactPinnedResourceSetAndHashes`
+    (`/private` 前缀 #filePath 解析,先例 #301/#305 在案)。**CI 正常路径
+    checkout 口径 = 346/1 skip/0 failures**;若 runner 上述两测试复现失败,
+    处置 = 显式豁免清单 + 具名注记(实现 PR 载明),禁止静默 skip/`|| true`。
+  - Runner pins:GitHub-hosted `macos-15`;实现时该 label 不可用或排队异常
+    → 停回 readiness 重钉,不静默换 image;CI 实际 Xcode/Swift 版本以首个
+    run 记 evidence(与本地 6.3.3 差异如实记录,不作为失败豁免理由)。
+  - workflow 形态钉定:触发 = `pull_request` + push `main`/`agent/**`(与
+    sdd-guard 对齐);`permissions: contents: read`、零 secret;
+    `timeout-minutes: 30`;concurrency = 同 ref 后发取消先发;v1 无 cache
+    (零第三方依赖,增量 cache key 复杂度 > 收益,时长成瓶颈另立);路径感知
+    首步 = diff 触碰 `Packages/**`/`Package.*` 判定,未触碰秒级 success 并
+    job summary 注记;App/XCUITest 不覆盖亦注记进 summary(不伪装覆盖)。
+  - 待改文件:`.github/workflows/swift-ci.yml` 于 base 不存在(纯新增,
+    零既有文件触碰);交付形态 = 当前凭据经 SSH 推送不受 `workflow` scope
+    限制,agent 可直接推;TASK-BAP-003 收权落地后按 design §5 复核
+    (agent 起草 + 维护者应用)。
+  - canary 钉定:丢弃分支(`agent/mech-001-canary`)注入必败测试 → run 红 →
+    evidence 记链接 → 删分支,永不合入。
+  - Review boundary:本 PR 只翻转 `blocked→ready` 并登记 pins/基线;实现 PR、
+    `ready→done` 状态 PR 各自独立,均须维护者 review/merge。
 - Objective:交付 `.github/workflows/swift-ci.yml`(design §1):macOS runner
   上对 PR 与 `main`/`agent/**` push 跑 ArkDeckKit `swift test` 全量;路径感知
   恒运行(未触碰 Swift 面秒级 success);零 secret、`contents: read`、
