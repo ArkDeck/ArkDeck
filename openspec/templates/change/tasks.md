@@ -14,7 +14,7 @@
 - Forbidden paths:
   - `openspec/constitution.md`
   - `openspec/specs/**`(除非任务本身就是 archive PR 的 delta 合入)
-- Risk:low | medium | high | destructive(destructive 的真实设备步骤只能由人类执行)
+- Risk:low | medium | high | destructive(destructive 的真实设备步骤须持 merged PR 承载的 standing authorization;人类亲手或 Agent 无人值守执行均须 evidence 记录 executor)
 - Hardware required:yes | no
 
 ### Deliverables

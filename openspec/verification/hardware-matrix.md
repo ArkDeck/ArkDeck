@@ -4,7 +4,8 @@
 > Rule：simulation、fake 和 plan-only 不得进入 verified hardware rows
 
 本文件是人类可读视图，不是权威证据源。机器事实来自各 change `evidence/` 下符合
-`contracts/hardware-evidence.schema.json` 的记录（由人类操作者产生，经维护者 PR review）；
+`contracts/hardware-evidence.schema.json` 的记录（由执行者产生——人类操作者或持
+standing authorization 的自主 Agent——经维护者 PR review）；
 表格文字本身不能让硬件验收通过。
 
 ## Required dimensions
@@ -16,7 +17,8 @@
 - HDC client/server/daemon version 与 tool hash；
 - transport；
 - Provider/Profile/version；
-- 人类操作者、执行前的物理目标确认、稳定 device identity 与 binding revision；
+- executor（human 或 agent；agent 另记 authorizationRef）、执行前的目标确认
+  （人工物理确认或机器身份读回）、稳定 device identity 与 binding revision；
 - UI Dump/Trace/Debug/Flash capability；
 - prerequisite 和 recovery tool/path；
 - evidence date、tester、artifact hash/controlled location；

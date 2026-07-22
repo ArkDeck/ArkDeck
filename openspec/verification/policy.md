@@ -13,7 +13,7 @@
 6. **Real platform tests**:clean-host、Sandbox/SmartScreen、签名、安装、更新和辅助技术。
 7. **Real hardware matrix**:精确设备、固件、HDC、transport、权限和 Provider。
 
-低层测试不能替代高层证据。Simulation/fake 只能证明 orchestration,不证明硬件支持。真实设备 destructive 操作只能由人类执行(见 `governance/enforcement.md`)。
+低层测试不能替代高层证据。Simulation/fake 只能证明 orchestration,不证明硬件支持。真实设备 destructive 操作须持维护者经 merged PR 预先批准的 standing authorization——由人类亲手执行或由自主 Agent 无人值守执行均可,执行门对授权逐项校验并 fail closed(见 `governance/enforcement.md`)。
 
 ## Core property invariants
 

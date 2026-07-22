@@ -38,9 +38,10 @@ CI 红 = 不能合并;CI 绿 ≠ 批准。授权判断永远来自维护者 revi
 
 ## 真实硬件与 destructive 操作
 
-- Agent(以及任何自动化)不得对真实设备执行 destructive 操作;只能产出 plan 与人工执行步骤。
-- 真实硬件 evidence 必须记录:操作者(人类)、设备身份(型号/序列号/binding)、固件/工具版本、执行时间、执行的确切命令与结果;destructive 操作另需记录执行前的人工目标确认。格式见 `contracts/hardware-evidence.schema.json`。
-- simulation/fake/plan-only 证据必须显式分类,永不计入真实硬件验收。
+- 执行分级(CHG-2026-025,POL-AGENT-002):**E0** 只读采集与 host 侧分析在 approved change 的 ready 任务范围内可无人值守执行;**E1** 可逆 deviceMutation 另需 per-device typed capability evidence;**E2** destructive 须持维护者经 merged PR 预先批准的 standing authorization(逐项 pin 目标设备身份/binding revision、固件、transport、HDC、Provider、Step 集合、plan hash、恢复路径、有效期与次数),执行门在首个真实设备 Step 前逐项校验并做设备身份读回,任一缺失或不一致即 fail closed(零 dispatch,记 blocked-attempt)。
+- 普通 CI(无 standing authorization 载体的自动化,如 GitHub Actions)仍只允许 contract、fake、simulated、plan-only 分支。
+- 真实硬件 evidence 必须记录:executor(human 或 agent;agent 另记 authorizationRef)、设备身份(型号/序列号摘要/binding)、固件/工具版本、执行时间、执行的确切命令与结果;destructive 操作另需记录执行前的目标确认(人工物理确认,或与授权逐项比对的机器身份读回)。格式见 `contracts/hardware-evidence.schema.json`。
+- simulation/fake/plan-only 证据必须显式分类,永不计入真实硬件验收。Agent 不得自行创建、修改或批准 standing authorization;授权与吊销的载体都是维护者 merge 的 PR,git 历史即授权审计账本。
 
 ## Baseline
 
