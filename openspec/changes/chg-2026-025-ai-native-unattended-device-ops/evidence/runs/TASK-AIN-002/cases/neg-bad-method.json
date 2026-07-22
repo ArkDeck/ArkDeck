@@ -1,0 +1,39 @@
+{
+  "schemaVersion": "3.0.0",
+  "evidenceId": "EVD-AIN-SCHEMA-FIXTURE-001",
+  "executor": {
+    "kind": "human",
+    "id": "lvye"
+  },
+  "physicalTargetConfirmation": {
+    "confirmedDeviceIdentity": "DAYU200 (RK3568), serial sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "confirmedAt": "2026-07-22T03:00:00Z",
+    "method": "assumed"
+  },
+  "device": {
+    "model": "DAYU200 (RK3568)",
+    "serial": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "firmware": "7.0.0.33",
+    "bindingRevision": 3
+  },
+  "toolchain": {
+    "hdcVersion": "3.2.0d"
+  },
+  "transport": "usb",
+  "provider": "RockchipRockUSBFlashProvider",
+  "stepKinds": [
+    "flashPartition"
+  ],
+  "acceptanceIds": [
+    "AC-FLASH-015-03"
+  ],
+  "executedAt": "2026-07-22T03:05:00Z",
+  "artifacts": [
+    {
+      "path": "runs/TASK-AIN-004/transcript.redacted.log",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "note": "AIN-SCHEMA-001 校验 fixture,非真实执行记录"
+    }
+  ],
+  "notes": "AIN-SCHEMA-001 校验 fixture,非真实执行记录"
+}
