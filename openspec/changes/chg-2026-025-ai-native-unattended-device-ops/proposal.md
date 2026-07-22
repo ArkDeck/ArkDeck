@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-025-ai-native-unattended-device-ops
 revision: 1
-status: proposed
+status: approved # r1 propose 经 #280 合入(5ed66d44…7001);本 approval-only PR 由维护者 review/merge 构成正式批准
 class: core
 core_change_level: major
 owner: lvye
@@ -110,3 +110,32 @@ V2 治理:本 propose PR 合入仅登记提案。批准须独立 approval-only P
 因此 TASK-AIN-004 的无人值守真机执行在 approve + readiness 后、archive 前即为合法。
 verified 翻转与 archive(合入 constitution/specs/schema、ratify CORE-3.0.0)各自
 独立 PR。
+
+## Approval
+
+- r1 proposal 经 PR #280 合入 main(merge commit
+  `5ed66d44a7414608e9ffa9b10a627a2ebec37001`,status:proposed,merged by
+  维护者 @lvye,2026-07-22)。owner 方向确认:2026-07-22 维护者亲自提出
+  "允许 AI 无人值守执行刷机/日志抓取/分析"并指示开出本 approval PR。
+- 正式批准:2026-07-22 由本 approval-only PR(先例 #55/#89/#171/#195/#226/
+  #253/#254)将本 change 置为 `approved`;批准由维护者 review/merge 本 PR 构成。
+  merge 即批准:
+  - **delta 方向**:Constitution POL-AGENT-002 MODIFIED(constitution-delta.md
+    完整替换文本,1.0.0 → 2.0.0)、REQ-FLASH-015 MODIFIED + AC-FLASH-015-03
+    ADDED(specs/flashing/spec.md delta)、hardware-evidence schema
+    2.0.0 → 3.0.0(executor 对象,v3-draft);class core /
+    core_change_level major,CORE-3.0.0 候选;
+  - **执行模型**:执行分级 E0/E1/E2、standing authorization 载体与失效规则、
+    执行门五步校验序列、evidence v3 字段面(design §1–§4);
+  - **四任务 scope 与边界**:TASK-AIN-001(治理文档面同步,host-only)、
+    TASK-AIN-002(schema 3.0.0 定稿,host-only)、TASK-AIN-003(Kit 执行门
+    standing-authorization 路径 + real-fault contract tests)、TASK-AIN-004
+    (首次无人值守真机验收,DAYU200)的 objective/allowed-paths/验证方式;
+  - **不动面**:POL-AGENT-001、其余全部 POL-* 条款、普通 CI 边界、V2 PR 链、
+    诚实证据规则、凭据分离(见 design §5)。
+- 本批准不产生任务执行:四任务保持 `blocked`,各须独立 readiness PR 转
+  `ready`。**本批准亦不构成任何一次具体真机执行的 standing authorization**——
+  TASK-AIN-004 的授权块须由其 readiness PR 承载并逐项 pin,先例 pins 惯例
+  (全 OID/全 hash)适用。delta 与 schema 于 archive PR 合入 current
+  specs/contracts 并 ratify CORE-3.0.0;在此之前 current specs 原文不变,
+  实现期以 approved delta overlay 为有效规格。
