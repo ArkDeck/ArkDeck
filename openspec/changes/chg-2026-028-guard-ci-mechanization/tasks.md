@@ -6,9 +6,20 @@
 
 ## TASK-MECH-001 — macOS Swift build+test CI job
 
-- Status:ready(2026-07-22 本 readiness PR;前置 ① 已满足 = approval #318
-  merge `c15814593ea3d46149e749d3a47121ea70af1cea`;状态仅在维护者
-  review/merge 本 PR 后生效)
+- Status:done(2026-07-22 D0 完成状态;仅在维护者 review/merge 本独立状态
+  PR 后生效。实现 #329 head `bc843c94c7adf88efeaaca76d48d6a6e784ab737`
+  已由 `lvye` 合入 `2c8aacad5ca8bf78e62171d4a71bbc2cabdd9bd0`,但 GitHub
+  元数据如实为 `reviews=[]`;本状态不追溯声称 #329 已获 approving review,
+  维护者须在本 PR 审核当前实现与证据。D1 基线修订 #339 已由 `lvye`
+  APPROVED 并合入 `477f7fff0a68109223d132344d22c08a1642eaf3`,接受
+  358/1/0。于 protected `main` `a436e740eb36be80d1ee54c54cd2b0be10923acf`
+  复验:本地 Apple Swift 6.3.3/Xcode 26.6 全量 = 358 tests/1 skipped/
+  0 failures;真实 PR 绿 run `29923584904`/`29924113820`/`29924573502`
+  均命中路径感知 quick path(7s/8s/8s);全量绿 run `29924110657`;
+  注入必败测试 canary 红 run `29924117682`;`check-sdd` = 0 error/
+  0 warning/111 acceptance IDs,PR 路径守卫单测 = 12/12。required-status 翻转
+  仍属 D2/维护者 GitHub 设置动作且不在本任务范围;`done` 不代表 change
+  `verified`,亦不扩张至 App/XCUITest 覆盖)
 - Readiness(r1,base = main `c15814593ea3d46149e749d3a47121ea70af1cea`):
   - 本地全量基线(worktree @ base 实测,2026-07-22;toolchain = Apple Swift
     6.3.3(swiftlang-6.3.3.1.3)/ Xcode 26.6(17F113)):**346 tests /
