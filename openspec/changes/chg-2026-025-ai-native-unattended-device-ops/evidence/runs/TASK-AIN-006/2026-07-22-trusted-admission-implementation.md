@@ -60,16 +60,37 @@ public receipt hash, tool profile/mode/topology/sequence and plan drift; unknown
 actual serial/VID/PID/topology/sequence; stale/expired/overlong readback; concurrent usage, exact retry
 and post-replace crash recovery. Every failing fact case left the real usage ledger empty.
 
-### Full Swift regression
+### Full Swift regression and post-merge count correction
 
 ```text
 CI=true swift test --package-path Packages/ArkDeckKit
-RESULT: 348 tests executed, 1 skipped manual sleep/wake observation, 0 failures
+RESULT (merged main acd8ed930c6f008a9ace9cfc23542307b6c7472a):
+345 tests executed, 1 skipped manual sleep/wake observation, 0 failures
 ```
 
-This is the readiness baseline of 336 tests plus 12 TASK-AIN-006 tests. The existing suite contains
-controlled local process fixtures; TASK-AIN-006 tests themselves use only deterministic Git/GitHub
-metadata fixtures, fake fact ports and temporary host filesystem ledgers.
+The readiness baseline of 336 included three legacy `StandingAuthorizationContractTests` methods
+that this task replaced. TASK-AIN-006 removed those three methods and added twelve focused methods,
+so the authoritative total is `336 - 3 + 12 = 345`. The implementation run's earlier count of 348
+came from incremental SwiftPM/XCTest discovery retaining the three deleted methods and is superseded
+by this correction. The existing suite contains controlled local process fixtures; TASK-AIN-006
+tests themselves use only deterministic Git/GitHub metadata fixtures, fake fact ports and temporary
+host filesystem ledgers.
+
+A fresh scratch-path run independently discovered the same 345-test total:
+
+```text
+CI=true swift test --package-path Packages/ArkDeckKit \
+  --scratch-path /private/tmp/arkdeck-ain006-merged-main-recheck-20260722-1716
+RESULT: 345 tests executed, 1 skipped, 2 failures
+```
+
+All twelve TASK-AIN-006 tests passed in that run. The two failures were limited to
+`HDCGoldenResourceContractTests.testGoldenPackContainsExactRegisteredFixtureSetWithMatchingHashes`
+and `HDCProbeRegistryContractTests.testPackContainsExactPinnedResourceSetAndHashes`: both expected
+resource paths beginning with `1.0.0/`, while the scratch build observed `/private1.0.0/`. This is a
+separate scratch-path fixture-hermeticity issue outside TASK-AIN-006; the standard merged-main suite
+above completed with zero failures. This evidence correction changes no implementation, contract,
+acceptance conclusion or task/change status.
 
 ### SDD and source hygiene
 
