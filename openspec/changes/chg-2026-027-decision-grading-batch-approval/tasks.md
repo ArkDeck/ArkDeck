@@ -58,9 +58,34 @@
 
 ## TASK-BAP-003 — Agent 凭据分离落实(human 执行项)
 
-- Status:blocked(双前置:① approve;② 独立 readiness PR——须钉凭据机制
-  (GitHub ruleset/deploy key/GitHub App 等,design §5)、作用面与正负双向
-  验证步骤)
+- Status:ready(2026-07-22 本 readiness PR;前置 ① 已满足 = approval #317
+  merge `bc4a68b4888d5018992fb5004f5fbd7216c12419`;状态仅在维护者
+  review/merge 本 PR 后生效;执行者 = 维护者,仓外窗口任意、无设备)
+- Readiness(r1,base = main `c15814593ea3d46149e749d3a47121ea70af1cea`;
+  维护者 merge 本 PR = 接受下述机制方案):
+  - 机制钉定:**repository ruleset + 非 bypass 机器凭据**——
+    (a) GitHub 仓库侧建 ruleset:target = 全部 branch ref,exclude
+    `refs/heads/agent/**`;rules = restrict creations/updates/deletions;
+    bypass list = 仅维护者(repo admin)。受保护 main 的既有分支保护不动,
+    该 ruleset 是叠加收权。
+    (b) Agent 运行环境凭据换为无 bypass 资格的机器身份:机器账号
+    (collaborator write)+ fine-grained PAT,或 deploy key——择一落地,
+    evidence 记实际形态与作用面(凭据值/token 永不入仓入日志)。
+    (c) 维护者本人账号凭据与批准动作从 Agent 可达的进程/keychain/
+    gh 配置中移除。
+  - 验证步骤(全部记 evidence):正向 = 以 agent 凭据 push
+    `agent/cred-probe`(成功后删分支);负向 = 同凭据 push
+    `refs/heads/cred-probe-denied` 与直接 push `main` → 均须被 ruleset 拒,
+    拒绝输出原样(脱敏)记录。双向齐备才算 PASS。
+  - 影响面注记:`agent-pr` workflow(blob
+    `2b9b03a90d70671d85da21be6a667e2f2f9c8acb`)以 github-actions bot token
+    开 PR,与推送凭据无关,auto-PR 机制不受影响;收权后 agent 推送
+    `.github/workflows/**` 的能力受 PAT `workflow` scope 约束,MECH-001/004
+    交付形态按 CHG-2026-028 design §5 处理(agent 起草 + 维护者应用)。
+  - 附带面(可同窗口顺带,不属本任务 AC):V1 三私钥删除/轮换、GitHub
+    secrets `ARKDECK_TRUST_BUNDLE`/`ARKDECK_LEDGER_KEY` 清理。
+  - Review boundary:本 PR 只翻转 `blocked→ready` 并登记方案;执行记录
+    (evidence PR)与 `ready→done` 状态 PR 各自独立,均须维护者 review/merge。
 - Objective:落实 enforcement.md 信任模型第 3 条与"V1 遗留清理"悬置项:Agent
   运行环境仅持能推送 `agent/**` 的受限凭据;维护者账号凭据与批准动作不出现
   在 Agent 可达的进程/密钥环;正向(`agent/**` 推送成功)+ 负向(非
