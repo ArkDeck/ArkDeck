@@ -4,6 +4,11 @@
 change approved 前保持 blocked;approved 后每任务另需独立 readiness PR 转 ready
 (pins 于 readiness 钉定,全 OID/全 hash)。
 
+> r2 security-remediation：TASK-AIN-001/002/003 的 done 历史保持不改写；复审发现
+> authorization provenance、trusted fact source、usage ceiling、locked contracts 与产品内
+> dispatch 未闭环，因此 TASK-AIN-004 从 ready 回到 blocked。新增 TASK-AIN-005/006/007
+> 均为 blocked，须依次独立 readiness/实现/done；全部完成后 AIN-004 再重新 readiness。
+
 ## TASK-AIN-001 — 治理文档面同步(host-only)
 
 - Status:done
@@ -215,12 +220,19 @@ change approved 前保持 blocked;approved 后每任务另需独立 readiness PR
 
 ## TASK-AIN-004 — 首次无人值守真机验收(DAYU200)
 
-- Status:ready
-- Readiness r2(2026-07-22):E0 身份读回于设备窗口完成(operator lvye,crib exit 0,serial 摘要 `958780b2…` 命中被授权目标;run 记录 `evidence/runs/TASK-AIN-004/`)。载体 `AUTH-2026-025-DAYU200-001.json` 最终化:`bindingRevision` -1 → 1(首次 durable 绑定,Core `DeviceBindingHistory` 不变量;执行期须提供同值,门 fail-closed 校验)、`carrier` PENDING → r2 PR 引用。host pin 于合入版 f15c3a8 复核无漂移。维护者 merge 本 r2 = 批准精确目标,任务转 ready。
+- Status:blocked（r2 security review 发现 P0-AUTH/FACT/DISPATCH/CONTRACT 缺口；#296
+  readiness 作为历史保留但不得复用。等待 TASK-AIN-005/006/007 全部 done 后，以新的 main
+  OID、未过期 authorization、可信执行宿主和独立 PR 重新 readiness）
+- Historical readiness r2(2026-07-22,**superseded**):E0 身份读回于设备窗口完成
+  (operator lvye,crib exit 0,serial 摘要 `958780b2…` 命中被授权目标;run 记录
+  `evidence/runs/TASK-AIN-004/`)。载体当时将 `bindingRevision` -1 → 1、`carrier`
+  PENDING → r2 PR 引用，host pin 于合入版 f15c3a8 复核无漂移。该 merge 当时把任务标为
+  ready；本 security-remediation 已废止其操作效力，不能据此 dispatch。
 - Platform:macos
 - Requirements:REQ-FLASH-015(MODIFIED)
 - Acceptance:AC-FLASH-015-03(realHardware 面);AC-FLASH-015-01/02 真机负探针
-- Depends on:TASK-AIN-001、TASK-AIN-002、TASK-AIN-003
+- Depends on:TASK-AIN-001、TASK-AIN-002、TASK-AIN-003、TASK-AIN-005、
+  TASK-AIN-006、TASK-AIN-007
 - Allowed paths:
   - `openspec/changes/chg-2026-025-ai-native-unattended-device-ops/evidence/**`
   - `scripts/e0_readback/**`(E0 只读身份/binding readback crib,host-only 交付物;先例 TR-001 harness `scripts/trace_capture/`)
@@ -253,8 +265,12 @@ change approved 前保持 blocked;approved 后每任务另需独立 readiness PR
 ### Notes / handoff
 
 - 中止如实记 blocked-attempt(#104/#173 先例);序列号字节只入摘要。
+- r2 期间禁止调用现行 `--authorization/--unattended-context` 路径执行真实命令；现有
+  AUTH 文件由 POL-AGENT-001 保护，本 remediation 不修改它，任务状态与执行门均须阻断。
+- 下一次 readiness 不得把现行 gate 的 `dispatch=0 real_device=0` 正例当作产品执行证据；
+  必须 pin AIN-DISPATCH-001 的 product-owned fake executor 结果与可信宿主隔离证据。
 
-### Readiness pins(r1 host-complete,2026-07-22)
+### Historical readiness pins(r1 host-complete,2026-07-22; superseded)
 
 **状态说明**:本 r1 锁定全部 host 可推导 pin 与 standing authorization 载体的
 host 字段;`bindingRevision` 是唯一需一次设备读回才能确定的 pin,故本任务保持
@@ -294,10 +310,125 @@ host 字段;`bindingRevision` 是唯一需一次设备读回才能确定的 pin,
   4. 首份 `executor.kind=agent` v3 evidence(authorizationRef 可解引用)+
      hardware-matrix 新行。
 
-### r2 finalize(一次 E0 设备读回后)
+### Historical r2 finalize(已完成且已被 security-remediation 废止)
 
 在具名设备窗口对目标 DAYU200 执行一次 E0 只读身份/binding 读回(本 change 生效后
 E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durable binding revision、
 复核 serial 摘要 == `958780b2…7a7e`、USB vid:pid == `0x2207:0x350a`。然后 r2:
-把载体 `bindingRevision` 从 `-1` 改为读回值、`carrier` 从 PENDING 改为 r2 PR 的
-`PR #<n> <path>@<blob-oid>`、本任务翻 `ready`。维护者 merge r2 = 批准精确目标。
+当时把载体 `bindingRevision` 从 `-1` 改为读回值、`carrier` 从 PENDING 改为 r2 PR 的
+`PR #<n> <path>@<blob-oid>`、本任务翻 `ready`。该记录仅供审计；当前状态以本节顶部
+`Status:blocked` 为准，旧载体和旧 readiness 均不得复用。
+
+## TASK-AIN-005 — authorized-agent locked contract closure
+
+- Status:blocked（等待 r2 amendment 由维护者 merge；之后仍须独立 readiness PR）
+- Platform:macos
+- Requirements:REQ-FLASH-015(MODIFIED)、POL-WORKFLOW-001、POL-RECOVERY-001、
+  POL-AGENT-002(MODIFIED)
+- Acceptance:AIN-CONTRACT-001；AC-FLASH-015-01/02/03 的 persistence 面
+- Depends on:r2 amendment approved
+- Allowed paths（readiness 时以 blob/OID 细化）：
+  - `openspec/changes/chg-2026-025-ai-native-unattended-device-ops/contracts/**`
+  - `openspec/changes/chg-2026-025-ai-native-unattended-device-ops/evidence/**`
+  - `Packages/ArkDeckKit/Sources/ArkDeckStorage/**`
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/**`
+- Forbidden paths:
+  - `openspec/contracts/**`（archive PR 才替换正本）
+  - `openspec/specs/**`
+  - 真实 device/HDC/network/external-process dispatch
+- Risk:high（Core persistence/authority contract；host-only）
+- Hardware required:no
+
+### Deliverables
+
+- change-local manifest/journal/authorization-usage schema drafts 与 provider-contract delta；
+- `authorizedAgent` 只可由 verified grant mint；standardAgent/ordinary CI destructive success
+  继续结构性拒绝；
+- destructive intent/outcome/manifest/confirmation/usage reservation 的 authorizationRef
+  关联与 semantic validator；v1 历史 read compatibility；
+- 正反 fixture：缺 ref、ref 漂移、旧 schema 伪装 authorized success、usage correlation 断裂
+  全拒绝。
+
+### Verification
+
+- AIN-CONTRACT-001 全分支 PASS；Swift storage/manifest/journal 全量回归；check-sdd 绿；
+- fake/simulation/plan-only 与 real-authorized 语义持续可辨识，零真实 dispatch。
+
+## TASK-AIN-006 — trusted authorization provenance, facts and usage gate
+
+- Status:blocked（等待 TASK-AIN-005 done；之后仍须独立 readiness PR）
+- Platform:macos
+- Requirements:REQ-FLASH-015(MODIFIED)、POL-TARGET-001、POL-AGENT-001/002
+- Acceptance:AIN-AUTH-PROV-001、AIN-FACT-001、AIN-USAGE-001、
+  AC-FLASH-015-01/02
+- Depends on:TASK-AIN-005
+- Allowed paths（readiness 时以具体新/既有文件与 OID 细化）：
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/StandingAuthorization*.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/Authorization*.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/Rockchip*Fact*.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckCLI/ArkDeckCLIMain.swift`
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/StandingAuthorization*.swift`
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/Authorization*.swift`
+  - 本 change `evidence/**`
+- Forbidden paths:
+  - authorization 载体 `evidence/authorizations/**`
+  - current specs/contracts/baselines
+  - 真实 device/HDC/destructive dispatch
+- Risk:high（authorization root 与 usage ceiling；host/fake only）
+- Hardware required:no
+
+### Deliverables
+
+- CLI autonomous path 只接受 `authorizationId`；移除 caller authorization path 与
+  unattended context 作为可信输入；
+- `MaintainerMergedAuthorizationResolver`：fresh protected-main commit/blob + GitHub merged
+  PR/CODEOWNER review 验证，产生不可由 caller 构造的 verified grant；
+- durable binding/tool/plan/prerequisite/readback fact ports，readback freshness 与同 Job/target
+  correlation；
+- host-wide atomic usage reservation，`maxRuns=1` 并发/崩溃不超发、不退款；
+- 伪造 carrier/worktree/ref、stale cache、offline no-cache、caller context、并发 race 的
+  real-fault tests。
+
+### Verification
+
+- AIN-AUTH-PROV/FACT/USAGE-001 全 PASS；所有负面 destructive dispatch=0；
+- 测试使用本地 deterministic Git/GitHub metadata fixture 与 fake device/tool ports，不访问
+  真实网络/设备，不把 fixture merge metadata 冒充 production approval。
+
+## TASK-AIN-007 — product-owned Rockchip typed executor
+
+- Status:blocked（等待 TASK-AIN-005/006 done；之后仍须独立 readiness PR）
+- Platform:macos
+- Requirements:REQ-FLASH-008/009/011/012/013/015、POL-WORKFLOW-001、
+  POL-RECOVERY-001
+- Acceptance:AIN-DISPATCH-001；AC-FLASH-008-01、012-01、013-01、015-03 contract 面
+- Depends on:TASK-AIN-005、TASK-AIN-006
+- Allowed paths（readiness 时以具体文件与 OID 细化）：
+  - `Packages/ArkDeckKit/Package.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipFlashExecution*.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckCLI/ArkDeckCLIMain.swift`
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/RockchipFlashExecution*.swift`
+  - `Packages/ArkDeckKit/Tests/ArkDeckFakeRockchipFixture/**`
+  - 本 change `evidence/**`
+- Forbidden paths:
+  - current specs/contracts/baselines
+  - authorization 载体
+  - 真实 device/HDC/rkdeveloptool dispatch（真机仅 AIN-004）
+- Risk:destructive semantics（实现与验证仅 fake descriptor executor，真实 dispatch=0）
+- Hardware required:no
+
+### Deliverables
+
+- package-owned one-shot dispatch capability；autonomous path 不再返回 handoff strings 供外部
+  shell 执行；
+- safe image staging、固定 descriptor-bound `ld/ppt/wlx/rd` argv、每步 durable intent/outcome、
+  raw Artifact、semantic marker、critical safe cancellation、postflight/recovery；
+- Agent 环境不能直接获得 executor primitive；production 组合不能注入 caller argv/path；
+- fake 成功、exit0 semantic failure、crash windows、cancel、sleep/wake、disconnect、postflight
+  mismatch、outcomeUnknown 全覆盖。
+
+### Verification
+
+- AIN-DISPATCH-001 端到端 PASS，授权成功路径 fake process dispatch 精确等于 plan；
+- handoff/external-shell、无 grant、fact drift、usage exhausted、intent 未 durable 的 process
+  launch 恒为 0；全量 Swift + check-sdd + diff/privacy/scope 检查。
