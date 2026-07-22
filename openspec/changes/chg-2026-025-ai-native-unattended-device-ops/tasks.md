@@ -455,7 +455,16 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
 
 ## TASK-AIN-006 — trusted authorization provenance, facts and usage gate
 
-- Status:ready
+- Status:done
+- Done:2026-07-22；实现经 #307 合入 main（merge commit
+  `acd8ed930c6f008a9ace9cfc23542307b6c7472a`；reviewed head
+  `4829bd96528cbc9349c16d882b56f900715f46d0`），证据计数修正经 #308 合入
+  （merge commit `c893e19df78523b0377c7893ad4dff3bd2b7ee11`；reviewed head
+  `1b9b3011000341006b3cb16c8138b71698c85cb3`）；done recheck 于合入版复验：专项
+  12/0 failures、Swift 全量 345/1 skipped/0 failures、四项 canonical 摘要全 PASS、guard
+  0/0/111；#307 实现范围与 #308 evidence 的 reviewed head 到各自 merge commit tree diff
+  均为 0。fresh-scratch 的两项独立 HDC resource-path fixture 偏差已如实保留在 evidence；
+  evidence = `evidence/runs/TASK-AIN-006/2026-07-22-trusted-admission-implementation.md`
 - Platform:macos
 - Requirements:REQ-FLASH-015(MODIFIED)、POL-TARGET-001、POL-AGENT-001/002
 - Acceptance:AIN-AUTH-PROV-001、AIN-FACT-001、AIN-USAGE-001、
