@@ -5,8 +5,31 @@
 
 ## TASK-TR-001 — trace 工具 provenance 登记(integration 面,device-gated)
 
-- Status:ready(readiness;仅在维护者 review/merge 本独立状态 PR 后生效。单文件、
-  不含实现、不产生 evidence、不执行真机)
+- Status:done(TASK-TR-001 implementation + evidence PR #282 已由维护者 `lvye`
+  APPROVED 并合入 `main` merge commit
+  `171a269d981b996f4a65c3388d56c7acecc6239e`;implementation source commit
+  `9bb60d3a06d3326c88c8070f86ab4a0a52f7c797`。本独立状态 PR 依据下列 completion
+  evidence 起草 `ready→done`,仅在维护者 review/merge 后生效。本状态只关闭
+  trace tool provenance 登记,不改变 TASK-TR-003(`blocked`,仍须独立 readiness PR)、
+  change `verified`、adapter implementation、hardware/compatibility/support/
+  conformance/release 状态)
+- Done recheck(2026-07-22;于最新合入版 `main`
+  `fbc1b6747f5cb2183c04cfb0965133d23b5f5834`):
+  - implementation + evidence PR #282 的 21 个交付文件全部位于本任务 allowed paths;
+    实现 PR 未修改 `tasks.md`、accepted Core/spec/contracts、adapter source 或其他 task
+    evidence。
+  - `python3 -m unittest scripts/trace_capture/test_capture.py
+    scripts/trace_capture/test_registry.py -v` PASS(37 tests,0 failures);
+    `TEST-TRACE-PROV-001 PASS`(7 entries,7 resources,14,939 fixture bytes,hash/privacy
+    closure,real device dispatch 0);`check-sdd` 0 errors/0 warnings/111 acceptance IDs。
+  - `TRACE-PROV-001` 的 exact argv/authority/timeout/marker、help/tag/capture/header golden、
+    逐文件 SHA-256、三份 redacted manifest 与受控人工 capture 可由 run evidence 复查;
+    schema-1.1 cleanup-gate 偏差及 schema-1.2 remediation 已如实记录。完整 raw trace、
+    connect key 与 serial-bearing inventory 保持仓库外;bytrace capture 保持
+    `probeOnlyNotCaptureEligible`;Agent device/HDC/network dispatch = 0。
+- Completion evidence:`evidence/runs/TASK-TR-001/run.md` + `evidence/summary.md`;
+  implementation/evidence 的维护者 review/merge 只确认本任务 provenance 交付,不构成
+  TASK-TR-003 parser AC、change verified 或任何支持声明。
 - Readiness review(2026-07-21;host-only,零设备命令):
   - Approve gate:satisfied(#253 squash `684c42c`);design §0 候选命令面、§4
     登记形态随批准生效。
