@@ -33,8 +33,9 @@ The harness generates a fresh UUID-isolated remote directory under
 ``/data/local/tmp/arkdeck/<uuid>/``. Cleanup removes exactly that generated
 file and then the empty owned directory (``rmdir`` refuses a non-empty
 directory). No wildcard, recursive or discovered-path cleanup exists. If the
-received file is missing, empty, truncated or fails the sensitive self-check,
-cleanup is not dispatched and the manifest records the retained remote hazard.
+capture markers/path, remote-size receipt, received byte count, ftrace header
+or sensitive self-check is missing or mismatched, cleanup is not dispatched
+and the manifest records the retained remote hazard.
 
 Exit codes: 0 = probe recorded, or capture reached non-empty verified receive
 and cleanup, with self-check passed; 1 = sensitive-content self-check failed or
@@ -60,8 +61,8 @@ import time
 import uuid
 from typing import Callable, Optional
 
-MANIFEST_SCHEMA = "arkdeck-trace-capture-manifest-1.1.0"
-REDACTED_SCHEMA = "arkdeck-trace-capture-redacted-1.1.0"
+MANIFEST_SCHEMA = "arkdeck-trace-capture-manifest-1.2.0"
+REDACTED_SCHEMA = "arkdeck-trace-capture-redacted-1.2.0"
 
 MAX_STREAM_BYTES = 4 * 1_024 * 1_024
 DEFAULT_TIMEOUT_SECONDS = 60
@@ -84,6 +85,22 @@ RECV_LOCAL_NAME = "minimal.ftrace"
 # the capture phase may run (see the capture gate above).
 GATE_HELP_TOKENS = (b"-t", b"-b", b"-o")
 GATE_TAG_TOKEN = b"sched"
+
+# Registered by TASK-TR-001 from the maintainer-operated DAYU200 capture.  Exit
+# code 0 alone is never a capture-success receipt: all ordered semantic markers,
+# the exact owned output path, a regular-file size receipt and a recognizable
+# ftrace header are required before remote cleanup becomes eligible.
+CAPTURE_SUCCESS_MARKERS = (
+    b"start capture, please wait 5s ...",
+    b"capture done, start to read trace.",
+    b"trace read done, output: ",
+    b"TraceFinish done.",
+)
+FTRACE_HEADER_MARKERS = (
+    b"# tracer: ",
+    b"# entries-in-buffer/entries-written:",
+    b"#           TASK-PID       TGID    CPU#",
+)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -556,6 +573,48 @@ def _sha256_file(path: str) -> tuple[str, int]:
     return digest.hexdigest(), total
 
 
+def _capture_output_confirms_success(data: bytes, remote_file: str) -> bool:
+    """Recognize only the registered ordered hitrace completion family."""
+    cursor = 0
+    for marker in CAPTURE_SUCCESS_MARKERS:
+        position = data.find(marker, cursor)
+        if position < 0:
+            return False
+        cursor = position + len(marker)
+    output_line = b"trace read done, output: " + remote_file.encode("utf-8")
+    return output_line in data.splitlines()
+
+
+def _parse_regular_file_size(data: bytes, remote_file: str) -> Optional[int]:
+    """Parse the exact registered ``ls -l <owned-file>`` success shape.
+
+    The 3.2.0d device shell reports one regular-file row whose fifth
+    whitespace-delimited field is the byte count and whose final field is the
+    exact harness-generated path.  Any other shape is unregistered.
+    """
+    lines = data.splitlines()
+    if len(lines) != 1:
+        return None
+    fields = lines[0].split()
+    expected_path = remote_file.encode("utf-8")
+    if (
+        len(fields) < 8
+        or not fields[0].startswith(b"-")
+        or not fields[4].isdigit()
+        or fields[-1] != expected_path
+    ):
+        return None
+    size = int(fields[4])
+    return size if size > 0 else None
+
+
+def _ftrace_header_is_registered(data: bytes) -> bool:
+    if not data.startswith(FTRACE_HEADER_MARKERS[0]):
+        return False
+    header = data[:16_384]
+    return all(marker in header for marker in FTRACE_HEADER_MARKERS)
+
+
 def _write_stream(out_dir: str, name: str, data: bytes) -> None:
     target = os.path.join(out_dir, name)
 
@@ -662,6 +721,12 @@ def capture(
     results: list[dict] = []
     overall_self_check_passed = True
     received_artifact_verified = False
+    capture_markers_verified = False
+    remote_file_size_bytes: Optional[int] = None
+    received_size_matched = False
+    received_format_verified = False
+    capture_attempted = False
+    receive_attempted = False
     cleanup_attempts: list[dict] = []
     sequence_stopped_reason: Optional[str] = None
     cleanup_ids = {"trace-remote-rm", "trace-remote-rmdir"}
@@ -669,8 +734,8 @@ def capture(
     for index, spec in enumerate(selected):
         if spec.ident in cleanup_ids and not received_artifact_verified:
             sequence_stopped_reason = (
-                "received artifact was not non-empty and self-check verified; "
-                "owned remote path retained")
+                "capture/receive receipt gate was not fully verified; owned remote "
+                "path retained")
             break
         argv = build_argv(
             resolved_hdc, spec, target,
@@ -691,25 +756,58 @@ def capture(
         stderr_check = self_check(result.stderr, target)
         command_passed = stdout_check["passed"] and stderr_check["passed"]
 
+        if spec.ident == "hitrace-capture-minimal":
+            capture_attempted = True
+            capture_markers_verified = bool(
+                result.exit_code == 0
+                and not result.timed_out
+                and not result.stdout_truncated
+                and not result.stderr_truncated
+                and not result.stderr
+                and _capture_output_confirms_success(result.stdout, remote_trace_file))
+        elif (
+            spec.ident == "trace-remote-stat"
+            and capture_attempted
+            and not receive_attempted
+            and result.exit_code == 0
+            and not result.timed_out
+            and not result.stdout_truncated
+            and not result.stderr_truncated
+        ):
+            remote_file_size_bytes = _parse_regular_file_size(
+                result.stdout, remote_trace_file)
+
         received: Optional[dict] = None
         if spec.recv_to_local:
+            receive_attempted = True
             if os.path.isfile(recv_local_path):
                 os.chmod(recv_local_path, 0o600)
                 file_sha256, file_bytes = _sha256_file(recv_local_path)
                 with open(recv_local_path, "rb") as handle:
-                    file_check = self_check(handle.read(MAX_STREAM_BYTES), target)
+                    received_bytes = handle.read(MAX_STREAM_BYTES)
+                    file_check = self_check(received_bytes, target)
+                received_size_matched = bool(
+                    remote_file_size_bytes is not None
+                    and file_bytes == remote_file_size_bytes)
+                received_format_verified = _ftrace_header_is_registered(received_bytes)
                 received = {
                     "file": RECV_LOCAL_NAME,
                     "sha256": file_sha256,
                     "bytes": file_bytes,
                     "present": True,
                     "selfCheck": file_check,
+                    "remoteSizeBytes": remote_file_size_bytes,
+                    "remoteSizeMatched": received_size_matched,
+                    "formatVerified": received_format_verified,
                 }
                 command_passed = command_passed and file_check["passed"]
                 received_artifact_verified = bool(
                     file_bytes > 0
                     and file_bytes <= MAX_STREAM_BYTES
                     and command_passed
+                    and capture_markers_verified
+                    and received_size_matched
+                    and received_format_verified
                     and result.exit_code == 0
                     and not result.timed_out
                     and not result.stdout_truncated
@@ -787,6 +885,10 @@ def capture(
         },
         "receiveVerification": {
             "nonEmptySelfChecked": received_artifact_verified,
+            "captureSuccessMarkersVerified": capture_markers_verified,
+            "remoteFileSizeBytes": remote_file_size_bytes,
+            "receivedSizeMatched": received_size_matched,
+            "ftraceHeaderVerified": received_format_verified,
         },
         "remoteCleanup": {
             "eligible": received_artifact_verified,

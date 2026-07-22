@@ -1,0 +1,97 @@
+{
+  "schemaVersion": "1.0.0",
+  "packVersion": "1.0.0",
+  "registryId": "OPENHARMONY-TRACE-PROBES",
+  "registryVersion": "1.0.0",
+  "integrationProfile": "OPENHARMONY-TOOLS@0.4.0",
+  "registeredBy": "CHG-2026-021-trace-adapter-capture/TASK-TR-001",
+  "captureWindow": {
+    "date": "2026-07-22",
+    "timezone": "Asia/Shanghai",
+    "operator": "lvye",
+    "environment": "DAYU200/OpenHarmony 7.0.0.34 over USB; macOS 26.5.2 arm64; HDC Ver: 3.2.0d",
+    "fullRawTrace": {
+      "storage": "operatorControlledOutsideRepository",
+      "bytes": 1058246,
+      "sha256": "6227b5bb0685a2c5c3cd647c6f92bd71da2106ff55e34056cc72c7486b78c21e"
+    }
+  },
+  "resources": [
+    {
+      "id": "tr001-hitrace-help-dayu200-oh7",
+      "role": "helpFamilyGolden",
+      "path": "fixtures/hitrace-help.stdout.bin",
+      "sha256": "9ab0718d7da1d5beb459c74548f89cc69775a931be7931686637d6e584d70e39",
+      "sizeBytes": 3382,
+      "sourceCommandIds": ["hitrace-help-long", "hitrace-help-short"],
+      "evidenceClass": "controlledHumanCapture"
+    },
+    {
+      "id": "tr001-hitrace-tags-dayu200-oh7",
+      "role": "tagListGolden",
+      "path": "fixtures/hitrace-tags.stdout.bin",
+      "sha256": "ade3fdc4dd8231dc57e2a8e4ec9d38151a376d245b822f75687c207ead467e96",
+      "sizeBytes": 3604,
+      "sourceCommandIds": ["hitrace-tag-list"],
+      "evidenceClass": "controlledHumanCapture"
+    },
+    {
+      "id": "tr001-bytrace-help-dayu200-oh7",
+      "role": "helpFamilyGolden",
+      "path": "fixtures/bytrace-help.stdout.bin",
+      "sha256": "690ca26bbe14d6edd8ad163cce18c1f1a494e4984e8d86f1866f32b7f8bb94fd",
+      "sizeBytes": 3382,
+      "sourceCommandIds": ["bytrace-help-long", "bytrace-help-short"],
+      "evidenceClass": "controlledHumanCapture"
+    },
+    {
+      "id": "tr001-bytrace-tags-dayu200-oh7",
+      "role": "tagListGolden",
+      "path": "fixtures/bytrace-tags.stdout.bin",
+      "sha256": "c37e017549ff634b5ffd03339fc7cbe50fd627a1140e84496eb6b68a56694810",
+      "sizeBytes": 3604,
+      "sourceCommandIds": ["bytrace-tag-list"],
+      "evidenceClass": "controlledHumanCapture"
+    },
+    {
+      "id": "tr001-hitrace-capture-success-dayu200-oh7",
+      "role": "captureSuccessGolden",
+      "path": "fixtures/hitrace-capture.stdout.bin",
+      "sha256": "6070bb0b3d804313449a43e92e570b5e34415cb731ec43ded91b4a3796d99723",
+      "sizeBytes": 268,
+      "sourceCommandIds": ["hitrace-capture-minimal"],
+      "evidenceClass": "controlledHumanCapture"
+    },
+    {
+      "id": "tr001-raw-ftrace-header-dayu200-oh7",
+      "role": "rawFtraceHeaderGolden",
+      "path": "fixtures/raw-ftrace-header.bin",
+      "sha256": "4b6433a1845d533dd466aeb3db965e273f4d4db582c94fe67cf1cb6e1a625ae0",
+      "sizeBytes": 601,
+      "sourceCommandIds": ["hitrace-capture-minimal", "trace-recv-minimal"],
+      "evidenceClass": "controlledHumanCaptureHeaderExtraction",
+      "sourceLineage": "Exact first 12 comment/header lines of the immutable 1,058,246-byte received trace; no data row or process name is included."
+    },
+    {
+      "id": "tr001-resource-attributes",
+      "role": "binarySafetyPolicy",
+      "path": ".gitattributes",
+      "sha256": "98e891fbdca73bd8cfaaf860c0e5d5183385c256787cc03088990b1ae8c1f429",
+      "sizeBytes": 98,
+      "evidenceClass": "contract"
+    }
+  ],
+  "privacyBoundary": {
+    "repositoryContains": [
+      "help output without connect key or user path",
+      "tag-list output without connect key or user path",
+      "capture semantic stdout with only the harness-owned UUID path",
+      "the 12-line ftrace format header without any trace data row"
+    ],
+    "operatorControlledOnly": [
+      "device connect key and serial-bearing inventory",
+      "full manifests",
+      "full raw trace and process/event data"
+    ]
+  }
+}

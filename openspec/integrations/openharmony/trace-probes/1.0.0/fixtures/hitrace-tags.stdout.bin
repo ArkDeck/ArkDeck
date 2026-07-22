@@ -1,0 +1,83 @@
+2021/01/02 14:35:18 hitrace enter, running_state is SHOW_LIST_CATEGORY
+            tagName:   description:
+             ability - Ability Manager Service
+       accesscontrol - Access Control Module
+       accessibility - Accessibility Manager
+             account - Account Manager
+                 ace - ArkUI Cross-platform Engine Development Framework
+           animation - Animation Module
+                 app - Application Module
+                 ark - Ark Module
+              binder - Binder Kernel Info
+           bluetooth - Communication Bluetooth
+               cloud - Cloud Subsystem
+          commercial - Commercial Version Tag
+       commonlibrary - Common Library
+              daudio - Distributed Audio
+             dcamera - Distributed Camera
+          deviceauth - Device Authentication
+       devicemanager - Device Manager
+       deviceprofile - Device Profile
+               dhfwk - Distributed Hardware Framework
+              dinput - Distributed Input
+                disk - Disk I/O
+  distributeddatamgr - Distributed Data Manager
+              dlpcre - Data Loss Prevention Credential Service
+                 drm - Digital Rights Management
+              dsched - Distributed Schedule
+             dscreen - Distributed Screen
+                dslm - Device Security Level Management
+            dsoftbus - Distributed Softbus
+               erofs - Enhanced Read-Only File System
+                ffrt - FFRT Tasks
+      filemanagement - File Management
+                freq - CPU Frequency
+             graphic - Graphic Module
+           gresource - Global Resource Manager
+                hdcd - hdcd Tool
+                 hdf - Hardware Driver Foundation
+                hmfs - HMFS Commands
+                huks - Universal Key Store
+                 i2c - Inter-Integrated Circuit Events
+                idle - CPU Idle
+           interconn - Interconnection Subsystem
+                 ipa - Thermal Power Allocator
+                 irq - IRQ Events
+              irqoff - IRQ-disabled Code Section Tracing
+                load - CPU Load
+                mdfs - Mobile Distributed File System
+              membus - Memory Bus Utilization
+              memory - Memory
+          memreclaim - Kernel Memory Reclaim
+                misc - Misc Module
+                 mmc - Embedded MultiMediaCard Commands
+                msdp - Multimodal Sensor Data Platform
+     multimodalinput - Multimodal Input
+                musl - musl Module
+                 net - Net Module
+        notification - Notification Module
+                nweb - NWeb Module
+                ohos - System General Tag
+           pagecache - Page Cache
+               power - Power Manager
+          preemptoff - Preempt-disabled Code Section Tracing
+                push - Push Subsystem
+          regulators - Voltage and Current Regulators
+                 rpc - RPC and IPC
+               samgr - Service Ability Manager Group
+               sched - CPU Scheduling
+             schedlt - CPU Scheduling Lite
+            security - Security Subsystem
+             sensors - Sensors Module
+                sync - DMA Synchronization
+                 ufs - Universal Flash Storage Commands
+                 usb - USB Subsystem
+             useriam - User Identity and Access Management
+               virse - Virtualization Service
+              window - Window Manager
+               workq - Kernel Workqueues
+              zaudio - Audio Module
+             zbinder - ZBinder Events
+             zcamera - Camera Module
+              zimage - Image Module
+              zmedia - Media Module

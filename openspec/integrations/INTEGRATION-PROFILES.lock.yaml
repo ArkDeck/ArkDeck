@@ -1,12 +1,12 @@
 # Integration adapter 输入的版本登记(V2:普通 profile 不逐文件 hash pin;历史对比用 git;
 # golden fixture 与 production probe resource 例外:逐文件 SHA-256 pin)
-lock: INTEGRATION-PROFILES-0.4.0
+lock: INTEGRATION-PROFILES-0.5.0
 status: current
-updated_at: 2026-07-20
+updated_at: 2026-07-22
 
 profiles:
   - id: OPENHARMONY-TOOLS
-    version: 0.3.0
+    version: 0.4.0
     path: openspec/integrations/openharmony/profile.md
 
 catalogs:
@@ -83,13 +83,55 @@ probe_resources:
     path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Probes/1.0.0/.gitattributes
     sha256: 341812c59f415702c2351d9357b43a43a67be8bc4f7a1389f512470583722421
 
+trace_probe_registries:
+  - id: OPENHARMONY-TRACE-PROBES
+    version: 1.0.0
+    profile: OPENHARMONY-TOOLS@0.4.0
+    path: openspec/integrations/openharmony/trace-probes/1.0.0/registry.yaml
+    sha256: 0c093f98b57706b3723a68ae7552bef0db0731a675fb6cc023f69bbe21d6e566
+
+trace_probe_resources:
+  - id: tr001-resources-manifest
+    version: 1.0.0
+    path: openspec/integrations/openharmony/trace-probes/1.0.0/resources.json
+    sha256: 6b77b020b50921ef419720a434a186aba48c13e7284fa66598d4efd0c4f14879
+  - id: tr001-hitrace-help-dayu200-oh7
+    version: 1.0.0
+    path: openspec/integrations/openharmony/trace-probes/1.0.0/fixtures/hitrace-help.stdout.bin
+    sha256: 9ab0718d7da1d5beb459c74548f89cc69775a931be7931686637d6e584d70e39
+  - id: tr001-hitrace-tags-dayu200-oh7
+    version: 1.0.0
+    path: openspec/integrations/openharmony/trace-probes/1.0.0/fixtures/hitrace-tags.stdout.bin
+    sha256: ade3fdc4dd8231dc57e2a8e4ec9d38151a376d245b822f75687c207ead467e96
+  - id: tr001-bytrace-help-dayu200-oh7
+    version: 1.0.0
+    path: openspec/integrations/openharmony/trace-probes/1.0.0/fixtures/bytrace-help.stdout.bin
+    sha256: 690ca26bbe14d6edd8ad163cce18c1f1a494e4984e8d86f1866f32b7f8bb94fd
+  - id: tr001-bytrace-tags-dayu200-oh7
+    version: 1.0.0
+    path: openspec/integrations/openharmony/trace-probes/1.0.0/fixtures/bytrace-tags.stdout.bin
+    sha256: c37e017549ff634b5ffd03339fc7cbe50fd627a1140e84496eb6b68a56694810
+  - id: tr001-hitrace-capture-success-dayu200-oh7
+    version: 1.0.0
+    path: openspec/integrations/openharmony/trace-probes/1.0.0/fixtures/hitrace-capture.stdout.bin
+    sha256: 6070bb0b3d804313449a43e92e570b5e34415cb731ec43ded91b4a3796d99723
+  - id: tr001-raw-ftrace-header-dayu200-oh7
+    version: 1.0.0
+    path: openspec/integrations/openharmony/trace-probes/1.0.0/fixtures/raw-ftrace-header.bin
+    sha256: 4b6433a1845d533dd466aeb3db965e273f4d4db582c94fe67cf1cb6e1a625ae0
+  - id: tr001-resource-attributes
+    version: 1.0.0
+    path: openspec/integrations/openharmony/trace-probes/1.0.0/.gitattributes
+    sha256: 98e891fbdca73bd8cfaaf860c0e5d5183385c256787cc03088990b1ae8c1f429
+
 adoption_boundary:
-  previous_lock: INTEGRATION-PROFILES-0.3.0
-  previous_openharmony_profile: OPENHARMONY-TOOLS@0.2.0
+  previous_lock: INTEGRATION-PROFILES-0.4.0
+  previous_openharmony_profile: OPENHARMONY-TOOLS@0.3.0
   rule: >-
-    Existing consumers retain 0.2.0 authority. The read-only probe registry is available only
-    to a consumer that explicitly adopts OPENHARMONY-TOOLS@0.3.0 and its complete 1.0.0 registry
-    and resource hash closure through an independently approved task.
+    Existing consumers retain their pinned authority. The trace registry is available only to
+    a consumer that explicitly adopts OPENHARMONY-TOOLS@0.4.0 and the complete
+    OPENHARMONY-TRACE-PROBES@1.0.0 registry/resource hash closure through an independently
+    approved task. The HDC read-only registry remains pinned to its 0.3.0 provenance tuple.
 
 change_rule: >-
   Parser families, adapter mappings, catalogs and golden fixtures evolve through

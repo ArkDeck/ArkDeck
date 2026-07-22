@@ -1,0 +1,416 @@
+{
+  "boundary": "controlled trace probe/minimal-capture; observed-only; not a support/compatibility claim; classified controlledHumanCapture — a registry/golden registration of record happens only through the maintainer-reviewed TR-001 evidence PR; serial-bearing and raw trace bytes remain in this controlled non-repository location",
+  "captureGate": null,
+  "captureOutcome": "probeCaptured",
+  "change": "CHG-2026-021-trace-adapter-capture",
+  "commands": [
+    {
+      "argv": [
+        "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/toolchains/hdc",
+        "-v"
+      ],
+      "commandId": "hdc-version",
+      "deviceWrite": false,
+      "durationMs": 10,
+      "exitCode": 0,
+      "purpose": "pinned HDC client version",
+      "selfCheck": {
+        "passed": true,
+        "stderr": {
+          "keyMaterialFound": false,
+          "passed": true,
+          "serialPresent": false,
+          "userPathFound": false
+        },
+        "stdout": {
+          "keyMaterialFound": false,
+          "passed": true,
+          "serialPresent": false,
+          "userPathFound": false
+        }
+      },
+      "stderr": {
+        "bytes": 0,
+        "file": "00-hdc-version.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "truncated": false
+      },
+      "stdout": {
+        "bytes": 12,
+        "file": "00-hdc-version.stdout",
+        "sha256": "906d35a917937ecbb33d8dc3bbb6b3e1783bd2996a6201ab7227fb406d474ed9",
+        "truncated": false
+      },
+      "timedOut": false
+    },
+    {
+      "argv": [
+        "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/toolchains/hdc",
+        "list",
+        "targets"
+      ],
+      "commandId": "hdc-list-targets",
+      "deviceWrite": false,
+      "durationMs": 20,
+      "exitCode": 0,
+      "purpose": "device discovery",
+      "selfCheck": {
+        "passed": true,
+        "stderr": {
+          "keyMaterialFound": false,
+          "passed": true,
+          "serialPresent": false,
+          "userPathFound": false
+        },
+        "stdout": {
+          "keyMaterialFound": false,
+          "passed": true,
+          "serialPresent": true,
+          "userPathFound": false
+        }
+      },
+      "stderr": {
+        "bytes": 0,
+        "file": "01-hdc-list-targets.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "truncated": false
+      },
+      "stdout": {
+        "bytes": 33,
+        "file": "01-hdc-list-targets.stdout",
+        "sha256": "2035c0783fe1b2fbc3bba6badfb76003c1a5d46bbe16d1479de439e9fd874fc2",
+        "truncated": false
+      },
+      "timedOut": false
+    },
+    {
+      "argv": [
+        "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/toolchains/hdc",
+        "list",
+        "targets",
+        "-v"
+      ],
+      "commandId": "hdc-list-targets-verbose",
+      "deviceWrite": false,
+      "durationMs": 20,
+      "exitCode": 0,
+      "purpose": "device discovery with detail",
+      "selfCheck": {
+        "passed": true,
+        "stderr": {
+          "keyMaterialFound": false,
+          "passed": true,
+          "serialPresent": false,
+          "userPathFound": false
+        },
+        "stdout": {
+          "keyMaterialFound": false,
+          "passed": true,
+          "serialPresent": true,
+          "userPathFound": false
+        }
+      },
+      "stderr": {
+        "bytes": 0,
+        "file": "02-hdc-list-targets-verbose.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "truncated": false
+      },
+      "stdout": {
+        "bytes": 58,
+        "file": "02-hdc-list-targets-verbose.stdout",
+        "sha256": "d8816e413776d80e6e577b78f6abbf8c114bfd570b3627f7a007c97681af9c48",
+        "truncated": false
+      },
+      "timedOut": false
+    },
+    {
+      "argv": [
+        "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/toolchains/hdc",
+        "-t",
+        "<connectkey>",
+        "shell",
+        "hitrace",
+        "--help"
+      ],
+      "commandId": "hitrace-help-long",
+      "deviceWrite": false,
+      "durationMs": 132,
+      "exitCode": 0,
+      "purpose": "hitrace help family (long form; error-line-with-exit-0 shapes are captured too)",
+      "selfCheck": {
+        "passed": true,
+        "stderr": {
+          "keyMaterialFound": false,
+          "passed": true,
+          "serialPresent": false,
+          "userPathFound": false
+        },
+        "stdout": {
+          "keyMaterialFound": false,
+          "passed": true,
+          "serialPresent": false,
+          "userPathFound": false
+        }
+      },
+      "stderr": {
+        "bytes": 0,
+        "file": "03-hitrace-help-long.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "truncated": false
+      },
+      "stdout": {
+        "bytes": 3382,
+        "file": "03-hitrace-help-long.stdout",
+        "sha256": "9ab0718d7da1d5beb459c74548f89cc69775a931be7931686637d6e584d70e39",
+        "truncated": false
+      },
+      "timedOut": false
+    },
+    {
+      "argv": [
+        "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/toolchains/hdc",
+        "-t",
+        "<connectkey>",
+        "shell",
+        "hitrace",
+        "-h"
+      ],
+      "commandId": "hitrace-help-short",
+      "deviceWrite": false,
+      "durationMs": 129,
+      "exitCode": 0,
+      "purpose": "hitrace help family (short form)",
+      "selfCheck": {
+        "passed": true,
+        "stderr": {
+          "keyMaterialFound": false,
+          "passed": true,
+          "serialPresent": false,
+          "userPathFound": false
+        },
+        "stdout": {
+          "keyMaterialFound": false,
+          "passed": true,
+          "serialPresent": false,
+          "userPathFound": false
+        }
+      },
+      "stderr": {
+        "bytes": 0,
+        "file": "04-hitrace-help-short.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "truncated": false
+      },
+      "stdout": {
+        "bytes": 3382,
+        "file": "04-hitrace-help-short.stdout",
+        "sha256": "9ab0718d7da1d5beb459c74548f89cc69775a931be7931686637d6e584d70e39",
+        "truncated": false
+      },
+      "timedOut": false
+    },
+    {
+      "argv": [
+        "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/toolchains/hdc",
+        "-t",
+        "<connectkey>",
+        "shell",
+        "hitrace",
+        "-l"
+      ],
+      "commandId": "hitrace-tag-list",
+      "deviceWrite": false,
+      "durationMs": 134,
+      "exitCode": 0,
+      "purpose": "hitrace tag/category list",
+      "selfCheck": {
+        "passed": true,
+        "stderr": {
+          "keyMaterialFound": false,
+          "passed": true,
+          "serialPresent": false,
+          "userPathFound": false
+        },
+        "stdout": {
+          "keyMaterialFound": false,
+          "passed": true,
+          "serialPresent": false,
+          "userPathFound": false
+        }
+      },
+      "stderr": {
+        "bytes": 0,
+        "file": "05-hitrace-tag-list.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "truncated": false
+      },
+      "stdout": {
+        "bytes": 3604,
+        "file": "05-hitrace-tag-list.stdout",
+        "sha256": "ade3fdc4dd8231dc57e2a8e4ec9d38151a376d245b822f75687c207ead467e96",
+        "truncated": false
+      },
+      "timedOut": false
+    },
+    {
+      "argv": [
+        "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/toolchains/hdc",
+        "-t",
+        "<connectkey>",
+        "shell",
+        "bytrace",
+        "--help"
+      ],
+      "commandId": "bytrace-help-long",
+      "deviceWrite": false,
+      "durationMs": 181,
+      "exitCode": 0,
+      "purpose": "bytrace help family (long form; absence/error shape is a valid observation)",
+      "selfCheck": {
+        "passed": true,
+        "stderr": {
+          "keyMaterialFound": false,
+          "passed": true,
+          "serialPresent": false,
+          "userPathFound": false
+        },
+        "stdout": {
+          "keyMaterialFound": false,
+          "passed": true,
+          "serialPresent": false,
+          "userPathFound": false
+        }
+      },
+      "stderr": {
+        "bytes": 0,
+        "file": "06-bytrace-help-long.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "truncated": false
+      },
+      "stdout": {
+        "bytes": 3382,
+        "file": "06-bytrace-help-long.stdout",
+        "sha256": "690ca26bbe14d6edd8ad163cce18c1f1a494e4984e8d86f1866f32b7f8bb94fd",
+        "truncated": false
+      },
+      "timedOut": false
+    },
+    {
+      "argv": [
+        "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/toolchains/hdc",
+        "-t",
+        "<connectkey>",
+        "shell",
+        "bytrace",
+        "-h"
+      ],
+      "commandId": "bytrace-help-short",
+      "deviceWrite": false,
+      "durationMs": 183,
+      "exitCode": 0,
+      "purpose": "bytrace help family (short form)",
+      "selfCheck": {
+        "passed": true,
+        "stderr": {
+          "keyMaterialFound": false,
+          "passed": true,
+          "serialPresent": false,
+          "userPathFound": false
+        },
+        "stdout": {
+          "keyMaterialFound": false,
+          "passed": true,
+          "serialPresent": false,
+          "userPathFound": false
+        }
+      },
+      "stderr": {
+        "bytes": 0,
+        "file": "07-bytrace-help-short.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "truncated": false
+      },
+      "stdout": {
+        "bytes": 3382,
+        "file": "07-bytrace-help-short.stdout",
+        "sha256": "690ca26bbe14d6edd8ad163cce18c1f1a494e4984e8d86f1866f32b7f8bb94fd",
+        "truncated": false
+      },
+      "timedOut": false
+    },
+    {
+      "argv": [
+        "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/toolchains/hdc",
+        "-t",
+        "<connectkey>",
+        "shell",
+        "bytrace",
+        "-l"
+      ],
+      "commandId": "bytrace-tag-list",
+      "deviceWrite": false,
+      "durationMs": 182,
+      "exitCode": 0,
+      "purpose": "bytrace tag/category list",
+      "selfCheck": {
+        "passed": true,
+        "stderr": {
+          "keyMaterialFound": false,
+          "passed": true,
+          "serialPresent": false,
+          "userPathFound": false
+        },
+        "stdout": {
+          "keyMaterialFound": false,
+          "passed": true,
+          "serialPresent": false,
+          "userPathFound": false
+        }
+      },
+      "stderr": {
+        "bytes": 0,
+        "file": "08-bytrace-tag-list.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "truncated": false
+      },
+      "stdout": {
+        "bytes": 3604,
+        "file": "08-bytrace-tag-list.stdout",
+        "sha256": "c37e017549ff634b5ffd03339fc7cbe50fd627a1140e84496eb6b68a56694810",
+        "truncated": false
+      },
+      "timedOut": false
+    }
+  ],
+  "deviceWriteEnabled": false,
+  "evidenceClass": "controlledHumanCapture",
+  "host": {
+    "arch": "arm64",
+    "os": "Darwin",
+    "osVersion": "26.5.2"
+  },
+  "receiveVerification": {
+    "nonEmptySelfChecked": false
+  },
+  "remoteCleanup": {
+    "attempts": [],
+    "complete": false,
+    "eligible": false,
+    "retainedReason": null
+  },
+  "remoteOwnedSurface": {
+    "directory": null,
+    "file": null,
+    "runId": null
+  },
+  "schema": "arkdeck-trace-capture-redacted-1.1.0",
+  "selfCheckPassed": true,
+  "targetConnectkeyProvided": true,
+  "task": "TASK-TR-001",
+  "toolchain": {
+    "hdcPath": "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/toolchains/hdc",
+    "hdcSha256": "48395ba8d87115dffca47df2a640a6c868bc9a2bd4eb49611e4138ff88d8d260",
+    "transport": "usb"
+  }
+}
