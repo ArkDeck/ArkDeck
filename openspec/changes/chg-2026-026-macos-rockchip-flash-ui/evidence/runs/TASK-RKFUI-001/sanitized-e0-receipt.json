@@ -1,0 +1,80 @@
+{
+  "schemaVersion": "1.0.0",
+  "capturedAt": "2026-07-22T06:20:49Z",
+  "evidenceClass": "signedSandboxHostOnly",
+  "executor": "agent",
+  "app": {
+    "bundleIdentifier": "dev.arkdeck.rockchip-e0-probe",
+    "executableSHA256": "f3e1934aa8cfde53e19a6c77a33a4fd8cc722202ada3544bbf48d25255dffb5f",
+    "signatureClass": "adHoc",
+    "developerIDIdentityAvailable": false,
+    "hardenedRuntime": true,
+    "codesignVerified": true,
+    "entitlements": {
+      "com.apple.security.app-sandbox": true,
+      "com.apple.security.device.serial": true,
+      "com.apple.security.device.usb": true,
+      "com.apple.security.files.bookmarks.app-scope": true,
+      "com.apple.security.files.user-selected.read-write": true,
+      "com.apple.security.network.client": true
+    }
+  },
+  "tool": {
+    "basename": "rkdeveloptool",
+    "pathSource": "userSelectedSecurityScopedBookmark",
+    "bookmarkCreated": true,
+    "securityScopeStarted": true,
+    "reportedVersion": "rkdeveloptool ver 1.32",
+    "versionEvidence": "approvedRegistryPinBoundByExactExecutableSHA256",
+    "sha256": "038a8a0ea26ef7eb77451789f310c0c9fbeaf43a78af1d6146e02311a9c23611",
+    "upstreamCommit": "304f073752fd25c854e1bcf05d8e7f925b1f4e14",
+    "platformTrust": {
+      "codeTrust": "adHoc",
+      "signatureIntegrityValid": true,
+      "quarantinePresent": true,
+      "gatekeeperAssessment": "rejected"
+    }
+  },
+  "invocation": {
+    "arguments": ["ld"],
+    "environmentOverrideCount": 0,
+    "preflightFailure": "quarantinePresent",
+    "childLaunchAttempted": false,
+    "termination": null,
+    "exitCode": null,
+    "stdout": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sizeBytes": 0
+    },
+    "stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sizeBytes": 0
+    }
+  },
+  "deviceAccessAdvisor": {
+    "verdict": "toolBlocked",
+    "diagnostic": "quarantinePresent",
+    "responsibility": "user",
+    "remediation": "selectPinnedUserApprovedTool"
+  },
+  "usbAccessResult": "notAttemptedBecauseToolTrustBlockedBeforeChildLaunch",
+  "executeReadinessGate": "blocked",
+  "dispatchCounters": {
+    "ldReadOnly": 0,
+    "versionDuringDeviceWindow": 0,
+    "hdcModeSwitch": 0,
+    "deviceMutation": 0,
+    "destructive": 0,
+    "sudoOrPrivilegeElevation": 0,
+    "helperOrDriverInstall": 0,
+    "systemRuleGroupOrACLMutation": 0,
+    "network": 0
+  },
+  "privacy": {
+    "fullToolPathRecorded": false,
+    "rawQuarantinePayloadRecorded": false,
+    "deviceSerialRecorded": false,
+    "locationIDRecorded": false,
+    "rawArtifacts": "emptyBecauseChildLaunchWasBlocked"
+  }
+}

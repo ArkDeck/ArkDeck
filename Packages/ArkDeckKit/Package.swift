@@ -24,7 +24,7 @@ let package = Package(
     .target(name: "ArkDeckOpenHarmony", dependencies: ["ArkDeckCore", "ArkDeckProcess"]),
     .target(
       name: "ArkDeckWorkflows",
-      dependencies: ["ArkDeckCore", "ArkDeckOpenHarmony", "ArkDeckStorage"]),
+      dependencies: ["ArkDeckCore", "ArkDeckProcess", "ArkDeckOpenHarmony", "ArkDeckStorage"]),
     .target(name: "ArkDeckStorage", dependencies: ["ArkDeckCore"]),
     .executableTarget(
       name: "ArkDeckCLI",
@@ -61,7 +61,8 @@ let package = Package(
         // the versioned `Golden/<version>/...` directory tree inside Bundle.module so registry
         // paths stay valid and future pack versions cannot collide.
         .copy("Fixtures/HDC/Golden"),
-        .copy("Fixtures/HDC/Probes")
+        .copy("Fixtures/HDC/Probes"),
+        .copy("Fixtures/Rockchip")
       ]
     ),
   ]
