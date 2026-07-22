@@ -1,94 +1,23 @@
 name: Swift CI
 
-# CHG-2026-028 TASK-MECH-001(readiness #323 pins)。
-# 授权语义不变:CI 红 = 不能合并;CI 绿 ≠ 批准(enforcement"CI 校验"节)。
-# 零 secret;只读权限。覆盖边界:仅 Packages/ArkDeckKit 全量 swift test;
-# ArkDeckApp 与 XCUITest 面不在本 job(见 job summary,不伪装覆盖)。
-# 路径感知:diff 未触碰 Swift 面(Packages/**、Package.*)时秒级 success;
-# diff 基准不可得时 fail closed = 跑全量(宁多跑不漏跑)。
-
+# 探针形态(丢弃分支专用):枚举 macos-26 镜像的 Xcode/Swift 清单,为
+# MECH-001 readiness r2 重钉提供事实。不跑测试。
 on:
   push:
-    branches: [main, "agent/**"]
-  pull_request:
+    branches: ["agent/**"]
 
 permissions:
   contents: read
 
-concurrency:
-  group: swift-ci-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
   swift:
-    runs-on: macos-15
-    timeout-minutes: 30
+    runs-on: macos-26
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Determine Swift-relevant diff
-        id: paths
-        run: |
-          set -eu
-          BASE=""
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            BASE="${{ github.event.pull_request.base.sha }}"
-          elif [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ] \
-            && git cat-file -e "${{ github.event.before }}" 2>/dev/null; then
-            BASE="${{ github.event.before }}"
-          fi
-          if [ -z "$BASE" ]; then
-            # 无可靠 diff 基准(分支新建/force 场景)→ fail closed:跑全量
-            echo "swift=true" >> "$GITHUB_OUTPUT"
-            echo "reason=no-diff-base-fail-closed" >> "$GITHUB_OUTPUT"
-          elif git diff --name-only "$BASE" "${{ github.sha }}" | grep -qE '^(Packages/|Package\.)'; then
-            echo "swift=true" >> "$GITHUB_OUTPUT"
-            echo "reason=swift-surface-touched" >> "$GITHUB_OUTPUT"
-          else
-            echo "swift=false" >> "$GITHUB_OUTPUT"
-            echo "reason=no-swift-surface" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Select Xcode (Swift 6.3+ required)
-        if: steps.paths.outputs.swift == 'true'
-        run: |
-          set -eu
-          # 仓库基线 = Swift 6.3.3/Xcode 26.6(readiness #323);macos-15 默认
-          # Xcode 16.4/Swift 6.1.2 编译不过(首 run 实证)。fail closed:找不到
-          # Xcode 26.x 即失败并列出可用项,不静默降级到旧工具链。
-          XCODE=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)
-          if [ -z "${XCODE}" ]; then
-            echo "::error::No Xcode 26.x on this runner image; available Xcodes:"
-            ls -d /Applications/Xcode*.app || true
-            exit 1
-          fi
-          sudo xcode-select -s "${XCODE}/Contents/Developer"
-          echo "Selected: ${XCODE}"
-
-      - name: Toolchain versions
-        if: steps.paths.outputs.swift == 'true'
+      - name: Enumerate Xcodes
         run: |
           sw_vers
-          xcodebuild -version
-          swift --version
-
-      - name: swift test (ArkDeckKit full suite)
-        if: steps.paths.outputs.swift == 'true'
-        run: swift test --package-path Packages/ArkDeckKit
-
-      - name: Job summary
-        if: always()
-        run: |
-          {
-            echo "### Swift CI"
-            echo "- Path decision: \`${{ steps.paths.outputs.reason }}\`"
-            if [ "${{ steps.paths.outputs.swift }}" = "true" ]; then
-              echo "- Ran the full ArkDeckKit test suite."
-            else
-              echo "- Skipped swift test: diff touches no Swift surface (Packages/**, Package.*)."
-            fi
-            echo "- Coverage boundary: Packages/ArkDeckKit only. ArkDeckApp and XCUITest surfaces are NOT covered by this job."
-            echo "- CI green is not approval; authorization stays with maintainer PR review (governance/enforcement.md)."
-          } >> "$GITHUB_STEP_SUMMARY"
+          ls -d /Applications/Xcode*.app
+          for x in /Applications/Xcode_26*.app; do
+            echo "== $x"; "$x/Contents/Developer/usr/bin/swift" --version 2>/dev/null | head -1 || true
+          done
