@@ -1,45 +1,55 @@
 import ArkDeckCore
-import ArkDeckStorage
 import Foundation
 
-// TASK-AIN-003 (CHG-2026-025). REQ-FLASH-015 standing-authorization path: the machine-
-// verifiable carrier that lets an autonomous agent execute the destructive flash surface
-// unattended. Authorization only ever comes from a maintainer-merged PR; this file parses
-// and compares. A missing, expired, exhausted or mismatching authorization fails closed —
-// there is no downgrade to "warn and continue".
-
-// MARK: - Parse errors
+// TASK-AIN-006 (CHG-2026-025). This file defines and strictly parses the standing-
+// authorization document. Parsed bytes are data, not authority: only
+// MaintainerMergedAuthorizationResolver can combine them with protected-main provenance and
+// mint a VerifiedAuthorizationGrant.
 
 public enum RockchipStandingAuthorizationParseError: Error, Equatable, Sendable {
   case invalidJSON(String)
   case unsupportedSchemaVersion(String)
+  case closedShapeViolation(String)
+  case invalidAuthorizationID
   case emptyField(String)
   case invalidDigest(field: String)
-  case negativeValue(field: String)
+  case invalidTimestamp(field: String)
+  case invalidNonnegativeValue(field: String)
+  case invalidPositiveValue(field: String)
 }
 
-// MARK: - Authorization document
+/// The only accepted registry identifier syntax. It deliberately excludes filesystem syntax,
+/// percent encoding, Unicode equivalence and case folding, so an ID can map to exactly one
+/// `<id>.json` path beneath the fixed protected-main registry.
+public enum RockchipStandingAuthorizationIdentifier {
+  public static func isValid(_ value: String) -> Bool {
+    guard (6...128).contains(value.utf8.count), value.hasPrefix("AUTH-"),
+      value.first != "-", value.last != "-", !value.contains("--")
+    else { return false }
+    return value.utf8.allSatisfy {
+      (UInt8(ascii: "A")...UInt8(ascii: "Z")).contains($0)
+        || (UInt8(ascii: "0")...UInt8(ascii: "9")).contains($0)
+        || $0 == UInt8(ascii: "-")
+    }
+  }
+}
 
 public struct RockchipStandingAuthorizationTarget: Codable, Equatable, Sendable {
   public let model: String
-  /// SHA-256 digest of the device serial. Raw serial bytes never enter the repository
-  /// (RF-001/RF-002 redaction precedent), so the authorization pins the digest.
+  /// SHA-256 digest of the exact device-serial bytes. Raw serial bytes never enter the
+  /// repository or evidence.
   public let serialSHA256: String
-  /// The durable binding revision the maintainer approved. Dispatch requires the current
-  /// durable revision to equal this value exactly (POL-TARGET-001).
   public let bindingRevision: Int
 }
 
-/// The maintainer-approved execution plan pin set. Every field is compared verbatim
-/// against the plan and environment before the first real device step; the carrier
-/// (merged PR) is the authorization audit trail.
+/// A decoded maintainer-authored carrier. `approvedBy` and `carrier` are display/cross-check
+/// fields only; neither can establish approval without GitHub provenance.
 public struct RockchipStandingAuthorization: Codable, Equatable, Sendable {
   public static let supportedSchemaVersion = "1.0.0"
 
   public let schemaVersion: String
   public let authorizationId: String
   public let approvedBy: String
-  /// Merged-PR carrier reference, e.g. "PR #N <path>@<blob-oid>".
   public let carrier: String
   public let target: RockchipStandingAuthorizationTarget
   public let firmwareArchiveSHA256: String
@@ -49,17 +59,25 @@ public struct RockchipStandingAuthorization: Codable, Equatable, Sendable {
   public let planDigestSHA256: String
   public let stepSetDigestSHA256: String
   public let recoveryPath: String
-  /// ISO-8601 timestamp; the authorization is invalid at or after this instant.
   public let validUntil: String
-  /// 0 = unlimited runs inside the validity window; otherwise a hard run-count ceiling.
   public let maxRuns: Int
 
-  public var authorizationRef: String { "\(authorizationId) (\(carrier))" }
-
-  /// Strict parse of the JSON carrier: unknown schema versions, empty identity fields,
-  /// malformed digests and negative counters are rejected at the boundary so the
-  /// comparison stage only ever sees a well-formed document.
   public static func parse(_ data: Data) throws -> RockchipStandingAuthorization {
+    var duplicateValidator = StandingAuthorizationDuplicateValidator(data: data)
+    do {
+      try duplicateValidator.validate()
+    } catch {
+      throw RockchipStandingAuthorizationParseError.invalidJSON(String(describing: error))
+    }
+
+    let root: JSONValue
+    do {
+      root = try JSONDecoder().decode(JSONValue.self, from: data)
+    } catch {
+      throw RockchipStandingAuthorizationParseError.invalidJSON(String(describing: error))
+    }
+    try validateClosedShape(root)
+
     let decoded: RockchipStandingAuthorization
     do {
       decoded = try JSONDecoder().decode(RockchipStandingAuthorization.self, from: data)
@@ -70,8 +88,10 @@ public struct RockchipStandingAuthorization: Codable, Equatable, Sendable {
       throw RockchipStandingAuthorizationParseError.unsupportedSchemaVersion(
         decoded.schemaVersion)
     }
+    guard RockchipStandingAuthorizationIdentifier.isValid(decoded.authorizationId) else {
+      throw RockchipStandingAuthorizationParseError.invalidAuthorizationID
+    }
     for (field, value) in [
-      ("authorizationId", decoded.authorizationId),
       ("approvedBy", decoded.approvedBy),
       ("carrier", decoded.carrier),
       ("target.model", decoded.target.model),
@@ -79,229 +99,254 @@ public struct RockchipStandingAuthorization: Codable, Equatable, Sendable {
       ("toolchainFingerprint", decoded.toolchainFingerprint),
       ("providerIdentity", decoded.providerIdentity),
       ("recoveryPath", decoded.recoveryPath),
-      ("validUntil", decoded.validUntil),
-    ] where value.trimmingCharacters(in: .whitespaces).isEmpty {
+    ] where value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
       throw RockchipStandingAuthorizationParseError.emptyField(field)
     }
     guard decoded.maxRuns >= 0 else {
-      throw RockchipStandingAuthorizationParseError.negativeValue(field: "maxRuns")
+      throw RockchipStandingAuthorizationParseError.invalidNonnegativeValue(field: "maxRuns")
     }
-    guard decoded.target.bindingRevision >= 0 else {
-      throw RockchipStandingAuthorizationParseError.negativeValue(
+    guard decoded.target.bindingRevision > 0 else {
+      throw RockchipStandingAuthorizationParseError.invalidPositiveValue(
         field: "target.bindingRevision")
     }
-    return RockchipStandingAuthorization(
-      schemaVersion: decoded.schemaVersion,
-      authorizationId: decoded.authorizationId,
-      approvedBy: decoded.approvedBy,
-      carrier: decoded.carrier,
-      target: RockchipStandingAuthorizationTarget(
-        model: decoded.target.model,
-        serialSHA256: try normalizedDigest(decoded.target.serialSHA256, field: "target.serialSHA256"),
-        bindingRevision: decoded.target.bindingRevision),
-      firmwareArchiveSHA256: try normalizedDigest(
-        decoded.firmwareArchiveSHA256, field: "firmwareArchiveSHA256"),
-      transport: decoded.transport,
-      toolchainFingerprint: decoded.toolchainFingerprint,
-      providerIdentity: decoded.providerIdentity,
-      planDigestSHA256: try normalizedDigest(decoded.planDigestSHA256, field: "planDigestSHA256"),
-      stepSetDigestSHA256: try normalizedDigest(
-        decoded.stepSetDigestSHA256, field: "stepSetDigestSHA256"),
-      recoveryPath: decoded.recoveryPath,
-      validUntil: decoded.validUntil,
-      maxRuns: decoded.maxRuns)
-  }
-
-  private static func normalizedDigest(_ value: String, field: String) throws -> String {
-    let normalized = value.lowercased()
-    guard normalized.count == 64,
-      normalized.allSatisfy({ $0.isHexDigit && ($0.isNumber || $0.isLowercase) })
-    else {
-      throw RockchipStandingAuthorizationParseError.invalidDigest(field: field)
+    guard Self.isCanonicalTimestamp(decoded.validUntil) else {
+      throw RockchipStandingAuthorizationParseError.invalidTimestamp(field: "validUntil")
     }
-    return normalized
+    for (field, value) in [
+      ("target.serialSHA256", decoded.target.serialSHA256),
+      ("firmwareArchiveSHA256", decoded.firmwareArchiveSHA256),
+      ("planDigestSHA256", decoded.planDigestSHA256),
+      ("stepSetDigestSHA256", decoded.stepSetDigestSHA256),
+    ] {
+      guard Self.isCanonicalSHA256(value) else {
+        throw RockchipStandingAuthorizationParseError.invalidDigest(field: field)
+      }
+    }
+    return decoded
   }
-}
 
-// MARK: - Execution context (injected facts, never guessed)
-
-/// Pre-dispatch identity readback from the physical target (machine counterpart of the
-/// human physical-target confirmation). Produced by actually querying the device.
-public struct RockchipDeviceIdentityReadback: Codable, Equatable, Sendable {
-  public let serialDigestSHA256: String
-  public let usbVendorID: UInt16
-  public let usbProductID: UInt16
-  public let readAtTimestamp: String
-
-  public init(
-    serialDigestSHA256: String, usbVendorID: UInt16, usbProductID: UInt16,
-    readAtTimestamp: String
-  ) {
-    self.serialDigestSHA256 = serialDigestSHA256.lowercased()
-    self.usbVendorID = usbVendorID
-    self.usbProductID = usbProductID
-    self.readAtTimestamp = readAtTimestamp
-  }
-}
-
-/// Everything the validator needs that is not in the authorization itself. All values are
-/// injected by the caller from durable sources (journal, evidence ledger, device probe);
-/// the validator never reads clocks or devices on its own.
-public struct RockchipStandingAuthorizationContext: Equatable, Sendable {
-  public let currentTimestamp: String
-  /// Completed unattended runs already recorded against this authorization.
-  public let priorRunCount: Int
-  /// The current durable binding revision for the target device.
-  public let durableBindingRevision: Int
-  public let identityReadback: RockchipDeviceIdentityReadback?
-
-  public init(
-    currentTimestamp: String, priorRunCount: Int, durableBindingRevision: Int,
-    identityReadback: RockchipDeviceIdentityReadback?
-  ) {
-    self.currentTimestamp = currentTimestamp
-    self.priorRunCount = priorRunCount
-    self.durableBindingRevision = durableBindingRevision
-    self.identityReadback = identityReadback
-  }
-}
-
-// MARK: - Validation
-
-public enum RockchipStandingAuthorizationVerdict: Equatable, Sendable {
-  case expiredOrExhausted(reason: String)
-  case mismatch(fields: [String])
-  case readbackMissingOrMismatch(fields: [String])
-  case valid(authorizationRef: String)
-}
-
-public enum RockchipStandingAuthorizationValidator {
-  /// REQ-FLASH-015 gate sequence for the unattended path: validity window and run count
-  /// first, then the verbatim field-by-field comparison, then the device identity
-  /// readback. Every branch that is not a full match returns a blocking verdict.
-  public static func validate(
-    authorization: RockchipStandingAuthorization,
-    plan: RockchipFlashPlan,
-    binding: RockchipRealDeviceBinding,
-    context: RockchipStandingAuthorizationContext
-  ) -> RockchipStandingAuthorizationVerdict {
-    // 1. Validity window and run ceiling (fail closed on anything unparseable).
+  static func parseTimestamp(_ value: String) -> Date? {
     let formatter = ISO8601DateFormatter()
-    guard let now = formatter.date(from: context.currentTimestamp) else {
-      return .expiredOrExhausted(reason: "unparseableCurrentTimestamp")
-    }
-    guard let validUntil = formatter.date(from: authorization.validUntil) else {
-      return .expiredOrExhausted(reason: "unparseableValidUntil")
-    }
-    guard now < validUntil else {
-      return .expiredOrExhausted(reason: "expired(validUntil=\(authorization.validUntil))")
-    }
-    guard context.priorRunCount >= 0 else {
-      return .expiredOrExhausted(reason: "negativePriorRunCount")
-    }
-    if authorization.maxRuns > 0 && context.priorRunCount >= authorization.maxRuns {
-      return .expiredOrExhausted(
-        reason: "runsExhausted(\(context.priorRunCount)/\(authorization.maxRuns))")
-    }
+    if let date = formatter.date(from: value) { return date }
+    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    return formatter.date(from: value)
+  }
 
-    // 2. Verbatim pin comparison against the plan and pinned environment.
-    var mismatchedFields: [String] = []
-    if authorization.target.model != RockchipFlashProfile.targetDeviceModel {
-      mismatchedFields.append("targetModel")
-    }
-    if authorization.target.bindingRevision != context.durableBindingRevision {
-      mismatchedFields.append("targetBindingRevision")
-    }
-    if authorization.firmwareArchiveSHA256 != plan.archiveSHA256.lowercased() {
-      mismatchedFields.append("firmwareArchiveSha256")
-    }
-    if authorization.transport != "usb" {
-      mismatchedFields.append("transport")
-    }
-    if authorization.toolchainFingerprint != RockchipFlashProfile.pinnedToolchainFingerprint {
-      mismatchedFields.append("toolchainFingerprint")
-    }
-    if authorization.providerIdentity != RockchipRockUSBFlashProvider.providerIdentity {
-      mismatchedFields.append("providerIdentity")
-    }
-    if authorization.planDigestSHA256 != plan.planDigestSHA256.lowercased() {
-      mismatchedFields.append("planDigestSha256")
-    }
-    if authorization.stepSetDigestSHA256 != plan.stepSetDigestSHA256.lowercased() {
-      mismatchedFields.append("stepSetDigestSha256")
-    }
-    guard mismatchedFields.isEmpty else {
-      return .mismatch(fields: mismatchedFields)
-    }
+  static func isCanonicalTimestamp(_ value: String) -> Bool {
+    value.range(
+      of: #"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]{3})?Z$"#,
+      options: .regularExpression) == value.startIndex..<value.endIndex
+      && parseTimestamp(value) != nil
+  }
 
-    // 3. Device identity readback (machine physical-target confirmation).
-    guard let readback = context.identityReadback else {
-      return .readbackMissingOrMismatch(fields: ["identityReadbackMissing"])
-    }
-    var readbackMismatches: [String] = []
-    if readback.serialDigestSHA256 != authorization.target.serialSHA256 {
-      readbackMismatches.append("serialDigestSha256")
-    }
-    if readback.usbVendorID != binding.usbVendorID
-      || readback.usbProductID != binding.usbProductID
-    {
-      readbackMismatches.append("usbIdentity")
-    }
-    guard readbackMismatches.isEmpty else {
-      return .readbackMissingOrMismatch(fields: readbackMismatches)
-    }
+  static func isCanonicalSHA256(_ value: String) -> Bool {
+    value.utf8.count == 64
+      && value.utf8.allSatisfy {
+        (UInt8(ascii: "0")...UInt8(ascii: "9")).contains($0)
+          || (UInt8(ascii: "a")...UInt8(ascii: "f")).contains($0)
+      }
+  }
 
-    return .valid(authorizationRef: authorization.authorizationRef)
+  private static func validateClosedShape(_ root: JSONValue) throws {
+    let rootKeys: Set<String> = [
+      "schemaVersion", "authorizationId", "approvedBy", "carrier", "target",
+      "firmwareArchiveSHA256", "transport", "toolchainFingerprint", "providerIdentity",
+      "planDigestSHA256", "stepSetDigestSHA256", "recoveryPath", "validUntil", "maxRuns",
+    ]
+    let targetKeys: Set<String> = ["model", "serialSHA256", "bindingRevision"]
+    guard case .object(let object) = root, Set(object.keys) == rootKeys,
+      case .object(let target)? = object["target"], Set(target.keys) == targetKeys
+    else {
+      throw RockchipStandingAuthorizationParseError.closedShapeViolation(
+        "authorization document contains unknown or missing members")
+    }
   }
 }
 
-// MARK: - Durable intent (POL-WORKFLOW-001: intent before side effect)
+private enum StandingAuthorizationStrictJSONError: Error, CustomStringConvertible {
+  case duplicateMember(String)
+  case malformed(String)
 
-/// The durable record written before any authorized unattended dispatch. It binds the
-/// run to the authorization carrier so the journal alone answers "who allowed this".
-public struct RockchipUnattendedExecutionIntent: Codable, Equatable, Sendable {
-  public let intentID: String
-  public let authorizationRef: String
-  public let planDigestSHA256: String
-  public let stepSetDigestSHA256: String
-  public let targetSerialDigestSHA256: String
-  public let timestamp: String
+  var description: String {
+    switch self {
+    case .duplicateMember(let path): "duplicate JSON member at \(path)"
+    case .malformed(let reason): reason
+    }
+  }
+}
 
-  public static func make(
-    authorization: RockchipStandingAuthorization,
-    plan: RockchipFlashPlan,
-    timestamp: String
-  ) -> RockchipUnattendedExecutionIntent {
-    let identity = RockchipRockUSBFlashProvider.sha256Hex(
-      Data(
-        "unattended-flash|\(authorization.authorizationRef)|\(plan.planDigestSHA256)|\(timestamp)"
-          .utf8))
-    return RockchipUnattendedExecutionIntent(
-      intentID: "unattended-flash-intent-\(identity.prefix(16))",
-      authorizationRef: authorization.authorizationRef,
-      planDigestSHA256: plan.planDigestSHA256,
-      stepSetDigestSHA256: plan.stepSetDigestSHA256,
-      targetSerialDigestSHA256: authorization.target.serialSHA256,
-      timestamp: timestamp)
+/// Local duplicate-key validator because the storage target's equivalent parser is intentionally
+/// not part of its public API. JSONDecoder alone accepts duplicate members and therefore cannot
+/// protect an authorization carrier.
+private struct StandingAuthorizationDuplicateValidator {
+  private let bytes: [UInt8]
+  private var index = 0
+
+  init(data: Data) { bytes = Array(data) }
+
+  mutating func validate() throws {
+    skipWhitespace()
+    try parseValue(path: "$", depth: 0)
+    skipWhitespace()
+    guard index == bytes.count else {
+      throw StandingAuthorizationStrictJSONError.malformed("unexpected trailing JSON data")
+    }
   }
 
-  /// Durable form: callers persist this through the session audit store before the first
-  /// real device step; the matching outcome record is written by the executing run.
-  public func auditRecord(sessionID: String, jobID: String) throws -> SessionAuditRecord {
-    try SessionAuditRecord(
-      recordID: intentID,
-      auditID: "rockusb-unattended-flash",
-      correlationID: "rockusb-flash-run",
-      sessionID: sessionID,
-      jobID: jobID,
-      category: .intent,
-      timestamp: timestamp,
-      details: [
-        "kind": .string("unattendedFlashIntent"),
-        "authorizationRef": .string(authorizationRef),
-        "planDigestSha256": .string(planDigestSHA256),
-        "stepSetDigestSha256": .string(stepSetDigestSHA256),
-        "targetSerialDigestSha256": .string(targetSerialDigestSHA256),
-      ])
+  private mutating func parseValue(path: String, depth: Int) throws {
+    guard depth <= 256, let byte = currentByte else {
+      throw StandingAuthorizationStrictJSONError.malformed("missing or over-nested JSON value")
+    }
+    switch byte {
+    case UInt8(ascii: "{"): try parseObject(path: path, depth: depth)
+    case UInt8(ascii: "["): try parseArray(path: path, depth: depth)
+    case UInt8(ascii: "\""): _ = try parseString()
+    case UInt8(ascii: "-"), UInt8(ascii: "0")...UInt8(ascii: "9"): try parseNumber()
+    case UInt8(ascii: "t"): try parseLiteral(Array("true".utf8))
+    case UInt8(ascii: "f"): try parseLiteral(Array("false".utf8))
+    case UInt8(ascii: "n"): try parseLiteral(Array("null".utf8))
+    default: throw StandingAuthorizationStrictJSONError.malformed("unexpected JSON byte")
+    }
+  }
+
+  private mutating func parseObject(path: String, depth: Int) throws {
+    try consume(UInt8(ascii: "{"))
+    skipWhitespace()
+    if consumeIfPresent(UInt8(ascii: "}")) { return }
+    var names = Set<String>()
+    while true {
+      let name = try parseString()
+      let memberPath = "\(path).\(name)"
+      guard names.insert(name).inserted else {
+        throw StandingAuthorizationStrictJSONError.duplicateMember(memberPath)
+      }
+      skipWhitespace()
+      try consume(UInt8(ascii: ":"))
+      skipWhitespace()
+      try parseValue(path: memberPath, depth: depth + 1)
+      skipWhitespace()
+      if consumeIfPresent(UInt8(ascii: "}")) { return }
+      try consume(UInt8(ascii: ","))
+      skipWhitespace()
+    }
+  }
+
+  private mutating func parseArray(path: String, depth: Int) throws {
+    try consume(UInt8(ascii: "["))
+    skipWhitespace()
+    if consumeIfPresent(UInt8(ascii: "]")) { return }
+    var element = 0
+    while true {
+      try parseValue(path: "\(path)[\(element)]", depth: depth + 1)
+      element += 1
+      skipWhitespace()
+      if consumeIfPresent(UInt8(ascii: "]")) { return }
+      try consume(UInt8(ascii: ","))
+      skipWhitespace()
+    }
+  }
+
+  private mutating func parseString() throws -> String {
+    let start = index
+    try consume(UInt8(ascii: "\""))
+    while let byte = currentByte {
+      switch byte {
+      case UInt8(ascii: "\""):
+        index += 1
+        do { return try JSONDecoder().decode(String.self, from: Data(bytes[start..<index])) } catch
+        { throw StandingAuthorizationStrictJSONError.malformed("invalid JSON string") }
+      case UInt8(ascii: "\\"):
+        index += 1
+        guard let escaped = currentByte else {
+          throw StandingAuthorizationStrictJSONError.malformed("unterminated JSON escape")
+        }
+        if escaped == UInt8(ascii: "u") {
+          index += 1
+          for _ in 0..<4 {
+            guard let hex = currentByte, Self.isHexDigit(hex) else {
+              throw StandingAuthorizationStrictJSONError.malformed("invalid Unicode escape")
+            }
+            index += 1
+          }
+        } else {
+          let simple: Set<UInt8> = [
+            UInt8(ascii: "\""), UInt8(ascii: "\\"), UInt8(ascii: "/"),
+            UInt8(ascii: "b"), UInt8(ascii: "f"), UInt8(ascii: "n"),
+            UInt8(ascii: "r"), UInt8(ascii: "t"),
+          ]
+          guard simple.contains(escaped) else {
+            throw StandingAuthorizationStrictJSONError.malformed("invalid JSON escape")
+          }
+          index += 1
+        }
+      case 0x00...0x1F:
+        throw StandingAuthorizationStrictJSONError.malformed("JSON control character")
+      default: index += 1
+      }
+    }
+    throw StandingAuthorizationStrictJSONError.malformed("unterminated JSON string")
+  }
+
+  private mutating func parseLiteral(_ literal: [UInt8]) throws {
+    let end = index + literal.count
+    guard end <= bytes.count, bytes[index..<end].elementsEqual(literal) else {
+      throw StandingAuthorizationStrictJSONError.malformed("invalid JSON literal")
+    }
+    index = end
+  }
+
+  private mutating func parseNumber() throws {
+    if consumeIfPresent(UInt8(ascii: "-")), currentByte == nil {
+      throw StandingAuthorizationStrictJSONError.malformed("invalid JSON number")
+    }
+    if consumeIfPresent(UInt8(ascii: "0")) {
+      guard currentByte.map(Self.isDigit) != true else {
+        throw StandingAuthorizationStrictJSONError.malformed("leading JSON number zero")
+      }
+    } else {
+      guard let byte = currentByte, (UInt8(ascii: "1")...UInt8(ascii: "9")).contains(byte)
+      else { throw StandingAuthorizationStrictJSONError.malformed("invalid JSON integer") }
+      repeat { index += 1 } while currentByte.map(Self.isDigit) == true
+    }
+    if consumeIfPresent(UInt8(ascii: ".")) {
+      guard currentByte.map(Self.isDigit) == true else {
+        throw StandingAuthorizationStrictJSONError.malformed("invalid JSON fraction")
+      }
+      repeat { index += 1 } while currentByte.map(Self.isDigit) == true
+    }
+    if currentByte == UInt8(ascii: "e") || currentByte == UInt8(ascii: "E") {
+      index += 1
+      if currentByte == UInt8(ascii: "+") || currentByte == UInt8(ascii: "-") { index += 1 }
+      guard currentByte.map(Self.isDigit) == true else {
+        throw StandingAuthorizationStrictJSONError.malformed("invalid JSON exponent")
+      }
+      repeat { index += 1 } while currentByte.map(Self.isDigit) == true
+    }
+  }
+
+  private mutating func consume(_ expected: UInt8) throws {
+    guard consumeIfPresent(expected) else {
+      throw StandingAuthorizationStrictJSONError.malformed("unexpected JSON token")
+    }
+  }
+
+  private mutating func consumeIfPresent(_ expected: UInt8) -> Bool {
+    guard currentByte == expected else { return false }
+    index += 1
+    return true
+  }
+
+  private mutating func skipWhitespace() {
+    let whitespace: Set<UInt8> = [0x20, 0x09, 0x0A, 0x0D]
+    while let byte = currentByte, whitespace.contains(byte) { index += 1 }
+  }
+
+  private var currentByte: UInt8? { index < bytes.count ? bytes[index] : nil }
+  private static func isDigit(_ byte: UInt8) -> Bool {
+    (UInt8(ascii: "0")...UInt8(ascii: "9")).contains(byte)
+  }
+  private static func isHexDigit(_ byte: UInt8) -> Bool {
+    isDigit(byte) || (UInt8(ascii: "a")...UInt8(ascii: "f")).contains(byte)
+      || (UInt8(ascii: "A")...UInt8(ascii: "F")).contains(byte)
   }
 }
