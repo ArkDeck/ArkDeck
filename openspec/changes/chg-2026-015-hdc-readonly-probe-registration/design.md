@@ -1,6 +1,6 @@
 # CHG-2026-015 design — closed read-only probe registry
 
-> Change:CHG-2026-015-hdc-readonly-probe-registration@r1
+> Change:CHG-2026-015-hdc-readonly-probe-registration@r3
 > Status:approved with the change (maintainer review/merge of approval-only PR #123,
 > `9f08c9421a24beb5c670452ec42af7c0bbdef5b1`, 2026-07-19); task execution still requires the
 > independent readiness PR — see tasks.md
@@ -71,13 +71,33 @@ source. M1-006 adoption requires a later approved task revision that pins the ne
 maps the registry through its closed adapters, reruns headless contracts, and separately completes
 signed Sandbox platform evidence. Registration is necessary but not sufficient for any HDC AC.
 
+## Decision 6:archive relocation is a bounded immutability exception
+
+The verified `1.0.0` fixture/registry content remains logically immutable. Moving this change to
+`openspec/changes/archive/2026-07-22-chg-2026-015-hdc-readonly-probe-registration/` creates one
+exception limited to the four production `provenance.sourcePath` values and the hashes/sizes that
+are mechanically derived from those bytes.
+
+- no integration or fixture version is bumped because no probe recipe, source bytes, source hash,
+  authority, effect or consumer behavior changes;
+- the living registry and its fixture mirror remain byte-identical after relocation;
+- receipt hash/size changes flow into registry input-contract pins, then registry/resource pins,
+  then only their exact living consumers (`profile.md`, Integration lock, macOS profile and the
+  closed Swift registry constants);
+- archive-local evidence and prior run records remain historical and are never rewritten to make
+  an old run claim the new hashes;
+- a normalized before/after comparison must prove that the permitted path fields and their
+  derivative hash/size closure are the entire semantic delta. Any additional delta requires a new
+  approved change/version rather than this exception.
+
 ## Failure, cancellation and recovery
 
 - unknown output, mismatched executable/endpoint/identity, stale device binding, missing key
   authority, unproven effect, timeout or cancellation => typed unavailable/unknown result;
 - no failure path may retry with a broader argv, default device or fallback key path;
 - registration artifacts are immutable/versioned. A bad entry is superseded by a new approved
-  integration version, never edited in place after dependent evidence exists;
+  integration version, never edited in place after dependent evidence exists; Decision 6 is the
+  sole exception and cannot change a bad entry or any observation semantics;
 - registration implementation is one revertable PR. Revert leaves consumers on 0.2.0 and M1-006
   blocked.
 

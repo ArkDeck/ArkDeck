@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-015-hdc-readonly-probe-registration
-revision: 2
-status: verified # 2026-07-21 本 verification-closure PR(先例 #175/#176/#201/#208);approve 载体 #123;archive 另行(chg-002/019 账本引用其 registry/provenance,归档前须引用面收口)。原注: r1 proposal 经 PR #121 合入；批准由 approval-only PR #123 的维护者 review/merge 构成；r2 为 plan-only revision（capture-plan.md），仅在对应治理 PR 合入后生效
+revision: 3
+status: verified # 2026-07-21 本 verification-closure PR(先例 #175/#176/#201/#208);approve 载体 #123;2026-07-22 r3 仅起草 archive provenance 路径迁移/hash-size 重钉例外范围,不改变 verification 结论,仅在本 D1 PR 经独立 AI premerge review 且维护者 review/merge 后生效。原注:r1 proposal 经 PR #121 合入；批准由 approval-only PR #123 的维护者 review/merge 构成；r2 为 plan-only revision（capture-plan.md）
 class: integration
 core_change_level: none
 owner: lvye
@@ -125,6 +125,27 @@ probe、不修改 M1-006 源码，也不声称任何 HDC AC 已通过。
   `TASK-I15-001` 继续保持 `blocked`；只有独立 readiness PR 确认四类 authoritative
   capture/receipt 输入可得且 provenance 已获维护者认可后，任务才能转为 `ready`。缺任一
   family provenance 时不得开始部分注册，也不得宣称 M1-006 blocker 已解除。
+
+## Archive relocation scope (r3; D1)
+
+本 revision 只为 verified change 的归档建立一个封闭、可复核的路径迁移例外。它不重开
+`TASK-I15-001`，不改变七项 `I15-HDC-*` 结论，也不授予新的 probe、device 或 mutation
+authority。只有本 D1 revision 经独立其他会话 AI premerge review 并由维护者 review/merge
+进入受保护 `main` 后，后续独立 archive PR 才可开工。
+
+- 固定归档目标为
+  `openspec/changes/archive/2026-07-22-chg-2026-015-hdc-readonly-probe-registration/`；
+- 唯一获准的生产语义字段变化，是四个 entry 的 `provenance.sourcePath` 从当前 change 根
+  精确迁移到上述 archive 根。provenance source bytes/source SHA-256、`acceptedBy`、family、
+  registry/version、effect、precondition、authority 与 adoption boundary 必须逐字节或逐字段
+  保持不变；
+- 因 sourcePath bytes 变化而产生的 receipt SHA-256/size、registry SHA-256/size、
+  `resources.json` SHA-256/size 及其 living consumer pins 可以且仅可以做传递闭包重钉；
+- 既有 evidence/run/provenance 内容和历史结论保持冻结。归档目录内的历史 hash 记录、旧
+  OID 与运行结果不得为了匹配新 living pins 而改写；
+- 实际目录迁移、living provenance 更新与全部派生 re-pin 必须在同一独立 archive PR 原子
+  完成；缺任一 closure、出现归一化结构以外差异或仍有 active-root 生产 provenance 引用时
+  fail closed。
 
 ## Verification closure(2026-07-21)
 
