@@ -1,8 +1,12 @@
 # CHG-2026-024 Verification Plan
 
-> Change:CHG-2026-024-hdc-device-snapshot-registration@r1
+> Change:CHG-2026-024-hdc-device-snapshot-registration@r2
 > Status:planned
 > Core baseline:CORE-2.1.0（canonical Core AC 零认领）
+> Note(2026-07-22):三方 revision 同步补记(@r1→@r2、acceptance change_revision
+> 1→2),对齐 proposal r2(capture-plan 细化,#275 合入;该 PR review 已记录此
+> 漂移并建议补同步,先例 #152)。r2 未改变 AC 集合与文本,本补记零语义变化;
+> 亦为 CHG-2026-028 TASK-MECH-002(三方 revision 校验)实现前置的存量清零。
 
 ## Environment
 
