@@ -1,0 +1,110 @@
+{
+  "authorization": "AUTH-2026-025-DAYU200-001",
+  "bindingRevisionNote": "This readback confirms identity only. target.bindingRevision has no host read-path; resolve it at r2 from ArkDeck's durable device-binding journal (initial durable binding == revision 1 per Core DeviceBindingHistory), and supply the same value in --unattended-context at execution. The gate fails closed if the two ever diverge.",
+  "boundary": "read-only identity/mode readback; no device state changed; not a support or hardware-acceptance claim. Serial-bearing bytes remain in this controlled non-repository location; only digests and match booleans are repo-safe.",
+  "change": "CHG-2026-025-ai-native-unattended-device-ops",
+  "commands": [
+    {
+      "argv": [
+        "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/toolchains/hdc",
+        "-v"
+      ],
+      "commandId": "hdc-version",
+      "durationMs": 6,
+      "exitCode": 0,
+      "purpose": "hdc client version",
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 12,
+        "sha256": "906d35a917937ecbb33d8dc3bbb6b3e1783bd2996a6201ab7227fb406d474ed9"
+      },
+      "timedOut": false
+    },
+    {
+      "argv": [
+        "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/toolchains/hdc",
+        "checkserver"
+      ],
+      "commandId": "hdc-checkserver",
+      "durationMs": 18,
+      "exitCode": 0,
+      "purpose": "hdc server/daemon version",
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 55,
+        "sha256": "50e8dfe03cb770dfade5b91198523b964fd3bd6fd8855b541ceb46201f0d014a"
+      },
+      "timedOut": false
+    },
+    {
+      "argv": [
+        "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/toolchains/hdc",
+        "list",
+        "targets"
+      ],
+      "commandId": "hdc-list-targets",
+      "durationMs": 16,
+      "exitCode": 0,
+      "purpose": "device discovery (connect key/serial)",
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 33,
+        "sha256": "2035c0783fe1b2fbc3bba6badfb76003c1a5d46bbe16d1479de439e9fd874fc2"
+      },
+      "timedOut": false
+    },
+    {
+      "argv": [
+        "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/toolchains/hdc",
+        "list",
+        "targets",
+        "-v"
+      ],
+      "commandId": "hdc-list-targets-verbose",
+      "durationMs": 16,
+      "exitCode": 0,
+      "purpose": "device discovery with detail (serial + state)",
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 58,
+        "sha256": "d8816e413776d80e6e577b78f6abbf8c114bfd570b3627f7a007c97681af9c48"
+      },
+      "timedOut": false
+    }
+  ],
+  "evidenceClass": "controlledReadback",
+  "host": {
+    "arch": "arm64",
+    "os": "Darwin",
+    "osVersion": "26.5.2"
+  },
+  "schema": "arkdeck-e0-readback-redacted-1.0.0",
+  "sensitiveSelfCheckPassed": true,
+  "serialVerdict": {
+    "matched": true,
+    "observedDigests": [
+      "958780b2ffb7090d4f22cdc1f547f9804ed0f0b605e3020f384e5d4823dc7a7e"
+    ],
+    "pinnedDigest": "958780b2ffb7090d4f22cdc1f547f9804ed0f0b605e3020f384e5d4823dc7a7e",
+    "serialTokenCount": 1
+  },
+  "task": "TASK-AIN-004",
+  "toolchain": {
+    "hdcPath": "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/toolchains/hdc",
+    "hdcSha256": "48395ba8d87115dffca47df2a640a6c868bc9a2bd4eb49611e4138ff88d8d260",
+    "transport": "usb"
+  },
+  "usbIdentities": []
+}

@@ -215,7 +215,8 @@ change approved 前保持 blocked;approved 后每任务另需独立 readiness PR
 
 ## TASK-AIN-004 — 首次无人值守真机验收(DAYU200)
 
-- Status:blocked
+- Status:ready
+- Readiness r2(2026-07-22):E0 身份读回于设备窗口完成(operator lvye,crib exit 0,serial 摘要 `958780b2…` 命中被授权目标;run 记录 `evidence/runs/TASK-AIN-004/`)。载体 `AUTH-2026-025-DAYU200-001.json` 最终化:`bindingRevision` -1 → 1(首次 durable 绑定,Core `DeviceBindingHistory` 不变量;执行期须提供同值,门 fail-closed 校验)、`carrier` PENDING → r2 PR 引用。host pin 于合入版 f15c3a8 复核无漂移。维护者 merge 本 r2 = 批准精确目标,任务转 ready。
 - Platform:macos
 - Requirements:REQ-FLASH-015(MODIFIED)
 - Acceptance:AC-FLASH-015-03(realHardware 面);AC-FLASH-015-01/02 真机负探针

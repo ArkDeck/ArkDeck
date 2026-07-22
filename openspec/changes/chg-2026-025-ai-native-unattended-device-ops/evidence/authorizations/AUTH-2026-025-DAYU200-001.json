@@ -2,11 +2,11 @@
   "schemaVersion": "1.0.0",
   "authorizationId": "AUTH-2026-025-DAYU200-001",
   "approvedBy": "lvye",
-  "carrier": "PENDING — set to \"PR #<n> openspec/changes/chg-2026-025-ai-native-unattended-device-ops/evidence/authorizations/AUTH-2026-025-DAYU200-001.json@<blob-oid>\" at the readiness r2 merge that finalizes bindingRevision",
+  "carrier": "PR #296 openspec/changes/chg-2026-025-ai-native-unattended-device-ops/evidence/authorizations/AUTH-2026-025-DAYU200-001.json (CHG-2026-025 TASK-AIN-004 readiness r2 finalize; approved by maintainer merge, provenance = the r2 merge commit in git history)",
   "target": {
     "model": "DAYU200 (RK3568)",
     "serialSHA256": "958780b2ffb7090d4f22cdc1f547f9804ed0f0b605e3020f384e5d4823dc7a7e",
-    "bindingRevision": -1
+    "bindingRevision": 1
   },
   "firmwareArchiveSHA256": "fc7637f34a8394847b1b6c7e7ff2750863d18c6dc05e184abaf5aed70ec75280",
   "transport": "usb",
