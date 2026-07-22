@@ -74,6 +74,23 @@
   `ready→done` D0 状态 PR。TASK-MECH-003 继续等待 MECH-002 done 后重钉
   同文件 blobs,不得基于本未合 PR 投机开工。
 
+## Live PR evidence(pre-final synchronize)
+
+- PR #343 初始 implementation head
+  `c98eb5e858038129ec558afb8774c5db949f58c6`。push Swift run
+  `29936036221` = **SUCCESS**:Apple Swift 6.3.3,全量 **358 tests /
+  1 skipped / 0 failures**;push SDD Guard run `29936040282` = guard
+  SUCCESS(`allowed-paths` 在 push event 正确 skipped,不冒充 PR diff check)。
+- 自动 PR-opened 的 Swift run `29936062954` = `action_required`,不是绿证据;
+  PR body edited 后真实 `pull_request` SDD Guard run `29936110570` = guard
+  SUCCESS + live `allowed-paths` SUCCESS。追加本段的 synchronize commit 将
+  触发 final-head PR Swift 与 SDD Guard;二者必须实际出现且绿色后才可入队。
+- 不同 AI 会话对 implementation + 本 run evidence 前一版的 final commit
+  `c98eb5e858038129ec558afb8774c5db949f58c6` 独立复核 = **APPROVE**;
+  逐项重跑 13/13、12/12、0/0/111 与 diff check,核对 #341/#342 exact-head
+  approval/merge、active revision 清单、allowed paths 与零状态翻转。reviewer
+  未在 GitHub approve/merge;本 evidence-only delta 仍须对新 final head 复核。
+
 ## AC conclusion(candidate)
 
 `MECH-REV-001`:本地 contract 与真实 baseline 面全部 PASS;实现 PR live
