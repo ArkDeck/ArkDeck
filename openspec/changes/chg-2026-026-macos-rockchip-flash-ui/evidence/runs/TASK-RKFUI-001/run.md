@@ -55,7 +55,7 @@ standing authorization was changed.
 | `xcrun swift-format lint --strict <three new Swift files>` | PASS |
 | `ARKDECK_PYTHON=<temporary PyYAML-6.0.3 env> scripts/check-sdd.sh` | PASS: 0 errors, 0 warnings, 111 acceptance IDs |
 | signed probe build + `codesign --verify --deep --strict` + entitlement equality | PASS; ad-hoc signature, Hardened Runtime, exact six entitlements |
-| `swift test --package-path Packages/ArkDeckKit` | **BLOCKED**: 328 tests executed, 1 skipped, 1 failure; all other tests passed |
+| `swift test --package-path Packages/ArkDeckKit` | **PASS**: 328 tests executed, 1 skipped, 0 failures; allowed-paths blocker cleared by merged remediation PR #303 |
 
 Contract anchors observed:
 
@@ -64,18 +64,19 @@ TEST-AC-FLASH-001-01 PASS success=1 multi=1 maskrom=blocked similar=blocked malf
 TEST-AC-UX-007-01 PASS permission=distinct driver=distinct offline=distinct sudo=0 helper_install=0 system_rule=0 group_acl=0
 ```
 
-### Full-suite blocker
+### Full-suite blocker (cleared by remediation PR #303)
 
-`ArkDeckContractTests.testPackageTargetsImportOnlyDeclaredArkDeckModules` has a hard-coded
+`ArkDeckContractTests.testPackageTargetsImportOnlyDeclaredArkDeckModules` had a hard-coded
 dependency table in
-`Packages/ArkDeckKit/Tests/ArkDeckContractTests/ArkDeckContractTests.swift`. It still lists
-`ArkDeckWorkflows` without `ArkDeckProcess`, so it fails after the approved design's discovery
+`Packages/ArkDeckKit/Tests/ArkDeckContractTests/ArkDeckContractTests.swift`. It listed
+`ArkDeckWorkflows` without `ArkDeckProcess`, so it failed after the approved design's discovery
 adapter reuses `FoundationProcessExecutor` and `Package.swift` declares that dependency.
 
-Updating the table is the direct fix, but that file is not in TASK-RKFUI-001 allowed paths.
+Updating the table was the direct fix, but that file was not in TASK-RKFUI-001 allowed paths.
 Bypassing its import scanner, disabling the test, or replacing the shared executor with a second
-process implementation would violate the task scope/design. A maintainer-merged readiness
-remediation must add this exact test file to allowed paths before implementation can close.
+process implementation would violate the task scope/design. Merged remediation PR #303 added this
+exact test file with authority limited to synchronizing the hard-coded dependency table; the full
+suite now passes as recorded above.
 
 ## Signed Sandbox E0 attempt
 
