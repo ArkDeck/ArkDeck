@@ -76,9 +76,42 @@
 
 ## TASK-MECH-004 — PR allowed-paths diff 校验
 
-- Status:blocked(双前置:① approve;② 独立 readiness PR——须钉任务声明
-  解析约定定稿(标题/body/分支名优先序)、敏感面清单、glob 语义与交付形态
-  (design §5 凭据注记))
+- Status:ready(2026-07-22 本 readiness PR;前置 ① 已满足 = approval #318
+  merge `c15814593ea3d46149e749d3a47121ea70af1cea`;状态仅在维护者
+  review/merge 本 PR 后生效)
+- Readiness(r1,base = main `c15814593ea3d46149e749d3a47121ea70af1cea`;
+  维护者 merge 本 PR = 接受下述解析约定):
+  - 任务声明解析定稿(首个命中生效):① PR body 独立行
+    `Task: TASK-<AREA>-<NNN>` ② PR 标题中 token `TASK-[A-Z0-9]+-[0-9]{3}`
+    ③ 分支名 `agent/task-<slug>`(slug 归一大写、`-` 保留)映射。标题/body
+    出现多个互异 task token = 具名 err(fail closed);声明任务必须存在于某
+    active change 的 tasks.md,否则 err。
+  - 敏感面清单定稿(未声明任务的 PR 触碰即红):`Packages/**`、
+    `ArkDeckApp/**`、`ArkDeckAppUITests/**`、`scripts/**`、`.github/**`;
+    纯 docs/governance diff(propose/approval/readiness/状态/decision PR
+    形态)未声明任务时通过。
+  - glob 语义定稿:fnmatch,`**` 跨层;Allowed paths 行(含续行)反引号
+    token 全量提取,`本 change` 前缀解析为该 change 目录;行缺失/零 token =
+    具名 err(fail closed,非静默过)。
+  - 待改/新增文件 pins(实现时漂移即停并重做 readiness):
+
+    ```yaml pins
+    - path: .github/workflows/sdd-guard.yml
+      blob: 4a44098728cab7ac9752a6c539b28eaeb83ed13f
+    ```
+
+    新增 `scripts/check_pr_paths.py` 与 `scripts/test_check_pr_paths.py` 于
+    base 不存在;载体 = sdd-guard workflow 内新增独立 job(仅
+    `pull_request` event,复用 python 环境),不动既有 guard job 定义。
+  - 交付形态:当前凭据经 SSH 推送不受 `workflow` scope 限制,agent 可直接
+    推;TASK-BAP-003 收权落地后按 design §5 复核(agent 起草 + 维护者应用)。
+  - canary 钉定:draft PR 声明任务并触碰其 Allowed paths 外路径 → job 红并
+    列出越界路径 → evidence 记链接 → close 丢弃,永不合入。
+  - 协调:与 MECH-002/003 零文件交集(新脚本 vs check_sdd);与 MECH-001 零
+    文件交集(sdd-guard.yml vs swift-ci.yml)。本批次内三个 MECH readiness
+    同文件(本 tasks.md)不同段,后合者如冲突 update-branch 即可。
+  - Review boundary:本 PR 只翻转 `blocked→ready` 并登记约定/pins;实现 PR、
+    `ready→done` 状态 PR 各自独立,均须维护者 review/merge。
 - Objective:新 CI job(design §4,`pull_request` event,可并入 sdd-guard
   workflow):声明 `TASK-*` 的 PR 校验 diff ⊆ 该任务 Allowed paths(反引号
   token 提取为 glob,`本 change` 前缀解析;行缺失/零 token/任务不存在 err,
