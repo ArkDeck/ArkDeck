@@ -612,38 +612,140 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
 
 ## TASK-AIN-007 — product-owned Rockchip typed executor
 
-- Status:blocked（等待 TASK-AIN-005/006 done；之后仍须独立 readiness PR）
+- Status:ready（仅在维护者 review/merge 本独立 readiness PR 后生效；本 PR 只冻结实现文件
+  面、输入 pins 与二值验证门，不含 executor/code/test/evidence 实现，不授权任何真实 dispatch）
 - Platform:macos
 - Requirements:REQ-FLASH-008/009/011/012/013/015、POL-WORKFLOW-001、
   POL-RECOVERY-001
 - Acceptance:AIN-DISPATCH-001；AC-FLASH-008-01、012-01、013-01、015-03 contract 面
 - Depends on:TASK-AIN-005、TASK-AIN-006
-- Allowed paths（readiness 时以具体文件与 OID 细化）：
-  - `Packages/ArkDeckKit/Package.swift`
-  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipFlashExecution*.swift`
-  - `Packages/ArkDeckKit/Sources/ArkDeckCLI/ArkDeckCLIMain.swift`
-  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/RockchipFlashExecution*.swift`
-  - `Packages/ArkDeckKit/Tests/ArkDeckFakeRockchipFixture/**`
-  - 本 change `evidence/**`
+- Readiness reviewed:2026-07-22；base = protected `main`
+  `ce7b48e9ed5bd135ce6e77e0b43d32e21efe8e06`（#309 merge，AIN-006 done），审计时
+  open PR = 0。TASK-AIN-005 已由 #304 done；TASK-AIN-006 实现 #307、evidence 修正
+  #308 与 done #309 均已合入；#309 head
+  `7082b9f7d41128862650d94973e8524ab6a42d0f` 到 merge commit 在 `tasks.md` tree
+  diff = 0。
+- Allowed paths（实现 PR 的封闭文件面）：
+  - 修改 `Packages/ArkDeckKit/Package.swift`
+    `dc2374629ac6b0235302312b59717e0f565c7ed2`（仅给 `ArkDeckWorkflows` 增加
+    `ArkDeckRuntime` 依赖，并登记 `ArkDeckFakeRockchipFixture` test executable/依赖）
+  - 修改 `Packages/ArkDeckKit/Sources/ArkDeckCLI/ArkDeckCLIMain.swift`
+    `b1671da1682a877fcc2c8e7e870c43a4ce1a10b9`（移除 AI 分支的
+    `executorUnavailable`，只路由 high-level typed request；human handoff 面保持）
+  - 新增 `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipFlashExecution.swift`
+  - 新增 `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipFlashExecutionHost.swift`
+  - 新增 `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipFlashExecutionLowering.swift`
+  - 新增 `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipFlashExecutionStaging.swift`
+  - 新增 `Packages/ArkDeckKit/Tests/ArkDeckContractTests/RockchipFlashExecutionContractTests.swift`
+  - 新增 `Packages/ArkDeckKit/Tests/ArkDeckContractTests/RockchipFlashExecutionFaultContractTests.swift`
+  - 新增 `Packages/ArkDeckKit/Tests/ArkDeckFakeRockchipFixture/main.swift`
+  - 新增本 change `evidence/runs/TASK-AIN-007/**`
+- Read-only implementation inputs（不得修改；任一 blob 漂移即本 readiness 失效重查）：
+  - admission/facts/gate：`AuthorizationAdmission.swift`
+    `69fec8990c7cb68c989460ee883bbe358900cc96`、`RockchipAuthorizationFacts.swift`
+    `a5df9a5a5c496b894f59c30a0497f393c5a7fc20`、`RockchipFlashAuthorization.swift`
+    `a3fb1711271d32119db861a351ce2f2aa70c94fd`；
+  - Provider/profile/archive/discovery：`RockchipRockUSBFlashProvider.swift`
+    `8a30eb828773260d8b02b854d03a63ecf2da124f`、`RockchipFlashProfile.swift`
+    `de82a3a008b95ef63148f7c9e4374298e6671328`、`GzipTarArchiveReader.swift`
+    `36daf0eea9279790258d1ffaa1d87365cd1489d1`、`RockchipDeviceDiscovery.swift`
+    `67f585324d002f80c2682a1bdaa9ae7d11ed035a`、Rockchip integration profile
+    `433263fc3f4f15bad798758a29e77740a43ef812`；
+  - process/runtime/storage：`ArkDeckProcess.swift`
+    `b1d5f423c004f4ba15b15a8cf862ed2085d8bcc9`、`PowerActivity.swift`
+    `9d887070a21eac8140cfca236bbde29492d007a5`、`ArtifactStorage.swift`
+    `635f4da53094305dc52dff6ebdb26e1ccb026ea1`、`AuthorizationUsageLedger.swift`
+    `d87d93caf9fba52e34bdfbaa9a5eb6e16c7cc1b9`、`DurableFiles.swift`
+    `039fbb891fdc78c3cf19acc47b3f1231b9dde5c0`、`JournalEvent.swift`
+    `38759bdfd8aa749f107f1cb1f74f2dece8a4c01f`、`JournalEventValidation.swift`
+    `bfbff8430c1f5bd12745ec0847f7581165db1dca`、`JournalReplay.swift`
+    `3614aaeb5db541ca7009ef6b0c84abdef7bb1c1f`、`SessionManifest.swift`
+    `739859546298a6aa5131221beb795722f49d9df6`、`SessionLayout.swift`
+    `ed48f90a96ee239769e86727ae9272017fea72f7`、`DeviceBindingJournalAdapter.swift`
+    `b07a8c7a8b5d45e335b2ec5dc04dd18cba48dde4`；
+  - locked deltas：provider v2 `3413edf56811ac30bef833f324cbdf59cff9ce52`、journal v2
+    `6285acd4ca0350d427aa624afa91be3107769a64`、manifest v2
+    `9ac334013968a5aba1a0bd77fe2acc982ba0e680`、usage v1
+    `b232db49d2d76fc2eb96fed6b7d0230455d99345`。
 - Forbidden paths:
-  - current specs/contracts/baselines
-  - authorization 载体
-  - 真实 device/HDC/rkdeveloptool dispatch（真机仅 AIN-004）
+  - 除上列文件外的全部 `Packages/**`，尤其 Core/Process/Runtime/Storage、现行
+    Provider/Profile/admission/facts/gate/discovery；需要修改即停止并另提 scope amendment
+  - current specs/contracts/baselines、change-local contract/schema 与 authorization 载体
+  - AIN-004 evidence、hardware matrix、真实 device/HDC/rkdeveloptool/network dispatch；
+    implementation/verification 只准运行 repository-built fake descriptor executable
 - Risk:destructive semantics（实现与验证仅 fake descriptor executor，真实 dispatch=0）
 - Hardware required:no
 
-### Deliverables
+### Readiness trust and composition boundary
 
-- package-owned one-shot dispatch capability；autonomous path 不再返回 handoff strings 供外部
-  shell 执行；
-- safe image staging、固定 descriptor-bound `ld/ppt/wlx/rd` argv、每步 durable intent/outcome、
-  raw Artifact、semantic marker、critical safe cancellation、postflight/recovery；
-- Agent 环境不能直接获得 executor primitive；production 组合不能注入 caller argv/path；
-- fake 成功、exit0 semantic failure、crash windows、cancel、sleep/wake、disconnect、postflight
-  mismatch、outcomeUnknown 全覆盖。
+- public/CLI 输入只含 strict `authorizationId`、archive URL 与 target location selector；archive
+  path 只是待现场 hash/stage 的内容位置，selector 只是 cross-check。CLI flag、环境变量、工作树、
+  caller executable/tool path、argv、journal/Manifest、fact receipt 或 handoff command 均不能成为
+  authority、tool/device fact 或 dispatch primitive；继续拒绝 retired `--authorization`、
+  `--unattended-context` 及新增的 `--tool`/`--argv`/`--executable` 类注入面。
+- `RockchipFlashExecutionHost` 的 production initializer 不公开依赖注入：fresh protected-main
+  source、product-owned tool/bookmark、binding/session/storage roots、clock、power、probe 与
+  `FoundationProcessExecutor` 由 composition root 固定持有；仅 `@testable` package-internal
+  initializer 可注入 deterministic ports/fake descriptor。Agent/CLI 永远拿不到 admission、
+  prepared launch、open descriptor 或 raw executor。
+- 顺序固定为 admission(grant→facts→usage reservation)→v2 `authorizedAgent` jobCreated→gate
+  plan correlation→one-shot admission consume(validUntil/readback deadline 再验)→逐 Step durable
+  intent→descriptor-bound spawn→raw Artifact + semantic result→durable outcome→postflight→
+  terminal Manifest。任一阶段不确定即停止；reservation 不退款，未知 destructive intent 不重放。
+- `RockchipHumanHandoff` 只保留 human/diagnostic 路径；autonomous branch 不读取其 commandLines、
+  不输出可执行 handoff、不调用 host shell/sudo，也不把 `controlledHardwareLab` 或 public
+  `ProcessExecutableIdentityReceipt` 升级成 authorized-agent authority。
+
+### Closed staging, lowering and persistence
+
+- archive 只流式提取 Profile 精确列出的九个 regular members；duplicate、absolute/`..` 路径、
+  link/special member、尾随 sibling、size/hash/member-set 漂移全部在 spawn 前拒绝。staging 位于
+  owned Session root，目录/文件 owner-only；每个 image 以 no-follow descriptor 确认 inode/
+  size/hash，child 结束前保留 descriptor，argv 只出现稳定 descriptor path，不出现 caller
+  archive/member 路径。空间 claim、写入、fsync/rename/cleanup 不确定时 fail closed；crash/
+  outcomeUnknown 保留恢复所需 staging，不猜测清理。
+- typed lowering 是封闭表：Loader gate=`["ld"]`，partition-table precheck=`["ppt"]`，每个
+  `flashPartition/rockusb.wlx-write`=`["wlx", partition, stagedDescriptorPath]`（按 Provider 九分区
+  顺序），reset=`["rd"]`；`wl` fallback、未知 operation/kind/argument、额外 option 与 caller
+  argv 恒拒绝。每次 spawn 都用同一 product-pinned executable SHA-256 做
+  `executeIdentityBound`，并与 admission tool fact receipt 对同一 descriptor identity 再关联。
+- Loader 与 15-row ppt parser、每个 wlx success marker、rd marker、postflight typed readback 均
+  必须语义通过；exit 0 单独永不成功。stdout/stderr 分流写 bounded raw Artifact；Manifest 只在
+  journal replay、Artifact hash、exact plan、九个 write outcomes、reset 与 postflight 全关联后
+  原子发布。
+- 所有 external-effect Step 先 durable intent 后 launch；v2 jobCreated 与每个 destructive
+  wlx intent/outcome 携带同一 `authorizationRef`/`usageReservationId`，Manifest 的
+  authorizedAgent actor/intent set 与 journal 精确相等。fake run 只能标 contract/fake，绝不
+  产生 v3 realHardware evidence 或 hardware support 声明。
+- 首个 device Step 前取得 idle-sleep activity，直到 postflight 或稳定 recovery/terminal 全路径
+  释放；sleep/wake 只触发 durable event + reconcile。wlx 为 `criticalNonInterruptible`：取消/
+  exit 先 durable 记录，绝不 force-kill 当前 child，到 semantic safe boundary 后阻断后续 Step；
+  disconnect、identity drift、缺 outcome 或 postflight mismatch 进入 `waitingForRecovery`/
+  `outcomeUnknown`，不得标 failed/succeeded 或自动重放。
 
 ### Verification
 
-- AIN-DISPATCH-001 端到端 PASS，授权成功路径 fake process dispatch 精确等于 plan；
-- handoff/external-shell、无 grant、fact drift、usage exhausted、intent 未 durable 的 process
-  launch 恒为 0；全量 Swift + check-sdd + diff/privacy/scope 检查。
+- `TEST-AIN-DISPATCH-001`：真实 AIN-005/006 contract 类型 + repository-built fake descriptor
+  端到端；process argv 精确为 1×ld、1×ppt、9×wlx、1×rd，九个 image descriptor 的 bytes/
+  hash 对应 Profile；v2 job/intent/outcome/Manifest correlation 全 PASS；handoff/shell/sudo/
+  caller-command dispatch=0，real device/HDC/rkdeveloptool/network=0。
+- admission negatives：无 grant、伪 carrier、fact/plan/readback/tool identity drift、expired/
+  exhausted usage、capability reuse、CLI injection 全部在首个 fake spawn 前拒绝；usage 已 reserve
+  的后续失败不退款。public API/source assertion 证明外部 target 不能构造 admission、host、
+  prepared launch 或注入 executor/argv/path。
+- persistence/crash matrix：jobCreated、intent append/write/fsync、spawn 前 descriptor recheck
+  失败 → launch=0；durable intent 后/child side effect 后/outcome append/fsync/Manifest publish
+  crash → reopened state 只能是 `waitingForRecovery/outcomeUnknown`，destructive replay=0，且
+  authorization/intent correlation 不丢失。
+- semantic/recovery matrix：ld/ppt/wlx/rd 各覆盖 nonzero、exit0 缺 marker、stderr/oversize/
+  invalid UTF-8；九个 partition 中途 failure、disconnect、identity drift、postflight mismatch
+  均停止后续 dispatch并产生诚实 recovery；只有全 marker + postflight 正例可 succeeded。
+- cancellation/power/staging matrix：九个 critical window 逐一 cancel/exit，当前 child
+  force-kill=0、后续 dispatch=0、activity 全路径归零；sleep/wake、ENOSPC、archive traversal/
+  duplicate/link、stage path replacement、executable inode/hash replacement全部 fail closed。
+- readiness baseline（上述 base 实测）：macOS 26.5.2 (25F84)、Xcode 26.6 (17F113)、Swift
+  6.3.3；Swift 全量 **345 tests / 1 skipped / 0 failures**，guard **0 errors / 0 warnings /
+  111 acceptance IDs**。实现 PR 须运行新增两组焦点测试、现行 Provider/authorization/
+  process/runtime/storage/journal 回归与全量 Swift，strict format/diff/scope/privacy/no-live-
+  dispatch 审计，并在 `evidence/runs/TASK-AIN-007/` 记录命令、结果、偏差与残余风险；任务
+  completion/change verified 仍使用后续独立 PR。
