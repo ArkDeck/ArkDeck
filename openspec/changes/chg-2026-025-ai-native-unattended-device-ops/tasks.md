@@ -6,8 +6,8 @@ change approved 前保持 blocked;approved 后每任务另需独立 readiness PR
 
 ## TASK-AIN-001 — 治理文档面同步(host-only)
 
-- Status:ready
-- Candidate:2026-07-22 实现交付于本 PR(七处改写 + AIN-DOC-001 grep 复核 0 残留);done 翻转须独立 PR 复核合入版
+- Status:done
+- Done:2026-07-22;实现经 #287 合入 main(merge commit `c0d5253389faf8f9e90bceea5dd2c02fec83710b`);done recheck 于合入版 `4621a73001e53277cfb5ca0d718c76145e8f4ac9` 复验:AIN-DOC-001 grep 残留 0、guard 0/0/111;evidence = `evidence/runs/TASK-AIN-001/run.md`
 - Platform:macos
 - Requirements:Constitution POL-AGENT-002(MODIFIED,载体 constitution-delta.md)语义在非 baseline 治理文档中的同步
 - Acceptance:change-local AIN-DOC-001(文档面零残留"只能由人类执行"矛盾表述;grep 复核面见 verification.md)
