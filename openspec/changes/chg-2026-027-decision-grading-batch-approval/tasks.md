@@ -6,9 +6,38 @@
 
 ## TASK-BAP-001 — 决策分级与批次审批协议入正本(host-only,docs)
 
-- Status:blocked(双前置:① CHG-2026-027 经 approval-only PR 批准;② 独立
-  readiness PR——须钉 enforcement.md 与 AGENTS.md 的 base blob OID(全 OID)
-  并复核与在途 change 的文本零冲突)
+- Status:ready(2026-07-22 本 readiness PR;前置 ① 已满足 = approval #317
+  merge `bc4a68b4888d5018992fb5004f5fbd7216c12419`;状态仅在维护者
+  review/merge 本 PR 后生效)
+- Readiness(r1,base = main `c15814593ea3d46149e749d3a47121ea70af1cea`):
+  - Governance chain:propose #315 merge
+    `7a58b026646a3b1ed543cc5e941ddb1d1e02206f`;approval #317 merge
+    `bc4a68b4888d5018992fb5004f5fbd7216c12419`(status:approved 生效)。
+  - 待改文件 pins(实现时任一漂移即停并重做 readiness):
+
+    ```yaml pins
+    - path: openspec/governance/enforcement.md
+      blob: eeea673aa62a6dbd6c0c1c873e451de90f3c01f4
+    - path: AGENTS.md
+      blob: 096776024275057487fcf14bf574ffe18463049c
+    ```
+
+    (pins 采用 CHG-2026-028 design §3 定稿的 fenced `pins` block 结构,
+    先行实践该惯例;MECH-003 校验落地前由 review 把关。)
+  - 实现边界:enforcement.md 只在"批准语义"节 ADDED"决策分级"与"批次审批
+    协议"两小节 + header 版本 2.0.0→2.1.0,不触碰信任模型/CI 校验(sdd-guard)/
+    真实硬件与 destructive 操作/Baseline/V1 遗留清理各节既有文本;AGENTS.md
+    只在"执行规则"节追加批次协作条目(批次组织 + 判断门后零投机堆叠),
+    不动权威顺序/信任与批准/Agent 禁令各节。两文件表述与 design §0 六条
+    不变量逐条一致是合前 review 门。
+  - 竞争面:readiness 审计时(2026-07-22,base 上)zero open PR;在途
+    chg-2026-025 lane 的实现面为 Kit 文件与其 change 目录,与本任务两文件
+    零交集。本批次内 BAP-003 readiness 与本 PR 同文件(tasks.md)不同段,
+    后合者如冲突 update-branch 即可。
+  - 基线:check-sdd 于 base = 0 errors / 0 warnings / 111 acceptance IDs;
+    本任务零 Swift 面、零设备、零网络。
+  - Review boundary:本 PR 只翻转 `blocked→ready` 并登记 pins/边界;实现 PR、
+    `ready→done` 状态 PR 各自独立,均须维护者 review/merge。
 - Objective:enforcement.md"批准语义"节 ADDED"决策分级"(D0/D1/D2 定义与
   三条件判定标准,design §1)与"批次审批协议"(队列载体/digest/按序逐 PR
   合并语义/入队门/遇拒停链,design §2)两小节,版本 2.0.0 → 2.1.0;AGENTS.md
