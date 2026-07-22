@@ -80,7 +80,16 @@ struct ArkDeckCommandLine {
     let monitor = RockchipFlashDispatchMonitor()
 
     guard authority == .humanOperator, let operatorIdentity else {
-      // Agent/CI credential: fail closed before any prompt, produce the controlled handoff.
+      if options.value("--authorization") != nil {
+        // TASK-AIN-003 unattended path: a maintainer-merged standing authorization
+        // replaces the in-person operator; the gate compares it pin-by-pin.
+        try await runUnattendedExecute(
+          options: options, plan: plan, authority: authority, gate: gate,
+          provider: provider, monitor: monitor)
+        return
+      }
+      // No standing authorization: fail closed before any prompt, produce the controlled
+      // handoff naming the missing carrier.
       let decision = await gate.authorize(
         authority: authority,
         binding: bindingState(options),
@@ -95,7 +104,9 @@ struct ArkDeckCommandLine {
       print("Job marker: \(decision.jobMarker)")
       print(
         "execute requires a human operator at an interactive terminal (--operator plus a "
-          + "TTY); this run is \(authority.rawValue) and real destructive dispatch stays 0.")
+          + "TTY) or a maintainer-merged standing authorization (--authorization plus "
+          + "--unattended-context); this run is \(authority.rawValue) and real destructive "
+          + "dispatch stays 0.")
       try writeHandoff(handoff, options: options)
       exit(3)
     }
@@ -155,6 +166,87 @@ struct ArkDeckCommandLine {
     case .blockedManualConfirmationMismatch(let fields):
       print("manual confirmation mismatch (\(fields.joined(separator: ", "))); dispatch 0.")
       exit(4)
+    default:
+      exit(4)
+    }
+  }
+
+  // MARK: unattended execute (TASK-AIN-003)
+
+  static func runUnattendedExecute(
+    options: CLIOptions,
+    plan: RockchipFlashPlan,
+    authority: RockchipExecutionAuthority,
+    gate: RockchipFlashAuthorizationGate,
+    provider: RockchipRockUSBFlashProvider,
+    monitor: RockchipFlashDispatchMonitor
+  ) async throws {
+    guard let authorizationPath = options.value("--authorization") else {
+      throw CLIError(exitCode: EX_USAGE, message: "missing --authorization <AUTH-*.json>")
+    }
+    guard let contextPath = options.value("--unattended-context") else {
+      throw CLIError(
+        exitCode: EX_USAGE,
+        message: "unattended execute requires --unattended-context <context.json> "
+          + "(prior run count, durable binding revision, prerequisites, identity readback)")
+    }
+    let authorization = try RockchipStandingAuthorization.parse(
+      Data(contentsOf: URL(fileURLWithPath: authorizationPath)))
+    let contextDocument = try JSONDecoder().decode(
+      CLIUnattendedContext.self, from: Data(contentsOf: URL(fileURLWithPath: contextPath)))
+
+    let prerequisites = provider.evaluatePrerequisites(contextDocument.observations())
+    let decision = await gate.authorize(
+      authority: authority,
+      binding: bindingState(options),
+      plan: plan,
+      prerequisites: prerequisites,
+      destructiveConfirmationAccepted: false,
+      manualConfirmation: nil,
+      standingAuthorization: authorization,
+      standingContext: contextDocument.standingContext(
+        currentTimestamp: ISO8601DateFormatter().string(from: Date())),
+      monitor: monitor)
+    print("Job marker: \(decision.jobMarker)")
+
+    switch decision.outcome {
+    case .authorizedForUnattendedAgentExecution(let commandSurface, let intent):
+      // Durable intent first (POL-WORKFLOW-001), then the command surface.
+      let intentURL = outputURL(options, fileName: "arkdeck-flash-unattended-intent.json")
+      let encoder = JSONEncoder()
+      encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+      try encoder.encode(intent).write(to: intentURL, options: .atomic)
+      print("durable intent: \(intentURL.path)")
+      print("authorizationRef: \(decision.authorizationRef ?? "")")
+      try writeHandoff(commandSurface, options: options)
+      print(
+        "\nAuthorized for unattended execution. The executing run must persist the intent, "
+          + "dispatch exactly the listed commands, and record executor.kind=agent with the "
+          + "authorizationRef in the v3 evidence.")
+    case .policyBlocked(let handoff):
+      print("standing authorization not applicable for \(authority.rawValue); dispatch 0.")
+      try writeHandoff(handoff, options: options)
+      exit(3)
+    case .blockedStandingAuthorizationExpiredOrExhausted(let reason):
+      print("standing authorization expired/exhausted (\(reason)); dispatch 0.")
+      exit(4)
+    case .blockedStandingAuthorizationMismatch(let fields):
+      print(
+        "standing authorization mismatch (\(fields.joined(separator: ", "))); dispatch 0.")
+      exit(4)
+    case .blockedDeviceIdentityReadbackMismatch(let fields):
+      print(
+        "device identity readback mismatch (\(fields.joined(separator: ", "))); dispatch 0.")
+      exit(4)
+    case .blockedByPrerequisites(let violations):
+      for violation in violations {
+        print("blocked: \(violation)")
+      }
+      exit(4)
+    case .blockedTargetBindingUnconfirmed:
+      throw CLIError(
+        exitCode: EX_USAGE,
+        message: "unattended execute requires --target-location-id <usb-location>")
     default:
       exit(4)
     }
@@ -301,11 +393,15 @@ struct ArkDeckCommandLine {
         arkdeck flash plan --images <images.tar.gz> [--mode planOnly|simulated] [--out <dir>]
         arkdeck flash execute --images <images.tar.gz> --target-location-id <usb-location> \
       --operator <name> [--out <dir>]
+        arkdeck flash execute --images <images.tar.gz> --target-location-id <usb-location> \
+      --authorization <AUTH-*.json> --unattended-context <context.json> [--out <dir>]
         arkdeck flash postflight --observation <observation.json>
 
-      execute never flashes by itself: it validates the archive, shows the exact plan,
-      collects the destructive confirmations and, only for a human operator at a TTY,
-      emits a handoff document whose commands the operator runs personally.
+      execute never flashes by itself: it validates the archive, shows the exact plan and
+      ends at an authorization decision. A human operator at a TTY gets a handoff whose
+      commands they run personally; an agent credential passes only when a maintainer-
+      merged standing authorization matches the plan pin-by-pin (CHG-2026-025), producing
+      a durable intent plus the authorized command surface. Everything else fails closed.
       """
     print(usage)
   }
@@ -336,6 +432,60 @@ struct CLIOptions {
 
   func value(_ name: String) -> String? {
     values[name]
+  }
+}
+
+/// Codable carrier for the unattended-execute context (TASK-AIN-003): durable facts the
+/// gate must not guess — prior run count, current binding revision, machine-checked
+/// prerequisites and the pre-dispatch identity readback.
+struct CLIUnattendedContext: Codable {
+  struct Readback: Codable {
+    let serialDigestSHA256: String
+    let usbVendorID: UInt16
+    let usbProductID: UInt16
+    let readAtTimestamp: String
+  }
+
+  struct Prerequisites: Codable {
+    let loader: String
+    let recoveryPath: String
+    let unlocked: String
+  }
+
+  let priorRunCount: Int
+  let durableBindingRevision: Int
+  let prerequisites: Prerequisites
+  let identityReadback: Readback?
+
+  func observations() -> [RockchipPrerequisiteObservation] {
+    func status(_ raw: String) -> RockchipPrerequisiteStatus {
+      switch raw {
+      case "satisfied": return .satisfied
+      case "unsatisfied": return .unsatisfied
+      default: return .unknown  // anything unrecognized stays unknown (fail closed)
+      }
+    }
+    return [
+      RockchipPrerequisiteObservation(identifier: .loader, status: status(prerequisites.loader)),
+      RockchipPrerequisiteObservation(
+        identifier: .recoveryPath, status: status(prerequisites.recoveryPath)),
+      RockchipPrerequisiteObservation(
+        identifier: .unlocked, status: status(prerequisites.unlocked)),
+    ]
+  }
+
+  func standingContext(currentTimestamp: String) -> RockchipStandingAuthorizationContext {
+    RockchipStandingAuthorizationContext(
+      currentTimestamp: currentTimestamp,
+      priorRunCount: priorRunCount,
+      durableBindingRevision: durableBindingRevision,
+      identityReadback: identityReadback.map {
+        RockchipDeviceIdentityReadback(
+          serialDigestSHA256: $0.serialDigestSHA256,
+          usbVendorID: $0.usbVendorID,
+          usbProductID: $0.usbProductID,
+          readAtTimestamp: $0.readAtTimestamp)
+      })
   }
 }
 

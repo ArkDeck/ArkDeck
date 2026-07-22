@@ -4,8 +4,10 @@ import Foundation
 
 // TASK-RF-002. REQ-FLASH-015 Agent/CI destructive boundary and the REQ-FLASH-007/008
 // safety gates for the RockUSB Provider. Nothing in this file can dispatch a device
-// command: the only executable output is a human handoff document, and the dispatch
-// monitor exists to make the permanent zero visible in evidence.
+// command: the executable outputs are a human handoff document or, under a maintainer-
+// merged standing authorization (TASK-AIN-003, CHG-2026-025), an authorized unattended
+// command surface plus a durable intent. The dispatch monitor exists to make the
+// in-process zero visible in evidence.
 
 // MARK: - Dispatch instrumentation
 
@@ -154,7 +156,8 @@ public struct RockchipHumanHandoff: Equatable, Sendable {
 
   public static func make(
     plan: RockchipFlashPlan,
-    profile: RockchipFlashProfile
+    profile: RockchipFlashProfile,
+    noteMissingStandingAuthorization: Bool = false
   ) -> RockchipHumanHandoff {
     var commandLines: [String] = [
       "sudo rkdeveloptool ld",
@@ -165,23 +168,33 @@ public struct RockchipHumanHandoff: Equatable, Sendable {
         "sudo rkdeveloptool wlx \(partition.partitionName) \(partition.imageMemberName)")
     }
     commandLines.append("sudo rkdeveloptool rd")
-    return RockchipHumanHandoff(
-      planDigestSHA256: plan.planDigestSHA256,
-      stepSetDigestSHA256: plan.stepSetDigestSHA256,
-      commandLines: commandLines,
-      confirmationRequirements: [
-        "A human operator executes every command personally; ArkDeck and any Agent/CI "
-          + "credential never dispatch them.",
-        "Before the first real device step, a manual confirmation must exactly match this "
-          + "plan: target binding digest, firmware archive SHA-256, transport, toolchain "
-          + "fingerprint, Provider identity and step-set digest.",
+    var requirements: [String] = []
+    if noteMissingStandingAuthorization {
+      requirements.append(
+        "No valid standing authorization carrier covers this plan (CHG-2026-025): either a "
+          + "maintainer merges an AUTH-*.json readiness carrier for unattended agent "
+          + "execution, or a human operator executes the commands personally.")
+    }
+    requirements.append(contentsOf: [
+        "Execution requires either a human operator running every command personally, or a "
+          + "standing authorization approved by a maintainer-merged PR whose pins match "
+          + "this plan exactly (REQ-FLASH-015).",
+        "Before the first real device step, the authorizing record (human manual "
+          + "confirmation, or the standing authorization pins for an unattended run) must "
+          + "exactly match this plan: target identity, firmware archive SHA-256, transport, "
+          + "toolchain fingerprint, Provider identity, plan and step-set digest.",
         "`ld` must report 0x2207:0x350a Loader before anything else (mode gate).",
         "`ppt` output must match the FA-001 §2 15-row baseline before any wlx write; "
           + "the `wl <BeginSec>` fallback sector values come from the Profile, never from "
           + "manual arithmetic.",
         "Every wlx write must end with \"\(RockchipRockUSBFlashProvider.writeSuccessMarker)\" "
           + "and exit 0; any deviation stops the sequence (fail closed).",
-      ],
+    ])
+    return RockchipHumanHandoff(
+      planDigestSHA256: plan.planDigestSHA256,
+      stepSetDigestSHA256: plan.stepSetDigestSHA256,
+      commandLines: commandLines,
+      confirmationRequirements: requirements,
       recoveryPathSummary:
         "CHG-2026-016 verified Loader-mode wlx recovery route (attempt #5): re-enter Loader, "
         + "ppt baseline compare, wlx the 9 mapped partitions from a validated archive, rd.")
@@ -196,19 +209,38 @@ public enum RockchipEvidenceEligibility: String, Codable, Equatable, Sendable {
   /// The gate passed for a human operator; the human-executed run (and only it) may
   /// produce realHardware evidence.
   case humanExecutedRunMayProduceRealHardwareEvidence
+  /// The gate passed against a maintainer-merged standing authorization; the authorized
+  /// unattended run may produce realHardware evidence with executor.kind=agent and the
+  /// authorizationRef recorded (REQ-FLASH-015 / AC-FLASH-015-03).
+  case authorizedAgentRunMayProduceRealHardwareEvidence
 }
 
 public enum RockchipAuthorizationOutcome: Equatable, Sendable {
   case allowedNonExecuteBranch
   case blockedByPrerequisites([RockchipPrerequisiteViolation])
   case blockedDestructiveConfirmationDeclined
-  /// Agent/CI credential with an execute plan: Job is marked policyBlocked and a controlled
-  /// human handoff is produced (AC-FLASH-015-01).
+  /// Agent/CI credential with an execute plan and no covering standing authorization:
+  /// Job is marked policyBlocked and a controlled handoff is produced that names the
+  /// missing authorization carrier (AC-FLASH-015-01).
   case policyBlocked(handoff: RockchipHumanHandoff)
   case blockedMissingManualConfirmation
   case blockedManualConfirmationMismatch(fields: [String])
   case blockedTargetBindingUnconfirmed
+  /// Standing authorization exists but is past validUntil, over its run ceiling, or its
+  /// validity inputs are unparseable (AC-FLASH-015-02, fail closed).
+  case blockedStandingAuthorizationExpiredOrExhausted(reason: String)
+  /// Standing authorization pins differ from the plan/environment on the listed fields
+  /// (AC-FLASH-015-02).
+  case blockedStandingAuthorizationMismatch(fields: [String])
+  /// Pre-dispatch device identity readback is missing or does not match the authorized
+  /// target (AC-FLASH-015-02, machine physical-target confirmation).
+  case blockedDeviceIdentityReadbackMismatch(fields: [String])
   case authorizedForHumanExecution(handoff: RockchipHumanHandoff)
+  /// Gate pass for the unattended path (AC-FLASH-015-03): the command surface is the
+  /// same closed design §0 sequence, and the durable intent must be persisted before
+  /// the first real device step.
+  case authorizedForUnattendedAgentExecution(
+    commandSurface: RockchipHumanHandoff, intent: RockchipUnattendedExecutionIntent)
 }
 
 public struct RockchipAuthorizationDecision: Equatable, Sendable {
@@ -218,6 +250,23 @@ public struct RockchipAuthorizationDecision: Equatable, Sendable {
   /// device-binding journal adapter.
   public let jobMarker: String
   public let dispatchSnapshot: RockchipDispatchSnapshot
+  /// Set only when the decision was made under a valid standing authorization; the same
+  /// reference must appear in the durable intent and the v3 evidence record.
+  public let authorizationRef: String?
+
+  init(
+    outcome: RockchipAuthorizationOutcome,
+    evidenceEligibility: RockchipEvidenceEligibility,
+    jobMarker: String,
+    dispatchSnapshot: RockchipDispatchSnapshot,
+    authorizationRef: String? = nil
+  ) {
+    self.outcome = outcome
+    self.evidenceEligibility = evidenceEligibility
+    self.jobMarker = jobMarker
+    self.dispatchSnapshot = dispatchSnapshot
+    self.authorizationRef = authorizationRef
+  }
 }
 
 public struct RockchipFlashAuthorizationGate: Sendable {
@@ -234,12 +283,14 @@ public struct RockchipFlashAuthorizationGate: Sendable {
     prerequisites: RockchipPrerequisiteGateResult,
     destructiveConfirmationAccepted: Bool,
     manualConfirmation: RockchipManualFlashConfirmation?,
+    standingAuthorization: RockchipStandingAuthorization? = nil,
+    standingContext: RockchipStandingAuthorizationContext? = nil,
     monitor: RockchipFlashDispatchMonitor
   ) async -> RockchipAuthorizationDecision {
     let snapshot = await monitor.snapshot()
 
     guard plan.executionMode == .execute else {
-      // planOnly and simulated are the only branches an Agent/CI credential may take;
+      // planOnly and simulated are the only branches every credential may take;
       // neither contains a real dispatch path.
       return RockchipAuthorizationDecision(
         outcome: .allowedNonExecuteBranch,
@@ -249,13 +300,14 @@ public struct RockchipFlashAuthorizationGate: Sendable {
     }
 
     guard authority == .humanOperator else {
-      // Real binding plus a destructive execute plan is the canonical AC-FLASH-015-01
-      // shape, but an Agent/CI execute request fails closed even without it.
-      return RockchipAuthorizationDecision(
-        outcome: .policyBlocked(handoff: RockchipHumanHandoff.make(plan: plan, profile: profile)),
-        evidenceEligibility: .notEligible,
-        jobMarker: "policyBlocked",
-        dispatchSnapshot: snapshot)
+      return authorizeUnattended(
+        authority: authority,
+        binding: binding,
+        plan: plan,
+        prerequisites: prerequisites,
+        standingAuthorization: standingAuthorization,
+        standingContext: standingContext,
+        snapshot: snapshot)
     }
 
     if case .blockedBeforeDestructiveConfirmation(let violations) = prerequisites {
@@ -329,6 +381,84 @@ public struct RockchipFlashAuthorizationGate: Sendable {
       evidenceEligibility: .humanExecutedRunMayProduceRealHardwareEvidence,
       jobMarker: "authorizedForHumanExecution",
       dispatchSnapshot: snapshot)
+  }
+
+  /// TASK-AIN-003 unattended path (REQ-FLASH-015 / design §3). Ordinary CI never takes
+  /// this path: only a standardAgent credential with a maintainer-merged standing
+  /// authorization can pass, and every non-match fails closed with zero dispatch.
+  private func authorizeUnattended(
+    authority: RockchipExecutionAuthority,
+    binding: RockchipDeviceBindingState,
+    plan: RockchipFlashPlan,
+    prerequisites: RockchipPrerequisiteGateResult,
+    standingAuthorization: RockchipStandingAuthorization?,
+    standingContext: RockchipStandingAuthorizationContext?,
+    snapshot: RockchipDispatchSnapshot
+  ) -> RockchipAuthorizationDecision {
+    guard authority == .standardAgent,
+      let authorization = standingAuthorization,
+      let context = standingContext
+    else {
+      // AC-FLASH-015-01: no covering standing authorization (or an ordinary CI
+      // credential, which is never eligible for the unattended path).
+      return RockchipAuthorizationDecision(
+        outcome: .policyBlocked(
+          handoff: RockchipHumanHandoff.make(
+            plan: plan, profile: profile, noteMissingStandingAuthorization: true)),
+        evidenceEligibility: .notEligible,
+        jobMarker: "policyBlocked",
+        dispatchSnapshot: snapshot)
+    }
+
+    if case .blockedBeforeDestructiveConfirmation(let violations) = prerequisites {
+      return RockchipAuthorizationDecision(
+        outcome: .blockedByPrerequisites(violations),
+        evidenceEligibility: .notEligible,
+        jobMarker: "prerequisiteBlocked",
+        dispatchSnapshot: snapshot)
+    }
+
+    guard case .realDevice(let realBinding) = binding else {
+      return RockchipAuthorizationDecision(
+        outcome: .blockedTargetBindingUnconfirmed,
+        evidenceEligibility: .notEligible,
+        jobMarker: "targetBindingUnconfirmed",
+        dispatchSnapshot: snapshot)
+    }
+
+    switch RockchipStandingAuthorizationValidator.validate(
+      authorization: authorization, plan: plan, binding: realBinding, context: context)
+    {
+    case .expiredOrExhausted(let reason):
+      return RockchipAuthorizationDecision(
+        outcome: .blockedStandingAuthorizationExpiredOrExhausted(reason: reason),
+        evidenceEligibility: .notEligible,
+        jobMarker: "standingAuthorizationExpiredOrExhausted",
+        dispatchSnapshot: snapshot)
+    case .mismatch(let fields):
+      return RockchipAuthorizationDecision(
+        outcome: .blockedStandingAuthorizationMismatch(fields: fields),
+        evidenceEligibility: .notEligible,
+        jobMarker: "standingAuthorizationMismatch",
+        dispatchSnapshot: snapshot)
+    case .readbackMissingOrMismatch(let fields):
+      return RockchipAuthorizationDecision(
+        outcome: .blockedDeviceIdentityReadbackMismatch(fields: fields),
+        evidenceEligibility: .notEligible,
+        jobMarker: "deviceIdentityReadbackMismatch",
+        dispatchSnapshot: snapshot)
+    case .valid(let authorizationRef):
+      let intent = RockchipUnattendedExecutionIntent.make(
+        authorization: authorization, plan: plan, timestamp: context.currentTimestamp)
+      return RockchipAuthorizationDecision(
+        outcome: .authorizedForUnattendedAgentExecution(
+          commandSurface: RockchipHumanHandoff.make(plan: plan, profile: profile),
+          intent: intent),
+        evidenceEligibility: .authorizedAgentRunMayProduceRealHardwareEvidence,
+        jobMarker: "authorizedForUnattendedAgentExecution",
+        dispatchSnapshot: snapshot,
+        authorizationRef: authorizationRef)
+    }
   }
 }
 
