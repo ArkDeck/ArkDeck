@@ -161,19 +161,21 @@
 
 ## TASK-MECH-003 — pins 结构化全 hash 校验
 
-- Status:blocked(三前置:① approve;② TASK-MECH-002 done(同文件串行,
-  design §6);③ 独立 readiness PR——须重钉 guard 两文件基 blob 与 pins block
-  语法定稿)
+- Status:blocked(已满足:r1 approve、TASK-MECH-002 done。剩余两前置:
+  ① proposal/design r2 carrier namespace 修订经维护者 review/merge 生效;
+  ② 其后独立 readiness PR 重钉 guard 两文件基 blob 与完整 pins schema)
 - Objective:定义 fenced `pins` block 约定并入 guard 校验(design §3):
-  `blob`/`commit` 恰 40 hex、`sha256` 恰 64 hex,yaml 不可解析/长度非法即
-  具名 err;无 block 文档不校验(opt-in 收紧)、`archive/**` 豁免;
-  `openspec/templates/change/` 相关模板加 pins block 示例与"新 readiness 应
-  使用"注记(模板改写先例 = CHG-2026-025 TASK-AIN-001);合成 fixture
-  正反例测试。
+  精确 `yaml pins` 为真实 carrier,其中 `blob`/`commit` 恰 40 hex、`sha256`
+  恰 64 hex,yaml 不可解析/未知 key/长度非法/字面占位符即具名 err;
+  `yaml pin-example` 与无 block 文档不校验(opt-in 收紧)、`archive/**` 豁免;
+  `openspec/templates/change/` 相关模板加非载体示例与"实例化 readiness 时改用
+  `yaml pins` 并填完整真实值"注记(模板改写先例 = CHG-2026-025
+  TASK-AIN-001);合成 fixture 正反例测试。
 - Requirements/AC:change-local `MECH-PIN-001`(见 acceptance-cases.yaml)。
-- Depends on:approve、TASK-MECH-002 done。
+- Depends on:r1 approve、TASK-MECH-002 done、r2 carrier namespace 修订 merge。
 - In scope:guard 与其测试;change 模板 pins 示例;evidence run。
-- Out of scope:既有文档的 pins 追溯改写;prose 缩写惯例(不受限)。
+- Out of scope:既有真实 pins carrier 的追溯改写;prose 缩写惯例(不受限);
+  为 `yaml pins` 内 placeholder/截断值建立白名单。
 - Allowed paths:`scripts/check_sdd.py`、`scripts/test_check_sdd.py`、
   `openspec/templates/change/**`、本 change `evidence/**`、本 change
   `tasks.md`(仅本任务状态)。

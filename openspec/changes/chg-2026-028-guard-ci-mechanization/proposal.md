@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-028-guard-ci-mechanization
-revision: 1
-status: approved # 2026-07-22 本 approval-only PR(先例 #226/#253/#254/#281);r1 proposal 经 #316 合入 main `2382b47`;批准由维护者 review/merge 本 PR 构成
+revision: 2
+status: approved # r1 经 #318 批准;本 r2 carrier namespace 修订仅在维护者 review/merge 当前 revision PR 后生效
 class: implementation-only
 core_change_level: none
 owner: lvye
@@ -46,9 +46,11 @@ platforms: [macos]
   `revision` == acceptance-cases.yaml `change_revision` == verification.md
   header `@rN`,不一致即具名 err;合成 fixture 正反例测试(CHG-017 形态)。
 - **TASK-MECH-003 — pins 结构化全 hash 校验**:定义 fenced `pins` block 结构
-  约定(readiness/评估文档中的机器可读 pin 载体);guard 校验 block 内
-  git OID 必须 40 hex、sha256 必须 64 hex,截断即具名 err。**opt-in 收紧**:
-  无 block 的既有文档不校验、不追溯改写;新 readiness 采用 block 后截断
+  约定(readiness/评估文档中的机器可读 pin 载体);只有精确 info string
+  `yaml pins` 激活校验,文档/模板中的占位示例使用非载体 `yaml pin-example`。
+  guard 校验真实 carrier 内 git OID 必须 40 hex、sha256 必须 64 hex,截断或
+  字面占位符即具名 err,不存在 placeholder 白名单。**opt-in 收紧**:无真实
+  carrier 的既有文档不校验、不追溯改写;新 readiness 采用 carrier 后截断
   不再可能(design §3 诚实边界)。
 - **TASK-MECH-004 — PR allowed-paths diff 校验**:新 CI job(PR event):
   实现 PR 声明所属 `TASK-*`(分支名/标题/body 约定)→ 解析该任务 tasks.md
@@ -65,6 +67,8 @@ Out of scope / Non-goals:
   (CHG-2026-027 分级下的 D2),不属任何实现 PR;evidence gate 见 tasks。
 - 既有漂移的修复不混入 guard 实现 PR:实现前扫描,如有存量漂移,以漂移所属
   change 名义独立 PR 先行修复(readiness 钉扫描结果)。
+- `yaml pin-example` 只区分 schema 示例与真实 carrier,不允许在 `yaml pins`
+  carrier 内使用 `<40-hex>`/`<64-hex>` 或任何其他占位符。
 - `archive/**` 全体豁免全部新校验(归档 = 冻结历史)。
 - Core spec/contract/schema/constitution/enforcement 零改动;CORE baseline
   不升版;POL-* 原文不动。
@@ -133,3 +137,19 @@ V2 治理:本 propose PR 合入仅登记提案;批准须独立 approval-only PR;
 - 本批准不产生任务执行:四任务保持 `blocked`,各须独立 readiness PR 转
   `ready`;不构成任何 check 的 required status 翻转,亦不构成对既有 change
   文档的任何追溯改写授权。
+
+### r2 carrier namespace 修订(2026-07-23)
+
+- MECH-003 readiness 预检于 protected `main`
+  `8c50780cc716de340310a267bfd306719d0b8bd9` 发现:r1 design 用
+  `yaml pins` 展示 `<40-hex git OID>`/`<64-hex>` schema 占位符,但同一 design
+  又要求扫描所有 active `openspec/changes/**` 的 pins carrier 并拒绝非完整
+  hash;严格实现会立即破坏 0/0/111,而为占位符开白名单会放宽全 hash 门。
+- r2 只消除这项自引用歧义:精确 `yaml pins` 是真实 carrier,必须全部通过严格
+  hash/schema 校验;精确 `yaml pin-example` 是非载体 schema 示例,guard 忽略。
+  本 design 的占位示例改用后者;未来模板也以 `pin-example` 展示,实例化为真实
+  readiness 时必须同时替换 info string 与全部占位值。
+- 本 r2 不改变四任务范围、Core/Canonical AC、archive 豁免、required-status
+  边界或授权语义,不含 guard 实现,也不把 TASK-MECH-003 置 `ready`。修订仅在
+  维护者对本 revision PR exact head review/merge 后生效;其后仍须独立
+  MECH-003 readiness 重钉 guard blobs 与完整 schema。
