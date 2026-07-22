@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-028-guard-ci-mechanization
 revision: 1
-status: proposed
+status: approved # 2026-07-22 本 approval-only PR(先例 #226/#253/#254/#281);r1 proposal 经 #316 合入 main `2382b47`;批准由维护者 review/merge 本 PR 构成
 class: implementation-only
 core_change_level: none
 owner: lvye
@@ -106,3 +106,30 @@ Observable behavior before/after:
 V2 治理:本 propose PR 合入仅登记提案;批准须独立 approval-only PR;四任务
 各自独立 readiness/实现/done PR。change verified = 四 AC 有可复查证据(含
 各自 canary 红反证)+ 0/0/111 基线与 Swift 基线保持(另行 verify PR)。
+
+## Approval
+
+- r1 proposal 经 PR #316 合入 main(squash
+  `2382b47afb4a7ad2d0cb0f88e571b55b65593e61`,status:proposed,merged by
+  维护者 @lvye,2026-07-22)。本 change 是 CHG-2026-027(#315)design §6
+  预告的伴随 change,维护者指示随 027 一并推进批准。
+- 正式批准:2026-07-22 由本 approval-only PR(先例 #55/#89/#171/#195/#226/
+  #253/#254/#281)将本 change 置为 `approved`;批准由维护者 review/merge 本
+  PR 构成。merge 即批准:
+  - **四任务 scope 与边界**:TASK-MECH-001(swift-ci workflow:macOS runner
+    全量 ArkDeckKit swift test、路径感知恒运行、零 secret、App/XCUITest 不
+    覆盖如实注记)、TASK-MECH-002(guard 三方 revision 同步校验,archive
+    豁免、存量漂移先以所属 change 名义修复)、TASK-MECH-003(fenced pins
+    block 全 hash 校验,opt-in 收紧、prose 缩写不受限;blocked 于 002 done
+    同文件串行)、TASK-MECH-004(PR allowed-paths diff 校验:任务声明约定、
+    敏感面强制、解析失败 fail closed、guard-rail 非安全边界)的
+    objective/allowed-paths/验证方式;
+  - **验收共同门**:每个新 check 须 canary 红反证(只有绿证据整体 fail)、
+    0/0/111 基线前后保持、`archive/**` 零触碰;
+  - **不动面**:授权语义("CI 红 = 不能合并;CI 绿 ≠ 批准"逐字保持)、
+    required status 翻转属维护者 GitHub 设置动作不属任何实现 PR、Core
+    spec/contract/schema/constitution/enforcement 零改动、CORE baseline
+    不升版。
+- 本批准不产生任务执行:四任务保持 `blocked`,各须独立 readiness PR 转
+  `ready`;不构成任何 check 的 required status 翻转,亦不构成对既有 change
+  文档的任何追溯改写授权。
