@@ -969,19 +969,19 @@ private func validateAuthorizationCorrelation(
   usageReservationID: String?
 ) throws {
   // v1 remains a byte-for-byte compatible historical reader. Its authorization limitation is
-  // enforced by the locked v1 Manifest contract; only v2 introduces journal-level correlation.
+  // enforced by the locked v1 Manifest contract; later schemas add journal-level correlation.
   if event.schemaVersion == JournalEvent.schemaVersion { return }
   if effect == .destructive {
     if executionMode == "simulated" {
       throw DurableFileError.sequenceViolation(
-        "v2 simulated journal cannot contain destructive intent")
+        "authorized-agent simulated journal cannot contain destructive intent")
     }
     if executionAuthority == "standardAgent" {
       throw DurableFileError.sequenceViolation(
         "standardAgent journal cannot contain destructive intent")
     }
     if executionAuthority == "authorizedAgent" {
-      guard event.schemaVersion == JournalEvent.authorizedAgentSchemaVersion,
+      guard JournalEvent.supportsAuthorizationCorrelation(event.schemaVersion),
         let authorizationReference, let usageReservationID,
         event.authorizationReference == authorizationReference,
         event.usageReservationID == usageReservationID

@@ -106,6 +106,224 @@ final class SessionArtifactStorageContractTests: XCTestCase {
     print("TEST-AIN-CONTRACT-001 manifest-v2=PASS device_dispatch=0 external_process=0")
   }
 
+  func testTEST_AIN_ROCKCHIP_PERSISTENCE_001_V21IdentityRoundTripAndClosedShape()
+    async throws
+  {
+    let reference = try AuthorizationReference(
+      authorizationID: "authorization-rockchip", mainCommitOID: String(repeating: "a", count: 40),
+      authorizationBlobOID: String(repeating: "b", count: 40), approvalPRNumber: 311)
+    let arguments: [String: JSONValue] = [
+      "providerOperationId": .string("fixtureFlash"),
+      "partition": .string("system"),
+      "imageArtifactId": .string("image-rockchip"),
+      "imageSha256": .string(String(repeating: "c", count: 64)),
+      "imageSize": .integer(1),
+      "confirmationId": .string("confirmation-authorized"),
+      "safeBoundaryId": .string("safe-boundary-rockchip"),
+    ]
+    let workflowStep = try WorkflowStep(
+      id: "authorized-flash", kind: .flashPartition, declaredEffect: .destructive,
+      declaredCancellation: .criticalNonInterruptible,
+      declaredBindingRequirement: .confirmedDevice, arguments: arguments)
+    let manifestStep = try executionStep(
+      id: "authorized-flash", kind: "flashPartition", effect: "destructive",
+      cancellation: "criticalNonInterruptible", bindingRequirement: "confirmedDevice",
+      arguments: arguments, disposition: "executed", outcomeCertainty: "confirmed",
+      semanticResult: "succeeded")
+    let toolchain: [String: Any] = [
+      "kind": "rockchip",
+      "profileIdentifier": "ROCKCHIP-ROCKUSB-DISCOVERY@1.0.0",
+      "reportedVersion": "rkdeveloptool ver 1.32",
+      "sha256": "038a8a0ea26ef7eb77451789f310c0c9fbeaf43a78af1d6146e02311a9c23611",
+      "pathSource": "userSelectedSecurityScopedBookmark",
+      "descriptorIdentity": [
+        "device": 17, "inode": 29, "fileSize": 4_096, "mode": 0o100755,
+      ],
+    ]
+
+    let fixture = try await makeSession(
+      sessionID: "session-rockchip-v21", jobID: "job-rockchip-v21")
+    defer { try? FileManager.default.removeItem(at: fixture.base) }
+    let manifest = try SessionManifestDocument(
+      data: authorizedManifestData(
+        sessionID: fixture.layout.sessionID, jobID: fixture.layout.jobID,
+        step: manifestStep, reference: reference,
+        destructiveIntentEventIDs: ["rockchip-intent"],
+        schemaVersion: JournalEvent.rockchipAuthorizedAgentSchemaVersion,
+        toolchain: toolchain))
+    XCTAssertEqual(manifest.schemaVersion, "2.1.0")
+    let canonicalRoot = try jsonObject(manifest.canonicalData)
+    let canonicalToolchain = try XCTUnwrap(canonicalRoot["toolchain"] as? [String: Any])
+    XCTAssertEqual(
+      canonicalToolchain["profileIdentifier"] as? String, toolchain["profileIdentifier"] as? String)
+    XCTAssertEqual(
+      canonicalToolchain["reportedVersion"] as? String, toolchain["reportedVersion"] as? String)
+    XCTAssertEqual(canonicalToolchain["sha256"] as? String, toolchain["sha256"] as? String)
+    XCTAssertEqual(canonicalToolchain["pathSource"] as? String, toolchain["pathSource"] as? String)
+    let canonicalDescriptor = try XCTUnwrap(
+      canonicalToolchain["descriptorIdentity"] as? [String: Any])
+    XCTAssertEqual(canonicalDescriptor["device"] as? Int, 17)
+    XCTAssertEqual(canonicalDescriptor["inode"] as? Int, 29)
+    XCTAssertEqual(canonicalDescriptor["fileSize"] as? Int, 4_096)
+    XCTAssertEqual(canonicalDescriptor["mode"] as? Int, 0o100755)
+    try appendAuthorizedTerminalJournal(
+      layout: fixture.layout, manifest: manifest, workflowStep: workflowStep,
+      reference: reference, intentEventID: "rockchip-intent",
+      schemaVersion: JournalEvent.rockchipAuthorizedAgentSchemaVersion)
+    XCTAssertNoThrow(try AtomicSessionManifestPublisher(layout: fixture.layout).publish(manifest))
+
+    let (_, exportClaim) = try await admittedClaim(
+      claimID: "rockchip-v21-export", jobID: fixture.layout.jobID,
+      layout: fixture.layout, writer: .heavy)
+    let exportURL = fixture.base.appending(path: "rockchip-v21-export")
+    _ = try SessionDiagnosticExporter().export(
+      layout: fixture.layout, artifacts: [], claim: exportClaim, to: exportURL,
+      deviceIdentifierPolicy: .redact)
+    let exportedData = try Data(contentsOf: exportURL.appending(path: "manifest.json"))
+    let exported = try SessionManifestDocument(data: exportedData)
+    let exportedRoot = try jsonObject(exported.canonicalData)
+    let exportedToolchain = try XCTUnwrap(exportedRoot["toolchain"] as? [String: Any])
+    XCTAssertEqual(
+      try JSONSerialization.data(withJSONObject: exportedToolchain, options: [.sortedKeys]),
+      try JSONSerialization.data(withJSONObject: canonicalToolchain, options: [.sortedKeys]))
+    let exportedText = String(decoding: exportedData, as: UTF8.self)
+    for forbidden in ["authorizedPath", "bookmarkData", "argv", "environment", "callerLabel"] {
+      XCTAssertFalse(exportedText.contains("\"\(forbidden)\""), forbidden)
+    }
+
+    for missing in ["profileIdentifier", "reportedVersion", "sha256", "pathSource"] {
+      var root = try jsonObject(manifest.canonicalData)
+      var mutated = try XCTUnwrap(root["toolchain"] as? [String: Any])
+      mutated.removeValue(forKey: missing)
+      root["toolchain"] = mutated
+      XCTAssertThrowsError(
+        try SessionManifestDocument(data: JSONSerialization.data(withJSONObject: root)),
+        "missing \(missing) must fail closed")
+    }
+    for (field, drift) in [
+      ("profileIdentifier", "caller-profile"),
+      ("reportedVersion", "rkdeveloptool ver 9.99"),
+      ("sha256", String(repeating: "d", count: 64)),
+      ("pathSource", "explicitSupportPath"),
+    ] {
+      var root = try jsonObject(manifest.canonicalData)
+      var mutated = try XCTUnwrap(root["toolchain"] as? [String: Any])
+      mutated[field] = drift
+      root["toolchain"] = mutated
+      XCTAssertThrowsError(
+        try SessionManifestDocument(data: JSONSerialization.data(withJSONObject: root)),
+        "drifted \(field) must fail closed")
+    }
+    for (field, invalid) in [
+      ("device", 0), ("inode", 0), ("fileSize", 0), ("mode", 0),
+    ] {
+      var root = try jsonObject(manifest.canonicalData)
+      var mutated = try XCTUnwrap(root["toolchain"] as? [String: Any])
+      var descriptor = try XCTUnwrap(mutated["descriptorIdentity"] as? [String: Any])
+      descriptor[field] = invalid
+      mutated["descriptorIdentity"] = descriptor
+      root["toolchain"] = mutated
+      XCTAssertThrowsError(
+        try SessionManifestDocument(data: JSONSerialization.data(withJSONObject: root)),
+        "invalid descriptor \(field) must fail closed")
+    }
+    for missing in ["device", "inode", "fileSize", "mode"] {
+      var root = try jsonObject(manifest.canonicalData)
+      var mutated = try XCTUnwrap(root["toolchain"] as? [String: Any])
+      var descriptor = try XCTUnwrap(mutated["descriptorIdentity"] as? [String: Any])
+      descriptor.removeValue(forKey: missing)
+      mutated["descriptorIdentity"] = descriptor
+      root["toolchain"] = mutated
+      XCTAssertThrowsError(
+        try SessionManifestDocument(data: JSONSerialization.data(withJSONObject: root)),
+        "missing descriptor \(missing) must fail closed")
+    }
+    var oversizedModeRoot = try jsonObject(manifest.canonicalData)
+    var oversizedModeToolchain = try XCTUnwrap(
+      oversizedModeRoot["toolchain"] as? [String: Any])
+    var oversizedModeDescriptor = try XCTUnwrap(
+      oversizedModeToolchain["descriptorIdentity"] as? [String: Any])
+    oversizedModeDescriptor["mode"] = 4_294_967_296
+    oversizedModeToolchain["descriptorIdentity"] = oversizedModeDescriptor
+    oversizedModeRoot["toolchain"] = oversizedModeToolchain
+    XCTAssertThrowsError(
+      try SessionManifestDocument(
+        data: JSONSerialization.data(withJSONObject: oversizedModeRoot)))
+    for forbidden in ["path", "bookmarkData", "argv", "environment", "callerLabel"] {
+      var root = try jsonObject(manifest.canonicalData)
+      var mutated = try XCTUnwrap(root["toolchain"] as? [String: Any])
+      mutated[forbidden] = "forged"
+      root["toolchain"] = mutated
+      XCTAssertThrowsError(
+        try SessionManifestDocument(data: JSONSerialization.data(withJSONObject: root)),
+        "forbidden \(forbidden) must fail closed")
+    }
+    var v2Root = try jsonObject(manifest.canonicalData)
+    v2Root["schemaVersion"] = JournalEvent.authorizedAgentSchemaVersion
+    XCTAssertThrowsError(
+      try SessionManifestDocument(data: JSONSerialization.data(withJSONObject: v2Root)))
+
+    let mixedFixture = try await makeSession(
+      sessionID: "session-rockchip-mixed", jobID: "job-rockchip-mixed")
+    defer { try? FileManager.default.removeItem(at: mixedFixture.base) }
+    let journal = try FileDurableJournal(url: mixedFixture.layout.journalURL)
+    try journal.appendAndSynchronize(
+      JournalEvent.jobCreated(
+        eventID: "mixed-created", sequence: 0, sessionID: mixedFixture.layout.sessionID,
+        jobID: mixedFixture.layout.jobID, timestamp: SessionStorageFixtures.timestamp,
+        executionMode: "execute", executionAuthority: "authorizedAgent",
+        schemaVersion: JournalEvent.rockchipAuthorizedAgentSchemaVersion,
+        authorizationRef: reference, usageReservationID: "reservation-1"))
+    XCTAssertThrowsError(
+      try journal.appendAndSynchronize(
+        JournalEvent.stateTransition(
+          eventID: "mixed-preflight", sequence: 1, sessionID: mixedFixture.layout.sessionID,
+          jobID: mixedFixture.layout.jobID, timestamp: SessionStorageFixtures.timestamp,
+          from: .queued, to: .preflight, reason: "mixed schema fixture",
+          schemaVersion: JournalEvent.authorizedAgentSchemaVersion)))
+
+    let driftFixture = try await makeSession(
+      sessionID: "session-rockchip-drift", jobID: "job-rockchip-drift")
+    defer { try? FileManager.default.removeItem(at: driftFixture.base) }
+    let driftJournal = try FileDurableJournal(url: driftFixture.layout.journalURL)
+    let v21 = JournalEvent.rockchipAuthorizedAgentSchemaVersion
+    try driftJournal.appendAndSynchronize(
+      JournalEvent.jobCreated(
+        eventID: "drift-created", sequence: 0, sessionID: driftFixture.layout.sessionID,
+        jobID: driftFixture.layout.jobID, timestamp: SessionStorageFixtures.timestamp,
+        executionMode: "execute", executionAuthority: "authorizedAgent",
+        schemaVersion: v21, authorizationRef: reference,
+        usageReservationID: "reservation-1"))
+    try driftJournal.appendAndSynchronize(
+      JournalEvent.stateTransition(
+        eventID: "drift-preflight", sequence: 1, sessionID: driftFixture.layout.sessionID,
+        jobID: driftFixture.layout.jobID, timestamp: SessionStorageFixtures.timestamp,
+        from: .queued, to: .preflight, reason: "authorization drift fixture",
+        schemaVersion: v21))
+    try driftJournal.appendAndSynchronize(
+      JournalEvent.stateTransition(
+        eventID: "drift-running", sequence: 2, sessionID: driftFixture.layout.sessionID,
+        jobID: driftFixture.layout.jobID, timestamp: SessionStorageFixtures.timestamp,
+        from: .preflight, to: .running, reason: "authorization drift fixture",
+        schemaVersion: v21))
+    XCTAssertThrowsError(
+      try driftJournal.appendAndSynchronize(
+        JournalEvent.stepIntent(
+          eventID: "drift-intent", sequence: 3, sessionID: driftFixture.layout.sessionID,
+          jobID: driftFixture.layout.jobID, timestamp: SessionStorageFixtures.timestamp,
+          step: workflowStep,
+          target: JournalTarget(
+            scope: "device", targetID: "device-fixture", connectKey: "fixture-device",
+            identitySnapshotHash: String(repeating: "e", count: 64)),
+          attempt: 1, bindingRevision: 1, schemaVersion: v21,
+          authorizationRef: reference, usageReservationID: "reservation-forged")))
+
+    print(
+      "TEST-AIN-ROCKCHIP-PERSISTENCE-001 manifest=2.1.0 journal=2.1.0 "
+        + "identity=descriptor-bound "
+        + "export=non-sensitive negatives=closed-shape mixed-version=rejected dispatch=0")
+  }
+
   func testTEST_AC_ART_001_01_failedSessionPreservesJournalPartialAndManifestStatus() async throws {
     let fixture = try await makeSession()
     defer { try? FileManager.default.removeItem(at: fixture.base) }
@@ -5778,7 +5996,9 @@ extension SessionArtifactStorageContractTests {
     jobID: String,
     step: JSONValue,
     reference: AuthorizationReference,
-    destructiveIntentEventIDs: [String]
+    destructiveIntentEventIDs: [String],
+    schemaVersion: String = JournalEvent.authorizedAgentSchemaVersion,
+    toolchain: [String: Any]? = nil
   ) throws -> Data {
     var root = try jsonObject(
       SessionStorageFixtures.manifest(
@@ -5798,7 +6018,8 @@ extension SessionArtifactStorageContractTests {
             "relatedStepIds": .array([.string("authorized-flash")]),
           ])
         ]))
-    root["schemaVersion"] = "2.0.0"
+    root["schemaVersion"] = schemaVersion
+    if let toolchain { root["toolchain"] = toolchain }
     root["authorization"] = [
       "authorizationRef": authorizationReferenceObject(reference),
       "usageReservationId": "reservation-1",
@@ -5812,9 +6033,10 @@ extension SessionArtifactStorageContractTests {
     manifest: SessionManifestDocument,
     workflowStep: WorkflowStep,
     reference: AuthorizationReference,
-    intentEventID: String
+    intentEventID: String,
+    schemaVersion: String = JournalEvent.authorizedAgentSchemaVersion
   ) throws {
-    let version = JournalEvent.authorizedAgentSchemaVersion
+    let version = schemaVersion
     let journal = try FileDurableJournal(url: layout.journalURL)
     try journal.appendAndSynchronize(
       JournalEvent.jobCreated(

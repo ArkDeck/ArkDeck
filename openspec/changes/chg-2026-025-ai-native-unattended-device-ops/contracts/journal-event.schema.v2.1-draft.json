@@ -1,0 +1,155 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://arkdeck.dev/schemas/journal-event-2.1.0-draft.json",
+  "title": "ArkDeck Journal Event v2.1 (change-local draft)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "eventId", "sequence", "sessionId", "jobId", "timestamp", "kind", "payload"],
+  "properties": {
+    "schemaVersion": { "const": "2.1.0" },
+    "eventId": { "type": "string", "minLength": 1 },
+    "sequence": { "type": "integer", "minimum": 0 },
+    "sessionId": { "type": "string", "minLength": 1 },
+    "jobId": { "type": "string", "minLength": 1 },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "accumulatedElapsedDurationNanoseconds": { "type": ["integer", "null"], "minimum": 0 },
+    "accumulatedActiveDurationNanoseconds": { "type": ["integer", "null"], "minimum": 0 },
+    "kind": { "$ref": "../../../contracts/journal-event.schema.json#/$defs/eventKind" },
+    "stepId": { "type": ["string", "null"], "minLength": 1 },
+    "attempt": { "type": ["integer", "null"], "minimum": 1 },
+    "bindingRevision": { "type": ["integer", "null"], "minimum": 1 },
+    "argumentsHash": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
+    "payload": { "type": "object" }
+  },
+  "oneOf": [
+    { "$ref": "#/$defs/jobCreatedEvent" },
+    { "$ref": "#/$defs/stepIntentEvent" },
+    { "$ref": "#/$defs/stepOutcomeEvent" },
+    { "$ref": "../../../contracts/journal-event.schema.json#/$defs/stateTransitionEvent" },
+    { "$ref": "../../../contracts/journal-event.schema.json#/$defs/compensationIntentEvent" },
+    { "$ref": "../../../contracts/journal-event.schema.json#/$defs/compensationOutcomeEvent" },
+    { "$ref": "../../../contracts/journal-event.schema.json#/$defs/bindingCandidateEvent" },
+    { "$ref": "../../../contracts/journal-event.schema.json#/$defs/bindingConfirmedEvent" },
+    { "$ref": "../../../contracts/journal-event.schema.json#/$defs/bindingRejectedEvent" },
+    { "$ref": "../../../contracts/journal-event.schema.json#/$defs/serverGenerationChangedEvent" },
+    { "$ref": "../../../contracts/journal-event.schema.json#/$defs/sleepEvent" },
+    { "$ref": "../../../contracts/journal-event.schema.json#/$defs/wakeEvent" },
+    { "$ref": "../../../contracts/journal-event.schema.json#/$defs/reconcileStartedEvent" },
+    { "$ref": "../../../contracts/journal-event.schema.json#/$defs/reconcileOutcomeEvent" },
+    { "$ref": "../../../contracts/journal-event.schema.json#/$defs/abandonIntentEvent" },
+    { "$ref": "../../../contracts/journal-event.schema.json#/$defs/abandonOutcomeEvent" },
+    { "$ref": "../../../contracts/journal-event.schema.json#/$defs/warningEvent" },
+    { "$ref": "../../../contracts/journal-event.schema.json#/$defs/errorEvent" },
+    { "$ref": "../../../contracts/journal-event.schema.json#/$defs/finalizedEvent" }
+  ],
+  "$defs": {
+    "gitOID": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "authorizationRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["authorizationId", "mainCommitOID", "authorizationBlobOID", "approvalPRNumber"],
+      "properties": {
+        "authorizationId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+        "mainCommitOID": { "$ref": "#/$defs/gitOID" },
+        "authorizationBlobOID": { "$ref": "#/$defs/gitOID" },
+        "approvalPRNumber": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "jobCreatedEvent": {
+      "properties": {
+        "kind": { "const": "jobCreated" },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["executionMode", "executionAuthority", "initialState", "coreBaseline"],
+          "properties": {
+            "executionMode": { "enum": ["execute", "planOnly", "simulated"] },
+            "executionAuthority": { "enum": ["interactiveUser", "standardAgent", "controlledHardwareLab", "authorizedAgent"] },
+            "initialState": { "const": "queued" },
+            "coreBaseline": { "type": "string", "pattern": "^CORE-[0-9]+\\.[0-9]+\\.[0-9]+$" },
+            "authorizationRef": { "$ref": "#/$defs/authorizationRef" },
+            "usageReservationId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": { "executionAuthority": { "const": "authorizedAgent" } },
+                "required": ["executionAuthority"]
+              },
+              "then": { "required": ["authorizationRef", "usageReservationId"] },
+              "else": {
+                "not": {
+                  "anyOf": [
+                    { "required": ["authorizationRef"] },
+                    { "required": ["usageReservationId"] }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "stepIntentPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["step", "target"],
+      "properties": {
+        "step": { "$ref": "https://arkdeck.dev/schemas/workflow-step-1.0.0.json#/$defs/workflowStep" },
+        "target": { "$ref": "../../../contracts/journal-event.schema.json#/$defs/target" },
+        "authorizationRef": { "$ref": "#/$defs/authorizationRef" },
+        "usageReservationId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" }
+      },
+      "dependentRequired": {
+        "authorizationRef": ["usageReservationId"],
+        "usageReservationId": ["authorizationRef"]
+      }
+    },
+    "stepIntentEvent": {
+      "required": ["stepId", "attempt", "bindingRevision", "argumentsHash"],
+      "properties": {
+        "kind": { "const": "stepIntent" },
+        "stepId": { "type": "string", "minLength": 1 },
+        "attempt": { "type": "integer", "minimum": 1 },
+        "bindingRevision": { "type": ["integer", "null"], "minimum": 1 },
+        "argumentsHash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "payload": { "$ref": "#/$defs/stepIntentPayload" }
+      }
+    },
+    "stepOutcomePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["correlatesToIntentEventId", "result", "outcomeCertainty"],
+      "properties": {
+        "correlatesToIntentEventId": { "type": "string", "minLength": 1 },
+        "result": { "enum": ["succeeded", "failed", "cancelled", "timedOut"] },
+        "outcomeCertainty": { "$ref": "../../../contracts/journal-event.schema.json#/$defs/outcomeCertainty" },
+        "semanticCode": { "type": ["string", "null"] },
+        "summary": { "type": ["string", "null"] },
+        "authorizationRef": { "$ref": "#/$defs/authorizationRef" },
+        "usageReservationId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" }
+      },
+      "dependentRequired": {
+        "authorizationRef": ["usageReservationId"],
+        "usageReservationId": ["authorizationRef"]
+      }
+    },
+    "stepOutcomeEvent": {
+      "required": ["stepId", "attempt"],
+      "properties": {
+        "kind": { "const": "stepOutcome" },
+        "stepId": { "type": "string", "minLength": 1 },
+        "attempt": { "type": "integer", "minimum": 1 },
+        "payload": { "$ref": "#/$defs/stepOutcomePayload" }
+      }
+    }
+  },
+  "x-arkdeck-semantic-invariants": [
+    "all events in one Session use exactly one schemaVersion",
+    "authorizedAgent destructive stepIntent carries the exact jobCreated authorizationRef and usageReservationId",
+    "the matching stepOutcome carries the exact intent correlation and authorization pair",
+    "a simulated v2.1 Session cannot contain a destructive stepIntent",
+    "non-destructive and non-authorized events cannot borrow authorization correlation",
+    "v1 historical events remain governed by journal-event.schema.json and are never upgraded in place"
+  ]
+}
