@@ -1,0 +1,426 @@
+{
+  "boundary": "controlled trace probe/minimal-capture; observed-only; not a support/compatibility claim; classified controlledHumanCapture — a registry/golden registration of record happens only through the maintainer-reviewed TR-001 evidence PR; serial-bearing and raw trace bytes remain in this controlled non-repository location",
+  "captureGate": {
+    "gateDir": "~/tr001-capture/2026-07-22/probe",
+    "helpTokensEvidenced": [
+      "-t",
+      "-b",
+      "-o"
+    ],
+    "probeCommandCount": 9,
+    "probeHdcSha256": "48395ba8d87115dffca47df2a640a6c868bc9a2bd4eb49611e4138ff88d8d260",
+    "probeManifestSha256": "6078243a9f62f0fd532a525e35ba1b1d339ea274bda04506e1ee3b56cb6ea1c7",
+    "probeTargetMatched": true,
+    "tagEvidenced": "sched"
+  },
+  "captureOutcome": "receivedNonEmptyCleanupComplete",
+  "change": "CHG-2026-021-trace-adapter-capture",
+  "commands": [
+    {
+      "argv": [
+        "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/toolchains/hdc",
+        "-t",
+        "<connectkey>",
+        "shell",
+        "mkdir",
+        "-p",
+        "/data/local/tmp/arkdeck/ab33cebd-fa36-47c5-a699-99d68a9d0da1"
+      ],
+      "commandId": "trace-remote-mkdir",
+      "deviceWrite": true,
+      "durationMs": 132,
+      "exitCode": 0,
+      "purpose": "create the owned UUID-isolated remote trace directory",
+      "selfCheck": {
+        "passed": true,
+        "stderr": {
+          "keyMaterialFound": false,
+          "passed": true,
+          "serialPresent": false,
+          "userPathFound": false
+        },
+        "stdout": {
+          "keyMaterialFound": false,
+          "passed": true,
+          "serialPresent": false,
+          "userPathFound": false
+        }
+      },
+      "stderr": {
+        "bytes": 0,
+        "file": "00-trace-remote-mkdir.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "truncated": false
+      },
+      "stdout": {
+        "bytes": 0,
+        "file": "00-trace-remote-mkdir.stdout",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "truncated": false
+      },
+      "timedOut": false
+    },
+    {
+      "argv": [
+        "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/toolchains/hdc",
+        "-t",
+        "<connectkey>",
+        "shell",
+        "ls",
+        "-l",
+        "/data/local/tmp/arkdeck/ab33cebd-fa36-47c5-a699-99d68a9d0da1/minimal.ftrace"
+      ],
+      "commandId": "trace-remote-stat",
+      "deviceWrite": false,
+      "durationMs": 127,
+      "exitCode": 0,
+      "purpose": "owned trace file inventory (harness-generated UUID path; pre/post capture)",
+      "selfCheck": {
+        "passed": true,
+        "stderr": {
+          "keyMaterialFound": false,
+          "passed": true,
+          "serialPresent": false,
+          "userPathFound": false
+        },
+        "stdout": {
+          "keyMaterialFound": false,
+          "passed": true,
+          "serialPresent": false,
+          "userPathFound": false
+        }
+      },
+      "stderr": {
+        "bytes": 0,
+        "file": "01-trace-remote-stat.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "truncated": false
+      },
+      "stdout": {
+        "bytes": 107,
+        "file": "01-trace-remote-stat.stdout",
+        "sha256": "f5bc0e0b3539fc2b446933cd66f9060bf70f7325f384e4f89e44d833ebc197ac",
+        "truncated": false
+      },
+      "timedOut": false
+    },
+    {
+      "argv": [
+        "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/toolchains/hdc",
+        "-t",
+        "<connectkey>",
+        "shell",
+        "hitrace",
+        "-t",
+        "5",
+        "-b",
+        "2048",
+        "sched",
+        "-o",
+        "/data/local/tmp/arkdeck/ab33cebd-fa36-47c5-a699-99d68a9d0da1/minimal.ftrace"
+      ],
+      "commandId": "hitrace-capture-minimal",
+      "deviceWrite": true,
+      "durationMs": 5651,
+      "exitCode": 0,
+      "purpose": "minimal 5s sched-tag capture to the owned remote file (argv is the pre-declared candidate; execution requires the help-anchored gate)",
+      "selfCheck": {
+        "passed": true,
+        "stderr": {
+          "keyMaterialFound": false,
+          "passed": true,
+          "serialPresent": false,
+          "userPathFound": false
+        },
+        "stdout": {
+          "keyMaterialFound": false,
+          "passed": true,
+          "serialPresent": false,
+          "userPathFound": false
+        }
+      },
+      "stderr": {
+        "bytes": 0,
+        "file": "02-hitrace-capture-minimal.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "truncated": false
+      },
+      "stdout": {
+        "bytes": 268,
+        "file": "02-hitrace-capture-minimal.stdout",
+        "sha256": "6070bb0b3d804313449a43e92e570b5e34415cb731ec43ded91b4a3796d99723",
+        "truncated": false
+      },
+      "timedOut": false
+    },
+    {
+      "argv": [
+        "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/toolchains/hdc",
+        "-t",
+        "<connectkey>",
+        "shell",
+        "ls",
+        "-l",
+        "/data/local/tmp/arkdeck/ab33cebd-fa36-47c5-a699-99d68a9d0da1/minimal.ftrace"
+      ],
+      "commandId": "trace-remote-stat",
+      "deviceWrite": false,
+      "durationMs": 134,
+      "exitCode": 0,
+      "purpose": "owned trace file inventory (harness-generated UUID path; pre/post capture)",
+      "selfCheck": {
+        "passed": true,
+        "stderr": {
+          "keyMaterialFound": false,
+          "passed": true,
+          "serialPresent": false,
+          "userPathFound": false
+        },
+        "stdout": {
+          "keyMaterialFound": false,
+          "passed": true,
+          "serialPresent": false,
+          "userPathFound": false
+        }
+      },
+      "stderr": {
+        "bytes": 0,
+        "file": "03-trace-remote-stat.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "truncated": false
+      },
+      "stdout": {
+        "bytes": 124,
+        "file": "03-trace-remote-stat.stdout",
+        "sha256": "556c8c907d66f149235bdb6541a24fd6a8b802d8ae17df3451e0fa388e65e37d",
+        "truncated": false
+      },
+      "timedOut": false
+    },
+    {
+      "argv": [
+        "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/toolchains/hdc",
+        "-t",
+        "<connectkey>",
+        "file",
+        "recv",
+        "/data/local/tmp/arkdeck/ab33cebd-fa36-47c5-a699-99d68a9d0da1/minimal.ftrace",
+        "~/tr001-capture/2026-07-22/capture/minimal.ftrace"
+      ],
+      "commandId": "trace-recv-minimal",
+      "deviceWrite": true,
+      "durationMs": 79,
+      "exitCode": 0,
+      "purpose": "receive the owned trace file into the controlled out-dir",
+      "receivedFile": {
+        "bytes": 1058246,
+        "file": "minimal.ftrace",
+        "present": true,
+        "selfCheck": {
+          "keyMaterialFound": false,
+          "passed": true,
+          "serialPresent": false,
+          "userPathFound": false
+        },
+        "sha256": "6227b5bb0685a2c5c3cd647c6f92bd71da2106ff55e34056cc72c7486b78c21e"
+      },
+      "selfCheck": {
+        "passed": true,
+        "stderr": {
+          "keyMaterialFound": false,
+          "passed": true,
+          "serialPresent": false,
+          "userPathFound": false
+        },
+        "stdout": {
+          "keyMaterialFound": false,
+          "passed": true,
+          "serialPresent": false,
+          "userPathFound": false
+        }
+      },
+      "stderr": {
+        "bytes": 0,
+        "file": "04-trace-recv-minimal.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "truncated": false
+      },
+      "stdout": {
+        "bytes": 79,
+        "file": "04-trace-recv-minimal.stdout",
+        "sha256": "718906062c7d75530541990fdc41b31255c7e64fa46a4843efbb24321a6c625f",
+        "truncated": false
+      },
+      "timedOut": false
+    },
+    {
+      "argv": [
+        "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/toolchains/hdc",
+        "-t",
+        "<connectkey>",
+        "shell",
+        "rm",
+        "/data/local/tmp/arkdeck/ab33cebd-fa36-47c5-a699-99d68a9d0da1/minimal.ftrace"
+      ],
+      "commandId": "trace-remote-rm",
+      "deviceWrite": true,
+      "durationMs": 134,
+      "exitCode": 0,
+      "purpose": "remove exactly the owned UUID-isolated trace file (no wildcard)",
+      "selfCheck": {
+        "passed": true,
+        "stderr": {
+          "keyMaterialFound": false,
+          "passed": true,
+          "serialPresent": false,
+          "userPathFound": false
+        },
+        "stdout": {
+          "keyMaterialFound": false,
+          "passed": true,
+          "serialPresent": false,
+          "userPathFound": false
+        }
+      },
+      "stderr": {
+        "bytes": 0,
+        "file": "05-trace-remote-rm.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "truncated": false
+      },
+      "stdout": {
+        "bytes": 0,
+        "file": "05-trace-remote-rm.stdout",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "truncated": false
+      },
+      "timedOut": false
+    },
+    {
+      "argv": [
+        "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/toolchains/hdc",
+        "-t",
+        "<connectkey>",
+        "shell",
+        "ls",
+        "-l",
+        "/data/local/tmp/arkdeck/ab33cebd-fa36-47c5-a699-99d68a9d0da1/minimal.ftrace"
+      ],
+      "commandId": "trace-remote-stat",
+      "deviceWrite": false,
+      "durationMs": 134,
+      "exitCode": 0,
+      "purpose": "owned trace file inventory (harness-generated UUID path; pre/post capture)",
+      "selfCheck": {
+        "passed": true,
+        "stderr": {
+          "keyMaterialFound": false,
+          "passed": true,
+          "serialPresent": false,
+          "userPathFound": false
+        },
+        "stdout": {
+          "keyMaterialFound": false,
+          "passed": true,
+          "serialPresent": false,
+          "userPathFound": false
+        }
+      },
+      "stderr": {
+        "bytes": 0,
+        "file": "06-trace-remote-stat.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "truncated": false
+      },
+      "stdout": {
+        "bytes": 107,
+        "file": "06-trace-remote-stat.stdout",
+        "sha256": "f5bc0e0b3539fc2b446933cd66f9060bf70f7325f384e4f89e44d833ebc197ac",
+        "truncated": false
+      },
+      "timedOut": false
+    },
+    {
+      "argv": [
+        "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/toolchains/hdc",
+        "-t",
+        "<connectkey>",
+        "shell",
+        "rmdir",
+        "/data/local/tmp/arkdeck/ab33cebd-fa36-47c5-a699-99d68a9d0da1"
+      ],
+      "commandId": "trace-remote-rmdir",
+      "deviceWrite": true,
+      "durationMs": 136,
+      "exitCode": 0,
+      "purpose": "remove the owned UUID directory only when empty (rmdir refuses otherwise)",
+      "selfCheck": {
+        "passed": true,
+        "stderr": {
+          "keyMaterialFound": false,
+          "passed": true,
+          "serialPresent": false,
+          "userPathFound": false
+        },
+        "stdout": {
+          "keyMaterialFound": false,
+          "passed": true,
+          "serialPresent": false,
+          "userPathFound": false
+        }
+      },
+      "stderr": {
+        "bytes": 0,
+        "file": "07-trace-remote-rmdir.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "truncated": false
+      },
+      "stdout": {
+        "bytes": 0,
+        "file": "07-trace-remote-rmdir.stdout",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "truncated": false
+      },
+      "timedOut": false
+    }
+  ],
+  "deviceWriteEnabled": true,
+  "evidenceClass": "controlledHumanCapture",
+  "host": {
+    "arch": "arm64",
+    "os": "Darwin",
+    "osVersion": "26.5.2"
+  },
+  "receiveVerification": {
+    "nonEmptySelfChecked": true
+  },
+  "remoteCleanup": {
+    "attempts": [
+      {
+        "commandId": "trace-remote-rm",
+        "completed": true
+      },
+      {
+        "commandId": "trace-remote-rmdir",
+        "completed": true
+      }
+    ],
+    "complete": true,
+    "eligible": true,
+    "retainedReason": null
+  },
+  "remoteOwnedSurface": {
+    "directory": "/data/local/tmp/arkdeck/ab33cebd-fa36-47c5-a699-99d68a9d0da1",
+    "file": "/data/local/tmp/arkdeck/ab33cebd-fa36-47c5-a699-99d68a9d0da1/minimal.ftrace",
+    "runId": "ab33cebd-fa36-47c5-a699-99d68a9d0da1"
+  },
+  "schema": "arkdeck-trace-capture-redacted-1.1.0",
+  "selfCheckPassed": true,
+  "targetConnectkeyProvided": true,
+  "task": "TASK-TR-001",
+  "toolchain": {
+    "hdcPath": "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/toolchains/hdc",
+    "hdcSha256": "48395ba8d87115dffca47df2a640a6c868bc9a2bd4eb49611e4138ff88d8d260",
+    "transport": "usb"
+  }
+}

@@ -18,6 +18,11 @@ blocked-attempt。
    逐流 size/hash 与敏感自检,再要求 hitrace help/tag 字节对 capture argv 用到的
    `-t`/`-b`/`-o` 与 `sched` tag 逐一有据。任一缺失即拒——预声明 argv 只能由
    设备自己的 help 面授权,不允许现场改 argv或拿旧目录/另一设备的 probe 代替。
+4. **cleanup receipt gate(schema 1.2.0+)**:exit 0 不构成成功。hitrace stdout 必须
+   按序包含已登记的 start/capture-done/read-done/TraceFinish marker,read-done path
+   必须等于 owned UUID file；post-capture `ls -l` 必须产生该 exact regular-file 的
+   正数 byte receipt；recv bytes 必须与 receipt 相等且匹配已登记 ftrace header。
+   任一不满足均保留 remote file/dir,cleanup dispatch=0。
 
 ## 身份门(窗口开始前)
 
@@ -67,15 +72,17 @@ python3 capture.py --hdc "<HDC>" --out-dir ~/tr001-capture/<date>/capture \
 固定序列使用 harness 生成的 canonical UUID owned 面
 `/data/local/tmp/arkdeck/<uuid>/minimal.ftrace`:mkdir → stat(pre)→
 `hitrace -t 5 -b 2048 sched -o <owned-file>` → stat(post)→ `file recv` 到 out-dir
-→ 仅在 received file 非空、未截断且敏感自检通过后 rm(精确文件)→ stat(absent
-复查)→ rmdir(空目录才成功)。UUID/path 由 harness 生成,操作者不可提供。
+→ 仅在 marker/path、remote/local size、registered header 与敏感自检全部通过后
+rm(精确文件)→ stat(absent 复查)→ rmdir(空目录才成功)。UUID/path 由 harness 生成,
+操作者不可提供。
 
 - gate 失败(help 无 `-t`/`-b`/`-o` 或 tag 表无 `sched`):**STOP**,记
   blocked-attempt——这是"该 build 的 hitrace 面与候选 argv 不符"的一手事实,交
   Agent 起草 registry 修订,不现场换 flag/换 tag;
 - capture 为 deviceMutation 级(写 owned tmp 文件;不 set 任何参数、不碰
   已有分区/数据);任何非序列内输出形态 → 停手保留现场;
-- receive 缺失/空/截断/敏感自检失败时,harness 不 dispatch rm/rmdir,manifest
+- receive 缺失/空/remote-size 不等/格式未登记/敏感自检失败,或 capture semantic
+  marker/path 不匹配时,harness 不 dispatch rm/rmdir,manifest
   记录 `partialRemoteRetained`;不要手工清理,按 blocked/partial attempt 收档;
 - recv 后的 `minimal.ftrace` 留在 out-dir(仓库外 0600);其内容(进程名等设备侧
   信息)不回贴、不入仓——registry/golden 的入仓由 TR-001 evidence PR 经维护者

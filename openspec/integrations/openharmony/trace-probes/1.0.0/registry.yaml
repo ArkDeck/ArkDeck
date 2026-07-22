@@ -1,0 +1,200 @@
+{
+  "schemaVersion": "1.0.0",
+  "serializationFormat": "json-compatible-yaml-1.2",
+  "registryId": "OPENHARMONY-TRACE-PROBES",
+  "registryVersion": "1.0.0",
+  "integrationProfile": "OPENHARMONY-TOOLS@0.4.0",
+  "registeredBy": "CHG-2026-021-trace-adapter-capture/TASK-TR-001",
+  "acceptanceState": "candidateUntilMaintainerReviewAndMerge",
+  "unknownFamilyDisposition": "unsupported",
+  "toolContext": {
+    "platform": "macos",
+    "hostOS": "26.5.2",
+    "hostArch": "arm64",
+    "deviceFamily": "DAYU200",
+    "firmware": "OpenHarmony 7.0.0.34",
+    "transport": "usb",
+    "hdcReportedVersion": "3.2.0d",
+    "hdcExecutableSHA256": "48395ba8d87115dffca47df2a640a6c868bc9a2bd4eb49611e4138ff88d8d260"
+  },
+  "bindingPolicy": {
+    "executable": "selected HDC toolchain snapshot",
+    "targetToken": "<durableConnectKey>",
+    "targetSource": "current durable DeviceBindingReference",
+    "replacementOrRevisionDriftDisposition": "unsupported",
+    "defaultTargetAllowed": false,
+    "serverLifecycleAuthority": "none",
+    "mayKillHDCServer": false
+  },
+  "capabilityMatrix": [
+    {
+      "tool": "hitrace",
+      "family": "hitrace.dayu200-oh7.text-v1",
+      "help": "registered",
+      "tagList": "registered",
+      "minimalCapture": "registered",
+      "adapterSelection": "eligible",
+      "selectionReason": "The exact help/tag family and a non-empty minimal capture with registered semantic markers and ftrace header were all observed in the same controlled window.",
+      "duration": {"supported": true, "flag": "-t", "unit": "seconds"},
+      "buffer": {"supported": true, "flag": "-b", "unit": "KB as spelled by this registered help family"},
+      "output": {"supported": true, "flag": "-o", "ownedPathRequired": true},
+      "beginFinish": {"supported": true, "flags": ["--trace_begin", "--trace_finish", "--trace_finish_nodump"]},
+      "reliableByteTotalAvailable": false,
+      "registeredTags": [
+        "ability", "accesscontrol", "accessibility", "account", "ace", "animation", "app", "ark", "binder", "bluetooth", "cloud", "commercial", "commonlibrary", "daudio", "dcamera", "deviceauth", "devicemanager", "deviceprofile", "dhfwk", "dinput", "disk", "distributeddatamgr", "dlpcre", "drm", "dsched", "dscreen", "dslm", "dsoftbus", "erofs", "ffrt", "filemanagement", "freq", "graphic", "gresource", "hdcd", "hdf", "hmfs", "huks", "i2c", "idle", "interconn", "ipa", "irq", "irqoff", "load", "mdfs", "membus", "memory", "memreclaim", "misc", "mmc", "msdp", "multimodalinput", "musl", "net", "notification", "nweb", "ohos", "pagecache", "power", "preemptoff", "push", "regulators", "rpc", "samgr", "sched", "schedlt", "security", "sensors", "sync", "ufs", "usb", "useriam", "virse", "window", "workq", "zaudio", "zbinder", "zcamera", "zimage", "zmedia"
+      ]
+    },
+    {
+      "tool": "bytrace",
+      "family": "bytrace.dayu200-oh7.text-v1",
+      "help": "registered",
+      "tagList": "registered",
+      "minimalCapture": "unregistered",
+      "adapterSelection": "probeOnlyNotCaptureEligible",
+      "selectionReason": "The help and tag-list family was observed, but no bytrace capture was executed; tool-name similarity and exit code cannot supply capture authority.",
+      "duration": {"supported": true, "flag": "-t", "unit": "seconds", "authority": "configurationProbeOnly"},
+      "buffer": {"supported": true, "flag": "-b", "unit": "KB as spelled by this registered help family", "authority": "configurationProbeOnly"},
+      "output": {"supported": true, "flag": "-o", "authority": "configurationProbeOnly"},
+      "beginFinish": {"supported": true, "flags": ["--trace_begin", "--trace_finish", "--trace_finish_nodump"], "authority": "configurationProbeOnly"},
+      "reliableByteTotalAvailable": false,
+      "registeredTagsSource": "tr001-bytrace-tags-dayu200-oh7"
+    }
+  ],
+  "entries": [
+    {
+      "id": "tr001-hitrace-help-long-dayu200-oh7",
+      "tool": "hitrace",
+      "intent": "helpFamilyProbe",
+      "status": "registered",
+      "exactArgv": ["-t", "<durableConnectKey>", "shell", "hitrace", "--help"],
+      "effectClassification": "readOnly",
+      "timeout": {"milliseconds": 60000, "resultOnExpiry": "timedOutUnknown"},
+      "judgement": {
+        "exitCodeAloneIsSuccess": false,
+        "stream": "stdout",
+        "stderrMustBeEmpty": true,
+        "requiredOrderedMarkers": ["hitrace enter, running_state is SHOW_HELP", "usage: hitrace [options] [categories...]", "-b N", "-t N", "-o filename"],
+        "timestampPrefixPolicy": "Ignore only the leading YYYY/MM/DD HH:MM:SS token pair on the registered enter line.",
+        "goldenResource": "tr001-hitrace-help-dayu200-oh7",
+        "unregisteredShape": "unknown"
+      },
+      "authority": {
+        "mayEstablish": ["the registered hitrace help family", "advertised flags for configuration"],
+        "neverEstablish": ["capture success", "device identity", "parameter write authority", "support outside this exact tool/device context"]
+      },
+      "cancellation": {"result": "cancelledUnknown", "mayTerminateOwnedClientProcess": true, "mayKillHDCServer": false}
+    },
+    {
+      "id": "tr001-hitrace-help-short-dayu200-oh7",
+      "tool": "hitrace",
+      "intent": "helpFamilyProbe",
+      "status": "registered",
+      "exactArgv": ["-t", "<durableConnectKey>", "shell", "hitrace", "-h"],
+      "effectClassification": "readOnly",
+      "timeout": {"milliseconds": 60000, "resultOnExpiry": "timedOutUnknown"},
+      "judgement": {"exitCodeAloneIsSuccess": false, "stream": "stdout", "stderrMustBeEmpty": true, "byteIdenticalTo": "tr001-hitrace-help-long-dayu200-oh7", "goldenResource": "tr001-hitrace-help-dayu200-oh7", "unregisteredShape": "unknown"},
+      "authority": {"mayEstablish": ["the same registered hitrace help family as --help"], "neverEstablish": ["capture success", "device identity", "support outside this exact tool/device context"]},
+      "cancellation": {"result": "cancelledUnknown", "mayTerminateOwnedClientProcess": true, "mayKillHDCServer": false}
+    },
+    {
+      "id": "tr001-hitrace-tag-list-dayu200-oh7",
+      "tool": "hitrace",
+      "intent": "tagCapabilityProbe",
+      "status": "registered",
+      "exactArgv": ["-t", "<durableConnectKey>", "shell", "hitrace", "-l"],
+      "effectClassification": "readOnly",
+      "timeout": {"milliseconds": 60000, "resultOnExpiry": "timedOutUnknown"},
+      "judgement": {"exitCodeAloneIsSuccess": false, "stream": "stdout", "stderrMustBeEmpty": true, "requiredOrderedMarkers": ["hitrace enter, running_state is SHOW_LIST_CATEGORY", "tagName:   description:", "sched - CPU Scheduling"], "goldenResource": "tr001-hitrace-tags-dayu200-oh7", "unregisteredShape": "unknown"},
+      "authority": {"mayEstablish": ["only the exact tag names parsed from this registered family"], "neverEstablish": ["unlisted tags", "capture success", "parameter capability", "support outside this exact tool/device context"]},
+      "cancellation": {"result": "cancelledUnknown", "mayTerminateOwnedClientProcess": true, "mayKillHDCServer": false}
+    },
+    {
+      "id": "tr001-bytrace-help-long-dayu200-oh7",
+      "tool": "bytrace",
+      "intent": "helpFamilyProbe",
+      "status": "registeredProbeOnly",
+      "exactArgv": ["-t", "<durableConnectKey>", "shell", "bytrace", "--help"],
+      "effectClassification": "readOnly",
+      "timeout": {"milliseconds": 60000, "resultOnExpiry": "timedOutUnknown"},
+      "judgement": {"exitCodeAloneIsSuccess": false, "stream": "stdout", "stderrMustBeEmpty": true, "requiredOrderedMarkers": ["bytrace enter, running_state is SHOW_HELP", "usage: bytrace [options] [categories...]", "-b N", "-t N", "-o filename"], "timestampPrefixPolicy": "Ignore only the leading YYYY/MM/DD HH:MM:SS token pair on the registered enter line.", "goldenResource": "tr001-bytrace-help-dayu200-oh7", "unregisteredShape": "unknown"},
+      "authority": {"mayEstablish": ["the registered bytrace help family", "advertised configuration surface"], "neverEstablish": ["bytrace capture eligibility", "capture success", "device identity", "support outside this exact tool/device context"]},
+      "cancellation": {"result": "cancelledUnknown", "mayTerminateOwnedClientProcess": true, "mayKillHDCServer": false}
+    },
+    {
+      "id": "tr001-bytrace-help-short-dayu200-oh7",
+      "tool": "bytrace",
+      "intent": "helpFamilyProbe",
+      "status": "registeredProbeOnly",
+      "exactArgv": ["-t", "<durableConnectKey>", "shell", "bytrace", "-h"],
+      "effectClassification": "readOnly",
+      "timeout": {"milliseconds": 60000, "resultOnExpiry": "timedOutUnknown"},
+      "judgement": {"exitCodeAloneIsSuccess": false, "stream": "stdout", "stderrMustBeEmpty": true, "byteIdenticalTo": "tr001-bytrace-help-long-dayu200-oh7", "goldenResource": "tr001-bytrace-help-dayu200-oh7", "unregisteredShape": "unknown"},
+      "authority": {"mayEstablish": ["the same registered bytrace help family as --help"], "neverEstablish": ["bytrace capture eligibility", "capture success", "support outside this exact tool/device context"]},
+      "cancellation": {"result": "cancelledUnknown", "mayTerminateOwnedClientProcess": true, "mayKillHDCServer": false}
+    },
+    {
+      "id": "tr001-bytrace-tag-list-dayu200-oh7",
+      "tool": "bytrace",
+      "intent": "tagCapabilityProbe",
+      "status": "registeredProbeOnly",
+      "exactArgv": ["-t", "<durableConnectKey>", "shell", "bytrace", "-l"],
+      "effectClassification": "readOnly",
+      "timeout": {"milliseconds": 60000, "resultOnExpiry": "timedOutUnknown"},
+      "judgement": {"exitCodeAloneIsSuccess": false, "stream": "stdout", "stderrMustBeEmpty": true, "requiredOrderedMarkers": ["bytrace enter, running_state is SHOW_LIST_CATEGORY", "tagName:   description:", "sched - CPU Scheduling"], "goldenResource": "tr001-bytrace-tags-dayu200-oh7", "unregisteredShape": "unknown"},
+      "authority": {"mayEstablish": ["only the exact tag names parsed from this registered family"], "neverEstablish": ["bytrace capture eligibility", "unlisted tags", "capture success", "support outside this exact tool/device context"]},
+      "cancellation": {"result": "cancelledUnknown", "mayTerminateOwnedClientProcess": true, "mayKillHDCServer": false}
+    },
+    {
+      "id": "tr001-hitrace-minimal-capture-dayu200-oh7",
+      "tool": "hitrace",
+      "intent": "minimalOwnedTraceCapture",
+      "status": "registered",
+      "exactArgv": ["-t", "<durableConnectKey>", "shell", "hitrace", "-t", "5", "-b", "2048", "sched", "-o", "/data/local/tmp/arkdeck/<jobUUID>/minimal.ftrace"],
+      "effectClassification": "deviceMutation",
+      "preconditions": ["exclusive device mutation lane", "matching durable binding revision", "same-window registered help and tag receipts", "operator device-write confirmation", "harness-generated canonical Job UUID owned path"],
+      "timeout": {"milliseconds": 60000, "resultOnExpiry": "outcomeUnknownRemoteRetained"},
+      "judgement": {
+        "exitCodeAloneIsSuccess": false,
+        "stream": "stdout",
+        "stderrMustBeEmpty": true,
+        "requiredOrderedMarkers": ["start capture, please wait 5s ...", "capture done, start to read trace.", "trace read done, output: <exactOwnedRemoteFile>", "TraceFinish done."],
+        "goldenResource": "tr001-hitrace-capture-success-dayu200-oh7",
+        "additionalRequiredReceipts": ["exact regular-file post-capture byte size", "received bytes equal remote byte size", "non-empty received file", "registered ftrace header", "sensitive-content self-check"],
+        "rawHeaderResource": "tr001-raw-ftrace-header-dayu200-oh7",
+        "unregisteredOrMissingMarkerDisposition": "failedOrUnknownRemoteRetained"
+      },
+      "authority": {"mayEstablish": ["this exact minimal hitrace capture family on the registered tuple"], "mustMatch": ["durable target", "owned remote path", "same-window help/tag receipts"], "neverEstablish": ["bytrace capture support", "other firmware families", "hardware support or conformance", "cleanup before all receipts"]},
+      "cancellation": {"result": "cancelledOrOutcomeUnknownRemoteRetained", "mayTerminateOwnedClientProcess": true, "mayKillHDCServer": false, "cleanup": "No automatic cleanup without verified receive and exact remote-size receipt."}
+    }
+  ],
+  "controlledCaptureProtocol": {
+    "remotePathTemplate": "/data/local/tmp/arkdeck/<jobUUID>/minimal.ftrace",
+    "steps": [
+      {"id": "trace-remote-mkdir", "exactArgv": ["-t", "<durableConnectKey>", "shell", "mkdir", "-p", "/data/local/tmp/arkdeck/<jobUUID>"], "effect": "deviceMutation", "success": "intent recorded; no cleanup authority"},
+      {"id": "trace-remote-stat-pre", "exactArgv": ["-t", "<durableConnectKey>", "shell", "ls", "-l", "/data/local/tmp/arkdeck/<jobUUID>/minimal.ftrace"], "effect": "readOnly", "success": "absence observation only; exit code alone is not interpreted"},
+      {"id": "hitrace-capture-minimal", "entryRef": "tr001-hitrace-minimal-capture-dayu200-oh7"},
+      {"id": "trace-remote-stat-post", "exactArgv": ["-t", "<durableConnectKey>", "shell", "ls", "-l", "/data/local/tmp/arkdeck/<jobUUID>/minimal.ftrace"], "effect": "readOnly", "success": "one exact regular-file row supplies a positive byte-size receipt; any other shape is unknown"},
+      {"id": "trace-recv-minimal", "exactArgv": ["-t", "<durableConnectKey>", "file", "recv", "/data/local/tmp/arkdeck/<jobUUID>/minimal.ftrace", "<controlledOutDir>/minimal.ftrace"], "effect": "deviceToHostTransfer", "success": "received file exists, is non-empty, matches remote byte-size receipt and registered ftrace header, and passes sensitive self-check; exit code alone is insufficient"},
+      {"id": "trace-remote-rm", "exactArgv": ["-t", "<durableConnectKey>", "shell", "rm", "/data/local/tmp/arkdeck/<jobUUID>/minimal.ftrace"], "effect": "deviceMutationCleanup", "precondition": "verified receive receipt"},
+      {"id": "trace-remote-stat-absent", "exactArgv": ["-t", "<durableConnectKey>", "shell", "ls", "-l", "/data/local/tmp/arkdeck/<jobUUID>/minimal.ftrace"], "effect": "readOnly", "success": "registered absence observation; exit code alone is not interpreted"},
+      {"id": "trace-remote-rmdir", "exactArgv": ["-t", "<durableConnectKey>", "shell", "rmdir", "/data/local/tmp/arkdeck/<jobUUID>"], "effect": "deviceMutationCleanup", "precondition": "verified receive receipt and exact file cleanup attempt"}
+    ],
+    "failureRule": "Any timeout, truncation, marker/path mismatch, stderr, unregistered stat shape, byte-size mismatch, empty/invalid receive, or sensitive-content hit produces no cleanup authority and retains the owned remote surface."
+  },
+  "resourceManifest": {
+    "path": "resources.json",
+    "closureRule": "Every goldenResource/rawHeaderResource must resolve to exactly one resource whose repository bytes match its declared SHA-256 and size; no extra .bin file is allowed."
+  },
+  "provenance": {
+    "evidenceClass": "controlledHumanCapture",
+    "operator": "lvye",
+    "captureWindow": "2026-07-22 08:59-09:02 Asia/Shanghai",
+    "runbook": "scripts/trace_capture/README.md",
+    "redactedManifests": [
+      "openspec/changes/chg-2026-021-trace-adapter-capture/evidence/runs/TASK-TR-001/redacted-manifests/discover.json",
+      "openspec/changes/chg-2026-021-trace-adapter-capture/evidence/runs/TASK-TR-001/redacted-manifests/probe.json",
+      "openspec/changes/chg-2026-021-trace-adapter-capture/evidence/runs/TASK-TR-001/redacted-manifests/capture.json"
+    ],
+    "acceptedBy": "maintainer review and merge of the TASK-TR-001 implementation/evidence PR"
+  }
+}

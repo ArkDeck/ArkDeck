@@ -35,20 +35,50 @@ def _load_m0b_module():
 def fake_runner_factory(
     stdout: bytes = b"ok\n", stderr: bytes = b"", exit_code: int = 0,
     write_recv_bytes: bytes | None = None,
+    capture_stdout: bytes | None = None,
+    remote_size_bytes: int | None = None,
 ):
     """A fake runner. When ``write_recv_bytes`` is not None and the argv looks
     like a recv command, the fake writes the local destination file the way a
     real `hdc file recv` would."""
 
     calls: list[list[str]] = []
+    remote_present = False
+    observed_size = remote_size_bytes
+    if observed_size is None and write_recv_bytes is not None:
+        observed_size = len(write_recv_bytes)
 
     def runner(argv: list[str], timeout: int) -> capture.RunnerResult:
+        nonlocal remote_present
         calls.append(list(argv))
+        result_stdout = stdout
+        if "hitrace" in argv and "-o" in argv:
+            remote_present = True
+            remote_file = argv[-1]
+            result_stdout = capture_stdout
+            if result_stdout is None:
+                result_stdout = (
+                    b"start capture, please wait 5s ...\n"
+                    b"capture done, start to read trace.\n"
+                    + b"trace read done, output: " + remote_file.encode("utf-8") + b"\n"
+                    b"TraceFinish done.\n")
+        elif "ls" in argv and "-l" in argv:
+            remote_file = argv[-1]
+            if remote_present and observed_size is not None:
+                result_stdout = (
+                    b"-rw-r--r-- 1 root root " + str(observed_size).encode("ascii")
+                    + b" 2026-07-22 09:00 " + remote_file.encode("utf-8") + b"\n")
+            else:
+                result_stdout = (
+                    b"ls: " + remote_file.encode("utf-8")
+                    + b": No such file or directory\n")
         if write_recv_bytes is not None and "recv" in argv:
             with open(argv[-1], "wb") as handle:
                 handle.write(write_recv_bytes)
+        if "rm" in argv and "rmdir" not in argv:
+            remote_present = False
         return capture.RunnerResult(
-            exit_code=exit_code, timed_out=False, stdout=stdout, stderr=stderr,
+            exit_code=exit_code, timed_out=False, stdout=result_stdout, stderr=stderr,
             stdout_truncated=False, stderr_truncated=False, duration_ms=1)
 
     runner.calls = calls
@@ -257,7 +287,12 @@ class HarnessTestCase(unittest.TestCase):
 
     def test_full_capture_sequence_runs_with_gate_and_manifest_records_gate(self):
         selected = [capture.SPECS_BY_ID[ident] for ident in capture.CAPTURE_SEQUENCE]
-        runner = fake_runner_factory(write_recv_bytes=b"# tracer: nop\ntrace data\n")
+        trace_bytes = (
+            b"# tracer: nop\n"
+            b"# entries-in-buffer/entries-written: 1/1   #P:1\n"
+            b"#           TASK-PID       TGID    CPU#  |||||  TIMESTAMP  FUNCTION\n"
+            b"trace data\n")
+        runner = fake_runner_factory(write_recv_bytes=trace_bytes)
         manifest = capture.capture(
             self.hdc, self.out_dir(), selected, "KEY", runner=runner,
             home="/Users/tester", allow_device_write=True,
@@ -277,7 +312,11 @@ class HarnessTestCase(unittest.TestCase):
         self.assertEqual(len(recv_entries), 1)
         received = recv_entries[0]["receivedFile"]
         self.assertTrue(received["present"])
-        self.assertEqual(received["bytes"], len(b"# tracer: nop\ntrace data\n"))
+        self.assertEqual(received["bytes"], len(trace_bytes))
+        self.assertTrue(received["remoteSizeMatched"])
+        self.assertTrue(received["formatVerified"])
+        self.assertTrue(
+            manifest["receiveVerification"]["captureSuccessMarkersVerified"])
         local = os.path.join(self.out_dir(), capture.RECV_LOCAL_NAME)
         self.assertTrue(os.path.isfile(local))
         mode = stat.S_IMODE(os.stat(local).st_mode)
@@ -299,6 +338,51 @@ class HarnessTestCase(unittest.TestCase):
         self.assertFalse(manifest["remoteCleanup"]["eligible"])
         self.assertEqual(manifest["remoteCleanup"]["attempts"], [])
         self.assertFalse(any("rm" in argv or "rmdir" in argv for argv in runner.calls))
+
+    def test_recv_size_mismatch_retains_remote(self):
+        selected = [capture.SPECS_BY_ID[ident] for ident in capture.CAPTURE_SEQUENCE]
+        trace_bytes = (
+            b"# tracer: nop\n"
+            b"# entries-in-buffer/entries-written: 1/1   #P:1\n"
+            b"#           TASK-PID       TGID    CPU#  |||||  TIMESTAMP  FUNCTION\n")
+        runner = fake_runner_factory(
+            write_recv_bytes=trace_bytes, remote_size_bytes=len(trace_bytes) + 7)
+        manifest = capture.capture(
+            self.hdc, self.out_dir(), selected, "KEY", runner=runner,
+            home="/Users/tester", allow_device_write=True,
+            gate_dir=self.passing_gate_dir())
+        self.assertFalse(manifest["receiveVerification"]["receivedSizeMatched"])
+        self.assertEqual(manifest["captureOutcome"], "partialRemoteRetained")
+        self.assertEqual(manifest["remoteCleanup"]["attempts"], [])
+
+    def test_missing_capture_success_marker_retains_remote(self):
+        selected = [capture.SPECS_BY_ID[ident] for ident in capture.CAPTURE_SEQUENCE]
+        trace_bytes = (
+            b"# tracer: nop\n"
+            b"# entries-in-buffer/entries-written: 1/1   #P:1\n"
+            b"#           TASK-PID       TGID    CPU#  |||||  TIMESTAMP  FUNCTION\n")
+        runner = fake_runner_factory(
+            write_recv_bytes=trace_bytes,
+            capture_stdout=b"capture done without registered completion markers\n")
+        manifest = capture.capture(
+            self.hdc, self.out_dir(), selected, "KEY", runner=runner,
+            home="/Users/tester", allow_device_write=True,
+            gate_dir=self.passing_gate_dir())
+        self.assertFalse(
+            manifest["receiveVerification"]["captureSuccessMarkersVerified"])
+        self.assertEqual(manifest["captureOutcome"], "partialRemoteRetained")
+        self.assertEqual(manifest["remoteCleanup"]["attempts"], [])
+
+    def test_unregistered_ftrace_header_retains_remote(self):
+        selected = [capture.SPECS_BY_ID[ident] for ident in capture.CAPTURE_SEQUENCE]
+        runner = fake_runner_factory(write_recv_bytes=b"not an ftrace document\n")
+        manifest = capture.capture(
+            self.hdc, self.out_dir(), selected, "KEY", runner=runner,
+            home="/Users/tester", allow_device_write=True,
+            gate_dir=self.passing_gate_dir())
+        self.assertFalse(manifest["receiveVerification"]["ftraceHeaderVerified"])
+        self.assertEqual(manifest["captureOutcome"], "partialRemoteRetained")
+        self.assertEqual(manifest["remoteCleanup"]["attempts"], [])
 
     def test_received_file_with_host_user_path_fails_self_check(self):
         selected = [capture.SPECS_BY_ID[ident] for ident in capture.CAPTURE_SEQUENCE]

@@ -1,0 +1,12 @@
+# tracer: nop
+#
+# entries-in-buffer/entries-written: 6393/6393   #P:4
+#
+#                                          _-----=> irqs-off/BH-disabled
+#                                         / _----=> need-resched
+#                                        | / _---=> hardirq/softirq
+#                                        || / _--=> preempt-depth
+#                                        ||| / _-=> migrate-disable
+#                                        |||| /     delay
+#           TASK-PID       TGID    CPU#  |||||  TIMESTAMP  FUNCTION
+#              | |           |       |   |||||     |         |

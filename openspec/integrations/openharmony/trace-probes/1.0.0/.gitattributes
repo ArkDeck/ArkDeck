@@ -1,0 +1,2 @@
+# TASK-TR-001: observed golden bytes must not be rewritten by text/eol normalization
+*.bin binary

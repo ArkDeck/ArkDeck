@@ -1,0 +1,158 @@
+{
+  "boundary": "controlled trace probe/minimal-capture; observed-only; not a support/compatibility claim; classified controlledHumanCapture — a registry/golden registration of record happens only through the maintainer-reviewed TR-001 evidence PR; serial-bearing and raw trace bytes remain in this controlled non-repository location",
+  "captureGate": null,
+  "captureOutcome": "probeCaptured",
+  "change": "CHG-2026-021-trace-adapter-capture",
+  "commands": [
+    {
+      "argv": [
+        "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/toolchains/hdc",
+        "-v"
+      ],
+      "commandId": "hdc-version",
+      "deviceWrite": false,
+      "durationMs": 10,
+      "exitCode": 0,
+      "purpose": "pinned HDC client version",
+      "selfCheck": {
+        "passed": true,
+        "stderr": {
+          "keyMaterialFound": false,
+          "passed": true,
+          "serialPresent": null,
+          "userPathFound": false
+        },
+        "stdout": {
+          "keyMaterialFound": false,
+          "passed": true,
+          "serialPresent": null,
+          "userPathFound": false
+        }
+      },
+      "stderr": {
+        "bytes": 0,
+        "file": "00-hdc-version.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "truncated": false
+      },
+      "stdout": {
+        "bytes": 12,
+        "file": "00-hdc-version.stdout",
+        "sha256": "906d35a917937ecbb33d8dc3bbb6b3e1783bd2996a6201ab7227fb406d474ed9",
+        "truncated": false
+      },
+      "timedOut": false
+    },
+    {
+      "argv": [
+        "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/toolchains/hdc",
+        "list",
+        "targets"
+      ],
+      "commandId": "hdc-list-targets",
+      "deviceWrite": false,
+      "durationMs": 20,
+      "exitCode": 0,
+      "purpose": "device discovery",
+      "selfCheck": {
+        "passed": true,
+        "stderr": {
+          "keyMaterialFound": false,
+          "passed": true,
+          "serialPresent": null,
+          "userPathFound": false
+        },
+        "stdout": {
+          "keyMaterialFound": false,
+          "passed": true,
+          "serialPresent": null,
+          "userPathFound": false
+        }
+      },
+      "stderr": {
+        "bytes": 0,
+        "file": "01-hdc-list-targets.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "truncated": false
+      },
+      "stdout": {
+        "bytes": 33,
+        "file": "01-hdc-list-targets.stdout",
+        "sha256": "2035c0783fe1b2fbc3bba6badfb76003c1a5d46bbe16d1479de439e9fd874fc2",
+        "truncated": false
+      },
+      "timedOut": false
+    },
+    {
+      "argv": [
+        "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/toolchains/hdc",
+        "list",
+        "targets",
+        "-v"
+      ],
+      "commandId": "hdc-list-targets-verbose",
+      "deviceWrite": false,
+      "durationMs": 20,
+      "exitCode": 0,
+      "purpose": "device discovery with detail",
+      "selfCheck": {
+        "passed": true,
+        "stderr": {
+          "keyMaterialFound": false,
+          "passed": true,
+          "serialPresent": null,
+          "userPathFound": false
+        },
+        "stdout": {
+          "keyMaterialFound": false,
+          "passed": true,
+          "serialPresent": null,
+          "userPathFound": false
+        }
+      },
+      "stderr": {
+        "bytes": 0,
+        "file": "02-hdc-list-targets-verbose.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "truncated": false
+      },
+      "stdout": {
+        "bytes": 58,
+        "file": "02-hdc-list-targets-verbose.stdout",
+        "sha256": "d8816e413776d80e6e577b78f6abbf8c114bfd570b3627f7a007c97681af9c48",
+        "truncated": false
+      },
+      "timedOut": false
+    }
+  ],
+  "deviceWriteEnabled": false,
+  "evidenceClass": "controlledHumanCapture",
+  "host": {
+    "arch": "arm64",
+    "os": "Darwin",
+    "osVersion": "26.5.2"
+  },
+  "receiveVerification": {
+    "nonEmptySelfChecked": false
+  },
+  "remoteCleanup": {
+    "attempts": [],
+    "complete": false,
+    "eligible": false,
+    "retainedReason": null
+  },
+  "remoteOwnedSurface": {
+    "directory": null,
+    "file": null,
+    "runId": null
+  },
+  "schema": "arkdeck-trace-capture-redacted-1.1.0",
+  "selfCheckPassed": true,
+  "targetConnectkeyProvided": false,
+  "task": "TASK-TR-001",
+  "toolchain": {
+    "hdcPath": "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/toolchains/hdc",
+    "hdcSha256": "48395ba8d87115dffca47df2a640a6c868bc9a2bd4eb49611e4138ff88d8d260",
+    "transport": "usb"
+  }
+}
