@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "1.0.0",
+  "authorizationId": "AUTH-2026-025-DAYU200-001",
+  "approvedBy": "lvye",
+  "carrier": "PENDING — set to \"PR #<n> openspec/changes/chg-2026-025-ai-native-unattended-device-ops/evidence/authorizations/AUTH-2026-025-DAYU200-001.json@<blob-oid>\" at the readiness r2 merge that finalizes bindingRevision",
+  "target": {
+    "model": "DAYU200 (RK3568)",
+    "serialSHA256": "958780b2ffb7090d4f22cdc1f547f9804ed0f0b605e3020f384e5d4823dc7a7e",
+    "bindingRevision": -1
+  },
+  "firmwareArchiveSHA256": "fc7637f34a8394847b1b6c7e7ff2750863d18c6dc05e184abaf5aed70ec75280",
+  "transport": "usb",
+  "toolchainFingerprint": "rkdeveloptool-1.32@038a8a0ea26ef7eb77451789f310c0c9fbeaf43a78af1d6146e02311a9c23611",
+  "providerIdentity": "arkdeck.rockchip-rockusb-flash-provider",
+  "planDigestSHA256": "c85be3b34ae671ad213781619235a22dcb242d406850d4eb8cef8785487d6cff",
+  "stepSetDigestSHA256": "075b52c4fc7dc71e422c76c9edd5e1cd26e7641c844fa4cfb4ae79f29d1c8fdb",
+  "recoveryPath": "CHG-2026-016 verified Loader-mode wlx re-flash route (attempt #5): re-enter Loader (ld reports 0x2207:0x350a), ppt baseline compare, wlx the 9 mapped partitions from a validated archive, rd.",
+  "validUntil": "2026-08-31T00:00:00Z",
+  "maxRuns": 1
+}
