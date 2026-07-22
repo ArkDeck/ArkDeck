@@ -74,3 +74,67 @@ D2 维护者动作;CI 绿不构成批准。
 - guard-rail 不防恶意谎报其他 task;批准防线仍是维护者逐 PR review。
 - status/propose live 形态只能在对应真实 PR 出现后累计,不以合成 fixture
   冒充;在 evidence gate 未闭合前不得翻 TASK-MECH-004 done。
+
+## Post-merge independent review and remediation(2026-07-22)
+
+- 实现 PR #335 在 PR-event SDD Guard/Swift CI 均为 `action_required`、
+  `allowed-paths` 未执行且独立 review 尚未结束时,由维护者 `lvye` merge;
+  merge OID = `72b295f4987410c57c04cf2d11a4b479bc8f63bf`,review head =
+  `35507506319527bd13833019e024777f0a9af246`,GitHub `reviews=[]`。合入前
+  可见绿只含 push `guard`/Swift;push `allowed-paths` 正确 skipped,不得冒充
+  PR check。main push SDD Guard run `29928566248` success,但同样不验证
+  pull_request live diff。
+- 不同 AI 会话的合后 review 结论 = **REQUEST_CHANGES**,发现两项 blocking:
+  1. workflow 使用 GitHub 默认 `pull_request` activity types,PR title/body/base
+     被 edited 后不重跑,旧绿可能与当前声明或 `base..head` 脱节;
+  2. checker 把 `\\` 改写为 `/`;Linux 上反斜杠是合法文件名字符,根目录
+     `scripts\\outside.py` 会被错误改成 `scripts/outside.py` 并匹配
+     `scripts/**`,形成具体 fail-open。
+- 本独立 remediation 只在原 TASK-MECH-004 allowed paths 内修复:显式订阅
+  `opened/synchronize/reopened/edited`;删除反斜杠改写,直接比较 `git -z`
+  返回的 repository-relative path;新增两项回归测试。无 task status 翻转,
+  不把合后修复伪装成 #335 的合前 APPROVE。
+
+Remediation live PR、canary 红与独立复审链接在新分支 push 后追加;此前
+`MECH-PATH-001` 保持 candidate/not done。
+
+### Remediation live evidence
+
+- Remediation PR
+  [#336](https://github.com/ArkDeck/ArkDeck/pull/336),head
+  `961af7db70847d19ea8d131e483a2481da887711`:PR body `edited` 触发
+  [SDD Guard 29929295656](https://github.com/ArkDeck/ArkDeck/actions/runs/29929295656),
+  `guard` **SUCCESS** + `allowed-paths` **SUCCESS**;后者先完成 12 项 contract
+  tests,再对 live `base..head` diff PASS。这是实际 `pull_request` run,不是
+  push skipped job。
+- 不同 AI 会话对上述 remediation head 独立复审 = **APPROVE**:两项原
+  blocking 均关闭,无新 blocking;复跑 12/12、py_compile、0/0/111、diff
+  check 全绿;reviewer 未在 GitHub approve/merge。
+- Draft canary
+  [#337](https://github.com/ArkDeck/ArkDeck/pull/337),head
+  `651c2d6ed783e04c8b8d57ef6a83b443f24e999c`:只额外加入越界
+  `docs/mech-004-canary.md`。body `edited` 触发
+  [SDD Guard 29929641697](https://github.com/ArkDeck/ArkDeck/actions/runs/29929641697):
+  `guard` SUCCESS;`allowed-paths` contract tests SUCCESS;live check **FAILURE**
+  并具名
+  `declared task TASK-MECH-004 has paths outside Allowed paths:
+  docs/mech-004-canary.md`,exit 1。#337 于 2026-07-22T14:40:24Z closed,
+  `mergedAt`/`mergeCommit` 为空;远端 canary ref 查询为空,永未合入。
+
+### PR CI gate recheck
+
+初始 `pull_request` Swift CI run `29929220711` 为 `action_required`,当时
+确实不可入队;该历史不改写。追加 live evidence 的 synchronize head
+`238d2846ce62d38b0e4b23f2caf02462509b7033` 后,预期 PR Actions 已实际出现
+并绿色:
+
+- [SDD Guard 29929878055](https://github.com/ArkDeck/ArkDeck/actions/runs/29929878055):
+  `guard` SUCCESS + `allowed-paths` SUCCESS(contract tests + live diff 均执行);
+- [Swift CI 29929876685](https://github.com/ArkDeck/ArkDeck/actions/runs/29929876685):
+  `swift` SUCCESS,路径感知明确判定零 Swift surface,full test 步骤 skipped,
+  job summary success;未把快速路径冒充 Swift 全量。
+
+本次文件更新仅把上述已完成 run 固定进 evidence;其后 PR final head 仍须 fresh
+确认预期 checks 绿色 + 独立 reviewer 对 evidence-only delta 无新 finding 才可
+入队。TASK-MECH-004 仍不得 done:status/propose 两种真实形态绿尚待自然累计,
+且 required-status 翻转仍是 out-of-scope D2。

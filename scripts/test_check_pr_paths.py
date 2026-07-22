@@ -113,6 +113,23 @@ class PullRequestPathTests(unittest.TestCase):
             ),
         )
 
+    def test_backslash_filename_cannot_be_rewritten_into_allowed_directory(self):
+        tasks = """\
+## TASK-MECH-004 — path guard
+- Allowed paths:`scripts/**`
+"""
+        temporary, root = self.make_repo(tasks)
+        self.addCleanup(temporary.cleanup)
+        context = self.context(body="Task: TASK-MECH-004\n")
+        self.assert_error(
+            r"scripts\outside.py",
+            lambda: check_pr_paths.check_paths(
+                root,
+                context,
+                (r"scripts\outside.py",),
+            ),
+        )
+
     def test_undeclared_sensitive_fails_and_docs_governance_passes(self):
         temporary, root = self.make_repo(None)
         self.addCleanup(temporary.cleanup)
@@ -282,6 +299,16 @@ class PullRequestPathTests(unittest.TestCase):
                 "full 40-hex OID",
                 lambda: check_pr_paths.load_pull_request_context(event_path),
             )
+
+    def test_workflow_rechecks_when_pr_metadata_or_base_is_edited(self):
+        repo_root = Path(__file__).resolve().parents[1]
+        workflow = (repo_root / ".github" / "workflows" / "sdd-guard.yml").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn(
+            "pull_request:\n    types: [opened, synchronize, reopened, edited]",
+            workflow,
+        )
 
 
 if __name__ == "__main__":
