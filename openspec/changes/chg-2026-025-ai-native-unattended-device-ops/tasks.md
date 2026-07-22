@@ -6,7 +6,7 @@ change approved 前保持 blocked;approved 后每任务另需独立 readiness PR
 
 ## TASK-AIN-001 — 治理文档面同步(host-only)
 
-- Status:blocked
+- Status:ready
 - Platform:macos
 - Requirements:Constitution POL-AGENT-002(MODIFIED,载体 constitution-delta.md)语义在非 baseline 治理文档中的同步
 - Acceptance:change-local AIN-DOC-001(文档面零残留"只能由人类执行"矛盾表述;grep 复核面见 verification.md)
@@ -38,6 +38,40 @@ change approved 前保持 blocked;approved 后每任务另需独立 readiness PR
 ### Notes / handoff
 
 - 完成后在 `evidence/runs/TASK-AIN-001/` 追加 run 记录。
+
+### Readiness pins(r1,2026-07-22)
+
+- Base:main `923e5023de76341297a4274584d3ec5e6a6aae72`(#281 merge,change
+  approved);guard 于 base 实测 0 error / 0 warning / 111 acceptance IDs。
+- 待改文件 blob(全 OID,漂移即本 readiness 失效重查):
+  - `AGENTS.md` `895d93bcdc29c1edc9ffcf7527ffa3c8ebf8cc61`
+  - `openspec/governance/enforcement.md` `e0ad08c3fc85616c721256437afb4271d7969180`
+  - `openspec/verification/policy.md` `070613b199fbc1124cc2f7398a8ed671e5c90f81`
+  - `openspec/verification/hardware-matrix.md` `dcd1b7a272637eee296a5b5db0c0a587978d7761`
+  - `openspec/templates/change/tasks.md` `2362b5723a3b2b1d7204daf98d479a7cc88263d7`
+  - `openspec/templates/change/evidence-run.md` `226d08a3be2b00f83bfda370f7d19faff68ff03e`
+- 只读依据 blob:constitution-delta 与 flashing delta 随 #280 入 main
+  (`specs/flashing/spec.md` delta `5fd7ed4df9574e52e822930eff0e824641c0bd5f`);
+  改写措辞以 delta 文本为准,不得引入 delta 之外的新语义。
+- 改写面清单(base 上 grep 实测,共 7 处,AIN-DOC-001 复核以此为封闭集):
+  1. `AGENTS.md` Agent 禁令第 2 条(“不得对真实设备执行 Flash…由人类亲自执行”);
+  2. `openspec/governance/enforcement.md` “真实硬件与 destructive 操作”节第 1 条
+     (“Agent(以及任何自动化)不得…只能产出 plan 与人工执行步骤”);
+  3. 同节第 2 条 operator 表述(操作者(人类)→ executor 语义);
+  4. `openspec/verification/policy.md` “真实设备 destructive 操作只能由人类执行”;
+  5. `openspec/verification/hardware-matrix.md` 序言“由人类操作者产生”与
+     evidence 要求“人类操作者”两行;
+  6. `openspec/templates/change/tasks.md` Risk 行注释“destructive 的真实设备步骤
+     只能由人类执行”;
+  7. `openspec/templates/change/evidence-run.md` “除非 task 明确授权人类执行”。
+- 边界确认:`openspec/constitution.md`、`openspec/specs/**`、
+  `openspec/baselines/**`、历史 evidence 与 `changes/archive/**` 零接触
+  (constitution/spec 正文由 archive PR 合入);hardware-matrix 既有数据行
+  (EVD-* 行)一字不动。
+- 二值门:完成后同一 grep 面残留矛盾表述 = 0;guard 保持 0/0/111。
+- 并行边界:与 TASK-AIN-002(change 目录 `contracts/**`)、TASK-AIN-003
+  (`Packages/**`)零文件交集,可并行;三 readiness PR 同改本 tasks.md 不同段,
+  后合者如冲突需 rebase(#255/#256 先例)。
 
 ## TASK-AIN-002 — hardware-evidence schema 3.0.0 定稿(host-only)
 
