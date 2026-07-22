@@ -136,6 +136,27 @@
 
 - Status:ready(readiness;仅在维护者 review/merge 本独立状态 PR 后生效;本 PR 只修改
   `tasks.md`,不含实现/evidence,不执行 device/HDC/network/external-process)
+- Readiness revision r2(2026-07-22;D1;仅在维护者 review/merge 本独立修订 PR 后生效):
+  - Base = protected `main`
+    `2ad9278d84b21aa516f74053e1031dcd8014720d`(#336 merge)。TASK-MECH-004
+    allowed-paths guard 已合入;其 parser 只消费 `Allowed paths` block 内的反引号
+    token。r1 的“对应 Tests”是未结构化 prose,会使已批准的新测试文件 fail closed。
+  - 实现 scope 零扩张:仍严格限 r1 钉定的两个新文件
+    `Packages/ArkDeckKit/Sources/ArkDeckOpenHarmony/TraceProbeAdapter.swift` 与
+    `Packages/ArkDeckKit/Tests/ArkDeckContractTests/TraceAdapterGoldenTests.swift`,
+    加本任务单一 run 记录与后续状态行;`Allowed paths` 改为四个完整、机器可读的
+    repository-relative token。source/test 两文件在本 base 仍不存在。
+  - Registry/resource closure 与 r1 全部 SHA-256 pin 重算无漂移;
+    `HDCReadOnlyProbeRegistry.swift`、三份 `Trace*Contracts.swift` blob 逐项无漂移。
+    `Package.swift` 因 TASK-AIN-007 合入发生已审计漂移,只读 pin 从
+    `a47bccf05a0c044ef506ddd015fe8c0ecaaa89e2` 重钉为
+    `91a1032f8a5ff9285154ef6f48ef35470b294eb7`;本任务仍不得修改该文件。
+  - 当前 main 基线(Apple Swift 6.3.3、Xcode 26.6/17F113)实测 Swift 全量
+    358 tests/1 skipped/0 failures;trace registry validator PASS(7 entries/
+    7 resources/14,939 fixture bytes/real device dispatch 0);MECH-004 parser tests
+    12/0;`check-sdd` 0 errors/0 warnings/111 acceptance IDs。
+  - 本修订只修改本 change `tasks.md`,不含 adapter/test/evidence,不改变 task
+    objective、AC、fixture authority、风险、设备边界或 change verification。
 - Readiness review(2026-07-22;host-only,零设备命令):
   - Approve/dependency gates:satisfied。change approval PR #253 merge
     `684c42c92bf093c4c1e8d5844d2ad571c844c1ba`;TASK-TR-002 done PR #271 merge
@@ -200,8 +221,11 @@
   TASK-TR-002R done(host-contract remediation)。
 - In scope:adapter family 解析器 + golden 测试 + evidence run。
 - Out of scope:未登记 family 的任何支持声明;新固件族。
-- Allowed paths(approve/readiness 后细化):`Packages/ArkDeckKit/Sources/**`、
-  对应 Tests、本 change `evidence/**`、本 change `tasks.md`(仅本任务状态)。
+- Allowed paths(r2 readiness 精确机器面):
+  - `Packages/ArkDeckKit/Sources/ArkDeckOpenHarmony/TraceProbeAdapter.swift`
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/TraceAdapterGoldenTests.swift`
+  - `openspec/changes/chg-2026-021-trace-adapter-capture/evidence/runs/TASK-TR-003/run.md`
+  - `openspec/changes/chg-2026-021-trace-adapter-capture/tasks.md`(仅本任务状态/evidence 引用)
 - Risk:low(host-only,golden 驱动)。
 - Hardware required:no(fixture 已由 TR-001 登记)。
 - Verification:2 AC parserGolden 测试 PASS、fixture hash 与 registry closure 一致。
