@@ -1,16 +1,63 @@
 # Tasks — CHG-2026-026 macOS Rockchip Flash UI
 
-> 本 proposal 尚未批准。以下任务均因 approval/DoR gate 保持 `blocked`；Agent 不得把它们
-> 自行翻为 ready。每个实现任务单独 PR，不混入 readiness/status PR。
+> PR #297 只登记 proposal；本独立 governance/readiness PR 同时起草 change
+> `proposed→approved` 与 TASK-RKFUI-001 `blocked→ready`，仅在维护者 review/merge 后生效。
+> 其余任务继续 `blocked`。每个实现任务单独 PR，不混入 readiness/status PR。
 
 ## TASK-RKFUI-001 — RockUSB discovery contract 与 signed Sandbox E0 access spike
 
-- Status:blocked（等待 CHG-2026-026 approval/readiness；需具名 E0 设备窗口与
-  `rkdeveloptool` toolchain pin）
+- Status:ready（仅在维护者 review/merge 本独立 governance/readiness PR 后生效；只允许
+  contract/fake 与具名窗口内 E0/read-only access spike，零 mode switch、零
+  mutation/destructive）
+- Readiness review（2026-07-22；host-only 审计，真实 `rkdeveloptool ld`/HDC/device
+  dispatch 0）：
+  - Approval gate:on merge。PR #297 仅登记 `status: proposed` proposal；本 PR 明确承载
+    CHG-2026-026 `proposed→approved` 与本任务 `blocked→ready`，两者由维护者一次 review
+    后同时生效。批准的 `REQ-FLASH-015` 解释、E0-only 边界与其他任务继续 blocked 见
+    `proposal.md` 的 Approval and readiness boundary。
+  - Objective/scope gate:satisfied。目标只包括 strict `ld` discovery contract、固定 executable
+    URL + argv adapter 与 signed Sandbox 非提权 E0 spike；in/out scope、allowed/forbidden
+    paths、两条 canonical AC、deliverables 与二值 verification 均已固定，不需要执行 Agent
+    新做产品或 Safety 决策。
+  - Base/input pins:proposal base = `main`
+    `88dee1dc83d4e9e4675ea36803d5b261f1cdf3da`；实现必须基于本 readiness 合入后的
+    `main`，开始前重核下列 SHA-256，任一漂移即停并重做 readiness：
+    - `Packages/ArkDeckKit/Package.swift` =
+      `60bd68200aa8d25eb209e5fdd6f9d1e20594af07743849841f31defa4b9b5175`；
+    - read-only Provider/Profile/Authorization inputs 分别为
+      `81ff71a69f4dd3556de38d5fdf15526e57015529f23384d0fe6832ca32f86eee`、
+      `62c51f992654303ed0237b27c1642462dd1d8531b4d4a29661e718c962c2537b`、
+      `e3b6cdc334410b67d93782184c705ab55cdefb2cd4340f8c6fe0b35970552edb`；
+      本任务只读消费，禁止修改；
+    - discovery source/test、Rockchip fixtures/registry、integration directory 与 E0 probe
+      script 在 base 均不存在（零路径碰撞）；实现只能在 Allowed paths 新建。
+  - Toolchain gate:satisfied。维护者选择的仓库外 executable 于 readiness 重核为
+    `rkdeveloptool ver 1.32`、SHA-256
+    `038a8a0ea26ef7eb77451789f310c0c9fbeaf43a78af1d6146e02311a9c23611`，与已归档
+    CHG-2026-016/TASK-RR-001 pin 一致，来源为官方 upstream commit
+    `304f073752fd25c854e1bcf05d8e7f925b1f4e14`。实现/真机 E0 只能由用户显式选择并经
+    security-scoped access 获取该 exact identity；禁止 PATH lookup，版本/hash/source
+    任一不符即 fail closed。
+  - Environment gate:satisfied。macOS 26.5.2、Xcode 26.6 (17F113)、Apple Swift 6.3.3
+    可用；任务本身负责生成 signed Sandbox 目标并验证 direct non-elevated access，若目标
+    交付形态不能在零 sudo/helper/install/ACL/group/rule modification 下执行，则如实记录
+    blocked result，TASK-RKFUI-003 继续 blocked。
+  - Hardware/window gate:satisfied for spike。目标为维护者 @lvye 控制的 DAYU200 + USB；
+    使用本 readiness 合入后维护者明确开始的首个连续 E0 窗口，并与其他设备任务互斥。
+    维护者只负责按已验证物理序列把设备置于 Loader；Agent/App 不发送进态命令。spike 仅可
+    执行 exact `["ld"]` 并只接受 semantic `0x2207:0x350a + Loader`；normal/HDC、
+    `0x5000`、Maskrom、未知、多候选或权限失败均阻断，不允许用 VID/PID/单设备假设补全身份。
+  - Verification/evidence gate:satisfied。contract/golden/fault tests 覆盖 success、malformed、
+    multi-device、Maskrom 与相似 family；真实 E0 run 记录 tool identity、signed target、
+    entitlements、direct invocation、USB result 与 typed verdict，serial 仅留摘要。fake/simulation
+    与 realHardware 分类分离；E1 dispatch、E2 dispatch、sudo/helper/system mutation 计数必须为 0。
+  - Concurrency/review gate:satisfied。readiness 审计时 GitHub open PR = 0；本 PR 只修改本
+    change 的 `proposal.md`/`tasks.md` 状态与 review record，不携带实现/evidence，也不改变
+    其他任务状态。TASK-RKFUI-001 implementation+evidence 与后续 `ready→done` 各用独立 PR。
 - Platform:macos
 - Requirements:`REQ-FLASH-001`、`REQ-UX-007`、`POL-WORKFLOW-001`
 - Acceptance:`AC-FLASH-001-01`、`AC-UX-007-01`
-- Depends on:none
+- Depends on:CHG-2026-026 approved（本 PR merge 后满足）；无前序任务
 - Allowed paths:
   - `openspec/integrations/rockchip/**`
   - `Packages/ArkDeckKit/Package.swift`
