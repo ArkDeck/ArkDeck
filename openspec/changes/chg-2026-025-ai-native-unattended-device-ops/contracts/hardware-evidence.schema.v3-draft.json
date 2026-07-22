@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "arkdeck://contracts/hardware-evidence/3.0.0-draft",
-  "title": "ArkDeck real-hardware evidence record (V3 draft, CHG-2026-025)",
+  "$id": "arkdeck://contracts/hardware-evidence/3.0.0",
+  "title": "ArkDeck real-hardware evidence record (V3, CHG-2026-025)",
   "description": "Records evidence produced on real hardware by a human operator or by an autonomous agent executing under a maintainer-merged standing authorization. Honesty is enforced by maintainer PR review; simulation/fake results must never be recorded here.",
   "type": "object",
   "additionalProperties": false,

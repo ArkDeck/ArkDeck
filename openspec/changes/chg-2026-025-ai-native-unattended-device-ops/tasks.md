@@ -76,6 +76,7 @@ change approved 前保持 blocked;approved 后每任务另需独立 readiness PR
 ## TASK-AIN-002 — hardware-evidence schema 3.0.0 定稿(host-only)
 
 - Status:ready
+- Candidate:2026-07-22 实现交付于本 PR(schema 定稿 + AIN-SCHEMA-001 9/9 PASS;executor/confirmation 语义零变化,AIN-003 readiness 无须重查);done 翻转须独立 PR 复核合入版
 - Platform:macos
 - Requirements:REQ-FLASH-015(MODIFIED)的 evidence 字段面
 - Acceptance:change-local AIN-SCHEMA-001(v3 schema 对合法/非法实例的接受/拒绝行为二值可证)
