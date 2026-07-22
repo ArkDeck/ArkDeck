@@ -5,10 +5,10 @@ import Foundation
 
 // TASK-RF-002. `arkdeck flash` — the product face of the RockUSB Provider.
 //
-// This executable never dispatches a device command and never spawns an external process.
-// Its human execute branch ends at a handoff. Its AI execute surface accepts only a strict
-// authorization ID; until TASK-AIN-007 composes the trusted resolver/fact ports/executor, it fails
-// executorUnavailable before reading an archive, resolving authorization or reserving usage.
+// The human execute branch still ends at a handoff. The autonomous branch passes only the strict
+// authorization ID, archive URL and location selector into the product-owned typed executor; it
+// has no executable, argv, shell, fact receipt, storage-root or dependency-injection surface.
+// Migration guard: the obsolete executorUnavailable branch must not be restored below this host.
 
 @main
 struct ArkDeckCommandLine {
@@ -86,10 +86,30 @@ struct ArkDeckCommandLine {
           exitCode: EX_USAGE,
           message: "--operator and --authorization-id are mutually exclusive")
       }
-      throw CLIError(
-        exitCode: 3,
-        message: "executorUnavailable: trusted authorization execution is delivered by "
-          + "TASK-AIN-007; no authorization was resolved and no usage was reserved")
+      guard options.value("--out") == nil else {
+        throw CLIError(
+          exitCode: EX_USAGE,
+          message: "--out is unavailable with --authorization-id; the trusted host owns "
+            + "Session storage")
+      }
+      guard let imagesPath = options.value("--images"),
+        let location = options.value("--target-location-id")
+      else {
+        throw CLIError(
+          exitCode: EX_USAGE,
+          message: "authorized execution requires --images and --target-location-id")
+      }
+      let request = try RockchipFlashExecutionRequest(
+        authorizationID: authorizationID,
+        archiveURL: URL(fileURLWithPath: imagesPath),
+        targetLocationSelector: location)
+      let result = try await RockchipFlashExecutionHost().execute(request)
+      print("session: \(result.sessionID)")
+      print("job: \(result.jobID)")
+      print("terminal status: \(result.status.rawValue)")
+      print("evidence class: \(result.evidenceClass.rawValue)")
+      if let manifestURL = result.manifestURL { print("manifest: \(manifestURL.path)") }
+      return
     }
 
     let plan = try validateAndPlan(options: options, mode: .execute)
@@ -326,14 +346,14 @@ struct ArkDeckCommandLine {
         arkdeck flash execute --images <images.tar.gz> --target-location-id <usb-location> \
       --operator <name> [--out <dir>]
         arkdeck flash execute --images <images.tar.gz> --target-location-id <usb-location> \
-      --authorization-id <AUTH-ID> [--out <dir>]
+      --authorization-id <AUTH-ID>
         arkdeck flash postflight --observation <observation.json>
 
-      execute never flashes by itself: it validates the archive, shows the exact plan and
-      ends at an authorization decision. A human operator at a TTY gets a handoff whose
-      commands they run personally. The AI surface accepts only an authorization ID and fails
-      executorUnavailable before side effects until TASK-AIN-007 supplies the trusted execution
-      host. Caller-provided authorization files or fact/context documents are rejected.
+      A human operator at a TTY gets a handoff whose commands they run personally. The AI
+      surface accepts only an authorization ID, archive path and target-location selector; the
+      product-owned host performs fresh protected-main admission, durable usage reservation,
+      descriptor-bound typed execution and terminal persistence. Caller-provided authorization
+      files, fact/context documents, executables, argv and storage roots are rejected.
       """
     print(usage)
   }
