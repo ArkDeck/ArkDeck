@@ -30,4 +30,4 @@
 
 ## Deviations and residual risk
 
-- 偏差、未执行项与后续动作;destructive dispatch 计数(应恒为 0,除非 task 明确授权人类执行)。
+- 偏差、未执行项与后续动作;destructive dispatch 计数(应恒为 0,除非该 run 由人类亲手执行或持有效 standing authorization)。
