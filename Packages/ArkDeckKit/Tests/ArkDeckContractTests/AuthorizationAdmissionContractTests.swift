@@ -59,6 +59,7 @@ final class AuthorizationAdmissionContractTests: XCTestCase {
     let request: AuthorizationAdmissionRequest
     let plan: RockchipFlashPlan
     let clock: FixedAdmissionClock
+    let executableIdentity: ProcessExecutableIdentityReceipt
   }
 
   private func fixture(
@@ -120,6 +121,14 @@ final class AuthorizationAdmissionContractTests: XCTestCase {
         targetID: overrides.durableTargetID, revision: overrides.bindingRevision),
       binding: binding)
 
+    let executableIdentity = ProcessExecutableIdentityReceipt(
+      authorizedPath: "/opt/arkdeck/rkdeveloptool",
+      inodeLaunchPath: "/.vol/1/2",
+      device: 1,
+      inode: 2,
+      fileSize: 4096,
+      mode: 0o100755,
+      sha256: overrides.toolSHA256)
     let toolFact = RockchipTrustedToolDeviceFact(
       sessionID: Self.sessionID,
       jobID: overrides.toolJobID ?? jobID,
@@ -133,14 +142,7 @@ final class AuthorizationAdmissionContractTests: XCTestCase {
         usbProductID: RockchipProbeEvidence.dayu200LoaderProductID,
         locationID: overrides.toolLocation,
         mode: overrides.toolMode),
-      executableIdentity: ProcessExecutableIdentityReceipt(
-        authorizedPath: "/opt/arkdeck/rkdeveloptool",
-        inodeLaunchPath: "/dev/fd/9",
-        device: 1,
-        inode: 2,
-        fileSize: 4096,
-        mode: 0o100755,
-        sha256: overrides.toolSHA256))
+      executableIdentity: executableIdentity)
 
     let prerequisites = RockchipTrustedPrerequisiteFact(
       sessionID: Self.sessionID, jobID: jobID, targetID: Self.targetID,
@@ -201,7 +203,8 @@ final class AuthorizationAdmissionContractTests: XCTestCase {
           targetID: Self.targetID,
           targetLocationSelector: Self.topology)),
       plan: plan,
-      clock: clock)
+      clock: clock,
+      executableIdentity: executableIdentity)
   }
 
   func testTEST_AIN_FACT_001_TrustedFactsMintOneShotAdmissionWithoutDispatch() async throws {
@@ -211,6 +214,7 @@ final class AuthorizationAdmissionContractTests: XCTestCase {
     XCTAssertEqual(admission.usageReservation.ordinal, 1)
     XCTAssertEqual(admission.facts.bindingReference.targetID, Self.targetID)
     XCTAssertEqual(admission.facts.usbTopology, Self.topology)
+    XCTAssertEqual(admission.facts.executableIdentity, value.executableIdentity)
 
     let monitor = RockchipFlashDispatchMonitor()
     let decision = await RockchipFlashAuthorizationGate().authorizeUnattended(
@@ -225,6 +229,7 @@ final class AuthorizationAdmissionContractTests: XCTestCase {
 
     let consumed = try admission.consume(at: value.clock.now())
     XCTAssertEqual(consumed.usageReservation.reservationID, reservationID)
+    XCTAssertEqual(consumed.facts.executableIdentity, value.executableIdentity)
     XCTAssertThrowsError(try admission.consume(at: value.clock.now())) { error in
       XCTAssertEqual(error as? AuthorizationAdmissionError, .capabilityAlreadyConsumed)
     }
@@ -240,7 +245,7 @@ final class AuthorizationAdmissionContractTests: XCTestCase {
     }
     print(
       "TEST-AIN-FACT-001 PASS facts=trusted correlation=same-admission "
-        + "serial=readback capability=one-shot dispatch=0")
+        + "serial=readback executable-identity=same-receipt capability=one-shot dispatch=0")
   }
 
   func testFactMismatchesFailBeforeUsageReservation() async throws {
@@ -389,6 +394,9 @@ final class AuthorizationAdmissionContractTests: XCTestCase {
       contentsOf: packageRoot.appendingPathComponent(
         "Sources/ArkDeckWorkflows/RockchipAuthorizationFacts.swift"), encoding: .utf8)
     XCTAssertTrue(factsSource.contains("attempt.observations.count == 1"))
+    XCTAssertTrue(
+      factsSource.contains("plan: plan, executableIdentity: toolDevice.executableIdentity"))
+    XCTAssertFalse(factsSource.contains("struct RockchipTrustedAuthorizationFacts: Codable"))
   }
 
   private func authorizationBytes(plan: RockchipFlashPlan, maxRuns: Int) throws -> Data {

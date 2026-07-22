@@ -39,6 +39,15 @@ public enum JournalEventValidationError: Error, Equatable, Sendable {
 public struct JournalEvent: Equatable, Sendable {
   public static let schemaVersion = "1.0.0"
   public static let authorizedAgentSchemaVersion = "2.0.0"
+  public static let rockchipAuthorizedAgentSchemaVersion = "2.1.0"
+
+  static func isSupportedSchemaVersion(_ value: String) -> Bool {
+    value == schemaVersion || supportsAuthorizationCorrelation(value)
+  }
+
+  static func supportsAuthorizationCorrelation(_ value: String) -> Bool {
+    value == authorizedAgentSchemaVersion || value == rockchipAuthorizedAgentSchemaVersion
+  }
 
   public let schemaVersion: String
   public let eventID: String
@@ -71,10 +80,7 @@ public struct JournalEvent: Equatable, Sendable {
     argumentsHash: String? = nil,
     payload: [String: JSONValue]
   ) throws {
-    guard
-      schemaVersion == Self.schemaVersion
-        || schemaVersion == Self.authorizedAgentSchemaVersion
-    else {
+    guard Self.isSupportedSchemaVersion(schemaVersion) else {
       throw JournalEventValidationError.malformedEnvelope("unsupported schemaVersion")
     }
     self.schemaVersion = schemaVersion
@@ -419,10 +425,7 @@ public enum JournalEventCodec {
       throw JournalEventValidationError.malformedEnvelope("payload must be an object")
     }
     let schemaVersion = try object.requiredString("schemaVersion", context: "envelope")
-    guard
-      schemaVersion == JournalEvent.schemaVersion
-        || schemaVersion == JournalEvent.authorizedAgentSchemaVersion
-    else {
+    guard JournalEvent.isSupportedSchemaVersion(schemaVersion) else {
       throw JournalEventValidationError.malformedEnvelope("unsupported schemaVersion")
     }
     return try JournalEvent(

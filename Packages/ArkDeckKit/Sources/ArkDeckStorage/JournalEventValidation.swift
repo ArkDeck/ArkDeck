@@ -28,10 +28,7 @@ enum JournalEventSemanticValidator {
   }
 
   static func validate(_ event: JournalEvent) throws {
-    guard
-      event.schemaVersion == JournalEvent.schemaVersion
-        || event.schemaVersion == JournalEvent.authorizedAgentSchemaVersion
-    else {
+    guard JournalEvent.isSupportedSchemaVersion(event.schemaVersion) else {
       throw JournalEventValidationError.malformedEnvelope("unsupported schemaVersion")
     }
     guard event.sequence >= 0, !event.eventID.isEmpty, !event.sessionID.isEmpty,
@@ -93,7 +90,7 @@ enum JournalEventSemanticValidator {
       "interactiveUser", "standardAgent", "controlledHardwareLab", "authorizedAgent",
     ]
     guard allowedAuthorities.contains(authority),
-      event.schemaVersion == JournalEvent.authorizedAgentSchemaVersion
+      JournalEvent.supportsAuthorizationCorrelation(event.schemaVersion)
         || authority != "authorizedAgent"
     else { throw payload(event, "executionAuthority is not supported by this schemaVersion") }
     if authority == "authorizedAgent" {
@@ -130,7 +127,7 @@ enum JournalEventSemanticValidator {
     try event.requireStepEnvelope(requiresArgumentsHash: true)
     try event.payload.requireKeys(
       ["step", "target"],
-      optional: event.schemaVersion == JournalEvent.authorizedAgentSchemaVersion
+      optional: JournalEvent.supportsAuthorizationCorrelation(event.schemaVersion)
         ? ["authorizationRef", "usageReservationId"] : [])
     guard let stepValue = event.payload["step"], let targetValue = event.payload["target"] else {
       throw payload(event, "missing step or target")
@@ -162,7 +159,7 @@ enum JournalEventSemanticValidator {
     try event.requireStepEnvelope(requiresArgumentsHash: false)
     try event.payload.requireKeys(
       ["correlatesToIntentEventId", "result", "outcomeCertainty"],
-      optional: event.schemaVersion == JournalEvent.authorizedAgentSchemaVersion
+      optional: JournalEvent.supportsAuthorizationCorrelation(event.schemaVersion)
         ? ["semanticCode", "summary", "authorizationRef", "usageReservationId"]
         : ["semanticCode", "summary"])
     _ = try event.payload.requiredNonemptyString(

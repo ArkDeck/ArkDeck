@@ -199,6 +199,9 @@ enum RockchipAuthorizationFactError: Error, Sendable, Equatable {
 
 struct RockchipTrustedAuthorizationFacts: Sendable, Equatable {
   let plan: RockchipFlashPlan
+  /// Descriptor-bound identity collected for the exact executable used by the trusted probe.
+  /// This remains internal authority evidence; callers cannot synthesize or serialize it.
+  let executableIdentity: ProcessExecutableIdentityReceipt
   let bindingReference: DeviceBindingReference
   let targetDigestSHA256: String
   let serialDigestSHA256: String
@@ -396,7 +399,8 @@ struct RockchipAuthorizationFactCollector: Sendable {
           String(observation.usbVendorID), String(observation.usbProductID),
         ].joined(separator: "|").utf8))
     return RockchipTrustedAuthorizationFacts(
-      plan: plan, bindingReference: durable.reference, targetDigestSHA256: targetDigest,
+      plan: plan, executableIdentity: toolDevice.executableIdentity,
+      bindingReference: durable.reference, targetDigestSHA256: targetDigest,
       serialDigestSHA256: durableSerialDigest, usbTopology: topology,
       observationSequence: readback.observationSequence,
       readbackDeadlineMonotonicNanoseconds: readback.deadlineMonotonicNanoseconds,

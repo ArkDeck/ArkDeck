@@ -1029,6 +1029,7 @@ public struct SessionDiagnosticExporter: Sendable {
     "authorization.destructiveIntentEventIds.*",
     "bindingHistory.*.transport", "bindingHistory.*.confirmedBy",
     "bindingHistory.*.channelProtection", "toolchain.kind", "toolchain.sha256",
+    "toolchain.profileIdentifier", "toolchain.reportedVersion", "toolchain.pathSource",
     "toolchain.serverOwnership", "workflow.kind", "workflow.profileVersion", "steps.*.kind",
     "steps.*.effect", "steps.*.cancellation", "steps.*.bindingRequirement",
     "steps.*.argumentsHash", "steps.*.compensationTrigger", "steps.*.disposition",

@@ -721,6 +721,12 @@ private func sameManifestJournalSnapshot(_ lhs: stat, _ rhs: stat) -> Bool {
 }
 
 private enum LockedSessionManifestValidator {
+  private static let rockchipProfileIdentifier = "ROCKCHIP-ROCKUSB-DISCOVERY@1.0.0"
+  private static let rockchipReportedVersion = "rkdeveloptool ver 1.32"
+  private static let rockchipExecutableSHA256 =
+    "038a8a0ea26ef7eb77451789f310c0c9fbeaf43a78af1d6146e02311a9c23611"
+  private static let rockchipPathSource = "userSelectedSecurityScopedBookmark"
+
   private static let topLevelKeys: Set<String> = [
     "schemaVersion", "appVersion", "coreSpecBaseline", "platformProfile", "sessionId",
     "jobId", "status", "executionMode", "executionAuthority", "outcomeCertainty",
@@ -731,7 +737,7 @@ private enum LockedSessionManifestValidator {
 
   static func validate(_ object: [String: JSONValue]) throws {
     let schemaVersion = try object.manifestString("schemaVersion")
-    guard schemaVersion == "1.0.0" || schemaVersion == "2.0.0" else {
+    guard ["1.0.0", "2.0.0", "2.1.0"].contains(schemaVersion) else {
       throw failure("unsupported schemaVersion")
     }
     if schemaVersion == "1.0.0" {
@@ -753,7 +759,7 @@ private enum LockedSessionManifestValidator {
       object, "status", ["planned", "succeeded", "failed", "cancelled", "interrupted"])
     let mode = try enumValue(object, "executionMode", ["execute", "planOnly", "simulated"])
     let authorities =
-      schemaVersion == "2.0.0"
+      schemaVersion == "2.0.0" || schemaVersion == "2.1.0"
       ? ["interactiveUser", "standardAgent", "controlledHardwareLab", "authorizedAgent"]
       : ["interactiveUser", "standardAgent", "controlledHardwareLab"]
     let authority = try enumValue(object, "executionAuthority", authorities)
@@ -778,7 +784,9 @@ private enum LockedSessionManifestValidator {
       guard case .object(let binding) = value else { throw failure("binding must be object") }
       try validateBinding(binding, simulated: mode == "simulated")
     }
-    try validateToolchain(try object.manifestObject("toolchain"), simulated: mode == "simulated")
+    try validateToolchain(
+      try object.manifestObject("toolchain"), schemaVersion: schemaVersion,
+      simulated: mode == "simulated")
     try validateWorkflow(try object.manifestObject("workflow"), simulated: mode == "simulated")
 
     let steps = try object.manifestArray("steps")
@@ -788,9 +796,9 @@ private enum LockedSessionManifestValidator {
     let compensations = try object.manifestArray("compensations")
     try compensations.forEach(validateCompensation)
     let confirmations = try object.manifestArray("confirmations")
-    try confirmations.forEach {
+    for confirmation in confirmations {
       try validateConfirmation(
-        $0, schemaVersion: schemaVersion, authority: authority,
+        confirmation, schemaVersion: schemaVersion, authority: authority,
         authorizationReference: authorization?.authorizationReference)
     }
     let artifacts = try object.manifestArray("artifacts")
@@ -811,7 +819,7 @@ private enum LockedSessionManifestValidator {
     try validateConditionals(
       object: object, status: status, mode: mode, authority: authority, certainty: certainty,
       steps: steps, parameters: parameters, compensations: compensations)
-    if schemaVersion == "2.0.0", mode == "simulated" {
+    if schemaVersion != "1.0.0", mode == "simulated" {
       for value in steps {
         guard case .object(let step) = value,
           try step.manifestString("effect") == "destructive"
@@ -905,7 +913,31 @@ private enum LockedSessionManifestValidator {
     }
   }
 
-  private static func validateToolchain(_ object: [String: JSONValue], simulated: Bool) throws {
+  private static func validateToolchain(
+    _ object: [String: JSONValue], schemaVersion: String, simulated: Bool
+  ) throws {
+    if object["kind"] == .string("rockchip") {
+      guard schemaVersion == "2.1.0", !simulated else {
+        throw failure("rockchip toolchain requires non-simulated schemaVersion 2.1.0")
+      }
+      try object.manifestRequireKeys([
+        "kind", "profileIdentifier", "reportedVersion", "sha256", "pathSource",
+        "descriptorIdentity",
+      ])
+      guard try object.manifestString("profileIdentifier") == rockchipProfileIdentifier,
+        try object.manifestString("reportedVersion") == rockchipReportedVersion,
+        try object.manifestString("sha256") == rockchipExecutableSHA256,
+        try object.manifestString("pathSource") == rockchipPathSource
+      else { throw failure("rockchip toolchain does not match the pinned integration profile") }
+      let identity = try object.manifestObject("descriptorIdentity")
+      try identity.manifestRequireKeys(["device", "inode", "fileSize", "mode"])
+      guard try identity.manifestUnsignedInteger("device") > 0,
+        try identity.manifestUnsignedInteger("inode") > 0,
+        try identity.manifestInteger("fileSize") > 0,
+        let mode = UInt32(exactly: try identity.manifestUnsignedInteger("mode")), mode > 0
+      else { throw failure("rockchip descriptor identity contains a non-positive field") }
+      return
+    }
     let allowed: Set<String> = [
       "kind", "source", "path", "sha256", "clientVersion", "serverVersion", "daemonVersion",
       "endpoint", "serverGeneration", "serverOwnership",
@@ -1637,6 +1669,15 @@ extension Dictionary where Key == String, Value == JSONValue {
     case .integer(let integer): return integer
     case .unsignedInteger(let integer) where integer <= UInt64(Int64.max): return Int64(integer)
     default: throw SessionStorageError.invalidManifest("\(key) must be integer")
+    }
+  }
+
+  fileprivate func manifestUnsignedInteger(_ key: String) throws -> UInt64 {
+    guard let value = self[key] else { throw SessionStorageError.invalidManifest("missing \(key)") }
+    switch value {
+    case .integer(let integer) where integer >= 0: return UInt64(integer)
+    case .unsignedInteger(let integer): return integer
+    default: throw SessionStorageError.invalidManifest("\(key) must be unsigned integer")
     }
   }
 
