@@ -36,6 +36,16 @@
     升级)**。canary 红反证须在 r2 形态下重做(r1 轮的红 = 编译错而非注入
     测试,无效,已在 run.md 如实入档)。其余 r1 钉定(触发面/权限/timeout/
     concurrency/无 cache/路径感知/summary)不变。
+  - **Swift baseline re-pin(r3,2026-07-22,D1;仅在维护者 review/merge 本
+    readiness r3 PR 后生效)**:r1 的 346 tests 基线来自
+    `c15814593ea3d46149e749d3a47121ea70af1cea`,早于 TASK-AIN-007 实现 #326。
+    #326 新增两组 Rockchip executor/fault contract tests 后,MECH-001 r2 形态的
+    首个全量绿 run `29924110657` 已实测 **358 tests / 1 skipped / 0 failures**;
+    增量 +12 可逐项归因于该已合入任务,不是 skip、删除或静默漂移。于最新
+    protected `main` `2ad9278d84b21aa516f74053e1031dcd8014720d` 使用同一
+    Apple Swift 6.3.3/Xcode 26.6(17F113)再次全量复验 = **358 / 1 / 0**。
+    本 r3 只接受 346→358 的基线前移;runner/Xcode、workflow 形态、canary 红门、
+    真实 PR 绿 run 数量门、required-status D2 边界与 task `ready` 状态全部不变。
   - workflow 形态钉定:触发 = `pull_request` + push `main`/`agent/**`(与
     sdd-guard 对齐);`permissions: contents: read`、零 secret;
     `timeout-minutes: 30`;concurrency = 同 ref 后发取消先发;v1 无 cache
