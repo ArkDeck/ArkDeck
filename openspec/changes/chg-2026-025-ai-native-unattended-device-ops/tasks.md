@@ -321,8 +321,14 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
 
 ## TASK-AIN-005 — authorized-agent locked contract closure
 
-- Status:ready（仅在维护者 review/merge 本独立 readiness PR 后生效；本 PR 只修改本任务
-  状态、pins 与实现边界，不含 contract/code/test/evidence 实现）
+- Status:done
+- Done:2026-07-22；实现经 #302 合入 main（merge commit
+  `c909de882a327a9d4947a61c68735babde4e9685`；reviewed head
+  `00c62cf6785c3e9e32f3675c8d141422688e1be0`）；done recheck 于合入版复验：Swift
+  全量 330/1 skipped/0 failures，AIN-CONTRACT-001 三项 canonical 摘要全 PASS，三个新增
+  schema Draft 2020-12 校验通过，guard 0/0/111；reviewed head 到 merge commit 在
+  TASK-AIN-005 实现范围内 tree diff = 0；evidence =
+  `evidence/runs/TASK-AIN-005/2026-07-22-contract-implementation.md`
 - Readiness review（2026-07-22；host-only 审计，device/HDC/network/external-process
   dispatch 均为 0）：
   - Approval/dependency gate:satisfied。r2 amendment PR #299 已由维护者 `lvye` merge，
