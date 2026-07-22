@@ -1,7 +1,9 @@
 # Verification Plan
 
-> Change:CHG-2026-025-ai-native-unattended-device-ops
+> Change:CHG-2026-025-ai-native-unattended-device-ops@r2
 > Status:planned # 结论经维护者在 PR 中确认
+> Revision review:2026-07-22 已逐项对照 r2 security-remediation、TASK-AIN-005/006/
+> 008/007 与 AIN-004 stop gate;本计划不复用 superseded #296 readiness/authorization。
 
 ## Environment
 
@@ -10,6 +12,9 @@
 - Host:macOS(现行 Swift 全量基线为回归底线);Device:DAYU200(RK3568),
   pinned 参考镜像 7.0.0.33
 - toolchain/HDC/Provider 版本与全部 hash 于各任务 readiness PR 钉定(全 OID)
+- authorized-agent persistence 采用 AIN-005 + AIN-008 的 closed contract：
+  authorization-usage `1.0.0`，Manifest/Journal `2.1.0` Rockchip toolchain 与
+  descriptor-bound executable identity；v1/v2 历史 bytes/语义不改写
 
 ## Acceptance matrix
 
@@ -23,8 +28,8 @@
 | AIN-AUTH-PROV-001(change-local,r2) | provenance contract：任意 caller file/worktree override/历史 main/伪造 carrier/无 CODEOWNER approval 全 reject；fresh protected-main grant accept | passed | TASK-AIN-006 run 记录 |
 | AIN-FACT-001(change-local,r2) | caller context 注入、stale readback、非 durable binding、tool/plan drift 全 dispatch=0；可信 port 同 Job 关联正例通过 | passed | TASK-AIN-006 run 记录 |
 | AIN-USAGE-001(change-local,r2) | 并发/崩溃/重试 fault test：`maxRuns=1` 只有一个 durable reservation，crash 不退款、不重复 dispatch | passed | TASK-AIN-006 run 记录 |
-| AIN-CONTRACT-001(change-local,r2) | authorizedAgent manifest/journal/usage round-trip；standardAgent destructive success 与无 ref intent 全 reject；v1 历史仍可读 | passed | TASK-AIN-005 run 记录 |
-| AIN-DISPATCH-001(change-local,r2) | fake descriptor executor 端到端：grant→reservation→intent→固定 argv→semantic outcome→manifest；handoff/external-shell dispatch=0 | passed | TASK-AIN-007 run 记录 |
+| AIN-CONTRACT-001(change-local,r2) | authorizedAgent manifest/journal/usage round-trip + AIN-008 Manifest/Journal 2.1 Rockchip persistence/identity regression；standardAgent destructive success 与无 ref intent 全 reject；v1/v2 历史仍可读 | passed | TASK-AIN-005/008 run 记录 |
+| AIN-DISPATCH-001(change-local,r2) | AIN-008 descriptor-bound admission 前置 + AIN-007 fake descriptor executor 端到端：grant→reservation→intent→固定 argv→semantic outcome→manifest；handoff/external-shell dispatch=0 | passed | TASK-AIN-008/007 run 记录 |
 
 ## Negative and recovery tests
 
@@ -36,6 +41,9 @@
   ceiling 不超发且 unknown 不退款；
 - fake product executor 必须证明实际 argv 只来自 typed Provider plan；测试输出
   `dispatch=0` 的 handoff-only 路径不能再作为 AIN-004 readiness 依据；
+- Manifest/Journal v1/v2 不得伪装 Rockchip authorized success；2.1 toolchain
+  profile/version/hash/descriptor identity 任一漂移须在 spawn 前拒绝，且 AIN-006
+  verified executable receipt 必须与 AIN-007 每次 identity-bound spawn 同次关联；
 - 刷机中断电/未回连 → 沿用 POL-RECOVERY-001 outcomeUnknown 语义,恢复路径 =
   CHG-2026-016 Loader wlx runbook(已演练);
 - privacy scan:序列号字节不入仓(只入摘要),transcript 脱敏(RF-001/002 先例);
@@ -47,10 +55,13 @@
 
 ## Result gate
 
+- [ ] TASK-AIN-001/002/003/005/006/008/007/004 全部 done，且 AIN-004 使用四项
+  host remediation 的 fresh main OID 重新 readiness（不复用 #296）
 - [ ] 所有适用 AC passed 且 evidence 可复查
 - [ ] Simulation/fake 未计入硬件支持
 - [ ] executor.kind=agent 的 evidence 全部携带可解引用的 authorizationRef
 - [ ] Traceability updated(AC-FLASH-015-03 入 registry,111 → 112)
-- [ ] AIN-AUTH-PROV/FACT/USAGE/CONTRACT/DISPATCH-001 全部有独立 run evidence
+- [ ] AIN-AUTH-PROV/FACT/USAGE/CONTRACT/DISPATCH-001 全部有独立 run evidence，
+  且 AIN-008 的 2.1 persistence/descriptor-identity regression evidence 在案
 - [ ] standardAgent/ordinary CI 与 caller-supplied context 的 destructive dispatch 恒为 0
 - [ ] AIN-004 使用的新 authorization 在执行时 fresh、未超次且由产品 executor 消费
