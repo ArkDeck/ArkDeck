@@ -1,0 +1,78 @@
+name: Swift CI
+
+# CHG-2026-028 TASK-MECH-001(readiness #323 pins)。
+# 授权语义不变:CI 红 = 不能合并;CI 绿 ≠ 批准(enforcement"CI 校验"节)。
+# 零 secret;只读权限。覆盖边界:仅 Packages/ArkDeckKit 全量 swift test;
+# ArkDeckApp 与 XCUITest 面不在本 job(见 job summary,不伪装覆盖)。
+# 路径感知:diff 未触碰 Swift 面(Packages/**、Package.*)时秒级 success;
+# diff 基准不可得时 fail closed = 跑全量(宁多跑不漏跑)。
+
+on:
+  push:
+    branches: [main, "agent/**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: swift-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  swift:
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine Swift-relevant diff
+        id: paths
+        run: |
+          set -eu
+          BASE=""
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+          elif [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ] \
+            && git cat-file -e "${{ github.event.before }}" 2>/dev/null; then
+            BASE="${{ github.event.before }}"
+          fi
+          if [ -z "$BASE" ]; then
+            # 无可靠 diff 基准(分支新建/force 场景)→ fail closed:跑全量
+            echo "swift=true" >> "$GITHUB_OUTPUT"
+            echo "reason=no-diff-base-fail-closed" >> "$GITHUB_OUTPUT"
+          elif git diff --name-only "$BASE" "${{ github.sha }}" | grep -qE '^(Packages/|Package\.)'; then
+            echo "swift=true" >> "$GITHUB_OUTPUT"
+            echo "reason=swift-surface-touched" >> "$GITHUB_OUTPUT"
+          else
+            echo "swift=false" >> "$GITHUB_OUTPUT"
+            echo "reason=no-swift-surface" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Toolchain versions
+        if: steps.paths.outputs.swift == 'true'
+        run: |
+          sw_vers
+          xcodebuild -version
+          swift --version
+
+      - name: swift test (ArkDeckKit full suite)
+        if: steps.paths.outputs.swift == 'true'
+        run: swift test --package-path Packages/ArkDeckKit
+
+      - name: Job summary
+        if: always()
+        run: |
+          {
+            echo "### Swift CI"
+            echo "- Path decision: \`${{ steps.paths.outputs.reason }}\`"
+            if [ "${{ steps.paths.outputs.swift }}" = "true" ]; then
+              echo "- Ran the full ArkDeckKit test suite."
+            else
+              echo "- Skipped swift test: diff touches no Swift surface (Packages/**, Package.*)."
+            fi
+            echo "- Coverage boundary: Packages/ArkDeckKit only. ArkDeckApp and XCUITest surfaces are NOT covered by this job."
+            echo "- CI green is not approval; authorization stays with maintainer PR review (governance/enforcement.md)."
+          } >> "$GITHUB_STEP_SUMMARY"
