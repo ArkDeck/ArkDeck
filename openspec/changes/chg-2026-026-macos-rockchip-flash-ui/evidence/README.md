@@ -1,13 +1,20 @@
 # CHG-2026-026 Evidence
 
 本 change 已由 PR #298 合入 `main` 后成为 `approved`；当前只有
-`TASK-RKFUI-001` 为 `ready`。该任务的实现/E0 尝试记录位于：
+`TASK-RKFUI-001` 为 `ready`。
 
-未来 run 位置：
+已有 evidence：
 
 ```text
 evidence/runs/TASK-RKFUI-001/run.md
 evidence/runs/TASK-RKFUI-001/sanitized-e0-receipt.json
+evidence/runs/TASK-RKFUI-001/diagnostic-alignment-2026-07-22.md
+evidence/runs/TASK-RKFUI-001/review-nits-2026-07-22.md
+```
+
+未来 run 位置：
+
+```text
 evidence/runs/TASK-RKFUI-002/
 evidence/runs/TASK-RKFUI-003/
 evidence/runs/TASK-RKFUI-004/

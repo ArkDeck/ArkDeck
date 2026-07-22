@@ -181,6 +181,14 @@ final class RockchipDeviceDiscoveryContractTests: XCTestCase {
     XCTAssertEqual(
       RockchipLDOutputParser.parse(stdout: validPlusGarbage),
       .blocked(.malformedLine(line: 2)))
+
+    let carriageReturnOutput = Data(
+      "DevNo=1\tVid=0x2207,Pid=0x350a,LocationID=2\tLoader\r\n".utf8)
+    let carriageReturnResult = RockchipLDOutputParser.parse(stdout: carriageReturnOutput)
+    XCTAssertEqual(carriageReturnResult, .blocked(.unexpectedCarriageReturn))
+    XCTAssertEqual(
+      RockchipDeviceAccessAdvisor.verdict(for: carriageReturnResult), .malformedOutput)
+
     XCTAssertEqual(
       RockchipLDOutputParser.parse(
         stdout: Data(repeating: 0x41, count: RockchipLDOutputParser.maximumOutputBytes + 1)),

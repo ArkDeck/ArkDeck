@@ -28,6 +28,38 @@ private struct ProbeEnvelope: Codable {
   let launchErrorCode: Int?
 }
 
+private enum ProbeOutputStream {
+  case stdout
+  case stderr
+}
+
+private final class ProbeOutputCapture: @unchecked Sendable {
+  private static let maximumStoredBytes = 64 * 1024 + 1
+
+  private let lock = NSLock()
+  private var stdout = Data()
+  private var stderr = Data()
+
+  func append(_ bytes: Data, to stream: ProbeOutputStream) {
+    lock.lock()
+    defer { lock.unlock() }
+
+    let remaining = max(0, Self.maximumStoredBytes - stdout.count - stderr.count)
+    guard remaining > 0 else { return }
+    let storedBytes = bytes.prefix(remaining)
+    switch stream {
+    case .stdout: stdout.append(contentsOf: storedBytes)
+    case .stderr: stderr.append(contentsOf: storedBytes)
+    }
+  }
+
+  func snapshot() -> (stdout: Data, stderr: Data) {
+    lock.lock()
+    defer { lock.unlock() }
+    return (stdout, stderr)
+  }
+}
+
 @main
 private enum RockchipE0ProbeApp {
   static func main() {
@@ -161,6 +193,18 @@ private enum RockchipE0ProbeApp {
 
     do {
       try process.run()
+      try? stdout.fileHandleForWriting.close()
+      try? stderr.fileHandleForWriting.close()
+
+      let outputCapture = ProbeOutputCapture()
+      let readers = DispatchGroup()
+      startReader(
+        for: stdout.fileHandleForReading, stream: .stdout,
+        capture: outputCapture, group: readers)
+      startReader(
+        for: stderr.fileHandleForReading, stream: .stderr,
+        capture: outputCapture, group: readers)
+
       let deadline = Date().addingTimeInterval(5)
       while process.isRunning && Date() < deadline {
         RunLoop.current.run(mode: .default, before: Date().addingTimeInterval(0.05))
@@ -169,10 +213,15 @@ private enum RockchipE0ProbeApp {
       if process.isRunning {
         termination = "timedOut"
         process.terminate()
+        let terminationDeadline = Date().addingTimeInterval(1)
+        while process.isRunning && Date() < terminationDeadline {
+          RunLoop.current.run(mode: .default, before: Date().addingTimeInterval(0.05))
+        }
+        if process.isRunning { kill(process.processIdentifier, SIGKILL) }
       }
       process.waitUntilExit()
-      let stdoutBytes = stdout.fileHandleForReading.readDataToEndOfFile()
-      let stderrBytes = stderr.fileHandleForReading.readDataToEndOfFile()
+      readers.wait()
+      let output = outputCapture.snapshot()
       emit(
         ProbeEnvelope(
           schemaVersion: "1.0.0", selectionCompleted: true,
@@ -182,8 +231,8 @@ private enum RockchipE0ProbeApp {
           preflightFailure: nil, exactArguments: exactArguments,
           childLaunchAttempted: true, termination: termination,
           exitCode: process.terminationStatus,
-          stdoutBase64: stdoutBytes.base64EncodedString(),
-          stderrBase64: stderrBytes.base64EncodedString(),
+          stdoutBase64: output.stdout.base64EncodedString(),
+          stderrBase64: output.stderr.base64EncodedString(),
           launchErrorDomain: nil, launchErrorCode: nil))
     } catch let error as NSError {
       emit(
@@ -196,6 +245,21 @@ private enum RockchipE0ProbeApp {
           childLaunchAttempted: true, termination: "launchFailed", exitCode: nil,
           stdoutBase64: "", stderrBase64: "", launchErrorDomain: error.domain,
           launchErrorCode: error.code))
+    }
+  }
+
+  private static func startReader(
+    for handle: FileHandle,
+    stream: ProbeOutputStream,
+    capture: ProbeOutputCapture,
+    group: DispatchGroup
+  ) {
+    group.enter()
+    DispatchQueue.global(qos: .utility).async {
+      defer { group.leave() }
+      while let bytes = try? handle.read(upToCount: 4 * 1024), !bytes.isEmpty {
+        capture.append(bytes, to: stream)
+      }
     }
   }
 

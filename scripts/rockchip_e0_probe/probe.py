@@ -97,7 +97,7 @@ def parse_ld(stdout: bytes, stderr: bytes, termination: str | None, exit_code: i
     if not stdout:
         return {"verdict": "offlineOrUnauthorized", "diagnostic": "offline", "observations": []}
     if b"\r" in stdout:
-        return {"verdict": "malformedOutput", "diagnostic": "invalidUTF8", "observations": []}
+        return {"verdict": "malformedOutput", "diagnostic": "unexpectedCarriageReturn", "observations": []}
     try:
         stdout.decode("utf-8")
     except UnicodeDecodeError:

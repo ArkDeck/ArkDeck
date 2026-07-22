@@ -36,7 +36,7 @@
       "path": "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/Rockchip/Discovery/1.0.0/maskrom.stdout.bin",
       "sha256": "54b1c907f77ca96e93bb2db15ceffc78478afad42bd93140296f95468aa07731",
       "sizeBytes": 51,
-      "evidenceClass": "controlledHistoricalCapture"
+      "evidenceClass": "syntheticFault"
     },
     {
       "id": "permission-denied-stderr",

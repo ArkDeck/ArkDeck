@@ -135,6 +135,7 @@ public struct RockchipDeviceObservation: Sendable, Equatable {
 public enum RockchipDiscoveryDiagnostic: Error, Sendable, Equatable {
   case outputTooLarge
   case invalidUTF8
+  case unexpectedCarriageReturn
   case unexpectedStandardError
   case permissionDenied
   case driverUnavailable
@@ -199,7 +200,8 @@ public enum RockchipLDOutputParser {
     }
     guard stderr.isEmpty else { return .blocked(.unexpectedStandardError) }
     guard !stdout.isEmpty else { return .blocked(.offline) }
-    guard let text = String(data: stdout, encoding: .utf8), !text.contains("\r") else {
+    guard !stdout.contains(0x0d) else { return .blocked(.unexpectedCarriageReturn) }
+    guard let text = String(data: stdout, encoding: .utf8) else {
       return .blocked(.invalidUTF8)
     }
 
@@ -328,7 +330,8 @@ public enum RockchipDeviceAccessAdvisor {
       case .driverUnavailable: return .driverUnavailable
       case .offline, .unauthorized: return .offlineOrUnauthorized
       case .malformedLine, .numberOutOfRange, .duplicateDeviceNumber, .duplicateLocationID,
-        .unknownMode, .invalidUTF8, .unexpectedStandardError, .outputTooLarge,
+        .unknownMode, .invalidUTF8, .unexpectedCarriageReturn, .unexpectedStandardError,
+        .outputTooLarge,
         .tooManyDevices:
         return .malformedOutput
       case .processTerminated: return .probeFailed

@@ -87,6 +87,15 @@ class RockchipE0ProbeTests(unittest.TestCase):
             PROBE.parse_ld(b"", self.fixture("driver-unavailable.stderr.bin"), "exited", 1)["verdict"],
             "driverUnavailable",
         )
+        carriage_return = self.fixture("success-single-loader.stdout.bin").replace(b"\n", b"\r\n")
+        self.assertEqual(
+            PROBE.parse_ld(carriage_return, b"", "exited", 0),
+            {
+                "verdict": "malformedOutput",
+                "diagnostic": "unexpectedCarriageReturn",
+                "observations": [],
+            },
+        )
 
     def test_combined_standard_output_and_error_must_fit_maximum_output_bytes(self) -> None:
         stdout = b"A" * (63 * 1_024)
