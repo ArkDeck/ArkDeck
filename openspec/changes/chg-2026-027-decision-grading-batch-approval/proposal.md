@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-027-decision-grading-batch-approval
 revision: 1
-status: proposed
+status: approved # 2026-07-22 本 approval-only PR(先例 #226/#253/#254/#281);r1 proposal 经 #315 合入 main `7a58b02`;批准由维护者 review/merge 本 PR 构成
 class: implementation-only
 core_change_level: none
 owner: lvye
@@ -112,3 +112,30 @@ V2 治理:本 propose PR 合入仅登记提案;批准须独立 approval-only PR(
 执行)/done PR。TASK-BAP-001 与 TASK-BAP-003 可并行,TASK-BAP-002 blocked 于
 两者 done。change verified = 三 AC 有可复查证据 + 首次批次演练 evidence 在案
 (另行 verify PR)。
+
+## Approval
+
+- r1 proposal 经 PR #315 合入 main(squash
+  `7a58b026646a3b1ed543cc5e941ddb1d1e02206f`,status:proposed,merged by
+  维护者 @lvye,2026-07-22)。owner 方向确认:2026-07-22 维护者亲自提出
+  "AI 无人值守闭环所有机器可判定的 host-only 任务;遇审批/产品决策/硬件授权
+  暂停并汇总成人类批次审批;批准后自动继续"并指示起草本 change 与批准 PR。
+- 正式批准:2026-07-22 由本 approval-only PR(先例 #55/#89/#171/#195/#226/
+  #253/#254/#281)将本 change 置为 `approved`;批准由维护者 review/merge 本
+  PR 构成。merge 即批准:
+  - **决策分级**:D0/D1/D2 定义与 D0 三条件判定标准(design §1),门类封闭
+    列举、拿不准升级;与 E0/E1/E2 设备执行分级正交;
+  - **批次审批协议**:GitHub issue 队列载体、digest 字段面、入队三门(CI 绿/
+    独立 AI 合前 review APPROVE/digest 完整)、按 digest 声明顺序逐 PR 合并、
+    遇拒停依赖链(design §2);**digest 无批准语义、任何等级无 auto-merge**;
+  - **宽度并行原则**:判断门(D1/D2)后零投机堆叠,吞吐来自多 lane 并行
+    (design §3);
+  - **三任务 scope 与边界**:TASK-BAP-001(enforcement 2.0.0→2.1.0 决策分级+
+    批次协议两小节 + AGENTS.md 同步)、TASK-BAP-002(digest 模板 + 守望循环
+    runbook + 首次批次演练;blocked 于 001+003 done)、TASK-BAP-003(Agent
+    凭据分离落实,human 执行项)的 objective/allowed-paths/验证方式;
+  - **不动面**:唯一信任根(受保护 main + CODEOWNER review)、POL-* 全部
+    原文、V2 PR 链步骤、"CI 绿 ≠ 批准"、E0/E1/E2、CORE baseline(不升版)。
+- 本批准不产生任务执行:三任务保持 `blocked`,各须独立 readiness PR 转
+  `ready`。**本批准亦不构成任何具体批次的预先批准**——批次内每次合并仍是
+  维护者逐 PR 批准,本 change 的协议只组织其节奏。
