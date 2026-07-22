@@ -74,3 +74,26 @@ D2 维护者动作;CI 绿不构成批准。
 - guard-rail 不防恶意谎报其他 task;批准防线仍是维护者逐 PR review。
 - status/propose live 形态只能在对应真实 PR 出现后累计,不以合成 fixture
   冒充;在 evidence gate 未闭合前不得翻 TASK-MECH-004 done。
+
+## Post-merge independent review and remediation(2026-07-22)
+
+- 实现 PR #335 在 PR-event SDD Guard/Swift CI 均为 `action_required`、
+  `allowed-paths` 未执行且独立 review 尚未结束时,由维护者 `lvye` merge;
+  merge OID = `72b295f4987410c57c04cf2d11a4b479bc8f63bf`,review head =
+  `35507506319527bd13833019e024777f0a9af246`,GitHub `reviews=[]`。合入前
+  可见绿只含 push `guard`/Swift;push `allowed-paths` 正确 skipped,不得冒充
+  PR check。main push SDD Guard run `29928566248` success,但同样不验证
+  pull_request live diff。
+- 不同 AI 会话的合后 review 结论 = **REQUEST_CHANGES**,发现两项 blocking:
+  1. workflow 使用 GitHub 默认 `pull_request` activity types,PR title/body/base
+     被 edited 后不重跑,旧绿可能与当前声明或 `base..head` 脱节;
+  2. checker 把 `\\` 改写为 `/`;Linux 上反斜杠是合法文件名字符,根目录
+     `scripts\\outside.py` 会被错误改成 `scripts/outside.py` 并匹配
+     `scripts/**`,形成具体 fail-open。
+- 本独立 remediation 只在原 TASK-MECH-004 allowed paths 内修复:显式订阅
+  `opened/synchronize/reopened/edited`;删除反斜杠改写,直接比较 `git -z`
+  返回的 repository-relative path;新增两项回归测试。无 task status 翻转,
+  不把合后修复伪装成 #335 的合前 APPROVE。
+
+Remediation live PR、canary 红与独立复审链接在新分支 push 后追加;此前
+`MECH-PATH-001` 保持 candidate/not done。

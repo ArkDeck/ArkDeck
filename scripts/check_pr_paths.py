@@ -205,18 +205,22 @@ def check_paths(
     context: PullRequestContext,
     changed_paths: Sequence[str],
 ) -> CheckResult:
-    normalized_paths = tuple(path.replace("\\", "/") for path in changed_paths)
+    # `git diff -z` already returns repository-relative paths with `/` as the
+    # directory separator. On Unix a backslash is a legal filename byte, so
+    # rewriting it would turn a root file such as `scripts\outside.py` into a
+    # false in-scope path under `scripts/**`.
+    repository_paths = tuple(changed_paths)
     task_id = resolve_task_declaration(context)
     if task_id is None:
         offenders = sorted(
-            path for path in normalized_paths if path_matches(path, SENSITIVE_PATTERNS)
+            path for path in repository_paths if path_matches(path, SENSITIVE_PATTERNS)
         )
         if offenders:
             raise CheckError(
                 "PR has no task declaration and touches sensitive paths: "
                 + ", ".join(offenders)
             )
-        return CheckResult(None, normalized_paths, SENSITIVE_PATTERNS)
+        return CheckResult(None, repository_paths, SENSITIVE_PATTERNS)
 
     definitions = load_task_definitions(repo_root)
     task = definitions.get(task_id)
@@ -224,14 +228,14 @@ def check_paths(
         raise CheckError(f"declared task {task_id} does not exist in an active change")
     allowed_patterns = extract_allowed_patterns(repo_root, task)
     offenders = sorted(
-        path for path in normalized_paths if not path_matches(path, allowed_patterns)
+        path for path in repository_paths if not path_matches(path, allowed_patterns)
     )
     if offenders:
         raise CheckError(
             f"declared task {task_id} has paths outside Allowed paths: "
             + ", ".join(offenders)
         )
-    return CheckResult(task_id, normalized_paths, allowed_patterns)
+    return CheckResult(task_id, repository_paths, allowed_patterns)
 
 
 def git_changed_paths(repo_root: Path, base_oid: str, head_oid: str) -> tuple[str, ...]:
