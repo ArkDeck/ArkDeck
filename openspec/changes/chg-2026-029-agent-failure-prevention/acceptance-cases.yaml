@@ -1,0 +1,48 @@
+---
+schema_version: 1.0.0
+change_id: CHG-2026-029-agent-failure-prevention
+change_revision: 1
+platform: macos
+evidence_classes:
+- documentReview
+cases:
+- acceptance_id: AFP-HANDBOOK-001
+  test_id: TEST-AFP-HANDBOOK-001
+  method: Non-normative handbook structure, provenance, authority and privacy review.
+  expected_source: openspec/changes/chg-2026-029-agent-failure-prevention/verification.md#AFP-HANDBOOK-001
+  minimum_evidence: documentReview
+  expected_result: >-
+    The handbook declares its non-normative authority and conflict boundary on
+    the first screen; AF-001 through AF-009 are unique and each contains a
+    signal, observed repository cases, root cause, preflight, positive and
+    negative verification, canonical references, an honest automation status,
+    and currency bound to a full protected-main OID and date. Links resolve,
+    facts and inferences are distinct, raw or sensitive evidence is not copied,
+    no normative or approval semantics are created, and archive bytes are not
+    modified.
+- acceptance_id: AFP-TEMPLATE-001
+  test_id: TEST-AFP-TEMPLATE-001
+  method: Before-and-after document review of the three change templates.
+  expected_source: openspec/changes/chg-2026-029-agent-failure-prevention/verification.md#AFP-TEMPLATE-001
+  minimum_evidence: documentReview
+  expected_result: >-
+    The task, design and evidence-run templates add the bounded fields defined
+    by design section 4 without deleting or relaxing any existing scope,
+    dependency, risk, hardware, failure, security, verification or evidence
+    classification entry. An honest not-applicable answer requires a reason
+    and is not an automatic pass; the templates create no approval or status
+    semantics, do not upgrade fake or simulation evidence, and do not let the
+    handbook override a canonical rule.
+- acceptance_id: AFP-DRILL-001
+  test_id: TEST-AFP-DRILL-001
+  method: Fixed historical-case detection drill using repository audit records only.
+  expected_source: openspec/changes/chg-2026-029-agent-failure-prevention/verification.md#AFP-DRILL-001
+  minimum_evidence: documentReview
+  expected_result: >-
+    Six readiness-pinned historical case families each map to the earliest
+    trigger stage, an AF identifier, a concrete template field, the action that
+    should have occurred, and the repository evidence that ultimately exposed
+    the problem. At least one environment-only counterexample remains an
+    environment blocker or deviation rather than a product failure. The drill
+    changes no historical bytes or conclusions and creates no production,
+    hardware, conformance, support or release claim.
