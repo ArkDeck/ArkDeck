@@ -704,20 +704,23 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
 
 ## TASK-AIN-007 — product-owned Rockchip typed executor
 
-- Status:blocked（#310 readiness 在实现前 recheck 发现 Manifest toolchain 表达与 admission
-  executable identity retention 两项 P0 缺口，见 TASK-AIN-008/设计 §13；#310 作为历史保留但
-  不得用于实现或 dispatch。等待 AIN-008 done 后以新 main/OID 独立重做 readiness）
+- Status:ready（仅在维护者 review/merge 本 readiness PR 后生效；本 PR 只更新 `tasks.md`，
+  不含实现、授权、设备操作或 dispatch。#310 readiness 因设计 §13 的两项 P0 缺口失效并仅作
+  历史保留；本 readiness 不继承 #310 的 base/OID）
 - Platform:macos
 - Requirements:REQ-FLASH-008/009/011/012/013/015、POL-WORKFLOW-001、
   POL-RECOVERY-001
 - Acceptance:AIN-DISPATCH-001；AC-FLASH-008-01、012-01、013-01、015-03 contract 面
 - Depends on:TASK-AIN-005、TASK-AIN-006、TASK-AIN-008
 - Readiness reviewed:2026-07-22；base = protected `main`
-  `ce7b48e9ed5bd135ce6e77e0b43d32e21efe8e06`（#309 merge，AIN-006 done），审计时
-  open PR = 0。TASK-AIN-005 已由 #304 done；TASK-AIN-006 实现 #307、evidence 修正
-  #308 与 done #309 均已合入；#309 head
-  `7082b9f7d41128862650d94973e8524ab6a42d0f` 到 merge commit 在 `tasks.md` tree
-  diff = 0。
+  `2c2d0d523cb62ecb8c71ed4877b11f7279cef568`（#313 merge，AIN-008 done），审计时
+  open PR = 0。TASK-AIN-005/006 已 done；TASK-AIN-008 实现 #312（head
+  `ea81120218b004ff9a3193fd7fa24a933a9d4bea`，merge
+  `de988f19cf9d1200523370c797ed5f70718eda11`）与 done #313（head
+  `c5048baaf2e0cf88a5e30f9e9a6ad202ffedaa54`，merge = 本 base）均已合入，两个
+  reviewed head 到各自 merge commit 的 tree diff 均为 0。设计 §13 的 Manifest toolchain
+  与 admission executable identity retention 缺口已由 AIN-008 的 exact `2.1.0` contract
+  关闭；依赖、文件面、composition、fake-only 验证路径与 current APIs 已重新审计。
 - Allowed paths（实现 PR 的封闭文件面）：
   - 修改 `Packages/ArkDeckKit/Package.swift`
     `dc2374629ac6b0235302312b59717e0f565c7ed2`（仅给 `ArkDeckWorkflows` 增加
@@ -734,32 +737,46 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
   - 新增 `Packages/ArkDeckKit/Tests/ArkDeckFakeRockchipFixture/main.swift`
   - 新增本 change `evidence/runs/TASK-AIN-007/**`
 - Read-only implementation inputs（不得修改；任一 blob 漂移即本 readiness 失效重查）：
-  - admission/facts/gate：`AuthorizationAdmission.swift`
+  - provenance/admission/facts/gate：`AuthorizationProvenance.swift`
+    `3f6c18fcece43b5754ec9e4ea4a2149481c1b228`、`AuthorizationAdmission.swift`
     `69fec8990c7cb68c989460ee883bbe358900cc96`、`RockchipAuthorizationFacts.swift`
-    `a5df9a5a5c496b894f59c30a0497f393c5a7fc20`、`RockchipFlashAuthorization.swift`
+    `971fe98feb9c9f5debf4abef948420383570f8ef`、`RockchipFlashAuthorization.swift`
     `a3fb1711271d32119db861a351ce2f2aa70c94fd`；
   - Provider/profile/archive/discovery：`RockchipRockUSBFlashProvider.swift`
     `8a30eb828773260d8b02b854d03a63ecf2da124f`、`RockchipFlashProfile.swift`
     `de82a3a008b95ef63148f7c9e4374298e6671328`、`GzipTarArchiveReader.swift`
     `36daf0eea9279790258d1ffaa1d87365cd1489d1`、`RockchipDeviceDiscovery.swift`
-    `67f585324d002f80c2682a1bdaa9ae7d11ed035a`、Rockchip integration profile
-    `433263fc3f4f15bad798758a29e77740a43ef812`；
+    `67f585324d002f80c2682a1bdaa9ae7d11ed035a`、Rockchip integration profile 目录 tree
+    `d4c5b3724506013a06a8a5d928e7856a778c6733`（其中 `registry.yaml`
+    `f7fa0945f70730bca601f81955a3faea411a19f3`）；
   - process/runtime/storage：`ArkDeckProcess.swift`
     `b1d5f423c004f4ba15b15a8cf862ed2085d8bcc9`、`PowerActivity.swift`
-    `9d887070a21eac8140cfca236bbde29492d007a5`、`ArtifactStorage.swift`
+    `9d887070a21eac8140cfca236bbde29492d007a5`、`SleepWake.swift`
+    `1fb6972c5690dea6c6cc9465eb83a2edc21c1215`、`ArtifactStorage.swift`
     `635f4da53094305dc52dff6ebdb26e1ccb026ea1`、`AuthorizationUsageLedger.swift`
     `d87d93caf9fba52e34bdfbaa9a5eb6e16c7cc1b9`、`DurableFiles.swift`
     `039fbb891fdc78c3cf19acc47b3f1231b9dde5c0`、`JournalEvent.swift`
-    `38759bdfd8aa749f107f1cb1f74f2dece8a4c01f`、`JournalEventValidation.swift`
-    `bfbff8430c1f5bd12745ec0847f7581165db1dca`、`JournalReplay.swift`
-    `3614aaeb5db541ca7009ef6b0c84abdef7bb1c1f`、`SessionManifest.swift`
-    `739859546298a6aa5131221beb795722f49d9df6`、`SessionLayout.swift`
-    `ed48f90a96ee239769e86727ae9272017fea72f7`、`DeviceBindingJournalAdapter.swift`
-    `b07a8c7a8b5d45e335b2ec5dc04dd18cba48dde4`；
-  - locked deltas：provider v2 `3413edf56811ac30bef833f324cbdf59cff9ce52`、journal v2
-    `6285acd4ca0350d427aa624afa91be3107769a64`、manifest v2
-    `9ac334013968a5aba1a0bd77fe2acc982ba0e680`、usage v1
-    `b232db49d2d76fc2eb96fed6b7d0230455d99345`。
+    `48103ee11ac7dd343518718df66a65ad987eddb6`、`JournalEventValidation.swift`
+    `a038703f88cff61ad5ed23c8dbc02bf6bf79db72`、`JournalReplay.swift`
+    `9ea0b4aea122937cc206922a32b13170859e092c`、`SessionManifest.swift`
+    `2e168e49abad60e165cec6e49df41d429c5d9ff0`、`SessionLayout.swift`
+    `ed48f90a96ee239769e86727ae9272017fea72f7`、`RetentionAndExport.swift`
+    `ed53dcd3e911bc8ff968b7f1e22f51cefe5a0d94`、`DeviceBindingJournalAdapter.swift`
+    `b07a8c7a8b5d45e335b2ec5dc04dd18cba48dde4`；对应 Process/Runtime/Storage
+    source tree 分别 pin `9f039fc495d7334fe2c7173376b322db9cc10f63`、
+    `852adaa7cc5aa17dc08eeda7197cab49634293bf`、
+    `33dfb05f71e0a4cfc0980178c774992798178ea0`；
+  - locked deltas/contracts：provider v2
+    `3413edf56811ac30bef833f324cbdf59cff9ce52`、historical journal v2
+    `6285acd4ca0350d427aa624afa91be3107769a64`、historical manifest v2
+    `9ac334013968a5aba1a0bd77fe2acc982ba0e680`、exact journal 2.1
+    `ef71f22c45a7bc06bcde35b0606e94fb6bb79037`、exact manifest 2.1
+    `02c7f27a9d65cbbca6e8fe23535ae8e62e398e7c`、usage v1
+    `b232db49d2d76fc2eb96fed6b7d0230455d99345`；AIN-008 regression tests
+    `AuthorizationAdmissionContractTests.swift`
+    `b8cc11c91248437c13b8ce7214759e9bd750243e` 与
+    `SessionArtifactStorageContractTests.swift`
+    `68904a3f9ac87d70c31547c3242af86c232807a1`。
 - Forbidden paths:
   - 除上列文件外的全部 `Packages/**`，尤其 Core/Process/Runtime/Storage、现行
     Provider/Profile/admission/facts/gate/discovery；需要修改即停止并另提 scope amendment
@@ -781,7 +798,7 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
   `FoundationProcessExecutor` 由 composition root 固定持有；仅 `@testable` package-internal
   initializer 可注入 deterministic ports/fake descriptor。Agent/CLI 永远拿不到 admission、
   prepared launch、open descriptor 或 raw executor。
-- 顺序固定为 admission(grant→facts→usage reservation)→v2 `authorizedAgent` jobCreated→gate
+- 顺序固定为 admission(grant→facts→usage reservation)→2.1 `authorizedAgent` jobCreated→gate
   plan correlation→one-shot admission consume(validUntil/readback deadline 再验)→逐 Step durable
   intent→descriptor-bound spawn→raw Artifact + semantic result→durable outcome→postflight→
   terminal Manifest。任一阶段不确定即停止；reservation 不退款，未知 destructive intent 不重放。
@@ -806,7 +823,7 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
   必须语义通过；exit 0 单独永不成功。stdout/stderr 分流写 bounded raw Artifact；Manifest 只在
   journal replay、Artifact hash、exact plan、九个 write outcomes、reset 与 postflight 全关联后
   原子发布。
-- 所有 external-effect Step 先 durable intent 后 launch；v2 jobCreated 与每个 destructive
+- 所有 external-effect Step 先 durable intent 后 launch；2.1 jobCreated 与每个 destructive
   wlx intent/outcome 携带同一 `authorizationRef`/`usageReservationId`，Manifest 的
   authorizedAgent actor/intent set 与 journal 精确相等。fake run 只能标 contract/fake，绝不
   产生 v3 realHardware evidence 或 hardware support 声明。
@@ -820,7 +837,7 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
 
 - `TEST-AIN-DISPATCH-001`：真实 AIN-005/006 contract 类型 + repository-built fake descriptor
   端到端；process argv 精确为 1×ld、1×ppt、9×wlx、1×rd，九个 image descriptor 的 bytes/
-  hash 对应 Profile；v2 job/intent/outcome/Manifest correlation 全 PASS；handoff/shell/sudo/
+  hash 对应 Profile；2.1 job/intent/outcome/Manifest correlation 全 PASS；handoff/shell/sudo/
   caller-command dispatch=0，real device/HDC/rkdeveloptool/network=0。
 - admission negatives：无 grant、伪 carrier、fact/plan/readback/tool identity drift、expired/
   exhausted usage、capability reuse、CLI injection 全部在首个 fake spawn 前拒绝；usage 已 reserve
@@ -836,8 +853,13 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
 - cancellation/power/staging matrix：九个 critical window 逐一 cancel/exit，当前 child
   force-kill=0、后续 dispatch=0、activity 全路径归零；sleep/wake、ENOSPC、archive traversal/
   duplicate/link、stage path replacement、executable inode/hash replacement全部 fail closed。
+- fake/production boundary：production initializer 只接受 actual pinned profile/hash/bookmark 与
+  descriptor receipt；测试注入仅存在于 package-internal initializer，fixture/port 结果必须显式
+  标为 contract/fake，不能生成 realHardware evidence 或 support 声明。2.1 persistence payload
+  仍使用 closed production shape；synthetic receipt 只证明相关性规则，不冒充实际生产 tool
+  identity，Foundation descriptor/hash/replace 行为由真实 fixture fault tests 单独覆盖。
 - readiness baseline（上述 base 实测）：macOS 26.5.2 (25F84)、Xcode 26.6 (17F113)、Swift
-  6.3.3；Swift 全量 **345 tests / 1 skipped / 0 failures**，guard **0 errors / 0 warnings /
+  6.3.3；Swift 全量 **346 tests / 1 skipped / 0 failures**，guard **0 errors / 0 warnings /
   111 acceptance IDs**。实现 PR 须运行新增两组焦点测试、现行 Provider/authorization/
   process/runtime/storage/journal 回归与全量 Swift，strict format/diff/scope/privacy/no-live-
   dispatch 审计，并在 `evidence/runs/TASK-AIN-007/` 记录命令、结果、偏差与残余风险；任务
