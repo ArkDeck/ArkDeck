@@ -136,6 +136,7 @@ change approved 前保持 blocked;approved 后每任务另需独立 readiness PR
 ## TASK-AIN-003 — ArkDeckKit 执行门 standing-authorization 路径
 
 - Status:ready
+- Candidate:2026-07-22 实现交付于本 PR(五门全 PASS;全量 323/1skip/2 已知环境性 = 基线+3 零回退;既有 015-01/02 输出逐字不变;授权载体 JSON 化偏差已记 run);done 翻转须独立 PR 复核合入版
 - Platform:macos
 - Requirements:REQ-FLASH-015(MODIFIED)
 - Acceptance:AC-FLASH-015-01、AC-FLASH-015-02、AC-FLASH-015-03(contract 面)
