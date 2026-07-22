@@ -97,3 +97,34 @@ D2 维护者动作;CI 绿不构成批准。
 
 Remediation live PR、canary 红与独立复审链接在新分支 push 后追加;此前
 `MECH-PATH-001` 保持 candidate/not done。
+
+### Remediation live evidence
+
+- Remediation PR
+  [#336](https://github.com/ArkDeck/ArkDeck/pull/336),head
+  `961af7db70847d19ea8d131e483a2481da887711`:PR body `edited` 触发
+  [SDD Guard 29929295656](https://github.com/ArkDeck/ArkDeck/actions/runs/29929295656),
+  `guard` **SUCCESS** + `allowed-paths` **SUCCESS**;后者先完成 12 项 contract
+  tests,再对 live `base..head` diff PASS。这是实际 `pull_request` run,不是
+  push skipped job。
+- 不同 AI 会话对上述 remediation head 独立复审 = **APPROVE**:两项原
+  blocking 均关闭,无新 blocking;复跑 12/12、py_compile、0/0/111、diff
+  check 全绿;reviewer 未在 GitHub approve/merge。
+- Draft canary
+  [#337](https://github.com/ArkDeck/ArkDeck/pull/337),head
+  `651c2d6ed783e04c8b8d57ef6a83b443f24e999c`:只额外加入越界
+  `docs/mech-004-canary.md`。body `edited` 触发
+  [SDD Guard 29929641697](https://github.com/ArkDeck/ArkDeck/actions/runs/29929641697):
+  `guard` SUCCESS;`allowed-paths` contract tests SUCCESS;live check **FAILURE**
+  并具名
+  `declared task TASK-MECH-004 has paths outside Allowed paths:
+  docs/mech-004-canary.md`,exit 1。#337 于 2026-07-22T14:40:24Z closed,
+  `mergedAt`/`mergeCommit` 为空;远端 canary ref 查询为空,永未合入。
+
+### Remaining gate
+
+PR #336 的 `pull_request` Swift CI run `29929220711` 仍为
+`action_required`;push Swift 绿不替代 PR run。因预期 Actions 尚未全部实际
+执行并绿色,#336 **不可入批次队列/不可合并**,TASK-MECH-004 仍不得 done。
+维护者须在 GitHub 批准该 workflow run(D2 仓外动作);批准后须 fresh 查询
+其 completion/conclusion,不得从现有 rollup 猜测。
