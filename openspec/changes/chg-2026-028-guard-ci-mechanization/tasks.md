@@ -11,7 +11,7 @@
   已由 `lvye` 合入 `2c8aacad5ca8bf78e62171d4a71bbc2cabdd9bd0`,但 GitHub
   元数据如实为 `reviews=[]`;本状态不追溯声称 #329 已获 approving review,
   维护者须在本 PR 审核当前实现与证据。D1 基线修订 #339 已由 `lvye`
-  APPROVED 并合入 `477f7fff0a68109223d132344d22c08a1642eaf3`,接受
+  APPROVED 并合入 `477f7fff1cf87cc39d0b7b44a9842cb72b235def`,接受
   358/1/0。于 protected `main` `a436e740eb36be80d1ee54c54cd2b0be10923acf`
   复验:本地 Apple Swift 6.3.3/Xcode 26.6 全量 = 358 tests/1 skipped/
   0 failures;真实 PR 绿 run `29923584904`/`29924113820`/`29924573502`
