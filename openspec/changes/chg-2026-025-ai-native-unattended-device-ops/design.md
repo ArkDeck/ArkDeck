@@ -113,9 +113,85 @@ authorization:
 
 ## §7 迁移与回滚
 
-- 迁移:approval 后按 tasks.md 分期;archive 前的无人值守执行依据 approved delta
-  overlay 合法进行(实现期有效规格规则);
+- 迁移:r2 amendment approval 后按 tasks.md 依次完成 AIN-005/006/007；只有 AIN-004
+  再次独立 readiness、取得 fresh authorization 且可信宿主验收通过后，archive 前的无人
+  值守执行才可依据 approved delta overlay 合法进行(实现期有效规格规则);
 - 人工执行模型作为**可选路径保留**:人类操作者亲手执行仍产生有效 evidence
   (executor.kind=human),用于 Agent 主机不可达等场景;
 - 回滚:revert delta(独立 change),已产出 evidence 保留并如实标注授权依据;
   standing authorization 全部作废即回到纯人工模型。
+
+## §8 r2 threat-model correction
+
+r1 的纯函数 validator 能证明“输入字段彼此一致”，不能证明“输入事实真实”。现行 CLI
+允许调用方提供任意授权文件路径与 `unattended-context.json`，其中包含 prior run count、
+binding revision、prerequisite 状态与 identity readback；授权自身的 `approvedBy` 与
+`carrier` 也只是普通字符串。该边界允许同一不可信调用方同时制造 grant 与全部验证事实，
+不满足 §0 的批准权/执行权分离。
+
+r2 将信任边界移动到 **TrustedExecutionHost**：AI/CLI 只表达 typed intent 与
+`authorizationId`，所有 grant bytes、Git provenance、usage、binding、tool/device facts
+均由执行宿主拥有的 port 读取。调用方 JSON、环境变量、工作树文件、CLI flag 和 imported
+Manifest 都不是授权或事实来源。
+
+## §9 MaintainerMergedAuthorizationResolver
+
+执行宿主在每次 E2 admission 时 SHALL：
+
+1. fresh fetch `origin/main`，取得完整 main commit OID；网络不可用时只可使用宿主自有、
+   未过 freshness deadline 且已验证的缓存 attestation，否则 fail closed；
+2. 只按 `authorizationId` 在该 commit 的固定 authorization registry 中解引用 bytes，拒绝
+   caller path、工作树覆盖、symlink 与历史 commit 回退；
+3. 核对授权文件 blob OID、承载 commit、PR number、GitHub `mergedAt/mergedBy/reviews`，且
+   approving reviewer 为 CODEOWNER `lvye`；任何字段只写在 JSON 内但无 GitHub 事实支撑
+   均无效；
+4. 产生不可由调用方构造的 `VerifiedAuthorizationGrant` capability，包含 full commit/blob
+   OID、PR、scope pins、validity 与 usage ceiling；gate 只接受该 capability，不再接受裸
+   `RockchipStandingAuthorization` 作为 dispatch authority。
+
+## §10 Trusted execution facts and usage
+
+- binding revision 来自 `DeviceBindingJournalAdapter` 返回的 durable receipt；CLI 的 location
+  或 revision 只可作为 selector，不能作为确认事实；
+- tool identity 由 descriptor-bound process port 在 launch 前重新 hash；firmware/plan hash
+  由产品 validator 现场生成；prerequisite 来自 typed probe receipt；identity readback 必须
+  在首个真实 Step 前由目标设备实际 probe，绑定 observation sequence/deadline；
+- `AuthorizationUsageLedger` 是 host-wide single-writer durable store。E2 admission 在首个
+  intent 前原子写 `reserved`；reservation 一经 durable 即消耗一次额度，crash 不退款，
+  防止两个并发 Job 都观察到 `priorRunCount=0`；terminal outcome 只关闭 reservation，不
+  改写消费事实；
+- usage、binding、readback 或 grant 任一无法关联到同一 Job/plan/target 时 dispatch=0。
+
+## §11 Product-owned dispatch
+
+`authorizedForUnattendedAgentExecution` 不再返回供外部 shell 使用的 command strings，而是
+返回 package-owned one-shot dispatch capability。执行链固定为：
+
+```text
+typed request
+  → verified grant + trusted facts + usage reservation
+  → Session/Job + durable stepIntent(authorizationRef)
+  → descriptor-bound fixed argv dispatch
+  → raw stdout/stderr Artifact + semantic result
+  → durable stepOutcome
+  → postflight / waitingForRecovery / terminal manifest
+```
+
+`RockchipHumanHandoff` 只保留为只读诊断/人工 fallback，不得作为 autonomous execute 的
+executor 输入。真实执行宿主必须是唯一 device/tool capability owner；若 Agent 进程仍可绕过
+宿主直接调用 HDC/rkdeveloptool 或打开相同 USB capability，该环境不得标记为
+`zeroTouchVerified`，AIN-004 保持 blocked。
+
+## §12 r2 contract model
+
+- `executionAuthority` 新增 `authorizedAgent`；只能由 TrustedExecutionHost 在
+  `VerifiedAuthorizationGrant` 存在时 mint。`standardAgent` 与 ordinary CI 的 destructive
+  execution 仍为结构性禁止；
+- destructive `stepIntent` 必须携带可解引用的 `authorizationRef`（authorization ID、main
+  commit OID、blob OID、PR）；outcome/manifest 必须引用同一 intent；
+- confirmation actor 从固定字符串 `user` 升级为 typed actor：`interactiveUser` 或
+  `authorizedAgent`；后者必须引用相同 grant；
+- 新增 host-wide authorization usage record，定义 reservation ordinal、ceiling、Job/plan/
+  target binding 与 terminal correlation；
+- v1 manifest/journal 与历史 evidence 不迁移；只有新版本可表达 authorized-agent real
+  destructive success。
