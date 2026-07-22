@@ -321,17 +321,110 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
 
 ## TASK-AIN-005 — authorized-agent locked contract closure
 
-- Status:blocked（等待 r2 amendment 由维护者 merge；之后仍须独立 readiness PR）
+- Status:ready（仅在维护者 review/merge 本独立 readiness PR 后生效；本 PR 只修改本任务
+  状态、pins 与实现边界，不含 contract/code/test/evidence 实现）
+- Readiness review（2026-07-22；host-only 审计，device/HDC/network/external-process
+  dispatch 均为 0）：
+  - Approval/dependency gate:satisfied。r2 amendment PR #299 已由维护者 `lvye` merge，
+    merge commit = `a2dab4c3f4279cff0ef1a859cdb5297afe9aeb85`；按 V2 `merge = approval`，
+    新增 AIN-005/006/007 scope 与 AIN-004 stop gate 已生效。AIN-005 无其他前序任务。
+  - Objective/scope gate:satisfied。任务只闭合 change-local locked-contract drafts、Swift
+    persistence/semantic validator 与 host-wide usage ledger；不解析 GitHub provenance、不读取
+    真实授权载体、不启动产品 executor。实现 Agent 不得在本任务新增 Core/AC、改变 Step
+    registry 或决定 device/tool capability。
+  - Base/input pins:实现必须基于本 readiness 合入后的 `main`；审计 base = `main`
+    `a2dab4c3f4279cff0ef1a859cdb5297afe9aeb85`。下列只读权威输入任一 blob 漂移即停并重做
+    readiness：manifest v1 `1100b951f8c7565e10f403d576acfe260e401155`、journal v1
+    `d25b7a55e9970d301558430febd235ccc910d8b7`、provider contract v1
+    `ceb6709fb405fc46d72ef2126b715e252ac720ab`、workflow-step v1
+    `c510d96478f3192168478b1a1669b5fcd2a848f7`、flashing delta
+    `5fd7ed4df9574e52e822930eff0e824641c0bd5f`、r2 design
+    `6c2e5e56433aa9a04d922702a1ecde694dcea9b4`。
+  - Schema/version gate:fixed。change-local 新版本精确为 manifest `2.0.0`、journal-event
+    `2.0.0`、authorization-usage `1.0.0`、provider-contract delta target `2.0.0`；文件名见
+    Allowed paths。current `openspec/contracts/**` v1 正本继续只读，v1 历史 bytes/解码/语义
+    保持兼容，只有 v2 可表达 `authorizedAgent` destructive success，禁止把 v1 原地改写或
+    解释升级。
+  - Authorization reference gate:fixed。共享 `authorizationRef` 是封闭对象且只含
+    `authorizationId`、40 位小写 full `mainCommitOID`、40 位小写 full
+    `authorizationBlobOID`、正整数 `approvalPRNumber`。字符串 carrier、路径、branch/tag、
+    缩写 OID 或 caller JSON 不能替代该对象；本任务只验证 shape/correlation，不授予
+    production dispatch authority。
+  - Manifest/journal gate:fixed。manifest v2 新增 nullable `authorization`；
+    `executionAuthority=authorizedAgent` 时必须为
+    `{authorizationRef,usageReservationId,destructiveIntentEventIds}`，其中每个实际执行或
+    outcomeUnknown 的 destructive Step 对应且只对应一个 durable intent event；其他 authority
+    不得借该字段升级。journal v2 的 authorized-agent `jobCreated`、每个 destructive
+    `stepIntent` 及其 `stepOutcome` 必须携带同一 `authorizationRef` 与
+    `usageReservationId`，outcome 仍须反向引用 intent；缺失、漂移、ghost/duplicate ref、
+    mixed v1/v2 Session 全拒绝。`standardAgent`/planOnly/simulated 的既有 destructive
+    `notRun` 不变量逐字保持。
+  - Confirmation gate:fixed。manifest v2 confirmation `actor` 从字符串升级为封闭对象：
+    `{kind:interactiveUser}` 或 `{kind:authorizedAgent,authorizationRef}`；后者仅允许
+    `executionAuthority=authorizedAgent`，且 ref 必须与 manifest/journal/usage 完全相同。
+    recovery-abandon 的人工确认语义不在本任务放宽。
+  - Usage gate:fixed。authorization-usage v1 是
+    `{schemaVersion,reservations:[...]}`，reservation 记录
+    `reservationId/authorizationRef/ordinal/maxRuns/jobId/planDigestSHA256/targetDigestSHA256/
+    reservedAt/terminal`；`terminal` 只能为 null，或
+    `{status:succeeded|failed|cancelled|interrupted|outcomeUnknown,closedAt,
+    destructiveIntentEventIds}`。同一 authorization 的 ordinal 单调且唯一，`maxRuns>0` 时 reserve
+    超限必拒绝。reserve 必须在任何 destructive intent 前，以 host-wide stable lock + 原子
+    replace + file/directory durability barrier 完成；durable reserve 即消费额度，crash、失败、
+    cancel、outcomeUnknown 均不退款。相同 reservation retry 只能返回相同 receipt，字段漂移
+    必拒绝；terminal 只能关闭既有 reservation，不能删除/降 ordinal/补发权限。
+  - Implementation seam pins:允许修改的既有 source blobs 为 `SessionManifest.swift`
+    `8b31dd1a63bbfb573e51a0457d8a2d944b90ff1a`、`JournalEvent.swift`
+    `06e2c7b277df9e75cab99c52621ae1f552a26517`、`JournalEventValidation.swift`
+    `bb3db4c2d6183d588509a28e61d62888cd210dc8`、`JournalReplay.swift`
+    `48ac1eef0c1a0b9b96159cf918ffe0e5ba322d40`、`RetentionAndExport.swift`
+    `7c52f04dfcc73d6eb44c10b3f6cba7bac9f3d887`；焦点 tests 为
+    `SessionArtifactStorageContractTests.swift`
+    `24e4b67dc0f9db14d7916972136b90170e92d7ca`、`JournalRecoveryContractTests.swift`
+    `ce30c3faa6957d22aec19e3790030a8b6e9b0ac2`。只读 storage seam
+    `DurableFiles.swift` `039fbb891fdc78c3cf19acc47b3f1231b9dde5c0` 与 `StrictJSON.swift`
+    `d5df2a82ced6b8a06635c1e9f1887d70c693f005` 禁止修改；实现复用其 argv-free durable/
+    strict-JSON primitives。
+  - New-file/collision gate:四个 change-local contract 文件、
+    `AuthorizationUsageLedger.swift`、`AuthorizationUsageLedgerContractTests.swift` 与本任务
+    run 路径在 base 均不存在；实现只能按 Allowed paths 新建。若上述既有 source 与
+    明列的新文件不足以闭环，须停回 blocked 并先做 scope amendment，不能
+    扩到 Workflows/CLI/Runtime/current contracts。
+  - Binary verification gate:AIN-CONTRACT-001 至少覆盖 v2 正向 round-trip、v1 历史读取、
+    standardAgent destructive success、authorizedAgent 缺/漂移 ref、actor ref 漂移、intent/
+    outcome/manifest ghost ref、mixed-version Session、usage 并发、同 reservation 漂移重试、
+    reserve/replace/fsync crash windows、lock/path/symlink substitution；全部负例拒绝且
+    external-process/device dispatch=0。export/redaction round-trip 必须保留非敏感 OID/ID，
+    不泄露 target 原始身份字节。
+  - Toolchain/baseline gate:satisfied。macOS 26.5.2 (25F84)、Xcode 26.6 (17F113)、
+    Apple Swift 6.3.3；全量 Swift **323 tests / 1 skipped / 0 failures**，manifest+journal
+    焦点 **87 tests / 0 failures**（JournalRecovery 29 + SessionArtifactStorage 58），
+    `check-sdd` **0 errors / 0 warnings / 111 acceptance IDs**。实现 PR 不得降低这些基线，
+    并须追加 AIN-CONTRACT-001 canonical PASS 摘要与 run evidence。
+  - Concurrency/review gate:satisfied。readiness 审计时 GitHub open PR = 0；本 PR 仅修改本
+    `tasks.md` 段落。AIN-005 implementation+evidence、`ready→done`、AIN-006 readiness 各自
+    使用独立 PR；AIN-004 与旧授权继续 blocked，真实设备操作始终为 0。
 - Platform:macos
 - Requirements:REQ-FLASH-015(MODIFIED)、POL-WORKFLOW-001、POL-RECOVERY-001、
   POL-AGENT-002(MODIFIED)
 - Acceptance:AIN-CONTRACT-001；AC-FLASH-015-01/02/03 的 persistence 面
-- Depends on:r2 amendment approved
-- Allowed paths（readiness 时以 blob/OID 细化）：
-  - `openspec/changes/chg-2026-025-ai-native-unattended-device-ops/contracts/**`
-  - `openspec/changes/chg-2026-025-ai-native-unattended-device-ops/evidence/**`
-  - `Packages/ArkDeckKit/Sources/ArkDeckStorage/**`
-  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/**`
+- Depends on:r2 amendment approved（#299 / main
+  `a2dab4c3f4279cff0ef1a859cdb5297afe9aeb85`）
+- Allowed paths:
+  - `openspec/changes/chg-2026-025-ai-native-unattended-device-ops/contracts/manifest.schema.v2-draft.json`（new）
+  - `openspec/changes/chg-2026-025-ai-native-unattended-device-ops/contracts/journal-event.schema.v2-draft.json`（new）
+  - `openspec/changes/chg-2026-025-ai-native-unattended-device-ops/contracts/authorization-usage.schema.v1-draft.json`（new）
+  - `openspec/changes/chg-2026-025-ai-native-unattended-device-ops/contracts/provider-contracts.v2-delta.md`（new）
+  - `openspec/changes/chg-2026-025-ai-native-unattended-device-ops/evidence/runs/TASK-AIN-005/**`
+  - `Packages/ArkDeckKit/Sources/ArkDeckStorage/SessionManifest.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckStorage/JournalEvent.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckStorage/JournalEventValidation.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckStorage/JournalReplay.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckStorage/RetentionAndExport.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckStorage/AuthorizationUsageLedger.swift`（new）
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/SessionArtifactStorageContractTests.swift`
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/JournalRecoveryContractTests.swift`
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/AuthorizationUsageLedgerContractTests.swift`（new）
 - Forbidden paths:
   - `openspec/contracts/**`（archive PR 才替换正本）
   - `openspec/specs/**`
