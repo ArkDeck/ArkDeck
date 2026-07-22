@@ -92,10 +92,20 @@
 
 ## TASK-MECH-002 — guard 三方 revision 同步校验
 
-- Status:ready(2026-07-22 本 readiness PR;前置 ① 已满足 = approval #318
-  merge `c15814593ea3d46149e749d3a47121ea70af1cea`;状态仅在维护者
-  review/merge 本 PR 后生效。**实现另有二值前置 = 下述存量漂移三处清零**,
-  未清零前实现 PR 不得开)
+- Status:done(2026-07-23 D0 完成状态;仅在维护者 review/merge 本独立状态
+  PR 后生效。实现 #343 head `c98eb5e858038129ec558afb8774c5db949f58c6`
+  已由 `lvye` exact-head APPROVED 并合入
+  `6f9e3df9ee29d792d7d5cfb85b035a425c03e19c`;evidence #346 head
+  `9049f39209b3c444e5a5957bbfc2a9952f562cf3` 已由 `lvye` 合入
+  `8f36de56add57ec7f85b46e929a8f8bb72dd6211`,但 GitHub 元数据如实为
+  `reviews=[]`/`REVIEW_REQUIRED`,本状态不追溯声称 #346 已获 approving
+  review,维护者须在本 PR 审核当前实现与 evidence。于 protected `main`
+  `813361830593f416eb845f0cceb9556ab51168be` 复验:revision contract =
+  13/13、PR 路径守卫 = 12/12、`check-sdd` = 0 error/0 warning/
+  111 acceptance IDs、Swift 全量 = 358 tests/1 skipped/0 failures;
+  `MECH-REV-001` 为通过候选。`done` 不代表 change `verified`;
+  TASK-MECH-003 仅可在本状态 PR 合入后另立 readiness 重钉同文件 blobs,
+  不得基于本未生效状态投机开工)
 - Readiness(r1,base = main `c15814593ea3d46149e749d3a47121ea70af1cea`):
   - 待改文件 pins(实现时任一漂移即停并重做 readiness):
 
