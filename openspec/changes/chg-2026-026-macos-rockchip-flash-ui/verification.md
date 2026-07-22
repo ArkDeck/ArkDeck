@@ -1,7 +1,9 @@
 # Verification Plan — CHG-2026-026
 
-> Change:CHG-2026-026
+> Change:CHG-2026-026@r1
 > Status:planned
+> Note(2026-07-22):header 补记 @r1(本 change 从未修订,零语义变化;三方
+> revision 同步惯例对齐,CHG-2026-028 MECH-002 实现前置的存量清零)。
 
 ## Environment
 

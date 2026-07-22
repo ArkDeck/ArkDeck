@@ -1,5 +1,6 @@
 ---
 id: CHG-2026-026
+revision: 1 # 2026-07-22 补记缺失字段(本 change 从未修订,r1 无歧义;CHG-2026-028 MECH-002 三方 revision 校验实现前置的存量清零)
 status: approved # 本状态与 TASK-RKFUI-001 readiness 仅在维护者 review/merge 对应治理 PR 后生效
 class: platform
 core_change_level: none
