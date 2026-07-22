@@ -610,15 +610,101 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
   `evidence/runs/TASK-AIN-006/` 记录命令、结果、偏差与残余风险；任务完成/verified 状态仍须
   后续独立 PR，不在实现 PR 自翻。
 
+## TASK-AIN-008 — Rockchip persistence and admission identity closure
+
+- Status:ready（仅在维护者 review/merge 本 scope-remediation/readiness PR 后生效；本 PR
+  不含 schema/code/test/evidence 实现，不授权任何 external/device/destructive dispatch）
+- Platform:macos
+- Requirements:REQ-FLASH-011/012/015、POL-WORKFLOW-001、POL-ARTIFACT-001、
+  POL-PRIVACY-001
+- Acceptance:AIN-CONTRACT-001 regression；AIN-DISPATCH-001 prerequisite contract 面
+- Depends on:TASK-AIN-005、TASK-AIN-006
+- Objective:在不改写历史 v1/v2 的前提下，以 Manifest/Journal `2.1.0` 表达诚实的
+  descriptor-bound Rockchip toolchain，并把 AIN-006 已验证的 executable identity 保留到
+  one-shot admission final facts，使 AIN-007 能逐 spawn 做同一 descriptor identity 再关联。
+- Readiness reviewed:2026-07-22；base = protected `main`
+  `444547761c3a855cd4db44acb8a50ca54e9a3294`（#310 merge）。AIN-005 已由 #304 done；
+  AIN-006 已由 #309 done；审计时 open PR = 0。#310 仅改 `tasks.md`，其 345/1 skipped/0
+  failure Swift 与 guard 0/0/111 baseline 对本任务继续有效。
+- Blocker provenance:
+  - current/Manifest v1 `$defs.toolchain` 只允许 `hdc|none`，locked Manifest v2
+    `9ac334013968a5aba1a0bd77fe2acc982ba0e680` 直接引用该定义；
+    `SessionManifest.swift` `739859546298a6aa5131221beb795722f49d9df6` 同样硬编码
+    `hdc|none`。non-simulated Rockchip run 无诚实可编码值；
+  - `RockchipAuthorizationFacts.swift`
+    `a5df9a5a5c496b894f59c30a0497f393c5a7fc20` 的 tool fact 含
+    `ProcessExecutableIdentityReceipt`，但 final `RockchipTrustedAuthorizationFacts` 未保留它；
+    AIN-007 无法满足 #310 声明的 same-admission descriptor identity correlation。
+- Allowed paths（实现 PR 的封闭文件面）：
+  - 新增 change-local
+    `contracts/manifest.schema.v2.1-draft.json` 与
+    `contracts/journal-event.schema.v2.1-draft.json`；v1/v2 文件只读；
+  - 修改 `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipAuthorizationFacts.swift`
+    `a5df9a5a5c496b894f59c30a0497f393c5a7fc20`（仅 final facts 保留 collector 已验证的
+    executable identity receipt）；
+  - 修改 Storage：`JournalEvent.swift`
+    `38759bdfd8aa749f107f1cb1f74f2dece8a4c01f`、`JournalEventValidation.swift`
+    `bfbff8430c1f5bd12745ec0847f7581165db1dca`、`JournalReplay.swift`
+    `3614aaeb5db541ca7009ef6b0c84abdef7bb1c1f`、`SessionManifest.swift`
+    `739859546298a6aa5131221beb795722f49d9df6`、`RetentionAndExport.swift`
+    `62299802134964d23ecd51c547415257d847b906`；
+  - 修改焦点 tests：`AuthorizationAdmissionContractTests.swift`
+    `94b5467580dbcf28bdbbbcd52dafd94452f0b4dc`、
+    `SessionArtifactStorageContractTests.swift`
+    `d7f1c2cfa7f67fc1694e4292a8e60380c8e376b5`；
+  - 新增 `evidence/runs/TASK-AIN-008/**`。
+- Forbidden paths:
+  - current specs/contracts/baseline、既有 Manifest/Journal v1/v2 schema bytes、Provider/Profile、
+    Process/Runtime、Authorization admission/provenance/usage ledger、CLI、AIN-007 executor 文件；
+  - authorization 载体、AIN-004 evidence、hardware matrix、network/HDC/rkdeveloptool/device/
+    external-process dispatch。
+- Risk:contract/persistence（host-only；dispatch=0）
+- Hardware required:no
+
+### Locked 2.1 contract
+
+- Manifest/Journal schemaVersion 固定 `2.1.0`；v1/v2 decode/encode/canonical bytes、mixed-version
+  拒绝、authorizedAgent authorization/usage/destructive intent correlation 原样保持。2.1 Journal
+  不增加 caller 字段，只继承 v2 payload semantics，使 terminal Manifest 与 Session journal 保持
+  exact schema version。
+- 2.1 Manifest toolchain 新增唯一 closed shape：
+  `{kind:"rockchip",profileIdentifier,reportedVersion,sha256,pathSource,
+  descriptorIdentity:{device,inode,fileSize,mode}}`。`profileIdentifier/reportedVersion/sha256/
+  pathSource` 必须与 trusted tool fact/pinned integration profile 一致；数字字段来自 Process port
+  实际 descriptor receipt。禁止 absolute path、bookmark bytes、stable descriptor path、caller
+  label/argv/environment 与额外字段；existing `hdc|none` shape 原样可读。
+- `RockchipTrustedAuthorizationFacts` 仅新增内部
+  `executableIdentity:ProcessExecutableIdentityReceipt`，值必须逐字来自同次 collector 的
+  `RockchipTrustedToolDeviceFact`。不新增 public initializer/Codable/API，receipt 本身不授予
+  dispatch；AIN-006 grant→facts→reserve 顺序和 one-shot consume 不变。
+- retention/export allowlist 仅放行上述非敏感 Rockchip identity 字段；本机授权路径、原始 serial、
+  bookmark、环境变量、stdout/stderr 不得进入 Manifest 或 export。
+
+### Verification
+
+- `TEST-AIN-ROCKCHIP-PERSISTENCE-001`：2.1 authorizedAgent positive round-trip + terminal
+  journal/Manifest exact correlation；toolchain profile/version/hash/descriptor identity 全保留，
+  absolute path/bookmark/argv/extra field 均不存在；export round-trip 只保留 allowlist 字段。
+- negatives：缺/漂移 profile、version、hash、pathSource、device/inode/size/mode，伪 path/bookmark、
+  v2 填 rockchip、2.1 mixed v1/v2 event、authorization/usage/intent drift/ghost/duplicate 全拒绝。
+- admission：collector verified receipt 与 final facts/one-shot consumed capability 完全相等；tool fact
+  drift 仍在 reserve 前拒绝，capability reuse 不变；public target 仍不能构造 final facts/grant。
+- regression：AIN-CONTRACT-001、AIN-GATE-001、AIN-USAGE-001、全部 manifest/journal/storage/export
+  tests 与 full Swift；新增两份 schema 做 Draft 2020-12 positive/negative validation；strict format/
+  diff/scope/privacy/no-live-dispatch 审计；run evidence 记录命令、结果、偏差与残余风险。
+- 实现完成后使用独立 status PR 标 AIN-008 done；AIN-007 另做新 readiness，重新 pin main、
+  2.1 schema 与 modified facts/storage OID，不能复用 #310 readiness。
+
 ## TASK-AIN-007 — product-owned Rockchip typed executor
 
-- Status:ready（仅在维护者 review/merge 本独立 readiness PR 后生效；本 PR 只冻结实现文件
-  面、输入 pins 与二值验证门，不含 executor/code/test/evidence 实现，不授权任何真实 dispatch）
+- Status:blocked（#310 readiness 在实现前 recheck 发现 Manifest toolchain 表达与 admission
+  executable identity retention 两项 P0 缺口，见 TASK-AIN-008/设计 §13；#310 作为历史保留但
+  不得用于实现或 dispatch。等待 AIN-008 done 后以新 main/OID 独立重做 readiness）
 - Platform:macos
 - Requirements:REQ-FLASH-008/009/011/012/013/015、POL-WORKFLOW-001、
   POL-RECOVERY-001
 - Acceptance:AIN-DISPATCH-001；AC-FLASH-008-01、012-01、013-01、015-03 contract 面
-- Depends on:TASK-AIN-005、TASK-AIN-006
+- Depends on:TASK-AIN-005、TASK-AIN-006、TASK-AIN-008
 - Readiness reviewed:2026-07-22；base = protected `main`
   `ce7b48e9ed5bd135ce6e77e0b43d32e21efe8e06`（#309 merge，AIN-006 done），审计时
   open PR = 0。TASK-AIN-005 已由 #304 done；TASK-AIN-006 实现 #307、evidence 修正

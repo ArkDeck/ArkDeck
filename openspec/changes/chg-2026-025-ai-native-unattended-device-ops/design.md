@@ -113,7 +113,7 @@ authorization:
 
 ## §7 迁移与回滚
 
-- 迁移:r2 amendment approval 后按 tasks.md 依次完成 AIN-005/006/007；只有 AIN-004
+- 迁移:r2 amendment approval 后按 tasks.md 依次完成 AIN-005/006/008/007；只有 AIN-004
   再次独立 readiness、取得 fresh authorization 且可信宿主验收通过后，archive 前的无人
   值守执行才可依据 approved delta overlay 合法进行(实现期有效规格规则);
 - 人工执行模型作为**可选路径保留**:人类操作者亲手执行仍产生有效 evidence
@@ -195,3 +195,28 @@ executor 输入。真实执行宿主必须是唯一 device/tool capability owner
   target binding 与 terminal correlation；
 - v1 manifest/journal 与历史 evidence 不迁移；只有新版本可表达 authorized-agent real
   destructive success。
+
+## §13 Rockchip persistence/tool identity correction
+
+AIN-007 readiness 合入后、实现开始前的 code-to-contract recheck 发现两项相互独立的
+fail-closed 阻断：
+
+1. locked Manifest v2 继续引用 current Manifest 的 HDC-only toolchain definition，只允许
+   `kind=hdc|none`。Rockchip execute 若写 `hdc` 会制造虚假工具链证据，若写 `none` 又违反
+   non-simulated contract；因此不能产生诚实且可通过 validator 的 terminal Manifest。
+2. AIN-006 在 `RockchipTrustedToolDeviceFact` 中验证了 descriptor identity，但
+   `RockchipTrustedAuthorizationFacts` 没有保留该 receipt。执行器只能知道 SHA-256 pin，无法
+   按 §10/§11 将每次 identity-bound spawn receipt 与同一次 admission 的 device/inode/size/
+   mode/hash 逐项再关联。
+
+修正采用只增不改的 contract 版本：Manifest/Journal `2.1.0` 保留 v1/v2 历史 bytes 与语义，
+只为 authorized Rockchip execution 增加诚实的 descriptor-bound toolchain shape；Journal
+2.1 沿用 v2 的 authorization/usage/intent 相关性，但与 Manifest 维持同版本 Session 不变量。
+Rockchip toolchain Manifest 不持久化本机绝对路径或 bookmark bytes，只记录 profile/version、
+SHA-256 与 descriptor identity 数字字段。AIN-006 final facts 保留内部、不可序列化的
+`ProcessExecutableIdentityReceipt`；它仍不是 authority，只有同一个 one-shot admission 与
+每次 Process port 实际返回的 receipt 完全一致时，AIN-007 才可继续。
+
+这项修正不新增 command、effect、设备能力或授权来源，也不放宽 v1/v2；实现前置任务与精确
+scope 见 TASK-AIN-008。AIN-007 的 #310 readiness 因只读输入不足而失效，须在 AIN-008 done
+后基于新的 main/OID 独立重做 readiness。
