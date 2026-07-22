@@ -246,3 +246,51 @@ change approved 前保持 blocked;approved 后每任务另需独立 readiness PR
 ### Notes / handoff
 
 - 中止如实记 blocked-attempt(#104/#173 先例);序列号字节只入摘要。
+
+### Readiness pins(r1 host-complete,2026-07-22)
+
+**状态说明**:本 r1 锁定全部 host 可推导 pin 与 standing authorization 载体的
+host 字段;`bindingRevision` 是唯一需一次设备读回才能确定的 pin,故本任务保持
+`blocked`,r2(见末尾)一次 E0 读回后翻 `ready`。r1 不构成任何真机执行授权。
+
+- Base:main `0a5c9fd99c3cc7f6bcf4e44044706de7c9d2215f`(#292 merge,AIN-003 done
+  载体 #293 在途);guard 于 base 实测 0 error / 0 warning / 111 acceptance IDs;
+  Swift 焦点套件复验 015-01/02/03 全 PASS。
+- Depends on(DoR):AIN-001 done(#289)、AIN-002 done(#290)、AIN-003 done
+  (#293 待合)——r2 提交前须确认三者均在 main。
+- **standing authorization 载体** = `evidence/authorizations/AUTH-2026-025-DAYU200-001.json`
+  (README 同目录)。host 字段于 base 实测锁定(全 hash):
+  - `planDigestSHA256` `c85be3b34ae671ad213781619235a22dcb242d406850d4eb8cef8785487d6cff`
+    (合入版 `makePlan(mode:.execute, archiveValidation:.valid)` 实测,与 RF-002
+    transcript 逐字一致——AIN-003 未触碰 makePlan);
+  - `stepSetDigestSHA256` `075b52c4fc7dc71e422c76c9edd5e1cd26e7641c844fa4cfb4ae79f29d1c8fdb`;
+  - `firmwareArchiveSHA256` `fc7637f34a8394847b1b6c7e7ff2750863d18c6dc05e184abaf5aed70ec75280`
+    (pinned 参考镜像 7.0.0.33);
+  - `toolchainFingerprint` `rkdeveloptool-1.32@038a8a0ea26ef7eb77451789f310c0c9fbeaf43a78af1d6146e02311a9c23611`;
+  - `providerIdentity` `arkdeck.rockchip-rockusb-flash-provider`;
+  - `target.model` `DAYU200 (RK3568)`;`transport` usb;`maxRuns` 1;
+    `validUntil` 2026-08-31T00:00:00Z;
+  - `target.serialSHA256` `958780b2ffb7090d4f22cdc1f547f9804ed0f0b605e3020f384e5d4823dc7a7e`
+    = SHA-256 of the DAYU200 serial recorded in-repo by
+    `EVD-M0B-DAYU200-20260718-001`(同一物理设备;原始字节不复制入本载体)。
+- **唯一待读回 pin**:`target.bindingRevision` 现为 `-1`(fail-closed 占位)——
+  `RockchipStandingAuthorization.parse` 对负值直接拒绝,故 r1 载体在解析层即不可
+  授权任何 dispatch(有意)。
+- Allowed paths(r2 及执行期):`evidence/**`(载体、authorizations、runs)+
+  `hardware-matrix.md` 新增行;`Packages/**` forbidden(实现已冻结,缺陷回 AIN-003)。
+- 二值门(r2/执行期,不在 r1 交付):
+  1. E0 无人值守日志采集到 owned 路径 + 拉取分析(TR-001 harness 复用);
+  2. E2 无人值守刷机:门通过(authorizationRef 非空)→ durable intent 落盘 →
+     九分区 wlx → rd → postflight 语义判定;
+  3. 真机负探针:篡改载体一项 pin 重试 → 实测 policyBlocked、dispatch=0
+     (AC-FLASH-015-02 真机面);
+  4. 首份 `executor.kind=agent` v3 evidence(authorizationRef 可解引用)+
+     hardware-matrix 新行。
+
+### r2 finalize(一次 E0 设备读回后)
+
+在具名设备窗口对目标 DAYU200 执行一次 E0 只读身份/binding 读回(本 change 生效后
+E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durable binding revision、
+复核 serial 摘要 == `958780b2…7a7e`、USB vid:pid == `0x2207:0x350a`。然后 r2:
+把载体 `bindingRevision` 从 `-1` 改为读回值、`carrier` 从 PENDING 改为 r2 PR 的
+`PR #<n> <path>@<blob-oid>`、本任务翻 `ready`。维护者 merge r2 = 批准精确目标。
