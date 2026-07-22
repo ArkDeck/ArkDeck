@@ -19,9 +19,23 @@
     (`/private` 前缀 #filePath 解析,先例 #301/#305 在案)。**CI 正常路径
     checkout 口径 = 346/1 skip/0 failures**;若 runner 上述两测试复现失败,
     处置 = 显式豁免清单 + 具名注记(实现 PR 载明),禁止静默 skip/`|| true`。
-  - Runner pins:GitHub-hosted `macos-15`;实现时该 label 不可用或排队异常
-    → 停回 readiness 重钉,不静默换 image;CI 实际 Xcode/Swift 版本以首个
-    run 记 evidence(与本地 6.3.3 差异如实记录,不作为失败豁免理由)。
+  - Runner pins(r1,已被 r2 取代):GitHub-hosted `macos-15`;实现时该
+    label 不可用或排队异常 → 停回 readiness 重钉,不静默换 image;CI 实际
+    Xcode/Swift 版本以首个 run 记 evidence(与本地 6.3.3 差异如实记录,
+    不作为失败豁免理由)。
+  - **Runner re-pin(r2,2026-07-22,本 readiness r2 PR;维护者 merge =
+    接受重钉)**:r1 钉定的 `macos-15` 经两次实现 run 实证无法满足仓库
+    Swift 基线——默认 Xcode 16.4/Swift 6.1.2 编译错(run `29923242782`),
+    显式选择镜像最高 Xcode 26.3/Swift 6.2.4 后仍同一编译错(run
+    `29923580984`,`HDCServerLifecycleJournalAdapter.swift:1275` 重载解析
+    差异);丢弃分支探针 run `29923763807`(success)枚举 `macos-26` 镜像
+    (ProductVersion 26.4)载有 Xcode 26.0–26.6 全谱。**r2 钉定:
+    `runs-on: macos-26` + workflow 显式 `xcode-select` 到
+    `/Applications/Xcode_26.6.app`(与本地基线 Xcode 26.6/Swift 6.3.3
+    对齐);该 app 不存在即失败并列出可用项(fail closed,不静默降级/
+    升级)**。canary 红反证须在 r2 形态下重做(r1 轮的红 = 编译错而非注入
+    测试,无效,已在 run.md 如实入档)。其余 r1 钉定(触发面/权限/timeout/
+    concurrency/无 cache/路径感知/summary)不变。
   - workflow 形态钉定:触发 = `pull_request` + push `main`/`agent/**`(与
     sdd-guard 对齐);`permissions: contents: read`、零 secret;
     `timeout-minutes: 30`;concurrency = 同 ref 后发取消先发;v1 无 cache
