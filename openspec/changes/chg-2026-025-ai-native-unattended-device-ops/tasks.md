@@ -222,6 +222,7 @@ change approved 前保持 blocked;approved 后每任务另需独立 readiness PR
 - Depends on:TASK-AIN-001、TASK-AIN-002、TASK-AIN-003
 - Allowed paths:
   - `openspec/changes/chg-2026-025-ai-native-unattended-device-ops/evidence/**`
+  - `scripts/e0_readback/**`(E0 只读身份/binding readback crib,host-only 交付物;先例 TR-001 harness `scripts/trace_capture/`)
   - `openspec/verification/hardware-matrix.md`(新增行)
 - Forbidden paths:
   - `Packages/**`(实现已冻结,发现缺陷回 TASK-AIN-003)
@@ -230,6 +231,11 @@ change approved 前保持 blocked;approved 后每任务另需独立 readiness PR
 
 ### Deliverables
 
+- **E0 readback crib(host-only,已交付):`scripts/e0_readback/`**——只读身份/模式
+  读回,确认物理设备 serial 摘要 == 载体 pin、记录 USB 模式,产出 r2 finalize 的身份
+  依据;不读/不臆造 bindingRevision(无 host 读取路径,r2 从 binding journal 定,见
+  README)。封闭只读 allowlist、argv 数组无 shell、输出仓外、脱敏门;26 unittest +
+  `--selftest-host` host 侧自测绿。
 - E0 面:agent 无人值守采集 hilog/hitrace 到 owned 路径并拉取分析(TR-001 harness
   复用);
 - E2 面:agent 依 standing authorization 无人值守执行 pinned plan 刷机(PD-002
