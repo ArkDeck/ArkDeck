@@ -38,7 +38,9 @@ public enum JournalEventValidationError: Error, Equatable, Sendable {
 
 public struct JournalEvent: Equatable, Sendable {
   public static let schemaVersion = "1.0.0"
+  public static let authorizedAgentSchemaVersion = "2.0.0"
 
+  public let schemaVersion: String
   public let eventID: String
   public let sequence: Int
   public let sessionID: String
@@ -54,6 +56,7 @@ public struct JournalEvent: Equatable, Sendable {
   public let payload: [String: JSONValue]
 
   public init(
+    schemaVersion: String = Self.schemaVersion,
     eventID: String,
     sequence: Int,
     sessionID: String,
@@ -68,6 +71,13 @@ public struct JournalEvent: Equatable, Sendable {
     argumentsHash: String? = nil,
     payload: [String: JSONValue]
   ) throws {
+    guard
+      schemaVersion == Self.schemaVersion
+        || schemaVersion == Self.authorizedAgentSchemaVersion
+    else {
+      throw JournalEventValidationError.malformedEnvelope("unsupported schemaVersion")
+    }
+    self.schemaVersion = schemaVersion
     self.eventID = eventID
     self.sequence = sequence
     self.sessionID = sessionID
@@ -100,6 +110,13 @@ public struct JournalEvent: Equatable, Sendable {
 
   public var stepEffect: WorkflowEffect? { workflowStep?.effect }
 
+  public var authorizationReference: AuthorizationReference? {
+    guard let value = payload["authorizationRef"] else { return nil }
+    return try? AuthorizationReference(jsonValue: value, context: "journal.authorizationRef")
+  }
+
+  public var usageReservationID: String? { payload.string("usageReservationId") }
+
   public var stateTransition: JobStateTransition? {
     guard kind == .stateTransition,
       let fromRaw = payload.string("from"), let from = JobState(rawValue: fromRaw),
@@ -116,17 +133,23 @@ public struct JournalEvent: Equatable, Sendable {
     timestamp: String,
     executionMode: String,
     executionAuthority: String = "standardAgent",
-    coreBaseline: String = "CORE-2.0.0"
+    coreBaseline: String = "CORE-2.0.0",
+    schemaVersion: String = Self.schemaVersion,
+    authorizationRef: AuthorizationReference? = nil,
+    usageReservationID: String? = nil
   ) throws -> JournalEvent {
-    try JournalEvent(
+    var payload: [String: JSONValue] = [
+      "executionMode": .string(executionMode),
+      "executionAuthority": .string(executionAuthority),
+      "initialState": .string("queued"),
+      "coreBaseline": .string(coreBaseline),
+    ]
+    if let authorizationRef { payload["authorizationRef"] = authorizationRef.jsonValue }
+    if let usageReservationID { payload["usageReservationId"] = .string(usageReservationID) }
+    return try JournalEvent(
+      schemaVersion: schemaVersion,
       eventID: eventID, sequence: sequence, sessionID: sessionID, jobID: jobID,
-      timestamp: timestamp, kind: .jobCreated,
-      payload: [
-        "executionMode": .string(executionMode),
-        "executionAuthority": .string(executionAuthority),
-        "initialState": .string("queued"),
-        "coreBaseline": .string(coreBaseline),
-      ])
+      timestamp: timestamp, kind: .jobCreated, payload: payload)
   }
 
   public static func stateTransition(
@@ -138,13 +161,15 @@ public struct JournalEvent: Equatable, Sendable {
     from: JobState,
     to: JobState,
     reason: String,
-    triggerEventID: String? = nil
+    triggerEventID: String? = nil,
+    schemaVersion: String = Self.schemaVersion
   ) throws -> JournalEvent {
     var payload: [String: JSONValue] = [
       "from": .string(from.rawValue), "to": .string(to.rawValue), "reason": .string(reason),
     ]
     payload["triggerEventId"] = triggerEventID.map(JSONValue.string) ?? .null
     return try JournalEvent(
+      schemaVersion: schemaVersion,
       eventID: eventID, sequence: sequence, sessionID: sessionID, jobID: jobID,
       timestamp: timestamp, kind: .stateTransition, payload: payload)
   }
@@ -158,17 +183,24 @@ public struct JournalEvent: Equatable, Sendable {
     step: WorkflowStep,
     target: JournalTarget,
     attempt: Int,
-    bindingRevision: Int?
+    bindingRevision: Int?,
+    schemaVersion: String = Self.schemaVersion,
+    authorizationRef: AuthorizationReference? = nil,
+    usageReservationID: String? = nil
   ) throws -> JournalEvent {
     let argumentsHash = try JournalCanonicalJSON.argumentsHash(step.arguments)
+    var payload: [String: JSONValue] = [
+      "step": try JournalCanonicalJSON.value(step),
+      "target": target.jsonValue,
+    ]
+    if let authorizationRef { payload["authorizationRef"] = authorizationRef.jsonValue }
+    if let usageReservationID { payload["usageReservationId"] = .string(usageReservationID) }
     return try JournalEvent(
+      schemaVersion: schemaVersion,
       eventID: eventID, sequence: sequence, sessionID: sessionID, jobID: jobID,
       timestamp: timestamp, kind: .stepIntent, stepID: step.id, attempt: attempt,
       bindingRevision: bindingRevision, argumentsHash: argumentsHash,
-      payload: [
-        "step": try JournalCanonicalJSON.value(step),
-        "target": target.jsonValue,
-      ])
+      payload: payload)
   }
 
   public static func stepOutcome(
@@ -183,7 +215,10 @@ public struct JournalEvent: Equatable, Sendable {
     result: String,
     outcomeCertainty: JournalOutcomeCertainty,
     semanticCode: String? = nil,
-    summary: String? = nil
+    summary: String? = nil,
+    schemaVersion: String = Self.schemaVersion,
+    authorizationRef: AuthorizationReference? = nil,
+    usageReservationID: String? = nil
   ) throws -> JournalEvent {
     var payload: [String: JSONValue] = [
       "correlatesToIntentEventId": .string(correlatesToIntentEventID),
@@ -192,7 +227,10 @@ public struct JournalEvent: Equatable, Sendable {
     ]
     if let semanticCode { payload["semanticCode"] = .string(semanticCode) }
     if let summary { payload["summary"] = .string(summary) }
+    if let authorizationRef { payload["authorizationRef"] = authorizationRef.jsonValue }
+    if let usageReservationID { payload["usageReservationId"] = .string(usageReservationID) }
     return try JournalEvent(
+      schemaVersion: schemaVersion,
       eventID: eventID, sequence: sequence, sessionID: sessionID, jobID: jobID,
       timestamp: timestamp, kind: .stepOutcome, stepID: stepID, attempt: attempt,
       payload: payload)
@@ -381,10 +419,14 @@ public enum JournalEventCodec {
       throw JournalEventValidationError.malformedEnvelope("payload must be an object")
     }
     let schemaVersion = try object.requiredString("schemaVersion", context: "envelope")
-    guard schemaVersion == JournalEvent.schemaVersion else {
+    guard
+      schemaVersion == JournalEvent.schemaVersion
+        || schemaVersion == JournalEvent.authorizedAgentSchemaVersion
+    else {
       throw JournalEventValidationError.malformedEnvelope("unsupported schemaVersion")
     }
     return try JournalEvent(
+      schemaVersion: schemaVersion,
       eventID: try object.requiredString("eventId", context: "envelope"),
       sequence: try object.requiredInt("sequence", context: "envelope"),
       sessionID: try object.requiredString("sessionId", context: "envelope"),
@@ -407,7 +449,7 @@ public enum JournalEventCodec {
 extension JournalEvent {
   fileprivate var jsonObject: [String: JSONValue] {
     var object: [String: JSONValue] = [
-      "schemaVersion": .string(Self.schemaVersion),
+      "schemaVersion": .string(schemaVersion),
       "eventId": .string(eventID),
       "sequence": .integer(Int64(sequence)),
       "sessionId": .string(sessionID),

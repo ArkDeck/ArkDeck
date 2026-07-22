@@ -1,0 +1,208 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://arkdeck.dev/schemas/session-manifest-2.0.0-draft.json",
+  "title": "ArkDeck Session Manifest v2 (change-local draft)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "appVersion", "coreSpecBaseline", "platformProfile",
+    "sessionId", "jobId", "status", "executionMode", "executionAuthority",
+    "authorization", "outcomeCertainty", "sessionDisposition", "createdAt",
+    "completedAt", "archivedAt", "originalTarget", "bindingHistory", "toolchain",
+    "workflow", "steps", "parameters", "compensations", "confirmations", "artifacts",
+    "warnings", "failure", "recovery"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "2.0.0" },
+    "appVersion": { "type": "string", "minLength": 1 },
+    "coreSpecBaseline": {
+      "type": "string",
+      "pattern": "^CORE-[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "platformProfile": { "type": "string", "minLength": 1 },
+    "sessionId": { "$ref": "../../../contracts/manifest.schema.json#/$defs/id" },
+    "jobId": { "$ref": "../../../contracts/manifest.schema.json#/$defs/id" },
+    "status": { "enum": ["planned", "succeeded", "failed", "cancelled", "interrupted"] },
+    "executionMode": { "enum": ["execute", "planOnly", "simulated"] },
+    "executionAuthority": {
+      "enum": ["interactiveUser", "standardAgent", "controlledHardwareLab", "authorizedAgent"]
+    },
+    "authorization": {
+      "oneOf": [
+        { "$ref": "#/$defs/authorization" },
+        { "type": "null" }
+      ]
+    },
+    "outcomeCertainty": { "enum": ["confirmed", "outcomeUnknown", "mixed"] },
+    "sessionDisposition": { "enum": ["finalized", "archived"] },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "completedAt": { "type": "string", "format": "date-time" },
+    "archivedAt": { "type": ["string", "null"], "format": "date-time" },
+    "originalTarget": { "$ref": "../../../contracts/manifest.schema.json#/$defs/target" },
+    "bindingHistory": {
+      "type": "array", "minItems": 1,
+      "items": { "$ref": "../../../contracts/manifest.schema.json#/$defs/binding" }
+    },
+    "toolchain": { "$ref": "../../../contracts/manifest.schema.json#/$defs/toolchain" },
+    "workflow": { "$ref": "../../../contracts/manifest.schema.json#/$defs/workflow" },
+    "steps": {
+      "type": "array",
+      "items": {
+        "$ref": "https://arkdeck.dev/schemas/workflow-step-1.0.0.json#/$defs/executionRecord"
+      }
+    },
+    "parameters": {
+      "type": "array",
+      "items": { "$ref": "../../../contracts/manifest.schema.json#/$defs/parameter" }
+    },
+    "compensations": {
+      "type": "array",
+      "items": { "$ref": "../../../contracts/manifest.schema.json#/$defs/compensationRecord" }
+    },
+    "confirmations": { "type": "array", "items": { "$ref": "#/$defs/confirmation" } },
+    "artifacts": {
+      "type": "array",
+      "items": { "$ref": "../../../contracts/manifest.schema.json#/$defs/artifact" }
+    },
+    "warnings": {
+      "type": "array", "items": { "type": "string", "minLength": 1 }
+    },
+    "failure": {
+      "oneOf": [
+        { "$ref": "../../../contracts/manifest.schema.json#/$defs/failure" },
+        { "type": "null" }
+      ]
+    },
+    "recovery": {
+      "oneOf": [
+        { "$ref": "../../../contracts/manifest.schema.json#/$defs/recovery" },
+        { "type": "null" }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "executionMode": { "const": "simulated" } },
+        "required": ["executionMode"]
+      },
+      "then": {
+        "properties": {
+          "steps": {
+            "items": {
+              "if": {
+                "properties": { "effect": { "const": "destructive" } },
+                "required": ["effect"]
+              },
+              "then": {
+                "properties": {
+                  "disposition": { "enum": ["notExecuted(planned)", "skipped"] },
+                  "outcomeCertainty": { "const": "notApplicable" },
+                  "semanticResult": { "const": "notRun" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "executionAuthority": { "const": "authorizedAgent" } },
+        "required": ["executionAuthority"]
+      },
+      "then": { "properties": { "authorization": { "$ref": "#/$defs/authorization" } } },
+      "else": { "properties": { "authorization": { "type": "null" } } }
+    },
+    {
+      "if": {
+        "properties": { "executionAuthority": { "const": "standardAgent" } },
+        "required": ["executionAuthority"]
+      },
+      "then": {
+        "properties": {
+          "steps": {
+            "items": {
+              "if": {
+                "properties": { "effect": { "const": "destructive" } },
+                "required": ["effect"]
+              },
+              "then": {
+                "properties": {
+                  "disposition": { "enum": ["notExecuted(planned)", "skipped"] },
+                  "outcomeCertainty": { "const": "notApplicable" },
+                  "semanticResult": { "const": "notRun" }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "gitOID": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "authorizationRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["authorizationId", "mainCommitOID", "authorizationBlobOID", "approvalPRNumber"],
+      "properties": {
+        "authorizationId": { "$ref": "../../../contracts/manifest.schema.json#/$defs/id" },
+        "mainCommitOID": { "$ref": "#/$defs/gitOID" },
+        "authorizationBlobOID": { "$ref": "#/$defs/gitOID" },
+        "approvalPRNumber": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "authorization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["authorizationRef", "usageReservationId", "destructiveIntentEventIds"],
+      "properties": {
+        "authorizationRef": { "$ref": "#/$defs/authorizationRef" },
+        "usageReservationId": { "$ref": "../../../contracts/manifest.schema.json#/$defs/id" },
+        "destructiveIntentEventIds": {
+          "type": "array", "uniqueItems": true,
+          "items": { "$ref": "../../../contracts/manifest.schema.json#/$defs/id" }
+        }
+      }
+    },
+    "confirmation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["confirmationId", "kind", "scopeHash", "decision", "actor", "decidedAt", "relatedStepIds"],
+      "properties": {
+        "confirmationId": { "$ref": "../../../contracts/manifest.schema.json#/$defs/id" },
+        "kind": { "enum": ["deviceMutation", "destructive", "serverLifecycle", "recoveryAbandon", "securityBoundary"] },
+        "scopeHash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "decision": { "enum": ["accepted", "rejected"] },
+        "actor": {
+          "oneOf": [
+            {
+              "type": "object", "additionalProperties": false, "required": ["kind"],
+              "properties": { "kind": { "const": "interactiveUser" } }
+            },
+            {
+              "type": "object", "additionalProperties": false,
+              "required": ["kind", "authorizationRef"],
+              "properties": {
+                "kind": { "const": "authorizedAgent" },
+                "authorizationRef": { "$ref": "#/$defs/authorizationRef" }
+              }
+            }
+          ]
+        },
+        "decidedAt": { "type": "string", "format": "date-time" },
+        "relatedStepIds": {
+          "type": "array",
+          "items": { "$ref": "../../../contracts/manifest.schema.json#/$defs/id" }
+        }
+      }
+    }
+  },
+  "x-arkdeck-semantic-invariants": [
+    "authorizedAgent confirmation refs equal manifest authorizationRef",
+    "each executed or outcomeUnknown destructive Step maps to exactly one listed durable stepIntent",
+    "destructiveIntentEventIds exactly equal the correlated journal v2 destructive intent set",
+    "all v1 relationship, status, mode, target, recovery and artifact invariants remain in force"
+  ]
+}

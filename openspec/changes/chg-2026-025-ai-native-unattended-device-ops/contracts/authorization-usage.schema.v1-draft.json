@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://arkdeck.dev/schemas/authorization-usage-1.0.0-draft.json",
+  "title": "ArkDeck Authorization Usage Ledger v1 (change-local draft)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "reservations"],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "reservations": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/reservation" }
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "gitOID": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "authorizationRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "authorizationId",
+        "mainCommitOID",
+        "authorizationBlobOID",
+        "approvalPRNumber"
+      ],
+      "properties": {
+        "authorizationId": { "$ref": "#/$defs/id" },
+        "mainCommitOID": { "$ref": "#/$defs/gitOID" },
+        "authorizationBlobOID": { "$ref": "#/$defs/gitOID" },
+        "approvalPRNumber": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "terminal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "closedAt", "destructiveIntentEventIds"],
+      "properties": {
+        "status": {
+          "enum": [
+            "succeeded",
+            "failed",
+            "cancelled",
+            "interrupted",
+            "outcomeUnknown"
+          ]
+        },
+        "closedAt": { "type": "string", "format": "date-time" },
+        "destructiveIntentEventIds": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/id" }
+        }
+      }
+    },
+    "reservation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reservationId",
+        "authorizationRef",
+        "ordinal",
+        "maxRuns",
+        "jobId",
+        "planDigestSHA256",
+        "targetDigestSHA256",
+        "reservedAt",
+        "terminal"
+      ],
+      "properties": {
+        "reservationId": { "$ref": "#/$defs/id" },
+        "authorizationRef": { "$ref": "#/$defs/authorizationRef" },
+        "ordinal": { "type": "integer", "minimum": 1 },
+        "maxRuns": { "type": "integer", "minimum": 0 },
+        "jobId": { "$ref": "#/$defs/id" },
+        "planDigestSHA256": { "$ref": "#/$defs/sha256" },
+        "targetDigestSHA256": { "$ref": "#/$defs/sha256" },
+        "reservedAt": { "type": "string", "format": "date-time" },
+        "terminal": {
+          "oneOf": [
+            { "$ref": "#/$defs/terminal" },
+            { "type": "null" }
+          ]
+        }
+      }
+    }
+  },
+  "x-arkdeck-semantic-invariants": [
+    "reservationId is globally unique",
+    "authorizationRef and maxRuns never drift for one authorizationId",
+    "ordinals for one authorizationId are unique, monotonic and contiguous from 1",
+    "maxRuns > 0 rejects ordinal > maxRuns; maxRuns = 0 is unbounded",
+    "a durable reservation consumes usage and is never refunded",
+    "same reservationId retry is idempotent only when every field is identical",
+    "terminal may close an existing reservation once and may not mutate reservation fields"
+  ]
+}

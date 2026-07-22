@@ -6,6 +6,106 @@ import Foundation
 import XCTest
 
 final class SessionArtifactStorageContractTests: XCTestCase {
+  func testAuthorizedAgentV2ManifestJournalRoundTripAndGhostActorDriftRejection() async throws {
+    let reference = try AuthorizationReference(
+      authorizationID: "authorization-1", mainCommitOID: String(repeating: "a", count: 40),
+      authorizationBlobOID: String(repeating: "b", count: 40), approvalPRNumber: 299)
+    let arguments: [String: JSONValue] = [
+      "providerOperationId": .string("fixtureFlash"),
+      "partition": .string("system"),
+      "imageArtifactId": .string("image-1"),
+      "imageSha256": .string(String(repeating: "c", count: 64)),
+      "imageSize": .integer(1),
+      "confirmationId": .string("confirmation-authorized"),
+      "safeBoundaryId": .string("safe-boundary-1"),
+    ]
+    let workflowStep = try WorkflowStep(
+      id: "authorized-flash", kind: .flashPartition, declaredEffect: .destructive,
+      declaredCancellation: .criticalNonInterruptible,
+      declaredBindingRequirement: .confirmedDevice, arguments: arguments)
+    let manifestStep = try executionStep(
+      id: "authorized-flash", kind: "flashPartition", effect: "destructive",
+      cancellation: "criticalNonInterruptible", bindingRequirement: "confirmedDevice",
+      arguments: arguments, disposition: "executed", outcomeCertainty: "confirmed",
+      semanticResult: "succeeded")
+
+    let fixture = try await makeSession(
+      sessionID: "session-authorized-v2", jobID: "job-authorized-v2")
+    defer { try? FileManager.default.removeItem(at: fixture.base) }
+    let manifest = try SessionManifestDocument(
+      data: authorizedManifestData(
+        sessionID: fixture.layout.sessionID, jobID: fixture.layout.jobID,
+        step: manifestStep, reference: reference,
+        destructiveIntentEventIDs: ["authorized-intent"]))
+    XCTAssertEqual(manifest.schemaVersion, "2.0.0")
+    XCTAssertEqual(manifest.executionAuthority, "authorizedAgent")
+    XCTAssertEqual(manifest.authorization?.authorizationReference, reference)
+    XCTAssertEqual(manifest.confirmations.first?.actor, "authorizedAgent")
+    try appendAuthorizedTerminalJournal(
+      layout: fixture.layout, manifest: manifest, workflowStep: workflowStep,
+      reference: reference, intentEventID: "authorized-intent")
+    XCTAssertNoThrow(try AtomicSessionManifestPublisher(layout: fixture.layout).publish(manifest))
+    let (_, exportClaim) = try await admittedClaim(
+      claimID: "authorized-v2-export", jobID: fixture.layout.jobID,
+      layout: fixture.layout, writer: .heavy)
+    let exportURL = fixture.base.appending(path: "authorized-v2-export")
+    _ = try SessionDiagnosticExporter().export(
+      layout: fixture.layout, artifacts: [], claim: exportClaim, to: exportURL,
+      deviceIdentifierPolicy: .redact)
+    let exportedData = try Data(contentsOf: exportURL.appending(path: "manifest.json"))
+    let exportedManifest = try SessionManifestDocument(data: exportedData)
+    XCTAssertEqual(exportedManifest.authorization, manifest.authorization)
+    XCTAssertEqual(exportedManifest.confirmations.first?.actorAuthorizationReference, reference)
+    XCTAssertFalse(String(decoding: exportedData, as: UTF8.self).contains("fixture-device"))
+
+    var missingAuthorization = try jsonObject(manifest.canonicalData)
+    missingAuthorization["authorization"] = NSNull()
+    XCTAssertThrowsError(
+      try SessionManifestDocument(
+        data: JSONSerialization.data(withJSONObject: missingAuthorization)))
+
+    var actorDrift = try jsonObject(manifest.canonicalData)
+    var confirmations = try XCTUnwrap(actorDrift["confirmations"] as? [[String: Any]])
+    var actor = try XCTUnwrap(confirmations[0]["actor"] as? [String: Any])
+    var actorReference = try XCTUnwrap(actor["authorizationRef"] as? [String: Any])
+    actorReference["authorizationBlobOID"] = String(repeating: "d", count: 40)
+    actor["authorizationRef"] = actorReference
+    confirmations[0]["actor"] = actor
+    actorDrift["confirmations"] = confirmations
+    XCTAssertThrowsError(
+      try SessionManifestDocument(data: JSONSerialization.data(withJSONObject: actorDrift)))
+
+    var standardSuccess = try jsonObject(manifest.canonicalData)
+    standardSuccess["executionAuthority"] = "standardAgent"
+    standardSuccess["authorization"] = NSNull()
+    confirmations = try XCTUnwrap(standardSuccess["confirmations"] as? [[String: Any]])
+    confirmations[0]["actor"] = ["kind": "interactiveUser"]
+    standardSuccess["confirmations"] = confirmations
+    XCTAssertThrowsError(
+      try SessionManifestDocument(data: JSONSerialization.data(withJSONObject: standardSuccess)))
+
+    let ghostFixture = try await makeSession(
+      sessionID: "session-authorized-ghost", jobID: "job-authorized-ghost")
+    defer { try? FileManager.default.removeItem(at: ghostFixture.base) }
+    let ghostManifest = try SessionManifestDocument(
+      data: authorizedManifestData(
+        sessionID: ghostFixture.layout.sessionID, jobID: ghostFixture.layout.jobID,
+        step: manifestStep, reference: reference,
+        destructiveIntentEventIDs: ["ghost-intent"]))
+    try appendAuthorizedTerminalJournal(
+      layout: ghostFixture.layout, manifest: ghostManifest, workflowStep: workflowStep,
+      reference: reference, intentEventID: "real-intent")
+    XCTAssertThrowsError(
+      try AtomicSessionManifestPublisher(layout: ghostFixture.layout).publish(ghostManifest)
+    ) { error in
+      guard case SessionStorageError.invalidManifest(let message) = error else {
+        return XCTFail("ghost authorization ref returned wrong error: \(error)")
+      }
+      XCTAssertTrue(message.contains("ghost") || message.contains("missing journal refs"))
+    }
+    print("TEST-AIN-CONTRACT-001 manifest-v2=PASS device_dispatch=0 external_process=0")
+  }
+
   func testTEST_AC_ART_001_01_failedSessionPreservesJournalPartialAndManifestStatus() async throws {
     let fixture = try await makeSession()
     defer { try? FileManager.default.removeItem(at: fixture.base) }
@@ -5671,6 +5771,128 @@ extension SessionArtifactStorageContractTests {
 
   fileprivate func jsonObject(_ data: Data) throws -> [String: Any] {
     try XCTUnwrap(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+  }
+
+  fileprivate func authorizedManifestData(
+    sessionID: String,
+    jobID: String,
+    step: JSONValue,
+    reference: AuthorizationReference,
+    destructiveIntentEventIDs: [String]
+  ) throws -> Data {
+    var root = try jsonObject(
+      SessionStorageFixtures.manifest(
+        sessionID: sessionID, jobID: jobID, executionMode: "execute",
+        executionAuthority: "authorizedAgent", steps: [step],
+        confirmations: [
+          .object([
+            "confirmationId": .string("confirmation-authorized"),
+            "kind": .string("destructive"),
+            "scopeHash": .string(SessionStorageFixtures.scopeHash),
+            "decision": .string("accepted"),
+            "actor": .object([
+              "kind": .string("authorizedAgent"),
+              "authorizationRef": authorizationReferenceValue(reference),
+            ]),
+            "decidedAt": .string(SessionStorageFixtures.timestamp),
+            "relatedStepIds": .array([.string("authorized-flash")]),
+          ])
+        ]))
+    root["schemaVersion"] = "2.0.0"
+    root["authorization"] = [
+      "authorizationRef": authorizationReferenceObject(reference),
+      "usageReservationId": "reservation-1",
+      "destructiveIntentEventIds": destructiveIntentEventIDs,
+    ]
+    return try JSONSerialization.data(withJSONObject: root, options: [.sortedKeys])
+  }
+
+  fileprivate func appendAuthorizedTerminalJournal(
+    layout: SessionLayout,
+    manifest: SessionManifestDocument,
+    workflowStep: WorkflowStep,
+    reference: AuthorizationReference,
+    intentEventID: String
+  ) throws {
+    let version = JournalEvent.authorizedAgentSchemaVersion
+    let journal = try FileDurableJournal(url: layout.journalURL)
+    try journal.appendAndSynchronize(
+      JournalEvent.jobCreated(
+        eventID: "authorized-created", sequence: 0, sessionID: layout.sessionID,
+        jobID: layout.jobID, timestamp: SessionStorageFixtures.timestamp,
+        executionMode: "execute", executionAuthority: "authorizedAgent",
+        schemaVersion: version, authorizationRef: reference,
+        usageReservationID: "reservation-1"))
+    try journal.appendAndSynchronize(
+      JournalEvent.stateTransition(
+        eventID: "authorized-preflight", sequence: 1, sessionID: layout.sessionID,
+        jobID: layout.jobID, timestamp: SessionStorageFixtures.timestamp,
+        from: .queued, to: .preflight, reason: "fixture", schemaVersion: version))
+    try journal.appendAndSynchronize(
+      JournalEvent.stateTransition(
+        eventID: "authorized-running", sequence: 2, sessionID: layout.sessionID,
+        jobID: layout.jobID, timestamp: SessionStorageFixtures.timestamp,
+        from: .preflight, to: .running, reason: "fixture", schemaVersion: version))
+    try journal.appendAndSynchronize(
+      JournalEvent.stepIntent(
+        eventID: intentEventID, sequence: 3, sessionID: layout.sessionID,
+        jobID: layout.jobID, timestamp: SessionStorageFixtures.timestamp,
+        step: workflowStep,
+        target: JournalTarget(
+          scope: "device", targetID: "device-fixture", connectKey: "fixture-device",
+          identitySnapshotHash: String(repeating: "e", count: 64)),
+        attempt: 1, bindingRevision: 1, schemaVersion: version,
+        authorizationRef: reference, usageReservationID: "reservation-1"))
+    try journal.appendAndSynchronize(
+      JournalEvent.stepOutcome(
+        eventID: "authorized-outcome", sequence: 4, sessionID: layout.sessionID,
+        jobID: layout.jobID, timestamp: SessionStorageFixtures.timestamp,
+        stepID: workflowStep.id, attempt: 1,
+        correlatesToIntentEventID: intentEventID, result: "succeeded",
+        outcomeCertainty: .confirmed, schemaVersion: version,
+        authorizationRef: reference, usageReservationID: "reservation-1"))
+    try journal.appendAndSynchronize(
+      JournalEvent.stateTransition(
+        eventID: "authorized-finalizing", sequence: 5, sessionID: layout.sessionID,
+        jobID: layout.jobID, timestamp: SessionStorageFixtures.timestamp,
+        from: .running, to: .finalizing, reason: "fixture", schemaVersion: version))
+    try journal.appendAndSynchronize(
+      JournalEvent.stateTransition(
+        eventID: "authorized-succeeded", sequence: 6, sessionID: layout.sessionID,
+        jobID: layout.jobID, timestamp: SessionStorageFixtures.timestamp,
+        from: .finalizing, to: .succeeded, reason: "fixture", schemaVersion: version))
+    try journal.appendAndSynchronize(
+      JournalEvent(
+        schemaVersion: version, eventID: "authorized-finalized", sequence: 7,
+        sessionID: layout.sessionID, jobID: layout.jobID,
+        timestamp: SessionStorageFixtures.timestamp, kind: .finalized,
+        payload: [
+          "terminalStatus": .string("succeeded"),
+          "manifestSha256": .string(manifest.sha256),
+          "outcomeCertainty": .string("confirmed"),
+        ]))
+  }
+
+  fileprivate func authorizationReferenceObject(
+    _ reference: AuthorizationReference
+  ) -> [String: Any] {
+    [
+      "authorizationId": reference.authorizationID,
+      "mainCommitOID": reference.mainCommitOID,
+      "authorizationBlobOID": reference.authorizationBlobOID,
+      "approvalPRNumber": reference.approvalPRNumber,
+    ]
+  }
+
+  fileprivate func authorizationReferenceValue(
+    _ reference: AuthorizationReference
+  ) -> JSONValue {
+    .object([
+      "authorizationId": .string(reference.authorizationID),
+      "mainCommitOID": .string(reference.mainCommitOID),
+      "authorizationBlobOID": .string(reference.authorizationBlobOID),
+      "approvalPRNumber": .integer(Int64(reference.approvalPRNumber)),
+    ])
   }
 
   fileprivate func executionStep(
