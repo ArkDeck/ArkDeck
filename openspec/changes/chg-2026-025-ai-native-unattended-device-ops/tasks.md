@@ -455,44 +455,151 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
 
 ## TASK-AIN-006 — trusted authorization provenance, facts and usage gate
 
-- Status:blocked（等待 TASK-AIN-005 done；之后仍须独立 readiness PR）
+- Status:ready
 - Platform:macos
 - Requirements:REQ-FLASH-015(MODIFIED)、POL-TARGET-001、POL-AGENT-001/002
 - Acceptance:AIN-AUTH-PROV-001、AIN-FACT-001、AIN-USAGE-001、
   AC-FLASH-015-01/02
 - Depends on:TASK-AIN-005
-- Allowed paths（readiness 时以具体新/既有文件与 OID 细化）：
-  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/StandingAuthorization*.swift`
-  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/Authorization*.swift`
-  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/Rockchip*Fact*.swift`
-  - `Packages/ArkDeckKit/Sources/ArkDeckCLI/ArkDeckCLIMain.swift`
-  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/StandingAuthorization*.swift`
-  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/Authorization*.swift`
-  - 本 change `evidence/**`
+- Readiness reviewed:2026-07-22；base = protected `main`
+  `c2342ca363e60bea8d159d6fe8b87e8fca31d8ca`（#305 merge；#301 discovery 后续 hermetic
+  test fixture 修复），审计时 open PR = 0。
+  TASK-AIN-005 已由实现 #302 与 done recheck #304 合入；#304 reviewed head
+  `4c42ec122b4f3d9710fc90aee53521837e3616fc`、merge commit
+  `ac54b77c4037b8790b1ecfa31df114c21151f7ec` 均为 current main 祖先。
+- Allowed paths（实现 PR 的封闭文件面）：
+  - 修改 `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/StandingAuthorization.swift`
+    `b68e9b92c13f94a0cd935705f2dfcf730dd9f71e`
+  - 修改 `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipFlashAuthorization.swift`
+    `4bc5f5af014a7f765ca6d5c05937a31c68e6ccac`
+  - 新增 `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/AuthorizationProvenance.swift`
+  - 新增 `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/AuthorizationAdmission.swift`
+  - 新增 `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipAuthorizationFacts.swift`
+  - 修改 `Packages/ArkDeckKit/Sources/ArkDeckCLI/ArkDeckCLIMain.swift`
+    `44c5cf7a92e47dcf0f30d2765d0d9209e990afaa`
+  - 修改 `Packages/ArkDeckKit/Tests/ArkDeckContractTests/StandingAuthorizationContractTests.swift`
+    `e866fb5240d40d6264beb11305166856c3ef6cdf`
+  - 新增 `Packages/ArkDeckKit/Tests/ArkDeckContractTests/AuthorizationProvenanceContractTests.swift`
+  - 新增 `Packages/ArkDeckKit/Tests/ArkDeckContractTests/AuthorizationAdmissionContractTests.swift`
+  - 新增本 change `evidence/runs/TASK-AIN-006/**`
+- Scope clarification:`RockchipFlashAuthorization.swift` 不匹配原草案的
+  `Authorization*.swift` glob，但它是当前接受裸 authorization/context 并产出 autonomous
+  command surface 的实际 gate。为完成已批准 deliverable“gate 只接受 verified capability”，
+  本 readiness 将该既有文件显式纳入；除上述文件外不得借此扩面。
 - Forbidden paths:
-  - authorization 载体 `evidence/authorizations/**`
-  - current specs/contracts/baselines
-  - 真实 device/HDC/destructive dispatch
+  - authorization 载体 `evidence/authorizations/**`（不得创建、修改、刷新或批准授权）
+  - `openspec/specs/**`、`openspec/contracts/**`、current baselines、change-local contract/schema
+  - `Packages/ArkDeckKit/Package.swift` 与除上列外的全部 `Packages/**`
+  - 真实 device/HDC/rkdeveloptool/网络调用与 destructive dispatch；external shell/handoff 执行
 - Risk:high（authorization root 与 usage ceiling；host/fake only）
 - Hardware required:no
 
+### Readiness pins and trust boundary
+
+- **唯一 caller 输入**：autonomous CLI 只接受严格格式的 `authorizationId` 与 typed intent/
+  selector；selector（image path、target location 等）从不成为批准、binding、usage、tool 或
+  readback 事实。移除并显式拒绝 `--authorization`、`--unattended-context` 及其 JSON
+  context；caller bytes/path、环境变量、工作树、ref/branch/tag、历史 commit、imported manifest
+  均不得进入信任根。
+- **固定解引用**：resolver 固定仓库 `ArkDeck/ArkDeck`、受保护分支 `main` 与 registry
+  `openspec/changes/chg-2026-025-ai-native-unattended-device-ops/evidence/authorizations/`；
+  `authorizationId` 必须满足实现内封闭语法并只能映射同名 `<id>.json`，路径分隔符、`.`/
+  `..`、percent encoding、大小写/Unicode 等价替代均拒绝。每次 resolve 现场读取 GitHub
+  branch/commit/tree/blob/PR/review/CODEOWNERS metadata；本任务**不实现离线缓存**，网络/API
+  不可用、rate-limit 或任一字段不确定即 fail closed。
+- **merged-PR provenance**：current protected-main blob 必须与 approving review 的 exact PR
+  head 及 merge commit 中 blob 逐字节同 OID；PR 必须 merged、base=`main`、merge commit 为
+  current main 祖先，author=`github-actions[bot]`，`mergedBy` 与 APPROVED review 均为
+  CODEOWNER `lvye`，review `commit_id` 必须等于该 PR head。CODEOWNERS 只从同一 protected
+  main 读取（readiness pin `.github/CODEOWNERS`
+  `f4edd22f87965efcfc27ea512283a0c2252bf0fb`，`* @lvye`）；author/reviewer/merger 角色不得
+  合并。JSON 的 `approvedBy`/`carrier` 只可作为 display/cross-check 字段，不能产生信任。
+- **closed parse + capability**：授权 JSON 拒绝 duplicate key、unknown/missing 字段、非规范
+  digest/时间/数字。resolver 由 GitHub 事实导出 AIN-005 的 typed
+  `AuthorizationReference`（authorization ID + current full main OID + blob OID + approval PR）
+  并 mint `VerifiedAuthorizationGrant`；grant 与最终 admission capability 均 non-Codable、
+  无 public initializer，只有 package-owned resolver/admission 可 mint。typed reference 本身
+  是可序列化审计引用，**不单独构成 authority**；raw document/context validator 不得再成为
+  autonomous gate 的入口。
+- **trusted composition**：生产入口只公开 `authorizationId` + typed request；GitHub、clock、
+  durable binding、tool/device probe、plan validator、usage ledger 依赖由 product composition
+  root 固定持有。测试可通过 `@testable` 注入 package-internal deterministic ports；调用方
+  不得通过 public initializer 替换这些 ports 或自行构造 fact/grant/capability。
+
 ### Deliverables
 
-- CLI autonomous path 只接受 `authorizationId`；移除 caller authorization path 与
-  unattended context 作为可信输入；
-- `MaintainerMergedAuthorizationResolver`：fresh protected-main commit/blob + GitHub merged
-  PR/CODEOWNER review 验证，产生不可由 caller 构造的 verified grant；
-- durable binding/tool/plan/prerequisite/readback fact ports，readback freshness 与同 Job/target
-  correlation；
-- host-wide atomic usage reservation，`maxRuns=1` 并发/崩溃不超发、不退款；
-- 伪造 carrier/worktree/ref、stale cache、offline no-cache、caller context、并发 race 的
-  real-fault tests。
+- `MaintainerMergedAuthorizationResolver` 按上述 fresh protected-main/GitHub 链产生不可由
+  caller 构造的 grant；任一 provenance fault 返回具名 policy block，零 capability、零 usage
+  reservation、零 device/process dispatch。
+- `RockchipAuthorizationFactCollector` 必须在同一 admission invocation 内自行取得并关联：
+  1. `RockchipRockUSBFlashProvider` 对实际 archive 现场生成的 execute plan、archive SHA、
+     plan/step-set digest 与 provider/profile identity；caller 不得构造 `RockchipFlashPlan`
+     作为事实；
+  2. `DeviceBindingJournalAdapter.currentDurableBinding()` 产生的 package receipt，且
+     session/job、target ID、revision 与 grant/plan 全部相同；identity snapshot 必须含非空
+     `serial` 与 canonical `usbTopology`，serial 只在内存按精确 UTF-8 bytes SHA-256，raw
+     bytes 不入日志/evidence；
+  3. descriptor-bound tool probe 的实际 executable identity/hash receipt与 pinned
+     rkdeveloptool profile；公开可构造的 `ProcessExecutableIdentityReceipt`、
+     `RockchipDeviceObservation`/`RockchipDeviceDiscoveryAttempt` 均不可信，collector 必须
+     亲自调用 trusted port 并包装为无 public initializer 的 fact；
+  4. product-owned typed prerequisite receipts（loader/recoveryPath/unlocked/stablePower 全部
+     required 项为 satisfied；missing/unknown/unsatisfied 一律拒绝）；
+  5. 目标设备**实际 probe**返回的 serial digest + USB VID/PID/topology readback，匹配
+     authorization 与 durable binding，并绑定同一 job/plan/target、单调 observation sequence
+     与 `observedAt/deadline`。deadline 最大 30 秒，首个真实 Step 前必须重验；journal 中的
+     serial 只能作为 expected value，不能冒充实际 readback。
+- #301 的只读 Rockchip discovery seam（source
+  `67f585324d002f80c2682a1bdaa9ae7d11ed035a`、integration profile
+  `433263fc3f4f15bad798758a29e77740a43ef812`）可为 trusted collector 提供 actual
+  `rkdeveloptool ld` descriptor receipt 与 Loader VID/PID/location observation，但其不返回
+  serial，**单独不足以** mint machineReadback/final admission。missing serial、多个/歧义
+  observation、topology/mode/profile/hash 漂移一律拒绝；不得猜测或从 durable binding 合成
+  actual observation。该 seam 本任务只读，修改须另开任务。
+- `AuthorizationAdmissionService` 必须先完成 grant + 全部事实验证，再调用 AIN-005
+  `AuthorizationUsageLedger`（readiness pin
+  `d87d93caf9fba52e34bdfbaa9a5eb6e16c7cc1b9`）在 product-owned fixed host root 做 atomic
+  reservation，之后才可返回 package-owned one-shot admission capability。reservation ID
+  由 authorizationRef/job/plan/target 确定性导出，同一 retry 幂等；`maxRuns=1` 下并发最多
+  一个 durable reservation，atomic replace 后 crash 仍消费、不退款，ledger/lock/fsync/
+  decode 不确定时无 capability。
+- `RockchipFlashAuthorizationGate` 的 human 路径保留，ordinary CI/standard agent 仍
+  `policyBlocked`；autonomous 路径只接受上述 admission capability，不接受 raw
+  `RockchipStandingAuthorization`、caller context、typed reference 或任一公开 receipt。
+  删除现有 agent 成功后返回 command strings/handoff 的 authority；本任务不得 mint
+  stepIntent、不得 spawn/dispatch。
+- AIN-007 产品 executor 尚未存在，因此 `arkdeck flash --execute --agent` 必须在 resolver/
+  fact/usage 之前以明确 `executorUnavailable` fail closed：不读取授权、不烧 usage、不输出
+  可供 external shell 执行的命令。AIN-006 的正例仅在 package-local fake contract 中证明
+  admission capability；绝不声明 production approval、realHardware 或实际执行能力。
 
 ### Verification
 
-- AIN-AUTH-PROV/FACT/USAGE-001 全 PASS；所有负面 destructive dispatch=0；
-- 测试使用本地 deterministic Git/GitHub metadata fixture 与 fake device/tool ports，不访问
-  真实网络/设备，不把 fixture merge metadata 冒充 production approval。
+- `TEST-AIN-AUTH-PROV-001`：fresh protected-main 正例只 mint 一份 grant；invalid ID/path、
+  worktree/ref/历史-main override、unprotected/moved main、blob/tree/merge ancestry 漂移、PR
+  open/wrong base/wrong actor/wrong merge/review/CODEOWNER、duplicate/unknown JSON、stale/offline
+  no-cache 全部拒绝，capability/reservation/process/device/destructive dispatch 均 0。
+- `TEST-AIN-FACT-001`：caller context/API 已消失；非 durable/wrong job-target-revision binding、
+  caller-constructed public receipt、missing serial/topology、tool/profile/plan/archive drift、
+  prerequisite unknown/unsatisfied、actual serial/VID/PID/topology/mode mismatch、ambiguous device、
+  stale/replayed/expired readback 全拒绝；只有同一 admission 内可信 ports 的全关联正例可进入
+  reservation。
+- `TEST-AIN-USAGE-001`：直接复用真实 AIN-005 ledger 做并发、lock/append/replace/fsync crash
+  window 与 retry fault test；`maxRuns=1` 恰一 durable reservation、retry 不重复、crash 不退款，
+  reservation 与 typed authorizationRef/job/plan/target correlation 全匹配。
+- API/source assertion：旧 `--authorization`、`--unattended-context`、
+  `CLIUnattendedContext` 与 raw-agent gate 入口为 0；外部 test target 不能构造 grant/fact/final
+  capability；agent command surface/stepIntent/child launch 恒为 0。保留并复跑
+  AC-FLASH-015-01/02、AIN-CONTRACT-001、usage ledger 与 discovery regression。
+- 测试只使用本地 deterministic Git/GitHub metadata fixture、真实 host filesystem ledger 与
+  fake device/tool/fact ports；network/HDC/rkdeveloptool/device/destructive dispatch = 0，不把
+  fixture merge metadata、fake readback 或 plan-only 结果冒充 production approval/hardware。
+- Readiness baseline：macOS 26.5.2 (25F84)、Xcode 26.6 (17F113)、Swift 6.3.3；
+  `swift test --package-path Packages/ArkDeckKit` **336 tests / 1 skipped / 0 failures**；
+  `check-sdd` **0 errors / 0 warnings / 111 acceptance IDs**。实现 PR 运行 full Swift、焦点三
+  canonical tests、strict format/diff/scope/privacy/no-network/no-device 审计，并在
+  `evidence/runs/TASK-AIN-006/` 记录命令、结果、偏差与残余风险；任务完成/verified 状态仍须
+  后续独立 PR，不在实现 PR 自翻。
 
 ## TASK-AIN-007 — product-owned Rockchip typed executor
 
