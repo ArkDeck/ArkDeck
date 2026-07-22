@@ -704,9 +704,16 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
 
 ## TASK-AIN-007 — product-owned Rockchip typed executor
 
-- Status:ready（仅在维护者 review/merge 本 readiness PR 后生效；本 PR 只更新 `tasks.md`，
-  不含实现、授权、设备操作或 dispatch。#310 readiness 因设计 §13 的两项 P0 缺口失效并仅作
-  历史保留；本 readiness 不继承 #310 的 base/OID）
+- Status:done
+- Done:2026-07-22；实现经 #326 合入 main（merge commit
+  `fac1a128903fb17b9aa98273e831eb60be9542bf`；PR head
+  `2c03c5990bdbd948ca9d658a08f58e53fbcb128b`；维护者 `lvye` merge）；done recheck
+  于最新 main `42cc63123738313d253b25c9de78220e1e6814b5` 复验：焦点 12/0 failures、
+  Swift 全量 358/1 skipped/0 failures、`TEST-AIN-DISPATCH-001` canonical 摘要 PASS、
+  guard 0/0/111；PR head 到 merge commit、merge commit 到最新 main 在 TASK-AIN-007
+  实现范围内 tree diff 均为 0；contractFake/host-only，device/HDC/real rkdeveloptool/network/
+  shell/destructive dispatch = 0；evidence =
+  `evidence/runs/TASK-AIN-007/2026-07-22-rockchip-executor-implementation.md`
 - Platform:macos
 - Requirements:REQ-FLASH-008/009/011/012/013/015、POL-WORKFLOW-001、
   POL-RECOVERY-001
