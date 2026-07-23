@@ -1,6 +1,6 @@
 # CHG-2026-028 Verification Plan
 
-> Status:planned
+> Status:passed;maintainer confirmation 见 proposal.md Verification closure(2026-07-23)
 > Change:CHG-2026-028-guard-ci-mechanization@r3
 > Core baseline:CORE-2.1.0(零 Core 变更;canonical Core AC 零认领)
 

@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-028-guard-ci-mechanization
 revision: 3
-status: approved # r1 经 #318 批准;r2 经 #349 批准;本 r3 atomic-archive task lookup 修订仅在维护者 review/merge 当前 revision PR 后生效
+status: verified # 2026-07-23 本 verification-closure PR(先例 #224/#239);批准链 r1 #318 / r2 #349 / r3 #353;四 task done 已合入(OID 见 Verification closure);archive 另行
 class: implementation-only
 core_change_level: none
 owner: lvye
@@ -185,3 +185,71 @@ V2 治理:本 propose PR 合入仅登记提案;批准须独立 approval-only PR;
   #351 archive、不改变 canonical Core AC、批准语义或 required-status D2 边界;
   仅在维护者 exact-head review/merge 后,才可另开 TASK-MECH-004 remediation
   implementation/evidence PR。
+
+## Verification closure(2026-07-23)
+
+依 verification.md Gate 逐项复核(V2:整体结论由维护者 review/merge 本 PR
+确认;先例 #224/#239)。本次复核仅基于 main 已合入状态 + 确定性检查,全部
+离线检查于 main `98593848defa91f73e6537bd7d151d58fcc42428` 重跑。
+
+- **任务面**:四 task 均 done,各有 merged 交付 + 独立 done 状态 PR +
+  evidence(run 记录 = 本 change `evidence/runs/TASK-MECH-00N/run.md`)——
+  TASK-MECH-001(实现 #329 `2c8aacad5ca8bf78e62171d4a71bbc2cabdd9bd0`、
+  D1 基线修订 #339 `477f7fff1cf87cc39d0b7b44a9842cb72b235def`、done
+  `f2abfd1ffc4f7cb2fb672f4ea1576c78c6992928` + 勘误 #342
+  `7fd15a93bbed33d3e9d00062116abf13c74d68f6`);TASK-MECH-002(实现 #343
+  `6f9e3df9ee29d792d7d5cfb85b035a425c03e19c`、evidence #346
+  `8f36de56add57ec7f85b46e929a8f8bb72dd6211`、done #348
+  `8c50780cc716de340310a267bfd306719d0b8bd9`);TASK-MECH-003(实现 +
+  evidence #352 `0186a61929540d972eae800eee9dbddabb1f8add`、done #363
+  `1fb4c83b8f4aec08575c1087762bb5cfbd86e1bc`);TASK-MECH-004(r1 实现
+  #335 `72b295f4987410c57c04cf2d11a4b479bc8f63bf`、remediation #336
+  `2ad9278d84b21aa516f74053e1031dcd8014720d`、r3 修订 #353
+  `ff4bc40f3af7280a31bccd9996945ce44c18bf92`、r3 实现 #373
+  `0c10364addc0d5a70f093d69ecc61b8bfb075b09`、evidence closure #377
+  `9df5642620ca07584c822d43f95d6cc5df187360`、done #378
+  `5640614f427e873cf21fce2032c502822d219a30`)。
+- **change-local 验收**(四项均可复查):
+  - `MECH-CI-001`(documentReview)**PASS**:swift-ci workflow(main 在案)
+    零 secret、`permissions: contents: read`;真实 PR 绿 run ≥3
+    (`29923584904`/`29924113820`/`29924573502`,路径感知 7s/8s/8s 秒级
+    success = docs-only 面)+ 全量绿 run `29924110657`(Xcode 26.6/Swift
+    6.3.3,358 tests/1 skipped/0 failures,与 #339 D1 重钉基线一致);
+    canary 红 run `29924117682` 红因 = 注入必败测试(编译通过,log 在案;
+    canary PR #330/#332/#334 均已 close,分支删除,永未合入);job summary
+    如实注记 ArkDeckKit-only、App/XCUITest 不覆盖;测试步骤无静默
+    skip/forced-success(workflow 内唯一 `|| true` 位于 Xcode 缺失
+    fail-closed 报错分支的诊断列举,随后 `exit 1`)。
+  - `MECH-REV-001`(contract)**PASS**:三方一致正例过;proposal/
+    acceptance/verification 三处各单独漂移反例恰一条具名 err(含三实值);
+    header 缺失/不可解析 err;archive fixture 跳过——见 TASK-MECH-002
+    run.md 与 `scripts/test_check_sdd.py`(本复核重跑 = 19/19 PASS);
+    真实基线实现前后 0/0/111 保持(本复核重跑 = 0/0/111)。
+  - `MECH-PIN-001`(contract)**PASS**:精确 `yaml pins` 合法正例过;
+    39/41 hex blob、63 hex sha256、非 YAML、unknown key、carrier 内字面
+    占位符各具名 err;`yaml pin-example` 与无 carrier 文档零校验零 err;
+    archive 跳过——见 TASK-MECH-003 run.md 与同一 19/19 suite(含
+    structured pins contract tests,本复核重跑 PASS);change tasks 模板载
+    非载体 `yaml pin-example` + 实例化替换注记(main 在案);真实基线
+    0/0/111 保持。
+  - `MECH-PATH-001`(contract)**PASS**:live canary #337 红并具名列出
+    越界路径 `docs/mech-004-canary.md`(closed,`mergedAt` 空,永未合入);
+    implementation #336 / propose #359 / status #367 三类真实形态 PR 绿
+    (run `29929295656`/`29971877142`/`29973955756`);未声明任务 + 敏感面
+    红、纯 docs 未声明绿、任务不存在/Allowed paths 行缺失/零 token fail
+    closed,以及 r3 atomic-archive 等值迁移正反例(archive-only/partial/
+    mutated/copied/ambiguous/pre-existing target、active-root 残留、living
+    越界均具名 err)由 `scripts/test_check_pr_paths.py` 合成 fixture 承载
+    (本复核重跑 = 20/20 PASS)。
+- **共同门**:每个新 check 均有红反证(CI canary 红 run、guard 反例
+  fixture 断言 err 增量恰 1、live canary #337 红);0/0/111 基线保持(本
+  复核重跑确认);`archive/**` 零触碰(guard 全体豁免 + 各 run 在案);
+  Swift 全量基线 358/1/0 保持(#352 exact-final-head run `29969201669` 等
+  merged 记录在案);存量 revision 漂移(chg-024/025/026)已在各自 change
+  lane 清零(TASK-MECH-002 run.md 实现前扫描在案)。
+- **边界**:verified 不构成任何 check 的 required status 翻转(维护者
+  GitHub 设置动作,D2,独立记录);授权语义逐字保持——CI 红 = 不能合并、
+  CI 绿 ≠ 批准;MECH-004 为 guard-rail 而非安全边界(防线仍是维护者
+  review);#373 PR-event 绿晚于 merge 的 process residual 如实在案
+  (TASK-MECH-004 run.md),不被本闭包改写;archive 属后续独立 governance
+  PR,由维护者判定。
