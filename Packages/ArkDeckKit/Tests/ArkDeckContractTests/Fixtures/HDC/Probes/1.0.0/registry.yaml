@@ -55,7 +55,7 @@
         "exitCode": null,
         "receiptId": "i15-receipt-server-identity-generation",
         "receiptPath": "1.0.0/receipts/server-identity-generation.json",
-        "receiptSHA256": "6f71af96bcd6c25a8a7c900538e01c1aff6144ee85e6c928a37fbc654c003a69"
+        "receiptSHA256": "b8f60c014eefc64f9c17f6ebf3e762691157601eeeb51e0b3aba5c20652dec72"
       },
       "semanticMappings": [
         {"input": "identityTupleMatchesPriorReceipt", "result": "observed.sameGeneration"},
@@ -85,7 +85,7 @@
       },
       "provenance": {
         "evidenceClass": "controlledHumanCapture",
-        "sourcePath": "openspec/changes/chg-2026-015-hdc-readonly-probe-registration/evidence/provenance/host-only-capture-2026-07-20.md",
+        "sourcePath": "openspec/changes/archive/2026-07-22-chg-2026-015-hdc-readonly-probe-registration/evidence/provenance/host-only-capture-2026-07-20.md",
         "sourceSHA256": "7949d8a2f813b7f2f6b7d8ba45d37cca84d57167f0e319e4761b5f50e53493d8",
         "acceptedBy": "maintainer review and merge of PR #155"
       },
@@ -136,7 +136,7 @@
         "rawStorage": "operatorControlledOutsideRepository",
         "receiptId": "i15-receipt-selected-device-authorization-binding",
         "receiptPath": "1.0.0/receipts/selected-device-authorization-binding.json",
-        "receiptSHA256": "ea8257eb7c8404805521963307f06a94634341ad1470ccf13118f7f9028e0383"
+        "receiptSHA256": "277cfa5ae36a1e7140c80d9da11debcabc28a93f5bebcaaf0cae87d903ab29ea"
       },
       "semanticMappings": [
         {"input": "exactRegisteredConnectedRowAndDurableBindingMatch", "result": "observed.ready"},
@@ -164,7 +164,7 @@
       },
       "provenance": {
         "evidenceClass": "controlledHumanCapture",
-        "sourcePath": "openspec/changes/chg-2026-015-hdc-readonly-probe-registration/evidence/provenance/device-window-capture-2026-07-20.md",
+        "sourcePath": "openspec/changes/archive/2026-07-22-chg-2026-015-hdc-readonly-probe-registration/evidence/provenance/device-window-capture-2026-07-20.md",
         "sourceSHA256": "a06cc98999adb1067448ab879870c77e88740988cbc3905dff933a98fb7ae887",
         "acceptedBy": "maintainer review and merge of PR #156"
       },
@@ -212,7 +212,7 @@
         "exitCode": null,
         "receiptId": "i15-receipt-key-access-diagnostics",
         "receiptPath": "1.0.0/receipts/key-access-diagnostics.json",
-        "receiptSHA256": "a87c2cf3754cd380699939060b2250b4bf0e406f1920cb8a69b930c9a23839e5"
+        "receiptSHA256": "abe6ea2aac83aed97cb98695c5db6334fe0e5e5955ebf9da4678544580b9a858"
       },
       "semanticMappings": [
         {"input": "any", "result": "unsupported"}
@@ -235,7 +235,7 @@
       },
       "provenance": {
         "evidenceClass": "controlledHumanCapture",
-        "sourcePath": "openspec/changes/chg-2026-015-hdc-readonly-probe-registration/evidence/provenance/host-only-capture-2026-07-20.md",
+        "sourcePath": "openspec/changes/archive/2026-07-22-chg-2026-015-hdc-readonly-probe-registration/evidence/provenance/host-only-capture-2026-07-20.md",
         "sourceSHA256": "7949d8a2f813b7f2f6b7d8ba45d37cca84d57167f0e319e4761b5f50e53493d8",
         "acceptedBy": "maintainer review and merge of PR #155"
       },
@@ -279,7 +279,7 @@
         "exitCode": null,
         "receiptId": "i15-receipt-subserver-capability",
         "receiptPath": "1.0.0/receipts/subserver-capability.json",
-        "receiptSHA256": "565beee8a8d0ca84e026968db13a12ea5ebcb419428423dd2ee7dcd1165734ea"
+        "receiptSHA256": "0fee0d35053866afbe6db8eaad9199408148d91d381b41eda0b525220d68663e"
       },
       "semanticMappings": [
         {"input": "versionOnlyOrMutationNameOrUnknown", "result": "unsupported"}
@@ -302,7 +302,7 @@
       },
       "provenance": {
         "evidenceClass": "documentReview",
-        "sourcePath": "openspec/changes/chg-2026-015-hdc-readonly-probe-registration/evidence/provenance/subserver-capability-doc.md",
+        "sourcePath": "openspec/changes/archive/2026-07-22-chg-2026-015-hdc-readonly-probe-registration/evidence/provenance/subserver-capability-doc.md",
         "sourceSHA256": "6bb63426ecee6e0e86f4027bd7d9b6034db56e116663494885fd69aa89618013",
         "acceptedBy": "maintainer review and merge of PR #141"
       },
