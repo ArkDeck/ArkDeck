@@ -88,7 +88,7 @@ trace_probe_registries:
     version: 1.0.0
     profile: OPENHARMONY-TOOLS@0.4.0
     path: openspec/integrations/openharmony/trace-probes/1.0.0/registry.yaml
-    sha256: 0c093f98b57706b3723a68ae7552bef0db0731a675fb6cc023f69bbe21d6e566
+    sha256: 9d2a390b84092f1d78d86c10bf182884bc3a2ef8b3cdc3d35ed8e7e2b087b613
 
 trace_probe_resources:
   - id: tr001-resources-manifest
