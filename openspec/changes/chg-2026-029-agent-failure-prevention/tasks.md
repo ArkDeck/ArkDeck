@@ -6,16 +6,25 @@
 
 ## TASK-AFP-001 — 建立非权威 Agent 失败模式手册
 
-- Status:ready（2026-07-23 D1 readiness；仅在维护者 review/merge 本独立 PR 后
-  生效。CHG-2026-029 approval 与本任务历史审计 base、九项 case routing、固定文档
+- Status:ready（2026-07-23 D1 readiness **r2**；仅在维护者 review/merge 本独立 PR 后
+  生效。CHG-2026-029 approval 与本任务历史审计 base、**十八项** case routing、固定文档
   结构及验证矩阵已闭合；merge 前不得开 implementation/evidence PR）
-- Readiness（r1，base = protected `main`
-  `ff4bc40f3af7280a31bccd9996945ce44c18bf92`）：
+- **r1 readiness 已失效（pin drift，如实记录不改写）**：r1 于 #356 合入
+  `e73b025dab3c12162465040bd0829470b2409ae9`，其 pins carrier 钉定本 change 四个
+  文件的 r1 blob。CHG-2026-029 revision r2（#355 合入
+  `de6b79aafa95700297a94dc311e94b1283f8abdd`）把 taxonomy 由 `AF-001`…`AF-009`
+  扩为 `AF-001`…`AF-018` 并改动了这四个文件，四枚 pin 全部漂移。按 r1 自身
+  “任一漂移即立即停止并重新 readiness”条款，本 r2 重钉全部 pin 与 case routing。
+  r1 的 nine-ID routing 结论未被推翻，逐条并入下方 r2 routing；r1 文本保留在
+  `#356` 的 Git 历史中，不追溯改写。
+- Readiness（**r2**，base = protected `main`
+  `de6b79aafa95700297a94dc311e94b1283f8abdd`）：
   - **Approval/dependency gate:satisfied。**r1 proposal #345 合入
     `7083148b4ed6916f17ec87e05cc5970378839ba7`；approval-only #347 已由维护者
-    @lvye 合入 `813361830593f416eb845f0cceb9556ab51168be`，因此
-    `proposal.md status:approved` 已在 protected `main` 生效。本任务无前序 task；
-    AFP-002/003 不构成本任务依赖并继续 `blocked`。
+    @lvye 合入 `813361830593f416eb845f0cceb9556ab51168be`；revision r2 #355 已由
+    维护者 @lvye 合入 `de6b79aafa95700297a94dc311e94b1283f8abdd`，因此
+    `proposal.md status:approved` 与 `revision: 2` 均已在 protected `main` 生效。
+    本任务无前序 task；AFP-002/003 不构成本任务依赖并继续 `blocked`。
   - **Base/input pins。**以下是真实 `yaml pins` carrier；implementation 开工时必须
     基于本 readiness 合入后的最新 protected `main`，逐项确认路径仍解析到 exact blob、
     两枚 commit 仍在 ancestry 中。任一漂移、路径删除/重命名或 case 结论被后续记录
@@ -23,10 +32,14 @@
     正确或获得批准。
 
     ```yaml pins
-    - artifact: TASK-AFP-001 readiness audit base
-      commit: ff4bc40f3af7280a31bccd9996945ce44c18bf92
+    - artifact: TASK-AFP-001 readiness r2 audit base
+      commit: de6b79aafa95700297a94dc311e94b1283f8abdd
     - artifact: CHG-2026-029 approval merge
       commit: 813361830593f416eb845f0cceb9556ab51168be
+    - artifact: CHG-2026-029 revision r2 merge
+      commit: de6b79aafa95700297a94dc311e94b1283f8abdd
+    - artifact: TASK-AFP-001 readiness r1 merge (superseded by this r2)
+      commit: e73b025dab3c12162465040bd0829470b2409ae9
     - path: AGENTS.md
       blob: 3c2d3c6a01d3eaa31cd9e3ee333f3153552f4164
     - path: openspec/constitution.md
@@ -36,13 +49,13 @@
     - path: openspec/verification/policy.md
       blob: ef3b42085ff50b54f1bb70650510f27bdc020cf1
     - path: openspec/changes/chg-2026-029-agent-failure-prevention/proposal.md
-      blob: bfe120c269391fccc102eac97dc1e1a2b344db39
+      blob: 91ee9a883439fb0d6b749c7d76a49968aa98417e
     - path: openspec/changes/chg-2026-029-agent-failure-prevention/design.md
-      blob: 6b448490eae99b3be280acf0ddfce2093ea9f459
+      blob: e559a6d45f15520b101280a20ed78591a924022a
     - path: openspec/changes/chg-2026-029-agent-failure-prevention/verification.md
-      blob: 93cb31a6cb89578f42a6d16a097ea905ef8962bd
+      blob: ba0a586442f9397e4c458165fb7972d334f19e2b
     - path: openspec/changes/chg-2026-029-agent-failure-prevention/acceptance-cases.yaml
-      blob: c746fd84da3c8e2e5f6d6b92bcf546589289f566
+      blob: 8137232534e498c329a85dece459887f8ef4b8a6
     - path: openspec/changes/chg-2026-026-macos-rockchip-flash-ui/evidence/runs/TASK-RKFUI-001/run.md
       blob: 0f24bb2424e43edb34de0fffaa0eee3c4e5cbec3
     - path: openspec/changes/chg-2026-022-hdc-supervisor-observability/review.md
@@ -67,6 +80,28 @@
       blob: e336f498db72ba4c7a4abcd4303d595e152bcb2a
     - path: openspec/planning/postmortem-2026-07-governance.md
       blob: 308d260be9d545b8e27d20a6a30e0719cd76fd19
+    - path: openspec/changes/archive/2026-07-21-chg-2026-001-macos-m0a/evidence/runs/TASK-M0A-003/run.md
+      blob: 7fc3ab1d4fd3b2000b74ea04b0356d9a6c56fce6
+    - path: openspec/changes/archive/2026-07-21-chg-2026-002-macos-m1-infrastructure/tasks.md
+      blob: 2ea2ba6672b03f7ab6a86a6a7b136c5d531d9ac9
+    - path: openspec/changes/chg-2026-021-trace-adapter-capture/design.md
+      blob: 219c2812a321030bdd7a81517150ccc7fac755ab
+    - path: openspec/changes/chg-2026-021-trace-adapter-capture/tasks.md
+      blob: aea6b410a31d06587679432407ec3119ac819997
+    - path: openspec/changes/chg-2026-021-trace-adapter-capture/evidence/runs/TASK-TR-001/run.md
+      blob: 6069642a7b3c13d741383fbbdd17a0f921c6b9f2
+    - path: openspec/changes/chg-2026-026-macos-rockchip-flash-ui/verification.md
+      blob: f4aea707ded798680aacb7811a4786247a94dac8
+    - path: openspec/changes/archive/2026-07-21-chg-2026-020-dayu200-real-flash/evidence/runs/TASK-RF-002/run.md
+      blob: 8869ad61b9ebf6e5397e7e6007318e11cb26429d
+    - path: openspec/changes/archive/2026-07-21-chg-2026-016-dayu200-recovery-rehearsal/evidence/runs/TASK-RH-001/rehearsal-attempt-4-2026-07-21.md
+      blob: 6af1a69bea454251bac9a16ba26e58f2483702da
+    - path: openspec/changes/chg-2026-028-guard-ci-mechanization/evidence/runs/TASK-MECH-001/run.md
+      blob: f5e51fad2f2a429748126eee27ab61df282c2f23
+    - path: openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/tasks.md
+      blob: abaee6a12290108f4daeac9f84a3ff6700971433
+    - path: openspec/planning/backlog.md
+      blob: fc20c3de0187f3f4b4a7e60129163c33a6d1c6c3
     ```
 
   - **Historical case routing（全部只读引用，不改历史结论）：**
@@ -102,11 +137,60 @@
     - `AF-009` → `postmortem-2026-07-governance.md`；#2 merge
       `47b310d6ef4e06a3048b74c71420bfe411b53621`。事实范围是 V1 密钥同 UID、
       ledger 跨 run 不成立、机制自伤与 V2 决策，不复活废止机制或改写治理规则。
+  - **Historical case routing — r2 执行/验证轴（同为只读引用，不改历史结论）：**
+    - `AF-010` → archived M0A-003 `run.md` 的 tautological counter removal，与
+      archived CHG-2026-002 `tasks.md` 两处套套逻辑清理（测试回显字面量被误写为
+      运行期度量）；补充只读引用 CHG-2026-022 `review.md`（#269 merge
+      `3147e33c0d4bf0f9f54e6160850a42f370c05cb6`）中“计数落在生产不可达入口”一面。
+      事实范围是这些断言/计数曾被移除或判为无效，不推断当前测试套的整体质量。
+    - `AF-011` → CHG-2026-021 `design.md`（空 trace `exit 0` 不判 succeeded）、
+      CHG-2026-026 `verification.md`（`AC-FLASH-012-01` 的 exit0/marker/postflight
+      叉乘）与 archived RF-002 `run.md`（`assessOutcome` 语义 postflight）。手册只
+      陈述这些登记面要求按真实成功语义判定，不复制 argv、marker 字面量或工具输出。
+    - `AF-012` → archived CHG-2026-016 `rehearsal-attempt-4-2026-07-21.md`；该 blocked
+      attempt 记录的根因是 `python3 -` 的 stdin 被 heredoc 抢占、管道数据被丢弃。
+      事实范围限于该 attempt 自身，同目录另有 attempt 2/3/5 记录；harness echo
+      remediation done 见 #229 merge `3ac44f2d759bd8bec8f95405b85281d70f89cad0`。
+      blocked attempt 不升级为 passing evidence，也不复制 transcript 或设备标识。
+    - `AF-013` → CHG-2026-021 TR-001 `run.md`；hardening #274 merge
+      `628653c69afdf5f1b3c69e0b9eda03ba111fa5bc`。事实范围是照搬既有 harness 形态
+      导致 REQ-TRACE-006 的 Job-UUID 隔离与 verified-receive-before-cleanup 未被覆盖，
+      经 hardening 修正；不推断其他 harness 是否存在同类漏项（如需断言必须标 inference）。
+    - `AF-014` → CHG-2026-021 `tasks.md` 的 TASK-TR-002R 节；scoping #276 merge
+      `6e85a784579809b0b79a95bb117d48033892fdf4`，real-fault 修复 #278 merge
+      `4bdad2f037cd62c76dbc483f0cfb4a35ae3af539`。事实范围是四条 fail-closed 弱化
+      （binding 未 target-bound、无条件 cleanup 无 publication receipt、
+      membership 被当 capability、public enum case 绕门）由 post-merge 对抗审查
+      发现并以真实 fault 注入堵住；不改写 #270 的历史 review 结论。
+    - `AF-015` → archived M1-009 四份 `review-remediation*.md`（与 `AF-008` 共用
+      pinned bytes，此处取“同类问题逐轮再现”一面），与 RKFUI-001
+      `hermetic-contract-test-2026-07-22.md`；#305 merge
+      `c2342ca363e60bea8d159d6fe8b87e8fca31d8ca`。事实范围是 `#filePath` 同族模式
+      的部分收口与其余**如实记录为限制**；不得把已注明的 out-of-scope 写成已解决。
+    - `AF-016` → CHG-2026-028 MECH-001 `run.md`：readiness r1 钉 `macos-15` 被 CI
+      实测推翻，r2 #333 merge `e51dcd7a529d42d521efb9ec113a57716894a6b9` 重钉
+      `macos-26`。事实范围是该假设未经探针实证即入 pin、随后被一手 run 证伪；
+      三轮 attempt 均在案，手册不复述 run 编号之外的 CI 细节。
+    - `AF-017` → CHG-2026-008 `tasks.md` 与 `planning/backlog.md` 记录的 r3 初稿
+      过度架构与裁剪：#131 merge `d99ba58042b9cad64de39d6f4baa5994b2c351b2` 将 r3
+      裁剪为 M0B-model gates、JAUTH 降级入 backlog；**#128 未合并（closed draft，
+      其 head 保留于提交历史）**，手册不得把它写成 merged。次要引用
+      `postmortem-2026-07-governance.md` 的 V1 机制规模一面（与 `AF-009` 共用
+      pinned bytes，取“规模超配”而非“强度错位”）。
+    - `AF-018` → CHG-2026-021 `tasks.md` 与 RKFUI-001 `run.md` 中已登记的并行事实：
+      文件级分工作为并行前置、分支被他会话 worktree 占用的处置。**dated
+      observation（2026-07-23）**：本任务 r1 readiness（#356 merge
+      `e73b025dab3c12162465040bd0829470b2409ae9`）与 CHG-2026-029 revision r2
+      （#355 merge `de6b79aafa95700297a94dc311e94b1283f8abdd`）由两个 lane 并行
+      推进，导致本 r2 重钉——该实例可作为 `AF-018` 的仓内 case，但必须标注为
+      本 change 自身的过程事实，不得表述为产品缺陷或他人过失。
   - **Handbook shape:closed。**唯一新增目标为
     `openspec/planning/agent-failure-patterns.md`，它在 audit base 不存在（零路径碰撞）。
     首屏依次声明 non-normative、权威顺序/冲突时忽略手册并按 canonical rule 处理、
     只链接不复制 evidence、隐私与 archive 只读边界；不得出现新的批准/授权/支持语义。
-    随后恰有 `AF-001`…`AF-009` 九个二级标题，标题名逐字采用 proposal taxonomy；
+    随后恰有 `AF-001`…`AF-018` 十八个二级标题，标题名逐字采用 proposal r2 taxonomy
+    （治理/交付轴九项 + 执行/验证轴九项，见 design §3、§3.2）；`AF-001`…`AF-009`
+    的 `Observed cases` 须含 design §3.1 登记的子面；
     每项恰有 design §2 的八个三级标题：`Signal`、`Observed cases`、`Root cause`、
     `Preflight`、`Verification`、`Canonical references`、`Automation status`、
     `Currency`。Observed cases 以 `Fact`/`Inference` 显式分离；Verification 至少一个
@@ -121,7 +205,7 @@
     approved change，不冒充 canonical authority。
   - **Verification/evidence gate:binary。**implementation/evidence PR 必须同时交付手册、
     本任务 run 与 `tasks.md` 本任务 evidence 引用，但不得翻 `ready→done`；run 至少记录：
-    九 ID/八字段唯一性审读、十八个 positive/negative 方法存在、全部 case/canonical
+    十八 ID/八字段唯一性审读、三十六个 positive/negative 方法存在、全部 case/canonical
     relative link 解析、完整 40-hex OID 与上述 pin currency 复核、`Fact`/`Inference`
     分离、shadow-spec 扫描（新增 normative `SHALL`/`MUST`、自动 approval/ready/done、
     platform/hardware/support 声明均为 0）、secret/绝对用户路径/device identifier/raw
@@ -133,11 +217,16 @@
     `rg` 与 Python/PyYAML SDD 环境可用；实现无需新权限、签名、联网依赖或产品/Safety
     判断。若实现期间出现同路径 PR、canonical conflict、secret/privacy 风险或需要修改
     forbidden path，任务立即回到 `blocked`。
-  - **Review boundary。**本 readiness PR 只修改本文件的状态摘要与 AFP-001 本节，将
-    AFP-001 `blocked→ready` 并登记 pins/case/shape/verification；零手册、零
-    implementation、零 evidence、零 archive/历史改写。implementation/evidence 与后续
-    `ready→done` 各自使用独立 PR；本 readiness merge 不构成
-    `AFP-HANDBOOK-001` PASS 或 change `verified`。
+  - **Review boundary。**本 readiness PR 只修改本文件的 AFP-001 本节，重钉
+    pins/case/shape/verification 并把失效的 r1 替换为 r2；任务保持 `ready`
+    （r1 已翻转，本 r2 不再产生状态跃迁，只恢复 readiness 有效性）。零手册、零
+    implementation、零 evidence、零 archive/历史改写；`#356` 的 r1 文本保留在 Git
+    历史中不追溯改写。implementation/evidence 与后续 `ready→done` 各自使用独立 PR；
+    本 readiness merge 不构成 `AFP-HANDBOOK-001` PASS 或 change `verified`。
+  - **Currency 复核（2026-07-23）。**上表全部 blob 与 commit 于 audit base
+    `de6b79aafa95700297a94dc311e94b1283f8abdd` 实测取值，非从 r1 转抄；r1 中未受
+    r2 影响的 pin 逐枚重取后与 r1 值一致，受影响的四枚已更新（见本节开头的
+    pin drift 记录）。开工前须再次对最新 protected `main` 复核，漂移即停止。
 - Platform:macos（过程文档跨平台可复用，零平台产品行为）
 - Requirements/AC:change-local `AFP-HANDBOOK-001`
 - Depends on:change approval、independent readiness
