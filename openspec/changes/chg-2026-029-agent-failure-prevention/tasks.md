@@ -729,6 +729,23 @@
 - archive、历史 evidence、产品代码 diff 均为零；`scripts/check-sdd.sh` 与
   `git diff --check`。
 
+### Evidence（candidate；不构成状态翻转）
+
+- implementation + evidence run:
+  [`evidence/runs/TASK-AFP-003/run.md`](evidence/runs/TASK-AFP-003/run.md)
+  （2026-07-23，base `cfab930722afe60ed5e8759ea0c91d7a178971cc`）。
+- 覆盖：readiness r2 钉定的六个历史案例逐行六列齐全（`AF-001`/`AF-002`+`AF-010`/
+  `AF-003`+`AF-014`/`AF-004`/`AF-008`+`AF-015`/`AF-009`+`AF-017`），主环境反例 =
+  RKFUI-001 E0 quarantine blocker（typed `toolBlocked(quarantinePresent)`、零子进程、
+  未清除 quarantine、未提权，记为 BLOCKED），备用反例 = `/private/tmp` flaky 纪律面；
+  另按可选覆盖追加 `AF-012` 一例作为方法示范。
+- 二值门实测：开工前 carrier 28/28 无漂移；引用的 12 个 AF ID 全部存在于已合入手册、
+  6 个模板字段全部存在于已合入模板；OID 全部在 ancestry；列 ④ 与"会更早发现"整体
+  显式标注为 `Inference`；hindsight-bias 扫描（历史结论改写 / 产品硬件重新验证 /
+  fake→realHardware）三项均为 0；archive、手册、模板 diff = 0；check-sdd 0/0/111。
+- 任务状态保持 `ready`；`AFP-DRILL-001` 的 PASS 结论待维护者在独立 `ready→done` PR
+  中确认。
+
 ### Notes / handoff
 
 - 演练结果若发现当前 active task 的现实缺陷，只记录指针并 fail closed；不得在 AFP-003
