@@ -83,9 +83,11 @@ partition PASS。
 - TASK-BAP-003 在案 ruleset `agent-ref-boundary`（ID `19595282`）使用 exclude
   `refs/heads/agent/**`，其真实正向 probe 仅覆盖单层
   `agent/cred-probe`。
-- GitHub ruleset 使用带 `File::FNM_PATHNAME` 的 `fnmatch`；`*` 不匹配 `/`，
-  官方多层示例使用 `qa/**/*`。因此既有 exclude 没有覆盖三层 reserved branch，
-  restrict-creations rule 正确地返回 GH013。
+- GitHub
+  [ruleset fnmatch 文档](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/creating-rulesets-for-a-repository#using-fnmatch-syntax)
+  明示使用 `File::FNM_PATHNAME`、`*` 不匹配 `/`，多层示例使用 `qa/**/*`。
+  因此既有 exclude 没有覆盖三层 reserved branch，restrict-creations rule 正确地
+  返回 GH013。
 - 候选修复方向是由维护者经独立 D1/D2 方案审查，把 ref boundary 扩展到经验证的
   多层 `agent` namespace（例如评估 `refs/heads/agent/**/*`），并同时重跑单层/
   多层正向及 ordinary/main 负向 probes。Agent 本 run 未读取或修改 ruleset，
