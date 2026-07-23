@@ -195,3 +195,60 @@ Remediation live PR、canary 红与独立复审链接在新分支 push 后追加
 - 当前 TASK-MECH-004 仍为 `ready`;r3 实现 PR 的真实 pull-request CI、独立
   reviewer 与 merge 尚待后续追加,本记录不把本地结果冒充 PR 绿或人类批准,
   也不构成 change `verified`。
+
+## r3 post-merge evidence closure(2026-07-23)
+
+- r3 implementation PR
+  [#373](https://github.com/ArkDeck/ArkDeck/pull/373):base
+  `e48673fbe8c8440d7e12dbfe6aea5e94f996a4e2`,reviewed head
+  `84d99b61ab52eb69ca11d9dd38e2a51fdcd123ec`;GitHub human review
+  `APPROVED` by `lvye` 于 2026-07-23T02:54:46Z,review commit 与该 head
+  精确一致。`lvye` 于 2026-07-23T02:54:53Z merge,merge OID =
+  `0c10364addc0d5a70f093d69ecc61b8bfb075b09`。
+- 不同 AI 会话最终 review 亦钉在该 exact head,结论 **APPROVE**、零 finding;
+  其前一轮对旧 head `a6bf749bee0a17e8e44fb6ce334a4d719c3df264`
+  的 week-date **REQUEST_CHANGES** 与修复历史继续保留,未被最终结论覆盖。
+- Reviewed head 与 merge OID 的完整 tree 均为
+  `c45080aeb146d72796c566d8720f504d153554f4`;对本 PR 三个交付路径执行
+  `git diff --exit-code <head> <merge> -- <paths>` = PASS,零 tree drift。
+
+### Live CI and timing
+
+- 分支 push 上 [SDD Guard 29975458843](https://github.com/ArkDeck/ArkDeck/actions/runs/29975458843)
+  `guard` SUCCESS、push-only `allowed-paths` 正确 skipped;
+  [Swift CI 29975458842](https://github.com/ArkDeck/ArkDeck/actions/runs/29975458842)
+  SUCCESS。该 Swift run 只按 workflow 自身路径策略解释,不冒充额外
+  atomic-archive contract evidence。
+- PR body 编辑触发真实 `pull_request` event
+  [SDD Guard 29975599680](https://github.com/ArkDeck/ArkDeck/actions/runs/29975599680),
+  head 精确为 `84d99b61ab52eb69ca11d9dd38e2a51fdcd123ec`:
+  `guard` job `89106568292` SUCCESS;
+  `allowed-paths` job `89106568356` SUCCESS,且其“PR allowed-paths contract
+  tests”与“Check PR diff against declared task”两步均实际执行并 SUCCESS。
+- 时间线必须保留:上述 PR run created at 2026-07-23T02:54:54Z、jobs start at
+  02:54:57Z,晚于 #373 merge at 02:54:53Z;故这是**合后 PR-head 复验**,
+  不是合前 entry-gate green,不得倒写。维护者 exact-head review/merge 是批准
+  事实,CI 完成时序偏差作为 process residual 如实在案。
+- Merge OID main push
+  [SDD Guard 29975600680](https://github.com/ArkDeck/ArkDeck/actions/runs/29975600680)
+  SUCCESS;
+  [Swift CI 29975600682](https://github.com/ArkDeck/ArkDeck/actions/runs/29975600682)
+  SUCCESS。
+
+### Real-shape evidence gate closure
+
+- implementation 形态与 canary 红反证仍分别由 #336 / #337 及上文 run
+  支持。
+- propose 真实形态:#359 head
+  `39b5a8f5af244b9bf82d3f654b7f954046b2513b`,
+  [SDD Guard 29971877142](https://github.com/ArkDeck/ArkDeck/actions/runs/29971877142)
+  的 `guard` + `allowed-paths` 均 SUCCESS。
+- status 真实形态:#367 head
+  `f2948e3a5fd90b8e41260282e3e9137aece9b22d`,
+  [SDD Guard 29973955756](https://github.com/ArkDeck/ArkDeck/actions/runs/29973955756)
+  的 `guard` + `allowed-paths` 均 SUCCESS。
+- 结合 r3 20/20 atomic-archive contract、#373 exact-head human/AI review、
+  合后 PR-head green 与 main push green,`MECH-PATH-001` 的 task-level evidence
+  gate 现为 **PASS**。本 evidence-only PR 不翻 task status;只有本记录经维护者
+  review/merge 后才可另起 `ready→done` D0 状态 PR。required-status 配置仍为
+  out-of-scope D2;change 仍非 `verified`。
