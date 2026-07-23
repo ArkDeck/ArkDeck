@@ -161,12 +161,23 @@
 
 ## TASK-MECH-003 — pins 结构化全 hash 校验
 
-- Status:ready(2026-07-23 本 D1 readiness PR;前置已满足:r1 approval #318
-  merge `c15814593ea3d46149e749d3a47121ea70af1cea`、TASK-MECH-002 done
-  #348 merge `8c50780cc716de340310a267bfd306719d0b8bd9`、carrier namespace r2
-  #349 经 `lvye` exact-head APPROVED 并 merge
-  `03f5ebae80ed6f3b24c1cff14fa91c8e9400b45c`;状态仅在维护者 review/merge
-  本 PR 后生效,此前不得开 implementation PR)
+- Status:done(2026-07-23 D0 完成状态;仅在维护者 review/merge 本独立状态 PR
+  后生效。实现/evidence #352 final head
+  `25abff8aa78c4accd9f28fe311402a16b77aa250` 已由 `lvye` exact-head APPROVED
+  并合入 `0186a61929540d972eae800eee9dbddabb1f8add`;四个交付路径从 final
+  head→merge→当前 protected `main`
+  `95dc61cf6ed9223f5b5c1728aaf0d9a1ba6c9d5c` 零 tree drift,`Packages/**`
+  同期亦零漂移。当前 main 复验:structured pins/revision contract = 19/19、
+  PR 路径守卫 = 12/12、Python compile PASS、`check-sdd` = 0 error/0 warning/
+  111 acceptance IDs;#352 exact-final-head 正常 checkout Swift run
+  `29969201669` 的全量 step SUCCESS,merged run evidence 记录 358 tests/
+  1 skipped/0 failures。本地 `/private/tmp` 冷 worktree 复跑为 358/1/2,
+  两项失败恰为 readiness 已钉定的 `#filePath` 前缀环境族
+  (`HDCGoldenResourceContractTests.testGoldenPackContainsExactRegisteredFixtureSetWithMatchingHashes`
+  与 `HDCProbeRegistryContractTests.testPackContainsExactPinnedResourceSetAndHashes`),
+  0 unexpected,不冒充正常 checkout 绿结果。`MECH-PIN-001` completion evidence
+  已闭合;本状态不把 change 标为 `verified`,不翻 required status,不改变
+  archive/授权语义或产生任何 hardware/device claim)
 - Readiness(r1,base = protected main
   `03f5ebae80ed6f3b24c1cff14fa91c8e9400b45c`):
   - 待改文件 pins(implementation 开工时任一 blob 漂移即停并重做 readiness):
