@@ -135,6 +135,10 @@
 ### Notes / handoff
 
 - implementation/evidence PR 不翻 `ready→done`；done 使用独立 D0 状态 PR；
+- contract implementation evidence:
+  `evidence/runs/TASK-HLR-001/2026-07-23-envelope-contract.md`（任务状态仍为
+  `ready`；仅在本 implementation/evidence PR 经独立 review 并合入后，后续 D0
+  status PR 才可引用其完整 merge OID）；
 - readiness 若发现 templates 或 current `MECH-004` grammar 冲突，停止并提议 scope
   revision，不在本 task 改 canonical governance。
 
