@@ -192,11 +192,19 @@
 
 ## TASK-HLR-002A — Legacy bootstrap namespace partition
 
-- Status:ready（r5 D2 re-readiness；仅在维护者对本独立 `blocked→ready` PR
-  review/merge 后生效。本 readiness 固定 ruleset `19595282` 的完整 before/
-  rollback/after bytes、维护者窗口、active-rule/ref/canary 矩阵与 fresh refs；
-  merge 只批准下述 D2 计划，不自行修改 ruleset。readiness merge 前，或窗口/
-  read-back/pin 任一不匹配时，仓外 PUT/ref/probe dispatch = 0。）
+- Status:ready（r4 / r5 D2 re-readiness；仅在维护者 review/merge 本独立
+  re-readiness PR 后生效。本 r4 明确作废 #424 固定但主动跳过的 r3 窗口，重新钉定
+  `2026-07-24T02:00:00Z`→`03:00:00Z`、最新 protected-main audit base 与 fresh
+  probes；ruleset before/rollback/after bytes 保持逐字不变。merge 只批准下述
+  人类 D2 计划，不自行修改 ruleset；任一窗口/read-back/pin 不匹配时仓外
+  PUT/ref/probe dispatch = 0。）
+- Historical Status:ready（r3 D2 re-readiness #424 merge
+  `b5b4f239c90825bf55e79af6713d75d8c6169277` 后生效；维护者于旧窗口开始前明确
+  选择跳过，zero PUT/ref/probe。`2026-07-23T14:12:17Z` 复查 ruleset
+  `updated_at` 未变、仍只有 `refs/heads/agent/**` exclude，reserved/control refs
+  与 open PR 均为 0，`gh` zero logged-in hosts。r4 merge 后 r3
+  `2026-07-23T14:45:00Z`→`15:30:00Z` 窗口及其 UUID/script 永久 superseded，
+  不得补跑或复用。）
 - Historical Status:blocked（r5 stop gate；#423 合入 D1 revision 后继续保持，
   直至本 r5 D2 re-readiness 合入。
   implementation PR #419 exact reviewed head
@@ -275,7 +283,98 @@
   - **Evidence/done boundary。**D2 receipt + fresh live facts 使用独立 evidence PR，
     只追加本任务 evidence，不改 source/status；其 merge 后再以独立 D0 PR
     `ready→done`。HLR-002 在 HLR-002A done 前持续 blocked。
-- Readiness（r3 / r5 D2 re-readiness，audit base = protected `main`
+- Readiness（r4 / r5 D2 re-readiness，audit base = protected `main`
+  `b5b4f239c90825bf55e79af6713d75d8c6169277`）：
+  - **r3 skip fact:closed。**#424 exact reviewed head
+    `bba513aebd227195e859165f51573f8beb80a518` 由 `lvye` 于
+    `2026-07-23T13:58:33Z` APPROVED，五个 exact-head push/pull-request runs
+    全部 terminal success，并于 `2026-07-23T14:03:29Z` squash merge 为
+    `b5b4f239c90825bf55e79af6713d75d8c6169277`；其唯一 parent 恰为 r3 audit
+    base `b62762010705b3ff6c7fc864a86aec76563d3f01`，reviewed head→merge 的
+    `tasks.md` tree diff = 0。旧 executor script 在窗口前
+    `2026-07-23T14:08:01Z` 只触发 time-lock，status=`blocked`、write count = 0；
+    维护者随后明确跳过本窗口。`2026-07-23T14:12:17Z` 公开 read-back 再证明
+    ruleset ID/name/enforcement/conditions/rules/created_at/updated_at 与 r3 before
+    相同，`agent/host-loop/**`/`agent/hlr-002a-control/**` refs = 0、open PR = 0，
+    maintainer `gh` 仍不可达。没有 D2 receipt，也没有可复用的 PASS。
+  - **Approval/base gate:closed。**本 r4 只移动未执行的人类维护窗口并更换全部
+    probe UUID；r5 D1、#419 source、#421 failure、#424 r3 readiness 与
+    TASK-BAP-003 done 均为本 audit base ancestor。下列当前 Git pins 实测：
+
+    ```yaml pins
+    - artifact: TASK-HLR-002A r4 D2 re-readiness audit base
+      commit: b5b4f239c90825bf55e79af6713d75d8c6169277
+    - artifact: TASK-HLR-002A r3 readiness reviewed head
+      commit: bba513aebd227195e859165f51573f8beb80a518
+    - artifact: TASK-HLR-002A r3 readiness merge
+      commit: b5b4f239c90825bf55e79af6713d75d8c6169277
+    - path: .github/workflows/agent-pr.yml
+      blob: 41426544637db25224dc6c6b3718abd4ebbfca7c
+    - path: .github/workflows/sdd-guard.yml
+      blob: 809147e462512d970813d1992a3fcdf41f8b4b10
+    - path: scripts/test_agent_pr_workflow.py
+      blob: 6a256a1556827c2153df0785479c5cbc53796f28
+    - path: scripts/check_pr_paths.py
+      blob: 267417ca5d0f9a2bd5ef775314b93915717aea9b
+    - path: scripts/test_check_pr_paths.py
+      blob: 2aa1e2cb37ef0085d2e101adb34d2b3615246b82
+    - path: openspec/changes/chg-2026-030-host-loop-runtime/proposal.md
+      blob: 21ac153075aaeb44a81808effa6257e71561b03c
+    - path: openspec/changes/chg-2026-030-host-loop-runtime/design.md
+      blob: fbab391e567bee468e84e9f9084023c420147d25
+    - path: openspec/changes/chg-2026-030-host-loop-runtime/tasks.md
+      blob: 8f0a159642bcf2560507290dcab463ef02c8372a
+    - path: openspec/changes/chg-2026-030-host-loop-runtime/verification.md
+      blob: ae3b1baa203362434094f96f7c4af88fb8101882
+    ```
+
+    本 r4 merge 的 first parent 必须恰为 audit base，diff 只允许本
+    TASK-HLR-002A section；否则 r4 失效。readiness branch
+    `agent/hlr-002a-r5-d2-readiness-r4` 在 audit 时 remote ref absent、all-state
+    PR = 0，本仓 open PR = 0。
+  - **Ruleset bytes re-pin:closed。**r3 `Authenticated ruleset before` 的完整
+    702-byte JSON/SHA-256
+    `a5725db245d84174090de47e1fc45123219dbf5cfdd00d45856b04d801a3d5f2`、
+    `Exact rollback bytes` 的 301-byte payload/SHA-256
+    `5943b6ce840cbb385ad83615da15ff2ee4ec5710bd696fae6140b37302042157` 与
+    `Exact additive after` 的 325-byte payload/SHA-256
+    `8537b85939b7be059c19601360cadb95bdf4f0abe5151d5948bb6f7826405d30`
+    逐字继续构成本 r4 carrier；三段 canonical JSON 原文见紧随其后的 Historical
+    Readiness r3，r4 不重排、不省略。公开 ruleset `updated_at =
+    2026-07-23T02:20:11.425Z` 未前进，因此 authenticated hidden bypass pin 仍由
+    r3 完整响应 + 未漂移 timestamp 双重固定。D2 preflight 仍须 authenticated GET
+    逐字复核完整 before/hash；不匹配则 PUT = 0。
+  - **New maintenance gate:closed。**operator = `@lvye`
+    (`actor_id=4340161`)；rollback contact = `@lvye`；新固定窗口 =
+    `2026-07-24T02:00:00Z`（北京时间 `10:00`）至
+    `2026-07-24T03:00:00Z`（北京时间 `11:00`）。r4 未在窗口前 merge、main/
+    ruleset/ref/open-conflict 任一 pin 漂移、operator 不匹配、时钟不确定或窗口外，
+    PUT = 0；不得把旧脚本改时间后复用。r4 merge 后才可生成绑定 r4 PR/head/merge/
+    parent 与下列 UUID 的 fresh executor；Agent 仍不持 admin、不执行 PUT。
+  - **Fresh active-rule/ref matrix:closed。**以下 ref 在
+    `2026-07-23T14:12Z` 后生成，逐个 exact-ref GET = 404。before active-rule
+    实测：single Agent = 0；其余六项均只命中 ruleset `19595282` 的
+    creation/update/deletion。after 预期：single、reserved/control matrix 与两
+    canary = 0；non-agent/similar-prefix 与 main 继续命中 exact 三条。
+
+    ```yaml probes
+    single_agent: agent/hlr002a-single-af2cd10c-078d-4af7-b0a3-d385c335a46c
+    reserved_matrix: agent/host-loop/probes/9b94a7cf-e3f2-4a6b-b167-3902b95392c3
+    control_matrix: agent/hlr-002a-control/3f96c625-ea0b-476a-9e03-19c4819e6c28
+    non_agent: hlr002a-denied-435885e9-170d-42db-8384-d3e38e5823d3
+    similar_prefix: agentx/host-loop/probes/722d0d68-135f-4166-9e1a-50c2751b33ff
+    reserved_canary: agent/host-loop/probes/2b3b5047-a43c-4910-b222-2f6fe784344f
+    ordinary_canary: agent/hlr-002a-control/810b17ba-d16d-4cda-aefc-d85e9c810b92
+    ```
+
+    任一 ref 在 D2 preflight 前出现、active rules 漂移或旧 r3 UUID 被误用均停止，
+    不换名补跑。exact after read-back 后的 ref matrix、fresh canary、cleanup 与
+    evidence/done 分离顺序逐字沿用 r3；r4 不放宽任何 PASS/FAIL 门。
+  - **Review boundary。**本 r4 PR 只修改本文件 TASK-HLR-002A section，记录旧窗口
+    zero-write skip、更新 audit base/window/fresh refs，并把 r3 标为 historical；
+    零 ruleset/API/ref/probe/credential/scheduler 仓外写，零 source/workflow/test/
+    evidence 改写。merge 只批准新窗口，不是 D2 receipt、acceptance PASS 或 done。
+- Historical Readiness（r3 / r5 D2 re-readiness，audit base = protected `main`
   `b62762010705b3ff6c7fc864a86aec76563d3f01`）：
   - **Approval/dependency gate:satisfied。**CHG-2026-030 r5 #423 exact reviewed
     head `4fd9878b50d8dfccc5c36ed08d04e8e30b79efb7` 由 `lvye` 于
