@@ -190,11 +190,156 @@
 
 ## TASK-HLR-002A — Legacy bootstrap namespace partition
 
-- Status:blocked（前置：① CHG-2026-030 revision r3 由维护者 review/merge；②
-  TASK-HLR-001 done；③ TASK-BAP-003 done；④ 独立 readiness PR 钉定
-  `agent-pr.yml`/`sdd-guard.yml` blobs、GitHub Actions branch-filter semantics、
+- Status:ready（2026-07-23 D1 readiness；仅在维护者 review/merge 本独立
+  `blocked→ready` PR 后生效。）
+- Historical Status:blocked（前置：① CHG-2026-030 revision r3 由维护者
+  review/merge；② TASK-HLR-001 done；③ TASK-BAP-003 done；④ 独立 readiness PR
+  钉定 `agent-pr.yml`/`sdd-guard.yml` blobs、GitHub Actions branch-filter semantics、
   reserved namespace grammar、control/canary 矩阵与零 open workflow conflict。r3
-  proposal 合入不使本任务 ready。）
+  proposal 合入本身不使本任务 ready。）
+- Readiness（r1，audit base = protected `main`
+  `0080403e87527c4487849ee6e3c705236e1437b7`）：
+  - **Approval/dependency gate:satisfied。**CHG-2026-030 r3 exact head
+    `c54964d76bb843215ad956251e7fc08cea502796` 已由维护者 `lvye` APPROVED，
+    并以 `0080403e87527c4487849ee6e3c705236e1437b7` 合入 protected `main`
+    （#407）；reviewed head→merge 对本 change 四文档 tree diff = 0。
+    TASK-HLR-001 done merge =
+    `d09f5021107e4133d2fc41c1ce65d0bd09d6c12b`（#402），TASK-BAP-003 done
+    merge = `6a6b6b7010b6563d67aa7d96e6838505e82eb25a`（#376），二者与 r3 merge
+    均为本 audit base 的 ancestor。本任务只消费既有 Deploy Key/ruleset 分离事实，
+    不读取或改变 credential、ruleset、secret 或 scheduler。
+  - **Base/input pins。**以下 carrier 由本 audit base 的 Git objects 实测。
+    implementation 只能在本 readiness merge 后从最新 protected `main` 新建
+    **non-reserved** branch；开工前逐项重核 exact blob/absence、三个 dependency
+    merge ancestry 与本 readiness merge first parent。readiness merge 的 first parent
+    若不是本 audit base，或任一 input 漂移/路径被占用，立即停止并重新 D1 readiness。
+    `tasks.md` 是本 readiness 的自载体，表中钉修改前 blob；readiness merge 后改为
+    核验其 diff 只落在本 TASK-HLR-002A readiness section，并把完整 merge OID 当作
+    implementation 状态事实。
+
+    ```yaml pins
+    - artifact: TASK-HLR-002A readiness audit base
+      commit: 0080403e87527c4487849ee6e3c705236e1437b7
+    - artifact: CHG-2026-030 revision r3 merge
+      commit: 0080403e87527c4487849ee6e3c705236e1437b7
+    - artifact: TASK-HLR-001 done merge
+      commit: d09f5021107e4133d2fc41c1ce65d0bd09d6c12b
+    - artifact: TASK-BAP-003 done merge
+      commit: 6a6b6b7010b6563d67aa7d96e6838505e82eb25a
+    - path: .github/workflows/agent-pr.yml
+      blob: 2b9b03a90d70671d85da21be6a667e2f2f9c8acb
+    - path: .github/workflows/sdd-guard.yml
+      blob: 809147e462512d970813d1992a3fcdf41f8b4b10
+    - path: openspec/changes/chg-2026-030-host-loop-runtime/proposal.md
+      blob: 551cddc2bc0c261f841064a568db87eb025725f6
+    - path: openspec/changes/chg-2026-030-host-loop-runtime/design.md
+      blob: f2b450aac4ebdb65d5f3ba141b7550ca5f753a0a
+    - path: openspec/changes/chg-2026-030-host-loop-runtime/tasks.md
+      blob: 558c776016d259a3f7ca2429bbf58b35b7b934a8
+    - path: openspec/changes/chg-2026-030-host-loop-runtime/verification.md
+      blob: 0e5a55cdd1766d56157d8abceefd7480caa8b1fd
+    - path: scripts/host_loop/pr_envelope.py
+      blob: c990fcfb17de52ed1166fec55cb1f9365e0e7736
+    - path: scripts/host_loop/test_pr_envelope.py
+      blob: 35d9a284e8ddde67fd1076bc1c2f0f11f02d26db
+    - path: scripts/check_pr_paths.py
+      blob: 7fdc47933b98284c556d5cba6fd8cfe99b87e0ad
+    - path: scripts/test_check_pr_paths.py
+      blob: 1f7093402034c622553a11a71b6fc50cb8622bec
+    ```
+
+    `.github/workflows/agent-pr.yml` 与新
+    `scripts/test_agent_pr_workflow.py` 是 implementation 唯一 workflow/test
+    写入面；`.github/workflows/sdd-guard.yml` 必须与上列 blob byte-for-byte
+    相同。`scripts/test_agent_pr_workflow.py` 在本 audit base 不存在，须作为本任务
+    唯一新文件创建。implementation 若需其他 workflow、runtime 或 dependency 文件，
+    停止并回到 scope revision，不在实现 PR 扩面。
+  - **GitHub branch-filter semantics:closed。**按 GitHub Actions 当前官方
+    `on.push.branches` 语义，同一列表中正/负 pattern 按顺序求值；正匹配后的
+    `!` pattern 排除，后续正 pattern 可重新包含。实现必须把 current flow-style
+    单值改成下面 exact ordered block sequence，不得同时出现 `branches-ignore`，
+    不得用 job-level `if`、`paths`、title/body 或 runtime shell 代替 event filter：
+
+    ```yaml
+    on:
+      push:
+        branches:
+          - "agent/**"
+          - "!agent/host-loop/**"
+    ```
+
+    pattern 对 branch name（不含 `refs/heads/`）求值。结果固定为：全部
+    `agent/host-loop/**` push 零 `agent-pr` workflow dispatch；所有其他
+    `agent/**`（含 `agent/task-*`、`agent/host-loopx/**` 与
+    `agent/host-loops/**`）继续 dispatch；非 `agent/**` 仍不 dispatch。
+    `sdd-guard.yml` 的 `main` + `agent/**` push 和 `pull_request` subscriptions
+    保持原样。
+  - **Reserved grammar:binary。**production ref 的完整 branch name 必须恰好为：
+    `agent/host-loop/tasks/<task-id>`、
+    `agent/host-loop/leases/<task-id>` 或
+    `agent/host-loop/probes/<run-id>`。`<task-id>` 使用 canonical uppercase token
+    `TASK-[A-Z0-9]+-[A-Z0-9]+(?:-[A-Z0-9]+)*`；`<run-id>` 使用 lowercase RFC 4122
+    UUIDv4 文本
+    `[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}`。
+    parser 对完整 branch name 做 full match，不接受 `refs/heads/` 输入。空 leaf、
+    额外 segment、`.`/`..`、backslash、percent-encoding、空白、case drift、
+    非 v4/uppercase UUID、相似 family/prefix 与 trailing slash 均不命中 reserved
+    grammar；它们不得被 runtime 当成 task/lease/probe。event filter 对整个
+    `agent/host-loop/**` 的宽排除是 creator quarantine，不把非法 branch 升格为
+    reserved identity。
+  - **Contract implementation/test matrix:closed。**新测试使用 Python 3 standard
+    library，以 UTF-8/LF、indentation-aware 的封闭 extractor 读取 workflow 的
+    `on.push.branches` block；duplicate/unknown event/filter key、flow-style list、
+    alias、非 scalar、顺序颠倒、缺 positive/negative、额外 re-include、
+    `branches-ignore` 或 job-level substitute 均具名失败。ordered pattern evaluator
+    至少覆盖 ordinary `agent/task-hlr-002a-bootstrap-partition`、三类合法 reserved、
+    namespace root、空/额外 segment、case drift、`..`/backslash、相似 prefix、
+    non-agent branch；reserved parser 对每类正/负 fixture 单独断言。测试不执行网络、
+    subprocess 或 shell，不 hard-code token/host path，不修改现有 envelope/MECH-004
+    parser。
+  - **Implementation and repository gate:binary。**implementation branch 固定为
+    non-reserved `agent/task-hlr-002a-bootstrap-partition`，以保留 legacy creator
+    coverage；PR 只允许修改 `agent-pr.yml`、新增 contract test 与追加本任务的
+    contract run evidence，不翻状态、不做 live canary。固定验证：
+    `python3 scripts/test_agent_pr_workflow.py`、
+    `python3 -m unittest discover -s scripts/host_loop -p 'test_*.py'`、
+    `python3 scripts/test_check_pr_paths.py`、`scripts/check-sdd.sh`、
+    `git diff --check`，以及相对 implementation base 的 allowed/forbidden diff 与
+    `sdd-guard.yml` byte equality。任一失败、实现 PR 未由 legacy
+    `github-actions[bot]` 唯一创建、或首个 branch guard 缺失，均停止，不形成
+    bootstrap PASS。
+  - **Post-merge live control/canary:binary。**仅在 implementation exact reviewed
+    head 已以完整 merge OID 进入 protected `main` 后，以该 merge 为共同 parent
+    创建两个各含一个 empty commit、零文件 diff 的临时 ref：
+    ordinary `agent/hlr-002a-control/<uuid-v4>` 与 reserved
+    `agent/host-loop/probes/<uuid-v4>`。先 push reserved、再 push ordinary；两者
+    都必须取得 exact head 的 `sdd-guard` push run/`guard` job terminal success。
+    ordinary 还必须恰有一个 `agent-pr.yml` push run terminal success，且 exact
+    head 恰有一个 open、作者为 `github-actions[bot]` 的 PR。reserved 必须由
+    Actions workflow-runs API（workflow path + event + branch/head）返回
+    `agent-pr` run count = 0，并由 all-state PR exact-head 查询返回 PR count = 0；
+    两个查询在 ordinary control 已闭合后及 cleanup 前各 read-back 一次，记录
+    request filters、时间、full head OID 与结果。这里的零结论依赖“相同 source
+    tree + contract semantics + reserved head guard delivery + ordinary creator
+    liveness + 两类 GitHub read-back”，不得仅凭 elapsed time、branch disappearance
+    或 cleanup 推断。
+  - **Live cleanup/evidence boundary。**上述事实完整后才 close control PR、删除
+    control/canary refs，并再次确认 PR merged=false 与 refs absent；cleanup 不改变
+    先前 PASS/FAIL。live evidence 使用独立 PR，只追加本任务 evidence，不改 workflow/
+    test/status。任何 reserved legacy run/PR、ordinary 0/2 run/PR、head guard
+    缺失、API ambiguity 或 cleanup 前事实不全均保留为 FAIL，TASK-HLR-002A 维持
+    `ready` 或回到 `blocked`，不得进入 HLR-002 D2 readiness。
+  - **Concurrency/review gate:satisfied。**截至 `2026-07-23T08:19:50Z`，GitHub
+    connector 对本仓库 all open PR 查询为 0；open HLR-002A/bootstrap query 为 0；
+    fetch 后远端 `agent/host-loop/**` 与 HLR-002A branch 为 0。
+    `.github/workflows/agent-pr.yml` 无其他 active task ownership。若 readiness
+    review/merge 前出现 workflow/path overlap PR、reserved ref 或新的 owner，停止并
+    重做 concurrency audit。
+  - **Review boundary。**本 PR 只修改本文件 TASK-HLR-002A section，登记
+    `blocked→ready`、pins、grammar、contract 与 post-merge canary 计划；零 workflow/
+    test/evidence、零 identity/secret/scheduler/ruleset、零 probe/ref、零 HLR-002
+    准备。readiness merge 不构成 HLR acceptance PASS；implementation/contract
+    evidence、live canary evidence 与后续 `ready→done` 各自独立 PR。
 - Platform:github-actions + macos（host/bootstrap control plane；零产品平台声明）
 - Requirements/AC:change-local `HLR-LEASE-001`、`HLR-WORKER-001`
 - Depends on:change revision r3、TASK-HLR-001 done、TASK-BAP-003 done、
