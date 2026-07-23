@@ -192,7 +192,13 @@
 
 ## TASK-HLR-002A — Legacy bootstrap namespace partition
 
-- Status:blocked（r5 stop gate；仅在维护者 review/merge 本 D1 revision 后生效。
+- Status:ready（r5 D2 re-readiness；仅在维护者对本独立 `blocked→ready` PR
+  review/merge 后生效。本 readiness 固定 ruleset `19595282` 的完整 before/
+  rollback/after bytes、维护者窗口、active-rule/ref/canary 矩阵与 fresh refs；
+  merge 只批准下述 D2 计划，不自行修改 ruleset。readiness merge 前，或窗口/
+  read-back/pin 任一不匹配时，仓外 PUT/ref/probe dispatch = 0。）
+- Historical Status:blocked（r5 stop gate；#423 合入 D1 revision 后继续保持，
+  直至本 r5 D2 re-readiness 合入。
   implementation PR #419 exact reviewed head
   `39965af82bcb9a03f07e9501c844e86691b91d88` 已由 `lvye` APPROVED，并以
   `99ba8aa4b04018918daad2fc8830009c1030f6da` 合入；但首个 post-merge reserved
@@ -269,6 +275,167 @@
   - **Evidence/done boundary。**D2 receipt + fresh live facts 使用独立 evidence PR，
     只追加本任务 evidence，不改 source/status；其 merge 后再以独立 D0 PR
     `ready→done`。HLR-002 在 HLR-002A done 前持续 blocked。
+- Readiness（r3 / r5 D2 re-readiness，audit base = protected `main`
+  `b62762010705b3ff6c7fc864a86aec76563d3f01`）：
+  - **Approval/dependency gate:satisfied。**CHG-2026-030 r5 #423 exact reviewed
+    head `4fd9878b50d8dfccc5c36ed08d04e8e30b79efb7` 由 `lvye` 于
+    `2026-07-23T11:26:45Z` APPROVED，并于 `2026-07-23T11:26:56Z` 以
+    `b62762010705b3ff6c7fc864a86aec76563d3f01` 合入 protected `main`；
+    merge first parent =
+    `5a60d37fb736a6172a1053fe7a4cfff96f362ab7`（独立 #422），subject 携
+    `(#423)`，reviewed head→merge 对本 change 四文档 tree diff = 0。
+    #419 implementation merge
+    `99ba8aa4b04018918daad2fc8830009c1030f6da`、#421 failure evidence merge
+    `e4b33d036f796de7eb4aaed254724329ca040e68` 与 TASK-BAP-003 done merge
+    `6a6b6b7010b6563d67aa7d96e6838505e82eb25a` 均为本 audit base ancestor。
+    本 readiness decision grade = D2；仓外动作只含维护者在固定窗口对
+    ruleset `19595282` 应用 exact one-pattern delta 与 immediate read-back。
+  - **Git/input pins。**下列 Git objects 在本 audit base 实测。本 readiness
+    merge 的 first parent 必须恰为本 audit base、diff 必须只修改本
+    TASK-HLR-002A section；任一 drift、并发路径占用或非 fast current-main
+    review 立即使本 readiness 失效，重新起草，不延用本窗口或 probes。
+
+    ```yaml pins
+    - artifact: TASK-HLR-002A r5 D2 re-readiness audit base
+      commit: b62762010705b3ff6c7fc864a86aec76563d3f01
+    - artifact: CHG-2026-030 revision r5 reviewed head
+      commit: 4fd9878b50d8dfccc5c36ed08d04e8e30b79efb7
+    - artifact: CHG-2026-030 revision r5 merge
+      commit: b62762010705b3ff6c7fc864a86aec76563d3f01
+    - artifact: TASK-HLR-002A implementation merge
+      commit: 99ba8aa4b04018918daad2fc8830009c1030f6da
+    - artifact: TASK-HLR-002A failure evidence merge
+      commit: e4b33d036f796de7eb4aaed254724329ca040e68
+    - artifact: TASK-BAP-003 done merge
+      commit: 6a6b6b7010b6563d67aa7d96e6838505e82eb25a
+    - path: .github/workflows/agent-pr.yml
+      blob: 41426544637db25224dc6c6b3718abd4ebbfca7c
+    - path: .github/workflows/sdd-guard.yml
+      blob: 809147e462512d970813d1992a3fcdf41f8b4b10
+    - path: .github/workflows/swift-ci.yml
+      blob: 640065f3f3849e1add0cc6bfa92078873eb315ef
+    - path: scripts/test_agent_pr_workflow.py
+      blob: 6a256a1556827c2153df0785479c5cbc53796f28
+    - path: scripts/check_pr_paths.py
+      blob: 267417ca5d0f9a2bd5ef775314b93915717aea9b
+    - path: scripts/test_check_pr_paths.py
+      blob: 2aa1e2cb37ef0085d2e101adb34d2b3615246b82
+    - path: openspec/changes/chg-2026-030-host-loop-runtime/proposal.md
+      blob: 21ac153075aaeb44a81808effa6257e71561b03c
+    - path: openspec/changes/chg-2026-030-host-loop-runtime/design.md
+      blob: fbab391e567bee468e84e9f9084023c420147d25
+    - path: openspec/changes/chg-2026-030-host-loop-runtime/tasks.md
+      blob: 5bc006b6f41200a1360b4f69a7cdf3cb9013e395
+    - path: openspec/changes/chg-2026-030-host-loop-runtime/verification.md
+      blob: ae3b1baa203362434094f96f7c4af88fb8101882
+    - path: openspec/changes/chg-2026-030-host-loop-runtime/evidence/runs/TASK-HLR-002A/live-canary-r1-fail.md
+      blob: 9fc841f46c9b62ff74eede541b00890e1c6f6dbe
+    - path: openspec/changes/chg-2026-027-decision-grading-batch-approval/evidence/runs/TASK-BAP-003/run.md
+      blob: d6eaf28e188b1f5f64317ce4eacad22eae10ab10
+    ```
+
+  - **Authenticated ruleset before:closed。**维护者控制的只读 discovery 于
+    `2026-07-23T13:41:38.116565Z` GET
+    `repos/ArkDeck/ArkDeck/rulesets/19595282?includes_parents=false`；classification
+    = authenticated GET only、零 secret value、零 repository/ruleset/ref write。
+    完整响应按 UTF-8、sorted keys、separators `(',', ':')`、no trailing LF
+    canonicalize 后 byte count = `702`、SHA-256 =
+    `a5725db245d84174090de47e1fc45123219dbf5cfdd00d45856b04d801a3d5f2`。
+    canonical bytes 完整如下：
+
+    ```json
+    {"_links":{"html":{"href":"https://github.com/ArkDeck/ArkDeck/rules/19595282"},"self":{"href":"https://api.github.com/repos/ArkDeck/ArkDeck/rulesets/19595282"}},"bypass_actors":[{"actor_id":4340161,"actor_type":"User","bypass_mode":"always"}],"conditions":{"ref_name":{"exclude":["refs/heads/agent/**"],"include":["~ALL"]}},"created_at":"2026-07-23T10:20:11.391+08:00","current_user_can_bypass":"always","enforcement":"active","id":19595282,"name":"agent-ref-boundary","node_id":"RRS_lACqUmVwb3NpdG9yec5Na16-zgErABI","rules":[{"type":"creation"},{"type":"update"},{"type":"deletion"}],"source":"ArkDeck/ArkDeck","source_type":"Repository","target":"branch","updated_at":"2026-07-23T10:20:11.425+08:00"}
+    ```
+
+    `bypass_actors` 恰为维护者 `lvye` 的
+    `(actor_id=4340161, actor_type=User, bypass_mode=always)`；Deploy Key ID
+    `158088026` 不在 bypass。Agent origin 仍为 repository-scoped Deploy Key
+    alias。维护者 discovery 后已退出 `gh`；Agent 外部复查 `gh auth status`
+    exit 1/zero logged-in hosts。`2026-07-23T13:43:25Z` 再次公开 GET 的
+    ID/name/enforcement/conditions/rules/created_at/updated_at 与上述 before
+    一致；公开响应按 GitHub 保密边界省略 bypass，不以该省略推断空 bypass。
+  - **Exact rollback bytes:closed。**若 after PUT、read-back、active-rule
+    evaluation 或任一字段比较失败，维护者必须向同一 ruleset PUT 下列完整
+    canonical bytes；byte count = `301`、SHA-256 =
+    `5943b6ce840cbb385ad83615da15ff2ee4ec5710bd696fae6140b37302042157`：
+
+    ```json
+    {"bypass_actors":[{"actor_id":4340161,"actor_type":"User","bypass_mode":"always"}],"conditions":{"ref_name":{"exclude":["refs/heads/agent/**"],"include":["~ALL"]}},"enforcement":"active","name":"agent-ref-boundary","rules":[{"type":"creation"},{"type":"update"},{"type":"deletion"}],"target":"branch"}
+    ```
+
+    rollback 后立即 authenticated GET，重新构造同一 write payload 并复核上述
+    SHA-256；无法证明恢复即停止，TASK-HLR-002A 回到 `blocked`，不执行 ref matrix。
+  - **Exact additive after:closed。**唯一获准的 PUT endpoint =
+    `repos/ArkDeck/ArkDeck/rulesets/19595282`，method = `PUT`；body 必须逐字为
+    下列 canonical UTF-8 bytes，byte count = `325`、SHA-256 =
+    `8537b85939b7be059c19601360cadb95bdf4f0abe5151d5948bb6f7826405d30`：
+
+    ```json
+    {"bypass_actors":[{"actor_id":4340161,"actor_type":"User","bypass_mode":"always"}],"conditions":{"ref_name":{"exclude":["refs/heads/agent/**","refs/heads/agent/**/*"],"include":["~ALL"]}},"enforcement":"active","name":"agent-ref-boundary","rules":[{"type":"creation"},{"type":"update"},{"type":"deletion"}],"target":"branch"}
+    ```
+
+    before→after 只允许 append `refs/heads/agent/**/*`；ID/name/target/
+    enforcement/include、原 `refs/heads/agent/**`、三个 rules、bypass actor 与
+    顺序均保持。PUT 后立即 authenticated GET；去除 read-only fields 后重构 exact
+    write payload，必须与上述 bytes/hash 相同。任一额外/缺失/reorder、broad bypass、
+    `updated_at` 不前进或 API ambiguity 立即 rollback，不解释性放行。
+  - **Maintenance/rollback gate:closed。**operator = `@lvye`
+    (`actor_id=4340161`)；rollback contact = `@lvye`；固定窗口 =
+    `2026-07-23T14:45:00Z`（北京时间 `22:45`）至
+    `2026-07-23T15:30:00Z`（北京时间 `23:30`）。本 readiness 未在窗口开始前
+    merge、merge first parent 不等于 audit base、窗口外/时钟不确定、operator
+    不匹配或 authenticated preflight payload hash 不等于 rollback hash时，PUT
+    调用数必须为 0；不得自行顺延窗口。Agent 不持 ruleset admin，不执行 PUT。
+    维护者完成 exact after read-back 后必须再次退出 `gh`，Agent 只消费脱敏 receipt。
+  - **Active-rule evaluation pins:closed。**before 的 GitHub
+    `GET /rules/branches/{branch}` 实测为：single-level Agent ref 零命中；reserved/
+    control/canary 多层 ref、`main`、non-agent 与 `agentx/**` 相似前缀均只命中
+    ruleset `19595282` 的 `creation/update/deletion`。after read-back 后预期：
+    single-level 与四个 multi-level Agent refs 均零命中；`main`、non-agent 与
+    `agentx/**` 仍各命中 exact 三条。缺/多/其他 ruleset、source/ID/type 漂移均 FAIL。
+  - **Fresh branch/ref pins:closed。**discovery 时本仓 open PR = 0；readiness branch
+    `agent/hlr-002a-r5-d2-readiness` remote ref absent、all-state PR = 0；
+    下列七个 exact target refs 全部 absent，UUID 均为 fresh lowercase RFC 4122 v4：
+
+    ```yaml probes
+    single_agent: agent/hlr002a-single-f682845d-a3d2-4a96-8e49-bb41734e22dc
+    reserved_matrix: agent/host-loop/probes/bce81c4f-44a6-4665-8404-dfb1a8652231
+    control_matrix: agent/hlr-002a-control/5ec939cd-cbd8-4d25-b34f-618644d96a00
+    non_agent: hlr002a-denied-d373e018-612d-4e79-bb07-c0b4dced767f
+    similar_prefix: agentx/host-loop/probes/b5004775-00c0-4535-951b-068fea80cd0e
+    reserved_canary: agent/host-loop/probes/56508656-b94b-4b6d-b2bf-88c5df04a293
+    ordinary_canary: agent/hlr-002a-control/1d62d30b-1d77-4773-b53f-e7066a905093
+    ```
+
+    D2 preflight 必须再读全部 target refs；任一已存在、open overlapping PR/
+    ruleset operation 或 readiness head/base 漂移即停止，不换名续跑。
+  - **D2 execution order:binary。**readiness merge 后且仅在窗口内：
+    (1) 维护者 authenticated GET + rollback payload hash preflight；
+    (2) 维护者 PUT exact after bytes；
+    (3) 维护者 immediate authenticated GET/write-payload hash read-back；
+    (4) GitHub active-rule matrix read-back；任一步失败先 PUT exact rollback 并
+    验证，随后停止；
+    (5) exact after 与 active-rule matrix 全部闭合后，维护者退出 `gh` 并把脱敏
+    receipt 交回；此时才允许同一 non-bypass Deploy Key 执行 ref matrix。
+    ref matrix 顺序固定为 single-agent create/delete、reserved-matrix
+    create/delete、control-matrix create/delete、non-agent create rejection、
+    direct-main empty-commit update rejection；正向必须成功，两个负向必须为
+    GH013，main OID 前后相同，全部临时 refs cleanup 后 absent。任一负向意外成功
+    是权限扩大事故，即使 cleanup 成功也永久 FAIL。
+  - **Fresh canary order:binary。**ruleset receipt + ref matrix PASS 后重新读取并
+    钉 stable protected-main OID；reserved/ordinary canary 各建一个以该 OID 为
+    parent、tree 相同的 fresh empty commit。严格先 push `reserved_canary`，取得
+    exact-head SDD Guard success 且 Agent PR run/PR count = 0；再确认 main 未前进，
+    push `ordinary_canary`，取得 exact-head SDD Guard + Agent PR run terminal
+    success且唯一 bot PR。main 前进、head guard 缺失、0/2 bot PR、API ambiguity
+    或任一 target preexist 均停止。事实闭合后才 close ordinary control PR（必须
+    read-back `merged=false`）、删除两个 refs并复查 absent；cleanup 不覆盖结论。
+  - **Evidence/review boundary。**本 readiness PR 只修改本文件
+    TASK-HLR-002A section，登记 `blocked→ready`、D2 pins/window/rollback/matrix；
+    零 source/workflow/test/evidence 改写，零 ruleset/API/ref/PR/Issue/credential/
+    scheduler 仓外写。readiness merge 只批准计划，不是 receipt 或 acceptance PASS。
+    D2 receipt + ref matrix + fresh live facts 使用后续独立 evidence PR；其合入后
+    再以独立 D0 PR `ready→done`。HLR-002 在 done 前持续 blocked。
 - Readiness（r2，audit base = protected `main`
   `33050b0ceed5a4cfa400f3eb6829a724200a71de`）：
   - **Approval/dependency gate:satisfied。**#415 的 exact head
