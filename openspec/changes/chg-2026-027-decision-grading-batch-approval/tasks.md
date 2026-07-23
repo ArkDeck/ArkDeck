@@ -65,28 +65,36 @@
 
 ## TASK-BAP-002 — 批次运营载体与首次批次演练
 
-- Status:ready(2026-07-23 本独立 D1 readiness r1;仅在维护者 review/merge
+- Status:ready(2026-07-23 本独立 D1 readiness r2;仅在维护者 review/merge
   后生效。四前置闭合:① approval #317 merge
   `bc4a68b4888d5018992fb5004f5fbd7216c12419`;② TASK-BAP-001 done #328
   merge `d1873fb6f4b0d523f9263fcdcffe17b062840247`;③ TASK-BAP-003 execution
   evidence #375 merge `bb61726a7f47b9462296a9beae316dda88218db1` + done #376
   merge `6a6b6b7010b6563d67aa7d96e6838505e82eb25a`;④ 本 readiness 钉定
-  deliverables、队列、候选 D0、两会话分工与演练门。merge 前不得开
-  implementation、候选状态 PR、batch issue 或 drill evidence PR)
-- Readiness(r1,base = protected main
-  `21d339b97d083f1e79c1851854737d5cf0a68d8e`):
+  deliverables、队列、候选 D0、两会话分工与演练门。r1 #380 曾钉
+  #378/#379,但两者在 #380 合入前分别合入 main,故从未成为有效 drill 项;
+  r2 fail closed 重钉天然后继。r2 merge 前 BAP-002 lane 不得开
+  implementation、batch issue、候选 PR 或 drill evidence PR)
+- Readiness(r2,base = protected main
+  `7d04c3dccb598a5e1a1d3b16846162353069dbf2`):
   - **Authority/input pins。**实现开工时以下 commit/blob 任一漂移即停止并
     重做 D1 readiness;完整 hash 只固定输入,不自行构成批准:
 
     ```yaml pins
     - artifact: TASK-BAP-002 readiness audit base
-      commit: 21d339b97d083f1e79c1851854737d5cf0a68d8e
+      commit: 7d04c3dccb598a5e1a1d3b16846162353069dbf2
     - artifact: CHG-2026-027 approval merge
       commit: bc4a68b4888d5018992fb5004f5fbd7216c12419
     - artifact: TASK-BAP-001 done status merge
       commit: d1873fb6f4b0d523f9263fcdcffe17b062840247
     - artifact: TASK-BAP-003 done status merge
       commit: 6a6b6b7010b6563d67aa7d96e6838505e82eb25a
+    - artifact: TASK-BAP-002 readiness r1 merge (candidate pins invalidated)
+      commit: 7d04c3dccb598a5e1a1d3b16846162353069dbf2
+    - artifact: TASK-MECH-004 done status merge (r1 candidate #378, invalidated)
+      commit: 5640614f427e873cf21fce2032c502822d219a30
+    - artifact: TASK-AFP-004 done status merge (r1 candidate #379, invalidated)
+      commit: 605bff09fdc992478203109b1e5414b207d553b3
     - path: AGENTS.md
       blob: 3c2d3c6a01d3eaa31cd9e3ee333f3153552f4164
     - path: openspec/governance/enforcement.md
@@ -97,14 +105,24 @@
       blob: 039d6b5418d546c34c0717ba28272acb48006d86
     - path: openspec/changes/chg-2026-027-decision-grading-batch-approval/acceptance-cases.yaml
       blob: 1981dcadad0b9280f88c400ff7086356c0136a4a
+    - path: openspec/changes/chg-2026-028-guard-ci-mechanization/proposal.md
+      blob: 2395c2b6f4624d806c2b88cb8769a9a0a5326253
     - path: openspec/changes/chg-2026-028-guard-ci-mechanization/tasks.md
-      blob: 6353c97c159a65f8d8a2e269d1cbf70d4ab6e2b2
+      blob: b1f756b9d71b03508f5a2008d9a0f66a0cc5ad46
+    - path: openspec/changes/chg-2026-028-guard-ci-mechanization/verification.md
+      blob: ea9ed46a42d9807606c1fc4291a393d34c7e38e0
+    - path: openspec/changes/chg-2026-028-guard-ci-mechanization/acceptance-cases.yaml
+      blob: 7fbd0708aad6bf84d6a1b88f77779bd99c3fa40d
+    - path: openspec/changes/chg-2026-028-guard-ci-mechanization/evidence/runs/TASK-MECH-001/run.md
+      blob: f5e51fad2f2a429748126eee27ab61df282c2f23
+    - path: openspec/changes/chg-2026-028-guard-ci-mechanization/evidence/runs/TASK-MECH-002/run.md
+      blob: f435c864bca7d8b2fc18f27029c3ecaa55bd85fb
+    - path: openspec/changes/chg-2026-028-guard-ci-mechanization/evidence/runs/TASK-MECH-003/run.md
+      blob: 9c5d9aa06320cda9e73e7613f604a9e99a0e9818
     - path: openspec/changes/chg-2026-028-guard-ci-mechanization/evidence/runs/TASK-MECH-004/run.md
       blob: dfd6c464ef88b955458c8b8b256987f75709892c
     - path: openspec/changes/chg-2026-029-agent-failure-prevention/tasks.md
-      blob: dec71a6d67f5f9a7e94ded0f00b88c9601e1eb51
-    - path: openspec/changes/chg-2026-029-agent-failure-prevention/evidence/runs/TASK-AFP-004/run.md
-      blob: 4eed9d2f5ab8d79ef681a6d1473ed31b71d5242b
+      blob: 9789f0da3573739521f31423666b4f67dfd40d0c
     ```
 
     两个 deliverable 在 base 均不存在:
@@ -133,29 +151,41 @@
     新模板列两项 digest 与固定顺序,close 仅表示导航归档。若 title 冲突、
     issue 写能力不可用或需新 credential,演练保持 blocked 并回到 D1,
     不改用仓内批准文件。
-  - **两个天然 D0 候选(顺序固定,不为演练制造)。**
-    1. `TASK-MECH-004 ready → done`:r3 implementation #373 merge
-       `0c10364addc0d5a70f093d69ecc61b8bfb075b09`;evidence closure #377
-       merge `9df5642620ca07584c822d43f95d6cc5df187360`;main 中 task 仍为
-       `ready`,其 run 已把 `MECH-PATH-001` evidence gate 置为 PASS。
-       候选 PR 只改 CHG-2026-028 `tasks.md` 的本任务状态。
-    2. `TASK-AFP-004 ready → done`:implementation/evidence #374 merge
-       `21d339b97d083f1e79c1851854737d5cf0a68d8e`;main 中 task 仍为
-       `ready`,run 记录 `AFP-CORRECT-001` PASS。候选 PR 只改 CHG-2026-029
-       `tasks.md` 的本任务状态。
+  - **两个天然 D0 候选源(顺序固定,不为演练制造)。**r1 的 #378/#379
+    已在本 readiness merge 前由维护者分别合入
+    `5640614f427e873cf21fce2032c502822d219a30` /
+    `605bff09fdc992478203109b1e5414b207d553b3`,不得追记进 drill。r2
+    只选择本来就会发生的两个后继状态面:
+    1. `CHG-2026-028 approved → verified`:四个 MECH task 已在 protected
+       main 全部 `done`,四份 run 与四条 change-local AC 均在案。候选仅可
+       把 proposal status 置 `verified`、在 proposal 写 verification closure
+       并把 verification header `planned → passed`;不得追加/修改实现、
+       evidence、task、required-status 或 archive。若逐 AC 复核不能由已合入
+       状态 + 确定性检查完全得出 PASS,则它不是 D0,演练保持 blocked。
+    2. `TASK-AFP-003 ready → done`:该 host-only historical detection drill
+       已由独立 D1 readiness 固定且在 base 仍为 `ready`;其 implementation/
+       evidence 尚未产生(`evidence/runs/TASK-AFP-003/` 在 base 不存在)。
+       只有 AFP lane 自然完成 implementation/evidence PR、由维护者合入且
+       run 闭合 `AFP-DRILL-001` 后,才可由该 lane 起草仅改本 task 状态/
+       evidence 引用的 D0 候选。本 lane 不执行 AFP-003、不补 evidence、
+       不代起草其状态 PR。
 
-    两项改不同文件、互无依赖,但首轮 drill 仍按上述 1→2 顺序逐 PR
-    review/merge。任一候选被他方提前翻转、evidence 被 supersede、pin 漂移
-    或不再满足 D0 三条件时,不得临时替换/制造项目;须停下并用独立 D1
-    readiness re-pin 新的天然候选。
-  - **两会话与人类分工。**producer/watch 会话负责实现模板+runbook、在其
-    implementation PR 合入后起草两个候选状态 PR、填 digest、poll 并以
-    merge OID 自动续跑;独立 reviewer 会话不得参与上述 diff,对每个候选
-    exact head 做合前 review,只写 `APPROVE` 或 finding 指针。发现修改后
-    必须对新 head 重审,旧 APPROVE 不继承。维护者 `lvye` 只按 issue 声明
-    顺序逐 PR review/merge;会话与 workflow 均不得代为批准或合并。
+    两项改不同 change、互无依赖,首轮 drill 仍按上述 1→2 顺序逐 PR
+    review/merge。候选 PR 只在 template/runbook implementation 合入且各自
+    前置自然闭合后起草;创建时把 base/head OID 与 files read-back 写入 digest。
+    任一候选提前合入/关闭、head 漂移、evidence 被 supersede 或不再满足 D0
+    三条件,不得临时替换/制造项目,须停下并用独立 D1 readiness re-pin。
+  - **两会话与人类分工。**CHG-2026-028 verify closure 与 AFP-003 的
+    implementation/evidence/status 各由其独立 lane producer 负责;BAP-002
+    producer/watch 会话只负责实现 template+runbook、读取而不修改候选、
+    填 digest、poll 并以 merge OID 自动续跑。独立 reviewer 会话不得参与
+    上述 diff,对每个候选 exact head 做合前 review,只写 `APPROVE` 或 finding
+    指针。发现修改后必须对新 head 重审,旧 APPROVE 不继承。维护者 `lvye`
+    只按 issue 声明顺序逐 PR review/merge;会话与 workflow 均不得代为批准
+    或合并。
   - **演练时序与 evidence。**模板/runbook implementation PR 先独立
-    review/merge;随后才创建 issue 与两个候选 D0 PR。两候选各自满足
+    review/merge;随后才创建 issue,等待上述两 lane 的天然候选,不另造项目。
+    两候选各自满足
     guard/适用 CI 绿 + 独立 exact-head APPROVE + digest 完整后才入队。
     watch 对每次合并记录 PR/head/merge OID、检测时间与 ancestry,检测失败
     即暂停;两项均确认后自动续跑为本 change 的独立 drill evidence PR,
@@ -167,10 +197,17 @@
     `BAP-DRILL-001` 在同批次不足两个合格 D0 merge 时不得 PASS。任何
     digest/PR 漂移、未 approved scope、判断门后投机 PR、auto-merge 或把
     issue 当批准载体均使 drill fail closed。
-  - **Environment/concurrency。**readiness audit 时 GitHub open PR = 0、
-    同名 batch issue = 0;host-only docs/metadata,零设备、零硬件、零
-    device/network product effect。实现前须重新检查 open PR 与上述 pins;
-    路径竞争或不可判定状态即暂停。
+  - **Environment/concurrency。**初次 r1 audit 时 GitHub open PR 查询结果
+    = 0、同名 batch issue = 0;其后 #378 于 `2026-07-23T03:13:43Z`、#379
+    于 `2026-07-23T03:15:02Z`、本 readiness #380 于
+    `2026-07-23T03:15:37Z` 依次创建。#378/#379 又分别于
+    `2026-07-23T03:18:49Z`/`2026-07-23T03:19:17Z` 在 #380 合入前合并,
+    因而 r1 候选失效且 drill 计数仍为 0;#380 于
+    `2026-07-23T03:20:29Z` 合入;r2 audit 时 open PR = 0。
+    该并发来自不同 task lane,不是 BAP-002 越过 D1 门的成 PR 工作。
+    host-only docs/metadata,零设备、零硬件、零 device/network product
+    effect。实现前须重新检查 open PR、同名 issue 与上述 pins;路径竞争或
+    不可判定状态即暂停。
   - **Verification gate。**实现 PR 至少跑 `scripts/check-sdd.sh` 与
     `git diff --check`,并逐条对照 design §0/§2/§4;drill evidence 按
     `BAP-DRILL-001` 做 documentReview。只以 merged OID + exact-head
