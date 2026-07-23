@@ -109,6 +109,16 @@
 - Status:blocked(三前置:① approve;② TASK-AU-001 done(选型认可);③ 独立
   readiness PR——须钉选型记录 OID、依赖 pin 方案(如适用)、entitlement diff
   声明与实现基线)
+- Pre-readiness allowed-path remediation(2026-07-24；仅在维护者 review/merge
+  本独立 D1 governance PR 后生效)：原任务虽要求 contract tests、feed 生成与发布
+  规程，却没有可被 `check_pr_paths.py` 解析的 `Allowed paths` 行，也未列出现有
+  SwiftPM test target、`Package.swift`、共享 target-dependency contract 表或发布
+  文档的精确路径，因而 AU-002 不能诚实进入 readiness。下列封闭路径补齐这些
+  已批准交付面，并把 App 侧限制在现有 source/resource 文件，避免触及显式文件组
+  的 `project.pbxproj`。本 remediation 只修改本任务治理声明，不携带产品实现、
+  测试、evidence、依赖或状态翻转；TASK-AU-002 保持 blocked，合入后仍须独立
+  readiness 固定 AU-001 选型合同、public-key/feed 合同、零第三方依赖、
+  entitlement 空 diff 与实现基线。
 - Objective:按选型集成应用内自动更新:检查(手动 + 可开关的自动)、显式同意
   安装、验签 fail-closed 双层(design §0)、隐私最小化字段与披露文案、
   SystemLogger 事件类扩展;发布侧 = feed 生成与 EdDSA 私钥处理规程(私钥永不
@@ -121,6 +131,19 @@
   逻辑与测试)、发布规程文档、本 change `evidence/**`、本 change `tasks.md`
   (仅本任务状态);依赖清单文件(如适用)。
 - Out of scope:遥测/crash 上报(DEC-008)、delta 更新、分轨、release 本身。
+- Allowed paths after readiness:
+  - `ArkDeckApp/App/ArkDeckApp.swift`
+  - `ArkDeckApp/Resources/Localizable.xcstrings`
+  - `Packages/ArkDeckKit/Package.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckRuntime/SystemLogger.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/AutoUpdate/**`
+  - `Packages/ArkDeckKit/Sources/ArkDeckCLI/ArkDeckCLIMain.swift`
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/ArkDeckContractTests.swift`
+    (仅同步 ArkDeckWorkflows 的声明依赖表)
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/AutoUpdateContractTests.swift`
+  - `docs/release/macos-auto-update.md`
+  - 本 change `evidence/**`
+  - 本 change `tasks.md`(仅本任务状态/evidence 引用)
 - Risk:medium(首个出站网络面 + 可能的首个第三方依赖;fail-closed 与隐私
   边界是核心不变量)。
 - Hardware required:no。
