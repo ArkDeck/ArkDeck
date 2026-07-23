@@ -188,15 +188,111 @@
 
 ## TASK-HLR-002 — D2 integration identity 与 host activation
 
-- Status:blocked（r2 stop gate：2026-07-23 readiness 勘察确认 GitHub
-  `Pull requests:write` 同时覆盖 PR create/review，`Contents:write` 同时覆盖
-  `agent/**` ref/merge endpoint；r1 的正向能力与“零 review/merge API permission”
-  无法同时由 permission manifest 证明，故未翻 `ready`，也未创建/修改任何 identity、
-  secret、scheduler 或 live probe。解除前置：① CHG-2026-030 revision r2 经维护者
-  review/merge；② TASK-BAP-003 done；③ 独立 D2 readiness/维护者窗口钉定实际
-  integration identity、最小 repository categories、非 CODEOWNER/bypass 事实、secret
-  storage、host scheduler owner、rollback contact 与正/负 probe。Agent 不得代为创建、
-  修改或批准仓外 D2 配置。）
+- Status:ready（2026-07-23 D2 readiness r1；仅在维护者 review/merge 本独立 PR 后
+  生效。该 merge 接受下述 actual identity class、permission categories、Keychain/
+  launchd 形态、probe 风险与 rollback 窗口；它不创建 identity、secret、scheduler 或
+  GitHub object，也不构成 `HLR-LEASE-001` evidence。仓外 D2 只能由维护者在本
+  readiness 合入后逐项执行，任一 readback/probe 不符即撤销并回到 `blocked`。）
+- Historical Status:blocked（r2 stop gate；GitHub permission-category coupling 已由
+  CHG-2026-030 revision r2 #405 修复。r2 reviewed head
+  `09efe761df88b79059c3bda1915428d54b392aa0` 经 `lvye` APPROVED，以 merge OID
+  `c3244a7ff66a23f4b049cab8ed6ece35ac3c7ad5` 合入 protected `main`；
+  subject 携 `(#405)`，四个 revision 文件与 reviewed head 的 scoped diff = 0。）
+- Readiness（r1，audit base = protected `main`
+  `c3244a7ff66a23f4b049cab8ed6ece35ac3c7ad5`）：
+  - **Approval/dependency gate:satisfied。**CHG-2026-030 r1 approval #361 merge
+    `3434d4e80e0785af2abaa44614d24cadee55b12e`、r2 permission-boundary #405
+    merge `c3244a7ff66a23f4b049cab8ed6ece35ac3c7ad5` 与 TASK-BAP-003 done #376
+    merge `6a6b6b7010b6563d67aa7d96e6838505e82eb25a` 均在本 base ancestry；
+    `agent-ref-boundary` ruleset `19595282` 与 Deploy Key `158088026` 的历史
+    evidence 只作为现有 ref boundary 事实，不被本任务修改。`2026-07-23T07:56:58Z`
+    经 GitHub connector 与 remote-ref readback 复核：open PR = 0、TASK-HLR-002
+    PR/branch = 0。
+  - **Authority/input pins。**执行时须从最新 protected `main` 重读本 readiness merge，
+    并确认 r2 merge 仍在 ancestry、TASK-HLR-002 唯一且为 `ready`、以下 r2 carriers
+    未被后续 revision 取代：
+
+    ```yaml pins
+    - artifact: TASK-HLR-002 readiness audit base
+      commit: c3244a7ff66a23f4b049cab8ed6ece35ac3c7ad5
+    - artifact: CHG-2026-030 revision r2 merge
+      commit: c3244a7ff66a23f4b049cab8ed6ece35ac3c7ad5
+    - artifact: TASK-BAP-003 done merge
+      commit: 6a6b6b7010b6563d67aa7d96e6838505e82eb25a
+    - path: openspec/changes/chg-2026-030-host-loop-runtime/proposal.md
+      blob: ed6b9d70e63ab0606a00e2a419831812e9414266
+    - path: openspec/changes/chg-2026-030-host-loop-runtime/design.md
+      blob: 42b32a8b0fbb8d30703f1b364af9eade0c1a9451
+    - path: openspec/changes/chg-2026-030-host-loop-runtime/verification.md
+      blob: dcc37637012387d917afe1cfa5849ba2edab31bd
+    ```
+
+    `tasks.md` 是本 readiness 自载体，不以修改前 blob 约束自身；readiness merge
+    必须只改变本 TASK-HLR-002 section。任一 authority/carrier 漂移、同 task PR/branch
+    冲突或需要 forbidden path，停止并重新 readiness。
+  - **Integration identity:closed。**维护者创建一个 dedicated private GitHub App，
+    display name/预期 slug = `ArkDeck Host Loop` / `arkdeck-host-loop`，禁止 OAuth
+    user authorization 与 webhook delivery，只安装到 `ArkDeck/ArkDeck` 单仓。若 slug
+    不可用、owner/installation scope 不等于本 pin 或 GitHub 要求额外 permission，
+    不得临时改名/扩权继续，须回到 readiness。实际 App/installation ID 只以 SHA-256
+    摘要写 evidence，private key/token 值永不记录。
+  - **Permission categories:exact。**repository permissions 仅：
+    `Metadata:read`（GitHub mandatory）、`Contents:read/write`、`Pull requests:read/write`、
+    `Issues:read/write`、`Checks:read`；其余 repository/organization/account permissions
+    全部 `none`，尤其 `Administration`、`Actions`、`Workflows`、`Members`、`Secrets`
+    为 `none`。installation 不是 CODEOWNER，也不得出现在 branch protection、
+    repository ruleset 或 `agent-ref-boundary` bypass actor 中。共享 write category
+    对 review/merge endpoint 的平台 coverage 必须在 evidence 如实注明；它不构成
+    runtime authority，后续 HLR-003 typed adapter 仍须做到 generic/review/merge/admin
+    route 构造数恒为 0。
+  - **Secret storage:closed。**GitHub App private key 只进入维护者控制的 macOS
+    Keychain generic-password item，service = `org.arkdeck.host-loop.github-app-key`、
+    account = `arkdeck-host-loop`。维护者通过 GitHub UI 取得 private key 后只允许一次性
+    导入，导入完成即删除下载副本；其路径与 bytes 不记录，后续唯一持久 storage =
+    Keychain。secret 不得写 env file、launchd plist、repo、shell history、log 或
+    evidence。App/installation public identifiers 进入无 secret host config；scheduler
+    每轮只 mint 短期 installation token，token 不落盘且退出即丢弃。evidence 只记录
+    Keychain item class/service/account、ACL/readback 结论和 value `notObserved`，不记录
+    private key、token、Keychain dump 或用户路径。
+  - **Host scheduler:staged activation。**host owner/rollback contact = 维护者 `@lvye`；
+    scheduler = macOS user `launchd`，固定 labels
+    `org.arkdeck.host-loop.worker` 与 `org.arkdeck.host-loop.reviewer`。HLR-002 只允许
+    以 `ProgramArguments = ["/usr/bin/false"]`、`RunAtLoad = false`、
+    `KeepAlive = false`、无 calendar/interval trigger 的 fail-closed sentinel 注册，
+    两 label 均保持 disabled/stopped；runtime/reviewer 尚未实现前 process dispatch
+    必须为 0。HLR-003/004 各自在独立 readiness 后才可替换对应 argv/enable schedule。
+    receipt 记录脱敏 host ID、owner role、labels、registered/disabled/stopped readback、
+    plist SHA-256 与 observation time；不记录绝对用户路径。
+  - **Positive probe:exact order。**维护者以 opaque run ID 执行：① read back App
+    owner/installation/permission manifest 与 CODEOWNER/bypass absence；② mint
+    installation token（值不输出）并读取 repository metadata；③ 创建后关闭一个
+    `host-loop-d2-probe-<run>` Issue；④ 用 Git data API 创建与 main 同 tree 的 empty
+    commit 和 `agent/probes/hlr-002-<run>` ref，以该 App 创建一个 probe PR；⑤ 创建、
+    exact-read、CAS 更新并删除
+    `refs/heads/agent/leases/task-hlr-002-probe-<run>`，记录每次 full OID；⑥ 完成负向
+    probe 后 close PR unmerged、删除 probe ref，并复查 Issue/PR/ref cleanup。出现旧
+    `agent-pr` workflow 抢建 PR、0/2 PR lookup 或任一 API timeout 即停止，不重试创建。
+  - **Negative probe:fail closed。**先记录 protected-main full OID；同一 identity
+    依次尝试：① 将 main fast-forward 到上述 same-tree empty commit（必须被
+    ruleset/protection 拒绝）；② 对 integration-authored probe PR 提交 self-approval
+    （必须拒绝）；③ merge 该 probe PR（必须拒绝）；④ 对 repository Actions
+    permissions 发送由维护者预先 read back 的 same-value mutation（必须因无 admin/
+    Actions permission 拒绝）。最后 main OID 必须与 probe 前相同，App 仍非
+    CODEOWNER/bypass，GitHub reviews/merge metadata 无 automation success。任一意外
+    成功均为整体 FAIL：立即停 scheduler、撤销 App installation/key、保留脱敏事实并
+    回到 `blocked`；same-tree 或 cleanup 后“无内容差异”不得改写失败结论。
+  - **Rollback/receipt gate。**撤销顺序固定为 disable/unregister 两 launchd labels →
+    revoke/delete App private key 并 uninstall repository installation → delete Keychain
+    item → close/delete 所有 probe object → read back main/ref/PR/Issue/scheduler/Keychain
+    状态。执行 evidence 写
+    `evidence/runs/TASK-HLR-002/run.md`，machine-readable receipt 写
+    `evidence/runs/TASK-HLR-002/activation-receipt.json`；二者只含类别、摘要、full
+    Git OID、公开 PR/Issue URL、状态码/错误类别与 UTC 时间。receipt 与正负 probe
+    齐备后才能提交独立 implementation/evidence PR；`ready→done` 仍使用后续 D0 PR。
+  - **Review boundary。**本 readiness PR 只修改本 TASK-HLR-002 section，零
+    proposal/design/verification、零 evidence/runtime/workflow、零 GitHub identity/
+    permission/ref/PR/Issue、零 Keychain/launchd。readiness 合入只是维护者对上述 D2
+    窗口的预先决策，不是执行或验收。
 - Platform:macos（受控 host 运维；零产品平台声明）
 - Requirements/AC:change-local `HLR-LEASE-001`
 - Depends on:change revision r2、TASK-BAP-003 done、independent D2 readiness
