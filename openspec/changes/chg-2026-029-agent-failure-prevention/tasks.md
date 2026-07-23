@@ -1166,3 +1166,70 @@
 - 本任务**不**处理其余 24 条活跃链接的结构性问题，另立 change；
 - 实现/evidence PR 不翻 task 状态；`ready→done` 使用独立 PR；
 - 本任务 done 后方可起草 change 级 verify；archive 仍须等发现 2 解除。
+
+## TASK-AFP-006 — AF-014 一手事实修正与 evidence addendum
+
+- Status:blocked（仅登记于 proposal r5；r5 经维护者 review/merge 后仍须独立
+  readiness PR 才可进入 `ready`）
+- Platform:macos（纯 host-side document remediation，零产品/设备执行）
+- Requirements/AC:change-local `AFP-HANDBOOK-001`、`AFP-CORRECT-001`
+- Depends on:revision r5、TASK-AFP-001 done、TASK-AFP-004 done、独立 readiness
+- Readiness input pins:待独立 readiness PR 对最新 protected `main` 实测登记；至少包含
+  手册、r5 proposal/design/verification/acceptance、TASK-AFP-004 run、CHG-2026-021
+  tasks 与 TASK-TR-002R run 的完整 blob OID，以及 r5 merge OID
+- Applicable failure patterns:`AF-016`（错误表述来自会话记忆）、
+  `AF-015`（首次全量复核漏过同一已知表述，须重扫全部 Fact）、
+  `AF-005`（旧 PASS 通过 addendum 明确 superseded/currency）
+- Production reachability:not applicable；纯文档事实修正，零 product effect、
+  device/network/process dispatch
+- Trusted fact sources:
+  `openspec/changes/chg-2026-021-trace-adapter-capture/tasks.md` 二值门 ①/④、
+  `openspec/changes/chg-2026-021-trace-adapter-capture/evidence/runs/TASK-TR-002R/run.md`
+  的 publication/capability/reliable-total 一手记录，以及逐条 Fact 所引 protected-main
+  bytes；本 change 的旧转述、会话记忆与跨会话摘要不得作为事实源
+- Allowed paths:`openspec/planning/agent-failure-patterns.md`、
+  `openspec/changes/chg-2026-029-agent-failure-prevention/evidence/**`、
+  `openspec/changes/chg-2026-029-agent-failure-prevention/tasks.md`
+  （仅本任务状态/evidence 引用）
+- Forbidden paths:`AGENTS.md`、`openspec/constitution.md`、
+  `openspec/governance/**`、`openspec/specs/**`、`openspec/contracts/**`、
+  `openspec/changes/archive/**`、`openspec/changes/chg-2026-021-trace-adapter-capture/**`、
+  `openspec/templates/**`、本 change proposal/design/verification/acceptance、
+  产品 source/tests/scripts/workflows
+- Risk:low（主要风险是再次用二手转述替代一手 bytes，或把旧 evidence 静默改写）
+- Hardware required:no
+
+### Deliverables
+
+- 只修正手册 `AF-014` 的 Signal、Observed cases、Preflight 与 Negative verification，
+  删除“公开枚举 case”机制表述，改为 capability-bound reliable-total factory/receipt
+  的一手事实；
+- `evidence/runs/TASK-AFP-004/addendum-r5.md`：明确旧 AFP-004 run 的 AF-014 PASS
+  已 superseded，并提供当前全部 Fact 行的逐行一手复核矩阵；
+- `evidence/runs/TASK-AFP-006/run.md`：记录 pins、before/after、全部二值门、实际链接
+  计数、AC 结论、偏差与残余风险；
+- 18 项 `Currency` 更新为实际 implementation audit base；旧 run bytes 不改写。
+
+### Verification
+
+- `AFP-HANDBOOK-001`：AF-014 与 design §3.2/§3.3 的四条一手 root/case anchor 一致，
+  手册中“公开枚举 case/public enum case”命中 0；
+- `AFP-CORRECT-001`：当前全部 Fact 行逐行具有相对路径、完整 blob OID、locator、
+  verdict 与 disposition；AF-014 明确引用 tasks + TASK-TR-002R run 两个一手 source；
+- ID 集合、taxonomy/两轴、八字段顺序、Automation status 取值域、positive/negative
+  方法数、首屏声明零变化；
+- 全部相对链接/anchor 可解析、OID 在 ancestry、代码符号可解析；
+  secret/privacy/user-path/device identifier/raw evidence 复制为 0；
+- `openspec/templates/**`、`changes/archive/**`、CHG-2026-021、spec/contracts/
+  governance/product diff 为 0；`scripts/check-sdd.sh` 0/0/111；`git diff --check`。
+
+### Evidence
+
+- 待 implementation/evidence PR 生成；本 r5 revision 不创建 addendum/run，也不翻转状态。
+
+### Notes / handoff
+
+- 固定顺序：r5 merge → readiness → implementation/evidence → done → change verify；
+- implementation/evidence PR 不翻 `ready→done`；旧 TASK-AFP-004 run 不追溯修改；
+- 若全量 Fact 重扫发现 AF-014 之外的 unsupported 表述，记录全部命中并 fail closed，
+  不得只修已知一处后继续。

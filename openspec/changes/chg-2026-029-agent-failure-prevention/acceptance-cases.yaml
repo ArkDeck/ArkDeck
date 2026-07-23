@@ -1,7 +1,7 @@
 ---
 schema_version: 1.0.0
 change_id: CHG-2026-029-agent-failure-prevention
-change_revision: 4
+change_revision: 5
 platform: macos
 evidence_classes:
 - documentReview
@@ -19,9 +19,11 @@ cases:
     and currency bound to a full protected-main OID and date. AF-001 through
     AF-009 carry the observed sub-surfaces registered in design section 3.1, and
     AF-010 through AF-018 match the root causes and case anchors registered in
-    design section 3.2. Links resolve, facts and inferences are distinct, raw or
-    sensitive evidence is not copied, no normative or approval semantics are
-    created, and archive bytes are not modified.
+    design section 3.2. AF-014 uses the capability-bound reliable-total
+    factory/receipt first sources registered in design section 3.3 and contains
+    no public-enum bypass assertion. Links resolve, facts and inferences are
+    distinct, raw or sensitive evidence is not copied, no normative or approval
+    semantics are created, and archive bytes are not modified.
 - acceptance_id: AFP-TEMPLATE-001
   test_id: TEST-AFP-TEMPLATE-001
   method: Before-and-after document review of the three change templates.
@@ -54,16 +56,18 @@ cases:
   expected_source: openspec/changes/chg-2026-029-agent-failure-prevention/verification.md#AFP-CORRECT-001
   minimum_evidence: documentReview
   expected_result: >-
-    Every Fact line in handbook entries AF-001 through AF-018 is matched to a
-    first-source repository record by relative path and full 40-hex OID, with a
-    supported or unsupported verdict. Unsupported specific wording is either
-    rewritten to what the source supports or demoted to Inference, and each
-    disposition records its basis. Inference lines are not mislabelled as Fact.
-    The AF identifier set, taxonomy attribution, eight-field contract,
-    automation status value domain and two-axis split are unchanged; code
-    symbols appearing in the handbook resolve inside the repository outside the
-    handbook and this change; currency is updated; archive and template diffs
-    are zero.
+    The r5 addendum marks the old AFP-004 AF-014 PASS conclusion as superseded.
+    Every current Fact line in handbook entries AF-001 through AF-018 is matched
+    to a first-source repository record by relative path, full 40-hex blob OID
+    and searchable locator, with a supported or unsupported verdict. Unsupported
+    specific wording is either rewritten to what the source supports or demoted
+    to Inference, and each disposition records its basis. AF-014 pins both the
+    CHG-2026-021 tasks record and TASK-TR-002R run. Inference lines are not
+    mislabelled as Fact. The AF identifier set, taxonomy attribution,
+    eight-field contract, automation status value domain and two-axis split are
+    unchanged; code symbols appearing in the handbook resolve inside the
+    repository outside the handbook and this change; currency is updated;
+    archive and template diffs are zero.
 - acceptance_id: AFP-LINK-001
   test_id: TEST-AFP-LINK-001
   method: Archive-readiness reference review of the handbook.
