@@ -93,9 +93,15 @@
 
 ## TASK-BAP-003 — Agent 凭据分离落实(human 执行项)
 
-- Status:ready(2026-07-22 本 readiness PR;前置 ① 已满足 = approval #317
-  merge `bc4a68b4888d5018992fb5004f5fbd7216c12419`;状态仅在维护者
-  review/merge 本 PR 后生效;执行者 = 维护者,仓外窗口任意、无设备)
+- Status:done(2026-07-23 本独立 D0 状态 PR,仅在维护者 review/merge 后生效。
+  Done recheck:human execution evidence PR #375 merge
+  `bb61726a7f47b9462296a9beae316dda88218db1` 已在 main;ruleset
+  `19595282` 与非 bypass Deploy Key `158088026` 在案;`agent/cred-probe`
+  创建/删除成功,普通分支创建与直接更新 main 均收到 GH013 ruleset rejection;
+  测试前后 main OID 均为
+  `e48673fbe8c8440d7e12dbfe6aea5e94f996a4e2`;维护者凭据不可达检查 PASS。
+  可复查记录见 `evidence/runs/TASK-BAP-003/run.md`;边界注记:done ≠ change
+  verified,TASK-BAP-002 仅在本 PR 合入后满足其 TASK-BAP-003 done 前置)
 - Readiness(r1,base = main `c15814593ea3d46149e749d3a47121ea70af1cea`;
   维护者 merge 本 PR = 接受下述机制方案):
   - 机制钉定:**repository ruleset + 非 bypass 机器凭据**——
