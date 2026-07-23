@@ -912,6 +912,22 @@
 - 符号级扫描复跑：手册内出现的代码符号必须能在仓内（手册与本 change 之外）解析；
 - `scripts/check-sdd.sh` 与 `git diff --check`，archive 与模板 diff 为零。
 
+### Evidence（candidate；不构成状态翻转）
+
+- implementation + evidence run:
+  [`evidence/runs/TASK-AFP-004/run.md`](evidence/runs/TASK-AFP-004/run.md)
+  （2026-07-23，base `e48673fbe8c8440d7e12dbfe6aea5e94f996a4e2`）。
+- 复核结果：37 条 `Fact` 全数核对 → 33 `supported` / 3 `partially-supported`
+  （F07/F09/F14 改写）/ 1 `unsupported`（F36 删除，无任何一手出处）；`Fact` 37→36，
+  `Inference` 18 行无误标。四行的共同来源均为跨会话记忆而非 pinned bytes，
+  与 r3 所修 `AF-014` 缺陷同源（`AF-016`）。
+- 二值门实测：开工前 carrier 39/39 无漂移；ID 集合/八字段契约/`Automation status`
+  取值域/两轴划分零变化；positive 18 + negative 18；符号级复扫仅余本 change 自定义
+  取值域；链接 98 条全解析（含 56 anchor）；OID 21 枚全在 ancestry；
+  archive 与模板 diff = 0；check-sdd 0/0/111；`git diff --check` 干净。
+- 任务状态保持 `ready`；`AFP-CORRECT-001` 的 PASS 结论待维护者在独立
+  `ready→done` PR 中确认。
+
 ### Notes / handoff
 
 - 本任务只更正表述，不重新验证被引用 change 的任何结论，也不改变其 task/AC 状态；
