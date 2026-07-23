@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-029-agent-failure-prevention
-revision: 4
-status: approved # r1 经 #345/#347 批准,r2 经 #355、r3 经 #371 合入;本 r4 归档就绪修订仅在维护者 review/merge 当前 revision PR 后生效
+revision: 5
+status: approved # r1 经 #345/#347 批准,r2 经 #355、r3 经 #371、r4 经 #387 合入;本 r5 verification remediation 仅在维护者 review/merge 当前 revision PR 后生效
 class: implementation-only
 core_change_level: none
 owner: lvye
@@ -308,3 +308,60 @@ forbidden paths 内，本 change **不修复、不改写**该 pin，只在此登
 `AFP-LINK-001` 有可复查 evidence 之后起草**，即顺序为：r4 批准 → AFP-005
 readiness/实现/done → verify → （待发现 2 解除后）archive。此调整避免"先 verify、
 再对已 verified 的 change 追加修订"这一形态。
+
+## r5 追加动因（2026-07-23，change-level verification remediation）
+
+在 protected `main` `95e56eae0102c37a885c0277089089a02b7bc4fb` 上执行首次
+change-level verification 时，五条 change-local acceptance 中三条通过，但
+`AFP-HANDBOOK-001` 与 `AFP-CORRECT-001` 被同一个一手事实冲突阻断：
+
+1. r3 已在 design §3.2 明确更正：第四条 gap 是 reliable progress total 可不经
+   capability 校验产生；正确的一手形态是
+   `chg-2026-021/tasks.md` 的 reliable-total receipt 只可由当前 adapter
+   `capability=true` factory 产生，以及 `TASK-TR-002R/run.md` 的
+   “Reliable progress totals have no public initializer”；
+2. 现行手册 `AF-014` 的 Signal、Fact、Preflight 与 Negative verification 仍保留
+   “公开枚举 case 可绕过能力门”这一 r2 已否定的表述；
+3. TASK-AFP-004 run 却把 `AFP-CORRECT-001` 记为 passed，且其 readiness source
+   inventory 未包含 `TASK-TR-002R/run.md`，因此该结论对 AF-014 不可复查；
+4. `verification.md` 已在矩阵中登记 r3/r4 新增的两条 AC，但首段与 Result gate
+   仍写“三条”及 `AFP-001/002/003`，与 r4 proposal 的五条验收顺序不一致。
+
+一手 bytes（本 r5 起草基线）：
+
+- `openspec/changes/chg-2026-021-trace-adapter-capture/tasks.md` blob
+  `14703a488170143e02b15d3ae496d23cf390864e`；
+- `openspec/changes/chg-2026-021-trace-adapter-capture/evidence/runs/TASK-TR-002R/run.md`
+  blob `23434076488e8ef6a10d9d93121cefc4e1c6fd80`；
+- 现行手册 blob `6fbb1a706bcf488aa39db672b51f0327a92cdf9b`；
+- TASK-AFP-004 run blob `4eed9d2f5ab8d79ef681a6d1473ed31b71d5242b`。
+
+根因仍是本 change 已登记的 `AF-016`（会话记忆替代一手核查），而首次全量复核又
+漏过同一已知表述，触发 `AF-015`。旧 run 不追溯改写；按 `AF-005` 新增 addendum，
+在当前事实原位建立 supersession/currency 指针。
+
+### TASK-AFP-006 — AF-014 一手事实修正与 evidence addendum
+
+新增一个 `blocked` remediation 任务，封闭完成以下工作：
+
+- 按 design §3.2/r5 §3.3 与上述两份一手 bytes 修正手册 `AF-014` 的四处错误表述；
+- 对手册当前全部 `Fact` 行重新执行逐行一手复核，addendum 必须逐行列出 AF ID、
+  相对路径、完整 blob OID、可检索位置、判定与处置，不能只给汇总计数；
+- 新增 `evidence/runs/TASK-AFP-004/addendum-r5.md`，明确 TASK-AFP-004 run 对
+  AF-014 的旧 PASS 结论已被本 addendum 取代；旧 run bytes 保持不动；
+- 新增 `evidence/runs/TASK-AFP-006/run.md`，记录实现基线、输入 pins、before/after、
+  全链接/OID/不变量/隐私/allowed-paths 检查与两条 AC 的唯一结论；
+- 手册 `Currency` 更新为 AFP-006 的实际 implementation audit base。
+
+任务边界只含手册、本 change `evidence/**` 与 `tasks.md` 的本任务状态/evidence 引用；
+不改 taxonomy、ID 集合、八字段契约、其他 AF 项的语义、模板、archive、CHG-2026-021
+历史 bytes、spec/contracts/governance 或产品代码。任务复用
+`AFP-HANDBOOK-001` 与 `AFP-CORRECT-001`，不新增 acceptance ID。
+
+### r5 flow 与批准边界
+
+本 r5 revision PR 只登记 remediation scope、design/verification 与 revision 同步，
+并新增保持 `blocked` 的 TASK-AFP-006；**不含手册修复、addendum 或 readiness**。
+顺序固定为：r5 维护者 review/merge → AFP-006 独立 readiness → implementation/
+evidence → done → 重跑五条 change-local acceptance → 独立 change verified PR。
+按 D1 判断门后零投机堆叠，r5 合入前不得起草后续成 PR 工作。
