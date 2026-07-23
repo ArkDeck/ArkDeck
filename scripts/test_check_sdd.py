@@ -350,5 +350,146 @@ class RevisionConsistencyTests(unittest.TestCase):
             self.assertEqual(self.revision_errors(root), [])
 
 
+class StructuredPinsTests(unittest.TestCase):
+    def write_document(
+        self,
+        root: Path,
+        change_name: str,
+        text: str,
+        filename: str = "tasks.md",
+    ) -> Path:
+        change = root / change_name
+        change.mkdir(parents=True, exist_ok=True)
+        path = change / filename
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8")
+        return path
+
+    def pins_errors(self, changes_dir: Path) -> list[str]:
+        start = len(check_sdd.errors)
+        try:
+            check_sdd.check_structured_pins(changes_dir)
+            return list(check_sdd.errors[start:])
+        finally:
+            del check_sdd.errors[start:]
+
+    @staticmethod
+    def carrier(body: str) -> str:
+        return f"# Fixture\n\n  ```yaml pins   \n{body}\n  ```   \n"
+
+    def test_legal_blob_commit_and_sha256_pass(self):
+        body = (
+            "  - path: Packages/One.swift\n"
+            f"    blob: {'aA' * 20}\n"
+            "  - artifact: openspec/contracts/example.yaml\n"
+            f"    commit: {'B' * 40}\n"
+            f"    sha256: {'c' * 64}"
+        )
+        with tempfile.TemporaryDirectory(prefix="check-sdd-pins-valid-") as temp:
+            root = Path(temp)
+            self.write_document(root, "chg-valid", self.carrier(body))
+            self.assertEqual(self.pins_errors(root), [])
+
+    def test_schema_and_digest_failures_are_one_named_error_per_block(self):
+        valid_blob = "a" * 40
+        cases = (
+            ("blob-39", f"- path: one\n  blob: {'a' * 39}", "blob must be a 40-hex string"),
+            ("blob-41", f"- path: one\n  blob: {'a' * 41}", "blob must be a 40-hex string"),
+            ("sha-63", f"- artifact: one\n  sha256: {'a' * 63}", "sha256 must be a 64-hex string"),
+            ("placeholder", "- path: one\n  blob: <40-hex git OID>", "blob must be a 40-hex string"),
+            ("unknown", f"- path: one\n  blob: {valid_blob}\n  owner: agent", "unknown key 'owner'"),
+            ("duplicate", f"- blob: {valid_blob}\n  blob: {'b' * 40}", "YAML parse failed: duplicate mapping key"),
+            ("mapping-top", f"path: one\nblob: {valid_blob}", "top-level must be a non-empty sequence"),
+            ("scalar-top", "not-a-sequence", "top-level must be a non-empty sequence"),
+            ("empty-sequence", "[]", "top-level must be a non-empty sequence"),
+            ("scalar-item", "- not-a-mapping", "item 1 must be a mapping"),
+            ("empty-path", f"- path: '   '\n  blob: {valid_blob}", "path must be a non-empty string"),
+            ("bad-artifact", f"- artifact: 7\n  blob: {valid_blob}", "artifact must be a non-empty string"),
+            ("bad-scalar", "- path: one\n  blob: 123", "blob must be a 40-hex string"),
+            ("no-digest", "- path: one", "item 1 must contain a digest key"),
+            ("empty-block", "", "top-level must be a non-empty sequence"),
+            ("non-yaml", "- path: [", "YAML parse failed:"),
+        )
+        for label, body, expected in cases:
+            with self.subTest(label=label), tempfile.TemporaryDirectory(
+                prefix=f"check-sdd-pins-{label}-"
+            ) as temp:
+                root = Path(temp)
+                path = self.write_document(
+                    root, f"chg-{label}", self.carrier(body)
+                )
+                failures = self.pins_errors(root)
+                self.assertEqual(len(failures), 1, failures)
+                self.assertIn(f"ERROR {check_sdd.rel(path)}:", failures[0])
+                self.assertIn("pins block at opening line 3 invalid:", failures[0])
+                self.assertIn(expected, failures[0])
+
+    def test_multiple_reasons_are_sorted_inside_one_error(self):
+        body = "- owner: agent\n  path: ''\n  blob: short"
+        with tempfile.TemporaryDirectory(prefix="check-sdd-pins-reasons-") as temp:
+            root = Path(temp)
+            self.write_document(root, "chg-reasons", self.carrier(body))
+            failures = self.pins_errors(root)
+            self.assertEqual(len(failures), 1)
+            self.assertTrue(
+                failures[0].endswith(
+                    "item 1 blob must be a 40-hex string; "
+                    "item 1 has unknown key 'owner'; "
+                    "item 1 path must be a non-empty string"
+                ),
+                failures[0],
+            )
+
+    def test_unterminated_carrier_is_one_named_error(self):
+        with tempfile.TemporaryDirectory(prefix="check-sdd-pins-open-") as temp:
+            root = Path(temp)
+            path = self.write_document(
+                root,
+                "chg-open",
+                "# Fixture\n```yaml pins\n- path: one\n  blob: " + "a" * 40 + "\n",
+            )
+            failures = self.pins_errors(root)
+            self.assertEqual(len(failures), 1)
+            self.assertIn(f"ERROR {check_sdd.rel(path)}:", failures[0])
+            self.assertIn("opening line 2 invalid: unterminated fence", failures[0])
+
+    def test_noncarriers_documents_without_carriers_and_archive_are_skipped(self):
+        invalid_body = "- path: one\n  blob: <placeholder>"
+        with tempfile.TemporaryDirectory(prefix="check-sdd-pins-skip-") as temp:
+            root = Path(temp)
+            self.write_document(
+                root,
+                "chg-example",
+                f"```yaml pin-example\n{invalid_body}\n```\n",
+            )
+            self.write_document(
+                root,
+                "chg-extra-info",
+                f"```yaml pins extra\n{invalid_body}\n```\n",
+            )
+            self.write_document(
+                root,
+                "chg-no-carrier",
+                "# Pins\n\nblob: <placeholder>\n",
+            )
+            self.write_document(
+                root / "archive",
+                "chg-archived",
+                f"```yaml pins\n{invalid_body}\n```\n",
+            )
+            self.assertEqual(self.pins_errors(root), [])
+
+    def test_real_baseline_and_template_contract_pass(self):
+        self.assertEqual(
+            self.pins_errors(check_sdd.OPENSPEC / "changes"), []
+        )
+        template = (
+            check_sdd.OPENSPEC / "templates" / "change" / "tasks.md"
+        ).read_text(encoding="utf-8")
+        self.assertIn("```yaml pin-example", template)
+        self.assertIn("info string 改为 `yaml pins`", template)
+        self.assertIn("完整、真实的 40-hex Git OID 或 64-hex sha256", template)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

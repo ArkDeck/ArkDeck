@@ -9,6 +9,17 @@
 - Requirements:REQ-...
 - Acceptance:AC-...
 - Depends on:TASK-...(或 none)
+- Readiness input pins(非载体示例):
+
+  ```yaml pin-example
+  - path: path/to/pinned-input
+    blob: <40-hex git OID>
+  - artifact: path/to/pinned-artifact
+    sha256: <64-hex sha256>
+  ```
+
+  实例化新的 readiness 时,必须把 info string 改为 `yaml pins`,并将示例值
+  替换为完整、真实的 40-hex Git OID 或 64-hex sha256。
 - Allowed paths:
   - `path/**`
 - Forbidden paths:
