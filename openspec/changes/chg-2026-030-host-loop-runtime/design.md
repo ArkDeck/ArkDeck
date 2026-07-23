@@ -86,6 +86,35 @@ executable。HLR-003 先以独立 source PR 交付 worker，再以分离的 D2 h
 注册/启用 scheduler、完成 live first-PR proof 与 legacy migration；source 未合入或
 receipt/source hash 漂移时 scheduler dispatch 恒为 0。
 
+## 1C. MECH task-token compatibility（r4）
+
+HLR-002A candidate #412 的首次 source push 已证明 ordinary `agent/**` 的 legacy
+creator 与 head guard 可达；但 evidence-only head 触发的首个真实
+`pull_request/synchronize` 暴露了既有 grammar seam：`scripts/check_pr_paths.py`
+的 task token 只接受 `TASK-<group>-<three digits>`，而同文件 active task-header
+grammar 与仓库既有任务允许末段三位数字后的单个大写 suffix（例如
+`TASK-HLR-002A`、`TASK-M1-001R`）。因此 #412 的标题不能声明真实 task，branch
+fallback 又把描述性 slug 拼入 task ID，`allowed-paths` 正确地 fail closed。
+
+r4 的修复边界是让 title/body/full-token regex 复用一个与既有 task-header grammar
+等价的 token definition：
+
+```text
+TASK-[A-Z0-9]+(?:-[A-Z0-9]+)*-[0-9]{3}[A-Z]?
+```
+
+这只恢复 canonical task identity 的可表达性，不扩张路径授权：
+
+- suffix token 仍必须唯一解析到 active `tasks.md` 的 exact header；
+- malformed、lowercase、多字符 suffix、多个不一致 Task 与 token adjacency 继续拒绝；
+- branch fallback 只在 title/body 无 token时使用，描述性 branch slug 不升级为 task；
+- 不把 `TASK-HLR-002A` 改写/别名为 `TASK-HLR-002`，不靠人工编辑 metadata
+  掩盖失败，不修改 `sdd-guard.yml` 的批准语义。
+
+parser/tests 与 namespace filter 必须在同一 HLR-002A implementation candidate 中通过，
+且真实 pull-request `allowed-paths` 绿色；但 #412 已永久 superseded，r4 后仍须独立
+readiness 选择 fresh branch/head，不能修补或复用该 PR。
+
 ## 2. PR envelope
 
 worker 以版本化模板生成 body，而不是拼接固定 vendor 文案。task-bound PR 的必填面：

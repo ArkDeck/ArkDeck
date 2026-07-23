@@ -1,7 +1,7 @@
 # CHG-2026-030 Verification Plan
 
 > Status:planned
-> Change:CHG-2026-030-host-loop-runtime@r3
+> Change:CHG-2026-030-host-loop-runtime@r4
 > Core baseline:CORE-2.1.0（零 Core/Product behavior change）
 
 ## Environment
@@ -20,7 +20,7 @@
 | --- | --- | --- | --- |
 | HLR-ENVELOPE-001 | HLR-001, HLR-005 | contract + live | task-bound PR 在创建时含独立 `Task: TASK-*`、完整 base/head OID、grade、dependency、evidence、配置 attribution；每类缺失/歧义失败；proposal 用 `Task: none`；无固定厂商 attribution；首个 PR event 能供 MECH-004 读取 |
 | HLR-LEASE-001 | HLR-002A, HLR-002, HLR-003, HLR-005 | D2 review + fault integration | legacy bootstrap 对 `agent/host-loop/**` 零 creator；PR/Issue identity 只有 Metadata read、Contents read、Pull requests write、Issues write，非 CODEOWNER/bypass；ref 只由 BAP-003 Deploy Key + ruleset 写；self-approval、main write、merge、admin probe 均拒绝；runtime typed adapter 无 generic/review/merge/admin route；remote lease acquire/renew/takeover 使用 exact OID fence；两个 owner、stale owner、heartbeat loss、cursor corruption 和 API timeout 全部停 lane/重协调，零 duplicate dispatch |
-| HLR-WORKER-001 | HLR-002A, HLR-003, HLR-005 | contract + live | worker 只处理 approved+ready host-only task，在 `agent/host-loop/tasks/**` 创建/更新唯一 stable identity PR；reserved branch 零 legacy creator，首个 `pull_request` checks 实测存在且 metadata 已完整；legacy creator 仅在 live proof 后退出，rollback 可复查 |
+| HLR-WORKER-001 | HLR-002A, HLR-003, HLR-005 | contract + live | MECH-004 title/body token 接受 active task-header grammar 的单字母 suffix 且 malformed/ambiguous token 失败；worker 只处理 approved+ready host-only task，在 `agent/host-loop/tasks/**` 创建/更新唯一 stable identity PR；reserved branch 零 legacy creator，首个 `pull_request` checks 实测存在且 metadata 已完整；legacy creator 仅在 live proof 后退出，rollback 可复查 |
 | HLR-REVIEW-001 | HLR-004, HLR-005 | contract + live | reviewer run/worktree/session 独立且只读；missing/failed checks、`REQUEST_CHANGES` 或 `BLOCKED` 不入 batch；`APPROVE` 是独立 AI 预审记录而非 GitHub/human approval；零 auto-merge |
 | HLR-RECOVERY-001 | HLR-004, HLR-005 | fault injection + live recovery | acquire、create、update、heartbeat、review、merge observation 各 crash window 可重启；仅 GitHub merge metadata 与 protected-main full OID 同时匹配才 advance/release；branch缺失、Issue声称 merged、CI绿、时间流逝均不通过 |
 
@@ -35,6 +35,9 @@
 - `agent/host-loop/**` 仍触发 legacy creator、普通 `agent/**` 被意外排除、reserved
   head 出现 0/2 PR、head guard 或 pull-request allowed-paths 缺失 → partition/activation
   failure；不以 branch cleanup 或 elapsed time 伪造零 creator；
+- canonical suffix task（如 `TASK-HLR-002A`）不能被 title/body 唯一声明、描述性
+  branch slug 被升级为 task、错误 alias task 能绕过 allowed-paths、multi-suffix/
+  lowercase/adjacent token 被接受 → parser/partition failure；不手工改 body 掩盖；
 - identity 成为 CODEOWNER/bypass、permission category/scope 超 pin、protected-main
   direct write / integration-authored PR self-approval / merge / admin same-value mutation
   任一成功、typed adapter 可构造 generic request 或 review/merge/admin route →
@@ -51,6 +54,8 @@
 - runtime fixture/contract/fault suite；
 - `agent-pr.yml` branch-filter contract test + implementation 合入后的普通 control /
   reserved canary live evidence；`sdd-guard.yml` byte-for-byte 零 diff；
+- `check_pr_paths` task-token suffix 正反 fixtures + fresh implementation PR 的真实
+  pull-request `guard`/`allowed-paths` terminal success；#412 红灯不得复用；
 - `scripts/check-sdd.sh`：0 errors / 0 warnings，acceptance count 以执行时 protected
   main 重新记录，禁止沿用陈旧数字；
 - `git diff --check`、allowed/forbidden path audit、no-shell-string static scan；

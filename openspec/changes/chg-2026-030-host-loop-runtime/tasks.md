@@ -5,6 +5,8 @@
 > D2 host/credential 配置与源码 PR 分离；任何判断门未合入前不做门后的成 PR 工作。
 > r3 新增 TASK-HLR-002A 划分 `agent/host-loop/**` exclusive creator namespace；
 > 该 task done 前 HLR-002 不得 ready，零 identity/secret/scheduler/probe 动作。
+> r4 因 #412 首个 pull-request `allowed-paths` 暴露 canonical suffix task grammar
+> 不兼容而 fail closed；r4 只扩 HLR-002A 的 parser/test scope，不使其 ready。
 
 ## TASK-HLR-001 — 结构化 PR envelope 与纯 runtime contract
 
@@ -190,13 +192,35 @@
 
 ## TASK-HLR-002A — Legacy bootstrap namespace partition
 
-- Status:ready（2026-07-23 D1 readiness；仅在维护者 review/merge 本独立
-  `blocked→ready` PR 后生效。）
+- Status:blocked（r4 stop gate：readiness #411 后的 implementation candidate #412
+  虽通过 offline filter contract、首次 branch guard 与唯一 legacy creator，但
+  `pull_request/synchronize` SDD Guard run `29992997396` 的 `allowed-paths` job
+  `89159873429` 因 pinned MECH-004 不识别 canonical `TASK-HLR-002A` 而失败。
+  #412 不得合入且永久 superseded；解除前置：① r4 由维护者 review/merge；
+  ② #412 `closed`、`merged=false`，旧 branch 不复用；③ 独立 re-readiness 从当时
+  protected `main` 重钉 workflow、MECH parser/tests、fresh branch 与验证矩阵。r4
+  合入本身不使任务 ready。）
+- Historical Status:ready（#411 merge
+  `6b40866e18fe33edc5973de5158f494adfdd48d2` 后生效；其 r1 readiness 因 #412
+  首个 PR integration gate failure 被 r4 supersede，不能授权继续实现。）
 - Historical Status:blocked（前置：① CHG-2026-030 revision r3 由维护者
   review/merge；② TASK-HLR-001 done；③ TASK-BAP-003 done；④ 独立 readiness PR
   钉定 `agent-pr.yml`/`sdd-guard.yml` blobs、GitHub Actions branch-filter semantics、
   reserved namespace grammar、control/canary 矩阵与零 open workflow conflict。r3
   proposal 合入本身不使本任务 ready。）
+- Re-readiness requirements（r4）：
+  - 以 r4 merge 后最新 protected `main` 为 audit base，重钉
+    `agent-pr.yml`、`sdd-guard.yml`、`scripts/check_pr_paths.py`、
+    `scripts/test_check_pr_paths.py`、HLR envelope parser/tests 与本 change 四文档；
+  - 固定 task token 为
+    `TASK-[A-Z0-9]+(?:-[A-Z0-9]+)*-[0-9]{3}[A-Z]?`，正例至少含
+    `TASK-HLR-002A`/`TASK-M1-001R`，反例覆盖多字符 suffix、lowercase、邻接污染、
+    multiple Task 与描述性 branch slug；
+  - 选择未使用的 fresh non-reserved implementation branch/head；#412 必须
+    `closed`、`merged=false`，旧 branch/ref 不复用，open workflow/path owner 为 0；
+  - 重钉 local contract、首个 push guard、唯一 legacy creator、真实
+    `pull_request` guard/allowed-paths 与 post-merge control/canary 二值门；任一事实
+    不全继续 blocked。
 - Readiness（r1，audit base = protected `main`
   `0080403e87527c4487849ee6e3c705236e1437b7`）：
   - **Approval/dependency gate:satisfied。**CHG-2026-030 r3 exact head
@@ -346,12 +370,14 @@
   independent readiness
 - In scope:`agent-pr.yml` push filter 保留 `agent/**` include、增加
   `!agent/host-loop/**` exclude；固定 task/lease/probe 三个 reserved family；
-  branch-filter contract test；implementation merge 后的 control/canary live evidence；
-  本 change evidence 与本任务状态。
+  branch-filter contract test；MECH-004 title/body/full task token 对齐现有 active
+  task-header grammar，并覆盖单字母 suffix 正反 fixtures；implementation merge 后的
+  control/canary live evidence；本 change evidence 与本任务状态。
 - Out of scope:修改 `sdd-guard.yml`、创建/配置 integration identity/secret/scheduler、
   PR body/envelope/runtime/lease/cursor 实现、移除 legacy bootstrap、真实设备或产品代码。
 - Allowed paths:`.github/workflows/agent-pr.yml`、
-  `scripts/test_agent_pr_workflow.py`、本 change `evidence/**`、本 change
+  `scripts/test_agent_pr_workflow.py`、`scripts/check_pr_paths.py`、
+  `scripts/test_check_pr_paths.py`、本 change `evidence/**`、本 change
   `tasks.md`（仅本任务状态/evidence 引用）。
 - Forbidden paths:`AGENTS.md`、`openspec/constitution.md`、
   `openspec/governance/**`、`openspec/specs/**`、`openspec/contracts/**`、
@@ -371,6 +397,9 @@
   与相似前缀不命中 reserved parser；
 - contract test 解析 workflow YAML/event filter，证明 include + exclude 同时存在，
   `sdd-guard.yml` byte-for-byte 零 diff；
+- MECH-004 对 `TASK-HLR-002A`/既有单字母 suffix task 可从 title/body 唯一绑定
+  active task，malformed/ambiguous/multi-suffix 继续失败，真实 implementation PR
+  `allowed-paths` 绿色；
 - implementation 合入后 live canary：普通 control branch 仍由 legacy creator 创建唯一
   PR；reserved probe branch 的 head guard 出现但 legacy PR/workflow run 数为 0，canary
   清理不以 branch disappearance 代替查询结果。
@@ -380,13 +409,16 @@
 - `HLR-LEASE-001`/`HLR-WORKER-001` bootstrap slice：contract fixtures 全通过；
   control/canary 的 branch/head/full run/PR IDs 可复查；reserved branch 零
   `github-actions[bot]` PR，普通 control 恰一 legacy PR；
-- `python3 scripts/test_agent_pr_workflow.py`、HLR envelope regression、MECH-004
-  path tests、`check-sdd`、`git diff --check` 与 allowed/forbidden diff 通过。
+- `python3 scripts/test_agent_pr_workflow.py`、HLR envelope regression、扩展后的
+  MECH-004 path tests、真实 PR `allowed-paths`、`check-sdd`、`git diff --check`
+  与 allowed/forbidden diff 通过。
 
 ### Notes / handoff
 
 - implementation/evidence、live canary evidence 与 `ready→done` 分离；canary 分支/PR
   不合入，清理结果如实记录；
+- #412 只保留为失败诊断；其 commits、checks、PR 或 branch 均不得作为 r4 后 fresh
+  candidate 的 implementation/live PASS 复用；
 - TASK-HLR-002A done 只建立 creator 空间，不授权 D2 identity，也不构成 HLR-002
   activation receipt。
 
