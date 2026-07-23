@@ -76,13 +76,13 @@
   r2 fail closed 重钉天然后继。r2 merge 前 BAP-002 lane 不得开
   implementation、batch issue、候选 PR 或 drill evidence PR)
 - Readiness(r2,base = protected main
-  `7d04c3dccb598a5e1a1d3b16846162353069dbf2`):
+  `cfab930722afe60ed5e8759ea0c91d7a178971cc`):
   - **Authority/input pins。**实现开工时以下 commit/blob 任一漂移即停止并
     重做 D1 readiness;完整 hash 只固定输入,不自行构成批准:
 
     ```yaml pins
     - artifact: TASK-BAP-002 readiness audit base
-      commit: 7d04c3dccb598a5e1a1d3b16846162353069dbf2
+      commit: cfab930722afe60ed5e8759ea0c91d7a178971cc
     - artifact: CHG-2026-027 approval merge
       commit: bc4a68b4888d5018992fb5004f5fbd7216c12419
     - artifact: TASK-BAP-001 done status merge
@@ -95,6 +95,8 @@
       commit: 5640614f427e873cf21fce2032c502822d219a30
     - artifact: TASK-AFP-004 done status merge (r1 candidate #379, invalidated)
       commit: 605bff09fdc992478203109b1e5414b207d553b3
+    - artifact: TASK-AFP-003 readiness r2 merge
+      commit: cfab930722afe60ed5e8759ea0c91d7a178971cc
     - path: AGENTS.md
       blob: 3c2d3c6a01d3eaa31cd9e3ee333f3153552f4164
     - path: openspec/governance/enforcement.md
@@ -122,7 +124,7 @@
     - path: openspec/changes/chg-2026-028-guard-ci-mechanization/evidence/runs/TASK-MECH-004/run.md
       blob: dfd6c464ef88b955458c8b8b256987f75709892c
     - path: openspec/changes/chg-2026-029-agent-failure-prevention/tasks.md
-      blob: 9789f0da3573739521f31423666b4f67dfd40d0c
+      blob: bbbda9b9f2ebefbe9b360fe2cade4e70712ed724
     ```
 
     两个 deliverable 在 base 均不存在:
@@ -163,8 +165,10 @@
        evidence、task、required-status 或 archive。若逐 AC 复核不能由已合入
        状态 + 确定性检查完全得出 PASS,则它不是 D0,演练保持 blocked。
     2. `TASK-AFP-003 ready → done`:该 host-only historical detection drill
-       已由独立 D1 readiness 固定且在 base 仍为 `ready`;其 implementation/
-       evidence 尚未产生(`evidence/runs/TASK-AFP-003/` 在 base 不存在)。
+       已由独立 D1 readiness r2 #381 合入
+       `cfab930722afe60ed5e8759ea0c91d7a178971cc` 且在 base 为 `ready`;
+       其 implementation/evidence 尚未产生
+       (`evidence/runs/TASK-AFP-003/` 在 base 不存在)。
        只有 AFP lane 自然完成 implementation/evidence PR、由维护者合入且
        run 闭合 `AFP-DRILL-001` 后,才可由该 lane 起草仅改本 task 状态/
        evidence 引用的 D0 候选。本 lane 不执行 AFP-003、不补 evidence、
@@ -203,7 +207,10 @@
     `2026-07-23T03:15:37Z` 依次创建。#378/#379 又分别于
     `2026-07-23T03:18:49Z`/`2026-07-23T03:19:17Z` 在 #380 合入前合并,
     因而 r1 候选失效且 drill 计数仍为 0;#380 于
-    `2026-07-23T03:20:29Z` 合入;r2 audit 时 open PR = 0。
+    `2026-07-23T03:20:29Z` 合入。r2 首次 audit 时 open PR = 0;随后独立
+    AFP lane 的 readiness r2 #381 于 `2026-07-23T03:25:37Z` 创建并在
+    `2026-07-23T03:27:25Z` 合入,本 r2 重新读取其 merge/blob 后继续;
+    当前 open PR 仅本 readiness r2 #382。
     该并发来自不同 task lane,不是 BAP-002 越过 D1 门的成 PR 工作。
     host-only docs/metadata,零设备、零硬件、零 device/network product
     effect。实现前须重新检查 open PR、同名 issue 与上述 pins;路径竞争或
