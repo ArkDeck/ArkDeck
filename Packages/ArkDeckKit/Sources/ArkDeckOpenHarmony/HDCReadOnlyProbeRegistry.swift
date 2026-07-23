@@ -15,9 +15,9 @@ struct HDCReadOnlyProbeRegistry: Sendable, Equatable {
   static let registryID = "OPENHARMONY-HDC-READONLY-PROBES"
   static let registryVersion = "1.0.0"
   static let registrySHA256 =
-    "9014c480c3df61b5a6db7e54e52f29e89d7c93431e91d0856cf5710c22466b9d"
+    "b0ac1564109b8138c7a73cbb83684400967633f6e6b04701175a22d314d88da6"
   static let resourceManifestSHA256 =
-    "d93fcc2668006f7e23e3355a0855b5a7f07515baa95413aaa31777dced74ac02"
+    "e91e38dfa9a01132062865837844cf77494644488fba9527ce52c5a68c593bf6"
   static let controlVectorSHA256 =
     "68c4aa48eb293d22d3531091fcd5dfce89ec73700674bfb6532584a94672726f"
   static let targetPlatform = "macos"
@@ -69,7 +69,7 @@ struct HDCReadOnlyProbeRegistry: Sendable, Equatable {
         probeKind: .platformProcessObservation, exactArguments: [], invocationAllowed: false,
         timeoutMilliseconds: 1_000, rawFamily: "redactedPlatformReceipt", rawSHA256: nil,
         receiptID: "i15-receipt-server-identity-generation",
-        receiptSHA256: "6f71af96bcd6c25a8a7c900538e01c1aff6144ee85e6c928a37fbc654c003a69",
+        receiptSHA256: "b8f60c014eefc64f9c17f6ebf3e762691157601eeeb51e0b3aba5c20652dec72",
         unsupportedReason: nil),
       Entry(
         id: "openharmony-hdc-selected-device-authorization-binding-3.2.0d",
@@ -79,7 +79,7 @@ struct HDCReadOnlyProbeRegistry: Sendable, Equatable {
         rawFamily: "listTargetsVerbose.singleUSBRow.connected.3.2.0d",
         rawSHA256: "d8816e413776d80e6e577b78f6abbf8c114bfd570b3627f7a007c97681af9c48",
         receiptID: "i15-receipt-selected-device-authorization-binding",
-        receiptSHA256: "ea8257eb7c8404805521963307f06a94634341ad1470ccf13118f7f9028e0383",
+        receiptSHA256: "277cfa5ae36a1e7140c80d9da11debcabc28a93f5bebcaaf0cae87d903ab29ea",
         unsupportedReason: nil),
       Entry(
         id: "openharmony-hdc-key-access-diagnostics-3.2.0d-macos",
@@ -87,7 +87,7 @@ struct HDCReadOnlyProbeRegistry: Sendable, Equatable {
         probeKind: .platformFileAccess, exactArguments: [], invocationAllowed: false,
         timeoutMilliseconds: 0, rawFamily: "noneRegistered", rawSHA256: nil,
         receiptID: "i15-receipt-key-access-diagnostics",
-        receiptSHA256: "a87c2cf3754cd380699939060b2250b4bf0e406f1920cb8a69b930c9a23839e5",
+        receiptSHA256: "abe6ea2aac83aed97cb98695c5db6334fe0e5e5955ebf9da4678544580b9a858",
         unsupportedReason:
           "No configured or user-approved HDC key locator was identified; the captured conventional-path absence cannot grant production path authority."
       ),
@@ -97,7 +97,7 @@ struct HDCReadOnlyProbeRegistry: Sendable, Equatable {
         probeKind: .hdcCommand, exactArguments: [], invocationAllowed: false,
         timeoutMilliseconds: 0, rawFamily: "noneRegistered", rawSHA256: nil,
         receiptID: "i15-receipt-subserver-capability",
-        receiptSHA256: "565beee8a8d0ca84e026968db13a12ea5ebcb419428423dd2ee7dcd1165734ea",
+        receiptSHA256: "0fee0d35053866afbe6db8eaad9199408148d91d381b41eda0b525220d68663e",
         unsupportedReason:
           "The reviewed upstream source is 3.2.0b rather than the exact 3.2.0d target and proves no client-local, zero-lifecycle/device-migration observation command for the target revision."
       ),

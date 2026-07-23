@@ -5,7 +5,7 @@
   "family": "subserverCapability",
   "evidenceClass": "maintainerAcceptedDocumentReviewDerivedReceipt",
   "source": {
-    "path": "openspec/changes/chg-2026-015-hdc-readonly-probe-registration/evidence/provenance/subserver-capability-doc.md",
+    "path": "openspec/changes/archive/2026-07-22-chg-2026-015-hdc-readonly-probe-registration/evidence/provenance/subserver-capability-doc.md",
     "sha256": "6bb63426ecee6e0e86f4027bd7d9b6034db56e116663494885fd69aa89618013",
     "acceptedBy": "maintainer review and merge of PR #141"
   },

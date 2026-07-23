@@ -5,7 +5,7 @@
   "family": "selectedDeviceAuthorizationBinding",
   "evidenceClass": "controlledHumanCaptureDerivedReceipt",
   "source": {
-    "path": "openspec/changes/chg-2026-015-hdc-readonly-probe-registration/evidence/provenance/device-window-capture-2026-07-20.md",
+    "path": "openspec/changes/archive/2026-07-22-chg-2026-015-hdc-readonly-probe-registration/evidence/provenance/device-window-capture-2026-07-20.md",
     "sha256": "a06cc98999adb1067448ab879870c77e88740988cbc3905dff933a98fb7ae887",
     "acceptedBy": "maintainer review and merge of PR #156"
   },

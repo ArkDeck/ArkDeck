@@ -57,7 +57,7 @@ Packages/ArkDeckKit/
 
 M1-006 consumes the exact `OPENHARMONY-TOOLS@0.3.0` registry at
 `openspec/integrations/openharmony/readonly-probes.yaml` (SHA-256
-`9014c480c3df61b5a6db7e54e52f29e89d7c93431e91d0856cf5710c22466b9d`). macOS maps
+`b0ac1564109b8138c7a73cbb83684400967633f6e6b04701175a22d314d88da6`). macOS maps
 the four registered families as follows:
 
 | Probe family | macOS access / diagnostic mapping |

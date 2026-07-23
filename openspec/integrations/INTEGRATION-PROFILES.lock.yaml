@@ -47,33 +47,33 @@ probe_registries:
     version: 1.0.0
     profile: OPENHARMONY-TOOLS@0.3.0
     path: openspec/integrations/openharmony/readonly-probes.yaml
-    sha256: 9014c480c3df61b5a6db7e54e52f29e89d7c93431e91d0856cf5710c22466b9d
+    sha256: b0ac1564109b8138c7a73cbb83684400967633f6e6b04701175a22d314d88da6
 
 probe_resources:
   - id: i15-probe-resources-manifest
     version: 1.0.0
     path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Probes/1.0.0/resources.json
-    sha256: d93fcc2668006f7e23e3355a0855b5a7f07515baa95413aaa31777dced74ac02
+    sha256: e91e38dfa9a01132062865837844cf77494644488fba9527ce52c5a68c593bf6
   - id: i15-probe-registry-snapshot
     version: 1.0.0
     path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Probes/1.0.0/registry.yaml
-    sha256: 9014c480c3df61b5a6db7e54e52f29e89d7c93431e91d0856cf5710c22466b9d
+    sha256: b0ac1564109b8138c7a73cbb83684400967633f6e6b04701175a22d314d88da6
   - id: i15-receipt-server-identity-generation
     version: 1.0.0
     path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Probes/1.0.0/receipts/server-identity-generation.json
-    sha256: 6f71af96bcd6c25a8a7c900538e01c1aff6144ee85e6c928a37fbc654c003a69
+    sha256: b8f60c014eefc64f9c17f6ebf3e762691157601eeeb51e0b3aba5c20652dec72
   - id: i15-receipt-selected-device-authorization-binding
     version: 1.0.0
     path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Probes/1.0.0/receipts/selected-device-authorization-binding.json
-    sha256: ea8257eb7c8404805521963307f06a94634341ad1470ccf13118f7f9028e0383
+    sha256: 277cfa5ae36a1e7140c80d9da11debcabc28a93f5bebcaaf0cae87d903ab29ea
   - id: i15-receipt-key-access-diagnostics
     version: 1.0.0
     path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Probes/1.0.0/receipts/key-access-diagnostics.json
-    sha256: a87c2cf3754cd380699939060b2250b4bf0e406f1920cb8a69b930c9a23839e5
+    sha256: abe6ea2aac83aed97cb98695c5db6334fe0e5e5955ebf9da4678544580b9a858
   - id: i15-receipt-subserver-capability
     version: 1.0.0
     path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Probes/1.0.0/receipts/subserver-capability.json
-    sha256: 565beee8a8d0ca84e026968db13a12ea5ebcb419428423dd2ee7dcd1165734ea
+    sha256: 0fee0d35053866afbe6db8eaad9199408148d91d381b41eda0b525220d68663e
   - id: i15-fail-closed-control-vectors
     version: 1.0.0
     path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Probes/1.0.0/controls/fail-closed-vectors.json
