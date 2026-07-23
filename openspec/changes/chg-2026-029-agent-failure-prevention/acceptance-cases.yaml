@@ -1,7 +1,7 @@
 ---
 schema_version: 1.0.0
 change_id: CHG-2026-029-agent-failure-prevention
-change_revision: 1
+change_revision: 2
 platform: macos
 evidence_classes:
 - documentReview
@@ -13,13 +13,15 @@ cases:
   minimum_evidence: documentReview
   expected_result: >-
     The handbook declares its non-normative authority and conflict boundary on
-    the first screen; AF-001 through AF-009 are unique and each contains a
+    the first screen; AF-001 through AF-018 are unique and each contains a
     signal, observed repository cases, root cause, preflight, positive and
     negative verification, canonical references, an honest automation status,
-    and currency bound to a full protected-main OID and date. Links resolve,
-    facts and inferences are distinct, raw or sensitive evidence is not copied,
-    no normative or approval semantics are created, and archive bytes are not
-    modified.
+    and currency bound to a full protected-main OID and date. AF-001 through
+    AF-009 carry the observed sub-surfaces registered in design section 3.1, and
+    AF-010 through AF-018 match the root causes and case anchors registered in
+    design section 3.2. Links resolve, facts and inferences are distinct, raw or
+    sensitive evidence is not copied, no normative or approval semantics are
+    created, and archive bytes are not modified.
 - acceptance_id: AFP-TEMPLATE-001
   test_id: TEST-AFP-TEMPLATE-001
   method: Before-and-after document review of the three change templates.
