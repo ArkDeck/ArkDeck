@@ -65,8 +65,9 @@
 
 ## TASK-BAP-002 — 批次运营载体与首次批次演练
 
-- Status:ready(2026-07-23 本独立 D1 readiness r2,同日 r3 增补重钉(见
-  Readiness r3 增补块);仅在维护者 review/merge 后生效。四前置闭合:① approval #317 merge
+- Status:ready(2026-07-23 本独立 D1 readiness r2,同日 r3/r4 增补(见
+  各增补块;r4 = drill 阶段转换与候选 2 规则化);仅在维护者 review/merge
+  后生效。四前置闭合:① approval #317 merge
   `bc4a68b4888d5018992fb5004f5fbd7216c12419`;② TASK-BAP-001 done #328
   merge `d1873fb6f4b0d523f9263fcdcffe17b062840247`;③ TASK-BAP-003 execution
   evidence #375 merge `bb61726a7f47b9462296a9beae316dda88218db1` + done #376
@@ -106,6 +107,35 @@
     open 队列,等 batch issue 建立、exact-head review 完成后按 digest 顺序
     合并**——再次实时秒合将第四次消耗候选,`BAP-DRILL-001` 在"同批次
     ≥2 个合格 D0 merge"门下将永远无法 PASS。
+- **Readiness r4 增补(2026-07-23,本 PR;维护者 merge = 接受;r2/r3 未被
+  本块修改的条款继续有效)**:
+  - 阶段事实:template/runbook implementation 已交付合入(#388 merge
+    `21a416dbbaa88c17a71a6adf55827169d1f6b9f4`,与实现分支逐字一致)。
+    **本 change 进入 drill-only 阶段**:r2 的 15 项 authority/input pins
+    的使命是锁定实现输入,随实现合入完成使命退役;drill 阶段不再以兄弟
+    lane 高频文件为 authority pin——r3 重钉的 chg-029 tasks.md blob
+    `dc8129773d18349b7e7d5123ce2fa8beefb80b7d` 已再次因 #387(chg-029 r4,
+    merge `d53da289b7da80a4ee2282f5dea3122ebf97325a`)漂移为
+    `6211712d85bd719b7384769f8788a745d7249c21`,连续第二次证明该类 pin
+    结构性易碎。
+  - **候选 2′ 失效(第四次候选失效;本次成因是兄弟 lane 天然演化而非
+    合并节奏)**:chg-029 r4 新增 TASK-AFP-005(blocked)并升 verification
+    @r4,"四任务全 done 即 verify"前提不再成立,chg-029 verify 闭包不再是
+    近期天然 D0。
+  - **候选 2 改为规则钉定(维护者 merge 本 r4 = 接受该规则,取代逐次
+    re-pin)**:候选 2″ = 候选 1 之后**最先天然产生且经入队三门齐备**的
+    D0 状态推进 PR——必须满足 enforcement"决策分级"D0 三条件,digest 中
+    逐条说明;仍**禁止为演练制造项目**;候选在入队前被合并 → 该项不计入
+    drill,规则自动指向下一个天然产生者(不再逐次 D1 re-pin;这是对连续
+    四次候选失效的结构性修复)。当前在途可能来源枚举(仅导航,不构成
+    限定):TASK-HLR-001 ready→done、TASK-AFP-005 ready→done。
+  - 候选 1 保留 = `CHG-2026-028 approved → verified`(r2 原文条款逐字
+    有效);其前置(implementation 合入)已闭合,lane 现可起草;起草后
+    **留在 open 队列**。
+  - 队列载体与 issue 命名:沿用 r2;若演练跨日,建 issue 时按当日
+    `batch-YYYYMMDD-1` 命名(建前复查同名 = 0)并在 digest 首屏注记。
+    digest/runbook contracts 已成正本(#388),两会话与人类分工、演练时序、
+    failure semantics 其余条款沿用 r2/r3 原文。
 - Readiness(r2,base = protected main
   `cfab930722afe60ed5e8759ea0c91d7a178971cc`):
   - **Authority/input pins。**实现开工时以下 commit/blob 任一漂移即停止并
