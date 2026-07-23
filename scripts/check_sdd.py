@@ -15,7 +15,9 @@
      Requirements/AC 认领面精确认领;
   7. active changes 的 proposal/acceptance/verification revision 保持同步,
      archive/** 豁免;
-  8. platform/integration lock 与 core-conformance 引用的路径存在,
+  8. active changes 中精确 `yaml pins` fenced block 使用封闭 schema 与
+     完整 40/64-hex digest,其他 info string 与 archive/** 不扫描;
+  9. platform/integration lock 与 core-conformance 引用的路径存在,
      safety_coverage 引用的 AC 存在。
 
 退出码:0 = 通过(允许 warning);1 = 存在 error。
@@ -449,7 +451,95 @@ def check_change_scope_coverage(changes_dir: Path | None = None):
             )
 
 
-# ------------------------------------------------ 8. locks and conformance
+# ---------------------------------------------------- 8. structured pins
+PINS_OPENING = "```yaml pins"
+PINS_CLOSING = "```"
+PINS_ALLOWED_KEYS = {"path", "artifact", "blob", "commit", "sha256"}
+PINS_DIGEST_LENGTHS = {"blob": 40, "commit": 40, "sha256": 64}
+PINS_HEX_RE = {
+    key: re.compile(rf"[0-9A-Fa-f]{{{length}}}")
+    for key, length in PINS_DIGEST_LENGTHS.items()
+}
+
+
+def _pins_block_reasons(block_text: str) -> list[str]:
+    """Return stable schema failures for one real pins carrier."""
+    try:
+        data = yaml.load(block_text, Loader=StrictLoader)
+    except Exception as exc:  # noqa: BLE001 - collapse one bad block to one err
+        detail = " ".join(str(exc).split())
+        return [f"YAML parse failed: {detail}"]
+
+    if not isinstance(data, list) or not data:
+        return ["top-level must be a non-empty sequence"]
+
+    reasons: list[str] = []
+    for index, item in enumerate(data, 1):
+        if not isinstance(item, dict):
+            reasons.append(f"item {index} must be a mapping")
+            continue
+
+        for key in item:
+            if key not in PINS_ALLOWED_KEYS:
+                reasons.append(f"item {index} has unknown key {key!r}")
+
+        if not any(key in item for key in PINS_DIGEST_LENGTHS):
+            reasons.append(f"item {index} must contain a digest key")
+
+        for key in ("path", "artifact"):
+            if key in item and (
+                not isinstance(item[key], str) or not item[key].strip()
+            ):
+                reasons.append(f"item {index} {key} must be a non-empty string")
+
+        for key, length in PINS_DIGEST_LENGTHS.items():
+            if key not in item:
+                continue
+            value = item[key]
+            if not isinstance(value, str) or PINS_HEX_RE[key].fullmatch(value) is None:
+                reasons.append(
+                    f"item {index} {key} must be a {length}-hex string"
+                )
+
+    return sorted(set(reasons))
+
+
+def check_structured_pins(changes_dir: Path | None = None):
+    """Validate exact `yaml pins` carriers in active change Markdown files."""
+    changes_dir = changes_dir or OPENSPEC / "changes"
+    for change in sorted(changes_dir.glob("chg-*")):
+        if not change.is_dir():
+            continue
+        for path in sorted(change.rglob("*.md")):
+            lines = path.read_text(encoding="utf-8").splitlines()
+            index = 0
+            while index < len(lines):
+                if lines[index].strip() != PINS_OPENING:
+                    index += 1
+                    continue
+
+                opening_line = index + 1
+                index += 1
+                body: list[str] = []
+                while index < len(lines) and lines[index].strip() != PINS_CLOSING:
+                    body.append(lines[index])
+                    index += 1
+
+                if index == len(lines):
+                    reasons = ["unterminated fence"]
+                else:
+                    reasons = _pins_block_reasons("\n".join(body))
+                    index += 1
+
+                if reasons:
+                    err(
+                        path,
+                        f"pins block at opening line {opening_line} invalid: "
+                        + "; ".join(reasons),
+                    )
+
+
+# ------------------------------------------------ 9. locks and conformance
 def check_locks_and_conformance(spec_acs):
     for lock_path, keys in (
         (OPENSPEC / "platforms" / "PLATFORM-PROFILES.lock.yaml",
@@ -501,6 +591,7 @@ def main():
     check_changes()
     check_change_revision_consistency()
     check_change_scope_coverage()
+    check_structured_pins()
     check_locks_and_conformance(spec_acs)
 
     for w in warnings:
