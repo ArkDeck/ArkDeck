@@ -1,6 +1,6 @@
 # CHG-2026-021 Verification Plan
 
-> Status:planned
+> Status:passed # 2026-07-23；9 Core AC、5 change-local evidence 与全链 OID 见 proposal.md「Verification closure」；仅在维护者 review/merge 本 verification-closure PR 后生效
 > Change:CHG-2026-021-trace-adapter-capture@r2
 > Core baseline:CORE-2.1.0(零 Core 变更;认领 trace REQ-TRACE-* 的 macOS 面)
 
