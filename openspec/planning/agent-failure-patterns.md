@@ -20,8 +20,9 @@
 > 不改写其任何字节或结论。被引用 change 的现实缺陷仍由其所属 approved change 处理。
 
 本手册登记 ArkDeck 可审计历史中**重复发生**的 Agent 失败模式，供新任务开工前
-检索。taxonomy 与其封闭范围登记在
-[CHG-2026-029 design §3](../changes/chg-2026-029-agent-failure-prevention/design.md)：
+检索。taxonomy 与其封闭范围登记在 **CHG-2026-029 的 `design.md` §3**（revision r4，
+protected `main` `d53da289b7da80a4ee2282f5dea3122ebf97325a`；该 change 归档后目录
+位置会变，故此处以 change ID 与完整 OID 定位，不使用相对路径）：
 `AF-001`…`AF-009` 是**治理/交付轴**（change、PR、evidence、授权面），
 `AF-010`…`AF-018` 是**执行/验证轴**（实现与验证动作本身）。两轴正交，同一次事故
 可以同时命中两轴；本手册按根因归属登记，不做互斥分类，也不维护"发生次数真相
