@@ -135,6 +135,94 @@ class PullRequestPathTests(unittest.TestCase):
             lambda: check_pr_paths.resolve_task_declaration(ambiguous),
         )
 
+    def test_suffix_task_tokens_bind_and_malformed_variants_fail_closed(self):
+        self.assertEqual(
+            check_pr_paths.TASK_TOKEN_TEXT,
+            r"TASK-[A-Z0-9]+(?:-[A-Z0-9]+)*-[0-9]{3}[A-Z]?",
+        )
+        for task_id in (
+            "TASK-HLR-002A",
+            "TASK-M1-001R",
+            "TASK-M0A-005B",
+            "TASK-HLR-003",
+        ):
+            with self.subTest(task_id=task_id, source="title"):
+                context = self.context(
+                    title=f"feat({task_id}): suffix-compatible declaration",
+                    head_ref="agent/descriptive-branch",
+                )
+                self.assertEqual(
+                    check_pr_paths.resolve_task_declaration(context), task_id
+                )
+            with self.subTest(task_id=task_id, source="body"):
+                context = self.context(
+                    body=f"Task: {task_id}\n",
+                    head_ref="agent/descriptive-branch",
+                )
+                self.assertEqual(
+                    check_pr_paths.resolve_task_declaration(context), task_id
+                )
+
+        for malformed in (
+            "TASK-HLR-002AB",
+            "TASK-HLR-02A",
+            "task-HLR-002A",
+            "TASK-HLR-002a",
+        ):
+            with self.subTest(malformed=malformed):
+                context = self.context(
+                    body=f"Task: {malformed}\n",
+                    head_ref="agent/task-hlr-002a-bootstrap-partition-r2",
+                )
+                self.assert_error(
+                    "normalizes to invalid",
+                    lambda context=context: check_pr_paths.resolve_task_declaration(
+                        context
+                    ),
+                )
+
+        adjacency = self.context(
+            title="feat(XTASK-HLR-002AY): reject adjacent token",
+            head_ref="agent/governance-update",
+        )
+        self.assertIsNone(check_pr_paths.resolve_task_declaration(adjacency))
+
+        descriptive = self.context(
+            title="feat: bootstrap partition",
+            head_ref="agent/task-hlr-002a-bootstrap-partition-r2",
+        )
+        self.assert_error(
+            "normalizes to invalid",
+            lambda: check_pr_paths.resolve_task_declaration(descriptive),
+        )
+
+        ambiguous = self.context(
+            title="feat(TASK-HLR-002A): suffix task",
+            body="Task: TASK-HLR-003\n",
+        )
+        self.assert_error(
+            "multiple distinct tasks",
+            lambda: check_pr_paths.resolve_task_declaration(ambiguous),
+        )
+
+        tasks = """\
+## TASK-HLR-002A — suffix task
+- Allowed paths:`scripts/check_pr_paths.py`
+"""
+        temporary, root = self.make_repo(tasks)
+        self.addCleanup(temporary.cleanup)
+        context = self.context(title="feat(TASK-HLR-002A): suffix task")
+        result = check_pr_paths.check_paths(
+            root, context, ("scripts/check_pr_paths.py",)
+        )
+        self.assertEqual(result.task_id, "TASK-HLR-002A")
+
+        unknown = self.context(title="feat(TASK-M1-001R): unknown active task")
+        self.assert_error(
+            "does not exist in an active change",
+            lambda: check_pr_paths.check_paths(root, unknown, ("docs/x.md",)),
+        )
+
     def test_declared_task_allows_exact_glob_and_change_relative_paths(self):
         tasks = """\
 ## TASK-MECH-004 — path guard
@@ -259,7 +347,7 @@ class PullRequestPathTests(unittest.TestCase):
             lambda: check_pr_paths.check_paths(root, context, ("docs/x.md",)),
         )
 
-    def test_non_declarable_task_header_still_delimits_previous_section(self):
+    def test_suffix_task_header_delimits_previous_section_and_is_loaded(self):
         tasks = """\
 ## TASK-MECH-004 — path guard
 - Allowed paths:`scripts/check_pr_paths.py`
@@ -269,11 +357,13 @@ class PullRequestPathTests(unittest.TestCase):
 """
         temporary, root = self.make_repo(tasks)
         self.addCleanup(temporary.cleanup)
-        task = check_pr_paths.load_task_definitions(root)["TASK-MECH-004"]
+        definitions = check_pr_paths.load_task_definitions(root)
+        task = definitions["TASK-MECH-004"]
         self.assertEqual(
             check_pr_paths.extract_allowed_patterns(root, task),
             ("scripts/check_pr_paths.py",),
         )
+        self.assertIn("TASK-MECH-004R", definitions)
 
     def test_existing_allowed_paths_label_variants_are_parsed(self):
         variants = (

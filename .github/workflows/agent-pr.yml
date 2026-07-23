@@ -12,7 +12,9 @@ name: Agent PR
 
 on:
   push:
-    branches: ["agent/**"]
+    branches:
+      - "agent/**"
+      - "!agent/host-loop/**"
 
 permissions:
   contents: read

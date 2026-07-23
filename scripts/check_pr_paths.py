@@ -19,13 +19,10 @@ from pathlib import Path
 from typing import Iterable, Sequence
 
 
-TASK_TOKEN_TEXT = r"TASK-[A-Z0-9]+-[0-9]{3}"
+TASK_TOKEN_TEXT = r"TASK-[A-Z0-9]+(?:-[A-Z0-9]+)*-[0-9]{3}[A-Z]?"
 TASK_TOKEN_RE = re.compile(rf"(?<![A-Z0-9-])({TASK_TOKEN_TEXT})(?![A-Z0-9-])")
 TASK_LINE_RE = re.compile(rf"^\s*Task:\s*({TASK_TOKEN_TEXT})\s*$", re.MULTILINE)
-TASK_HEADER_RE = re.compile(
-    r"^##\s+(TASK-[A-Z0-9]+(?:-[A-Z0-9]+)*-[0-9]{3}[A-Z]?)(?:\s|$)",
-    re.MULTILINE,
-)
+TASK_HEADER_RE = re.compile(rf"^##\s+({TASK_TOKEN_TEXT})(?:\s|$)", re.MULTILINE)
 FULL_TASK_RE = re.compile(rf"^{TASK_TOKEN_TEXT}$")
 FULL_OID_RE = re.compile(r"^[0-9a-fA-F]{40}$")
 CALENDAR_DATE_RE = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$")
