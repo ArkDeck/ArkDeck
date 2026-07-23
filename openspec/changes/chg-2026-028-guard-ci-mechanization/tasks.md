@@ -255,13 +255,24 @@
 
 ## TASK-MECH-004 — PR allowed-paths diff 校验
 
-- Status:ready(2026-07-22 本 readiness PR;前置 ① 已满足 = approval #318
-  merge `c15814593ea3d46149e749d3a47121ea70af1cea`;状态仅在维护者
-  review/merge 本 PR 后生效。r1 implementation #335 已合入
-  `72b295f4987410c57c04cf2d11a4b479bc8f63bf`,remediation #336 经 exact-head
-  APPROVED 并合入 `2ad9278d84b21aa516f74053e1031dcd8014720d`;r3 archive fallback
-  是新增 D1 scope,仅在 r3 revision merge 后才可起草对应 remediation
-  implementation)
+- Status:done(2026-07-23 D0 完成状态;仅在维护者 review/merge 本独立状态 PR
+  后生效。r1 implementation #335 已合入
+  `72b295f4987410c57c04cf2d11a4b479bc8f63bf`,remediation #336 已合入
+  `2ad9278d84b21aa516f74053e1031dcd8014720d`;r3 revision #353 已合入
+  `ff4bc40f3af7280a31bccd9996945ce44c18bf92`。r3 implementation #373
+  final head `84d99b61ab52eb69ca11d9dd38e2a51fdcd123ec` 已由 `lvye`
+  exact-head APPROVED 并合入
+  `0c10364addc0d5a70f093d69ecc61b8bfb075b09`;evidence closure #377
+  final head `9ba8609a7ac94ff82f5094b268c74271db8cd535` 已由 `lvye`
+  exact-head APPROVED 并合入
+  `9df5642620ca07584c822d43f95d6cc5df187360`。于该 protected main
+  复验:PR path contract = 20/20、SDD contract = 19/19、`check-sdd` =
+  0 error/0 warning/111 acceptance IDs;#336 implementation 绿、#337 canary 红、
+  #359 propose 绿、#367 status 绿及 r3 atomic-archive 正反 evidence 均已在
+  `evidence/runs/TASK-MECH-004/run.md` 闭合,`MECH-PATH-001` task-level
+  evidence = PASS。#373 PR-event green 晚于 merge 的 process residual 如实
+  保留;required-status 配置仍属 out-of-scope D2。`done` 不代表 change
+  `verified`,不修改 archive/授权语义且不产生任何 hardware/device claim)
 - Readiness(r1,base = main `c15814593ea3d46149e749d3a47121ea70af1cea`;
   维护者 merge 本 PR = 接受下述解析约定):
   - 任务声明解析定稿(首个命中生效):① PR body 独立行
