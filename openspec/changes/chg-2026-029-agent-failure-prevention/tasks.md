@@ -512,10 +512,27 @@
 
 ## TASK-AFP-003 — 历史案例检出演练与误报边界复核
 
-- Status:ready（2026-07-23 D1 readiness **r2**；仅在维护者 review/merge 本独立 PR
-  后生效。四前置保持闭合：① change approval；② TASK-AFP-001 done；③ TASK-AFP-002
-  done；④ 本 r2 重钉六个案例与环境反例的完整 base/link。r1 已因 pin drift 失效
-  （见下），任务状态不因本次重钉而跃迁；merge 前不得开 implementation/evidence PR）
+- Status:done（2026-07-23；仅在维护者 review/merge 本独立状态 PR 后生效。
+  implementation + evidence PR #383 已合入 protected `main`，squash merge OID
+  `493153f65025f177550071b5c7ac5ea7cb0b90d0`；该 squash 只含本任务两个交付文件
+  （`evidence/runs/TASK-AFP-003/run.md` 与 `tasks.md`），两者 blob 与实现分支 head
+  `86fc669cd7b780c90eb8a450749a57d580f65385` **逐字一致**。done 不等于 change
+  `verified`：`AFP-DRILL-001` 的最终结论仍需 change 级 verify PR 由维护者确认。）
+- Done recheck（在**合入版** `493153f65025f177550071b5c7ac5ea7cb0b90d0` 上重跑，
+  非沿用实现 PR 的结论）：
+  - drill 覆盖：六案例 + 1 个环境反例节，逐行六列齐全；
+  - 引用一致性：12 个 `AF-NNN` 全部存在于已合入手册（AFP-004 更正后版本）；
+    6 个模板字段全部存在于已合入模板（AFP-002 交付版本）；
+  - OID：9 枚中 commit 类全部在 protected `main` ancestry；
+  - hindsight-bias 二值边界：列 ④ 全部标注 `Inference`（共 16 处 `Inference` 标注）；
+    历史结论改写 = 0、产品/硬件重新验证声明 = 0、`fake`→`realHardware` 升级 = 0；
+  - readiness r2 carrier 在合入版复核 **28/28** 无漂移；
+  - `scripts/check-sdd.sh` 0 error / 0 warning / 111 acceptance IDs。
+- Provenance 复核边界（**如实记录**）：TASK-BAP-003 凭据分离生效后 Agent 无维护者
+  `gh` 凭据，无法读取 #383 的 reviews/mergedBy。本次以 `git` 验证：squash commit
+  `493153f6…` 在 protected `main` 上、其 diff 恰为本任务两个交付文件、blob 与实现
+  head 逐字一致。**"由维护者 APPROVED"未经 Agent 独立验证**，由维护者 review 本
+  状态 PR 时确认。
 - **r1 readiness 已失效（pin drift，如实记录不改写）**：r1 于 #369 合入
   `16325dbe40bad0fd445587e34ef4e99f93a76b9b`，其 pins carrier 钉定了本 change 四个
   文档与手册的当时 blob。此后两次**有意的更正**改动了这五个文件：
