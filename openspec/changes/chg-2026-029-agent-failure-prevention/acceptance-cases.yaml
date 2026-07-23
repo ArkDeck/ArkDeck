@@ -1,7 +1,7 @@
 ---
 schema_version: 1.0.0
 change_id: CHG-2026-029-agent-failure-prevention
-change_revision: 2
+change_revision: 3
 platform: macos
 evidence_classes:
 - documentReview
@@ -48,3 +48,19 @@ cases:
     environment blocker or deviation rather than a product failure. The drill
     changes no historical bytes or conclusions and creates no production,
     hardware, conformance, support or release claim.
+- acceptance_id: AFP-CORRECT-001
+  test_id: TEST-AFP-CORRECT-001
+  method: First-source verification review of every handbook Fact assertion.
+  expected_source: openspec/changes/chg-2026-029-agent-failure-prevention/verification.md#AFP-CORRECT-001
+  minimum_evidence: documentReview
+  expected_result: >-
+    Every Fact line in handbook entries AF-001 through AF-018 is matched to a
+    first-source repository record by relative path and full 40-hex OID, with a
+    supported or unsupported verdict. Unsupported specific wording is either
+    rewritten to what the source supports or demoted to Inference, and each
+    disposition records its basis. Inference lines are not mislabelled as Fact.
+    The AF identifier set, taxonomy attribution, eight-field contract,
+    automation status value domain and two-axis split are unchanged; code
+    symbols appearing in the handbook resolve inside the repository outside the
+    handbook and this change; currency is updated; archive and template diffs
+    are zero.
