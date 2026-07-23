@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-030-host-loop-runtime
 revision: 1
-status: proposed # 仅维护者 review/merge proposal PR 后登记；不构成批准或任务 ready
+status: approved # 本 approval-only PR 经维护者 exact-head review/merge 后生效；所有任务仍 blocked
 class: implementation-only
 core_change_level: none
 owner: lvye
@@ -115,3 +115,27 @@ CHG-2026-028 `MECH-004` evidence 如实引用；未出现该 run 不得预填为
 必须等两者 done，review/recovery 和 live pilot 再按顺序推进。每个 PR 仍独立 review/
 merge；D1/D2 判断门后不做投机性成 PR 工作；change `verified` 只能在五条 acceptance
 均有可复查 evidence 后以独立状态 PR 起草。
+
+## Approval
+
+- r1 proposal 由 PR #359 登记：proposal head
+  `39b5a8f5af244b9bf82d3f654b7f954046b2513b` 经维护者 `lvye` APPROVED，
+  以 merge OID `b2571fa6e30cf00594869c365c10d48946a8c9f6` 合入 protected
+  `main`（2026-07-23）。该 merge 只登记 `status: proposed` 的 change package，
+  不构成本 change 的正式批准或任务 ready。
+- 正式批准由本 approval-only PR 将 `status: proposed → approved`，并由维护者对
+  exact head review/merge 后生效。批准范围封闭为 proposal/design/tasks/verification
+  r1 已列出的五项 host-only task、五条 change-local acceptance、worker/reviewer
+  双循环、结构化 PR envelope、Issue cursor、fenced lease/heartbeat、legacy creator
+  migration 与 merge-OID recovery。
+- 批准同时接受以下不变量：protected `main` + 维护者逐 PR review/merge 仍是唯一
+  批准事实；runtime 不 auto-merge、不作 GitHub approval、不自行翻转 change/task
+  状态；Issue/digest/lease/reviewer result 均无批准语义；任何 fence、PR identity、
+  check/review 或 merge OID 不确定都 fail closed。
+- 本批准不授权 implementation。TASK-HLR-001…005 全部保持 `blocked`；各自仍须满足
+  `tasks.md` 的依赖与独立 readiness。尤其 TASK-BAP-003 done、TASK-HLR-002 的 D2
+  integration identity/host activation receipt、后续串行依赖与 allowed/forbidden paths
+  均不可跳过。
+- 本 PR 零 runtime/workflow/evidence、零 Core/spec/contract/schema/governance 正本、
+  零产品/设备行为变更；CORE baseline 保持 `CORE-2.1.0`。change verified 仍须等待
+  五 task done、正反 live evidence 完整及独立 verification PR。
