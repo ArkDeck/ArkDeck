@@ -718,3 +718,53 @@
 
 - 演练结果若发现当前 active task 的现实缺陷，只记录指针并 fail closed；不得在 AFP-003
   allowed paths 外顺手修复。
+
+## TASK-AFP-004 — 手册 `Fact` 断言的一手核对与更正
+
+- Status:blocked（三前置：① CHG-2026-029 revision r3 经维护者 review/merge 生效；
+  ② TASK-AFP-001 done（已满足，#362 合入
+  `4c8506a30afc5505230134903ccf03729a640c07`）；③ 独立 readiness PR 钉定手册 blob、
+  逐条待核 `Fact` 清单与其一手出处）
+- Platform:macos（过程文档跨平台可复用，零平台产品行为）
+- Requirements/AC:change-local `AFP-CORRECT-001`
+- Depends on:revision r3、TASK-AFP-001 done、independent readiness
+- Applicable failure patterns:`AF-016`（本任务修复的正是该模式的一次复发）、
+  `AF-015`（要求全量复核而非只改发现点）、`AF-005`（在事实原位更正而非文末注记）
+- Production reachability:not applicable；纯文档更正，零产品 effect、零 dispatch
+- Trusted fact sources:每条 `Fact` 所引 pinned 一手记录的仓内 bytes；**会话记忆、
+  跨会话摘要与本 change 自身的 design/proposal 转述均不作为事实源**（design 转述
+  正是本次缺陷的来源）
+- Allowed paths:`openspec/planning/agent-failure-patterns.md`、
+  `openspec/changes/chg-2026-029-agent-failure-prevention/evidence/**`、
+  `openspec/changes/chg-2026-029-agent-failure-prevention/tasks.md`（仅本任务状态/evidence 引用）
+- Forbidden paths:`AGENTS.md`、`openspec/constitution.md`、
+  `openspec/governance/**`、`openspec/specs/**`、`openspec/contracts/**`、
+  `openspec/changes/archive/**`、`openspec/templates/**`、产品 source/tests/scripts/workflows
+- Risk:low（风险是把可支持的表述误删、或把更正写成 taxonomy 变更）
+- Hardware required:no
+
+### Deliverables
+
+- 对手册 `AF-001`…`AF-018` 的**全部** `Fact` 行逐条一手复核；
+- 凡不能由其 pinned 一手出处支持的具体表述：改写为可支持的表述，或降级标注为
+  `Inference`；两种处置都要在 evidence 中给出该行的一手出处与判定依据；
+- `Inference` 行只检查是否被误写成 `Fact`，不因本任务扩写；
+- `AF-014` 的第四条 gap 表述按 design §3.2（r3 更正版）对齐到一手出处；
+- 手册的 `Currency` 行更新为本次复核的 base OID 与日期。
+
+### Verification
+
+- `AFP-CORRECT-001` document review；
+- 复核矩阵：每条 `Fact` → 一手出处（相对路径 + 完整 40-hex OID）→ 支持/不支持
+  → 处置（保留/改写/降级），无遗漏行；
+- 不变量：`AF-NNN` ID 集合、taxonomy 归属、八字段契约、`Automation status` 取值域
+  与两轴划分**零变化**；ID 不新增不删除；
+- 符号级扫描复跑：手册内出现的代码符号必须能在仓内（手册与本 change 之外）解析；
+- `scripts/check-sdd.sh` 与 `git diff --check`，archive 与模板 diff 为零。
+
+### Notes / handoff
+
+- 本任务只更正表述，不重新验证被引用 change 的任何结论，也不改变其 task/AC 状态；
+- 若某条 `Fact` 的一手出处显示被引用 change 本身有现实缺陷，只记录指针并 fail closed，
+  交回该 change 处理，不在本任务修复；
+- 实现/evidence PR 不翻 task 状态；`ready→done` 使用独立 PR。
