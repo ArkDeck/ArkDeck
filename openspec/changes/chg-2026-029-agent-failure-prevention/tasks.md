@@ -1402,9 +1402,27 @@
 - `openspec/templates/**`、`changes/archive/**`、CHG-2026-021、spec/contracts/
   governance/product diff 为 0；`scripts/check-sdd.sh` 0/0/111；`git diff --check`。
 
-### Evidence
+### Evidence（candidate；不构成状态翻转）
 
-- 待 implementation/evidence PR 生成；本 r5 revision 不创建 addendum/run，也不翻转状态。
+- current Fact addendum:
+  [`evidence/runs/TASK-AFP-004/addendum-r5.md`](evidence/runs/TASK-AFP-004/addendum-r5.md)
+  （2026-07-23，implementation base
+  `31865366f7bdb8e5ca33f0c8d41c15f6daba7933`）。旧 TASK-AFP-004 run bytes
+  保持不动，其 `AFP-CORRECT-001 PASS` 仅在 AF-014 面被明确 superseded。
+- implementation + evidence run:
+  [`evidence/runs/TASK-AFP-006/run.md`](evidence/runs/TASK-AFP-006/run.md)
+  （2026-07-23，`documentReview`；零设备/HDC/network/process/effect dispatch）。
+- 结果：36 条 current Fact 全数形成 F01–F36 矩阵，35 retained + F27 rewritten，
+  当前 36/36 `supported`；AF-014 同时回源 CHG-2026-021 tasks 与 TASK-TR-002R run；
+  错误“公开枚举 case/public enum case”机制命中 0；18 项 Currency 更新为实际
+  implementation base。
+- 二值门：readiness pins 37/37 path blobs + 8/8 commit ancestry；H2 18/H3 144；
+  Fact 36/Inference 18/positive 18/negative 18；handbook links 98（56 anchors）；
+  完整 OID 22 枚全在 ancestry；Fact named symbols 16/16 可解析；
+  archive/template/CHG-021/spec/contracts/governance/product diff = 0；
+  check-sdd 0/0/111；`git diff --check` 干净。
+- 任务状态保持 `ready`；`AFP-HANDBOOK-001`/`AFP-CORRECT-001` 的 candidate PASS
+  待维护者在独立 `ready→done` PR 中确认。
 
 ### Notes / handoff
 
