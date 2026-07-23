@@ -5,11 +5,22 @@
 
 ## TASK-AU-001 — 更新机制评估与选型(documentReview,host-only)
 
-- Status:ready(2026-07-23 r2 source-repin candidate；r1 readiness 已由 PR #427
-  合入，r2 仅在维护者 review/merge 本独立 D1 remediation PR 后生效。发现
-  upstream stable tag 漂移后，documentReview 已暂停；r2 merge 后仍只授权下述
-  documentReview/evidence，零依赖引入、零第三方代码下载/构建/执行、零产品
-  实现；选型结论仍须由后续独立交付 PR 的维护者 review/merge 认可)
+- Status:done(2026-07-23 D0 完成状态；仅在维护者 review/merge 本独立状态
+  PR 后生效。选型/evidence PR #429 head
+  `4085fe7f4e05072edd2631d5fe8d28b44c1ef9ae` 已由 `lvye` exact-head
+  APPROVED 并合入 protected `main`
+  `a8084cd1a77205b7014c45e7733445c30642ffd9`；合入版
+  `evaluation.md`/`sources.md`/`run.md` blobs =
+  `fcbfa0dd23220b833e3a2b4eef28129ea88b3a0f`/
+  `2efee2309b7eb59cc0ed7f5fe6e036756c174322`/
+  `e897ec3d938225483491ce10735ce3aebd8c85b4`。`TEST-AU-EVAL-001` =
+  **PASS(candidate evidence)**：五维 documentReview 推荐最小自研
+  check+download+verify，以显式 EdDSA **AND** same-Team gate 后再由用户
+  挂载 DMG/手工替换；third-party dependency/file download/code execution =
+  0/0/0，`check-sdd` = 0 error/0 warning/111 acceptance IDs，exact-head
+  Swift/guard/PR allowed-paths 均绿。本翻转仅确认 TASK-AU-001 done，不把
+  change 标为 verified、不授权产品实现；TASK-AU-002 仍 blocked 于本状态 PR
+  合入后的独立 readiness，须固定选型合同与 implementation base)
 - Readiness review(2026-07-23；host-only，external code/network service/device
   dispatch 0):
   - Approval/dependency gate:satisfied。CHG-2026-023 r1 approval 已在 protected
