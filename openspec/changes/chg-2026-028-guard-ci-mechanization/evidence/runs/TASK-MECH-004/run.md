@@ -138,3 +138,60 @@ Remediation live PR、canary 红与独立复审链接在新分支 push 后追加
 确认预期 checks 绿色 + 独立 reviewer 对 evidence-only delta 无新 finding 才可
 入队。TASK-MECH-004 仍不得 done:status/propose 两种真实形态绿尚待自然累计,
 且 required-status 翻转仍是 out-of-scope D2。
+
+## r3 atomic-archive fallback remediation(2026-07-23)
+
+- Executor:agent(host-only Python/Git contract);零设备、零 HDC、零
+  `rkdeveloptool`、零 network dispatch、零 secret、零 device mutation。
+- Initial fresh implementation base:
+  `03a28162bc4ab75b661e996019056bf682174b54`;pre-push 又依次 fresh rebase 到
+  `b53db548197486bd58d9236e183632c744f5276e`(#371,仅 CHG-2026-029
+  revision files)与 `e48673fbe8c8440d7e12dbfe6aea5e94f996a4e2`
+  (#372,仅 TASK-AFP-004 readiness),均与本任务零路径交集。r3 revision 已由
+  #353 合入 main;开工及两次 rebase 后 readiness 两个源码 pins 均仍精确匹配:
+  - `scripts/check_pr_paths.py` blob
+    `9c8ba3aea54c9ce17e3bb7b033a2a570f34cb1c4`;
+  - `scripts/test_check_pr_paths.py` blob
+    `38cc148d1c0f238083aa738c5818781ba9422a0c`。
+- 实现仅在 head active task 缺失时读取 base 的 active `chg-*/tasks.md`;
+  archive tasks 始终不解析、不提供 authority。fallback 要求 base change root
+  在 head 完全消失,且其全部 tracked entries 以相同 relative path、object
+  type、blob OID 与 mode 迁入唯一、本次新增且具有有效日期的
+  `YYYY-MM-DD-<change-dir>` target。经等值证明的 deletion/addition pair
+  才豁免;其他 living diff 继续用 base task 的 Allowed paths 校验。
+- fail-closed fixture 覆盖 archive-only、partial/extra、mutated、mode drift、
+  copied/active-root residue、ambiguous targets、wrong/invalid target name、
+  pre-existing target 与 living scope expansion;正例同时带一个明确 allowed
+  的 living update,证明非 relocation 路径没有静默扩权。脚本继续只以
+  executable + argv 调用 Git,零 host shell 拼接。
+
+### Local verification
+
+| Command/check | Result |
+| --- | --- |
+| `python3 -m py_compile scripts/check_pr_paths.py scripts/test_check_pr_paths.py` | PASS |
+| `python3 scripts/test_check_pr_paths.py` | PASS:20 tests,0 failures/errors/skips |
+| `/private/tmp/arkdeck-mech003-venv/bin/python scripts/test_check_sdd.py` | PASS:19 tests,0 failures/errors/skips(Python 3.14.6/PyYAML 6.0.3) |
+| `ARKDECK_PYTHON=/private/tmp/arkdeck-mech003-venv/bin/python ./scripts/check-sdd.sh` | PASS:0 errors,0 warnings,111 acceptance IDs |
+| `git diff --check` | PASS |
+
+首轮组合命令中,system `python3` 在 20/20 路径合约通过后执行
+`scripts/test_check_sdd.py` 时因环境缺少 `yaml` 而在 import 阶段退出;随后
+复用已有 Python 3.14.6/PyYAML 6.0.3 环境得到上述 19/19 与 0/0/111。
+该环境偏差如实保留,未被记为测试通过,也未下载依赖或强制 success。
+
+首轮独立 review 对 head `a6bf749bee0a17e8e44fb6ce334a4d719c3df264`
+给出 **REQUEST_CHANGES**:`datetime.date.fromisoformat()` 也接受
+`2026-W01-1` ISO week-date,不满足精确 ASCII `YYYY-MM-DD`。实现随即先以
+`^[0-9]{4}-[0-9]{2}-[0-9]{2}$` 封闭形态、再校验真实日历日期,并加入
+`2026-W01-1-chg-test-archive` 具名失败反例;最终结论只以修复后的新 head
+及其重新复验/复审为准。
+
+### AC conclusion and residual state
+
+- `MECH-PATH-001` r3 离线 atomic-archive 正反 contract:**PASS**。
+- 本 remediation 不修改 workflow、任何 archive bytes、task status、Core/
+  Safety/spec/contract;既有 r1/r2 live canary 与真实形态证据不被改写。
+- 当前 TASK-MECH-004 仍为 `ready`;r3 实现 PR 的真实 pull-request CI、独立
+  reviewer 与 merge 尚待后续追加,本记录不把本地结果冒充 PR 绿或人类批准,
+  也不构成 change `verified`。
