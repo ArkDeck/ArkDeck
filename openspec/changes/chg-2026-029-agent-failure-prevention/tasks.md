@@ -1134,6 +1134,23 @@
   `openspec/changes/archive/**` 与 chg-2026-027 目录 diff 为 0；
 - `scripts/check-sdd.sh` 与 `git diff --check`。
 
+### Evidence（candidate；不构成状态翻转）
+
+- implementation + evidence run:
+  [`evidence/runs/TASK-AFP-005/run.md`](evidence/runs/TASK-AFP-005/run.md)
+  （2026-07-23，base `857ce32ce33931a0328cda099e203df6b005818d`）。
+- 二值门实测：开工前 carrier 12/12 无漂移；`openspec/planning/**` 下对本 change 的
+  引用 1 → **0**；手册 change 链接 35 → **34**（10 archive + 24 active），减少的恰为
+  本 change 那 1 条；三项事实指向（change ID / `design.md` §3 / 完整 OID）在场；
+  不动面（ID 集合、八字段契约、`Automation status` 取值域、`Fact` 36 / `Inference`
+  18、positive 18 / negative 18、其余 34 条链接）逐项零变化；模板、archive 与
+  chg-2026-027 目录 diff = 0；check-sdd 0/0/111。
+- 归档模拟：改后手册对本 change 目录引用为 0，归档**不存在可断项**（改前为 1，
+  即改前归档必断）。
+- 任务状态保持 `ready`；`AFP-LINK-001` 的 PASS 结论待维护者在独立 `ready→done` PR
+  中确认。**该 done PR 可能构成 CHG-2026-027 批次演练的候选 2″**（其 r4 已将
+  `TASK-AFP-005 ready→done` 列为在途可能来源），起草时须留在 open 队列、不催合。
+
 ### Notes / handoff
 
 - 本任务**不**处理 r4 发现 2（CHG-2026-027 TASK-BAP-002 的 pin 漂移）：该 path 在
