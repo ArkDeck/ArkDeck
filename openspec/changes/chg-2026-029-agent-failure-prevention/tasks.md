@@ -472,6 +472,18 @@
 - 搜索不存在自动批准、自动 ready/done、fake→hardware 或手册覆盖 canonical rule 的措辞；
 - `scripts/check-sdd.sh` 与 `git diff --check`，archive diff 为零。
 
+### Evidence（candidate；不构成状态翻转）
+
+- implementation + evidence run:
+  [`evidence/runs/TASK-AFP-002/run.md`](evidence/runs/TASK-AFP-002/run.md)
+  （2026-07-23，base `9397e23d62434cc9b7cb747d721044442322763f`）。
+- 二值门实测：开工前 pins 52/52 无漂移；三模板 diff 为 `+13 -0` / `+11 -0` /
+  `+10 -0`（零删除零修改）；base 行缺失逐文件为 0；13 项点名既有条目全部在场；
+  polarity-aware boundary scan 六类全 0 且 4 条 canary 全部变红；模板内新增相对
+  路径解析通过；archive diff = 0；check-sdd 0/0/111；`git diff --check` 干净。
+- 任务状态保持 `ready`；`AFP-TEMPLATE-001` 的 PASS 结论待维护者在独立
+  `ready→done` PR 中确认。
+
 ### Notes / handoff
 
 - 不在本任务引入 parser/CI；进一步机械化必须另立 change；
