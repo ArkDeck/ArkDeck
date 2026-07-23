@@ -6,9 +6,103 @@
 
 ## TASK-HLR-001 — 结构化 PR envelope 与纯 runtime contract
 
-- Status:blocked（前置：① 本 change approval；② 独立 readiness PR 钉定 runtime/
-  template inputs、测试命令和当前 `main` 基线；③ TASK-BAP-003 的受限 agent 凭据
-  已 done。满足前不得实现。）
+- Status:ready（2026-07-23 D1 readiness r1；仅在维护者 review/merge 本独立 PR 后
+  生效。三前置闭合：① CHG-2026-030 approval #361；② 本 readiness 钉定 envelope v1
+  grammar、runtime/template inputs、测试矩阵与当前 protected `main` 基线；③
+  TASK-BAP-003 done #376。merge 前不得开始 implementation/evidence PR。）
+- Readiness（r1，base = protected `main`
+  `493153f65025f177550071b5c7ac5ea7cb0b90d0`）：
+  - **Approval/dependency gate:satisfied。**approval-only #361 的 exact head
+    `1144aedd82d913d5497bb56c702017c234064af6` 由维护者 `lvye` APPROVED，并以
+    `3434d4e80e0785af2abaa44614d24cadee55b12e` 合入 protected `main`；
+    TASK-BAP-003 的 human execution evidence #375 与独立 done #376 已依次合入，
+    done merge OID = `6a6b6b7010b6563d67aa7d96e6838505e82eb25a`。本任务只消费
+    已批准的凭据分离事实，不读取或配置任何 credential。
+  - **Base/input pins。**以下 carrier 均在本 base 由 Git object 实测；implementation
+    开工时必须基于本 readiness 合入后的最新 protected `main`，逐项重核 exact blob 与
+    absence。任一漂移、路径抢占或被后续 revision supersede，立即停止并重新 readiness：
+
+    ```yaml pins
+    - artifact: TASK-HLR-001 readiness audit base
+      commit: 493153f65025f177550071b5c7ac5ea7cb0b90d0
+    - artifact: CHG-2026-030 approval merge
+      commit: 3434d4e80e0785af2abaa44614d24cadee55b12e
+    - artifact: TASK-BAP-003 done merge
+      commit: 6a6b6b7010b6563d67aa7d96e6838505e82eb25a
+    - path: openspec/changes/chg-2026-030-host-loop-runtime/proposal.md
+      blob: e59001c14b528c19207ecdd0d262c2114c778a48
+    - path: openspec/changes/chg-2026-030-host-loop-runtime/design.md
+      blob: d47987ed6ae19d07926f59e6a8ed50b371074e0c
+    - path: openspec/changes/chg-2026-030-host-loop-runtime/tasks.md
+      blob: 7ac459518771274925a592f311336726363f6844
+    - path: openspec/changes/chg-2026-030-host-loop-runtime/verification.md
+      blob: f62d9f08648f5741206144cf650620d82ffd5ee0
+    - path: scripts/check_pr_paths.py
+      blob: 7fdc47933b98284c556d5cba6fd8cfe99b87e0ad
+    - path: scripts/test_check_pr_paths.py
+      blob: 1f7093402034c622553a11a71b6fc50cb8622bec
+    - path: .github/workflows/agent-pr.yml
+      blob: 2b9b03a90d70671d85da21be6a667e2f2f9c8acb
+    - path: openspec/changes/chg-2026-027-decision-grading-batch-approval/tasks.md
+      blob: c8cbc972a432b16bc62489fd76955658dd389d33
+    ```
+
+    `scripts/host_loop/**` 与 `openspec/templates/agent-pr-body.md` 在本 base **均不存在**；
+    它们是本任务唯一获准的新输出根/文件，不得覆盖或迁移其他 owner 的内容。
+  - **Envelope v1 grammar:closed。**canonical renderer 输出 UTF-8/LF 文本；首个
+    non-empty line 必须恰为 `<!-- arkdeck-pr-envelope:v1 -->`，machine block 以独立行
+    `<!-- /arkdeck-pr-envelope -->` 结束，两个 marker 各且仅出现一次。block 内 scalar
+    各恰一行，字段顺序固定为 `Envelope-Version: 1`、`PR-Type:`、`Change:`、`Task:`、
+    `Base-OID:`、`Head-OID:`、`Decision-Grade:`、`Depends-On:`、`Evidence:`、
+    `Attribution:`；`Depends-On` 是 design §2 规定的 scalar，`Evidence`/`Attribution`
+    是以两个空格 + `- ` 开头的列表块。renderer 与 parser 共用单一 field definition，
+    不各自维护枚举。解析器拒绝 marker 缺失/重复/倒序、block 内 duplicate/unknown/
+    missing field、非 UTF-8、CR、前后空白歧义、空列表和列表外游离文本；人类说明只允许
+    位于 closing marker 之后，且不得反向覆盖已解析值。
+  - **Type/task mapping:binary。**`PR-Type` 取值域固定为 `implementation`、`status`、
+    `verification`、`archive`、`proposal`、`approval`、`readiness`。前四类必须有独立
+    `Task: TASK-*` 行；后三类必须恰为 `Task: none`，并以 `Change:` 表达范围。
+    `Change:` 必须与唯一 active change 的 `proposal.md` frontmatter canonical `id`
+    （`CHG-*`）逐字匹配；task-bound 类型还须由同目录 active `tasks.md` 唯一解析该 task。
+    该 mapping 不新增批准语义：validator 只判结构，不判 task/change 已批准、ready、
+    done 或 verified。
+  - **Field validation:fail closed。**base/head 必须各为小写完整 40-hex 且不同；
+    decision grade 只接受 `D0`/`D1`/`D2`；`Depends-On` 按 design §2 只接受单值
+    `#<positive decimal PR number>` 或 `none`。`Evidence` 每项只接受仓库相对路径；确无
+    evidence 时整块只接受单项 `none: <non-empty reason>`，绝对路径、`..`、URL 与空
+    reason 拒绝。Attribution 恰含从显式 configuration 注入的 `producer`、固定
+    `runtime: host-loop/1` 与 opaque non-empty `run`。生产 template/source/default
+    禁止硬编码 Claude、OpenAI 或其他 provider 名称；negative fixture 可使用明确 sentinel
+    验证 hard-coded provider 被拒绝，但该 sentinel 不得成为 renderer 默认值。
+  - **MECH-004 compatibility:binary。**task-bound renderer 的 `Task: TASK-*` 必须被当前
+    `scripts/check_pr_paths.py` 的 `TASK_LINE_RE`/`resolve_task_declaration` 原样识别；
+    `Task: none` 不得产生 task declaration。测试用真实 active task fixture 同时证明：
+    完整 task envelope 可进入现有 allowed-path resolver；多个/不一致 Task、短 OID、
+    unknown grade、type/task mismatch 与零/多 active task 命中分别具名失败。不得修改
+    MECH-004 parser、tests 或 workflow 来迁就本实现。
+  - **Runtime boundary:closed。**本任务仅实现纯 renderer/parser/validator 与 Markdown
+    template；零 GitHub/API/network/subprocess/shell、零 Issue/ref/lease、零 credential、
+    零现有 workflow 修改。实现使用 Python 3 standard library，external command
+    构造与执行调用数均为 0；任何 live PR 创建/更新留给 HLR-003/005。
+  - **Test/evidence gate:binary。**固定命令为
+    `python3 -m unittest discover -s scripts/host_loop -p 'test_*.py'`、
+    `python3 scripts/test_check_pr_paths.py`、`scripts/check-sdd.sh` 与
+    `git diff --check`。fixture 至少覆盖完整 task、proposal/approval/readiness 的
+    `Task: none`、七类 type mapping、每个必填字段单独缺失、marker 缺失/重复/倒序、
+    duplicate/unknown field、short/uppercase/same OID、unknown grade、multiple Task、
+    `Depends-On` 非 `#<PR>`/`none`、empty/no-reason evidence、绝对/traversal evidence、
+    configured attribution 与 hard-coded provider sentinel regression；run 记录精确 test
+    数、allowed/forbidden diff、archive/Core/governance/product/workflow diff = 0。任一失败
+    即不形成 `HLR-ENVELOPE-001` PASS。
+  - **Concurrency/review gate:satisfied。**审计时唯一 open PR = #384（TASK-AFP-003
+    D0 status，仅 CHG-2026-029 `tasks.md`）；本轮已合入的 #378…#383 也只触及
+    CHG-2026-027/028/029，均与本任务唯一 readiness path（本文件 HLR-001 section）零
+    交集。`scripts/host_loop/**` 与 agent PR template 无其他 active task 授权。出现同路径
+    PR、canonical conflict 或需要 forbidden path 时立即回到 `blocked`。
+  - **Review boundary。**本 PR 只修改本文件 TASK-HLR-001 section，将
+    `blocked→ready` 并登记 D1 contract/pins/tests；零 runtime/template/evidence、零
+    HLR-002 D2 准备、零 implementation。readiness merge 不构成
+    `HLR-ENVELOPE-001` PASS；implementation/evidence 与后续 `ready→done` 各使用独立 PR。
 - Platform:macos（纯 host runtime；不产生产品平台支持声明）
 - Requirements/AC:change-local `HLR-ENVELOPE-001`
 - Depends on:change approval、independent readiness、TASK-BAP-003 done
