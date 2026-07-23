@@ -721,10 +721,160 @@
 
 ## TASK-AFP-004 — 手册 `Fact` 断言的一手核对与更正
 
-- Status:blocked（三前置：① CHG-2026-029 revision r3 经维护者 review/merge 生效；
-  ② TASK-AFP-001 done（已满足，#362 合入
-  `4c8506a30afc5505230134903ccf03729a640c07`）；③ 独立 readiness PR 钉定手册 blob、
-  逐条待核 `Fact` 清单与其一手出处）
+- Status:ready（2026-07-23 D1 readiness r1；仅在维护者 review/merge 本独立 PR 后
+  生效。三前置全部闭合：① revision r3 生效；② TASK-AFP-001 done；③ 本 readiness
+  钉定手册 blob、37 条待核 `Fact` 清单与其 26 个一手出处。merge 前不得开
+  implementation/evidence PR）
+- Readiness（r1，base = protected `main`
+  `b53db548197486bd58d9236e183632c744f5276e`）：
+  - **Approval/dependency gate:satisfied。**approval-only #347 合入
+    `813361830593f416eb845f0cceb9556ab51168be`；revision r3 #371 合入
+    `b53db548197486bd58d9236e183632c744f5276e`（`revision: 3` 已在 protected `main`
+    生效，本任务与 `AFP-CORRECT-001` 随之登记）。**前置 ②**：TASK-AFP-001 实现 #360
+    合入 `95dc61cf6ed9223f5b5c1728aaf0d9a1ba6c9d5c`、done #362 合入
+    `4c8506a30afc5505230134903ccf03729a640c07`，手册已在 protected `main` 上。
+    AFP-002 `done`、AFP-003 `ready` 均不构成本任务依赖。
+  - **Base/input pins。**以下是真实 `yaml pins` carrier，全部于本 base 由脚本枚举
+    并实测取值（非手抄）。implementation 开工时必须基于本 readiness 合入后的最新
+    protected `main`，逐项确认路径仍解析到 exact blob、commit 仍在 ancestry 中。
+    任一漂移、路径删除/重命名或被引用结论被后续记录 supersede，立即停止并重新
+    readiness；完整 hash 只证明固定引用，不自行证明内容正确或获得批准。
+
+    ```yaml pins
+    - artifact: TASK-AFP-004 readiness audit base
+      commit: b53db548197486bd58d9236e183632c744f5276e
+    - artifact: CHG-2026-029 revision r3 merge
+      commit: b53db548197486bd58d9236e183632c744f5276e
+    - artifact: CHG-2026-029 approval merge
+      commit: 813361830593f416eb845f0cceb9556ab51168be
+    - artifact: TASK-AFP-001 done status merge
+      commit: 4c8506a30afc5505230134903ccf03729a640c07
+    - path: openspec/planning/agent-failure-patterns.md
+      blob: 5b8c3b6b26b76893744aa11bdd7618318eab4674
+    - path: openspec/changes/archive/2026-07-21-chg-2026-001-macos-m0a/evidence/runs/TASK-M0A-003/run.md
+      blob: 7fc3ab1d4fd3b2000b74ea04b0356d9a6c56fce6
+    - path: openspec/changes/archive/2026-07-21-chg-2026-002-macos-m1-infrastructure/evidence/runs/TASK-M1-009/review-remediation-2026-07-18.md
+      blob: f615d3fabb42450621e05aa1daa5b837906f41d3
+    - path: openspec/changes/archive/2026-07-21-chg-2026-002-macos-m1-infrastructure/evidence/runs/TASK-M1-009/review-remediation-round-2-2026-07-18.md
+      blob: 309a7f39f5befd20f3df93f95dcc42b3c02cf975
+    - path: openspec/changes/archive/2026-07-21-chg-2026-002-macos-m1-infrastructure/evidence/runs/TASK-M1-009/review-remediation-round-3-2026-07-18.md
+      blob: 8911811f11710ab1692b5ae834b21dfe020ea56e
+    - path: openspec/changes/archive/2026-07-21-chg-2026-002-macos-m1-infrastructure/evidence/runs/TASK-M1-009/review-remediation-round-4-2026-07-18.md
+      blob: e336f498db72ba4c7a4abcd4303d595e152bcb2a
+    - path: openspec/changes/archive/2026-07-21-chg-2026-002-macos-m1-infrastructure/tasks.md
+      blob: 2ea2ba6672b03f7ab6a86a6a7b136c5d531d9ac9
+    - path: openspec/changes/archive/2026-07-21-chg-2026-009-dayu200-partition-decode/evidence/runs/TASK-PD-002/platform-attempt-2026-07-20.md
+      blob: e0f3b1b77f54b4b7cb1ff17c39316e8e70c29179
+    - path: openspec/changes/archive/2026-07-21-chg-2026-016-dayu200-recovery-rehearsal/evidence/runs/TASK-RH-001/rehearsal-attempt-4-2026-07-21.md
+      blob: 6af1a69bea454251bac9a16ba26e58f2483702da
+    - path: openspec/changes/archive/2026-07-21-chg-2026-020-dayu200-real-flash/evidence/runs/TASK-RF-002/run.md
+      blob: 8869ad61b9ebf6e5397e7e6007318e11cb26429d
+    - path: openspec/changes/archive/2026-07-22-chg-2026-015-hdc-readonly-probe-registration/proposal.md
+      blob: b09301e257619d176c6adb0530847d499e97b6e6
+    - path: openspec/changes/chg-2026-006-dayu200-m0b-bringup/tasks.md
+      blob: 779ff6ac060ab7ba82ddaf955b65702ec52285db
+    - path: openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/evidence/runs/TASK-UD-REDACTOR-001/run.md
+      blob: 172ea48fba64819d0bf0743816323b8da68b6ec3
+    - path: openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/tasks.md
+      blob: abaee6a12290108f4daeac9f84a3ff6700971433
+    - path: openspec/changes/chg-2026-021-trace-adapter-capture/design.md
+      blob: 219c2812a321030bdd7a81517150ccc7fac755ab
+    - path: openspec/changes/chg-2026-021-trace-adapter-capture/evidence/runs/TASK-TR-001/run.md
+      blob: 6069642a7b3c13d741383fbbdd17a0f921c6b9f2
+    - path: openspec/changes/chg-2026-021-trace-adapter-capture/tasks.md
+      blob: 14703a488170143e02b15d3ae496d23cf390864e
+    - path: openspec/changes/chg-2026-022-hdc-supervisor-observability/proposal.md
+      blob: 63fa348e8f08276d17b1655532714d5da3a67482
+    - path: openspec/changes/chg-2026-022-hdc-supervisor-observability/review.md
+      blob: d03118ab83cbeb278910c08e55573094edbd5169
+    - path: openspec/changes/chg-2026-025-ai-native-unattended-device-ops/review.md
+      blob: 197e4adc47f75444a54eefadf00e58b4681e5202
+    - path: openspec/changes/chg-2026-026-macos-rockchip-flash-ui/evidence/runs/TASK-RKFUI-001/hermetic-contract-test-2026-07-22.md
+      blob: 659f99f470cea5f03984de6ea28ce1395e391287
+    - path: openspec/changes/chg-2026-026-macos-rockchip-flash-ui/evidence/runs/TASK-RKFUI-001/run.md
+      blob: 0f24bb2424e43edb34de0fffaa0eee3c4e5cbec3
+    - path: openspec/changes/chg-2026-026-macos-rockchip-flash-ui/verification.md
+      blob: f4aea707ded798680aacb7811a4786247a94dac8
+    - path: openspec/changes/chg-2026-028-guard-ci-mechanization/evidence/runs/TASK-MECH-001/run.md
+      blob: f5e51fad2f2a429748126eee27ab61df282c2f23
+    - path: openspec/changes/chg-2026-028-guard-ci-mechanization/proposal.md
+      blob: 2395c2b6f4624d806c2b88cb8769a9a0a5326253
+    - path: openspec/planning/backlog.md
+      blob: fc20c3de0187f3f4b4a7e60129163c33a6d1c6c3
+    - path: openspec/planning/postmortem-2026-07-governance.md
+      blob: 308d260be9d545b8e27d20a6a30e0719cd76fd19
+    - path: openspec/changes/chg-2026-029-agent-failure-prevention/design.md
+      blob: fd3d21147fd75ecc9543222d567aefae351171f5
+    - path: openspec/changes/chg-2026-029-agent-failure-prevention/proposal.md
+      blob: c0ac4b1dbe331abcad38c6b05a1287cede8af9fe
+    - path: openspec/changes/chg-2026-029-agent-failure-prevention/verification.md
+      blob: 075f6177b5cdbd0207ef27e93b4d257fb3971d77
+    - path: openspec/changes/chg-2026-029-agent-failure-prevention/acceptance-cases.yaml
+      blob: 54963daaac8302ee5900024780c9dd7b3a9b3814
+    - path: AGENTS.md
+      blob: 3c2d3c6a01d3eaa31cd9e3ee333f3153552f4164
+    - path: openspec/constitution.md
+      blob: 137d09da7eaa535670a8bd3b0c9537681e6cb21b
+    - path: openspec/governance/enforcement.md
+      blob: e8ff3c130e1b8b15f8405d150ad567e774a0d82b
+    - path: openspec/verification/policy.md
+      blob: ef3b42085ff50b54f1bb70650510f27bdc020cf1
+    ```
+
+  - **Audit inventory:closed。**待核对象 = 手册 `Observed cases` 中标注为
+    `**Fact` 的**全部 37 行**，按项分布（脚本枚举，实现时须复现同一计数）：
+    `AF-001` 2、`AF-002` 1、`AF-003` 2、`AF-004` 2、`AF-005` 2、`AF-006` 2、
+    `AF-007` 2、`AF-008` 2、`AF-009` 1、`AF-010` 3、`AF-011` 3、`AF-012` 2、
+    `AF-013` 2、`AF-014` 2、`AF-015` 2、`AF-016` 2、`AF-017` 2、`AF-018` 3。
+    其中 **32 行含内联出处链接**，**5 行无内联链接**（依赖同项上文或共用 pinned
+    bytes）——这 5 行必须在复核矩阵中显式补出其一手出处，不得以"上文已给"略过。
+    一手出处文件共 **26 个**，全部在上表 pin 中。
+  - **Audit method:binary。**每条 `Fact` 逐条执行，缺任一列即该行不通过：
+    ① 定位其一手出处（相对路径 + 完整 40-hex blob OID，取自上表）；
+    ② 在该出处的 bytes 中定位支持该表述的具体位置（行号或可检索片段）；
+    ③ 判定 `supported` / `unsupported` / `partially-supported`；
+    ④ 处置——`supported` 保留原文；`unsupported`/`partially-supported` 二选一：
+    改写为该出处能支持的表述，或整行降级标注为 `**Inference.**`；
+    ⑤ 记录判定依据（为何该片段支持/不支持该表述）。
+    **禁止**以本 change 自身的 `design.md`/`proposal.md` 转述、会话记忆或跨会话
+    摘要充当出处——该来源正是 r3 所修缺陷的成因（`AF-016`）。
+  - **Inference 行处理:bounded。**`Inference` 行**只检查是否被误写成 `Fact`**；
+    不因本任务扩写、删改或补证。发现 `Inference` 被误标为 `Fact` 时按上述 ④ 处置。
+  - **Invariants:binary（零变化）。**`AF-NNN` ID 集合（恰 `AF-001`…`AF-018`，
+    不新增不删除不复用）、taxonomy 归属与两轴划分、八字段契约与其顺序、
+    `Automation status` 取值域（`mechanized`/`partiallyMechanized`/`semanticReview`）、
+    首屏 non-normative/authority/conflict/privacy/archive 声明——**全部零变化**。
+    本任务只改 `Observed cases` 内的表述与必要的 `Currency` 行。
+  - **符号级复扫:binary。**实现后复跑 r3 起草期的符号级扫描：手册内出现的代码
+    符号必须能在仓内（手册与本 change 之外）解析；不可解析即 fail。r3 已确认基线
+    为"手册 `Fact` 行只引文件名、零代码符号"，本任务不得引入新的不可解析符号。
+  - **Currency 更新。**手册 18 项的 `Currency` 行统一更新为本次复核的完整 base OID
+    与日期；原 audit base `de6b79aafa95700297a94dc311e94b1283f8abdd` 的记录不追溯
+    改写，按 `AF-005` 在事实原位更新当前值。
+  - **Environment/concurrency gate:satisfied。**纯 host-side document review，零硬件、
+    零 device/network/effect dispatch。手册面并发已核：TASK-AFP-001（唯一曾持
+    该路径授权的任务）为 `done`；TASK-AFP-003（`ready`）的 allowed paths 仅本 change
+    `evidence/**` 与 `tasks.md`，**不含手册**，故本任务对手册持唯一 live 授权。
+    audit 时 GitHub open PR = 0。若实现期间出现同路径 PR、canonical conflict、
+    secret/privacy 风险或需要修改 forbidden path，任务立即回到 `blocked`。
+  - **Verification/evidence gate:binary。**implementation/evidence PR 必须交付手册更正、
+    本任务 run 与 `tasks.md` 本任务 evidence 引用，但不得翻 `ready→done`；run 至少
+    记录：37 行复核矩阵无遗漏（含 5 行无内联链接者）、每行五列齐全、invariants 全部
+    零变化的实测证据、符号级复扫通过、`Inference` 未被误标统计、相对链接与 anchor
+    全解析、`changes/archive/**` 与 `openspec/templates/**` diff 为 0、
+    allowed/forbidden path audit、`scripts/check-sdd.sh` 0 error/0 warning/
+    111 acceptance IDs 与 `git diff --check` PASS。任何一项失败即不形成
+    `AFP-CORRECT-001` PASS。
+  - **Review boundary。**本 readiness PR 只修改本文件的 AFP-004 本节，将 AFP-004
+    `blocked→ready` 并登记 pins/inventory/method/invariants；零手册改动、零
+    implementation、零 evidence、零 archive/历史改写。implementation/evidence 与后续
+    `ready→done` 各自使用独立 PR；本 readiness merge 不构成 `AFP-CORRECT-001` PASS
+    或 change `verified`。
+  - **Currency 复核（2026-07-23）。**上表全部 blob 与 commit 于 audit base
+    `b53db548197486bd58d9236e183632c744f5276e` **由脚本枚举并实测取值**，非从既往
+    readiness 或起草期勘察转抄；`chg-2026-021/tasks.md` 的当前 blob 与 AFP-001 r2
+    carrier 所钉值不同（TR-003 done PR `#367` 向该文件追加状态所致，无删除），
+    本表采用**当前**值。开工前须再次对最新 protected `main` 复核，漂移即停止。
 - Platform:macos（过程文档跨平台可复用，零平台产品行为）
 - Requirements/AC:change-local `AFP-CORRECT-001`
 - Depends on:revision r3、TASK-AFP-001 done、independent readiness
