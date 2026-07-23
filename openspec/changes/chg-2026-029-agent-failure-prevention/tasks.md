@@ -298,8 +298,146 @@
 
 ## TASK-AFP-002 — 将失败模式选择、生产可达性与 evidence freshness 接入模板
 
-- Status:blocked（三前置：① change approval；② TASK-AFP-001 done；③ 独立 readiness
-  PR 钉定三个模板 blob 与精确新增字段）
+- Status:ready（2026-07-23 D1 readiness r1；仅在维护者 review/merge 本独立 PR 后
+  生效。三前置全部闭合：① change approval；② TASK-AFP-001 done；③ 本 readiness
+  钉定三个模板 blob 与逐字新增字段。merge 前不得开 implementation/evidence PR）
+- Readiness（r1，base = protected `main`
+  `9753b4bbc024b90454c7efc68f28d48a2760c545`）：
+  - **Approval/dependency gate:satisfied。**approval-only #347 合入
+    `813361830593f416eb845f0cceb9556ab51168be`；revision r2 #355 合入
+    `de6b79aafa95700297a94dc311e94b1283f8abdd`（`status: approved` 与
+    `revision: 2` 均已在 protected `main` 生效）。**前置 ② 已满足**：
+    TASK-AFP-001 implementation #360 合入
+    `95dc61cf6ed9223f5b5c1728aaf0d9a1ba6c9d5c`，`ready→done` 状态 PR #362 合入
+    `4c8506a30afc5505230134903ccf03729a640c07`，该任务在 protected `main` 上为
+    `done`。AFP-003 不构成本任务依赖并继续 `blocked`。
+  - **Base/input pins。**以下是真实 `yaml pins` carrier；implementation 开工时必须
+    基于本 readiness 合入后的最新 protected `main`，逐项确认路径仍解析到 exact blob、
+    commit 仍在 ancestry 中。任一漂移、路径删除/重命名或字段定义被后续记录
+    supersede，立即停止并重新 readiness；完整 hash 只证明固定引用，不自行证明内容
+    正确或获得批准。
+
+    ```yaml pins
+    - artifact: TASK-AFP-002 readiness audit base
+      commit: 9753b4bbc024b90454c7efc68f28d48a2760c545
+    - artifact: CHG-2026-029 approval merge
+      commit: 813361830593f416eb845f0cceb9556ab51168be
+    - artifact: CHG-2026-029 revision r2 merge
+      commit: de6b79aafa95700297a94dc311e94b1283f8abdd
+    - artifact: TASK-AFP-001 implementation merge
+      commit: 95dc61cf6ed9223f5b5c1728aaf0d9a1ba6c9d5c
+    - artifact: TASK-AFP-001 done status merge
+      commit: 4c8506a30afc5505230134903ccf03729a640c07
+    - path: openspec/templates/change/tasks.md
+      blob: 7fe7e00a9cf3ebc051abb4ced4147b8ca8d8d540
+    - path: openspec/templates/change/design.md
+      blob: b3f18410a2199975595b44a1cdd558ab890825d5
+    - path: openspec/templates/change/evidence-run.md
+      blob: a5fb98d9eada0d0664772756cfc8b2a2b1e78f3a
+    - path: openspec/planning/agent-failure-patterns.md
+      blob: 5b8c3b6b26b76893744aa11bdd7618318eab4674
+    - path: openspec/changes/chg-2026-029-agent-failure-prevention/design.md
+      blob: e559a6d45f15520b101280a20ed78591a924022a
+    - path: openspec/changes/chg-2026-029-agent-failure-prevention/proposal.md
+      blob: 91ee9a883439fb0d6b749c7d76a49968aa98417e
+    - path: openspec/changes/chg-2026-029-agent-failure-prevention/verification.md
+      blob: ba0a586442f9397e4c458165fb7972d334f19e2b
+    - path: openspec/changes/chg-2026-029-agent-failure-prevention/acceptance-cases.yaml
+      blob: 8137232534e498c329a85dece459887f8ef4b8a6
+    - path: AGENTS.md
+      blob: 3c2d3c6a01d3eaa31cd9e3ee333f3153552f4164
+    - path: openspec/constitution.md
+      blob: 137d09da7eaa535670a8bd3b0c9537681e6cb21b
+    - path: openspec/governance/enforcement.md
+      blob: e8ff3c130e1b8b15f8405d150ad567e774a0d82b
+    - path: openspec/verification/policy.md
+      blob: ef3b42085ff50b54f1bb70650510f27bdc020cf1
+    ```
+
+  - **Exact field set:closed。**只增不删；下列是允许写入的**全部**新增内容，
+    实现不得超出，也不得少于任一项。字段措辞可在不改变语义的范围内润色，但
+    "允许诚实 `not applicable` + 理由""不自动通过""不创造批准/状态语义"三条必须
+    在模板文本中可见。
+
+    1. `templates/change/tasks.md` — 在既有 `Readiness input pins` 块之后、
+       `Allowed paths` 之前插入**恰三个** bullet（与 design §4 的字段名一致，
+       并与本 change 自身 tasks.md 的既有相对顺序一致）：
+       - `Applicable failure patterns:` — 取 `AF-NNN`… 或 `none`，`none` 须附
+         可审查理由；写明 reviewer 可要求改为相关 AF ID，选 `none` 不是自动通过；
+         引用手册相对路径 `../../planning/agent-failure-patterns.md`。
+       - `Production reachability:` — `root → authority → effect`，或明确
+         `not applicable` 加理由。
+       - `Trusted fact sources:` — 事实生产者、freshness/binding 与 anti-forgery
+         边界；写明调用方自报字段不因填写本行而升级为可信事实。
+    2. `templates/change/design.md` — 在 `## Data and contract changes` 之后、
+       `## Failure, cancellation, and recovery` 之前新增**恰一个**二级小节
+       `## Authority and production reachability`，含 design §4 的五个要点：
+       production composition root；authority/permit/capability 的唯一产生点；
+       effect dispatch point 与 intent/outcome durable 边界；fake/simulation 与
+       production 的结构差异；facts/provenance 能否由同一调用方同时控制。
+       纯文档/host-only 无 effect 的任务可写 `not applicable`，但须给出理由。
+    3. `templates/change/evidence-run.md` — 在既有 run identity bullet 列表
+       （`Evidence class` / `Core baseline` / `Scope`）中增补**恰四个** bullet：
+       完整 base OID；关键输入 hash/pin；producer→consumer 路径；
+       evidence currency 三态 `current` / `superseded` / `invalidated` 及其含义。
+       同时写明 currency 状态须在**事实原位**可见，不得只在文件尾部写模糊
+       supersession 注记。
+
+  - **Zero-deletion / zero-relaxation gate:binary。**实现 PR 必须给出 before/after
+    字段矩阵，逐项证明三个模板的既有条目**零删除、零放宽**，具体包括但不限于：
+    tasks 模板的 `Status`/`Platform`/`Requirements`/`Acceptance`/`Depends on`/
+    `Readiness input pins`（含 MECH-003 引入的**非载体** `yaml pin-example` 块与
+    "实例化时改用 `yaml pins`"注记，逐字保留）/`Allowed paths`/`Forbidden paths`/
+    `Risk`（含 CHG-2026-025 引入的 destructive/standing authorization 注释）/
+    `Hardware required`/`Deliverables`/`Verification`/`Notes / handoff`；
+    design 模板的六个既有小节；evidence-run 模板的抬头禁令、`Evidence class`
+    取值域、四个既有小节与"run record 不改任务状态""simulation/fake 永不计入
+    realHardware"两条（含 CHG-2026-025 引入的人类执行例外措辞）。
+  - **Boundary scan:binary。**实现后全模板搜索，下列各项计数必须为 0：自动
+    approval / 自动 `ready`/`done` / auto-merge 表述；`fake`、`simulation` 或
+    `plan` 升级为 `realHardware` 或平台支持的表述；把手册描述为 required gate 或
+    可覆盖 canonical rule 的表述；新增 normative `SHALL`/`MUST`；secret、真实设备
+    标识、用户绝对路径。
+  - **Canonical-reference routing:closed。**新增字段只引用 canonical rule 与手册，
+    不复制其 normative 文本：
+    [`AGENTS.md` 权威顺序](../../../AGENTS.md#权威顺序)与
+    [执行规则](../../../AGENTS.md#执行规则)、
+    [`POL-SAFETY-001`](../../constitution.md#pol-safety-001-fail-closed-under-uncertainty)、
+    [`POL-VERIFY-001`](../../constitution.md#pol-verify-001-evidence-not-task-completion)、
+    [enforcement — 批准语义](../../governance/enforcement.md#批准语义)、
+    [verification policy — Definition of Ready](../../verification/policy.md#definition-of-ready)
+    与 [Evidence 与 run 记录](../../verification/policy.md#evidence-与-run-记录)。
+    模板不得暗示填写某字段本身构成批准、就绪或完成。
+  - **Environment/concurrency gate:satisfied。**纯 host-side document task，零硬件、
+    零 HDC/device/network/effect dispatch。**模板面并发已核**（截至 base，凭
+    `gh pr list` 与逐 change `tasks.md` 复核）：曾持 `openspec/templates/change/**`
+    授权的 TASK-MECH-003（CHG-2026-028）与曾改动两个模板的 TASK-AIN-001
+    （CHG-2026-025）均为 `done`；同期唯一 `ready` 的 TASK-MECH-004 其 Allowed
+    paths 为 `.github/workflows/sdd-guard.yml`、`scripts/check_pr_paths.py`、
+    `scripts/test_check_pr_paths.py` 及其 change 自有路径，**不含模板面**。因此本
+    任务对三个模板持唯一 live 授权。若实现期间出现同路径 PR、canonical conflict、
+    secret/privacy 风险或需要修改 forbidden path，任务立即回到 `blocked`。
+  - **Verification/evidence gate:binary。**implementation/evidence PR 必须同时交付
+    三个模板改动、本任务 run 与 `tasks.md` 本任务 evidence 引用，但不得翻
+    `ready→done`；run 至少记录：三处新增与上述 Exact field set 逐项对应、
+    before/after 字段矩阵零删除零放宽、boundary scan 各项为 0、新增字段的
+    canonical 相对链接与 anchor 全部解析、`changes/archive/**` diff 为 0、
+    allowed/forbidden path audit、`scripts/check-sdd.sh` 0 error/0 warning/
+    111 acceptance IDs 与 `git diff --check` PASS。任何一项失败即不形成
+    `AFP-TEMPLATE-001` PASS。
+  - **Review boundary。**本 readiness PR 只修改本文件的 AFP-002 本节，将
+    AFP-002 `blocked→ready` 并登记 pins/field-set/gate；零模板改动、零
+    implementation、零 evidence、零 archive/历史改写。implementation/evidence 与后续
+    `ready→done` 各自使用独立 PR；本 readiness merge 不构成 `AFP-TEMPLATE-001`
+    PASS 或 change `verified`。
+  - **Currency 复核（2026-07-23）。**上表全部 blob 与 commit 实测取值，非从
+    AFP-001 readiness 转抄。起草起点为 `4c8506a30afc5505230134903ccf03729a640c07`
+    （TASK-AFP-001 done 合入点）；起草期间 protected `main` 前进到
+    `9753b4bbc024b90454c7efc68f28d48a2760c545`（#358 TASK-TR-003 实现，与本任务
+    授权面零文件交集），audit base 已改钉该 commit 并在其上**重新复核全部 pin**：
+    本 carrier 17/17、TASK-AFP-001 r2 carrier 35/35，合计 52/52 零漂移。其中
+    `chg-2026-021-trace-adapter-capture/tasks.md` 未被 #358 改动，符合"实现 PR 不
+    翻 task 状态"约定。开工前须再次对最新 protected `main` 复核，漂移即停止。
 - Platform:macos（模板跨平台可复用，零平台产品行为）
 - Requirements/AC:change-local `AFP-TEMPLATE-001`
 - Depends on:change approval、TASK-AFP-001 done、independent readiness
