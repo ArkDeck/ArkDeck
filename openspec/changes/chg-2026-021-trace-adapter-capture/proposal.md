@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-021-trace-adapter-capture
-revision: 3
-status: verified # 2026-07-23 verification-closure PR #403 merge `95e56eae0102c37a885c0277089089a02b7bc4fb`；r1 approval #253、r2 amendment #276；本 r3 只起草 archive provenance 路径迁移、living link 收口与 registry hash 重钉的封闭例外，不改变 verification 结论，仅在本 D1 PR 经独立 AI premerge review 且维护者 review/merge 后生效
+revision: 4
+status: verified # 2026-07-23 verification-closure PR #403 merge `95e56eae0102c37a885c0277089089a02b7bc4fb`；r3 archive scope #404 merge `2cddc8a83399e643e11dbe93d1852b1e6417a1bd`；本 r4 只把 #413 后新增的 living handbook link 纳入 archive closure（5→6），不改变 verification 结论或其他 r3 边界，仅在本 D1 PR 经独立 AI premerge review且维护者 review/merge 后生效
 class: platform
 core_change_level: none
 owner: lvye
@@ -183,6 +183,36 @@ premerge review 并由维护者 review/merge 进入受保护 `main` 后，后续
   5 个 living handbook link 必须在同一独立 archive PR 原子完成。缺任一 closure、
   新增目录外 active 引用、normalized comparison 出现列举外差异或隐私扫描命中时
   fail closed。
+
+## Archive relocation scope correction (r4; D1)
+
+r3 合入后，CHG-2026-029 的独立 r5 remediation implementation PR #413（merge
+`99dbacd2923ed40b86dbff9f69ef259e16c9fd94`）为 AF-014 增加了一条指向
+`TASK-TR-002R/run.md` 的 living handbook link。该新增 active reference 触发 r3 的
+fail-closed 条款；本 revision 只修订这个确定性计数与 target 闭包，不授权 archive
+实现，也不改变 r3 的 registry、hash consumer、历史 carrier 或产品语义边界。
+
+- 复核基线为 protected `main`
+  `ac0cfaa2091a4ac2b14bcb0308f8c98388a98d77`（#418 merge）；#418 已由维护者
+  APPROVED 并把 CHG-2026-029 移入 archive，满足 r3 的前置条件。其父级 #419
+  `99ba8aa4b04018918daad2fc8830009c1030f6da` 只修改 Agent PR/allowed-path guard
+  与 CHG-2026-030 evidence，和本 closure 零路径交集。
+- `openspec/planning/agent-failure-patterns.md` 的 current blob 为
+  `4ef0268dd72d22734f704e86375f0114602e5452`；目录外 living handbook closure
+  现为 6 个 link target：2 个 `tasks.md`（AF-008/AF-014）之外另有 AF-018 的
+  `tasks.md`、1 个 `design.md`、TASK-TR-001 `run.md` 与 TASK-TR-002R `run.md`。
+  archive PR 只允许把这 6 个 target 的 active 根替换为 r3 固定 archive 根，
+  link text、anchor、Fact/Inference、完整 OID、taxonomy 与其他字节保持不变。
+- r3 文本中的“5 个 Markdown/link target/living handbook link”均由本 r4
+  **仅在计数与 target 集合上**取代为 6；r3 的 3 个 registry path、3 个 living
+  hash consumer、registry `15511→15568` bytes 与
+  `0c093f98b57706b3723a68ae7552bef0db0731a675fb6cc023f69bbe21d6e566`
+  → `9d2a390b84092f1d78d86c10bf182884bc3a2ef8b3cdc3d35ed8e7e2b087b613`
+  候选闭包实测无漂移。
+- CHG-2026-029 archive 内全部旧 active-root path+blob 与相对 link bytes 继续作为
+  historical evidence 原样保留，不计入 living closure，也不得由 CHG-2026-021
+  archive PR 改写。除本 r4 列明的第 6 个 link 外再出现新 active consumer/reference，
+  仍须停止并先走新的 D1 scope revision。
 
 ## Verification closure(2026-07-23)
 
