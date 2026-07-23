@@ -6,12 +6,14 @@
 
 ## TASK-HLR-001 — 结构化 PR envelope 与纯 runtime contract
 
-- Status:ready（2026-07-23 D1 readiness r1；仅在维护者 review/merge 本独立 PR 后
-  生效。三前置闭合：① CHG-2026-030 approval #361；② 本 readiness 钉定 envelope v1
-  grammar、runtime/template inputs、测试矩阵与当前 protected `main` 基线；③
-  TASK-BAP-003 done #376。merge 前不得开始 implementation/evidence PR。）
-- Readiness（r1，base = protected `main`
-  `493153f65025f177550071b5c7ac5ea7cb0b90d0`）：
+- Status:ready（2026-07-23 D1 readiness r2；r1 #385 在 implementation 开工后因
+  #386 改变其显式 pinned carrier 而 fail closed，自动创建的实现 PR #389 已关闭且
+  未合入。本 r2 仅在维护者 review/merge 本独立 re-pin PR 后生效。三前置闭合：
+  ① CHG-2026-030 approval #361；② 本 readiness 重新钉定 envelope v1 grammar、
+  runtime/template inputs、测试矩阵与当前 protected `main` 基线；③ TASK-BAP-003
+  done #376。r2 merge 前不得重开 implementation/evidence PR。）
+- Readiness（r2，base = protected `main`
+  `00bbc5a2c7888e628997537a5ca859b46d772215`）：
   - **Approval/dependency gate:satisfied。**approval-only #361 的 exact head
     `1144aedd82d913d5497bb56c702017c234064af6` 由维护者 `lvye` APPROVED，并以
     `3434d4e80e0785af2abaa44614d24cadee55b12e` 合入 protected `main`；
@@ -20,11 +22,14 @@
     已批准的凭据分离事实，不读取或配置任何 credential。
   - **Base/input pins。**以下 carrier 均在本 base 由 Git object 实测；implementation
     开工时必须基于本 readiness 合入后的最新 protected `main`，逐项重核 exact blob 与
-    absence。任一漂移、路径抢占或被后续 revision supersede，立即停止并重新 readiness：
+    absence。任一漂移、路径抢占或被后续 revision supersede，立即停止并重新 readiness。
+    `tasks.md` 是本 readiness 的自载体，表中只钉 r2 PR 开工前 blob；r2 merge 后不得要求
+    它等于自身修改前 blob，而须核对该 merge 的 parent 恰为本 base、diff 只含本 HLR-001
+    readiness section，并把 r2 完整 merge OID 作为 implementation 的状态事实：
 
     ```yaml pins
     - artifact: TASK-HLR-001 readiness audit base
-      commit: 493153f65025f177550071b5c7ac5ea7cb0b90d0
+      commit: 00bbc5a2c7888e628997537a5ca859b46d772215
     - artifact: CHG-2026-030 approval merge
       commit: 3434d4e80e0785af2abaa44614d24cadee55b12e
     - artifact: TASK-BAP-003 done merge
@@ -34,7 +39,7 @@
     - path: openspec/changes/chg-2026-030-host-loop-runtime/design.md
       blob: d47987ed6ae19d07926f59e6a8ed50b371074e0c
     - path: openspec/changes/chg-2026-030-host-loop-runtime/tasks.md
-      blob: 7ac459518771274925a592f311336726363f6844
+      blob: d6696dbd06ffe4dad457649e9a50912a82229282
     - path: openspec/changes/chg-2026-030-host-loop-runtime/verification.md
       blob: f62d9f08648f5741206144cf650620d82ffd5ee0
     - path: scripts/check_pr_paths.py
@@ -44,11 +49,14 @@
     - path: .github/workflows/agent-pr.yml
       blob: 2b9b03a90d70671d85da21be6a667e2f2f9c8acb
     - path: openspec/changes/chg-2026-027-decision-grading-batch-approval/tasks.md
-      blob: c8cbc972a432b16bc62489fd76955658dd389d33
+      blob: 97cf591e56b1fedfb7c3369b6f9050a2b47e8f12
     ```
 
     `scripts/host_loop/**` 与 `openspec/templates/agent-pr-body.md` 在本 base **均不存在**；
     它们是本任务唯一获准的新输出根/文件，不得覆盖或迁移其他 owner 的内容。
+    r1 候选 head `d18b38164e6eef9d5e7aee6769e747896efc64a3` 只保留为本地可审计
+    候选；r2 合入后必须从新 main 重放/复核并形成新 head，不得 reopen #389 或沿用其
+    stale base/evidence。
   - **Envelope v1 grammar:closed。**canonical renderer 输出 UTF-8/LF 文本；首个
     non-empty line 必须恰为 `<!-- arkdeck-pr-envelope:v1 -->`，machine block 以独立行
     `<!-- /arkdeck-pr-envelope -->` 结束，两个 marker 各且仅出现一次。block 内 scalar
@@ -94,14 +102,15 @@
     configured attribution 与 hard-coded provider sentinel regression；run 记录精确 test
     数、allowed/forbidden diff、archive/Core/governance/product/workflow diff = 0。任一失败
     即不形成 `HLR-ENVELOPE-001` PASS。
-  - **Concurrency/review gate:satisfied。**审计时唯一 open PR = #384（TASK-AFP-003
-    D0 status，仅 CHG-2026-029 `tasks.md`）；本轮已合入的 #378…#383 也只触及
-    CHG-2026-027/028/029，均与本任务唯一 readiness path（本文件 HLR-001 section）零
-    交集。`scripts/host_loop/**` 与 agent PR template 无其他 active task 授权。出现同路径
+  - **Concurrency/review gate:satisfied。**审计时 open PR #387 只修改 CHG-2026-029
+    change package；#388 只修改 TASK-BAP-002 evidence、batch digest template 与其
+    owning host-loop runbook，二者均不触及本 readiness path、`scripts/host_loop/**` 或
+    `openspec/templates/agent-pr-body.md`。失效实现 PR #389 已因远端 head 删除而关闭，
+    `merged_at = null`。当前无其他 active task 获准占用本任务的新输出路径。出现同路径
     PR、canonical conflict 或需要 forbidden path 时立即回到 `blocked`。
   - **Review boundary。**本 PR 只修改本文件 TASK-HLR-001 section，将
-    `blocked→ready` 并登记 D1 contract/pins/tests；零 runtime/template/evidence、零
-    HLR-002 D2 准备、零 implementation。readiness merge 不构成
+    r1 readiness 重钉为 r2 并登记 D1 base/pins/concurrency；零 runtime/template/evidence、
+    零 HLR-002 D2 准备、零 implementation。readiness merge 不构成
     `HLR-ENVELOPE-001` PASS；implementation/evidence 与后续 `ready→done` 各使用独立 PR。
 - Platform:macos（纯 host runtime；不产生产品平台支持声明）
 - Requirements/AC:change-local `HLR-ENVELOPE-001`
