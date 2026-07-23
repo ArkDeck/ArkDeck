@@ -298,9 +298,26 @@
 
 ## TASK-AFP-002 — 将失败模式选择、生产可达性与 evidence freshness 接入模板
 
-- Status:ready（2026-07-23 D1 readiness r1；仅在维护者 review/merge 本独立 PR 后
-  生效。三前置全部闭合：① change approval；② TASK-AFP-001 done；③ 本 readiness
-  钉定三个模板 blob 与逐字新增字段。merge 前不得开 implementation/evidence PR）
+- Status:done（2026-07-23；仅在维护者 review/merge 本独立状态 PR 后生效。
+  implementation + evidence PR #366 已由维护者 @lvye APPROVED 并合入 protected
+  `main`，merge OID `3ed97323225b4614aa537bc707e1c79bb5fb9b36`。done 不等于
+  change `verified`：`AFP-TEMPLATE-001` 的最终结论仍需 change 级 verify PR 由
+  维护者确认。）
+- Done recheck（在**合入版** `3ed97323225b4614aa537bc707e1c79bb5fb9b36` 上重跑，
+  非沿用实现 PR 的结论）：
+  - 相对 readiness base `9397e23d62434cc9b7cb747d721044442322763f`，三模板
+    `+13 -0` / `+11 -0` / `+10 -0`——**零删除零修改行**；base 每一非空行在合入版
+    逐文件缺失均为 0；
+  - readiness 封闭的 8 处新增在合入版全部在场：tasks 三个 bullet、design 的
+    `## Authority and production reachability`、evidence-run 的 `Base`/
+    `Input pins`/`Producer → consumer`/`Evidence currency`；
+  - polarity-aware boundary scan 六类在合入版全部为 0；
+  - `scripts/check-sdd.sh` 0 error / 0 warning / 111 acceptance IDs。
+- Pin lifecycle 说明（**预期行为，非漂移事故**）：本任务 readiness carrier 钉定的
+  三个模板 blob 是**实现前**的值，其用途是"开工时确认未被他方改动"，该义务已在
+  开工时满足（base `9397e23d…` 上 52/52 无漂移）。实现合入后这三枚 blob 必然改变，
+  属任务自身交付物所致，与 TASK-AFP-001 r1 那次"实现开工前被他方 PR 打掉 pin"
+  性质不同，不触发重新 readiness。其余 49 项 pin 在合入版仍逐项命中。
 - Readiness（r1，base = protected `main`
   `9753b4bbc024b90454c7efc68f28d48a2760c545`）：
   - **Approval/dependency gate:satisfied。**approval-only #347 合入
