@@ -5,10 +5,11 @@
 
 ## TASK-AU-001 — 更新机制评估与选型(documentReview,host-only)
 
-- Status:ready(2026-07-23 本独立 D1 readiness candidate；仅在维护者
-  review/merge 本 PR 后生效。只授权下述 documentReview/evidence，零依赖引入、
-  零第三方代码下载/构建/执行、零产品实现；选型结论仍须由后续独立交付 PR
-  的维护者 review/merge 认可)
+- Status:ready(2026-07-23 r2 source-repin candidate；r1 readiness 已由 PR #427
+  合入，r2 仅在维护者 review/merge 本独立 D1 remediation PR 后生效。发现
+  upstream stable tag 漂移后，documentReview 已暂停；r2 merge 后仍只授权下述
+  documentReview/evidence，零依赖引入、零第三方代码下载/构建/执行、零产品
+  实现；选型结论仍须由后续独立交付 PR 的维护者 review/merge 认可)
 - Readiness review(2026-07-23；host-only，external code/network service/device
   dispatch 0):
   - Approval/dependency gate:satisfied。CHG-2026-023 r1 approval 已在 protected
@@ -47,13 +48,24 @@
     六项。AU-001 只读这些事实，禁止修改 package/project/entitlement/ADR/profile。
   - Official-source boundary:只允许一手资料。Sparkle 面固定为官方文档
     `https://sparkle-project.org/documentation/`、`/documentation/sandboxing/`、
-    官方 GitHub `sparkle-project/Sparkle` 的 stable `2.9.2` tag
-    `6276ba2b404829d139c45ff98427cf90e2efc59b` 下 LICENSE/Package.swift/
+    官方 GitHub `sparkle-project/Sparkle` 的 stable `2.9.4` tag
+    `b6496a74a087257ef5e6da1c5b29a447a60f5bd7` 下 LICENSE/Package.swift/
     Configurations/Documentation/source；Apple 面固定为 developer.apple.com 的
     App Sandbox entitlement、Code Signing Services、`SecStaticCode` validity/code
     requirement 与 Team Identifier 文档。允许只读网页/源码；禁止 clone/install/
     build/run Sparkle，禁止执行 release tool，禁止创建 feed、key 或网络服务。
     二手博客、社区流行度、搜索摘要不能支撑 fact。
+  - Readiness source-repin r2(2026-07-23；仅在本独立 D1 remediation PR
+    review/merge 后生效)：PR #427 固定 `2.9.2`
+    (`6276ba2b404829d139c45ff98427cf90e2efc59b`) 后、AU-001 开工前的官方
+    `git ls-remote` 复核发现 stable `2.9.3` 与 `2.9.4` tags 已存在；官方
+    security/reliability 文档还列出 2.9.4 的 installation timeout、delta symlink
+    与 appcast-item race 修复。继续只读 2.9.2 会使安全/失败维度失真，故在产生
+    evaluation/evidence 前 fail closed 暂停。本 r2 仅把 Sparkle source boundary
+    精确替换为上述 2.9.4 tag；候选集合、五维度、Apple/local inputs、allowed
+    paths、零下载/执行/实现与验证门全部不变。r2 audit base = PR #427 merge
+    `2c04d0d3ad337a1bdaf074c132a50c4474fe99cb`；除本 task status/source pin 外
+    零文件变化，r1 固定的九个 local input blob OID 全部复核无漂移。
   - Verification/evidence gate:satisfied。交付只写本 change `evidence/**`：
     evaluation/selection record、逐来源访问日期/稳定 URL/tag OID、`run.md` 与
     `TEST-AU-EVAL-001` 二值结论；记录 third-party dependency/file change/
