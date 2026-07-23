@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 import json
+import shutil
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -39,6 +41,64 @@ class PullRequestPathTests(unittest.TestCase):
             change.mkdir(parents=True)
             (change / "tasks.md").write_text(task_section, encoding="utf-8")
         return temporary, root
+
+    def run_git(self, root: Path, *arguments: str) -> str:
+        completed = subprocess.run(
+            ["git", "-C", str(root), *arguments],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(
+            completed.returncode,
+            0,
+            msg=f"git {' '.join(arguments)} failed: {completed.stderr}",
+        )
+        return completed.stdout.strip()
+
+    def commit(self, root: Path, message: str) -> str:
+        self.run_git(root, "add", "-A")
+        self.run_git(root, "commit", "--quiet", "-m", message)
+        return self.run_git(root, "rev-parse", "HEAD")
+
+    def make_archivable_repo(
+        self,
+    ) -> tuple[tempfile.TemporaryDirectory, Path, Path, str]:
+        temporary = tempfile.TemporaryDirectory(prefix="check-pr-archive-")
+        root = Path(temporary.name)
+        self.run_git(root, "init", "--quiet")
+        self.run_git(root, "config", "user.name", "Contract Test")
+        self.run_git(root, "config", "user.email", "contract@example.invalid")
+        self.run_git(root, "config", "core.filemode", "true")
+        change = root / "openspec" / "changes" / "chg-test-archive"
+        (change / "evidence").mkdir(parents=True)
+        (change / "tasks.md").write_text(
+            "## TASK-ARC-001 — archive fixture\n"
+            "- Allowed paths:`docs/allowed.md`\n",
+            encoding="utf-8",
+        )
+        (change / "proposal.md").write_text("# proposal\n", encoding="utf-8")
+        (change / "evidence" / "run.md").write_text("run\n", encoding="utf-8")
+        base_oid = self.commit(root, "base active change")
+        return temporary, root, change, base_oid
+
+    def archive_context(
+        self, base_oid: str, head_oid: str
+    ) -> check_pr_paths.PullRequestContext:
+        return check_pr_paths.PullRequestContext(
+            title="governance(TASK-ARC-001): archive change",
+            body="Task: TASK-ARC-001\n",
+            head_ref="agent/task-arc-001-archive",
+            base_oid=base_oid,
+            head_oid=head_oid,
+        )
+
+    def move_to_archive(self, root: Path, change: Path, target_name: str) -> Path:
+        archive_root = root / "openspec" / "changes" / "archive"
+        archive_root.mkdir(parents=True, exist_ok=True)
+        target = archive_root / target_name
+        change.rename(target)
+        return target
 
     def assert_error(self, expected: str, callback) -> None:
         with self.assertRaises(check_pr_paths.CheckError) as caught:
@@ -270,6 +330,218 @@ class PullRequestPathTests(unittest.TestCase):
             (
                 "openspec/changes/chg-proposed/proposal.md",
                 "openspec/changes/chg-proposed/tasks.md",
+            ),
+        )
+
+    def test_atomic_archive_uses_base_task_and_allows_declared_living_path(self):
+        temporary, root, change, base_oid = self.make_archivable_repo()
+        self.addCleanup(temporary.cleanup)
+        self.move_to_archive(root, change, "2026-07-23-chg-test-archive")
+        allowed = root / "docs" / "allowed.md"
+        allowed.parent.mkdir(parents=True)
+        allowed.write_text("allowed living update\n", encoding="utf-8")
+        head_oid = self.commit(root, "atomic archive")
+        context = self.archive_context(base_oid, head_oid)
+        changed = check_pr_paths.git_changed_paths(root, base_oid, head_oid)
+
+        result = check_pr_paths.check_paths(root, context, changed)
+
+        self.assertEqual(result.task_id, "TASK-ARC-001")
+        self.assertEqual(result.allowed_patterns, ("docs/allowed.md",))
+        self.assertIn(
+            "openspec/changes/archive/2026-07-23-chg-test-archive/tasks.md",
+            result.changed_paths,
+        )
+
+    def test_archive_only_task_never_supplies_authority(self):
+        temporary = tempfile.TemporaryDirectory(prefix="check-pr-archive-only-")
+        self.addCleanup(temporary.cleanup)
+        root = Path(temporary.name)
+        self.run_git(root, "init", "--quiet")
+        self.run_git(root, "config", "user.name", "Contract Test")
+        self.run_git(root, "config", "user.email", "contract@example.invalid")
+        archived = (
+            root
+            / "openspec"
+            / "changes"
+            / "archive"
+            / "2026-07-22-chg-old"
+        )
+        archived.mkdir(parents=True)
+        (archived / "tasks.md").write_text(
+            "## TASK-ARC-001 — archive only\n- Allowed paths:`**`\n",
+            encoding="utf-8",
+        )
+        base_oid = self.commit(root, "archive-only base")
+        note = root / "docs" / "note.md"
+        note.parent.mkdir(parents=True)
+        note.write_text("update\n", encoding="utf-8")
+        head_oid = self.commit(root, "unrelated update")
+        context = self.archive_context(base_oid, head_oid)
+
+        self.assert_error(
+            "archive-only tasks are not authority",
+            lambda: check_pr_paths.check_paths(
+                root,
+                context,
+                check_pr_paths.git_changed_paths(root, base_oid, head_oid),
+            ),
+        )
+
+    def test_atomic_archive_rejects_partial_extra_mutated_and_mode_drift(self):
+        cases = (
+            (
+                "partial",
+                lambda target: (target / "proposal.md").unlink(),
+                "partial/extra move",
+            ),
+            (
+                "extra",
+                lambda target: (target / "extra.md").write_text(
+                    "extra\n", encoding="utf-8"
+                ),
+                "partial/extra move",
+            ),
+            (
+                "mutated",
+                lambda target: (target / "proposal.md").write_text(
+                    "mutated\n", encoding="utf-8"
+                ),
+                "mutated=proposal.md",
+            ),
+            (
+                "mode",
+                lambda target: (target / "proposal.md").chmod(0o755),
+                "mode mismatch=proposal.md",
+            ),
+        )
+        for label, mutate, expected in cases:
+            with self.subTest(label=label):
+                temporary, root, change, base_oid = self.make_archivable_repo()
+                self.addCleanup(temporary.cleanup)
+                target = self.move_to_archive(
+                    root, change, "2026-07-23-chg-test-archive"
+                )
+                mutate(target)
+                head_oid = self.commit(root, f"{label} archive")
+                context = self.archive_context(base_oid, head_oid)
+                self.assert_error(
+                    expected,
+                    lambda root=root, context=context, base_oid=base_oid, head_oid=head_oid: check_pr_paths.check_paths(
+                        root,
+                        context,
+                        check_pr_paths.git_changed_paths(root, base_oid, head_oid),
+                    ),
+                )
+
+    def test_atomic_archive_rejects_copy_with_active_root_residue(self):
+        temporary, root, change, base_oid = self.make_archivable_repo()
+        self.addCleanup(temporary.cleanup)
+        target = (
+            root
+            / "openspec"
+            / "changes"
+            / "archive"
+            / "2026-07-23-chg-test-archive"
+        )
+        target.parent.mkdir(parents=True)
+        shutil.copytree(change, target)
+        head_oid = self.commit(root, "copied archive")
+        context = self.archive_context(base_oid, head_oid)
+
+        self.assert_error(
+            "active-root residue",
+            lambda: check_pr_paths.check_paths(
+                root,
+                context,
+                check_pr_paths.git_changed_paths(root, base_oid, head_oid),
+            ),
+        )
+
+    def test_atomic_archive_rejects_ambiguous_new_targets(self):
+        temporary, root, change, base_oid = self.make_archivable_repo()
+        self.addCleanup(temporary.cleanup)
+        first = self.move_to_archive(root, change, "2026-07-22-chg-test-archive")
+        second = first.parent / "2026-07-23-chg-test-archive"
+        shutil.copytree(first, second)
+        head_oid = self.commit(root, "ambiguous archive")
+        context = self.archive_context(base_oid, head_oid)
+
+        self.assert_error(
+            "ambiguous newly added targets",
+            lambda: check_pr_paths.check_paths(
+                root,
+                context,
+                check_pr_paths.git_changed_paths(root, base_oid, head_oid),
+            ),
+        )
+
+    def test_atomic_archive_rejects_wrong_or_invalid_target_name(self):
+        for target_name in (
+            "chg-test-archive",
+            "2026-W01-1-chg-test-archive",
+            "2026-99-99-chg-test-archive",
+            "2026-07-23-chg-other",
+        ):
+            with self.subTest(target_name=target_name):
+                temporary, root, change, base_oid = self.make_archivable_repo()
+                self.addCleanup(temporary.cleanup)
+                self.move_to_archive(root, change, target_name)
+                head_oid = self.commit(root, "wrong archive target")
+                context = self.archive_context(base_oid, head_oid)
+                self.assert_error(
+                    "must be named YYYY-MM-DD-chg-test-archive",
+                    lambda root=root, context=context, base_oid=base_oid, head_oid=head_oid: check_pr_paths.check_paths(
+                        root,
+                        context,
+                        check_pr_paths.git_changed_paths(root, base_oid, head_oid),
+                    ),
+                )
+
+    def test_atomic_archive_rejects_pre_existing_target(self):
+        temporary, root, change, _ = self.make_archivable_repo()
+        self.addCleanup(temporary.cleanup)
+        target = (
+            root
+            / "openspec"
+            / "changes"
+            / "archive"
+            / "2026-07-23-chg-test-archive"
+        )
+        target.mkdir(parents=True)
+        (target / "marker.md").write_text("pre-existing\n", encoding="utf-8")
+        base_oid = self.commit(root, "add pre-existing archive target")
+        for child in tuple(change.iterdir()):
+            child.rename(target / child.name)
+        change.rmdir()
+        head_oid = self.commit(root, "move into pre-existing target")
+        context = self.archive_context(base_oid, head_oid)
+
+        self.assert_error(
+            "pre-existing target",
+            lambda: check_pr_paths.check_paths(
+                root,
+                context,
+                check_pr_paths.git_changed_paths(root, base_oid, head_oid),
+            ),
+        )
+
+    def test_atomic_archive_rejects_living_scope_expansion(self):
+        temporary, root, change, base_oid = self.make_archivable_repo()
+        self.addCleanup(temporary.cleanup)
+        self.move_to_archive(root, change, "2026-07-23-chg-test-archive")
+        outside = root / "scripts" / "outside.py"
+        outside.parent.mkdir(parents=True)
+        outside.write_text("print('outside')\n", encoding="utf-8")
+        head_oid = self.commit(root, "archive plus living scope expansion")
+        context = self.archive_context(base_oid, head_oid)
+
+        self.assert_error(
+            "paths outside Allowed paths: scripts/outside.py",
+            lambda: check_pr_paths.check_paths(
+                root,
+                context,
+                check_pr_paths.git_changed_paths(root, base_oid, head_oid),
             ),
         )
 
