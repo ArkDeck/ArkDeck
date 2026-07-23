@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-027-decision-grading-batch-approval
 revision: 1
-status: approved # 2026-07-22 本 approval-only PR(先例 #226/#253/#254/#281);r1 proposal 经 #315 合入 main `7a58b02`;批准由维护者 review/merge 本 PR 构成
+status: verified # 2026-07-23 本 verification-closure PR(先例 #224/#239/#393);approval #317;三 task done 已合入(OID 见 Verification closure);archive 另行。原注:2026-07-22 approval-only PR 置 approved;r1 proposal 经 #315 合入 main `7a58b02`
 class: implementation-only
 core_change_level: none
 owner: lvye
@@ -139,3 +139,38 @@ V2 治理:本 propose PR 合入仅登记提案;批准须独立 approval-only PR(
 - 本批准不产生任务执行:三任务保持 `blocked`,各须独立 readiness PR 转
   `ready`。**本批准亦不构成任何具体批次的预先批准**——批次内每次合并仍是
   维护者逐 PR 批准,本 change 的协议只组织其节奏。
+
+## Verification closure(2026-07-23)
+
+三 task 全部 done 于 protected main 在案,三条 change-local AC 证据可复查;
+本 PR 仅状态翻转 + 引用,零实现夹带(先例 #224/#239/#393)。
+
+- **任务链**:BAP-001 实现 #327 merge
+  `42cc63123738313d253b25c9de78220e1e6814b5`、done #328 merge
+  `d1873fb6f4b0d523f9263fcdcffe17b062840247`;BAP-003 execution evidence
+  #375 merge `bb61726a7f47b9462296a9beae316dda88218db1`、done #376 merge
+  `6a6b6b7010b6563d67aa7d96e6838505e82eb25a`;BAP-002 实现 #388 merge
+  `21a416dbbaa88c17a71a6adf55827169d1f6b9f4`、drill evidence #397 merge
+  `0df47e85f3a84ef7b81f4ccd2fe04e4b67eb50c4`、done #398 merge
+  `ab5bccef0ae544789c8345276df983ff551cfbee`。
+- **BAP-GOV-001(documentReview)= PASS**:enforcement.md 2.1.0"决策分级
+  (D0/D1/D2)"与"批次审批协议"两小节在 main 正本(D0 三条件、D1/D2 封闭
+  列举、逐 PR 批准、digest 无批准语义、遇拒停链、零 auto-merge 逐项在文);
+  AGENTS.md 批次协作条同步且信任根/权威顺序文本零改动;design §0 六不变量
+  逐条对照见 `evidence/runs/TASK-BAP-001/run.md`。
+- **BAP-CRED-001(documentReview)= PASS**:ruleset `agent-ref-boundary`
+  (bypass 仅维护者)+ Deploy Key `arkdeck-agent-writer`(无 bypass);三项
+  真实 ref 验证(agent/** 正向、普通分支与 main 直推负向均 GH013 拒)与
+  维护者凭据移除四查(gh/env/credential-helper/ssh-agent)见
+  `evidence/runs/TASK-BAP-003/run.md`;凭据值零入仓。
+- **BAP-DRILL-001(documentReview)= PASS**:首次批次演练
+  (issue #395,`batch-20260723-1`)两项合格 D0 同批次按 digest 顺序合并
+  (#393 merge `ee205537de89ab5ad0e3e81fb1f71328228c6a4e` → #396 merge
+  `1b9079268db8e85bee9383f7b705d957f2a9cda3`,前者为后者祖先),各自入队
+  三门齐备(CI 绿/独立 exact-head APPROVE 零 finding/digest 完整);watch
+  三源核验树等值后自动续跑;偏差 1-5 如实入档,见
+  `evidence/runs/TASK-BAP-002/drill.md`。
+- **Gate 边界**(verification.md 原文照守):verified 不构成对后续每个批次
+  的质量担保——逐 PR review 永远是唯一批准载体;不构成 guard/CI 机械化
+  (CHG-2026-028,已 verified)或 host-loop runtime(CHG-2026-030,在途)
+  的任何完成声明;archive 另行(引用扫描先决)。
