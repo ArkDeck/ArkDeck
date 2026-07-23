@@ -25,7 +25,10 @@
     absence。任一漂移、路径抢占或被后续 revision supersede，立即停止并重新 readiness。
     `tasks.md` 是本 readiness 的自载体，表中只钉 r2 PR 开工前 blob；r2 merge 后不得要求
     它等于自身修改前 blob，而须核对该 merge 的 parent 恰为本 base、diff 只含本 HLR-001
-    readiness section，并把 r2 完整 merge OID 作为 implementation 的状态事实：
+    readiness section，并把 r2 完整 merge OID 作为 implementation 的状态事实。r2 只
+    supersede r1 对 CHG-2026-027 `tasks.md` 的 whole-file blob pin：该依赖改为
+    TASK-BAP-003 done merge ancestry 与唯一 TASK-BAP-003 section hash 的双重固定；
+    r1 其余 pin 继续有效：
 
     ```yaml pins
     - artifact: TASK-HLR-001 readiness audit base
@@ -48,15 +51,27 @@
       blob: 1f7093402034c622553a11a71b6fc50cb8622bec
     - path: .github/workflows/agent-pr.yml
       blob: 2b9b03a90d70671d85da21be6a667e2f2f9c8acb
-    - path: openspec/changes/chg-2026-027-decision-grading-batch-approval/tasks.md
-      blob: 97cf591e56b1fedfb7c3369b6f9050a2b47e8f12
+    - artifact: TASK-BAP-003 section
+      path: openspec/changes/chg-2026-027-decision-grading-batch-approval/tasks.md
+      sha256: 6f377758c7d96534b38e6a3373cd191d0189f3e3a16949e12fcb386e089948e0
     ```
 
+    section extractor 必须先确认全文件中只有一行以 exact task-header token
+    `## TASK-BAP-003`（token 后为 whitespace 或 EOL）开头；零个或多个匹配均视为
+    pin drift。唯一 section 从该行的首字节起，至下一行以 `## TASK-` 开头前或 EOF
+    的 UTF-8 bytes 止；预期 byte count = `3724`。本 section 的 byte count/SHA-256
+    在 #376 done merge、#385 r1 merge 与本 r2 audit base 均相同；BAP-001/002 独立
+    section 变化不再误伤本 lane。
     `scripts/host_loop/**` 与 `openspec/templates/agent-pr-body.md` 在本 base **均不存在**；
     它们是本任务唯一获准的新输出根/文件，不得覆盖或迁移其他 owner 的内容。
-    r1 候选 head `d18b38164e6eef9d5e7aee6769e747896efc64a3` 只保留为本地可审计
-    候选；r2 合入后必须从新 main 重放/复核并形成新 head，不得 reopen #389 或沿用其
-    stale base/evidence。
+    在 #386 已使 r1 pin 漂移后，共享会话误将候选 head
+    `d18b38164e6eef9d5e7aee6769e747896efc64a3` 推送到远端分支
+    `agent/task-hlr-001-envelope-r2`，并于 `2026-07-23T03:59:17Z` 自动创建 #389；
+    这违反 r2 merge 前零成 PR 边界，作为偏差记录而非任何批准。#389 已于
+    `2026-07-23T04:00:35Z` 关闭，`merged_at = null`、零维护者 approval/merge，
+    远端分支已删除。该 head/base/evidence 永久 superseded，不得 reopen 或复用；
+    r2 合入后必须从最新 protected `main` 建立新 branch、形成新 exact head、重跑全部
+    verification 并取得针对该新 head 的独立 review，才可创建新的 implementation PR。
   - **Envelope v1 grammar:closed。**canonical renderer 输出 UTF-8/LF 文本；首个
     non-empty line 必须恰为 `<!-- arkdeck-pr-envelope:v1 -->`，machine block 以独立行
     `<!-- /arkdeck-pr-envelope -->` 结束，两个 marker 各且仅出现一次。block 内 scalar
@@ -105,9 +120,9 @@
   - **Concurrency/review gate:satisfied。**审计时 open PR #387 只修改 CHG-2026-029
     change package；#388 只修改 TASK-BAP-002 evidence、batch digest template 与其
     owning host-loop runbook，二者均不触及本 readiness path、`scripts/host_loop/**` 或
-    `openspec/templates/agent-pr-body.md`。失效实现 PR #389 已因远端 head 删除而关闭，
-    `merged_at = null`。当前无其他 active task 获准占用本任务的新输出路径。出现同路径
-    PR、canonical conflict 或需要 forbidden path 时立即回到 `blocked`。
+    `openspec/templates/agent-pr-body.md`。上述失效实现 PR #389 已关闭且未合入，当前
+    无 live HLR-001 implementation PR，也无其他 active task 获准占用本任务的新输出路径。
+    出现同路径 PR、canonical conflict 或需要 forbidden path 时立即回到 `blocked`。
   - **Review boundary。**本 PR 只修改本文件 TASK-HLR-001 section，将
     r1 readiness 重钉为 r2 并登记 D1 base/pins/concurrency；零 runtime/template/evidence、
     零 HLR-002 D2 准备、零 implementation。readiness merge 不构成
