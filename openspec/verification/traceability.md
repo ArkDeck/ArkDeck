@@ -1,12 +1,13 @@
 # Baseline Traceability Index
 
-> Core baseline：CORE-2.0.0  
+> Core baseline：CORE-2.1.0
 > Status：requirements and AC defined; per-change evidence tracked in change ledgers
 >
 > 更新规则（2026-07-20 成文,账本对齐 PR）:平台列仅在对应平台 change 达到 change 级
 > `verified` 时翻转;单任务 done/单 AC passed 的证据由各 change 的 verification.md
-> acceptance matrix 与 evidence/ 承载,不提前汇入本表。CORE-2.0.0 下尚无平台 change
-> verified,故各平台列 `notStarted` 如实保持。
+> acceptance matrix 与 evidence/ 承载,不提前汇入本表。CHG-2026-021 的 verification
+> closure 经维护者 review/merge 后,Trace 的 macOS canonical contract/parserGolden 面
+> 翻转为 `verified`;其余未达同等 change gate 的平台列保持 `notStarted`。
 
 每个 Requirement 的 Scenario 位于同一 `spec.md`，是验收事实源。本索引只记录验证套件和平台状态，不复制 AC 文本。
 
@@ -20,7 +21,7 @@
 | REQ-ART-001…006 | `specs/session-artifact-storage/spec.md` | TEST-ARTIFACT / TEST-MANIFEST / TEST-PRIVACY | notStarted | notStarted | notStarted |
 | REQ-STO-001…005 | `specs/session-artifact-storage/spec.md` | TEST-STORAGE-COORDINATOR / TEST-ENOSPC | notStarted | notStarted | notStarted |
 | REQ-DUMP-001…008 | `specs/ui-dump/spec.md` | TEST-DUMP-PARSER / TEST-DUMP-WORKFLOW / EVD-HW-DUMP | notStarted | notStarted | notStarted |
-| REQ-TRACE-001…009 | `specs/trace/spec.md` | TEST-TRACE-ADAPTER / TEST-PARAM-RESTORE / EVD-HW-TRACE | notStarted | notStarted | notStarted |
+| REQ-TRACE-001…009 | `specs/trace/spec.md` | TEST-TRACE-ADAPTER / TEST-PARAM-RESTORE / EVD-HW-TRACE | verified | notStarted | notStarted |
 | REQ-DEBUG-001…007 | `specs/debug-workbench/spec.md` | TEST-HILOG-ROTATION / TEST-DEBUG-COMMANDS / EVD-HW-DEBUG | notStarted | notStarted | notStarted |
 | REQ-FLASH-001…015 | `specs/flashing/spec.md` | TEST-FLASH-PLAN / TEST-FLASH-RECOVERY / EVD-HW-FLASH | notStarted | notStarted | notStarted |
 | REQ-UX-001…007 | `specs/desktop-ux-observability/spec.md` | TEST-VIEWMODEL / TEST-HISTORY / TEST-A11Y / TEST-DEVICE-ACCESS | notStarted | notStarted | notStarted |
