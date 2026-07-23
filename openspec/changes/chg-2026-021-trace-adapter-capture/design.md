@@ -1,6 +1,6 @@
 # CHG-2026-021 Design:hitrace/bytrace adapter 采集 MVP
 
-> Status:r1 approved;r2 remediation approved;r3 archive-relocation candidate
+> Status:r1 approved;r2 remediation approved;r3 archive-relocation approved;r4 link-closure correction candidate
 > Core baseline:CORE-2.1.0(零 Core 变更;认领 trace REQ-TRACE-* 的 macOS 面)
 
 ## 0. 采集命令面草案(候选;exact argv 由 TR-001 真机 provenance 固定)
@@ -134,3 +134,16 @@ blocked 并先经 scope amendment，不能在任务中扩写 Core/storage contra
 - normalized before/after 比较必须证明列举外 semantic delta 为 0。任何新 consumer、
   新 active-root reference、resource/hash 漂移或需要 version bump 的变化都会使本例外
   失效，必须停止并先走新的 D1/integration scope。
+
+## 8. r4 closes the post-r3 handbook-link drift
+
+CHG-2026-029 r5 在 r3 合入后为 AF-014 增加了 TASK-TR-002R run 的一手 source link，
+使 living handbook target 从 5 增至 6。r4 只把该 target 纳入同一原子路径迁移：
+
+- 6 个 link 仍只替换 active change 根为 r3 固定 archive 根，link text、anchor、
+  Fact/Inference、OID、taxonomy 与其他 handbook bytes 不变；
+- r3 的 3 个 registry path、3 个 hash consumer、registry candidate bytes/hash、
+  resource closure、version 与产品/adapter 语义全部不变；
+- 已归档 CHG-2026-029 中的历史 path/link bytes 保留，不参与 living rewrite；
+- r4 合入前 archive 不得开工；若再出现新的 active reference，继续 fail closed
+  并先做新的 D1 revision。
