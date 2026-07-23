@@ -192,12 +192,20 @@
 
 ## TASK-HLR-002A — Legacy bootstrap namespace partition
 
-- Status:ready（r4 / r5 D2 re-readiness；仅在维护者 review/merge 本独立
-  re-readiness PR 后生效。本 r4 明确作废 #424 固定但主动跳过的 r3 窗口，重新钉定
-  `2026-07-24T02:00:00Z`→`03:00:00Z`、最新 protected-main audit base 与 fresh
-  probes；ruleset before/rollback/after bytes 保持逐字不变。merge 只批准下述
-  人类 D2 计划，不自行修改 ruleset；任一窗口/read-back/pin 不匹配时仓外
-  PUT/ref/probe dispatch = 0。）
+- Status:blocked（human-operation deferral stop gate；仅在维护者 review/merge
+  本独立状态 PR 后生效。维护者已明确要求跳过所有必须由本人执行的任务，因此
+  #425 固定的人类 D2 ruleset 窗口不执行，PUT/ref/probe dispatch = 0；没有 D2
+  receipt、acceptance PASS 或 done。TASK-HLR-002 持续 blocked，
+  TASK-HLR-003→004→005 继续传递停链。恢复本任务必须另起独立 D2 re-readiness
+  PR，重新钉定当时 protected-main/ruleset/refs/维护窗口与维护者可执行性；不得
+  复用 r3/r4 script、UUID 或窗口。）
+- Historical Status:ready（r4 / r5 D2 re-readiness；#425 exact reviewed head
+  `30e4d42669bdd256be70c4ee1c82c5f41e1a85ad` 由 `lvye` APPROVED，并以
+  `0dac14d9fe021d7bd52808b54c139003f1aced2f` 合入 protected `main`；其唯一
+  parent = r4 audit base `b5b4f239c90825bf55e79af6713d75d8c6169277`。r4
+  固定的 `2026-07-24T02:00:00Z`→`03:00:00Z` 人类 D2 窗口现按维护者指示主动
+  跳过；该 readiness 只批准计划，从未构成 D2 receipt、acceptance PASS 或
+  done。）
 - Historical Status:ready（r3 D2 re-readiness #424 merge
   `b5b4f239c90825bf55e79af6713d75d8c6169277` 后生效；维护者于旧窗口开始前明确
   选择跳过，zero PUT/ref/probe。`2026-07-23T14:12:17Z` 复查 ruleset
@@ -237,6 +245,28 @@
   钉定 `agent-pr.yml`/`sdd-guard.yml` blobs、GitHub Actions branch-filter semantics、
   reserved namespace grammar、control/canary 矩阵与零 open workflow conflict。r3
   proposal 合入本身不使本任务 ready。）
+- Human-operation deferral stop gate：
+  - **Decision fact:closed。**维护者明确表示无法执行脚本，并要求所有需要本人
+    操作的任务跳过；本状态只把 TASK-HLR-002A 从 `ready` 转为 `blocked`，不把
+    “跳过”冒充完成、验证或平台豁免。
+  - **Zero-execution fact:closed。**截至 `2026-07-23T14:34:46Z` 的公开只读
+    read-back，ruleset ID `19595282` 仍是 active、include `~ALL`、仅 exclude
+    `refs/heads/agent/**`、creation/update/deletion，`updated_at =
+    2026-07-23T02:20:11.425Z`；`agent/host-loop/**` 与
+    `agent/hlr-002a-control/**` refs = 0、open PR = 0，`gh` zero logged-in
+    hosts。没有 ruleset PUT、probe dispatch、ref create/delete 或 receipt。
+  - **Dependency consequence:closed。**TASK-HLR-002 依赖本任务 done，且仍另需
+    人类 integration identity/secret/scheduler D2；TASK-HLR-003 依赖 HLR-002，
+    HLR-004/005 再依赖 HLR-003。因此本 change 没有可合法跳转执行的 AI-only
+    ready task，下游全部 fail closed。
+  - **Resume boundary:closed。**以后若恢复，先以独立 readiness PR 从最新
+    protected `main` 重做 authenticated ruleset before/read-back、fresh ref
+    absence、fresh UUID、exact maintenance window、operator availability 与
+    rollback pin；该 PR 合入前仓外写仍为 0。旧 executor 仅是历史载体，不得补跑
+    或改时间复用。
+  - **Review boundary。**本状态 PR 只修改本文件 TASK-HLR-002A section；零
+    ruleset/API/ref/probe/credential/scheduler 仓外写，零 source/workflow/test/
+    evidence 改写。merge 只批准暂停和下游停链，不批准任何 D2 动作。
 - r5 remediation（D1 revision audit base = protected `main`
   `e4b33d036f796de7eb4aaed254724329ca040e68`）：
   - **Failure fact:closed。**#419 implementation 的 offline、push、bot-PR、
@@ -283,7 +313,7 @@
   - **Evidence/done boundary。**D2 receipt + fresh live facts 使用独立 evidence PR，
     只追加本任务 evidence，不改 source/status；其 merge 后再以独立 D0 PR
     `ready→done`。HLR-002 在 HLR-002A done 前持续 blocked。
-- Readiness（r4 / r5 D2 re-readiness，audit base = protected `main`
+- Historical Readiness（r4 / r5 D2 re-readiness，audit base = protected `main`
   `b5b4f239c90825bf55e79af6713d75d8c6169277`）：
   - **r3 skip fact:closed。**#424 exact reviewed head
     `bba513aebd227195e859165f51573f8beb80a518` 由 `lvye` 于
