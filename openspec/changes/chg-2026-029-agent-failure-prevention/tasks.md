@@ -6,9 +6,25 @@
 
 ## TASK-AFP-001 — 建立非权威 Agent 失败模式手册
 
-- Status:ready（2026-07-23 D1 readiness **r2**；仅在维护者 review/merge 本独立 PR 后
-  生效。CHG-2026-029 approval 与本任务历史审计 base、**十八项** case routing、固定文档
-  结构及验证矩阵已闭合；merge 前不得开 implementation/evidence PR）
+- Status:done（2026-07-23；仅在维护者 review/merge 本独立状态 PR 后生效。
+  implementation + evidence PR #360 已由维护者 @lvye APPROVED 并合入 protected
+  `main`，merge OID `95dc61cf6ed9223f5b5c1728aaf0d9a1ba6c9d5c`；交付物
+  `openspec/planning/agent-failure-patterns.md` 于该 merge 的 blob 为
+  `5b8c3b6b26b76893744aa11bdd7618318eab4674`。done 不等于 change `verified`：
+  `AFP-HANDBOOK-001` 的最终结论仍需 change 级 verify PR 由维护者确认。）
+- Done recheck（在**合入版** `95dc61cf6ed9223f5b5c1728aaf0d9a1ba6c9d5c` 上重跑，
+  非沿用实现 PR 的结论）：
+  - 结构：H2 = 18 且 `AF-001`…`AF-018` 唯一无缺号；H3 = 144，18 组均为 design §2
+    八字段且同序；
+  - 方法：positive 18 + negative 18 = 36；`Fact`/`Inference` 每项至少各一；
+    `Automation status` 18 项全部落在三个合法取值内；`Currency` 18 项统一记
+    audit base `de6b79aafa95700297a94dc311e94b1283f8abdd` 与 `2026-07-23`；
+  - 引用：相对链接 99 条全解析（含 56 个 section anchor 命中目标文件真实标题）；
+    完整 40-hex OID 20 枚全部在 ancestry；
+  - 边界：新增 normative `SHALL`/`MUST` = 0；用户绝对路径 = 0；裸 64-hex 摘要 = 0；
+  - readiness r2 pins 在合入版复核 35/35 无漂移；
+  - `scripts/check-sdd.sh` 0 error / 0 warning / 111 acceptance IDs；
+    `git diff --check` 干净。
 - **r1 readiness 已失效（pin drift，如实记录不改写）**：r1 于 #356 合入
   `e73b025dab3c12162465040bd0829470b2409ae9`，其 pins carrier 钉定本 change 四个
   文件的 r1 blob。CHG-2026-029 revision r2（#355 合入
