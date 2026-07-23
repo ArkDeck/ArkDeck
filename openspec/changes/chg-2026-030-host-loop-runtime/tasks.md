@@ -3,6 +3,8 @@
 > 本 change 的每个 task 均 host-only，零真实设备/HDC/effect dispatch。proposal PR
 > 只含本 change package；批准、readiness、实现/evidence、done、verified 均为独立 PR。
 > D2 host/credential 配置与源码 PR 分离；任何判断门未合入前不做门后的成 PR 工作。
+> r3 新增 TASK-HLR-002A 划分 `agent/host-loop/**` exclusive creator namespace；
+> 该 task done 前 HLR-002 不得 ready，零 identity/secret/scheduler/probe 动作。
 
 ## TASK-HLR-001 — 结构化 PR envelope 与纯 runtime contract
 
@@ -186,28 +188,89 @@
 - readiness 若发现 templates 或 current `MECH-004` grammar 冲突，停止并提议 scope
   revision，不在本 task 改 canonical governance。
 
+## TASK-HLR-002A — Legacy bootstrap namespace partition
+
+- Status:blocked（前置：① CHG-2026-030 revision r3 由维护者 review/merge；②
+  TASK-HLR-001 done；③ TASK-BAP-003 done；④ 独立 readiness PR 钉定
+  `agent-pr.yml`/`sdd-guard.yml` blobs、GitHub Actions branch-filter semantics、
+  reserved namespace grammar、control/canary 矩阵与零 open workflow conflict。r3
+  proposal 合入不使本任务 ready。）
+- Platform:github-actions + macos（host/bootstrap control plane；零产品平台声明）
+- Requirements/AC:change-local `HLR-LEASE-001`、`HLR-WORKER-001`
+- Depends on:change revision r3、TASK-HLR-001 done、TASK-BAP-003 done、
+  independent readiness
+- In scope:`agent-pr.yml` push filter 保留 `agent/**` include、增加
+  `!agent/host-loop/**` exclude；固定 task/lease/probe 三个 reserved family；
+  branch-filter contract test；implementation merge 后的 control/canary live evidence；
+  本 change evidence 与本任务状态。
+- Out of scope:修改 `sdd-guard.yml`、创建/配置 integration identity/secret/scheduler、
+  PR body/envelope/runtime/lease/cursor 实现、移除 legacy bootstrap、真实设备或产品代码。
+- Allowed paths:`.github/workflows/agent-pr.yml`、
+  `scripts/test_agent_pr_workflow.py`、本 change `evidence/**`、本 change
+  `tasks.md`（仅本任务状态/evidence 引用）。
+- Forbidden paths:`AGENTS.md`、`openspec/constitution.md`、
+  `openspec/governance/**`、`openspec/specs/**`、`openspec/contracts/**`、
+  `openspec/changes/archive/**`、`.github/workflows/sdd-guard.yml`、
+  `scripts/host_loop/**`、产品 source/tests、其他 change。
+- Risk:medium（filter 过宽会停掉现有 PR bootstrap，过窄会造成双 creator；任一情况
+  fail closed，不进入 D2）。
+- Hardware required:no。
+
+### Deliverables
+
+- legacy workflow 对 `agent/host-loop/**` 零 dispatch，对其他 `agent/**` 行为不变；
+- exact namespace：
+  `agent/host-loop/tasks/<task-id>`、
+  `agent/host-loop/leases/<task-id>`、
+  `agent/host-loop/probes/<run-id>`；空/额外 segment、`..`、backslash、case drift
+  与相似前缀不命中 reserved parser；
+- contract test 解析 workflow YAML/event filter，证明 include + exclude 同时存在，
+  `sdd-guard.yml` byte-for-byte 零 diff；
+- implementation 合入后 live canary：普通 control branch 仍由 legacy creator 创建唯一
+  PR；reserved probe branch 的 head guard 出现但 legacy PR/workflow run 数为 0，canary
+  清理不以 branch disappearance 代替查询结果。
+
+### Verification
+
+- `HLR-LEASE-001`/`HLR-WORKER-001` bootstrap slice：contract fixtures 全通过；
+  control/canary 的 branch/head/full run/PR IDs 可复查；reserved branch 零
+  `github-actions[bot]` PR，普通 control 恰一 legacy PR；
+- `python3 scripts/test_agent_pr_workflow.py`、HLR envelope regression、MECH-004
+  path tests、`check-sdd`、`git diff --check` 与 allowed/forbidden diff 通过。
+
+### Notes / handoff
+
+- implementation/evidence、live canary evidence 与 `ready→done` 分离；canary 分支/PR
+  不合入，清理结果如实记录；
+- TASK-HLR-002A done 只建立 creator 空间，不授权 D2 identity，也不构成 HLR-002
+  activation receipt。
+
 ## TASK-HLR-002 — D2 integration identity 与 host activation
 
-- Status:blocked（r2 stop gate：2026-07-23 readiness 勘察确认 GitHub
+- Status:blocked（r3 stop gate：现有 legacy bootstrap 会抢先创建所有 `agent/**`
+  PR，故在 TASK-HLR-002A done 前无法形成新 identity create-PR 正例。解除前置：
+  ① CHG-2026-030 revision r3 经维护者 review/merge；② TASK-BAP-003 done；
+  ③ TASK-HLR-002A done；④ 独立 D2 readiness/维护者窗口钉定实际 integration
+  identity、单仓 scope、最小 categories、非 CODEOWNER/bypass 事实、secret storage、
+  scheduler owner/label reservation、rollback contact 与正/负 probe。Agent 不得代为
+  创建、修改或批准仓外 D2 配置。r2 历史 finding：2026-07-23 勘察确认 GitHub
   `Pull requests:write` 同时覆盖 PR create/review，`Contents:write` 同时覆盖
   `agent/**` ref/merge endpoint；r1 的正向能力与“零 review/merge API permission”
-  无法同时由 permission manifest 证明，故未翻 `ready`，也未创建/修改任何 identity、
-  secret、scheduler 或 live probe。解除前置：① CHG-2026-030 revision r2 经维护者
-  review/merge；② TASK-BAP-003 done；③ 独立 D2 readiness/维护者窗口钉定实际
-  integration identity、最小 repository categories、非 CODEOWNER/bypass 事实、secret
-  storage、host scheduler owner、rollback contact 与正/负 probe。Agent 不得代为创建、
-  修改或批准仓外 D2 配置。）
+  无法同时由 permission manifest 证明。）
 - Platform:macos（受控 host 运维；零产品平台声明）
 - Requirements/AC:change-local `HLR-LEASE-001`
-- Depends on:change revision r2、TASK-BAP-003 done、independent D2 readiness
-- In scope:维护者建立非 `GITHUB_TOKEN` integration identity、受限 `agent/**` lease
-  ref、PR/Issue 所需的最小 GitHub repository permission categories、host scheduler
-  registration 与脱敏正/负 probe；identity 必须非 CODEOWNER、非 protected-main/
-  ruleset bypass；本 change evidence 与本任务状态。
+- Depends on:change revision r3、TASK-BAP-003 done、TASK-HLR-002A done、
+  independent D2 readiness
+- In scope:维护者建立非 `GITHUB_TOKEN`、repository-only、非 CODEOWNER/bypass 的
+  PR/Issue integration identity；permission categories 固定为 Metadata read、Contents
+  read、Pull requests write、Issues write，其他 repository/organization/account
+  permission 为 none；`agent/host-loop/**` ref 继续复用 BAP-003 Deploy Key/ruleset；
+  配置 secret storage、scheduler owner/label reservation（worker 保持 disabled）与
+  脱敏正/负 probe；本 change evidence 与本任务状态。
 - Out of scope:任何批准/合并权威、Actions/Workflows/Administration 或 branch
   protection/ruleset admin、token/key 入仓、runtime 源码、旧 `agent-pr` workflow
-  迁移。平台共享 write category 对 review/merge endpoint 的潜在 coverage 必须如实
-  记录，不能误报为 endpoint permission 不存在。
+  最终迁移、启动尚不存在的 worker。平台共享 Pull requests write 对 review endpoint
+  的潜在 coverage 必须如实记录，不能误报为 endpoint permission 不存在。
 - Allowed paths:本 change `evidence/**`、本 change `tasks.md`（仅本任务状态/evidence
   引用）。
 - Forbidden paths:`AGENTS.md`、`openspec/constitution.md`、`openspec/governance/**`、
@@ -219,37 +282,44 @@
 ### Deliverables
 
 - 维护者执行的 D2 evidence：identity 类型/权限类别（不含值）、host owner、secret
-  storage 类别、单仓 scope、非 CODEOWNER/bypass readback、lease ref 与 PR/Issue
-  正向操作、protected-main direct write / integration-authored PR self-approval /
-  merge / admin same-value mutation 的负向拒绝、撤销与 rollback 方法；
-- runtime 启动前可查询的 host activation receipt，仅含脱敏 IDs 与时间。
+  storage 类别、单仓 scope、非 CODEOWNER/bypass readback、reserved lease ref 与
+  integration-authored reserved probe PR/Issue 正向操作、protected-main direct write /
+  self-approval / merge / admin same-value mutation 的负向拒绝、撤销与 rollback；
+- host staging receipt：仅含脱敏 identity/host/scheduler IDs、时间、permission
+  categories、secret-storage class、`workerDisabled=true`；不把 scheduler
+  owner/label reservation 误写为 worker 已注册或运行。
 
 ### Verification
 
 - `HLR-LEASE-001` D2 document/integration review：非 `GITHUB_TOKEN` identity 能创建
-  受限 probe PR/Issue 与 `agent/**` lease ref；permission manifest 与 repository scope
-  等于 readiness pins，identity 非 CODEOWNER/bypass；直写 main、自己的 probe PR
-  approval、merge 和 admin same-value mutation 均被拒；token/private key/绝对用户路径
-  为零；`check-sdd`/diff check 通过。任何负向 probe 意外成功即撤销 identity 并保持
-  `blocked`，cleanup 不把该次失败改写为 PASS。
+  reserved probe PR/Issue，Deploy Key 能创建/CAS/删除
+  `agent/host-loop/leases/**` ref；legacy creator 对 reserved probe 零 PR；permission
+  manifest/scope 等于 readiness pins，identity 非 CODEOWNER/bypass；直写 main、
+  自己的 probe PR approval、merge 和 admin same-value mutation 均被拒；
+  token/private key/绝对用户路径为零；`check-sdd`/diff check 通过。任何负向 probe
+  意外成功即撤销 identity 并保持 `blocked`，cleanup 不把失败改写为 PASS。
 
 ### Notes / handoff
 
 - 维护者须亲自执行并确认 D2 动作；runtime/Agent 只能读取事实性 receipt；
+- HLR-002 done 时 worker 必须仍 disabled；实际 scheduler registration/enable 与
+  source hash binding 属 HLR-003 的分离 D2 evidence 阶段；
 - 未形成可复查 receipt 时，HLR-003/004/005 一律保持 blocked。
 
 ## TASK-HLR-003 — Fenced worker loop 与 legacy PR creator 迁移
 
-- Status:blocked（前置：① 本 change approval；② TASK-HLR-001 done；③ TASK-HLR-002
-  done；④ 独立 readiness PR 钉定 `agent-pr.yml`、MECH-004 parser 与 runtime blobs，
-  并确认零 open creator migration conflict。）
+- Status:blocked（前置：① change revision r3 approval；② TASK-HLR-001 done；
+  ③ TASK-HLR-002A done；④ TASK-HLR-002 done；⑤ 独立 readiness PR 钉定
+  `agent-pr.yml`、MECH-004 parser、identity/staging receipt、scheduler activation
+  plan 与 runtime blobs，并确认 reserved namespace 零 creator conflict。）
 - Platform:macos（host-only）
 - Requirements/AC:change-local `HLR-LEASE-001`、`HLR-WORKER-001`
-- Depends on:TASK-HLR-001 done、TASK-HLR-002 done、independent readiness
+- Depends on:TASK-HLR-001 done、TASK-HLR-002A done、TASK-HLR-002 done、
+  independent readiness
 - In scope:worker `--once` loop、Issue cursor rebuild、remote fenced lease、heartbeat、
   deterministic PR lookup/create/update、existing `agent-pr` bootstrap 的原子迁移、
   无 generic REST/GraphQL escape hatch 的 typed GitHub adapter、unit/fault tests、
-  live worker evidence。
+  source 合入后的分离 scheduler registration/enable 与 live worker evidence。
 - Out of scope:reviewer adapter/dispatch、batch merge、task/change 状态自动翻转、
   任意 governance text、D2 credential 修改。
 - Allowed paths:`scripts/host_loop/**`、`.github/workflows/agent-pr.yml`、本 change
@@ -272,14 +342,18 @@
   route 构造数恒为 0，reviewer process 不接收 integration credential；
 - migration 仅在新 integration identity 成功的 live probe 后关闭 legacy creator，且
   rollback 记录不把 branch disappearance 解释成 merge。
+- source PR 合入后才允许维护者把 scheduler reservation 绑定 exact source hash 并启用；
+  activation/evidence PR 与 source PR 分离，启用前 `workerDisabled=true`。
 
 ### Verification
 
 - `HLR-LEASE-001`/`HLR-WORKER-001` contract + live integration：双 worker acquire、
   stale-fence write、heartbeat loss、create timeout、Issue corruption、0/2 PR lookup、
   old creator coexistence 分别 fail closed；唯一有效 lease 能创建带完整 envelope 的
-  task PR，并在首个 `pull_request` event 上看到 checks；fake transport/route inventory/
-  source scan 证明 generic request 与 review/merge/admin route 均不可构造；
+  `agent/host-loop/tasks/**` task PR，并在首个 `pull_request` event 上看到 checks；
+  reserved branch 零 legacy creator；scheduler receipt source hash 与 main exact blob
+  相同；fake transport/route inventory/source scan 证明 generic request 与
+  review/merge/admin route 均不可构造；
   `MECH-004` allowed-paths、`check-sdd`、diff check 均绿。
 
 ### Notes / handoff
