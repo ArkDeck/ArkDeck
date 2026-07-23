@@ -1169,14 +1169,193 @@
 
 ## TASK-AFP-006 — AF-014 一手事实修正与 evidence addendum
 
-- Status:blocked（仅登记于 proposal r5；r5 经维护者 review/merge 后仍须独立
-  readiness PR 才可进入 `ready`）
+- Status:ready（2026-07-23；D1 readiness，仅在维护者 review/merge 本独立
+  readiness PR 后生效；本 PR 不含手册修正、addendum、run 或 acceptance 结论）
+- Readiness（r1，base = protected `main`
+  `0080403e87527c4487849ee6e3c705236e1437b7`）：
+  - **Approval/dependency gate:satisfied。**CHG-2026-029 revision r5 PR #408 已由
+    维护者 review/merge，protected-main merge OID 为
+    `3304797578b75d072b3b4dc235dccec35fc7d060`，其 parent 为
+    `c3244a7ff66a23f4b049cab8ed6ece35ac3c7ad5`，commit subject 含 `(#408)`；
+    `proposal.md revision: 5` 与本任务 scope 已在 `main` 生效。TASK-AFP-001 done
+    PR #362 merge `4c8506a30afc5505230134903ccf03729a640c07`；
+    TASK-AFP-004 implementation PR #374 merge
+    `21d339b97d083f1e79c1851854737d5cf0a68d8e`、done PR #379 merge
+    `605bff09fdc992478203109b1e5414b207d553b3`；两项依赖均在 protected `main`
+    上为 `done`。AFP-002/003/005 也均为 `done`，但不构成本任务额外依赖。
+    原分支延迟产生的重复 PR #409 指向与 #408 相同的 head
+    `21be4ce872e9b673712efa1d65f3b934a45f8f46`，已按 enforcement 标明
+    superseded 并关闭，不作为批准或输入来源。
+  - **Base/input pins。**以下为真实 `yaml pins` carrier，全部在本 audit base
+    从 protected-main tree 实测取得。implementation 开工时必须以本 readiness
+    合入后的最新 protected `main` 为 base，逐项确认 path 仍解析到 exact blob、
+    commit 仍在 ancestry 中；任一漂移、删除/重命名、source conclusion 被
+    supersede 或出现新的同路径 PR，立即停止并重新 readiness。完整 OID 只固定
+    bytes/历史位置，不自行证明内容正确或获得批准。
+
+    ```yaml pins
+    - artifact: TASK-AFP-006 readiness r1 audit base
+      commit: 0080403e87527c4487849ee6e3c705236e1437b7
+    - artifact: CHG-2026-029 revision r5 merge
+      commit: 3304797578b75d072b3b4dc235dccec35fc7d060
+    - artifact: CHG-2026-029 approval merge
+      commit: 813361830593f416eb845f0cceb9556ab51168be
+    - artifact: TASK-AFP-001 done status merge
+      commit: 4c8506a30afc5505230134903ccf03729a640c07
+    - artifact: TASK-AFP-004 implementation merge
+      commit: 21d339b97d083f1e79c1851854737d5cf0a68d8e
+    - artifact: TASK-AFP-004 done status merge
+      commit: 605bff09fdc992478203109b1e5414b207d553b3
+    - artifact: CHG-2026-029 revision r2 merge (AF-018 dated source)
+      commit: de6b79aafa95700297a94dc311e94b1283f8abdd
+    - artifact: TASK-AFP-001 readiness r1 merge (AF-018 dated source)
+      commit: e73b025dab3c12162465040bd0829470b2409ae9
+    - path: AGENTS.md
+      blob: 3c2d3c6a01d3eaa31cd9e3ee333f3153552f4164
+    - path: openspec/constitution.md
+      blob: 137d09da7eaa535670a8bd3b0c9537681e6cb21b
+    - path: openspec/governance/enforcement.md
+      blob: e8ff3c130e1b8b15f8405d150ad567e774a0d82b
+    - path: openspec/verification/policy.md
+      blob: ef3b42085ff50b54f1bb70650510f27bdc020cf1
+    - path: openspec/planning/agent-failure-patterns.md
+      blob: 6fbb1a706bcf488aa39db672b51f0327a92cdf9b
+    - path: openspec/changes/chg-2026-029-agent-failure-prevention/proposal.md
+      blob: 0785f8b1d36f380f32d25c7828cf858912f675a3
+    - path: openspec/changes/chg-2026-029-agent-failure-prevention/design.md
+      blob: 246a197513b950552bcf4ed567d8e05148b10c0c
+    - path: openspec/changes/chg-2026-029-agent-failure-prevention/verification.md
+      blob: 38f3fe166cf7ee545c27508e3793163786584e07
+    - path: openspec/changes/chg-2026-029-agent-failure-prevention/acceptance-cases.yaml
+      blob: 6c5b0a2b109c5e22f770a7939969300061a549f3
+    - path: openspec/changes/chg-2026-029-agent-failure-prevention/evidence/runs/TASK-AFP-004/run.md
+      blob: 4eed9d2f5ab8d79ef681a6d1473ed31b71d5242b
+    - path: openspec/changes/archive/2026-07-21-chg-2026-001-macos-m0a/evidence/runs/TASK-M0A-003/run.md
+      blob: 7fc3ab1d4fd3b2000b74ea04b0356d9a6c56fce6
+    - path: openspec/changes/archive/2026-07-21-chg-2026-002-macos-m1-infrastructure/evidence/runs/TASK-M1-009/review-remediation-2026-07-18.md
+      blob: f615d3fabb42450621e05aa1daa5b837906f41d3
+    - path: openspec/changes/archive/2026-07-21-chg-2026-002-macos-m1-infrastructure/evidence/runs/TASK-M1-009/review-remediation-round-2-2026-07-18.md
+      blob: 309a7f39f5befd20f3df93f95dcc42b3c02cf975
+    - path: openspec/changes/archive/2026-07-21-chg-2026-002-macos-m1-infrastructure/evidence/runs/TASK-M1-009/review-remediation-round-3-2026-07-18.md
+      blob: 8911811f11710ab1692b5ae834b21dfe020ea56e
+    - path: openspec/changes/archive/2026-07-21-chg-2026-002-macos-m1-infrastructure/evidence/runs/TASK-M1-009/review-remediation-round-4-2026-07-18.md
+      blob: e336f498db72ba4c7a4abcd4303d595e152bcb2a
+    - path: openspec/changes/archive/2026-07-21-chg-2026-002-macos-m1-infrastructure/tasks.md
+      blob: 2ea2ba6672b03f7ab6a86a6a7b136c5d531d9ac9
+    - path: openspec/changes/archive/2026-07-21-chg-2026-009-dayu200-partition-decode/evidence/runs/TASK-PD-002/platform-attempt-2026-07-20.md
+      blob: e0f3b1b77f54b4b7cb1ff17c39316e8e70c29179
+    - path: openspec/changes/archive/2026-07-21-chg-2026-016-dayu200-recovery-rehearsal/evidence/runs/TASK-RH-001/rehearsal-attempt-4-2026-07-21.md
+      blob: 6af1a69bea454251bac9a16ba26e58f2483702da
+    - path: openspec/changes/archive/2026-07-21-chg-2026-020-dayu200-real-flash/evidence/runs/TASK-RF-002/run.md
+      blob: 8869ad61b9ebf6e5397e7e6007318e11cb26429d
+    - path: openspec/changes/archive/2026-07-22-chg-2026-015-hdc-readonly-probe-registration/proposal.md
+      blob: b09301e257619d176c6adb0530847d499e97b6e6
+    - path: openspec/changes/chg-2026-006-dayu200-m0b-bringup/tasks.md
+      blob: 779ff6ac060ab7ba82ddaf955b65702ec52285db
+    - path: openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/evidence/runs/TASK-UD-REDACTOR-001/run.md
+      blob: 172ea48fba64819d0bf0743816323b8da68b6ec3
+    - path: openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/tasks.md
+      blob: abaee6a12290108f4daeac9f84a3ff6700971433
+    - path: openspec/changes/chg-2026-021-trace-adapter-capture/design.md
+      blob: ac83328d9718a78633cd637020780442d826da1c
+    - path: openspec/changes/chg-2026-021-trace-adapter-capture/evidence/runs/TASK-TR-001/run.md
+      blob: 6069642a7b3c13d741383fbbdd17a0f921c6b9f2
+    - path: openspec/changes/chg-2026-021-trace-adapter-capture/tasks.md
+      blob: 14703a488170143e02b15d3ae496d23cf390864e
+    - path: openspec/changes/chg-2026-021-trace-adapter-capture/evidence/runs/TASK-TR-002R/run.md
+      blob: 23434076488e8ef6a10d9d93121cefc4e1c6fd80
+    - path: openspec/changes/chg-2026-022-hdc-supervisor-observability/proposal.md
+      blob: 63fa348e8f08276d17b1655532714d5da3a67482
+    - path: openspec/changes/chg-2026-022-hdc-supervisor-observability/review.md
+      blob: d03118ab83cbeb278910c08e55573094edbd5169
+    - path: openspec/changes/chg-2026-025-ai-native-unattended-device-ops/review.md
+      blob: 197e4adc47f75444a54eefadf00e58b4681e5202
+    - path: openspec/changes/chg-2026-026-macos-rockchip-flash-ui/evidence/runs/TASK-RKFUI-001/hermetic-contract-test-2026-07-22.md
+      blob: 659f99f470cea5f03984de6ea28ce1395e391287
+    - path: openspec/changes/chg-2026-026-macos-rockchip-flash-ui/evidence/runs/TASK-RKFUI-001/run.md
+      blob: 0f24bb2424e43edb34de0fffaa0eee3c4e5cbec3
+    - path: openspec/changes/chg-2026-026-macos-rockchip-flash-ui/verification.md
+      blob: f4aea707ded798680aacb7811a4786247a94dac8
+    - path: openspec/changes/chg-2026-028-guard-ci-mechanization/evidence/runs/TASK-MECH-001/run.md
+      blob: f5e51fad2f2a429748126eee27ab61df282c2f23
+    - path: openspec/changes/chg-2026-028-guard-ci-mechanization/proposal.md
+      blob: d7718251c074f3b23bb32f8703c863efc9912245
+    - path: openspec/planning/backlog.md
+      blob: fc20c3de0187f3f4b4a7e60129163c33a6d1c6c3
+    - path: openspec/planning/postmortem-2026-07-governance.md
+      blob: 308d260be9d545b8e27d20a6a30e0719cd76fd19
+    ```
+
+  - **Current handbook inventory:closed。**在本 base 实测：
+    `AF-001`…`AF-018` 二级标题 18 个、三级字段 144 个且每项八字段同序；
+    当前 `Fact` **36** 行，按项分布为 `2/1/2/2/2/2/2/2/1/3/3/2/2/2/2/2/2/2`；
+    `Inference` 18、positive 18、negative 18、`Currency` 18。36 条 Fact 中有
+    **5 条**没有本行/本 block 的直接 Markdown source link（现行行号 166、653、
+    761、811、970）；addendum 必须逐条补出实际一手 source，不得以“同一记录”、
+    “链接见上文”或 PR/OID 裸引用略过。标准 Markdown link 实测 **97** 条，
+    implementation run 必须报告实际计数，不沿用旧 run 的 98。
+  - **AF-014 correction:closed。**允许的手册语义改动恰为 design §3.3 的四处：
+    Signal、Observed cases 第四条 gap、Preflight、Negative verification。本 base
+    对错误的“公开枚举 case/public enum case”机制表述实测 **4** 处；改后须为 0。
+    第四条只能表述为：reliable-total receipt 由当前 adapter
+    `capability=true` factory 产生，reliable totals 无 public initializer，
+    false/missing/invalid/drifted capability 保持 indeterminate。前三条 gap 分别
+    绑定 expected target + exact `revision + 1` rebind、matching
+    `PublishedArtifact` → cleanup authority、catalog membership alone 不构成
+    per-device capability。唯一允许的一手根为上表
+    `chg-2026-021/tasks.md` 与 `TASK-TR-002R/run.md`；不得以本 change r2/r3
+    散文补足。
+  - **Addendum row contract:binary。**`TASK-AFP-004/addendum-r5.md` 按手册
+    implementation base 中 36 条 Fact 的出现顺序分配稳定 row ID；每行必须包含：
+    row ID、AF ID、Fact 定位/原文、一个或多个一手相对路径、各路径完整
+    40-hex blob OID、可检索 locator、`supported`/`partially-supported`/
+    `unsupported` verdict、disposition 与判定依据。AF-014 单列 before/after
+    逐句映射；旧 TASK-AFP-004 run 的 `AFP-CORRECT-001 PASS` 仅在 AF-014 面
+    标记 `superseded`，旧 run bytes 保持不动。AF-018 dated row 以本 readiness
+    合入后的 `tasks.md` process record 与上表 #355/#356 Git ledger OID 回源，
+    不把会话摘要当作 source。
+  - **Invariants/boundaries:binary。**除 AF-014 四处与 18 条 `Currency` 外，
+    其他 AF 项语义、`AF-NNN` ID 集合、taxonomy/两轴、八字段及顺序、
+    `Automation status` 取值域、首屏 non-normative/authority/conflict/privacy/
+    archive 声明、`Fact`/`Inference` 分类与 positive/negative 数量均零变化。
+    全部相对链接/anchor 必须解析；完整 OID 在 protected-main ancestry；手册内
+    代码符号须在手册与本 change 外解析。若全量复核发现 AF-014 之外的
+    unsupported/partially-supported 具体表述，记录全部命中并将任务停回
+    `blocked`，不得越过封闭改动面顺手修复。
+  - **Environment/concurrency gate:satisfied。**纯 host-side document remediation，
+    零硬件、零 device/HDC/network/process/effect dispatch；Git、Markdown、`rg` 与
+    Python/PyYAML SDD 环境可用。手册路径在 active tasks 中只由本 change 认领，
+    AFP-001/004/005 均已 `done`；审计时唯一其他 open PR #406 只改
+    `openspec/changes/chg-2026-030-host-loop-runtime/tasks.md`，与本任务
+    allowed paths 零交集；重复 #409 已关闭。若实现前出现同路径 PR、canonical
+    conflict、secret/privacy 风险、source pin 漂移或需要 forbidden path，任务立即
+    回到 `blocked`。
+  - **Verification/evidence gate:binary。**implementation/evidence PR 必须同时交付
+    仅 AF-014 四处修正、`TASK-AFP-004/addendum-r5.md`、`TASK-AFP-006/run.md`
+    与本任务 evidence 引用，但不得翻 `ready→done`。run 至少记录：implementation
+    base 与全部 pins 复核、36 行逐行矩阵、5 条无直接链接 Fact 的明确回源、
+    AF-014 before/after、旧 PASS supersession、18 Currency、全部链接/anchor/OID/
+    symbol/invariant/privacy/allowed-path checks、标准 Markdown link 实际计数、
+    `scripts/check-sdd.sh` 0 error/0 warning/111 IDs 与 `git diff --check` PASS；
+    只对 `AFP-HANDBOOK-001`/`AFP-CORRECT-001` 给出二值结论。任一项失败即不形成
+    PASS。
+  - **Review boundary。**本 readiness PR 只修改本文件 TASK-AFP-006 本节，
+    将 `blocked→ready` 并登记 pins/inventory/method/boundary；零手册修正、零
+    addendum/run、零旧 evidence 改写、零 proposal/design/verification/acceptance、
+    archive/template/CHG-2026-021/spec/contracts/governance/product diff。
+    implementation/evidence、`ready→done` 与 change verify 分别使用独立 PR；
+    本 readiness merge 不构成两条 AC PASS 或 change `verified`。
+  - **Currency 复核（2026-07-23）。**全部 path blob 由
+    `git ls-tree -r origin/main -- <path>` 在 audit base 实测取得；r5 merge 与依赖
+    merge 均以 `git merge-base --is-ancestor` 验证在 protected-main ancestry。
+    当前 handbook 形状/计数由仓内 bytes 重算，非从 TASK-AFP-004 run 转抄；
+    `TASK-TR-002R/run.md` 作为 r5 新增一手 source 首次进入 carrier。
 - Platform:macos（纯 host-side document remediation，零产品/设备执行）
 - Requirements/AC:change-local `AFP-HANDBOOK-001`、`AFP-CORRECT-001`
 - Depends on:revision r5、TASK-AFP-001 done、TASK-AFP-004 done、独立 readiness
-- Readiness input pins:待独立 readiness PR 对最新 protected `main` 实测登记；至少包含
-  手册、r5 proposal/design/verification/acceptance、TASK-AFP-004 run、CHG-2026-021
-  tasks 与 TASK-TR-002R run 的完整 blob OID，以及 r5 merge OID
+- Readiness input pins:见上述 readiness r1 carrier；37 个 path blob 与 8 个 commit
+  OID 已在 audit base 实测复核，包含手册、r5 四 artifact、TASK-AFP-004 run、
+  CHG-2026-021 tasks、TASK-TR-002R run、全部 current Fact sources 与 r5 merge OID
 - Applicable failure patterns:`AF-016`（错误表述来自会话记忆）、
   `AF-015`（首次全量复核漏过同一已知表述，须重扫全部 Fact）、
   `AF-005`（旧 PASS 通过 addendum 明确 superseded/currency）
