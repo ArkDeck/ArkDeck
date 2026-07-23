@@ -1169,8 +1169,32 @@
 
 ## TASK-AFP-006 — AF-014 一手事实修正与 evidence addendum
 
-- Status:ready（2026-07-23；D1 readiness，仅在维护者 review/merge 本独立
-  readiness PR 后生效；本 PR 不含手册修正、addendum、run 或 acceptance 结论）
+- Status:done（2026-07-23；D0 completion 状态，仅在维护者 review/merge 本独立
+  状态 PR 后生效。implementation + evidence PR #413 已由维护者 @lvye `APPROVED`
+  并合入 protected `main`，merge OID
+  `99dbacd2923ed40b86dbff9f69ef259e16c9fd94`；implementation head
+  `96cb26ee57e6cb1d495def862dd94a6d258047ac` 与该 merge 的四个交付路径逐字一致。
+  done 不等于 change `verified`：`AFP-HANDBOOK-001`/`AFP-CORRECT-001` 的最终结论
+  仍须后续独立 change verification PR 由维护者确认。）
+- Done recheck（在**合入版**
+  `99dbacd2923ed40b86dbff9f69ef259e16c9fd94` 上重跑，非沿用实现 PR 会话结论）：
+  - 交付物在案：手册 blob `4ef0268dd72d22734f704e86375f0114602e5452`；
+    addendum blob `859a388f9b961c9ed47ea2cd79dc30a5f631a81b`；TASK-AFP-006 run blob
+    `473036627755fe197969ed1d3ae9d17e9a647f78`；
+  - AF-014 的四个允许位置已回源 CHG-2026-021 tasks + TASK-TR-002R run，
+    手册“公开枚举/public enum case”错误机制命中 0；Currency 18/18 为实际
+    implementation base `31865366f7bdb8e5ca33f0c8d41c15f6daba7933`；
+  - addendum F01–F36 唯一无缺号，47 个 source path/blob pair 全部匹配 pinned
+    implementation-base bytes；结果 35 retained + F27 rewritten，当前 36/36
+    `supported`，旧 AFP-004 run 只在 AF-014 面明确 superseded；
+  - 不变量：H2 = 18、H3 = 144 且八字段同序；Fact 36、Inference 18、
+    positive 18、negative 18；handbook links 98（56 anchors）、addendum links 48、
+    run links 3，全部解析；完整 handbook OID 22 枚全在合入版 ancestry；
+  - secret/用户绝对路径/真实 device identifier/raw evidence/裸 64-hex digest 复制为
+    0；实现仍为 `documentReview`，device/HDC/network/process/effect/destructive
+    dispatch = 0，真实硬件 = 无；
+  - `scripts/check-sdd.sh` 0 error / 0 warning / 111 acceptance IDs；
+    `git diff --check` 干净。
 - Readiness（r1，base = protected `main`
   `0080403e87527c4487849ee6e3c705236e1437b7`）：
   - **Approval/dependency gate:satisfied。**CHG-2026-029 revision r5 PR #408 已由
