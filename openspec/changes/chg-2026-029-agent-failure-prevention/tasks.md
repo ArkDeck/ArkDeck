@@ -260,6 +260,20 @@
   archive-zero-diff 检查；
 - `scripts/check-sdd.sh` 与 `git diff --check`。
 
+### Evidence（candidate；不构成状态翻转）
+
+- implementation + evidence run:
+  [`evidence/runs/TASK-AFP-001/run.md`](evidence/runs/TASK-AFP-001/run.md)
+  （2026-07-23，base `2f0c53e2924382bdf051c4975d1ed35b4ffd042d`，readiness r2 audit
+  base `de6b79aafa95700297a94dc311e94b1283f8abdd`）。交付物
+  `openspec/planning/agent-failure-patterns.md` blob
+  `5b8c3b6b26b76893744aa11bdd7618318eab4674`。
+- 二值门实测：H2 = 18 / H3 = 144（八字段同序）、positive 18 + negative 18 = 36、
+  链接 99 全解析（含 56 个 anchor）、40-hex OID 20 枚全在 ancestry、shadow-spec 与
+  隐私扫描均为 0、archive diff = 0、check-sdd 0/0/111、`git diff --check` 干净。
+- 任务状态保持 `ready`；`AFP-HANDBOOK-001` 的 PASS 结论待维护者在独立
+  `ready→done` PR 中确认。
+
 ### Notes / handoff
 
 - 实现/evidence PR 不翻 task 状态；`ready→done` 使用独立 PR；
