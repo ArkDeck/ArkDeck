@@ -1,7 +1,7 @@
 ---
 schema_version: 1.0.0
 change_id: CHG-2026-029-agent-failure-prevention
-change_revision: 3
+change_revision: 4
 platform: macos
 evidence_classes:
 - documentReview
@@ -64,3 +64,20 @@ cases:
     symbols appearing in the handbook resolve inside the repository outside the
     handbook and this change; currency is updated; archive and template diffs
     are zero.
+- acceptance_id: AFP-LINK-001
+  test_id: TEST-AFP-LINK-001
+  method: Archive-readiness reference review of the handbook.
+  expected_source: openspec/changes/chg-2026-029-agent-failure-prevention/verification.md#AFP-LINK-001
+  minimum_evidence: documentReview
+  expected_result: >-
+    The handbook contains zero relative-path references to this change's own
+    directory, verified by repository search under the planning tree, while the
+    factual pointer to the taxonomy registered in CHG-2026-029 design section 3
+    is preserved in a form that does not depend on the change directory
+    location. The AF identifier set, taxonomy attribution and two-axis split,
+    eight-field contract and ordering, automation status value domain, first
+    screen declarations, Fact and Inference labelling and the positive and
+    negative method counts are unchanged. The remaining relative links to other
+    active changes are untouched and recorded as a known limitation with its
+    owning follow-up. Template, archive and CHG-2026-027 directory diffs are
+    zero.

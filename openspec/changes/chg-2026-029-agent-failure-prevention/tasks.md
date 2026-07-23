@@ -1003,3 +1003,58 @@
 - 若某条 `Fact` 的一手出处显示被引用 change 本身有现实缺陷，只记录指针并 fail closed，
   交回该 change 处理，不在本任务修复；
 - 实现/evidence PR 不翻 task 状态；`ready→done` 使用独立 PR。
+
+## TASK-AFP-005 — 手册 archive 断链收口
+
+- Status:blocked（三前置：① CHG-2026-029 revision r4 经维护者 review/merge 生效；
+  ② TASK-AFP-001 done（已满足，#362 合入
+  `4c8506a30afc5505230134903ccf03729a640c07`）与 TASK-AFP-004 done（已满足，#379
+  合入 `605bff0…`，手册最近一次授权改动者）；③ 独立 readiness PR 钉定手册 blob、
+  待改行与改法）
+- Platform:macos（过程文档跨平台可复用，零平台产品行为）
+- Requirements/AC:change-local `AFP-LINK-001`
+- Depends on:revision r4、TASK-AFP-001 done、TASK-AFP-004 done、independent readiness
+- Applicable failure patterns:`AF-006`（archive 前引用扫描与断链即暂缓）、
+  `AF-005`（在事实原位更正而非追加注记）
+- Production reachability:not applicable；纯文档索引，零产品 effect、零 dispatch
+- Trusted fact sources:`git grep` 对 protected `main` 的实测结果与被引用文件的仓内
+  bytes；不以会话记忆或本 change 的 proposal 转述替代复扫
+- Allowed paths:`openspec/planning/agent-failure-patterns.md`、
+  `openspec/changes/chg-2026-029-agent-failure-prevention/evidence/**`、
+  `openspec/changes/chg-2026-029-agent-failure-prevention/tasks.md`（仅本任务状态/evidence 引用）
+- Forbidden paths:`AGENTS.md`、`openspec/constitution.md`、
+  `openspec/governance/**`、`openspec/specs/**`、`openspec/contracts/**`、
+  `openspec/changes/archive/**`、`openspec/changes/chg-2026-027-decision-grading-batch-approval/**`、
+  `openspec/templates/**`、产品 source/tests/scripts/workflows
+- Risk:low（风险是改法把事实指向一并删掉，或顺手动了其余 24 条活跃链接）
+- Hardware required:no
+
+### Deliverables
+
+- 手册对**本 change 目录**的相对路径引用归零：第 24 行改为不依赖 change 目录位置
+  的表述，保留"taxonomy 与其封闭范围登记在 CHG-2026-029 design §3"这一事实指向
+  （可用 change ID + 完整 OID 或章节名，不用会随归档失效的相对路径）；
+- 复扫证据：`git grep 'chg-2026-029-agent-failure-prevention'` 在
+  `openspec/planning/**` 下命中数为 0；
+- 其余 24 条指向**其他活跃 change** 的链接**逐字不动**，并在 run 中如实登记为
+  已知限制与其归属（另立 change 处置）。
+
+### Verification
+
+- `AFP-LINK-001` document review；
+- 不变量零变化：`AF-NNN` ID 集合、taxonomy 归属与两轴划分、八字段契约与顺序、
+  `Automation status` 取值域、首屏 non-normative/authority/conflict/privacy/archive
+  声明、`Fact`/`Inference` 标注与 positive/negative 方法数；
+- 断链复核：模拟归档路径（`changes/archive/<date>-<id>/`）下手册对本 change 的引用
+  不再存在可断项；
+- 越界复核：手册对其他 change 的链接 diff 为 0；`openspec/templates/**`、
+  `openspec/changes/archive/**` 与 chg-2026-027 目录 diff 为 0；
+- `scripts/check-sdd.sh` 与 `git diff --check`。
+
+### Notes / handoff
+
+- 本任务**不**处理 r4 发现 2（CHG-2026-027 TASK-BAP-002 的 pin 漂移）：该 path 在
+  本任务 forbidden paths 内，只由 r4 proposal 登记指针，交回 chg-027 lane；
+- 本任务**不**处理其余 24 条活跃链接的结构性问题，另立 change；
+- 实现/evidence PR 不翻 task 状态；`ready→done` 使用独立 PR；
+- 本任务 done 后方可起草 change 级 verify；archive 仍须等发现 2 解除。
