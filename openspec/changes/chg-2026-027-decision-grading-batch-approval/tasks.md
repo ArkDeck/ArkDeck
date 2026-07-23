@@ -65,7 +65,22 @@
 
 ## TASK-BAP-002 — 批次运营载体与首次批次演练
 
-- Status:ready(2026-07-23 本独立 D1 readiness r2,同日 r3/r4 增补(见
+- Status:done(2026-07-23 本独立 D0 状态 PR,仅在维护者 review/merge 后
+  生效。Done recheck:① deliverables 实现 #388 merge
+  `21a416dbbaa88c17a71a6adf55827169d1f6b9f4`(template + runbook 在 main
+  正本);② 首次批次演练完成——issue #395(batch-20260723-1)两项 D0
+  按 digest 顺序合并:#393(merge
+  `ee205537de89ab5ad0e3e81fb1f71328228c6a4e`)→ #396(merge
+  `1b9079268db8e85bee9383f7b705d957f2a9cda3`),各自三门齐备(CI 绿/独立
+  exact-head APPROVE/digest 完整),watch 三源核验树等值后自动续跑;
+  ③ drill evidence #397 merge
+  `0df47e85f3a84ef7b81f4ccd2fe04e4b67eb50c4`,合入版与推送分支 diff 为空,
+  偏差 1-5 如实入档,`BAP-DRILL-001` 候选 PASS;evidence gate("演练
+  evidence 合入后 ready→done")满足。边界:done ≠ change verified,
+  chg-027 verify 须三 AC 齐备另行独立 PR。历史 readiness r2/r3/r4 全文
+  保留于下)
+- 历史 Status(r2/r3/r4 readiness 记录,实现与演练已完成):ready
+  (2026-07-23 本独立 D1 readiness r2,同日 r3/r4 增补(见
   各增补块;r4 = drill 阶段转换与候选 2 规则化);仅在维护者 review/merge
   后生效。四前置闭合:① approval #317 merge
   `bc4a68b4888d5018992fb5004f5fbd7216c12419`;② TASK-BAP-001 done #328
