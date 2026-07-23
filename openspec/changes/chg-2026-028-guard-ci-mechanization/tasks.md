@@ -161,9 +161,67 @@
 
 ## TASK-MECH-003 — pins 结构化全 hash 校验
 
-- Status:blocked(已满足:r1 approve、TASK-MECH-002 done。剩余两前置:
-  ① proposal/design r2 carrier namespace 修订经维护者 review/merge 生效;
-  ② 其后独立 readiness PR 重钉 guard 两文件基 blob 与完整 pins schema)
+- Status:ready(2026-07-23 本 D1 readiness PR;前置已满足:r1 approval #318
+  merge `c15814593ea3d46149e749d3a47121ea70af1cea`、TASK-MECH-002 done
+  #348 merge `8c50780cc716de340310a267bfd306719d0b8bd9`、carrier namespace r2
+  #349 经 `lvye` exact-head APPROVED 并 merge
+  `03f5ebae80ed6f3b24c1cff14fa91c8e9400b45c`;状态仅在维护者 review/merge
+  本 PR 后生效,此前不得开 implementation PR)
+- Readiness(r1,base = protected main
+  `03f5ebae80ed6f3b24c1cff14fa91c8e9400b45c`):
+  - 待改文件 pins(implementation 开工时任一 blob 漂移即停并重做 readiness):
+
+    ```yaml pins
+    - path: scripts/check_sdd.py
+      blob: 269f58bc70fc8e72f4daaffc03a20f59c0964c27
+    - path: scripts/test_check_sdd.py
+      blob: e21500d22e80bdc9fedb3df8a3f1c97710517b02
+    - path: openspec/templates/change/tasks.md
+      blob: 7288cfe9bed5d8c5e998ee4d8baf1bf197f7ef74
+    ```
+
+  - active carrier 扫描:精确 `yaml pins` 共 3 blocks/5 blob values——
+    CHG-027 tasks 1 block、CHG-028 tasks 2 blocks;五值均为完整 40-hex,
+    YAML 均为 sequence-of-mappings。精确 `yaml pin-example` 共 1 block
+    (本 change design 的 schema 占位示例),按 r2 明确不激活校验;
+    `archive/**` 不在扫描面。实现落地预期真实 baseline 仍为 0/0/111,
+    不需要任何存量 carrier 的结构性 remediation。本 readiness 自身新增第
+    4 block/3 blob values;其合入后 implementation 预期扫描 = 4 blocks/
+    8 values,八值均为完整 40-hex。
+  - fence 语法定稿:对每个 active `openspec/changes/chg-*` 目录递归扫描
+    `*.md`;每行先去首尾空白,仅由三个反引号紧接精确 `yaml pins` 组成的
+    opening 激活,因而允许 Markdown list indentation 与 trailing whitespace,
+    但拒绝附加 info token;其后首个去空白后仅含三个反引号的行闭合。
+    未闭合 = 具名 err;其他 info string/普通 prose/`yaml pin-example` 均不解析。
+  - block schema 定稿:使用仓内 `StrictLoader`(duplicate mapping key err);
+    top-level 必须为 non-empty sequence,每项必须为 mapping;允许 key 封闭为
+    `path`/`artifact`/`blob`/`commit`/`sha256`,每项至少含一个 digest key;
+    `path`/`artifact` 如出现必须为非空 string;`blob`/`commit` 必须为 string
+    且匹配 `[0-9A-Fa-f]{40}`,`sha256` 必须为 string 且匹配
+    `[0-9A-Fa-f]{64}`。unknown/duplicate key、错误类型、空 sequence、无 digest、
+    非 YAML、字面 placeholder 或长度非法均 fail closed;每个非法 block 恰一条
+    具名 err,含相对文件、opening line 与确定性排序的原因,避免一处坏 block
+    产生不稳定多错。
+  - 诚实边界:本 check 只证明 carrier/schema/hash 文本完整,不解析 Git object、
+    不比较 `path` 当前 blob、不证明 pin freshness/存在性/语义正确;历史完整 hash
+    即使已过时也不由本任务追溯判错。真实性与 currency 仍由 readiness 人类
+    review/evidence 负责,CI 绿不构成 pin 内容批准。
+  - fixture 面:合法 blob/commit/sha256 正例;39/41-hex blob、63-hex sha256、
+    placeholder、unknown/duplicate key、错误 top-level/item/scalar type、空 block、
+    无 digest、非 YAML、unterminated fence 各负例;`yaml pin-example`、无 carrier
+    文档与 archive drift 跳过。负例断言具名 err 与单 block 单 err,不是只测绿。
+  - 模板面仅改 `openspec/templates/change/tasks.md`:加入非载体
+    `yaml pin-example` 示例,并明确新 readiness 实例化时必须把 info string
+    改为 `yaml pins`、填入完整真实 hash;不改 proposal/design/verification/
+    evidence-run 模板,不追溯改写既有 readiness。
+  - 当前工具/基线:Python 3.14.6/PyYAML 6.0.3;fresh base 上
+    `test_check_sdd.py` = 13/13、PR path contract = 12/12、`check-sdd` =
+    0 errors/0 warnings/111 acceptance IDs;main push SDD Guard
+    `29967027772` 与 Swift CI `29967027816` 均 SUCCESS。
+  - Review boundary:本 PR 只翻 `blocked→ready` 并登记上述 pins/schema/测试面;
+    guard+tests+template+evidence implementation PR 与 `ready→done` 状态 PR
+    各自独立,均须维护者 review/merge。CI 绿不构成批准,required-status 翻转
+    仍属 out-of-scope D2。
 - Objective:定义 fenced `pins` block 约定并入 guard 校验(design §3):
   精确 `yaml pins` 为真实 carrier,其中 `blob`/`commit` 恰 40 hex、`sha256`
   恰 64 hex,yaml 不可解析/未知 key/长度非法/字面占位符即具名 err;
