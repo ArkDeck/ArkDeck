@@ -65,12 +65,34 @@ Contract fixtures 包含：
   reversed/missing pattern、额外 re-include、`branches-ignore` 与 job-level
   substitute 均具名失败。
 
+## Repository gate read-back
+
+首次 implementation source push 的 full head 为
+`c330c0ef3245f0b7ea9cc2f63bd960899c9f80cd`（commit time
+`2026-07-23T08:36:41Z`）。GitHub 的首次 read-back 在
+`2026-07-23T08:39Z`—`08:41Z` 暂时返回 workflow run/check suite/PR 均为 0；
+该事件闭合前未重推、未追加 commit、未手工创建 PR。相同 head 后续异步闭合为：
+
+- SDD Guard push run `29992345788`（run `#1314`），terminal success；
+- Agent PR push run `29992345574`（run `#387`），terminal success；
+- Swift CI push run `29992345865`（run `#268`），terminal success；
+- exact-head PR `#412` 于 `2026-07-23T08:47:20Z` 由
+  `github-actions[bot]` 唯一创建，base 为 `main`
+  `31865366f7bdb8e5ca33f0c8d41c15f6daba7933`，head 与上述 full OID 相同，
+  changed files 恰为本任务三个 allowed paths。
+
+只读查询使用 exact `head_sha` workflow-runs/check-suites 与
+`state=all&head=ArkDeck:agent/task-hlr-002a-bootstrap-partition` PR filter。
+这证明首个 branch guard 与 legacy creator 均来自首次 push；短时零结果仅记录为
+GitHub event delivery delay，不以 elapsed time 自行判定 PASS。本节由后续
+evidence-only commit 追加，不改变上述 first-source-head 事实。
+
 ## Scope 与 AC 结论
 
 - Allowed implementation paths：`agent-pr.yml`、新 contract test 与本 run record；
   `sdd-guard.yml`、runtime、Core/spec/contracts/governance、产品 source/tests 均零 diff。
 - `HLR-LEASE-001` / `HLR-WORKER-001` 的 HLR-002A **offline contract slice**：
-  candidate PASS。
+  PASS；implementation repository gate 同时满足。
 - 本 run 不声明 post-merge live control/canary PASS，不创建 integration identity，
   不授权 HLR-002 D2，不翻 TASK-HLR-002A 状态，也不构成 change verification。
   implementation 合入后仍须按 readiness 执行独立 live evidence PR；事实不全即
