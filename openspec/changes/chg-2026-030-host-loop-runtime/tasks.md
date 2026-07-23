@@ -165,6 +165,10 @@
 
 ### Notes / handoff
 
+- Implementation/evidence candidate（本 PR，任务状态保持 `ready`）：
+  `evidence/runs/TASK-HLR-001/run.md`；其中只声明
+  `HLR-ENVELOPE-001` 的 HLR-001 contract slice，live first-event 证据仍归
+  TASK-HLR-005，任务完成结论待独立 D0 done PR。
 - implementation/evidence PR 不翻 `ready→done`；done 使用独立 D0 状态 PR；
 - readiness 若发现 templates 或 current `MECH-004` grammar 冲突，停止并提议 scope
   revision，不在本 task 改 canonical governance。
