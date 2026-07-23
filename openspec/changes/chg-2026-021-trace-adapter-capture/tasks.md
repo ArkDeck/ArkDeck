@@ -134,8 +134,33 @@
 
 ## TASK-TR-003 — adapter golden 面(hitrace/bytrace 识别与 ftrace 过滤)
 
-- Status:ready(readiness;仅在维护者 review/merge 本独立状态 PR 后生效;本 PR 只修改
-  `tasks.md`,不含实现/evidence,不执行 device/HDC/network/external-process)
+- Status:done(TASK-TR-003 implementation + evidence PR #358 已由维护者 `lvye` 对
+  exact head `8efbcb1cd1092315f0044dbe12e06ff566faa3a6` APPROVED，并合入
+  protected `main` merge commit `9753b4bbc024b90454c7efc68f28d48a2760c545`；
+  本独立状态 PR 依据下列 completion evidence 起草 `ready→done`，仅在维护者
+  review/merge 后生效。本状态只关闭 adapter parser-golden 任务，不改变 change
+  `verified`、已登记 tool/fixture authority 或任何 hardware/compatibility/support/
+  conformance/release 状态)
+- Done recheck(2026-07-23；于合入版 protected `main`
+  `9753b4bbc024b90454c7efc68f28d48a2760c545`):
+  - #358 的三个交付路径全部位于本任务精确 allowed paths；final head → merge →
+    当前 main 的三个路径逐字一致。实现 PR 未修改 `tasks.md` 状态、readiness pins、
+    registry/resource、accepted Core/spec/contracts、manifest、UI 或其他任务 evidence。
+  - #358 exact-head GitHub Swift CI 全量 PASS(365 tests/1 个既有 opt-in skip/
+    0 failures)；当前 main 本地 `TraceAdapterGoldenTests` PASS(7 tests,0 failures)，
+    两条 canonical `TEST-AC-TRACE-001-01`/`TEST-AC-TRACE-007-01` PASS 行复现。
+    `/private/tmp` 本地全量为 365/1 skip/2 failures，且精确等于 readiness 已知的
+    `#filePath` `/tmp` vs `/private/tmp` 两例（`HDCGoldenResourceContractTests`、
+    `HDCProbeRegistryContractTests`），0 unexpected；不把该环境 run 记为全绿。
+    trace registry tests 4/0，validator PASS(7 entries/7 resources/14,939 fixture
+    bytes/real device dispatch 0)；`check-sdd` 0 errors/0 warnings/111 acceptance IDs。
+  - evidence class 保持 `parserGolden`；hitrace 仅 exact registered family
+    capture-eligible，bytrace 保持 probe-only，未知/漂移/stderr 与未登记 header
+    fail closed，raw bytes/hash 不变。Agent 真实 device/HDC/network dispatch = 0；
+    full suite 的既有 local fake/process fixtures 不构成真实设备或 Trace 采集证据。
+- Completion evidence:`evidence/runs/TASK-TR-003/run.md`；implementation/evidence
+  的维护者 review/merge 只确认本任务 parser-golden 交付，不构成 change verified、
+  新固件族支持或硬件验收。
 - Readiness revision r3(2026-07-23;D1;仅在维护者 review/merge 本独立重钉 PR 后生效):
   - Base = protected `main`
     `0186a61929540d972eae800eee9dbddabb1f8add`(#352 merge)。#351 归档
