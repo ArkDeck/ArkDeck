@@ -1,6 +1,6 @@
 # CHG-2026-029 Verification Plan
 
-> Status:planned
+> Status:passed # 2026-07-23；五条 AC、六 task merge 链与当前 main 重跑结论见 proposal.md「Verification closure」；仅在维护者 review/merge 本 verification-closure PR 后生效
 > Change:CHG-2026-029-agent-failure-prevention@r5
 > Core baseline:CORE-2.1.0（零 Core/Product behavior 变更）
 > r2 把 `AFP-HANDBOOK-001` 的验收对象由九项 ID 扩为十八项。
