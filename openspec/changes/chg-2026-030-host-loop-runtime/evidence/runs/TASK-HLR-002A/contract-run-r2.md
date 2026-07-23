@@ -52,8 +52,22 @@
 
 ## Repository integration gate
 
-- First-source push/run/PR facts:pending；仅在首次 source commit 推送且 exact-head
-  查询闭合后追加。
+- First-source commit =
+  `fe2de6e1f3458c5803fb8cb6afe3452321684008`，subject =
+  `feat(TASK-HLR-002A): partition suffix-compatible bootstrap`。
+- 同一 exact head 的 push runs 均 terminal success：
+  Agent PR `29996251679`（created `2026-07-23T09:40:07Z`，updated
+  `09:40:17Z`）、SDD Guard `29996251870`（updated `09:40:18Z`）、
+  Swift CI `29996251655`（updated `09:42:44Z`）。
+- Agent PR run 唯一创建 #419：state=`open`、draft=`false`、author =
+  `github-actions[bot]`、base =
+  `e69a0c23b327571327bfce4a87d5e50f406db256`、head 恰为 first-source
+  commit；created `2026-07-23T09:40:14Z`。
+- `2026-07-23T09:43Z` all-state exact-branch query 返回 count = 1，唯一项
+  为 #419；未手工创建或修改 PR，未复用 #412。
+- first-source head 的 pull-request SDD Guard `29996264791` 与 Swift CI
+  `29996264969` 被 GitHub 标为 `action_required`；此事实不冒充 success，最终
+  synchronize head 仍须取得真实 PR-event terminal success。
 - Synchronize-head facts:pending；PR 创建后只允许在本文件追加 first-source
   facts 的 evidence-only commit，再核验 pull-request `guard`、`allowed-paths`、
   Swift CI 与 Agent PR 幂等性。
