@@ -7,6 +7,16 @@
 - Evidence class: `platform` | `simulation` | `fake` | `plan` | `realHardware`
 - Core baseline: `CORE-x.y.z`
 - Scope: 本次 run 覆盖的 Requirement/AC ID
+- Base: 本 run 绑定的完整 40-hex protected `main` OID(不用截断前缀)
+- Input pins: 关键输入的完整 hash/pin(工具、fixture、载体、readiness pins 复核结论)
+- Producer → consumer: 本 run 实际走通的路径两端;未端到端跑通时写明缺口
+- Evidence currency: `current` | `superseded` | `invalidated`
+  - `current`:本 run 精确绑定当前被评审 bytes;
+  - `superseded`:保留历史事实,不得用于当前结论;
+  - `invalidated`:执行/输入/环境不满足方法,不构成 acceptance evidence。
+
+  状态变化后须在**事实原位**逐处标注(陈旧 hash 行、PASS 行、计数行),
+  不得只在文件尾部写一句模糊 supersession 注记。
 
 ## Environment
 
