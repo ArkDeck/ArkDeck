@@ -16,6 +16,38 @@
 5. 任何 GitHub state write 都先做 deterministic identity lookup，再重读目标状态；
    不确定、歧义、API timeout 或 fence mismatch 全部 fail closed。
 
+## 1A. Integration credential containment（r2）
+
+GitHub 的 repository permission category 不是逐 endpoint capability。官方 GitHub App
+权限表把 `POST /repos/{owner}/{repo}/pulls` 与
+`POST /repos/{owner}/{repo}/pulls/{pull_number}/reviews` 同列为
+`Pull requests:write`，并把 ref write 与 merge endpoint 同列在
+`Contents:write`。因此 r1 所写“能创建 PR/ref，但 credential 没有 review/merge API
+权限”在平台上不可表达；不得以 self-approval 被拒或 runtime 当前没有调用代码伪称
+permission category 不存在。
+
+r2 使用三层闭合边界，缺一即 `blocked`：
+
+1. **Platform minimum。**D2 readiness 钉定实际非 `GITHUB_TOKEN` identity、单仓
+   installation/repository scope 与完成 PR/Issue/`agent/**` ref 所需的最小 permission
+   categories；Administration、Actions、Workflows、Members、Secrets 等管理面均为
+   none。identity 不得是 CODEOWNER，也不得出现在 branch protection/ruleset bypass。
+2. **Typed adapter。**worker 只依赖封闭的 PR lookup/create/update、Issue
+   lookup/create/update 与 `agent/**` ref read/create/CAS/delete 方法；transport 不提供
+   generic REST/GraphQL method。review submit/dismiss、merge/auto-merge、branch update、
+   protection/ruleset/repository admin 的 method/route 构造数恒为 0。HLR-003 用 fake
+   transport、route inventory 与 source scan 同时证伪 escape hatch。
+3. **Live authority probes。**维护者用实际 identity 证明 protected `main` 直接写拒绝，
+   integration-authored probe PR 的 self-approval 与 merge 拒绝，admin same-value
+   mutation probe 拒绝，且 identity 不是 CODEOWNER/bypass。任一请求意外成功，立即停
+   scheduler、撤销 identity、保留脱敏事实并把任务维持 `blocked`；不得把 cleanup 后
+   “无净变化”记成 PASS。
+
+这里区分 endpoint coverage 与 authority：共享 write category 的潜在 coverage 是
+GitHub 平台约束，不是 runtime 授权；protected-main rules + human-only CODEOWNER +
+typed adapter 共同保证 automation 无批准/合并权威。独立 AI review 仍只产生仓外
+`APPROVE`/`REQUEST_CHANGES`/`BLOCKED` 结果，绝不调用 GitHub review API。
+
 ## 2. PR envelope
 
 worker 以版本化模板生成 body，而不是拼接固定 vendor 文案。task-bound PR 的必填面：
@@ -91,6 +123,8 @@ adapter，保存 `APPROVE`、`REQUEST_CHANGES` 或 `BLOCKED` 和固定 head/base
 证据。这里的 `APPROVE` 仅是 CHG-2026-027 所谓独立 AI 合前 review 结论，绝不调用
 GitHub approval API，也不替代维护者 review。只有该结论、checks 与 digest 都完整，
 worker 才可将 PR 导航信息加入 batch Issue；任何 merge 动作仍在 runtime 外由维护者完成。
+reviewer process 不接收 integration credential；worker transport 即使底层 category
+覆盖 review/merge endpoint，也没有对应 typed method 或 generic escape hatch。
 
 ## 5. Recovery and migration
 
