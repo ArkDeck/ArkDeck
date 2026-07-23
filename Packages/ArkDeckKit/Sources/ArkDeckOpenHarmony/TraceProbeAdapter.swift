@@ -8,7 +8,7 @@ public enum TraceProbeAdapterProfile {
   public static let registryID = "OPENHARMONY-TRACE-PROBES"
   public static let registryVersion = "1.0.0"
   public static let registrySHA256 =
-    "0c093f98b57706b3723a68ae7552bef0db0731a675fb6cc023f69bbe21d6e566"
+    "9d2a390b84092f1d78d86c10bf182884bc3a2ef8b3cdc3d35ed8e7e2b087b613"
   public static let resourceManifestSHA256 =
     "6b77b020b50921ef419720a434a186aba48c13e7284fa66598d4efd0c4f14879"
 

@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-021-trace-adapter-capture
 revision: 4
-status: verified # 2026-07-23 verification-closure PR #403 merge `95e56eae0102c37a885c0277089089a02b7bc4fb`；r3 archive scope #404 merge `2cddc8a83399e643e11dbe93d1852b1e6417a1bd`；本 r4 只把 #413 后新增的 living handbook link 纳入 archive closure（5→6），不改变 verification 结论或其他 r3 边界，仅在本 D1 PR 经独立 AI premerge review且维护者 review/merge 后生效
+status: archived # 2026-07-23 archive candidate；verification #403 merge `95e56eae0102c37a885c0277089089a02b7bc4fb`、r3 scope #404 merge `2cddc8a83399e643e11dbe93d1852b1e6417a1bd`、r4 correction #420 merge `3d9a6dbdd07419cdba3e0a565ba8cf764177d51f`；archive audit base `e4b33d036f796de7eb4aaed254724329ca040e68`；仅在维护者 review/merge 本独立 D0 archive PR 后生效
 class: platform
 core_change_level: none
 owner: lvye

@@ -191,9 +191,9 @@
     "captureWindow": "2026-07-22 08:59-09:02 Asia/Shanghai",
     "runbook": "scripts/trace_capture/README.md",
     "redactedManifests": [
-      "openspec/changes/chg-2026-021-trace-adapter-capture/evidence/runs/TASK-TR-001/redacted-manifests/discover.json",
-      "openspec/changes/chg-2026-021-trace-adapter-capture/evidence/runs/TASK-TR-001/redacted-manifests/probe.json",
-      "openspec/changes/chg-2026-021-trace-adapter-capture/evidence/runs/TASK-TR-001/redacted-manifests/capture.json"
+      "openspec/changes/archive/2026-07-23-chg-2026-021-trace-adapter-capture/evidence/runs/TASK-TR-001/redacted-manifests/discover.json",
+      "openspec/changes/archive/2026-07-23-chg-2026-021-trace-adapter-capture/evidence/runs/TASK-TR-001/redacted-manifests/probe.json",
+      "openspec/changes/archive/2026-07-23-chg-2026-021-trace-adapter-capture/evidence/runs/TASK-TR-001/redacted-manifests/capture.json"
     ],
     "acceptedBy": "maintainer review and merge of the TASK-TR-001 implementation/evidence PR"
   }
