@@ -1,6 +1,6 @@
 # CHG-2026-028 Design:guard/CI 机械化
 
-> Status:candidate(r2 carrier namespace 修订;仅在维护者 review/merge 当前
+> Status:candidate(r3 atomic-archive task lookup 修订;仅在维护者 review/merge 当前
 > revision PR 后生效,且不构成 TASK-MECH-003 readiness)
 > Core baseline:CORE-2.1.0(零 Core 变更)
 
@@ -14,8 +14,10 @@
 3. **0/0/111 基线保持**:guard 每项增强合入前后
    `check-sdd = 0 error / 0 warning / 111 acceptance IDs` 不变;存量漂移先以
    所属 change 名义独立 PR 修复,不混入 guard 实现 PR。
-4. **`archive/**` 全体豁免**:归档目录是冻结历史,新校验一律跳过,永不因新
-   规则要求改写历史。
+4. **`archive/**` 不提供 authority**:归档目录是冻结历史,revision/pins 扫描
+   一律跳过,task lookup 也不得解析 archive。MECH-004 只可为原子归档识别而
+   比较 base active tree 与 head 新 archive tree 的 blob/mode 等值关系,永不
+   要求或允许改写 archive bytes。
 5. **fail closed**:校验器对格式解析失败报具名 err,不静默跳过(MECH-004
    的任务声明解析、MECH-003 的 block 解析同此)。
 6. **与 CHG-2026-027 正交**:本 change 降低 D0 项的人工核验成本,不改变任何
@@ -99,6 +101,20 @@
   为 glob(`本 change` 前缀解析为该 change 目录);校验
   `git diff --name-only base..head` 每一路径匹配某 glob,超出即红并列出
   越界路径。Allowed paths 行缺失或零 token = err(fail closed)。
+- **原子归档 fallback(r3)**:默认仍只读取 head active
+  `openspec/changes/chg-*/tasks.md`。声明 task 在 head 不存在时,校验器才读取
+  base tree;task 必须在 base 恰好一个 active change 中定义,否则 err。随后
+  必须证明:(a) base active change root 在 head 完全不存在;(b) base..head
+  恰好新增一个目录名为 `YYYY-MM-DD-<change-dir>` 的 archive target;
+  (c) base root 每个 tracked entry 都在 target 的相同相对路径存在且 blob OID
+  与 mode 相同;(d) target 没有额外 entry,且 base 时该 target 不存在。满足后,
+  relocation pairs 视为允许,其余 diff 继续用 **base task** Allowed paths;
+  `本 change` 仍解析到 base active root,不解析或信任 archive tasks.md。
+- fallback 任一条件失败均具名 fail closed:包括 task 只存在于旧 archive、base
+  task 重复、active root 残留、partial move、archive byte/mode 变化、错误日期/
+  basename、多个/预存 target、copy 而非 move,或 living path 越出 base Allowed
+  paths。guard 不从 proposal/design 的 prose 推导额外路径;需更新 living
+  consumer 的 archive change 必须先以 D1 revision 精确扩充 active task。
 - 未声明任务:diff 触碰敏感面(`Packages/**`、`ArkDeckApp/**`、
   `ArkDeckAppUITests/**`、`scripts/**`、`.github/**`)即红——产品/工具代码
   变更必须以任务名义;纯 docs/governance diff 通过(propose/approval/
@@ -108,6 +124,8 @@
   形态:实现无意越出授权面(#301 remediation 类)、状态/readiness PR 夹带
   实现(#28 规则、#126 误合类)、未立项即改产品代码。
 - 测试与 canary:解析器单元测试(声明命中/未命中/任务不存在/行缺失);
+  r3 增加完整等值 atomic move 正例,以及 archive-only task、partial/mutated/
+  copied/ambiguous/pre-existing target、active-root 残留和 living path 越界负例;
   canary draft PR 触碰 forbidden path 证明红(丢弃不合入);真实形态 PR
   (实现/状态/propose 各一)绿。
 

@@ -246,7 +246,11 @@
 
 - Status:ready(2026-07-22 本 readiness PR;前置 ① 已满足 = approval #318
   merge `c15814593ea3d46149e749d3a47121ea70af1cea`;状态仅在维护者
-  review/merge 本 PR 后生效)
+  review/merge 本 PR 后生效。r1 implementation #335 已合入
+  `72b295f4987410c57c04cf2d11a4b479bc8f63bf`,remediation #336 经 exact-head
+  APPROVED 并合入 `2ad9278d84b21aa516f74053e1031dcd8014720d`;r3 archive fallback
+  是新增 D1 scope,仅在 r3 revision merge 后才可起草对应 remediation
+  implementation)
 - Readiness(r1,base = main `c15814593ea3d46149e749d3a47121ea70af1cea`;
   维护者 merge 本 PR = 接受下述解析约定):
   - 任务声明解析定稿(首个命中生效):① PR body 独立行
@@ -261,6 +265,28 @@
   - glob 语义定稿:fnmatch,`**` 跨层;Allowed paths 行(含续行)反引号
     token 全量提取,`本 change` 前缀解析为该 change 目录;行缺失/零 token =
     具名 err(fail closed,非静默过)。
+  - r3 atomic-archive fallback(仅在本 r3 D1 revision merge 后生效):head active
+    task 缺失时,只允许读取 base 中唯一 active task;base change 必须完全消失,
+    并以相同相对路径/blob OID/mode 一对一迁入唯一、本次新增且命名为
+    `YYYY-MM-DD-<change-dir>` 的 archive target。relocation pair 由等值证明
+    放行,其余 living diff 仍须命中 base task Allowed paths;archive task 永不
+    解析。partial/mutated/copied/ambiguous/pre-existing target、active-root
+    残留、archive-only task 或 living 越界均具名 err。
+  - r3 remediation base/pins = protected main
+    `583b1c1d4de1a77fc0554908f9b45e28fe604a56`;实现开工时任一 blob 漂移即停并
+    另立 D1 re-pin,不得把漂移吸收到实现 PR:
+
+    ```yaml pins
+    - path: scripts/check_pr_paths.py
+      blob: 9c8ba3aea54c9ce17e3bb7b033a2a570f34cb1c4
+    - path: scripts/test_check_pr_paths.py
+      blob: 38cc148d1c0f238083aa738c5818781ba9422a0c
+    ```
+
+    r3 remediation 的实现文件面封闭为上述两个脚本 + 本 change
+    `evidence/**`;`.github/workflows/sdd-guard.yml` 不需变更且对该 remediation
+    只读,task 状态另走独立 PR。若实现证明必须改 workflow 或其他路径,停止并
+    回到 D1 scope revision。
   - 待改/新增文件 pins(实现时漂移即停并重做 readiness):
 
     ```yaml pins
@@ -283,7 +309,10 @@
 - Objective:新 CI job(design §4,`pull_request` event,可并入 sdd-guard
   workflow):声明 `TASK-*` 的 PR 校验 diff ⊆ 该任务 Allowed paths(反引号
   token 提取为 glob,`本 change` 前缀解析;行缺失/零 token/任务不存在 err,
-  fail closed);未声明任务的 PR 触碰敏感面(`Packages/**`、`ArkDeckApp/**`、
+  fail closed);对经逐 entry blob/mode 等值证明的 base-active→head-archive
+  原子迁移,允许从 base 唯一 active task 读取 Allowed paths,但 archive 永不
+  提供 authority,所有非 relocation 路径仍受 base Allowed paths 限制;未声明
+  任务的 PR 触碰敏感面(`Packages/**`、`ArkDeckApp/**`、
   `ArkDeckAppUITests/**`、`scripts/**`、`.github/**`)即红,纯 docs/governance
   diff 通过;校验脚本 + 单元测试 + canary 红反证。
 - Requirements/AC:change-local `MECH-PATH-001`(见 acceptance-cases.yaml)。
@@ -292,13 +321,15 @@
   canary draft PR(触碰 forbidden path 证红,丢弃不合入);evidence run
   (三类真实形态 PR 绿 + canary 红)。
 - Out of scope:谎报任务声明的防御(guard-rail 边界,design §4;防线 =
-  维护者 review);tasks.md 格式改造(解析现行格式)。
+  维护者 review);tasks.md 格式改造(解析现行格式);从 archive task 或
+  change-level prose 取得授权;为 archive living consumer 自动扩权;追溯修改
+  #351 或任何既有 archive bytes。
 - Allowed paths:`.github/workflows/sdd-guard.yml`、
   `scripts/check_pr_paths.py`、`scripts/test_check_pr_paths.py`、本 change
   `evidence/**`、本 change `tasks.md`(仅本任务状态)。
 - Risk:medium(误报会挡正常 PR;失败模式 = job 移除/修复走独立 PR,
   维护者可随时不设 required,零治理损失)。
 - Hardware required:no。
-- Verification:`MECH-PATH-001`;check-sdd 绿。
+- Verification:`MECH-PATH-001`;r3 atomic-archive 正反 fixture;check-sdd 绿。
 - Evidence gate:job 合入 + 绿/红双向 run 证据在案后 `ready→done` 独立状态
   PR。
