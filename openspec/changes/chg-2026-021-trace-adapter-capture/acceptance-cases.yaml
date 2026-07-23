@@ -1,7 +1,7 @@
 ---
 schema_version: 1.0.0
 change_id: CHG-2026-021-trace-adapter-capture
-change_revision: 2
+change_revision: 3
 platform: macos
 evidence_classes:
 - documentReview

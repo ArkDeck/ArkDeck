@@ -1,7 +1,7 @@
 # CHG-2026-021 Verification Plan
 
 > Status:passed # 2026-07-23；9 Core AC、5 change-local evidence 与全链 OID 见 proposal.md「Verification closure」；仅在维护者 review/merge 本 verification-closure PR 后生效
-> Change:CHG-2026-021-trace-adapter-capture@r2
+> Change:CHG-2026-021-trace-adapter-capture@r3
 > Core baseline:CORE-2.1.0(零 Core 变更;认领 trace REQ-TRACE-* 的 macOS 面)
 
 本 change 认领 Core `REQ-TRACE-001…009` 的 macOS 面。canonical AC 的 method/
@@ -45,6 +45,43 @@ expected result/minimum evidence 以 `openspec/verification/acceptance-cases.yam
 - 所有测试为 host-only deterministic contract/fault injection，真实 device/HDC/network/
   external-process dispatch 恒为 0。
 
+## Archive relocation gate (r3)
+
+后续 archive PR 不得重跑真实设备采集或改写历史 TASK-TR-* evidence，并须同时满足：
+
+- 本 r3 已由维护者 review/merge，且 CHG-2026-029 已归档；或者 CHG-2026-029 自身
+  独立批准的 revision 已明确解除其 active task carrier 与 living handbook 对本目录的
+  迁移阻断。r3 本身不授权改写另一 active change 的历史 pin。
+- 目录精确移动到
+  `openspec/changes/archive/2026-07-23-chg-2026-021-trace-adapter-capture/`，
+  proposal 同 PR `verified→archived`；无 spec/acceptance baseline/traceability/
+  platform-profile 变化。
+- living registry 只替换 3 个 `provenance.redactedManifests` path。归一化这三个
+  path 后，registry JSON semantic diff 为空；`resources.json` 与 7 个 resource
+  bytes/hash/size 逐字节不变。
+- registry 从 15,511 bytes /
+  `0c093f98b57706b3723a68ae7552bef0db0731a675fb6cc023f69bbe21d6e566`
+  精确变为 15,568 bytes /
+  `9d2a390b84092f1d78d86c10bf182884bc3a2ef8b3cdc3d35ed8e7e2b087b613`；
+  新 hash 只重钉 OpenHarmony profile、Integration lock 与
+  `TraceProbeAdapterProfile.registrySHA256`，三者与实际 registry bytes 全部一致。
+- failure-pattern handbook 的 5 个 link target 精确迁移到固定 archive 根，链接
+  anchor 可解析，Fact/Inference、完整 OID、taxonomy 与其余文本零变化。
+- archive-local evidence/run/tasks/design/verification/acceptance-cases 的历史
+  bytes 不变；CHG-2026-029 已归档时，其 carrier 中旧 path+blob 记录也保持不变。
+- 对 active tree 的引用扫描除固定 archive path 外，不再发现旧 active root 的
+  production provenance 或 living Markdown link；任何新增 active consumer/reference
+  都必须先经 D1 scope 修订，不得在 archive PR 临时扩面。
+- `python3 -m unittest scripts/trace_capture/test_capture.py
+  scripts/trace_capture/test_registry.py -v`、registry validator、
+  `TraceAdapterGoldenTests`、Swift 全量、`scripts/check-sdd.sh` 与
+  `git diff --check` 全部通过；secret、用户绝对路径、device identifier 与 raw trace
+  扫描为 0，真实 device/HDC/network dispatch 为 0。
+
+任一项失败都阻断目录移动。该 gate 只证明归档引用与 hash closure，不重新分类或扩大
+既有 9 条 Core AC、5 条 change-local evidence、hardware/support/conformance/release
+结论。
+
 ## Gate
 
 本 change `verified` 前提:四 task(TASK-TR-001/002/002R/003) done(各有 merged 实现 +
@@ -53,3 +90,4 @@ parserGolden 对 TR-001 登记 fixture);五条 change-local evidence ID 全部 P
 Agent 设备命令 dispatch 恒 0(采集由维护者执行)。不构成任何固件族/设备兼容性或
 支持声明;fixture/fake
 永不冒充真机形态;traceability trace 行在 change 级 verified 时翻转。
+本 r3 archive gate 保留上述 passed 结果，不要求也不允许重判既有 acceptance。
