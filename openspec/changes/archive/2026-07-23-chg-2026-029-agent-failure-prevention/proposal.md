@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-029-agent-failure-prevention
 revision: 5
-status: verified # 2026-07-23 本 verification-closure PR；r1 #345/#347、r2 #355、r3 #371、r4 #387、r5 #408；六 task done 已合入（OID 见 Verification closure）；仅在维护者 review/merge 本 PR 后生效
+status: archived # 2026-07-23 本 archive PR；verified #416 merge `bfc11e306890012dc98270178764f356a9e40912`；implementation-only、零 spec/registry delta；目录外旧 active-root 精确路径仅 CHG-2026-027 已退役历史 pin 2 处；仅在维护者 review/merge 本 PR 后生效
 class: implementation-only
 core_change_level: none
 owner: lvye
@@ -443,3 +443,33 @@ V2 下本节只记录候选结论；五条 AC 的整体确认与 front matter `s
 change 相对链接会随各自未来归档而断，须由独立 change 统一收口；本 verified 状态
 不把手册提升为权威规则，不改变产品/platform/conformance/support 状态，也不授权
 未来 CI/guard 或 archive 工作。
+
+## Archive closure（2026-07-23）
+
+- Verification closure PR #416 已由 @lvye `APPROVED` 并合入 protected `main`
+  `bfc11e306890012dc98270178764f356a9e40912`，本 change 的 `verified` 状态已生效。
+- Archive audit base 为 protected `main`
+  `e69a0c23b327571327bfce4a87d5e50f406db256`；其最新并发 #417 只修改
+  CHG-2026-030 `tasks.md`，与本 change、手册、模板和 evidence 零路径交集。
+- 本 change 为 `implementation-only`，无 spec delta、canonical acceptance
+  registry、Core baseline、integration/platform profile 或产品实现需要合入；archive
+  的有效变更只有 proposal `verified→archived` 与整棵 change 目录迁移到
+  `openspec/changes/archive/2026-07-23-chg-2026-029-agent-failure-prevention/`。
+- 归档前目录外精确 active-root 扫描仅命中 CHG-2026-027 `tasks.md` 两处：一处
+  readiness r3 的 dated 漂移叙述，一处 readiness r2 的旧 `yaml pins` carrier。
+  CHG-2026-027 readiness r4 #391
+  `98593848defa91f73e6537bd7d151d58fcc42428` 已合入并明确这些实现期
+  authority/input pins “随实现合入完成使命退役”，其任务随后由 #398
+  `ab5bccef0ae544789c8345276df983ff551cfbee` 置 done、change 由 #399
+  `09d4afd77b213efd07a5f8b0d07f1be23d71d095` 置 verified；两处现为冻结的
+  historical process record，不是 living authority，不在本 archive PR 改写。
+- `openspec/planning/**` 对旧 active-root 的引用为 0；手册使用 change ID、
+  `design.md` §3 与完整 OID 定位，归档不造成该指向断链。其他目录外
+  `CHG-2026-029` 命中均为 change ID/历史名称引用，不含旧目录路径。
+- CHG-2026-021 r3 登记的 archive 顺序门因此满足其“CHG-2026-029 已归档”分支；
+  本 PR 不替该 change 执行后续 archive，也不改写其 scope、evidence 或 living
+  consumers。
+
+本 archive 只改变治理位置与状态，不重新验证历史 AC，不改变手册权威边界、产品/
+platform/conformance/support 结论，也不产生任何 device/HDC/network/process/effect/
+destructive dispatch。
