@@ -65,8 +65,8 @@
 
 ## TASK-BAP-002 — 批次运营载体与首次批次演练
 
-- Status:ready(2026-07-23 本独立 D1 readiness r2;仅在维护者 review/merge
-  后生效。四前置闭合:① approval #317 merge
+- Status:ready(2026-07-23 本独立 D1 readiness r2,同日 r3 增补重钉(见
+  Readiness r3 增补块);仅在维护者 review/merge 后生效。四前置闭合:① approval #317 merge
   `bc4a68b4888d5018992fb5004f5fbd7216c12419`;② TASK-BAP-001 done #328
   merge `d1873fb6f4b0d523f9263fcdcffe17b062840247`;③ TASK-BAP-003 execution
   evidence #375 merge `bb61726a7f47b9462296a9beae316dda88218db1` + done #376
@@ -75,6 +75,37 @@
   #378/#379,但两者在 #380 合入前分别合入 main,故从未成为有效 drill 项;
   r2 fail closed 重钉天然后继。r2 merge 前 BAP-002 lane 不得开
   implementation、batch issue、候选 PR 或 drill evidence PR)
+- **Readiness r3 增补(2026-07-23,本 PR;维护者 merge = 接受重钉;r2 其余
+  钉定全部原文有效,r3 merge 前实现仍不得开工)**:
+  - 触发事实:r2(#382)合入后,独立 AFP lane 的 evidence #383(merge
+    `493153f65025f177550071b5c7ac5ea7cb0b90d0`)与 done 翻转 #384(merge
+    `5a51ec460409085067bc0e0dacba958d580b79c6`)在任何 batch issue 建立之前
+    被实时逐 PR 合并。后果有二:① r2 authority pin
+    `chg-2026-029…/tasks.md` blob `bbbda9b9f2ebefbe9b360fe2cade4e70712ed724`
+    因 #384 漂移;② **drill 候选 2(AFP-003 ready→done)被消耗——连续第
+    三个候选未入批次即被合并(r1 #378/#379 同型)**。按 r2"任一候选提前
+    合入…不得临时替换/制造项目,须停下并用独立 D1 readiness re-pin"与
+    pins 漂移条款,停止实现、起草本 r3。
+  - Re-pin:audit base 前移至 protected main
+    `679c57f43c60a56b8957c3e075208a8037bd5d98`(#385 后);
+    `openspec/changes/chg-2026-029-agent-failure-prevention/tasks.md` blob
+    重钉为 `dc8129773d18349b7e7d5123ce2fa8beefb80b7d`;r2 其余 14 项
+    commit/blob pins 已于新 base 逐项复核零漂移,原文继续有效。
+  - **候选 2 替换 = `CHG-2026-029 approved → verified`**(与候选 1 同构:
+    四个 AFP task 已全部 done 且 evidence 在案;候选 PR 仅可置 proposal
+    status `verified`、写 verification closure 并把 verification header
+    `planned → passed`,零实现零 evidence 改写;若逐 AC 复核不能由已合入
+    状态 + 确定性检查完全得出 PASS,则它不是 D0,演练保持 blocked)。
+    顺序固定:候选 1(chg-028 verify)→ 候选 2'(chg-029 verify);由各自
+    lane producer 在 template/runbook 合入且前置自然闭合后起草。
+  - 队列载体(issue `batch-20260723-1`,r3 起草时以公开 search API 复查
+    同名 = 0)、digest/runbook contracts、两会话与人类分工、演练时序、
+    failure semantics 全部沿用 r2 原文。
+  - **节奏前置(维护者动作,亦是 drill 的物理前提)**:本 r3 与随后的
+    implementation PR 可即时合并;但其后两个候选 PR 产生时,**必须留在
+    open 队列,等 batch issue 建立、exact-head review 完成后按 digest 顺序
+    合并**——再次实时秒合将第四次消耗候选,`BAP-DRILL-001` 在"同批次
+    ≥2 个合格 D0 merge"门下将永远无法 PASS。
 - Readiness(r2,base = protected main
   `cfab930722afe60ed5e8759ea0c91d7a178971cc`):
   - **Authority/input pins。**实现开工时以下 commit/blob 任一漂移即停止并
