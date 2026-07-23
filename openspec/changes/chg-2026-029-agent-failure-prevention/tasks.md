@@ -512,12 +512,22 @@
 
 ## TASK-AFP-003 — 历史案例检出演练与误报边界复核
 
-- Status:ready（2026-07-23 D1 readiness r1；仅在维护者 review/merge 本独立 PR 后
-  生效。四前置全部闭合：① change approval；② TASK-AFP-001 done；③ TASK-AFP-002
-  done；④ 本 readiness 钉定六个案例与环境反例的完整 base/link。merge 前不得开
-  implementation/evidence PR）
-- Readiness（r1，base = protected `main`
-  `89f6c916e2724941b3cb9d949c3d925a92ade3db`）：
+- Status:ready（2026-07-23 D1 readiness **r2**；仅在维护者 review/merge 本独立 PR
+  后生效。四前置保持闭合：① change approval；② TASK-AFP-001 done；③ TASK-AFP-002
+  done；④ 本 r2 重钉六个案例与环境反例的完整 base/link。r1 已因 pin drift 失效
+  （见下），任务状态不因本次重钉而跃迁；merge 前不得开 implementation/evidence PR）
+- **r1 readiness 已失效（pin drift，如实记录不改写）**：r1 于 #369 合入
+  `16325dbe40bad0fd445587e34ef4e99f93a76b9b`，其 pins carrier 钉定了本 change 四个
+  文档与手册的当时 blob。此后两次**有意的更正**改动了这五个文件：
+  CHG-2026-029 revision r3（#371 合入 `b53db548197486bd58d9236e183632c744f5276e`，
+  更正 design §3.2 `AF-014`）与 TASK-AFP-004（实现 #374 合入
+  `21d339b97d083f1e79c1851854737d5cf0a68d8e`、状态 #379 合入
+  `605bff0…`），五枚 pin 全部漂移。按 r1 自身"任一漂移即立即停止并重新 readiness"
+  条款，本 r2 重钉全部 pin。**r1 的 drill case set、环境反例、row shape 与
+  hindsight-bias 边界结论未被推翻**，逐条保留于下方 r2；r1 文本保留在 `#369` 的
+  Git 历史中，不追溯改写。该漂移是 r3 已预先登记的连带后果，不是意外。
+- Readiness（**r2**，base = protected `main`
+  `7d04c3dccb598a5e1a1d3b16846162353069dbf2`）：
   - **Approval/dependency gate:satisfied。**approval-only #347 合入
     `813361830593f416eb845f0cceb9556ab51168be`；revision r2 #355 合入
     `de6b79aafa95700297a94dc311e94b1283f8abdd`。**前置 ②**：TASK-AFP-001 实现 #360
@@ -533,8 +543,14 @@
     正确或获得批准。
 
     ```yaml pins
-    - artifact: TASK-AFP-003 readiness audit base
-      commit: 89f6c916e2724941b3cb9d949c3d925a92ade3db
+    - artifact: TASK-AFP-003 readiness r2 audit base
+      commit: 7d04c3dccb598a5e1a1d3b16846162353069dbf2
+    - artifact: CHG-2026-029 revision r3 merge
+      commit: b53db548197486bd58d9236e183632c744f5276e
+    - artifact: TASK-AFP-004 implementation merge (handbook corrections)
+      commit: 21d339b97d083f1e79c1851854737d5cf0a68d8e
+    - artifact: TASK-AFP-003 readiness r1 merge (superseded by this r2)
+      commit: 16325dbe40bad0fd445587e34ef4e99f93a76b9b
     - artifact: CHG-2026-029 approval merge
       commit: 813361830593f416eb845f0cceb9556ab51168be
     - artifact: CHG-2026-029 revision r2 merge
@@ -544,7 +560,7 @@
     - artifact: TASK-AFP-002 done status merge
       commit: 89f6c916e2724941b3cb9d949c3d925a92ade3db
     - path: openspec/planning/agent-failure-patterns.md
-      blob: 5b8c3b6b26b76893744aa11bdd7618318eab4674
+      blob: 3aab3c3fd6c7cf9e80ab4831b60ac58588d5d431
     - path: openspec/templates/change/tasks.md
       blob: b5a73d0f2bd9a7529e751fdc46fe23b43df365b5
     - path: openspec/templates/change/design.md
@@ -568,13 +584,13 @@
     - path: openspec/changes/chg-2026-026-macos-rockchip-flash-ui/evidence/runs/TASK-RKFUI-001/hermetic-contract-test-2026-07-22.md
       blob: 659f99f470cea5f03984de6ea28ce1395e391287
     - path: openspec/changes/chg-2026-029-agent-failure-prevention/design.md
-      blob: e559a6d45f15520b101280a20ed78591a924022a
+      blob: fd3d21147fd75ecc9543222d567aefae351171f5
     - path: openspec/changes/chg-2026-029-agent-failure-prevention/proposal.md
-      blob: 91ee9a883439fb0d6b749c7d76a49968aa98417e
+      blob: c0ac4b1dbe331abcad38c6b05a1287cede8af9fe
     - path: openspec/changes/chg-2026-029-agent-failure-prevention/verification.md
-      blob: ba0a586442f9397e4c458165fb7972d334f19e2b
+      blob: 075f6177b5cdbd0207ef27e93b4d257fb3971d77
     - path: openspec/changes/chg-2026-029-agent-failure-prevention/acceptance-cases.yaml
-      blob: 8137232534e498c329a85dece459887f8ef4b8a6
+      blob: 54963daaac8302ee5900024780c9dd7b3a9b3814
     - path: AGENTS.md
       blob: 3c2d3c6a01d3eaa31cd9e3ee333f3153552f4164
     - path: openspec/constitution.md
@@ -634,29 +650,22 @@
   - **Hindsight-bias 边界:binary。**drill 不得声称任何历史 change/task/AC 结论因本
     演练而改变；不得重新验证产品或硬件；不得把"更早发现"表述为"当时应当被发现"
     之外的更强主张；不得对未被 pin 的记录下结论。任一处违反即 `AFP-DRILL-001` fail。
-  - **Known upstream defect pointer（本 readiness 起草期发现，fail closed 不在本任务
-    修复）。**起草期对 pinned bytes 逐项复核时发现：`design.md` §3.2 的 `AF-014`
-    条目（合入版 blob `e559a6d45f15520b101280a20ed78591a924022a`，经 #355 merge
-    `de6b79aafa95700297a94dc311e94b1283f8abdd` 入 main）把 TR-002R 的第四条 gap 写作
-    "`TraceProgressTotal.reliable` 作为 public case 绕过 capability 门"，并把该表述
-    归属于 `chg-2026-021/tasks.md`。经全仓复核：
-    - `TraceProgressTotal` **在仓内不存在**（仅出现于该 design.md 自身）；
-    - 该 gap 的一手表述是 `chg-2026-021/tasks.md` 二值门 ④"reliable-total receipt
-      只能由当前 adapter capability=true factory 产生，false/缺失/drift/非法 total
-      均保持 indeterminate + elapsed"，与 `TASK-TR-002R/run.md` 的 "Reliable progress
-      totals have no public initializer … minted only by a factory"；真实字段名为
-      `TraceCatalogContracts.swift` 的 `reliableByteTotalAvailable`；
-    - 同段的 `expectedTargetID` 与 `publication receipt` 是**真实符号**，但分别位于
-      `TraceWorkflowContracts.swift` 与 `TraceWorkflowContractTests.swift`/
-      `TASK-TR-002R/run.md`，不在被归属的 `tasks.md` 内。
-    - 已合入手册 `AF-014` 的对应 `Fact` 为中文转述"一个公开枚举 case 可绕过能力门"，
-      未使用上述不存在的符号名，但"公开枚举 case"这一机制描述同样未经一手核对。
-    根因 = `AF-016`（以会话记忆代替一手核查），发生在本 change 自己的 r2 起草中。
-    **处置（fail closed）**：本 readiness 不修复、不改写 design.md 或手册，只登记
-    指针；drill 实现**必须以 pinned 一手记录为准**，不得引用 design.md §3.2 对该
-    gap 的措辞。修复需独立载体（design.md 走 CHG-2026-029 revision r3；手册更正走
-    其自身 allowed paths 的独立任务），由维护者决定是否立项与排序。
-    `AF-014` 模式本身与其四条 gap 的存在性不受影响（#276/#278 载体成立）。
+  - **r1 登记的 upstream 缺陷:已闭环（r2 更新）。**r1 曾登记一条 fail-closed 指针：
+    design §3.2 的 `AF-014` 把 TR-002R 第四条 gap 写作 "`TraceProgressTotal.reliable`
+    作为 public case 绕过 capability 门"，而 `TraceProgressTotal` 在仓内不存在。
+    该指针已由两个独立载体闭环，**不再是 drill 的开工障碍**：
+    - **design 侧**：CHG-2026-029 revision r3（#371 合入
+      `b53db548197486bd58d9236e183632c744f5276e`）在事实原位把四条 gap 逐条钉到一手
+      出处（`chg-2026-021/tasks.md` 二值门 ①/④ 与 `TASK-TR-002R/run.md`），并保留
+      r2 勘误记录；真实字段名为 `TraceCatalogContracts.swift` 的
+      `reliableByteTotalAvailable`。
+    - **手册侧**：TASK-AFP-004（实现 #374 合入
+      `21d339b97d083f1e79c1851854737d5cf0a68d8e`）对全部 37 条 `Fact` 做一手复核，
+      33 `supported` / 3 改写 / 1 删除；`AF-014` 的相关表述已对齐一手出处。
+    **对 drill 的现行要求（保留 r1 的实质约束）**：仍以 pinned 一手记录为准；
+    引用 `AF-014` 时以**本 r2 所钉的** design/手册 blob 为准，不得引用 r2/r1 时期的
+    历史措辞。若 drill 期间再发现同类缺陷，仍按本任务 Notes 的 fail-closed 条款
+    只记指针、不在本任务修复。
   - **可选覆盖（不构成新验收条件）。**design §5 r2 补充允许追加执行/验证轴案例
     （推荐 `AF-012` 的 CHG-2026-016 attempt-4 heredoc 窗口损耗、`AF-014` 的
     TR-002R 四 gap）。追加与否不影响"六案例 + 至少一个环境反例"这一二值门。
@@ -679,10 +688,16 @@
     implementation、零 evidence、零手册/模板改动、零 archive/历史改写。
     implementation/evidence 与后续 `ready→done` 各自使用独立 PR；本 readiness merge
     不构成 `AFP-DRILL-001` PASS 或 change `verified`。
-  - **Currency 复核（2026-07-23）。**上表全部 blob 与 commit 于 audit base
-    `89f6c916e2724941b3cb9d949c3d925a92ade3db` **实测取值**，非从 AFP-001/AFP-002
-    readiness 或起草期勘察结果转抄；六个案例的承载 merge OID 逐个经 `gh pr view`
-    复核。开工前须再次对最新 protected `main` 复核，漂移即停止。
+  - **Currency 复核（2026-07-23，r2）。**上表全部 blob 与 commit 于 audit base
+    `7d04c3dccb598a5e1a1d3b16846162353069dbf2` **由脚本逐项重取**，非从 r1 转抄；
+    r1 中未受 r3/AFP-004 影响的 pin 重取后与 r1 值一致，受影响的五枚（手册 +
+    本 change 四文档）已更新。
+    **provenance 复核方式变更（如实记录）**：r1 时六个案例的承载 merge OID 曾逐个
+    经 `gh pr view` 复核；TASK-BAP-003 凭据分离（#375/#376）生效后 Agent 环境已无
+    维护者 `gh` 凭据，本 r2 改用 `git merge-base --is-ancestor` 验证全部承载 OID 仍在
+    protected `main` 的 ancestry 中，并逐项复核 blob。**"该 PR 由维护者 APPROVED"
+    这一层本 r2 未独立验证**，由维护者 review 时确认。
+    开工前须再次对最新 protected `main` 复核，漂移即停止。
 - Platform:macos（document review；零真实设备/产品执行）
 - Requirements/AC:change-local `AFP-DRILL-001`
 - Depends on:change approval、TASK-AFP-001 done、TASK-AFP-002 done、independent readiness
