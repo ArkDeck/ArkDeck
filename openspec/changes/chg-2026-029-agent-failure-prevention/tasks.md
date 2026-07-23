@@ -1006,11 +1006,94 @@
 
 ## TASK-AFP-005 — 手册 archive 断链收口
 
-- Status:blocked（三前置：① CHG-2026-029 revision r4 经维护者 review/merge 生效；
-  ② TASK-AFP-001 done（已满足，#362 合入
-  `4c8506a30afc5505230134903ccf03729a640c07`）与 TASK-AFP-004 done（已满足，#379
-  合入 `605bff0…`，手册最近一次授权改动者）；③ 独立 readiness PR 钉定手册 blob、
-  待改行与改法）
+- Status:ready（2026-07-23 D1 readiness r1；仅在维护者 review/merge 本独立 PR 后
+  生效。三前置全部闭合：① revision r4 已生效；② TASK-AFP-001 done 与 TASK-AFP-004
+  done；③ 本 readiness 钉定手册 blob、待改行与改法。merge 前不得开
+  implementation/evidence PR）
+- Readiness（r1，base = protected `main`
+  `d53da289b7da80a4ee2282f5dea3122ebf97325a`）：
+  - **Approval/dependency gate:satisfied。**revision r4 #387 合入
+    `d53da289b7da80a4ee2282f5dea3122ebf97325a`（`revision: 4` 与本任务、
+    `AFP-LINK-001` 均已在 protected `main` 生效）。TASK-AFP-001 done #362 合入
+    `4c8506a30afc5505230134903ccf03729a640c07`；TASK-AFP-004 done #379 合入
+    `605bff09fdc992478203109b1e5414b207d553b3`（手册最近一次授权改动者）。
+    AFP-002/003 已 done，不构成本任务依赖。
+  - **Base/input pins。**以下是真实 `yaml pins` carrier，于本 base 实测取值。
+    implementation 开工时必须基于本 readiness 合入后的最新 protected `main`，逐项
+    确认路径仍解析到 exact blob、commit 仍在 ancestry 中；任一漂移立即停止并重新
+    readiness。
+
+    ```yaml pins
+    - artifact: TASK-AFP-005 readiness audit base
+      commit: d53da289b7da80a4ee2282f5dea3122ebf97325a
+    - artifact: CHG-2026-029 revision r4 merge
+      commit: d53da289b7da80a4ee2282f5dea3122ebf97325a
+    - artifact: TASK-AFP-001 done status merge
+      commit: 4c8506a30afc5505230134903ccf03729a640c07
+    - path: openspec/planning/agent-failure-patterns.md
+      blob: 3aab3c3fd6c7cf9e80ab4831b60ac58588d5d431
+    - path: openspec/changes/chg-2026-029-agent-failure-prevention/design.md
+      blob: fd3d21147fd75ecc9543222d567aefae351171f5
+    - path: openspec/changes/chg-2026-029-agent-failure-prevention/proposal.md
+      blob: 821794ee769d4f406b78616358fcaaa58e9041c9
+    - path: openspec/changes/chg-2026-029-agent-failure-prevention/verification.md
+      blob: 84e8f4aed003244ebc48582429175ec468272958
+    - path: openspec/changes/chg-2026-029-agent-failure-prevention/acceptance-cases.yaml
+      blob: 7329d640e772b12e577c32e8d4dc00a3854b661d
+    - path: AGENTS.md
+      blob: 3c2d3c6a01d3eaa31cd9e3ee333f3153552f4164
+    - path: openspec/constitution.md
+      blob: 137d09da7eaa535670a8bd3b0c9537681e6cb21b
+    - path: openspec/governance/enforcement.md
+      blob: e8ff3c130e1b8b15f8405d150ad567e774a0d82b
+    - path: openspec/verification/policy.md
+      blob: ef3b42085ff50b54f1bb70650510f27bdc020cf1
+    ```
+
+  - **待改行:closed（恰一处）。**手册第 24 行：
+
+    ```text
+    [CHG-2026-029 design §3](../changes/chg-2026-029-agent-failure-prevention/design.md)：
+    ```
+
+    这是手册中**唯一**指向本 change 目录的相对路径引用（`git grep` 于
+    `openspec/planning/**` 命中 1 处，实测）。
+  - **改法:closed。**改为**不含相对链接**的纯文本指向，保留三项事实：
+    ① change ID `CHG-2026-029`；② 章节 `design §3`；③ 一个不随目录移动而失效的
+    定位锚——采用**完整 40-hex merge OID**（r4 merge
+    `d53da289b7da80a4ee2282f5dea3122ebf97325a`，taxonomy 现行版本所在）。
+    禁止改法：改指向 `changes/archive/<date>-<id>/`（每次归档都要再改手册，把一次
+    性问题变成周期性负担）；删掉整句事实指向；把 §3 内容复制进手册（会制造第二
+    份 taxonomy 正本，违反 design §1 的 non-normative 边界）。
+  - **不动面:binary。**其余 **24 条**指向**其他活跃 change** 的相对链接与 **10 条**
+    指向 `changes/archive/**` 的链接**逐字不动**（实测 35 条 = 10 archive + 25
+    active，其中 1 条为本 change）；`AF-NNN` ID 集合、taxonomy 归属与两轴划分、
+    八字段契约与顺序、`Automation status` 取值域、首屏五项声明、`Fact`/`Inference`
+    标注与 positive/negative 各 18 的计数——**全部零变化**。
+  - **Verification/evidence gate:binary。**implementation/evidence PR 必须交付手册
+    改动、本任务 run 与 `tasks.md` evidence 引用，但不得翻 `ready→done`；run 至少
+    记录：`git grep 'chg-2026-029-agent-failure-prevention'` 于
+    `openspec/planning/**` 命中 **0**；三项事实指向仍在；上述不动面逐项零变化的
+    实测；手册链接总数由 35 变 34 且减少的恰为本 change 那 1 条；
+    `openspec/templates/**`、`changes/archive/**` 与
+    `openspec/changes/chg-2026-027-decision-grading-batch-approval/**` diff 为 0；
+    `scripts/check-sdd.sh` 0/0/111 与 `git diff --check` PASS。
+  - **Dated 注记（2026-07-23）——r4 发现 2 的现状更新，不改写 r4 原文。**r4 登记
+    CHG-2026-027 TASK-BAP-002 的 pin 漂移时，尚不知该 lane 已自行处理。经本 readiness
+    起草期在 `origin/main` `d53da289…` 实测复核，准确现状为三点：
+    ① 该 lane 已于 readiness **r3**（#386 合入
+    `00bbc5a…`）识别漂移（其触发事实明确列出本 change 的 #383/#384）并在**散文**中
+    重钉为 `dc8129773d18349b7e7d5123ce2fa8beefb80b7d`；
+    ② 但其 **`yaml pins` carrier 未同步**，`tasks.md:157-158` 仍为
+    `bbbda9b9f2ebefbe9b360fe2cade4e70712ed724`——同一份 readiness 内散文与机器可读
+    载体两值并存（MECH-003 只校验 hash 形状不校验解析结果，故 guard 不报）；
+    ③ 该散文值此后又被本 change 的 r4（#387）打漂，当前实际为
+    `6211712d85bd719b7384769f8788a745d7249c21`。
+    **处置不变（fail closed）**：该目录在本任务 forbidden paths 内，本 change 不修复
+    不改写，已按 r4 决定通知 CHG-2026-027 lane；**chg-029 的 archive PR 仍须待该
+    carrier 条目被重钉或解除后方可起草**。另据该 lane r3，`CHG-2026-029 verify` 已被
+    指定为其批次演练**候选 2'**，且要求候选 PR 留在 open 队列按 digest 顺序合并——
+    本 change 起草 verify PR 时须遵守该节奏，不催合。
 - Platform:macos（过程文档跨平台可复用，零平台产品行为）
 - Requirements/AC:change-local `AFP-LINK-001`
 - Depends on:revision r4、TASK-AFP-001 done、TASK-AFP-004 done、independent readiness
