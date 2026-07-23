@@ -157,15 +157,17 @@
 ### Deliverables
 
 - `openspec/planning/agent-failure-patterns.md`，包含 design §2 固定字段与首批
-  `AF-001`…`AF-009`；
+  `AF-001`…`AF-018`（r1 治理/交付轴九项 + r2 执行/验证轴九项，见 design §3.2）；
+- `AF-001`…`AF-009` 各自并入 design §3.1 登记的已观察子面；
 - 每项至少一个可复查仓内案例与 canonical rule 引用，事实/推断分离；
-- CHG-2026-028 已覆盖面与未覆盖语义面诚实标注；
+- CHG-2026-028 已覆盖面与未覆盖语义面诚实标注（含 `AF-010`/`AF-016` 的
+  “canary 红反证只覆盖新 check”“pins 校验只覆盖形状不覆盖来源”两处边界）；
 - non-normative/authority/conflict/privacy/archive 边界在首屏明确。
 
 ### Verification
 
 - `AFP-HANDBOOK-001` document review；
-- 九个 ID 唯一且字段齐全；link/OID/currency 审计；shadow-spec、secret/privacy、
+- 十八个 ID 唯一且字段齐全；link/OID/currency 审计；shadow-spec、secret/privacy、
   archive-zero-diff 检查；
 - `scripts/check-sdd.sh` 与 `git diff --check`。
 
