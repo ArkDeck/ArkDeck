@@ -721,10 +721,30 @@
 
 ## TASK-AFP-004 — 手册 `Fact` 断言的一手核对与更正
 
-- Status:ready（2026-07-23 D1 readiness r1；仅在维护者 review/merge 本独立 PR 后
-  生效。三前置全部闭合：① revision r3 生效；② TASK-AFP-001 done；③ 本 readiness
-  钉定手册 blob、37 条待核 `Fact` 清单与其 26 个一手出处。merge 前不得开
-  implementation/evidence PR）
+- Status:done（2026-07-23；仅在维护者 review/merge 本独立状态 PR 后生效。
+  implementation + evidence PR #374 已合入 protected `main`，merge OID
+  `21d339b97d083f1e79c1851854737d5cf0a68d8e`；手册于该 merge 的 blob 为
+  `3aab3c3fd6c7cf9e80ab4831b60ac58588d5d431`，与实现 PR head
+  `2e52fdd3f681f428f180c881fc2b3bd778774a76` 的交付 blob **逐字一致**。
+  done 不等于 change `verified`：`AFP-CORRECT-001` 的最终结论仍需 change 级
+  verify PR 由维护者确认。）
+- Done recheck（在**合入版** `21d339b97d083f1e79c1851854737d5cf0a68d8e` 上重跑，
+  非沿用实现 PR 的结论）：
+  - Invariants 零变化：`AF-001`…`AF-018` ID 集合完整；H3 = 144 且八字段同序；
+    `Automation status` 18 项取值合法；positive 18 + negative 18；
+  - 复核结果落地：`Fact` = 36、`Inference` = 18（与 run 的 37→36 处置一致）；
+    四处已删/改表述（"分类不一致"、`rawValue`、"依次暴露"、"工作树占用"）残留 = 0；
+  - `Currency` 18/18 记本次基线 `e48673fbe8c8440d7e12dbfe6aea5e94f996a4e2`；
+  - 引用：链接 98 条全解析（含 56 anchor）；OID 21 枚全在 ancestry；
+  - 符号级复扫：仅余 `partiallyMechanized`/`semanticReview`，即本 change 自定义的
+    `Automation status` 取值域（r3 已确认该边界）；
+  - `scripts/check-sdd.sh` 0 error / 0 warning / 111 acceptance IDs。
+- Provenance 复核边界（**如实记录**）：本次复核在 TASK-BAP-003 凭据分离
+  （#375/#376）生效后进行，Agent 环境已不具备维护者 `gh` 凭据，因此**无法**以
+  `gh pr view` 读取 #374 的 reviews/mergedBy。可由 Agent 直接验证的是：merge commit
+  `21d339b9…` 在 protected `main` 的 ancestry 中、其 committer 为 GitHub、author 为
+  `github-actions[bot]`，且合入版交付物 blob 与实现 head 逐字一致。**"由维护者
+  APPROVED"这一点本次未经 Agent 独立验证**，由维护者在 review 本状态 PR 时确认。
 - Readiness（r1，base = protected `main`
   `b53db548197486bd58d9236e183632c744f5276e`）：
   - **Approval/dependency gate:satisfied。**approval-only #347 合入
