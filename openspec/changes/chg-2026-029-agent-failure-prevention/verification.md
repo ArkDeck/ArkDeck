@@ -1,10 +1,11 @@
 # CHG-2026-029 Verification Plan
 
 > Status:planned
-> Change:CHG-2026-029-agent-failure-prevention@r3
+> Change:CHG-2026-029-agent-failure-prevention@r4
 > Core baseline:CORE-2.1.0（零 Core/Product behavior 变更）
 > r2 把 `AFP-HANDBOOK-001` 的验收对象由九项 ID 扩为十八项。
 > r3 新增 `AFP-CORRECT-001`（TASK-AFP-004 手册 `Fact` 一手复核）；
+> r4 新增 `AFP-LINK-001`（TASK-AFP-005 手册 archive 断链收口）；
 > `AFP-HANDBOOK-001`/`AFP-TEMPLATE-001`/`AFP-DRILL-001` 的验收内容逐字不变。
 
 本 change 只认领三条 change-local acceptance。验证目标不是证明历史产品重新合格，
@@ -19,6 +20,7 @@
 | AFP-TEMPLATE-001 | AFP-002 | documentReview | tasks/design/evidence-run 三模板按 design §4 增加短字段；既有 Requirements/Acceptance/Depends/Allowed/Forbidden/Risk/Hardware/Deliverables/Verification/Notes、failure/security 与 evidence-class 规则零删除零放宽；字段允许 `not applicable` + 理由但不自动通过；不存在自动 approval/ready/done、simulation→hardware 或手册覆盖 canonical rule 的表达 |
 | AFP-DRILL-001 | AFP-003 | documentReview | readiness 钉定的六类历史案例全部映射到最早触发阶段、AF ID、模板字段、预防/验证动作与历史 evidence；至少一个环境失败反例保持 environment blocked/deviation 而非产品 failure；演练不修改历史 bytes、不重判 task/change/AC、不产生产品或硬件支持声明 |
 | AFP-CORRECT-001 | AFP-004 | documentReview | 手册 `AF-001`…`AF-018` 的全部 `Fact` 行逐条给出一手出处（相对路径 + 完整 40-hex OID）与支持/不支持判定；不被支持的具体表述已改写为可支持表述或降级为 `Inference`，两种处置均有判定依据；`Inference` 行未被误写为 `Fact`；`AF-NNN` ID 集合、taxonomy 归属、八字段契约、`Automation status` 取值域与两轴划分零变化；手册内代码符号可在仓内（手册与本 change 之外）解析；`Currency` 已更新；archive 与模板 diff 为零 |
+| AFP-LINK-001 | AFP-005 | documentReview | 手册对**本 change 目录**的相对路径引用归零（`git grep` 在 `openspec/planning/**` 下命中 0），且 taxonomy 登记在 CHG-2026-029 design §3 这一事实指向以不依赖 change 目录位置的形式保留；`AF-NNN` ID 集合、taxonomy 归属与两轴划分、八字段契约与顺序、`Automation status` 取值域、首屏声明、`Fact`/`Inference` 标注与 positive/negative 方法数**零变化**；指向其他活跃 change 的 24 条链接逐字不动并在 run 中登记为已知限制；`openspec/templates/**`、`changes/archive/**` 与 chg-2026-027 目录 diff 为 0 |
 
 ## Negative and boundary checks
 
