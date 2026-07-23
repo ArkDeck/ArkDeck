@@ -92,7 +92,18 @@ evidence-only commit 追加，不改变上述 first-source-head 事实。
 - Allowed implementation paths：`agent-pr.yml`、新 contract test 与本 run record；
   `sdd-guard.yml`、runtime、Core/spec/contracts/governance、产品 source/tests 均零 diff。
 - `HLR-LEASE-001` / `HLR-WORKER-001` 的 HLR-002A **offline contract slice**：
-  PASS；implementation repository gate 同时满足。
+  PASS；首次 source push 的 branch guard 与唯一 legacy creator gate 同时满足。
+- 后续 evidence-only head
+  `4d0d5e1a0830158340e98190c856f89862980841` 触发 PR `synchronize` 后，
+  SDD Guard pull-request run `29992997396` 的 `allowed-paths` job
+  `89159873429` terminal failure。具名错误为：
+  `branch task declaration 'agent/task-hlr-002a-bootstrap-partition' normalizes to
+  invalid 'TASK-HLR-002A-BOOTSTRAP-PARTITION'`。
+- 根因是 pinned `scripts/check_pr_paths.py` 的 `TASK_TOKEN_TEXT`/`TASK_LINE_RE`
+  只接受末段三位数字，而 canonical active task 为 `TASK-HLR-002A`。标题/body
+  均无法诚实声明该 task；伪填 `TASK-HLR-002` 会绑定错误任务，修改 parser 又超出
+  本 readiness allowed paths。故 PR integration gate = **FAIL**，不形成 bootstrap
+  PASS，#412 不得合入；须经独立 scope revision/readiness 后重新实现。
 - 本 run 不声明 post-merge live control/canary PASS，不创建 integration identity，
   不授权 HLR-002 D2，不翻 TASK-HLR-002A 状态，也不构成 change verification。
   implementation 合入后仍须按 readiness 执行独立 live evidence PR；事实不全即
