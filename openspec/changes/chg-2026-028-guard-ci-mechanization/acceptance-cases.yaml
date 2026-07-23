@@ -1,7 +1,7 @@
 ---
 schema_version: 1.0.0
 change_id: CHG-2026-028-guard-ci-mechanization
-change_revision: 2
+change_revision: 3
 platform: macos
 evidence_classes:
 - documentReview
@@ -61,4 +61,11 @@ cases:
     surface is red while a docs-only undeclared PR is green; a declared task
     that does not exist, a missing allowed-paths line or a line yielding zero
     path tokens each fail closed as a named error rather than silently
-    passing.
+    passing. When the declared task exists uniquely in an active change at the
+    base but the whole change is atomically moved at the head to one newly
+    added date-prefixed archive target with identical relative paths, blob
+    OIDs and modes, the base task's allowed paths remain authoritative and the
+    relocation pairs pass; every non-relocation path must still match those
+    base allowed paths. Archive-only tasks, partial or mutated moves, copied,
+    ambiguous or pre-existing targets, an active-root residue and living-path
+    scope expansion each fail closed with a named error.

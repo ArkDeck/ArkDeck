@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-028-guard-ci-mechanization
-revision: 2
-status: approved # r1 经 #318 批准;本 r2 carrier namespace 修订仅在维护者 review/merge 当前 revision PR 后生效
+revision: 3
+status: approved # r1 经 #318 批准;r2 经 #349 批准;本 r3 atomic-archive task lookup 修订仅在维护者 review/merge 当前 revision PR 后生效
 class: implementation-only
 core_change_level: none
 owner: lvye
@@ -58,6 +58,9 @@ platforms: [macos]
   超出即红;未声明任务的 PR 触碰敏感面(`Packages/**`、`ArkDeckApp/**`、
   `ArkDeckAppUITests/**`、`scripts/**`、`.github/**`)即红,纯 docs/governance
   diff 通过(propose/approval/readiness/状态 PR 形态);解析失败 fail closed。
+  原子归档 PR 若使 task 在 head 的 active changes 中消失,只允许从 base 的
+  唯一 active task 读取 Allowed paths,且须先证明整棵 change 以相同相对路径、
+  blob 与 mode 原子迁移到唯一的新 archive 目标;archive 自身永不提供 authority。
 
 Out of scope / Non-goals:
 
@@ -69,7 +72,9 @@ Out of scope / Non-goals:
   change 名义独立 PR 先行修复(readiness 钉扫描结果)。
 - `yaml pin-example` 只区分 schema 示例与真实 carrier,不允许在 `yaml pins`
   carrier 内使用 `<40-hex>`/`<64-hex>` 或任何其他占位符。
-- `archive/**` 全体豁免全部新校验(归档 = 冻结历史)。
+- `archive/**` 内容不作为 revision/pins/task authority 的扫描源(归档 = 冻结
+  历史)。MECH-004 r3 只可把 head 中新出现的 archive tree 与 base active
+  change tree 做只读 blob/mode 等值比较,不得解析 archive tasks 取得授权。
 - Core spec/contract/schema/constitution/enforcement 零改动;CORE baseline
   不升版;POL-* 原文不动。
 - 设备/硬件零涉及;XCUITest/App 构建、性能基准、覆盖率门不进本 change。
@@ -153,3 +158,30 @@ V2 治理:本 propose PR 合入仅登记提案;批准须独立 approval-only PR;
   边界或授权语义,不含 guard 实现,也不把 TASK-MECH-003 置 `ready`。修订仅在
   维护者对本 revision PR exact head review/merge 后生效;其后仍须独立
   MECH-003 readiness 重钉 guard blobs 与完整 schema。
+
+### r3 atomic-archive task lookup 修订(2026-07-23)
+
+- 触发证据:CHG-2026-015 原子归档 PR #351(base
+  `65ffe6d90457569e10cdde43a46d5478e972c664`,head
+  `e09b80d68ad83e75a2a4eab63b33031246eba78d`)把 active change 整体移入
+  archive,因此 head-only `load_task_definitions()` 找不到 `TASK-I15-001`;
+  `allowed-paths` run `29968517228`/job `89085131177` 如实报红。维护者随后对
+  exact head APPROVED 并合入 #351(`583b1c1d4de1a77fc0554908f9b45e28fe604a56`),
+  当时该 job 尚非 required status。本 revision 记录机制缺口,不追溯改变该次
+  review、失败结果或 archive bytes。
+- r3 只扩充 MECH-004 的 task definition lookup:head active task 仍为首选;
+  head 缺失时,只有 task 在 base 恰好一个 active change 中存在,且该 change
+  在 head 完全消失并逐文件等值迁移到一个本次新增的
+  `openspec/changes/archive/YYYY-MM-DD-<change-dir>/` 目标,才允许使用 base
+  task 的 Allowed paths。归档迁移对每个 tracked entry 要求相同相对路径、
+  blob OID 与 mode;任何 partial/mutated/copied/ambiguous/pre-existing target
+  或 active root 残留均 fail closed。
+- 等值 relocation pair 仅因上述证明而获准;archive tasks.md 永不解析、永不
+  复活历史 task。其余 living/non-relocation diff 仍必须命中 base task 的
+  Allowed paths;因此 archive PR 若需更新 living consumer,必须在归档前通过
+  独立 D1 revision 把精确路径写入 active task,不得由 guard 推断 change-level
+  prose 或给 `archive/**` 通配豁免。
+- 本 r3 同步收紧 `MECH-PATH-001` 的正反 fixture。它不含 guard 实现、不修改
+  #351 archive、不改变 canonical Core AC、批准语义或 required-status D2 边界;
+  仅在维护者 exact-head review/merge 后,才可另开 TASK-MECH-004 remediation
+  implementation/evidence PR。
