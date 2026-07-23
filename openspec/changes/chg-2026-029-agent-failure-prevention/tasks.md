@@ -1006,10 +1006,18 @@
 
 ## TASK-AFP-005 — 手册 archive 断链收口
 
-- Status:ready（2026-07-23 D1 readiness r1；仅在维护者 review/merge 本独立 PR 后
-  生效。三前置全部闭合：① revision r4 已生效；② TASK-AFP-001 done 与 TASK-AFP-004
-  done；③ 本 readiness 钉定手册 blob、待改行与改法。merge 前不得开
-  implementation/evidence PR）
+- Status:done（2026-07-23 D0 完成状态；仅在维护者 review/merge 本独立状态 PR 后
+  生效。Done recheck（全部基于 protected `main` 已合入状态 + 确定性检查，非沿用
+  实现 PR 会话结论）：implementation + evidence PR #394 已合入，merge OID
+  `21445775cef0837fe98381a1750464bcc2a829f8` 为 `origin/main` 祖先，且其树与
+  PR head `eaf84172fd6f64b50a0ef97515e5b5fbc58f84e2` **逐字一致**（`git diff`
+  为空）；run 在案：`evidence/runs/TASK-AFP-005/run.md`（已在 main）。二值门于
+  合入版重验：`git grep 'chg-2026-029-agent-failure-prevention'` 于
+  `openspec/planning/**` 命中 **0**；手册 change 链接总数 **34**（10 archive +
+  24 active）；`scripts/check-sdd.sh` 0 error / 0 warning / 111 acceptance IDs。
+  done 不等于 change `verified`：`AFP-LINK-001` 的最终结论仍需 change 级 verify
+  PR 由维护者确认。本 PR = CHG-2026-027 批次演练**候选 2″**（BAP-002 drill，
+  issue #395）：须留在 open 队列按 digest 顺序合并，不催合。）
 - Readiness（r1，base = protected `main`
   `d53da289b7da80a4ee2282f5dea3122ebf97325a`）：
   - **Approval/dependency gate:satisfied。**revision r4 #387 合入
