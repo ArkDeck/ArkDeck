@@ -1,7 +1,7 @@
 # CHG-2026-030 Verification Plan
 
 > Status:planned
-> Change:CHG-2026-030-host-loop-runtime@r1
+> Change:CHG-2026-030-host-loop-runtime@r2
 > Core baseline:CORE-2.1.0（零 Core/Product behavior change）
 
 ## Environment
@@ -18,7 +18,7 @@
 | Evidence ID | Task | Method | Expected result |
 | --- | --- | --- | --- |
 | HLR-ENVELOPE-001 | HLR-001, HLR-005 | contract + live | task-bound PR 在创建时含独立 `Task: TASK-*`、完整 base/head OID、grade、dependency、evidence、配置 attribution；每类缺失/歧义失败；proposal 用 `Task: none`；无固定厂商 attribution；首个 PR event 能供 MECH-004 读取 |
-| HLR-LEASE-001 | HLR-002, HLR-003, HLR-005 | D2 review + fault integration | least-privilege identity 无 main bypass/merge/approval/admin；remote lease acquire/renew/takeover 使用 exact OID fence；两个 owner、stale owner、heartbeat loss、cursor corruption 和 API timeout 全部停 lane/重协调，零 duplicate dispatch |
+| HLR-LEASE-001 | HLR-002, HLR-003, HLR-005 | D2 review + fault integration | identity 只持 GitHub 平台所需的最小 repository categories，非 CODEOWNER/bypass 且无 approval/merge authority/admin；integration-authored PR self-approval、main write、merge、admin probe 均拒绝；runtime typed adapter 无 generic/review/merge/admin route；remote lease acquire/renew/takeover 使用 exact OID fence；两个 owner、stale owner、heartbeat loss、cursor corruption 和 API timeout 全部停 lane/重协调，零 duplicate dispatch |
 | HLR-WORKER-001 | HLR-003, HLR-005 | contract + live | worker 只处理 approved+ready host-only task，创建/更新唯一 stable identity PR；首个 `pull_request` checks 实测存在且 metadata 已完整；legacy creator 仅在 live proof 后退出，rollback 可复查 |
 | HLR-REVIEW-001 | HLR-004, HLR-005 | contract + live | reviewer run/worktree/session 独立且只读；missing/failed checks、`REQUEST_CHANGES` 或 `BLOCKED` 不入 batch；`APPROVE` 是独立 AI 预审记录而非 GitHub/human approval；零 auto-merge |
 | HLR-RECOVERY-001 | HLR-004, HLR-005 | fault injection + live recovery | acquire、create、update、heartbeat、review、merge observation 各 crash window 可重启；仅 GitHub merge metadata 与 protected-main full OID 同时匹配才 advance/release；branch缺失、Issue声称 merged、CI绿、时间流逝均不通过 |
@@ -31,6 +31,10 @@
   `reconcile-required`，不创建第二 PR、不开新 task；
 - `GITHUB_TOKEN` creator、首个 check 缺失、legacy/new creator 同存、PR lookup 0 或 >1 →
   migration failure/rollback，不用人工编辑 body 掩盖；
+- identity 成为 CODEOWNER/bypass、permission category/scope 超 pin、protected-main
+  direct write / integration-authored PR self-approval / merge / admin same-value mutation
+  任一成功、typed adapter 可构造 generic request 或 review/merge/admin route →
+  撤销 identity、停 scheduler、overall failure；cleanup 不改变失败结论；
 - reviewer 与 implementer 同 run/session/worktree、reviewer 尝试写 GitHub approval 或
   merge、checks pending/red、batch digest 不完整 → 不入队；
 - merge OID 单源、branch delete、PR closed without mergedAt、network/clock uncertainty →
