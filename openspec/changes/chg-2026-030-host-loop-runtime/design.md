@@ -1,7 +1,7 @@
 # CHG-2026-030 Design — host-loop runtime
 
 > Status:draft
-> Change:CHG-2026-030-host-loop-runtime@r3
+> Change:CHG-2026-030-host-loop-runtime@r5
 > 本设计只约束本 change 的候选实现。与 Constitution、AGENTS.md、
 > enforcement.md 或 CHG-2026-027 冲突时，停止并以高层规则为准。
 
@@ -114,6 +114,41 @@ TASK-[A-Z0-9]+(?:-[A-Z0-9]+)*-[0-9]{3}[A-Z]?
 parser/tests 与 namespace filter 必须在同一 HLR-002A implementation candidate 中通过，
 且真实 pull-request `allowed-paths` 绿色；但 #412 已永久 superseded，r4 后仍须独立
 readiness 选择 fresh branch/head，不能修补或复用该 PR。
+
+## 1D. Multi-level ref boundary remediation（r5）
+
+HLR-002A implementation #419 已证明 workflow/parser contract，但 #421 记录的首个
+post-merge reserved create 对
+`refs/heads/agent/host-loop/probes/<uuid-v4>` 返回 GH013。失败 head 与 #419 merge
+tree 相同，远端 ref、workflow run 与 PR 均为 0；由于 reserved head guard 缺失，该零
+结果不能证明 creator isolation。
+
+根因是 TASK-BAP-003 ruleset `agent-ref-boundary`（ID `19595282`）把 `~ALL` 作为
+include，只以 `refs/heads/agent/**` 作为 exclude，并只用单层
+`agent/cred-probe` 做过正向验证。GitHub ruleset 的 `fnmatch` 使用
+`File::FNM_PATHNAME`，`*` 不跨 `/`；多层示例使用 `qa/**/*`。因此 r5 固定的最小
+target-pattern delta 是：保留现有 `refs/heads/agent/**`，**仅追加**
+`refs/heads/agent/**/*`；不更改 `~ALL`、creation/update/deletion rules、仅维护者
+bypass 或 Deploy Key 的 non-bypass 身份。
+
+该 delta 属 D2 权限配置，runtime/Agent 不得自行应用。独立 D2 readiness 必须钉定：
+
+1. ruleset ID、完整 before JSON/hash、enforcement、include/exclude、rules 与 bypass；
+2. exact after 只比 before 多一个 `refs/heads/agent/**/*` exclude；
+3. 维护者窗口、操作者、rollback contact，以及失败时恢复完整 before JSON 的步骤；
+4. GitHub active-rule evaluation 预期：单层 `agent/<probe>` 与多层
+   `agent/host-loop/probes/<uuid>`/`agent/hlr-002a-control/<uuid>` 不命中收权
+   ruleset；`main`、`<non-agent-probe>` 与相似前缀 `agentx/**` 仍命中；
+5. Agent credential 的单层/多层 create-delete 正向、non-agent create 与基于空提交的
+   direct-main update 负向；任一负向意外成功都视为权限扩大事故。
+
+维护者应用并 read-back exact after 后，fresh canary 不复用 #421 run ID/head。它在
+执行时重新钉一个 protected-main OID，两个 empty commit 以该 OID 为共同 parent 且
+tree 相同；main 在 reserved/ordinary 两次 push 之间前进、ruleset read-back 漂移或
+任一 ref 预存在都停止。随后仍严格 reserved-first、ordinary-second：两者 head guard
+成功；reserved legacy run/PR 均 0；ordinary legacy run/PR 恰一。事实闭合后才 close
+control PR、删除两个 refs 并再次 read-back。cleanup 不改变 PASS/FAIL，D2 ruleset
+receipt/live evidence 与 `ready→done` 仍是不同 PR。
 
 ## 2. PR envelope
 
