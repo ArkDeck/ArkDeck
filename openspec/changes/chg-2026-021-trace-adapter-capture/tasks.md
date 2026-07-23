@@ -136,6 +136,29 @@
 
 - Status:ready(readiness;仅在维护者 review/merge 本独立状态 PR 后生效;本 PR 只修改
   `tasks.md`,不含实现/evidence,不执行 device/HDC/network/external-process)
+- Readiness revision r3(2026-07-23;D1;仅在维护者 review/merge 本独立重钉 PR 后生效):
+  - Base = protected `main`
+    `0186a61929540d972eae800eee9dbddabb1f8add`(#352 merge)。#351 归档
+    CHG-2026-015 并重钉该 change 的 provenance,使本任务只读 seam
+    `HDCReadOnlyProbeRegistry.swift` 发生已审计 blob 漂移;按 r1/r2 fail-closed
+    条款,本修订合入前不得开始 adapter implementation。后续 #352 只交付
+    TASK-MECH-003 pins carrier guard/template/evidence,与本任务四个 allowed paths 及
+    全部 readiness pins 均无交集。
+  - 该 seam 的实现只读 pin 从
+    `da9d060b3107ee4891f6f67db89ba1741d4993d6` 重钉为
+    `2dfe8e9d8290d6e939b4e3531ac81bb332a7cc29`。审计 diff 仅更新 registry/resource
+    manifest 与四份 CHG-2026-015 receipt 的 SHA-256 literal(6 additions/
+    6 deletions);本任务不采用、解释或修改其 HDC authority。
+  - Trace registry/resource closure 与 r1 全部 SHA-256 pin 无漂移;三份
+    `Trace*Contracts.swift` blob 及 r2 `Package.swift` blob pin 无漂移;两份待新增
+    adapter/test 文件在本 base 仍不存在。实现 scope、四个 allowed-path token、
+    AC、fixture authority、风险、隐私与零 device/HDC/network/external-process 边界均不变。
+  - 当前 main host-only 复验:trace registry tests 4/0;validator PASS(7 entries/
+    7 resources/14,939 fixture bytes/real device dispatch 0);`check-sdd` 0 errors/
+    0 warnings/111 acceptance IDs。#351 main checks 的 SDD Guard 与 Swift CI 均成功。
+  - 本修订只修改本 change `tasks.md`,不含 adapter/test/evidence,不改变 task 状态、
+    objective、change verification 或任何 hardware/compatibility/support/conformance/
+    release claim。
 - Readiness revision r2(2026-07-22;D1;仅在维护者 review/merge 本独立修订 PR 后生效):
   - Base = protected `main`
     `2ad9278d84b21aa516f74053e1031dcd8014720d`(#336 merge)。TASK-MECH-004
