@@ -6,17 +6,29 @@
 
 ## TASK-HLR-001 — 结构化 PR envelope 与纯 runtime contract
 
-- Status:ready（2026-07-23 D1 readiness r3；r2 #390 的 GitHub PR base 虽为
+- Status:done（2026-07-23 D0 completion；仅在维护者 review/merge 本独立
+  `ready→done` PR 后生效。implementation/evidence #401 exact head
+  `2472c946a255f8c40ecc5d102fa6341871c97121` 已由 `lvye` APPROVED，并以
+  `145d46384251e535a563aa94a142d83860f2a710` 合入 protected `main`；merge
+  subject 携 `(#401)`，reviewed head→merge 的六个交付路径 tree diff = 0。
+  合入树复验：HLR envelope = 17/17、MECH-004 path contract = 20/20、SDD
+  contract = 19/19、`check-sdd` = 0 errors / 0 warnings / 111 acceptance IDs、
+  Python compile/diff check = PASS；run =
+  `evidence/runs/TASK-HLR-001/run.md`。本 done 只闭合 HLR-001 contract slice，
+  不构成 HLR-005 live first-event evidence、HLR-002 D2 readiness、后续任务
+  ready 或 change `verified`。）
+- Historical Status:r3 `ready`（#400 merge
+  `ece39d9d2a94640e56bb0a3bc7b47e5dc8804cc6` 后生效；2026-07-23 D1
+  readiness r3）；r2 #390 的 GitHub PR base 虽为
   `00bbc5a2c7888e628997537a5ca859b46d772215`，但实际 merge
   `2782f47f98c7fca95996a02560e1a2be31525dc5` 的 first parent 已前进为
   `d53da289b7da80a4ee2282f5dea3122ebf97325a`，不满足 r2 自身“merge parent
-  恰为 audit base”的二值门，因此 fail closed，未开始实现。本 r3 仅在维护者
-  review/merge 本独立 re-pin PR 后生效。三前置仍闭合：① CHG-2026-030
+  恰为 audit base”的二值门，因此 fail closed，未开始实现。r3 三前置闭合：
+  ① CHG-2026-030
   approval #361；② 本 readiness 重新钉定 envelope v1 grammar、runtime/template
   inputs、测试矩阵与当前 protected `main` 基线；③ TASK-BAP-003 done #376。
-  r3 merge 前不得创建 implementation/evidence PR。）
-- Historical Status:r2 `ready`（#390；因上述 exact-parent mismatch 被本 r3
-  supersede，零 implementation/evidence 可复用）。
+  r2 `ready` 因上述 exact-parent mismatch 被 r3 supersede，零
+  implementation/evidence 被复用。
 - Readiness（r3，base = protected `main`
   `09d4afd77b213efd07a5f8b0d07f1be23d71d095`）：
   - **Approval/dependency gate:satisfied。**approval-only #361 的 exact head
@@ -165,10 +177,11 @@
 
 ### Notes / handoff
 
-- Implementation/evidence candidate（本 PR，任务状态保持 `ready`）：
-  `evidence/runs/TASK-HLR-001/run.md`；其中只声明
+- Implementation/evidence：#401 merge
+  `145d46384251e535a563aa94a142d83860f2a710`；
+  `evidence/runs/TASK-HLR-001/run.md` 只声明
   `HLR-ENVELOPE-001` 的 HLR-001 contract slice，live first-event 证据仍归
-  TASK-HLR-005，任务完成结论待独立 D0 done PR。
+  TASK-HLR-005。
 - implementation/evidence PR 不翻 `ready→done`；done 使用独立 D0 状态 PR；
 - readiness 若发现 templates 或 current `MECH-004` grammar 冲突，停止并提议 scope
   revision，不在本 task 改 canonical governance。
