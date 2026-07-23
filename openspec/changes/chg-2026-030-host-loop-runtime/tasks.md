@@ -192,14 +192,16 @@
 
 ## TASK-HLR-002A — Legacy bootstrap namespace partition
 
-- Status:blocked（r4 stop gate：readiness #411 后的 implementation candidate #412
+- Status:ready（2026-07-23 D1 re-readiness r2；仅在维护者 review/merge 本独立
+  `blocked→ready` PR 后生效。）
+- Historical Status:blocked（r4 stop gate：readiness #411 后的 implementation candidate #412
   虽通过 offline filter contract、首次 branch guard 与唯一 legacy creator，但
   `pull_request/synchronize` SDD Guard run `29992997396` 的 `allowed-paths` job
   `89159873429` 因 pinned MECH-004 不识别 canonical `TASK-HLR-002A` 而失败。
-  #412 不得合入且永久 superseded；解除前置：① r4 由维护者 review/merge；
-  ② #412 `closed`、`merged=false`，旧 branch 不复用；③ 独立 re-readiness 从当时
-  protected `main` 重钉 workflow、MECH parser/tests、fresh branch 与验证矩阵。r4
-  合入本身不使任务 ready。）
+  #412 已于 `2026-07-23T09:12:44Z` 关闭且 `merged=false`；CHG-2026-030 r4
+  exact head `55b32e9f27f3cdc04ea772243e46f1f2a681ab4c` 已由维护者 `lvye`
+  APPROVED，并以 `33050b0ceed5a4cfa400f3eb6829a724200a71de` 合入 protected
+  `main`（#415）。本 r2 re-readiness 重新钉定后解除该 stop gate。）
 - Historical Status:ready（#411 merge
   `6b40866e18fe33edc5973de5158f494adfdd48d2` 后生效；其 r1 readiness 因 #412
   首个 PR integration gate failure 被 r4 supersede，不能授权继续实现。）
@@ -208,20 +210,108 @@
   钉定 `agent-pr.yml`/`sdd-guard.yml` blobs、GitHub Actions branch-filter semantics、
   reserved namespace grammar、control/canary 矩阵与零 open workflow conflict。r3
   proposal 合入本身不使本任务 ready。）
-- Re-readiness requirements（r4）：
-  - 以 r4 merge 后最新 protected `main` 为 audit base，重钉
-    `agent-pr.yml`、`sdd-guard.yml`、`scripts/check_pr_paths.py`、
-    `scripts/test_check_pr_paths.py`、HLR envelope parser/tests 与本 change 四文档；
-  - 固定 task token 为
-    `TASK-[A-Z0-9]+(?:-[A-Z0-9]+)*-[0-9]{3}[A-Z]?`，正例至少含
-    `TASK-HLR-002A`/`TASK-M1-001R`，反例覆盖多字符 suffix、lowercase、邻接污染、
-    multiple Task 与描述性 branch slug；
-  - 选择未使用的 fresh non-reserved implementation branch/head；#412 必须
-    `closed`、`merged=false`，旧 branch/ref 不复用，open workflow/path owner 为 0；
-  - 重钉 local contract、首个 push guard、唯一 legacy creator、真实
-    `pull_request` guard/allowed-paths 与 post-merge control/canary 二值门；任一事实
-    不全继续 blocked。
-- Readiness（r1，audit base = protected `main`
+- Readiness（r2，audit base = protected `main`
+  `33050b0ceed5a4cfa400f3eb6829a724200a71de`）：
+  - **Approval/dependency gate:satisfied。**#415 的 exact head
+    `55b32e9f27f3cdc04ea772243e46f1f2a681ab4c` 由 `lvye` 于
+    `2026-07-23T09:12:18Z` APPROVED，并以
+    `33050b0ceed5a4cfa400f3eb6829a724200a71de` 于
+    `2026-07-23T09:14:24Z` squash merge；merge parent 恰为
+    `2462f72d71dffe26e3a69a8932fe469e667f2a38`，subject 携 `(#415)`，
+    reviewed head→merge 对本 change 四文档 tree diff = 0。TASK-HLR-001 done
+    `d09f5021107e4133d2fc41c1ce65d0bd09d6c12b` 与 TASK-BAP-003 done
+    `6a6b6b7010b6563d67aa7d96e6838505e82eb25a` 均为本 audit base ancestor。
+    #412 state=`closed`、merged=`false`、head =
+    `6744d353b42faf8da15314c09f3465749be05f77`，只保留失败诊断，不复用。
+  - **Base/input pins。**以下 Git objects 在本 audit base 实测；本 readiness merge
+    后 implementation 开工前必须重核 exact blob/absence、依赖 ancestry、本
+    readiness merge parent 与 diff-only-self-section。任一漂移或路径占用立即停止并
+    重新 D1 readiness。
+
+    ```yaml pins
+    - artifact: TASK-HLR-002A re-readiness r2 audit base
+      commit: 33050b0ceed5a4cfa400f3eb6829a724200a71de
+    - artifact: CHG-2026-030 revision r4 reviewed head
+      commit: 55b32e9f27f3cdc04ea772243e46f1f2a681ab4c
+    - artifact: CHG-2026-030 revision r4 merge
+      commit: 33050b0ceed5a4cfa400f3eb6829a724200a71de
+    - artifact: TASK-HLR-001 done merge
+      commit: d09f5021107e4133d2fc41c1ce65d0bd09d6c12b
+    - artifact: TASK-BAP-003 done merge
+      commit: 6a6b6b7010b6563d67aa7d96e6838505e82eb25a
+    - path: .github/workflows/agent-pr.yml
+      blob: 2b9b03a90d70671d85da21be6a667e2f2f9c8acb
+    - path: .github/workflows/sdd-guard.yml
+      blob: 809147e462512d970813d1992a3fcdf41f8b4b10
+    - path: .github/workflows/swift-ci.yml
+      blob: 640065f3f3849e1add0cc6bfa92078873eb315ef
+    - path: openspec/changes/chg-2026-030-host-loop-runtime/proposal.md
+      blob: 8760c1fef107ca90bc043b1706e836f234ba52a5
+    - path: openspec/changes/chg-2026-030-host-loop-runtime/design.md
+      blob: f7af899c91efdb933be90382a28d2868af190e2b
+    - path: openspec/changes/chg-2026-030-host-loop-runtime/tasks.md
+      blob: 52952297c43f9493f4981706e4424971f7d8bf29
+    - path: openspec/changes/chg-2026-030-host-loop-runtime/verification.md
+      blob: 697684800b8ce94a16208ed28012b29ef7e1ca46
+    - path: scripts/check_pr_paths.py
+      blob: 7fdc47933b98284c556d5cba6fd8cfe99b87e0ad
+    - path: scripts/test_check_pr_paths.py
+      blob: 1f7093402034c622553a11a71b6fc50cb8622bec
+    - path: scripts/host_loop/pr_envelope.py
+      blob: c990fcfb17de52ed1166fec55cb1f9365e0e7736
+    - path: scripts/host_loop/test_pr_envelope.py
+      blob: 35d9a284e8ddde67fd1076bc1c2f0f11f02d26db
+    ```
+
+    `scripts/test_agent_pr_workflow.py` 在本 audit base 经 Git object lookup 确认为
+    absent；它仍是本 implementation 唯一允许新增的文件。
+
+  - **Implementation scope/branch:closed。**fresh branch 固定为
+    `agent/hlr-002a-bootstrap-partition-r2`；截至 `2026-07-23T09:16:08Z`
+    all-state exact-head PR query = 0、remote ref = absent，且本仓 open PR = 0、
+    remote `agent/host-loop/**` ref = 0。旧
+    `agent/task-hlr-002a-bootstrap-partition`/head `6744d353...` 不删除也不复用。
+    implementation 只允许修改 `.github/workflows/agent-pr.yml`、
+    新增 `scripts/test_agent_pr_workflow.py`、`scripts/check_pr_paths.py`、
+    `scripts/test_check_pr_paths.py` 与追加本任务 evidence；不翻状态，不改
+    `sdd-guard.yml`/`swift-ci.yml`、HLR envelope、runtime、identity/secret/scheduler。
+  - **MECH suffix grammar:binary。**`TASK_TOKEN_TEXT` 必须恰为
+    `TASK-[A-Z0-9]+(?:-[A-Z0-9]+)*-[0-9]{3}[A-Z]?`，且
+    `TASK_TOKEN_RE`、`TASK_LINE_RE`、`FULL_TASK_RE` 与 `TASK_HEADER_RE` 共享该
+    definition，不保留第二套 task grammar。title/body 正例至少覆盖
+    `TASK-HLR-002A`、`TASK-M1-001R`、`TASK-M0A-005B` 与 numeric
+    `TASK-HLR-003`；lowercase、两字符 suffix、缺三位数字、邻接污染、多个不一致
+    Task、unknown active task 与描述性 branch slug 分别具名失败。branch fallback、
+    active task 唯一解析、allowed-path expansion logic 与 archive semantics 均不改。
+  - **Namespace/filter contract:binary。**`agent-pr.yml` 只把 current flow list 改为
+    ordered `["agent/**", "!agent/host-loop/**"]` block；新 standard-library contract
+    test 继续覆盖 r1 的全部 include/exclude、reserved task/lease/probe grammar 与
+    malformed fixtures。`sdd-guard.yml`/`swift-ci.yml` 必须与 pins byte-for-byte
+    相同，`scripts/host_loop/**` 零 diff。
+  - **Repository integration gate:binary。**首次 source commit subject 必须含
+    canonical `TASK-HLR-002A`，push 后 exact head 必须取得 SDD Guard、Swift CI 与
+    Agent PR push run terminal success，并由 legacy `github-actions[bot]` 唯一创建
+    PR。PR 创建后只允许在同一 evidence 文件追加 first-source-head run/PR IDs 的
+    evidence-only commit；该 synchronize head 必须取得真实 pull-request `guard` 与
+    `allowed-paths` terminal success、Swift CI success，Agent PR 幂等 run 不得创建
+    第二 PR。all-state exact-head/branch 查询始终恰一 PR；不得手工改 body、错绑
+    `TASK-HLR-002`、复用 #412 checks 或用 elapsed time 推断。任一 0/2 PR、红/缺 check、
+    parser ambiguity 或 source/evidence 越界均停止，不形成 bootstrap PASS。
+  - **Fixed validation。**`python3 scripts/test_agent_pr_workflow.py`、
+    `python3 -m unittest discover -s scripts/host_loop -p 'test_*.py'`、
+    `python3 scripts/test_check_pr_paths.py`、`python3 scripts/test_check_sdd.py`、
+    `scripts/check-sdd.sh`、`git diff --check`、allowed/forbidden diff 与 pinned
+    workflow/HLR input 的 byte-equality 全部通过；run record 分开声明
+    offline、first-source 与 synchronize 事实，不预填 live canary。
+  - **Post-merge control/canary:binary。**implementation exact reviewed head 合入后，
+    仍按 r1 下列 live plan 从同一 merge parent 先 push reserved probe、再 push ordinary
+    control；两者 head guard 绿，ordinary 恰一 legacy run/PR，reserved 的 legacy
+    run/PR 均为 0；cleanup 前后 read-back 与失败保持事实性。该 live evidence 使用
+    独立 PR，之后再走独立 `ready→done`。
+  - **Review boundary。**本 re-readiness PR 只修改本文件 TASK-HLR-002A section，
+    登记 r4/#412 closure、r2 pins、fresh branch、suffix grammar 与 repository gate；
+    零 implementation/evidence、零 external/D2 write。其 merge 只使任务 ready。
+- Historical Readiness（r1，audit base = protected `main`
   `0080403e87527c4487849ee6e3c705236e1437b7`）：
   - **Approval/dependency gate:satisfied。**CHG-2026-030 r3 exact head
     `c54964d76bb843215ad956251e7fc08cea502796` 已由维护者 `lvye` APPROVED，
