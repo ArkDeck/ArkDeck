@@ -29,12 +29,12 @@ evidence/runs/TASK-RKFUI-001A/blocked-capability-preflight-maskrom-still-present
 evidence/runs/TASK-RKFUI-001A/blocked-capability-preflight-hdc-drift-maskrom-2026-07-24.md
 evidence/runs/TASK-RKFUI-001A/blocked-capability-preflight-hdc-drift-maskrom-2026-07-24.json
 evidence/runs/TASK-RKFUI-001B/run.md
+evidence/runs/TASK-RKFUI-001C/run.md
 ```
 
 未来 run 位置：
 
 ```text
-evidence/runs/TASK-RKFUI-001C/
 evidence/runs/TASK-RKFUI-002/
 evidence/runs/TASK-RKFUI-003/
 evidence/runs/TASK-RKFUI-004/
@@ -89,3 +89,11 @@ bundled resource mirror、17 个 hash-pinned fixtures、Swift production parser/
 terminator、missing final terminator 与 empty record 全部 fail closed；合成 CRLF
 Maskrom 仍是一个显式 wrong-mode observation。本任务没有运行 HDC、`rkdeveloptool` 或
 USB observation，E1/E2/destructive、intent、binding 和 usage reservation 均为 0。
+
+`TASK-RKFUI-001C/run.md` 记录 r5 host-only exact repin closure：canonical
+loader-transition registry、Python probe registry validation、FakeRunner/negative tests 与
+README 只接受 HDC `Ver: 3.2.0f` /
+`05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83`，并固定
+`PR#481@0f0a79aff7ede1519b9fbc0cbdca12b5c687ef07`。旧 version/hash 各自作为
+fail-closed drift case，不存在 fallback 或双 pin。本任务没有运行任何 HDC、
+`rkdeveloptool`、USB 或设备命令，也不构成逐设备 capability evidence。

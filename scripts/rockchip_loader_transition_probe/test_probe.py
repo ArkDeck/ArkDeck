@@ -31,6 +31,11 @@ PINNED_SERIAL_SHA256 = (
     "958780b2ffb7090d4f22cdc1f547f9804ed0f0b605e3020f384e5d4823dc7a7e"
 )
 FIRMWARE = "OpenHarmony 7.0.0.33"
+HDC_VERSION = "Ver: 3.2.0f"
+HDC_SHA256 = "05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83"
+OLD_HDC_VERSION = "Ver: 3.2.0d"
+OLD_HDC_SHA256 = "48395ba8d87115dffca47df2a640a6c868bc9a2bd4eb49611e4138ff88d8d260"
+R5_AUTHORIZATION_REF = "PR#481@0f0a79aff7ede1519b9fbc0cbdca12b5c687ef07"
 LOADER_LINE = b"DevNo=1\tVid=0x2207,Pid=0x350a,LocationID=2\tLoader\n"
 
 
@@ -39,6 +44,7 @@ class FakeRunner:
         self,
         *,
         firmware: str = FIRMWARE,
+        hdc_version: str = HDC_VERSION,
         targets: bytes | None = None,
         post_targets: bytes = b"",
         pre_ld: bytes = b"",
@@ -47,6 +53,7 @@ class FakeRunner:
         e1_stderr: bytes = b"",
     ):
         self.firmware = firmware
+        self.hdc_version = hdc_version
         self.targets = targets or f"{CONNECT_KEY}\n".encode("ascii")
         self.post_targets = post_targets
         self.pre_ld = pre_ld
@@ -60,9 +67,14 @@ class FakeRunner:
     def __call__(self, argv, timeout_ms, cwd):
         self.calls.append(list(argv))
         if argv[-1:] == ["-v"] and pathlib.Path(argv[0]).name == "hdc":
-            return result(b"Ver: 3.2.0d\n")
+            return result((self.hdc_version + "\n").encode("utf-8"))
         if argv[-1:] == ["checkserver"]:
-            return result(b"server version: Ver: 3.2.0d daemon version: Ver: 3.2.0d\n")
+            return result(
+                (
+                    f"server version: {self.hdc_version} "
+                    f"daemon version: {self.hdc_version}\n"
+                ).encode("utf-8")
+            )
         if argv[-2:] == ["list", "targets"]:
             self.target_list_calls += 1
             stdout = self.targets if self.target_list_calls <= 2 else self.post_targets
@@ -140,6 +152,7 @@ class HarnessCase(unittest.TestCase):
             authorization_refs=(
                 "PR#440@f4e901492e7d3b82f883424c756868fffa4946df",
                 "PR#452@d22cdeeebc781b9c3a1b063dbee6631934c51ac0",
+                R5_AUTHORIZATION_REF,
             ),
             valid_until=valid_until or dt.datetime(2030, 1, 1, tzinfo=dt.timezone.utc),
             max_runs=1,
@@ -149,7 +162,7 @@ class HarnessCase(unittest.TestCase):
             firmware=FIRMWARE,
             transport="usb",
             binding_revision=1,
-            hdc_version="Ver: 3.2.0d",
+            hdc_version=HDC_VERSION,
             hdc_sha256=probe.sha256_file(self.hdc),
             rkdeveloptool_version="rkdeveloptool ver 1.32",
             rkdeveloptool_sha256=probe.sha256_file(self.rk),
@@ -211,12 +224,51 @@ class RegistryAndArgvTests(HarnessCase):
         self.assertEqual(registry["target"]["firmware"], FIRMWARE)
         self.assertEqual(registry["target"]["serialSHA256"], PINNED_SERIAL_SHA256)
         self.assertEqual(
+            registry["authorization"]["refs"],
+            [
+                "PR#440@f4e901492e7d3b82f883424c756868fffa4946df",
+                "PR#452@d22cdeeebc781b9c3a1b063dbee6631934c51ac0",
+                R5_AUTHORIZATION_REF,
+            ],
+        )
+        self.assertEqual(registry["hdc"], probe.EXPECTED_HDC)
+        self.assertEqual(registry["hdc"]["reportedVersion"], HDC_VERSION)
+        self.assertEqual(registry["hdc"]["sha256"], HDC_SHA256)
+        self.assertEqual(
             registry["operation"]["exactArgvTemplate"],
             ["-t", "<durable-connect-key>", "shell", "reboot", "loader"],
         )
         self.assertEqual(registry["rockUSBObservation"]["exactArgv"], ["ld"])
         self.assertIn("destructive", registry["operation"]["forbiddenEffects"])
         self.assertIn("retry", registry["operation"]["forbiddenEffects"])
+
+    def test_registry_rejects_each_old_hdc_pin_without_dual_pin_fallback(self):
+        registry = json.loads(
+            (
+                pathlib.Path(__file__).resolve().parents[2]
+                / probe.REGISTRY_RELATIVE_PATH
+            ).read_text()
+        )
+        for field, old_value in (
+            ("reportedVersion", OLD_HDC_VERSION),
+            ("sha256", OLD_HDC_SHA256),
+        ):
+            with self.subTest(field=field):
+                drifted = json.loads(json.dumps(registry))
+                drifted["hdc"][field] = old_value
+                repo_root = self.root / field
+                registry_path = repo_root / probe.REGISTRY_RELATIVE_PATH
+                registry_path.parent.mkdir(parents=True)
+                registry_path.write_text(json.dumps(drifted), encoding="utf-8")
+                with self.assertRaisesRegex(
+                    probe.ProbeError,
+                    "loader-transition HDC exact pin or server policy drifted",
+                ):
+                    probe.load_config(
+                        self.rk,
+                        repo_root=repo_root,
+                        state_root=self.root / f"{field}-state",
+                    )
 
     def test_materializers_are_closed_and_targeted(self):
         config = self.config()
@@ -430,6 +482,16 @@ class WorkflowTests(HarnessCase):
 
     def test_firmware_mismatch_blocks_before_usage_and_e1(self):
         fake = FakeRunner(firmware="OpenHarmony 7.0.0.34")
+        exit_code, receipt, _ = self.run_workflow(fake)
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(receipt["counters"]["e1DeviceMutation"], 0)
+        self.assertFalse((self.state / "usage.json").exists())
+        self.assertFalse(
+            any(argv[-2:] == ["reboot", "loader"] for argv in fake.calls)
+        )
+
+    def test_old_hdc_version_blocks_before_usage_and_e1(self):
+        fake = FakeRunner(hdc_version=OLD_HDC_VERSION)
         exit_code, receipt, _ = self.run_workflow(fake)
         self.assertEqual(exit_code, 1)
         self.assertEqual(receipt["counters"]["e1DeviceMutation"], 0)

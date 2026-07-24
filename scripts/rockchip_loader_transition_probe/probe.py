@@ -30,6 +30,20 @@ from typing import Any, Callable, Optional
 REGISTRY_RELATIVE_PATH = pathlib.Path(
     "openspec/integrations/rockchip/loader-transition/1.0.0/registry.yaml"
 )
+EXPECTED_AUTHORIZATION_REFS = (
+    "PR#440@f4e901492e7d3b82f883424c756868fffa4946df",
+    "PR#452@d22cdeeebc781b9c3a1b063dbee6631934c51ac0",
+    "PR#481@0f0a79aff7ede1519b9fbc0cbdca12b5c687ef07",
+)
+EXPECTED_HDC = {
+    "absoluteExecutable": (
+        "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/toolchains/hdc"
+    ),
+    "reportedVersion": "Ver: 3.2.0f",
+    "sha256": "05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83",
+    "serverRequirement": "preExistingExternalSameUIDPinnedExecutable",
+    "serverLifecycleMutationAllowed": False,
+}
 EMPTY_SHA256 = hashlib.sha256(b"").hexdigest()
 LINE_PATTERN = re.compile(
     rb"\ADevNo=([0-9]+)\tVid=0x([0-9A-Fa-f]{4}),Pid=0x([0-9A-Fa-f]{4}),"
@@ -294,6 +308,10 @@ def load_config(
     hdc = registry["hdc"]
     rockusb = registry["rockUSBObservation"]
     operation = registry["operation"]
+    if tuple(authorization.get("refs", ())) != EXPECTED_AUTHORIZATION_REFS:
+        raise ProbeError("loader-transition authorization refs drifted")
+    if hdc != EXPECTED_HDC:
+        raise ProbeError("loader-transition HDC exact pin or server policy drifted")
     valid_until = dt.datetime.fromisoformat(
         authorization["validUntil"].replace("Z", "+00:00")
     )
