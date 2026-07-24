@@ -109,23 +109,54 @@ alter either protection layer.
 
 ## Independent blocked-state observation
 
-This operability-evidence PR itself is the bounded negative pilot. Its initial
-exact head is intentionally observed through public GET only before any human
-review. The following facts will be appended on a later commit of this same
-PR:
+This operability-evidence PR itself supplied the bounded negative pilot. Its
+initial commit was pushed and observed through public GET only:
 
-- initial exact head and PR number;
-- zero approving reviews;
-- `guard` pending/absent or its exact completion state;
-- GitHub `mergeable_state=blocked` after mergeability computation.
+```text
+PR:                    477
+author:                github-actions[bot] / 41898282
+base OID:              6f874efc5c4e9fdd39bcdcc91cfcaa6a862e1961
+initial exact head:    8a568dbef61594e8ebb583c1f96945fdab2fb9c5
+PR created at:         2026-07-24T12:37:05Z
+guard App ID:          15368
+guard started at:      2026-07-24T12:37:01Z
+guard completed at:    2026-07-24T12:37:11Z
+guard conclusion:      success
+reviews before update: []
+auto_merge:            null
+merged:                false
+mergeable:             true
+mergeable_state:       unstable
+Swift completed at:    2026-07-24T12:38:56Z / success
+```
+
+The PR creation instant falls strictly inside the `guard` start/completion
+interval. At that point the required check was pending and the exact branch
+protection therefore made the PR ineligible to merge. No merge attempt was
+needed or authorized.
+
+After every observed check completed successfully, the reviews endpoint still
+returned the exact empty array and the PR remained open/unmerged with
+`mergeable_state=unstable`. `mergeable=true` only establishes that Git can
+construct a merge; it does not override branch policy or constitute merge
+authorization. The authenticated protection requires one approving
+CODEOWNER review, so an empty review set cannot satisfy the merge gate.
+
+The REST field is recorded exactly as `unstable`; it is not rewritten as
+`blocked`. The no-review conclusion comes from the conjunction of the
+authenticated exact protection, the empty reviews array, the completed check
+set and the open/unmerged PR state.
 
 No merge, review, auto-merge, PR-state, ref-probe, credential or control-plane
-write is attempted to obtain that observation.
+write was attempted to obtain these observations. The only writes were the
+ordinary Agent branch push and bot PR creation already required to carry this
+evidence.
 
-## Acceptance conclusion at initial commit
+## Acceptance conclusion
 
-- `RPT-MAIN-001`:the positive no-bypass merge path is evidenced by #476; the
-  independent unapproved/guard-state negative remains to be appended.
+- `RPT-MAIN-001`:PASS. #476 proves the positive normal no-bypass merge path;
+  #477 proves the required-check-pending and check-green/no-review negative
+  states without attempting a bypass.
 - `RPT-IDENTITY-001`:PASS for the enumerated Agent/API route inventory and
   negative/unconstructible routes; the PR-write category is recorded without
   upgrading it to CODEOWNER authority.
