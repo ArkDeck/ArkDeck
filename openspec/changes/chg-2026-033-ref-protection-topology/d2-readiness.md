@@ -1,6 +1,7 @@
 # TASK-RPT-001 D2 readiness
 
-> Status:PROPOSED / NON-EXECUTABLE UNTIL THIS EXACT FILE IS REVIEWED AND MERGED
+> Status:SUPERSEDING REVISION PROPOSED / NON-EXECUTABLE UNTIL THIS EXACT FILE IS
+> REVIEWED AND MERGED
 >
 > 本文件只固定一次性、human-isolated D2 plan。PR 合入前 GitHub control-plane
 > write、probe ref mutation、PR state mutation 与 Agent privileged dispatch 均为 0。
@@ -24,7 +25,8 @@ captured_by:
   type: User
   site_admin: false
 protected_main_oid_at_capture: 60ea5266e506f88b81c0ef8a2c6744c770b5b3d5
-readiness_base_oid: 5b41a15391256d9adcc3a5a316654971c9aab57e
+readiness_base_oid: f14d9de8d5f32d0998837466674adeff9516e5b5
+superseded_pr462_readiness_merge_oid: f14d9de8d5f32d0998837466674adeff9516e5b5
 change_approval_merge_oid: c86f07ae6b843affaaa3f698e2f9f08a6f4c96cd
 compatible_chg030_r7_merge_oid: c5a1a9f0f1c0a9bc0dd3d04275ac01a5738697f7
 task_ready_merge_oid: 298ffa4867f5c0588b8d8adba1a2cb4fb76d5cd8
@@ -34,7 +36,12 @@ non_agent_non_main_remote_refs: []
 ```
 
 capture 后，非重叠 PR #461 以
-`5b41a15391256d9adcc3a5a316654971c9aab57e` 合入并成为 readiness base；
+`5b41a15391256d9adcc3a5a316654971c9aab57e` 合入。随后 PR #462 在本轮
+self-approval capability 审计完成前，以旧 head
+`1839b1ec4009eee6d371217ba8ee35f189a3ca64` 合入为
+`f14d9de8d5f32d0998837466674adeff9516e5b5`。#462 没有固定或关闭
+`can_approve_pull_request_reviews=true`，因此其 readiness **失效且 execution
+dispatch 必须为 0**；本 superseding revision 以该 merge 为新 readiness base。
 `60ea5266e506f88b81c0ef8a2c6744c770b5b3d5` 因而只保留为 capture provenance，
 **不是 execution pin**。本 readiness PR 合入前 `readiness_merge_oid` 不存在；执行
 preflight 必须从 GitHub 的 protected-main merge facts 取得本 PR 的完整 merge OID，
@@ -63,13 +70,13 @@ preflight 必须从 GitHub 的 protected-main merge facts 取得本 PR 的完整
 本文件自身的 blob 只能在 readiness merge 后固定。执行时必须固定 merged readiness
 blob，并证明其内容等于维护者 approved head；表中其余 blob 必须逐项相等。
 
-`2026-07-24T04:56Z` 的 public refresh 发现：
+`2026-07-24T05:04:01Z` 的 public refresh 发现：
 
-| PR | Head | Decision |
+| PR | Head OID | Decision |
 | --- | --- | --- |
-| #457 | `agent/au-002-implementation` | product/updater 与 CHG-2026-023 paths；零 D2 overlap |
-| #459 | `agent/task-au-002-update-runtime` | product/updater 与 CHG-2026-023 paths；零 D2 overlap |
-| #462 | `agent/task-rpt-001-d2-readiness` | 本 readiness carrier；必须先由 `lvye` review/merge |
+| #457 | `3905a980138485d2f2362be29be59acf2ba94ff5` | product/updater 与 CHG-2026-023 paths；零 D2 overlap |
+| #459 | `d3aeeaaa8eba79526474580208dc253c4c46d26a` | product/updater 与 CHG-2026-023 paths；零 D2 overlap |
+| #463 | 本 superseding readiness 的 exact reviewed head | 必须先由 `lvye` review/merge；其 merge OID 才是 execution pin |
 
 全部远端 branch ref：
 
@@ -506,13 +513,21 @@ target、payload、blind retry 或 window extension。
 - BAP supersession 与 HLR readiness：TASK-RPT-002 后续独立 PR；
 - change verification：最后独立 PR。
 
-本 readiness merge 只授权上述 exact、一次性、human-isolated D2 window；不构成
+本 superseding readiness merge 只授权上述 exact、一次性、human-isolated D2
+window；不构成
 task done、change verified、standing authorization 或 Agent privileged capability。
 
 ## K. Explicit supersession and zero-reuse statement
 
 #435、旧 HLR-002A readiness、CHG-2026-030 r6/#449 gateway，以及其 OID、window、
 payload、hash、probe UUID/ref、script 与 receipt 全部不可执行、不可重放、不可作为
-current mechanism evidence。本文件的 before 来自
+current mechanism evidence。
+
+PR #462 / merge `f14d9de8d5f32d0998837466674adeff9516e5b5` 的 readiness 也由本
+revision 显式 supersede：它没有关闭 Actions 的 review approval capability，不得执行
+其中 window/payload/probe。只有本 revision 的 exact head 经 PR #463 由 `lvye`
+review/merge 后，才可进入 Section C/F preflight。
+
+本文件的 before 来自
 `arkdeck-rpt001-human-capture-v1`；payload/hash、nonce/derived refs 与 window 均为
 本 readiness 独有。
