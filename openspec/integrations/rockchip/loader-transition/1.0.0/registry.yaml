@@ -8,7 +8,8 @@
   "authorization": {
     "refs": [
       "PR#440@f4e901492e7d3b82f883424c756868fffa4946df",
-      "PR#452@d22cdeeebc781b9c3a1b063dbee6631934c51ac0"
+      "PR#452@d22cdeeebc781b9c3a1b063dbee6631934c51ac0",
+      "PR#481@0f0a79aff7ede1519b9fbc0cbdca12b5c687ef07"
     ],
     "validUntil": "2026-07-31T16:00:00Z",
     "maxRuns": 1
@@ -23,8 +24,8 @@
   },
   "hdc": {
     "absoluteExecutable": "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/toolchains/hdc",
-    "reportedVersion": "Ver: 3.2.0d",
-    "sha256": "48395ba8d87115dffca47df2a640a6c868bc9a2bd4eb49611e4138ff88d8d260",
+    "reportedVersion": "Ver: 3.2.0f",
+    "sha256": "05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83",
     "serverRequirement": "preExistingExternalSameUIDPinnedExecutable",
     "serverLifecycleMutationAllowed": false
   },

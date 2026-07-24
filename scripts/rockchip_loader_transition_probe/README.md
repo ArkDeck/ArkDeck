@@ -1,7 +1,18 @@
 # TASK-RKFUI-001A HDC → Loader characterization probe
 
-This is the one-run E1 harness authorized by CHG-2026-026 r3. It is not a generic HDC or
-Rockchip command wrapper.
+This is the one-run E1 harness authorized by CHG-2026-026. The r5 closure pins the HDC client
+and pre-existing server to the exact authorization merged as
+`PR#481@0f0a79aff7ede1519b9fbc0cbdca12b5c687ef07`:
+
+- absolute path:
+  `/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/toolchains/hdc`;
+- reported version: `Ver: 3.2.0f`;
+- SHA-256: `05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83`.
+
+The old `Ver: 3.2.0d` /
+`48395ba8d87115dffca47df2a640a6c868bc9a2bd4eb49611e4138ff88d8d260` pair is a
+fail-closed drift case, not a fallback pin. This is not a generic HDC or Rockchip command
+wrapper.
 
 The production command surface is closed:
 
@@ -20,7 +31,8 @@ mixed LF/CRLF, missing final terminators and empty records remain blocked. This 
 does not change device semantics: Maskrom and every non-`0x2207:0x350a + Loader` observation
 remain ineligible.
 
-Before dispatch the harness verifies the r3 window and every target/tool pin, acquires a
+Before dispatch the harness verifies the r5 authorization closure, window and every target/tool
+pin, acquires a
 per-target mutation lane, durably saves `OriginalTargetSnapshot`, revision-1
 `CurrentDeviceBinding`, impact confirmation, the global `maxRuns=1` reservation, and the exact
 `enterUpdater` intent. A reservation is never refunded; a crash or failed attempt cannot be
@@ -41,8 +53,10 @@ Host-only tests:
 python3 -m unittest scripts/rockchip_loader_transition_probe/test_probe.py -v
 ```
 
-Future E1 run (only while the r3 window is valid and after the r4 per-device typed capability
-evidence gate has been accepted through a maintainer-merged PR):
+Future E1 run (only after TASK-RKFUI-001C is marked done by a separate D0 status PR, while the
+window is valid, after a fresh real-USB E0 preflight proves zero pre-existing RockUSB candidates,
+and after the per-device typed capability evidence gate has been accepted through a
+maintainer-merged PR):
 
 ```bash
 python3 scripts/rockchip_loader_transition_probe/probe.py characterize \
