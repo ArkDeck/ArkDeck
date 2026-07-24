@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-033-ref-protection-topology
 revision: 3
-status: approved # r3 仅在独立 approval-only PR #474 经 lvye review/merge 后生效；proposal #473 merge 6153d581d7caf1bd1ed3335171318b3e92250926
+status: verified # 2026-07-25 本 verification-closure PR；r3 approval #474 merge `d94e8f8378fabd14323dddc1ba138391d9dad09c`；两 task done 与五条 change-local AC 见 Verification closure；仅在维护者 review/merge 本 PR 后生效，archive 另行。原注:r3 proposal #473 merge `6153d581d7caf1bd1ed3335171318b3e92250926`
 class: implementation-only
 core_change_level: none
 owner: lvye
@@ -274,3 +274,130 @@ D2 window、done 或 verified；r2 #459 的精确授权边界以下文为准。
   PR-state mutation，也不构成 AC PASS、task `done` 或 change `verified`。它只允许
   TASK-RPT-001 进入 `ready` 并在下一独立 PR 从届时最新 protected main 起草 D2
   readiness。
+
+## Verification closure（2026-07-25）
+
+本 closure 在 protected `main`
+`47cec786315e79e0aad8a3209c6a7c600e6cfc60` 上独立复核五条
+change-local acceptance。本 PR 是 D0 状态推进，只修改本 proposal 的状态/证据引用与
+`verification.md` 抬头；零实现、零 evidence 改写、零 GitHub setting/ref/credential/
+PR-state mutation。`verified` 仅在维护者 review/merge 本 PR 后生效。
+
+### 批准、任务与证据链
+
+- r3 proposal #473 merge
+  `6153d581d7caf1bd1ed3335171318b3e92250926`；独立 approval-only #474 merge
+  `d94e8f8378fabd14323dddc1ba138391d9dad09c`；
+- TASK-RPT-001：D2 readiness #475 merge
+  `b69170f573890661dbd731eac8ed99d82e807919`；execution evidence #476 merge
+  `6f874efc5c4e9fdd39bcdcc91cfcaa6a862e1961`；no-bypass operability
+  evidence #477 merge
+  `7a221d24133eefed38aa616fcda376fef33f6cf3`；done #478 merge
+  `94c23c4123712a46e7fb2f96a0509f84f5f49ba7`；
+- TASK-RPT-002：readiness #479 merge
+  `d869f9a36ec95e30bc1fba3c649ed414ca36bf0a`；implementation/documentReview
+  #480 merge `2b46558629ba67c8fa1fcd6f80b8234cd8c8d0c6`；done #494 final
+  head `09ab1b9ff8c83d183ba50588c4d1760986fb0b96`，merge
+  `47cec786315e79e0aad8a3209c6a7c600e6cfc60`。
+
+上述 merge OID 全部是 verify base ancestor；`tasks.md` 中 TASK-RPT-001/002 均为
+`done`。#494 的 exact PR head 在 merge 前由 Git ref 与 PR read-back 固定；本 closure
+时匿名 GitHub REST 受限为 HTTP 403，故不声称重新读取其 review endpoint，维护者对本
+verification PR 的 review 同时确认该 protected-main 状态链。
+
+### `RPT-BOUNDARY-001` — **passed**（documentReview of real control-plane evidence）
+
+证据：
+`evidence/runs/TASK-RPT-001/2026-07-24-topology-success.json`（blob
+`8eb63bf170e993785acda6345a80558fb6871b76`，文件 SHA-256
+`9340eae63e4b4586a07525340e1c6a4b9fe39c0a5958bda1cda55dda16df9d9f`）与同名
+`.md`（blob `6c4541d41c8a166edd201883d10190be031d0bea`）。真实 Git server matrix 证明：
+
+- Deploy Key 对单层、深层 `agent/**` create/update/delete 全部成功；
+- ordinary ref create/update/delete 与 `agentx/**` create 均被 GH013 拒绝；
+- ruleset after 保持 active、`~ALL`、creation/update/deletion，exclusion 精确为
+  `agent/**`、`agent/**/*` 与 `main`，authenticated after 的唯一 bypass 为人类
+  `lvye`；
+- pinned residual deeper ref 已按 exact OID 删除，最终 controlled refs remaining = 0；
+  positive probe 的后续 run/PR inventory 为 0。
+
+### `RPT-MAIN-001` — **passed**（documentReview of real control-plane evidence）
+
+同一 success receipt 的 branch-protection full hash =
+`04f09f273fce806afaa44679c9e8257c74cce3e480fe60da27c7dcca06e85f04`，固定
+PR、1 approval、CODEOWNER、App `15368` 的 `guard`、admin enforcement、人类
+`lvye` 单一 push restriction、teams/apps 空、force/delete false。Deploy Key 与
+`lvye` 在 overlap 下的 direct-main 均拒绝；ruleset 排除 main 后 Deploy Key
+direct-main 由 GH006 branch protection 拒绝。
+
+独立
+`evidence/runs/TASK-RPT-001/2026-07-24-no-bypass-operability.md`（blob
+`73005c421eb3fc36a16b435873a18f6e84b97369`）记录 #476 exact-head
+CODEOWNER approval、`guard` success 与人类正常 squash merge，未选择 bypass；
+#477 同时覆盖 check pending 与 check green/no review 两种不可 merge 状态。
+
+### `RPT-IDENTITY-001` — **passed**（documentReview）
+
+authenticated actor/route inventory、post-logout read-back 与 #477 的 route matrix
+共同证明 Agent 可达身份不具有人类 CODEOWNER、admin/bypass、main push、merge、
+auto-merge 或 Administration authority；共享 `pull-requests:write` category 被如实
+记录，不升级为批准权威。verify base 的当前复核还确认：
+
+- sandbox 内外 `gh auth status --hostname github.com` 均为 zero logged-in hosts；
+  Git transport 仅使用 `github-arkdeck-agent` Deploy Key；
+- 当前 workflows 顶层 `permissions: {}`；`open-pr` 仅
+  `contents:read + pull-requests:write`，`allowed-paths` 仅
+  `contents:read + pull-requests:read`，SDD/Swift 均仅 `contents:read`；
+- #485 后的 workflow contract 测试 **8/8**、PR path/identity tests **24/24**
+  通过，并显式拒绝 `contents/actions/checks/workflows/administration` write、
+  secret/OIDC、`pull_request_target` 与错 head/author/state；
+- #490/#495 的 merged evidence 证明该 workflow 变化只恢复自动 exact-head checks，
+  GitHub setting/credential/review/merge/auto-merge mutation = 0。
+
+### `RPT-MIGRATION-001` — **passed**（documentReview）
+
+success receipt 固定 branch protection first、overlap negatives、ruleset main
+exclusion second、branch-protection-only direct-main negative、逐步 authenticated
+read-back与 main 全程不变。receipt 中 8 组 `canonical_json + sha256` 在 verify base
+全部复算一致（mismatch = 0）；before/after/rollback facts 可复查。
+
+#470/#472 的历史 fail-closed receipt 保持原样，记录单次 stale REST 后安全回滚；
+r3 readiness 与成功执行采用 Git receipt + 两次稳定 `ls-remote` + authenticated REST
+bounded convergence，并固定“main/protection 不确定时优先恢复保护；exact after 已知时
+先清理 controlled ref”的条件恢复顺序。本次成功 run 无 rollback、main incident =
+false、最终 controlled refs = 0；不把未发生的 rollback 写成真实执行。
+
+### `RPT-AUDIT-001` — **passed**（documentReview）
+
+证据：
+`evidence/runs/TASK-RPT-002/2026-07-24-document-review.md`（blob
+`b9df5780c07c48627377a0f0918b723005232109`）。独立复核：
+
+- CHG-2026-027 原 TASK-BAP-003 run blob
+  `d6eaf28e188b1f5f64317ce4eacad22eae10ab10`、CHG-2026-030 历史 contract/failure
+  blobs `610fad98fe97f0618d04adafd313ebb72bdd0549` /
+  `9fc841f46c9b62ff74eede541b00890e1c6f6dbe` 均未改写；
+- CHG-2026-027 append-only addendum 与 host-loop runbook 明确 ordinary refs 由
+  ruleset、exact main 由 branch protection、human approval 由 exact-head `lvye`
+  review 分层承担；
+- CHG-2026-030 r9 已把 r8 canary refs/UUID/pins 标为永久 superseded，
+  HLR-002A 当前保持 `blocked`；#495 只闭合 HLR-001A，仍要求后续 fresh readiness，
+  没有补跑旧 canary；
+- `AGENTS.md` blob
+  `3c2d3c6a01d3eaa31cd9e3ee333f3153552f4164` 与
+  `enforcement.md` blob
+  `e8ff3c130e1b8b15f8405d150ad567e774a0d82b` 保持不变。
+
+### 共同门与边界
+
+- `scripts/check-sdd.sh` = **0 errors / 0 warnings / 111 acceptance IDs**；
+  `git diff --check` PASS；
+- evidence secret/private-path scan 只有“未发现 `/Users/`/token/Authorization/Bearer
+  value”的自述文本命中，实际 secret、token value 与绝对用户路径 = 0；
+- 五条 AC 的 minimum evidence 均为 `documentReview`；真实 topology 操作只认
+  human-isolated D2 receipt，bootstrap/fake/失败子结果未被冒充为成功验收。
+
+本 `verified` 只确认 CHG-2026-033 的五条 change-local AC，不构成持续在线监控，不授权
+新的 ruleset、branch protection、repository setting、credential、ref probe、review/
+merge/auto-merge 或 HLR canary；不改变 Core/Product/platform conformance/support。
+change archive 仍须后续独立 PR。
