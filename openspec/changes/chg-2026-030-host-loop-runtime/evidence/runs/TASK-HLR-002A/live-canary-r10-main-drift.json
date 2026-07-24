@@ -1,0 +1,158 @@
+{
+  "schema": "arkdeck-hlr002a-live-canary-r10/v1",
+  "classification": "live GitHub repository ref/workflow canary; zero device or GitHub settings mutation",
+  "executor": "agent",
+  "status": "fail_closed",
+  "started_at_utc": "2026-07-24T23:10:53Z",
+  "finished_before_utc": "2026-07-24T23:15:14Z",
+  "readiness": {
+    "pr": 498,
+    "reviewed_head_oid": "c3a35e31b16c17234ba667de56c359eb39af9e0f",
+    "reviewer": "lvye",
+    "review_state": "APPROVED",
+    "review_submitted_at_utc": "2026-07-24T23:08:15Z",
+    "merge_oid": "53b4924227bc3931523357e68ee2cb61b5814646",
+    "merge_parent_oid": "47cec786315e79e0aad8a3209c6a7c600e6cfc60",
+    "merge_tree_oid": "19a13d2e01d42aa63825603cdc4f1455037d1a3c",
+    "reviewed_head_tree_oid": "19a13d2e01d42aa63825603cdc4f1455037d1a3c",
+    "merged_at_utc": "2026-07-24T23:08:21Z",
+    "merged_by": "lvye",
+    "subject": "governance(CHG-2026-030): authorize fresh HLR-002A canary (#498)",
+    "checks": {
+      "agent_pr_run_id": 30108591049,
+      "open_pr_job_id": 89532095459,
+      "open_pr_conclusion": "success",
+      "allowed_paths_job_id": 89532183693,
+      "allowed_paths_conclusion": "success",
+      "sdd_guard_run_id": 30108591103,
+      "guard_job_id": 89532095580,
+      "guard_conclusion": "success",
+      "swift_ci_run_id": 30108591094,
+      "swift_job_id": 89532095253,
+      "swift_conclusion": "success"
+    }
+  },
+  "targets": {
+    "reserved_ref": "refs/heads/agent/host-loop/probes/7e9bc001-c515-4aef-b3dc-c71d7f0124ee",
+    "ordinary_ref": "refs/heads/agent/hlr-002a-control/4a2314d2-72c3-44f8-b579-606735e279b8"
+  },
+  "reserved": {
+    "commit_oid": "dbccd1f2da9c5831b4d2345339c354e468598027",
+    "parent_oid": "53b4924227bc3931523357e68ee2cb61b5814646",
+    "tree_oid": "19a13d2e01d42aa63825603cdc4f1455037d1a3c",
+    "author": "ArkDeck Agent <arkdeck-agent@users.noreply.github.com>",
+    "committer": "ArkDeck Agent <arkdeck-agent@users.noreply.github.com>",
+    "subject": "test(TASK-HLR-002A): reserved creator canary r10",
+    "push": {
+      "attempts": 1,
+      "exit_code": 0,
+      "result": "created"
+    },
+    "sdd_guard": {
+      "filter": "workflow=sdd-guard.yml,event=push,branch=agent/host-loop/probes/7e9bc001-c515-4aef-b3dc-c71d7f0124ee,head_sha=dbccd1f2da9c5831b4d2345339c354e468598027,per_page=100,page=1",
+      "total_count": 1,
+      "run_id": 30133093487,
+      "conclusion": "success",
+      "guard_job_id": 89611466997,
+      "guard_job_conclusion": "success",
+      "allowed_paths_job_id": 89611467546,
+      "allowed_paths_job_conclusion": "skipped"
+    },
+    "swift_ci": {
+      "filter": "workflow=swift-ci.yml,event=push,branch=agent/host-loop/probes/7e9bc001-c515-4aef-b3dc-c71d7f0124ee,head_sha=dbccd1f2da9c5831b4d2345339c354e468598027,per_page=100,page=1",
+      "total_count": 1,
+      "run_id": 30133093488,
+      "conclusion": "success",
+      "swift_job_id": 89611467217,
+      "swift_job_conclusion": "success",
+      "completed_at_utc": "2026-07-24T23:12:44Z"
+    },
+    "legacy_creator_queries": [
+      {
+        "filter": "workflow=agent-pr.yml,event=push,branch=agent/host-loop/probes/7e9bc001-c515-4aef-b3dc-c71d7f0124ee,head_sha=dbccd1f2da9c5831b4d2345339c354e468598027,per_page=100,page=1",
+        "total_count": 0,
+        "pagination_link_present": false
+      },
+      {
+        "filter": "workflow=agent-pr.yml,event=push,branch=agent/host-loop/probes/7e9bc001-c515-4aef-b3dc-c71d7f0124ee,head_sha=dbccd1f2da9c5831b4d2345339c354e468598027,per_page=100,page=1",
+        "total_count": 0,
+        "pagination_link_present": false
+      }
+    ],
+    "all_state_pr_queries": [
+      {
+        "filter": "state=all,head=ArkDeck:agent/host-loop/probes/7e9bc001-c515-4aef-b3dc-c71d7f0124ee,base=main,per_page=100,page=1",
+        "count": 0,
+        "pagination_link_present": false
+      },
+      {
+        "filter": "state=all,head=ArkDeck:agent/host-loop/probes/7e9bc001-c515-4aef-b3dc-c71d7f0124ee,base=main,per_page=100,page=1",
+        "count": 0,
+        "pagination_link_present": false
+      },
+      {
+        "filter": "state=all,head=ArkDeck:agent/host-loop/probes/7e9bc001-c515-4aef-b3dc-c71d7f0124ee,base=main,per_page=100,page=1",
+        "count": 0,
+        "pagination_link_present": false,
+        "phase": "after_cleanup"
+      }
+    ]
+  },
+  "stop_condition": {
+    "reason": "protected main advanced after reserved completion and before ordinary dispatch",
+    "expected_main_oid": "53b4924227bc3931523357e68ee2cb61b5814646",
+    "observed_main_oid": "ce4a11c3d7cb59686024be9cbd51939c084041d1",
+    "drift_pr": 497,
+    "drift_pr_reviewed_head_oid": "076e3bf516c96ccd81e93da4c7a3f4366333ea2a",
+    "drift_pr_reviewer": "lvye",
+    "drift_pr_review_state": "APPROVED",
+    "drift_pr_review_submitted_at_utc": "2026-07-24T23:08:52Z",
+    "drift_merge_oid": "ce4a11c3d7cb59686024be9cbd51939c084041d1",
+    "drift_merge_parent_oid": "53b4924227bc3931523357e68ee2cb61b5814646",
+    "drift_merged_at_utc": "2026-07-24T23:12:30Z",
+    "drift_merged_by": "lvye",
+    "drift_subject": "governance(CHG-2026-033): verify ref protection topology (#497)",
+    "drift_paths": [
+      "openspec/changes/chg-2026-033-ref-protection-topology/proposal.md",
+      "openspec/changes/chg-2026-033-ref-protection-topology/verification.md"
+    ],
+    "overlap_classification": "non-overlap, but r10 exact-main gate forbids continuing"
+  },
+  "ordinary": {
+    "commit_created": false,
+    "push_attempts": 0,
+    "ref_created": false,
+    "workflow_runs": 0,
+    "pull_requests": 0
+  },
+  "cleanup": {
+    "reserved_delete_attempts": 1,
+    "reserved_delete_exit_code": 0,
+    "reserved_ref_absent_readbacks": 2,
+    "ordinary_delete_attempts": 0,
+    "ordinary_ref_absent_readbacks": 2,
+    "reserved_all_state_pr_count_after_cleanup": 0
+  },
+  "mutations": {
+    "reserved_ref_create_attempts": 1,
+    "reserved_ref_delete_attempts": 1,
+    "ordinary_ref_create_attempts": 0,
+    "ordinary_ref_delete_attempts": 0,
+    "pr_state_mutations": 0,
+    "review_mutations": 0,
+    "merge_mutations": 0,
+    "auto_merge_mutations": 0,
+    "ruleset_mutations": 0,
+    "branch_protection_mutations": 0,
+    "repository_setting_mutations": 0,
+    "credential_mutations": 0,
+    "device_mutations": 0
+  },
+  "conclusion": {
+    "reserved_partition": "pass",
+    "ordinary_creator_liveness": "not_run",
+    "creator_canary": "incomplete_fail_closed",
+    "task_done_authorized": false,
+    "next_step": "merge this independent failure evidence, then approve a fresh readiness with new refs and a main-drift policy"
+  }
+}
