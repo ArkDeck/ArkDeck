@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-033-ref-protection-topology
 revision: 3
-status: approved # r3 仅在本独立 approval-only PR 经 lvye review/merge 后生效；proposal #473 merge 6153d581d7caf1bd1ed3335171318b3e92250926
+status: approved # r3 仅在独立 approval-only PR #474 经 lvye review/merge 后生效；proposal #473 merge 6153d581d7caf1bd1ed3335171318b3e92250926
 class: implementation-only
 core_change_level: none
 owner: lvye
@@ -263,7 +263,7 @@ D2 window、done 或 verified；r2 #459 的精确授权边界以下文为准。
   `APPROVED`、`guard`/Swift success 后，由 `lvye` 于
   `2026-07-24T11:20:17Z` 合入 protected main
   `6153d581d7caf1bd1ed3335171318b3e92250926`。该 merge 只登记 r3 proposal。
-- 本独立 r3 approval-only PR 经 `lvye` review/merge 后，批准的新增范围仅为：
+- 独立 r3 approval-only PR #474 经 `lvye` review/merge 后，批准的新增范围仅为：
   - Git push receipt + bounded stable `ls-remote` + authenticated REST convergence；
   - positive probe tip `[skip actions]`、workflow trigger/blob pin 与零 run/PR assertion；
   - 在 exact after main protection 下的 controlled-ref-first conditional cleanup；
