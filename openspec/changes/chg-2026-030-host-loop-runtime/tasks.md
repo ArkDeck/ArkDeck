@@ -200,10 +200,27 @@
 
 ## TASK-HLR-001A — Bot-authored Agent PR automatic exact-head checks
 
-- Status:ready（仅在维护者 review/merge r9 compatible revision/readiness PR 后
-  生效。该 merge 只批准下述 workflow/parser/test implementation/evidence；
-  不执行 GitHub setting、credential、ref canary、review、merge 或 auto-merge，
-  不构成 task done/change verified。）
+- Status:done（2026-07-24 D0 completion；仅在维护者 review/merge 本独立
+  `ready→done` PR 后生效。implementation #485 exact final head
+  `6717ae3c8cfbc464294de284a173e914ed1024bf` 已由 `lvye` APPROVED，并以
+  `cae9a4c378b75409a4d7a31205583560f17d73aa` 合入 protected main。
+  #488 只形成 create/existing-path partial PASS；其未执行 human
+  `edited/reopened` 且 final `allowed-paths` 失败的事实永久保留，不作为 done
+  依据。fresh evidence closure #490 exact final head
+  `f578c23dedaba38119c157b6d0cb93da4a53e971` 已由 `lvye` APPROVED，并于
+  `2026-07-24T15:20:23Z` 由 `lvye` 以
+  `89ce135c109871c5428022ad0620a383430635dc` 合入 protected main。
+  #490 自动 create、human `edited`、human `reopened` 与 final-head push
+  checks 均 success、零 `action_required`；contract tests = 8/8 + 24/24，
+  host-loop = 17/17，`check-sdd` = 0 errors / 0 warnings / 111 acceptance IDs。
+  evidence = `evidence/runs/TASK-HLR-001A/source-run.md`、
+  `evidence/runs/TASK-HLR-001A/post-merge-live.md`、
+  `evidence/runs/TASK-HLR-001A/post-merge-live-closure.md`。本 done 只闭合
+  `HLR-AUTOCI-001`；不修改 GitHub setting/credential，不形成 change
+  `verified`，不使 HLR-002A ready，也不授权任何旧 r8 ref/UUID/canary。）
+- Historical Status:ready（r9 compatible revision/readiness #483 exact reviewed
+  head `83f508aa6d64ba26789edd6e82ce0c2f8dff5fb3` 已由 `lvye` APPROVED，并以
+  `c2fd6d1dff71717f8a8dd3137c68b4a06cf569cf` 合入 protected main。）
 - Readiness（r1；audit base = protected `main`
   `0f0a79aff7ede1519b9fbc0cbdca12b5c687ef07`）：
   - **Authority/dependency gate:closed。**#480 exact reviewed head
@@ -331,18 +348,17 @@
 
 - Source implementation candidate:#485 first source head
   `e4e94afe52e059c4bfba56ed8897bb5db0006a76`；contract + initial create-path
-  evidence 见 `evidence/runs/TASK-HLR-001A/source-run.md`。本引用不翻
-  `ready→done`；final-head checks、post-merge ordinary-PR live evidence 与 done
-  仍按 readiness 分离。
+  evidence 见 `evidence/runs/TASK-HLR-001A/source-run.md`；final reviewed
+  implementation head/merge 见本任务 Status。
 - Post-merge live evidence:#488 的 create/existing-path partial PASS 与
   incomplete final gate 见 `evidence/runs/TASK-HLR-001A/post-merge-live.md`；
   preserved failure 与 #490 fresh human `edited/reopened` closure 见
-  `evidence/runs/TASK-HLR-001A/post-merge-live-closure.md`。本引用仍不翻
-  `ready→done`；#490 evidence merge 后才允许独立 D0 done PR。
+  `evidence/runs/TASK-HLR-001A/post-merge-live-closure.md`；#490 exact
+  review/merge 见本任务 Status。
 - implementation/evidence PR 不翻 `ready→done`；live evidence 与 done 分离；
 - current branch protection required `guard` 仍来自 App `15368` 的 push run，
   r9 不修改其设置或语义；
-- source done 后必须先重建 HLR-002A fresh readiness，不直接执行 canary。
+- 本 task done 后必须先重建 HLR-002A fresh readiness，不直接执行 canary。
 
 ## TASK-HLR-002A — Legacy bootstrap namespace partition
 
