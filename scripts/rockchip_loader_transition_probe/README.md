@@ -14,6 +14,26 @@ The old `Ver: 3.2.0d` /
 fail-closed drift case, not a fallback pin. This is not a generic HDC or Rockchip command
 wrapper.
 
+CHG-2026-026 r6 adds the authorization merged as
+`PR#491@37e16c5dd42951c02422627b9f7ca0d72a5cdafc`. It closes clean
+`rkdeveloptool` source provenance through one protected-main reviewed tuple:
+
+- artifact SHA-256:
+  `bbd7bdc0fb121d414fb61085e77211cc1fdd9a3b6c6b285c54380f70e56c9923`;
+- upstream commit: `304f073752fd25c854e1bcf05d8e7f925b1f4e14`;
+- source acceptance: `PR#445@cbad982cc211c7d8579a025b8c35f4ed1a519f16`;
+- reviewed evidence:
+  `openspec/changes/chg-2026-026-macos-rockchip-flash-ui/evidence/runs/TASK-RKFUI-001/clean-discovery-repin-2026-07-24.md`,
+  SHA-256 `d0b5089954e19a4aba354846fe6108b2d5c89bfc12ab0396c2cd7eb4a082189a`.
+
+The registry does not independently create approval: the trust root remains protected `main`
+plus maintainer PR review/merge. The probe verifies the exact registry tuple and reviewed
+evidence bytes before external commands, then separately verifies the selected executable's
+regular-file/executable status, hash, version, ad-hoc signature and absent quarantine. It never
+derives source from the executable parent, an ancestor `.git`, a live checkout HEAD or
+`/usr/bin/git`. Moving the same exact binary under an unrelated Git repository therefore does
+not change the source-provenance verdict.
+
 The production command surface is closed:
 
 - fixed pinned HDC executable;
@@ -31,7 +51,7 @@ mixed LF/CRLF, missing final terminators and empty records remain blocked. This 
 does not change device semantics: Maskrom and every non-`0x2207:0x350a + Loader` observation
 remain ineligible.
 
-Before dispatch the harness verifies the r5 authorization closure, window and every target/tool
+Before dispatch the harness verifies the r6 authorization closure, window and every target/tool
 pin, acquires a
 per-target mutation lane, durably saves `OriginalTargetSnapshot`, revision-1
 `CurrentDeviceBinding`, impact confirmation, the global `maxRuns=1` reservation, and the exact
@@ -51,9 +71,10 @@ Host-only tests:
 
 ```bash
 python3 -m unittest scripts/rockchip_loader_transition_probe/test_probe.py -v
+python3 scripts/rockchip_loader_transition_probe/probe.py selftest-host
 ```
 
-Future E1 run (only after TASK-RKFUI-001C is marked done by a separate D0 status PR, while the
+Future E1 run (only after TASK-RKFUI-001D is marked done by a separate D0 status PR, while the
 window is valid, after a fresh real-USB E0 preflight proves zero pre-existing RockUSB candidates,
 and after the per-device typed capability evidence gate has been accepted through a
 maintainer-merged PR):

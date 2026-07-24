@@ -32,6 +32,7 @@ evidence/runs/TASK-RKFUI-001A/blocked-capability-preflight-rkdeveloptool-source-
 evidence/runs/TASK-RKFUI-001A/blocked-capability-preflight-rkdeveloptool-source-drift-2026-07-24.json
 evidence/runs/TASK-RKFUI-001B/run.md
 evidence/runs/TASK-RKFUI-001C/run.md
+evidence/runs/TASK-RKFUI-001D/run.md
 ```
 
 未来 run 位置：
@@ -108,3 +109,12 @@ checkout 的 object。preflight 因此在 codesign/quarantine、`ld`、USB obser
 binding/capability evidence、intent、usage 与 E1 前 fail closed。candidate count 未观察，
 不得记为 0；详情见
 `TASK-RKFUI-001A/blocked-capability-preflight-rkdeveloptool-source-drift-2026-07-24.*`。
+
+`TASK-RKFUI-001D/run.md` 记录 r6 host-only immutable source-provenance closure：
+loader-transition registry 以 protected-main reviewed tuple 绑定 clean artifact SHA-256、
+upstream commit、PR #445 source acceptance 与 exact evidence digest；probe 在外部 runner
+前验证 tuple/evidence，再独立保留 binary version/hash/codesign/quarantine gates。原
+executable-parent `git rev-parse HEAD` inference 与 command receipt 已移除；missing/drift、
+evidence bytes drift 和 unrelated parent Git HEAD 均有 hermetic 正负测试。本任务没有运行
+真实 HDC、`rkdeveloptool`、codesign/xattr、USB 或设备命令，E1/E2/destructive、binding、
+intent 和 usage reservation 均为 0。

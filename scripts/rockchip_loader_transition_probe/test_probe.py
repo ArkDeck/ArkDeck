@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import dataclasses
 import datetime as dt
 import importlib.util
 import json
@@ -36,6 +37,10 @@ HDC_SHA256 = "05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83"
 OLD_HDC_VERSION = "Ver: 3.2.0d"
 OLD_HDC_SHA256 = "48395ba8d87115dffca47df2a640a6c868bc9a2bd4eb49611e4138ff88d8d260"
 R5_AUTHORIZATION_REF = "PR#481@0f0a79aff7ede1519b9fbc0cbdca12b5c687ef07"
+R6_AUTHORIZATION_REF = "PR#491@37e16c5dd42951c02422627b9f7ca0d72a5cdafc"
+SOURCE_EVIDENCE = REPOSITORY_ROOT.joinpath(
+    *pathlib.PurePosixPath(probe.SOURCE_EVIDENCE_RELATIVE_PATH).parts
+)
 LOADER_LINE = b"DevNo=1\tVid=0x2207,Pid=0x350a,LocationID=2\tLoader\n"
 
 
@@ -83,8 +88,6 @@ class FakeRunner:
             return result((self.firmware + "\n").encode("utf-8"))
         if pathlib.Path(argv[0]).name == "rkdeveloptool" and argv[-1:] == ["-v"]:
             return result(b"rkdeveloptool ver 1.32\n")
-        if argv[:2] == ["/usr/bin/git", "-C"]:
-            return result(b"304f073752fd25c854e1bcf05d8e7f925b1f4e14\n")
         if argv[:3] == ["/usr/bin/codesign", "-dv", "--verbose=4"]:
             return result(stderr=b"Signature=adhoc\n")
         if argv[:3] == ["/usr/bin/xattr", "-p", "com.apple.quarantine"]:
@@ -138,10 +141,40 @@ class HarnessCase(unittest.TestCase):
         self.rk.write_bytes(b"fake pinned rkdeveloptool")
         self.hdc.chmod(0o755)
         self.rk.chmod(0o755)
+        self.source_evidence = self.root.joinpath(
+            *pathlib.PurePosixPath(probe.SOURCE_EVIDENCE_RELATIVE_PATH).parts
+        )
+        self.source_evidence.parent.mkdir(parents=True)
+        self.source_evidence.write_bytes(SOURCE_EVIDENCE.read_bytes())
         self.state = self.root / "controlled-state"
 
     def tearDown(self):
         self.temp.cleanup()
+
+    def registry_document(self):
+        return json.loads(
+            (REPOSITORY_ROOT / probe.REGISTRY_RELATIVE_PATH).read_text(encoding="utf-8")
+        )
+
+    def write_registry_repo(
+        self,
+        registry: dict,
+        label: str,
+        *,
+        evidence_bytes: bytes | None = None,
+    ) -> pathlib.Path:
+        repo_root = self.root / label
+        registry_path = repo_root / probe.REGISTRY_RELATIVE_PATH
+        registry_path.parent.mkdir(parents=True)
+        registry_path.write_text(json.dumps(registry), encoding="utf-8")
+        evidence_path = repo_root.joinpath(
+            *pathlib.PurePosixPath(probe.SOURCE_EVIDENCE_RELATIVE_PATH).parts
+        )
+        evidence_path.parent.mkdir(parents=True)
+        evidence_path.write_bytes(
+            SOURCE_EVIDENCE.read_bytes() if evidence_bytes is None else evidence_bytes
+        )
+        return repo_root
 
     def config(self, *, valid_until: dt.datetime | None = None):
         return probe.Config(
@@ -153,6 +186,7 @@ class HarnessCase(unittest.TestCase):
                 "PR#440@f4e901492e7d3b82f883424c756868fffa4946df",
                 "PR#452@d22cdeeebc781b9c3a1b063dbee6631934c51ac0",
                 R5_AUTHORIZATION_REF,
+                R6_AUTHORIZATION_REF,
             ),
             valid_until=valid_until or dt.datetime(2030, 1, 1, tzinfo=dt.timezone.utc),
             max_runs=1,
@@ -167,6 +201,14 @@ class HarnessCase(unittest.TestCase):
             rkdeveloptool_version="rkdeveloptool ver 1.32",
             rkdeveloptool_sha256=probe.sha256_file(self.rk),
             rkdeveloptool_upstream_commit="304f073752fd25c854e1bcf05d8e7f925b1f4e14",
+            rkdeveloptool_source_provenance=probe.SourceProvenance(
+                kind=probe.SOURCE_PROVENANCE_KIND,
+                artifact_sha256=probe.sha256_file(self.rk),
+                upstream_commit="304f073752fd25c854e1bcf05d8e7f925b1f4e14",
+                accepted_by=probe.SOURCE_ACCEPTANCE_REF,
+                evidence_path=probe.SOURCE_EVIDENCE_RELATIVE_PATH,
+                evidence_sha256=probe.SOURCE_EVIDENCE_SHA256,
+            ),
             e1_arguments_template=(
                 "-t",
                 "<durable-connect-key>",
@@ -229,6 +271,7 @@ class RegistryAndArgvTests(HarnessCase):
                 "PR#440@f4e901492e7d3b82f883424c756868fffa4946df",
                 "PR#452@d22cdeeebc781b9c3a1b063dbee6631934c51ac0",
                 R5_AUTHORIZATION_REF,
+                R6_AUTHORIZATION_REF,
             ],
         )
         self.assertEqual(registry["hdc"], probe.EXPECTED_HDC)
@@ -239,8 +282,112 @@ class RegistryAndArgvTests(HarnessCase):
             ["-t", "<durable-connect-key>", "shell", "reboot", "loader"],
         )
         self.assertEqual(registry["rockUSBObservation"]["exactArgv"], ["ld"])
+        self.assertEqual(
+            registry["rockUSBObservation"]["sourceProvenance"],
+            probe.EXPECTED_SOURCE_PROVENANCE,
+        )
+        self.assertEqual(
+            registry["rockUSBObservation"]["sha256"],
+            registry["rockUSBObservation"]["sourceProvenance"]["artifactSHA256"],
+        )
+        self.assertEqual(
+            registry["rockUSBObservation"]["upstreamCommit"],
+            registry["rockUSBObservation"]["sourceProvenance"]["upstreamCommit"],
+        )
         self.assertIn("destructive", registry["operation"]["forbiddenEffects"])
         self.assertIn("retry", registry["operation"]["forbiddenEffects"])
+
+    def test_registry_rejects_provenance_and_top_level_tuple_drifts(self):
+        registry = self.registry_document()
+
+        def drifted_registry(label):
+            drifted = json.loads(json.dumps(registry))
+            provenance = drifted["rockUSBObservation"]["sourceProvenance"]
+            if label == "missing":
+                drifted["rockUSBObservation"].pop("sourceProvenance")
+            elif label == "kind":
+                provenance["kind"] = "liveCheckoutHead"
+            elif label == "artifact":
+                provenance["artifactSHA256"] = "0" * 64
+            elif label == "upstream":
+                provenance["upstreamCommit"] = "0" * 40
+            elif label == "accepted-by":
+                provenance["acceptedBy"] = "PR#0@" + ("0" * 40)
+            elif label == "evidence-path":
+                provenance["evidencePath"] = "unreviewed/source.md"
+            elif label == "evidence-sha":
+                provenance["evidenceSHA256"] = "0" * 64
+            elif label == "top-level-artifact":
+                drifted["rockUSBObservation"]["sha256"] = "0" * 64
+            elif label == "top-level-upstream":
+                drifted["rockUSBObservation"]["upstreamCommit"] = "0" * 40
+            else:
+                raise AssertionError(label)
+            return drifted
+
+        labels = (
+            "missing",
+            "kind",
+            "artifact",
+            "upstream",
+            "accepted-by",
+            "evidence-path",
+            "evidence-sha",
+            "top-level-artifact",
+            "top-level-upstream",
+        )
+        for label in labels:
+            with self.subTest(label=label):
+                repo_root = self.write_registry_repo(
+                    drifted_registry(label), f"provenance-{label}"
+                )
+                state_root = self.root / f"state-{label}"
+                with self.assertRaises(probe.ProbeError):
+                    probe.load_config(
+                        self.rk,
+                        repo_root=repo_root,
+                        state_root=state_root,
+                    )
+                self.assertFalse(state_root.exists())
+
+    def test_registry_rejects_drifted_reviewed_evidence_bytes(self):
+        repo_root = self.write_registry_repo(
+            self.registry_document(),
+            "drifted-evidence-bytes",
+            evidence_bytes=b"unreviewed evidence bytes\n",
+        )
+        state_root = self.root / "drifted-evidence-state"
+        with self.assertRaisesRegex(
+            probe.ProbeError, "reviewed source evidence bytes drifted"
+        ):
+            probe.load_config(
+                self.rk,
+                repo_root=repo_root,
+                state_root=state_root,
+            )
+        self.assertFalse(state_root.exists())
+
+    def test_exact_registry_loads_reviewed_provenance_without_external_commands(self):
+        repo_root = self.write_registry_repo(self.registry_document(), "exact-provenance")
+        config = probe.load_config(
+            self.rk,
+            repo_root=repo_root,
+            state_root=self.root / "exact-provenance-state",
+        )
+        self.assertEqual(
+            probe.validate_source_provenance(config),
+            {
+                "kind": probe.SOURCE_PROVENANCE_KIND,
+                "artifactSHA256": config.rkdeveloptool_sha256,
+                "upstreamCommit": config.rkdeveloptool_upstream_commit,
+                "acceptedBy": probe.SOURCE_ACCEPTANCE_REF,
+                "evidence": {
+                    "path": probe.SOURCE_EVIDENCE_RELATIVE_PATH,
+                    "sha256": probe.SOURCE_EVIDENCE_SHA256,
+                },
+                "validationVerdict": "matchedProtectedMainRegistryAndEvidence",
+            },
+        )
 
     def test_registry_rejects_each_old_hdc_pin_without_dual_pin_fallback(self):
         registry = json.loads(
@@ -313,6 +460,95 @@ class RegistryAndArgvTests(HarnessCase):
                             isinstance(keyword.value, ast.Constant)
                             and keyword.value.value is True
                         )
+
+    def test_tool_identity_has_no_live_git_or_parent_source_inference(self):
+        source = MODULE_PATH.read_text(encoding="utf-8")
+        tree = ast.parse(source)
+        inspect_function = next(
+            node
+            for node in tree.body
+            if isinstance(node, ast.FunctionDef)
+            and node.name == "inspect_rkdeveloptool"
+        )
+        inspect_source = ast.get_source_segment(source, inspect_function)
+        self.assertNotIn("/usr/bin/git", inspect_source)
+        self.assertNotIn("rev-parse", inspect_source)
+        self.assertNotIn("path.parent", inspect_source)
+        self.assertNotIn("commitReceipt", inspect_source)
+
+    def test_tool_identity_ignores_unrelated_parent_git_head(self):
+        git_directory = self.root / ".git"
+        git_directory.mkdir()
+        head = git_directory / "HEAD"
+        head.write_text("ref: refs/heads/unrelated-one\n", encoding="utf-8")
+        config = self.config()
+
+        first_runner = FakeRunner()
+        first_run = self.root / "tool-run-one"
+        first_run.mkdir()
+        first_tool, first_ordinal = probe.inspect_rkdeveloptool(
+            config,
+            runner=first_runner,
+            run_dir=first_run,
+            ordinal=0,
+        )
+        self.assertEqual(first_ordinal, 3)
+        self.assertEqual(
+            first_tool["sourceProvenance"]["validationVerdict"],
+            "matchedProtectedMainRegistryAndEvidence",
+        )
+        self.assertNotIn("commitReceipt", first_tool)
+        self.assertFalse(
+            any(call and call[0] == "/usr/bin/git" for call in first_runner.calls)
+        )
+
+        head.write_text("ref: refs/heads/unrelated-two\n", encoding="utf-8")
+        second_runner = FakeRunner()
+        second_run = self.root / "tool-run-two"
+        second_run.mkdir()
+        second_tool, second_ordinal = probe.inspect_rkdeveloptool(
+            config,
+            runner=second_runner,
+            run_dir=second_run,
+            ordinal=0,
+        )
+        self.assertEqual(second_ordinal, 3)
+        self.assertEqual(
+            second_tool["sourceProvenance"], first_tool["sourceProvenance"]
+        )
+        self.assertFalse(
+            any(call and call[0] == "/usr/bin/git" for call in second_runner.calls)
+        )
+
+    def test_runtime_provenance_drift_blocks_before_tool_or_trust_commands(self):
+        base = self.config()
+        mutations = {
+            "kind": {"kind": "liveCheckoutHead"},
+            "artifact": {"artifact_sha256": "0" * 64},
+            "upstream": {"upstream_commit": "0" * 40},
+            "accepted-by": {"accepted_by": "PR#0@" + ("0" * 40)},
+            "evidence-path": {"evidence_path": "unreviewed/source.md"},
+            "evidence-sha": {"evidence_sha256": "0" * 64},
+        }
+        for label, fields in mutations.items():
+            with self.subTest(label=label):
+                runner = FakeRunner()
+                run_dir = self.root / f"runtime-drift-{label}"
+                run_dir.mkdir()
+                provenance = dataclasses.replace(
+                    base.rkdeveloptool_source_provenance, **fields
+                )
+                config = dataclasses.replace(
+                    base, rkdeveloptool_source_provenance=provenance
+                )
+                with self.assertRaises(probe.ProbeError):
+                    probe.inspect_rkdeveloptool(
+                        config,
+                        runner=runner,
+                        run_dir=run_dir,
+                        ordinal=0,
+                    )
+                self.assertEqual(runner.calls, [])
 
     def test_subprocess_capture_applies_one_combined_output_limit(self):
         command = [
@@ -455,6 +691,13 @@ class WorkflowTests(HarnessCase):
         self.assertEqual(receipt["counters"]["e1DeviceMutation"], 1)
         self.assertEqual(receipt["counters"]["rebootLoader"], 1)
         self.assertEqual(receipt["counters"]["e2Destructive"], 0)
+        self.assertEqual(
+            receipt["rkdeveloptool"]["sourceProvenance"]["validationVerdict"],
+            "matchedProtectedMainRegistryAndEvidence",
+        )
+        self.assertFalse(
+            any(argv and argv[0] == "/usr/bin/git" for argv in fake.calls)
+        )
         e1_calls = [
             argv
             for argv in fake.calls
