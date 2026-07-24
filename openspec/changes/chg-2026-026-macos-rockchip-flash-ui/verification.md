@@ -1,10 +1,10 @@
 # Verification Plan — CHG-2026-026
 
-> Change:CHG-2026-026@r5
+> Change:CHG-2026-026@r6
 > Status:planned
-> Note(2026-07-24):r5 只精确替换 TASK-RKFUI-001A 的 HDC version/hash，新增
-> TASK-RKFUI-001C registry/probe closure；不改变 Core/AC/schema、typed argv、
-> target/firmware/transport、RockUSB grammar 或 destructive pins。
+> Note(2026-07-24):r6 只新增 TASK-RKFUI-001D immutable rkdeveloptool provenance
+> registry/probe closure；不改变 Core/AC/schema、artifact version/hash/upstream、typed
+> argv、target/firmware/HDC/transport、RockUSB grammar 或 destructive pins。
 
 ## Environment
 
@@ -15,7 +15,9 @@
   `rkdeveloptool ver 1.32` / SHA-256 `bbd7bdc0…9923` / upstream `304f0737…`，且
   version/hash/trust 与 r2 后的 Rockchip registry 完全匹配；既有 destructive
   Provider/Profile 继续 pin `038a8a0e…3611`，r2 不构成 destructive repin。生产不使用
-  BlueTool/upgrade_tool。
+  BlueTool/upgrade_tool。r6 后 loader-transition probe 还必须命中 protected-main
+  `sourceProvenance` 的 exact artifact-digest ↔ upstream-commit ↔ source acceptance/
+  evidence tuple；不得从 executable parent/ancestor git HEAD 推导 source。
 - HDC（r5 on merge）：TASK-RKFUI-001A exact path 只接受 client/server
   `Ver: 3.2.0f` / executable SHA-256 `05b2bf7a…f83`；server 必须是 pre-existing
   external same-UID pinned executable，Agent lifecycle mutation 0。旧 `3.2.0d` /
@@ -27,7 +29,8 @@
   OpenHarmony `7.0.0.33` / HDC `3.2.0f` / USB 组合的 E1 mode transition 与
   TASK-RKFUI-004；其余测试无设备、零真实 dispatch。r2 允许 001A 为 001 提供 Loader
   前置态，r3 只修正 current firmware，r5 只修正 current HDC artifact；各 evidence 分离，
-  001A 明确禁止 destructive command。
+  r6 只修正 source provenance closure；各 evidence 分离，001A 明确禁止 destructive
+  command。
 
 ## Acceptance matrix
 
@@ -64,7 +67,11 @@
 
 ## Negative and recovery tests
 
-- Tool：missing/non-executable/hash drift/version mismatch/quarantine/trust unknown/permission denied。
+- Tool：missing/non-executable/hash drift/version mismatch/quarantine/trust unknown/permission
+  denied；source provenance missing/unknown kind、artifact/upstream/acceptedBy/evidence
+  path/hash drift、顶层/typed tuple 不一致、binary 位于 unrelated git parent 或 parent
+  HEAD 改变。前述 provenance negatives 必须在 `ld` 前 fail closed，runtime
+  `/usr/bin/git` dispatch 恒为 0。
 - Discovery：空、多个、重复 LocationID、Maskrom、未知 PID/mode、bare CR、LF/CRLF 混用、
   缺末尾 terminator、空 record、截断、额外垃圾、timeout。
 - Mode transition：already Loader skip；HDC offline/unsupported/empty target；command nonzero/exit0
@@ -100,6 +107,11 @@
   不符，因此 001A 保持 blocked。r5 merge 后仍须 TASK-RKFUI-001C 原子更新 registry/
   probe/tests；001C done 前不得 E0。old/new 双 pin、自动 HDC server restart、把沙箱
   offline scout 记为 candidate=0 或忽略真实 Maskrom observation 均禁止。
+- r6 merge 前不得把 `/opt/homebrew` HEAD 注册为 upstream、删除 source check，或仅凭
+  binary hash 静默放行。r6 merge 后仍须 TASK-RKFUI-001D 原子更新 loader-transition
+  registry/probe/tests/README；001D done 的独立 D0 状态 PR merge 前不得重新 E0。
+  protected-main provenance tuple 任一字段漂移、live git inference 残留、把 PR #487 的
+  unobserved candidate count 改记为 0，均保持 001A blocked。
 - `REQ-FLASH-015` 交互式 App executor 解释未获维护者明确确认时，execute 不实现；不得把
   plan-only/handoff 记作一键真机刷机。
 - DAYU200 exact combination 的 `reboot loader` E1 capability 未证明 supported 时，Route B
@@ -117,6 +129,9 @@
       仍显式 blocked
 - [ ] r5 HDC registry/probe closure 只接受 `3.2.0f` / `05b2bf7a…f83`；旧 pin 与
       server lifecycle mutation 均 fail closed
+- [ ] r6 source provenance closure 只接受
+      `bbd7bdc0…9923` ↔ `304f0737…` ↔ `PR#445@cbad982…` ↔ exact evidence digest；
+      missing/drift 与 runtime Git inference 均 fail closed
 - [ ] Real hardware App path 由适格操作者执行，evidence 精确 pin 全组合
 - [ ] Traceability updated（无新 Core AC ID；记录现有 AC → 新 tests/evidence）
 - [ ] 无 shell/sudo/helper/BlueTool asset、无 secret/真实 serial/raw 敏感输出入库
