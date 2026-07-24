@@ -4,7 +4,9 @@
 `TASK-RKFUI-001` 与 `TASK-RKFUI-001A` 为 `ready`。PR #452 已合入 r3 的
 OpenHarmony `7.0.0.33` exact repin。001A 的首个 r3 implementation preflight 因 Codex
 子进程的全量 `ps` 不可见外部 HDC server 而在 E1 前 fail closed；本 implementation
-修正为先从 loopback listener 发现 PID，再定向核验进程与 executable。
+修正为先从 loopback listener 发现 PID，再定向核验进程与 executable。PR #460 已合入该
+guarded probe；后续 E0-only capability preflight 又发现真实 `ld` 为 CRLF，并有一个
+Maskrom candidate 与 HDC target 同时存在，因此 r4 继续在 E1 前 fail closed。
 
 已有 evidence：
 
@@ -20,6 +22,8 @@ evidence/runs/TASK-RKFUI-001A/blocked-preflight-firmware-drift-2026-07-24.md
 evidence/runs/TASK-RKFUI-001A/blocked-preflight-firmware-drift-2026-07-24.json
 evidence/runs/TASK-RKFUI-001A/blocked-preflight-server-discovery-2026-07-24.md
 evidence/runs/TASK-RKFUI-001A/blocked-preflight-server-discovery-2026-07-24.json
+evidence/runs/TASK-RKFUI-001A/blocked-capability-preflight-crlf-maskrom-2026-07-24.md
+evidence/runs/TASK-RKFUI-001A/blocked-capability-preflight-crlf-maskrom-2026-07-24.json
 ```
 
 未来 run 位置：
@@ -49,3 +53,12 @@ r3 implementation 的 server-discovery preflight 同样在 E1 前关闭：HDC li
 可稳定得到同一 PID/UID/command/executable，因此 harness 已改用该闭包并增加 host-only
 测试。该 preflight 的 E1/destructive dispatch 与 usage reservation 仍全为 0；它不是
 capability verdict，未在本 PR 内重试设备入口。
+
+PR #460 merge 后，两次 E1 start request 均被执行环境在 process start 前拒绝，因为仓内
+尚无维护者已接受的逐设备 typed capability evidence；设备 command、intent、binding 与
+usage reservation 均未发生。随后独立 E0-only preflight 命中 exact HDC/firmware/tool
+pins，但 `rkdeveloptool ld` 的真实 stdout 为 52-byte homogeneous CRLF，现行 LF-only
+parser 以 `unexpectedCarriageReturn` 阻断。diagnostic-only byte inspection 显示一个
+`0x2207:0x5000 Maskrom` candidate，而 pinned HDC target 同时 online；两者物理关联
+unknown。CRLF 修复不能隐藏或放行该 candidate。该 run 的 E1/E2/destructive 与 usage
+reservation 全为 0，不构成 capability evidence。

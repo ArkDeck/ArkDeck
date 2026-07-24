@@ -1,9 +1,10 @@
 # Verification Plan — CHG-2026-026
 
-> Change:CHG-2026-026@r3
+> Change:CHG-2026-026@r4
 > Status:planned
-> Note(2026-07-24):r3 只把一次 E1 characterization window 的 exact firmware pin 从
-> `7.0.0.34` 替换为 E0 读回的 `7.0.0.33`；r2 其余 pins、Core/AC/schema 均不变。
+> Note(2026-07-24):r4 只注册 RockUSB `ld` homogeneous LF/CRLF integration family、
+> TASK-RKFUI-001B 与新的 E1 evidence gate；不改变 Core/AC/schema、VID/PID/mode 或
+> destructive pins。
 
 ## Environment
 
@@ -15,8 +16,9 @@
   version/hash/trust 与 r2 后的 Rockchip registry 完全匹配；既有 destructive
   Provider/Profile 继续 pin `038a8a0e…3611`，r2 不构成 destructive repin。生产不使用
   BlueTool/upgrade_tool。
-- Fixtures：fake rkdeveloptool、版本化 `ld/ppt/wlx/rd` stdout/stderr、valid/corrupt/drift/
-  path-traversal tar.gz、journal crash points、postflight observations。
+- Fixtures：fake rkdeveloptool、版本化 `ld` homogeneous LF/CRLF 与
+  bare-CR/mixed/missing-final-terminator faults、`ppt/wlx/rd` stdout/stderr、
+  valid/corrupt/drift/path-traversal tar.gz、journal crash points、postflight observations。
 - Hardware：TASK-RKFUI-001 E0、TASK-RKFUI-001A 对 exact DAYU200 /
   OpenHarmony `7.0.0.33` / HDC `3.2.0d` / USB 组合的 E1 mode transition 与
   TASK-RKFUI-004；其余测试无设备、零真实 dispatch。r2 允许 001A 为 001 提供 Loader
@@ -27,7 +29,7 @@
 
 | AC ID | Verification method | Expected result | Evidence |
 | --- | --- | --- | --- |
-| AC-FLASH-001-01 | parser golden/real-fault + E0 `ld` | 仅 2207:350a Loader applicable；其他/畸形阻断，相似命令 0 | TASK-RKFUI-001 |
+| AC-FLASH-001-01 | parser golden/real-fault + E0 `ld` | homogeneous LF/CRLF 同义且仅 2207:350a Loader applicable；bare/mixed/其他/畸形阻断，相似命令 0 | TASK-RKFUI-001/001B |
 | AC-UX-007-01 | signed Sandbox E0 matrix | permission/driver/offline 可区分；sudo/helper/install/system mutation 0 | TASK-RKFUI-001 |
 | AC-FLASH-003-01 | archive drift/corrupt/unsafe fixture | execute 与 planned-success 均 blocked | TASK-RKFUI-002/003 |
 | AC-FLASH-004-01 | plan/manifest encode-decode + UI | mode 在 UI/Job/manifest/History presentation 持续可见 | TASK-RKFUI-002 |
@@ -59,7 +61,8 @@
 ## Negative and recovery tests
 
 - Tool：missing/non-executable/hash drift/version mismatch/quarantine/trust unknown/permission denied。
-- Discovery：空、多个、重复 LocationID、Maskrom、未知 PID/mode、截断、额外垃圾、timeout。
+- Discovery：空、多个、重复 LocationID、Maskrom、未知 PID/mode、bare CR、LF/CRLF 混用、
+  缺末尾 terminator、空 record、截断、额外垃圾、timeout。
 - Mode transition：already Loader skip；HDC offline/unsupported/empty target；command nonzero/exit0
   无 disconnect；disconnect 后无 Loader、`0x5000`/Maskrom/wrong mode、多 candidate、deadline、
   sleep/wake；pre/post topology/fingerprint match/mismatch；用户拒绝 rebind；physical fallback。
@@ -84,6 +87,11 @@
 - r3 合入前，`7.0.0.33` 只是一条 blocked E0 observation，不构成 E1 授权或 capability
   evidence；probe implementation、`reboot loader` 与 `ld` transition observation dispatch
   必须为 0。r3 merge 后仍只允许原窗口剩余的单次 exact run，不得把未消费次数解释为可重试。
+- r4 合入前不得把真实 CRLF bytes 在 parser 中临时 normalize；合入后也只能接受完整输出
+  homogeneous LF/CRLF，不能宽松接受 bare/mixed/missing-final-terminator。CRLF remediation
+  不改变 `0x5000 Maskrom` wrong-mode disposition。001B merge、无 pre-existing RockUSB
+  candidate 的 E0 preflight 与逐设备 typed capability evidence acceptance PR 任一缺失时，
+  001A 的 E1 必须为 0。
 - `REQ-FLASH-015` 交互式 App executor 解释未获维护者明确确认时，execute 不实现；不得把
   plan-only/handoff 记作一键真机刷机。
 - DAYU200 exact combination 的 `reboot loader` E1 capability 未证明 supported 时，Route B
@@ -97,6 +105,8 @@
 - [ ] E0 signed Sandbox access gate passed，或 execute task 明确保持 blocked
 - [ ] E1 HDC→Loader exact-combination capability 有诚实 verdict；unsupported/unknown 默认
       physical fallback，destructive dispatch 0
+- [ ] LF/CRLF registry、fixtures、Swift/Python parser closure 原子一致；Maskrom fixture
+      仍显式 blocked
 - [ ] Real hardware App path 由适格操作者执行，evidence 精确 pin 全组合
 - [ ] Traceability updated（无新 Core AC ID；记录现有 AC → 新 tests/evidence）
 - [ ] 无 shell/sudo/helper/BlueTool asset、无 secret/真实 serial/raw 敏感输出入库
