@@ -131,14 +131,21 @@ GitHub control-plane/ref/probe 数为 0。
 
 ## TASK-RPT-002 — Supersede mechanism pointers 并重建 dependent governance
 
-- Status:ready（仅在本独立 D1 readiness PR 经维护者 review/merge 后生效。
-  TASK-RPT-001 done PR #478 exact head
-  `54c8e0392c5bf4ef3c50f7e6086cfad680481e7d` 已由 `lvye` APPROVED，
-  App `15368` `guard=success`，并由 `lvye` 合入 protected main
-  `94c23c4123712a46e7fb2f96a0509f84f5f49ba7`。本状态只批准下述
-  append-only current-pointer/compatible-revision 计划；不修改任何目标文档，
-  不使 HLR-002A ready，不执行 canary，不修改 GitHub setting/ref/credential，
-  也不批准 TASK-RPT-002 done 或 change verified。）
+- Status:done（仅在本独立 D0 状态 PR 经维护者 review/merge 后生效。
+  readiness #479 exact head
+  `8096397bcc66890cb496a36d4cecb5e601f37daf` 已合入
+  `d869f9a36ec95e30bc1fba3c649ed414ca36bf0a`；implementation/documentReview
+  #480 exact head `fea214bac75711c075f6a023086688eee28822d3` 已由 `lvye`
+  APPROVED，并由 `lvye` squash 合入 protected main
+  `2b46558629ba67c8fa1fcd6f80b8234cd8c8d0c6`。merged evidence
+  `evidence/runs/TASK-RPT-002/2026-07-24-document-review.md` blob =
+  `b9df5780c07c48627377a0f0918b723005232109`，其 `RPT-AUDIT-001`
+  candidate PASS 随 #480 生效。#480 后 CHG-2026-030 r9 仅永久作废未执行的
+  r8 canary refs/readiness 并使 HLR-002A 保持 `blocked`；current topology
+  pointer、CHG-2026-027 append-only addendum、host-loop runbook 与本 merged
+  evidence 未漂移，符合本任务“fresh readiness 或保持 blocked”的边界。本翻转
+  不新增/改写 evidence，不使 CHG-2026-033 `verified`，不执行 GitHub
+  control-plane/ref/credential/PR-state mutation。）
 - Readiness（r1；audit base = protected main
   `94c23c4123712a46e7fb2f96a0509f84f5f49ba7`）：
   - **Dependency/evidence gate:closed。**#476 execution-evidence merge
