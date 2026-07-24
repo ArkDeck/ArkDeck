@@ -25,18 +25,17 @@ GitHub control-plane/ref/probe 数为 0。
 
 ## TASK-RPT-001 — 隔离 Agent 身份并迁移 ref protection topology
 
-- Status:ready（仅在独立 r3 approval-only PR #474 经维护者 review/merge 后生效，
-  且只允许下一独立 PR 从当时最新 protected main 起草/固定 D2 readiness。
-  r3 proposal #473 exact head
-  `9c359396ca1cdd7355ea2c0c3d28e988335ad49b` 已由 `lvye` APPROVED 并合入
-  `6153d581d7caf1bd1ed3335171318b3e92250926`；该 merge 只登记 proposal。
-  #455 approval merge
-  `c86f07ae6b843affaaa3f698e2f9f08a6f4c96cd` 与 CHG-2026-030 r7 #456 merge
-  `c5a1a9f0f1c0a9bc0dd3d04275ac01a5738697f7` 是 r1 历史 gate；
-  #474 merge 是 r3 current gate。
-  本状态不批准任何 before/after/rollback payload、hash、window、operator action、
-  probe-ref mutation、credential 或 GitHub control-plane write；D2 readiness 未由 `lvye`
-  review/merge 前，task execution dispatch = 0。）
+- Status:done（仅在本独立 D0 状态 PR 经维护者 review/merge 后生效。r3 D2
+  readiness #475 合入 `b69170f573890661dbd731eac8ed99d82e807919`；成功
+  execution-evidence #476 合入
+  `6f874efc5c4e9fdd39bcdcc91cfcaa6a862e1961`；独立 operability-evidence
+  #477 exact head `b3ed3d6df50b77153e095d4d42caca8c077aebc9` 由 `lvye`
+  APPROVED，App `15368` `guard=success`，并由 `lvye` 合入
+  `7a221d24133eefed38aa616fcda376fef33f6cf3`。两份 merged evidence 共同覆盖
+  settings/ref migration、完整正负矩阵、Agent/API route 隔离及正常人类
+  no-bypass squash merge。本状态翻转不新增 evidence，不批准 TASK-RPT-002、
+  HLR-002A readiness 或任何 payload/window/operator action，且 GitHub
+  control-plane/ref/credential mutation 为 0。）
 - Platform:macos
 - Requirements/AC:change-local `RPT-BOUNDARY-001`、`RPT-MAIN-001`、
   `RPT-IDENTITY-001`、`RPT-MIGRATION-001`
