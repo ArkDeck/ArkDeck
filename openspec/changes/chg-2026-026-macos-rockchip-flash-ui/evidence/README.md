@@ -26,12 +26,15 @@ evidence/runs/TASK-RKFUI-001A/blocked-capability-preflight-crlf-maskrom-2026-07-
 evidence/runs/TASK-RKFUI-001A/blocked-capability-preflight-crlf-maskrom-2026-07-24.json
 evidence/runs/TASK-RKFUI-001A/blocked-capability-preflight-maskrom-still-present-2026-07-24.md
 evidence/runs/TASK-RKFUI-001A/blocked-capability-preflight-maskrom-still-present-2026-07-24.json
+evidence/runs/TASK-RKFUI-001A/blocked-capability-preflight-hdc-drift-maskrom-2026-07-24.md
+evidence/runs/TASK-RKFUI-001A/blocked-capability-preflight-hdc-drift-maskrom-2026-07-24.json
 evidence/runs/TASK-RKFUI-001B/run.md
 ```
 
 未来 run 位置：
 
 ```text
+evidence/runs/TASK-RKFUI-001C/
 evidence/runs/TASK-RKFUI-002/
 evidence/runs/TASK-RKFUI-003/
 evidence/runs/TASK-RKFUI-004/
@@ -72,6 +75,13 @@ DAYU200 serial/firmware、HDC/server 与 discovery tool pins 全部命中；但 
 pre-existing RockUSB candidate count 为 0，本次在 original target、revision-1 binding、
 typed capability evidence、intent、usage reservation 与 E1 前停止。该物理/身份 blocker
 不能通过代码或治理 PR 消除；环境无预存 RockUSB candidate 后才可重新进行 E0 preflight。
+
+PR #468 merge 后的下一次真实 USB E0 preflight 又在 target readback 前发现 HDC pin 漂移：
+同一 DevEco absolute path 现为 client/server `Ver: 3.2.0f`、SHA-256 `05b2bf7a…f83`，
+不同于 r3 的 `3.2.0d` / `48395ba8…d260`。同次 exact `ld` 仍得到相同 Maskrom record。
+target/firmware HDC command、original target、binding、typed capability evidence、intent、
+usage reservation 与 E1 均为 0。HDC 需要新的 scoped readiness + registry/probe closure；
+Maskrom 则仍须由物理环境消除，二者任一未闭合时 E1 保持 blocked。
 
 `TASK-RKFUI-001B/run.md` 记录 r4 line-termination implementation：canonical registry、
 bundled resource mirror、17 个 hash-pinned fixtures、Swift production parser/tests 与
