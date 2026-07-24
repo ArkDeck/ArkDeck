@@ -30,6 +30,8 @@ evidence/runs/TASK-RKFUI-001A/blocked-capability-preflight-hdc-drift-maskrom-202
 evidence/runs/TASK-RKFUI-001A/blocked-capability-preflight-hdc-drift-maskrom-2026-07-24.json
 evidence/runs/TASK-RKFUI-001A/blocked-capability-preflight-rkdeveloptool-source-drift-2026-07-24.md
 evidence/runs/TASK-RKFUI-001A/blocked-capability-preflight-rkdeveloptool-source-drift-2026-07-24.json
+evidence/runs/TASK-RKFUI-001A/blocked-capability-preflight-r6-maskrom-persists-2026-07-25.md
+evidence/runs/TASK-RKFUI-001A/blocked-capability-preflight-r6-maskrom-persists-2026-07-25.json
 evidence/runs/TASK-RKFUI-001B/run.md
 evidence/runs/TASK-RKFUI-001C/run.md
 evidence/runs/TASK-RKFUI-001D/run.md
@@ -118,3 +120,11 @@ executable-parent `git rev-parse HEAD` inference 与 command receipt 已移除�
 evidence bytes drift 和 unrelated parent Git HEAD 均有 hermetic 正负测试。本任务没有运行
 真实 HDC、`rkdeveloptool`、codesign/xattr、USB 或设备命令，E1/E2/destructive、binding、
 intent 和 usage reservation 均为 0。
+
+PR #496 合入后，r6 fresh real-hardware E0 preflight 已完整命中 DAYU200 serial/firmware、
+HDC client/server、clean discovery artifact trust 与 protected-main immutable source
+provenance pins；但 sole exact `rkdeveloptool ld` 仍返回同一 52-byte homogeneous CRLF
+`0x2207:0x5000 Maskrom` observation。并行 `system_profiler` 空视图不能覆盖注册工具的
+candidate=1 事实。本次在 OriginalTarget/revision-1 binding、typed capability evidence、
+impact confirmation、intent、usage 与 E1 前 fail closed，且未重试；详情见
+`TASK-RKFUI-001A/blocked-capability-preflight-r6-maskrom-persists-2026-07-25.*`。
