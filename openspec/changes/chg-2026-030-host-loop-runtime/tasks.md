@@ -456,6 +456,12 @@
     与本 readiness、pinned topology evidence、workflow/parser/target refs
     零交集，故记为 audited non-overlap。执行前必须完整分页重做 all-open
     PR/files 与 remote refs；任何 overlap、main drift 或查询不完整均停止。
+    **Archive currency note（2026-07-25）：**#497 已合入 protected `main`
+    `ce4a11c3d7cb59686024be9cbd51939c084041d1`；同一独立 archive PR 生效后，上文
+    保留的 active-root `tasks.md` 路径按
+    `openspec/changes/archive/2026-07-25-chg-2026-033-ref-protection-topology/tasks.md`
+    定位。该目录移动与注记不改变 #498 固定的 readiness pins、target refs、执行顺序
+    或 fail-closed 门。
   - **Fresh target refs:closed。**
 
     ```yaml
