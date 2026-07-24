@@ -329,6 +329,11 @@
 
 ### Notes / handoff
 
+- Source implementation candidate:#485 first source head
+  `e4e94afe52e059c4bfba56ed8897bb5db0006a76`；contract + initial create-path
+  evidence 见 `evidence/runs/TASK-HLR-001A/source-run.md`。本引用不翻
+  `ready→done`；final-head checks、post-merge ordinary-PR live evidence 与 done
+  仍按 readiness 分离。
 - implementation/evidence PR 不翻 `ready→done`；live evidence 与 done 分离；
 - current branch protection required `guard` 仍来自 App `15368` 的 push run，
   r9 不修改其设置或语义；

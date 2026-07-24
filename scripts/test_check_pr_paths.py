@@ -474,6 +474,8 @@ class PullRequestPathTests(unittest.TestCase):
             "scripts/check_pr_paths.py",
             "scripts/test_check_pr_paths.py",
             "scripts/test_agent_pr_workflow.py",
+            "openspec/changes/chg-2026-030-host-loop-runtime/evidence/runs/TASK-HLR-001A/source-run.md",
+            "openspec/changes/chg-2026-030-host-loop-runtime/tasks.md",
         )
         result = check_pr_paths.check_paths(repo_root, context, changed)
         self.assertEqual(result.task_id, "TASK-HLR-001A")
