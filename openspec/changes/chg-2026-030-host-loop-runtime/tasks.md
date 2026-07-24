@@ -334,6 +334,11 @@
   evidence 见 `evidence/runs/TASK-HLR-001A/source-run.md`。本引用不翻
   `ready→done`；final-head checks、post-merge ordinary-PR live evidence 与 done
   仍按 readiness 分离。
+- Post-merge live evidence:#488 的 create/existing-path partial PASS 与
+  incomplete final gate 见 `evidence/runs/TASK-HLR-001A/post-merge-live.md`；
+  preserved failure 与 #490 fresh human `edited/reopened` closure 见
+  `evidence/runs/TASK-HLR-001A/post-merge-live-closure.md`。本引用仍不翻
+  `ready→done`；#490 evidence merge 后才允许独立 D0 done PR。
 - implementation/evidence PR 不翻 `ready→done`；live evidence 与 done 分离；
 - current branch protection required `guard` 仍来自 App `15368` 的 push run，
   r9 不修改其设置或语义；
