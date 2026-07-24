@@ -537,12 +537,14 @@ private final class CLIUpdateReplayStore: UpdateReplayStoring, @unchecked Sendab
   private var record: UpdateReplayRecord?
   private let lock = NSLock()
 
-  func load() throws -> UpdateReplayRecord? {
-    lock.withLock { record }
-  }
-
-  func save(_ record: UpdateReplayRecord) throws {
-    lock.withLock { self.record = record }
+  func validateAndCommit(
+    _ candidate: UpdateReplayRecord
+  ) throws -> UpdateReplayDecision {
+    lock.withLock {
+      let decision = UpdateReplayPolicy.decision(previous: record, candidate: candidate)
+      if decision == .accepted { record = candidate }
+      return decision
+    }
   }
 }
 

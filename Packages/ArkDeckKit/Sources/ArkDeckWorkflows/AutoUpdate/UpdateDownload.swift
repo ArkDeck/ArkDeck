@@ -16,21 +16,30 @@ public struct UpdateFileIdentity: Equatable, Sendable {
   public let device: UInt64
   public let inode: UInt64
   public let byteLength: UInt64
+  public let mode: UInt32
   public let modifiedSeconds: Int64
   public let modifiedNanoseconds: Int64
+  public let changedSeconds: Int64
+  public let changedNanoseconds: Int64
 
   public init(
     device: UInt64,
     inode: UInt64,
     byteLength: UInt64,
+    mode: UInt32,
     modifiedSeconds: Int64,
-    modifiedNanoseconds: Int64
+    modifiedNanoseconds: Int64,
+    changedSeconds: Int64,
+    changedNanoseconds: Int64
   ) {
     self.device = device
     self.inode = inode
     self.byteLength = byteLength
+    self.mode = mode
     self.modifiedSeconds = modifiedSeconds
     self.modifiedNanoseconds = modifiedNanoseconds
+    self.changedSeconds = changedSeconds
+    self.changedNanoseconds = changedNanoseconds
   }
 }
 
@@ -243,17 +252,22 @@ public struct UpdateArtifactStore: Sendable {
     _ metadata: stat,
     requiredType: mode_t = S_IFREG
   ) throws -> UpdateFileIdentity {
+    let permissions = metadata.st_mode & mode_t(0o777)
     guard metadata.st_mode & S_IFMT == requiredType, metadata.st_uid == geteuid(),
       requiredType == S_IFDIR || metadata.st_nlink == 1,
       metadata.st_mode & (S_IRWXG | S_IRWXO) == 0,
+      requiredType == S_IFDIR || permissions == mode_t(S_IRUSR),
       metadata.st_size >= 0
     else { throw UpdateDownloadError.unsafeArtifact }
     return UpdateFileIdentity(
       device: UInt64(metadata.st_dev),
       inode: UInt64(metadata.st_ino),
       byteLength: UInt64(metadata.st_size),
+      mode: UInt32(permissions),
       modifiedSeconds: Int64(metadata.st_mtimespec.tv_sec),
-      modifiedNanoseconds: Int64(metadata.st_mtimespec.tv_nsec))
+      modifiedNanoseconds: Int64(metadata.st_mtimespec.tv_nsec),
+      changedSeconds: Int64(metadata.st_ctimespec.tv_sec),
+      changedNanoseconds: Int64(metadata.st_ctimespec.tv_nsec))
   }
 
   private func writeAll(_ data: Data, descriptor: Int32) throws {

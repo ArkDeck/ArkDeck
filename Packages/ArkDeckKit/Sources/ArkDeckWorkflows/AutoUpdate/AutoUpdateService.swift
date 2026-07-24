@@ -331,6 +331,7 @@ public actor AutoUpdateService {
 public enum AutoUpdateApplicationFacade {
   public static func make() throws -> AutoUpdateService {
     let artifactStore = try UpdateArtifactStore.production()
+    let replayStore = try FileUpdateReplayStore.production()
     let trust = try UpdateFeedTrust.production
     let preferences = UserDefaultsAutoUpdatePreferences()
     let eventLogger: any AutoUpdateEventLogging
@@ -349,7 +350,7 @@ public enum AutoUpdateApplicationFacade {
     return AutoUpdateService(
       streamer: URLSessionUpdateHTTPStreamer(),
       verifier: UpdateFeedVerifier(
-        trust: trust, replayStore: UserDefaultsUpdateReplayStore()),
+        trust: trust, replayStore: replayStore),
       artifactStore: artifactStore,
       artifactValidator: SystemUpdateArtifactValidator(),
       preferences: preferences,

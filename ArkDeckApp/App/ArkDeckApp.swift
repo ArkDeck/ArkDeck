@@ -141,9 +141,14 @@ private final class AutoUpdateViewModel: ObservableObject {
       {
         await synchronize()
       } catch {
-        // Automatic failure stays non-modal without claiming that this App is current.
-        statusKey = "update.status.automaticCheckIncomplete"
-        isBusy = false
+        // Only connectivity failure is softened. Integrity, replay and local-state failures keep
+        // the service's explicit failed presentation instead of looking like a routine miss.
+        if case .failed(.network) = await service.state {
+          statusKey = "update.status.automaticCheckIncomplete"
+          isBusy = false
+        } else {
+          await synchronize()
+        }
       }
     }
   }

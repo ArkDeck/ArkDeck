@@ -47,7 +47,9 @@ feed；feed 自身不能下发新的信任根。
 1. 构建归档并使用 Developer ID Application identity 签名 App 和 DMG。
 2. 提交公证并 stapling。
 3. 验证 App、DMG、staple 和 Gatekeeper 结果；确认 DMG 的 Team identifier 与
-   发布中的 ArkDeck App 相同。
+   发布中的 ArkDeck App 相同。客户端会用同一条 code requirement 同时验证当前
+   运行 App 与 DMG：Apple generic anchor、Developer ID Application leaf OID
+   `1.2.840.113635.100.6.1.13` 存在，并且 leaf OU 等于当前 App 的 Team ID。
 4. 使用仓库构建出的 `arkdeck update-feed prepare` 流式计算最终 DMG 的长度和
    SHA-256；该命令先验证版本、时间窗口、架构与 artifact URL，再生成确定性
    payload 与签名输入。失败时不得进入隔离签名步骤。

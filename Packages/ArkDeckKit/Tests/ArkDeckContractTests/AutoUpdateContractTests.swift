@@ -147,8 +147,15 @@ final class AutoUpdateContractTests: XCTestCase {
     assertVerificationError(
       expired.envelope, verifier: self.verifier(trust: trust), expected: .feedExpired)
 
+    let expiresExactlyNow = try signedFixture(
+      privateKey: key, sequence: 6, issuedAt: "2026-07-23T00:00:00Z",
+      expiresAt: "2026-07-24T00:00:00Z")
+    assertVerificationError(
+      expiresExactlyNow.envelope, verifier: self.verifier(trust: trust),
+      expected: .feedExpired)
+
     let future = try signedFixture(
-      privateKey: key, sequence: 6, issuedAt: "2026-07-25T00:00:00Z",
+      privateKey: key, sequence: 7, issuedAt: "2026-07-25T00:00:00Z",
       expiresAt: "2026-08-01T00:00:00Z")
     assertVerificationError(
       future.envelope, verifier: self.verifier(trust: trust), expected: .feedNotYetValid)
@@ -162,11 +169,50 @@ final class AutoUpdateContractTests: XCTestCase {
       "https://github.com/ArkDeck.zip",
     ] {
       let invalid = try signedFixture(
-        privateKey: key, sequence: 7, artifactURL: invalidURL)
+        privateKey: key, sequence: 8, artifactURL: invalidURL)
       assertVerificationError(
         invalid.envelope, verifier: self.verifier(trust: trust),
         expected: .invalidArtifactURL)
     }
+  }
+
+  func testTEST_AU_CONTRACT_001_replayTransactionKeepsHighestAcrossStoresAndReopen()
+    async throws
+  {
+    let root = FileManager.default.temporaryDirectory.appending(
+      path: "arkdeck-replay-\(UUID().uuidString)", directoryHint: .isDirectory)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let firstStore = FileUpdateReplayStore(directory: root)
+    let secondStore = FileUpdateReplayStore(directory: root)
+    let sequenceOne = UpdateReplayRecord(
+      sequence: 1, payloadSHA256: String(repeating: "1", count: 64), version: "1.0.0")
+    let sequenceTwo = UpdateReplayRecord(
+      sequence: 2, payloadSHA256: String(repeating: "2", count: 64), version: "2.0.0")
+    let sequenceThree = UpdateReplayRecord(
+      sequence: 3, payloadSHA256: String(repeating: "3", count: 64), version: "3.0.0")
+    XCTAssertEqual(try firstStore.validateAndCommit(sequenceOne), .accepted)
+
+    let start = ConcurrentStartGate(participants: 2)
+    let lowerWriter = Task.detached {
+      start.arriveAndWait()
+      return try firstStore.validateAndCommit(sequenceTwo)
+    }
+    let higherWriter = Task.detached {
+      start.arriveAndWait()
+      return try secondStore.validateAndCommit(sequenceThree)
+    }
+    let lowerDecision = try await lowerWriter.value
+    let higherDecision = try await higherWriter.value
+    XCTAssertTrue([.accepted, .replay].contains(lowerDecision))
+    XCTAssertEqual(higherDecision, .accepted)
+
+    let reopened = FileUpdateReplayStore(directory: root)
+    XCTAssertEqual(try reopened.loadCurrentRecord(), sequenceThree)
+    XCTAssertEqual(try reopened.validateAndCommit(sequenceTwo), .replay)
+    XCTAssertEqual(try reopened.validateAndCommit(sequenceThree), .accepted)
+    XCTAssertFalse(
+      try FileManager.default.contentsOfDirectory(atPath: root.path)
+        .contains(where: { $0.hasSuffix(".part") }))
   }
 
   func testTEST_AU_CONTRACT_001_prepareRejectsInvalidUnsignedPayloadBeforeSigning() throws {
@@ -337,6 +383,15 @@ final class AutoUpdateContractTests: XCTestCase {
       try UpdateArtifactStore.verifyFile(
         at: artifact.url, expectedLength: UInt64(bytes.count), expectedSHA256: digest),
       artifact.identity)
+    XCTAssertEqual(artifact.identity.mode, 0o400)
+
+    XCTAssertEqual(Darwin.chmod(artifact.url.path, 0o600), 0)
+    XCTAssertThrowsError(
+      try UpdateArtifactStore.verifyFile(
+        at: artifact.url, expectedLength: UInt64(bytes.count), expectedSHA256: digest)
+    ) { error in
+      XCTAssertEqual(error as? UpdateDownloadError, .unsafeArtifact)
+    }
 
     for failure in DownloadFailureFixture.allCases {
       let next = try temporaryArtifactStore()
@@ -411,6 +466,64 @@ final class AutoUpdateContractTests: XCTestCase {
     guard case .available = await service.state else {
       return XCTFail("late completion from the cancelled download clobbered the replacement check")
     }
+    XCTAssertTrue(try cachedArtifacts(in: storage.store).isEmpty)
+  }
+
+  func testTEST_AU_CONTRACT_001_developerIDRequirementAppliesToRunningAppAndArtifact()
+    async throws
+  {
+    let storage = try temporaryArtifactStore()
+    defer { try? FileManager.default.removeItem(at: storage.root) }
+    let bytes = Data("verified-dmg-fixture".utf8)
+    let artifact = try await storage.store.writeVerified(
+      stream: stream([bytes]), expectedLength: UInt64(bytes.count),
+      expectedSHA256: UpdateFeedCodec.sha256(bytes))
+    let codeSigning = RecordingCodeSigningChecker(
+      runningTeam: "ABCDEFGHIJ", artifactTeam: "ABCDEFGHIJ")
+    let validated = try SystemUpdateArtifactValidator(codeSigning: codeSigning).validate(artifact)
+    XCTAssertEqual(validated.teamIdentifier, "ABCDEFGHIJ")
+
+    let expected =
+      "anchor apple generic and certificate leaf[field.1.2.840.113635.100.6.1.13] exists"
+      + " and certificate leaf[subject.OU] = \"ABCDEFGHIJ\""
+    XCTAssertEqual(codeSigning.runningRequirements, [expected])
+    XCTAssertEqual(codeSigning.artifactRequirements, [expected])
+    XCTAssertThrowsError(
+      try SystemUpdateArtifactValidator.developerIDApplicationRequirementSource(
+        teamIdentifier: "invalid team"))
+  }
+
+  func testTEST_AU_CONTRACT_001_ownerWritableArtifactFailsFinalReverification()
+    async throws
+  {
+    let signed = try signedFixture()
+    let storage = try temporaryArtifactStore()
+    defer { try? FileManager.default.removeItem(at: storage.root) }
+    let streamer = FakeUpdateStreamer(feed: signed.envelope, artifact: signed.artifactBytes)
+    let revealer = RecordingArtifactRevealer()
+    let service = AutoUpdateService(
+      streamer: streamer,
+      verifier: UpdateFeedVerifier(
+        trust: signed.trust, replayStore: MemoryReplayStore()),
+      artifactStore: storage.store,
+      artifactValidator: SnapshotArtifactValidator(),
+      preferences: MemoryUpdatePreferences())
+    _ = try await service.checkManually(identity: verificationIdentity(), now: now)
+    let awaiting = try await service.downloadAvailableUpdate()
+    guard case .awaitingConsent(_, let approved) = awaiting else {
+      return XCTFail("expected final-consent state")
+    }
+    XCTAssertEqual(Darwin.chmod(approved.downloaded.url.path, 0o600), 0)
+
+    do {
+      _ = try await service.handoff(explicitConsent: true, revealer: revealer)
+      XCTFail("owner-writable artifact must fail final verification")
+    } catch {
+      XCTAssertEqual(error as? UpdateDownloadError, .unsafeArtifact)
+    }
+    XCTAssertEqual(revealer.count, 0)
+    let failedState = await service.state
+    XCTAssertEqual(failedState, .failed(.handoff))
     XCTAssertTrue(try cachedArtifacts(in: storage.store).isEmpty)
   }
 
@@ -593,6 +706,8 @@ final class AutoUpdateContractTests: XCTestCase {
       contentsOf: repository.appending(path: "ArkDeckApp/App/ArkDeckApp.swift"),
       encoding: .utf8)
     XCTAssertTrue(appSource.contains("update.status.automaticCheckIncomplete"))
+    XCTAssertTrue(appSource.contains("if case .failed(.network) = await service.state"))
+    XCTAssertTrue(appSource.contains("Integrity, replay and local-state failures"))
     XCTAssertFalse(appSource.contains("artifact.downloaded.url.lastPathComponent"))
     let cliSource = try String(
       contentsOf: repository.appending(
@@ -844,12 +959,35 @@ private final class MemoryReplayStore: UpdateReplayStoring, @unchecked Sendable 
   private let lock = NSLock()
   private var record: UpdateReplayRecord?
 
-  func load() throws -> UpdateReplayRecord? {
-    lock.withLock { record }
+  func validateAndCommit(
+    _ candidate: UpdateReplayRecord
+  ) throws -> UpdateReplayDecision {
+    lock.withLock {
+      let decision = UpdateReplayPolicy.decision(previous: record, candidate: candidate)
+      if decision == .accepted { record = candidate }
+      return decision
+    }
+  }
+}
+
+private final class ConcurrentStartGate: @unchecked Sendable {
+  private let condition = NSCondition()
+  private let participants: Int
+  private var arrivals = 0
+
+  init(participants: Int) {
+    self.participants = participants
   }
 
-  func save(_ record: UpdateReplayRecord) throws {
-    lock.withLock { self.record = record }
+  func arriveAndWait() {
+    condition.lock()
+    arrivals += 1
+    if arrivals == participants {
+      condition.broadcast()
+    } else {
+      while arrivals < participants { condition.wait() }
+    }
+    condition.unlock()
   }
 }
 
@@ -935,6 +1073,53 @@ private final class CancellableArtifactStreamer: UpdateHTTPStreaming, @unchecked
       lock.withLock { started = true }
       continuation.yield(partialArtifact)
     }
+  }
+}
+
+private final class RecordingCodeSigningChecker: UpdateCodeSigningChecking, @unchecked Sendable {
+  private let lock = NSLock()
+  private let runningTeam: String
+  private let artifactTeam: String?
+  private var recordedRunningRequirements: [String] = []
+  private var recordedArtifactRequirements: [String] = []
+
+  init(runningTeam: String, artifactTeam: String?) {
+    self.runningTeam = runningTeam
+    self.artifactTeam = artifactTeam
+  }
+
+  var runningRequirements: [String] {
+    lock.withLock { recordedRunningRequirements }
+  }
+
+  var artifactRequirements: [String] {
+    lock.withLock { recordedArtifactRequirements }
+  }
+
+  func runningApplicationTeamIdentifier() throws -> String {
+    runningTeam
+  }
+
+  func validateRunningApplication(requirementSource: String) throws {
+    lock.withLock { recordedRunningRequirements.append(requirementSource) }
+  }
+
+  func validateArtifact(at url: URL, requirementSource: String) throws -> String? {
+    lock.withLock { recordedArtifactRequirements.append(requirementSource) }
+    return artifactTeam
+  }
+}
+
+private struct SnapshotArtifactValidator: UpdateArtifactValidating {
+  func validate(_ artifact: DownloadedUpdateArtifact) throws -> ValidatedUpdateArtifact {
+    let identity = try UpdateArtifactStore.verifyFile(
+      at: artifact.url, expectedLength: artifact.byteLength,
+      expectedSHA256: artifact.sha256)
+    guard identity == artifact.identity else {
+      throw UpdateArtifactSecurityError.artifactReplaced
+    }
+    return ValidatedUpdateArtifact(
+      downloaded: artifact, teamIdentifier: "ABCDEFGHIJ")
   }
 }
 

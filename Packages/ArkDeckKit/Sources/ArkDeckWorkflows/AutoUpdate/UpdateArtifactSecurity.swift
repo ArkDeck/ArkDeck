@@ -30,9 +30,24 @@ public protocol UpdateArtifactRevealing: Sendable {
   @MainActor func revealInFinder(_ url: URL) throws
 }
 
-/// Uses the running product's signature as the trust anchor. No Team identifier is hard-coded.
+protocol UpdateCodeSigningChecking: Sendable {
+  func runningApplicationTeamIdentifier() throws -> String
+  func validateRunningApplication(requirementSource: String) throws
+  func validateArtifact(at url: URL, requirementSource: String) throws -> String?
+}
+
+/// Uses the running product's Developer ID Application signature as the trust anchor. No Team
+/// identifier is hard-coded.
 public struct SystemUpdateArtifactValidator: UpdateArtifactValidating, Sendable {
-  public init() {}
+  private let codeSigning: any UpdateCodeSigningChecking
+
+  public init() {
+    codeSigning = SystemUpdateCodeSigningChecker()
+  }
+
+  init(codeSigning: any UpdateCodeSigningChecking) {
+    self.codeSigning = codeSigning
+  }
 
   public func validate(_ artifact: DownloadedUpdateArtifact) throws -> ValidatedUpdateArtifact {
     let before = try UpdateArtifactStore.verifyFile(
@@ -42,25 +57,13 @@ public struct SystemUpdateArtifactValidator: UpdateArtifactValidating, Sendable 
     guard before == artifact.identity else {
       throw UpdateArtifactSecurityError.artifactReplaced
     }
-    let teamIdentifier = try Self.runningApplicationTeamIdentifier()
-    let requirement = try Self.sameTeamRequirement(teamIdentifier)
-    var staticCode: SecStaticCode?
+    let teamIdentifier = try codeSigning.runningApplicationTeamIdentifier()
+    let requirementSource = try Self.developerIDApplicationRequirementSource(
+      teamIdentifier: teamIdentifier)
+    try codeSigning.validateRunningApplication(requirementSource: requirementSource)
     guard
-      SecStaticCodeCreateWithPath(artifact.url as CFURL, SecCSFlags(), &staticCode)
-        == errSecSuccess,
-      let staticCode
-    else { throw UpdateArtifactSecurityError.staticCodeUnavailable }
-
-    let flags = SecCSFlags(
-      rawValue: kSecCSStrictValidate | kSecCSCheckAllArchitectures | kSecCSCheckNestedCode)
-    let status = SecStaticCodeCheckValidity(staticCode, flags, requirement)
-    guard status == errSecSuccess else {
-      if status == errSecCSReqFailed {
-        throw UpdateArtifactSecurityError.differentTeam
-      }
-      throw UpdateArtifactSecurityError.unsignedOrInvalidArtifact
-    }
-    guard let artifactTeam = try Self.teamIdentifier(for: staticCode),
+      let artifactTeam = try codeSigning.validateArtifact(
+        at: artifact.url, requirementSource: requirementSource),
       artifactTeam == teamIdentifier
     else { throw UpdateArtifactSecurityError.differentTeam }
 
@@ -72,19 +75,71 @@ public struct SystemUpdateArtifactValidator: UpdateArtifactValidating, Sendable 
     return ValidatedUpdateArtifact(downloaded: artifact, teamIdentifier: artifactTeam)
   }
 
-  private static func runningApplicationTeamIdentifier() throws -> String {
+  static func developerIDApplicationRequirementSource(
+    teamIdentifier: String
+  ) throws -> String {
+    guard isValidTeamIdentifier(teamIdentifier) else {
+      throw UpdateArtifactSecurityError.invalidRunningApplicationTeam
+    }
+    return
+      "anchor apple generic and certificate leaf[field.1.2.840.113635.100.6.1.13] exists"
+      + " and certificate leaf[subject.OU] = \"\(teamIdentifier)\""
+  }
+
+  private static func isValidTeamIdentifier(_ value: String) -> Bool {
+    value.count == 10
+      && value.allSatisfy { $0.isASCII && ($0.isNumber || $0.isUppercase) }
+  }
+}
+
+private struct SystemUpdateCodeSigningChecker: UpdateCodeSigningChecking {
+  func runningApplicationTeamIdentifier() throws -> String {
     var runningCode: SecCode?
     var runningStaticCode: SecStaticCode?
     guard SecCodeCopySelf(SecCSFlags(), &runningCode) == errSecSuccess, let runningCode,
       SecCodeCheckValidity(runningCode, SecCSFlags(), nil) == errSecSuccess,
       SecCodeCopyStaticCode(runningCode, SecCSFlags(), &runningStaticCode) == errSecSuccess,
       let runningStaticCode,
-      let team = try teamIdentifier(for: runningStaticCode)
+      let team = try Self.teamIdentifier(for: runningStaticCode)
     else { throw UpdateArtifactSecurityError.runningApplicationUnsigned }
-    guard isValidTeamIdentifier(team) else {
+    guard
+      (try? SystemUpdateArtifactValidator.developerIDApplicationRequirementSource(
+        teamIdentifier: team)) != nil
+    else {
       throw UpdateArtifactSecurityError.invalidRunningApplicationTeam
     }
     return team
+  }
+
+  func validateRunningApplication(requirementSource: String) throws {
+    let requirement = try Self.requirement(source: requirementSource)
+    var runningCode: SecCode?
+    guard SecCodeCopySelf(SecCSFlags(), &runningCode) == errSecSuccess, let runningCode else {
+      throw UpdateArtifactSecurityError.runningApplicationUnsigned
+    }
+    let flags = SecCSFlags(rawValue: kSecCSStrictValidate)
+    guard SecCodeCheckValidity(runningCode, flags, requirement) == errSecSuccess else {
+      throw UpdateArtifactSecurityError.runningApplicationUnsigned
+    }
+  }
+
+  func validateArtifact(at url: URL, requirementSource: String) throws -> String? {
+    let requirement = try Self.requirement(source: requirementSource)
+    var staticCode: SecStaticCode?
+    guard
+      SecStaticCodeCreateWithPath(url as CFURL, SecCSFlags(), &staticCode) == errSecSuccess,
+      let staticCode
+    else { throw UpdateArtifactSecurityError.staticCodeUnavailable }
+    let flags = SecCSFlags(
+      rawValue: kSecCSStrictValidate | kSecCSCheckAllArchitectures | kSecCSCheckNestedCode)
+    let status = SecStaticCodeCheckValidity(staticCode, flags, requirement)
+    guard status == errSecSuccess else {
+      if status == errSecCSReqFailed {
+        throw UpdateArtifactSecurityError.differentTeam
+      }
+      throw UpdateArtifactSecurityError.unsignedOrInvalidArtifact
+    }
+    return try Self.teamIdentifier(for: staticCode)
   }
 
   private static func teamIdentifier(for code: SecStaticCode) throws -> String? {
@@ -97,23 +152,13 @@ public struct SystemUpdateArtifactValidator: UpdateArtifactValidating, Sendable 
     return dictionary?[kSecCodeInfoTeamIdentifier as String] as? String
   }
 
-  private static func sameTeamRequirement(_ teamIdentifier: String) throws -> SecRequirement {
-    guard isValidTeamIdentifier(teamIdentifier) else {
-      throw UpdateArtifactSecurityError.invalidRunningApplicationTeam
-    }
-    let source =
-      "anchor apple generic and certificate leaf[subject.OU] = \"\(teamIdentifier)\""
-      as CFString
+  private static func requirement(source: String) throws -> SecRequirement {
     var requirement: SecRequirement?
     guard
-      SecRequirementCreateWithString(source, SecCSFlags(), &requirement) == errSecSuccess,
+      SecRequirementCreateWithString(source as CFString, SecCSFlags(), &requirement)
+        == errSecSuccess,
       let requirement
     else { throw UpdateArtifactSecurityError.invalidRunningApplicationTeam }
     return requirement
-  }
-
-  private static func isValidTeamIdentifier(_ value: String) -> Bool {
-    value.count == 10
-      && value.allSatisfy { $0.isASCII && ($0.isNumber || $0.isUppercase) }
   }
 }

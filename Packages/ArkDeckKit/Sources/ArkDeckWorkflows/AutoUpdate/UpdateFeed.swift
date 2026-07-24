@@ -1,4 +1,5 @@
 import CryptoKit
+import Darwin
 import Foundation
 
 public enum UpdateFeedError: Error, Equatable, Sendable {
@@ -270,45 +271,260 @@ public struct UpdateReplayRecord: Codable, Equatable, Sendable {
   }
 }
 
-public protocol UpdateReplayStoring: Sendable {
-  func load() throws -> UpdateReplayRecord?
-  func save(_ record: UpdateReplayRecord) throws
+public enum UpdateReplayDecision: Equatable, Sendable {
+  case accepted
+  case replay
+  case sequenceConflict
+  case nonIncreasingRelease
 }
 
-public final class UserDefaultsUpdateReplayStore: UpdateReplayStoring, @unchecked Sendable {
-  public static let persistenceKey = "ArkDeck.AutoUpdate.Replay.v1"
-  private let defaults: UserDefaults
-  private let lock = NSLock()
+public enum UpdateReplayPolicy {
+  public static func decision(
+    previous: UpdateReplayRecord?,
+    candidate: UpdateReplayRecord
+  ) -> UpdateReplayDecision {
+    guard let previous else { return .accepted }
+    if candidate.sequence < previous.sequence { return .replay }
+    if candidate.sequence == previous.sequence {
+      return candidate == previous ? .accepted : .sequenceConflict
+    }
+    guard let previousVersion = UpdateSemanticVersion(previous.version),
+      let candidateVersion = UpdateSemanticVersion(candidate.version),
+      previousVersion < candidateVersion
+    else { return .nonIncreasingRelease }
+    return .accepted
+  }
+}
 
-  public init(defaults: UserDefaults = .standard) {
-    self.defaults = defaults
+public protocol UpdateReplayStoring: Sendable {
+  func validateAndCommit(_ candidate: UpdateReplayRecord) throws -> UpdateReplayDecision
+}
+
+/// Serializes replay admission across both store instances and App processes, then persists the
+/// highest accepted record with an atomic same-directory rename and durable file/directory sync.
+public final class FileUpdateReplayStore: UpdateReplayStoring, @unchecked Sendable {
+  private static let stateName = "replay-state-v1.json"
+  private static let lockName = ".replay-state-v1.lock"
+  private static let maximumStateBytes = 4 * 1_024
+
+  public let directory: URL
+  private let processLock: NSLock
+
+  public init(directory: URL) {
+    self.directory = directory.standardizedFileURL
+    self.processLock = UpdateReplayProcessLockRegistry.shared.lock(for: self.directory.path)
   }
 
-  public func load() throws -> UpdateReplayRecord? {
-    lock.lock()
-    defer { lock.unlock() }
-    guard let value = defaults.object(forKey: Self.persistenceKey) else { return nil }
-    guard let data = value as? Data,
-      let record = try? JSONDecoder().decode(UpdateReplayRecord.self, from: data)
+  public static func production() throws -> FileUpdateReplayStore {
+    do {
+      let support = try FileManager.default.url(
+        for: .applicationSupportDirectory, in: .userDomainMask,
+        appropriateFor: nil, create: true)
+      return FileUpdateReplayStore(
+        directory: support.appending(
+          path: "ArkDeck/AutoUpdateReplay", directoryHint: .isDirectory))
+    } catch {
+      throw UpdateFeedError.replayStateWriteFailed
+    }
+  }
+
+  public func validateAndCommit(
+    _ candidate: UpdateReplayRecord
+  ) throws -> UpdateReplayDecision {
+    guard Self.isValid(candidate) else { throw UpdateFeedError.replayStateWriteFailed }
+    return try withExclusiveTransaction { directoryDescriptor in
+      let previous = try Self.loadRecord(directoryDescriptor: directoryDescriptor)
+      let decision = UpdateReplayPolicy.decision(previous: previous, candidate: candidate)
+      if decision == .accepted, previous != candidate {
+        try Self.persist(candidate, directoryDescriptor: directoryDescriptor)
+      }
+      return decision
+    }
+  }
+
+  public func loadCurrentRecord() throws -> UpdateReplayRecord? {
+    try withExclusiveTransaction { directoryDescriptor in
+      try Self.loadRecord(directoryDescriptor: directoryDescriptor)
+    }
+  }
+
+  private func withExclusiveTransaction<T>(
+    _ body: (Int32) throws -> T
+  ) throws -> T {
+    processLock.lock()
+    defer { processLock.unlock() }
+    let directoryDescriptor = try openSecureDirectory()
+    defer { Darwin.close(directoryDescriptor) }
+    let lockDescriptor = Darwin.openat(
+      directoryDescriptor, Self.lockName,
+      O_RDWR | O_CREAT | O_CLOEXEC | O_NOFOLLOW, 0o600)
+    guard lockDescriptor >= 0 else { throw UpdateFeedError.replayStateWriteFailed }
+    defer { Darwin.close(lockDescriptor) }
+    guard fchmod(lockDescriptor, 0o600) == 0 else {
+      throw UpdateFeedError.replayStateWriteFailed
+    }
+    var lockMetadata = stat()
+    guard fstat(lockDescriptor, &lockMetadata) == 0,
+      lockMetadata.st_mode & S_IFMT == S_IFREG,
+      lockMetadata.st_uid == geteuid(), lockMetadata.st_nlink == 1,
+      lockMetadata.st_mode & mode_t(0o777) == mode_t(0o600)
+    else { throw UpdateFeedError.replayStateWriteFailed }
+    while flock(lockDescriptor, LOCK_EX) != 0 {
+      if errno == EINTR { continue }
+      throw UpdateFeedError.replayStateWriteFailed
+    }
+    defer { _ = flock(lockDescriptor, LOCK_UN) }
+    return try body(directoryDescriptor)
+  }
+
+  private func openSecureDirectory() throws -> Int32 {
+    guard directory.isFileURL, directory.path.hasPrefix("/") else {
+      throw UpdateFeedError.replayStateWriteFailed
+    }
+    do {
+      try FileManager.default.createDirectory(
+        at: directory, withIntermediateDirectories: true,
+        attributes: [.posixPermissions: 0o700])
+    } catch {
+      throw UpdateFeedError.replayStateWriteFailed
+    }
+    let descriptor = Darwin.open(
+      directory.path, O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW)
+    guard descriptor >= 0 else { throw UpdateFeedError.replayStateWriteFailed }
+    do {
+      guard fchmod(descriptor, 0o700) == 0 else {
+        throw UpdateFeedError.replayStateWriteFailed
+      }
+      var opened = stat()
+      var linked = stat()
+      guard fstat(descriptor, &opened) == 0,
+        lstat(directory.path, &linked) == 0,
+        opened.st_mode & S_IFMT == S_IFDIR,
+        linked.st_mode & S_IFMT == S_IFDIR,
+        opened.st_uid == geteuid(), linked.st_uid == geteuid(),
+        opened.st_mode & mode_t(0o777) == mode_t(0o700),
+        linked.st_mode & mode_t(0o777) == mode_t(0o700),
+        opened.st_dev == linked.st_dev, opened.st_ino == linked.st_ino
+      else { throw UpdateFeedError.replayStateWriteFailed }
+      return descriptor
+    } catch {
+      Darwin.close(descriptor)
+      throw error
+    }
+  }
+
+  private static func loadRecord(directoryDescriptor: Int32) throws -> UpdateReplayRecord? {
+    let descriptor = Darwin.openat(
+      directoryDescriptor, stateName, O_RDONLY | O_CLOEXEC | O_NOFOLLOW)
+    guard descriptor >= 0 else {
+      if errno == ENOENT { return nil }
+      throw UpdateFeedError.replayStateCorrupt
+    }
+    defer { Darwin.close(descriptor) }
+    var metadata = stat()
+    guard fstat(descriptor, &metadata) == 0,
+      metadata.st_mode & S_IFMT == S_IFREG,
+      metadata.st_uid == geteuid(), metadata.st_nlink == 1,
+      metadata.st_mode & mode_t(0o777) == mode_t(0o400),
+      metadata.st_size > 0, metadata.st_size <= maximumStateBytes
+    else { throw UpdateFeedError.replayStateCorrupt }
+    var data = Data()
+    var buffer = [UInt8](repeating: 0, count: 1_024)
+    while true {
+      let count = Darwin.read(descriptor, &buffer, buffer.count)
+      if count < 0, errno == EINTR { continue }
+      guard count >= 0 else { throw UpdateFeedError.replayStateCorrupt }
+      if count == 0 { break }
+      guard data.count + count <= maximumStateBytes else {
+        throw UpdateFeedError.replayStateCorrupt
+      }
+      data.append(contentsOf: buffer[0..<count])
+    }
+    guard data.count == metadata.st_size,
+      let record = try? JSONDecoder().decode(UpdateReplayRecord.self, from: data),
+      isValid(record),
+      try canonicalData(record) == data
     else { throw UpdateFeedError.replayStateCorrupt }
     return record
   }
 
-  public func save(_ record: UpdateReplayRecord) throws {
-    lock.lock()
-    defer { lock.unlock() }
+  private static func persist(
+    _ record: UpdateReplayRecord,
+    directoryDescriptor: Int32
+  ) throws {
+    let data: Data
     do {
-      let encoder = JSONEncoder()
-      encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-      let data = try encoder.encode(record)
-      defaults.set(data, forKey: Self.persistenceKey)
-      guard defaults.data(forKey: Self.persistenceKey) == data else {
-        throw UpdateFeedError.replayStateWriteFailed
-      }
-    } catch let error as UpdateFeedError {
-      throw error
+      data = try canonicalData(record)
     } catch {
       throw UpdateFeedError.replayStateWriteFailed
+    }
+    let temporaryName = ".replay-\(UUID().uuidString.lowercased()).part"
+    let descriptor = Darwin.openat(
+      directoryDescriptor, temporaryName,
+      O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, 0o600)
+    guard descriptor >= 0 else { throw UpdateFeedError.replayStateWriteFailed }
+    var temporaryExists = true
+    defer {
+      Darwin.close(descriptor)
+      if temporaryExists { _ = unlinkat(directoryDescriptor, temporaryName, 0) }
+    }
+    try writeAll(data, descriptor: descriptor)
+    try fullSync(descriptor)
+    guard fchmod(descriptor, 0o400) == 0 else {
+      throw UpdateFeedError.replayStateWriteFailed
+    }
+    try fullSync(descriptor)
+    guard renameat(directoryDescriptor, temporaryName, directoryDescriptor, stateName) == 0 else {
+      throw UpdateFeedError.replayStateWriteFailed
+    }
+    temporaryExists = false
+    try fullSync(directoryDescriptor)
+  }
+
+  private static func canonicalData(_ record: UpdateReplayRecord) throws -> Data {
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+    return try encoder.encode(record)
+  }
+
+  private static func isValid(_ record: UpdateReplayRecord) -> Bool {
+    record.sequence > 0
+      && UpdateSemanticVersion(record.version) != nil
+      && record.payloadSHA256.count == 64
+      && record.payloadSHA256.allSatisfy {
+        $0.isASCII && ($0.isNumber || ($0 >= "a" && $0 <= "f"))
+      }
+  }
+
+  private static func writeAll(_ data: Data, descriptor: Int32) throws {
+    var offset = 0
+    while offset < data.count {
+      let count = data.withUnsafeBytes { bytes in
+        Darwin.write(descriptor, bytes.baseAddress!.advanced(by: offset), data.count - offset)
+      }
+      if count < 0, errno == EINTR { continue }
+      guard count > 0 else { throw UpdateFeedError.replayStateWriteFailed }
+      offset += count
+    }
+  }
+
+  private static func fullSync(_ descriptor: Int32) throws {
+    if fcntl(descriptor, F_FULLFSYNC) == 0 { return }
+    guard fsync(descriptor) == 0 else { throw UpdateFeedError.replayStateWriteFailed }
+  }
+}
+
+private final class UpdateReplayProcessLockRegistry: @unchecked Sendable {
+  static let shared = UpdateReplayProcessLockRegistry()
+  private let registryLock = NSLock()
+  private var locks: [String: NSLock] = [:]
+
+  func lock(for path: String) -> NSLock {
+    registryLock.withLock {
+      if let existing = locks[path] { return existing }
+      let lock = NSLock()
+      locks[path] = lock
+      return lock
     }
   }
 }
@@ -379,25 +595,22 @@ public struct UpdateFeedVerifier: Sendable {
     let payload = decoded.payload
     let validated = try Self.validateStaticPayload(payload)
     guard now >= validated.issued else { throw UpdateFeedError.feedNotYetValid }
-    guard now <= validated.expires else { throw UpdateFeedError.feedExpired }
+    guard now < validated.expires else { throw UpdateFeedError.feedExpired }
     let candidate = validated.version
     let payloadHash = UpdateFeedCodec.sha256(decoded.canonicalPayload)
     let nextRecord = UpdateReplayRecord(
       sequence: payload.sequence, payloadSHA256: payloadHash, version: payload.version)
-    if let previous = try replayStore.load() {
-      if payload.sequence < previous.sequence { throw UpdateFeedError.replay }
-      if payload.sequence == previous.sequence {
-        guard payloadHash == previous.payloadSHA256, payload.version == previous.version else {
-          throw UpdateFeedError.sequenceConflict
-        }
-      } else {
-        guard let previousVersion = UpdateSemanticVersion(previous.version),
-          previousVersion < candidate
-        else { throw UpdateFeedError.nonIncreasingRelease }
-      }
-    }
     if candidate < installed { throw UpdateFeedError.downgrade }
-    try replayStore.save(nextRecord)
+    switch try replayStore.validateAndCommit(nextRecord) {
+    case .accepted:
+      break
+    case .replay:
+      throw UpdateFeedError.replay
+    case .sequenceConflict:
+      throw UpdateFeedError.sequenceConflict
+    case .nonIncreasingRelease:
+      throw UpdateFeedError.nonIncreasingRelease
+    }
     if candidate == installed { return .noUpdate(.currentVersion) }
     guard payload.architectures.contains(context.architecture) else {
       return .noUpdate(.unsupportedArchitecture)
