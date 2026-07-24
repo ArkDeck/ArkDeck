@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-030-host-loop-runtime
-revision: 8
-status: approved # r1 #361、r2 #405、r3 #407、r4 #415、r5 #423、r6 #449、r7 #456 已批准；r8 current-topology consumption + fresh canary-only readiness 仅在维护者 review/merge 本 PR 后生效
+revision: 9
+status: approved # r1 #361、r2 #405、r3 #407、r4 #415、r5 #423、r6 #449、r7 #456、r8 #480 已批准；r9 automatic Agent-PR checks 仅在维护者 review/merge 本 PR 后生效
 class: implementation-only
 core_change_level: none
 owner: lvye
@@ -10,6 +10,17 @@ platforms: [macos]
 ---
 
 # Host-loop runtime：为 Agent PR 建立可恢复的 worker/reviewer 双循环
+
+> r9 stop gate（2026-07-24）：r8 revision/readiness #480 exact reviewed head
+> `fea214bac75711c075f6a023086688eee28822d3` 已由 `lvye` APPROVED，并以
+> `2b46558629ba67c8fa1fcd6f80b8234cd8c8d0c6` 合入 protected main。
+> 但 #480 首个 bot-created head
+> `a841962cc7ce371d0921383584543fba03054ab9` 的 pull-request Swift/SDD
+> runs `30096501384`/`30096501389` 均为 `action_required`；维护者更新 branch
+> 后 final head 才取得自动绿 runs。用户要求后续 routine Agent PR 不再需要点击
+> `Approve and run workflows`。该实现会改变 r8 钉定的 workflow blobs，因此
+> r8 canary refs/UUID/readiness 自本 r9 合入起永久 superseded，HLR-002A 回到
+> `blocked`；r9 合入前 workflow diff 与 r8 canary/ref dispatch 均为 0。
 
 > r8 resume gate（2026-07-24）：CHG-2026-033 TASK-RPT-001 已以 execution
 > evidence #476 merge `6f874efc5c4e9fdd39bcdcc91cfcaa6a862e1961`、
@@ -86,11 +97,12 @@ platforms: [macos]
 工具。它没有为 task PR 写入 `Task: TASK-*`，也没有完整 base OID、D0/D1/D2
 grade、evidence 或依赖字段。
 
-这使得 CHG-2026-028 的 `MECH-004` 虽已提供 PR diff guard，仍不能可靠地在首个
-PR event 得到正确输入：`GITHUB_TOKEN` 创建的 PR 不会触发新的 workflow run；随后
-必须有人另行编辑 body，才可能得到 `pull_request` 的 allowed-paths 复核。GitHub 对
-Actions 递归事件的限制见
-[官方事件文档](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#triggering-a-workflow-from-a-workflow)。
+这使得 CHG-2026-028 的 `MECH-004` 虽已提供 PR diff guard，仍不能在首个
+bot-created PR event 无人值守取得结果：GitHub 对 `GITHUB_TOKEN` 创建/更新 PR 的
+`opened`/`synchronize`/`reopened` 事件建立 approval-required runs，须由 write
+用户选择 `Approve and run workflows` 才执行。#480 的 initial/final head 对照已
+实证该行为。GitHub 对递归门的 current 说明见
+[GITHUB_TOKEN 文档](https://docs.github.com/en/actions/concepts/security/github_token#when-github_token-triggers-workflow-runs)。
 
 更根本的是，现有守望流程没有 durable cursor、可 fencing 的 task lease、heartbeat、
 崩溃后从 GitHub/main 重新协调的机制，亦没有把实现与独立 AI 合前 review 调度为两个
@@ -156,6 +168,13 @@ Actions 递归事件的限制见
   固定全新 reserved/ordinary canary refs、latest-main audit base、sensitive blobs、
   overlap 与 stop/cleanup 边界。本 r8 merge 只使 canary/evidence 计划 ready，
   不形成 creator-isolation PASS 或 task done。
+- r9 新增 TASK-HLR-001A：保留 `GITHUB_TOKEN` bot authorship 与零新 secret，
+  把 routine Agent PR 的 PR-metadata/allowed-paths 校验移到现有 `agent/**` push
+  workflow，在 create-or-find exact PR 后自动执行；SDD Guard/Swift 的 routine
+  head checks 继续由 push 事件产生，`pull_request` 只保留 human
+  `edited`/`reopened` metadata revalidation。r9 不增加 App/PAT/private key，
+  不改变 main protection、required `guard`、CODEOWNER、批准/合并或 credential
+  boundary。
 - reviewer loop 仅调度并记录独立 AI 合前 review（`APPROVE` / `REQUEST_CHANGES` /
   `BLOCKED`）；它不作 GitHub approval、不 merge、不改变 change/task 状态。通过
   checks 与独立 review 后，worker 才可按 CHG-2026-027 将 digest 放入 batch Issue；
@@ -183,16 +202,21 @@ Out of scope / Non-goals:
 
 Observable behavior before/after:
 
-- Before：PR body 无结构化 task/grade/evidence/dependency/base pin，首次 PR check
-  可能缺席；host 守望靠临时上下文，崩溃后缺少可验证恢复点，review 不独立调度。
+- Before：PR body 无结构化 task/grade/evidence/dependency/base pin；routine
+  `GITHUB_TOKEN` bot-created PR 的 pull-request runs 进入 `action_required`，
+  首个 PR metadata/allowed-paths check 需要人类先放行；host 守望靠临时上下文，
+  崩溃后缺少可验证恢复点，review 不独立调度。
 - After：每个 task PR 在创建时即携带可解析 envelope 并触发首个 `pull_request`
-  checks；worker/reviewer 以 lease 与 cursor 协调，所有外部写均可幂等重试，merge
-  只以 exact OID 确认后续跑。人工批准的信任根与 before 完全相同。
+  或等价 exact-head push checks；legacy ordinary Agent PR create-or-find 后自动
+  取得 PR metadata/allowed-paths 结果，无 routine workflow-approval click；
+  worker/reviewer 以 lease 与 cursor 协调，所有外部写均可幂等重试，merge 只以
+  exact OID 确认后续跑。人工批准的信任根与 before 完全相同。
 
 ## Scope(涉及的 Requirement/AC)
 
 - Requirements:无（canonical Core 零认领）
-- Acceptance:五条 change-local：`HLR-ENVELOPE-001`、`HLR-LEASE-001`、
+- Acceptance:六条 change-local：`HLR-ENVELOPE-001`、`HLR-AUTOCI-001`、
+  `HLR-LEASE-001`、
   `HLR-WORKER-001`、`HLR-REVIEW-001`、`HLR-RECOVERY-001`。r6 新增的
   `HLR-D2-GATE-001` 随 #449/#454 gateway path 由 r7 退役，不是 current result gate。
 - Contracts/schemas:repo-local runtime envelope、cursor 和 lease serialization；均不进入
@@ -247,15 +271,18 @@ Observable behavior before/after:
 真实 proposal 形态，只有在实际 `pull_request` allowed-paths job 绿色时，才可由
 CHG-2026-028 `MECH-004` evidence 如实引用；未出现该 run 不得预填为 live evidence。
 
-r1 的 TASK-HLR-001 已 done；HLR-002A implementation #419 已合入，但 live canary
+r1 的 TASK-HLR-001 已 done；r9 新增 TASK-HLR-001A，须在独立
+implementation/evidence 与 done PR 后，重新为 HLR-002A 制定 fresh canary
+readiness。HLR-002A implementation #419 已合入，但 live canary
 #421 = FAIL。#435 从未产生 D2 receipt/PASS；#449/r6 与 #454 readiness 已由 r7
 supersede，TASK-HLR-002B 作为不可复用的历史 tombstone 保持 `blocked`，不进入
-implementation/evidence/done。r8 只在本 PR 经维护者 review/merge 后批准
-HLR-002A fresh canary-only readiness；canary/evidence 使用后一独立 PR，
-其合入后再以独立 D0 PR `ready→done`。HLR-002A done 后才进入
+implementation/evidence/done。r8 已批准的 canary-only readiness 因 r9 将改变
+sensitive workflow blobs 而 superseded；r8 refs/UUID 不执行。TASK-HLR-001A done
+后须再以独立 D1 readiness 生成全新 HLR-002A refs/pins；canary/evidence 使用后一
+独立 PR，其合入后再以独立 D0 PR `ready→done`。HLR-002A done 后才进入
 TASK-HLR-002。worker migration、review/recovery 与 live pilot 再按顺序推进。每个
 PR 仍独立 review/merge；D1/D2 判断门后不做投机性成 PR 工作；change
-`verified` 只能在六个 active task 与五条 acceptance 均有可复查 evidence 后以
+`verified` 只能在七个 active task 与六条 acceptance 均有可复查 evidence 后以
 独立状态 PR 起草。
 
 ## Approval
@@ -432,3 +459,25 @@ PR 仍独立 review/merge；D1/D2 判断门后不做投机性成 PR 工作；cha
 - canary execution/evidence 与 `ready→done` 必须各自独立 PR。r8 merge 本身
   不构成 `HLR-LEASE-001`/`HLR-WORKER-001` live PASS、TASK-HLR-002A done
   或 CHG-2026-030 verified。
+
+## r9 approval and readiness boundary
+
+- 本 revision 是 #480 上 `GITHUB_TOKEN` PR workflow approval friction 的 D1
+  compatible remediation，只修改本 change 的 proposal/design/tasks/verification。
+  它不修改 workflow、script、evidence、GitHub setting、credential、ref 或 PR
+  state，也不执行 r8 canary。
+- 维护者 review/merge 本 PR 即批准新增 TASK-HLR-001A 及其 exact readiness，
+  允许后一独立 implementation/evidence PR 修改
+  `.github/workflows/agent-pr.yml`、`sdd-guard.yml`、`swift-ci.yml`、
+  `scripts/check_pr_paths.py` 与两份对应 contract tests。该实现只使用现有
+  ephemeral `GITHUB_TOKEN`，不得加入 PAT、App private key、repository secret、
+  OIDC broker、`pull_request_target`、Actions/admin write 或任何人类凭据。
+- routine initial/synchronize coverage 必须由 exact-head push runs 闭合：
+  `guard`、Swift 与 create-or-find 后的 PR-metadata/allowed-paths 全部自动运行；
+  PR title/body 的 human `edited/reopened` 继续触发 base-defined revalidation。
+  任一 check 缺失、重复 PR、head/base 不一致、PR JSON 不可解析、workflow approval
+  仍是 routine 必需步骤或非 Agent PR coverage 被静默删除，implementation FAIL。
+- r9 merge 同时使 HLR-002A 的 r8 readiness/UUID 永久 superseded 并将该 task
+  `ready→blocked`。TASK-HLR-001A done 后才能从届时最新 protected main 生成
+  全新 HLR-002A canary refs/readiness；不得把 #480/r8 的 refs、pins、runs 或
+  workflow behavior 补跑为 r9 PASS。
