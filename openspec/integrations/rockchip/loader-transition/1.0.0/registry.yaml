@@ -1,0 +1,101 @@
+{
+  "schemaVersion": "1.0.0",
+  "serializationFormat": "json-compatible-yaml-1.2",
+  "registryId": "ROCKCHIP-DAYU200-HDC-LOADER-TRANSITION",
+  "registryVersion": "1.0.0",
+  "registeredBy": "CHG-2026-026/TASK-RKFUI-001A",
+  "characterizationStatus": "pending",
+  "authorization": {
+    "refs": [
+      "PR#440@f4e901492e7d3b82f883424c756868fffa4946df",
+      "PR#452@d22cdeeebc781b9c3a1b063dbee6631934c51ac0"
+    ],
+    "validUntil": "2026-07-31T16:00:00Z",
+    "maxRuns": 1
+  },
+  "target": {
+    "model": "DAYU200",
+    "soc": "RK3568",
+    "serialSHA256": "958780b2ffb7090d4f22cdc1f547f9804ed0f0b605e3020f384e5d4823dc7a7e",
+    "firmware": "OpenHarmony 7.0.0.33",
+    "transport": "usb",
+    "requiredInitialBindingRevision": 1
+  },
+  "hdc": {
+    "absoluteExecutable": "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/toolchains/hdc",
+    "reportedVersion": "Ver: 3.2.0d",
+    "sha256": "48395ba8d87115dffca47df2a640a6c868bc9a2bd4eb49611e4138ff88d8d260",
+    "serverRequirement": "preExistingExternalSameUIDPinnedExecutable",
+    "serverLifecycleMutationAllowed": false
+  },
+  "rockUSBObservation": {
+    "reportedVersion": "rkdeveloptool ver 1.32",
+    "sha256": "bbd7bdc0fb121d414fb61085e77211cc1fdd9a3b6c6b285c54380f70e56c9923",
+    "upstreamCommit": "304f073752fd25c854e1bcf05d8e7f925b1f4e14",
+    "signatureClass": "adHoc",
+    "quarantineAllowed": false,
+    "exactArgv": ["ld"],
+    "expectedObservation": {
+      "usbVendorID": "0x2207",
+      "usbProductID": "0x350a",
+      "mode": "Loader"
+    }
+  },
+  "operation": {
+    "typedIntent": "enterUpdater",
+    "providerOperationId": "rockusb.enter-loader",
+    "effectClassification": "deviceMutation",
+    "exactArgvTemplate": ["-t", "<durable-connect-key>", "shell", "reboot", "loader"],
+    "impactConfirmationToken": "ENTER-LOADER-WILL-DISCONNECT-HDC",
+    "firmwareReadbackArgvTemplate": [
+      "-t",
+      "<durable-connect-key>",
+      "shell",
+      "param",
+      "get",
+      "const.product.software.version"
+    ],
+    "commandTimeoutMilliseconds": 10000,
+    "disconnectDeadlineMilliseconds": 15000,
+    "loaderDeadlineMilliseconds": 45000,
+    "pollIntervalMilliseconds": 500,
+    "maximumOutputBytes": 65536,
+    "maximumLoaderCandidates": 1,
+    "successRequires": [
+      "matching pre-dispatch E0 serial and firmware",
+      "durable OriginalTargetSnapshot",
+      "durable CurrentDeviceBinding revision 1",
+      "durable impact confirmation and enterUpdater intent",
+      "exactly one HDC reboot-loader dispatch",
+      "HDC endpoint disconnect",
+      "exactly one semantic 0x2207:0x350a Loader observation"
+    ],
+    "forbiddenEffects": [
+      "defaultHDCTarget",
+      "hostShell",
+      "callerSuppliedArgv",
+      "hdcServerLifecycleMutation",
+      "sudo",
+      "helperInstall",
+      "driverInstall",
+      "systemRuleWrite",
+      "groupOrACLMutation",
+      "ppt",
+      "wlx",
+      "rd",
+      "flash",
+      "erase",
+      "format",
+      "unlock",
+      "update",
+      "destructive",
+      "retry"
+    ]
+  },
+  "evidence": {
+    "run": null,
+    "sanitizedReceiptSHA256": null,
+    "capabilityVerdict": "unknown",
+    "autoRebindVerdict": "unknown"
+  }
+}
