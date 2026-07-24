@@ -162,6 +162,22 @@
   手册中不存在可断项；
 - `scripts/check-sdd.sh` 与 `git diff --check`；archive 与 templates diff 为零。
 
+### Evidence（candidate；不构成状态翻转）
+
+- implementation + evidence run:
+  [`evidence/runs/TASK-HLD-001/run.md`](evidence/runs/TASK-HLD-001/run.md)
+  与逐条对照表
+  [`evidence/runs/TASK-HLD-001/link-inventory.md`](evidence/runs/TASK-HLD-001/link-inventory.md)
+  （2026-07-23，base `a7ee3f88634972cea4f3bb6622d2f6dab6ea6e06`）。
+- 二值门实测：开工前 carrier 23/23 无漂移、六个目标 change 均未归档；活跃 change
+  相对链接 19 → **0**；archive 类 16 条计数与内容零变化；新增 11 个唯一 blob OID
+  全部可解析；不动面（ID 集合、H3=144 八字段同序、`Automation status` 取值域、
+  `Fact` 36 / `Inference` 18、positive/negative 各 18、`Currency` 18 行）逐项零变化；
+  **六个活跃 change 的归档模拟各 0 条可断项**；模板与 archive diff = 0；
+  check-sdd 0/0/111。
+- 任务状态保持 `ready`；`HLD-DURABLE-001` 的 PASS 结论待维护者在独立 `ready→done`
+  PR 中确认。
+
 ### Notes / handoff
 
 - 逐条 OID 一律以 `git rev-parse` / `git log` 实测取得并在 run 中记录取值命令；
