@@ -1,7 +1,7 @@
 # CHG-2026-030 Verification Plan
 
 > Status:planned
-> Change:CHG-2026-030-host-loop-runtime@r9
+> Change:CHG-2026-030-host-loop-runtime@r10
 > Core baseline:CORE-2.1.0（零 Core/Product behavior change）
 
 ## Environment
@@ -48,6 +48,47 @@
   routine approval gate required for its checks; all four exact-head checks
   complete automatically, while human edit/reopen still revalidates.
 
+## HLR-002A r10 canary readiness（current）
+
+- Audit base:
+  `47cec786315e79e0aad8a3209c6a7c600e6cfc60`。
+- Dependency evidence:TASK-HLR-001A implementation #485 merge
+  `cae9a4c378b75409a4d7a31205583560f17d73aa`、fresh live evidence #490
+  merge `89ce135c109871c5428022ad0620a383430635dc` 与 done #495 merge
+  `1815105971b5ec9bee58cb7be04cd759dc01a32b`。
+- Current topology authority:CHG-2026-033 TASK-RPT-001 #476/#477/#478
+  merged evidence；branch-protection projection/full SHA-256 =
+  `f423ce0ca2eb3f667a34dbb7f9bcfa923266928d073ee0e50763b2f69ee2663a` /
+  `04f09f273fce806afaa44679c9e8257c74cce3e480fe60da27c7dcca06e85f04`，
+  ruleset projection/full SHA-256 =
+  `9bb7ef3d62246733ca1dcaac074a3b07f5b4aead6985d645cd58fbf82db62163` /
+  `b172750c1c0764956725393823fa72014146d9e2ec0f1b19c48cf670964d54b5`。
+- Exact fresh refs:
+  `agent/host-loop/probes/7e9bc001-c515-4aef-b3dc-c71d7f0124ee` and
+  `agent/hlr-002a-control/4a2314d2-72c3-44f8-b579-606735e279b8`；
+  evidence branch =
+  `agent/task-hlr-002a-canary-evidence-r10`。
+- Expected reserved result:exact-head push SDD Guard and Swift success;
+  Agent PR run count = 0 and all-state exact-head PR count = 0, each queried
+  twice using complete workflow-path/event/branch/head and PR pagination.
+- Expected ordinary result:exact-head push SDD Guard and Swift success;
+  exactly one successful Agent PR push run whose `open-pr` and
+  `allowed-paths` jobs succeed; exactly one open/unmerged base-main
+  exact-head PR authored by `github-actions[bot]`; no workflow approval or
+  `action_required` run is needed.
+- Cleanup result:after pre-cleanup double read-back, Deploy Key deletes
+  ordinary then reserved; both are stably absent and the ordinary PR is
+  closed/unmerged. A residual open PR requires independent human close and
+  blocks evidence closure.
+- Forbidden dispatch in this carrier:apart from its existing Agent branch/PR
+  submission transport, any target-canary/ref or extra PR-state write;
+  ruleset, branch-protection, repository-setting or credential writes;
+  integration/scheduler/review/merge/auto-merge/admin routes; any reuse of r8
+  or #421/#435/#454 refs, UUIDs, pins, payloads, windows or runs.
+- Evidence separation:r10 readiness merge authorizes the exact plan but is
+  not live PASS. Canary evidence and D0 `ready→done` remain two later,
+  separately reviewed PRs.
+
 ## HLR-002A r8 canary readiness（historical；r9 superseded）
 
 - Audit base:
@@ -92,9 +133,9 @@
 - `agent/host-loop/**` 仍触发 legacy creator、普通 `agent/**` 被意外排除、reserved
   head 出现 0/2 PR、head guard 或 pull-request allowed-paths 缺失 → partition/activation
   failure；不以 branch cleanup 或 elapsed time 伪造零 creator；
-- r8 readiness merge 未由 exact-head human review/`guard`/`mergedBy`/git
+- r10 readiness merge 未由 exact-head human review/`guard`/`mergedBy`/git
   history 共同确认、fresh ref/evidence branch 预存在、open PR files 查询不完整或
-  #468 之外出现 overlap，仍 push canary → failure；零下一步 dispatch；
+  discovery 后出现 overlap，仍 push canary → failure；零下一步 dispatch；
 - canary commit 包含 Actions skip instruction、reserved/ordinary 未使用同一
   protected-main parent/tree、两次 push 之间 main/sensitive blob 漂移、cleanup
   前未重复固定 run/PR facts，或把 head deletion 当作此前零 creator 证明 →
@@ -144,7 +185,7 @@
   的完整 before/after/rollback JSON/hash、actor inventory、active-rule evaluation，
   以及单层/多层正向 + non-agent/main/agentx/review/merge/admin 负向 transcript；
 - r8 exact reserved/ordinary refs、pins 与 UUID 只能作为 zero-dispatch
-  superseded history；r9 后 fresh readiness 必须使用全新 refs；
+  superseded history；只有 r10 exact fresh refs 可用于 current canary；
 - `check_pr_paths` task-token suffix 正反 fixtures + fresh implementation PR 的真实
   pull-request `guard`/`allowed-paths` terminal success；#412 红灯不得复用；
 - `scripts/check-sdd.sh`：0 errors / 0 warnings，acceptance count 以执行时 protected

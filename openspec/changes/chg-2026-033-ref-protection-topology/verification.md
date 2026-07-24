@@ -1,7 +1,7 @@
 # CHG-2026-033 Verification Plan
 
 > Change:CHG-2026-033-ref-protection-topology@r3
-> Status:planned
+> Status:passed（2026-07-25；五条 change-local acceptance 均 passed，见 proposal 的 Verification closure）
 > Core baseline:CORE-2.1.0（零 Core/Product behavior change）
 
 ## Environment
