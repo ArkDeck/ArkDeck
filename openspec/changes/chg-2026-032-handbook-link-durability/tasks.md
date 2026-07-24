@@ -321,6 +321,20 @@
 - 不动面同 TASK-HLD-001（ID 集合、八字段契约、取值域、标注与计数零变化）；
 - `scripts/check-sdd.sh` 与 `git diff --check`。
 
+### Evidence（candidate；不构成状态翻转）
+
+- implementation + evidence run:
+  [`evidence/runs/TASK-HLD-002/run.md`](evidence/runs/TASK-HLD-002/run.md)
+  （2026-07-23，base `5f34a2aa376bd3677b69ba14410f265f1a29aaf7`）。
+- 二值门实测：开工前 carrier 12/12 无漂移；首屏块数 4 → **5**，新增块恰为
+  `**引用形式。**`；块 ③ 的隐私条款与两处 `POL-*` 引用逐字保留；首屏其余 3 块、
+  `AF-NNN` ID 集合、H3 = 144 八字段同序、`Fact` 36 / `Inference` 18、
+  positive/negative 各 18、`Currency` 18 行、活跃相对链接 0 / archive 类 16 /
+  11 个耐久 blob 可解析——全部零变化；shadow-spec 三项扫描均为 0；手册 diff
+  2 个 hunk；模板与 archive diff = 0；check-sdd 0/0/111。
+- 任务状态保持 `ready`；`HLD-CONVENTION-001` 的 PASS 结论待维护者在独立
+  `ready→done` PR 中确认。
+
 ### Notes / handoff
 
 - 本任务只加约定文本，不再改任何既有链接；
