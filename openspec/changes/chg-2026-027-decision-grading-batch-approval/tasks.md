@@ -375,3 +375,14 @@
 - Verification:`BAP-CRED-001` documentReview——双向证据在案、凭据值零入仓;
   check-sdd 绿。
 - Evidence gate:evidence 合入后 `ready→done` 独立状态 PR。
+
+### Current mechanism note（2026-07-24；append-only）
+
+TASK-BAP-003 的 `done` 与 2026-07-23 run 均保持原义。CHG-2026-033
+TASK-RPT-001 后续以两层 topology 重新验证同一高层 AC：ordinary ref 拒绝来自
+ruleset `19595282`，exact `main` 拒绝来自 branch protection，维护者凭据隔离与
+actor/route containment 由其独立 authenticated evidence 证明。current pointer 与
+历史/current 分界见
+`evidence/runs/TASK-BAP-003/2026-07-24-ref-protection-topology-addendum.md`。
+该 note 不重开、不重做或重新标记 TASK-BAP-003，也不把旧 direct-main
+GH013 transcript 当作当前 main enforcement 的因果证据。

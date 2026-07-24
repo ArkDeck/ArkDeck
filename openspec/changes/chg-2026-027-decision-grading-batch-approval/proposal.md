@@ -174,3 +174,33 @@ V2 治理:本 propose PR 合入仅登记提案;批准须独立 approval-only PR(
   的质量担保——逐 PR review 永远是唯一批准载体;不构成 guard/CI 机械化
   (CHG-2026-028,已 verified)或 host-loop runtime(CHG-2026-030,在途)
   的任何完成声明;archive 另行(引用扫描先决)。
+
+## Current mechanism addendum（2026-07-24；append-only）
+
+上面的 2026-07-23 verification closure 与
+`evidence/runs/TASK-BAP-003/run.md` 保留当日真实历史，不回写、不删除，也不把
+当日由 ruleset 拒绝 `main` 的结果改判为错误。自 CHG-2026-033 TASK-RPT-001
+execution-evidence #476、operability-evidence #477 与 done #478 合入后，
+`BAP-CRED-001` 的 current mechanism pointer 更新为：
+
+- Agent 仍只持 repository Deploy Key ID `158088026`，维护者凭据仍不在 Agent
+  可达环境；该身份不是 CODEOWNER、admin、ruleset bypass 或 main push actor；
+- ordinary ref 边界由 ruleset `19595282` 执行：active `~ALL` +
+  creation/update/deletion，排除 single-level `refs/heads/agent/**`、
+  multi-level `refs/heads/agent/**/*` 与 exact `refs/heads/main`，唯一 bypass
+  actor 仍为人类 `lvye`；
+- exact `main` 不再由该 ruleset 负责拒绝；它由 branch protection 独立强制
+  PR、至少 1 个 approving review、`@lvye` CODEOWNER review、App `15368`
+  的 strict `guard`、administrator enforcement、仅 `lvye` push allowlist，
+  并禁止 force-push、deletion 与 repository auto-merge；
+- current behavior revalidation 已覆盖 Deploy Key 对 single/multi-level
+  `agent/**` 的 create/update/delete 成功、ordinary/`agentx/**` 拒绝、
+  ruleset 排除 main 后 direct-main 被 branch protection 明确拒绝，以及正常人类
+  CODEOWNER + `guard` 的 Squash merge 无需 ruleset bypass。
+
+权威证据为 CHG-2026-033：
+`2026-07-24-topology-success.{json,md}` 与
+`2026-07-24-no-bypass-operability.md`；本 change 的 append-only addendum
+`evidence/runs/TASK-BAP-003/2026-07-24-ref-protection-topology-addendum.md`
+只建立 current pointer，不重新执行、不扩大或撤销 TASK-BAP-003，也不改变本
+change 已 verified 的历史结论。
