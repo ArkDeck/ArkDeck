@@ -285,8 +285,10 @@
 
 ## TASK-RKFUI-001B — RockUSB `ld` homogeneous CRLF integration remediation
 
-- Status:ready（仅在维护者 review/merge proposal r4 后生效；r4 合入前 implementation
-  不得开工）
+- Status:done（implementation/evidence PR #464 已由维护者 review/merge 至 `main`，
+  merge OID `c61cc458d2c95545ac57ab5d02d23768635ea2cd`；required guard 与 Swift CI
+  通过。本独立 D0 状态 PR 仅记录该确定性结果，不新增 scope、风险接受、授权或设备
+  dispatch）
 - Platform:macos
 - Requirements:`REQ-FLASH-001`
 - Acceptance:`AC-FLASH-001-01`
