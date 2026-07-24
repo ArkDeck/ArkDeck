@@ -45,8 +45,9 @@ GitHub control-plane/ref/probe 数为 0。
   `openspec/changes/chg-2026-033-ref-protection-topology/d2-readiness.md`、
   本 change `evidence/**`、本 change `tasks.md`（仅本任务状态/evidence 引用）。
   #467 fail-closed 后的一次性 #459 bootstrap carrier 另允许本 change
-  `proposal.md`、`design.md`、`verification.md`、`acceptance-cases.yaml`，仅用于修订
-  Actions create+approve 组合 capability 的机制描述；不得修改任何其他 path。
+  `proposal.md`、本 change `design.md`、本 change `verification.md`、本 change
+  `acceptance-cases.yaml`，仅用于修订 Actions create+approve 组合 capability 的
+  机制描述；不得修改任何其他 path。
 - Forbidden paths:`AGENTS.md`、`openspec/constitution.md`、
   `openspec/governance/enforcement.md`、`openspec/specs/**`、
   `openspec/contracts/**`、`.github/**`、产品 source/tests、其他 change

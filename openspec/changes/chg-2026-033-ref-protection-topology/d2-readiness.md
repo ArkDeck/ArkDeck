@@ -64,8 +64,9 @@ capture_file_bytes_with_lf: 22536
 capture_file_sha256: 0af8f98938a9c230fa8a77c4c544c2d268b4093062b1f7714c04dabfb94abfc9
 capture_script_sha256: 487701e6602ddd20a8d18db6bfce59d58f4597dc7ea3b15e171f45e8934d637a
 capture_wrapper_sha256: eb37c969a71d90ab7c23c483d35b05cd4d11c779f5b6c4c92cb149e8b6520397
-bootstrap_apply_script_sha256: 96f8fefb793d5cc0d0de09699cd8f9fe6d1a4a2d597b8ce8121e1cb031c262bf
+bootstrap_apply_script_sha256: 305c4b515425575e2dc0e19de82562685cf54be1d71314ec04da89b0f53c2f79
 superseded_carrier_head_oid: d3aeeaaa8eba79526474580208dc253c4c46d26a
+superseded_intermediate_carrier_head_oid: e00d25954377200e73e7956c3f7a264dbd63bb7d
 exhausted_readiness_merge_oid: 9de9c63f7fe17069ad50ff0a73fc171ce6a14ec8
 declared_open_control_plane_operations: []
 non_agent_non_main_remote_refs: []
@@ -109,10 +110,10 @@ exact reviewed PR head and merge facts, avoiding a self-reference.
 | CHG-2026-030 `verification.md` | `49f284b397006fa8626e76ec2fa51f5d9a88e307` |
 | CHG-2026-033 `proposal.md` | `3a5476dc785a2f824e15caca379f0caf78880233` |
 | CHG-2026-033 `design.md` | `99d93a3be78ec0d21d789d0f6824b18f6b1813a1` |
-| CHG-2026-033 `tasks.md` | `9ff1addd3ccda3ee537eddbb017ef7a093dfb6b5` |
+| CHG-2026-033 `tasks.md` | `10b095e34a35c06489cbbaea628502fcd51f230f` |
 | CHG-2026-033 `verification.md` | `48a990bba60ea4e7679cf08d01c247fee0a98ac4` |
 | CHG-2026-033 `acceptance-cases.yaml` | `3f0355894d0c18c26576042d11b34b9cb3732297` |
-| TASK-RPT-001 fail-closed evidence | `6637ae3d190aca9afcd1557dbbf5275a54047d7a` |
+| TASK-RPT-001 fail-closed evidence | `94b7814c7cf795fa87b5c06105f7502c11c8940c` |
 | `openspec/governance/enforcement.md` | `e8ff3c130e1b8b15f8405d150ad567e774a0d82b` |
 | `openspec/governance/host-loop-runbook.md` | `70e0bcc5b736a896f0329e24a89e273164762558` |
 
@@ -300,7 +301,7 @@ receipt are not valid preflight inputs.
 ## G. Exact execution order
 
 1. Verify the executor bytes have SHA-256
-   `96f8fefb793d5cc0d0de09699cd8f9fe6d1a4a2d597b8ce8121e1cb031c262bf`,
+   `305c4b515425575e2dc0e19de82562685cf54be1d71314ec04da89b0f53c2f79`,
    enter the window in a separate human Terminal and authenticate as exact
    `lvye`; no credential value may be copied to Agent-visible output.
 2. Perform all Section F GET-only checks. Mutation counters remain zero until
@@ -384,3 +385,7 @@ payload, and retain overlap-first migration and ruleset-first rollback.
 - PR #459 old head
   `d3aeeaaa8eba79526474580208dc253c4c46d26a` remains a superseded carrier
   provenance fact, not an implementation candidate.
+- PR #459 intermediate head
+  `e00d25954377200e73e7956c3f7a264dbd63bb7d` and its expected
+  `allowed-paths` parser failure remain provenance facts, not executable
+  authority.

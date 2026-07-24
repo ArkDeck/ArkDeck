@@ -312,6 +312,47 @@ It does not approve the draft, restore the Actions setting, or authorize any
 ruleset/main-protection mutation. Governance authority begins only if the
 updated #459 exact head is reviewed and merged by `lvye`.
 
+## Bootstrap carrier allowed-paths fail-closed correction
+
+The first authorized replacement of #459 used head
+`e00d25954377200e73e7956c3f7a264dbd63bb7d`. Public read-back confirmed:
+
+```text
+state: open
+author: github-actions[bot] (ID 41898282)
+base: main / 9de9c63f7fe17069ad50ff0a73fc171ce6a14ec8
+changed files: exact authorized seven-file set
+guard (push): success
+guard (pull_request): success
+open-pr (push): success
+allowed-paths (pull_request): failure
+```
+
+After the human changed the title/body to the exact bootstrap scope, the
+pull-request `allowed-paths` check reran and still failed. The public check
+annotation exposed only `Process completed with exit code 1`; local execution
+of the same pinned `scripts/check_pr_paths.py` against the exact base/head and
+PR metadata reproduced the complete cause:
+
+```text
+declared task TASK-RPT-001 has paths outside Allowed paths:
+  openspec/changes/chg-2026-033-ref-protection-topology/acceptance-cases.yaml
+  openspec/changes/chg-2026-033-ref-protection-topology/design.md
+  openspec/changes/chg-2026-033-ref-protection-topology/verification.md
+```
+
+The human-readable task scope already authorized all three files, but its
+machine-readable list wrote `本 change` only before the first backtick token.
+The parser therefore expanded `proposal.md` relative to CHG-2026-033 while
+interpreting the remaining three tokens as repository-root paths. No scope was
+added: the correction repeats `本 change` before each already-authorized path
+and repins the task/evidence/executor hashes.
+
+No review, merge, ruleset, branch-protection, repository setting, credential or
+ref-probe mutation occurred. Main remained
+`9de9c63f7fe17069ad50ff0a73fc171ce6a14ec8`. The intermediate head is retained
+here as provenance and is not executable authority.
+
 ## Remediation boundary
 
 - Do not rerun either script or reuse #467's OID, window, payload/hash,
