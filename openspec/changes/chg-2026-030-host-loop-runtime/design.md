@@ -1,7 +1,7 @@
 # CHG-2026-030 Design — host-loop runtime
 
 > Status:draft
-> Change:CHG-2026-030-host-loop-runtime@r9
+> Change:CHG-2026-030-host-loop-runtime@r10
 > 本设计只约束本 change 的候选实现。与 Constitution、AGENTS.md、
 > enforcement.md 或 CHG-2026-027 冲突时，停止并以高层规则为准。
 
@@ -383,7 +383,7 @@ identity/scheduler。
 inputs 而 supersede 本节的 exact refs/pins/UUID。本节继续证明 r8 当时批准了什么，
 但不再是 executable readiness；fresh canary 只能在 TASK-HLR-001A done 后重建。
 
-## 1H. Automatic checks for `GITHUB_TOKEN`-created Agent PRs（r9 current）
+## 1H. Automatic checks for `GITHUB_TOKEN`-created Agent PRs（r9 active baseline）
 
 GitHub current semantics deliberately create approval-required
 `pull_request` runs when a workflow uses its repository `GITHUB_TOKEN` to
@@ -440,6 +440,61 @@ unchanged and does not become approval authority.
   contribution path requires an explicit event/approval policy and separate
   evidence. `pull_request_target` is forbidden because running or importing
   untrusted head content in base context would enlarge the trust boundary.
+
+## 1I. Fresh automatic-check creator canary（r10 current readiness）
+
+r10 consumes the completed TASK-HLR-001A baseline instead of replaying the
+r8 plan. Its audit base is protected main
+`47cec786315e79e0aad8a3209c6a7c600e6cfc60`, and its only mutable live targets
+are:
+
+```text
+reserved: agent/host-loop/probes/7e9bc001-c515-4aef-b3dc-c71d7f0124ee
+ordinary: agent/hlr-002a-control/4a2314d2-72c3-44f8-b579-606735e279b8
+evidence: agent/task-hlr-002a-canary-evidence-r10
+```
+
+The readiness carrier itself is governance-only. Apart from the existing
+Agent branch/PR transport needed to submit that carrier, it performs zero
+target-ref, extra PR-state, setting or credential writes. After the carrier
+has an exact-head `lvye` approval and protected-main squash merge, its merge
+OID becomes the common parent and tree for two distinct empty commits. Both
+subjects identify `TASK-HLR-002A` and contain no Actions skip instruction.
+
+The fail-closed state machine is:
+
+1. Re-read current main, the pinned workflow/parser/governance blobs, all open
+   PR files and every remote branch. Require both target refs and the evidence
+   branch to be absent and require no overlapping PR.
+2. Push reserved with the Agent Deploy Key. Require exact-head push SDD Guard
+   `guard=success` and Swift CI `swift=success`; query Agent PR by exact
+   workflow path, `event=push`, branch and head and require zero runs. Query
+   all-state PRs by exact same-repository head and require zero PRs.
+3. Re-read main, pins and reserved facts. Only then push ordinary. Require
+   exact-head push SDD Guard and Swift success; require exactly one successful
+   Agent PR run with successful `open-pr` and `allowed-paths` jobs; require
+   exactly one open, unmerged, exact-head/base-main PR authored by
+   `github-actions[bot]`.
+4. Before cleanup, repeat the reserved zero-run/zero-PR queries and the
+   ordinary unique-run/unique-PR queries with complete pagination. Record
+   request filters, full OIDs, run/job/PR IDs, conclusions and timestamps.
+5. Delete ordinary and then reserved using only the Deploy Key. Confirm each
+   Git receipt and stable `ls-remote` absence. The ordinary PR must be
+   closed/unmerged; if deletion does not close it, record the residual and
+   stop for independent human closure.
+
+An `action_required` pull-request run is not expected or needed for this
+push-based canary. Its appearance, any 0/2 ordinary creator, any reserved
+creator, a missing required push job, ref push/delete ambiguity, main/input/
+overlap drift, incomplete pagination or API ambiguity stops the state machine.
+Cleanup preserves the observed PASS/FAIL and never repairs missing evidence.
+
+The protection topology is consumed, not modified: ruleset `19595282`
+continues to guard ordinary non-main refs while exact-main branch protection
+enforces PR, human CODEOWNER review, App `15368` `guard`, administrators,
+human-only push restriction and force/delete prohibitions. Any live result
+inconsistent with the merged CHG-2026-033 authenticated evidence returns the
+work to that change; r10 must not mutate or reinterpret protection settings.
 
 ## 2. PR envelope
 

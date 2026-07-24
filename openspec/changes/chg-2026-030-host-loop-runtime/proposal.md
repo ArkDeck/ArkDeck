@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-030-host-loop-runtime
-revision: 9
-status: approved # r1 #361、r2 #405、r3 #407、r4 #415、r5 #423、r6 #449、r7 #456、r8 #480 已批准；r9 automatic Agent-PR checks 仅在维护者 review/merge 本 PR 后生效
+revision: 10
+status: approved # r1 #361、r2 #405、r3 #407、r4 #415、r5 #423、r6 #449、r7 #456、r8 #480、r9 #483 已批准；r10 fresh HLR-002A canary readiness 仅在维护者 review/merge 本 PR 后生效
 class: implementation-only
 core_change_level: none
 owner: lvye
@@ -10,6 +10,17 @@ platforms: [macos]
 ---
 
 # Host-loop runtime：为 Agent PR 建立可恢复的 worker/reviewer 双循环
+
+> r10 resume gate（2026-07-25）：TASK-HLR-001A implementation #485 merge
+> `cae9a4c378b75409a4d7a31205583560f17d73aa`、fresh live evidence #490
+> merge `89ce135c109871c5428022ad0620a383430635dc` 与 done #495 merge
+> `1815105971b5ec9bee58cb7be04cd759dc01a32b` 已闭合 automatic exact-head
+> checks；#488 的 partial PASS/final failure 继续如实保留。最新 discovery audit
+> base 为 protected main `47cec786315e79e0aad8a3209c6a7c600e6cfc60`。本 r10
+> 只重建 HLR-002A creator canary 的全新 refs/UUID/pins 与 fail-closed 执行边界；
+> 合入前 reserved/ordinary canary dispatch = 0；除提交本 governance carrier
+> 所需的既有 Agent branch/PR transport 外，额外 ref/PR-state、ruleset、branch
+> protection、repository setting 与 credential mutation = 0。
 
 > r9 stop gate（2026-07-24）：r8 revision/readiness #480 exact reviewed head
 > `fea214bac75711c075f6a023086688eee28822d3` 已由 `lvye` APPROVED，并以
@@ -175,6 +186,12 @@ bot-created PR event 无人值守取得结果：GitHub 对 `GITHUB_TOKEN` 创建
   `edited`/`reopened` metadata revalidation。r9 不增加 App/PAT/private key，
   不改变 main protection、required `guard`、CODEOWNER、批准/合并或 credential
   boundary。
+- r10 在 TASK-HLR-001A done 后，从最新 protected main 重建 HLR-002A
+  canary-only readiness。它固定全新 reserved/ordinary UUID refs、当前 automatic
+  workflow/parser blobs、merged topology evidence hashes、全部 open PR/remote
+  ref overlap、严格的 reserved-first/ordinary-second run/PR 查询和 cleanup
+  顺序。本 revision 只修改本 change 四份治理文档；canary 写入、evidence 与
+  `ready→done` 仍分别位于后续独立阶段。
 - reviewer loop 仅调度并记录独立 AI 合前 review（`APPROVE` / `REQUEST_CHANGES` /
   `BLOCKED`）；它不作 GitHub approval、不 merge、不改变 change/task 状态。通过
   checks 与独立 review 后，worker 才可按 CHG-2026-027 将 digest 放入 batch Issue；
@@ -271,15 +288,16 @@ Observable behavior before/after:
 真实 proposal 形态，只有在实际 `pull_request` allowed-paths job 绿色时，才可由
 CHG-2026-028 `MECH-004` evidence 如实引用；未出现该 run 不得预填为 live evidence。
 
-r1 的 TASK-HLR-001 已 done；r9 新增 TASK-HLR-001A，须在独立
-implementation/evidence 与 done PR 后，重新为 HLR-002A 制定 fresh canary
-readiness。HLR-002A implementation #419 已合入，但 live canary
+r1 的 TASK-HLR-001 与 r9 的 TASK-HLR-001A 已 done；r10 从最新 protected
+main 重新为 HLR-002A 制定 fresh canary readiness。HLR-002A implementation
+#419 已合入，但 live canary
 #421 = FAIL。#435 从未产生 D2 receipt/PASS；#449/r6 与 #454 readiness 已由 r7
 supersede，TASK-HLR-002B 作为不可复用的历史 tombstone 保持 `blocked`，不进入
 implementation/evidence/done。r8 已批准的 canary-only readiness 因 r9 将改变
-sensitive workflow blobs 而 superseded；r8 refs/UUID 不执行。TASK-HLR-001A done
-后须再以独立 D1 readiness 生成全新 HLR-002A refs/pins；canary/evidence 使用后一
-独立 PR，其合入后再以独立 D0 PR `ready→done`。HLR-002A done 后才进入
+sensitive workflow blobs 而 superseded；r8 refs/UUID 不执行。只有本 r10
+独立 D1 readiness 经维护者 review/merge 后，才可使用其全新 HLR-002A
+refs/pins 执行 canary；evidence 使用后一独立 PR，其合入后再以独立 D0 PR
+`ready→done`。HLR-002A done 后才进入
 TASK-HLR-002。worker migration、review/recovery 与 live pilot 再按顺序推进。每个
 PR 仍独立 review/merge；D1/D2 判断门后不做投机性成 PR 工作；change
 `verified` 只能在七个 active task 与六条 acceptance 均有可复查 evidence 后以
@@ -481,3 +499,31 @@ PR 仍独立 review/merge；D1/D2 判断门后不做投机性成 PR 工作；cha
   `ready→blocked`。TASK-HLR-001A done 后才能从届时最新 protected main 生成
   全新 HLR-002A canary refs/readiness；不得把 #480/r8 的 refs、pins、runs 或
   workflow behavior 补跑为 r9 PASS。
+
+## r10 approval and readiness boundary
+
+- 本 revision 是 TASK-HLR-001A done 后的 compatible D1 readiness；只修改本
+  change 的 proposal/design/tasks/verification。它不修改 workflow、parser、
+  evidence、ruleset、branch protection、repository setting、credential、
+  integration identity 或 scheduler，也不执行 canary；除提交本 governance
+  carrier 的既有 Agent branch/PR transport 外，不产生额外 ref/PR-state write。
+- 维护者对本 PR exact head review/merge 后，才批准 tasks.md 中 r10 HLR-002A
+  canary-only readiness 并使该任务 `blocked→ready`。执行只允许使用
+  `agent/host-loop/probes/7e9bc001-c515-4aef-b3dc-c71d7f0124ee` 与
+  `agent/hlr-002a-control/4a2314d2-72c3-44f8-b579-606735e279b8`，且以
+  reviewed readiness squash merge OID 作为共同 parent/tree，严格先 reserved、
+  后 ordinary。
+- 两个 exact head 都必须取得 push `guard` 与 Swift success；reserved 必须两次
+  证明 legacy `agent-pr` run/PR 均为 0；ordinary 必须恰有一个 successful
+  `agent-pr` run、其 `open-pr`/`allowed-paths` jobs success，且恰有一个
+  `github-actions[bot]` open PR。所有查询按 workflow path/event/branch/head 和
+  all-state exact-head PR 完整分页；缺失、重复、漂移或 API ambiguity 均停止。
+- 成功事实固定后才可用 Deploy Key 删除 ordinary、再删除 reserved，并复核 refs
+  absent 与 ordinary PR closed/unmerged。若 PR 未随 ref 删除自动关闭，只登记
+  residual 并请求人类独立关闭；Agent 不 review、merge、enable auto-merge 或借用
+  维护者凭据。
+- 本 r10 merge 不构成 canary PASS、TASK-HLR-002A done 或 change verified。
+  canary evidence 必须走独立
+  `agent/task-hlr-002a-canary-evidence-r10` PR，随后才可另起 D0
+  `ready→done` PR；旧 #421/#435/#454 与 r8 的 OID/window/payload/hash/ref/UUID
+  永久只作历史。
