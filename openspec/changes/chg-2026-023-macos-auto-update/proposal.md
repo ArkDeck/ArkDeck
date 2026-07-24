@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-023-macos-auto-update
 revision: 1
-status: approved # 2026-07-21 本 approval-only PR(先例 #226/#253/#254);r1 proposal 经 #262 合入 main `e9a4989`;批准由维护者 review/merge 本 PR 构成
+status: verified # 2026-07-24 本 verification-closure PR；approval #266 merge `21b5b9975beb960ba4f57a78a59d6246a4f86b0b`；两 task done 与三条 change-local AC 见 Verification closure；仅在维护者 review/merge 本 PR 后生效，archive 另行。原注:r1 proposal 经 #262 合入 `e9a4989`
 class: platform
 core_change_level: none
 owner: lvye
@@ -79,3 +79,96 @@ V2 治理:本 propose PR 合入仅登记提案;批准须独立 approval-only PR;
   `ready`;不引入任何依赖(依赖决策属 AU-001 选型 + AU-002 readiness 的
   pin 方案);verified 前手动公证 DMG 过渡通道保持。不构成 release、兼容性或
   支持声明。
+
+## Verification closure（2026-07-24）
+
+依 `verification.md` Gate 于 protected `main`
+`dbb15236cc1dae63398ceff8a697d5d8b24c9ead` 逐项独立复核。本 PR 是 D0
+状态推进，只修改本 proposal 的状态/evidence 引用与 `verification.md` 抬头，
+零实现、零 evidence 改写、零 release/publish；`verified` 仅在维护者
+review/merge 本 PR 后生效。
+
+### 批准、任务与证据链
+
+- change approval：#266 merge
+  `21b5b9975beb960ba4f57a78a59d6246a4f86b0b`；
+- TASK-AU-001：evaluation/evidence #429 merge
+  `a8084cd1a77205b7014c45e7733445c30642ffd9`，done #430 merge
+  `2ee97120c27e178ed9e54a0cf4a59b4d7413fae4`；
+- TASK-AU-002：readiness #447 merge
+  `b8a6656ad2d04ead59443053cd646e31907c873c`，implementation/evidence #457
+  merge `9ae1bbd2d3351a2b6980255d0eef55078d09cd37`，done #486 merge
+  `dbb15236cc1dae63398ceff8a697d5d8b24c9ead`。
+
+上述 OID 全部是 verify base 的 ancestor。#457 final head 与 merge tree 相同；
+#486 已由 `lvye` 对 exact head
+`f0046fb25804bd2471dc41ee228dbc458adfae5a` APPROVE 后合入。早先被
+CHG-2026-033 bootstrap 显式替换的 PR #466 original head 不承载本状态的批准语义。
+closure carrier 随后快进到 main
+`26c59d0798374db26dc9b5d892620843435faf0f`；新增 #487 只修改
+CHG-2026-026 evidence，与本 change、App、updater、package、CLI、logger、
+测试及发布规程路径均零重叠，AU 验证输入无漂移。
+
+### `AU-EVAL-001` — **passed**（documentReview）
+
+`evidence/runs/TASK-AU-001/evaluation.md`、`sources.md` 与 `run.md` 的 merge
+blob 仍精确为
+`fcbfa0dd23220b833e3a2b4eef28129ea88b3a0f`、
+`2efee2309b7eb59cc0ed7f5fe6e036756c174322`、
+`e897ec3d938225483491ce10735ce3aebd8c85b4`。五维评估均含可追溯
+fact/source/consequence/uncertainty；推荐最小自研
+check + download + verify + Finder handoff，并明确排除 Sparkle 2.9.4
+`EdDSA OR code signing` 与新增 dependency/XPC/entitlement 面。评估自身
+third-party download/execution/dependency change = 0。
+
+### `AU-CONTRACT-001` — **passed**（contract）
+
+证据：`evidence/runs/TASK-AU-002/run.md`（merge blob
+`91bff70f3619de5e7c795dc439f7da837e19f94a`）。verify base 独立重跑
+`AutoUpdateContractTests` = **17 tests / 0 failures**：
+
+- 缺失/坏/错 key/错 signer 签名、unknown/duplicate/noncanonical feed、
+  downgrade/replay/expiry、非法 URL/redirect 全部 fail closed；
+- overflow/truncate/digest mismatch/interruption/cancel 均清理 partial；
+  unsigned/different-Team、下载后替换、owner-writable mutation、缺少最终同意
+  均使 Finder handoff = 0，installed-byte sentinel 不变；
+- positive 路径仍需“用户启动下载 + 最终独立同意”两次动作，自动检查不会下载；
+- entitlement 精确为 ADR-0002 六项，external package/XPC/helper/private-key
+  material = 0。
+
+Security.framework production 路径由 SwiftPM 与 Xcode 编译；unsigned/
+different-Team 矩阵在 typed code-signing seam 上以 `contractFake` 验证。本
+closure 没有 Developer ID/notarized DMG fixture，不把该结果写成真实
+Team-signed 制品、notarization 或 release 验收。
+
+### `AU-PRIVACY-001` — **passed**（contract）
+
+同一 17-test suite 通过 URLProtocol 捕获实际 `URLSession` feed/artifact/
+redirect request：初始产品字段精确为
+`{appVersion,osVersion,arch}`；redirect 移除三字段；仅固定
+`Accept`/`User-Agent`，body/cookie/Authorization/credential = 0。App 披露文案
+与该白名单一致，设备/硬件标识、用户路径、locale 与 telemetry 字段 = 0。
+
+### 共同门与回归
+
+- `CI=true swift test --package-path Packages/ArkDeckKit` =
+  **400 tests / 1 个既有 opt-in manual sleep/wake skip / 0 failures**；
+- macOS Xcode Debug no-sign build PASS；
+- `scripts/check-sdd.sh` = 0 errors / 0 warnings / 111 acceptance IDs；
+  `git diff --check` PASS；
+- `ArkDeckApp.entitlements` 恰为六个 `true` key；`Package.resolved`、
+  `.package(` 与 `XCRemoteSwiftPackageReference` 均不存在；
+- `docs/release/macos-auto-update.md`（blob
+  `ecc8d8a02dbe37d66ca1716aeeafa1491f3a7af8`）固定 archive/sign/notarize/
+  staple/static verify/digest/隔离交互签名/self-verify/fetch-back/feed-last 顺序；
+  本次 production private-key access/sign、真实 feed/artifact network、
+  upload/publish、DMG mount/open/install/App replacement、production Finder
+  handoff 全部为 0。
+
+### verified 的边界
+
+本 closure 满足 ADR-0002 release gate #3（自动更新 change verified），但不
+构成 ArkDeck release，也不满足或替代其余 Developer ID、clean-host/clean-VM、
+distribution profile 等 release gates；不改变 platform conformance/support/
+compatibility 状态，不声称真实 Team-signed DMG positive acceptance。release、
+feed publish 与 change archive 均须后续独立流程。
