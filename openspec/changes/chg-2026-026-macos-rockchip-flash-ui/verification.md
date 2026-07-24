@@ -1,9 +1,9 @@
 # Verification Plan — CHG-2026-026
 
-> Change:CHG-2026-026@r2
+> Change:CHG-2026-026@r3
 > Status:planned
-> Note(2026-07-24):r2 仅增加 clean discovery tool repin、修正 001/001A 循环依赖并
-> 钉定一次 E1 characterization window；Core/AC/schema 不变。
+> Note(2026-07-24):r3 只增加 discovery/destructive identity namespace separation；
+> r2 clean repin、001A D2 window、Core/AC/schema 均不变。
 
 ## Environment
 
@@ -12,8 +12,9 @@
 - Platform：macOS 14+；Swift 6；signed Sandboxed Developer ID/Hardened Runtime App 形态。
 - Tool：TASK-RKFUI-001/001A 的 read-only discovery 使用外部用户选择的 clean
   `rkdeveloptool ver 1.32` / SHA-256 `bbd7bdc0…9923` / upstream `304f0737…`，且
-  version/hash/trust 与 r2 后的 Rockchip registry 完全匹配；既有 destructive
-  Provider/Profile 继续 pin `038a8a0e…3611`，r2 不构成 destructive repin。生产不使用
+  version/hash/trust 与 r2 后的 Rockchip registry 完全匹配。r3 要求该 identity 只存在于
+  read-only discovery namespace；既有 destructive Provider/Profile/authorization/execution/
+  manifest 继续只接受 `038a8a0e…3611`，r2/r3 均不构成 destructive repin。生产不使用
   BlueTool/upgrade_tool。
 - Fixtures：fake rkdeveloptool、版本化 `ld/ppt/wlx/rd` stdout/stderr、valid/corrupt/drift/
   path-traversal tar.gz、journal crash points、postflight observations。
@@ -64,6 +65,9 @@
 - Archive：hash/size/member drift、缺失/重复成员、corrupt gzip/tar、absolute/`..` path、
   symlink/hardlink/device entry、trailing payload、ENOSPC/read-only volume/bookmark expiry。
 - Authorization：旧 plan、旧 binding、错误 physical target、取消/不完整双确认、非交互 authority。
+- Identity separation：discovery closure 残留旧 hash、destructive closure 引用新 hash、
+  shared default 被任一 destructive consumer 使用、manifest/toolchain mismatch → blocked，
+  device/destructive dispatch 0。
 - Process：每个 intent/outcome 窗口 crash；exit nonzero、exit0 无 marker、partial marker、无限输出、
   timeout、disconnect、sleep/wake。
 - Cancellation：preflight immediate、写前 immediate、`wlx` critical deferred、safe boundary 后停止。
@@ -78,6 +82,9 @@
 - r2 clean discovery repin 若未在 registry/resource closure/Swift/Python probe 四面原子完成，
   或当前 artifact/firmware/HDC/binding 与 readiness pins 任一漂移，001/001A 均 fail closed；
   不得回退到 quarantined artifact、接受两个 hash 或用 destructive Provider 的旧 pin 冒充。
+- r3 separation 后若只跑 discovery 定向测试而完整 Swift suite 的 destructive
+  authorization/execution/manifest contract 未通过，不得提交 implementation PR；不得通过
+  修改 locked manifest、扩大 accepted hash 或把 destructive pin 改为 clean hash 消除失败。
 - `REQ-FLASH-015` 交互式 App executor 解释未获维护者明确确认时，execute 不实现；不得把
   plan-only/handoff 记作一键真机刷机。
 - DAYU200 exact combination 的 `reboot loader` E1 capability 未证明 supported 时，Route B

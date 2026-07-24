@@ -7,6 +7,10 @@
 > r2（2026-07-24，on merge）只起草 discovery clean-tool repin authority、修正
 > TASK-RKFUI-001↔001A 的循环依赖，并把 001A 在精确 D2 pins 下 `blocked→ready`。本 PR
 > 不携带 repin/probe implementation 或设备 run；后续仍按任务分别提交独立 PR。
+>
+> r3（2026-07-24，on merge）只修正 discovery/destructive identity namespace 与精确
+> Allowed paths。它不修改两个 tool hash、001A D2 window 或任务状态；本 PR 仍不携带
+> implementation 或设备 run。
 
 ## TASK-RKFUI-001 — RockUSB discovery contract 与 signed Sandbox E0 access spike
 
@@ -91,6 +95,58 @@
     `1f7cacda22ed6cef97d4a25ed63c3e4aa890cbb6`、
     `92eb2876bfe9dcd0ffadf1d0318b9b7b05c93857`、
     `f7fa0945f70730bca601f81955a3faea411a19f3`；任一漂移即停止并重做 readiness。
+- Identity namespace remediation（proposal r3；仅在维护者 review/merge 本独立
+  governance PR 后生效）：
+  - 2026-07-24 在 protected `main`
+    `73b46b684b27eda23cfbaad06c5b707bff39e2cc` 上预跑 r2 implementation：Python probe
+    `7/7`、Swift discovery `6/6` 通过，但完整 Swift suite `382` tests 中 destructive
+    manifest contract 唯一失败，报错
+    `rockchip toolchain does not match the pinned integration profile`。device/HDC/`ld`
+    dispatch 均为 0；证据见
+    `evidence/runs/TASK-RKFUI-001/identity-separation-preflight-2026-07-24.md`。
+  - Root cause：`RockchipDiscoveryIntegrationProfile.pinnedProduction` 同时被 standalone
+    discovery、`RockchipAuthorizationFacts` 与 `RockchipFlashExecutionHost` 消费。按 r2
+    在 `RockchipDeviceDiscovery.swift` 删除旧 pin 会让 destructive admission/execution
+    继承 clean hash；保留旧 pin 又违反 discovery closure “任一旧 pin 残留即失败”。现有
+    Allowed/Forbidden paths 无法同时满足两个已批准边界。
+  - r3 只授权 namespace separation：read-only discovery identity 固定
+    `bbd7bdc0…9923`；`RockchipFlashProfile.swift` 成为 destructive
+    `038a8a0e…3611` 的唯一 Workflows identity source；Authorization/Execution 只迁移
+    常量引用和 destructive preflight profile injection，不修改 argv、控制流、Provider
+    plan、authorization 条件、manifest shape 或任何 dispatch authority。
+  - 精确新增 Allowed paths：
+    - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipFlashProfile.swift`（只新增/集中
+      destructive tool identity 常量；archive/member/partition/prerequisite 数据零修改）；
+    - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipAuthorizationFacts.swift`（只把
+      destructive profile/version/hash 引用迁到 Flash identity）；
+    - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipFlashExecutionHost.swift`（只把
+      destructive identity 引用与 destructive `ld` preflight profile injection 迁到 Flash
+      identity；process argv、journal/manifest shape 与 step flow 零修改）；
+    - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/AuthorizationAdmissionContractTests.swift`
+      （只同步 destructive fixture identity）。
+  - Read-only invariant：`Packages/ArkDeckKit/Sources/ArkDeckStorage/SessionManifest.swift`
+    保持 forbidden/read-only，继续独立要求旧 hash；不得靠修改 validator 让 full suite 通过。
+    `RockchipRockUSBFlashProvider.swift`、specs/contracts/App 也继续 forbidden。
+  - Input base = r3 governance audit `main`
+    `5f34a2aa376bd3677b69ba14410f265f1a29aaf7`。discovery
+    source/test/probe/registry blobs 仍为
+    `67f585324d002f80c2682a1bdaa9ae7d11ed035a` /
+    `1f7cacda22ed6cef97d4a25ed63c3e4aa890cbb6` /
+    `92eb2876bfe9dcd0ffadf1d0318b9b7b05c93857` /
+    `f7fa0945f70730bca601f81955a3faea411a19f3`；
+    Flash Profile/Authorization/Execution/authorization-test/locked-manifest 分别为
+    `de82a3a008b95ef63148f7c9e4374298e6671328` /
+    `971fe98feb9c9f5debf4abef948420383570f8ef` /
+    `50c23bf2b431bcae0fa4beb90f315a456957cc0c` /
+    `b8cc11c91248437c13b8ce7214759e9bd750243e` /
+    `87baadf3cd228660acb9923463cf288e90de6934`。implementation 开始前任一 blob 漂移即
+    停止并重做 readiness。
+  - Verification gate：新增闭包测试同时断言 discovery 无旧 pin、destructive 无新 pin，
+    并要求 Python probe、discovery 定向 Swift、完整 Swift suite、SDD guard 与
+    `git diff --check` 全部通过。完整 suite 任一 destructive contract 失败即不得推送。
+  - r3 PR 是 D1 governance-only 判断门。合入前当前 implementation 不推送、不建 PR；
+    device/HDC/`ld` dispatch 0。合入后 implementation+host evidence 仍是单独 PR，
+    TASK-RKFUI-001 保持 `ready` 而非 `done`，001A 本轮窗口与 `maxRuns=1` 不变。
 - Platform:macos
 - Requirements:`REQ-FLASH-001`、`REQ-UX-007`、`POL-WORKFLOW-001`
 - Acceptance:`AC-FLASH-001-01`、`AC-UX-007-01`
@@ -99,9 +155,17 @@
   - `openspec/integrations/rockchip/**`
   - `Packages/ArkDeckKit/Package.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipDeviceDiscovery.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipFlashProfile.swift`（仅 proposal r3
+    identity namespace remediation 所列 destructive tool identity 常量）
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipAuthorizationFacts.swift`（仅 proposal
+    r3 所列 destructive identity 引用）
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipFlashExecutionHost.swift`（仅 proposal
+    r3 所列 destructive identity 引用与 preflight profile injection）
   - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/ArkDeckContractTests.swift`（仅更新
     `declaredPackageDependencies` 的硬编码 target 依赖表，使 `ArkDeckWorkflows` 与已批准的
     `Package.swift` 依赖声明一致；禁止其他修改）
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/AuthorizationAdmissionContractTests.swift`
+    （仅 proposal r3 所列 destructive fixture identity）
   - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/RockchipDeviceDiscoveryContractTests.swift`
   - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/Rockchip/**`
   - `scripts/rockchip_e0_probe/**`
@@ -109,8 +173,8 @@
 - Forbidden paths:
   - `openspec/constitution.md`
   - `openspec/specs/**`
+  - `Packages/ArkDeckKit/Sources/ArkDeckStorage/SessionManifest.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipRockUSBFlashProvider.swift`
-  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipFlashProfile.swift`
   - `ArkDeckApp/**`
 - Risk:medium（E0/read-only 真机 probe；零 mode switch、零 mutation/destructive）
 - Hardware required:yes（E0 窗口；contract/fixture no）

@@ -2,9 +2,9 @@
 
 ## Context and constraints
 
-- Proposal revision：r2，r1 已 `approved`；r2 的 clean discovery tool repin、依赖修正与
-  TASK-RKFUI-001A D2 window 只在维护者 review/merge r2 PR 后生效。合入前新增 scope
-  blocked，零 E1 dispatch。
+- Proposal revision：r3；r1 已由 PR #298 批准，r2 已由 PR #440 批准。r3 只修正
+  discovery/destructive identity namespace 与 allowed paths，不改变 r2 tool values、
+  TASK-RKFUI-001A D2 window 或 Core/AC/schema。r3 合入前对应实现 blocked，零 E1 dispatch。
 - Core baseline：`CORE-2.0.0`，叠加实现开始时已批准并适用的 scoped delta。
 - Related specs：flashing、desktop UX、device targeting、workflow journal/recovery、
   session/artifact/storage、macOS platform profile。
@@ -78,6 +78,35 @@ process executor、storage/power/binding/authorization ports；fixture compositi
    target 均不能 materialize 命令。
 6. execute 前重新运行 `ld`/HDC observation 并核对 selected observation、durable binding
    revision 和物理确认；LocationID 只能寻址，不能替代设备 identity。
+
+### Identity namespace separation
+
+r2 implementation preflight 证明现有 `RockchipDiscoveryIntegrationProfile.pinnedProduction`
+被两条语义不同的 lane 共享：standalone E0 discovery 与 destructive Flash
+admission/execution。直接改其 hash 会让 destructive manifest 从历史 pin 漂移。r3 固定如下
+单向依赖：
+
+```text
+read-only discovery registry/probe
+        -> Rockchip read-only discovery identity (bbd7…9923, ["ld"])
+
+destructive Flash Profile
+        -> Rockchip Flash toolchain identity (038a…3611)
+        -> authorization / execution / manifest validation
+```
+
+- read-only discovery source 不再承载或导出 destructive hash；canonical registry、fixture、
+  Swift adapter、Python harness 与 Sandbox probe app 必须一致。
+- destructive identity 的唯一 Workflows source 位于 `RockchipFlashProfile.swift`；它保留现有
+  profile identifier、reported version、hash 与 path source。authorization/execution 只能
+  引用该 source，不得借用 discovery default。
+- destructive lane 为确认既有工具/Loader observation 而执行的 `ld` 使用 Flash toolchain
+  identity；它不是 standalone E0 discovery successor，也不能让 clean discovery hash 获得
+  `ppt/wlx/rd` authority。
+- `ArkDeckStorage` locked manifest validator 保持独立、只读且继续固定旧 destructive hash，
+  防止 Workflows 常量误改被同层自证。
+- regression 必须同时证明 discovery closure 无旧 pin、destructive closure 无新 pin，并跑
+  完整 Swift suite；仅跑 discovery 定向测试不足以关闭该边界。
 
 ## Enter Loader routes and rebinding
 
