@@ -29,15 +29,33 @@
 
 ## Live result gate
 
-本 initial evidence commit 只建立可审计载体，不预填 live PASS。首次 push 后必须
-从 public GitHub API 固定以下事实，随后才可在同一 PR 的 evidence-only commit
-中判定：
+### Initial create path
 
-- exactly one open same-repository PR；`author=github-actions[bot]`，
-  base/ref/head OID 与本 branch 完全一致；
-- exact-head SDD Guard、Swift CI、Agent PR `open-pr` 与 `allowed-paths` 均自动
-  success；event 为 `push`，`pull_request`/`action_required` routine run = 0；
-- 不需要维护者点击 `Approve and run workflows`；
+- Evidence head:
+  `9f96b826dc44ac07f27502a09d33cdc39472c8a6`。
+- PR:#488，`author=github-actions[bot]`，same-repository，`state=open`，
+  base/ref/head exact
+  `cae9a4c378b75409a4d7a31205583560f17d73aa` /
+  `agent/task-hlr-001a-auto-ci-evidence` /
+  `9f96b826dc44ac07f27502a09d33cdc39472c8a6`。
+- SDD Guard push run `30101216857` = `success`；`guard` job
+  `89507438465` = `success`。
+- Swift CI push run `30101216875` = `success`；`swift` job
+  `89507439274` = `success`。
+- Agent PR push run `30101216895` = `success`：
+  - `open-pr` job `89507438511` = `success`；
+  - `allowed-paths` job `89507483167` = `success`。
+- Exact-head Actions read-back returned `total_count=3`；all three events were
+  `push` and all conclusions were `success`。`pull_request` and
+  `action_required` count = 0；没有请求或使用 `Approve and run workflows`。
+- Create-path result:PASS。exactly one bot-authored PR and all four required
+  exact-head checks completed automatically。
+
+### Remaining gates
+
+本记录仍不宣告整体 `HLR-AUTOCI-001` PASS。后续 evidence-only push 与 human
+metadata event 必须固定以下事实：
+
 - existing-PR evidence-only push 仍复核同一 PR 且四项检查自动 success；
 - human edit/reopen 仍触发 base-defined metadata revalidation，且无需 workflow
   approval。
