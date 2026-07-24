@@ -6,9 +6,26 @@
 
 ## TASK-HLD-001 — 活跃 change 引用改为耐久形式
 
-- Status:ready（2026-07-23 D1 readiness r1；仅在维护者 review/merge 本独立 PR 后生效。
-  双前置全部闭合：① CHG-2026-032 经 approval-only PR #438 批准；② 本 readiness 钉定
-  手册 blob 与 19 条逐条待改清单。merge 前不得开 implementation/evidence PR）
+- Status:done（2026-07-23；仅在维护者 review/merge 本独立状态 PR 后生效。
+  implementation + evidence PR #441 已合入 protected `main`，squash merge OID
+  `b8f41066e0aa3a8d1343f805524f9c9439ff9c5c`；交付物
+  `openspec/planning/agent-failure-patterns.md` 与
+  `evidence/runs/TASK-HLD-001/run.md` 于该 merge 的 blob 与实现分支 head
+  `be495dd8885b5da6ce164f0bd47af92f6df7f4f3` **逐字一致**。done 不等于 change
+  `verified`：`HLD-DURABLE-001` 的最终结论仍需 change 级 verify PR 由维护者确认。）
+- Done recheck（在**合入版** `b8f41066e0aa3a8d1343f805524f9c9439ff9c5c` 上重跑，
+  非沿用实现 PR 的结论）：
+  - 活跃 change 相对链接 = **0**；`changes/archive/**` 类 = **16**（计数与内容零变化）；
+  - 新增 blob OID 11 个唯一值，`git cat-file -e` 逐个可解析，0 不可解析；
+  - 不动面：`AF-001`…`AF-018` ID 集合完整；H3 = 144 且八字段同序；
+    `Fact` 36 / `Inference` 18 / positive 18 / negative 18；`Currency` 18 行；
+  - **归档模拟**：chg-2026-006/008/022/025/026/028 六个被引用活跃 change 逐个验证，
+    各 **0 条可断项**；
+  - `scripts/check-sdd.sh` 0 error / 0 warning / 111 acceptance IDs。
+- Provenance 复核边界（**如实记录**）：TASK-BAP-003 凭据分离生效后 Agent 无维护者
+  `gh` 凭据，无法读取 #441 的 reviews/mergedBy。本次以 `git` 验证：squash commit
+  `b8f41066…` 在 protected `main` 上，两个交付物 blob 与实现 head 逐字一致。
+  **"由维护者 APPROVED"未经 Agent 独立验证**，由维护者 review 本状态 PR 时确认。
 - Readiness（r1，base = protected `main` `4675971ee132d0b94a7f0780e9987518489974bf`）：
   - **Approval/dependency gate:satisfied。**r1 proposal #437 合入
     `02b27b01246eaed4b230f3a2cfec6a72545c63ff`；approval-only #438 合入
