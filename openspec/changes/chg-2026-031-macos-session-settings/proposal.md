@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-031-macos-session-settings
 revision: 1
-status: proposed
+status: approved # 本 approval-only PR 经维护者 review/merge 后生效；r1 proposal 已由 #432 登记
 class: platform
 core_change_level: none
 owner: lvye
@@ -113,3 +113,23 @@ DEC-006 已决定 macOS 产品默认值：
 必须由独立 approval-only PR 完成；`TASK-SSET-001` 与 `TASK-SSET-002` 各自再走独立
 readiness、implementation/evidence 和 done PR。`TASK-SSET-002` 依赖
 `TASK-SSET-001 done`，不得在其判断门合入前投机形成 UI 实现 PR。
+
+## Approval
+
+- r1 proposal 已由 PR #432 登记：exact head
+  `f69ce61282118c530a1a7bf185dae38d8140c2af` 经维护者 `lvye` APPROVED，并以 merge
+  OID `2eb070353fc3343c604a5cba61d6fd16f865d365` 合入 protected `main`。该 merge
+  只登记 `status: proposed` 的 change package，不构成正式批准或 task readiness。
+- 正式批准由本 approval-only PR 将 `status: proposed → approved`，并仅在维护者对
+  exact head review/merge 后生效。批准范围封闭为 r1 的两个 host-only task、四条
+  change-local AC、DEC-006 精确默认值、security-scoped root、secure retention
+  catalog、shared storage runtime、用户确认后 apply + 实际 rescan、conservative
+  heavy-writer admission，以及 macOS Settings/signed UI contract。
+- 批准同时接受 `design.md` §0 的六条不变量，以及 `spec-impact.md` 中两项需判断的
+  macOS 产品解释：retention 自动 refresh/阻断但不自动删除；首次索引此前无 pin
+  入口的 valid finalized Session 时初始化为 unpinned，之后任何 metadata 缺失、损坏
+  或 identity mismatch 均按 preserved-unknown。
+- 本批准不授权产品实现或真实用户数据删除，不修改 Core/spec/locked schema，不新增
+  device authority。`TASK-SSET-001`、`TASK-SSET-002` 均保持 `blocked`，各自必须另走
+  independent readiness；尤其 `TASK-SSET-002` 在 `TASK-SSET-001 done` 前不得形成实现
+  PR。本 PR 零 code、test、evidence、task 状态和 platform support 变化。
