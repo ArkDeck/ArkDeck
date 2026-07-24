@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-033-ref-protection-topology
 revision: 1
-status: proposed
+status: approved # r1 proposal 经 PR #453 合入 main cecca155fa74a3304fa3d4b7b0ac8fcccc591f1d；本 approval-only PR 仅在维护者 review/merge 后生效
 class: implementation-only
 core_change_level: none
 owner: lvye
@@ -136,4 +136,20 @@ r7 合入前，r6 gateway/readiness/execution 的 dispatch 必须为 0。
 
 ## Approval
 
-无。仅允许独立 approval-only PR 记录维护者决定。
+- r1 proposal carrier：PR #453，head
+  `acb3e618b021cab128306341d7bedd62feef7a2c`，由维护者 `lvye` 合入 protected main
+  `cecca155fa74a3304fa3d4b7b0ac8fcccc591f1d`。该 merge 只登记 proposal，不构成
+  approval。
+- 本 approval-only PR 的维护者 review/merge 构成对下列范围的批准：
+  - Layer A ordinary-ref ruleset、Layer B exact-main branch protection、Layer C
+    identity/repository capability containment 三层缺一不可；
+  - ruleset、branch protection、repository setting 与 credential 变更只由人类维护者
+    在 Agent 不可达的隔离 session 中执行；
+  - 先以 CHG-2026-030 r7 supersede #449/r6 Agent-operated D2 gateway，再进入
+    TASK-RPT-001 独立 readiness；
+  - overlap-first migration、双 direct-main negative、ruleset-first rollback 与
+    execution/operability/done evidence separation；
+  - enforcement.md、AGENTS.md、Constitution 与 Core specs/contracts 零修改。
+- 本 merge 不使 TASK-RPT-001/002 `ready`，不创建 D2 authorization/window，不批准
+  payload/probe，不修改任何 GitHub control-plane/ref/credential，也不构成
+  `done`/`verified`。
