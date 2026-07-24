@@ -14,6 +14,12 @@ The production command surface is closed:
 - no `ppt`, `wlx`, `rd`, Flash, erase, format, unlock, update, host shell, `sudo`, helper, driver,
   ACL/group or system-rule mutation.
 
+CHG-2026-026 r4 registers two exact `ld` line-termination families: every non-empty record in
+one complete stdout uses LF, or every record uses CRLF. A final terminator is mandatory. Bare CR,
+mixed LF/CRLF, missing final terminators and empty records remain blocked. This normalization
+does not change device semantics: Maskrom and every non-`0x2207:0x350a + Loader` observation
+remain ineligible.
+
 Before dispatch the harness verifies the r3 window and every target/tool pin, acquires a
 per-target mutation lane, durably saves `OriginalTargetSnapshot`, revision-1
 `CurrentDeviceBinding`, impact confirmation, the global `maxRuns=1` reservation, and the exact
@@ -35,7 +41,8 @@ Host-only tests:
 python3 -m unittest scripts/rockchip_loader_transition_probe/test_probe.py -v
 ```
 
-Authorized real run (only while the r3 window is valid):
+Future E1 run (only while the r3 window is valid and after the r4 per-device typed capability
+evidence gate has been accepted through a maintainer-merged PR):
 
 ```bash
 python3 scripts/rockchip_loader_transition_probe/probe.py characterize \

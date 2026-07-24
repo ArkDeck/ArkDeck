@@ -5,7 +5,7 @@ import XCTest
 
 @testable import ArkDeckWorkflows
 
-/// TASK-RKFUI-001 contract/fake coverage only. The suite launches `/usr/bin/true`
+/// TASK-RKFUI-001/001B contract/fake coverage only. The suite launches `/usr/bin/true`
 /// as a no-output process control; it never invokes rkdeveloptool or accesses a device.
 final class RockchipDeviceDiscoveryContractTests: XCTestCase {
   private struct Registry: Decodable {
@@ -14,6 +14,7 @@ final class RockchipDeviceDiscoveryContractTests: XCTestCase {
     let registryId: String
     let registryVersion: String
     let integrationProfile: String
+    let revisedBy: String
     let unknownFamilyDisposition: String
     let toolContext: ToolContext
     let operation: Operation
@@ -29,6 +30,17 @@ final class RockchipDeviceDiscoveryContractTests: XCTestCase {
     }
 
     struct Operation: Decodable {
+      struct StdoutGrammar: Decodable {
+        let record: String
+        let registeredLineTerminators: [String]
+        let homogeneousLineTerminatorsRequired: Bool
+        let finalLineTerminatorRequired: Bool
+        let emptyRecordDisposition: String
+        let bareCarriageReturnDisposition: String
+        let mixedLineTerminatorDisposition: String
+        let missingFinalLineTerminatorDisposition: String
+      }
+
       let family: String
       let status: String
       let exactArgv: [String]
@@ -36,6 +48,7 @@ final class RockchipDeviceDiscoveryContractTests: XCTestCase {
       let timeoutMilliseconds: Int
       let maximumOutputBytes: Int
       let maximumDeviceCount: Int
+      let stdoutGrammar: StdoutGrammar
       let wholeOutputConsumed: Bool
       let duplicateDeviceNumberDisposition: String
       let duplicateLocationIDDisposition: String
@@ -79,6 +92,7 @@ final class RockchipDeviceDiscoveryContractTests: XCTestCase {
     XCTAssertEqual(registry.registryId, "ROCKCHIP-ROCKUSB-DISCOVERY")
     XCTAssertEqual(registry.registryVersion, "1.0.0")
     XCTAssertEqual(registry.integrationProfile, profile.identifier)
+    XCTAssertEqual(registry.revisedBy, "CHG-2026-026/TASK-RKFUI-001B")
     XCTAssertEqual(registry.unknownFamilyDisposition, "blocked")
     XCTAssertEqual(registry.toolContext.platform, "macos")
     XCTAssertEqual(registry.toolContext.reportedVersion, profile.reportedToolVersion)
@@ -105,6 +119,18 @@ final class RockchipDeviceDiscoveryContractTests: XCTestCase {
     XCTAssertEqual(registry.operation.timeoutMilliseconds, 5_000)
     XCTAssertEqual(registry.operation.maximumOutputBytes, 65_536)
     XCTAssertEqual(registry.operation.maximumDeviceCount, 64)
+    XCTAssertEqual(
+      registry.operation.stdoutGrammar.record,
+      "DevNo=<canonical-u32>\\tVid=0x<hex4>,Pid=0x<hex4>,LocationID=<canonical-u64>\\t<Loader|Maskrom>"
+    )
+    XCTAssertEqual(registry.operation.stdoutGrammar.registeredLineTerminators, ["LF", "CRLF"])
+    XCTAssertTrue(registry.operation.stdoutGrammar.homogeneousLineTerminatorsRequired)
+    XCTAssertTrue(registry.operation.stdoutGrammar.finalLineTerminatorRequired)
+    XCTAssertEqual(registry.operation.stdoutGrammar.emptyRecordDisposition, "blocked")
+    XCTAssertEqual(registry.operation.stdoutGrammar.bareCarriageReturnDisposition, "blocked")
+    XCTAssertEqual(registry.operation.stdoutGrammar.mixedLineTerminatorDisposition, "blocked")
+    XCTAssertEqual(
+      registry.operation.stdoutGrammar.missingFinalLineTerminatorDisposition, "blocked")
     XCTAssertTrue(registry.operation.wholeOutputConsumed)
     XCTAssertEqual(registry.operation.duplicateDeviceNumberDisposition, "blocked")
     XCTAssertEqual(registry.operation.duplicateLocationIDDisposition, "blocked")
@@ -122,7 +148,7 @@ final class RockchipDeviceDiscoveryContractTests: XCTestCase {
     XCTAssertEqual(manifest.schemaVersion, "1.0.0")
     XCTAssertEqual(manifest.registryId, registry.registryId)
     XCTAssertEqual(manifest.registryVersion, registry.registryVersion)
-    XCTAssertEqual(manifest.resources.count, 10)
+    XCTAssertEqual(manifest.resources.count, 17)
     XCTAssertEqual(Set(manifest.resources.map(\.id)).count, manifest.resources.count)
     let manifestPathPrefix =
       "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/Rockchip/Discovery/1.0.0/"
@@ -151,6 +177,10 @@ final class RockchipDeviceDiscoveryContractTests: XCTestCase {
     XCTAssertEqual(singleObservations[0].locationID, 2)
     XCTAssertEqual(singleObservations[0].mode, .loader)
     XCTAssertEqual(singleObservations[0].providerPreflightDisposition, .applicableLoader)
+    XCTAssertEqual(
+      RockchipLDOutputParser.parse(
+        stdout: try fixture("success-single-loader-crlf.stdout.bin")),
+      single)
 
     let multi = RockchipLDOutputParser.parse(stdout: try fixture("success-multi-device.stdout.bin"))
     guard case .observations(let multiObservations) = multi else {
@@ -161,12 +191,16 @@ final class RockchipDeviceDiscoveryContractTests: XCTestCase {
     XCTAssertEqual(multiObservations.map(\.locationID), [2, 5])
     XCTAssertEqual(multiObservations.map(\.mode), [.loader, .maskrom])
     XCTAssertEqual(RockchipDeviceAccessAdvisor.verdict(for: multi), .accessible)
+    XCTAssertEqual(
+      RockchipLDOutputParser.parse(
+        stdout: try fixture("success-multi-device-crlf.stdout.bin")),
+      multi)
   }
 
   func testTEST_AC_FLASH_001_01_MaskromSimilarMalformedDuplicateAndUnknownBlockWithoutGuessing()
     throws
   {
-    for name in ["maskrom.stdout.bin", "similar-family.stdout.bin"] {
+    for name in ["maskrom.stdout.bin", "maskrom-crlf.stdout.bin", "similar-family.stdout.bin"] {
       let parsed = RockchipLDOutputParser.parse(stdout: try fixture(name))
       guard case .observations(let observations) = parsed else {
         return XCTFail("known blocked observation must remain diagnosable: \(name)")
@@ -196,12 +230,27 @@ final class RockchipDeviceDiscoveryContractTests: XCTestCase {
       RockchipLDOutputParser.parse(stdout: validPlusGarbage),
       .blocked(.malformedLine(line: 2)))
 
-    let carriageReturnOutput = Data(
-      "DevNo=1\tVid=0x2207,Pid=0x350a,LocationID=2\tLoader\r\n".utf8)
-    let carriageReturnResult = RockchipLDOutputParser.parse(stdout: carriageReturnOutput)
-    XCTAssertEqual(carriageReturnResult, .blocked(.unexpectedCarriageReturn))
+    let lineTerminationFaults: [(String, RockchipDiscoveryDiagnostic)] = [
+      ("bare-carriage-return.stdout.bin", .unexpectedCarriageReturn),
+      ("mixed-line-terminators.stdout.bin", .mixedLineTerminators),
+      ("missing-final-terminator.stdout.bin", .missingFinalLineTerminator),
+      ("empty-record.stdout.bin", .emptyLine(line: 2)),
+    ]
+    for (name, diagnostic) in lineTerminationFaults {
+      let parsed = RockchipLDOutputParser.parse(stdout: try fixture(name))
+      XCTAssertEqual(parsed, .blocked(diagnostic), name)
+      XCTAssertEqual(RockchipDeviceAccessAdvisor.verdict(for: parsed), .malformedOutput, name)
+    }
+    var crlfThenMissingFinal = try fixture("success-single-loader-crlf.stdout.bin")
+    crlfThenMissingFinal.append(
+      contentsOf: Data("DevNo=2\tVid=0x2207,Pid=0x350a,LocationID=5\tLoader".utf8))
     XCTAssertEqual(
-      RockchipDeviceAccessAdvisor.verdict(for: carriageReturnResult), .malformedOutput)
+      RockchipLDOutputParser.parse(stdout: crlfThenMissingFinal),
+      .blocked(.missingFinalLineTerminator))
+
+    XCTAssertEqual(
+      RockchipLDOutputParser.parse(stdout: Data([0xff, 0x0a])),
+      .blocked(.invalidUTF8))
 
     XCTAssertEqual(
       RockchipLDOutputParser.parse(
@@ -209,7 +258,9 @@ final class RockchipDeviceDiscoveryContractTests: XCTestCase {
       .blocked(.outputTooLarge))
     print(
       "TEST-AC-FLASH-001-01 PASS success=1 multi=1 maskrom=blocked "
-        + "similar=blocked malformed=blocked duplicate=blocked unknown=blocked similar_dispatch=0")
+        + "lf_crlf=parity bare_cr=blocked mixed=blocked missing_final=blocked "
+        + "empty_record=blocked similar=blocked malformed=blocked duplicate=blocked "
+        + "unknown=blocked similar_dispatch=0")
   }
 
   func testCombinedStandardOutputAndErrorMustFitMaximumOutputBytes() {

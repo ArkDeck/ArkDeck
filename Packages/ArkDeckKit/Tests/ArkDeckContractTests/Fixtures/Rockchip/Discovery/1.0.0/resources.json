@@ -4,6 +4,13 @@
   "registryVersion": "1.0.0",
   "resources": [
     {
+      "id": "bare-carriage-return-stdout",
+      "path": "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/Rockchip/Discovery/1.0.0/bare-carriage-return.stdout.bin",
+      "sha256": "22adc5864a9c84f1d165ab497e10c6101474bb841c934a2415004811e715564a",
+      "sizeBytes": 50,
+      "evidenceClass": "syntheticFault"
+    },
+    {
       "id": "driver-unavailable-stderr",
       "path": "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/Rockchip/Discovery/1.0.0/driver-unavailable.stderr.bin",
       "sha256": "201558d27a8f90846e09cfdfa7415f08ea5ae11756e3cc05df78487738ac218b",
@@ -25,6 +32,13 @@
       "evidenceClass": "syntheticFault"
     },
     {
+      "id": "empty-record-stdout",
+      "path": "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/Rockchip/Discovery/1.0.0/empty-record.stdout.bin",
+      "sha256": "0a5812088dd40dba6ce83fc488549f17e2e7fffc863276f12638271f02848032",
+      "sizeBytes": 51,
+      "evidenceClass": "syntheticFault"
+    },
+    {
       "id": "malformed-missing-tab-stdout",
       "path": "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/Rockchip/Discovery/1.0.0/malformed-missing-tab.stdout.bin",
       "sha256": "aef47b651cd77dc7103cdad6ca5170cedad8e44632be6641cad36f1d28e774bb",
@@ -32,10 +46,31 @@
       "evidenceClass": "syntheticFault"
     },
     {
+      "id": "maskrom-crlf-stdout",
+      "path": "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/Rockchip/Discovery/1.0.0/maskrom-crlf.stdout.bin",
+      "sha256": "06cc7ba1a2c96c24c1542986139534ca8e92def3e4416318d99fd36ec089a8e4",
+      "sizeBytes": 52,
+      "evidenceClass": "syntheticFault"
+    },
+    {
       "id": "maskrom-stdout",
       "path": "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/Rockchip/Discovery/1.0.0/maskrom.stdout.bin",
       "sha256": "54b1c907f77ca96e93bb2db15ceffc78478afad42bd93140296f95468aa07731",
       "sizeBytes": 51,
+      "evidenceClass": "syntheticFault"
+    },
+    {
+      "id": "missing-final-terminator-stdout",
+      "path": "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/Rockchip/Discovery/1.0.0/missing-final-terminator.stdout.bin",
+      "sha256": "40145ef238f6358a970c3137e593d0ad649e5131bb28b88f8762f9a3986a93a6",
+      "sizeBytes": 49,
+      "evidenceClass": "syntheticFault"
+    },
+    {
+      "id": "mixed-line-terminators-stdout",
+      "path": "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/Rockchip/Discovery/1.0.0/mixed-line-terminators.stdout.bin",
+      "sha256": "57770129375cfe009ca376ccd80d41fc3f5af70245116e1f859f643a1ea94ae6",
+      "sizeBytes": 102,
       "evidenceClass": "syntheticFault"
     },
     {
@@ -53,10 +88,24 @@
       "evidenceClass": "syntheticFault"
     },
     {
+      "id": "success-multi-device-crlf-stdout",
+      "path": "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/Rockchip/Discovery/1.0.0/success-multi-device-crlf.stdout.bin",
+      "sha256": "be20b89961d54b8b7f00a21df8a6e9c3f29005bd141587f4b0c9a7e9c5d479d4",
+      "sizeBytes": 103,
+      "evidenceClass": "syntheticControl"
+    },
+    {
       "id": "success-multi-device-stdout",
       "path": "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/Rockchip/Discovery/1.0.0/success-multi-device.stdout.bin",
       "sha256": "bb56fe5ac24db4c5f39d2eebd3efedb492e983aa42705812c0fdd1303b34547d",
       "sizeBytes": 101,
+      "evidenceClass": "syntheticControl"
+    },
+    {
+      "id": "success-single-loader-crlf-stdout",
+      "path": "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/Rockchip/Discovery/1.0.0/success-single-loader-crlf.stdout.bin",
+      "sha256": "0a21864aee52bf9f997524e3d49a31a36ba7b490771acf764784052bc9c5ce3b",
+      "sizeBytes": 51,
       "evidenceClass": "syntheticControl"
     },
     {
