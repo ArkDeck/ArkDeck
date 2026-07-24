@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-033-ref-protection-topology
 revision: 3
-status: proposed # r1 经 #453/#455 批准；r2 经 #459 批准；r3 probe-verifier remediation 仍须独立 approval-only PR
+status: approved # r3 仅在本独立 approval-only PR 经 lvye review/merge 后生效；proposal #473 merge 6153d581d7caf1bd1ed3335171318b3e92250926
 class: implementation-only
 core_change_level: none
 owner: lvye
@@ -257,3 +257,20 @@ D2 window、done 或 verified；r2 #459 的精确授权边界以下文为准。
 - r3 proposal carrier 只登记机制修订与作废 #470 readiness，不批准任何 GitHub
   control-plane/ref/PR-state write，不把成功的子 probe 改判为 AC PASS，也不使
   TASK-RPT-001 `ready`。r3 的批准必须由后续独立 approval-only PR 完成。
+- r3 proposal carrier #473 由 `github-actions[bot]` 创建，exact head
+  `9c359396ca1cdd7355ea2c0c3d28e988335ad49b`、base
+  `398a1e9f14ebf0debe785591f4f7517b54e16b26`，经 `lvye` 对该 head
+  `APPROVED`、`guard`/Swift success 后，由 `lvye` 于
+  `2026-07-24T11:20:17Z` 合入 protected main
+  `6153d581d7caf1bd1ed3335171318b3e92250926`。该 merge 只登记 r3 proposal。
+- 本独立 r3 approval-only PR 经 `lvye` review/merge 后，批准的新增范围仅为：
+  - Git push receipt + bounded stable `ls-remote` + authenticated REST convergence；
+  - positive probe tip `[skip actions]`、workflow trigger/blob pin 与零 run/PR assertion；
+  - 在 exact after main protection 下的 controlled-ref-first conditional cleanup；
+  - 在后续 fresh D2 中按 exact name/OID 清理 #470 residual ref；
+  - #470/#471/#472 的历史/stop boundary 与全新 D2 pins 要求。
+- r3 approval 不改变 Layer A/B/C、高层治理不变量或五条 AC；不批准任何 current
+  before/after/rollback payload、hash、window、operator action、control-plane/ref/
+  PR-state mutation，也不构成 AC PASS、task `done` 或 change `verified`。它只允许
+  TASK-RPT-001 进入 `ready` 并在下一独立 PR 从届时最新 protected main 起草 D2
+  readiness。
