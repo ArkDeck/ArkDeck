@@ -1,7 +1,9 @@
 # CHG-2026-033 Tasks
 
-> 本 change 当前仅为 `proposed`。所有任务均为 `blocked`；本文件没有 approval、
-> readiness、authorization、done 或 verified 语义。
+> 本 change 已由 approval-only PR #455 置为 `approved`。TASK-RPT-001 仅在本独立
+> D1 状态 PR 经维护者 review/merge 后成为 `ready`，且该状态只开放独立 D2 readiness
+> 起草；TASK-RPT-002 保持 `blocked`。本文件不创建 D2 authorization/window，不批准
+> payload/probe，也没有 done 或 verified 语义。
 
 ## Cross-change stop gate
 
@@ -21,12 +23,18 @@ GitHub control-plane/ref/probe 数为 0。
 
 ## TASK-RPT-001 — 隔离 Agent 身份并迁移 ref protection topology
 
-- Status:blocked（前置：change approval、CHG-2026-030 r7 compatible revision
-  merge、独立 D2 readiness）
+- Status:ready（仅在本独立 D1 状态 PR 经维护者 review/merge 后生效；只允许下一
+  独立 PR 从当时最新 protected main 起草/固定 D2 readiness。#455 approval merge
+  `c86f07ae6b843affaaa3f698e2f9f08a6f4c96cd` 与 CHG-2026-030 r7 #456 merge
+  `c5a1a9f0f1c0a9bc0dd3d04275ac01a5738697f7` 已闭合 cross-change stop gate。
+  本状态不批准任何 before/after/rollback payload、hash、window、operator action、
+  probe-ref mutation、credential 或 GitHub control-plane write；D2 readiness 未由 `lvye`
+  review/merge 前，task execution dispatch = 0。）
 - Platform:macos
 - Requirements/AC:change-local `RPT-BOUNDARY-001`、`RPT-MAIN-001`、
   `RPT-IDENTITY-001`、`RPT-MIGRATION-001`
-- Depends on:change approval、cross-change stop gate、independent D2 readiness
+- Depends on:change approval、cross-change stop gate；execution 另依赖 independent
+  D2 readiness
 - Applicable failure patterns:`AF-009`、`AF-016`
 - Production reachability:human-isolated GitHub admin session → repository
   settings authority → branch protection/ruleset/repository setting mutation
@@ -63,6 +71,10 @@ GitHub control-plane/ref/probe 数为 0。
 ### Notes / handoff
 
 - readiness PR 只能在 task 经独立 D1 状态 PR 成为 `ready` 后起草；
+- 本 D1 状态 PR 只修改本文件的 TASK-RPT-001 状态/依赖说明；不填写
+  `d2-readiness.md`，不新增 evidence，不采集 authenticated control-plane JSON，
+  除承载本状态变更的普通 `agent/**` branch/PR transport 外，不执行 probe ref、
+  setting、credential 或其他 control-plane 操作；
 - 人类设置变更发生在 Agent 外，Agent 只可准备 secret-free payload/hash 并验证
   public/negative facts；
 - 本任务不授权真实 main force/delete success path。
