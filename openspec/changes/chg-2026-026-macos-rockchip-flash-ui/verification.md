@@ -1,10 +1,10 @@
 # Verification Plan — CHG-2026-026
 
-> Change:CHG-2026-026@r4
+> Change:CHG-2026-026@r5
 > Status:planned
-> Note(2026-07-24):r4 只注册 RockUSB `ld` homogeneous LF/CRLF integration family、
-> TASK-RKFUI-001B 与新的 E1 evidence gate；不改变 Core/AC/schema、VID/PID/mode 或
-> destructive pins。
+> Note(2026-07-24):r5 只精确替换 TASK-RKFUI-001A 的 HDC version/hash，新增
+> TASK-RKFUI-001C registry/probe closure；不改变 Core/AC/schema、typed argv、
+> target/firmware/transport、RockUSB grammar 或 destructive pins。
 
 ## Environment
 
@@ -16,14 +16,18 @@
   version/hash/trust 与 r2 后的 Rockchip registry 完全匹配；既有 destructive
   Provider/Profile 继续 pin `038a8a0e…3611`，r2 不构成 destructive repin。生产不使用
   BlueTool/upgrade_tool。
+- HDC（r5 on merge）：TASK-RKFUI-001A exact path 只接受 client/server
+  `Ver: 3.2.0f` / executable SHA-256 `05b2bf7a…f83`；server 必须是 pre-existing
+  external same-UID pinned executable，Agent lifecycle mutation 0。旧 `3.2.0d` /
+  `48395ba8…d260` 必须作为 drift negative 拒绝，不能双 pin。
 - Fixtures：fake rkdeveloptool、版本化 `ld` homogeneous LF/CRLF 与
   bare-CR/mixed/missing-final-terminator faults、`ppt/wlx/rd` stdout/stderr、
   valid/corrupt/drift/path-traversal tar.gz、journal crash points、postflight observations。
 - Hardware：TASK-RKFUI-001 E0、TASK-RKFUI-001A 对 exact DAYU200 /
-  OpenHarmony `7.0.0.33` / HDC `3.2.0d` / USB 组合的 E1 mode transition 与
+  OpenHarmony `7.0.0.33` / HDC `3.2.0f` / USB 组合的 E1 mode transition 与
   TASK-RKFUI-004；其余测试无设备、零真实 dispatch。r2 允许 001A 为 001 提供 Loader
-  前置态，r3 只修正当前 firmware pin；两份 evidence 分离，001A 明确禁止 destructive
-  command。
+  前置态，r3 只修正 current firmware，r5 只修正 current HDC artifact；各 evidence 分离，
+  001A 明确禁止 destructive command。
 
 ## Acceptance matrix
 
@@ -92,6 +96,10 @@
   不改变 `0x5000 Maskrom` wrong-mode disposition。001B merge、无 pre-existing RockUSB
   candidate 的 E0 preflight 与逐设备 typed capability evidence acceptance PR 任一缺失时，
   001A 的 E1 必须为 0。
+- r5 merge 前旧 HDC pin 继续是唯一批准值，但 current `3.2.0f` / `05b2bf7a…f83` 与其
+  不符，因此 001A 保持 blocked。r5 merge 后仍须 TASK-RKFUI-001C 原子更新 registry/
+  probe/tests；001C done 前不得 E0。old/new 双 pin、自动 HDC server restart、把沙箱
+  offline scout 记为 candidate=0 或忽略真实 Maskrom observation 均禁止。
 - `REQ-FLASH-015` 交互式 App executor 解释未获维护者明确确认时，execute 不实现；不得把
   plan-only/handoff 记作一键真机刷机。
 - DAYU200 exact combination 的 `reboot loader` E1 capability 未证明 supported 时，Route B
@@ -107,6 +115,8 @@
       physical fallback，destructive dispatch 0
 - [ ] LF/CRLF registry、fixtures、Swift/Python parser closure 原子一致；Maskrom fixture
       仍显式 blocked
+- [ ] r5 HDC registry/probe closure 只接受 `3.2.0f` / `05b2bf7a…f83`；旧 pin 与
+      server lifecycle mutation 均 fail closed
 - [ ] Real hardware App path 由适格操作者执行，evidence 精确 pin 全组合
 - [ ] Traceability updated（无新 Core AC ID；记录现有 AC → 新 tests/evidence）
 - [ ] 无 shell/sudo/helper/BlueTool asset、无 secret/真实 serial/raw 敏感输出入库

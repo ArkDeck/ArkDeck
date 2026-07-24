@@ -2,9 +2,14 @@
 
 ## Context and constraints
 
-- Proposal revision：r4；r1/r2/r3 已由维护者 merge。r4 的 CRLF integration family、
-  TASK-RKFUI-001B readiness 与新的 E1 evidence gate 只在维护者 review/merge r4 PR 后
-  生效。合入前新增 scope blocked，零 E1 dispatch。
+- Proposal revision：r5；r1-r4 已由维护者 merge。r5 只把 TASK-RKFUI-001A 的 HDC
+  executable identity 从 `Ver: 3.2.0d` / `48395ba8…d260` 精确替换为
+  `Ver: 3.2.0f` / `05b2bf7a…f83`，并新增 TASK-RKFUI-001C registry/probe closure。
+  r5 merge 与 001C done 前 E0 preparation/E1 均 blocked。
+- r5 不改变 typed operation、target/firmware/transport、discovery tool、binding、window、
+  maxRuns、rebind 或 Safety 设计；HDC server 仍必须是 pre-existing external same-UID
+  pinned executable，Agent server lifecycle mutation 为 0。Maskrom candidate 是独立
+  physical/identity blocker，不因 repin 被过滤或放行。
 - Core baseline：`CORE-2.0.0`，叠加实现开始时已批准并适用的 scoped delta。
 - Related specs：flashing、desktop UX、device targeting、workflow journal/recovery、
   session/artifact/storage、macOS platform profile。
