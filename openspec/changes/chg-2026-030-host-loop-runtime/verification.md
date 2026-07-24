@@ -1,7 +1,7 @@
 # CHG-2026-030 Verification Plan
 
 > Status:planned
-> Change:CHG-2026-030-host-loop-runtime@r7
+> Change:CHG-2026-030-host-loop-runtime@r8
 > Core baseline:CORE-2.1.0（零 Core/Product behavior change）
 
 ## Environment
@@ -30,6 +30,32 @@
 | HLR-REVIEW-001 | HLR-004, HLR-005 | contract + live | reviewer run/worktree/session 独立且只读；missing/failed checks、`REQUEST_CHANGES` 或 `BLOCKED` 不入 batch；`APPROVE` 是独立 AI 预审记录而非 GitHub/human approval；零 auto-merge |
 | HLR-RECOVERY-001 | HLR-004, HLR-005 | fault injection + live recovery | acquire、create、update、heartbeat、review、merge observation 各 crash window 可重启；仅 GitHub merge metadata 与 protected-main full OID 同时匹配才 advance/release；branch缺失、Issue声称 merged、CI绿、时间流逝均不通过 |
 
+## HLR-002A r8 canary readiness
+
+- Audit base:
+  `d869f9a36ec95e30bc1fba3c649ed414ca36bf0a`。
+- Current topology authority:CHG-2026-033 TASK-RPT-001 #476/#477/#478
+  merged evidence；branch-protection projection/full SHA-256 =
+  `f423ce0ca2eb3f667a34dbb7f9bcfa923266928d073ee0e50763b2f69ee2663a` /
+  `04f09f273fce806afaa44679c9e8257c74cce3e480fe60da27c7dcca06e85f04`，
+  ruleset projection/full SHA-256 =
+  `9bb7ef3d62246733ca1dcaac074a3b07f5b4aead6985d645cd58fbf82db62163` /
+  `b172750c1c0764956725393823fa72014146d9e2ec0f1b19c48cf670964d54b5`。
+- Exact fresh refs:
+  `agent/host-loop/probes/8bd61cc3-d7c7-41ff-bfc8-0c62952afba3` and
+  `agent/hlr-002a-control/5a2570ed-5916-4cc8-ac84-4afa294e4b9e`。
+- Expected live result:reserved ref has exact-head SDD Guard success and zero
+  legacy `agent-pr` run/PR；ordinary ref has exact-head SDD Guard success,
+  exactly one successful legacy creator run and exactly one
+  `github-actions[bot]` PR. Both refs are deleted after the facts are fixed,
+  and the ordinary PR is closed/unmerged.
+- Forbidden dispatch:ruleset/branch-protection/repository-setting/credential/
+  gateway/authorization/integration/scheduler writes, review, merge,
+  auto-merge, old #435/#454 payload/ref/UUID reuse, or any canary before the r8
+  readiness carrier is merged.
+- Evidence separation:canary execution/evidence and `ready→done` are two
+  later independent PRs. This r8 carrier is not a live PASS.
+
 ## Negative and recovery tests
 
 - 短 OID、unknown D grade、multiple `Task:`、空 evidence without reason、硬编码 provider
@@ -41,6 +67,13 @@
 - `agent/host-loop/**` 仍触发 legacy creator、普通 `agent/**` 被意外排除、reserved
   head 出现 0/2 PR、head guard 或 pull-request allowed-paths 缺失 → partition/activation
   failure；不以 branch cleanup 或 elapsed time 伪造零 creator；
+- r8 readiness merge 未由 exact-head human review/`guard`/`mergedBy`/git
+  history 共同确认、fresh ref/evidence branch 预存在、open PR files 查询不完整或
+  #468 之外出现 overlap，仍 push canary → failure；零下一步 dispatch；
+- canary commit 包含 Actions skip instruction、reserved/ordinary 未使用同一
+  protected-main parent/tree、两次 push 之间 main/sensitive blob 漂移、cleanup
+  前未重复固定 run/PR facts，或把 head deletion 当作此前零 creator 证明 →
+  failure；cleanup 不改变结论；
 - TASK-RPT-001 evidence/done merge 缺失，或 ruleset/main protection after/hash/actor
   inventory 漂移，仍进入 HLR-002A readiness/canary → failure；HLR-002A blocked；
   #421 的零 run/PR 不得充作 isolation PASS；
@@ -80,6 +113,9 @@
 - TASK-RPT-001 evidence merge OID、ruleset ID `19595282` 与 main branch protection
   的完整 before/after/rollback JSON/hash、actor inventory、active-rule evaluation，
   以及单层/多层正向 + non-agent/main/agentx/review/merge/admin 负向 transcript；
+- r8 exact reserved/ordinary refs、readiness merge OID、共同 parent/tree、
+  exact-head SDD Guard/Agent PR run IDs、ordinary PR number/head/author/
+  merged=false、cleanup Git receipts 与 stable ref absence；
 - `check_pr_paths` task-token suffix 正反 fixtures + fresh implementation PR 的真实
   pull-request `guard`/`allowed-paths` terminal success；#412 红灯不得复用；
 - `scripts/check-sdd.sh`：0 errors / 0 warnings，acceptance count 以执行时 protected

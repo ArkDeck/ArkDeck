@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-030-host-loop-runtime
-revision: 7
-status: approved # r1 #361、r2 #405、r3 #407、r4 #415、r5 #423、r6 #449 已批准；r7 human-only ref-protection execution revision 仅在维护者 review/merge 后生效
+revision: 8
+status: approved # r1 #361、r2 #405、r3 #407、r4 #415、r5 #423、r6 #449、r7 #456 已批准；r8 current-topology consumption + fresh canary-only readiness 仅在维护者 review/merge 本 PR 后生效
 class: implementation-only
 core_change_level: none
 owner: lvye
@@ -10,6 +10,19 @@ platforms: [macos]
 ---
 
 # Host-loop runtime：为 Agent PR 建立可恢复的 worker/reviewer 双循环
+
+> r8 resume gate（2026-07-24）：CHG-2026-033 TASK-RPT-001 已以 execution
+> evidence #476 merge `6f874efc5c4e9fdd39bcdcc91cfcaa6a862e1961`、
+> no-bypass operability #477 merge
+> `7a221d24133eefed38aa616fcda376fef33f6cf3` 与 done #478 merge
+> `94c23c4123712a46e7fb2f96a0509f84f5f49ba7` 闭合两层 topology。
+> TASK-RPT-002 readiness #479 merge
+> `d869f9a36ec95e30bc1fba3c649ed414ca36bf0a` 只授权本次 compatible
+> pointer/revision/readiness 文档工作。本 r8 PR 合入前 HLR-002A 仍为
+> `blocked`，reserved/ordinary canary dispatch = 0；合入后只允许使用 r8
+> 固定的全新 refs 执行 creator-partition canary/evidence，GitHub
+> ruleset、branch protection、repository setting、credential、gateway、
+> standing authorization、integration identity 与 scheduler mutation 均为 0。
 
 > r7 stop gate（2026-07-24）：更晚批准的 CHG-2026-033（proposal #453、approval
 > #455，merge `c86f07ae6b843affaaa3f698e2f9f08a6f4c96cd`）把 GitHub
@@ -137,6 +150,12 @@ Actions 递归事件的限制见
   产生 ruleset/branch-protection/repository-setting write capability。HLR-002A 后续
   只消费 TASK-RPT-001 已合入的 authenticated read-back、正负矩阵与 evidence merge
   OID，执行 fresh creator canary；不得重放旧 topology payload 或旧 probe。
+- r8 消费 TASK-RPT-001 已合入的 exact after/hash、actor inventory、ref matrix 与
+  no-bypass pilot，明确 ordinary ref ruleset + exact-main branch protection 是
+  current mechanism；在不修改任何 protection/credential 的前提下，为 HLR-002A
+  固定全新 reserved/ordinary canary refs、latest-main audit base、sensitive blobs、
+  overlap 与 stop/cleanup 边界。本 r8 merge 只使 canary/evidence 计划 ready，
+  不形成 creator-isolation PASS 或 task done。
 - reviewer loop 仅调度并记录独立 AI 合前 review（`APPROVE` / `REQUEST_CHANGES` /
   `BLOCKED`）；它不作 GitHub approval、不 merge、不改变 change/task 状态。通过
   checks 与独立 review 后，worker 才可按 CHG-2026-027 将 digest 放入 batch Issue；
@@ -229,14 +248,15 @@ Observable behavior before/after:
 CHG-2026-028 `MECH-004` evidence 如实引用；未出现该 run 不得预填为 live evidence。
 
 r1 的 TASK-HLR-001 已 done；HLR-002A implementation #419 已合入，但 live canary
-#421 = FAIL。#435 从未产生 D2 receipt/PASS；#449/r6 与 #454 readiness 现由 r7
+#421 = FAIL。#435 从未产生 D2 receipt/PASS；#449/r6 与 #454 readiness 已由 r7
 supersede，TASK-HLR-002B 作为不可复用的历史 tombstone 保持 `blocked`，不进入
-implementation/evidence/done。r7 后的权威顺序是：先由 CHG-2026-033
-TASK-RPT-001 独立 readiness → 人类设置执行 → evidence → done；再以其 evidence merge
-OID 起草 HLR-002A fresh canary-only readiness。HLR-002A done 后才进入
-TASK-HLR-002。worker migration、review/recovery 与 live pilot 再按顺序推进。每个 PR
-仍独立 review/merge；D1/D2 判断门后不做投机性成 PR 工作；change `verified`
-只能在六个 active task 与五条 acceptance 均有可复查 evidence 后以独立状态 PR 起草。
+implementation/evidence/done。r8 只在本 PR 经维护者 review/merge 后批准
+HLR-002A fresh canary-only readiness；canary/evidence 使用后一独立 PR，
+其合入后再以独立 D0 PR `ready→done`。HLR-002A done 后才进入
+TASK-HLR-002。worker migration、review/recovery 与 live pilot 再按顺序推进。每个
+PR 仍独立 review/merge；D1/D2 判断门后不做投机性成 PR 工作；change
+`verified` 只能在六个 active task 与五条 acceptance 均有可复查 evidence 后以
+独立状态 PR 起草。
 
 ## Approval
 
@@ -384,3 +404,31 @@ TASK-HLR-002。worker migration、review/recovery 与 live pilot 再按顺序推
 - 本 r7 merge 不使 TASK-HLR-002A、TASK-HLR-002B 或任何下游 task ready。任一
   Agent-reachable ruleset/protection/admin/credential route、维护者凭据暴露、旧 payload
   重放或 TASK-RPT-001 尚未 done 即起草 HLR-002A readiness，均 dispatch = 0。
+
+## r8 approval and readiness boundary
+
+- 本 revision 是 CHG-2026-033 TASK-RPT-001 done 与 TASK-RPT-002 readiness
+  合入后的 compatible D1 follow-up；只更新本 change 的四份治理文档，并与
+  TASK-RPT-002 current-pointer/documentReview 同载体交付。它不修改 workflow、
+  parser、runtime、历史 HLR evidence、ruleset、branch protection、repository
+  setting、credential、ref、PR state、gateway、standing authorization、
+  integration identity 或 scheduler。
+- 维护者 review/merge 本 PR 同时批准 r8 与 tasks.md 中 exact HLR-002A
+  canary-only readiness，使该 task `blocked→ready`。该批准只允许使用固定的
+  `agent/host-loop/probes/8bd61cc3-d7c7-41ff-bfc8-0c62952afba3` 与
+  `agent/hlr-002a-control/5a2570ed-5916-4cc8-ac84-4afa294e4b9e`
+  做 reserved-first/ordinary-second creator canary、只读 run/PR/check 查询与
+  成功后清理；不允许任何 GitHub 管理设置或 credential write。
+- current topology authority 固定为 #476/#477/#478 merged evidence：ordinary
+  ruleset ID `19595282` 精确排除 single/multi-level Agent namespace 与 exact
+  main；exact-main branch protection 独立强制 PR、human CODEOWNER、
+  App `15368` `guard`、admin enforcement、human-only push allowlist，并禁止
+  force/delete/auto-merge。任何公开行为、ref result 或 evidence hash 与该投影
+  不一致，canary 零下一步 dispatch并回到 CHG-2026-033。
+- #435 的 OID/window/payload/hash/UUID/executor、#449/r6 gateway、#454
+  readiness/pins/branch 与 #421 run/head 均永久不可复用。TASK-HLR-002B 保持
+  superseded `blocked` tombstone；HLR-002、HLR-003 继续 blocked 于
+  HLR-002A done。
+- canary execution/evidence 与 `ready→done` 必须各自独立 PR。r8 merge 本身
+  不构成 `HLR-LEASE-001`/`HLR-WORKER-001` live PASS、TASK-HLR-002A done
+  或 CHG-2026-030 verified。

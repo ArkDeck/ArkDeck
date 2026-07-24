@@ -62,7 +62,19 @@ rebase --onto → resume`
 ## Credential 边界(TASK-BAP-003 之后的形态)
 
 - 本机 `gh` 零账号;Agent 写操作面 = Deploy Key 推送 `refs/heads/agent/**`
-  (ruleset `agent-ref-boundary` 对其余 ref fail closed)。
+  (single/multi-level Agent namespace 由
+  `refs/heads/agent/**` + `refs/heads/agent/**/*` 精确排除)。
+- ruleset `agent-ref-boundary` 对除 Agent namespace 与 exact
+  `refs/heads/main` 之外的 ordinary refs 继续以 creation/update/deletion
+  restrictions fail closed；唯一 bypass actor 是人类 `lvye`。
+- exact `main` 由独立 branch protection fail closed：必须走 PR，要求
+  `@lvye` CODEOWNER approving review 与 App `15368` 的 `guard`，管理员同样受
+  enforcement；push allowlist 仅 `lvye`，Deploy Key/Actions/App/integration
+  均不在内，force-push、deletion 与 auto-merge 禁止。`lvye` 在 allowlist
+  不等于可 direct push，仍须满足 PR/review/check。
+- current topology 与正负矩阵的权威 evidence 为 CHG-2026-033
+  TASK-RPT-001；CHG-2026-027 TASK-BAP-003 原 run 只保留其执行日历史，不再把
+  main 拒绝归因于 current ruleset。
 - 批次 issue 的创建/更新(仅导航内容)只经现有 GitHub connector;connector
   不可用或需要新 credential 时,该步保持 blocked 并回到 D1,不改用仓内
   批准文件、不新增凭据。

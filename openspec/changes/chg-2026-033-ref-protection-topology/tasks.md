@@ -258,3 +258,7 @@ GitHub control-plane/ref/probe 数为 0。
 
 - 本任务只在 TASK-RPT-001 done 后进入 readiness；
 - enforcement.md 与 AGENTS.md 高层不变量不变，不为描述新 topology 而修改。
+- Implementation/documentReview candidate:
+  `evidence/runs/TASK-RPT-002/2026-07-24-document-review.md`。本
+  implementation PR 不翻本任务状态；只有该 evidence 与 current-pointer/r8
+  diff 经维护者 review/merge 后，才允许另立独立 D0 `ready→done` PR。

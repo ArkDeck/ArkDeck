@@ -22,3 +22,20 @@
 done PR + evidence);三 change-local AC 有可复查证据;首次批次演练 evidence
 在案。verified 不构成对后续每个批次的质量担保——逐 PR review 永远是唯一批准
 载体;也不构成 guard/CI 机械化四项(伴随 change)的任何完成声明。
+
+## Current BAP-CRED-001 mechanism revalidation（2026-07-24）
+
+2026-07-23 的 PASS 仍证明其执行时的凭据分离与 ref 行为。current enforcement
+机制由 CHG-2026-033 TASK-RPT-001 的 merged evidence 取代具体因果归因：
+
+- ruleset `19595282` 保护除 exact main 与 single/multi-level Agent namespace
+  之外的 ordinary refs；
+- exact main branch protection 保护 main，并要求 human CODEOWNER review 与
+  App-bound `guard`；
+- Deploy Key、Actions、GitHub App/integration 均不进入 ruleset bypass 或 main
+  push allowlist，维护者 credential 对 Agent 不可达；
+- current 正负矩阵与正常 no-bypass merge pilot 均可复查。
+
+因此 `BAP-CRED-001` 的高层 expected result 不变；旧 run 原文不作为永久 topology
+证明。current evidence pointer 见
+`evidence/runs/TASK-BAP-003/2026-07-24-ref-protection-topology-addendum.md`。
