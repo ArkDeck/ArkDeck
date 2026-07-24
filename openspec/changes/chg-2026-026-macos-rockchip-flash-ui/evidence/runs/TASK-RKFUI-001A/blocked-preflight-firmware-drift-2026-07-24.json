@@ -1,0 +1,88 @@
+{
+  "schemaVersion": "1.0.0",
+  "change": "CHG-2026-026",
+  "task": "TASK-RKFUI-001A",
+  "capturedAt": "2026-07-24T03:14:35Z",
+  "evidenceClass": "controlledReadOnlyPreflight",
+  "executor": "autonomousAgent",
+  "baseCommit": "fee0f9f507f7a008cc75952bb895056205c6d4f1",
+  "approvedWindow": {
+    "authorizationRef": "PR#440@f4e901492e7d3b82f883424c756868fffa4946df",
+    "expectedFirmware": "OpenHarmony 7.0.0.34",
+    "expiresAt": "2026-07-31T16:00:00Z",
+    "maxRuns": 1,
+    "e1RunsConsumed": 0
+  },
+  "target": {
+    "model": "DAYU200 (RK3568)",
+    "transport": "usb",
+    "pinnedSerialSHA256": "958780b2ffb7090d4f22cdc1f547f9804ed0f0b605e3020f384e5d4823dc7a7e",
+    "observedSerialSHA256": "958780b2ffb7090d4f22cdc1f547f9804ed0f0b605e3020f384e5d4823dc7a7e",
+    "serialMatched": true,
+    "targetCount": 1,
+    "rawConnectKey": "retained only in controlled output outside every git repository"
+  },
+  "hdc": {
+    "path": "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/toolchains/hdc",
+    "reportedVersion": "Ver: 3.2.0d",
+    "sha256": "48395ba8d87115dffca47df2a640a6c868bc9a2bd4eb49611e4138ff88d8d260",
+    "serverOwnership": "preExistingExternalSameUIDPinnedExecutable",
+    "serverExecutableMatchedClient": true,
+    "serverLifecycleMutationCount": 0
+  },
+  "firmwareProbe": {
+    "effectClassification": "readOnly",
+    "argv": [
+      "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/toolchains/hdc",
+      "-t",
+      "<redacted-connect-key>",
+      "shell",
+      "param",
+      "get",
+      "const.product.software.version"
+    ],
+    "actualArgvSHA256": "6114667935f67bb5b122c412b98a7d18f4f30b4e4e3b3a97146b7af4409268ae",
+    "exitCode": 0,
+    "durationMilliseconds": 79,
+    "stdout": {
+      "bytes": 22,
+      "sha256": "4358db3f825bb43e72e393e00b9b6d571e83910d84d479fe48c9ef5beaf786dd",
+      "semanticValue": "OpenHarmony 7.0.0.33"
+    },
+    "stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "matchesApprovedFirmware": false
+  },
+  "rockUSBObservationTool": {
+    "basename": "rkdeveloptool",
+    "reportedVersion": "rkdeveloptool ver 1.32",
+    "sha256": "bbd7bdc0fb121d414fb61085e77211cc1fdd9a3b6c6b285c54380f70e56c9923",
+    "upstreamCommit": "304f073752fd25c854e1bcf05d8e7f925b1f4e14",
+    "signatureClass": "adHoc",
+    "quarantinePresent": false,
+    "ldDispatchCount": 0
+  },
+  "dispatchCounters": {
+    "e0ReadOnlyHDC": 5,
+    "e1DeviceMutation": 0,
+    "e2Destructive": 0,
+    "rebootLoader": 0,
+    "flashEraseFormatUnlockUpdate": 0,
+    "pptWlxRd": 0,
+    "sudoHelperDriverSystemMutation": 0
+  },
+  "rawEvidence": {
+    "location": "operator-controlled directory outside every git repository",
+    "redactedE0SummarySHA256": "ca19ec916f56dcef6cc19f934dd0acd118cde0a3d96639719b8fbbe61be8713a",
+    "rawSerialOrConnectKeyStoredInRepository": false
+  },
+  "verdict": {
+    "status": "blockedBeforeE1Dispatch",
+    "reason": "firmwarePinMismatch",
+    "observedFirmware": "OpenHarmony 7.0.0.33",
+    "approvedFirmware": "OpenHarmony 7.0.0.34",
+    "capabilityVerdict": "unknown"
+  }
+}

@@ -7,6 +7,10 @@
 > r2（2026-07-24，on merge）只起草 discovery clean-tool repin authority、修正
 > TASK-RKFUI-001↔001A 的循环依赖，并把 001A 在精确 D2 pins 下 `blocked→ready`。本 PR
 > 不携带 repin/probe implementation 或设备 run；后续仍按任务分别提交独立 PR。
+>
+> proposal r3（2026-07-24，on merge）只把 TASK-RKFUI-001A 的 exact firmware pin 从
+> `7.0.0.34` 替换为 E0 读回的 `7.0.0.33`；其余 D2 pins、窗口、次数与安全边界不变。
+> r3 合入前 probe implementation/E1 dispatch 仍为 0。
 
 ## TASK-RKFUI-001 — RockUSB discovery contract 与 signed Sandbox E0 access spike
 
@@ -137,8 +141,9 @@
 
 ## TASK-RKFUI-001A — DAYU200 HDC→Loader E1 capability characterization
 
-- Status:ready（仅在维护者 review/merge change proposal r2 governance/readiness PR 后生效；
-  该 merge 同时批准下列一次性 D2 pins/window。合入前仍为 blocked，E1 dispatch 0）
+- Status:ready（r2 已由 PR #440 合入；当前 firmware drift 使 execute gate fail closed。仅在
+  维护者 review/merge proposal r3 后，下列 `7.0.0.33` 一次性 D2 pins/window 才生效；
+  r3 合入前 probe implementation 与 E1 dispatch 均为 0）
 - Readiness review r2（2026-07-24；host-only 审计，device/HDC command dispatch 0）：
   - Approval/dependency gate:on merge。CHG-2026-026 r1 已由 PR #298 批准；001 discovery
     implementation/hardening 已由 #301/#305 合入。r2 修正旧依赖环：维护者选择 HDC 软件进态
@@ -153,14 +158,15 @@
     current main。`scripts/rockchip_loader_transition_probe/**` 当前不存在；只允许在本任务
     Allowed paths 新建。开始前若 r2 文档、serial/firmware evidence、HDC 或 clean
     rkdeveloptool facts 漂移，立即停止并重新 readiness。
-  - Target pin:DAYU200 (RK3568)，serial SHA-256
+  - Target pin（proposal r3 on merge）:DAYU200 (RK3568)，serial SHA-256
     `958780b2ffb7090d4f22cdc1f547f9804ed0f0b605e3020f384e5d4823dc7a7e`，USB，
-    OpenHarmony `7.0.0.34`。serial pin 来自
+    OpenHarmony `7.0.0.33`。serial pin 来自
     `TASK-AIN-004/e0-readback-redacted-summary.json`（blob
-    `39c4154b7420a78a554f53a81ea16f12b50b1939`）；firmware/HDC combination 来自
-    `TASK-TR-001/run.md`（blob `6069642a7b3c13d741383fbbdd17a0f921c6b9f2`）。两份均为
-    historical E0/controlled capture evidence，只用作本次 readiness pin，不冒充本次 E1
-    capability evidence。
+    `39c4154b7420a78a554f53a81ea16f12b50b1939`）；current firmware 来自本任务固定
+    read-only E0 preflight（`blocked-preflight-firmware-drift-2026-07-24.json`），HDC
+    historical combination 来自 `TASK-TR-001/run.md`（blob
+    `6069642a7b3c13d741383fbbdd17a0f921c6b9f2`）。这些只用作 readiness pins，不冒充本次
+    E1 capability evidence。
   - Binding gate:dispatch 前须重新 E0 读回 serial digest，构造并 durable 保存
     `OriginalTargetSnapshot` 与 revision 1 `CurrentDeviceBinding`；raw connect key 只留仓外
     受控 run。若已有 ArkDeck binding、revision 不是 1、connect key 缺失、identity 不匹配、
@@ -193,6 +199,25 @@
     占用；本 PR 只含 proposal/design/tasks/verification 与既有 blocked preflight evidence。
     r2 合入前零 probe implementation/设备 command；合入后 001 tool repin remediation 与
     001A implementation+evidence 仍使用两个独立 PR。
+- Firmware pin remediation r3（2026-07-24；仅在维护者 review/merge proposal r3 后生效）：
+  - E0 preflight 在 current `main`
+    `fee0f9f507f7a008cc75952bb895056205c6d4f1` 确认 serial 摘要、USB transport、HDC、
+    pre-existing external same-UID server 与 clean `rkdeveloptool` 全部命中原 pins；固定
+    read-only firmware query 返回 `OpenHarmony 7.0.0.33`，与 r2 的 `7.0.0.34` 不符。
+    E1/reboot/`ld` dispatch 均为 0，`maxRuns = 1` 未消费。
+  - r3 只授权把本任务的 firmware pin 替换为 `7.0.0.33`。serial、transport、HDC
+    path/version/hash、server lifecycle 零 mutation、clean discovery tool identity、revision 1
+    binding、typed argv、窗口截止与 maxRuns 全部保持 r2 原值；不授权其他固件或重试。
+  - r3 input blobs：proposal/tasks/verification 分别为
+    `4b8675fe9013fd118231a0c26b031743d59f1aea`、
+    `64e6cbfddb423c06b3e4e011dd2a7b5bb46b3af1`、
+    `6e809511bc2efb12b70e22d450079c9f826ecfcc`；开始 implementation 前须基于 r3 merge 后
+    current `main` 复核，任一治理输入、target/tool/server/window pin 漂移即停止并重新
+    readiness。
+  - r3 PR 只允许 change 治理文档、`evidence/README.md` 与
+    `evidence/runs/TASK-RKFUI-001A/blocked-preflight-firmware-drift-2026-07-24.*`；
+    `scripts/rockchip_loader_transition_probe/**` 在 r3 merge 前保持不存在，真实 E1 command
+    dispatch 为 0。
 - Platform:macos
 - Requirements:`REQ-FLASH-002`、`REQ-FLASH-007`、`REQ-FLASH-010`、
   `REQ-DEV-001`、`REQ-DEV-002`、`REQ-DEV-003`、`REQ-DEV-006`、`REQ-DEV-008`、
@@ -200,7 +225,7 @@
 - Acceptance:`AC-FLASH-002-01`、`AC-FLASH-007-01`、`AC-FLASH-010-01`、
   `AC-DEV-001-01`、`AC-DEV-002-01`、`AC-DEV-002-02`、`AC-DEV-003-01`、
   `AC-DEV-003-02`、`AC-DEV-006-01`、`AC-DEV-008-01`
-- Depends on:CHG-2026-026 proposal r2 merged；TASK-RKFUI-001 contract
+- Depends on:CHG-2026-026 proposal r3 merged；TASK-RKFUI-001 contract
   implementation/hardening (#301/#305) merged。TASK-RKFUI-001 signed Sandbox E0 hardware
   result 不再是前置，避免软件进态 Loader 来源的循环依赖
 - Allowed paths:
