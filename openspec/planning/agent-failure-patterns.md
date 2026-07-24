@@ -11,13 +11,19 @@
 > contracts 冲突时，**忽略本手册**，按 [`AGENTS.md` 的权威顺序](../../AGENTS.md#权威顺序)
 > 处理；无法裁决时任务 `blocked`，而不是由本手册选择更方便的解释。
 >
-> **只链接，不复制。**每条案例只给出仓内相对路径与完整 40-hex Git OID。本手册
-> 不复制 raw evidence、hash 表、transcript、secret、真实设备标识、用户绝对路径或
-> 大段日志（[`POL-PRIVACY-001`](../constitution.md#pol-privacy-001-local-first-and-explicit-export)、
+> **只链接，不复制。**每条案例只给出可定位的引用（形式见下条）与完整 40-hex
+> Git OID。本手册不复制 raw evidence、hash 表、transcript、secret、真实设备标识、
+> 用户绝对路径或大段日志（[`POL-PRIVACY-001`](../constitution.md#pol-privacy-001-local-first-and-explicit-export)、
 > [`POL-ARTIFACT-001`](../constitution.md#pol-artifact-001-raw-evidence-is-immutable)）。
 >
 > **archive 只读。**`openspec/changes/archive/**` 是冻结历史，本手册只读引用，
 > 不改写其任何字节或结论。被引用 change 的现实缺陷仍由其所属 approved change 处理。
+>
+> **引用形式。**引用**活跃 change**（仍在 `openspec/changes/<id>/` 下）时使用耐久
+> 形式：change ID + change 目录内路径 + 完整 40-hex blob OID，不使用相对路径——
+> 因为该目录在归档时会移动，而本手册不会。引用**已在 `changes/archive/**` 的目标**
+> 时可保留相对路径，归档目录不再移动。本条只约束本手册自身的后续编辑，不创造
+> 规则，也不改变 `AGENTS.md`、enforcement、模板或任何其他文档的要求。
 
 本手册登记 ArkDeck 可审计历史中**重复发生**的 Agent 失败模式，供新任务开工前
 检索。taxonomy 与其封闭范围登记在 **CHG-2026-029 的 `design.md` §3**（revision r4，
