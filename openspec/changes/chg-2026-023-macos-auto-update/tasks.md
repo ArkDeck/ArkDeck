@@ -106,9 +106,156 @@
 
 ## TASK-AU-002 — 实现与发布管线面
 
-- Status:blocked(三前置:① approve;② TASK-AU-001 done(选型认可);③ 独立
-  readiness PR——须钉选型记录 OID、依赖 pin 方案(如适用)、entitlement diff
-  声明与实现基线)
+- Status:ready(2026-07-24 D1 readiness candidate；仅在维护者 review/merge 本
+  独立 readiness PR 后生效。三前置已闭合：① CHG-2026-023 approved；②
+  TASK-AU-001 done 且最小自研路线已由维护者认可；③ 本记录固定选型 OID、
+  零第三方依赖、entitlement 空 diff、实现基线、public-key/feed/下载/验签/
+  隐私/发布合同。本 PR 只修改本任务状态与 readiness 记录，零产品实现、零
+  release、零私钥接触；merge 只授权 AU-002 按封闭合同开工，不构成 done、
+  verified 或 ADR-0002 release gate #3 满足)
+- Readiness review(2026-07-24；host-only，product update/device/release dispatch
+  0，Agent private-key access 0):
+  - Approval/dependency gate:satisfied。CHG-2026-023 r1 approval 已在 protected
+    `main` commit `21b5b9975beb960ba4f57a78a59d6246a4f86b0b` 生效；
+    TASK-AU-001 evaluation PR #429 head
+    `4085fe7f4e05072edd2631d5fe8d28b44c1ef9ae` 已合入
+    `a8084cd1a77205b7014c45e7733445c30642ffd9`，done 状态 PR #430 head
+    `2c43bc0c132ad476e7d6690407d556a91ddff19a` 已合入
+    `2ee97120c27e178ed9e54a0cf4a59b4d7413fae4`。AU-002 allowed-path
+    remediation PR #431 head
+    `12da1fef37fdd77f18ce3ce061a51c7b90f5c612` 已合入
+    `e3b8838f855d60c5d484f0df5ff7c2dc8b8c64f8`；上述 commit 均为本
+    implementation base 的 ancestor。
+  - Selection/dependency/entitlement gate:satisfied。选型严格固定为
+    **最小自研 check + download + verify + Finder handoff**：Foundation/
+    URLSession、CryptoKit、Security 与 AppKit 系统 API，external package、
+    XPC/helper、自动安装器均为 0。`Packages/ArkDeckKit/Package.swift` 无
+    external package，Xcode 工程仅引用仓库内 `Packages/ArkDeckKit`，
+    `Package.resolved` 不存在；dependency pin plan = **N/A/禁止引入**。
+    entitlement diff = **空集**，实现后仍须精确等于 ADR-0002 的六项；任何新增
+    dependency、XPC/helper、entitlement 或 App 自替换能力都立即 blocked，须另立
+    change/readiness，不得在 AU-002 内便利性扩展。
+  - Git/input pins:actual implementation base = protected `main`
+    `5f34a2aa376bd3677b69ba14410f265f1a29aaf7`。审计期间 base 从
+    `73b46b684b27eda23cfbaad06c5b707bff39e2cc` 前进一项，仅修改
+    CHG-2026-032 `tasks.md`，下列 AU-002 输入 blob 全部复核无漂移。readiness
+    初始取值时 GitHub open PR = 0；下列输入均由
+    `git ls-tree origin/main -- <path>` 实测，开始 implementation 前任一相关
+    blob 漂移即停止并重做 readiness：
+    - `proposal.md`/`design.md`/`verification.md`/`acceptance-cases.yaml` =
+      `c7515254522f3f049fc7e89098eb3d522a91ded9`/
+      `f25882d74e7d1a7ba7953ad33f255e414398271f`/
+      `e171304af3bf02a4641fc72dc25465e12d5ec8aa`/
+      `dd3264dea573bf04e776a47cc4344f15c7a46a03`；
+    - AU-001 `evaluation.md`/`sources.md`/`run.md` =
+      `fcbfa0dd23220b833e3a2b4eef28129ea88b3a0f`/
+      `2efee2309b7eb59cc0ed7f5fe6e036756c174322`/
+      `e897ec3d938225483491ce10735ce3aebd8c85b4`；
+    - ADR-0002/macOS profile/App entitlement/Xcode project =
+      `5111bb8c8657d0ed05e0184fbbaeb88af5fc5d8f`/
+      `a9a5931ffedd304a7ce3a088f4397c26fd87e744`/
+      `6435d00f8493ce4fbca24a806ca7f320db9fbfa6`/
+      `e7943096688728a22f4b940e536a32f3b8eaaf98`；
+    - `ArkDeckApp.swift`/`Localizable.xcstrings`/`Package.swift`/
+      `SystemLogger.swift`/`ArkDeckCLIMain.swift`/共享 target-dependency
+      contract 表 =
+      `5e1f175d82d2de867b6b783ddd80ea47fee87194`/
+      `2f52fac028a4606cfb38783e190f4afafe28820b`/
+      `91a1032f8a5ff9285154ef6f48ef35470b294eb7`/
+      `8551d6b521b08ccf406bdf419b3f6c24b55435f3`/
+      `be9bc136ae2f5086153459e8d7252c8c72ec13b1`/
+      `98f98253c0f9ab67ab268255cd7596f8a07ff724`；
+    - `Sources/ArkDeckWorkflows/AutoUpdate/**`、
+      `AutoUpdateContractTests.swift` 与 `docs/release/macos-auto-update.md`
+      在 base 均不存在，implementation 只可在已批准 allowed paths 内新建。
+  - Production public-key pin:satisfied by maintainer-provided public material
+    only。维护者声明已在 Agent 不可达的独立发布环境重新生成并导出；Agent
+    未创建、读取或探测私钥。44-byte Ed25519 SPKI DER 已由
+    `openssl pkey -pubin -inform DER -pubcheck` 验证：
+    - key ID = `arkdeck-update-2026-07-b949b102`；
+    - SPKI DER SHA-256 =
+      `b949b102c5eb266084c3d59ee2e05de45681947841a4864afa0fc4136a1e7ddf`；
+    - SPKI DER base64 =
+      `MCowBQYDK2VwAyEAc5Ho0xkWFQ3Ovzjx98dQhF3n5sytJjffqD3a+ftgP8c=`；
+    - CryptoKit raw 32-byte public-key base64 =
+      `c5Ho0xkWFQ3Ovzjx98dQhF3n5sytJjffqD3a+ftgP8c=`。
+    App 与 contract 必须 pin key ID + raw bytes；仓库、Git history、CI、fixture
+    与 log 禁止出现 private material。v1 只信任这一枚 key；轮换须先经独立
+    change 发布信任新 key 的 App，再切 feed，不能由 feed 自行下发信任根。
+  - Signed-feed wire contract:固定为 UTF-8 JSON envelope，且只允许四个字段：
+    `schemaVersion:1`、上述 `keyId`、base64 `payload`、base64 64-byte
+    `signature`；duplicate/unknown/missing field、非规范 base64、超限输入均
+    fail closed。签名输入精确为
+    `ASCII("ArkDeck.UpdateFeed.v1") || 0x00 || UTF8(keyId) || 0x00 ||
+    decodedPayloadBytes`，Ed25519 在**解析 payload 前**验证；禁止对已解析
+    JSON 重序列化后再验签。payload 是确定性 UTF-8 JSON：sorted keys、零
+    无意义 whitespace、slash 不转义、string NFC；实现以 strict decode 后按
+    同规则 re-encode 与原 bytes 相等来拒绝重复 key/非规范编码。
+  - Signed payload/schema gate:只允许
+    `{sequence,version,minimumSystemVersion,architectures,issuedAt,expiresAt,
+    artifact,releaseNotesSummary}`；`artifact` 只允许
+    `{url,byteLength,sha256}`。`version` 为无前导零的稳定
+    `major.minor.patch`，v1 arch 只接受 `arm64`，minimum OS 不低于 macOS 14；
+    URL/byte length/lowercase 64-hex SHA-256 全部在签名内。`sequence` 为正
+    UInt64 且发布时严格递增；持久化最高 `(sequence,payloadSHA256,version)`：
+    较小 sequence、同 sequence 不同 payload 或新 sequence 非递增 version
+    均拒绝；同 sequence 同 payload 幂等。candidate 等于当前 App 版本 =
+    honest no-update，低于当前版本 = downgrade error/零下载。`issuedAt`/
+    `expiresAt` 为 UTC RFC3339，窗口须正且不超过 30 天；过期/尚未生效 feed
+    拒绝，配合 sequence 防 replay。
+  - Network/privacy/redirect gate:生产 feed URL 固定为
+    `https://github.com/ArkDeck/ArkDeck/releases/latest/download/arkdeck-update-feed-v1.json`。
+    feed 初始请求的产品字段精确为 query
+    `{appVersion,osVersion,arch}`；无 body/cookie/credential/cache、无 locale、
+    用户路径、设备/硬件标识或遥测，协议 header 只允许固定、隐私中性的
+    `Accept`/`User-Agent` 值。自动检查默认开启、仅 App 启动时且距上次尝试至少
+    24 小时；用户可关闭，手动检查不受频率限制；检查绝不触发自动下载。
+    redirect 最多 5 跳，每跳必须 HTTPS、无 userinfo/fragment/IP literal，host
+    仅 `{github.com,release-assets.githubusercontent.com,
+    objects.githubusercontent.com}`；禁止转发 cookie/authorization，初始三个
+    产品 query 字段不得泄漏到 redirect request。artifact initial URL 必须与
+    signed payload 精确一致；redirect 仍受相同 allowlist，最终 bytes 继续受
+    signed length/digest 与 Team gate 约束。URLProtocol/local-server contract
+    必须捕获初始/redirect/feed/artifact 的实际 request 逐字段断言。
+  - Download/state/cleanup gate:状态机封闭为
+    `idle→checking→available→downloading(partial)→verifying→
+    awaitingConsent→handedOff`，任一步只能转 `failed`/`cancelled`，失败后不得
+    回到 handoff。下载必须由用户显式发起；不支持 Range/resume，在 App container
+    owner-only 临时目录写随机名 `.part`，边写边计数且不得超过 signed
+    `byteLength`。EOF 后 length 与 SHA-256 双匹配才可同卷原子 rename 为
+    owner-read-only verified DMG；cancel/interruption/truncate/overflow/
+    digest mismatch/启动恢复时的 orphan partial 全部删除，不可信缓存永不复用。
+  - Artifact identity/TOCTOU/handoff gate:对最终 DMG path 使用
+    `SecStaticCodeCreateWithPath`，以
+    `kSecCSStrictValidate|kSecCSCheckAllArchitectures|kSecCSCheckNestedCode`
+    做静态完整性检查；再以当前运行 App 的签名信息动态取得 Developer ID Team
+    identifier 并施加 same-Team requirement。当前 App 无 Team identity、
+    DMG unsigned/ad-hoc/invalid/different-Team 均 fail closed；生产代码禁止
+    hard-code 测试 Team。首次验证记录 no-follow file identity；用户点击最终
+    consent 后、Finder handoff 前必须重新 no-follow 打开并复核 identity、
+    length、digest、static validity 与 same-Team，任何 replacement/race 均零
+    handoff。ArkDeck 只在这次独立同意后 reveal verified DMG；不自动 mount/open、
+    不替换 App、不 update-on-quit、不声称自动回滚。用户文案必须明确手工挂载/
+    替换与失败支持边界；任一 negative 的 installed-byte mutation 与
+    `NSWorkspace` handoff count 均为 0。
+  - Release pipeline/key-isolation gate:实现只提供不接触生产私钥的确定性 feed
+    prepare/assemble/self-verify 能力；维护者在隔离发布环境依序执行
+    `archive → Developer ID sign → notarize/staple → DMG static/Gatekeeper
+    verify → length/SHA-256 → canonical payload/signature-input → OpenSSL
+    Ed25519 sign → assemble → pinned-public-key self-verify → upload/fetch-back
+    byte verify → publish feed`。private key material/passphrase 不作为 CLI
+    参数、环境变量、CI secret、日志或 evidence；private path 只可交给隔离
+    维护者环境内的本地 OpenSSL，签名时交互读取 encrypted key。feed 必须最后
+    发布，失败不得覆盖上一份有效 feed。
+  - Verification/evidence gate:实现 PR 必须交付
+    `TEST-AU-CONTRACT-001`/`TEST-AU-PRIVACY-001` contract evidence：坏/缺/
+    错 key 签名、非规范/未知 feed、downgrade/replay、非法 URL/redirect、
+    length/digest mismatch、中断/截断/cancel、unsigned/different-Team DMG、
+    verify 后替换、未同意等 negative 全部 honest error + 零 handoff/零已安装字节
+    变化；positive 仍须走独立 consent。另须断言 exact entitlement 六项、external
+    dependency/private-key material = 0、实际请求白名单与披露一致；发布规程、
+    全量 Swift/Xcode 基线、`check-sdd`、allowed-path/secret scan 全绿。实现 PR
+    不翻 `ready→done`，done 另走独立 D0 状态 PR。
 - Pre-readiness allowed-path remediation(2026-07-24；仅在维护者 review/merge
   本独立 D1 governance PR 后生效)：原任务虽要求 contract tests、feed 生成与发布
   规程，却没有可被 `check_pr_paths.py` 解析的 `Allowed paths` 行，也未列出现有
