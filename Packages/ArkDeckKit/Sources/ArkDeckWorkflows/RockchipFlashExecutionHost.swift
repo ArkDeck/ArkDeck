@@ -683,7 +683,6 @@ private enum RockchipProductionExecutionComposition {
       executor: FoundationProcessExecutor())
     let postflight = RockchipProductPostflightPort(probe: usbProbe)
     let coordinator = storage.context.coordinator
-    let store = storage.context.sessionStore
     let storageProbe = SystemHostStorageProbe()
     let requiredGrowth =
       UInt64(
@@ -694,9 +693,9 @@ private enum RockchipProductionExecutionComposition {
       admission: admission, process: process, postflight: postflight,
       power: ProductRockchipPowerActivityController(),
       makePersistence: { sessionID, jobID, _ in
-        let catalog = try await storage.context.prepareHeavyWriterAdmission()
+        let admission = try await storage.context.prepareHeavyWriterAdmission()
         let snapshot = try storageProbe.snapshot(for: storage.context.rootLease.url)
-        guard snapshot.volumeIdentity == catalog.volumeIdentity else {
+        guard snapshot.volumeIdentity == admission.volumeIdentity else {
           throw RockchipFlashExecutionError.storageRejected(
             "Session root volume identity changed")
         }
@@ -706,10 +705,13 @@ private enum RockchipProductionExecutionComposition {
             metadataHeadroomBytes: 16 * 1_024 * 1_024,
             finalizationHeadroomBytes: 16 * 1_024 * 1_024,
             remainingGrowthBytes: requiredGrowth, writerClass: .heavy))
-        guard case .admitted(let claim) = await coordinator.admit(request, snapshot: snapshot)
+        guard
+          case .admitted(let claim) = await storage.context.admitHeavyWriter(
+            request, snapshot: snapshot, admission: admission)
         else { throw RockchipFlashExecutionError.storageRejected("host storage queued") }
-        let layout = try store.createSession(
-          sessionID: sessionID, jobID: jobID, createdAt: Date(), claim: claim)
+        let layout = try await storage.context.createSession(
+          sessionID: sessionID, jobID: jobID, createdAt: Date(), claim: claim,
+          admission: admission)
         return try RockchipDurableExecutionPersistence(
           layout: layout, claim: claim, coordinator: coordinator,
           storageContext: storage.context)

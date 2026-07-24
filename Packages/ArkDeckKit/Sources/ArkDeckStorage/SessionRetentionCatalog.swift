@@ -73,22 +73,26 @@ public struct SessionRetentionCatalogSnapshot: Equatable, Sendable {
 public struct SessionRetentionCatalog: Sendable {
   public static let metadataFileName = ".arkdeck-retention-catalog.json"
   private static let lockFileName = ".arkdeck-retention-catalog.lock"
+  private static let initializedLockMarker: UInt8 = 0xA5
   private static let maximumIdentityBytes = 4 * 1_024
   private static let maximumMetadataBytes = 16 * 1_024 * 1_024
 
   public let sessionsRoot: URL
   private let volumeIdentityResolver: any VolumeIdentityResolving
   private let faultInjector: SessionRetentionCatalogFaultInjector
+  private let configurationEpoch: StorageConfigurationEpoch?
 
   public init(
     sessionsRoot: URL,
     volumeIdentityResolver: any VolumeIdentityResolving = SystemVolumeIdentityResolver(),
-    faultInjector: SessionRetentionCatalogFaultInjector = .none
+    faultInjector: SessionRetentionCatalogFaultInjector = .none,
+    configurationEpoch: StorageConfigurationEpoch? = nil
   ) throws {
     try DurableFilePrimitives.requireAbsoluteFileURL(sessionsRoot)
     self.sessionsRoot = sessionsRoot.standardizedFileURL
     self.volumeIdentityResolver = volumeIdentityResolver
     self.faultInjector = faultInjector
+    self.configurationEpoch = configurationEpoch
   }
 
   public func scan(
@@ -103,6 +107,33 @@ public struct SessionRetentionCatalog: Sendable {
     }
   }
 
+  public func requireCurrentRoot(
+    identity expectedIdentity: SessionCatalogRootIdentity,
+    volumeIdentity expectedVolumeIdentity: VolumeIdentity
+  ) throws {
+    var pathMetadata = stat()
+    guard Darwin.lstat(sessionsRoot.path, &pathMetadata) == 0,
+      pathMetadata.st_mode & S_IFMT == S_IFDIR,
+      pathMetadata.st_uid == geteuid(),
+      pathMetadata.st_mode & (S_IWGRP | S_IWOTH) == 0
+    else { throw SessionRetentionCatalogError.invalidRoot }
+    let descriptor = Darwin.open(
+      sessionsRoot.path, O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW)
+    guard descriptor >= 0 else { throw SessionRetentionCatalogError.invalidRoot }
+    defer { Darwin.close(descriptor) }
+    var opened = stat()
+    guard fstat(descriptor, &opened) == 0,
+      opened.st_mode & S_IFMT == S_IFDIR,
+      opened.st_uid == geteuid(),
+      opened.st_mode & (S_IWGRP | S_IWOTH) == 0,
+      opened.st_dev == pathMetadata.st_dev,
+      opened.st_ino == pathMetadata.st_ino,
+      SessionCatalogRootIdentity(opened) == expectedIdentity,
+      try volumeIdentityResolver.resolve(openFileDescriptor: descriptor)
+        == expectedVolumeIdentity
+    else { throw SessionRetentionCatalogError.invalidRoot }
+  }
+
   public func registerFinalizedSession(
     sessionRoot: URL,
     retentionDays: UInt64,
@@ -110,6 +141,10 @@ public struct SessionRetentionCatalog: Sendable {
   ) throws {
     let retentionDays = try validatedRetentionDays(retentionDays)
     try withLockedRoot { root in
+      if case .missing = try loadMetadata(root) {
+        _ = try scanLocked(
+          root, retentionDays: retentionDays, policyGeneration: policyGeneration)
+      }
       let metadata = try requireMetadata(root)
       let relative = try relativeSessionComponents(sessionRoot)
       guard
@@ -416,8 +451,7 @@ public struct SessionRetentionCatalog: Sendable {
       expectedDevice: expectedDevice)
     let manifest = try SessionManifestDocument(data: manifestData)
     guard manifestData == manifest.canonicalData,
-      manifest.sessionID == sessionID, manifest.jobID == identity.jobID,
-      manifest.status != "planned"
+      manifest.sessionID == sessionID, manifest.jobID == identity.jobID
     else { return nil }
     try faultInjector.check(.beforeMeasurement)
     let size = try measureDirectory(descriptor, expectedDevice: expectedDevice)
@@ -528,6 +562,9 @@ public struct SessionRetentionCatalog: Sendable {
           parseTimestamp(entry.expiresAt) != nil
         else { return .corrupt }
       }
+      if root.metadataMissingIsFresh {
+        try markCatalogInitialized(root)
+      }
       return .valid(document)
     } catch {
       return .corrupt
@@ -546,6 +583,19 @@ public struct SessionRetentionCatalog: Sendable {
   }
 
   private func writeMetadata(_ document: PersistentCatalog, root: LockedRoot) throws {
+    if let configurationEpoch {
+      try configurationEpoch.performMutation {
+        try writeMetadataUnderConfigurationFence(document, root: root)
+      }
+    } else {
+      try writeMetadataUnderConfigurationFence(document, root: root)
+    }
+  }
+
+  private func writeMetadataUnderConfigurationFence(
+    _ document: PersistentCatalog,
+    root: LockedRoot
+  ) throws {
     let data = try canonicalData(document)
     guard !data.isEmpty, data.count <= Self.maximumMetadataBytes else {
       throw SessionRetentionCatalogError.metadataCorrupt
@@ -591,6 +641,39 @@ public struct SessionRetentionCatalog: Sendable {
     guard Darwin.fsync(root.descriptor) == 0 else {
       throw SessionStorageError.writeFailed(path: Self.metadataFileName, errno: errno)
     }
+    try markCatalogInitialized(root)
+  }
+
+  private func markCatalogInitialized(_ root: LockedRoot) throws {
+    var metadata = stat()
+    guard fstat(root.lockDescriptor, &metadata) == 0 else {
+      throw SessionRetentionCatalogError.invalidRoot
+    }
+    if metadata.st_size == 1 {
+      var marker: UInt8 = 0
+      let readCount = withUnsafeMutableBytes(of: &marker) {
+        Darwin.pread(root.lockDescriptor, $0.baseAddress, 1, 0)
+      }
+      guard readCount == 1,
+        marker == Self.initializedLockMarker
+      else { throw SessionRetentionCatalogError.invalidRoot }
+      return
+    }
+    guard metadata.st_size == 0 else {
+      throw SessionRetentionCatalogError.invalidRoot
+    }
+    var marker = Self.initializedLockMarker
+    let written = withUnsafeBytes(of: &marker) {
+      Darwin.pwrite(root.lockDescriptor, $0.baseAddress, 1, 0)
+    }
+    guard written == 1 else {
+      throw SessionStorageError.writeFailed(path: Self.lockFileName, errno: errno)
+    }
+    try DurableFilePrimitives.fullSync(
+      root.lockDescriptor, path: Self.lockFileName)
+    guard Darwin.fsync(root.descriptor) == 0 else {
+      throw SessionStorageError.writeFailed(path: Self.lockFileName, errno: errno)
+    }
   }
 
   private func withLockedRoot<T>(_ body: (LockedRoot) throws -> T) throws -> T {
@@ -614,11 +697,10 @@ public struct SessionRetentionCatalog: Sendable {
     else { throw SessionRetentionCatalogError.invalidRoot }
 
     var priorLockMetadata = stat()
-    let lockWasPresent =
-      fstatat(
-        rootDescriptor, Self.lockFileName, &priorLockMetadata,
-        AT_SYMLINK_NOFOLLOW) == 0
-    if !lockWasPresent, errno != ENOENT {
+    if fstatat(
+      rootDescriptor, Self.lockFileName, &priorLockMetadata,
+      AT_SYMLINK_NOFOLLOW) != 0, errno != ENOENT
+    {
       throw SessionRetentionCatalogError.invalidRoot
     }
     let lockDescriptor = Darwin.openat(
@@ -638,13 +720,26 @@ public struct SessionRetentionCatalog: Sendable {
       throw SessionRetentionCatalogError.invalidRoot
     }
     defer { _ = flock(lockDescriptor, LOCK_UN) }
+    guard fstat(lockDescriptor, &lockMetadata) == 0,
+      lockMetadata.st_size == 0 || lockMetadata.st_size == 1
+    else { throw SessionRetentionCatalogError.invalidRoot }
+    if lockMetadata.st_size == 1 {
+      var marker: UInt8 = 0
+      let readCount = withUnsafeMutableBytes(of: &marker) {
+        Darwin.pread(lockDescriptor, $0.baseAddress, 1, 0)
+      }
+      guard readCount == 1,
+        marker == Self.initializedLockMarker
+      else { throw SessionRetentionCatalogError.invalidRoot }
+    }
     return try body(
       LockedRoot(
-        descriptor: rootDescriptor, device: rootMetadata.st_dev,
+        descriptor: rootDescriptor, lockDescriptor: lockDescriptor,
+        device: rootMetadata.st_dev,
         identity: SessionCatalogRootIdentity(rootMetadata),
         volumeIdentity: try volumeIdentityResolver.resolve(
           openFileDescriptor: rootDescriptor),
-        metadataMissingIsFresh: !lockWasPresent))
+        metadataMissingIsFresh: lockMetadata.st_size == 0))
   }
 
   private func openOwnedDirectory(
@@ -891,6 +986,7 @@ public struct SessionRetentionCatalog: Sendable {
 
 private struct LockedRoot {
   let descriptor: Int32
+  let lockDescriptor: Int32
   let device: dev_t
   let identity: SessionCatalogRootIdentity
   let volumeIdentity: VolumeIdentity

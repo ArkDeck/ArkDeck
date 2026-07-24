@@ -62,6 +62,15 @@ public struct SessionRetentionApplyResult: Equatable, Sendable {
   public let previewAfterRescan: SessionRetentionPreview
 }
 
+public struct SessionHeavyWriterAdmission: Equatable, Sendable {
+  public let catalog: SessionRetentionCatalogSnapshot
+  fileprivate let configurationToken: StorageConfigurationToken
+
+  public var volumeIdentity: VolumeIdentity { catalog.volumeIdentity }
+  public var rootIdentity: SessionCatalogRootIdentity { catalog.rootIdentity }
+  public var catalogGeneration: UInt64? { catalog.catalogGeneration }
+}
+
 public struct SessionStorageExecutionContext: Sendable {
   public let settings: SessionSettingsSnapshot
   public let rootLease: SessionRootAccessLease
@@ -94,22 +103,67 @@ public struct SessionStorageExecutionContext: Sendable {
 
   @discardableResult
   public func prepareHeavyWriterAdmission() async throws
-    -> SessionRetentionCatalogSnapshot
+    -> SessionHeavyWriterAdmission
   {
     try requireCurrentSettings()
     let snapshot = try catalog.scan(
       retentionDays: settings.retentionDays,
       policyGeneration: settings.generation)
+    let configurationToken = settingsStore.configurationEpoch.snapshot()
     let active = await coordinator.activeSessions(on: snapshot.volumeIdentity)
+    try requireCurrentSettings()
+    try settingsStore.configurationEpoch.performIfCurrent(configurationToken) {}
     let planning = try makeRetentionPlanning(
       catalog: snapshot, settings: settings, active: active,
       controller: retentionController)
-    await coordinator.setRetentionAdmission(
-      blocked: planning.mustBlockBeforeCleanup, on: snapshot.volumeIdentity)
+    let updated = await coordinator.setRetentionAdmission(
+      blocked: planning.mustBlockBeforeCleanup, on: snapshot.volumeIdentity,
+      configurationToken: configurationToken)
+    guard updated else { throw SessionRetentionRuntimeError.stalePreview }
     guard !planning.mustBlockBeforeCleanup else {
       throw SessionRetentionRuntimeError.retentionBlocked
     }
-    return snapshot
+    return SessionHeavyWriterAdmission(
+      catalog: snapshot, configurationToken: configurationToken)
+  }
+
+  public func admitHeavyWriter(
+    _ request: StorageClaimRequest,
+    snapshot: HostStorageSnapshot,
+    admission: SessionHeavyWriterAdmission
+  ) async -> StorageAdmission {
+    guard request.volumeIdentity == admission.volumeIdentity,
+      snapshot.volumeIdentity == admission.volumeIdentity
+    else { return .queued(.waitingForStorage) }
+    do {
+      try catalog.requireCurrentRoot(
+        identity: admission.rootIdentity,
+        volumeIdentity: admission.volumeIdentity)
+    } catch {
+      return .queued(.waitingForStorage)
+    }
+    return await coordinator.admit(
+      request, snapshot: snapshot,
+      configurationToken: admission.configurationToken)
+  }
+
+  public func createSession(
+    sessionID: String,
+    jobID: String,
+    createdAt: Date,
+    claim: StorageClaim,
+    admission: SessionHeavyWriterAdmission
+  ) async throws -> SessionLayout {
+    do {
+      try catalog.requireCurrentRoot(
+        identity: admission.rootIdentity,
+        volumeIdentity: admission.volumeIdentity)
+      return try sessionStore.createSession(
+        sessionID: sessionID, jobID: jobID, createdAt: createdAt, claim: claim)
+    } catch {
+      await coordinator.cancelUnboundAdmission(claim)
+      throw error
+    }
   }
 
   public func registerFinalizedSession(_ sessionRoot: URL) async {
@@ -121,12 +175,16 @@ public struct SessionStorageExecutionContext: Sendable {
       let snapshot = try catalog.scan(
         retentionDays: settings.retentionDays,
         policyGeneration: settings.generation)
+      let configurationToken = settingsStore.configurationEpoch.snapshot()
       let active = await coordinator.activeSessions(on: snapshot.volumeIdentity)
+      try requireCurrentSettings()
+      try settingsStore.configurationEpoch.performIfCurrent(configurationToken) {}
       let planning = try makeRetentionPlanning(
         catalog: snapshot, settings: settings, active: active,
         controller: retentionController)
-      await coordinator.setRetentionAdmission(
-        blocked: planning.mustBlockBeforeCleanup, on: snapshot.volumeIdentity)
+      _ = await coordinator.setRetentionAdmission(
+        blocked: planning.mustBlockBeforeCleanup, on: snapshot.volumeIdentity,
+        configurationToken: configurationToken)
     } catch {
       if let snapshot = try? catalog.scan(
         retentionDays: settings.retentionDays,
@@ -152,14 +210,18 @@ public actor SessionStorageApplicationRuntime {
   public static let production = SessionStorageApplicationRuntime()
 
   public init(
-    settingsStore: SessionSettingsStore = SessionSettingsStore(),
-    coordinator: HostStorageCoordinator = HostStorageCoordinator(),
+    settingsStore: SessionSettingsStore? = nil,
+    coordinator: HostStorageCoordinator? = nil,
     volumeIdentityResolver: any VolumeIdentityResolving = SystemVolumeIdentityResolver(),
     catalogFaultInjector: SessionRetentionCatalogFaultInjector = .none,
     retentionController: SessionRetentionController = SessionRetentionController()
   ) {
-    self.settingsStore = settingsStore
-    self.coordinator = coordinator
+    let configurationEpoch =
+      settingsStore?.configurationEpoch ?? StorageConfigurationEpoch()
+    self.settingsStore =
+      settingsStore ?? SessionSettingsStore(configurationEpoch: configurationEpoch)
+    self.coordinator =
+      coordinator ?? HostStorageCoordinator(configurationEpoch: configurationEpoch)
     self.volumeIdentityResolver = volumeIdentityResolver
     self.catalogFaultInjector = catalogFaultInjector
     self.retentionController = retentionController
@@ -171,7 +233,8 @@ public actor SessionStorageApplicationRuntime {
     let catalog = try SessionRetentionCatalog(
       sessionsRoot: access.lease.url,
       volumeIdentityResolver: volumeIdentityResolver,
-      faultInjector: catalogFaultInjector)
+      faultInjector: catalogFaultInjector,
+      configurationEpoch: settingsStore.configurationEpoch)
     return try SessionStorageExecutionContext(
       access: access, settingsStore: settingsStore, coordinator: coordinator,
       catalog: catalog, retentionController: retentionController)
@@ -234,10 +297,15 @@ public actor SessionStorageApplicationRuntime {
       let afterState = try await scanState(context)
       pendingRescanVolumes.remove(current.volumeIdentity)
       let shouldBlock = afterState.planning.mustBlockBeforeCleanup
-      await coordinator.clearConservativeRetentionBlockAfterSuccessfulRescan(
-        on: afterState.catalog.volumeIdentity)
-      await coordinator.setRetentionAdmission(
-        blocked: shouldBlock, on: afterState.catalog.volumeIdentity)
+      let updated = await coordinator.setRetentionAdmission(
+        blocked: shouldBlock, on: afterState.catalog.volumeIdentity,
+        configurationToken: afterState.configurationToken)
+      let cleared = await coordinator.clearConservativeRetentionBlockAfterSuccessfulRescan(
+        on: afterState.catalog.volumeIdentity,
+        configurationToken: afterState.configurationToken)
+      guard cleared, updated else {
+        throw SessionRetentionRuntimeError.stalePreview
+      }
       let after = preview(
         context: context, state: afterState,
         blocksNewHeavyWriters: shouldBlock)
@@ -272,8 +340,10 @@ public actor SessionStorageApplicationRuntime {
     let mustBlock =
       state.planning.mustBlockBeforeCleanup
       || pendingRescanVolumes.contains(state.catalog.volumeIdentity)
-    await coordinator.setRetentionAdmission(
-      blocked: mustBlock, on: state.catalog.volumeIdentity)
+    let updated = await coordinator.setRetentionAdmission(
+      blocked: mustBlock, on: state.catalog.volumeIdentity,
+      configurationToken: state.configurationToken)
+    guard updated else { throw SessionRetentionRuntimeError.stalePreview }
     return preview(
       context: context, state: state, blocksNewHeavyWriters: mustBlock)
   }
@@ -285,11 +355,16 @@ public actor SessionStorageApplicationRuntime {
     let snapshot = try context.catalog.scan(
       retentionDays: context.settings.retentionDays,
       policyGeneration: context.settings.generation)
+    let configurationToken = settingsStore.configurationEpoch.snapshot()
     let active = await coordinator.activeSessions(on: snapshot.volumeIdentity)
+    try context.requireCurrentSettings()
+    try settingsStore.configurationEpoch.performIfCurrent(configurationToken) {}
     let planning = try makeRetentionPlanning(
       catalog: snapshot, settings: context.settings, active: active,
       controller: retentionController)
-    return RuntimeScanState(catalog: snapshot, planning: planning)
+    return RuntimeScanState(
+      catalog: snapshot, planning: planning,
+      configurationToken: configurationToken)
   }
 
   private func preview(
@@ -318,6 +393,7 @@ public actor SessionStorageApplicationRuntime {
 private struct RuntimeScanState {
   let catalog: SessionRetentionCatalogSnapshot
   let planning: RetentionPlanningState
+  let configurationToken: StorageConfigurationToken
 }
 
 private struct RetentionPlanningState {

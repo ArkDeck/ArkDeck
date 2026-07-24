@@ -138,6 +138,97 @@ final class SessionSettingsContractTests: XCTestCase {
     XCTAssertTrue(FileManager.default.fileExists(atPath: fixture.defaultRoot.path))
   }
 
+  func testStaleBookmarkReplacementFailuresRequireReselectionWithoutFallback() throws {
+    let overflowBookmark = FakeSessionBookmarkAccess()
+    let overflow = try SettingsFixture(
+      label: "stale-overflow", bookmark: overflowBookmark)
+    defer { overflow.cleanup() }
+    let custom = overflow.base.appending(path: "custom", directoryHint: .isDirectory)
+    try makeOwnerOnlyDirectory(custom)
+    overflowBookmark.configure(resolvedURL: custom, stale: true, allowsScope: true)
+    let overflowEnvelope = try canonicalJSON(
+      .object([
+        "schemaVersion": .string("1.0.0"),
+        "generation": .unsignedInteger(UInt64.max),
+        "rootSource": .string("userBookmark"),
+        "expectedRootPath": .string(custom.standardizedFileURL.path),
+        "totalQuotaBytes": .unsignedInteger(4_096),
+        "safetyMarginBytes": .unsignedInteger(1_024),
+        "retentionDays": .unsignedInteger(90),
+        "bookmark": .string(Data("stale-bookmark".utf8).base64EncodedString()),
+      ]))
+    overflow.defaults.set(
+      overflowEnvelope, forKey: SessionSettingsStore.persistenceKey)
+    XCTAssertThrowsError(
+      try overflow.store.acquireRoot(for: overflow.store.load())
+    ) {
+      XCTAssertEqual($0 as? SessionSettingsError, .requiresReselection)
+    }
+    XCTAssertEqual(
+      overflow.defaults.data(forKey: SessionSettingsStore.persistenceKey),
+      overflowEnvelope)
+    XCTAssertFalse(FileManager.default.fileExists(atPath: overflow.defaultRoot.path))
+
+    let persistenceBookmark = FakeSessionBookmarkAccess()
+    let persistence = try SettingsFixture(
+      label: "stale-persistence", bookmark: persistenceBookmark)
+    defer { persistence.cleanup() }
+    let persistedCustom = persistence.base.appending(
+      path: "custom", directoryHint: .isDirectory)
+    try makeOwnerOnlyDirectory(persistedCustom)
+    persistenceBookmark.configure(
+      resolvedURL: persistedCustom, stale: false, allowsScope: true)
+    let selected = try persistence.store.selectCustomRoot(
+      persistedCustom, expectedGeneration: 0)
+    let before = try XCTUnwrap(
+      persistence.defaults.data(forKey: SessionSettingsStore.persistenceKey))
+    persistenceBookmark.configure(
+      resolvedURL: persistedCustom, stale: true, allowsScope: true)
+    let failingStore = SessionSettingsStore(
+      defaults: persistence.defaults,
+      defaultRootProvider: { [root = persistence.defaultRoot] in root },
+      bookmarkAccess: persistenceBookmark,
+      faultInjector: SessionSettingsFaultInjector { point in
+        if point == .beforePersistence { throw SessionSettingsTestError.injected }
+      })
+    XCTAssertThrowsError(try failingStore.acquireRoot(for: selected)) {
+      XCTAssertEqual($0 as? SessionSettingsError, .requiresReselection)
+    }
+    XCTAssertEqual(
+      persistence.defaults.data(forKey: SessionSettingsStore.persistenceKey), before)
+    XCTAssertFalse(FileManager.default.fileExists(atPath: persistence.defaultRoot.path))
+  }
+
+  func testCustomRootRequiresOwnerWriteSearchAndDescriptorWriteProbe() throws {
+    let readOnly = try SettingsFixture(label: "root-0500")
+    defer { readOnly.cleanup() }
+    let root = readOnly.base.appending(path: "read-only", directoryHint: .isDirectory)
+    try makeOwnerOnlyDirectory(root)
+    XCTAssertEqual(chmod(root.path, 0o500), 0)
+    XCTAssertThrowsError(
+      try readOnly.store.selectCustomRoot(root, expectedGeneration: 0)
+    ) {
+      XCTAssertEqual($0 as? SessionSettingsError, .invalidRoot)
+    }
+    XCTAssertNil(readOnly.defaults.object(forKey: SessionSettingsStore.persistenceKey))
+
+    let denied = try SettingsFixture(
+      label: "root-probe-denied",
+      faultInjector: SessionSettingsFaultInjector { point in
+        if point == .beforeRootWriteProbe { throw SessionSettingsTestError.injected }
+      })
+    defer { denied.cleanup() }
+    let deniedRoot = denied.base.appending(
+      path: "acl-style-denial", directoryHint: .isDirectory)
+    try makeOwnerOnlyDirectory(deniedRoot)
+    XCTAssertThrowsError(
+      try denied.store.selectCustomRoot(deniedRoot, expectedGeneration: 0)
+    ) {
+      XCTAssertEqual($0 as? SessionSettingsError, .invalidRoot)
+    }
+    XCTAssertNil(denied.defaults.object(forKey: SessionSettingsStore.persistenceKey))
+  }
+
   func testCatalogInitializesPinsRegistersNewSessionsAndPreservesMissingMetadata() throws {
     let root = try temporaryRoot("catalog-pins")
     defer { try? FileManager.default.removeItem(at: root) }
@@ -186,6 +277,35 @@ final class SessionSettingsContractTests: XCTestCase {
     XCTAssertEqual(Set(snapshot.unknownSessionIDs), ["session-first", "session-second"])
     XCTAssertTrue(FileManager.default.fileExists(atPath: first.path))
     XCTAssertTrue(FileManager.default.fileExists(atPath: second.path))
+  }
+
+  func testCatalogIndexesPlanOnlyAndRecoversFreshRegisterAsFirstOperation() throws {
+    let planRoot = try temporaryRoot("catalog-plan-only")
+    defer { try? FileManager.default.removeItem(at: planRoot) }
+    _ = try makeFinalizedSession(
+      root: planRoot, year: "2026", month: "07", sessionID: "session-plan-only",
+      jobID: "job-plan-only", completedAt: "2026-07-01T00:00:00Z",
+      payloadBytes: 8, status: "planned", executionMode: "planOnly")
+    let planSnapshot = try SessionRetentionCatalog(sessionsRoot: planRoot)
+      .scan(retentionDays: 90, policyGeneration: 0)
+    XCTAssertEqual(planSnapshot.sessions.map(\.sessionID), ["session-plan-only"])
+    XCTAssertEqual(planSnapshot.entries.map(\.sessionID), ["session-plan-only"])
+    XCTAssertFalse(planSnapshot.unknownPressure)
+
+    let registerRoot = try temporaryRoot("catalog-register-first")
+    defer { try? FileManager.default.removeItem(at: registerRoot) }
+    let session = try makeFinalizedSession(
+      root: registerRoot, year: "2026", month: "07",
+      sessionID: "session-register-first", jobID: "job-register-first",
+      completedAt: "2026-07-01T00:00:00Z", payloadBytes: 8)
+    let registerCatalog = try SessionRetentionCatalog(sessionsRoot: registerRoot)
+    try registerCatalog.registerFinalizedSession(
+      sessionRoot: session, retentionDays: 90, policyGeneration: 0)
+    let registered = try registerCatalog.scan(
+      retentionDays: 90, policyGeneration: 0)
+    XCTAssertEqual(registered.sessions.map(\.sessionID), ["session-register-first"])
+    XCTAssertEqual(registered.entries.map(\.sessionID), ["session-register-first"])
+    XCTAssertFalse(registered.unknownPressure)
   }
 
   func testCatalogRejectsSymlinksDuplicateIdentityFIFOHardlinkAndMeasurementFault() throws {
@@ -586,6 +706,233 @@ final class SessionSettingsContractTests: XCTestCase {
     XCTAssertTrue(FileManager.default.fileExists(atPath: volumeSession.path))
   }
 
+  func testRetentionPreservesActiveBoundAndUnfinalizedPartialSessions() async throws {
+    let fixture = try SettingsFixture(label: "active-partial-retention")
+    defer { fixture.cleanup() }
+    try makeOwnerOnlyDirectory(fixture.defaultRoot)
+    _ = try fixture.store.savePolicy(
+      totalQuotaBytes: 1_000, safetyMarginBytes: 100,
+      retentionDays: 1, expectedGeneration: 0)
+    let runtime = SessionStorageApplicationRuntime(settingsStore: fixture.store)
+    let context = try runtime.makeExecutionContext()
+    let admission = try await context.prepareHeavyWriterAdmission()
+    let snapshot = HostStorageSnapshot(
+      volumeIdentity: admission.volumeIdentity,
+      totalBytes: 1_000_000, availableBytes: 1_000_000, isReadOnly: false)
+    let request = try StorageClaimRequest(
+      claimID: "claim-active-retention", jobID: "job-active-retention",
+      volumeIdentity: admission.volumeIdentity,
+      budget: StorageBudget(
+        metadataHeadroomBytes: 1, finalizationHeadroomBytes: 1,
+        remainingGrowthBytes: 1, writerClass: .heavy))
+    guard
+      case .admitted(let claim) = await context.admitHeavyWriter(
+        request, snapshot: snapshot, admission: admission)
+    else { return XCTFail("active retention fixture must acquire a bound claim") }
+    let active = try await context.createSession(
+      sessionID: "session-active-retention", jobID: "job-active-retention",
+      createdAt: Date(timeIntervalSince1970: 1_577_836_800), claim: claim,
+      admission: admission)
+    try writeOwnerOnly(
+      try SessionStorageFixtures.manifest(
+        sessionID: active.sessionID, jobID: active.jobID,
+        timestamp: "2020-01-01T00:00:00Z"),
+      to: active.manifestURL)
+    try writeOwnerOnly(
+      Data(repeating: 0x41, count: 64),
+      to: active.root.appending(path: "active-payload.bin"))
+    try context.catalog.registerFinalizedSession(
+      sessionRoot: active.root, retentionDays: 1,
+      policyGeneration: context.settings.generation)
+
+    let deletable = try makeFinalizedSession(
+      root: fixture.defaultRoot, year: "2020", month: "02",
+      sessionID: "session-deletable-retention", jobID: "job-deletable-retention",
+      completedAt: "2020-02-01T00:00:00Z", payloadBytes: 64)
+    try context.catalog.registerFinalizedSession(
+      sessionRoot: deletable, retentionDays: 1,
+      policyGeneration: context.settings.generation)
+
+    let partial =
+      fixture.defaultRoot
+      .appending(path: "2020", directoryHint: .isDirectory)
+      .appending(path: "03", directoryHint: .isDirectory)
+      .appending(path: "session-unfinalized-partial", directoryHint: .isDirectory)
+    try makeOwnerOnlyDirectory(partial)
+    try writeOwnerOnly(
+      try identityData(
+        sessionID: "session-unfinalized-partial", jobID: "job-unfinalized-partial"),
+      to: partial.appending(path: ".session-identity.json"))
+    try writeOwnerOnly(
+      Data(repeating: 0x50, count: 64),
+      to: partial.appending(path: "partial-payload.bin"))
+
+    let preview = try await runtime.refresh()
+    XCTAssertTrue(preview.deletionSessionIDs.contains("session-deletable-retention"))
+    XCTAssertFalse(preview.deletionSessionIDs.contains("session-active-retention"))
+    XCTAssertTrue(
+      preview.unknownSessionIDs.contains("2020/03/session-unfinalized-partial"))
+    let confirmation = try await runtime.confirm(preview)
+    _ = try await runtime.apply(confirmation)
+    XCTAssertTrue(FileManager.default.fileExists(atPath: active.root.path))
+    XCTAssertTrue(FileManager.default.fileExists(atPath: partial.path))
+    XCTAssertFalse(FileManager.default.fileExists(atPath: deletable.path))
+    let activeSessionIDs = await runtime.coordinator.activeSessions(
+      on: admission.volumeIdentity
+    ).map(\.sessionID)
+    XCTAssertEqual(activeSessionIDs, ["session-active-retention"])
+  }
+
+  func testStaleScanCannotClearNewerBlockAndStaleClaimCannotCreateSession()
+    async throws
+  {
+    let racing = try SettingsFixture(label: "stale-scan")
+    defer { racing.cleanup() }
+    try makeOwnerOnlyDirectory(racing.defaultRoot)
+    _ = try makeFinalizedSession(
+      root: racing.defaultRoot, year: "2026", month: "07",
+      sessionID: "session-scan-race", jobID: "job-scan-race",
+      completedAt: "2026-07-01T00:00:00Z", payloadBytes: 8)
+    let entered = DispatchSemaphore(value: 0)
+    let resume = DispatchSemaphore(value: 0)
+    let measurements = LockedInteger()
+    let racingRuntime = SessionStorageApplicationRuntime(
+      settingsStore: racing.store,
+      catalogFaultInjector: SessionRetentionCatalogFaultInjector { point in
+        if point == .beforeMeasurement, measurements.increment() == 1 {
+          entered.signal()
+          _ = resume.wait(timeout: .now() + 10)
+        }
+      })
+    let racingContext = try racingRuntime.makeExecutionContext()
+    let oldScan = Task.detached {
+      try await racingContext.prepareHeavyWriterAdmission()
+    }
+    let didEnter = await withCheckedContinuation { continuation in
+      DispatchQueue.global().async {
+        continuation.resume(
+          returning: entered.wait(timeout: .now() + 10) == .success)
+      }
+    }
+    XCTAssertTrue(didEnter)
+    let volume = try SystemVolumeIdentityResolver().resolve(racing.defaultRoot)
+    _ = try racing.store.savePolicy(
+      totalQuotaBytes: 8_192, safetyMarginBytes: 1_024,
+      retentionDays: 30, expectedGeneration: 0)
+    await racingRuntime.coordinator.setRetentionAdmission(
+      blocked: true, on: volume)
+    resume.signal()
+    do {
+      _ = try await oldScan.value
+      XCTFail("a scan from an older settings generation must be rejected")
+    } catch {}
+    let remainsBlocked = await racingRuntime.coordinator.retentionAdmissionIsBlocked(
+      on: volume)
+    XCTAssertTrue(remainsBlocked)
+
+    let staleClaim = try SettingsFixture(label: "stale-claim")
+    defer { staleClaim.cleanup() }
+    let staleRuntime = SessionStorageApplicationRuntime(settingsStore: staleClaim.store)
+    let staleContext = try staleRuntime.makeExecutionContext()
+    let staleAdmission = try await staleContext.prepareHeavyWriterAdmission()
+    let staleSnapshot = HostStorageSnapshot(
+      volumeIdentity: staleAdmission.volumeIdentity,
+      totalBytes: 1_000_000, availableBytes: 1_000_000, isReadOnly: false)
+    let staleRequest = try StorageClaimRequest(
+      claimID: "claim-stale-configuration", jobID: "job-stale-configuration",
+      volumeIdentity: staleAdmission.volumeIdentity,
+      budget: StorageBudget(
+        metadataHeadroomBytes: 1, finalizationHeadroomBytes: 1,
+        remainingGrowthBytes: 1, writerClass: .heavy))
+    guard
+      case .admitted(let claim) = await staleContext.admitHeavyWriter(
+        staleRequest, snapshot: staleSnapshot, admission: staleAdmission)
+    else { return XCTFail("stale-claim fixture must initially admit") }
+    _ = try staleClaim.store.savePolicy(
+      totalQuotaBytes: 8_192, safetyMarginBytes: 1_024,
+      retentionDays: 30, expectedGeneration: 0)
+    do {
+      _ = try await staleContext.createSession(
+        sessionID: "session-stale-configuration",
+        jobID: "job-stale-configuration",
+        createdAt: Date(timeIntervalSince1970: 1_704_067_200),
+        claim: claim, admission: staleAdmission)
+      XCTFail("a claim from an older configuration must not create a Session")
+    } catch {
+      guard case SessionStorageError.claimUnavailable = error else {
+        return XCTFail("expected stale claim rejection, got \(error)")
+      }
+    }
+    let activeClaimCount = await staleRuntime.coordinator.activeClaimCount(
+      on: staleAdmission.volumeIdentity)
+    XCTAssertEqual(activeClaimCount, 0)
+    XCTAssertFalse(
+      FileManager.default.fileExists(
+        atPath: staleClaim.defaultRoot
+          .appending(path: "2024/01/session-stale-configuration").path))
+  }
+
+  func testRootIdentityIsRecheckedBeforeClaimAndSessionCreation() async throws {
+    let fixture = try SettingsFixture(label: "admission-root-drift")
+    defer { fixture.cleanup() }
+    let runtime = SessionStorageApplicationRuntime(settingsStore: fixture.store)
+    let context = try runtime.makeExecutionContext()
+    let oldAdmission = try await context.prepareHeavyWriterAdmission()
+    let oldSnapshot = HostStorageSnapshot(
+      volumeIdentity: oldAdmission.volumeIdentity,
+      totalBytes: 1_000_000, availableBytes: 1_000_000, isReadOnly: false)
+    let oldRequest = try StorageClaimRequest(
+      claimID: "claim-root-drift-before-admit", jobID: "job-root-drift-before-admit",
+      volumeIdentity: oldAdmission.volumeIdentity,
+      budget: StorageBudget(
+        metadataHeadroomBytes: 1, finalizationHeadroomBytes: 1,
+        remainingGrowthBytes: 1, writerClass: .heavy))
+    let firstRoot = fixture.base.appending(
+      path: "preserved-first-root", directoryHint: .isDirectory)
+    try FileManager.default.moveItem(at: fixture.defaultRoot, to: firstRoot)
+    try makeOwnerOnlyDirectory(fixture.defaultRoot)
+    let staleRootAdmission = await context.admitHeavyWriter(
+      oldRequest, snapshot: oldSnapshot, admission: oldAdmission)
+    XCTAssertEqual(staleRootAdmission, .queued(.waitingForStorage))
+
+    let currentAdmission = try await context.prepareHeavyWriterAdmission()
+    let currentSnapshot = HostStorageSnapshot(
+      volumeIdentity: currentAdmission.volumeIdentity,
+      totalBytes: 1_000_000, availableBytes: 1_000_000, isReadOnly: false)
+    let currentRequest = try StorageClaimRequest(
+      claimID: "claim-root-drift-before-create",
+      jobID: "job-root-drift-before-create",
+      volumeIdentity: currentAdmission.volumeIdentity,
+      budget: StorageBudget(
+        metadataHeadroomBytes: 1, finalizationHeadroomBytes: 1,
+        remainingGrowthBytes: 1, writerClass: .heavy))
+    guard
+      case .admitted(let claim) = await context.admitHeavyWriter(
+        currentRequest, snapshot: currentSnapshot, admission: currentAdmission)
+    else { return XCTFail("current root must initially admit") }
+    let secondRoot = fixture.base.appending(
+      path: "preserved-second-root", directoryHint: .isDirectory)
+    try FileManager.default.moveItem(at: fixture.defaultRoot, to: secondRoot)
+    try makeOwnerOnlyDirectory(fixture.defaultRoot)
+    do {
+      _ = try await context.createSession(
+        sessionID: "session-root-drift-before-create",
+        jobID: "job-root-drift-before-create",
+        createdAt: Date(timeIntervalSince1970: 1_704_067_200),
+        claim: claim, admission: currentAdmission)
+      XCTFail("root replacement must reject Session creation")
+    } catch {
+      XCTAssertEqual(error as? SessionRetentionCatalogError, .invalidRoot)
+    }
+    let activeClaims = await runtime.coordinator.activeClaimCount(
+      on: currentAdmission.volumeIdentity)
+    XCTAssertEqual(activeClaims, 0)
+    XCTAssertFalse(
+      FileManager.default.fileExists(
+        atPath: fixture.defaultRoot
+          .appending(path: "2024/01/session-root-drift-before-create").path))
+  }
+
   func testProductionStorageCompositionUsesValidatedRootAndSharedCoordinator() async throws {
     let fixture = try SettingsFixture(label: "composition")
     defer { fixture.cleanup() }
@@ -656,7 +1003,8 @@ private final class SettingsFixture {
 
   init(
     label: String,
-    bookmark: any SessionBookmarkAccessing = FakeSessionBookmarkAccess()
+    bookmark: any SessionBookmarkAccessing = FakeSessionBookmarkAccess(),
+    faultInjector: SessionSettingsFaultInjector = .none
   ) throws {
     base = try temporaryRoot("settings-\(label)")
     defaultRoot = base.appending(path: "default-sessions", directoryHint: .isDirectory)
@@ -666,7 +1014,8 @@ private final class SettingsFixture {
     store = SessionSettingsStore(
       defaults: defaults,
       defaultRootProvider: { [defaultRoot] in defaultRoot },
-      bookmarkAccess: bookmark)
+      bookmarkAccess: bookmark,
+      faultInjector: faultInjector)
   }
 
   func cleanup() {
@@ -800,7 +1149,9 @@ private func makeFinalizedSession(
   sessionID: String,
   jobID: String,
   completedAt: String,
-  payloadBytes: Int
+  payloadBytes: Int,
+  status: String = "succeeded",
+  executionMode: String = "simulated"
 ) throws -> URL {
   let session =
     root
@@ -813,7 +1164,8 @@ private func makeFinalizedSession(
     to: session.appending(path: ".session-identity.json"))
   try writeOwnerOnly(
     try SessionStorageFixtures.manifest(
-      sessionID: sessionID, jobID: jobID, timestamp: completedAt),
+      sessionID: sessionID, jobID: jobID, status: status,
+      executionMode: executionMode, timestamp: completedAt),
     to: session.appending(path: "manifest.json"))
   try writeOwnerOnly(
     Data(repeating: 0x5A, count: payloadBytes),

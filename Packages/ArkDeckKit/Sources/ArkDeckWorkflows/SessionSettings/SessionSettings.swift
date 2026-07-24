@@ -1,3 +1,4 @@
+import ArkDeckStorage
 import Darwin
 import Foundation
 
@@ -53,6 +54,27 @@ public enum SessionSettingsError: Error, Equatable, Sendable {
   case staleGeneration(expected: UInt64, actual: UInt64)
   case persistenceFailed
   case requiresReselection
+}
+
+public enum SessionSettingsFaultPoint: String, CaseIterable, Sendable {
+  case beforePersistence
+  case beforeRootWriteProbe
+}
+
+public struct SessionSettingsFaultInjector: @unchecked Sendable {
+  private let body: @Sendable (SessionSettingsFaultPoint) throws -> Void
+
+  public init(
+    _ body: @escaping @Sendable (SessionSettingsFaultPoint) throws -> Void
+  ) {
+    self.body = body
+  }
+
+  public func check(_ point: SessionSettingsFaultPoint) throws {
+    try body(point)
+  }
+
+  public static let none = SessionSettingsFaultInjector { _ in }
 }
 
 public struct SessionBookmarkResolution: Equatable, Sendable {
@@ -140,10 +162,12 @@ public struct SessionRootAccessContext: Sendable {
 
 public final class SessionSettingsStore: @unchecked Sendable {
   public static let persistenceKey = "ArkDeck.SessionSettings.v1"
+  public let configurationEpoch: StorageConfigurationEpoch
 
   private let defaults: UserDefaults
   private let defaultRootProvider: @Sendable () throws -> URL
   private let bookmarkAccess: any SessionBookmarkAccessing
+  private let faultInjector: SessionSettingsFaultInjector
   private let lock = NSLock()
 
   public init(
@@ -157,11 +181,15 @@ public final class SessionSettingsStore: @unchecked Sendable {
         .appending(path: "ArkDeck", directoryHint: .isDirectory)
         .appending(path: "Sessions", directoryHint: .isDirectory)
     },
-    bookmarkAccess: any SessionBookmarkAccessing = SystemSessionBookmarkAccess()
+    bookmarkAccess: any SessionBookmarkAccessing = SystemSessionBookmarkAccess(),
+    configurationEpoch: StorageConfigurationEpoch = StorageConfigurationEpoch(),
+    faultInjector: SessionSettingsFaultInjector = .none
   ) {
     self.defaults = defaults
     self.defaultRootProvider = defaultRootProvider
     self.bookmarkAccess = bookmarkAccess
+    self.configurationEpoch = configurationEpoch
+    self.faultInjector = faultInjector
   }
 
   public func load() throws -> SessionSettingsSnapshot {
@@ -300,13 +328,17 @@ public final class SessionSettingsStore: @unchecked Sendable {
         do {
           try validateRoot(resolved, createIfMissing: false)
           if resolution.isStale {
-            let replacement = try bookmarkAccess.makeReadWriteBookmark(for: resolved)
-            guard !replacement.isEmpty else {
+            do {
+              let replacement = try bookmarkAccess.makeReadWriteBookmark(for: resolved)
+              guard !replacement.isEmpty else {
+                throw SessionSettingsError.requiresReselection
+              }
+              envelope.generation = try nextGeneration(envelope.generation)
+              envelope.bookmark = replacement
+              try persist(envelope)
+            } catch {
               throw SessionSettingsError.requiresReselection
             }
-            envelope.generation = try nextGeneration(envelope.generation)
-            envelope.bookmark = replacement
-            try persist(envelope)
           }
           accessTransferred = true
           return SessionRootAccessContext(
@@ -386,10 +418,13 @@ public final class SessionSettingsStore: @unchecked Sendable {
 
   private func persist(_ envelope: PersistentSessionSettings) throws {
     let data = try canonicalData(envelope)
-    defaults.set(data, forKey: Self.persistenceKey)
-    guard let persisted = defaults.object(forKey: Self.persistenceKey) as? Data,
-      persisted == data
-    else { throw SessionSettingsError.persistenceFailed }
+    try configurationEpoch.performMutation {
+      try faultInjector.check(.beforePersistence)
+      defaults.set(data, forKey: Self.persistenceKey)
+      guard let persisted = defaults.object(forKey: Self.persistenceKey) as? Data,
+        persisted == data
+      else { throw SessionSettingsError.persistenceFailed }
+    }
   }
 
   private func validatePolicy(
@@ -419,6 +454,7 @@ public final class SessionSettingsStore: @unchecked Sendable {
     guard Darwin.lstat(url.path, &metadata) == 0,
       metadata.st_mode & S_IFMT == S_IFDIR,
       metadata.st_uid == geteuid(),
+      metadata.st_mode & (S_IWUSR | S_IXUSR) == (S_IWUSR | S_IXUSR),
       metadata.st_mode & (S_IWGRP | S_IWOTH) == 0
     else { throw SessionSettingsError.invalidRoot }
     let descriptor = Darwin.open(
@@ -429,9 +465,34 @@ public final class SessionSettingsStore: @unchecked Sendable {
     guard fstat(descriptor, &opened) == 0,
       opened.st_mode & S_IFMT == S_IFDIR,
       opened.st_uid == geteuid(),
+      opened.st_mode & (S_IWUSR | S_IXUSR) == (S_IWUSR | S_IXUSR),
       opened.st_mode & (S_IWGRP | S_IWOTH) == 0,
       opened.st_dev == metadata.st_dev, opened.st_ino == metadata.st_ino
     else { throw SessionSettingsError.invalidRoot }
+
+    do {
+      try faultInjector.check(.beforeRootWriteProbe)
+    } catch {
+      throw SessionSettingsError.invalidRoot
+    }
+    let probeName = ".arkdeck-settings-write-probe-\(UUID().uuidString)"
+    let probe = Darwin.openat(
+      descriptor, probeName,
+      O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, 0o600)
+    guard probe >= 0 else { throw SessionSettingsError.invalidRoot }
+    var probeIsOpen = true
+    defer {
+      if probeIsOpen { Darwin.close(probe) }
+      _ = Darwin.unlinkat(descriptor, probeName, 0)
+    }
+    guard Darwin.close(probe) == 0 else {
+      probeIsOpen = false
+      throw SessionSettingsError.invalidRoot
+    }
+    probeIsOpen = false
+    guard Darwin.unlinkat(descriptor, probeName, 0) == 0 else {
+      throw SessionSettingsError.invalidRoot
+    }
   }
 
   private func standardizedAbsoluteFileURL(_ url: URL) throws -> URL {
