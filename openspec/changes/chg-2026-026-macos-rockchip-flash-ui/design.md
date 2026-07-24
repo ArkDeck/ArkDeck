@@ -2,14 +2,15 @@
 
 ## Context and constraints
 
-- Proposal revision：r5；r1-r4 已由维护者 merge。r5 只把 TASK-RKFUI-001A 的 HDC
-  executable identity 从 `Ver: 3.2.0d` / `48395ba8…d260` 精确替换为
-  `Ver: 3.2.0f` / `05b2bf7a…f83`，并新增 TASK-RKFUI-001C registry/probe closure。
-  r5 merge 与 001C done 前 E0 preparation/E1 均 blocked。
-- r5 不改变 typed operation、target/firmware/transport、discovery tool、binding、window、
-  maxRuns、rebind 或 Safety 设计；HDC server 仍必须是 pre-existing external same-UID
-  pinned executable，Agent server lifecycle mutation 为 0。Maskrom candidate 是独立
-  physical/identity blocker，不因 repin 被过滤或放行。
+- Proposal revision：r6；r1-r5 已由维护者 merge。r6 只修正 TASK-RKFUI-001A probe
+  对 clean `rkdeveloptool` source provenance 的错误 runtime 推导，并新增
+  TASK-RKFUI-001D registry/probe closure。r6 merge 与 001D done 前 E0 preparation/E1
+  均 blocked。
+- r6 不改变 typed operation、target/firmware/transport、discovery binary
+  version/hash/upstream、binding、window、maxRuns、rebind 或 Safety 设计；HDC server 仍
+  必须是 pre-existing external same-UID pinned executable，Agent server lifecycle mutation
+  为 0。pre-existing RockUSB candidate 是独立 physical/identity gate，不因 provenance
+  closure 被过滤或放行。
 - Core baseline：`CORE-2.0.0`，叠加实现开始时已批准并适用的 scoped delta。
 - Related specs：flashing、desktop UX、device targeting、workflow journal/recovery、
   session/artifact/storage、macOS platform profile。
@@ -72,16 +73,23 @@ process executor、storage/power/binding/authorization ports；fixture compositi
    `bbd7bdc0…9923` / upstream `304f0737…`；它必须在 registry、Swift adapter/tests 与
    signed probe 中原子采用。旧 `038a8a0e…3611` 继续属于既有 destructive
    Provider/Profile，r2 不让两个 identity 互相替代。
-2. 只读 probe 使用绝对 executable URL 和 `arguments: ["ld"]`；不使用 PATH 或 shell。
-3. parser 只接受注册 fixture family：`DevNo`、VID、PID、LocationID、Mode。整份 stdout
+2. r6 loader-transition probe 从受保护 `main` 的 registry 读取 typed
+   `sourceProvenance`。该对象把 exact `bbd7bdc0…9923`、`304f0737…`、source acceptance
+   `PR#445@cbad982…` 和 reviewed evidence path/SHA-256 绑定为一个不可分 tuple。probe
+   同时验证顶层 tool tuple 与 provenance tuple 完全一致、evidence bytes 命中；它不把
+   executable parent、安装前缀、附近 `.git` 或 live checkout HEAD 视为 artifact source。
+3. 只读 probe 使用绝对 executable URL 和 `arguments: ["ld"]`；不使用 PATH、shell 或
+   `/usr/bin/git`。binary version/hash、ad-hoc signature 与 quarantine absent 仍须 runtime
+   精确验证，source provenance closure 不替代这些 artifact/trust checks。
+4. parser 只接受注册 fixture family：`DevNo`、VID、PID、LocationID、Mode。整份 stdout
    必须被消费；重复 DevNo/location、字段缺失、未知 mode、截断或额外设备行均给出 typed
    diagnostic，而不是退化为空列表。
-4. UI 可显示多台候选；用户必须选择一台。只有 `2207:350a + Loader` 可进入当前 Provider。
+5. UI 可显示多台候选；用户必须选择一台。只有 `2207:350a + Loader` 可进入当前 Provider。
    Maskrom/其他 PID 仅显示 blocked reason。
-5. normal/HDC 设备只能从已 durable 保存的 `OriginalTargetSnapshot` 与
+6. normal/HDC 设备只能从已 durable 保存的 `OriginalTargetSnapshot` 与
    `CurrentDeviceBinding` 进入 software transition；UI 当前选择、WMI、VID/PID 或 HDC 默认
    target 均不能 materialize 命令。
-6. execute 前重新运行 `ld`/HDC observation 并核对 selected observation、durable binding
+7. execute 前重新运行 `ld`/HDC observation 并核对 selected observation、durable binding
    revision 和物理确认；LocationID 只能寻址，不能替代设备 identity。
 
 ## Enter Loader routes and rebinding
@@ -173,6 +181,11 @@ candidate 均不开始 destructive step。
   implementation 立即 blocked，不自行扩 schema。
 - 新增版本化 RockUSB `ld` fixtures/registry，pin `rkdeveloptool` family/version/hash 与 exact
   argv。若需要扩展未知输出 family，必须走 integration revision，不在 parser 中宽松接受。
+- r6 只在 loader-transition registry 增加 typed
+  `protectedMainArtifactDigestToUpstreamCommit` provenance closure；artifact SHA-256、
+  upstream commit、source acceptance 与 evidence path/SHA-256 任一缺失、不一致或漂移，
+  均在任何 `ld`/USB/device command 前 blocked。该对象不是新 artifact repin，也不改变
+  rockusb-discovery registry、destructive Provider/Profile 或 Core schema。
 - r4 line-termination revision 仅登记 complete stdout 的 homogeneous LF 与 homogeneous
   CRLF 两种 family。parser 必须先在 raw bytes 上确认末尾 terminator、全输出同族与完整
   消费，再把 CRLF record 的单个 CR 去掉并复用同一 record grammar；bare CR、mixed
@@ -190,6 +203,9 @@ candidate 均不开始 destructive step。
 
 - tool missing/untrusted/quarantined/permission denied：零 probe 或零 mutation（取决于失败
   阶段），显示 typed remediation owner；不自动修复系统。
+- loader-transition source provenance missing/unknown kind、tuple/evidence drift：在
+  `ld`/USB/binding/intent 前 fail closed；不回退到 executable parent HEAD，不通过相同
+  version/hash 之外的第二 pin，也不在线获取或构建 replacement。
 - device list malformed/multiple-selection stale/identity mismatch：清除旧确认，重新 preflight。
 - HDC unavailable/unsupported：选择 physical fallback；typed command rejected、原 endpoint 未
   断开、deadline 内无 `0x350a Loader`、出现 `0x5000`/Maskrom/未知 mode 或多候选：保留
@@ -207,6 +223,9 @@ candidate 均不开始 destructive step。
 
 - 禁止 `sudo`、shell、AppleScript、Authorization Services、helper/driver 自动安装、ACL/group/
   rule 修改、quarantine 清除和 tool 自动下载。
+- probe runtime 禁止对 executable parent/ancestor 执行 Git source discovery。source
+  attribution 只来自 reviewed registry + exact evidence digest；actual executable bytes 和
+  platform trust 仍在本地独立重核。
 - 仅持久化 bookmark、工具/镜像 hash、脱敏 device/location 标识和关联 ID；原始用户路径、
   serial、业务字符串不进默认日志/evidence。
 - BlueTool 资源不复制进 repo，不用其 bundled 8G uboot，不执行其网络/API 路径。
@@ -221,6 +240,14 @@ candidate 均不开始 destructive step。
   Session-owned typed executor，也会形成文本解析旁路。
 - **BlueTool 式 HDC reboot 后取唯一 RockUSB**：拒绝其 identity 规则；接受软件进态产品目标，
   但必须先有具名 E1 evidence，并走 durable typed intent、bounded polling 和 Core rebind。
+- **把 `/opt/homebrew` HEAD 当 upstream**：拒绝。安装目录可能位于无关、可变 repository，
+  与 binary source 无密码学绑定。
+- **删除 upstream/source check，只看 binary hash**：拒绝。采用 protected-main reviewed
+  artifact-digest ↔ upstream-commit ↔ evidence tuple，使相同 binary bytes 只在已登记
+  provenance 下可用。
+- **要求 executable 紧邻 exact upstream checkout**：本窗口不采用。它会改变用户选择的
+  artifact path/packaging 前提；若未来选择该方案，须另起 readiness 并精确 pin checkout
+  root、commit 与 build/output relation。
 - **只保留物理按键**：作为可靠 fallback 保留，不作为唯一产品路径；已验证软件进态组合
   默认可从同一 Start Job 流程进入 Loader。
 - **先交付 plan-only UI**：接受为分阶段交付；execute 仍以 E0 non-elevated USB access 和
