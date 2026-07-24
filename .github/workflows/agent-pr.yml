@@ -6,9 +6,10 @@ name: Agent PR
 # github-actions[bot]. GitHub forbids only the PR *author* from approving,
 # so the human CODEOWNER (@lvye) can then review and approve the change.
 #
-# The required `guard` status is produced by the sdd-guard workflow on the
-# branch push (per-SHA), because pull requests created with GITHUB_TOKEN do
-# not trigger workflows themselves.
+# Required head checks are produced by push workflows. GitHub places
+# pull_request runs caused by a GITHUB_TOKEN-created/updated PR behind a
+# manual approval gate, so routine create/synchronize validation stays in
+# this exact-head push run.
 
 on:
   push:
@@ -16,31 +17,148 @@ on:
       - "agent/**"
       - "!agent/host-loop/**"
 
-permissions:
-  contents: read
-  pull-requests: write
+permissions: {}
 
 jobs:
   open-pr:
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+    outputs:
+      pr-number: ${{ steps.validate.outputs.pr-number }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Open pull request as github-actions[bot]
+      - name: Create or find and validate github-actions bot PR
+        id: validate
         env:
           GH_TOKEN: ${{ github.token }}
           BRANCH: ${{ github.ref_name }}
+          HEAD_SHA: ${{ github.sha }}
         run: |
           set -eu
-          if gh pr list --repo "$GITHUB_REPOSITORY" --head "$BRANCH" --state open --json number --jq 'length' | grep -qv '^0$'; then
-            echo "PR already open for $BRANCH"
-            exit 0
+          CANDIDATES="$RUNNER_TEMP/pull-candidates-before.json"
+          gh api --method GET --paginate --slurp \
+            "/repos/$GITHUB_REPOSITORY/pulls" \
+            -f state=open \
+            -f "head=$GITHUB_REPOSITORY_OWNER:$BRANCH" \
+            -f per_page=100 > "$CANDIDATES"
+          PR_NUMBER=$(
+            python scripts/check_pr_paths.py \
+              --repo-root "$GITHUB_WORKSPACE" \
+              --pull-list "$CANDIDATES" \
+              --allow-zero
+          )
+          if [ "$PR_NUMBER" = "none" ]; then
+            TITLE=$(git log -1 --pretty=%s)
+            BODY="$RUNNER_TEMP/pull-request-body.md"
+            printf 'Agent-drafted change from `%s`.\n\n- Review per AGENTS.md authority order; approval by the human CODEOWNER constitutes the governance decision.\n- Required exact-head checks are attached by push workflows.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n' "$BRANCH" > "$BODY"
+            gh pr create \
+              --repo "$GITHUB_REPOSITORY" \
+              --head "$BRANCH" \
+              --base main \
+              --title "$TITLE" \
+              --body-file "$BODY"
           fi
-          TITLE=$(git log -1 --pretty=%s)
-          gh pr create \
-            --repo "$GITHUB_REPOSITORY" \
-            --head "$BRANCH" \
-            --base main \
-            --title "$TITLE" \
-            --body "$(printf 'Agent-drafted change from `%s`.\n\n- Review per AGENTS.md authority order; approval by the human CODEOWNER constitutes the governance decision.\n- Required `guard` status is attached to the head commit by the sdd-guard workflow.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)' "$BRANCH")"
+
+          CANDIDATES="$RUNNER_TEMP/pull-candidates-after.json"
+          gh api --method GET --paginate --slurp \
+            "/repos/$GITHUB_REPOSITORY/pulls" \
+            -f state=open \
+            -f "head=$GITHUB_REPOSITORY_OWNER:$BRANCH" \
+            -f per_page=100 > "$CANDIDATES"
+          PR_NUMBER=$(
+            python scripts/check_pr_paths.py \
+              --repo-root "$GITHUB_WORKSPACE" \
+              --pull-list "$CANDIDATES"
+          )
+          case "$PR_NUMBER" in
+            ""|*[!0-9]*)
+              echo "::error::validated PR number is not numeric"
+              exit 1
+              ;;
+          esac
+
+          PULL_REQUEST="$RUNNER_TEMP/pull-request.json"
+          gh api --method GET \
+            "/repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" > "$PULL_REQUEST"
+          VALIDATED_NUMBER=$(
+            python scripts/check_pr_paths.py \
+              --repo-root "$GITHUB_WORKSPACE" \
+              --pull-request "$PULL_REQUEST" \
+              --identity-only \
+              --expected-repository "$GITHUB_REPOSITORY" \
+              --expected-number "$PR_NUMBER" \
+              --expected-base-ref main \
+              --expected-head-ref "$BRANCH" \
+              --expected-head-oid "$HEAD_SHA" \
+              --expected-author 'github-actions[bot]'
+          )
+          if [ "$VALIDATED_NUMBER" != "$PR_NUMBER" ]; then
+            echo "::error::fixed PR read-back did not preserve the selected number"
+            exit 1
+          fi
+          echo "pr-number=$VALIDATED_NUMBER" >> "$GITHUB_OUTPUT"
+
+  allowed-paths:
+    needs: open-pr
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: PR allowed-paths contract tests
+        run: python scripts/test_check_pr_paths.py
+
+      - name: Validate exact PR and declared task paths
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ needs.open-pr.outputs.pr-number }}
+          HEAD_REF: ${{ github.ref_name }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          set -eu
+          case "$PR_NUMBER" in
+            ""|*[!0-9]*)
+              echo "::error::open-pr output is not a numeric PR number"
+              exit 1
+              ;;
+          esac
+          CANDIDATES="$RUNNER_TEMP/pull-candidates-validation.json"
+          gh api --method GET --paginate --slurp \
+            "/repos/$GITHUB_REPOSITORY/pulls" \
+            -f state=open \
+            -f "head=$GITHUB_REPOSITORY_OWNER:$HEAD_REF" \
+            -f per_page=100 > "$CANDIDATES"
+          CURRENT_NUMBER=$(
+            python scripts/check_pr_paths.py \
+              --repo-root "$GITHUB_WORKSPACE" \
+              --pull-list "$CANDIDATES"
+          )
+          if [ "$CURRENT_NUMBER" != "$PR_NUMBER" ]; then
+            echo "::error::open PR identity changed between workflow jobs"
+            exit 1
+          fi
+          PULL_REQUEST="$RUNNER_TEMP/pull-request.json"
+          gh api --method GET \
+            "/repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" > "$PULL_REQUEST"
+          python scripts/check_pr_paths.py \
+            --repo-root "$GITHUB_WORKSPACE" \
+            --pull-request "$PULL_REQUEST" \
+            --expected-repository "$GITHUB_REPOSITORY" \
+            --expected-number "$PR_NUMBER" \
+            --expected-base-ref main \
+            --expected-head-ref "$HEAD_REF" \
+            --expected-head-oid "$HEAD_SHA" \
+            --expected-author 'github-actions[bot]'

@@ -16,7 +16,10 @@ from pathlib import Path
 
 REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
 WORKFLOW_PATH = REPOSITORY_ROOT / ".github" / "workflows" / "agent-pr.yml"
+SDD_WORKFLOW_PATH = REPOSITORY_ROOT / ".github" / "workflows" / "sdd-guard.yml"
+SWIFT_WORKFLOW_PATH = REPOSITORY_ROOT / ".github" / "workflows" / "swift-ci.yml"
 EXPECTED_PATTERNS = ("agent/**", "!agent/host-loop/**")
+EXPECTED_PUSH_FLOW = '    branches: [main, "agent/**"]'
 
 TASK_ID_TEXT = r"TASK-[A-Z0-9]+-[A-Z0-9]+(?:-[A-Z0-9]+)*"
 UUID4_TEXT = (
@@ -160,6 +163,139 @@ def validate_agent_pr_filter(text: str) -> tuple[str, ...]:
     return patterns
 
 
+def extract_event_names(text: str) -> tuple[str, ...]:
+    lines = _meaningful_lines(text)
+    on_indexes = [index for index, (_, line) in enumerate(lines) if line == "on:"]
+    if len(on_indexes) != 1:
+        raise WorkflowContractError(
+            f"expected exactly one top-level on block, found {len(on_indexes)}"
+        )
+    start, end = _closed_child_block(lines, on_indexes[0], 0)
+    event_re = re.compile(r"^  ([a-z_]+):$")
+    events: list[str] = []
+    for number, line in lines[start:end]:
+        if _indent(line) != 2:
+            continue
+        match = event_re.fullmatch(line)
+        if match is None:
+            raise WorkflowContractError(f"line {number}: invalid event entry")
+        events.append(match.group(1))
+    return tuple(events)
+
+
+def extract_pull_request_types(text: str) -> tuple[str, ...]:
+    lines = _meaningful_lines(text)
+    event_indexes = [
+        index for index, (_, line) in enumerate(lines) if line == "  pull_request:"
+    ]
+    if len(event_indexes) != 1:
+        raise WorkflowContractError(
+            f"expected exactly one pull_request event, found {len(event_indexes)}"
+        )
+    start, end = _closed_child_block(lines, event_indexes[0], 2)
+    entries = [
+        (number, line)
+        for number, line in lines[start:end]
+        if _indent(line) == 4
+    ]
+    if len(entries) != 1:
+        raise WorkflowContractError("pull_request event must contain exactly one types entry")
+    number, line = entries[0]
+    match = re.fullmatch(r"    types: \[([a-z_]+(?:, [a-z_]+)*)\]", line)
+    if match is None:
+        raise WorkflowContractError(f"line {number}: invalid pull_request types")
+    return tuple(match.group(1).split(", "))
+
+
+def _job_block(text: str, job_name: str) -> str:
+    raw_lines = text.splitlines()
+    indexes = [
+        index for index, line in enumerate(raw_lines) if line == f"  {job_name}:"
+    ]
+    if len(indexes) != 1:
+        raise WorkflowContractError(
+            f"expected exactly one {job_name} job, found {len(indexes)}"
+        )
+    start = indexes[0]
+    end = len(raw_lines)
+    for index in range(start + 1, len(raw_lines)):
+        line = raw_lines[index]
+        if line and not line.startswith(" ") and not line.startswith("#"):
+            end = index
+            break
+        if line.startswith("  ") and not line.startswith("    ") and line.endswith(":"):
+            end = index
+            break
+    return "\n".join(raw_lines[start:end]) + "\n"
+
+
+def validate_automatic_check_contract(
+    agent_text: str, sdd_text: str, swift_text: str
+) -> None:
+    validate_agent_pr_filter(agent_text)
+    if agent_text.count("permissions: {}") != 1:
+        raise WorkflowContractError("Agent PR must deny permissions at workflow scope")
+    open_job = _job_block(agent_text, "open-pr")
+    allowed_job = _job_block(agent_text, "allowed-paths")
+    required_open = (
+        "    permissions:\n      contents: read\n      pull-requests: write\n",
+        "    outputs:\n      pr-number: ${{ steps.validate.outputs.pr-number }}\n",
+        "gh api --method GET --paginate --slurp",
+        "--pull-list \"$CANDIDATES\"",
+        "--identity-only",
+        "--expected-author 'github-actions[bot]'",
+        'echo "pr-number=$VALIDATED_NUMBER" >> "$GITHUB_OUTPUT"',
+    )
+    required_allowed = (
+        "    needs: open-pr\n",
+        "    permissions:\n      contents: read\n      pull-requests: read\n",
+        "PR_NUMBER: ${{ needs.open-pr.outputs.pr-number }}",
+        "gh api --method GET --paginate --slurp",
+        "--pull-list \"$CANDIDATES\"",
+        'if [ "$CURRENT_NUMBER" != "$PR_NUMBER" ]; then',
+        '"/repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER"',
+        "--pull-request \"$PULL_REQUEST\"",
+        "--expected-head-oid \"$HEAD_SHA\"",
+    )
+    for token in required_open:
+        if token not in open_job:
+            raise WorkflowContractError(f"open-pr job missing contract token: {token}")
+    for token in required_allowed:
+        if token not in allowed_job:
+            raise WorkflowContractError(
+                f"allowed-paths job missing contract token: {token}"
+            )
+
+    forbidden = (
+        "pull_request_target:",
+        "secrets.",
+        "secrets[",
+        "id-token: write",
+        "contents: write",
+        "actions: write",
+        "checks: write",
+        "statuses: write",
+        "workflows: write",
+        "administration: write",
+    )
+    for token in forbidden:
+        if token in agent_text + sdd_text + swift_text:
+            raise WorkflowContractError(f"forbidden workflow capability: {token}")
+
+    if extract_event_names(sdd_text) != ("push", "pull_request"):
+        raise WorkflowContractError("SDD Guard event set must be push + pull_request")
+    if EXPECTED_PUSH_FLOW not in sdd_text:
+        raise WorkflowContractError("SDD Guard push branches drifted")
+    if extract_pull_request_types(sdd_text) != ("reopened", "edited"):
+        raise WorkflowContractError(
+            "SDD Guard pull_request types must be reopened + edited"
+        )
+    if extract_event_names(swift_text) != ("push",):
+        raise WorkflowContractError("Swift CI must be push-only")
+    if EXPECTED_PUSH_FLOW not in swift_text:
+        raise WorkflowContractError("Swift CI push branches drifted")
+
+
 def _glob_regex(pattern: str) -> re.Pattern[str]:
     pieces = [r"\A"]
     index = 0
@@ -235,6 +371,61 @@ class AgentPrWorkflowContractTests(unittest.TestCase):
     def test_repository_filter_is_exact(self) -> None:
         text = WORKFLOW_PATH.read_text(encoding="utf-8")
         self.assertEqual(validate_agent_pr_filter(text), EXPECTED_PATTERNS)
+
+    def test_repository_automatic_check_contract_is_exact(self) -> None:
+        validate_automatic_check_contract(
+            WORKFLOW_PATH.read_text(encoding="utf-8"),
+            SDD_WORKFLOW_PATH.read_text(encoding="utf-8"),
+            SWIFT_WORKFLOW_PATH.read_text(encoding="utf-8"),
+        )
+
+    def test_automatic_check_contract_rejects_permission_event_and_dependency_drift(
+        self,
+    ) -> None:
+        agent = WORKFLOW_PATH.read_text(encoding="utf-8")
+        sdd = SDD_WORKFLOW_PATH.read_text(encoding="utf-8")
+        swift = SWIFT_WORKFLOW_PATH.read_text(encoding="utf-8")
+        cases = (
+            ("missing dependency", agent.replace("    needs: open-pr\n", ""), sdd, swift),
+            (
+                "write validation",
+                agent.replace(
+                    "      pull-requests: read\n", "      pull-requests: write\n"
+                ),
+                sdd,
+                swift,
+            ),
+            (
+                "secret",
+                agent + "      TOKEN: ${{ secrets.PR_TOKEN }}\n",
+                sdd,
+                swift,
+            ),
+            (
+                "bot opened",
+                agent,
+                sdd.replace(
+                    "types: [reopened, edited]",
+                    "types: [opened, synchronize, reopened, edited]",
+                ),
+                swift,
+            ),
+            (
+                "swift pull request",
+                agent,
+                sdd,
+                swift.replace(
+                    '  push:\n    branches: [main, "agent/**"]\n',
+                    '  push:\n    branches: [main, "agent/**"]\n  pull_request:\n',
+                ),
+            ),
+        )
+        for label, agent_case, sdd_case, swift_case in cases:
+            with self.subTest(label=label):
+                with self.assertRaises(WorkflowContractError):
+                    validate_automatic_check_contract(
+                        agent_case, sdd_case, swift_case
+                    )
 
     def test_dispatch_matrix(self) -> None:
         dispatched = (
