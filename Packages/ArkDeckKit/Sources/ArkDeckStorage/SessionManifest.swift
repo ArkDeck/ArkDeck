@@ -83,6 +83,7 @@ public struct SessionManifestDocument: Equatable, Sendable {
   public let status: String
   public let executionMode: String
   public let executionAuthority: String
+  public let completedAt: Date
   public let authorization: SessionManifestAuthorization?
   public let artifacts: [ArtifactRecord]
   public let confirmations: [SessionManifestConfirmation]
@@ -109,6 +110,8 @@ public struct SessionManifestDocument: Equatable, Sendable {
     status = try object.manifestString("status")
     executionMode = try object.manifestString("executionMode")
     executionAuthority = try object.manifestString("executionAuthority")
+    completedAt = try Self.lockedTimestampDate(
+      try object.manifestString("completedAt"), field: "completedAt")
     if case .object(let authorizationObject)? = object["authorization"] {
       authorization = try SessionManifestAuthorization(object: authorizationObject)
     } else {
@@ -125,6 +128,66 @@ public struct SessionManifestDocument: Equatable, Sendable {
       return try SessionManifestConfirmation(
         object: confirmation, schemaVersion: decodedSchemaVersion)
     }
+  }
+
+  static func lockedTimestampDate(_ value: String, field: String) throws -> Date {
+    // The locked contract intentionally accepts leap seconds and numeric offsets through
+    // ±23:59. Foundation's ISO8601DateFormatter rejects part of that accepted domain, so
+    // convert the already-validated components without narrowing the manifest contract.
+    try SessionStorageValidation.timestamp(value, field: field)
+    let localDateTime: Substring
+    let offsetSeconds: Int
+    if value.last == "Z" || value.last == "z" {
+      localDateTime = value.dropLast()
+      offsetSeconds = 0
+    } else {
+      let offsetStart = value.index(value.endIndex, offsetBy: -6)
+      let offset = value[offsetStart...]
+      guard let hour = Int(offset.dropFirst().prefix(2)),
+        let minute = Int(offset.suffix(2))
+      else { throw SessionStorageError.invalidTimestamp(field) }
+      let magnitude = hour * 3_600 + minute * 60
+      offsetSeconds = offset.first == "-" ? -magnitude : magnitude
+      localDateTime = value[..<offsetStart]
+    }
+
+    let dateAndTime = localDateTime.split(whereSeparator: { $0 == "T" || $0 == "t" })
+    let dateParts = dateAndTime[0].split(separator: "-")
+    let timeParts = dateAndTime[1].split(separator: ":")
+    let secondParts = timeParts[2].split(
+      separator: ".", maxSplits: 1, omittingEmptySubsequences: false)
+    guard let year = Int(dateParts[0]), let month = Int(dateParts[1]),
+      let day = Int(dateParts[2]), let hour = Int(timeParts[0]),
+      let minute = Int(timeParts[1]), let second = Int(secondParts[0])
+    else { throw SessionStorageError.invalidTimestamp(field) }
+
+    var components = DateComponents()
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+    components.calendar = calendar
+    components.timeZone = calendar.timeZone
+    components.year = year
+    components.month = month
+    components.day = day
+    components.hour = hour
+    components.minute = minute
+    components.second = min(second, 59)
+    guard var date = calendar.date(from: components) else {
+      throw SessionStorageError.invalidTimestamp(field)
+    }
+    if second == 60 {
+      date.addTimeInterval(1)
+    }
+    if secondParts.count == 2 {
+      let nanosecondText = String(secondParts[1].prefix(9)).padding(
+        toLength: 9, withPad: "0", startingAt: 0)
+      guard let nanoseconds = Int(nanosecondText) else {
+        throw SessionStorageError.invalidTimestamp(field)
+      }
+      date.addTimeInterval(TimeInterval(nanoseconds) / 1_000_000_000)
+    }
+    date.addTimeInterval(TimeInterval(-offsetSeconds))
+    return date
   }
 }
 

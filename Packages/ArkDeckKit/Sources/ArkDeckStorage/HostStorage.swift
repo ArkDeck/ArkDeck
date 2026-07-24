@@ -1,6 +1,48 @@
 import Darwin
 import Foundation
 
+public struct StorageConfigurationToken: Equatable, Sendable {
+  fileprivate let value: UUID
+}
+
+/// A process-local linearization fence shared by settings, retention metadata, admission, and
+/// Session creation. Successful or partially-visible configuration mutations invalidate every
+/// previously issued token. Claim-bound Session creation holds the fence through root creation so
+/// a settings/catalog mutation is ordered either wholly before or wholly after that creation.
+public final class StorageConfigurationEpoch: @unchecked Sendable {
+  private let lock = NSLock()
+  private var value = UUID()
+
+  public init() {}
+
+  public func snapshot() -> StorageConfigurationToken {
+    lock.lock()
+    defer { lock.unlock() }
+    return StorageConfigurationToken(value: value)
+  }
+
+  public func performMutation<T>(_ body: () throws -> T) rethrows -> T {
+    lock.lock()
+    defer {
+      value = UUID()
+      lock.unlock()
+    }
+    return try body()
+  }
+
+  public func performIfCurrent<T>(
+    _ token: StorageConfigurationToken,
+    _ body: () throws -> T
+  ) throws -> T {
+    lock.lock()
+    defer { lock.unlock() }
+    guard token.value == value else {
+      throw SessionStorageError.claimUnavailable("stale-storage-configuration")
+    }
+    return try body()
+  }
+}
+
 public struct VolumeIdentity: Hashable, Codable, Sendable {
   public let value: String
 
@@ -464,6 +506,28 @@ private final class StorageClaimPermit: @unchecked Sendable {
     return sessionBindingState
   }
 
+  func currentSessionBinding() -> StorageClaimSessionBinding? {
+    lock.lock()
+    defer { lock.unlock() }
+    switch sessionBindingState {
+    case .unbound:
+      return nil
+    case .provisional(let binding):
+      return binding
+    case .committed(let owned), .failed(let owned):
+      return owned.binding
+    }
+  }
+
+  func cancelIfUnbound() -> Bool {
+    lock.lock()
+    defer { lock.unlock() }
+    guard active, sessionBindingState == .unbound else { return false }
+    active = false
+    remainingGrowthBytes = 0
+    return true
+  }
+
   private func rootOwnership(atPath path: String) -> StorageClaimSessionRootOwnership? {
     var metadata = stat()
     guard lstat(path, &metadata) == 0, metadata.st_mode & S_IFMT == S_IFDIR else {
@@ -482,8 +546,14 @@ public struct StorageClaim: Equatable, @unchecked Sendable {
   public let finalizationHeadroomBytes: UInt64
   fileprivate let admissionGeneration: UUID
   fileprivate let permit: StorageClaimPermit
+  fileprivate let configurationEpoch: StorageConfigurationEpoch?
+  fileprivate let configurationToken: StorageConfigurationToken?
 
-  fileprivate init(request: StorageClaimRequest) {
+  fileprivate init(
+    request: StorageClaimRequest,
+    configurationEpoch: StorageConfigurationEpoch? = nil,
+    configurationToken: StorageConfigurationToken? = nil
+  ) {
     claimID = request.claimID
     jobID = request.jobID
     volumeIdentity = request.volumeIdentity
@@ -492,6 +562,8 @@ public struct StorageClaim: Equatable, @unchecked Sendable {
     finalizationHeadroomBytes = request.budget.finalizationHeadroomBytes
     admissionGeneration = UUID()
     permit = StorageClaimPermit(remainingGrowthBytes: request.budget.remainingGrowthBytes)
+    self.configurationEpoch = configurationEpoch
+    self.configurationToken = configurationToken
   }
 
   public var remainingGrowthBytes: UInt64 { permit.remainingGrowth() }
@@ -529,6 +601,15 @@ public struct StorageClaim: Equatable, @unchecked Sendable {
   ) throws -> T {
     guard jobID == layout.jobID else {
       throw SessionStorageError.claimUnavailable("\(claimID):job-mismatch")
+    }
+    if let configurationEpoch, let configurationToken {
+      return try configurationEpoch.performIfCurrent(configurationToken) {
+        try permit.performSessionCreation(
+          claimID: claimID,
+          binding: StorageClaimSessionBinding(
+            sessionID: layout.sessionID, rootPath: layout.root.standardizedFileURL.path),
+          body: body)
+      }
     }
     return try permit.performSessionCreation(
       claimID: claimID,
@@ -618,6 +699,24 @@ public enum StorageQueueReason: String, Equatable, Sendable {
 public enum StorageAdmission: Equatable, Sendable {
   case admitted(StorageClaim)
   case queued(StorageQueueReason)
+}
+
+public struct ActiveStorageSessionSnapshot: Equatable, Sendable {
+  public let claimID: String
+  public let jobID: String
+  public let sessionID: String
+  public let sessionRoot: URL
+  public let volumeIdentity: VolumeIdentity
+  public let writerClass: StorageWriterClass
+
+  fileprivate init(claim: StorageClaim, binding: StorageClaimSessionBinding) {
+    claimID = claim.claimID
+    jobID = claim.jobID
+    sessionID = binding.sessionID
+    sessionRoot = URL(filePath: binding.rootPath).standardizedFileURL
+    volumeIdentity = claim.volumeIdentity
+    writerClass = claim.writerClass
+  }
 }
 
 public enum StorageRevalidationAction: Equatable, Sendable {
@@ -756,22 +855,53 @@ public actor HostStorageCoordinator {
   private var completedTerminalReceipts: [String: StorageTerminalPersistenceReceipt] = [:]
   private var completedTerminalReceiptOrder: [String] = []
   private let completedTerminalReceiptLimit: Int
+  private let configurationEpoch: StorageConfigurationEpoch?
   private var retentionBlockedVolumes: Set<VolumeIdentity> = []
+  private var conservativeRetentionBlockedVolumes: Set<VolumeIdentity> = []
 
-  public init(completedReceiptCacheLimit: Int = 256) {
+  public init(
+    completedReceiptCacheLimit: Int = 256,
+    configurationEpoch: StorageConfigurationEpoch? = nil
+  ) {
     completedTerminalReceiptLimit = max(1, completedReceiptCacheLimit)
+    self.configurationEpoch = configurationEpoch
   }
 
   public func admit(_ request: StorageClaimRequest, snapshot: HostStorageSnapshot)
     -> StorageAdmission
   {
+    admitUnchecked(request, snapshot: snapshot, configurationToken: nil)
+  }
+
+  public func admit(
+    _ request: StorageClaimRequest,
+    snapshot: HostStorageSnapshot,
+    configurationToken: StorageConfigurationToken
+  ) -> StorageAdmission {
+    guard let configurationEpoch else { return .queued(.waitingForStorage) }
+    do {
+      return try configurationEpoch.performIfCurrent(configurationToken) {
+        admitUnchecked(
+          request, snapshot: snapshot, configurationToken: configurationToken)
+      }
+    } catch {
+      return .queued(.waitingForStorage)
+    }
+  }
+
+  private func admitUnchecked(
+    _ request: StorageClaimRequest,
+    snapshot: HostStorageSnapshot,
+    configurationToken: StorageConfigurationToken?
+  ) -> StorageAdmission {
     purgeCompletedClaims()
     guard request.volumeIdentity == snapshot.volumeIdentity else {
       return .queued(.waitingForStorage)
     }
     guard !snapshot.isReadOnly else { return .queued(.volumeReadOnly) }
     guard claims[request.claimID] == nil else { return .queued(.waitingForStorage) }
-    if retentionBlockedVolumes.contains(request.volumeIdentity),
+    if retentionBlockedVolumes.contains(request.volumeIdentity)
+      || conservativeRetentionBlockedVolumes.contains(request.volumeIdentity),
       request.budget.writerClass != .light
     {
       return .queued(.insufficientHeadroom)
@@ -803,7 +933,10 @@ public actor HostStorageCoordinator {
     // starts a distinct generation and supersedes only the coordinator's idempotency cache for
     // the older generation; stale receipts remain unable to complete the new permit.
     removeCompletedReceipt(forKey: request.claimID)
-    let claim = StorageClaim(request: request)
+    let claim = StorageClaim(
+      request: request,
+      configurationEpoch: configurationToken == nil ? nil : configurationEpoch,
+      configurationToken: configurationToken)
     claims[claim.claimID] = claim
     return .admitted(claim)
   }
@@ -814,6 +947,14 @@ public actor HostStorageCoordinator {
       throw SessionStorageError.invalidRecord("unknown claim: \(claimID)")
     }
     try claim.reduceRemainingGrowth(to: remainingBytes)
+  }
+
+  public func cancelUnboundAdmission(_ claim: StorageClaim) {
+    guard let current = claims[claim.claimID],
+      current.admissionGeneration == claim.admissionGeneration,
+      current.permit.cancelIfUnbound()
+    else { return }
+    claims.removeValue(forKey: claim.claimID)
   }
 
   public func revalidate(
@@ -870,10 +1011,62 @@ public actor HostStorageCoordinator {
     _ plan: SessionRetentionPlan,
     on volume: VolumeIdentity
   ) {
-    if plan.blocksNewHeavyWriters {
+    setRetentionAdmission(blocked: plan.blocksNewHeavyWriters, on: volume)
+  }
+
+  public func setRetentionAdmission(blocked: Bool, on volume: VolumeIdentity) {
+    if blocked {
       retentionBlockedVolumes.insert(volume)
     } else {
       retentionBlockedVolumes.remove(volume)
+    }
+  }
+
+  @discardableResult
+  public func setRetentionAdmission(
+    blocked: Bool,
+    on volume: VolumeIdentity,
+    configurationToken: StorageConfigurationToken
+  ) -> Bool {
+    guard let configurationEpoch else { return false }
+    do {
+      return try configurationEpoch.performIfCurrent(configurationToken) {
+        setRetentionAdmission(blocked: blocked, on: volume)
+        return true
+      }
+    } catch {
+      return false
+    }
+  }
+
+  public func retentionAdmissionIsBlocked(on volume: VolumeIdentity) -> Bool {
+    retentionBlockedVolumes.contains(volume)
+      || conservativeRetentionBlockedVolumes.contains(volume)
+  }
+
+  public func requireConservativeRetentionBlock(on volume: VolumeIdentity) {
+    conservativeRetentionBlockedVolumes.insert(volume)
+  }
+
+  public func clearConservativeRetentionBlockAfterSuccessfulRescan(
+    on volume: VolumeIdentity
+  ) {
+    conservativeRetentionBlockedVolumes.remove(volume)
+  }
+
+  @discardableResult
+  public func clearConservativeRetentionBlockAfterSuccessfulRescan(
+    on volume: VolumeIdentity,
+    configurationToken: StorageConfigurationToken
+  ) -> Bool {
+    guard let configurationEpoch else { return false }
+    do {
+      return try configurationEpoch.performIfCurrent(configurationToken) {
+        conservativeRetentionBlockedVolumes.remove(volume)
+        return true
+      }
+    } catch {
+      return false
     }
   }
 
@@ -1025,6 +1218,21 @@ public actor HostStorageCoordinator {
     purgeCompletedClaims()
     guard let volume else { return claims.count }
     return claims.values.filter { $0.volumeIdentity == volume }.count
+  }
+
+  public func activeSessions(
+    on volume: VolumeIdentity? = nil
+  ) -> [ActiveStorageSessionSnapshot] {
+    purgeCompletedClaims()
+    return claims.values.compactMap { claim in
+      guard volume == nil || claim.volumeIdentity == volume,
+        let binding = claim.permit.currentSessionBinding()
+      else { return nil }
+      return ActiveStorageSessionSnapshot(claim: claim, binding: binding)
+    }.sorted {
+      if $0.sessionID != $1.sessionID { return $0.sessionID < $1.sessionID }
+      return $0.claimID < $1.claimID
+    }
   }
 
   public func completedReceiptTombstoneCount() -> Int {
