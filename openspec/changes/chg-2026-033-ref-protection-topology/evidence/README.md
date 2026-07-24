@@ -31,3 +31,10 @@ byte-identical sanitized receipt、成功/未执行边界、残留 controlled re
 PR #471 记录在 `runs/TASK-RPT-001/2026-07-24-topology-fail-closed.*`。
 该记录不构成任何 topology AC PASS；#470 executor、窗口、OID、payload、hash 与
 probe UUID 均已失效。
+
+2026-07-24 的 r3 topology D2 随后按 #475 fresh readiness 成功执行。完整、字节
+一致的 sanitized receipt 与人工可读结论记录在
+`runs/TASK-RPT-001/2026-07-24-topology-success.*`。该 run 完成 settings/ref
+迁移与矩阵，但 TASK-RPT-001 仍为 `ready`：正常 no-bypass merge 与剩余
+Agent/API route negatives 必须由后一独立 operability-evidence PR 记录，之后才允许
+独立 done PR。
