@@ -21,7 +21,9 @@ final class ArkDeckContractTests: XCTestCase {
     "ArkDeckProcess": ["ArkDeckCore"],
     "ArkDeckRuntime": ["ArkDeckCore"],
     "ArkDeckOpenHarmony": ["ArkDeckCore", "ArkDeckProcess"],
-    "ArkDeckWorkflows": ["ArkDeckCore", "ArkDeckOpenHarmony", "ArkDeckProcess", "ArkDeckStorage"],
+    "ArkDeckWorkflows": [
+      "ArkDeckCore", "ArkDeckOpenHarmony", "ArkDeckProcess", "ArkDeckRuntime", "ArkDeckStorage",
+    ],
     "ArkDeckStorage": ["ArkDeckCore"],
   ]
 

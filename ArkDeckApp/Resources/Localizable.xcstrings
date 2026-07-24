@@ -1,6 +1,120 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "update.automaticChecks" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Check automatically when ArkDeck starts (at most once every 24 hours)" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "ArkDeck 启动时自动检查（每 24 小时最多一次）" } }
+      }
+    },
+    "update.checkNow" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Check Now" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "立即检查" } }
+      }
+    },
+    "update.download" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Download Update" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "下载更新" } }
+      }
+    },
+    "update.manualInstallDisclosure" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "ArkDeck only downloads and verifies the DMG. After a separate confirmation it reveals the file in Finder. You must mount the DMG and replace the app manually; ArkDeck does not install, replace itself, update on quit, or claim automatic rollback." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "ArkDeck 只下载并验证 DMG。再次确认后仅在 Finder 中显示文件；你需要手动挂载 DMG 并替换应用。ArkDeck 不会安装、自替换、退出时更新，也不承诺自动回滚。" } }
+      }
+    },
+    "update.privacyDisclosure" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Update checks send only the ArkDeck version, macOS version, and CPU architecture. No device ID, user path, locale, telemetry, cookies, or credentials are sent." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "更新检查只发送 ArkDeck 版本、macOS 版本和 CPU 架构；不会发送设备标识、用户路径、区域设置、遥测、Cookie 或凭据。" } }
+      }
+    },
+    "update.reveal" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Confirm and Reveal Verified DMG" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "确认并显示已验证的 DMG" } }
+      }
+    },
+    "update.status.available" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "An update is available. Download requires your action." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "有可用更新，需要你手动开始下载。" } }
+      }
+    },
+    "update.status.awaitingConsent" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The DMG passed signature and Team verification. Confirm once more to reveal it." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "DMG 已通过签名与 Team 验证。请再次确认后在 Finder 中显示。" } }
+      }
+    },
+    "update.status.automaticCheckIncomplete" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The last automatic update check did not complete. Use Check Now to retry." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "上次自动更新检查未完成。可点“立即检查”重试。" } }
+      }
+    },
+    "update.status.cancelled" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Update operation cancelled." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "更新操作已取消。" } }
+      }
+    },
+    "update.status.checking" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Checking for updates…" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "正在检查更新……" } }
+      }
+    },
+    "update.status.current" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "No newer verified update is available." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "当前没有已验证的较新版本。" } }
+      }
+    },
+    "update.status.downloading" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Downloading the signed artifact…" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "正在下载签名产物……" } }
+      }
+    },
+    "update.status.failed" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Update verification failed. Nothing was installed or replaced." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "更新验证失败，未安装或替换任何内容。" } }
+      }
+    },
+    "update.status.handedOff" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Verified DMG revealed in Finder. Continue manually." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "已在 Finder 中显示验证过的 DMG，请手动继续。" } }
+      }
+    },
+    "update.status.idle" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Ready to check for updates." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "可以检查更新。" } }
+      }
+    },
+    "update.status.unavailable" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The updater could not be initialized." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "更新器无法初始化。" } }
+      }
+    },
+    "update.status.verifying" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Verifying the DMG signature and Team identity…" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "正在验证 DMG 签名与 Team 身份……" } }
+      }
+    },
+    "update.title" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Software Update" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "软件更新" } }
+      }
+    },
     "app.navigation.debug" : {
       "extractionState" : "stale",
       "localizations" : {

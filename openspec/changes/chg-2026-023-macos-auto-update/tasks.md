@@ -299,4 +299,5 @@
   与声明一致断言;`AU-PRIVACY-001` 更新检查请求字段白名单断言(零设备/用户
   标识)+ 披露文案存在;全量基线零回归。
 - Evidence gate:contract 全绿 + 发布规程文档在案后合入;`ready→done` 独立状态
-  PR;change verified = ADR-0002 release gate #3 满足(另行 verify PR)。
+  PR;change verified = ADR-0002 release gate #3 满足(另行 verify PR)。实现候选
+  evidence:`evidence/runs/TASK-AU-002/run.md`。
