@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-023-macos-auto-update
 revision: 1
-status: verified # 2026-07-24 本 verification-closure PR；approval #266 merge `21b5b9975beb960ba4f57a78a59d6246a4f86b0b`；两 task done 与三条 change-local AC 见 Verification closure；仅在维护者 review/merge 本 PR 后生效，archive 另行。原注:r1 proposal 经 #262 合入 `e9a4989`
+status: archived # 2026-07-24 本 archive PR；verified #489 merge `9094c92c402c69b4bb7b21a8ca5534f6e1a5797e`；platform change、零 spec/registry delta，故只迁移 change 目录并记录归档状态；仅在维护者 review/merge 本 PR 后生效。原注:approval #266 merge `21b5b9975beb960ba4f57a78a59d6246a4f86b0b`；r1 proposal 经 #262 合入 `e9a4989`
 class: platform
 core_change_level: none
 owner: lvye
@@ -172,3 +172,31 @@ redirect request：初始产品字段精确为
 distribution profile 等 release gates；不改变 platform conformance/support/
 compatibility 状态，不声称真实 Team-signed DMG positive acceptance。release、
 feed publish 与 change archive 均须后续独立流程。
+
+## Archive record（2026-07-24）
+
+- 前置：verification closure PR #489 已由 `lvye` 对 exact head
+  `244534d3587a5541e1835477a8e32b63d97ceb08` `APPROVED`，并 squash 合入
+  protected `main` 为
+  `9094c92c402c69b4bb7b21a8ca5534f6e1a5797e`；本 archive audit base 即该
+  merge OID。
+- 归档目录：
+  `openspec/changes/archive/2026-07-24-chg-2026-023-macos-auto-update/`。
+  整棵 change 共 9 个文件完成迁移；除本 proposal 的
+  `verified` → `archived` 与本记录外，其余 8 个文件内容不变。
+- 归档前对
+  `openspec/changes/chg-2026-023-macos-auto-update` 的目录外精确路径扫描只有
+  2 处命中：CHG-2026-030 的
+  `evidence/runs/TASK-HLR-001A/post-merge-live.md` 记录 #486 合入时的
+  changed-file list；CHG-2026-033 的
+  `evidence/runs/TASK-RPT-001/2026-07-24-d2-fail-closed.md` 记录 #466
+  original changed-file list。两处都是带 OID/PR 的 dated 历史过程证据，不是
+  living consumer、权威 pin 或可点击导航链接，故不改写；长期文档对本 change
+  仅以 `CHG-2026-023` ID 引用，归档不造成断链。
+- 本 change 为 `platform` class，批准范围明确不改 Core spec/contract/schema；
+  change-local acceptance cases 不进入 canonical acceptance registry。
+  TASK-AU-002 已在 #457 同步产品实现、macOS platform profile 与发布规程，本次
+  archive 没有 delta 需要合入 current specs、registry、baseline 或 profile。
+- 本 archive 只改变治理位置与状态，不重新执行或放宽历史 AC，不构成 release、
+  feed publish、Developer ID/notarization 验收、真实网络或设备操作。目录合入后
+  冻结，不再改写。
