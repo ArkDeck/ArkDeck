@@ -20,7 +20,7 @@ credential_location: isolated, Agent-unreachable
 repository: ArkDeck/ArkDeck
 api_version: 2026-03-10
 ruleset_id: 19595282
-readiness_pr: PENDING-BOT-PR-NUMBER
+readiness_pr: 470
 readiness_title: "governance(TASK-RPT-001): authorize topology D2"
 readiness_head_ref: agent/task-rpt-001-topology-readiness
 readiness_changed_files:
@@ -35,7 +35,7 @@ capture_file_bytes_with_lf: 21079
 capture_file_sha256: 4cd34aa394a440de20d2e180a07fc0bdd2b98deb73ac9fa500169b7d8c3346c6
 capture_script_sha256: 487701e6602ddd20a8d18db6bfce59d58f4597dc7ea3b15e171f45e8934d637a
 capture_wrapper_sha256: 82e612aaf429e36a3f3ab53b988bc096eb5adf3a8fa54b716f96c9b8117536d8
-apply_script_sha256: f76d5e8d7f710e167bf9d9b8bb85d0a7bf3e4bbbe6c7c4ced0d49a4041dd4273
+apply_script_sha256: 124f9b799169fda8e3b0814442accf925f51efffdb2b7165acb7063743dd8f2c
 ```
 
 The capture was produced in a separate human-controlled Terminal as exact
