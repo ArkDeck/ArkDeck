@@ -9,6 +9,11 @@
   absence 按 `tasks.md` 逐项复核通过。最终实现 base 快进到 protected `main`
   `5737c1b7127f2cbe98cfb953434b4a0dfe11498d`；新增提交仅修改
   CHG-2026-030 `tasks.md`，与本任务 allowed paths 零重叠。
+- Review remediation 推送时 protected `main` 已推进至
+  `a7ee3f88634972cea4f3bb6622d2f6dab6ea6e06`；merge-base 仍为上述 `5737c1b...`，
+  其后 #437/#438/#439 仅为 CHG-2026-032 proposal/approval/readiness，和本任务
+  8 个 PR paths 零重叠。GitHub compare 显示本分支 ahead 2/behind 3，PR 文件集仍精确
+  为 8 个 allowed paths。
 
 ## 实现与生产接线
 
