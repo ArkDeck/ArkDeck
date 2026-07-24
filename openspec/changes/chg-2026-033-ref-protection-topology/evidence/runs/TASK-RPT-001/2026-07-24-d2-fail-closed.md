@@ -200,16 +200,59 @@ The secret-free sanitized attempt-2 report at handoff had:
 sha256: 49e00088529e5f4b22de604a3d9250b76d33594255af7e8bc9cdfa520817f843
 ```
 
+## Follow-up — ordinary Agent PR transport became unavailable
+
+The facts-only evidence above was committed and pushed to
+`agent/task-rpt-001-failure-evidence`:
+
+```text
+commit: 25f1a57587b7f17a07c6d097fc2e6f13e11a943a
+guard: success
+open-pr: failure
+pull requests with this head: []
+```
+
+The pinned `.github/workflows/agent-pr.yml` uses the repository
+`GITHUB_TOKEN` with `pull-requests: write` to create the PR as
+`github-actions[bot]`. GitHub documents
+`can_approve_pull_request_reviews` as the single combined repository setting
+“Allow GitHub Actions to create and approve pull requests”; it is not a
+review-only capability. The observed `open-pr` failure immediately after the
+setting was changed to `false`, together with the absence of a PR for the
+head, is consistent with that documented combined behavior. Public check
+annotations exposed only the job's exit code; anonymous log retrieval was
+denied, so this record does not invent a more specific stderr message.
+
+This means the stricter partial state preserved main integrity but also
+disabled the repository's ordinary governance bootstrap: an Agent can still
+push `agent/**` and obtain `guard`, but the approved bot-authored PR route
+cannot create a new PR. A human-authored PR is not an equivalent substitute
+because GitHub does not allow a PR author to supply the approving review
+required by this repository's sole human CODEOWNER.
+
+No existing open PR or branch was repurposed or force-pushed. Doing so would
+mix or replace its approved scope and is forbidden without a new explicit
+human recovery decision. No GitHub settings, protection or pull-request state
+was mutated by the Agent while recording this follow-up.
+
 ## Remediation boundary
 
 - Do not rerun either script or reuse #467's OID, window, payload/hash,
   nonce, derived refs or authorization.
-- Do not restore Actions review approval to `true`.
-- First merge this facts-only failure evidence.
+- Do not restore the combined Actions create/approve setting to `true`
+  under #467; a new merged bootstrap-recovery authorization is required.
+- The normal `agent-pr` route cannot merge this facts-only evidence while
+  the combined setting is `false`. Preserve the evidence branch and stop
+  rather than treating the push as approval.
+- Do not overwrite or repurpose an existing bot-authored PR as a recovery
+  carrier without an exact human instruction naming that PR and accepting
+  the exceptional carrier/scope history.
+- After a valid recovery carrier restores ordinary PR transport, first merge
+  this facts-only failure evidence.
 - Then capture a fresh authenticated full before from the new protected main.
 - A new independent superseding D2 readiness must:
-  - treat Actions approval `false` as before and after, with zero Actions
-    mutation;
+  - explicitly resolve the combined Actions create/approve capability instead
+    of assuming that PR creation can remain enabled while review is disabled;
   - use an API-schema-valid required-status-check write form while preserving
     `guard` and its App ID `15368` binding;
   - provide new exact before/after/rollback payloads, hashes, window and nonce;
