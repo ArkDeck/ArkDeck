@@ -12,8 +12,8 @@
 - Review remediation 推送时 protected `main` 已推进至
   `a7ee3f88634972cea4f3bb6622d2f6dab6ea6e06`；merge-base 仍为上述 `5737c1b...`，
   其后 #437/#438/#439 仅为 CHG-2026-032 proposal/approval/readiness，和本任务
-  8 个 PR paths 零重叠。GitHub compare 显示本分支 ahead 2/behind 3，PR 文件集仍精确
-  为 8 个 allowed paths。
+  8 个 PR paths 零重叠。GitHub compare 显示本分支 behind 3，PR 文件集仍精确为
+  8 个 allowed paths。
 
 ## 实现与生产接线
 
