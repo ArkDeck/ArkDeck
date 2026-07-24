@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-032-handbook-link-durability
 revision: 1
-status: verified # 2026-07-23 本 verification-closure PR;approval #438 merge `4675971ee132d0b94a7f0780e9987518489974bf`;两 task done 已合入(OID 见 Verification closure);archive 另行。原注:r1 proposal 经 #437 合入 `02b27b01246eaed4b230f3a2cfec6a72545c63ff`
+status: archived # 2026-07-23 本 archive PR;verified #450 merge `11808179d165c8975b4634ad1480760fa91545a9`;implementation-only、零 spec delta,故 archive 为纯目录迁移 + 状态翻转,无 delta 合入 current specs。原注:approval #438 merge `4675971ee132d0b94a7f0780e9987518489974bf`;r1 proposal 经 #437 合入 `02b27b01246eaed4b230f3a2cfec6a72545c63ff`
 class: implementation-only
 core_change_level: none
 owner: lvye
@@ -189,3 +189,20 @@ TASK-BAP-003 凭据分离生效后 Agent 无维护者 `gh` 凭据，无法读取
 reviews/mergedBy。本 closure 以 `git` 验证：所列 merge OID 全部在 protected `main`
 的 ancestry 中，且各交付物 blob 与其实现分支 head 逐字一致。**“由维护者 APPROVED”
 未经 Agent 独立验证**，由维护者 review 本 verify PR 时确认。
+
+## Archive record（2026-07-23）
+
+- 归档目录：`openspec/changes/archive/2026-07-23-chg-2026-032-handbook-link-durability/`；
+  迁移为 **9 个文件的纯 rename**，内容零改动（`git diff -M` 实测 9 renames /
+  0 内容变更）。
+- 前置：change `verified` 经 #450 合入 protected `main`
+  `11808179d165c8975b4634ad1480760fa91545a9`；两任务均 `done`（TASK-HLD-001 #442、TASK-HLD-002 #448）。
+- **归档前引用扫描（`AF-006` 强制项）**：`git grep` 全仓，本 change 目录的**目录外
+  引用 = 0**，无断链项，无需暂缓。这一结果由 TASK-HLD-001 直接促成——它把手册对
+  change 目录的引用全部转为耐久形式，因而本 change 不被任何长期文档以相对路径
+  引用。
+- **spec delta**：无。本 change 为 `implementation-only`，`spec-impact.md` 已登记
+  零 spec/contract/schema/baseline 影响，故归档不向 current specs 合入任何 delta。
+- **archive 后不改写**：本目录自此为冻结历史。手册（`openspec/planning/`）不随本
+  change 移动，其内容不因归档而变化；手册中 16 条指向 `changes/archive/**` 的相对
+  链接仍然有效（归档目录不再移动）。
