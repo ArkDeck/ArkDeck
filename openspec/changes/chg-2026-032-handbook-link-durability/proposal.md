@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-032-handbook-link-durability
 revision: 1
-status: proposed
+status: approved # r1 proposal 经 PR #437 合入 main `02b27b01246eaed4b230f3a2cfec6a72545c63ff`;正式批准仅由维护者 review/merge 本 approval-only PR 构成
 class: implementation-only
 core_change_level: none
 owner: lvye
@@ -95,3 +95,29 @@ V2 治理：本 propose PR 合入仅登记提案，状态保持 `proposed`，两
 `blocked`；批准须独立 approval-only PR；两任务各自经 readiness、
 implementation/evidence、done PR；change verified 需两条 change-local acceptance
 均有可复查 evidence 并由维护者在独立 verify PR 中确认。
+
+## Approval
+
+- r1 proposal 经 PR #437 合入 protected `main`，merge OID
+  `02b27b01246eaed4b230f3a2cfec6a72545c63ff`。该 merge 只登记 `status: proposed` 的
+  proposal/design/tasks/verification/acceptance-cases/spec-impact，**不构成 change
+  approval 或任务执行**。
+- 正式批准：仅在维护者 review/merge 本 approval-only PR 后，本 change 的
+  `status: approved` 才生效。该 merge 表示维护者接受以下封闭范围：
+  - **TASK-HLD-001**：只把手册中指向**活跃 change** 的相对链接改为耐久形式
+    （change ID + 文件名 + 必要章节/任务标识 + 完整 40-hex OID）；指向
+    `changes/archive/**` 的链接逐字不动；不改任何案例的事实内容。
+  - **TASK-HLD-002**：只在手册首屏既有边界声明中增加一条**非规范**引用约定，
+    且该约定只约束本手册自身的后续编辑，不创造 normative 规则、不改变
+    `AGENTS.md`/enforcement/模板对其他文档的要求。
+  - **共同验收**：`HLD-DURABLE-001`、`HLD-CONVENTION-001` 按 verification r1
+    二值执行；计数门、逐条对照、OID 可解析、归档模拟、不动面零变化与
+    shadow-spec 扫描全部保持。
+  - **不动面**：`AF-NNN` ID 集合、taxonomy 归属与两轴划分、八字段契约与顺序、
+    `Automation status` 取值域、`Fact`/`Inference` 标注与 positive/negative 计数、
+    案例事实内容、`openspec/templates/**`、`AGENTS.md`、Constitution、
+    enforcement、current specs/contracts、`changes/archive/**` 与所有
+    platform/conformance/support 状态**均不改变**。
+- 本批准**不产生任何任务执行或 readiness**：TASK-HLD-001/002 继续保持 `blocked`，
+  各自必须在依赖满足后通过独立 readiness PR 才能开工；本批准也不授权新增
+  parser/CI、不授权处理仓内其他文件的同类引用。

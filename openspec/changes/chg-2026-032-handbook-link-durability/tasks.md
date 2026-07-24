@@ -6,8 +6,8 @@
 
 ## TASK-HLD-001 — 活跃 change 引用改为耐久形式
 
-- Status:blocked（双前置：① CHG-2026-032 经 approval-only PR 批准；② 独立 readiness
-  PR 钉定手册 blob 与逐条待改清单）
+- Status:blocked（双前置：① CHG-2026-032 经 approval-only PR 批准——**本批准 PR 合入后
+  该项满足**；② 独立 readiness PR 钉定手册 blob 与逐条待改清单——**仍未满足**）
 - Platform:macos（过程文档跨平台可复用，零平台产品行为）
 - Requirements/AC:change-local `HLD-DURABLE-001`
 - Depends on:change approval、independent readiness
