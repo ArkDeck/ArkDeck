@@ -1,7 +1,7 @@
 ---
 schema_version: 1.0.0
 change_id: CHG-2026-033-ref-protection-topology
-change_revision: 1
+change_revision: 2
 platform: macos
 evidence_classes:
 - documentReview
@@ -38,8 +38,10 @@ cases:
     No Agent-reachable process, connector, browser, keychain, secret store,
     token, app session or tool can act as lvye. Every Agent identity is
     non-CODEOWNER, non-admin, non-bypass and outside main push restrictions;
-    review, merge, auto-merge, main ref update and repository, branch or
-    ruleset administration routes are absent or denied.
+    shared platform permission categories are recorded truthfully, while
+    self-approval, effective CODEOWNER approval, merge, auto-merge, main ref
+    update and repository, branch or ruleset administration authority is
+    absent or denied.
 - acceptance_id: RPT-MIGRATION-001
   test_id: TEST-RPT-MIGRATION-001
   method: Document review of the ordered migration, read-backs and rollback receipt.

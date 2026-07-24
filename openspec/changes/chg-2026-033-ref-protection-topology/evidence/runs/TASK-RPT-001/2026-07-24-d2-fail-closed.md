@@ -235,6 +235,83 @@ mix or replace its approved scope and is forbidden without a new explicit
 human recovery decision. No GitHub settings, protection or pull-request state
 was mutated by the Agent while recording this follow-up.
 
+## Bootstrap carrier authorization and fresh authenticated capture
+
+The human supplied the required explicit recovery decision:
+
+> 授权将 PR #459 作为一次性 bootstrap 恢复载体；确认远端 head 和 open 状态无漂移后，
+> 可基于最新 main 替换该分支，原 head 永久记入 evidence。载体仅允许包含失败证据、
+> PR 通道机制修订和恢复通道所需 D2 readiness；不得实施 ruleset 或 main protection
+> 切换。
+
+Before any replacement, an unauthenticated public REST read and an isolated
+authenticated GET-only capture independently confirmed:
+
+```text
+protected main:
+  9de9c63f7fe17069ad50ff0a73fc171ce6a14ec8
+PR: 459
+state: open
+author: github-actions[bot]
+head ref: agent/task-au-002-update-runtime
+head OID: d3aeeaaa8eba79526474580208dc253c4c46d26a
+base ref: main
+other open PRs: 466, 468
+non-agent non-main refs: []
+```
+
+The old #459 diff was the TASK-AU-002 updater implementation already replaced
+on protected main by #457. The authorized replacement uses the old head only
+as an exact `force-with-lease` expected value; the old OID remains in this
+append-only record.
+
+Fresh authenticated capture:
+
+```text
+captured at: 2026-07-24T07:59:50.411399Z
+captured by: lvye (user ID 4340161)
+schema: arkdeck-rpt001-discovery/v2
+API version: 2026-03-10
+request semantics: GET-only
+canonical bytes (without trailing LF): 22535
+canonical SHA-256: 16e66c6675188cb48ddbdf9cf7df105a7af9227aedc64ff2620b98dcf72816e2
+file bytes (with trailing LF): 22536
+file SHA-256: 0af8f98938a9c230fa8a77c4c544c2d268b4093062b1f7714c04dabfb94abfc9
+discovery script SHA-256:
+  487701e6602ddd20a8d18db6bfce59d58f4597dc7ea3b15e171f45e8934d637a
+capture wrapper SHA-256:
+  eb37c969a71d90ab7c23c483d35b05cd4d11c779f5b6c4c92cb149e8b6520397
+```
+
+All 11 embedded canonical artifacts passed independent byte-count and SHA-256
+recalculation. Relevant fresh facts were:
+
+```text
+ruleset_full: 702 / a5725db245d84174090de47e1fc45123219dbf5cfdd00d45856b04d801a3d5f2
+branch_protection_full: 1227 / e45fb8583eb8002e49fcd402c0d9026f7277a1b823b6fe7410695da5666f0b0c
+actor_inventory: 4521 / 107c011df3b617fb1982ad0e61472bf238037b05574fc2d7ced050ca44ea7101
+repository_settings: 660 / 8f605ec84f4d83ef6a860c238e1c506cacd1ab8c85ecb90448bdf2a684daf3f7
+open_pull_requests: 2028 / 0e67143c27f5f87d23342ffcaa3f01568a80d3be2355e920237144deada69845
+remote_refs: 1278 / 6b01357566245bdb78572b82c3d52aa52bf7b72a52817e90862a8f1abbc3ae8c
+workflow permissions:
+  can_approve_pull_request_reviews=false
+  default_workflow_permissions=read
+repository allow_auto_merge=false
+ruleset bypass actors: lvye only
+collaborators: lvye only
+Deploy Key: 158088026 / arkdeck-agent-writer / write / non-bypass
+teams/installations/outside collaborators/pending invitations: empty
+```
+
+The human session was logged out before the capture was processed. Agent-side
+checks reported no authenticated `gh` host and no GitHub token environment
+variable. The capture itself performed zero GitHub writes.
+
+This authorization permits drafting and exact expected-head replacement only.
+It does not approve the draft, restore the Actions setting, or authorize any
+ruleset/main-protection mutation. Governance authority begins only if the
+updated #459 exact head is reviewed and merged by `lvye`.
+
 ## Remediation boundary
 
 - Do not rerun either script or reuse #467's OID, window, payload/hash,
@@ -247,8 +324,9 @@ was mutated by the Agent while recording this follow-up.
 - Do not overwrite or repurpose an existing bot-authored PR as a recovery
   carrier without an exact human instruction naming that PR and accepting
   the exceptional carrier/scope history.
-- After a valid recovery carrier restores ordinary PR transport, first merge
-  this facts-only failure evidence.
+- The valid recovery carrier must merge this facts-only failure evidence as
+  part of its explicitly disclosed bootstrap-only scope; the evidence branch
+  itself remains unmerged and must not be treated as approval.
 - Then capture a fresh authenticated full before from the new protected main.
 - A new independent superseding D2 readiness must:
   - explicitly resolve the combined Actions create/approve capability instead

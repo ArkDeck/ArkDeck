@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-033-ref-protection-topology
-revision: 1
-status: approved # r1 proposal 经 PR #453 合入 main cecca155fa74a3304fa3d4b7b0ac8fcccc591f1d；本 approval-only PR 仅在维护者 review/merge 后生效
+revision: 2
+status: approved # r1 经 #453/#455 批准；r2 bootstrap revision 仅在 repurposed PR #459 经维护者 review/merge 后成为 current
 class: implementation-only
 core_change_level: none
 owner: lvye
@@ -41,6 +41,35 @@ ruleset，这与本 change 的“GitHub 设置变更由人类维护者在 Agent 
 因此本 change 获批后，必须先以独立 CHG-2026-030 r7 supersede 该 r6 D2 路径；
 r7 合入前，r6 gateway/readiness/execution 的 dispatch 必须为 0。
 
+### r2 bootstrap finding
+
+#467 D2 执行在 fail-closed 顺序中先把 repository workflow setting
+`can_approve_pull_request_reviews` 从 `true` 改为 `false`，随后 branch-protection
+PUT 因同时发送 legacy `contexts` 与 App-bound `checks` 被 GitHub 以 HTTP 422 拒绝。
+ruleset 与 main protection 没有被修改，旧 ruleset 继续覆盖 main。
+
+后续实测与 GitHub 官方 setting 语义共同证明：
+`can_approve_pull_request_reviews` 是 “Allow GitHub Actions to **create and approve**
+pull requests” 的组合开关，不存在 repository-level create-only 取值。设为 `false`
+同时切断 `.github/workflows/agent-pr.yml` 使用 `GITHUB_TOKEN` 创建 bot-authored PR
+的既有治理通道。失败证据 branch 的 `guard` 成功而 `open-pr` 失败，且没有生成 PR。
+
+这不改变高层不变量，但推翻 r1 readiness 的低层假设。GitHub permission category
+可能覆盖 review endpoint，并不等于 automation 拥有批准权威；current enforcement
+必须由以下事实共同闭合：
+
+- Agent 草案 PR 的唯一作者是 `github-actions[bot]`；
+- GitHub 禁止 PR 作者批准自己的 PR；
+- 唯一 CODEOWNER 仍是人类 `lvye`；
+- Actions bot 不是 CODEOWNER、collaborator/admin、ruleset bypass 或 main push actor；
+- main 仍要求人类 CODEOWNER approving review、`guard`，并禁止 auto-merge。
+
+普通新 PR 已无法创建。用户明确授权将仍为 bot-authored/open、head 精确为
+`d3aeeaaa8eba79526474580208dc253c4c46d26a` 的 #459 作为一次性 bootstrap
+载体，并允许在 expected-head 无漂移时以最新 main 为 base 替换其旧产品 diff。该聊天
+授权只允许安全重建载体；**只有更新后的 #459 经 `lvye` review/merge 才批准 r2
+机制修订与其中 exact bootstrap D2 readiness**。
+
 ## What changes
 
 ### In scope
@@ -62,6 +91,10 @@ r7 合入前，r6 gateway/readiness/execution 的 dispatch 必须为 0。
   - push restriction users 仅 `lvye`，teams/apps 为空；
   - force-push 与 deletion 禁止；
 - repository auto-merge 关闭；merge queue/自动审批/自动 merge 不进入方案；
+- legacy `agent-pr` 仍以 `github-actions[bot]` 创建普通 `agent/**` PR；由于 GitHub
+  只有 create+approve 组合开关，repository setting 保持/恢复为 `true`，但该平台
+  endpoint coverage 不构成批准权威，self-approval 与有效 CODEOWNER approval
+  仍由作者分离 + human-only CODEOWNER + main protection 阻断；
 - 所有 `lvye` credential、delegated session、connector、browser session、CLI、
   keychain 与 secret storage 对 Agent 不可达；
 - 枚举 Deploy Key、Actions token、GitHub App/integration identity，证明它们均不是
@@ -77,17 +110,27 @@ r7 合入前，r6 gateway/readiness/execution 的 dispatch 必须为 0。
 - 修改 D0/D1/D2 或 E0/E1/E2 定义；
 - 任何形式的 auto-merge、merge queue、自动 approval/merge；
 - 让 Deploy Key、Actions、GitHub App 或 integration 获得 bypass/main push；
+- 把 `can_approve_pull_request_reviews=true` 误写为 Actions 已获得 CODEOWNER、
+  main merge 或 self-approval authority；
 - 把维护者 credential 放进 Agent runtime、gateway 或 connector；
 - 由 Agent 执行 ruleset、branch protection、repository setting 或 credential 变更；
 - 改写历史 evidence bytes 来掩盖旧机制；
-- 把本 proposal、approval 或 readiness merge 当作 D2 execution authorization。
+- 把 r1 proposal/approval 或任一 superseded readiness merge 当作 D2 execution
+  authorization；
+- 在一次性 bootstrap readiness 下修改 ruleset、main branch protection、repository
+  merge setting、credential、ref protection 或任何 PR review/merge 状态。
 
 ### Observable behavior before/after
 
 - Before：合规 PR 仍要求维护者显式 bypass ruleset。
+- Bootstrap failure state：main 完整性仍由旧 ruleset 保持，但 Actions PR creator
+  不可用，普通 governance PR 无法新建。
+- Bootstrap recovery after：只恢复 bot-authored PR transport；ruleset 与 main
+  protection 保持原样，完整两层 topology 仍等待后续独立 fresh D2 readiness。
 - After：automation-authored PR 只有在 `lvye` CODEOWNER approval 与 `guard` 成功后，
   才能由 `lvye` 正常 Squash and merge，且无需选择 bypass；Agent direct-main、
-  approval、merge、force-push、delete 与 auto-merge 仍不可构造或被拒绝。
+  self-approval、有效 CODEOWNER approval、merge、force-push、delete 与 auto-merge
+  authority 仍不可构造或被拒绝。
 
 ## Scope(涉及的 Requirement/AC)
 
@@ -115,24 +158,25 @@ r7 合入前，r6 gateway/readiness/execution 的 dispatch 必须为 0。
 
 ## Approval and flow
 
-1. 本 proposal PR：只登记方案；status 保持 `proposed`，任务保持 `blocked`，零 GitHub
-   control-plane/ref/credential/probe 变更。
-2. 独立 approval-only PR：`proposed → approved`。
-3. 独立 CHG-2026-030 r7：supersede #449/r6 的 Agent-operated D2 gateway，明确
-   #435 失效、HLR-002A blocked、ruleset setting 只由人类执行，并依赖本 change
-   evidence。
-4. 独立 D2 readiness PR：fresh main、完整 authenticated before、exact after/rollback
-   payload、hash、操作者、窗口和 probe names。
-5. 人类维护者在 Agent 外执行 exact GitHub setting 变更。
-6. 独立 execution-evidence PR。
-7. 独立 operability-evidence PR，记录前一 PR 的 review/check/mergedBy/merge OID 与
-   正常无 bypass merge。
-8. 独立 task done PR。
-9. BAP-CRED-001 current-mechanism supersession/revalidation 与 CHG-2026-030 fresh
-   HLR-002A readiness。
-10. 五条 AC 全部有 merged、可复查 evidence 后，独立 verification PR。
+1. r1 proposal/approval、CHG-2026-030 r7、TASK-RPT-001 ready 与 #467 readiness
+   保留历史；#467 execution 已 fail closed 且永久 exhausted。
+2. 一次性 bootstrap carrier #459 只包含失败证据、r2 机制修订与恢复 PR transport
+   的 exact D2 readiness。载体复用/阶段合并是由通道自身失效造成的封闭例外，必须在
+   PR title/body/review 中显式披露；它不允许 topology mutation。
+3. #459 经 `lvye` review/merge 后，人类维护者在 Agent 不可达的隔离 session 中只把
+   Actions 组合 setting 从 exact `false/read` 恢复为 exact `true/read` 并 read-back。
+4. human session logout、Agent credential containment 复核后，以普通
+   `agent-pr` 通道创建并合入独立 failure/execution evidence PR。
+5. 从届时最新 protected main 重新执行正常序列：独立 proposal/mechanism follow-up
+   （若需要）→ approval-only → fresh topology D2 readiness → human execution →
+   execution evidence → operability evidence → done。
+6. 后续 topology readiness 的 branch-protection payload 使用 App-bound
+   `checks` **而不同时发送 legacy `contexts`**；全部 before/after/rollback/hash、
+   window、nonce、OID 重新固定。
+7. TASK-RPT-002、BAP-CRED-001/HLR supersession 与最终 verification 继续保持原依赖。
 
-本 PR 的合入不构成 approval、readiness、authorization、D2 window、done 或 verified。
+历史 r1 proposal carrier #453 的合入不构成 approval、readiness、authorization、
+D2 window、done 或 verified；r2 #459 的精确授权边界以下文为准。
 
 ## Approval
 
@@ -140,7 +184,7 @@ r7 合入前，r6 gateway/readiness/execution 的 dispatch 必须为 0。
   `acb3e618b021cab128306341d7bedd62feef7a2c`，由维护者 `lvye` 合入 protected main
   `cecca155fa74a3304fa3d4b7b0ac8fcccc591f1d`。该 merge 只登记 proposal，不构成
   approval。
-- 本 approval-only PR 的维护者 review/merge 构成对下列范围的批准：
+- 历史 approval-only PR #455 的维护者 review/merge 构成对下列范围的批准：
   - Layer A ordinary-ref ruleset、Layer B exact-main branch protection、Layer C
     identity/repository capability containment 三层缺一不可；
   - ruleset、branch protection、repository setting 与 credential 变更只由人类维护者
@@ -150,6 +194,13 @@ r7 合入前，r6 gateway/readiness/execution 的 dispatch 必须为 0。
   - overlap-first migration、双 direct-main negative、ruleset-first rollback 与
     execution/operability/done evidence separation；
   - enforcement.md、AGENTS.md、Constitution 与 Core specs/contracts 零修改。
-- 本 merge 不使 TASK-RPT-001/002 `ready`，不创建 D2 authorization/window，不批准
-  payload/probe，不修改任何 GitHub control-plane/ref/credential，也不构成
-  `done`/`verified`。
+- #455 merge 本身不使 TASK-RPT-001/002 `ready`，不创建 D2
+  authorization/window，不批准 payload/probe，不修改任何 GitHub
+  control-plane/ref/credential，也不构成 `done`/`verified`。
+- r2 bootstrap carrier #459 的维护者 review/merge 仅批准：
+  - 本 proposal 的 platform-capability 机制修订；
+  - `d2-readiness.md` 中一次 exact Actions transport recovery；
+  - 将 #459 的旧 head 作为 superseded historical OID，并接受一次性载体复用事实。
+- r2 merge 不批准 ruleset、branch protection、repository merge setting、credential、
+  probe ref、review、merge 或 auto-merge mutation；不构成 TASK-RPT-001 `done` 或
+  change `verified`。
