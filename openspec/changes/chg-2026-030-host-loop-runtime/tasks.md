@@ -192,13 +192,20 @@
 
 ## TASK-HLR-002A — Legacy bootstrap namespace partition
 
-- Status:blocked（human-operation deferral stop gate；仅在维护者 review/merge
-  本独立状态 PR 后生效。维护者已明确要求跳过所有必须由本人执行的任务，因此
-  #425 固定的人类 D2 ruleset 窗口不执行，PUT/ref/probe dispatch = 0；没有 D2
-  receipt、acceptance PASS 或 done。TASK-HLR-002 持续 blocked，
-  TASK-HLR-003→004→005 继续传递停链。恢复本任务必须另起独立 D2 re-readiness
-  PR，重新钉定当时 protected-main/ruleset/refs/维护窗口与维护者可执行性；不得
-  复用 r3/r4 script、UUID 或窗口。）
+- Status:ready（r5 resume / r5 D2 re-readiness；仅在维护者 review/merge 本独立
+  readiness PR 后生效。#426 的 human-operation deferral 已以 exact merge OID
+  `e56baa2f39998c1b3c2f7c6681b112dd1643ca7c` 进入 protected `main`，本 r5 从
+  最新 main 重新完成 authenticated ruleset before/read-back、fresh refs/UUID、
+  零 open conflict 与维护者可执行性勘察，并固定全新窗口
+  `2026-07-24T02:30:00Z`→`03:30:00Z`。merge 只批准下述人类 D2 计划，不自行
+  修改 ruleset；窗口/pin/read-back 任一不匹配时 PUT/ref/probe dispatch = 0。）
+- Historical Status:blocked（#426 exact reviewed head
+  `8beef9786a32ebb7e04eb8506a2223c946856d98` 由 `lvye` 对 exact head
+  APPROVED，并于 `2026-07-23T14:45:14Z` 以 merge commit
+  `e56baa2f39998c1b3c2f7c6681b112dd1643ca7c` 合入；first parent =
+  `0dac14d9fe021d7bd52808b54c139003f1aced2f`，second parent = reviewed head。
+  deferral 期间 zero PUT/ref/probe、无 receipt/PASS/done；本 r5 readiness 合入后
+  仅解除“维护者不可执行”的 stop gate，其他 D2 二值门不放宽。）
 - Historical Status:ready（r4 / r5 D2 re-readiness；#425 exact reviewed head
   `30e4d42669bdd256be70c4ee1c82c5f41e1a85ad` 由 `lvye` APPROVED，并以
   `0dac14d9fe021d7bd52808b54c139003f1aced2f` 合入 protected `main`；其唯一
@@ -245,7 +252,7 @@
   钉定 `agent-pr.yml`/`sdd-guard.yml` blobs、GitHub Actions branch-filter semantics、
   reserved namespace grammar、control/canary 矩阵与零 open workflow conflict。r3
   proposal 合入本身不使本任务 ready。）
-- Human-operation deferral stop gate：
+- Historical human-operation deferral stop gate：
   - **Decision fact:closed。**维护者明确表示无法执行脚本，并要求所有需要本人
     操作的任务跳过；本状态只把 TASK-HLR-002A 从 `ready` 转为 `blocked`，不把
     “跳过”冒充完成、验证或平台豁免。
@@ -313,6 +320,164 @@
   - **Evidence/done boundary。**D2 receipt + fresh live facts 使用独立 evidence PR，
     只追加本任务 evidence，不改 source/status；其 merge 后再以独立 D0 PR
     `ready→done`。HLR-002 在 HLR-002A done 前持续 blocked。
+- Readiness（r5 resume / r5 D2 re-readiness，audit base = protected `main`
+  `e9406075cb6ac1401447d2f90c22ffc488a05512`）：
+  - **Deferral/resume gate:satisfied。**#426 exact head
+    `8beef9786a32ebb7e04eb8506a2223c946856d98` 由 `lvye` 于
+    `2026-07-23T14:44:52Z` 起对 exact head APPROVED，并于
+    `2026-07-23T14:45:14Z` 以 merge commit
+    `e56baa2f39998c1b3c2f7c6681b112dd1643ca7c` 合入 protected `main`；
+    merge parents 依序为 #425 merge
+    `0dac14d9fe021d7bd52808b54c139003f1aced2f` 与 reviewed head。维护者现已明确
+    恢复执行脚本/真机的人类可用性；本 task 仍为 host-only、零真机。#426 至本
+    audit base 的后续合入只涉及 CHG-2026-023/031，未修改本 change、workflow、
+    parser 或 HLR evidence。r5 D1、#419 source、#421 failure、TASK-BAP-003 done
+    与 #426 deferral 均为本 audit base ancestor。
+  - **Git/input/concurrency pins。**下列 Git objects 在本 audit base 实测。本
+    readiness merge 的 first parent 必须恰为本 audit base、diff 只允许本
+    TASK-HLR-002A section；任一 main/input drift、并发路径占用或窗口前未 merge
+    立即使 r5 resume 失效，必须重新 discovery/readiness，不顺延窗口或复用 probes。
+
+    ```yaml pins
+    - artifact: TASK-HLR-002A r5-resume D2 readiness audit base
+      commit: e9406075cb6ac1401447d2f90c22ffc488a05512
+    - artifact: TASK-HLR-002A human-operation deferral reviewed head
+      commit: 8beef9786a32ebb7e04eb8506a2223c946856d98
+    - artifact: TASK-HLR-002A human-operation deferral merge
+      commit: e56baa2f39998c1b3c2f7c6681b112dd1643ca7c
+    - artifact: CHG-2026-030 revision r5 merge
+      commit: b62762010705b3ff6c7fc864a86aec76563d3f01
+    - artifact: TASK-HLR-002A implementation merge
+      commit: 99ba8aa4b04018918daad2fc8830009c1030f6da
+    - artifact: TASK-HLR-002A failure evidence merge
+      commit: e4b33d036f796de7eb4aaed254724329ca040e68
+    - artifact: TASK-BAP-003 done merge
+      commit: 6a6b6b7010b6563d67aa7d96e6838505e82eb25a
+    - path: .github/workflows/agent-pr.yml
+      blob: 41426544637db25224dc6c6b3718abd4ebbfca7c
+    - path: .github/workflows/sdd-guard.yml
+      blob: 809147e462512d970813d1992a3fcdf41f8b4b10
+    - path: .github/workflows/swift-ci.yml
+      blob: 640065f3f3849e1add0cc6bfa92078873eb315ef
+    - path: scripts/test_agent_pr_workflow.py
+      blob: 6a256a1556827c2153df0785479c5cbc53796f28
+    - path: scripts/check_pr_paths.py
+      blob: 267417ca5d0f9a2bd5ef775314b93915717aea9b
+    - path: scripts/test_check_pr_paths.py
+      blob: 2aa1e2cb37ef0085d2e101adb34d2b3615246b82
+    - path: openspec/changes/chg-2026-030-host-loop-runtime/proposal.md
+      blob: 21ac153075aaeb44a81808effa6257e71561b03c
+    - path: openspec/changes/chg-2026-030-host-loop-runtime/design.md
+      blob: fbab391e567bee468e84e9f9084023c420147d25
+    - path: openspec/changes/chg-2026-030-host-loop-runtime/tasks.md
+      blob: 9c97a5135075eb82984234bf9005d93e7941ba8a
+    - path: openspec/changes/chg-2026-030-host-loop-runtime/verification.md
+      blob: ae3b1baa203362434094f96f7c4af88fb8101882
+    - path: openspec/changes/chg-2026-030-host-loop-runtime/evidence/runs/TASK-HLR-002A/live-canary-r1-fail.md
+      blob: 9fc841f46c9b62ff74eede541b00890e1c6f6dbe
+    - path: openspec/changes/chg-2026-027-decision-grading-batch-approval/evidence/runs/TASK-BAP-003/run.md
+      blob: d6eaf28e188b1f5f64317ce4eacad22eae10ab10
+    ```
+
+    `tasks.md` 是本 readiness 自载体，上列为修改前 blob；merge 后改为核验其
+    parents、reviewed head 与 diff-only-self-section。本 discovery 捕获时
+    readiness branch `agent/hlr-002a-r5-d2-readiness-r5` remote ref absent、
+    all-state PR = 0，本仓 open PR = 0；`2026-07-24T01:01:22Z` 的公开复核仍为
+    open PR = 0、reserved/control refs = 0、protected main = audit base。
+  - **Fresh authenticated ruleset before:closed。**维护者控制的 resume discovery
+    于 `2026-07-24T01:00:11.764317Z` 以 actor `lvye`
+    (`actor_id=4340161`) 执行 authenticated GitHub GET only；schema =
+    `arkdeck-hlr002a-r5-resume-discovery/v1`，零 secret value、零 repository/
+    ruleset/ref/PR/Issue write。完整 ruleset 响应按 UTF-8、sorted keys、
+    separators `(',', ':')`、no trailing LF canonicalize 后 byte count = `702`、
+    SHA-256 =
+    `a5725db245d84174090de47e1fc45123219dbf5cfdd00d45856b04d801a3d5f2`：
+
+    ```json
+    {"_links":{"html":{"href":"https://github.com/ArkDeck/ArkDeck/rules/19595282"},"self":{"href":"https://api.github.com/repos/ArkDeck/ArkDeck/rulesets/19595282"}},"bypass_actors":[{"actor_id":4340161,"actor_type":"User","bypass_mode":"always"}],"conditions":{"ref_name":{"exclude":["refs/heads/agent/**"],"include":["~ALL"]}},"created_at":"2026-07-23T10:20:11.391+08:00","current_user_can_bypass":"always","enforcement":"active","id":19595282,"name":"agent-ref-boundary","node_id":"RRS_lACqUmVwb3NpdG9yec5Na16-zgErABI","rules":[{"type":"creation"},{"type":"update"},{"type":"deletion"}],"source":"ArkDeck/ArkDeck","source_type":"Repository","target":"branch","updated_at":"2026-07-23T10:20:11.425+08:00"}
+    ```
+
+    bypass 恰为维护者 `(4340161, User, always)`；Deploy Key 不在 bypass。
+    discovery 完成后维护者已执行 logout，`2026-07-24T01:01:22Z` 的外部
+    `gh auth status` 为 zero logged-in hosts；公开 ruleset ID/name/enforcement/
+    conditions/rules/created_at/updated_at 与 authenticated before 一致。
+  - **Fresh exact rollback bytes:closed。**任一 PUT/read-back/active-rule
+    evaluation 或字段比较失败时，维护者必须向 ruleset `19595282` PUT 下列完整
+    canonical bytes；byte count = `301`、SHA-256 =
+    `5943b6ce840cbb385ad83615da15ff2ee4ec5710bd696fae6140b37302042157`：
+
+    ```json
+    {"bypass_actors":[{"actor_id":4340161,"actor_type":"User","bypass_mode":"always"}],"conditions":{"ref_name":{"exclude":["refs/heads/agent/**"],"include":["~ALL"]}},"enforcement":"active","name":"agent-ref-boundary","rules":[{"type":"creation"},{"type":"update"},{"type":"deletion"}],"target":"branch"}
+    ```
+
+    rollback 后立即 authenticated GET、重构同一 write payload 并复核 hash；无法
+    证明恢复即停止，TASK-HLR-002A 回到 `blocked`，ref matrix dispatch = 0。
+  - **Fresh exact additive after:closed。**唯一获准 endpoint =
+    `repos/ArkDeck/ArkDeck/rulesets/19595282`，method = `PUT`；body 必须逐字为
+    下列 canonical UTF-8 bytes，byte count = `325`、SHA-256 =
+    `8537b85939b7be059c19601360cadb95bdf4f0abe5151d5948bb6f7826405d30`：
+
+    ```json
+    {"bypass_actors":[{"actor_id":4340161,"actor_type":"User","bypass_mode":"always"}],"conditions":{"ref_name":{"exclude":["refs/heads/agent/**","refs/heads/agent/**/*"],"include":["~ALL"]}},"enforcement":"active","name":"agent-ref-boundary","rules":[{"type":"creation"},{"type":"update"},{"type":"deletion"}],"target":"branch"}
+    ```
+
+    before→after 只允许 append `refs/heads/agent/**/*`；原 single-level exclude、
+    `~ALL`、active enforcement、三个 rules、maintainer-only bypass 与字段顺序均
+    保持。PUT 后 immediate authenticated GET；重构 write payload 必须与上述
+    bytes/hash 相同。任何 extra/missing/reorder、broad bypass、`updated_at` 不前进
+    或 API ambiguity 立即 rollback，不解释性放行。
+  - **Fresh maintenance gate:closed。**operator = `@lvye`
+    (`actor_id=4340161`)；rollback contact = `@lvye`；固定窗口 =
+    `2026-07-24T02:30:00Z`（北京时间 `10:30`）至
+    `2026-07-24T03:30:00Z`（北京时间 `11:30`）。本 readiness 未在窗口前
+    review/merge、merge first parent 不等于 audit base、main/ruleset/ref/open
+    conflict 任一 pin 漂移、operator 不匹配、时钟不确定或窗口外，PUT = 0；
+    不得顺延或复用 r3/r4 script/window/UUID。readiness merge 后才可生成绑定本
+    PR/head/merge/parents 与下列 probes 的 fresh executor；Agent 不持 ruleset
+    admin，不代替维护者执行 PUT。
+  - **Fresh active-rule/ref matrix:closed。**authenticated discovery 对 before
+    实测：single Agent = 0；reserved/control/canary 四个 multi-level Agent ref、
+    `main`、non-agent 与 `agentx/**` 相似前缀均只命中 ruleset `19595282` 的
+    creation/update/deletion。after 预期：single 与四个 multi-level Agent refs
+    均为 0；`main`、non-agent、similar-prefix 继续命中 exact 三条。七个 target
+    refs 全部 exact absent：
+
+    ```yaml probes
+    single_agent: agent/hlr002a-single-ee9e135e-0db5-4ec8-8c9c-fbe6ceb858dd
+    reserved_matrix: agent/host-loop/probes/ce790c41-8304-48c0-a198-768939cb9e39
+    control_matrix: agent/hlr-002a-control/b6499c18-708a-4509-867b-e5b445041b5d
+    non_agent: hlr002a-denied-23a0704f-78c4-493a-94a9-8a8f083c8ced
+    similar_prefix: agentx/host-loop/probes/2d0c7628-0930-4a19-b8df-78babbeb47f1
+    reserved_canary: agent/host-loop/probes/d0e9a475-d5e8-4ecf-af30-0aec950ef3dd
+    ordinary_canary: agent/hlr-002a-control/4d6da223-b496-4b12-bbd4-a1697999f824
+    ```
+
+    D2 preflight 必须再次读取全部 target refs 与 active rules；任一 ref 存在、
+    rule/source/type 漂移、旧 UUID 被误用或 open overlapping operation 出现均停止，
+    不换名补跑。
+  - **D2 execution/read-back:binary。**readiness merge 后且仅在窗口内：
+    (1) 维护者 authenticated GET + exact rollback hash preflight；
+    (2) PUT exact after bytes；
+    (3) immediate authenticated GET/write-payload hash read-back；
+    (4) active-rule after matrix read-back；任一步失败先 PUT exact rollback 并验证，
+    随后停止；
+    (5) exact after 与 active rules 闭合后，维护者退出 `gh` 并交回零 secret 的
+    receipt；此时才允许 non-bypass Deploy Key 依次执行 single/reserved/control
+    create-delete、non-agent create GH013 与 direct-main empty-commit update GH013。
+    main OID 前后必须相同；任一负向意外成功是权限扩大事故，cleanup 不改变 FAIL。
+  - **Fresh canary/evidence order:binary。**ruleset receipt + ref matrix PASS 后重读
+    stable protected-main OID；reserved/ordinary 各建 fresh empty commit，共用该
+    parent/tree，严格 reserved-first/ordinary-second。两者 exact-head SDD Guard
+    success；reserved Agent PR run/PR = 0；ordinary Agent PR run terminal success
+    且 bot PR = 1。main 前进、head guard 缺失、0/2 PR、API ambiguity 或 target
+    preexist 均停止。闭合后才 close ordinary PR并 read-back `merged=false`、删除
+    refs并复查 absent。D2 receipt + ref matrix + canary facts 使用后续独立 evidence
+    PR，只追加 evidence；其合入后再走独立 D0 `ready→done`。
+  - **Review boundary。**本 r5-resume readiness PR 只修改本文件
+    TASK-HLR-002A section，登记 `blocked→ready`、#426 closure、fresh pins/
+    authenticated before/window/probes；零 source/workflow/test/evidence，零
+    ruleset/API/ref/PR/Issue/credential/scheduler 仓外写。merge 只批准计划，不是
+    D2 receipt、acceptance PASS 或 done；HLR-002 在 HLR-002A done 前持续 blocked。
 - Historical Readiness（r4 / r5 D2 re-readiness，audit base = protected `main`
   `b5b4f239c90825bf55e79af6713d75d8c6169277`）：
   - **r3 skip fact:closed。**#424 exact reviewed head
