@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-033-ref-protection-topology
 revision: 3
-status: verified # 2026-07-25 本 verification-closure PR；r3 approval #474 merge `d94e8f8378fabd14323dddc1ba138391d9dad09c`；两 task done 与五条 change-local AC 见 Verification closure；仅在维护者 review/merge 本 PR 后生效，archive 另行。原注:r3 proposal #473 merge `6153d581d7caf1bd1ed3335171318b3e92250926`
+status: archived # 2026-07-25 本 archive PR；verified #497 merge `ce4a11c3d7cb59686024be9cbd51939c084041d1`；implementation-only、零 spec/registry/baseline delta，故 archive 仅迁移目录、翻转状态并追加两个目录外引用的 currency note；仅在维护者 review/merge 本 PR 后生效。原注:r3 approval #474 merge `d94e8f8378fabd14323dddc1ba138391d9dad09c`
 class: implementation-only
 core_change_level: none
 owner: lvye
@@ -401,3 +401,24 @@ false、最终 controlled refs = 0；不把未发生的 rollback 写成真实执
 新的 ruleset、branch protection、repository setting、credential、ref probe、review/
 merge/auto-merge 或 HLR canary；不改变 Core/Product/platform conformance/support。
 change archive 仍须后续独立 PR。
+
+## Archive record（2026-07-25）
+
+- 前置：verification-only PR #497 已合入 protected `main`
+  `ce4a11c3d7cb59686024be9cbd51939c084041d1`；本目录两项 task 均为
+  `done`，五条 change-local acceptance 均为 `passed`。
+- Delta：本 change 为 `implementation-only`、`core_change_level:none`，没有
+  `specs/**` delta，也不修改 acceptance registry、contract、baseline、产品代码或
+  platform conformance。
+- 目录：本 archive PR 将完整 change package 移至
+  `openspec/changes/archive/2026-07-25-chg-2026-033-ref-protection-topology/`；
+  除本 proposal 的状态与本记录外，目录内历史 artifact/evidence 字节保持不变。
+- 引用面：归档前全仓扫描发现两个目录外 current/handoff 引用。本 PR 不改写其原始
+  事实行，只分别向 CHG-2026-027 的 TASK-BAP-003 current-topology addendum 与
+  CHG-2026-030 的 HLR-002A readiness 追加 dated archive currency note，使新位置
+  可定位；其中已固定的 evidence blob OID 不因目录移动而变化。
+- 边界：零 GitHub control-plane/ref/credential/PR-state mutation，零设备、网络或
+  产品 effect；本归档不授权 HLR-002A canary，也不改变 #498 readiness 的执行门。
+
+本目录在 archive PR 经维护者 review/merge 后冻结；后续事实使用新 change 或
+append-only 外部记录，不改写归档历史。
