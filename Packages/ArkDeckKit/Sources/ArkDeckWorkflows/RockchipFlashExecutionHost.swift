@@ -230,6 +230,7 @@ final class RockchipDurableExecutionPersistence: @unchecked Sendable,
   private let layout: SessionLayout
   private let claim: StorageClaim
   private let coordinator: HostStorageCoordinator
+  private let storageContext: SessionStorageExecutionContext?
   private let journal: FileDurableJournal
   private let audit: FileDurableSessionAuditStore
   private let artifactStore: SessionArtifactStore
@@ -244,12 +245,14 @@ final class RockchipDurableExecutionPersistence: @unchecked Sendable,
   init(
     layout: SessionLayout,
     claim: StorageClaim,
-    coordinator: HostStorageCoordinator
+    coordinator: HostStorageCoordinator,
+    storageContext: SessionStorageExecutionContext? = nil
   ) throws {
     self.layout = layout
     sessionRoot = layout.root
     self.claim = claim
     self.coordinator = coordinator
+    self.storageContext = storageContext
     journal = try FileDurableJournal(url: layout.journalURL)
     audit = try FileDurableSessionAuditStore(layout: layout)
     artifactStore = SessionArtifactStore(layout: layout)
@@ -443,6 +446,9 @@ final class RockchipDurableExecutionPersistence: @unchecked Sendable,
       audit: audit, manifestPublisher: publisher
     ).persist(claim: claim, disposition: .succeeded, auditRecord: record, manifest: manifest)
     _ = try await coordinator.completeRecoveredFinalization(receipt)
+    if let storageContext {
+      await storageContext.registerFinalizedSession(layout.root)
+    }
     return layout.manifestURL
   }
 
@@ -663,6 +669,7 @@ private struct RockchipPersistedStepResult {
 private enum RockchipProductionExecutionComposition {
   static func make() throws -> RockchipFlashExecutionDependencies {
     let settings = try RockchipProductExecutionSettings.load()
+    let storage = try RockchipProductionStorageComposition.make()
     let clock = RockchipContinuousAdmissionClock()
     let usbProbe = RockchipProductUSBProbe()
     let provenance = GitHubProtectedMainAuthorizationPort(token: settings.githubToken)
@@ -675,8 +682,8 @@ private enum RockchipProductionExecutionComposition {
       securityScopedURL: settings.securityScopedURL,
       executor: FoundationProcessExecutor())
     let postflight = RockchipProductPostflightPort(probe: usbProbe)
-    let coordinator = HostStorageCoordinator()
-    let store = try SessionStore(sessionsRoot: settings.sessionsRoot)
+    let coordinator = storage.context.coordinator
+    let store = storage.context.sessionStore
     let storageProbe = SystemHostStorageProbe()
     let requiredGrowth =
       UInt64(
@@ -687,7 +694,12 @@ private enum RockchipProductionExecutionComposition {
       admission: admission, process: process, postflight: postflight,
       power: ProductRockchipPowerActivityController(),
       makePersistence: { sessionID, jobID, _ in
-        let snapshot = try storageProbe.snapshot(for: settings.sessionsRoot)
+        let catalog = try await storage.context.prepareHeavyWriterAdmission()
+        let snapshot = try storageProbe.snapshot(for: storage.context.rootLease.url)
+        guard snapshot.volumeIdentity == catalog.volumeIdentity else {
+          throw RockchipFlashExecutionError.storageRejected(
+            "Session root volume identity changed")
+        }
         let request = try StorageClaimRequest(
           claimID: "claim-\(jobID)", jobID: jobID, volumeIdentity: snapshot.volumeIdentity,
           budget: StorageBudget(
@@ -699,8 +711,19 @@ private enum RockchipProductionExecutionComposition {
         let layout = try store.createSession(
           sessionID: sessionID, jobID: jobID, createdAt: Date(), claim: claim)
         return try RockchipDurableExecutionPersistence(
-          layout: layout, claim: claim, coordinator: coordinator)
+          layout: layout, claim: claim, coordinator: coordinator,
+          storageContext: storage.context)
       }, lifecycle: ProductRockchipExecutionLifecyclePort())
+  }
+}
+
+struct RockchipProductionStorageComposition: Sendable {
+  let context: SessionStorageExecutionContext
+
+  static func make(
+    runtime: SessionStorageApplicationRuntime = .production
+  ) throws -> RockchipProductionStorageComposition {
+    RockchipProductionStorageComposition(context: try runtime.makeExecutionContext())
   }
 }
 
@@ -712,7 +735,6 @@ private struct RockchipProductBindingSnapshot: Codable, Sendable {
 }
 
 private final class RockchipProductExecutionSettings: @unchecked Sendable {
-  let sessionsRoot: URL
   let usageRoot: URL
   let tool: RockchipSelectedDiscoveryTool
   let securityScopedURL: URL
@@ -720,14 +742,12 @@ private final class RockchipProductExecutionSettings: @unchecked Sendable {
   let binding: RockchipProductBindingSnapshot
 
   private init(
-    sessionsRoot: URL,
     usageRoot: URL,
     tool: RockchipSelectedDiscoveryTool,
     securityScopedURL: URL,
     githubToken: String,
     binding: RockchipProductBindingSnapshot
   ) {
-    self.sessionsRoot = sessionsRoot
     self.usageRoot = usageRoot
     self.tool = tool
     self.securityScopedURL = securityScopedURL
@@ -741,9 +761,8 @@ private final class RockchipProductExecutionSettings: @unchecked Sendable {
       for: .applicationSupportDirectory, in: .userDomainMask,
       appropriateFor: nil, create: true)
     let root = applicationSupport.appending(path: "ArkDeck", directoryHint: .isDirectory)
-    let sessions = root.appending(path: "Sessions", directoryHint: .isDirectory)
     let usage = root.appending(path: "AuthorizationUsage", directoryHint: .isDirectory)
-    for directory in [root, sessions, usage] {
+    for directory in [root, usage] {
       try manager.createDirectory(
         at: directory, withIntermediateDirectories: true,
         attributes: [.posixPermissions: 0o700])
@@ -801,7 +820,7 @@ private final class RockchipProductExecutionSettings: @unchecked Sendable {
         "durable Rockchip binding snapshot is invalid")
     }
     return RockchipProductExecutionSettings(
-      sessionsRoot: sessions, usageRoot: usage, tool: selectedTool,
+      usageRoot: usage, tool: selectedTool,
       securityScopedURL: executableURL, githubToken: token, binding: binding)
   }
 

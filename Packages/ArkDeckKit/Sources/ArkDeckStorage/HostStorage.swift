@@ -464,6 +464,19 @@ private final class StorageClaimPermit: @unchecked Sendable {
     return sessionBindingState
   }
 
+  func currentSessionBinding() -> StorageClaimSessionBinding? {
+    lock.lock()
+    defer { lock.unlock() }
+    switch sessionBindingState {
+    case .unbound:
+      return nil
+    case .provisional(let binding):
+      return binding
+    case .committed(let owned), .failed(let owned):
+      return owned.binding
+    }
+  }
+
   private func rootOwnership(atPath path: String) -> StorageClaimSessionRootOwnership? {
     var metadata = stat()
     guard lstat(path, &metadata) == 0, metadata.st_mode & S_IFMT == S_IFDIR else {
@@ -620,6 +633,24 @@ public enum StorageAdmission: Equatable, Sendable {
   case queued(StorageQueueReason)
 }
 
+public struct ActiveStorageSessionSnapshot: Equatable, Sendable {
+  public let claimID: String
+  public let jobID: String
+  public let sessionID: String
+  public let sessionRoot: URL
+  public let volumeIdentity: VolumeIdentity
+  public let writerClass: StorageWriterClass
+
+  fileprivate init(claim: StorageClaim, binding: StorageClaimSessionBinding) {
+    claimID = claim.claimID
+    jobID = claim.jobID
+    sessionID = binding.sessionID
+    sessionRoot = URL(filePath: binding.rootPath).standardizedFileURL
+    volumeIdentity = claim.volumeIdentity
+    writerClass = claim.writerClass
+  }
+}
+
 public enum StorageRevalidationAction: Equatable, Sendable {
   case continueWriting
   case stopOptionalWritesAndFinalize
@@ -757,6 +788,7 @@ public actor HostStorageCoordinator {
   private var completedTerminalReceiptOrder: [String] = []
   private let completedTerminalReceiptLimit: Int
   private var retentionBlockedVolumes: Set<VolumeIdentity> = []
+  private var conservativeRetentionBlockedVolumes: Set<VolumeIdentity> = []
 
   public init(completedReceiptCacheLimit: Int = 256) {
     completedTerminalReceiptLimit = max(1, completedReceiptCacheLimit)
@@ -771,7 +803,8 @@ public actor HostStorageCoordinator {
     }
     guard !snapshot.isReadOnly else { return .queued(.volumeReadOnly) }
     guard claims[request.claimID] == nil else { return .queued(.waitingForStorage) }
-    if retentionBlockedVolumes.contains(request.volumeIdentity),
+    if retentionBlockedVolumes.contains(request.volumeIdentity)
+      || conservativeRetentionBlockedVolumes.contains(request.volumeIdentity),
       request.budget.writerClass != .light
     {
       return .queued(.insufficientHeadroom)
@@ -870,11 +903,30 @@ public actor HostStorageCoordinator {
     _ plan: SessionRetentionPlan,
     on volume: VolumeIdentity
   ) {
-    if plan.blocksNewHeavyWriters {
+    setRetentionAdmission(blocked: plan.blocksNewHeavyWriters, on: volume)
+  }
+
+  public func setRetentionAdmission(blocked: Bool, on volume: VolumeIdentity) {
+    if blocked {
       retentionBlockedVolumes.insert(volume)
     } else {
       retentionBlockedVolumes.remove(volume)
     }
+  }
+
+  public func retentionAdmissionIsBlocked(on volume: VolumeIdentity) -> Bool {
+    retentionBlockedVolumes.contains(volume)
+      || conservativeRetentionBlockedVolumes.contains(volume)
+  }
+
+  public func requireConservativeRetentionBlock(on volume: VolumeIdentity) {
+    conservativeRetentionBlockedVolumes.insert(volume)
+  }
+
+  public func clearConservativeRetentionBlockAfterSuccessfulRescan(
+    on volume: VolumeIdentity
+  ) {
+    conservativeRetentionBlockedVolumes.remove(volume)
   }
 
   private func release(
@@ -1025,6 +1077,21 @@ public actor HostStorageCoordinator {
     purgeCompletedClaims()
     guard let volume else { return claims.count }
     return claims.values.filter { $0.volumeIdentity == volume }.count
+  }
+
+  public func activeSessions(
+    on volume: VolumeIdentity? = nil
+  ) -> [ActiveStorageSessionSnapshot] {
+    purgeCompletedClaims()
+    return claims.values.compactMap { claim in
+      guard volume == nil || claim.volumeIdentity == volume,
+        let binding = claim.permit.currentSessionBinding()
+      else { return nil }
+      return ActiveStorageSessionSnapshot(claim: claim, binding: binding)
+    }.sorted {
+      if $0.sessionID != $1.sessionID { return $0.sessionID < $1.sessionID }
+      return $0.claimID < $1.claimID
+    }
   }
 
   public func completedReceiptTombstoneCount() -> Int {
