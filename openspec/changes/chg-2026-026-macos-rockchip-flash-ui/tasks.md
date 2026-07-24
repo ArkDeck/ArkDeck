@@ -3,6 +3,10 @@
 > PR #297 只登记 proposal；本独立 governance/readiness PR 同时起草 change
 > `proposed→approved` 与 TASK-RKFUI-001 `blocked→ready`，仅在维护者 review/merge 后生效。
 > 其余任务继续 `blocked`。每个实现任务单独 PR，不混入 readiness/status PR。
+>
+> r2（2026-07-24，on merge）只起草 discovery clean-tool repin authority、修正
+> TASK-RKFUI-001↔001A 的循环依赖，并把 001A 在精确 D2 pins 下 `blocked→ready`。本 PR
+> 不携带 repin/probe implementation 或设备 run；后续仍按任务分别提交独立 PR。
 
 ## TASK-RKFUI-001 — RockUSB discovery contract 与 signed Sandbox E0 access spike
 
@@ -62,6 +66,31 @@
   `Package.swift` 声明一致；不授权修改其他测试、源码、依赖、行为或 task status。本 remediation
   PR 只修改治理文档；TASK-RKFUI-001 implementation PR 须在本 r2 合入后再承载该单行 Swift
   表项修复。
+- Tool identity remediation r3（2026-07-24；仅在 change proposal r2 governance/readiness
+  PR 被维护者 review/merge 后生效）：
+  - 2026-07-24 host preflight 重核到两个候选：历史 approved artifact
+    `038a8a0e…3611` 仍有 quarantine；无 quarantine 的 current artifact 为
+    `rkdeveloptool ver 1.32`、SHA-256
+    `bbd7bdc0fb121d414fb61085e77211cc1fdd9a3b6c6b285c54380f70e56c9923`、upstream
+    commit `304f073752fd25c854e1bcf05d8e7f925b1f4e14`、ad-hoc signature。两者均在旧
+    registry 下 fail closed，`ld` dispatch 0，记录见
+    `evidence/runs/TASK-RKFUI-001/e0-preflight-2026-07-24.md`。
+  - r3 允许一个独立 implementation remediation 在本任务现有 Allowed paths 内原子更新
+    `openspec/integrations/rockchip/**`、`RockchipDeviceDiscovery.swift`、对应 contract
+    fixtures/tests 与 `scripts/rockchip_e0_probe/**`，使 discovery identity 精确变为
+    `bbd7…9923`。registry/version/resource closure/Swift/Python 四面必须同步，任一旧 pin
+    残留即测试失败；不允许接受 hash 列表、通配 version、PATH lookup、quarantine bypass 或
+    第二个 argv。
+  - 本授权只覆盖 E0/read-only `ld`。Provider/Profile/Authorization 与所有 destructive
+    toolchain pin 保持 `038a8a0e…3611` 且仍为 forbidden/read-only input；不得在该
+    implementation PR 一并修改。
+  - Input base = proposal r2 merge commit；现 main 审计 base
+    `a7ee3f88634972cea4f3bb6622d2f6dab6ea6e06`。开始 implementation 前须 rebase 到
+    merge 后 main 并复核现有 discovery source/test/probe/registry blobs 分别为
+    `67f585324d002f80c2682a1bdaa9ae7d11ed035a`、
+    `1f7cacda22ed6cef97d4a25ed63c3e4aa890cbb6`、
+    `92eb2876bfe9dcd0ffadf1d0318b9b7b05c93857`、
+    `f7fa0945f70730bca601f81955a3faea411a19f3`；任一漂移即停止并重做 readiness。
 - Platform:macos
 - Requirements:`REQ-FLASH-001`、`REQ-UX-007`、`POL-WORKFLOW-001`
 - Acceptance:`AC-FLASH-001-01`、`AC-UX-007-01`
@@ -108,8 +137,62 @@
 
 ## TASK-RKFUI-001A — DAYU200 HDC→Loader E1 capability characterization
 
-- Status:blocked（等待 CHG-2026-026 approval、TASK-RKFUI-001 done、具名 E1 设备窗口、
-  per-device typed capability/人工授权和精确 HDC/firmware/tool pin）
+- Status:ready（仅在维护者 review/merge change proposal r2 governance/readiness PR 后生效；
+  该 merge 同时批准下列一次性 D2 pins/window。合入前仍为 blocked，E1 dispatch 0）
+- Readiness review r2（2026-07-24；host-only 审计，device/HDC command dispatch 0）：
+  - Approval/dependency gate:on merge。CHG-2026-026 r1 已由 PR #298 批准；001 discovery
+    implementation/hardening 已由 #301/#305 合入。r2 修正旧依赖环：维护者选择 HDC 软件进态
+    作为本轮 Loader 来源，因此 001A 不再等待 001 signed Sandbox E0 hardware result
+    `done`；001A 的 E1 receipt 不能替代 001 的独立 signed E0 receipt。
+  - Scope gate:satisfied。唯一 deviceMutation 是一次 typed `enterUpdater` characterization；
+    只允许 HDC exact argv、HDC disconnect observation、bounded clean-tool `ld` polling 与
+    identity/rebind verdict。`ppt/wlx/rd`、Flash/erase/format/unlock/update、默认 HDC target、
+    shell string、sudo/helper/driver/system mutation 全为 0。
+  - Base/input gate:on merge。governance audit base =
+    `a7ee3f88634972cea4f3bb6622d2f6dab6ea6e06`；implementation 必须基于本 r2 merge 后的
+    current main。`scripts/rockchip_loader_transition_probe/**` 当前不存在；只允许在本任务
+    Allowed paths 新建。开始前若 r2 文档、serial/firmware evidence、HDC 或 clean
+    rkdeveloptool facts 漂移，立即停止并重新 readiness。
+  - Target pin:DAYU200 (RK3568)，serial SHA-256
+    `958780b2ffb7090d4f22cdc1f547f9804ed0f0b605e3020f384e5d4823dc7a7e`，USB，
+    OpenHarmony `7.0.0.34`。serial pin 来自
+    `TASK-AIN-004/e0-readback-redacted-summary.json`（blob
+    `39c4154b7420a78a554f53a81ea16f12b50b1939`）；firmware/HDC combination 来自
+    `TASK-TR-001/run.md`（blob `6069642a7b3c13d741383fbbdd17a0f921c6b9f2`）。两份均为
+    historical E0/controlled capture evidence，只用作本次 readiness pin，不冒充本次 E1
+    capability evidence。
+  - Binding gate:dispatch 前须重新 E0 读回 serial digest，构造并 durable 保存
+    `OriginalTargetSnapshot` 与 revision 1 `CurrentDeviceBinding`；raw connect key 只留仓外
+    受控 run。若已有 ArkDeck binding、revision 不是 1、connect key 缺失、identity 不匹配、
+    多设备或 server ownership 不确定，E1 dispatch = 0 并回到 readiness。
+  - HDC pin:absolute executable =
+    `/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/toolchains/hdc`，
+    `Ver: 3.2.0d`，SHA-256
+    `48395ba8d87115dffca47df2a640a6c868bc9a2bd4eb49611e4138ff88d8d260`。2026-07-24
+    host-only `-v`/hash 重核匹配；任务不得启动、停止、迁移或重配 HDC server。
+  - RockUSB observation pin:clean discovery artifact =
+    `rkdeveloptool ver 1.32`，SHA-256
+    `bbd7bdc0fb121d414fb61085e77211cc1fdd9a3b6c6b285c54380f70e56c9923`，
+    upstream commit `304f073752fd25c854e1bcf05d8e7f925b1f4e14`，quarantine absent，
+    ad-hoc signature。只允许 exact `["ld"]`，只接受 semantic
+    `0x2207:0x350a + Loader`；该 pin 不修改 destructive Provider/Profile identity。
+  - Typed argv/intent gate:唯一 E1 argv =
+    `["-t", "<durable-connect-key>", "shell", "reboot", "loader"]`，从 revision 1 binding
+    materialize。command 前先 durable 写 `enterUpdater` intent、target/binding revision、
+    argv hash 与影响确认；最多一次 dispatch。exit 0 不构成成功，必须观察原 HDC endpoint
+    disconnect 与目标 Loader。
+  - Window gate:on merge。有效期至 `2026-07-31T16:00:00Z`，`maxRuns = 1`；用户本轮要求
+    通过 HDC 进入 Loader，但聊天指令本身不构成 capability evidence或 merge approval。
+    维护者 merge 本 r2 PR 才接受本 exact D2 window。窗口过期、失败后重试、任一 pin 漂移
+    均须新 readiness PR。
+  - Verification/evidence gate:run 必须逐时记录 E0 identity、intent durability、HDC
+    receipt/exit/stdout/stderr hash、disconnect、每次 `ld` observation、timeout/candidate/
+    topology、rebind evaluation 与最终 `supported|unsupported|unknown`。仓内只存 serial/
+    connectKey/location 摘要；E1 ≤ 1，E2/destructive = 0。
+  - Concurrency/review gate:satisfied for drafting。审计 base 的 change paths 无并发 PR
+    占用；本 PR 只含 proposal/design/tasks/verification 与既有 blocked preflight evidence。
+    r2 合入前零 probe implementation/设备 command；合入后 001 tool repin remediation 与
+    001A implementation+evidence 仍使用两个独立 PR。
 - Platform:macos
 - Requirements:`REQ-FLASH-002`、`REQ-FLASH-007`、`REQ-FLASH-010`、
   `REQ-DEV-001`、`REQ-DEV-002`、`REQ-DEV-003`、`REQ-DEV-006`、`REQ-DEV-008`、
@@ -117,7 +200,9 @@
 - Acceptance:`AC-FLASH-002-01`、`AC-FLASH-007-01`、`AC-FLASH-010-01`、
   `AC-DEV-001-01`、`AC-DEV-002-01`、`AC-DEV-002-02`、`AC-DEV-003-01`、
   `AC-DEV-003-02`、`AC-DEV-006-01`、`AC-DEV-008-01`
-- Depends on:TASK-RKFUI-001
+- Depends on:CHG-2026-026 proposal r2 merged；TASK-RKFUI-001 contract
+  implementation/hardening (#301/#305) merged。TASK-RKFUI-001 signed Sandbox E0 hardware
+  result 不再是前置，避免软件进态 Loader 来源的循环依赖
 - Allowed paths:
   - `scripts/rockchip_loader_transition_probe/**`
   - `openspec/integrations/rockchip/**`
