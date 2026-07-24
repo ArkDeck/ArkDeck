@@ -1115,11 +1115,9 @@
 
 ## TASK-HLR-002B — Scoped D2 gateway、standing authorization 与 namespace lease
 
-- Status:blocked（前置：① CHG-2026-030 revision r6 由维护者 review/merge；
-  ② TASK-HLR-001 done；③ TASK-BAP-003 done；④ 独立 D1 readiness 钉定 gateway
-  source/API、authorization/manifest schemas、clock/lease backend、overlap pagination
-  contract、negative route inventory 与 allowed paths。本 r6 proposal 合入本身不使
-  任务 ready，不 provision credential、不执行 ruleset/ref write。）
+- Status:ready（本 D1 readiness 经维护者 review/merge 后生效；只授权下述纯离线
+  source/contract implementation，不 provision credential、不创建 standing
+  authorization、不执行 ruleset/ref/PR/Issue write。）
 - Platform:macos（host control plane；零产品/设备平台声明）
 - Requirements/AC:change-local `HLR-D2-GATE-001`、`HLR-LEASE-001`、
   `HLR-RECOVERY-001`
@@ -1147,6 +1145,167 @@
 - Risk:high（gateway/lease/auth parser 缺陷可能扩大仓库管理权限或重复执行；任何
   ambiguity、fence mismatch、clock discontinuity、unknown outcome 均 fail closed）。
 - Hardware required:no。
+- Readiness（r1，audit base = protected `main`
+  `e8eaef86acc13ef76270e29f7a63873d0b2fa6cb`）：
+  - **Approval/dependency gate:satisfied。**CHG-2026-030 r6 #449 exact reviewed head
+    `0bb864ba8f76a53396e24e594a176d233115be7b` 由 `lvye` 于
+    `2026-07-24T03:17:01Z` APPROVED，并于 `2026-07-24T03:17:08Z` 以
+    `490412f0da3ab29fee254643f0844b705a9e1b1a` squash merge；merge parent =
+    `11808179d165c8975b4634ad1480760fa91545a9`，reviewed head→merge 对本 change
+    四文档 tree diff = 0。TASK-HLR-001 done merge
+    `d09f5021107e4133d2fc41c1ce65d0bd09d6c12b` 与 TASK-BAP-003 done merge
+    `6a6b6b7010b6563d67aa7d96e6838505e82eb25a` 均为 audit base ancestor。
+  - **Input/concurrency pins:closed。**以下 Git objects 在 audit base 实测；本
+    readiness merge 后 implementation 开工前必须确认该 merge 是 current protected
+    main ancestor、readiness diff 只落在本 TASK-HLR-002B section，且除本文件由
+    readiness 自身产生的预期新 blob 外其余 sensitive blobs 全等。main 可有无关
+    前进；任一 sensitive blob、dependency ancestry 或 output absence 漂移即停止并
+    重新 D1 readiness。
+
+    ```yaml pins
+    - artifact: TASK-HLR-002B readiness audit base
+      commit: e8eaef86acc13ef76270e29f7a63873d0b2fa6cb
+    - artifact: CHG-2026-030 revision r6 reviewed head
+      commit: 0bb864ba8f76a53396e24e594a176d233115be7b
+    - artifact: CHG-2026-030 revision r6 merge
+      commit: 490412f0da3ab29fee254643f0844b705a9e1b1a
+    - artifact: TASK-HLR-001 done merge
+      commit: d09f5021107e4133d2fc41c1ce65d0bd09d6c12b
+    - artifact: TASK-BAP-003 done merge
+      commit: 6a6b6b7010b6563d67aa7d96e6838505e82eb25a
+    - path: openspec/changes/chg-2026-030-host-loop-runtime/proposal.md
+      blob: f119ea3acd283d71e0c1e3ad7f76aeaf9f1d71fb
+    - path: openspec/changes/chg-2026-030-host-loop-runtime/design.md
+      blob: d599ff8fc196e4b7155ffbf3b8ac61ba3dbd83ee
+    - path: openspec/changes/chg-2026-030-host-loop-runtime/tasks.md
+      blob: 88243bf02ee189f832cc3c94f6e36b65ca54036e
+    - path: openspec/changes/chg-2026-030-host-loop-runtime/verification.md
+      blob: b362b36e6264bc05fc8b46badf741693112e210d
+    - path: .github/workflows/agent-pr.yml
+      blob: 41426544637db25224dc6c6b3718abd4ebbfca7c
+    - path: .github/workflows/sdd-guard.yml
+      blob: 809147e462512d970813d1992a3fcdf41f8b4b10
+    - path: .github/workflows/swift-ci.yml
+      blob: 640065f3f3849e1add0cc6bfa92078873eb315ef
+    - path: scripts/check_pr_paths.py
+      blob: 267417ca5d0f9a2bd5ef775314b93915717aea9b
+    - path: scripts/test_check_pr_paths.py
+      blob: 2aa1e2cb37ef0085d2e101adb34d2b3615246b82
+    - path: scripts/test_agent_pr_workflow.py
+      blob: 6a256a1556827c2153df0785479c5cbc53796f28
+    - path: scripts/host_loop/__init__.py
+      blob: a0e413fbf6bab34fbfeafc236a09f24c7a6c7f00
+    - path: scripts/host_loop/pr_envelope.py
+      blob: c990fcfb17de52ed1166fec55cb1f9365e0e7736
+    - path: scripts/host_loop/test_pr_envelope.py
+      blob: 35d9a284e8ddde67fd1076bc1c2f0f11f02d26db
+    ```
+
+    `scripts/host_loop/d2_gateway/**` 在 audit base 全部 absent。截至
+    `2026-07-24T03:26:14Z`，GitHub all-open PR = 0；readiness branch
+    `agent/chg-2026-030-hlr-002b-readiness` 与固定 implementation branch
+    `agent/task-hlr-002b-scoped-d2-gateway` 的 remote ref/all-state exact-head PR
+    均为 0。implementation 前只重新阻断真实 overlap，不因无关 PR 或无关 main
+    commit 停止。
+  - **Implementation surface:closed。**实现使用 Python 3 standard library，禁止
+    network/subprocess/shell 与第三方 dependency；production source 只新增
+    `scripts/host_loop/d2_gateway/{__init__,contracts,manifest,authorization,overlap,clock,lease,gateway}.py`，
+    tests 只新增同目录
+    `test_{manifest,authorization,overlap,clock,lease,gateway,security}.py`，run record
+    只追加
+    `evidence/runs/TASK-HLR-002B/contract-r1.md`。不得修改既有 host-loop、
+    workflow/parser/test、任务状态或其他文件；若该封闭文件集不足，停止并修订
+    readiness，不在 implementation PR 扩面。
+  - **Manifest v1:binary。**canonical form 是 strict UTF-8 JSON object，sorted keys、
+    separators `(',', ':')`、no trailing LF；duplicate/unknown key、非 NFC string、
+    非小写 40-hex Git OID/64-hex SHA-256、非 canonical round-trip 均拒绝。顶层固定
+    `schema/repository/readiness/repositoryInputs/ruleset/targetRefs/leaseKey/operation`
+    八项；`repositoryInputs` 按 path 排序并逐项含 exact blob，`targetRefs` 按 full
+    `refs/heads/**` 排序并逐项含 expected state，readiness 固定 PR number/reviewed
+    head/merge OID/`merged_at`。ruleset 固定 ID `19595282`、source/type/name/target/
+    enforcement、before/after/rollback hashes 与 active-rule projection；operation
+    固定 exact method/endpoint/body hash。manifest SHA-256 只对上述 canonical bytes
+    计算，不能把 current main OID、无关 open PR 或无关 repository path 加入敏感
+    投影。
+  - **Ruleset fixture:closed。**只读公开 read-back 于
+    `2026-07-24T03:22:48Z` 仍为 repository ruleset `19595282`、name
+    `agent-ref-boundary`、active、include `~ALL`、exclude 仅
+    `refs/heads/agent/**`、rules 恰为 creation/update/deletion、`updated_at =
+    2026-07-23T02:20:11.425Z`。contract fixtures 继续固定 authenticated before
+    canonical SHA-256
+    `a5725db245d84174090de47e1fc45123219dbf5cfdd00d45856b04d801a3d5f2`、
+    before/rollback write SHA-256
+    `5943b6ce840cbb385ad83615da15ff2ee4ec5710bd696fae6140b37302042157`
+    与 exact additive after SHA-256
+    `8537b85939b7be059c19601360cadb95bdf4f0abe5151d5948bb6f7826405d30`；
+    after 相对 before 只追加 `refs/heads/agent/**/*`。本 source task 不重新读取
+    authenticated bypass、不生成 fresh probe ref，也不把 fixture 当作 live receipt。
+  - **Authorization v1:binary。**parser 接受一个 canonical JSON carrier 与 typed
+    GitHub/main facts，字段固定为
+    `schema/authorizationId/repository/readiness/manifestSha256/operationDigest/ruleset/
+    targetRefs/leaseKey/gateway/validFromOffsetSeconds/validUntilOffsetSeconds/maxUses/
+    rollbackContact/revokeConditions`；unknown/duplicate/missing field 一律拒绝。
+    offset 只允许 `900/2700`，`maxUses` 只接受 `1..100` 的有限正整数；本次
+    ruleset remediation carrier 必须为 `1`。method/endpoint 只允许
+    `PUT /repos/ArkDeck/ArkDeck/rulesets/19595282`，lease key 逐字为
+    `ArkDeck/ArkDeck|ruleset:19595282|target-patterns:refs/heads/agent/**,refs/heads/agent/**/*`。
+    validator 必须证明 carrier-changing actor 与 APPROVING reviewer 均为 `lvye`、
+    reviewed head = GitHub merge metadata head、merge OID 是 current-main ancestor，
+    且 manifest/operation/body/before/after/rollback/targets/gateway source+redacted
+    identity hashes 全等；revoked/expired/exhausted、merge facts 不完整或 Agent-authored
+    carrier 均在 credential lookup 前拒绝。use 在首次 mutation intent 前 durable
+    claim；只有可证明 mutation call count = 0 才可释放，timeout/unknown 永不返还或
+    盲重试。
+  - **Pagination/overlap:binary。**typed read port 必须消费全部 open-PR pages，并对
+    每个 PR 消费全部 changed-files pages；page number/cursor 连续、terminal marker、
+    item count、duplicate PR/file 与 declared totals 必须闭合。error、timeout、
+    truncation、重复/跳页、malformed envelope/body 或无法证明 complete 均返回
+    `query-uncertain`。overlap predicate 只含 r6 五类：manifest sensitive path、
+    本 change HLR-002A/002B task/evidence、同 readiness/executor branch、同合法
+    operation digest/lease key、同 exact target ref；title/仓库活动/无关 path 与
+    无关 PR 明确放行。
+  - **Clock/store:binary。**`merged_at` 只接受 GitHub UTC RFC3339 `Z` 时间并计算
+    半开 `[+900s,+2700s)`；local observation 与 commit timestamp 不可替代。
+    injected clock 在 lease acquire 与每个 authenticated read/write 前同时取 aware
+    UTC wall + monotonic snapshot；wall/monotonic delta 差绝对值大于 1 秒、wall
+    回拨、monotonic 非递增、窗口外或上界余量不足均零 dispatch。durable backend
+    固定 Python `sqlite3`、caller-supplied gateway-private database、WAL +
+    `BEGIN IMMEDIATE`；`lease_current/lease_events/authorization_uses/operations/
+    receipts` 使用事务性 CAS。fence 对 lease key 严格递增且 release/expiry 后不复用；
+    record 固定 authorization/operation/owner/fence/acquired/expires/previous-hash/
+    record-hash/state。stale owner/fence、双 owner、expiry、DB busy/corrupt 或 record
+    hash mismatch 均停止；expiry/release 不解释 external outcome。
+  - **Gateway API/state machine:binary。**package root 只给 worker 暴露
+    `D2Gateway.executeAuthorizedRulesetDelta(canonicalRequest)`；credential provider
+    与 exact transport 保持 private，零 credential-return/generic request/GraphQL/
+    review/merge/admin/ruleset CRUD/arbitrary ref method。route inventory 的唯一写
+    route是上述 ruleset PUT，且 body 只接受 carrier 固定的 after 或 rollback
+    canonical bytes；read routes仅为 readiness merge/main ancestry、全量 open
+    PR/files、同 ruleset GET、manifest exact refs 与 active-rule projection。
+    固定 journal 顺序为 validate→overlap→lease→authenticated before→durable
+    mutation intent/use claim→one-shot after PUT→immediate read-back→active/ref
+    verify→append-only redacted receipt→finalize use→release。mutation timeout 先
+    read-back且不得再 PUT after；after/unknown mismatch 在同 fence 下只允许一次 exact
+    rollback + read-back。outcome 枚举固定
+    `rejected-pre-dispatch/completed/not-applied-stop/rolled-back-stop/
+    reconcile-required/rollback-failed`；任何 restart 从 durable operation journal
+    只做 read-back/reconcile，不重复 mutation。
+  - **Contract/repository gate:binary。**tests 必须覆盖 canonical round-trip 与逐字段
+    drift、multi-page PR/files 正交/overlap/截断、window 两端/clock discontinuity、
+    SQLite 双连接 owner/CAS/stale fence/expiry/corruption、authorization actor/review/
+    merge/ancestor/revoke/expiry/use exhaustion、before/after/rollback/timeout 每个
+    outcome、restart 零 duplicate mutation、credential sentinel 零 stdout/stderr/
+    exception/receipt，以及 AST/public-surface/route inventory 负向扫描。固定验证为
+    `python3 -m unittest discover -s scripts/host_loop -p 'test_*.py'`、
+    `python3 scripts/test_check_pr_paths.py`、`python3 scripts/test_check_sdd.py`、
+    `scripts/check-sdd.sh`、`git diff --check`、相对 implementation base 的
+    allowed/forbidden audit与全部 pinned existing blobs byte equality。implementation
+    branch/commit/PR 必须唯一绑定 `TASK-HLR-002B`；任一红/缺 check 或 0/2 PR 均停止。
+  - **Review boundary。**本 readiness PR 只修改本文件 TASK-HLR-002B section，
+    登记 `blocked→ready` 与上述 pins/contracts；零 source/test/evidence、零
+    credential/authorization/lease database、零 network write。merge 只授权纯离线
+    implementation，不是 standing authorization、D2 execution receipt、acceptance
+    PASS 或 done；source+contract run 合入后仍须独立 D0 `ready→done` PR。
 
 ### Deliverables
 
