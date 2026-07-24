@@ -124,6 +124,37 @@ schema: arkdeck-rpt001-parser-recovery-apply-report/v1
 status: success
 ```
 
+## Restored PR-transport liveness
+
+After logout, the Agent created only the new ref
+`refs/heads/agent/task-rpt-001-bootstrap-execution-evidence` and pushed the
+initial evidence commit:
+
+```text
+initial head: b7c66851a63c584a9078326fc92af010980c84f9
+base main: ef13965fb2e0c98a24bffbbf1033f7d34d8076ba
+```
+
+The restored pinned `.github/workflows/agent-pr.yml` created exactly one PR:
+
+```text
+PR: 469
+state: open
+draft: false
+created at: 2026-07-24T09:42:50Z
+author: github-actions[bot] (ID 41898282)
+head ref: agent/task-rpt-001-bootstrap-execution-evidence
+head OID at creation: b7c66851a63c584a9078326fc92af010980c84f9
+base OID at creation: ef13965fb2e0c98a24bffbbf1033f7d34d8076ba
+title: evidence(TASK-RPT-001): record bootstrap recovery success
+open-pr (push): success
+guard (push): success / App ID 15368
+```
+
+No second PR was created. The follow-up evidence append stays on the same
+branch; `open-pr` must observe the existing PR and succeed without creating a
+duplicate. PR #469 remains unapproved and unmerged at this evidence boundary.
+
 ## Acceptance and next gate
 
 This run proves only:
@@ -136,8 +167,7 @@ It does not prove `RPT-BOUNDARY-001`, `RPT-MAIN-001`,
 `RPT-IDENTITY-001` or `RPT-MIGRATION-001`; it does not mark TASK-RPT-001
 `done` or the change `verified`.
 
-The first push of this evidence branch is the authorized liveness probe for
-the restored `agent-pr` channel. Its bot-authored PR number, initial head and
-creator check result must be appended to this same evidence PR before human
-review. Only after that evidence PR is reviewed and merged may a new,
-independent topology D2 readiness be drafted from then-current protected main.
+The first push of this evidence branch was the authorized liveness probe for
+the restored `agent-pr` channel. Only after this evidence PR is reviewed and
+merged may a new, independent topology D2 readiness be drafted from
+then-current protected main.
