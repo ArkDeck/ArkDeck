@@ -1,0 +1,231 @@
+{
+  "schemaVersion": "1.0.0",
+  "change": "CHG-2026-026",
+  "task": "TASK-RKFUI-001A",
+  "runId": "c11244c4-7a1c-43c9-bc94-86167961c6f8",
+  "capturedAt": "2026-07-24T06:31:21Z",
+  "baseCommit": "2e449569a3dda7c5b6bad7ad083df9934169c840",
+  "evidenceClass": "realHardwareE0CapabilityPreflight",
+  "executor": {
+    "kind": "agent",
+    "id": "codex",
+    "authorizationRefs": [
+      "PR#440@f4e901492e7d3b82f883424c756868fffa4946df",
+      "PR#452@d22cdeeebc781b9c3a1b063dbee6631934c51ac0",
+      "PR#461@5b41a15391256d9adcc3a5a316654971c9aab57e",
+      "PR#464@c61cc458d2c95545ac57ab5d02d23768635ea2cd",
+      "PR#465@2e449569a3dda7c5b6bad7ad083df9934169c840"
+    ]
+  },
+  "host": {
+    "os": "Darwin",
+    "osVersion": "26.5.2",
+    "arch": "arm64"
+  },
+  "window": {
+    "validUntil": "2026-07-31T16:00:00Z",
+    "maxRuns": 1,
+    "e1RunsConsumed": 0
+  },
+  "target": {
+    "model": "DAYU200",
+    "soc": "RK3568",
+    "transport": "usb",
+    "pinnedSerialSHA256": "958780b2ffb7090d4f22cdc1f547f9804ed0f0b605e3020f384e5d4823dc7a7e",
+    "observedSerialSHA256": "958780b2ffb7090d4f22cdc1f547f9804ed0f0b605e3020f384e5d4823dc7a7e",
+    "serialMatched": true,
+    "firmware": "OpenHarmony 7.0.0.33",
+    "targetCount": 1
+  },
+  "hdc": {
+    "path": "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/toolchains/hdc",
+    "reportedVersion": "Ver: 3.2.0d",
+    "sha256": "48395ba8d87115dffca47df2a640a6c868bc9a2bd4eb49611e4138ff88d8d260",
+    "serverOwnership": "preExistingExternalSameUIDPinnedExecutable",
+    "serverExecutableMatchedClient": true,
+    "serverLifecycleMutationCount": 0
+  },
+  "rockUSBObservationTool": {
+    "path": "/opt/homebrew/bin/rkdeveloptool",
+    "reportedVersion": "rkdeveloptool ver 1.32",
+    "sha256": "bbd7bdc0fb121d414fb61085e77211cc1fdd9a3b6c6b285c54380f70e56c9923",
+    "upstreamCommit": "304f073752fd25c854e1bcf05d8e7f925b1f4e14",
+    "upstreamCommitEvidence": "exactExecutableSHA256BindsCanonicalRegistryProvenance",
+    "signatureClass": "adHoc",
+    "quarantinePresent": false
+  },
+  "observations": {
+    "firmware": {
+      "semantic": "OpenHarmony 7.0.0.33",
+      "stdoutBytes": 22,
+      "stdoutSHA256": "4358db3f825bb43e72e393e00b9b6d571e83910d84d479fe48c9ef5beaf786dd"
+    },
+    "rockUSB": {
+      "parserStatus": "observations",
+      "candidateCount": 1,
+      "stdoutBytes": 52,
+      "stdoutSHA256": "b474e0ab05ecc648dd39169e60d979e0c7d2cca832abbfc95d56f3f1be4c5238",
+      "stderrBytes": 0,
+      "stderrSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "candidate": {
+        "deviceNumber": 1,
+        "usbVendorID": "0x2207",
+        "usbProductID": "0x5000",
+        "mode": "Maskrom",
+        "locationIDSHA256": "d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35",
+        "isExpectedLoader": false,
+        "providerDisposition": "providerDoesNotSupportMaskrom"
+      }
+    }
+  },
+  "commandReceipts": {
+    "hdcVersion": {
+      "startedArgvSHA256": "fc45a6d08ad80bc6a76feed76e1146de7e51f71f6096f8b65c1bd8b2b08f8c05",
+      "exitCode": 0,
+      "timedOut": false,
+      "outputTruncated": false,
+      "stdout": {
+        "bytes": 12,
+        "sha256": "906d35a917937ecbb33d8dc3bbb6b3e1783bd2996a6201ab7227fb406d474ed9"
+      },
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "hdcCheckserver": {
+      "startedArgvSHA256": "1f46e98c2a1b466aa8f2e9828a88b181dd16d2266ef8220f8d3ae743851042f9",
+      "exitCode": 0,
+      "timedOut": false,
+      "outputTruncated": false,
+      "stdout": {
+        "bytes": 55,
+        "sha256": "50e8dfe03cb770dfade5b91198523b964fd3bd6fd8855b541ceb46201f0d014a"
+      },
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "hdcTargets": {
+      "startedArgvSHA256": "d5a358028b147293e7994451f3d96e65661b677f249c1960e13506278a24f46d",
+      "exitCode": 0,
+      "timedOut": false,
+      "outputTruncated": false,
+      "stdout": {
+        "bytes": 33,
+        "sha256": "2035c0783fe1b2fbc3bba6badfb76003c1a5d46bbe16d1479de439e9fd874fc2"
+      },
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "hdcFirmware": {
+      "startedArgvSHA256": "6114667935f67bb5b122c412b98a7d18f4f30b4e4e3b3a97146b7af4409268ae",
+      "exitCode": 0,
+      "timedOut": false,
+      "outputTruncated": false,
+      "stdout": {
+        "bytes": 22,
+        "sha256": "4358db3f825bb43e72e393e00b9b6d571e83910d84d479fe48c9ef5beaf786dd"
+      },
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "toolVersion": {
+      "startedArgvSHA256": "1b56278e5c457d94714c9a9536f7f8cd29413e3782d037579a23354571fe9652",
+      "exitCode": 0,
+      "timedOut": false,
+      "outputTruncated": false,
+      "stdout": {
+        "bytes": 24,
+        "sha256": "8edc164e8e73ec8e3bd3cb242ccaa73dec5492bf070e958e827073b4d98a0468"
+      },
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "toolCodesign": {
+      "startedArgvSHA256": "4f3951f8bda3e423c3f513493b459121c90dc28a209240bdce73dfab926a5754",
+      "exitCode": 0,
+      "timedOut": false,
+      "outputTruncated": false,
+      "stdout": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stderr": {
+        "bytes": 798,
+        "sha256": "36322c266c62754d35a524d32ce0bd21cf1df3be022e36bdc9ae703a8803026d"
+      }
+    },
+    "toolQuarantine": {
+      "startedArgvSHA256": "c60e0a208098c9caed27f7ea714c6d5c119ec5743fdae92dd3738e654361b713",
+      "exitCode": 1,
+      "timedOut": false,
+      "outputTruncated": false,
+      "semantic": "attributeAbsent",
+      "stdout": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stderr": {
+        "bytes": 76,
+        "sha256": "bebfa93e3a11e4d0f8f56ed2efe823680974389b4d084737adb954110adb30c3"
+      }
+    },
+    "rockUSBList": {
+      "startedArgvSHA256": "17e78ab2de6ea99ca6092fe1a847b9ad5d03f7e3949bdf256af2867a5e7edf72",
+      "exitCode": 0,
+      "timedOut": false,
+      "outputTruncated": false,
+      "stdout": {
+        "bytes": 52,
+        "sha256": "b474e0ab05ecc648dd39169e60d979e0c7d2cca832abbfc95d56f3f1be4c5238"
+      },
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    }
+  },
+  "counters": {
+    "e0ReadOnlyHDC": 4,
+    "e0RockUSBList": 1,
+    "bindingMaterialization": 0,
+    "typedCapabilityEvidenceMaterialization": 0,
+    "enterUpdaterIntent": 0,
+    "usageReservation": 0,
+    "e1DeviceMutation": 0,
+    "e2Destructive": 0,
+    "rebootLoader": 0,
+    "pptWlxRd": 0,
+    "flashEraseFormatUnlockUpdate": 0,
+    "hdcServerLifecycleMutation": 0,
+    "sudoHelperDriverSystemMutation": 0,
+    "hostShell": 0,
+    "retry": 0
+  },
+  "rawEvidence": {
+    "location": "private controlled task state outside every git repository",
+    "rawIdentityStoredInRepository": false,
+    "rawStdoutStoredInRepository": false
+  },
+  "identityCorrelationVerdict": "unknown",
+  "preflightVerdict": "blockedBeforeBindingPreparation",
+  "blockedReasons": [
+    "preExistingRockUSBCandidateWrongMode",
+    "physicalIdentityCorrelationUnknown",
+    "typedCapabilityEvidenceNotMaterialized"
+  ],
+  "characterizationCapabilityVerdict": "unknown",
+  "autoRebindVerdict": "unknown",
+  "typedCapabilityEvidenceMaterialized": false,
+  "e1Gate": "blocked",
+  "e1Dispatched": false,
+  "usageReserved": false
+}
