@@ -382,3 +382,151 @@ here as provenance and is not executable authority.
 This run proves only fail-closed behavior and the Actions capability
 reduction. `RPT-BOUNDARY-001`, `RPT-MAIN-001`, `RPT-IDENTITY-001` and
 `RPT-MIGRATION-001` remain unverified.
+
+## Bootstrap apply preflight failure — nullable merge field
+
+PR #459 was reviewed and merged exactly as its bootstrap readiness required:
+
+```text
+reviewed head: 6bc5876b8cdd4fadc6e83e8812a0a995333cf9bf
+reviewer: lvye / APPROVED
+review submitted: 2026-07-24T08:46:55Z
+merged by: lvye
+merged at: 2026-07-24T08:47:07Z
+current main: ced32841a39147e3de74787f755d2377ccfba460
+single parent: 9de9c63f7fe17069ad50ff0a73fc171ce6a14ec8
+subject: governance(TASK-RPT-001): recover bot-authored PR transport (#459)
+associated pull requests: [459]
+```
+
+The exact bootstrap executor SHA-256
+`305c4b515425575e2dc0e19de82562685cf54be1d71314ec04da89b0f53c2f79`
+started in the authorized window. GitHub's current pull response omitted
+`merge_commit_sha` (a projection with `jq` renders the absent value as
+`null`). The executor incorrectly treated any value other than current main,
+including absence, as drift and stopped with:
+
+```text
+status: fail_closed
+reason: carrier merge OID is not current protected main
+Actions after attempts: 0
+Actions rollback attempts: 0
+branch-protection attempts: 0
+ruleset attempts: 0
+repository PATCH attempts: 0
+credential mutations: 0
+ref/review/merge/PR-state mutations: 0
+logout verified: true
+```
+
+The secret-free report is 803 bytes with SHA-256
+`ae228dbed662fa42b6200f2acb1387c2f4b1e474d9561c450e32180cfc73d347`.
+No GitHub control-plane request using a mutating method was dispatched.
+Actions remained exact `false/read`; ruleset and branch protection were
+untouched.
+
+The field is optional evidence, not authority. The fail-closed parser
+correction is:
+
+1. if `merge_commit_sha` is a string, it must equal current protected main;
+2. if it is absent or `null`, it contributes no fact and does not fail by
+   itself;
+3. every execution still requires all independent mandatory facts: current
+   main, a single exact parent, exact subject, exact associated PR, exact
+   `mergedBy`, exact bot author/head/title/file set, exact-head human approval
+   and pinned `guard=success`;
+4. any non-null non-string value, mismatching string, missing mandatory
+   fallback fact or ambiguity remains a zero-write stop.
+
+The exact #459 readiness, capture, window and executor are exhausted and must
+not be rerun.
+
+## Second parser-recovery carrier authorization and fresh capture
+
+The human explicitly authorized a second one-time carrier:
+
+> 授权将 PR #466 作为第二次一次性 bootstrap parser-recovery
+> 载体；确认远端 head 和 open 状态无漂移后，可基于最新 main 替换该分支，原 head
+> 永久记入 evidence。载体仅允许包含本次零写入失败证据、nullable
+> merge_commit_sha 解析修订和全新 bootstrap D2 readiness；不得实施 ruleset、
+> main protection 或 Actions setting 切换。
+
+Public REST and Git read-back before any replacement established:
+
+```text
+current main: ced32841a39147e3de74787f755d2377ccfba460
+PR: 466
+state: open
+draft: false
+author: github-actions[bot] (ID 41898282)
+head ref: agent/task-au-002-done
+head OID: 3fda06cc3e5e91e06890845f2a760a9a3fec592c
+original changed files:
+  openspec/changes/chg-2026-023-macos-auto-update/tasks.md
+other open PR: 468
+non-agent non-main refs: []
+```
+
+The original #466 head is permanently retained here as provenance. It is an
+expected `force-with-lease` value only and is not parser-recovery authority.
+
+An isolated authenticated GET-only capture then recorded:
+
+```text
+captured at: 2026-07-24T08:57:31.008065Z
+captured by: lvye (user ID 4340161)
+schema: arkdeck-rpt001-discovery/v2
+API version: 2026-03-10
+protected main: ced32841a39147e3de74787f755d2377ccfba460
+local clean base: ced32841a39147e3de74787f755d2377ccfba460
+canonical bytes without LF: 21730
+canonical SHA-256:
+  68decddf9505cb7527e472061c27c70948ba4ee7bd4de59912772a61b6d4e40f
+file bytes with LF: 21731
+file SHA-256:
+  56f282e4628f6ffb75c765176fcc548569239e16db5295640951f69888ab5fc8
+discovery script SHA-256:
+  487701e6602ddd20a8d18db6bfce59d58f4597dc7ea3b15e171f45e8934d637a
+capture wrapper SHA-256:
+  849f9c83c2b44f9f1404bc7793699343371192ef3c42228d75cfa89d49a47b72
+```
+
+All 11 embedded artifact byte counts and SHA-256 values independently
+recalculated successfully:
+
+```text
+active_main_rules:
+  335 / 560eff7e8ecceb7b044a19634c7e559a8b0411b486717a97c05896246a3c7137
+actor_inventory:
+  4521 / 107c011df3b617fb1982ad0e61472bf238037b05574fc2d7ced050ca44ea7101
+branch_main:
+  5656 / 3b8b9123dd186cedc1b9ae36daca9c760ac6f8b532e99c67791767ad5ef0fe1b
+branch_protection_full:
+  1227 / e45fb8583eb8002e49fcd402c0d9026f7277a1b823b6fe7410695da5666f0b0c
+open_pull_requests:
+  875 / e6653448d4eaa30d464dbc5e1294ca5f14eb7ddcd032e3d364f400ece8f0939b
+organization_settings:
+  482 / db3047ad7868abfb58303681c011c7c6a4ebe79de8a7d0e3166760320d297b09
+pin_blobs:
+  1716 / 28c7be6bccacb0ef30a62ad9be9a34c318fb529ee312ef19e01a4b65d4cbb68b
+remote_refs:
+  1168 / 76d81bdc7ec84fd2765d497d9e6e8b21a242af5f3239c2df8cc838a3eea64520
+repository_settings:
+  660 / 8f605ec84f4d83ef6a860c238e1c506cacd1ab8c85ecb90448bdf2a684daf3f7
+ruleset_full:
+  702 / a5725db245d84174090de47e1fc45123219dbf5cfdd00d45856b04d801a3d5f2
+rulesets_full:
+  438 / a603d5a0af93112475f4e92a597b16c515b9eebe320cbab98f7bd26b0d9487b0
+```
+
+The Actions setting remained exact `false/read`; only `lvye` remained a
+collaborator/admin/member and ruleset bypass actor; Deploy Key `158088026`
+remained write-enabled but non-bypass; teams, App installations, outside
+collaborators, invitations and organization-role assignments remained empty.
+The capture performed zero writes and the human session was logged out before
+Agent processing.
+
+This second authorization permits drafting and exact expected-head
+replacement only. It does not approve the draft or authorize any GitHub
+setting mutation. D2 authority begins only if the updated #466 exact head is
+reviewed and merged by `lvye`.
