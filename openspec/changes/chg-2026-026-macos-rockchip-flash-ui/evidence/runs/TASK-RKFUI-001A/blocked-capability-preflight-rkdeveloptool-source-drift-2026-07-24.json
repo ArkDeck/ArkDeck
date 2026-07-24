@@ -1,0 +1,246 @@
+{
+  "schemaVersion": "1.0.0",
+  "change": "CHG-2026-026",
+  "task": "TASK-RKFUI-001A",
+  "runId": "296eac0e-83c7-4010-a069-52b98086616c",
+  "capturedAt": "2026-07-24T14:20:39.782469Z",
+  "baseCommit": "bacf2b7137c29a99cfde02d162e5cdac8d4e3613",
+  "inputBlobs": {
+    "tasks": "18cd40592a27cc339fe6b4e8c999f9ac8c22191f",
+    "loaderTransitionRegistry": "107f00279259674e0d8928f77b4c8170e11ea0b1",
+    "probe": "e98b5306c95f2c3ff511cffb2c04c366a29fae06",
+    "probeTests": "88ac093320ae74231ed4a089b1eb862689845d2c",
+    "evidenceREADME": "a0e3b2882608d0cafe48782c463df34aa9e8aa43"
+  },
+  "evidenceClass": "realHardwareE0CapabilityPreflight",
+  "executor": {
+    "kind": "agent",
+    "id": "codex",
+    "authorizationRefs": [
+      "PR#440@f4e901492e7d3b82f883424c756868fffa4946df",
+      "PR#452@d22cdeeebc781b9c3a1b063dbee6631934c51ac0",
+      "PR#461@5b41a15391256d9adcc3a5a316654971c9aab57e",
+      "PR#464@c61cc458d2c95545ac57ab5d02d23768635ea2cd",
+      "PR#465@2e449569a3dda7c5b6bad7ad083df9934169c840",
+      "PR#481@0f0a79aff7ede1519b9fbc0cbdca12b5c687ef07",
+      "PR#482@048ce16b017db701f88a1eee1349de2b46595db7",
+      "PR#484@bacf2b7137c29a99cfde02d162e5cdac8d4e3613"
+    ]
+  },
+  "window": {
+    "validUntil": "2026-07-31T16:00:00Z",
+    "maxRuns": 1,
+    "e1RunsConsumed": 0
+  },
+  "expectedTarget": {
+    "model": "DAYU200",
+    "soc": "RK3568",
+    "transport": "usb",
+    "pinnedSerialSHA256": "958780b2ffb7090d4f22cdc1f547f9804ed0f0b605e3020f384e5d4823dc7a7e",
+    "firmware": "OpenHarmony 7.0.0.33"
+  },
+  "diagnosticPredecessor": {
+    "runId": "044f837c-1063-41ad-9e18-d8bf9248dd42",
+    "capturedAt": "2026-07-24T14:19:19.656624Z",
+    "privateReceiptSHA256": "c53911be13e1ae9db16e4a896a0b9798a2b0887f20d3bdbea98c84b764827ebc",
+    "reason": "temporaryCollectorExpectedWrongCheckserverTextShape",
+    "observedTextShape": "Client version:<version>, server version:<version>",
+    "observedClientVersion": "Ver: 3.2.0f",
+    "observedServerVersion": "Ver: 3.2.0f",
+    "e0ReadOnlyHDC": 2,
+    "targetFirmwareRockUSBUSBCommands": 0,
+    "e1DeviceMutation": 0,
+    "usedAsCapabilityEvidence": false
+  },
+  "hdc": {
+    "path": "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/toolchains/hdc",
+    "reportedVersion": "Ver: 3.2.0f",
+    "sha256": "05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83",
+    "versionMatched": true,
+    "sha256Matched": true,
+    "serverOwnership": "preExistingExternalSameUIDPinnedExecutable",
+    "serverExecutableMatchedClientPath": true,
+    "serverLifecycleMutationCount": 0,
+    "checkserverSemantic": {
+      "clientVersion": "Ver: 3.2.0f",
+      "serverVersion": "Ver: 3.2.0f",
+      "matched": true
+    },
+    "versionReceipt": {
+      "commandId": "hdc-version",
+      "durationMilliseconds": 4,
+      "exitCode": 0,
+      "ordinal": 0,
+      "outputTruncated": false,
+      "startedArgvSHA256": "fc45a6d08ad80bc6a76feed76e1146de7e51f71f6096f8b65c1bd8b2b08f8c05",
+      "stdout": {
+        "bytes": 12,
+        "sha256": "baa9ba964655552c91af6af899d137d1472fe6adad853cd05602f968b0b00f93"
+      },
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "timedOut": false
+    },
+    "checkserverReceipt": {
+      "commandId": "hdc-checkserver",
+      "durationMilliseconds": 15,
+      "exitCode": 0,
+      "ordinal": 1,
+      "outputTruncated": false,
+      "startedArgvSHA256": "1f46e98c2a1b466aa8f2e9828a88b181dd16d2266ef8220f8d3ae743851042f9",
+      "stdout": {
+        "bytes": 55,
+        "sha256": "d01952a5bcf4d4c536ce828b3a06c42364153ba6131fa13dea043ae9e1aa0a52"
+      },
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "timedOut": false
+    }
+  },
+  "targetReadback": {
+    "targetCount": 1,
+    "serialMatched": true,
+    "connectKeySHA256": "958780b2ffb7090d4f22cdc1f547f9804ed0f0b605e3020f384e5d4823dc7a7e",
+    "firmware": "OpenHarmony 7.0.0.33",
+    "targetEnumerationReceipt": {
+      "commandId": "hdc-targets",
+      "durationMilliseconds": 17,
+      "exitCode": 0,
+      "ordinal": 2,
+      "outputTruncated": false,
+      "startedArgvSHA256": "d5a358028b147293e7994451f3d96e65661b677f249c1960e13506278a24f46d",
+      "stdout": {
+        "bytes": 33,
+        "sha256": "2035c0783fe1b2fbc3bba6badfb76003c1a5d46bbe16d1479de439e9fd874fc2"
+      },
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "timedOut": false
+    },
+    "firmwareReceipt": {
+      "commandId": "hdc-firmware",
+      "durationMilliseconds": 76,
+      "exitCode": 0,
+      "ordinal": 3,
+      "outputTruncated": false,
+      "startedArgvSHA256": "6114667935f67bb5b122c412b98a7d18f4f30b4e4e3b3a97146b7af4409268ae",
+      "stdout": {
+        "bytes": 22,
+        "sha256": "4358db3f825bb43e72e393e00b9b6d571e83910d84d479fe48c9ef5beaf786dd"
+      },
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "timedOut": false
+    }
+  },
+  "rockUSBObservation": {
+    "tool": {
+      "path": "/opt/homebrew/bin/rkdeveloptool",
+      "fileType": "regularFile",
+      "bytes": 217584,
+      "reportedVersion": "rkdeveloptool ver 1.32",
+      "sha256": "bbd7bdc0fb121d414fb61085e77211cc1fdd9a3b6c6b285c54380f70e56c9923",
+      "versionMatched": true,
+      "sha256Matched": true,
+      "expectedUpstreamCommit": "304f073752fd25c854e1bcf05d8e7f925b1f4e14",
+      "observedSourceCheckoutRoot": "/opt/homebrew",
+      "observedSourceCheckoutHead": "7c2bb3b2972fb1ec0788dac8ab0bfeb24ba435a7",
+      "upstreamCommitMatched": false,
+      "expectedUpstreamCommitPresentInObservedCheckout": false,
+      "signatureCheckDispatched": false,
+      "quarantineCheckDispatched": false,
+      "versionReceipt": {
+        "commandId": "rkdeveloptool-version",
+        "exitCode": 0,
+        "ordinal": 4,
+        "outputTruncated": false,
+        "startedArgvSHA256": "1b56278e5c457d94714c9a9536f7f8cd29413e3782d037579a23354571fe9652",
+        "stdout": {
+          "bytes": 24,
+          "sha256": "8edc164e8e73ec8e3bd3cb242ccaa73dec5492bf070e958e827073b4d98a0468"
+        },
+        "stderr": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "timedOut": false
+      },
+      "sourceCommitReceipt": {
+        "commandId": "rkdeveloptool-upstream-commit",
+        "exitCode": 0,
+        "ordinal": 5,
+        "outputTruncated": false,
+        "startedArgvSHA256": "458593d26e8a9f3b3bbc31d68aae101a39fd09f72e0277c1058af073e6472223",
+        "stdout": {
+          "bytes": 41,
+          "sha256": "bd79f9d47c94a9ca2548b321da1e989687f80d69cb1ed9e614985eb92dea5be7"
+        },
+        "stderr": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "timedOut": false
+      }
+    },
+    "discoveryDispatched": false,
+    "candidateCount": null,
+    "candidateCountZeroProven": false,
+    "reason": "rkdeveloptoolSourceCheckoutHeadMismatch"
+  },
+  "usbTopology": {
+    "dispatched": false,
+    "reason": "blockedAtRockUSBToolIdentity"
+  },
+  "counters": {
+    "diagnosticE0Runs": 1,
+    "canonicalE0Runs": 1,
+    "e0HostProcessInspection": 6,
+    "e0ReadOnlyHDC": 6,
+    "e0HDCTargetReadback": 2,
+    "e0RockUSBToolIdentity": 2,
+    "e0RockUSBList": 0,
+    "e0USBTopology": 0,
+    "bindingMaterialization": 0,
+    "typedCapabilityEvidenceMaterialization": 0,
+    "impactConfirmationMaterialization": 0,
+    "enterUpdaterIntent": 0,
+    "usageReservation": 0,
+    "e1DeviceMutation": 0,
+    "e1Retry": 0,
+    "e2Destructive": 0,
+    "rebootLoader": 0,
+    "pptWlxRd": 0,
+    "flashEraseFormatUnlockUpdate": 0,
+    "hdcServerLifecycleMutation": 0,
+    "sudoHelperDriverSystemMutation": 0,
+    "hostShell": 0
+  },
+  "rawEvidence": {
+    "location": "private controlled task state outside every git repository",
+    "canonicalPrivateReceiptSHA256": "3f9e5006d907efd93e3636b2b4f4971cc7e02642ec4390004f6d26397fa9734b",
+    "rawIdentityStoredInRepository": false,
+    "rawStdoutStoredInRepository": false
+  },
+  "preflightVerdict": "blockedBeforeRockUSBDiscoveryAndBindingPreparation",
+  "blockedReasons": [
+    "rkdeveloptoolSourceCheckoutHeadMismatch",
+    "approvedUpstreamCommitUnavailableInObservedCheckout",
+    "preExistingRockUSBCandidateCountNotObserved",
+    "typedCapabilityEvidenceNotMaterialized"
+  ],
+  "identityCorrelationVerdict": "unknown",
+  "characterizationCapabilityVerdict": "unknown",
+  "autoRebindVerdict": "unknown",
+  "typedCapabilityEvidenceMaterialized": false,
+  "e1Gate": "blocked",
+  "e1Dispatched": false,
+  "usageReserved": false
+}

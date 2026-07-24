@@ -106,13 +106,37 @@
 
 ## TASK-AU-002 — 实现与发布管线面
 
-- Status:ready(2026-07-24 D1 readiness candidate；仅在维护者 review/merge 本
-  独立 readiness PR 后生效。三前置已闭合：① CHG-2026-023 approved；②
-  TASK-AU-001 done 且最小自研路线已由维护者认可；③ 本记录固定选型 OID、
-  零第三方依赖、entitlement 空 diff、实现基线、public-key/feed/下载/验签/
-  隐私/发布合同。本 PR 只修改本任务状态与 readiness 记录，零产品实现、零
-  release、零私钥接触；merge 只授权 AU-002 按封闭合同开工，不构成 done、
-  verified 或 ADR-0002 release gate #3 满足)
+- Status:done(2026-07-24；仅在维护者 review/merge 本独立状态 PR 后生效。
+  implementation + evidence PR #457 final head
+  `3905a980138485d2f2362be29be59acf2ba94ff5` 已由维护者 `lvye` exact-head
+  APPROVED，并以 squash merge OID
+  `9ae1bbd2d3351a2b6980255d0eef55078d09cd37` 合入 protected `main`；final
+  head 与 merge 的完整 tree OID 均为
+  `ca49484361e9e15e3e2dc225aca94fc712122d80`。实现候选 evidence
+  `evidence/runs/TASK-AU-002/run.md`（merge blob
+  `91bff70f3619de5e7c795dc439f7da837e19f94a`）随该 merge 合入。本翻转使
+  CHG-2026-023 两个 task 全部 done。done 不等于 change `verified`：
+  `AU-CONTRACT-001`/`AU-PRIVACY-001` 的最终结论与 ADR-0002 release gate #3
+  仍须 change 级 verification-closure PR 由维护者确认。)
+- Done recheck(2026-07-24；在合入版
+  `9ae1bbd2d3351a2b6980255d0eef55078d09cd37` 上重跑，非沿用实现 PR 结论):
+  - 实现 merge 的 16 个交付路径全部位于本任务 allowed paths；final head 与
+    merge 完整 tree 逐字一致。
+  - `AutoUpdateContractTests` PASS(17 tests，0 failures)；
+    ArkDeckKit 全量 PASS(400 tests，1 个既有 opt-in manual skip，0 failures)；
+    macOS Xcode no-sign build PASS。
+  - `TEST-AU-CONTRACT-001` 与 `TEST-AU-PRIVACY-001` 保持
+    **PASS(candidate contract evidence)**；真实 release/upload/feed publish、
+    production private-key access、真实 DMG 安装/替换与 production Finder
+    handoff 均为 0，不把 typed seam/fixture 结果记为真实 Team-signed DMG 验收。
+  - `scripts/check-sdd.sh` 0 errors / 0 warnings / 111 acceptance IDs；
+    `git diff --check` PASS。
+- Provenance recheck:GitHub 复核确认 #457 的 final head、`lvye` exact-head
+  APPROVED、merged 状态与上述 squash OID；本状态 PR 不依赖本地 `gh` 凭据。
+- Superseded-carrier recheck:早先相同 D0 状态提交
+  `3fda06cc3e5e91e06890845f2a760a9a3fec592c` 是 PR #466 的 original head，
+  后因 CHG-2026-033 parser-recovery bootstrap 被显式替换且从未作为 AU-002
+  状态合入；本 PR 是唯一 live replacement carrier，不复用 #466 的批准语义。
 - Readiness review(2026-07-24；host-only，product update/device/release dispatch
   0，Agent private-key access 0):
   - Approval/dependency gate:satisfied。CHG-2026-023 r1 approval 已在 protected

@@ -28,6 +28,8 @@ evidence/runs/TASK-RKFUI-001A/blocked-capability-preflight-maskrom-still-present
 evidence/runs/TASK-RKFUI-001A/blocked-capability-preflight-maskrom-still-present-2026-07-24.json
 evidence/runs/TASK-RKFUI-001A/blocked-capability-preflight-hdc-drift-maskrom-2026-07-24.md
 evidence/runs/TASK-RKFUI-001A/blocked-capability-preflight-hdc-drift-maskrom-2026-07-24.json
+evidence/runs/TASK-RKFUI-001A/blocked-capability-preflight-rkdeveloptool-source-drift-2026-07-24.md
+evidence/runs/TASK-RKFUI-001A/blocked-capability-preflight-rkdeveloptool-source-drift-2026-07-24.json
 evidence/runs/TASK-RKFUI-001B/run.md
 evidence/runs/TASK-RKFUI-001C/run.md
 ```
@@ -97,3 +99,12 @@ README 只接受 HDC `Ver: 3.2.0f` /
 `PR#481@0f0a79aff7ede1519b9fbc0cbdca12b5c687ef07`。旧 version/hash 各自作为
 fail-closed drift case，不存在 fallback 或双 pin。本任务没有运行任何 HDC、
 `rkdeveloptool`、USB 或设备命令，也不构成逐设备 capability evidence。
+
+PR #484 合入、001A 恢复 E0 preparation 后，fresh real-hardware E0 preflight 已确认
+HDC client/server `3.2.0f`、executable hash、唯一 target serial 与 firmware 全部命中；
+但 clean `rkdeveloptool` 虽仍命中 version/hash，其所在 `/opt/homebrew` source checkout
+HEAD 已变为 `7c2bb3b2…`，不匹配 registry 的 upstream `304f0737…`，且后者不是该
+checkout 的 object。preflight 因此在 codesign/quarantine、`ld`、USB observation、
+binding/capability evidence、intent、usage 与 E1 前 fail closed。candidate count 未观察，
+不得记为 0；详情见
+`TASK-RKFUI-001A/blocked-capability-preflight-rkdeveloptool-source-drift-2026-07-24.*`。
