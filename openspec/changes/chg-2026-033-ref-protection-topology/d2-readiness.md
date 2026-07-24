@@ -17,7 +17,7 @@ credential_location: isolated, Agent-unreachable
 repository: ArkDeck/ArkDeck
 api_version: 2026-03-10
 ruleset_id: 19595282
-readiness_pr: 0
+readiness_pr: 475
 readiness_title: "governance(TASK-RPT-001): authorize r3 topology D2"
 readiness_head_ref: agent/task-rpt-001-r3-topology-readiness
 readiness_changed_files:
@@ -32,7 +32,7 @@ capture_file_bytes_with_lf: 31409
 capture_file_sha256: 715029efd426f1d1f461f974667c320a2c1847cc08e378bf7079dc8de4708ca7
 capture_script_sha256: 0f72c5b7485814cfdd11282b75d53585ed16db6e8b2d7ee28fb25d3640ed2d2d
 capture_wrapper_sha256: 2016cbbfa14bdc6590e1eee3f00f25c64114d0e35e3af41b2d7638158854469b
-apply_script_sha256: ececc4a5edd485cae8ec98982adee1d308aad7084d5a6d55e3a9371803c32917
+apply_script_sha256: 616e753dbe422e61bb4279e321724a156e7694416b4e0f209b3463b75ed9f50e
 ```
 
 The capture was produced in a separate human Terminal as exact `lvye`
@@ -385,8 +385,8 @@ deletion must not add any run or PR, and #471 must remain closed/unmerged.
 
 Before the first write, the exact executor proves:
 
-1. The final readiness PR number replaces the placeholder in Section A and
-   in the executor. It is bot-authored by `github-actions[bot]` ID
+1. Readiness PR #475 is pinned in Section A and the executor. It is
+   bot-authored by `github-actions[bot]` ID
    `41898282`, has the exact title/head ref, changes only this file, is
    closed/merged with `auto_merge=null`, and has exact-head `lvye` approval
    plus exact-head App `15368` `guard=success`.
