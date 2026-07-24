@@ -1,17 +1,17 @@
 # CHG-2026-033 Tasks
 
-> r1/r2 历史批准保持真实。#470 topology D2 fail closed 与 #472 evidence 合入后，
-> r3 只登记 ref convergence、workflow suppression、conditional cleanup 与 residual-ref
-> cleanup 机制；在独立 r3 approval-only PR 合入前，TASK-RPT-001 回到 `blocked`，
-> TASK-RPT-002 保持 `blocked`。本 proposal revision 不创建 D2
+> r1/r2 历史批准保持真实。r3 proposal #473 已登记 ref convergence、workflow
+> suppression、conditional cleanup 与 residual-ref cleanup 机制。独立
+> approval-only PR #474 只在维护者 review/merge 后批准 r3，并使 TASK-RPT-001
+> `blocked → ready`；TASK-RPT-002 保持 `blocked`。本 PR 不创建 D2
 > authorization/window，不批准 payload/probe，也没有 done 或 verified 语义。
 
 ## Cross-change stop gate
 
 在任何 D2 readiness 前必须满足：
 
-- 本 change 当前 revision 已由独立 approval-only PR 置为 `approved`；r3 approval
-  前不得沿用 r1/r2 approval；
+- 本 change current r3 仅在独立 approval-only PR #474 经维护者 review/merge 后为
+  `approved`；r1/r2 approval 不授权 r3 D2；
 - CHG-2026-030 以独立 r7 revision：
   - supersede 已由 #449 合入的 r6 Agent-operated ruleset gateway；
   - 明确 #435 与全部旧 window/OID/payload/hash/UUID 永久不可执行；
@@ -25,13 +25,15 @@ GitHub control-plane/ref/probe 数为 0。
 
 ## TASK-RPT-001 — 隔离 Agent 身份并迁移 ref protection topology
 
-- Status:blocked（r2 曾为 `ready`；#470 fail closed 后，r3 proposal revision 需要
-  独立 approval-only。只有该 approval-only 经维护者 review/merge 后，任务才重新
-  `ready`，且只允许下一独立 PR 从当时最新 protected main 起草/固定 D2 readiness。
+- Status:ready（仅在独立 r3 approval-only PR #474 经维护者 review/merge 后生效，
+  且只允许下一独立 PR 从当时最新 protected main 起草/固定 D2 readiness。
+  r3 proposal #473 exact head
+  `9c359396ca1cdd7355ea2c0c3d28e988335ad49b` 已由 `lvye` APPROVED 并合入
+  `6153d581d7caf1bd1ed3335171318b3e92250926`；该 merge 只登记 proposal。
   #455 approval merge
   `c86f07ae6b843affaaa3f698e2f9f08a6f4c96cd` 与 CHG-2026-030 r7 #456 merge
   `c5a1a9f0f1c0a9bc0dd3d04275ac01a5738697f7` 是 r1 历史 gate；
-  r3 approval-only 是新增 current gate。
+  #474 merge 是 r3 current gate。
   本状态不批准任何 before/after/rollback payload、hash、window、operator action、
   probe-ref mutation、credential 或 GitHub control-plane write；D2 readiness 未由 `lvye`
   review/merge 前，task execution dispatch = 0。）
