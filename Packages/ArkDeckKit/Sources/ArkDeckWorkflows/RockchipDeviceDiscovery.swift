@@ -2,8 +2,22 @@ import ArkDeckProcess
 import Foundation
 
 /// The closed RockUSB discovery family registered by CHG-2026-026/TASK-RKFUI-001.
-/// Production accepts one hash-pinned upstream build and one read-only argv shape.
+/// E0 production discovery accepts one hash-pinned upstream build and one read-only argv shape.
+/// The separately pinned destructive compatibility identity is not accepted by the default adapter.
 public struct RockchipDiscoveryIntegrationProfile: Sendable, Equatable {
+  /// The clean, non-quarantined build approved only for E0/read-only `ld` discovery.
+  public static let pinnedReadOnlyDiscovery = RockchipDiscoveryIntegrationProfile(
+    identifier: "ROCKCHIP-ROCKUSB-DISCOVERY@1.0.0",
+    reportedToolVersion: "rkdeveloptool ver 1.32",
+    executableSHA256: "bbd7bdc0fb121d414fb61085e77211cc1fdd9a3b6c6b285c54380f70e56c9923",
+    upstreamCommit: "304f073752fd25c854e1bcf05d8e7f925b1f4e14",
+    exactArguments: ["ld"],
+    timeout: 5,
+    requiresSecurityScopedBookmark: true)
+
+  /// Compatibility identity consumed by the existing destructive Flash authorization,
+  /// execution, and manifest surfaces. CHG-2026-026 r2 explicitly leaves this pin unchanged;
+  /// read-only discovery must use `pinnedReadOnlyDiscovery`.
   public static let pinnedProduction = RockchipDiscoveryIntegrationProfile(
     identifier: "ROCKCHIP-ROCKUSB-DISCOVERY@1.0.0",
     reportedToolVersion: "rkdeveloptool ver 1.32",
@@ -476,7 +490,7 @@ public actor RockchipDeviceDiscoveryAdapter {
   private let executor: FoundationProcessExecutor
 
   public init() {
-    profile = .pinnedProduction
+    profile = .pinnedReadOnlyDiscovery
     executor = FoundationProcessExecutor()
   }
 

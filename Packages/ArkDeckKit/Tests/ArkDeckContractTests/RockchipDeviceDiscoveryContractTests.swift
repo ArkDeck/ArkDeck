@@ -72,7 +72,7 @@ final class RockchipDeviceDiscoveryContractTests: XCTestCase {
   func testRegistryPinsOneReadOnlyIdentityBoundLDOperationAndAllFixtureBytes() throws {
     let registry = try JSONDecoder().decode(
       Registry.self, from: Data(contentsOf: bundledRegistryURL()))
-    let profile = RockchipDiscoveryIntegrationProfile.pinnedProduction
+    let profile = RockchipDiscoveryIntegrationProfile.pinnedReadOnlyDiscovery
 
     XCTAssertEqual(registry.schemaVersion, "1.0.0")
     XCTAssertEqual(registry.serializationFormat, "json-compatible-yaml-1.2")
@@ -83,6 +83,16 @@ final class RockchipDeviceDiscoveryContractTests: XCTestCase {
     XCTAssertEqual(registry.toolContext.platform, "macos")
     XCTAssertEqual(registry.toolContext.reportedVersion, profile.reportedToolVersion)
     XCTAssertEqual(registry.toolContext.executableSHA256, profile.executableSHA256)
+    XCTAssertEqual(
+      profile.executableSHA256,
+      "bbd7bdc0fb121d414fb61085e77211cc1fdd9a3b6c6b285c54380f70e56c9923")
+    XCTAssertNotEqual(
+      profile.executableSHA256,
+      "038a8a0ea26ef7eb77451789f310c0c9fbeaf43a78af1d6146e02311a9c23611")
+    XCTAssertEqual(
+      RockchipDiscoveryIntegrationProfile.pinnedProduction.executableSHA256,
+      "038a8a0ea26ef7eb77451789f310c0c9fbeaf43a78af1d6146e02311a9c23611",
+      "the E0 discovery repin must not alter the destructive Flash toolchain identity")
     XCTAssertEqual(registry.toolContext.upstreamCommit, profile.upstreamCommit)
     XCTAssertEqual(registry.toolContext.pathSource, "userSelectedSecurityScopedBookmark")
     XCTAssertTrue(registry.toolContext.platformTrustRequired)
@@ -279,6 +289,39 @@ final class RockchipDeviceDiscoveryContractTests: XCTestCase {
     XCTAssertEqual(offlineControl.execution?.termination, .exited(0))
     XCTAssertEqual(offlineControl.executableIdentity?.sha256, executableHash)
     XCTAssertEqual(launches.value, 1)
+  }
+
+  func testDefaultAdapterUsesOnlyTheCleanReadOnlyDiscoveryIdentity() async throws {
+    let executable = URL(fileURLWithPath: "/usr/bin/true")
+    let profile = RockchipDiscoveryIntegrationProfile.pinnedReadOnlyDiscovery
+    let adapter = RockchipDeviceDiscoveryAdapter()
+    let selected = RockchipSelectedDiscoveryTool(
+      executableURL: executable,
+      pathSource: .userSelectedSecurityScopedBookmark,
+      securityScopedBookmark: Data([0x01]),
+      reportedVersion: profile.reportedToolVersion,
+      sha256: profile.executableSHA256,
+      platformTrust: RockchipPlatformTrustReceipt(
+        codeTrust: .adHoc, quarantinePresent: false))
+
+    let request = try await adapter.processRequest(for: selected)
+    XCTAssertEqual(request.expectedSHA256, profile.executableSHA256)
+    XCTAssertEqual(request.process.arguments, ["ld"])
+
+    let oldDestructiveIdentity = RockchipSelectedDiscoveryTool(
+      executableURL: executable,
+      pathSource: .userSelectedSecurityScopedBookmark,
+      securityScopedBookmark: Data([0x01]),
+      reportedVersion: profile.reportedToolVersion,
+      sha256: RockchipDiscoveryIntegrationProfile.pinnedProduction.executableSHA256,
+      platformTrust: RockchipPlatformTrustReceipt(
+        codeTrust: .adHoc, quarantinePresent: false))
+    do {
+      _ = try await adapter.processRequest(for: oldDestructiveIdentity)
+      XCTFail("the old destructive tool identity must not be accepted for E0 discovery")
+    } catch {
+      XCTAssertEqual(error as? RockchipToolValidationError, .executableHashMismatch)
+    }
   }
 
   // MARK: - Helpers

@@ -122,6 +122,14 @@ class RockchipE0ProbeTests(unittest.TestCase):
         )
 
     def test_closed_command_and_entitlements(self) -> None:
+        self.assertEqual(
+            PROBE.PINNED_TOOL_SHA256,
+            "bbd7bdc0fb121d414fb61085e77211cc1fdd9a3b6c6b285c54380f70e56c9923",
+        )
+        self.assertNotEqual(
+            PROBE.PINNED_TOOL_SHA256,
+            "038a8a0ea26ef7eb77451789f310c0c9fbeaf43a78af1d6146e02311a9c23611",
+        )
         self.assertEqual(PROBE.EXACT_ARGUMENTS, ["ld"])
         self.assertNotIn("sudo", PROBE.EXACT_ARGUMENTS)
         self.assertNotIn("sh", PROBE.EXACT_ARGUMENTS)
