@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-033-ref-protection-topology
-revision: 2
-status: approved # r1 经 #453/#455 批准；r2 bootstrap revision 仅在 repurposed PR #459 经维护者 review/merge 后成为 current
+revision: 3
+status: proposed # r1 经 #453/#455 批准；r2 经 #459 批准；r3 probe-verifier remediation 仍须独立 approval-only PR
 class: implementation-only
 core_change_level: none
 owner: lvye
@@ -70,6 +70,35 @@ pull requests” 的组合开关，不存在 repository-level create-only 取值
 授权只允许安全重建载体；**只有更新后的 #459 经 `lvye` review/merge 才批准 r2
 机制修订与其中 exact bootstrap D2 readiness**。
 
+### r3 topology execution finding
+
+#470 的完整 topology D2 已真实执行并 fail closed。branch protection after、ruleset
+after、双层/branch-protection-only main negative、single-level Agent ref
+create/update/delete，以及 multi-level Agent ref create/update 的 server receipts 均成功；
+`main` 全程保持
+`928d6e06b928e16874df9137950a9830aa38d8d0`。失败发生在 multi-level update 后：
+Git push 已成功，但紧随其后的单次 Git-ref REST GET 暂时返回更新前 OID，执行器把它
+判为 drift 并回滚。稍后独立 `git ls-remote` 与 #471 head 都观察到预期更新后 OID。
+这与 read-after-write 可见性延迟一致，但只能作为原因推断，不能把失败 run 改判 PASS。
+
+回滚重新让旧 ruleset 覆盖 main，branch-protection write projection 也恢复 before；
+完整 branch-protection JSON 因 GitHub materialize 空
+`dismissal_restrictions` 而未逐字节复现旧 capture。因此后续必须 fresh authenticated
+capture，不能复用 #470 的 full hash。
+
+执行还暴露两个副作用：
+
+- multi-level probe 创建触发 `agent-pr`，自动生成无 diff 的 #471；#471 已于
+  `2026-07-24T11:00:50Z` 关闭且从未合并；
+- rollback 先恢复 old ruleset 后，Deploy Key 无法删除 deeper probe ref。该 ref 仍固定为
+  `refs/heads/agent/rpt001/deep/7908274d-d874-47d6-b844-c2e35ba9d2a9` /
+  `2e1e5ce85266f96f54eb60d9f2547398d1c9b3e7`，只能由新的 exact D2 plan 在安全
+  after-ruleset 状态内清理。
+
+#470 readiness、executor、window、payload/hash 与全部 probe UUID 均已 exhausted。
+#472 merge
+`398a1e9f14ebf0debe785591f4f7517b54e16b26` 只固化失败事实，不批准 r3 或新 D2。
+
 ## What changes
 
 ### In scope
@@ -101,6 +130,18 @@ pull requests” 的组合开关，不存在 repository-level create-only 取值
   CODEOWNER、admin、bypass、main push 或 human-approval actor；
 - 使用 exact before/after/rollback JSON、hash、受控人类窗口和 fail-closed
   overlap-first 顺序迁移；
+- positive ref probe 的每个 pushed tip commit 固定包含 GitHub 支持的
+  `[skip actions]`，并在 preflight 固定全部 workflow trigger，防止临时 probe
+  触发 `agent-pr` 或创建 PR；这不修改 workflow、Actions setting 或 main；
+- successful ref mutation 以 Git server receipt + bounded `git ls-remote` +
+  bounded Git-ref REST convergence 交叉验证；单次即时 stale REST observation 不再
+  直接升级为 drift，超出固定收敛预算或两通道持续矛盾仍 fail closed；
+- residual #470 deeper probe ref 作为唯一具名 preexisting controlled ref，在新
+  ruleset after 已 authenticated read-back、branch protection 已知 exact after 且 main
+  未变后由 Deploy Key 删除；不得用 `lvye` bypass 或替换 ref/OID；
+- 非 main-security failure 时，若 branch protection exact after 且 main 未变，先在
+  after-ruleset 下清理全部 controlled Agent refs，再恢复 ruleset main coverage；
+  main state 未知或 negative unexpected success 时仍优先恢复/保留更严格 main protection；
 - 以 append-only supersession/revalidation 更新 CHG-2026-027、CHG-2026-030 与
   host-loop runbook 的 current-mechanism 指针，不改写历史 evidence。
 
@@ -119,6 +160,8 @@ pull requests” 的组合开关，不存在 repository-level create-only 取值
   authorization；
 - 在一次性 bootstrap readiness 下修改 ruleset、main branch protection、repository
   merge setting、credential、ref protection 或任何 PR review/merge 状态。
+- 为 probe 修改 `.github/**`、临时关闭 workflow/Actions、使用 workflow
+  disable/enable API，或把自动生成 PR 当作允许的清理副作用。
 
 ### Observable behavior before/after
 
@@ -174,6 +217,13 @@ pull requests” 的组合开关，不存在 repository-level create-only 取值
    `checks` **而不同时发送 legacy `contexts`**；全部 before/after/rollback/hash、
    window、nonce、OID 重新固定。
 7. TASK-RPT-002、BAP-CRED-001/HLR supersession 与最终 verification 继续保持原依赖。
+8. #470 execution 与 #472 failure evidence 保留历史；r3 proposal revision 先登记
+   ref convergence、workflow suppression、conditional cleanup 与 residual-ref
+   cleanup 机制。r3 只有在后一独立 approval-only PR 经 `lvye` review/merge 后成为
+   approved/current；在此之前 TASK-RPT-001 回到 `blocked`，D2 dispatch 为 0。
+9. r3 approval 后，从当时最新 protected main 做 fresh authenticated discovery；再以
+   独立 D2 readiness 固定新的 main/PR/blob/ref/settings、normalized full branch
+   protection before、exact after/rollback、全新 UUID、收敛预算、operator 与窗口。
 
 历史 r1 proposal carrier #453 的合入不构成 approval、readiness、authorization、
 D2 window、done 或 verified；r2 #459 的精确授权边界以下文为准。
@@ -204,3 +254,6 @@ D2 window、done 或 verified；r2 #459 的精确授权边界以下文为准。
 - r2 merge 不批准 ruleset、branch protection、repository merge setting、credential、
   probe ref、review、merge 或 auto-merge mutation；不构成 TASK-RPT-001 `done` 或
   change `verified`。
+- r3 proposal carrier 只登记机制修订与作废 #470 readiness，不批准任何 GitHub
+  control-plane/ref/PR-state write，不把成功的子 probe 改判为 AC PASS，也不使
+  TASK-RPT-001 `ready`。r3 的批准必须由后续独立 approval-only PR 完成。

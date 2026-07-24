@@ -1,11 +1,34 @@
-# TASK-RPT-001 full topology D2 readiness
+# TASK-RPT-001 full topology D2 readiness — exhausted #470 record
 
-> Status:PROPOSED / NON-EXECUTABLE UNTIL THIS EXACT FILE IS REVIEWED AND
-> SQUASH-MERGED BY `lvye` IN THE BOT-AUTHORED READINESS PR.
+> Status:EXHAUSTED / NON-EXECUTABLE. This exact file was reviewed and merged
+> in #470, executed once, and ended `fail_closed`. Its window, payloads,
+> hashes, script and UUIDs must not be rerun, repaired or cited as current
+> readiness.
 >
-> Scope:one fail-closed human-isolated migration of repository ruleset
-> `19595282` and exact-main branch protection, followed by the fixed ref
-> matrix below. This file does not mark the task approved, done or verified.
+> Historical scope below is preserved for audit. #472 records the execution
+> facts. A successor is forbidden until CHG-2026-033 r3 is independently
+> approved and a new readiness replaces every pin from fresh protected main.
+
+## 0. #470 outcome and successor stop gate
+
+The #470 executor stopped after a successful multi-level ref update because
+one immediate Git-ref REST read returned the prior OID. Later `ls-remote` and
+the automatically opened #471 head showed the expected updated OID. The run
+rolled back; `main` did not change; no topology AC passed.
+
+The old ruleset again covers main. #471 is closed/unmerged. The exact residual
+ref remains:
+
+```text
+refs/heads/agent/rpt001/deep/7908274d-d874-47d6-b844-c2e35ba9d2a9
+2e1e5ce85266f96f54eb60d9f2547398d1c9b3e7
+```
+
+Do not delete, move or reuse it outside the successor exact D2 plan. The
+successor must use fresh authenticated before JSON, Git/REST bounded
+convergence, `[skip actions]` probe tips, workflow/PR side-effect assertions,
+conditional pre-rollback ref cleanup and new UUIDs/window/operator hashes.
+Nothing below authorizes another write.
 
 ## A. Authority and fresh protected-main discovery
 
