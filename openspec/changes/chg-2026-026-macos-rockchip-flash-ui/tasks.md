@@ -150,13 +150,15 @@
 
 ## TASK-RKFUI-001A — DAYU200 HDC→Loader E1 capability characterization
 
-- Status:ready（仅在本独立 D0 状态 PR 由维护者 review/merge 后恢复 fresh E0
-  capability preparation。TASK-RKFUI-001D implementation/evidence PR #493 已合入
-  `main`，merge OID `606de6d7b807693466982b08cce394e96593cbf2`。fresh E0 仍须在真实
-  USB 可见环境证明 pre-existing RockUSB candidate 为 0，并命中 immutable source
-  provenance 与其他全部 exact pins；E1 继续 blocked，且还须由后续维护者 merged PR
-  接受逐设备 typed capability evidence。binding、capability evidence、intent、usage 与
-  E1 dispatch 当前仍全为 0）
+- Status:blocked（PR #496 恢复 fresh E0 preparation 后，real-hardware evidence PR #499
+  已由维护者 review/merge 至 `main`，merge OID
+  `730ba65003b5135893bcec6647ce153bac4c0d5f`。该 E0 命中 target/firmware、HDC
+  client/server、clean tool trust 与 immutable source provenance 全部 exact pins，但 sole
+  `rkdeveloptool ld` 仍观察到一个 `0x2207:0x5000 Maskrom`；`system_profiler` 空视图
+  不能覆盖 registered tool 的 candidate=1 事实。等待物理环境明确移除 pre-existing
+  RockUSB candidate 后另行恢复 fresh E0；OriginalTarget/revision-1 binding、typed
+  capability evidence、impact confirmation、intent、usage、E1/E2 均为 0，`maxRuns=1`
+  未消费）
 - Readiness review r2（2026-07-24；host-only 审计，device/HDC command dispatch 0）：
   - Approval/dependency gate:on merge。CHG-2026-026 r1 已由 PR #298 批准；001 discovery
     implementation/hardening 已由 #301/#305 合入。r2 修正旧依赖环：维护者选择 HDC 软件进态
