@@ -1,533 +1,570 @@
-# TASK-RPT-001 D2 readiness
+# TASK-RPT-001 r3 full topology D2 readiness
 
-> Status:SUPERSEDING REVISION PROPOSED / NON-EXECUTABLE UNTIL THIS EXACT FILE IS
-> REVIEWED AND MERGED
->
-> 本文件只固定一次性、human-isolated D2 plan。PR 合入前 GitHub control-plane
-> write、probe ref mutation、PR state mutation 与 Agent privileged dispatch 均为 0。
-> 合入后仍须通过全部 credential-containment、fresh read-back、drift、quiescence 与
-> window gates；任一失败均为零 dispatch，或按 Section I fail closed。
+> Status:DRAFT / NON-EXECUTABLE until this exact file is reviewed and merged
+> by `lvye`. This document replaces the exhausted #470 readiness; it does not
+> mark TASK-RPT-001 approved, done or verified.
 
-## A. Authority, capture and concurrency pins
+## A. Authority and fresh protected-main discovery
 
 ```yaml
-schema: arkdeck-rpt001-readiness/v1
-human_capture_schema: arkdeck-rpt001-human-capture-v1
-human_capture_api_version: 2026-03-10
-human_capture_started_utc: 2026-07-24T04:47:25Z
-human_capture_finished_utc: 2026-07-24T04:47:59Z
-human_capture_request_semantics: GET-only
-human_capture_canonical_bytes: 22179
-human_capture_sha256: 0a10b79fae6908b3be1fe57fecb2de9165ab7e4eeb331a25f390f3b8af560d14
-captured_by:
-  login: lvye
-  id: 4340161
-  type: User
-  site_admin: false
-protected_main_oid_at_capture: 60ea5266e506f88b81c0ef8a2c6744c770b5b3d5
-readiness_base_oid: f14d9de8d5f32d0998837466674adeff9516e5b5
-superseded_pr462_readiness_merge_oid: f14d9de8d5f32d0998837466674adeff9516e5b5
-change_approval_merge_oid: c86f07ae6b843affaaa3f698e2f9f08a6f4c96cd
-compatible_chg030_r7_merge_oid: c5a1a9f0f1c0a9bc0dd3d04275ac01a5738697f7
-task_ready_merge_oid: 298ffa4867f5c0588b8d8adba1a2cb4fb76d5cd8
+schema: arkdeck-rpt001-topology-readiness/v2
+change: CHG-2026-033-ref-protection-topology@r3
+task: TASK-RPT-001
+task_status: ready
+operator: lvye
+executor: human
+credential_location: isolated, Agent-unreachable
+repository: ArkDeck/ArkDeck
+api_version: 2026-03-10
 ruleset_id: 19595282
-declared_open_control_plane_operations: []
-non_agent_non_main_remote_refs: []
+readiness_pr: 475
+readiness_title: "governance(TASK-RPT-001): authorize r3 topology D2"
+readiness_head_ref: agent/task-rpt-001-r3-topology-readiness
+readiness_changed_files:
+  - openspec/changes/chg-2026-033-ref-protection-topology/d2-readiness.md
+capture_schema: arkdeck-rpt001-discovery/v3
+capture_classification: GET-only; zero credential values; zero external writes
+capture_timestamp_utc: 2026-07-24T11:34:10.230244Z
+capture_main_oid: d94e8f8378fabd14323dddc1ba138391d9dad09c
+capture_canonical_bytes_without_lf: 31408
+capture_canonical_sha256: 35f2f73aa8bd8b5c2f157a19c489aac166b73a49bb3edd85e484317ee7675782
+capture_file_bytes_with_lf: 31409
+capture_file_sha256: 715029efd426f1d1f461f974667c320a2c1847cc08e378bf7079dc8de4708ca7
+capture_script_sha256: 0f72c5b7485814cfdd11282b75d53585ed16db6e8b2d7ee28fb25d3640ed2d2d
+capture_wrapper_sha256: 2016cbbfa14bdc6590e1eee3f00f25c64114d0e35e3af41b2d7638158854469b
+apply_script_sha256: a19a4c538415db7fecbd72845c3e518864b518b355f9651c1f3a5a5f17511260
 ```
 
-capture 后，非重叠 PR #461 以
-`5b41a15391256d9adcc3a5a316654971c9aab57e` 合入。随后 PR #462 在本轮
-self-approval capability 审计完成前，以旧 head
-`1839b1ec4009eee6d371217ba8ee35f189a3ca64` 合入为
-`f14d9de8d5f32d0998837466674adeff9516e5b5`。#462 没有固定或关闭
-`can_approve_pull_request_reviews=true`，因此其 readiness **失效且 execution
-dispatch 必须为 0**；本 superseding revision 以该 merge 为新 readiness base。
-`60ea5266e506f88b81c0ef8a2c6744c770b5b3d5` 因而只保留为 capture provenance，
-**不是 execution pin**。本 readiness PR 合入前 `readiness_merge_oid` 不存在；执行
-preflight 必须从 GitHub 的 protected-main merge facts 取得本 PR 的完整 merge OID，
-并证明当时 `main` 正好等于该 OID。PR head、短 SHA、本地推测或旧 capture main
-均不能替代。
+The capture was produced in a separate human Terminal as exact `lvye`
+(user ID `4340161`). It declared zero credential values and zero writes,
+contained no sensitive credential environment-variable name, and was returned
+only after the wrapper logged out. Independent Agent-side `gh auth status`
+then reported no logged-in GitHub host.
 
-固定 blob：
+The capture reparses as canonical UTF-8 JSON plus one trailing LF. Every
+embedded artifact reproduces its declared byte count and SHA-256:
+
+| Artifact | Bytes | SHA-256 |
+| --- | ---: | --- |
+| `active_main_rules` | 335 | `560eff7e8ecceb7b044a19634c7e559a8b0411b486717a97c05896246a3c7137` |
+| `actor_inventory` | 4,520 | `feb3e80c5b5070136fbc423a459fb8111d9b352c559cb2c09eb8cf041cfddfac` |
+| `branch_main` | 5,390 | `71e3915860d8b319e05e4bb213c4615bdff81bb1d965b1901c597e6906eb52df` |
+| `branch_protection_full` | 1,613 | `7e30197b45effc98224943ebe383c45993cecf31a105dcd52f4a14103e5ea7ab` |
+| `open_pull_requests` | 607 | `0a8d7d2b9940e7d12fe129174c8ec00b01d728512e353438817abffb2822ecbb` |
+| `organization_settings` | 482 | `db3047ad7868abfb58303681c011c7c6a4ebe79de8a7d0e3166760320d297b09` |
+| `pin_blobs` | 1,812 | `41d8a48eb13c01b62d852a6c317d4c415e65fdc9b5fe61a5adbdbd5d27955072` |
+| `relevant_pull_requests` | 7,720 | `ee838ed507ac9be5a1d30af7ee4768d85e21c88fdd059854a41f35c9257c6f28` |
+| `remote_refs` | 1,200 | `0db696c1bdffb7ed5dda82399122755e07bc480a284b40082dc907f931d7d79c` |
+| `repository_settings` | 660 | `8f605ec84f4d83ef6a860c238e1c506cacd1ab8c85ecb90448bdf2a684daf3f7` |
+| `ruleset_full` | 702 | `0fd4b6393837e82d6f211ba826728f0db612bad0e200194bf341e5d977676e9b` |
+| `rulesets_full` | 438 | `02994ffbe52d928dd2ec8c41ae9bbee9d6e6456dac7e06fb1008658c97c4cbd2` |
+| `workflow_files` | 435 | `05d9f262a2d76581ca925bddd937e775ac4a5ef594deb1022fa3816036f97f78` |
+
+This is independent r3 readiness. It inherits no execution authority from
+#435, #467, #470, either bootstrap carrier, or any earlier HLR readiness.
+
+## B. Current diagnosis, history and quiescence
+
+Protected main at capture:
+
+```text
+d94e8f8378fabd14323dddc1ba138391d9dad09c
+governance(CHG-2026-033): approve ref probe remediation (#474)
+parent: 6153d581d7caf1bd1ed3335171318b3e92250926
+```
+
+#474 was bot-authored, changed only the approved r3 governance paths, had
+exact-head `lvye` approval and App `15368` `guard=success`, and was merged by
+`lvye` at `2026-07-24T11:26:53Z`. It authorizes drafting this fresh readiness,
+not the writes in this file before this file itself is reviewed and merged.
+
+Historical boundaries are fixed:
+
+- #470 was merged and executed once; its script, window, hashes, payload
+  instance and UUIDs are exhausted.
+- #470 ended `fail_closed`; its partial probe success is not an AC PASS.
+- #471 is closed, unmerged and has no changed files.
+- #472 preserves the #470 failure facts.
+- #473 and #474 are the r3 proposal and approval-only gates.
+
+Exactly one unrelated PR was open:
+
+```json
+[{"base_ref":"main","base_sha":"9de9c63f7fe17069ad50ff0a73fc171ce6a14ec8","changed_files":["openspec/changes/chg-2026-026-macos-rockchip-flash-ui/evidence/README.md","openspec/changes/chg-2026-026-macos-rockchip-flash-ui/evidence/runs/TASK-RKFUI-001A/blocked-capability-preflight-maskrom-still-present-2026-07-24.json","openspec/changes/chg-2026-026-macos-rockchip-flash-ui/evidence/runs/TASK-RKFUI-001A/blocked-capability-preflight-maskrom-still-present-2026-07-24.md"],"draft":false,"head_ref":"agent/rkfui-001a-e0-capability-preflight","head_sha":"9ecbb7a1de6a6504b1a72281d4f122a0f7590def","number":468}]
+```
+
+It does not overlap this topology. At execution it must still be the only
+open PR with this exact projection; any merge, close, head/path change or
+additional open PR is drift and stops before the first write.
+
+All remote branches at capture:
+
+| Ref | OID |
+| --- | --- |
+| `refs/heads/main` | `d94e8f8378fabd14323dddc1ba138391d9dad09c` |
+| `refs/heads/agent/chg-2026-029-r5-remediation` | `21be4ce872e9b673712efa1d65f3b934a45f8f46` |
+| `refs/heads/agent/obs-001-observability` | `3c7f049bb5dac137351f6f6eb4bbfbbb3ab1d2a0` |
+| `refs/heads/agent/rkfui-001-identity-separation-readiness` | `53bbec764c645978accb8020415a64e6fe7ce1b4` |
+| `refs/heads/agent/rkfui-001a-e0-capability-preflight` | `9ecbb7a1de6a6504b1a72281d4f122a0f7590def` |
+| `refs/heads/agent/rpt001/deep/7908274d-d874-47d6-b844-c2e35ba9d2a9` | `2e1e5ce85266f96f54eb60d9f2547398d1c9b3e7` |
+| `refs/heads/agent/task-hlr-002-readiness` | `8c39aab06f03538c9f95bfbc7ccb17b44f110fae` |
+| `refs/heads/agent/task-hlr-002a-bootstrap-partition` | `6744d353b42faf8da15314c09f3465749be05f77` |
+| `refs/heads/agent/task-mech-002` | `66474de216bc1ae80e59a6ba7d1ea12ca1f76a07` |
+| `refs/heads/agent/task-rpt-001-failure-evidence` | `a95d6c879ccc7c3e251a42f98a048ce8123c4659` |
+| `refs/heads/agent/task-tr-003` | `bee1f96420f8a70c6652be1ae9bd1c97386405a2` |
+
+There is no non-main ordinary branch. At execution the list must be identical
+except that main is the single-parent squash merge of this readiness and the
+readiness branch may be deleted or remain at its exact reviewed head.
+
+## C. Complete authenticated before
+
+Canonicalization is UTF-8, recursively sorted object keys, compact separators
+and no trailing LF.
+
+### Ruleset `19595282`
+
+```json
+{"_links":{"html":{"href":"https://github.com/ArkDeck/ArkDeck/rules/19595282"},"self":{"href":"https://api.github.com/repos/ArkDeck/ArkDeck/rulesets/19595282"}},"bypass_actors":[{"actor_id":4340161,"actor_type":"User","bypass_mode":"always"}],"conditions":{"ref_name":{"exclude":["refs/heads/agent/**"],"include":["~ALL"]}},"created_at":"2026-07-23T10:20:11.391+08:00","current_user_can_bypass":"always","enforcement":"active","id":19595282,"name":"agent-ref-boundary","node_id":"RRS_lACqUmVwb3NpdG9yec5Na16-zgErABI","rules":[{"type":"creation"},{"type":"update"},{"type":"deletion"}],"source":"ArkDeck/ArkDeck","source_type":"Repository","target":"branch","updated_at":"2026-07-24T18:45:53.061+08:00"}
+```
+
+```yaml
+bytes: 702
+sha256: 0fd4b6393837e82d6f211ba826728f0db612bad0e200194bf341e5d977676e9b
+current_user_can_bypass: always
+sole_bypass_actor: "User 4340161 / lvye"
+```
+
+Authenticated active-main evaluation is exactly the three rules
+`creation`, `update` and `deletion` from ruleset `19595282`; canonical bytes
+`335`, SHA-256
+`560eff7e8ecceb7b044a19634c7e559a8b0411b486717a97c05896246a3c7137`.
+
+### Main branch protection
+
+```json
+{"allow_deletions":{"enabled":false},"allow_force_pushes":{"enabled":false},"allow_fork_syncing":{"enabled":false},"block_creations":{"enabled":false},"enforce_admins":{"enabled":false,"url":"https://api.github.com/repos/ArkDeck/ArkDeck/branches/main/protection/enforce_admins"},"lock_branch":{"enabled":false},"required_conversation_resolution":{"enabled":false},"required_linear_history":{"enabled":true},"required_pull_request_reviews":{"dismiss_stale_reviews":true,"dismissal_restrictions":{"apps":[],"teams":[],"teams_url":"https://api.github.com/repos/ArkDeck/ArkDeck/branches/main/protection/dismissal_restrictions/teams","url":"https://api.github.com/repos/ArkDeck/ArkDeck/branches/main/protection/dismissal_restrictions","users":[],"users_url":"https://api.github.com/repos/ArkDeck/ArkDeck/branches/main/protection/dismissal_restrictions/users"},"require_code_owner_reviews":true,"require_last_push_approval":false,"required_approving_review_count":1,"url":"https://api.github.com/repos/ArkDeck/ArkDeck/branches/main/protection/required_pull_request_reviews"},"required_signatures":{"enabled":false,"url":"https://api.github.com/repos/ArkDeck/ArkDeck/branches/main/protection/required_signatures"},"required_status_checks":{"checks":[{"app_id":15368,"context":"guard"}],"contexts":["guard"],"contexts_url":"https://api.github.com/repos/ArkDeck/ArkDeck/branches/main/protection/required_status_checks/contexts","strict":true,"url":"https://api.github.com/repos/ArkDeck/ArkDeck/branches/main/protection/required_status_checks"},"url":"https://api.github.com/repos/ArkDeck/ArkDeck/branches/main/protection"}
+```
+
+```yaml
+bytes: 1613
+sha256: 7e30197b45effc98224943ebe383c45993cecf31a105dcd52f4a14103e5ea7ab
+```
+
+The complete GET proves the current gap is only
+`enforce_admins=false` plus absent push restrictions. PR review,
+CODEOWNER, strict App-bound `guard`, linear history, force-push false and
+delete false already exist. The old ruleset still covers main during this
+gap. The full before differs from #470 because GitHub has materialized empty
+`dismissal_restrictions`; #470's full hash is not reused.
+
+### Repository, Actions and actor before
+
+```json
+{"fields":{"allow_auto_merge":false,"allow_forking":true,"allow_merge_commit":true,"allow_rebase_merge":true,"allow_squash_merge":true,"allow_update_branch":false,"archived":false,"default_branch":"main","delete_branch_on_merge":true,"disabled":false,"full_name":"ArkDeck/ArkDeck","id":1298882238,"is_template":false,"merge_commit_message":"PR_TITLE","merge_commit_title":"MERGE_MESSAGE","name":"ArkDeck","node_id":"R_kgDOTWtevg","private":false,"squash_merge_commit_message":"COMMIT_MESSAGES","squash_merge_commit_title":"COMMIT_OR_PR_TITLE","visibility":"public","web_commit_signoff_required":false},"missing_known_fields":["use_squash_pr_title_as_default"]}
+```
+
+Repository projection: 660 bytes, SHA-256
+`8f605ec84f4d83ef6a860c238e1c506cacd1ab8c85ecb90448bdf2a684daf3f7`.
+
+```json
+{"can_approve_pull_request_reviews":true,"default_workflow_permissions":"read"}
+```
+
+Actions workflow permission: 79 bytes, SHA-256
+`e4eea28a28f0c12dc5a441d5d6451c4bc7f3f72ed8f0b717c6cb5502e825965d`;
+mutation budget zero.
+
+The complete actor artifact proves:
+
+- sole collaborator, organization member and administrator:
+  `lvye` / ID `4340161`;
+- sole Deploy Key: `arkdeck-agent-writer` / ID `158088026`, write-enabled,
+  enabled and verified;
+- repository teams, outside collaborators, pending invitations and GitHub
+  App installations are empty;
+- every listed organization-role assignment is empty;
+- ruleset bypass contains only `lvye`;
+- main push restrictions are absent before;
+- workflow defaults remain exact `true/read`.
+
+The full actor artifact is 4,520 bytes with SHA-256
+`feb3e80c5b5070136fbc423a459fb8111d9b352c559cb2c09eb8cf041cfddfac`.
+After removing only Deploy Key `created_at` and `last_used`, the stable
+projection is 4,449 bytes with SHA-256
+`cdd8fc98d2a1fccbbb619c4ddf987975aa7a97f971754542bd0ccde383b293d0`.
+No Deploy Key, Actions identity, App, team, role or integration appears in
+ruleset bypass or a main push allowlist.
+
+### Protected-main pins
+
+Except for this readiness file, whose reviewed-head blob must equal its merge
+tree blob, execution pins:
 
 | Path | Blob OID |
 | --- | --- |
 | `.github/CODEOWNERS` | `f4edd22f87965efcfc27ea512283a0c2252bf0fb` |
 | `.github/workflows/agent-pr.yml` | `41426544637db25224dc6c6b3718abd4ebbfca7c` |
 | `.github/workflows/sdd-guard.yml` | `809147e462512d970813d1992a3fcdf41f8b4b10` |
+| `.github/workflows/swift-ci.yml` | `640065f3f3849e1add0cc6bfa92078873eb315ef` |
 | `AGENTS.md` | `3c2d3c6a01d3eaa31cd9e3ee333f3153552f4164` |
 | CHG-2026-030 `proposal.md` | `890a40585b2898c0fd9e7d2b72f5b2a8e81b515c` |
 | CHG-2026-030 `design.md` | `7e2e20bfb884875de32cbbeb5f0399df7a137056` |
 | CHG-2026-030 `tasks.md` | `7fc3c14bb207facec9d330a8d74b23fb9aefdb58` |
 | CHG-2026-030 `verification.md` | `49f284b397006fa8626e76ec2fa51f5d9a88e307` |
-| CHG-2026-033 `proposal.md` | `8a98c95fdb24029c1ac13325578f2800eae8018c` |
-| CHG-2026-033 `design.md` | `be556c61967101b1b66c85cb2b19aa7cae428bcd` |
-| CHG-2026-033 `tasks.md` | `dc021364f6aa0fb221047f1b362c68a3c5f1f56a` |
-| CHG-2026-033 `verification.md` | `a8a6dc71221850a3f965e8ee2a964150296262a2` |
+| CHG-2026-033 `proposal.md` | `765e6f5fdba0cb616ffaad33fa6dc7a472555bd3` |
+| CHG-2026-033 `design.md` | `53f3aec7d26f5f1db8a461bacea73c9707c116f6` |
+| CHG-2026-033 `tasks.md` | `b73a543333873298228c602b28b2639852947c56` |
+| CHG-2026-033 `verification.md` | `d44ff4d6610a1727b7c8587978f563e42ae57407` |
 | `openspec/governance/enforcement.md` | `e8ff3c130e1b8b15f8405d150ad567e774a0d82b` |
 | `openspec/governance/host-loop-runbook.md` | `70e0bcc5b736a896f0329e24a89e273164762558` |
 
-本文件自身的 blob 只能在 readiness merge 后固定。执行时必须固定 merged readiness
-blob，并证明其内容等于维护者 approved head；表中其余 blob 必须逐项相等。
+The workflow inventory is exactly those three workflow files. Their pinned
+events are only `push` and/or `pull_request`; none has
+`pull_request_target`, `workflow_run`, `workflow_dispatch`,
+`repository_dispatch`, `schedule` or an administration/review/merge route.
 
-`2026-07-24T05:04:01Z` 的 public refresh 发现：
+## D. Exact writes, read-back projections and rollback
 
-| PR | Head OID | Decision |
-| --- | --- | --- |
-| #457 | `3905a980138485d2f2362be29be59acf2ba94ff5` | product/updater 与 CHG-2026-023 paths；零 D2 overlap |
-| #459 | `d3aeeaaa8eba79526474580208dc253c4c46d26a` | product/updater 与 CHG-2026-023 paths；零 D2 overlap |
-| #463 | 本 superseding readiness 的 exact reviewed head | 必须先由 `lvye` review/merge；其 merge OID 才是 execution pin |
-
-全部远端 branch ref：
-
-```text
-refs/heads/agent/au-002-implementation
-refs/heads/agent/chg-2026-029-r5-remediation
-refs/heads/agent/obs-001-observability
-refs/heads/agent/rkfui-001-identity-separation-readiness
-refs/heads/agent/task-au-002-update-runtime
-refs/heads/agent/task-hlr-002-readiness
-refs/heads/agent/task-hlr-002a-bootstrap-partition
-refs/heads/agent/task-mech-002
-refs/heads/agent/task-rpt-001-d2-readiness
-refs/heads/agent/task-tr-003
-refs/heads/main
-```
-
-除 `main` 外均为 `agent/**`。非重叠 PR 不要求关闭；若 execution preflight 发现它们
-或新 PR 修改 pinned inputs、目标 refs、ruleset/protection/repository/Actions setting、
-credential authority 或本 readiness，立即停止。
-
-## B. Authenticated before artifacts
-
-canonicalization：UTF-8、递归排序 object keys、separators `(',', ':')`、无 trailing
-LF。完整 human capture 由 Section A 的 bytes/hash 固定；本节嵌入执行所需的 full
-control objects 与 enforcement projection。
-
-| Artifact | Bytes | SHA-256 |
-| --- | ---: | --- |
-| `ruleset_full` | 702 | `a5725db245d84174090de47e1fc45123219dbf5cfdd00d45856b04d801a3d5f2` |
-| `branch_protection_full` | 1,227 | `e45fb8583eb8002e49fcd402c0d9026f7277a1b823b6fe7410695da5666f0b0c` |
-| `repository_settings_full` | 648 | `ec3df4f619d474d83acc3199ae677104149e56bb45e05ea0eb67dee49a3b0e9d` |
-| `actions_full` | 212 | `61c9241c4a9f27565c00d7e5938852390934b174f75983b0df247ecb8e1b13ee` |
-| `actor_enforcement_projection` | 1,294 | `eba50756ae888703531e39fbf85c09d6e8324109de2927cb19ef7a5f10f1aca9` |
-
-### `ruleset_full`
-
-```json
-{"_links":{"html":{"href":"https://github.com/ArkDeck/ArkDeck/rules/19595282"},"self":{"href":"https://api.github.com/repos/ArkDeck/ArkDeck/rulesets/19595282"}},"bypass_actors":[{"actor_id":4340161,"actor_type":"User","bypass_mode":"always"}],"conditions":{"ref_name":{"exclude":["refs/heads/agent/**"],"include":["~ALL"]}},"created_at":"2026-07-23T10:20:11.391+08:00","current_user_can_bypass":"always","enforcement":"active","id":19595282,"name":"agent-ref-boundary","node_id":"RRS_lACqUmVwb3NpdG9yec5Na16-zgErABI","rules":[{"type":"creation"},{"type":"update"},{"type":"deletion"}],"source":"ArkDeck/ArkDeck","source_type":"Repository","target":"branch","updated_at":"2026-07-23T10:20:11.425+08:00"}
-```
-
-### `branch_protection_full`
-
-```json
-{"allow_deletions":{"enabled":false},"allow_force_pushes":{"enabled":false},"allow_fork_syncing":{"enabled":false},"block_creations":{"enabled":false},"enforce_admins":{"enabled":false,"url":"https://api.github.com/repos/ArkDeck/ArkDeck/branches/main/protection/enforce_admins"},"lock_branch":{"enabled":false},"required_conversation_resolution":{"enabled":false},"required_linear_history":{"enabled":true},"required_pull_request_reviews":{"dismiss_stale_reviews":true,"require_code_owner_reviews":true,"require_last_push_approval":false,"required_approving_review_count":1,"url":"https://api.github.com/repos/ArkDeck/ArkDeck/branches/main/protection/required_pull_request_reviews"},"required_signatures":{"enabled":false,"url":"https://api.github.com/repos/ArkDeck/ArkDeck/branches/main/protection/required_signatures"},"required_status_checks":{"checks":[{"app_id":15368,"context":"guard"}],"contexts":["guard"],"contexts_url":"https://api.github.com/repos/ArkDeck/ArkDeck/branches/main/protection/required_status_checks/contexts","strict":true,"url":"https://api.github.com/repos/ArkDeck/ArkDeck/branches/main/protection/required_status_checks"},"url":"https://api.github.com/repos/ArkDeck/ArkDeck/branches/main/protection"}
-```
-
-GET response 不含 `restrictions`，即 before 无 push allowlist；after 必须变为 users
-恰为 `[lvye]`、teams/apps 为空。
-
-### `repository_settings_full`
-
-```json
-{"allow_auto_merge":false,"allow_merge_commit":true,"allow_rebase_merge":true,"allow_squash_merge":true,"archived":false,"default_branch":"main","delete_branch_on_merge":true,"disabled":false,"full_name":"ArkDeck/ArkDeck","id":1298882238,"node_id":"R_kgDOTWtevg","owner":{"id":304203651,"login":"ArkDeck","node_id":"O_kgDOEiHHgw","site_admin":false,"type":"Organization"},"permissions":{"admin":true,"maintain":true,"pull":true,"push":true,"triage":true},"squash_merge_commit_message":"COMMIT_MESSAGES","squash_merge_commit_title":"COMMIT_OR_PR_TITLE","use_squash_pr_title_as_default":null,"visibility":"public","web_commit_signoff_required":false}
-```
-
-### `actions_full`
-
-```json
-{"permissions":{"allowed_actions":"all","enabled":true,"sha_pinning_required":false},"selected_actions":null,"workflow_permissions":{"can_approve_pull_request_reviews":true,"default_workflow_permissions":"read"}}
-```
-
-`can_approve_pull_request_reviews=true` 是 before 中必须闭合的 capability 缺口。仅扫描
-workflow source、承诺不调用 review API 或把 Actions 排除出 CODEOWNERS，均不能替代
-把该 repository setting 改为 false。
-
-### `actor_enforcement_projection`
-
-```json
-{"authenticated_identity":{"id":4340161,"login":"lvye","node_id":"MDQ6VXNlcjQzNDAxNjE=","site_admin":false,"type":"User"},"collaborators":[{"id":4340161,"login":"lvye","node_id":"MDQ6VXNlcjQzNDAxNjE=","permissions":{"admin":true,"maintain":true,"pull":true,"push":true,"triage":true},"role_name":"admin","site_admin":false,"type":"User"}],"custom_repository_roles":{"availability":"feature-not-available","feature":"custom-repository-roles","http_status":404,"message":"Feature not available for the ArkDeck organization."},"deploy_keys":[{"added_by":"lvye","created_at":"2026-07-23T02:28:34Z","enabled":true,"id":158088026,"last_used":"2026-07-23T02:34:41Z","read_only":false,"title":"arkdeck-agent-writer","verified":true}],"org_installations":{"installations":[],"total_count":0},"organization_role_assignments":[{"role_id":138,"teams":[],"users":[]},{"role_id":8132,"teams":[],"users":[]},{"role_id":8133,"teams":[],"users":[]},{"role_id":8134,"teams":[],"users":[]},{"role_id":8135,"teams":[],"users":[]},{"role_id":8136,"teams":[],"users":[]},{"role_id":26237,"teams":[],"users":[]},{"role_id":33679,"teams":[],"users":[]},{"role_id":82849,"teams":[],"users":[]}],"organization_role_ids":[138,8132,8133,8134,8135,8136,26237,33679,82849],"selected_installation_repositories":[],"teams":[]}
-```
-
-结论：
-
-- ruleset bypass 只有 human `lvye`（user ID `4340161`）；Deploy Key、Actions、
-  Integration、App、team 与 repository role 均不在 bypass；
-- Deploy Key `158088026` 是 write key，但不是 collaborator/admin/CODEOWNER/main
-  push actor；
-- repository collaborators 只有 `lvye`，teams 为空；organization role assignments
-  全空；organization App installations 与 selected installation repositories 全空；
-- custom repository role endpoint 精确返回 feature-unavailable HTTP 404，不能把它
-  猜成 hidden actor；
-- before 尚无 main push allowlist；after 只能出现 `lvye`。
-
-## C. Credential-containment gate
-
-human capture 只证明 before，不证明 execution containment。首次 write 前必须在已退出
-capture session 后，以 fresh Agent session 二值证明：
-
-1. 所有以 `lvye` 认证的 Codex/GitHub connector、browser delegation、CLI session
-   已从 ArkDeck 断开，且 Agent tools 中不存在可用 human session；
-2. `gh auth status` 不报告 human account；
-3. Agent process 的 environment、credential helper、keychain 可达项与 ssh-agent
-   均无 human credential；只记录 presence/result，不读取或输出 credential value；
-4. Agent metadata identity 若存在，必须不是 `lvye`，且 `admin=false`、
-   `maintain=false`、`push=false`；
-5. Deploy Key、Actions 与任何 future integration 均有 stable actor/permission record，
-   且非 CODEOWNER、bypass、admin、main-push；
-6. CHG-2026-030 r7 仍为 current；#449/r6、#435 及等价 Agent-operated D2 route
-   均不可执行。
-
-任一条件不能证明：Actions/repository/branch-protection/ruleset write 数、ref probe 数
-与 Agent privileged dispatch 全部为 0。
-
-## D. Exact write payloads
-
-所有 endpoint 使用：
+Every request uses:
 
 ```text
 Accept: application/vnd.github+json
 X-GitHub-Api-Version: 2026-03-10
 ```
 
-禁止 UI 手工逐字段编辑、临时追加字段、改序后重算 hash 或在窗口内修订 payload。
-write 后必须 full GET；同时把 response 归一化为对应 write contract projection，
-其 bytes/hash 必须等于本节固定值。
+No UI edit, endpoint substitution, payload repair, blind retry or in-window
+hash recalculation is authorized.
 
-### Branch protection
+### Main branch protection
 
-Endpoint: `PUT /repos/ArkDeck/ArkDeck/branches/main/protection`
+Endpoint:
 
-`BP_BEFORE_WRITE_PAYLOAD`：
+```text
+PUT /repos/ArkDeck/ArkDeck/branches/main/protection
+```
+
+Exact after write payload:
 
 ```json
-{"allow_deletions":false,"allow_force_pushes":false,"allow_fork_syncing":false,"block_creations":false,"enforce_admins":false,"lock_branch":false,"required_conversation_resolution":false,"required_linear_history":true,"required_pull_request_reviews":{"bypass_pull_request_allowances":{"apps":[],"teams":[],"users":[]},"dismiss_stale_reviews":true,"dismissal_restrictions":{"apps":[],"teams":[],"users":[]},"require_code_owner_reviews":true,"require_last_push_approval":false,"required_approving_review_count":1},"required_status_checks":{"checks":[{"app_id":15368,"context":"guard"}],"contexts":["guard"],"strict":true},"restrictions":null}
+{"allow_deletions":false,"allow_force_pushes":false,"allow_fork_syncing":false,"block_creations":false,"enforce_admins":true,"lock_branch":false,"required_conversation_resolution":false,"required_linear_history":true,"required_pull_request_reviews":{"bypass_pull_request_allowances":{"apps":[],"teams":[],"users":[]},"dismiss_stale_reviews":true,"dismissal_restrictions":{"apps":[],"teams":[],"users":[]},"require_code_owner_reviews":true,"require_last_push_approval":false,"required_approving_review_count":1},"required_status_checks":{"checks":[{"app_id":15368,"context":"guard"}],"strict":true},"restrictions":{"apps":[],"teams":[],"users":["lvye"]}}
 ```
 
 ```yaml
-byte_count: 640
-sha256: 78606ef9437dfb40ca17bc351f43f907cc7d5bb5403e1059a556af2044bacba3
+bytes: 653
+sha256: 7aee2cf84a64bd8e0b9b43d5506b2705456266ae9bd1a9617d4bd3585cead5f9
+legacy_contexts_member_in_write_payload: absent
 ```
 
-`BP_AFTER_WRITE_PAYLOAD`：
+Exact required authenticated read-back projection:
 
 ```json
 {"allow_deletions":false,"allow_force_pushes":false,"allow_fork_syncing":false,"block_creations":false,"enforce_admins":true,"lock_branch":false,"required_conversation_resolution":false,"required_linear_history":true,"required_pull_request_reviews":{"bypass_pull_request_allowances":{"apps":[],"teams":[],"users":[]},"dismiss_stale_reviews":true,"dismissal_restrictions":{"apps":[],"teams":[],"users":[]},"require_code_owner_reviews":true,"require_last_push_approval":false,"required_approving_review_count":1},"required_status_checks":{"checks":[{"app_id":15368,"context":"guard"}],"contexts":["guard"],"strict":true},"restrictions":{"apps":[],"teams":[],"users":["lvye"]}}
 ```
 
-```yaml
-byte_count: 674
-sha256: f423ce0ca2eb3f667a34dbb7f9bcfa923266928d073ee0e50763b2f69ee2663a
+Projection: 674 bytes, SHA-256
+`f423ce0ca2eb3f667a34dbb7f9bcfa923266928d073ee0e50763b2f69ee2663a`.
+The full server-normalized after response is also recorded and hashed.
+
+Exact rollback write payload:
+
+```json
+{"allow_deletions":false,"allow_force_pushes":false,"allow_fork_syncing":false,"block_creations":false,"enforce_admins":false,"lock_branch":false,"required_conversation_resolution":false,"required_linear_history":true,"required_pull_request_reviews":{"bypass_pull_request_allowances":{"apps":[],"teams":[],"users":[]},"dismiss_stale_reviews":true,"dismissal_restrictions":{"apps":[],"teams":[],"users":[]},"require_code_owner_reviews":true,"require_last_push_approval":false,"required_approving_review_count":1},"required_status_checks":{"checks":[{"app_id":15368,"context":"guard"}],"strict":true},"restrictions":null}
 ```
 
-`BP_ROLLBACK_WRITE_PAYLOAD` 与 before literal bytes 相同：
+Write payload: 619 bytes, SHA-256
+`ce1e5c736f50e51efa1429223ddd3b6657103e6e5c87a54fc277058a1486fb94`.
 
-```yaml
-byte_count: 640
-sha256: 78606ef9437dfb40ca17bc351f43f907cc7d5bb5403e1059a556af2044bacba3
+Exact rollback read-back projection:
+
+```json
+{"allow_deletions":false,"allow_force_pushes":false,"allow_fork_syncing":false,"block_creations":false,"enforce_admins":false,"lock_branch":false,"required_conversation_resolution":false,"required_linear_history":true,"required_pull_request_reviews":{"bypass_pull_request_allowances":{"apps":[],"teams":[],"users":[]},"dismiss_stale_reviews":true,"dismissal_restrictions":{"apps":[],"teams":[],"users":[]},"require_code_owner_reviews":true,"require_last_push_approval":false,"required_approving_review_count":1},"required_status_checks":{"checks":[{"app_id":15368,"context":"guard"}],"contexts":["guard"],"strict":true},"restrictions":null}
 ```
 
-after 只改变 `enforce_admins false → true` 并新增 restrictions users `[lvye]`、
-teams/apps `[]`；PR、1 approval、CODEOWNER、strict `guard` app ID `15368`、
-stale-review dismissal、linear history 与全部 false safety flags 保持。commit
-signature protection 不属于该 PUT；其 authenticated before/after 必须保持 false，
-漂移即停止。
+Projection: 640 bytes, SHA-256
+`78606ef9437dfb40ca17bc351f43f907cc7d5bb5403e1059a556af2044bacba3`.
+Rollback must additionally reproduce the complete current before response:
+1,613 bytes and SHA-256
+`7e30197b45effc98224943ebe383c45993cecf31a105dcd52f4a14103e5ea7ab`.
+
+Only the App-bound `checks` input alternative is sent. The GET-derived
+`contexts:["guard"]` member is not copied into the mutually exclusive write
+payload.
 
 ### Ordinary-ref ruleset
 
-Endpoint: `PUT /repos/ArkDeck/ArkDeck/rulesets/19595282`
+Endpoint:
 
-`RULESET_BEFORE_WRITE_PAYLOAD`：
-
-```json
-{"bypass_actors":[{"actor_id":4340161,"actor_type":"User","bypass_mode":"always"}],"conditions":{"ref_name":{"exclude":["refs/heads/agent/**"],"include":["~ALL"]}},"enforcement":"active","name":"agent-ref-boundary","rules":[{"type":"creation"},{"type":"update"},{"type":"deletion"}],"target":"branch"}
+```text
+PUT /repos/ArkDeck/ArkDeck/rulesets/19595282
 ```
 
-```yaml
-byte_count: 301
-sha256: 5943b6ce840cbb385ad83615da15ff2ee4ec5710bd696fae6140b37302042157
-```
-
-`RULESET_AFTER_WRITE_PAYLOAD`：
+Exact after write/read-back projection:
 
 ```json
 {"bypass_actors":[{"actor_id":4340161,"actor_type":"User","bypass_mode":"always"}],"conditions":{"ref_name":{"exclude":["refs/heads/agent/**","refs/heads/agent/**/*","refs/heads/main"],"include":["~ALL"]}},"enforcement":"active","name":"agent-ref-boundary","rules":[{"type":"creation"},{"type":"update"},{"type":"deletion"}],"target":"branch"}
 ```
 
-```yaml
-byte_count: 343
-sha256: 9bb7ef3d62246733ca1dcaac074a3b07f5b4aead6985d645cd58fbf82db62163
-```
+Projection: 343 bytes, SHA-256
+`9bb7ef3d62246733ca1dcaac074a3b07f5b4aead6985d645cd58fbf82db62163`.
 
-`RULESET_ROLLBACK_WRITE_PAYLOAD` 与 before literal bytes 相同：
-
-```yaml
-byte_count: 301
-sha256: 5943b6ce840cbb385ad83615da15ff2ee4ec5710bd696fae6140b37302042157
-```
-
-after 除 exclusions 增加 `refs/heads/agent/**/*` 与 exact main 外零差异。
-
-### Repository merge setting
-
-Endpoint（本 plan 不 dispatch）：`PATCH /repos/ArkDeck/ArkDeck`
-
-`REPOSITORY_BEFORE_WRITE_PAYLOAD`、`REPOSITORY_AFTER_WRITE_PAYLOAD` 与
-`REPOSITORY_ROLLBACK_WRITE_PAYLOAD` 三者相同：
+Exact rollback write/read-back projection:
 
 ```json
-{"allow_auto_merge":false}
+{"bypass_actors":[{"actor_id":4340161,"actor_type":"User","bypass_mode":"always"}],"conditions":{"ref_name":{"exclude":["refs/heads/agent/**"],"include":["~ALL"]}},"enforcement":"active","name":"agent-ref-boundary","rules":[{"type":"creation"},{"type":"update"},{"type":"deletion"}],"target":"branch"}
+```
+
+Projection: 301 bytes, SHA-256
+`5943b6ce840cbb385ad83615da15ff2ee4ec5710bd696fae6140b37302042157`.
+The complete GET is recorded; `updated_at` is expected to advance on a
+successful PUT and is never fabricated as an exact rollback value.
+
+Repository settings, Actions permissions, credentials, collaborators, teams,
+Apps/installations, CODEOWNERS, reviews, merges, auto-merge and PR state have
+mutation budget zero.
+
+## E. Fresh probes, convergence and mutation budgets
+
+Fresh, non-substitutable refs:
+
+```yaml
+single_agent: refs/heads/agent/rpt001-7be86404-3716-4588-87db-b74b90604188
+multi_agent: refs/heads/agent/host-loop/rpt001/f3a923fa-01bb-4375-9c62-75ccc7c6f4e3
+ordinary_create: refs/heads/rpt001-ordinary-b595ba40-7845-4756-88d1-9602e9734831
+ordinary_fixture: refs/heads/rpt001-fixture-0839caf8-adf2-49d5-a12a-d97f92e579ad
+similar_prefix: refs/heads/agentx/rpt001-af0a1a0d-014d-4702-90be-07c0713dadc2
+reserved_execution_evidence: refs/heads/agent/rpt001-evidence-fb7a0b0a-f73e-4d70-91a0-bff2680a0c78
+pinned_residual: refs/heads/agent/rpt001/deep/7908274d-d874-47d6-b844-c2e35ba9d2a9
+pinned_residual_oid: 2e1e5ce85266f96f54eb60d9f2547398d1c9b3e7
 ```
 
 ```yaml
-byte_count: 26
-sha256: 280087f72d1ae343f2490e5b06fa2eaba71307656582fa7804a563a43ce800a5
-```
-
-fresh before 必须仍为 false；只 read-back，不发送 same-value PATCH。若变为 true，
-视为 drift 并停止，不在本 readiness 内临时修复。唯一 ruleset 不含 merge-queue
-rule；fresh applicable/full ruleset inventory 出现 merge queue 即停止。
-
-### Actions workflow approval capability
-
-Endpoint:
-`PUT /repos/ArkDeck/ArkDeck/actions/permissions/workflow`
-
-`ACTIONS_WORKFLOW_BEFORE_WRITE_PAYLOAD`：
-
-```json
-{"can_approve_pull_request_reviews":true,"default_workflow_permissions":"read"}
-```
-
-```yaml
-byte_count: 79
-sha256: e4eea28a28f0c12dc5a441d5d6451c4bc7f3f72ed8f0b717c6cb5502e825965d
-```
-
-`ACTIONS_WORKFLOW_AFTER_WRITE_PAYLOAD`：
-
-```json
-{"can_approve_pull_request_reviews":false,"default_workflow_permissions":"read"}
-```
-
-```yaml
-byte_count: 80
-sha256: fb00f7e1aab4200684b287b484155d5521381f4593552beed4bbb5f9b1622ede
-```
-
-`ACTIONS_WORKFLOW_ROLLBACK_WRITE_PAYLOAD` 与 before literal bytes 相同：
-
-```yaml
-byte_count: 79
-sha256: e4eea28a28f0c12dc5a441d5d6451c4bc7f3f72ed8f0b717c6cb5502e825965d
-dispatch_under_this_readiness: forbidden
-```
-
-把 Actions approval 从 false 恢复为 true 会重新打开 Agent self-approval capability，
-违反不变量；因此 payload 为 exact forensic rollback 记录，但本 readiness 不授权发送。
-任一后续失败均保留更严格的 false。
-
-## E. Operator, window and budgets
-
-```yaml
-operator: lvye
-executor: human
-credential_location: isolated, Agent-unreachable
-window_start_utc: 2026-07-24T05:30:00Z
-window_end_utc: 2026-07-24T09:30:00Z
-rollback_contact: lvye
-maximum_actions_workflow_mutations: 1 after + 0 rollback
-maximum_repository_patch_mutations: 0
+window_start_utc: 2026-07-24T12:00:00Z
+window_end_utc: 2026-07-24T20:00:00Z
+window_semantics: half-open
+git_rest_convergence_attempts: 12
+git_rest_convergence_interval_seconds: 1
+required_consecutive_ls_remote_observations: 2
+side_effect_observations: 2
+side_effect_interval_seconds: 3
 maximum_branch_protection_mutations: 1 after + 1 rollback
 maximum_ruleset_mutations: 1 after + 1 rollback
-agent_privileged_dispatch: 0
+exact_success_path_ref_probe_attempts: 16
+exact_success_path_ref_probe_successes: 9
+maximum_ref_cleanup_attempts: controlled refs only
+maximum_repository_patch_mutations: 0
+maximum_actions_setting_mutations: 0
+maximum_credential_control_plane_mutations: 0
+maximum_review_mutations: 0
+maximum_merge_mutations: 0
+maximum_auto_merge_mutations: 0
+maximum_pr_state_mutations: 0
+maximum_force_push_main_requests: 0
+maximum_delete_main_requests: 0
+agent_privileged_api_dispatch: 0
+rollback_contact: lvye
 ```
 
-采用半开区间 `[start,end)`。window 只在 readiness 已 merge、当前 main 正好等于该
-merge OID 且全部 preflight 通过时有效。过期、系统时钟不可信、main/pin/control-plane
-drift 或中途出现 overlap，重新 readiness；不顺延、不换 target、不重算 hash。
+Every positive create/update tip is an exact descendant of the readiness
+merge and its commit subject contains `[skip actions]`. Each success requires:
 
-## F. Quiescence, read-back and stop conditions
+1. Git exit 0 and a target-ref server receipt;
+2. two consecutive exact `git ls-remote --refs` observations;
+3. authenticated REST convergence within the same 12-attempt budget;
+4. two zero-run/zero-PR observations for the exact branch.
 
-首次 write 前，由 isolated human session fresh GET 并 canonicalize：
+The prior expected OID or absence may be observed while converging; any third
+OID fails immediately. One or more bounded stale REST reads are recorded and
+do not become PASS until convergence. Delete requires symmetric stable
+absence plus REST 404. Timeout or persistent disagreement fails closed.
 
-- readiness PR exact approved head、`lvye` approving review、`guard` success、
-  mergedBy、merge OID/committed_at 与当前 protected main；
-- Section A 全部 pinned blobs；
-- 全部 open PR、changed files、remote refs 与 announced control-plane operation；
-- ruleset full JSON、`updated_at`、applicable rulesets 与 main active-rule evaluation；
-- branch protection full JSON，包括 restrictions、review bypass allowances 与 signatures；
-- repository merge settings、Actions permissions 与 workflow permissions；
-- collaborator、team、custom-role、organization-role assignment、App installation、
-  selected-repository 与 Deploy Key inventory；
-- Section H 按 merged readiness OID 派生的全部 refs 均不存在。
+The residual ref uses its historical workflow/PR inventory as a baseline;
+deletion must not add any run or PR, and #471 must remain closed/unmerged.
 
-仅开放 PR 本身不阻塞；与 sensitive inputs/control-plane/targets 重叠才阻塞。以下任一
-发生立即停止：
+## F. Mandatory preflight and stop conditions
 
-- current main 不等于 readiness merge OID，approved head/merge facts 不完整，或
-  pinned blob drift；
-- overlapping PR、ref owner、credential rotation 或 control-plane operation；
-- 未在 Section H 列出的 non-Agent/non-main ref；
-- hidden/unexpected actor、role assignment、team、App、bypass、main-push actor
-  或 permission；
-- full JSON、canonical byte count、hash、`updated_at` 或 exact payload mismatch；
-- Actions approval capability不能先关闭或 after read-back 不为 false；
-- stale probe name、derived ref 已存在、nonce/derivation mismatch；
-- human credential isolation 不能证明；
-- API/Git timeout、ambiguous response、unknown outcome 或 blind retry；
-- exact before/rollback 无法解释或恢复；
-- #449/r6、#435 或等价 Agent-operated D2 capability 可执行/再次出现。
+Before the first write, the exact executor proves:
 
-## G. Exact execution order
+1. Readiness PR #475 is pinned in Section A and the executor. It is
+   bot-authored by `github-actions[bot]` ID
+   `41898282`, has the exact title/head ref, changes only this file, is
+   closed/merged with `auto_merge=null`, and has exact-head `lvye` approval
+   plus exact-head App `15368` `guard=success`.
+2. Current main is that PR's single-parent squash merge; its parent is
+   capture main, subject is exact `READINESS_TITLE (#N)`, associated PR is
+   exactly the readiness PR and `mergedBy=lvye`. A nullable
+   `merge_commit_sha` is only absence of a fact; a string must equal main.
+3. This executor's SHA-256 appears literally in merged readiness; the
+   readiness blob is identical in the reviewed head and merge tree.
+4. The local worktree is clean; `origin` is exact
+   `git@github-arkdeck-agent:ArkDeck/ArkDeck.git`; all Git ref transport uses
+   that Deploy Key except the one explicit `lvye` HTTPS negative.
+5. All complete before objects, stable actor projection, pinned blobs,
+   workflow inventory, historical PRs, open PR and remote refs match.
+6. The sole pinned residual ref/OID exists; every fresh probe ref and its
+   run/PR inventory is absent.
+7. Ruleset `updated_at` is exactly
+   `2026-07-24T18:45:53.061+08:00`; it evaluates on main with only
+   creation/update/deletion.
+8. Repository auto-merge is false; Actions is exact `true/read`; sole
+   collaborator/admin is `lvye`; sole Deploy Key is ID `158088026`; teams,
+   Apps/installations, outside collaborators, invitations and role
+   assignments remain empty.
+9. No human `lvye` credential/session is Agent-visible. The isolated
+   Terminal contains no GitHub token environment-variable name and requires
+   typed confirmation.
+10. UTC is within the exact half-open window.
 
-1. 在 window 内完成 Section C/F preflight；全部 before bytes/hash exact。
-2. PUT exact `ACTIONS_WORKFLOW_AFTER_WRITE_PAYLOAD`；立即 GET，确认
-   `can_approve_pull_request_reviews=false` 与 default `read`。
-3. 确认 repository `allow_auto_merge=false` 且无 merge queue；只 read-back。
-4. PUT exact `BP_AFTER_WRITE_PAYLOAD`；立即 full authenticated GET，并验证
-   contract projection/hash、signatures 与未声明字段。
-5. 验证 PR/review/CODEOWNER/strict check/admin/push/force/delete effective settings。
-6. 旧 ruleset 仍覆盖 main 时：
-   - Deploy Key direct-main negative 必须拒绝，只证明 overlap fail closed；
-   - `lvye` 作为 ruleset bypass/admin 的 direct-main negative 也必须拒绝，用于证明
-     branch protection 的 PR/admin enforcement；probe 使用 Section H 的受控 commit。
-7. 再次证明 Agent identity containment；human admin session 对 Agent process/tool/
-   browser 仍不可达。
-8. PUT exact `RULESET_AFTER_WRITE_PAYLOAD`；立即 full authenticated GET、contract
-   projection/hash 与 main active-rule evaluation，证明 main 不再命中该 ruleset。
-9. 立即重复 Deploy Key direct-main negative；必须由 branch protection 拒绝。
-10. 按 Section H 完成 Deploy Key single/multi positive、ordinary/fixture/agentx
-    negative 与受控 cleanup。
-11. 完成 Agent/API review、merge、auto-merge、ref/admin route negatives。Actions
-    approval 以 false read-back + workflow route inventory 证明不可构造；Deploy Key
-    只有 SSH Git transport，不伪造 HTTP token。
-12. fact capture 后 cleanup controlled refs；退出 isolated admin session，再次证明
-    无 human credential 可达。
-13. 以普通 Agent PR path 创建 execution-evidence PR；同一 PR 依次记录未审批、
-    `guard` non-green 与 ready 状态；只有 `guard` success + `lvye` approval 后由
-    `lvye` normal no-bypass squash merge。
-14. 后续独立 operability-evidence PR 记录第 13 步 review/check/mergedBy/merge OID、
-    subject `(#N)` 与无 bypass UI fact。
+Any missing field, hidden actor, stale approval, main/PR/blob/ref/settings
+drift, dirty tree, wrong remote, preexisting fresh probe, hash mismatch,
+expired window, API ambiguity, network-only negative, unexpected workflow/PR
+or overlapping control operation means zero first write and stop.
 
-任何 response 不确定时不重试、不换 probe 名继续。fact capture 前不 cleanup。
+## G. Fail-closed execution order
 
-## H. Fresh probe derivation and matrix
+1. Complete all GET-only preflight checks.
+2. PUT the exact branch-protection after payload.
+3. Read back complete protection and exact after projection; prove main
+   unchanged and required signatures still false.
+4. Build create/update and merge-shaped fast-forward commits; every commit
+   contains `[skip actions]`.
+5. Deploy Key direct-main negative while both layers overlap.
+6. `lvye` direct-main negative while both layers overlap. Since `lvye` is the
+   ruleset's sole bypass actor, rejection is attributable to enforced branch
+   protection.
+7. PUT the exact ruleset after payload only after both negatives.
+8. Read back complete ruleset and exact projection; prove ruleset
+   `19595282` no longer evaluates on main.
+9. Repeat Deploy Key direct-main negative, now attributable to branch
+   protection alone.
+10. Repeat the pinned read-only actor/repository/workflow/PR inventory.
+11. Confirm #471 closed/unmerged, then delete the exact residual ref with the
+    Deploy Key and prove stable absence, REST 404 and unchanged side effects.
+12. Run single- and multi-level Agent create/update/delete positives with
+    Git/REST convergence and zero side effects.
+13. Run ordinary-create and `agentx/**` create negatives.
+14. Create the ordinary fixture with isolated `lvye` at a `[skip actions]`
+    tip, prove Deploy Key update/delete rejection, then delete it with
+    isolated `lvye`.
+15. Re-read main, both protection layers, repository/Actions/actor
+    invariants, open/historical PRs, remote refs and every side-effect gate.
+16. Write a secret-free canonical report, log out `lvye`, and verify logout.
 
-固定 nonce：
+No refspec uses `+` or `--force`. Main probes are non-force, fast-forward,
+merge-shaped commits, so rejection cannot be a non-fast-forward artifact. A
+negative counts only with an explicit GitHub policy marker and unchanged
+target; DNS, authentication, transport or local-hook failure is never PASS.
+No force-push or delete request is sent to main.
+
+## H. Recovery and cancellation
+
+There is no blind retry.
+
+- Every settings PUT is followed by authenticated GET classification as exact
+  before, exact after or unknown.
+- If main is unchanged, branch protection is exact after and no main
+  negative unexpectedly succeeded, all known controlled Agent/ordinary refs
+  are cleaned while the after-ruleset still permits deeper Agent deletion.
+- Only then is ruleset exact-before restored and verified active on main;
+  branch protection may then be restored with the exact rollback payload and
+  complete full-before hash.
+- If main or branch-protection state is unknown, or a main negative
+  unexpectedly succeeds, main recovery takes priority: restore ruleset
+  coverage if classifiable, retain stricter protection and do not delay for
+  ref cleanup.
+- Unknown mutation outcome is resolved only by GET/`ls-remote`; no guessed
+  repeat is sent. Uncleanable refs are exact residuals and keep the task
+  blocked.
+- No unexpected main update is force-rewritten. It is a security incident.
+- Interrupt, timeout, logout failure, cleanup uncertainty or rollback hash
+  mismatch yields `fail_closed`.
+
+Cleanup never converts a failed security probe into PASS. The report records
+all complete settings responses, projections, convergence traces, server
+receipts, side-effect observations, rollback decisions and remaining refs.
+
+## I. Verification boundary
+
+This execution may establish:
+
+- Deploy Key create/update/delete for single- and multi-level `agent/**`;
+- Deploy Key ordinary-create, existing ordinary update/delete and
+  `agentx/**` rejection;
+- Deploy Key direct-main rejection under overlap and branch-protection only;
+- `lvye` direct-main rejection despite sole push-allowlist membership;
+- branch protection exact after: PR, one approval, CODEOWNER, strict
+  `guard`/App `15368`, admin enforcement, users `[lvye]`, empty teams/apps,
+  no PR bypass actor, force/delete false;
+- ruleset exact after: `~ALL`, creation/update/deletion, only `lvye` bypass,
+  exactly two Agent exclusions plus exact main;
+- residual #470 ref removal without new workflow/PR side effects;
+- settings/actor/Actions/auto-merge invariants and overlap-first migration.
+
+This execution intentionally sends zero real main force-push/delete, review,
+merge, auto-merge or PR-state mutations.
+
+Independent execution-evidence and operability-evidence PRs must still prove:
+
+- bot self-approval and non-human CODEOWNER satisfaction are rejected;
+- unapproved and guard-red/pending PRs cannot merge;
+- compliant `lvye` approval plus `guard=success` can Squash and merge without
+  selecting bypass;
+- merge subject, review, `mergedBy` and merge OID are auditable;
+- Agent/API review, merge, enable-auto-merge and Administration routes are
+  rejected or unconstructible under the final actor inventory.
+
+The execution-evidence PR records only facts. A second operability-evidence PR
+records its normal no-bypass merge and remaining route negatives. Only after
+both are merged may a separate D0 PR propose TASK-RPT-001 `ready → done`.
+
+## J. Explicit supersession and zero reuse
+
+- #435 and all old HLR-002A OIDs, windows, payloads, hashes, scripts, refs and
+  UUIDs remain invalid.
+- #462, #463 and #467 topology readiness/script/window/payload/probe sets are
+  exhausted.
+- #459/#466 bootstrap captures, carriers, windows, payloads and scripts are
+  transport-recovery history only.
+- #470 readiness/head `c5cb4757065a9a3c65b5f98351e56a3236eda396`,
+  merge `928d6e06b928e16874df9137950a9830aa38d8d0`, executor
+  `124f9b799169fda8e3b0814442accf925f51efffdb2b7165acb7063743dd8f2c`,
+  window, hashes, payload instance and UUIDs are exhausted.
+- #471 remains closed/unmerged and is used only as the pinned residual
+  cleanup target.
+- #472 preserves failure facts but creates no AC PASS.
+- This readiness alone supplies the fresh capture, main parent, complete
+  before, window, script and UUIDs for a new single execution.
+
+Historical BAP-CRED-001 evidence remains true for its date. Its old mechanism
+description is not sufficient for the post-migration current claim.
+Append-only BAP/HLR supersession and fresh HLR-002A readiness belong to
+TASK-RPT-002 after TASK-RPT-001 is done. `enforcement.md`, `AGENTS.md`,
+Constitution and Core specs/contracts remain unchanged because the high-level
+governance invariants do not change.
+
+## K. Human invocation after merge only
+
+Before execution:
 
 ```text
-55310649-57be-47ae-b5ff-a07466d7c041
+shasum -a 256 /private/tmp/arkdeck-rpt001-r3-apply.py
 ```
 
-readiness merge 后，对每个 slot 计算：
+It must equal the final `apply_script_sha256` in Section A. Only in a separate
+human Terminal inside the window:
 
 ```text
-token = first 24 lowercase hex characters of
-        SHA-256("arkdeck-rpt001-probe-v1\n" +
-                readiness_merge_oid + "\n" +
-                "55310649-57be-47ae-b5ff-a07466d7c041" + "\n" +
-                slot)
+python3 /private/tmp/arkdeck-rpt001-r3-apply.py \
+  --repo /Users/fuhanfeng/.codex/worktrees/b1b2/ArkDeck
 ```
 
-executor 使用固定 argv 与本地 hash library，不以 shell 拼接外部命令；evidence 记录
-input、full digest 与派生 ref。
+The script requires typed
+`HUMAN-ISOLATED-LVYE-TOPOLOGY`, automatically logs out `lvye`, and writes:
 
-| Slot | Exact ref/head form | Expected actor/result |
-| --- | --- | --- |
-| `single-agent` | `refs/heads/agent/rpt001-<token>` | Deploy Key create/update/delete success |
-| `multi-agent` | `refs/heads/agent/rpt001/deep/<token>` | Deploy Key create/update/delete success |
-| `ordinary-create` | `refs/heads/rpt001-ordinary-<token>` | Deploy Key create reject；永不应存在 |
-| `ordinary-fixture` | `refs/heads/rpt001-fixture-<token>` | human create/delete；Deploy Key update/delete reject |
-| `similar-prefix` | `refs/heads/agentx/rpt001-<token>` | Deploy Key create reject；永不应存在 |
-| `execution-evidence-pr` | `refs/heads/agent/rpt001-evidence-<token>` | unapproved/non-green merge reject；最终 normal merge |
+```text
+/private/tmp/arkdeck-rpt001-r3-apply-report.json
+```
 
-`main_probe_commit` 在 window 内生成：tree 与 locked readiness merge 相同，第一 parent
-为 locked main，第二 parent 为从 locked main 派生的 fresh empty commit，subject
-固定为 `test(TASK-RPT-001): unauthorized merge-shaped main probe`。同一 OID 用于
-Deploy Key overlap negative、`lvye` direct-push negative 与 ruleset-after Deploy Key
-negative；不得换 commit 绕过失败。
-
-controlled ordinary fixture 由 human isolated session 在旧 ruleset bypass 下创建，
-固定指向 locked main；Deploy Key update/delete negatives fact capture 后，再由同一
-human session删除。
-
-真实 main force-push/delete request **不发送**：本 readiness 不把可能成功的 destructive
-request 当测试。其禁止结论由 authenticated `allow_force_pushes=false`、
-`allow_deletions=false`、human-only restriction、admin enforcement、linear history、
-Deploy Key/human direct-main negatives共同验证。任一 reviewer 认为仍需 live
-force/delete 才能判 PASS，则对应 AC 保持 blocked，并另起 readiness；不得在本 window
-临时补发。
-
-Agent/API identity matrix：
-
-- Deploy Key：仅 SSH Git；普通 ref、fixture update/delete、agentx、main 拒绝；
-- Actions：workflow approval setting false，default token read，workflow sources
-  不含 review/merge/admin route；
-- GitHub App/integration：authenticated inventory 为空；出现任何 installation 即 stop；
-- disconnected Agent metadata surface：无 human credential；review、merge、
-  enable-auto-merge、update-ref 与 admin route 不可构造或 unauthenticated 拒绝；
-- `lvye`：只在 isolated session 操作 exact payload/probes；direct main 拒绝，合规 PR
-  只能在 review/check 后 normal merge。
-
-## I. Rollback and unexpected success
-
-Actions after 已写：
-
-- 不恢复 `can_approve_pull_request_reviews=true`；保留更严格 false；
-- false read-back 不明确时，不继续 protection/ruleset。
-
-ruleset 尚未修改时失败：
-
-- 旧 ruleset 继续覆盖 main；
-- branch protection 只有在 exact authenticated before/hash 可恢复，且恢复不削弱当时
-  required invariants 时，才 PUT `BP_ROLLBACK_WRITE_PAYLOAD`；
-- 否则保留更严格 branch protection、退出 session、停链。
-
-ruleset 已修改后失败：
-
-1. 首先 PUT exact `RULESET_ROLLBACK_WRITE_PAYLOAD`；
-2. authenticated GET，验证 active、旧 exclusion、updated timestamp 与 main 的
-   creation/update/deletion coverage；
-3. restoration 二值通过后，才判断 branch protection rollback；
-4. repository 始终保持 auto-merge false，Actions approval 始终保持 false；
-5. 重读全部 before/pin/actor facts；
-6. 退出 admin session，提交 failure evidence，任务保持 blocked。
-
-任一 negative probe unexpected success：
-
-- 立即记录 exact request/response/OID/ref/time，停止后续 matrix；
-- 不 force-reset、不删除 main、不用另一个名字重试；
-- 若 ordinary/agentx fixture 意外创建，由 human isolated session 在 main coverage
-  已确认后按 exact ref cleanup；cleanup 不把 FAIL 改为 PASS；
-- 若 main 意外更新/删除，按 governance incident 处理，不能用本 readiness 自行修复。
-
-无法证明 ruleset restoration 时，不继续编辑来制造“干净外观”。rollback 不授权新
-target、payload、blind retry 或 window extension。
-
-## J. Evidence and done boundary
-
-- execution receipt/evidence PR：facts only，零状态翻转；
-- operability-evidence PR：记录上一 PR 的 normal no-bypass merge；
-- done PR：只含状态与 merged evidence pointers；
-- BAP supersession 与 HLR readiness：TASK-RPT-002 后续独立 PR；
-- change verification：最后独立 PR。
-
-本 superseding readiness merge 只授权上述 exact、一次性、human-isolated D2
-window；不构成
-task done、change verified、standing authorization 或 Agent privileged capability。
-
-## K. Explicit supersession and zero-reuse statement
-
-#435、旧 HLR-002A readiness、CHG-2026-030 r6/#449 gateway，以及其 OID、window、
-payload、hash、probe UUID/ref、script 与 receipt 全部不可执行、不可重放、不可作为
-current mechanism evidence。
-
-PR #462 / merge `f14d9de8d5f32d0998837466674adeff9516e5b5` 的 readiness 也由本
-revision 显式 supersede：它没有关闭 Actions 的 review approval capability，不得执行
-其中 window/payload/probe。只有本 revision 的 exact head 经 PR #463 由 `lvye`
-review/merge 后，才可进入 Section C/F preflight。
-
-本文件的 before 来自
-`arkdeck-rpt001-human-capture-v1`；payload/hash、nonce/derived refs 与 window 均为
-本 readiness 独有。
+Return only that secret-free report and its SHA-256 after
+`logout_verified=true`. Never paste a token, device code, cookie, keychain
+record, browser storage, public/private key body or raw credential output.
