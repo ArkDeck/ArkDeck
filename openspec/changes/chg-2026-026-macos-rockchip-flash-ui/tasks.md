@@ -150,12 +150,13 @@
 
 ## TASK-RKFUI-001A — DAYU200 HDC→Loader E1 capability characterization
 
-- Status:blocked（PR #484 恢复 E0 preparation 后，fresh preflight evidence PR #487 已由
-  维护者 review/merge 至 `main`，merge OID
-  `26c59d0798374db26dc9b5d892620843435faf0f`；该 E0 在 `ld` 前发现当前 probe 把
-  executable parent 的无关 Homebrew HEAD 当作 upstream source。等待 proposal r6 与
-  TASK-RKFUI-001D immutable provenance closure 合入，再由独立 D0 状态 PR 恢复 fresh E0。
-  E1、binding、capability evidence、intent 与 usage 仍全为 0）
+- Status:ready（仅在本独立 D0 状态 PR 由维护者 review/merge 后恢复 fresh E0
+  capability preparation。TASK-RKFUI-001D implementation/evidence PR #493 已合入
+  `main`，merge OID `606de6d7b807693466982b08cce394e96593cbf2`。fresh E0 仍须在真实
+  USB 可见环境证明 pre-existing RockUSB candidate 为 0，并命中 immutable source
+  provenance 与其他全部 exact pins；E1 继续 blocked，且还须由后续维护者 merged PR
+  接受逐设备 typed capability evidence。binding、capability evidence、intent、usage 与
+  E1 dispatch 当前仍全为 0）
 - Readiness review r2（2026-07-24；host-only 审计，device/HDC command dispatch 0）：
   - Approval/dependency gate:on merge。CHG-2026-026 r1 已由 PR #298 批准；001 discovery
     implementation/hardening 已由 #301/#305 合入。r2 修正旧依赖环：维护者选择 HDC 软件进态
@@ -433,9 +434,11 @@
 
 ## TASK-RKFUI-001D — immutable rkdeveloptool source-provenance closure
 
-- Status:ready（仅在 proposal r6 governance/readiness PR 由维护者 review/merge 后生效；
-  本任务只做 host-only registry/probe closure，不执行 HDC、`rkdeveloptool`、USB 或
-  device command）
+- Status:done（implementation/evidence PR #493 已由维护者 review/merge 至 `main`，
+  merge OID `606de6d7b807693466982b08cce394e96593cbf2`；required guard 与 Swift CI
+  通过，scoped PASS evidence 见 `evidence/runs/TASK-RKFUI-001D/run.md`。本独立 D0
+  状态 PR 只记录确定性结果并恢复 TASK-RKFUI-001A 的 fresh E0 preparation，不新增
+  scope、风险接受、授权或任何 HDC/`rkdeveloptool`/USB/device/mutation dispatch）
 - Platform:macos
 - Requirements:`REQ-FLASH-002`、`REQ-DEV-001`、`REQ-DEV-002`、`POL-WORKFLOW-001`
 - Acceptance:`AC-FLASH-002-01`、`AC-DEV-001-01`、`AC-DEV-002-01`
