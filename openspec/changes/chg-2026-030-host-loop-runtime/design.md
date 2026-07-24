@@ -1,7 +1,7 @@
 # CHG-2026-030 Design — host-loop runtime
 
 > Status:draft
-> Change:CHG-2026-030-host-loop-runtime@r5
+> Change:CHG-2026-030-host-loop-runtime@r6
 > 本设计只约束本 change 的候选实现。与 Constitution、AGENTS.md、
 > enforcement.md 或 CHG-2026-027 冲突时，停止并以高层规则为准。
 
@@ -9,8 +9,10 @@
 
 1. protected `main` + 维护者 CODEOWNER review/merge 仍是唯一批准事实；CI、
    envelope、Issue、lease、review result 和 runtime log 均不是批准事实。
-2. runtime 绝不 merge、作 GitHub approval、设置 task/change 状态，或修改 branch
-   protection/credentials；D2 配置也不由 runtime 创建或修改。
+2. ordinary worker/reviewer runtime 绝不 merge、作 GitHub approval、设置
+   task/change 状态，或修改 branch protection/credentials。唯一例外是 r6 constrained
+   gateway 在有效 standing authorization 下执行其 exact ruleset method；它不属于
+   worker 的 generic GitHub capability，也不得创建/修改 authorization 或 credential。
 3. worker 与 reviewer 是不同 run ID、不同工作目录、不同 execution session。reviewer
    只读实现 head 和证据，不得提交实现或改 PR body。
 4. 所有 host command 使用 executable + argv；PR title/body、branch、Issue content
@@ -131,7 +133,10 @@ target-pattern delta 是：保留现有 `refs/heads/agent/**`，**仅追加**
 `refs/heads/agent/**/*`；不更改 `~ALL`、creation/update/deletion rules、仅维护者
 bypass 或 Deploy Key 的 non-bypass 身份。
 
-该 delta 属 D2 权限配置，runtime/Agent 不得自行应用。独立 D2 readiness 必须钉定：
+该 delta 属 D2 权限配置；r5 规定 runtime/Agent 不得应用。r6 仅在 §1E 的维护者
+standing authorization、constrained gateway 与 scoped lease 全部成立后，才以
+one-shot exact method 取代“维护者直接 PUT”；其他应用路径仍禁止。独立 D2
+readiness 必须钉定：
 
 1. ruleset ID、完整 before JSON/hash、enforcement、include/exclude、rules 与 bypass；
 2. exact after 只比 before 多一个 `refs/heads/agent/**/*` exclude；
@@ -149,6 +154,137 @@ tree 相同；main 在 reserved/ordinary 两次 push 之间前进、ruleset read
 成功；reserved legacy run/PR 均 0；ordinary legacy run/PR 恰一。事实闭合后才 close
 control PR、删除两个 refs 并再次 read-back。cleanup 不改变 PASS/FAIL，D2 ruleset
 receipt/live evidence 与 `ready→done` 仍是不同 PR。
+
+## 1E. Scoped D2 authorization, lease and drift model（r6）
+
+r5 把“readiness 时看到的整个 main/open-PR 集合”误当成 D2 输入，导致无关产品提交
+或无关 PR 也使已批准计划失效；绝对 UTC 窗口还会在 review/merge 排队时自然过期。
+r6 将安全边界改为一份 canonical sensitive-input manifest、一个 scoped lease 和一个
+有限 standing authorization。三者均不能替代 protected-main 上的维护者批准。
+
+### Sensitive-input manifest
+
+readiness merge tree 中生成 canonical UTF-8/JSON manifest，至少固定：
+
+- repository 与 change ID、readiness PR number/reviewed head；merge 后由 gateway
+  从 GitHub metadata 绑定该 head 对应的 merge OID，merge OID 不进入预合并 manifest
+  hash，避免循环引用；
+- 本 change `proposal.md`、`design.md`、`tasks.md`、`verification.md` 的 exact blob；
+- `.github/workflows/agent-pr.yml`、`.github/workflows/sdd-guard.yml`、
+  `scripts/test_agent_pr_workflow.py`、`scripts/check_pr_paths.py`、
+  `scripts/test_check_pr_paths.py` 的 exact blob；
+- ruleset `19595282` 的 canonical full before、write-payload before/after/rollback
+  hash、active-rule expected projection；
+- 每个 exact target ref 的 expected presence/OID（通常为 absent），reserved/control
+  namespace 与 probe role。
+
+执行时 current protected main 只需满足 readiness merge 是其 ancestor，并且上述
+repository paths 的 blob 与 readiness merge 相同；其他路径可以前进。gateway 对
+ruleset 与 target refs 做 authenticated/read-only preflight，逐项与 manifest 比较。
+main 的当前 OID 只在 direct-main negative probe 的最小原子区间内作为 target snapshot；
+区间外发生且不改变 sensitive paths 的 main 前进不使 readiness 失效。任何 sensitive
+blob、ruleset field 或 target ref state 漂移都停止，不能以“语义
+看起来相同”解释放行。
+
+operation/body、authorization、gateway source/identity、window 与 lease 仍须逐项校验，
+但它们属于授权/执行完整性 gate，不扩张上面的 repository/external drift 集合。
+
+### Overlapping-PR classifier
+
+preflight 必须分页读取全部 open PR，并对每个 PR 分页读取完整 changed-files 集合。
+仅以下任一成立时判为 overlap：
+
+1. changed files 与 sensitive-input manifest 的 repository paths 相交；
+2. PR 修改本 change 的 HLR-002A/002B task/evidence，或占用同一 readiness/executor
+   branch；
+3. PR envelope/body 中合法声明同一 D2 operation digest 或
+   `repository + ruleset ID + ref namespace` lease key；
+4. PR 的可验证计划会创建、修改或删除 manifest 中任一 exact target ref。
+
+不满足这些条件的 open PR 与本 D2 正交，不阻断 readiness 或执行。API error、权限
+不足、分页不完整、changed-files 截断、metadata 语法歧义或无法证明“不相交”时仍
+fail closed。title 相似、PR 数量或“仓库有活动”本身均不是 overlap 证据。
+
+### Merge-relative window
+
+执行窗口由 GitHub 对 readiness PR 返回的可信 `merged_at` 计算为半开区间
+`[merged_at + 15 minutes, merged_at + 45 minutes)`；禁止把本地 merge 观察时间、
+commit author/committer time 或 readiness 文本中的绝对时间当作起点。gateway 在
+acquire lease 与每个 privileged dispatch 前同时检查可信 UTC wall clock 和单调计时
+连续性；时钟回拨、休眠造成边界不确定、进入窗口前或到达上界后均零 dispatch。
+窗口过期只需重新 readiness/authorization，不回滚已经被 exact read-back 证明完成的
+operation。
+
+### Scoped D2 lease
+
+lease key 至少为
+`ArkDeck/ArkDeck + ruleset:19595282 + target-patterns(agent/**,agent/**/*)`，只序列化同一 gateway
+内会读写该 ruleset/namespace 的 D2 operation；它不锁 protected main、不禁止无关
+PR/merge，也不声称阻止 GitHub UI 或其他凭据的仓外写。lease 保存在 gateway 的 durable
+CAS store，而不是受该 ruleset 约束的 Git ref；record 含 authorization ID、operation
+digest、owner run、monotonic fence、acquired/expiry、previous record hash 与状态。
+
+每个 authenticated ruleset/ref read 或 write 前 gateway 重读 lease 并核对 owner、
+fence、expiry 与 operation digest；失配即停止。外部 actor 不受 lease 物理阻止，因此
+每个 write 后仍须 immediate read-back，下一步前再做 sensitive projection 对比。
+超时结果先 lookup/read-back，不盲重试。release/expiry 只解除 gateway 串行化，不把
+未知 operation outcome 改成成功。
+
+### Standing authorization and constrained gateway
+
+standing authorization 的有效载体必须是维护者创建/修改并 review/merge 的
+authorization-bearing readiness PR；该同一 merge 同时产生 readiness 状态、
+authorization 与 `merged_at` 窗口起点。Agent 可提交只读 discovery 输出，但不得创建、
+修改、批准或撤销 authorization carrier。authorization 至少固定：
+
+```text
+authorization-id
+repository
+ruleset-id
+method + endpoint
+before/after/rollback SHA-256
+operation body SHA-256
+sensitive-manifest SHA-256
+target refs + expected state
+lease key
+gateway identity/source SHA-256
+valid-from: readiness.merged_at + 15m
+valid-until: readiness.merged_at + 45m
+maxUses
+rollback contact + revoke conditions
+```
+
+本次 ruleset remediation 的 `maxUses` 必须为 1；未来成熟操作可申请大于 1 的有限值，
+但每次仍需独立 operation digest、fence、preflight/read-back receipt，且不得越过授权
+列举的 targets。gateway 必须证明 authorization/readiness 的 reviewed head 就是
+GitHub merge metadata 记录的 head，且该 merge OID 是 current main ancestor；授权被
+后续 protected-main commit 明确撤销、过期或用尽时调用数为 0。
+
+raw maintainer credential/App private key 只存在于 gateway 的隔离 secret storage，
+worker 只能调用 `executeAuthorizedRulesetDelta(canonicalRequest)`。gateway 不暴露
+generic REST/GraphQL、任意 method/URL/body、ruleset CRUD、branch protection、
+review/merge 或 arbitrary ref write；route inventory 和 source scan 对这些构造数必须
+为 0。gateway 按固定状态机执行：
+
+```text
+verify authorization/manifest/window
+  -> classify overlapping PRs
+  -> acquire scoped lease
+  -> authenticated before read
+  -> exact one-shot mutation
+  -> immediate exact-after read-back
+  -> ref/active-rule verification
+  -> append immutable redacted receipt
+  -> consume authorization use
+  -> release lease
+
+any ambiguity -> stop; if mutation may have occurred -> read-back;
+after mismatch -> exact rollback under same fence -> read-back -> stop
+```
+
+receipt 记录 authorization/operation/manifest hash、fence、脱敏 executor/gateway
+identity、GitHub response classification、before/after/rollback hash、target-ref
+projection、时间和 outcome；不含 secret/raw payload/用户绝对路径，也不承载批准语义。
 
 ## 2. PR envelope
 
