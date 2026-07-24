@@ -14,6 +14,11 @@ import unittest
 
 
 MODULE_PATH = pathlib.Path(__file__).with_name("probe.py")
+REPOSITORY_ROOT = pathlib.Path(__file__).resolve().parents[2]
+DISCOVERY_FIXTURES = (
+    REPOSITORY_ROOT
+    / "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/Rockchip/Discovery/1.0.0"
+)
 SPEC = importlib.util.spec_from_file_location("_rkfui001a_probe", MODULE_PATH)
 probe = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = probe
@@ -290,14 +295,56 @@ class ParserTests(HarnessCase):
             probe.parse_firmware(result(b"OpenHarmony 7.0.0.34\n"), FIRMWARE)
 
     def test_ld_accepts_only_exact_loader_semantics(self):
-        parsed = probe.parse_ld(result(LOADER_LINE))
-        self.assertEqual(parsed["status"], "observations")
-        self.assertEqual(len(parsed["observations"]), 1)
-        self.assertTrue(parsed["observations"][0]["isExpectedLoader"])
-        maskrom = probe.parse_ld(
-            result(b"DevNo=1\tVid=0x2207,Pid=0x350a,LocationID=2\tMaskrom\n")
+        loader_lf = probe.parse_ld(
+            result((DISCOVERY_FIXTURES / "success-single-loader.stdout.bin").read_bytes())
         )
-        self.assertFalse(maskrom["observations"][0]["isExpectedLoader"])
+        loader_crlf = probe.parse_ld(
+            result((DISCOVERY_FIXTURES / "success-single-loader-crlf.stdout.bin").read_bytes())
+        )
+        self.assertEqual(loader_lf["status"], "observations")
+        self.assertEqual(loader_crlf, loader_lf)
+        self.assertEqual(len(loader_lf["observations"]), 1)
+        self.assertTrue(loader_lf["observations"][0]["isExpectedLoader"])
+
+        self.assertEqual(
+            probe.parse_ld(
+                result((DISCOVERY_FIXTURES / "success-multi-device-crlf.stdout.bin").read_bytes())
+            ),
+            probe.parse_ld(
+                result((DISCOVERY_FIXTURES / "success-multi-device.stdout.bin").read_bytes())
+            ),
+        )
+
+        maskrom_crlf = probe.parse_ld(
+            result((DISCOVERY_FIXTURES / "maskrom-crlf.stdout.bin").read_bytes())
+        )
+        self.assertEqual(maskrom_crlf["status"], "observations")
+        self.assertEqual(len(maskrom_crlf["observations"]), 1)
+        self.assertFalse(maskrom_crlf["observations"][0]["isExpectedLoader"])
+
+    def test_ld_line_termination_faults_fail_closed(self):
+        cases = {
+            "bare-carriage-return.stdout.bin": "unexpectedCarriageReturn",
+            "mixed-line-terminators.stdout.bin": "mixedLineTerminators",
+            "missing-final-terminator.stdout.bin": "missingFinalLineTerminator",
+            "empty-record.stdout.bin": "emptyLine:2",
+        }
+        for fixture_name, expected_reason in cases.items():
+            with self.subTest(reason=expected_reason):
+                parsed = probe.parse_ld(
+                    result((DISCOVERY_FIXTURES / fixture_name).read_bytes())
+                )
+                self.assertEqual(parsed["status"], "blocked")
+                self.assertEqual(parsed["reason"], expected_reason)
+                self.assertEqual(parsed["observations"], [])
+        crlf_then_missing_final = (
+            (DISCOVERY_FIXTURES / "success-single-loader-crlf.stdout.bin").read_bytes()
+            + b"DevNo=2\tVid=0x2207,Pid=0x350a,LocationID=5\tLoader"
+        )
+        self.assertEqual(
+            probe.parse_ld(result(crlf_then_missing_final))["reason"],
+            "missingFinalLineTerminator",
+        )
 
     def test_ld_malformed_multi_and_stderr_fail_closed(self):
         self.assertEqual(probe.parse_ld(result(b"garbage\n"))["status"], "blocked")

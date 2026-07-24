@@ -546,16 +546,18 @@ def parse_ld(result: CommandResult) -> dict[str, Any]:
         return {"status": "blocked", "reason": "unexpectedStandardError", "observations": []}
     if not stdout:
         return {"status": "offline", "reason": "empty", "observations": []}
-    if b"\r" in stdout:
-        return {"status": "blocked", "reason": "unexpectedCarriageReturn", "observations": []}
     try:
         stdout.decode("utf-8")
     except UnicodeDecodeError:
         return {"status": "blocked", "reason": "invalidUTF8", "observations": []}
 
-    lines = stdout.split(b"\n")
-    if lines[-1] == b"":
-        lines.pop()
+    lines, line_termination_error = split_registered_ld_lines(stdout)
+    if line_termination_error is not None:
+        return {
+            "status": "blocked",
+            "reason": line_termination_error,
+            "observations": [],
+        }
     if not lines or len(lines) > 64:
         return {"status": "blocked", "reason": "deviceCount", "observations": []}
     device_numbers: set[int] = set()
@@ -620,6 +622,40 @@ def parse_ld(result: CommandResult) -> dict[str, Any]:
             }
         )
     return {"status": "observations", "reason": None, "observations": observations}
+
+
+def split_registered_ld_lines(stdout: bytes) -> tuple[list[bytes], str | None]:
+    lines: list[bytes] = []
+    line_start = 0
+    line_number = 1
+    registered_terminator_is_crlf: bool | None = None
+    index = 0
+
+    while index < len(stdout):
+        byte = stdout[index]
+        if byte == 0x0D:
+            if index + 1 >= len(stdout) or stdout[index + 1] != 0x0A:
+                return [], "unexpectedCarriageReturn"
+        elif byte == 0x0A:
+            terminator_is_crlf = index > line_start and stdout[index - 1] == 0x0D
+            if (
+                registered_terminator_is_crlf is not None
+                and registered_terminator_is_crlf != terminator_is_crlf
+            ):
+                return [], "mixedLineTerminators"
+            registered_terminator_is_crlf = terminator_is_crlf
+
+            line_end = index - 1 if terminator_is_crlf else index
+            if line_start == line_end:
+                return [], f"emptyLine:{line_number}"
+            lines.append(stdout[line_start:line_end])
+            line_start = index + 1
+            line_number += 1
+        index += 1
+
+    if line_start != len(stdout):
+        return [], "missingFinalLineTerminator"
+    return lines, None
 
 
 def parse_usb_topology(system_profiler_json: bytes) -> list[dict[str, str]]:

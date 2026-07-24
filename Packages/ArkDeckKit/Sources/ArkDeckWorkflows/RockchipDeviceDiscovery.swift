@@ -150,6 +150,9 @@ public enum RockchipDiscoveryDiagnostic: Error, Sendable, Equatable {
   case outputTooLarge
   case invalidUTF8
   case unexpectedCarriageReturn
+  case mixedLineTerminators
+  case missingFinalLineTerminator
+  case emptyLine(line: Int)
   case unexpectedStandardError
   case permissionDenied
   case driverUnavailable
@@ -214,13 +217,17 @@ public enum RockchipLDOutputParser {
     }
     guard stderr.isEmpty else { return .blocked(.unexpectedStandardError) }
     guard !stdout.isEmpty else { return .blocked(.offline) }
-    guard !stdout.contains(0x0d) else { return .blocked(.unexpectedCarriageReturn) }
-    guard let text = String(data: stdout, encoding: .utf8) else {
+    guard String(data: stdout, encoding: .utf8) != nil else {
       return .blocked(.invalidUTF8)
     }
 
-    var lines = text.components(separatedBy: "\n")
-    if lines.last == "" { lines.removeLast() }
+    let lines: [String]
+    switch splitRegisteredLines(stdout) {
+    case .success(let lineBytes):
+      lines = lineBytes.map { String(decoding: $0, as: UTF8.self) }
+    case .failure(let diagnostic):
+      return .blocked(diagnostic)
+    }
     guard !lines.isEmpty, lines.count <= maximumDeviceCount else {
       return .blocked(lines.isEmpty ? .offline : .tooManyDevices)
     }
@@ -270,6 +277,49 @@ public enum RockchipLDOutputParser {
           mode: mode))
     }
     return .observations(observations)
+  }
+
+  private static func splitRegisteredLines(
+    _ stdout: Data
+  ) -> Result<[Data], RockchipDiscoveryDiagnostic> {
+    var lines: [Data] = []
+    var lineStart = stdout.startIndex
+    var lineNumber = 1
+    var registeredTerminatorIsCRLF: Bool?
+    var index = stdout.startIndex
+
+    while index < stdout.endIndex {
+      let byte = stdout[index]
+      if byte == 0x0d {
+        let next = stdout.index(after: index)
+        guard next < stdout.endIndex, stdout[next] == 0x0a else {
+          return .failure(.unexpectedCarriageReturn)
+        }
+      } else if byte == 0x0a {
+        let previous = index > lineStart ? stdout.index(before: index) : index
+        let terminatorIsCRLF = previous < index && stdout[previous] == 0x0d
+        if let registeredTerminatorIsCRLF,
+          registeredTerminatorIsCRLF != terminatorIsCRLF
+        {
+          return .failure(.mixedLineTerminators)
+        }
+        registeredTerminatorIsCRLF = terminatorIsCRLF
+
+        let lineEnd = terminatorIsCRLF ? previous : index
+        guard lineStart < lineEnd else {
+          return .failure(.emptyLine(line: lineNumber))
+        }
+        lines.append(Data(stdout[lineStart..<lineEnd]))
+        lineStart = stdout.index(after: index)
+        lineNumber += 1
+      }
+      index = stdout.index(after: index)
+    }
+
+    guard lineStart == stdout.endIndex else {
+      return .failure(.missingFinalLineTerminator)
+    }
+    return .success(lines)
   }
 
   private static func containsAny(_ text: String, markers: [String]) -> Bool {
@@ -344,8 +394,8 @@ public enum RockchipDeviceAccessAdvisor {
       case .driverUnavailable: return .driverUnavailable
       case .offline, .unauthorized: return .offlineOrUnauthorized
       case .malformedLine, .numberOutOfRange, .duplicateDeviceNumber, .duplicateLocationID,
-        .unknownMode, .invalidUTF8, .unexpectedCarriageReturn, .unexpectedStandardError,
-        .outputTooLarge,
+        .unknownMode, .invalidUTF8, .unexpectedCarriageReturn, .mixedLineTerminators,
+        .missingFinalLineTerminator, .emptyLine, .unexpectedStandardError, .outputTooLarge,
         .tooManyDevices:
         return .malformedOutput
       case .processTerminated: return .probeFailed

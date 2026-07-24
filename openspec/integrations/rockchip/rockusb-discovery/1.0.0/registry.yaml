@@ -5,6 +5,7 @@
   "registryVersion": "1.0.0",
   "integrationProfile": "ROCKCHIP-ROCKUSB-DISCOVERY@1.0.0",
   "registeredBy": "CHG-2026-026/TASK-RKFUI-001",
+  "revisedBy": "CHG-2026-026/TASK-RKFUI-001B",
   "unknownFamilyDisposition": "blocked",
   "toolContext": {
     "platform": "macos",
@@ -26,7 +27,16 @@
     "timeoutMilliseconds": 5000,
     "maximumOutputBytes": 65536,
     "maximumDeviceCount": 64,
-    "stdoutGrammar": "DevNo=<canonical-u32>\\tVid=0x<hex4>,Pid=0x<hex4>,LocationID=<canonical-u64>\\t<Loader|Maskrom>\\n",
+    "stdoutGrammar": {
+      "record": "DevNo=<canonical-u32>\\tVid=0x<hex4>,Pid=0x<hex4>,LocationID=<canonical-u64>\\t<Loader|Maskrom>",
+      "registeredLineTerminators": ["LF", "CRLF"],
+      "homogeneousLineTerminatorsRequired": true,
+      "finalLineTerminatorRequired": true,
+      "emptyRecordDisposition": "blocked",
+      "bareCarriageReturnDisposition": "blocked",
+      "mixedLineTerminatorDisposition": "blocked",
+      "missingFinalLineTerminatorDisposition": "blocked"
+    },
     "wholeOutputConsumed": true,
     "duplicateDeviceNumberDisposition": "blocked",
     "duplicateLocationIDDisposition": "blocked",
