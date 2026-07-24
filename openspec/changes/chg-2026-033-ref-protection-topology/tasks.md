@@ -131,7 +131,94 @@ GitHub control-plane/ref/probe 数为 0。
 
 ## TASK-RPT-002 — Supersede mechanism pointers 并重建 dependent governance
 
-- Status:blocked
+- Status:ready（仅在本独立 D1 readiness PR 经维护者 review/merge 后生效。
+  TASK-RPT-001 done PR #478 exact head
+  `54c8e0392c5bf4ef3c50f7e6086cfad680481e7d` 已由 `lvye` APPROVED，
+  App `15368` `guard=success`，并由 `lvye` 合入 protected main
+  `94c23c4123712a46e7fb2f96a0509f84f5f49ba7`。本状态只批准下述
+  append-only current-pointer/compatible-revision 计划；不修改任何目标文档，
+  不使 HLR-002A ready，不执行 canary，不修改 GitHub setting/ref/credential，
+  也不批准 TASK-RPT-002 done 或 change verified。）
+- Readiness（r1；audit base = protected main
+  `94c23c4123712a46e7fb2f96a0509f84f5f49ba7`）：
+  - **Dependency/evidence gate:closed。**#476 execution-evidence merge
+    `6f874efc5c4e9fdd39bcdcc91cfcaa6a862e1961`、#477 operability-evidence
+    merge `7a221d24133eefed38aa616fcda376fef33f6cf3` 与 #478 done merge
+    `94c23c4123712a46e7fb2f96a0509f84f5f49ba7` 均为 audit base ancestor。
+    #477 记录正常人类 no-bypass squash merge；#478 只完成 TASK-RPT-001
+    `ready→done`，未夹带 TASK-RPT-002 scope。
+  - **Current topology evidence pins:closed。**成功 receipt JSON blob =
+    `8eb63bf170e993785acda6345a80558fb6871b76`，文件 SHA-256 =
+    `9340eae63e4b4586a07525340e1c6a4b9fe39c0a5958bda1cda55dda16df9d9f`；
+    human-readable success blob =
+    `6c4541d41c8a166edd201883d10190be031d0bea`；no-bypass operability blob =
+    `73005c421eb3fc36a16b435873a18f6e84b97369`。receipt 内 current after
+    hashes 固定为 branch-protection projection
+    `f423ce0ca2eb3f667a34dbb7f9bcfa923266928d073ee0e50763b2f69ee2663a`、
+    full `04f09f273fce806afaa44679c9e8257c74cce3e480fe60da27c7dcca06e85f04`，
+    ruleset projection
+    `9bb7ef3d62246733ca1dcaac074a3b07f5b4aead6985d645cd58fbf82db62163`、
+    full `b172750c1c0764956725393823fa72014146d9e2ec0f1b19c48cf670964d54b5`；
+    不从 public projection 推断 hidden actor。
+  - **Input blob pins:closed。**implementation 只从本 readiness merge 后的最新
+    protected main 新建分支；开工前以下 audit-base blobs 必须逐项重读，除
+    readiness 自身预期改变的本文件外均须相等：
+
+    ```yaml
+    chg027_proposal: 47f05f5df464dd110daaffdaa00956115f807df1
+    chg027_tasks: edc483423d0193104b1977d4ae25c2b27409a131
+    chg027_verification: 78f95258ae6570d622636c978d244a4ac1eefa0d
+    chg030_proposal: 890a40585b2898c0fd9e7d2b72f5b2a8e81b515c
+    chg030_design: 7e2e20bfb884875de32cbbeb5f0399df7a137056
+    chg030_tasks: 7fc3c14bb207facec9d330a8d74b23fb9aefdb58
+    chg030_verification: 49f284b397006fa8626e76ec2fa51f5d9a88e307
+    host_loop_runbook: 70e0bcc5b736a896f0329e24a89e273164762558
+    enforcement: e8ff3c130e1b8b15f8405d150ad567e774a0d82b
+    AGENTS: 3c2d3c6a01d3eaa31cd9e3ee333f3153552f4164
+    ```
+
+  - **Historical evidence immutability:binary。**CHG-2026-027 original
+    TASK-BAP-003 run blob
+    `d6eaf28e188b1f5f64317ce4eacad22eae10ab10`、CHG-2026-030 #419 contract
+    run blob `610fad98fe97f0618d04adafd313ebb72bdd0549` 与 #421 live failure blob
+    `9fc841f46c9b62ff74eede541b00890e1c6f6dbe` 必须 byte-for-byte 不变。
+    current mechanism 只通过新 addendum 与 current-status note 指向
+    TASK-RPT-001 merged evidence；旧 run 在原日期的事实不删除、不改写、不
+    反向标成错误。
+  - **Implementation scope:closed。**后一独立 implementation/documentReview PR
+    只允许：(1) 向 CHG-2026-027 proposal/tasks/verification 追加 current-mechanism
+    pointer，并新增 TASK-BAP-003 append-only addendum；(2) 将 CHG-2026-030
+    proposal/design/tasks/verification 作 compatible r8 follow-up，消费上述 merged
+    topology evidence；(3) 把 host-loop runbook 的单层 ruleset 归因改为 ordinary
+    ruleset + exact-main branch protection；(4) 在本 change TASK-RPT-002 evidence
+    目录新增 documentReview。`enforcement.md` 与 `AGENTS.md` 必须零 diff。
+  - **HLR-002A readiness boundary:binary。**同一 implementation PR 可作为
+    CHG-2026-030 fresh canary-only readiness carrier，但只有在从届时最新 main
+    重新读取所有 input blobs、公开 topology/branch/ref 状态、完整 open-PR files，
+    确认无 overlap，并生成全新 reserved/ordinary refs 后，才可把 HLR-002A
+    `blocked→ready`。该 readiness 只授权既有 creator-partition canary/evidence；
+    ruleset、branch protection、repository setting、credential、gateway、
+    standing authorization、integration identity 与 scheduler mutation 全部为 0。
+    canary execution/evidence/done 仍属于 CHG-2026-030 后续独立 PR，不在
+    TASK-RPT-002 implementation 中执行。
+  - **Concurrency:closed for this readiness。**只读公开页面显示当前唯一 open
+    PR #468，其 diff 仅为 CHG-2026-026 TASK-RKFUI-001A 三个 evidence path，与本
+    task 零交集；计划分支
+    `agent/task-rpt-002-mechanism-supersession` 与
+    `agent/task-hlr-002a-canary-readiness` 均不存在。匿名 REST 配额 403 不被
+    猜成完整 API 事实；implementation 开工前必须重做分页/公开页面 + exact diff
+    交叉检查，任何不完整或 overlap 均停止。
+  - **Permanent supersession:binary。**#435 的 OID/window/before/after/rollback
+    payload/hash/ref/UUID/executor、#449/r6 Agent-operated gateway 与 #454
+    pins/branch 均只作历史，不复制、不补跑、不改时间复用。TASK-HLR-002B 保持
+    superseded `blocked` tombstone。
+  - **Review/evidence boundary。**本 readiness PR 只修改本文件 TASK-RPT-002
+    状态/readiness 段，GitHub control-plane/ref/probe/credential write = 0。
+    implementation PR 可包含其 documentReview evidence，但不翻 TASK-RPT-002
+    状态；其合入后另立独立 D0 `ready→done` PR。任一 target blob/evidence
+    hash/ancestry/concurrency/topology pointer 漂移、历史 evidence diff、旧
+    readiness 值复用、forbidden-path diff、secret/绝对用户路径或无法重现
+    `scripts/check-sdd.sh`/`git diff --check`，立即停止并重新 readiness。
 - Platform:macos
 - Requirements/AC:change-local `RPT-AUDIT-001`
 - Depends on:TASK-RPT-001 done、independent readiness
