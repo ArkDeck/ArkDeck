@@ -1,51 +1,47 @@
-# TASK-RPT-001 one-time bootstrap recovery D2 readiness
+# TASK-RPT-001 second bootstrap parser-recovery D2 readiness
 
 > Status:PROPOSED / NON-EXECUTABLE UNTIL THIS EXACT FILE IS REVIEWED AND MERGED
-> IN THE REPURPOSED BOT-AUTHORED PR #459
+> IN THE REPURPOSED BOT-AUTHORED PR #466
 >
-> Scope:restore the ordinary `agent-pr` transport only. This readiness does
-> **not** authorize a ruleset, main branch-protection, repository merge
-> setting, credential, ref probe, review, merge, auto-merge or PR-state
-> mutation.
+> Scope:correct the nullable `merge_commit_sha` preflight and restore the
+> ordinary `agent-pr` transport only. This readiness does **not** authorize a
+> ruleset, main branch-protection, repository merge setting, credential, ref
+> probe, review, merge, auto-merge or PR-state mutation.
 
-## A. Why this exceptional carrier is necessary
+## A. Why a second exceptional carrier is necessary
 
-#467 / merge `9de9c63f7fe17069ad50ff0a73fc171ce6a14ec8` authorized a
-fail-closed topology migration. Its human execution changed the GitHub Actions
-workflow setting from `true/read` to `false/read`, then stopped when the exact
-branch-protection payload was rejected with HTTP 422 because it sent both
-legacy `contexts` and App-bound `checks`.
+The first bootstrap carrier #459 was reviewed and squash-merged as
+`ced32841a39147e3de74787f755d2377ccfba460`. Its executor then stopped before
+all writes because GitHub omitted the optional `merge_commit_sha` field and
+the parser incorrectly required that field itself to equal current main.
 
-No branch-protection or ruleset write succeeded. The old ruleset still covers
-main, but GitHub exposes `can_approve_pull_request_reviews` as one combined
-“create and approve pull requests” switch. Setting it to false also prevented
-the pinned `.github/workflows/agent-pr.yml` from creating new bot-authored PRs.
-The failure-evidence branch received `guard=success`, `open-pr=failure`, and no
-PR.
-
-The user then explicitly authorized still-open, bot-authored PR #459 as a
-one-time bootstrap carrier, with exact expected old head:
+Independent merge facts were exact: current main, single parent, subject,
+associated PR, `mergedBy`, exact bot-authored head, exact-head `lvye`
+approval and pinned `guard=success`. The failure was parser-only:
 
 ```text
-PR: 459
-author: github-actions[bot]
-head ref: agent/task-au-002-update-runtime
-expected old head: d3aeeaaa8eba79526474580208dc253c4c46d26a
+Actions mutations: 0
+ruleset mutations: 0
+branch-protection mutations: 0
+repository/ref/review/merge/PR-state mutations: 0
+logout verified: true
 ```
 
-That authorization permits an expected-head branch replacement only. D2
-authority begins only when `lvye` reviews and merges the updated #459 exact
-head. The old product diff and old OID remain historical evidence.
+The user explicitly authorized still-open, bot-authored #466 as a second
+one-time parser-recovery carrier. Its original head is
+`3fda06cc3e5e91e06890845f2a760a9a3fec592c`; that OID is retained as
+provenance and may be used only as the expected value of the authorized
+`force-with-lease`.
 
-The usual proposal / approval-only / independent-readiness separation is
-collapsed once for this bootstrap because the mechanism that creates those
-new PRs is unavailable. The exception is narrow and disclosed in the carrier;
-normal PR separation resumes immediately after transport recovery.
+The ordinary PR creator remains unavailable because Actions is still exact
+`false/read`. The usual PR separation is therefore collapsed once more for
+this parser-only correction. Normal separation resumes immediately after
+transport recovery.
 
 ## B. Authority and fresh capture pins
 
 ```yaml
-schema: arkdeck-rpt001-bootstrap-readiness/v1
+schema: arkdeck-rpt001-parser-recovery-readiness/v1
 change: CHG-2026-033-ref-protection-topology@r2
 task: TASK-RPT-001
 operator: lvye
@@ -54,49 +50,48 @@ credential_location: isolated, Agent-unreachable
 repository: ArkDeck/ArkDeck
 api_version: 2026-03-10
 ruleset_id: 19595282
+carrier_pr: 466
+carrier_head_ref: agent/task-au-002-done
+carrier_expected_old_head: 3fda06cc3e5e91e06890845f2a760a9a3fec592c
+carrier_required_title: "governance(TASK-RPT-001): recover nullable merge parser"
 capture_schema: arkdeck-rpt001-discovery/v2
 capture_request_semantics: GET-only
-capture_timestamp_utc: 2026-07-24T07:59:50.411399Z
-capture_main_oid: 9de9c63f7fe17069ad50ff0a73fc171ce6a14ec8
-capture_canonical_bytes_without_lf: 22535
-capture_canonical_sha256: 16e66c6675188cb48ddbdf9cf7df105a7af9227aedc64ff2620b98dcf72816e2
-capture_file_bytes_with_lf: 22536
-capture_file_sha256: 0af8f98938a9c230fa8a77c4c544c2d268b4093062b1f7714c04dabfb94abfc9
+capture_timestamp_utc: 2026-07-24T08:57:31.008065Z
+capture_main_oid: ced32841a39147e3de74787f755d2377ccfba460
+capture_canonical_bytes_without_lf: 21730
+capture_canonical_sha256: 68decddf9505cb7527e472061c27c70948ba4ee7bd4de59912772a61b6d4e40f
+capture_file_bytes_with_lf: 21731
+capture_file_sha256: 56f282e4628f6ffb75c765176fcc548569239e16db5295640951f69888ab5fc8
 capture_script_sha256: 487701e6602ddd20a8d18db6bfce59d58f4597dc7ea3b15e171f45e8934d637a
-capture_wrapper_sha256: eb37c969a71d90ab7c23c483d35b05cd4d11c779f5b6c4c92cb149e8b6520397
-bootstrap_apply_script_sha256: 305c4b515425575e2dc0e19de82562685cf54be1d71314ec04da89b0f53c2f79
-superseded_carrier_head_oid: d3aeeaaa8eba79526474580208dc253c4c46d26a
-superseded_intermediate_carrier_head_oid: e00d25954377200e73e7956c3f7a264dbd63bb7d
-exhausted_readiness_merge_oid: 9de9c63f7fe17069ad50ff0a73fc171ce6a14ec8
+capture_wrapper_sha256: 849f9c83c2b44f9f1404bc7793699343371192ef3c42228d75cfa89d49a47b72
+apply_script_sha256: 41230cb2edec90f1685d9c62eefa1b690d736d378db9ec657a34042624ed05f5
+previous_zero_write_report_sha256: ae228dbed662fa42b6200f2acb1387c2f4b1e474d9561c450e32180cfc73d347
+exhausted_first_bootstrap_merge_oid: ced32841a39147e3de74787f755d2377ccfba460
 declared_open_control_plane_operations: []
 non_agent_non_main_remote_refs: []
 ```
 
-The authenticated capture was produced by `lvye` after the old D2 failure and
-before carrier replacement. All 11 embedded canonical artifacts independently
-recalculated to their declared byte counts and SHA-256 values.
-
-### Capture artifact hashes
+All 11 embedded canonical artifacts independently recalculated to their
+declared byte counts and SHA-256 values:
 
 | Artifact | Bytes | SHA-256 |
 | --- | ---: | --- |
 | `active_main_rules` | 335 | `560eff7e8ecceb7b044a19634c7e559a8b0411b486717a97c05896246a3c7137` |
 | `actor_inventory` | 4,521 | `107c011df3b617fb1982ad0e61472bf238037b05574fc2d7ced050ca44ea7101` |
-| `branch_main` | 5,152 | `63d4787938352d4e8ac5fae635604753502818463fcf56a5058b8f40af2b043c` |
+| `branch_main` | 5,656 | `3b8b9123dd186cedc1b9ae36daca9c760ac6f8b532e99c67791767ad5ef0fe1b` |
 | `branch_protection_full` | 1,227 | `e45fb8583eb8002e49fcd402c0d9026f7277a1b823b6fe7410695da5666f0b0c` |
-| `open_pull_requests` | 2,028 | `0e67143c27f5f87d23342ffcaa3f01568a80d3be2355e920237144deada69845` |
+| `open_pull_requests` | 875 | `e6653448d4eaa30d464dbc5e1294ca5f14eb7ddcd032e3d364f400ece8f0939b` |
 | `organization_settings` | 482 | `db3047ad7868abfb58303681c011c7c6a4ebe79de8a7d0e3166760320d297b09` |
-| `pin_blobs` | 1,716 | `14dc91731d9a2c96cb06ae646e106f7c080958f14503631682d7af27e382bbfd` |
-| `remote_refs` | 1,278 | `6b01357566245bdb78572b82c3d52aa52bf7b72a52817e90862a8f1abbc3ae8c` |
+| `pin_blobs` | 1,716 | `28c7be6bccacb0ef30a62ad9be9a34c318fb529ee312ef19e01a4b65d4cbb68b` |
+| `remote_refs` | 1,168 | `76d81bdc7ec84fd2765d497d9e6e8b21a242af5f3239c2df8cc838a3eea64520` |
 | `repository_settings` | 660 | `8f605ec84f4d83ef6a860c238e1c506cacd1ab8c85ecb90448bdf2a684daf3f7` |
 | `ruleset_full` | 702 | `a5725db245d84174090de47e1fc45123219dbf5cfdd00d45856b04d801a3d5f2` |
 | `rulesets_full` | 438 | `a603d5a0af93112475f4e92a597b16c515b9eebe320cbab98f7bd26b0d9487b0` |
 
 ### Carrier blob pins
 
-Execution must read these blobs from the reviewed #459 head and from its merge
-tree. Every value must be exact. This file's own blob is instead bound by the
-exact reviewed PR head and merge facts, avoiding a self-reference.
+Every value must match both the reviewed #466 head and its merge tree. This
+readiness file binds itself through the exact reviewed head and merge facts.
 
 | Path | Blob OID |
 | --- | --- |
@@ -113,13 +108,13 @@ exact reviewed PR head and merge facts, avoiding a self-reference.
 | CHG-2026-033 `tasks.md` | `10b095e34a35c06489cbbaea628502fcd51f230f` |
 | CHG-2026-033 `verification.md` | `48a990bba60ea4e7679cf08d01c247fee0a98ac4` |
 | CHG-2026-033 `acceptance-cases.yaml` | `3f0355894d0c18c26576042d11b34b9cb3732297` |
-| TASK-RPT-001 fail-closed evidence | `94b7814c7cf795fa87b5c06105f7502c11c8940c` |
+| TASK-RPT-001 fail-closed evidence | `f3e74f97b580a3ea87540723c5824f767a33bee6` |
 | `openspec/governance/enforcement.md` | `e8ff3c130e1b8b15f8405d150ad567e774a0d82b` |
 | `openspec/governance/host-loop-runbook.md` | `70e0bcc5b736a896f0329e24a89e273164762558` |
 
 ## C. Fresh exact before
 
-Canonicalization is UTF-8, recursively sorted object keys, compact separators,
+Canonicalization is UTF-8, recursively sorted object keys, compact separators
 and no trailing LF.
 
 ### Actions workflow setting
@@ -157,9 +152,9 @@ sha256: e45fb8583eb8002e49fcd402c0d9026f7277a1b823b6fe7410695da5666f0b0c
 mutation_budget: 0
 ```
 
-The GET response contains no `restrictions`, and `enforce_admins=false`.
-Those are known topology gaps still covered by the old ruleset. This bootstrap
-must not repair them.
+The response still has no push `restrictions` and has
+`enforce_admins=false`. Those known topology gaps remain covered by the old
+ruleset and must not be repaired in this bootstrap.
 
 ### Repository settings projection — read-only invariant
 
@@ -184,14 +179,23 @@ bytes: 1437
 sha256: a621fdb55dd5ef0e9e2888f8c47b00b3a241a97d63565645253df2015f4096d9
 ```
 
-Only `lvye` is a collaborator/admin/member and ruleset bypass actor. Deploy Key
-`158088026` is write-enabled but is not a collaborator, CODEOWNER, bypass or
-main-push actor. Volatile informational fields such as Deploy Key `last_used`
-are retained in the full capture but deliberately excluded from this stable
-execution projection. Teams, App installations, outside collaborators,
-invitations and all organization-role assignments are empty.
+Only `lvye` is a collaborator/admin/member and ruleset bypass actor. Deploy
+Key `158088026` remains write-enabled but non-bypass. Teams, Apps, outside
+collaborators, invitations and organization-role assignments are empty.
 
-## D. Exact authorized payloads
+## D. Nullable merge-field rule and exact authorized payload
+
+`merge_commit_sha` is optional evidence:
+
+- absent or JSON `null`:accepted only as “no fact”; all independent mandatory
+  merge facts below remain required;
+- string:must equal current protected main;
+- any other type or mismatching string:zero-write stop.
+
+This correction does not weaken the merge proof. Current main must still be a
+single-parent squash commit whose parent is the captured main, whose subject
+is exact, whose associated PR is #466, whose `mergedBy` is `lvye`, and whose
+exact head has the required review and `guard`.
 
 All requests use:
 
@@ -200,13 +204,13 @@ Accept: application/vnd.github+json
 X-GitHub-Api-Version: 2026-03-10
 ```
 
-Endpoint:
+The sole authorized write endpoint is:
 
 ```text
 PUT /repos/ArkDeck/ArkDeck/actions/permissions/workflow
 ```
 
-### Exact before and rollback payload
+Exact before and rollback:
 
 ```json
 {"can_approve_pull_request_reviews":false,"default_workflow_permissions":"read"}
@@ -217,7 +221,7 @@ bytes: 80
 sha256: fb00f7e1aab4200684b287b484155d5521381f4593552beed4bbb5f9b1622ede
 ```
 
-### Exact after payload
+Exact after:
 
 ```json
 {"can_approve_pull_request_reviews":true,"default_workflow_permissions":"read"}
@@ -228,20 +232,15 @@ bytes: 79
 sha256: e4eea28a28f0c12dc5a441d5d6451c4bc7f3f72ed8f0b717c6cb5502e825965d
 ```
 
-This after value is required by the existing `GITHUB_TOKEN` PR creator. It
-does not place Actions in ruleset bypass or main push restrictions, does not
-make the bot a CODEOWNER/admin, and does not bypass the GitHub rule that a PR
-author cannot approve its own PR.
-
-Future topology D2 must separately use `required_status_checks.checks` without
-also sending legacy `contexts`. That future payload is deliberately absent
-from this readiness.
+This restores the existing bot-authored PR transport. It does not add Actions
+to ruleset bypass or a main push allowlist, make the bot a CODEOWNER/admin, or
+make self-approval effective.
 
 ## E. Window and mutation budgets
 
 ```yaml
-window_start_utc: 2026-07-24T08:30:00Z
-window_end_utc: 2026-07-24T14:00:00Z
+window_start_utc: 2026-07-24T09:30:00Z
+window_end_utc: 2026-07-24T15:00:00Z
 window_semantics: half-open
 maximum_actions_workflow_mutations: 1 after + 1 rollback
 maximum_ruleset_mutations: 0
@@ -256,136 +255,107 @@ agent_privileged_dispatch: 0
 rollback_contact: lvye
 ```
 
-Expiry, clock uncertainty or any drift requires another merged recovery
-authority. The window must not be extended in place.
+Expiry, clock uncertainty or drift requires another merged recovery
+authority. This window may not be extended in place.
 
 ## F. Preflight and stop conditions
 
-Before the single PUT, the isolated human session must prove all of:
+Before the single PUT, the isolated human executor must prove all of:
 
-1. #459 is merged, was authored by `github-actions[bot]`, has exact title
-   `governance(TASK-RPT-001): recover bot-authored PR transport`, and its exact
-   reviewed head received an approving review from `lvye` plus `guard=success`.
-2. Current protected main equals #459's full merge OID; the merge commit has
-   the single exact parent
-   `9de9c63f7fe17069ad50ff0a73fc171ce6a14ec8`, subject with `(#459)`,
-   associated PR and `mergedBy`.
-3. The updated #459 diff contains exactly:
-   - CHG-2026-033 proposal/design/tasks/verification/acceptance revision;
-   - this bootstrap readiness;
-   - TASK-RPT-001 fail-closed/bootstrap evidence.
-4. Every carrier blob in Section B matches. `AGENTS.md`,
-   `enforcement.md`, `.github/**`, CHG-2026-030, Core/spec/contracts and product
-   files have zero diff.
-5. The full Actions before, ruleset, branch protection, repository settings and
-   actor projection match Sections C/D byte-for-byte and hash-for-hash.
+1. #466 is merged, was authored by exact `github-actions[bot]` ID `41898282`,
+   has exact title
+   `governance(TASK-RPT-001): recover nullable merge parser`, exact head ref
+   `agent/task-au-002-done`, and its exact reviewed head has `lvye`
+   `APPROVED` plus `guard=success` from App ID `15368`.
+2. Optional `merge_commit_sha` follows Section D. Independently, current main
+   is the exact #466 squash commit with the single parent
+   `ced32841a39147e3de74787f755d2377ccfba460`, exact subject ending `(#466)`,
+   associated PR #466 and exact `mergedBy=lvye`.
+3. The #466 changed-file set is exactly this readiness plus
+   `evidence/runs/TASK-RPT-001/2026-07-24-d2-fail-closed.md`.
+4. The local carrier worktree is clean and remains at the exact reviewed #466
+   head. Every Section B carrier blob matches the reviewed head and merge
+   tree.
+5. Full Actions before, ruleset, active-main rules, branch protection,
+   repository settings, organization settings and stable actor projection
+   match Sections B/C byte-for-byte and hash-for-hash.
 6. Ruleset `updated_at` remains
-   `2026-07-23T10:20:11.425+08:00`; its active main evaluation still contains
-   creation/update/deletion.
-7. `allow_auto_merge=false`; no merge-queue rule is present.
-8. Every open PR is authored by exact `github-actions[bot]`. #466/#468 may
-   remain only if their exact heads and changed paths remain non-overlapping;
-   any new PR receives a full path/actor overlap classification.
-9. Every non-main branch is under `refs/heads/agent/**`; no unexpected
+   `2026-07-23T10:20:11.425+08:00`; its active main evaluation is exactly
+   creation/update/deletion. `allow_auto_merge=false`.
+7. If #468 remains open, it is exact bot-authored head
+   `9ecbb7a1de6a6504b1a72281d4f122a0f7590def` with only its three captured,
+   non-overlapping evidence paths. No other open PR is allowed.
+8. Every non-main branch is under `refs/heads/agent/**`; no unexpected
    collaborator/team/App/role assignment/bypass/main-push actor exists.
-10. Human credential/session is absent from every Agent-reachable connector,
-    process, environment, helper, keychain, browser and tool surface.
+9. Human credential/session is absent from every Agent-reachable connector,
+   process, environment, helper, keychain, browser and tool surface.
 
-Any missing field, unexpected actor, main/blob/ref/PR/control-plane drift,
-ambiguous response, timeout, hash mismatch, expired window or inability to
-explain rollback means zero PUT and stop.
-
-The old #467 apply scripts, payload, window, nonce, derived refs and execution
-receipt are not valid preflight inputs.
+Any missing field other than the explicitly nullable merge field, unexpected
+actor, main/blob/ref/PR/control drift, ambiguity, timeout, hash mismatch,
+expired window or rollback uncertainty means zero PUT and stop.
 
 ## G. Exact execution order
 
-1. Verify the executor bytes have SHA-256
-   `305c4b515425575e2dc0e19de82562685cf54be1d71314ec04da89b0f53c2f79`,
-   enter the window in a separate human Terminal and authenticate as exact
-   `lvye`; no credential value may be copied to Agent-visible output.
-2. Perform all Section F GET-only checks. Mutation counters remain zero until
+1. Verify executor SHA-256
+   `41230cb2edec90f1685d9c62eefa1b690d736d378db9ec657a34042624ed05f5`.
+2. In a separate human Terminal inside the window authenticate as exact
+   `lvye`; no credential value may enter Agent-visible output.
+3. Perform every Section F GET-only check. Mutation counters remain zero until
    all pass.
-3. Send the exact Section D after payload once.
-4. Immediately authenticated GET the same endpoint. Canonical projection must
-   equal 79 bytes and SHA-256
+4. Send the exact Section D after payload once.
+5. Immediately authenticated GET the same endpoint. It must equal 79 bytes
+   and SHA-256
    `e4eea28a28f0c12dc5a441d5d6451c4bc7f3f72ed8f0b717c6cb5502e825965d`.
-5. Re-read ruleset, branch protection, repository auto-merge and actor
-   inventory. They must remain exactly at the pinned read-only state.
-6. Write a secret-free receipt, logout `lvye`, and verify the Agent has no
-   human credential/session.
-7. Only after logout may the Agent add the execution receipt to the preserved
-   failure-evidence branch and push that `agent/**` ref. The restored
-   `agent-pr` workflow must create exactly one PR authored by
-   `github-actions[bot]`.
-8. That evidence PR remains unapproved until `lvye` reviews it. Its existence
-   proves creator liveness only; it is not topology evidence or task `done`.
+6. Re-read ruleset, active rules, branch protection, repository settings and
+   actor inventory. Only the approved workflow field may differ.
+7. Write a secret-free receipt, logout `lvye`, and verify logout.
+8. Only after logout may the Agent push an execution-evidence branch. The
+   restored workflow must create exactly one bot-authored PR.
 
-No branch-protection/ruleset fix, no review probe and no ref probe may be
-“added while the session is open”.
+No topology repair, review probe or ref probe may be added while the session
+is open.
 
 ## H. Rollback and unexpected outcomes
 
-- If the PUT response is timeout/nonzero/ambiguous, do not blindly retry. GET
-  the endpoint once and classify exact false/read, exact true/read or unknown.
-- Exact false/read means no successful change; stop with mutation attempt
-  recorded.
-- Exact true/read after a non-success response is still an ambiguous dispatch:
-  send exact false/read rollback once, verify it and stop. Only an unambiguous
-  success response plus exact true/read may continue to post-invariant checks.
-- Any other value is unknown/incident: send the exact rollback payload at most
-  once only if its target state and safety can still be established, then
-  authenticated read-back and stop.
-- If a pinned read-only invariant drifts after the successful Actions write,
-  send exact false/read rollback once, verify it, and stop. Do not edit the
-  drifted object.
-- If rollback outcome is ambiguous, retain the full response classification,
-  logout and treat the task as blocked. Do not claim a clean state.
-- If subsequent bot PR creation fails, do not toggle repeatedly. Within the
-  same still-valid window the human may execute the exact false/read rollback
-  once after a fresh full preflight; otherwise a new merged readiness is
-  required.
+- A timeout/nonzero/ambiguous PUT is never retried. GET once and classify
+  exact false/read, exact true/read or unknown.
+- Exact false/read means no successful change; record and stop.
+- Exact true/read after a non-success response is an ambiguous dispatch:
+  rollback once to exact false/read, verify and stop.
+- Any unexpected state permits at most one exact false/read rollback when its
+  safety remains established, followed by read-back and stop.
+- Any post-write pinned-invariant drift triggers the same single rollback;
+  the drifted object itself must not be edited.
+- Ambiguous rollback means blocked. Logout and make no clean-state claim.
+- Failure of subsequent bot PR creation does not permit repeated toggling.
 
 Rollback never authorizes a ruleset, protection, repository, credential, ref,
 review, merge or PR-state write.
 
 ## I. Evidence and acceptance boundary
 
-The bootstrap receipt must record:
+The receipt must record the exact #466 head, review/check/merge facts, nullable
+field observation, current main, executor hash, before/after/read-back hashes,
+all mutation counters, invariant hashes, human executor/window and logout.
 
-- #459 reviewed head, review/check/merge facts and current main OID;
-- exact bootstrap executor SHA-256;
-- before/after/read-back canonical bytes and hashes;
-- all mutation counters;
-- pinned read-only object hashes before and after;
-- executor `human`, time/window and confirmed logout;
-- bot-authored evidence PR number/head and its creator check result.
-
-This recovery proves only governance transport availability and preserves the
-human-approval architecture. It does **not** pass
-`RPT-BOUNDARY-001`, `RPT-MAIN-001`, `RPT-IDENTITY-001` or
-`RPT-MIGRATION-001`, does not mark TASK-RPT-001 done, and does not verify the
-change.
-
-After the bootstrap evidence is merged, a new independent topology D2
-readiness must recapture current main and every control object, use a new
-window/nonce/probe set, use a schema-valid checks-only branch-protection
-payload, and retain overlap-first migration and ruleset-first rollback.
+This recovery proves only PR-transport availability. It does not pass any
+topology AC, mark TASK-RPT-001 done or verify the change. After the independent
+bootstrap evidence is merged, the topology migration requires another fresh,
+independent D2 readiness with a new main/OID/window/payload/probe set.
 
 ## J. Explicit supersession and zero reuse
 
-- #435 / old HLR-002A OID, window, payload/hash, script, UUID and probe refs
-  remain permanently invalid.
-- #462, #463 and #467 topology readiness revisions are exhausted and
-  non-executable.
-- Both failed apply scripts and all reports are evidence only; they must not be
-  rerun.
-- This bootstrap's capture, window, payload and merge authority cannot be
-  reused for the later topology migration.
-- PR #459 old head
-  `d3aeeaaa8eba79526474580208dc253c4c46d26a` remains a superseded carrier
-  provenance fact, not an implementation candidate.
-- PR #459 intermediate head
-  `e00d25954377200e73e7956c3f7a264dbd63bb7d` and its expected
-  `allowed-paths` parser failure remain provenance facts, not executable
-  authority.
+- #435 and every old HLR-002A OID/window/payload/hash/script/UUID/ref remain
+  invalid.
+- #462, #463 and #467 topology readiness revisions remain exhausted.
+- The #459 bootstrap capture/readiness/window/executors and zero-write report
+  are evidence only and must not be rerun.
+- PR #459 heads
+  `d3aeeaaa8eba79526474580208dc253c4c46d26a`,
+  `e00d25954377200e73e7956c3f7a264dbd63bb7d` and
+  `6bc5876b8cdd4fadc6e83e8812a0a995333cf9bf` are provenance only.
+- PR #466 old head
+  `3fda06cc3e5e91e06890845f2a760a9a3fec592c` is provenance and the one-time
+  lease expectation only.
+- This capture, window, payload and merge authority cannot be reused for the
+  later topology migration.
