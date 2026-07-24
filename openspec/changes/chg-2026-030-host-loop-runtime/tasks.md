@@ -7,10 +7,11 @@
 > 该 task done 前 HLR-002 不得 ready，零 identity/secret/scheduler/probe 动作。
 > r4 因 #412 首个 pull-request `allowed-paths` 暴露 canonical suffix task grammar
 > 不兼容而 fail closed；r4 只扩 HLR-002A 的 parser/test scope，不使其 ready。
-> r6 因 #435 的全仓漂移/open-PR/绝对窗口模型产生无关阻塞而 fail closed；新增
-> TASK-HLR-002B 先实现 scoped D2 gateway/lease。HLR-002A 回到 blocked，旧 r5
-> executor 永久失效；新的 Agent D2 只能在维护者 standing authorization 与
-> merge-relative window 内执行。
+> r7 因 CHG-2026-033 approval #455 已把 ref-protection 管理操作收回人类隔离会话，
+> 而后合入的 #454 又把 r6 TASK-HLR-002B gateway 标为 ready，故 fail closed：
+> #449/r6 gateway 与 #454 readiness 均 superseded，TASK-HLR-002B/002A blocked，
+> Agent control-plane/ruleset/ref probe dispatch = 0。HLR-002A fresh readiness
+> 依赖 CHG-2026-033 TASK-RPT-001 done/evidence merge OID。
 
 ## TASK-HLR-001 — 结构化 PR envelope 与纯 runtime contract
 
@@ -196,12 +197,14 @@
 
 ## TASK-HLR-002A — Legacy bootstrap namespace partition
 
-- Status:blocked（r6 stop gate：#435 已批准的是 r5 exact-current-main、zero-open-PR
-  与绝对窗口计划；它没有产生 D2 receipt/PASS，且被本 r6 revision supersede。
-  解除前置：① r6 由维护者 review/merge；② TASK-HLR-002B done；③ 维护者创建并
-  merge authorization-bearing r6 scoped D2 readiness，固定
-  sensitive manifest、overlap classifier、relative window、lease key、gateway
-  source/identity 与 fresh target refs。旧 r5 executor/UUID/window 不得补跑。）
+- Status:blocked（r7 stop gate：CHG-2026-033 approval #455 是 current
+  ref-protection authority；#449/r6 Agent-operated gateway 与后续 #454
+  TASK-HLR-002B readiness 均由 r7 supersede。解除前置仅为：① r7 经维护者
+  review/merge；② CHG-2026-033 TASK-RPT-001 的 human-isolated migration、
+  evidence 与 done PR 全部合入；③ 独立 fresh canary-only readiness 固定
+  TASK-RPT-001 evidence merge OID、authenticated after projection 与全新 refs。
+  readiness 不得包含 ruleset/branch-protection/repository-setting write。#435 的
+  executor/OID/window/payload/hash/UUID 与 #454 的 pins/branch 均不得补跑。）
 - Historical Status:ready（r5 resume / r5 D2 re-readiness；维护者已 review/merge
   #435：exact head `a66138b7e9315badf86d2d493e8251dc1c6f7506` 于
   `2026-07-24T01:09:02Z` 以
@@ -268,7 +271,24 @@
   钉定 `agent-pr.yml`/`sdd-guard.yml` blobs、GitHub Actions branch-filter semantics、
   reserved namespace grammar、control/canary 矩阵与零 open workflow conflict。r3
   proposal 合入本身不使本任务 ready。）
-- r6 remediation：
+- r7 remediation（current）：
+  - **Authority gate:required。**CHG-2026-033 TASK-RPT-001 必须先按独立
+    D2 readiness 由维护者在人类隔离会话完成 main protection + ordinary ruleset
+    fail-closed migration，并以独立 evidence/done PR 合入。Agent、Deploy Key、
+    GitHub App、Actions token、integration identity 与本 task 均无 ruleset/
+    protection/repository-setting/credential write authority。
+  - **Supersession gate:closed。**#449/r6 gateway 与 #454 readiness 只作历史；
+    TASK-HLR-002B 不得 implementation/done，standing authorization、gateway
+    credential lookup、ruleset PUT/rollback 与其派生 probe dispatch = 0。
+  - **Fresh readiness gate:required。**TASK-RPT-001 done 后，HLR-002A 才可用独立
+    D1 readiness 固定其 evidence merge OID、current protected main、authenticated
+    topology projection、全新 reserved/ordinary canary refs 与 concurrency。该
+    readiness 只授权 creator canary/evidence；任何管理设置 drift 退回
+    CHG-2026-033，不在本 task 修复。
+  - **Historical evidence:preserved。**#419 source/repository PASS 与 #421 GH013
+    live FAIL 原样有效；旧 readiness、window、payload、hash、UUID 不能升级为新
+    topology 或 fresh canary PASS。
+- r6 remediation（historical；由 r7 supersede）：
   - **Supersession fact:closed。**#435 的 exact reviewed head/merge 已进入 protected
     main，但其执行计划把任何 main 前进、任何 open PR 与绝对窗口都作为全局 stop。
     该计划没有形成 ruleset PUT/read-back、ref matrix、canary 或 acceptance PASS。
@@ -1038,23 +1058,19 @@
     准备。readiness merge 不构成 HLR acceptance PASS；implementation/contract
     evidence、live canary evidence 与后续 `ready→done` 各自独立 PR。
 - Platform:github-actions + macos（host/bootstrap control plane；零产品平台声明）
-- Requirements/AC:change-local `HLR-LEASE-001`、`HLR-WORKER-001`、
-  `HLR-D2-GATE-001`
-- Depends on:change revision r6、TASK-HLR-001 done、TASK-BAP-003 done、
-  TASK-HLR-002B done、maintainer-created authorization-bearing scoped D2 readiness
+- Requirements/AC:change-local `HLR-LEASE-001`、`HLR-WORKER-001`
+- Depends on:change revision r7、TASK-HLR-001 done、TASK-BAP-003 done、
+  CHG-2026-033 TASK-RPT-001 done/evidence merge、independent fresh canary-only readiness
 - In scope:`agent-pr.yml` push filter 保留 `agent/**` include、增加
   `!agent/host-loop/**` exclude；固定 task/lease/probe 三个 reserved family；
   branch-filter contract test；MECH-004 title/body/full task token 对齐现有 active
-  task-header grammar，并覆盖单字母 suffix 正反 fixtures；Agent 在维护者已 merge 的
-  finite standing authorization 下经 TASK-HLR-002B constrained gateway 将 ruleset
-  target 从单层 Agent ref 精确扩展到多层 Agent ref，保留其他收权；sensitive-input
-  drift/overlapping-PR/merge-relative-window/scoped-lease preflight；单层/多层正向与
-  non-agent/main 负向 ref matrix；implementation merge 后的 fresh control/canary live
-  evidence；本 change evidence 与本任务状态。
-- Out of scope:修改 `sdd-guard.yml`；除本任务明确的 target-pattern additive delta 外
-  创建 bypass、停用/删除 ruleset 或改变其他 repository permission；Agent 直接持有
-  maintainer/admin credential、调用 generic API 或创建/修改/批准 standing
-  authorization；创建/配置
+  task-header grammar，并覆盖单字母 suffix 正反 fixtures；消费 CHG-2026-033
+  TASK-RPT-001 merged evidence 与 authenticated topology projection；使用全新 refs
+  执行 reserved-first/ordinary-second creator canary；本 change evidence 与本任务状态。
+- Out of scope:修改 `sdd-guard.yml`；创建/修改/回滚 ruleset、branch protection、
+  repository setting、bypass、push allowlist 或 credential；Agent 直接持有
+  maintainer/admin credential、调用 generic API 或创建/修改/批准/执行 standing
+  authorization/gateway；重放 #435/#454 计划；创建/配置
   integration identity/secret/scheduler；PR body/envelope/runtime/lease/cursor 实现；
   移除 legacy bootstrap；真实设备或产品代码。
 - Allowed paths:`.github/workflows/agent-pr.yml`、
@@ -1066,8 +1082,8 @@
   `openspec/changes/archive/**`、`.github/workflows/sdd-guard.yml`、
   `scripts/host_loop/**`、产品 source/tests、其他 change。
 - Risk:high（workflow filter 过宽会停掉现有 PR bootstrap，过窄会造成双 creator；
-  ruleset exclude 过宽会扩大 Deploy Key ref 写面，过窄会阻断 runtime。D2 exact
-  read-back、正负 probes 与完整 rollback 缺一即 fail closed）。
+  current topology/evidence 不闭合或任何管理设置 drift 时必须回到
+  CHG-2026-033，不能由本 task 修复或绕过）。
 - Hardware required:no。
 
 ### Deliverables
@@ -1083,10 +1099,9 @@
 - MECH-004 对 `TASK-HLR-002A`/既有单字母 suffix task 可从 title/body 唯一绑定
   active task，malformed/ambiguous/multi-suffix 继续失败，真实 implementation PR
   `allowed-paths` 绿色；
-- ruleset 保留 `~ALL`、creation/update/deletion 与 human-only bypass，target exclude
-  同时覆盖 single-level `refs/heads/agent/**` 和 multi-level
-  `refs/heads/agent/**/*`；Deploy Key 的单层/多层正向与 non-agent/main 负向矩阵
-  全部通过；
+- TASK-RPT-001 merged evidence 证明 ordinary ruleset 与 exact-main branch protection
+  的 current projection、actor inventory 和正负矩阵闭合；本 task 不重复管理设置
+  mutation，只用 fresh refs 验证 creator partition；
 - implementation 合入后 live canary：普通 control branch 仍由 legacy creator 创建唯一
   PR；reserved probe branch 的 head guard 出现但 legacy PR/workflow run 数为 0，canary
   清理不以 branch disappearance 代替查询结果。
@@ -1096,8 +1111,8 @@
 - `HLR-LEASE-001`/`HLR-WORKER-001` bootstrap slice：contract fixtures 全通过；
   control/canary 的 branch/head/full run/PR IDs 可复查；reserved branch 零
   `github-actions[bot]` PR，普通 control 恰一 legacy PR；
-- ruleset before/after JSON/hash 与 active-rule evaluation 可复查，after 相对 before
-  只追加一个 multi-level exclude；main/non-agent 负向前后 OID/ref 不变；
+- TASK-RPT-001 evidence/done merge OID、authenticated after JSON/hash、actor
+  inventory 与 negative matrix 可复查；fresh canary 前 topology 任一 drift 即 blocked；
 - `python3 scripts/test_agent_pr_workflow.py`、HLR envelope regression、扩展后的
   MECH-004 path tests、真实 PR `allowed-paths`、`check-sdd`、`git diff --check`
   与 allowed/forbidden diff 通过。
@@ -1115,15 +1130,16 @@
 
 ## TASK-HLR-002B — Scoped D2 gateway、standing authorization 与 namespace lease
 
-- Status:ready（本 D1 readiness 经维护者 review/merge 后生效；只授权下述纯离线
-  source/contract implementation，不 provision credential、不创建 standing
-  authorization、不执行 ruleset/ref/PR/Issue write。）
+- Status:blocked（r7 superseded tombstone；#454 readiness merge
+  `49490a8f8e0212998119cb590de4df48f46d0f1c` 依赖的 #449/r6
+  Agent-operated ruleset gateway 与 CHG-2026-033 approval #455 冲突。不得实现、
+  provision、执行、标记 done 或复用本 task ID；gateway/control-plane dispatch = 0。）
+> 下述 r6 readiness、pins、scope、deliverables 与 verification 仅保留为历史审计记录，
+> 自 r7 合入起无 current readiness/authorization/implementation 语义。
 - Platform:macos（host control plane；零产品/设备平台声明）
-- Requirements/AC:change-local `HLR-D2-GATE-001`、`HLR-LEASE-001`、
-  `HLR-RECOVERY-001`
-- Depends on:change revision r6、TASK-HLR-001 done、TASK-BAP-003 done、
-  independent readiness
-- In scope:canonical sensitive-input manifest builder/validator；完整 open-PR/files
+- Requirements/AC:none current；historical r6 `HLR-D2-GATE-001` 已退役
+- Depends on:none；tombstone 永久不进入 readiness/implementation/done
+- Historical r6 in scope:canonical sensitive-input manifest builder/validator；完整 open-PR/files
   pagination 与 overlap classifier；GitHub `merged_at` relative-window validator；
   durable CAS scoped lease；standing-authorization parser/validator/revocation/use
   accounting；仅暴露
@@ -1131,12 +1147,13 @@
   authenticated before/one-shot mutation/immediate read-back/rollback 状态机；
   immutable redacted receipt；pure fixture、fault、route-inventory tests 与本任务
   evidence/status。
-- Out of scope:创建/修改/批准/撤销真实 standing authorization；向 Agent 暴露 raw
+- Current out of scope:本 section 下全部 source/test/evidence/status implementation；
+  创建/修改/批准/撤销真实 standing authorization；向 Agent 暴露 raw
   credential；provision secret/keychain/launchd；真实 ruleset/ref/PR/Issue write；
   generic REST/GraphQL、任意 method/URL/body、branch protection、review/merge、
   arbitrary ref mutation；修改既有 workflow/parser、Core/governance 或产品代码。
-- Allowed paths:`scripts/host_loop/d2_gateway/**`、本 change `evidence/**`、本 change
-  `tasks.md`（仅本任务状态/evidence 引用）。
+- Allowed paths:none for task execution；后续 governance 只能以独立 approved revision
+  修改本 tombstone。
 - Forbidden paths:`AGENTS.md`、`openspec/constitution.md`、
   `openspec/governance/**`、`openspec/specs/**`、`openspec/contracts/**`、
   `openspec/changes/archive/**`、`.github/**`、`scripts/check_pr_paths.py`、
@@ -1145,7 +1162,7 @@
 - Risk:high（gateway/lease/auth parser 缺陷可能扩大仓库管理权限或重复执行；任何
   ambiguity、fence mismatch、clock discontinuity、unknown outcome 均 fail closed）。
 - Hardware required:no。
-- Readiness（r1，audit base = protected `main`
+- Historical readiness（r1；superseded，audit base = protected `main`
   `d22cdeeebc781b9c3a1b063dbee6631934c51ac0`）：
   - **Approval/dependency gate:satisfied。**CHG-2026-030 r6 #449 exact reviewed head
     `0bb864ba8f76a53396e24e594a176d233115be7b` 由 `lvye` 于
@@ -1361,9 +1378,10 @@
 
 ## TASK-HLR-002 — D2 integration identity 与 host activation
 
-- Status:blocked（r6 stop gate：#421 已证明 multi-level reserved ref 被 active ruleset
+- Status:blocked（r7 stop gate：#421 已证明旧 topology 下 multi-level reserved ref
+  被 active ruleset
   拒绝，故在 TASK-HLR-002A remediation done 前无法形成新 identity create-PR 正例。
-  解除前置：① CHG-2026-030 revision r6 经维护者 review/merge；② TASK-BAP-003 done；
+  解除前置：① CHG-2026-030 revision r7 经维护者 review/merge；② TASK-BAP-003 done；
   ③ TASK-HLR-002A done；④ 独立 D2 readiness/维护者窗口钉定实际 integration
   identity、单仓 scope、最小 categories、非 CODEOWNER/bypass 事实、secret storage、
   scheduler owner/label reservation、rollback contact 与正/负 probe。Agent 不得代为
@@ -1373,7 +1391,7 @@
   无法同时由 permission manifest 证明。）
 - Platform:macos（受控 host 运维；零产品平台声明）
 - Requirements/AC:change-local `HLR-LEASE-001`
-- Depends on:change revision r6、TASK-BAP-003 done、TASK-HLR-002A done、
+- Depends on:change revision r7、TASK-BAP-003 done、TASK-HLR-002A done、
   independent D2 readiness
 - In scope:维护者建立非 `GITHUB_TOKEN`、repository-only、非 CODEOWNER/bypass 的
   PR/Issue integration identity；permission categories 固定为 Metadata read、Contents

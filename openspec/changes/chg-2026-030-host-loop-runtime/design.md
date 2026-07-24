@@ -1,7 +1,7 @@
 # CHG-2026-030 Design — host-loop runtime
 
 > Status:draft
-> Change:CHG-2026-030-host-loop-runtime@r6
+> Change:CHG-2026-030-host-loop-runtime@r7
 > 本设计只约束本 change 的候选实现。与 Constitution、AGENTS.md、
 > enforcement.md 或 CHG-2026-027 冲突时，停止并以高层规则为准。
 
@@ -10,9 +10,9 @@
 1. protected `main` + 维护者 CODEOWNER review/merge 仍是唯一批准事实；CI、
    envelope、Issue、lease、review result 和 runtime log 均不是批准事实。
 2. ordinary worker/reviewer runtime 绝不 merge、作 GitHub approval、设置
-   task/change 状态，或修改 branch protection/credentials。唯一例外是 r6 constrained
-   gateway 在有效 standing authorization 下执行其 exact ruleset method；它不属于
-   worker 的 generic GitHub capability，也不得创建/修改 authorization 或 credential。
+   task/change 状态，或修改 ruleset、branch protection、repository setting/
+   credential。r7 无 gateway 例外；所有 GitHub 管理设置只由维护者在 Agent 不可达的
+   隔离会话按 CHG-2026-033 执行，维护者凭据不得进入 Agent runtime 或 secret boundary。
 3. worker 与 reviewer 是不同 run ID、不同工作目录、不同 execution session。reviewer
    只读实现 head 和证据，不得提交实现或改 PR body。
 4. 所有 host command 使用 executable + argv；PR title/body、branch、Issue content
@@ -133,13 +133,15 @@ target-pattern delta 是：保留现有 `refs/heads/agent/**`，**仅追加**
 `refs/heads/agent/**/*`；不更改 `~ALL`、creation/update/deletion rules、仅维护者
 bypass 或 Deploy Key 的 non-bypass 身份。
 
-该 delta 属 D2 权限配置；r5 规定 runtime/Agent 不得应用。r6 仅在 §1E 的维护者
-standing authorization、constrained gateway 与 scoped lease 全部成立后，才以
-one-shot exact method 取代“维护者直接 PUT”；其他应用路径仍禁止。独立 D2
+该 delta 属 D2 权限配置；r5 规定 runtime/Agent 不得应用。r6 曾以 §1E gateway
+建立例外，但该路径已由 r7/CHG-2026-033 supersede。current plan 中 ruleset 与
+exact-main branch protection 只能由维护者在 Agent 不可达的隔离会话执行；独立 D2
 readiness 必须钉定：
 
 1. ruleset ID、完整 before JSON/hash、enforcement、include/exclude、rules 与 bypass；
-2. exact after 只比 before 多一个 `refs/heads/agent/**/*` exclude；
+2. exact after/rollback 采用 CHG-2026-033 批准的两层 topology：ordinary ruleset
+   同时排除单层/多层 Agent namespace 与 exact `main`，main branch protection 独立
+   强制 PR/CODEOWNER/`guard`/admin enforcement/human-only push allowlist；
 3. 维护者窗口、操作者、rollback contact，以及失败时恢复完整 before JSON 的步骤；
 4. GitHub active-rule evaluation 预期：单层 `agent/<probe>` 与多层
    `agent/host-loop/probes/<uuid>`/`agent/hlr-002a-control/<uuid>` 不命中收权
@@ -155,7 +157,13 @@ tree 相同；main 在 reserved/ordinary 两次 push 之间前进、ruleset read
 control PR、删除两个 refs 并再次 read-back。cleanup 不改变 PASS/FAIL，D2 ruleset
 receipt/live evidence 与 `ready→done` 仍是不同 PR。
 
-## 1E. Scoped D2 authorization, lease and drift model（r6）
+## 1E. Scoped D2 authorization, lease and drift model（r6 historical；r7 superseded）
+
+本节完整保留 #449/r6 与 #454 readiness 所批准机制的历史设计语境，但自 r7 合入起
+不再具有 implementation、readiness、authorization 或 execution 语义。任何
+`TASK-HLR-002B` source、gateway provisioning、standing authorization、privileged
+credential lookup、ruleset PUT/rollback 或由该机制派生的 probe dispatch 均为 0；
+不得以本节构造 current plan。
 
 r5 把“readiness 时看到的整个 main/open-PR 集合”误当成 D2 输入，导致无关产品提交
 或无关 PR 也使已批准计划失效；绝对 UTC 窗口还会在 review/merge 排队时自然过期。
@@ -285,6 +293,34 @@ after mismatch -> exact rollback under same fence -> read-back -> stop
 receipt 记录 authorization/operation/manifest hash、fence、脱敏 executor/gateway
 identity、GitHub response classification、before/after/rollback hash、target-ref
 projection、时间和 outcome；不含 secret/raw payload/用户绝对路径，也不承载批准语义。
+
+## 1F. Human-only ref-protection execution（r7 current）
+
+CHG-2026-033 是 current ref-protection topology 与迁移流程的批准权威。本 change
+只消费其结果，不复制其管理能力：
+
+1. **Authority boundary。**ruleset、branch protection、repository setting 与
+   credential 的 authenticated read/write 仅由维护者在 Agent 不可达的隔离会话执行。
+   Deploy Key、GitHub App、Actions token、integration identity、worker/reviewer 与本
+   change source 均无 Administration/protection/ruleset route；raw human credential
+   不得进入 repository、Agent process、gateway、environment 或 Agent 可达 storage。
+2. **Fail-closed ordering。**TASK-RPT-001 先强化并 read-back main protection，证明
+   human-only push allowlist、PR、CODEOWNER review、`guard`、admin enforcement、
+   force/delete/auto-merge 禁令生效，并以 Deploy Key direct-main negative probe
+   明确拒绝；之后才可把 exact `main` 加入 ordinary ruleset exclusion。任一步失败即
+   保持更严格状态或恢复 exact before，不得出现 main 无保护窗口。
+3. **Evidence dependency。**HLR-002A 保持 `blocked`，直到 TASK-RPT-001
+   evidence 与 done PR 均合入。fresh HLR-002A readiness 必须固定该 evidence merge
+   OID、authenticated after projection 与全新 canary refs，只授权 creator
+   control/canary；不得包含 ruleset/branch-protection/repository-setting mutation。
+4. **Historical invalidation。**#435 的 OID/window/payload/hash/UUID、#449 的
+   Agent-operated gateway 与 #454 的 readiness/fixtures/implementation branch 全部
+   不可重放。#419 仍是真实 source/repository evidence，#421 仍是真实 live FAIL；
+   两者均不能替代新 topology evidence 或 fresh canary。
+5. **Negative closure。**任何 Agent-reachable admin/ruleset/protection/credential
+   method，任何 non-human actor 进入 bypass/main push allowlist，任何 direct-main、
+   self-approval、merge/auto-merge 或手工 merge-commit路径意外成功，均立即停链并
+   触发 CHG-2026-033 rollback/incident 边界；cleanup 不把失败改成 PASS。
 
 ## 2. PR envelope
 

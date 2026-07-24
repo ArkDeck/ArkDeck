@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-030-host-loop-runtime
-revision: 6
-status: approved # r1 #361、r2 #405、r3 #407、r4 #415、r5 #423 已批准；r6 scoped D2 lease/standing-authorization remediation 仅在维护者 review/merge 后生效
+revision: 7
+status: approved # r1 #361、r2 #405、r3 #407、r4 #415、r5 #423、r6 #449 已批准；r7 human-only ref-protection execution revision 仅在维护者 review/merge 后生效
 class: implementation-only
 core_change_level: none
 owner: lvye
@@ -10,6 +10,17 @@ platforms: [macos]
 ---
 
 # Host-loop runtime：为 Agent PR 建立可恢复的 worker/reviewer 双循环
+
+> r7 stop gate（2026-07-24）：更晚批准的 CHG-2026-033（proposal #453、approval
+> #455，merge `c86f07ae6b843affaaa3f698e2f9f08a6f4c96cd`）把 GitHub
+> ruleset/branch-protection/repository-setting/credential mutation 全部收回到 Agent
+> 不可达的人类隔离管理会话。TASK-HLR-002B readiness #454 已随后以 merge
+> `49490a8f8e0212998119cb590de4df48f46d0f1c` 进入 main，但它依赖的 #449/r6
+> Agent-operated gateway 与该更高层、更新的批准边界冲突。r7 合入后 #449 的 gateway
+> path 与 #454 readiness 均永久 superseded，TASK-HLR-002B/002A 均为 `blocked`，
+> gateway/ruleset/ref/control-plane dispatch = 0。HLR-002A 只能在
+> CHG-2026-033 TASK-RPT-001 done/evidence merge 后，以 fresh canary-only readiness
+> 重新启动；#435 及其 OID/window/payload/hash/probe UUID 仍不得复用。
 
 > r6 stop gate（2026-07-24）：r5 readiness #435 已由维护者 review/merge，但它把
 > protected-main exact OID、全部 open PR 与绝对维护窗口绑定为执行前提；随后无关产品
@@ -109,17 +120,23 @@ Actions 递归事件的限制见
   non-agent/main 负向矩阵。只有维护者完成仓外规则变更并 read-back，Agent 才可从
   同一 protected-main base 重新执行 reserved-first/ordinary-second canary。r5 不改
   已合入 workflow/parser，也不把 #421 的零 run/PR 误算为 creator isolation。
-- r6 不再要求 readiness 后整个仓库静止，也不因任意 open PR 存在而阻断 D2。新增
+- r6（历史；由 r7 supersede）不再要求 readiness 后整个仓库静止，也不因任意 open PR 存在而阻断 D2。新增
   TASK-HLR-002B 交付 constrained D2 gateway、sensitive-input manifest、完整 open-PR
   overlap classifier、merge-relative window 与 durable scoped lease 的纯 host contract。
   HLR-002A 的新 readiness 只固定本 change 四文档、相关 workflow/parser、ruleset
   before/after 与 exact target refs；其他路径上的 main 前进和无关 PR 可继续。
-- r6 允许 Agent 在逐项验证通过后调用一个 exact、one-shot、无 generic API escape
+- r6（历史；由 r7 supersede）允许 Agent 在逐项验证通过后调用一个 exact、one-shot、无 generic API escape
   hatch 的 ruleset operation。原始管理员 token/private key 只在 gateway secret
   boundary 内；standing authorization 必须由维护者在 authorization-bearing
   readiness PR 中创建并 merge，包含
   operation digest、before/after/rollback hash、ruleset/ref lease key、相对有效期、
   max uses 与撤销条件。Agent 不得创建、修改或批准该授权。
+- r7 采用 CHG-2026-033 已批准的两层保护：ordinary ref ruleset 与 exact-main branch
+  protection 的仓外变更只由人类维护者在 Agent 不可达的隔离会话执行。CHG-2026-030
+  不实现、provision 或调用 privileged gateway，不持有 standing authorization，也不
+  产生 ruleset/branch-protection/repository-setting write capability。HLR-002A 后续
+  只消费 TASK-RPT-001 已合入的 authenticated read-back、正负矩阵与 evidence merge
+  OID，执行 fresh creator canary；不得重放旧 topology payload 或旧 probe。
 - reviewer loop 仅调度并记录独立 AI 合前 review（`APPROVE` / `REQUEST_CHANGES` /
   `BLOCKED`）；它不作 GitHub approval、不 merge、不改变 change/task 状态。通过
   checks 与独立 review 后，worker 才可按 CHG-2026-027 将 digest 放入 batch Issue；
@@ -156,9 +173,9 @@ Observable behavior before/after:
 ## Scope(涉及的 Requirement/AC)
 
 - Requirements:无（canonical Core 零认领）
-- Acceptance:六条 change-local：`HLR-ENVELOPE-001`、`HLR-LEASE-001`、
-  `HLR-WORKER-001`、`HLR-REVIEW-001`、`HLR-RECOVERY-001`、
-  `HLR-D2-GATE-001`
+- Acceptance:五条 change-local：`HLR-ENVELOPE-001`、`HLR-LEASE-001`、
+  `HLR-WORKER-001`、`HLR-REVIEW-001`、`HLR-RECOVERY-001`。r6 新增的
+  `HLR-D2-GATE-001` 随 #449/#454 gateway path 由 r7 退役，不是 current result gate。
 - Contracts/schemas:repo-local runtime envelope、cursor 和 lease serialization；均不进入
   Core contract registry
 - Core baseline bump:不需要
@@ -181,17 +198,19 @@ Observable behavior before/after:
   category 的潜在 endpoint coverage 不构成批准/合并权威；main 写、self-approval、
   merge 与 admin 的 live negative probes 仍须 fail closed。凭据值永不入仓。该前置与
   CHG-2026-027 TASK-BAP-003 凭据分离同等不可跳过。
-- Scoped D2 authority：TASK-HLR-002B 的 gateway 使用与普通 worker credential 隔离的
-  secret boundary，只接受 canonical operation request；每次 dispatch 前从 protected
-  main 验证 authorization carrier 已 merged、未撤销、未过期、use count 未耗尽，并以
-  durable compare-and-swap lease 锁定 `repository + ruleset ID + ref namespace`。
-  lease/receipt 只记录 fence、hash、时间和脱敏 identity，不是批准事实。gateway 不能
-  构造 authorization 未列出的 method、endpoint、body 或 target。
-- Ref boundary：ruleset target pattern 同属 D2 权限配置。当前
-  `refs/heads/agent/**` 的单层 probe 不能外推到多层 reserved ref；修复必须保留
-  `~ALL` 的 creation/update/deletion 收权、非 bypass Deploy Key 与仅维护者 bypass，
-  只增加经 read-back/正负 probes 证明的 `agent` 多层 exclusion。任何 pattern 过宽、
-  main/non-agent write 意外成功或 reserved create 仍被拒都立即 rollback/停链。
+- Human-only D2 authority：ruleset、branch protection、repository setting 与 credential
+  的 authenticated read/write 只能由维护者在 Agent 不可达的隔离会话执行，并由
+  CHG-2026-033 的独立 readiness/evidence/done 流程授权和记录。Agent runtime、Deploy
+  Key、GitHub App、Actions token 与任何 integration identity 均不得取得该管理能力；
+  maintainer credential 不得进入 gateway、Agent process、repository 或 Agent 可达
+  secret storage。
+- Ref boundary：current 目标由 CHG-2026-033 的两层 topology 定义。ordinary ref
+  ruleset 保留 `~ALL`、creation/update/deletion、human-only bypass，并排除 exact
+  `main` 及单层/多层 `agent` namespace；exact `main` 由 branch protection 独立强制
+  PR、CODEOWNER review、`guard`、admin enforcement、human-only push allowlist 及
+  force/delete/auto-merge 禁令。HLR-002A 不再拥有 ruleset delta，只能在
+  TASK-RPT-001 evidence 合入后验证 reserved/ordinary creator 行为。任一保护缺失、
+  actor 超集、负向意外成功或 read-back 不确定都停链。
 - Privacy：cursor/evidence 只存 full Git OID、公开 PR/Issue URL、脱敏 command/result
   摘要与 runtime run ID；不复制 raw API payload、secret 或用户路径。
 - Compatibility：TASK-HLR-002A 只让 legacy workflow 忽略
@@ -210,14 +229,14 @@ Observable behavior before/after:
 CHG-2026-028 `MECH-004` evidence 如实引用；未出现该 run 不得预填为 live evidence。
 
 r1 的 TASK-HLR-001 已 done；HLR-002A implementation #419 已合入，但 live canary
-#421 = FAIL，r5 readiness #435 的绝对窗口/全仓漂移模型由 r6 supersede，未产生 D2
-receipt 或 PASS。r6 批准后先走新增 TASK-HLR-002B 的独立 readiness、实现/evidence 与
-done；随后由维护者创建一个包含有限 standing authorization 的 HLR-002A scoped D2
-readiness PR。该 PR merge 后以其 `merged_at +15m` 到 `+45m` 为执行窗口，
-Agent 在 exact gateway/lease/sensitive gates 全过后执行。HLR-002A done 后才进入
+#421 = FAIL。#435 从未产生 D2 receipt/PASS；#449/r6 与 #454 readiness 现由 r7
+supersede，TASK-HLR-002B 作为不可复用的历史 tombstone 保持 `blocked`，不进入
+implementation/evidence/done。r7 后的权威顺序是：先由 CHG-2026-033
+TASK-RPT-001 独立 readiness → 人类设置执行 → evidence → done；再以其 evidence merge
+OID 起草 HLR-002A fresh canary-only readiness。HLR-002A done 后才进入
 TASK-HLR-002。worker migration、review/recovery 与 live pilot 再按顺序推进。每个 PR
 仍独立 review/merge；D1/D2 判断门后不做投机性成 PR 工作；change `verified`
-只能在七个 task 与六条 acceptance 均有可复查 evidence 后以独立状态 PR 起草。
+只能在六个 active task 与五条 acceptance 均有可复查 evidence 后以独立状态 PR 起草。
 
 ## Approval
 
@@ -343,3 +362,25 @@ TASK-HLR-002。worker migration、review/recovery 与 live pilot 再按顺序推
   probe reservation 均只作历史，不得补跑、改时间或作为 r6 PASS。r6 后必须使用
   TASK-HLR-002B 已验证实现与独立 fresh readiness/authorization；HLR-002/003 在
   HLR-002A done 前继续 blocked。
+
+## r7 approval boundary
+
+- 本 revision 是 CHG-2026-033 approval #455 与后续 TASK-HLR-002B readiness #454
+  合入后的 D1 governance-only conflict resolution；只修改本 change 的
+  proposal/design/tasks/verification。它不修改 source/test/workflow/evidence，
+  不创建/修改 ruleset、branch protection、repository setting、credential、ref、PR
+  状态或 standing authorization，也不执行 probe。
+- 维护者 review/merge 本 revision 后，#449/r6 的 Agent-operated constrained gateway、
+  standing authorization、merge-relative window 与 scoped D2 ruleset lease 不再是
+  current plan；#454 的 `ready` 及其 pins/fixtures/allowed paths 只作历史，不授权
+  implementation。TASK-HLR-002B 保留为 `blocked` tombstone，task ID 不得复用；
+  `HLR-D2-GATE-001` 从 current acceptance/result gate 退役。
+- #435 与所有旧 OID、window、payload、hash、probe UUID、temporary executor 永久
+  不可执行；#419 source/repository evidence 与 #421 GH013 failure evidence 保持原
+  日期下的历史真实性，不得删除、改写为 PASS 或当作 fresh canary。
+- ruleset/main protection 迁移仅由 CHG-2026-033 TASK-RPT-001 的 human-isolated D2
+  流程执行。HLR-002A 保持 `blocked`，且其 fresh readiness 必须依赖 TASK-RPT-001
+  done/evidence merge OID，只授权 canary/evidence，不含任何 GitHub 管理设置 mutation。
+- 本 r7 merge 不使 TASK-HLR-002A、TASK-HLR-002B 或任何下游 task ready。任一
+  Agent-reachable ruleset/protection/admin/credential route、维护者凭据暴露、旧 payload
+  重放或 TASK-RPT-001 尚未 done 即起草 HLR-002A readiness，均 dispatch = 0。
