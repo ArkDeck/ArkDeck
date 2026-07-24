@@ -169,6 +169,26 @@ final class AutoUpdateContractTests: XCTestCase {
     }
   }
 
+  func testTEST_AU_CONTRACT_001_prepareRejectsInvalidUnsignedPayloadBeforeSigning() throws {
+    XCTAssertNoThrow(
+      try UpdateFeedVerifier.validateUnsignedPayloadForSigning(
+        payloadModel(
+          issuedAt: "2026-07-01T00:00:00Z",
+          expiresAt: "2026-07-31T00:00:00Z")))
+
+    assertUnsignedPayloadError(payloadModel(version: "2.0"), expected: .invalidVersion)
+    assertUnsignedPayloadError(
+      payloadModel(issuedAt: "2026-07-23 00:00:00Z"), expected: .invalidTimestamp)
+    assertUnsignedPayloadError(
+      payloadModel(
+        issuedAt: "2026-07-01T00:00:00Z",
+        expiresAt: "2026-08-01T00:00:00Z"),
+      expected: .invalidValidityWindow)
+    assertUnsignedPayloadError(
+      payloadModel(artifactURL: "https://evil.example/ArkDeck.dmg"),
+      expected: .invalidArtifactURL)
+  }
+
   func testTEST_AU_PRIVACY_001_requestAndRedirectAllowlist() throws {
     let identity = UpdateProductIdentity(
       appVersion: "1.2.3", osVersion: "14.4.1", architecture: "arm64")
@@ -352,6 +372,48 @@ final class AutoUpdateContractTests: XCTestCase {
     }
   }
 
+  func testTEST_AU_CONTRACT_001_cancelTerminatesDownloadAndLateCatchCannotClobberRestart()
+    async throws
+  {
+    let signed = try signedFixture()
+    let storage = try temporaryArtifactStore()
+    defer { try? FileManager.default.removeItem(at: storage.root) }
+    let streamer = CancellableArtifactStreamer(
+      feed: signed.envelope,
+      partialArtifact: Data(signed.artifactBytes.prefix(5)))
+    let service = AutoUpdateService(
+      streamer: streamer,
+      verifier: UpdateFeedVerifier(
+        trust: signed.trust, replayStore: MemoryReplayStore()),
+      artifactStore: storage.store,
+      artifactValidator: FakeArtifactValidator(),
+      preferences: MemoryUpdatePreferences())
+
+    _ = try await service.checkManually(identity: verificationIdentity(), now: now)
+    let download = Task {
+      try await service.downloadAvailableUpdate()
+    }
+    try await waitUntil { streamer.artifactStarted }
+    await service.cancel()
+
+    let restarted = try await service.checkManually(identity: verificationIdentity(), now: now)
+    guard case .available = restarted else {
+      return XCTFail("the replacement check must remain active")
+    }
+    let result = await download.result
+    switch result {
+    case .success:
+      XCTFail("cancelled download unexpectedly succeeded")
+    case .failure(let error):
+      XCTAssertEqual(error as? UpdateDownloadError, .cancelled)
+    }
+    try await waitUntil { streamer.artifactTerminated }
+    guard case .available = await service.state else {
+      return XCTFail("late completion from the cancelled download clobbered the replacement check")
+    }
+    XCTAssertTrue(try cachedArtifacts(in: storage.store).isEmpty)
+  }
+
   func testTEST_AU_CONTRACT_001_teamUnsignedReplacementAndConsentHaveZeroHandoff()
     async throws
   {
@@ -432,7 +494,11 @@ final class AutoUpdateContractTests: XCTestCase {
     }
     XCTAssertEqual(fixture.streamer.feedRequestCount, 1)
 
-    _ = try await fixture.service.downloadAvailableUpdate()
+    let awaitingConsent = try await fixture.service.downloadAvailableUpdate()
+    guard case .awaitingConsent(let feed, _) = awaitingConsent else {
+      return XCTFail("expected final-consent state")
+    }
+    XCTAssertEqual(feed.payload.releaseNotesSummary, "Security and reliability improvements.")
     XCTAssertEqual(fixture.streamer.artifactRequestCount, 1)
     let countBeforeHandoff = fixture.revealer.count
     XCTAssertEqual(countBeforeHandoff, 0)
@@ -460,6 +526,9 @@ final class AutoUpdateContractTests: XCTestCase {
       ISO8601DateFormatter().date(from: "2026-07-24T00:00:00Z"))
     preferences.recordCheckAttempt(attempt)
     XCTAssertEqual(preferences.lastCheckAttempt(), attempt)
+    XCTAssertEqual(AutoUpdateApplicationFacade.normalizedApplicationVersion("1.4"), "1.4.0")
+    XCTAssertEqual(AutoUpdateApplicationFacade.normalizedApplicationVersion("1.4.2"), "1.4.2")
+    XCTAssertEqual(AutoUpdateApplicationFacade.normalizedApplicationVersion("01.4"), "01.4")
   }
 
   func testTEST_AU_CONTRACT_001_entitlementsDependenciesSecretsAndDisclosure() throws {
@@ -489,6 +558,14 @@ final class AutoUpdateContractTests: XCTestCase {
       contentsOf: repository.appending(path: "ArkDeck.xcodeproj/project.pbxproj"),
       encoding: .utf8)
     XCTAssertFalse(project.contains("XCRemoteSwiftPackageReference"))
+    let marketingVersions = project.split(separator: "\n").compactMap { line -> String? in
+      guard line.contains("MARKETING_VERSION =") else { return nil }
+      return line.split(separator: "=", maxSplits: 1)[1]
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+        .trimmingCharacters(in: CharacterSet(charactersIn: ";"))
+    }
+    XCTAssertFalse(marketingVersions.isEmpty)
+    XCTAssertTrue(marketingVersions.allSatisfy { UpdateSemanticVersion($0) != nil })
     XCTAssertFalse(
       FileManager.default.fileExists(
         atPath: repository.appending(path: "Package.resolved").path))
@@ -510,12 +587,32 @@ final class AutoUpdateContractTests: XCTestCase {
     XCTAssertTrue(localization.contains("ArkDeck version, macOS version, and CPU architecture"))
     XCTAssertTrue(localization.contains("No device ID, user path, locale, telemetry"))
     XCTAssertTrue(localization.contains("does not install, replace itself, update on quit"))
+    XCTAssertTrue(localization.contains("\"update.status.automaticCheckIncomplete\""))
+    XCTAssertTrue(localization.contains("automatic update check did not complete"))
+    let appSource = try String(
+      contentsOf: repository.appending(path: "ArkDeckApp/App/ArkDeckApp.swift"),
+      encoding: .utf8)
+    XCTAssertTrue(appSource.contains("update.status.automaticCheckIncomplete"))
+    XCTAssertFalse(appSource.contains("artifact.downloaded.url.lastPathComponent"))
+    let cliSource = try String(
+      contentsOf: repository.appending(
+        path: "Packages/ArkDeckKit/Sources/ArkDeckCLI/ArkDeckCLIMain.swift"),
+      encoding: .utf8)
+    XCTAssertTrue(cliSource.contains("validateUnsignedPayloadForSigning(payload)"))
+    let feedSource = try String(
+      contentsOf: repository.appending(
+        path: "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/AutoUpdate/UpdateFeed.swift"),
+      encoding: .utf8)
+    XCTAssertTrue(feedSource.contains("UpdateNetworkContract.allowedHosts.contains(host)"))
+    XCTAssertFalse(feedSource.contains("allowedArtifactHosts"))
     let releaseProcedure = try String(
       contentsOf: repository.appending(path: "docs/release/macos-auto-update.md"),
       encoding: .utf8)
     XCTAssertTrue(releaseProcedure.contains("openssl pkeyutl -sign -rawin"))
     XCTAssertTrue(releaseProcedure.contains("最后才发布签名 feed"))
     XCTAssertTrue(releaseProcedure.contains("不得成为 CLI 参数、环境变量"))
+    XCTAssertTrue(releaseProcedure.contains("30 天有效期是强制 freshness 边界"))
+    XCTAssertTrue(releaseProcedure.contains("不支持同版本续期"))
   }
 
   func testTEST_AU_CONTRACT_001_updateDiagnosticsUseClosedPublicEventsOnly() throws {
@@ -541,6 +638,25 @@ final class AutoUpdateContractTests: XCTestCase {
 
   // MARK: - Fixtures
 
+  private func payloadModel(
+    sequence: UInt64 = 1,
+    version: String = "2.0.0",
+    issuedAt: String = "2026-07-23T00:00:00Z",
+    expiresAt: String = "2026-08-01T00:00:00Z",
+    artifactURL: String =
+      "https://github.com/ArkDeck/ArkDeck/releases/download/v2.0.0/ArkDeck.dmg",
+    notes: String = "Security and reliability improvements."
+  ) -> UpdateFeedPayload {
+    let artifactBytes = Data("verified-dmg-fixture".utf8)
+    return UpdateFeedPayload(
+      sequence: sequence, version: version, minimumSystemVersion: "14.0.0",
+      architectures: ["arm64"], issuedAt: issuedAt, expiresAt: expiresAt,
+      artifact: UpdateArtifactDescriptor(
+        url: artifactURL, byteLength: UInt64(artifactBytes.count),
+        sha256: UpdateFeedCodec.sha256(artifactBytes)),
+      releaseNotesSummary: notes)
+  }
+
   private func signedFixture(
     privateKey: Curve25519.Signing.PrivateKey = .init(),
     sequence: UInt64 = 1,
@@ -554,14 +670,10 @@ final class AutoUpdateContractTests: XCTestCase {
     let trust = try UpdateFeedTrust(
       keyID: "test-update-key", rawPublicKey: privateKey.publicKey.rawRepresentation)
     let artifactBytes = Data("verified-dmg-fixture".utf8)
-    let payloadModel = UpdateFeedPayload(
-      sequence: sequence, version: version, minimumSystemVersion: "14.0.0",
-      architectures: ["arm64"], issuedAt: issuedAt, expiresAt: expiresAt,
-      artifact: UpdateArtifactDescriptor(
-        url: artifactURL, byteLength: UInt64(artifactBytes.count),
-        sha256: UpdateFeedCodec.sha256(artifactBytes)),
-      releaseNotesSummary: notes)
-    let payload = try UpdateFeedCodec.canonicalPayload(payloadModel)
+    let payload = try UpdateFeedCodec.canonicalPayload(
+      payloadModel(
+        sequence: sequence, version: version, issuedAt: issuedAt, expiresAt: expiresAt,
+        artifactURL: artifactURL, notes: notes))
     let signature = try privateKey.signature(
       for: UpdateFeedCodec.signatureInput(payload: payload, keyID: trust.keyID))
     return SignedFixture(
@@ -612,6 +724,31 @@ final class AutoUpdateContractTests: XCTestCase {
     ) { error in
       XCTAssertEqual(error as? UpdateFeedError, expected, file: file, line: line)
     }
+  }
+
+  private func assertUnsignedPayloadError(
+    _ payload: UpdateFeedPayload,
+    expected: UpdateFeedError,
+    file: StaticString = #filePath,
+    line: UInt = #line
+  ) {
+    XCTAssertThrowsError(
+      try UpdateFeedVerifier.validateUnsignedPayloadForSigning(payload),
+      file: file, line: line
+    ) { error in
+      XCTAssertEqual(error as? UpdateFeedError, expected, file: file, line: line)
+    }
+  }
+
+  private func waitUntil(
+    attempts: Int = 2_000,
+    condition: () -> Bool
+  ) async throws {
+    for _ in 0..<attempts {
+      if condition() { return }
+      try await Task.sleep(for: .milliseconds(1))
+    }
+    throw URLError(.timedOut)
   }
 
   private func stream(_ chunks: [Data]) -> AsyncThrowingStream<Data, any Error> {
@@ -761,6 +898,42 @@ private final class FakeUpdateStreamer: UpdateHTTPStreaming, @unchecked Sendable
     return AsyncThrowingStream { continuation in
       continuation.yield(data)
       continuation.finish()
+    }
+  }
+}
+
+private final class CancellableArtifactStreamer: UpdateHTTPStreaming, @unchecked Sendable {
+  private let feed: Data
+  private let partialArtifact: Data
+  private let lock = NSLock()
+  private var started = false
+  private var terminated = false
+
+  init(feed: Data, partialArtifact: Data) {
+    self.feed = feed
+    self.partialArtifact = partialArtifact
+  }
+
+  var artifactStarted: Bool { lock.withLock { started } }
+  var artifactTerminated: Bool { lock.withLock { terminated } }
+
+  func stream(
+    for request: URLRequest,
+    maximumBytes: UInt64
+  ) -> AsyncThrowingStream<Data, any Error> {
+    guard request.url?.path.hasSuffix(".dmg") == true else {
+      return AsyncThrowingStream { continuation in
+        continuation.yield(feed)
+        continuation.finish()
+      }
+    }
+    return AsyncThrowingStream { continuation in
+      continuation.onTermination = { [weak self] _ in
+        guard let self else { return }
+        self.lock.withLock { self.terminated = true }
+      }
+      lock.withLock { started = true }
+      continuation.yield(partialArtifact)
     }
   }
 }

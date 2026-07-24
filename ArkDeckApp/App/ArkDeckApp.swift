@@ -141,8 +141,8 @@ private final class AutoUpdateViewModel: ObservableObject {
       {
         await synchronize()
       } catch {
-        // Automatic network failure is intentionally non-modal. Manual checks expose failure.
-        statusKey = "update.status.current"
+        // Automatic failure stays non-modal without claiming that this App is current.
+        statusKey = "update.status.automaticCheckIncomplete"
         isBusy = false
       }
     }
@@ -225,9 +225,9 @@ private final class AutoUpdateViewModel: ObservableObject {
       statusKey = "update.status.verifying"
       isBusy = true
       canCheck = false
-    case .awaitingConsent(let artifact):
+    case .awaitingConsent(let feed, _):
       statusKey = "update.status.awaitingConsent"
-      releaseNotesSummary = artifact.downloaded.url.lastPathComponent
+      releaseNotesSummary = feed.payload.releaseNotesSummary
       canCheck = false
       canReveal = true
     case .handedOff:

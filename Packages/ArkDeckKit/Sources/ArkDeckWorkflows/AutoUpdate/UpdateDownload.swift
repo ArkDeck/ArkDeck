@@ -70,7 +70,7 @@ public struct UpdateArtifactStore: Sendable {
     do {
       names = try FileManager.default.contentsOfDirectory(atPath: directory.path)
     } catch {
-      throw UpdateDownloadError.fileOperationFailed(errno: errno)
+      throw UpdateDownloadError.fileOperationFailed(errno: Self.posixErrorCode(for: error))
     }
     for name in names where name.hasSuffix(".part") {
       guard name == URL(fileURLWithPath: name).lastPathComponent else { continue }
@@ -120,6 +120,7 @@ public struct UpdateArtifactStore: Sendable {
     } catch is CancellationError {
       throw UpdateDownloadError.cancelled
     }
+    if Task.isCancelled { throw UpdateDownloadError.cancelled }
     guard received == expectedLength else { throw UpdateDownloadError.truncated }
     let actualDigest = hasher.finalize().map { String(format: "%02x", $0) }.joined()
     guard actualDigest == expectedSHA256 else { throw UpdateDownloadError.digestMismatch }
@@ -198,7 +199,7 @@ public struct UpdateArtifactStore: Sendable {
         at: directory, withIntermediateDirectories: true,
         attributes: [.posixPermissions: 0o700])
     } catch {
-      throw UpdateDownloadError.fileOperationFailed(errno: errno)
+      throw UpdateDownloadError.fileOperationFailed(errno: Self.posixErrorCode(for: error))
     }
     let descriptor = Darwin.open(
       directory.path, O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW)
@@ -263,10 +264,23 @@ public struct UpdateArtifactStore: Sendable {
       }
       if count < 0, errno == EINTR { continue }
       guard count > 0 else {
-        throw UpdateDownloadError.fileOperationFailed(errno: errno)
+        throw UpdateDownloadError.fileOperationFailed(errno: count == 0 ? EIO : errno)
       }
       offset += count
     }
+  }
+
+  private static func posixErrorCode(for error: any Error) -> Int32 {
+    let cocoaError = error as NSError
+    if cocoaError.domain == NSPOSIXErrorDomain {
+      return Int32(clamping: cocoaError.code)
+    }
+    if let underlying = cocoaError.userInfo[NSUnderlyingErrorKey] as? NSError,
+      underlying.domain == NSPOSIXErrorDomain
+    {
+      return Int32(clamping: underlying.code)
+    }
+    return EIO
   }
 
   private func fullSync(_ descriptor: Int32) throws {

@@ -49,6 +49,12 @@
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "DMG 已通过签名与 Team 验证。请再次确认后在 Finder 中显示。" } }
       }
     },
+    "update.status.automaticCheckIncomplete" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The last automatic update check did not complete. Use Check Now to retry." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "上次自动更新检查未完成。可点“立即检查”重试。" } }
+      }
+    },
     "update.status.cancelled" : {
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Update operation cancelled." } },

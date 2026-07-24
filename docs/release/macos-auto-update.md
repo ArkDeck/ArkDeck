@@ -32,6 +32,11 @@ payload、signature input、64-byte signature、feed 和内置公钥。
 - UTC RFC3339 的 `issuedAt`/`expiresAt`，有效窗口为正且不超过 30 天；
 - GitHub Release 的最终 HTTPS DMG URL。
 
+v1 的 30 天有效期是强制 freshness 边界，不支持同版本续期：相同 `sequence`
+只能重放逐字节相同的 payload，而更高 `sequence` 必须携带严格更高的稳定版本。
+因此维护者必须监控当前 feed 的 `expiresAt`，并在到期前发布一个更高版本（必要时
+发布只含维护修订的 patch 版本）和新的 feed。不得只延长同版本的 `expiresAt`。
+
 如果 key 需要轮换，必须先通过独立 change 发布同时信任新 key 的 App，再切换
 feed；feed 自身不能下发新的信任根。
 
@@ -44,7 +49,8 @@ feed；feed 自身不能下发新的信任根。
 3. 验证 App、DMG、staple 和 Gatekeeper 结果；确认 DMG 的 Team identifier 与
    发布中的 ArkDeck App 相同。
 4. 使用仓库构建出的 `arkdeck update-feed prepare` 流式计算最终 DMG 的长度和
-   SHA-256，并生成确定性 payload 与签名输入。
+   SHA-256；该命令先验证版本、时间窗口、架构与 artifact URL，再生成确定性
+   payload 与签名输入。失败时不得进入隔离签名步骤。
 5. 在隔离维护者终端使用本地 OpenSSL 私钥签名 signature input。
 6. 使用 `arkdeck update-feed assemble` 以 App 内置公钥组装并完整自验 feed。
 7. 先上传 DMG，再下载回读并逐字节核对长度和 SHA-256。
@@ -97,5 +103,7 @@ Gatekeeper 结论以及 feed 自验结论；不得记录私钥路径、口令、
 - feed 组装、自验、上传或 fetch-back 不一致：不发布/不覆盖 feed。
 - feed 已发布后发现问题：旧 sequence 不能重放，旧版本不能降级发布。修复产物后
   使用更高版本和更高 sequence 重新走完整流程。
+- 当前 feed 即将到期但没有功能发布：仍须在 `expiresAt` 前发布更高 patch 版本；
+  同版本 re-issue/续期会被客户端按 replay/non-increasing release 拒绝。
 - 客户端验签、长度、摘要、Team identity 或最终复验失败：删除不可信缓存，安装
   动作为零。支持人员只可建议重新检查或改用已记录的手动公证 DMG 过渡通道。

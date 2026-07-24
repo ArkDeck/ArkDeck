@@ -350,9 +350,6 @@ public enum UpdateAvailability: Equatable, Sendable {
 
 public struct UpdateFeedVerifier: Sendable {
   public static let maximumValiditySeconds: TimeInterval = 30 * 24 * 60 * 60
-  public static let allowedArtifactHosts: Set<String> = [
-    "github.com", "release-assets.githubusercontent.com", "objects.githubusercontent.com",
-  ]
 
   private let trust: UpdateFeedTrust
   private let replayStore: any UpdateReplayStoring
@@ -373,12 +370,17 @@ public struct UpdateFeedVerifier: Sendable {
     guard let installed = UpdateSemanticVersion(context.installedVersion) else {
       throw UpdateFeedError.invalidVersion
     }
-    guard let system = UpdateSemanticVersion(normalizedSystemVersion(context.systemVersion)) else {
+    guard
+      let system = UpdateSemanticVersion(Self.normalizedSystemVersion(context.systemVersion))
+    else {
       throw UpdateFeedError.invalidSystemVersion
     }
     let decoded = try UpdateFeedCodec.decodeAndVerify(data, trust: trust)
     let payload = decoded.payload
-    let candidate = try validatePayload(payload, now: now)
+    let validated = try Self.validateStaticPayload(payload)
+    guard now >= validated.issued else { throw UpdateFeedError.feedNotYetValid }
+    guard now <= validated.expires else { throw UpdateFeedError.feedExpired }
+    let candidate = validated.version
     let payloadHash = UpdateFeedCodec.sha256(decoded.canonicalPayload)
     let nextRecord = UpdateReplayRecord(
       sequence: payload.sequence, payloadSHA256: payloadHash, version: payload.version)
@@ -401,7 +403,8 @@ public struct UpdateFeedVerifier: Sendable {
       return .noUpdate(.unsupportedArchitecture)
     }
     guard
-      let minimum = UpdateSemanticVersion(normalizedSystemVersion(payload.minimumSystemVersion)),
+      let minimum = UpdateSemanticVersion(
+        Self.normalizedSystemVersion(payload.minimumSystemVersion)),
       minimum <= system
     else {
       return .noUpdate(.unsupportedSystem)
@@ -412,9 +415,16 @@ public struct UpdateFeedVerifier: Sendable {
         payloadSHA256: payloadHash))
   }
 
-  private func validatePayload(_ payload: UpdateFeedPayload, now: Date) throws
-    -> UpdateSemanticVersion
-  {
+  /// Validates every signed payload field that can be checked before the isolated maintainer
+  /// environment signs it. Freshness against the client's current clock and replay state remain
+  /// verification-time checks.
+  public static func validateUnsignedPayloadForSigning(_ payload: UpdateFeedPayload) throws {
+    _ = try validateStaticPayload(payload)
+  }
+
+  private static func validateStaticPayload(_ payload: UpdateFeedPayload) throws -> (
+    version: UpdateSemanticVersion, issued: Date, expires: Date
+  ) {
     guard payload.sequence > 0 else { throw UpdateFeedError.invalidPayload }
     guard let version = UpdateSemanticVersion(payload.version) else {
       throw UpdateFeedError.invalidVersion
@@ -435,13 +445,11 @@ public struct UpdateFeedVerifier: Sendable {
     guard duration > 0, duration <= Self.maximumValiditySeconds else {
       throw UpdateFeedError.invalidValidityWindow
     }
-    guard now >= issued else { throw UpdateFeedError.feedNotYetValid }
-    guard now <= expires else { throw UpdateFeedError.feedExpired }
     try validateArtifact(payload.artifact)
-    return version
+    return (version, issued, expires)
   }
 
-  private func validateArtifact(_ artifact: UpdateArtifactDescriptor) throws {
+  private static func validateArtifact(_ artifact: UpdateArtifactDescriptor) throws {
     guard artifact.byteLength > 0 else { throw UpdateFeedError.invalidArtifactLength }
     guard artifact.sha256.count == 64,
       artifact.sha256.allSatisfy({
@@ -451,13 +459,13 @@ public struct UpdateFeedVerifier: Sendable {
     guard let components = URLComponents(string: artifact.url),
       components.scheme == "https", components.user == nil, components.password == nil,
       components.fragment == nil, components.port == nil,
-      let host = components.host?.lowercased(), Self.allowedArtifactHosts.contains(host),
+      let host = components.host?.lowercased(), UpdateNetworkContract.allowedHosts.contains(host),
       !isIPAddress(host), components.path.hasSuffix(".dmg"),
       components.url?.absoluteString == artifact.url
     else { throw UpdateFeedError.invalidArtifactURL }
   }
 
-  private func timestamp(_ value: String) throws -> Date {
+  private static func timestamp(_ value: String) throws -> Date {
     let formatter = ISO8601DateFormatter()
     formatter.formatOptions = [.withInternetDateTime]
     guard let date = formatter.date(from: value), formatter.string(from: date) == value else {
@@ -466,13 +474,13 @@ public struct UpdateFeedVerifier: Sendable {
     return date
   }
 
-  private func normalizedSystemVersion(_ value: String) -> String {
+  private static func normalizedSystemVersion(_ value: String) -> String {
     let parts = value.split(separator: ".", omittingEmptySubsequences: false)
     if parts.count == 2 { return value + ".0" }
     return value
   }
 
-  private func isIPAddress(_ host: String) -> Bool {
+  private static func isIPAddress(_ host: String) -> Bool {
     host.contains(":")
       || host.split(separator: ".").count == 4
         && host.split(separator: ".").allSatisfy { UInt8($0) != nil }

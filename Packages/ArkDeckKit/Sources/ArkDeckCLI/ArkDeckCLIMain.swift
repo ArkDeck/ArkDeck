@@ -296,6 +296,7 @@ struct ArkDeckCommandLine {
       artifact: UpdateArtifactDescriptor(
         url: artifactURL, byteLength: measurement.byteLength, sha256: measurement.sha256),
       releaseNotesSummary: notes)
+    try UpdateFeedVerifier.validateUnsignedPayloadForSigning(payload)
     let canonicalPayload = try UpdateFeedCodec.canonicalPayload(payload)
     let signatureInput = try UpdateFeedCodec.signatureInput(
       payload: canonicalPayload, keyID: UpdateFeedTrust.productionKeyID)

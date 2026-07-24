@@ -7,7 +7,6 @@ public enum AutoUpdateFailureCode: String, Equatable, Sendable {
   case download
   case artifact
   case handoff
-  case internalState
 }
 
 public enum AutoUpdateServiceError: Error, Equatable, Sendable {
@@ -25,7 +24,7 @@ public enum AutoUpdateState: Equatable, Sendable {
   case noUpdate(UpdateNoUpdateReason)
   case downloading(VerifiedUpdateFeed)
   case verifying(DownloadedUpdateArtifact)
-  case awaitingConsent(ValidatedUpdateArtifact)
+  case awaitingConsent(feed: VerifiedUpdateFeed, artifact: ValidatedUpdateArtifact)
   case handedOff(URL)
   case failed(AutoUpdateFailureCode)
   case cancelled
@@ -84,6 +83,7 @@ public actor AutoUpdateService {
   private let eventLogger: any AutoUpdateEventLogging
   private var internalState: AutoUpdateState = .idle
   private var activeOperationID: UUID?
+  private var activeDownloadTask: Task<DownloadedUpdateArtifact, any Error>?
 
   public init(
     streamer: any UpdateHTTPStreaming,
@@ -159,15 +159,21 @@ public actor AutoUpdateService {
       let request = try UpdateRequestFactory.artifactRequest(signedURL: feed.payload.artifact.url)
       let stream = streamer.stream(
         for: request, maximumBytes: feed.payload.artifact.byteLength)
-      let materialized = try await artifactStore.writeVerified(
-        stream: stream,
-        expectedLength: feed.payload.artifact.byteLength,
-        expectedSHA256: feed.payload.artifact.sha256)
+      let artifactStore = self.artifactStore
+      let downloadTask = Task {
+        try await artifactStore.writeVerified(
+          stream: stream,
+          expectedLength: feed.payload.artifact.byteLength,
+          expectedSHA256: feed.payload.artifact.sha256)
+      }
+      activeDownloadTask = downloadTask
+      let materialized = try await downloadTask.value
       downloaded = materialized
       guard activeOperationID == operationID else {
         artifactStore.remove(materialized)
         throw UpdateDownloadError.cancelled
       }
+      activeDownloadTask = nil
       internalState = .verifying(materialized)
       eventLogger.record(.verificationStarted)
       let validated = try artifactValidator.validate(materialized)
@@ -176,25 +182,22 @@ public actor AutoUpdateService {
         throw UpdateDownloadError.cancelled
       }
       activeOperationID = nil
-      internalState = .awaitingConsent(validated)
+      internalState = .awaitingConsent(feed: feed, artifact: validated)
       return internalState
     } catch is CancellationError {
-      activeOperationID = nil
       if let downloaded { artifactStore.remove(downloaded) }
-      internalState = .cancelled
-      eventLogger.record(.cancelled)
+      transitionIfCurrent(operationID, to: .cancelled, event: .cancelled)
       throw UpdateDownloadError.cancelled
     } catch let error as UpdateDownloadError where error == .cancelled {
-      activeOperationID = nil
       if let downloaded { artifactStore.remove(downloaded) }
-      internalState = .cancelled
-      eventLogger.record(.cancelled)
+      transitionIfCurrent(operationID, to: .cancelled, event: .cancelled)
       throw error
     } catch {
-      activeOperationID = nil
       if let downloaded { artifactStore.remove(downloaded) }
-      internalState = .failed(failureCode(for: error, default: .download))
-      eventLogger.record(.failed)
+      transitionIfCurrent(
+        operationID,
+        to: .failed(failureCode(for: error, default: .download)),
+        event: .failed)
       throw error
     }
   }
@@ -205,7 +208,7 @@ public actor AutoUpdateService {
     revealer: any UpdateArtifactRevealing
   ) async throws -> AutoUpdateState {
     guard explicitConsent else { throw AutoUpdateServiceError.explicitConsentRequired }
-    guard case .awaitingConsent(let approved) = internalState else {
+    guard case .awaitingConsent(_, let approved) = internalState else {
       throw AutoUpdateServiceError.invalidTransition
     }
     do {
@@ -234,6 +237,8 @@ public actor AutoUpdateService {
   public func cancel() {
     switch internalState {
     case .checking, .downloading, .verifying:
+      activeDownloadTask?.cancel()
+      activeDownloadTask = nil
       activeOperationID = nil
       internalState = .cancelled
       eventLogger.record(.cancelled)
@@ -290,16 +295,25 @@ public actor AutoUpdateService {
       }
       return internalState
     } catch is CancellationError {
-      activeOperationID = nil
-      internalState = .cancelled
-      eventLogger.record(.cancelled)
+      transitionIfCurrent(operationID, to: .cancelled, event: .cancelled)
       throw UpdateDownloadError.cancelled
     } catch {
-      activeOperationID = nil
-      internalState = .failed(failureCode(for: error, default: .feed))
-      eventLogger.record(.failed)
+      transitionIfCurrent(
+        operationID, to: .failed(failureCode(for: error, default: .feed)), event: .failed)
       throw error
     }
+  }
+
+  private func transitionIfCurrent(
+    _ operationID: UUID,
+    to state: AutoUpdateState,
+    event: AutoUpdateLogEvent
+  ) {
+    guard activeOperationID == operationID else { return }
+    activeDownloadTask = nil
+    activeOperationID = nil
+    internalState = state
+    eventLogger.record(event)
   }
 
   private func failureCode(
@@ -355,8 +369,18 @@ public enum AutoUpdateApplicationFacade {
       let architecture = "unsupported"
     #endif
     return UpdateProductIdentity(
-      appVersion: version,
+      appVersion: normalizedApplicationVersion(version),
       osVersion: "\(os.majorVersion).\(os.minorVersion).\(os.patchVersion)",
       architecture: architecture)
+  }
+
+  static func normalizedApplicationVersion(_ value: String) -> String {
+    if UpdateSemanticVersion(value) != nil { return value }
+    let components = value.split(separator: ".", omittingEmptySubsequences: false)
+    let threePart = value + ".0"
+    if components.count == 2, UpdateSemanticVersion(threePart) != nil {
+      return threePart
+    }
+    return value
   }
 }
