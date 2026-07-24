@@ -10,7 +10,7 @@ hash-pinned `rkdeveloptool` build. It grants no generic Rockchip command authori
 
 - Executable source: explicit user selection plus app-scoped security-scoped bookmark.
 - Tool identity: `rkdeveloptool ver 1.32`, SHA-256
-  `038a8a0ea26ef7eb77451789f310c0c9fbeaf43a78af1d6146e02311a9c23611`, upstream
+  `bbd7bdc0fb121d414fb61085e77211cc1fdd9a3b6c6b285c54380f70e56c9923`, upstream
   commit `304f073752fd25c854e1bcf05d8e7f925b1f4e14`.
 - Exact argv: `ld`.
 - Effect: read-only observation.
