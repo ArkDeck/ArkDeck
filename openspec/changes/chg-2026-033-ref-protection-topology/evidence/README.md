@@ -38,3 +38,9 @@ probe UUID 均已失效。
 迁移与矩阵，但 TASK-RPT-001 仍为 `ready`：正常 no-bypass merge 与剩余
 Agent/API route negatives 必须由后一独立 operability-evidence PR 记录，之后才允许
 独立 done PR。
+
+2026-07-24 的独立 operability addendum 位于
+`runs/TASK-RPT-001/2026-07-24-no-bypass-operability.md`。它记录 #476 的 exact
+review/check/mergedBy/merge OID、人类未选择 bypass 的 UI 观察、Agent/API route
+inventory，并以自身 PR 的未审批/guard 状态作为只读负向 pilot。该 PR 不修改任务
+状态；只有 addendum 合入后才允许另开 TASK-RPT-001 done PR。
