@@ -59,3 +59,15 @@ b172750c1c0764956725393823fa72014146d9e2ec0f1b19c48cf670964d54b5
 This addendum preserves the high-level `BAP-CRED-001` PASS while replacing its
 current low-level topology pointer. It does not claim a new task execution,
 change TASK-BAP-003 status, or modify historical evidence.
+
+## Archive currency note（2026-07-25）
+
+CHG-2026-033 已由 verification-only PR #497 合入 protected `main`
+`ce4a11c3d7cb59686024be9cbd51939c084041d1` 并进入独立 archive PR。上文三条
+active-root 路径作为 2026-07-24 addendum 原始事实逐字保留；本 archive PR 生效后，
+其 current repository location 为：
+
+`openspec/changes/archive/2026-07-25-chg-2026-033-ref-protection-topology/evidence/runs/TASK-RPT-001/`
+
+目录移动不改变上文固定的三个 Git blob OID 或 JSON 文件 SHA-256。本注只登记路径
+currency，不重跑 topology、不改变 `BAP-CRED-001` 结论，也不改写原始 run evidence。
