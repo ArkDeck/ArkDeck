@@ -150,9 +150,11 @@
 
 ## TASK-RKFUI-001A — DAYU200 HDC→Loader E1 capability characterization
 
-- Status:blocked（proposal r5 merge 后仍等待 TASK-RKFUI-001C done 的 D0 状态推进，才可
-  恢复 E0 capability preparation。E1 继续 blocked：还须确认 pre-existing RockUSB
-  candidate 为 0，并由后续维护者 merged PR 接受逐设备 typed capability evidence）
+- Status:ready（仅在本独立 D0 状态 PR 由维护者 review/merge 后恢复 E0 capability
+  preparation。TASK-RKFUI-001C implementation/evidence PR #482 已合入 `main`，
+  merge OID `048ce16b017db701f88a1eee1349de2b46595db7`。fresh E0 仍须在真实 USB
+  环境证明 pre-existing RockUSB candidate 为 0；E1 继续 blocked，且还须由后续维护者
+  merged PR 接受逐设备 typed capability evidence）
 - Readiness review r2（2026-07-24；host-only 审计，device/HDC command dispatch 0）：
   - Approval/dependency gate:on merge。CHG-2026-026 r1 已由 PR #298 批准；001 discovery
     implementation/hardening 已由 #301/#305 合入。r2 修正旧依赖环：维护者选择 HDC 软件进态
@@ -361,8 +363,11 @@
 
 ## TASK-RKFUI-001C — HDC `3.2.0f` loader-transition exact repin closure
 
-- Status:ready（仅在 proposal r5 由维护者 review/merge 后生效；只允许 host-only
-  registry/probe/test closure，所有 HDC/device/USB command 与 mutation dispatch 为 0）
+- Status:done（implementation/evidence PR #482 已由维护者 review/merge 至 `main`，
+  merge OID `048ce16b017db701f88a1eee1349de2b46595db7`；required guard 与 Swift CI
+  通过，scoped PASS evidence 见 `evidence/runs/TASK-RKFUI-001C/run.md`。本独立 D0
+  状态 PR 只记录确定性结果并恢复 TASK-RKFUI-001A 的 E0 preparation，不新增 scope、
+  风险接受、授权或任何 HDC/device/USB/mutation dispatch）
 - Platform:macos
 - Requirements:`REQ-FLASH-002`、`REQ-DEV-001`、`REQ-DEV-002`
 - Acceptance:`AC-FLASH-002-01`、`AC-DEV-001-01`、`AC-DEV-002-01`
