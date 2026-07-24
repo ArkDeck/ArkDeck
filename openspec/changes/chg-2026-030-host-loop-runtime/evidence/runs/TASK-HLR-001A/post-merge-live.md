@@ -51,14 +51,48 @@
 - Create-path result:PASS。exactly one bot-authored PR and all four required
   exact-head checks completed automatically。
 
+### Existing-PR push path
+
+- Evidence-only follow-up head:
+  `725e9b2a28b300ffd677bc66dcf78d592eb459fd`。
+- Fixed PR read-back remained exactly #488，`author=github-actions[bot]`，
+  `state=open`，same repository，base/ref/head exact
+  `cae9a4c378b75409a4d7a31205583560f17d73aa` /
+  `agent/task-hlr-001a-auto-ci-evidence` /
+  `725e9b2a28b300ffd677bc66dcf78d592eb459fd`。
+- SDD Guard push run `30101592910` = `success`；`guard` job
+  `89508708500` = `success`。
+- Swift CI push run `30101592935` = `success`；`swift` job
+  `89508708466` = `success`。
+- Agent PR push run `30101592833` = `success`：
+  - `open-pr` job `89508708491` = `success`；
+  - `allowed-paths` job `89508745486` = `success`。
+- Exact-head Actions read-back again returned `total_count=3`，all
+  `push/success`；`pull_request`/`action_required` count = 0。
+- Existing-PR result:PASS。the workflow found and revalidated the same unique
+  PR；未创建 duplicate PR，未请求或使用 workflow approval。
+
+### Concurrent protected-main movement
+
+- During the initial Swift run，#486 exact head
+  `f0046fb25804bd2471dc41ee228dbc458adfae5a` was merged by `lvye` at
+  `2026-07-24T14:31:43Z`，advancing main from this pilot's base
+  `cae9a4c378b75409a4d7a31205583560f17d73aa` to
+  `dbb15236cc1dae63398ceff8a697d5d8b24c9ead`。
+- #486 changed only
+  `openspec/changes/chg-2026-023-macos-auto-update/tasks.md`；it has zero
+  overlap with TASK-HLR-001A allowed paths and does not invalidate the
+  post-#485 create/existing-path observations。Before human review，this
+  evidence branch must integrate the then-latest protected main and rerun all
+  exact-head push checks。
+
 ### Remaining gates
 
-本记录仍不宣告整体 `HLR-AUTOCI-001` PASS。后续 evidence-only push 与 human
-metadata event 必须固定以下事实：
+本记录仍不宣告整体 `HLR-AUTOCI-001` PASS。human metadata events 必须固定以下
+事实：
 
-- existing-PR evidence-only push 仍复核同一 PR 且四项检查自动 success；
-- human edit/reopen 仍触发 base-defined metadata revalidation，且无需 workflow
-  approval。
+- human `edited` 与 `reopened` 各自触发 base-defined SDD Guard `guard` 和
+  `allowed-paths` revalidation，且无需 workflow approval。
 
 任一 0/2 PR、wrong repository/base/ref/head/author、缺失 check、`action_required`
 或必须人工批准 workflow 才能满足治理门，均为 FAIL；停止本 task done 与后续
