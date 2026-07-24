@@ -1,6 +1,6 @@
 # CHG-2026-033 Verification Plan
 
-> Change:CHG-2026-033-ref-protection-topology@r2
+> Change:CHG-2026-033-ref-protection-topology@r3
 > Status:planned
 > Core baseline:CORE-2.1.0（零 Core/Product behavior change）
 
@@ -59,8 +59,20 @@ repository/ruleset/branch admin route 不可构造或被 GitHub 拒绝。
 
 完整 before/after/rollback canonical bytes/hash 可复现。旧 ruleset 覆盖 main 时先强化
 branch protection；overlap negative 通过后才 exclusion main；read-back 后重复 negative
-明确由 branch protection 拒绝。任何 failure 先恢复 ruleset main coverage；全流程没有
-main 同时失去两层保护的区间。
+明确由 branch protection 拒绝。failure recovery 先分类 main 与两层保护：已知 exact
+branch-protection after 且 main 未变时，先清理会被 old ruleset 阻断的 controlled Agent
+refs，再恢复 ruleset coverage；main/protection 不确定时优先恢复或保留更严格 main
+保护。全流程没有 main 同时失去两层保护的区间。
+
+Ref mutation read-back uses an exact bounded convergence gate: successful Git
+server receipt, two stable `ls-remote` observations and authenticated REST
+must agree before advancing. A single immediate stale REST value is recorded,
+not silently converted to success or immediate drift. Probe tip commits carry
+`[skip actions]`; pinned workflow/event scans and live run/PR inventory prove
+that temporary probes create no governance PR. When main protection is known
+exact after and main is unchanged, controlled Agent refs are cleaned before
+ruleset rollback; otherwise main recovery takes priority and residual cleanup
+remains blocked.
 
 ### RPT-AUDIT-001
 
@@ -89,6 +101,10 @@ OID/window/payload/hash/ref/UUID/script 明确不可执行。AGENTS.md 与 enfor
 - main force-push/delete：拒绝。
 - merge 后 commit subject `(#N)`、review、mergedBy、merge OID 可审计。
 - before/after/rollback JSON canonical bytes 与 SHA-256 全部复现。
+- 每个 positive ref mutation 的 Git receipt、bounded `ls-remote`/REST convergence
+  与 cleanup absence 可复查；没有 probe-triggered workflow/PR。
+- #470 residual deeper ref 在 exact after-ruleset 下由 Deploy Key 删除；#471 保持
+  closed/unmerged，且不会被复用。
 
 ## Negative and recovery tests
 
@@ -106,6 +122,12 @@ OID/window/payload/hash/ref/UUID/script 明确不可执行。AGENTS.md 与 enfor
 - branch protection full PUT 漏字段或放宽 unrelated stricter setting；
 - negative probe unexpected success；
 - API timeout/ambiguous outcome 后发生 blind retry；
+- 单次 immediate REST stale value 被直接判成 drift，或在 bounded Git/REST
+  convergence 未闭合时继续；
+- positive probe tip 缺少 `[skip actions]`、workflow route/pin 漂移，或 probe
+  产生 Actions run/PR；
+- rollback 在已知 exact main protection 下先恢复会阻断 controlled ref cleanup 的旧
+  ruleset，却未记录 residual；或为了 cleanup 延迟未知 main state 的 recovery；
 - rollback 无法 authenticated read-back/hash；
 - #449/r6 Agent-operated gateway 未由 CHG-2026-030 r7 supersede，或其他 PR 修改
   相同 ruleset/topology/credential authority 而未阻断。
@@ -118,12 +140,15 @@ failed response 与 unknown outcome 原样保存，不在同一 window 换 targe
 1. Bootstrap recovery receipt/evidence PR：只记录 Actions transport setting
    read-back 与 bot-authored PR creation 恢复，不把它算作 topology PASS。
 2. 从该 evidence merge 后的最新 protected main 起草独立 topology D2 readiness。
-3. Human topology D2 execution receipt/evidence PR：只记录事实，不改 task 状态。
-4. 该 PR 在新 topology 下由 `lvye` approval、`guard` success 后正常 merge。
-5. 第二个 operability-evidence PR 记录上一 PR 的 review/check/mergedBy/merge OID 与
+3. #470 fail-closed receipt/evidence #472：只记录历史事实；不构成 AC PASS。
+4. r3 proposal revision → 独立 approval-only → fresh authenticated discovery →
+   全新 topology D2 readiness；各门合入前下一成 PR 工作为 0。
+5. Human topology D2 execution receipt/evidence PR：只记录事实，不改 task 状态。
+6. 该 PR 在新 topology 下由 `lvye` approval、`guard` success 后正常 merge。
+7. 第二个 operability-evidence PR 记录上一 PR 的 review/check/mergedBy/merge OID 与
    人类 no-bypass UI evidence。
-6. 独立 task done PR。
-7. BAP/HLR supersession 由 TASK-RPT-002 独立 readiness/implementation/done PR。
+8. 独立 task done PR。
+9. BAP/HLR supersession 由 TASK-RPT-002 独立 readiness/implementation/done PR。
 
 ## Repository checks
 

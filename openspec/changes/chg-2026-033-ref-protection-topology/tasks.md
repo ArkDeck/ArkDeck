@@ -1,15 +1,17 @@
 # CHG-2026-033 Tasks
 
-> 本 change 已由 approval-only PR #455 置为 `approved`。TASK-RPT-001 仅在本独立
-> D1 状态 PR 经维护者 review/merge 后成为 `ready`，且该状态只开放独立 D2 readiness
-> 起草；TASK-RPT-002 保持 `blocked`。本文件不创建 D2 authorization/window，不批准
-> payload/probe，也没有 done 或 verified 语义。
+> r1/r2 历史批准保持真实。#470 topology D2 fail closed 与 #472 evidence 合入后，
+> r3 只登记 ref convergence、workflow suppression、conditional cleanup 与 residual-ref
+> cleanup 机制；在独立 r3 approval-only PR 合入前，TASK-RPT-001 回到 `blocked`，
+> TASK-RPT-002 保持 `blocked`。本 proposal revision 不创建 D2
+> authorization/window，不批准 payload/probe，也没有 done 或 verified 语义。
 
 ## Cross-change stop gate
 
 在任何 D2 readiness 前必须满足：
 
-- 本 change 已由独立 approval-only PR 置为 `approved`；
+- 本 change 当前 revision 已由独立 approval-only PR 置为 `approved`；r3 approval
+  前不得沿用 r1/r2 approval；
 - CHG-2026-030 以独立 r7 revision：
   - supersede 已由 #449 合入的 r6 Agent-operated ruleset gateway；
   - 明确 #435 与全部旧 window/OID/payload/hash/UUID 永久不可执行；
@@ -23,10 +25,13 @@ GitHub control-plane/ref/probe 数为 0。
 
 ## TASK-RPT-001 — 隔离 Agent 身份并迁移 ref protection topology
 
-- Status:ready（仅在本独立 D1 状态 PR 经维护者 review/merge 后生效；只允许下一
-  独立 PR 从当时最新 protected main 起草/固定 D2 readiness。#455 approval merge
+- Status:blocked（r2 曾为 `ready`；#470 fail closed 后，r3 proposal revision 需要
+  独立 approval-only。只有该 approval-only 经维护者 review/merge 后，任务才重新
+  `ready`，且只允许下一独立 PR 从当时最新 protected main 起草/固定 D2 readiness。
+  #455 approval merge
   `c86f07ae6b843affaaa3f698e2f9f08a6f4c96cd` 与 CHG-2026-030 r7 #456 merge
-  `c5a1a9f0f1c0a9bc0dd3d04275ac01a5738697f7` 已闭合 cross-change stop gate。
+  `c5a1a9f0f1c0a9bc0dd3d04275ac01a5738697f7` 是 r1 历史 gate；
+  r3 approval-only 是新增 current gate。
   本状态不批准任何 before/after/rollback payload、hash、window、operator action、
   probe-ref mutation、credential 或 GitHub control-plane write；D2 readiness 未由 `lvye`
   review/merge 前，task execution dispatch = 0。）
@@ -48,6 +53,10 @@ GitHub control-plane/ref/probe 数为 0。
   `proposal.md`、本 change `design.md`、本 change `verification.md`、本 change
   `acceptance-cases.yaml`，仅用于修订 Actions create+approve 组合 capability 的
   机制描述；不得修改任何其他 path。
+  #472 合入后的 r3 proposal revision 另允许本 change `proposal.md`、`design.md`、
+  `verification.md`、`acceptance-cases.yaml`、`tasks.md` 与
+  `d2-readiness.md`，仅登记 #470 failure、作废旧 readiness 与修订 probe/recovery
+  机制；不包含新 D2 pins、script 或 GitHub mutation。
 - Forbidden paths:`AGENTS.md`、`openspec/constitution.md`、
   `openspec/governance/enforcement.md`、`openspec/specs/**`、
   `openspec/contracts/**`、`.github/**`、产品 source/tests、其他 change
@@ -65,6 +74,12 @@ GitHub control-plane/ref/probe 数为 0。
   after/rollback payload/hash、operator/window、actor inventory 与 fresh probe names；
 - human execution receipt：credential containment、repository auto-merge、main
   branch protection 与 ruleset；
+- bounded ref convergence：Git server receipt、连续 `ls-remote` 与 authenticated
+  REST 在固定预算内一致；单次 stale read 不升级为 drift；
+- probe workflow isolation：positive tip commit 使用 `[skip actions]`，workflow
+  blobs/events 固定，临时 probe 不创建 Actions run 或 PR；
+- #470 residual ref 只在 exact after-ruleset 下由 Deploy Key 删除；失败 cleanup 在
+  main exact protection 已知时先于会重新阻断 deeper ref 的 ruleset rollback；
 - single/multi-level Agent ref 正向矩阵与 ordinary/main/agentx 负向矩阵；
 - Agent/API review/merge/auto-merge/ref/admin 负向矩阵；
 - 正常人类 no-bypass squash merge pilot；由后一独立 operability-evidence PR 记录。
@@ -77,6 +92,8 @@ GitHub control-plane/ref/probe 数为 0。
   `RPT-MIGRATION-001` 全部二值可复查；
 - unexpected success、hidden actor、drift、missing field、ambiguous API、hash mismatch
   或无法 rollback，任一发生立即失败；
+- convergence timeout、Git/REST 持续矛盾、unexpected workflow/PR、residual OID
+  漂移或 cleanup absence 无法证明，任一发生立即失败；
 - execution/evidence PR 不翻状态；evidence 与 operability addendum 均合入后，才可
   以独立 D0 PR `ready → done`。
 
@@ -86,6 +103,16 @@ GitHub control-plane/ref/probe 数为 0。
 - #467 readiness/merge
   `9de9c63f7fe17069ad50ff0a73fc171ce6a14ec8`、两份 apply script、旧 window、
   payload/hash、nonce 与 derived refs 已 exhausted，禁止重跑；
+- #470 readiness/head
+  `c5cb4757065a9a3c65b5f98351e56a3236eda396`、merge
+  `928d6e06b928e16874df9137950a9830aa38d8d0`、executor
+  `124f9b799169fda8e3b0814442accf925f51efffdb2b7165acb7063743dd8f2c`、
+  window、payload/hash 与全部 UUID 已 exhausted；#472 failure evidence merge
+  `398a1e9f14ebf0debe785591f4f7517b54e16b26` 不产生 AC PASS；
+- #471 已 closed/unmerged；其 head ref 保留为唯一 pinned residual：
+  `refs/heads/agent/rpt001/deep/7908274d-d874-47d6-b844-c2e35ba9d2a9` /
+  `2e1e5ce85266f96f54eb60d9f2547398d1c9b3e7`。r3 approval 和 fresh D2
+  merge 前不得删除、移动或复用；
 - 用户明确授权把 bot-authored/open PR #459 的旧 head
   `d3aeeaaa8eba79526474580208dc253c4c46d26a` 作为一次性
   `force-with-lease` expected value。该例外只恢复治理 PR transport，不授权

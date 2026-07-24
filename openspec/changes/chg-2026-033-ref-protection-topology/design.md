@@ -1,7 +1,7 @@
 # CHG-2026-033 Design — fail-closed GitHub ref protection topology
 
 > Status:draft / non-executable
-> Change:CHG-2026-033-ref-protection-topology@r2
+> Change:CHG-2026-033-ref-protection-topology@r3
 
 ## Context and constraints
 
@@ -24,6 +24,11 @@
 - GitHub 没有为 `GITHUB_TOKEN` 提供 repository-level “create PR yes / approve
   review no” 分离开关。r2 必须区分 platform endpoint coverage 与 repository approval
   authority，沿用 CHG-2026-030 r2 已批准的三层证明方式，而不是虚构不存在的 permission。
+- #470 topology D2 已 fail closed 并由 #472 固化：单次 immediate REST ref GET
+  观察到旧 OID，后续 `ls-remote` 与 #471 head 观察到预期新 OID；旧 ruleset 与
+  branch-protection projection 已恢复，`main` 未变。#470 全部 pins 已 exhausted。
+- #470 留下一个 exact deeper `agent/**` ref；误建的无 diff PR #471 已关闭未合并。
+  后续只能在 fresh D2 中按 exact ref/OID 清理，不能用 human bypass 临时处理。
 
 ## Requirement mapping
 
@@ -211,13 +216,16 @@ discover
   -> excludeMainFromOrdinaryRuleset
   -> authenticatedReadbackRuleset
   -> repeatNegativeMainProbeUnderBranchProtectionOnly
+  -> cleanupPinnedResidualRef
   -> negativeRefAndAPIMatrix
   -> normalHumanMergePilot
   -> evidence
 
 any ambiguity/failure
+  -> classifyMainAndBothProtections
+  -> cleanupControlledAgentRefsWhenMainProtectionIsExact
   -> restoreMainRulesetCoverage
-  -> verifyRestore
+  -> verifyMainCoverage
   -> restoreOtherBeforeStateIfSafe
   -> blocked
 ```
@@ -235,14 +243,52 @@ any ambiguity/failure
 7. 人类隔离 admin session 在两项 mutation、read-back 与 immediate negatives 完成后
    才退出，且从未暴露给 Agent。
 
+### Probe transport, convergence and workflow isolation
+
+Temporary ref probes are not governance PR branches. Every positive
+create/update tip commit SHALL contain the exact GitHub skip instruction
+`[skip actions]`. Preflight SHALL pin all repository workflow blobs and prove
+that no workflow uses an event outside `push`/`pull_request` that ignores this
+instruction. The multi-level positive additionally uses the already excluded
+`agent/host-loop/**` namespace. No workflow file, Actions setting or workflow
+enabled state is modified. This mechanism follows GitHub's documented
+[`push`/`pull_request` skip instructions](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/skip-workflow-runs);
+the live preflight remains authoritative over documentation alone.
+
+For each successful create/update:
+
+1. require exit 0 plus the expected server-side Git push receipt;
+2. poll `git ls-remote --refs` within an exact readiness-pinned budget until
+   two consecutive observations equal the expected OID;
+3. poll authenticated Git-ref REST within the same bounded budget until it
+   converges to the expected OID;
+4. assert no PR, Actions run or unexpected ref was created for the probe.
+
+A single stale REST observation is recorded but is not drift while the bounded
+convergence gate remains open. Timeout, persistent transport disagreement,
+unexpected workflow/PR creation or a ref moving to any third OID is ambiguous
+and fails closed. Delete uses the symmetric two-observation absent check plus
+REST 404. DNS, authentication, transport failure or local inference is never
+a positive result.
+
+The exact residual #470 ref/OID is allowed as the sole preexisting controlled
+ref in the next preflight. It is deleted with the Deploy Key only after main
+branch protection is exact after, the ruleset exact after excludes both Agent
+patterns and main, main is unchanged, and #471 is closed/unmerged. Its absence
+is required before fresh probe names are used.
+
 上述 state machine 只适用于后续完整 topology D2。bootstrap recovery 使用更窄的
 `read exact before → write Actions true/read → authenticated read-back → logout`
 state machine，且完全不进入 `strengthenMainProtection` 或
 `excludeMainFromOrdinaryRuleset`。
 
-任一阶段取消或 API outcome 不确定：零盲重试。ruleset 已修改时先恢复 main coverage；
-恢复已验证后，才可在不削弱不变量的前提下恢复其他 before。无法安全恢复则保留更严格
-状态并上报 incident。
+任一阶段取消或 API outcome 不确定：零盲写重试。若 branch protection exact after、
+main 未变且不存在 main negative unexpected success，controlled Agent ref cleanup
+先在 after-ruleset 仍允许 deletion 时执行，随后恢复 ruleset main coverage并验证，再
+恢复 branch protection before。若 main 或 branch-protection state 未知、main negative
+unexpected success，优先恢复 ruleset coverage或保留更严格 branch protection；不得为了
+清理 ref 推迟 main recovery。无法在安全条件下清理的 ref 作为 exact residual 报告，不能
+用未固定的人类 bypass 补删。cleanup 永不把 failed run 变成 PASS。
 
 ## Security and privacy
 
