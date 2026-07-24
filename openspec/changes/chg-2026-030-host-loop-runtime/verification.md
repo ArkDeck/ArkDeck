@@ -1,7 +1,7 @@
 # CHG-2026-030 Verification Plan
 
 > Status:planned
-> Change:CHG-2026-030-host-loop-runtime@r8
+> Change:CHG-2026-030-host-loop-runtime@r9
 > Core baseline:CORE-2.1.0（零 Core/Product behavior change）
 
 ## Environment
@@ -25,12 +25,30 @@
 | Evidence ID | Task | Method | Expected result |
 | --- | --- | --- | --- |
 | HLR-ENVELOPE-001 | HLR-001, HLR-005 | contract + live | task-bound PR 在创建时含独立 `Task: TASK-*`、完整 base/head OID、grade、dependency、evidence、配置 attribution；每类缺失/歧义失败；proposal 用 `Task: none`；无固定厂商 attribution；首个 PR event 能供 MECH-004 读取 |
+| HLR-AUTOCI-001 | HLR-001A | contract + live | routine `agent/**` push 以现有 `GITHUB_TOKEN` create-or-find 唯一 bot PR 后，exact-head `guard`、Swift、open-pr、PR-metadata/allowed-paths 全部自动完成，不需要 workflow approval；existing PR push 与 human metadata edit/reopen 均复验；零新 credential/secret/admin/review/merge route |
 | HLR-LEASE-001 | HLR-002A, HLR-002, HLR-003, HLR-005 | D2 review + fault integration | legacy bootstrap 对 `agent/host-loop/**` 零 creator；消费 TASK-RPT-001 evidence 证明 ordinary ruleset 精确排除 single/multi-level Agent namespace 与 exact main、main branch protection 独立强制 PR/CODEOWNER/`guard`/admin enforcement/human-only push allowlist，Deploy Key 单层/多层成功而 non-agent/main 拒绝；PR/Issue identity 只有 Metadata read、Contents read、Pull requests write、Issues write，非 CODEOWNER/bypass；self-approval、main write、merge、admin probe 均拒绝；runtime typed adapter 无 generic/review/merge/admin route；task lease 使用 exact fence/CAS；两个 owner、stale owner、heartbeat loss、cursor corruption 和 API timeout 全部停 lane/重协调，零 duplicate dispatch |
 | HLR-WORKER-001 | HLR-002A, HLR-003, HLR-005 | contract + live | MECH-004 title/body token 接受 active task-header grammar 的单字母 suffix 且 malformed/ambiguous token 失败；worker 只处理 approved+ready host-only task，在 `agent/host-loop/tasks/**` 创建/更新唯一 stable identity PR；reserved branch 零 legacy creator，首个 `pull_request` checks 实测存在且 metadata 已完整；legacy creator 仅在 live proof 后退出，rollback 可复查 |
 | HLR-REVIEW-001 | HLR-004, HLR-005 | contract + live | reviewer run/worktree/session 独立且只读；missing/failed checks、`REQUEST_CHANGES` 或 `BLOCKED` 不入 batch；`APPROVE` 是独立 AI 预审记录而非 GitHub/human approval；零 auto-merge |
 | HLR-RECOVERY-001 | HLR-004, HLR-005 | fault injection + live recovery | acquire、create、update、heartbeat、review、merge observation 各 crash window 可重启；仅 GitHub merge metadata 与 protected-main full OID 同时匹配才 advance/release；branch缺失、Issue声称 merged、CI绿、时间流逝均不通过 |
 
-## HLR-002A r8 canary readiness
+## HLR-001A r9 automatic-CI readiness
+
+- Audit base:
+  `0f0a79aff7ede1519b9fbc0cbdca12b5c687ef07`。
+- Trigger evidence:#480 initial bot head pull-request Swift/SDD runs
+  `30096501384`/`30096501389` = `action_required`; final reviewed head after
+  human branch update runs `30096750425`/`30096750430` = success.
+- Source gate:exact pinned workflow/parser/test blobs from tasks.md;
+  implementation uses no new credential and no GitHub setting.
+- Expected implementation result:the implementation head receives successful
+  push `guard`, Swift, open-pr and new allowed-paths without approving its
+  duplicate old-base pull-request runs; create-or-find, exact PR metadata and
+  permission/event contracts pass all offline negative fixtures.
+- Expected post-merge live result:a fresh ordinary Agent evidence PR has no
+  routine approval gate required for its checks; all four exact-head checks
+  complete automatically, while human edit/reopen still revalidates.
+
+## HLR-002A r8 canary readiness（historical；r9 superseded）
 
 - Audit base:
   `d869f9a36ec95e30bc1fba3c649ed414ca36bf0a`。
@@ -53,8 +71,9 @@
   gateway/authorization/integration/scheduler writes, review, merge,
   auto-merge, old #435/#454 payload/ref/UUID reuse, or any canary before the r8
   readiness carrier is merged.
-- Evidence separation:canary execution/evidence and `ready→done` are two
-  later independent PRs. This r8 carrier is not a live PASS.
+- Evidence separation:r8 carrier never produced canary dispatch or live PASS.
+  Its refs/pins/UUID are permanently superseded by r9; HLR-001A done and a
+  new independent HLR-002A readiness are required before any canary.
 
 ## Negative and recovery tests
 
@@ -64,6 +83,12 @@
   `reconcile-required`，不创建第二 PR、不开新 task；
 - `GITHUB_TOKEN` creator、首个 check 缺失、legacy/new creator 同存、PR lookup 0 或 >1 →
   migration failure/rollback，不用人工编辑 body 掩盖；
+- routine Agent PR 仍须人工 approve workflows 才能取得任一治理所需 check、
+  create-or-find 遇到 existing PR 后跳过 validation、0/2 PR、wrong
+  main/head/author/merged state、PR JSON/number 未 fail closed、validation job
+  取得 write permission、新 PAT/App/private key/secret/OIDC/
+  `pull_request_target`、bot opened/synchronize approval gate 被重新引入或 human
+  edit/reopen 不复验 → `HLR-AUTOCI-001` failure；
 - `agent/host-loop/**` 仍触发 legacy creator、普通 `agent/**` 被意外排除、reserved
   head 出现 0/2 PR、head guard 或 pull-request allowed-paths 缺失 → partition/activation
   failure；不以 branch cleanup 或 elapsed time 伪造零 creator；
@@ -108,14 +133,18 @@
 - runtime fixture/contract/fault suite；
 - TASK-HLR-002B tombstone check：status `blocked`，#454 superseded，
   `scripts/host_loop/d2_gateway/**` absent，零 gateway/authorization implementation；
-- `agent-pr.yml` branch-filter contract test + implementation 合入后的普通 control /
-  reserved canary live evidence；`sdd-guard.yml` byte-for-byte 零 diff；
+- `agent-pr.yml` branch-filter/automatic-check contract；HLR-001A 对
+  `sdd-guard.yml`/`swift-ci.yml` event partition 的 exact reviewed delta；
+  HLR-002A fresh readiness 之后的普通 control / reserved canary live evidence
+  对该新 baseline byte-for-byte 零额外 workflow diff；
+- HLR-001A workflow event/permission/job-dependency fixtures、raw PR JSON
+  正反解析、create-or-find 0/1/2 matrix、implementation exact-head push checks、
+  post-merge ordinary PR no-approval pilot 与 human edited/reopened revalidation；
 - TASK-RPT-001 evidence merge OID、ruleset ID `19595282` 与 main branch protection
   的完整 before/after/rollback JSON/hash、actor inventory、active-rule evaluation，
   以及单层/多层正向 + non-agent/main/agentx/review/merge/admin 负向 transcript；
-- r8 exact reserved/ordinary refs、readiness merge OID、共同 parent/tree、
-  exact-head SDD Guard/Agent PR run IDs、ordinary PR number/head/author/
-  merged=false、cleanup Git receipts 与 stable ref absence；
+- r8 exact reserved/ordinary refs、pins 与 UUID 只能作为 zero-dispatch
+  superseded history；r9 后 fresh readiness 必须使用全新 refs；
 - `check_pr_paths` task-token suffix 正反 fixtures + fresh implementation PR 的真实
   pull-request `guard`/`allowed-paths` terminal success；#412 红灯不得复用；
 - `scripts/check-sdd.sh`：0 errors / 0 warnings，acceptance count 以执行时 protected
@@ -127,8 +156,9 @@
 
 ## Result gate
 
-本 change 仅在 HLR-001、HLR-002A、HLR-002、HLR-003、HLR-004、HLR-005
-均由独立 implementation/evidence 与 done PR 合入，五条 active acceptance 具备可复查
+本 change 仅在 HLR-001、HLR-001A、HLR-002A、HLR-002、HLR-003、HLR-004、
+HLR-005 均由独立 implementation/evidence 与 done PR 合入，六条 active
+acceptance 具备可复查
 正反证据，并且 TASK-HLR-002B 仍为 superseded `blocked` tombstone，
 D2 identity staging receipt 明示 `workerDisabled=true`、HLR-003 scheduler activation
 receipt 绑定 exact source、first-check live proof、independent reviewer proof、

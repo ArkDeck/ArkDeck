@@ -12,6 +12,9 @@
 > #449/r6 gateway 与 #454 readiness 均 superseded，TASK-HLR-002B/002A blocked，
 > Agent control-plane/ruleset/ref probe dispatch = 0。HLR-002A fresh readiness
 > 依赖 CHG-2026-033 TASK-RPT-001 done/evidence merge OID。
+> r9 因 #480 实证 routine `GITHUB_TOKEN` bot-created PR 仍需人工放行
+> pull-request workflows，新增 TASK-HLR-001A；其 source/live evidence/done 前，
+> r8 HLR-002A canary readiness/UUID 均 superseded，canary/ref dispatch = 0。
 
 ## TASK-HLR-001 — 结构化 PR envelope 与纯 runtime contract
 
@@ -195,17 +198,163 @@
 - readiness 若发现 templates 或 current `MECH-004` grammar 冲突，停止并提议 scope
   revision，不在本 task 改 canonical governance。
 
+## TASK-HLR-001A — Bot-authored Agent PR automatic exact-head checks
+
+- Status:ready（仅在维护者 review/merge r9 compatible revision/readiness PR 后
+  生效。该 merge 只批准下述 workflow/parser/test implementation/evidence；
+  不执行 GitHub setting、credential、ref canary、review、merge 或 auto-merge，
+  不构成 task done/change verified。）
+- Readiness（r1；audit base = protected `main`
+  `0f0a79aff7ede1519b9fbc0cbdca12b5c687ef07`）：
+  - **Authority/dependency gate:closed。**#480 exact reviewed head
+    `fea214bac75711c075f6a023086688eee28822d3` 由 `lvye` APPROVED，并于
+    `2026-07-24T13:29:03Z` 以 squash merge
+    `2b46558629ba67c8fa1fcd6f80b8234cd8c8d0c6` 进入 protected main；
+    `mergedBy=lvye`，base `70c043d901e1180af1cc3383f3345ae9edabc5c3`。
+    后续 #481 只修改 CHG-2026-026，形成当前 audit base；它与本 task
+    workflow/parser/test paths 零交集。
+  - **Observed trigger:closed。**#480 initial bot head
+    `a841962cc7ce371d0921383584543fba03054ab9` 的 pull-request Swift/SDD runs
+    `30096501384`/`30096501389` 均为 `action_required`；维护者 update branch
+    产生 final head 后，pull-request runs `30096750425`/`30096750430` 才为
+    success。GitHub current `GITHUB_TOKEN` 文档明确此为 workflow-created PR 的
+    recursion gate，不是 main protection/ruleset bypass。
+  - **Input pins:closed。**以下 blobs 均从 audit base Git object 实测；r9
+    readiness merge 后 implementation 开工时必须逐项相等，任一漂移即停止并
+    重新 readiness：
+
+    ```yaml pins
+    - artifact: TASK-HLR-001A readiness audit base
+      commit: 0f0a79aff7ede1519b9fbc0cbdca12b5c687ef07
+    - path: .github/workflows/agent-pr.yml
+      blob: 41426544637db25224dc6c6b3718abd4ebbfca7c
+    - path: .github/workflows/sdd-guard.yml
+      blob: 809147e462512d970813d1992a3fcdf41f8b4b10
+    - path: .github/workflows/swift-ci.yml
+      blob: 640065f3f3849e1add0cc6bfa92078873eb315ef
+    - path: scripts/check_pr_paths.py
+      blob: 267417ca5d0f9a2bd5ef775314b93915717aea9b
+    - path: scripts/test_check_pr_paths.py
+      blob: 2aa1e2cb37ef0085d2e101adb34d2b3615246b82
+    - path: scripts/test_agent_pr_workflow.py
+      blob: 6a256a1556827c2153df0785479c5cbc53796f28
+    ```
+
+    `AGENTS.md` blob
+    `3c2d3c6a01d3eaa31cd9e3ee333f3153552f4164` 与
+    `openspec/governance/enforcement.md` blob
+    `e8ff3c130e1b8b15f8405d150ad567e774a0d82b` 均须零 diff。
+  - **Exact workflow delta:closed。**`agent-pr.yml` 保留 exact ordered push
+    include/exclude 与 `github-actions[bot]` authorship；`open-pr` 必须
+    create-or-find 唯一 same-repository PR、复核 number/main/exact
+    head/author/unmerged 并输出 validated number，不能因 PR 已存在直接跳过
+    validation。其 dependent `allowed-paths` job 仅
+    `contents:read`/`pull-requests:read`，从固定 PR endpoint 获取 JSON，在
+    Python 内解析不可信 metadata，运行 MECH-004 contract + exact base/head diff。
+    `sdd-guard.yml` 的 routine initial/synchronize coverage 改由 push
+    `guard` + Agent PR `allowed-paths` 承担，仅保留 human `edited/reopened`
+    pull-request revalidation；`swift-ci.yml` 使用 push-only。不得引入
+    `pull_request_target`、PAT、App/private key、secret、OIDC、Actions/Checks/
+    Administration/Workflows/Contents write、review/merge route。
+  - **Branch/concurrency gate:closed。**discovery 时 remote protected main =
+    audit base；随后 open PR 从 0 变为 exactly #482，head
+    `0506f2f3010b75973c9fd82daa5439c35906f829`。其分页完整 files 恰为
+    CHG-2026-026 TASK-RKFUI-001C evidence/registry 与
+    `scripts/rockchip_loader_transition_probe/**` 六个路径，不触碰本 change、
+    三个 workflow、三个 parser/test input、计划分支或 canary namespace，
+    故为已审计 non-overlap。planned revision branch
+    `agent/chg-2026-030-r9-auto-ci`、implementation branch
+    `agent/task-hlr-001a-auto-ci`、evidence branch
+    `agent/task-hlr-001a-auto-ci-evidence` 与 r8 canary namespaces 均 absent；
+    Agent-side `gh auth status` 为 zero logged-in hosts。implementation 开工前
+    重做全部 open-PR files、remote refs 与 input pins；查询不完整或 overlap
+    即停止。
+  - **Live/evidence separation:binary。**implementation PR 本身必须在不点击
+    workflow approval 的情况下取得 exact-head push `guard`、Swift、
+    `open-pr` 与 new `allowed-paths` success；旧 base 对该 PR 可能仍展示
+    approval-required duplicate pull-request runs，但它们不得是 merge 所需事实。
+    implementation merge 后，另以 ordinary Agent evidence PR 验证 base 已不再
+    为 bot `opened` 产生 routine approval gate，human metadata edit/reopen
+    revalidation 仍有效。source/offline evidence、post-merge live evidence 与
+    `ready→done` 分离；任一 0/2 PR/check、wrong head/base/author、缺失
+    revalidation 或仍需 workflow approval 才能满足治理门均 FAIL。
+  - **HLR-002A supersession:binary。**r9 merge 使 r8 reserved
+    `agent/host-loop/probes/8bd61cc3-d7c7-41ff-bfc8-0c62952afba3`、
+    ordinary `agent/hlr-002a-control/5a2570ed-5916-4cc8-ac84-4afa294e4b9e`
+    及其 pins/readiness 永久不可执行。TASK-HLR-001A done 后，HLR-002A
+    必须从届时最新 main 以全新 UUID/branches/complete pins 重新 D1 readiness。
+- Platform:github-actions + macos（host CI/control plane；零产品平台声明）
+- Requirements/AC:change-local `HLR-AUTOCI-001`
+- Depends on:change revision r9（本 compatible revision/readiness PR 合入后）、
+  TASK-HLR-001 done、TASK-RPT-001 done、TASK-RPT-002 implementation merge #480
+- In scope:`.github/workflows/agent-pr.yml`、
+  `.github/workflows/sdd-guard.yml`、`.github/workflows/swift-ci.yml`、
+  `scripts/check_pr_paths.py`、`scripts/test_check_pr_paths.py`、
+  `scripts/test_agent_pr_workflow.py`、本 change `evidence/**`、
+  本 change `tasks.md`（仅本任务 evidence/status 引用）。
+- Out of scope:GitHub settings、branch protection、ruleset、required checks、
+  credential/App/PAT/private key/secret/OIDC、`pull_request_target`、review、merge、
+  auto-merge、Core/canonical governance、product/device code、r8 canary execution。
+- Allowed paths:`.github/workflows/agent-pr.yml`、
+  `.github/workflows/sdd-guard.yml`、`.github/workflows/swift-ci.yml`、
+  `scripts/check_pr_paths.py`、`scripts/test_check_pr_paths.py`、
+  `scripts/test_agent_pr_workflow.py`、本 change `evidence/**`、
+  本 change `tasks.md`（仅本任务 evidence/status 引用）。
+- Forbidden paths:`AGENTS.md`、`openspec/constitution.md`、
+  `openspec/governance/**`、`openspec/specs/**`、`openspec/contracts/**`、
+  `openspec/changes/archive/**`、`.gitignore`、产品 source/tests、其他 change。
+- Risk:medium（event partition 错误会漏掉 scope/Swift check；PR JSON 或
+  create-or-find 不封闭会产生 duplicate/错 head）。
+- Hardware required:no。
+
+### Deliverables
+
+- routine Agent PR 的 exact-head push `guard`/Swift/open-pr/allowed-paths 全自动，
+  无需 `Approve and run workflows`；
+- existing PR 每次 push 仍 validate，0/2 PR、wrong head/base/author fail closed；
+- human metadata edit/reopen 自动复验，bot initial/synchronize 不产生必要的
+  approval gate；
+- source/offline evidence、post-merge live evidence 与 done 独立。
+
+### Verification
+
+- `HLR-AUTOCI-001` contract + live：workflow event/permission/job dependency
+  parser fixtures；raw PR JSON 正反解析；MECH-004 全回归；首次 implementation
+  push checks；post-merge ordinary PR 零必要 approval gate；human edited/reopened
+  revalidation；
+- `python3 scripts/test_agent_pr_workflow.py`、
+  `python3 scripts/test_check_pr_paths.py`、
+  `python3 -m unittest discover -s scripts/host_loop -p 'test_*.py'`、
+  `scripts/check-sdd.sh`、`git diff --check` 与 forbidden-path scan。
+
+### Notes / handoff
+
+- implementation/evidence PR 不翻 `ready→done`；live evidence 与 done 分离；
+- current branch protection required `guard` 仍来自 App `15368` 的 push run，
+  r9 不修改其设置或语义；
+- source done 后必须先重建 HLR-002A fresh readiness，不直接执行 canary。
+
 ## TASK-HLR-002A — Legacy bootstrap namespace partition
 
-- Status:ready（r8 fresh canary-only readiness；仅在维护者 review/merge 本
-  compatible revision/readiness PR 后生效。该 merge 只允许执行下述
-  reserved-first/ordinary-second creator canary、只读 run/PR/check 查询、ref
-  cleanup 与独立 evidence PR；不批准 ruleset、branch protection、repository
-  setting、credential、gateway、standing authorization、integration identity、
-  scheduler、review、merge 或 auto-merge mutation，也不构成 acceptance PASS、
-  task done 或 change verified。）
-- Readiness（r8；audit base = protected `main`
+- Status:blocked（r9 stop gate；r8 #480 readiness 已合入但 zero canary/ref
+  dispatch。用户要求先改变其 sensitive workflow inputs，故 r8 refs/pins/UUID
+  永久 superseded。解除前置：① r9 revision/readiness merge；②
+  TASK-HLR-001A implementation/evidence + live evidence + done；③ 从届时最新
+  protected main 另立 fresh canary-only readiness，生成全新 refs/UUID/pins。
+  任一前置未闭合时 reserved/ordinary canary dispatch = 0。）
+- Historical Status:ready（r8 compatible revision/readiness #480 exact reviewed
+  head `fea214bac75711c075f6a023086688eee28822d3` 已由 `lvye` APPROVED，
+  并以 `2b46558629ba67c8fa1fcd6f80b8234cd8c8d0c6` 合入 protected main。
+  该 readiness 从未执行 canary；r9 合入后只作历史，不得补跑。）
+- Historical Readiness（r8；audit base = protected `main`
   `d869f9a36ec95e30bc1fba3c649ed414ca36bf0a`）：
+  - **Historical approval boundary。**r8 fresh canary-only readiness 仅在维护者
+    review/merge #480 后生效。该 merge 只允许执行下述
+    reserved-first/ordinary-second creator canary、只读 run/PR/check 查询、ref
+    cleanup 与独立 evidence PR；不批准 ruleset、branch protection、repository
+    setting、credential、gateway、standing authorization、integration identity、
+    scheduler、review、merge 或 auto-merge mutation，也不构成 acceptance PASS、
+    task done 或 change verified。
   - **Approval/dependency gate:closed。**CHG-2026-030 r7 #456 merge
     `c5a1a9f0f1c0a9bc0dd3d04275ac01a5738697f7`、
     TASK-HLR-001 done `d09f5021107e4133d2fc41c1ce65d0bd09d6c12b` 与
@@ -1154,9 +1303,9 @@
     evidence、live canary evidence 与后续 `ready→done` 各自独立 PR。
 - Platform:github-actions + macos（host/bootstrap control plane；零产品平台声明）
 - Requirements/AC:change-local `HLR-LEASE-001`、`HLR-WORKER-001`
-- Depends on:change revision r8（本 compatible revision/readiness PR 合入后）、
-  TASK-HLR-001 done、TASK-BAP-003 done、CHG-2026-033 TASK-RPT-001
-  done/evidence merge、本独立 fresh canary-only readiness
+- Depends on:change revision r9、TASK-HLR-001 done、TASK-HLR-001A done、
+  TASK-BAP-003 done、CHG-2026-033 TASK-RPT-001 done/evidence merge、
+  r9 后独立 fresh canary-only readiness
 - In scope:`agent-pr.yml` push filter 保留 `agent/**` include、增加
   `!agent/host-loop/**` exclude；固定 task/lease/probe 三个 reserved family；
   branch-filter contract test；MECH-004 title/body/full task token 对齐现有 active
@@ -1474,12 +1623,13 @@
 
 ## TASK-HLR-002 — D2 integration identity 与 host activation
 
-- Status:blocked（r8 current gate：#421 保留为旧 topology 下 multi-level
+- Status:blocked（r9 current gate：#421 保留为旧 topology 下 multi-level
   reserved ref 被 active ruleset 拒绝的历史 FAIL；current topology 已由
   CHG-2026-033 TASK-RPT-001 闭合，但在 TASK-HLR-002A fresh canary/evidence/done
   前仍无法形成新 identity create-PR 正例。
-  解除前置：① CHG-2026-030 revision r8 经维护者 review/merge；② TASK-BAP-003 done；
-  ③ TASK-HLR-002A done；④ 独立 D2 readiness/维护者窗口钉定实际 integration
+  解除前置：① CHG-2026-030 revision r9 经维护者 review/merge；②
+  TASK-HLR-001A done；③ TASK-BAP-003 done；④ TASK-HLR-002A done；
+  ⑤ 独立 D2 readiness/维护者窗口钉定实际 integration
   identity、单仓 scope、最小 categories、非 CODEOWNER/bypass 事实、secret storage、
   scheduler owner/label reservation、rollback contact 与正/负 probe。Agent 不得代为
   创建、修改或批准仓外 D2 配置。r2 历史 finding：2026-07-23 勘察确认 GitHub
@@ -1488,7 +1638,8 @@
   无法同时由 permission manifest 证明。）
 - Platform:macos（受控 host 运维；零产品平台声明）
 - Requirements/AC:change-local `HLR-LEASE-001`
-- Depends on:change revision r8、TASK-BAP-003 done、TASK-HLR-002A done、
+- Depends on:change revision r9、TASK-HLR-001A done、TASK-BAP-003 done、
+  TASK-HLR-002A done、
   independent D2 readiness
 - In scope:维护者建立非 `GITHUB_TOKEN`、repository-only、非 CODEOWNER/bypass 的
   PR/Issue integration identity；permission categories 固定为 Metadata read、Contents
