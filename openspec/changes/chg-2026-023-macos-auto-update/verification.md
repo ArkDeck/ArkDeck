@@ -1,6 +1,6 @@
 # CHG-2026-023 Verification Plan
 
-> Status:planned
+> Status:passed # 2026-07-24；三条 change-local AC 与完整任务/merge/evidence 链见 proposal.md「Verification closure」；仅在维护者 review/merge 本 verification-closure PR 后生效
 > Change:CHG-2026-023-macos-auto-update@r1
 > Core baseline:CORE-2.1.0(零 Core 变更;canonical Core AC 零认领)
 
