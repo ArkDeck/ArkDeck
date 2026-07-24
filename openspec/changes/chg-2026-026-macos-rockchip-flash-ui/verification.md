@@ -1,9 +1,9 @@
 # Verification Plan — CHG-2026-026
 
-> Change:CHG-2026-026@r2
+> Change:CHG-2026-026@r3
 > Status:planned
-> Note(2026-07-24):r2 仅增加 clean discovery tool repin、修正 001/001A 循环依赖并
-> 钉定一次 E1 characterization window；Core/AC/schema 不变。
+> Note(2026-07-24):r3 只把一次 E1 characterization window 的 exact firmware pin 从
+> `7.0.0.34` 替换为 E0 读回的 `7.0.0.33`；r2 其余 pins、Core/AC/schema 均不变。
 
 ## Environment
 
@@ -17,9 +17,11 @@
   BlueTool/upgrade_tool。
 - Fixtures：fake rkdeveloptool、版本化 `ld/ppt/wlx/rd` stdout/stderr、valid/corrupt/drift/
   path-traversal tar.gz、journal crash points、postflight observations。
-- Hardware：TASK-RKFUI-001 E0、TASK-RKFUI-001A E1 mode transition 与 TASK-RKFUI-004；其余
-  测试无设备、零真实 dispatch。r2 允许 001A 为 001 提供 Loader 前置态，但两份 evidence
-  分离；001A 明确禁止 destructive command。
+- Hardware：TASK-RKFUI-001 E0、TASK-RKFUI-001A 对 exact DAYU200 /
+  OpenHarmony `7.0.0.33` / HDC `3.2.0d` / USB 组合的 E1 mode transition 与
+  TASK-RKFUI-004；其余测试无设备、零真实 dispatch。r2 允许 001A 为 001 提供 Loader
+  前置态，r3 只修正当前 firmware pin；两份 evidence 分离，001A 明确禁止 destructive
+  command。
 
 ## Acceptance matrix
 
@@ -76,8 +78,12 @@
 - signed Sandbox direct non-elevated USB access 若失败，TASK-RKFUI-003/004 不得用 sudo/helper
   绕过；如实 blocked 并新建平台/分发 change。
 - r2 clean discovery repin 若未在 registry/resource closure/Swift/Python probe 四面原子完成，
-  或当前 artifact/firmware/HDC/binding 与 readiness pins 任一漂移，001/001A 均 fail closed；
+  或当前 artifact/`7.0.0.33` firmware/HDC/binding 与 readiness pins 任一漂移，001/001A
+  均 fail closed；
   不得回退到 quarantined artifact、接受两个 hash 或用 destructive Provider 的旧 pin 冒充。
+- r3 合入前，`7.0.0.33` 只是一条 blocked E0 observation，不构成 E1 授权或 capability
+  evidence；probe implementation、`reboot loader` 与 `ld` transition observation dispatch
+  必须为 0。r3 merge 后仍只允许原窗口剩余的单次 exact run，不得把未消费次数解释为可重试。
 - `REQ-FLASH-015` 交互式 App executor 解释未获维护者明确确认时，execute 不实现；不得把
   plan-only/handoff 记作一键真机刷机。
 - DAYU200 exact combination 的 `reboot loader` E1 capability 未证明 supported 时，Route B
