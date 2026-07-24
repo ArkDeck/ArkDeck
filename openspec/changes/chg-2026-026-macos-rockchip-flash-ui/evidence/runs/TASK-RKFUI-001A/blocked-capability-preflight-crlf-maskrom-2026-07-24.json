@@ -1,0 +1,104 @@
+{
+  "authorizationRefs": [
+    "PR#440@f4e901492e7d3b82f883424c756868fffa4946df",
+    "PR#452@d22cdeeebc781b9c3a1b063dbee6631934c51ac0",
+    "PR#460@60ea5266e506f88b81c0ef8a2c6744c770b5b3d5"
+  ],
+  "blockedReasons": [
+    "trustedPerDeviceTypedCapabilityEvidenceMissing",
+    "rockUSBOutputLineEndingNotRegistered",
+    "preExistingRockUSBCandidateWrongMode"
+  ],
+  "autoRebindVerdict": "unknown",
+  "capabilityVerdict": "unknown",
+  "capturedAt": "2026-07-24T04:35:12Z",
+  "change": "CHG-2026-026",
+  "counters": {
+    "bindingMaterialization": 0,
+    "e0ReadOnlyHDC": 4,
+    "e0RockUSBList": 1,
+    "e1DeviceMutation": 0,
+    "e2Destructive": 0,
+    "enterUpdaterIntent": 0,
+    "flashEraseFormatUnlockUpdate": 0,
+    "hdcServerLifecycleMutation": 0,
+    "hostShell": 0,
+    "pptWlxRd": 0,
+    "rebootLoader": 0,
+    "sudoHelperDriverSystemMutation": 0,
+    "usageReservation": 0
+  },
+  "e1Dispatched": false,
+  "e1StartRequestsRejectedBeforeProcessStart": 2,
+  "evidenceClass": "realHardwareE0CapabilityPreflight",
+  "executor": "autonomousAgent",
+  "host": {
+    "arch": "arm64",
+    "os": "Darwin",
+    "osVersion": "26.5.2"
+  },
+  "identityCorrelationVerdict": "unknown",
+  "observations": {
+    "firmware": {
+      "semantic": "OpenHarmony 7.0.0.33",
+      "stdoutBytes": 22,
+      "stdoutSHA256": "4358db3f825bb43e72e393e00b9b6d571e83910d84d479fe48c9ef5beaf786dd"
+    },
+    "hdc": {
+      "checkServerStdoutBytes": 55,
+      "checkServerStdoutSHA256": "50e8dfe03cb770dfade5b91198523b964fd3bd6fd8855b541ceb46201f0d014a",
+      "exactTargetCount": 1,
+      "serverExecutableMatched": true,
+      "serverLifecycleMutation": 0,
+      "serverOwnershipMatched": true,
+      "targetsStdoutBytes": 33,
+      "targetsStdoutSHA256": "2035c0783fe1b2fbc3bba6badfb76003c1a5d46bbe16d1479de439e9fd874fc2",
+      "versionStdoutBytes": 12,
+      "versionStdoutSHA256": "906d35a917937ecbb33d8dc3bbb6b3e1783bd2996a6201ab7227fb406d474ed9"
+    },
+    "rockUSB": {
+      "contractParserResult": "blocked:unexpectedCarriageReturn",
+      "diagnosticOnlyCandidateCount": 1,
+      "diagnosticOnlyObservation": {
+        "mode": "Maskrom",
+        "productID": "0x5000",
+        "providerDisposition": "providerDoesNotSupportMaskrom",
+        "vendorID": "0x2207"
+      },
+      "lineTermination": "homogeneousCRLF",
+      "stderrBytes": 0,
+      "stdoutBytes": 52,
+      "stdoutSHA256": "b474e0ab05ecc648dd39169e60d979e0c7d2cca832abbfc95d56f3f1be4c5238"
+    },
+    "tool": {
+      "executableSHA256": "bbd7bdc0fb121d414fb61085e77211cc1fdd9a3b6c6b285c54380f70e56c9923",
+      "quarantinePresent": false,
+      "reportedVersion": "rkdeveloptool ver 1.32",
+      "upstreamCommit": "304f073752fd25c854e1bcf05d8e7f925b1f4e14",
+      "versionStdoutBytes": 24,
+      "versionStdoutSHA256": "8edc164e8e73ec8e3bd3cb242ccaa73dec5492bf070e958e827073b4d98a0468"
+    }
+  },
+  "rawEvidence": {
+    "location": "controlled task state outside every git repository",
+    "rawConnectKeyStoredInRepository": false,
+    "rawIdentityStoredInRepository": false,
+    "rawStdoutStoredInRepository": false
+  },
+  "runId": "98458089-1d62-459e-ab59-c7d3aad52945",
+  "schemaVersion": "1.0.0",
+  "target": {
+    "firmware": "OpenHarmony 7.0.0.33",
+    "model": "DAYU200",
+    "pinnedSerialSHA256": "958780b2ffb7090d4f22cdc1f547f9804ed0f0b605e3020f384e5d4823dc7a7e",
+    "soc": "RK3568",
+    "transport": "usb"
+  },
+  "task": "TASK-RKFUI-001A",
+  "typedCapabilityEvidenceMaterialized": false,
+  "usageReserved": false,
+  "window": {
+    "maxRuns": 1,
+    "validUntil": "2026-07-31T16:00:00Z"
+  }
+}

@@ -11,6 +11,10 @@
 > proposal r3（2026-07-24，on merge）只把 TASK-RKFUI-001A 的 exact firmware pin 从
 > `7.0.0.34` 替换为 E0 读回的 `7.0.0.33`；其余 D2 pins、窗口、次数与安全边界不变。
 > r3 合入前 probe implementation/E1 dispatch 仍为 0。
+>
+> proposal r4（2026-07-24，on merge）只注册 homogeneous LF/CRLF discovery grammar、
+> 新增独立 TASK-RKFUI-001B，并归档 CRLF + Maskrom blocked E0 receipt。r4 不接受逐设备
+> capability evidence，不授权 E1；001B merge 与后续 evidence PR merge 前 E1 为 0。
 
 ## TASK-RKFUI-001 — RockUSB discovery contract 与 signed Sandbox E0 access spike
 
@@ -141,9 +145,10 @@
 
 ## TASK-RKFUI-001A — DAYU200 HDC→Loader E1 capability characterization
 
-- Status:ready（r2 已由 PR #440 合入；当前 firmware drift 使 execute gate fail closed。仅在
-  维护者 review/merge proposal r3 后，下列 `7.0.0.33` 一次性 D2 pins/window 才生效；
-  r3 合入前 probe implementation 与 E1 dispatch 均为 0）
+- Status:ready（仅允许 E0 capability preparation；r2/r3 与 probe implementation 已由
+  PR #440/#452/#460 合入。E1 当前 blocked：须先合入 proposal r4、完成
+  TASK-RKFUI-001B、确认 pre-existing RockUSB candidate 为 0，并由后续维护者 merged PR
+  接受逐设备 typed capability evidence）
 - Readiness review r2（2026-07-24；host-only 审计，device/HDC command dispatch 0）：
   - Approval/dependency gate:on merge。CHG-2026-026 r1 已由 PR #298 批准；001 discovery
     implementation/hardening 已由 #301/#305 合入。r2 修正旧依赖环：维护者选择 HDC 软件进态
@@ -218,6 +223,17 @@
     `evidence/runs/TASK-RKFUI-001A/blocked-preflight-firmware-drift-2026-07-24.*`；
     `scripts/rockchip_loader_transition_probe/**` 在 r3 merge 前保持不存在，真实 E1 command
     dispatch 为 0。
+  - r4 real-fault gate：PR #460 merge 后的 E0-only preflight 命中 exact target/HDC/tool
+    pins，但 clean `rkdeveloptool ld` 返回 CRLF；当前 1.0.0 parser 按已批准 LF-only
+    grammar 返回 `unexpectedCarriageReturn`。diagnostic-only normalization 另显示一个
+    `0x2207:0x5000 Maskrom` candidate 与 HDC target 同时存在，physical identity
+    correlation 为 unknown。两项均在 E1 process start、binding、intent、usage reservation
+    前 fail closed；E1/deviceMutation/destructive = 0。
+  - r4 E1 gate：TASK-RKFUI-001B 只能修复 line-termination closure，不得接受/隐藏
+    Maskrom。001B merge 后，本任务可重新执行 E0 capability preflight；只有其证明
+    pre-existing RockUSB candidate = 0、durable original target/revision 1 binding 与全部
+    pins 命中，并将逐设备 typed capability evidence 通过后续 PR 由维护者 merge 接受，
+    才可进入原 r3 E1 dispatch gate。任一条件未满足均保持 E1 = 0。
 - Platform:macos
 - Requirements:`REQ-FLASH-002`、`REQ-FLASH-007`、`REQ-FLASH-010`、
   `REQ-DEV-001`、`REQ-DEV-002`、`REQ-DEV-003`、`REQ-DEV-006`、`REQ-DEV-008`、
@@ -226,7 +242,9 @@
   `AC-DEV-001-01`、`AC-DEV-002-01`、`AC-DEV-002-02`、`AC-DEV-003-01`、
   `AC-DEV-003-02`、`AC-DEV-006-01`、`AC-DEV-008-01`
 - Depends on:CHG-2026-026 proposal r3 merged；TASK-RKFUI-001 contract
-  implementation/hardening (#301/#305) merged。TASK-RKFUI-001 signed Sandbox E0 hardware
+  implementation/hardening (#301/#305) merged。E0 preparation 可继续；E1 dispatch 另依赖
+  proposal r4 merged、TASK-RKFUI-001B done、pre-existing RockUSB candidate = 0 与逐设备
+  typed capability evidence acceptance merged。TASK-RKFUI-001 signed Sandbox E0 hardware
   result 不再是前置，避免软件进态 Loader 来源的循环依赖
 - Allowed paths:
   - `scripts/rockchip_loader_transition_probe/**`
@@ -265,16 +283,73 @@
   `evidence/runs/TASK-RKFUI-001A/`。若 exact combination 未证明 supported，后续产品默认
   physical fallback。
 
+## TASK-RKFUI-001B — RockUSB `ld` homogeneous CRLF integration remediation
+
+- Status:ready（仅在维护者 review/merge proposal r4 后生效；r4 合入前 implementation
+  不得开工）
+- Platform:macos
+- Requirements:`REQ-FLASH-001`
+- Acceptance:`AC-FLASH-001-01`
+- Depends on:CHG-2026-026 proposal r4 merged；TASK-RKFUI-001 contract/hardening
+  (#301/#305) 与 TASK-RKFUI-001A guarded probe (#460) merged
+- Allowed paths:
+  - `openspec/integrations/rockchip/rockusb-discovery/1.0.0/**`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipDeviceDiscovery.swift`
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/RockchipDeviceDiscoveryContractTests.swift`
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/Rockchip/Discovery/1.0.0/**`
+  - `scripts/rockchip_loader_transition_probe/**`
+  - `openspec/changes/chg-2026-026-macos-rockchip-flash-ui/evidence/**`
+- Forbidden paths:
+  - `openspec/constitution.md`
+  - `openspec/specs/**`
+  - `openspec/contracts/**`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipRockUSBFlashProvider.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipFlashProfile.swift`
+  - `ArkDeckApp/**`
+- Risk:low（strict parser/fixture/registry/probe closure；host/device external command、
+  mutation/destructive dispatch 0）
+- Hardware required:no
+
+### Deliverables
+
+- 原子更新 canonical registry、test resource mirror、resource hash closure、binary fixtures、
+  Swift parser/tests 与 Python probe/tests；任一面未同步即测试失败。
+- 完整非空 stdout 只接受 homogeneous LF 或 homogeneous CRLF，且每条 record（含最后一条）
+  必须有 terminator。raw-byte validation 后只移除 CRLF 自带的一个 CR，再复用既有
+  `DevNo/Vid/Pid/LocationID/Mode` grammar。
+- 为 single/multi record 的 LF 与 CRLF positive fixtures 建立同义结果；为 bare CR、
+  mixed LF/CRLF、missing-final-terminator、empty record 建立 negative fixtures。
+- 保持 Maskrom、non-`0x2207:0x350a`、unknown mode、duplicate、garbage、invalid UTF-8、
+  stderr、output/device count 与 tool identity 全部门禁不变。
+
+### Verification
+
+- 定向 Swift contract tests 与 Python probe tests 覆盖 LF/CRLF parity 和所有新增 negative
+  family；既有 RockUSB discovery/Provider tests 全部通过。
+- registry/resource closure hash 与 SDD checker 通过；代码评审确认没有 `.splitlines()` 等
+  会静默接受 bare/mixed terminator 的宽松路径。
+- 以本次 sanitized 52-byte shape 构造的 CRLF Maskrom fixture 必须解析为一个显式
+  wrong-mode observation，随后仍被 capability preflight blocked；不得变成 offline、
+  expected Loader 或零 candidate。
+- 本任务所有 HDC/`rkdeveloptool`/USB observation、E1/E2、usage reservation、
+  `ppt/wlx/rd`、host privilege 与 system mutation 计数均为 0。
+
+### Notes / handoff
+
+- 本任务只修复注册输出 family，不产生逐设备 capability evidence。合入后由
+  TASK-RKFUI-001A 在无 pre-existing RockUSB candidate 的明确环境重新运行 E0 preflight，
+  evidence 另行通过维护者 PR 接受；在此之前 E1 继续为 0。
+
 ## TASK-RKFUI-002 — Flash application facade、plan-only UI 与全局 Job presentation
 
-- Status:blocked（等待 CHG-2026-026 approval + TASK-RKFUI-001/001A done）
+- Status:blocked（等待 CHG-2026-026 approval + TASK-RKFUI-001/001A/001B done）
 - Platform:macos
 - Requirements:`REQ-FLASH-003`、`REQ-FLASH-004`、`REQ-FLASH-005`、
   `REQ-FLASH-011`、`REQ-UX-001`、`REQ-UX-005`、`REQ-UX-006`、`REQ-I18N-001`
 - Acceptance:`AC-FLASH-003-01`、`AC-FLASH-004-01`、`AC-FLASH-005-01`、
   `AC-FLASH-005-02`、`AC-FLASH-011-01`、`AC-UX-001-01`、`AC-UX-005-01`、
   `AC-UX-006-01`、`AC-I18N-001-01`
-- Depends on:TASK-RKFUI-001、TASK-RKFUI-001A
+- Depends on:TASK-RKFUI-001、TASK-RKFUI-001A、TASK-RKFUI-001B
 - Allowed paths:
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipFlashApplicationFacade.swift`
   - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/RockchipFlashApplicationFacadeContractTests.swift`
@@ -317,7 +392,7 @@
 
 ## TASK-RKFUI-003 — Typed rkdeveloptool execute orchestration 与交互式确认接线
 
-- Status:blocked（等待 CHG-2026-026 approval、TASK-RKFUI-001/001A/002 done、non-elevated USB
+- Status:blocked（等待 CHG-2026-026 approval、TASK-RKFUI-001/001A/001B/002 done、non-elevated USB
   access PASS、软件进态 capability verdict，以及维护者确认 `REQ-FLASH-015` 解释）
 - Platform:macos
 - Requirements:`REQ-FLASH-002`、`REQ-FLASH-007`、`REQ-FLASH-008`、
@@ -330,7 +405,7 @@
   `AC-FLASH-012-01`、`AC-FLASH-013-01`、`AC-FLASH-015-01`、
   `AC-FLASH-015-02`、`AC-DEV-001-01`、`AC-DEV-002-01`、`AC-DEV-002-02`、
   `AC-DEV-003-01`、`AC-DEV-003-02`、`AC-DEV-006-01`、`AC-DEV-008-01`
-- Depends on:TASK-RKFUI-001、TASK-RKFUI-001A、TASK-RKFUI-002
+- Depends on:TASK-RKFUI-001、TASK-RKFUI-001A、TASK-RKFUI-001B、TASK-RKFUI-002
 - Allowed paths:
   - `Packages/ArkDeckKit/Package.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipFlashApplicationFacade.swift`

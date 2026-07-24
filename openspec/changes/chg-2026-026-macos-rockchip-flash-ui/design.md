@@ -2,9 +2,9 @@
 
 ## Context and constraints
 
-- Proposal revision：r2，r1 已 `approved`；r2 的 clean discovery tool repin、依赖修正与
-  TASK-RKFUI-001A D2 window 只在维护者 review/merge r2 PR 后生效。合入前新增 scope
-  blocked，零 E1 dispatch。
+- Proposal revision：r4；r1/r2/r3 已由维护者 merge。r4 的 CRLF integration family、
+  TASK-RKFUI-001B readiness 与新的 E1 evidence gate 只在维护者 review/merge r4 PR 后
+  生效。合入前新增 scope blocked，零 E1 dispatch。
 - Core baseline：`CORE-2.0.0`，叠加实现开始时已批准并适用的 scoped delta。
 - Related specs：flashing、desktop UX、device targeting、workflow journal/recovery、
   session/artifact/storage、macOS platform profile。
@@ -168,6 +168,12 @@ candidate 均不开始 destructive step。
   implementation 立即 blocked，不自行扩 schema。
 - 新增版本化 RockUSB `ld` fixtures/registry，pin `rkdeveloptool` family/version/hash 与 exact
   argv。若需要扩展未知输出 family，必须走 integration revision，不在 parser 中宽松接受。
+- r4 line-termination revision 仅登记 complete stdout 的 homogeneous LF 与 homogeneous
+  CRLF 两种 family。parser 必须先在 raw bytes 上确认末尾 terminator、全输出同族与完整
+  消费，再把 CRLF record 的单个 CR 去掉并复用同一 record grammar；bare CR、mixed
+  LF/CRLF、missing-final-terminator、empty record 与其他额外字节继续 blocked。该
+  normalization 不改变 VID/PID/mode 或 candidate 数量，Maskrom 仍是明确的 wrong-mode
+  observation。
 - r2 discovery identity revision 只修改 read-only `ld` registry family，不修改
   `RockchipFlashProfile.pinnedToolchainFingerprint`、destructive authorization 或既有硬件
   support matrix。后续 execute 若要采用新 build，必须另行 readiness/change 并重新验证
