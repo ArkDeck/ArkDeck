@@ -1,0 +1,59 @@
+---
+schema_version: 1.0.0
+change_id: CHG-2026-031-macos-session-settings
+change_revision: 1
+platform: macos
+evidence_classes:
+- contract
+- platform
+cases:
+- acceptance_id: SSET-CONFIG-001
+  test_id: TEST-SSET-CONFIG-001
+  method: Typed settings persistence and security-scoped root contract.
+  expected_source: openspec/changes/chg-2026-031-macos-session-settings/verification.md#acceptance-matrix
+  minimum_evidence: contract
+  expected_result: >-
+    Missing preferences yield the exact DEC-006 defaults (20 GiB total quota,
+    2 GiB safety margin, 90 days and the user-domain Application Support
+    ArkDeck/Sessions root). Valid changes round-trip as typed values. Invalid,
+    overflowed or incomplete persisted values fail with a named configuration
+    error. A custom root is usable only while its read-write security-scoped
+    bookmark resolves to the persisted expected path; stale, inaccessible or
+    mismatched bookmarks require reselection and never silently fall back.
+- acceptance_id: SSET-CATALOG-001
+  test_id: TEST-SSET-CATALOG-001
+  method: Secure Session catalog and retention-metadata fault contract.
+  expected_source: openspec/changes/chg-2026-031-macos-session-settings/verification.md#acceptance-matrix
+  minimum_evidence: contract
+  expected_result: >-
+    Only finalized Sessions with safe YYYY/MM/sessionID layout, matching
+    identity and a valid locked manifest become deletion candidates. Pin state
+    and policy generation persist atomically. Active or partial Sessions,
+    symlink traversal, duplicate or mismatched identities, corrupt metadata or
+    manifests, and incomplete size measurements are preserved and contribute
+    conservative pressure instead of being treated as deletable or zero bytes.
+- acceptance_id: SSET-RETENTION-001
+  test_id: TEST-SSET-RETENTION-001
+  method: Retention plan/apply/rescan and production-composition contract.
+  expected_source: openspec/changes/chg-2026-031-macos-session-settings/verification.md#acceptance-matrix
+  minimum_evidence: contract
+  expected_result: >-
+    The ordered plan is bound to settings, catalog, root and volume
+    generations. Zero deletions occur without a fresh exact user confirmation.
+    After apply, a real rescan rather than projected bytes updates the shared
+    HostStorageCoordinator; any drift, partial failure or unknown pressure
+    keeps new heavy writers blocked. Rockchip production SessionStore consumes
+    the same validated root and coordinator, and cannot bypass a missing
+    bookmark or retention admission state.
+- acceptance_id: SSET-UI-001
+  test_id: TEST-SSET-UI-001
+  method: Signed macOS Settings UI and composition contract.
+  expected_source: openspec/changes/chg-2026-031-macos-session-settings/verification.md#acceptance-matrix
+  minimum_evidence: platform
+  expected_result: >-
+    The localized, accessible Settings scene exposes output-root selection and
+    reset, quota, margin and retention validation, pin state, current and
+    projected usage, unknown/pinned preservation, heavy-writer status, exact
+    cleanup preview, cancel and a separate delete confirmation. The UI fixture
+    has no production deletion port, while production dispatch is available
+    only through the real facade with a fresh generation-bound confirmation.
