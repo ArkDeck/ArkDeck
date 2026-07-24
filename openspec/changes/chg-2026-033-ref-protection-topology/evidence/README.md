@@ -1,7 +1,9 @@
 # CHG-2026-033 Evidence
 
-本 proposal PR 没有 execution evidence，也没有 GitHub control-plane/ref/credential
-变更。
+本 change 的 proposal PR 没有 execution evidence，也没有 GitHub
+control-plane/ref/credential 变更。后续 TASK-RPT-001 evidence 已按独立 run 文件
+追加；目录中的每份记录必须以自身 classification、authority、OID、hash 与 acceptance
+boundary 为准，不得把目录存在本身当作 PASS。
 
 未来 evidence 仅在 change approved、任务经独立 readiness 成为 `ready`、cross-change
 stop gate 闭合后追加：
