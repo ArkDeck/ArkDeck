@@ -1,6 +1,6 @@
 # CHG-2026-032 Verification Plan
 
-> Status:planned
+> Status:passed（2026-07-23；两条 change-local acceptance 均 passed，见 proposal 的 Verification closure）
 > Change:CHG-2026-032-handbook-link-durability@r1
 > Core baseline:CORE-2.1.0（零 Core/Product behavior 变更）
 
