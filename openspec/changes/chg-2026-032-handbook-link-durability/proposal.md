@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-032-handbook-link-durability
 revision: 1
-status: approved # r1 proposal 经 PR #437 合入 main `02b27b01246eaed4b230f3a2cfec6a72545c63ff`;正式批准仅由维护者 review/merge 本 approval-only PR 构成
+status: verified # 2026-07-23 本 verification-closure PR;approval #438 merge `4675971ee132d0b94a7f0780e9987518489974bf`;两 task done 已合入(OID 见 Verification closure);archive 另行。原注:r1 proposal 经 #437 合入 `02b27b01246eaed4b230f3a2cfec6a72545c63ff`
 class: implementation-only
 core_change_level: none
 owner: lvye
@@ -121,3 +121,71 @@ implementation/evidence、done PR；change verified 需两条 change-local accep
 - 本批准**不产生任何任务执行或 readiness**：TASK-HLD-001/002 继续保持 `blocked`，
   各自必须在依赖满足后通过独立 readiness PR 才能开工；本批准也不授权新增
   parser/CI、不授权处理仓内其他文件的同类引用。
+
+## Verification closure（2026-07-23）
+
+本节随 change `approved → verified` 写入。两条 change-local acceptance 均有可复查
+evidence，且本 closure 的每项结论在 verify base `fee0f9f507f7a008cc75952bb895056205c6d4f1`
+上**独立实测复核**，非引用 run 的自述。
+
+### 任务与承载
+
+| Task | implementation/evidence | done 状态 PR |
+| --- | --- | --- |
+| TASK-HLD-001 | #441 merge `b8f41066e0aa3a8d1343f805524f9c9439ff9c5c` | #442 merge `73b46b684b27eda23cfbaad06c5b707bff39e2cc` |
+| TASK-HLD-002 | #444 merge `03d5cb3653b9fa4b87b139321ac25844e3ff7350` | #448 merge `fee0f9f507f7a008cc75952bb895056205c6d4f1` |
+
+approval-only #438 merge `4675971ee132d0b94a7f0780e9987518489974bf`；
+readiness：HLD-001 #439 merge `a7ee3f88634972cea4f3bb6622d2f6dab6ea6e06`、
+HLD-002 #443 merge `5f34a2aa376bd3677b69ba14410f265f1a29aaf7`。
+
+### `HLD-DURABLE-001` — **passed**（documentReview）
+
+evidence：`evidence/runs/TASK-HLD-001/run.md` 与逐条对照表
+`evidence/runs/TASK-HLD-001/link-inventory.md`。verify base 独立实测：
+
+- 手册中指向**活跃 change** 的相对链接 = **0**（原 19 条全数处置）；
+- 指向 `changes/archive/**` 的链接 = **16**，计数与内容零变化；
+- 耐久引用 blob = **11** 个唯一值，`git cat-file -e` 逐个可解析，**0 不可解析**；
+- **归档模拟**：chg-2026-006/008/022/025/026/028 六个被引用活跃 change 逐个验证，
+  各 **0 条可断项**。
+
+### `HLD-CONVENTION-001` — **passed**（documentReview）
+
+evidence：`evidence/runs/TASK-HLD-002/run.md`。verify base 独立实测：
+
+- 首屏块数 = **5**，末块恰为 `**引用形式。**`，三点（活跃 change 用耐久形式并说明
+  理由、已归档目标可保留相对路径、只约束本手册自身后续编辑）齐备；
+- 块 ③ 的隐私条款与 `POL-PRIVACY-001`/`POL-ARTIFACT-001` 两处引用逐字保留；
+- shadow-spec：新增 normative `SHALL`/`MUST` = **0**。
+
+### 共同不动面（两 AC 同项，verify base 实测零变化）
+
+`AF-001`…`AF-018` ID 集合完整；H2 = 18、H3 = 144 且八字段同序；
+`Fact` 36 / `Inference` 18；positive 18 / negative 18；`Currency` 18 行；
+`Automation status` 取值域合法。
+
+### Repository checks
+
+`scripts/check-sdd.sh` = 0 error / 0 warning / 111 acceptance IDs；
+`git diff --check` 干净；`changes/archive/**` 与 `openspec/templates/**` diff = **0**。
+
+### 归档就绪（前瞻，不构成 archive 授权）
+
+`git grep` 全仓扫描：本 change 目录的**目录外引用 = 0**。TASK-HLD-001 已把手册对
+change 目录的引用全部转为耐久形式，故本 change 的归档不产生新的引用耦合，也不需要
+先修改任何其他文件。archive 仍须独立 PR。
+
+### verified 的边界
+
+verified **不**把手册提升为权威规则（它仍是 non-normative 索引）、**不**改变任何
+产品/platform/conformance/support/release 状态、**不**构成未来 guard/CI 扩展授权。
+手册中仍有 **16 条**指向 `changes/archive/**` 的相对链接，属**有意保留**
+（归档目录不再移动，见 design §3），非遗留缺陷。
+
+### Provenance 复核边界（如实记录）
+
+TASK-BAP-003 凭据分离生效后 Agent 无维护者 `gh` 凭据，无法读取上述各 PR 的
+reviews/mergedBy。本 closure 以 `git` 验证：所列 merge OID 全部在 protected `main`
+的 ancestry 中，且各交付物 blob 与其实现分支 head 逐字一致。**“由维护者 APPROVED”
+未经 Agent 独立验证**，由维护者 review 本 verify PR 时确认。
