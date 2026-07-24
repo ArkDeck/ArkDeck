@@ -33,6 +33,41 @@ class PullRequestPathTests(unittest.TestCase):
             head_oid=ONE_OID,
         )
 
+    def pull_request_api(
+        self,
+        *,
+        number: object = 483,
+        state: object = "open",
+        merged: object = False,
+        title: object = "ci(TASK-HLR-001A): automate Agent PR checks",
+        body: object = None,
+        base_ref: object = "main",
+        base_sha: object = ZERO_OID,
+        base_repo: object = "ArkDeck/ArkDeck",
+        head_ref: object = "agent/task-hlr-001a-auto-ci",
+        head_sha: object = ONE_OID,
+        head_repo: object = "ArkDeck/ArkDeck",
+        author: object = "github-actions[bot]",
+    ) -> dict[str, object]:
+        return {
+            "number": number,
+            "state": state,
+            "merged": merged,
+            "title": title,
+            "body": body,
+            "base": {
+                "ref": base_ref,
+                "sha": base_sha,
+                "repo": {"full_name": base_repo},
+            },
+            "head": {
+                "ref": head_ref,
+                "sha": head_sha,
+                "repo": {"full_name": head_repo},
+            },
+            "user": {"login": author},
+        }
+
     def make_repo(self, task_section: str | None) -> tuple[tempfile.TemporaryDirectory, Path]:
         temporary = tempfile.TemporaryDirectory(prefix="check-pr-paths-")
         root = Path(temporary.name)
@@ -423,6 +458,34 @@ class PullRequestPathTests(unittest.TestCase):
             ),
         )
 
+    def test_current_hlr_001a_task_allows_only_the_reviewed_automation_surface(self):
+        repo_root = Path(__file__).resolve().parents[1]
+        context = check_pr_paths.PullRequestContext(
+            title="ci(TASK-HLR-001A): automate Agent PR checks",
+            body="",
+            head_ref="agent/task-hlr-001a-auto-ci",
+            base_oid=ZERO_OID,
+            head_oid=ONE_OID,
+        )
+        changed = (
+            ".github/workflows/agent-pr.yml",
+            ".github/workflows/sdd-guard.yml",
+            ".github/workflows/swift-ci.yml",
+            "scripts/check_pr_paths.py",
+            "scripts/test_check_pr_paths.py",
+            "scripts/test_agent_pr_workflow.py",
+        )
+        result = check_pr_paths.check_paths(repo_root, context, changed)
+        self.assertEqual(result.task_id, "TASK-HLR-001A")
+        self.assertEqual(result.changed_paths, changed)
+
+        self.assert_error(
+            "paths outside Allowed paths: .gitignore",
+            lambda: check_pr_paths.check_paths(
+                repo_root, context, changed + (".gitignore",)
+            ),
+        )
+
     def test_atomic_archive_uses_base_task_and_allows_declared_living_path(self):
         temporary, root, change, base_oid = self.make_archivable_repo()
         self.addCleanup(temporary.cleanup)
@@ -662,15 +725,96 @@ class PullRequestPathTests(unittest.TestCase):
                 lambda: check_pr_paths.load_pull_request_context(event_path),
             )
 
+    def test_paginated_pull_list_create_or_find_matrix_fails_closed(self):
+        with tempfile.TemporaryDirectory(prefix="check-pr-list-") as temp:
+            list_path = Path(temp) / "pulls.json"
+
+            list_path.write_text("[[]]", encoding="utf-8")
+            self.assertIsNone(
+                check_pr_paths.select_unique_pull_request_number(
+                    list_path, allow_zero=True
+                )
+            )
+            self.assert_error(
+                "found 0",
+                lambda: check_pr_paths.select_unique_pull_request_number(
+                    list_path, allow_zero=False
+                ),
+            )
+
+            list_path.write_text('[[{"number":483}]]', encoding="utf-8")
+            self.assertEqual(
+                check_pr_paths.select_unique_pull_request_number(
+                    list_path, allow_zero=False
+                ),
+                483,
+            )
+
+            for payload, expected in (
+                ('[[{"number":483},{"number":484}]]', "found 2"),
+                ('[{"number":483}]', "array of page arrays"),
+                ('[[{"number":"483"}]]', "positive integer"),
+                ('[[{"number":true}]]', "positive integer"),
+                ('[[null]]', "non-object"),
+            ):
+                with self.subTest(payload=payload):
+                    list_path.write_text(payload, encoding="utf-8")
+                    self.assert_error(
+                        expected,
+                        lambda: check_pr_paths.select_unique_pull_request_number(
+                            list_path, allow_zero=False
+                        ),
+                    )
+
+    def test_pull_request_api_identity_positive_and_negative_matrix(self):
+        expected = {
+            "expected_repository": "ArkDeck/ArkDeck",
+            "expected_number": 483,
+            "expected_base_ref": "main",
+            "expected_head_ref": "agent/task-hlr-001a-auto-ci",
+            "expected_head_oid": ONE_OID,
+            "expected_author": "github-actions[bot]",
+        }
+        context = check_pr_paths.validate_pull_request_identity(
+            self.pull_request_api(), **expected
+        )
+        self.assertEqual(context.base_oid, ZERO_OID)
+        self.assertEqual(context.head_oid, ONE_OID)
+        self.assertEqual(context.body, "")
+
+        cases = (
+            ("number", {"number": 484}, "number does not match"),
+            ("number type", {"number": "483"}, "positive integer"),
+            ("state", {"state": "closed"}, "state must be open"),
+            ("merged", {"merged": True}, "merged must be false"),
+            ("base ref", {"base_ref": "develop"}, "base.ref"),
+            ("base repo", {"base_repo": "fork/ArkDeck"}, "base repository"),
+            ("head ref", {"head_ref": "agent/other"}, "head.ref"),
+            ("head repo", {"head_repo": "fork/ArkDeck"}, "head repository"),
+            ("head sha", {"head_sha": ZERO_OID}, "head.sha"),
+            ("author", {"author": "lvye"}, "author"),
+            ("short base", {"base_sha": "abc"}, "full 40-hex OID"),
+            ("null title", {"title": None}, "title must be a string"),
+        )
+        for label, changes, expected_error in cases:
+            with self.subTest(label=label):
+                self.assert_error(
+                    expected_error,
+                    lambda changes=changes: check_pr_paths.validate_pull_request_identity(
+                        self.pull_request_api(**changes), **expected
+                    ),
+                )
+
     def test_workflow_rechecks_when_pr_metadata_or_base_is_edited(self):
         repo_root = Path(__file__).resolve().parents[1]
         workflow = (repo_root / ".github" / "workflows" / "sdd-guard.yml").read_text(
             encoding="utf-8"
         )
         self.assertIn(
-            "pull_request:\n    types: [opened, synchronize, reopened, edited]",
+            "    types: [reopened, edited]",
             workflow,
         )
+        self.assertNotIn("types: [opened, synchronize", workflow)
 
 
 if __name__ == "__main__":

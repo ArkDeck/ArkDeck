@@ -86,15 +86,16 @@ def _string(value: object, field: str) -> str:
     return value
 
 
-def load_pull_request_context(event_path: Path) -> PullRequestContext:
+def _load_json(path: Path, label: str) -> object:
     try:
-        event = json.loads(event_path.read_text(encoding="utf-8"))
+        return json.loads(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeError, json.JSONDecodeError) as error:
-        raise CheckError(f"cannot parse pull_request event {event_path}: {error}") from error
+        raise CheckError(f"cannot parse {label} {path}: {error}") from error
 
-    pull_request = event.get("pull_request") if isinstance(event, dict) else None
+
+def pull_request_context_from_object(pull_request: object) -> PullRequestContext:
     if not isinstance(pull_request, dict):
-        raise CheckError("event has no pull_request object")
+        raise CheckError("pull_request must be an object")
 
     base = pull_request.get("base")
     head = pull_request.get("head")
@@ -120,6 +121,94 @@ def load_pull_request_context(event_path: Path) -> PullRequestContext:
         base_oid=base_oid.lower(),
         head_oid=head_oid.lower(),
     )
+
+
+def load_pull_request_context(event_path: Path) -> PullRequestContext:
+    event = _load_json(event_path, "pull_request event")
+    pull_request = event.get("pull_request") if isinstance(event, dict) else None
+    if not isinstance(pull_request, dict):
+        raise CheckError("event has no pull_request object")
+    return pull_request_context_from_object(pull_request)
+
+
+def _positive_integer(value: object, field: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+        raise CheckError(f"pull_request {field} must be a positive integer")
+    return value
+
+
+def select_unique_pull_request_number(
+    pages_path: Path, *, allow_zero: bool
+) -> int | None:
+    pages = _load_json(pages_path, "paginated pull_request list")
+    if not isinstance(pages, list) or any(not isinstance(page, list) for page in pages):
+        raise CheckError("paginated pull_request list must be an array of page arrays")
+
+    numbers: list[int] = []
+    for page in pages:
+        for pull_request in page:
+            if not isinstance(pull_request, dict):
+                raise CheckError("paginated pull_request list contains a non-object entry")
+            numbers.append(_positive_integer(pull_request.get("number"), "number"))
+
+    if not numbers and allow_zero:
+        return None
+    if len(numbers) != 1:
+        raise CheckError(
+            f"expected exactly one open pull_request after create-or-find, found {len(numbers)}"
+        )
+    return numbers[0]
+
+
+def _repository_name(value: object, field: str) -> str:
+    if not isinstance(value, dict):
+        raise CheckError(f"pull_request {field} must be an object")
+    return _string(value.get("full_name"), f"{field}.full_name")
+
+
+def validate_pull_request_identity(
+    pull_request: object,
+    *,
+    expected_repository: str,
+    expected_number: int,
+    expected_base_ref: str,
+    expected_head_ref: str,
+    expected_head_oid: str,
+    expected_author: str,
+) -> PullRequestContext:
+    if not isinstance(pull_request, dict):
+        raise CheckError("pull_request must be an object")
+    if not FULL_OID_RE.fullmatch(expected_head_oid):
+        raise CheckError("expected head OID must be a full 40-hex OID")
+    if _positive_integer(pull_request.get("number"), "number") != expected_number:
+        raise CheckError("pull_request number does not match the selected PR")
+    if pull_request.get("state") != "open":
+        raise CheckError("pull_request state must be open")
+    if pull_request.get("merged") is not False:
+        raise CheckError("pull_request merged must be false")
+
+    base = pull_request.get("base")
+    head = pull_request.get("head")
+    author = pull_request.get("user")
+    if not isinstance(base, dict) or not isinstance(head, dict):
+        raise CheckError("pull_request base/head objects are missing")
+    if not isinstance(author, dict):
+        raise CheckError("pull_request user must be an object")
+
+    if _string(base.get("ref"), "base.ref") != expected_base_ref:
+        raise CheckError("pull_request base.ref does not match expected base")
+    if _repository_name(base.get("repo"), "base.repo") != expected_repository:
+        raise CheckError("pull_request base repository does not match expected repository")
+    if _string(head.get("ref"), "head.ref") != expected_head_ref:
+        raise CheckError("pull_request head.ref does not match the pushed branch")
+    if _repository_name(head.get("repo"), "head.repo") != expected_repository:
+        raise CheckError("pull_request head repository does not match expected repository")
+    if _string(head.get("sha"), "head.sha").lower() != expected_head_oid.lower():
+        raise CheckError("pull_request head.sha does not match the pushed commit")
+    if _string(author.get("login"), "user.login") != expected_author:
+        raise CheckError("pull_request author does not match expected bot identity")
+
+    return pull_request_context_from_object(pull_request)
 
 
 def resolve_task_declaration(context: PullRequestContext) -> str | None:
@@ -577,15 +666,68 @@ def git_changed_paths(repo_root: Path, base_oid: str, head_oid: str) -> tuple[st
 def parse_args(argv: Sequence[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo-root", type=Path, required=True)
-    parser.add_argument("--event", type=Path, required=True)
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument("--event", type=Path)
+    source.add_argument("--pull-request", type=Path)
+    source.add_argument("--pull-list", type=Path)
+    parser.add_argument("--allow-zero", action="store_true")
+    parser.add_argument("--identity-only", action="store_true")
+    parser.add_argument("--expected-repository")
+    parser.add_argument("--expected-number", type=int)
+    parser.add_argument("--expected-base-ref")
+    parser.add_argument("--expected-head-ref")
+    parser.add_argument("--expected-head-oid")
+    parser.add_argument("--expected-author")
     return parser.parse_args(argv)
+
+
+def _required_pull_request_expectations(args: argparse.Namespace) -> dict[str, object]:
+    fields = {
+        "expected_repository": args.expected_repository,
+        "expected_number": args.expected_number,
+        "expected_base_ref": args.expected_base_ref,
+        "expected_head_ref": args.expected_head_ref,
+        "expected_head_oid": args.expected_head_oid,
+        "expected_author": args.expected_author,
+    }
+    missing = sorted(name.replace("_", "-") for name, value in fields.items() if value is None)
+    if missing:
+        raise CheckError(
+            "pull_request API mode is missing expectations: " + ", ".join(missing)
+        )
+    return fields
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(sys.argv[1:] if argv is None else argv)
     repo_root = args.repo_root.resolve()
     try:
-        context = load_pull_request_context(args.event)
+        if args.pull_list is not None:
+            if args.identity_only:
+                raise CheckError("--identity-only is invalid with --pull-list")
+            number = select_unique_pull_request_number(
+                args.pull_list, allow_zero=args.allow_zero
+            )
+            print("none" if number is None else number)
+            return 0
+
+        if args.allow_zero:
+            raise CheckError("--allow-zero is valid only with --pull-list")
+        if args.event is not None:
+            if args.identity_only:
+                raise CheckError("--identity-only is valid only with --pull-request")
+            context = load_pull_request_context(args.event)
+        else:
+            expectations = _required_pull_request_expectations(args)
+            pull_request = _load_json(args.pull_request, "pull_request API response")
+            context = validate_pull_request_identity(
+                pull_request,
+                **expectations,
+            )
+            if args.identity_only:
+                print(expectations["expected_number"])
+                return 0
+
         changed_paths = git_changed_paths(repo_root, context.base_oid, context.head_oid)
         result = check_paths(repo_root, context, changed_paths)
     except CheckError as error:
