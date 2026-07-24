@@ -26,7 +26,8 @@ let package = Package(
     .target(
       name: "ArkDeckWorkflows",
       dependencies: [
-        "ArkDeckCore", "ArkDeckProcess", "ArkDeckOpenHarmony", "ArkDeckStorage",
+        "ArkDeckCore", "ArkDeckProcess", "ArkDeckRuntime", "ArkDeckOpenHarmony",
+        "ArkDeckStorage",
       ]),
     .target(name: "ArkDeckStorage", dependencies: ["ArkDeckCore"]),
     .executableTarget(

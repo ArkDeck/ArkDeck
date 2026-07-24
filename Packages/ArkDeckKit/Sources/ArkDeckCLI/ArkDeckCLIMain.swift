@@ -1,5 +1,6 @@
 import ArkDeckCore
 import ArkDeckWorkflows
+import CryptoKit
 import Darwin
 import Foundation
 
@@ -14,33 +15,42 @@ import Foundation
 struct ArkDeckCommandLine {
   static func main() async {
     let arguments = Array(CommandLine.arguments.dropFirst())
-    guard arguments.first == "flash" else {
-      printUsage()
-      exit(EX_USAGE)
-    }
-    let flashArguments = Array(arguments.dropFirst())
-    guard let subcommand = flashArguments.first else {
+    guard let command = arguments.first else {
       printUsage()
       exit(EX_USAGE)
     }
     do {
-      switch subcommand {
-      case "plan":
-        try runPlan(Array(flashArguments.dropFirst()))
-      case "execute":
-        try await runExecute(Array(flashArguments.dropFirst()))
-      case "postflight":
-        try runPostflight(Array(flashArguments.dropFirst()))
+      switch command {
+      case "flash":
+        try await runFlash(Array(arguments.dropFirst()))
+      case "update-feed":
+        try runUpdateFeed(Array(arguments.dropFirst()))
       default:
         printUsage()
         exit(EX_USAGE)
       }
     } catch let error as CLIError {
-      FileHandle.standardError.write(Data("arkdeck flash: \(error.message)\n".utf8))
+      FileHandle.standardError.write(Data("arkdeck \(command): \(error.message)\n".utf8))
       exit(error.exitCode)
     } catch {
-      FileHandle.standardError.write(Data("arkdeck flash: \(error)\n".utf8))
+      FileHandle.standardError.write(Data("arkdeck \(command): \(error)\n".utf8))
       exit(1)
+    }
+  }
+
+  static func runFlash(_ arguments: [String]) async throws {
+    guard let subcommand = arguments.first else {
+      throw CLIError(exitCode: EX_USAGE, message: "missing flash subcommand")
+    }
+    switch subcommand {
+    case "plan":
+      try runPlan(Array(arguments.dropFirst()))
+    case "execute":
+      try await runExecute(Array(arguments.dropFirst()))
+    case "postflight":
+      try runPostflight(Array(arguments.dropFirst()))
+    default:
+      throw CLIError(exitCode: EX_USAGE, message: "unsupported flash subcommand")
     }
   }
 
@@ -238,6 +248,155 @@ struct ArkDeckCommandLine {
     }
   }
 
+  // MARK: update-feed
+
+  static func runUpdateFeed(_ arguments: [String]) throws {
+    guard let subcommand = arguments.first else {
+      throw CLIError(exitCode: EX_USAGE, message: "missing update-feed subcommand")
+    }
+    switch subcommand {
+    case "prepare":
+      try prepareUpdateFeed(Array(arguments.dropFirst()))
+    case "assemble":
+      try assembleUpdateFeed(Array(arguments.dropFirst()))
+    default:
+      throw CLIError(exitCode: EX_USAGE, message: "unsupported update-feed subcommand")
+    }
+  }
+
+  static func prepareUpdateFeed(_ arguments: [String]) throws {
+    let options = try CLIOptions(arguments)
+    try options.validateAllowed([
+      "--sequence", "--version", "--minimum-system", "--issued-at", "--expires-at",
+      "--artifact", "--artifact-url", "--notes", "--out",
+    ])
+    guard let sequenceText = options.value("--sequence"), let sequence = UInt64(sequenceText),
+      sequence > 0,
+      let version = options.value("--version"),
+      let minimumSystemVersion = options.value("--minimum-system"),
+      let issuedAt = options.value("--issued-at"), let expiresAt = options.value("--expires-at"),
+      let artifactPath = options.value("--artifact"),
+      let artifactURL = options.value("--artifact-url"),
+      let notes = options.value("--notes"), let outputPath = options.value("--out")
+    else {
+      throw CLIError(
+        exitCode: EX_USAGE,
+        message: "prepare requires sequence/version/minimum-system/issued-at/expires-at/"
+          + "artifact/artifact-url/notes/out")
+    }
+    let artifact = URL(fileURLWithPath: artifactPath).standardizedFileURL
+    let measurement = try measureArtifact(artifact)
+    let payload = UpdateFeedPayload(
+      sequence: sequence,
+      version: version,
+      minimumSystemVersion: minimumSystemVersion,
+      architectures: ["arm64"],
+      issuedAt: issuedAt,
+      expiresAt: expiresAt,
+      artifact: UpdateArtifactDescriptor(
+        url: artifactURL, byteLength: measurement.byteLength, sha256: measurement.sha256),
+      releaseNotesSummary: notes)
+    let canonicalPayload = try UpdateFeedCodec.canonicalPayload(payload)
+    let signatureInput = try UpdateFeedCodec.signatureInput(
+      payload: canonicalPayload, keyID: UpdateFeedTrust.productionKeyID)
+    let output = URL(fileURLWithPath: outputPath).standardizedFileURL
+    try FileManager.default.createDirectory(
+      at: output, withIntermediateDirectories: true,
+      attributes: [.posixPermissions: 0o700])
+    let payloadURL = output.appending(path: "arkdeck-update-payload-v1.json")
+    let inputURL = output.appending(path: "arkdeck-update-signature-input-v1.bin")
+    try canonicalPayload.write(to: payloadURL, options: [.atomic, .completeFileProtection])
+    try signatureInput.write(to: inputURL, options: [.atomic, .completeFileProtection])
+    print("payload: \(payloadURL.path)")
+    print("signature input: \(inputURL.path)")
+    print("artifact bytes: \(measurement.byteLength)")
+    print("artifact sha256: \(measurement.sha256)")
+    print("key ID: \(UpdateFeedTrust.productionKeyID)")
+  }
+
+  static func assembleUpdateFeed(_ arguments: [String]) throws {
+    let options = try CLIOptions(arguments)
+    try options.validateAllowed(["--payload", "--signature", "--out"])
+    guard let payloadPath = options.value("--payload"),
+      let signaturePath = options.value("--signature"),
+      let outputPath = options.value("--out")
+    else {
+      throw CLIError(
+        exitCode: EX_USAGE, message: "assemble requires --payload, --signature and --out")
+    }
+    let payload = try Data(
+      contentsOf: URL(fileURLWithPath: payloadPath),
+      options: [.mappedIfSafe, .uncached])
+    let signature = try Data(
+      contentsOf: URL(fileURLWithPath: signaturePath),
+      options: [.mappedIfSafe, .uncached])
+    let envelope = try UpdateFeedCodec.assemble(
+      canonicalPayload: payload,
+      signature: signature,
+      keyID: UpdateFeedTrust.productionKeyID)
+    let decoded = try UpdateFeedCodec.decodeAndVerify(
+      envelope, trust: try UpdateFeedTrust.production)
+    guard decoded.canonicalPayload == payload else {
+      throw CLIError(exitCode: 2, message: "self-verification payload mismatch")
+    }
+    let system = ProcessInfo.processInfo.operatingSystemVersion
+    _ = try UpdateFeedVerifier(
+      trust: try UpdateFeedTrust.production,
+      replayStore: CLIUpdateReplayStore()
+    ).verify(
+      envelope,
+      context: UpdateVerificationContext(
+        installedVersion: "0.0.0",
+        systemVersion: "\(system.majorVersion).\(system.minorVersion).\(system.patchVersion)",
+        architecture: "arm64"),
+      now: Date())
+    let output = URL(fileURLWithPath: outputPath).standardizedFileURL
+    try envelope.write(to: output, options: [.atomic, .completeFileProtection])
+    print("feed: \(output.path)")
+    print("feed sha256: \(UpdateFeedCodec.sha256(envelope))")
+    print("self-verification: valid")
+  }
+
+  static func measureArtifact(_ url: URL) throws -> (byteLength: UInt64, sha256: String) {
+    let descriptor = Darwin.open(url.path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW)
+    guard descriptor >= 0 else {
+      throw CLIError(exitCode: 2, message: "cannot open artifact (errno \(errno))")
+    }
+    defer { Darwin.close(descriptor) }
+    var metadata = stat()
+    guard fstat(descriptor, &metadata) == 0, metadata.st_mode & S_IFMT == S_IFREG,
+      metadata.st_size > 0
+    else { throw CLIError(exitCode: 2, message: "artifact must be a non-empty regular file") }
+    var hasher = SHA256()
+    var measured: UInt64 = 0
+    var buffer = [UInt8](repeating: 0, count: 1_024 * 1_024)
+    while true {
+      let count = Darwin.read(descriptor, &buffer, buffer.count)
+      if count < 0, errno == EINTR { continue }
+      guard count >= 0 else {
+        throw CLIError(exitCode: 2, message: "artifact read failed (errno \(errno))")
+      }
+      if count == 0 { break }
+      hasher.update(data: Data(buffer[0..<count]))
+      measured += UInt64(count)
+    }
+    var after = stat()
+    guard fstat(descriptor, &after) == 0,
+      measured == UInt64(metadata.st_size),
+      after.st_dev == metadata.st_dev,
+      after.st_ino == metadata.st_ino,
+      after.st_size == metadata.st_size,
+      after.st_mtimespec.tv_sec == metadata.st_mtimespec.tv_sec,
+      after.st_mtimespec.tv_nsec == metadata.st_mtimespec.tv_nsec,
+      after.st_ctimespec.tv_sec == metadata.st_ctimespec.tv_sec,
+      after.st_ctimespec.tv_nsec == metadata.st_ctimespec.tv_nsec
+    else {
+      throw CLIError(exitCode: 2, message: "artifact changed while being measured")
+    }
+    let digest = hasher.finalize().map { String(format: "%02x", $0) }.joined()
+    return (measured, digest)
+  }
+
   // MARK: shared helpers
 
   static func validateAndPlan(
@@ -348,12 +507,21 @@ struct ArkDeckCommandLine {
         arkdeck flash execute --images <images.tar.gz> --target-location-id <usb-location> \
       --authorization-id <AUTH-ID>
         arkdeck flash postflight --observation <observation.json>
+        arkdeck update-feed prepare --sequence <n> --version <x.y.z> \
+      --minimum-system <x.y.z> --issued-at <RFC3339> --expires-at <RFC3339> \
+      --artifact <ArkDeck.dmg> --artifact-url <https-url> --notes <summary> --out <dir>
+        arkdeck update-feed assemble --payload <payload.json> --signature <signature.bin> \
+      --out <feed.json>
 
       A human operator at a TTY gets a handoff whose commands they run personally. The AI
       surface accepts only an authorization ID, archive path and target-location selector; the
       product-owned host performs fresh protected-main admission, durable usage reservation,
       descriptor-bound typed execution and terminal persistence. Caller-provided authorization
       files, fact/context documents, executables, argv and storage roots are rejected.
+
+      update-feed never accepts or reads a private key. `prepare` emits deterministic public
+      payload and signature-input files; an isolated maintainer signs the latter with local
+      OpenSSL, then `assemble` verifies the raw 64-byte signature against the pinned public key.
       """
     print(usage)
   }
@@ -362,6 +530,19 @@ struct ArkDeckCommandLine {
 struct CLIError: Error {
   let exitCode: Int32
   let message: String
+}
+
+private final class CLIUpdateReplayStore: UpdateReplayStoring, @unchecked Sendable {
+  private var record: UpdateReplayRecord?
+  private let lock = NSLock()
+
+  func load() throws -> UpdateReplayRecord? {
+    lock.withLock { record }
+  }
+
+  func save(_ record: UpdateReplayRecord) throws {
+    lock.withLock { self.record = record }
+  }
 }
 
 struct CLIOptions {

@@ -23,6 +23,10 @@ public enum SystemLogEventName: String, Codable, CaseIterable, Sendable {
   case privacyContract = "privacy.contract"
   case jobFailed = "job.failed"
   case platformContract = "platform.contract"
+  case updateCheck = "update.check"
+  case updateDownload = "update.download"
+  case updateVerification = "update.verification"
+  case updateHandoff = "update.handoff"
 }
 
 public enum SystemLogFieldKey: String, Codable, CaseIterable, Sendable {
@@ -44,12 +48,12 @@ public enum SystemLogFieldKey: String, Codable, CaseIterable, Sendable {
   fileprivate func validatePublicValue(_ value: String) -> Bool {
     switch self {
     case .publicCode:
-      value == DiagnosticPublicCode.diagnosticsTest.rawValue
-        || value == DiagnosticPublicCode.rotationSample.rawValue
+      guard let code = DiagnosticPublicCode(rawValue: value) else { return false }
+      return code != .fixtureFailure
     case .code:
-      value == DiagnosticPublicCode.fixtureFailure.rawValue
+      return value == DiagnosticPublicCode.fixtureFailure.rawValue
     case .device, .path, .business:
-      false
+      return false
     }
   }
 }
@@ -75,6 +79,12 @@ public enum DiagnosticPublicCode: String, Codable, CaseIterable, Sendable {
   case diagnosticsTest = "diagnostics.test"
   case fixtureFailure = "fixture.failure"
   case rotationSample = "diagnostics.rotation"
+  case updateStarted = "update.started"
+  case updateAvailable = "update.available"
+  case updateNoUpdate = "update.no-update"
+  case updateFailed = "update.failed"
+  case updateCancelled = "update.cancelled"
+  case updateHandoff = "update.handoff"
 }
 
 public enum DiagnosticInputField: Equatable, Sendable {
