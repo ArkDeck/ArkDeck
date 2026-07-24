@@ -1,0 +1,40 @@
+---
+schema_version: 1.0.0
+change_id: CHG-2026-032-handbook-link-durability
+change_revision: 1
+platform: macos
+evidence_classes:
+- documentReview
+cases:
+- acceptance_id: HLD-DURABLE-001
+  test_id: TEST-HLD-DURABLE-001
+  method: Reference-durability review of the failure-pattern handbook.
+  expected_source: openspec/changes/chg-2026-032-handbook-link-durability/verification.md#HLD-DURABLE-001
+  minimum_evidence: documentReview
+  expected_result: >-
+    The handbook contains zero relative-path links into active change
+    directories. Every rewritten reference retains a uniquely locatable factual
+    pointer consisting of the change identifier, the file name, any needed
+    section or task identifier, and a full 40-hex object id that resolves inside
+    the protected main ancestry. The run records, for each rewritten line, the
+    original link, the replacement text, the locating object id and the command
+    used to measure it. Links into the archive tree are unchanged in count and
+    content. The AF identifier set, taxonomy attribution and two-axis split, the
+    eight-field contract and its ordering, the automation status value domain,
+    Fact and Inference labelling and the positive and negative method counts are
+    unchanged. Under an archive simulation for each referenced active change no
+    breakable reference remains, and archive and template diffs are zero.
+- acceptance_id: HLD-CONVENTION-001
+  test_id: TEST-HLD-CONVENTION-001
+  method: Non-normative convention review of the handbook first screen.
+  expected_source: openspec/changes/chg-2026-032-handbook-link-durability/verification.md#HLD-CONVENTION-001
+  minimum_evidence: documentReview
+  expected_result: >-
+    The handbook first screen carries a non-normative referencing convention
+    stating that active change targets use the durable form of change
+    identifier plus full object id while already archived targets may keep
+    relative paths, and stating explicitly that the convention binds only later
+    edits of this handbook. No new normative SHALL or MUST wording, no mandatory
+    requirement on any other document and no approval, ready or done semantics
+    are introduced. The invariants listed for the durability case remain
+    unchanged.
