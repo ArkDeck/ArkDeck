@@ -1146,7 +1146,7 @@
   ambiguity、fence mismatch、clock discontinuity、unknown outcome 均 fail closed）。
 - Hardware required:no。
 - Readiness（r1，audit base = protected `main`
-  `e8eaef86acc13ef76270e29f7a63873d0b2fa6cb`）：
+  `d22cdeeebc781b9c3a1b063dbee6631934c51ac0`）：
   - **Approval/dependency gate:satisfied。**CHG-2026-030 r6 #449 exact reviewed head
     `0bb864ba8f76a53396e24e594a176d233115be7b` 由 `lvye` 于
     `2026-07-24T03:17:01Z` APPROVED，并于 `2026-07-24T03:17:08Z` 以
@@ -1164,7 +1164,7 @@
 
     ```yaml pins
     - artifact: TASK-HLR-002B readiness audit base
-      commit: e8eaef86acc13ef76270e29f7a63873d0b2fa6cb
+      commit: d22cdeeebc781b9c3a1b063dbee6631934c51ac0
     - artifact: CHG-2026-030 revision r6 reviewed head
       commit: 0bb864ba8f76a53396e24e594a176d233115be7b
     - artifact: CHG-2026-030 revision r6 merge
@@ -1201,12 +1201,14 @@
       blob: 35d9a284e8ddde67fd1076bc1c2f0f11f02d26db
     ```
 
-    `scripts/host_loop/d2_gateway/**` 在 audit base 全部 absent。截至
-    `2026-07-24T03:26:14Z`，GitHub all-open PR = 0；readiness branch
-    `agent/chg-2026-030-hlr-002b-readiness` 与固定 implementation branch
-    `agent/task-hlr-002b-scoped-d2-gateway` 的 remote ref/all-state exact-head PR
-    均为 0。implementation 前只重新阻断真实 overlap，不因无关 PR 或无关 main
-    commit 停止。
+    `scripts/host_loop/d2_gateway/**` 在 audit base 全部 absent。pre-publication
+    `2026-07-24T03:26:14Z` 时 GitHub all-open PR = 0，readiness 与固定
+    implementation branch 均 remote ref/all-state exact-head PR = 0；main 随后只以
+    #453/#452 前进 CHG-2026-033 与 CHG-2026-026 路径，全部 sensitive inputs
+    byte-equal。`2026-07-24T03:32:47Z` repin 时唯一 open PR 是本 readiness #454，
+    branch `agent/chg-2026-030-hlr-002b-readiness`；implementation branch
+    `agent/task-hlr-002b-scoped-d2-gateway` 仍 remote ref/all-state PR = 0。
+    implementation 前只重新阻断真实 overlap，不因无关 PR 或无关 main commit 停止。
   - **Implementation surface:closed。**实现使用 Python 3 standard library，禁止
     network/subprocess/shell 与第三方 dependency；production source 只新增
     `scripts/host_loop/d2_gateway/{__init__,contracts,manifest,authorization,overlap,clock,lease,gateway}.py`，
