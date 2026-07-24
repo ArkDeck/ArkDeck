@@ -41,8 +41,13 @@ GitHub control-plane/ref/probe 数为 0。
 - Trusted fact sources:human-controlled authenticated GitHub GET；public Git full
   OID；exact PR/check/review/merge metadata；移除 human credential 后的 Agent negative
   probes。executor 自报字段不能单独升级为可信事实。
-- Allowed paths:`openspec/changes/chg-2026-033-ref-protection-topology/d2-readiness.md`、
-  本 change `evidence/**`、本 change `tasks.md`（仅本任务状态/evidence 引用）
+- Allowed paths:通常为
+  `openspec/changes/chg-2026-033-ref-protection-topology/d2-readiness.md`、
+  本 change `evidence/**`、本 change `tasks.md`（仅本任务状态/evidence 引用）。
+  #467 fail-closed 后的一次性 #459 bootstrap carrier 另允许本 change
+  `proposal.md`、本 change `design.md`、本 change `verification.md`、本 change
+  `acceptance-cases.yaml`，仅用于修订 Actions create+approve 组合 capability 的
+  机制描述；不得修改任何其他 path。
 - Forbidden paths:`AGENTS.md`、`openspec/constitution.md`、
   `openspec/governance/enforcement.md`、`openspec/specs/**`、
   `openspec/contracts/**`、`.github/**`、产品 source/tests、其他 change
@@ -51,6 +56,11 @@ GitHub control-plane/ref/probe 数为 0。
 
 ### Deliverables
 
+- #467 fail-closed receipt 与 ordinary `agent-pr` transport failure evidence；
+- 一次性 bootstrap recovery readiness：只授权 Actions workflow setting
+  `false/read → true/read`，其他 GitHub settings/ref/PR-state mutation 为 0；
+- transport 恢复后的独立 evidence PR，证明 bot-authored PR 创建恢复且仍需
+  `lvye` CODEOWNER approval；
 - 独立 D2 readiness：fresh protected main、完整 authenticated before、exact
   after/rollback payload/hash、operator/window、actor inventory 与 fresh probe names；
 - human execution receipt：credential containment、repository auto-merge、main
@@ -61,6 +71,8 @@ GitHub control-plane/ref/probe 数为 0。
 
 ### Verification
 
+- bootstrap recovery 只证明 PR transport liveness 与 self-approval/authority
+  separation，不计为任何 topology AC PASS；
 - `RPT-BOUNDARY-001`、`RPT-MAIN-001`、`RPT-IDENTITY-001`、
   `RPT-MIGRATION-001` 全部二值可复查；
 - unexpected success、hidden actor、drift、missing field、ambiguous API、hash mismatch
@@ -71,7 +83,17 @@ GitHub control-plane/ref/probe 数为 0。
 ### Notes / handoff
 
 - readiness PR 只能在 task 经独立 D1 状态 PR 成为 `ready` 后起草；
-- 本 D1 状态 PR 只修改本文件的 TASK-RPT-001 状态/依赖说明；不填写
+- #467 readiness/merge
+  `9de9c63f7fe17069ad50ff0a73fc171ce6a14ec8`、两份 apply script、旧 window、
+  payload/hash、nonce 与 derived refs 已 exhausted，禁止重跑；
+- 用户明确授权把 bot-authored/open PR #459 的旧 head
+  `d3aeeaaa8eba79526474580208dc253c4c46d26a` 作为一次性
+  `force-with-lease` expected value。该例外只恢复治理 PR transport，不授权
+  ruleset/main protection mutation，也不把聊天指令当作 D2 approval；
+- #459 的维护者 review/merge 同时批准 r2 mechanism revision 与 exact bootstrap
+  readiness，是通道不可用条件下的显式 carrier collapse。任务状态保持 `ready`；
+  topology execution 仍需 transport 恢复后的全新独立 readiness；
+- 历史 D1 状态 PR 只修改本文件的 TASK-RPT-001 状态/依赖说明；未填写
   `d2-readiness.md`，不新增 evidence，不采集 authenticated control-plane JSON，
   除承载本状态变更的普通 `agent/**` branch/PR transport 外，不执行 probe ref、
   setting、credential 或其他 control-plane 操作；
