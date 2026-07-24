@@ -1,7 +1,7 @@
 # CHG-2026-030 Verification Plan
 
 > Status:planned
-> Change:CHG-2026-030-host-loop-runtime@r10
+> Change:CHG-2026-030-host-loop-runtime@r11
 > Core baseline:CORE-2.1.0（零 Core/Product behavior change）
 
 ## Environment
@@ -48,7 +48,42 @@
   routine approval gate required for its checks; all four exact-head checks
   complete automatically, while human edit/reopen still revalidates.
 
-## HLR-002A r10 canary readiness（current）
+## HLR-002A r11 canary readiness（current）
+
+- Audit base:
+  `1c1ae70a869d03e50a3a012e53d2a1b47a9f311d`。
+- Prior failure authority:#501 machine/human receipt blobs
+  `4ddd4b1b2b6f5b68de09d8d848b48680d546a25e` /
+  `14de289897e476915fc776600732a0ed067440de`；r10 reserved PASS、
+  ordinary not-run、combined incomplete、cleanup complete。
+- Archived topology authority:
+  `openspec/changes/archive/2026-07-25-chg-2026-033-ref-protection-topology/`；
+  topology/no-bypass evidence blobs and authenticated projection/full hashes
+  remain byte-identical to r10。
+- Exact fresh refs:
+  `agent/host-loop/probes/0f803ee1-332e-4bf3-a58c-32af75ce8579` and
+  `agent/hlr-002a-control/5dab2542-ec7b-4561-b3d0-ad41046affb6`；
+  evidence branch =
+  `agent/task-hlr-002a-canary-evidence-r11`。
+- Dispatch barrier:both empty commits share the r11 readiness merge
+  parent/tree. Reserved must first have `guard=success`, exactly one
+  delivered Swift push run, zero Agent PR run and zero all-state PR; Swift
+  may still be running. Main/pins must still match before ordinary push.
+- Terminal result:both SDD Guard/Swift runs succeed; reserved double
+  read-back remains zero creator; ordinary has exactly one successful Agent
+  PR run with successful `open-pr`/`allowed-paths` and exactly one
+  bot-authored open/unmerged exact-head PR. No `action_required` is needed.
+- Post-dispatch drift:after ordinary Git receipt only, a linear descendant
+  main may be accepted when every intervening reviewed PR and cumulative Git
+  diff are fully paginated and non-overlapping with the sensitive manifest,
+  this change/evidence, topology pointers and targets. Drift cannot repair a
+  failed job, change commit/UUID/ref or authorize retry/merge.
+- Cleanup/evidence:double read-back before ordinary→reserved deletion; both
+  refs stably absent and ordinary PR closed/unmerged. Success evidence and
+  D0 done remain separate PRs; the evidence PR must have terminal successful
+  `allowed-paths` before merge.
+
+## HLR-002A r10 canary readiness（historical；incomplete fail-closed）
 
 - Audit base:
   `47cec786315e79e0aad8a3209c6a7c600e6cfc60`。
@@ -85,9 +120,10 @@
   ruleset, branch-protection, repository-setting or credential writes;
   integration/scheduler/review/merge/auto-merge/admin routes; any reuse of r8
   or #421/#435/#454 refs, UUIDs, pins, payloads, windows or runs.
-- Evidence separation:r10 readiness merge authorizes the exact plan but is
-  not live PASS. Canary evidence and D0 `ready→done` remain two later,
-  separately reviewed PRs.
+- Execution result:reserved SDD Guard/Swift success and zero legacy creator;
+  #497 main drift before ordinary triggered the exact stop; ordinary writes
+  remained zero and reserved cleanup completed. #501 merged the immutable
+  failure receipt. r10 refs/UUIDs are permanently non-executable.
 
 ## HLR-002A r8 canary readiness（historical；r9 superseded）
 
@@ -133,13 +169,17 @@
 - `agent/host-loop/**` 仍触发 legacy creator、普通 `agent/**` 被意外排除、reserved
   head 出现 0/2 PR、head guard 或 pull-request allowed-paths 缺失 → partition/activation
   failure；不以 branch cleanup 或 elapsed time 伪造零 creator；
-- r10 readiness merge 未由 exact-head human review/`guard`/`mergedBy`/git
+- r11 readiness merge 未由 exact-head human review/`guard`/`mergedBy`/git
   history 共同确认、fresh ref/evidence branch 预存在、open PR files 查询不完整或
   discovery 后出现 overlap，仍 push canary → failure；零下一步 dispatch；
 - canary commit 包含 Actions skip instruction、reserved/ordinary 未使用同一
-  protected-main parent/tree、两次 push 之间 main/sensitive blob 漂移、cleanup
+  protected-main parent/tree、ordinary receipt 前 main/sensitive blob 漂移、cleanup
   前未重复固定 run/PR facts，或把 head deletion 当作此前零 creator 证明 →
   failure；cleanup 不改变结论；
+- reserved `guard`/Swift run delivery/zero creator 尚未闭合即 push ordinary，
+  或 post-dispatch main 非 readiness merge 的 linear descendant、任一 intervening
+  PR/files/cumulative diff 不完整或触碰 sensitive manifest/change/evidence/targets，
+  仍保留 canary facts → failure；不得重建 commit 或换 UUID 掩盖；
 - TASK-RPT-001 evidence/done merge 缺失，或 ruleset/main protection after/hash/actor
   inventory 漂移，仍进入 HLR-002A readiness/canary → failure；HLR-002A blocked；
   #421 的零 run/PR 不得充作 isolation PASS；
@@ -184,8 +224,8 @@
 - TASK-RPT-001 evidence merge OID、ruleset ID `19595282` 与 main branch protection
   的完整 before/after/rollback JSON/hash、actor inventory、active-rule evaluation，
   以及单层/多层正向 + non-agent/main/agentx/review/merge/admin 负向 transcript；
-- r8 exact reserved/ordinary refs、pins 与 UUID 只能作为 zero-dispatch
-  superseded history；只有 r10 exact fresh refs 可用于 current canary；
+- r8 exact refs 与 r10 incomplete refs/pins/UUID 均只作 superseded history；
+  只有 r11 exact fresh refs 可用于 current canary；
 - `check_pr_paths` task-token suffix 正反 fixtures + fresh implementation PR 的真实
   pull-request `guard`/`allowed-paths` terminal success；#412 红灯不得复用；
 - `scripts/check-sdd.sh`：0 errors / 0 warnings，acceptance count 以执行时 protected
