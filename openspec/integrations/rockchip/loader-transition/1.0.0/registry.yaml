@@ -9,7 +9,8 @@
     "refs": [
       "PR#440@f4e901492e7d3b82f883424c756868fffa4946df",
       "PR#452@d22cdeeebc781b9c3a1b063dbee6631934c51ac0",
-      "PR#481@0f0a79aff7ede1519b9fbc0cbdca12b5c687ef07"
+      "PR#481@0f0a79aff7ede1519b9fbc0cbdca12b5c687ef07",
+      "PR#491@37e16c5dd42951c02422627b9f7ca0d72a5cdafc"
     ],
     "validUntil": "2026-07-31T16:00:00Z",
     "maxRuns": 1
@@ -33,6 +34,14 @@
     "reportedVersion": "rkdeveloptool ver 1.32",
     "sha256": "bbd7bdc0fb121d414fb61085e77211cc1fdd9a3b6c6b285c54380f70e56c9923",
     "upstreamCommit": "304f073752fd25c854e1bcf05d8e7f925b1f4e14",
+    "sourceProvenance": {
+      "kind": "protectedMainArtifactDigestToUpstreamCommit",
+      "artifactSHA256": "bbd7bdc0fb121d414fb61085e77211cc1fdd9a3b6c6b285c54380f70e56c9923",
+      "upstreamCommit": "304f073752fd25c854e1bcf05d8e7f925b1f4e14",
+      "acceptedBy": "PR#445@cbad982cc211c7d8579a025b8c35f4ed1a519f16",
+      "evidencePath": "openspec/changes/chg-2026-026-macos-rockchip-flash-ui/evidence/runs/TASK-RKFUI-001/clean-discovery-repin-2026-07-24.md",
+      "evidenceSHA256": "d0b5089954e19a4aba354846fe6108b2d5c89bfc12ab0396c2cd7eb4a082189a"
+    },
     "signatureClass": "adHoc",
     "quarantineAllowed": false,
     "exactArgv": ["ld"],

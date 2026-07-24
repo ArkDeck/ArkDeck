@@ -30,10 +30,21 @@ from typing import Any, Callable, Optional
 REGISTRY_RELATIVE_PATH = pathlib.Path(
     "openspec/integrations/rockchip/loader-transition/1.0.0/registry.yaml"
 )
+SOURCE_PROVENANCE_KIND = "protectedMainArtifactDigestToUpstreamCommit"
+SOURCE_ACCEPTANCE_REF = "PR#445@cbad982cc211c7d8579a025b8c35f4ed1a519f16"
+SOURCE_EVIDENCE_RELATIVE_PATH = (
+    "openspec/changes/chg-2026-026-macos-rockchip-flash-ui/evidence/runs/"
+    "TASK-RKFUI-001/clean-discovery-repin-2026-07-24.md"
+)
+SOURCE_EVIDENCE_SHA256 = (
+    "d0b5089954e19a4aba354846fe6108b2d5c89bfc12ab0396c2cd7eb4a082189a"
+)
+R6_AUTHORIZATION_REF = "PR#491@37e16c5dd42951c02422627b9f7ca0d72a5cdafc"
 EXPECTED_AUTHORIZATION_REFS = (
     "PR#440@f4e901492e7d3b82f883424c756868fffa4946df",
     "PR#452@d22cdeeebc781b9c3a1b063dbee6631934c51ac0",
     "PR#481@0f0a79aff7ede1519b9fbc0cbdca12b5c687ef07",
+    R6_AUTHORIZATION_REF,
 )
 EXPECTED_HDC = {
     "absoluteExecutable": (
@@ -43,6 +54,28 @@ EXPECTED_HDC = {
     "sha256": "05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83",
     "serverRequirement": "preExistingExternalSameUIDPinnedExecutable",
     "serverLifecycleMutationAllowed": False,
+}
+EXPECTED_SOURCE_PROVENANCE = {
+    "kind": SOURCE_PROVENANCE_KIND,
+    "artifactSHA256": "bbd7bdc0fb121d414fb61085e77211cc1fdd9a3b6c6b285c54380f70e56c9923",
+    "upstreamCommit": "304f073752fd25c854e1bcf05d8e7f925b1f4e14",
+    "acceptedBy": SOURCE_ACCEPTANCE_REF,
+    "evidencePath": SOURCE_EVIDENCE_RELATIVE_PATH,
+    "evidenceSHA256": SOURCE_EVIDENCE_SHA256,
+}
+EXPECTED_ROCKUSB_OBSERVATION = {
+    "reportedVersion": "rkdeveloptool ver 1.32",
+    "sha256": "bbd7bdc0fb121d414fb61085e77211cc1fdd9a3b6c6b285c54380f70e56c9923",
+    "upstreamCommit": "304f073752fd25c854e1bcf05d8e7f925b1f4e14",
+    "sourceProvenance": EXPECTED_SOURCE_PROVENANCE,
+    "signatureClass": "adHoc",
+    "quarantineAllowed": False,
+    "exactArgv": ["ld"],
+    "expectedObservation": {
+        "usbVendorID": "0x2207",
+        "usbProductID": "0x350a",
+        "mode": "Loader",
+    },
 }
 EMPTY_SHA256 = hashlib.sha256(b"").hexdigest()
 LINE_PATTERN = re.compile(
@@ -90,6 +123,29 @@ USBReader = Callable[[int, pathlib.Path], CommandResult]
 
 
 @dataclasses.dataclass(frozen=True)
+class SourceProvenance:
+    kind: str
+    artifact_sha256: str
+    upstream_commit: str
+    accepted_by: str
+    evidence_path: str
+    evidence_sha256: str
+
+    def receipt(self) -> dict[str, Any]:
+        return {
+            "kind": self.kind,
+            "artifactSHA256": self.artifact_sha256,
+            "upstreamCommit": self.upstream_commit,
+            "acceptedBy": self.accepted_by,
+            "evidence": {
+                "path": self.evidence_path,
+                "sha256": self.evidence_sha256,
+            },
+            "validationVerdict": "matchedProtectedMainRegistryAndEvidence",
+        }
+
+
+@dataclasses.dataclass(frozen=True)
 class Config:
     repo_root: pathlib.Path
     state_root: pathlib.Path
@@ -109,6 +165,7 @@ class Config:
     rkdeveloptool_version: str
     rkdeveloptool_sha256: str
     rkdeveloptool_upstream_commit: str
+    rkdeveloptool_source_provenance: SourceProvenance
     e1_arguments_template: tuple[str, ...]
     firmware_arguments_template: tuple[str, ...]
     impact_confirmation_token: str
@@ -167,6 +224,46 @@ def sha256_file(path: pathlib.Path) -> str:
         while chunk := handle.read(64 * 1024):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _source_evidence_path(repo_root: pathlib.Path, relative_path: str) -> pathlib.Path:
+    if relative_path != SOURCE_EVIDENCE_RELATIVE_PATH:
+        raise ProbeError("rkdeveloptool source evidence path drifted")
+    pure_path = pathlib.PurePosixPath(relative_path)
+    if pure_path.is_absolute() or any(part in ("", ".", "..") for part in pure_path.parts):
+        raise ProbeError("rkdeveloptool source evidence path is not a safe repo-relative path")
+    resolved_root = repo_root.resolve()
+    resolved_evidence = resolved_root.joinpath(*pure_path.parts).resolve()
+    try:
+        resolved_evidence.relative_to(resolved_root)
+    except ValueError as error:
+        raise ProbeError("rkdeveloptool source evidence escapes the repository") from error
+    if not resolved_evidence.is_file():
+        raise ProbeError("rkdeveloptool source evidence is unavailable")
+    return resolved_evidence
+
+
+def validate_source_provenance(config: Config) -> dict[str, Any]:
+    provenance = config.rkdeveloptool_source_provenance
+    if provenance.kind != SOURCE_PROVENANCE_KIND:
+        raise ProbeError("rkdeveloptool source provenance kind drifted")
+    if provenance.artifact_sha256 != config.rkdeveloptool_sha256:
+        raise ProbeError("rkdeveloptool artifact/source provenance SHA-256 tuple mismatch")
+    if provenance.upstream_commit != config.rkdeveloptool_upstream_commit:
+        raise ProbeError("rkdeveloptool artifact/source provenance commit tuple mismatch")
+    if provenance.accepted_by != SOURCE_ACCEPTANCE_REF:
+        raise ProbeError("rkdeveloptool source acceptance ref drifted")
+    if provenance.evidence_sha256 != SOURCE_EVIDENCE_SHA256:
+        raise ProbeError("rkdeveloptool source evidence SHA-256 pin drifted")
+    if not re.fullmatch(r"[0-9a-f]{64}", provenance.artifact_sha256):
+        raise ProbeError("rkdeveloptool source artifact SHA-256 is malformed")
+    if not re.fullmatch(r"[0-9a-f]{40}", provenance.upstream_commit):
+        raise ProbeError("rkdeveloptool source upstream commit is malformed")
+    evidence_path = _source_evidence_path(config.repo_root, provenance.evidence_path)
+    observed_evidence_sha256 = sha256_file(evidence_path)
+    if observed_evidence_sha256 != provenance.evidence_sha256:
+        raise ProbeError("rkdeveloptool reviewed source evidence bytes drifted")
+    return provenance.receipt()
 
 
 def canonical_json_bytes(document: Any) -> bytes:
@@ -312,6 +409,18 @@ def load_config(
         raise ProbeError("loader-transition authorization refs drifted")
     if hdc != EXPECTED_HDC:
         raise ProbeError("loader-transition HDC exact pin or server policy drifted")
+    if not isinstance(rockusb, dict) or not isinstance(
+        rockusb.get("sourceProvenance"), dict
+    ):
+        raise ProbeError("loader-transition RockUSB source provenance is missing")
+    source_provenance = rockusb["sourceProvenance"]
+    if (
+        rockusb.get("sha256") != source_provenance.get("artifactSHA256")
+        or rockusb.get("upstreamCommit") != source_provenance.get("upstreamCommit")
+    ):
+        raise ProbeError("loader-transition RockUSB top-level/provenance tuple mismatch")
+    if rockusb != EXPECTED_ROCKUSB_OBSERVATION:
+        raise ProbeError("loader-transition RockUSB exact pin or provenance drifted")
     valid_until = dt.datetime.fromisoformat(
         authorization["validUntil"].replace("Z", "+00:00")
     )
@@ -342,6 +451,14 @@ def load_config(
         rkdeveloptool_version=rockusb["reportedVersion"],
         rkdeveloptool_sha256=rockusb["sha256"],
         rkdeveloptool_upstream_commit=rockusb["upstreamCommit"],
+        rkdeveloptool_source_provenance=SourceProvenance(
+            kind=source_provenance["kind"],
+            artifact_sha256=source_provenance["artifactSHA256"],
+            upstream_commit=source_provenance["upstreamCommit"],
+            accepted_by=source_provenance["acceptedBy"],
+            evidence_path=source_provenance["evidencePath"],
+            evidence_sha256=source_provenance["evidenceSHA256"],
+        ),
         e1_arguments_template=tuple(operation["exactArgvTemplate"]),
         firmware_arguments_template=tuple(operation["firmwareReadbackArgvTemplate"]),
         impact_confirmation_token=operation["impactConfirmationToken"],
@@ -370,6 +487,7 @@ def validate_config(config: Config) -> None:
         raise ProbeError("registry SHA-256 field is malformed")
     if len(config.rkdeveloptool_sha256) != 64:
         raise ProbeError("registry rkdeveloptool SHA-256 is malformed")
+    validate_source_provenance(config)
     if config.maximum_output_bytes != MAX_RAW_BYTES:
         raise ProbeError("registry maximumOutputBytes drifted")
     assert_outside_repository(config.state_root)
@@ -750,6 +868,7 @@ def inspect_rkdeveloptool(
     run_dir: pathlib.Path,
     ordinal: int,
 ) -> tuple[dict[str, Any], int]:
+    source_provenance_receipt = validate_source_provenance(config)
     path = config.rkdeveloptool_path
     if not path.is_absolute() or not path.is_file() or not os.access(path, os.X_OK):
         raise ProbeError("rkdeveloptool is not an executable absolute regular file")
@@ -774,24 +893,6 @@ def inspect_rkdeveloptool(
         != config.rkdeveloptool_version
     ):
         raise ProbeError("rkdeveloptool reported version mismatch")
-
-    commit_result, commit_receipt = capture_command(
-        runner=runner,
-        argv=["/usr/bin/git", "-C", str(path.parent), "rev-parse", "HEAD"],
-        timeout_ms=5_000,
-        run_dir=run_dir,
-        stem="rkdeveloptool-upstream-commit",
-        ordinal=ordinal,
-    )
-    ordinal += 1
-    if (
-        commit_result.exit_code != 0
-        or commit_result.timed_out
-        or commit_result.stderr
-        or commit_result.stdout.decode("ascii", errors="replace").strip()
-        != config.rkdeveloptool_upstream_commit
-    ):
-        raise ProbeError("rkdeveloptool upstream commit mismatch")
 
     signature_result, signature_receipt = capture_command(
         runner=runner,
@@ -837,10 +938,10 @@ def inspect_rkdeveloptool(
             "reportedVersion": config.rkdeveloptool_version,
             "sha256": observed_hash,
             "upstreamCommit": config.rkdeveloptool_upstream_commit,
+            "sourceProvenance": source_provenance_receipt,
             "signatureClass": "adHoc",
             "quarantinePresent": False,
             "versionReceipt": version_receipt,
-            "commitReceipt": commit_receipt,
             "signatureReceipt": signature_receipt,
             "quarantineReceipt": quarantine_receipt,
         },
