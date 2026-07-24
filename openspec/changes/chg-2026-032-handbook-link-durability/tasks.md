@@ -6,8 +6,123 @@
 
 ## TASK-HLD-001 — 活跃 change 引用改为耐久形式
 
-- Status:blocked（双前置：① CHG-2026-032 经 approval-only PR 批准——**本批准 PR 合入后
-  该项满足**；② 独立 readiness PR 钉定手册 blob 与逐条待改清单——**仍未满足**）
+- Status:ready（2026-07-23 D1 readiness r1；仅在维护者 review/merge 本独立 PR 后生效。
+  双前置全部闭合：① CHG-2026-032 经 approval-only PR #438 批准；② 本 readiness 钉定
+  手册 blob 与 19 条逐条待改清单。merge 前不得开 implementation/evidence PR）
+- Readiness（r1，base = protected `main` `4675971ee132d0b94a7f0780e9987518489974bf`）：
+  - **Approval/dependency gate:satisfied。**r1 proposal #437 合入
+    `02b27b01246eaed4b230f3a2cfec6a72545c63ff`；approval-only #438 合入
+    `4675971ee132d0b94a7f0780e9987518489974bf`，`status: approved` 已在 protected `main` 生效。
+    本任务无前序 task；TASK-HLD-002 依赖本任务 done，继续 `blocked`。
+  - **Base/input pins。**下表由脚本枚举并于本 base 实测取值（非手抄）。implementation
+    开工时必须基于本 readiness 合入后的最新 protected `main` 逐项复核；任一漂移、
+    路径删除/重命名或目标 change 在开工前归档，立即停止并重新 readiness。
+
+    ```yaml pins
+    - artifact: TASK-HLD-001 readiness audit base
+      commit: 4675971ee132d0b94a7f0780e9987518489974bf
+    - artifact: CHG-2026-032 propose merge
+      commit: 02b27b01246eaed4b230f3a2cfec6a72545c63ff
+    - artifact: CHG-2026-032 approval merge
+      commit: 4675971ee132d0b94a7f0780e9987518489974bf
+    - path: openspec/planning/agent-failure-patterns.md
+      blob: f35cd6ad9fa3f283d27a4a8d01b67a7ac584777c
+    - path: openspec/changes/chg-2026-006-dayu200-m0b-bringup/tasks.md
+      blob: 779ff6ac060ab7ba82ddaf955b65702ec52285db
+    - path: openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/evidence/runs/TASK-UD-REDACTOR-001/run.md
+      blob: 172ea48fba64819d0bf0743816323b8da68b6ec3
+    - path: openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/tasks.md
+      blob: abaee6a12290108f4daeac9f84a3ff6700971433
+    - path: openspec/changes/chg-2026-022-hdc-supervisor-observability/proposal.md
+      blob: 63fa348e8f08276d17b1655532714d5da3a67482
+    - path: openspec/changes/chg-2026-022-hdc-supervisor-observability/review.md
+      blob: d03118ab83cbeb278910c08e55573094edbd5169
+    - path: openspec/changes/chg-2026-025-ai-native-unattended-device-ops/review.md
+      blob: 197e4adc47f75444a54eefadf00e58b4681e5202
+    - path: openspec/changes/chg-2026-026-macos-rockchip-flash-ui/evidence/runs/TASK-RKFUI-001/hermetic-contract-test-2026-07-22.md
+      blob: 659f99f470cea5f03984de6ea28ce1395e391287
+    - path: openspec/changes/chg-2026-026-macos-rockchip-flash-ui/evidence/runs/TASK-RKFUI-001/run.md
+      blob: 0f24bb2424e43edb34de0fffaa0eee3c4e5cbec3
+    - path: openspec/changes/chg-2026-026-macos-rockchip-flash-ui/verification.md
+      blob: f4aea707ded798680aacb7811a4786247a94dac8
+    - path: openspec/changes/chg-2026-028-guard-ci-mechanization/evidence/runs/TASK-MECH-001/run.md
+      blob: f5e51fad2f2a429748126eee27ab61df282c2f23
+    - path: openspec/changes/chg-2026-028-guard-ci-mechanization/proposal.md
+      blob: d7718251c074f3b23bb32f8703c863efc9912245
+    - path: openspec/changes/chg-2026-032-handbook-link-durability/proposal.md
+      blob: 1b3d49b36a405923921515bf51725dc5066ba1d3
+    - path: openspec/changes/chg-2026-032-handbook-link-durability/design.md
+      blob: 3ea8dd7f44db5037401f60a5aaeb8d0dfc906130
+    - path: openspec/changes/chg-2026-032-handbook-link-durability/verification.md
+      blob: ab0abcce77c2c0a573e733ef53a8c97e7d1209df
+    - path: openspec/changes/chg-2026-032-handbook-link-durability/acceptance-cases.yaml
+      blob: 65f0b651fe3fa7075c8c51720daf37e2b9595730
+    - path: AGENTS.md
+      blob: 3c2d3c6a01d3eaa31cd9e3ee333f3153552f4164
+    - path: openspec/constitution.md
+      blob: 137d09da7eaa535670a8bd3b0c9537681e6cb21b
+    - path: openspec/governance/enforcement.md
+      blob: e8ff3c130e1b8b15f8405d150ad567e774a0d82b
+    - path: openspec/verification/policy.md
+      blob: ef3b42085ff50b54f1bb70650510f27bdc020cf1
+    ```
+
+  - **待改清单:closed（恰 19 条，落在 11 个目标文件）。**下表为**全部**待改项，
+    实现不得多改也不得少改。行号以本 base 的手册为准（改写会使后续行号位移，
+    实现时以 `AF` 项 + 目标路径定位，不以行号定位）。
+
+| # | 行 | AF 项 | change | 目标文件（change 目录内相对） | 定位 blob |
+| --- | --- | --- | --- | --- | --- |
+| L01 | 46 | `AF-001` | `CHG-026` | `evidence/runs/TASK-RKFUI-001/run.md` | `0f24bb2424e4…` |
+| L02 | 51 | `AF-001` | `CHG-006` | `tasks.md` | `779ff6ac060a…` |
+| L03 | 53 | `AF-001` | `CHG-022` | `proposal.md` | `63fa348e8f08…` |
+| L04 | 88 | `AF-001` | `CHG-028` | `proposal.md` | `d7718251c074…` |
+| L05 | 105 | `AF-002` | `CHG-022` | `review.md` | `d03118ab83cb…` |
+| L06 | 158 | `AF-003` | `CHG-025` | `review.md` | `197e4adc47f7…` |
+| L07 | 221 | `AF-004` | `CHG-026` | `evidence/runs/TASK-RKFUI-001/run.md` | `0f24bb2424e4…` |
+| L08 | 271 | `AF-005` | `CHG-008` | `evidence/runs/TASK-UD-REDACTOR-001/run.md` | `172ea48fba64…` |
+| L09 | 275 | `AF-005` | `CHG-026` | `evidence/runs/TASK-RKFUI-001/run.md` | `0f24bb2424e4…` |
+| L10 | 328 | `AF-006` | `CHG-028` | `proposal.md` | `d7718251c074…` |
+| L11 | 383 | `AF-007` | `CHG-026` | `evidence/runs/TASK-RKFUI-001/hermetic-contract-test-2026-07-22.md` | `659f99f470ce…` |
+| L12 | 389 | `AF-007` | `CHG-028` | `evidence/runs/TASK-MECH-001/run.md` | `f5e51fad2f2a…` |
+| L13 | 551 | `AF-010` | `CHG-022` | `review.md` | `d03118ab83cb…` |
+| L14 | 600 | `AF-011` | `CHG-026` | `verification.md` | `f4aea707ded7…` |
+| L15 | 708 | `AF-013` | `CHG-022` | `review.md` | `d03118ab83cb…` |
+| L16 | 822 | `AF-015` | `CHG-026` | `evidence/runs/TASK-RKFUI-001/hermetic-contract-test-2026-07-22.md` | `659f99f470ce…` |
+| L17 | 868 | `AF-016` | `CHG-028` | `evidence/runs/TASK-MECH-001/run.md` | `f5e51fad2f2a…` |
+| L18 | 872 | `AF-016` | `CHG-022` | `review.md` | `d03118ab83cb…` |
+| L19 | 921 | `AF-017` | `CHG-008` | `tasks.md` | `abaee6a12290…` |
+
+  - **改法:closed。**每条改为与 CHG-2026-029 TASK-AFP-005 同构的耐久形式，保留三项：
+    ① change ID（如 `CHG-2026-026`）；② change 目录内的文件路径（含必要的
+    `TASK-*`/章节标识）；③ 上表的**完整 40-hex blob OID**。去掉 `](../changes/...)`
+    相对链接。链接文字（如 “TASK-RKFUI-001 `run.md`”）可保留为普通文本。
+    **禁止改法**：改指向预期的 `changes/archive/<date>-<id>/` 路径；删除事实指向；
+    把被引用内容复制进手册；改动任何案例的事实文字。
+  - **不动面:binary。**指向 `changes/archive/**` 的 **16 条**链接逐字不动；
+    `AF-NNN` ID 集合（`AF-001`…`AF-018`）、taxonomy 归属与两轴划分、八字段契约与
+    顺序（H3 = 144）、`Automation status` 取值域、`Fact` 36 / `Inference` 18、
+    positive 18 / negative 18、首屏五项声明、各项 `Currency` 行——全部零变化。
+  - **OID 取值纪律:binary。**上表 blob 均由 `git rev-parse HEAD:<path>` 实测取得；
+    实现时须逐条复取并在 run 中记录取值命令。**禁止由短 hash 补全为 40 位**——该形态
+    是 `AF-016` 的已知复发实例（CHG-2026-029 期间发生过，见其 TASK-AFP-005 readiness
+    的起草期自纠记录）。
+  - **Verification/evidence gate:binary。**implementation/evidence PR 必须交付手册改动、
+    本任务 run 与 `tasks.md` evidence 引用，但不得翻 `ready→done`；run 至少记录：
+    19 条逐条“原链接 → 改后文本 → 定位 OID → 取值命令”、活跃 change 相对链接计数
+    → 0、archive 类 16 条计数与内容零变化、每个新增 OID 经 `git cat-file -e` 实测
+    可解析、上述不动面逐项零变化的实测、归档模拟（对 6 个被引用活跃 change 逐个
+    验证其目录移入 archive 后手册无可断项）、`openspec/templates/**` 与
+    `changes/archive/**` diff 为 0、`scripts/check-sdd.sh` 0/0/111 与
+    `git diff --check` PASS。
+  - **Environment/concurrency gate:satisfied。**纯 host-side document task，零硬件、
+    零 device/network/effect dispatch。手册面并发：本 change 是当前唯一持
+    `openspec/planning/agent-failure-patterns.md` 授权的 change（CHG-2026-029 已
+    archived，其任务不再可开工）。若实现期间出现同路径 PR、目标 change 归档或
+    canonical conflict，任务立即回到 `blocked`。
+  - **Review boundary。**本 readiness PR 只修改本文件的 HLD-001 本节；零手册改动、
+    零 implementation、零 evidence。implementation/evidence 与后续 `ready→done` 各自
+    使用独立 PR；本 readiness merge 不构成 `HLD-DURABLE-001` PASS 或 change `verified`。
 - Platform:macos（过程文档跨平台可复用，零平台产品行为）
 - Requirements/AC:change-local `HLD-DURABLE-001`
 - Depends on:change approval、independent readiness
