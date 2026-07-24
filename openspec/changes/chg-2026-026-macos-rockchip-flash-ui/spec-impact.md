@@ -8,6 +8,10 @@
 已定义 original target、durable binding revision、跨模式 rebind threshold、identity gate 和
 mutation lane。本 change 只让 macOS App 实现这些既有要求。
 
+r2 的 discovery executable repin、001/001A dependency correction 与一次 E1
+characterization window 仍属于同一 platform/integration scope：typed `enterUpdater`、
+binding/rebind threshold、effect classification 与全部 Core AC 均不变。
+
 ## No-op delta conclusion
 
 - `openspec/specs/**`：零修改。

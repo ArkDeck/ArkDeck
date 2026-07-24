@@ -2,8 +2,9 @@
 
 ## Context and constraints
 
-- Proposal revision：r2，`status: proposed`；在维护者 review/merge 批准前所有实现任务
-  blocked。
+- Proposal revision：r2，r1 已 `approved`；r2 的 clean discovery tool repin、依赖修正与
+  TASK-RKFUI-001A D2 window 只在维护者 review/merge r2 PR 后生效。合入前新增 scope
+  blocked，零 E1 dispatch。
 - Core baseline：`CORE-2.0.0`，叠加实现开始时已批准并适用的 scoped delta。
 - Related specs：flashing、desktop UX、device targeting、workflow journal/recovery、
   session/artifact/storage、macOS platform profile。
@@ -62,6 +63,10 @@ process executor、storage/power/binding/authorization ports；fixture compositi
 1. 用户通过文件选择器选择 `rkdeveloptool`；App 持久化 app-scoped bookmark，并验证
    executable、version、SHA-256、platform trust。仅 pinned/approved family 可进入
    production discovery。
+   r2 的 discovery successor 精确为 `rkdeveloptool ver 1.32` /
+   `bbd7bdc0…9923` / upstream `304f0737…`；它必须在 registry、Swift adapter/tests 与
+   signed probe 中原子采用。旧 `038a8a0e…3611` 继续属于既有 destructive
+   Provider/Profile，r2 不让两个 identity 互相替代。
 2. 只读 probe 使用绝对 executable URL 和 `arguments: ["ld"]`；不使用 PATH 或 shell。
 3. parser 只接受注册 fixture family：`DevNo`、VID、PID、LocationID、Mode。整份 stdout
    必须被消费；重复 DevNo/location、字段缺失、未知 mode、截断或额外设备行均给出 typed
@@ -88,6 +93,11 @@ process executor、storage/power/binding/authorization ports；fixture compositi
 3. **Physical fallback**：HDC unavailable/unsupported、transition/reconnect 失败或 identity
    歧义时，UI 展示 CHG-2026-016 已验证按键序列，并继续只读观察 `ld`。App 不把提示记为
    自动执行。
+
+r2 修正 characterization 顺序：001 的 parser/adapter contract 已合入，但其 E0 hardware
+receipt 需要先得到 Loader。维护者选择 Route B 作为本轮 Loader 来源，因此 001A 可在 001
+最终 `done` 前先执行一次具名 E1；成功后 001 的 signed Sandbox probe 仍须独立运行并生成
+自己的 receipt。001A 的 command/USB observation 不会被复制或重分类为 001 E0 PASS。
 
 软件路线顺序固定为：
 
@@ -158,6 +168,10 @@ candidate 均不开始 destructive step。
   implementation 立即 blocked，不自行扩 schema。
 - 新增版本化 RockUSB `ld` fixtures/registry，pin `rkdeveloptool` family/version/hash 与 exact
   argv。若需要扩展未知输出 family，必须走 integration revision，不在 parser 中宽松接受。
+- r2 discovery identity revision 只修改 read-only `ld` registry family，不修改
+  `RockchipFlashProfile.pinnedToolchainFingerprint`、destructive authorization 或既有硬件
+  support matrix。后续 execute 若要采用新 build，必须另行 readiness/change 并重新验证
+  Provider 全命令面。
 - 安全解包产物是 Session-owned staging，不是 raw Artifact 的原地修改；archive raw 保持
   不变，成员来源/hash 可追溯。
 

@@ -1,21 +1,25 @@
 # Verification Plan — CHG-2026-026
 
-> Change:CHG-2026-026@r1
+> Change:CHG-2026-026@r2
 > Status:planned
-> Note(2026-07-22):header 补记 @r1(本 change 从未修订,零语义变化;三方
-> revision 同步惯例对齐,CHG-2026-028 MECH-002 实现前置的存量清零)。
+> Note(2026-07-24):r2 仅增加 clean discovery tool repin、修正 001/001A 循环依赖并
+> 钉定一次 E1 characterization window；Core/AC/schema 不变。
 
 ## Environment
 
 - Baseline：`CORE-2.0.0` + 实现开始时已批准的 scoped delta；若 CHG-2026-025 归档/baseline
   变化，重新 pin 并做 spec-impact review。
 - Platform：macOS 14+；Swift 6；signed Sandboxed Developer ID/Hardened Runtime App 形态。
-- Tool：外部用户选择的 `rkdeveloptool`，版本/hash/trust 与 approved Rockchip registry 完全
-  匹配；生产不使用 BlueTool/upgrade_tool。
+- Tool：TASK-RKFUI-001/001A 的 read-only discovery 使用外部用户选择的 clean
+  `rkdeveloptool ver 1.32` / SHA-256 `bbd7bdc0…9923` / upstream `304f0737…`，且
+  version/hash/trust 与 r2 后的 Rockchip registry 完全匹配；既有 destructive
+  Provider/Profile 继续 pin `038a8a0e…3611`，r2 不构成 destructive repin。生产不使用
+  BlueTool/upgrade_tool。
 - Fixtures：fake rkdeveloptool、版本化 `ld/ppt/wlx/rd` stdout/stderr、valid/corrupt/drift/
   path-traversal tar.gz、journal crash points、postflight observations。
 - Hardware：TASK-RKFUI-001 E0、TASK-RKFUI-001A E1 mode transition 与 TASK-RKFUI-004；其余
-  测试无设备、零真实 dispatch。001A 明确禁止 destructive command。
+  测试无设备、零真实 dispatch。r2 允许 001A 为 001 提供 Loader 前置态，但两份 evidence
+  分离；001A 明确禁止 destructive command。
 
 ## Acceptance matrix
 
@@ -71,6 +75,9 @@
 
 - signed Sandbox direct non-elevated USB access 若失败，TASK-RKFUI-003/004 不得用 sudo/helper
   绕过；如实 blocked 并新建平台/分发 change。
+- r2 clean discovery repin 若未在 registry/resource closure/Swift/Python probe 四面原子完成，
+  或当前 artifact/firmware/HDC/binding 与 readiness pins 任一漂移，001/001A 均 fail closed；
+  不得回退到 quarantined artifact、接受两个 hash 或用 destructive Provider 的旧 pin 冒充。
 - `REQ-FLASH-015` 交互式 App executor 解释未获维护者明确确认时，execute 不实现；不得把
   plan-only/handoff 记作一键真机刷机。
 - DAYU200 exact combination 的 `reboot loader` E1 capability 未证明 supported 时，Route B
