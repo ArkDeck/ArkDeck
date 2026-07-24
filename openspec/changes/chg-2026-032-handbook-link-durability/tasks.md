@@ -203,8 +203,95 @@
 
 ## TASK-HLD-002 — 在手册内登记引用约定
 
-- Status:blocked（三前置：① change approval；② TASK-HLD-001 done；③ 独立 readiness
-  PR 钉定手册 blob 与拟增文本的精确位置）
+- Status:ready（2026-07-23 D1 readiness r1；仅在维护者 review/merge 本独立 PR 后生效。
+  三前置全部闭合：① approval-only #438；② TASK-HLD-001 done #442 合入
+  `73b46b684b27eda23cfbaad06c5b707bff39e2cc`；③ 本 readiness 钉定手册 blob、拟增文本的精确位置与措辞边界。
+  **维护者 merge 本 readiness 亦构成对下方“范围扩展”一节的接受**；merge 前不得开
+  implementation/evidence PR）
+- Readiness（r1，base = protected `main` `73b46b684b27eda23cfbaad06c5b707bff39e2cc`）：
+  - **Approval/dependency gate:satisfied。**propose #437 合入
+    `02b27b01246eaed4b230f3a2cfec6a72545c63ff`；approval-only #438 合入
+    `4675971ee132d0b94a7f0780e9987518489974bf`；TASK-HLD-001 实现 #441 合入
+    `b8f41066e0aa3a8d1343f805524f9c9439ff9c5c`、done #442 合入 `73b46b684b27eda23cfbaad06c5b707bff39e2cc`。
+    本任务为本 change 最后一个任务。
+  - **Base/input pins。**
+
+    ```yaml pins
+    - artifact: TASK-HLD-002 readiness audit base
+      commit: 73b46b684b27eda23cfbaad06c5b707bff39e2cc
+    - artifact: CHG-2026-032 approval merge
+      commit: 4675971ee132d0b94a7f0780e9987518489974bf
+    - artifact: TASK-HLD-001 done status merge
+      commit: 73b46b684b27eda23cfbaad06c5b707bff39e2cc
+    - path: openspec/planning/agent-failure-patterns.md
+      blob: 9fae009c83fc9d560a0eaafa8a759cc471de0988
+    - path: openspec/changes/chg-2026-032-handbook-link-durability/proposal.md
+      blob: 1b3d49b36a405923921515bf51725dc5066ba1d3
+    - path: openspec/changes/chg-2026-032-handbook-link-durability/design.md
+      blob: 3ea8dd7f44db5037401f60a5aaeb8d0dfc906130
+    - path: openspec/changes/chg-2026-032-handbook-link-durability/verification.md
+      blob: ab0abcce77c2c0a573e733ef53a8c97e7d1209df
+    - path: openspec/changes/chg-2026-032-handbook-link-durability/acceptance-cases.yaml
+      blob: 65f0b651fe3fa7075c8c51720daf37e2b9595730
+    - path: AGENTS.md
+      blob: 3c2d3c6a01d3eaa31cd9e3ee333f3153552f4164
+    - path: openspec/constitution.md
+      blob: 137d09da7eaa535670a8bd3b0c9537681e6cb21b
+    - path: openspec/governance/enforcement.md
+      blob: e8ff3c130e1b8b15f8405d150ad567e774a0d82b
+    - path: openspec/verification/policy.md
+      blob: ef3b42085ff50b54f1bb70650510f27bdc020cf1
+    ```
+
+  - **首屏现状:实测。**手册首屏为 **4 个**引用块（非此前登记的“五项”，见下方勘误）：
+    ① `**本文件不是规则源。**`（L3）；② `**冲突处置。**`（L7）；
+    ③ `**只链接，不复制。**`（L14）；④ `**archive 只读。**`（L19）。
+  - **拟增文本:closed（恰一条）。**在 ④ `**archive 只读。**` 块之后、正文首段之前
+    插入**恰一个**新引用块 `**引用形式。**`，内容须含且仅含三点：① 指向**活跃
+    change** 时使用耐久形式（change ID + change 目录内路径 + 完整 40-hex blob OID），
+    不使用相对路径；② 指向已在 `changes/archive/**` 的目标可保留相对路径（归档目录
+    不再移动）；③ **该约定只约束本手册自身的后续编辑**，不创造 normative 规则，不
+    改变 `AGENTS.md`、enforcement、模板或任何其他文档的要求。措辞禁止出现
+    `SHALL`/`MUST` 及对其他文档的强制表述。
+  - **范围扩展:需维护者接受（merge 本 readiness 即接受）。**除“增加一条”外，本任务
+    另需**修正一处因 TASK-HLD-001 而陈旧的既有表述**：首屏块 ③ `**只链接，不复制。**`
+    现文为“每条案例只给出仓内相对路径与完整 40-hex Git OID”。HLD-001 合入后，
+    **19 条活跃 change 引用已不再是相对路径**，该句与手册实际内容矛盾。
+    - **为何超出 approval 字面**：#438 的封闭范围写的是“只在手册首屏既有边界声明中
+      **增加**一条非规范引用约定”，未授权修改既有声明句。
+    - **为何仍建议纳入**：不改则手册首屏自述与正文形式相互矛盾，且该矛盾正由本
+      change 的 HLD-001 造成；为一句话另立任务的成本高于收益。
+    - **边界**：只改该句中描述**引用形式**的部分（相对路径 → 区分活跃/已归档两种
+      形式）；“不复制 raw evidence、hash 表、transcript、secret、真实设备标识、
+      用户绝对路径或大段日志”及其 `POL-PRIVACY-001`/`POL-ARTIFACT-001` 两处引用
+      **逐字保留**。
+    - 若维护者不接受该扩展，请在 review 中指出；实现将退回“只增加一条”，并把块 ③
+      的陈旧表述作为已知缺陷指针留待独立载体处理。
+  - **不动面:binary。**首屏其余 3 块（①②④）逐字不动；`AF-NNN` ID 集合
+    （`AF-001`…`AF-018`）、taxonomy 归属与两轴划分、八字段契约与顺序（H3 = 144）、
+    `Automation status` 取值域、`Fact` 36 / `Inference` 18、positive 18 /
+    negative 18、各项 `Currency` 行、正文全部 19 条耐久引用与 16 条 archive 类
+    链接——全部零变化。
+  - **勘误（dated，2026-07-23）。**TASK-HLD-001 readiness 的不动面条款写作“首屏
+    **五项**声明”，实测为 **4 块**。该数字未被 HLD-001 的实现或 done recheck 用作
+    判定依据（其校验的是 ID 集合、八字段契约、计数与链接等具体门），故**未产生
+    错误结论**；但登记值本身错误，属 `AF-016`（凭印象写计数）。此处在事实原位
+    更正，不改写 HLD-001 已合入的记录。
+  - **Verification/evidence gate:binary。**implementation/evidence PR 必须交付手册
+    改动、本任务 run 与 `tasks.md` evidence 引用，但不得翻 `ready→done`；run 至少
+    记录：首屏块数 4 → 5 且新增块恰为 `**引用形式。**`；块 ③ 的改动逐字对照
+    （改前/改后，并证明隐私条款与两处 `POL-*` 引用逐字保留）；shadow-spec 扫描
+    （新增 `SHALL`/`MUST` = 0、对其他文档的强制表述 = 0、自动批准/ready/done
+    语义 = 0）；不动面逐项零变化的实测；活跃 change 相对链接仍为 0、archive 类仍
+    为 16；`openspec/templates/**` 与 `changes/archive/**` diff 为 0；
+    `scripts/check-sdd.sh` 0/0/111 与 `git diff --check` PASS。
+  - **Environment/concurrency gate:satisfied。**纯 host-side document task，零硬件、
+    零 device/network/effect dispatch；本 change 是当前唯一持该手册授权者。若出现
+    同路径 PR 或 canonical conflict，任务立即回到 `blocked`。
+  - **Review boundary。**本 readiness PR 只修改本文件的 HLD-002 本节；零手册改动、
+    零 implementation、零 evidence。implementation/evidence 与后续 `ready→done` 各自
+    使用独立 PR；本 readiness merge 不构成 `HLD-CONVENTION-001` PASS 或 change
+    `verified`。
 - Platform:macos（过程文档跨平台可复用，零平台产品行为）
 - Requirements/AC:change-local `HLD-CONVENTION-001`
 - Depends on:change approval、TASK-HLD-001 done、independent readiness
