@@ -51,7 +51,7 @@ dependency closure, SBOM, source-offer mechanism, or release signing receipt
 exists. Those are mandatory pre-implementation gates, not assumptions.
 
 The complete comparison is
-`openspec/changes/chg-2026-035-macos-rockchip-tool-architecture/evidence/runs/TASK-RKTA-001/candidate-matrix.md`.
+`openspec/changes/archive/2026-07-25-chg-2026-035-macos-rockchip-tool-architecture/evidence/runs/TASK-RKTA-001/candidate-matrix.md`.
 
 ## Production topology and authority
 

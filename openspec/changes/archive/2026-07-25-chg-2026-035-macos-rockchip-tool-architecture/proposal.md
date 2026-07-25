@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-035-macos-rockchip-tool-architecture
 revision: 1
-status: verified # 本 2026-07-25 verification-closure PR 经维护者 review/merge 后生效；完整 OID 链见 Verification closure；archive 另行
+status: archived # 本 2026-07-25 archive PR 经维护者 review/merge 后生效；verified #533 merge `56d6ad6e2802107094160eb1ccc830c2f2f202bd`；platform/no-op delta，目录迁移与 ADR-0003 唯一 living path 更新见 Archive record
 class: platform
 core_change_level: none
 owner: lvye
@@ -183,3 +183,32 @@ carrier 合入后，才能另立或修订后续 implementation change；CHG-2026
   不证明 bundled component 已实现、可分发、可访问 USB/RockUSB 或可刷设备，不形成
   macOS platform/hardware conformance claim，也不修改 CHG-2026-026。产品实现必须
   另立 approved change 并逐项关闭 ADR-0003 handoff；archive 使用后续独立 PR。
+
+## Archive record（2026-07-25）
+
+- **前置：closed。**verification-closure #533 exact reviewed head
+  `edd00b21f4d88e2fc4541b060e1603a23dd73f36` 已由 CODEOWNER `lvye`
+  APPROVED，并以 `56d6ad6e2802107094160eb1ccc830c2f2f202bd` 合入 protected
+  `main`；本 archive audit base 即该 merge OID。`TASK-RKTA-001` 为 `done`，
+  verification 为 `passed`。
+- **目录：atomic。**完整 9-file change package 移至
+  `openspec/changes/archive/2026-07-25-chg-2026-035-macos-rockchip-tool-architecture/`。
+  除本 proposal 的 `verified → archived` 与本记录外，其余 8 个 change artifact/
+  evidence 文件保持逐 blob 等值。
+- **引用面：closed。**归档前全仓精确目录/ID 扫描发现五处目录外命中：ADR-0003
+  一处是指向 candidate matrix 的 living exact-path consumer，本 PR 将其唯一改写为
+  dated archive 路径；ADR-0003 另两处与 `open-questions.md`、macOS profile 各一处
+  仅使用 `CHG-2026-035` ID，不依赖目录位置，不会断链。归档后 active path 命中
+  为 0，新 archive matrix 路径可解析。
+- **Delta：none。**本 change 为 `platform`、`core_change_level:none`；
+  `spec-impact.md` 已确认 current Core specs/contracts、canonical acceptance
+  registry/index、baseline、HDC external-first 与 CHG-2026-026 均零变化。
+  `RKTA-*` 只属 change-local document review，因此 archive 不合入任何 current
+  spec/registry delta。
+- **边界：unchanged。**本 archive 只改变治理位置、状态与一个文档导航指针；
+  不实现或批准 bundled component，不修改产品/profile/entitlement/CHG-2026-026，
+  不形成 distribution/platform/hardware conformance，也不授权进程、USB、设备或
+  destructive effect。后续产品工作仍须独立 approved change 关闭 ADR-0003 handoff。
+
+本目录在 archive PR 经维护者 review/merge 后冻结；后续事实使用新 change 或
+append-only 外部记录，不改写归档历史。
