@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-036-macos-bundled-rockchip-component
 revision: 1
-status: proposed # 本 proposal PR 只登记 change；approval/readiness/implementation/evidence/status/verification 均须后续独立 PR
+status: approved # 本 approval-only PR 经维护者 review/merge 后生效；r1 proposal 已由 #535 登记；六个 tasks 仍 blocked
 class: platform
 core_change_level: none
 owner: lvye
@@ -141,3 +141,31 @@ implementation/evidence PR 合入后再使用独立 D0 status PR。
 只有六个任务全部 done 且 verification closure 合入，才可另开 CHG-2026-026
 revision/readiness。该后续 change 仍须单独决定 UI 与真实 destructive acceptance；
 本 change 的 proposal、approval 或实现 evidence 均不授权一键刷机。
+
+## Approval
+
+- r1 proposal 已由 PR #535 登记：exact head
+  `a56eb3e9c0d41b35c208d4372b7f2007c8e5976f` 经维护者 `lvye` APPROVED，并以 merge
+  OID `16b3dbc7f7d2c565f15388bc1ca0f2aef41dd867` 合入 protected `main`。该 merge
+  只登记 `status: proposed` 的七条 change-local AC、六个 blocked tasks 与 no-op
+  Core delta，不构成正式批准、task readiness、license/distribution 接受或实现证据。
+- 正式批准由本 approval-only PR 将 `status: proposed → approved`，并仅在维护者对
+  exact head review/merge 后生效。批准范围封闭为 proposal/design/tasks/
+  verification/acceptance/spec-impact 已登记的 source/distribution、
+  reproducible build、nested package/signing、product composition、signed
+  Sandbox E0 与 clean-host distribution 六段顺序门；任一门失败都保持 execute
+  disabled，不能启用 external/helper/download/copy fallback。
+- 批准同时接受 `design.md` 的 App-owned direct-child 架构、single authority/
+  typed-effect/durable outcome 边界，以及 `spec-impact.md` 的零 Core、零 locked
+  contract、零 HDC external-first、零 CHG-2026-026/hardware-matrix 变化结论。
+  发现必须改变任一边界时，须先走 proposal revision/new change。
+- 本批准不接受 GPL-2.0、libusb/libiconv 或其他 dependency 的 distribution 条款，
+  不接受 corresponding-source/source-offer 方案，也不固定 source archive、builder、
+  toolchain、architectures、SBOM/CVE owner、bundle identifier/location、signing/
+  notary credential 或 release/update/rollback policy；这些只能由
+  `TASK-BRC-001` 及后继任务的独立 D1 decision/readiness/evidence 闭合。
+- 本批准不使任何 task `ready`，不授权 source/network/download/vendor/build、
+  App/component launch、sign/notarize、文件/USB/设备访问、E1/E2/mutation/destructive
+  操作，不修改 product/test/script/integration/spec/contract/evidence 或
+  CHG-2026-026。六个 task 继续 `blocked`；合入后只有 `TASK-BRC-001` 可以另走
+  independent D1 readiness。
