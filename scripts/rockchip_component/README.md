@@ -8,6 +8,8 @@ The recipe:
 - fetches only the four URLs pinned in
   `openspec/integrations/rockchip/bundled-component/1.0.0/recipe.json`;
 - verifies exact size/SHA-256 and the libusb detached signature before extraction;
+- verifies the exact hosted GnuPG formula/version/link/realpath provenance, records
+  the observed executable hashes, and requires the two builders to agree on them;
 - rejects unsafe archive members and extracts into a fresh temporary root;
 - builds only on the exact GitHub-hosted `macos-26-arm64` image pinned by the
   recipe, with its exact macOS/Xcode/SDK/Clang envelope, inside a deny-network

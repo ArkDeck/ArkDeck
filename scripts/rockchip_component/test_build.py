@@ -82,6 +82,18 @@ class RockchipComponentBuildTests(unittest.TestCase):
             ["/Applications/Xcode_26.6.app/Contents/Developer"],
         )
         self.assertRegex(self.recipe["builder"]["gnupgBottle"]["sha256"], r"^[0-9a-f]{64}$")
+        self.assertRegex(
+            self.recipe["builder"]["gnupgBottle"]["formulaCommit"],
+            r"^[0-9a-f]{40}$",
+        )
+        for tool_name in ("gpg", "gpgv"):
+            tool = self.recipe["builder"][tool_name]
+            self.assertEqual(tool["version"], "2.5.21")
+            self.assertTrue(tool["absolutePath"].startswith("/opt/homebrew/bin/"))
+            self.assertTrue(
+                tool["realPath"].startswith("/opt/homebrew/Cellar/gnupg/2.5.21/bin/")
+            )
+            self.assertNotIn("sha256", tool)
         self.assertEqual(self.recipe["reproducibility"]["cleanBuilders"], 2)
         self.assertEqual(self.recipe["reproducibility"]["normalization"], "forbidden")
         self.assertEqual(self.recipe["environment"]["callerPATH"], "ignored")
@@ -315,7 +327,15 @@ class RockchipComponentBuildTests(unittest.TestCase):
             "metadata": {"registry.yaml": {"sha256": "c" * 64}},
             "recipe": {"sha256": "d" * 64},
             "signature": {"verdict": "GOODSIG+VALIDSIG"},
-            "toolchain": {"xcodeVersion": "26.6"},
+            "toolchain": {
+                "signatureVerifier": {
+                    "tools": {
+                        "gpg": {"sha256": "e" * 64},
+                        "gpgv": {"sha256": "f" * 64},
+                    }
+                },
+                "xcodeVersion": "26.6",
+            },
         }
 
     def _write_compare_fixture(self, root: Path, builder_id: str) -> None:
@@ -354,6 +374,21 @@ class RockchipComponentBuildTests(unittest.TestCase):
             b.mkdir()
             self._write_compare_fixture(a, "builder-a")
             self._write_compare_fixture(b, "builder-a")
+            with self.assertRaises(build.BuildError):
+                build.compare_outputs(a, b, root / "comparison.json")
+
+    def test_compare_rejects_verifier_hash_disagreement(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            a = root / "a"
+            b = root / "b"
+            a.mkdir()
+            b.mkdir()
+            self._write_compare_fixture(a, "builder-a")
+            self._write_compare_fixture(b, "builder-b")
+            receipt = json.loads((b / "builder-receipt.json").read_text(encoding="utf-8"))
+            receipt["toolchain"]["signatureVerifier"]["tools"]["gpg"]["sha256"] = "0" * 64
+            build.write_canonical_json(b / "builder-receipt.json", receipt)
             with self.assertRaises(build.BuildError):
                 build.compare_outputs(a, b, root / "comparison.json")
 

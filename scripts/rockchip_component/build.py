@@ -571,14 +571,31 @@ def inspect_toolchain(recipe: Mapping[str, Any]) -> Dict[str, Any]:
         raise BuildError("SDK iconv.h drift")
     if sha256_file(iconv_tbd) != recipe["inspection"]["sdkIconvTbdSHA256"]:
         raise BuildError("SDK libiconv.2.tbd drift")
+    verifier_tools: Dict[str, Dict[str, str]] = {}
     for tool_name in ("gpg", "gpgv"):
         tool_pin = expected[tool_name]
         tool_path = Path(tool_pin["absolutePath"])
-        if not tool_path.is_file() or sha256_file(tool_path) != tool_pin["sha256"]:
-            raise BuildError("{} binary drift".format(tool_name))
+        if not tool_path.is_symlink() or not tool_path.is_file():
+            raise BuildError("{} absolute link is unavailable".format(tool_name))
+        resolved_path = tool_path.resolve()
+        _require_exact_fact(
+            "{} realpath".format(tool_name),
+            str(resolved_path),
+            tool_pin["realPath"],
+        )
         version_line = _decode(_run_raw([str(tool_path), "--version"], env=env)).splitlines()[0]
-        if tool_pin["version"] not in version_line:
-            raise BuildError("{} version drift".format(tool_name))
+        version = version_line.rsplit(None, 1)[-1]
+        _require_exact_fact("{} version".format(tool_name), version, tool_pin["version"])
+        verifier_tools[tool_name] = {
+            "absolutePath": str(tool_path),
+            "realPath": str(resolved_path),
+            "sha256": sha256_file(resolved_path),
+            "version": version,
+        }
+    facts["signatureVerifier"] = {
+        "packageProvenance": dict(expected["gnupgBottle"]),
+        "tools": verifier_tools,
+    }
     if not Path("/usr/bin/sandbox-exec").is_file():
         raise BuildError("sandbox-exec is unavailable")
     return facts
@@ -1317,6 +1334,7 @@ def generate_registry(
         "serializationFormat": "json-compatible-yaml-1.2",
     }
     document["builder"]["hostedImage"] = dict(toolchain["hostedImage"])
+    document["builder"]["signatureVerifier"] = dict(toolchain["signatureVerifier"])
     assert_no_sensitive_values(document)
     write_canonical_json(output, document)
 
@@ -1600,6 +1618,7 @@ def build_once(builder_id: str, work_root: Path, output_dir: Path) -> Dict[str, 
         "verdict": "PASS",
     }
     receipt["toolchain"]["hostedImage"] = dict(toolchain["hostedImage"])
+    receipt["toolchain"]["signatureVerifier"] = dict(toolchain["signatureVerifier"])
     assert_no_sensitive_values(receipt)
     write_canonical_json(output_dir / "builder-receipt.json", receipt)
     return receipt
