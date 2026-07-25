@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-035-macos-rockchip-tool-architecture
 revision: 1
-status: proposed
+status: approved # 本 approval-only PR 经维护者 review/merge 后生效；r1 proposal 已由 #526 登记
 class: platform
 core_change_level: none
 owner: lvye
@@ -113,3 +113,26 @@ allowed paths 与验证命令。架构判断/evidence 和后续 `ready → done`
 proposal 或 approval merge 均不授权任何候选实现。只有架构任务 done 且 decision
 carrier 合入后，才能另立或修订后续 implementation change；CHG-2026-026 不因本 change
 自动恢复。
+
+## Approval
+
+- r1 proposal 已由 PR #526 登记：exact head
+  `15755c9e467ead1b99cf46f502b90aa6b003c362` 经维护者 `lvye` APPROVED，并以 merge
+  OID `4bee496d9b33f271fe4d80bb93690befdf5ff30f` 合入 protected `main`。该 merge
+  只登记 `status: proposed` 的 change package，不构成正式批准、task readiness 或
+  架构选择。
+- 正式批准由本 approval-only PR 将 `status: proposed → approved`，并仅在维护者对
+  exact head review/merge 后生效。批准范围封闭为一个 host-only document-review
+  task、四条 change-local AC，以及对 selected external、bundled Rockchip component、
+  XPC/broker/helper、plan-only handoff 与 distribution revisit 五类完整 end-state 的
+  source-pinned 同矩阵评估。
+- 批准同时接受 `design.md` 的 frozen-facts、candidate-envelope、binary-decision、
+  authority/effect mapping 与 no-workaround 边界，以及 `spec-impact.md` 的零 Core、
+  零 HDC external-first、零 CHG-2026-026 变化结论。最终 carrier 必须选择一个完整
+  end-state 或明确 no-viable；任何 Core/entitlement/distribution/contract 变化只可
+  成为后续独立 change gate。
+- 本批准不选择或推荐任何候选，不创建 ADR-0003，不授权 001G retry、probe/fixture、
+  App/tool launch、网络/USB/设备、helper/install/privilege、E1/E2/destructive 操作，
+  也不修改 product source、spec/contract、profile、decision inventory、evidence 或
+  task 状态。`TASK-RKTA-001` 保持 `blocked`，必须另走 independent D1 readiness；
+  本 PR 零 code、test、evidence 和 platform support 变化。
