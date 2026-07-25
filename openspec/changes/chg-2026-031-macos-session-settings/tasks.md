@@ -6,10 +6,31 @@
 
 ## TASK-SSET-001 — Settings、retention catalog 与 production storage wiring
 
-- Status:ready（2026-07-24 D1 readiness；仅在维护者 review/merge 本独立 PR 后
-  生效。本 PR 零产品 source/test/evidence、零用户 Session 访问/删除、零
-  `TASK-SSET-002` 开工；implementation 必须基于本 readiness 合入后的最新
-  protected `main` 重核全部 pins）
+- Status:blocked（2026-07-25；仅在维护者 review/merge 本独立 D0 状态 PR 后生效。
+  implementation/evidence PR #436 exact head
+  `ad389a2190af2132365112f9a107105fbebf3b8e` 已由 `lvye` APPROVED，并合入
+  protected `main` `9346a6da81fc42285c228ded183df089fc596c4a`；merged run blob
+  `e622e62c0dc507851c0739747395bc122644b4a1` 如实记录
+  `SSET-CONFIG-001`/`SSET-CATALOG-001` 与适用 canonical AC 的 contract candidate
+  PASS，但 `SSET-RETENTION-001` 因 App-owned runtime 到真实 Host consumer 的
+  production reachability 未闭合而 BLOCKED。进一步实现必须先经独立 D1
+  scope-remediation 选择 App-process consumer、受签名共享载体或显式收窄
+  production reachability；本状态 PR 不作该判断、不修改实现/evidence，也不使
+  `TASK-SSET-002` ready。）
+- Blocked recheck（protected `main`
+  `1c1ae70a869d03e50a3a012e53d2a1b47a9f311d`）：
+  - #436 的八个 implementation/evidence path 从 merge 至本 base 零漂移；run blob
+    与 merge 时逐字一致；
+  - `SessionSettingsContractTests` 在本 base 重跑 17/17 PASS，证明已实现的
+    settings/catalog/同进程 composition contract 未回退，但测试中的依赖注入不替代
+    App→真实 Host consumer reachability；
+  - production 调用仍只有独立 `ArkDeckCLI` 构造
+    `RockchipFlashExecutionHost()`；`ArkDeckApp/**` 对
+    `SessionStorageApplicationRuntime`/`RockchipFlashExecutionHost` 零引用，
+    entitlement 中也没有 App Group/shared preferences 载体，因此 blocker 仍成立；
+  - #501/#502 已分别合入本 base；其完整文件集只位于 CHG-2026-030 evidence 与
+    CHG-2026-026 tasks，与本状态路径零重叠。状态起草时公开 API 的 open PR count
+    为 0。
 - Readiness review:
   - **Approval/dependency gate:satisfied。**CHG-2026-031 r1 proposal #432 exact
     head `f69ce61282118c530a1a7bf185dae38d8140c2af` 经维护者 `lvye` APPROVED，
