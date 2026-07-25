@@ -28,3 +28,22 @@ effect 有显式确认；维护者批准本 change 即接受这一 macOS 产品�
 损坏或 identity mismatch 都按 preserved-unknown 处理。若维护者不接受此前无 pin
 入口的 Session 采用该一次性初始化规则，`TASK-SSET-001` 保持 blocked 并在批准前修订，
 不得在实现期自行选择。
+
+## r2 production-composition impact
+
+#436 证明同进程 runtime contract，但没有证明 App-owned runtime 到真实 Host consumer 的
+production reachability。r2 选择由 CHG-2026-026 `TASK-RKFUI-002` 的 App-process
+plan-only Rockchip facade 消费同一个 settings runtime/root/coordinator；随后由
+`TASK-SSET-001R` 独立复验。standalone CLI 保持独立 process-local settings domain，
+不受 App-owned settings runtime 控制，也不作为 App reachability evidence。
+
+该选择仍是 macOS platform/product composition：
+
+- Core Requirement、canonical AC 文本/ID 与 acceptance registry 零修改；
+- locked manifest/journal/schema 与 Core contract 零修改；
+- App Group、IPC、shared bookmark/preferences、entitlement 与 baseline 零新增；
+- CHG-2026-026 的任务范围/状态不由本 change 修改；只有其未来独立 D1 readiness
+  显式接受 dependency 后，才可承载对应 App consumer 实现。
+
+因此 no-op delta 结论不变。若后续选择跨进程共享配置/bookmark，必须另立 ADR/change，
+不能把它当成本 r2 的实现细节。
