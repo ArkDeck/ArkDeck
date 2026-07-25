@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-026
-revision: 6 # r6 只起草 rkdeveloptool immutable source-provenance closure；仅在维护者 review/merge 本 revision PR 后生效
-status: approved # r1-r5 已由 PR #298/#440/#452/#461/#481 批准；r6 scoped revision 仍须维护者 review/merge 后生效
+revision: 7 # r7 只起草 signed Sandbox read-only selection characterization；仅在维护者 review/merge 本 revision PR 后生效
+status: approved # r1-r6 已由 PR #298/#440/#452/#461/#481/#491 批准；r7 scoped revision 仍须维护者 review/merge 后生效
 class: platform
 core_change_level: none
 owner: "@lvye"
@@ -83,6 +83,23 @@ sleep、弱设备重绑定和非严格镜像集合。ArkDeck 只借鉴交互目�
   commit ↔ source evidence closure 原子登记到 loader-transition registry，并让 probe
   校验该不可变 closure；不得 repin 到 Homebrew HEAD、删除 source check、接受双 pin 或
   依赖 executable 的安装目录/git ancestry。
+- r7 记录 PR #509 的 signed Sandbox E0 blocker：exact discovery artifact 在 host precheck
+  时无 quarantine；维护者通过 `NSOpenPanel` 选择解析到该 artifact 的唯一 symlink 后，
+  bookmark/hash/source/signature gates 均命中，但 resolved executable 新观察到 quarantine，
+  Gatekeeper 拒绝，child/`ld`/USB/device dispatch 全为 0。由于该 run 使用 symlink，r7
+  不把 metadata transition 泛化为 canonical-path 行为，也不把维护者报告的 Loader 状态
+  记为 USB observation。
+- r7 新增独立 TASK-RKFUI-001E，仅用 disposable wrong-hash executable 在 signed Sandbox
+  host 上做单变量 characterization：Probe entitlement 只把
+  `com.apple.security.files.user-selected.read-write` 替换为
+  `com.apple.security.files.user-selected.read-only`，其余五项保持不变；分别通过
+  canonical URL 与单层 symlink 选择，验证 bookmark/security scope、pre/post quarantine
+  语义与 child-launch=0。wrong hash 必须在任何 child/USB/device access 前 fail closed。
+- r7 不批准 `com.apple.security.files.user-selected.executable`、
+  `LSFileQuarantineEnabled`/excluded-path、quarantine/xattr 写入或清除、复制/重建 pinned
+  tool 规避 assessment、ArkDeckApp entitlement 修改、helper/broker 产品架构或真实 E0
+  重试。001E PASS 只回答 read-only selection metadata 行为；后续真实 external-tool E0 与
+  产品分发边界仍需新的 D1 readiness。
 - 新增 Flash application facade、SwiftUI 页面和中英文 String Catalog：显式刷新/选择
   设备、选择本地 `images.tar.gz`、流式校验、plan-only、精确计划、危险确认、阶段日志、
   normal/切换中/Loader/歧义状态、软件进态、物理按键 fallback、execution-mode badge、
@@ -160,6 +177,10 @@ sleep、弱设备重绑定和非严格镜像集合。ArkDeck 只借鉴交互目�
   PATH 猜测、环境覆盖或 BlueTool 二进制 fallback。
 - App 不调用 `sudo`/`osascript`/Authorization Services，不安装 driver/helper，不改
   ACL/group/系统 rule。访问失败区分 permission/driver/offline，并提供最小人工指导。
+- r7 host-only characterization 不访问真实 pinned tool 或设备，不运行 selected fixture。
+  disposable fixture 必须在选择前证明 wrong hash/quarantine absent，并在 direct/symlink
+  两个独立 run 后再次检查；任一 metadata drift、bookmark/scope failure 或非零 child
+  launch 均 blocked，不允许追加 executable-writing entitlement 或 quarantine exclusion。
 - 用户选择的工具与镜像使用 security-scoped access；默认日志只记录脱敏路径和 hash，
   raw tool output 作为受控本地 Artifact，不自动上传。
 - 分区写 intent 已 durable 而 outcome 缺失时进入 `outcomeUnknown`，禁止自动重放；恢复
@@ -388,3 +409,65 @@ sleep、弱设备重绑定和非严格镜像集合。ArkDeck 只借鉴交互目�
   exact reboot-loader argv、window/maxRuns 与 one-run 未消费状态全部不变。E2/destructive、
   `ppt/wlx/rd`、default target、host shell、`sudo`、server lifecycle mutation 与 retry
   全为 0。
+
+### r7 scoped read-only Sandbox selection characterization（2026-07-25；on merge）
+
+- 分类：proposal revision / platform entitlement characterization readiness = D1。本 PR
+  只修改 proposal/design/tasks/verification；不修改 Probe entitlement/code/tests，不运行
+  selected executable、HDC、`rkdeveloptool`、USB 或 device command，也不接受任何 E1/E2
+  capability/authorization。
+- Real-fault input：PR #509 已由维护者 review/merge，merge OID
+  `ba8ca9c3ef68b097125154d6e1df20f905d12774`。其 sanitized receipt 证明现行 signed
+  Sandbox Probe 的六项 entitlement、bookmark、security scope、exact
+  `bbd7bdc0…9923` hash/source 与 ad-hoc signature 均命中，但 symlink selection 后
+  `quarantinePresent=true` / Gatekeeper rejected；`childLaunchAttempted=false`、
+  `ldReadOnly=0`，全部 device/privilege/install/system/destructive counters 为 0。
+  Evidence 路径与 SHA-256 分别为
+  `evidence/runs/TASK-RKFUI-001/blocked-sandbox-selection-quarantine-2026-07-25.md` /
+  `58cabe3958af53d6f750993ac0b3fd1f60bbc31082fb0faa8c79f731720218aa` 与
+  `.json` / `18c603b243abe0f5da77a1cd1208d2ba91b4cbabcbdffb3a6a9fc0e58d7daae8`。
+- Platform basis：Apple 的
+  [`NSOpenPanel`](https://developer.apple.com/documentation/appkit/nsopenpanel) 文档说明
+  用户选择会把文件加入 App sandbox；App Sandbox entitlement 文档分别定义
+  [`user-selected.read-only`](https://developer.apple.com/documentation/bundleresources/entitlements/com.apple.security.files.user-selected.read-only)
+  与
+  [`user-selected.read-write`](https://developer.apple.com/documentation/bundleresources/entitlements/com.apple.security.files.user-selected.read-write)。
+  Apple 的
+  [archived App Sandbox guide](https://developer.apple.com/library/archive/documentation/Miscellaneous/Reference/EntitlementKeyReference/Chapters/EnablingAppSandbox.html)
+  说明
+  `user-selected.executable` 用于**写入**非 quarantined executable；本任务不创建/写入
+  executable，因此不申请该扩权 entitlement。
+- Chosen characterization：TASK-RKFUI-001E 只允许将 Probe expected/actual entitlement 中
+  `user-selected.read-write` 一对一替换为 `user-selected.read-only`。其他五项 entitlement、
+  App source 的 pinned hash/signature/quarantine/fixed `["ld"]` preflight 与 receipt privacy
+  必须保持不变。用 fresh disposable、ad-hoc signed、quarantine-absent、wrong-hash、
+  basename=`rkdeveloptool` 的 inert executable 分别做 canonical direct selection 与单层
+  symlink selection；wrong hash 必须确保两个 run 均在 child launch 前终止。
+- Pass/fail boundary：两个 run 都必须 bookmark/scope 成功，selected/resolved identity
+  如实记录，选择前后 fixture target quarantine 均 absent，且 child/process/USB/network/
+  HDC/device/mutation/destructive/system dispatch 全为 0，才可提交 001E 的
+  implementation+evidence PR。任一项失败时不得合入 entitlement substitution，只能提交
+  fail-closed evidence，001E/TASK-RKFUI-001 保持 blocked。
+- Product boundary：001E PASS 不改变 `ArkDeckApp/ArkDeckApp.entitlements` 或 macOS platform
+  profile，不证明 read-write 主 App、helper/XPC/broker、持久产品 bookmark 或真实 external
+  executable launch 可用。后续若选择 product broker/helper、修改主 App entitlement、使用
+  executable-writing entitlement 或重新 provision exact pinned tool，必须另起 D1
+  ADR/readiness；E0 device run 另需 fresh exact non-quarantined artifact 与具名 Loader 窗口。
+- Sequencing：r7 merge 前不得修改 Probe entitlement/tests 或生成 001E 成 PR 工作；merge
+  后只允许 001E host-only characterization。001E implementation/evidence merge 后另起 D0
+  状态 PR；该状态 PR 不得恢复 TASK-RKFUI-001 E0 或启动产品工作，后续 D1 决策合入前零
+  speculative implementation/device run。
+- Draft/input closure：本 r7 起草 base =
+  `ba8ca9c3ef68b097125154d6e1df20f905d12774`。proposal/design/tasks/verification input
+  blobs 分别为 `f73a058d99e6f9675130e8654a068fbbbe294fa0`、
+  `4493cf645440ebbaba5c4e7d62c2af38d3bf6ff0`、
+  `d460189c39da718ac0dc292e08703fe18b0318fd`、
+  `1a6b77ef08f25c6635e77263dd035ad7f80e0e1c`；Probe Python/App/entitlement/tests input
+  blobs 分别为 `b703baecb0c80a18e73b40028163cc1adda22133`、
+  `2c763da059c7adf65a4aec170e71c042dbed4288`、
+  `dab555e5b3d03480ab43403ae25a34a6e6822e11`、
+  `3ffc0f7ac675af1bf9ed3b6e21daf1c059feec2a`。001E 开工前须基于 r7 merge 后
+  current `main` 复核，任一非 r7 预期漂移即停止。
+- Concurrency：起草时唯一 open PR #503 只修改
+  `openspec/changes/chg-2026-031-macos-session-settings/tasks.md`，与本 r7 四个治理文件及
+  未来 001E paths 无重叠。r7 是 D1 判断门；本 PR 合入前不得起草 001E 成 PR 工作。

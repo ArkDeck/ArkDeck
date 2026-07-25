@@ -1,10 +1,11 @@
 # Verification Plan — CHG-2026-026
 
-> Change:CHG-2026-026@r6
+> Change:CHG-2026-026@r7
 > Status:planned
-> Note(2026-07-24):r6 只新增 TASK-RKFUI-001D immutable rkdeveloptool provenance
-> registry/probe closure；不改变 Core/AC/schema、artifact version/hash/upstream、typed
-> argv、target/firmware/HDC/transport、RockUSB grammar 或 destructive pins。
+> Note(2026-07-25):r7 只新增 TASK-RKFUI-001E signed Sandbox read-only selection
+> characterization，并把 #509 后的 TASK-RKFUI-001 如实恢复 blocked；不改变
+> Core/AC/schema、artifact version/hash/upstream、typed argv、target/firmware/HDC/
+> transport、RockUSB grammar 或 destructive pins。
 
 ## Environment
 
@@ -25,6 +26,9 @@
 - Fixtures：fake rkdeveloptool、版本化 `ld` homogeneous LF/CRLF 与
   bare-CR/mixed/missing-final-terminator faults、`ppt/wlx/rd` stdout/stderr、
   valid/corrupt/drift/path-traversal tar.gz、journal crash points、postflight observations。
+- r7 host fixture：private-temp inert/ad-hoc-signed/quarantine-absent executable，basename
+  `rkdeveloptool`，SHA-256 必须不等于 `bbd7bdc0…9923`；canonical direct URL 与解析到同一
+  target 的单层 symlink 各一次。fixture 永不执行，不访问网络/USB/device。
 - Hardware：TASK-RKFUI-001 E0、TASK-RKFUI-001A 对 exact DAYU200 /
   OpenHarmony `7.0.0.33` / HDC `3.2.0f` / USB 组合的 E1 mode transition 与
   TASK-RKFUI-004；其余测试无设备、零真实 dispatch。r2 允许 001A 为 001 提供 Loader
@@ -37,7 +41,7 @@
 | AC ID | Verification method | Expected result | Evidence |
 | --- | --- | --- | --- |
 | AC-FLASH-001-01 | parser golden/real-fault + E0 `ld` | homogeneous LF/CRLF 同义且仅 2207:350a Loader applicable；bare/mixed/其他/畸形阻断，相似命令 0 | TASK-RKFUI-001/001B |
-| AC-UX-007-01 | signed Sandbox E0 matrix | permission/driver/offline 可区分；sudo/helper/install/system mutation 0 | TASK-RKFUI-001 |
+| AC-UX-007-01 | signed Sandbox E0 + read-only selection matrix | permission/driver/offline 可区分；read-only direct/symlink metadata 如实；sudo/helper/install/system mutation 0 | TASK-RKFUI-001/001E |
 | AC-FLASH-003-01 | archive drift/corrupt/unsafe fixture | execute 与 planned-success 均 blocked | TASK-RKFUI-002/003 |
 | AC-FLASH-004-01 | plan/manifest encode-decode + UI | mode 在 UI/Job/manifest/History presentation 持续可见 | TASK-RKFUI-002 |
 | AC-FLASH-005-01 | plan-only integration | exact plan 含 mutation/destructive steps，runner 0，terminal planned | TASK-RKFUI-002 |
@@ -72,6 +76,10 @@
   path/hash drift、顶层/typed tuple 不一致、binary 位于 unrelated git parent 或 parent
   HEAD 改变。前述 provenance negatives 必须在 `ld` 前 fail closed，runtime
   `/usr/bin/git` dispatch 恒为 0。
+- r7 Sandbox selection：read-only entitlement 缺失、read-write/executable-writing
+  entitlement 残留、Info.plist quarantine exclusion、fixture hash 意外命中、canonical
+  target 不同、bookmark/scope failure、direct/symlink 任一 pre/post quarantine drift、
+  selected child launch 非零。任一 case 均 blocked，USB/device/privilege/xattr-write 0。
 - Discovery：空、多个、重复 LocationID、Maskrom、未知 PID/mode、bare CR、LF/CRLF 混用、
   缺末尾 terminator、空 record、截断、额外垃圾、timeout。
 - Mode transition：already Loader skip；HDC offline/unsupported/empty target；command nonzero/exit0
@@ -112,6 +120,11 @@
   registry/probe/tests/README；001D done 的独立 D0 状态 PR merge 前不得重新 E0。
   protected-main provenance tuple 任一字段漂移、live git inference 残留、把 PR #487 的
   unobserved candidate count 改记为 0，均保持 001A blocked。
+- r7 merge 前不得修改 signed E0 Probe entitlement/tests 或生成 001E 成 PR
+  implementation；merge 后也只能做 disposable wrong-hash host characterization。
+  `user-selected.executable`、quarantine exclusion/clear/write、复制或重建 pinned tool、
+  修改 ArkDeckApp entitlement、运行 selected fixture/真实 tool/USB/device 均禁止。001E
+  PASS 不恢复 TASK-RKFUI-001，不构成 product broker/helper 或 real E0 approval。
 - `REQ-FLASH-015` 交互式 App executor 解释未获维护者明确确认时，execute 不实现；不得把
   plan-only/handoff 记作一键真机刷机。
 - DAYU200 exact combination 的 `reboot loader` E1 capability 未证明 supported 时，Route B
@@ -132,6 +145,9 @@
 - [ ] r6 source provenance closure 只接受
       `bbd7bdc0…9923` ↔ `304f0737…` ↔ `PR#445@cbad982…` ↔ exact evidence digest；
       missing/drift 与 runtime Git inference 均 fail closed
+- [ ] r7 read-only direct/symlink characterization 均 bookmark/scope PASS、pre/post
+      quarantine absent、wrong-hash fail closed、selected child/USB/device/xattr-write 0；
+      结果不被重分类为 real E0/product evidence
 - [ ] Real hardware App path 由适格操作者执行，evidence 精确 pin 全组合
 - [ ] Traceability updated（无新 Core AC ID；记录现有 AC → 新 tests/evidence）
 - [ ] 无 shell/sudo/helper/BlueTool asset、无 secret/真实 serial/raw 敏感输出入库
