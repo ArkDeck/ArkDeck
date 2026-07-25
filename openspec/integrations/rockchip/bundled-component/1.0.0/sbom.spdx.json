@@ -1,0 +1,1060 @@
+{
+  "SPDXID": "SPDXRef-DOCUMENT",
+  "creationInfo": {
+    "created": "2026-05-17T14:37:21Z",
+    "creators": [
+      "Organization: ArkDeck",
+      "Tool: rockchip-component-build@1.0.0"
+    ],
+    "licenseListVersion": "3.27"
+  },
+  "dataLicense": "CC0-1.0",
+  "documentNamespace": "https://spdx.org/spdxdocs/arkdeck-rockchip-component-1.0.0-304f073752fd25c854e1bcf05d8e7f925b1f4e14",
+  "files": [
+    {
+      "SPDXID": "SPDXRef-File-bc37d034bad564583790",
+      "checksums": [
+        {
+          "algorithm": "SHA1",
+          "checksumValue": "fdedcf0b109f0716b924ae28de5d4cfb85baa8f3"
+        },
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "f9c401a2262b027e47913615dda900106d7dd7a82164b9ecb2439d9cad0a3885"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "fileName": "./sources/rkdeveloptool-304f073752fd25c854e1bcf05d8e7f925b1f4e14/.gitignore",
+      "licenseConcluded": "GPL-2.0-or-later",
+      "licenseInfoInFiles": [
+        "NOASSERTION"
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-File-5723c1a90301ab8a3020",
+      "checksums": [
+        {
+          "algorithm": "SHA1",
+          "checksumValue": "6484c615f24912e8ce504c226316c0c5d1e74fec"
+        },
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "8e22a30e30fa550a9716c1af897f407b25c0bde0b3271d1be8f2b7f8dd9e3674"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "fileName": "./sources/rkdeveloptool-304f073752fd25c854e1bcf05d8e7f925b1f4e14/99-rk-rockusb.rules",
+      "licenseConcluded": "GPL-2.0-or-later",
+      "licenseInfoInFiles": [
+        "NOASSERTION"
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-File-1e7de1ae2d059d21e1dd",
+      "checksums": [
+        {
+          "algorithm": "SHA1",
+          "checksumValue": "7fbd2f34cc28171598103a79b61f2869bbd304ff"
+        },
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "6f600c131ca71eb2f2928859b6fa83e54b9e29c48b28aec539c43dad7e1c7869"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "fileName": "./sources/rkdeveloptool-304f073752fd25c854e1bcf05d8e7f925b1f4e14/CMakeLists.txt",
+      "licenseConcluded": "GPL-2.0-or-later",
+      "licenseInfoInFiles": [
+        "NOASSERTION"
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-File-44e330bde4a544e6ff0b",
+      "checksums": [
+        {
+          "algorithm": "SHA1",
+          "checksumValue": "05eb1cd09d1e965eee1c4a09580beeb4454a8aab"
+        },
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "9319aa5f0eea9967582a266d90abdaa183ae38b239a78348d0f232898deb1c4c"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "fileName": "./sources/rkdeveloptool-304f073752fd25c854e1bcf05d8e7f925b1f4e14/DefineHeader.h",
+      "licenseConcluded": "GPL-2.0-or-later",
+      "licenseInfoInFiles": [
+        "NOASSERTION"
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-File-250dcce1169b7b27c848",
+      "checksums": [
+        {
+          "algorithm": "SHA1",
+          "checksumValue": "2a6c190d7c9c0aac800ab0dffc6030a5b287fc88"
+        },
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "f4758e673584e77050967e478764c4949f9f8e746f0e4c8b77e332a9c8a663e7"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "fileName": "./sources/rkdeveloptool-304f073752fd25c854e1bcf05d8e7f925b1f4e14/Endian.h",
+      "licenseConcluded": "GPL-2.0-or-later",
+      "licenseInfoInFiles": [
+        "NOASSERTION"
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-File-0462e381b2fb32865682",
+      "checksums": [
+        {
+          "algorithm": "SHA1",
+          "checksumValue": "2612c798de23174c7788f70e7ed0deb619334be4"
+        },
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "ba75282284ab4ac79a1eefd80a5ac24b0139f5d51cbdda753e533ea9d2a6b0f6"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "fileName": "./sources/rkdeveloptool-304f073752fd25c854e1bcf05d8e7f925b1f4e14/Makefile.am",
+      "licenseConcluded": "GPL-2.0-or-later",
+      "licenseInfoInFiles": [
+        "NOASSERTION"
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-File-9057d4deaf982b1deb9d",
+      "checksums": [
+        {
+          "algorithm": "SHA1",
+          "checksumValue": "172553d6714e3f17c94d1662918c8a278b529813"
+        },
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "08497fa417caacb171013e45a742f4f0b00fb9a39919f328159973f1cc69e7ec"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "fileName": "./sources/rkdeveloptool-304f073752fd25c854e1bcf05d8e7f925b1f4e14/Property.hpp",
+      "licenseConcluded": "LicenseRef-Rockchip-Property-permissive",
+      "licenseInfoInFiles": [
+        "LicenseRef-Rockchip-Property-permissive"
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-File-f61cb505df5053901eea",
+      "checksums": [
+        {
+          "algorithm": "SHA1",
+          "checksumValue": "5cd8bb3042f0388c3b8fc03482cd6d210ef55357"
+        },
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "716ac77522328381c98fc38ff1477dfde88563fd0f08eec84f05202ad4cf6c10"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "fileName": "./sources/rkdeveloptool-304f073752fd25c854e1bcf05d8e7f925b1f4e14/RKBoot.cpp",
+      "licenseConcluded": "GPL-2.0-or-later",
+      "licenseInfoInFiles": [
+        "GPL-2.0-or-later"
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-File-ab9efd6a0975c0130c70",
+      "checksums": [
+        {
+          "algorithm": "SHA1",
+          "checksumValue": "686c3789da78011089fb4dc4af08fcb3459a4913"
+        },
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "20ae45560441da05ebddec4205749f7fc2f28385d62a367dd3da1847788c7af8"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "fileName": "./sources/rkdeveloptool-304f073752fd25c854e1bcf05d8e7f925b1f4e14/RKBoot.h",
+      "licenseConcluded": "GPL-2.0-or-later",
+      "licenseInfoInFiles": [
+        "NOASSERTION"
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-File-37cb386efc1e62b77437",
+      "checksums": [
+        {
+          "algorithm": "SHA1",
+          "checksumValue": "9964059feaeb087d8beff54913415ec9184a0dc4"
+        },
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "f3aac40b9e938ed8b903bb734b9290defe770399336743fb930eaa7ca0cf77a2"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "fileName": "./sources/rkdeveloptool-304f073752fd25c854e1bcf05d8e7f925b1f4e14/RKComm.cpp",
+      "licenseConcluded": "GPL-2.0-or-later",
+      "licenseInfoInFiles": [
+        "GPL-2.0-or-later"
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-File-04c0b2233d164f09e21c",
+      "checksums": [
+        {
+          "algorithm": "SHA1",
+          "checksumValue": "70defe1b6bcbc20122d03ab50580b8538259300d"
+        },
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "fe254f525279096bb76730d2789b5f6cb16113abb99ca7bd7680c1d82b560774"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "fileName": "./sources/rkdeveloptool-304f073752fd25c854e1bcf05d8e7f925b1f4e14/RKComm.h",
+      "licenseConcluded": "GPL-2.0-or-later",
+      "licenseInfoInFiles": [
+        "NOASSERTION"
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-File-07db3f6478a92e58804c",
+      "checksums": [
+        {
+          "algorithm": "SHA1",
+          "checksumValue": "4ec3f501c144a103bb20becbdabb4bfc9684539f"
+        },
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "c0ba587e0eb80edbf4165e2b154fe6cf4dc566b1b3ef88a1391a2e10e3dfef7e"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "fileName": "./sources/rkdeveloptool-304f073752fd25c854e1bcf05d8e7f925b1f4e14/RKDevice.cpp",
+      "licenseConcluded": "GPL-2.0-or-later",
+      "licenseInfoInFiles": [
+        "GPL-2.0-or-later"
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-File-2dac472b41a76505f2a6",
+      "checksums": [
+        {
+          "algorithm": "SHA1",
+          "checksumValue": "9dce62688048c725b44b971c75f77aa389421033"
+        },
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "61b21fe991c749f8723516d1f4ddc0fe399ae2a1e261ff8c02135f2b7257ec9d"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "fileName": "./sources/rkdeveloptool-304f073752fd25c854e1bcf05d8e7f925b1f4e14/RKDevice.h",
+      "licenseConcluded": "GPL-2.0-or-later",
+      "licenseInfoInFiles": [
+        "NOASSERTION"
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-File-f0230792535d4361a3da",
+      "checksums": [
+        {
+          "algorithm": "SHA1",
+          "checksumValue": "32dc55b2fdf775d6b81735c70f23bb2ba89f2108"
+        },
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "61fc479f05338d5f7543ab81b07fa0a3aa4090c3647ba405a2b0702bd8b46eb8"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "fileName": "./sources/rkdeveloptool-304f073752fd25c854e1bcf05d8e7f925b1f4e14/RKImage.cpp",
+      "licenseConcluded": "GPL-2.0-or-later",
+      "licenseInfoInFiles": [
+        "GPL-2.0-or-later"
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-File-4fc9d22127c1c1133384",
+      "checksums": [
+        {
+          "algorithm": "SHA1",
+          "checksumValue": "87d627a90a60d71b77b4f421382604bb9447f213"
+        },
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "cb5730393960ad9e20699b55ea497bec90c187f616bf1bc308430fe47068d666"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "fileName": "./sources/rkdeveloptool-304f073752fd25c854e1bcf05d8e7f925b1f4e14/RKImage.h",
+      "licenseConcluded": "GPL-2.0-or-later",
+      "licenseInfoInFiles": [
+        "NOASSERTION"
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-File-1319634c3c81518867f1",
+      "checksums": [
+        {
+          "algorithm": "SHA1",
+          "checksumValue": "435de62ca09cdd9f199e936d4eea581632910868"
+        },
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "8843383b9d25666fa13a39058b814e4e65f4e96e29c9095b25b723769fc7bf99"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "fileName": "./sources/rkdeveloptool-304f073752fd25c854e1bcf05d8e7f925b1f4e14/RKLog.cpp",
+      "licenseConcluded": "GPL-2.0-or-later",
+      "licenseInfoInFiles": [
+        "GPL-2.0-or-later"
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-File-d6c15cf75e77e9e12011",
+      "checksums": [
+        {
+          "algorithm": "SHA1",
+          "checksumValue": "7d146549c27b0d68460a48893e7b87d123fcf03f"
+        },
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "4fd01f8d657137a68c2cfe3d746ae49105883f1398222ddc59e238381c11de58"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "fileName": "./sources/rkdeveloptool-304f073752fd25c854e1bcf05d8e7f925b1f4e14/RKLog.h",
+      "licenseConcluded": "GPL-2.0-or-later",
+      "licenseInfoInFiles": [
+        "NOASSERTION"
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-File-8384092c494b493720ec",
+      "checksums": [
+        {
+          "algorithm": "SHA1",
+          "checksumValue": "6d1dac150102f8588757882413ff12e3c4c4e8ae"
+        },
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "61a598582887719d06ebe085e677f76c883c4990800729448ab5cf9848bee287"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "fileName": "./sources/rkdeveloptool-304f073752fd25c854e1bcf05d8e7f925b1f4e14/RKScan.cpp",
+      "licenseConcluded": "GPL-2.0-or-later",
+      "licenseInfoInFiles": [
+        "GPL-2.0-or-later"
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-File-8a6944738078708b9da7",
+      "checksums": [
+        {
+          "algorithm": "SHA1",
+          "checksumValue": "85ebc443de484dbec1a4412d04d0922ffd7572d2"
+        },
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "50f79a50059fec160c2fbc69e6d2d9c45eb007f65b73a891d8827c9d4138a81b"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "fileName": "./sources/rkdeveloptool-304f073752fd25c854e1bcf05d8e7f925b1f4e14/RKScan.h",
+      "licenseConcluded": "GPL-2.0-or-later",
+      "licenseInfoInFiles": [
+        "NOASSERTION"
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-File-479953aabd0a996a9a0a",
+      "checksums": [
+        {
+          "algorithm": "SHA1",
+          "checksumValue": "7751c0e52c94eaf20b96bafaaa45b2e612e92f96"
+        },
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "ee0e07b19b6122fb273b84148fe60cbb4ac900ba2038c79ca58f206565e28357"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "fileName": "./sources/rkdeveloptool-304f073752fd25c854e1bcf05d8e7f925b1f4e14/Readme.txt",
+      "licenseConcluded": "GPL-2.0-or-later",
+      "licenseInfoInFiles": [
+        "NOASSERTION"
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-File-7544c8642acdd15d2959",
+      "checksums": [
+        {
+          "algorithm": "SHA1",
+          "checksumValue": "76d079a7919b264b948e72b802018f821daf6100"
+        },
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "17dc15ff91a0ed04f86c48886a0cd03d1e394c74dc73e810ee2bfa017e2da8be"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "fileName": "./sources/rkdeveloptool-304f073752fd25c854e1bcf05d8e7f925b1f4e14/autogen.sh",
+      "licenseConcluded": "GPL-2.0-or-later",
+      "licenseInfoInFiles": [
+        "NOASSERTION"
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-File-defe4c1a3be8c31b5c91",
+      "checksums": [
+        {
+          "algorithm": "SHA1",
+          "checksumValue": "6918f945cdb9fda4c766783361cd3690b43a4c7b"
+        },
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "e612c0b4103e955e7cabea9818a86fe242683e9b205c2328d0c6d66da6ad204a"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "fileName": "./sources/rkdeveloptool-304f073752fd25c854e1bcf05d8e7f925b1f4e14/boot_merger.h",
+      "licenseConcluded": "GPL-2.0-or-later",
+      "licenseInfoInFiles": [
+        "GPL-2.0-or-later"
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-File-5de85deb066e10964af7",
+      "checksums": [
+        {
+          "algorithm": "SHA1",
+          "checksumValue": "d51f2cc176e62ed561cacf332d7be9c718b42e8c"
+        },
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "64486843dcc1f2ef4c16ef92fb1f2b2aa4f18ac559ee8c57a6916fcd2cebae5c"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "fileName": "./sources/rkdeveloptool-304f073752fd25c854e1bcf05d8e7f925b1f4e14/cfg/.gitignore",
+      "licenseConcluded": "GPL-2.0-or-later",
+      "licenseInfoInFiles": [
+        "NOASSERTION"
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-File-2243bb5834c9a9034833",
+      "checksums": [
+        {
+          "algorithm": "SHA1",
+          "checksumValue": "88a347d240faf046c9b97cf351dfddedbea8389a"
+        },
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "70b3129c80e37232c4775280d37eb63f7361178c68240094b24243266f43ed69"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "fileName": "./sources/rkdeveloptool-304f073752fd25c854e1bcf05d8e7f925b1f4e14/cfg/Makefile.am",
+      "licenseConcluded": "GPL-2.0-or-later",
+      "licenseInfoInFiles": [
+        "NOASSERTION"
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-File-64897e45dd681866cfd2",
+      "checksums": [
+        {
+          "algorithm": "SHA1",
+          "checksumValue": "cfd2d113c08a621d1d81bb007928bc17800f9374"
+        },
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "5d0f951cb5f813a2472e08deec82c627f37db19d128ac98dc913753ba77f6992"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "fileName": "./sources/rkdeveloptool-304f073752fd25c854e1bcf05d8e7f925b1f4e14/config.h.in",
+      "licenseConcluded": "GPL-2.0-or-later",
+      "licenseInfoInFiles": [
+        "NOASSERTION"
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-File-0795adfe01df662f6a34",
+      "checksums": [
+        {
+          "algorithm": "SHA1",
+          "checksumValue": "da39a3ee5e6b4b0d3255bfef95601890afd80709"
+        },
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "fileName": "./sources/rkdeveloptool-304f073752fd25c854e1bcf05d8e7f925b1f4e14/config.ini",
+      "licenseConcluded": "GPL-2.0-or-later",
+      "licenseInfoInFiles": [
+        "NOASSERTION"
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-File-49473dca262eeab3b4a4",
+      "checksums": [
+        {
+          "algorithm": "SHA1",
+          "checksumValue": "90633738bb7005da3d83d473dcd6ccc1865d1670"
+        },
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "71bd724eba56b07324950d5e830094403eff6c11c4688bc5098b1ddd8b8f8cf4"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "fileName": "./sources/rkdeveloptool-304f073752fd25c854e1bcf05d8e7f925b1f4e14/configure.ac",
+      "licenseConcluded": "GPL-2.0-or-later",
+      "licenseInfoInFiles": [
+        "NOASSERTION"
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-File-04f50abeebf1ba8b6bde",
+      "checksums": [
+        {
+          "algorithm": "SHA1",
+          "checksumValue": "b9c177b831962293cf3f4b08e39a0a37c301120f"
+        },
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "2c86087dfa4cd9851e1395c3a482746936db46cb92e7a5c0c82d7a30e0e41786"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "fileName": "./sources/rkdeveloptool-304f073752fd25c854e1bcf05d8e7f925b1f4e14/crc.cpp",
+      "licenseConcluded": "GPL-2.0-or-later",
+      "licenseInfoInFiles": [
+        "GPL-2.0-or-later"
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-File-1266c2a13510bcd5ff76",
+      "checksums": [
+        {
+          "algorithm": "SHA1",
+          "checksumValue": "65265c5d2be7741d9de5879e42f5746837ff32ce"
+        },
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "089653678607eb43d5a2b487a0668fbdd26db007bff5718bfa48a7f43c426e47"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "fileName": "./sources/rkdeveloptool-304f073752fd25c854e1bcf05d8e7f925b1f4e14/gpt.h",
+      "licenseConcluded": "GPL-2.0-or-later",
+      "licenseInfoInFiles": [
+        "NOASSERTION"
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-File-7bb54d15ef4c4e0f20bb",
+      "checksums": [
+        {
+          "algorithm": "SHA1",
+          "checksumValue": "ae1df93f57a98b641ccf4bda9b9041ca6e2793c3"
+        },
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "1be990a929b50ca91d815cea1cd3cebb5c49e86076ade82b1103f2b9cd71a3af"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "fileName": "./sources/rkdeveloptool-304f073752fd25c854e1bcf05d8e7f925b1f4e14/license.txt",
+      "licenseConcluded": "GPL-2.0-only",
+      "licenseInfoInFiles": [
+        "GPL-2.0-only"
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-File-608d8de3fba954c50110",
+      "checksums": [
+        {
+          "algorithm": "SHA1",
+          "checksumValue": "e38c81921633f99cc99eae9f571a67f57886fb25"
+        },
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "d3dcfedd874d7d7741400fecd1b3008c24f9d658fb2ab772cc8c61b00678cdaf"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "fileName": "./sources/rkdeveloptool-304f073752fd25c854e1bcf05d8e7f925b1f4e14/main.cpp",
+      "licenseConcluded": "GPL-2.0-or-later",
+      "licenseInfoInFiles": [
+        "GPL-2.0-or-later"
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-File-842325865842b9f8b467",
+      "checksums": [
+        {
+          "algorithm": "SHA1",
+          "checksumValue": "381d0a5eaf13c7523ef1e6e82461c8e604f8675e"
+        },
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "97010d6dfdef4047af7764c89170ec0a1eef8fddf37bc27708e15abba0f50c25"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "fileName": "./sources/rkdeveloptool-304f073752fd25c854e1bcf05d8e7f925b1f4e14/parameter_gpt.txt",
+      "licenseConcluded": "GPL-2.0-or-later",
+      "licenseInfoInFiles": [
+        "NOASSERTION"
+      ]
+    }
+  ],
+  "hasExtractedLicensingInfos": [
+    {
+      "extractedText": "//-- Property.hpp --\n\n/*--------------------------------------------------------------------------\n                         Class Library\n\n     Copyrights Emad Barsoum (ebarsoum@msn.com) 2003. All rights reserved.\n     ________________________________________________________________\n\n\n     PROJECT   : General\n     MODULE    : property\n     FILENAME  : Property.hpp\n\t   BUILD     : 1\n\n     History of Modifications:\n\n     Date(dd/mm/yyyy)Person                Description\n     ----            ------                -----------\n     25/03/2003      Emad Barsoum          Initial design and coding\n\n     CLASS NAME: property\n     VERSION: 1.0\n\n     DESCRIPTION:\n        This class try to simulate property for C++, using template technique.\n\n     LICENSE:\n        You are free to change or modify or redistribute the code, just keep the header.\n      And you can use this class in any application you want without any warranty.*/\n",
+      "licenseId": "LicenseRef-Rockchip-Property-permissive",
+      "name": "Rockchip Property.hpp permissive notice"
+    }
+  ],
+  "name": "ArkDeck Rockchip bundled component 1.0.0",
+  "packages": [
+    {
+      "SPDXID": "SPDXRef-Package-rkdeveloptool-artifact",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "3caee2136551b4b849daf7e9a906813354f354f8adb61e5f092de49ec7a2e56a"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "GPL-2.0-or-later",
+      "licenseDeclared": "GPL-2.0-or-later",
+      "name": "rkdeveloptool-unsigned-macos-arm64",
+      "primaryPackagePurpose": "APPLICATION",
+      "supplier": "Organization: Rockchip",
+      "versionInfo": "1.32"
+    },
+    {
+      "SPDXID": "SPDXRef-Package-rkdeveloptool-source",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "389ba41af6986c16f1eeebdc1febcb0bf4b8acb7abd694d3d652e78504215843"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "downloadLocation": "https://codeload.github.com/rockchip-linux/rkdeveloptool/tar.gz/304f073752fd25c854e1bcf05d8e7f925b1f4e14",
+      "filesAnalyzed": true,
+      "licenseConcluded": "GPL-2.0-or-later AND LicenseRef-Rockchip-Property-permissive",
+      "licenseDeclared": "GPL-2.0-or-later",
+      "licenseInfoFromFiles": [
+        "GPL-2.0-only",
+        "GPL-2.0-or-later",
+        "LicenseRef-Rockchip-Property-permissive",
+        "NOASSERTION"
+      ],
+      "name": "rkdeveloptool-source",
+      "packageVerificationCode": {
+        "packageVerificationCodeValue": "7d8529b49179e405aaaaa0c56561cdcfea13944d"
+      },
+      "primaryPackagePurpose": "SOURCE",
+      "supplier": "Organization: Rockchip",
+      "versionInfo": "304f073752fd25c854e1bcf05d8e7f925b1f4e14"
+    },
+    {
+      "SPDXID": "SPDXRef-Package-libusb",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "fea36f34f9156400209595e300840767ab1a385ede1dc7ee893015aea9c6dbaf"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "downloadLocation": "https://github.com/libusb/libusb/releases/download/v1.0.30/libusb-1.0.30.tar.bz2",
+      "externalRefs": [
+        {
+          "referenceCategory": "OTHER",
+          "referenceLocator": "https://github.com/libusb/libusb/releases/download/v1.0.30/libusb-1.0.30.tar.bz2.asc#sha256=7e8916e689a399b98df1087cfc48eab33a6bfd8027291c5af00c3fbba90a2cec",
+          "referenceType": "source-signature"
+        },
+        {
+          "referenceCategory": "OTHER",
+          "referenceLocator": "https://raw.githubusercontent.com/libusb/libusb/v1.0.30/KEYS#sha256=52b20b8f44c0912fdbd0c7f53c14629b9b72834118dd52ecff3fec671ba50ff3",
+          "referenceType": "signing-keys"
+        }
+      ],
+      "filesAnalyzed": false,
+      "licenseConcluded": "LGPL-2.1-or-later",
+      "licenseDeclared": "LGPL-2.1-or-later",
+      "name": "libusb",
+      "primaryPackagePurpose": "LIBRARY",
+      "supplier": "Organization: libusb project",
+      "versionInfo": "1.0.30"
+    },
+    {
+      "SPDXID": "SPDXRef-Tool-AppleClang",
+      "comment": "Apple clang version 21.0.0 (clang-2100.1.1.101)",
+      "copyrightText": "NOASSERTION",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "name": "Apple clang",
+      "primaryPackagePurpose": "APPLICATION",
+      "supplier": "Organization: Apple Inc.",
+      "versionInfo": "21.0.0"
+    },
+    {
+      "SPDXID": "SPDXRef-Tool-macOS-SDK",
+      "comment": "macOS SDK 26.5 (25F70)",
+      "copyrightText": "NOASSERTION",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "name": "macOS SDK",
+      "primaryPackagePurpose": "SOURCE",
+      "supplier": "Organization: Apple Inc.",
+      "versionInfo": "26.5"
+    },
+    {
+      "SPDXID": "SPDXRef-SystemDependency-01",
+      "comment": "scope: provided; install-name: /System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation",
+      "copyrightText": "NOASSERTION",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "name": "CoreFoundation",
+      "primaryPackagePurpose": "LIBRARY",
+      "supplier": "Organization: Apple Inc.",
+      "versionInfo": "system-provided"
+    },
+    {
+      "SPDXID": "SPDXRef-SystemDependency-02",
+      "comment": "scope: provided; install-name: /System/Library/Frameworks/IOKit.framework/Versions/A/IOKit",
+      "copyrightText": "NOASSERTION",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "name": "IOKit",
+      "primaryPackagePurpose": "LIBRARY",
+      "supplier": "Organization: Apple Inc.",
+      "versionInfo": "system-provided"
+    },
+    {
+      "SPDXID": "SPDXRef-SystemDependency-03",
+      "comment": "scope: provided; install-name: /System/Library/Frameworks/Security.framework/Versions/A/Security",
+      "copyrightText": "NOASSERTION",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "name": "Security",
+      "primaryPackagePurpose": "LIBRARY",
+      "supplier": "Organization: Apple Inc.",
+      "versionInfo": "system-provided"
+    },
+    {
+      "SPDXID": "SPDXRef-SystemDependency-04",
+      "comment": "scope: provided; install-name: /usr/lib/libSystem.B.dylib",
+      "copyrightText": "NOASSERTION",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "name": "libSystem.B.dylib",
+      "primaryPackagePurpose": "LIBRARY",
+      "supplier": "Organization: Apple Inc.",
+      "versionInfo": "system-provided"
+    },
+    {
+      "SPDXID": "SPDXRef-SystemDependency-05",
+      "comment": "scope: provided; install-name: /usr/lib/libc++.1.dylib",
+      "copyrightText": "NOASSERTION",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "name": "libc++.1.dylib",
+      "primaryPackagePurpose": "LIBRARY",
+      "supplier": "Organization: Apple Inc.",
+      "versionInfo": "system-provided"
+    },
+    {
+      "SPDXID": "SPDXRef-SystemDependency-06",
+      "comment": "scope: provided; install-name: /usr/lib/libiconv.2.dylib",
+      "copyrightText": "NOASSERTION",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "name": "libiconv.2.dylib",
+      "primaryPackagePurpose": "LIBRARY",
+      "supplier": "Organization: Apple Inc.",
+      "versionInfo": "system-provided"
+    },
+    {
+      "SPDXID": "SPDXRef-SystemDependency-07",
+      "comment": "scope: provided; install-name: /usr/lib/libobjc.A.dylib",
+      "copyrightText": "NOASSERTION",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "name": "libobjc.A.dylib",
+      "primaryPackagePurpose": "LIBRARY",
+      "supplier": "Organization: Apple Inc.",
+      "versionInfo": "system-provided"
+    }
+  ],
+  "relationships": [
+    {
+      "relatedSpdxElement": "SPDXRef-Package-rkdeveloptool-artifact",
+      "relationshipType": "DESCRIBES",
+      "spdxElementId": "SPDXRef-DOCUMENT"
+    },
+    {
+      "comment": "scope: provided; /System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation",
+      "relatedSpdxElement": "SPDXRef-SystemDependency-01",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-rkdeveloptool-artifact"
+    },
+    {
+      "comment": "scope: provided; /System/Library/Frameworks/IOKit.framework/Versions/A/IOKit",
+      "relatedSpdxElement": "SPDXRef-SystemDependency-02",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-rkdeveloptool-artifact"
+    },
+    {
+      "comment": "scope: provided; /System/Library/Frameworks/Security.framework/Versions/A/Security",
+      "relatedSpdxElement": "SPDXRef-SystemDependency-03",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-rkdeveloptool-artifact"
+    },
+    {
+      "comment": "scope: provided; /usr/lib/libSystem.B.dylib",
+      "relatedSpdxElement": "SPDXRef-SystemDependency-04",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-rkdeveloptool-artifact"
+    },
+    {
+      "comment": "scope: provided; /usr/lib/libc++.1.dylib",
+      "relatedSpdxElement": "SPDXRef-SystemDependency-05",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-rkdeveloptool-artifact"
+    },
+    {
+      "comment": "scope: provided; /usr/lib/libiconv.2.dylib",
+      "relatedSpdxElement": "SPDXRef-SystemDependency-06",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-rkdeveloptool-artifact"
+    },
+    {
+      "comment": "scope: provided; /usr/lib/libobjc.A.dylib",
+      "relatedSpdxElement": "SPDXRef-SystemDependency-07",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-rkdeveloptool-artifact"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-Package-libusb",
+      "relationshipType": "GENERATED_FROM",
+      "spdxElementId": "SPDXRef-Package-rkdeveloptool-artifact"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-Package-rkdeveloptool-source",
+      "relationshipType": "GENERATED_FROM",
+      "spdxElementId": "SPDXRef-Package-rkdeveloptool-artifact"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-Package-libusb",
+      "relationshipType": "STATIC_LINK",
+      "spdxElementId": "SPDXRef-Package-rkdeveloptool-artifact"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-File-0462e381b2fb32865682",
+      "relationshipType": "CONTAINS",
+      "spdxElementId": "SPDXRef-Package-rkdeveloptool-source"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-File-04c0b2233d164f09e21c",
+      "relationshipType": "CONTAINS",
+      "spdxElementId": "SPDXRef-Package-rkdeveloptool-source"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-File-04f50abeebf1ba8b6bde",
+      "relationshipType": "CONTAINS",
+      "spdxElementId": "SPDXRef-Package-rkdeveloptool-source"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-File-0795adfe01df662f6a34",
+      "relationshipType": "CONTAINS",
+      "spdxElementId": "SPDXRef-Package-rkdeveloptool-source"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-File-07db3f6478a92e58804c",
+      "relationshipType": "CONTAINS",
+      "spdxElementId": "SPDXRef-Package-rkdeveloptool-source"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-File-1266c2a13510bcd5ff76",
+      "relationshipType": "CONTAINS",
+      "spdxElementId": "SPDXRef-Package-rkdeveloptool-source"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-File-1319634c3c81518867f1",
+      "relationshipType": "CONTAINS",
+      "spdxElementId": "SPDXRef-Package-rkdeveloptool-source"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-File-1e7de1ae2d059d21e1dd",
+      "relationshipType": "CONTAINS",
+      "spdxElementId": "SPDXRef-Package-rkdeveloptool-source"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-File-2243bb5834c9a9034833",
+      "relationshipType": "CONTAINS",
+      "spdxElementId": "SPDXRef-Package-rkdeveloptool-source"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-File-250dcce1169b7b27c848",
+      "relationshipType": "CONTAINS",
+      "spdxElementId": "SPDXRef-Package-rkdeveloptool-source"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-File-2dac472b41a76505f2a6",
+      "relationshipType": "CONTAINS",
+      "spdxElementId": "SPDXRef-Package-rkdeveloptool-source"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-File-37cb386efc1e62b77437",
+      "relationshipType": "CONTAINS",
+      "spdxElementId": "SPDXRef-Package-rkdeveloptool-source"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-File-44e330bde4a544e6ff0b",
+      "relationshipType": "CONTAINS",
+      "spdxElementId": "SPDXRef-Package-rkdeveloptool-source"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-File-479953aabd0a996a9a0a",
+      "relationshipType": "CONTAINS",
+      "spdxElementId": "SPDXRef-Package-rkdeveloptool-source"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-File-49473dca262eeab3b4a4",
+      "relationshipType": "CONTAINS",
+      "spdxElementId": "SPDXRef-Package-rkdeveloptool-source"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-File-4fc9d22127c1c1133384",
+      "relationshipType": "CONTAINS",
+      "spdxElementId": "SPDXRef-Package-rkdeveloptool-source"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-File-5723c1a90301ab8a3020",
+      "relationshipType": "CONTAINS",
+      "spdxElementId": "SPDXRef-Package-rkdeveloptool-source"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-File-5de85deb066e10964af7",
+      "relationshipType": "CONTAINS",
+      "spdxElementId": "SPDXRef-Package-rkdeveloptool-source"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-File-608d8de3fba954c50110",
+      "relationshipType": "CONTAINS",
+      "spdxElementId": "SPDXRef-Package-rkdeveloptool-source"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-File-64897e45dd681866cfd2",
+      "relationshipType": "CONTAINS",
+      "spdxElementId": "SPDXRef-Package-rkdeveloptool-source"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-File-7544c8642acdd15d2959",
+      "relationshipType": "CONTAINS",
+      "spdxElementId": "SPDXRef-Package-rkdeveloptool-source"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-File-7bb54d15ef4c4e0f20bb",
+      "relationshipType": "CONTAINS",
+      "spdxElementId": "SPDXRef-Package-rkdeveloptool-source"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-File-8384092c494b493720ec",
+      "relationshipType": "CONTAINS",
+      "spdxElementId": "SPDXRef-Package-rkdeveloptool-source"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-File-842325865842b9f8b467",
+      "relationshipType": "CONTAINS",
+      "spdxElementId": "SPDXRef-Package-rkdeveloptool-source"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-File-8a6944738078708b9da7",
+      "relationshipType": "CONTAINS",
+      "spdxElementId": "SPDXRef-Package-rkdeveloptool-source"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-File-9057d4deaf982b1deb9d",
+      "relationshipType": "CONTAINS",
+      "spdxElementId": "SPDXRef-Package-rkdeveloptool-source"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-File-ab9efd6a0975c0130c70",
+      "relationshipType": "CONTAINS",
+      "spdxElementId": "SPDXRef-Package-rkdeveloptool-source"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-File-bc37d034bad564583790",
+      "relationshipType": "CONTAINS",
+      "spdxElementId": "SPDXRef-Package-rkdeveloptool-source"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-File-d6c15cf75e77e9e12011",
+      "relationshipType": "CONTAINS",
+      "spdxElementId": "SPDXRef-Package-rkdeveloptool-source"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-File-defe4c1a3be8c31b5c91",
+      "relationshipType": "CONTAINS",
+      "spdxElementId": "SPDXRef-Package-rkdeveloptool-source"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-File-f0230792535d4361a3da",
+      "relationshipType": "CONTAINS",
+      "spdxElementId": "SPDXRef-Package-rkdeveloptool-source"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-File-f61cb505df5053901eea",
+      "relationshipType": "CONTAINS",
+      "spdxElementId": "SPDXRef-Package-rkdeveloptool-source"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-Package-rkdeveloptool-artifact",
+      "relationshipType": "BUILD_TOOL_OF",
+      "spdxElementId": "SPDXRef-Tool-AppleClang"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-Package-rkdeveloptool-artifact",
+      "relationshipType": "BUILD_TOOL_OF",
+      "spdxElementId": "SPDXRef-Tool-macOS-SDK"
+    }
+  ],
+  "spdxVersion": "SPDX-2.3"
+}

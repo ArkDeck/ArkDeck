@@ -1,0 +1,101 @@
+name: Rockchip Component
+
+# CHG-2026-036 / TASK-BRC-002.
+# This workflow builds an unsigned, non-runnable release input on two isolated
+# macOS runners. It never signs, packages, launches or dispatches to a device.
+
+on:
+  push:
+    branches: [main, "agent/**"]
+    paths:
+      - ".github/workflows/rockchip-component.yml"
+      - "scripts/rockchip_component/**"
+      - "openspec/integrations/rockchip/bundled-component/**"
+      - "openspec/changes/chg-2026-036-macos-bundled-rockchip-component/evidence/runs/TASK-BRC-002/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rockchip-component-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit:
+    runs-on: macos-26
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Mutation and contract tests
+        run: /usr/bin/python3 scripts/rockchip_component/test_build.py
+
+  build:
+    runs-on: macos-26
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        builder: [builder-a, builder-b]
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Exact toolchain preflight and clean unsigned build
+        run: |
+          set -eu
+          test -d "$DEVELOPER_DIR"
+          /usr/bin/python3 scripts/rockchip_component/build.py build \
+            --builder-id "${{ matrix.builder }}" \
+            --work-root "$RUNNER_TEMP/work-${{ matrix.builder }}" \
+            --output-dir "$RUNNER_TEMP/output-${{ matrix.builder }}"
+
+      - name: Upload transient unsigned output and sanitized receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: rockchip-${{ matrix.builder }}
+          path: ${{ runner.temp }}/output-${{ matrix.builder }}
+          if-no-files-found: error
+          retention-days: 1
+
+  compare:
+    needs: [unit, build]
+    runs-on: macos-26
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Download builder A
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: rockchip-builder-a
+          path: ${{ runner.temp }}/builder-a
+
+      - name: Download builder B
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: rockchip-builder-b
+          path: ${{ runner.temp }}/builder-b
+
+      - name: Byte-identical comparison
+        run: |
+          set -eu
+          /usr/bin/python3 scripts/rockchip_component/build.py compare \
+            --builder-a "$RUNNER_TEMP/builder-a" \
+            --builder-b "$RUNNER_TEMP/builder-b" \
+            --output "$RUNNER_TEMP/reproducibility.json"
+
+      - name: Upload comparison receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: rockchip-reproducibility
+          path: ${{ runner.temp }}/reproducibility.json
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Committed metadata audit
+        run: |
+          set -eu
+          /usr/bin/python3 scripts/rockchip_component/build.py verify-committed \
+            --reference "$RUNNER_TEMP/builder-a"
