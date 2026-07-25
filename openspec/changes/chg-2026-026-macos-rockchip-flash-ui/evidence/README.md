@@ -18,6 +18,8 @@ evidence/runs/TASK-RKFUI-001/review-nits-2026-07-22.md
 evidence/runs/TASK-RKFUI-001/hermetic-contract-test-2026-07-22.md
 evidence/runs/TASK-RKFUI-001/e0-preflight-2026-07-24.md
 evidence/runs/TASK-RKFUI-001/clean-discovery-repin-2026-07-24.md
+evidence/runs/TASK-RKFUI-001/blocked-sandbox-selection-quarantine-2026-07-25.md
+evidence/runs/TASK-RKFUI-001/blocked-sandbox-selection-quarantine-2026-07-25.json
 evidence/runs/TASK-RKFUI-001A/blocked-preflight-firmware-drift-2026-07-24.md
 evidence/runs/TASK-RKFUI-001A/blocked-preflight-firmware-drift-2026-07-24.json
 evidence/runs/TASK-RKFUI-001A/blocked-preflight-server-discovery-2026-07-24.md
@@ -52,6 +54,15 @@ ArkDeck platform/realHardware 验收，且未执行任何真实设备命令。
 package-boundary 测试表与已批准设计/Package 依赖不一致，所需测试文件不在任务 allowed
 paths；signed Sandbox E0 又在 child launch 前因所选工具带 quarantine fail closed。
 该 run 不构成 RockUSB direct-access PASS、真机支持或后续 execute readiness。
+
+clean discovery repin 合入后的 2026-07-25 signed Sandbox E0 再次在 child launch 前
+fail closed：host precheck 时 exact `bbd7bdc0…9923` executable 无 quarantine；维护者通过
+`NSOpenPanel` 选择解析到该 executable 的唯一 symlink 后，security-scoped bookmark/hash/
+source/signature gates 均命中，但 App 观察到新 quarantine 且 Gatekeeper 拒绝。typed verdict
+为 `toolBlocked(quarantinePresent)`，`ldReadOnly=0`，USB/Loader 未观察，全部 mutation、
+destructive、提权、安装与系统修改计数为 0。由于本次使用临时 symlink，evidence 不把元数据
+变化泛化为 canonical-path 行为；agent 未清除 quarantine、复制/重建工具规避、放宽 entitlement
+或重试。详情见 `TASK-RKFUI-001/blocked-sandbox-selection-quarantine-2026-07-25.*`。
 
 `TASK-RKFUI-001A` firmware-drift preflight 只读确认目标 serial、HDC/server 与 clean
 `rkdeveloptool` pins 命中，但当前设备报告 OpenHarmony `7.0.0.33`，不同于 PR #440
