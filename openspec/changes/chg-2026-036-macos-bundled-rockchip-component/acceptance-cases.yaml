@@ -1,0 +1,90 @@
+---
+schema_version: 1.0.0
+change_id: CHG-2026-036-macos-bundled-rockchip-component
+change_revision: 1
+platform: macos
+evidence_classes:
+- documentReview
+- contract
+- platform
+- realHardware
+cases:
+- acceptance_id: BRC-SUPPLY-001
+  test_id: TEST-BRC-SUPPLY-001
+  method: Document review of the accepted source, license, dependency and distribution envelope.
+  expected_source: openspec/changes/chg-2026-036-macos-bundled-rockchip-component/verification.md#acceptance-matrix
+  minimum_evidence: documentReview
+  expected_result: >-
+    An identified maintainer accepts or explicitly blocks the exact upstream
+    source, GPL obligations, notices, corresponding-source mechanism,
+    dependency licenses, SBOM and vulnerability ownership, and update,
+    rollback and retention policy. Every accepted build input is machine-pinned;
+    proposal or change approval alone is not distribution acceptance.
+- acceptance_id: BRC-REPRO-001
+  test_id: TEST-BRC-REPRO-001
+  method: Compare two isolated clean unsigned builds and audit their registry, SBOM and dependency graph.
+  expected_source: openspec/changes/chg-2026-036-macos-bundled-rockchip-component/verification.md#acceptance-matrix
+  minimum_evidence: platform
+  expected_result: >-
+    Exact pinned source, dependencies, recipe, builder and toolchain produce an
+    identical unsigned component identity or an independently reviewable
+    readiness-approved normalization on two clean builders. The release build
+    has no ambient Homebrew, PATH, network, cache, header or library input, and
+    registry, SBOM, licenses and linked dependencies agree.
+- acceptance_id: BRC-PACKAGE-001
+  test_id: TEST-BRC-PACKAGE-001
+  method: Inspect the nested component, signed App and notarized DMG with independent package tooling.
+  expected_source: openspec/changes/chg-2026-036-macos-bundled-rockchip-component/verification.md#acceptance-matrix
+  minimum_evidence: platform
+  expected_result: >-
+    Bundle location, component identifier, minimum OS, architectures, source
+    registry and artifact identity are exact. The child has only App Sandbox
+    and inherit entitlements, the App keeps its approved six entitlements, and
+    inside-out Developer ID signing, Hardened Runtime, notarization and stapling
+    all validate; any drift blocks distribution.
+- acceptance_id: BRC-COMPOSITION-001
+  test_id: TEST-BRC-COMPOSITION-001
+  method: Contract, fault and source-reachability tests of the product-owned component composition.
+  expected_source: openspec/changes/chg-2026-036-macos-bundled-rockchip-component/verification.md#acceptance-matrix
+  minimum_evidence: contract
+  expected_result: >-
+    Production composition obtains executable identity only from a reviewed
+    bundle-owned descriptor. Callers cannot supply an executable URL or hash,
+    raw argv or environment, component receipt or authority bytes. Typed
+    image, key and output leases, intent-before-effect, semantic outcome,
+    cancellation, timeout, crash and reconciliation are closed, while shell,
+    PATH, external-tool and download/copy fallbacks are unreachable.
+- acceptance_id: BRC-SANDBOX-E0-001
+  test_id: TEST-BRC-SANDBOX-E0-001
+  method: Staged signed-Sandbox observations of the embedded child, file leases and read-only RockUSB E0.
+  expected_source: openspec/changes/chg-2026-036-macos-bundled-rockchip-component/verification.md#acceptance-matrix
+  minimum_evidence: realHardware
+  expected_result: >-
+    The exact signed App and child separately demonstrate bounded component
+    launch, file-lease access and RockUSB read-only discovery on the pinned E0
+    target. Identity, permission, malformed output, multi-device, timeout,
+    cancellation, crash and disconnect failures are explicit; privilege,
+    mutation, E1, E2 and destructive counters are all zero. This result is not
+    a Flash or hardware-conformance claim.
+- acceptance_id: BRC-DISTRIBUTION-001
+  test_id: TEST-BRC-DISTRIBUTION-001
+  method: Clean-host or clean-VM installation, launch, update and rollback of the Developer ID notarized DMG.
+  expected_source: openspec/changes/chg-2026-036-macos-bundled-rockchip-component/verification.md#acceptance-matrix
+  minimum_evidence: platform
+  expected_result: >-
+    A clean host validates the Developer ID, nested signature, Gatekeeper,
+    notarization, staple, registry, notices, SBOM and corresponding-source
+    tuple from the distributed DMG. Install, bounded E0, supported update and
+    rollback never expose a mixed App/component version, never replay an
+    unknown effect and preserve execute-disabled fail-closed behavior.
+- acceptance_id: BRC-HANDOFF-001
+  test_id: TEST-BRC-HANDOFF-001
+  method: Cross-file review of task ancestry, evidence, final diff and downstream reachability.
+  expected_source: openspec/changes/chg-2026-036-macos-bundled-rockchip-component/verification.md#acceptance-matrix
+  minimum_evidence: documentReview
+  expected_result: >-
+    All six tasks have independently reviewed readiness and evidence ancestry,
+    while Core specs and contracts, HDC external-first, CHG-2026-026 and the
+    hardware matrix have no silent change. Product Flash UI and destructive
+    dispatch remain disabled, and the only downstream path is a separately
+    proposed or revised CHG-2026-026 gate.
