@@ -2281,7 +2281,93 @@
 
 ## TASK-HLR-003 — Fenced worker loop 与 legacy PR creator 迁移
 
-- Status:ready（r1 implementation readiness；仅在维护者对本独立 readiness PR
+- Status:ready（r2 corrective readiness；仅在维护者对本独立 readiness PR exact
+  head review/merge 后生效。r1 已交付的 offline runtime 不重新授权；r2 只额外授权
+  一个 D0 source PR 交付 worker 的可执行入口与生产后端接线，使 scheduler 有可绑定
+  的对象；不授权 scheduler 创建/注册/启用、worker 启动、legacy creator 在 live
+  proof 前退出、review/merge/auto-merge/admin route、D2 credential 修改、
+  `sdd-guard.yml` 或任何 governance text 变更。）
+- Readiness（r2；audit base = protected `main`
+  `1a8e235fc7174c647e8e971dee3f1a6d2dd16325`）：
+  - **Approval boundary:pending human merge。**本 carrier 只修改本文件
+    TASK-HLR-003 section。只有 `lvye` 对 exact head APPROVED、required checks
+    terminal success、`mergedBy=lvye`、`auto_merge=null` 且 squash subject 携
+    `(#N)` 的 merge OID 进入 protected main 后，本修订才生效。合入前
+    source/workflow/ref/PR/Issue/scheduler/credential mutation = 0。
+  - **Why r2 exists:r1 的 scheduler 条款与 In scope 自相矛盾。**r1 的
+    `Scheduler separation` 门写明「不创建 account/plist/socket/**worker
+    executable**」，而同一任务 In scope 要求交付 worker `--once` loop。该禁令是从
+    TASK-HLR-002 readiness 逐字搬来的——对 identity 任务成立，对 worker 任务则禁掉
+    了本任务存在的目的。后果是**无人被授权创建入口**：source PR 被禁止，而 D2 阶段
+    是主机/凭据操作，在 D2 窗口内撰写源码本身越界。实测确认 r1 source PR #524 合入
+    后，`scripts/host_loop/` 在 protected main 上 `__main__`/`argparse`/`def main`/
+    `if __name__`/`--once` 的非测试命中均为 0，`subprocess`/`urllib`/`http` 的
+    非测试命中亦为 0——即注入式后端全无生产实现。r2 收窄禁令并显式授权补齐。
+  - **Dependency/authority gate:closed。**r1 readiness #521 merge
+    `2667a10badb8180a0c7f5079636d46b03f637184`；r1 source #524 merge
+    `1a8e235fc7174c647e8e971dee3f1a6d2dd16325`（parent
+    `c74fa46a810f6713b987c639ce23246ddf24a307`，改动面恰为
+    `scripts/host_loop/**` 十个文件）。两者均为 audit-base ancestors。
+  - **Corrected scheduler separation:binary（取代 r1 同名门）。**本 task 的 source
+    PR 不得创建 launchd account、plist/job/socket，不得 load/enable/kickstart，
+    scheduler dispatch 恒为 0、`workerDisabled=true`。**worker 的可执行入口与生产
+    后端属源码，明确在 source PR 授权范围内。**scheduler 绑定 exact merged source
+    blob hash 与启用仍属 source PR 合入后的**分离** D2 evidence 阶段；source 未
+    合入或 receipt/source hash 漂移时 dispatch 恒为 0。
+  - **Authorized second source PR:binary。**只授权在
+    `scripts/host_loop/**` 内交付下列面，且必须与已合入的 offline 契约保持行为
+    一致（既有 189 项 offline test 不得放宽）：
+    - `--once` CLI 入口（`python3 -m host_loop --once` 可被 launchd 直接调用），
+      exit code 区分 dispatched / no-dispatch / reconcile-required / error；
+    - `ApiPort` 的生产 sender：只发 typed allowlist 路由，token 从环境或 root-only
+      staging 读取且不落日志、不进 argv；
+    - `RefPort` 的生产 git runner：`ls-remote` 与
+      `push --atomic --force-with-lease=<ref>:<expected>`，服务端拒绝与歧义传输
+      失败必须仍分别映射到 `Refused`/`PolicyRefused` 与 `TransportError`；
+    - `prepare_branch`、`render_body`（复用已合入的 `pr_envelope.render_envelope`）、
+      `read_lease_record`、`commit_writer` 的真实实现；
+    - installation token 的最小获取路径（JWT 签名交由 root 侧 openssl，PEM 不进
+      进程内存），与 TASK-HLR-002 evidence 记录的 containment 一致。
+    禁止在该 PR 内新增任何 typed route、放宽任何字段 allowlist、或引入 generic
+    request/escape hatch；`ALLOWED_ROUTES` 与 `forbidden_capability_count` 的
+    negative proof 必须继续为 0。
+  - **Merged source pins:closed。**第二个 source PR 必须以下列 exact blob 为基线；
+    任一 drift 即停并重新 readiness：
+
+    ```yaml
+    host_loop_init: 7a6c5b9223c68f9d8aadd503fb38842346c710fc
+    transport:      6a77e264ed8b5f717d2dc2734f7f19b1226e95c2
+    lease:          f260f43d2c2b1e614f33f9ccfaacf2f57ac5b47b
+    identity:       d22e62946e3b5b836cbdcd9b48b57031172fe4b1
+    cursor:         24063899d0b1f0b4a89511aa6e20fcf3970ce354
+    worker:         d3bc77c18a28f2d478b1bf483aa352bdc7a33c2a
+    pr_envelope:    2c286c8da0fa8945d512115dfce9de5150db0831
+    ```
+
+  - **r1 gates carried forward unchanged:binary。**下列 r1 门在 r2 下继续完整有效，
+    不因本修订而重新开放或放宽：F1 的 option B 决议（reserved namespace 的
+    `pull_request` 覆盖由 worker 一次 body update 触发 `edited`，`.github/**` 零
+    改动；F2 因此不适用且已如实记录）、F3 已交付的 envelope token 统一与 parity
+    测试、F4 的 CAS 证明义务（**仍 open**：topology evidence 与 HLR-002 的单次
+    stale-fence 均不构成充分证明）、fault matrix、adapter negative proof 三重
+    证伪、migration atomicity（legacy coverage 不得早于同 PR 的 live proof 退出）、
+    self-claim stop（worker 不得 claim `TASK-HLR-003` 及其后缀变体）。
+  - **r1 delivery of record:informational。**r1 source PR #524 经三个 head 与一轮
+    自动化 unbound-guard 审计后合入：审计提出 41 项候选、证伪 34 项、确认 7 项，
+    其中两项 high 为「required check 判据按名字判定且 `skipped` 计为 green」，
+    致 check dispatch 在生产中从未触发且可能在路径契约未被评估的 head 上返回
+    `checksGreen`；均已在合入前修复。合入面为 offline 契约与测试，无入口、无生产
+    后端——这正是 r2 要补齐的部分。
+  - **Live-proof task dependency:open（阻塞后段，不阻塞本修订与第二个 source
+    PR）。**live first-PR proof 与 legacy migration 仍需一个**天然产生**的 ready
+    host-only D0 task。撰写时 `TASK-RKFUI-001G` 为 `ready`、`hw=no`、macos
+    host-only，且其 `G` 后缀正是 r1 F3 统一后才可被 envelope 接受的形态；是否以其
+    为 live proof 对象属维护者判断，不得为满足该 proof 制造任务。
+  - **Concurrency/absence gate:closed at drafting。**remote 上
+    `agent/task-hlr-003*` 分支数 = 0；`agent/host-loop/*` 分支数 = 0。历史
+    `agent/task-hlr-003-worker-loop` 已随 #524 合入删除，不得复用。push 前须重查
+    全页 open PR 与 remote 分支。
+- Historical Status:ready（r1 implementation readiness；仅在维护者对本独立 readiness PR
   exact head review/merge 后生效。只授权一个 D0 source PR 交付 worker `--once`
   loop、Issue cursor、fenced lease、typed GitHub adapter、`agent-pr.yml` 的
   reserved-namespace `pull_request` allowed-paths 覆盖与 expected-author
@@ -2289,8 +2375,8 @@
   不授权 scheduler 创建/注册/启用、worker 启动、legacy creator 在 live proof
   前退出、review/merge/auto-merge/admin route、D2 credential 修改、
   `sdd-guard.yml` 或任何 governance text 变更。）
-- Readiness（r1；audit base = protected `main`
-  `f0ed7f8e901bc1acf9d740b02c7d9bbb563b39f8`）：
+- Historical Readiness（r1；audit base = protected `main`
+  `f0ed7f8e901bc1acf9d740b02c7d9bbb563b39f8`；scheduler 条款经 r2 更正）：
   - **Approval boundary:pending human merge。**本 carrier 只修改本文件
     TASK-HLR-003 section。只有 `lvye` 对 exact head APPROVED、required checks
     terminal success、`mergedBy=lvye`、`auto_merge=null` 且 squash subject 携
