@@ -114,9 +114,14 @@ class LeaseRecord:
         return record
 
     def validate(self) -> None:
-        if not isinstance(self.fence, int) or self.fence < 1:
+        # bool is a subclass of int and True >= 1, so a plain isinstance check
+        # accepts `"fence": true` as fence 1. That record then compares equal to
+        # a real fence of 1 and increments to 2, which makes a type confusion
+        # into a fence collision. Excluded explicitly, here and below.
+        if (not isinstance(self.fence, int) or isinstance(self.fence, bool)
+                or self.fence < 1):
             raise LeaseError("fence must be a positive integer")
-        if not isinstance(self.expires_at, int):
+        if not isinstance(self.expires_at, int) or isinstance(self.expires_at, bool):
             raise LeaseError("expires_at must be epoch seconds")
         if not OID_RE.match(self.base_oid):
             raise LeaseError("base_oid must be lowercase full 40-hex")
@@ -125,7 +130,8 @@ class LeaseRecord:
         if self.previous_lease_oid is not None and not OID_RE.match(self.previous_lease_oid):
             raise LeaseError("previous_lease_oid must be lowercase full 40-hex or null")
         if self.pr_number is not None and (
-            not isinstance(self.pr_number, int) or self.pr_number < 1
+            not isinstance(self.pr_number, int) or isinstance(self.pr_number, bool)
+            or self.pr_number < 1
         ):
             raise LeaseError("pr_number must be a positive integer or null")
         if not isinstance(self.create_attempted, bool):

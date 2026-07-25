@@ -163,24 +163,36 @@ class CursorTruthReconciliation(unittest.TestCase):
         rebuilt = rebuild_and_validate(stale, truth())
         self.assertEqual(rebuilt.cursor_main_oid, MAIN)
 
-    def test_candidate_not_ready_is_a_conflict(self):
-        with self.assertRaisesRegex(CursorError, r"not a currently ready task"):
-            rebuild_and_validate(state(candidate_task="TASK-GONE-001"), truth())
+    def test_candidate_not_ready_is_reconciled_not_fatal(self):
+        """Staleness in a cache is not corruption.
 
-    def test_pr_not_open_is_a_conflict(self):
-        with self.assertRaisesRegex(CursorError, r"not among the observed open PRs"):
-            rebuild_and_validate(state(pr_number=999), truth())
+        The previous version asserted the wedge as the contract: it required a
+        stale candidate to abort the round, and since reconciliation runs before
+        any cursor write, the cache could never catch up.
+        """
+        out = rebuild_and_validate(state(candidate_task="TASK-GONE-001"), truth())
+        self.assertIsNone(out.candidate_task)
 
-    def test_absent_lease_ref_is_a_conflict(self):
+    def test_pr_not_open_is_reconciled_not_fatal(self):
+        out = rebuild_and_validate(state(pr_number=999, pr_head=HEAD), truth())
+        self.assertIsNone(out.pr_number)
+        self.assertIsNone(out.pr_head)
+
+    def test_an_absent_lease_ref_is_cleared_not_fatal(self):
         cur = state(lease_ref=lease_ref(TASK), lease_oid="1" * 40)
-        with self.assertRaisesRegex(CursorError, r"does not exist"):
-            rebuild_and_validate(cur, truth())
+        out = rebuild_and_validate(cur, truth())
+        self.assertIsNone(out.lease_ref)
+        self.assertIsNone(out.lease_oid)
 
-    def test_lease_oid_mismatch_is_a_conflict(self):
+    def test_a_lease_oid_behind_the_ref_is_refreshed_not_fatal(self):
+        """This is the shape one dropped cursor write leaves behind.
+
+        A transient 502 on a single cursor PATCH, or the process dying between a
+        ref write and its matching cursor write, used to wedge the task for ever.
+        """
         cur = state(lease_ref=lease_ref(TASK), lease_oid="1" * 40)
         t = truth(lease_oid_by_ref={lease_ref(TASK): "2" * 40})
-        with self.assertRaisesRegex(CursorError, r"!= observed"):
-            rebuild_and_validate(cur, t)
+        self.assertEqual(rebuild_and_validate(cur, t).lease_oid, "2" * 40)
 
     def test_consistent_cursor_passes(self):
         cur = state(candidate_task=TASK, pr_number=7,
@@ -224,15 +236,25 @@ class CursorPersistence(unittest.TestCase):
         self.assertTrue(wrote)
         self.assertTrue([c for c in fake.calls if c[0] == "PATCH"])
 
-    def test_record_lease_write_rejects_a_malformed_oid(self):
-        """A truncated or uppercase OID must not enter the cursor."""
+    def test_a_malformed_lease_oid_cannot_enter_the_cursor(self):
+        """Re-pointed from record_lease_write, which was dead at its call site.
+
+        The property is worth keeping; asserting it against a function nothing
+        calls is not. record_round is the one the round actually goes through.
+        """
         for bad in ("", "deadbeef", "A" * 40, "g" * 40, "1" * 39, "1" * 41):
             with self.subTest(bad=bad):
                 with self.assertRaises(CursorError):
-                    cursor_mod.record_lease_write(state(), lease_ref(TASK), bad, 2000)
+                    cursor_mod.record_round(
+                        state(), main_oid=MAIN, candidate_task=TASK,
+                        lease_ref_name=lease_ref(TASK), lease_oid=bad,
+                        pr_number=None, pr_head=None, observed_at=2000)
 
-    def test_lease_write_is_recorded_in_the_cursor(self):
-        updated = cursor_mod.record_lease_write(state(), lease_ref(TASK), "3" * 40, 2000)
+    def test_a_lease_write_is_recorded_in_the_cursor(self):
+        updated = cursor_mod.record_round(
+            state(), main_oid=MAIN, candidate_task=TASK,
+            lease_ref_name=lease_ref(TASK), lease_oid="3" * 40,
+            pr_number=None, pr_head=None, observed_at=2000)
         self.assertEqual(updated.lease_ref, lease_ref(TASK))
         self.assertEqual(updated.lease_oid, "3" * 40)
         self.assertEqual(updated.last_observed_at, 2000)
@@ -330,14 +352,13 @@ class RoundOutcomes(unittest.TestCase):
         self.assertEqual(result.state, WorkerState.IDLE)
         self.assertFalse(result.dispatched)
 
-    def test_cursor_conflict_yields_reconcile_required(self):
-        w = build_worker(FakeRemote(), api_port(FakeApi()))
+    def test_a_stale_cursor_does_not_stop_the_round(self):
+        """The cursor must never be why a round cannot proceed."""
+        w = build_worker(FakeRemote(), api_port(FakeApi(pulls=[pull(21)])))
         result = w.run_once([candidate()], "CHG-X", MAIN,
-                            state(pr_number=999), truth())
-        self.assertEqual(result.state, WorkerState.RECONCILE_REQUIRED)
-        self.assertFalse(result.dispatched)
-        # The cursor conflict must be the reason, not an incidental later failure.
-        self.assertIn("not among the observed open PRs", result.detail)
+                            state(pr_number=999, pr_head=HEAD), truth())
+        self.assertNotEqual(result.state, WorkerState.RECONCILE_REQUIRED,
+                            f"stale cache must reconcile, not abort: {result.detail}")
 
     def test_duplicate_pr_yields_reconcile_required_not_a_crash(self):
         remote = FakeRemote()
@@ -918,8 +939,9 @@ class AuditRegressions(unittest.TestCase):
                           "a foreign lease OID must not be cached as ours")
         self.assertIsNone(persisted.lease_ref)
 
-    def test_a_cached_foreign_oid_would_wedge_the_next_round(self):
-        """Shows why the above matters: the stale pairing fails validation."""
+    def test_a_cached_foreign_oid_recovers_on_the_next_round(self):
+        """v3 stopped caching a foreign OID, but a cursor already holding one
+        still had to recover — the fix cannot retroactively clean the Issue."""
         remote, _fake, clock, _mgr, _build, tr = self._rig([])
         rival = LeaseManager(RefPort(remote="origin", _run=remote.run),
                              owner_run="host-loop/rival", now=lambda: clock["t"],
@@ -928,10 +950,9 @@ class AuditRegressions(unittest.TestCase):
         poisoned = state(candidate_task=TASK, lease_ref=lease_ref(TASK),
                          lease_oid=held.ref_oid)
         rival.renew(held)
-        with self.assertRaises(CursorError):
-            rebuild_and_validate(poisoned, tr())
+        out = rebuild_and_validate(poisoned, tr())
+        self.assertEqual(out.lease_oid, remote.refs[lease_ref(TASK)])
 
-    # --- D: identity must use the lease's frozen base -----------------------
     def test_the_round_survives_main_advancing(self):
         """main drifts several times an hour here; identity must not follow it."""
         remote, _fake, _clock, _mgr, build, tr = self._rig(

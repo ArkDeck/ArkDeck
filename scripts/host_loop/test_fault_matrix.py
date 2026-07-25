@@ -138,7 +138,11 @@ class FakeApi:
         if method == "POST" and path.endswith("/issues"):
             return 201, {"number": 7}
         if method == "GET" and "/check-runs" in path:
-            return 200, {"check_runs": self.check_runs}
+            # The real endpoint always sends total_count. A fake that omits a
+            # field the API always sends is how the r1 `skipped` stub defect
+            # stayed invisible, so the envelope is modelled, not simplified.
+            return 200, {"total_count": len(self.check_runs),
+                         "check_runs": self.check_runs}
         return 200, {}
 
 
