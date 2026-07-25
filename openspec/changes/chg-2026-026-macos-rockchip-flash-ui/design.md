@@ -2,11 +2,11 @@
 
 ## Context and constraints
 
-- Proposal revision：r6；r1-r5 已由维护者 merge。r6 只修正 TASK-RKFUI-001A probe
-  对 clean `rkdeveloptool` source provenance 的错误 runtime 推导，并新增
-  TASK-RKFUI-001D registry/probe closure。r6 merge 与 001D done 前 E0 preparation/E1
-  均 blocked。
-- r6 不改变 typed operation、target/firmware/transport、discovery binary
+- Proposal revision：r7；r1-r6 已由维护者 merge。r7 只处理 PR #509 暴露的 signed
+  Sandbox selection-time quarantine blocker，并新增 TASK-RKFUI-001E host-only
+  read-only entitlement characterization。r7 不批准真实 external-tool/device rerun或产品
+  broker/helper 架构。
+- r7 不改变 typed operation、target/firmware/transport、discovery binary
   version/hash/upstream、binding、window、maxRuns、rebind 或 Safety 设计；HDC server 仍
   必须是 pre-existing external same-UID pinned executable，Agent server lifecycle mutation
   为 0。pre-existing RockUSB candidate 是独立 physical/identity gate，不因 provenance
@@ -32,7 +32,7 @@
 | REQ-DEV-001/002/003/006/008 | durable HDC original binding + typed mode transition + Core rebind + exclusive mutation lane | contract/fault + E1 characterization |
 | REQ-FLASH-012/013 | semantic marker parser + reconnect postflight + RecoveryGuide | fake success/failure + real hardware |
 | REQ-UX-001、REQ-I18N-001 | Flash page + global Job card + zh-Hans/en strings | XCUITest + localization lint |
-| REQ-UX-007 | DeviceAccessAdvisor presentation; zero elevation/install calls | signed Sandbox E0 spike |
+| REQ-UX-007 | DeviceAccessAdvisor presentation; zero elevation/install calls | signed Sandbox E0 + r7 read-only selection characterization |
 
 ## Architecture and data flow
 
@@ -73,6 +73,9 @@ process executor、storage/power/binding/authorization ports；fixture compositi
    `bbd7bdc0…9923` / upstream `304f0737…`；它必须在 registry、Swift adapter/tests 与
    signed probe 中原子采用。旧 `038a8a0e…3611` 继续属于既有 destructive
    Provider/Profile，r2 不让两个 identity 互相替代。
+   r7 不把 PR #509 的 symlink selection metadata transition 解释为 canonical-path 事实；
+   001E 仅在 disposable wrong-hash fixture 上隔离 `user-selected.read-only` 这一变量，
+   其结果不替代真实 pinned tool 或产品 App evidence。
 2. r6 loader-transition probe 从受保护 `main` 的 registry 读取 typed
    `sourceProvenance`。该对象把 exact `bbd7bdc0…9923`、`304f0737…`、source acceptance
    `PR#445@cbad982…` 和 reviewed evidence path/SHA-256 绑定为一个不可分 tuple。probe
@@ -91,6 +94,35 @@ process executor、storage/power/binding/authorization ports；fixture compositi
    target 均不能 materialize 命令。
 7. execute 前重新运行 `ld`/HDC observation 并核对 selected observation、durable binding
    revision 和物理确认；LocationID 只能寻址，不能替代设备 identity。
+
+## r7 signed Sandbox selection characterization
+
+001E 使用现有 Probe 的 preflight ordering，但 selected fixture 永远不能进入 child
+execution。实验保持 App source、Hardened Runtime、bundle ID 与其余五项 entitlement 不变，
+只替换 user-selected file entitlement：
+
+```text
+control (#509): user-selected.read-write
+r7 candidate:  user-selected.read-only
+forbidden:     user-selected.executable
+```
+
+fixture 在 private temp 从可审查 inert source 构建，basename 为 `rkdeveloptool`，ad-hoc
+签名且无 quarantine；其 byte hash 必须与 registry pin 不同。host 在 App launch 前记录
+target hash/signature/quarantine boolean；App 只执行 `NSOpenPanel`、security-scoped bookmark
+round-trip 和现有 hash/signature/quarantine preflight。hash mismatch 必须终止流程，固定
+`["ld"]` adapter 不得到达 Process。
+
+两个 fresh App run 不共享 bookmark/container-derived selection state：
+
+1. 直接选择 fixture canonical URL；
+2. 选择 private-temp 单层 symlink，且 resolving-symlinks 后精确指向同一 fixture。
+
+host 在每次退出后重新核验 target bytes/signature/quarantine；symlink 自身另记 semantic
+boolean。receipt 不保存 locator 或 raw xattr。只有两个 run 都满足 bookmark/scope 成功、
+target quarantine 前后 absent、`executableHashMismatch`、child/USB/device/network 0，
+characterization 才 PASS。该 PASS 只为后续 D1 提供输入，不能证明真实 external executable
+执行、PowerBox extension 跨进程转移、ArkDeckApp read-write shape 或产品 broker/helper。
 
 ## Enter Loader routes and rebinding
 
@@ -192,6 +224,12 @@ candidate 均不开始 destructive step。
   LF/CRLF、missing-final-terminator、empty record 与其他额外字节继续 blocked。该
   normalization 不改变 VID/PID/mode 或 candidate 数量，Maskrom 仍是明确的 wrong-mode
   observation。
+- r7 不修改 registry、Swift discovery adapter、locked schema 或 executable identity。它只
+  允许 signed E0 Probe 的 entitlement expectation 做一项替换：
+  `user-selected.read-write` → `user-selected.read-only`，并以 host-only wrong-hash
+  fixture 验证 PowerBox/bookmark/quarantine metadata。fixture hash mismatch 必须先于任何
+  child/USB/device access 生效；characterization receipt 是 platform evidence，不是
+  realHardware 或 product-delivery evidence。
 - r2 discovery identity revision 只修改 read-only `ld` registry family，不修改
   `RockchipFlashProfile.pinnedToolchainFingerprint`、destructive authorization 或既有硬件
   support matrix。后续 execute 若要采用新 build，必须另行 readiness/change 并重新验证
@@ -203,6 +241,10 @@ candidate 均不开始 destructive step。
 
 - tool missing/untrusted/quarantined/permission denied：零 probe 或零 mutation（取决于失败
   阶段），显示 typed remediation owner；不自动修复系统。
+- 001E read-only direct/symlink selection 任一 bookmark/scope 失败、选择前后 quarantine
+  metadata 改变、fixture 意外命中 pinned hash、child launch 非零或 receipt 泄漏 locator：
+  characterization blocked；不提交 entitlement substitution，不升级到
+  `user-selected.executable`，不接触真实 tool/device。
 - loader-transition source provenance missing/unknown kind、tuple/evidence drift：在
   `ld`/USB/binding/intent 前 fail closed；不回退到 executable parent HEAD，不通过相同
   version/hash 之外的第二 pin，也不在线获取或构建 replacement。
@@ -223,6 +265,11 @@ candidate 均不开始 destructive step。
 
 - 禁止 `sudo`、shell、AppleScript、Authorization Services、helper/driver 自动安装、ACL/group/
   rule 修改、quarantine 清除和 tool 自动下载。
+- r7 还禁止 `LSFileQuarantineEnabled`/excluded-path 配置、
+  `com.apple.security.files.user-selected.executable`、fixture/pinned-tool xattr 写入、
+  复制/重建 pinned artifact 规避 assessment，以及修改
+  `ArkDeckApp/ArkDeckApp.entitlements`。001E 的 disposable fixture 可在 private temp
+  目录确定性构建并 ad-hoc sign，但永不执行、永不冒充 registry tool。
 - probe runtime 禁止对 executable parent/ancestor 执行 Git source discovery。source
   attribution 只来自 reviewed registry + exact evidence digest；actual executable bytes 和
   platform trust 仍在本地独立重核。
@@ -248,10 +295,23 @@ candidate 均不开始 destructive step。
 - **要求 executable 紧邻 exact upstream checkout**：本窗口不采用。它会改变用户选择的
   artifact path/packaging 前提；若未来选择该方案，须另起 readiness 并精确 pin checkout
   root、commit 与 build/output relation。
+- **直接清除 quarantine、设置 exclusion 或复制/重建 pinned tool**：拒绝。它会把
+  assessment blocker 变成 host metadata 绕过，且无法回答用户选择边界是否安全。
+- **给现有 Probe 增加 `user-selected.executable`**：拒绝。Apple 将该 entitlement 定位为
+  sandboxed App 写入非 quarantined executable 的能力；001E 不写 selected executable，
+  无需也不得扩大此权限。
+- **立即修改 ArkDeckApp 的 read-write entitlement**：拒绝。macOS platform profile 仍要求
+  output directory read-write；#509 也没有 canonical direct-selection 对照。全局修改会把
+  characterization 扩成产品文件/输出回归决策。
+- **先做 read-only 单变量 host characterization**：采用。保留其余五项 entitlement，
+  用 wrong-hash inert fixture 让 child launch 结构性为 0，分别观察 canonical/symlink
+  selection 的 bookmark 与 quarantine metadata。PASS 仍不自动选择 product
+  broker/helper；该架构须后续 D1 ADR/readiness。
 - **只保留物理按键**：作为可靠 fallback 保留，不作为唯一产品路径；已验证软件进态组合
   默认可从同一 Start Job 流程进入 Loader。
 - **先交付 plan-only UI**：接受为分阶段交付；execute 仍以 E0 non-elevated USB access 和
   `REQ-FLASH-015` 审查为硬前置，不把 plan-only 宣称为一键真机刷机完成。
 
 若 signed Sandbox 内直接运行外部 `rkdeveloptool` 需要新的 helper/entitlement/分发决策，
-必须新增 ADR/change；本 design 不隐含授权。
+必须新增 ADR/change。r7 只批准 read-only host characterization，不隐含产品架构或真实
+external-tool 执行授权。
