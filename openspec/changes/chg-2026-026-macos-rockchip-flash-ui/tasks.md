@@ -645,10 +645,17 @@
 
 ## TASK-RKFUI-001F — signed Sandbox read-only bookmark option remediation
 
-- Status:ready（仅在维护者 review/merge proposal r8 后生效；只允许 disposable
-  wrong-hash fixture 的 host-only canonical/symlink bookmark characterization；
-  selected process、真实 `rkdeveloptool`、network、USB/HDC/device、E1/E2、mutation/
-  destructive dispatch 全为 0）
+- Status:done（implementation/evidence PR #516 exact reviewed head
+  `3b713eeab536c504e9bd04ca98bd5ade7bcec5aa` 已由 `lvye` APPROVED，并以
+  `8e10af395882f28517e2e133359712261b5e28c7` 合入 protected `main`。canonical
+  direct/single-layer symlink 两次 signed App run 均 PASS，sanitized receipt
+  SHA-256 分别为 `6c1ceecec431468bdee7f097f4516659baa62289fdf84d48ee2e2e5ce0641a98` /
+  `6bbd415b649a17e9a5b549bec4cd1880f094818abe2abe218efd2fb33975267d`；
+  bookmark creation/resolution/security scope 成功，并在 wrong-hash preflight
+  fail closed，selected child 与全部 external/device/mutation dispatch 为 0。
+  scoped PASS evidence 见 `evidence/runs/TASK-RKFUI-001F/run.md`。本独立 D0 状态
+  PR 只记录确定性结果，不恢复 TASK-RKFUI-001，不构成 change `verified`、产品边界
+  决策或真实 E0 授权；后续仍须独立 D1）
 - Readiness review r8（2026-07-25；host-only D1 governance audit）：
   - Approval/scope gate:on merge。PR #512 已把 001E fail-closed receipts 合入 `main`；
     r8 只批准一个 Apple-documented bookmark creation option remediation，不批准产品
