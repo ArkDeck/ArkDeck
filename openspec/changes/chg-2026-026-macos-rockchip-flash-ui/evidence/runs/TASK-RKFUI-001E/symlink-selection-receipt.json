@@ -1,0 +1,139 @@
+{
+  "app": {
+    "buildReceiptExecutableSHA256": "76954b9d6c383568226c681a7d4aca95fd82246b2e7d5eea130200f8a260437c",
+    "bundleIdentifier": "dev.arkdeck.rockchip-e0-probe",
+    "codesignVerified": true,
+    "entitlements": {
+      "com.apple.security.app-sandbox": true,
+      "com.apple.security.device.serial": true,
+      "com.apple.security.device.usb": true,
+      "com.apple.security.files.bookmarks.app-scope": true,
+      "com.apple.security.files.user-selected.read-only": true,
+      "com.apple.security.network.client": true
+    },
+    "executableSHA256": "76954b9d6c383568226c681a7d4aca95fd82246b2e7d5eea130200f8a260437c",
+    "hardenedRuntime": true,
+    "infoPlistQuarantineOverridePresent": false,
+    "signatureClass": "adHoc"
+  },
+  "capturedAt": "2026-07-25T01:59:23Z",
+  "dispatchCounters": {
+    "aclMutation": 0,
+    "destructive": 0,
+    "device": 0,
+    "deviceMutation": 0,
+    "driverInstall": 0,
+    "groupMutation": 0,
+    "hdc": 0,
+    "helper": 0,
+    "ldReadOnly": 0,
+    "network": 0,
+    "selectedProcess": 0,
+    "sudoOrPrivilegeElevation": 0,
+    "systemRuleMutation": 0,
+    "usb": 0,
+    "xattrWrite": 0
+  },
+  "evidenceClass": "signedSandboxHostOnlySelectionCharacterization",
+  "executor": "agent",
+  "fixture": {
+    "basename": "rkdeveloptool",
+    "byteHashUnchanged": true,
+    "codeDirectoryHash": "5646303119253586ce9c21f8440def813a259801",
+    "codeTrust": "adHoc",
+    "executable": true,
+    "executed": false,
+    "pinnedRegistryHashMatched": false,
+    "quarantinePresentAfter": false,
+    "quarantinePresentBefore": false,
+    "regularFile": true,
+    "sha256": "ac16dc31b98440622c19af303c4c5082a872669dffe88fab36a9b0b3bbec257b",
+    "signatureIntegrityValidAfter": true,
+    "signatureIntegrityValidBefore": true,
+    "signatureUnchanged": true,
+    "sourceSHA256": "2942324860125ecdc95a45651a8f8acb0632b29b06bdc562ce316dad304bcb6d"
+  },
+  "gateChecks": {
+    "appCodesignVerified": true,
+    "appExactEntitlements": true,
+    "appForbiddenEntitlementsAbsent": true,
+    "appHardenedRuntime": true,
+    "appObservedFixtureHash": false,
+    "appObservedQuarantineAbsent": false,
+    "appObservedSignatureValid": false,
+    "bookmarkCreated": false,
+    "fixtureAdHocSigned": true,
+    "fixtureBasename": true,
+    "fixtureBuildHashMatches": true,
+    "fixtureBuildReceiptPassed": true,
+    "fixtureBytesUnchanged": true,
+    "fixtureCodeDirectoryHashPresent": true,
+    "fixtureQuarantineAbsentAfter": true,
+    "fixtureQuarantineAbsentBefore": true,
+    "fixtureRegularExecutable": true,
+    "fixtureSignatureUnchanged": true,
+    "fixtureSignatureValidAfter": true,
+    "fixtureSignatureValidBefore": true,
+    "fixtureSizeUnchanged": true,
+    "fixtureWrongHash": true,
+    "probeDispatchZero": true,
+    "rawOutputEmpty": true,
+    "securityScopeStarted": true,
+    "selectedChildNotLaunched": true,
+    "selectedExpectedEntry": false,
+    "selectedResolvedTarget": true,
+    "selectionCompleted": true,
+    "selectorKindMatched": true,
+    "selectorResolvedBefore": true,
+    "selectorUnchanged": true,
+    "wrongHashPreflight": false
+  },
+  "gateFailures": [
+    "appObservedFixtureHash",
+    "appObservedQuarantineAbsent",
+    "appObservedSignatureValid",
+    "bookmarkCreated",
+    "selectedExpectedEntry",
+    "wrongHashPreflight"
+  ],
+  "preflight": {
+    "childLaunchAttempted": false,
+    "exactArgumentsThatWereNotDispatched": [
+      "ld"
+    ],
+    "failure": "bookmarkCreationOrResolutionFailed"
+  },
+  "privacy": {
+    "deviceSerialRecorded": false,
+    "fullPathRecorded": false,
+    "locationIDRecorded": false,
+    "rawXattrPayloadRecorded": false
+  },
+  "schemaVersion": "1.0.0",
+  "scope": {
+    "productDeliveryEvidence": false,
+    "realHardwareEvidence": false,
+    "realToolUsed": false,
+    "usbOrDeviceAccessed": false
+  },
+  "selection": {
+    "appObservedQuarantinePresent": null,
+    "appObservedSHA256": null,
+    "appObservedSignatureIntegrityValid": null,
+    "bookmarkCreated": false,
+    "completed": true,
+    "securityScopeStarted": true
+  },
+  "selector": {
+    "basename": "rkdeveloptool",
+    "isSymlink": true,
+    "kind": "singleLayerSymlink",
+    "resolvedTargetMatchesFixtureAfter": true,
+    "resolvedTargetMatchesFixtureBefore": true,
+    "selectedExpectedEntry": false,
+    "selectedResolvedTarget": true,
+    "symlinkDepth": 1
+  },
+  "task": "TASK-RKFUI-001E",
+  "verdict": "blocked"
+}

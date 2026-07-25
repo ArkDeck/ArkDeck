@@ -1,0 +1,36 @@
+{
+  "compilerInvocation": {
+    "linkerUUID": false,
+    "optimization": "size",
+    "shellUsed": false,
+    "targetArchitecture": "arm64"
+  },
+  "fixtureExecuted": false,
+  "fixtureSourceSHA256": "2942324860125ecdc95a45651a8f8acb0632b29b06bdc562ce316dad304bcb6d",
+  "pinnedRegistryHashMatched": false,
+  "privacy": {
+    "fullPathRecorded": false,
+    "rawXattrPayloadRecorded": false
+  },
+  "schemaVersion": "1.0.0",
+  "selector": {
+    "basename": "rkdeveloptool",
+    "isSymlink": true,
+    "resolvedTargetMatchesFixture": true,
+    "symlinkDepth": 1
+  },
+  "target": {
+    "basename": "rkdeveloptool",
+    "codeDirectoryHash": "5646303119253586ce9c21f8440def813a259801",
+    "codeTrust": "adHoc",
+    "executable": true,
+    "quarantinePresent": false,
+    "regularFile": true,
+    "sha256": "ac16dc31b98440622c19af303c4c5082a872669dffe88fab36a9b0b3bbec257b",
+    "signatureIntegrityValid": true,
+    "sizeBytes": 34896
+  },
+  "task": "TASK-RKFUI-001E",
+  "verdict": "passed",
+  "xattrWriteCount": 0
+}
