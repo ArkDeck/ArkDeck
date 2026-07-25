@@ -1,0 +1,288 @@
+{
+  "checks": [
+    {
+      "facts": {
+        "id": 4340161,
+        "login": "lvye"
+      },
+      "id": "C0",
+      "name": "operator identity is exact lvye/4340161",
+      "status": "PASS"
+    },
+    {
+      "facts": {
+        "note": "readiness requires zero sensitive env token names in the D2 write session",
+        "sensitive_env_names_present": []
+      },
+      "id": "C0b",
+      "name": "environment free of sensitive token names",
+      "status": "PASS"
+    },
+    {
+      "facts": {
+        "authoritative_merge_oid_from_git": "c7badb73fa3cf12109344731937b88e8bb3611c5",
+        "auto_merge": null,
+        "carrier_changed_files": [
+          "openspec/changes/chg-2026-030-host-loop-runtime/tasks.md"
+        ],
+        "carrier_subject": "governance(TASK-HLR-002): authorize D2 identity staging (#508)",
+        "current_main_oid": "56af827a26470f5a9273ca684c9a32b9d39afc4c",
+        "exact_head_approvals_by_operator": 1,
+        "exact_reviewed_head": "f744a11a72dd405df0797a55445dc3bc2615a563",
+        "main_advanced_since_carrier": true,
+        "merge_commit_sha_nullable_observed": false,
+        "merge_commit_sha_reported": "c7badb73fa3cf12109344731937b88e8bb3611c5",
+        "merged_at_utc": "2026-07-25T00:59:47Z",
+        "merged_by": "lvye",
+        "pinned_blob_drift_after_carrier": {},
+        "post_carrier_commits": [
+          "56af827 evidence(TASK-RKFUI-001E): record read-only bookmark block (#512)",
+          "c2c6abe proposal(CHG-2026-031): remediate App storage composition (#511)",
+          "cc5e6f3 status(TASK-SSET-001): record production reachability blocker (#503)",
+          "c8a7db7 proposal(CHG-2026-026): define read-only Sandbox characterization (#510)",
+          "ba8ca9c evidence(TASK-RKFUI-001): record Sandbox quarantine block (#509)"
+        ],
+        "readiness_pr": 508
+      },
+      "id": "C1",
+      "name": "readiness authority (joint PR + Git determination)",
+      "status": "PASS"
+    },
+    {
+      "facts": {
+        "check_runs": {
+          "allowed-paths": "skipped",
+          "guard": "success",
+          "open-pr": "success",
+          "swift": "success"
+        },
+        "combined_state": "pending",
+        "failed": [],
+        "nonterminal": []
+      },
+      "id": "C1b",
+      "name": "required checks terminal success on reviewed head",
+      "status": "PASS"
+    },
+    {
+      "facts": {
+        "merged_at": "2026-07-25T00:59:47Z",
+        "remaining_seconds": 16878,
+        "trusted_now": "2026-07-25T02:18:29+00:00",
+        "window_closes": "2026-07-25T06:59:47+00:00",
+        "window_opens": "2026-07-25T01:04:47+00:00"
+      },
+      "id": "C2",
+      "name": "D2 window is open",
+      "status": "PASS"
+    },
+    {
+      "facts": {
+        "drift": {},
+        "pins_checked": 19
+      },
+      "id": "C3",
+      "name": "Git input pins (14 blobs + base identity + file SHA-256)",
+      "status": "PASS"
+    },
+    {
+      "facts": {
+        "conflicting_open_prs": [],
+        "forbidden_reuse_branch_note": "historical branch must NEVER be reused",
+        "forbidden_reuse_branch_present": true,
+        "open_pr_pages": 1,
+        "open_prs": [],
+        "remote_head_refs": [
+          "refs/heads/agent/rkfui-001-identity-separation-readiness",
+          "refs/heads/agent/task-hlr-002-readiness",
+          "refs/heads/agent/task-hlr-002a-bootstrap-partition",
+          "refs/heads/main"
+        ],
+        "target_refs_expected_absent": [
+          "refs/heads/agent/task-hlr-002-d2-readiness-r1",
+          "refs/heads/agent/task-hlr-002-d2-evidence-r1",
+          "refs/heads/agent/host-loop/probes/4020f4b8-19dd-43a7-b8ca-5bc044965b79",
+          "refs/heads/agent/host-loop/leases/899eb606-e25f-4302-b84c-27a589b41cc2"
+        ],
+        "target_refs_unexpectedly_present": []
+      },
+      "id": "C4",
+      "name": "concurrency / target-ref absence",
+      "status": "PASS"
+    },
+    {
+      "facts": {
+        "candidate_in_installation_inventory": false,
+        "candidate_name": "ArkDeck Host Loop Runtime 901708a7",
+        "candidate_slug": "arkdeck-host-loop-runtime-901708a7",
+        "coverage_limit": "REST exposes no endpoint listing App registrations owned by ArkDeck; the operator MUST visually confirm absence in the owner Settings > Developer settings > GitHub Apps list before creation.",
+        "installation_count": 0,
+        "installation_inventory_source": "/orgs/ArkDeck/installations",
+        "installation_pages": 1,
+        "installed_app_slugs": [],
+        "owner_type": "Organization",
+        "public_app_lookup_404": true
+      },
+      "id": "C5",
+      "name": "candidate App slug absent (API surface)",
+      "status": "PASS"
+    },
+    {
+      "facts": {
+        "candidate_in_installation_inventory": false,
+        "candidate_name": "ArkDeck Host Loop Runtime 901708a7",
+        "candidate_slug": "arkdeck-host-loop-runtime-901708a7",
+        "coverage_limit": "REST exposes no endpoint listing App registrations owned by ArkDeck; the operator MUST visually confirm absence in the owner Settings > Developer settings > GitHub Apps list before creation.",
+        "installation_count": 0,
+        "installation_inventory_source": "/orgs/ArkDeck/installations",
+        "installation_pages": 1,
+        "installed_app_slugs": [],
+        "owner_type": "Organization",
+        "public_app_lookup_404": true
+      },
+      "id": "C5b",
+      "name": "owner App-registration list visually confirmed absent",
+      "status": "MANUAL"
+    },
+    {
+      "facts": {
+        "candidate_app_is_codeowner_or_bypass": false,
+        "codeowners_lines": [
+          "* @lvye"
+        ],
+        "main_push_apps": [],
+        "main_push_teams": [],
+        "main_push_users": [
+          "lvye"
+        ],
+        "ruleset_bypass_actors": [
+          {
+            "actor_id": 4340161,
+            "actor_type": "User",
+            "bypass_mode": "always",
+            "ruleset": "agent-ref-boundary"
+          }
+        ]
+      },
+      "id": "C6",
+      "name": "actor topology: sole CODEOWNER, no App bypass/push",
+      "status": "PASS"
+    },
+    {
+      "facts": {
+        "canonicalization": "json.dumps(obj, sort_keys=True, separators=(',',':'))",
+        "computed": {
+          "branch_protection_full": {
+            "bytes": 2942,
+            "sha256": "04f09f273fce806afaa44679c9e8257c74cce3e480fe60da27c7dcca06e85f04"
+          },
+          "branch_protection_projection": {
+            "bytes": 674,
+            "sha256": "f423ce0ca2eb3f667a34dbb7f9bcfa923266928d073ee0e50763b2f69ee2663a"
+          },
+          "ruleset_full": {
+            "bytes": 744,
+            "sha256": "b172750c1c0764956725393823fa72014146d9e2ec0f1b19c48cf670964d54b5"
+          },
+          "ruleset_projection": {
+            "bytes": 343,
+            "sha256": "9bb7ef3d62246733ca1dcaac074a3b07f5b4aead6985d645cd58fbf82db62163"
+          }
+        },
+        "mismatches": [],
+        "pins": {
+          "branch_protection_full": "04f09f273fce806afaa44679c9e8257c74cce3e480fe60da27c7dcca06e85f04",
+          "branch_protection_projection": "f423ce0ca2eb3f667a34dbb7f9bcfa923266928d073ee0e50763b2f69ee2663a",
+          "ruleset_full": "b172750c1c0764956725393823fa72014146d9e2ec0f1b19c48cf670964d54b5",
+          "ruleset_projection": "9bb7ef3d62246733ca1dcaac074a3b07f5b4aead6985d645cd58fbf82db62163"
+        },
+        "projection_note": "full-GET hashes are sensitive to any GitHub response-shape change; a full-hash-only mismatch with a matching projection is a platform representation drift, not a topology change, and still requires human adjudication before any write"
+      },
+      "id": "C7",
+      "name": "authenticated protection/ruleset hashes equal topology pins",
+      "status": "PASS"
+    },
+    {
+      "facts": {
+        "bap003_expected": {
+          "fingerprint_sha256": "SHA256:HUhfMAcNoDNfZgYKmXjgqpkkjzSs9mWYI+LtyAUuDOI",
+          "id": 158088026,
+          "read_only": false,
+          "title": "arkdeck-agent-writer"
+        },
+        "fingerprint_note": "REST does not return the key fingerprint; the operator must confirm SHA256:HUhf... in the repository Deploy keys UI",
+        "inventory": [
+          {
+            "id": 158088026,
+            "read_only": false,
+            "title": "arkdeck-agent-writer"
+          }
+        ],
+        "problems": []
+      },
+      "id": "C8",
+      "name": "Deploy Key inventory compatible with BAP-003",
+      "status": "PASS"
+    },
+    {
+      "facts": {
+        "bap003_expected": {
+          "fingerprint_sha256": "SHA256:HUhfMAcNoDNfZgYKmXjgqpkkjzSs9mWYI+LtyAUuDOI",
+          "id": 158088026,
+          "read_only": false,
+          "title": "arkdeck-agent-writer"
+        },
+        "fingerprint_note": "REST does not return the key fingerprint; the operator must confirm SHA256:HUhf... in the repository Deploy keys UI",
+        "inventory": [
+          {
+            "id": 158088026,
+            "read_only": false,
+            "title": "arkdeck-agent-writer"
+          }
+        ],
+        "problems": []
+      },
+      "id": "C8b",
+      "name": "Deploy Key fingerprint visually confirmed",
+      "status": "MANUAL"
+    },
+    {
+      "facts": {
+        "launchd_label_unloaded": true,
+        "problems": [],
+        "root_readback_note": "non-root stat cannot see a root-only 0700 directory's contents; re-run the staging check under sudo before staging the PEM",
+        "scheduler_account_absent": true,
+        "staging_path_absent": true,
+        "staging_path_sha256": "21b74bafff8d1e14b874f465b7edba718fd648afb646256f5a16982985c882be",
+        "worker_disabled": true
+      },
+      "id": "C9",
+      "name": "host staging/account/label absent, worker disabled",
+      "status": "PASS"
+    }
+  ],
+  "classification": "zero-write authenticated preflight",
+  "http_methods_used": [
+    "GET"
+  ],
+  "manual_confirmations_required": [
+    "C5b",
+    "C8b"
+  ],
+  "mutations": {
+    "credentials": 0,
+    "github_non_get": 0,
+    "host_writes": 0,
+    "issues": 0,
+    "prs": 0,
+    "refs": 0
+  },
+  "operator": "lvye",
+  "readiness_pr": 508,
+  "request_count": 17,
+  "schema": "arkdeck-hlr002-d2-preflight/v1",
+  "started_at_utc": "2026-07-25T02:18:25+00:00",
+  "status": "pass",
+  "stop_reason": null,
+  "task": "TASK-HLR-002"
+}
