@@ -20,12 +20,24 @@
 > `3.2.0d` / `48395ba8…d260` 精确替换为 `3.2.0f` / `05b2bf7a…f83`，新增
 > TASK-RKFUI-001C registry/probe closure，并归档 HDC drift + persistent Maskrom blocked
 > E0 receipt。r5/001C 不接受 capability evidence、不授权 E1。
+>
+> proposal r6（2026-07-24，on merge）只新增 TASK-RKFUI-001D immutable
+> source-provenance closure；不改变 binary/HDC/device/window pins，也不授权 E1。
+>
+> proposal r7（2026-07-25，on merge）接受 PR #509 的 signed Sandbox fail-closed
+> evidence，把 TASK-RKFUI-001 `ready→blocked`，并新增 TASK-RKFUI-001E host-only
+> read-only selection characterization `blocked→ready`。r7 不携带 Probe implementation、
+> 不运行 selected executable/USB/device command，也不批准 product helper/broker。
 
 ## TASK-RKFUI-001 — RockUSB discovery contract 与 signed Sandbox E0 access spike
 
-- Status:ready（仅在维护者 review/merge 本独立 governance/readiness PR 后生效；只允许
-  contract/fake 与具名窗口内 E0/read-only access spike，零 mode switch、零
-  mutation/destructive）
+- Status:blocked（PR #509 已由维护者 review/merge 至 `main`，merge OID
+  `ba8ca9c3ef68b097125154d6e1df20f905d12774`。现行六 entitlement signed Sandbox
+  Probe 经 symlink 选择 exact tool 后在 child launch 前观察到新 quarantine 并
+  fail closed；`ld`/USB/device/mutation/destructive 全为 0，且该 host exact artifact
+  现已不再满足 quarantine-absent gate。等待 TASK-RKFUI-001E 完成 host-only read-only
+  characterization，以及后续独立 D1 对 product/真实 E0 边界作出决定；不得清除
+  quarantine、复制/重建工具规避或直接重试）
 - Readiness review（2026-07-22；host-only 审计，真实 `rkdeveloptool ld`/HDC/device
   dispatch 0）：
   - Approval gate:on merge。PR #297 仅登记 `status: proposed` proposal；本 PR 明确承载
@@ -104,10 +116,22 @@
     `1f7cacda22ed6cef97d4a25ed63c3e4aa890cbb6`、
     `92eb2876bfe9dcd0ffadf1d0318b9b7b05c93857`、
     `f7fa0945f70730bca601f81955a3faea411a19f3`；任一漂移即停止并重做 readiness。
+- Sandbox selection characterization r7（2026-07-25；仅在维护者 review/merge proposal
+  r7 后生效）：
+  - #509 receipt 证明 exact tool identity/bookmark/security scope 命中，但 symlink selection
+    后 quarantine present、Gatekeeper rejected、child launch 0。由于缺 canonical direct
+    control，不能自行判定是 read-write entitlement、symlink resolution 或其他平台行为。
+  - r7 只允许独立 TASK-RKFUI-001E 以 disposable wrong-hash fixture 做 host-only
+    characterization，并只把 Probe 的 `user-selected.read-write` 替换为
+    `user-selected.read-only`。TASK-RKFUI-001 自身保持 blocked；001E PASS 不自动恢复它。
+  - 真实 exact tool 当前已 quarantined，Agent 不清除/改写 xattr、不复制/重建/下载替代；
+    `user-selected.executable`、Info.plist quarantine exclusion、ArkDeckApp entitlement、
+    helper/broker 与真实 E0 device run 均未获授权。
 - Platform:macos
 - Requirements:`REQ-FLASH-001`、`REQ-UX-007`、`POL-WORKFLOW-001`
 - Acceptance:`AC-FLASH-001-01`、`AC-UX-007-01`
-- Depends on:CHG-2026-026 approved（本 PR merge 后满足）；无前序任务
+- Depends on:CHG-2026-026 approved；TASK-RKFUI-001E done；001E 后独立 D1
+  product/真实 E0 readiness merged，并由维护者提供 fresh exact non-quarantined artifact
 - Allowed paths:
   - `openspec/integrations/rockchip/**`
   - `Packages/ArkDeckKit/Package.swift`
@@ -514,10 +538,99 @@
   不修改 discovery product adapter 或 destructive tool identity。合入后另起 D0 状态 PR；
   fresh E0 必须重新采集，PR #487 的 candidate count `null` 不得重分类为 0。
 
+## TASK-RKFUI-001E — signed Sandbox read-only selection characterization
+
+- Status:ready（仅在维护者 review/merge proposal r7 后生效；只允许 disposable
+  wrong-hash executable 的 host-only direct/symlink selection，selected process、真实
+  `rkdeveloptool`、USB/HDC/device/mutation/destructive dispatch 全为 0）
+- Readiness review r7（2026-07-25；host-only governance audit）：
+  - Approval/scope gate:on merge。PR #509 已把现行 read-write Probe 的 fail-closed
+    receipt 合入 `main`，但 symlink selection 不足以裁决 canonical behavior。r7 选择
+    read-only 单变量 characterization，不批准产品 entitlement/helper/broker 或真实 E0。
+  - Objective gate:satisfied。目标只回答：在其余五项 entitlement 和 Probe source 不变时，
+    `user-selected.read-only` 对 disposable executable 的 canonical direct selection 与
+    symlink selection 是否都能完成 bookmark/security scope 且不新增 quarantine。结果是
+    二值 PASS/BLOCKED，不要求 Agent 做后续产品决策。
+  - Safety gate:satisfied。fixture 必须是 fresh private-temp、inert、ad-hoc signed、
+    quarantine absent、basename=`rkdeveloptool`、SHA-256 明确不等于 registry pin
+    `bbd7bdc0…9923` 的 regular executable。hash mismatch 保证 App 在 selected child launch
+    前停止；两个 run 均不得接入设备、执行 fixture、运行 HDC/`rkdeveloptool` 或访问网络。
+  - Permission gate:satisfied。只允许一项 entitlement substitution：
+    `com.apple.security.files.user-selected.read-write` →
+    `com.apple.security.files.user-selected.read-only`。不得新增
+    `com.apple.security.files.user-selected.executable`，不得设置
+    `LSFileQuarantineEnabled`/excluded paths，不得写/清 xattr 或修改主 App entitlement。
+  - Evidence gate:satisfied。每个 run 记录 App executable hash、完整 entitlement map、
+    fixture byte hash/signature、canonical-vs-symlink selector、bookmark/scope、pre/post
+    quarantine boolean、typed preflight failure 与全部 dispatch counters；不记录 full path
+    或 raw xattr payload。
+  - Concurrency gate:satisfied for drafting。唯一 open PR #503 只修改 CHG-2026-031
+    `tasks.md`，与 r7/001E paths 无重叠。
+  - Sequencing gate:on merge。r7 merge 前零 Probe change/characterization PR；001E
+    implementation+evidence 使用一个独立 PR。两个 run 全 PASS 才可保留 entitlement
+    substitution；任一失败时不得合入该 implementation，只提交 fail-closed evidence。
+- Platform:macos
+- Requirements:`REQ-FLASH-001`、`REQ-UX-007`、`POL-WORKFLOW-001`
+- Acceptance:`AC-FLASH-001-01`、`AC-UX-007-01`
+- Depends on:CHG-2026-026 proposal r7 merged；PR #509 evidence merged
+- Allowed paths:
+  - `scripts/rockchip_e0_probe/**`
+  - `openspec/changes/chg-2026-026-macos-rockchip-flash-ui/evidence/**`
+- Forbidden paths:
+  - `openspec/constitution.md`
+  - `openspec/specs/**`
+  - `openspec/contracts/**`
+  - `openspec/integrations/rockchip/**`
+  - `Packages/**`
+  - `ArkDeckApp/**`
+  - `ArkDeck.xcodeproj/**`
+- Risk:low（signed Sandbox host-only metadata characterization；selected child、network、
+  USB/HDC/device、E1/E2、mutation/destructive dispatch 0）
+- Hardware required:no
+
+### Deliverables
+
+- `Probe.entitlements` 与 `probe.py` expected entitlement map 只做 read-write→read-only
+  一项替换，其他五项及 Hardened Runtime/codesign equality 不变；tests 显式拒绝
+  read-write、`user-selected.executable` 与 Info.plist quarantine exclusion。
+- 在 private temp 确定性构建一个 inert wrong-hash `rkdeveloptool` fixture，ad-hoc sign，
+  证明 regular/executable、quarantine absent、hash 与 registry pin 不同。fixture source
+  可审查，binary/path/raw xattr 不入库且永不执行。
+- 运行两个 fresh signed App：
+  1. `NSOpenPanel` 直接选择 fixture canonical URL；
+  2. 选择单层 symlink，且 resolved canonical URL 精确等于同一 fixture。
+- 两个 receipt 都必须显示 bookmark/security scope 成功、
+  `preflightFailure=executableHashMismatch`、`childLaunchAttempted=false`，且 host 独立
+  pre/post 检查 target quarantine 均 absent。symlink 自身与 target 语义分别记录，但不提交
+  raw xattr。
+- 在 `evidence/runs/TASK-RKFUI-001E/` 记录 input closure、build/codesign、两个 sanitized
+  receipt、测试、allowed-path 与所有零 dispatch counters；不修改 TASK status。
+
+### Verification
+
+- Probe Python tests 验证 exact six-key set = 原五项 +
+  `user-selected.read-only`，read-write/executable-writing entitlement 均 absent；#509
+  read-write receipt 保持 immutable historical evidence，不覆盖、不重分类。
+- direct/symlink 两个 App bundle 都通过 `codesign --verify --deep --strict`、Hardened
+  Runtime 与 exact entitlement equality；fixture 选择前后 byte hash/signature 不变，
+  quarantine absent。
+- 两个 run 的 selected process/`ld`/USB/network/HDC/device/mutation/destructive、
+  sudo/helper/install/system-rule/group/ACL/xattr-write counters 全为 0。
+- `python3 -m unittest scripts/rockchip_e0_probe/test_probe.py -v`、SDD checker、
+  `git diff --check`、allowed-path 与 secret/path/raw-xattr scan 通过。
+
+### Notes / handoff
+
+- 001E PASS 只证明 read-only PowerBox selection metadata 行为，不证明 external executable
+  可在 Sandbox 中启动、RockUSB USB access、Loader observation 或产品 App 分发形态。
+- 001E merge 后独立 D0 PR 只能标记 001E done；TASK-RKFUI-001 继续 blocked。后续须由新
+  D1 ADR/readiness 决定 product boundary，并由维护者提供 fresh exact
+  non-quarantined artifact 后，才能批准另一个真实 E0 窗口。
+
 ## TASK-RKFUI-002 — Flash application facade、plan-only UI 与全局 Job presentation
 
 - Status:blocked（等待 CHG-2026-026 approval +
-  TASK-RKFUI-001/001A/001B/001C/001D done）
+  TASK-RKFUI-001/001A/001B/001C/001D/001E done）
 - Platform:macos
 - Requirements:`REQ-FLASH-003`、`REQ-FLASH-004`、`REQ-FLASH-005`、
   `REQ-FLASH-011`、`REQ-UX-001`、`REQ-UX-005`、`REQ-UX-006`、`REQ-I18N-001`
@@ -525,7 +638,7 @@
   `AC-FLASH-005-02`、`AC-FLASH-011-01`、`AC-UX-001-01`、`AC-UX-005-01`、
   `AC-UX-006-01`、`AC-I18N-001-01`
 - Depends on:TASK-RKFUI-001、TASK-RKFUI-001A、TASK-RKFUI-001B、TASK-RKFUI-001C、
-  TASK-RKFUI-001D
+  TASK-RKFUI-001D、TASK-RKFUI-001E
 - Allowed paths:
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipFlashApplicationFacade.swift`
   - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/RockchipFlashApplicationFacadeContractTests.swift`
@@ -569,7 +682,7 @@
 ## TASK-RKFUI-003 — Typed rkdeveloptool execute orchestration 与交互式确认接线
 
 - Status:blocked（等待 CHG-2026-026 approval、
-  TASK-RKFUI-001/001A/001B/001C/001D/002 done、non-elevated USB access PASS、
+  TASK-RKFUI-001/001A/001B/001C/001D/001E/002 done、non-elevated USB access PASS、
   软件进态 capability verdict，以及维护者确认 `REQ-FLASH-015` 解释）
 - Platform:macos
 - Requirements:`REQ-FLASH-002`、`REQ-FLASH-007`、`REQ-FLASH-008`、
@@ -583,7 +696,7 @@
   `AC-FLASH-015-02`、`AC-DEV-001-01`、`AC-DEV-002-01`、`AC-DEV-002-02`、
   `AC-DEV-003-01`、`AC-DEV-003-02`、`AC-DEV-006-01`、`AC-DEV-008-01`
 - Depends on:TASK-RKFUI-001、TASK-RKFUI-001A、TASK-RKFUI-001B、TASK-RKFUI-001C、
-  TASK-RKFUI-001D、TASK-RKFUI-002
+  TASK-RKFUI-001D、TASK-RKFUI-001E、TASK-RKFUI-002
 - Allowed paths:
   - `Packages/ArkDeckKit/Package.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipFlashApplicationFacade.swift`
