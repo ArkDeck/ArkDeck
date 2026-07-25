@@ -20,6 +20,13 @@ evidence/runs/TASK-RKFUI-001/e0-preflight-2026-07-24.md
 evidence/runs/TASK-RKFUI-001/clean-discovery-repin-2026-07-24.md
 evidence/runs/TASK-RKFUI-001/blocked-sandbox-selection-quarantine-2026-07-25.md
 evidence/runs/TASK-RKFUI-001/blocked-sandbox-selection-quarantine-2026-07-25.json
+evidence/runs/TASK-RKFUI-001E/run.md
+evidence/runs/TASK-RKFUI-001E/candidate-fixture-source.c
+evidence/runs/TASK-RKFUI-001E/fixture-build-receipt.json
+evidence/runs/TASK-RKFUI-001E/direct-app-build-receipt.json
+evidence/runs/TASK-RKFUI-001E/direct-selection-receipt.json
+evidence/runs/TASK-RKFUI-001E/symlink-app-build-receipt.json
+evidence/runs/TASK-RKFUI-001E/symlink-selection-receipt.json
 evidence/runs/TASK-RKFUI-001A/blocked-preflight-firmware-drift-2026-07-24.md
 evidence/runs/TASK-RKFUI-001A/blocked-preflight-firmware-drift-2026-07-24.json
 evidence/runs/TASK-RKFUI-001A/blocked-preflight-server-discovery-2026-07-24.md
@@ -63,6 +70,17 @@ source/signature gates 均命中，但 App 观察到新 quarantine 且 Gatekeepe
 destructive、提权、安装与系统修改计数为 0。由于本次使用临时 symlink，evidence 不把元数据
 变化泛化为 canonical-path 行为；agent 未清除 quarantine、复制/重建工具规避、放宽 entitlement
 或重试。详情见 `TASK-RKFUI-001/blocked-sandbox-selection-quarantine-2026-07-25.*`。
+
+`TASK-RKFUI-001E` 的 read-only host characterization 使用同一 disposable、ad-hoc signed、
+wrong-hash 且 quarantine-absent fixture，分别运行 fresh canonical-direct 与 single-layer
+symlink App。两次选择与 security scope 均成功，但都在 `.withSecurityScope` bookmark
+创建/解析处以 `bookmarkCreationOrResolutionFailed` 阻断，未到 hash/signature/quarantine
+App preflight；symlink receipt 还显示 lexical link entry 未保留、returned URL 解析到
+canonical target（与 `NSOpenPanel` normalization 一致）。fixture 前后
+bytes/signature/quarantine 均不变，selected process、`ld`、USB/device/network、E1/E2、
+mutation/destructive、提权/安装/系统修改与 xattr write 全为 0。按 r7，未通过的
+read-only entitlement/Probe candidate 不保留；本次只归档 fail-closed evidence，不修改
+TASK status，也不构成 real E0 或 product boundary 决策。
 
 `TASK-RKFUI-001A` firmware-drift preflight 只读确认目标 serial、HDC/server 与 clean
 `rkdeveloptool` pins 命中，但当前设备报告 OpenHarmony `7.0.0.33`，不同于 PR #440
