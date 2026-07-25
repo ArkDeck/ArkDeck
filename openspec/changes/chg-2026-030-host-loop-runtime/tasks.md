@@ -2281,10 +2281,166 @@
 
 ## TASK-HLR-003 — Fenced worker loop 与 legacy PR creator 迁移
 
-- Status:blocked（前置：① change revision r3 approval；② TASK-HLR-001 done；
-  ③ TASK-HLR-002A done；④ TASK-HLR-002 done；⑤ 独立 readiness PR 钉定
-  `agent-pr.yml`、MECH-004 parser、identity/staging receipt、scheduler activation
-  plan 与 runtime blobs，并确认 reserved namespace 零 creator conflict。）
+- Status:ready（r1 implementation readiness；仅在维护者对本独立 readiness PR
+  exact head review/merge 后生效。只授权一个 D0 source PR 交付 worker `--once`
+  loop、Issue cursor、fenced lease、typed GitHub adapter、`agent-pr.yml` 的
+  reserved-namespace `pull_request` allowed-paths 覆盖与 expected-author
+  参数化、envelope task-token grammar 统一，以及 unit/contract/fault tests；
+  不授权 scheduler 创建/注册/启用、worker 启动、legacy creator 在 live proof
+  前退出、review/merge/auto-merge/admin route、D2 credential 修改、
+  `sdd-guard.yml` 或任何 governance text 变更。）
+- Readiness（r1；audit base = protected `main`
+  `f0ed7f8e901bc1acf9d740b02c7d9bbb563b39f8`）：
+  - **Approval boundary:pending human merge。**本 carrier 只修改本文件
+    TASK-HLR-003 section。只有 `lvye` 对 exact head APPROVED、required checks
+    terminal success、`mergedBy=lvye`、`auto_merge=null` 且 squash subject 携
+    `(#N)` 的 merge OID 进入 protected main 后，本 readiness 才生效。合入前
+    source/workflow/ref/PR/Issue/scheduler/credential mutation = 0；本 merge 不
+    构成 implementation evidence、task done 或 change `verified`。
+  - **Dependency/authority gate:closed。**① change revision r3 approval；
+    ② TASK-HLR-001 done merge `d09f5021107e4133d2fc41c1ce65d0bd09d6c12b`
+    （`(#402)`）与 TASK-HLR-001A done merge
+    `1815105971b5ec9bee58cb7be04cd759dc01a32b`（`(#495)`）；③ TASK-HLR-002A
+    done merge `901708a7af9893bc91ee654630df6922ea5099f8`（`(#507)`）；
+    ④ TASK-HLR-002 D2 evidence #518 exact reviewed head
+    `111ccae0c42c03a960cc7e47fc790cda39c4d31a` 由 `lvye` 于
+    `2026-07-25T03:09:59Z` APPROVED、`03:10:05Z` 以
+    `8e76ea4b9a832b31588f000c35feffde9f0d1c6d` 合入，done #520 exact reviewed
+    head `f729d7156b11a671c083349860939ef23f4d4142` 由 `lvye` 于
+    `2026-07-25T03:19:51Z` APPROVED、`03:21:26Z` 以
+    `f0ed7f8e901bc1acf9d740b02c7d9bbb563b39f8` 合入；两者 `auto_merge=null`、
+    `mergedBy=lvye`。①–④ 均为 audit-base ancestors。
+  - **Identity/staging receipt pins:closed。**consume TASK-HLR-002 evidence：
+    private App `4388667` / `arkdeck-host-loop-runtime-901708a7[bot]`，单仓
+    installation `148855345`（`repository_selection=selected`，
+    `GET /installation/repositories` 权威确认为 `[ArkDeck/ArkDeck]`），permission
+    恰为 Metadata read / Contents read / Pull requests write / Issues write，
+    `events=[]`；App 非 CODEOWNER、非 ruleset bypass、非 main push actor；PEM 仅
+    root-only staging（`-rw------- root:wheel`）；scheduler owner `arkdeckhlr`
+    与 launchd label `com.arkdeck.host-loop.runtime` 仍仅为 reservation，
+    account/plist absent，**`workerDisabled=true`**。evidence blobs =
+    `43f55a2950e1e77461e3ccde99168fdbd2dc8885` /
+    `505ca0ab97c8ad7e01c5e902deb9ac03739615fe` /
+    `3f4d0e28f36937cca8f7c6bb7be04f33bc1e142f` /
+    `365b6724d5a31258d693e98b1d21fe396a0b1648` /
+    `e39cb93d42321150dd54ba5f8e5fa181676a9e0d` /
+    `4cf01bdcb135b9023e4425fe981eb33448fa4d50` /
+    `a46868f8bbf0829482f866e7de4d01e818af8e0d`。receipt 漂移即零 implementation
+    write。
+  - **Git input pins:closed。**下列 blobs 必须在 implementation base 与本
+    readiness reviewed-head/merge tree 中逐项相等；任一 drift 即停并重新
+    readiness：
+
+    ```yaml
+    agent_pr_workflow:      a514d9e539964f9e1960acbe4ffaa696629571da
+    sdd_guard_workflow:     c64135e1f9dc253a92640a30bbcad42b0afa86fa
+    mech004_parser:         02332a9b572013e99b74acd46db8810ba4f7275a
+    mech004_tests:          feb697f760c8b2ba9e57072ac79f73a96ed7905f
+    workflow_contract_test: 10b32515f9590ba78eb9fa477e8fc7b0b93d15a2
+    host_loop_init:         a0e413fbf6bab34fbfeafc236a09f24c7a6c7f00
+    pr_envelope:            c990fcfb17de52ed1166fec55cb1f9365e0e7736
+    pr_envelope_tests:      35d9a284e8ddde67fd1076bc1c2f0f11f02d26db
+    chg030_design:          9cb3bebd1874e13a2ad580138d4f91eeace2fb6b
+    ```
+
+    `sdd_guard_workflow` 为 forbidden-path witness pin：本 task 禁止修改该文件，
+    它必须在 implementation 前后完全不变。
+  - **Reserved namespace zero-creator gate:closed。**以仓库内
+    `scripts/test_agent_pr_workflow.py` 的 ordered evaluator 对 exact patterns
+    `('agent/**', '!agent/host-loop/**')` 判定：legacy creator 对
+    `agent/host-loop/tasks/**`、`agent/host-loop/leases/**`、
+    `agent/host-loop/probes/**` dispatch 恒为 false，对 ordinary `agent/**` 仍为
+    true；remote `agent/host-loop/*` 分支数 = 0。TASK-HLR-002 D2 实测复证：
+    reserved head 上 `agent-pr.yml` run 数 = 0、全状态 PR 数 = 1。
+  - **Reserved `pull_request` check coverage:binary（F1 决议）。**TASK-HLR-002 D2
+    实测确立：reserved namespace 上 bot `opened` 事件不产生任何 `allowed-paths`
+    job——`agent-pr.yml` 为 push-only 且排除 `agent/host-loop/**`，
+    `sdd-guard.yml` 的该 job 受 `if: github.event_name == 'pull_request'` 限制
+    且 `types` 仅 `[reopened, edited]`（design §1H 故意排除 bot `opened`）。同一
+    实测也确立 `allowed-paths` 逻辑本身对 reserved PR 是**通过**的：probe PR 上
+    `guard` = success/success、`allowed-paths` = skipped（push）/**success**
+    （`edited`）、`swift` = success，`action_required` = 0。因此缺的只是触发事件。
+    本 task 只允许在 `.github/workflows/agent-pr.yml` 内新增 reserved-namespace
+    `pull_request` allowed-paths 覆盖；禁止修改 `sdd-guard.yml`，禁止为 ordinary
+    lane 重新引入 bot `opened` 或 routine `synchronize`，禁止
+    `pull_request_target`。新 job 必须 read-only（`contents:read` +
+    `pull-requests:read`）、把 PR JSON 落临时文件后在 Python 内解析、不把 PR
+    title/body/head 文本插入 host shell。
+  - **PR author parameterization:binary（F2）。**`agent-pr.yml` 现有两处
+    `--expected-author 'github-actions[bot]'`（`:97`、`:164`）。legacy push job
+    必须继续 exact 期望 `github-actions[bot]`；新 reserved job 必须 exact 期望
+    `arkdeck-host-loop-runtime-901708a7[bot]`。任一处放宽为 wildcard、正则或
+    空值即 fail closed。
+  - **Envelope token grammar unification:binary（F3；跨 HLR-001 契约面）。**
+    `scripts/host_loop/pr_envelope.py` 的 `TASK_RE`/`TASK_HEADER_RE` 当前为
+    `TASK-[A-Z0-9]+-[0-9]{3}`，比 `scripts/check_pr_paths.py` r4 token
+    `TASK-[A-Z0-9]+(?:-[A-Z0-9]+)*-[0-9]{3}[A-Z]?` 窄；实测 active task header
+    中 14 项（`TASK-HLR-001A/002A/002B`、`TASK-RKFUI-001A/B/C/D`、七个
+    `TASK-UD-*`）被 MECH-004 接受而被 envelope 拒绝。本 readiness 显式授权在同一
+    source PR 内把 envelope 收敛到该单一 token definition，并加 parity 测试断言
+    两处定义逐字节相同以防再分叉。收敛不扩张路径授权：suffix token 仍须唯一解析
+    到 active `tasks.md` exact header；malformed、lowercase、多字符 suffix、多个
+    不一致 Task 与 token adjacency 继续拒绝；不得把 `TASK-HLR-002A` 别名为
+    `TASK-HLR-002`。本项修改 TASK-HLR-001 已 done 的契约面，按 TASK-RPT-002 先例
+    在本 readiness 显式声明 scope，不得夹带；`scripts/host_loop/**` 已在 Allowed
+    paths 内。
+  - **Lease CAS proof obligation:open（F4）。**CHG-2026-033 TASK-RPT-001 topology
+    evidence 只证明 Deploy Key 在 `refs/heads/agent/host-loop/**` 四层 ref 上
+    create/update/delete 成功，**不构成 compare-and-swap 证明**。TASK-HLR-002 D2
+    已额外实测一次 stale-fence 写入被服务端 precondition 拒绝，但仅覆盖单一场景。
+    本 readiness 禁止把上述任一 evidence 引用为 CAS 已充分证明；exact
+    `--force-with-lease`（指明旧 remote OID）语义必须由本 task 自己的 fault
+    matrix 完整证明，且实现必须区分服务端明确拒绝与歧义传输失败——只有前者可
+    作为负向证据。
+  - **Fault matrix:binary。**下列每项必须 fail closed 且 duplicate dispatch = 0：
+    双 worker 同时 acquire、stale fence write、heartbeat loss、create timeout
+    （先 GET reconcile，禁止盲重试）、Issue/cursor corruption、PR lookup 命中 0
+    或 >1、reserved 分支上 legacy creator 共存。create 意图必须在 create 调用
+    **之前**持久化，使响应丢失的 create 不能被重放为第二个 PR。
+  - **Adapter negative proof:binary。**typed adapter 只暴露 PR lookup/create/
+    update、Issue lookup/create/update 与 `agent/**` ref read/create/CAS/delete。
+    review/merge/auto-merge/branch-update/admin route 构造数恒为 0，必须由三重
+    证伪同时给出：fake transport 记录全部构造 route、route inventory 断言、
+    source scan 排除 generic request/escape hatch。reviewer process 不接收
+    integration credential。credential 面因 identity 的 Contents 被钉为 read 而
+    必然分离：PR/Issue 走 App installation token，`agent/host-loop/**` ref 的
+    create/CAS/delete 走 TASK-BAP-003 Deploy Key；GitHub REST 的
+    `PATCH /git/refs/*` 只有 `force` 布尔、无 expected-old-OID 参数，故真正的
+    CAS 只能由 git 侧 `--force-with-lease` 实现。该双 backend 结构属本 task
+    scope，不得被误判为 scope 蔓延。
+  - **Migration atomicity:binary。**`agent-pr.yml` 对 reserved namespace 的
+    legacy coverage 移除/禁用不得早于同一 PR 内的新 creator live proof。rollback
+    先停 scheduler/worker，再恢复 reserved namespace 的 legacy coverage，然后对
+    未释放 lease/开放 PR 做只读 reconcile；branch disappearance 永远不得解释为
+    merge（TASK-HLR-002 D2 已出现一次由 `lvye` 手动提前删除 probe ref 的实例，
+    未 merge 由 main OID、ancestry 与 PR `closed/unmerged` 三条独立证据确认）。
+  - **Scheduler separation:binary。**本 source PR 内 scheduler dispatch 恒为 0、
+    `workerDisabled=true`；不创建 account/plist/socket/worker executable，不
+    load/enable/kickstart。scheduler 绑定 exact merged source blob hash 与启用
+    属 source PR 合入后的**分离** D2 evidence 阶段；source 未合入或 receipt/
+    source hash 漂移时 dispatch 恒为 0。
+  - **Live-proof task dependency:open（阻塞后段，不阻塞 source PR）。**
+    worker 的 live first-PR proof 与 legacy migration 需要一个**天然产生**的
+    ready host-only D0 task 供其 claim；本 readiness 撰写时 active changes 中
+    ready 任务数 = **0**（`TASK-SSET-001` 与 `TASK-RKFUI-001E` 均已在本日被独立
+    会话推进为 `blocked`）。禁止为满足该 proof 而制造任务。因此 readiness、
+    source PR 与全部离线 unit/contract/fault tests 不受阻，但 scheduler
+    activation、live first-PR proof 与 legacy creator 退出必须等到一个 ready
+    host-only task 自然出现。
+  - **Self-claim stop:binary。**本 readiness 合入后 `TASK-HLR-003` 自身即为
+    `ready` host-only task。worker 不得 claim `TASK-HLR-003`：其 discovery 必须
+    显式排除本任务，否则会对正在人工实现的任务另开 PR。如需以本任务作为 live
+    proof 对象，须经独立 readiness 明确授权。
+  - **Concurrency/absence gate:closed at drafting。**remote 分支全页只含
+    protected main 与四个 `agent/**`（`rkfui-001-identity-separation-readiness`、
+    `task-hlr-002-readiness`、`task-hlr-002a-bootstrap-partition`、
+    `task-rkfui-001f-done`），与本 task 零交集；`agent/task-hlr-003*` 与
+    `agent/host-loop/*` 均 absent。历史 `agent/task-hlr-002-readiness` 永久不得
+    复用。push 前须重查全页 open PR 与 remote 分支，确认无另一会话同 lane
+    （先例 AFP-005）。
+  - **Batch:approved。**维护者已批准本 readiness 与 TASK-HLR-002 done PR 攒为
+    同一 review 批次；批次内每个 PR 仍为独立 PR、独立 exact-head review，不混装
+    scope。
 - Platform:macos（host-only）
 - Requirements/AC:change-local `HLR-LEASE-001`、`HLR-WORKER-001`
 - Depends on:TASK-HLR-001 done、TASK-HLR-002A done、TASK-HLR-002 done、
