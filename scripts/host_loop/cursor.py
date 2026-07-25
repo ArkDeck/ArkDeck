@@ -59,12 +59,21 @@ class CursorState:
             value = getattr(self, name)
             if value is not None and not OID_RE.match(value):
                 raise CursorError(f"{name} must be lowercase full 40-hex or null")
+        # bool is a subclass of int, so a plain isinstance check accepts True as
+        # 1. The guard was added to LeaseRecord.validate and not here; the cursor
+        # is parsed from an Issue body a human can edit, so it needs it more.
         if self.pr_number is not None and (
-            not isinstance(self.pr_number, int) or self.pr_number < 1
+            not isinstance(self.pr_number, int) or isinstance(self.pr_number, bool)
+            or self.pr_number < 1
         ):
             raise CursorError("pr_number must be a positive integer or null")
-        if not isinstance(self.last_observed_at, int):
+        if (not isinstance(self.last_observed_at, int)
+                or isinstance(self.last_observed_at, bool)):
             raise CursorError("last_observed_at must be epoch seconds")
+        for name in ("candidate_task", "lease_ref", "review_run"):
+            value = getattr(self, name)
+            if value is not None and not isinstance(value, str):
+                raise CursorError(f"{name} must be a string or null")
         if (self.lease_ref is None) != (self.lease_oid is None):
             raise CursorError("lease_ref and lease_oid must be set together")
 
@@ -110,35 +119,67 @@ class Truth:
     lease_oid_by_ref: dict[str, str]
 
 
-def rebuild_and_validate(state: CursorState, truth: Truth) -> CursorState:
-    """Reconcile the cache against truth, or refuse.
+def reconcile(state: CursorState, truth: Truth) -> tuple[CursorState, list[str]]:
+    """Re-derive every cached navigation fact from Truth. Never raises.
 
-    A stale `cursor_main_oid` is normal — main advances constantly — so it is
-    refreshed, not treated as a conflict. Everything the cursor claims about
-    leases, PRs and candidate tasks must still match observed reality.
+    Staleness is not corruption. This Issue is a cache, so any field that no
+    longer matches Truth is simply refreshed and the correction is reported for
+    the round record. Treating divergence as fatal wedged the lane permanently:
+    reconciliation is the first statement of a round and the cursor is written
+    later, so a single dropped cursor write — one transient 502, or the process
+    dying between a ref write and its matching cursor write — left the cache
+    behind the ref for ever, with zero further cursor writes to catch up.
+
+    Corruption is handled elsewhere and stays fatal: an unparsable body, a wrong
+    schema, unknown or missing fields and malformed OIDs are refused by
+    parse_machine_block and CursorState.validate, because acting on a misread
+    cache is worse than stopping.
     """
-    conflicts: list[str] = []
+    corrections: list[str] = []
+    updates: dict[str, object] = {}
+
+    if state.cursor_main_oid != truth.main_oid:
+        corrections.append(
+            f"cursor_main_oid {state.cursor_main_oid[:12]} -> {truth.main_oid[:12]}")
+        updates["cursor_main_oid"] = truth.main_oid
 
     if state.candidate_task is not None and state.candidate_task not in truth.ready_tasks:
-        conflicts.append(
-            f"cursor candidate {state.candidate_task!r} is not a currently ready task"
-        )
+        corrections.append(
+            f"candidate_task {state.candidate_task} is no longer ready; cleared")
+        updates["candidate_task"] = None
+
     if state.pr_number is not None and state.pr_number not in truth.open_pr_numbers:
-        conflicts.append(
-            f"cursor PR #{state.pr_number} is not among the observed open PRs"
-        )
+        corrections.append(f"pr_number {state.pr_number} is not open; cleared")
+        updates["pr_number"] = None
+        updates["pr_head"] = None
+
     if state.lease_ref is not None:
         observed = truth.lease_oid_by_ref.get(state.lease_ref)
         if observed is None:
-            conflicts.append(f"cursor lease ref {state.lease_ref} does not exist")
+            corrections.append(f"lease ref {state.lease_ref} is absent; cleared")
+            updates["lease_ref"] = None
+            updates["lease_oid"] = None
         elif observed != state.lease_oid:
-            conflicts.append(
-                f"cursor lease OID {state.lease_oid} != observed {observed}"
-            )
-    if conflicts:
-        raise CursorError("; ".join(conflicts))
+            corrections.append(
+                f"lease_oid {(state.lease_oid or '')[:12]} -> {observed[:12]}")
+            updates["lease_oid"] = observed
 
-    return replace(state, cursor_main_oid=truth.main_oid)
+    if not updates:
+        return state, corrections
+    reconciled = replace(state, **updates)
+    reconciled.validate()
+    return reconciled, corrections
+
+
+def rebuild_and_validate(state: CursorState, truth: Truth) -> CursorState:
+    """Reconcile against Truth and return the corrected cache.
+
+    Retained as the name the round calls. It no longer refuses on staleness —
+    see reconcile() for why that was a permanent wedge rather than a safety
+    property.
+    """
+    reconciled, _corrections = reconcile(state, truth)
+    return reconciled
 
 
 def load(api: ApiPort, issue_number: int) -> tuple[CursorState, dict]:
@@ -157,13 +198,42 @@ def load(api: ApiPort, issue_number: int) -> tuple[CursorState, dict]:
     return parse_machine_block(issue.get("body") or ""), issue
 
 
+def surrounding_human_text(previous_body: str) -> tuple[str, str]:
+    """Split an existing cursor body into the text that is NOT the machine block.
+
+    The Issue is a shared surface: the maintainer writes context above the block
+    and the worker owns only what is between the markers. Preservation is derived
+    here rather than passed in by the caller, because the earlier design took an
+    opt-in `human_prefix` argument and its single call site never passed one —
+    so every write silently truncated the Issue to the bare block. A parameter
+    the caller has to remember is a parameter the caller forgets.
+    """
+    if not previous_body:
+        return "", ""
+    if previous_body.count(OPEN_MARKER) > 1 or previous_body.count(CLOSE_MARKER) > 1:
+        raise CursorError("cursor body carries duplicate machine blocks")
+    open_at = previous_body.find(OPEN_MARKER)
+    if open_at < 0:
+        if previous_body.count(CLOSE_MARKER):
+            raise CursorError("cursor body has a closing marker with no open")
+        # No block yet, so everything already present is human text.
+        tail = "" if previous_body.endswith("\n") else "\n"
+        return previous_body + tail, ""
+    close_at = previous_body.find(CLOSE_MARKER, open_at)
+    if close_at < 0:
+        raise CursorError("cursor body has an opening marker with no close")
+    end = close_at + len(CLOSE_MARKER)
+    if previous_body[end:end + 1] == "\n":
+        end += 1
+    return previous_body[:open_at], previous_body[end:]
+
+
 def store(
     api: ApiPort,
     issue_number: int,
     state: CursorState,
     *,
     previous_body: str,
-    human_prefix: str = "",
 ) -> bool:
     """Write the cursor back. Returns False when the canonical bytes are unchanged.
 
@@ -172,8 +242,8 @@ def store(
     not produce a stream of no-op edits.
     """
     state.validate()
-    block = state.render()
-    body = f"{human_prefix}{block}" if human_prefix else block
+    prefix, suffix = surrounding_human_text(previous_body)
+    body = f"{prefix}{state.render()}{suffix}"
     if previous_body == body:
         return False
     api.update_issue(issue_number, body=body)
@@ -193,14 +263,3 @@ def record_round(
     )
     nxt.validate()
     return nxt
-
-
-def record_lease_write(
-    state: CursorState, lease_ref: str, lease_oid: str, observed_at: int
-) -> CursorState:
-    """design §3: every lease write updates the cursor with the new ref OID."""
-    if not OID_RE.match(lease_oid):
-        raise CursorError("lease_oid must be lowercase full 40-hex")
-    return replace(
-        state, lease_ref=lease_ref, lease_oid=lease_oid, last_observed_at=observed_at
-    )

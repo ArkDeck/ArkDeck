@@ -73,7 +73,11 @@ class Route(NamedTuple):
 
 
 # Frozen positive allowlist. Adding to this set is a governance change: it is
-# pinned by the HLR-003 readiness and asserted by the route-inventory test.
+# pinned by the HLR-003 readiness, and its exact CONTENTS are asserted by
+# test_backends_cli.NoNewRouteOrEscapeHatch. Previously only the size was pinned
+# and the comment credited the route-inventory test, which asserts no such thing
+# — so substituting one entry for another (as the check-runs pagination did) was
+# invisible to every test in the suite.
 ALLOWED_ROUTES: frozenset[tuple[str, str]] = frozenset(
     {
         ("GET", "/repos/{owner}/{repo}/pulls"),
@@ -85,7 +89,7 @@ ALLOWED_ROUTES: frozenset[tuple[str, str]] = frozenset(
         ("GET", "/repos/{owner}/{repo}/issues/{number}"),
         ("POST", "/repos/{owner}/{repo}/issues"),
         ("PATCH", "/repos/{owner}/{repo}/issues/{number}"),
-        ("GET", "/repos/{owner}/{repo}/commits/{oid}/check-runs"),
+        ("GET", "/repos/{owner}/{repo}/commits/{oid}/check-runs?per_page&page"),
     }
 )
 
@@ -147,6 +151,8 @@ def _templatize(path: str) -> str:
         # the allowlist rather than being normalised away.
         if keys == ["head", "page", "per_page", "state"]:
             return _templatize(base) + "?head&state&per_page"
+        if keys == ["page", "per_page"]:
+            return _templatize(base) + "?per_page&page"
         return _templatize(base) + "?" + "&".join(keys)
     parts = path.split("/")
     out: list[str] = []
@@ -406,17 +412,71 @@ class ApiPort:
     def list_check_runs(self, oid: str) -> list[dict]:
         if not OID_RE.match(oid):
             raise TransportError("check-runs requires a lowercase full 40-hex OID")
-        payload = self._call(
-            "GET",
-            f"/repos/{self.owner}/{self.repo}/commits/{oid}/check-runs",
-            "checks-lookup",
-        )
-        if isinstance(payload, dict):
+        # Paginated to exhaustion and cross-checked against total_count. The
+        # endpoint caps a page at 30, so reading only the first page hid any red
+        # check beyond the thirtieth — a false green, and one that compounds
+        # with the verdict logic.
+        per_page = 100
+        collected: list[dict] = []
+        total: int | None = None
+        page = 1
+        while True:
+            payload = self._call(
+                "GET",
+                f"/repos/{self.owner}/{self.repo}/commits/{oid}/check-runs"
+                f"?per_page={per_page}&page={page}",
+                "checks-lookup",
+            )
+            if not isinstance(payload, dict):
+                raise TransportError("checks-lookup did not return an object")
             runs = payload.get("check_runs")
             if not isinstance(runs, list):
                 raise TransportError("checks-lookup payload missing check_runs")
-            return runs
-        raise TransportError("checks-lookup did not return an object")
+            # total_count is deny-on-unreadable, not best-effort. This endpoint
+            # always sends it, and it is the only way to tell a complete view
+            # from a truncated one; treating absence as "probably fine" is the
+            # shape that once turned a swallowed page into a false ALL PASS.
+            count = payload.get("total_count")
+            if not isinstance(count, int) or isinstance(count, bool) or count < 0:
+                raise TransportError(
+                    "checks-lookup payload missing a usable total_count; "
+                    "refusing a view whose completeness cannot be established"
+                )
+            if total is None:
+                total = count
+            elif count != total:
+                raise TransportError(
+                    f"check-run total_count changed mid-walk {total} -> {count}; "
+                    "the view is not a consistent snapshot"
+                )
+            collected.extend(runs)
+            # Short page = last page. This is the loop's real control; without it
+            # a full final page is indistinguishable from a middle one.
+            if len(runs) < per_page or len(collected) >= total:
+                break
+            page += 1
+            if page > 20:
+                raise TransportError(
+                    "checks-lookup pagination cap exceeded; refusing a truncated view"
+                )
+        if len(collected) != total:
+            raise TransportError(
+                f"incomplete check-run view: total_count={total} "
+                f"collected={len(collected)}"
+            )
+        # Counting alone is not completeness. A page reordered between requests
+        # yields a view that repeats one run and drops another, and len ==
+        # total_count still holds — so a dropped red check would read as a
+        # complete green view. Run ids are distinct per run; a required name
+        # legitimately appears several times, so identity is the id, not the name.
+        identities = [run.get("id") for run in collected
+                      if isinstance(run, dict) and run.get("id") is not None]
+        if len(set(identities)) != len(identities):
+            raise TransportError(
+                "duplicate check-run ids in a paginated view; the pages shifted "
+                "mid-walk and the view is not a consistent snapshot"
+            )
+        return collected
 
 
 @dataclass
@@ -472,13 +532,31 @@ class RefPort:
             # fence is intact, and calling that a fence loss is exactly the
             # misreport this module promises not to make. git emits these tokens
             # untranslated regardless of locale.
-            if "stale info" in text or "non-fast-forward" in text:
+            # Precedence matters, and getting it wrong misdirects the operator
+            # in both directions:
+            #   1. "stale info" is git's lease-specific wording. Only a rejected
+            #      --force-with-lease produces it, so it is definitive even when
+            #      some hook also chimed in.
+            #   2. Policy markers next. A ruleset rejection whose text happens to
+            #      mention a lock must NOT be laundered into a fence loss; that
+            #      sends the operator hunting a concurrent worker that does not
+            #      exist. This ordering was inverted, so "cannot lock ref"
+            #      out-ranked "[remote rejected]".
+            #   3. Only then the generic race wordings, which mean someone else
+            #      moved the ref but are not lease-specific.
+            # git emits these tokens untranslated regardless of locale.
+            if "stale info" in text:
                 raise Refused(f"fence lost on {op} of {ref}: stale expected OID")
             if ("declined" in text or "protected" in text
                     or "rule violations" in text or "[remote rejected]" in text):
                 raise PolicyRefused(
                     f"policy declined {op} of {ref}: {err.strip()[:200]} — the "
                     "fence was not contested; fix the ref policy, do not retry"
+                )
+            if ("non-fast-forward" in text or "fetch first" in text
+                    or "cannot lock ref" in text):
+                raise Refused(
+                    f"fence lost on {op} of {ref}: the ref moved under us"
                 )
             raise TransportError(
                 f"ambiguous {op} of {ref}: {err.strip()[:200]} — reconcile by "

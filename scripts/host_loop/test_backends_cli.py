@@ -157,8 +157,38 @@ class RefusalSplitSurvivesTheRealRunner(unittest.TestCase):
 class NoNewRouteOrEscapeHatch(unittest.TestCase):
     """r2 forbids adding a typed route or widening a field allowlist."""
 
+    # The exact set, not just its cardinality. Pinning only len() meant swapping
+    # one route for another passed silently, which is what the check-runs
+    # pagination change did — a substitution no test could see.
+    EXPECTED_ROUTES = {
+        ("GET", "/repos/{owner}/{repo}/pulls"),
+        ("GET", "/repos/{owner}/{repo}/pulls?head&state&per_page"),
+        ("POST", "/repos/{owner}/{repo}/pulls"),
+        ("GET", "/repos/{owner}/{repo}/pulls/{number}"),
+        ("PATCH", "/repos/{owner}/{repo}/pulls/{number}"),
+        ("GET", "/repos/{owner}/{repo}/issues"),
+        ("POST", "/repos/{owner}/{repo}/issues"),
+        ("GET", "/repos/{owner}/{repo}/issues/{number}"),
+        ("PATCH", "/repos/{owner}/{repo}/issues/{number}"),
+        ("GET", "/repos/{owner}/{repo}/commits/{oid}/check-runs?per_page&page"),
+    }
+
     def test_allowlist_is_unchanged_in_size(self):
         self.assertEqual(len(transport_mod.ALLOWED_ROUTES), 10)
+
+    def test_allowlist_contents_are_pinned_exactly(self):
+        actual = set(transport_mod.ALLOWED_ROUTES)
+        self.assertEqual(
+            actual, self.EXPECTED_ROUTES,
+            f"added={sorted(actual - self.EXPECTED_ROUTES)} "
+            f"removed={sorted(self.EXPECTED_ROUTES - actual)}")
+
+    def test_no_route_reaches_a_forbidden_capability(self):
+        for method, template in transport_mod.ALLOWED_ROUTES:
+            lowered = f"{method} {template}".lower()
+            for capability in transport_mod.FORBIDDEN_CAPABILITIES:
+                with self.subTest(route=template, capability=capability):
+                    self.assertNotIn(capability, lowered)
 
     def test_field_allowlists_are_unchanged(self):
         self.assertEqual(sorted(transport_mod.ALLOWED_PR_PATCH_FIELDS),
@@ -493,9 +523,15 @@ class DiscoveryIsAReaderOnly(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             change = Path(tmp, "openspec", "changes", "chg-x")
             change.mkdir(parents=True)
+            # Both sections declare hardware, so the only difference between
+            # them is the allowed-paths line this test is about. The fixture
+            # previously omitted it, which stopped isolating the variable once
+            # an undeclared hardware requirement also began omitting a task.
             (change / "tasks.md").write_text(
-                "## TASK-AAA-001 — no allowed paths\n\n- Status:ready\n\n"
+                "## TASK-AAA-001 — no allowed paths\n\n- Status:ready\n"
+                "- Hardware required:no\n- Depends on:none\n\n"
                 "## TASK-BBB-002 — has them\n\n- Status:ready\n"
+                "- Hardware required:no\n- Depends on:none\n"
                 "- Allowed paths:`x/**`\n")
             found = discover_candidates(Path(tmp), "CHG-X")
             self.assertEqual([c.task_id for c in found], ["TASK-BBB-002"])
@@ -515,7 +551,8 @@ class DiscoveryIsAReaderOnly(unittest.TestCase):
             change.mkdir(parents=True)
             (change / "tasks.md").write_text(
                 "## TASK-HW-001 — device\n\n- Status:ready\n"
-                "- Allowed paths:`x/**`\n- Hardware required:yes\n")
+                "- Allowed paths:`x/**`\n- Hardware required:yes\n"
+                "- Depends on:none\n")
             found = discover_candidates(Path(tmp), "CHG-X")
             self.assertTrue(found[0].hardware_required)
 

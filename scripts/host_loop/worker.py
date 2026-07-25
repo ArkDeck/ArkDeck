@@ -22,7 +22,7 @@ Hard rules encoded here:
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import Enum
 from typing import Callable
 
@@ -238,8 +238,20 @@ class Worker:
         cursor_state: CursorState,
         truth: Truth,
     ) -> RoundResult:
+        self._corrections: list[str] = []
         try:
-            return self._round(candidates, change_id, main_oid, cursor_state, truth)
+            result = self._round(candidates, change_id, main_oid, cursor_state,
+                                 truth)
+            # The corrections list is the ONLY compensating control for having
+            # made cache staleness non-fatal: without it every cache/Truth
+            # divergence is silent, and a genuine anomaly looks like a clean
+            # round. It was computed and discarded, which is the same
+            # "written but never bound" shape flagged twice in review.
+            if self._corrections:
+                joined = "; ".join(self._corrections)
+                result = replace(
+                    result, detail=f"{result.detail} [cursor reconciled: {joined}]")
+            return result
         except (FenceLost, LeaseError, ReconcileRequired, CursorError,
                 TransportError) as error:
             # Every ambiguity funnels here. No retry, no second PR, no dispatch.
@@ -262,12 +274,12 @@ class Worker:
         cursor_state: CursorState,
         truth: Truth,
     ) -> RoundResult:
-        from .cursor import rebuild_and_validate
+        from .cursor import reconcile
 
         # The cursor is a cache: reconcile it against truth and KEEP the
         # reconciled value. Discarding it left the cache permanently stale, so
         # the next round conflicted against state it had never written.
-        cursor_state = rebuild_and_validate(cursor_state, truth)
+        cursor_state, self._corrections = reconcile(cursor_state, truth)
 
         candidate, outcome, reason = self.select(candidates, change_id, main_oid)
         if candidate is None:
@@ -333,6 +345,11 @@ class Worker:
                 cursor_state = self._after_lease_write(
                     cursor_state, main_oid, candidate.task_id, held)
 
+        # _prepare_branch pushes refs/heads/agent/host-loop/tasks/<task>, which
+        # is the round's FIRST external write and the ref a rival's PR head points
+        # at. The gate used to sit on the line after it, so a worker that had
+        # already lost its fence still moved the shared branch.
+        self._leases.assert_still_held(held, self._read_lease_record)
         head_oid = self._prepare_branch(candidate, frozen_base)
 
         self._leases.assert_still_held(held, self._read_lease_record)
@@ -372,7 +389,6 @@ class Worker:
         number = int(pull["number"])
 
         # --- required checks, guarded by a persisted dispatch fact -----------
-        # --- required checks -------------------------------------------------
         # Gated on the DURABLE fact, not on a name being absent. Absence was the
         # wrong trigger: the push run already publishes a `skipped` run named
         # `allowed-paths`, so nothing ever looked absent and the
@@ -389,6 +405,13 @@ class Worker:
                 pr_number=number, pr_head=head_oid)
             checks = self._api.list_check_runs(head_oid)
 
+        # The last external write of the round. It needs the same gate as every
+        # other one: when the required checks are already green the dispatch
+        # branch above is skipped entirely, and its gate went with it — so a
+        # worker whose fence had been taken still wrote the shared cursor Issue,
+        # stamping its own stale lease OID over the real holder's and wedging
+        # the next round.
+        self._leases.assert_still_held(held, self._read_lease_record)
         self._persist_cursor(cursor_state, main_oid, candidate.task_id,
                              lease_ref(candidate.task_id), held.ref_oid,
                              pr_number=number, pr_head=head_oid)
@@ -427,14 +450,14 @@ class Worker:
         demands equality, the lane then wedged permanently. store() skips a
         no-op write, so calling this after each advance is cheap.
         """
-        from .cursor import record_lease_write, store
-
-        nxt = record_lease_write(cursor_state, lease_ref(held.record.task_id),
-                                 held.ref_oid, self._now())
-        nxt = self._persist_cursor(nxt, main_oid, task_id,
-                                   lease_ref(held.record.task_id), held.ref_oid,
-                                   pr_number=pr_number, pr_head=pr_head)
-        return nxt
+        # record_lease_write used to run here first. It was a no-op at this one
+        # call site: _persist_cursor's record_round() rewrites every field it had
+        # just set, with the same values, and validates them itself. Two tests
+        # covered it, which made the dead step look load-bearing — the same
+        # "written but never bound" shape flagged twice before.
+        return self._persist_cursor(cursor_state, main_oid, task_id,
+                                    lease_ref(held.record.task_id), held.ref_oid,
+                                    pr_number=pr_number, pr_head=pr_head)
 
     def _persist_cursor(self, cursor_state, main_oid, task_id, lease_ref_name,
                         lease_oid, *, pr_number=None, pr_head=None):
@@ -452,38 +475,82 @@ class Worker:
         return nxt
 
 
-# Conclusions meaning "this check did not execute". On a REQUIRED name they must
-# never count as success: sdd-guard.yml publishes an `allowed-paths` run with
-# conclusion `skipped` on every push to agent/**, so accepting them returned
-# CHECKS_GREEN on a head whose MECH-004 path contract was never evaluated. And
-# because presence was decided by name alone, the same stub also meant the check
-# dispatch never fired in production at all.
-NON_EXECUTED_CONCLUSIONS = frozenset({"skipped", "neutral", None})
+# Conclusions that mean "this check did not execute". On a REQUIRED name they
+# never satisfy the gate; on a non-required name they are benign.
+BENIGN_NON_EXECUTION = frozenset({"skipped", "neutral"})
+
+
+def _run_state(run: dict) -> str:
+    """Classify ONE check run: 'failed' | 'blocking' | 'benign' | 'success'.
+
+    Single classifier for both the required and the non-required side. They used
+    to classify independently, and the two drifted: the non-required side kept a
+    separate `pending` accumulator while the required side collapsed each name to
+    one value with no way back from "success". That drift WAS the asymmetry —
+    requiring a check made the gate laxer, which is the opposite of the point.
+
+      failed    completed, and the conclusion says it ran and did not pass.
+      blocking  not completed yet, or completed with no conclusion at all. The
+                first is in flight; the second is malformed. Neither is a
+                failure, and neither may read as satisfied.
+      benign    completed as `skipped` or `neutral` — it deliberately did not
+                execute. Not a failure, but it satisfies nothing either.
+      success   completed with conclusion `success`.
+    """
+    if run.get("status") != "completed":
+        return "blocking"
+    conclusion = run.get("conclusion")
+    if conclusion is None:
+        return "blocking"
+    if conclusion in BENIGN_NON_EXECUTION:
+        return "benign"
+    return "success" if conclusion == "success" else "failed"
 
 
 def required_verdicts(check_runs: list[dict]) -> dict[str, str]:
     """Single source of truth for required-check state.
 
-    One of "success" | "failed" | "pending" per name in REQUIRED_PR_CHECKS,
-    seeded to "pending" so an absent name — or a name whose only run did not
-    execute — cannot read as satisfied. Several runs may share a name (the push
-    run and the `pull_request` run both publish `guard`), and an executed
-    success anywhere wins over a non-executed sibling.
+    One of "success" | "failed" | "pending" per name in REQUIRED_PR_CHECKS, over
+    a three-tier lattice: FAILED > PENDING > SUCCESS. Every run for the name is
+    scanned to exhaustion before deciding, so the verdict cannot depend on
+    arrival order.
+
+    A required name carries SEVERAL runs: `guard` is published by both the push
+    suite and the `pull_request` suite, because sdd-guard.yml's guard job carries
+    no event condition. This function has now been wrong three times, each time
+    by letting one run's outcome speak for the name:
+
+      r1  presence was decided by name alone and `skipped` counted as success, so
+          a required check that never ran read as green.
+      v3  `success` was made absorbing per name, so an executed failure on the
+          same name was swallowed.
+      v4  `success` was still terminal for the name, so a sibling that had not
+          finished yet contributed nothing: [guard success (push), guard
+          in_progress (edited)] read as GREEN with nothing unsatisfied, which
+          also suppressed re-dispatch. That is the ordinary steady state right
+          after a dispatch, because the edited `allowed-paths` job returns fast
+          while the edited `guard` job runs the whole of check-sdd.sh — and the
+          still-running run is precisely the one that can differ from the push
+          run, since a pull_request checkout resolves the merge ref.
+
+    Hence: a name is satisfied only when at least one of its runs executed
+    successfully AND none of its runs is still blocking.
     """
-    verdicts = {name: "pending" for name in REQUIRED_PR_CHECKS}
+    seen: dict[str, set[str]] = {name: set() for name in REQUIRED_PR_CHECKS}
     for run in check_runs:
         name = run.get("name")
-        if name not in verdicts:
+        if name not in seen:
             continue
-        if run.get("status") != "completed":
-            continue
-        conclusion = run.get("conclusion")
-        if conclusion in NON_EXECUTED_CONCLUSIONS:
-            continue
-        if conclusion == "success":
-            verdicts[name] = "success"
-        elif verdicts[name] != "success":
+        seen[name].add(_run_state(run))
+
+    verdicts: dict[str, str] = {}
+    for name, states in seen.items():
+        if "failed" in states:
             verdicts[name] = "failed"
+        elif "blocking" in states or "success" not in states:
+            verdicts[name] = "pending"
+        else:
+            verdicts[name] = "success"
     return verdicts
 
 
@@ -495,23 +562,33 @@ def unsatisfied_required_checks(check_runs: list[dict]) -> tuple[str, ...]:
     ))
 
 
+def _non_required_outcome(check_runs: list[dict], required: set[str]) -> str:
+    """'ok' | 'pending' | 'failed' for runs outside REQUIRED_PR_CHECKS.
+
+    Scanned to exhaustion before deciding, so a still-running run that happens
+    to be listed before a failed one cannot downgrade the failure to pending.
+    """
+    states = {_run_state(run) for run in check_runs
+              if run.get("name") not in required}
+    if "failed" in states:
+        return "failed"
+    return "pending" if "blocking" in states else "ok"
+
+
 def classify_checks(check_runs: list[dict]) -> str:
     """'green' | 'pending' | 'failed', derived from that one mapping.
 
     Green requires every REQUIRED name to have executed successfully. Runs
-    outside REQUIRED_PR_CHECKS (Swift CI, say) can still fail the round, but a
-    skipped or neutral conclusion on a non-required run is not a failure.
+    outside REQUIRED_PR_CHECKS can still fail or delay the round, but a skipped
+    or neutral conclusion on one of them is not a failure. Requiring a check may
+    only ever make the gate stricter, never laxer.
     """
     verdicts = required_verdicts(check_runs)
     if "failed" in verdicts.values():
         return "failed"
-    for run in check_runs:
-        if run.get("name") in verdicts:
-            continue
-        if run.get("status") != "completed":
-            return "pending"
-        if run.get("conclusion") not in ("success", "neutral", "skipped"):
-            return "failed"
-    if any(v == "pending" for v in verdicts.values()):
+    outside = _non_required_outcome(check_runs, set(verdicts))
+    if outside == "failed":
+        return "failed"
+    if outside == "pending" or any(v == "pending" for v in verdicts.values()):
         return "pending"
     return "green"
