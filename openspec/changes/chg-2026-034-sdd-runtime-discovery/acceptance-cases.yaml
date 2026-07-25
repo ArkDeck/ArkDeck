@@ -1,0 +1,43 @@
+---
+schema_version: 1.0.0
+change_id: CHG-2026-034-sdd-runtime-discovery
+change_revision: 1
+platform: host
+evidence_classes:
+  - hostOnlyContract
+  - hostOnlyIntegration
+  - ci
+cases:
+  - acceptance_id: SDR-DISCOVERY-001
+    test_id: TEST-SDR-DISCOVERY-001
+    method: Resolver precedence contract and real linked-worktree integration.
+    expected_source: openspec/changes/chg-2026-034-sdd-runtime-discovery/verification.md#acceptance-matrix
+    minimum_evidence: hostOnlyIntegration
+    expected_result: >-
+      The entrypoint resolves explicit, worktree-local, same-repository primary
+      checkout and PATH interpreters in that exact order without token splitting.
+      A linked worktree with no local venv reuses the primary checkout's pinned
+      venv read-only, while an ordinary checkout or unavailable Git topology has
+      a deterministic PATH fallback.
+  - acceptance_id: SDR-DIAGNOSTIC-001
+    test_id: TEST-SDR-DIAGNOSTIC-001
+    method: Adversarial interpreter, dependency, path and side-effect contract.
+    expected_source: openspec/changes/chg-2026-034-sdd-runtime-discovery/verification.md#acceptance-matrix
+    minimum_evidence: hostOnlyContract
+    expected_result: >-
+      Missing or unstartable interpreters, missing yaml, PyYAML version drift and
+      malformed dependency pins fail with stable actionable diagnostics and no
+      traceback. A broken higher-priority candidate is not hidden by fallback,
+      paths containing spaces remain one argv token, and checker execution calls
+      no pip, venv, network or write path.
+  - acceptance_id: SDR-BOOTSTRAP-001
+    test_id: TEST-SDR-BOOTSTRAP-001
+    method: Explicit bootstrap argv and post-install preflight contract.
+    expected_source: openspec/changes/chg-2026-034-sdd-runtime-discovery/verification.md#acceptance-matrix
+    minimum_evidence: hostOnlyContract
+    expected_result: >-
+      Only a direct user invocation creates or updates the same repository's
+      primary-checkout .venv-sdd and installs the current requirements file
+      through that venv's Python. It never modifies global Python or uses
+      --break-system-packages, and no success is reported unless the exact
+      PyYAML pin imports afterward.
