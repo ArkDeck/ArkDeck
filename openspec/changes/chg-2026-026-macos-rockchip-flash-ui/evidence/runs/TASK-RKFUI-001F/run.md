@@ -1,6 +1,6 @@
 # TASK-RKFUI-001F — read-only bookmark option remediation
 
-- Captured:2026-07-25T02:52:09Z–2026-07-25T02:52:28Z
+- Captured:2026-07-25T02:54:07Z–2026-07-25T02:55:51Z
 - Executor:agent（两次 `NSOpenPanel` 选择由维护者完成）
 - Evidence class:`signedSandboxHostOnlyBookmarkOptionRemediation`
 - Result:`passed`
@@ -54,6 +54,9 @@
 - bookmark failure 拆成 `bookmarkCreationFailed` /
   `bookmarkResolutionFailed`，只允许 Foundation error domain/code；message、path、
   locator、bookmark bytes 与 raw xattr 不进入 sanitized receipt。
+- bookmark 已创建、但后续 executable inspection 失败时如实保留
+  `bookmarkCreated=true`；preflight 仍以 `executableInspectionFailed` fail closed，
+  不产生 child dispatch。
 
 ## Environment and build
 
@@ -107,7 +110,7 @@ python3 scripts/rockchip_e0_probe/probe.py characterize \
 - `preflightFailure=executableHashMismatch`、`childLaunchAttempted=false`，fixture 未执行。
 - Host pre/post target bytes/size/CDHash/signature 不变且 quarantine absent。
 - Verdict:`passed`；sanitized receipt SHA-256 =
-  `6924f8a7b96090e628e0fca54b1a838ecd4eb5015c59301573e1a4e86e4faf6c`。
+  `6c1ceecec431468bdee7f097f4516659baa62289fdf84d48ee2e2e5ce0641a98`。
 
 ### Single-layer symlink
 
@@ -127,7 +130,7 @@ python3 scripts/rockchip_e0_probe/probe.py characterize \
 - bookmark、App hash/signature/quarantine、wrong-hash preflight 与 host metadata gates
   全部同 canonical run PASS；fixture 未执行。
 - Verdict:`passed`；sanitized receipt SHA-256 =
-  `dbe612ca9be659e27e0a19b5847e1e92db4f242e4185a699fe42d627e8810ca9`。
+  `6bbd415b649a17e9a5b549bec4cd1880f094818abe2abe218efd2fb33975267d`。
 
 ## Safety and dispatch accounting
 
