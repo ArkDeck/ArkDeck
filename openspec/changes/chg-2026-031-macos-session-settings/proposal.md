@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-031-macos-session-settings
-revision: 1
-status: approved # 本 approval-only PR 经维护者 review/merge 后生效；r1 proposal 已由 #432 登记
+revision: 2
+status: approved # r2 production-composition scope remediation 仅在维护者 review/merge 本 PR 后成为 current；r1 approval #433 merge `39af11ec9e5862a2edddfe73c35bcb3acd010656`
 class: platform
 core_change_level: none
 owner: lvye
@@ -133,3 +133,67 @@ readiness、implementation/evidence 和 done PR。`TASK-SSET-002` 依赖
   device authority。`TASK-SSET-001`、`TASK-SSET-002` 均保持 `blocked`，各自必须另走
   independent readiness；尤其 `TASK-SSET-002` 在 `TASK-SSET-001 done` 前不得形成实现
   PR。本 PR 零 code、test、evidence、task 状态和 platform support 变化。
+
+## r2 production-composition scope remediation（2026-07-25）
+
+### Trigger
+
+TASK-SSET-001 implementation/evidence PR #436 exact head
+`ad389a2190af2132365112f9a107105fbebf3b8e` 经 `lvye` APPROVED，并合入
+protected `main` `9346a6da81fc42285c228ded183df089fc596c4a`。其 merged run blob
+`e622e62c0dc507851c0739747395bc122644b4a1` 证明 settings、secure catalog、retention
+plan/apply/admission 与同进程 Workflows→Rockchip composition contracts 已实现，但也
+如实记录：当前唯一真实 consumer 是独立 `arkdeck` CLI；`ArkDeckApp` 没有
+`SessionStorageApplicationRuntime`/`RockchipFlashExecutionHost` consumer，App 与 CLI
+也没有受审查的 shared preferences/App Group/security-scope capability。因此
+`SSET-RETENTION-001` production reachability 保持 blocked。独立状态 PR #503 已将该
+事实合入 protected `main`
+`cc5e6f359c73f37e34fcc4f055429abc0f94e8e0`。
+
+### Decision（r2 scoped override）
+
+r2 选择**真实 Host consumer 进入 ArkDeckApp process**，并把具体 consumer owner 固定为
+CHG-2026-026 的 `TASK-RKFUI-002`：
+
+- `RockchipFlashApplicationFacade` 的 App-process plan-only production composition
+  SHALL 消费同一个 `SessionStorageApplicationRuntime` instance 提供的 validated root
+  lease 与 shared `HostStorageCoordinator`，并通过该 context 创建 owned Session 与
+  plan Artifact；
+- App composition root SHALL 持有上述唯一 runtime 并注入 Flash facade，同时把该
+  runtime 保留为后续 `TASK-SSET-002` Settings facade 的唯一生产依赖；Flash facade、
+  ViewModel、App target 或后续 Settings facade 不得另建 `SessionSettingsStore`、
+  独立 coordinator 或字符串 root fallback；
+- `TASK-RKFUI-002` 仍由 CHG-2026-026 自己的独立 D1 readiness/implementation/evidence/
+  done 流程控制。本 r2 不修改 CHG-2026-026、不使该任务 ready，也不放宽其
+  plan-only、零 mutation/destructive runner 边界；
+- CHG-2026-026 在未来 readiness 中只有显式接受本 dependency、pin 本 r2 与 #436
+  runtime/evidence、并把 App-process producer→consumer contract 纳入 evidence 后，
+  才能被 CHG-2026-031 用作 production reachability 证明；若未接受，SSET tasks
+  继续 blocked；
+- 新增 `TASK-SSET-001R`，只在 `TASK-RKFUI-002` done 后独立复验合入版 App composition
+  与 evidence，不修改产品 source。其完成后，TASK-SSET-001 才可另以 D0 状态 PR
+  `blocked→done`；TASK-SSET-002 仍须后续独立 readiness。
+
+standalone `arkdeck` CLI 是不同 process/product surface，继续使用自己的 process-local
+settings domain；App Settings **不**声称控制 CLI preferences/bookmark/Session root。
+CLI 不得作为 App reachability 的替代证据，也不因本 r2 被删除或降低既有安全门。
+
+### Rejected alternatives
+
+- **App Group/shared UserDefaults 或把 App bookmark 搬给 CLI：拒绝。**当前 entitlement
+  集没有 App Group；新增 group、签名载体、跨进程 bookmark capability 与 migration/
+  revocation 语义会扩大权限和数据 contract，须独立 ADR/change，不能作为本 scope
+  remediation 的隐式实现。
+- **App 启动时只构造未消费的 runtime/host：拒绝。**对象可构造性不是 production
+  producer→consumer reachability，也不能证明真实 Session root/admission 被使用。
+- **把 contract DI 或 standalone CLI 当作 App evidence：拒绝。**两者都不能证明
+  App composition root 持有的 authority 被 App 内真实 Host consumer 消费。
+- **删除 App-owned runtime 要求或让 Settings 只做展示：拒绝。**这会把已批准的用户设置
+  降为无真实 effect 的 UI，并改变 `SSET-RETENTION-001` pass/fail。
+
+### Scope and safety
+
+本 r2 是 D1 governance-only revision：只修改 CHG-2026-031 artifacts，零产品 source/
+test/evidence、零 entitlement/App Group/IPC、零用户 Session 读取或删除、零设备或
+GitHub control-plane effect。Core/spec/contracts/acceptance ID 与 baseline 均不变；
+macOS App composition 的实际实现必须等待相关独立 readiness 合入。
