@@ -1961,7 +1961,71 @@
 
 ## TASK-HLR-002 — D2 integration identity 与 host activation
 
-- Status:ready（r1 D2 readiness；仅在维护者对本独立 readiness PR exact
+- Status:done（2026-07-25 D0 completion；仅在维护者 review/merge 本独立
+  `ready→done` PR 后生效。D2 readiness #508 exact reviewed head
+  `f744a11a72dd405df0797a55445dc3bc2615a563` 已由 `lvye` APPROVED，并以
+  `c7badb73fa3cf12109344731937b88e8bb3611c5` 合入 protected main；
+  `mergedBy=lvye`、`auto_merge=null`。维护者在窗口
+  `[2026-07-25T01:04:46Z, 2026-07-25T06:59:46Z)` 内于 Agent/Codex credential
+  boundary 外单独执行 D2；Agent privileged dispatch = 0。
+  evidence #518 exact reviewed head
+  `111ccae0c42c03a960cc7e47fc790cda39c4d31a` 由 `lvye` 于
+  `2026-07-25T03:09:59Z` APPROVED，并于 `03:10:05Z` 由 `lvye` 以
+  `8e76ea4b9a832b31588f000c35feffde9f0d1c6d` 合入 protected main；
+  `auto_merge=null`，carrier scope 恰为本 change
+  `evidence/runs/TASK-HLR-002/**` 七个文件。
+  retained identity = private App `4388667` /
+  `arkdeck-host-loop-runtime-901708a7[bot]`，单仓 installation `148855345`
+  （`repository_selection=selected`、`GET /installation/repositories` 权威确认
+  为 `[ArkDeck/ArkDeck]`），permission 恰为 Metadata read / Contents read /
+  Pull requests write / Issues write，`events=[]`；App 非 CODEOWNER、非 ruleset
+  bypass、非 main push actor（安装后复核）。PEM 仅 root-only staging
+  （`-rw------- root:wheel`，path 只以 SHA-256 记录），client/webhook secret
+  即时丢弃，installation token 仅存于执行内存；JWT 签名交由 root 侧 openssl，
+  PEM 从未进入 executor 进程。
+  正向 probe：Deploy Key 以 exact `--force-with-lease` 创建/CAS/删除
+  `agent/host-loop/leases/**`，stale-fence 写入被服务端 precondition 干净拒绝；
+  integration identity 在 `agent/host-loop/probes/**` 创建唯一 PR #514 与携
+  exact probe ID 的 Issue #515；reserved head 上 legacy `agent-pr.yml`
+  run 数 = 0、全状态 PR 数 = 1。
+  负向 7 项全部被拒、零 severity-1：直写 protected main、merge、repository
+  admin same-value PATCH、branch protection、ruleset 与 GraphQL auto-merge 均
+  为 `Resource not accessible by integration`；self-approval 为 HTTP 422
+  平台规则拒绝（`Pull requests: write` 确实触及 review endpoint，如实记录，
+  不得误报为 permission absent）。负向后 main OID 未变、PR
+  `merged=false`、`auto_merge=null`。
+  cleanup：Issue closed、PR closed/unmerged、lease 与 probe refs 两次稳定
+  read-back 均 absent；scheduler owner `arkdeckhlr` 与 launchd label
+  `com.arkdeck.host-loop.runtime` 仍仅为 reservation，account/plist absent，
+  **`workerDisabled=true`**。
+  三轮 void receipt 永久保留且不作为 done 依据：preflight r1
+  `51f2fcb21d5e6ffd002413dd91824f11c1736862b74fbe4b0f636a52d3294474`
+  （envelope-shape fail-closed）、preflight r2
+  `6a0b7e26f8cb40b0a7a537f4641e6d52c04826457c359b6f8fb8ca6af726ac07`
+  （fail-open，C5 结论 void）、phase b2 首轮
+  `b92766acb3f552793c50221320242ae8bc5521a31aade888eb215c773d9c9bc5`
+  （auto-merge 使用伪造 GraphQL node id，未达授权层，该项 void）。
+  evidence blobs = `43f55a2950e1e77461e3ccde99168fdbd2dc8885`（human summary）/
+  `505ca0ab97c8ad7e01c5e902deb9ac03739615fe`（preflight r3）/
+  `3f4d0e28f36937cca8f7c6bb7be04f33bc1e142f`（install verify）/
+  `365b6724d5a31258d693e98b1d21fe396a0b1648`（phase A）/
+  `e39cb93d42321150dd54ba5f8e5fa181676a9e0d`（phase b1）/
+  `4cf01bdcb135b9023e4425fe981eb33448fa4d50`（phase b2 valid）/
+  `a46868f8bbf0829482f866e7de4d01e818af8e0d`（phase b3）。
+  已记录的开放事实：reserved namespace 上 bot `opened` 事件不产生任何
+  `allowed-paths` job（`agent-pr.yml` 排除 `agent/host-loop/**`；
+  `sdd-guard.yml` 的该 job 受 `pull_request` 限制且 types 仅
+  `[reopened, edited]`），维护者授权以一次 PR body update 触发
+  `pull_request: edited` 取得所需检查；此即 CHG-2026-030 F1 缺口，作为
+  TASK-HLR-003 readiness 输入，修法只能落 `agent-pr.yml`。probe ref 由 `lvye`
+  于 `2026-07-25T02:55:42Z` 手动提前删除（#514 timeline `head_ref_deleted`
+  归因），未 merge 由 main OID 不变、probe commit 非 main ancestor 与 PR
+  `closed/unmerged` 三条不依赖分支存在的证据独立确认。
+  本 done 只闭合 HLR-002 的 D2 identity/secret-storage/probe slice；不构成
+  change `verified`、不构成 TASK-HLR-003/004/005 的 readiness，也不注册或启用
+  scheduler——scheduler registration/enable 与 exact source hash binding 属
+  TASK-HLR-003 的分离 D2 evidence 阶段，在其 source PR 合入前 dispatch 恒为 0。）
+- Historical Status:ready（r1 D2 readiness；仅在维护者对本独立 readiness PR exact
   head review/merge 后生效。只授权一轮由 `lvye` 在 Agent/Codex
   credential boundary 外执行的 GitHub App identity/单仓 installation/root-only
   secret staging、reserved probe/lease、正负 authority probes、cleanup 与后一
