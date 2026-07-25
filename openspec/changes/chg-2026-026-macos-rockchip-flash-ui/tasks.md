@@ -28,6 +28,12 @@
 > evidence，把 TASK-RKFUI-001 `ready→blocked`，并新增 TASK-RKFUI-001E host-only
 > read-only selection characterization `blocked→ready`。r7 不携带 Probe implementation、
 > 不运行 selected executable/USB/device command，也不批准 product helper/broker。
+>
+> proposal r8（2026-07-25，on merge）接受 PR #512 的 read-only bookmark fail-closed
+> evidence，把 TASK-RKFUI-001E `ready→blocked`，并新增 TASK-RKFUI-001F
+> `blocked→ready`。r8 只批准 Apple-documented read-only bookmark creation option 的
+> host-only remediation；不携带 Probe implementation，不运行 selected executable/真实
+> tool/USB/device，也不批准 product entitlement/helper/broker。
 
 ## TASK-RKFUI-001 — RockUSB discovery contract 与 signed Sandbox E0 access spike
 
@@ -35,8 +41,8 @@
   `ba8ca9c3ef68b097125154d6e1df20f905d12774`。现行六 entitlement signed Sandbox
   Probe 经 symlink 选择 exact tool 后在 child launch 前观察到新 quarantine 并
   fail closed；`ld`/USB/device/mutation/destructive 全为 0，且该 host exact artifact
-  现已不再满足 quarantine-absent gate。等待 TASK-RKFUI-001E 完成 host-only read-only
-  characterization，以及后续独立 D1 对 product/真实 E0 边界作出决定；不得清除
+  现已不再满足 quarantine-absent gate。等待 TASK-RKFUI-001F 完成 host-only read-only
+  bookmark remediation，以及后续独立 D1 对 product/真实 E0 边界作出决定；不得清除
   quarantine、复制/重建工具规避或直接重试）
 - Readiness review（2026-07-22；host-only 审计，真实 `rkdeveloptool ld`/HDC/device
   dispatch 0）：
@@ -127,10 +133,16 @@
   - 真实 exact tool 当前已 quarantined，Agent 不清除/改写 xattr、不复制/重建/下载替代；
     `user-selected.executable`、Info.plist quarantine exclusion、ArkDeckApp entitlement、
     helper/broker 与真实 E0 device run 均未获授权。
+  - r8 接受 #512：direct/symlink 都完成 selection/scope，但
+    `.withSecurityScope` bookmark 创建/解析 blocked，未到 App hash/signature/quarantine
+    preflight；host target pre/post quarantine absent 且 bytes/signature unchanged，
+    child/`ld`/USB/device/network/xattr-write/privilege/system/mutation/destructive 全为 0。
+    下一步只允许 TASK-RKFUI-001F 验证 Apple-documented
+    `.securityScopeAllowOnlyReadAccess` creation option；结果不恢复本任务。
 - Platform:macos
 - Requirements:`REQ-FLASH-001`、`REQ-UX-007`、`POL-WORKFLOW-001`
 - Acceptance:`AC-FLASH-001-01`、`AC-UX-007-01`
-- Depends on:CHG-2026-026 approved；TASK-RKFUI-001E done；001E 后独立 D1
+- Depends on:CHG-2026-026 approved；TASK-RKFUI-001F done；001F 后独立 D1
   product/真实 E0 readiness merged，并由维护者提供 fresh exact non-quarantined artifact
 - Allowed paths:
   - `openspec/integrations/rockchip/**`
@@ -540,9 +552,14 @@
 
 ## TASK-RKFUI-001E — signed Sandbox read-only selection characterization
 
-- Status:ready（仅在维护者 review/merge proposal r7 后生效；只允许 disposable
-  wrong-hash executable 的 host-only direct/symlink selection，selected process、真实
-  `rkdeveloptool`、USB/HDC/device/mutation/destructive dispatch 全为 0）
+- Status:blocked（PR #512 已由维护者 review/merge 至 `main`，merge OID
+  `56af827a26470f5a9273ca684c9a32b9d39afc4c`。canonical direct 与 single-layer
+  symlink 两次 signed App run 都完成 selection/security scope，但在
+  `.withSecurityScope` bookmark 创建/解析处 blocked，未到 hash/signature/quarantine
+  App preflight；host target pre/post quarantine absent、bytes/signature unchanged，
+  selected child/`ld`/USB/HDC/device/network/xattr-write/mutation/destructive 全为 0。
+  read-only entitlement/Probe candidate 未保留；等待 TASK-RKFUI-001F 验证
+  Apple-documented read-only bookmark creation option）
 - Readiness review r7（2026-07-25；host-only governance audit）：
   - Approval/scope gate:on merge。PR #509 已把现行 read-write Probe 的 fail-closed
     receipt 合入 `main`，但 symlink selection 不足以裁决 canonical behavior。r7 选择
@@ -621,16 +638,141 @@
 
 ### Notes / handoff
 
-- 001E PASS 只证明 read-only PowerBox selection metadata 行为，不证明 external executable
-  可在 Sandbox 中启动、RockUSB USB access、Loader observation 或产品 App 分发形态。
-- 001E merge 后独立 D0 PR 只能标记 001E done；TASK-RKFUI-001 继续 blocked。后续须由新
-  D1 ADR/readiness 决定 product boundary，并由维护者提供 fresh exact
-  non-quarantined artifact 后，才能批准另一个真实 E0 窗口。
+- #512 evidence 在 `evidence/runs/TASK-RKFUI-001E/`；它是 host-only platform
+  real-fault，不是 external executable、USB、Loader、realHardware 或产品 App evidence。
+- 001E 不进入 done，也不生成 D0 状态 PR。TASK-RKFUI-001 继续 blocked；只有 r8 merge 后
+  才可执行 001F，001F 结果之后仍须新 D1 决定 product boundary。
+
+## TASK-RKFUI-001F — signed Sandbox read-only bookmark option remediation
+
+- Status:ready（仅在维护者 review/merge proposal r8 后生效；只允许 disposable
+  wrong-hash fixture 的 host-only canonical/symlink bookmark characterization；
+  selected process、真实 `rkdeveloptool`、network、USB/HDC/device、E1/E2、mutation/
+  destructive dispatch 全为 0）
+- Readiness review r8（2026-07-25；host-only D1 governance audit）：
+  - Approval/scope gate:on merge。PR #512 已把 001E fail-closed receipts 合入 `main`；
+    r8 只批准一个 Apple-documented bookmark creation option remediation，不批准产品
+    entitlement/helper/broker、真实 external-tool launch 或设备 run。
+  - Real-fault gate:satisfied。direct/symlink receipts 的 SHA-256 分别为
+    `9525cae0b8a45bf0107ed08d9f6d4d383c312b7e3cc2c5b72e366630d6c7fc47` /
+    `4de519e88e685ab32b36a0c497087bc08a387c8c98d0a7b164282aec18e15ddf`；
+    两者 selection/scope 成功、bookmark round-trip blocked，App hash/signature/quarantine
+    未观察；host target pre/post quarantine absent、bytes/signature unchanged，全部
+    selected-child/external/device/mutation counters 为 0。
+  - Platform gate:satisfied for characterization。Apple 定义 `.withSecurityScope` 为
+    read/write bookmark，并要求后续不需写入时同时包含
+    `.securityScopeAllowOnlyReadAccess`；Xcode 26.6 macOS 26.5 SDK 同样提供该 option。
+    这只构成合法、最小的待验证假设，不预判 #512 root cause 或 PASS。
+  - Objective gate:satisfied。相对 #512 临时候选，唯一行为变量是 bookmark creation
+    options 从 `.withSecurityScope` 改为
+    `[.withSecurityScope, .securityScopeAllowOnlyReadAccess]`；resolution 继续固定
+    `[.withSecurityScope, .withoutUI]`。由于 001E code 未合入，本任务 implementation
+    同时重现 read-write→read-only entitlement substitution，但不得改变其他五项
+    entitlement、Hardened Runtime、bundle ID、hash/signature/quarantine ordering 或固定
+    `["ld"]` adapter。
+  - Diagnostic gate:satisfied。允许把 combined bookmark catch 拆分为 sanitized
+    `bookmarkCreationFailed` / `bookmarkResolutionFailed` stage，并记录 Foundation
+    error domain/code；禁止记录 error message、selected locator、full path、bookmark bytes
+    或 raw xattr。该诊断只增加 observation，不得改变 preflight/dispatch。
+  - Selector gate:satisfied。canonical run 必须选择 exact canonical entry。symlink run
+    在 launch 前由 host 证明 picker 内唯一 entry 是一层 link 且解析到同一 fixture；
+    returned URL 是否 lexical 保留 link 只作 observation，不是 PASS gate。两者都必须在
+    resolving-symlinks 后精确命中同一 target。
+  - Safety gate:satisfied。fixture 必须 fresh private-temp、inert、ad-hoc signed、
+    quarantine absent、basename=`rkdeveloptool`、regular/executable 且 SHA-256 不等于
+    `bbd7bdc0…9923`。wrong hash 必须在 `Process` 前 fail closed；fixture 永不执行，
+    不运行真实 tool/HDC，不访问 network/USB/device，不写/清 xattr。
+  - Input gate:on merge。r8 draft base =
+    `56af827a26470f5a9273ca684c9a32b9d39afc4c`；proposal/design/tasks/verification blobs
+    为 `6c8c938d85ce6efe4ad0a1d6adae4d1e6460df1d` /
+    `4ef1cd0a36feb72e18427573db107f4d26da76fd` /
+    `2856bd5645b92b6f6deb6c055fae1e1fa6a50bfe` /
+    `1974766d44163f0d0de23aca467db5e48411a77a`；main Probe
+    Python/App/entitlement/tests blobs 为
+    `b703baecb0c80a18e73b40028163cc1adda22133` /
+    `2c763da059c7adf65a4aec170e71c042dbed4288` /
+    `dab555e5b3d03480ab43403ae25a34a6e6822e11` /
+    `3ffc0f7ac675af1bf9ed3b6e21daf1c059feec2a`。implementation 开始前须基于 r8
+    merge 后 current `main` 复核全部输入和 #512 evidence digests；任一漂移即停止。
+  - Permission gate:satisfied。只允许 read-only entitlement + read-only bookmark option。
+    `user-selected.executable`、Info.plist quarantine override、document-scope、implicit-only
+    bookmark、ArkDeckApp entitlement、helper/XPC/broker、quarantine/xattr write/clear、
+    pinned tool copy/rebuild/download 全部禁止。
+  - Evidence gate:satisfied。两个 fresh signed App receipt 分别记录 exact App hash/
+    entitlement/options、selector semantics、bookmark creation/resolution stage、scope、
+    App-observed hash/signature/quarantine、host pre/post target state 与所有 zero counters；
+    不记录 path/locator/raw bookmark/raw xattr。
+  - Sequencing gate:on merge。r8 merge 前不得修改 Probe 或生成 001F 成 PR 工作。merge
+    后 canonical/symlink 两个 run 全 PASS 才可提交 implementation+evidence；任一失败只
+    提交 fail-closed evidence，不保留 entitlement/API change。无论 PASS/BLOCKED 都不
+    自动恢复 TASK-RKFUI-001。
+  - Concurrency gate:satisfied for drafting。r8 起草时 GitHub open PR 集合为空；本任务
+    paths 无并发占用。
+- Platform:macos
+- Requirements:`REQ-FLASH-001`、`REQ-UX-007`、`POL-WORKFLOW-001`
+- Acceptance:`AC-FLASH-001-01`、`AC-UX-007-01`
+- Depends on:CHG-2026-026 proposal r8 merged；PR #512 evidence merged
+- Allowed paths:
+  - `scripts/rockchip_e0_probe/**`
+  - `openspec/changes/chg-2026-026-macos-rockchip-flash-ui/evidence/**`
+- Forbidden paths:
+  - `openspec/constitution.md`
+  - `openspec/specs/**`
+  - `openspec/contracts/**`
+  - `openspec/integrations/rockchip/**`
+  - `Packages/**`
+  - `ArkDeckApp/**`
+  - `ArkDeck.xcodeproj/**`
+- Risk:low（signed Sandbox host-only bookmark metadata characterization；selected child、
+  network、USB/HDC/device、E1/E2、mutation/destructive dispatch 0）
+- Hardware required:no
+
+### Deliverables
+
+- `Probe.entitlements` 与 `probe.py` expected entitlement map 只做
+  read-write→read-only substitution；App bookmark creation options 精确为
+  `[.withSecurityScope, .securityScopeAllowOnlyReadAccess]`，resolution options 精确保持
+  `[.withSecurityScope, .withoutUI]`。tests 显式拒绝 read-write、
+  `user-selected.executable`、document-scope、Info.plist quarantine override 与
+  implicit-only bookmark。
+- 复用 #512 reviewable inert source，在 fresh private temp 确定性构建 wrong-hash
+  `rkdeveloptool` fixture；证明 regular/executable、ad-hoc signature、quarantine absent、
+  hash mismatch。binary/path/bookmark/raw xattr 不入库且 fixture 永不执行。
+- 运行两个 fresh signed App：canonical exact entry 一次，host-proven single-layer
+  symlink entry 一次。两者 returned URL resolving 后必须等于同一 fixture；symlink
+  lexical preservation 只记录、不作 PASS gate。
+- 两个 receipt 都必须显示 bookmark creation/resolution/security scope 成功、
+  `preflightFailure=executableHashMismatch`、`childLaunchAttempted=false`，且 target
+  pre/post quarantine absent、bytes/signature unchanged、全部 dispatch counters 0。
+- 在 `evidence/runs/TASK-RKFUI-001F/` 记录 input closure、Apple/SDK API basis、
+  build/codesign、两个 sanitized receipts、测试、allowed-path 与 privacy scan；不修改
+  TASK status。
+
+### Verification
+
+- Python/static tests 验证 exact six entitlement keys、exact creation/resolution option
+  sets、forbidden entitlement/Info.plist option absence，以及 stage-specific sanitized
+  bookmark failure contract。
+- 两个 App bundle 均通过 `codesign --verify --deep --strict`、Hardened Runtime 与 exact
+  entitlement equality；fixture pre/post hash/size/CDHash/signature 不变且 quarantine
+  absent。
+- direct/symlink 两个 run 的 selected process/`ld`/USB/network/HDC/device/mutation/
+  destructive/sudo/helper/install/system-rule/group/ACL/xattr-write counters 全为 0。
+- `python3 -m unittest scripts/rockchip_e0_probe/test_probe.py -v`、SDD checker、
+  `git diff --check`、allowed-path 与 secret/path/bookmark/raw-xattr scan 全部通过。
+
+### Notes / handoff
+
+- 001F PASS 只证明 disposable fixture 上的 read-only PowerBox/bookmark metadata 行为；
+  不证明 external executable launch、RockUSB access、Loader observation、main App output
+  directory 或产品分发形态。
+- 001F implementation/evidence merge 后仅允许独立 D0 status PR；TASK-RKFUI-001 继续
+  blocked，后续须新 D1 决定 product/真实 E0 boundary。
 
 ## TASK-RKFUI-002 — Flash application facade、plan-only UI 与全局 Job presentation
 
 - Status:blocked（等待 CHG-2026-026 approval +
-  TASK-RKFUI-001/001A/001B/001C/001D/001E done）
+  TASK-RKFUI-001/001A/001B/001C/001D/001F done）
 - Platform:macos
 - Requirements:`REQ-FLASH-003`、`REQ-FLASH-004`、`REQ-FLASH-005`、
   `REQ-FLASH-011`、`REQ-UX-001`、`REQ-UX-005`、`REQ-UX-006`、`REQ-I18N-001`
@@ -638,7 +780,7 @@
   `AC-FLASH-005-02`、`AC-FLASH-011-01`、`AC-UX-001-01`、`AC-UX-005-01`、
   `AC-UX-006-01`、`AC-I18N-001-01`
 - Depends on:TASK-RKFUI-001、TASK-RKFUI-001A、TASK-RKFUI-001B、TASK-RKFUI-001C、
-  TASK-RKFUI-001D、TASK-RKFUI-001E
+  TASK-RKFUI-001D、TASK-RKFUI-001F
 - Allowed paths:
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipFlashApplicationFacade.swift`
   - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/RockchipFlashApplicationFacadeContractTests.swift`
@@ -682,7 +824,7 @@
 ## TASK-RKFUI-003 — Typed rkdeveloptool execute orchestration 与交互式确认接线
 
 - Status:blocked（等待 CHG-2026-026 approval、
-  TASK-RKFUI-001/001A/001B/001C/001D/001E/002 done、non-elevated USB access PASS、
+  TASK-RKFUI-001/001A/001B/001C/001D/001F/002 done、non-elevated USB access PASS、
   软件进态 capability verdict，以及维护者确认 `REQ-FLASH-015` 解释）
 - Platform:macos
 - Requirements:`REQ-FLASH-002`、`REQ-FLASH-007`、`REQ-FLASH-008`、
@@ -696,7 +838,7 @@
   `AC-FLASH-015-02`、`AC-DEV-001-01`、`AC-DEV-002-01`、`AC-DEV-002-02`、
   `AC-DEV-003-01`、`AC-DEV-003-02`、`AC-DEV-006-01`、`AC-DEV-008-01`
 - Depends on:TASK-RKFUI-001、TASK-RKFUI-001A、TASK-RKFUI-001B、TASK-RKFUI-001C、
-  TASK-RKFUI-001D、TASK-RKFUI-001E、TASK-RKFUI-002
+  TASK-RKFUI-001D、TASK-RKFUI-001F、TASK-RKFUI-002
 - Allowed paths:
   - `Packages/ArkDeckKit/Package.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipFlashApplicationFacade.swift`
