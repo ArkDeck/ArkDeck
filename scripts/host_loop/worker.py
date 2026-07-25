@@ -108,6 +108,49 @@ class TaskCandidate:
     base_pin: str | None
 
 
+GATED_GRADE_REASON = "decision grade {grade} is human-gated (D1/D2)"
+
+
+def rejection_reasons(
+    candidate: "TaskCandidate", *, done: frozenset[str] | set[str], main_oid: str
+) -> tuple[str, ...]:
+    """Every reason this candidate is not claimable, in gate order.
+
+    Empty means claimable. This is the SINGLE implementation of the gate set:
+    Worker.select() consumes it to pick a task and Worker.explain() consumes it
+    to describe why nothing was picked. A second, independent copy for the
+    reporting side would drift from the deciding side, and the receipt would then
+    describe gates the round does not actually apply — the same
+    "two implementations of one contract" failure this module has already been
+    bitten by.
+
+    Every gate is evaluated, not short-circuited, because a candidate blocked for
+    three reasons and a candidate blocked for one are different situations and
+    the operator needs to see both.
+    """
+    reasons: list[str] = []
+    if is_never_claim(candidate.task_id):
+        reasons.append("never-claim: the readiness forbids claiming this task")
+    if not candidate.status.startswith("ready"):
+        reasons.append(f"status {candidate.status!r} is not ready")
+    if candidate.hardware_required:
+        reasons.append("hardware required: device work is never host-loop work")
+    missing = sorted(d for d in candidate.dependencies if d not in done)
+    if missing:
+        reasons.append(f"dependencies not done: {missing}")
+    if not candidate.allowed_paths:
+        reasons.append("no declared allowed paths")
+    if candidate.base_pin is not None and candidate.base_pin != main_oid:
+        reasons.append(
+            f"base pin {candidate.base_pin} does not match main {main_oid}")
+    if candidate.decision_grade in GATED_GRADES:
+        reasons.append(GATED_GRADE_REASON.format(grade=candidate.decision_grade))
+    elif candidate.decision_grade not in DISPATCHABLE_GRADES:
+        reasons.append(
+            f"decision grade {candidate.decision_grade!r} is not dispatchable")
+    return tuple(reasons)
+
+
 @dataclass(frozen=True)
 class RoundResult:
     state: WorkerState
@@ -166,6 +209,26 @@ class Worker:
         return f"{self._now()}-{self._dispatch_counter}"
 
     # -- discovery --------------------------------------------------------
+    def explain(
+        self, candidates: list[TaskCandidate], change_id: str, main_oid: str
+    ) -> tuple[bool, list[tuple[str, tuple[str, ...]]]]:
+        """Per-candidate, per-gate verdict for the `--explain` dry run.
+
+        Returns (change_approved, [(task_id, reasons), ...]) where an empty
+        reasons tuple means claimable. Reads nothing but the same inputs select()
+        reads and performs no network call, so it is safe to run before any
+        credential exists.
+
+        This exists because the r3 readiness requires a receipt to carry a
+        per-gate enumeration, and `exit 10` alone cannot supply it: that one code
+        covers "no candidates", "all candidates rejected" and "only never-claim
+        tasks are ready", which are different facts with different consequences.
+        """
+        done = self._done_tasks()
+        rows = [(c.task_id, rejection_reasons(c, done=done, main_oid=main_oid))
+                for c in candidates]
+        return self._change_approved(change_id), rows
+
     def select(
         self, candidates: list[TaskCandidate], change_id: str, main_oid: str
     ) -> tuple[TaskCandidate | None, SelectionOutcome, str]:
@@ -177,25 +240,14 @@ class Worker:
         done = self._done_tasks()
         gated: list[str] = []
         for candidate in candidates:
-            if is_never_claim(candidate.task_id):
-                continue  # readiness self-claim stop
-            if not candidate.status.startswith("ready"):
-                continue
-            if candidate.hardware_required:
-                continue  # device work is never host-loop dispatchable
-            missing = [d for d in candidate.dependencies if d not in done]
-            if missing:
-                continue
-            if not candidate.allowed_paths:
-                continue  # a task with no declared allowed paths is never claimed
-            if candidate.base_pin is not None and candidate.base_pin != main_oid:
-                continue  # base pin drifted; re-readiness, not a claim
-            if candidate.decision_grade in GATED_GRADES:
+            reasons = rejection_reasons(candidate, done=done, main_oid=main_oid)
+            if not reasons:
+                return candidate, SelectionOutcome.CLAIMABLE, "claimable"
+            if reasons == (GATED_GRADE_REASON.format(grade=candidate.decision_grade),):
+                # Human-gated is only the *outcome* when the grade is the single
+                # thing standing in the way; a D1 task that is also blocked or
+                # missing dependencies is not "ready but gated".
                 gated.append(candidate.task_id)
-                continue
-            if candidate.decision_grade not in DISPATCHABLE_GRADES:
-                continue
-            return candidate, SelectionOutcome.CLAIMABLE, "claimable"
 
         if gated:
             return (None, SelectionOutcome.ONLY_GATED_READY,
