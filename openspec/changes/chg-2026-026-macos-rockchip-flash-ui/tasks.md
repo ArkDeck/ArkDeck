@@ -41,8 +41,8 @@
   `ba8ca9c3ef68b097125154d6e1df20f905d12774`。现行六 entitlement signed Sandbox
   Probe 经 symlink 选择 exact tool 后在 child launch 前观察到新 quarantine 并
   fail closed；`ld`/USB/device/mutation/destructive 全为 0，且该 host exact artifact
-  现已不再满足 quarantine-absent gate。等待 TASK-RKFUI-001E 完成 host-only read-only
-  characterization，以及后续独立 D1 对 product/真实 E0 边界作出决定；不得清除
+  现已不再满足 quarantine-absent gate。等待 TASK-RKFUI-001F 完成 host-only read-only
+  bookmark remediation，以及后续独立 D1 对 product/真实 E0 边界作出决定；不得清除
   quarantine、复制/重建工具规避或直接重试）
 - Readiness review（2026-07-22；host-only 审计，真实 `rkdeveloptool ld`/HDC/device
   dispatch 0）：
@@ -772,7 +772,7 @@
 ## TASK-RKFUI-002 — Flash application facade、plan-only UI 与全局 Job presentation
 
 - Status:blocked（等待 CHG-2026-026 approval +
-  TASK-RKFUI-001/001A/001B/001C/001D/001E done）
+  TASK-RKFUI-001/001A/001B/001C/001D/001F done）
 - Platform:macos
 - Requirements:`REQ-FLASH-003`、`REQ-FLASH-004`、`REQ-FLASH-005`、
   `REQ-FLASH-011`、`REQ-UX-001`、`REQ-UX-005`、`REQ-UX-006`、`REQ-I18N-001`
@@ -780,7 +780,7 @@
   `AC-FLASH-005-02`、`AC-FLASH-011-01`、`AC-UX-001-01`、`AC-UX-005-01`、
   `AC-UX-006-01`、`AC-I18N-001-01`
 - Depends on:TASK-RKFUI-001、TASK-RKFUI-001A、TASK-RKFUI-001B、TASK-RKFUI-001C、
-  TASK-RKFUI-001D、TASK-RKFUI-001E
+  TASK-RKFUI-001D、TASK-RKFUI-001F
 - Allowed paths:
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipFlashApplicationFacade.swift`
   - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/RockchipFlashApplicationFacadeContractTests.swift`
@@ -824,7 +824,7 @@
 ## TASK-RKFUI-003 — Typed rkdeveloptool execute orchestration 与交互式确认接线
 
 - Status:blocked（等待 CHG-2026-026 approval、
-  TASK-RKFUI-001/001A/001B/001C/001D/001E/002 done、non-elevated USB access PASS、
+  TASK-RKFUI-001/001A/001B/001C/001D/001F/002 done、non-elevated USB access PASS、
   软件进态 capability verdict，以及维护者确认 `REQ-FLASH-015` 解释）
 - Platform:macos
 - Requirements:`REQ-FLASH-002`、`REQ-FLASH-007`、`REQ-FLASH-008`、
@@ -838,7 +838,7 @@
   `AC-FLASH-015-02`、`AC-DEV-001-01`、`AC-DEV-002-01`、`AC-DEV-002-02`、
   `AC-DEV-003-01`、`AC-DEV-003-02`、`AC-DEV-006-01`、`AC-DEV-008-01`
 - Depends on:TASK-RKFUI-001、TASK-RKFUI-001A、TASK-RKFUI-001B、TASK-RKFUI-001C、
-  TASK-RKFUI-001D、TASK-RKFUI-001E、TASK-RKFUI-002
+  TASK-RKFUI-001D、TASK-RKFUI-001F、TASK-RKFUI-002
 - Allowed paths:
   - `Packages/ArkDeckKit/Package.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipFlashApplicationFacade.swift`
