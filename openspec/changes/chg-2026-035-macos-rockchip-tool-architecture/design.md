@@ -2,7 +2,8 @@
 
 ## Context and constraints
 
-- Approved proposal revision：尚无；r1 仅在 proposal PR 合入后登记为 `proposed`。
+- Approved proposal revision：r1；proposal #526 与 approval-only #527 已合入，
+  readiness #528 已把 TASK-RKTA-001 置为 `ready`。
 - Core baseline：`CORE-2.1.0`，零 Core delta。
 - Related authority：ADR-0002、DEC-004、DEC-007、macOS platform profile、
   flashing/workflow/desktop UX current specs、CHG-2026-026 r9 与
@@ -160,3 +161,65 @@ document-review task 中直接添加或实现。
   reopen/supersession，而不是在本 change 内静默覆盖。
 - 若选择 bundled Rockchip component，必须明确它不改变 DEC-007 的“不捆绑 HDC”；
   Rockchip tool 与 HDC 不得合并成一个模糊的“toolchain”决定。
+
+## r1 decision outcome
+
+Decision/evidence carrier outcome：
+
+> `selected:bundledRockchipComponent`
+
+ADR-0003、DEC-011、macOS profile、candidate matrix 与 run 使用同一 candidate ID。
+目标 topology 是 App-owned exact Rockchip nested component 的 direct child launch，
+不组合 XPC/broker/login item/LaunchAgent/LaunchDaemon/privileged helper，也不重开
+distribution。HDC 仍由 DEC-007 保持 external-first、不捆绑。
+
+### Selected production mapping
+
+```text
+ArkDeckApp composition root
+  -> RockchipFlashApplicationFacade / RockchipFlashExecutionHost
+  -> typed plan + confirmed CurrentDeviceBinding revision
+  -> RockchipFlashAuthorizationGate (single authority mint)
+  -> bundle-owned component descriptor
+  -> FoundationRockchipExecutionProcessPort
+     (absolute bundle URL + RockchipClosedCommand + empty environment)
+  -> FoundationProcessExecutor prepared identity-bound launch
+  -> RockUSB effect
+  -> durable intent + semantic outcome/postflight | waitingForRecovery
+```
+
+后续实现必须让 caller 无法提供 executable URL/hash/argv/environment/component receipt
+或 authority bytes；component 不能自报 caller facts、mint authority 或证明自己的
+effect。fake/simulation/plan-only 不取得真实 executor/binding，plan-only 的外部人工
+结果不能成为 ArkDeck `succeeded`。
+
+### Pre-implementation handoff
+
+本 decision 不批准实现。后续独立 change 在任何 product code 开工前须按 ADR-0003
+逐项批准并闭合：
+
+1. exact upstream commit 的 hermetic/reproducible source→artifact recipe、builder、
+   architecture、artifact identity 与独立 bundled-component registry；
+2. GPL-2.0 legal/distribution acceptance、notice、corresponding source/source offer、
+   modification/build-script delivery；
+3. libusb/libiconv 及全部 non-system dependency 的 source/version/hash/license/build、
+   SBOM、CVE/update/rollback owner；
+4. component `app-sandbox + inherit`、bundle location/identifier、Code Sign On Copy、
+   Hardened Runtime、inside-out Developer ID signing、notarization/ticket；
+5. product composition/authority、child image/key/output leases、tamper/TOCTOU、fixed
+   command、cancel/crash/reconcile 的 contract/fault evidence；
+6. signed Sandbox E0 的 embedded launch、file access、USB/RockUSB 与
+   Developer ID/notarized clean-host/clean-VM evidence；
+7. implementation/evidence 合入后的独立 CHG-2026-026 revision/readiness；001G
+   blocked run 不改写，真实 destructive acceptance 仍单独授权。
+
+任一 gate 失败，Rockchip execute 保持 blocked，implementation task 不得自行改走
+external、helper 或 non-Sandbox fallback。
+
+### Decision rollback and revalidation
+
+实现前 rollback 是单次 revert ADR/DEC/profile/design/evidence carrier；实现后 rollback
+是发布移除 component 并关闭 Rockchip execute 的 App，不回退外部 executable。
+upstream/license/dependency/build identity、Apple embedded/Sandbox/signing/notarization
+规则、ADR-0002/entitlement、Core/Provider command surface变化，或 signed E0/
+clean-host 阻断 direct bundled route时，必须重开 DEC-011/ADR-0003。
