@@ -1,0 +1,17 @@
+{
+  "appExecutableSHA256": "9c1b65ab89a862f5d60c88279c07fd7fd91073e6e9bfa35a75f74b5dbea9099c",
+  "codesignVerified": true,
+  "developerIDIdentityAvailableAtBuild": false,
+  "entitlements": {
+    "com.apple.security.app-sandbox": true,
+    "com.apple.security.device.serial": true,
+    "com.apple.security.device.usb": true,
+    "com.apple.security.files.bookmarks.app-scope": true,
+    "com.apple.security.files.user-selected.read-only": true,
+    "com.apple.security.network.client": true
+  },
+  "hardenedRuntime": true,
+  "schemaVersion": "1.0.0",
+  "signatureClass": "adHoc",
+  "signingIdentityRequested": "adHoc"
+}

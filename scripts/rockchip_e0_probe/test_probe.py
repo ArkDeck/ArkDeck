@@ -1,7 +1,10 @@
 import importlib.util
 import json
 import pathlib
+import plistlib
 import re
+import sys
+import tempfile
 import unittest
 
 
@@ -133,9 +136,25 @@ class RockchipE0ProbeTests(unittest.TestCase):
         self.assertEqual(PROBE.EXACT_ARGUMENTS, ["ld"])
         self.assertNotIn("sudo", PROBE.EXACT_ARGUMENTS)
         self.assertNotIn("sh", PROBE.EXACT_ARGUMENTS)
-        self.assertEqual(len(PROBE.EXPECTED_ENTITLEMENTS), 6)
-        self.assertTrue(PROBE.EXPECTED_ENTITLEMENTS["com.apple.security.app-sandbox"])
-        self.assertTrue(PROBE.EXPECTED_ENTITLEMENTS["com.apple.security.device.usb"])
+        self.assertEqual(
+            PROBE.EXPECTED_ENTITLEMENTS,
+            {
+                "com.apple.security.app-sandbox": True,
+                "com.apple.security.device.serial": True,
+                "com.apple.security.device.usb": True,
+                "com.apple.security.files.bookmarks.app-scope": True,
+                "com.apple.security.files.user-selected.read-only": True,
+                "com.apple.security.network.client": True,
+            },
+        )
+        self.assertTrue(
+            PROBE.FORBIDDEN_ENTITLEMENTS.isdisjoint(PROBE.EXPECTED_ENTITLEMENTS)
+        )
+        entitlement_document = plistlib.loads((ROOT / "Probe.entitlements").read_bytes())
+        self.assertEqual(entitlement_document, PROBE.EXPECTED_ENTITLEMENTS)
+        self.assertTrue(
+            PROBE.FORBIDDEN_ENTITLEMENTS.isdisjoint(entitlement_document)
+        )
         self.assertEqual(
             PROBE.classify_preflight_failure("quarantinePresent"),
             {"verdict": "toolBlocked", "diagnostic": "quarantinePresent", "observations": []},
@@ -143,13 +162,152 @@ class RockchipE0ProbeTests(unittest.TestCase):
         for failure in (
             "securityScopedBookmarkStale",
             "securityScopedBookmarkPathMismatch",
-            "bookmarkCreationOrResolutionFailed",
+            "bookmarkCreationFailed",
+            "bookmarkResolutionFailed",
+            "executableInspectionFailed",
         ):
             with self.subTest(failure=failure):
                 self.assertEqual(
                     PROBE.classify_preflight_failure(failure),
                     {"verdict": "toolBlocked", "diagnostic": failure, "observations": []},
                 )
+
+    def test_bookmark_options_and_sanitized_failure_contract_are_exact(self) -> None:
+        self.assertEqual(
+            PROBE.BOOKMARK_CREATION_OPTIONS,
+            ["withSecurityScope", "securityScopeAllowOnlyReadAccess"],
+        )
+        self.assertEqual(
+            PROBE.BOOKMARK_RESOLUTION_OPTIONS,
+            ["withSecurityScope", "withoutUI"],
+        )
+        swift_source = (ROOT / "RockchipE0ProbeApp.swift").read_text(encoding="utf-8")
+        self.assertRegex(
+            swift_source,
+            r"bookmarkCreationOptions: URL\.BookmarkCreationOptions = \[\s*"
+            r"\.withSecurityScope, \.securityScopeAllowOnlyReadAccess,\s*\]",
+        )
+        self.assertRegex(
+            swift_source,
+            r"bookmarkResolutionOptions: URL\.BookmarkResolutionOptions = \[\s*"
+            r"\.withSecurityScope, \.withoutUI,\s*\]",
+        )
+        self.assertNotIn("bookmarkCreationOrResolutionFailed", swift_source)
+        self.assertNotIn("localizedDescription", swift_source)
+        self.assertNotIn("bookmarkDataBase64", swift_source)
+        self.assertNotIn(".withoutImplicitSecurityScope", swift_source)
+        self.assertNotIn(".minimalBookmark", swift_source)
+        self.assertNotIn(".suitableForBookmarkFile", swift_source)
+        self.assertGreaterEqual(swift_source.count("relativeTo: nil"), 2)
+        self.assertRegex(
+            swift_source,
+            r"selectedPath: selectedURL\.path, bookmarkCreated: true,\s*"
+            r"securityScopeStarted: selectedScope, executableSHA256: nil,\s*"
+            r"signatureIntegrityValid: nil, quarantinePresent: nil,\s*"
+            r'preflightFailure: "executableInspectionFailed"',
+        )
+        for stage in ("bookmarkCreationFailed", "bookmarkResolutionFailed"):
+            observation = PROBE._sanitized_bookmark_observation(
+                {
+                    "bookmarkCreated": False,
+                    "preflightFailure": stage,
+                    "launchErrorDomain": "NSCocoaErrorDomain",
+                    "launchErrorCode": 256,
+                    "localizedDescription": "/private/tmp/forbidden",
+                    "selectedPath": "/private/tmp/forbidden",
+                    "bookmarkDataBase64": "forbidden",
+                }
+            )
+            self.assertEqual(
+                set(observation),
+                {
+                    "creationOptions",
+                    "resolutionOptions",
+                    "created",
+                    "failureStage",
+                    "errorDomain",
+                    "errorCode",
+                },
+            )
+            self.assertEqual(observation["failureStage"], stage)
+            self.assertEqual(observation["errorDomain"], "NSCocoaErrorDomain")
+            self.assertEqual(observation["errorCode"], 256)
+            self.assertNotIn("forbidden", json.dumps(observation))
+        non_bookmark = PROBE._sanitized_bookmark_observation(
+            {
+                "bookmarkCreated": True,
+                "preflightFailure": "executableHashMismatch",
+                "launchErrorDomain": "forbidden",
+                "launchErrorCode": 999,
+            }
+        )
+        self.assertIsNone(non_bookmark["failureStage"])
+        self.assertIsNone(non_bookmark["errorDomain"])
+        self.assertIsNone(non_bookmark["errorCode"])
+
+    def test_info_plist_has_no_quarantine_override(self) -> None:
+        with tempfile.TemporaryDirectory(dir="/private/tmp") as root:
+            path = pathlib.Path(root) / "Info.plist"
+            PROBE._make_info_plist(path)
+            document = plistlib.loads(path.read_bytes())
+        self.assertTrue(PROBE.FORBIDDEN_INFO_PLIST_KEYS.isdisjoint(document))
+
+    def test_selector_lexical_policy_only_gates_canonical_entry(self) -> None:
+        self.assertTrue(
+            PROBE._selector_entry_policy_satisfied("canonicalDirect", True)
+        )
+        self.assertFalse(
+            PROBE._selector_entry_policy_satisfied("canonicalDirect", False)
+        )
+        self.assertTrue(
+            PROBE._selector_entry_policy_satisfied("singleLayerSymlink", False)
+        )
+
+    def test_characterization_dispatch_surface_is_structurally_closed(self) -> None:
+        self.assertEqual(
+            set(PROBE.CHARACTERIZATION_DISPATCH_COUNTERS),
+            {
+                "selectedProcess",
+                "ldReadOnly",
+                "usb",
+                "network",
+                "hdc",
+                "device",
+                "deviceMutation",
+                "destructive",
+                "sudoOrPrivilegeElevation",
+                "helper",
+                "driverInstall",
+                "systemRuleMutation",
+                "groupMutation",
+                "aclMutation",
+                "xattrWrite",
+            },
+        )
+        self.assertEqual(
+            set(PROBE.CHARACTERIZATION_DISPATCH_COUNTERS.values()), {0}
+        )
+        source = (ROOT / "CharacterizationFixture.c").read_text(encoding="utf-8")
+        self.assertIsNone(re.search(r"\b(?:exec|fork|system)\s*\(", source))
+
+    @unittest.skipUnless(sys.platform == "darwin", "requires macOS codesign toolchain")
+    def test_characterization_fixture_build_is_deterministic_and_unpinned(self) -> None:
+        with tempfile.TemporaryDirectory(dir="/private/tmp") as parent:
+            first = pathlib.Path(parent) / "first"
+            second = pathlib.Path(parent) / "second"
+            first_receipt = PROBE.build_characterization_fixture(first)
+            second_receipt = PROBE.build_characterization_fixture(second)
+        self.assertEqual(
+            first_receipt["target"]["sha256"], second_receipt["target"]["sha256"]
+        )
+        self.assertNotEqual(
+            first_receipt["target"]["sha256"], PROBE.PINNED_TOOL_SHA256
+        )
+        self.assertEqual(first_receipt["target"]["codeTrust"], "adHoc")
+        self.assertFalse(first_receipt["target"]["quarantinePresent"])
+        self.assertTrue(first_receipt["selector"]["isSymlink"])
+        self.assertEqual(first_receipt["selector"]["symlinkDepth"], 1)
+        self.assertFalse(first_receipt["fixtureExecuted"])
 
     def test_sanitized_receipt_schema_matches_committed_evidence(self) -> None:
         envelope = {
@@ -187,7 +345,33 @@ class RockchipE0ProbeTests(unittest.TestCase):
             execute_readiness_passed=False,
         )
         committed = json.loads(COMMITTED_RECEIPT.read_text(encoding="utf-8"))
-        self.assertEqual(dictionary_key_paths(receipt), dictionary_key_paths(committed))
+        current_schema = {
+            path
+            for path in dictionary_key_paths(receipt)
+            if not path.startswith("app.entitlements.")
+        }
+        historical_schema = {
+            path
+            for path in dictionary_key_paths(committed)
+            if not path.startswith("app.entitlements.")
+        }
+        self.assertEqual(current_schema, historical_schema)
+        self.assertIn(
+            "com.apple.security.files.user-selected.read-write",
+            committed["app"]["entitlements"],
+        )
+        self.assertNotIn(
+            "com.apple.security.files.user-selected.read-only",
+            committed["app"]["entitlements"],
+        )
+        self.assertIn(
+            "com.apple.security.files.user-selected.read-only",
+            receipt["app"]["entitlements"],
+        )
+        self.assertNotIn(
+            "com.apple.security.files.user-selected.read-write",
+            receipt["app"]["entitlements"],
+        )
         self.assertNotIn("rawArtifacts", receipt)
         self.assertEqual(
             receipt["privacy"]["rawArtifacts"], "emptyBecauseChildLaunchWasBlocked"

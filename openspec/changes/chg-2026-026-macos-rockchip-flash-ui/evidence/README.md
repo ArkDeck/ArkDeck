@@ -27,6 +27,12 @@ evidence/runs/TASK-RKFUI-001E/direct-app-build-receipt.json
 evidence/runs/TASK-RKFUI-001E/direct-selection-receipt.json
 evidence/runs/TASK-RKFUI-001E/symlink-app-build-receipt.json
 evidence/runs/TASK-RKFUI-001E/symlink-selection-receipt.json
+evidence/runs/TASK-RKFUI-001F/run.md
+evidence/runs/TASK-RKFUI-001F/fixture-build-receipt.json
+evidence/runs/TASK-RKFUI-001F/direct-app-build-receipt.json
+evidence/runs/TASK-RKFUI-001F/direct-selection-receipt.json
+evidence/runs/TASK-RKFUI-001F/symlink-app-build-receipt.json
+evidence/runs/TASK-RKFUI-001F/symlink-selection-receipt.json
 evidence/runs/TASK-RKFUI-001A/blocked-preflight-firmware-drift-2026-07-24.md
 evidence/runs/TASK-RKFUI-001A/blocked-preflight-firmware-drift-2026-07-24.json
 evidence/runs/TASK-RKFUI-001A/blocked-preflight-server-discovery-2026-07-24.md
@@ -81,6 +87,17 @@ bytes/signature/quarantine 均不变，selected process、`ld`、USB/device/netw
 mutation/destructive、提权/安装/系统修改与 xattr write 全为 0。按 r7，未通过的
 read-only entitlement/Probe candidate 不保留；本次只归档 fail-closed evidence，不修改
 TASK status，也不构成 real E0 或 product boundary 决策。
+
+`TASK-RKFUI-001F` 在同一 disposable wrong-hash shape 上把 bookmark creation options
+精确变为 `.withSecurityScope + .securityScopeAllowOnlyReadAccess`，resolution 保持
+`.withSecurityScope + .withoutUI`。fresh canonical 与 single-layer symlink App 都完成
+bookmark round-trip/security scope，并观察到同一 fixture hash、valid signature 与
+quarantine absent，随后以 `executableHashMismatch` 在 Process 前停止。symlink returned
+URL 的 lexical entry 未保留，但解析后精确命中同一 target，按 r8 只作 observation。
+fixture bytes/signature/quarantine 前后不变，selected process、`ld`、network、USB/device、
+E1/E2、mutation/destructive、提权/安装/系统修改与 xattr write 全为 0。该 PASS 只属于
+host-only bookmark metadata evidence；本 PR 不修改 TASK status，也不恢复真实 E0/
+product boundary。
 
 `TASK-RKFUI-001A` firmware-drift preflight 只读确认目标 serial、HDC/server 与 clean
 `rkdeveloptool` pins 命中，但当前设备报告 OpenHarmony `7.0.0.33`，不同于 PR #440
