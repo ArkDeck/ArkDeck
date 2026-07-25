@@ -6,7 +6,7 @@
 - Evidence class：`platform` + `contract`
 - Executor：`agent`
 - Execution window：`2026-07-25T10:33:15Z` —
-  `2026-07-25T11:16:24Z`（final exact-head rerun pending）
+  `2026-07-25T11:23:01Z`
 - Audit base / readiness merge：
   `d063b3ca775a5e858020e21a7b4a53db31f37144`
 - TASK-BRC-002 readiness exact head：
@@ -180,12 +180,13 @@ v11 fresh roots 仅用于探索；最终 evidence 来自 run 30155933128 hosted 
 
 ## AC verdict
 
-- `BRC-REPRO-001`：**PENDING final exact-head committed-metadata audit**。相同 exact
+- `BRC-REPRO-001`：**PASS（hosted exact-image two-clean-builder slice）**。相同 exact
   inputs/toolchain 在两个 fresh roots 产生 byte-identical unsigned artifact 与
   registry/SBOM/notices/source manifest；无 normalization、ambient
-  Homebrew/PATH/network/cache dependency。run 30155933128 的 builders、A/B compare
-  与 comparison upload 均 PASS；该 run 最后只因 repo 仍为 pre-materialization
-  metadata 而在 committed audit 预期失败。下一 exact head 必须全绿后才改为 PASS。
+  Homebrew/PATH/network/cache dependency。materialization run 30155933128 的
+  builders、A/B compare 与 comparison upload 均 PASS；final verification run
+  30156115854 在新 fresh builders 上再次生成相同 outputs，且 committed metadata
+  audit PASS。
 - `AC-JOB-005-01`：**PASS（TASK-BRC-002 build/descriptor slice）**。host orchestration
   使用 absolute executable + argument arrays；caller 路径/环境被丢弃，无 shell
   expansion。该结论不声称 runtime image/key argv。
@@ -196,7 +197,11 @@ v11 fresh roots 仅用于探索；最终 evidence 来自 run 30155933128 hosted 
 GitHub two-builder materialization run = 30155933128，exact head =
 `5e473df5f9ef85f6a1ccc2b41e5b83a8c7cb5f2f`。builder A/B 与 byte-identical
 comparison PASS，committed metadata audit 预期 FAIL；该 run 只授权本次
-materialization，不单独闭合 implementation evidence。
+materialization，不单独闭合 implementation evidence。final verification
+[run 30156115854](https://github.com/ArkDeck/ArkDeck/actions/runs/30156115854)，
+exact head = `bee231543718716c9cf227860bf1611bdad1edac`：unit、builder A、
+builder B、byte-identical comparison、comparison receipt upload 与 committed
+metadata audit 全部 PASS。
 
 ## Effect and privacy counters
 
@@ -223,7 +228,7 @@ credential、用户 path、device identifier 与 binary 均未入仓。
 - 本 run 不证明 signed package、Sandbox child launch、file lease、RockUSB、clean-host
   distribution 或真实 Flash；这些分别属于 TASK-BRC-003/005/006 与后续
   CHG-2026-026。
-- hosted materialization output 已写入声明 paths；仍需下一 exact-head workflow
-  对 committed metadata 全绿复验，再把本记录的 pending verdict 改为 PASS。
+- hosted materialization output 已写入声明 paths，并由 run 30156115854 在两个
+  新 hosted builders 上完成 committed metadata 全绿复验。
 - TASK-BRC-002 保持 `ready`；implementation/evidence 合入后必须另开 D0 status-only
   PR，TASK-BRC-003 在该 done merge 与独立 D1 readiness 前继续 `blocked`。
