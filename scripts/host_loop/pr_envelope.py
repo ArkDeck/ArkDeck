@@ -32,9 +32,17 @@ CHANGE_BOUND_TYPES = (
 PR_TYPES = TASK_BOUND_TYPES + CHANGE_BOUND_TYPES
 DECISION_GRADES = frozenset(("D0", "D1", "D2"))
 
-TASK_RE = re.compile(r"^TASK-[A-Z0-9]+-[0-9]{3}$")
+# Single canonical task-token definition, byte-identical to
+# scripts/check_pr_paths.py TASK_TOKEN_TEXT (MECH-004 r4 grammar). The active
+# task-header grammar allows one uppercase suffix after the three digits
+# (TASK-HLR-002A) and multi-segment groups (TASK-UD-REDACTOR-001); a narrower
+# copy here silently rejected 14 of 46 active task headers. Uniqueness against
+# the active tasks.md header is enforced separately by validate_envelope, so
+# widening the token does not widen path authority.
+TASK_TOKEN_TEXT = r"TASK-[A-Z0-9]+(?:-[A-Z0-9]+)*-[0-9]{3}[A-Z]?"
+TASK_RE = re.compile(rf"^{TASK_TOKEN_TEXT}$")
 TASK_HEADER_RE = re.compile(
-    r"^##\s+(TASK-[A-Z0-9]+-[0-9]{3})(?:\s|$)",
+    rf"^##\s+({TASK_TOKEN_TEXT})(?:\s|$)",
     re.MULTILINE,
 )
 CHANGE_RE = re.compile(r"^CHG-[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*$")
