@@ -1,0 +1,51 @@
+---
+schema_version: 1.0.0
+change_id: CHG-2026-035-macos-rockchip-tool-architecture
+change_revision: 1
+platform: macos
+evidence_classes:
+- documentReview
+cases:
+- acceptance_id: RKTA-OPTIONS-001
+  test_id: TEST-RKTA-OPTIONS-001
+  method: Document review of the source-pinned end-state candidate matrix.
+  expected_source: openspec/changes/chg-2026-035-macos-rockchip-tool-architecture/verification.md#acceptance-matrix
+  minimum_evidence: documentReview
+  expected_result: >-
+    Selected-external, bundled Rockchip component, XPC/broker/helper,
+    plan-only handoff and distribution-revisit end states are each evaluated
+    against the complete mandatory criteria. Every cell has a pass, fail,
+    unknown or requires-new-change result with a primary source and a clear
+    fact-versus-inference label; no unknown is promoted to pass.
+- acceptance_id: RKTA-DECISION-001
+  test_id: TEST-RKTA-DECISION-001
+  method: Cross-file document review of the ADR, decision inventory and macOS profile.
+  expected_source: openspec/changes/chg-2026-035-macos-rockchip-tool-architecture/verification.md#acceptance-matrix
+  minimum_evidence: documentReview
+  expected_result: >-
+    The carrier chooses exactly one complete end-state or explicitly concludes
+    that no candidate is viable. The ADR, decision inventory and macOS profile
+    agree and record rejected alternatives, residual risks, rollback,
+    revalidation triggers and every required distribution or Core reopen.
+- acceptance_id: RKTA-BOUNDARY-001
+  test_id: TEST-RKTA-BOUNDARY-001
+  method: Document review of production authority, provenance and effect reachability.
+  expected_source: openspec/changes/chg-2026-035-macos-rockchip-tool-architecture/verification.md#acceptance-matrix
+  minimum_evidence: documentReview
+  expected_result: >-
+    A selected execution path identifies the App composition root, authority
+    minting point, component boundary, exact tool identity, typed argv, file
+    leases, process and device dispatch, and durable intent/outcome. A
+    plan-only or no-viable result instead identifies zero process/device
+    dispatch and cannot be represented as ArkDeck execution success.
+- acceptance_id: RKTA-HANDOFF-001
+  test_id: TEST-RKTA-HANDOFF-001
+  method: Document review of scope, dependencies, diff and zero-effect evidence.
+  expected_source: openspec/changes/chg-2026-035-macos-rockchip-tool-architecture/verification.md#acceptance-matrix
+  minimum_evidence: documentReview
+  expected_result: >-
+    The follow-on change and all prerequisite approvals are explicit. Core
+    specs and contracts, the HDC external-first decision, CHG-2026-026 task
+    state and the merged 001G evidence are unchanged, while this task performs
+    zero product build, process, network, USB, device, helper, install,
+    privilege or destructive dispatch.
