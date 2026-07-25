@@ -1,0 +1,223 @@
+{
+  "schema": "arkdeck-hlr002a-live-canary-r11/v1",
+  "classification": "live GitHub repository ref/workflow canary; zero device or GitHub settings mutation",
+  "executor": "agent",
+  "status": "success",
+  "started_at_utc": "2026-07-25T00:01:07Z",
+  "finished_at_utc": "2026-07-25T00:06:22Z",
+  "readiness": {
+    "pr": 504,
+    "reviewed_head_oid": "e304f1f2e70a78652accdceea502eda92e2b8519",
+    "reviewer": "lvye",
+    "review_state": "APPROVED",
+    "review_submitted_at_utc": "2026-07-24T23:58:43Z",
+    "merge_oid": "f1ebdf0b67014cbb921db4ae55f2400448f620ce",
+    "merge_parent_oid": "1c1ae70a869d03e50a3a012e53d2a1b47a9f311d",
+    "merge_tree_oid": "9385dde9ce6efb9bad3d960f2e38d894daa009d7",
+    "reviewed_head_tree_oid": "9385dde9ce6efb9bad3d960f2e38d894daa009d7",
+    "merged_at_utc": "2026-07-24T23:59:20Z",
+    "merged_by": "lvye",
+    "auto_merge": null,
+    "subject": "governance(CHG-2026-030): remediate HLR-002A canary race (#504)"
+  },
+  "common_source": {
+    "parent_oid": "f1ebdf0b67014cbb921db4ae55f2400448f620ce",
+    "tree_oid": "9385dde9ce6efb9bad3d960f2e38d894daa009d7",
+    "author": "ArkDeck Agent <arkdeck-agent@users.noreply.github.com>",
+    "committer": "ArkDeck Agent <arkdeck-agent@users.noreply.github.com>"
+  },
+  "targets": {
+    "reserved_ref": "refs/heads/agent/host-loop/probes/0f803ee1-332e-4bf3-a58c-32af75ce8579",
+    "ordinary_ref": "refs/heads/agent/hlr-002a-control/5dab2542-ec7b-4561-b3d0-ad41046affb6"
+  },
+  "reserved": {
+    "commit_oid": "31e490996d0acf095e59b2d5100354da5019087c",
+    "subject": "test(TASK-HLR-002A): reserved creator canary r11",
+    "push": {
+      "attempts": 1,
+      "exit_code": 0,
+      "result": "created"
+    },
+    "sdd_guard": {
+      "filter": "workflow=sdd-guard.yml,event=push,branch=agent/host-loop/probes/0f803ee1-332e-4bf3-a58c-32af75ce8579,head_sha=31e490996d0acf095e59b2d5100354da5019087c,per_page=100,page=1",
+      "total_count": 1,
+      "run_id": 30135271767,
+      "conclusion": "success",
+      "guard_job_id": 89617752951,
+      "guard_job_conclusion": "success",
+      "allowed_paths_job_id": 89617753419,
+      "allowed_paths_job_conclusion": "skipped"
+    },
+    "swift_ci": {
+      "filter": "workflow=swift-ci.yml,event=push,branch=agent/host-loop/probes/0f803ee1-332e-4bf3-a58c-32af75ce8579,head_sha=31e490996d0acf095e59b2d5100354da5019087c,per_page=100,page=1",
+      "total_count": 1,
+      "run_id": 30135271761,
+      "conclusion": "success",
+      "swift_job_id": 89617753013,
+      "swift_job_conclusion": "success",
+      "completed_at_utc": "2026-07-25T00:03:39Z"
+    },
+    "legacy_creator_readbacks": [
+      {
+        "filter": "workflow=agent-pr.yml,event=push,branch=agent/host-loop/probes/0f803ee1-332e-4bf3-a58c-32af75ce8579,head_sha=31e490996d0acf095e59b2d5100354da5019087c,per_page=100,page=1",
+        "run_count": 0,
+        "pr_filter": "state=all,head=ArkDeck:agent/host-loop/probes/0f803ee1-332e-4bf3-a58c-32af75ce8579,base=main,per_page=100,page=1",
+        "pr_count": 0,
+        "pagination_link_present": false,
+        "phase": "dispatch_barrier"
+      },
+      {
+        "filter": "workflow=agent-pr.yml,event=push,branch=agent/host-loop/probes/0f803ee1-332e-4bf3-a58c-32af75ce8579,head_sha=31e490996d0acf095e59b2d5100354da5019087c,per_page=100,page=1",
+        "run_count": 0,
+        "pr_filter": "state=all,head=ArkDeck:agent/host-loop/probes/0f803ee1-332e-4bf3-a58c-32af75ce8579,base=main,per_page=100,page=1",
+        "pr_count": 0,
+        "pagination_link_present": false,
+        "phase": "pre_cleanup"
+      }
+    ]
+  },
+  "ordinary": {
+    "commit_oid": "d1da93ebadbaa3b591dbec4776bcda12e3cd16e3",
+    "subject": "test(TASK-HLR-002A): ordinary creator control r11",
+    "push": {
+      "attempts": 1,
+      "exit_code": 0,
+      "result": "created",
+      "dispatch_barrier_closed_before_utc": "2026-07-25T00:02:19Z"
+    },
+    "sdd_guard": {
+      "filter": "workflow=sdd-guard.yml,event=push,branch=agent/hlr-002a-control/5dab2542-ec7b-4561-b3d0-ad41046affb6,head_sha=d1da93ebadbaa3b591dbec4776bcda12e3cd16e3,per_page=100,page=1",
+      "total_count": 1,
+      "run_id": 30135308323,
+      "conclusion": "success",
+      "guard_job_id": 89617862390,
+      "guard_job_conclusion": "success",
+      "allowed_paths_job_id": 89617862748,
+      "allowed_paths_job_conclusion": "skipped"
+    },
+    "swift_ci": {
+      "filter": "workflow=swift-ci.yml,event=push,branch=agent/hlr-002a-control/5dab2542-ec7b-4561-b3d0-ad41046affb6,head_sha=d1da93ebadbaa3b591dbec4776bcda12e3cd16e3,per_page=100,page=1",
+      "total_count": 1,
+      "run_id": 30135308065,
+      "conclusion": "success",
+      "swift_job_id": 89617861786,
+      "swift_job_conclusion": "success",
+      "completed_at_utc": "2026-07-25T00:04:00Z"
+    },
+    "legacy_creator": {
+      "filter": "workflow=agent-pr.yml,event=push,branch=agent/hlr-002a-control/5dab2542-ec7b-4561-b3d0-ad41046affb6,head_sha=d1da93ebadbaa3b591dbec4776bcda12e3cd16e3,per_page=100,page=1",
+      "run_count": 1,
+      "run_id": 30135308064,
+      "run_conclusion": "success",
+      "open_pr_job_id": 89617862335,
+      "open_pr_job_conclusion": "success",
+      "allowed_paths_job_id": 89617903654,
+      "allowed_paths_job_conclusion": "success",
+      "readback_count": 2,
+      "pagination_link_present": false
+    },
+    "pull_request": {
+      "filter": "state=all,head=ArkDeck:agent/hlr-002a-control/5dab2542-ec7b-4561-b3d0-ad41046affb6,base=main,per_page=100,page=1",
+      "readback_count": 2,
+      "count": 1,
+      "number": 505,
+      "title": "test(TASK-HLR-002A): ordinary creator control r11",
+      "author": "github-actions[bot]",
+      "head_oid": "d1da93ebadbaa3b591dbec4776bcda12e3cd16e3",
+      "head_ref": "agent/hlr-002a-control/5dab2542-ec7b-4561-b3d0-ad41046affb6",
+      "base_oid": "f1ebdf0b67014cbb921db4ae55f2400448f620ce",
+      "base_ref": "main",
+      "created_at_utc": "2026-07-25T00:02:14Z",
+      "pre_cleanup_state": "open",
+      "pre_cleanup_merged_at": null,
+      "auto_merge": null,
+      "pagination_link_present": false
+    }
+  },
+  "all_event_run_matrix": {
+    "reserved": [
+      {
+        "run_id": 30135271767,
+        "workflow": "SDD Guard",
+        "event": "push",
+        "conclusion": "success"
+      },
+      {
+        "run_id": 30135271761,
+        "workflow": "Swift CI",
+        "event": "push",
+        "conclusion": "success"
+      }
+    ],
+    "ordinary": [
+      {
+        "run_id": 30135308323,
+        "workflow": "SDD Guard",
+        "event": "push",
+        "conclusion": "success"
+      },
+      {
+        "run_id": 30135308064,
+        "workflow": "Agent PR",
+        "event": "push",
+        "conclusion": "success"
+      },
+      {
+        "run_id": 30135308065,
+        "workflow": "Swift CI",
+        "event": "push",
+        "conclusion": "success"
+      }
+    ],
+    "action_required_count": 0
+  },
+  "post_dispatch_drift": {
+    "used": false,
+    "main_oid_at_pre_cleanup": "f1ebdf0b67014cbb921db4ae55f2400448f620ce",
+    "main_oid_after_cleanup_via_git": "f1ebdf0b67014cbb921db4ae55f2400448f620ce"
+  },
+  "cleanup": {
+    "ordinary_delete_attempts": 1,
+    "ordinary_delete_exit_code": 0,
+    "reserved_delete_attempts": 1,
+    "reserved_delete_exit_code": 0,
+    "both_refs_absent_readbacks": 2,
+    "ordinary_pr_final_state": "closed",
+    "ordinary_pr_merged": false,
+    "ordinary_pr_merged_at": null,
+    "ordinary_pr_closed_at_utc": "2026-07-25T00:05:36Z",
+    "ordinary_pr_auto_merge": null,
+    "reserved_pr_count_after_cleanup": 0,
+    "ordinary_pr_count_after_cleanup": 1
+  },
+  "api_observation": {
+    "required_workflow_job_pr_queries_complete": true,
+    "optional_issue_events_query": "HTTP 403 after required facts and cleanup were complete",
+    "post_cleanup_main_fallback": "exact git ls-remote and fetch"
+  },
+  "mutations": {
+    "reserved_ref_create_attempts": 1,
+    "reserved_ref_delete_attempts": 1,
+    "ordinary_ref_create_attempts": 1,
+    "ordinary_ref_delete_attempts": 1,
+    "github_actions_pr_creations": 1,
+    "github_head_deletion_auto_closures": 1,
+    "agent_direct_pr_state_mutations": 0,
+    "review_mutations": 0,
+    "merge_mutations": 0,
+    "auto_merge_mutations": 0,
+    "ruleset_mutations": 0,
+    "branch_protection_mutations": 0,
+    "repository_setting_mutations": 0,
+    "credential_mutations": 0,
+    "device_mutations": 0
+  },
+  "conclusion": {
+    "reserved_partition": "pass",
+    "ordinary_creator_liveness": "pass",
+    "creator_canary": "pass",
+    "cleanup": "pass",
+    "task_done_authorized_by_this_receipt": false,
+    "next_step": "merge an independent evidence PR, then submit a separate D0 ready-to-done PR"
+  }
+}
