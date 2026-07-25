@@ -1,9 +1,9 @@
 # Verification Plan — CHG-2026-026
 
-> Change:CHG-2026-026@r7
+> Change:CHG-2026-026@r8
 > Status:planned
-> Note(2026-07-25):r7 只新增 TASK-RKFUI-001E signed Sandbox read-only selection
-> characterization，并把 #509 后的 TASK-RKFUI-001 如实恢复 blocked；不改变
+> Note(2026-07-25):r8 接受 #512 bookmark fail-closed evidence，把 001E 标记 blocked，
+> 并只新增 TASK-RKFUI-001F read-only bookmark creation option remediation；不改变
 > Core/AC/schema、artifact version/hash/upstream、typed argv、target/firmware/HDC/
 > transport、RockUSB grammar 或 destructive pins。
 
@@ -29,6 +29,11 @@
 - r7 host fixture：private-temp inert/ad-hoc-signed/quarantine-absent executable，basename
   `rkdeveloptool`，SHA-256 必须不等于 `bbd7bdc0…9923`；canonical direct URL 与解析到同一
   target 的单层 symlink 各一次。fixture 永不执行，不访问网络/USB/device。
+- r8 bookmark candidate：同一 fixture/source/build shape；bookmark creation options 必须
+  精确为 `[.withSecurityScope, .securityScopeAllowOnlyReadAccess]`，resolution options
+  精确为 `[.withSecurityScope, .withoutUI]`。canonical 与 host-proven single-layer
+  symlink 各用 fresh signed App；symlink returned URL lexical match 只观察，resolved target
+  equality 为 gate。
 - Hardware：TASK-RKFUI-001 E0、TASK-RKFUI-001A 对 exact DAYU200 /
   OpenHarmony `7.0.0.33` / HDC `3.2.0f` / USB 组合的 E1 mode transition 与
   TASK-RKFUI-004；其余测试无设备、零真实 dispatch。r2 允许 001A 为 001 提供 Loader
@@ -41,7 +46,7 @@
 | AC ID | Verification method | Expected result | Evidence |
 | --- | --- | --- | --- |
 | AC-FLASH-001-01 | parser golden/real-fault + E0 `ld` | homogeneous LF/CRLF 同义且仅 2207:350a Loader applicable；bare/mixed/其他/畸形阻断，相似命令 0 | TASK-RKFUI-001/001B |
-| AC-UX-007-01 | signed Sandbox E0 + read-only selection matrix | permission/driver/offline 可区分；read-only direct/symlink metadata 如实；sudo/helper/install/system mutation 0 | TASK-RKFUI-001/001E |
+| AC-UX-007-01 | signed Sandbox E0 + read-only selection/bookmark matrix | permission/driver/offline 可区分；read-only direct/symlink metadata 与 bookmark stage 如实；sudo/helper/install/system mutation 0 | TASK-RKFUI-001/001E/001F |
 | AC-FLASH-003-01 | archive drift/corrupt/unsafe fixture | execute 与 planned-success 均 blocked | TASK-RKFUI-002/003 |
 | AC-FLASH-004-01 | plan/manifest encode-decode + UI | mode 在 UI/Job/manifest/History presentation 持续可见 | TASK-RKFUI-002 |
 | AC-FLASH-005-01 | plan-only integration | exact plan 含 mutation/destructive steps，runner 0，terminal planned | TASK-RKFUI-002 |
@@ -80,6 +85,11 @@
   entitlement 残留、Info.plist quarantine exclusion、fixture hash 意外命中、canonical
   target 不同、bookmark/scope failure、direct/symlink 任一 pre/post quarantine drift、
   selected child launch 非零。任一 case 均 blocked，USB/device/privilege/xattr-write 0。
+- r8 bookmark remediation：creation option 缺少/重复/多出任意 flag、resolution options
+  漂移、document-scope/implicit-only fallback、combined failure 隐藏 stage、diagnostic
+  泄漏 message/path/bookmark bytes、symlink host input 非一层或 resolved target 不同。
+  returned URL lexical canonicalization 单独不失败；其余任一 case blocked，selected child/
+  network/USB/device/privilege/xattr-write 0。
 - Discovery：空、多个、重复 LocationID、Maskrom、未知 PID/mode、bare CR、LF/CRLF 混用、
   缺末尾 terminator、空 record、截断、额外垃圾、timeout。
 - Mode transition：already Loader skip；HDC offline/unsupported/empty target；command nonzero/exit0
@@ -125,6 +135,10 @@
   `user-selected.executable`、quarantine exclusion/clear/write、复制或重建 pinned tool、
   修改 ArkDeckApp entitlement、运行 selected fixture/真实 tool/USB/device 均禁止。001E
   PASS 不恢复 TASK-RKFUI-001，不构成 product broker/helper 或 real E0 approval。
+- r8 merge 前不得修改 signed Probe 或生成 001F 成 PR implementation；merge 后也只能
+  在 #512 candidate 上加入 exact read-only creation option 与 sanitized failure stage。
+  001F PASS 不恢复 TASK-RKFUI-001；document-scope、implicit-only access、产品
+  entitlement/helper/broker、真实 tool/USB/device 继续禁止。
 - `REQ-FLASH-015` 交互式 App executor 解释未获维护者明确确认时，execute 不实现；不得把
   plan-only/handoff 记作一键真机刷机。
 - DAYU200 exact combination 的 `reboot loader` E1 capability 未证明 supported 时，Route B
@@ -145,9 +159,12 @@
 - [ ] r6 source provenance closure 只接受
       `bbd7bdc0…9923` ↔ `304f0737…` ↔ `PR#445@cbad982…` ↔ exact evidence digest；
       missing/drift 与 runtime Git inference 均 fail closed
-- [ ] r7 read-only direct/symlink characterization 均 bookmark/scope PASS、pre/post
-      quarantine absent、wrong-hash fail closed、selected child/USB/device/xattr-write 0；
-      结果不被重分类为 real E0/product evidence
+- [ ] r7/#512 read-only direct/symlink BLOCKED evidence 保持 immutable，bookmark failure、
+      pre/post quarantine absent 与所有 zero counters 如实；未通过 candidate 未合入，
+      结果未被重分类为 real E0/product evidence
+- [ ] r8 read-only creation/resolution options 精确，direct/symlink 均 bookmark round-trip/
+      scope PASS、resolved target match、pre/post quarantine absent、wrong-hash fail closed，
+      selected child/network/USB/device/xattr-write 0；lexical symlink normalization 如实记录
 - [ ] Real hardware App path 由适格操作者执行，evidence 精确 pin 全组合
 - [ ] Traceability updated（无新 Core AC ID；记录现有 AC → 新 tests/evidence）
 - [ ] 无 shell/sudo/helper/BlueTool asset、无 secret/真实 serial/raw 敏感输出入库

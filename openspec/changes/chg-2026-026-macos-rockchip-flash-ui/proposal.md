@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-026
-revision: 7 # r7 只起草 signed Sandbox read-only selection characterization；仅在维护者 review/merge 本 revision PR 后生效
-status: approved # r1-r6 已由 PR #298/#440/#452/#461/#481/#491 批准；r7 scoped revision 仍须维护者 review/merge 后生效
+revision: 8 # r8 只起草 read-only bookmark option remediation；仅在维护者 review/merge 本 revision PR 后生效
+status: approved # r1-r7 已由 PR #298/#440/#452/#461/#481/#491/#510 批准；r8 scoped revision 仍须维护者 review/merge 后生效
 class: platform
 core_change_level: none
 owner: "@lvye"
@@ -100,6 +100,22 @@ sleep、弱设备重绑定和非严格镜像集合。ArkDeck 只借鉴交互目�
   tool 规避 assessment、ArkDeckApp entitlement 修改、helper/broker 产品架构或真实 E0
   重试。001E PASS 只回答 read-only selection metadata 行为；后续真实 external-tool E0 与
   产品分发边界仍需新的 D1 readiness。
+- r8 接受 PR #512 的 001E fail-closed evidence：canonical direct 与单层 symlink 两次
+  signed App 选择均完成且 `securityScopeStarted=true`，但都在
+  `.withSecurityScope` bookmark 创建/解析处返回
+  `bookmarkCreationOrResolutionFailed`，因此没有到达 fixture hash/signature/quarantine
+  App preflight。host 独立证明 fixture target 选择前后 quarantine absent、bytes/signature
+  unchanged；selected child、`ld`、USB/device/network/xattr-write 与全部 mutation/
+  destructive/privilege/system counters 为 0。symlink receipt 还如实显示 returned URL
+  未保留 lexical link entry、但解析到同一 canonical target。
+- r8 将 TASK-RKFUI-001E `ready→blocked`，并新增独立 TASK-RKFUI-001F。001F 只在
+  #512 read-only candidate 上增加 Apple 文档指定的 bookmark creation option
+  `.securityScopeAllowOnlyReadAccess`，与 `.withSecurityScope` 组合；bookmark resolution
+  options、其余五项 entitlement、wrong-hash fixture、preflight ordering 与全部 Safety/
+  privacy gate 保持不变。这是待验证的平台假设，不把 #512 失败预先归因为缺少该 option。
+- r8 仍不批准主 App entitlement、implicit-only/non-persistent access、document-scope、
+  executable-writing entitlement、quarantine exclusion/clear/write、helper/broker、
+  pinned tool 复制/重建/下载、真实 external-tool launch 或任何 USB/device run。
 - 新增 Flash application facade、SwiftUI 页面和中英文 String Catalog：显式刷新/选择
   设备、选择本地 `images.tar.gz`、流式校验、plan-only、精确计划、危险确认、阶段日志、
   normal/切换中/Loader/歧义状态、软件进态、物理按键 fallback、execution-mode badge、
@@ -181,6 +197,12 @@ sleep、弱设备重绑定和非严格镜像集合。ArkDeck 只借鉴交互目�
   disposable fixture 必须在选择前证明 wrong hash/quarantine absent，并在 direct/symlink
   两个独立 run 后再次检查；任一 metadata drift、bookmark/scope failure 或非零 child
   launch 均 blocked，不允许追加 executable-writing entitlement 或 quarantine exclusion。
+- r8 host-only remediation 仍只使用 disposable wrong-hash fixture；相对 #512 candidate
+  唯一行为变量是 bookmark creation options 加入
+  `.securityScopeAllowOnlyReadAccess`。canonical 与 symlink 各使用 fresh signed App；
+  symlink lexical preservation 只作 observation，host-proven one-layer selector 与 returned
+  URL resolving 到同一 target 才是 identity gate。任一 bookmark/preflight/metadata/counter
+  gate 失败均阻断，不运行 fixture 或真实工具。
 - 用户选择的工具与镜像使用 security-scoped access；默认日志只记录脱敏路径和 hash，
   raw tool output 作为受控本地 Artifact，不自动上传。
 - 分区写 intent 已 durable 而 outcome 缺失时进入 `outcomeUnknown`，禁止自动重放；恢复
@@ -471,3 +493,66 @@ sleep、弱设备重绑定和非严格镜像集合。ArkDeck 只借鉴交互目�
 - Concurrency：起草时唯一 open PR #503 只修改
   `openspec/changes/chg-2026-031-macos-session-settings/tasks.md`，与本 r7 四个治理文件及
   未来 001E paths 无重叠。r7 是 D1 判断门；本 PR 合入前不得起草 001E 成 PR 工作。
+
+### r8 scoped read-only bookmark option remediation（2026-07-25；on merge）
+
+- 分类：proposal revision / platform API remediation readiness = D1。本 PR 只修改
+  proposal/design/tasks/verification；不修改 Probe entitlement/code/tests，不启动 signed
+  App，不运行 selected fixture、HDC、`rkdeveloptool`、USB 或 device command，也不接受
+  E1/E2 capability/authorization。
+- Real-fault input：PR #512 已由维护者 review/merge，merge OID
+  `56af827a26470f5a9273ca684c9a32b9d39afc4c`。direct/symlink sanitized receipt 分别为
+  `evidence/runs/TASK-RKFUI-001E/direct-selection-receipt.json` /
+  SHA-256 `9525cae0b8a45bf0107ed08d9f6d4d383c312b7e3cc2c5b72e366630d6c7fc47`
+  与 `symlink-selection-receipt.json` /
+  `4de519e88e685ab32b36a0c497087bc08a387c8c98d0a7b164282aec18e15ddf`。
+  两次均 selection/scope 成功但 bookmark round-trip blocked，App hash/signature/quarantine
+  observation 未发生；host pre/post target quarantine absent、bytes/signature unchanged，
+  child/`ld`/USB/device/network/xattr-write/privilege/system/mutation/destructive 全为 0。
+- Platform basis：Apple 的
+  [`withSecurityScope`](https://developer.apple.com/documentation/foundation/nsurl/bookmarkcreationoptions/withsecurityscope)
+  文档把该 option 定义为 resolution 后提供 read/write access；Apple 的
+  [`securityScopeAllowOnlyReadAccess`](https://developer.apple.com/documentation/foundation/nsurl/bookmarkcreationoptions/1418284-securityscopeallowonlyreadaccess)
+  文档说明它须与 `withSecurityScope` 组合并提供 read-only access。Apple 的
+  [App Sandbox file-access guide](https://developer.apple.com/documentation/security/accessing-files-from-the-macos-app-sandbox)
+  进一步要求：后续不需要写入时，创建 bookmark 应包含该 read-only option。Xcode 26.6
+  macOS 26.5 SDK 的 `Foundation/NSURL.h` 同样登记该 flag 自 macOS 10.7 可用。上述事实
+  证明候选 API shape 合法，但不证明它一定是 #512 blocker 的原因。
+- Chosen remediation：新增 TASK-RKFUI-001F。相对 #512 临时候选，唯一行为变化是
+  bookmark creation 从 `.withSecurityScope` 变为
+  `[.withSecurityScope, .securityScopeAllowOnlyReadAccess]`；resolution 继续精确使用
+  `[.withSecurityScope, .withoutUI]`。由于 001E implementation 未合入，001F 成 PR
+  implementation 必须同时重现已记录的 read-write→read-only entitlement substitution，
+  但不得增加其他 entitlement/Info.plist/platform capability。允许把 combined bookmark
+  catch 拆成 sanitized `bookmarkCreationFailed` / `bookmarkResolutionFailed` stage，
+  只记录 error domain/code，不记录 message、locator 或 path；该诊断不得改变控制流。
+- Selector boundary：canonical run 必须选择 exact canonical entry。symlink run 在 launch
+  前由 host 证明 operator-facing entry 是一层 link 且解析到同一 fixture；App returned URL
+  是否 lexical 保留 link 必须如实记录，但不作为 PASS gate。PASS gate 是 returned URL
+  resolving 后精确等于同一 target、bookmark/scope 成功、target pre/post quarantine
+  absent、`executableHashMismatch` 且 child/全部外部 dispatch 为 0。
+- Pass/fail boundary：canonical 与 symlink 两个 fresh App run 全部 PASS，才允许保留
+  001F implementation+evidence。任一失败时不得合入 entitlement/API implementation，
+  只能提交 fail-closed evidence；不得自动尝试 document-scope、implicit-only bookmark、
+  executable-writing entitlement、quarantine bypass 或真实 tool/device。
+- Product boundary：001F PASS 仍只证明 disposable read-only bookmark metadata 行为，不
+  修改 `ArkDeckApp/ArkDeckApp.entitlements` 或 platform profile，不证明 external executable
+  launch、USB access、PowerBox extension 跨进程转移、output-directory read-write 回归、
+  helper/XPC/broker 或产品分发。真实 E0/product boundary 仍需后续独立 D1。
+- Sequencing：本 r8 merge 时 001E 才 `ready→blocked`、001F 才 `blocked→ready`。merge 前
+  不得修改 Probe 或生成 001F 成 PR 工作；merge 后只允许 001F host-only
+  implementation+evidence。PASS implementation merge 后另起 D0 status PR；001F failed
+  evidence merge 后也须另起治理决策，均不得直接恢复 TASK-RKFUI-001 或运行真实 E0。
+- Draft/input closure：本 r8 起草 base =
+  `56af827a26470f5a9273ca684c9a32b9d39afc4c`。proposal/design/tasks/verification input
+  blobs 分别为 `6c8c938d85ce6efe4ad0a1d6adae4d1e6460df1d`、
+  `4ef1cd0a36feb72e18427573db107f4d26da76fd`、
+  `2856bd5645b92b6f6deb6c055fae1e1fa6a50bfe`、
+  `1974766d44163f0d0de23aca467db5e48411a77a`；Probe Python/App/entitlement/tests input
+  blobs 仍为 `b703baecb0c80a18e73b40028163cc1adda22133`、
+  `2c763da059c7adf65a4aec170e71c042dbed4288`、
+  `dab555e5b3d03480ab43403ae25a34a6e6822e11`、
+  `3ffc0f7ac675af1bf9ed3b6e21daf1c059feec2a`。001F 开工前须基于 r8 merge 后
+  current `main` 复核；任一非 r8 预期漂移即停止。
+- Concurrency：起草时 GitHub open PR 集合为空；四个治理文件与未来 001F allowed paths
+  无并发占用。r8 是 D1 判断门，本 PR 合入前零 speculative implementation/Probe run。

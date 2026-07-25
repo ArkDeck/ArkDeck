@@ -2,11 +2,10 @@
 
 ## Context and constraints
 
-- Proposal revision：r7；r1-r6 已由维护者 merge。r7 只处理 PR #509 暴露的 signed
-  Sandbox selection-time quarantine blocker，并新增 TASK-RKFUI-001E host-only
-  read-only entitlement characterization。r7 不批准真实 external-tool/device rerun或产品
-  broker/helper 架构。
-- r7 不改变 typed operation、target/firmware/transport、discovery binary
+- Proposal revision：r8；r1-r7 已由维护者 merge。r8 只处理 PR #512 暴露的 read-only
+  security-scoped bookmark blocker，并新增 TASK-RKFUI-001F host-only bookmark creation
+  option remediation。r8 不批准真实 external-tool/device rerun或产品 broker/helper 架构。
+- r8 不改变 typed operation、target/firmware/transport、discovery binary
   version/hash/upstream、binding、window、maxRuns、rebind 或 Safety 设计；HDC server 仍
   必须是 pre-existing external same-UID pinned executable，Agent server lifecycle mutation
   为 0。pre-existing RockUSB candidate 是独立 physical/identity gate，不因 provenance
@@ -32,7 +31,7 @@
 | REQ-DEV-001/002/003/006/008 | durable HDC original binding + typed mode transition + Core rebind + exclusive mutation lane | contract/fault + E1 characterization |
 | REQ-FLASH-012/013 | semantic marker parser + reconnect postflight + RecoveryGuide | fake success/failure + real hardware |
 | REQ-UX-001、REQ-I18N-001 | Flash page + global Job card + zh-Hans/en strings | XCUITest + localization lint |
-| REQ-UX-007 | DeviceAccessAdvisor presentation; zero elevation/install calls | signed Sandbox E0 + r7 read-only selection characterization |
+| REQ-UX-007 | DeviceAccessAdvisor presentation; zero elevation/install calls | signed Sandbox E0 + r7/r8 read-only selection characterization |
 
 ## Architecture and data flow
 
@@ -76,6 +75,8 @@ process executor、storage/power/binding/authorization ports；fixture compositi
    r7 不把 PR #509 的 symlink selection metadata transition 解释为 canonical-path 事实；
    001E 仅在 disposable wrong-hash fixture 上隔离 `user-selected.read-only` 这一变量，
    其结果不替代真实 pinned tool 或产品 App evidence。
+   r8 同样不把 #512 bookmark failure 归类为真实 tool failure；001F 仅在同一 disposable
+   read-only candidate 上验证 Apple-documented bookmark creation option。
 2. r6 loader-transition probe 从受保护 `main` 的 registry 读取 typed
    `sourceProvenance`。该对象把 exact `bbd7bdc0…9923`、`304f0737…`、source acceptance
    `PR#445@cbad982…` 和 reviewed evidence path/SHA-256 绑定为一个不可分 tuple。probe
@@ -123,6 +124,44 @@ boolean。receipt 不保存 locator 或 raw xattr。只有两个 run 都满足 b
 target quarantine 前后 absent、`executableHashMismatch`、child/USB/device/network 0，
 characterization 才 PASS。该 PASS 只为后续 D1 提供输入，不能证明真实 external executable
 执行、PowerBox extension 跨进程转移、ArkDeckApp read-write shape 或产品 broker/helper。
+
+## r8 read-only bookmark option remediation
+
+#512 证明 PowerBox selection extension 已取得（两个 run 均
+`securityScopeStarted=true`），但现有 creation call 只使用 `.withSecurityScope`，在
+bookmark creation/resolution catch 内失败，未到 fixture hash gate。Apple 将
+`.withSecurityScope` 定义为 read/write bookmark；对后续不需写入的资源，文档要求同时
+包含 `.securityScopeAllowOnlyReadAccess`。因此 001F 验证下列单变量假设：
+
+```text
+#512 candidate creation: [.withSecurityScope]
+r8 candidate creation:   [.withSecurityScope, .securityScopeAllowOnlyReadAccess]
+resolution (unchanged):  [.withSecurityScope, .withoutUI]
+```
+
+这是平台 API hypothesis，不是 root-cause 结论。由于 #512 按 fail-only boundary 未合入
+candidate code，001F implementation 从 current main 重新应用 read-only entitlement 与
+fixture harness，但行为差异必须严格等于新增 creation option。其他五项 entitlement、
+Hardened Runtime、bundle ID、signature/hash/quarantine ordering、fixed `["ld"]` adapter
+均不变。允许拆分 bookmark creation 与 resolution error stage，只输出稳定 stage、
+Foundation error domain/code；message、path、locator、bookmark bytes 不得进入 receipt。
+
+两个 fresh App run 仍为：
+
+1. picker 内 exact canonical fixture entry；
+2. picker 内 host-proven one-layer symlink entry，launch 前证明它解析到同一 fixture。
+
+`NSOpenPanel` 可返回 canonicalized URL；receipt 必须分别记录 picker input link semantic、
+returned URL lexical-match boolean 与 resolving 后 target equality。lexical preservation
+不是 PASS gate，resolving 后 exact target equality 才是 identity gate。两个 run 都必须
+bookmark creation/resolution/scope 成功，App 观察到 same wrong hash、valid signature 与
+quarantine absent，随后以 `executableHashMismatch` 在 Process 前停止；host pre/post
+target bytes/CDHash/signature/quarantine 不变，所有 selected-process/external/device/
+network/mutation counters 为 0。
+
+001F PASS 仍只是一条 host-only platform evidence：它不证明 bookmark extension 可传给
+其他进程、不证明真实 external executable 可启动或访问 USB，也不决定 main App
+read-write output entitlement 与产品 broker/helper。
 
 ## Enter Loader routes and rebinding
 
@@ -230,6 +269,10 @@ candidate 均不开始 destructive step。
   fixture 验证 PowerBox/bookmark/quarantine metadata。fixture hash mismatch 必须先于任何
   child/USB/device access 生效；characterization receipt 是 platform evidence，不是
   realHardware 或 product-delivery evidence。
+- r8 仍不修改 registry、production adapter、schema 或 executable identity。它只允许
+  001F 在 #512 read-only candidate 上把 bookmark creation options 精确扩为
+  `[.withSecurityScope, .securityScopeAllowOnlyReadAccess]`，resolution options 保持不变；
+  stage-specific bookmark diagnostic 只增加 sanitized observation，不增加持久 contract。
 - r2 discovery identity revision 只修改 read-only `ld` registry family，不修改
   `RockchipFlashProfile.pinnedToolchainFingerprint`、destructive authorization 或既有硬件
   support matrix。后续 execute 若要采用新 build，必须另行 readiness/change 并重新验证
@@ -245,6 +288,10 @@ candidate 均不开始 destructive step。
   metadata 改变、fixture 意外命中 pinned hash、child launch 非零或 receipt 泄漏 locator：
   characterization blocked；不提交 entitlement substitution，不升级到
   `user-selected.executable`，不接触真实 tool/device。
+- 001F canonical/symlink 任一 bookmark creation/resolution/scope、resolved target、
+  App/host quarantine、wrong-hash 或 zero-counter gate 失败：remediation blocked；不保留
+  entitlement/API change，不回退 implicit-only access，不扩大 entitlement，也不接触真实
+  tool/device。symlink lexical URL 未保留本身只作 observation，不单独构成失败。
 - loader-transition source provenance missing/unknown kind、tuple/evidence drift：在
   `ld`/USB/binding/intent 前 fail closed；不回退到 executable parent HEAD，不通过相同
   version/hash 之外的第二 pin，也不在线获取或构建 replacement。
@@ -265,11 +312,13 @@ candidate 均不开始 destructive step。
 
 - 禁止 `sudo`、shell、AppleScript、Authorization Services、helper/driver 自动安装、ACL/group/
   rule 修改、quarantine 清除和 tool 自动下载。
-- r7 还禁止 `LSFileQuarantineEnabled`/excluded-path 配置、
+- r7/r8 还禁止 `LSFileQuarantineEnabled`/excluded-path 配置、
   `com.apple.security.files.user-selected.executable`、fixture/pinned-tool xattr 写入、
   复制/重建 pinned artifact 规避 assessment，以及修改
   `ArkDeckApp/ArkDeckApp.entitlements`。001E 的 disposable fixture 可在 private temp
-  目录确定性构建并 ad-hoc sign，但永不执行、永不冒充 registry tool。
+  目录确定性构建并 ad-hoc sign，001F 可精确复用该 source/build shape；fixture 永不执行、
+  永不冒充 registry tool。document-scope、implicit-only bookmark 与 raw bookmark bytes
+  persistence 也不属于 001F。
 - probe runtime 禁止对 executable parent/ancestor 执行 Git source discovery。source
   attribution 只来自 reviewed registry + exact evidence digest；actual executable bytes 和
   platform trust 仍在本地独立重核。
@@ -307,11 +356,19 @@ candidate 均不开始 destructive step。
   用 wrong-hash inert fixture 让 child launch 结构性为 0，分别观察 canonical/symlink
   selection 的 bookmark 与 quarantine metadata。PASS 仍不自动选择 product
   broker/helper；该架构须后续 D1 ADR/readiness。
+- **在 read-only entitlement 下继续只用 `.withSecurityScope` 重试**：拒绝。#512 两个
+  fresh selector 已在相同 creation shape 下失败；无 API 变量的重复不能增加证据。
+- **加入 `.securityScopeAllowOnlyReadAccess`**：采用为 001F。它是 Apple 对只读
+  security-scoped bookmark 明示的 creation option，且不扩大 entitlement 或进入 Process；
+  仍须用两个 wrong-hash run 证伪/证实，不能预判成功。
+- **删除 app-scope bookmark，依赖 picker implicit scope**：本轮拒绝。它放弃产品所需的
+  persistent selection seam，也无法回答 bookmark round-trip blocker；若产品选择
+  session-only access，须另起 D1 ADR。
 - **只保留物理按键**：作为可靠 fallback 保留，不作为唯一产品路径；已验证软件进态组合
   默认可从同一 Start Job 流程进入 Loader。
 - **先交付 plan-only UI**：接受为分阶段交付；execute 仍以 E0 non-elevated USB access 和
   `REQ-FLASH-015` 审查为硬前置，不把 plan-only 宣称为一键真机刷机完成。
 
 若 signed Sandbox 内直接运行外部 `rkdeveloptool` 需要新的 helper/entitlement/分发决策，
-必须新增 ADR/change。r7 只批准 read-only host characterization，不隐含产品架构或真实
-external-tool 执行授权。
+必须新增 ADR/change。r8 只批准 read-only bookmark option host characterization，不隐含
+产品架构或真实 external-tool 执行授权。
