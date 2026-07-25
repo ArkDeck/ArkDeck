@@ -2281,7 +2281,334 @@
 
 ## TASK-HLR-003 — Fenced worker loop 与 legacy PR creator 迁移
 
-- Status:ready（r2 corrective readiness；仅在维护者对本独立 readiness PR exact
+- Status:ready（r3 D2 readiness；仅在维护者对本独立 readiness PR exact head
+  review/merge 后生效。r1/r2 已交付的 offline runtime 与 source 不重新授权；r3 只额外
+  授权 ① 一个 D0 source PR 交付 root-owned shell minter 的可 review 源、`--explain`
+  干跑模式与两处已实测 fail-closed 缺陷的修复，② 一轮由 `lvye` 亲手执行的 host
+  scheduler staging 窗口 **Phase 0–3**，③ 其后一个独立 evidence PR。不授权 Phase 4
+  （cursor Issue 创建与首次 Issue 写入）、任何 dispatch、Agent 代为执行 D2、worker
+  认领任务、legacy creator 在 live proof 前退出、review/merge/auto-merge/admin
+  route、GitHub settings/protection/ruleset 修改、App 权限或 PEM 存放位置变更、
+  `sdd-guard.yml` 或任何 governance text 变更、以及**代任何任务撰写
+  `Decision-Grade`**。）
+- Historical Status:ready（r2 corrective readiness；#529 merge
+  `05d500354f802813239803982047b08178c62fcf` 后生效。r2 授权「一个 D0 source PR」，
+  由 #524 merge `1a8e235fc7174c647e8e971dee3f1a6d2dd16325` 消耗；**#531 merge
+  `d82ceb3d03df09c4650c4edc9fcef2c406e3c0ef` 与 #539 merge
+  `e70d7863b2fcdd2cf8c65a2983abd4c84919ecec` 各由维护者在会话内另行显式授权**，不由
+  r2 覆盖。r3 起草期曾把三者笼统记为「r2 授权额度」，与 r2 自身文本不符，此处更正。）
+- Readiness（r3；audit base = protected `main`
+  `40bfee1a3bf2f8981fa752e9e3995d8d04434e00`）：
+  - **Approval boundary:pending human merge。**本 carrier 只修改本文件
+    TASK-HLR-003 section。只有 `lvye` 对 exact head APPROVED、required checks
+    terminal success、`mergedBy=lvye`、`auto_merge=null` 且 squash subject 携
+    `(#N)` 的 merge OID 进入 protected main 后，本 readiness 才生效。合入前
+    account/launchd/plist/token-file/PEM/App/installation/Issue/PR/ref/scheduler
+    mutation = 0；本 merge 不构成 D2 evidence、task done 或 change verified。
+  - **Operator 与窗口边界。**执行者恒为 `lvye`，在 Agent/Codex 不可达的凭据边界外
+    亲手执行；Agent 只起草计划与核验 receipt，不得代为执行任何 Phase 步骤。窗口为
+    **单次连续会话**，跨会话续做须重跑 Phase 0 全部 absence 复验。窗口的**终态有且
+    只有两种**，须在 receipt 中明确宣告其一：`terminal=left-running`（两个 unit 保持
+    装载，此后进入 r4 授权范围前不得再有任何变更）或 `terminal=rolled-back`（按下方
+    Rollback 全部六步执行并复验缺席）。不得留下「部分装载」终态。
+  - **Why r3 exists。**TASK-HLR-002 receipt 的 Boundary 明写 `Worker registration,
+    scheduler enablement and source-hash binding belong to TASK-HLR-003's separate
+    D2 evidence phase`，但该阶段从未有过授权载体。r2 只授权「交付可执行入口，使
+    scheduler 有可绑定的对象」，未授权任何主机侧 staging。r3 是这个载体。
+  - **Ordering:source PR 先，readiness 不预钉未来字节。**本 readiness **不**钉定尚未
+    写出的 minter 源码 hash——那是把不存在的字节串写成 pin。改为钉定可验证的义务：
+    窗口 preflight 必须记录并校验
+    `sha256(仓外已安装 minter) == sha256(仓内 minter @ 该次 preflight 时 protected
+    main 的 exact OID)`，**两个 hash 与那个 main OID 三者全部进 receipt**；仓内一侧
+    的读取必须来自 `git show <main-oid>:<path>` 而非工作树文件，以免读到未提交内容。
+    任一不等即零 D2 write。
+  - **Dependency/authority gate:closed。**下列均为 audit-base ancestors（已逐一以
+    `git merge-base --is-ancestor` 复验），全部由 `lvye` 对 exact head APPROVED 并亲手
+    合入，`auto_merge` 全程为 `null`：
+
+    ```yaml
+    hlr003_readiness_r1:  2667a10badb8180a0c7f5079636d46b03f637184  # PR #521
+    hlr003_source_r1:     1a8e235fc7174c647e8e971dee3f1a6d2dd16325  # PR #524
+    hlr003_readiness_r2:  05d500354f802813239803982047b08178c62fcf  # PR #529
+    hlr003_entrypoint:    d82ceb3d03df09c4650c4edc9fcef2c406e3c0ef  # PR #531
+    hlr003_corrective:    e70d7863b2fcdd2cf8c65a2983abd4c84919ecec  # PR #539
+    hlr002_d2_readiness:  c7badb73fa3cf12109344731937b88e8bb3611c5  # PR #508
+    ```
+
+    #539 reviewed head = `4a9b429a197b22028b32ef4113ad74900a7d5d28`，`lvye` 于
+    `2026-07-25T09:06:06Z` APPROVED、`09:06:44Z` 合入；pushed head
+    `63f6dcf69007f81269cce8747323eac84cc2e2a3` 与 reviewed head 之间的 update-branch
+    只带入 chg-2026-036 的两个无关文件，本 task 十三个交付件两跳 tree diff = 0。
+  - **Git input pins。**audit base parent =
+    `e9848ba274123bea46b98e39cbf989bd93dfc225`，tree =
+    `120ccd4988ae465108fdde9119b7095b1fd06c1c`，subject =
+    `readiness(TASK-BRC-003): pin package blockers (#546)`。
+
+    下列**十六个 blob 是 drift gate**：必须在 D2 preflight 中逐项相等，任一 drift 即零
+    D2 write。`hostloop_init` 是 r3 起草期漏掉而循环每轮 import 的模块，此处补入。
+
+    ```yaml
+    agents_contract:     3c2d3c6a01d3eaa31cd9e3ee333f3153552f4164
+    codeowners:          f4edd22f87965efcfc27ea512283a0c2252bf0fb
+    agent_pr_workflow:   a514d9e539964f9e1960acbe4ffaa696629571da
+    sdd_guard_workflow:  c64135e1f9dc253a92640a30bbcad42b0afa86fa
+    chg030_proposal:     f179c9981d50d0e2a90cf20b93a6b6b23912e4bf
+    chg030_design:       9cb3bebd1874e13a2ad580138d4f91eeace2fb6b
+    chg030_verification: b3154599c3d2d935adfbcade5d9765cd34e3cca5
+    hostloop_init:       7a6c5b9223c68f9d8aadd503fb38842346c710fc
+    hostloop_main:       07d2c8d1a4c4d95bc28ce02449e4a724f47a161a
+    hostloop_backends:   0efa3e8c74c7935f96742d4d9f1649cc91534dd2
+    hostloop_transport:  55e17e3caf139522c189dc6284db6ae90272fad2
+    hostloop_worker:     f71d3a9824e80bf0512b0dcf9afc5940e89486aa
+    hostloop_cursor:     0961ec62409644421dc8ed8eea68230e8fa93b5e
+    hostloop_lease:      685fb3c3c8c8266c52816027c92b300ea7cd6732
+    hostloop_identity:   d22e62946e3b5b836cbdcd9b48b57031172fe4b1
+    hostloop_envelope:   2c286c8da0fa8945d512115dfce9de5150db0831
+    ```
+
+    本文件的 blob **不是** drift gate，只作 provenance：合入本 readiness 必然改变它，
+    把它写成「须在 merge tree 中相等」会自我否证。audit-base 值 =
+    `ccb808d88c2d2bfc96f7a41135105016269ec7c8`；preflight 须记录合入后的实际值，并
+    确认其与 audit-base 值之间的差异**只有**本 r3 block。
+  - **Dispatch-authority binding:循环的权威必须来自 protected main，而非可写工作树。**
+    已实测:`discover_candidates`/`_change_is_approved`/`done_task_ids` 全部读取本地
+    checkout 的文件，而该 checkout 对 Agent 可写。因此每一阶段执行前后都必须记录
+    `git rev-parse HEAD`、`git rev-parse origin/main`、以及
+    `git status --porcelain -- <上表全部 drift-gate 路径> openspec/changes/*/tasks.md`
+    ——三者须满足 `HEAD == origin/main` 且 porcelain 输出为空，否则零 D2 write。
+    **这只是窗口期的补偿控制，不是修复**：「循环从可变工作树取得派发权威」是一项
+    standing 架构缺口，须由 HLR-004/005 以「从 protected main 的 exact OID 读取治理
+    输入」收口；本 readiness 明确不声称已解决它。
+  - **Concurrency/absence gate:closed at discovery（2026-07-25）。**`agent/host-loop/**`
+    远端 refs 全页计数 = 0。下列均 absent，**每一行都注明其被测量的域**，窗口第一步须
+    在**同一个域**复验；r3 起草期曾把 runtime label 的缺席钉在 system 域而 Phase 3 将
+    其装入 `gui/$(id -u)`，那样的 113 对一个只住 gui 的 unit 是恒真的非证据，此处更正
+    为双域测量：
+
+    ```yaml
+    readiness_branch:   agent/task-hlr-003-d2-readiness-r3   # 远端 absent
+    source_branch:      agent/task-hlr-003-minter-source     # 远端 absent
+    evidence_branch:    agent/task-hlr-003-d2-evidence-r1    # 远端 absent
+    refresh_label:      com.arkdeck.host-loop.refresh
+      domain: system                                          # print -> exit 113
+    runtime_label:      com.arkdeck.host-loop.runtime
+      domain_gui: gui/<uid>                                   # print -> exit 113
+      domain_system: system                                   # print -> exit 113
+    launchagents_dir:   ~/Library/LaunchAgents                # 8 项，含 host-loop 者 0
+    disabled_gui:       launchctl print-disabled gui/<uid>    # host-loop 条目 0
+    disabled_system:    launchctl print-disabled system       # host-loop 条目 0
+    service_account:    arkdeckhlr                            # 不存在（见退役条款）
+    ```
+
+    `cursor_issue` 不列为 absence pin——它没有稳定可观测的身份（任何人都可另建一个
+    同名 Issue，而「不存在」无法由一次查询证明）。改为正向约束:窗口内
+    `--cursor-issue` 一律不传且 `ARKDECK_HOST_LOOP_CURSOR_ISSUE` 一律不在环境中，
+    receipt 以「本 App identity 名下 Issue 创建计数 = 0」为观测值。#395 是 batch
+    Issue，永久不得复用。
+  - **Credential topology:D′，binary。**两种不可互替的凭据:App installation token
+    （app_id `4388667`、installation `148855345`、权限 `{metadata:read,
+    contents:read, pull_requests:write, issues:write}`）只用于 PR/Issue；
+    `agent/host-loop/**` 的 ref 写、以及**每轮两次 `git ls-remote`** 走 TASK-BAP-003
+    Deploy Key 的 SSH 别名 `github-arkdeck-agent`。**App 是 `contents: read`，推不了
+    ref**；Deploy Key 也不只用于写，读路径同样依赖它。
+
+    token 生命期约 1 小时，而 `main()` 每轮都调 `read_token()`。授权且仅授权如下拆分：
+
+    - **root 侧只做一件事:用 root-only PEM 签名并铸 token。**system 域 LaunchDaemon
+      `com.arkdeck.host-loop.refresh`，`ProgramArguments[0]` 为 `/bin/sh`，其执行的
+      minter 与全部被调用二进制**必须全部 `root:wheel` 且非 root 不可写**。已实测可用
+      集合:`/bin/sh`、`/usr/bin/openssl`、`/usr/bin/curl`、`/usr/bin/base64`、
+      `/usr/bin/install`、`/usr/bin/mktemp`、`/bin/chmod`、`/usr/sbin/chown`、
+      `/usr/bin/stat`。纯 shell 铸 RS256 JWT 已实测通过独立验签
+      （`openssl dgst -sha256 -verify` → Verified OK）。
+    - **scheduler 侧以 `lvye` 自己的用户运行仓库代码**，只读
+      `ARKDECK_HOST_LOOP_TOKEN_FILE` 指向的路径，**不接触 PEM**。
+
+    **关于 sudo 的如实表述（更正 r3 起草期一处假陈述）:**该 scheduler 用户**持有全权
+    sudo**——已实测 `dscl . -read /Groups/admin GroupMembership` = `root fuhanfeng`，
+    admin 组成员在本机即可 sudo。因此「scheduler 永不获得任何 sudo 规则」是**假的**，
+    且以 `sudo -l -U` 无 openssl 规则作为通过条件是一道**永远无法通过**的门（同一用户
+    还需 sudo 执行 Phase 0 的 `ls` 与 Phase 2 的 `bootstrap`）。本 readiness 删除该
+    表述与该门，改用三条可检验且确实为真的性质：
+    ① **无新增 sudoers 规则**——窗口前后 `sudo -l -U <user>` 输出逐字节相同，且
+      `/etc/sudoers.d/` 目录列表与各文件 sha256 前后相同；
+    ② **scheduler unit 自身不调用 sudo**——其 `ProgramArguments` 与 minter 之外的任何
+      被执行脚本中 `sudo` 出现计数 = 0，且 unit 以非 root 身份运行（`launchctl print`
+      显示的 uid 须为该用户）；
+    ③ **token 权威严格弱于该用户已持凭据**——受 App 四项权限约束，不含 ref 写、不含
+      review/merge/admin，而该用户已持 Deploy Key 与 `gh`（scopes 含
+      `repo`/`workflow`/`admin:org`）。故把 1 小时 token 置于该用户可读文件**不新增
+      暴露面**；这是本拓扑的真实论证，不得改写成「已隔离」。
+
+    **禁止形态（每条均有实测依据）:**root 进程执行任何非 root 可写的解释器或脚本
+    （已实测 `/opt/homebrew` 及 Cellar 属 `fuhanfeng:admin`、`python3.14` 二进制属
+    `fuhanfeng`、仓库 checkout 属 `fuhanfeng:staff`；以其作为 root daemon 执行面 = 任何
+    以该用户运行的东西可无人值守取得 root，**严格差于给 scheduler 免密 sudo**）；以
+    `/usr/bin/python3` 替代（已实测 3.9.6，`import host_loop` 即 `TypeError`，
+    `identity.py` 的 `X | None` 运行时求值）；以 `curl -H` 传 JWT（已实测明文进 argv，
+    `ps` 对所有本地账号可见；必须 `curl --config -` 从 stdin 喂，已实测 argv 仅
+    `/usr/bin/curl --config -`，且配置不得落盘）；scheduler 以 root 运行；把 token 值
+    写入 launchd 环境块（只允许写路径）。
+  - **Scheduler ownership:`lvye` 自己的用户；`arkdeckhlr` 保留位退役。**三条理由均为
+    实测:① `man launchd.plist` 明载 `UserName` 只适用于 privileged system domain 且
+    「for agents, the UserName key is ignored」，LaunchAgent 无法以他人身份运行；服务
+    账号无 GUI 会话，`launchctl print gui/<其 uid>` 返回 `Could not find domain for
+    user gui`，故亦无可 bootstrap 的 agent 域。② `~/Dropbox` 实测 mode `drwx------`，
+    服务账号无法遍历进入 checkout，给它访问权必须放松该 0700。③ 见上方 sudo 条款 ③：
+    隔离 token 换不到东西。维护者 review/merge 本 readiness 即认可该退役；若不认可，
+    窗口不得开启，须以 r4 重钉服务账号供给清单（含 0700 放松方案及其风险评估）。
+  - **Blocking prerequisite ①:一个 D0 source PR（本 readiness 授权，含四项交付）。**
+
+    1. **root-owned shell minter 的可 review 源**（仓内 `scripts/host_loop/` 下）。契约
+       为二值:`curl --config -` 从 stdin 传 header；原子写（`mktemp` 于**目标同一
+       文件系统**、`chmod 600`、`chown` 到 scheduler 用户、最后 `mv`，顺序为先权限后
+       改名）；目标目录本身须 `0700` 且属 scheduler 用户；显式 `umask 077`；token 永不
+       出现在 stdout/stderr/日志/argv；失败非零退出且**不截断也不删除**既有 token
+       文件；`expires_at` 写入**不含 token** 的旁路 receipt。
+    2. **`--explain` 干跑模式。**输出每个候选在每一道门上的判定与完整拒绝原因列表，
+       零网络写入。这是 Phase 1/3 所要求的「逐门枚举」的产出工具——r3 起草期要求了一个
+       当时没有任何命令能产出的观测，此处补齐使该门可判定。
+    3. **归档依赖缺陷修复。**已实测 `done_task_ids` 只 glob `changes/*/tasks.md`，
+       匹配不到 `changes/archive/<日期>-<change>/tasks.md`；`TASK-RPT-001`/`RPT-002`
+       均已 done 且已归档却永久读作未闭，使 TASK-HLR-001A/002A 依赖恒不满足。归档一个
+       change 会静默且永久废掉所有指向它的依赖且无任何报出。fail-closed 故不危险，但
+       会让循环在未来必然卡住。
+    4. **补测试护住「省略 `--cursor-issue` ⇒ 零 Issue 写」。**该保证目前由 `worker.py`
+       单一 `if self._cursor_issue is not None` 承担且无测试覆盖；且已实测该参数默认值
+       取自 `ARKDECK_HOST_LOOP_CURSOR_ISSUE`，**环境变量会静默供值**，故零写入不能靠
+       「不传该 flag」保证。测试须覆盖这条绕过路径。
+  - **`Decision-Grade`:不是本窗口前置，但它是当前唯一挡住一个 D1 产品任务的东西
+    （更正 r3 起草期一处方向相反的结论）。**实测逐门（**跨全部 11 个活跃 change**，
+    非仅本 change）：
+
+    - 在本 change 内，八个候选全部被拒:HLR-001/002 `status=done`；HLR-001A/002A
+      `status=done` 且依赖指向已归档 change；HLR-002B/004/005 `status=blocked`；
+      **HLR-003 是唯一 `ready` 者而被 `never-claim` 明令禁止自我认领**。故在本 change
+      内补齐 grade 不改变可派发性。
+    - 但 **`TASK-RKFUI-001G`（chg-2026-026-macos-rockchip-flash-ui）其余每一道门均已
+      通过**——`ready`、change 已批准、无硬件、非 never-claim、依赖已闭、allowed paths
+      为 `scripts/rockchip_e0_probe/**` 与该 change 的 `evidence/**`——**只差一行
+      `Decision-Grade`**。而该任务自身 readiness 写明它是 **D1**（host-only D1
+      product-boundary audit）。
+
+    因此 r3 起草期「补齐 grade 也依然一个都派发不出去」的说法是把单 change 结论当成
+    全局结论，**方向相反**：`Decision-Grade` 的缺失正是当前唯一挡在循环与一个可认领
+    D1 产品任务之间的东西。补齐它是**逐任务的人工判断**，不是批量填空；写错一个 `D0`
+    即让循环去认领产品边界任务。**Agent 永不代写该字段**（已列入上方 Status 的不授权
+    清单）。窗口期的补偿控制:scheduler 的 `--change` 恒为
+    `CHG-2026-030-host-loop-runtime`，receipt 须记录该实参并以 `--explain` 输出证明
+    该 change 内零可派发候选。
+  - **Phase gates:0→3，逐阶段停。**每阶段完成即停下核验 receipt，任一项不符即停，
+    不进下一阶段；不得为放宽任一门而推进。**每条 launchctl 命令必须写明其域**：root
+    refresher 恒在 `system`，scheduler 恒在 `gui/$(id -u)`（该域正确，因 scheduler 本
+    就以该用户运行）。r3 起草期「全部 launchctl 操作只用 system 域」的表述与 Phase 3
+    自相矛盾，若照字面执行会产出被禁止的 root-running scheduler，此处删除。
+
+    - **Phase 0（零主机变更）**:按上方 absence 表逐项复验，**每项在其注明的域内**；
+      runtime label 须在 `gui/$(id -u)` **与** `system` 双域均返回 113，并同时检查
+      `~/Library/LaunchAgents/` 无 host-loop 条目、两个 `print-disabled` 表无 host-loop
+      条目（disabled-but-present 的 unit 不会出现在 `print` 中）。执行
+      Dispatch-authority binding 的三项记录。`sudo ls -l <pem>` 须显示 `root` 拥有；
+      **观测到的 mode 一律写入 receipt 作为基线，不设「receipt 未记录时自行放宽」的
+      退路**。记录 `main` 全 OID 与 `sudo -l -U <user>` 的窗口前基线输出与
+      `/etc/sudoers.d/` 清单及各文件 sha256。abort:任何 label/account/ref 已存在，或
+      binding 三项不满足。
+    - **Phase 1（手工前台单轮）**:命令须给出解释器全路径与 `PYTHONPATH=<repo>/scripts`
+      ——已实测 `python3 -m host_loop` 从仓根跑不起来（`No module named host_loop`）。
+      须显式 `unset ARKDECK_HOST_LOOP_CURSOR_ISSUE`。**Phase 1 与 Phase 3 必须使用同一
+      解释器绝对路径**，该路径写入 receipt 并在 Phase 3 的 plist 中逐字节一致；否则
+      Phase 1 的绿不对 Phase 3 构成证据。本阶段依赖前置① 已合入并安装。
+      期望:退出码 10；新 PR = 0、新 ref = 0、`agent/host-loop/**` 仍为空；stdout 单行
+      且不含 token 或 `/Users/` 路径。**`exit 10` 不是充分证据**——它同时覆盖「无候选」
+      「候选全被拒」「候选被 never-claim 拒」等不同原因，故必须另附 `--explain` 输出
+      作为逐门枚举。abort:退出码 1（先修环境，**不得**先建 launchd）或 0/20。
+    - **Phase 2（root refresher unit）**:plist 置于 `/Library/LaunchDaemons/`，
+      **`root:wheel` mode `0644`**（launchd 首先拒绝的就是 plist 属主/权限）；
+      `sudo launchctl bootstrap system <plist>`；以
+      `launchctl print system/com.arkdeck.host-loop.refresh` 确认存在。**必须配置
+      `StandardOutPath`/`StandardErrorPath` 到 root 拥有且非 root 不可写的路径**——未配
+      时 launchd 把 stdio 送 `/dev/null`，本窗口全部「观测」都不可观测。`StartInterval`
+      定为 **1800s**，并配 `RunAtLoad=true`；因 `StartInterval` 在睡眠期间的触发会被
+      跳过而非补偿，minter 必须在每次运行时**先检查既有 token 的 `expires_at`**，剩余
+      不足 15 分钟即重铸，且 scheduler 侧遇 401/403 时须以 `Refused` 停止该轮而非重试。
+      手工触发命令为 `sudo launchctl kickstart -k system/com.arkdeck.host-loop.refresh`
+      （receipt 须记录该命令与其退出码；缺少手工触发命令时「token 文件未出现」与
+      「尚未到点」不可区分）。触发后:token 文件 `0600`、owner 为 scheduler 用户、
+      **父目录 `0700` 且属该用户**、link count = 1；旁路 receipt 有 `expires_at` 且无
+      token；日志经检查不含 token。反证:以一个 root 拥有的空文件作为 PEM 路径参数
+      触发（**不移动、不改名、不改权限真 PEM**），须非零退出且既有 token 文件未被截断
+      或删除。abort:任一反证未成立，或日志为空。
+    - **Phase 3（scheduler unit）**:plist 置于 `~/Library/LaunchAgents/`，**属该用户、
+      mode `0644`**；`launchctl bootstrap gui/$(id -u) <plist>`；以
+      `launchctl print gui/$(id -u)/com.arkdeck.host-loop.runtime` 确认存在，并确认其
+      显示的运行 uid 为该用户（非 0）。`ProgramArguments` 形式为
+      `[<python 绝对路径>, "-m", "host_loop", "--once", "--repo-dir", <repo>]`，配
+      `WorkingDirectory=<repo>` 与 `EnvironmentVariables` 含
+      `PYTHONPATH=<repo>/scripts`——已实测以脚本路径直接执行会因相对 import 失败，
+      必须走 `-m` 且提供 `PYTHONPATH`。环境只含 `ARKDECK_HOST_LOOP_TOKEN_FILE`、
+      `ARKDECK_REPO`、`PYTHONPATH`、`PATH`、`HOME`（`HOME` **不是** ssh 别名解析所需
+      ——已实测 OpenSSH 用 `getpwuid` 定位家目录，r3 起草期该理由是错的；但 git 读
+      `~/.gitconfig` 仍看 `HOME`，故仍设置并在 receipt 记录此真实理由）。必须配
+      `StandardOutPath`/`StandardErrorPath`。须确认 `ARKDECK_HOST_LOOP_CURSOR_ISSUE`
+      不在环境中。`StartInterval` 定为 **900s**。
+      连续观察 ≥ 3 轮:每轮退出 10（由日志中每轮一行输出证明，并附一次 `--explain`）、
+      PR/ref/Issue 增量全 0。**非并发不以「少一轮」推断**——launchd 的合并行为表现为
+      缺失而非可见信号，故改为正向观测:minter 与 scheduler 均须在日志每行前缀写入
+      `run_id` 与 pid，receipt 以「同一时间窗内不存在两个不同 pid 的未完成轮次」为
+      观测值；若三轮内无法取得该观测，如实记录为「未证明」，不得写成「已证明」。
+      反证:临时移除 token 文件后退出 1 且不创建任何东西，且该失败在日志中可见。
+      abort:出现并发轮次、任何非 10 的稳定退出码、任何 GitHub 写入、或日志为空。
+  - **Negative probes:必须为拒绝或缺席，且逐项以观测值证明。**窗口内不得出现:任何
+    dispatch；任何 `agent/host-loop/**` ref 写；任何 Issue/PR 创建或编辑；任何
+    review/approve/merge/auto-merge/update-branch/protection/ruleset/admin route；任何
+    App 权限或 PEM 存放变更；任何新增 sudoers 规则；任何 legacy `agent-pr.yml` 行为
+    改变。可观测项须给出观测值；**确无窗口期观测量者**（例如「未调用某 REST route」）
+    改以运行时事实替代:`route_inventory()` 与 `forbidden_capability_count()` 的输出，
+    以及 `ALLOWED_ROUTES` 内容与 drift-gate blob 一致这一事实。不得以「未执行」代替
+    观测值。
+  - **Rollback:先停、验停、再拆、再验缺席。**六步固定，**每步注明域**：
+    ① `launchctl bootout gui/$(id -u)/com.arkdeck.host-loop.runtime`；
+    ② `sudo launchctl bootout system/com.arkdeck.host-loop.refresh`；
+    ③ **验证已停**——runtime 在 `gui/$(id -u)` **与** `system` 双域 `print` 均 113；
+      refresh 在 `system` 为 113；`pgrep -fl host_loop` 为空；两个 `print-disabled`
+      表无 host-loop 条目。**`bootout` 首次即返回 113 意味着打错了域，不等于「本来就
+      没在跑」**；且只有 `print` 返回 113 不足以断定未武装，必须同时确认 plist 已删
+      （见 ④）与 disabled 表干净。
+    ④ 删除两个 plist 文件（`~/Library/LaunchAgents/` 与 `/Library/LaunchDaemons/`）
+      ——只 `bootout` 不删 plist，则下次开机/登录会重新武装；
+    ⑤ 删除 token 文件，并**明确记录该删除既不吊销该 token 也不擦除磁盘残留**（已实测
+      macOS `rm -P` 在本机文档中为无操作，不得写成「已安全擦除」）；如需真正失效须由
+      维护者在 GitHub 侧处置，属 TASK-HLR-002 receipt 范围；
+    ⑥ 复验 Phase 0 全部 absence 与 sudoers 基线恢复成立，并宣告
+      `terminal=rolled-back`。
+    PEM、App、installation、Deploy Key、ruleset、protection 一律不动。lease ref 的
+    删除**不在** rollback 内——Phase 0–3 不创建任何 lease ref；若出现属 reconcile
+    事件，须停机由人判断，不得由 rollback 顺手写删除。
+  - **Receipt shape:**`evidence/runs/TASK-HLR-003/d2-scheduler-*.md` 加配套 `.json`，
+    照 TASK-HLR-002 的 `d2-*.json` 形状。须含每阶段命令（含域）/退出码/观测值、
+    `--explain` 逐门枚举、三元组（installed hash、仓内 hash、该次 main OID）、
+    Dispatch-authority binding 三项记录、`workerDisabled` 状态迁移、label 与 account
+    存在性前后对比（注明域）、sudoers 前后基线、全 OID/全 hash（不用截断前缀）、
+    negative probes 观测值、终态宣告，以及明写**未做**什么。
+    脱敏面**与 TASK-HLR-002 已合入的门一致或更严**:不得含 token、JWT、PEM 内容、
+    `Authorization`/`Bearer` 值、任何绝对 `/Users/` 路径、设备序列号、connect key，
+    亦不得含 root-only PEM 的**目录路径**或 staging 路径明文。
+    **一处如实登记而非假装隐藏:**PEM 路径会出现在 root 进程 argv 中，对本机所有账号
+    可见（`openssl dgst -sign <path>` 必须以路径接收密钥）。TASK-HLR-002 只以 SHA-256
+    发布该路径；本 readiness 记录该隐蔽性在窗口开启后不再成立。路径本身不是秘密
+    （文件对非 root 不可读），但 receipt 不得声称路径仍未公开，也不得因此把路径写进
+    receipt 正文。
+  - **Phase 4 不在本 readiness 授权范围。**三条理由:① 它是本 change 第一次**永久公开
+    写入**（Issue 可关闭不可删除）；② 已实测其当前形态**无法工作**——手工创建的 Issue
+    没有机器块，`cursor.load` → `parse_machine_block` 直接拒绝且不代建，每轮 exit 1，
+    故 Phase 4 需要先定义「如何合法播种第一个机器块」这一尚不存在的机制；③ 它唯一的
+    意义依赖「本 change 内存在可认领的 D0 任务」，而按上方实测该条件在 HLR-003 → done
+    且 HLR-004 → ready 之前不成立。现在授权等于在未合入的门后面预先授权。
+    另:HLR-003 自身的 live first-PR proof 归属**不由本 readiness 改判**——r3 起草期曾
+    把它整体推给 HLR-005，而 HLR-005 依赖 HLR-003 done，构成环。本 readiness 只声明
+    Phase 0–3 不产生任何 live PR proof，该 proof 的归属留待 r4 与 HLR-004 readiness
+    共同钉定。
+- Historical Readiness r2（原 Status，r3 生效后降级为历史；仅在维护者对本独立 readiness PR exact
   head review/merge 后生效。r1 已交付的 offline runtime 不重新授权；r2 只额外授权
   一个 D0 source PR 交付 worker 的可执行入口与生产后端接线，使 scheduler 有可绑定
   的对象；不授权 scheduler 创建/注册/启用、worker 启动、legacy creator 在 live
