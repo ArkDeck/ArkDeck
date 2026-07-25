@@ -1,8 +1,13 @@
 # CHG-2026-031 Tasks
 
 > proposal、approval、readiness、implementation/evidence、done、verified 分离。
-> 两项任务均 host-only，测试只使用临时 Session fixture；不得读取或删除用户真实
+> 三项任务均 host-only，测试只使用临时 Session fixture；不得读取或删除用户真实
 > Session。proposal 合入不使任何任务 ready。
+>
+> r2（2026-07-25，on merge）接受 #436/#503 的 production-reachability blocker，
+> 选择由 CHG-2026-026 `TASK-RKFUI-002` 的 App-process plan-only facade 消费同一
+> Session runtime，并新增只读复验任务 `TASK-SSET-001R`。r2 不修改另一 change、
+> 不使任何 task ready，也不授权 App/CLI/entitlement/IPC 实现。
 
 ## TASK-SSET-001 — Settings、retention catalog 与 production storage wiring
 
@@ -31,6 +36,18 @@
   - #501/#502 已分别合入本 base；其完整文件集只位于 CHG-2026-030 evidence 与
     CHG-2026-026 tasks，与本状态路径零重叠。状态起草时公开 API 的 open PR count
     为 0。
+- r2 remediation route（仅在 r2 经维护者 review/merge 后生效）：
+  - 选择 App-process real consumer，不选择 App Group/shared preferences/bookmark IPC，
+    也不收窄 `SSET-RETENTION-001` 为同进程 contract；
+  - product implementation owner 固定为 CHG-2026-026 `TASK-RKFUI-002`。该任务未来
+    readiness 必须显式接受本 dependency、pin r2/#436，并要求
+    `RockchipFlashApplicationFacade` 的 plan-only production route 通过同一
+    `SessionStorageApplicationRuntime` 创建 owned Session/plan Artifact；
+  - CHG-2026-031 不得在该 cross-change readiness/implementation/done 前投机修改
+    App/Flash source。其合入后再由 `TASK-SSET-001R` 独立 documentReview/contract
+    revalidation；001R done 后本任务才可单独 `blocked→done`；
+  - standalone CLI 保持独立 process-local settings domain；CLI contract 或 host
+    可构造性不替代 App production reachability。
 - Readiness review:
   - **Approval/dependency gate:satisfied。**CHG-2026-031 r1 proposal #432 exact
     head `f69ce61282118c530a1a7bf185dae38d8140c2af` 经维护者 `lvye` APPROVED，
@@ -200,7 +217,7 @@
 - Acceptance:`AC-ART-006-02`、`AC-STO-001-01`、`AC-STO-003-01`、
   `AC-STO-004-01`、`SSET-CONFIG-001`、`SSET-CATALOG-001`、
   `SSET-RETENTION-001`
-- Depends on:change approval
+- Depends on:r2 approval、TASK-SSET-001R done（#436 implementation/evidence 已 merged）
 - Readiness input pins:由独立 readiness PR 固定，不在 proposal 预填未来 OID
 - Applicable failure patterns:`AF-001`、`AF-002`、`AF-007`、`AF-008`、
   `AF-010`、`AF-017`
@@ -236,6 +253,9 @@
 - Risk:medium（host-local delete 与 production root composition；所有删除只在临时
   fixture 验证，真实 App effect 留给用户确认）
 - Hardware required:no
+- r2 remaining implementation authority:none。#436 后本任务不再修改产品 source；
+  cross-change product wiring 由 CHG-2026-026 自身的独立 readiness/task 承载，本
+  change 后续只做 001R revalidation 与状态推进。
 
 ### Deliverables
 
@@ -264,15 +284,87 @@
 - 如果需要 locked schema、自动删除、用户真实目录或 task allowed paths 之外的消费者，
   立即 blocked 并修订 change，不在实现 PR 扩 scope。
 
+## TASK-SSET-001R — App-process production composition revalidation
+
+- Status:blocked（前置：r2 经维护者 review/merge、CHG-2026-026
+  `TASK-RKFUI-002` 独立 readiness/implementation/evidence/done 全部合入、本任务再经
+  独立 readiness；本 r2 不执行 revalidation、不新增 evidence）
+- Platform:macos
+- Requirements:`REQ-ART-001`、`REQ-ART-006`、`REQ-STO-001`、
+  `REQ-STO-003`、`REQ-STO-004`
+- Acceptance:`AC-ART-006-02`、`AC-STO-001-01`、`AC-STO-003-01`、
+  `AC-STO-004-01`、`SSET-RETENTION-001`
+- Depends on:r2 approval、#436 implementation/evidence 与 #503 blocker record 已 merged、
+  CHG-2026-026 `TASK-RKFUI-002` done、independent readiness
+- Applicable failure patterns:`AF-001`、`AF-002`、`AF-009`、`AF-017`
+- Production reachability:
+  signed/testable `ArkDeckApp` composition root →
+  唯一 `SessionStorageApplicationRuntime` →
+  `RockchipFlashApplicationFacade` 实际消费同一 runtime →
+  validated root lease/shared coordinator →
+  App plan-only `SessionStore.createSession` + owned plan Artifact。该 runtime 同时作为
+  后续 TASK-SSET-002 Settings facade 的固定生产依赖，但本任务不要求该 facade 已实现。
+- Trusted fact sources:CHG-2026-026 merged source/test/evidence 与 full merge OID；
+  App composition/runtime identity、实际 created Session root、coordinator/admission
+  receipt。UI 文本、fixture DI、standalone CLI 或对象可构造性不能自证 reachability。
+- Allowed paths:
+  - `openspec/changes/chg-2026-031-macos-session-settings/evidence/runs/TASK-SSET-001R/**`
+  - `openspec/changes/chg-2026-031-macos-session-settings/tasks.md`（仅本任务状态/
+    evidence 引用与 TASK-SSET-001 dependency/status）
+- Forbidden paths:
+  - `AGENTS.md`
+  - `openspec/constitution.md`
+  - `openspec/governance/**`
+  - `openspec/specs/**`
+  - `openspec/contracts/**`
+  - `openspec/changes/archive/**`
+  - `Packages/**`
+  - `ArkDeckApp/**`
+  - `ArkDeckAppUITests/**`
+  - `ArkDeck.xcodeproj/**`
+- Risk:low（只读合入版 revalidation；零产品修改、零用户数据删除、零设备 effect）
+- Hardware required:no
+
+### Deliverables
+
+- append-only run 固定 CHG-2026-026 `TASK-RKFUI-002` exact reviewed head、merge OID、
+  source/test/evidence blobs 与 protected-main ancestry；
+- document/source review 证明 App composition root 持有并向 Rockchip facade 注入唯一
+  runtime/configuration epoch，App plan-only Session 真实落在 validated root 且使用
+  shared coordinator；同时确认 TASK-SSET-002 的后续 dependency contract 禁止另建
+  production runtime；
+- 重跑 production composition contract：missing bookmark、root drift、retention block
+  时 Session create = 0；fixture delete/process/device port = 0；
+- 明确 standalone CLI 仍是独立 domain，不把其测试结果写成 App evidence。
+
+### Verification
+
+- `SSET-RETENTION-001` 与四条 canonical AC 的 merged producer→consumer evidence
+  二值复验；
+- CHG-2026-026 evidence 分类必须是 host-only plan-only/platform，不得冒充硬件；
+- App Group/shared preferences/IPC/entitlement diff = 0；
+- full Swift、相关 App/signed test、`scripts/check-sdd.sh`、`git diff --check` 与
+  secret/private-path scan 全绿；
+- revalidation/evidence PR 不翻 TASK-SSET-001R 或 TASK-SSET-001 状态；各自后续 D0
+  状态 PR 分离。
+
+### Notes / handoff
+
+- 若 CHG-2026-026 的未来 readiness 未接受本 dependency，或其 App facade 另建
+  settings/coordinator/root fallback，本任务保持 blocked，不把部分 composition 重判 PASS。
+- 若实现要求 App Group、IPC、共享 bookmark 或修改 locked schema，停止并另立
+  ADR/change；本 r2 没有批准这些能力。
+
 ## TASK-SSET-002 — macOS Settings UI 与 signed UI contract
 
-- Status:blocked（前置：change approval、TASK-SSET-001 done、独立 readiness PR；
+- Status:blocked（前置：r2 approval、TASK-SSET-001R done、TASK-SSET-001 done、
+  独立 readiness PR；
   readiness 须固定 facade API、Xcode project groups/target、String Catalog、signed
   Sandbox entitlement 与 UI fixture 零 delete-port 证明）
 - Platform:macos
 - Requirements:`REQ-ART-006`
 - Acceptance:`AC-ART-006-02`、`SSET-UI-001`
-- Depends on:change approval、TASK-SSET-001 done
+- Depends on:r2 approval、TASK-SSET-001R done、TASK-SSET-001 done
 - Readiness input pins:由独立 readiness PR 固定，不在 proposal 预填未来 OID
 - Applicable failure patterns:`AF-001`、`AF-002`、`AF-007`、`AF-010`、
   `AF-013`、`AF-017`

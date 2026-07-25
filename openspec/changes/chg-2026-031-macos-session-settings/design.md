@@ -155,3 +155,74 @@ filesystem delete port；production facade 标志为 true。按钮只有 product
   后台自动清理，必须独立 change 明确触发、通知与 crash/recovery 语义。
 - 不需要新 ADR；若实现发现需要修改 locked schema、自动删除或 Core retention 语义，
   本 change 保持 blocked 并另起 Core delta。
+
+## 9. r2 App-process production composition
+
+本节是 r2 对 §4、§5、§7 中 production reachability 的 scoped clarification；其他设计
+不变量保持不变。
+
+### 9.1 Process and authority boundary
+
+App-owned settings runtime 只控制 `ArkDeckApp` process 内的 product composition。
+App composition root 持有唯一 `SessionStorageApplicationRuntime`，先把该 instance
+注入 App-process Flash facade，并将同一依赖保留给后续 `TASK-SSET-002`：
+
+```text
+ArkDeckApp composition root
+        |
+        +--> one SessionStorageApplicationRuntime
+        |          |
+        |          +--> reserved production dependency for
+        |               SessionSettingsApplicationFacade (TASK-SSET-002)
+        |
+        +--> RockchipFlashApplicationFacade (CHG-2026-026 / TASK-RKFUI-002)
+                  |
+                  +--> runtime execution context
+                        + validated SessionRootAccessLease
+                        + shared HostStorageCoordinator
+                        + settings/catalog generation fence
+                  |
+                  +--> SessionStore.createSession + owned plan Artifact
+```
+
+`RockchipFlashApplicationFacade` 的 plan-only route 是第一个可交付的 App-process real Host
+consumer：它创建真实 owned Session/plan Artifact，但 mutation/destructive runner 仍为 0。
+这足以验证 Session root 与 storage admission 的 production consumption，不需要等待真机
+execute；它不把 plan-only 结果算作硬件支持。
+
+standalone `arkdeck` CLI 保持独立 process-local composition。它不读取 App container、
+App preferences 或 App security-scoped bookmark，也不作为 App Settings 的 consumer。
+如未来要求 App 与 CLI 共享配置，须为签名 identity、App Group、bookmark capability、
+migration、revocation 与 crash consistency 建立独立 ADR/change。
+
+### 9.2 Cross-change ownership
+
+- CHG-2026-031 继续拥有 settings/catalog/runtime contract 与 Settings UI。
+- CHG-2026-026 `TASK-RKFUI-002` 拥有 App Flash facade、plan-only Session consumer 与
+  App navigation/UI。它未来的独立 readiness 必须显式 pin 本 r2、#436 merged runtime
+  与 evidence，并增加 App-process producer→consumer contract；本 r2 不替它授权实现。
+- `TASK-SSET-001R` 在上述 cross-change task done 后只读复验合入版 source/test/evidence，
+  证明 App composition root 持有唯一 runtime 且 Flash facade 实际消费它，并追加
+  CHG-2026-031 evidence；它不要求尚未实现的 Settings facade 存在。
+- `TASK-SSET-001R` done 后，TASK-SSET-001 才能独立翻 `blocked→done`；随后才可为
+  TASK-SSET-002 起草 readiness。该 readiness 必须要求 Settings facade 消费既有
+  App-owned runtime，不能创建第二套 production runtime。
+
+### 9.3 Required evidence
+
+cross-change evidence 至少证明：
+
+1. signed/testable `ArkDeckApp` composition 只创建一个 production runtime；
+2. App composition root 注入 Rockchip facade 的 runtime identity/configuration epoch
+   与其持有的唯一 production runtime 相同，且该依赖可由后续 TASK-SSET-002 复用；
+3. App plan-only route 创建的 Session path 位于该 runtime validated root，并使用其 shared
+   coordinator/admission fence；
+4. bookmark unavailable、root drift 或 retention block 时，App plan-only Session create
+   call count = 0；
+5. fixture facade 没有 production delete/device/process port，plan-only mutation/
+   destructive dispatch = 0；
+6. App source 与 entitlements 不新增 App Group/IPC/shared-preferences authority；
+7. CLI composition 仍通过既有 contract，但明确不宣称受 App-owned settings runtime
+   控制。
+
+仅构造 runtime/host、依赖注入单元测试或 CLI 成功均不能单独满足上述 evidence。

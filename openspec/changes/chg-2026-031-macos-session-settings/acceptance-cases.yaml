@@ -1,7 +1,7 @@
 ---
 schema_version: 1.0.0
 change_id: CHG-2026-031-macos-session-settings
-change_revision: 1
+change_revision: 2
 platform: macos
 evidence_classes:
 - contract
@@ -42,9 +42,13 @@ cases:
     generations. Zero deletions occur without a fresh exact user confirmation.
     After apply, a real rescan rather than projected bytes updates the shared
     HostStorageCoordinator; any drift, partial failure or unknown pressure
-    keeps new heavy writers blocked. Rockchip production SessionStore consumes
-    the same validated root and coordinator, and cannot bypass a missing
-    bookmark or retention admission state.
+    keeps new heavy writers blocked. The ArkDeckApp-process Rockchip plan-only
+    production SessionStore consumes the same validated root and coordinator
+    held by the ArkDeckApp composition root, and cannot bypass a missing
+    bookmark or retention admission state. That runtime remains the required
+    production dependency for the later Settings facade. The standalone CLI
+    is a separate settings domain and is not accepted as evidence for this
+    App reachability.
 - acceptance_id: SSET-UI-001
   test_id: TEST-SSET-UI-001
   method: Signed macOS Settings UI and composition contract.
