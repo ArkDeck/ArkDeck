@@ -471,6 +471,17 @@ def _decode(completed: subprocess.CompletedProcess, stream: str = "stdout") -> s
     return data.decode("utf-8", errors="replace")
 
 
+def _require_exact_fact(name: str, observed: Any, expected: Any) -> None:
+    if observed != expected:
+        raise BuildError(
+            "{} drift: observed={!r} expected={!r}".format(
+                name,
+                observed,
+                expected,
+            )
+        )
+
+
 def inspect_toolchain(recipe: Mapping[str, Any]) -> Dict[str, Any]:
     expected = recipe["builder"]
     developer_dir = Path(
@@ -515,12 +526,18 @@ def inspect_toolchain(recipe: Mapping[str, Any]) -> Dict[str, Any]:
     make_version = _decode(_run_raw(["/usr/bin/make", "--version"], env=env)).splitlines()[0]
     bash_version = _decode(_run_raw(["/bin/bash", "--version"], env=env)).splitlines()[0]
     python_version = "{}.{}.{}".format(*sys.version_info[:3])
+    hosted_image = {
+        "imageOS": os.environ.get("ImageOS", ""),
+        "label": "macos-{}-{}".format(os_version.split(".", 1)[0], architecture),
+        "version": os.environ.get("ImageVersion", ""),
+    }
 
     facts = {
         "architecture": architecture,
         "bash": re.search(r"version ([^ -]+)", bash_version).group(1),
         "clang": clang_version,
         "developerDirectory": str(developer_dir),
+        "hostedImage": hosted_image,
         "make": make_version,
         "osBuild": os_build,
         "osVersion": os_version,
@@ -545,8 +562,8 @@ def inspect_toolchain(recipe: Mapping[str, Any]) -> Dict[str, Any]:
         "xcodeBuild",
         "xcodeVersion",
     ):
-        if facts[key] != expected[key]:
-            raise BuildError("toolchain fact drift for {}".format(key))
+        _require_exact_fact("toolchain fact for {}".format(key), facts[key], expected[key])
+    _require_exact_fact("hosted image", facts["hostedImage"], expected["hostedImage"])
 
     iconv_header = sdk_path / "usr/include/iconv.h"
     iconv_tbd = sdk_path / "usr/lib/libiconv.2.tbd"
@@ -1299,6 +1316,7 @@ def generate_registry(
         "schemaVersion": "1.0.0",
         "serializationFormat": "json-compatible-yaml-1.2",
     }
+    document["builder"]["hostedImage"] = dict(toolchain["hostedImage"])
     assert_no_sensitive_values(document)
     write_canonical_json(output, document)
 
@@ -1581,6 +1599,7 @@ def build_once(builder_id: str, work_root: Path, output_dir: Path) -> Dict[str, 
         },
         "verdict": "PASS",
     }
+    receipt["toolchain"]["hostedImage"] = dict(toolchain["hostedImage"])
     assert_no_sensitive_values(receipt)
     write_canonical_json(output_dir / "builder-receipt.json", receipt)
     return receipt

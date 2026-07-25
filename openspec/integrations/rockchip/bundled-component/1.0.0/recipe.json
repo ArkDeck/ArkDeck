@@ -4,9 +4,14 @@
     "bash": "3.2.57(1)",
     "clang": "Apple clang version 21.0.0 (clang-2100.1.1.101)",
     "developerDirectoryAllowlist": [
-      "/Applications/Xcode.app/Contents/Developer",
       "/Applications/Xcode_26.6.app/Contents/Developer"
     ],
+    "gnupgBottle": {
+      "formula": "gnupg",
+      "sha256": "77a293d5ac76a99d7ca1fca4d57860bd76bb25b3c334b2504fc9b7fc145f1502",
+      "tag": "arm64_tahoe",
+      "version": "2.5.21"
+    },
     "gpg": {
       "absolutePath": "/opt/homebrew/bin/gpg",
       "sha256": "33912b52dc018219f5346bf9fa6705a6d737198ed5e57370e1e91fde45a9acaa",
@@ -17,9 +22,14 @@
       "sha256": "da2acbb7c6f54461b80d4ccc61c82dc4258a580298bf1a974ebda1ff8a504780",
       "version": "2.5.21"
     },
+    "hostedImage": {
+      "imageOS": "macos26",
+      "label": "macos-26-arm64",
+      "version": "20260720.0258.1"
+    },
     "make": "GNU Make 3.81",
-    "osBuild": "25F84",
-    "osVersion": "26.5.2",
+    "osBuild": "25E246",
+    "osVersion": "26.4",
     "python": "3.9.6",
     "sdkBuild": "25F70",
     "sdkVersion": "26.5",

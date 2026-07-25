@@ -67,6 +67,21 @@ class RockchipComponentBuildTests(unittest.TestCase):
         self.assertEqual(self.recipe["recipeId"], "rockchip-component-build@1.0.0")
         self.assertEqual(self.recipe["component"]["targetTriple"], "arm64-apple-macos14.0")
         self.assertEqual(self.recipe["component"]["architecture"], "arm64")
+        self.assertEqual(
+            self.recipe["builder"]["hostedImage"],
+            {
+                "imageOS": "macos26",
+                "label": "macos-26-arm64",
+                "version": "20260720.0258.1",
+            },
+        )
+        self.assertEqual(self.recipe["builder"]["osBuild"], "25E246")
+        self.assertEqual(self.recipe["builder"]["osVersion"], "26.4")
+        self.assertEqual(
+            self.recipe["builder"]["developerDirectoryAllowlist"],
+            ["/Applications/Xcode_26.6.app/Contents/Developer"],
+        )
+        self.assertRegex(self.recipe["builder"]["gnupgBottle"]["sha256"], r"^[0-9a-f]{64}$")
         self.assertEqual(self.recipe["reproducibility"]["cleanBuilders"], 2)
         self.assertEqual(self.recipe["reproducibility"]["normalization"], "forbidden")
         self.assertEqual(self.recipe["environment"]["callerPATH"], "ignored")
@@ -84,6 +99,18 @@ class RockchipComponentBuildTests(unittest.TestCase):
                 self.assertRegex(asset["sha256"], r"^[0-9a-f]{64}$")
                 self.assertGreater(asset["size"], 0)
                 self.assertTrue(asset["url"].startswith("https://"))
+
+    def test_hosted_image_mutations_fail_closed(self) -> None:
+        expected = self.recipe["builder"]["hostedImage"]
+        build._require_exact_fact("hosted image", dict(expected), expected)
+        mutations = (
+            {**expected, "imageOS": "macos27"},
+            {**expected, "label": "macos-26"},
+            {**expected, "version": "20260721.0000.1"},
+        )
+        for mutation in mutations:
+            with self.subTest(mutation=mutation), self.assertRaises(build.BuildError):
+                build._require_exact_fact("hosted image", mutation, expected)
 
     def test_archive_accepts_one_root_and_extracts_regular_files(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

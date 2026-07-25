@@ -78,15 +78,13 @@ jobs:
           name: rockchip-builder-b
           path: ${{ runner.temp }}/builder-b
 
-      - name: Byte-identical comparison and committed metadata audit
+      - name: Byte-identical comparison
         run: |
           set -eu
           /usr/bin/python3 scripts/rockchip_component/build.py compare \
             --builder-a "$RUNNER_TEMP/builder-a" \
             --builder-b "$RUNNER_TEMP/builder-b" \
             --output "$RUNNER_TEMP/reproducibility.json"
-          /usr/bin/python3 scripts/rockchip_component/build.py verify-committed \
-            --reference "$RUNNER_TEMP/builder-a"
 
       - name: Upload comparison receipt
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -95,3 +93,9 @@ jobs:
           path: ${{ runner.temp }}/reproducibility.json
           if-no-files-found: error
           retention-days: 1
+
+      - name: Committed metadata audit
+        run: |
+          set -eu
+          /usr/bin/python3 scripts/rockchip_component/build.py verify-committed \
+            --reference "$RUNNER_TEMP/builder-a"

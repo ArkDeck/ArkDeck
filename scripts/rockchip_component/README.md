@@ -9,7 +9,8 @@ The recipe:
   `openspec/integrations/rockchip/bundled-component/1.0.0/recipe.json`;
 - verifies exact size/SHA-256 and the libusb detached signature before extraction;
 - rejects unsafe archive members and extracts into a fresh temporary root;
-- builds with the exact macOS/Xcode/SDK/Clang envelope inside a deny-network
+- builds only on the exact GitHub-hosted `macos-26-arm64` image pinned by the
+  recipe, with its exact macOS/Xcode/SDK/Clang envelope, inside a deny-network
   `sandbox-exec` profile;
 - compares two independent build roots without output normalization;
 - emits sanitized receipts plus deterministic registry, SPDX 2.3 JSON, notices and
@@ -38,6 +39,9 @@ credential or GPG keyring is committed.
 ```
 
 `build` creates and owns the specified fresh roots. Existing non-empty roots fail
-closed. Network is allowed only while fetching the pinned inputs; configure,
-compilation, linking and inspection run without network. The binary remains in the
-temporary output directory and is inspected as data only.
+closed. A local host may run the unit/mutation suite, but its build output is
+exploratory and cannot become final evidence. Final metadata is materialized only
+from the two-builder hosted workflow after byte comparison. Network is allowed only
+while fetching the pinned inputs; configure, compilation, linking and inspection run
+without network. The binary remains in the temporary output directory and is
+inspected as data only.
