@@ -183,12 +183,12 @@ private enum RockchipE0ProbeApp {
         scopeStarted: selectedScope || resolvedScope,
         executableHash: executableHash,
         signatureValid: signatureValid,
-          quarantinePresent: hasQuarantine)
+        quarantinePresent: hasQuarantine)
     } catch let error as NSError {
       emit(
         ProbeEnvelope(
           schemaVersion: "1.0.0", selectionCompleted: true,
-          selectedPath: selectedURL.path, bookmarkCreated: false,
+          selectedPath: selectedURL.path, bookmarkCreated: true,
           securityScopeStarted: selectedScope, executableSHA256: nil,
           signatureIntegrityValid: nil, quarantinePresent: nil,
           preflightFailure: "executableInspectionFailed",

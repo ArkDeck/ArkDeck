@@ -199,6 +199,13 @@ class RockchipE0ProbeTests(unittest.TestCase):
         self.assertNotIn(".minimalBookmark", swift_source)
         self.assertNotIn(".suitableForBookmarkFile", swift_source)
         self.assertGreaterEqual(swift_source.count("relativeTo: nil"), 2)
+        self.assertRegex(
+            swift_source,
+            r"selectedPath: selectedURL\.path, bookmarkCreated: true,\s*"
+            r"securityScopeStarted: selectedScope, executableSHA256: nil,\s*"
+            r"signatureIntegrityValid: nil, quarantinePresent: nil,\s*"
+            r'preflightFailure: "executableInspectionFailed"',
+        )
         for stage in ("bookmarkCreationFailed", "bookmarkResolutionFailed"):
             observation = PROBE._sanitized_bookmark_observation(
                 {

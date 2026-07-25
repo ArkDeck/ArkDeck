@@ -1,6 +1,6 @@
 # TASK-RKFUI-001F — read-only bookmark option remediation
 
-- Captured:2026-07-25T02:41:50Z–2026-07-25T02:42:48Z
+- Captured:2026-07-25T02:52:09Z–2026-07-25T02:52:28Z
 - Executor:agent（两次 `NSOpenPanel` 选择由维护者完成）
 - Evidence class:`signedSandboxHostOnlyBookmarkOptionRemediation`
 - Result:`passed`
@@ -28,9 +28,9 @@
   两份 blocked evidence 未改写或重分类。
 - 实现后的 Probe Python/App/entitlement/tests/README/fixture-source blobs 为
   `3ff1a3ea6e22f7b15509274f871482cd96708f1a` /
-  `32615a958d7d67f07eabf0d59915890e9d90bcf5` /
+  `cc75588161682254083d70278e9fb43023666c9f` /
   `f2c71dc71c38abe01829e6000d10ae49a2272f04` /
-  `e8b1b367579d90df91a3b2243ead90facb906d37` /
+  `68db205919b6bc66e4b7383273697186e51565e4` /
   `d40220be3480fcc685096d597697c811dd859e1c` /
   `3556f0204fc706d29f407c732ca97b83bb3c97ae`。
 
@@ -79,13 +79,13 @@ python3 scripts/rockchip_e0_probe/probe.py build \
   与 registry pin 不同；regular/executable、ad-hoc signed、CDHash
   `5646303119253586ce9c21f8440def813a259801`、quarantine absent。
 - 两个 fresh App executable SHA-256 都为
-  `c6036e9da6eabab1ac17c60421934d9adaed699a661cb2aeddd8246aa2d5d91b`；
+  `9c1b65ab89a862f5d60c88279c07fd7fd91073e6e9bfa35a75f74b5dbea9099c`；
   均通过 `codesign --verify --deep --strict`、Hardened Runtime 与 exact six-entitlement
   equality。
 - fixture build receipt SHA-256 =
   `5607c3fd3a243f1e9d1690e3153e6ed8c88bf377b2956dc5e03c8073a5b2ba1d`；
   两个 App build receipt SHA-256 都为
-  `419a10b2426b5fd0cbf77b6499b80f2b5c14155d67c54a760a4b732a78a852be`。
+  `39830ab2a5f3d278abb44d91c2464c12b7473d5c1b33aeaaf3d8b9196ec17e89`。
 
 ## Run matrix
 
@@ -107,7 +107,7 @@ python3 scripts/rockchip_e0_probe/probe.py characterize \
 - `preflightFailure=executableHashMismatch`、`childLaunchAttempted=false`，fixture 未执行。
 - Host pre/post target bytes/size/CDHash/signature 不变且 quarantine absent。
 - Verdict:`passed`；sanitized receipt SHA-256 =
-  `650ed80c3bf6909ec08b898794464fff470e4d7ce88ffe04db02f6ed4dba9890`。
+  `6924f8a7b96090e628e0fca54b1a838ecd4eb5015c59301573e1a4e86e4faf6c`。
 
 ### Single-layer symlink
 
@@ -127,7 +127,7 @@ python3 scripts/rockchip_e0_probe/probe.py characterize \
 - bookmark、App hash/signature/quarantine、wrong-hash preflight 与 host metadata gates
   全部同 canonical run PASS；fixture 未执行。
 - Verdict:`passed`；sanitized receipt SHA-256 =
-  `b8dd2af48f873d5b4db64c404a2c42247160e0428be76bee1adf85efb7d1615f`。
+  `dbe612ca9be659e27e0a19b5847e1e92db4f242e4185a699fe42d627e8810ca9`。
 
 ## Safety and dispatch accounting
 
@@ -150,7 +150,7 @@ serial 或 LocationID。
 python3 -m unittest scripts/rockchip_e0_probe/test_probe.py -v
 # 11 tests, PASS
 
-ARKDECK_PYTHON=<existing-sdd-venv>/bin/python sh scripts/check-sdd.sh
+ARKDECK_PYTHON=<private-temp-sdd-venv>/bin/python sh scripts/check-sdd.sh
 # 0 errors, 0 warnings, 111 acceptance IDs
 
 python3 <repository-safe receipt assertions>
@@ -164,6 +164,17 @@ Tests 明确覆盖 exact six-key entitlement、creation/resolution option sets�
 read-write/executable-writing entitlement、Info.plist quarantine override、document/implicit
 bookmark options、stage-specific sanitized error contract、deterministic wrong-hash fixture、
 symlink lexical non-gate 与全零 dispatch surface。
+
+额外运行完整 `CI=true swift test --package-path Packages/ArkDeckKit`：400 tests 中
+397 passed、1 skipped、2 failed。失败仅为既有
+`HDCGoldenResourceContractTests.testGoldenPackContainsExactRegisteredFixtureSetWithMatchingHashes`
+与
+`HDCProbeRegistryContractTests.testPackContainsExactPinnedResourceSetAndHashes`；
+两者在 `/private/tmp` worktree 下把 resource path 前缀错误归一化为
+`/private1.0.0/...`。同两组测试在 exact `origin/main`
+`177c50086b413536b4b867c9885ecb2f0ce2fee2` 的独立 `/private/tmp` worktree
+同样为 10 tests / 2 failures。本任务未修改 `Packages/**`，该路径归一化问题不在
+001F allowed paths，未在本 PR 中顺带修复。
 
 ## AC conclusion and handoff
 

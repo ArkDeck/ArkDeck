@@ -1,6 +1,6 @@
 {
   "app": {
-    "buildReceiptExecutableSHA256": "c6036e9da6eabab1ac17c60421934d9adaed699a661cb2aeddd8246aa2d5d91b",
+    "buildReceiptExecutableSHA256": "9c1b65ab89a862f5d60c88279c07fd7fd91073e6e9bfa35a75f74b5dbea9099c",
     "bundleIdentifier": "dev.arkdeck.rockchip-e0-probe",
     "codesignVerified": true,
     "entitlements": {
@@ -11,7 +11,7 @@
       "com.apple.security.files.user-selected.read-only": true,
       "com.apple.security.network.client": true
     },
-    "executableSHA256": "c6036e9da6eabab1ac17c60421934d9adaed699a661cb2aeddd8246aa2d5d91b",
+    "executableSHA256": "9c1b65ab89a862f5d60c88279c07fd7fd91073e6e9bfa35a75f74b5dbea9099c",
     "hardenedRuntime": true,
     "infoPlistQuarantineOverridePresent": false,
     "signatureClass": "adHoc"
@@ -30,7 +30,7 @@
       "withoutUI"
     ]
   },
-  "capturedAt": "2026-07-25T02:41:50Z",
+  "capturedAt": "2026-07-25T02:54:07Z",
   "dispatchCounters": {
     "aclMutation": 0,
     "destructive": 0,
