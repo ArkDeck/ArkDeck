@@ -181,10 +181,23 @@ def discover_candidates(repo_root: Path, change_id: str) -> list[TaskCandidate]:
 
 
 def done_task_ids(repo_root: Path) -> frozenset[str]:
-    """Every task recorded as done across active changes."""
+    """Every task recorded as done, in active AND archived changes.
+
+    The archived half is not optional. `changes/*/tasks.md` does not match
+    `changes/archive/<date>-<change>/tasks.md`, so archiving a change used to
+    make every task inside it read as NOT done — permanently and silently.
+    Measured consequence: TASK-RPT-001 and TASK-RPT-002 are both done and both
+    archived, so TASK-HLR-001A's and TASK-HLR-002A's declared dependencies could
+    never be satisfied again. Fail-closed, hence not dangerous, but it wedges the
+    loop for good and nothing reports it.
+
+    A task is done when a change says so; whether that change has since been
+    archived is a filing fact about the change, not a retraction of the task.
+    """
     done: set[str] = set()
     changes = repo_root / "openspec" / "changes"
-    for tasks_file in sorted(changes.glob("*/tasks.md")):
+    for tasks_file in sorted(list(changes.glob("*/tasks.md"))
+                             + list(changes.glob("archive/*/tasks.md"))):
         text = _without_code_fences(tasks_file.read_text(encoding="utf-8"))
         for section in re.split(r"(?m)^##\s+", text)[1:]:
             header = _TASK_HEADER_RE.match("## " + section)
@@ -246,8 +259,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         prog="python3 -m host_loop",
         description="Run one host-loop worker round and exit.",
     )
-    parser.add_argument("--once", action="store_true", required=True,
-                        help="perform exactly one round (the only supported mode)")
+    mode = parser.add_mutually_exclusive_group(required=True)
+    mode.add_argument("--once", action="store_true",
+                     help="perform exactly one round")
+    mode.add_argument("--explain", action="store_true",
+                      help="print the per-gate verdict for every candidate and "
+                           "exit; performs no network call and needs no credential")
     parser.add_argument("--repo-dir", default=os.environ.get("ARKDECK_REPO"),
                         help="path to the ArkDeck checkout")
     parser.add_argument("--change", default="CHG-2026-030-host-loop-runtime")
@@ -273,6 +290,62 @@ def _int_env(name: str) -> int | None:
         return None
 
 
+def _explain(repo_root: Path, args, runner) -> int:
+    """Print the per-gate verdict for every candidate. No network, no credential.
+
+    The r3 D2 readiness requires the window's receipt to carry a per-gate
+    enumeration, because `exit 10` conflates "no candidates", "every candidate
+    rejected" and "only never-claim tasks are ready". Before this mode existed
+    that requirement was undecidable: nothing in the repository could produce the
+    observation the gate asked for.
+
+    Exit 0 when at least one candidate is claimable, 10 when none is — the same
+    convention as a real round, so a scheduler wrapper can compare the two.
+    """
+    from .worker import GATED_GRADES, rejection_reasons
+
+    candidates = discover_candidates(repo_root, args.change)
+    approved = _change_is_approved(repo_root, args.change)
+    done = done_task_ids(repo_root)
+    # A dry run must not reach the NETWORK; a local subprocess is fine. An
+    # earlier version hand-parsed .git/HEAD and crashed with NotADirectoryError,
+    # because in a git worktree `.git` is a FILE holding a gitdir pointer, not a
+    # directory. git itself knows where its HEAD is; ask it.
+    code, out, _err = runner(["git", "rev-parse", "HEAD"])
+    local_oid = out.strip() if code == 0 and OID_RE.match(out.strip()) else ""
+
+    print(f"change={args.change} approved={approved} "
+          f"local_head={local_oid or 'unknown'} (advisory; no ls-remote)")
+    print(f"done_task_ids={len(done)} (active + archived changes)")
+    claimable: list[str] = []
+    for candidate in candidates:
+        reasons = rejection_reasons(candidate, done=done, main_oid=local_oid)
+        if not reasons:
+            claimable.append(candidate.task_id)
+            print(f"  {candidate.task_id}: CLAIMABLE")
+            continue
+        print(f"  {candidate.task_id}: rejected")
+        for reason in reasons:
+            print(f"      - {reason}")
+    if not approved:
+        print("change is not approved; nothing is dispatchable regardless")
+        return EXIT_NO_DISPATCH
+    only_grade = [
+        c.task_id for c in candidates
+        if len(rejection_reasons(c, done=done, main_oid=local_oid)) == 1
+        and c.decision_grade not in GATED_GRADES
+        and "decision grade" in rejection_reasons(
+            c, done=done, main_oid=local_oid)[0]
+    ]
+    if only_grade:
+        # Stated loudly because it inverts the safety story: for these tasks the
+        # missing Decision-Grade line is the ONLY thing standing between the loop
+        # and a claim, so filling the field in is a per-task human judgement.
+        print(f"one Decision-Grade line from claimable: {sorted(only_grade)}")
+    print(f"claimable={sorted(claimable) or 'none'}")
+    return EXIT_DISPATCHED if claimable else EXIT_NO_DISPATCH
+
+
 def main(argv: list[str] | None = None) -> int:
     try:
         args = parse_args(argv)
@@ -283,6 +356,14 @@ def main(argv: list[str] | None = None) -> int:
             raise BackendError(f"{repo_root} is not a git checkout")
 
         runner = SubprocessGitRunner(repo_dir=str(repo_root))
+
+        if args.explain:
+            # Returns BEFORE read_token() and before any port is constructed, so
+            # a dry run cannot make a network call and cannot require the
+            # credential the window has not staged yet. main_oid is read from the
+            # local HEAD rather than ls-remote for the same reason.
+            return _explain(repo_root, args, runner)
+
         refs = RefPort(remote="origin", _run=runner)
         api = ApiPort(owner=args.owner, repo=args.repo,
                       _send=UrllibSender(token=read_token()))
