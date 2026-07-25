@@ -7,6 +7,12 @@ import Security
 private let pinnedExecutableSHA256 =
   "bbd7bdc0fb121d414fb61085e77211cc1fdd9a3b6c6b285c54380f70e56c9923"
 private let exactArguments = ["ld"]
+private let bookmarkCreationOptions: URL.BookmarkCreationOptions = [
+  .withSecurityScope, .securityScopeAllowOnlyReadAccess,
+]
+private let bookmarkResolutionOptions: URL.BookmarkResolutionOptions = [
+  .withSecurityScope, .withoutUI,
+]
 
 private struct ProbeEnvelope: Codable {
   let schemaVersion: String
@@ -98,17 +104,35 @@ private enum RockchipE0ProbeApp {
       if selectedScope { selectedURL.stopAccessingSecurityScopedResource() }
     }
 
+    let bookmark: Data
     do {
-      let bookmark = try selectedURL.bookmarkData(
-        options: .withSecurityScope,
+      bookmark = try selectedURL.bookmarkData(
+        options: bookmarkCreationOptions,
         includingResourceValuesForKeys: nil,
         relativeTo: nil)
-      var stale = false
-      let resolvedURL = try URL(
+    } catch let error as NSError {
+      emitBookmarkFailure(
+        selectedURL: selectedURL, scopeStarted: selectedScope,
+        failure: "bookmarkCreationFailed", error: error)
+      return
+    }
+
+    var stale = false
+    let resolvedURL: URL
+    do {
+      resolvedURL = try URL(
         resolvingBookmarkData: bookmark,
-        options: [.withSecurityScope, .withoutUI],
+        options: bookmarkResolutionOptions,
         relativeTo: nil,
         bookmarkDataIsStale: &stale)
+    } catch let error as NSError {
+      emitBookmarkFailure(
+        selectedURL: selectedURL, scopeStarted: selectedScope,
+        failure: "bookmarkResolutionFailed", error: error)
+      return
+    }
+
+    do {
       guard !stale else {
         emitPreflightFailure(
           selectedURL: selectedURL, scopeStarted: selectedScope,
@@ -159,7 +183,7 @@ private enum RockchipE0ProbeApp {
         scopeStarted: selectedScope || resolvedScope,
         executableHash: executableHash,
         signatureValid: signatureValid,
-        quarantinePresent: hasQuarantine)
+          quarantinePresent: hasQuarantine)
     } catch let error as NSError {
       emit(
         ProbeEnvelope(
@@ -167,7 +191,7 @@ private enum RockchipE0ProbeApp {
           selectedPath: selectedURL.path, bookmarkCreated: false,
           securityScopeStarted: selectedScope, executableSHA256: nil,
           signatureIntegrityValid: nil, quarantinePresent: nil,
-          preflightFailure: "bookmarkCreationOrResolutionFailed",
+          preflightFailure: "executableInspectionFailed",
           exactArguments: exactArguments, childLaunchAttempted: false,
           termination: nil, exitCode: nil, stdoutBase64: "", stderrBase64: "",
           launchErrorDomain: error.domain, launchErrorCode: error.code))
@@ -281,6 +305,24 @@ private enum RockchipE0ProbeApp {
         childLaunchAttempted: false, termination: nil, exitCode: nil,
         stdoutBase64: "", stderrBase64: "", launchErrorDomain: nil,
         launchErrorCode: nil))
+  }
+
+  private static func emitBookmarkFailure(
+    selectedURL: URL,
+    scopeStarted: Bool,
+    failure: String,
+    error: NSError
+  ) {
+    emit(
+      ProbeEnvelope(
+        schemaVersion: "1.0.0", selectionCompleted: true,
+        selectedPath: selectedURL.path, bookmarkCreated: false,
+        securityScopeStarted: scopeStarted, executableSHA256: nil,
+        signatureIntegrityValid: nil, quarantinePresent: nil,
+        preflightFailure: failure, exactArguments: exactArguments,
+        childLaunchAttempted: false, termination: nil, exitCode: nil,
+        stdoutBase64: "", stderrBase64: "",
+        launchErrorDomain: error.domain, launchErrorCode: error.code))
   }
 
   private static func sha256(of url: URL) throws -> String {

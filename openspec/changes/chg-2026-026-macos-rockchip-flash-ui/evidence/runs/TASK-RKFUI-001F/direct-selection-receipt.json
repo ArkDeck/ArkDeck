@@ -1,0 +1,148 @@
+{
+  "app": {
+    "buildReceiptExecutableSHA256": "c6036e9da6eabab1ac17c60421934d9adaed699a661cb2aeddd8246aa2d5d91b",
+    "bundleIdentifier": "dev.arkdeck.rockchip-e0-probe",
+    "codesignVerified": true,
+    "entitlements": {
+      "com.apple.security.app-sandbox": true,
+      "com.apple.security.device.serial": true,
+      "com.apple.security.device.usb": true,
+      "com.apple.security.files.bookmarks.app-scope": true,
+      "com.apple.security.files.user-selected.read-only": true,
+      "com.apple.security.network.client": true
+    },
+    "executableSHA256": "c6036e9da6eabab1ac17c60421934d9adaed699a661cb2aeddd8246aa2d5d91b",
+    "hardenedRuntime": true,
+    "infoPlistQuarantineOverridePresent": false,
+    "signatureClass": "adHoc"
+  },
+  "bookmark": {
+    "created": true,
+    "creationOptions": [
+      "withSecurityScope",
+      "securityScopeAllowOnlyReadAccess"
+    ],
+    "errorCode": null,
+    "errorDomain": null,
+    "failureStage": null,
+    "resolutionOptions": [
+      "withSecurityScope",
+      "withoutUI"
+    ]
+  },
+  "capturedAt": "2026-07-25T02:41:50Z",
+  "dispatchCounters": {
+    "aclMutation": 0,
+    "destructive": 0,
+    "device": 0,
+    "deviceMutation": 0,
+    "driverInstall": 0,
+    "groupMutation": 0,
+    "hdc": 0,
+    "helper": 0,
+    "ldReadOnly": 0,
+    "network": 0,
+    "selectedProcess": 0,
+    "sudoOrPrivilegeElevation": 0,
+    "systemRuleMutation": 0,
+    "usb": 0,
+    "xattrWrite": 0
+  },
+  "evidenceClass": "signedSandboxHostOnlyBookmarkOptionRemediation",
+  "executor": "agent",
+  "fixture": {
+    "basename": "rkdeveloptool",
+    "byteHashUnchanged": true,
+    "codeDirectoryHash": "5646303119253586ce9c21f8440def813a259801",
+    "codeTrust": "adHoc",
+    "executable": true,
+    "executed": false,
+    "pinnedRegistryHashMatched": false,
+    "quarantinePresentAfter": false,
+    "quarantinePresentBefore": false,
+    "regularFile": true,
+    "sha256": "ac16dc31b98440622c19af303c4c5082a872669dffe88fab36a9b0b3bbec257b",
+    "signatureIntegrityValidAfter": true,
+    "signatureIntegrityValidBefore": true,
+    "signatureUnchanged": true,
+    "sourceSHA256": "1d4bee2e3e9c7960d9a7d58ea4cf16f14032bc4fab8f4546f465b157c352e573"
+  },
+  "gateChecks": {
+    "appCodesignVerified": true,
+    "appExactEntitlements": true,
+    "appForbiddenEntitlementsAbsent": true,
+    "appHardenedRuntime": true,
+    "appObservedFixtureHash": true,
+    "appObservedQuarantineAbsent": true,
+    "appObservedSignatureValid": true,
+    "bookmarkCreated": true,
+    "bookmarkCreationOptionsExact": true,
+    "bookmarkResolutionOptionsExact": true,
+    "fixtureAdHocSigned": true,
+    "fixtureBasename": true,
+    "fixtureBuildHashMatches": true,
+    "fixtureBuildReceiptPassed": true,
+    "fixtureBytesUnchanged": true,
+    "fixtureCodeDirectoryHashPresent": true,
+    "fixtureQuarantineAbsentAfter": true,
+    "fixtureQuarantineAbsentBefore": true,
+    "fixtureRegularExecutable": true,
+    "fixtureSignatureUnchanged": true,
+    "fixtureSignatureValidAfter": true,
+    "fixtureSignatureValidBefore": true,
+    "fixtureSizeUnchanged": true,
+    "fixtureWrongHash": true,
+    "probeDispatchZero": true,
+    "rawOutputEmpty": true,
+    "securityScopeStarted": true,
+    "selectedChildNotLaunched": true,
+    "selectedEntryPolicySatisfied": true,
+    "selectedResolvedTarget": true,
+    "selectionCompleted": true,
+    "selectorKindMatched": true,
+    "selectorResolvedBefore": true,
+    "selectorUnchanged": true,
+    "wrongHashPreflight": true
+  },
+  "gateFailures": [],
+  "preflight": {
+    "childLaunchAttempted": false,
+    "exactArgumentsThatWereNotDispatched": [
+      "ld"
+    ],
+    "failure": "executableHashMismatch"
+  },
+  "privacy": {
+    "deviceSerialRecorded": false,
+    "fullPathRecorded": false,
+    "locationIDRecorded": false,
+    "rawXattrPayloadRecorded": false
+  },
+  "schemaVersion": "1.0.0",
+  "scope": {
+    "productDeliveryEvidence": false,
+    "realHardwareEvidence": false,
+    "realToolUsed": false,
+    "usbOrDeviceAccessed": false
+  },
+  "selection": {
+    "appObservedQuarantinePresent": false,
+    "appObservedSHA256": "ac16dc31b98440622c19af303c4c5082a872669dffe88fab36a9b0b3bbec257b",
+    "appObservedSignatureIntegrityValid": true,
+    "bookmarkCreated": true,
+    "completed": true,
+    "securityScopeStarted": true
+  },
+  "selector": {
+    "basename": "rkdeveloptool",
+    "isSymlink": false,
+    "kind": "canonicalDirect",
+    "resolvedTargetMatchesFixtureAfter": true,
+    "resolvedTargetMatchesFixtureBefore": true,
+    "selectedEntryLexicallyMatched": true,
+    "selectedResolvedTarget": true,
+    "symlinkDepth": 0
+  },
+  "task": "TASK-RKFUI-001F",
+  "verdict": "passed"
+}
