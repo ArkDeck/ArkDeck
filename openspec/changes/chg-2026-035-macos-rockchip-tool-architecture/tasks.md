@@ -6,13 +6,24 @@
 
 ## TASK-RKTA-001 — 评估并决定 macOS Rockchip 工具执行架构
 
-- Status:ready（r1 D1 readiness；仅在维护者对本单文件 readiness PR 的 exact head
-  review/merge 后生效。本 PR 不形成 candidate matrix/ADR/decision/evidence，不修改
-  product/profile/decision inventory，也不授权 App/tool/helper/device effect。）
+- Status:done（2026-07-25 D0 completion；仅在维护者 review/merge 本独立
+  `ready → done` PR 后生效。decision/evidence #530 exact reviewed head
+  `91a9cc3fa29303d78e1079b0e7f1f4210f51cd46` 已由 `lvye` APPROVED，并以
+  `94704827e541cc13c34da9395f5d9810b78cca17` 合入 protected `main`；
+  `open-pr`、`guard`、`swift` 与 final `allowed-paths` checks 均 SUCCESS。
+  accepted outcome = `selected:bundledRockchipComponent`，run/matrix blob 分别为
+  `49d2688b0cba20b0f4d142d63d3ba46a3739313d` /
+  `7af58939d359aca7b1626c18070c676b16c5f04b`。本 done 只闭合 host-side
+  `documentReview` architecture selection；不构成 change `verified`、产品实现、
+  App/tool/helper/USB/device effect 或 CHG-2026-026 revision/readiness 授权。）
+- Historical Status:ready（r1 D1 readiness #528 exact reviewed head
+  `651b75290c733df213f5aea905836a0e38c262b1` 已由 `lvye` APPROVED，并以
+  `8f035b5eb64c731f5c1a19affd06e58c93a17d5b` 合入 protected `main`。该状态只授权
+  decision/evidence document review，不预先接受候选或形成 done。）
 - Historical Status:blocked（r1 proposal #526 与 approval-only #527 已依次合入；
   两者均未选择架构或自动产生 readiness。）
-- Decision/evidence candidate（仅在维护者 review/merge 本独立 PR 后成为 accepted
-  task evidence；本 PR 不翻 `ready → done`）：outcome =
+- Accepted decision/evidence（PR #530 已由维护者 review/merge；本独立 D0 PR 只记录
+  其确定性结果）：outcome =
   `selected:bundledRockchipComponent`。ADR-0003/DEC-011/macOS profile 与
   `evidence/runs/TASK-RKTA-001/candidate-matrix.md`、`run.md` 同步选择 App-owned
   source-pinned Rockchip nested component 的 direct child route；无 XPC/broker/
