@@ -1,0 +1,176 @@
+{
+  "capturedAt": "2026-07-25T04:55:51Z",
+  "evidenceClass": "signedSandboxHostOnlyExternalFixtureLaunchCharacterization",
+  "executor": "agent",
+  "governance": {
+    "approvedBy": "lvye",
+    "decisionMergeOID": "27796f52734a844f1cda0e0ed2c9113abb83d39e",
+    "reviewedHeadOID": "7e4bb944ca5787f56af60fa5ab8ca17614842db6"
+  },
+  "host": {
+    "architecture": "arm64",
+    "operatingSystem": "macOS",
+    "sdkVersion": "26.5",
+    "version": "26.5.2"
+  },
+  "inputClosure": {
+    "appEntitlementsBlob": "6435d00f8493ce4fbca24a806ca7f320db9fbfa6",
+    "macOSProfileBlob": "a9a5931ffedd304a7ce3a088f4397c26fd87e744",
+    "probeAppBlob": "cc75588161682254083d70278e9fb43023666c9f",
+    "probeEntitlementsBlob": "f2c71dc71c38abe01829e6000d10ae49a2272f04",
+    "probePythonBlob": "3ff1a3ea6e22f7b15509274f871482cd96708f1a",
+    "probeTestsBlob": "68db205919b6bc66e4b7383273697186e51565e4",
+    "r9MergeOID": "27796f52734a844f1cda0e0ed2c9113abb83d39e"
+  },
+  "schemaVersion": "1.0.0",
+  "stageA": {
+    "app": {
+      "buildBoundExecutableSHA256": "bbd7bdc0fb121d414fb61085e77211cc1fdd9a3b6c6b285c54380f70e56c9923",
+      "codesignVerified": true,
+      "entitlements": {
+        "com.apple.security.app-sandbox": true,
+        "com.apple.security.device.serial": true,
+        "com.apple.security.device.usb": true,
+        "com.apple.security.files.bookmarks.app-scope": true,
+        "com.apple.security.files.user-selected.read-write": true,
+        "com.apple.security.network.client": true
+      },
+      "executableSHA256": "01c4c8d1d0b3d6dfa7581f8d3df2cb289898602b416f4001089d310e8961e006",
+      "hardenedRuntime": true,
+      "signatureClass": "adHoc"
+    },
+    "bookmark": {
+      "candidateEnvelopeReportedCreated": true,
+      "creationAPIDispatchCount": 0,
+      "creationOptions": [
+        "withSecurityScope",
+        "securityScopeAllowOnlyReadAccess"
+      ],
+      "created": false,
+      "resolutionAPIDispatchCount": 0,
+      "resolutionOptions": [
+        "withSecurityScope",
+        "withoutUI"
+      ],
+      "sanitizerCorrection": "selectedEntryNotRegularFile is emitted before bookmark creation; the candidate envelope reused a post-bookmark helper and therefore reported an invalid true value"
+    },
+    "candidateImplementationRetained": false,
+    "dispatchCounters": {
+      "aclMutation": 0,
+      "device": 0,
+      "driverInstall": 0,
+      "e1DeviceMutation": 0,
+      "e2Destructive": 0,
+      "fixtureLd": 0,
+      "groupMutation": 0,
+      "hdc": 0,
+      "helper": 0,
+      "network": 0,
+      "realToolLd": 0,
+      "realToolProcess": 0,
+      "selectedFixtureProcess": 0,
+      "sudoOrPrivilegeElevation": 0,
+      "systemRuleMutation": 0,
+      "usb": 0,
+      "xattrWrite": 0
+    },
+    "fixture": {
+      "byteHashUnchanged": true,
+      "codeDirectoryHash": "2512cdb23da32d5f438dae46013e6577d3539028",
+      "codeTrust": "adHoc",
+      "executable": true,
+      "executed": false,
+      "forbiddenImports": [],
+      "forbiddenLibraries": [],
+      "importedSymbols": [],
+      "linkedLibraries": [
+        "/usr/lib/libSystem.B.dylib"
+      ],
+      "linkerUUIDPresent": false,
+      "pinnedRegistryHashMatched": false,
+      "quarantinePresentAfter": false,
+      "quarantinePresentBefore": false,
+      "regularFile": true,
+      "sha256": "56007f66978b3f8e012569482c660120fc4574aac6849c934cc8ef4e1f24b557",
+      "signatureIntegrityValidAfter": true,
+      "signatureIntegrityValidBefore": true,
+      "signatureUnchanged": true,
+      "sizeBytes": 34896,
+      "sizeUnchanged": true,
+      "sourceSHA256": "431981c919ffb3a41235a77a5179b87e61a946b520796a3b74d554dff7b8ac7b"
+    },
+    "gateFailures": [
+      "candidateBookmarkEnvelopeContract",
+      "securityScopeStarted",
+      "selectedEntryCanonicalRegularFile",
+      "selectedEntryLexicallyMatched",
+      "selectedEntryResolvedTarget",
+      "wrongHashPreflight"
+    ],
+    "launch": {
+      "childLaunchAttempted": false,
+      "exitCode": null,
+      "retried": false,
+      "stderr": {
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "sizeBytes": 0
+      },
+      "stdout": {
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "sizeBytes": 0
+      },
+      "termination": null
+    },
+    "preflight": {
+      "failure": "selectedEntryNotRegularFile",
+      "hashInspectionReached": false,
+      "signatureInspectionReached": false
+    },
+    "runtimeInput": {
+      "callerArgumentsAccepted": false,
+      "callerEnvironmentAccepted": false,
+      "callerHashAccepted": false,
+      "callerPathAccepted": false,
+      "childArguments": [
+        "ld"
+      ],
+      "childEnvironmentOverrideCount": 0
+    },
+    "securityScopeStarted": false,
+    "selectionCompleted": true,
+    "selector": {
+      "aliasAllowed": false,
+      "canonicalDirectoryEntryCount": 1,
+      "fixtureIsSymlink": false,
+      "kind": "canonicalRegularFile",
+      "multipleEntriesAllowed": false,
+      "selectedEntryLexicallyMatched": false,
+      "selectedEntryPathRecorded": false,
+      "selectedEntryResolvedTarget": false
+    },
+    "verdict": "blocked"
+  },
+  "stageB": {
+    "appBuilt": false,
+    "fixtureBuilt": false,
+    "processDispatchCount": 0,
+    "reason": "Stage A did not pass every closed gate",
+    "runAttempted": false
+  },
+  "task": "TASK-RKFUI-001G",
+  "privacy": {
+    "fixtureBinaryRecorded": false,
+    "fullPathRecorded": false,
+    "rawBookmarkRecorded": false,
+    "rawSandboxLogRecorded": false,
+    "rawXattrPayloadRecorded": false
+  },
+  "scope": {
+    "developerIDOrNotarizedDistributionEvidence": false,
+    "productImplementationEvidence": false,
+    "realHardwareEvidence": false,
+    "realToolUsed": false,
+    "usbOrDeviceAccessed": false
+  },
+  "verdict": "blocked"
+}

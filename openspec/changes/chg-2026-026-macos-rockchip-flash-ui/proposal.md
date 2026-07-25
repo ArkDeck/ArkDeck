@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-026
-revision: 8 # r8 只起草 read-only bookmark option remediation；仅在维护者 review/merge 本 revision PR 后生效
-status: approved # r1-r7 已由 PR #298/#440/#452/#461/#481/#491/#510 批准；r8 scoped revision 仍须维护者 review/merge 后生效
+revision: 9 # r9 只起草 v1 product-entitlement external-fixture launch characterization；仅在维护者 review/merge 后生效
+status: approved # r1-r8 已由 PR #298/#440/#452/#461/#481/#491/#510/#513 批准；r9 scoped revision 仍须维护者 review/merge 后生效
 class: platform
 core_change_level: none
 owner: "@lvye"
@@ -116,6 +116,20 @@ sleep、弱设备重绑定和非严格镜像集合。ArkDeck 只借鉴交互目�
 - r8 仍不批准主 App entitlement、implicit-only/non-persistent access、document-scope、
   executable-writing entitlement、quarantine exclusion/clear/write、helper/broker、
   pinned tool 复制/重建/下载、真实 external-tool launch 或任何 USB/device run。
+- r9 接受 PR #516/#519 的 001F PASS 与 D0 completion：纯 read-only entitlement Probe
+  已证明 canonical/symlink 的 read-only bookmark round-trip、安全 scope 与 wrong-hash
+  fail-closed 行为，但尚未证明 v1 主 App 的 exact six-entitlement shape 可运行用户选择的
+  外部 executable。Apple 官方 macOS App Sandbox 文档同时明确提示，user-selected file
+  entitlement 本身不能假定可运行 App bundle/container/app-group 之外的程序。
+- r9 新增独立 TASK-RKFUI-001G，只用 canonical regular-file、ad-hoc signed、
+  quarantine-absent 的 inert `rkdeveloptool` fixture 做两阶段 host-only characterization：
+  先在 v1 exact six entitlements 下以 wrong-hash control 证明选择/bookmark 不改变 target
+  metadata，再由另一 fresh App 把同一 reviewable fixture hash 编译期绑定并仅尝试固定
+  `["ld"]`。fixture 只返回 exit 0 + empty stdout/stderr，不链接或访问 libusb/IOKit/network。
+- r9 不修改 `ArkDeckApp.entitlements`、ADR-0002、platform profile、production adapter、
+  registry 或真实 tool pin；不批准 symlink product selection、helper/XPC/broker、
+  bundled/copied/downloaded tool、quarantine 写入/清除或任何 USB/device run。001G PASS
+  后仍须独立 D1 + fresh exact non-quarantined artifact 才能恢复真实 E0。
 - 新增 Flash application facade、SwiftUI 页面和中英文 String Catalog：显式刷新/选择
   设备、选择本地 `images.tar.gz`、流式校验、plan-only、精确计划、危险确认、阶段日志、
   normal/切换中/Loader/歧义状态、软件进态、物理按键 fallback、execution-mode badge、
@@ -203,6 +217,14 @@ sleep、弱设备重绑定和非严格镜像集合。ArkDeck 只借鉴交互目�
   symlink lexical preservation 只作 observation，host-proven one-layer selector 与 returned
   URL resolving 到同一 target 才是 identity gate。任一 bookmark/preflight/metadata/counter
   gate 失败均阻断，不运行 fixture 或真实工具。
+- r9 host-only characterization 使用 ADR-0002 与 current
+  `ArkDeckApp/ArkDeckApp.entitlements` 已固定的 exact six-key product entitlement set；
+  bookmark creation/resolution options 继续精确复用 001F。只接受 canonical regular-file
+  selection。control run 必须 wrong-hash、child launch 0；只有 control 前后 fixture
+  bytes/signature/quarantine 不变，才允许第二个 fresh App 对编译期绑定的 inert fixture
+  执行一次固定 `["ld"]`。launch run 只接受 exited/0/empty stdout+stderr，真实
+  `rkdeveloptool`、USB/HDC/device/network/E1/E2/mutation/destructive 与 xattr-write
+  dispatch 均为 0；任何漂移立即停止且不尝试 helper、copy 或 entitlement 扩权。
 - 用户选择的工具与镜像使用 security-scoped access；默认日志只记录脱敏路径和 hash，
   raw tool output 作为受控本地 Artifact，不自动上传。
 - 分区写 intent 已 durable 而 outcome 缺失时进入 `outcomeUnknown`，禁止自动重放；恢复
@@ -556,3 +578,77 @@ sleep、弱设备重绑定和非严格镜像集合。ArkDeck 只借鉴交互目�
   current `main` 复核；任一非 r8 预期漂移即停止。
 - Concurrency：起草时 GitHub open PR 集合为空；四个治理文件与未来 001F allowed paths
   无并发占用。r8 是 D1 判断门，本 PR 合入前零 speculative implementation/Probe run。
+
+### r9 scoped v1 product-entitlement external-fixture launch characterization（2026-07-25；on merge）
+
+- 分类：proposal revision / product external-process boundary readiness = D1。本 PR 只修改
+  proposal/design/tasks/verification；不修改 Probe、App、entitlement、ADR、platform
+  profile、registry 或 product code，不启动 signed App/fixture，不运行真实
+  `rkdeveloptool`、USB/HDC/device command，也不接受任何 E1/E2 capability/authorization。
+- Accepted input：001F implementation/evidence PR #516 exact reviewed head
+  `3b713eeab536c504e9bd04ca98bd5ade7bcec5aa` 已由 `lvye` APPROVED，并以
+  `8e10af395882f28517e2e133359712261b5e28c7` 合入；D0 PR #519 exact reviewed head
+  `60e64d06422a15dabd87b09ea682a17fe4f5e1fe` 已由 `lvye` APPROVED，并以
+  `0ff3703b0543409cbe6c9b71cea316589ddf5cc9` 合入。001F direct/symlink receipt
+  SHA-256 分别为
+  `6c1ceecec431468bdee7f097f4516659baa62289fdf84d48ee2e2e5ce0641a98` /
+  `6bbd415b649a17e9a5b549bec4cd1880f094818abe2abe218efd2fb33975267d`；
+  两者 bookmark/scope PASS、wrong-hash fail closed、child/external/device counters 0。
+- Product-authority boundary：DEC-004/ADR-0002 与 current
+  `ArkDeckApp/ArkDeckApp.entitlements` 固定 v1 为 Sandboxed + USB/serial +
+  app-scoped bookmark + `user-selected.read-write` + network client 的六项形态；r9
+  不改写该决定。Apple
+  [`Accessing files from the macOS App Sandbox`](https://developer.apple.com/documentation/security/accessing-files-from-the-macos-app-sandbox)
+  说明 user-selected file access 不能被直接当作运行 bundle/container/app-group 外程序的
+  权限，并要求后续不写入时创建 bookmark 包含
+  `.securityScopeAllowOnlyReadAccess`。因此 external process 是待证伪/证实的 product
+  boundary，不可从 001F metadata PASS 推断。
+- Chosen characterization：新增 TASK-RKFUI-001G。Probe 的 exact entitlement set 必须等于
+  current product 六项；bookmark creation 继续
+  `[.withSecurityScope, .securityScopeAllowOnlyReadAccess]`，resolution 继续
+  `[.withSecurityScope, .withoutUI]`。禁止修改 `ArkDeckApp.entitlements`；Probe 只是
+  product-shape platform harness，不构成产品实现或 release evidence。
+- Two-stage gate：只允许 canonical regular-file selector，symlink/alias/多 entry 均 blocked。
+  Stage A 用 fresh signed App 与 wrong-hash fixture，必须到
+  `executableHashMismatch`、child launch 0，且 host/App 都观察 quarantine absent、target
+  bytes/CDHash/signature 不变。Stage A 全 PASS 后，Stage B 才可用另一个 fresh signed App
+  把 fresh reviewable fixture 的 exact SHA-256 编译期绑定，选择后只执行一次固定
+  `["ld"]`；不接受 runtime caller hash、path、argv 或 environment override。
+- Fixture/launch boundary：fixture source 只能 `return 0`，stdout/stderr 为空；构建必须
+  deterministic/no UUID、ad-hoc signed、quarantine absent，并验证 linked libraries /
+  imported symbols 不含 libusb、IOKit、network 或 shell。Stage B PASS 精确要求
+  bookmark creation/resolution/scope、hash/signature/quarantine preflight 全部命中，
+  `childLaunchAttempted=true`、`termination=exited`、`exitCode=0`、raw output size 0，
+  pre/post bytes/CDHash/signature/quarantine 不变。selected fixture process 计数恰为 1；
+  真实 tool/`ld`、USB/HDC/device/network/E1/E2/mutation/destructive/privilege/helper/
+  install/system-rule/group/ACL/xattr-write 均为 0。
+- Pass/fail boundary：Stage A 或 B 任一失败，只提交 sanitized fail-closed evidence，不
+  保留 candidate entitlement/hash/launch implementation，不尝试 symlink、implicit-only、
+  `user-selected.executable`、Info.plist quarantine override、copy/rebuild/download、
+  helper/XPC/broker 或真实 tool/device。两阶段全 PASS 才可提交 001G
+  implementation+evidence；该 PASS 也只证明 exact host tuple 上的 inert external fixture
+  launch，不证明真实 tool、USB、PowerBox-to-child file access、产品分发或 realHardware。
+- Sequencing：r9 merge 前不得修改 Probe 或生成 001G 成 PR 工作。001G PASS
+  implementation/evidence merge 后另起 D0 status PR；其 merge 后仍须独立 D1 锁定 fresh
+  exact non-quarantined real artifact、目标/窗口与 E0-only argv，才可恢复
+  TASK-RKFUI-001。r9/001G 不恢复 001，不推进 TASK-RKFUI-002/003/004。
+- Draft/input closure：r9 draft base =
+  `2667a10badb8180a0c7f5079636d46b03f637184`；#519 后的 #520/#521 只修改
+  CHG-2026-030 `tasks.md`，下列 r9 inputs 未漂移。proposal/design/tasks/verification blobs
+  为 `094c939e938b3845de07c0decdb9a22ef700134c` /
+  `0e11d6d592189dda5fcfced069dd70e1d4132450` /
+  `6b98c99b9c882e636975a9039ea387a7bab0dd0e` /
+  `395e801f57f9cc93f840999b803df181ade4246c`；Probe
+  Python/App/entitlement/tests/fixture-source blobs 为
+  `3ff1a3ea6e22f7b15509274f871482cd96708f1a` /
+  `cc75588161682254083d70278e9fb43023666c9f` /
+  `f2c71dc71c38abe01829e6000d10ae49a2272f04` /
+  `68db205919b6bc66e4b7383273697186e51565e4` /
+  `3556f0204fc706d29f407c732ca97b83bb3c97ae`。current App entitlement /
+  ADR-0002 / macOS profile blobs 为
+  `6435d00f8493ce4fbca24a806ca7f320db9fbfa6` /
+  `5111bb8c8657d0ed05e0184fbbaeb88af5fc5d8f` /
+  `a9a5931ffedd304a7ce3a088f4397c26fd87e744`。001G 开工前须基于 r9 merge 后
+  current `main` 复核，任一非 r9 预期漂移即停止。
+- Concurrency：r9 起草时 GitHub open PR 集合为空；四个治理文件与未来 001G paths 无
+  并发占用。r9 是 D1 判断门，本 PR 合入前零 speculative implementation/App/fixture run。
