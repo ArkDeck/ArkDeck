@@ -1,0 +1,188 @@
+{
+  "app_id": 4388667,
+  "bot_login": "arkdeck-host-loop-runtime-901708a7[bot]",
+  "checks": {
+    "observed": {
+      "allowed-paths": [
+        "success",
+        "skipped"
+      ],
+      "guard": [
+        "success",
+        "success"
+      ],
+      "swift": [
+        "success"
+      ]
+    },
+    "required_present": [
+      "guard",
+      "allowed-paths"
+    ]
+  },
+  "finished_at_utc": "2026-07-25T02:47:20+00:00",
+  "installation_id": 148855345,
+  "issue_number": 515,
+  "lease_oids": {
+    "cas": "e5f2b1b2530e33e57c7645653954a592e3e80bff",
+    "create": "08c19ee8dd0fe84109a081c45e06b43b9119cd19"
+  },
+  "main_oid": "177c50086b413536b4b867c9885ecb2f0ce2fee2",
+  "phase": "b1",
+  "pr_number": 514,
+  "probe_oid": "a750c8bf7104f23ccef45c53a05856e2fde18fb0",
+  "schema": "arkdeck-hlr002-phase-b1/v1",
+  "started_at_utc": "2026-07-25T02:44:29+00:00",
+  "status": "pass",
+  "steps": [
+    {
+      "at_utc": "2026-07-25T02:44:35+00:00",
+      "facts": {
+        "main_oid": "177c50086b413536b4b867c9885ecb2f0ce2fee2"
+      },
+      "status": "info",
+      "step": "protected main observed and present locally"
+    },
+    {
+      "at_utc": "2026-07-25T02:44:39+00:00",
+      "facts": {
+        "expires_at": "2026-07-25T03:44:39Z",
+        "permissions": {
+          "contents": "read",
+          "issues": "write",
+          "metadata": "read",
+          "pull_requests": "write"
+        },
+        "repository_selection": "selected"
+      },
+      "status": "ok",
+      "step": "installation token minted"
+    },
+    {
+      "at_utc": "2026-07-25T02:44:39+00:00",
+      "facts": {
+        "repositories": [
+          "ArkDeck/ArkDeck"
+        ]
+      },
+      "status": "ok",
+      "step": "installation repository scope == [ArkDeck/ArkDeck]"
+    },
+    {
+      "at_utc": "2026-07-25T02:44:47+00:00",
+      "facts": {
+        "base": "177c50086b413536b4b867c9885ecb2f0ce2fee2",
+        "oid": "a750c8bf7104f23ccef45c53a05856e2fde18fb0",
+        "ref": "refs/heads/agent/host-loop/probes/4020f4b8-19dd-43a7-b8ca-5bc044965b79"
+      },
+      "status": "ok",
+      "step": "probe ref created (empty commit)"
+    },
+    {
+      "at_utc": "2026-07-25T02:44:49+00:00",
+      "facts": {
+        "author": "arkdeck-host-loop-runtime-901708a7[bot]",
+        "base": "main",
+        "head_sha": "a750c8bf7104f23ccef45c53a05856e2fde18fb0",
+        "number": 514
+      },
+      "status": "ok",
+      "step": "probe PR created by the integration identity"
+    },
+    {
+      "at_utc": "2026-07-25T02:44:50+00:00",
+      "facts": {
+        "author": "arkdeck-host-loop-runtime-901708a7[bot]",
+        "number": 514
+      },
+      "status": "ok",
+      "step": "probe PR read-back exact"
+    },
+    {
+      "at_utc": "2026-07-25T02:44:51+00:00",
+      "facts": {
+        "number": 514,
+        "rationale": "sdd-guard pull_request types are [reopened, edited]; `opened` produces no allowed-paths job on the reserved namespace, so this is the minimal in-capability action that yields the required pull_request checks"
+      },
+      "status": "ok",
+      "step": "PR body updated to fire `pull_request: edited`"
+    },
+    {
+      "at_utc": "2026-07-25T02:46:56+00:00",
+      "facts": {
+        "observed": {
+          "allowed-paths": [
+            "success",
+            "skipped"
+          ],
+          "guard": [
+            "success",
+            "success"
+          ],
+          "swift": [
+            "success"
+          ]
+        },
+        "required_present": [
+          "guard",
+          "allowed-paths"
+        ]
+      },
+      "status": "ok",
+      "step": "required checks terminal success"
+    },
+    {
+      "at_utc": "2026-07-25T02:46:57+00:00",
+      "facts": {
+        "author": "arkdeck-host-loop-runtime-901708a7[bot]",
+        "number": 515
+      },
+      "status": "ok",
+      "step": "probe Issue created and read back"
+    },
+    {
+      "at_utc": "2026-07-25T02:46:58+00:00",
+      "facts": {
+        "agent_pr_runs": 0,
+        "pr_count": 1,
+        "pr_number": 514
+      },
+      "status": "ok",
+      "step": "legacy creator zero on reserved head"
+    },
+    {
+      "at_utc": "2026-07-25T02:47:07+00:00",
+      "facts": {
+        "oid": "08c19ee8dd0fe84109a081c45e06b43b9119cd19"
+      },
+      "status": "ok",
+      "step": "lease ref created"
+    },
+    {
+      "at_utc": "2026-07-25T02:47:12+00:00",
+      "facts": {
+        "from": "08c19ee8dd0fe84109a081c45e06b43b9119cd19",
+        "to": "e5f2b1b2530e33e57c7645653954a592e3e80bff"
+      },
+      "status": "ok",
+      "step": "lease CAS on exact expected OID"
+    },
+    {
+      "at_utc": "2026-07-25T02:47:14+00:00",
+      "facts": {
+        "actual_remote_oid": "e5f2b1b2530e33e57c7645653954a592e3e80bff",
+        "expected_oid_used": "08c19ee8dd0fe84109a081c45e06b43b9119cd19"
+      },
+      "status": "refused",
+      "step": "stale-fence write refused (expected)"
+    },
+    {
+      "at_utc": "2026-07-25T02:47:20+00:00",
+      "facts": {
+        "expected_oid": "e5f2b1b2530e33e57c7645653954a592e3e80bff"
+      },
+      "status": "ok",
+      "step": "lease ref deleted"
+    }
+  ]
+}

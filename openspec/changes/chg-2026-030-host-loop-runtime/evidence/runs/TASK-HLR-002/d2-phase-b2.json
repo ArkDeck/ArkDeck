@@ -1,0 +1,197 @@
+{
+  "app_id": 4388667,
+  "bot_login": "arkdeck-host-loop-runtime-901708a7[bot]",
+  "finished_at_utc": "2026-07-25T02:54:22+00:00",
+  "installation_id": 148855345,
+  "invariants": {
+    "main_oid_after": "177c50086b413536b4b867c9885ecb2f0ce2fee2",
+    "pr_auto_merge": null,
+    "pr_merged": false,
+    "pr_state": "open"
+  },
+  "negatives": {
+    "auto_merge": {
+      "auto_merge_enabled": false,
+      "classification": "refused-by-permission",
+      "expectation": "a real node id is used so the mutation reaches authorization; refusal reason recorded honestly",
+      "graphql_errors": [
+        "Resource not accessible by integration"
+      ],
+      "http_status": 200,
+      "pr_node_id_resolved": true,
+      "repo_allow_auto_merge": false,
+      "route": "POST /graphql enablePullRequestAutoMerge"
+    },
+    "branch_protection": {
+      "classification": "refused-by-permission",
+      "expectation": "Administration is none; protection routes must be unreachable",
+      "http_status": 403,
+      "route": "PUT /repos/ArkDeck/ArkDeck/branches/main/protection",
+      "server_message": "Resource not accessible by integration"
+    },
+    "main_ref_update": {
+      "classification": "refused-by-permission",
+      "expectation": "Contents is pinned to read; protected main must reject a direct update",
+      "http_status": 403,
+      "route": "PATCH /repos/ArkDeck/ArkDeck/git/refs/heads/main",
+      "server_message": "Resource not accessible by integration"
+    },
+    "merge_pr": {
+      "classification": "refused-by-permission",
+      "expectation": "no Contents write, no CODEOWNER approval, protected main requires both",
+      "http_status": 403,
+      "route": "PUT /repos/ArkDeck/ArkDeck/pulls/514/merge",
+      "server_message": "Resource not accessible by integration"
+    },
+    "repo_admin_patch": {
+      "classification": "refused-by-permission",
+      "expectation": "same-value admin PATCH must still be refused; Administration is none",
+      "http_status": 403,
+      "route": "PATCH /repos/ArkDeck/ArkDeck",
+      "server_message": "Resource not accessible by integration"
+    },
+    "ruleset_route": {
+      "classification": "refused-by-permission",
+      "expectation": "ruleset administration must be unreachable",
+      "http_status": 403,
+      "route": "POST /repos/ArkDeck/ArkDeck/rulesets",
+      "server_message": "Resource not accessible by integration"
+    },
+    "self_approve": {
+      "classification": "refused-by-rule",
+      "expectation": "platform shares review endpoints under Pull requests: write, so record honestly whether the refusal is permission-based or the author-cannot-approve-own-PR rule",
+      "http_status": 422,
+      "route": "POST /repos/ArkDeck/ArkDeck/pulls/514/reviews",
+      "server_message": "Unprocessable Entity"
+    }
+  },
+  "phase": "b2",
+  "schema": "arkdeck-hlr002-phase-b2/v1",
+  "started_at_utc": "2026-07-25T02:54:12+00:00",
+  "status": "pass",
+  "steps": [
+    {
+      "at_utc": "2026-07-25T02:54:12+00:00",
+      "facts": {
+        "expires_at": "2026-07-25T03:54:12Z",
+        "permissions": {
+          "contents": "read",
+          "issues": "write",
+          "metadata": "read",
+          "pull_requests": "write"
+        },
+        "repository_selection": "selected"
+      },
+      "status": "ok",
+      "step": "installation token minted"
+    },
+    {
+      "at_utc": "2026-07-25T02:54:13+00:00",
+      "facts": {
+        "classification": "refused-by-permission",
+        "expectation": "Contents is pinned to read; protected main must reject a direct update",
+        "http_status": 403,
+        "route": "PATCH /repos/ArkDeck/ArkDeck/git/refs/heads/main",
+        "server_message": "Resource not accessible by integration"
+      },
+      "status": "refused",
+      "step": "negative: direct protected-main ref update refused"
+    },
+    {
+      "at_utc": "2026-07-25T02:54:13+00:00",
+      "facts": {
+        "classification": "refused-by-rule",
+        "expectation": "platform shares review endpoints under Pull requests: write, so record honestly whether the refusal is permission-based or the author-cannot-approve-own-PR rule",
+        "http_status": 422,
+        "route": "POST /repos/ArkDeck/ArkDeck/pulls/514/reviews",
+        "server_message": "Unprocessable Entity"
+      },
+      "status": "refused",
+      "step": "negative: self-approve own probe PR refused"
+    },
+    {
+      "at_utc": "2026-07-25T02:54:14+00:00",
+      "facts": {
+        "classification": "refused-by-permission",
+        "expectation": "no Contents write, no CODEOWNER approval, protected main requires both",
+        "http_status": 403,
+        "route": "PUT /repos/ArkDeck/ArkDeck/pulls/514/merge",
+        "server_message": "Resource not accessible by integration"
+      },
+      "status": "refused",
+      "step": "negative: merge own probe PR refused"
+    },
+    {
+      "at_utc": "2026-07-25T02:54:16+00:00",
+      "facts": {
+        "auto_merge_enabled": false,
+        "classification": "refused-by-permission",
+        "expectation": "a real node id is used so the mutation reaches authorization; refusal reason recorded honestly",
+        "graphql_errors": [
+          "Resource not accessible by integration"
+        ],
+        "http_status": 200,
+        "pr_node_id_resolved": true,
+        "repo_allow_auto_merge": false,
+        "route": "POST /graphql enablePullRequestAutoMerge"
+      },
+      "status": "refused",
+      "step": "negative: enable auto-merge refused"
+    },
+    {
+      "at_utc": "2026-07-25T02:54:17+00:00",
+      "facts": {
+        "auto_merge": null
+      },
+      "status": "ok",
+      "step": "auto-merge absent on REST read-back"
+    },
+    {
+      "at_utc": "2026-07-25T02:54:18+00:00",
+      "facts": {
+        "classification": "refused-by-permission",
+        "expectation": "same-value admin PATCH must still be refused; Administration is none",
+        "http_status": 403,
+        "route": "PATCH /repos/ArkDeck/ArkDeck",
+        "server_message": "Resource not accessible by integration"
+      },
+      "status": "refused",
+      "step": "negative: repository admin same-value PATCH refused"
+    },
+    {
+      "at_utc": "2026-07-25T02:54:18+00:00",
+      "facts": {
+        "classification": "refused-by-permission",
+        "expectation": "Administration is none; protection routes must be unreachable",
+        "http_status": 403,
+        "route": "PUT /repos/ArkDeck/ArkDeck/branches/main/protection",
+        "server_message": "Resource not accessible by integration"
+      },
+      "status": "refused",
+      "step": "negative: branch protection admin route refused"
+    },
+    {
+      "at_utc": "2026-07-25T02:54:19+00:00",
+      "facts": {
+        "classification": "refused-by-permission",
+        "expectation": "ruleset administration must be unreachable",
+        "http_status": 403,
+        "route": "POST /repos/ArkDeck/ArkDeck/rulesets",
+        "server_message": "Resource not accessible by integration"
+      },
+      "status": "refused",
+      "step": "negative: ruleset admin route refused"
+    },
+    {
+      "at_utc": "2026-07-25T02:54:22+00:00",
+      "facts": {
+        "main_oid_after": "177c50086b413536b4b867c9885ecb2f0ce2fee2",
+        "pr_auto_merge": null,
+        "pr_merged": false,
+        "pr_state": "open"
+      },
+      "status": "ok",
+      "step": "post-negative invariants hold"
+    }
+  ]
+}
