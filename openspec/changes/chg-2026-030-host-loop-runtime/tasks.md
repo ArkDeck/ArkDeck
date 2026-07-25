@@ -362,12 +362,33 @@
 
 ## TASK-HLR-002A — Legacy bootstrap namespace partition
 
-- Status:ready（r11 D1 readiness；仅在维护者对本 revision PR exact head
-  review/merge 后生效。该批准只授权下述全新 reserved-first/ordinary-second
-  creator canary、只读 GitHub facts 查询、ref cleanup 与后一独立 evidence PR；
-  除提交本 governance carrier 的既有 Agent branch/PR transport 外，本
-  readiness 阶段 target canary/ref、额外 PR-state、settings/credential
-  dispatch = 0。）
+- Status:done（2026-07-25 D0 completion；仅在维护者 review/merge 本独立
+  `ready→done` PR 后生效。source/contract implementation #419 exact reviewed
+  head `39965af82bcb9a03f07e9501c844e86691b91d88` 已由 `lvye` APPROVED，
+  并以 `99ba8aa4b04018918daad2fc8830009c1030f6da` 合入 protected main。
+  #421 的旧 topology live FAIL 与 #501 的 r10 incomplete/fail-closed receipt
+  永久保留，不作为 done 依据。r11 readiness #504 exact reviewed head
+  `e304f1f2e70a78652accdceea502eda92e2b8519` 已由 `lvye` APPROVED，
+  并以 `f1ebdf0b67014cbb921db4ae55f2400448f620ce` 合入 protected main。
+  fresh success evidence #506 exact final head
+  `dbe4453dd7d2e7437dc33e2589d083855c91ad60` 由 `lvye` 于
+  `2026-07-25T00:17:42Z` APPROVED，并于 `00:17:48Z` 由 `lvye` 以
+  `1bd36668565d5508dcdd3cd584114631ca4fd6ec` 合入 protected main；
+  `auto_merge=null`。r11 reserved/ordinary commits 共用 #504 merge
+  parent/tree：reserved SDD Guard/Swift success 且 exact legacy run/PR 双读回
+  均为 0；ordinary SDD Guard/Swift/唯一 Agent PR run success，并由
+  `github-actions[bot]` 创建唯一 #505；两边 `action_required=0`。Deploy Key
+  依序删除 ordinary/reserved refs，两次 read-back 均 absent；#505
+  closed/unmerged。machine/human evidence =
+  `evidence/runs/TASK-HLR-002A/live-canary-r11-success.json` /
+  `evidence/runs/TASK-HLR-002A/live-canary-r11-success.md`，blobs =
+  `d695c9098c2478c6627fa312d127e278b1e8a48a` /
+  `8f1261e07cef4e2297e3cf9090f1b1b7be197738`，JSON SHA-256 =
+  `8965c39a06a8d68c33dea30215f82299e9e67c4b542f1a2e12bddd61529b1bb3`。
+  本 done 只闭合 `HLR-LEASE-001`/`HLR-WORKER-001` bootstrap slice；不修改
+  ruleset、branch protection、repository setting 或 credential，不创建
+  integration identity/scheduler，不构成 change `verified` 或 HLR-002 D2
+  authorization；HLR-002 在独立 D2 readiness 前继续 blocked。）
 - Historical Status:ready（r10 #498 exact reviewed head
   `c3a35e31b16c17234ba667de56c359eb39af9e0f` 由 `lvye` APPROVED，并以
   `53b4924227bc3931523357e68ee2cb61b5814646` 合入。reserved SDD/Swift 与
