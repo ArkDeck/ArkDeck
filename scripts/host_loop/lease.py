@@ -32,6 +32,9 @@ TASK_BRANCH_PREFIX = "refs/heads/agent/host-loop/tasks/"
 LEASE_SCHEMA = "arkdeck-host-loop-lease/v1"
 
 
+_KEEP = object()
+
+
 class LeaseError(RuntimeError):
     """Fence violation, expiry ambiguity, or malformed lease record."""
 
@@ -59,6 +62,9 @@ class LeaseRecord:
     pr_number: int | None    # None until the PR exists
     create_attempted: bool   # set BEFORE the create call, so a timed-out
                              # create can never be replayed as a second PR
+    checks_dispatched_head: str | None  # head OID a check dispatch was issued
+                             # for; persisted so a round running before the
+                             # check-run objects materialise does not re-fire it
     previous_lease_oid: str | None
 
     def serialize(self) -> str:
@@ -74,6 +80,7 @@ class LeaseRecord:
                 "pr_branch": self.pr_branch,
                 "pr_number": self.pr_number,
                 "create_attempted": self.create_attempted,
+                "checks_dispatched_head": self.checks_dispatched_head,
                 "previous_lease_oid": self.previous_lease_oid,
             },
             sort_keys=True,
@@ -98,6 +105,7 @@ class LeaseRecord:
                 pr_branch=raw["pr_branch"],
                 pr_number=raw["pr_number"],
                 create_attempted=raw["create_attempted"],
+                checks_dispatched_head=raw["checks_dispatched_head"],
                 previous_lease_oid=raw["previous_lease_oid"],
             )
         except KeyError as error:
@@ -124,6 +132,12 @@ class LeaseRecord:
             raise LeaseError("create_attempted must be a boolean")
         if self.pr_number is not None and not self.create_attempted:
             raise LeaseError("pr_number present without a recorded create attempt")
+        if self.checks_dispatched_head is not None and not OID_RE.match(
+            self.checks_dispatched_head
+        ):
+            raise LeaseError(
+                "checks_dispatched_head must be lowercase full 40-hex or null"
+            )
 
 
 @dataclass(frozen=True)
@@ -186,6 +200,7 @@ class LeaseManager:
             pr_branch=task_branch(task_id),
             pr_number=None,
             create_attempted=False,
+            checks_dispatched_head=None,
             previous_lease_oid=None,
         )
         record.validate()
@@ -226,8 +241,17 @@ class LeaseManager:
             raise LeaseError("pr_number must be positive")
         return self._advance(held, pr_number=pr_number, create_attempted=True)
 
+    def record_dispatch(self, held: HeldLease, head_oid: str) -> HeldLease:
+        """Durably record that a check dispatch was issued for this head."""
+        return self._advance(
+            held, pr_number=held.record.pr_number,
+            create_attempted=held.record.create_attempted,
+            checks_dispatched_head=head_oid,
+        )
+
     def _advance(
-        self, held: HeldLease, *, pr_number: int | None, create_attempted: bool
+        self, held: HeldLease, *, pr_number: int | None, create_attempted: bool,
+        checks_dispatched_head: object = _KEEP,
     ) -> HeldLease:
         nxt = replace(
             held.record,
@@ -235,6 +259,11 @@ class LeaseManager:
             expires_at=self._now() + self._ttl,
             pr_number=pr_number,
             create_attempted=create_attempted,
+            checks_dispatched_head=(
+                held.record.checks_dispatched_head
+                if checks_dispatched_head is _KEEP
+                else checks_dispatched_head
+            ),
             previous_lease_oid=held.ref_oid,
             owner_run=self._owner_run,
         )

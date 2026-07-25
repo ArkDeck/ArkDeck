@@ -46,7 +46,7 @@ def _matches(pull: dict, identity: PRIdentity, read_envelope: EnvelopeReader) ->
     head = (pull.get("head") or {}).get("ref")
     if head != identity.head_branch:
         return False
-    if pull.get("base", {}).get("ref") != "main":
+    if (pull.get("base") or {}).get("ref") != "main":
         return False
     parsed = read_envelope(pull.get("body") or "")
     if parsed is None:

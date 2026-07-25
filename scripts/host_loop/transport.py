@@ -42,6 +42,16 @@ class RouteViolation(TransportError):
     """A route outside the typed allowlist was constructed. Never retried."""
 
 
+class PolicyRefused(TransportError):
+    """The server refused a mutation on a *policy* ground, not a precondition.
+
+    A ruleset, branch-protection rule or pre-receive hook declined the write.
+    The fence was never contested, so this must NEVER be reported as a lost
+    fence: doing so sends operators hunting for a concurrent worker that does
+    not exist. It is also not retryable — the policy will decline again.
+    """
+
+
 class Refused(TransportError):
     """The server refused a mutation on an explicit precondition.
 
@@ -67,6 +77,7 @@ class Route(NamedTuple):
 ALLOWED_ROUTES: frozenset[tuple[str, str]] = frozenset(
     {
         ("GET", "/repos/{owner}/{repo}/pulls"),
+        ("GET", "/repos/{owner}/{repo}/pulls?head&state&per_page"),
         ("GET", "/repos/{owner}/{repo}/pulls/{number}"),
         ("POST", "/repos/{owner}/{repo}/pulls"),
         ("PATCH", "/repos/{owner}/{repo}/pulls/{number}"),
@@ -104,8 +115,14 @@ FORBIDDEN_METHODS: tuple[str, ...] = ("PUT", "DELETE", "HEAD", "OPTIONS", "TRACE
 # PR body/title are the only mutable PR fields. Anything else (base, state,
 # draft, milestone) is refused so a PR can never be retargeted or closed-merged
 # through the update path.
+SUCCESS_STATUSES: frozenset[int] = frozenset({200, 201})
+
 ALLOWED_PR_PATCH_FIELDS: frozenset[str] = frozenset({"title", "body"})
-ALLOWED_ISSUE_PATCH_FIELDS: frozenset[str] = frozenset({"title", "body", "state"})
+# `state` is deliberately absent. GitHub's issues endpoint also serves pull
+# requests, so PATCH /issues/<pr-number> {state: closed} would close a PR and
+# walk straight around the PR-update guard above. Closing the cursor Issue goes
+# through close_issue(), which refuses any number that resolves to a PR.
+ALLOWED_ISSUE_PATCH_FIELDS: frozenset[str] = frozenset({"title", "body"})
 
 
 def assert_route_allowed(method: str, path: str) -> None:
@@ -123,6 +140,14 @@ def assert_route_allowed(method: str, path: str) -> None:
 
 def _templatize(path: str) -> str:
     """Reduce a concrete path to its allowlist template."""
+    base, _, query = path.partition("?")
+    if query:
+        keys = sorted({item.split("=", 1)[0] for item in query.split("&") if item})
+        # Only the pinned lookup shape is expressible; any other key set fails
+        # the allowlist rather than being normalised away.
+        if keys == ["head", "page", "per_page", "state"]:
+            return _templatize(base) + "?head&state&per_page"
+        return _templatize(base) + "?" + "&".join(keys)
     parts = path.split("/")
     out: list[str] = []
     for index, part in enumerate(parts):
@@ -170,6 +195,13 @@ class ApiPort:
     repo: str
     _send: Sender
     route_log: list[Route] = field(default_factory=list)
+    # When set, PR mutations are confined to this number. The worker binds it
+    # from the fenced lease record, so a stale handle cannot edit somebody
+    # else's pull request even though the route shape is identical.
+    owned_pull: int | None = None
+    # Issue numbers this port may touch. Binding the cursor Issue explicitly is
+    # what keeps PATCH /issues/<pr> from becoming a PR side channel.
+    owned_issue: int | None = None
 
     def _call(self, method: str, path: str, purpose: str, body: dict | None = None):
         assert_route_allowed(method, path)
@@ -185,24 +217,51 @@ class ApiPort:
             raise Refused(f"refused {purpose}: HTTP {status}")
         if status >= 400:
             raise TransportError(f"unclassifiable {purpose}: HTTP {status}")
+        # Success is an allowlist, not "anything below 400". A 3xx redirect or a
+        # 204 is not a completed mutation; treating one as success previously let
+        # `{"message": "Moved Permanently"}` read as an applied update.
+        if status not in SUCCESS_STATUSES:
+            raise TransportError(
+                f"unexpected non-success status {status} on {purpose}; "
+                "reconcile by lookup before any retry"
+            )
         return payload
 
     # -- pull requests ----------------------------------------------------
     def list_open_pulls_for_head(self, head_branch: str) -> list[dict]:
-        payload = self._call(
-            "GET",
-            f"/repos/{self.owner}/{self.repo}/pulls",
-            "pr-lookup",
-            None,
-        )
-        if not isinstance(payload, list):
-            raise TransportError("pr-lookup did not return a list")
-        return [
-            pull
-            for pull in payload
-            if (pull.get("head") or {}).get("ref") == head_branch
-            and pull.get("state") == "open"
-        ]
+        """Server-side head filter, fully paginated.
+
+        Filtering a single default page client-side was a duplicate-PR hazard:
+        with more than per_page open PRs the target may not be on page 1, the
+        lookup would see zero matches, and the round would open a second PR on
+        the same head. GitHub's `head=owner:branch` filter exists for this, and
+        pagination is followed to exhaustion rather than truncated.
+        """
+        collected: list[dict] = []
+        page = 1
+        while True:
+            path = (
+                f"/repos/{self.owner}/{self.repo}/pulls"
+                f"?head={self.owner}:{head_branch}&state=open&per_page=100&page={page}"
+            )
+            payload = self._call("GET", path, "pr-lookup", None)
+            if not isinstance(payload, list):
+                raise TransportError("pr-lookup did not return a list")
+            collected.extend(payload)
+            if len(payload) < 100:
+                break
+            page += 1
+            if page > 20:
+                raise TransportError(
+                    "pr-lookup pagination cap exceeded; refusing a truncated view"
+                )
+        for pull in collected:
+            if (pull.get("head") or {}).get("ref") != head_branch:
+                raise TransportError(
+                    "pr-lookup returned a pull request for a different head; "
+                    "refusing an unverified result set"
+                )
+        return [pull for pull in collected if pull.get("state") == "open"]
 
     def get_pull(self, number: int) -> dict:
         payload = self._call(
@@ -229,6 +288,10 @@ class ApiPort:
         rejected = set(fields) - ALLOWED_PR_PATCH_FIELDS
         if rejected:
             raise RouteViolation(f"PR update may not set {sorted(rejected)}")
+        if self.owned_pull is not None and int(number) != self.owned_pull:
+            raise RouteViolation(
+                f"PR update confined to #{self.owned_pull}; refusing #{number}"
+            )
         payload = self._call(
             "PATCH",
             f"/repos/{self.owner}/{self.repo}/pulls/{int(number)}",
@@ -263,6 +326,10 @@ class ApiPort:
         rejected = set(fields) - ALLOWED_ISSUE_PATCH_FIELDS
         if rejected:
             raise RouteViolation(f"Issue update may not set {sorted(rejected)}")
+        if self.owned_issue is not None and int(number) != self.owned_issue:
+            raise RouteViolation(
+                f"Issue update confined to #{self.owned_issue}; refusing #{number}"
+            )
         payload = self._call(
             "PATCH",
             f"/repos/{self.owner}/{self.repo}/issues/{int(number)}",
@@ -271,6 +338,31 @@ class ApiPort:
         )
         if not isinstance(payload, dict):
             raise TransportError("issue-update did not return an object")
+        return payload
+
+    def close_issue(self, number: int) -> dict:
+        """Close a real Issue. Refuses anything that is actually a PR.
+
+        GitHub serves pull requests from the issues endpoint, so a state change
+        here could close a PR. The target is read first and refused when it
+        carries `pull_request`, which no plain Issue does.
+        """
+        if self.owned_issue is not None and int(number) != self.owned_issue:
+            raise RouteViolation(
+                f"close confined to Issue #{self.owned_issue}; refusing #{number}"
+            )
+        current = self.get_issue(number)
+        if current.get("pull_request") is not None:
+            raise RouteViolation(
+                f"#{number} is a pull request, not an Issue; refusing to close it "
+                "through the issues endpoint"
+            )
+        payload = self._call(
+            "PATCH", f"/repos/{self.owner}/{self.repo}/issues/{int(number)}",
+            "issue-close", {"state": "closed"},
+        )
+        if not isinstance(payload, dict):
+            raise TransportError("issue-close did not return an object")
         return payload
 
     # -- checks -----------------------------------------------------------
@@ -337,8 +429,20 @@ class RefPort:
         code, _out, err = self._run(argv)
         if code != 0:
             text = err.lower()
-            if "stale info" in text or "rejected" in text or "non-fast-forward" in text:
+            # Only git's lease-specific wording proves the expected OID was
+            # stale. `[remote rejected]` alone does NOT: a ruleset, branch
+            # protection or pre-receive hook produces the same phrase while the
+            # fence is intact, and calling that a fence loss is exactly the
+            # misreport this module promises not to make. git emits these tokens
+            # untranslated regardless of locale.
+            if "stale info" in text or "non-fast-forward" in text:
                 raise Refused(f"fence lost on {op} of {ref}: stale expected OID")
+            if ("declined" in text or "protected" in text
+                    or "rule violations" in text or "[remote rejected]" in text):
+                raise PolicyRefused(
+                    f"policy declined {op} of {ref}: {err.strip()[:200]} — the "
+                    "fence was not contested; fix the ref policy, do not retry"
+                )
             raise TransportError(
                 f"ambiguous {op} of {ref}: {err.strip()[:200]} — reconcile by "
                 "ls-remote before any retry"
@@ -382,11 +486,23 @@ FORBIDDEN_CAPABILITIES: tuple[str, ...] = (
 
 
 def forbidden_capability_count(*ports: ApiPort) -> int:
-    """Must be identically 0. Counts any forbidden capability ever constructed."""
+    """Count constructed routes the typed allowlist would not admit.
+
+    The previous implementation only searched route-template strings for words
+    like "review" or "merge". That is blind to a forbidden *effect* reached
+    through an allowlisted shape — closing a pull request via
+    PATCH /issues/<pr-number>, for instance — so it reported 0 while such a call
+    had just succeeded. It now re-validates every recorded route, and remains a
+    supporting signal only: the field-level and ownership guards, not this
+    counter, are what actually confine effects.
+    """
     total = 0
-    for key in route_inventory(*ports):
-        lowered = key.lower()
-        for capability in FORBIDDEN_CAPABILITIES:
-            if capability in lowered:
+    for port in ports:
+        for route in port.route_log:
+            if (route.method, route.template) not in ALLOWED_ROUTES:
                 total += 1
+            else:
+                lowered = f"{route.method} {route.template}".lower()
+                if any(cap in lowered for cap in FORBIDDEN_CAPABILITIES):
+                    total += 1
     return total

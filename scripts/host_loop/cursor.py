@@ -180,6 +180,21 @@ def store(
     return True
 
 
+def record_round(
+    state: CursorState, *, main_oid: str, candidate_task: str | None,
+    lease_ref_name: str | None, lease_oid: str | None, pr_number: int | None,
+    pr_head: str | None, observed_at: int,
+) -> CursorState:
+    """Fold one completed round's navigation facts into the cache."""
+    nxt = replace(
+        state, cursor_main_oid=main_oid, candidate_task=candidate_task,
+        lease_ref=lease_ref_name, lease_oid=lease_oid, pr_number=pr_number,
+        pr_head=pr_head, last_observed_at=observed_at,
+    )
+    nxt.validate()
+    return nxt
+
+
 def record_lease_write(
     state: CursorState, lease_ref: str, lease_oid: str, observed_at: int
 ) -> CursorState:

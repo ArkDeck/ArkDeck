@@ -23,9 +23,9 @@ from host_loop import cursor as cursor_mod
 from host_loop import worker as worker_mod
 from host_loop.cursor import CursorError, CursorState, Truth, parse_machine_block, rebuild_and_validate
 from host_loop.identity import ReconcileRequired
-from host_loop.lease import LeaseManager, lease_ref, task_branch
+from host_loop.lease import LeaseManager, LeaseRecord, lease_ref, task_branch
 from host_loop.test_fault_matrix import BASE, FakeApi, FakeRemote, HEAD, TASK, api_port, envelope_reader, manager, pull
-from host_loop.transport import RouteViolation
+from host_loop.transport import RefPort, RouteViolation
 from host_loop.worker import RoundResult, TaskCandidate, Worker, WorkerState, classify_checks
 
 MAIN = "f" * 40
@@ -232,44 +232,44 @@ class DiscoveryGates(unittest.TestCase):
 
     def test_unapproved_change_blocks_all_dispatch(self):
         w = build_worker(FakeRemote(), api_port(FakeApi()), approved=False)
-        picked, reason = w.select([candidate()], "CHG-X", MAIN)
+        picked, _outcome, reason = w.select([candidate()], "CHG-X", MAIN)
         self.assertIsNone(picked)
         self.assertIn("not approved", reason)
 
     def test_non_ready_status_is_skipped(self):
-        picked, _ = self.worker.select([candidate(status="blocked")], "CHG-X", MAIN)
+        picked, _outcome, _reason = self.worker.select([candidate(status="blocked")], "CHG-X", MAIN)
         self.assertIsNone(picked)
 
     def test_hardware_task_is_never_dispatchable(self):
-        picked, _ = self.worker.select([candidate(hardware_required=True)], "CHG-X", MAIN)
+        picked, _outcome, _reason = self.worker.select([candidate(hardware_required=True)], "CHG-X", MAIN)
         self.assertIsNone(picked)
 
     def test_unmet_dependency_is_skipped(self):
-        picked, _ = self.worker.select(
+        picked, _outcome, _reason = self.worker.select(
             [candidate(dependencies=("TASK-DEP-001",))], "CHG-X", MAIN)
         self.assertIsNone(picked)
 
     def test_met_dependency_is_claimable(self):
         w = build_worker(FakeRemote(), api_port(FakeApi()), done=frozenset({"TASK-DEP-001"}))
-        picked, _ = w.select([candidate(dependencies=("TASK-DEP-001",))], "CHG-X", MAIN)
+        picked, _outcome, _reason = w.select([candidate(dependencies=("TASK-DEP-001",))], "CHG-X", MAIN)
         self.assertIsNotNone(picked)
 
     def test_missing_allowed_paths_is_skipped(self):
-        picked, _ = self.worker.select([candidate(allowed_paths=())], "CHG-X", MAIN)
+        picked, _outcome, _reason = self.worker.select([candidate(allowed_paths=())], "CHG-X", MAIN)
         self.assertIsNone(picked)
 
     def test_drifted_base_pin_is_skipped(self):
-        picked, _ = self.worker.select([candidate(base_pin="0" * 40)], "CHG-X", MAIN)
+        picked, _outcome, _reason = self.worker.select([candidate(base_pin="0" * 40)], "CHG-X", MAIN)
         self.assertIsNone(picked)
 
     def test_matching_base_pin_is_claimable(self):
-        picked, _ = self.worker.select([candidate(base_pin=MAIN)], "CHG-X", MAIN)
+        picked, _outcome, _reason = self.worker.select([candidate(base_pin=MAIN)], "CHG-X", MAIN)
         self.assertIsNotNone(picked)
 
     def test_d1_and_d2_are_recorded_not_started(self):
         for grade in ("D1", "D2"):
             with self.subTest(grade=grade):
-                picked, reason = self.worker.select(
+                picked, _outcome, reason = self.worker.select(
                     [candidate(decision_grade=grade)], "CHG-X", MAIN)
                 self.assertIsNone(picked)
                 self.assertIn("gate is not confirmed", reason)
@@ -278,12 +278,12 @@ class DiscoveryGates(unittest.TestCase):
         """An unrecognised grade must fail closed, not fall through as claimable."""
         for grade in ("D3", "", "d0", "UNKNOWN"):
             with self.subTest(grade=grade):
-                picked, _ = self.worker.select(
+                picked, _outcome, _reason = self.worker.select(
                     [candidate(decision_grade=grade)], "CHG-X", MAIN)
                 self.assertIsNone(picked)
 
     def test_only_d0_is_claimed(self):
-        picked, _ = self.worker.select([candidate(decision_grade="D0")], "CHG-X", MAIN)
+        picked, _outcome, _reason = self.worker.select([candidate(decision_grade="D0")], "CHG-X", MAIN)
         self.assertEqual(picked.task_id, TASK)
 
 
@@ -345,17 +345,40 @@ class RoundOutcomes(unittest.TestCase):
         self.assertEqual(result.state, WorkerState.WORKER_PAUSED)
         self.assertFalse(result.dispatched)
 
-    def test_no_state_beyond_checksGreen_is_reachable(self):
-        """Everything past checksGreen belongs to TASK-HLR-004."""
-        reachable = {WorkerState.IDLE, WorkerState.BLOCKED_RECORDED,
-                     WorkerState.PR_OPEN, WorkerState.CHECKS_GREEN,
-                     WorkerState.WORKER_PAUSED, WorkerState.RECONCILE_REQUIRED}
-        source = open(worker_mod.__file__).read()
-        for forbidden in ("reviewRequested", "reviewRecorded", "batchQueued",
-                          "mergeOIDConfirmed", "leaseReleased"):
-            self.assertNotIn(f'"{forbidden}"', source)
-        self.assertTrue(reachable)
+    def test_observed_state_set_matches_the_hlr003_scope(self):
+        """Drive every branch and compare the observed state set.
 
+        Replaces a source grep plus assertTrue on a literal set, which asserted
+        nothing at all.
+        """
+        observed = set()
+        w = build_worker(FakeRemote(), api_port(FakeApi()))
+        observed.add(w.run_once([], "CHG-X", MAIN, state(),
+                                truth(ready_tasks=frozenset())).state)
+        w = build_worker(FakeRemote(), api_port(FakeApi()))
+        observed.add(w.run_once([candidate(decision_grade="D2")], "CHG-X", MAIN,
+                                state(), truth(ready_tasks=frozenset())).state)
+        w = build_worker(FakeRemote(), api_port(FakeApi()))
+        observed.add(w.run_once([candidate()], "CHG-X", MAIN,
+                                state(pr_number=999), truth()).state)
+        w = build_worker(FakeRemote(), api_port(FakeApi(pulls=[pull(21)])))
+        observed.add(w.run_once([candidate()], "CHG-X", MAIN, state(), truth()).state)
+        fake = FakeApi(pulls=[pull(21)])
+        fake.check_runs = [{"name": "guard", "status": "completed", "conclusion": "success"},
+                           {"name": "allowed-paths", "status": "completed",
+                            "conclusion": "failure"}]
+        observed.add(build_worker(FakeRemote(), api_port(fake)).run_once(
+            [candidate()], "CHG-X", MAIN, state(), truth()).state)
+        fake = FakeApi(pulls=[pull(21)])
+        fake.check_runs = [{"name": "guard", "status": "completed", "conclusion": "success"},
+                           {"name": "allowed-paths", "status": "completed",
+                            "conclusion": "success"}]
+        observed.add(build_worker(FakeRemote(), api_port(fake)).run_once(
+            [candidate()], "CHG-X", MAIN, state(), truth()).state)
+        self.assertEqual(observed, {
+            WorkerState.IDLE, WorkerState.BLOCKED_RECORDED,
+            WorkerState.RECONCILE_REQUIRED, WorkerState.PR_OPEN,
+            WorkerState.WORKER_PAUSED, WorkerState.CHECKS_GREEN})
 
 class MidRoundFenceLoss(unittest.TestCase):
     """The lease must be re-confirmed immediately before the first external write."""
@@ -473,22 +496,80 @@ class CheckDispatch(unittest.TestCase):
         self.assertEqual(result.state, WorkerState.PR_OPEN)
         self.assertIn("required checks still absent", result.detail)
 
-    def test_dispatch_reconfirms_the_fence_before_writing(self):
+    def test_dispatch_does_not_write_after_the_fence_is_lost(self):
+        """Behavioural: steal the lease mid-round and assert zero PR writes.
+
+        The previous version grepped worker.py for the gate's source text and
+        asserted a non-zero string index, so it could not tell a deleted gate
+        from a reformatted one.
+        """
         remote = FakeRemote()
         fake = FakeApi(pulls=[pull(21)])
         fake.check_runs = [{"name": "guard", "status": "completed",
                             "conclusion": "success"}]
         w = self._worker(remote, fake)
-        # steal the lease right before the dispatch write
-        original = w._dispatch_checks
-        def steal_then_dispatch(*a, **k):
-            raise AssertionError("dispatch must not run after the fence is lost")
-        mgr, _ = manager(remote, run="run-RIVAL")
-        w.run_once([candidate()], "CHG-X", MAIN, state(), truth())
-        # fence intact here; assert the gate exists in the call order
-        src = open(worker_mod.__file__).read()
-        idx_assert = src.index("self._leases.assert_still_held(held, self._read_lease_record)\n            self._dispatch_checks")
-        self.assertGreater(idx_assert, 0)
+        original_prepare = w._prepare_branch
+
+        def prepare_then_steal(cand, base):
+            observed = w._leases.observe(cand.task_id, remote.read_record)
+            assert observed
+            record, _oid = observed
+            remote.refs[lease_ref(cand.task_id)] = remote.write_commit(
+                record.serialize(), None)
+            return original_prepare(cand, base)
+
+        w._prepare_branch = prepare_then_steal
+        result = w.run_once([candidate()], "CHG-X", MAIN, state(), truth())
+        self.assertEqual(result.state, WorkerState.RECONCILE_REQUIRED)
+        self.assertIn("lease OID moved", result.detail)
+        writes = [c for c in fake.calls if c[0] in ("POST", "PATCH")]
+        self.assertEqual(writes, [], f"no write may occur after fence loss; {writes}")
+
+    def test_fence_is_reconfirmed_immediately_before_the_dispatch_write(self):
+        """Steal the lease between the PR lookup and the dispatch.
+
+        An earlier version of this test stole it during branch preparation, which
+        the pre-lookup gate catches — so deleting the pre-dispatch gate went
+        undetected. The steal now lands inside list_check_runs, which runs after
+        the PR is resolved and immediately before the dispatch decision.
+        """
+        remote = FakeRemote()
+        fake = FakeApi(pulls=[pull(21)])
+        w = self._worker(remote, fake)
+        stolen = {"done": False}
+        original = fake.__class__.__call__
+
+        def steal_on_checks(self_fake, method, path, body):
+            if method == "GET" and "/check-runs" in path and not stolen["done"]:
+                observed = w._leases.observe(TASK, remote.read_record)
+                assert observed
+                record, _oid = observed
+                remote.refs[lease_ref(TASK)] = remote.write_commit(
+                    record.serialize(), None)
+                stolen["done"] = True
+            return original(self_fake, method, path, body)
+
+        fake.__class__.__call__ = steal_on_checks
+        try:
+            result = w.run_once([candidate()], "CHG-X", MAIN, state(), truth())
+        finally:
+            fake.__class__.__call__ = original
+        self.assertTrue(stolen["done"], "the steal must have happened")
+        self.assertEqual(result.state, WorkerState.RECONCILE_REQUIRED)
+        patches = [c for c in fake.calls if c[0] == "PATCH" and "/pulls/" in c[1]]
+        self.assertEqual(patches, [], "no dispatch write may follow a lost fence")
+
+    def test_two_dispatches_in_the_same_second_render_distinct_bodies(self):
+        """A second-granularity token collides, and GitHub emits no `edited`."""
+        remote = FakeRemote()
+        fake = FakeApi(pulls=[pull(21)])
+        w = self._worker(remote, fake)
+        bodies = set()
+        for _ in range(2):
+            token = w._dispatch_token()
+            bodies.add(f"ENVELOPE\n{worker_mod.DISPATCH_MARKER}: {token}\n")
+        self.assertEqual(len(bodies), 2,
+                         "same-second dispatches must still change the bytes")
 
     def test_marker_is_never_nested(self):
         remote = FakeRemote()
@@ -515,7 +596,7 @@ class SelfClaimStop(unittest.TestCase):
 
     def test_own_task_is_never_claimed(self):
         own = candidate(task_id="TASK-HLR-003")
-        picked, reason = self.worker.select([own], "CHG-X", MAIN)
+        picked, _outcome, reason = self.worker.select([own], "CHG-X", MAIN)
         self.assertIsNone(picked)
         self.assertIn("never-claim", reason)
 
@@ -526,19 +607,161 @@ class SelfClaimStop(unittest.TestCase):
         self.assertIsNone(self.worker.select([own], "CHG-X", MAIN)[0])
 
     def test_a_claimable_peer_is_still_selected_alongside_it(self):
-        picked, _ = self.worker.select(
+        picked, _outcome, _reason = self.worker.select(
             [candidate(task_id="TASK-HLR-003"), candidate()], "CHG-X", MAIN)
         self.assertIsNotNone(picked)
         self.assertNotEqual(picked.task_id, "TASK-HLR-003")
 
-    def test_never_claim_set_is_exactly_the_readiness_scope(self):
-        self.assertEqual(set(worker_mod.NEVER_CLAIM), {"TASK-HLR-003"})
+    def test_suffixed_and_denormalised_siblings_are_also_excluded(self):
+        """Exact-string matching let TASK-HLR-003A through; the grammar admits it."""
+        for variant in ("TASK-HLR-003", "TASK-HLR-003A", "TASK-HLR-003R",
+                        "task-hlr-003", " TASK-HLR-003 "):
+            with self.subTest(variant=variant):
+                self.assertTrue(worker_mod.is_never_claim(variant))
+        for other in ("TASK-HLR-004", "TASK-HLR-0031", "TASK-DEMO-001"):
+            with self.subTest(other=other):
+                self.assertFalse(worker_mod.is_never_claim(other))
+
+    def test_a_never_claim_variant_is_skipped_by_discovery(self):
+        picked, outcome, _ = self.worker.select(
+            [candidate(task_id="TASK-HLR-003A")], "CHG-X", MAIN)
+        self.assertIsNone(picked)
+        self.assertEqual(outcome, worker_mod.SelectionOutcome.ONLY_NEVER_CLAIM_READY)
 
     def test_round_with_only_own_task_does_not_dispatch(self):
         w = build_worker(FakeRemote(), api_port(FakeApi()))
         result = w.run_once([candidate(task_id="TASK-HLR-003")], "CHG-X", MAIN,
                             state(), truth(ready_tasks=frozenset()))
         self.assertFalse(result.dispatched)
+
+
+class MultiRoundLifecycle(unittest.TestCase):
+    """The runtime must actually progress across `--once` rounds (finding 3).
+
+    The previous suite only ever ran one round and reached the adopt/takeover
+    paths by calling functions directly, so it never saw that round two always
+    collided with the lease ref round one had created.
+    """
+
+    def _rig(self):
+        remote = FakeRemote()
+        fake = FakeApi(pulls=[pull(21)])
+        clock = {"t": 1000}
+        mgr = LeaseManager(
+            RefPort(remote="origin", _run=remote.run), owner_run="host-loop/worker",
+            now=lambda: clock["t"], commit_writer=remote.write_commit, ttl_seconds=900)
+
+        def build(**kw):
+            return Worker(
+                api_port(fake), mgr, change_approved=lambda c: True,
+                done_tasks=lambda: frozenset(),
+                read_envelope=envelope_reader(base=MAIN),
+                read_lease_record=remote.read_record,
+                prepare_branch=lambda c, b: HEAD,
+                render_body=lambda c, b, h: "ENVELOPE",
+                now=lambda: clock["t"], owner_run="host-loop/worker", **kw)
+
+        def tr():
+            return Truth(main_oid=MAIN, ready_tasks=frozenset({TASK}),
+                         open_pr_numbers=frozenset({21}),
+                         lease_oid_by_ref=dict(remote.refs))
+        return remote, fake, clock, mgr, build, tr
+
+    def test_three_consecutive_rounds_progress(self):
+        remote, fake, _clock, _mgr, build, tr = self._rig()
+        r1 = build().run_once([candidate()], "CHG-X", MAIN, state(), tr())
+        self.assertEqual(r1.state, WorkerState.PR_OPEN)
+        r2 = build().run_once([candidate()], "CHG-X", MAIN, state(), tr())
+        self.assertNotEqual(r2.state, WorkerState.RECONCILE_REQUIRED,
+                            f"round two must not collide with its own lease: {r2.detail}")
+        self.assertEqual(r2.state, WorkerState.PR_OPEN)
+        fake.check_runs = [
+            {"name": "guard", "status": "completed", "conclusion": "success"},
+            {"name": "allowed-paths", "status": "completed", "conclusion": "success"}]
+        r3 = build().run_once([candidate()], "CHG-X", MAIN, state(), tr())
+        self.assertEqual(r3.state, WorkerState.CHECKS_GREEN)
+
+    def test_dispatch_fires_once_across_rounds(self):
+        _remote, fake, _clock, _mgr, build, tr = self._rig()
+        for _ in range(3):
+            build().run_once([candidate()], "CHG-X", MAIN, state(), tr())
+        patches = [c for c in fake.calls if c[0] == "PATCH" and "/pulls/" in c[1]]
+        self.assertEqual(len(patches), 1,
+                         f"dispatch must not re-fire while runs queue; got {len(patches)}")
+
+    def test_fence_increases_monotonically_across_rounds(self):
+        remote, _fake, _clock, mgr, build, tr = self._rig()
+        fences = []
+        for _ in range(3):
+            build().run_once([candidate()], "CHG-X", MAIN, state(), tr())
+            fences.append(mgr.observe(TASK, remote.read_record)[0].fence)
+        self.assertEqual(fences, sorted(set(fences)), f"fence must advance: {fences}")
+
+    def test_lease_is_retained_while_the_pr_is_unmerged(self):
+        remote, _fake, _clock, _mgr, build, tr = self._rig()
+        build().run_once([candidate()], "CHG-X", MAIN, state(), tr())
+        self.assertIn(lease_ref(TASK), remote.refs,
+                      "design §4 releases the lease only after mergeOIDConfirmed")
+
+    def test_a_live_foreign_lease_blocks_dispatch_without_stealing(self):
+        remote, fake, clock, _mgr, build, tr = self._rig()
+        rival = LeaseManager(RefPort(remote="origin", _run=remote.run),
+                             owner_run="host-loop/rival", now=lambda: clock["t"],
+                             commit_writer=remote.write_commit, ttl_seconds=900)
+        rival.acquire(TASK, MAIN)
+        before = dict(remote.refs)
+        result = build().run_once([candidate()], "CHG-X", MAIN, state(), tr())
+        self.assertEqual(result.state, WorkerState.IDLE)
+        self.assertIn("live owner", result.detail)
+        self.assertEqual(remote.refs, before, "must not touch a live foreign lease")
+        self.assertEqual([c for c in fake.calls if c[0] in ("POST", "PATCH")], [])
+
+    def test_an_expired_foreign_lease_is_taken_over(self):
+        remote, _fake, clock, mgr, build, tr = self._rig()
+        rival = LeaseManager(RefPort(remote="origin", _run=remote.run),
+                             owner_run="host-loop/rival", now=lambda: clock["t"],
+                             commit_writer=remote.write_commit, ttl_seconds=60)
+        rival.acquire(TASK, MAIN)
+        clock["t"] += 3600
+        result = build().run_once([candidate()], "CHG-X", MAIN, state(), tr())
+        self.assertNotEqual(result.state, WorkerState.IDLE)
+        self.assertEqual(mgr.observe(TASK, remote.read_record)[0].owner_run,
+                         "host-loop/worker")
+
+    def test_a_stale_cursor_main_oid_is_refreshed_before_persisting(self):
+        """The reconciled cursor must be the one written, not the input."""
+        remote, fake, _clock, _mgr, build, tr = self._rig()
+        stale = state(cursor_main_oid="0" * 40)
+        build(cursor_issue=7, cursor_body="").run_once(
+            [candidate()], "CHG-X", MAIN, stale, tr())
+        issue_patches = [c for c in fake.calls if c[0] == "PATCH" and "/issues/" in c[1]]
+        self.assertTrue(issue_patches)
+        body = issue_patches[-1][2]["body"]
+        self.assertIn(MAIN, body, "the refreshed main OID must be persisted")
+        self.assertNotIn("0" * 40, body, "the stale OID must not survive")
+
+    def test_an_unexpected_exception_becomes_reconcile_required(self):
+        """A TypeError from a malformed payload must stop the lane, not crash."""
+        remote, fake, _clock, _mgr, build, tr = self._rig()
+        w = build()
+
+        def exploding_prepare(cand, base):
+            raise TypeError("simulated malformed payload")
+
+        w._prepare_branch = exploding_prepare
+        result = w.run_once([candidate()], "CHG-X", MAIN, state(), tr())
+        self.assertEqual(result.state, WorkerState.RECONCILE_REQUIRED)
+        self.assertIn("unexpected TypeError", result.detail)
+
+    def test_cursor_is_written_back_with_the_lease_oid(self):
+        remote, fake, _clock, _mgr, build, tr = self._rig()
+        build(cursor_issue=7, cursor_body="").run_once(
+            [candidate()], "CHG-X", MAIN, state(), tr())
+        issue_patches = [c for c in fake.calls if c[0] == "PATCH" and "/issues/" in c[1]]
+        self.assertTrue(issue_patches, "the cursor must be persisted, not read-only")
+        body = issue_patches[-1][2]["body"]
+        self.assertIn(remote.refs[lease_ref(TASK)], body)
+        self.assertIn(TASK, body)
 
 
 class CheckClassification(unittest.TestCase):
