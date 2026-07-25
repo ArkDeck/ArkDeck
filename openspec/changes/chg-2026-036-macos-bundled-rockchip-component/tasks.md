@@ -344,14 +344,181 @@
 
 ## TASK-BRC-002 — 实现 hermetic/reproducible build、registry 与 SBOM
 
-- Status:blocked
+- Status:ready（r1 D1 readiness；仅在维护者对本单文件 readiness PR 的 exact
+  head review/merge 后生效。本 PR 不下载 source、不构建/运行 component、不生成
+  registry/SBOM/source package/binary，也不修改 product、workflow 或 evidence。）
+- Historical Status:blocked（TASK-BRC-001 的 decision #538 与 D0 done #540
+  已依次合入；001 done 只满足 dependency，不自动接受本任务的 recipe、builder、
+  network、registry/SBOM 或 reproducibility 边界。）
+- Readiness review:
+  - **Approval/dependency gate:satisfied。**TASK-BRC-001 decision #538 exact head
+    `44970db58cfe39c241e3b3961c52e976b79fff68` 经 `lvye` APPROVED，并以
+    `4a461ba40f532500e635509455acae95376757ca` 合入；D0 done #540 的最终
+    exact head（含与最新 main 的无冲突合并）
+    `d53ee0522f6474c744bc42644381fddc2523e6b5` 经 `lvye` 于
+    `2026-07-25T09:07:24Z` APPROVED，并以
+    `8dfde471bb876b0cd6630ba33859df270d49140e` 于
+    `2026-07-25T09:10:41Z` 合入 protected `main`。两条 merge 均为本
+    readiness audit base 的 ancestor；#540 只改当前 `tasks.md`，全部 exact-head
+    checks 成功。
+  - **Audit base/input pins:closed。**readiness audit base =
+    `8dfde471bb876b0cd6630ba33859df270d49140e`。implementation/evidence 开工时
+    必须基于本 readiness merged OID，确认 #538/#540 merge 仍为 ancestor，并逐项
+    重核所有非自载体 pin；`tasks.md` 改核 readiness merge 中 reviewed 内容。无重叠
+    PR 推进 main 不单独使 readiness 失效，但任一 pinned blob/source/tool/action、
+    planned-path absence 或 ownership 漂移都必须回到 `blocked` 并 fresh
+    readiness：
+
+    ```yaml pins
+    - artifact: TASK-BRC-002 readiness audit base
+      commit: 8dfde471bb876b0cd6630ba33859df270d49140e
+    - artifact: TASK-BRC-001 accepted decision merge
+      commit: 4a461ba40f532500e635509455acae95376757ca
+    - artifact: TASK-BRC-001 done merge
+      commit: 8dfde471bb876b0cd6630ba33859df270d49140e
+    - path: docs/release/rockchip-component-distribution.md
+      blob: 60dd039582b216d0b2fb21336fe4ee0abc9b0f7c
+    - path: openspec/changes/chg-2026-036-macos-bundled-rockchip-component/evidence/runs/TASK-BRC-001/run.md
+      blob: bab53f9da272d0dbeabdf43cbe90bfc20d16422b
+    - path: openspec/changes/chg-2026-036-macos-bundled-rockchip-component/proposal.md
+      blob: 7c9cf2815927ac1d8dfda2a5eac8788a1d10621b
+    - path: openspec/changes/chg-2026-036-macos-bundled-rockchip-component/design.md
+      blob: c343320d00de2a22d6993325000997e7f5f7c1e1
+    - path: openspec/changes/chg-2026-036-macos-bundled-rockchip-component/tasks.md
+      blob: 443b8db0d51d1fc39a656e43113edeb6a44e124a
+    - path: openspec/changes/chg-2026-036-macos-bundled-rockchip-component/verification.md
+      blob: 86f82516a2b8bd1de91dffb282499d68ebdba3cf
+    - path: openspec/changes/chg-2026-036-macos-bundled-rockchip-component/acceptance-cases.yaml
+      blob: cd179bf8627ade54a77e205962e98200ac8374c9
+    - path: openspec/changes/chg-2026-036-macos-bundled-rockchip-component/spec-impact.md
+      blob: 32027c2c667185ccbac4914725481d905890e813
+    - path: openspec/specs/flashing/spec.md
+      blob: c914d587bf4893a3f4a9f776a28c74e7ef002c8e
+    - path: openspec/specs/workflow-journal-recovery/spec.md
+      blob: f97c64785533f832d6798a63e8c7c96080bb7b69
+    - path: openspec/planning/agent-failure-patterns.md
+      blob: ed539ff8436bccda1d8bb8a3b85a0f6e494fea81
+    - path: .github/workflows/swift-ci.yml
+      blob: 01f40a032061bdbc9e30e12ab628bf1ee896c8fb
+    ```
+
+    `vendor/rockchip/`、`scripts/rockchip_component/`、
+    `.github/workflows/rockchip-component.yml`、
+    `openspec/integrations/rockchip/bundled-component/` 与
+    `evidence/runs/TASK-BRC-002/` 在 audit base 均不存在；本 readiness PR 不创建或
+    占用它们。
+  - **Source/dependency gate:closed。**implementation 只接受
+    `rkdeveloptool@304f073752fd25c854e1bcf05d8e7f925b1f4e14` 的 codeload
+    archive（59,310 bytes；SHA-256
+    `389ba41af6986c16f1eeebdc1febcb0bf4b8acb7abd694d3d652e78504215843`）
+    与 libusb 1.0.30 official archive（656,112 bytes；SHA-256
+    `fea36f34f9156400209595e300840767ab1a385ede1dc7ee893015aea9c6dbaf`）、
+    detached signature（833 bytes；SHA-256
+    `7e8916e689a399b98df1087cfc48eab33a6bfd8027291c5af00c3fbba90a2cec`）
+    和 KEYS（7,048 bytes；SHA-256
+    `52b20b8f44c0912fdbd0c7f53c14629b9b72834118dd52ecff3fec671ba50ff3`）。
+    signature 必须验证为 primary
+    `C68187379B23DE9EFC46651E2C80FF56C6830A0E` / signing subkey
+    `9C7EA94939C69C4FBC3DBFA8AA0639079EFB61B9`；hash/signature 任一失败即
+    FAIL。两个 builder 各自只向 accepted record 的四个 URL 发起 fetch，验证后进入
+    deny-network build；不得 clone、resolve branch/tag、使用 mirror/Homebrew
+    bottle/cache 或第三个 dependency。
+  - **Archive/extraction gate:binary。**repo-owned verifier 必须在解包前校验
+    URL/final URL、size、SHA-256 与 libusb signature；解包只接受单一 top-level
+    directory 和 regular file/directory，拒绝 absolute/`..`、duplicate normalized
+    path、symlink/hardlink、device/FIFO/socket、特权 mode/owner 与第二 root。
+    negative fixtures 必须逐类变异并证明零解包/零编译；archive bytes 只落独立
+    temporary input roots，不写 repo、用户目录或 build cache。
+  - **Recipe/toolchain gate:closed。**recipe identity 固定为
+    `rockchip-component-build@1.0.0`：target
+    `arm64-apple-macos14.0`、minimum macOS `14.0.0`、rkdeveloptool `1.32`、
+    upstream modifications `none`；libusb 只以
+    `--disable-shared --enable-static` 构建并静态链接；libiconv 只允许 SDK
+    `/usr/lib/libiconv.2.dylib`。rkdeveloptool 只编译 accepted record 列出的八个
+    `.cpp`，使用 repo-owned generated `config.h` 与 absolute argument-array
+    process calls；禁止 upstream CMake、shell command string、PATH/pkg-config、
+    ambient env/header/library、download-in-build、source patch 与 bundled dylib。
+    compiler/link source list、全部 argv、generated file bytes 与 dependency
+    allowlist 必须写入 registry/receipt；若实现需要改变这些约束，返回 001 fresh D1，
+    不在 002 内选择替代。
+  - **Builder availability gate:satisfied。**audit host 实测为 macOS 26.5.2
+    (`25F84`) arm64、Xcode 26.6 (`17F113`)、SDK 26.5 (`25F70`)、Apple clang
+    21.0.0 (`clang-2100.1.1.101`)、GNU Make 3.81、Apple `/bin/bash`
+    3.2.57(1)、`/usr/bin/python3` 3.9.6。SDK `iconv.h` SHA-256 =
+    `3fcec709f204ac60c7941488b9e49d8536150d356beff1f8cf8926cdfef7456d`，
+    `libiconv.2.tbd` SHA-256 =
+    `b257056db07bac43cd4d2f6fd806605ad3462fa0bb99918dc43c64176a018cea`。
+    implementation 必须 assert 全部 exact facts、只从 selected
+    `DEVELOPER_DIR`/OS absolute paths resolve tools，并在 drift 时停止。source
+    signature verifier 是 fetch-stage analyst tooling，与 build environment/linked
+    graph 分离；当前可复核 pin 为 GnuPG/gpgv 2.5.21、
+    `/opt/homebrew/bin/gpgv` SHA-256
+    `da2acbb7c6f54461b80d4ccc61c82dc4258a580298bf1a974ebda1ff8a504780`。
+    该 absolute verifier 只可在隔离 keyring 上验证上述 exact bytes；任何其他
+    Homebrew path/header/library/cache 均不得传入 build，verifier/version/hash
+    漂移须 fresh readiness。
+  - **Two-clean-builder/reproducibility gate:binary。**builder A/B 必须是两个独立
+    fresh roots（各自 empty `HOME`/`TMPDIR`/cache/output），环境只含
+    `LC_ALL=C`、`LANG=C`、`TZ=UTC`、`ZERO_AR_DATE=1`、
+    `SOURCE_DATE_EPOCH=1779028641`、`umask 022` 与显式 tool inputs；fetch 完成后
+    build 在 `/usr/bin/sandbox-exec` deny-network profile 内运行。两者必须产生
+    byte-identical unsigned Mach-O、notice、source manifest 与 SPDX JSON；
+    normalization/strip-after-compare、复制一方 output 或 shared build/cache root
+    均禁止。GitHub workflow 另以两个独立 `macos-26` runners 重跑并 fail closed
+    assert 同一 OS/Xcode/SDK/toolchain；workflow action pins 固定为
+    `actions/checkout@11d5960a326750d5838078e36cf38b85af677262`、
+    `actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02`、
+    `actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093`，
+    禁用 dependency/artifact cache。
+  - **Artifact/registry/SBOM gate:binary。**versioned target 固定为
+    `openspec/integrations/rockchip/bundled-component/1.0.0/`，包含
+    `registry.yaml`、`recipe.json`、`sbom.spdx.json`、
+    `THIRD-PARTY-NOTICES.txt` 与 `source-distribution-manifest.json`。registry
+    必须 machine-pin sources/signature/toolchain/argv/generated files/output、
+    `otool -L`/load commands/symbol inspection、minimum OS/arch 和 accepted direct
+    dependency allowlist；非 system dylib 数为 0，libusb symbols 来自 static
+    archive。SPDX 必须是 deterministic 2.3 JSON，含 file-level licenses、
+    `LicenseRef-Rockchip-Property-permissive` extracted text、source/signature/
+    recipe/output refs、`GENERATED_FROM/BUILD_TOOL_OF/STATIC_LINK/DEPENDS_ON/
+    DESCRIBES` 与 system `provided` relationships。notice/source manifest 必须由
+    pins 生成并在两 builders byte-identical；缺字段、graph disagreement、absolute
+    path/credential/cache/device data 都是 FAIL。
+  - **Implementation surface gate:closed。**implementation/evidence PR 的 changed
+    paths 只允许新增 `.github/workflows/rockchip-component.yml`、
+    `scripts/rockchip_component/{README.md,build.py,test_build.py}`、
+    上述 `bundled-component/1.0.0/` 五个文件，以及
+    `evidence/runs/TASK-BRC-002/{run.md,builder-a.json,builder-b.json,reproducibility.json}`。
+    不使用 `vendor/rockchip/`，不提交 source archive、unsigned Mach-O、dylib、
+    build/cache/root、GitHub artifact 或 credential。accepted distribution record、
+    proposal/design/tasks/verification/acceptance/spec-impact、Core/spec/contracts、
+    CHG-2026-026、ArkDeckApp/Xcode/Packages 全部只读；发现需要修改即 blocked/fresh
+    readiness。implementation/evidence merge 后另开 D0 status-only PR。
+  - **Verification/failure gate:closed。**tests 必须覆盖 source/size/hash/signature/
+    extraction、toolchain/SDK/architecture/minimum OS、env/PATH/Homebrew/network/
+    cache、source list/generated config/argv、extra dylib/load command/symbol、
+    registry/SBOM/license/notice/manifest/output drift；每类至少一个 mutation 反例，
+    避免 `AF-010` 自证。run 分别映射 `BRC-REPRO-001`、
+    `AC-FLASH-013-01` 与 `AC-JOB-005-01`，记录两 builder receipts、workflow run、
+    exact commands、negative verdict、zero-effect counters 与 residual risks。
+    `scripts/check-sdd.sh`、`scripts/test_check_pr_paths.py`、repo-owned build tests、
+    `git diff --check`、exact changed-path/forbidden-path 与 secret/privacy scan
+    必须全绿；binary 不执行，故不声称 runtime/package/Sandbox/hardware AC。
+  - **Effect/privacy/concurrency gate:satisfied。**本任务仅有 allowlisted source
+    fetch、host verifier/compiler/linker/inspection 与临时文件 effect；不进入 App
+    bundle、不 sign/notarize/install/launch component，不访问 HDC/USB/device/
+    bookmark/image/key/output，不产生 product authority、E1/E2/destructive、
+    privilege/entitlement/system-rule/group/ACL effect。`2026-07-25T09:56:48Z`
+    分页完整查询唯一 open PR #523，exact head
+    `2ff6c42ee02d0f5010d55fac7d2f00a5d8992354` 仅修改 CHG-2026-034 七个
+    paths，与本 readiness/implementation surface 零重叠；implementation 开工前
+    必须重做 open-PR files/heads、planned-path absence 与 secrets scan，查询不完整、
+    overlap 或新 owner 抢占即 blocked。
 - Platform:macos
 - Requirements：`REQ-FLASH-004`、`REQ-FLASH-013`、`REQ-JOB-005`
 - Acceptance：`BRC-REPRO-001`、`AC-FLASH-013-01`、`AC-JOB-005-01`
 - Depends on：`TASK-BRC-001` done；独立 D1 readiness
-- Readiness input pins：未实例化；必须固定 001 accepted merge、source/dependency
-  digests、recipe revision、builder/toolchain/minimum OS/architectures、expected
-  output normalization 与 clean-builder procedure
+- Readiness input pins：见上方 r1 D1 readiness；implementation/evidence 开工时从
+  readiness merge 重新核验
 - Applicable failure patterns：`AF-001`、`AF-002`、`AF-003`、`AF-007`、
   `AF-009`、`AF-010`、`AF-017`
 - Production reachability：not applicable；host-side unsigned component build only，
