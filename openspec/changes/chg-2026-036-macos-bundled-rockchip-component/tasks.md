@@ -344,10 +344,15 @@
 
 ## TASK-BRC-002 — 实现 hermetic/reproducible build、registry 与 SBOM
 
-- Status:ready（r3 fresh D1 readiness；仅在维护者对本单文件 readiness PR 的
-  exact head review/merge 后生效。本 PR 不下载 source、不构建/运行 component、
-  不生成 registry/SBOM/source package/binary，也不修改 product、workflow 或
-  evidence。）
+- Status:done（r1 D0 status-only；仅在维护者对本单文件 PR 的 exact head
+  review/merge 后生效。结论完全由 main 已合入的 readiness +
+  implementation/evidence、exact Git objects、hosted reproducibility runs 与
+  deterministic checks 决定，不增加 scope、risk acceptance、authorization 或
+  build/product/device effect。）
+- Historical Status:ready（r3 fresh D1 readiness；#544 exact head
+  `d5ac44f8ee96b12bc23a83a4f8c73cc21ab2f589` 经 `lvye` APPROVED，并以
+  `d063b3ca775a5e858020e21a7b4a53db31f37144` 合入后，#542 才恢复
+  implementation/evidence。）
 - Historical Status:ready（r2 readiness #543 已合入；#542 exact hosted-image
   rerun 通过 image/OS/Xcode/SDK facts 后在 GnuPG installed-binary hash gate
   fail closed，未产生可接受 build/reproducibility evidence。r3 合入前 #542
@@ -358,6 +363,70 @@
 - Historical Status:blocked（TASK-BRC-001 的 decision #538 与 D0 done #540
   已依次合入；001 done 只满足 dependency，不自动接受本任务的 recipe、builder、
   network、registry/SBOM 或 reproducibility 边界。）
+- Completion record:
+  - **Implementation/evidence:closed。**#542 exact head
+    `4d02b9945ecfe2db1e8af7adc98251a1b0ef9589` 经 `lvye` 于
+    `2026-07-25T11:58:55Z` APPROVED，并以
+    `182757cdc9ca191f2ce0a2d61dfce78440c74cd9` 于
+    `2026-07-25T11:59:05Z` 合入 protected `main`；r3 readiness merge
+    `d063b3ca775a5e858020e21a7b4a53db31f37144` 是该 merge 的直接父提交，
+    r1/r2 readiness、TASK-BRC-001 decision/done merges 也都是祖先。#542 只交付
+    readiness 声明的 workflow、repo-owned build tooling、versioned integration
+    metadata 与 sanitized reproducibility evidence，任务状态在实现 PR 中仍为
+    `ready`。
+  - **Git object/artifact identity:closed。**#542 merge 中 workflow/build/test
+    blobs 分别为
+    `8ccb3e7d9033b89c2dbe746995f5c496427e9d96` /
+    `33fe437901b97802f7231449cc16f9bc0bcdc404` /
+    `7a6226282d0ea90ce149c1ffe07f705f4993adf0`；recipe/registry/SBOM/notices/
+    source-manifest blobs 分别为
+    `fa4289b73880540b0db19d24242d039053ae8916` /
+    `505122327e877900d7fdb2b908cf6914f207b70f` /
+    `e66e3d7f22a4d2079e59edcc51c2682650362689` /
+    `6d1f7bf4624972fdb8559d203fd89163c3003c43` /
+    `bbce240466dedfc7de3ebb19d1db5fe8b0f3a865`；run/builder-A/builder-B/
+    reproducibility blobs 分别为
+    `94108fb6f1f0a4d86b027e03ef9885c7360f9c56` /
+    `3276b1ef772be3707276e18cb3f8ec9bc38d168b` /
+    `5c1d007f1bcac91c896ad19085ff778fae826324` /
+    `4fe66aea41198779c158303825c15332403ef6cf`；本状态修改前
+    `tasks.md` blob = `7e5e00e55ac794d8f4354a6905841a510b8f0cb4`。
+    hosted unsigned artifact 为 247,488 bytes、arm64、minimum macOS 14.0、
+    code signature absent，SHA-256 =
+    `3caee2136551b4b849daf7e9a906813354f354f8adb61e5f092de49ec7a2e56a`；
+    artifact 本身未入仓。
+  - **Reproducibility/AC gate:closed。**materialization run
+    [30155933128](https://github.com/ArkDeck/ArkDeck/actions/runs/30155933128)
+    的 unit、builder A/B、byte comparison 与 receipt upload PASS，整体仅因
+    metadata 尚未提交时的预期 committed-metadata audit FAIL；final verification
+    [30156115854](https://github.com/ArkDeck/ArkDeck/actions/runs/30156115854)
+    在新 fresh builders 上全部 PASS；final exact-head
+    [30156181935](https://github.com/ArkDeck/ArkDeck/actions/runs/30156181935)
+    对 #542 exact head 的 unit、builder A/B、byte comparison、receipt upload 与
+    committed metadata audit 全部 PASS。两 builders 对 unsigned artifact、
+    registry、SBOM、notices 与 source manifest byte-identical，normalization =
+    forbidden；run 对 `BRC-REPRO-001`、本任务 slice 的 `AC-JOB-005-01` 与
+    `AC-FLASH-013-01` 给出 PASS，未声称 package/runtime/Sandbox/hardware AC。
+  - **No-effect/scope gate:closed。**#542 未提交 source archive、unsigned Mach-O、
+    dylib、build/cache/root、credential 或用户/设备数据；component/App launch、
+    package/sign/notarize/install/update、HDC/USB/device、E1/E2/deviceMutation/
+    destructive 与 privilege/entitlement/system mutation counters 全为 0；
+    Core/spec/contracts、CHG-2026-026、product/Xcode/Packages 与 hardware matrix
+    零变化。本 D0 PR 只修改当前 `tasks.md` 的 TASK-BRC-002 status/completion
+    record。
+  - **Deterministic checks:closed。**audit base
+    `182757cdc9ca191f2ce0a2d61dfce78440c74cd9` 上，readiness/decision/done
+    ancestry、exact blobs、receipt/artifact hashes、final exact-head jobs 与唯一
+    open PR #523 的零路径重叠均复核；下载的 final exact-head builder A output
+    通过 repo-owned `verify-committed`；repo-owned build/mutation tests = 18/18
+    PASS，`scripts/check-sdd.sh` = 0 error / 0 warning / 111
+    acceptance IDs，`scripts/test_check_pr_paths.py` = 24/24 PASS；
+    `git diff --check`、exact changed-path 与 secret/privacy scan 均 PASS。
+  - **Successor remains gated。**本 done merge 只满足 `TASK-BRC-003` 的 dependency；
+    TASK-BRC-003 继续 `blocked`，必须另开 D1 readiness pin 本 done merge、exact
+    unsigned artifact/registry/SBOM、bundle identity/location、entitlements、
+    signing order、Developer ID/notary environment 与 negative fixtures。不得在
+    本 PR copy/package/sign/notarize/launch component 或启动 003。
 - Readiness review:
   - **r3 fresh-readiness trigger:closed for review。**r2 readiness #543 exact head
     `42c65feea6528034d043bdbf14d92060b2144a71` 经 `lvye` 于
