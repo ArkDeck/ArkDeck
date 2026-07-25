@@ -7,8 +7,8 @@
       "size": 51206
     },
     "registry.yaml": {
-      "sha256": "f0a7de9bf2c0ddbbde8020c2f0622b794e3c5bb042eb586eca870cd32fb308fb",
-      "size": 6159
+      "sha256": "0649cb6f0974107e15cb39e75844532dc9dbaff33a7099d0a64cc7c248e07f54",
+      "size": 7150
     },
     "rkdeveloptool": {
       "sha256": "3caee2136551b4b849daf7e9a906813354f354f8adb61e5f092de49ec7a2e56a",
@@ -19,7 +19,7 @@
       "size": 37076
     },
     "source-distribution-manifest.json": {
-      "sha256": "9887ca04ed14b67e4e258db9668293e3c9646238c0815368f4f83c6b582a795a",
+      "sha256": "558282ba42f6dfdfd21599f5987206bb9f6370180b1653676f826559e61dc563",
       "size": 3256
     }
   },

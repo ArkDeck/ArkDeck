@@ -6,34 +6,46 @@
 - Evidence class：`platform` + `contract`
 - Executor：`agent`
 - Execution window：`2026-07-25T10:33:15Z` —
-  `2026-07-25T10:34:44Z`
+  `2026-07-25T11:16:24Z`（final exact-head rerun pending）
 - Audit base / readiness merge：
-  `0fe0db4e74a3fd642b6d60d6cbda3d12ff96a105`
+  `d063b3ca775a5e858020e21a7b4a53db31f37144`
 - TASK-BRC-002 readiness exact head：
-  `41bc8490981697805876e258f7b2666c2d704827`
+  `d5ac44f8ee96b12bc23a83a4f8c73cc21ab2f589`
+- Earlier readiness merges：
+  r2 `b56505aa2180ad8792302dba2566e20a0dd4db47`；
+  r1 `0fe0db4e74a3fd642b6d60d6cbda3d12ff96a105`
 - TASK-BRC-001 accepted decision merge：
   `4a461ba40f532500e635509455acae95376757ca`
 - TASK-BRC-001 done merge：
   `8dfde471bb876b0cd6630ba33859df270d49140e`
 
-## Environment
+## Final builder environment
 
-- macOS 26.5.2 (`25F84`) arm64
+- GitHub-hosted `macos-26-arm64` image `20260720.0258.1`
+- macOS 26.4 (`25E246`) arm64
 - Xcode 26.6 (`17F113`)
 - macOS SDK 26.5 (`25F70`)
 - Apple clang 21.0.0 (`clang-2100.1.1.101`)
 - GNU Make 3.81
 - Apple `/bin/bash` 3.2.57(1)
 - `/usr/bin/python3` 3.9.6
-- GnuPG/gpgv 2.5.21；gpgv SHA-256
-  `da2acbb7c6f54461b80d4ccc61c82dc4258a580298bf1a974ebda1ff8a504780`
+- GnuPG/gpgv 2.5.21，Homebrew formula commit
+  `4d32c765e16bde9fffd6c0194a0317ac1ea16c07`
+- hosted observed `gpg` SHA-256
+  `9d8501878158144e8db80be1454f6c69d62b8a97c21441da3b720081f917f8ac`
+- hosted observed `gpgv` SHA-256
+  `d9eb7bc783a1a0f1f39bb1f12ff0c94d7c2aac3b25aac2a7909a647d60be7bd4`
 - `SOURCE_DATE_EPOCH=1779028641`、`LC_ALL=C`、`LANG=C`、`TZ=UTC`、
   `ZERO_AR_DATE=1`、umask `022`
 
-Builder A/B 使用不同且最初不存在的 OS temporary roots；所有 receipt 中的 root、
-SDK 与 Developer directory 均替换为稳定占位符，未保存真实绝对用户路径。两者各自
-建立独立 input、GPG keyring、HOME、TMPDIR、build、cache 与 output；未共享 source
-extraction、object、archive 或 output。
+Builder A/B 是 workflow
+[run 30155933128](https://github.com/ArkDeck/ArkDeck/actions/runs/30155933128)
+中的两个独立 GitHub-hosted jobs，各自使用最初不存在的 runner temporary roots。
+所有 receipt 中的 root、SDK 与 Developer directory 均替换为稳定占位符，未保存
+真实绝对用户路径。两者各自建立独立 input、GPG keyring、HOME、TMPDIR、build、
+cache 与 output；未共享 source extraction、object、archive 或 output。本地
+macOS 26.5.2 (`25F84`) v11 build 只属于 pre-r3 exploratory evidence，其 output/
+receipt 已由上述 hosted builders 完整取代，不计入最终 `BRC-REPRO-001`。
 
 ## Pinned inputs and acquisition result
 
@@ -84,13 +96,21 @@ string、`os.system`、caller PATH/environment 或 pkg-config：
 /usr/bin/python3 scripts/rockchip_component/build.py verify-committed
   --reference <fresh-builder-a-output>
 
+gh run download 30155933128
+  --name rockchip-builder-a --dir <builder-a-download-root>
+gh run download 30155933128
+  --name rockchip-builder-b --dir <builder-b-download-root>
+gh run download 30155933128
+  --name rockchip-reproducibility --dir <comparison-download-root>
+
 scripts/check-sdd.sh
 <sdd-venv>/bin/python scripts/test_check_pr_paths.py
 ```
 
-Repo-owned tests：16/16 PASS。PR-path contract tests：24/24 PASS。SDD：
+Repo-owned tests：18/18 PASS。PR-path contract tests：24/24 PASS。SDD：
 0 error / 0 warning / 111 acceptance IDs。workflow YAML parse、committed/generated
-metadata byte comparison 与 scoped secret/privacy scan 均 PASS。
+metadata byte comparison、downloaded comparison receipt 的独立重算/cmp 与 scoped
+secret/privacy scan 均 PASS。
 
 ## Build and reproducibility result
 
@@ -104,9 +124,9 @@ linker ad-hoc signature；artifact 未执行。
 | --- | ---: | --- | --- |
 | temporary unsigned `rkdeveloptool` | 247,488 | `3caee2136551b4b849daf7e9a906813354f354f8adb61e5f092de49ec7a2e56a` | byte-identical |
 | `THIRD-PARTY-NOTICES.txt` | 51,206 | `33383934a0db7a5b833c280e0d2904405772f01cc16fea7bf26c18d84f038e2a` | byte-identical |
-| `registry.yaml` | 6,159 | `f0a7de9bf2c0ddbbde8020c2f0622b794e3c5bb042eb586eca870cd32fb308fb` | byte-identical |
+| `registry.yaml` | 7,150 | `0649cb6f0974107e15cb39e75844532dc9dbaff33a7099d0a64cc7c248e07f54` | byte-identical |
 | `sbom.spdx.json` | 37,076 | `05ae1fa74cbabe55dac1ff0bca59607b555b60fb2dbfc556e3af95671e3100ed` | byte-identical |
-| `source-distribution-manifest.json` | 3,256 | `9887ca04ed14b67e4e258db9668293e3c9646238c0815368f4f83c6b582a795a` | byte-identical |
+| `source-distribution-manifest.json` | 3,256 | `558282ba42f6dfdfd21599f5987206bb9f6370180b1653676f826559e61dc563` | byte-identical |
 
 Normalization：`forbidden`。shared build/cache/output root：`false`。artifact inspection：
 
@@ -125,19 +145,20 @@ Normalization：`forbidden`。shared build/cache/output root：`false`。artifac
 Evidence identities：
 
 - `builder-a.json` SHA-256
-  `7025847cdc182372b45773194aa4f8b2dcc176af92ecfbfde5480379f33e23e1`
+  `a909f8f01eae5bcb4fccb4416054cd981b20dbc7384f2c1b100cfe651097f21f`
 - `builder-b.json` SHA-256
-  `08cba2c8accd99b97c7eb7a7dcd6c40fcb962e6ea4011fc737d0671817b39227`
+  `280f54df014978a65680ab4e9890595ced9165ed89571841493ab73662e9895e`
 - `reproducibility.json` SHA-256
-  `972f53729827075648f6e9f520fe8b99f6335123e5f90ea651f5788c1d722aa9`
+  `1c9a3af1df792092065be99d3a37edaf6f7b286dc0c3314b55f6db06628080b8`
 
 ## Negative/fault matrix
 
-16 repo-owned tests include mutation evidence for：
+18 repo-owned tests include mutation evidence for：
 
 - archive absolute/`..`/noncanonical/backslash paths、second root、case-fold
   duplicate、symlink、hardlink、FIFO、privilege bits；
 - input size/hash drift；
+- hosted image OS/label/version drift 与 hosted `gpg/gpgv` hash disagreement；
 - caller PATH/Homebrew/config-site/pkg-config injection；
 - wrong/minimum-OS load-command shape；
 - dependency allowlist、bundled dylib 与 normalization drift；
@@ -145,19 +166,26 @@ Evidence identities：
 - identical-output mutation、same-builder identity 与 receipt path instability；
 - source audit 对 shell expansion APIs 的封闭检查。
 
-所有失败都在可信 output/metadata 形成前 fail closed。实现中用于定位的前序临时
+所有失败都在可信 output/metadata 形成前 fail closed。r1
+[run 30154865194](https://github.com/ArkDeck/ArkDeck/actions/runs/30154865194)
+在 hosted OS drift 停止；r2
+[run 30155496750](https://github.com/ArkDeck/ArkDeck/actions/runs/30155496750)
+在本地-host GnuPG binary hash 被错误用作 hosted precondition 时停止；两次均
+zero upload/build/link/launch。实现中用于定位的更早本地临时
 attempt 曾分别命中 configure conftest UUID、archive executable mode、make target、
 static version evidence、linker ad-hoc signature、Property notice delimiter、
 Python 3.9 API 与 receipt/load-command path instability；每次均 non-zero 停止，
-没有 launch binary、没有把失败 output/materialization 记为 evidence，最终 v11
-fresh roots 才产生本记录。
+没有 launch binary、没有把失败 output/materialization 记为最终 evidence。本地
+v11 fresh roots 仅用于探索；最终 evidence 来自 run 30155933128 hosted builders。
 
 ## AC verdict
 
-- `BRC-REPRO-001`：**PASS（local exact-host two-clean-builder slice）**。相同 exact
+- `BRC-REPRO-001`：**PENDING final exact-head committed-metadata audit**。相同 exact
   inputs/toolchain 在两个 fresh roots 产生 byte-identical unsigned artifact 与
   registry/SBOM/notices/source manifest；无 normalization、ambient
-  Homebrew/PATH/network/cache dependency。
+  Homebrew/PATH/network/cache dependency。run 30155933128 的 builders、A/B compare
+  与 comparison upload 均 PASS；该 run 最后只因 repo 仍为 pre-materialization
+  metadata 而在 committed audit 预期失败。下一 exact head 必须全绿后才改为 PASS。
 - `AC-JOB-005-01`：**PASS（TASK-BRC-002 build/descriptor slice）**。host orchestration
   使用 absolute executable + argument arrays；caller 路径/环境被丢弃，无 shell
   expansion。该结论不声称 runtime image/key argv。
@@ -165,8 +193,10 @@ fresh roots 才产生本记录。
   registry/receipts 固定 stage、identity、failure reason 与 recovery =
   fail build / return fresh readiness；不把 build 或 process exit 0 当成 Flash 成功。
 
-GitHub `macos-26` 两独立 runners 的 workflow run 将在 first exact implementation
-push 后追加引用；在该 run 通过前，本地 PASS 不单独闭合 implementation evidence。
+GitHub two-builder materialization run = 30155933128，exact head =
+`5e473df5f9ef85f6a1ccc2b41e5b83a8c7cb5f2f`。builder A/B 与 byte-identical
+comparison PASS，committed metadata audit 预期 FAIL；该 run 只授权本次
+materialization，不单独闭合 implementation evidence。
 
 ## Effect and privacy counters
 
@@ -193,7 +223,7 @@ credential、用户 path、device identifier 与 binary 均未入仓。
 - 本 run 不证明 signed package、Sandbox child launch、file lease、RockUSB、clean-host
   distribution 或真实 Flash；这些分别属于 TASK-BRC-003/005/006 与后续
   CHG-2026-026。
-- GitHub two-runner result 与 exact workflow URL 在首次实现 push 前尚不可存在；需在
-  本 PR 内追加并由更新后的 exact-head checks 再验证。
+- hosted materialization output 已写入声明 paths；仍需下一 exact-head workflow
+  对 committed metadata 全绿复验，再把本记录的 pending verdict 改为 PASS。
 - TASK-BRC-002 保持 `ready`；implementation/evidence 合入后必须另开 D0 status-only
   PR，TASK-BRC-003 在该 done merge 与独立 D1 readiness 前继续 `blocked`。

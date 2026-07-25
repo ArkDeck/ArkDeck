@@ -26,24 +26,52 @@
     }
   },
   "build": {
-    "commandDigest": "25d2d19cb9dd185e621581d7dd8efac891e2ae6ef8d1630e797df243fa1f3280",
+    "commandDigest": "ab83aeed822e85baec24956a3217c7be29082a9e66a08f71670a5825d5eb132a",
     "networkDuringBuild": "denied-by-sandbox-exec",
     "normalization": "forbidden",
-    "recipeGitBlob": "74a1dc39954138f66135b29180eeaae7e55ab1ed",
+    "recipeGitBlob": "fa4289b73880540b0db19d24242d039053ae8916",
     "recipePath": "openspec/integrations/rockchip/bundled-component/1.0.0/recipe.json",
-    "recipeSHA256": "5844d1131eb7a5ce7233aac7fee13ac7ff1fb9bafdc2d03accb8a5d4a622f344",
+    "recipeSHA256": "8b42fdc29d26f597f4c40506f581fd06b5df1fdc1a9cc8eac225e706ce3998f6",
     "sourceDateEpoch": 1779028641
   },
   "builder": {
     "architecture": "arm64",
     "bash": "3.2.57(1)",
     "clang": "Apple clang version 21.0.0 (clang-2100.1.1.101)",
+    "hostedImage": {
+      "imageOS": "macos26",
+      "label": "macos-26-arm64",
+      "version": "20260720.0258.1"
+    },
     "make": "GNU Make 3.81",
-    "osBuild": "25F84",
-    "osVersion": "26.5.2",
+    "osBuild": "25E246",
+    "osVersion": "26.4",
     "python": "3.9.6",
     "sdkBuild": "25F70",
     "sdkVersion": "26.5",
+    "signatureVerifier": {
+      "packageProvenance": {
+        "formula": "gnupg",
+        "formulaCommit": "4d32c765e16bde9fffd6c0194a0317ac1ea16c07",
+        "sha256": "77a293d5ac76a99d7ca1fca4d57860bd76bb25b3c334b2504fc9b7fc145f1502",
+        "tag": "arm64_tahoe",
+        "version": "2.5.21"
+      },
+      "tools": {
+        "gpg": {
+          "absolutePath": "/opt/homebrew/bin/gpg",
+          "realPath": "/opt/homebrew/Cellar/gnupg/2.5.21/bin/gpg",
+          "sha256": "9d8501878158144e8db80be1454f6c69d62b8a97c21441da3b720081f917f8ac",
+          "version": "2.5.21"
+        },
+        "gpgv": {
+          "absolutePath": "/opt/homebrew/bin/gpgv",
+          "realPath": "/opt/homebrew/Cellar/gnupg/2.5.21/bin/gpgv",
+          "sha256": "d9eb7bc783a1a0f1f39bb1f12ff0c94d7c2aac3b25aac2a7909a647d60be7bd4",
+          "version": "2.5.21"
+        }
+      }
+    },
     "xcodeBuild": "17F113",
     "xcodeVersion": "26.6"
   },
@@ -110,7 +138,7 @@
     },
     "sourceDistributionManifest": {
       "path": "source-distribution-manifest.json",
-      "sha256": "9887ca04ed14b67e4e258db9668293e3c9646238c0815368f4f83c6b582a795a"
+      "sha256": "558282ba42f6dfdfd21599f5987206bb9f6370180b1653676f826559e61dc563"
     }
   },
   "inputs": {
