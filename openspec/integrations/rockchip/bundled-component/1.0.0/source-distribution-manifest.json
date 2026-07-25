@@ -1,0 +1,83 @@
+{
+  "availabilityWindow": "max(binary public availability, five years after release issuedAt)",
+  "buildFiles": [
+    {
+      "gitBlob": "5a98b38753937083689038fdb2b83b6dc21c1177",
+      "path": "scripts/rockchip_component/README.md",
+      "sha256": "b2515cdbcc5670323527003a9178b93b5cd4f062cff3a66f40f93e2690a920f2",
+      "size": 1816
+    },
+    {
+      "gitBlob": "fc0df2ceababf83bd724e41267c205703d8c170f",
+      "path": "scripts/rockchip_component/build.py",
+      "sha256": "62d590523d9df1712d49f56482235c3db9c2cdd217e998cdb7acd5904ca806cb",
+      "size": 63819
+    },
+    {
+      "gitBlob": "71a20a6048b37ce35b7353fd1a2aa52b01d0c593",
+      "path": "scripts/rockchip_component/test_build.py",
+      "sha256": "ac546c18c70cae00befa36eb0b17d2acd563159f2968dc382d1f6c24cdc4410e",
+      "size": 16107
+    },
+    {
+      "gitBlob": "74a1dc39954138f66135b29180eeaae7e55ab1ed",
+      "path": "openspec/integrations/rockchip/bundled-component/1.0.0/recipe.json",
+      "sha256": "5844d1131eb7a5ce7233aac7fee13ac7ff1fb9bafdc2d03accb8a5d4a622f344",
+      "size": 4644
+    }
+  ],
+  "component": {
+    "architecture": "arm64",
+    "minimumMacOS": "14.0.0",
+    "name": "rkdeveloptool",
+    "version": "1.32"
+  },
+  "distributionMode": "GPL-2.0-section-3a-same-release-complete-source",
+  "generatedAssets": [
+    {
+      "path": "THIRD-PARTY-NOTICES.txt",
+      "sha256": "33383934a0db7a5b833c280e0d2904405772f01cc16fea7bf26c18d84f038e2a",
+      "size": 51206
+    },
+    {
+      "pathTemplate": "ArkDeck-rockchip-component-sbom-<appVersion>.spdx.json",
+      "sha256": "05ae1fa74cbabe55dac1ff0bca59607b555b60fb2dbfc556e3af95671e3100ed",
+      "size": 37076
+    }
+  ],
+  "manifestAlgorithm": "MANIFEST.sha256 covers every other regular file in sorted UTF-8 path order",
+  "publicReleasePaths": {
+    "binary": "ArkDeck-<appVersion>.dmg",
+    "notices": "ArkDeck-rockchip-component-notices-<appVersion>.txt",
+    "sbom": "ArkDeck-rockchip-component-sbom-<appVersion>.spdx.json",
+    "source": "ArkDeck-rockchip-component-source-<appVersion>.tar.gz"
+  },
+  "schemaVersion": "1.0.0",
+  "sourceAssets": [
+    {
+      "archivePath": "sources/rkdeveloptool-304f073752fd25c854e1bcf05d8e7f925b1f4e14.tar.gz",
+      "sha256": "389ba41af6986c16f1eeebdc1febcb0bf4b8acb7abd694d3d652e78504215843",
+      "size": 59310,
+      "url": "https://codeload.github.com/rockchip-linux/rkdeveloptool/tar.gz/304f073752fd25c854e1bcf05d8e7f925b1f4e14"
+    },
+    {
+      "archivePath": "sources/libusb-1.0.30.tar.bz2",
+      "sha256": "fea36f34f9156400209595e300840767ab1a385ede1dc7ee893015aea9c6dbaf",
+      "size": 656112,
+      "url": "https://github.com/libusb/libusb/releases/download/v1.0.30/libusb-1.0.30.tar.bz2"
+    },
+    {
+      "archivePath": "sources/libusb-1.0.30.tar.bz2.asc",
+      "sha256": "7e8916e689a399b98df1087cfc48eab33a6bfd8027291c5af00c3fbba90a2cec",
+      "size": 833,
+      "url": "https://github.com/libusb/libusb/releases/download/v1.0.30/libusb-1.0.30.tar.bz2.asc"
+    },
+    {
+      "archivePath": "sources/libusb-v1.0.30-KEYS",
+      "sha256": "52b20b8f44c0912fdbd0c7f53c14629b9b72834118dd52ecff3fec671ba50ff3",
+      "size": 7048,
+      "url": "https://raw.githubusercontent.com/libusb/libusb/v1.0.30/KEYS"
+    }
+  ],
+  "writtenOfferMode": "forbidden"
+}

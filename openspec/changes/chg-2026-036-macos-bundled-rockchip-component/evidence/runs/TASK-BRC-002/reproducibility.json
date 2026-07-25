@@ -1,0 +1,30 @@
+{
+  "builderA": "builder-a",
+  "builderB": "builder-b",
+  "comparedOutputs": {
+    "THIRD-PARTY-NOTICES.txt": {
+      "sha256": "33383934a0db7a5b833c280e0d2904405772f01cc16fea7bf26c18d84f038e2a",
+      "size": 51206
+    },
+    "registry.yaml": {
+      "sha256": "f0a7de9bf2c0ddbbde8020c2f0622b794e3c5bb042eb586eca870cd32fb308fb",
+      "size": 6159
+    },
+    "rkdeveloptool": {
+      "sha256": "3caee2136551b4b849daf7e9a906813354f354f8adb61e5f092de49ec7a2e56a",
+      "size": 247488
+    },
+    "sbom.spdx.json": {
+      "sha256": "05ae1fa74cbabe55dac1ff0bca59607b555b60fb2dbfc556e3af95671e3100ed",
+      "size": 37076
+    },
+    "source-distribution-manifest.json": {
+      "sha256": "9887ca04ed14b67e4e258db9668293e3c9646238c0815368f4f83c6b582a795a",
+      "size": 3256
+    }
+  },
+  "normalization": "forbidden",
+  "schemaVersion": "1.0.0",
+  "sharedBuildRoot": false,
+  "verdict": "PASS-byte-identical"
+}
