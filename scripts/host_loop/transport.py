@@ -24,7 +24,7 @@ Design constraints (CHG-2026-030 design §1B, §3, §4, deliverables):
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Callable, Literal, NamedTuple, Protocol, Sequence
 
 OID_RE = re.compile(r"^[0-9a-f]{40}$")
@@ -195,13 +195,26 @@ class ApiPort:
     repo: str
     _send: Sender
     route_log: list[Route] = field(default_factory=list)
-    # When set, PR mutations are confined to this number. The worker binds it
-    # from the fenced lease record, so a stale handle cannot edit somebody
-    # else's pull request even though the route shape is identical.
+    # Mutation targets. `None` means UNBOUND, and unbound refuses every
+    # mutation on that object type — the default is deny, not allow. The
+    # previous default of None-means-unrestricted put the safety boundary the
+    # wrong way round: nothing in production ever set these, so the guard was a
+    # no-op outside its own tests. Bind with bound_to_pull()/bound_to_issue()
+    # once the fenced lease has established which object this run owns.
     owned_pull: int | None = None
-    # Issue numbers this port may touch. Binding the cursor Issue explicitly is
-    # what keeps PATCH /issues/<pr> from becoming a PR side channel.
     owned_issue: int | None = None
+
+    def bound_to_pull(self, number: int) -> "ApiPort":
+        """A port permitted to mutate exactly this pull request."""
+        if not isinstance(number, int) or number < 1:
+            raise RouteViolation(f"cannot bind to pull request {number!r}")
+        return replace(self, owned_pull=int(number))
+
+    def bound_to_issue(self, number: int) -> "ApiPort":
+        """A port permitted to mutate exactly this Issue."""
+        if not isinstance(number, int) or number < 1:
+            raise RouteViolation(f"cannot bind to Issue {number!r}")
+        return replace(self, owned_issue=int(number))
 
     def _call(self, method: str, path: str, purpose: str, body: dict | None = None):
         assert_route_allowed(method, path)
@@ -288,7 +301,12 @@ class ApiPort:
         rejected = set(fields) - ALLOWED_PR_PATCH_FIELDS
         if rejected:
             raise RouteViolation(f"PR update may not set {sorted(rejected)}")
-        if self.owned_pull is not None and int(number) != self.owned_pull:
+        if self.owned_pull is None:
+            raise RouteViolation(
+                "this port is not bound to a pull request; PR mutation refused. "
+                "Bind with bound_to_pull() from the fenced lease first"
+            )
+        if int(number) != self.owned_pull:
             raise RouteViolation(
                 f"PR update confined to #{self.owned_pull}; refusing #{number}"
             )
@@ -326,7 +344,12 @@ class ApiPort:
         rejected = set(fields) - ALLOWED_ISSUE_PATCH_FIELDS
         if rejected:
             raise RouteViolation(f"Issue update may not set {sorted(rejected)}")
-        if self.owned_issue is not None and int(number) != self.owned_issue:
+        if self.owned_issue is None:
+            raise RouteViolation(
+                "this port is not bound to an Issue; Issue mutation refused. "
+                "Bind with bound_to_issue() first"
+            )
+        if int(number) != self.owned_issue:
             raise RouteViolation(
                 f"Issue update confined to #{self.owned_issue}; refusing #{number}"
             )
@@ -347,14 +370,28 @@ class ApiPort:
         here could close a PR. The target is read first and refused when it
         carries `pull_request`, which no plain Issue does.
         """
-        if self.owned_issue is not None and int(number) != self.owned_issue:
+        if self.owned_issue is None:
+            raise RouteViolation(
+                "this port is not bound to an Issue; close refused"
+            )
+        if int(number) != self.owned_issue:
             raise RouteViolation(
                 f"close confined to Issue #{self.owned_issue}; refusing #{number}"
             )
+        # Two independent read-then-act checks. Neither is structural — GitHub
+        # decides the payload shape — so they are stated as defence in depth, not
+        # as a proof that a PR can never be closed here. The binding above is the
+        # load-bearing control.
         current = self.get_issue(number)
         if current.get("pull_request") is not None:
             raise RouteViolation(
                 f"#{number} is a pull request, not an Issue; refusing to close it "
+                "through the issues endpoint"
+            )
+        url = current.get("html_url")
+        if isinstance(url, str) and "/pull/" in url:
+            raise RouteViolation(
+                f"#{number} has a pull-request html_url; refusing to close it "
                 "through the issues endpoint"
             )
         payload = self._call(

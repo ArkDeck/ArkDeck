@@ -65,8 +65,30 @@ class CursorRoundTrip(unittest.TestCase):
         original = state(candidate_task=TASK, pr_number=7, pr_head=HEAD)
         self.assertEqual(parse_machine_block(original.render()), original)
 
-    def test_render_is_canonical_and_stable(self):
-        self.assertEqual(state().render(), state().render())
+    def test_render_is_canonical_across_construction_order(self):
+        """Two states built differently but equal must render identical bytes.
+
+        Comparing one pure call with another of itself asserted nothing. This
+        pins the actual canonicality property: sorted keys, compact separators,
+        and no dependence on how the object was assembled.
+        """
+        import json
+        from dataclasses import replace as dc_replace
+
+        direct = state(candidate_task=TASK, pr_number=7, pr_head=HEAD)
+        stepwise = dc_replace(
+            dc_replace(dc_replace(state(), pr_head=HEAD), pr_number=7),
+            candidate_task=TASK)
+        self.assertEqual(direct, stepwise)
+        self.assertEqual(direct.render(), stepwise.render())
+
+        payload = direct.render().split(cursor_mod.OPEN_MARKER)[1]
+        payload = payload.split(cursor_mod.CLOSE_MARKER)[0].strip()
+        self.assertEqual(
+            payload,
+            json.dumps(json.loads(payload), sort_keys=True, separators=(",", ":")),
+            "the machine block must be canonical JSON")
+        self.assertNotIn(", ", payload, "compact separators only")
 
     def test_human_prefix_is_tolerated(self):
         body = "human notes\n\n" + state().render()
@@ -197,10 +219,17 @@ class CursorPersistence(unittest.TestCase):
     def test_changed_bytes_are_written(self):
         fake = FakeApi()
         api = api_port(fake)
-        wrote = cursor_mod.store(api, 7, state(candidate_task=TASK),
+        wrote = cursor_mod.store(api.bound_to_issue(7), 7, state(candidate_task=TASK),
                                  previous_body=state().render())
         self.assertTrue(wrote)
         self.assertTrue([c for c in fake.calls if c[0] == "PATCH"])
+
+    def test_record_lease_write_rejects_a_malformed_oid(self):
+        """A truncated or uppercase OID must not enter the cursor."""
+        for bad in ("", "deadbeef", "A" * 40, "g" * 40, "1" * 39, "1" * 41):
+            with self.subTest(bad=bad):
+                with self.assertRaises(CursorError):
+                    cursor_mod.record_lease_write(state(), lease_ref(TASK), bad, 2000)
 
     def test_lease_write_is_recorded_in_the_cursor(self):
         updated = cursor_mod.record_lease_write(state(), lease_ref(TASK), "3" * 40, 2000)
@@ -473,7 +502,13 @@ class CheckDispatch(unittest.TestCase):
         self.assertEqual(len(patches), 1, f"expected exactly one dispatch PATCH; {patches}")
         self.assertIn(worker_mod.DISPATCH_MARKER, patches[0][2]["body"])
 
-    def test_present_checks_do_not_re_fire_the_dispatch(self):
+    def test_executed_checks_do_not_re_fire_the_dispatch(self):
+        """Required checks that have genuinely executed need no dispatch.
+
+        Note the distinction the previous version missed: "present" is not
+        "executed". A skipped run named allowed-paths is present and does NOT
+        satisfy the gate; only a completed success does.
+        """
         remote = FakeRemote()
         fake = FakeApi(pulls=[pull(21)])
         fake.check_runs = [
@@ -483,8 +518,28 @@ class CheckDispatch(unittest.TestCase):
         w = self._worker(remote, fake)
         result = w.run_once([candidate()], "CHG-X", MAIN, state(), truth())
         patches = [c for c in fake.calls if c[0] == "PATCH" and "/pulls/" in c[1]]
-        self.assertEqual(patches, [], "recovery round must not re-fire the dispatch")
+        self.assertEqual(patches, [], "an executed-green head needs no dispatch")
         self.assertEqual(result.state, WorkerState.CHECKS_GREEN)
+
+    def test_a_skipped_stub_still_triggers_exactly_one_dispatch(self):
+        """The push run's skipped stub must not be mistaken for an executed check."""
+        remote = FakeRemote()
+        fake = FakeApi(pulls=[pull(21)])
+        fake.check_runs = [
+            {"name": "guard", "status": "completed", "conclusion": "success"},
+            {"name": "allowed-paths", "status": "completed", "conclusion": "skipped"},
+        ]
+        first = self._worker(remote, fake).run_once(
+            [candidate()], "CHG-X", MAIN, state(), truth())
+        self.assertEqual(first.state, WorkerState.PR_OPEN)
+        patches = [c for c in fake.calls if c[0] == "PATCH" and "/pulls/" in c[1]]
+        self.assertEqual(len(patches), 1, "the edited run must be triggered once")
+        # a later round, runs still queued: no second dispatch
+        second = self._worker(remote, fake).run_once(
+            [candidate()], "CHG-X", MAIN, state(),
+            truth(lease_oid_by_ref=dict(remote.refs)))
+        patches = [c for c in fake.calls if c[0] == "PATCH" and "/pulls/" in c[1]]
+        self.assertEqual(len(patches), 1, f"no re-fire while runs queue: {second.detail}")
 
     def test_checks_still_absent_after_dispatch_stays_prOpen(self):
         """Never call a PR green when the required checks never appeared."""
@@ -494,7 +549,7 @@ class CheckDispatch(unittest.TestCase):
         w = self._worker(remote, fake)
         result = w.run_once([candidate()], "CHG-X", MAIN, state(), truth())
         self.assertEqual(result.state, WorkerState.PR_OPEN)
-        self.assertIn("required checks still absent", result.detail)
+        self.assertIn("not yet executed successfully", result.detail)
 
     def test_dispatch_does_not_write_after_the_fence_is_lost(self):
         """Behavioural: steal the lease mid-round and assert zero PR writes.
@@ -635,6 +690,43 @@ class SelfClaimStop(unittest.TestCase):
         self.assertFalse(result.dispatched)
 
 
+class OwnerIdentityIsSingleSourced(unittest.TestCase):
+    """Worker must not carry its own copy of the lease identity."""
+
+    def test_worker_has_no_owner_run_parameter(self):
+        import inspect
+        self.assertNotIn("owner_run",
+                         inspect.signature(Worker.__init__).parameters,
+                         "a second copy of the identity could silently disagree")
+
+    def test_worker_identity_equals_the_lease_managers(self):
+        remote = FakeRemote()
+        for name in ("run-1", "host-loop/other", "whatever"):
+            mgr = LeaseManager(RefPort(remote="origin", _run=remote.run),
+                               owner_run=name, now=lambda: 1000,
+                               commit_writer=remote.write_commit)
+            w = Worker(api_port(FakeApi()), mgr, change_approved=lambda c: True,
+                       done_tasks=lambda: frozenset(),
+                       read_envelope=envelope_reader(base=MAIN),
+                       read_lease_record=remote.read_record,
+                       prepare_branch=lambda c, b: HEAD,
+                       render_body=lambda c, b, h: "ENVELOPE", now=lambda: 1000)
+            self.assertEqual(w._owner_run, name)
+
+    def test_the_legacy_helper_now_progresses_across_rounds(self):
+        """The helper 22 tests share used to deadlock at `idle` from round two."""
+        remote = FakeRemote()
+        fake = FakeApi(pulls=[pull(21)])
+        cand = candidate()
+        states = []
+        for _ in range(3):
+            w = build_worker(remote, api_port(fake))
+            states.append(w.run_once([cand], "CHG-X", MAIN, state(),
+                                     truth(lease_oid_by_ref=dict(remote.refs))).state)
+        self.assertNotIn(WorkerState.IDLE, states,
+                         f"a mismatched identity would idle forever: {states}")
+
+
 class MultiRoundLifecycle(unittest.TestCase):
     """The runtime must actually progress across `--once` rounds (finding 3).
 
@@ -659,7 +751,7 @@ class MultiRoundLifecycle(unittest.TestCase):
                 read_lease_record=remote.read_record,
                 prepare_branch=lambda c, b: HEAD,
                 render_body=lambda c, b, h: "ENVELOPE",
-                now=lambda: clock["t"], owner_run="host-loop/worker", **kw)
+                now=lambda: clock["t"], **kw)
 
         def tr():
             return Truth(main_oid=MAIN, ready_tasks=frozenset({TASK}),
@@ -764,33 +856,237 @@ class MultiRoundLifecycle(unittest.TestCase):
         self.assertIn(TASK, body)
 
 
+class AuditRegressions(unittest.TestCase):
+    """Regressions for the four findings the unbound-guard audit confirmed."""
+
+    def _rig(self, checks):
+        remote = FakeRemote()
+        fake = FakeApi(pulls=[pull(21)], check_runs=list(checks))
+        clock = {"t": 1000}
+        mgr = LeaseManager(RefPort(remote="origin", _run=remote.run),
+                           owner_run="host-loop/worker", now=lambda: clock["t"],
+                           commit_writer=remote.write_commit, ttl_seconds=900)
+        build = lambda **kw: Worker(
+            api_port(fake), mgr, change_approved=lambda c: True,
+            done_tasks=lambda: frozenset(), read_envelope=envelope_reader(base=MAIN),
+            read_lease_record=remote.read_record, prepare_branch=lambda c, b: HEAD,
+            render_body=lambda c, b, h: "ENVELOPE", now=lambda: clock["t"], **kw)
+        tr = lambda m=MAIN: Truth(main_oid=m, ready_tasks=frozenset({TASK}),
+                                  open_pr_numbers=frozenset({21}),
+                                  lease_oid_by_ref=dict(remote.refs))
+        return remote, fake, clock, mgr, build, tr
+
+    # --- A: status must be consulted, not just the conclusion ---------------
+    def test_a_required_run_still_in_progress_is_pending(self):
+        """Only a COMPLETED run can satisfy a required name.
+
+        Dropping the status check leaves a conclusion-only test, which an
+        in-flight run carrying a stale success conclusion would satisfy.
+        """
+        runs = [{"name": "guard", "status": "completed", "conclusion": "success"},
+                {"name": "allowed-paths", "status": "in_progress",
+                 "conclusion": "success"}]
+        self.assertEqual(worker_mod.required_verdicts(runs)["allowed-paths"],
+                         "pending")
+        self.assertEqual(classify_checks(runs), "pending")
+
+    def test_a_queued_required_run_is_pending_not_failed(self):
+        runs = [{"name": "guard", "status": "queued", "conclusion": None},
+                {"name": "allowed-paths", "status": "completed",
+                 "conclusion": "success"}]
+        self.assertEqual(worker_mod.required_verdicts(runs)["guard"], "pending")
+
+    # --- C: a foreign lease OID must never enter the cursor -----------------
+    def test_a_live_foreign_lease_is_not_cached_in_the_cursor(self):
+        """Caching the other owner's ref OID wedged the lane on their next renew.
+
+        The cursor has no owner field, so it cannot express "someone else's
+        lease", and rebuild_and_validate demands byte equality.
+        """
+        remote, fake, clock, _mgr, build, tr = self._rig([])
+        rival = LeaseManager(RefPort(remote="origin", _run=remote.run),
+                             owner_run="host-loop/rival", now=lambda: clock["t"],
+                             commit_writer=remote.write_commit, ttl_seconds=900)
+        rival.acquire(TASK, MAIN)
+        result = build(cursor_issue=7, cursor_body="").run_once(
+            [candidate()], "CHG-X", MAIN, state(), tr())
+        self.assertEqual(result.state, WorkerState.IDLE)
+        writes = [c for c in fake.calls if c[0] == "PATCH" and "/issues/" in c[1]]
+        self.assertTrue(writes)
+        persisted = cursor_mod.parse_machine_block(writes[-1][2]["body"])
+        self.assertIsNone(persisted.lease_oid,
+                          "a foreign lease OID must not be cached as ours")
+        self.assertIsNone(persisted.lease_ref)
+
+    def test_a_cached_foreign_oid_would_wedge_the_next_round(self):
+        """Shows why the above matters: the stale pairing fails validation."""
+        remote, _fake, clock, _mgr, _build, tr = self._rig([])
+        rival = LeaseManager(RefPort(remote="origin", _run=remote.run),
+                             owner_run="host-loop/rival", now=lambda: clock["t"],
+                             commit_writer=remote.write_commit, ttl_seconds=900)
+        held = rival.acquire(TASK, MAIN)
+        poisoned = state(candidate_task=TASK, lease_ref=lease_ref(TASK),
+                         lease_oid=held.ref_oid)
+        rival.renew(held)
+        with self.assertRaises(CursorError):
+            rebuild_and_validate(poisoned, tr())
+
+    # --- D: identity must use the lease's frozen base -----------------------
+    def test_the_round_survives_main_advancing(self):
+        """main drifts several times an hour here; identity must not follow it."""
+        remote, _fake, _clock, _mgr, build, tr = self._rig(
+            [{"name": "guard", "status": "completed", "conclusion": "success"},
+             {"name": "allowed-paths", "status": "completed", "conclusion": "skipped"}])
+        first = build().run_once([candidate()], "CHG-X", MAIN, state(), tr())
+        self.assertEqual(first.state, WorkerState.PR_OPEN)
+        advanced = "e" * 40
+        second = build().run_once([candidate()], "CHG-X", advanced, state(),
+                                  tr(advanced))
+        self.assertNotEqual(second.state, WorkerState.RECONCILE_REQUIRED,
+                            f"identity must use the frozen base: {second.detail}")
+        self.assertEqual(second.state, WorkerState.PR_OPEN)
+
+    def test_identity_base_comes_from_the_lease_record(self):
+        remote, _fake, _clock, mgr, build, tr = self._rig([])
+        build().run_once([candidate()], "CHG-X", MAIN, state(), tr())
+        record, _oid = mgr.observe(TASK, remote.read_record)
+        self.assertEqual(record.base_oid, MAIN)
+        # a later round at a different main must still resolve against MAIN
+        advanced = "e" * 40
+        build().run_once([candidate()], "CHG-X", advanced, state(), tr(advanced))
+        record2, _ = mgr.observe(TASK, remote.read_record)
+        self.assertEqual(record2.base_oid, MAIN,
+                         "the frozen base must not be rewritten by a later round")
+
+    # --- B: cursor written per lease write ---------------------------------
+    def test_every_lease_ref_oid_appears_in_the_cursor_writes(self):
+        """design §3: every lease write updates the cursor with the new ref OID.
+
+        Asserting merely "more than one write happened" was too weak — removing
+        any single call site left the others plus the terminal persist, so the
+        count stayed above one. This compares the exact sequence of OIDs the ref
+        passed through against the OIDs the cursor recorded, so dropping any one
+        call site is detected.
+        """
+        remote, fake, _clock, _mgr, build, tr = self._rig([])
+        build(cursor_issue=7, cursor_body="").run_once(
+            [candidate()], "CHG-X", MAIN, state(), tr())
+
+        ref = lease_ref(TASK)
+        pushed_oids = []
+        for argv in remote.pushes:
+            refspec = argv[-1]
+            source, _, target = refspec.partition(":")
+            if target == ref and source:
+                pushed_oids.append(source)
+        self.assertTrue(pushed_oids, "the round must have advanced the lease ref")
+
+        recorded = []
+        for call in fake.calls:
+            if call[0] == "PATCH" and "/issues/" in call[1]:
+                parsed = cursor_mod.parse_machine_block(call[2]["body"])
+                if parsed.lease_oid:
+                    recorded.append(parsed.lease_oid)
+
+        missing = [oid for oid in pushed_oids if oid not in recorded]
+        self.assertEqual(missing, [],
+                         f"lease OIDs never written to the cursor: {missing}; "
+                         f"pushed={pushed_oids} recorded={recorded}")
+        self.assertEqual(recorded[-1], remote.refs[ref],
+                         "the cursor must end level with the ref")
+
+
 class CheckClassification(unittest.TestCase):
     def test_empty_check_set_is_pending_not_green(self):
         self.assertEqual(classify_checks([]), "pending")
+        self.assertEqual(worker_mod.unsatisfied_required_checks([]),
+                         ("allowed-paths", "guard"))
 
     def test_incomplete_run_is_pending(self):
         self.assertEqual(
-            classify_checks([{"status": "in_progress", "conclusion": None}]), "pending")
+            classify_checks([{"name": "guard", "status": "in_progress",
+                              "conclusion": None}]), "pending")
 
     def test_failure_is_failed(self):
-        self.assertEqual(
-            classify_checks([{"status": "completed", "conclusion": "failure"}]), "failed")
+        self.assertEqual(classify_checks(
+            [{"name": "guard", "status": "completed", "conclusion": "failure"}]),
+            "failed")
 
-    def test_neutral_and_skipped_count_as_green(self):
-        self.assertEqual(classify_checks([
-            {"status": "completed", "conclusion": "neutral"},
-            {"status": "completed", "conclusion": "skipped"},
-        ]), "green")
+    def test_skipped_required_check_is_pending_not_green(self):
+        """The exact set sdd-guard.yml leaves on a host-loop push head.
+
+        Recorded in this change's own evidence (d2-identity-staging.md:161):
+        allowed-paths is `skipped` on push and only `success` on the `edited`
+        run. The previous assertion locked in the opposite — it asserted that a
+        skipped conclusion counts as green — which is how a head whose MECH-004
+        path contract was never evaluated could be handed back as CHECKS_GREEN.
+        """
+        push_only = [
+            {"name": "guard", "status": "completed", "conclusion": "success"},
+            {"name": "allowed-paths", "status": "completed", "conclusion": "skipped"},
+        ]
+        self.assertEqual(classify_checks(push_only), "pending")
+        self.assertEqual(worker_mod.unsatisfied_required_checks(push_only),
+                         ("allowed-paths",))
+        self.assertEqual(worker_mod.required_verdicts(push_only),
+                         {"guard": "success", "allowed-paths": "pending"})
+
+    def test_an_executed_success_on_the_edited_run_promotes_to_green(self):
+        both_runs = [
+            {"name": "guard", "status": "completed", "conclusion": "success"},
+            {"name": "allowed-paths", "status": "completed", "conclusion": "skipped"},
+            {"name": "allowed-paths", "status": "completed", "conclusion": "success"},
+        ]
+        self.assertEqual(classify_checks(both_runs), "green")
+        self.assertEqual(worker_mod.unsatisfied_required_checks(both_runs), ())
+
+    def test_neutral_on_a_required_name_is_also_pending(self):
+        runs = [{"name": "guard", "status": "completed", "conclusion": "success"},
+                {"name": "allowed-paths", "status": "completed", "conclusion": "neutral"}]
+        self.assertEqual(classify_checks(runs), "pending")
+
+    def test_skipped_on_a_NON_required_run_is_not_a_failure(self):
+        runs = [{"name": "guard", "status": "completed", "conclusion": "success"},
+                {"name": "allowed-paths", "status": "completed", "conclusion": "success"},
+                {"name": "swift", "status": "completed", "conclusion": "skipped"}]
+        self.assertEqual(classify_checks(runs), "green")
+
+    def test_a_failing_non_required_run_fails_the_round(self):
+        """Swift CI is not in REQUIRED_PR_CHECKS but must still be able to fail.
+
+        Folding unknown names into the required mapping would make them skip the
+        non-required failure scan, silently ignoring a red Swift run.
+        """
+        runs = [{"name": "guard", "status": "completed", "conclusion": "success"},
+                {"name": "allowed-paths", "status": "completed", "conclusion": "success"},
+                {"name": "swift", "status": "completed", "conclusion": "failure"}]
+        self.assertEqual(classify_checks(runs), "failed")
+        self.assertEqual(worker_mod.unsatisfied_required_checks(runs), ())
+
+    def test_a_pending_non_required_run_keeps_the_round_pending(self):
+        runs = [{"name": "guard", "status": "completed", "conclusion": "success"},
+                {"name": "allowed-paths", "status": "completed", "conclusion": "success"},
+                {"name": "swift", "status": "in_progress", "conclusion": None}]
+        self.assertEqual(classify_checks(runs), "pending")
+
+    def test_an_unknown_extra_run_cannot_contribute_greenness(self):
+        runs = [{"name": "guard", "status": "completed", "conclusion": "success"},
+                {"name": "some-other-check", "status": "completed",
+                 "conclusion": "success"}]
+        self.assertEqual(worker_mod.unsatisfied_required_checks(runs),
+                         ("allowed-paths",))
+        self.assertEqual(classify_checks(runs), "pending")
 
     def test_mixed_pending_wins_over_success(self):
         self.assertEqual(classify_checks([
-            {"status": "completed", "conclusion": "success"},
-            {"status": "queued", "conclusion": None},
+            {"name": "guard", "status": "completed", "conclusion": "success"},
+            {"name": "allowed-paths", "status": "queued", "conclusion": None},
         ]), "pending")
 
     def test_action_required_is_failed(self):
         self.assertEqual(classify_checks(
-            [{"status": "completed", "conclusion": "action_required"}]), "failed")
+            [{"name": "guard", "status": "completed",
+              "conclusion": "action_required"}]), "failed")
 
 
 if __name__ == "__main__":

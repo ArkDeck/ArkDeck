@@ -198,9 +198,9 @@ class AdapterNegativeProof(unittest.TestCase):
         port.list_open_pulls_for_head(task_branch(TASK).removeprefix("refs/heads/"))
         port.get_pull(5)
         port.create_pull(head="agent/host-loop/tasks/X", base="main", title="t", body="b")
-        port.update_pull(5, title="t2")
+        port.bound_to_pull(5).update_pull(5, title="t2")
         port.create_issue(title="t", body="b")
-        port.update_issue(7, body="b")
+        port.bound_to_issue(7).update_issue(7, body="b")
         self.assertEqual(transport_mod.forbidden_capability_count(port), 0)
         self.assertTrue(transport_mod.route_inventory(port))
 
@@ -223,7 +223,10 @@ class AdapterNegativeProof(unittest.TestCase):
         # pull requests, so a state change here was a PR-close bypass.
         with self.assertRaises(RouteViolation):
             port.update_issue(7, state="closed")
-        port.update_issue(7, body="machine block")
+        # And an unbound port refuses outright; binding is what permits the write.
+        with self.assertRaisesRegex(RouteViolation, r"not bound to an Issue"):
+            port.update_issue(7, body="machine block")
+        port.bound_to_issue(7).update_issue(7, body="machine block")
 
     def test_pr_create_is_restricted_to_main(self):
         port = api_port(FakeApi())
@@ -308,7 +311,8 @@ class OwnershipAndBypass(unittest.TestCase):
                 if method == "GET" and "/issues/" in path:
                     return 200, {"number": 524, "pull_request": {"url": "x"}}
                 return super().__call__(method, path, body)
-        port = ApiPort(owner="ArkDeck", repo="ArkDeck", _send=PRIssue())
+        port = ApiPort(owner="ArkDeck", repo="ArkDeck", _send=PRIssue()
+                       ).bound_to_issue(524)
         with self.assertRaisesRegex(RouteViolation, r"is a pull request"):
             port.close_issue(524)
 
@@ -318,8 +322,50 @@ class OwnershipAndBypass(unittest.TestCase):
                 if method == "GET" and "/issues/" in path:
                     return 200, {"number": 7, "state": "open"}
                 return super().__call__(method, path, body)
-        port = ApiPort(owner="ArkDeck", repo="ArkDeck", _send=RealIssue())
+        port = ApiPort(owner="ArkDeck", repo="ArkDeck", _send=RealIssue()
+                       ).bound_to_issue(7)
         self.assertTrue(port.close_issue(7))
+
+    def test_an_unbound_port_refuses_every_mutation(self):
+        """Deny by default: the previous None-means-unrestricted default made
+        this guard a no-op everywhere except its own tests."""
+        port = self._port()
+        self.assertIsNone(port.owned_pull)
+        self.assertIsNone(port.owned_issue)
+        with self.assertRaisesRegex(RouteViolation, r"not bound to a pull request"):
+            port.update_pull(999, body="somebody else's PR")
+        with self.assertRaisesRegex(RouteViolation, r"not bound to an Issue"):
+            port.update_issue(999, body="x")
+        with self.assertRaisesRegex(RouteViolation, r"not bound to an Issue"):
+            port.close_issue(999)
+
+    def test_binding_rejects_a_nonsense_number(self):
+        for bad in (0, -1, None, "21", 3.0):
+            with self.subTest(bad=bad):
+                with self.assertRaises(RouteViolation):
+                    self._port().bound_to_pull(bad)
+                with self.assertRaises(RouteViolation):
+                    self._port().bound_to_issue(bad)
+
+    def test_a_bound_port_shares_the_route_log(self):
+        """Binding must not fork the inventory, or the negative proof loses calls."""
+        port = self._port()
+        bound = port.bound_to_pull(21)
+        self.assertIs(bound.route_log, port.route_log)
+        bound.update_pull(21, body="x")
+        self.assertTrue(port.route_log, "the parent must see the bound port's call")
+
+    def test_close_issue_refuses_a_pull_html_url(self):
+        class PullUrl(FakeApi):
+            def __call__(self, method, path, body):
+                if method == "GET" and "/issues/" in path:
+                    return 200, {"number": 9, "state": "open",
+                                 "html_url": "https://github.com/A/R/pull/9"}
+                return super().__call__(method, path, body)
+        port = ApiPort(owner="ArkDeck", repo="ArkDeck", _send=PullUrl()
+                       ).bound_to_issue(9)
+        with self.assertRaisesRegex(RouteViolation, r"pull-request html_url"):
+            port.close_issue(9)
 
     def test_pr_update_is_confined_to_the_owned_number(self):
         port = self._port(owned_pull=21)

@@ -171,6 +171,18 @@ class LeaseManager:
         self._write_commit = commit_writer
         self._ttl = ttl_seconds
 
+    @property
+    def owner_run(self) -> str:
+        """The single source of truth for this worker's lease identity.
+
+        Worker reads it from here instead of carrying its own copy: two
+        independently-supplied strings that merely had to be equal produced a
+        silent deadlock when they were not — round one acquired the lease and
+        every later round reported `idle` ("held by a live owner") forever,
+        which is not an alarming state.
+        """
+        return self._owner_run
+
     # -- observation ------------------------------------------------------
     def observe(self, task_id: str, read_record: Callable[[str], str]) -> tuple[LeaseRecord, str] | None:
         """Return (record, ref_oid) or None when the lease is absent."""

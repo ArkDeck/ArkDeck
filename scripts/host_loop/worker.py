@@ -137,7 +137,6 @@ class Worker:
         render_body: Callable[[TaskCandidate, str, str], str],
         now: Callable[[], int],
         dispatch_token: Callable[[], str] | None = None,
-        owner_run: str = "host-loop/worker",
         cursor_issue: int | None = None,
         cursor_body: str | None = None,
     ) -> None:
@@ -155,7 +154,10 @@ class Worker:
         # runs. The counter guarantees a distinct body per dispatch.
         self._dispatch_counter = 0
         self._dispatch_token = dispatch_token or self._default_dispatch_token
-        self._owner_run = owner_run
+        # Derived, never supplied: the lease manager owns this identity. A
+        # second independently-passed copy could disagree with it and the
+        # mismatch was silent.
+        self._owner_run = leases.owner_run
         self._cursor_issue = cursor_issue
         self._cursor_body = cursor_body
 
@@ -223,7 +225,10 @@ class Worker:
                 "rendered envelope already contains a dispatch marker; refusing "
                 "to nest markers"
             )
-        self._api.update_pull(number, body=f"{body}\n{marker}\n")
+        # Bind to exactly this PR before mutating it. Without the binding the
+        # port refuses, so the ownership guard is now on the production path
+        # rather than only in its own tests.
+        self._api.bound_to_pull(number).update_pull(number, body=f"{body}\n{marker}\n")
 
     def run_once(
         self,
@@ -275,16 +280,23 @@ class Worker:
             self._persist_cursor(cursor_state, main_oid, None, None, None)
             return RoundResult(state, None, reason, outcome=outcome)
 
+        # --- lease acquisition / adoption / takeover -------------------------
+        # The lease record is the single source of truth for the FROZEN base OID.
+        # Rebuilding PR identity from whatever main happens to be now made the
+        # worker stop recognising its own PR the moment main advanced — which in
+        # this repository happens several times an hour — leaving the lane in
+        # permanent reconcileRequired with create_attempted already set.
+        observed = self._leases.observe(candidate.task_id, self._read_lease_record)
+        frozen_base = main_oid if observed is None else observed[0].base_oid
         identity = PRIdentity(
             task_id=candidate.task_id,
-            base_oid=main_oid,
+            base_oid=frozen_base,
             head_branch=task_branch(candidate.task_id).removeprefix("refs/heads/"),
         )
-
-        # --- lease acquisition / adoption / takeover -------------------------
-        observed = self._leases.observe(candidate.task_id, self._read_lease_record)
         if observed is None:
             held = self._leases.acquire(candidate.task_id, main_oid)
+            cursor_state = self._after_lease_write(
+                cursor_state, main_oid, candidate.task_id, held)
         else:
             record, ref_oid = observed
             if record.owner_run == self._owner_run:
@@ -292,9 +304,16 @@ class Worker:
                 # bumping the fence; this is what makes round two progress
                 # instead of colliding with the ref round one created.
                 held = self._leases.renew(HeldLease(record, ref_oid))
+                cursor_state = self._after_lease_write(
+                    cursor_state, main_oid, candidate.task_id, held)
             elif not self._leases.is_expired(record):
+                # Record that we hold nothing. Persisting the FOREIGN ref OID
+                # wedged the lane: the cursor has no owner field, so it could not
+                # express "someone else's lease", and rebuild_and_validate demands
+                # byte equality — the moment that owner renewed, every later round
+                # failed cursor validation instead of simply yielding.
                 self._persist_cursor(cursor_state, main_oid, candidate.task_id,
-                                     lease_ref(candidate.task_id), ref_oid)
+                                     None, None)
                 return RoundResult(
                     WorkerState.IDLE, candidate.task_id,
                     f"lease for {candidate.task_id} is held by live owner "
@@ -311,8 +330,10 @@ class Worker:
                     pr_identity_requeried=True,
                     read_record=self._read_lease_record,
                 )
+                cursor_state = self._after_lease_write(
+                    cursor_state, main_oid, candidate.task_id, held)
 
-        head_oid = self._prepare_branch(candidate, main_oid)
+        head_oid = self._prepare_branch(candidate, frozen_base)
 
         self._leases.assert_still_held(held, self._read_lease_record)
         resolution = resolve_pull(
@@ -325,10 +346,15 @@ class Worker:
             assert pull is not None
             if held.record.pr_number != int(pull["number"]):
                 held = self._leases.attach_pull(held, int(pull["number"]))
+                cursor_state = self._after_lease_write(
+                    cursor_state, main_oid, candidate.task_id, held,
+                    pr_number=int(pull["number"]))
         else:
             held = self._leases.mark_create_attempted(held)
+            cursor_state = self._after_lease_write(
+                cursor_state, main_oid, candidate.task_id, held)
             self._leases.assert_still_held(held, self._read_lease_record)
-            body = self._render_body(candidate, main_oid, head_oid)
+            body = self._render_body(candidate, frozen_base, head_oid)
             self._api.create_pull(
                 head=identity.head_branch, base="main",
                 title=f"{candidate.task_id}: host-loop dispatch", body=body,
@@ -339,41 +365,42 @@ class Worker:
                 self._api, identity, self._read_envelope, expected_head_oid=head_oid
             )
             held = self._leases.attach_pull(held, int(pull["number"]))
+            cursor_state = self._after_lease_write(
+                cursor_state, main_oid, candidate.task_id, held,
+                pr_number=int(pull["number"]))
 
         number = int(pull["number"])
 
         # --- required checks, guarded by a persisted dispatch fact -----------
+        # --- required checks -------------------------------------------------
+        # Gated on the DURABLE fact, not on a name being absent. Absence was the
+        # wrong trigger: the push run already publishes a `skipped` run named
+        # `allowed-paths`, so nothing ever looked absent and the
+        # `pull_request: edited` run that actually executes allowed-paths never
+        # fired in production.
         checks = self._api.list_check_runs(head_oid)
-        if missing_required_checks(checks):
-            if held.record.checks_dispatched_head == head_oid:
-                # Already dispatched for this exact head. check-run objects lag
-                # the `edited` event while workflows queue, so re-firing here
-                # would emit a body update on every round until they surface.
-                self._persist_cursor(cursor_state, main_oid, candidate.task_id,
-                                     lease_ref(candidate.task_id), held.ref_oid,
-                                     pr_number=number, pr_head=head_oid)
-                return RoundResult(
-                    WorkerState.PR_OPEN, candidate.task_id,
-                    "check dispatch already issued for this head; waiting for the "
-                    "check runs to appear", number, outcome=outcome,
-                )
+        if (unsatisfied_required_checks(checks)
+                and held.record.checks_dispatched_head != head_oid):
             self._leases.assert_still_held(held, self._read_lease_record)
-            self._dispatch_checks(number, candidate, main_oid, head_oid)
+            self._dispatch_checks(number, candidate, frozen_base, head_oid)
             held = self._leases.record_dispatch(held, head_oid)
+            cursor_state = self._after_lease_write(
+                cursor_state, main_oid, candidate.task_id, held,
+                pr_number=number, pr_head=head_oid)
             checks = self._api.list_check_runs(head_oid)
 
         self._persist_cursor(cursor_state, main_oid, candidate.task_id,
                              lease_ref(candidate.task_id), held.ref_oid,
                              pr_number=number, pr_head=head_oid)
 
-        still_missing = missing_required_checks(checks)
-        if still_missing:
+        verdict = classify_checks(checks)
+        unsatisfied = unsatisfied_required_checks(checks)
+        if verdict != "failed" and unsatisfied:
             return RoundResult(
                 WorkerState.PR_OPEN, candidate.task_id,
-                f"PR open; required checks still absent after dispatch: "
-                f"{list(still_missing)}", number, outcome=outcome,
+                f"PR open; required checks not yet executed successfully: "
+                f"{list(unsatisfied)}", number, outcome=outcome,
             )
-        verdict = classify_checks(checks)
         if verdict == "pending":
             return RoundResult(WorkerState.PR_OPEN, candidate.task_id,
                                "PR open; checks not yet terminal", number,
@@ -391,6 +418,24 @@ class Worker:
             number, outcome=outcome,
         )
 
+    def _after_lease_write(self, cursor_state, main_oid, task_id, held,
+                           *, pr_number=None, pr_head=None):
+        """design §3: every lease write updates the cursor with the new ref OID.
+
+        Persisting only at round exit left the cursor behind the ref whenever a
+        round aborted mid-way, and since rebuild_and_validate runs first and
+        demands equality, the lane then wedged permanently. store() skips a
+        no-op write, so calling this after each advance is cheap.
+        """
+        from .cursor import record_lease_write, store
+
+        nxt = record_lease_write(cursor_state, lease_ref(held.record.task_id),
+                                 held.ref_oid, self._now())
+        nxt = self._persist_cursor(nxt, main_oid, task_id,
+                                   lease_ref(held.record.task_id), held.ref_oid,
+                                   pr_number=pr_number, pr_head=pr_head)
+        return nxt
+
     def _persist_cursor(self, cursor_state, main_oid, task_id, lease_ref_name,
                         lease_oid, *, pr_number=None, pr_head=None):
         """Write the reconciled cursor back. store() skips a no-op write."""
@@ -402,30 +447,71 @@ class Worker:
             pr_number=pr_number, pr_head=pr_head, observed_at=self._now(),
         )
         if self._cursor_issue is not None:
-            store(self._api, self._cursor_issue, nxt,
-                  previous_body=self._cursor_body or "")
+            store(self._api.bound_to_issue(self._cursor_issue), self._cursor_issue,
+                  nxt, previous_body=self._cursor_body or "")
         return nxt
 
 
-def missing_required_checks(check_runs: list[dict]) -> tuple[str, ...]:
-    """Required check names absent from the head. Empty means all present."""
-    present = {run.get("name") for run in check_runs}
-    return tuple(name for name in REQUIRED_PR_CHECKS if name not in present)
+# Conclusions meaning "this check did not execute". On a REQUIRED name they must
+# never count as success: sdd-guard.yml publishes an `allowed-paths` run with
+# conclusion `skipped` on every push to agent/**, so accepting them returned
+# CHECKS_GREEN on a head whose MECH-004 path contract was never evaluated. And
+# because presence was decided by name alone, the same stub also meant the check
+# dispatch never fired in production at all.
+NON_EXECUTED_CONCLUSIONS = frozenset({"skipped", "neutral", None})
+
+
+def required_verdicts(check_runs: list[dict]) -> dict[str, str]:
+    """Single source of truth for required-check state.
+
+    One of "success" | "failed" | "pending" per name in REQUIRED_PR_CHECKS,
+    seeded to "pending" so an absent name — or a name whose only run did not
+    execute — cannot read as satisfied. Several runs may share a name (the push
+    run and the `pull_request` run both publish `guard`), and an executed
+    success anywhere wins over a non-executed sibling.
+    """
+    verdicts = {name: "pending" for name in REQUIRED_PR_CHECKS}
+    for run in check_runs:
+        name = run.get("name")
+        if name not in verdicts:
+            continue
+        if run.get("status") != "completed":
+            continue
+        conclusion = run.get("conclusion")
+        if conclusion in NON_EXECUTED_CONCLUSIONS:
+            continue
+        if conclusion == "success":
+            verdicts[name] = "success"
+        elif verdicts[name] != "success":
+            verdicts[name] = "failed"
+    return verdicts
+
+
+def unsatisfied_required_checks(check_runs: list[dict]) -> tuple[str, ...]:
+    """Required names that have not yet executed successfully."""
+    return tuple(sorted(
+        name for name, verdict in required_verdicts(check_runs).items()
+        if verdict != "success"
+    ))
 
 
 def classify_checks(check_runs: list[dict]) -> str:
-    """'green' | 'pending' | 'failed'. An empty set is pending, never green.
+    """'green' | 'pending' | 'failed', derived from that one mapping.
 
-    An absent check set must not read as success: the reserved-namespace
-    `pull_request` coverage gap (F1) means "no checks" is exactly the state a
-    misconfigured lane produces.
+    Green requires every REQUIRED name to have executed successfully. Runs
+    outside REQUIRED_PR_CHECKS (Swift CI, say) can still fail the round, but a
+    skipped or neutral conclusion on a non-required run is not a failure.
     """
-    if not check_runs:
-        return "pending"
+    verdicts = required_verdicts(check_runs)
+    if "failed" in verdicts.values():
+        return "failed"
     for run in check_runs:
+        if run.get("name") in verdicts:
+            continue
         if run.get("status") != "completed":
             return "pending"
-    for run in check_runs:
         if run.get("conclusion") not in ("success", "neutral", "skipped"):
             return "failed"
+    if any(v == "pending" for v in verdicts.values()):
+        return "pending"
     return "green"
