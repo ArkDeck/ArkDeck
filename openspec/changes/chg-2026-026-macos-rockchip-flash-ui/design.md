@@ -2,14 +2,16 @@
 
 ## Context and constraints
 
-- Proposal revision：r8；r1-r7 已由维护者 merge。r8 只处理 PR #512 暴露的 read-only
-  security-scoped bookmark blocker，并新增 TASK-RKFUI-001F host-only bookmark creation
-  option remediation。r8 不批准真实 external-tool/device rerun或产品 broker/helper 架构。
-- r8 不改变 typed operation、target/firmware/transport、discovery binary
+- Proposal revision：r9；r1-r8 已由维护者 merge。r9 接受 001F read-only bookmark
+  metadata PASS，但不把它推断为 v1 product-entitlement external-process PASS；新增
+  TASK-RKFUI-001G，以 inert external fixture 验证 exact product six-entitlement +
+  read-only bookmark 的 canonical child-launch boundary。
+- r9 不改变 typed operation、target/firmware/transport、discovery binary
   version/hash/upstream、binding、window、maxRuns、rebind 或 Safety 设计；HDC server 仍
   必须是 pre-existing external same-UID pinned executable，Agent server lifecycle mutation
   为 0。pre-existing RockUSB candidate 是独立 physical/identity gate，不因 provenance
-  closure 被过滤或放行。
+  closure 被过滤或放行。r9 不修改 App/ADR/platform/registry/product code，也不运行真实
+  tool、USB 或 device command。
 - Core baseline：`CORE-2.0.0`，叠加实现开始时已批准并适用的 scoped delta。
 - Related specs：flashing、desktop UX、device targeting、workflow journal/recovery、
   session/artifact/storage、macOS platform profile。
@@ -31,7 +33,7 @@
 | REQ-DEV-001/002/003/006/008 | durable HDC original binding + typed mode transition + Core rebind + exclusive mutation lane | contract/fault + E1 characterization |
 | REQ-FLASH-012/013 | semantic marker parser + reconnect postflight + RecoveryGuide | fake success/failure + real hardware |
 | REQ-UX-001、REQ-I18N-001 | Flash page + global Job card + zh-Hans/en strings | XCUITest + localization lint |
-| REQ-UX-007 | DeviceAccessAdvisor presentation; zero elevation/install calls | signed Sandbox E0 + r7/r8 read-only selection characterization |
+| REQ-UX-007 | DeviceAccessAdvisor presentation; zero elevation/install calls | signed Sandbox E0 + r7/r8 bookmark + r9 external-fixture launch characterization |
 
 ## Architecture and data flow
 
@@ -77,6 +79,9 @@ process executor、storage/power/binding/authorization ports；fixture compositi
    其结果不替代真实 pinned tool 或产品 App evidence。
    r8 同样不把 #512 bookmark failure 归类为真实 tool failure；001F 仅在同一 disposable
    read-only candidate 上验证 Apple-documented bookmark creation option。
+   r9 把产品选择边界收紧为 canonical regular file，不允许 symlink/alias product
+   selection；001G 先以 wrong-hash control 验证 exact product entitlement 下 metadata
+   不变，再允许一个 task-local compiled-hash inert fixture 进入一次固定 child launch。
 2. r6 loader-transition probe 从受保护 `main` 的 registry 读取 typed
    `sourceProvenance`。该对象把 exact `bbd7bdc0…9923`、`304f0737…`、source acceptance
    `PR#445@cbad982…` 和 reviewed evidence path/SHA-256 绑定为一个不可分 tuple。probe
@@ -162,6 +167,47 @@ network/mutation counters 为 0。
 001F PASS 仍只是一条 host-only platform evidence：它不证明 bookmark extension 可传给
 其他进程、不证明真实 external executable 可启动或访问 USB，也不决定 main App
 read-write output entitlement 与产品 broker/helper。
+
+## r9 v1 product-entitlement external-fixture launch characterization
+
+v1 分发决定与 current App 都固定以下六项 entitlement：
+
+```text
+com.apple.security.app-sandbox
+com.apple.security.device.serial
+com.apple.security.device.usb
+com.apple.security.files.bookmarks.app-scope
+com.apple.security.files.user-selected.read-write
+com.apple.security.network.client
+```
+
+001F 的 `user-selected.read-only` Probe 因而不是 product-shape launch evidence。Apple
+macOS App Sandbox 文档也说明 user-selected file entitlement 不能被假定为运行 App
+bundle/container/app-group 外程序的授权。001G 以二阶段 closed gate 验证这一边界，不先
+引入 helper/broker、bundle/copy 或真实 tool：
+
+1. **Product-shape metadata control**：fresh App 使用 exact product six entitlements 与
+   001F 的 creation/resolution options，picker 内只有一个 canonical regular-file fixture。
+   App 仍 pin production tool hash，所以必须以 `executableHashMismatch` 在 Process 前
+   停止。selection/bookmark/scope、App/host quarantine absent 与 pre/post bytes/CDHash/
+   signature unchanged 全部 PASS，才可进入第二阶段。
+2. **Task-local inert launch**：fresh fixture 从 reviewable `return 0` source 构建，
+   deterministic/no UUID、ad-hoc signed、quarantine absent；fresh App 在编译期绑定该 exact
+   fixture hash，运行时不接受 caller hash/path/argv/environment。选择同样只允许 canonical
+   regular file，bookmark options 不变，唯一 child argv 固定为 `["ld"]`。
+
+launch receipt 必须显示 `childLaunchAttempted=true`、`termination=exited`、
+`exitCode=0`、stdout/stderr size 0，且 target pre/post metadata 不变。fixture linked
+libraries/imported symbols 必须排除 libusb、IOKit、network 与 shell；selected fixture
+process/fixture-`ld` 计数各为 1，真实 `rkdeveloptool`、USB/HDC/device/network/E1/E2/
+mutation/destructive/privilege/helper/install/system/xattr-write 计数全部为 0。
+
+Stage A failure 时 Stage B 不构建/不运行。Stage B launch error、quarantine transition、
+非空 output、timeout/nonzero exit 或 metadata drift 都是有效 fail-closed platform
+evidence；candidate implementation 不保留，也不自动尝试 symlink、entitlement 扩权、
+copy 或 helper。全 PASS 也只证明 exact host tuple 的 inert external process，不证明真实
+tool/USB 或 product delivery。后续仍需独立 D1 + fresh exact non-quarantined artifact
+批准真实 E0。
 
 ## Enter Loader routes and rebinding
 
@@ -273,6 +319,10 @@ candidate 均不开始 destructive step。
   001F 在 #512 read-only candidate 上把 bookmark creation options 精确扩为
   `[.withSecurityScope, .securityScopeAllowOnlyReadAccess]`，resolution options 保持不变；
   stage-specific bookmark diagnostic 只增加 sanitized observation，不增加持久 contract。
+- r9 仍不修改 registry、production adapter、schema、ADR、platform profile 或 real-tool
+  identity。001G 的 task-local fixture hash 只存在于 host-only build/receipt closure，
+  必须明确 `pinnedRegistryHashMatched=false`，不得写入 Rockchip discovery registry、
+  Provider/Profile 或任何产品 tool allowlist。
 - r2 discovery identity revision 只修改 read-only `ld` registry family，不修改
   `RockchipFlashProfile.pinnedToolchainFingerprint`、destructive authorization 或既有硬件
   support matrix。后续 execute 若要采用新 build，必须另行 readiness/change 并重新验证
@@ -292,6 +342,10 @@ candidate 均不开始 destructive step。
   App/host quarantine、wrong-hash 或 zero-counter gate 失败：remediation blocked；不保留
   entitlement/API change，不回退 implicit-only access，不扩大 entitlement，也不接触真实
   tool/device。symlink lexical URL 未保留本身只作 observation，不单独构成失败。
+- 001G Stage A 任何 selection/bookmark/canonical-target/quarantine/wrong-hash/metadata
+  gate 失败：Stage B dispatch 0。Stage B 任何 hash/signature/quarantine、fixed argv、
+  exited/0/empty-output 或 pre/post metadata gate 失败：characterization blocked；不重试、
+  不切 symlink、不改 entitlement、不复制/下载/重建真实工具，也不进入 USB/device。
 - loader-transition source provenance missing/unknown kind、tuple/evidence drift：在
   `ld`/USB/binding/intent 前 fail closed；不回退到 executable parent HEAD，不通过相同
   version/hash 之外的第二 pin，也不在线获取或构建 replacement。
@@ -312,13 +366,14 @@ candidate 均不开始 destructive step。
 
 - 禁止 `sudo`、shell、AppleScript、Authorization Services、helper/driver 自动安装、ACL/group/
   rule 修改、quarantine 清除和 tool 自动下载。
-- r7/r8 还禁止 `LSFileQuarantineEnabled`/excluded-path 配置、
+- r7/r8/r9 还禁止 `LSFileQuarantineEnabled`/excluded-path 配置、
   `com.apple.security.files.user-selected.executable`、fixture/pinned-tool xattr 写入、
   复制/重建 pinned artifact 规避 assessment，以及修改
-  `ArkDeckApp/ArkDeckApp.entitlements`。001E 的 disposable fixture 可在 private temp
-  目录确定性构建并 ad-hoc sign，001F 可精确复用该 source/build shape；fixture 永不执行、
-  永不冒充 registry tool。document-scope、implicit-only bookmark 与 raw bookmark bytes
-  persistence 也不属于 001F。
+  `ArkDeckApp/ArkDeckApp.entitlements`。001E/001F 的 disposable fixture 可在 private temp
+  目录确定性构建并 ad-hoc sign；001G Stage A 仍禁止 fixture 执行，Stage B 只允许同类
+  `return 0` fixture 的一次 fixed-argv launch，且永不冒充 registry tool。
+  document-scope、implicit-only bookmark 与 raw bookmark bytes persistence 也不属于
+  001F/001G。
 - probe runtime 禁止对 executable parent/ancestor 执行 Git source discovery。source
   attribution 只来自 reviewed registry + exact evidence digest；actual executable bytes 和
   platform trust 仍在本地独立重核。
@@ -361,6 +416,17 @@ candidate 均不开始 destructive step。
 - **加入 `.securityScopeAllowOnlyReadAccess`**：采用为 001F。它是 Apple 对只读
   security-scoped bookmark 明示的 creation option，且不扩大 entitlement 或进入 Process；
   仍须用两个 wrong-hash run 证伪/证实，不能预判成功。
+- **从 001F 直接运行真实 `rkdeveloptool`**：拒绝。001F 使用 read-only entitlement 且
+  child launch 0，与 ADR-0002 的 read-write product shape 和 external-process boundary
+  都不相同；current exact real artifact 也已 quarantined。
+- **立即选择 helper/XPC/broker 或 bundled/copied tool**：本轮拒绝。Apple 文档给出明确
+  风险信号，但现有仓库同时有历史 fake-child/selection 分离证据；先用 001G 的 canonical
+  inert fixture 取得二值 product-shape launch fact。失败后再以新 ADR 比较 broker、
+  reviewed bundled component、plan-only 或分发调整，不能在 characterization 中预选。
+- **canonical inert external-fixture 两阶段 characterization**：采用为 001G。先用
+  wrong-hash control 证明 product entitlement selection 不改写 metadata，再在另一个 fresh
+  App 中只放行编译期绑定的 `return 0` fixture。它最小化权限与副作用，同时直接回答
+  real-tool E0 readiness 前缺失的 child-launch 问题。
 - **删除 app-scope bookmark，依赖 picker implicit scope**：本轮拒绝。它放弃产品所需的
   persistent selection seam，也无法回答 bookmark round-trip blocker；若产品选择
   session-only access，须另起 D1 ADR。
@@ -369,6 +435,7 @@ candidate 均不开始 destructive step。
 - **先交付 plan-only UI**：接受为分阶段交付；execute 仍以 E0 non-elevated USB access 和
   `REQ-FLASH-015` 审查为硬前置，不把 plan-only 宣称为一键真机刷机完成。
 
-若 signed Sandbox 内直接运行外部 `rkdeveloptool` 需要新的 helper/entitlement/分发决策，
-必须新增 ADR/change。r8 只批准 read-only bookmark option host characterization，不隐含
-产品架构或真实 external-tool 执行授权。
+若 001G 不能在 signed Sandbox product shape 下运行 inert external fixture，新的
+helper/entitlement/bundled-component/分发决策必须新增 ADR/change；不得直接重试真实工具。
+若 001G PASS，真实 `rkdeveloptool`/USB 也仍须后续独立 D1 readiness。r9 不隐含产品架构、
+真实 external-tool、USB/device 或 destructive 执行授权。
