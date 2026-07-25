@@ -723,16 +723,197 @@
 
 ## TASK-BRC-003 — 闭合 nested component 打包、签名与公证
 
-- Status:blocked
+- Status:blocked（r1 D1 blocked-readiness；本记录只固定 package/sign/notary
+  contract 并如实记录 release environment 与 unsigned artifact handoff 缺口。合入
+  不构成 `ready`，不得开始 implementation/evidence。维护者完成下述 D2
+  configuration 后，必须另开 fresh D1 readiness 并经 review/merge，才可开工。）
+- Readiness review:
+  - **Approval/dependency gate:satisfied。**TASK-BRC-002 implementation/evidence
+    #542 exact head `4d02b9945ecfe2db1e8af7adc98251a1b0ef9589` 经 `lvye` 于
+    `2026-07-25T11:58:55Z` APPROVED，并以
+    `182757cdc9ca191f2ce0a2d61dfce78440c74cd9` 合入 protected `main`；
+    D0 #545 exact head `2ecf6d896e581a6ee1e9eed10b9048487e952638` 经 `lvye` 于
+    `2026-07-25T12:10:27Z` APPROVED，并以
+    `e9848ba274123bea46b98e39cbf989bd93dfc225` 于
+    `2026-07-25T12:10:35Z` 合入。两条 merge 及 TASK-BRC-001
+    decision/done ancestry 都是本 audit base 的祖先；dependency done 只允许本次
+    D1 勘察，不替代 package、credential 或 notary 判断。
+  - **Audit base/input pins:closed for review。**audit base =
+    `e9848ba274123bea46b98e39cbf989bd93dfc225`。fresh D1 必须从本
+    blocked-readiness merge 重新核验全部非自载体 pin；任一 artifact、registry、
+    App/entitlement、release policy 或 Apple tool contract 漂移都保持
+    `blocked`：
+
+    ```yaml pins
+    - artifact: TASK-BRC-002 implementation/evidence merge
+      commit: 182757cdc9ca191f2ce0a2d61dfce78440c74cd9
+    - artifact: TASK-BRC-002 done merge / TASK-BRC-003 audit base
+      commit: e9848ba274123bea46b98e39cbf989bd93dfc225
+    - path: openspec/integrations/rockchip/bundled-component/1.0.0/registry.yaml
+      blob: 505122327e877900d7fdb2b908cf6914f207b70f
+    - path: openspec/integrations/rockchip/bundled-component/1.0.0/recipe.json
+      blob: fa4289b73880540b0db19d24242d039053ae8916
+    - path: openspec/integrations/rockchip/bundled-component/1.0.0/sbom.spdx.json
+      blob: e66e3d7f22a4d2079e59edcc51c2682650362689
+    - path: openspec/integrations/rockchip/bundled-component/1.0.0/THIRD-PARTY-NOTICES.txt
+      blob: 6d1f7bf4624972fdb8559d203fd89163c3003c43
+    - path: openspec/integrations/rockchip/bundled-component/1.0.0/source-distribution-manifest.json
+      blob: bbce240466dedfc7de3ebb19d1db5fe8b0f3a865
+    - path: openspec/changes/chg-2026-036-macos-bundled-rockchip-component/evidence/runs/TASK-BRC-002/run.md
+      blob: 94108fb6f1f0a4d86b027e03ef9885c7360f9c56
+    - path: ArkDeck.xcodeproj/project.pbxproj
+      blob: e7943096688728a22f4b940e536a32f3b8eaaf98
+    - path: ArkDeck.xcodeproj/xcshareddata/xcschemes/ArkDeck.xcscheme
+      blob: 29d0fb995dd3a28ad535569a4cdc4c3964311def
+    - path: ArkDeckApp/ArkDeckApp.entitlements
+      blob: 6435d00f8493ce4fbca24a806ca7f320db9fbfa6
+    - path: docs/release/rockchip-component-distribution.md
+      blob: 60dd039582b216d0b2fb21336fe4ee0abc9b0f7c
+    - path: docs/release/macos-auto-update.md
+      blob: ecc8d8a02dbe37d66ca1716aeeafa1491f3a7af8
+    ```
+
+  - **Apple contract source gate:closed for review。**`2026-07-25` 只接受 Apple
+    primary documentation：[Embedding a helper tool in a sandboxed
+    app](https://developer.apple.com/documentation/xcode/embedding-a-helper-tool-in-a-sandboxed-app)、
+    [Creating distribution-signed code for the
+    Mac](https://developer.apple.com/documentation/xcode/creating-distribution-signed-code-for-the-mac/)、
+    [Customizing the notarization
+    workflow](https://developer.apple.com/documentation/security/customizing-the-notarization-workflow)
+    与 [TN2206 macOS Code Signing In
+    Depth](https://developer.apple.com/library/archive/technotes/tn2206/_index.html)。
+    它们分别约束 externally-built sandbox child 的 pre-sign/Code Sign On Copy/
+    Executables location、inside-out Developer ID/Hardened Runtime、outermost
+    distribution notarization/log/staple，以及 nested code location/designated
+    requirement inspection。fresh D1 必须重读 current Apple docs；不可用二手文章、
+    旧命令片段或 `--deep` 便利签名放宽 contract。
+  - **Unsigned component identity gate:closed, handoff blocked。**唯一可接受
+    component 是 #542 两个 clean builders 已证明 byte-identical 的 regular
+    Mach-O：name `rkdeveloptool`、247,488 bytes、SHA-256
+    `3caee2136551b4b849daf7e9a906813354f354f8adb61e5f092de49ec7a2e56a`、
+    `arm64`、minimum macOS `14.0`、signature absent、非 system dylib 数 0；
+    registry/recipe/SBOM/notices/source-manifest 必须逐 blob/内容匹配上述 pins。
+    package tool 只接受显式 input file URL，经 regular-file/no-symlink、
+    size/hash/Mach-O/architecture/minimum-OS/load-command/dependency inspection
+    后复制到 fresh staging root；不允许 rebuild-on-package、PATH、caller env、
+    Homebrew、download、cache、alternate binary 或 normalization。
+    final exact-head run `30156181935` 的 builder A artifact ID `8619054679`
+    （archive digest
+    `sha256:4298494e40bed1c2d09b091d1f534032623b443b84149bd3d95b3dc77466ed53`）
+    当前仅是 GitHub Actions transient handoff，`expires_at =
+    2026-07-26T11:25:04Z`；binary 按 002 contract 未入仓。维护者必须在 D2
+    选择受控且可复查的 materialization/retention handoff，fresh D1 再固定其
+    immutable provenance、retention、访问边界与 sanitized receipt。临时 artifact
+    过期、无法重新 materialize exact bytes 或只剩自报 hash 时均 FAIL。
+  - **Bundle topology/metadata gate:closed for review。**App target/bundle ID =
+    `ArkDeck` / `com.arkdeck.desktop`；component target location =
+    `ArkDeck.app/Contents/MacOS/rkdeveloptool`，code-sign identifier =
+    `com.arkdeck.desktop.rkdeveloptool`。二者与 App version 一起构成单一
+    atomic package，不存在独立 updater、search path、mutable component directory、
+    symlink、alternate location 或 external fallback。component 只允许 `arm64` /
+    minimum macOS `14.0`，Release App 同样必须只含 `arm64` 且 minimum macOS
+    `14.0`。上述五份 reviewed metadata 的逐字节副本固定置于
+    `ArkDeck.app/Contents/Resources/RockchipComponent/1.0.0/`；缺失、额外、
+    重命名或 digest drift 均阻止 archive/release。
+  - **Entitlement/signing gate:closed for review。**新增
+    `ArkDeckApp/RockchipComponent.entitlements` 只能包含 boolean true 的
+    `com.apple.security.app-sandbox` 与 `com.apple.security.inherit`，不得有
+    `get-task-allow`、USB/file/network 或任何 Hardened Runtime exception。
+    Release App 必须继续使用 blob
+    `6435d00f8493ce4fbca24a806ca7f320db9fbfa6` 的现行精确六项 entitlement，
+    `CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO`，不得增删。fresh staging
+    component 在 copy 前可按 Apple externally-built helper contract 使用 exact
+    identifier、exact child entitlement 与 `runtime` option 做 ad-hoc pre-sign；
+    该签名只为让 Xcode ingest/re-sign，不能计入 acceptance。Xcode 必须使用名为
+    `Embed Rockchip Component` 的 Copy Files/Executables phase 把 component
+    固定到 `Contents/MacOS` 并启用 Code Sign On Copy；Release archive 对 child
+    与 App 依次使用同一维护者批准的 `Developer ID Application` identity、
+    Hardened Runtime 与 secure timestamp。签名必须 inside-out，禁止用
+    `codesign --deep` 签名、preserve arbitrary metadata 或 ad-hoc/Apple
+    Development identity 代替；`--deep --strict` 只可用于 final read-only
+    verification。
+  - **Release order/outer package gate:closed for review。**唯一顺序是：
+    materialize + inspect exact unsigned input → fresh staging ad-hoc pre-sign →
+    Xcode Release archive/Code Sign On Copy → independently inspect child then App
+    signature/requirement/entitlements/runtime/timestamp/Team ID → create deterministic
+    single DMG → sign DMG with the same Team identity → submit the outermost DMG by
+    `notarytool` → require Accepted status and sanitized notary log → staple and
+    validate DMG → Gatekeeper-assess DMG and the contained App → emit immutable
+    package tuple/receipt。任一步 unknown/non-zero/mismatch 均删除候选 staging
+    output 并停止，不覆盖既有 release；不上传 GitHub Release、不发布 feed、
+    不 install/launch App 或 child。notary submission ID/log 可记录，credential、
+    private key、token、keychain/profile path 与绝对用户路径不得记录。
+  - **Current Xcode drift gate:binary FAIL until implementation。**audit base 的
+    Release App bundle ID/minimum OS 已是 `com.arkdeck.desktop` / `14.0`，但
+    `ENABLE_HARDENED_RUNTIME = NO`、manual ad-hoc identity `-`，且默认
+    architectures 为 `arm64 x86_64`；project 没有 component reference/copy phase。
+    host-side `CODE_SIGNING_ALLOWED=NO` exploratory Release build 成功但主 executable
+    是 `x86_64 arm64` universal Mach-O，只含 App/localization files，且仅有
+    linker-generated ad-hoc signature（identifier `ArkDeck`、Team ID absent、
+    sealed resources absent）。这些是 implementation 必须修复及 negative tests
+    必须锁住的 baseline FAIL，不是 `BRC-PACKAGE-001` evidence。
+  - **Implementation surface gate:closed for review。**fresh D1 若其余门全部满足，
+    implementation/evidence PR 的 changed paths 才可精确限定为
+    `ArkDeck.xcodeproj/project.pbxproj`、
+    `ArkDeckApp/RockchipComponent.entitlements`、
+    `scripts/release/{README.md,rockchip_component_package.py,test_rockchip_component_package.py}`、
+    `docs/release/rockchip-component-packaging.md`、
+    `openspec/integrations/rockchip/bundled-component/1.0.0/package.json` 与
+    `evidence/runs/TASK-BRC-003/{run.md,package-receipt.json,notary-log.json}`。
+    binary/App/DMG/archive/source/keychain/credential 不入仓；现有 registry、recipe、
+    SBOM/notices/source manifest 与 App entitlement 只读。若 Xcode input 不能由
+    repo-owned absolute argument-array packaging tool 通过 fresh staging root
+    注入、需要新增 workflow/schema/contract/product/runtime path 或更改上述 exact
+    list，保持 blocked 并 fresh D1，不在 implementation 内扩 scope。实现 PR 状态
+    仍为 `ready`；其 merge 后另开 D0 status-only PR。
+  - **Package verification/failure gate:closed for review。**repo-owned tests
+    必须逐类 mutation 并证明 fail before archive/notary：missing/wrong/non-regular/
+    symlink component，size/hash/architecture/minimum-OS/load-command/dependency
+    drift，wrong nested location/identifier，missing/extra App or child entitlement，
+    ad-hoc/development/mixed-Team/expired/untrusted/missing-timestamp signature，
+    Hardened Runtime disabled/exception，wrong App arch/minimum OS/version，missing/
+    extra/drifted metadata，extra nested executable/dylib，unsigned/malformed DMG，
+    notary rejected/invalid/unknown/missing log，staple/Gatekeeper failure，以及
+    mixed App-component-source/SBOM/notices tuple。positive evidence 必须记录
+    `file`/`lipo`/`vtool`/`otool`、`codesign -d`/`-r-`/
+    `--display --entitlements :-`/`--verify --deep --strict`、`hdiutil verify`、
+    `notarytool log`、`stapler validate`、`spctl` 与 SHA-256/size 的 sanitized
+    outputs；self-reported manifest/signing fields 不能替代 independent inspection。
+  - **D2 release-environment gate:BLOCKED。**`2026-07-25T12:23:09Z` 勘察 host =
+    macOS 26.5.2 (`25F84`) arm64、Xcode 26.6 (`17F113`)、
+    `notarytool 1.1.2 (41)`；`security find-identity -v -p codesigning` =
+    `0 valid identities found`。GitHub repository 没有 environment，Actions
+    secret metadata 也没有 Developer ID/notary 项（仅有两项已废止 V1
+    governance secret，不能复用）；因此当前没有可证明的 Developer ID signer、
+    Team ID、notary credential holder/environment 或长期 unsigned artifact
+    handoff。credential/permission/environment configuration 属 D2，Agent 不得
+    创建、导入、修改、轮换或自批。维护者必须在隔离 release environment 中完成：
+    (1) 可由 `security` 独立列举的有效 `Developer ID Application` certificate，
+    固定 certificate SHA-1、Team ID、有效期与 chain verdict；
+    (2) 可由一次 sanitized、只读 notary account/profile preflight 证明有效的
+    notarization credential，零 credential value/path 入 evidence；
+    (3) exact artifact materialization/retention handoff 与 operator/cleanup
+    boundary。完成后 fresh D1 只能引用维护者提供的非秘密 evidence/opaque
+    environment reference，并重新执行 package contract/tool availability/
+    concurrency/secret checks；任一项仍缺失就继续 `blocked`。
+  - **Effect/privacy/concurrency gate:satisfied for blocked-readiness。**本次只做
+    protected-main/GitHub metadata、Apple contract、repo/Xcode source 与 host-side
+    unsigned App inspection；component/App launch、package/sign/notarize/staple/
+    install/upload/update、HDC/USB/device/file-picker/bookmark、E1/E2/
+    deviceMutation/destructive、credential/system/entitlement mutation counters
+    全为 0。`2026-07-25T12:23:09Z` 完整查询的唯一 open PR #523 exact head
+    `2ff6c42ee02d0f5010d55fac7d2f00a5d8992354` 只修改 CHG-2026-034 七个
+    paths，与本 readiness/后继 surface 零重叠。本 PR 只修改当前 `tasks.md`
+    TASK-BRC-003 section；合入后 lane 在 D2/fresh D1 前暂停，零投机
+    implementation。
 - Platform:macos
 - Requirements：`REQ-FLASH-004`、`REQ-FLASH-013`、`REQ-JOB-005`、
   `REQ-UX-007`
 - Acceptance：`BRC-PACKAGE-001`、`AC-FLASH-013-01`、
   `AC-JOB-005-01`、`AC-UX-007-01`
 - Depends on：`TASK-BRC-002` done；独立 D1 readiness
-- Readiness input pins：未实例化；必须固定 exact unsigned artifact/registry/SBOM、
-  bundle location/identifier、App/child entitlement blobs、signing order、
-  Developer ID/notary environment contract、DMG/release scripts 与 negative fixtures
+- Readiness input pins：见上方 r1 D1 blocked-readiness；D2
+  release-environment/artifact handoff 完成后仍须 fresh D1 才可实例化为 ready
 - Applicable failure patterns：`AF-001`、`AF-002`、`AF-003`、`AF-007`、
   `AF-009`、`AF-010`、`AF-017`
 - Production reachability：ArkDeck Xcode/archive root → fixed nested component copy →
