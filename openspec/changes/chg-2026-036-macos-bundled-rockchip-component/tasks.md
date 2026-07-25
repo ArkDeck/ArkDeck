@@ -344,13 +344,34 @@
 
 ## TASK-BRC-002 — 实现 hermetic/reproducible build、registry 与 SBOM
 
-- Status:ready（r1 D1 readiness；仅在维护者对本单文件 readiness PR 的 exact
-  head review/merge 后生效。本 PR 不下载 source、不构建/运行 component、不生成
-  registry/SBOM/source package/binary，也不修改 product、workflow 或 evidence。）
+- Status:ready（r2 fresh D1 readiness；仅在维护者对本单文件 readiness PR 的
+  exact head review/merge 后生效。本 PR 不下载 source、不构建/运行 component、
+  不生成 registry/SBOM/source package/binary，也不修改 product、workflow 或
+  evidence。）
+- Historical Status:ready（r1 readiness #541 已合入；首次 implementation #542
+  在 GitHub runner OS exact-fact gate fail closed，未产生可接受远端 build/
+  reproducibility evidence。r2 合入前 #542 保持暂停且不得继续成 PR 工作。）
 - Historical Status:blocked（TASK-BRC-001 的 decision #538 与 D0 done #540
   已依次合入；001 done 只满足 dependency，不自动接受本任务的 recipe、builder、
   network、registry/SBOM 或 reproducibility 边界。）
 - Readiness review:
+  - **Fresh-readiness trigger:closed for review。**r1 readiness #541 exact head
+    `41bc8490981697805876e258f7b2666c2d704827` 经 `lvye` APPROVED，并以
+    `0fe0db4e74a3fd642b6d60d6cbda3d12ff96a105` 于
+    `2026-07-25T10:07:28Z` 合入 protected `main`。#542 first implementation
+    exact head `c308a999bdb4cdf327dc17436217f307ab49a896` 的 GitHub workflow
+    [run 30154865194](https://github.com/ArkDeck/ArkDeck/actions/runs/30154865194)
+    于 `2026-07-25T10:40Z` 在两个独立 builders 均报告
+    `toolchain fact drift for osBuild`；unit job 通过，compare 因 builders
+    fail closed 而未运行。runner 日志独立记录实际环境为
+    `macos-26-arm64` image `20260720.0258.1`、macOS 26.4 (`25E246`)、
+    provisioner `20260707.563` /
+    `02667638d2b423fbc733a8e32a88b44996a3ba6e`，与 r1 仅按 audit host
+    固定的 macOS 26.5.2 (`25F84`) 不同。两个 builder 都在 artifact/link/launch
+    前停止且未 upload output；该 run 是真实 fail-closed observation，不计作
+    `BRC-REPRO-001` PASS。r2 只修订 builder provenance、materialization 与
+    final evidence gate；source、license、recipe semantics、output graph、
+    product/effect 与 allowed paths 不变。
   - **Approval/dependency gate:satisfied。**TASK-BRC-001 decision #538 exact head
     `44970db58cfe39c241e3b3961c52e976b79fff68` 经 `lvye` APPROVED，并以
     `4a461ba40f532500e635509455acae95376757ca` 合入；D0 done #540 的最终
@@ -361,8 +382,10 @@
     `2026-07-25T09:10:41Z` 合入 protected `main`。两条 merge 均为本
     readiness audit base 的 ancestor；#540 只改当前 `tasks.md`，全部 exact-head
     checks 成功。
-  - **Audit base/input pins:closed。**readiness audit base =
-    `8dfde471bb876b0cd6630ba33859df270d49140e`。implementation/evidence 开工时
+    r1 readiness #541 exact head/merge 如 fresh-readiness trigger 所列；该
+    merge 仅修改当前 `tasks.md`，全部 exact-head checks 成功。
+  - **Audit base/input pins:closed。**r2 readiness audit base =
+    `0fe0db4e74a3fd642b6d60d6cbda3d12ff96a105`。implementation/evidence 恢复时
     必须基于本 readiness merged OID，确认 #538/#540 merge 仍为 ancestor，并逐项
     重核所有非自载体 pin；`tasks.md` 改核 readiness merge 中 reviewed 内容。无重叠
     PR 推进 main 不单独使 readiness 失效，但任一 pinned blob/source/tool/action、
@@ -370,8 +393,10 @@
     readiness：
 
     ```yaml pins
-    - artifact: TASK-BRC-002 readiness audit base
-      commit: 8dfde471bb876b0cd6630ba33859df270d49140e
+    - artifact: TASK-BRC-002 r2 readiness audit base
+      commit: 0fe0db4e74a3fd642b6d60d6cbda3d12ff96a105
+    - artifact: TASK-BRC-002 r1 readiness merge
+      commit: 0fe0db4e74a3fd642b6d60d6cbda3d12ff96a105
     - artifact: TASK-BRC-001 accepted decision merge
       commit: 4a461ba40f532500e635509455acae95376757ca
     - artifact: TASK-BRC-001 done merge
@@ -385,7 +410,7 @@
     - path: openspec/changes/chg-2026-036-macos-bundled-rockchip-component/design.md
       blob: c343320d00de2a22d6993325000997e7f5f7c1e1
     - path: openspec/changes/chg-2026-036-macos-bundled-rockchip-component/tasks.md
-      blob: 443b8db0d51d1fc39a656e43113edeb6a44e124a
+      blob: 7fc05bb7ac0dbb876b6802ab4c59a7d39d7f252a
     - path: openspec/changes/chg-2026-036-macos-bundled-rockchip-component/verification.md
       blob: 86f82516a2b8bd1de91dffb282499d68ebdba3cf
     - path: openspec/changes/chg-2026-036-macos-bundled-rockchip-component/acceptance-cases.yaml
@@ -441,31 +466,51 @@
     compiler/link source list、全部 argv、generated file bytes 与 dependency
     allowlist 必须写入 registry/receipt；若实现需要改变这些约束，返回 001 fresh D1，
     不在 002 内选择替代。
-  - **Builder availability gate:satisfied。**audit host 实测为 macOS 26.5.2
-    (`25F84`) arm64、Xcode 26.6 (`17F113`)、SDK 26.5 (`25F70`)、Apple clang
-    21.0.0 (`clang-2100.1.1.101`)、GNU Make 3.81、Apple `/bin/bash`
-    3.2.57(1)、`/usr/bin/python3` 3.9.6。SDK `iconv.h` SHA-256 =
+  - **Builder availability gate:satisfied with exact hosted profile。**最终
+    `BRC-REPRO-001` builder A/B 固定为两个独立 GitHub-hosted
+    `macos-26`/arm64 jobs；它们必须各自 assert image
+    `macos-26-arm64` version `20260720.0258.1`、macOS 26.4 (`25E246`)、
+    Xcode 26.6 (`17F113`)、SDK 26.5 (`25F70`)、Apple clang 21.0.0
+    (`clang-2100.1.1.101`)、GNU Make 3.81、Apple `/bin/bash` 3.2.57(1) 与
+    `/usr/bin/python3` 3.9.6。GitHub image release/manifest 与 first-run logs
+    共同证明当前 hosted profile 可得；workflow 必须记录并校验实际 image/OS
+    facts，`macos-26` alias 漂移不构成隐式升级。selected Xcode 的 SDK
+    `iconv.h` SHA-256 =
     `3fcec709f204ac60c7941488b9e49d8536150d356beff1f8cf8926cdfef7456d`，
     `libiconv.2.tbd` SHA-256 =
     `b257056db07bac43cd4d2f6fd806605ad3462fa0bb99918dc43c64176a018cea`。
     implementation 必须 assert 全部 exact facts、只从 selected
     `DEVELOPER_DIR`/OS absolute paths resolve tools，并在 drift 时停止。source
     signature verifier 是 fetch-stage analyst tooling，与 build environment/linked
-    graph 分离；当前可复核 pin 为 GnuPG/gpgv 2.5.21、
+    graph 分离；当前可复核 pin 为 Homebrew `gnupg` 2.5.21
+    `arm64_tahoe` bottle SHA-256
+    `77a293d5ac76a99d7ca1fca4d57860bd76bb25b3c334b2504fc9b7fc145f1502`、
+    `/opt/homebrew/bin/gpg` SHA-256
+    `33912b52dc018219f5346bf9fa6705a6d737198ed5e57370e1e91fde45a9acaa`、
     `/opt/homebrew/bin/gpgv` SHA-256
     `da2acbb7c6f54461b80d4ccc61c82dc4258a580298bf1a974ebda1ff8a504780`。
     该 absolute verifier 只可在隔离 keyring 上验证上述 exact bytes；任何其他
     Homebrew path/header/library/cache 均不得传入 build，verifier/version/hash
-    漂移须 fresh readiness。
+    漂移须 fresh readiness。本地 audit host macOS 26.5.2 (`25F84`) 只可用于
+    repo-owned unit/mutation tests 与 non-final exploratory build；其 output/
+    receipt 不得作为最终 registry 或 `BRC-REPRO-001` builder evidence。
   - **Two-clean-builder/reproducibility gate:binary。**builder A/B 必须是两个独立
     fresh roots（各自 empty `HOME`/`TMPDIR`/cache/output），环境只含
     `LC_ALL=C`、`LANG=C`、`TZ=UTC`、`ZERO_AR_DATE=1`、
     `SOURCE_DATE_EPOCH=1779028641`、`umask 022` 与显式 tool inputs；fetch 完成后
     build 在 `/usr/bin/sandbox-exec` deny-network profile 内运行。两者必须产生
-    byte-identical unsigned Mach-O、notice、source manifest 与 SPDX JSON；
-    normalization/strip-after-compare、复制一方 output 或 shared build/cache root
-    均禁止。GitHub workflow 另以两个独立 `macos-26` runners 重跑并 fail closed
-    assert 同一 OS/Xcode/SDK/toolchain；workflow action pins 固定为
+    byte-identical unsigned Mach-O、notice、source manifest、SPDX JSON 与
+    registry；normalization/strip-after-compare、复制一方 output 或 shared
+    build/cache root 均禁止。两者就是最终 GitHub builders，不再把不同 OS 的本地
+    output 计入最终 comparison。materialization 分两阶段且不得跳步：
+    (1) 首个 r2 implementation
+    head 在两个 hosted jobs 各自完整构建并先完成 A/B byte comparison；
+    (2) 仅将 comparison 已接受的 builder A metadata/receipts 从 transient
+    artifact 复制到声明的 repo paths，unsigned Mach-O 仍不入库；(3) 新 exact
+    head 必须重跑两个 fresh hosted jobs，A/B comparison 与 committed
+    registry/SBOM/notice/source-manifest/recipe verification 全部 PASS，只有该
+    final run 可关闭 `BRC-REPRO-001`。任一阶段不得用本地 output 填充远端 receipt。
+    workflow action pins 固定为
     `actions/checkout@11d5960a326750d5838078e36cf38b85af677262`、
     `actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02`、
     `actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093`，
@@ -507,12 +552,16 @@
     fetch、host verifier/compiler/linker/inspection 与临时文件 effect；不进入 App
     bundle、不 sign/notarize/install/launch component，不访问 HDC/USB/device/
     bookmark/image/key/output，不产生 product authority、E1/E2/destructive、
-    privilege/entitlement/system-rule/group/ACL effect。`2026-07-25T09:56:48Z`
-    分页完整查询唯一 open PR #523，exact head
-    `2ff6c42ee02d0f5010d55fac7d2f00a5d8992354` 仅修改 CHG-2026-034 七个
-    paths，与本 readiness/implementation surface 零重叠；implementation 开工前
-    必须重做 open-PR files/heads、planned-path absence 与 secrets scan，查询不完整、
-    overlap 或新 owner 抢占即 blocked。
+    privilege/entitlement/system-rule/group/ACL effect。`2026-07-25T10:49:04Z`
+    r2 勘察时 open PR #523
+    exact head `2ff6c42ee02d0f5010d55fac7d2f00a5d8992354` 仅修改
+    CHG-2026-034 七个 paths，与本 readiness/implementation surface 零重叠；
+    #542 exact head `c308a999bdb4cdf327dc17436217f307ab49a896` 是本任务
+    r1 implementation attempt，预期占用 implementation/evidence paths，已因
+    fresh-readiness trigger 暂停。r2 合入后 #542 必须先将 r2 merge 纳入 ancestry
+    并按本 gate 重做，不能把失败 run 记为 PASS。恢复前必须再次完整查询 open-PR
+    files/heads、planned paths 与 secrets scan；查询不完整、非 #542 overlap 或
+    新 owner 抢占即 blocked。
 - Platform:macos
 - Requirements：`REQ-FLASH-004`、`REQ-FLASH-013`、`REQ-JOB-005`
 - Acceptance：`BRC-REPRO-001`、`AC-FLASH-013-01`、`AC-JOB-005-01`
