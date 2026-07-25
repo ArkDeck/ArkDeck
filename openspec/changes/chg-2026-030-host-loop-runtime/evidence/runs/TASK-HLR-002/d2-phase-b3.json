@@ -1,0 +1,93 @@
+{
+  "app_id": 4388667,
+  "bot_login": "arkdeck-host-loop-runtime-901708a7[bot]",
+  "finished_at_utc": "2026-07-25T02:57:16+00:00",
+  "installation_id": 148855345,
+  "phase": "b3",
+  "retained": {
+    "app_id": 4388667,
+    "bot_login": "arkdeck-host-loop-runtime-901708a7[bot]",
+    "installation_id": 148855345,
+    "launchd_label_unloaded": true,
+    "scheduler_account_absent": true,
+    "worker_disabled": true
+  },
+  "schema": "arkdeck-hlr002-phase-b3/v1",
+  "started_at_utc": "2026-07-25T02:56:40+00:00",
+  "status": "pass",
+  "steps": [
+    {
+      "at_utc": "2026-07-25T02:56:41+00:00",
+      "facts": {
+        "expires_at": "2026-07-25T03:56:41Z",
+        "permissions": {
+          "contents": "read",
+          "issues": "write",
+          "metadata": "read",
+          "pull_requests": "write"
+        },
+        "repository_selection": "selected"
+      },
+      "status": "ok",
+      "step": "installation token minted"
+    },
+    {
+      "at_utc": "2026-07-25T02:56:42+00:00",
+      "facts": {
+        "number": 515
+      },
+      "status": "ok",
+      "step": "probe Issue closed"
+    },
+    {
+      "at_utc": "2026-07-25T02:56:44+00:00",
+      "facts": {
+        "auto_merge": null,
+        "merged": false,
+        "number": 514
+      },
+      "status": "ok",
+      "step": "probe PR closed and unmerged"
+    },
+    {
+      "at_utc": "2026-07-25T02:56:47+00:00",
+      "facts": {},
+      "status": "ok",
+      "step": "lease already absent"
+    },
+    {
+      "at_utc": "2026-07-25T02:56:49+00:00",
+      "facts": {},
+      "status": "ok",
+      "step": "probe ref already absent"
+    },
+    {
+      "at_utc": "2026-07-25T02:57:16+00:00",
+      "facts": {
+        "first": {
+          "lease": null,
+          "probe": null
+        },
+        "second": {
+          "lease": null,
+          "probe": null
+        }
+      },
+      "status": "ok",
+      "step": "two stable read-backs prove both refs absent"
+    },
+    {
+      "at_utc": "2026-07-25T02:57:16+00:00",
+      "facts": {
+        "app_id": 4388667,
+        "bot_login": "arkdeck-host-loop-runtime-901708a7[bot]",
+        "installation_id": 148855345,
+        "launchd_label_unloaded": true,
+        "scheduler_account_absent": true,
+        "worker_disabled": true
+      },
+      "status": "ok",
+      "step": "retained state matches the readiness success shape"
+    }
+  ]
+}

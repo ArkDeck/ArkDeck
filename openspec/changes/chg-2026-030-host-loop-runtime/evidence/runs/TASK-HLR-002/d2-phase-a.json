@@ -1,0 +1,31 @@
+{
+  "app_id": 4388667,
+  "app_slug": "arkdeck-host-loop-runtime-901708a7",
+  "bot_login": "arkdeck-host-loop-runtime-901708a7[bot]",
+  "client_secret_discarded": true,
+  "events": [],
+  "finished_at_utc": "2026-07-25T02:27:43+00:00",
+  "key_fingerprint": "SHA256:8779fbf2c41ad2deb6475d0ee0d39ec6df3fdfbf8e4109362caf780e9c6ebc66",
+  "mutations": {
+    "app_created": 1,
+    "pem_staged": 1
+  },
+  "owner": "ArkDeck",
+  "permissions": {
+    "contents": "read",
+    "issues": "write",
+    "metadata": "read",
+    "pull_requests": "write"
+  },
+  "phase": "A: app creation and PEM staging",
+  "schema": "arkdeck-hlr002-phase-a/v1",
+  "staging": {
+    "class": "non-repository, non-home system directory",
+    "mode_owner": "-rw------- root:wheel",
+    "path_sha256": "9b13372c20f89d37145cafce1c103a8606f7c2a0440b950017906f5daaea5eeb"
+  },
+  "started_at_utc": "2026-07-25T02:26:42+00:00",
+  "status": "pass",
+  "webhook_secret_discarded": true,
+  "worker_disabled": true
+}

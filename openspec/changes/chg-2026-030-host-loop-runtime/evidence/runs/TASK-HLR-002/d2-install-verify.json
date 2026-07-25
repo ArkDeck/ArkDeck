@@ -1,0 +1,78 @@
+{
+  "app_id": 4388667,
+  "app_slug": "arkdeck-host-loop-runtime-901708a7",
+  "bot_login": "arkdeck-host-loop-runtime-901708a7[bot]",
+  "checks": [
+    {
+      "facts": {
+        "app_id": 4388667,
+        "app_slug": "arkdeck-host-loop-runtime-901708a7",
+        "installation_id": 148855345
+      },
+      "id": "I1",
+      "name": "exactly one installation for the pinned App",
+      "status": "PASS"
+    },
+    {
+      "facts": {
+        "account": "ArkDeck",
+        "events": [],
+        "installation_id": 148855345,
+        "permissions": {
+          "contents": "read",
+          "issues": "write",
+          "metadata": "read",
+          "pull_requests": "write"
+        },
+        "repository_selection": "selected"
+      },
+      "id": "I2",
+      "name": "installation scope and permissions equal pins",
+      "status": "PASS"
+    },
+    {
+      "facts": {
+        "authoritative_check": "GET /installation/repositories with the installation token, executed as a pre-mutation gate in Phase B",
+        "coverage_limit": "a user PAT cannot list an installation's repositories; /user/installations/{id}/repositories requires a user-to-server token and returns HTTP 403 for a PAT",
+        "installation_id": 148855345,
+        "interim_confirmation": "visually confirm the selected repository list is exactly [ArkDeck/ArkDeck] at https://github.com/organizations/ArkDeck/settings/installations/148855345",
+        "repository_selection_confirmed_by_I2": "selected"
+      },
+      "id": "I3",
+      "name": "installation covers exactly one repository",
+      "status": "MANUAL"
+    },
+    {
+      "facts": {
+        "bot_login": "arkdeck-host-loop-runtime-901708a7[bot]",
+        "main_push_apps": [],
+        "main_push_users": [
+          "lvye"
+        ],
+        "ruleset_bypass_actors": [
+          {
+            "actor_id": 4340161,
+            "actor_type": "User",
+            "bypass_mode": "always"
+          }
+        ]
+      },
+      "id": "I4",
+      "name": "App is not CODEOWNER / bypass / main-push actor",
+      "status": "PASS"
+    }
+  ],
+  "classification": "zero-write post-installation verification",
+  "http_methods_used": [
+    "GET"
+  ],
+  "manual_confirmations_required": [
+    "I3"
+  ],
+  "mutations": {
+    "github_non_get": 0
+  },
+  "schema": "arkdeck-hlr002-install-verify/v1",
+  "status": "pass",
+  "stop_reason": null
+}
