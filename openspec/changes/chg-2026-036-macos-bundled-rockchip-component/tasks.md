@@ -6,15 +6,248 @@
 
 ## TASK-BRC-001 — 闭合 source、license、dependency 与 distribution 决策
 
-- Status:blocked
+- Status:ready（r1 D1 readiness；仅在维护者对本单文件 readiness PR 的 exact head
+  review/merge 后生效。本 PR 不形成 distribution decision、legal acceptance 或
+  evidence，不下载/构建/签名/打包/launch component，也不产生 App/process/USB/device
+  effect。）
+- Historical Status:blocked（CHG-2026-036 r1 proposal #535 与 approval-only #536
+  已依次合入；两者只批准 change scope，明确不接受 GPL/dependency/distribution，
+  也不自动产生 task readiness。）
+- Readiness review:
+  - **Approval/dependency gate:satisfied。**ADR-0003 所属 CHG-2026-035 archive
+    #534 exact head `162a4f320763f3b25461ca20e92d49dbaf7d445a` 经 `lvye`
+    APPROVED，并以 `5fc517f7ecfccd61ed0d140f9080e4b49e2cad95` 合入 protected
+    `main`；CHG-2026-036 proposal #535 exact head
+    `a56eb3e9c0d41b35c208d4372b7f2007c8e5976f` 经同一维护者 APPROVED，
+    并以 `16b3dbc7f7d2c565f15388bc1ca0f2aef41dd867` 登记；approval-only
+    #536 exact head `3a1e44da3e49bd7c83fa5a4f9ffb8f8b3d34f125` 经同一维护者
+    APPROVED，并以 `9bbc51313af9575c3d762db0f15692da753a3e01` 合入。三条 merge
+    OID 均为当前 `main` 祖先；proposal/approval/ADR 仍不替代本 D1 或
+    GPL/dependency/distribution 接受。
+  - **Audit base/input pins:closed。**readiness audit base =
+    `9bbc51313af9575c3d762db0f15692da753a3e01`。以下 Git objects 均从该
+    base 实测；`tasks.md` blob 只表示本 PR 修改前输入。decision/evidence 开工时必须
+    基于本 readiness merged OID，确认上述三个 merge 均为祖先，并逐项重核所有
+    非自载体 pin；`tasks.md` 改核 readiness merge 中 reviewed 内容。若 main 在 merge
+    前后由无重叠 PR 前进，不单凭 whole-main OID 失效；但任一 pinned blob、上游
+    object/source archive、license/dependency 一手来源、planned-path absence 或
+    allowed-path ownership 漂移，必须回到 `blocked` 并 fresh readiness：
+
+    ```yaml pins
+    - artifact: TASK-BRC-001 readiness audit base
+      commit: 9bbc51313af9575c3d762db0f15692da753a3e01
+    - artifact: CHG-2026-035 archive merge
+      commit: 5fc517f7ecfccd61ed0d140f9080e4b49e2cad95
+    - artifact: CHG-2026-036 proposal merge
+      commit: 16b3dbc7f7d2c565f15388bc1ca0f2aef41dd867
+    - artifact: CHG-2026-036 approval merge
+      commit: 9bbc51313af9575c3d762db0f15692da753a3e01
+    - path: openspec/changes/chg-2026-036-macos-bundled-rockchip-component/proposal.md
+      blob: 7c9cf2815927ac1d8dfda2a5eac8788a1d10621b
+    - path: openspec/changes/chg-2026-036-macos-bundled-rockchip-component/design.md
+      blob: c343320d00de2a22d6993325000997e7f5f7c1e1
+    - path: openspec/changes/chg-2026-036-macos-bundled-rockchip-component/tasks.md
+      blob: e86c11a6cfda1b066ae04f2d9c7c07e7d68b172a
+    - path: openspec/changes/chg-2026-036-macos-bundled-rockchip-component/verification.md
+      blob: 86f82516a2b8bd1de91dffb282499d68ebdba3cf
+    - path: openspec/changes/chg-2026-036-macos-bundled-rockchip-component/acceptance-cases.yaml
+      blob: cd179bf8627ade54a77e205962e98200ac8374c9
+    - path: openspec/changes/chg-2026-036-macos-bundled-rockchip-component/spec-impact.md
+      blob: 32027c2c667185ccbac4914725481d905890e813
+    - path: docs/adr/0003-macos-rockchip-tool-execution.md
+      blob: cef2cbe1190e05b591c13396e7ef5daf9fb90ef4
+    - path: openspec/changes/archive/2026-07-25-chg-2026-035-macos-rockchip-tool-architecture/tasks.md
+      blob: a5f7af86b55e68d5fa60149284f9f411836a875a
+    - path: openspec/changes/archive/2026-07-25-chg-2026-035-macos-rockchip-tool-architecture/verification.md
+      blob: d41516d6c04bc8bf709b9f706fb61424f22fc49a
+    - path: openspec/changes/archive/2026-07-25-chg-2026-035-macos-rockchip-tool-architecture/evidence/runs/TASK-RKTA-001/candidate-matrix.md
+      blob: 7af58939d359aca7b1626c18070c676b16c5f04b
+    - path: openspec/changes/archive/2026-07-25-chg-2026-035-macos-rockchip-tool-architecture/evidence/runs/TASK-RKTA-001/run.md
+      blob: 49d2688b0cba20b0f4d142d63d3ba46a3739313d
+    - path: docs/release/macos-auto-update.md
+      blob: ecc8d8a02dbe37d66ca1716aeeafa1491f3a7af8
+    - path: openspec/platforms/macos/profile.md
+      blob: d27264ab1ee1d0665062016a6d7e301f9ce924bd
+    - path: openspec/planning/open-questions.md
+      blob: cb078ced94769cce62adf5f9322f929daeb46752
+    - path: openspec/integrations/rockchip/profile.md
+      blob: 706e94f0e3704ed76809cce1c42002faa3d14d9c
+    - path: openspec/integrations/rockchip/rockusb-discovery/1.0.0/registry.yaml
+      blob: 394e2a8c588c531208cd3154a1dc8638ad77010e
+    - path: openspec/changes/chg-2026-026-macos-rockchip-flash-ui/tasks.md
+      blob: e83bcfea555fda6c8b6309ed16bf5f6e33fa40a0
+    - path: openspec/specs/flashing/spec.md
+      blob: c914d587bf4893a3f4a9f776a28c74e7ef002c8e
+    - path: openspec/specs/workflow-journal-recovery/spec.md
+      blob: f97c64785533f832d6798a63e8c7c96080bb7b69
+    - path: openspec/specs/desktop-ux-observability/spec.md
+      blob: 8f7613a4443605fcdac2aec0346b925948fcae09
+    - path: openspec/contracts/provider-contracts.md
+      blob: ceb6709fb405fc46d72ef2126b715e252ac720ab
+    - path: openspec/contracts/workflow-step-registry.yaml
+      blob: d9121ef78531560ab856dfa07468ce1ab4d42df6
+    - path: openspec/planning/agent-failure-patterns.md
+      blob: ed539ff8436bccda1d8bb8a3b85a0f6e494fea81
+    ```
+
+    `docs/release/rockchip-component-distribution.md`、
+    `evidence/runs/TASK-BRC-001/` 与
+    `openspec/integrations/rockchip/bundled-component/` 在 audit base 均不存在。
+    前两者只允许本任务创建；integration registry 属于后继 `TASK-BRC-002`，本任务
+    不得创建、预填或占用。
+  - **rkdeveloptool source/license dossier:closed for review。**唯一 upstream
+    source pin 固定为
+    `https://github.com/rockchip-linux/rkdeveloptool/commit/304f073752fd25c854e1bcf05d8e7f925b1f4e14`
+    （commit/tree =
+    `304f073752fd25c854e1bcf05d8e7f925b1f4e14` /
+    `9908d5bd43d32659500e6f0d0734755ee557122e`，commit time
+    `2025-03-07T07:34:30Z`，GitHub signature `verified`）。exact codeload source =
+    `https://codeload.github.com/rockchip-linux/rkdeveloptool/tar.gz/304f073752fd25c854e1bcf05d8e7f925b1f4e14`，
+    59,310 bytes，SHA-256 =
+    `389ba41af6986c16f1eeebdc1febcb0bf4b8acb7abd694d3d652e78504215843`。
+    Primary blobs 固定为 `license.txt`
+    `25e216a7063f10f19bf5b77b3a351f5bbd62e268`、`CMakeLists.txt`
+    `90faa72f90bf6111d26559d278685cdb5c39811a`、`Makefile.am`
+    `1b6385db22ce7b5c9181e043473545367afeb61d`、`configure.ac`
+    `c21355d35cfb0b9dbe9379c897254433c5c54dfe`、`Property.hpp`
+    `ddc7894b85ba91befaba8838605984fff555df0a`、`main.cpp`
+    `42bfbabaa76b9995d01784a1fc68225bbba0130f`。`license.txt` 包含 GPL v2
+    文本；九个 source file（`main.cpp`、`RKComm.cpp`、`boot_merger.h`、
+    `RKLog.cpp`、`RKDevice.cpp`、`RKImage.cpp`、`RKBoot.cpp`、`RKScan.cpp`、
+    `crc.cpp`）声明 `GPL-2.0+`；`Property.hpp` 另有保留 header 的
+    redistribution notice。accept 不能只复制 repository label 或把上述不同 header
+    折叠为未经复核的单一 license expression；必须完成逐文件 inventory、明确
+    ArkDeck 分发适用的 license expression/notice/modification/source obligations，
+    任何歧义均为 blocked。
+  - **libusb dependency dossier:closed for binary decision。**上游 CMake 硬编码
+    Homebrew `libusb/1.0.22` 动态库路径，但这不是可接受输入。候选只允许：
+    1. `libusb-1.0.22`：official release/tag commit/tree =
+       `0034b2afdcdb1614e78edaa2a9e22d5936aeae5d` /
+       `c248ce9378a2cc2acccde6ab6add09dbd8223dc4`，published
+       `2018-03-25T01:22:38Z`；official
+       `https://github.com/libusb/libusb/releases/download/v1.0.22/libusb-1.0.22.tar.bz2`
+       = 598,833 bytes，SHA-256
+       `75aeb9d59a4fdb800d329a545c2e6799f732362193b465ea198f2aa275518157`；
+       tag commit unsigned、release 无 detached signature，`COPYING` blob
+       `5ab7695ab8cabe0c5c8a814bb0ab1e8066578fbb`；
+    2. `libusb-1.0.30`：official release/tag commit/tree =
+       `87a55632db62c9bdc58cd31d3ccfa673f1bb017f` /
+       `1dab476e854bb3605113e4ff3e78f9130aac5d95`，published
+       `2026-05-17T22:06:02Z`；official source =
+       `https://github.com/libusb/libusb/releases/download/v1.0.30/libusb-1.0.30.tar.bz2`
+       = 656,112 bytes，SHA-256
+       `fea36f34f9156400209595e300840767ab1a385ede1dc7ee893015aea9c6dbaf`；
+       detached signature SHA-256
+       `7e8916e689a399b98df1087cfc48eab33a6bfd8027291c5af00c3fbba90a2cec`
+       由 bundled `KEYS` 中 primary fingerprint
+       `C68187379B23DE9EFC46651E2C80FF56C6830A0E` 的 signing subkey
+       `9C7EA94939C69C4FBC3DBFA8AA0639079EFB61B9` 验证；`COPYING` blob
+       `5ab7695ab8cabe0c5c8a814bb0ab1e8066578fbb`。
+
+    accepted record 必须只选一个 exact version/source/hash，给出选择或拒绝旧
+    unsigned release 的安全/兼容理由，固定 source/build/link mode、LGPL
+    obligations、notices、corresponding source、modification/build-script handling
+    与 transitive closure；不能临场选择第三个版本、Homebrew bottle 或 ambient
+    `/usr/local`/`/opt/homebrew`。
+  - **libiconv dependency dossier:closed for binary decision。**pinned source 没有
+    iconv API/include use，只有 CMake 的 Homebrew link path；ADR-0003 仍要求明确
+    `systemProvided | bundled`，不能把“当前没有调用”擅自改写成第三个 disposition。
+    候选只允许：
+    1. `systemProvided`：audit SDK = macOS 26.5 (`25F70`)；
+       `usr/include/iconv.h` SHA-256
+       `3fcec709f204ac60c7941488b9e49d8536150d356beff1f8cf8926cdfef7456d`
+       （BSD-2-Clause header）；`usr/lib/libiconv.2.tbd` SHA-256
+       `b257056db07bac43cd4d2f6fd806605ad3462fa0bb99918dc43c64176a018cea`，
+       install-name `/usr/lib/libiconv.2.dylib`，current/compatibility version 7。
+       这些 audit-host facts 不证明目标 architecture/minimum OS/runtime availability；
+       accepted record 必须另行用 Apple SDK/runtime primary facts闭合；
+    2. `bundledGNU1.19`：official source =
+       `https://ftp.gnu.org/pub/gnu/libiconv/libiconv-1.19.tar.gz`，
+       5,921,103 bytes，SHA-256
+       `88dd96a8c0464eca144fc791ae60cd31cd8ee78321e67397e25fc095c4a19aa6`；
+       detached signature 由 GNU keyring 中 Bruno Haible primary fingerprint
+       `E0FFBD975397F77A32AB76ECB6301D9E1BBEAC08` 验证；source 中
+       `COPYING.LIB` SHA-256
+       `20e50fe7aae3e56378ebf0417d9de904f55a0e61e4df315333e632a4d3555d95`，
+       `COPYING` SHA-256
+       `8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903`。
+
+    accepted record 必须只选一个 disposition，固定 link/runtime closure 与
+    license/notice/source handling；若需要移除 libiconv 或选择其他版本，先修订
+    ADR/readiness，不能在 decision run 中扩范围。
+  - **Distribution decision schema:binary。**唯一 decision owner/reviewer =
+    protected-main CODEOWNER `@lvye`；Agent 只整理 primary facts，不能自批 legal/
+    distribution acceptance。`rockchip-component-distribution.md` 必须逐字段给出
+    `proposedDisposition: accept | block`，并至少闭合：
+    `upstream/sourceArchive`、逐文件 `licenseInventory`、
+    `arkDeckSeparationAndModifications`、`notices`、
+    `correspondingSourceMode/location/availabilityWindow`、`buildScripts`、
+    `libusbChoice`、`libiconvChoice`、全部 `transitiveDependencies`、
+    `componentArchitectures`、`minimumMacOS`、`builder/toolchain`、
+    `hermeticInputs`、`sbomFormat`、`vulnerabilitySources/owner/SLA`、
+    `releaseOwner`、`updateOwner`、`rollbackOwner`、`retentionOwner/window`、
+    `revalidationTriggers` 与逐项 primary-source refs。SBOM 只能明确选择
+    `SPDX-2.3 JSON` 或 `CycloneDX-1.6 JSON`；对应 source delivery/offer 模式、
+    时限与公开 release 位置必须具体、可执行、与 GPL/LGPL 决定一致。空白、
+    `TBD`、`unknown`、`later`、无 owner/SLA、条件性 accept 或依赖未选择均等于
+    `block`。`accept` 仅在维护者 review/merge exact decision head 后生效；
+    `block` 必须指出 failed fields，且整个 CHG-2026-036 停止。
+  - **Release/update/rollback handoff gate:binary。**accepted record 必须保持单一
+    notarized DMG 与 App/component/source/dependency/SBOM 的 atomic tuple；component
+    不得有独立下载、自更新、PATH/Homebrew fallback。它必须准确承接现行
+    `check + download + verify + Finder handoff`：现状不自动 mount/replace/install，
+    也不声明自动 rollback。任何 App/component tuple 变化都使旧 package/E0/hardware
+    evidence 失效；rollback 只能返回一个已记录、完整、签名/公证且满足同等 source/
+    notice 义务的 tuple，或保持 execute-disabled，不能回退 selected external。
+  - **Successor machine gate:binary。**若 proposed disposition 为 accept，record
+    必须给 `TASK-BRC-002` 固定 exact upstream/dependency archive digests、source
+    extraction rules、builder/toolchain/minimum OS/architectures、link mode、
+    network/cache policy、expected dependency graph、SBOM schema、notice/source
+    manifest schema、two-clean-builder procedure、normalization/reproducibility
+    verdict rule 与 negative-drift cases。任务 001 不生成 recipe/registry/SBOM 或
+    artifact；只形成可被 fresh 002 readiness pin 的 envelope。任何 gate 不能转成
+    exact machine-checkable input 时，本任务结论必须是 block。
+  - **No-effect/source-review gate:binary。**本 task 只允许 Git/GitHub read、Apple/
+    upstream/GNU 官方 HTTPS documentation/source/license/signature GET、host SDK
+    metadata inspection 与仓库 checker 作为 analyst tooling；source archive 只可
+    落在 OS temp，必须记录 URL/size/hash/retrieval time，并与 ArkDeck product/tool
+    network effect 分栏。不得把 source/dependency/archive/binary 写入仓库或用户目录。
+    configure/build/link/install/package/sign/notarize/launch、App/probe/fixture、
+    Process/rkdeveloptool/HDC、USB/device、bookmark/picker、helper/XPC/daemon、
+    privilege、entitlement/system-rule/group/ACL mutation、E1/E2/destructive
+    dispatch 均为 0。若需要运行产物或设备验证，立即 blocked 并交给后继 task。
+  - **Deliverable/consistency gate:closed。**decision/evidence PR 的 exact changed
+    paths 只能是
+    `docs/release/rockchip-component-distribution.md` 与
+    `evidence/runs/TASK-BRC-001/run.md`，task 状态仍为 `ready`。run 必须逐项映射
+    `BRC-SUPPLY-001/BRC-HANDOFF-001/AC-FLASH-013-01/AC-UX-007-01`，记录 exact
+    commands、source retrievals、zero-effect counters、decision verdict 与 residual
+    risks；record/run 的 source/dependency/disposition 必须逐字一致。不修改
+    proposal/design/tasks/verification/acceptance/spec-impact、ADR/DEC/profile、
+    CHG-2026-026、Core/spec/contracts/integration registry、product/test/script/
+    workflow。decision/evidence merge 后另开 D0 status-only PR；不得在同一 PR
+    标 done 或启动 002。
+  - **Environment/check gate:satisfied。**audit host = macOS 26.5.2
+    (`25F84`) arm64、Xcode 26.6 (`17F113`)、Apple Swift 6.3.3
+    (`clang-2100.1.1.101`)、Git 2.55.0、GitHub CLI 2.96.0；source dossier latest
+    retrieval UTC = `2026-07-25T08:20:03Z`。base 上 `scripts/check-sdd.sh` =
+    0 error / 0 warning / 111 acceptance IDs，
+    `scripts/test_check_pr_paths.py` = 24/24 PASS。decision/evidence 必须复跑两者与
+    `git diff --check`，并用 exact changed-path、forbidden-path、secret/privacy scan
+    证明范围；不运行 Swift/product build。
+  - **Concurrency/review gate:satisfied。**`2026-07-25T08:20:03Z` 分页完整查询的
+    open PR 只有 #523（仅 CHG-2026-034 七个 paths），与本 change/release/evidence
+    paths 零重叠；planned decision/evidence/registry paths 均 absent。decision 开工前
+    重做 open-PR files/heads 与 planned-path absence；overlap、查询不完整或新 owner
+    抢占立即 blocked。本 readiness PR 本身只修改本 `tasks.md` 的 TASK-BRC-001
+    section，零 decision/evidence/source/dependency/product 变化。
 - Platform:macos
 - Requirements：`REQ-FLASH-004`、`REQ-FLASH-013`、`REQ-UX-007`
 - Acceptance：`BRC-SUPPLY-001`、`BRC-HANDOFF-001`、
   `AC-FLASH-013-01`、`AC-UX-007-01`
 - Depends on：CHG-2026-036 formal approval；ADR-0003 accepted/archive ancestry
-- Readiness input pins：未实例化；独立 readiness 必须固定 proposal/approval/ADR merge
-  OID、upstream commit/source archive digest、license/dependency primary sources、
-  retrieval date、review owner 与 exact allowed paths
+- Readiness input pins：见上方 r1 D1 readiness；decision/evidence 开工时从 readiness
+  merge 重新核验
 - Applicable failure patterns：`AF-001`、`AF-002`、`AF-007`、`AF-009`、`AF-010`
 - Production reachability：not applicable；host-only document/legal/distribution
   review，不 build/launch component，不产生 authority/effect
