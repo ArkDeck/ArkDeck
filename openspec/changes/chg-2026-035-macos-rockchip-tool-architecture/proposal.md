@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-035-macos-rockchip-tool-architecture
 revision: 1
-status: approved # 本 approval-only PR 经维护者 review/merge 后生效；r1 proposal 已由 #526 登记
+status: verified # 本 2026-07-25 verification-closure PR 经维护者 review/merge 后生效；完整 OID 链见 Verification closure；archive 另行
 class: platform
 core_change_level: none
 owner: lvye
@@ -136,3 +136,50 @@ carrier 合入后，才能另立或修订后续 implementation change；CHG-2026
   也不修改 product source、spec/contract、profile、decision inventory、evidence 或
   task 状态。`TASK-RKTA-001` 保持 `blocked`，必须另走 independent D1 readiness；
   本 PR 零 code、test、evidence 和 platform support 变化。
+
+## Verification closure（2026-07-25）
+
+本 verification-closure PR 只翻 change/verification 状态并引用 protected `main`
+上的既有证据，零实现、零新 scope、零新风险接受与零新授权；整体结论仅在维护者
+对本 PR 的 exact head review/merge 后生效。
+
+- **批准与任务链：closed。**r1 proposal #526 exact reviewed head
+  `15755c9e467ead1b99cf46f502b90aa6b003c362` 以
+  `4bee496d9b33f271fe4d80bb93690befdf5ff30f` 登记；approval-only #527 head
+  `4e801d764b204ce258644107db800b06dd55bc13` 以
+  `c74fa46a810f6713b987c639ce23246ddf24a307` 合入；D1 readiness #528 head
+  `651b75290c733df213f5aea905836a0e38c262b1` 以
+  `8f035b5eb64c731f5c1a19affd06e58c93a17d5b` 合入；decision/evidence #530
+  head `91a9cc3fa29303d78e1079b0e7f1f4210f51cd46` 以
+  `94704827e541cc13c34da9395f5d9810b78cca17` 合入；D0 done #532 head
+  `692e3e93ac340f585fb3de9e2a9aef958e9cd07b` 以
+  `d80027c5c766803b867cecdba7f558f7895da28c` 合入。五个 exact head 均由
+  CODEOWNER `lvye` APPROVED，merge OID 构成 protected-main ancestry。
+- **任务与 evidence：PASS。**`TASK-RKTA-001` 在 #532 后为 `done`。
+  #530 的 merged run/matrix blob 分别为
+  `49d2688b0cba20b0f4d142d63d3ba46a3739313d` /
+  `7af58939d359aca7b1626c18070c676b16c5f04b`，ADR-0003 blob 为
+  `5fc4a1519325002e32bd445355667032d8b34c02`；accepted outcome 为
+  `selected:bundledRockchipComponent`。
+- **Acceptance：PASS（`documentReview`）。**`RKTA-OPTIONS-001` 由完整五类
+  candidate、四个 helper subrow 与 234 个 controlled-verdict cells 证明；
+  `RKTA-DECISION-001` 由 ADR-0003、DEC-011、macOS profile、design、matrix 与 run
+  的唯一 outcome 一致性证明；`RKTA-BOUNDARY-001` 由 App root → authority mint →
+  bundle-owned component → fixed typed command/file leases → effect/durable outcome
+  trace 证明；`RKTA-HANDOFF-001` 由七项 pre-implementation gate 与 fail-closed
+  rollback/revalidation 证明。五条适用 canonical AC
+  `AC-FLASH-001-01`、`AC-FLASH-005-01`、`AC-FLASH-015-01`、
+  `AC-JOB-005-01`、`AC-UX-007-01` 的 scoped document-review verdict 也均在
+  merged `run.md` 中为 PASS。
+- **确定性复验：PASS。**audit base =
+  `d80027c5c766803b867cecdba7f558f7895da28c`；五个 merge OID 均为其 ancestor；
+  #530 exactly 八个 task-allowed decision/evidence path，#532 exactly 一个
+  `tasks.md` path；ADR/DEC/profile/design/tasks/verification/matrix/run outcome
+  一致；readiness 后 `openspec/specs/**`、`openspec/contracts/**`、Rockchip
+  registry 与 CHG-2026-026 零变化。verification branch 上
+  `scripts/check-sdd.sh` = 0 error / 0 warning / 111 acceptance IDs，
+  `python3 scripts/test_check_pr_paths.py` = 24/24，`git diff --check` 通过。
+- **边界：unchanged。**本 verified 只确认 architecture document-review change；
+  不证明 bundled component 已实现、可分发、可访问 USB/RockUSB 或可刷设备，不形成
+  macOS platform/hardware conformance claim，也不修改 CHG-2026-026。产品实现必须
+  另立 approved change 并逐项关闭 ADR-0003 handoff；archive 使用后续独立 PR。

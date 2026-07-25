@@ -1,7 +1,7 @@
 # CHG-2026-035 Verification Plan
 
 > Change:CHG-2026-035-macos-rockchip-tool-architecture@r1
-> Status:planned
+> Status:passed # 2026-07-25；证据与完整 OID 链见 proposal.md「Verification closure」；仅在维护者 review/merge 本 verification-closure PR 后生效
 > Core baseline:CORE-2.1.0（零 Core delta）
 
 ## Environment
@@ -58,10 +58,12 @@
 Core/spec/contract 修改或 CHG-2026-026 状态推进都不是允许的 deviation；发现后立即
 blocked，并以独立 change/revision 处理。
 
-## Decision/evidence result candidate
+## Accepted decision/evidence result
 
-仅在维护者 review/merge 本 decision/evidence PR 后，下列 `documentReview` result
-成为 accepted evidence：
+decision/evidence #530 exact reviewed head
+`91a9cc3fa29303d78e1079b0e7f1f4210f51cd46` 已由 `lvye` APPROVED，并以
+`94704827e541cc13c34da9395f5d9810b78cca17` 合入 protected `main`；下列
+`documentReview` result 已成为 accepted evidence：
 
 - outcome = `selected:bundledRockchipComponent`；
 - matrix = `evidence/runs/TASK-RKTA-001/candidate-matrix.md`；
@@ -73,14 +75,17 @@ blocked，并以独立 change/revision 处理。
   零变化。
 
 该 result 不证明 bundled component 已实现、可分发、可访问 USB 或可刷设备。
-TASK-RKTA-001 仍为 `ready`，合入后须以独立 D0 status PR 再确认 `done`。
+TASK-RKTA-001 已由独立 D0 status #532 exact reviewed head
+`692e3e93ac340f585fb3de9e2a9aef958e9cd07b` 经 `lvye` APPROVED，并以
+`d80027c5c766803b867cecdba7f558f7895da28c` 合入后确认 `done`。
 
 ## Result gate
 
-- [ ] `TASK-RKTA-001` 经独立 approval、readiness、decision/evidence 与 done PR 完成
+- [x] `TASK-RKTA-001` 经独立 approval、readiness、decision/evidence 与 done PR 完成
 - [x] 四条 change-local AC 与五条适用 canonical AC 均有可复查 documentReview 结论
 - [x] ADR、DEC inventory、macOS profile 与后续 handoff 一致
 - [x] Core/spec/contracts/registry、HDC 决策、CHG-2026-026 与 001G evidence 零未声明变化
 - [x] product/process/network/USB/device/helper/install/destructive effect = 0
 - [x] SDD、allowed-path、diff、secret/privacy checks 全绿
-- [ ] 独立 verification PR 只翻状态并引用具体 merged run/decision evidence
+- [x] 本独立 verification PR 只翻状态并引用具体 merged run/decision evidence；
+  整体通过结论仅在维护者对 exact head review/merge 后生效
