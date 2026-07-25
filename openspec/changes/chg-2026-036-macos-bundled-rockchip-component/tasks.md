@@ -6,13 +6,55 @@
 
 ## TASK-BRC-001 — 闭合 source、license、dependency 与 distribution 决策
 
-- Status:ready（r1 D1 readiness；仅在维护者对本单文件 readiness PR 的 exact head
-  review/merge 后生效。本 PR 不形成 distribution decision、legal acceptance 或
-  evidence，不下载/构建/签名/打包/launch component，也不产生 App/process/USB/device
-  effect。）
-- Historical Status:blocked（CHG-2026-036 r1 proposal #535 与 approval-only #536
-  已依次合入；两者只批准 change scope，明确不接受 GPL/dependency/distribution，
-  也不自动产生 task readiness。）
+- Status:done（r1 D0 status-only；仅在维护者对本单文件 PR 的 exact head
+  review/merge 后生效。结论完全由已合入的 readiness + decision/evidence 与
+  deterministic checks 决定，不增加 scope、risk acceptance、authorization 或
+  product/build/device effect。）
+- Historical Status:blocked → ready（CHG-2026-036 r1 proposal #535 与
+  approval-only #536 只批准 change scope；D1 readiness #537 exact head
+  `34aa3d140e6e094d811550354a29df55a74215a1` 经 `lvye` APPROVED，并以
+  `e32cdaba9f465fc2e264f8b61ad135efab3487a8` 合入后，TASK-BRC-001 才
+  `ready`。）
+- Completion record:
+  - **Decision acceptance:closed。**D1 decision/evidence #538 exact head
+    `44970db58cfe39c241e3b3961c52e976b79fff68` 经 `lvye` 于
+    `2026-07-25T08:51:02Z` APPROVED，并以
+    `4a461ba40f532500e635509455acae95376757ca` 于
+    `2026-07-25T08:51:08Z` 合入 protected `main`；readiness 与 decision merge
+    均为本状态 PR audit base 的 ancestor。该 merge 使 record 的
+    `proposedDisposition: accept` 生效，不再是 Agent 自报。
+  - **Evidence identity:closed。**
+    `docs/release/rockchip-component-distribution.md` blob =
+    `60dd039582b216d0b2fb21336fe4ee0abc9b0f7c`；
+    `evidence/runs/TASK-BRC-001/run.md` blob =
+    `bab53f9da272d0dbeabdf43cbe90bfc20d16422b`；本状态修改前
+    `tasks.md` blob = `824b0daea22df803fa4c84ab6849420942e376e7`。
+    三个 objects 均由 decision merge 引用或承载，内容与 #538 exact head 一致。
+  - **Deliverable/AC gate:closed。**accepted record 固定
+    `rkdeveloptool@304f073752fd25c854e1bcf05d8e7f925b1f4e14`、
+    `macOS 14.0+ / arm64`、signed libusb 1.0.30 static、Apple
+    system-provided libiconv、SPDX 2.3、GPL-2.0 §3(a) same-release complete
+    corresponding source、five-year minimum retention、owner/SLA 与 atomic
+    App/component/source/SBOM update/rollback；run 对
+    `BRC-SUPPLY-001`、`BRC-HANDOFF-001`、本任务 slice 的
+    `AC-FLASH-013-01`/`AC-UX-007-01` 给出 PASS，并明确未声称其余
+    runtime/platform/hardware slice。
+  - **No-effect/scope gate:closed。**decision/evidence 只新增上述 record/run；
+    ArkDeck/App/rkdeveloptool/libusb build/launch、binary/package/sign/notary/install/
+    update、HDC/process/USB/device、E1/E2/destructive 与 privilege/system mutation
+    counters 全为 0；Core/spec/contracts、HDC、CHG-2026-026、product、registry、
+    hardware matrix 零变化。本 D0 PR 只修改当前 `tasks.md` 的 TASK-BRC-001
+    status/completion record。
+  - **Deterministic checks:closed。**audit base
+    `4a461ba40f532500e635509455acae95376757ca` 上，readiness/decision ancestry、
+    exact blobs、accepted disposition、AC mapping 与 open-PR path ownership
+    均复核；`scripts/check-sdd.sh` = 0 error / 0 warning / 111 acceptance IDs，
+    `scripts/test_check_pr_paths.py` = 24/24 PASS，`git diff --check`、exact
+    changed-path 与 secret/privacy scan 均 PASS。
+  - **Successor remains gated。**本 done merge 只满足 `TASK-BRC-002` 的 dependency；
+    TASK-BRC-002 继续 `blocked`，必须另开 D1 readiness pin 本 done merge、
+    distribution record 与 exact source/toolchain/build/SBOM inputs。不得在本 PR
+    下载、构建、vendor、生成 registry/SBOM/artifact 或启动 002。
 - Readiness review:
   - **Approval/dependency gate:satisfied。**ADR-0003 所属 CHG-2026-035 archive
     #534 exact head `162a4f320763f3b25461ca20e92d49dbaf7d445a` 经 `lvye`
