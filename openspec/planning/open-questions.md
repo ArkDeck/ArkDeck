@@ -280,6 +280,43 @@ Open question 不得以聊天记忆留存。每项记录默认决策、阻塞范
 - Blocks：L1 implementation、任何 Linux release claim，以及把候选矩阵提升为 supported matrix
 - Affected：PLATFORM-LINUX@0.1.0、Platform verification/hardware matrix
 
+## DEC-011 macOS Rockchip tool execution
+
+- Status：decided（仅在维护者 review/merge 本 decision/evidence PR 后生效）
+- Owner：product/platform owner
+- Decision：`selected:bundledRockchipComponent`。macOS Rockchip execute 的目标
+  形态是把 source-pinned `rkdeveloptool` 作为 App-owned nested component 随
+  ArkDeck App bundle 构建、签名、公证和更新，并只从现有 typed Rockchip workflow
+  的 product-owned composition root 直接启动。它不是用户选择的外部 executable，
+  不经 XPC/broker/login item/LaunchAgent/LaunchDaemon/privileged helper，也不提供
+  shell、PATH、generic command 或 dynamic-download fallback。
+- Distribution boundary：DEC-004/ADR-0002 的 Sandboxed、现行精确六项 App
+  entitlement、Developer ID、Hardened Runtime、单一公证 DMG 保持不变；component
+  的候选签名形态 = `app-sandbox + inherit`，须由后续独立 change 批准并验证。
+  DEC-007 不变，HDC 继续 external-first 且不捆绑。
+- Required before implementation：独立 proposal/approval/D1 readiness 必须先关闭
+  exact upstream→artifact 可复现构建、GPL-2.0 notice/source-offer/legal acceptance、
+  libusb/libiconv dependency license/hash/build、SBOM/CVE owner、bundle location/
+  architecture、inside-out Developer ID/Hardened Runtime signing、notarization/ticket/
+  update/rollback、product composition/authority、child image/key/output leases、
+  signed Sandbox E0 USB 与 clean-host/clean-VM evidence。任一项失败即 Rockchip
+  execute 继续 blocked，不能在 implementation task 内回退其他候选。
+- CHG-2026-026 boundary：本决策不修改该 change 的 scope、任务状态或 001G
+  blocked evidence。只有 bundled implementation/evidence 合入后，另一个 approved
+  revision 才能决定如何替换/恢复其依赖；真实 destructive acceptance 仍需独立
+  readiness 与当时有效的精确执行授权。
+- Rejected：`selectedExternal`（user-selected file authority 不构成 out-of-bundle
+  executable authority）、各类 broker/helper（没有必要的独立能力收益且增加 IPC/
+  lifecycle/privilege 面）、`planOnlyHandoff`（不能满足现行 execute capability）、
+  `distributionRevisit`（当前无需重开 DEC-004）。完整事实矩阵与边界见 ADR-0003
+  和 CHG-2026-035/TASK-RKTA-001 evidence。
+- Reopen rule：upstream/license/dependency/build identity 漂移，Apple embedded-tool/
+  Sandbox/signing/notarization 规则变化，需要 XPC/持久 service/privilege/installer/
+  dynamic download，DEC-004/entitlement/Core/Provider command surface 改变，或后续
+  signed E0/clean-host evidence 阻断 direct bundled route，均须重开本条。
+- Affected：ADR-0003、PLATFORM-MACOS、CHG-2026-026 handoff；
+  `REQ-FLASH-001/004/005/015`、`REQ-JOB-005`、`REQ-UX-007`（零 Core delta）
+
 ## RISK-001 DAYU200 恢复演练残余风险接受(检查单第 4 项)
 
 - Revision：r2 evidence-owner correction candidate；仅维护者 review/merge 本 PR 后生效

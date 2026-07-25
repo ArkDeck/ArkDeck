@@ -11,6 +11,16 @@
   product/profile/decision inventory，也不授权 App/tool/helper/device effect。）
 - Historical Status:blocked（r1 proposal #526 与 approval-only #527 已依次合入；
   两者均未选择架构或自动产生 readiness。）
+- Decision/evidence candidate（仅在维护者 review/merge 本独立 PR 后成为 accepted
+  task evidence；本 PR 不翻 `ready → done`）：outcome =
+  `selected:bundledRockchipComponent`。ADR-0003/DEC-011/macOS profile 与
+  `evidence/runs/TASK-RKTA-001/candidate-matrix.md`、`run.md` 同步选择 App-owned
+  source-pinned Rockchip nested component 的 direct child route；无 XPC/broker/
+  login item/LaunchAgent/LaunchDaemon/privileged helper/external fallback/distribution
+  reopen。后续实现必须另立 approved change，先关闭 GPL-2.0、dependency/SBOM、
+  reproducible artifact、nested signing/notarization、file/USB E0、clean-host 与
+  CHG-2026-026 revision/readiness gates。当前 product/process/USB/device effect 和
+  CHG-2026-026 状态变化均为 0。
 - Readiness review:
   - **Approval/dependency gate:satisfied。**001G blocked evidence #525 exact head
     `9fed8772def1fb1f4743ddb0c37277805c36ba84` 经 `lvye` APPROVED，并以

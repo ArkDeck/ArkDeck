@@ -58,12 +58,29 @@
 Core/spec/contract 修改或 CHG-2026-026 状态推进都不是允许的 deviation；发现后立即
 blocked，并以独立 change/revision 处理。
 
+## Decision/evidence result candidate
+
+仅在维护者 review/merge 本 decision/evidence PR 后，下列 `documentReview` result
+成为 accepted evidence：
+
+- outcome = `selected:bundledRockchipComponent`；
+- matrix = `evidence/runs/TASK-RKTA-001/candidate-matrix.md`；
+- run = `evidence/runs/TASK-RKTA-001/run.md`；
+- ADR-0003、DEC-011、macOS profile、design/tasks/verification outcome 一致；
+- 四条 `RKTA-*` 与五条适用 canonical AC 的 documentReview verdict = PASS；
+- product/process/network/USB/device/helper/install/privilege/destructive effect = 0；
+- Core/spec/contracts/registry、HDC external-first、CHG-2026-026 task/evidence/status
+  零变化。
+
+该 result 不证明 bundled component 已实现、可分发、可访问 USB 或可刷设备。
+TASK-RKTA-001 仍为 `ready`，合入后须以独立 D0 status PR 再确认 `done`。
+
 ## Result gate
 
 - [ ] `TASK-RKTA-001` 经独立 approval、readiness、decision/evidence 与 done PR 完成
-- [ ] 四条 change-local AC 与五条适用 canonical AC 均有可复查 documentReview 结论
-- [ ] ADR、DEC inventory、macOS profile 与后续 handoff 一致
-- [ ] Core/spec/contracts/registry、HDC 决策、CHG-2026-026 与 001G evidence 零未声明变化
-- [ ] product/process/network/USB/device/helper/install/destructive effect = 0
-- [ ] SDD、allowed-path、diff、secret/privacy checks 全绿
+- [x] 四条 change-local AC 与五条适用 canonical AC 均有可复查 documentReview 结论
+- [x] ADR、DEC inventory、macOS profile 与后续 handoff 一致
+- [x] Core/spec/contracts/registry、HDC 决策、CHG-2026-026 与 001G evidence 零未声明变化
+- [x] product/process/network/USB/device/helper/install/destructive effect = 0
+- [x] SDD、allowed-path、diff、secret/privacy checks 全绿
 - [ ] 独立 verification PR 只翻状态并引用具体 merged run/decision evidence

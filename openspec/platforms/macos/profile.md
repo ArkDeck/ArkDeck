@@ -104,6 +104,31 @@ M0A 必须同时验证：
 
 工具/镜像 bookmark 使用只读 scope，只有输出目录需要 read-write。用户选择文件权限不等于允许执行任意外部程序；把 POSIX path 交给 child 也不能假定转移了运行时 PowerBox 动态扩展。外部 HDC 读取镜像、key 和输出目录必须端到端验证。
 
+### Rockchip tool execution（DEC-011 / ADR-0003）
+
+Decision outcome：`selected:bundledRockchipComponent`（仅在维护者 review/merge
+CHG-2026-035 decision/evidence PR 后生效）。
+
+macOS Rockchip execute 的目标形态是 App-owned、source-pinned
+`rkdeveloptool` nested component，直接由 product-owned typed workflow 通过
+bundle-relative absolute URL、fixed argv、empty caller environment 与 identity-bound
+prepared launch 启动。它不使用 user-selected external executable、XPC/broker、
+login item、LaunchAgent、LaunchDaemon、privileged helper、PATH/shell、动态下载或
+copy-to-container fallback。
+
+本决定保持 ADR-0002 的 Sandboxed 单一 DMG 与现行精确六项 App entitlement；候选
+component 自身只能在后续独立 approved change 中采用
+`com.apple.security.app-sandbox + com.apple.security.inherit` 并完成 Code Sign On
+Copy、Hardened Runtime、inside-out Developer ID signing、notarization/ticket 与
+update/rollback 验证。DEC-007 不变，HDC 继续 external-first、不捆绑。
+
+当前 profile **不声称 component 已存在或可运行**。实现前必须单独关闭：exact
+source→artifact 可复现构建、GPL-2.0 notice/source-offer/legal acceptance、libusb/
+libiconv dependency 与 SBOM/CVE owner、architecture、child image/key/output lease、
+signed Sandbox E0 USB、clean-host/clean-VM，以及 CHG-2026-026 的显式 revision/
+readiness。任一 gate 未满足，Rockchip App execute 保持 blocked；不得隐式切换其他
+候选。
+
 ## Gatekeeper and quarantine
 
 - ArkDeck 自身签名公证不等于外部 HDC 可信；
