@@ -1,7 +1,7 @@
 # CHG-2026-030 Design — host-loop runtime
 
 > Status:draft
-> Change:CHG-2026-030-host-loop-runtime@r10
+> Change:CHG-2026-030-host-loop-runtime@r11
 > 本设计只约束本 change 的候选实现。与 Constitution、AGENTS.md、
 > enforcement.md 或 CHG-2026-027 冲突时，停止并以高层规则为准。
 
@@ -441,7 +441,7 @@ unchanged and does not become approval authority.
   evidence. `pull_request_target` is forbidden because running or importing
   untrusted head content in base context would enlarge the trust boundary.
 
-## 1I. Fresh automatic-check creator canary（r10 current readiness）
+## 1I. Fresh automatic-check creator canary（r10 historical；main-drift stop）
 
 r10 consumes the completed TASK-HLR-001A baseline instead of replaying the
 r8 plan. Its audit base is protected main
@@ -495,6 +495,76 @@ enforces PR, human CODEOWNER review, App `15368` `guard`, administrators,
 human-only push restriction and force/delete prohibitions. Any live result
 inconsistent with the merged CHG-2026-033 authenticated evidence returns the
 work to that change; r10 must not mutate or reinterpret protection settings.
+
+The approved execution reached reserved PASS but not the combined conclusion.
+Reserved SDD Guard and Swift succeeded and both legacy creator queries were
+zero. Before ordinary dispatch, PR #497 advanced main from the readiness
+merge to `ce4a11c3d7cb59686024be9cbd51939c084041d1`; r10 therefore stopped,
+deleted reserved and left ordinary writes at zero. The machine/human evidence
+is merged by #501. The r10 UUIDs and refs are permanently non-executable.
+
+## 1J. Short critical window and scoped post-dispatch drift（r11 current readiness）
+
+r11 keeps the strongest comparability property:both canary commits are
+distinct empty commits with the r11 readiness squash merge as their common
+parent and tree. It changes only when terminal Swift is required.
+
+```text
+reserved: agent/host-loop/probes/0f803ee1-332e-4bf3-a58c-32af75ce8579
+ordinary: agent/hlr-002a-control/5dab2542-ec7b-4561-b3d0-ad41046affb6
+evidence: agent/task-hlr-002a-canary-evidence-r11
+```
+
+### Dispatch barrier
+
+1. Require the r11 readiness merge to be current protected main. Re-read the
+   sensitive manifest, all open PR files, all remote refs and the three fresh
+   branch absences. Construct both empty commits from that exact merge.
+2. Push reserved. Require its ref read-back, SDD Guard push
+   `guard=success`, exactly one exact-head Swift push run in
+   `queued|in_progress|completed`, Agent PR push run count = 0 and all-state
+   exact-head PR count = 0. Swift need not be terminal yet.
+3. Re-read current main, sensitive pins and both target refs. If main is no
+   longer the readiness merge, stop and delete reserved. Otherwise push
+   ordinary immediately and record the Git receipt and exact ref read-back.
+   This receipt closes the dispatch barrier.
+
+There is no authorization to continue through drift before step 3. The
+shortened gate is safe because reserved `guard` proves workflow delivery,
+exact Swift run existence proves the remaining check was dispatched, and the
+two exact creator queries prove the reserved event was excluded from legacy
+bootstrap. Terminal Swift is still mandatory for final PASS.
+
+### Post-dispatch scoped drift
+
+After both ref receipts, a later main advancement does not rewrite the
+already-created commits or already-triggered runs. It is accepted only when
+all of the following are true:
+
+- current main is a linear descendant of the r11 readiness merge;
+- each intervening commit is bound to a merged PR with human review metadata
+  and full files pagination;
+- the per-PR files and cumulative Git diff do not touch the sensitive
+  workflow/parser/governance manifest, this change or its evidence, either
+  target namespace/ref, or creator ownership;
+- both canary ref OIDs remain exact, and all exact-head run/job/PR queries
+  remain unambiguous.
+
+This is an evidence-preservation rule, not a retry rule. It cannot replace a
+commit parent/tree, change a UUID, reopen/re-push a ref, overlook a failed
+job, or make an outdated ordinary PR mergeable. The ordinary PR is a canary
+that must be closed unmerged.
+
+### Completion
+
+Both SDD Guard and Swift runs must finish success. Ordinary must have exactly
+one successful Agent PR push run with successful `open-pr` and
+`allowed-paths`, plus one open/unmerged exact-head/base PR authored by
+`github-actions[bot]`. Reserved zero-run/zero-PR and ordinary unique facts
+are queried again before cleanup. Then delete ordinary and reserved, prove
+stable absence and require the ordinary PR to be closed/unmerged. Any
+`action_required`, 0/2 creator, job failure, overlap, non-linear drift,
+incomplete pagination or cleanup ambiguity preserves FAIL.
 
 ## 2. PR envelope
 

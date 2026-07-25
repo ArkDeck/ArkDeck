@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-030-host-loop-runtime
-revision: 10
-status: approved # r1 #361、r2 #405、r3 #407、r4 #415、r5 #423、r6 #449、r7 #456、r8 #480、r9 #483 已批准；r10 fresh HLR-002A canary readiness 仅在维护者 review/merge 本 PR 后生效
+revision: 11
+status: approved # r1 #361、r2 #405、r3 #407、r4 #415、r5 #423、r6 #449、r7 #456、r8 #480、r9 #483、r10 #498 已批准；r11 HLR-002A race-remediated readiness 仅在维护者 review/merge 本 PR 后生效
 class: implementation-only
 core_change_level: none
 owner: lvye
@@ -10,6 +10,18 @@ platforms: [macos]
 ---
 
 # Host-loop runtime：为 Agent PR 建立可恢复的 worker/reviewer 双循环
+
+> r11 resume gate（2026-07-25）：r10 readiness #498 merge
+> `53b4924227bc3931523357e68ee2cb61b5814646` 后，reserved ref 已取得
+> `guard`、Swift success 与两次 legacy run/PR = 0；但 #497 在 reserved
+> Swift 等待期间以 `ce4a11c3d7cb59686024be9cbd51939c084041d1` 推进 main，
+> exact-main gate 正确阻止 ordinary dispatch。reserved 已删除，ordinary
+> create/push/run/PR = 0；failure evidence #501 final reviewed head
+> `961410627d779b281e7218536fd12bc05927d6ce` 已以
+> `1c1ae70a869d03e50a3a012e53d2a1b47a9f311d` 合入。#500 已将
+> CHG-2026-033 完整归档，topology evidence blobs/hashes 不变。r11 只缩短
+> 两次 ref dispatch 之间的 critical window 并定义 post-dispatch scoped drift；
+> 合入前新 canary dispatch = 0。
 
 > r10 resume gate（2026-07-25）：TASK-HLR-001A implementation #485 merge
 > `cae9a4c378b75409a4d7a31205583560f17d73aa`、fresh live evidence #490
@@ -192,6 +204,13 @@ bot-created PR event 无人值守取得结果：GitHub 对 `GITHUB_TOKEN` 创建
   ref overlap、严格的 reserved-first/ordinary-second run/PR 查询和 cleanup
   顺序。本 revision 只修改本 change 四份治理文档；canary 写入、evidence 与
   `ready→done` 仍分别位于后续独立阶段。
+- r11 保留 r10 的同 parent/tree、reserved-first、完整双读回与 cleanup，
+  但不再把 reserved Swift terminal success 放在 ordinary push 之前。reserved
+  ref create 后只需 `guard=success`、唯一 Swift run 已投递、legacy
+  `agent-pr` run/PR 均为 0 且 main/pins 未漂移，即立即 push ordinary；随后两边
+  Swift 与 ordinary creator jobs 并行收敛。ordinary push receipt 前任何 main
+  漂移仍停止；receipt 后的 main 前进只有在完整 PR/files 审计证明其为
+  sensitive-input/target/evidence non-overlap 时才保留已触发事实。
 - reviewer loop 仅调度并记录独立 AI 合前 review（`APPROVE` / `REQUEST_CHANGES` /
   `BLOCKED`）；它不作 GitHub approval、不 merge、不改变 change/task 状态。通过
   checks 与独立 review 后，worker 才可按 CHG-2026-027 将 digest 放入 batch Issue；
@@ -288,13 +307,14 @@ Observable behavior before/after:
 真实 proposal 形态，只有在实际 `pull_request` allowed-paths job 绿色时，才可由
 CHG-2026-028 `MECH-004` evidence 如实引用；未出现该 run 不得预填为 live evidence。
 
-r1 的 TASK-HLR-001 与 r9 的 TASK-HLR-001A 已 done；r10 从最新 protected
-main 重新为 HLR-002A 制定 fresh canary readiness。HLR-002A implementation
+r1 的 TASK-HLR-001 与 r9 的 TASK-HLR-001A 已 done；r10 canary 因 main
+drift fail closed，failure evidence #501 已合入；r11 从最新 protected main
+重新为 HLR-002A 制定 race-remediated fresh readiness。HLR-002A implementation
 #419 已合入，但 live canary
 #421 = FAIL。#435 从未产生 D2 receipt/PASS；#449/r6 与 #454 readiness 已由 r7
 supersede，TASK-HLR-002B 作为不可复用的历史 tombstone 保持 `blocked`，不进入
 implementation/evidence/done。r8 已批准的 canary-only readiness 因 r9 将改变
-sensitive workflow blobs 而 superseded；r8 refs/UUID 不执行。只有本 r10
+sensitive workflow blobs 而 superseded；r8 与 r10 refs/UUID 不执行。只有本 r11
 独立 D1 readiness 经维护者 review/merge 后，才可使用其全新 HLR-002A
 refs/pins 执行 canary；evidence 使用后一独立 PR，其合入后再以独立 D0 PR
 `ready→done`。HLR-002A done 后才进入
@@ -527,3 +547,29 @@ PR 仍独立 review/merge；D1/D2 判断门后不做投机性成 PR 工作；cha
   `agent/task-hlr-002a-canary-evidence-r10` PR，随后才可另起 D0
   `ready→done` PR；旧 #421/#435/#454 与 r8 的 OID/window/payload/hash/ref/UUID
   永久只作历史。
+
+## r11 approval and readiness boundary
+
+- 本 revision 是 r10 main-drift stop 与 #501 failure evidence 后的 compatible
+  D1 readiness；只修改本 change proposal/design/tasks/verification。除提交
+  governance carrier 的既有 Agent branch/PR transport 外，它不产生 target ref、
+  PR-state、setting、credential、review 或 merge write。
+- 维护者对本 PR exact head review/merge 后，才批准使用全新 reserved
+  `agent/host-loop/probes/0f803ee1-332e-4bf3-a58c-32af75ce8579` 与 ordinary
+  `agent/hlr-002a-control/5dab2542-ec7b-4561-b3d0-ad41046affb6` 重跑 combined
+  creator canary。r10 的 refs、UUID、commit/run facts 只作失败历史，不得重推。
+- 两个 empty commits 仍以 r11 readiness merge 为共同 parent/tree。reserved
+  必须先取得 `guard=success`、exact Swift run count = 1（可仍 running）、
+  Agent PR run/PR count = 0；重读 main/pins 不变后立即 push ordinary。ordinary
+  push receipt 前 main 漂移一律停止；receipt 后才进入 scoped post-dispatch
+  drift policy。
+- Scoped drift 只接受 readiness merge 的线性后代，并要求逐 PR 完整分页 files
+  与 cumulative Git diff 对 sensitive manifest、本 change/evidence、两个 target
+  refs 和 workflow ownership 零交集；任一 merge 无法绑定 reviewed PR、出现
+  overlap/non-linear history/API ambiguity，或任一已触发 run/job/PR 失败，仍
+  fail closed。它不允许重建 commit、换 UUID、重推 ref 或忽略红灯。
+- 最终 PASS 仍要求两边 SDD Guard/Swift success、reserved 双重零 creator、
+  ordinary 唯一 successful Agent PR run + `open-pr`/`allowed-paths` success +
+  唯一 bot PR、pre-cleanup 双读回、ordinary→reserved 删除与 PR
+  closed/unmerged。成功 evidence 与 D0 done 各自独立 PR；r11 merge 本身不
+  构成 PASS/done/verified。
