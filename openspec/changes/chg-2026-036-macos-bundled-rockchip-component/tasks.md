@@ -344,10 +344,14 @@
 
 ## TASK-BRC-002 — 实现 hermetic/reproducible build、registry 与 SBOM
 
-- Status:ready（r2 fresh D1 readiness；仅在维护者对本单文件 readiness PR 的
+- Status:ready（r3 fresh D1 readiness；仅在维护者对本单文件 readiness PR 的
   exact head review/merge 后生效。本 PR 不下载 source、不构建/运行 component、
   不生成 registry/SBOM/source package/binary，也不修改 product、workflow 或
   evidence。）
+- Historical Status:ready（r2 readiness #543 已合入；#542 exact hosted-image
+  rerun 通过 image/OS/Xcode/SDK facts 后在 GnuPG installed-binary hash gate
+  fail closed，未产生可接受 build/reproducibility evidence。r3 合入前 #542
+  继续保持 Draft/暂停且不得继续成 PR 工作。）
 - Historical Status:ready（r1 readiness #541 已合入；首次 implementation #542
   在 GitHub runner OS exact-fact gate fail closed，未产生可接受远端 build/
   reproducibility evidence。r2 合入前 #542 保持暂停且不得继续成 PR 工作。）
@@ -355,7 +359,24 @@
   已依次合入；001 done 只满足 dependency，不自动接受本任务的 recipe、builder、
   network、registry/SBOM 或 reproducibility 边界。）
 - Readiness review:
-  - **Fresh-readiness trigger:closed for review。**r1 readiness #541 exact head
+  - **r3 fresh-readiness trigger:closed for review。**r2 readiness #543 exact head
+    `42c65feea6528034d043bdbf14d92060b2144a71` 经 `lvye` 于
+    `2026-07-25T10:56:00Z` APPROVED，并以
+    `b56505aa2180ad8792302dba2566e20a0dd4db47` 于
+    `2026-07-25T10:56:07Z` 合入 protected `main`。#542 纳入该 merge 后的
+    exact head `19ec9a08564962381974bf455b696e9327009ffe` 在
+    [run 30155496750](https://github.com/ArkDeck/ArkDeck/actions/runs/30155496750)
+    以两个独立 hosted builders 重跑；17 项 unit/mutation tests PASS，两个
+    builders 都通过 r2 exact image、OS、architecture、Xcode、SDK、Clang、
+    Make、Bash、Python 与 SDK iconv facts，随后同时在
+    `gpg binary drift` 停止。compare 未运行，artifact/signature import/build/
+    link/launch/device effects 均为 0。该结果证明 r2 hosted profile 可得，也证明
+    r2 把本地 audit host 上的 installed binary SHA 当成 hosted image pin 不成立；
+    Homebrew bottle 可在 pour/link 时受 installed dependency paths 影响，formula/
+    version 相同不保证跨 image 的 installed executable bytes 相同。r3 只修订
+    fetch-stage signature verifier 的 provenance/observation gate，不放宽 source、
+    detached-signature/fingerprint、build graph、artifact 或 product/effect gate。
+  - **r2 fresh-readiness trigger:closed。**r1 readiness #541 exact head
     `41bc8490981697805876e258f7b2666c2d704827` 经 `lvye` APPROVED，并以
     `0fe0db4e74a3fd642b6d60d6cbda3d12ff96a105` 于
     `2026-07-25T10:07:28Z` 合入 protected `main`。#542 first implementation
@@ -384,8 +405,10 @@
     checks 成功。
     r1 readiness #541 exact head/merge 如 fresh-readiness trigger 所列；该
     merge 仅修改当前 `tasks.md`，全部 exact-head checks 成功。
-  - **Audit base/input pins:closed。**r2 readiness audit base =
-    `0fe0db4e74a3fd642b6d60d6cbda3d12ff96a105`。implementation/evidence 恢复时
+    r2 readiness #543 exact head/merge 如 r3 fresh-readiness trigger 所列；该
+    merge 同样仅修改当前 `tasks.md`，全部 exact-head checks 成功。
+  - **Audit base/input pins:closed。**r3 readiness audit base =
+    `b56505aa2180ad8792302dba2566e20a0dd4db47`。implementation/evidence 恢复时
     必须基于本 readiness merged OID，确认 #538/#540 merge 仍为 ancestor，并逐项
     重核所有非自载体 pin；`tasks.md` 改核 readiness merge 中 reviewed 内容。无重叠
     PR 推进 main 不单独使 readiness 失效，但任一 pinned blob/source/tool/action、
@@ -393,8 +416,10 @@
     readiness：
 
     ```yaml pins
-    - artifact: TASK-BRC-002 r2 readiness audit base
-      commit: 0fe0db4e74a3fd642b6d60d6cbda3d12ff96a105
+    - artifact: TASK-BRC-002 r3 readiness audit base
+      commit: b56505aa2180ad8792302dba2566e20a0dd4db47
+    - artifact: TASK-BRC-002 r2 readiness merge
+      commit: b56505aa2180ad8792302dba2566e20a0dd4db47
     - artifact: TASK-BRC-002 r1 readiness merge
       commit: 0fe0db4e74a3fd642b6d60d6cbda3d12ff96a105
     - artifact: TASK-BRC-001 accepted decision merge
@@ -410,7 +435,7 @@
     - path: openspec/changes/chg-2026-036-macos-bundled-rockchip-component/design.md
       blob: c343320d00de2a22d6993325000997e7f5f7c1e1
     - path: openspec/changes/chg-2026-036-macos-bundled-rockchip-component/tasks.md
-      blob: 7fc05bb7ac0dbb876b6802ab4c59a7d39d7f252a
+      blob: 30693d27aeeb73b1babe6129d9a30c7a62d7000c
     - path: openspec/changes/chg-2026-036-macos-bundled-rockchip-component/verification.md
       blob: 86f82516a2b8bd1de91dffb282499d68ebdba3cf
     - path: openspec/changes/chg-2026-036-macos-bundled-rockchip-component/acceptance-cases.yaml
@@ -482,16 +507,22 @@
     implementation 必须 assert 全部 exact facts、只从 selected
     `DEVELOPER_DIR`/OS absolute paths resolve tools，并在 drift 时停止。source
     signature verifier 是 fetch-stage analyst tooling，与 build environment/linked
-    graph 分离；当前可复核 pin 为 Homebrew `gnupg` 2.5.21
+    graph 分离。hosted verifier provenance 固定为 exact
+    `macos-26-arm64@20260720.0258.1`、Homebrew `gnupg` 2.5.21
     `arm64_tahoe` bottle SHA-256
     `77a293d5ac76a99d7ca1fca4d57860bd76bb25b3c334b2504fc9b7fc145f1502`、
-    `/opt/homebrew/bin/gpg` SHA-256
-    `33912b52dc018219f5346bf9fa6705a6d737198ed5e57370e1e91fde45a9acaa`、
-    `/opt/homebrew/bin/gpgv` SHA-256
-    `da2acbb7c6f54461b80d4ccc61c82dc4258a580298bf1a974ebda1ff8a504780`。
-    该 absolute verifier 只可在隔离 keyring 上验证上述 exact bytes；任何其他
-    Homebrew path/header/library/cache 均不得传入 build，verifier/version/hash
-    漂移须 fresh readiness。本地 audit host macOS 26.5.2 (`25F84`) 只可用于
+    formula commit `4d32c765e16bde9fffd6c0194a0317ac1ea16c07`、absolute links
+    `/opt/homebrew/bin/{gpg,gpgv}` 与 resolved paths
+    `/opt/homebrew/Cellar/gnupg/2.5.21/bin/{gpg,gpgv}`。implementation 必须
+    assert image/path/realpath/version，计算并在各自 receipt/registry 记录实际
+    `gpg`/`gpgv` SHA-256；A/B observed hashes 必须相同，不同即 FAIL。installed
+    binary SHA 是由 exact image 产生的可复核 observation，不再错误复用本地 host
+    SHA 作为 hosted precondition；不得下载/重装/upgrade/relocate Homebrew
+    verifier，也不得让任何 Homebrew header/library/cache 进入 deny-network build。
+    exact image、formula/version、path/realpath 或 A/B observed hash 漂移须 fresh
+    readiness。verifier 只在隔离 keyring 上导入 exact KEYS，且 GOODSIG/VALIDSIG
+    必须同时精确匹配 accepted primary/signing fingerprints；任一失败仍为 binary
+    FAIL。本地 audit host macOS 26.5.2 (`25F84`) 只可用于
     repo-owned unit/mutation tests 与 non-final exploratory build；其 output/
     receipt 不得作为最终 registry 或 `BRC-REPRO-001` builder evidence。
   - **Two-clean-builder/reproducibility gate:binary。**builder A/B 必须是两个独立
@@ -503,7 +534,7 @@
     registry；normalization/strip-after-compare、复制一方 output 或 shared
     build/cache root 均禁止。两者就是最终 GitHub builders，不再把不同 OS 的本地
     output 计入最终 comparison。materialization 分两阶段且不得跳步：
-    (1) 首个 r2 implementation
+    (1) 首个 r3 implementation
     head 在两个 hosted jobs 各自完整构建并先完成 A/B byte comparison；
     (2) 仅将 comparison 已接受的 builder A metadata/receipts 从 transient
     artifact 复制到声明的 repo paths，unsigned Mach-O 仍不入库；(3) 新 exact
@@ -552,21 +583,22 @@
     fetch、host verifier/compiler/linker/inspection 与临时文件 effect；不进入 App
     bundle、不 sign/notarize/install/launch component，不访问 HDC/USB/device/
     bookmark/image/key/output，不产生 product authority、E1/E2/destructive、
-    privilege/entitlement/system-rule/group/ACL effect。`2026-07-25T10:49:04Z`
-    r2 勘察时 open PR #523
+    privilege/entitlement/system-rule/group/ACL effect。`2026-07-25T11:04:10Z`
+    r3 勘察时 open PR #523
     exact head `2ff6c42ee02d0f5010d55fac7d2f00a5d8992354` 仅修改
     CHG-2026-034 七个 paths，与本 readiness/implementation surface 零重叠；
-    #542 exact head `c308a999bdb4cdf327dc17436217f307ab49a896` 是本任务
-    r1 implementation attempt，预期占用 implementation/evidence paths，已因
-    fresh-readiness trigger 暂停。r2 合入后 #542 必须先将 r2 merge 纳入 ancestry
-    并按本 gate 重做，不能把失败 run 记为 PASS。恢复前必须再次完整查询 open-PR
+    #542 exact head `19ec9a08564962381974bf455b696e9327009ffe` 是本任务
+    implementation attempt，预期占用 implementation/evidence paths，已纳入 r2
+    merge 并因 r3 fresh-readiness trigger 继续暂停。r3 合入后 #542 必须先将 r3
+    merge 纳入 ancestry 并按本 gate 重做，不能把任一失败 run 记为 PASS。恢复前
+    必须再次完整查询 open-PR
     files/heads、planned paths 与 secrets scan；查询不完整、非 #542 overlap 或
     新 owner 抢占即 blocked。
 - Platform:macos
 - Requirements：`REQ-FLASH-004`、`REQ-FLASH-013`、`REQ-JOB-005`
 - Acceptance：`BRC-REPRO-001`、`AC-FLASH-013-01`、`AC-JOB-005-01`
 - Depends on：`TASK-BRC-001` done；独立 D1 readiness
-- Readiness input pins：见上方 r1 D1 readiness；implementation/evidence 开工时从
+- Readiness input pins：见上方 r3 D1 readiness；implementation/evidence 开工时从
   readiness merge 重新核验
 - Applicable failure patterns：`AF-001`、`AF-002`、`AF-003`、`AF-007`、
   `AF-009`、`AF-010`、`AF-017`
