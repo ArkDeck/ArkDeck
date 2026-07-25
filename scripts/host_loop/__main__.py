@@ -55,13 +55,59 @@ EXIT_RECONCILE = 20
 _TASK_HEADER_RE = re.compile(
     r"^##\s+(TASK-[A-Z0-9]+(?:-[A-Z0-9]+)*-[0-9]{3}[A-Z]?)(?:\s|$)", re.MULTILINE
 )
+# A field value ends at whitespace OR at the punctuation the real tasks.md puts
+# straight after it. `(\S+)` was greedy to whitespace only, so
+# `- Status:ready（r2 corrective readiness）` parsed as `ready（r2` and the
+# worker's `status == "ready"` gate could never be true for any task. The class
+# is negated rather than alphanumeric so a CJK value such as `是` still yields a
+# token to reject explicitly, instead of silently not matching.
+_VALUE = r"([^\s：:,，。；;、（）()]+)"
+# The separator before a value is horizontal whitespace ONLY. `\s*` matched a
+# newline, so a field written with an empty value did not read as absent — the
+# parser stepped over the line break and captured the first token of the prose
+# below it. For Decision-Grade that manufactures a dispatchable D0 out of a
+# sentence, which is the one value this reader must never invent.
+_GAP = r"[ \t]*"
 _FIELD_RE = {
-    "status": re.compile(r"^-\s*Status:\s*(\S+)", re.MULTILINE),
-    "hardware": re.compile(r"^-\s*Hardware required:\s*(\S+)", re.MULTILINE),
-    "grade": re.compile(r"^-\s*Decision(?:-| )[Gg]rade:\s*(\S+)", re.MULTILINE),
+    # `- Historical Status:` must not satisfy `Status:` — the real file carries
+    # 18 of the former against 8 of the latter, and reading a superseded state
+    # as current would be worse than reading none. The `^-\s*` anchor is what
+    # keeps them apart.
+    "status": re.compile(r"^-[ \t]*Status[:：]" + _GAP + _VALUE, re.MULTILINE),
+    "hardware": re.compile(r"^-[ \t]*Hardware required[:：]" + _GAP + _VALUE,
+                           re.MULTILINE),
+    "grade": re.compile(r"^-[ \t]*Decision(?:-| )[Gg]rade[:：]" + _GAP + _VALUE,
+                        re.MULTILINE),
 }
+
+# Hardware is a safety field, so its vocabulary is closed in both directions and
+# anything outside it omits the task. The previous test was
+# `.lower().startswith("yes")`, which mapped `是`, `必需`, `TBD` and a missing
+# line alike to "no hardware needed" — a permissive default on exactly the field
+# that decides whether an unattended loop may touch a task at all.
+_HARDWARE_YES = frozenset({"yes", "true", "required", "是", "需要", "必需"})
+_HARDWARE_NO = frozenset({"no", "false", "none", "否", "不需要", "无"})
 _DEPENDS_RE = re.compile(r"^-\s*Depends on:\s*(.+?)(?=^-\s|\Z)", re.MULTILINE | re.DOTALL)
 _ALLOWED_RE = re.compile(r"^-\s*Allowed paths:\s*(.+?)(?=^-\s|\Z)", re.MULTILINE | re.DOTALL)
+
+
+_FENCE_RE = re.compile(r"^(?P<fence>```+|~~~+).*?^(?P=fence)[ \t]*$",
+                       re.MULTILINE | re.DOTALL)
+
+
+def _without_code_fences(text: str) -> str:
+    """Blank out fenced blocks, preserving line count so offsets stay usable.
+
+    Section splitting was fence-unaware, so a `## TASK-…` header quoted inside a
+    fenced example became a real section: an invented candidate in discovery,
+    and — worse — a fabricated id in done_task_ids, which is the set the
+    dependency gate consults. Documentation could therefore satisfy a real
+    task's prerequisite.
+    """
+    def blank(match: re.Match) -> str:
+        return "\n" * match.group(0).count("\n")
+
+    return _FENCE_RE.sub(blank, text)
 
 
 def discover_candidates(repo_root: Path, change_id: str) -> list[TaskCandidate]:
@@ -71,14 +117,24 @@ def discover_candidates(repo_root: Path, change_id: str) -> list[TaskCandidate]:
     entry point — `--once` would exit no-dispatch unconditionally. It is
     deliberately a *reader*: it grants nothing, and the worker's own gates
     (approved change, ready status, host-only, dependencies, allowed paths,
-    base pin, decision grade, never-claim) decide what may be claimed. A task
-    whose fields cannot be parsed is omitted rather than defaulted, so a
-    malformed header can never widen what is claimable.
+    base pin, decision grade, never-claim) decide what may be claimed.
+
+    A task whose fields cannot be parsed is omitted rather than defaulted, so a
+    malformed header can never widen what is claimable. That sentence was
+    previously true of the decision grade and false of `Hardware required`,
+    where a missing or unrecognised value produced False — i.e. "host-only, go
+    ahead". Absence now omits the task in both cases.
+
+    The one thing this reader deliberately does NOT do is supply a decision
+    grade. When `- Decision-Grade:` is absent the grade stays "unknown" and the
+    worker refuses, because declaring a task's decision grade is a human
+    judgement and inventing a default here would be the reader granting itself
+    the authority it is written not to have.
     """
     tasks_file = repo_root / "openspec" / "changes" / change_id.lower() / "tasks.md"
     if not tasks_file.is_file():
         raise BackendError(f"active tasks file not found: {tasks_file}")
-    text = tasks_file.read_text(encoding="utf-8")
+    text = _without_code_fences(tasks_file.read_text(encoding="utf-8"))
 
     candidates: list[TaskCandidate] = []
     sections = re.split(r"(?m)^##\s+", text)[1:]
@@ -91,8 +147,19 @@ def discover_candidates(repo_root: Path, change_id: str) -> list[TaskCandidate]:
         if status is None:
             continue
         hardware = _FIELD_RE["hardware"].search(section)
+        if hardware is None:
+            continue  # undeclared hardware requirement: never claimable
+        hardware_value = hardware.group(1).strip().lower()
+        if hardware_value not in _HARDWARE_YES and hardware_value not in _HARDWARE_NO:
+            continue  # undecidable safety field: never claimable
         grade = _FIELD_RE["grade"].search(section)
         depends = _DEPENDS_RE.search(section)
+        if depends is None:
+            # The last field whose absence silently meant "nothing blocks me".
+            # status, hardware and allowed-paths all omit the task when
+            # unparsable; this one collapsed to () and made the worker's
+            # dependency gate vacuous. All eight real tasks declare it.
+            continue
         allowed = _ALLOWED_RE.search(section)
         if allowed is None:
             continue  # no declared allowed paths: never claimable
@@ -105,7 +172,7 @@ def discover_candidates(repo_root: Path, change_id: str) -> list[TaskCandidate]:
             task_id=task_id,
             status=status.group(1),
             decision_grade=(grade.group(1) if grade else "unknown"),
-            hardware_required=bool(hardware and hardware.group(1).lower().startswith("yes")),
+            hardware_required=hardware_value in _HARDWARE_YES,
             dependencies=dependency_ids,
             allowed_paths=allowed_paths,
             base_pin=None,
@@ -118,7 +185,7 @@ def done_task_ids(repo_root: Path) -> frozenset[str]:
     done: set[str] = set()
     changes = repo_root / "openspec" / "changes"
     for tasks_file in sorted(changes.glob("*/tasks.md")):
-        text = tasks_file.read_text(encoding="utf-8")
+        text = _without_code_fences(tasks_file.read_text(encoding="utf-8"))
         for section in re.split(r"(?m)^##\s+", text)[1:]:
             header = _TASK_HEADER_RE.match("## " + section)
             status = _FIELD_RE["status"].search(section)
@@ -143,12 +210,21 @@ def build_truth(api: ApiPort, runner, repo_root: Path, change_id: str,
     ready = frozenset(c.task_id for c in candidates if c.status.startswith("ready"))
     code, out, _err = runner(["git", "ls-remote", "origin",
                               "refs/heads/agent/host-loop/leases/*"])
+    # A failed observation must not shrink the truth set. It used to leave
+    # lease_map empty, and since reconcile clears a lease_ref that Truth does not
+    # list, one flaky ls-remote read as "the lease is gone" and dropped the fence
+    # from the cache. The PR half of this function already re-raises for exactly
+    # this reason; the lease half did not.
+    if code != 0:
+        raise BackendError(
+            "ls-remote of the lease namespace failed; refusing to build a Truth "
+            "whose lease view may be incomplete"
+        )
     lease_map: dict[str, str] = {}
-    if code == 0:
-        for line in out.strip().splitlines():
-            parts = line.split()
-            if len(parts) == 2 and OID_RE.match(parts[0]):
-                lease_map[parts[1]] = parts[0]
+    for line in out.strip().splitlines():
+        parts = line.split()
+        if len(parts) == 2 and OID_RE.match(parts[0]):
+            lease_map[parts[1]] = parts[0]
     open_numbers: set[int] = set()
     for task in ready:
         head = f"agent/host-loop/tasks/{task}"
