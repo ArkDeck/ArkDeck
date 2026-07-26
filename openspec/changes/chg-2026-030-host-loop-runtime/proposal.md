@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-030-host-loop-runtime
 revision: 11
-status: approved # r1 #361、r2 #405、r3 #407、r4 #415、r5 #423、r6 #449、r7 #456、r8 #480、r9 #483、r10 #498 已批准；r11 HLR-002A race-remediated readiness 仅在维护者 review/merge 本 PR 后生效
+status: verified # 2026-07-26 本 verification-closure PR（先例 #224/#239/#399）；七任务 done + HLR-002B tombstone 全链在案（OID 见 Verification closure）；archive 另行。原注：r1 #361…r11 已批准
 class: implementation-only
 core_change_level: none
 owner: lvye
@@ -573,3 +573,52 @@ PR 仍独立 review/merge；D1/D2 判断门后不做投机性成 PR 工作；cha
   唯一 bot PR、pre-cleanup 双读回、ordinary→reserved 删除与 PR
   closed/unmerged。成功 evidence 与 D0 done 各自独立 PR；r11 merge 本身不
   构成 PASS/done/verified。
+
+## Verification closure（2026-07-26）
+
+七个任务全部由独立 implementation/evidence 与 done PR 合入 protected main，
+TASK-HLR-002B 保持 r7 superseded `blocked` tombstone；六条 active acceptance 的
+正反证据可复查；本 PR 仅状态翻转 + 引用，零实现夹带（先例 #224/#239/#399）。
+`check-sdd` 于起草时 protected main 重新记录：0 errors / 0 warnings /
+111 acceptance IDs；offline suite 482 OK + 1 expectedFailure（见诚实注记）。
+
+- **任务链（关键 merge OID）**：HLR-001 done #402
+  `d09f5021107e4133d2fc41c1ce65d0bd09d6c12b`；HLR-001A 实现 #485
+  `cae9a4c378b75409a4d7a31205583560f17d73aa`、live evidence #490
+  `89ce135c109871c5428022ad0620a383430635dc`、done #495
+  `1815105971b5ec9bee58cb7be04cd759dc01a32b`；HLR-002A done #507
+  `901708a7af9893bc91ee654630df6922ea5099f8`（r11 canary 全链）；HLR-002 D2
+  identity evidence #518 `8e76ea4b9a832b31588f000c35feffde9f0d1c6d`、done #520
+  `f0ed7f8e901bc1acf9d740b02c7d9bbb563b39f8`；HLR-003 readiness r1–r5
+  （#521/#529/#547/#549/#551）、source #524/#531/#539/#548、D2 staging evidence
+  #550 `ba46750c325c3ed8fa58f58930e495660593b91a`、done #552
+  `24395db6b15d72781f142991aa06e765cbb695cb`；HLR-004 readiness #553
+  `fde34146d6f0cc005a4620977222ee4748e216e1`、source #554
+  `f85e8cf2b2e2fd99c884c213a5a918e87d19c829`、done #555
+  `6bdad8bfef962b032c1a343650d6ec91cb73712a`；HLR-005 readiness r1/r2
+  #560/#562、pilot evidence #566 `bd7a23640aacfffc081d653e8c6a25d59fa39fec`、
+  done #567 `fd9919d5baf5aade396b01c322b4fd9dd0cafbc3`。
+- **六 AC 结论（证据指针）**：`HLR-ENVELOPE-001` PASS（offline 契约套件 +
+  live：pilot PR #564 创建即携完整 envelope，`Base-OID` = 当时 live main，
+  MECH-004 于首个 `pull_request` event 实际读取并绿）；`HLR-AUTOCI-001` PASS
+  （#485/#490：routine bot PR 四 check 全自动、无 workflow approval、human
+  edited/reopened 复验在案）；`HLR-LEASE-001` PASS（RPT-001 topology evidence +
+  D2 identity 七负探针 + pilot：fence CAS 七次真实推进、双 owner drill 零重复
+  dispatch、stale-OID 删除被 Refused）；`HLR-WORKER-001` PASS（唯一 stable
+  identity PR、reserved 零 legacy creator、首个 `pull_request` checks 实测、
+  suffix-token 语法在案）；`HLR-REVIEW-001` PASS（独立 `claude` 会话 run ≠
+  worker run、只读、APPROVE 绑定 exact head 且明示非 GitHub approval、零
+  auto-merge）；`HLR-RECOVERY-001` PASS（S8：metadata × ancestry × subject 三证
+  一致才 release；stale-OID CAS 负观测；六 crash window 契约 fixtures 在案）。
+- **Result gate 其余项**：D2 identity staging receipt 明示
+  `workerDisabled=true`（#518）；HLR-003 scheduler staging receipt 三元组绑定
+  exact source（#550 `5b8cbc06…` @ `ae597d0d…`）；CHG-2026-033 TASK-RPT-001
+  human-only evidence/done 已 merge 并 archived；first-check live proof、
+  independent reviewer proof、merge-OID recovery proof 均在 #566 receipt。
+- **诚实注记**：① suite 的 1 expectedFailure = 本 change 八任务自身无
+  `Decision-Grade` 行的在案标记——它们是人工编排任务、从未进入派发面；grade
+  机制的 live 证明由 CHG-2026-037 TASK-TAS-001 完成（维护者亲手 D0 行 →
+  loop 认领）。标记保留，摘除属未来治理决定。② legacy creator 迁移：前置
+  （live proof）已满足，维护者 2026-07-26 显式推迟（HLR-005 done PR 在案），
+  非静默未做。③ Phase 4/cursor live 写全程为 0，留独立后续授权。④ 两个
+  left-running unit 与凭据面（App/PEM/Deploy Key/minter）状态不因本翻转改变。
