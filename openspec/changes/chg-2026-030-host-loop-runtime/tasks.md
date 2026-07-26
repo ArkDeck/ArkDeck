@@ -2281,15 +2281,24 @@
 
 ## TASK-HLR-003 — Fenced worker loop 与 legacy PR creator 迁移
 
-- Status:ready（r4 D2 readiness；仅在维护者对本独立 readiness PR exact head
+- Status:ready（r5 done-boundary readiness；仅在维护者对本独立 readiness PR exact
+  head review/merge 后生效。r4 授权的 ② staging 窗口与 ③ evidence PR 已全额消耗
+  （#550）；r5 不授权任何 source PR、任何主机/launchd/token/PEM/unit 变更（含
+  rollback）、Phase 4、dispatch、worker 认领任务。r5 只授权 ① 本 carrier 的 done
+  边界判定注记与义务转移（本节 + TASK-HLR-005 Notes，同一文件），② 其后一个独立
+  的单文件 done 状态 PR（ready→done，recheck 义务见下）。不授权清单其余与 r4 逐字
+  相同，含 review/merge/auto-merge/admin route、GitHub settings/protection/ruleset
+  修改、`sdd-guard.yml` 变更、以及**代任何任务撰写 `Decision-Grade`**。）
+- Historical Status:ready（r4 D2 readiness；仅在维护者对本独立 readiness PR exact head
   review/merge 后生效。r3 的前置① 已由 #548 消耗，r4 不再授权任何 source PR；r4 只
   授权 ② 一轮由 `lvye` 亲手执行的 host scheduler staging 窗口 **Phase 0–3**（条款
-  = r3 原文 + 下方 r4 更正），③ 其后一个独立 evidence PR。不授权清单与 r3 逐字
-  相同：不授权 Phase 4（cursor Issue 创建与首次 Issue 写入）、任何 dispatch、Agent
-  代为执行 D2、worker 认领任务、legacy creator 在 live proof 前退出、
-  review/merge/auto-merge/admin route、GitHub settings/protection/ruleset 修改、
-  App 权限或 PEM 存放位置变更、`sdd-guard.yml` 或任何 governance text 变更、以及
-  **代任何任务撰写 `Decision-Grade`**。）
+  = r3 原文 + 下方 r4 更正），③ 其后一个独立 evidence PR。不授权 Phase 4
+  （cursor Issue 创建与首次 Issue 写入）、任何 dispatch、Agent 代为执行 D2、worker
+  认领任务、legacy creator 在 live proof 前退出、review/merge/auto-merge/admin
+  route、GitHub settings/protection/ruleset 修改、App 权限或 PEM 存放位置变更、
+  `sdd-guard.yml` 或任何 governance text 变更、以及**代任何任务撰写
+  `Decision-Grade`**。②③ 于 2026-07-26 全额消耗：窗口由 lvye 执行完毕
+  （terminal=left-running），evidence = #550。）
 - Historical Status:ready（r3 D2 readiness；仅在维护者对本独立 readiness PR exact head
   review/merge 后生效。r1/r2 已交付的 offline runtime 与 source 不重新授权；r3 只额外
   授权 ① 一个 D0 source PR 交付 root-owned shell minter 的可 review 源、`--explain`
@@ -2307,9 +2316,71 @@
   `d82ceb3d03df09c4650c4edc9fcef2c406e3c0ef` 与 #539 merge
   `e70d7863b2fcdd2cf8c65a2983abd4c84919ecec` 各由维护者在会话内另行显式授权**，不由
   r2 覆盖。r3 起草期曾把三者笼统记为「r2 授权额度」，与 r2 自身文本不符，此处更正。）
-- Readiness（r4；audit base = protected `main`
+- Readiness（r5；audit base = protected `main`
+  `ba46750c325c3ed8fa58f58930e495660593b91a`；**纯增注：done 边界判定 + 义务转移，
+  零主机变更授权，不删改任何既有 Verification 文字**）：
+  - **Approval boundary:pending human merge。**本 carrier 只修改本文件的
+    TASK-HLR-003 section 与 TASK-HLR-005 的 Notes/handoff（义务转移的落点，见下）。
+    只有 `lvye` 对 exact head APPROVED、required checks terminal success、
+    `mergedBy=lvye`、`auto_merge=null` 且 squash subject 携 `(#N)` 的 merge OID 进入
+    protected main 后，本 readiness 才生效。合入前 repo/host/GitHub mutation = 0；
+    本 merge 不构成 task done——done 是其后独立单文件 PR。
+  - **Why r5 exists:live proof 归属环，维护者 2026-07-26 拍板解开。**r3 明文把
+    live first-PR proof 的归属「留待 r4 与 HLR-004 readiness 共同钉定」，r4 未钉。
+    实测存在环：本任务 Verification 的 live 半幅（唯一有效 lease 创建带完整
+    envelope 的 task PR + 首个 `pull_request` checks）需要 Phase 4、
+    `Decision-Grade` 补齐与一个天然 D0 任务；而承载 live 全流程的 TASK-HLR-005
+    依赖本任务 done。共享 AC 事实：HLR-005 的 Requirements/AC 本就含
+    `HLR-LEASE-001`/`HLR-WORKER-001`——live 半幅在 HLR-005 验证与 AC 归属零冲突。
+    维护者决定：live 半幅移至 TASK-HLR-005，legacy 迁移随行，义务不灭失。
+  - **r4 consumption:closed。**② 窗口于 2026-07-26 由 `lvye` 单次连续会话执行完毕：
+    六 receipt（preflight 22 / install-verify 6 / phase1 4 / phase2 8 /
+    phase2-after-probe 10 / phase3 11 checks）全 PASS，02:35:26Z–04:27:40Z，
+    `terminal=left-running`；③ evidence PR = #550，head
+    `11634ce2d046c491d095318b57e789b980738d00` 由 `lvye` APPROVED、merge
+    `ba46750c325c3ed8fa58f58930e495660593b91a`、`auto_merge=null`。
+    **主机 standing 状态：两个 unit 保持装载（left-running）；本 r5 不授权触碰
+    它们（含 rollback）；下一次可触碰的授权载体 = HLR-004/005 readiness 或独立
+    r6。**
+  - **Done boundary（判定注记；Verification 原文一字不动）。**逐条对应：
+    - lease/worker 契约 fail-closed 全案（双 worker acquire、stale-fence write、
+      heartbeat loss、create timeout、Issue corruption、0/2 PR lookup 等）→
+      offline suite 满足（#524/#531/#539/#548 合入版，406 tests + 各 run 变异
+      记录）。
+    - typed adapter 只暴露白名单路由、review/merge/admin route 构造数恒 0、fake
+      transport/route inventory/source scan → offline suite 满足。
+    - scheduler receipt source hash 与 main exact blob 相同 → #550
+      `d2-install-verify.json` I3 三元组满足（`5b8cbc06…` @ `ae597d0d…`）。
+    - reserved branch 零 legacy creator → TASK-HLR-002 receipt（#518）与 #550
+      phase3 S10 零增量满足。
+    - `MECH-004` allowed-paths、`check-sdd`、diff check → 各 carrier PR checks
+      满足。
+    - **移至 TASK-HLR-005 验证（落点 = 其 Notes/handoff 新增条，本 carrier 同时
+      写入）**：① 唯一有效 lease 创建带完整 envelope 的
+      `agent/host-loop/tasks/**` task PR 并在首个 `pull_request` event 看到
+      checks（live）；② old creator coexistence 的 live 观测；③ lease
+      CAS/stale-fence 的 live 充分性证明（r1 F4 open 义务，原文「HLR-002 单次
+      stale-fence 不构成充分证明」继续有效）；④ legacy creator 迁移——
+      `agent-pr.yml` 的移除/禁用不得早于**同 PR** 的新 creator live proof，
+      原文约束逐字随移。
+  - **Authorized done PR:binary，recheck 义务五项。**(a) 链条九 merge 全为 flip
+    base 的 ancestors：#521 `2667a10b…`、#524 `1a8e235f…`、#529 `05d50035…`、
+    #531 `d82ceb3d…`、#539 `e70d7863…`、#547 `5307d1b9…`、#548 `891d4f54…`、
+    #549 `ae597d0d…`、#550 `ba46750c…`；(b) flip base 上 offline suite 406 绿
+    （1 expectedFailure = `Decision-Grade` 缺口的在案记录，不得摘除）且
+    `--explain` exit 10、`claimable=none`；(c) #550 六 JSON 在 main 在位且
+    sha256 与 receipt manifest 逐一相等；(d) done 注记明写**不声称** live
+    proof/迁移/CAS live 充分性（均已转 HLR-005）且 `Decision-Grade` 缺口仍在案；
+    (e) 单文件、只动本 task 的 Status 行与 done 注记。
+  - **Concurrency/absence:closed at drafting（2026-07-26）。**remote
+    `agent/task-hlr-003*` 分支 = 0；本 carrier 分支
+    `agent/task-hlr-003-readiness-r5` 与 done 分支 `agent/task-hlr-003-done` 均
+    absent。tasks.md audit-base blob = `fb81c1e40cf0b77d6576450397361473684a2e82`；
+    review 时须确认本 carrier 相对 audit base 的差异只有：本 r5 block、Status 行
+    r4→r5 降级、TASK-HLR-005 Notes/handoff 新增一条。
+- Historical Readiness（r4；audit base = protected `main`
   `891d4f542f05e2341a091b6437b491ff9bf64727`；**纯 pin 刷新 + 三处更正，其余 r3
-  条款原文有效**）：
+  条款原文有效；②③ 授权已于 2026-07-26 全额消耗（#550），见 r5**）：
   - **Approval boundary:pending human merge。**本 carrier 只修改本文件
     TASK-HLR-003 section。只有 `lvye` 对 exact head APPROVED、required checks
     terminal success、`mergedBy=lvye`、`auto_merge=null` 且 squash subject 携
@@ -3108,3 +3179,12 @@
 
 - pilot 完成不自动使本 change `verified`；所有 HLR task done 与 evidence 完整后，
   仍须独立 verify PR。
+- **自 TASK-HLR-003 r5（2026-07-26，维护者决定）转入的义务——本任务的 readiness
+  必须逐项钉定，缺一不得 ready**：① live first-PR proof：唯一有效 lease 创建带
+  完整 envelope 的 `agent/host-loop/tasks/**` task PR，并在首个 `pull_request`
+  event 上看到 checks（与既有 In scope 的「首个 PR checks」为同一交付，此处使
+  归属显式）；② old creator coexistence 的 live 观测；③ lease CAS/stale-fence
+  的 live 充分性证明（HLR-003 r1 F4 的 open 义务：topology evidence 与 HLR-002
+  的单次 stale-fence 均不构成充分证明）；④ legacy creator 迁移——`agent-pr.yml`
+  的移除/禁用不得早于**同 PR** 的新 creator live proof，任何失败先停 scheduler
+  并保留旧 workflow 或明确 rollback（HLR-003 Notes 原文约束逐字随移）。
