@@ -2,17 +2,141 @@
 
 ## TASK-MPF-001 — 施加三项 protection delta 并双向取证
 
-- Status:blocked（**attempt#1 2026-07-26 blocked，待 r2 readiness**：窗口
-  S0–S2 PASS、S3 已执行，但 REST PUT 对 `allow_force_pushes` 无效——REST 布尔
-  是「everyone 位 OR `bypassForcePushAllowances` 白名单非空」的拍扁渲染，白名单
-  `[lvye]` 仅 GraphQL/UI 可清，classic REST 面无字段无能力；S4 FAIL（live
-  projection `0df7bc6a…` ≠ expected `4046aced…`；strict/dismiss_stale 两项已
-  live 达标）；S7 经裁决**不执行**（rollback read-back 无法证明语义还原，且
-  会把 everyone 位主动写 true、劣化于驻留态；本 evidence PR merge = 追认）。
-  驻留态与 GraphQL 面取证、jq `paths(scalars)` 假阴性等工具缺陷、r2 契约要求
-  均已钉定于 `evidence/runs/TASK-MPF-001/run.md` attempt#1。r2 = 恰好一次
-  GraphQL `updateBranchProtectionRule` 清白名单 + 双面 read-back，零 REST
-  PUT。）
+- Status:ready（r2 execution readiness；仅在维护者对本独立 readiness PR exact
+  head review/merge 后生效。只授权：一次由 `lvye` 在 Agent 不可达会话亲手执行的
+  GraphQL 窗口 = 下方 R0–R5 门序（**恰好一次** `updateBranchProtectionRule` 清
+  `bypassForcePushActorIds`，**零 REST PUT**），失败时 R6 rollback（重加 lvye
+  actor）；窗口成功后 `MPF-FLOW-001` 两项自然观测；其后 run.md attempt#2 追记
+  evidence PR 与独立 done PR。不授权：Agent 任何 protection/settings 写入；
+  白名单之外任何字段变化；ruleset `19595282`/Deploy Key/App/凭据/任何其他
+  repository setting；auto-merge；governance 正文。）
+- Historical Status:blocked（**attempt#1 2026-07-26 blocked**：窗口 S0–S2
+  PASS、S3 已执行，但 REST PUT 对 `allow_force_pushes` 无效——REST 布尔是
+  「everyone 位 OR `bypassForcePushAllowances` 白名单非空」的拍扁渲染，白名单
+  `[lvye]` 仅 GraphQL/UI 可清；S4 FAIL（live projection `0df7bc6a…` ≠ expected
+  `4046aced…`；strict/dismiss_stale 两项已 live 达标）；S7 经裁决不执行，
+  #578 merge `4a1a118a197a1a0846f04e86acf8232e0784b592` = 追认。全档见
+  `evidence/runs/TASK-MPF-001/run.md` attempt#1。）
+- Historical Status:ready（r1 execution readiness = #576 merge
+  `66a70e2a3dc7338be3cd02f9b5ddb4a1dc1ba236`；其 S0–S7 契约与 pins 见下方
+  Readiness（r1）段，作历史记录保留；r1 的一次性 PUT 授权已于 attempt#1 消耗。）
+- Readiness（r2；audit base = protected `main`
+  `4a1a118a197a1a0846f04e86acf8232e0784b592`）：
+  - **Approval boundary:pending human merge。**本 carrier 只修改本文件并新增
+    `evidence/runs/TASK-MPF-001/inputs/` 两个工件（`mpf_gql_projection.jq`、
+    `mpf_delta.jq`）。只有 `lvye` 对 exact head APPROVED、required checks
+    terminal success、`mergedBy=lvye`、`auto_merge=null` 且 squash subject 携
+    `(#N)` 的 merge OID 进入 protected main 后，本 readiness 才生效。
+  - **Dependency gate:closed。**propose #574
+    `aa6b447ceb38585a56b506ee571362f91dccb73a`、approval #575
+    `1609b4d5d185410da8d3245efcd5b5a86ccc8d8c`、readiness r1 #576
+    `66a70e2a3dc7338be3cd02f9b5ddb4a1dc1ba236`、attempt#1 blocked-attempt
+    evidence #578 `4a1a118a197a1a0846f04e86acf8232e0784b592`（= no-S7 裁决
+    落账），均 `lvye` APPROVED、audit-base ancestors。
+  - **Before-state pins:closed（2026-07-26 r2 起草时 authenticated 复测，与
+    attempt#1 驻留态零漂移；执行窗 R1 任一不符 → 零写入、停、重 readiness）：**
+    - REST full-GET SHA-256 =
+      `d3fa39903526aaa111cda50a2255811045910f4e1b201003995d3bd75346475b`
+      （= attempt#1 put.response 逐字节同体）；
+    - REST canonical projection（`mpf_projection.jq`）SHA-256 =
+      `0df7bc6a1fba967ce7fa270d81182fc8cf0a992909411aeeb7003417f17fbbfe`；
+    - GraphQL canonical projection（`mpf_gql_projection.jq`，`jq -S -c`）
+      SHA-256 =
+      `dea8a6d097a15d22202b23dcf3b92fdb31707d11dc379edf542a8cf3da1035bd`
+      逐字 =
+      `{"allowsForcePushes":false,"bypass":{"actors":[{"login":"lvye","type":"User"}],"totalCount":1},"lockBranch":false,"pattern":"main"}`；
+    - ruleset `19595282` full-GET SHA-256 =
+      `c404036f4e78b09960cc7a1705cdf8c5160f08e7baa577cb439350e2fdb31267`；
+    - 工具谱系：`jq-1.7.1-apple`（/usr/bin/jq）、`shasum -a 256`、比对一律
+      `cmp`（裸 `diff` 本机被遮蔽且崩，attempt#1 已证，禁用）。
+  - **Window inputs:committed & pinned。**本 PR 新增（r1 三工件继续在位）：
+    - `mpf_gql_projection.jq` SHA-256 =
+      `75923b674933d1d36699b151d2bae5d47b17004f3160f0edbe1e1ff619253b9c`
+      （GraphQL 投影：pattern 过滤 `main`、actor 只取 `{type, login}` **刻意
+      不含 allowance node id**——rollback 重建的 node id 必然是新值，投影须对
+      其不敏感）；
+    - `mpf_delta.jq` SHA-256 =
+      `af7c2df11d77f772448743bf4014e648f8f0b8d7cab349f3901b0e6962913624`
+      （attempt#1 修正式：`paths(type != "object" and type != "array")` +
+      双侧路径并集，false/null 叶子与 b 侧增删均可见；单项/三项/两项/GraphQL
+      增删对四组实测通过）；
+    - r1 的 `put-after.json`/`put-rollback.json` 本窗口**零使用**（历史工件
+      如实保留，任何 REST PUT 均不在 r2 授权内）。
+  - **Expected after:closed（确定性推导 + host 侧实测）。**
+    - GraphQL projection SHA-256 =
+      `241b916010e3fa431663c36d21af7bd4b361cb4a374a789f0db7d74366efbac6`
+      逐字 =
+      `{"allowsForcePushes":false,"bypass":{"actors":[],"totalCount":0},"lockBranch":false,"pattern":"main"}`；
+    - REST projection SHA-256 = `4046aced77a6ff040ea6789b6edf96a80e288ae6ef144d9d89a85b76a336d2dc`
+      （r1 原 expected **复用**；「白名单清空后 REST 布尔渲染 false」是 R3
+      待证门而非假设——若 GraphQL 面全达标而 REST 布尔仍 true，即第三个渲染
+      语义面，停、如实记、重 readiness）；
+    - REST 逐字段 delta 恰一元（R3 输出须逐字节相等，jq `-c` 单行）：
+
+      ```json
+      [{"path":"allow_force_pushes","a":true,"b":false}]
+      ```
+
+    - 信任根七元组不变：`[1,true,true,["lvye"],true,["guard"],false]`。
+  - **Mutation pins。**rule `BPR_kwDOTWtevs4Extgh`（databaseId `80140321`）；
+    rollback actor = `lvye` User node id `MDQ6VXNlcjQzNDAxNjE=`（databaseId
+    `4340161`，与 REST `restrictions.users[0].id` 一致）；两条 mutation 字符串
+    逐字钉定于 R2/R6。GraphQL update 为 patch 语义（未提供字段不动），其兜底 =
+    R3 的 REST 全语义投影相等门（覆盖整个 protection 面）。GraphQL mutation
+    错误即原子失败 = 零变更（停、贴回转录，不重试不改写）。
+  - **Window contract（R0–R6；mutation 仅 R2/R6 且仅 `lvye` 亲手；Agent 已于
+    live before + 确定性 after 上 host 侧自测 R1/R3/R4 全部比对逻辑，mutation
+    字符串为语法审查 + R3 兜底门）：**
+
+    ```bash
+    # R0 身份与工具（输出须为 lvye / jq-1.7.1-apple）
+    gh api user --jq .login
+    jq --version
+    OUT=~/mpf001-out && mkdir -p "$OUT" && cd <ArkDeck checkout root>
+    IN=openspec/changes/chg-2026-038-main-protection-merge-friction/evidence/runs/TASK-MPF-001/inputs
+    # R1 输入工件 + before 复测（哈希逐一命中 pins；任一不符 → 停，零写入）
+    shasum -a 256 "$IN"/mpf_projection.jq "$IN"/mpf_gql_projection.jq "$IN"/mpf_delta.jq
+    gh api repos/ArkDeck/ArkDeck/branches/main/protection > "$OUT/r2.before.rest.json"
+    shasum -a 256 "$OUT/r2.before.rest.json"
+    jq -S -c -f "$IN/mpf_projection.jq" "$OUT/r2.before.rest.json" > "$OUT/r2.before.rest.projection.json"
+    shasum -a 256 "$OUT/r2.before.rest.projection.json"
+    gh api graphql -f query='{repository(owner:"ArkDeck",name:"ArkDeck"){branchProtectionRules(first:10){nodes{pattern allowsForcePushes lockBranch bypassForcePushAllowances(first:10){totalCount nodes{actor{__typename ... on User{login}}}}}}}}' > "$OUT/r2.before.gql.json"
+    jq -S -c -f "$IN/mpf_gql_projection.jq" "$OUT/r2.before.gql.json" > "$OUT/r2.before.gql.projection.json"
+    shasum -a 256 "$OUT/r2.before.gql.projection.json"
+    gh api repos/ArkDeck/ArkDeck/rulesets/19595282 > "$OUT/r2.ruleset.before.json"
+    shasum -a 256 "$OUT/r2.ruleset.before.json"
+    # R2 唯一写入（仅 lvye 亲手；GraphQL errors = 原子失败零变更，停并贴回）
+    gh api graphql -f query='mutation{updateBranchProtectionRule(input:{branchProtectionRuleId:"BPR_kwDOTWtevs4Extgh",bypassForcePushActorIds:[]}){branchProtectionRule{allowsForcePushes bypassForcePushAllowances(first:10){totalCount}}}}' > "$OUT/r2.mutation.response.json"
+    # R3 双面 read-back（GraphQL projection == 241b9160…；REST projection == 4046aced…；delta 恰一元；七元组；REST 全量哈希如实记录不 pin）
+    gh api graphql -f query='{repository(owner:"ArkDeck",name:"ArkDeck"){branchProtectionRules(first:10){nodes{pattern allowsForcePushes lockBranch bypassForcePushAllowances(first:10){totalCount nodes{actor{__typename ... on User{login}}}}}}}}' > "$OUT/r2.after.gql.json"
+    jq -S -c -f "$IN/mpf_gql_projection.jq" "$OUT/r2.after.gql.json" > "$OUT/r2.after.gql.projection.json"
+    shasum -a 256 "$OUT/r2.after.gql.projection.json"
+    gh api repos/ArkDeck/ArkDeck/branches/main/protection > "$OUT/r2.after.rest.json"
+    shasum -a 256 "$OUT/r2.after.rest.json"
+    jq -S -c -f "$IN/mpf_projection.jq" "$OUT/r2.after.rest.json" > "$OUT/r2.after.rest.projection.json"
+    shasum -a 256 "$OUT/r2.after.rest.projection.json"
+    jq -n -c --slurpfile a "$OUT/r2.before.rest.projection.json" --slurpfile b "$OUT/r2.after.rest.projection.json" -f "$IN/mpf_delta.jq" | tee "$OUT/r2.delta.json"
+    jq -c '[.required_pull_request_reviews.required_approving_review_count, .required_pull_request_reviews.require_code_owner_reviews, .enforce_admins.enabled, (.restrictions.users|map(.login)), .required_linear_history.enabled, (.required_status_checks.checks|map(.context)), .allow_deletions.enabled]' "$OUT/r2.after.rest.json"
+    # R4 ruleset 前后逐字节一致（cmp 沉默 + UNTOUCHED）
+    gh api repos/ArkDeck/ArkDeck/rulesets/19595282 > "$OUT/r2.ruleset.after.json"
+    cmp "$OUT/r2.ruleset.before.json" "$OUT/r2.ruleset.after.json" && echo RULESET-UNTOUCHED
+    # R5 receipts 汇总（贴回转录）
+    shasum -a 256 "$OUT"/r2.*
+    # R6 仅失败时 rollback（重加 lvye actor；read-back 双面 == before 投影 dea8a6d0…/0df7bc6a…；随后记 blocked-attempt）
+    gh api graphql -f query='mutation{updateBranchProtectionRule(input:{branchProtectionRuleId:"BPR_kwDOTWtevs4Extgh",bypassForcePushActorIds:["MDQ6VXNlcjQzNDAxNjE="]}){branchProtectionRule{bypassForcePushAllowances(first:10){totalCount}}}}' > "$OUT/r2.rollback.response.json"
+    gh api graphql -f query='{repository(owner:"ArkDeck",name:"ArkDeck"){branchProtectionRules(first:10){nodes{pattern allowsForcePushes lockBranch bypassForcePushAllowances(first:10){totalCount nodes{actor{__typename ... on User{login}}}}}}}}' | jq -S -c -f "$IN/mpf_gql_projection.jq" | shasum -a 256
+    gh api repos/ArkDeck/ArkDeck/branches/main/protection | jq -S -c -f "$IN/mpf_projection.jq" | shasum -a 256
+    ```
+
+  - **Flow observation 与 evidence deliverables:与 r1 条款同**——
+    `MPF-FLOW-001` 两观测在 `MPF-DELTA-001` PASS 后如实取首两个满足载体
+    （预期 = attempt#2 evidence PR 与 done PR，不绑死）；`lvye` 贴回 `$OUT`
+    receipts → Agent 起草 run.md **attempt#2 追记**（同文件追加，不改写
+    attempt#1）→ 独立 done PR。失败路径：R6 后 run.md 记 blocked-attempt，
+    任务退 blocked 重 readiness。
+  - **Concurrency/absence:closed at drafting（2026-07-26）。**remote
+    `agent/*mpf*` 分支除本 carrier 外 = 0；无其他 in-flight PR 触碰本 change
+    目录。
 - Historical Status:ready（r1 execution readiness = #576 merge
   `66a70e2a3dc7338be3cd02f9b5ddb4a1dc1ba236`；其 S0–S7 契约与 pins 见下方
   Readiness（r1）段，作历史记录保留；r1 的一次性 PUT 授权已于 attempt#1 消耗。）
@@ -173,6 +297,9 @@
 
 - rollback = 以 before 值反向 PUT 三项并 read-back 复验 before projection
   SHA-256；PEM/App/Deploy Key/ruleset/其他 setting 一律不动。
+- **r2 注记（2026-07-26）**：本条 REST 反向 PUT rollback 仅属 r1 窗口历史——
+  attempt#1 已证其 read-back 无法证明语义还原（见 run.md）；r2 窗口的 rollback
+  = GraphQL 重加 `lvye` actor + 双面投影 read-back（见 Readiness（r2）R6）。
 - 本任务不携带 `Decision-Grade` 行：该行由维护者亲手撰写。**注意等级判定**：
   protection 写入属 D2（凭据/设置面、人类执行），不是 D0——即使标了 grade 也不
   应进入循环派发面，`Hardware required:no` 不代表机器可判定。
