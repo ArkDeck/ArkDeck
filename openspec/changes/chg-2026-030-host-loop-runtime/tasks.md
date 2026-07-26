@@ -3276,15 +3276,103 @@
 
 ## TASK-HLR-005 — 受控 live pilot 与恢复演练
 
-- Status:blocked（pre-readiness r0 账目，2026-07-26：① change approval 已闭；②
-  TASK-HLR-003 done = #552 merge `24395db6b15d72781f142991aa06e765cbb695cb`；③
-  TASK-HLR-004 done = #555 merge `6bdad8bfef962b032c1a343650d6ec91cb73712a`（均
-  `lvye` APPROVED、`auto_merge=null`）；④ 独立 readiness **尚不可开**：其必须钉定
-  的「天然出现的已批准 ready host-only 可派发任务」经 2026-07-26 全仓逐门扫描
-  （11 个活跃 change × 全任务 × `rejection_reasons` 全门）**不存在**——唯一
-  grade-only 候选 `TASK-RKFUI-001G` 按其自身 readiness 为 **D1**（gated：worker
-  只记阻塞、不 dispatch），为喂 pilot 改标 D0 = 制造任务，为本 Status 原文所禁。
-  本任务保持 blocked 至天然 D0 出现；触发清单见下方 Pre-readiness。）
+- Status:ready（r1 pilot readiness；仅在维护者对本独立 readiness PR exact head
+  review/merge 后生效。授权且仅授权：① 一次实现内容推送——TASK-TAS-001 的
+  chg-037 r1 契约 diff，经 Deploy Key 推到 loop 创建的
+  `agent/host-loop/tasks/TASK-TAS-001` 分支（一次性，diff 恰为该契约）；②
+  foreground pilot 轮——与已合入代码同字节的
+  `python3 -m host_loop --once --change CHG-2026-037-host-loop-transport-allowlist-shrink`
+  重复执行至 checksGreen（人手替代 launchd 触发，unit 不参与也不可参与）；③
+  reviewer 的**首次 live dispatch**——`SubprocessReviewerAdapter` 拉起独立
+  `claude` 会话，结果 serialize 入 evidence，零 GitHub 写；④ merge 后 recovery
+  驱动——`confirm_merged` 双源确认 + 过期 lease takeover/release（= 唯一授权的
+  ref 删除写）+ 一次 exact-OID 不符负观测；⑤ 其后 evidence PR 与独立 done 状态
+  PR。不授权：cursor Issue 创建或任何 Issue 写（Phase 4 剥离，见 r1 更正）、任何
+  unit/plist/launchd/host 变更（r5 冻结续）、`agent-pr.yml`/`.github/**` 变更
+  （legacy 迁移载体见 r1 钉定）、review/merge/auto-merge/admin route、以及
+  **代任何任务撰写 `Decision-Grade`**（TAS-001 的 D0 行由维护者亲手落 main，
+  载体自选，时点 = 本 readiness 合入后、S2 之前）。）
+- Historical Status:blocked（pre-readiness r0 账目，2026-07-26：① change approval
+  已闭；② TASK-HLR-003 done = #552 merge
+  `24395db6b15d72781f142991aa06e765cbb695cb`；③ TASK-HLR-004 done = #555 merge
+  `6bdad8bfef962b032c1a343650d6ec91cb73712a`（均 `lvye` APPROVED、
+  `auto_merge=null`）；④ 独立 readiness 当时不可开：天然可派发任务经全仓扫描不
+  存在。**该缺口已闭**：维护者 2026-07-26 决定推进 transport allowlist 收缩线
+  （立项记录早于 pilot 触发的存在），CHG-2026-037 经 #557 propose、#558
+  approval、#559 readiness（merge `1c6581b163ce64a0c91405a5bc98325f99d6aa50`）
+  产出 TASK-TAS-001 = ready、host-only、依赖零缺、唯一拒因 grade unknown 的
+  天然任务。）
+- Readiness（r1；audit base = protected `main`
+  `1c6581b163ce64a0c91405a5bc98325f99d6aa50`）：
+  - **Approval boundary:pending human merge。**本 carrier 只修改本文件
+    TASK-HLR-005 section。只有 `lvye` 对 exact head APPROVED、required checks
+    terminal success、`mergedBy=lvye`、`auto_merge=null` 且 squash subject 携
+    `(#N)` 的 merge OID 进入 protected main 后，本 readiness 才生效；合入前
+    pilot 零动作。
+  - **两处更正（fail-closed 如实）**：① r0 曾写 Phase 4 播种 helper
+    「`--render-cursor-seed` 留待 r1 授权的小 source PR」——本任务 Forbidden
+    paths 含 `scripts/**`，该 helper 不可能在本任务内交付，r0 该句自相矛盾，
+    删除；Phase 4（cursor Issue 创建/首次写/loop 挂接）整体**剥离出 pilot**，
+    留待独立后续授权（五条 AC 的 live 最小面不需要 cursor；机器块人工播种的
+    可行性已实测：`CursorState.render()` round-trip PASS，事实备查）。② r0 与
+    TAS-001 r1 的「提前补 grade 即被 unit 提前认领」警示对 TAS-001 **不成立**：
+    unit 的 `--change` 恒为本 change（r3 补偿控制），扫不到 chg-037；该警示仅对
+    本 change 内任务有效。pilot 轮因此全部 foreground 显式带 `--change`，unit
+    全程只跑空轮（其持续 idle 本身就是 left-running 稳定性的并行观测）。
+  - **Pilot 对象:pinned。**TASK-TAS-001（CHG-2026-037，readiness #559 merge
+    `1c6581b163ce64a0c91405a5bc98325f99d6aa50`）；其三 source blob pins 与实现
+    契约（含「恰 3 pin 断言反应」门与 482 期望计数）以该 readiness 原文为准。
+    identity = App `4388667` / installation `148855345`（TASK-HLR-002
+    receipt）；expected checks = push 侧 `guard`+Swift、PR 侧 worker body-update
+    触发 `edited` 后 exact-head `guard`+`allowed-paths` 全 success（
+    `REQUIRED_PR_CHECKS` 语义）；reviewer session = `SubprocessReviewerAdapter`
+    + `claude` backend（availability probe 于 S0 复跑）；batch Issue =
+    `batch-20260726-1` 单项 digest（canonical 模板 blob `f5f82e34…`，维护者手
+    建，正文由 Agent 以 `queue_for_batch`/`render_batch_issue` 渲染供贴）。
+  - **编排（S0–S9，每步注明 actor；顺序固定，任一 STOP 即停）**：
+    S0 preflight（Agent，只读）：`HEAD==origin/main`、TAS-001 三 blob 零漂移、
+    `agent/host-loop/**` refs=0、task/lease 分支 absent、两 unit `print` 存活、
+    App 身份 PR/Issue 基线、probe 复跑。
+    S1 grade 行（**维护者亲手**）：向 chg-037 tasks.md TAS-001 section 落一行
+    `- Decision-Grade:D0。`进 protected main（载体自选：本地直接 push 属
+    push-allowlist 内先例，或自开 PR；Agent 不代写不代推）。
+    S2 认领轮（Agent，foreground）：`--once --change CHG-2026-037-…` → 期望
+    exit 0（dispatched）：lease `fence=1` 创建、空 envelope PR 开启（empty
+    commit on frozen base，MECH-004 接受空 diff）。记录 PR number/head、
+    push-side checks、reserved 分支 legacy creator run/PR = 0（coexistence 正
+    观测之一）。
+    S3 实现推送（Agent，授权①）：契约 diff 一个 commit 推上 task 分支，head
+    前移。
+    S4 接力轮（Agent，foreground，≥2 轮）：lease 未过期时先跑一轮 = **foreign-
+    lease/stale-fence drill**（期望 exit 10 零写；fault drill 分支「stale
+    fence 不创建第二 PR」的活观测）；过期后一轮 takeover（前置=PR identity 重
+    查+exact OID）→ adopt 唯一 PR（零第二 PR）→ body-update 重派 checks →
+    直至 `checksGreen`。
+    S5 reviewer（Agent，授权③）：`ReviewerLoop.review_once` 实跑；结论如实
+    （APPROVE 才入队；REQUEST_CHANGES/BLOCKED = workerPaused 如实记录并停）。
+    S6 batch（**维护者**）：手建 `batch-20260726-1`，贴 Agent 渲染正文（首屏
+    声明原样 + 单项 digest）。
+    S7 merge（**维护者**）：对 exact head review + squash merge = 唯一批准载
+    体。
+    S8 recovery（Agent，授权④）：`confirm_merged` 双源（metadata × ancestry+
+    subject）；**CAS 负观测** = 以 takeover 前旧 OID 尝试 lease 删除 → 必须
+    Refused/FenceLost；随后正确 takeover 过期 lease → `release`（exact-OID 删
+    lease ref）→ `ls-remote` 归零复验。
+    S9 evidence PR（分支 `agent/task-hlr-005-pilot-evidence-r1`，已验 absent）
+    → 独立 done 链（HLR-005 done、TAS-001 done、chg-037 verify 各自独立 PR）。
+  - **r5 四义务逐项钉定**：① live first-PR proof = S2–S4（唯一有效 lease 创建
+    带完整 envelope 的 task PR + 首个 `pull_request` event checks 实测）；②
+    old creator coexistence = S2 的 reserved 零 legacy 观测 + 同期任一 ordinary
+    `agent/*` 分支照常 bot auto-PR（本 carrier 自身即样本）；③ lease CAS live
+    充分性（F4 闭）= pilot 全程 ≥3 种 CAS 操作（create/takeover/delete）各≥1
+    次真实发生 + S8 的 exact-OID 不符负观测 ≥1 次；④ legacy 迁移 =
+    **载体钉定为 live proof 达成后由维护者决定的独立治理 PR**（`agent-pr.yml`
+    属本任务 Forbidden paths，Agent 不触碰）；HLR-005 done 条件 = ①②③ 齐备
+    且 ④ 已执行**或**维护者显式决定推迟并记录于 done PR——二者其一，如实。
+  - **失败面**：S2 非 exit 0、任何第二 PR、checks 非 green 稳定态、reviewer
+    非 APPROVE、S8 双源歧义、任何 cursor/Issue 意外写、reserved 分支出现
+    legacy creator——一律停在原地如实记录，evidence 记 blocked-attempt，不得
+    以 cleanup 改写结论。
 - Historical Status:blocked（前置：① 本 change approval；② TASK-HLR-003 done；③
   TASK-HLR-004 done；④ 独立 readiness PR 钉定一个天然出现的已批准 ready host-only
   task、integration identity receipt、预期 checks、reviewer session、batch Issue 与
