@@ -2281,7 +2281,16 @@
 
 ## TASK-HLR-003 — Fenced worker loop 与 legacy PR creator 迁移
 
-- Status:ready（r3 D2 readiness；仅在维护者对本独立 readiness PR exact head
+- Status:ready（r4 D2 readiness；仅在维护者对本独立 readiness PR exact head
+  review/merge 后生效。r3 的前置① 已由 #548 消耗，r4 不再授权任何 source PR；r4 只
+  授权 ② 一轮由 `lvye` 亲手执行的 host scheduler staging 窗口 **Phase 0–3**（条款
+  = r3 原文 + 下方 r4 更正），③ 其后一个独立 evidence PR。不授权清单与 r3 逐字
+  相同：不授权 Phase 4（cursor Issue 创建与首次 Issue 写入）、任何 dispatch、Agent
+  代为执行 D2、worker 认领任务、legacy creator 在 live proof 前退出、
+  review/merge/auto-merge/admin route、GitHub settings/protection/ruleset 修改、
+  App 权限或 PEM 存放位置变更、`sdd-guard.yml` 或任何 governance text 变更、以及
+  **代任何任务撰写 `Decision-Grade`**。）
+- Historical Status:ready（r3 D2 readiness；仅在维护者对本独立 readiness PR exact head
   review/merge 后生效。r1/r2 已交付的 offline runtime 与 source 不重新授权；r3 只额外
   授权 ① 一个 D0 source PR 交付 root-owned shell minter 的可 review 源、`--explain`
   干跑模式与两处已实测 fail-closed 缺陷的修复，② 一轮由 `lvye` 亲手执行的 host
@@ -2290,15 +2299,123 @@
   认领任务、legacy creator 在 live proof 前退出、review/merge/auto-merge/admin
   route、GitHub settings/protection/ruleset 修改、App 权限或 PEM 存放位置变更、
   `sdd-guard.yml` 或任何 governance text 变更、以及**代任何任务撰写
-  `Decision-Grade`**。）
+  `Decision-Grade`**。前置① 于 2026-07-25 由 #548 消耗；其 drift gate 与 #548 的
+  自相矛盾由 r4 更正。）
 - Historical Status:ready（r2 corrective readiness；#529 merge
   `05d500354f802813239803982047b08178c62fcf` 后生效。r2 授权「一个 D0 source PR」，
   由 #524 merge `1a8e235fc7174c647e8e971dee3f1a6d2dd16325` 消耗；**#531 merge
   `d82ceb3d03df09c4650c4edc9fcef2c406e3c0ef` 与 #539 merge
   `e70d7863b2fcdd2cf8c65a2983abd4c84919ecec` 各由维护者在会话内另行显式授权**，不由
   r2 覆盖。r3 起草期曾把三者笼统记为「r2 授权额度」，与 r2 自身文本不符，此处更正。）
-- Readiness（r3；audit base = protected `main`
-  `40bfee1a3bf2f8981fa752e9e3995d8d04434e00`）：
+- Readiness（r4；audit base = protected `main`
+  `891d4f542f05e2341a091b6437b491ff9bf64727`；**纯 pin 刷新 + 三处更正，其余 r3
+  条款原文有效**）：
+  - **Approval boundary:pending human merge。**本 carrier 只修改本文件
+    TASK-HLR-003 section。只有 `lvye` 对 exact head APPROVED、required checks
+    terminal success、`mergedBy=lvye`、`auto_merge=null` 且 squash subject 携
+    `(#N)` 的 merge OID 进入 protected main 后，本 readiness 才生效。合入前
+    account/launchd/plist/token-file/PEM/App/installation/Issue/PR/ref/scheduler
+    mutation = 0；本 merge 不构成 D2 evidence、task done 或 change verified。
+  - **Why r4 exists:r3 的 drift gate 与其自身前置① 自相矛盾（实测）。**r3 把
+    `hostloop_main`/`hostloop_worker` 钉进十六 blob drift gate（「任一 drift 即零
+    D2 write」），而 r3 前置① 要求的 `--explain`（落在 `__main__.py`）与归档依赖
+    修复（落在 `worker.py`）必然修改这两个文件。实测 @ `891d4f5…`：十四 pin 仍逐字
+    相等；`hostloop_main` `07d2c8d1…`→`aa47dd45…`、`hostloop_worker`
+    `f71d3a98…`→`b9662c76…`；#548 合入前（`5307d1b…`）两 blob 与 r3 pins 逐字相等；
+    自 r3 audit base `40bfee1a…` 起触碰 `scripts/host_loop/` 的 commit 有且只有
+    #548。故该门在 #548 之后**永远无法通过**——与 r3 自己删除的「sudo 恒假门」同型。
+    r4 以 #548 之后的 base 重钉全表；门语义不变。
+  - **Prerequisite ① consumed:closed。**#548 head
+    `c401e48891d0f0e95d6ddf694c2688adef7fc119` 由 `lvye` 于 exact head APPROVED，
+    `2026-07-25T15:17:46Z` 合入为 `891d4f542f05e2341a091b6437b491ff9bf64727`，
+    `auto_merge=null`、`mergedBy=lvye`；四文件 = minter 可 review 源、`--explain`、
+    归档依赖修复、cursor-env 零写测试，恰为 r3 前置① 四项。**r4 不授权任何新的
+    source PR**；若窗口前 `scripts/host_loop/**` 再有任何变更，本 readiness 作废，
+    须 r5。
+  - **Dependency/authority gate:closed。**r3 carrier #547 reviewed head
+    `a0b86f7bb14f627e9e88de1a496dd10c879a570c` 由 `lvye` APPROVED，
+    `2026-07-25T13:08:12Z` 合入为 `5307d1b9833333952ae54f41256764394d66f692`，
+    `auto_merge=null`；与上条 #548 均为 audit-base ancestors。r3 依赖表六 merge
+    不变，仍全部为 ancestors。
+  - **Git input pins（r4 drift gate，取代 r3 十六 blob 表）。**audit base parent =
+    `5307d1b9833333952ae54f41256764394d66f692`，tree =
+    `c81ac589eeb14cf0ce83eb86376eb2c32c4adac3`，subject =
+    `feat(TASK-HLR-003): add the token minter, --explain, and close two
+    fail-opens (#548)`。下列**十七个 blob 是 drift gate**：必须在 D2 preflight 中
+    逐项相等，任一 drift 即零 D2 write。第十七项 `hostloop_minter` 为 r4 新增——
+    root 每个间隔都执行它的已安装副本，它属于「循环每轮依赖的字节」，且其存在使
+    r3 的 Ordering 义务（installed hash == 仓内 hash @ preflight main OID，三者进
+    receipt，仓内侧必须 `git show <main-oid>:<path>` 读取）从「对未来字节的义务」
+    变为可同时对 pin 校验；该义务原文继续有效：
+
+    ```yaml
+    agents_contract:     3c2d3c6a01d3eaa31cd9e3ee333f3153552f4164
+    codeowners:          f4edd22f87965efcfc27ea512283a0c2252bf0fb
+    agent_pr_workflow:   a514d9e539964f9e1960acbe4ffaa696629571da
+    sdd_guard_workflow:  c64135e1f9dc253a92640a30bbcad42b0afa86fa
+    chg030_proposal:     f179c9981d50d0e2a90cf20b93a6b6b23912e4bf
+    chg030_design:       9cb3bebd1874e13a2ad580138d4f91eeace2fb6b
+    chg030_verification: b3154599c3d2d935adfbcade5d9765cd34e3cca5
+    hostloop_init:       7a6c5b9223c68f9d8aadd503fb38842346c710fc
+    hostloop_main:       aa47dd45a29ac4531e4c38e3cbe84acaaf2b18a5
+    hostloop_backends:   0efa3e8c74c7935f96742d4d9f1649cc91534dd2
+    hostloop_transport:  55e17e3caf139522c189dc6284db6ae90272fad2
+    hostloop_worker:     b9662c76a0948abb049d293b2b03948a8fb570a5
+    hostloop_cursor:     0961ec62409644421dc8ed8eea68230e8fa93b5e
+    hostloop_lease:      685fb3c3c8c8266c52816027c92b300ea7cd6732
+    hostloop_identity:   d22e62946e3b5b836cbdcd9b48b57031172fe4b1
+    hostloop_envelope:   2c286c8da0fa8945d512115dfce9de5150db0831
+    hostloop_minter:     4150401c5f875ac282d38d6f70eb4c0c35f97689
+    ```
+
+    本文件的 blob 仍**不是** drift gate，只作 provenance：audit-base 值 =
+    `327d84139ea6989674e3966e636a8fc38c90d3a2`；preflight 须记录合入后的实际值，并
+    确认其与 audit-base 值之间的差异**只有**本 r4 block（含 Status 行的 r3→r4
+    降级）。
+  - **Minter install path:pinned（维护者 2026-07-25 选定）。**安装路径 =
+    `/Library/PrivilegedHelperTools/com.arkdeck.host-loop.mint.sh`。该目录已实测
+    存在且 `root:wheel`（`drwxr-xr-t`），全链仅 root 可写，是 macOS 约定的 root
+    helper 可执行文件位置。安装形式：从
+    `git show <main-oid>:scripts/host_loop/mint_installation_token.sh` 的输出
+    （**不得**从工作树文件——工作树对 Agent 可写）经
+    `sudo install -o root -g wheel -m 0555` 落位。**该路径本身由本 readiness
+    公开钉定，receipt 得引用之**；PEM 目录路径与 PEM staging 路径仍不得以明文出现
+    （r3 脱敏面不变）。**手工确认 M1（进 receipt 的
+    `manual_confirmations_required`）：operator 确认该目录不是 PEM 所在目录**——
+    PEM 位置只有 operator 知道，此判断无法由 Agent 或机器检查替代；若同址，本 pin
+    作废，须 r5 另择路径。
+  - **Phase 3 非并发观测:如实记录条款（维护者 2026-07-25 决定）。**r3 要求
+    minter 与 scheduler「日志每行前缀写入 run_id 与 pid」，但已合入的 #548/#524
+    代码不输出该前缀（r3 起草时未对照实现，该观测在现字节上不可产出）。按 r3 自带
+    回退条款执行：receipt 将该观测**如实记录为「未证明」**，并补记两条结构性事实
+    作为替代观测：① launchd 对同一 label 不并发第二实例——`StartInterval` 到点时
+    上一实例未退出则跳过该次触发，表现为缺失；② scheduler 单轮为 `--once` 短进程，
+    `pgrep -fl host_loop` 在轮间隔内可抽样为空。**不授权**为补前缀而新开 source
+    PR；若未来 revision 引入前缀，归 HLR-004/005 的 readiness。其余 Phase 3 条款
+    （连续 ≥3 轮退出 10、增量全 0、反证、abort 条件）原文有效。
+  - **Concurrency/absence gate:re-measured 2026-07-25（Agent 起草前只读复测）。**
+    `agent/task-hlr-003*` 远端分支 = 0，`agent/host-loop/**` 远端 refs = 0；本
+    carrier 分支 `agent/task-hlr-003-d2-readiness-r4` 与 evidence 分支
+    `agent/task-hlr-003-d2-evidence-r1` 远端 absent；runtime label 在
+    `gui/501` 与 `system` 双域 `print` 均 exit 113，refresh label 在 `system` 域
+    exit 113；两域 `print-disabled` 的 host-loop 条目 = 0；`~/Library/
+    LaunchAgents/` 8 项、host-loop 者 0；`arkdeckhlr` = eDSRecordNotFound。窗口
+    Phase 0 仍须按 r3 absence 表在**同一域**逐项复验，本条不替代之。
+  - **Baseline runs @ audit base。**offline suite `python3.14.6` 406 tests OK +
+    1 expectedFailure（该 expectedFailure 即 Decision-Grade 缺失的在案记录）；
+    `--explain --repo-dir <checkout>` exit 10、八任务逐门拒绝、`claimable=none`
+    ——r3「scheduler `--change` 恒为本 change 且零可派发候选」的补偿控制观测已可
+    复现。窗口 Phase 1/3 仍须在窗口内重新产出各自的 `--explain` 输出。
+  - **Everything else:r3 原文有效，r4 不重述。**操作者与窗口边界（单次连续会话、
+    两种终态）、Ordering 义务、Dispatch-authority binding 三项记录、credential
+    topology D′ 全部条款（含 sudo 三性质与禁止形态）、scheduler ownership 退役、
+    Phase 0–3 全部门与 abort 条件、negative probes、Rollback 六步、Receipt shape
+    与脱敏面、Phase 4 三条不授权理由、live first-PR proof 归属留待 r4 与
+    HLR-004 readiness 共同钉定的声明——均以 r3 原文为准；本 r4 仅更正上列五处
+    （pin 表、audit base、minter 路径、① 消耗记录、Phase 3 观测记录规则）。
+- Historical Readiness（r3；audit base = protected `main`
+  `40bfee1a3bf2f8981fa752e9e3995d8d04434e00`；十六 blob pin 表经 r4 刷新为十七
+  blob 表，其余条款经 r4 确认继续有效）：
   - **Approval boundary:pending human merge。**本 carrier 只修改本文件
     TASK-HLR-003 section。只有 `lvye` 对 exact head APPROVED、required checks
     terminal success、`mergedBy=lvye`、`auto_merge=null` 且 squash subject 携
