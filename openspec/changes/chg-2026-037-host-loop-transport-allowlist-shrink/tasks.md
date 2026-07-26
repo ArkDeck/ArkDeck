@@ -70,6 +70,7 @@
   产品 source/tests、其他 change。
 - Risk:low（只收不放；全量 suite 为零行为变更之门；误删活路由会立即红）。
 - Hardware required:no。
+- Decision-Grade:D0。
 
 ### Deliverables
 
