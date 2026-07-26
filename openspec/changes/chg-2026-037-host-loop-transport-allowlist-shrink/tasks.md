@@ -2,14 +2,25 @@
 
 ## TASK-TAS-001 — 移除两条零构造点死路由并钉死收缩后语义
 
-- Status:ready（r1 implementation readiness；仅在维护者对本独立 readiness PR exact
-  head review/merge 后生效。只授权一个实现交付：按下方契约收缩 allowlist 并同步
-  pins/回归测试，载体 = 维护者按 CHG-2026-030 TASK-HLR-005 编排选定（预期 =
+- Status:done（2026-07-26 D0 completion；仅在维护者 review/merge 本独立
+  `ready→done` PR 后生效。实现载体 = host-loop pilot envelope PR #564（loop 认领、
+  App 身份 authored，exact head `f6bf27d64bfe3aa4efc47ac9ebbcf7dbe42dfb66` 由
+  `lvye` APPROVED，squash merge `877347f212ab0bffa9924801a037b3256f1eea56`、
+  `auto_merge=null`）——即 r1 记录的预期载体，全生命周期在
+  CHG-2026-030 TASK-HLR-005 pilot receipt 在案。evidence = #568 merge
+  `cd0d7bda5f090ead2102077a6af158b42a62c606`（TAS-ROUTE-001 与 TAS-BEHAVIOR-001
+  均 PASS）。flip base `cd0d7bda…` recheck：`ALLOWED_ROUTES` = 8 且内容被精确断言、
+  两条裸列表拒绝回归测试绿、全量 suite 482 OK + 1 expectedFailure（属 chg-030 的
+  在案标记，非本 change 缺口）、`check-sdd` 0/0/111、实现 diff 恰为三个 Allowed
+  文件。本 done 不声称 change 级 verified——verify 为下一独立 PR。）
+- Historical Status:ready（r1 implementation readiness；仅在维护者对本独立 readiness
+  PR exact head review/merge 后生效。只授权一个实现交付：按下方契约收缩 allowlist
+  并同步 pins/回归测试，载体 = 维护者按 CHG-2026-030 TASK-HLR-005 编排选定（预期 =
   host-loop pilot 的 `agent/host-loop/tasks/TASK-TAS-001` envelope PR；维护者亦可
   另行显式指定常规 agent PR）。不授权：任何其他 `scripts/host_loop/` 文件变更、
   任何新增路由/字段 allowlist/`FORBIDDEN_*` 变更、governance text 变更、
   scheduler/launchd/host 变更、以及**代任务撰写 `Decision-Grade`**（该行由维护者
-  亲手补写，时机受 HLR-005 编排约束）。）
+  亲手补写，时机受 HLR-005 编排约束）。授权已由 #564 全额消耗。）
 - Historical Status:blocked（前置：① 本 change approval-only PR merge；② 独立
   readiness PR 钉定实现 base 的 exact blob pins 与实现契约。① = #558 merge
   `bdead7e47d824e213942d273e671a5d9ab9f7cd8`；② = 本 r1。）
