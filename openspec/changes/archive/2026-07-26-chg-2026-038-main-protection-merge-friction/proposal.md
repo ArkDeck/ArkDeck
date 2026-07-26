@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-038-main-protection-merge-friction
 revision: 1
-status: verified # 2026-07-26 本 verification-closure PR（先例 #224/#239/#399/#570）；approval #575；TASK-MPF-001 done #582 已合入（全链 OID 见 Verification closure）；archive 另行。原注：approval-only #575 置 approved
+status: archived # 2026-07-26 本 archive PR（先例 #235/#241/#572）；verify #584 merge c4d4cb6126368fa00ced8f0f55001fd1d203b5bd；引用扫描：目录外精确路径引用 0，归档后全量 suite 482 OK + 1 expectedFailure、check_pr_paths 24 OK、`done_task_ids` 88 与归档前对照一致（TASK-MPF-001 仍被认得，#548 archive glob）。原注：verified 于 #584；approved 于 #575；proposal r1 经 #574
 class: implementation-only
 core_change_level: none
 owner: lvye
