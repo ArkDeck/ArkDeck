@@ -5,8 +5,8 @@
 - Status:ready（r2 execution readiness；仅在维护者对本独立 readiness PR exact
   head review/merge 后生效。只授权：一次由 `lvye` 在 Agent 不可达会话亲手执行的
   GraphQL 窗口 = 下方 R0–R5 门序（**恰好一次** `updateBranchProtectionRule` 清
-  `bypassForcePushActorIds`，**零 REST PUT**），失败时 R6 rollback（重加 lvye
-  actor）；窗口成功后 `MPF-FLOW-001` 两项自然观测；其后 run.md attempt#2 追记
+  `bypassForcePushActorIds`，**零 REST PUT**），失败时按 R6 触发限定处置（GraphQL
+  目标态未达成才 rollback；REST 渲染门单独 FAIL = 停不回滚）；窗口成功后 `MPF-FLOW-001` 两项自然观测；其后 run.md attempt#2 追记
   evidence PR 与独立 done PR。不授权：Agent 任何 protection/settings 写入；
   白名单之外任何字段变化；ruleset `19595282`/Deploy Key/App/凭据/任何其他
   repository setting；auto-merge；governance 正文。）
@@ -92,7 +92,7 @@
     # R0 身份与工具（输出须为 lvye / jq-1.7.1-apple）
     gh api user --jq .login
     jq --version
-    OUT=~/mpf001-out && mkdir -p "$OUT" && cd <ArkDeck checkout root>
+    OUT=~/mpf001-out && mkdir -p "$OUT" && cd "$(git rev-parse --show-toplevel)"
     IN=openspec/changes/chg-2026-038-main-protection-merge-friction/evidence/runs/TASK-MPF-001/inputs
     # R1 输入工件 + before 复测（哈希逐一命中 pins；任一不符 → 停，零写入）
     shasum -a 256 "$IN"/mpf_projection.jq "$IN"/mpf_gql_projection.jq "$IN"/mpf_delta.jq
@@ -122,7 +122,12 @@
     cmp "$OUT/r2.ruleset.before.json" "$OUT/r2.ruleset.after.json" && echo RULESET-UNTOUCHED
     # R5 receipts 汇总（贴回转录）
     shasum -a 256 "$OUT"/r2.*
-    # R6 仅失败时 rollback（重加 lvye actor；read-back 双面 == before 投影 dea8a6d0…/0df7bc6a…；随后记 blocked-attempt）
+    # R6 触发限定：仅当 after GraphQL projection ≠ 241b9160…（目标态未达成/错态）
+    # 或七元组/ruleset 门变化时 rollback（重加 lvye actor；read-back 双面 ==
+    # before 投影 dea8a6d0…/0df7bc6a…；随后记 blocked-attempt）。
+    # 若 GraphQL == 目标态而仅 REST 渲染门 FAIL → 零写入、停、如实记
+    # （Expected after 条款）、禁止 rollback——回滚会重加白名单、主动退出
+    # 已达成的语义目标态
     gh api graphql -f query='mutation{updateBranchProtectionRule(input:{branchProtectionRuleId:"BPR_kwDOTWtevs4Extgh",bypassForcePushActorIds:["MDQ6VXNlcjQzNDAxNjE="]}){branchProtectionRule{bypassForcePushAllowances(first:10){totalCount}}}}' > "$OUT/r2.rollback.response.json"
     gh api graphql -f query='{repository(owner:"ArkDeck",name:"ArkDeck"){branchProtectionRules(first:10){nodes{pattern allowsForcePushes lockBranch bypassForcePushAllowances(first:10){totalCount nodes{actor{__typename ... on User{login}}}}}}}}' | jq -S -c -f "$IN/mpf_gql_projection.jq" | shasum -a 256
     gh api repos/ArkDeck/ArkDeck/branches/main/protection | jq -S -c -f "$IN/mpf_projection.jq" | shasum -a 256
@@ -300,7 +305,8 @@
 - **r2 注记（2026-07-26）**：本条 REST 反向 PUT rollback 仅属 r1 窗口历史——
   attempt#1 已证其 read-back 无法证明语义还原（见 run.md）；r2 窗口的 rollback
   = GraphQL 重加 `lvye` actor + 双面投影 read-back（见 Readiness（r2）R6）。
-- 本任务不携带 `Decision-Grade` 行：该行由维护者亲手撰写。**注意等级判定**：
+- 本任务的 `Decision-Grade` 行由维护者亲手撰写（r1 时点尚不携带；#577 grade
+  播种 commit 已由维护者标注 `D2。`）。**注意等级判定**：
   protection 写入属 D2（凭据/设置面、人类执行），不是 D0——即使标了 grade 也不
   应进入循环派发面，`Hardware required:no` 不代表机器可判定。
 - 若执行期发现 before 状态与 readiness 钉定值不符（例如又有第三方改动），
