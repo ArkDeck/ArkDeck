@@ -1,0 +1,21 @@
+# CHG-2026-039 Verification Plan
+
+> Status:planned
+> Change:CHG-2026-039-host-loop-repo-wide-discovery@r1
+> Core baseline:CORE-2.1.0（零 Core 变更；canonical Core AC 零认领）
+
+验收面全部为 change-local。任何认领门放宽、任何 lease/transport 触碰、
+任何 launchd/plist 动作、任何未知任务 fail-open，整体 fail。
+
+## Change-local
+
+| Evidence ID | Task | Method | Expected result |
+| --- | --- | --- | --- |
+| NAV-DISC-001 | NAV-001 | contract | 缺省 round 与 `--explain` 枚举全部活跃 change（对真实仓的独立最小抽取对照）；显式 `--change <id>` 单 change 回归绿；跨 change 聚合下每轮至多一个 claim 由契约测试钉死；change-approved 门逐 change 判定有正/负对照 |
+| NAV-TRUTH-001 | NAV-001 | contract | done 状态 never-claim 任务不再触发 `only never-claim tasks are ready` 判词（回归测试 + 撤销修复必红的变异门；ready 状态 never-claim 正对照仍触发）；idle/claim 行含 UTC ISO-8601 时间戳与扫描范围 |
+| NAV-ARCH-001 | NAV-002 | contract | `check_pr_paths` 任务查找覆盖 `archive/*/tasks.md`（正 fixture）且未知任务仍拒绝（负 fixture）；scratch worktree `git mv` chg-2026-030 入 archive 后全量 suite 与 `check_pr_paths` 测试绿（#573 所列 1+5 error 全消）；`check-sdd` 0/0 基线保持 |
+
+## Gate
+
+三条全 PASS 且各任务 evidence run 在案，任务方可 done；change verify 于
+两任务 done 后以独立 PR 收口。
