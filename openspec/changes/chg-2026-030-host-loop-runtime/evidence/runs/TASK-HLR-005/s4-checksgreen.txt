@@ -1,0 +1,2 @@
+host-loop: checksGreen task=TASK-TAS-001 pr=564 :: checks green — this is NOT merge permission; the maintainer merges
+exit=0

@@ -1,0 +1,43 @@
+{
+ "step": "S8",
+ "task": "TASK-TAS-001",
+ "pr": 564,
+ "merge_confirmation": {
+  "observed_main": "877347f212ab0bffa9924801a037b3256f1eea56",
+  "confirmed": true,
+  "ambiguous": false,
+  "merge_oid": "877347f212ab0bffa9924801a037b3256f1eea56",
+  "detail": "metadata sha confirmed by ancestry and subject",
+  "metadata": {
+   "merged": true,
+   "merge_commit_sha": "877347f212ab0bffa9924801a037b3256f1eea56",
+   "merged_at": "2026-07-26T06:39:00Z"
+  }
+ },
+ "cas_negative": {
+  "status": "PASS",
+  "refused_as": "Refused",
+  "detail": "fence lost on delete of refs/heads/agent/host-loop/leases/TASK-TAS-001: stale expected OID",
+  "lease_untouched": true
+ },
+ "pr_identity_requery": {
+  "open_prs_on_identity": 0
+ },
+ "observed_lease": {
+  "oid": "39147db84732ac513bd3c2362383c858597f0ec4",
+  "fence": 7,
+  "owner": "host-loop/worker",
+  "expires_at": 1785047771,
+  "now": 1785048085,
+  "expired": true
+ },
+ "takeover": {
+  "status": "PASS",
+  "new_fence": 8,
+  "new_owner": "host-loop/recovery",
+  "new_oid": "14fc8108a1c23de66cb0e938432cb06a2adcda5d"
+ },
+ "absence_after_release": {
+  "host_loop_refs": 0
+ }
+}
