@@ -1,0 +1,92 @@
+---
+id: CHG-2026-039-host-loop-repo-wide-discovery
+revision: 1
+status: proposed
+class: implementation-only
+core_change_level: none
+owner: lvye
+core_baseline: CORE-2.1.0
+platforms: [macos]
+---
+
+# host-loop 全仓 discovery、idle 真话与 archive 免疫
+
+## Why
+
+**三个已实测的机械缺陷，共同使「无人值守迭代」停在纸面**（全部于
+2026-07-26 逐门复测）：
+
+1. **生产循环永久空转在一个已完结的 change 上**。LaunchAgent
+   `com.arkdeck.host-loop.runtime` 的 argv 不含 `--change`，而
+   `scripts/host_loop/__main__.py` 的 `--change` 默认值是字面量
+   `CHG-2026-030-host-loop-runtime`——该 change 八任务全 done、change 已
+   verified（#571）。循环每 900s 醒来一次，扫描一个不可能再产生候选的
+   change，31+ 轮 idle 实录在案。全仓其余十个活跃 change 对循环不可见；
+   `Decision-Grade` 播种（#577）后出现的 gated-ready 任务（如
+   TASK-RKFUI-001G）也不会出现在循环的报告里。
+2. **idle 判词说谎**。`worker.py` `select()` 的 `ONLY_NEVER_CLAIM_READY`
+   分支对**全部候选**检查 never-claim 成员资格而不过滤 `ready` 状态：
+   TASK-HLR-003 于 #552 翻 done 后，循环仍每轮打印
+   `only never-claim tasks are ready (['TASK-HLR-003'])`——消息文本声称
+   "are ready"而条件从未检查 ready。空转原因误诊曾在当日的战略盘点中
+   造成一次真实误判（险些定性为「循环读到陈旧树」）。idle 行亦无时间戳，
+   无法与轮次对账。
+3. **归档会打红套件，三个 verified change 因此滞留**。#573 实测：把
+   chg-2026-030 `git mv` 进 `archive/` 后 `test_check_pr_paths` 1 error、
+   host_loop ≥5 error（`test_backends_cli.BodyRendering` 三项、
+   `DiscoveryIsAReaderOnly.test_it_parses_the_live_change`、
+   `test_pr_envelope` 多个 pr_type 子例）。根因是刻意的质量选择——
+   TASK-HLR-003 立的规矩「解析器必须对着真实仓内文件断言」，这些测试以
+   chg-2026-030 为活体样本；而 `check_pr_paths.py` 的任务查找只 glob
+   `chg-*/tasks.md`（`check_pr_paths.py` 第 271 行），不含 `archive/`——
+   #548 已为 `done_task_ids` 补过同型 glob，任务查找侧漏同一课。#573 已
+   把两条收口条件写入 chg-030 proposal 的 dated 注记并声明独立立项；本
+   change 即该立项。chg-2026-027/028 的归档也在同一条链上等待。
+
+## What changes
+
+### In scope
+
+- **TASK-NAV-001（全仓 discovery 与 idle 真话）**：`--change` 缺省行为从
+  单一字面量改为**扫描全部活跃 change**（`openspec/changes/chg-*/tasks.md`
+  字典序；显式 `--change <id>` 保留单 change 语义）；每轮至多认领一个任务的
+  不变量不变，change-approved 门逐 change 判定；`--explain` 缺省同样全仓
+  枚举。`select()` 的 never-claim 分支收紧为**仅对 `ready` 候选**判定；
+  idle/claim 日志行加 UTC 时间戳与扫描范围计数。修复以回归测试钉死
+  （done 状态的 never-claim 任务不得再触发该判词）。
+- **TASK-NAV-002（archive 免疫）**：`check_pr_paths.py` 任务查找扩展到
+  `archive/*/tasks.md`（正/负 fixture 各至少一例）；五处活体样本测试引入
+  「active-or-archive」路径解析（先查 `changes/<id>/`，再查
+  `changes/archive/*-<id>/`，恰一处存在），**不削弱对真实文件断言的规矩**。
+  验收含归档演练：scratch worktree 内 `git mv` chg-2026-030 至 `archive/`
+  后全量 suite 与 `check_pr_paths` 必须保持绿。
+- 两任务零共享文件、可并行；acceptance 全部 change-local（见
+  verification.md：NAV-DISC-001 / NAV-TRUTH-001 / NAV-ARCH-001）。
+
+### Out of scope
+
+- `DISPATCHABLE_GRADES`（保持 `{"D0"}`）、never-claim 政策本体、grade 行
+  （维护者亲笔）；
+- transport/lease/identity/reviewer/recovery/cursor 面（零触碰）；
+- launchd unit/plist（**零动作**：plist 本就不传 `--change`，行为经代码
+  缺省值生效；生效条件 = 本机 checkout 前进到含实现的 main，两 unit 保持
+  left-running 不重载）；
+- Phase 4 cursor Issue 写入（另行授权）；
+- chg-2026-030/027/028 的 archive PR 本身（本 change done 后按既有归档
+  先例独立走）。
+
+## Risk
+
+low。两任务均为 host-only 机械变更，行为面收窄或保真：discovery 扫描范围
+扩大但认领门（status/hardware/grade/deps/allowed-paths/change-approved/
+never-claim）逐一保持；idle 分支只收紧不放宽；check_pr_paths 扩 glob 使
+「任务在 archive」从 error 变为正确解析，未知任务仍 fail closed。回退 =
+revert 实现 PR。首个风险控制 = readiness 照 TAS-001 形态把「恰 N 断言
+反应」与期望套件计数钉为门。
+
+## Tasks
+
+TASK-NAV-001 与 TASK-NAV-002（见 tasks.md），均 blocked 待 approval-only
+PR merge 后逐一 readiness。**两任务均改动循环自身代码/测试面，按
+TASK-HLR-003 先例为 never-claim：由会话实现、维护者合并；循环的首次自主
+认领对象是本 change 落地后出现的下一个 D0 任务。**propose 合入 ≠ 批准。
