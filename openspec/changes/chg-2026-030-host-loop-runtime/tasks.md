@@ -3276,7 +3276,37 @@
 
 ## TASK-HLR-005 — 受控 live pilot 与恢复演练
 
-- Status:ready（r1 pilot readiness；仅在维护者对本独立 readiness PR exact head
+- Status:done（2026-07-26 D0 completion；仅在维护者 review/merge 本独立
+  `ready→done` PR 后生效。授权载体 = r1 #560 merge
+  `9bfbb72aa6a0120ace0fb8d2f178359c48b1b308` + r2 S1-载体更正 #562 merge
+  `a3a684295142d1b61fc40346281ce0fadc257713`；pilot evidence = #566 merge
+  `bd7a23640aacfffc081d653e8c6a25d59fa39fec`（均 `lvye` APPROVED、
+  `auto_merge=null`）。
+  **Pilot 结果:end-to-end PASS**，单次连续会话 2026-07-26 06:0x–06:41Z，全程
+  记于 `evidence/runs/TASK-HLR-005/pilot-run.md` 及五份 receipt（manifest
+  sha256 于 flip base `bd7a2364…` 逐项复验相等）。关键 live 事实：loop 认领天然
+  任务 TASK-TAS-001 → App 身份开出完整 envelope PR #564 → exact head
+  `f6bf27d64bfe3aa4efc47ac9ebbcf7dbe42dfb66` 的 `pull_request` 事件
+  `guard`+`allowed-paths` 双绿 → 第二身份 stale-fence drill `exit 10` 零写零第二
+  PR → 独立 `claude` 会话 APPROVE 绑定 exact head（非 GitHub approval）→
+  维护者手建导航 Issue #565 → 维护者 APPROVE+squash
+  `877347f212ab0bffa9924801a037b3256f1eea56`（`merged_at 06:39:00Z`）→ 双源
+  merge 确认三证一致 → stale-OID CAS 删除被 `Refused`、lease 未动 → fence 7→8
+  takeover → exact-OID release → `agent/host-loop/**` refs = 0。
+  **r5 四义务处置（二值如实）**：① live first-PR proof CLOSED；② old-creator
+  coexistence CLOSED（reserved 零 legacy run/PR，同期 ordinary 分支 auto-PR 照常
+  工作）；③ lease CAS live 充分性（r1-F4）CLOSED（create+多次 renew 至 fence 7 +
+  takeover + exact-OID delete + 一次真实 stale-OID 拒绝）；④ legacy creator
+  迁移 = **维护者 2026-07-26 显式决定推迟**——前置（live proof）已满足，
+  `agent-pr.yml` 仍是普通 `agent/**` 分支的日常主通道（今日 #549–#566 全部经
+  它），退役它需先把普通分支流迁到 host-loop 身份，属独立设计，不搭本轮；
+  该推迟为在案决定，非静默未做。
+  **flip base `bd7a2364…` recheck**：offline suite 482 OK + 1 expectedFailure
+  （`Decision-Grade` 缺口标记未摘）；`check-sdd` 0/0/111；evidence manifest 五项
+  hash 相等；本 PR 单文件、只动本 Status 行。
+  本 done **不声称**：cursor Issue live 写（Phase 4 全程剥离，runtime Issue 写 = 0，
+  留独立后续授权）、legacy 迁移已执行（见 ④）、任何 change 级 verified。）
+- Historical Status:ready（r1 pilot readiness；仅在维护者对本独立 readiness PR exact head
   review/merge 后生效。授权且仅授权：① 一次实现内容推送——TASK-TAS-001 的
   chg-037 r1 契约 diff，经 Deploy Key 推到 loop 创建的
   `agent/host-loop/tasks/TASK-TAS-001` 分支（一次性，diff 恰为该契约）；②
