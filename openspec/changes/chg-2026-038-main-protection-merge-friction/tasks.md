@@ -2,13 +2,20 @@
 
 ## TASK-MPF-001 — 施加三项 protection delta 并双向取证
 
-- Status:ready（r1 execution readiness；仅在维护者对本独立 readiness PR exact
-  head review/merge 后生效。只授权：一次由 `lvye` 在 Agent 不可达会话亲手执行的
-  protection 窗口 = 下方 S0–S6 门序（恰好一次 after-state PUT + 双向 read-back
-  取证），失败时 S7 rollback；窗口成功后 `MPF-FLOW-001` 两项自然观测；其后独立
-  evidence PR 与 done PR。不授权：Agent 任何 protection/settings 写入；三项
-  delta 之外任何字段变化；ruleset `19595282`/Deploy Key/App/凭据/任何其他
-  repository setting；auto-merge；governance 正文。）
+- Status:blocked（**attempt#1 2026-07-26 blocked，待 r2 readiness**：窗口
+  S0–S2 PASS、S3 已执行，但 REST PUT 对 `allow_force_pushes` 无效——REST 布尔
+  是「everyone 位 OR `bypassForcePushAllowances` 白名单非空」的拍扁渲染，白名单
+  `[lvye]` 仅 GraphQL/UI 可清，classic REST 面无字段无能力；S4 FAIL（live
+  projection `0df7bc6a…` ≠ expected `4046aced…`；strict/dismiss_stale 两项已
+  live 达标）；S7 经裁决**不执行**（rollback read-back 无法证明语义还原，且
+  会把 everyone 位主动写 true、劣化于驻留态；本 evidence PR merge = 追认）。
+  驻留态与 GraphQL 面取证、jq `paths(scalars)` 假阴性等工具缺陷、r2 契约要求
+  均已钉定于 `evidence/runs/TASK-MPF-001/run.md` attempt#1。r2 = 恰好一次
+  GraphQL `updateBranchProtectionRule` 清白名单 + 双面 read-back，零 REST
+  PUT。）
+- Historical Status:ready（r1 execution readiness = #576 merge
+  `66a70e2a3dc7338be3cd02f9b5ddb4a1dc1ba236`；其 S0–S7 契约与 pins 见下方
+  Readiness（r1）段，作历史记录保留；r1 的一次性 PUT 授权已于 attempt#1 消耗。）
 - Historical Status:blocked（前置：① 本 change approval-only PR merge；② 独立
   readiness PR 钉定 before 状态的两个 SHA-256、after 期望 projection SHA-256、
   逐步命令与 rollback。**执行者恒为 `lvye`，在 Agent 不可达的会话内亲手执行；
