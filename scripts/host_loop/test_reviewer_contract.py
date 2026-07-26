@@ -356,8 +356,11 @@ class LoopReadOnly(unittest.TestCase):
         self.assertEqual(outcomes[0][1], ReviewState.RECONCILE_REQUIRED)
 
     def test_module_adds_no_transport_route(self):
-        """The frozen allowlist is untouched by importing/using this module."""
-        self.assertEqual(len(ALLOWED_ROUTES), 10)
+        """The frozen allowlist is untouched by importing/using this module.
+
+        8 after TASK-TAS-001 removed the two zero-callsite bare-list entries.
+        """
+        self.assertEqual(len(ALLOWED_ROUTES), 8)
 
 
 class BatchGate(unittest.TestCase):
