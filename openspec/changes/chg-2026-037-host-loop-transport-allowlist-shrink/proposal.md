@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-037-host-loop-transport-allowlist-shrink
 revision: 1
-status: proposed
+status: approved # 本 approval-only PR 经维护者 review/merge 后生效；r1 proposal 已由 #557 登记（merge 58ab9115）；TASK-TAS-001 仍 blocked 待独立 readiness
 class: implementation-only
 core_change_level: none
 owner: lvye
