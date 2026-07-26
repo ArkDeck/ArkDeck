@@ -3112,16 +3112,33 @@
 
 ## TASK-HLR-004 — 独立 reviewer loop、merge-OID recovery 与 batch handoff
 
-- Status:ready（r1 implementation readiness；仅在维护者对本独立 readiness PR exact
-  head review/merge 后生效。只授权 ① 一个 D0 source PR，在 `scripts/host_loop/**`
-  内交付 reviewer loop、merge-OID recovery 与 batch gating 的 **offline** 实现与
-  contract/fault tests（含下方点名的一处 stale 时点断言修复），② 其后一个独立
-  evidence 记录与 ③ 一个独立 `ready→done` 状态 PR。**零 live GitHub 写**：本任务
-  全部验证走既有 fake ports；live dispatch/batch Issue 写/legacy 迁移均属
-  TASK-HLR-005。不授权：GitHub review API 调用、review/merge/auto-merge/admin
-  route、任何 scheduler/launchd/unit/host 变更（两 unit left-running 冻结条款继续
-  有效）、`agent-pr.yml`/`sdd-guard.yml`/governance text 变更、transport 新增
-  route 或放宽 allowlist、以及**代任何任务撰写 `Decision-Grade`**。）
+- Status:done（2026-07-26 D0 completion；仅在维护者 review/merge 本独立
+  `ready→done` PR 后生效。授权载体 = r1 readiness #553 merge
+  `fde34146d6f0cc005a4620977222ee4748e216e1`；source PR = #554 merge
+  `f85e8cf2b2e2fd99c884c213a5a918e87d19c829`（`lvye` APPROVED、`mergedBy=lvye`、
+  `auto_merge=null`；6 文件 +1556/−4：reviewer.py、recovery.py、73 条契约测试、
+  #552 打破的 stale 时点断言按 r1 授权修复、contract-run evidence）。flip base
+  `f85e8cf2…` 复验：480 tests OK + 1 expectedFailure（= `Decision-Grade` 缺口在案
+  记录，未摘除）；check-sdd 0/0/111；`--explain` 显示本任务被拒且唯一理由 =
+  grade unknown（r1 互斥 pin 所预期的补偿观测）；12 source pin 于 #554 前零漂移；
+  worker.py/`__main__.py` 零触碰、transport 路由 10 条由测试钉死、变异 12/12 击杀
+  + 负对照存活（首轮 M9 存活经加强断言击杀，过程在 evidence）。evidence =
+  `evidence/runs/TASK-HLR-004/contract-run.md`（#554 携带入 main）。本 done
+  **不声称**：live reviewer session dispatch、batch Issue 的 live 写、live
+  first-PR proof、legacy creator 迁移——均属 TASK-HLR-005（r5 转移条 + 本任务
+  r1 边界）。r1 的 Decision-Grade 互斥 pin 随本 done 解除：本 change 内补 grade
+  的时机约束移交 HLR-005 readiness 统一编排。）
+- Historical Status:ready（r1 implementation readiness；仅在维护者对本独立 readiness
+  PR exact head review/merge 后生效。只授权 ① 一个 D0 source PR，在
+  `scripts/host_loop/**` 内交付 reviewer loop、merge-OID recovery 与 batch gating
+  的 **offline** 实现与 contract/fault tests（含下方点名的一处 stale 时点断言
+  修复），② 其后一个独立 evidence 记录与 ③ 一个独立 `ready→done` 状态 PR。
+  **零 live GitHub 写**：本任务全部验证走既有 fake ports；live dispatch/batch
+  Issue 写/legacy 迁移均属 TASK-HLR-005。不授权：GitHub review API 调用、
+  review/merge/auto-merge/admin route、任何 scheduler/launchd/unit/host 变更（两
+  unit left-running 冻结条款继续有效）、`agent-pr.yml`/`sdd-guard.yml`/governance
+  text 变更、transport 新增 route 或放宽 allowlist、以及**代任何任务撰写
+  `Decision-Grade`**。①②③ 依次由 #554（source+evidence）与本 done 翻转消耗。）
 - Historical Status:blocked（前置：① 本 change approval；② TASK-HLR-003 done；③ 独立
   readiness PR 钉定 reviewer adapter interface、failure matrix、batch Issue schema 和
   merge-OID sources；④ 不产生 PR 的 reviewer backend availability probe。①② 已闭：
