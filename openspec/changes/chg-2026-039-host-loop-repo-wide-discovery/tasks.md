@@ -130,9 +130,75 @@
 
 ## TASK-NAV-002 — check_pr_paths 与活体样本测试的 archive 免疫
 
-- Status:blocked（前置：① 本 change approval-only PR merge；② 独立
-  readiness PR 钉定受改文件 exact blob、五处活体样本测试清单、正/负
-  fixture 形态与归档演练步骤。）
+- Status:ready（r1 implementation readiness；仅在维护者对本独立 readiness
+  PR exact head review/merge 后生效。只授权一个实现交付：按下方契约扩
+  `check_pr_paths` 任务查找至 archive、给活体样本测试引入 archive 免疫、
+  并以归档演练取证；载体 = 常规会话 agent/* PR（本任务 never-claim，
+  循环不得认领；`NEVER_CLAIM_ROOTS` 扩根由 NAV-001 交付）。不授权：
+  `check_pr_paths.py` 路径匹配/任务解析语义变更（仅扩查找面）、host_loop
+  非测试代码变更、归档 PR 本身、`Decision-Grade` 代写、governance 正文、
+  NAV-001 分工文件（见契约④）。）
+- Historical Status:blocked（前置：① 本 change approval-only PR merge；
+  ② 独立 readiness PR。① = #587 merge
+  `17a9574a368e518ce475ef7d72135c3a6f71f2c7`；② = 本 r1。）
+- Readiness（r1；audit base = protected `main`
+  `17a9574a368e518ce475ef7d72135c3a6f71f2c7`）：
+  - **Approval boundary:pending human merge。**本 carrier 只修改本文件。
+    生效条件与 NAV-001 r1 同型（`lvye` exact head APPROVED、checks
+    terminal success、squash merge 进 protected main）。
+  - **Dependency gate:closed。**propose #586
+    `fa4bdeaae305b7898e3412a210656842ff50e2e2`、approval #587
+    `17a9574a368e518ce475ef7d72135c3a6f71f2c7`，均 `lvye` APPROVED、
+    audit-base ancestors。与 NAV-001 readiness 为堆叠双 carrier，按序
+    合并；两任务实现可并行（契约④文件分工零交集）。
+  - **Source pins:closed。**实现 base 须逐项等于：`check_pr_paths.py`
+    `02332a9b572013e99b74acd46db8810ba4f7275a`、`test_check_pr_paths.py`
+    `feb697f760c8b2ba9e57072ac79f73a96ed7905f`、`test_backends_cli.py`
+    `bb0521083c58b6c204d61d1cc6d2cbd6cab6da0b`、
+    `test_discovery_contract.py`
+    `c9c8e43edf0fdc764cf6299de00e6b71a28dc7e5`、`test_pr_envelope.py`
+    `35d9a284e8ddde67fd1076bc1c2f0f11f02d26db`；任一 drift 停并重钉。
+  - **Implementation contract:binary（2026-07-26 audit base 探针实测）。**
+    ① `load_task_definitions`（现仅 glob `chg-*/tasks.md`）扩至同时含
+    `archive/*/tasks.md`（#548 `done_task_ids` 同型）。**红探针已实测**：
+    audit base 上 lookup 共 58 任务，archived `TASK-TAS-001` 与
+    `TASK-MPF-001` 均不可见；实现后正 fixture = archived 任务可见
+    （`TASK-TAS-001` 级真实样本），负 fixture = 不存在的任务仍拒绝
+    （fail-closed 保持）。变异门：撤销 glob 扩展 → 正 fixture 必红。
+    ② 活体样本 archive 免疫，两条 #573 已录路线按用例性质取舍并入
+    evidence：纯文件读取断言改经新增单一支持文件
+    `scripts/host_loop/test_support.py` 的 active-or-archive 解析
+    （`changes/<id>/tasks.md` 与 `changes/archive/*-<id>/tasks.md`
+    恰一处存在，两处都在/都不在即 loud fail）；以
+    `discover_candidates(change_id)` 为被测面的用例改为动态活跃样本
+    （字典序首个含任务的活跃 change）或等价保真形态。受改用例清单 =
+    `test_backends_cli.BodyRendering` 三项、
+    `DiscoveryIsAReaderOnly.test_it_parses_the_live_change`、
+    `test_pr_envelope` pr_type 子例、`test_check_pr_paths` 真实仓调用。
+    「对真实仓内文件断言」规矩不削弱；归档演练为最终裁决门。
+    ③ **归档演练（evidence 门）**：scratch worktree 内 `git mv`
+    `openspec/changes/chg-2026-030-host-loop-runtime` →
+    `openspec/changes/archive/<date>-chg-2026-030-host-loop-runtime`
+    后，全量 suite 与 `check_pr_paths`/`check_sdd` 测试全绿；#573 具名
+    1+5 error（`test_check_pr_paths` 真实仓用例、`BodyRendering`×3、
+    `DiscoveryIsAReaderOnly.test_it_parses_the_live_change`、
+    `test_pr_envelope` pr_type 子例）全消；worktree 弃置不入仓，命令与
+    前后计数入 evidence。
+    ④ **File partition（与 NAV-001 并行零交集）**：本任务只改
+    `check_pr_paths.py`、`test_check_pr_paths.py`、
+    `test_backends_cli.py`、`test_discovery_contract.py`、
+    `test_pr_envelope.py` 与新文件 `scripts/host_loop/test_support.py`；
+    不触碰 `worker.py`/`__main__.py`/`test_navigation_contract.py`/
+    `test_minter_and_explain.py`。
+    ⑤ 套件：audit base 基线 = 482 OK + 1 expectedFailure；实现后 =
+    482 + 新增数全绿 + 1 xf 保持（精确计数入 PR body 与 evidence）；
+    `check-sdd` 0/0/111；diff 恰在 Allowed paths 内。
+  - **Concurrency/absence:closed at drafting（2026-07-26 23:56）。**
+    remote `agent/*nav*` 分支 = 0（推送前实测；本 carrier 与 NAV-001
+    readiness 堆叠）。
+  - **Grade 注记**：`Decision-Grade` 行由维护者亲笔（#577 载体先例）；
+    本契约已机器化，符合 D0 三条件。done 后 chg-2026-030/027/028 归档
+    链解锁（归档 PR 独立走）。
 - Platform:macos（host-only）
 - Requirements/AC:change-local `NAV-ARCH-001`
 - Depends on:none
