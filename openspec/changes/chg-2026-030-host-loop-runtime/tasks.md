@@ -3276,10 +3276,52 @@
 
 ## TASK-HLR-005 — 受控 live pilot 与恢复演练
 
-- Status:blocked（前置：① 本 change approval；② TASK-HLR-003 done；③ TASK-HLR-004
-  done；④ 独立 readiness PR 钉定一个天然出现的已批准 ready host-only task、
-  integration identity receipt、预期 checks、reviewer session、batch Issue 与
+- Status:blocked（pre-readiness r0 账目，2026-07-26：① change approval 已闭；②
+  TASK-HLR-003 done = #552 merge `24395db6b15d72781f142991aa06e765cbb695cb`；③
+  TASK-HLR-004 done = #555 merge `6bdad8bfef962b032c1a343650d6ec91cb73712a`（均
+  `lvye` APPROVED、`auto_merge=null`）；④ 独立 readiness **尚不可开**：其必须钉定
+  的「天然出现的已批准 ready host-only 可派发任务」经 2026-07-26 全仓逐门扫描
+  （11 个活跃 change × 全任务 × `rejection_reasons` 全门）**不存在**——唯一
+  grade-only 候选 `TASK-RKFUI-001G` 按其自身 readiness 为 **D1**（gated：worker
+  只记阻塞、不 dispatch），为喂 pilot 改标 D0 = 制造任务，为本 Status 原文所禁。
+  本任务保持 blocked 至天然 D0 出现；触发清单见下方 Pre-readiness。）
+- Historical Status:blocked（前置：① 本 change approval；② TASK-HLR-003 done；③
+  TASK-HLR-004 done；④ 独立 readiness PR 钉定一个天然出现的已批准 ready host-only
+  task、integration identity receipt、预期 checks、reviewer session、batch Issue 与
   rollback/close plan。不得为了演练凭空制造产品任务。）
+- Pre-readiness（r0；audit base = protected `main`
+  `6bdad8bfef962b032c1a343650d6ec91cb73712a`；**纯账目与触发条件钉定，零授权**——
+  本 carrier 不使任何东西 ready、不授权任何 source/host/live 动作）：
+  - **Ready 触发清单（全部满足才可起草 readiness r1，缺一不起草）**：(a) 某已批准
+    change 中天然出现一个 ready、host-only、依赖闭合、allowed-paths 齐备的 **D0**
+    任务（其存在理由独立于本 pilot）；(b) 维护者显式确认以其为 pilot 对象并亲手
+    为其补写 `Decision-Grade: D0` 行（时机 = readiness r1 合入后、pilot 窗口开启
+    时——活循环每 900s 扫描，提前补写即提前认领）；(c) readiness r1 钉定 Status
+    历史④ 全项：integration identity receipt（App `4388667`/installation
+    `148855345`，TASK-HLR-002 receipt 为准）、预期 checks（`guard`+`allowed-paths`
+    exact-head）、reviewer session 形态（TASK-HLR-004 已合入的 adapter 契约：
+    `SubprocessReviewerAdapter` + `claude` backend，availability probe 复跑）、
+    batch Issue（`batch-YYYYMMDD-N` 命名 + canonical 模板 blob）与 rollback/close
+    plan（不合入的 fault drill 含 stale-lease 或 create-timeout 分支）；(d) r5 自
+    TASK-HLR-003 转移的四义务逐项入 readiness（live first-PR proof、old creator
+    coexistence live 观测、lease CAS/stale-fence live 充分性、legacy 迁移含「不得
+    早于同 PR live proof」原文），见本节 Notes/handoff 转移条。
+  - **Phase 4 播种机制：定形（实现留待 readiness r1 授权的小 source PR）。**首次
+    cursor Issue 写**保持人类**：维护者创建 Issue 并手工粘贴由只读 helper 渲染的
+    机器块（载体 = 既有 `CursorState.render()`；helper 形态 = `--render-cursor-seed`
+    干跑 flag，零网络零凭据，同 `--explain` 边界）；`cursor.load` 对手贴块按既有
+    parser 校验，loop 侧「配置了 Issue 但不可解析即拒绝且不代建」语义不变。这解除
+    r3 记录的 Phase 4 三理由中的第②条（机制缺失），①（永久公开写）③（需可认领
+    任务）由 readiness r1 连同 pilot 一并授权与满足。
+  - **Decision-Grade 编排：**TASK-HLR-004 done 已解除其 r1 互斥 pin；但两 unit 仍
+    left-running，`--explain` 会把任何 D0-ready 任务标为 claimable 并在 ≤900s 内
+    被认领。故 grade 补写恒为「readiness r1 合入后、按其钉定的顺序逐任务进行」，
+    在此之前不批量补写（含本 change 与其他 change）。
+  - **候选路径备考（事实，非指令）**：transport allowlist 收缩（10 条中 2 条任何
+    公开方法不可达 = 死能力）已独立立项待维护者决定；若维护者推进该治理线，其
+    实现任务天然满足 (a)。
+  - **Standing host 状态不变**：两 unit left-running（r5 冻结条款）；本 carrier 与
+    未来 readiness r1 生效前，任何 unit/plist/token/PEM/minter 变更均无授权载体。
 - Platform:macos（host-only live GitHub integration；零产品/硬件声明）
 - Requirements/AC:change-local `HLR-ENVELOPE-001`、`HLR-LEASE-001`、
   `HLR-WORKER-001`、`HLR-REVIEW-001`、`HLR-RECOVERY-001`
