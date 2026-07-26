@@ -2,14 +2,27 @@
 
 ## TASK-MPF-001 — 施加三项 protection delta 并双向取证
 
-- Status:ready（r2 execution readiness；仅在维护者对本独立 readiness PR exact
-  head review/merge 后生效。只授权：一次由 `lvye` 在 Agent 不可达会话亲手执行的
-  GraphQL 窗口 = 下方 R0–R5 门序（**恰好一次** `updateBranchProtectionRule` 清
-  `bypassForcePushActorIds`，**零 REST PUT**），失败时按 R6 触发限定处置（GraphQL
-  目标态未达成才 rollback；REST 渲染门单独 FAIL = 停不回滚）；窗口成功后 `MPF-FLOW-001` 两项自然观测；其后 run.md attempt#2 追记
-  evidence PR 与独立 done PR。不授权：Agent 任何 protection/settings 写入；
-  白名单之外任何字段变化；ruleset `19595282`/Deploy Key/App/凭据/任何其他
-  repository setting；auto-merge；governance 正文。）
+- Status:done（2026-07-26。`MPF-DELTA-001` = **PASS**（attempt#2，见 run.md：
+  双面 read-back 全门命中、累计 delta 恰好三项、信任根七项一致、ruleset 未动、
+  Agent protection 写入计数 0；R6 未触发，#580 的触发限定条款未被用到）。
+  `MPF-FLOW-001` 载体：观测① = evidence PR #581（单命令合入 merge
+  `b055fe306d07126c1235788f84a8c035c7209c2e`）；观测②（落后分支免
+  `Update branch` 合入）**改于 verify/archive 载体对上执行**——本 PR 原与
+  #581 并行 in-flight 的编排被 #580 review-fix 的同段文本冲突打断，重排到
+  f28d416b 之后不再落后；重排 force-push 后其 approval 若存续即
+  `dismiss_stale_reviews=false` 的直接实证，连同两观测的 audit 四件套由
+  change verify PR 以 gh 记录复核落账。flip-base recheck 五项已执行于 #581
+  merge `b055fe30…`：(a) 链 ancestry #574/#575/#576/#577/#578/#579/#580/#581
+  八 merge 全为 ancestors；(b) run.md attempt#2 已在 flip base 树内；(c)
+  Agent 独立双面复验（flip 重排时点再测）全命中（REST `4046aced…`/GraphQL
+  `241b9160…`/ruleset `c404036f…`）；(d) 本 flip 单文件；(e) 不声称清单：
+  窗口 receipts 存 `~/mpf001-out` 未入仓，哈希清单在 run.md。）
+- Historical Status:ready（r2 execution readiness = #579 merge
+  `4aab55cc42b04d52d4d55b8aedbfa2b2d49eb998`，after #580 review-fix
+  `f28d416b4ef0a8e7d98bed2a1d4d4801482d1c68`（E1 paste-safety/E2 R6 触发
+  限定/E3 grade 注记时效）；R0–R6 契约与 pins 见下方 Readiness（r2）段，作
+  历史记录保留；其一次性 GraphQL mutation 授权已于 attempt#2 消耗（全门
+  PASS，R6 未触发）。）
 - Historical Status:blocked（**attempt#1 2026-07-26 blocked**：窗口 S0–S2
   PASS、S3 已执行，但 REST PUT 对 `allow_force_pushes` 无效——REST 布尔是
   「everyone 位 OR `bypassForcePushAllowances` 白名单非空」的拍扁渲染，白名单
