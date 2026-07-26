@@ -622,3 +622,33 @@ TASK-HLR-002B 保持 r7 superseded `blocked` tombstone；六条 active acceptanc
   （live proof）已满足，维护者 2026-07-26 显式推迟（HLR-005 done PR 在案），
   非静默未做。③ Phase 4/cursor live 写全程为 0，留独立后续授权。④ 两个
   left-running unit 与凭据面（App/PEM/Deploy Key/minter）状态不因本翻转改变。
+
+## Archive posture（2026-07-26，dated 注记；不改写历史、不 bump revision）
+
+本 change 已 `verified`（#571 merge
+`f4e1f4a8db530bf6de5330094040c528f32b310b`），但 **archive 暂缓**，与
+CHG-2026-015 同型（引用扫描命中即暂缓，见 workflow 约定）。
+
+**实测依据（非推断）**：在一个一次性 worktree 中执行
+`git mv openspec/changes/chg-2026-030-host-loop-runtime
+openspec/changes/archive/2026-07-26-…` 后重跑套件，得到 `scripts.test_check_pr_paths`
+1 个 error 与 `host_loop` 至少 5 个 error（`test_backends_cli.BodyRendering` 三项、
+`DiscoveryIsAReaderOnly.test_it_parses_the_live_change`、
+`test_pr_envelope.EnvelopeContractTests.test_all_seven_pr_types_have_binary_task_mapping`
+的多个 pr_type 子例）。
+
+**根因**：这些测试**刻意**读取真实 active change，而不是 fixture——
+`test_check_pr_paths.test_current_hlr_001a_task_allows_only_the_reviewed_automation_surface`
+以 `repo_root = Path(__file__).resolve().parents[1]` 调用
+`check_paths`，而 `check_pr_paths` 的任务查找只 glob
+`openspec/changes/chg-*/tasks.md`（不含 `archive/`）；host_loop 侧的
+`body_renderer`/`discover_candidates` 契约测试同样以本 change 为「活体样本」，
+这正是 TASK-HLR-003 期确立的规矩（**解析器必须对着真实仓内文件断言**）。
+
+**收口条件（任一成立即可解除暂缓，均属独立立项，不搭本轮）**：① 把这些测试的
+活体样本切换到另一个 active change 或 hermetic fixture，同时不弱化「对真实文件
+断言」这条规矩；或 ② 让 `check_pr_paths` 的任务查找同时覆盖 `archive/*/tasks.md`
+（与 `done_task_ids` 于 #548 的修复同型），并为其补正反 fixtures。
+
+在此之前本 change 保持 `verified` 且留在 `openspec/changes/`；这是**在案的暂缓
+决定**，不是遗漏。归档一旦解除阻断，仍走独立 archive PR。
