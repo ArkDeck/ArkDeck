@@ -1,0 +1,307 @@
+{
+ "audit_base": "891d4f542f05e2341a091b6437b491ff9bf64727",
+ "audit_base_parent": "5307d1b9833333952ae54f41256764394d66f692",
+ "audit_base_tree": "c81ac589eeb14cf0ce83eb86376eb2c32c4adac3",
+ "checks": [
+  {
+   "facts": {
+    "value": "ae597d0da7ee53ba8e2e8e6b7ad85554330b53a8"
+   },
+   "id": "A1",
+   "name": "--r4-merge-oid is a full 40-hex OID",
+   "status": "PASS"
+  },
+  {
+   "facts": {
+    "exit": 0,
+    "oid": "ae597d0da7ee53ba8e2e8e6b7ad85554330b53a8"
+   },
+   "id": "A2",
+   "name": "r4 carrier is an ancestor of origin/main",
+   "status": "PASS"
+  },
+  {
+   "facts": {
+    "files": [
+     "openspec/changes/chg-2026-030-host-loop-runtime/tasks.md"
+    ],
+    "subject": "readiness(TASK-HLR-003): refresh D2 drift pins after #548 (r4) (#549)"
+   },
+   "id": "A3",
+   "name": "r4 carrier touches only the chg-030 tasks.md",
+   "status": "PASS"
+  },
+  {
+   "facts": {
+    "audit_base_blob": "327d84139ea6989674e3966e636a8fc38c90d3a2",
+    "merged_blob": "fb81c1e40cf0b77d6576450397361473684a2e82",
+    "note": "diff between the two must be exactly the r4 block; confirmed by the maintainer's own review of #549"
+   },
+   "id": "A4",
+   "name": "tasks.md blob provenance recorded (audit-base vs merged)",
+   "status": "PASS"
+  },
+  {
+   "facts": {
+    "head": "ae597d0da7ee53ba8e2e8e6b7ad85554330b53a8",
+    "ls_remote_main": "ae597d0da7ee53ba8e2e8e6b7ad85554330b53a8"
+   },
+   "id": "B1",
+   "name": "HEAD == live origin/main",
+   "status": "PASS"
+  },
+  {
+   "facts": {
+    "exit": 0,
+    "porcelain": "(empty)"
+   },
+   "id": "B2",
+   "name": "porcelain empty for drift-gate paths and all tasks.md",
+   "status": "PASS"
+  },
+  {
+   "facts": {
+    "head_at_binding": "ae597d0da7ee53ba8e2e8e6b7ad85554330b53a8"
+   },
+   "id": "B3",
+   "name": "binding compensates, does not fix, the workable-tree authority gap (standing; owned by HLR-004/005)",
+   "status": "INFO"
+  },
+  {
+   "facts": {
+    ".github/CODEOWNERS": {
+     "pin": "f4edd22f87965efcfc27ea512283a0c2252bf0fb",
+     "seen": "f4edd22f87965efcfc27ea512283a0c2252bf0fb"
+    },
+    ".github/workflows/agent-pr.yml": {
+     "pin": "a514d9e539964f9e1960acbe4ffaa696629571da",
+     "seen": "a514d9e539964f9e1960acbe4ffaa696629571da"
+    },
+    ".github/workflows/sdd-guard.yml": {
+     "pin": "c64135e1f9dc253a92640a30bbcad42b0afa86fa",
+     "seen": "c64135e1f9dc253a92640a30bbcad42b0afa86fa"
+    },
+    "AGENTS.md": {
+     "pin": "3c2d3c6a01d3eaa31cd9e3ee333f3153552f4164",
+     "seen": "3c2d3c6a01d3eaa31cd9e3ee333f3153552f4164"
+    },
+    "openspec/changes/chg-2026-030-host-loop-runtime/design.md": {
+     "pin": "9cb3bebd1874e13a2ad580138d4f91eeace2fb6b",
+     "seen": "9cb3bebd1874e13a2ad580138d4f91eeace2fb6b"
+    },
+    "openspec/changes/chg-2026-030-host-loop-runtime/proposal.md": {
+     "pin": "f179c9981d50d0e2a90cf20b93a6b6b23912e4bf",
+     "seen": "f179c9981d50d0e2a90cf20b93a6b6b23912e4bf"
+    },
+    "openspec/changes/chg-2026-030-host-loop-runtime/verification.md": {
+     "pin": "b3154599c3d2d935adfbcade5d9765cd34e3cca5",
+     "seen": "b3154599c3d2d935adfbcade5d9765cd34e3cca5"
+    },
+    "scripts/host_loop/__init__.py": {
+     "pin": "7a6c5b9223c68f9d8aadd503fb38842346c710fc",
+     "seen": "7a6c5b9223c68f9d8aadd503fb38842346c710fc"
+    },
+    "scripts/host_loop/__main__.py": {
+     "pin": "aa47dd45a29ac4531e4c38e3cbe84acaaf2b18a5",
+     "seen": "aa47dd45a29ac4531e4c38e3cbe84acaaf2b18a5"
+    },
+    "scripts/host_loop/backends.py": {
+     "pin": "0efa3e8c74c7935f96742d4d9f1649cc91534dd2",
+     "seen": "0efa3e8c74c7935f96742d4d9f1649cc91534dd2"
+    },
+    "scripts/host_loop/cursor.py": {
+     "pin": "0961ec62409644421dc8ed8eea68230e8fa93b5e",
+     "seen": "0961ec62409644421dc8ed8eea68230e8fa93b5e"
+    },
+    "scripts/host_loop/identity.py": {
+     "pin": "d22e62946e3b5b836cbdcd9b48b57031172fe4b1",
+     "seen": "d22e62946e3b5b836cbdcd9b48b57031172fe4b1"
+    },
+    "scripts/host_loop/lease.py": {
+     "pin": "685fb3c3c8c8266c52816027c92b300ea7cd6732",
+     "seen": "685fb3c3c8c8266c52816027c92b300ea7cd6732"
+    },
+    "scripts/host_loop/mint_installation_token.sh": {
+     "pin": "4150401c5f875ac282d38d6f70eb4c0c35f97689",
+     "seen": "4150401c5f875ac282d38d6f70eb4c0c35f97689"
+    },
+    "scripts/host_loop/pr_envelope.py": {
+     "pin": "2c286c8da0fa8945d512115dfce9de5150db0831",
+     "seen": "2c286c8da0fa8945d512115dfce9de5150db0831"
+    },
+    "scripts/host_loop/transport.py": {
+     "pin": "55e17e3caf139522c189dc6284db6ae90272fad2",
+     "seen": "55e17e3caf139522c189dc6284db6ae90272fad2"
+    },
+    "scripts/host_loop/worker.py": {
+     "pin": "b9662c76a0948abb049d293b2b03948a8fb570a5",
+     "seen": "b9662c76a0948abb049d293b2b03948a8fb570a5"
+    }
+   },
+   "id": "C1",
+   "name": "all seventeen drift-gate blobs equal the r4 pins",
+   "status": "PASS"
+  },
+  {
+   "facts": {
+    "argv": "launchctl print gui/501/com.arkdeck.host-loop.runtime",
+    "exit": 113
+   },
+   "id": "D1",
+   "name": "com.arkdeck.host-loop.runtime absent in gui/501 (print exit 113)",
+   "status": "PASS"
+  },
+  {
+   "facts": {
+    "argv": "launchctl print system/com.arkdeck.host-loop.runtime",
+    "exit": 113
+   },
+   "id": "D2",
+   "name": "com.arkdeck.host-loop.runtime absent in system (print exit 113)",
+   "status": "PASS"
+  },
+  {
+   "facts": {
+    "argv": "launchctl print system/com.arkdeck.host-loop.refresh",
+    "exit": 113
+   },
+   "id": "D3",
+   "name": "com.arkdeck.host-loop.refresh absent in system (print exit 113)",
+   "status": "PASS"
+  },
+  {
+   "facts": {
+    "argv": "launchctl print-disabled gui/501",
+    "exit": 0,
+    "hits": 0
+   },
+   "id": "D4",
+   "name": "print-disabled gui/501 has no host-loop entry",
+   "status": "PASS"
+  },
+  {
+   "facts": {
+    "argv": "launchctl print-disabled system",
+    "exit": 0,
+    "hits": 0
+   },
+   "id": "D5",
+   "name": "print-disabled system has no host-loop entry",
+   "status": "PASS"
+  },
+  {
+   "facts": {
+    "count": 8,
+    "entries": [
+     "com.dropbox.DropboxUpdater.wake.plist",
+     "com.dropbox.dropboxmacupdate.agent.plist",
+     "com.dropbox.dropboxmacupdate.xpcservice.plist",
+     "com.google.GoogleUpdater.wake.plist",
+     "com.google.keystone.agent.plist",
+     "com.google.keystone.xpcservice.plist",
+     "com.jetbrains.toolbox.plist",
+     "com.macpaw.CleanMyMac-setapp.Updater.plist"
+    ]
+   },
+   "id": "D6",
+   "name": "~/Library/LaunchAgents contains no host-loop entry",
+   "status": "PASS"
+  },
+  {
+   "facts": {
+    "exit": 56
+   },
+   "id": "D7",
+   "name": "service account arkdeckhlr does not exist",
+   "status": "PASS"
+  },
+  {
+   "facts": {
+    "count": 0
+   },
+   "id": "D8",
+   "name": "agent/host-loop/** remote refs == 0",
+   "status": "PASS"
+  },
+  {
+   "facts": {
+    "count": 0
+   },
+   "id": "D9",
+   "name": "agent/task-hlr-003* remote branches == 0 (r4 carrier branch auto-deleted on merge)",
+   "status": "PASS"
+  },
+  {
+   "facts": {
+    "existing": [],
+    "paths": [
+     "~/Library/Application Support/ArkDeck/host-loop/installation-token",
+     "~/Library/Application Support/ArkDeck/host-loop/installation-token.meta"
+    ]
+   },
+   "id": "D10",
+   "name": "token file and sidecar absent before the window",
+   "status": "PASS"
+  },
+  {
+   "facts": {
+    "note": "path deliberately not recorded; observed mode is the baseline, no relaxation fallback",
+    "pem_mode": "600",
+    "pem_owner": "root"
+   },
+   "id": "E1",
+   "name": "operator-typed PEM baseline: root-owned, mode 600/400",
+   "status": "PASS"
+  },
+  {
+   "facts": {
+    "bytes": 589,
+    "sha256": "a851ae55d6cd5b463a694a965f67253a79492ddfe1a7762c282b757fae0fcd15"
+   },
+   "id": "F1",
+   "name": "sudo -l -U baseline captured (digest only)",
+   "status": "PASS"
+  },
+  {
+   "facts": {
+    "files": {}
+   },
+   "id": "F2",
+   "name": "/etc/sudoers.d listing + per-file sha256 captured",
+   "status": "PASS"
+  },
+  {
+   "facts": {
+    "bot_issues": 1,
+    "bot_prs": 1,
+    "note": "search API; phase3 recomputes and requires delta 0"
+   },
+   "id": "G1",
+   "name": "App-identity PR/Issue baselines recorded",
+   "status": "PASS"
+  }
+ ],
+ "classification": "read-only observer; every mutation is typed by the operator",
+ "executor_sha256": "617878ab86b794fce26a6fff0b62302e6368e3a2a9d87dd9169fff9eb9727d68",
+ "finished_at_utc": "2026-07-26T02:35:36Z",
+ "interpreter_pin": "/opt/homebrew/bin/python3",
+ "manual_confirmations_required": [
+  {
+   "confirm": "the minter install directory /Library/PrivilegedHelperTools is NOT the PEM staging directory (only the operator can judge this; if it is, STOP — the r4 path pin is void and needs r5)",
+   "id": "M1"
+  },
+  {
+   "confirm": "single continuous session: if this window is interrupted, re-run preflight in full before continuing",
+   "id": "M2"
+  }
+ ],
+ "mutations": 0,
+ "operator": "lvye",
+ "phase": "preflight",
+ "readiness": "r4 (PR #549) over r3 (PR #547 merge 5307d1b9833333952ae54f41256764394d66f692)",
+ "schema": "arkdeck-hlr003-d2/1",
+ "started_at_utc": "2026-07-26T02:35:26Z",
+ "status": "PASS",
+ "stop_reason": null,
+ "task": "TASK-HLR-003"
+}

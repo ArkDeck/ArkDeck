@@ -1,0 +1,157 @@
+{
+ "checks": [
+  {
+   "facts": {
+    "path": "~/Library/LaunchAgents/com.arkdeck.host-loop.runtime.plist",
+    "stat": {
+     "group": "staff",
+     "links": "1",
+     "mode": "644",
+     "owner": "fuhanfeng"
+    }
+   },
+   "id": "S1",
+   "name": "scheduler plist present, owned by the user, mode 0644",
+   "status": "PASS"
+  },
+  {
+   "facts": {
+    "expected": [
+     "/opt/homebrew/bin/python3",
+     "-m",
+     "host_loop",
+     "--once",
+     "--repo-dir",
+     "~/Dropbox/Code/Github/ArkDeck"
+    ],
+    "program": [
+     "/opt/homebrew/bin/python3",
+     "-m",
+     "host_loop",
+     "--once",
+     "--repo-dir",
+     "~/Dropbox/Code/Github/ArkDeck"
+    ]
+   },
+   "id": "S2",
+   "name": "ProgramArguments exactly [interpreter, -m, host_loop, --once, --repo-dir, <repo>] with the phase1 interpreter",
+   "status": "PASS"
+  },
+  {
+   "facts": {
+    "keys": [
+     "ARKDECK_HOST_LOOP_TOKEN_FILE",
+     "ARKDECK_REPO",
+     "HOME",
+     "PATH",
+     "PYTHONPATH"
+    ],
+    "token_file": "~/Library/Application Support/ArkDeck/host-loop/installation-token"
+   },
+   "id": "S3",
+   "name": "environment holds exactly the five allowed keys and no cursor-issue variable",
+   "status": "PASS"
+  },
+  {
+   "facts": {
+    "interval": 900,
+    "stderr": "~/Library/Logs/arkdeck-host-loop.err.log",
+    "stdout": "~/Library/Logs/arkdeck-host-loop.log"
+   },
+   "id": "S4",
+   "name": "StartInterval 900, log paths set, WorkingDirectory = repo",
+   "status": "PASS"
+  },
+  {
+   "facts": {
+    "argv": "launchctl print gui/501/com.arkdeck.host-loop.runtime",
+    "exit": 0
+   },
+   "id": "S5",
+   "name": "com.arkdeck.host-loop.runtime present in gui/501 (print exit 0)",
+   "status": "PASS"
+  },
+  {
+   "facts": {
+    "domain": "gui/501",
+    "note": "a gui-domain agent cannot run as root; domain itself is the primary fact",
+    "uid_lines": []
+   },
+   "id": "S6",
+   "name": "service runs in gui/<uid> as the user (never uid 0)",
+   "status": "PASS"
+  },
+  {
+   "facts": {
+    "leaks": [],
+    "rounds": 5,
+    "states": [
+     "idle",
+     "idle",
+     "idle",
+     "idle",
+     "idle"
+    ]
+   },
+   "id": "S7",
+   "name": ">=3 rounds logged, none in a write state, log free of secret shapes and /Users/ paths",
+   "status": "PASS"
+  },
+  {
+   "facts": {
+    "pgrep": "(empty)"
+   },
+   "id": "S8",
+   "name": "between-round sample: no resident host_loop process",
+   "status": "PASS"
+  },
+  {
+   "facts": {
+    "structural_fact_1": "launchd never starts a second instance of a label; an overdue StartInterval firing is skipped while the previous instance runs",
+    "structural_fact_2": "--once is a short-lived process; the S8 sample observed none resident",
+    "unproven": "merged code emits no run_id/pid line prefixes, so the required observation cannot be produced"
+   },
+   "id": "S9",
+   "name": "concurrency observable: UNPROVEN, recorded honestly per r3 fallback + r4 recording rule",
+   "status": "INFO"
+  },
+  {
+   "facts": {
+    "bot_issues": [
+     1,
+     1
+    ],
+    "bot_prs": [
+     1,
+     1
+    ],
+    "lease_refs": 0
+   },
+   "id": "S10",
+   "name": "GitHub increments all zero (App PRs, App Issues, agent/host-loop refs)",
+   "status": "PASS"
+  },
+  {
+   "facts": {
+    "err_tail": "host-loop: setup/round failure: cannot read the token file: [Errno 2] No such file or directory: '~/Library/Application Support/ArkDeck/host-loop/installation-token'",
+    "kickstart_exit": 0
+   },
+   "id": "S11",
+   "name": "token-removal probe: kickstarted round failed visibly (exit 1 in stderr log) and created nothing",
+   "status": "PASS"
+  }
+ ],
+ "classification": "read-only observer; every mutation is typed by the operator",
+ "executor_sha256": "617878ab86b794fce26a6fff0b62302e6368e3a2a9d87dd9169fff9eb9727d68",
+ "finished_at_utc": "2026-07-26T04:27:40Z",
+ "manual_confirmations_required": [],
+ "mutations": 0,
+ "operator": "lvye",
+ "phase": "phase3",
+ "readiness": "r4 (PR #549) over r3 (PR #547 merge 5307d1b9833333952ae54f41256764394d66f692)",
+ "schema": "arkdeck-hlr003-d2/1",
+ "started_at_utc": "2026-07-26T04:27:36Z",
+ "status": "PASS",
+ "stop_reason": null,
+ "task": "TASK-HLR-003"
+}
