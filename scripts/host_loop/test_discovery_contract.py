@@ -53,7 +53,11 @@ REPO_ROOT = SCRIPTS_DIR.parent
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
-from host_loop.__main__ import discover_candidates  # noqa: E402
+from host_loop.__main__ import (  # noqa: E402
+    _without_code_fences,
+    discover_candidates,
+    done_task_ids,
+)
 from host_loop.worker import DISPATCHABLE_GRADES  # noqa: E402
 
 CHANGE_ID = "CHG-2026-030-host-loop-runtime"
@@ -268,11 +272,39 @@ class AgainstTheRealFile(unittest.TestCase):
         self.assertLessEqual({c.status for c in self.found},
                              {"ready", "done", "blocked", "in-progress"})
 
-    def test_hlr_003_reads_as_ready(self):
-        """The task this change is currently working: it must read as ready."""
+    def test_statuses_equal_an_independent_minimal_extraction(self):
+        """Parser output must equal a second, simpler extraction of the file.
+
+        The point-in-time form is retired: this test used to pin
+        `TASK-HLR-003 == ready`, which the #552 done flip legitimately broke —
+        the parser was right and the assertion was stale (recorded in the
+        TASK-HLR-004 r1 readiness). Comparing against an independently
+        extracted value keeps the original purpose — a truncated or
+        prose-bearing value such as `ready（r2` must still fail loudly — while
+        freezing no task's current state into the suite.
+        """
+        import re as _re
+
+        text = _without_code_fences(REAL_TASKS.read_text(encoding="utf-8"))
+        independent: dict[str, str] = {}
+        for section in _re.split(r"(?m)^##\s+", text)[1:]:
+            header = _re.match(
+                r"^(TASK-[A-Z0-9]+(?:-[A-Z0-9]+)*-[0-9]{3}[A-Z]?)", section)
+            status = _re.search(r"^-[ \t]*Status[:：][ \t]*([a-z][a-z-]*)",
+                                section, _re.MULTILINE)
+            if header and status:
+                independent[header.group(1)] = status.group(1)
+        self.assertGreaterEqual(len(independent), 8,
+                                "the independent extraction must see the file")
+        self.assertEqual({c.task_id: c.status for c in self.found}, independent)
+
+    def test_hlr_003_is_done_and_no_longer_ready(self):
+        """#552 flipped TASK-HLR-003 to done; done is terminal, so both facts
+        are stable forever and safe to assert against the real file."""
+        self.assertIn("TASK-HLR-003", done_task_ids(REPO_ROOT))
         by_id = {c.task_id: c for c in self.found}
         self.assertIn("TASK-HLR-003", by_id)
-        self.assertEqual(by_id["TASK-HLR-003"].status, "ready")
+        self.assertNotEqual(by_id["TASK-HLR-003"].status, "ready")
 
     def test_every_task_declares_a_decidable_hardware_value(self):
         """No task may be omitted for an undecidable safety field."""
