@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-037-host-loop-transport-allowlist-shrink
 revision: 1
-status: verified # 2026-07-26 本 verification-closure PR（先例 #224/#239/#399）；approval #558；TASK-TAS-001 done 已合入（OID 见 Verification closure）；archive 另行。原注：approval-only #558 置 approved；r1 proposal 经 #557 合入
+status: archived # 2026-07-26 本 archive PR（先例 #235/#241/#534）；verify #570 merge 2b276d58cd45b729f2c80fadcb7149a1ccf0a004；引用扫描：目录外精确路径引用 0，归档后全量 suite 482 OK、check_pr_paths 24 OK、`done_task_ids` 仍认得 TASK-TAS-001（archive glob 由 TASK-HLR-003 #548 补上）。原注：verified 于 #570；approved 于 #558；proposal r1 经 #557
 class: implementation-only
 core_change_level: none
 owner: lvye
