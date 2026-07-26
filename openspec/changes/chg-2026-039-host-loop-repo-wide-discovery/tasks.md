@@ -6,10 +6,71 @@
 
 ## TASK-NAV-001 — 全仓 discovery 缺省与 idle 判词真话
 
-- Status:blocked（前置：① 本 change approval-only PR merge；② 独立
-  readiness PR 以 TAS-001 形态钉定实现契约——受改两文件的 exact blob、
-  「恰 N 断言反应」变异门、期望套件计数、never-claim 声明与 launchd
-  零动作条款。）
+- Status:ready（r1 implementation readiness；仅在维护者对本独立 readiness
+  PR exact head review/merge 后生效。只授权一个实现交付：按下方契约把缺省
+  discovery 扩为全仓、修复 never-claim ready 过滤、加 UTC 时间戳/范围
+  idle 行、并把 TASK-NAV-001/TASK-NAV-002 计入 `NEVER_CLAIM_ROOTS`；载体
+  = 常规会话 agent/* PR（本任务 never-claim，循环不得认领）。不授权：
+  transport/lease/identity/reviewer/recovery/cursor/backends/pr_envelope
+  变更、launchd/plist 任何动作、`Decision-Grade` 代写、governance 正文、
+  NAV-002 分工文件（见契约⑥）。）
+- Historical Status:blocked（前置：① 本 change approval-only PR merge；
+  ② 独立 readiness PR。① = #587 merge
+  `17a9574a368e518ce475ef7d72135c3a6f71f2c7`；② = 本 r1。）
+- Readiness（r1；audit base = protected `main`
+  `17a9574a368e518ce475ef7d72135c3a6f71f2c7`）：
+  - **Approval boundary:pending human merge。**本 carrier 只修改本文件。
+    只有 `lvye` 对 exact head APPROVED、required checks terminal
+    success、`mergedBy=lvye`、`auto_merge=null` 且 squash subject 携
+    `(#N)` 的 merge OID 进入 protected main 后，本 readiness 才生效。
+  - **Dependency gate:closed。**propose #586
+    `fa4bdeaae305b7898e3412a210656842ff50e2e2`、approval #587
+    `17a9574a368e518ce475ef7d72135c3a6f71f2c7`，均 `lvye` APPROVED、
+    audit-base ancestors。
+  - **Source pins:closed。**实现 base 须逐项等于：`__main__.py`
+    `aa47dd45a29ac4531e4c38e3cbe84acaaf2b18a5`、`worker.py`
+    `b9662c76a0948abb049d293b2b03948a8fb570a5`；任一 drift 停并重钉。
+  - **Implementation contract:binary（2026-07-26 audit base 探针实测）。**
+    ① 缺省（无 `--change`）round 与 `--explain` 扫描全部
+    `openspec/changes/chg-*/tasks.md`（字典序，archive 除外），
+    `--explain` 按 change 分组输出；显式 `--change <id>` 单 change 语义
+    保留（`test_minter_and_explain` 既有显式 `--change` 用例零语义
+    变更）。
+    ② 跨 change 聚合下每轮至多一个 claim 的不变量、change-approved 门
+    逐 change 判定，均以正/负 fixture 契约测试钉死。
+    ③ never-claim ready 过滤——**audit base 红探针已实测**：status=done
+    的 `TASK-HLR-003` 候选经 `select()` 仍产出
+    `ONLY_NEVER_CLAIM_READY` 与判词 `only never-claim tasks are ready
+    (['TASK-HLR-003'])`；实现后同输入不得再产出该 outcome（回归测试）；
+    status=ready 的 never-claim 候选仍产出（正对照 = 既有
+    `SelfClaimStop` 用例零修改保持绿，其 fixture 缺省即 ready）。变异
+    门：撤销 ready 过滤 → 回归测试必红。
+    ④ `NEVER_CLAIM_ROOTS`（worker.py 现 = `{"TASK-HLR-003"}`）增
+    `TASK-NAV-001`、`TASK-NAV-002`；新增测试钉**精确三根集合**（先例：
+    冻结集合钉内容不钉 len）。
+    ⑤ idle/claim 日志行加 UTC ISO-8601 时间戳与扫描范围（change 数/
+    候选数），格式契约测试钉死。
+    ⑥ **File partition（与 NAV-002 并行零交集）**：本任务只改
+    `worker.py`、`__main__.py`、新文件
+    `scripts/host_loop/test_navigation_contract.py`，以及仅当缺省
+    explain 形态变化打红其无 `--change` 用例时的
+    `test_minter_and_explain.py` 最小适配；不触碰 NAV-002 分工的
+    `check_pr_paths.py`/`test_check_pr_paths.py`/`test_backends_cli.py`/
+    `test_discovery_contract.py`/`test_pr_envelope.py`/
+    `test_support.py`。
+    ⑦ 套件：audit base 基线 = 482 OK + 1 expectedFailure；实现后 =
+    482 + 新增数全绿 + 1 xf 保持（精确计数入 PR body 与 evidence）；
+    `check-sdd` 0/0/111；diff 恰在 Allowed paths 内。
+  - **Deployment terms:closed。**LaunchAgent plist 不含 `--change`，
+    缺省值改动即部署；两 left-running unit 零动作；生效 = 运行机
+    checkout 前进至含实现的 protected main。实现合入前不得以
+    `--change` 本 change 跑任何 foreground round。
+  - **Concurrency/absence:closed at drafting（2026-07-26 23:56）。**
+    remote `agent/*nav*` 分支 = 0（推送前实测；本 readiness 与 NAV-002
+    readiness 为堆叠双 carrier，按序合并）。
+  - **Grade 注记**：`Decision-Grade` 行由维护者亲笔（#577 载体先例）；
+    本契约已机器化，符合 D0 三条件；④ 的 never-claim 为结构性防自认领
+    门，grade 与 claim 面解耦。
 - Platform:macos（host-only；零设备/HDC/网络写入面变更）
 - Requirements/AC:change-local `NAV-DISC-001`、`NAV-TRUTH-001`
 - Depends on:none
