@@ -1,12 +1,18 @@
 # Verification Plan — CHG-2026-026
 
-> Change:CHG-2026-026@r9
+> Change:CHG-2026-026@r10
 > Status:planned
 > Note(2026-07-25):r9 接受 #516/#519 的 001F PASS/D0 completion，并只新增
 > TASK-RKFUI-001G exact v1 product-entitlement external inert-fixture launch
 > characterization；不改变 Core/AC/schema、App/ADR/platform profile、artifact
 > version/hash/upstream、typed real-tool argv、target/firmware/HDC/transport、RockUSB
 > grammar 或 destructive pins。
+> Note(2026-07-26):r10 接受 #525 的 001G blocked Stage A evidence 与 #530 合入的
+> `DEC-011`/ADR-0003，把 TASK-RKFUI-001G `ready→blocked` 并记录 supersession。r10
+> 不改变 Core/AC/schema、requirement 集合、App/ADR/platform profile、artifact
+> version/hash/upstream、typed real-tool argv、target/firmware/HDC/transport、RockUSB
+> grammar 或 destructive pins；不新增任务，不改动已合入的 001G receipt，也不重判
+> TASK-RKFUI-001/002/003 的 dependency。
 
 ## Environment
 
@@ -157,6 +163,11 @@
   Stage B process = 0；任一失败不保留 candidate implementation，不追加 symlink、
   `user-selected.executable`、helper/XPC/broker、bundle/copy/download 或真实 tool/device。
   001G PASS 仍不恢复 TASK-RKFUI-001，真实 E0 继续等待 fresh artifact + 独立 D1。
+- r10 起 001G 为 blocked 且授权已消耗：不得重跑该 characterization、不得改写
+  `evidence/runs/TASK-RKFUI-001G/` 的 blocked receipt 使其转 PASS（ADR-0003 mandatory
+  follow-on gate 7），也不得在该任务内追加 symlink、`user-selected.executable`、
+  helper/XPC/broker、bundle/copy/download 或真实 tool/device 方案。重新提出
+  user-selected external executable 边界必须先有推翻或修订 `DEC-011` 的独立 ADR/change。
 - `REQ-FLASH-015` 交互式 App executor 解释未获维护者明确确认时，execute 不实现；不得把
   plan-only/handoff 记作一键真机刷机。
 - DAYU200 exact combination 的 `reboot loader` E1 capability 未证明 supported 时，Route B
@@ -187,6 +198,12 @@
       wrong-hash control child 0 且 metadata 不变；Stage B 仅在其后运行一次 compiled-hash
       `return 0` fixture，exited/0/empty output、metadata 不变。real tool/`ld`、network/
       USB/HDC/device/E1/E2/mutation/destructive/privilege/helper/system/xattr-write 0
+      —— **r10 起由下一条取代**：该 characterization 已执行且 blocked，不再是待达成目标
+- [ ] r10 001G 终态诚实：任务为 blocked，`evidence/runs/TASK-RKFUI-001G/` 的
+      blocked receipt 与 run.md 保持 immutable 且未被重分类为 PASS/product/real E0
+      evidence；`DEC-011`/ADR-0003 的 supersession 在 proposal/tasks/verification 三处
+      一致记录；无重跑、无 candidate implementation 留存、无 helper/XPC/broker/
+      bundle/copy/download/`user-selected.executable` 追加方案
 - [ ] Real hardware App path 由适格操作者执行，evidence 精确 pin 全组合
 - [ ] Traceability updated（无新 Core AC ID；记录现有 AC → 新 tests/evidence）
 - [ ] 无 shell/sudo/helper/BlueTool asset、无 secret/真实 serial/raw 敏感输出入库
