@@ -2,7 +2,7 @@
 id: CHG-2026-038-main-protection-merge-friction
 revision: 1
 status: proposed
-class: governance
+class: implementation-only
 core_change_level: none
 owner: lvye
 core_baseline: CORE-2.1.0
