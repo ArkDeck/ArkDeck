@@ -111,6 +111,7 @@
 - Risk:medium(真机在场运行生产 supervisor 只读路径;App 由人类启动;自动
   lifecycle/subserver 调用计数须为仪表化实测 0)
 - Hardware required:yes(物理 DAYU200,USB;操作者=人类维护者)
+- Decision-Grade:D2。
 - Deliverables:supervisor 真机观察记录(ownership/generation、lifecycle 计数、
   endpoint 隔离、设备出现/消失 fan-out)、evidence JSON 增补、run.md。
 - Verification:按 acceptance-cases.yaml `TEST-HW-M0B-DAYU200-SUPERVISOR-001`;

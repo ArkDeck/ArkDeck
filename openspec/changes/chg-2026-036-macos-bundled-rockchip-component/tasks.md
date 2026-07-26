@@ -941,6 +941,7 @@
   - `Packages/**`
 - Risk:medium（改变 App release/package shape，但零 runtime/device effect）
 - Hardware required:no
+- Decision-Grade:D2。
 
 ### Deliverables
 
@@ -1009,6 +1010,7 @@
   - `Packages/ArkDeckKit/Sources/ArkDeckCLI/**`
 - Risk:high（production composition/authority/effect 邻接代码；仅 contract/fake，零真实 effect）
 - Hardware required:no
+- Decision-Grade:D1。
 
 ### Deliverables
 
@@ -1076,6 +1078,7 @@
   - `openspec/verification/hardware-matrix.md`
 - Risk:high（真实 signed process/USB E0；严格零 device mutation/E1/E2/destructive）
 - Hardware required:yes
+- Decision-Grade:D2。
 
 ### Deliverables
 
@@ -1140,6 +1143,7 @@
   - `openspec/verification/hardware-matrix.md`
 - Risk:high（外部 release/notary/update effect；零设备 mutation）
 - Hardware required:no
+- Decision-Grade:D2。
 
 ### Deliverables
 

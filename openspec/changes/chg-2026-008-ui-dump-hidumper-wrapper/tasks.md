@@ -481,6 +481,7 @@ R2 decision 与 R2→R4 seam 两个串行任务,共 8 个。现行状态一律�
 - Forbidden now:任何实现/fixture/evidence、读取真实 raw、HDC/device/network/GUI、R2/R4
   dispatch、exact token/nonce/bundle 入仓、放宽 raw digest family或 repo-sensitive gate。
 - Hardware required:no;future implementation/tests synthetic-only,installed-HDC/device/network/
+- Decision-Grade:D1。
   destructive dispatch `0`。
 - Verification(candidate):decision-manifest parser contract、bundle/receipt closed-schema +
   deterministic serialization、OS randomness/permission/path gates、same-session binding、R4 exact
@@ -518,6 +519,7 @@ R2 decision 与 R2→R4 seam 两个串行任务,共 8 个。现行状态一律�
   - `openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/evidence/runs/TASK-UD-CAP-R4-001/**`
   - 本 `tasks.md`(仅本任务状态与 completion evidence,独立 status PR)
 - Hardware required:yes,human only。
+- Decision-Grade:D2。
 - Required evidence:同 Phase A(`run.md`、`redacted-manifests/`、`capture-hashes.md`、
   `hardware-evidence.json`),另附 decision/seam merged OID/hash、fresh R2 raw hash、repo-safe
   selection receipt与 private bundle SHA-256;exact token/nonce/bundle bytes不入仓。
@@ -736,6 +738,7 @@ task 按 M0B 先例由人类直接使用 installed `hdc`,同样不消费 M1-006 
 - Risk:medium(固定新的 argv/output-family 语义并导入 derived fixture;必须以 redaction
   receipt hash 链 + 维护者逐字审读闭环隐私,以 fake 对抗测试覆盖 exit-0 陷阱)。
 - Hardware required:no。真机输入只来自两个具名前置 realHardware task 的已合入
+- Decision-Grade:D1。
   evidence;本实现/contract verification 必须 headless、无设备。
 - Required environment:锁屏 macOS headless shell;Swift 6.3.3、`xcrun swift-format`
   6.3.0、SwiftPM;固定 Python `<ARKDECK_ROOT>/.venv-sdd/bin/python`(Python 3.14.6 +

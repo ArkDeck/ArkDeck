@@ -253,6 +253,7 @@
 - Risk:medium（host-local delete 与 production root composition；所有删除只在临时
   fixture 验证，真实 App effect 留给用户确认）
 - Hardware required:no
+- Decision-Grade:D1。
 - r2 remaining implementation authority:none。#436 后本任务不再修改产品 source；
   cross-change product wiring 由 CHG-2026-026 自身的独立 readiness/task 承载，本
   change 后续只做 001R revalidation 与状态推进。
@@ -324,6 +325,7 @@
   - `ArkDeck.xcodeproj/**`
 - Risk:low（只读合入版 revalidation；零产品修改、零用户数据删除、零设备 effect）
 - Hardware required:no
+- Decision-Grade:D1。
 
 ### Deliverables
 
@@ -394,6 +396,7 @@
   - `Packages/ArkDeckKit/Tests/**`
 - Risk:medium（用户可见删除确认 UI；fixture 与 production dispatch 必须结构隔离）
 - Hardware required:no
+- Decision-Grade:D1。
 
 ### Deliverables
 
