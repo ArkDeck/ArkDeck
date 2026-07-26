@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-037-host-loop-transport-allowlist-shrink
 revision: 1
-status: approved # 本 approval-only PR 经维护者 review/merge 后生效；r1 proposal 已由 #557 登记（merge 58ab9115）；TASK-TAS-001 仍 blocked 待独立 readiness
+status: verified # 2026-07-26 本 verification-closure PR（先例 #224/#239/#399）；approval #558；TASK-TAS-001 done 已合入（OID 见 Verification closure）；archive 另行。原注：approval-only #558 置 approved；r1 proposal 经 #557 合入
 class: implementation-only
 core_change_level: none
 owner: lvye
@@ -65,3 +65,27 @@ TASK-HLR-005 pre-readiness r0）。**如实登记双重作用**：维护者于 2
 
 单任务：TASK-TAS-001（见 tasks.md）。propose 合入 ≠ 批准；approval-only PR
 merge 后 change 方为 approved；任务经独立 readiness 后方可实现。
+
+## Verification closure（2026-07-26）
+
+单任务 TASK-TAS-001 done 于 protected main 在案，两条 change-local AC 证据可
+复查；本 PR 仅状态翻转 + 引用，零实现夹带（先例 #224/#239/#399）。
+
+- **任务链**：propose #557 merge `58ab9115e51d6b53a8a34632a067147a1a7fc00e`；
+  approval #558 merge `bdead7e47d824e213942d273e671a5d9ab9f7cd8`；readiness r1
+  #559 merge `1c6581b163ce64a0c91405a5bc98325f99d6aa50`；grade 行（维护者亲手
+  commit `e3270cb1…`，OID 不变传输）#563 merge
+  `6ffa653a3d2182a9b13ab492bdd23ccda66ac4ef`；实现 = host-loop pilot envelope
+  PR #564，exact head `f6bf27d64bfe3aa4efc47ac9ebbcf7dbe42dfb66` 经 `lvye`
+  APPROVED、squash merge `877347f212ab0bffa9924801a037b3256f1eea56`；evidence
+  #568 merge `cd0d7bda5f090ead2102077a6af158b42a62c606`；done #569 merge
+  `887e55bb38575ceb433601e01748afdfda7e260f`。
+- **TAS-ROUTE-001 = PASS**：`ALLOWED_ROUTES` 恰 8 条且内容精确断言；两条裸列表
+  模板被 `assert_route_allowed` 以 `RouteViolation` 拒绝（回归测试绿）；
+  `route_inventory`/`forbidden_capability_count` 负证 = 0。
+- **TAS-BEHAVIOR-001 = PASS**：全部公开方法契约测试零修改仍绿（同 template 异
+  method 的 `POST` 条目不受影响，与 design 结构论证一致）；全量 suite 482 OK +
+  1 expectedFailure（chg-030 在案标记）；`check-sdd` 0/0/111；实现 diff 恰为三个
+  Allowed 文件。
+- **交付方式本身即里程碑**：本 change 是第一个由 host-loop 无人值守认领并交付
+  实现的 change（CHG-2026-030 TASK-HLR-005 pilot receipt 在案）。
