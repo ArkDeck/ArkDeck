@@ -3112,9 +3112,111 @@
 
 ## TASK-HLR-004 — 独立 reviewer loop、merge-OID recovery 与 batch handoff
 
-- Status:blocked（前置：① 本 change approval；② TASK-HLR-003 done；③ 独立
+- Status:ready（r1 implementation readiness；仅在维护者对本独立 readiness PR exact
+  head review/merge 后生效。只授权 ① 一个 D0 source PR，在 `scripts/host_loop/**`
+  内交付 reviewer loop、merge-OID recovery 与 batch gating 的 **offline** 实现与
+  contract/fault tests（含下方点名的一处 stale 时点断言修复），② 其后一个独立
+  evidence 记录与 ③ 一个独立 `ready→done` 状态 PR。**零 live GitHub 写**：本任务
+  全部验证走既有 fake ports；live dispatch/batch Issue 写/legacy 迁移均属
+  TASK-HLR-005。不授权：GitHub review API 调用、review/merge/auto-merge/admin
+  route、任何 scheduler/launchd/unit/host 变更（两 unit left-running 冻结条款继续
+  有效）、`agent-pr.yml`/`sdd-guard.yml`/governance text 变更、transport 新增
+  route 或放宽 allowlist、以及**代任何任务撰写 `Decision-Grade`**。）
+- Historical Status:blocked（前置：① 本 change approval；② TASK-HLR-003 done；③ 独立
   readiness PR 钉定 reviewer adapter interface、failure matrix、batch Issue schema 和
-  merge-OID sources；④ 不产生 PR 的 reviewer backend availability probe。）
+  merge-OID sources；④ 不产生 PR 的 reviewer backend availability probe。①② 已闭：
+  approval 与 #552 done merge `24395db6b15d72781f142991aa06e765cbb695cb`；③ = 本 r1
+  readiness；④ 已于 2026-07-26 执行，见 r1。）
+- Readiness（r1；audit base = protected `main`
+  `24395db6b15d72781f142991aa06e765cbb695cb`）：
+  - **Approval boundary:pending human merge。**本 carrier 只修改本文件
+    TASK-HLR-004 section。只有 `lvye` 对 exact head APPROVED、required checks
+    terminal success、`mergedBy=lvye`、`auto_merge=null` 且 squash subject 携
+    `(#N)` 的 merge OID 进入 protected main 后，本 readiness 才生效。合入前
+    source/host/GitHub mutation = 0。
+  - **Dependency gate:closed。**① change approval（r3 #「approval #455 链」既存）；
+    ② TASK-HLR-003 done merge `24395db6b15d72781f142991aa06e765cbb695cb`（#552，
+    `lvye` APPROVED、`auto_merge=null`）；③ = 本 carrier；④ backend availability
+    probe 已执行（2026-07-26，只读零副作用）：`claude --version` → exit 0、输出
+    `2.1.220 (Claude Code)`，可执行文件位于操作者 PATH（`~/.local/bin/claude`）；
+    `codex` 不存在。probe 不触碰仓库、不创建 PR/Issue/ref。
+  - **Reviewer adapter interface:pinned。**注入式 `ReviewerPort`，唯一方法
+    `request_review(ReviewRequest) -> ReviewResult`。`ReviewRequest` 不可变：
+    `{change, task, pr_number, head_oid(40-hex), base_oid(40-hex),
+    checks_digest, requested_by_run}`；`ReviewResult` 不可变：
+    `{verdict ∈ {APPROVE, REQUEST_CHANGES, BLOCKED}, reviewer_run, head_oid,
+    recorded_at, reasons}`。硬约束（各配 contract test）：(i) adapter 构造参数
+    不含 token/ApiPort——reviewer process 不接收 integration credential；
+    (ii) `reviewer_run == requested_by_run` 的结果被拒收（HLR-REVIEW-001 同会话
+    禁令）；(iii) 结果序列化恒携「NOT a GitHub approval」声明字段；(iv) production
+    adapter = 独立 `claude` 会话 subprocess（独立 run ID/工作目录），**HLR-004 只
+    交付其 argv/契约与 availability probe，不做任何 live dispatch**。
+  - **Failure matrix:pinned（行为逐条 contract/fault test）。**① adapter
+    timeout/crash/非零退出 → `reconcileRequired`，零入队零盲重试；② result.head
+    ≠ request.head（head 漂移）→ 旧结论作废、候选退回 discover；③ verdict 非三
+    值/解析失败 → `reconcileRequired`；④ 同会话结果 → 拒收 +
+    `reconcileRequired`；⑤ `REQUEST_CHANGES`/`BLOCKED` → `workerPaused`，不入
+    队；⑥ checks 缺失/未全绿/歧义 → 候选不合格，不发起 review；⑦ 重复结果 →
+    后到者拒收；⑧ merge observation 歧义（两源不一致或不可唯一判定）→
+    `reconcileRequired`，零 lease release/零 cursor advance；⑨ 任何外部写前
+    lease fence mismatch → 停（既有 r1 gate 延续）。
+  - **Batch Issue schema:pinned = CHG-2026-027 canonical。**载体
+    `openspec/templates/batch-digest.md` exact blob
+    `f5f82e3413c88a646f49047f952a0677e92f636b`；digest 条目字段 = Grade、
+    Change/Task、内容、Base/Head OID（完整 40-hex）、Files read-back、风险与影响
+    面、Evidence/测试指针；**入队三门 = checks 全绿 + 独立会话对 exact head 的
+    APPROVE（head 变更即失效）+ digest 全字段完整**，缺一 `batchQueued` 不达。
+    batch Issue 仅导航、零批准语义、任何等级无 auto-merge（首屏声明原样）。
+    HLR-004 交付 gating + 条目 render + contract tests；live batch Issue 写属
+    HLR-005。canonical 载体不可用即记录 blocked，不自建权威载体（Notes 原文）。
+  - **Merge-OID sources:pinned（双源交叉，单源永不充分）。**source A = typed PR
+    lookup 的 GitHub merge metadata（`merged`、`merged_at`、`merge_commit_sha`
+    ——已实测该字段可能事后变 null，`merged=true` 不变，不得单独依赖）；
+    source B = protected main git history（`ls-remote origin refs/heads/main` +
+    fetch 后 ancestry/subject/tree：candidate OID 须为 main ancestor 且 squash
+    subject 携 `(#N)`）。判定：`merged=true` ∧（`merge_commit_sha` 非 null →
+    该 OID 须 source B 可证；null → source B 须以 subject `(#N)` 唯一定位 merge
+    commit），任一侧缺失/歧义 → `reconcileRequired`。**负例入 tests：branch 消
+    失、时间流逝、Issue 声称 merged、CI 绿，均永不充分。**确认后才 release
+    lease/advance cursor；crash restart fixtures 覆盖 acquire、PR create
+    timeout、body update、heartbeat、review dispatch、merge observation 六窗口。
+  - **Source pins:closed。**实现 base 与本 readiness merge tree 中下列 blob 须逐
+    项相等，任一 drift 即停并重钉：`__init__` `7a6c5b9223c68f9d8aadd503fb38842346c710fc`、
+    `__main__` `aa47dd45a29ac4531e4c38e3cbe84acaaf2b18a5`、`backends`
+    `0efa3e8c74c7935f96742d4d9f1649cc91534dd2`、`transport`
+    `55e17e3caf139522c189dc6284db6ae90272fad2`、`worker`
+    `b9662c76a0948abb049d293b2b03948a8fb570a5`、`cursor`
+    `0961ec62409644421dc8ed8eea68230e8fa93b5e`、`lease`
+    `685fb3c3c8c8266c52816027c92b300ea7cd6732`、`identity`
+    `d22e62946e3b5b836cbdcd9b48b57031172fe4b1`、`pr_envelope`
+    `2c286c8da0fa8945d512115dfce9de5150db0831`、`minter`
+    `4150401c5f875ac282d38d6f70eb4c0c35f97689`（不得动）、`agent-pr.yml`
+    `a514d9e539964f9e1960acbe4ffaa696629571da`（forbidden witness，迁移属
+    HLR-005）、`sdd-guard.yml` `c64135e1f9dc253a92640a30bbcad42b0afa86fa`
+    （forbidden witness）。允许改动面：`scripts/host_loop/` 新文件（reviewer/
+    recovery/tests）+ `worker.py`/`__main__.py` 的最小接线 +
+    `test_discovery_contract.py` 的 stale 断言修复；`ALLOWED_ROUTES` 与
+    `forbidden_capability_count()` 的 negative proof 必须继续为 0。
+  - **Baseline honesty:audit base 上套件为 405 pass + 1 FAIL + 1
+    expectedFailure。**该 FAIL = `test_discovery_contract.AgainstTheRealFile.
+    test_hlr_003_reads_as_ready`——对真实 tasks.md 的时点断言（「当前在做的任务
+    读作 ready」）被 #552 的合法 done 翻转打破；解析器行为正确（`--explain`
+    读出 done、`done_task_ids` 83→84）。这是 TASK-HLR-003 done PR recheck 条款
+    的设计漏洞（套件跑在翻转前的 flip base 上），如实入账。本 readiness 授权的
+    source PR 必须修复之，且修复形态不得再次时点化：以对当前文件 Status 行的
+    独立最小抽取对照 parser 输出，而非硬编码某任务的瞬时状态。
+  - **Live-loop mutual-exclusion hazard:pinned。**两个 unit 处于 left-running，
+    scheduler 每 900s 以 `--change CHG-2026-030-host-loop-runtime` 扫描本文件。
+    本 readiness 生效后 TASK-HLR-004 = ready 且各门皆过、唯缺 `Decision-Grade`
+    ——**在 TASK-HLR-004 done 之前，维护者不得为本 change 内任何任务补写
+    `Decision-Grade` 行**（补写 D0 即把该任务交给活循环认领，与本 readiness 授
+    权的 agent 会话形成双写竞态；D1/D2 亦会触发 gated 阻塞记录路径）。该约束是
+    时机约束，不改变「grade 由维护者人工判断」本身；HLR-005 readiness 将统一
+    编排补 grade 与 pilot 的顺序。
+  - **Concurrency/absence:closed at drafting（2026-07-26）。**remote
+    `agent/task-hlr-004*` 分支 = 0；分支名钉定：本 carrier =
+    `agent/task-hlr-004-readiness-r1`、source = `agent/task-hlr-004-reviewer-loop`、
+    done = `agent/task-hlr-004-done`。`agent/host-loop/**` refs = 0。
 - Platform:macos（host-only）
 - Requirements/AC:change-local `HLR-REVIEW-001`、`HLR-RECOVERY-001`
 - Depends on:TASK-HLR-003 done、independent readiness
