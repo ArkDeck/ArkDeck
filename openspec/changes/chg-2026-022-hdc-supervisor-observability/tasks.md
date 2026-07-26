@@ -62,6 +62,7 @@
 - Risk:medium(触碰 supervisor 生产文件;不变量 = 零语义变更,须既有全量测试
   零回归 + 新增门语义 diff 测试背书)。
 - Hardware required:no。
+- Decision-Grade:D1。
 - Verification:四 change-local AC contract 测试逐条 PASS(成功 spawn 计数器
   变异实验、ownership 四证据/managed provenance 矩阵、endpoint source/child-env、
   production-source fan-out 差分);全量基线零
@@ -83,6 +84,7 @@
 - Out of scope:Kit 语义(OBS-001 已定);诊断导出接线;真机观察执行。
 - Risk:low-medium(UI 面;XCUITest 环境依赖如实记录)。
 - Hardware required:no(XCUITest 用 fixture 门;真机观察属 M0B-002)。
+- Decision-Grade:D1。
 - Verification:`OBS-APPFACE-001` XCUITest PASS(新字段存在+值形态+可访问性)、
   生产路径零 fixture 断言、全量零回归。
 - Evidence gate:同 OBS-001 形态;done 后 TASK-M0B-002 具备新 readiness 条件。

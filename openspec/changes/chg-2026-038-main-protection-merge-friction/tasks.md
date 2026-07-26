@@ -139,6 +139,7 @@
 - Risk:low-medium（见 proposal「Risk」；只放宽两项摩擦开关、只收紧一项漂移，
   信任根零改动）。
 - Hardware required:no。
+- Decision-Grade:D2。
 
 ### Deliverables
 

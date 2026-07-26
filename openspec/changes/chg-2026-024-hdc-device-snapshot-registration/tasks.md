@@ -30,6 +30,7 @@
   - CHG-2026-015/022 tasks/evidence 或其他 change evidence
 - Risk:high（错误的 parameterized grammar/empty classification 会制造设备出现或消失）
 - Hardware required:no for Agent/CI implementation；supported provenance 需要维护者按
+- Decision-Grade:D2。
   `capture-plan.md` 提供受控真实 HDC/device capture，Agent 不执行
 
 ### Unblock prerequisites

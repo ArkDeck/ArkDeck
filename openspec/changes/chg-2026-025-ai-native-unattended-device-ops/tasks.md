@@ -241,6 +241,7 @@ change approved 前保持 blocked;approved 后每任务另需独立 readiness PR
   - `Packages/**`(实现已冻结,发现缺陷回 TASK-AIN-003)
 - Risk:destructive(本 change 授权模型下由 Agent 无人值守执行;standing authorization 于本任务 readiness PR 承载,恢复路径 = CHG-2026-016 Loader wlx 重刷)
 - Hardware required:yes
+- Decision-Grade:D2。
 
 ### Deliverables
 

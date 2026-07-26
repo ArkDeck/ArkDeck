@@ -176,6 +176,7 @@
   - `ArkDeckApp/**`
 - Risk:medium（E0/read-only 真机 probe；零 mode switch、零 mutation/destructive）
 - Hardware required:yes（E0 窗口；contract/fixture no）
+- Decision-Grade:D2。
 
 ### Deliverables
 
@@ -346,6 +347,7 @@
   - `openspec/contracts/**`
 - Risk:medium（E1/deviceMutation reboot；flash/erase/format/unlock/update/destructive dispatch 0）
 - Hardware required:yes（精确 DAYU200/HDC/firmware/rkdeveloptool/USB topology 窗口）
+- Decision-Grade:D2。
 
 ### Deliverables
 
@@ -617,6 +619,7 @@
 - Risk:low（signed Sandbox host-only metadata characterization；selected child、network、
   USB/HDC/device、E1/E2、mutation/destructive dispatch 0）
 - Hardware required:no
+- Decision-Grade:D1。
 
 ### Deliverables
 
@@ -883,6 +886,13 @@
 - Risk:medium（signed Sandbox host-only external inert fixture process；真实 tool、
   network、USB/HDC/device、E1/E2、mutation/destructive dispatch 0）
 - Hardware required:no
+- Decision-Grade:D1。
+- Grade-seeding note（2026-07-26，维护者）:本 `Decision-Grade` 行由维护者
+  grade 播种 commit 新增。它使本 change `tasks.md` 相对 r9 Input gate 表中
+  的自文件 blob（`6b98c99b9c882e636975a9039ea387a7bab0dd0e`）前进一格；该
+  漂移由维护者本人在本 commit 中接受并以本注记记录为「r9 预期漂移」，r9 其
+  余全部 pins、gates 与条款原文有效，001G 开工复核以本注记为该项漂移的记录
+  载体。
 
 ### Deliverables
 
@@ -953,6 +963,7 @@
   - 任何真实 execute/process dispatch 文件
 - Risk:medium（host-only archive read/write + plan-only；device mutation/destructive dispatch 0）
 - Hardware required:no
+- Decision-Grade:D1。
 
 ### Deliverables
 
@@ -1017,6 +1028,7 @@
   - BlueTool/upgrade_tool 资源或任意 shell/sudo/helper 接线
 - Risk:destructive（实现/fixture 测试必须零真实设备 dispatch）
 - Hardware required:no（本任务只做 contract/fake；真机归 TASK-RKFUI-004）
+- Decision-Grade:D1。
 
 ### Deliverables
 
@@ -1071,6 +1083,7 @@
 - Risk:destructive（CORE-2.0.0 下由人类维护者亲自执行；若未来 baseline 改为 standing
   authorization，readiness 仍须逐项 pin 并遵守当时最高权威规则）
 - Hardware required:yes（精确 DAYU200/固件/rkdeveloptool/App build/USB 窗口）
+- Decision-Grade:D2。
 
 ### Deliverables
 
