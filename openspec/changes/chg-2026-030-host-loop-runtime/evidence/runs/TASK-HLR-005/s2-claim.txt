@@ -1,0 +1,2 @@
+host-loop: prOpen task=TASK-TAS-001 pr=564 :: PR open; required checks not yet executed successfully: ['allowed-paths', 'guard']
+exit=0
