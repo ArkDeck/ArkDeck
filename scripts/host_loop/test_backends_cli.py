@@ -160,13 +160,16 @@ class NoNewRouteOrEscapeHatch(unittest.TestCase):
     # The exact set, not just its cardinality. Pinning only len() meant swapping
     # one route for another passed silently, which is what the check-runs
     # pagination change did — a substitution no test could see.
+    # TASK-TAS-001 removed the two bare-list entries: measured zero
+    # construction sites — every pulls/issues GET attaches a query or a
+    # /{number} segment, so the bare shapes served nothing while standing as
+    # permanently authorized surface. They are now explicit refusals (below),
+    # not silently legal.
     EXPECTED_ROUTES = {
-        ("GET", "/repos/{owner}/{repo}/pulls"),
         ("GET", "/repos/{owner}/{repo}/pulls?head&state&per_page"),
         ("POST", "/repos/{owner}/{repo}/pulls"),
         ("GET", "/repos/{owner}/{repo}/pulls/{number}"),
         ("PATCH", "/repos/{owner}/{repo}/pulls/{number}"),
-        ("GET", "/repos/{owner}/{repo}/issues"),
         ("POST", "/repos/{owner}/{repo}/issues"),
         ("GET", "/repos/{owner}/{repo}/issues/{number}"),
         ("PATCH", "/repos/{owner}/{repo}/issues/{number}"),
@@ -174,7 +177,17 @@ class NoNewRouteOrEscapeHatch(unittest.TestCase):
     }
 
     def test_allowlist_is_unchanged_in_size(self):
-        self.assertEqual(len(transport_mod.ALLOWED_ROUTES), 10)
+        self.assertEqual(len(transport_mod.ALLOWED_ROUTES), 8)
+
+    def test_bare_pull_list_is_refused(self):
+        """TAS-ROUTE-001: the dead capability stays dead. A future mis-wired
+        bare list call must be a RouteViolation, never silently legal."""
+        with self.assertRaises(transport_mod.RouteViolation):
+            transport_mod.assert_route_allowed("GET", "/repos/o/r/pulls")
+
+    def test_bare_issue_list_is_refused(self):
+        with self.assertRaises(transport_mod.RouteViolation):
+            transport_mod.assert_route_allowed("GET", "/repos/o/r/issues")
 
     def test_allowlist_contents_are_pinned_exactly(self):
         actual = set(transport_mod.ALLOWED_ROUTES)

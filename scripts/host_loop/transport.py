@@ -80,12 +80,10 @@ class Route(NamedTuple):
 # invisible to every test in the suite.
 ALLOWED_ROUTES: frozenset[tuple[str, str]] = frozenset(
     {
-        ("GET", "/repos/{owner}/{repo}/pulls"),
         ("GET", "/repos/{owner}/{repo}/pulls?head&state&per_page"),
         ("GET", "/repos/{owner}/{repo}/pulls/{number}"),
         ("POST", "/repos/{owner}/{repo}/pulls"),
         ("PATCH", "/repos/{owner}/{repo}/pulls/{number}"),
-        ("GET", "/repos/{owner}/{repo}/issues"),
         ("GET", "/repos/{owner}/{repo}/issues/{number}"),
         ("POST", "/repos/{owner}/{repo}/issues"),
         ("PATCH", "/repos/{owner}/{repo}/issues/{number}"),
