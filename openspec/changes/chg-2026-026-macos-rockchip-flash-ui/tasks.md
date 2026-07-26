@@ -40,6 +40,16 @@
 > read-only bookmark 的 canonical inert external-fixture launch characterization；
 > 不修改产品 App/entitlement/ADR/profile，不运行真实 tool/USB/device，也不批准
 > helper/XPC/broker、bundled/copied tool 或真实 E0。
+>
+> proposal r10（2026-07-26，on merge）接受 PR #525 的 001G blocked Stage A evidence 与
+> PR #530 合入的 `DEC-011`/ADR-0003，把 TASK-RKFUI-001G `ready→blocked` 并记录
+> supersession：macOS Rockchip 执行形态已定为 `selected:bundledRockchipComponent`，
+> 明文排除 user-selected external executable，而 001G characterize 的正是该边界。
+> r10 只做状态与记录，不重跑 001G、不改写其 receipt（ADR-0003 gate 7 要求它作为历史
+> 事实保留且不得改成 pass）、不新增任务、不修改 Probe/App/entitlement/ADR/profile/
+> registry/product code、不运行任何 tool/USB/device。TASK-RKFUI-001/002/003 的
+> `Depends on` 行不在 r10 内重判——按 ADR-0003 gate 7，须待 CHG-2026-036 bundled
+> implementation evidence 合入后由新的 approved revision 决定。
 
 ## TASK-RKFUI-001 — RockUSB discovery contract 与 signed Sandbox E0 access spike
 
@@ -794,10 +804,16 @@
 
 ## TASK-RKFUI-001G — signed Sandbox v1 entitlement external-fixture launch characterization
 
-- Status:ready（仅在维护者 review/merge proposal r9 后生效；只允许 canonical
-  wrong-hash control + 一次 task-local inert external fixture fixed-argv launch；真实
-  `rkdeveloptool`、network、USB/HDC/device、E1/E2、mutation/destructive dispatch 全为 0）
-- Readiness review r9（2026-07-25；host-only D1 product-boundary audit）：
+- Status:blocked（proposal r10 supersession，2026-07-26，仅在维护者 review/merge r10 后
+  生效。r9 授权的单次 characterization 已于 2026-07-25 执行，verdict = blocked，
+  evidence PR #525 已合入 `2b15a53986054f0984a71a0f113a5a2b807c3914`；其后 PR #530
+  合入的 `DEC-011`/ADR-0003 把 macOS Rockchip 执行形态定为
+  `selected:bundledRockchipComponent`，明文排除本任务 characterize 的 user-selected
+  external executable 边界。本任务不重跑、不转 PASS、不追加 helper/bundle/copy/
+  entitlement 方案；详见下方 Supersession record。下方 r9 readiness 全文保留为历史
+  记录，不再是可执行授权）
+- Readiness review r9（2026-07-25；host-only D1 product-boundary audit；r10 起为历史
+  记录，授权已消耗）：
   - Approval/scope gate:on merge。PR #516/#519 已闭合 001F implementation/evidence 与
     D0 status；r9 只批准 exact product entitlement shape 的外部 inert fixture
     characterization，不批准 ArkDeckApp 修改、helper/broker/bundle、真实 tool/device run。
@@ -893,6 +909,38 @@
   漂移由维护者本人在本 commit 中接受并以本注记记录为「r9 预期漂移」，r9 其
   余全部 pins、gates 与条款原文有效，001G 开工复核以本注记为该项漂移的记录
   载体。
+- Supersession record（2026-07-26；proposal r10；on merge）：
+  - 授权已消耗。r9 只授权一次 Stage A/B characterization。它已于 2026-07-25 执行：
+    Stage A 停在 `selectedEntryNotRegularFile`，未到达 security scope、bookmark、
+    hash/signature/quarantine 或 Process dispatch；candidate envelope 另有
+    `bookmarkCreated=true` 的契约错误并被记为独立 gate failure；Stage B 未构建、
+    未运行；全部 external/device/mutation/destructive counters 为 0。r9 的
+    Pass/fail boundary 规定任一失败只提交 fail-closed evidence 且不保留 candidate
+    implementation——evidence PR #525（`lvye` APPROVED @
+    `9fed8772def1fb1f4743ddb0c37277805c36ba84`，merge
+    `2b15a53986054f0984a71a0f113a5a2b807c3914`）即该唯一载体。
+  - Input gate 已 fail closed。r9 十二项 pin 中 `openspec/platforms/macos/profile.md`
+    由 `a9a5931ffedd304a7ce3a088f4397c26fd87e744` 前进到
+    `d27264ab1ee1d0665062016a6d7e301f9ce924bd`，载体 = PR #530 新增的
+    「Rockchip tool execution（DEC-011 / ADR-0003）」段，属非 r9 预期漂移；r9 Input
+    gate 原文为「任一非 r9 预期漂移即停止」。其余十一项的逐项实测结果记录在
+    `proposal.md` 的 r10 段。
+  - Owner decision 已改变形态。ADR-0003 / `DEC-011`（PR #530，`lvye` APPROVED @
+    `91a9cc3fa29303d78e1079b0e7f1f4210f51cd46`，merge
+    `94704827e541cc13c34da9395f5d9810b78cca17`，2026-07-25T07:12:22Z）选定
+    `selected:bundledRockchipComponent`，该形态不使用 user-selected external
+    executable、XPC/broker、login item、LaunchAgent、LaunchDaemon、privileged helper、
+    PATH/shell、动态下载或 copy-to-container fallback。r9 Notes 要求 001G BLOCKED 后
+    「下一步必须是独立 ADR/change」，ADR-0003 即该载体且已合入。
+  - Receipt immutability。ADR-0003 mandatory follow-on gate 7 明文
+    「TASK-RKFUI-001G and its blocked receipt remain historical facts and SHALL NOT
+    be changed to pass」。`evidence/runs/TASK-RKFUI-001G/` 两个文件保持不变；任何
+    后续 revision 都不得重跑本任务使其转 PASS。
+  - 重开条件。只有推翻或修订 `DEC-011` 的独立 ADR/change 才能重新提出 user-selected
+    external executable 边界问题；不得在本任务内追加 helper/bundle/copy/entitlement
+    方案。产品侧后续工作归 CHG-2026-036；TASK-RKFUI-001/002/003 对本任务的
+    `Depends on` 重判须待其 bundled implementation evidence 合入后的 approved
+    revision（ADR-0003 gate 7）。
 
 ### Deliverables
 

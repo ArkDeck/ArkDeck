@@ -2,10 +2,19 @@
 
 ## Context and constraints
 
-- Proposal revision：r9；r1-r8 已由维护者 merge。r9 接受 001F read-only bookmark
-  metadata PASS，但不把它推断为 v1 product-entitlement external-process PASS；新增
-  TASK-RKFUI-001G，以 inert external fixture 验证 exact product six-entitlement +
-  read-only bookmark 的 canonical child-launch boundary。
+- Proposal revision：r10；r1-r9 已由维护者 merge。r9 曾新增 TASK-RKFUI-001G，以 inert
+  external fixture 验证 exact product six-entitlement + read-only bookmark 的 canonical
+  child-launch boundary；该单次 characterization 已于 2026-07-25 执行并 blocked
+  （evidence PR #525）。r10 只记录 `DEC-011`/ADR-0003（PR #530）对该 boundary 的
+  supersession 并把 001G `ready→blocked`，不新增任务、不改变下方任何设计条款。
+- r10 supersession 的设计含义：macOS Rockchip 执行形态已定为
+  `selected:bundledRockchipComponent`，即 App-owned nested component + bundle-relative
+  absolute URL + fixed argv + empty caller environment，明文不使用 user-selected
+  external executable、XPC/broker、privileged helper、PATH/shell 或 copy-to-container
+  fallback。因此本文档中围绕 001E/001F/001G 的 user-selected external-executable
+  characterization 段落自 r10 起是**历史记录**，不是待执行设计；其结论与 receipt 保持
+  不变、不得改写成 PASS。产品侧的 bundled component 设计归 CHG-2026-036，不在本 change
+  内展开。
 - r9 不改变 typed operation、target/firmware/transport、discovery binary
   version/hash/upstream、binding、window、maxRuns、rebind 或 Safety 设计；HDC server 仍
   必须是 pre-existing external same-UID pinned executable，Agent server lifecycle mutation

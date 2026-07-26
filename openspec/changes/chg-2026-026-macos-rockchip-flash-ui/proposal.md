@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-026
-revision: 9 # r9 只起草 v1 product-entitlement external-fixture launch characterization；仅在维护者 review/merge 后生效
-status: approved # r1-r8 已由 PR #298/#440/#452/#461/#481/#491/#510/#513 批准；r9 scoped revision 仍须维护者 review/merge 后生效
+revision: 10 # r10 只记录 DEC-011/ADR-0003 对 TASK-RKFUI-001G 的 supersession 并把它 ready→blocked；仅在维护者 review/merge 后生效
+status: approved # r1-r9 已由 PR #298/#440/#452/#461/#481/#491/#510/#513/#522 批准；r10 scoped revision 仍须维护者 review/merge 后生效
 class: platform
 core_change_level: none
 owner: "@lvye"
@@ -130,6 +130,18 @@ sleep、弱设备重绑定和非严格镜像集合。ArkDeck 只借鉴交互目�
   registry 或真实 tool pin；不批准 symlink product selection、helper/XPC/broker、
   bundled/copied/downloaded tool、quarantine 写入/清除或任何 USB/device run。001G PASS
   后仍须独立 D1 + fresh exact non-quarantined artifact 才能恢复真实 E0。
+- r10 接受 PR #525 的 001G blocked Stage A evidence 与其后 PR #530 合入的
+  `DEC-011`/ADR-0003：r9 授权的单次 characterization 已执行且 verdict = blocked，而
+  macOS Rockchip 执行形态已由维护者决定为 `selected:bundledRockchipComponent`，明文
+  排除 user-selected external executable。r10 因此把 TASK-RKFUI-001G `ready→blocked`，
+  只做状态与 supersession 记录。
+- r10 不改写、不重跑、不重新解释 001G 的 blocked receipt（ADR-0003 mandatory follow-on
+  gate 7 要求它作为历史事实保留且不得改成 pass），不新增任务，不修改 Probe/App/
+  entitlement/ADR/platform profile/registry/product code，不运行任何 App、fixture、真实
+  tool、USB/HDC/device command，也不接受 E0/E1/E2 capability。
+- r10 不重判 TASK-RKFUI-001/002/003 对 001G 的 dependency 行。按 ADR-0003 gate 7，
+  只有在 CHG-2026-036 bundled implementation evidence 合入之后，才可由新的 approved
+  revision 决定 CHG-2026-026 哪些 blocked dependency 被替换或重新 ready。
 - 新增 Flash application facade、SwiftUI 页面和中英文 String Catalog：显式刷新/选择
   设备、选择本地 `images.tar.gz`、流式校验、plan-only、精确计划、危险确认、阶段日志、
   normal/切换中/Loader/歧义状态、软件进态、物理按键 fallback、execution-mode badge、
@@ -652,3 +664,71 @@ sleep、弱设备重绑定和非严格镜像集合。ArkDeck 只借鉴交互目�
   current `main` 复核，任一非 r9 预期漂移即停止。
 - Concurrency：r9 起草时 GitHub open PR 集合为空；四个治理文件与未来 001G paths 无
   并发占用。r9 是 D1 判断门，本 PR 合入前零 speculative implementation/App/fixture run。
+
+### r10 scoped DEC-011 supersession of the external-fixture characterization（2026-07-26；on merge）
+
+- 分类：proposal revision / superseded task retirement = D1。本 PR 只修改
+  proposal/design/tasks/verification；不修改 Probe、App、entitlement、ADR、platform
+  profile、registry、已合入 evidence 或 product code，不启动 signed App/fixture，不运行
+  真实 `rkdeveloptool`、USB/HDC/device command，也不接受任何 E0/E1/E2 capability。
+- Accepted input（r9 授权已消耗）：001G evidence PR #525 exact reviewed head
+  `9fed8772def1fb1f4743ddb0c37277805c36ba84` 已由 `lvye` APPROVED，并以
+  `2b15a53986054f0984a71a0f113a5a2b807c3914` 合入（2026-07-25T05:08:34Z）。verdict =
+  blocked：Stage A 停在 `selectedEntryNotRegularFile`，未到达 security scope、bookmark、
+  hash/signature/quarantine 或 Process dispatch；candidate envelope 另有
+  `bookmarkCreated=true` 的契约错误并被记为独立 gate failure。selected fixture
+  process、fixture-`ld`、real tool/`ld`、network、USB/HDC/device、E1/E2、mutation/
+  destructive/privilege/helper/install/system-rule/group/ACL/xattr-write counters 全为
+  0；Stage B 未构建、未运行。r9 的 Pass/fail boundary 规定任一失败只提交 fail-closed
+  evidence 且不保留 candidate implementation，#525 已是该唯一载体。
+- Superseding decision：`DEC-011` / ADR-0003 决定 carrier PR #530 exact reviewed head
+  `91a9cc3fa29303d78e1079b0e7f1f4210f51cd46` 已由 `lvye` APPROVED，并以
+  `94704827e541cc13c34da9395f5d9810b78cca17` 合入（2026-07-25T07:12:22Z），晚于 #525
+  两小时并在其 mandatory follow-on gates 中直接引用 001G 的 blocked receipt。Outcome =
+  `selected:bundledRockchipComponent`；该形态明文不使用 user-selected external
+  executable、XPC/broker、login item、LaunchAgent、LaunchDaemon、privileged helper、
+  PATH/shell、动态下载或 copy-to-container fallback。001G characterize 的正是
+  user-selected external executable 这条边界，该问题已由 owner decision 结案，不再是
+  待证伪的产品假设。r9 Notes 要求 001G BLOCKED 后"下一步必须是独立 ADR/change"，
+  ADR-0003 即该载体且已合入。
+- Input-gate drift（r10 起草时实测，基线 `17a9574a368e518ce475ef7d72135c3a6f71f2c7`）：
+  r9 Input gate 十二项 pin 中，`openspec/platforms/macos/profile.md` 已从
+  `a9a5931ffedd304a7ce3a088f4397c26fd87e744` 前进到
+  `d27264ab1ee1d0665062016a6d7e301f9ce924bd`，漂移载体即 #530 新增的
+  "Rockchip tool execution（DEC-011 / ADR-0003）"段。r9 Input gate 原文为"任一非 r9
+  预期漂移即停止"，故 001G 在 r10 之前即已 fail closed。其余 pin 的实测结果：Probe
+  Python/App/entitlement/tests/fixture-source 五项与 current App entitlement、ADR-0002
+  共七项逐项命中 r9 值；proposal/design/verification 等于 r9 merge OID
+  `27796f52734a844f1cda0e0ed2c9113abb83d39e` 上的值（r9 pin 记的是 draft base
+  `2667a10badb8180a0c7f5079636d46b03f637184`，该三格由 r9 自身推进）；`tasks.md`
+  相对 r9 merge 值仅前进 #577 grade 播种一格，已由该 commit 的 Grade-seeding note
+  记录为维护者接受的预期漂移。001F direct/symlink receipt SHA-256 实测仍为
+  `6c1ceecec431468bdee7f097f4516659baa62289fdf84d48ee2e2e5ce0641a98` /
+  `6bbd415b649a17e9a5b549bec4cd1880f094818abe2abe218efd2fb33975267d`，与 r9
+  Accepted-evidence gate 相等。
+- Chosen action：TASK-RKFUI-001G `ready→blocked`，任务段增记 supersession 注记。r10
+  不新增任务、不新增 AC、不改 Core baseline、不改 requirement/acceptance 集合，也不
+  改动已合入的 `evidence/runs/TASK-RKFUI-001G/` 两个文件。
+- Receipt immutability：ADR-0003 mandatory follow-on gate 7 明文
+  "TASK-RKFUI-001G and its blocked receipt remain historical facts and SHALL NOT be
+  changed to pass"。r10 与其后任何 revision 都不得重跑 001G 使其转 PASS；若将来需要
+  重新回答 user-selected external executable 边界，必须另起独立 ADR/change 推翻或修订
+  `DEC-011`，不能在本任务内追加 helper/bundle/copy/entitlement 方案。
+- Dependency handoff：TASK-RKFUI-001/002/003 的 `Depends on` 行逐字保留 001G。按
+  ADR-0003 gate 7，只有 CHG-2026-036 bundled implementation evidence 合入之后，才可由
+  approved revision 决定 CHG-2026-026 哪些 blocked dependency 被替换或重新 ready；r10
+  不做该判断，也不因 001G 转 blocked 而推进 TASK-RKFUI-001/002/003/004 中的任何一个。
+- Sequencing：r10 merge 前不得改动 001G 状态或 Probe；merge 即 001G `ready→blocked`
+  生效。r10 不产生实现 PR、不产生 evidence PR，也不需要独立 D0 status PR——状态翻转
+  由本 revision 自身承载（先例 = r7 把 TASK-RKFUI-001、r8 把 TASK-RKFUI-001E
+  `ready→blocked` 的同一形态）。
+- Draft/input closure：r10 draft base =
+  `17a9574a368e518ce475ef7d72135c3a6f71f2c7`。本 PR 修改的四个治理文件在该 base 上的
+  blobs 为 proposal `7392e120dcdcdd8e0e7d3b4ef90b201501551f1b` / design
+  `e97889463f86ab103aaa921faf209761ab31d0d6` / tasks
+  `426e07cb1e4aa61ccd57bd0179b5bc331cfc05a7` / verification
+  `d90b29c0d7ce9091fe6737ffe5bea450fad612a4`。
+- Concurrency：r10 起草时 GitHub open PR 集合 = {#523（CHG-2026-034 proposal）}，与本
+  PR 四个文件零路径交集；`scripts/rockchip_e0_probe/**` 与
+  `evidence/runs/TASK-RKFUI-001G/**` 无并发占用。r10 是 D1 判断门，本 PR 合入前零
+  implementation/App/fixture run。
