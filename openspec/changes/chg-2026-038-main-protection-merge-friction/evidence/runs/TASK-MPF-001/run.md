@@ -112,3 +112,62 @@ strict/dismiss_stale 现已 live 关闭，后续 merge 将事实上走单命令�
   应渲染 false，此推断本身列为 r2 的待证门而非假设）；
 - 修正版 delta 式 + `cmp`-only 比对纪律；
 - 执行者恒 `lvye` 于 Agent 不可达会话；Agent 零 protection 写入。
+
+---
+
+## attempt#2（2026-07-26）— PASS：GraphQL 清除白名单，三项 delta 全部达成
+
+### 窗口结果（r2 readiness = #579 merge `4aab55cc42b04d52d4d55b8aedbfa2b2d49eb998`）
+
+| 门 | 结果 | 取证 |
+| --- | --- | --- |
+| R0–R1 preflight | PASS | 六 pin 全命中：工件 `c1e3e61d…`/`75923b67…`/`af7c2df1…`；before REST `d3fa3990…`/proj `0df7bc6a…`、GraphQL proj `dea8a6d0…`；ruleset `c404036f…`（receipts `r2.before.*`） |
+| R2 mutation | 执行（`lvye` 亲手） | `r2.mutation.response.json` sha256 `c1d7b940acaa5d5446a59d82887123c3808ed23975f0a875c870820358b7aa0e`；response 即示 `allowsForcePushes=false`、`totalCount=0` |
+| R3 双面 read-back | **PASS 全门** | GraphQL after proj == `241b916010e3fa431663c36d21af7bd4b361cb4a374a789f0db7d74366efbac6`；REST after proj == `4046aced77a6ff040ea6789b6edf96a80e288ae6ef144d9d89a85b76a336d2dc`（**r1 expected 达成——「白名单清空后 REST 布尔渲染 false」待证门 PASS，拍扁渲染获反向证实**）；窗口 delta 恰一元（`r2.delta.json` sha256 `4974e311…`）；七元组 `[1,true,true,["lvye"],true,["guard"],false]`；after full-GET sha256 `f048d28b15de4de856b35d72bdf0107a7d5781c494219cf6b118c522695aaeaa`（如实记录，未 pin） |
+| R4 ruleset | PASS | before/after 均 `c404036f…`，`cmp` 零差 + `RULESET-UNTOUCHED` |
+| R5 receipts | 在案 | `~/mpf001-out/r2.*` 全清单已贴回转录（13 文件） |
+| R6 rollback | **未触发** | 全门 PASS，零回滚 |
+
+### Agent 独立复验（只读，2026-07-26 14:10:56Z）
+
+REST full-GET sha256 `f048d28b…`（**与 operator receipt 逐字节同体**）、projection
+`4046aced…`；GraphQL projection `241b9160…`；ruleset `c404036f…`。四项全部命中。
+
+### MPF-DELTA-001 判定：PASS
+
+- **累计 delta（原始 before `a8cff448…` → 最终 live `4046aced…`，修正式实测）
+  = 恰好三项**：
+
+  ```json
+  [{"path":"allow_force_pushes","a":true,"b":false},{"path":"required_pull_request_reviews.dismiss_stale_reviews","a":true,"b":false},{"path":"required_status_checks.strict","a":true,"b":false}]
+  ```
+
+- 信任根七项 before/after 两侧一致（`[1,true,true,["lvye"],true,["guard"],false]`）；
+- ruleset `19595282` 独立 GET 前后一致（attempt#1/attempt#2 四次读数同哈希）；
+- 执行者 `lvye`（attempt#1 S3 REST PUT 与 attempt#2 R2 GraphQL mutation 均亲手）；
+  **Agent protection 写入计数 = 0**（Agent 全程只读 GET/query）；
+- 两窗口合计写入：REST PUT ×1（attempt#1，部分生效）+ GraphQL mutation ×1
+  （attempt#2）,均在各自 readiness 授权内。
+
+### 补偿控制条款（strict 关闭后的约定延续，随本 evidence 入档）
+
+1. Agent 请求 merge 前把 PR rebase 到最新 `origin/main` 并在合成树跑全量套件
+   与 `check-sdd`（2026-07-26 已 25 载体实证的既有实践）；
+2. required check `guard` 仍于 PR exact head 强制，`enforce_admins=true` 不变；
+3. `required_linear_history=true`，squash 合并不产生分叉；
+4. 与 in-flight 变更有文件交集时按既有 drift 规矩重钉 pins，不靠 protection 兜底。
+
+### MPF-FLOW-001 观测设计（载体 = 本 evidence PR 与 done PR，merge 记录即证据）
+
+- **观测①（单命令流）**：本 evidence PR 以
+  `gh pr review --approve && gh pr merge --squash --delete-branch` 单命令合入，
+  审计四件套（APPROVED @ exact head / `mergedBy=lvye` / `auto_merge=null` /
+  squash subject 携 `(#N)`）由 change verify PR 以 gh 记录复核落账。
+- **观测②（免 update-branch + approval 存续）**：done PR 与本 PR 同 base 并行
+  in-flight；执行顺序 = 先 approve done PR → 单命令合入本 PR（main 前进，done
+  PR 落后一格）→ **不点 Update branch、不重新 approve** 直接 merge done PR。
+  其 merge 记录（approval 时间戳早于本 PR merge、head 未变、无 update 提交）
+  即观测②，由 change verify PR 复核落账。
+- 注：#578/#579 两次合并发生于 strict/dismiss_stale 已 live 关闭的驻留期，
+  是单命令流的事实预演；按 r1/r2 条款，正式采认自 `MPF-DELTA-001` PASS
+  （= 本 attempt）之后起，即上述两载体。
