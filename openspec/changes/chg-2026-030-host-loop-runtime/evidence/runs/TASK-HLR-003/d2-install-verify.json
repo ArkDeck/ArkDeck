@@ -1,0 +1,87 @@
+{
+ "checks": [
+  {
+   "facts": {
+    "head": "ae597d0da7ee53ba8e2e8e6b7ad85554330b53a8",
+    "live": "ae597d0da7ee53ba8e2e8e6b7ad85554330b53a8"
+   },
+   "id": "I1",
+   "name": "HEAD == live origin/main at install time",
+   "status": "PASS"
+  },
+  {
+   "facts": {
+    "pin": "4150401c5f875ac282d38d6f70eb4c0c35f97689",
+    "seen": "4150401c5f875ac282d38d6f70eb4c0c35f97689"
+   },
+   "id": "I2",
+   "name": "in-repo minter blob equals the r4 pin",
+   "status": "PASS"
+  },
+  {
+   "facts": {
+    "installed_path": "/Library/PrivilegedHelperTools/com.arkdeck.host-loop.mint.sh",
+    "installed_sha256": "5b8cbc06e7246c83c273f37dd78b07c2eca1e91b541cc88532c9f3c6f5cd9671",
+    "main_oid": "ae597d0da7ee53ba8e2e8e6b7ad85554330b53a8",
+    "repo_sha256": "5b8cbc06e7246c83c273f37dd78b07c2eca1e91b541cc88532c9f3c6f5cd9671"
+   },
+   "id": "I3",
+   "name": "sha256(installed) == sha256(git show <main-oid>:minter)",
+   "status": "PASS"
+  },
+  {
+   "facts": {
+    "stat": {
+     "group": "wheel",
+     "links": "1",
+     "mode": "555",
+     "owner": "root"
+    }
+   },
+   "id": "I4",
+   "name": "installed minter is root:wheel, mode 0555",
+   "status": "PASS"
+  },
+  {
+   "facts": {
+    "stat": {
+     "group": "wheel",
+     "links": "8",
+     "mode": "755",
+     "owner": "root"
+    }
+   },
+   "id": "I5",
+   "name": "install directory root:wheel and not group/other-writable",
+   "status": "PASS"
+  },
+  {
+   "facts": {
+    "path": "~/Library/Application Support/ArkDeck/host-loop",
+    "stat": {
+     "group": "staff",
+     "links": "2",
+     "mode": "700",
+     "owner": "fuhanfeng"
+    }
+   },
+   "id": "I6",
+   "name": "token directory exists, mode 700, owned by the scheduler user",
+   "status": "PASS"
+  }
+ ],
+ "classification": "read-only observer; every mutation is typed by the operator",
+ "executor_sha256": "617878ab86b794fce26a6fff0b62302e6368e3a2a9d87dd9169fff9eb9727d68",
+ "finished_at_utc": "2026-07-26T02:38:46Z",
+ "manual_confirmations_required": [],
+ "minter_installed_path": "/Library/PrivilegedHelperTools/com.arkdeck.host-loop.mint.sh",
+ "mutations": 0,
+ "operator": "lvye",
+ "phase": "install-verify",
+ "readiness": "r4 (PR #549) over r3 (PR #547 merge 5307d1b9833333952ae54f41256764394d66f692)",
+ "schema": "arkdeck-hlr003-d2/1",
+ "started_at_utc": "2026-07-26T02:38:43Z",
+ "status": "PASS",
+ "stop_reason": null,
+ "task": "TASK-HLR-003"
+}

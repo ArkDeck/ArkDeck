@@ -1,0 +1,55 @@
+{
+ "checks": [
+  {
+   "facts": {
+    "exit": 10,
+    "expected": "exit 10; single host-loop: line; no write-state; no /Users/",
+    "line": "host-loop: idle task=None pr=None :: only never-claim tasks are ready (['TASK-HLR-003']); discovery excludes this task's own implementation by readiness rule",
+    "state": "idle",
+    "stdout_lines": 1
+   },
+   "id": "P1",
+   "name": "manual foreground --once round is a clean no-dispatch",
+   "status": "PASS"
+  },
+  {
+   "facts": {
+    "exit": 10,
+    "has_enumeration": true,
+    "sha256": "e3e9c266feea5914c7fed55cb8d0aeab7f17f4cb13d70dbe396703302258f3eb"
+   },
+   "id": "P2",
+   "name": "--explain enumerates per-gate rejections, claimable=none",
+   "status": "PASS"
+  },
+  {
+   "facts": {
+    "count": 0
+   },
+   "id": "P3",
+   "name": "agent/host-loop/** remote refs still 0",
+   "status": "PASS"
+  },
+  {
+   "facts": {
+    "interpreter": "/opt/homebrew/bin/python3"
+   },
+   "id": "P4",
+   "name": "interpreter recorded; phase3 plist must equal it byte-for-byte",
+   "status": "PASS"
+  }
+ ],
+ "classification": "read-only observer; every mutation is typed by the operator",
+ "executor_sha256": "617878ab86b794fce26a6fff0b62302e6368e3a2a9d87dd9169fff9eb9727d68",
+ "finished_at_utc": "2026-07-26T02:40:10Z",
+ "manual_confirmations_required": [],
+ "mutations": 0,
+ "operator": "lvye",
+ "phase": "phase1",
+ "readiness": "r4 (PR #549) over r3 (PR #547 merge 5307d1b9833333952ae54f41256764394d66f692)",
+ "schema": "arkdeck-hlr003-d2/1",
+ "started_at_utc": "2026-07-26T02:40:08Z",
+ "status": "PASS",
+ "stop_reason": null,
+ "task": "TASK-HLR-003"
+}
