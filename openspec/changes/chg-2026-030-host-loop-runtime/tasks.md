@@ -2281,14 +2281,32 @@
 
 ## TASK-HLR-003 — Fenced worker loop 与 legacy PR creator 迁移
 
-- Status:ready（r5 done-boundary readiness；仅在维护者对本独立 readiness PR exact
-  head review/merge 后生效。r4 授权的 ② staging 窗口与 ③ evidence PR 已全额消耗
-  （#550）；r5 不授权任何 source PR、任何主机/launchd/token/PEM/unit 变更（含
-  rollback）、Phase 4、dispatch、worker 认领任务。r5 只授权 ① 本 carrier 的 done
-  边界判定注记与义务转移（本节 + TASK-HLR-005 Notes，同一文件），② 其后一个独立
-  的单文件 done 状态 PR（ready→done，recheck 义务见下）。不授权清单其余与 r4 逐字
-  相同，含 review/merge/auto-merge/admin route、GitHub settings/protection/ruleset
-  修改、`sdd-guard.yml` 变更、以及**代任何任务撰写 `Decision-Grade`**。）
+- Status:done（2026-07-26 D0 completion；仅在维护者 review/merge 本独立
+  `ready→done` PR 后生效。授权载体 = r5 #551，exact head
+  `7a6d427d281aadc6e654a683c5d0c80db613db9d` 由 `lvye` APPROVED，merge
+  `90fa542af7860e1bbfb2265c3a63f15dc853238f`、`mergedBy=lvye`、`auto_merge=null`。
+  r5 五项 recheck 义务已于 flip base `90fa542a…` 逐项执行：(a) 链条九 merge 全为
+  ancestors——#521 `2667a10b…`、#524 `1a8e235f…`、#529 `05d50035…`、#531
+  `d82ceb3d…`、#539 `e70d7863…`、#547 `5307d1b9…`、#548 `891d4f54…`、#549
+  `ae597d0d…`、#550 `ba46750c…`；(b) offline suite 406 tests OK + 1
+  expectedFailure（= `Decision-Grade` 缺口的在案记录，未摘除），`--explain`
+  exit 10、`claimable=none`；(c) #550 六份 receipt JSON 在 main 在位，sha256 与
+  `d2-scheduler-staging.md` manifest 逐一相等；(d) 本 done **不声称**下列四项——
+  live first-PR proof、old creator coexistence 的 live 观测、lease
+  CAS/stale-fence 的 live 充分性（F4）、legacy creator 迁移——均已按 r5 转移至
+  TASK-HLR-005（其 Notes/handoff 在案，缺一其 readiness 不得 ready）；
+  `Decision-Grade` 缺口仍在案；(e) 本 PR 单文件、只动本 Status 行。主机 standing
+  状态不变：两 unit 保持 left-running，r5 冻结条款（下一授权载体前不得触碰）继续
+  有效。）
+- Historical Status:ready（r5 done-boundary readiness；仅在维护者对本独立 readiness
+  PR exact head review/merge 后生效。r4 授权的 ② staging 窗口与 ③ evidence PR 已
+  全额消耗（#550）；r5 不授权任何 source PR、任何主机/launchd/token/PEM/unit 变更
+  （含 rollback）、Phase 4、dispatch、worker 认领任务。r5 只授权 ① 本 carrier 的
+  done 边界判定注记与义务转移（本节 + TASK-HLR-005 Notes，同一文件），② 其后一个
+  独立的单文件 done 状态 PR（ready→done，recheck 义务见下）。不授权清单其余与 r4
+  逐字相同，含 review/merge/auto-merge/admin route、GitHub
+  settings/protection/ruleset 修改、`sdd-guard.yml` 变更、以及**代任何任务撰写
+  `Decision-Grade`**。②授权由本 done 翻转消耗。）
 - Historical Status:ready（r4 D2 readiness；仅在维护者对本独立 readiness PR exact head
   review/merge 后生效。r3 的前置① 已由 #548 消耗，r4 不再授权任何 source PR；r4 只
   授权 ② 一轮由 `lvye` 亲手执行的 host scheduler staging 窗口 **Phase 0–3**（条款
