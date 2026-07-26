@@ -171,3 +171,29 @@ REST full-GET sha256 `f048d28b…`（**与 operator receipt 逐字节同体**）
 - 注：#578/#579 两次合并发生于 strict/dismiss_stale 已 live 关闭的驻留期，
   是单命令流的事实预演；按 r1/r2 条款，正式采认自 `MPF-DELTA-001` PASS
   （= 本 attempt）之后起，即上述两载体。
+
+### MPF-FLOW-001 观测实录（2026-07-26；gh 记录复核，全时间戳 UTC）
+
+- **观测①（单命令流）= #581：PASS。**`lvye` APPROVED @ exact head
+  `2d55cf67b2d6d6667215532fb95d2bcd0419275d`（14:17:01Z）→ squash merge
+  `b055fe306d07126c1235788f84a8c035c7209c2e`（14:17:04Z，**间隔 3 秒** =
+  `gh pr review --approve && gh pr merge --squash --delete-branch` 单命令）；
+  `mergedBy=lvye`、`auto_merge=null`、subject 携 `(#581)`。四件套齐。
+- **approval 存续实证（`dismiss_stale_reviews=false`）= #582。**
+  `lvye` APPROVED 14:16:45Z @ 原 head
+  `604b00ee138a295e897ba5f892e1904d2ab5ed58` → #580 review-fix
+  （`f28d416b…`，同段文本）使原 head 产生真实冲突 → done flip 重排
+  force-push 新 head `f61b9470ec918449414ef52cb4f5cc74e0a5c89a` → 14:24:24Z
+  以**同一份 review** 合入 `cb6a70a3b8481073321f41af46f45c72c309118d`
+  （无二次 review、`mergedBy=lvye`、`auto_merge=null`、subject 携 `(#582)`）。
+  review.commit ≠ merge head 且 review 早于 force-push——旧规则
+  （`dismiss_stale=true`）下该 review 必被作废；此 merge 记录即新开关的
+  机器可证实证。
+- **观测②（落后分支免 `Update branch` 合入）：载体重排实录。**原设计
+  （#582 与 #581 并行）被 #580 同段冲突如实打断——done flip 重排到
+  `f28d416b` 之后不再落后，观测条件消失。重排后的载体对 = **change verify
+  PR × 本追记 PR**：先 approve verify PR → 单命令合入本 PR（main 前进，
+  verify 落后一格）→ verify PR **免 `Update branch`、不重新 approve** 直接
+  merge。判据（merge 后由 gh/git 记录永久可证）：verify 的 approval 时间戳
+  早于本 PR 的 merge 时间戳；verify head 在 approve 后未变；verify 无
+  update/merge commit（linear history 在案）；无二次 review。
