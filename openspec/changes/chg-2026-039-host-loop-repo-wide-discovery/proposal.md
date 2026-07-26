@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-039-host-loop-repo-wide-discovery
 revision: 1
-status: proposed
+status: approved
 class: implementation-only
 core_change_level: none
 owner: lvye
