@@ -634,8 +634,6 @@ class HumanTextInTheCursorIssueSurvives(unittest.TestCase):
         self.assertEqual(body, "notes\n\n" + state(candidate_task=TASK).render())
 
 
-if __name__ == "__main__":
-    unittest.main(verbosity=2)
 
 
 # ------------------------------- v4 review: confirmed findings, second round
@@ -834,3 +832,7 @@ class CheckRunViewsAreDeduplicated(unittest.TestCase):
 
         port = ApiPort(owner="ArkDeck", repo="ArkDeck", _send=send)
         self.assertEqual(len(port.list_check_runs(MAIN)), 2)
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)

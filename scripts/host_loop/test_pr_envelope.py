@@ -622,5 +622,53 @@ class GovernedFileRegexesStayOnTheirLine(unittest.TestCase):
         self.assertEqual(offenders, [], f"whitespace class spans lines: {offenders}")
 
 
+# ------------------ DEC-HL-001 r2: the evidence path branch is a path branch
+
+class EvidenceIsAPathOrADeclaration(unittest.TestCase):
+    """The path branch accepted any prose that was not a `none:` line.
+
+    "this is just a sentence" validated as a repository-relative path, and the
+    one production renderer leaned on it: it declared "no evidence" with an
+    em-dash, missing the strict none grammar and falling through to the path
+    branch. That renderer now emits `none:`, so the branch can require
+    something path-shaped -- while the em-dash bodies already merged must keep
+    parsing, which is why the legacy spelling is recognised on read only.
+    """
+
+    def _validate(self, *items):
+        pr_envelope._validate_evidence(tuple(items))
+
+    def test_prose_is_no_longer_a_path(self):
+        with self.assertRaises(pr_envelope.EnvelopeError):
+            self._validate("this is just a sentence, not a path")
+
+    def test_a_real_path_still_validates(self):
+        self._validate("openspec/changes/chg-x/evidence/runs/T/run.md")
+
+    def test_several_real_paths_still_validate(self):
+        self._validate("a/b.md", "c/d.md")
+
+    def test_the_current_none_declaration_validates(self):
+        self._validate("none: host-loop dispatch carries no evidence file")
+
+    def test_the_legacy_none_declaration_still_parses(self):
+        """Persisted in merged pull request bodies; read-only compatibility."""
+        self._validate("none — host-loop dispatch carries no evidence file")
+
+    def test_the_legacy_form_still_needs_a_reason(self):
+        with self.assertRaises(pr_envelope.EnvelopeError):
+            self._validate("none — ")
+
+    def test_the_legacy_form_cannot_be_one_of_several(self):
+        with self.assertRaises(pr_envelope.EnvelopeError):
+            self._validate("none — no evidence", "a/b.md")
+
+    def test_the_renderer_emits_only_the_current_form(self):
+        source = Path(
+            Path(pr_envelope.__file__).parent / "backends.py").read_text()
+        self.assertIn('"none: ', source)
+        self.assertNotIn('"none — ', source)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
