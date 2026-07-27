@@ -6,14 +6,28 @@
 
 ## TASK-NAV-001 — 全仓 discovery 缺省与 idle 判词真话
 
-- Status:ready（r1 implementation readiness；仅在维护者对本独立 readiness
-  PR exact head review/merge 后生效。只授权一个实现交付：按下方契约把缺省
-  discovery 扩为全仓、修复 never-claim ready 过滤、加 UTC 时间戳/范围
-  idle 行、并把 TASK-NAV-001/TASK-NAV-002 计入 `NEVER_CLAIM_ROOTS`；载体
-  = 常规会话 agent/* PR（本任务 never-claim，循环不得认领）。不授权：
-  transport/lease/identity/reviewer/recovery/cursor/backends/pr_envelope
-  变更、launchd/plist 任何动作、`Decision-Grade` 代写、governance 正文、
-  NAV-002 分工文件（见契约⑥）。）
+- Status:done（2026-07-27 D0 completion；仅在维护者 review/merge 本独立
+  `ready→done` PR 后生效。实现载体 = #594（merge
+  `87e142801507f6d130404d06fcc64b1db0b26f78`）：全仓缺省 discovery、
+  never-claim ready 过滤修复、UTC 时间戳/范围 idle 行、
+  `NEVER_CLAIM_ROOTS` 三根精确集合，`test_navigation_contract.py` 契约
+  测试随载体交付。post-merge finding 已闭合：#594 新增测试 7 处把
+  chg-2026-030 钉为活跃态（NAV-002 归档演练逮出），由 review-fix #597
+  （merge `142330f5ae47fca8cbd1f1c04ec6254c4a071abb`，本任务 allowed
+  paths 内，#301 先例）以关系式/动态样本/双世界断言修复，修复合成树
+  归档演练全绿（TASK-NAV-002 run.md「drill re-run」节）。flip base
+  `7be0ac3d7273b6f296fb3b74efe304420e2f214d`（#596）recheck：(a) 链
+  #586/#587/#589/#591/#593/#594/#595/#597 八 merge 全为 ancestors
+  （逐一 `merge-base --is-ancestor` 实测）；(b) 套件 536 OK + 1
+  expectedFailure、`check-sdd` 0/0/111 于 flip 树实测（含 #596 的
+  chg-2026-040 新 package）；(c) evidence = `evidence/runs/TASK-NAV-001/contract-run.md`
+  （#594 随载体）在树；(d) 本 flip 单文件；(e) 不声称：change 级
+  verified 为下一独立 PR。部署事实：plist 零动作，运行机 checkout 已
+  前进（r1 Deployment terms 履约），unit 以全仓缺省运行。）
+- Historical Status:ready（r1 = #589 merge
+  `f8a04449d01e2ed1fa0b4b9bb29db1bb6fb2b14c`；其一次性实现授权已由
+  #594 全额消耗，post-merge finding 由 #597 在同授权面内闭合；r1
+  Readiness 块原文保留为历史。）
 - Historical Status:blocked（前置：① 本 change approval-only PR merge；
   ② 独立 readiness PR。① = #587 merge
   `17a9574a368e518ce475ef7d72135c3a6f71f2c7`；② = 本 r1。）
