@@ -63,9 +63,10 @@
 
 ## TASK-DEC-003 — check_sdd fail-closed 修复与测试基建接线
 
-- Status:blocked（前置：① approval merge;② 独立 readiness 钉
-  check_sdd.py/test_check_sdd.py/sdd-guard.yml exact blob 与修复条目
-  清单。）
+- Status:ready（r1 implementation readiness;前置① approval 已合
+  = #598 `cac07003836889881994367bde7ba3e0bdca70c0`（lvye APPROVED,
+  mergedBy lvye）,前置② 即本 readiness。授权范围与门见下方
+  「Readiness r1」节;任一门不满足即停,不得降门执行。）
 - Platform:macos（host-only）
 - Requirements/AC:change-local `DEC-SDD-001`
 - Depends on:none（与 NAV/其他 DEC 任务零文件交集）
@@ -91,6 +92,64 @@
   scope、M1 双行/零行与 done-ish、M2 重复 id、M4 各 null 形态）;CI
   workflow 运行两套件的 run 证据;现仓 guard 保持 0 error（或附清点与
   处置记录）。
+
+### Readiness r1（2026-07-27）
+
+**Audit base** = `005e1ffc321b2dbc87409895ac28c290b93f7e24`。approval merge
+是 `cac07003836889881994367bde7ba3e0bdca70c0`（#598）;其后合入的
+#600/#599/#523（NAV 两任务 done 翻转与 chg-034 propose）**对本任务的三个
+受改文件零触碰**——十九个受钉 blob 在两个 OID 上逐一比对全部相同,故
+下表与勘察结论在新 base 上继续成立。
+
+**Input gate（实现开工前逐条复核,任一不符即停并转 r2）**
+
+本任务的三个受改文件按 Ordering 义务而非 drift-gate blob pin 处理——
+readiness 授权的 PR 必然改写它们,把自己的产物钉进「任一漂移即零工作」
+的表会造成 HLR-003 r3 式自噬。实现 PR 的 evidence 须以
+`git show <audit base>:<path>` 三元组记录开工时的字节:
+
+```yaml pins
+- path: scripts/check_sdd.py
+  blob: 87e39df7136864d3c6a10417388d30ecdd11a480
+- path: scripts/test_check_sdd.py
+  blob: 2e40b5534764877a6dcb6c5107e5e5763fa7535b
+- path: .github/workflows/sdd-guard.yml
+  blob: c64135e1f9dc253a92640a30bbcad42b0afa86fa
+```
+
+上表是**开工基线声明**（记录用),不是 drift gate。若开工时实测值与上表
+不符,说明另有载体先动了同一文件,停并转 r2 重钉。
+
+**存量清点（已实测,r1 据此免除停机制）**：在 audit base 上以收紧版逐
+检查复算真实 openspec 树,七类**全为 0**（逐任务 Status 配对≠1、宽严
+正则差集、全角冒号 Status 行、需跨界吸收才成立的 scope 认领、解析为
+None 的治理文件、重复 capability id、`changes/` 游离条目）。**故本任务
+的收紧不需要修改任何 openspec 内容,全部落在 allowed paths 内**;若实现
+时复算出现非零,即触发 tasks.md 的 Risk 停条款——停并走独立载体,不得在
+本任务内顺手改 openspec 正文。
+
+**Pass/fail boundary**
+
+1. 六个修复族（A-H1/A-H2+M3/A-M1/A-M2/A-M4/A-L5）各有至少一个「撤销该
+   修复即变红」的 fixture;A-L2 死代码删除以行为等价测试兜底。
+2. **变异门**：逐条撤销修复后对应 fixture 必红,且正对照（合法输入）必绿;
+   任一条撤销后仍全绿 = 该修复无效,整轮作废。
+3. `check-sdd` 对真实仓保持 **0 error / 0 warning / 111 acceptance IDs**。
+4. `sdd-guard.yml` 的 guard job 实跑 `test_check_sdd.py` 与 host_loop
+   套件（`-m unittest discover`,直跑单文件不算——见台账 C-H3）,以 CI
+   run 链接为证据;host_loop 期望计数 **536 OK + 1 expected failure**。
+5. workflow 改动不得新增任何 permission、secret 或 `pull_request_target`;
+   `test_agent_pr_workflow.py` 的 forbidden-capability 扫描保持绿。
+
+**Risk acceptance（首次）**：收紧后的 check_sdd 对**未来**畸形输入更
+严格,可能使某个尚未写出的 tasks.md 形态被拒。已接受:方向为 fail-closed,
+且存量清点为零证明现有语料不受影响。回退 = revert 实现 PR。
+
+**Stop conditions**：存量复算非零;任一变异门不成立;guard 计数偏离;
+需要触碰 allowed paths 外任何文件（含 openspec 正文与其他 workflow）。
+
+**不授权**：任何 openspec 内容修改;check_pr_paths 侧改动（DEC-004）;
+两 checker 的 task 文法统一（记台账待评估）;`Decision-Grade` 代写。
 
 ## TASK-DEC-004 — check_pr_paths 信任边界与解析硬化
 
