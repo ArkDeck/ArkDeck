@@ -100,6 +100,7 @@
 - Risk:low（扫描范围扩大、认领门全数保持；idle 分支只收紧；回退 =
   revert）。
 - Hardware required:no。
+- Decision-Grade:D0。
 
 ### Deliverables
 
@@ -222,6 +223,7 @@
   change。
 - Risk:low（查找面只扩不收；未知任务拒绝路径保持；回退 = revert）。
 - Hardware required:no。
+- Decision-Grade:D0。
 
 ### Deliverables
 
