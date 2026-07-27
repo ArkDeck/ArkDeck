@@ -1,6 +1,6 @@
 ---
 id: CHG-2026-040-automation-decoupling
-revision: 1
+revision: 2
 status: approved
 class: implementation-only
 core_change_level: none
@@ -143,7 +143,21 @@ HTTP 服务器实测复现，非目测）。完整台账见本 change `review-fi
 
 ## Tasks
 
-八任务见 tasks.md。依赖链：DEC-003/005/006/008 无前置可先行;DEC-001 待
+**r2（2026-07-27）新增 TASK-DEC-009,九任务见 tasks.md。** 新增理由:
+DEC-005/006/007 的实现链在三处命中分区边界并如实停下,三项都需要一个
+可触碰 `scripts/host_loop/__main__.py` 与 `test_worker_cursor.py` 的载体,
+而唯一曾授权 `__main__.py` 的 TASK-DEC-007 已 done——**没有任何活任务能
+承载它们**。其中 `observed_main` 是本 change 台账里**唯一仍然存活的安全
+缺陷**。逐项:①`__main__.py` 的 `observed_main` 用 `out.split()[0]` 取
+多行 ls-remote 输出的首个空白分隔 token,任何尾为 `refs/heads/main` 的 ref
+可顶替受保护 main 的 OID（与 D-H2 同型,DEC-005 已修 `RefPort.read` 那
+一半）;②`FakeApi` 缺 `GET /issues/{n}` 路由,补上会打红
+`test_worker_cursor.test_closed_cursor_issue_is_refused`——该测试经查为
+死测试（`__call__` 设为实例属性,其 fake 从不被调用,靠 `{}` 回落巧合
+通过）;③TASK-DEC-005 的记录自身矛盾:r2 把 `identity.py` 与
+`pr_envelope.py` 加入 Allowed paths 时未从 Forbidden paths 移除。
+
+八任务原文如下。依赖链：DEC-003/005/006/008 无前置可先行;DEC-001 待
 TASK-NAV-002 done;DEC-004 待 DEC-001;DEC-007 待 TASK-NAV-001 done;
 DEC-002 收口在 DEC-005/006/007 全部 done 之后。全部任务改动自动化自身，
 照 TASK-HLR-003/NAV 先例为 **never-claim**（会话实现;`NEVER_CLAIM_ROOTS`
