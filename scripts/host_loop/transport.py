@@ -127,6 +127,20 @@ ALLOWED_PR_PATCH_FIELDS: frozenset[str] = frozenset({"title", "body"})
 ALLOWED_ISSUE_PATCH_FIELDS: frozenset[str] = frozenset({"title", "body"})
 
 
+_RATE_LIMIT_MARKERS = ("rate limit", "secondary rate", "abuse detection",
+                       "please wait", "retry your request")
+
+
+def _looks_rate_limited(payload: object) -> bool:
+    """True for GitHub's throttle shapes, which also arrive as HTTP 403."""
+    if not isinstance(payload, dict):
+        return False
+    text = " ".join(
+        str(payload.get(key, "")) for key in ("message", "documentation_url")
+    ).lower()
+    return any(marker in text for marker in _RATE_LIMIT_MARKERS)
+
+
 def assert_route_allowed(method: str, path: str) -> None:
     """Positive-allowlist gate plus denylist. Raises RouteViolation on refusal."""
     if method in FORBIDDEN_METHODS:
@@ -210,13 +224,16 @@ class ApiPort:
 
     def bound_to_pull(self, number: int) -> "ApiPort":
         """A port permitted to mutate exactly this pull request."""
-        if not isinstance(number, int) or number < 1:
+        if isinstance(number, bool) or not isinstance(number, int) or number < 1:
+            # `True` is an int and `True >= 1`, so a bool bound the port to
+            # pull request 1. This is the confinement boundary; it defaults to
+            # deny everywhere else and must not accept a type confusion here.
             raise RouteViolation(f"cannot bind to pull request {number!r}")
         return replace(self, owned_pull=int(number))
 
     def bound_to_issue(self, number: int) -> "ApiPort":
         """A port permitted to mutate exactly this Issue."""
-        if not isinstance(number, int) or number < 1:
+        if isinstance(number, bool) or not isinstance(number, int) or number < 1:
             raise RouteViolation(f"cannot bind to Issue {number!r}")
         return replace(self, owned_issue=int(number))
 
@@ -225,6 +242,14 @@ class ApiPort:
         self.route_log.append(Route(method, _templatize(path), purpose))
         status, payload = self._send(method, path, body)
         if status in (401, 403):
+            # GitHub answers 403 for secondary rate limits and abuse detection,
+            # not only for permission. Refused is declared to be the ONLY class
+            # admissible as negative-probe or fence-loss evidence, so recording
+            # a transient throttle as a definite credential refusal mislabels
+            # the fence itself. Rate-limit shapes are ambiguous instead.
+            if status == 403 and _looks_rate_limited(payload):
+                raise TransportError(
+                    f"ambiguous 403 (rate limit shape) on {purpose}")
             raise Refused(f"credential/permission refusal on {purpose}: {status}")
         if status >= 500 or status == 429:
             # Ambiguous: the write may or may not have landed. Callers must
@@ -506,9 +531,25 @@ class RefPort:
             return None
         if code != 0:
             raise TransportError(f"ambiguous ls-remote for {ref}: {err.strip()[:200]}")
-        first = out.split("\n")[0].split()
+        # `git ls-remote <remote> <pattern>` matches the pattern against the
+        # TAIL of a refname at a `/` boundary — it is not an exact-name lookup.
+        # Taking line one and reading only its OID meant a shadow such as
+        # `refs/backup/refs/heads/agent/host-loop/leases/TASK-X` (a mirror, a
+        # leftover copy) answered for the lease: it sorts first, so its OID won
+        # deterministically. If the shadow pins a previous lease commit the
+        # record still parses, and assert_still_held then keeps passing against
+        # a frozen OID after another worker has taken the real ref over — two
+        # owners writing at once.
+        lines = [line for line in out.split("\n") if line.strip()]
+        if len(lines) != 1:
+            raise TransportError(
+                f"ambiguous ls-remote for {ref}: {len(lines)} refs matched")
+        first = lines[0].split()
         if len(first) != 2 or not OID_RE.match(first[0]):
             raise TransportError(f"unparsable ls-remote output for {ref}")
+        if first[1] != ref:
+            raise TransportError(
+                f"ls-remote answered for {first[1]!r}, not the requested {ref!r}")
         return first[0]
 
     def _push(self, ref: str, new_oid: str | None, expected: str | None, op: str) -> None:

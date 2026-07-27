@@ -39,6 +39,16 @@ API_ROOT = "https://api.github.com"
 GIT_TIMEOUT_SECONDS = 120
 HTTP_TIMEOUT_SECONDS = 60
 
+# The only variables a git child inherits. Everything else — notably the
+# GIT_CONFIG_* family and anything that steers ssh — is dropped rather than
+# forwarded. HOME and SSH_AUTH_SOCK are here because the Deploy-Key push needs
+# them; the token variables are deliberately absent, so a git child never sees
+# the installation token in its environment.
+_GIT_ENV_PASSTHROUGH = (
+    "HOME", "PATH", "SSH_AUTH_SOCK", "TMPDIR", "LANG", "LC_ALL",
+    "GIT_SSH_COMMAND",
+)
+
 # Environment variable names. The token may also come from a root-only staging
 # file, which is preferred on the host because the value never enters the
 # scheduler's environment block.
@@ -90,11 +100,23 @@ class SubprocessGitRunner:
         argv = list(argv)
         if not argv or argv[0] != "git":
             raise BackendError(f"git runner refuses a non-git argv: {argv[:1]}")
+        # An allowlist, not a copy. Forwarding the whole environment handed
+        # every git child anything the loop account could set, and
+        # GIT_CONFIG_COUNT/KEY/VALUE inject arbitrary config — including
+        # core.sshCommand, which is arbitrary code execution on the next
+        # Deploy-Key push. The deployed unit happens to pin a five-variable
+        # environment, but that is the plist's property, not this module's.
+        env = {name: os.environ[name] for name in _GIT_ENV_PASSTHROUGH
+               if name in os.environ}
         # Deny interactive prompting: a hung credential prompt would otherwise
         # look like a timeout and be misread as ambiguity.
-        env = dict(os.environ)
         env["GIT_TERMINAL_PROMPT"] = "0"
-        env.setdefault("GIT_CONFIG_NOSYSTEM", "1")
+        # Assignment, not setdefault: an inherited GIT_CONFIG_NOSYSTEM=0 used to
+        # win and re-enable system config, which is the one thing this line
+        # exists to prevent.
+        env["GIT_CONFIG_NOSYSTEM"] = "1"
+        env["GIT_CONFIG_GLOBAL"] = os.devnull
+        env["GIT_CONFIG_COUNT"] = "0"
         try:
             done = subprocess.run(
                 argv, cwd=self.repo_dir, capture_output=True, text=True,
@@ -161,10 +183,14 @@ def commit_writer(repo_dir: str, timeout: int = GIT_TIMEOUT_SECONDS
                     "-p", parent_oid, "-m", record_text]
         env = dict(os.environ)
         # Deterministic, attributable, and independent of the host's git config.
-        env.setdefault("GIT_AUTHOR_NAME", "arkdeck-host-loop")
-        env.setdefault("GIT_AUTHOR_EMAIL", "host-loop@arkdeck.invalid")
-        env.setdefault("GIT_COMMITTER_NAME", "arkdeck-host-loop")
-        env.setdefault("GIT_COMMITTER_EMAIL", "host-loop@arkdeck.invalid")
+        # Assignment, not setdefault. The docstring claims the identity is
+        # independent of the host's git config, but setdefault let an inherited
+        # GIT_AUTHOR_NAME win — so lease commits became mis-attributed and
+        # non-deterministic exactly when the environment was dirty.
+        env["GIT_AUTHOR_NAME"] = "arkdeck-host-loop"
+        env["GIT_AUTHOR_EMAIL"] = "host-loop@arkdeck.invalid"
+        env["GIT_COMMITTER_NAME"] = "arkdeck-host-loop"
+        env["GIT_COMMITTER_EMAIL"] = "host-loop@arkdeck.invalid"
         done = subprocess.run(argv, cwd=repo_dir, capture_output=True, text=True,
                               timeout=timeout, env=env)
         if done.returncode != 0:
@@ -193,8 +219,37 @@ class UrllibSender:
     timeout: int = HTTP_TIMEOUT_SECONDS
     user_agent: str = "arkdeck-host-loop/1"
 
+    class _NoRedirect(urllib.request.HTTPRedirectHandler):
+        """Surface a 3xx as a status instead of following it.
+
+        urllib follows 301/302/303 on GET and POST transparently, replaying the
+        Authorization header — the installation token — at whatever host the
+        redirect names, and returning only the final 200. assert_route_allowed
+        had already run, against the original path, so the allowlist could not
+        see the destination; transport's own "a 3xx is not a completed
+        mutation" guard was unreachable for GET and POST for the same reason.
+        This is not only an adversarial case: GitHub answers 301 after an
+        owner or repository rename.
+        """
+
+        def redirect_request(self, req, fp, code, msg, headers, newurl):
+            return None
+
+    @classmethod
+    def _opener(cls) -> urllib.request.OpenerDirector:
+        return urllib.request.build_opener(cls._NoRedirect)
+
     def __call__(self, method: str, path: str, body: dict | None) -> tuple[int, object]:
-        url = path if path.startswith("http") else f"{API_ROOT}{path}"
+        # Route-relative only. Accepting an absolute URL here was an escape
+        # hatch around assert_route_allowed: ApiPort never passes one, but this
+        # sender is public and the minter already calls it directly.
+        # `//host/x` is protocol-relative: appended to API_ROOT it stays on
+        # api.github.com, but rejecting it keeps "route-relative" meaning one
+        # thing rather than two.
+        if not path.startswith("/") or path.startswith("//"):
+            raise BackendError(
+                f"sender path must be route-relative, got {path[:60]!r}")
+        url = f"{API_ROOT}{path}"
         data = json.dumps(body).encode() if body is not None else None
         request = urllib.request.Request(url, data=data, method=method)
         request.add_header("Accept", "application/vnd.github+json")
@@ -204,7 +259,7 @@ class UrllibSender:
         if data is not None:
             request.add_header("Content-Type", "application/json")
         try:
-            with urllib.request.urlopen(request, timeout=self.timeout) as response:
+            with self._opener().open(request, timeout=self.timeout) as response:
                 raw = response.read().decode()
                 return response.status, (json.loads(raw) if raw.strip() else None)
         except urllib.error.HTTPError as error:
@@ -248,64 +303,15 @@ def read_token(env: dict | None = None) -> str:
     return value
 
 
-def mint_installation_token(
-    *,
-    app_id: int,
-    installation_id: int,
-    pem_path: str,
-    sender_factory: Callable[[str], UrllibSender] | None = None,
-    signer: Callable[[bytes, str], bytes] | None = None,
-    now: Callable[[], int] = lambda: int(time.time()),
-) -> tuple[str, dict]:
-    """Mint an installation token, keeping the private key out of this process.
-
-    The JWT is signed by `sudo openssl`, so only root reads the PEM. The
-    returned token is not logged and the JWT is discarded immediately after the
-    exchange.
-    """
-    issued = now()
-    header = {"alg": "RS256", "typ": "JWT"}
-    claims = {"iat": issued - 60, "exp": issued + 540, "iss": str(app_id)}
-
-    def b64(raw: bytes) -> bytes:
-        return base64.urlsafe_b64encode(raw).rstrip(b"=")
-
-    signing_input = b".".join((
-        b64(json.dumps(header, separators=(",", ":")).encode()),
-        b64(json.dumps(claims, separators=(",", ":")).encode()),
-    ))
-    sign = signer if signer is not None else _openssl_sign
-    signature = sign(signing_input, pem_path)
-    if not signature:
-        raise BackendError("JWT signing produced no signature")
-    jwt = (signing_input + b"." + b64(signature)).decode()
-
-    sender = (sender_factory or UrllibSender)(jwt)
-    status, payload = sender(
-        "POST", f"/app/installations/{int(installation_id)}/access_tokens", None
-    )
-    del jwt
-    if status != 201 or not isinstance(payload, dict) or "token" not in payload:
-        raise BackendError(f"installation token mint failed: HTTP {status}")
-    meta = {
-        "expires_at": payload.get("expires_at"),
-        "permissions": payload.get("permissions"),
-        "repository_selection": payload.get("repository_selection"),
-    }
-    return payload["token"], meta
-
-
-def _openssl_sign(signing_input: bytes, pem_path: str) -> bytes:
-    done = subprocess.run(
-        ["sudo", "openssl", "dgst", "-sha256", "-sign", pem_path],
-        input=signing_input, capture_output=True, timeout=GIT_TIMEOUT_SECONDS,
-    )
-    if done.returncode != 0:
-        raise BackendError(
-            "JWT signing failed; is the staged PEM readable by root? "
-            f"({done.stderr.decode(errors='replace').strip()[:120]})"
-        )
-    return done.stdout
+# The Python minter (mint_installation_token / _openssl_sign) lived here and
+# was retired by TASK-DEC-005. It had zero production callers — the live minter
+# is the root-owned shell script — and _openssl_sign ran `sudo openssl dgst
+# -sign`, which only works with a NOPASSWD sudoers rule for openssl. Such a rule
+# is full root escalation for the loop account, since openssl reads and writes
+# arbitrary files as root: mint_installation_token.sh:8-12 records that this is
+# precisely the design the shell minter was written to replace. It also reached
+# GitHub on a route no allowlist covered. Keeping it, pinned by tests, read as
+# an endorsement of a rejected design.
 
 
 # --------------------------------------------------- worker callable factories
@@ -368,7 +374,7 @@ def body_renderer(
             head_oid=head_oid,
             decision_grade=candidate.decision_grade,
             depends_on="none",
-            evidence=("none — host-loop dispatch carries no evidence file",),
+            evidence=("none: host-loop dispatch carries no evidence file",),
             producer=producer,
             run=run_id,
         )
