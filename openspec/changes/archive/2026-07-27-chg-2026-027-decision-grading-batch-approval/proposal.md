@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-027-decision-grading-batch-approval
 revision: 1
-status: verified # 2026-07-23 本 verification-closure PR(先例 #224/#239/#393);approval #317;三 task done 已合入(OID 见 Verification closure);archive 另行。原注:2026-07-22 approval-only PR 置 approved;r1 proposal 经 #315 合入 main `7a58b02`
+status: archived # 2026-07-27 本 archive PR（先例 #235/#241/#572）；verify #399 merge 09d4afd7；AF-006 断链暂缓的成因（CHG-2026-030 HLR-001 readiness 对本 tasks.md 的 section pin）已随 pin 退役与 chg-030 先行入档解除；引用扫描：目录外精确路径引用 0
 class: implementation-only
 core_change_level: none
 owner: lvye
