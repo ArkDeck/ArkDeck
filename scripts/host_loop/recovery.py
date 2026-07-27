@@ -56,7 +56,17 @@ def _confirmed(oid: str, detail: str) -> MergeConfirmation:
 
 
 def _subject_carries(subject: str, pr_number: int) -> bool:
-    return f"(#{pr_number})" in subject
+    """True only when the subject ENDS with `(#N)`, the squash convention.
+
+    Substring matching failed both ways. A later commit that merely mentions
+    the number — "follow-up: address feedback from (#42)" — satisfied source B
+    in the sha-null fallback, so an unrelated commit could be confirmed as the
+    merge; and when the real squash and a mention both sat inside the history
+    window, two matches read as ambiguous and stopped the lane. GitHub places
+    `(#N)` at the end of a squash subject, which is what the r1 pin means by
+    locating the commit uniquely.
+    """
+    return subject.rstrip().endswith(f"(#{pr_number})")
 
 
 def confirm_merged(

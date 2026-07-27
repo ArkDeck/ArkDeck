@@ -29,6 +29,7 @@ from __future__ import annotations
 import hashlib
 import inspect
 import subprocess
+import time
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Callable, Protocol
@@ -184,22 +185,43 @@ class SubprocessReviewerAdapter:
         runner: Callable[..., tuple[int, str, str]] | None = None,
         timeout_seconds: int = 1800,
         workdir: str | None = None,
+        now: Callable[[], int] | None = None,
     ) -> None:
         self._executable = _require_text(executable, "executable")
         self._run_id_factory = run_id_factory
         self._runner = runner or self._subprocess_runner
         self._timeout = timeout_seconds
         self._workdir = workdir
+        # recorded_at was hardcoded to 0, so every archived result and batch
+        # digest claimed the same epoch. Injected rather than read directly so
+        # the contract tests stay deterministic.
+        self._now = now or (lambda: int(time.time()))
+
+    # A reviewer session's transcript is unbounded by nature; keeping all of it
+    # in memory for a 30-minute run is a resource risk with no upside, since
+    # only the trailing verdict and the REASON lines are ever read.
+    MAX_TRANSCRIPT_BYTES = 4 * 1024 * 1024
 
     @staticmethod
     def _subprocess_runner(argv: list[str], *, timeout: int,
                            cwd: str | None) -> tuple[int, str, str]:  # pragma: no cover
         try:
             proc = subprocess.run(argv, capture_output=True, text=True,
-                                  timeout=timeout, cwd=cwd)
-        except (OSError, subprocess.TimeoutExpired) as error:
-            return 124, "", str(error)
-        return proc.returncode, proc.stdout, proc.stderr
+                                  timeout=timeout, cwd=cwd,
+                                  # An interactive-leaning CLI that reads stdin
+                                  # would otherwise inherit the loop's and block
+                                  # until the 1800s timeout.
+                                  stdin=subprocess.DEVNULL)
+        except subprocess.TimeoutExpired as error:
+            return 124, "", f"timeout after {timeout}s: {error}"
+        except OSError as error:
+            # Distinguishable from a genuine exit 124 and from a timeout: all
+            # three used to arrive as the same synthetic code with the detail
+            # dropped, so an operator could not tell a missing binary from a
+            # reviewer that ran too long.
+            return 126, "", f"cannot execute reviewer backend: {error}"
+        cap = SubprocessReviewerAdapter.MAX_TRANSCRIPT_BYTES
+        return proc.returncode, proc.stdout[-cap:], proc.stderr[-cap:]
 
     @staticmethod
     def availability_probe(
@@ -253,22 +275,41 @@ class SubprocessReviewerAdapter:
         code, out, err = self._runner(self.build_argv(request),
                                       timeout=self._timeout, cwd=self._workdir)
         if code != 0:
-            raise AdapterFailure(f"reviewer backend exited {code}")
-        verdict, reasons = self._parse(out)
+            # Carry the backend's own words. Dropping err made every failure
+            # read "exited 124" with no way to separate a timeout from a
+            # missing binary from a genuine exit code, on the one path that
+            # stops a lane for a human.
+            detail = err.strip() or "no stderr"
+            raise AdapterFailure(f"reviewer backend exited {code}: {detail}")
+        try:
+            verdict, reasons = self._parse(out)
+        except AdapterFailure as failure:
+            # An unparsable transcript is reconciliation evidence, not noise.
+            tail = "\n".join(out.strip().splitlines()[-3:]) or "empty transcript"
+            raise AdapterFailure(f"{failure}; transcript tail: {tail!r}") from failure
         return ReviewResult(verdict=verdict, reviewer_run=reviewer_run,
-                            head_oid=request.head_oid, recorded_at=0,
+                            head_oid=request.head_oid, recorded_at=self._now(),
                             reasons=reasons)
 
     @staticmethod
     def _parse(transcript: str) -> tuple[str, tuple[str, ...]]:
         verdict = None
         reasons: list[str] = []
-        for line in transcript.splitlines():
+        lines = transcript.splitlines()
+        for line in lines:
             stripped = line.strip()
             if stripped.startswith(_REASON_LINE):
                 reasons.append(stripped[len(_REASON_LINE):].strip())
-            elif stripped.startswith(_VERDICT_LINE):
-                verdict = stripped[len(_VERDICT_LINE):].strip()
+        # The verdict must be the FINAL line, as the prompt and this module's
+        # own docstring already promised. Taking the last line that merely
+        # *starts with* VERDICT:, anywhere and after stripping indentation, let
+        # a reviewer that quotes the pull request it just read overturn itself:
+        # an appendix containing "    VERDICT: APPROVE" after a genuine
+        # REQUEST_CHANGES became an approval. The transcript is the one place in
+        # this loop where untrusted text and a decision share a channel.
+        tail = [line for line in lines if line.strip()]
+        if tail and tail[-1].startswith(_VERDICT_LINE):
+            verdict = tail[-1][len(_VERDICT_LINE):].strip()
         if verdict not in VERDICTS:
             raise AdapterFailure(
                 f"no parseable final verdict in reviewer output ({verdict!r})")
@@ -285,7 +326,7 @@ class ReviewPhase:
     def __init__(self, port: ReviewerPort, *, now: Callable[[], int]) -> None:
         self._port = port
         self._now = now
-        self._recorded: dict[int, ReviewResult] = {}
+        self._recorded: dict[tuple[int, str], ReviewResult] = {}
 
     # -- eligibility (failure-matrix row 6) --------------------------------
     @staticmethod
@@ -328,9 +369,17 @@ class ReviewPhase:
                     "base sha is not a full OID; metadata incomplete")
 
         # Failure-matrix row 7: the first recorded result stands; a later one
-        # is refused rather than silently replacing it.
-        if number in self._recorded:
-            return (ReviewState.REVIEW_RECORDED, self._recorded[number],
+        # is refused rather than silently replacing it. Keyed by (number, head)
+        # rather than number alone, because the head is what a review is *about*:
+        # keying on the PR replayed a result recorded at an earlier head as
+        # REVIEW_RECORDED, so a head that had never been reviewed read as
+        # progress — the opposite of row 2, which sends a stale result back to
+        # discovery. The returned state is re-derived from the recorded verdict
+        # for the same reason: a repeat query on a paused lane used to report
+        # REVIEW_RECORDED and un-pause it.
+        recorded = self._recorded.get((number, head))
+        if recorded is not None:
+            return (self._state_for(recorded), recorded,
                     "duplicate review refused; the first recorded result stands")
 
         request = ReviewRequest(
@@ -370,13 +419,25 @@ class ReviewPhase:
                     "review head does not match the candidate head; stale "
                     "result discarded")
 
-        self._recorded[number] = result
+        self._recorded[(number, head)] = result
         if result.verdict in (VERDICT_REQUEST_CHANGES, VERDICT_BLOCKED):
             # Row 5: an unfavourable independent review pauses the lane.
             return (ReviewState.WORKER_PAUSED, result,
                     f"independent review returned {result.verdict}; worker paused")
         return (ReviewState.REVIEW_RECORDED, result,
                 "independent review APPROVE recorded (not a GitHub approval)")
+
+    @staticmethod
+    def _state_for(result: ReviewResult) -> str:
+        """One verdict, one lane state, wherever the result is read from.
+
+        The recorded verdict decided the state on the recording path and was
+        ignored on the replay path, so a paused lane reported REVIEW_RECORDED
+        on the next query — two states for one fact.
+        """
+        if result.verdict in (VERDICT_REQUEST_CHANGES, VERDICT_BLOCKED):
+            return ReviewState.WORKER_PAUSED
+        return ReviewState.REVIEW_RECORDED
 
 
 class ReviewerLoop:

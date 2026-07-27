@@ -41,15 +41,21 @@ DECISION_GRADES = frozenset(("D0", "D1", "D2"))
 # widening the token does not widen path authority.
 TASK_TOKEN_TEXT = r"TASK-[A-Z0-9]+(?:-[A-Z0-9]+)*-[0-9]{3}[A-Z]?"
 TASK_RE = re.compile(rf"^{TASK_TOKEN_TEXT}$")
+# Horizontal whitespace only. `\s+` matches a newline, so a bare `##` line
+# followed by prose that opens with a task token counted as a header: the
+# "Task appears exactly once in tasks.md" check could then be satisfied by a
+# sentence, or double-counted against a real heading. Same class as the field
+# separators discovery already fixed.
 TASK_HEADER_RE = re.compile(
-    rf"^##\s+({TASK_TOKEN_TEXT})(?:\s|$)",
+    rf"^##[ \t]+({TASK_TOKEN_TEXT})(?:[ \t]|$)",
     re.MULTILINE,
 )
 CHANGE_RE = re.compile(r"^CHG-[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*$")
 LOWER_OID_RE = re.compile(r"^[0-9a-f]{40}$")
 DEPENDENCY_RE = re.compile(r"^#[1-9][0-9]*$")
 IDENTITY_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/@:-]{0,127}$")
-FRONTMATTER_ID_RE = re.compile(r"^id:\s*(CHG-[A-Za-z0-9-]+)\s*$", re.MULTILINE)
+FRONTMATTER_ID_RE = re.compile(r"^id:[ \t]*(CHG-[A-Za-z0-9-]+)[ \t]*$",
+                               re.MULTILINE)
 WINDOWS_ABSOLUTE_RE = re.compile(r"^[A-Za-z]:/")
 
 
