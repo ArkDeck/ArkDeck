@@ -147,12 +147,42 @@ DEC-004 且须维护者在其 readiness 认可清单）;两 checker 文法统一
 
 ## TASK-DEC-002 — host_loop 实例与协议常量收口（全链收尾）
 
-- Status:ready（r1 implementation readiness;前置① approval 已合 = #598
-  `cac07003836889881994367bde7ba3e0bdca70c0`,前置② 四依赖全部 done
-  （TASK-NAV-001 #600、TASK-DEC-005 #631、TASK-DEC-006 #632、
-  TASK-DEC-007 #625;`--explain` 实测对本任务的拒因已只剩 status/grade
-  与 never-claim,依赖门消失）,前置③ 即本 readiness。授权范围、常量
-  清单与门见下方「Readiness r1」节;任一门不满足即停,不得降门执行。）
+- Status:done（2026-07-27 D0 completion;仅在维护者 review/merge 本独立
+  `ready→done` PR 后生效。实现载体 = **#647**（merge
+  `67336efff07d3f9b510c7c2569ea861f5a9f172c`,lvye APPROVED,mergedBy
+  lvye）;readiness r1 = #646（merge
+  `fa5321521ac32459432faef50ca2744cfdcc71f7`）。evidence = `evidence/runs/TASK-DEC-002/implementation.md`。
+  交付新模块 `scripts/host_loop/instance.py`（37 个常量,五族;**纯数据**
+  由 AST 测试强制:模块顶层只许赋值,全树禁 `Call`/`Import`/`FunctionDef`
+  等）。三族收敛:lease 命名空间(含 `transport.RESERVED_REF_RE` 改**由
+  命名空间拼出**)、task 文法两处、base 分支五处(**错误消息里硬写的
+  `main` 一并改插值**——消息硬编码常量,改值那天即开始说谎)。
+  **取值零变更**,全部为搬移。
+  **变异门 16/16 击杀 + 负对照存活**;r1 实测「改坏后零测试反应」的
+  **八项全部转为必红**（lease schema、cursor marker、`ENV_TOKEN`、
+  API root、user-agent、owner 缺省、lease 写入余量、HTTP 超时）。
+  **两处自查如实记入 evidence**:①首版单一定义清点用精确相等比对,
+  致「f-string 常量块带尾斜杠」的变异**存活**（`agent/host-loop/tasks/`
+  与表内 `agent/host-loop/tasks` 差一字符）,改子串匹配后击杀;
+  ②收紧后的清点**当场又抓到两处我漏掉的**——`__main__.py` 错误消息硬写
+  `ARKDECK_REPO`（真重复,已收口）、`backends.py` 证据散文与标题模板
+  巧合同短语（非重复,记为**具名例外**而非放宽匹配）。清点走 **AST 非
+  grep**（HLR-003 的 grep 型测试曾因注释含同措辞而在缺陷引入后仍绿),
+  该性质本身亦配测试。
+  **线上兼容与 r1 预期不符,如实记录**:实测 `agent/host-loop/**` 远端
+  命名空间**为空**、无 cursor Issue,故两项冒烟无实物可测。**未以「无
+  实物」当通过**,改以:①新旧两树七项 wire 值逐字节相同;②**旧树渲染的
+  437 字节 cursor 机器块由新树解析**,四字段正确还原;③线上真实 PR
+  **#564** body 在两树解析的 `repr` sha256 相同 =
+  `832b7987cf970fff19ddb42317770e6d3649cb364dfc42f813098f7469897493`。
+  **写计数 0**（仅 `git ls-remote` 与 `gh api` GET）。
+  **flip 后复核**（在翻转后的树上执行,HLR-003 r5 教训）:`check-sdd`
+  **0/0/111**、host_loop `-m unittest discover` **631 OK + 1 expected
+  failure**、`test_check_pr_paths.py` **49 OK**、`test_token_parity.py`
+  **5 OK**、`done_task_ids` **100** 且含 `TASK-DEC-002`、`--explain`
+  对本任务报 `never-claim` + `status 'done' is not ready`。
+  **连带效果**:chg-2026-040 的八任务仅余 **TASK-DEC-008**（r1
+  source-only ready,待实现;其 D2 重装窗口需 r2 另行授权）未完成。）
 - Platform:macos（host-only）
 - Requirements/AC:change-local `DEC-CONST-001`
 - Depends on:TASK-NAV-001、TASK-DEC-005、TASK-DEC-006、TASK-DEC-007
