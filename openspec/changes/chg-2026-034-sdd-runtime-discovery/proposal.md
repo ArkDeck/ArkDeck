@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-034-sdd-runtime-discovery
 revision: 1
-status: approved
+status: verified # 2026-07-27 本 verification-closure PR；closure 段见文末；approved 于 #611
 class: implementation-only
 core_change_level: none
 owner: lvye
@@ -103,3 +103,44 @@ venv，既浪费时间，也把机器路径和临时环境选择带入 run 记�
 evidence，也不构成 change approval/readiness。维护者批准 change 后，
 `TASK-SDR-001` 仍须经独立 readiness PR 从 `blocked` 转为 `ready`；其后
 implementation/evidence、`ready→done`、verification 状态分别按仓库规则独立提交。
+
+## Verification closure（2026-07-27）
+
+唯一任务 done 于 protected main 在案，三条 change-local AC 证据可复查；本 PR
+仅状态翻转 + 引用，零实现夹带（先例 #224/#239/#570/#571/#601）。
+
+- **任务链**：propose #523 merge
+  `005e1ffc321b2dbc87409895ac28c290b93f7e24`；approval #611 merge
+  `ecd5320b35308ddd44f67fb6a825a9c5f9e3fc1b`；readiness r1 #612 merge
+  `982b679bf3fbc71b3422031a04e0e11b1e5592d2`（堆叠 governance carrier，
+  #593 形态）；实现 = #618 merge
+  `8a3482c7ae6aa1f525ca62507e6794d8acc20dea`（合入内容与实现分支五文件
+  逐字节一致，done flip 复核在案）；done #620 merge
+  `91d9c07d596ba7acecbc1af0e7feaf64f69adb9e`。evidence =
+  `evidence/runs/TASK-SDR-001/run.md`（随 #618 在树）。
+- **SDR-DISCOVERY-001 = PASS**：resolver 精确遵守 explicit → worktree →
+  shared → PATH（`test_sdd_runtime_entry.py` 正/负 fixture，含真实 git
+  linked-worktree 拓扑与 CI 形态裸名 `ARKDECK_PYTHON=python`）；本机
+  audit-base 红探针（无 venv worktree 裸跑 = `ModuleNotFoundError`
+  traceback、exit 1）实现后同命令转绿（`0 errors / 0 warnings / 111
+  acceptance IDs`、exit 0，经 primary 共享 venv 只读复用）；Git 二进制
+  不可用/无 Git metadata 封闭回退；含空格路径保持单 argv token。
+- **SDR-DIAGNOSTIC-001 = PASS**：五类具名稳定失败（缺 executable、无法
+  启动、缺 module、版本漂移、坏 pin 三态）全部 exit 2 且零 traceback、
+  零 env dump；坏高优先级候选阻断健康低级候选（fake 解释器日志证零降级
+  调用）；pip/venv/curl/wget canary 调用数恰 0；checker 运行前后工作树
+  文件清单逐项一致（零写入）；shared-discovery removal red canary 在成品
+  脚本上绿转红（全绿套件单独不作机制证据，design §4 要求履行）。
+- **SDR-BOOTSTRAP-001 = PASS**：fake base/venv Python argv 契约证 bootstrap
+  目标唯一 = primary checkout `.venv-sdd`（linked worktree 内调用亦然）、
+  pip argv = `-m pip install --require-virtualenv -r
+  scripts/requirements-sdd.txt`（无 `--break-system-packages`）、既有环境
+  保留不重建、venv/pip/post-install 三类失败均可见非成功、并发锁可见
+  失败；checker 拒收半成品 bootstrap 产物。**边界如实**：clean-host 真实
+  bootstrap 未在本机执行（本机 venv 先于本任务存在，两路径分别取证原则），
+  留作未来人工动作，已记 run.md Deviations。
+- **suite 基线**：新增 `test_sdd_runtime_entry.py` 33 tests；
+  `test_check_sdd` 19 OK 与 `test_check_pr_paths` 24 OK 于实现时现状复跑
+  （r1 关系式条款，DEC-003 面零钉）；guard 维持 `0/0/111`；CI
+  `sdd-guard.yml` 零改动（`ARKDECK_PYTHON=python` 显式路径由 preflight
+  原样放行，#618 CI 实证）。
