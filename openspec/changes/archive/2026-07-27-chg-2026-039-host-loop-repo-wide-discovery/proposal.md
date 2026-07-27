@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-039-host-loop-repo-wide-discovery
 revision: 2
-status: verified # 2026-07-27 本 verification-closure PR；closure 段见文末；approved 于 #587；r2 经 #593
+status: archived # 2026-07-27 本 archive PR（先例 #235/#241/#572/#605）；verify #601；引用扫描：目录外精确路径引用 0（NEVER_CLAIM_ROOTS/测试中的 TASK-NAV-* 为名称引用不断链）；归档后循环对本 change 的可见性终止属设计（done 集经 #548 archive glob 永续）
 class: implementation-only
 core_change_level: none
 owner: lvye
