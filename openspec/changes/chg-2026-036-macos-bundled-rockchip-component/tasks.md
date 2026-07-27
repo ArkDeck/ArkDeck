@@ -723,13 +723,26 @@
 
 ## TASK-BRC-002R — artifact dispatch 与 30 天保留（handoff remediation）
 
-- Status:ready（r1 implementation readiness；仅在维护者对本独立 carrier
-  exact head review/merge 后生效。只授权一个实现交付：给
-  `.github/workflows/rockchip-component.yml` 增加 `workflow_dispatch`
-  触发并把三处 `retention-days` 由 1 改为 30，外加本任务 evidence；
-  载体 = 常规会话 agent/* PR。不授权：任何构建逻辑/输入/registry/recipe/
-  SBOM 改动、其他 workflow、凭据或 environment 配置、Developer ID/notary
-  面、BRC-003 的任何 gate、`Decision-Grade` 代写。）
+- Status:done（2026-07-27 D0 completion；仅在维护者 review/merge 本独立
+  `ready→done` PR 后生效。实现 = #616 merge
+  `9ff769d`（`workflow_dispatch:` 与两处 `retention-days: 30`，构建
+  逻辑/输入/action pins/permissions/concurrency/matrix 零字节变更）；
+  evidence = #617 merge `01e6f9a6605f4a3a9463dcab2bf5731bd012ef48`
+  （push 路径的保留期与 identity 证明）+ 本 PR 追记的 dispatch proof。
+  **`BRC-HANDOFF-002` = PASS**：维护者 `02:53:23Z` 亲手 dispatch 的 run
+  `30233237693`（`event=workflow_dispatch`、head `01e6f9a6`、success、
+  四 job 全绿）三 artifact 均 expires `2026-08-26`（+30 天），且
+  `PASS: verify-committed` 以逐字节比对生成 `registry.yaml`（携 component
+  `sha256: 3caee213…56a`）证明 identity 复现。契约措辞更正（「三处
+  retention-days」实为 2 处声明覆盖 3 个 artifact）已如实入 evidence。
+  flip base = 本 PR base；recheck：#613/#616/#617 三 merge 均为 ancestors、
+  `check-sdd` 0/0/111、本 flip 仅动 tasks.md 与 evidence run。
+  **本 done 不使 TASK-BRC-003 ready**：其 D2 gate 余两项（可独立列举的
+  Developer ID Application certificate、可 preflight 证明的 notary
+  credential）仍待维护者在隔离 release environment 完成，之后 fresh D1。）
+- Historical Status:ready（r1 implementation readiness = #613 merge
+  `90085a9fc1341e13a5b59ba1afb676b10907d976`；其一次性授权已由 #616/#617
+  与本 flip 全额消耗；r1 Readiness 块原文保留为历史。）
 - Historical Status:blocked（前置 = 本 r2 carrier 同时登记任务与授权；
   proposal r2 增补记录维护者 2026-07-27 的 handoff 选择。）
 - Readiness（r1；audit base = protected `main` `ecd5320b35308ddd44f67fb6a825a9c5f9e3fc1b`）：
