@@ -842,10 +842,31 @@ readiness r2,内容须含:重装步骤逐条、新 digest、回滚 digest
 
 ## TASK-DEC-009 — 跨分区遗留收口（r2 新增）
 
-- Status:ready（r1 implementation readiness;前置① r2 修订已合 = #634
-  `6ee7242decfb990f2788c6176c2c1e9ec99d3efa`（lvye APPROVED,mergedBy
-  lvye）,前置② 即本 readiness。授权范围与门见下方「Readiness r1」节;
-  任一门不满足即停,不得降门执行。）
+- Status:done（2026-07-27 D0 completion;仅在维护者 review/merge 本独立
+  `ready→done` PR 后生效。实现载体 = **#636**（merge
+  `77d28842e0d5fe68e134ee302813ba02c45aabe8`,lvye APPROVED @ exact head
+  `c148f475dd8dade969ed0b1c171cc8fab5381317`,mergedBy lvye）;readiness
+  r1 = #635（merge `c74f135a0e8f442a711b8ebf53917071c2461928`）;立项载体
+  = change r2 修订 #634（merge `6ee7242decfb990f2788c6176c2c1e9ec99d3efa`）。
+  evidence = `evidence/runs/TASK-DEC-009/implementation.md`。
+  三项全部交付:①`observed_main` 单行 + refname 等值（修复前实测返回影子
+  OID `6666…` 而非受保护 main 的 `aaaa…`,修复后双向实测:影子/refname
+  不等各自 `BackendError`,单行精确仍返回该 OID）;②`FakeApi` 补
+  `GET /issues/{n}` 路由并复活死测试;③TASK-DEC-005 记录的
+  Allowed ∩ Forbidden 归零（恰移除两项,Allowed 侧 13 项未动）。
+  变异门 4/4 击杀 + 负对照存活。**②的首轮变异存活已如实记入 evidence**:
+  首版复活只断言 lookup 计数,而 `FakeApi` 在路由前即记录调用,故计数在
+  「staged 被返回」与「`{}` 回落」两种情况下相同——该测试当时仍在以其
+  原本的死因通过;补正对照（暂存 open Issue 并断言 `load()` 返回其解析
+  结果）后二轮全杀。
+  **flip 后复核**（在翻转后的树上执行,HLR-003 r5 教训）:host_loop
+  `-m unittest discover` **624 OK + 1 expected failure**、`check-sdd`
+  **0/0/111**、`done_task_ids` **96** 且含 `TASK-DEC-009`。
+  **里程碑**:本任务闭合了台账中最后一条存活的安全缺陷（D-H2 的
+  `observed_main` 半侧）。`observed_main` 与 `RefPort.read`（DEC-005 已修）
+  现对同一条「ls-remote 按尾部匹配」陷阱采取同一形态的拒绝。
+  **CHG-2026-040 台账中不再有已知未闭合的安全缺陷**;余下为 DEC-001/
+  002/003/004/008 的既有功能范围。）
 - Platform:macos（host-only;零设备面）
 - Requirements/AC:change-local `DEC-LEFT-001`
 - Depends on:none（DEC-005/006/007 均已 done,受改文件与 DEC-001/003/008
