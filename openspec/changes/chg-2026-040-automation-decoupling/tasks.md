@@ -458,10 +458,33 @@ DEC-006 按其已交付面独立 done）。r1 的其余条款原文继续有效�
 
 ## TASK-DEC-006 — reviewer/envelope/recovery 硬化
 
-- Status:ready（r1 implementation readiness;前置① approval 已合
-  = #598 `cac07003836889881994367bde7ba3e0bdca70c0`,前置② 即本
-  readiness。授权范围与门见下方「Readiness r1」节;任一门不满足即停,
-  不得降门执行。）
+- Status:done（2026-07-27 D0 completion;仅在维护者 review/merge 本独立
+  `ready→done` PR 后生效。实现载体 = **#627**（merge
+  `0b8179daf709174162b1b4d94d06b4ca3585c4d3`,lvye APPROVED @ exact head
+  `42681eddf1141f0b4d0a36ed8f80a316785917fd`,mergedBy lvye）;readiness
+  r1 载体 = #608（merge `beda4dc…`）。evidence =
+  `evidence/runs/TASK-DEC-006/implementation.md`。
+  交付:E-H1 verdict 末行契约、E-M1 去重键 (number, head) 与重放态重导出、
+  E-M2 `(#N)` 尾锚定、E-M4 两处 `\s`→`[ \t]` 与 AST 结构扫描、reviewer
+  子进程卫生（stdin=DEVNULL/转录上限/126 与 124 分码/stderr 入
+  AdapterFailure/recorded_at 用注入时钟）。变异门 8/8 击杀 + 负对照存活;
+  历史 PR body 兼容以线上 #564 的解析 `repr` sha256 `ace6adb602d6ab7b`
+  前后逐字节相同为证。
+  **本任务 readiness r1 预写的两条停条件当时如实命中并停下,现均已闭合
+  ——但不在本任务内**:`identity.confirm_merge` 退役与 envelope path 分支
+  收紧经维护者裁决由 **readiness r2 #628**（merge
+  `67397e249946b86ae25a39c7396a4a19247088fe`）移交 TASK-DEC-005,并已由
+  **#630**（merge `342fdc2e456c5be16b838876b8457c85ccbb699f`）交付;
+  `test_v3_hardening.py` 的 stray-main 与 TASK-DEC-007 侧
+  `expectedFailure` 的同步摘除亦在 #630 内一并完成。故本任务 done 的
+  边界 = #627 所交付面,移交三项的验收归 TASK-DEC-005。
+  **flip 后复核**（在翻转后的树上执行,HLR-003 r5 教训）:host_loop
+  `-m unittest discover` **617 OK + 1 expected failure**、`check-sdd`
+  **0/0/111**、`done_task_ids` **95** 且含 `TASK-DEC-006`。
+  **连带效果**:本翻转使 TASK-DEC-002 的四个依赖（NAV-001、DEC-005、
+  DEC-006、DEC-007）全部 done——`--explain` 对 DEC-002 的拒因中
+  「dependencies not done」已消失,仅余 status/grade 与 never-claim,
+  即 DEC-002 具备起草 readiness 的条件。）
 - Platform:macos（host-only）
 - Requirements/AC:change-local `DEC-REV-001`
 - Depends on:none（与 DEC-005/007 文件分区互斥）
