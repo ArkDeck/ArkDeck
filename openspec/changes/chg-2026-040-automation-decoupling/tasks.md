@@ -18,10 +18,10 @@
 
 ## TASK-DEC-001 — 敏感路径配置抽取与框架/产品边界文档
 
-- Status:blocked（前置：① 本 change approval-only PR merge;②
-  TASK-NAV-002 done——同文件 check_pr_paths.py/test_check_pr_paths.py，
-  避免与 archive-glob 实现冲突;③ 独立 readiness PR 钉受改文件 exact
-  blob 与配置 schema。）
+- Status:ready（r1 implementation readiness;前置① approval 已合 = #598
+  `cac07003…`,前置② TASK-NAV-002 已 done（#599,chg-2026-039 已 archived
+  于 #610）,前置③ 即本 readiness。授权范围与门见下方「Readiness r1」节;
+  任一门不满足即停,不得降门执行。）
 - Platform:macos（host-only）
 - Requirements/AC:change-local `DEC-CONF-001`
 - Depends on:TASK-NAV-002
@@ -41,6 +41,83 @@
 - `DEC-CONF-001`：配置文件五项与原硬编码逐字节相同（对照测试）;加载
   fail-closed 五种畸形各有红 fixture;敏感判定行为对既有 fixture 语料
   零漂移;README 覆盖 scripts/ 下全部一级条目。
+
+### Readiness r1（2026-07-27）
+
+**Audit base** = `ecd5320b35308ddd44f67fb6a825a9c5f9e3fc1b`。
+
+**开工基线声明（Ordering 义务,非 drift gate)**
+
+```yaml pins
+- path: scripts/check_pr_paths.py
+  blob: 02332a9b572013e99b74acd46db8810ba4f7275a
+- path: scripts/test_check_pr_paths.py
+  blob: a2f11b0450dafd4e2dbf3d0b35008d0ecbf01880
+```
+
+**待搬移值的实测正本（本 readiness 的锚,实现须逐字节相同）**
+
+audit base 上 `check_pr_paths.SENSITIVE_PATTERNS` 实测为**恰五项、按此
+顺序**（锚是下列字面量文本本身,实现须逐字符比对;其字节权威在上表钉定
+的 `check_pr_paths.py` blob `02332a9b…` 内）:
+
+1. `Packages/**`
+2. `ArkDeckApp/**`
+3. `ArkDeckAppUITests/**`
+4. `scripts/**`
+5. `.github/**`
+
+**配置载体的两条硬约束（均为实测得出,不是偏好）**
+
+1. **必须落在 `scripts/**` 之下**。该表本身决定"无任务声明的 PR 不得
+   触碰哪些路径";若配置文件落在非敏感路径（如 `openspec/**`）,一个
+   task-less PR 就能先改配置再触产品路径——自引用削弱。落在
+   `scripts/**` 下时配置文件受它自己声明的规则保护。**选定路径 =
+   `scripts/automation_config.json`。**
+2. **必须是 stdlib 可解析格式（JSON,不用 YAML）**。`agent-pr.yml` 与
+   `sdd-guard.yml` 的 allowed-paths job **不执行 `pip install`**
+   （`requirements-sdd.txt` 只在 guard job 装）,`check_pr_paths.py` 现
+   零第三方 import;引入 YAML 会使守卫在依赖缺失时无法运行。
+
+**加载语义 = fail-closed(五类畸形逐一拒绝)**
+
+文件缺失 / 顶层非对象或 schema 字段不符 / 出现未知 key /
+`sensitive_paths` 为空表或非列表 / 元素非字符串或有重复项 —— 一律
+`CheckError`,**绝不静默回退到硬编码默认值**。回退默认值会让"配置被删
+或被写坏"表现为"守卫照常绿",正是本 change 台账反复记录的形状。
+
+**Pass/fail boundary**
+
+1. **等价性对照测试**:配置文件解析结果与 r1 记录的五项**逐字节、按序**
+   相同;该测试须能因任一项改动而变红。
+2. 五类畸形各有红 fixture,且**各配正对照**（合法配置必绿）。
+3. **行为零漂移**:既有 `test_check_pr_paths.py` 全部 24 测试保持绿,
+   不得为通过而放宽任何断言;task-less PR 的敏感判定对既有 fixture 语料
+   结果不变。
+4. **变异门**:删除 fail-closed 加载的任一分支,对应 fixture 必红;把
+   加载改回硬编码默认,等价性测试之外必须另有测试变红（否则该配置是
+   装饰性的）。
+5. `scripts/README.md` 边界地图须覆盖 `scripts/` 下**全部一级条目**
+   （framework 与产品工具逐一分类,并标出各自实例参数所在);以清点对照
+   `ls scripts/` 为证,遗漏即不合格。
+6. 全套件 `check_pr_paths` **24 → ≥24 OK**;host_loop **≥536 OK + 1
+   expected failure**;`check-sdd` 保持 0/0/111。
+
+**Risk acceptance（首次）**：把安全相关的常量移出代码进入数据文件,
+本质上把"改这张表"的门从 code review 降为 data edit。已接受,理由:
+①文件位于 `scripts/**`,受自身声明的敏感规则保护,改它的 PR 仍需任务
+声明或触发 task-less 拒绝;②加载 fail-closed,损坏不会静默放行;
+③等价性测试锁住初值。**若实现时发现①不成立（例如该路径未被自身规则
+覆盖）,即停并转 r2。** 回退 = revert。
+
+**Stop conditions**：配置路径落在 `scripts/**` 之外;引入任何第三方
+依赖;任何既有断言为通过而被放宽;需要触碰 `.github/**`（workflow 无需
+改动——`check_pr_paths.py` 自读配置）或 `scripts/host_loop/**`。
+
+**不授权**：路径匹配语义变更（`fnmatch` 单星跨 `/` 等属 DEC-004）;
+`SENSITIVE_PATTERNS` **内容增删**（本任务只搬移,不改集合;扩项属
+DEC-004 且须维护者在其 readiness 认可清单）;两 checker 文法统一;
+`Decision-Grade` 代写。
 
 ## TASK-DEC-002 — host_loop 实例与协议常量收口（全链收尾）
 
