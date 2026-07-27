@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-040-automation-decoupling
 revision: 2
-status: verified
+status: archived
 class: implementation-only
 core_change_level: none
 owner: lvye
