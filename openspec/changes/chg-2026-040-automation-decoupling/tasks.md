@@ -287,12 +287,45 @@ None 的治理文件、重复 capability id、`changes/` 游离条目）。**故
 
 ## TASK-DEC-004 — check_pr_paths 信任边界与解析硬化
 
-- Status:ready（r1 implementation readiness;前置① approval 已合 = #598
-  `cac07003836889881994367bde7ba3e0bdca70c0`,前置② TASK-DEC-001 已 done
-  （实现 #640 `3232377744957b71b29700d275be58bfea799ee3`,翻转 #641
-  `9e7b924917a22f53caae65330ab8f8df8081a7aa`,均 lvye APPROVED/mergedBy
-  lvye）,前置③ 即本 readiness。授权范围、语义决策与门见下方
-  「Readiness r1」节;任一门不满足即停,不得降门执行。）
+- Status:done（2026-07-27 D0 completion;仅在维护者 review/merge 本独立
+  `ready→done` PR 后生效。实现载体 = **#644**（merge
+  `13f91bedff17e354a6cddc257d6e91fadad370b5`,lvye APPROVED,mergedBy
+  lvye）;readiness r1 = #642（merge
+  `b75212cfc6b2447545591f01382949a0a758b4b9`）、r2 = #643（merge
+  `6707699f23923322acadd9b455ac6da23babda23`）。evidence =
+  `evidence/runs/TASK-DEC-004/implementation.md`。
+  交付七项:B-H1（allowlist 取自 base 树,head 侧只决定是否归档搬移;
+  head-only 任务不供权）、B-H4（`--event` 祖先门 + state/merged/同仓
+  身份校验）、B-H3（Allowed paths 定界解析:声明行 vs 续行首个散文词、
+  跨行括号注释遮蔽、40-hex 判 pinned blob）、B-M1（单星不跨 `/`,并加
+  与 `test_agent_pr_workflow._glob_regex` 的 parity 测试）、B-M2
+  （`\s*`→`[ \t]*`）、B-M3（confusable token 报歧义)、B-M4（敏感表加四
+  根级条目 + 匹配大小写不敏感;Allowed 面保持敏感）、B-M8（identity
+  读回）;B-H2 按任务卡只做 docstring 显式记录。
+  **实测清点**:51 个 active 任务下路径类 pattern 丢失 **0**、新增 **0**、
+  惰性 token 出局 **24**;r1 钉的 60-commit 窗口 **36/36 判定相同**,
+  加深至 200 commit（129 个带任务声明）**128/129 相同**,唯一分歧
+  `ced32841…`（#459）经查是**真实发生过的自扩权**（维护者一次性
+  bootstrap carrier,同 commit 加四文件到自己 Allowed paths 再改它们)
+  ——形态非假想,守卫当时无法与攻击区分。task-less commit 触碰四个新增
+  敏感条目者 **0**。变异门 **16/16 击杀 + 负对照存活**。
+  **三处自查如实记入 evidence**:①B-M3 的 r1 写法被实测推翻——NFKC 把
+  U+2011 映到 U+2010 而非 ASCII `-`,改为折叠整个 Unicode `Pd` 类;
+  ②两条变异首轮存活,同源于「测试只盯 helper、未驱动生产路径」,改为
+  驱动 `main()` 后击杀;③首次推送 CI guard 红——`actions/checkout@v4`
+  默认 `fetch-depth: 1`,浅克隆无 `HEAD~1`;修法是收窄生产侧 git 依赖
+  （只有 base 树走 git),并以真实 `--depth 1` 克隆复现验证。
+  **r1 停条件如实命中一次并停下**:B-H1 最小修复干跑恰打红
+  `test_pr_envelope` 的 MECH-004(属 Forbidden paths),零 host_loop 改动
+  转 r2 扩权;r2 授权面(两常量)足够,断言逐字未动。
+  **flip 后复核**（在翻转后的树上执行,HLR-003 r5 教训）:`check-sdd`
+  **0/0/111**、`test_check_pr_paths.py` **49 tests OK**、host_loop
+  `-m unittest discover` **624 OK + 1 expected failure**、
+  `done_task_ids` **99** 且含 `TASK-DEC-004`、`--explain` 对本任务报
+  `never-claim` + `status 'done' is not ready`。
+  **连带效果**:chg-2026-040 的八任务现仅余 **TASK-DEC-002**（收口,四
+  依赖已全 done,可起草 readiness)与 **TASK-DEC-008**（r1 source-only
+  ready,待实现)未完成。）
 - Platform:macos（host-only）
 - Requirements/AC:change-local `DEC-PRP-001`
 - Depends on:TASK-DEC-001
