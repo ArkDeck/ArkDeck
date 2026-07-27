@@ -193,3 +193,108 @@ raw stdout/stderr、完整 manifest、`OB-*` 原文、绝对用户路径与设�
    `I24-HDC-DEVICE-EMPTY-001`，并把「拔线不等于消失」「transition 以同 key 行
    状态迁移为判据」写入 design；
 4. 其后才是 TASK-I24-001 的 readiness（registry/fixture/lock/test matrix）。
+
+---
+
+## V0 virgin-server 观察（2026-07-27）— 零行族存在，形态为显式空标记行
+
+### 授权
+
+capture plan **r5**（#657 merge `98d1f8853261a3af4332df83e1bfb0bdbddb5482`）
+单次授权，判据二值。执行者 = `lvye` 亲手；Agent 零 HDC 调用、零 raw stream
+读取（下列结论由 manifest 哈希/字节数与结构化探针导出）。
+
+### 前置（窗口之外，逐项留证）
+
+1. 物理零设备；`system_profiler SPUSBDataType` 命中 rockchip/openharmony/dayu
+   计数 = **0**；
+2. **停止现役 server**：对 PID `22677`（capture session #1 所用、已见过两台
+   设备）发送普通 `kill`（**未**使用 `hdc kill` 等 installed-HDC 调用），
+   停止时刻 ≈ `2026-07-27T12:47Z`；
+3. 双向确认零 server：`OB-0`（8710 无 LISTEN）+ executable 级 `OB-1`
+   （无 hdc 进程）→ `ZERO-SERVER-CONFIRMED`；
+4. **在零设备状态下**启动新 server：PID `80306`、`ppid=58389`（operator
+   shell，非 `ppid=1`；与 session #1 的 22677 不同，若该 shell 退出可能被
+   带走——如实记录）、启动 `2026-07-27T12:48:31Z`、
+   `lsof` normalized `127.0.0.1:8710 (LISTEN)`；server 自身日志同刻自报
+   `Ver: 3.2.0f`，与 (D-2) 钉定值一致。
+
+### 窗口（恰好一次采集）
+
+- 时刻 `2026-07-27T12:48:39Z`，输出目录 `V0`，commandId
+  `hdc-list-targets-verbose`，`exitCode 0`、`durationMs 1351`、
+  `timedOut false`、`truncated false`（双流）、`selfCheckPassed true`、
+  stderr **0 字节**（SHA-256 = 空串哈希）。
+- 窗口期间零设备接入、零第二次采集、零 server lifecycle 动作。
+- 旁证（server 侧日志，非 harness 捕获）：`connectKey.size 0`、
+  `No target channelId:…` —— server 明确自报无目标。
+
+### 观察结果与内容的机器证明
+
+- stdout = **9 字节 / 1 行 / 制表字段数 0**（`awk -F'\t'` 第 2..N 字段为空输出）；
+- stdout SHA-256 =
+  `c769b18b5babef2903583320036d1e507ee1e80e1386b29d098721999cd20bcf`；
+- **内容由哈希唯一确定**：`sha256("[Empty]\r\n")` 与上值逐字节相等（Agent 以
+  候选串重建，未读取原文）；`grep -c EMPTY` = 0，与混合大小写 `[Empty]`
+  一致（非全大写 `<EMPTY>`）。
+
+### 判据裁定：**A 支成立（形态修正）**
+
+r5 的 A 支为「零行」。实测形态是**一行显式空标记**而非零字节，因此按 r5
+「零行族存在」成立，但**形态需按实测修正**：virgin server 输出的是
+`[Empty]` 标记行，不是空输出。此形态**强于**零字节：它是「空」的**正向
+信号**，天然与 unavailable/failure/unknown 可区分，正对
+`I24-HDC-DEVICE-EMPTY-001` 最难的那半句要求；零字节反而与「读空/截断」
+难以区分。
+
+### 三态语义（session #1 + V0 合并结论）
+
+| server 状态 | 输出形态 | 字节 | 制表列 | 行终止符 | 语义 |
+| --- | --- | --- | --- | --- | --- |
+| 从未见过设备 | `[Empty]` 单标记行 | 9 | **0** | **CRLF** | 真 empty |
+| 见过、当前无在场 | N 行，状态全 `Offline` | 56×N | 5 | LF | 已知但不在场 |
+| 有在场设备 | N 行，含 `Connected` | 58/行（+56/离场行） | 5 | LF | 在场 M 台 |
+
+**`observedEmpty` 的正确定义 = 「零 `Connected` 行」**：它同时覆盖前两态。
+`[Empty]` 标记是**充分不必要**信号——只认标记则见过设备的 server 永远判不出
+空（session #1 的 C0 即此情形）。
+
+### 新发现：**同一命令的两种输出使用不同的行终止符**
+
+由字节账反推（非猜测）：
+
+- 设备行 = 32+0+3+`state`+9 字段 + 4 制表符 + **1** → 56 / 58 字节 ⇒ **LF**；
+- 空标记行 = 7 + **2** → 9 字节 ⇒ **CRLF**。
+
+**解析危害（必须写入注册文法与负向测试）**：任何以 `split("\n")` 为基础的
+解析器会在空标记分支留下游离 `\r`，使 `[Empty]\r` ≠ `[Empty]`，「空」判定
+**静默失败**并可能塌成 unknown。注册的 grammar 必须同时接受 LF 与 CRLF，
+且任何字段中不得残留 `\r`；须有一条「`[Empty]\r` 不得被读成非空/unknown」的
+反向测试。
+
+### AC 影响（本记录只陈述观察）
+
+| AC | V0 后的状态 |
+| --- | --- |
+| `I24-HDC-DEVICE-EMPTY-001` | 现文「registered successful **zero-row** family yields observedEmpty」与实测不相容：真 empty 是**标记行**而非零行，且见过设备的 server 以「全 `Offline`」表达空。重定义留待 **r6** |
+| `I24-HDC-DEVICE-SNAPSHOT-001` | 新增 grammar 硬要求：混合行终止符（LF/CRLF）与 `\r` 残留禁止 |
+| 其余三条 | 相对 session #1 无变化 |
+
+### server 收尾状态
+
+窗口结束时 PID `80306` 仍在运行，处于 **virgin**（未见过任何设备）状态，
+`ppid=58389`。是否保留由维护者处置；本记录不代为 kill，处置结果如需入档
+由后续记录补记。
+
+### 偏差
+
+本次窗口无新增偏差。r5 的四项前置、单次采集限制与三项披露义务（harness
+lifecycle 计数 0 / server 由 operator 窗口前启动 / 现役 server 由 operator
+窗口前主动停止并附 PID 与时刻）均已履行且分开陈述。
+
+### human attestation
+
+- operator `lvye`；UTC 区间 `12:47Z`（停 22677）–`12:48:39Z`（V0 采集）；
+- 零设备状态由 operator 物理确认并经 USB 枚举计数 0 佐证；窗口期间未接入
+  任何设备、未运行第二个 HDC 客户端、未开启 DevEco；
+- `accepted-by: pending maintainer evidence-PR review`。
