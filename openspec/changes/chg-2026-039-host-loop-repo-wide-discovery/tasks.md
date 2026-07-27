@@ -145,15 +145,26 @@
 
 ## TASK-NAV-002 — check_pr_paths 与活体样本测试的 archive 免疫
 
-- Status:ready（r2 corrective readiness；仅在维护者对本独立 readiness PR
-  exact head review/merge 后生效。r1 契约①的前提在实现预检中被实测证伪
-  （见 Readiness（r2）Falsification record；r1 授权零消耗、零实现推送）。
-  只授权一个实现交付：`check_pr_paths.py` **零字节变更**（invariant
-  pin），仅按 r2 契约给活体样本测试引入 archive 免疫并以归档演练取证；
-  载体 = 常规会话 agent/* PR（本任务 never-claim，循环不得认领；
-  `NEVER_CLAIM_ROOTS` 扩根由 NAV-001 交付）。不授权：`check_pr_paths.py`
-  任何字节变更、host_loop 非测试代码变更、归档 PR 本身、`Decision-Grade`
-  代写、governance 正文、NAV-001 分工文件。）
+- Status:done（2026-07-27 D0 completion；仅在维护者 review/merge 本独立
+  `ready→done` PR 后生效。实现载体 = #595（merge
+  `24401ddc553f72b37e66f73a322ba6e3d559c0da`）：`test_support.py` 三
+  helper + 11 单测（选样双过滤：id 自洽 + headers==candidates）、四文件
+  活体样本适配；**invariant pin 履约 = `check_pr_paths.py` blob
+  `02332a9b…` 于 flip base 复核逐字节未变**。change 级归档演练经
+  跨线修复 #597 合成树全绿（`git mv` chg-2026-030 入 archive 后 536 OK
+  + 1 expectedFailure 零失败、`test_check_pr_paths`/`test_check_sdd`/
+  `check-sdd` 全 OK），`NAV-ARCH-001` = **PASS**（evidence run.md
+  「drill re-run」节）。flip base `7be0ac3d7273b6f296fb3b74efe304420e2f214d`
+  （#596）recheck：(a) 链 #586/#587/#590/#591/#593/#595/#597 全为
+  ancestors；(b) 套件 536 OK + 1 expectedFailure、`check-sdd` 0/0/111
+  于 flip 树实测；(c) evidence = `evidence/runs/TASK-NAV-002/run.md`
+  （#595 随载体 + #597 追记）在树；(d) 本 flip 单文件（与 NAV-001
+  done flip 堆叠、按序合并）；(e) 不声称：change 级 verified 为下一
+  独立 PR；chg-2026-030/027/028 归档 PR 独立走。）
+- Historical Status:ready（r2 corrective readiness = #593 merge
+  `5b376275cd958e5f3514cc46b94f487c75c2f7dd`；其一次性实现授权已由
+  #595 全额消耗，change 级演练 gate 由 #597（TASK-NAV-001 review-fix）
+  合成树收口；r2 Readiness 块原文保留为历史。）
 - Historical Status:ready（r1 = #590 merge
   `a0bc3ff66954a7a2560ce951fc44e1c989bf7c45`。其契约①「扩查找面」与自身
   「零语义变更」条款相互矛盾且前提证伪：r1 红探针把带 14 条具名负向测试
