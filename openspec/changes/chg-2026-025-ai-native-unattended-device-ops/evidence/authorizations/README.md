@@ -9,7 +9,48 @@ AC-FLASH-015-01/02/03)。
 (POL-AGENT-001)。任何 pinned 字段漂移即整体失效,须新 readiness PR 重新授权。
 吊销 = 维护者 merge 删除/作废该文件的 PR;git 历史即授权审计账本。
 
-## AUTH-2026-025-DAYU200-001(TASK-AIN-004,首次无人值守真机验收)
+> **载体路径是契约,不是约定**:`MaintainerMergedAuthorizationResolver` 只从
+> `registryPath = openspec/changes/chg-2026-025-ai-native-unattended-device-ops/evidence/authorizations/<authorizationId>.json`
+> 读取,故**文件名必须与 `authorizationId` 逐字一致**。批准由 GitHub provenance 建立
+> (作者 `github-actions[bot]`、`lvye` 对 exact head approve、`lvye` merge、三方 actor
+> 分离、`.github/CODEOWNERS` blob OID 命中),`approvedBy`/`carrier` 只是显示与交叉核对
+> 字段,**单凭它们不构成批准**。
+
+## AUTH-2026-025-DAYU200-002(TASK-AIN-004 r3,当前载体,fail-closed)
+
+2026-07-27 由 readiness r3 引入,**取代 `-001`**(后者随 r2 security-remediation 作废,
+按 POL-AGENT-001 原样保留为历史,不修改、不复用)。host 侧字段已于 base
+`6e45a224cc7d5a758fe2f5661effe3c2ae726baf` 全部重新实测(非沿用 r1 值),实测结果与 r1
+逐字相同:
+
+| 字段 | 值 | 本次取证 |
+| --- | --- | --- |
+| `target.model` | DAYU200 (RK3568) | `RockchipFlashProfile.targetDeviceModel` 实测 |
+| `target.serialSHA256` | `958780b2…7a7e` | 同一物理设备(EVD-M0B-DAYU200-20260718-001);原始字节不入仓 |
+| `firmwareArchiveSHA256` | `fc7637f3…5280` | 本机 pinned 归档实测命中 |
+| `toolchainFingerprint` | rkdeveloptool-1.32@`038a8a0e…3611` | `~/dayu200-rehearsal/rkdeveloptool/rkdeveloptool` 实测命中 |
+| `providerIdentity` | arkdeck.rockchip-rockusb-flash-provider | Provider 常量实测 |
+| `planDigestSHA256` | `c85be3b3…6cff` | base 树 `makePlan(mode:.execute,.valid)` 实测 |
+| `stepSetDigestSHA256` | `075b52c4…8fdb` | 同上 |
+| `transport` / `maxRuns` / `validUntil` | usb / 1 / 2026-08-31T00:00:00Z | — |
+
+**`target.bindingRevision` = `-1`,`carrier` = PENDING:本载体现在授权为零。**
+`RockchipStandingAuthorization.parse` 对负值以
+`negativeValue(field: "target.bindingRevision")` 直接拒绝,故它在解析层即不可授权任何
+dispatch——这是有意的 fail-closed 状态,与 r1 同型。
+
+### 完成路径(r4)
+
+与 r1→r2 不同,`bindingRevision` **不再**由 caller 在 `--unattended-context` 里提供:
+AIN-005/006/007 之后,执行门要求 durable binding snapshot
+(`~/Library/Application Support/ArkDeck/rockchip-binding.json`)的 `revision`
+与本载体 `target.bindingRevision` 逐字相等。因此 r4 的前置是**先建立 durable 绑定**,
+再据其 revision 定本 pin,而不是靠一次 E0 读回臆造。
+
+r4 另需三项(见 tasks.md「Readiness pins(r3)」D-1/D-2/D-3):产品执行宿主四项前置
+可证、ADR-0003 范围裁决、hdc 身份重钉。三项任一未闭合即不得 r4。
+
+## AUTH-2026-025-DAYU200-001(TASK-AIN-004,首次无人值守真机验收;**superseded**)
 
 host 侧字段已于 base `0a5c9fd9…2215f` 实测锁定(见 tasks.md AIN-004 Readiness
 pins):

@@ -222,7 +222,10 @@ change approved 前保持 blocked;approved 后每任务另需独立 readiness PR
 
 - Status:blocked（r2 security review 发现 P0-AUTH/FACT/DISPATCH/CONTRACT 缺口；#296
   readiness 作为历史保留但不得复用。等待 TASK-AIN-005/006/007 全部 done 后，以新的 main
-  OID、未过期 authorization、可信执行宿主和独立 PR 重新 readiness）
+  OID、未过期 authorization、可信执行宿主和独立 PR 重新 readiness。**r3(2026-07-27)已
+  完成全部 host 可测量重钉,但三项独立阻断未闭合——D-1 产品执行宿主四项前置在本机全部
+  缺席、D-2 ADR-0003/TASK-BRC-004 与本任务争同一 production composition、D-3 hdc 工具
+  已漂移;见下「Readiness pins(r3)」。本任务保持 blocked,r3 不授权任何设备操作**）
 - Historical readiness r2(2026-07-22,**superseded**):E0 身份读回于设备窗口完成
   (operator lvye,crib exit 0,serial 摘要 `958780b2…` 命中被授权目标;run 记录
   `evidence/runs/TASK-AIN-004/`)。载体当时将 `bindingRevision` -1 → 1、`carrier`
@@ -237,6 +240,7 @@ change approved 前保持 blocked;approved 后每任务另需独立 readiness PR
   - `openspec/changes/chg-2026-025-ai-native-unattended-device-ops/evidence/**`
   - `scripts/e0_readback/**`(E0 只读身份/binding readback crib,host-only 交付物;先例 TR-001 harness `scripts/trace_capture/`)
   - `openspec/verification/hardware-matrix.md`(新增行)
+  - 本 change `tasks.md`(仅本任务状态/pins/evidence 引用;readiness 与 done 载体所需)
 - Forbidden paths:
   - `Packages/**`(实现已冻结,发现缺陷回 TASK-AIN-003)
 - Risk:destructive(本 change 授权模型下由 Agent 无人值守执行;standing authorization 于本任务 readiness PR 承载,恢复路径 = CHG-2026-016 Loader wlx 重刷)
@@ -271,6 +275,161 @@ change approved 前保持 blocked;approved 后每任务另需独立 readiness PR
 - 下一次 readiness 不得把现行 gate 的 `dispatch=0 real_device=0` 正例当作产品执行证据；
   必须 pin AIN-DISPATCH-001 的 product-owned fake executor 结果与可信宿主隔离证据。
 
+### Readiness pins(r3 host-complete,2026-07-27)
+
+**状态说明**:本 r3 按 r2 stop gate 的要求以新 base、新载体重新钉定全部 host 可推导
+事实,**不复用 #296 readiness,也不复用 `AUTH-2026-025-DAYU200-001`**。r3 **不**使本
+任务 ready,**不**授权任何 E0/E1/E2 设备操作:新载体在解析层即 fail closed,且下列
+D-1/D-2/D-3 三项阻断全部未闭合。r4(翻 `ready` + 授权设备窗口)必须在三项均由维护者
+判定关闭后另起独立 PR。
+
+#### Base 与套件基线(全部本次实测)
+
+- Base:main `6e45a224cc7d5a758fe2f5661effe3c2ae726baf`(#659 merge)。
+- guard:`./scripts/check-sdd.sh` 实测 **0 error / 0 warning / 111 acceptance IDs**,
+  exit 0。
+- Swift 全量:`swift test`(Packages/ArkDeckKit)实测
+  **Executed 400 tests, with 1 test skipped and 0 failures**,exit 0
+  (AIN-007 done recheck 记的 358 为当时值,本 r3 以 400 为回归底线)。
+- E0 crib host 自测:`python3 scripts/e0_readback/capture.py --selftest-host` 实测
+  **PASS (15/15)**,exit 0。
+- 测量方法学注记:上述 Swift 汇总行取自完整输出文件,**不经 `| tail`**——截断会吃掉
+  `Executed N tests...` 汇总行而只留管道退出码(本次起草时先犯后纠,记此防复发)。
+
+#### Provider/plan 面 pins(在 base 上重新实测,非沿用 r1 记忆值)
+
+以 `RockchipRockUSBFlashProvider().makePlan(mode: .execute, archiveValidation: .valid)`
+(默认 `planNonce` `rf002`)在 base 树实测,**与 2026-07-22 r1 值逐字相同,零漂移**:
+
+- `planDigestSHA256`
+  `c85be3b34ae671ad213781619235a22dcb242d406850d4eb8cef8785487d6cff`
+- `stepSetDigestSHA256`
+  `075b52c4fc7dc71e422c76c9edd5e1cd26e7641c844fa4cfb4ae79f29d1c8fdb`
+- `providerIdentity` `arkdeck.rockchip-rockusb-flash-provider`
+- `RockchipFlashProfile.pinnedToolchainFingerprint`
+  `rkdeveloptool-1.32@038a8a0ea26ef7eb77451789f310c0c9fbeaf43a78af1d6146e02311a9c23611`
+- `RockchipFlashProfile.targetDeviceModel` `DAYU200 (RK3568)`;`archiveSHA256`
+  `fc7637f34a8394847b1b6c7e7ff2750863d18c6dc05e184abaf5aed70ec75280`;mapped
+  partitions `9`
+- 测法:base 树 linked worktree 内加一次性 `@testable` 打印用例读取上述值,读毕删除;
+  仓内零残留,`Packages/**` 保持 Forbidden 未改。
+
+#### 物料与 provenance 面 pins(本机实测)
+
+- pinned 镜像:`~/Downloads/version-Daily_Version-OpenHarmony_7.0.0.33-20260713_000751-dayu200_img.tar.gz`
+  实测 SHA-256 `fc7637f34a8394847b1b6c7e7ff2750863d18c6dc05e184abaf5aed70ec75280`
+  == Profile `archiveSHA256` == 载体 `firmwareArchiveSHA256`,**命中**。
+- destructive 面工具:`~/dayu200-rehearsal/rkdeveloptool/rkdeveloptool` 实测 SHA-256
+  `038a8a0ea26ef7eb77451789f310c0c9fbeaf43a78af1d6146e02311a9c23611`
+  == `RockchipDiscoveryIntegrationProfile.pinnedProduction.executableSHA256`,**命中**。
+  注意 `/opt/homebrew/bin/rkdeveloptool` 与 `~/Code/OpenHarmony/rkdeveloptool/rkdeveloptool`
+  实测均为 `bbd7bdc0fb121d414fb61085e77211cc1fdd9a3b6c6b285c54380f70e56c9923`
+  = `pinnedReadOnlyDiscovery`(**E0 只读**面),**不得**用于 E2。
+- `.github/CODEOWNERS` blob OID 实测 `f4edd22f87965efcfc27ea512283a0c2252bf0fb`
+  == `MaintainerMergedAuthorizationResolver.pinnedCodeOwnersBlobOID`,**命中**;有效行
+  恰 `* @lvye`,满足 `codeOwnersRequireMaintainer`。
+- provenance 载体路径契约:`registryDirectory` =
+  `openspec/changes/chg-2026-025-ai-native-unattended-device-ops/evidence/authorizations`,
+  `registryPath = <registryDirectory>/<authorizationId>.json`。故新载体文件名必须与
+  `authorizationId` 逐字一致。
+- provenance 身份契约:PR 作者须为 `github-actions[bot]`、merge 者须为 `lvye`、须有
+  `lvye` 对 **exact head** 的 approve,且作者 ≠ 合并者 ≠ 批准者(`actorSeparationViolation`
+  防线)。这正是 `agent/*` bot auto-PR 载体形态存在的原因。
+
+#### D-1 阻断:产品执行宿主四项前置在本机全部缺席(实测)
+
+`RockchipProductExecutionSettings.load()` 是 production composition root。对本机逐项
+实测,**四项前置全部不满足**,故今日即便载体合法,`arkdeck` 也走不到任何 dispatch:
+
+| 前置 | 期望 | 本机实测 | 判定 |
+| --- | --- | --- | --- |
+| `UserDefaults` `ArkDeck.Rockchip.ToolBookmark` | security-scoped bookmark | 全部真实域(含 `com.arkdeck.desktop`)均无该 key | **缺席** |
+| `UserDefaults` `ArkDeck.Rockchip.ToolQuarantinePresent` | 键存在(值可为 false) | 缺席 → `tool quarantine assessment is absent` | **缺席** |
+| Keychain `dev.arkdeck.github-provenance` / `protected-main-reader` | 非空 token | `security find-generic-password` 报 item 不存在 | **缺席** |
+| `~/Library/Application Support/ArkDeck/rockchip-binding.json` | `revision > 0` + serial + 纯数字 usbTopology + 非空 evidence | 文件不存在(该目录下只有 `Characterization/`、`host-loop/`) | **缺席** |
+
+- 可行性已单独证伪一个常见假设:**非 sandbox CLI 能创建并解析 `.withSecurityScope`
+  bookmark**——本机实测 `bookmarkData(options:[.withSecurityScope])` 成功(824 B)、
+  `resolvingBookmarkData` 回原路径且 `stale=false`、
+  `startAccessingSecurityScopedResource()` 返回 `true`。故第 1 项属"未安装",不属
+  "架构上不可能";其余三项同为安装缺口。
+- **本 change 全目录零处记载这四项前置由谁、以何步骤安装**(实测 grep:
+  `ToolBookmark` / `protected-main-reader` / `rockchip-binding.json` /
+  `ToolQuarantinePresent` 在 chg-2026-025 目录内零命中)。这正是 r2 stop gate 所要求的
+  「可信执行宿主」证据的空缺处,r4 前必须由独立载体补齐。
+- **Keychain token 安装是维护者动作,不由 Agent 执行**(凭据不经 Agent 之手;
+  POL-AGENT-001 同向)。
+- `rockchip-binding.json` 的 `revision` 必须等于载体 `target.bindingRevision`
+  (`RockchipAuthorizationFacts` 实测断言 `durable.reference.revision ==
+  authorization.target.bindingRevision`),因此该 pin 只能在 durable 绑定建立后确定,
+  不能由 E0 读回臆造——与 r1 结论一致,但机制已由 caller-supplied context 改为 durable
+  snapshot。
+
+#### D-2 阻断:ADR-0003 / TASK-BRC-004 与本任务争同一 production composition
+
+- `DEC-011` / `ADR-0003`(CHG-2026-035,已 archived;结论录于
+  `openspec/platforms/macos/profile.md` §Rockchip tool execution)选定
+  `selected:bundledRockchipComponent`,明文「**不使用 user-selected external
+  executable**」,并写「任一 gate 未满足,Rockchip execute 保持 blocked」。
+- CHG-2026-036 `TASK-BRC-004`(**status blocked**,依赖同为 blocked 的 `TASK-BRC-003`)
+  的 Production reachability 链**逐字包含 `RockchipFlashExecutionHost`**,交付物明写
+  「删除 production route 对 user-selected executable URL/hash/bookmark … 的输入」——
+  即本任务 D-1 表格第 1 行所依赖的那条输入。
+- 但本仓实测:`chg-2026-025` 全目录零处提及 ADR-0003 / DEC-011 / CHG-2026-035 /
+  CHG-2026-036;`chg-2026-035` 与 `chg-2026-036` 全目录亦零处提及 CHG-2026-025 /
+  TASK-AIN-004。**两侧互不可见**(与 chg-026/RKFUI-001G 被 ADR-0003 作废时同型)。
+- 因此存在两种同样可辩护的读法,**其取舍是维护者的范围判断,r3 不代为裁决**:
+  (a) ADR-0003 的主语是 **Sandboxed macOS App** 的 execute 面(其证据矩阵、候选集、
+  entitlement/分发讨论均以 App 为主体,触发事实是 RKFUI-001G),则 chg-025 的 agent
+  CLI 面不受其阻断,AIN-004 可在 D-1/D-3 关闭后走 r4;
+  (b) ADR-0003 的主语是**任何 product-owned typed workflow 的 Rockchip execute**
+  (其原文即用此措辞,而 AIN-007 的执行宿主正是 product-owned typed workflow),则
+  AIN-004 的 E2 面须待 BRC-003/004 闭合后方可 readiness。
+- **r4 起草前必须先有维护者对 (a)/(b) 的书面裁决**;若判 (b),AIN-004 的 E2 面保持
+  blocked,E0 面是否单独放行亦由该裁决界定。
+
+#### D-3 阻断:hdc 工具已漂移,E0 读回的工具身份需重钉
+
+- AIN-004 既有 evidence 与既往采集计划引用 hdc `3.2.0d`
+  `48395ba8d87115dffca47df2a640a6c868bc9a2bd4eb49611e4138ff88d8d260`。
+- 本机实测两条路径
+  (`/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/toolchains/hdc`
+  与 `~/OpenHarmony/SDK/26.0.0/toolchains/hdc`)**同字节**,均为
+  `05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83`,与旧 pin 不符。
+- 版本号须由**维护者执行 `hdc -v`** 确认后写入(静态 `strings` 提取会得到 handshake
+  协议常量而非报告版本,该错法已有先例);Agent 不得调用 installed HDC。
+- E0 crib 本身不 pin hdc hash(只把实测值写进 receipt 的 `toolchain.hdcSha256`),故
+  crib 不会因漂移而失败——**这正是需要在 r4 显式重钉的原因**:不重钉就没有任何一道门
+  会因换工具而变红。
+
+#### 守卫可解析性(本 r3 顺带修复的活缺陷)
+
+- 实测:`check_pr_paths.extract_allowed_patterns` 对 `TASK-AIN-004` 抛
+  `task TASK-AIN-004 has multiple Allowed paths lines`——本任务此前有两条
+  `- Allowed paths` 声明行(顶部活声明 + 历史 r1 pins 块内一条)。**其后果是任何声明
+  `TASK-AIN-004` 的 PR 一律红**,与文件集无关。
+- 全仓横扫 42 个 active 任务:该 `multiple` 形态**仅 TASK-AIN-004 一例**;另有三例属
+  另一形态 `no Allowed paths line`(`TASK-OBS-001`/`TASK-OBS-002`/
+  `TASK-UD-R2-R4-SEAM-001`),不在本任务范围,单独记录待办。
+- 本 r3 把历史块那条改写为散文行(历史事实一字不改),使全任务只剩一条活声明;并把
+  `本 change tasks.md` 补进活声明,以便后续 readiness/done 载体可合法声明本任务。
+- 载体形态因此被实测定死:本 r3 只动 `openspec/**`,**标题不含 `TASK-` token**(无任务
+  声明 → 落 SENSITIVE 判定 → `openspec/**` 非敏感 → 通过);`scripts/e0_readback/**`
+  属敏感面,必须由**另一个声明 `TASK-AIN-004` 的 PR** 承载,且只能在本 r3 合入后提交。
+
+#### r4 的二值前置(全部为"必须成立",任一不成立即不得 r4)
+
+1. 维护者对 D-2 的 (a)/(b) 裁决落成书面载体(profile/ADR/change 任一,须可引用);
+2. D-1 四项前置在目标宿主上逐项可证(bookmark/quarantine/keychain/binding 快照),
+   且其安装步骤与责任人有仓内载体;
+3. `rockchip-binding.json` 的 `revision` 已确定,并与新载体 `target.bindingRevision`
+   逐字相等;
+4. hdc 身份与版本经维护者 `hdc -v` 确认并重钉;
+5. 届时以**当时的 main OID** 重跑 guard / Swift 全量 / crib 自测,三者均不低于本 r3
+   基线(0/0/111、400 tests 0 failures、15/15);
+6. 新载体 `AUTH-2026-025-DAYU200-002.json` 经 `github-actions[bot]` 作者、`lvye` 对
+   exact head approve 并 merge,`carrier` 字段由 PENDING 改为该 PR 引用。
+
 ### Historical readiness pins(r1 host-complete,2026-07-22; superseded)
 
 **状态说明**:本 r1 锁定全部 host 可推导 pin 与 standing authorization 载体的
@@ -300,8 +459,12 @@ host 字段;`bindingRevision` 是唯一需一次设备读回才能确定的 pin,
 - **唯一待读回 pin**:`target.bindingRevision` 现为 `-1`(fail-closed 占位)——
   `RockchipStandingAuthorization.parse` 对负值直接拒绝,故 r1 载体在解析层即不可
   授权任何 dispatch(有意)。
-- Allowed paths(r2 及执行期):`evidence/**`(载体、authorizations、runs)+
+- 历史授权面(r2 及执行期,superseded):`evidence/**`(载体、authorizations、runs)+
   `hardware-matrix.md` 新增行;`Packages/**` forbidden(实现已冻结,缺陷回 AIN-003)。
+  (本行原为第二条 `- Allowed paths` 声明行,与本任务顶部的活声明重复,使
+  `extract_allowed_patterns` 对 TASK-AIN-004 恒抛
+  `has multiple Allowed paths lines` — 见 r3 pins「守卫可解析性」。改写为散文后,
+  全任务只剩顶部一条活声明;本节其余文字不变,历史事实不改写。)
 - 二值门(r2/执行期,不在 r1 交付):
   1. E0 无人值守日志采集到 owned 路径 + 拉取分析(TR-001 harness 复用);
   2. E2 无人值守刷机:门通过(authorizationRef 非空)→ durable intent 落盘 →
