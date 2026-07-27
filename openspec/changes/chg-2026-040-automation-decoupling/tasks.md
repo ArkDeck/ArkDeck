@@ -18,10 +18,36 @@
 
 ## TASK-DEC-001 — 敏感路径配置抽取与框架/产品边界文档
 
-- Status:ready（r1 implementation readiness;前置① approval 已合 = #598
-  `cac07003…`,前置② TASK-NAV-002 已 done（#599,chg-2026-039 已 archived
-  于 #610）,前置③ 即本 readiness。授权范围与门见下方「Readiness r1」节;
-  任一门不满足即停,不得降门执行。）
+- Status:done（2026-07-27 D0 completion;仅在维护者 review/merge 本独立
+  `ready→done` PR 后生效。实现载体 = **#640**（merge
+  `3232377744957b71b29700d275be58bfea799ee3`,lvye APPROVED,mergedBy
+  lvye）;readiness r1 = #615（merge
+  `86f9e72b8ecb4295061d485a0f4925706c847be1`）。evidence =
+  `evidence/runs/TASK-DEC-001/implementation.md`。
+  交付:`scripts/automation_config.json`（schema
+  `arkdeck-automation-config/v1`,五项与 r1 钉定 blob `02332a9b…` 的
+  `SENSITIVE_PATTERNS` 逐字节按序相同,AST 提取比对);
+  `check_pr_paths.py` fail-closed 加载（缺失/坏 JSON/顶层非对象或
+  schema 不符/未知 key/空表或非列表/非字符串或重复项一律 CheckError,
+  且 `check_paths` **无条件加载**——坏配置连带任务声明的 PR 一起挡,
+  无任何静默回退分支);`scripts/README.md` 边界地图（22 个一级条目
+  framework/产品逐条分类 + 实例参数索引,覆盖由 `git ls-tree` 清点测试
+  固化,新增条目漏更新即红）。测试 24→30 纯追加零删行。
+  变异门代码侧 6/6 + 数据侧 3/3 击杀、负对照存活;其中 m6「加载改回
+  硬编码」在等价性测试保持绿的同时由另两条测试击杀 = 配置非装饰,
+  恰为 r1 Pass/fail 第 4 条要求的形状。Risk acceptance ①（配置文件受
+  自身声明规则保护）实测成立并钉为测试
+  （`test_the_config_file_is_protected_by_its_own_declared_table`）,
+  未触发转 r2;Stop conditions 零命中。
+  **flip 后复核**（在翻转后的树上执行,HLR-003 r5 教训）:`check-sdd`
+  **0/0/111**、`test_check_pr_paths.py` **30 tests OK**（直跑与
+  `-m unittest` 计数相等）、host_loop `-m unittest discover`
+  **624 OK + 1 expected failure**、`done_task_ids` **98** 且含
+  `TASK-DEC-001`、`--explain` 对本任务报 `never-claim` +
+  `status 'done' is not ready`。
+  **连带效果**:本翻转使 TASK-DEC-004 的唯一依赖（本任务）done——其
+  拒因仅余 status/grade 与 never-claim,即 DEC-004 具备起草 readiness
+  的条件。）
 - Platform:macos（host-only）
 - Requirements/AC:change-local `DEC-CONF-001`
 - Depends on:TASK-NAV-002
