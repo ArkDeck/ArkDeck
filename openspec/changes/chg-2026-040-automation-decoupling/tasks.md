@@ -1247,10 +1247,13 @@ r2 显式扩权）。
 
 ## TASK-DEC-008 — minter 脚本修复与部署副本重装（D2 窗口）
 
-- Status:ready（r1 implementation readiness,**仅授权 source PR**;前置①
-  approval 已合 = #598 `cac07003836889881994367bde7ba3e0bdca70c0`,前置②
-  即本 readiness。**前置③ D2 重装窗口未排期,故本 r1 不授权任何重装/
-  系统写入**;窗口与 done 的授权载体是后续 r2。见下方「Readiness r1」节。）
+- Status:ready（r1 = source-only readiness,其授权的 source PR 已合 =
+  **#649**（merge `15dcbb2089bc0d93ee7828df99f6349e73491fd0`,lvye
+  APPROVED/mergedBy lvye）;**r2 = D2 重装窗口授权**,见下方「Readiness
+  r2」节。前置① approval 已合 = #598
+  `cac07003836889881994367bde7ba3e0bdca70c0`。**本任务在 r2 的七条二值
+  条件全部成立、且窗口 evidence 合入之前不得 done**——部署副本现仍运行
+  旧字节 `5b8cbc06…`,新字节 `2df746cc…` 只在仓内。）
 - Platform:macos（host-only;root 部署副本人工重装）
 - Requirements/AC:change-local `DEC-MINT-001`
 - Depends on:none（文件与全部其他任务零交集）
@@ -1341,6 +1344,198 @@ r2 显式扩权）。
 readiness r2,内容须含:重装步骤逐条、新 digest、回滚 digest
 （`5b8cbc06…`）、窗口前后的双面 read-back 判据、以及 done 的二值条件。
 **在 r2 合入前,本任务不得 done。**
+
+### Readiness r2（2026-07-27）— D2 重装窗口授权
+
+**触发**：r1 的 source PR 已合 = **#649**（merge
+`15dcbb2089bc0d93ee7828df99f6349e73491fd0`,lvye APPROVED,mergedBy lvye）。
+仓内字节与部署副本自该合并起 digest 失配,按 r1 已接受;本 r2 授权把失配
+闭合的那次重装,并给出 done 的二值条件。**Agent 对系统面仍零写入**——
+窗口全部命令由维护者亲手执行。
+
+**双 digest（本窗口的两端)**
+
+| | sha256 |
+| --- | --- |
+| **现装 = 回滚目标** | `5b8cbc06e7246c83c273f37dd78b07c2eca1e91b541cc88532c9f3c6f5cd9671` |
+| **待装 = main `15dcbb2089…` 的字节** | `2df746cc58cf6dcf825a01f072cea4bdfffa61b706f40695c8e0531b3f2d6103` |
+
+回滚源无需备份文件即可获得:旧字节的 blob 是
+`4150401c5f875ac282d38d6f70eb4c0c35f97689`,`git cat-file blob` 恒可取出;
+窗口仍要求先留一份 root 备份,双保险。
+
+**窗口前实测事实（起草时只读采集,是下方停条件的依据)**
+
+- 部署副本:`/Library/PrivilegedHelperTools/com.arkdeck.host-loop.mint.sh`,
+  **root:wheel,mode 555**,mtime `Jul 26 10:38:25 2026`,digest 与上表
+  「现装」一致。
+- 调度单元:`/Library/LaunchDaemons/com.arkdeck.host-loop.refresh.plist`,
+  Label `com.arkdeck.host-loop.refresh`,**StartInterval 1800**、RunAtLoad,
+  采集时 `state = not running`、`runs = 65`、`last exit code = 0`。
+- 该 unit 传入的实参已实测记录（`--app-id 4388667`、
+  `--installation 148855345`、PEM 与 out 路径、`--owner fuhanfeng`、
+  `--margin 900`）。**本轮不改 plist**。
+- 输出面:out 目录 `fuhanfeng` **700**(满足脚本的目录门);token
+  `fuhanfeng` **600**;sidecar 现为 `fuhanfeng` **644**（旧脚本写的形态）。
+
+**⚠ 本 r2 最重要的一条:PEM 前置可能阻断铸造,且 Agent 无法预先验证**
+
+r1 的实现给 `--pem` 加了**属主/权限前置**（须 root 属主且 mode
+`600|400`）。部署 plist 指向
+`/Library/Application Support/ArkDeckHostLoop/staging/host-loop-integration.pem`,
+而该 staging 目录实测为 `drwx------ root`——**Agent 无权 stat 该文件,
+因此无法在窗口前确认它满足新前置**。若它不满足,重装后 minter 将**拒绝
+铸造**,token 在约一小时内过期,循环随之停摆。
+
+**故窗口第一步是只读的 PEM 判据检查,且它是硬停条件**:不满足即
+**不得安装**,停并转 r3 裁决（要么在 r3 内显式授权调整 PEM 权限,要么
+放宽该前置——两者都是维护者决策,不由实现自行选择）。
+
+**窗口步骤（逐条;全部由维护者执行,无占位符)**
+
+准备(任意目录,只读):
+
+```
+cd /Users/fuhanfeng/Dropbox/Code/Github/ArkDeck && git fetch origin && \
+git show 15dcbb2089bc0d93ee7828df99f6349e73491fd0:scripts/host_loop/mint_installation_token.sh \
+  | shasum -a 256
+```
+
+期望输出以 `2df746cc58cf6dcf825a01f072cea4bdfffa61b706f40695c8e0531b3f2d6103`
+开头;不符即停(说明取错了 OID 或本地对象不全)。
+
+**步骤 1（硬门,只读)** — PEM 判据:
+
+```
+sudo stat -f 'pem owner=%Su mode=%Lp' "/Library/Application Support/ArkDeckHostLoop/staging/host-loop-integration.pem"
+```
+
+**必须**为 `owner=root` 且 `mode=600` 或 `400`。任一不符 → **停,不装**。
+
+**步骤 2（只读)** — 记录窗口前状态:
+
+```
+shasum -a 256 /Library/PrivilegedHelperTools/com.arkdeck.host-loop.mint.sh; \
+stat -f 'deployed owner=%Su mode=%Lp mtime=%Sm' /Library/PrivilegedHelperTools/com.arkdeck.host-loop.mint.sh; \
+sudo launchctl print system/com.arkdeck.host-loop.refresh | grep -E 'state =|runs =|last exit code'; \
+stat -f '%N owner=%Su mode=%Lp' "/Users/fuhanfeng/Library/Application Support/ArkDeck/host-loop/installation-token" "/Users/fuhanfeng/Library/Application Support/ArkDeck/host-loop/installation-token.meta"
+```
+
+**步骤 3** — 备份 + 原子安装（`mv` 同文件系统内原子,**故不需要停
+launchd**;`cp` 覆盖会让恰好在跑的那次读到半个文件):
+
+```
+sudo cp -p /Library/PrivilegedHelperTools/com.arkdeck.host-loop.mint.sh \
+  /Library/PrivilegedHelperTools/com.arkdeck.host-loop.mint.sh.5b8cbc06.bak && \
+cd /Users/fuhanfeng/Dropbox/Code/Github/ArkDeck && \
+git show 15dcbb2089bc0d93ee7828df99f6349e73491fd0:scripts/host_loop/mint_installation_token.sh \
+  | sudo tee /Library/PrivilegedHelperTools/.mint.new >/dev/null && \
+sudo chown root:wheel /Library/PrivilegedHelperTools/.mint.new && \
+sudo chmod 555 /Library/PrivilegedHelperTools/.mint.new && \
+sudo mv -f /Library/PrivilegedHelperTools/.mint.new \
+  /Library/PrivilegedHelperTools/com.arkdeck.host-loop.mint.sh
+```
+
+**步骤 4（只读)** — 安装后 read-back,三项必须同时成立:
+
+```
+shasum -a 256 /Library/PrivilegedHelperTools/com.arkdeck.host-loop.mint.sh; \
+stat -f 'deployed owner=%Su group=%Sg mode=%Lp' /Library/PrivilegedHelperTools/com.arkdeck.host-loop.mint.sh
+```
+
+digest == `2df746cc…`、`owner=root group=wheel`、`mode=555`。
+
+**步骤 5** — 拒绝路径干跑（**不铸造、不触碰现有 token**;证明新字节可执行
+且参数契约生效）:
+
+```
+sudo /bin/sh /Library/PrivilegedHelperTools/com.arkdeck.host-loop.mint.sh \
+  --app-id 4388667 --installation 148855345 --pem /nonexistent \
+  --out "/Users/fuhanfeng/Library/Application Support/ArkDeck/host-loop/installation-token" \
+  --owner fuhanfeng; echo "exit=$?"
+```
+
+期望 `exit=2` 且 stderr 为 `private key not found at the given path`;随后
+复查 token 仍 `fuhanfeng 600` 且**未被改动**。
+
+**步骤 6** — 一次真实强制铸造（**唯一的活证据**:只有真铸一次才能证明
+改过的暂存路径与 sidecar 收紧在线上成立）:
+
+```
+sudo /bin/sh /Library/PrivilegedHelperTools/com.arkdeck.host-loop.mint.sh \
+  --app-id 4388667 --installation 148855345 \
+  --pem "/Library/Application Support/ArkDeckHostLoop/staging/host-loop-integration.pem" \
+  --out "/Users/fuhanfeng/Library/Application Support/ArkDeck/host-loop/installation-token" \
+  --owner fuhanfeng --margin 900 --force; echo "exit=$?"
+```
+
+随后只读复核:
+
+```
+stat -f '%N owner=%Su mode=%Lp' "/Users/fuhanfeng/Library/Application Support/ArkDeck/host-loop/installation-token" "/Users/fuhanfeng/Library/Application Support/ArkDeck/host-loop/installation-token.meta"; \
+ls -a "/Users/fuhanfeng/Library/Application Support/ArkDeck/host-loop" | grep -c '^\.mint\.' ; \
+sudo head -3 "/Users/fuhanfeng/Library/Application Support/ArkDeck/host-loop/installation-token.meta"
+```
+
+**期望**:`exit=0`;token `fuhanfeng 600`;**sidecar 变为 `root 600`**
+（这正是 D-M5 的线上生效证据,窗口前它是 `fuhanfeng 644`）;`.mint.` 残留
+计数 **0**;sidecar 前三行为 `app_id=`/`installation_id=`/`minted_at_epoch=`
+且**全文不含 token 明文**。
+
+**步骤 7（只读)** — 等下一次调度自然触发(≤30 分钟)后:
+
+```
+sudo launchctl print system/com.arkdeck.host-loop.refresh | grep -E 'runs =|last exit code'; \
+sudo tail -5 /var/log/arkdeck-host-loop-refresh.log
+```
+
+`runs` 较步骤 2 增加、`last exit code = 0`、日志末尾为 `fresh:` 或
+`minted:` 行(二者皆可;`fresh:` 说明新鲜度判据在 root 600 sidecar 上
+正常工作)。
+
+**Pass/fail boundary（r2;done 的二值条件即此七条)**
+
+1. 步骤 1 的 PEM 判据成立（否则整轮不装,转 r3)。
+2. 步骤 4 三项同时成立:digest == `2df746cc…`、root:wheel、555。
+3. 步骤 5:`exit=2`、错误文案为「private key not found」、token 未改动。
+4. 步骤 6:`exit=0`、token `fuhanfeng 600`、**sidecar `root 600`**、
+   `.mint.` 残留计数 0、sidecar 无 token 明文。
+5. 步骤 7:`runs` 增加且 `last exit code = 0`。
+6. 全程**零 plist 改动、零 launchd bootout/bootstrap**（原子 `mv` 使其
+   不必要;若实际执行时确需停机,即偏离本 r2,记入 evidence 并说明）。
+7. evidence 收录窗口 transcript(**按仓内脱敏规则:token 明文、PEM 内容、
+   任何 `ghs_` 串一律不入仓**;digest/权限/退出码可原样记录)。
+
+**七条全部成立 → done 翻转 PR 可起;任一条不成立 → 不 done**,按下方
+回滚处置并记 blocked-attempt(先例 #104/#173)。
+
+**回滚（任一步骤失败即执行,只读判据在后)**
+
+```
+sudo mv -f /Library/PrivilegedHelperTools/com.arkdeck.host-loop.mint.sh.5b8cbc06.bak \
+  /Library/PrivilegedHelperTools/com.arkdeck.host-loop.mint.sh && \
+shasum -a 256 /Library/PrivilegedHelperTools/com.arkdeck.host-loop.mint.sh
+```
+
+digest 须回到 `5b8cbc06…`。备份丢失时的等价源:
+`git cat-file blob 4150401c5f875ac282d38d6f70eb4c0c35f97689`。
+**回滚不需要 revert 仓内 PR**——失配期本身已被 r1 接受。
+
+**Risk acceptance（r2 新增）**：①步骤 6 是一次**真实铸造**,会替换线上
+installation token。已接受:这正是该 unit 每半小时做的常规动作,替换为
+`mv` 原子;旧 token 失效不影响已完成的 PR。②安装瞬间若恰有一次调度在
+执行,`mv` 保证它读到的是完整的旧文件或完整的新文件,不存在半个文件。
+③**若 PEM 不满足新前置,后果是循环停摆**——故它被前置为步骤 1 的硬门,
+而不是留给事后发现。
+
+**Stop conditions（r2）**：步骤 1 不成立;步骤 4 任一项不符;步骤 5 未
+返回 exit 2;步骤 6 出现非零退出、`.mint.` 残留、或 sidecar 未变为
+root 600;任何需要改 plist / token 路径 / App 或 installation id 的诉求;
+任何需要 Agent 亲自执行系统写入的情形（**窗口全部命令由维护者执行**）。
+
+**不授权（r2）**：plist 与调度参数变更;PEM 权限的**自动**调整(若步骤 1
+失败,处置方式由 r3 裁决);token 路径迁移;铸造语义变更;
+`Decision-Grade` 代写。
 
 ## TASK-DEC-009 — 跨分区遗留收口（r2 新增）
 
