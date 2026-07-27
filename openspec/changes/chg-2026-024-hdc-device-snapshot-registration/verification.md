@@ -1,8 +1,12 @@
 # CHG-2026-024 Verification Plan
 
-> Change:CHG-2026-024-hdc-device-snapshot-registration@r2
+> Change:CHG-2026-024-hdc-device-snapshot-registration@r3
 > Status:planned
 > Core baseline:CORE-2.1.0（canonical Core AC 零认领）
+> Note(2026-07-27):r3 三方同步 = capture-plan instrument drift（selected HDC
+> `48395ba8…`/`3.2.0d` 不在机，当前唯一副本 `05b2bf7a…`，维护者实测
+> `Ver: 3.2.0f`），新增 instrument-identity decision gate（D-1..D-4）与两条
+> stop condition；采集方法论未变。
 > Note(2026-07-22):三方 revision 同步补记(@r1→@r2、acceptance change_revision
 > 1→2),对齐 proposal r2(capture-plan 细化,#275 合入;该 PR review 已记录此
 > 漂移并建议补同步,先例 #152)。r2 未改变 AC 集合与文本,本补记零语义变化;
