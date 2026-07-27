@@ -443,9 +443,10 @@ body 语料解析回归失败;需要触碰 `test_fault_matrix.py` 或其他 DEC-
 
 ## TASK-DEC-008 — minter 脚本修复与部署副本重装（D2 窗口）
 
-- Status:blocked（前置：① approval merge;② 独立 readiness 钉脚本
-  exact blob、重装步骤与回滚 digest;③ 维护者 D2 窗口排期——窗口未开
-  实现 PR 可先行，重装与 done 须窗口 receipt。）
+- Status:ready（r1 implementation readiness,**仅授权 source PR**;前置①
+  approval 已合 = #598 `cac07003836889881994367bde7ba3e0bdca70c0`,前置②
+  即本 readiness。**前置③ D2 重装窗口未排期,故本 r1 不授权任何重装/
+  系统写入**;窗口与 done 的授权载体是后续 r2。见下方「Readiness r1」节。）
 - Platform:macos（host-only;root 部署副本人工重装）
 - Requirements/AC:change-local `DEC-MINT-001`
 - Depends on:none（文件与全部其他任务零交集）
@@ -471,3 +472,68 @@ body 语料解析回归失败;需要触碰 `test_fault_matrix.py` 或其他 DEC-
   成功路径产物齐全）;sidecar 属主/权限断言测试;弱断言替换后套件绿;
   窗口 receipt:重装前后双 digest、minter 干跑 exit 语义不变、token
   权限 600 复核。
+
+### Readiness r1（2026-07-27）— source-only
+
+**Audit base** = `005e1ffc321b2dbc87409895ac28c290b93f7e24`。
+
+**开工基线声明（Ordering 义务,非 drift gate)**
+
+```yaml pins
+- path: scripts/host_loop/mint_installation_token.sh
+  blob: 4150401c5f875ac282d38d6f70eb4c0c35f97689
+  sha256: 5b8cbc06e7246c83c273f37dd78b07c2eca1e91b541cc88532c9f3c6f5cd9671
+- path: scripts/host_loop/test_minter_and_explain.py
+  blob: cc1e8a8aa3d7df0262f41cf44735275c2248b6c9
+```
+
+上表的 `sha256` **同时是部署副本的当前 digest 与回滚目标**:
+`/Library/PrivilegedHelperTools/com.arkdeck.host-loop.mint.sh` 现装的正是
+这份字节（TASK-HLR-003 D2 窗口安装,`5b8cbc06…`）。
+
+**授权边界（r1 的核心限制）**
+
+本 r1 **只授权一个 source PR**。**不授权**:任何 `/Library/**` 写入、
+任何 `sudo`、任何 launchd 动作、任何对运行中 unit 的触碰、以及本任务的
+`done` 翻转。Agent 对系统面零写入,重装是维护者亲手动作。
+
+**合入→重装的间隔必须显式接受**：source PR 合入后,仓内字节与部署副本
+**立即 digest 失配**,而部署副本继续按旧字节运行。已接受,理由:①旧字节
+是当前 live 且已验证的形态,失配期内行为不退化;②脚本自身的 digest 自检
+比对的是"安装时 vs protected main 的 exact OID",失配只表现为下次重装
+时的比对基准前移,不影响运行;③本轮修复（trap 覆盖、sidecar 权限）都是
+故障路径与权限收紧,不改铸造语义。**失配期内若需回滚,回滚目标 =
+`5b8cbc06e7246c83c273f37dd78b07c2eca1e91b541cc88532c9f3c6f5cd9671`
+（即不动部署副本,仅 revert 仓内 source PR）。**
+
+**Pass/fail boundary（r1 可验收部分）**
+
+1. **trap 覆盖以注入式 fixture 证明**:在 `chmod`/`chown`/`mv` 阶段注入
+   失败,断言 `$OUT_DIR` 内**零 `.mint.*` 残留**;正对照 = 成功路径产物
+   齐全且权限正确。变异门:撤销 trap 修复该 fixture 必红。
+2. **sidecar 收紧**:新鲜度状态改 root 属主 600,配属主/权限断言测试;
+   须同时证明**非特权账户无法再改写 root 的重铸判据**。
+3. **弱断言替换**:`test_a_failed_mint_exits_two_and_says_the_token_is_
+   untouched` 的 `assertIn("2", ...)` 型断言（对任何含数字 2 的脚本恒真）
+   与 `test_every_external_command_is_a_root_owned_absolute_tool`
+   （实际只断言 `PATH=` 行存在）必须换成可区分的断言;替换后若变红,
+   修脚本而非放宽断言。
+4. **JWT 不入 argv 的性质必须保持**:`printf` 为 `/bin/sh` builtin 且经
+   `curl --config -` 由 stdin 供给——修改后重新验证该性质,写入 evidence。
+5. 脚本保持**单文件、`/bin/sh`、零仓内 import**（既有
+   `test_minter_and_explain.py:209-213` 契约不得放宽）;`set -eu`、
+   `umask 077`、`PATH` 钉死均保持。
+6. 全套件 **≥536 OK + 1 expected failure**;`check-sdd` 保持 0/0/111。
+
+**Risk acceptance（首次）**：修改 root 执行面的脚本源。已接受,因为 r1
+的产物只是仓内字节,不进入任何执行路径,直到维护者在独立 D2 窗口亲手
+重装;失配期风险如上分析。
+
+**Stop conditions**：任何需要 `sudo`/系统写入的步骤;JWT-not-in-argv
+性质无法保持;既有单文件/无 import 契约需要放宽;需要触碰 plist、token
+路径或 App/installation id。
+
+**r2 的触发条件（窗口授权,尚未给出）**：维护者排定 D2 窗口时另开
+readiness r2,内容须含:重装步骤逐条、新 digest、回滚 digest
+（`5b8cbc06…`）、窗口前后的双面 read-back 判据、以及 done 的二值条件。
+**在 r2 合入前,本任务不得 done。**
