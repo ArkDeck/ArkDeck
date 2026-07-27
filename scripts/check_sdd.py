@@ -73,13 +73,24 @@ StrictLoader.add_constructor(
 )
 
 
-def load_yaml(path):
+def load_yaml(path, *, empty_is_error=False):
+    """Parse a YAML file. `empty_is_error` refuses a document that is null.
+
+    An empty file, a comments-only file and a literal `null` all parse to None
+    without raising, so every caller that wrote `if not data: return` skipped
+    its entire check in silence — a truncated governance file read exactly like
+    a clean one. Callers that own a required document now pass
+    empty_is_error=True and get a reported failure instead of a skipped check.
+    """
     try:
         with open(path, encoding="utf-8") as fh:
-            return yaml.load(fh, Loader=StrictLoader)
+            data = yaml.load(fh, Loader=StrictLoader)
     except Exception as exc:  # noqa: BLE001 - report every parse failure
         err(path, f"YAML parse failed: {exc}")
         return None
+    if data is None and empty_is_error:
+        err(path, "document is empty or null; a required document may not be blank")
+    return data
 
 
 def load_json(path):
@@ -182,10 +193,21 @@ def check_acceptance(spec_acs):
     if index_ids != sorted(index_ids):
         err(index_path, "acceptance index is not sorted")
 
-    cases = load_yaml(cases_path) or {}
+    if not index_path.is_file():
+        err(index_path, "acceptance index is missing")
+        return
+    cases = load_yaml(cases_path, empty_is_error=True)
+    if not isinstance(cases, dict):
+        cases = {}
     case_ids = set()
-    for case in cases.get("cases", []):
+    for case in cases.get("cases") or []:
+        if not isinstance(case, dict):
+            err(cases_path, "each acceptance case must be a mapping")
+            continue
         ac = case.get("acceptance_id")
+        if not isinstance(ac, str) or not ac:
+            err(cases_path, "acceptance case is missing a string acceptance_id")
+            continue
         if ac in case_ids:
             err(cases_path, f"duplicate case {ac}")
         case_ids.add(ac)
@@ -216,17 +238,37 @@ def check_acceptance(spec_acs):
 # ---------------------------------------------------- 4. capability registry
 def check_capability_registry():
     path = OPENSPEC / "contracts" / "capability-registry.yaml"
-    data = load_yaml(path)
-    if not data:
+    data = load_yaml(path, empty_is_error=True)
+    if not isinstance(data, dict):
+        if data is not None:
+            err(path, "capability registry must be a mapping")
         return
-    caps = {c.get("id"): c for c in data.get("capabilities", [])}
+    entries = data.get("capabilities") or []
+    if not isinstance(entries, list):
+        err(path, "capabilities must be a list")
+        return
+    caps: dict[str, dict] = {}
+    for entry in entries:
+        if not isinstance(entry, dict):
+            err(path, "each capability must be a mapping")
+            continue
+        cid = entry.get("id")
+        # A dict comprehension silently kept the last entry, so a duplicate id
+        # meant the first entry's release class and requires were never checked
+        # and the 1:1 comparison against spec dirs could not see the collision.
+        # StrictLoader's duplicate-key rejection does not apply here: these are
+        # list items, not mapping keys.
+        if cid in caps:
+            err(path, f"duplicate capability id {cid!r}")
+            continue
+        caps[cid] = entry
     spec_dirs = {p.parent.name for p in (OPENSPEC / "specs").glob("*/spec.md")}
     if set(caps) != spec_dirs:
         err(path, f"capabilities != spec dirs; only-registry={sorted(set(caps)-spec_dirs)} only-specs={sorted(spec_dirs-set(caps))}")
     for cid, cap in caps.items():
         if cap.get("release") not in ("required", "optional"):
             err(path, f"{cid}: illegal release class {cap.get('release')!r}")
-        for dep in cap.get("requires", []):
+        for dep in cap.get("requires") or []:
             if dep not in caps:
                 err(path, f"{cid}: unknown dependency {dep}")
     # cycle check
@@ -239,7 +281,7 @@ def check_capability_registry():
         if cid in seen or cid not in caps:
             return
         stack.add(cid)
-        for dep in caps[cid].get("requires", []):
+        for dep in caps[cid].get("requires") or []:
             visit(dep)
         stack.discard(cid)
         seen.add(cid)
@@ -251,8 +293,15 @@ def check_capability_registry():
 # --------------------------------------------------------------- 5. changes
 CHANGE_STATUSES = {"proposed", "approved", "implementing", "verified", "archived", "rejected"}
 CHANGE_CLASSES = {"core", "capability", "integration", "platform", "implementation-only"}
-TASK_STATUS_RE = re.compile(r"^- Status[::]\s*(ready|in_progress|done|blocked)")
+# `[::]` was two ASCII colons, so the intended full-width tolerance never
+# existed; `[:：]` is what the sibling guard in check_pr_paths.py accepts.
+# The trailing boundary is what stops `- Status:readyish` and
+# `- Status:done_later` from counting as legal status lines.
+TASK_STATUS_RE = re.compile(
+    r"^- Status[:：][ \t]*(ready|in_progress|done|blocked)(?![A-Za-z0-9_-])")
 REQUIREMENTS_AC_PREFIX = "- Requirements/AC:"
+# A claim surface ends at the next top-level bullet OR at any heading.
+_CLAIM_SURFACE_END_RE = re.compile(r"^(?:- |#{1,6}[ \t])")
 IDENTIFIER_BOUNDARY_CHARS = r"A-Za-z0-9_-"
 VERIFICATION_REVISION_RE = re.compile(
     r"^> Change:[A-Za-z0-9][A-Za-z0-9-]*@r(?P<revision>[1-9][0-9]*)\s*$"
@@ -261,6 +310,16 @@ VERIFICATION_REVISION_RE = re.compile(
 
 def check_changes():
     changes_dir = OPENSPEC / "changes"
+    # Anything that is neither a chg-* directory, the archive, nor the README
+    # was silently unvalidated — including a directory whose name differs only
+    # in case, which this glob does not match on a case-sensitive filesystem.
+    if not changes_dir.is_dir():
+        err(changes_dir, "changes directory is missing")
+        return
+    for entry in sorted(changes_dir.iterdir()):
+        if entry.name in ("archive", "README.md") or entry.name.startswith("chg-"):
+            continue
+        err(changes_dir, f"unexpected entry {entry.name!r} under changes/")
     for change in sorted(changes_dir.glob("chg-*")):
         if not change.is_dir():
             continue
@@ -272,6 +331,10 @@ def check_changes():
             fm = front_matter(proposal)
             if fm is None:
                 err(proposal, "missing front matter")
+            elif not isinstance(fm, dict):
+                # `--- \n just a string \n ---` parsed to a str, and the
+                # `.get` below raised AttributeError, aborting the run.
+                err(proposal, "front matter must be a mapping")
             else:
                 if fm.get("status") not in CHANGE_STATUSES:
                     err(proposal, f"illegal status {fm.get('status')!r}")
@@ -281,16 +344,21 @@ def check_changes():
                     err(proposal, "missing id")
         tasks = change / "tasks.md"
         if tasks.is_file():
-            task_count, status_count = 0, 0
+            # Counted per task, not in aggregate. Comparing two totals meant a
+            # task carrying two status-looking lines paid for a task carrying
+            # none, so a task with no declared status could pass.
+            sections: list[tuple[str, int]] = []
             for line in tasks.read_text(encoding="utf-8").splitlines():
                 if line.startswith("## TASK-"):
-                    task_count += 1
-                if TASK_STATUS_RE.match(line.replace("(", " (")):
-                    status_count += 1
-            if task_count == 0:
+                    sections.append((line.strip(), 0))
+                elif sections and TASK_STATUS_RE.match(line):
+                    heading, count = sections[-1]
+                    sections[-1] = (heading, count + 1)
+            if not sections:
                 warn(tasks, "no tasks defined")
-            elif status_count < task_count:
-                err(tasks, f"{task_count} tasks but only {status_count} legal Status lines")
+            for heading, count in sections:
+                if count != 1:
+                    err(tasks, f"{heading[:60]} has {count} legal Status lines, expected 1")
 
 
 # -------------------------------------------- 6. change revision consistency
@@ -379,7 +447,14 @@ def requirements_ac_claim_surfaces(tasks_text: str) -> list[str]:
 
         surface = [line]
         index += 1
-        while index < len(lines) and not lines[index].startswith("- "):
+        # A heading ends the claim, as does the next top-level bullet. Only the
+        # bullet used to stop the scan, so non-bullet lines were skipped over
+        # rather than terminating it: an indented line under a LATER `## TASK-`
+        # heading was still appended to the previous task's claim surface, and
+        # an acceptance ID mentioned in that task's prose counted as claimed by
+        # the one before it. This check is the one the governance model leans on
+        # hardest, so its surface must end where the task does.
+        while index < len(lines) and not _CLAIM_SURFACE_END_RE.match(lines[index]):
             continuation = lines[index]
             if continuation.startswith((" ", "\t")):
                 surface.append(continuation)
@@ -415,8 +490,11 @@ def check_change_scope_coverage(changes_dir: Path | None = None):
         if not scope.is_file():
             continue
 
-        data = load_yaml(scope)
+        data = load_yaml(scope, empty_is_error=True)
         if data is None:
+            # Already reported by load_yaml. Previously this branch returned
+            # silently, so an emptied scope.yaml disabled the coverage check for
+            # its whole change while the run still exited 0.
             continue
         if not isinstance(data, dict):
             err(scope, "scope document must be a mapping")
@@ -546,10 +624,14 @@ def check_locks_and_conformance(spec_acs):
          ("profile_path", "verification_path", "case_manifest_path")),
         (OPENSPEC / "integrations" / "INTEGRATION-PROFILES.lock.yaml", ("path",)),
     ):
-        data = load_yaml(lock_path)
-        if not data:
+        data = load_yaml(lock_path, empty_is_error=True)
+        if not isinstance(data, dict):
+            if data is not None:
+                err(lock_path, "lock document must be a mapping")
             continue
-        entries = data.get("profiles", []) + data.get("catalogs", [])
+        # `data.get(k, [])` returns None for a key that is PRESENT with a null
+        # value, and `None + []` is a TypeError that aborted the whole run.
+        entries = (data.get("profiles") or []) + (data.get("catalogs") or [])
         for entry in entries:
             for key in keys:
                 value = entry.get(key)
@@ -557,8 +639,8 @@ def check_locks_and_conformance(spec_acs):
                     err(lock_path, f"referenced file missing: {value}")
 
     conf_path = OPENSPEC / "verification" / "core-conformance.yaml"
-    conf = load_yaml(conf_path)
-    if conf:
+    conf = load_yaml(conf_path, empty_is_error=True)
+    if isinstance(conf, dict):
         for section in ("acceptance_index", "acceptance_cases"):
             meta = conf.get(section) or {}
             p = meta.get("path")
@@ -567,7 +649,7 @@ def check_locks_and_conformance(spec_acs):
         declared = (conf.get("acceptance_index") or {}).get("count")
         if declared is not None and declared != len(spec_acs):
             err(conf_path, f"acceptance count {declared} != actual {len(spec_acs)}")
-        for block in conf.get("safety_coverage", []):
+        for block in conf.get("safety_coverage") or []:
             for phase in ("normal", "refusal_or_failure", "recovery_or_restart"):
                 acs = block.get(phase)
                 if isinstance(acs, list):

@@ -33,6 +33,18 @@ jobs:
           ARKDECK_PYTHON: python
         run: ./scripts/check-sdd.sh
 
+      # These two suites had no workflow running them at all, so the properties
+      # they pin held only when someone remembered to run them by hand.
+      # `unittest discover` specifically: executing a suite file directly runs
+      # whatever its module-level `unittest.main()` has collected so far, which
+      # has twice been less than the whole file.
+      - name: SDD checker contract tests
+        run: python scripts/test_check_sdd.py
+
+      - name: host-loop contract suite
+        working-directory: scripts
+        run: python -m unittest discover -s host_loop -t .
+
   allowed-paths:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
