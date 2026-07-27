@@ -1,12 +1,88 @@
 # CHG-2026-024 controlled capture execution plan
 
-> Status:plan-only (r2). Human maintainer execution only after the dedicated r2 governance PR
-> is reviewed and merged. Agent/CI must not execute this plan, invoke installed HDC, inspect raw
-> capture bytes or access a real device.
+> Status:plan-only (r3). Human maintainer execution only after the dedicated r3 governance PR
+> is reviewed and merged, **and only after the r3 instrument-identity precondition below is
+> resolved**. Agent/CI must not execute this plan, invoke installed HDC, inspect raw capture
+> bytes or access a real device.
+
+## r3 instrument drift and the decision it forces（2026-07-27；原 r2 正文如实保留）
+
+**实测(Agent host 侧只读,零 HDC 调用)**:r2 钉定的 selected HDC
+(`Ver: 3.2.0d` / SHA-256
+`48395ba8d87115dffca47df2a640a6c868bc9a2bd4eb49611e4138ff88d8d260`)
+**已不在本机**。当前唯一副本:
+
+| 事实 | 值 |
+| --- | --- |
+| 路径 | `/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/toolchains/hdc` |
+| 同字节副本 | `~/OpenHarmony/SDK/26.0.0/toolchains/hdc` |
+| SHA-256 | `05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83` |
+| size | 6,016,944 bytes；Mach-O 64-bit |
+| 报告版本(**维护者 2026-07-27 实测 `hdc -v`**) | `Ver: 3.2.0f` |
+
+搜索面:`/Applications`、`~/OpenHarmony`、`~/Library/OpenHarmony`、
+`/usr/local/bin`、`/opt/homebrew/bin` 与 `~` 六层深度——全机仅此一个 hdc
+二进制。成因推断(非断言):DevEco/SDK 升至 26.0.0(`~/OpenHarmony/SDK/26.0.0`
+目录时间 2026-07-24,晚于 2026-07-22 AIN-004 E0 读回确认 `48395ba8…` 的时点)。
+**版本来源与一处已更正的方法错误(如实记录)**:Agent 起草时用 `strings`
+静态提取,得到 `Ver: 3.0.0b` 并据此误判为「降级」。维护者实测 `hdc -v`
+输出 `Ver: 3.2.0f`,推翻该判断。事后定位根因:二进制里那条
+`Ver: 3.0.0b` 位于 handshake/auth 字符串群中(邻接 `invalid auth type %d`、
+`handshake info is : %s`、`daemonauthstatus`),是**协议握手常量**;真正的
+客户端版本在运行时由格式串 `%x.%x.%x%c`(紧邻另一处空的 `Ver: `)拼出,
+故 `3.2.0f` 在二进制中**不以文本形式存在**,`strings` 无论如何都找不到。
+**通用规矩:`strings` 找到的版本字面量不能当作工具报告版本**——当版本由
+printf 组装时,唯一权威来源是执行工具本身(本计划中该动作保留给人类),
+或维护者的实测转录。本表 `3.2.0f` 即采后者;S0 步的 stdout 仍是窗口内的
+最终判据。
+
+### ⚠ 这不是一次单纯的重钉:两个后果必须由维护者显式接受
+
+1. **是常规升级(d → f),但仍非同一工具**:`3.2.0f` > r2 钉定的 `3.2.0d`。
+   同 minor 线的补丁级前进,grammar 大概率兼容,但**「大概率」不是证据**——
+   本计划的存在意义正是对选定工具做可证伪判定,故 C0–C5 的输出结构仍须
+   按新工具重新判定,不得以「只差一个字母」免测。
+2. **跨 registry 版本不一致**:`3.2.0d`/`48395ba8…` 是**整个 openharmony
+   integration profile 的注册工具身份**——`integrations/openharmony/
+   readonly-probes.yaml` 的 `toolContext`(且其条目 ID 内嵌版本串,例:
+   `openharmony-hdc-server-identity-generation-3.2.0d-macos`)、
+   `integrations/openharmony/profile.md` 的观测来源、
+   `integrations/openharmony/trace-probes/1.0.0/{registry.yaml,resources.json}`,
+   以及 `verification/hardware-matrix.md` 两行 `observed`/`verified`
+   (`EVD-M0B-DAYU200-20260718-001`、`EVD-RF002-DAYU200-20260721-001`)。
+   在 3.2.0f 上采集并注册 device-observation family,会使该 family 的工具
+   身份与全部同胞 family 相左,并进入 TASK-I24-001 必须产出的
+   `INTEGRATION-PROFILES-0.5.0` 共享 lock。既有记录是历史观测,不因此变假;
+   但**新数据与它们不是同一工具的产物**。注意方向:此处落后的是 profile
+   (仍钉 3.2.0d)而非本次采集,故除下列三选项外另有第四条路(见 (D-4))。
+
+### r3 precondition:instrument-identity decision（gate,未解不得开窗）
+
+维护者必须在合入本 r3 时于 PR 中显式选定其一并记录理由:
+
+- **(D-1) 恢复 3.2.0d**:取回 pin 命中的旧副本后按 r2 原文执行。**代价**=
+  刻意固定在更旧的工具上,且需找回已不在机的二进制;仅在需要与既有
+  registry 逐字同源时才合理。
+- **(D-2) 接受双版本 profile(推荐的最小步)**:在 3.2.0f 上采集,接受
+  device-observation family 的工具身份与同胞 family 不一致;此时
+  TASK-I24-001 的 registry/lock/条目命名**必须显式携带 `3.2.0f`**,
+  evidence 与 profile 必须写明「本 family 观测自 3.2.0f,与
+  readonly-probes/trace-probes 登记的 3.2.0d 非同一工具」,不得静默混编。
+- **(D-3) 暂缓**:TASK-I24-001 保持 `blocked`,等工具面统一后再开窗。
+- **(D-4) 先统一 profile 再采集**:另立独立 change,把 openharmony
+  integration profile 整体从 3.2.0d 迁到 3.2.0f(重观测 readonly-probes/
+  trace-probes、更新 `toolContext` 与内嵌版本的条目 ID、hardware-matrix
+  按既有 needsReverification 规则处置),其后本采集与全 profile 同源。
+  **代价最高、结果最干净**;是否值得由维护者判断,不在本 r3 授权内。
+
+选 (D-2) 时,下列 r2 pin 由本 r3 重钉;选 (D-1)/(D-3)/(D-4) 时本节不生效。
+
+
 
 ## Goal and result boundary
 
-Determine whether exact HDC 3.2.0d `list targets -v` on macOS can support a parameterized,
+Determine whether the **selected exact HDC**(r2 = `3.2.0d`;r3 (D-2) = `3.2.0f`,见上方
+instrument-identity decision)`list targets -v` on macOS can support a parameterized,
 existing-server-only, zero-to-many device-observation family without server lifecycle, adoption,
 subserver, device-mutation or destructive effects.
 
@@ -72,8 +148,12 @@ Record before C0 and retain outside git:
 
 - human operator and UTC start time;
 - macOS build and architecture;
-- absolute selected HDC executable path, `OB-3` identity and expected SHA-256
-  `48395ba8d87115dffca47df2a640a6c868bc9a2bd4eb49611e4138ff88d8d260`;
+- absolute selected HDC executable path, `OB-3` identity and expected SHA-256:r2 =
+  `48395ba8d87115dffca47df2a640a6c868bc9a2bd4eb49611e4138ff88d8d260`(`3.2.0d`);
+  **r3 (D-2) = `05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83`**
+  (`3.2.0f`,6,016,944 bytes,路径
+  `/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/toolchains/hdc`);
+  实测哈希与选定值不符即停;
 - normalized exact endpoint `127.0.0.1:8710` and the fixed child environment below;
 - stable pre-existing `serverIdentityGeneration` from `OB-1/OB-2`;
 - controlled output root outside every git repository, directory mode `0700`, files `0600`;
@@ -105,8 +185,11 @@ literal absolute paths; do not use variables or command substitution:
   --commands hdc-version-flag
 ```
 
-The retained stdout must contain the pinned literal `Ver: 3.2.0d`; nonzero exit, stderr,
-timeout, truncation, self-check failure or version/hash drift stops the session.
+The retained stdout must contain the pinned literal:r2 = `Ver: 3.2.0d`;**r3 (D-2) =
+`Ver: 3.2.0f`**(源 = 维护者 2026-07-27 实测转录;本步是它在受控 harness 下的
+复证——stdout 与之不符,无论更高或更低版本,一律停并如实记录实际值)。
+nonzero exit, stderr, timeout, truncation, self-check failure or version/hash
+drift stops the session.
 
 ## Observation procedure
 
@@ -186,7 +269,9 @@ evidence record. The Agent never receives or reads the raw streams.
 ## Stop conditions
 
 - instrument/blob/hash/test drift or harness refusal;
-- selected HDC hash/version drift;
+- selected HDC hash/version drift(以 instrument-identity decision 选定值为基准);
+- (D-2) 下 registry/lock/条目命名未显式携带所采集的工具版本(`3.2.0f`),
+  或 evidence 未写明与同胞 family(`3.2.0d`)的工具版本差异;
 - server absent, ambiguous, substituted, endpoint-drifted or generation-changed;
 - any lifecycle/adoption/subserver/device-migration/device-mutation/destructive effect observed
   or uncertain;

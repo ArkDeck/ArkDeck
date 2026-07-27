@@ -1,6 +1,6 @@
 ---
 id: CHG-2026-024-hdc-device-snapshot-registration
-revision: 2
+revision: 3
 status: approved # r1 经 approval-only PR #273 合入 main `1eeb516`；r2 仅固定 human-controlled capture execution plan，须由维护者 review/merge 对应治理 PR 后生效
 class: integration
 core_change_level: none
@@ -147,3 +147,27 @@ change `verified` 与 CHG-2026-022 adoption/readiness 均使用独立 PR。
 - r2 不执行 installed HDC、不访问设备、不登记 registry/resource、不生成 provenance，
   也不改变任何 task 状态。只有维护者 review/merge 本 r2 治理 PR 后，维护者本人才能
   按该计划执行 capture；随后仍须独立 evidence PR 与 readiness PR。
+
+## r3 注记（2026-07-27，instrument drift；原文如实保留不改写）
+
+r2 `capture-plan.md` 钉定的 selected HDC（`Ver: 3.2.0d` / SHA-256
+`48395ba8…d260`）已不在维护者主机；当前唯一副本 SHA-256
+`05b2bf7a…a68f83`（6,016,944 bytes），维护者 2026-07-27 实测 `hdc -v` =
+**`Ver: 3.2.0f`**（相对 r2 钉定值为常规补丁升级 d→f）。
+
+**一处已更正的方法错误如实入档**：Agent 起草时以 `strings` 静态提取得到
+`Ver: 3.0.0b` 并据此误判为「降级」；该字面量实为 handshake/auth 协议常量，
+真实版本由 `%x.%x.%x%c` 运行时拼装、在二进制中无文本形态。规矩：`strings`
+所得版本字面量不构成工具报告版本的证据。
+
+r3 因此把 capture plan 置于一个**未解即不得开窗**的 instrument-identity
+decision 之下：(D-1) 恢复 3.2.0d 按 r2 原文执行（代价 = 刻意固定在更旧工具）；
+(D-2) 在 3.2.0f 上采集并接受双版本 profile，此时 registry/lock/条目命名必须
+显式携带 `3.2.0f` 且 evidence 必须写明与 `readonly-probes.yaml`/`trace-probes`/
+`profile.md`/`hardware-matrix` 所登记 3.2.0d 的差异；(D-3) 暂缓，TASK-I24-001
+保持 `blocked`；(D-4) 另立独立 change 先把整个 openharmony profile 从 3.2.0d
+迁到 3.2.0f，其后本采集与全 profile 同源（代价最高、结果最干净）。
+
+本 revision 不改变采集方法论（该计划本就是 falsifiable 判定而非预设结论），
+只更换被判定的对象并新增上述 gate 与两条 stop condition。TASK-I24-001 仍
+`blocked`；本 PR 合入不构成 ready，也不接受任何 provenance。
