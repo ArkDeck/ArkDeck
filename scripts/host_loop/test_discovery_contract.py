@@ -61,7 +61,16 @@ from host_loop.__main__ import (  # noqa: E402
 from host_loop.worker import DISPATCHABLE_GRADES  # noqa: E402
 
 CHANGE_ID = "CHG-2026-030-host-loop-runtime"
-REAL_TASKS = (REPO_ROOT / "openspec" / "changes" / CHANGE_ID.lower() / "tasks.md")
+# The frozen live sample: chg-2026-030 is done, so its file's shapes are
+# stable forever wherever the change lives (active today, archive after the
+# mv). change_tasks_path resolves either location; the fallback keeps the
+# skip-if-absent semantics for trees that carry neither (TASK-NAV-002).
+from host_loop.test_support import change_tasks_path, live_sample_change  # noqa: E402
+
+try:
+    REAL_TASKS = change_tasks_path(REPO_ROOT, CHANGE_ID)
+except AssertionError:
+    REAL_TASKS = (REPO_ROOT / "openspec" / "changes" / CHANGE_ID.lower() / "tasks.md")
 
 
 def write_tasks(tmp: Path, body: str) -> Path:
@@ -255,10 +264,16 @@ class AgainstTheRealFile(unittest.TestCase):
     def setUpClass(cls):
         if not REAL_TASKS.is_file():
             raise unittest.SkipTest(f"{REAL_TASKS} absent in this tree")
-        cls.found = discover_candidates(REPO_ROOT, CHANGE_ID)
+        # discover_candidates is an active-changes API by design (archived
+        # changes must never mint candidates), so the discovery half of this
+        # class samples a live change dynamically instead of pinning one
+        # that will someday archive (TASK-NAV-002).
+        cls.sample_change = live_sample_change(REPO_ROOT)
+        cls.sample_tasks = change_tasks_path(REPO_ROOT, cls.sample_change)
+        cls.found = discover_candidates(REPO_ROOT, cls.sample_change)
 
     def test_the_real_file_yields_the_tasks_it_declares(self):
-        headers = REAL_TASKS.read_text(encoding="utf-8").count("\n## TASK-")
+        headers = self.sample_tasks.read_text(encoding="utf-8").count("\n## TASK-")
         self.assertEqual(len(self.found), headers,
                          "every declared task must be discovered")
 
@@ -285,7 +300,7 @@ class AgainstTheRealFile(unittest.TestCase):
         """
         import re as _re
 
-        text = _without_code_fences(REAL_TASKS.read_text(encoding="utf-8"))
+        text = _without_code_fences(self.sample_tasks.read_text(encoding="utf-8"))
         independent: dict[str, str] = {}
         for section in _re.split(r"(?m)^##\s+", text)[1:]:
             header = _re.match(
@@ -294,21 +309,34 @@ class AgainstTheRealFile(unittest.TestCase):
                                 section, _re.MULTILINE)
             if header and status:
                 independent[header.group(1)] = status.group(1)
-        self.assertGreaterEqual(len(independent), 8,
+        self.assertGreaterEqual(len(independent), 1,
                                 "the independent extraction must see the file")
         self.assertEqual({c.task_id: c.status for c in self.found}, independent)
 
     def test_hlr_003_is_done_and_no_longer_ready(self):
         """#552 flipped TASK-HLR-003 to done; done is terminal, so both facts
-        are stable forever and safe to assert against the real file."""
+        are stable forever. The candidate half used to read the task through
+        discovery, which stops resolving the change once it archives, so the
+        status now comes from an independent minimal extraction of the frozen
+        file itself (TASK-NAV-002)."""
+        import re as _re
+
         self.assertIn("TASK-HLR-003", done_task_ids(REPO_ROOT))
-        by_id = {c.task_id: c for c in self.found}
-        self.assertIn("TASK-HLR-003", by_id)
-        self.assertNotEqual(by_id["TASK-HLR-003"].status, "ready")
+        text = _without_code_fences(REAL_TASKS.read_text(encoding="utf-8"))
+        statuses = {}
+        for chunk in _re.split(r"(?m)^##\s+", text)[1:]:
+            header = _re.match(
+                r"^(TASK-[A-Z0-9]+(?:-[A-Z0-9]+)*-[0-9]{3}[A-Z]?)", chunk)
+            status = _re.search(
+                r"^-[ \t]*Status[:\uff1a][ \t]*([a-z][a-z-]*)",
+                chunk, _re.MULTILINE)
+            if header and status:
+                statuses[header.group(1)] = status.group(1)
+        self.assertEqual(statuses.get("TASK-HLR-003"), "done")
 
     def test_every_task_declares_a_decidable_hardware_value(self):
         """No task may be omitted for an undecidable safety field."""
-        declared = REAL_TASKS.read_text(encoding="utf-8").count(
+        declared = self.sample_tasks.read_text(encoding="utf-8").count(
             "\n- Hardware required:")
         self.assertEqual(len(self.found), declared)
 
@@ -316,15 +344,14 @@ class AgainstTheRealFile(unittest.TestCase):
     def test_whether_any_task_is_claimable_at_all(self):
         """The loop's reason for existing: at least one D0 candidate.
 
-        KNOWN BLOCKER, recorded rather than hidden. tasks.md carries no
-        `- Decision-Grade:` line for any of its eight tasks, so every grade
-        parses as "unknown" and the worker refuses all of them. The loop can
-        therefore claim nothing at all today.
-
-        It is not the parser's to fix: declaring a task's decision grade is a
-        human judgement, and defaulting it here would be this reader granting
-        itself authority it is written not to have. So the assertion states the
-        truth and is marked expected-failure — the moment a maintainer adds the
+        Recorded rather than hidden. The original form pinned chg-2026-030,
+        whose grade gap the #577/#591 maintainer seedings have since
+        settled; the sampled live change now carries the fact forward: its
+        tasks are all human-gated (D1/D2) or ungraded, so the loop can
+        claim nothing from it. Declaring a grade stays a human judgement,
+        and defaulting it here would be this reader granting itself
+        authority it is written not to have. So the assertion states the
+        truth and keeps the expected-failure marker — the moment a maintainer adds the
         field this reports "unexpected success", which forces the marker off
         instead of letting a stale skip hide the fix.
         """
@@ -437,8 +464,10 @@ class DependenciesAreDeclaredNotAssumed(unittest.TestCase):
     def test_the_real_file_declares_dependencies_for_every_task(self):
         if not REAL_TASKS.is_file():
             self.skipTest("real tasks.md absent")
-        declared = REAL_TASKS.read_text(encoding="utf-8").count("\n- Depends on:")
-        self.assertEqual(len(discover_candidates(REPO_ROOT, CHANGE_ID)), declared)
+        sample = live_sample_change(REPO_ROOT)
+        declared = change_tasks_path(REPO_ROOT, sample).read_text(
+            encoding="utf-8").count("\n- Depends on:")
+        self.assertEqual(len(discover_candidates(REPO_ROOT, sample)), declared)
 
 
 class CodeFencesCannotMintTasks(unittest.TestCase):
@@ -492,10 +521,20 @@ Example of the shape a task takes:
                          "a fabricated done id would satisfy a real dependency")
 
     def test_the_real_file_is_unaffected(self):
+        """Fence-blanking neither mints nor loses a task on a real file:
+        discovery output equals the fence-blanked header set exactly."""
+        import re as _re
+
         if not REAL_TASKS.is_file():
             self.skipTest("real tasks.md absent")
-        ids = {c.task_id for c in discover_candidates(REPO_ROOT, CHANGE_ID)}
-        self.assertIn("TASK-HLR-003", ids)
+        sample = live_sample_change(REPO_ROOT)
+        ids = {c.task_id for c in discover_candidates(REPO_ROOT, sample)}
+        text = _without_code_fences(
+            change_tasks_path(REPO_ROOT, sample).read_text(encoding="utf-8"))
+        declared = set(_re.findall(
+            r"(?m)^##\s+(TASK-[A-Z0-9]+(?:-[A-Z0-9]+)*-[0-9]{3}[A-Z]?)", text))
+        self.assertEqual(ids, declared)
+        self.assertGreater(len(ids), 0)
 
 
 class TruthIsNeverBuiltFromAnIncompleteObservation(unittest.TestCase):

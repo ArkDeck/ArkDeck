@@ -23,8 +23,34 @@ from host_loop import pr_envelope  # noqa: E402
 
 BASE_OID = "a" * 40
 HEAD_OID = "b" * 40
-CHANGE_ID = "CHG-2026-030-host-loop-runtime"
-TASK_ID = "TASK-HLR-001"
+# Dynamically sampled: parse_and_validate binds Change to an ACTIVE
+# change directory by design, so a pinned sample breaks on archive
+# (TASK-NAV-002).
+from host_loop.test_support import first_task_id, live_sample_change  # noqa: E402
+
+CHANGE_ID = live_sample_change(REPO_ROOT)
+
+
+def _task_with_literal_allowed_path() -> tuple[str, str]:
+    """A sampled task plus one wildcard-free allowed path of its own.
+
+    The MECH-004 end-to-end below runs check_paths against the real repo,
+    so the changed file must fall inside the sampled task's declared
+    surface; a literal beats synthesising a name from a glob.
+    """
+    definitions = check_pr_paths.load_task_definitions(REPO_ROOT)
+    for task_id in sorted(definitions):
+        task = definitions[task_id]
+        if not task.tasks_file.match(f"*/{CHANGE_ID.lower()}/tasks.md"):
+            continue
+        patterns = check_pr_paths.extract_allowed_patterns(REPO_ROOT, task)
+        literals = [p for p in patterns if "*" not in p]
+        if literals:
+            return task_id, literals[0]
+    raise AssertionError(f"{CHANGE_ID} offers no task with a literal allowed path")
+
+
+TASK_ID, TASK_LITERAL_PATH = _task_with_literal_allowed_path()
 
 
 class EnvelopeContractTests(unittest.TestCase):
@@ -38,8 +64,8 @@ class EnvelopeContractTests(unittest.TestCase):
             "decision_grade": "D0",
             "depends_on": "none",
             "evidence": (
-                "openspec/changes/chg-2026-030-host-loop-runtime/evidence/"
-                "runs/TASK-HLR-001/run.md",
+                f"openspec/changes/{CHANGE_ID.lower()}/evidence/"
+                f"runs/{TASK_ID}/run.md",
             ),
             "producer": "macos-host-01",
             "run": "run-001",
@@ -211,8 +237,8 @@ class EnvelopeContractTests(unittest.TestCase):
             1,
         )
         out_of_order = rendered.replace(
-            "PR-Type: implementation\nChange: CHG-2026-030-host-loop-runtime\n",
-            "Change: CHG-2026-030-host-loop-runtime\nPR-Type: implementation\n",
+            f"PR-Type: implementation\nChange: {CHANGE_ID}\n",
+            f"Change: {CHANGE_ID}\nPR-Type: implementation\n",
             1,
         )
         free_text = rendered.replace(
@@ -468,12 +494,7 @@ class EnvelopeContractTests(unittest.TestCase):
             head_oid=HEAD_OID,
         )
         self.assertEqual(check_pr_paths.resolve_task_declaration(context), TASK_ID)
-        changed = (
-            "scripts/host_loop/pr_envelope.py",
-            "openspec/templates/agent-pr-body.md",
-            "openspec/changes/chg-2026-030-host-loop-runtime/evidence/"
-            "runs/TASK-HLR-001/run.md",
-        )
+        changed = (TASK_LITERAL_PATH,)
         result = check_pr_paths.check_paths(REPO_ROOT, context, changed)
         self.assertEqual(result.task_id, TASK_ID)
         self.assertEqual(result.changed_paths, changed)
