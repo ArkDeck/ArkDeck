@@ -147,10 +147,12 @@ DEC-004 且须维护者在其 readiness 认可清单）;两 checker 文法统一
 
 ## TASK-DEC-002 — host_loop 实例与协议常量收口（全链收尾）
 
-- Status:blocked（前置：① approval merge;② TASK-NAV-001、TASK-DEC-005、
-  TASK-DEC-006、TASK-DEC-007 全部 done——本任务是对同一批文件的纯搬移
-  收口，排最后避免与行为修复冲突;③ 独立 readiness 钉全部受改文件
-  exact blob 与常量清单。）
+- Status:ready（r1 implementation readiness;前置① approval 已合 = #598
+  `cac07003836889881994367bde7ba3e0bdca70c0`,前置② 四依赖全部 done
+  （TASK-NAV-001 #600、TASK-DEC-005 #631、TASK-DEC-006 #632、
+  TASK-DEC-007 #625;`--explain` 实测对本任务的拒因已只剩 status/grade
+  与 never-claim,依赖门消失）,前置③ 即本 readiness。授权范围、常量
+  清单与门见下方「Readiness r1」节;任一门不满足即停,不得降门执行。）
 - Platform:macos（host-only）
 - Requirements/AC:change-local `DEC-CONST-001`
 - Depends on:TASK-NAV-001、TASK-DEC-005、TASK-DEC-006、TASK-DEC-007
@@ -172,6 +174,145 @@ DEC-004 且须维护者在其 readiness 认可清单）;两 checker 文法统一
   task 文法/base 分支各余恰一处定义（grep 清点入 evidence）;全量套件
   与 check-sdd 基线保持;线上 lease ref、cursor Issue、既有 PR body 的
   解析回归绿。
+
+### Readiness r1（2026-07-27）
+
+**Audit base** = `12b03d2f6442d56aa5e950a1d0643cd6cd386d31`（TASK-DEC-004
+done 翻转 #645 合入后的 main;本 change 八任务现仅余本任务与
+TASK-DEC-008 未完成）。
+
+**开工基线声明（Ordering 义务,非 drift gate)**
+
+本任务必然改写下列文件,故按 Ordering 义务记录开工字节（HLR-003 r3 的
+drift-gate 自噬教训),不作「任一漂移即零工作」的门:
+
+```yaml pins
+- path: scripts/host_loop/backends.py
+  blob: 682f7fb4b4810cfd191167dbbd0b55770ef0ad84
+- path: scripts/host_loop/lease.py
+  blob: 7f4c0ee07802482bd64259e40ebfb17ff2e8112a
+- path: scripts/host_loop/transport.py
+  blob: 39a28dfc63239912aac2f81d1448817b03d9559e
+- path: scripts/host_loop/cursor.py
+  blob: 0961ec62409644421dc8ed8eea68230e8fa93b5e
+- path: scripts/host_loop/pr_envelope.py
+  blob: 1afe05150013167e14cc041ec7a9089fd5ee85c7
+- path: scripts/host_loop/identity.py
+  blob: 14fa2262243f6d40c638702132d86bd2aa1de9d4
+- path: scripts/host_loop/reviewer.py
+  blob: 7e92c585871c52cb2b3cb1ef979bbd2fd8acadb0
+- path: scripts/host_loop/worker.py
+  blob: 2f4d9f843e3a8a8dddeb9663950673ac93f50e95
+- path: scripts/host_loop/__main__.py
+  blob: 5200a9673653cd65cdbf22ca7aae3b2ec5fb3f4f
+- path: scripts/host_loop/recovery.py
+  blob: c4271d2b4bb54d530a685b7c9ac4b37aec87b2fc
+```
+
+测试文件同属 Ordering 义务（不逐一钉 blob:本任务对它们只增不改语义）。
+若开工时实测与上表不符,说明另有载体先动了同一文件,停并转 r2 重钉。
+
+**干跑实测(本 readiness 的核心,决定门的形状)**
+
+**① 搬移本身零反应。** 对 base 分支族（`"main"` 的五个生产站点:
+`identity.py:49`、`identity.py:124`、`reviewer.py:348`、
+`transport.py:317`、`worker.py:512`)施加最小收口——新建 `instance.py`
+定义 `BASE_BRANCH`、五处改引用、四文件加 import——全套件
+**624 OK + 1 expected failure,零断言反应**。**这不是「改动无影响」,
+而是两件事**:①零构造点,搬移可安全落地;②**「这些站点彼此一致」这条
+性质在现套件中零覆盖**——搬移做没做对,套件不会说话。
+
+**② 取值覆盖极不均匀,且八项完全未钉(逐一实测,非估计)。** 对每个
+待搬移常量单独改坏其值后统计变红测试数:
+
+| 常量 | 改坏后变红测试数 |
+| --- | --- |
+| `LEASE_REF_PREFIX` | 55 |
+| base 分支 `"main"` | 多条（fault matrix / reviewer / v3） |
+| `pr_envelope.RUNTIME_ID` | 3 |
+| `lease.TASK_BRANCH_PREFIX` | 2 |
+| `pr_envelope.OPEN_MARKER` | 1 |
+| **`lease.LEASE_SCHEMA`** | **0** |
+| **`cursor.OPEN_MARKER`** | **0** |
+| **`backends.API_ROOT`** | **0** |
+| **`backends` user-agent** | **0** |
+| **`backends.ENV_TOKEN`** | **0** |
+| **owner 缺省 `host-loop/worker`** | **0** |
+| **`lease.WRITE_MARGIN_SECONDS`** | **0** |
+| **`backends.HTTP_TIMEOUT_SECONDS`** | **0** |
+
+**推论(本任务风险的真实形状)**:纯搬移的危险不是「值算错」,而是
+**搬移途中一个字节被改而无人察觉**。上表证明:**八个值今天被改坏,
+全套件一条不红**——其中三个是**线上语义**:`cursor.OPEN_MARKER` 决定
+能否认出线上 cursor Issue 的机器块、`LEASE_SCHEMA` 是持久化进线上租约
+commit 的 schema 串、`ENV_TOKEN` 是读取凭据的环境变量名(改错 = 循环
+静默取不到 token)。**故精确内容冻结测试不是仪式,而是本任务唯一的
+有效性证明**;`GIT_AUTHOR_NAME` 因同名字面量在 author/committer 两处
+出现(实测 2 hits),搬移时须按「身份族」整组处理。
+
+**收口清单（实测站点,实现须逐一收敛;超出即越权)**
+
+1. **lease 命名空间**:`lease.py:30-31` 两前缀 + `__main__.py:343`
+   （`refs/heads/agent/host-loop/leases/*`）、`__main__.py:368` 与
+   `reviewer.py:461`（`agent/host-loop/tasks/{task}`）、`transport.py:33`
+   的 `(tasks|leases|probes)` 正则。
+2. **task 文法**:`__main__.py:62`、`__main__.py:212`、
+   `pr_envelope.py:42` 三处。**`scripts/check_pr_paths.py` 的第四处
+   在 host_loop 之外,属 Forbidden paths,本轮不动**——现有
+   `test_token_parity.py` 已守住两者不漂移,该守卫必须保持绿。
+3. **base 分支**:上文五处。
+4. **其余实例/协议常量**:lease schema、cursor 与 envelope marker、
+   git author/committer 身份、user-agent、API root、owner/repo/env 名
+   缺省、ttl/timeout、PR 标题模板。
+
+**Pass/fail boundary**
+
+1. **精确内容冻结测试**:每个搬移值配一条断言,与**测试内独立书写的
+   字面量副本逐字节相等**（不得 `from .instance import X;
+   assertEqual(X, X)` 之类的套套逻辑——本仓已记录该缺陷类 5 次以上)。
+2. **变异门**:逐个把 `instance.py` 中的值改坏,**对应冻结测试必红**;
+   正对照(合法值)必绿。上表中「0 红」的八项在实现后必须各自变红——
+   **这是本轮最重要的一条,若某项改坏后仍全绿,该值等于没收口**。
+3. **单一定义清点必须是 AST 级,不是 grep**:对每个族断言其字面量在
+   生产模块中**恰余一处**;扫描以 `ast` 遍历（注释天然不入 AST),并
+   显式排除 docstring 节点。**理由是实测教训**:HLR-003 曾有一条
+   「grep 源码文本」的测试,因分支上方注释含同一措辞而在缺陷被引入后
+   依然绿。清点表入 evidence（族/站点/文件:行/收敛后位置）。
+4. **零行为变更**:全套件 host_loop **≥624 OK + 1 expected failure**
+   （新增冻结测试使其增长;减少即回归);`check-sdd` 保持 **0/0/111**;
+   `test_check_pr_paths.py` **≥49 OK**;`test_token_parity.py` 保持绿。
+5. **既有断言零放宽**:不得为通过而修改任何既有断言。若某既有测试因
+   搬移变红,**先怀疑搬移改了字节**,而非改测试。
+6. **线上兼容是硬门(三项,只读取证)**:
+   - 现存 `refs/heads/agent/host-loop/leases/*` 的 lease record 在
+     改动后仍解析通过（取样 ref 名与解析结果入 evidence);
+   - 线上 cursor Issue 的机器块仍能被 `OPEN_MARKER`/`CLOSE_MARKER`
+     识别并解析;
+   - 取线上真实 worker PR body,在改动前后两棵树上 `parse_envelope`,
+     结果**逐字节相同**（先例:DEC-005/006 用 #564 的 `repr` sha256
+     做的比对)。
+   **冒烟须零写入**（receipt 记 ref_log/route_log,写计数必须为 0)。
+7. **`instance.py` 只放常量**:不得含任何逻辑、I/O 或对其他 host_loop
+   模块的 import（避免造出新的循环依赖与新的行为面)。
+
+**Risk acceptance（首次）**：本任务触文件面最宽（十个生产模块),而
+上表证明其中八个值今天改坏无人察觉。已接受,理由:①语义为零行为搬移,
+方向不引入新分支;②冻结测试 + 变异门把「搬移途中改字节」这一唯一真实
+风险转为必红;③线上兼容以只读冒烟取证;④两 left-running unit 零动作,
+行为经运行机 checkout 前进生效。回退 = revert。**若实现时发现某常量
+的收口会改变任何取值（哪怕看起来更合理),即停并转 r2**——本轮授权
+的是搬移,不是取值裁量。
+
+**Stop conditions**：任一取值发生变化;冻结测试或变异门不成立;单一
+定义清点仍余多处;线上三项兼容任一失败;冒烟出现任何写入;需要触碰
+`scripts/check_pr_paths.py`（task 文法第四处属其分区)、`.github/**`、
+launchd/plist;`test_pr_envelope.py` 的 `BASE_OID`/`HEAD_OID` 两常量
+（TASK-DEC-004 r2 刚落码,本任务零触碰以免同段冲突——该交叠已在
+DEC-004 r2 显式记录）。
+
+**不授权**：任何常量取值变更（含"顺手统一"大小写、版本号、超时值);
+`check_pr_paths.py` 侧的 task 文法第四处;两 checker 文法统一;
+新增任何行为或路由;launchd/plist;`Decision-Grade` 代写。
 
 ## TASK-DEC-003 — check_sdd fail-closed 修复与测试基建接线
 
