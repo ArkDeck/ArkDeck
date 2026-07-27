@@ -17,11 +17,12 @@ import json
 from dataclasses import dataclass, replace
 from typing import Callable
 
+from .instance import (
+    CURSOR_CLOSE_MARKER as CLOSE_MARKER,
+    CURSOR_OPEN_MARKER as OPEN_MARKER,
+    CURSOR_SCHEMA,
+)
 from .transport import OID_RE, ApiPort, TransportError
-
-OPEN_MARKER = "<!-- arkdeck-host-loop-cursor:v1 -->"
-CLOSE_MARKER = "<!-- /arkdeck-host-loop-cursor -->"
-CURSOR_SCHEMA = "arkdeck-host-loop-cursor/v1"
 
 # Exactly the fields design §3 permits the cursor to cache. Anything else is a
 # conflict: a wider cache would start to look like a source of truth.

@@ -12,6 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable, Literal
 
+from .instance import BASE_BRANCH
 from .transport import OID_RE, ApiPort, TransportError
 
 
@@ -46,7 +47,7 @@ def _matches(pull: dict, identity: PRIdentity, read_envelope: EnvelopeReader) ->
     head = (pull.get("head") or {}).get("ref")
     if head != identity.head_branch:
         return False
-    if (pull.get("base") or {}).get("ref") != "main":
+    if (pull.get("base") or {}).get("ref") != BASE_BRANCH:
         return False
     parsed = read_envelope(pull.get("body") or "")
     if parsed is None:
@@ -121,8 +122,8 @@ def confirm_created_pull(
         raise ReconcileRequired(
             f"read-back head OID {head.get('sha')} != expected {expected_head_oid}"
         )
-    if (pull.get("base") or {}).get("ref") != "main":
-        raise ReconcileRequired("read-back base is not main")
+    if (pull.get("base") or {}).get("ref") != BASE_BRANCH:
+        raise ReconcileRequired(f"read-back base is not {BASE_BRANCH}")
     if pull.get("merged"):
         raise ReconcileRequired("a freshly created PR reports merged; reconcile")
     if pull.get("auto_merge") is not None:

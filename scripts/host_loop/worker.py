@@ -26,6 +26,7 @@ from dataclasses import dataclass, replace
 from enum import Enum
 from typing import Callable
 
+from .instance import BASE_BRANCH, DISPATCH_PULL_TITLE
 from .cursor import CursorError, CursorState, Truth
 from .identity import PRIdentity, ReconcileRequired, resolve_pull
 from .lease import FenceLost, HeldLease, LeaseError, LeaseManager, lease_ref, task_branch
@@ -509,8 +510,9 @@ class Worker:
             self._leases.assert_still_held(held, self._read_lease_record)
             body = self._render_body(candidate, frozen_base, head_oid)
             self._api.create_pull(
-                head=identity.head_branch, base="main",
-                title=f"{candidate.task_id}: host-loop dispatch", body=body,
+                head=identity.head_branch, base=BASE_BRANCH,
+                title=DISPATCH_PULL_TITLE.format(task_id=candidate.task_id),
+                body=body,
             )
             from .identity import confirm_created_pull
 
