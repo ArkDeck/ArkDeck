@@ -186,9 +186,10 @@ None 的治理文件、重复 capability id、`changes/` 游离条目）。**故
 
 ## TASK-DEC-005 — host_loop transport/lease/backends 硬化
 
-- Status:blocked（前置：① approval merge;② 独立 readiness 钉三文件与
-  相关测试 exact blob、逐项修复契约（含「恰 N 断言反应」变异门）与
-  套件期望计数。）
+- Status:ready（r1 implementation readiness;前置① approval 已合
+  = #598 `cac07003836889881994367bde7ba3e0bdca70c0`,前置② 即本
+  readiness。授权范围与门见下方「Readiness r1」节;任一门不满足即停,
+  不得降门执行。）
 - Platform:macos（host-only;零设备面）
 - Requirements/AC:change-local `DEC-HL-001`
 - Depends on:none（transport/lease/backends 为 NAV Forbidden 文件，零
@@ -222,6 +223,79 @@ None 的治理文件、重复 capability id、`changes/` 游离条目）。**故
   GIT_CONFIG 注入 fixture 失效;403+限流头 → TransportError 而非
   Refused;每项「撤销即红」;死代码退役后套件全绿且 grep 零残留;真实
   远端只读冒烟（observe/read 对现存 lease 命名空间行为不变）。
+
+### Readiness r1（2026-07-27）
+
+**Audit base** = `005e1ffc321b2dbc87409895ac28c290b93f7e24`（approval
+`cac07003…` 之后的 #600/#599/#523 对本任务受改文件零触碰,十九 blob 逐一
+比对相同）。
+
+**开工基线声明（Ordering 义务,非 drift gate)**
+
+```yaml pins
+- path: scripts/host_loop/transport.py
+  blob: 537d57a02ea2f6996f58def3961854ef2abc94be
+- path: scripts/host_loop/lease.py
+  blob: 685fb3c3c8c8266c52816027c92b300ea7cd6732
+- path: scripts/host_loop/backends.py
+  blob: 0efa3e8c74c7935f96742d4d9f1649cc91534dd2
+- path: scripts/host_loop/test_fault_matrix.py
+  blob: 7a3b2d94e0a4f493c82e4a1c73ed490052a9a28b
+- path: scripts/host_loop/test_backends_cli.py
+  blob: 08f87845c142de2d05369a193e2aef5e0a3470e8
+- path: scripts/host_loop/test_token_parity.py
+  blob: efb937541d8da2049819267acc45bf94f3f3be64
+```
+
+**干跑实测（本 readiness 起草时执行,是下方变异门的依据）**
+
+对 D-H2（`RefPort.read` refname 等值 + 拒多行）与 D-H3（`_advance` 校验
+`owner_run`）各自单独施加最小修复后,全套件 **536 OK + 1 expected
+failure,零断言反应**。**这不是"改动无影响",而是两件事**:①零构造点——
+修复不依赖任何既有断言的具体形状,可安全落地;②**这两条性质在现套件中
+零覆盖**。故下方变异门是本 readiness 的核心条件:**没有会因 revert 变红
+的测试,修复等于没修**。
+
+**Pass/fail boundary**
+
+1. **每个修复必须有一个「撤销该修复即变红」的新测试**,且各配正对照
+   （合法输入必绿）。逐项覆盖 D-H1/D-H2/D-H3/D-M3/D-M6/D-M7/D-M8/D-M9。
+   任一修复撤销后套件仍全绿 = 该项无效,整轮作废。
+2. **D-H1 的判据是"3xx 到达 `_call` 成为状态"**,不是"测试通过":需
+   双服务器或等价替身证明 GET/POST 不跨主机跟随、Authorization 头不外
+   发、绝对 URL 逃逸口关闭;并使既有
+   `test_non_success_status_is_not_treated_as_applied` 对 GET/POST 真正
+   可达（台账记该守卫今日仅 PATCH 触发）。
+3. **`ALLOWED_ROUTES` 恰 8 条且内容集不变**——零路由增删,以精确内容集
+   断言（既有 `test_allowlist_contents_are_pinned_exactly` 保持绿;
+   `len()` 型断言不作数）。D-M1 记录的 minter 未钉路由**本轮不改**
+   （其载体是 DEC-008 与 instance 收口,此处只在 evidence 说明现状）。
+4. **测试替身补真实字段后不得放宽任何断言**:FakeApi 补 GET issue 路由、
+   pull 的 merged/auto_merge/merge_commit_sha/html_url、check-run `id`;
+   补齐后既有断言若变红,按"替身此前比真接口宽松"处理——修被测代码,
+   不改断言就绿。
+5. 死代码退役（Python minter 与其 sudo-openssl 测试、恒假 fence 断言、
+   `assert_no_secret` 接线或删除、`AGENT_REF_RE` 冗余分支）后:套件全绿、
+   `grep` 零残留、且**退役项不得留下"看起来在岗"的测试**。
+6. 全套件期望 **≥536 OK + 1 expected failure**（新增测试使其增长;
+   减少即回归）;`check-sdd` 保持 0/0/111。
+7. **真实远端只读冒烟**:对现存 `refs/heads/agent/host-loop/leases/*`
+   与 tasks 命名空间执行 `observe`/`read`,行为与修复前一致;**零写入**
+   （receipt 记 ref_log 与 route_log,写计数必须为 0）。
+
+**Risk acceptance（首次）**：本任务改的是 live 循环的写路径与唯一外呼
+通道。已接受:全部为收紧方向;两 left-running unit **零动作**,行为经
+运行机 checkout 前进到含实现的 main 生效;`_advance` 加 owner 校验会使
+任何依赖"renew 他人租约"的既有调用失败——已确认生产无此调用点
+（renew 仅在自持路径调用）,若实现时发现反例即停并转 r2。回退 = revert。
+
+**Stop conditions**：任一变异门不成立;`ALLOWED_ROUTES` 内容集变化;
+冒烟出现任何写入;需要触碰 Forbidden paths（尤其 `worker.py` 归
+DEC-007、`reviewer.py` 等归 DEC-006）;需要改 launchd/plist。
+
+**不授权**：路由增删;minter shell 修改（DEC-008）;`instance.py` 收口
+（DEC-002）;envelope path 分支收紧（DEC-006;本任务只做 backends 渲染侧
+`none:` 的一半）;`Decision-Grade` 代写。
 
 ## TASK-DEC-006 — reviewer/envelope/recovery 硬化
 
