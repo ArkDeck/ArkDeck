@@ -1,7 +1,7 @@
 ---
 schema_version: 1.0.0
 change_id: CHG-2026-024-hdc-device-snapshot-registration
-change_revision: 5
+change_revision: 6
 platform: macos
 evidence_classes:
 - contract
@@ -23,10 +23,14 @@ cases:
   expected_source: openspec/changes/chg-2026-024-hdc-device-snapshot-registration/verification.md#I24-HDC-DEVICE-EMPTY-001
   minimum_evidence: platform
   expected_result: >-
-    Only the registered successful zero-row family under stable server identity and endpoint
-    yields observedEmpty. Stderr, nonzero exit, truncation, timeout, cancellation, malformed
-    output or bracket drift remains unavailable or unknown and cannot manufacture a
-    disappearance event.
+    observedEmpty means zero Connected rows under stable server identity and endpoint, and is
+    satisfied by either registered successful form: the CRLF-terminated empty-marker line a
+    server emits before it has seen any device, or N LF-terminated rows whose state is Offline.
+    The marker is sufficient but not necessary; an implementation that recognises only the
+    marker fails this case, because a server with history never emits it again. A marker
+    carrying a residual CR does not read as empty. Stderr, nonzero exit, truncation, timeout,
+    cancellation, malformed output or bracket drift remains unavailable or unknown and cannot
+    manufacture a disappearance event.
 - acceptance_id: I24-HDC-DEVICE-PROVENANCE-001
   test_id: TEST-I24-HDC-DEVICE-PROVENANCE-001
   method: Controlled-human capture lineage, immutable hash, effect and privacy review.

@@ -1,6 +1,6 @@
 ---
 id: CHG-2026-024-hdc-device-snapshot-registration
-revision: 5
+revision: 6
 status: approved # r1 经 approval-only PR #273 合入 main `1eeb516`；r2 仅固定 human-controlled capture execution plan，须由维护者 review/merge 对应治理 PR 后生效
 class: integration
 core_change_level: none
@@ -205,3 +205,26 @@ server、在零设备状态下启动新 server，随后以 harness 采集**恰�
 **r5 不修改任何 AC**——`I24-HDC-DEVICE-EMPTY-001` 的重定义留待 r6，取决于 V0
 实测结果；先改 AC 再观察是本末倒置。新增一条披露义务（被停 server 的 PID 与
 时刻）与三条 stop condition。TASK-I24-001 仍 `blocked`。
+
+## r6 注记（2026-07-27，按实测重定义 empty 语义；原文如实保留）
+
+r5 把 AC 重定义推迟到实测之后。两次窗口的 evidence（#656 merge `af6d64d6`、
+#658 merge `6df25c25`）给出三态：virgin server 输出 `[Empty]` 标记行
+（9 字节、0 制表字段、**CRLF**，内容由 sha256 反证唯一确定）；见过设备但当前
+无在场，输出 N 行状态全 `Offline`；有在场设备则含 `Connected`。设备离场从不
+删行，只是原地翻转状态（`sed` 归一化后与在场快照哈希逐字节相等）。
+
+据此 r6 做四件事，**不扩任何 scope**：
+
+1. `I24-HDC-DEVICE-EMPTY-001` 由「registered successful zero-row family」改为
+   **`observedEmpty` = 零 `Connected` 行**，两种已登记成功形态（marker 行 /
+   全 `Offline` 行集）均满足；marker **充分不必要**，只认 marker 的实现必须
+   在该 matrix 上失败——因为见过设备的 server 永不再输出它。
+2. `I24-HDC-DEVICE-SNAPSHOT-001` 增加 grammar 硬要求：同时接受 LF 与 CRLF，
+   任何字段不得残留 `CR`。
+3. design §3 补记实测的行终止符风险与其静默失败路径，并在反模式清单新增两条
+   （「无 marker 即非空」「拔线视为删行」）。
+4. acceptance-cases 同步该 expected_result。
+
+零新增任务、零 scope 扩张、不触碰工具选择与既有 pin；TASK-I24-001 仍 `blocked`
+（其 readiness 为下一步）。

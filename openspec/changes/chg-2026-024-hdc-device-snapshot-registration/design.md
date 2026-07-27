@@ -49,9 +49,21 @@ bound total bytes, row count, line length, encoding, delimiter, column count/ord
 transport/status literals and the identifier field. Dynamic identifier bytes are values inside the
 registered grammar, not an arbitrary-output escape hatch.
 
+**Measured line-terminator hazard (2026-07-27, r6).** The same command emits two terminator
+styles: device rows end `LF`, the `[Empty]` marker line ends `CRLF`. A parser built on
+`split("\n")` therefore leaves a stray `CR` on the marker branch, so `[Empty]\r` fails an
+equality test against `[Empty]` and the empty verdict collapses silently — the exact
+manufactured-disappearance class this design forbids. The registered grammar must accept both
+terminators, must strip neither more nor less than the terminator, must leave no residual `CR`
+in any field, and must carry a negative test proving `[Empty]\r` is not read as non-empty.
+
 The parser consumes the complete stdout:
 
-- valid zero-row family => `.observedEmpty`;
+- valid empty family => `.observedEmpty`, where **empty means zero `Connected` rows**. Two
+  registered successful forms satisfy it (CHG-2026-024 capture session #1 + V0, 2026-07-27):
+  the `[Empty]` marker line emitted by a server that has never seen a device, and N rows whose
+  state literal is `Offline`. Recognising only the marker is a defect: a server that has seen a
+  device never emits it again;
 - valid one-to-N unique rows => `.observed(Set<DeviceObservationPseudonym>)`;
 - malformed/duplicate/mixed/unsupported rows, stderr, nonzero exit, truncation, timeout,
   cancellation or bracket drift => `.unknown(reason)` for the whole snapshot.
@@ -91,6 +103,11 @@ cadence, fan-out and presentation. This change neither implements nor approves t
 
 - Reuse `selectedDeviceAuthorizationBinding`:it is single-capture and binding-specific.
 - Treat missing/failed output as empty:would manufacture disappearance events.
+- Treat the absence of the `[Empty]` marker as non-empty:would make every server that has once
+  seen a device permanently non-empty, which the 2026-07-27 capture measured directly.
+- Treat a physically detached device as a removed row:this tool never deletes rows; departure is
+  an in-place state flip to `Offline` (proved byte-identical modulo the state literal). Presence
+  must be decided by the state field, never by row appearance or disappearance.
 - Regex any tab-separated row:would convert unknown tool output into authority.
 - Persist raw IDs or deterministic unkeyed hashes:would create unnecessary cross-session tracking.
 - Add the fifth family to the existing 1.0.0 registry:would break its closed-family and dependent
