@@ -37,14 +37,18 @@ APP_ID=''; INSTALLATION=''; PEM=''; OUT=''; OWNER=''; MARGIN=900; FORCE=0
 
 die() { printf '%s: %s\n' "mint_installation_token" "$1" >&2; exit "${2:-1}"; }
 
+# A value-taking flag in last position used to fall off the end of `shift 2`,
+# which under `set -e` exits with the shell's own message and no flag name.
+need_value() { [ "$2" -ge 2 ] || die "$1 requires a value"; }
+
 while [ $# -gt 0 ]; do
     case "$1" in
-        --app-id)       APP_ID=${2:-}; shift 2 ;;
-        --installation) INSTALLATION=${2:-}; shift 2 ;;
-        --pem)          PEM=${2:-}; shift 2 ;;
-        --out)          OUT=${2:-}; shift 2 ;;
-        --owner)        OWNER=${2:-}; shift 2 ;;
-        --margin)       MARGIN=${2:-}; shift 2 ;;
+        --app-id)       need_value "$1" $#; APP_ID=$2; shift 2 ;;
+        --installation) need_value "$1" $#; INSTALLATION=$2; shift 2 ;;
+        --pem)          need_value "$1" $#; PEM=$2; shift 2 ;;
+        --out)          need_value "$1" $#; OUT=$2; shift 2 ;;
+        --owner)        need_value "$1" $#; OWNER=$2; shift 2 ;;
+        --margin)       need_value "$1" $#; MARGIN=$2; shift 2 ;;
         --force)        FORCE=1; shift ;;
         *)              die "unknown argument: $1" ;;
     esac
@@ -62,6 +66,16 @@ case "$MARGIN" in *[!0-9]*|'') die "--margin must be digits" ;; esac
 
 [ "$(id -u)" = "0" ] || die "must run as root; the PEM is root-only" 1
 [ -f "$PEM" ] || die "private key not found at the given path" 2
+# The key is passed by path to a root process. If any other account can read or
+# replace it, that account can sign as the App, so ownership and mode are
+# preconditions rather than hygiene.
+PEM_OWNER=$(stat -f '%Su' "$PEM")
+PEM_MODE=$(stat -f '%Lp' "$PEM")
+[ "$PEM_OWNER" = "root" ] || die "private key must be owned by root, found $PEM_OWNER" 2
+case "$PEM_MODE" in
+    600|400) ;;
+    *) die "private key must be mode 600 or 400, found $PEM_MODE" 2 ;;
+esac
 id -u "$OWNER" >/dev/null 2>&1 || die "--owner is not a local account"
 
 OUT_DIR=$(dirname "$OUT")
@@ -106,19 +120,33 @@ jwt="$signing_input.$signature"
 # The JWT goes in on stdin via --config, never in argv: `curl -H "Authorization:
 # ..."` publishes it to `ps` for every local account (measured). The config is
 # never written to disk either.
+# Every staging path is named and trapped BEFORE the first one exists. The
+# trap used to cover only the two response files and to be installed after they
+# were created, so a failure between writing the token to `$staged` and the
+# `mv` that renames it left the token sitting in the output directory under a
+# `.mint.*` name — and a failure in the second mktemp leaked the first.
+response=''; status_file=''; curl_err=''; staged=''; staged_meta=''
+cleanup() {
+    rm -f ${response:+"$response"} ${status_file:+"$status_file"} \
+          ${curl_err:+"$curl_err"} ${staged:+"$staged"} ${staged_meta:+"$staged_meta"}
+}
+trap cleanup EXIT HUP INT TERM
+
 response=$(mktemp "$OUT_DIR/.mint.XXXXXX") || die "cannot create a temp file" 2
 status_file=$(mktemp "$OUT_DIR/.mint.XXXXXX") || die "cannot create a temp file" 2
-cleanup() { rm -f "$response" "$status_file"; }
-trap cleanup EXIT HUP INT TERM
+curl_err=$(mktemp "$OUT_DIR/.mint.XXXXXX") || die "cannot create a temp file" 2
 
 printf 'header = "Authorization: Bearer %s"\nheader = "Accept: application/vnd.github+json"\nheader = "X-GitHub-Api-Version: 2022-11-28"\nurl = "https://api.github.com/app/installations/%s/access_tokens"\nrequest = "POST"\nsilent\nshow-error\nfail-with-body\nmax-time = 30\noutput = "%s"\nwrite-out = "%%{http_code}"\n' \
     "$jwt" "$INSTALLATION" "$response" \
-    | curl --config - > "$status_file" 2>/dev/null || true
+    | curl --config - > "$status_file" 2>"$curl_err" || true
 
 http=$(cat "$status_file" 2>/dev/null || printf '000')
 if [ "$http" != "201" ]; then
-    # Deliberately does NOT echo the body: a 4xx body can quote the request.
-    die "installation token mint failed: HTTP $http (existing token untouched)" 2
+    # curl's own diagnostic ("Operation timed out", "Could not resolve host")
+    # is the difference between a diagnosable failure and a bare HTTP 000. The
+    # response body stays unprinted: a 4xx body can quote the request.
+    reason=$(head -1 "$curl_err" 2>/dev/null || printf '')
+    die "installation token mint failed: HTTP $http${reason:+ ($reason)} (existing token untouched)" 2
 fi
 
 token=$(sed -n 's/.*"token"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$response" | head -1)
@@ -161,8 +189,11 @@ staged_meta=$(mktemp "$OUT_DIR/.mint.XXXXXX") || die "cannot create a temp file"
     printf 'expires_at_epoch=%s\n' "$epoch"
     printf 'token_sha256=%s\n' "$token_digest"
 } > "$staged_meta"
-chmod 644 "$staged_meta"
-chown "$OWNER" "$staged_meta"
+# Root-owned 600, deliberately not handed to $OWNER. This file carries
+# expires_at_epoch, which is the criterion root reads to decide whether to
+# re-mint; at 644/$OWNER the unprivileged loop account could rewrite root's own
+# re-mint decision. Nothing outside this script reads it.
+chmod 600 "$staged_meta"
 mv -f "$staged_meta" "$SIDECAR"
 
 # The sidecar carries a digest, never the token. The digest is what lets a
