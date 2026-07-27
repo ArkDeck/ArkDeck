@@ -1,7 +1,7 @@
 ---
 schema_version: 1.0.0
 change_id: CHG-2026-036-macos-bundled-rockchip-component
-change_revision: 1
+change_revision: 2
 platform: macos
 evidence_classes:
 - documentReview
@@ -31,6 +31,17 @@ cases:
     readiness-approved normalization on two clean builders. The release build
     has no ambient Homebrew, PATH, network, cache, header or library input, and
     registry, SBOM, licenses and linked dependencies agree.
+- acceptance_id: BRC-HANDOFF-002
+  test_id: TEST-BRC-HANDOFF-002
+  method: Inspect the workflow diff and one dispatched run's artifact metadata.
+  expected_source: openspec/changes/chg-2026-036-macos-bundled-rockchip-component/verification.md#acceptance-matrix
+  minimum_evidence: platform
+  expected_result: >-
+    The component workflow accepts an on-demand dispatch and retains its
+    unsigned outputs for thirty days, with build inputs, build logic and the
+    produced component identity unchanged. One dispatched run reproduces the
+    accepted SHA-256 and reports an expiry about thirty days out, so the
+    signing window no longer races a one-day artifact.
 - acceptance_id: BRC-PACKAGE-001
   test_id: TEST-BRC-PACKAGE-001
   method: Inspect the nested component, signed App and notarized DMG with independent package tooling.

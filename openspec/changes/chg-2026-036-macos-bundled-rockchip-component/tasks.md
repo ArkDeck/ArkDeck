@@ -721,6 +721,111 @@
 - task 完成不表示 binary 可签名、可打包或可分发；`TASK-BRC-003` 必须重新 pin exact
   artifact/registry/blob。
 
+## TASK-BRC-002R — artifact dispatch 与 30 天保留（handoff remediation）
+
+- Status:ready（r1 implementation readiness；仅在维护者对本独立 carrier
+  exact head review/merge 后生效。只授权一个实现交付：给
+  `.github/workflows/rockchip-component.yml` 增加 `workflow_dispatch`
+  触发并把三处 `retention-days` 由 1 改为 30，外加本任务 evidence；
+  载体 = 常规会话 agent/* PR。不授权：任何构建逻辑/输入/registry/recipe/
+  SBOM 改动、其他 workflow、凭据或 environment 配置、Developer ID/notary
+  面、BRC-003 的任何 gate、`Decision-Grade` 代写。）
+- Historical Status:blocked（前置 = 本 r2 carrier 同时登记任务与授权；
+  proposal r2 增补记录维护者 2026-07-27 的 handoff 选择。）
+- Readiness（r1；audit base = protected `main` `ecd5320b35308ddd44f67fb6a825a9c5f9e3fc1b`）：
+  - **Approval boundary:pending human merge。**本 carrier 同时修改
+    proposal（revision 1→2 + dated 增补）、acceptance（change_revision
+    1→2 + `BRC-HANDOFF-002`）、verification（@r2 + matrix 行 + 两条
+    closure 计数）与本 tasks.md，三方同步一体生效；标题为 governance
+    形态（不携 task token），因为改动跨越本任务的 allowed paths。
+  - **Dependency gate:closed。**TASK-BRC-002 done merge
+    `e9848ba274123bea46b98e39cbf989bd93dfc225` 为 audit base 祖先；
+    本任务只改其交付的 workflow 的触发与保留策略，不改其构建契约。
+  - **Source pin:closed。**`.github/workflows/rockchip-component.yml`
+    blob `8ccb3e7d9033b89c2dbe746995f5c496427e9d96`；实现 base 不等即停并重钉。
+  - **Reproducibility premise:measured（2026-07-27）。**BRC-002 最终
+    run `30156181935` 的 head `4d02b9945ecfe2db1e8af7adc98251a1b0ef9589`
+    与本 audit base 之间，`scripts/rockchip_component/**`、
+    `openspec/integrations/rockchip/bundled-component/**` 与本 workflow
+    的 `git diff` 为**空**（逐 blob 复核：workflow `8ccb3e7d…`、
+    `build.py` `33fe4379…`、`test_build.py` `7a622628…`、`recipe.json`
+    `fa4289b7…` 四项 SAME）。故在 main 上 dispatch 预期复现已接受的
+    component identity；**该预期是 evidence 的待证门，不是假设**——
+    dispatched run 的 SHA-256 与 `3caee2136551b4b849daf7e9a906813354f354
+    f8adb61e5f092de49ec7a2e56a` 不等即 FAIL、停、重 readiness。
+  - **Implementation contract:binary。**
+    ① `on:` 增加 `workflow_dispatch:`（无 inputs），`push:` 段逐字不变；
+    ② 三处 `retention-days: 1` → `30`（builder matrix upload、
+    reproducibility upload；`compare` job 的 download 不变）；
+    ③ 其余 workflow 内容零字节变更：jobs/steps/action pins/concurrency/
+    permissions/timeout/matrix/`DEVELOPER_DIR`/命令行全部逐字保持，
+    实现 diff 必须恰为上述两类行。
+    ④ 本 carrier 合入即触发一次 push 构建（本 PR 改动命中该 workflow 的
+    触发路径，且分支在 `agent/**` 内）——这是既有行为，不构成新 effect：
+    unsigned build，零签名/公证/上传/发布/设备。
+  - **Evidence contract:binary。**evidence PR 记录：(a) 一次
+    `workflow_dispatch` 触发的 run id 与结论；(b) 其三个 artifact 的
+    `expires_at`（须约为创建 +30 天）与 size；(c) builder A 产出的
+    component SHA-256 == `3caee213…56a`（**identity 复现的正面证明**）；
+    (d) `compare` job 的 byte-identical 结论；(e) workflow diff 恰为两类
+    行。credential/token/绝对用户路径不入 evidence。
+  - **Effect/privacy/concurrency gate:satisfied。**零签名、零公证、零
+    上传、零发布、零 install/launch、零设备/HDC/USB、零凭据动作；起草时
+    remote `agent/*brc*` 分支 = 0。
+  - **Grade 注记**：`Decision-Grade` 行由维护者亲笔；本契约二值可判定，
+    符合 D0 三条件（结论由 main 已合入状态 + 确定性检查决定，diff 零新
+    scope/风险/授权，不改权威文件语义）。
+- Platform:macos（CI 配置面；零产品/设备声明）
+- Requirements/AC:change-local `BRC-HANDOFF-002`
+- Depends on:`TASK-BRC-002` done
+- In scope:`workflow_dispatch` 触发；三处 `retention-days` 1→30；
+  evidence（dispatched run 的 identity 复现与 expiry 证明）。
+- Out of scope:构建逻辑/输入/registry/recipe/SBOM/notices、其他
+  workflow、凭据/environment/Developer ID/notary、BRC-003 任何 gate、
+  产品 source/tests。
+- Allowed paths:
+  - `.github/workflows/rockchip-component.yml`
+  - `openspec/changes/chg-2026-036-macos-bundled-rockchip-component/evidence/**`
+  - `openspec/changes/chg-2026-036-macos-bundled-rockchip-component/tasks.md`
+- Forbidden paths:
+  - `.github/workflows/agent-pr.yml`
+  - `.github/workflows/sdd-guard.yml`
+  - `.github/workflows/swift-ci.yml`
+  - `scripts/**`
+  - `openspec/integrations/**`
+  - `openspec/constitution.md`
+  - `openspec/specs/**`
+  - `openspec/contracts/**`
+  - `openspec/changes/archive/**`
+  - `ArkDeckApp/**`
+  - `ArkDeck.xcodeproj/**`
+  - `Packages/**`
+- Risk:low（只放宽保留期与增加手动触发；构建逻辑与产出 identity 由
+  dispatched run 的 SHA-256 复现门守住；回退 = revert）。
+- Hardware required:no。
+
+### Deliverables
+
+- workflow 的 `workflow_dispatch` 触发与三处 30 天保留；
+- 一次 dispatched run 的 sanitized evidence：run id/结论、三 artifact 的
+  `expires_at`/size、component SHA-256 复现证明、`compare` 结论、
+  workflow diff 的两类行清点。
+
+### Verification
+
+- `BRC-HANDOFF-002`：dispatched run 复现已接受的 component identity；
+  artifact `expires_at` 约为创建 +30 天；workflow diff 恰为 dispatch 触发
+  与三处 retention 两类行，构建输入/逻辑零变化。
+
+### Notes / handoff
+
+- 本任务 done **不使 TASK-BRC-003 ready**：其 D2 gate 的另两项
+  （可独立列举的 Developer ID Application certificate、可 preflight 证明
+  的 notary credential）仍待维护者在隔离 release environment 完成；
+  fresh D1 才能把三项一并钉死。
+- 本任务把「签名窗口必须在 artifact 过期前一次做完」这一时间耦合解除，
+  使 BRC-003 窗口可独立排期。
+
 ## TASK-BRC-003 — 闭合 nested component 打包、签名与公证
 
 - Status:blocked（r1 D1 blocked-readiness；本记录只固定 package/sign/notary

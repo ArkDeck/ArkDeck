@@ -1,6 +1,6 @@
 # CHG-2026-036 Verification Plan
 
-> Change:CHG-2026-036-macos-bundled-rockchip-component@r1
+> Change:CHG-2026-036-macos-bundled-rockchip-component@r2
 > Status:planned
 > Core baseline:CORE-2.1.0（零 Core delta）
 
@@ -22,6 +22,7 @@
 | --- | --- | --- | --- |
 | `BRC-SUPPLY-001` | `documentReview` | source/GPL/dependency/SBOM/CVE/update/rollback/distribution envelope 由明确 owner 接受，所有后继 input machine-pinned | `TASK-BRC-001` run + distribution record |
 | `BRC-REPRO-001` | `platform` clean-build comparison | two clean builders 对 exact inputs 产生一致 unsigned identity/approved normalization；无 ambient Homebrew/PATH/network/cache dependency | `TASK-BRC-002` run + registry/SBOM/build receipts |
+| `BRC-HANDOFF-002` | `platform` workflow/artifact inspection | component workflow 可按需 dispatch 且 unsigned 输出保留 30 天；构建输入/逻辑/component identity 零变化，一次 dispatched run 复现已接受的 SHA-256 且 expiry 约 30 天 | `TASK-BRC-002R` run + dispatched run artifact metadata |
 | `BRC-PACKAGE-001` | `platform` package inspection | nested location/identifier/min OS/arch/exact child entitlements/inside-out Developer ID/HR/notary/staple 全部 exact match | `TASK-BRC-003` run + signed package receipts |
 | `BRC-COMPOSITION-001` | `contract` + source reachability | callers 无法选择 executable/hash/argv/env/receipt/authority；typed leases、intent/outcome/fault/reconcile 完整，external fallback 不可达 | `TASK-BRC-004` run + contract/fault tests |
 | `BRC-SANDBOX-E0-001` | `platform` + `realHardware` E0 | signed App 分离证明 child launch、file lease 与 RockUSB read-only；所有 mutation/E1/E2/destructive counters = 0 | `TASK-BRC-005` sanitized receipts |
@@ -73,8 +74,8 @@ deviation；必须停止并走 proposal revision/new change。无法满足 manda
 
 ## Result gate
 
-- [ ] 六个任务都有独立 approval/readiness/evidence/done ancestry
-- [ ] 七条 change-local AC 与全部适用 canonical AC 有可复查 evidence
+- [ ] 七个任务（含 r2 的 TASK-BRC-002R）都有独立 approval/readiness/evidence/done ancestry
+- [ ] 八条 change-local AC（含 `BRC-HANDOFF-002`）与全部适用 canonical AC 有可复查 evidence
 - [ ] source/license/dependency/SBOM/distribution owner 与 release retention closed
 - [ ] reproducible build、nested signature/notary、typed composition、E0/file access、
   clean-host/update/rollback evidence closed
