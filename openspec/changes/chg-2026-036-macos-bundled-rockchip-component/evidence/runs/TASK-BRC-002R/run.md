@@ -62,14 +62,32 @@ timeout、matrix `[builder-a, builder-b]`、`DEVELOPER_DIR`、全部命令行。
 的 workflow 定义）。main 上现状复核：`workflow_dispatch:` 在第 11 行、
 两处 `retention-days: 30` 在第 64/99 行。
 
-**待补 = dispatch proof（`BRC-HANDOFF-002` 最后一格）**：一次
+### dispatch proof（2026-07-27；`BRC-HANDOFF-002` 最后一格 = PASS）
 
-```
-gh workflow run rockchip-component.yml --ref main
-```
+维护者于 `2026-07-27T02:53:23Z` 亲手执行
+`gh workflow run rockchip-component.yml --ref main`（触发是写操作，
+Agent 零执行、只读核验）。Agent 于 `02:54:52Z` authenticated GET 复核：
 
-的 run id、结论与三 artifact 的 `expires_at`。触发是写操作，恒由维护者
-执行（Agent 只读核验）；结果追记于本节下方，随后即可 done。
+- run `30233237693`，**`event = workflow_dispatch`**、branch `main`、
+  head `01e6f9a6`（= evidence #617 的 merge commit）、
+  **conclusion `success`**；四个 job 全 success（`unit`、
+  `build (builder-a)`、`build (builder-b)`、`compare`）。
+- **保留期（dispatch 路径同样 30 天）**：
+
+  | artifact | id | size | created | expires |
+  | --- | --- | --- | --- | --- |
+  | `rockchip-builder-a` | 8640763234 | 125,046 | 02:53:56Z | 2026-08-26T02:53:55Z |
+  | `rockchip-builder-b` | 8640764283 | 125,047 | 02:54:02Z | 2026-08-26T02:54:01Z |
+  | `rockchip-reproducibility` | 8640767666 | 647 | 02:54:21Z | 2026-08-26T02:54:20Z |
+
+- **identity 复现 = PASS**：`rockchip-component: PASS: verify-committed`
+  （逐字节比对含 component `sha256: 3caee213…56a` / `size: 247488` 的
+  生成 `registry.yaml` 与仓内 committed 副本）；另有
+  `PASS: build`×2 与 `PASS: compare`（builder A/B 字节一致）。
+
+**结论**：按需 dispatch 可用、产出与已接受组件 identity 一致、保留 30 天。
+`BRC-HANDOFF-002` 三格（dispatch 可触发 / identity 复现 / 30 天保留）
+全部 PASS；BRC-003 的签名窗口自此与 artifact 过期解耦，可独立排期。
 
 ### 边界
 
