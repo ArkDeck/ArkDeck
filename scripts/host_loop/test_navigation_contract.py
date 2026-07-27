@@ -793,13 +793,6 @@ class EverySuiteCollectsAllOfItself(unittest.TestCase):
     grow a stray main block is caught here.
     """
 
-    # test_v3_hardening.py has the same defect (42 collected directly against
-    # 52 by discover) but it belongs to TASK-DEC-006's file partition, so this
-    # task may not edit it. Excluded by name rather than by weakening the rule,
-    # and pinned as an expected failure below so fixing it forces this list to
-    # shrink.
-    _OTHER_PARTITION = frozenset({"test_v3_hardening.py"})
-
     @staticmethod
     def _classes_after_main_guard(path: Path) -> bool:
         """Structural, not textual.
@@ -825,25 +818,11 @@ class EverySuiteCollectsAllOfItself(unittest.TestCase):
     def test_no_module_ends_its_own_collection_early(self):
         directory = Path(__file__).resolve().parent
         for path in sorted(directory.glob("test_*.py")):
-            if path.name in self._OTHER_PARTITION:
-                continue
             with self.subTest(module=path.name):
                 self.assertFalse(
                     self._classes_after_main_guard(path),
                     f"{path.name} defines test classes after unittest.main(); "
                     "running it directly would skip them")
-
-    @unittest.expectedFailure
-    def test_the_out_of_partition_module_is_also_whole(self):
-        """Records a known gap owned by TASK-DEC-006, not a passing property.
-
-        When DEC-006 moves that file's main guard to the end this reports an
-        unexpected success, which forces both this test and the exclusion above
-        to be removed. A skip would have hidden the fix instead.
-        """
-        for name in sorted(self._OTHER_PARTITION):
-            self.assertFalse(
-                self._classes_after_main_guard(Path(__file__).resolve().parent / name))
 
 
 class CorrectionsSurviveTheRoundsThatFail(unittest.TestCase):

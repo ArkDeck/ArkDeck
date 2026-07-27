@@ -130,25 +130,11 @@ def confirm_created_pull(
     return pull
 
 
-def confirm_merge(
-    pull: dict, main_history_contains: Callable[[str], bool]
-) -> str:
-    """Cross-confirm a merge from GitHub metadata AND protected-main history.
+# confirm_merge lived here and was retired by TASK-DEC-005 r2. It had zero
+# production callers and had drifted from recovery.confirm_merged, the live
+# implementation of the same semantic: it accepted a truthy `merged` (so `1`
+# and `"true"` passed where recovery refuses them as ambiguous), performed no
+# subject cross-check, and treated a null merge sha as terminal rather than
+# degrading to the history scan. Two classifiers for one fact drift; this one
+# only looked maintained because four tests exercised it.
 
-    design §5: branch deletion, elapsed time, an Issue comment or a green CI run
-    are all insufficient. `merge_commit_sha` may also be null on an
-    already-merged PR (observed on #507), so a null is never an OID.
-    """
-    if not pull.get("merged"):
-        raise ReconcileRequired("PR does not report merged")
-    oid = pull.get("merge_commit_sha")
-    if not isinstance(oid, str) or not OID_RE.match(oid):
-        raise ReconcileRequired(
-            "merge metadata carries no usable full merge OID (nullable observed); "
-            "cannot advance the cursor on this evidence alone"
-        )
-    if not main_history_contains(oid):
-        raise ReconcileRequired(
-            f"merge OID {oid} is not present in protected-main history"
-        )
-    return oid

@@ -21,6 +21,7 @@ if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
 from host_loop import identity as identity_mod
+from host_loop.recovery import confirm_merged
 from host_loop import lease as lease_mod
 from host_loop import transport as transport_mod
 from host_loop.identity import PRIdentity, ReconcileRequired, resolve_pull
@@ -129,14 +130,31 @@ class FakeApi:
             number = int(path.rsplit("/", 1)[1])
             for pull in self.pulls:
                 if pull.get("number") == number:
-                    return 200, pull
+                    # merged / auto_merge / merge_commit_sha / html_url are
+                    # always present on the real payload, and identity guards
+                    # branch on them; omitting them meant those branches only
+                    # ever saw an absent key.
+                    complete = {"merged": False, "auto_merge": None,
+                                "merge_commit_sha": None,
+                                "html_url": f"https://example.invalid/pull/{number}"}
+                    complete.update(pull)
+                    return 200, complete
             return 404, None
         if method == "POST" and path.endswith("/pulls"):
             return self.statuses.get("create", (201, {"number": 99}))
         if method == "PATCH":
             return 200, {"number": 99}
         if method == "POST" and path.endswith("/issues"):
-            return 201, {"number": 7}
+            return 201, {"number": 7, "state": "open", "title": "", "body": ""}
+        # A GET /issues/{n} route is deliberately ABSENT, and that is a defect
+        # this task could not close. Adding one (returning the state:"open"
+        # payload the real endpoint always sends) turns
+        # test_worker_cursor.test_closed_cursor_issue_is_refused red — because
+        # that test patches __call__ as an INSTANCE attribute, which Python
+        # resolves on the type, so its fake never runs and it passes only via
+        # the `{}` fallthrough below coincidentally failing the state check.
+        # The test is dead in the way the ledger records, but it lives in
+        # TASK-DEC-007's partition, so closing this needs its own carrier.
         if method == "GET" and "/check-runs" in path:
             # The real endpoint always sends total_count. A fake that omits a
             # field the API always sends is how the r1 `skipped` stub defect
@@ -816,27 +834,82 @@ class MalformedPayloads(unittest.TestCase):
                         task_branch(TASK).removeprefix("refs/heads/"))
 
 
+PR_NUMBER = 42
+
+
 class MergeConfirmation(unittest.TestCase):
-    def test_nullable_merge_sha_cannot_advance_the_cursor(self):
-        with self.assertRaises(ReconcileRequired):
-            identity_mod.confirm_merge({"merged": True, "merge_commit_sha": None},
-                                       lambda oid: True)
+    """Repointed at recovery.confirm_merged when identity.confirm_merge was
+    retired (TASK-DEC-005 r2).
+
+    The old duplicate was looser in exactly the ways that matter, so these are
+    not translations: they assert the surviving implementation is at least as
+    strict everywhere the retired one was, plus the two-source discipline the
+    retired one never had.
+    """
+
+    MAIN = "e" * 40
+    MERGE = "d" * 40
+
+    def _runner(self, *, in_history=True, subject=None, history=""):
+        def run(argv):
+            argv = list(argv)
+            if argv[:3] == ["git", "merge-base", "--is-ancestor"]:
+                return (0 if in_history else 1), "", ""
+            if argv[:2] == ["git", "show"]:
+                return 0, (subject if subject is not None
+                           else f"feat: do the thing (#{PR_NUMBER})\n"), ""
+            if argv[:2] == ["git", "log"]:
+                return 0, history, ""
+            return 1, "", f"unexpected {argv}"
+        return run
+
+    def test_a_null_merge_sha_does_not_advance_on_metadata_alone(self):
+        """The retired duplicate treated a null sha as terminal; this one
+        degrades to the history scan and confirms nothing when it finds no
+        uniquely-identified squash."""
+        result = confirm_merged({"merged": True, "merge_commit_sha": None},
+                                PR_NUMBER, self.MAIN, self._runner(history=""))
+        self.assertFalse(result.confirmed)
 
     def test_metadata_alone_is_insufficient(self):
-        with self.assertRaises(ReconcileRequired):
-            identity_mod.confirm_merge({"merged": True, "merge_commit_sha": "d" * 40},
-                                       lambda oid: False)
+        result = confirm_merged(
+            {"merged": True, "merge_commit_sha": self.MERGE}, PR_NUMBER,
+            self.MAIN, self._runner(in_history=False))
+        self.assertFalse(result.confirmed,
+                         "an OID absent from protected main was accepted")
 
     def test_both_sources_required(self):
-        oid = identity_mod.confirm_merge(
-            {"merged": True, "merge_commit_sha": "d" * 40}, lambda o: True)
-        self.assertEqual(oid, "d" * 40)
+        result = confirm_merged(
+            {"merged": True, "merge_commit_sha": self.MERGE}, PR_NUMBER,
+            self.MAIN, self._runner(in_history=True))
+        self.assertTrue(result.confirmed)
+        self.assertEqual(result.merge_oid, self.MERGE)
+
+    def test_the_subject_must_also_carry_the_number(self):
+        """The cross-check the retired duplicate did not perform at all."""
+        result = confirm_merged(
+            {"merged": True, "merge_commit_sha": self.MERGE}, PR_NUMBER,
+            self.MAIN, self._runner(subject="feat: unrelated commit\n"))
+        self.assertFalse(result.confirmed)
 
     def test_unmerged_is_refused(self):
-        with self.assertRaises(ReconcileRequired):
-            identity_mod.confirm_merge({"merged": False, "merge_commit_sha": "d" * 40},
-                                       lambda oid: True)
+        result = confirm_merged(
+            {"merged": False, "merge_commit_sha": self.MERGE}, PR_NUMBER,
+            self.MAIN, self._runner())
+        self.assertFalse(result.confirmed)
 
+    def test_a_truthy_non_boolean_merged_is_ambiguous_not_merged(self):
+        """The precise shape the retired duplicate accepted: `merged` as 1."""
+        for shape in (1, "true", "yes"):
+            with self.subTest(shape=shape):
+                result = confirm_merged(
+                    {"merged": shape, "merge_commit_sha": self.MERGE}, PR_NUMBER,
+                    self.MAIN, self._runner())
+                self.assertFalse(result.confirmed)
+
+    def test_the_retired_duplicate_is_gone(self):
+        self.assertFalse(hasattr(identity_mod, "confirm_merge"),
+                         "the drifted duplicate came back")
 
 class CreateTimeout(unittest.TestCase):
     def test_intent_is_recorded_before_create(self):

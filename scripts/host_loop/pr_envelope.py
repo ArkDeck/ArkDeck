@@ -301,9 +301,23 @@ def _validate_fields(envelope: Envelope) -> None:
         raise EnvelopeError("producer attribution must identify the configured host, not a provider")
 
 
+# Read-only compatibility. Before TASK-DEC-005 the worker declared "no evidence
+# file" with an em-dash, which missed the strict `none:` grammar and validated
+# as a path — the hole the path branch is now closed against. Those bodies are
+# persisted in merged pull requests (PR #564 among them) and must keep parsing,
+# so the legacy spelling is recognised here and nowhere else: render_envelope
+# emits `none:` only, and a new body carrying this form is a body nothing in
+# this repository produces.
+_LEGACY_NONE_PREFIX = "none — "
+
+
 def _validate_evidence(items: tuple[str, ...]) -> None:
     if not items:
         raise EnvelopeError("Evidence list must not be empty")
+    if len(items) == 1 and items[0].startswith(_LEGACY_NONE_PREFIX):
+        if not items[0][len(_LEGACY_NONE_PREFIX):].strip():
+            raise EnvelopeError("none evidence requires a non-empty reason")
+        return
     none_items = [item for item in items if item.startswith("none:")]
     if none_items:
         if len(items) != 1 or len(none_items) != 1:
@@ -318,6 +332,18 @@ def _validate_evidence(items: tuple[str, ...]) -> None:
     for item in items:
         if item != item.strip() or not item:
             raise EnvelopeError("Evidence path has ambiguous whitespace")
+        # The path branch used to accept any prose that was not a `none:`
+        # declaration — "this is just a sentence" validated as a path. The one
+        # production renderer leaned on that: it declared "no evidence" with an
+        # em-dash, which missed the strict none grammar above and fell through
+        # to here. That renderer now emits `none:` (TASK-DEC-005 r1), so the
+        # path branch can finally require something path-shaped. Whitespace is
+        # the discriminator because a repository-relative path never contains
+        # any, while every prose declaration does.
+        if any(character.isspace() for character in item):
+            raise EnvelopeError(
+                f"Evidence must be a path or a `none:` declaration, not prose: "
+                f"{item!r}")
         if (
             "\\" in item
             or "://" in item
