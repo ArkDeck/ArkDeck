@@ -131,17 +131,86 @@
 
 ## TASK-NAV-002 — check_pr_paths 与活体样本测试的 archive 免疫
 
-- Status:ready（r1 implementation readiness；仅在维护者对本独立 readiness
-  PR exact head review/merge 后生效。只授权一个实现交付：按下方契约扩
-  `check_pr_paths` 任务查找至 archive、给活体样本测试引入 archive 免疫、
-  并以归档演练取证；载体 = 常规会话 agent/* PR（本任务 never-claim，
-  循环不得认领；`NEVER_CLAIM_ROOTS` 扩根由 NAV-001 交付）。不授权：
-  `check_pr_paths.py` 路径匹配/任务解析语义变更（仅扩查找面）、host_loop
-  非测试代码变更、归档 PR 本身、`Decision-Grade` 代写、governance 正文、
-  NAV-001 分工文件（见契约④）。）
+- Status:ready（r2 corrective readiness；仅在维护者对本独立 readiness PR
+  exact head review/merge 后生效。r1 契约①的前提在实现预检中被实测证伪
+  （见 Readiness（r2）Falsification record；r1 授权零消耗、零实现推送）。
+  只授权一个实现交付：`check_pr_paths.py` **零字节变更**（invariant
+  pin），仅按 r2 契约给活体样本测试引入 archive 免疫并以归档演练取证；
+  载体 = 常规会话 agent/* PR（本任务 never-claim，循环不得认领；
+  `NEVER_CLAIM_ROOTS` 扩根由 NAV-001 交付）。不授权：`check_pr_paths.py`
+  任何字节变更、host_loop 非测试代码变更、归档 PR 本身、`Decision-Grade`
+  代写、governance 正文、NAV-001 分工文件。）
+- Historical Status:ready（r1 = #590 merge
+  `a0bc3ff66954a7a2560ce951fc44e1c989bf7c45`。其契约①「扩查找面」与自身
+  「零语义变更」条款相互矛盾且前提证伪：r1 红探针把带 14 条具名负向测试
+  的安全设计（archive-only 零权威）测量成了缺陷。r1 授权零消耗，由本 r2
+  全面取代；r1 Readiness 块原文保留为历史。）
 - Historical Status:blocked（前置：① 本 change approval-only PR merge；
   ② 独立 readiness PR。① = #587 merge
-  `17a9574a368e518ce475ef7d72135c3a6f71f2c7`；② = 本 r1。）
+  `17a9574a368e518ce475ef7d72135c3a6f71f2c7`；② = r1。）
+- Readiness（r2；audit base = protected `main`
+  `74e7cf95416ed43c781e7247bfb2fbeb068c8148`）：
+  - **Falsification record（2026-07-27 实现预检，双向实测）：**① 裸 glob
+    扩展干跑 → `test_check_pr_paths` 14 failures + 1 error，全部为既有
+    具名负向测试（`test_archive_only_task_never_supplies_authority`、
+    `test_archived_task_is_not_an_active_declaration_target`、
+    atomic-archive 目标名/残留/漂移家族）；撤销后基线回绿 = 因果隔离。
+    ② 现行 `check_paths` 已内建 archive 语义：active 查找失败 → 回落 PR
+    base commit 任务宇宙（`load_task_definitions_at_commit` +
+    `verify_atomic_archive_fallback` = 原子归档 PR 的授权路径）→ 两侧均
+    无才拒绝「archive-only tasks are not authority」。③ #573 之
+    `test_check_pr_paths` 1 error 根因重判：用例硬编码 TASK-HLR-001A +
+    合成 base OID，chg-030 归档后 active 查无、base 回落因合成 OID fail
+    closed——属活体样本病灶，非查找面缺口；#573 两条收口条件由 r2 走
+    **路线（1）活体样本免疫**闭合。
+  - **Approval boundary:pending human merge。**本 carrier 修改本文件、
+    proposal.md（r2 dated 更正注记 + revision 1→2）与 verification.md
+    （`NAV-ARCH-001` r2 重述 + @r2），三方同步一体生效。
+  - **Dependency gate:closed。**#586/#587/#589/#590/#591 五 merge 均
+    `lvye` APPROVED、audit-base ancestors。
+  - **Source pins:closed（r2 复钉，与 r1 零漂移）。**
+    `test_check_pr_paths.py` `feb697f760c8b2ba9e57072ac79f73a96ed7905f`、
+    `test_backends_cli.py` `bb0521083c58b6c204d61d1cc6d2cbd6cab6da0b`、
+    `test_discovery_contract.py`
+    `c9c8e43edf0fdc764cf6299de00e6b71a28dc7e5`、`test_pr_envelope.py`
+    `35d9a284e8ddde67fd1076bc1c2f0f11f02d26db`；**invariant pin** =
+    `check_pr_paths.py` `02332a9b572013e99b74acd46db8810ba4f7275a` 于
+    实现前后必须逐字节相等（blob 相等即「零变更」的机器证明）。
+  - **Implementation contract:binary（r2）。**
+    ① 新增单一支持文件 `scripts/host_loop/test_support.py`：
+    `change_tasks_path`（active-or-archive 恰一处存在，0/2+ loud
+    fail）、`live_sample_change`（活跃 change 中 discover_candidates
+    候选数最多者，并列取字典序首，零候选 loud fail）、`first_task_id`；
+    三 helper 自带单元测试（含恰一处存在的双向 fixture）。
+    ② 活体样本适配：纯文件读取断言（`test_discovery_contract` 的
+    shape/punctuation/Historical-counts 类）改经 `change_tasks_path`
+    读 chg-2026-030 正本（done 后内容冻结，断言永久稳定）；以
+    active-changes API 为被测面的用例（`test_backends_cli.BodyRendering`
+    三项、`test_pr_envelope` 的 `CHANGE_ID`/`TASK_ID` 消费面、
+    `test_discovery_contract` 的 discovery real-file 类、
+    `test_check_pr_paths.test_current_hlr_001a…`）改为
+    `live_sample_change` 动态采样；HLR-003 终态断言保留
+    `done_task_ids` 半幅并以 `change_tasks_path` 独立最小抽取
+    （status=done）取代瞬时候选半幅；expectedFailure 用例改依动态样本
+    并更新 docstring（其 chg-030 记账使命已由 #577/#591 播种解除）。
+    ③ 归档演练（最终裁决门）：scratch worktree `git mv`
+    `openspec/changes/chg-2026-030-host-loop-runtime` →
+    `openspec/changes/archive/<date>-chg-2026-030-host-loop-runtime`
+    后全量 suite + `test_check_pr_paths`/`test_check_sdd` 全绿；#573
+    具名 1+5 error 全消；worktree 弃置不入仓，命令与前后计数入
+    evidence。
+    ④ File partition（与 NAV-001 零交集）：仅四测试文件 + 新
+    `test_support.py`；不触碰 `check_pr_paths.py`/`worker.py`/
+    `__main__.py`/`test_navigation_contract.py`/
+    `test_minter_and_explain.py`。
+    ⑤ 套件：基线 482 OK + 1 expectedFailure → 482 + 新增数全绿 + 1 xf
+    保持（精确计数入 PR body 与 evidence）；`check-sdd` 0/0/111；diff
+    恰在 Allowed paths 内。
+  - **Concurrency/absence:closed at drafting（2026-07-27）。**remote
+    `agent/*nav-002*` = 本 r2 carrier；实现分支 `agent/task-nav-002`
+    本地仅含未跟踪 `test_support.py` 草稿、零推送。
+  - **Grade 注记**：#591 的 `- Decision-Grade:D0。` 保持有效——r2 契约
+    仍全机器可判定，授权面相对 r1 只收不放。
 - Readiness（r1；audit base = protected `main`
   `17a9574a368e518ce475ef7d72135c3a6f71f2c7`）：
   - **Approval boundary:pending human merge。**本 carrier 只修改本文件。
@@ -203,45 +272,46 @@
 - Platform:macos（host-only）
 - Requirements/AC:change-local `NAV-ARCH-001`
 - Depends on:none
-- In scope:`check_pr_paths.py` 任务查找由 `chg-*/tasks.md` 扩展为同时
-  查 `archive/*/tasks.md`（#548 `done_task_ids` 同型；未知任务仍 fail
-  closed）；host_loop 活体样本测试（`test_check_pr_paths` 的真实仓调用、
-  `test_backends_cli.BodyRendering` 三项、
-  `DiscoveryIsAReaderOnly.test_it_parses_the_live_change`、
-  `test_pr_envelope` pr_type 子例）引入 active-or-archive 路径解析
-  （`changes/<id>/` 与 `changes/archive/*-<id>/` 恰一处存在），保持
-  「对真实仓内文件断言」规矩不削弱。
-- Out of scope:`check_pr_paths.py` 的路径匹配/任务解析语义（仅扩查找
-  面）、host_loop 运行时代码、归档 PR 本身、grade 行、governance 正文。
-- Allowed paths:`scripts/check_pr_paths.py`、
-  `scripts/test_check_pr_paths.py`、`scripts/host_loop/test_*.py`（活体
-  样本解析的共享 helper 允许新增单一测试支持文件）、本 change
-  `evidence/**`、本 change `tasks.md`（仅本任务状态/evidence 引用）。
-- Forbidden paths:`scripts/host_loop/` 全部非测试 `.py`、`.github/**`、
+- In scope（r2）:活体样本测试的 archive 免疫（契约②两路线：
+  `change_tasks_path` 解析冻结正本 / `live_sample_change` 动态活跃
+  采样）；`test_support.py` 三 helper 及其单元测试；归档演练取证；
+  `check_pr_paths.py` 零字节变更由 invariant pin 机器证明。
+- Out of scope:`check_pr_paths.py` 任何字节（其 archive 语义已完整且被
+  14 条负向测试保护）、host_loop 运行时代码、归档 PR 本身、grade 行、
+  governance 正文。
+- Allowed paths:`scripts/test_check_pr_paths.py`、
+  `scripts/host_loop/test_backends_cli.py`、
+  `scripts/host_loop/test_discovery_contract.py`、
+  `scripts/host_loop/test_pr_envelope.py`、
+  `scripts/host_loop/test_support.py`（新）、本 change `evidence/**`、
+  本 change `tasks.md`（仅本任务状态/evidence 引用）。
+- Forbidden paths:`scripts/check_pr_paths.py`、`scripts/host_loop/` 全部
+  非测试 `.py`、`scripts/host_loop/test_navigation_contract.py`、
+  `scripts/host_loop/test_minter_and_explain.py`、`.github/**`、
   `openspec/governance/**`、`openspec/specs/**`、`openspec/contracts/**`、
   `openspec/changes/archive/**`（读不写）、产品 source/tests、其他
   change。
-- Risk:low（查找面只扩不收；未知任务拒绝路径保持；回退 = revert）。
+- Risk:low（纯测试面收敛；守卫零字节变更被 invariant pin 钉死；回退 =
+  revert）。
 - Hardware required:no。
 - Decision-Grade:D0。
 
 ### Deliverables
 
-- archive glob 扩展 + 正 fixture（archive 内任务被正确解析）+ 负
-  fixture（不存在的任务仍拒绝）；
-- 活体样本 active-or-archive 解析 helper 与五处测试的适配；
-- **归档演练证据**：scratch worktree 内 `git mv`
-  `openspec/changes/chg-2026-030-host-loop-runtime` →
-  `openspec/changes/archive/<date>-chg-2026-030-host-loop-runtime` 后，
-  全量 suite 与 `check_pr_paths` 测试保持绿（#573 所列 1+5 error 全部
-  消失），worktree 弃置不入仓。
+- `test_support.py` 三 helper 与其单元测试（恰一处存在的双向 loud-fail
+  fixture）；
+- 四个测试文件的活体样本适配（路线分派见 Readiness（r2）契约②）；
+- **归档演练证据** + `check_pr_paths.py` 前后 blob 相等证明（invariant
+  pin）；worktree 弃置不入仓。
 
 ### Verification
 
-- `NAV-ARCH-001`：归档演练绿 + 正/负 fixture 双向证据 + `check-sdd`
-  0/0 基线保持；#573 dated 注记所列两条收口条件由本任务闭合其一
-  （glob+fixtures 路线），archive-blocked 的 chg-2026-030/027/028 归档
-  链解锁（归档 PR 独立走，不在本任务内）。
+- `NAV-ARCH-001`（r2 措辞，正本见 verification.md）：invariant pin 前后
+  相等；既有 archive 负向测试集（archive-only 零权威、原子归档家族）
+  全绿；归档演练绿（#573 具名 1+5 error 全消）；`check-sdd` 0/0 基线
+  保持。#573 两条收口条件经**路线（1）活体样本免疫**闭合，
+  archive-blocked 的 chg-2026-030/027/028 归档链解锁（归档 PR 独立走，
+  不在本任务内）。
 
 ### Notes / handoff
 
