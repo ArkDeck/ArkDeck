@@ -29,6 +29,7 @@ Two rules this file keeps, both learned here the hard way:
 
 from __future__ import annotations
 
+import ast
 import os
 import re
 import subprocess
@@ -57,10 +58,15 @@ from host_loop.__main__ import (  # noqa: E402
     discover_candidates,
     parse_args,
 )
+from host_loop.backends import BackendError  # noqa: E402
+from host_loop.cursor import CursorError  # noqa: E402
+from host_loop.identity import ReconcileRequired  # noqa: E402
+from host_loop.lease import LeaseError  # noqa: E402
 from host_loop.pr_envelope import (  # noqa: E402
     CHANGE_RE,
     _active_change_directories,
 )
+from host_loop.transport import TransportError  # noqa: E402
 from host_loop.worker import (  # noqa: E402
     NEVER_CLAIM_ROOTS,
     RoundResult,
@@ -444,13 +450,31 @@ class NeverClaimRootsArePinnedByContent(unittest.TestCase):
     def test_the_exact_root_set(self):
         self.assertEqual(
             NEVER_CLAIM_ROOTS,
-            frozenset({"TASK-HLR-003", "TASK-NAV-001", "TASK-NAV-002"}))
+            frozenset({
+                "TASK-HLR-003", "TASK-NAV-001", "TASK-NAV-002",
+                "TASK-DEC-001", "TASK-DEC-002", "TASK-DEC-003", "TASK-DEC-004",
+                "TASK-DEC-005", "TASK-DEC-006", "TASK-DEC-007", "TASK-DEC-008",
+            }))
 
     def test_each_root_and_its_suffixed_siblings_are_excluded(self):
-        for root in ("TASK-HLR-003", "TASK-NAV-001", "TASK-NAV-002"):
+        for root in sorted(NEVER_CLAIM_ROOTS):
             for variant in (root, root + "A", root.lower(), f" {root} "):
                 with self.subTest(variant=variant):
                     self.assertTrue(is_never_claim(variant))
+
+    def test_every_task_of_this_change_is_excluded(self):
+        """CHG-2026-040 declares all eight DEC tasks session-implemented.
+
+        Before this test existed the declaration lived only in tasks.md prose
+        while the machine gate was this frozenset, so a Decision-Grade line was
+        the only thing standing between the loop and claiming work that edits
+        the gate itself. Enumerated rather than derived from NEVER_CLAIM_ROOTS:
+        deriving it would pass even if every DEC root were dropped.
+        """
+        for number in range(1, 9):
+            task = f"TASK-DEC-{number:03d}"
+            with self.subTest(task=task):
+                self.assertTrue(is_never_claim(task))
 
     def test_neighbours_are_not_excluded(self):
         for other in ("TASK-NAV-003", "TASK-NAV-0011", "TASK-HLR-004",
@@ -598,6 +622,416 @@ class TheRoundLineSaysWhenAndHowMuch(unittest.TestCase):
         for field in ("host-loop:", "task=", "pr=", " :: "):
             with self.subTest(field=field):
                 self.assertIn(field, line)
+
+
+# ------------------- DEC-NAV-001: continuation lists versus surrounding prose
+
+class GovernedFieldsReadListsNotProse(unittest.TestCase):
+    """`Depends on` and `Allowed paths` are legitimately written empty-valued
+    with an indented list underneath, so the region after the colon cannot be
+    discarded. It also cannot be swallowed whole: the prose that follows a task
+    field is where authors put the options they rejected, and scraping it turned
+    "曾考虑 `some/other/**` 但未批准" into a declared allowed path.
+    """
+
+    def _candidates(self, section: str):
+        temporary = tempfile.TemporaryDirectory(prefix="dec007-fields-")
+        self.addCleanup(temporary.cleanup)
+        root = Path(temporary.name)
+        change = root / "openspec" / "changes" / "chg-2026-900-probe"
+        change.mkdir(parents=True)
+        (change / "tasks.md").write_text(section, encoding="utf-8")
+        (change / "proposal.md").write_text(
+            "---\nid: CHG-2026-900-probe\nstatus: approved\n---\n", encoding="utf-8")
+        return discover_candidates(root, "chg-2026-900-probe")
+
+    _HEAD = ("## TASK-PROBE-001 — probe\n"
+             "- Status:ready\n"
+             "- Hardware required:no\n"
+             "- Decision-Grade:D0\n")
+
+    def test_an_indented_list_continuation_is_the_value(self):
+        found = self._candidates(
+            self._HEAD
+            + "- Depends on:none\n"
+            + "- Allowed paths:\n"
+            + "  - `scripts/probe/**`(采集脚本)\n"
+            + "  - `docs/probe.md`\n"
+            + "- Risk:low\n")
+        self.assertEqual(len(found), 1)
+        self.assertEqual(found[0].allowed_paths,
+                         ("scripts/probe/**", "docs/probe.md"))
+
+    def test_prose_after_an_empty_value_never_becomes_a_path(self):
+        found = self._candidates(
+            self._HEAD
+            + "- Depends on:none\n"
+            + "- Allowed paths:\n"
+            + "  注：曾考虑 `some/other/**` 但未批准\n"
+            + "- Risk:low\n")
+        self.assertEqual(found, [], "prose donated a path and made a candidate")
+
+    def test_prose_after_an_empty_depends_never_becomes_a_dependency(self):
+        found = self._candidates(
+            self._HEAD
+            + "- Depends on:\n"
+            + "  这一段解释了为什么 TASK-OTHER-002 曾被考虑\n"
+            + "- Allowed paths:`x/**`\n"
+            + "- Risk:low\n")
+        self.assertEqual(found, [], "an empty Depends read as 'nothing blocks me'")
+
+    def test_prose_below_a_real_list_is_still_excluded(self):
+        found = self._candidates(
+            self._HEAD
+            + "- Depends on:none\n"
+            + "- Allowed paths:\n"
+            + "  - `scripts/probe/**`\n"
+            + "  说明：`docs/rejected.md` 不在授权内\n"
+            + "- Risk:low\n")
+        self.assertEqual(len(found), 1)
+        self.assertEqual(found[0].allowed_paths, ("scripts/probe/**",))
+
+    def test_an_inline_value_still_works(self):
+        found = self._candidates(
+            self._HEAD
+            + "- Depends on:TASK-OTHER-002\n"
+            + "- Allowed paths:`scripts/probe/**`\n"
+            + "- Risk:low\n")
+        self.assertEqual(len(found), 1)
+        self.assertEqual(found[0].dependencies, ("TASK-OTHER-002",))
+        self.assertEqual(found[0].allowed_paths, ("scripts/probe/**",))
+
+
+class TheLiveCorpusKeepsParsing(unittest.TestCase):
+    """The fix tightens a parser against files it does not own.
+
+    Every empty-valued `Depends on` / `Allowed paths` in the live tree is the
+    same legitimate shape, so a naive "empty means omit" would have silently
+    dropped dozens of real tasks. This asserts the count relationship rather
+    than a fixed roster so ordinary governance edits do not break it.
+    """
+
+    def test_every_task_with_an_empty_valued_field_still_yields_its_value(self):
+        root = Path(__file__).resolve().parents[2]
+        empty_field = re.compile(
+            r"^-[ \t]*(?:Depends on|Allowed paths)[ \t]*:[ \t]*$")
+        owners = set()
+        for tasks in sorted((root / "openspec" / "changes").glob("chg-*/tasks.md")):
+            current = None
+            for line in tasks.read_text(encoding="utf-8").splitlines():
+                header = re.match(r"^## (TASK-[A-Z0-9-]+)", line)
+                if header:
+                    current = header.group(1)
+                elif current and empty_field.match(line):
+                    owners.add(current)
+        self.assertTrue(owners, "no live sample of the empty-valued shape")
+
+        discovered = {}
+        for change_id in active_change_ids(root):
+            for candidate in discover_candidates(root, change_id):
+                discovered[candidate.task_id] = candidate
+
+        for task_id in sorted(owners & set(discovered)):
+            with self.subTest(task=task_id):
+                self.assertTrue(
+                    discovered[task_id].allowed_paths,
+                    "an empty-valued field collapsed to no declared paths")
+
+
+# --------------------------- DEC-NAV-001: exit codes and suite self-collection
+
+class CursorTroubleIsReconcileNotSetupError(unittest.TestCase):
+    """Exit 1 says "transient, retry"; exit 20 says "stop, a human looks".
+
+    cursor.py calls a missing Issue, an unparsable machine block and any
+    conflict reconcile-required, and the identical CursorError raised inside
+    run_once already exits 20. Raised during setup it exited 1, so the one case
+    the design singles out as human-mandatory was the case the scheduler was
+    told to retry.
+    """
+
+    def _classify(self, error):
+        """Drive main()'s real handler with a controlled setup-phase failure.
+
+        Raised from inside the try block rather than simulated, so the test
+        measures the classification main() actually performs. read_token is
+        stubbed because the handler under test sits after port construction and
+        this run must not require the staged credential or the network.
+        """
+        argv = ["--once", "--repo-dir", str(REPO_ROOT)]
+        with unittest.mock.patch.object(main_mod, "read_token",
+                                        return_value="probe-token"), \
+             unittest.mock.patch.object(main_mod, "discover_all",
+                                        side_effect=error):
+            return main_mod.main(argv)
+
+    def test_cursor_error_is_reconcile_required(self):
+        self.assertEqual(self._classify(CursorError("machine block unparsable")),
+                         main_mod.EXIT_RECONCILE)
+
+    def test_reconcile_required_is_reconcile_required(self):
+        self.assertEqual(self._classify(ReconcileRequired("ambiguous identity")),
+                         main_mod.EXIT_RECONCILE)
+
+    def test_infrastructure_failures_remain_setup_errors(self):
+        for error in (BackendError("git missing"),
+                      TransportError("api unreachable"),
+                      LeaseError("ref write ambiguous")):
+            with self.subTest(error=type(error).__name__):
+                self.assertEqual(self._classify(error), main_mod.EXIT_ERROR)
+
+    def test_the_two_classes_are_distinguishable(self):
+        self.assertNotEqual(main_mod.EXIT_RECONCILE, main_mod.EXIT_ERROR)
+
+
+class EverySuiteCollectsAllOfItself(unittest.TestCase):
+    """test_discovery_contract carried `unittest.main()` in its middle.
+
+    Running it the way its shebang invites executed 19 of its 34 tests and
+    reported OK, silently skipping the four classes that cover the fail-open
+    regressions. Asserted for every suite in the package so the next file to
+    grow a stray main block is caught here.
+    """
+
+    # test_v3_hardening.py has the same defect (42 collected directly against
+    # 52 by discover) but it belongs to TASK-DEC-006's file partition, so this
+    # task may not edit it. Excluded by name rather than by weakening the rule,
+    # and pinned as an expected failure below so fixing it forces this list to
+    # shrink.
+    _OTHER_PARTITION = frozenset({"test_v3_hardening.py"})
+
+    @staticmethod
+    def _classes_after_main_guard(path: Path) -> bool:
+        """Structural, not textual.
+
+        A first attempt scanned for the literal `if __name__ ==` and found the
+        copy inside this very helper, reporting this file against itself. Source
+        text cannot tell a guard from a string that spells one; the AST can.
+        """
+        module = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        guard_line = None
+        for node in module.body:
+            if isinstance(node, ast.If) and any(
+                isinstance(sub, ast.Name) and sub.id == "__name__"
+                for sub in ast.walk(node.test)
+            ):
+                guard_line = node.lineno
+                break
+        if guard_line is None:
+            return False
+        return any(isinstance(node, ast.ClassDef) and node.lineno > guard_line
+                   for node in module.body)
+
+    def test_no_module_ends_its_own_collection_early(self):
+        directory = Path(__file__).resolve().parent
+        for path in sorted(directory.glob("test_*.py")):
+            if path.name in self._OTHER_PARTITION:
+                continue
+            with self.subTest(module=path.name):
+                self.assertFalse(
+                    self._classes_after_main_guard(path),
+                    f"{path.name} defines test classes after unittest.main(); "
+                    "running it directly would skip them")
+
+    @unittest.expectedFailure
+    def test_the_out_of_partition_module_is_also_whole(self):
+        """Records a known gap owned by TASK-DEC-006, not a passing property.
+
+        When DEC-006 moves that file's main guard to the end this reports an
+        unexpected success, which forces both this test and the exclusion above
+        to be removed. A skip would have hidden the fix instead.
+        """
+        for name in sorted(self._OTHER_PARTITION):
+            self.assertFalse(
+                self._classes_after_main_guard(Path(__file__).resolve().parent / name))
+
+
+class CorrectionsSurviveTheRoundsThatFail(unittest.TestCase):
+    """reconcile runs first and may already have persisted a corrected cursor.
+
+    The corrections list is the stated compensating control for making cache
+    staleness non-fatal, yet both error handlers rebuilt the result from
+    str(error) alone -- so on a reconcile-required round the write happened and
+    its explanation did not, on exactly the round an operator reads.
+    """
+
+    def _worker(self):
+        return Worker.__new__(Worker)
+
+    def test_a_clean_round_still_reports_them(self):
+        worker = self._worker()
+        worker._corrections = ["pr_number 21 is not open; cleared"]
+        result = worker._with_corrections(
+            RoundResult(WorkerState.IDLE, None, "nothing claimable"))
+        self.assertIn("cursor reconciled", result.detail)
+        self.assertIn("pr_number 21", result.detail)
+
+    def test_a_failing_round_reports_them_too(self):
+        worker = self._worker()
+        worker._corrections = ["lease fence rewound; cleared"]
+        result = worker._with_corrections(
+            RoundResult(WorkerState.RECONCILE_REQUIRED, None, "fence lost"))
+        self.assertIn("fence lost", result.detail)
+        self.assertIn("lease fence rewound", result.detail)
+
+    def test_no_corrections_leaves_the_detail_untouched(self):
+        worker = self._worker()
+        worker._corrections = []
+        original = RoundResult(WorkerState.IDLE, None, "nothing claimable")
+        self.assertEqual(worker._with_corrections(original), original)
+
+
+class AMisconfiguredCursorStopsInsteadOfDisablingItself(unittest.TestCase):
+    """Setting the variable is the operator stating intent to use a cursor.
+
+    A typo collapsed to None, which skipped load, validation and every write
+    while exiting like a healthy round -- the design's "MUST rebuild and
+    validate" bypassed with no diagnostic anywhere.
+    """
+
+    def test_an_unset_variable_is_still_simply_absent(self):
+        with unittest.mock.patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("DEC007_PROBE_ISSUE", None)
+            self.assertIsNone(main_mod._int_env("DEC007_PROBE_ISSUE"))
+
+    def test_a_blank_variable_is_still_simply_absent(self):
+        with unittest.mock.patch.dict(os.environ, {"DEC007_PROBE_ISSUE": "  "}):
+            self.assertIsNone(main_mod._int_env("DEC007_PROBE_ISSUE"))
+
+    def test_a_valid_value_is_returned(self):
+        with unittest.mock.patch.dict(os.environ, {"DEC007_PROBE_ISSUE": "42"}):
+            self.assertEqual(main_mod._int_env("DEC007_PROBE_ISSUE"), 42)
+
+    def test_an_unparsable_value_refuses_instead_of_returning_none(self):
+        with unittest.mock.patch.dict(os.environ, {"DEC007_PROBE_ISSUE": "12a"}):
+            with self.assertRaises(BackendError) as caught:
+                main_mod._int_env("DEC007_PROBE_ISSUE")
+        self.assertIn("DEC007_PROBE_ISSUE", str(caught.exception))
+
+
+class ApprovalIsNotLostToPunctuation(unittest.TestCase):
+    """`(\\S+)` ran to whitespace, so `approved（注）` made an approved change
+    read as unapprovable -- the same trap the task fields were fixed for."""
+
+    def _approved(self, status_line: str) -> bool:
+        temporary = tempfile.TemporaryDirectory(prefix="dec007-approval-")
+        self.addCleanup(temporary.cleanup)
+        root = Path(temporary.name)
+        change = root / "openspec" / "changes" / "chg-2026-900-probe"
+        change.mkdir(parents=True)
+        (change / "proposal.md").write_text(
+            f"---\nid: CHG-2026-900-probe\n{status_line}\n---\n", encoding="utf-8")
+        return main_mod._change_is_approved(root, "chg-2026-900-probe")
+
+    def test_a_plain_value_is_approved(self):
+        self.assertTrue(self._approved("status: approved"))
+
+    def test_a_trailing_full_width_parenthetical_is_still_approved(self):
+        self.assertTrue(self._approved("status:approved（2026-07-27 lvye）"))
+
+    def test_a_trailing_comment_is_still_verified(self):
+        self.assertTrue(self._approved("status: verified # ratified"))
+
+    def test_an_unapproved_status_stays_unapproved(self):
+        for status in ("proposed", "archived", "rejected"):
+            with self.subTest(status=status):
+                self.assertFalse(self._approved(f"status: {status}"))
+
+
+class TruthObservesEveryCandidateNotOnlyTheReadyOnes(unittest.TestCase):
+    """reconcile treats open_pr_numbers as total and clears what it omits.
+
+    Building it from `ready` alone meant a task that flipped to blocked or done
+    with its PR still open produced "pr_number N is not open; cleared" -- a
+    falsehood in the only log that explains cache divergence, written by the
+    same function whose lease half refuses to build an incomplete view.
+    """
+
+    class _Api:
+        def __init__(self):
+            self.heads = []
+
+        def list_open_pulls_for_head(self, head):
+            self.heads.append(head)
+            return [{"number": 21}] if head.endswith("TASK-STALE-001") else []
+
+    @staticmethod
+    def _runner(argv):
+        return 0, "", ""
+
+    def _build(self, candidates):
+        api = self._Api()
+        truth = main_mod.build_truth(api, self._runner, Path("/unused"),
+                                     "chg-probe", MAIN, candidates)
+        return api, truth
+
+    def test_a_blocked_task_with_an_open_pr_is_still_observed(self):
+        api, truth = self._build([
+            candidate(task_id="TASK-STALE-001", status="blocked"),
+            candidate(task_id="TASK-LIVE-001", status="ready"),
+        ])
+        self.assertIn("agent/host-loop/tasks/TASK-STALE-001", api.heads)
+        self.assertIn(21, truth.open_pr_numbers,
+                      "the open PR of a non-ready task was dropped from Truth")
+
+    def test_a_done_task_with_an_open_pr_is_still_observed(self):
+        _api, truth = self._build([
+            candidate(task_id="TASK-STALE-001", status="done"),
+        ])
+        self.assertIn(21, truth.open_pr_numbers)
+
+    def test_ready_tasks_are_unaffected(self):
+        _api, truth = self._build([
+            candidate(task_id="TASK-STALE-001", status="ready"),
+        ])
+        self.assertEqual(truth.ready_tasks, frozenset({"TASK-STALE-001"}))
+        self.assertIn(21, truth.open_pr_numbers)
+
+    def test_each_head_is_queried_once(self):
+        api, _truth = self._build([
+            candidate(task_id="TASK-LIVE-001", status="ready"),
+            candidate(task_id="TASK-LIVE-001", status="ready"),
+        ])
+        self.assertEqual(len(api.heads), len(set(api.heads)))
+
+
+class ALeaseWriteNeverBlanksTheKnownPullRequest(unittest.TestCase):
+    """record_round replaces every navigation field rather than merging it.
+
+    The adopt and renew paths knew the PR from the lease and passed nothing, so
+    each steady-state round stamped `pr_number: null` over a real open PR and
+    only restored it at round end -- a window in which the shared Issue asserted
+    a claimed task had no PR.
+    """
+
+    class _Held:
+        def __init__(self, pr_number):
+            self.record = type("R", (), {"task_id": "TASK-DEMO-001",
+                                         "pr_number": pr_number})()
+            self.ref_oid = "b" * 40
+
+    def _captured(self, held, **kwargs):
+        worker = Worker.__new__(Worker)
+        seen = {}
+
+        def fake_persist(cursor_state, main_oid, task_id, ref_name, lease_oid,
+                         *, pr_number=None, pr_head=None):
+            seen.update(pr_number=pr_number, pr_head=pr_head)
+            return cursor_state
+
+        worker._persist_cursor = fake_persist
+        worker._after_lease_write(None, MAIN, "TASK-DEMO-001", held, **kwargs)
+        return seen
+
+    def test_the_lease_supplies_the_pr_when_the_caller_does_not(self):
+        self.assertEqual(self._captured(self._Held(21))["pr_number"], 21)
+
+    def test_an_explicit_pr_still_wins(self):
+        self.assertEqual(
+            self._captured(self._Held(21), pr_number=99)["pr_number"], 99)
+
+    def test_a_lease_with_no_pr_still_records_none(self):
+        self.assertIsNone(self._captured(self._Held(None))["pr_number"])
 
 
 if __name__ == "__main__":

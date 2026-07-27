@@ -93,8 +93,39 @@ _FIELD_RE = {
 # that decides whether an unattended loop may touch a task at all.
 _HARDWARE_YES = frozenset({"yes", "true", "required", "是", "需要", "必需"})
 _HARDWARE_NO = frozenset({"no", "false", "none", "否", "不需要", "无"})
-_DEPENDS_RE = re.compile(r"^-\s*Depends on:\s*(.+?)(?=^-\s|\Z)", re.MULTILINE | re.DOTALL)
-_ALLOWED_RE = re.compile(r"^-\s*Allowed paths:\s*(.+?)(?=^-\s|\Z)", re.MULTILINE | re.DOTALL)
+# The colon class stays ASCII-only, deliberately. `status`, `hardware` and
+# `grade` above accept `：` as well, and the live corpus writes `Depends on：`
+# for the six TASK-BRC-* tasks, so these two fields silently drop them. That
+# divergence is a real defect (ledger C-M7) but it is not in this task's scope,
+# and widening the class here would enlarge the candidate set as a side effect
+# of a fail-closed fix. Recorded for a separate carrier; behaviour preserved.
+_DEPENDS_RE = re.compile(r"^-[ \t]*Depends on:" + _GAP + r"([^\n]*)$",
+                         re.MULTILINE)
+_ALLOWED_RE = re.compile(r"^-[ \t]*Allowed paths:" + _GAP + r"([^\n]*)$",
+                         re.MULTILINE)
+# A continuation line only carries field content when it is an indented list
+# item. Both fields are legitimately written with an empty value followed by an
+# indented `- \`path\`` list (34 occurrences across the live tasks.md files at
+# 86f9e72b), so the region cannot simply be discarded; but the previous
+# `(.+?)(?=^-\s|\Z)` DOTALL capture swallowed ordinary prose too, and then
+# scraped it for TASK tokens and backticked paths. A sentence such as
+# "曾考虑 `some/other/**` 但未批准" therefore became a declared allowed path,
+# which is a claim gate reading its own footnotes as authorisation.
+_LIST_ITEM_RE = re.compile(r"^[ \t]+[-*+][ \t]")
+_BLOCK_STOP_RE = re.compile(r"^(?:-[ \t]|#{1,6}[ \t])")
+
+
+def _field_block(section: str, match: "re.Match[str]") -> str:
+    """Inline remainder plus the indented list items that continue it."""
+    parts = [match.group(1)]
+    for line in section[match.end():].splitlines()[1:]:
+        if not line.strip():
+            continue
+        if _BLOCK_STOP_RE.match(line):
+            break
+        if _LIST_ITEM_RE.match(line):
+            parts.append(line)
+    return "\n".join(parts)
 
 
 _FENCE_RE = re.compile(r"^(?P<fence>```+|~~~+).*?^(?P=fence)[ \t]*$",
@@ -169,11 +200,19 @@ def discover_candidates(repo_root: Path, change_id: str) -> list[TaskCandidate]:
         allowed = _ALLOWED_RE.search(section)
         if allowed is None:
             continue  # no declared allowed paths: never claimable
-        dependency_ids = tuple(sorted(set(
-            _TASK_HEADER_RE.sub("", depends.group(1)) and
-            re.findall(r"TASK-[A-Z0-9]+(?:-[A-Z0-9]+)*-[0-9]{3}[A-Z]?", depends.group(1))
-        ))) if depends else ()
-        allowed_paths = tuple(re.findall(r"`([^`]+)`", allowed.group(1)))
+        depends_block = _field_block(section, depends)
+        allowed_block = _field_block(section, allowed)
+        if not depends_block.strip() or not allowed_block.strip():
+            # Declared with an empty value and no list continuation: the field
+            # is present but says nothing. Reading that as "no dependencies" or
+            # "no path restriction" is the permissive default this reader must
+            # never take, so the task is simply not a candidate.
+            continue
+        dependency_ids = tuple(sorted(set(re.findall(
+            r"TASK-[A-Z0-9]+(?:-[A-Z0-9]+)*-[0-9]{3}[A-Z]?", depends_block))))
+        allowed_paths = tuple(re.findall(r"`([^`]+)`", allowed_block))
+        if not allowed_paths:
+            continue  # a value that declares no path is not a path allowlist
         candidates.append(TaskCandidate(
             task_id=task_id,
             status=status.group(1),
@@ -301,8 +340,15 @@ def build_truth(api: ApiPort, runner, repo_root: Path, change_id: str,
         parts = line.split()
         if len(parts) == 2 and OID_RE.match(parts[0]):
             lease_map[parts[1]] = parts[0]
+    # Every candidate's head, not just the ready ones. reconcile treats this set
+    # as total and clears a cursor pr_number it does not list, so restricting the
+    # lookup to `ready` meant a task that flipped to blocked or done while its PR
+    # was still open produced the correction "pr_number N is not open; cleared" —
+    # a false statement of fact in the one log that exists to explain cache
+    # divergence. The lease half two blocks up already refuses to build a Truth
+    # from an incomplete view; this half was constructing one deliberately.
     open_numbers: set[int] = set()
-    for task in ready:
+    for task in sorted({c.task_id for c in candidates}):
         head = f"agent/host-loop/tasks/{task}"
         try:
             for pull in api.list_open_pulls_for_head(head):
@@ -400,13 +446,22 @@ def _candidate_body_renderer(repo_root: str, *, fallback_change: str,
 
 
 def _int_env(name: str) -> int | None:
+    """Absent means "not configured"; present-but-unparsable means stop.
+
+    Collapsing both to None made a typo in ARKDECK_HOST_LOOP_CURSOR_ISSUE
+    disable the whole cursor subsystem in silence: no load, no
+    rebuild-and-validate against the real Issue, no persistence, and an exit
+    code indistinguishable from a healthy round. The operator set the variable,
+    so the intent to use a cursor is not in doubt — only the value is.
+    """
     raw = os.environ.get(name)
     if raw is None or not raw.strip():
         return None
     try:
         return int(raw)
     except ValueError:
-        return None
+        raise BackendError(
+            f"{name} is set to {raw!r}, which is not an integer") from None
 
 
 def _explain(repo_root: Path, args, runner) -> int:
@@ -564,8 +619,15 @@ def main(argv: list[str] | None = None) -> int:
             cursor_body=cursor_body,
         )
         result = worker.run_once(candidates, scope, main_oid, cursor_state, truth)
-    except (BackendError, TransportError, LeaseError, CursorError,
-            ReconcileRequired) as error:
+    except (CursorError, ReconcileRequired) as error:
+        # cursor.py's contract calls a missing Issue, an unparsable machine
+        # block and any conflict reconcile-required, and the same CursorError
+        # raised fifteen lines later inside run_once already exits 20. Exiting 1
+        # here told the scheduler "transient setup problem, retry" for exactly
+        # the corruption the design says a human must look at.
+        print(f"host-loop: reconcile required: {error}", file=sys.stderr)
+        return EXIT_RECONCILE
+    except (BackendError, TransportError, LeaseError) as error:
         print(f"host-loop: setup/round failure: {error}", file=sys.stderr)
         return EXIT_ERROR
     except Exception as error:  # noqa: BLE001 - a crash must not read as success
@@ -605,7 +667,12 @@ def _change_is_approved(repo_root: Path, change_id: str) -> bool:
     if not proposal.is_file():
         return False
     for line in proposal.read_text(encoding="utf-8").splitlines()[:40]:
-        match = re.match(r"^status:\s*(\S+)", line.strip())
+        # Same punctuation trap the task fields carry: `(\S+)` runs to the next
+        # whitespace, so `status: approved # ratified` reads as `approved` but
+        # `status:approved（注）` or `status:approved#x` reads as a token that
+        # matches nothing and silently makes an approved change unapprovable.
+        # _VALUE stops at the punctuation the real files use.
+        match = re.match(r"^status:" + _GAP + _VALUE, line.strip())
         if match:
             return match.group(1) in ("approved", "verified")
     return False

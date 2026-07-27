@@ -82,8 +82,14 @@ GATED_GRADES = frozenset({"D1", "D2"})
 # let the loop rewrite the gate that decides what it may claim. Discovery therefore
 # excludes these roots unconditionally. Widening this set is a governance change,
 # not a configuration tweak: every entry is authorised by that task's own readiness
-# (TASK-HLR-003 r2; TASK-NAV-001 / TASK-NAV-002 r1, contract item 4).
-NEVER_CLAIM_ROOTS = frozenset({"TASK-HLR-003", "TASK-NAV-001", "TASK-NAV-002"})
+# (TASK-HLR-003 r2; TASK-NAV-001 / TASK-NAV-002 r1, contract item 4;
+# TASK-DEC-001..008 r1, CHG-2026-040 — every task in that change edits this
+# loop's own code, tests or CI, and DEC-005/DEC-007 edit the claim gate itself).
+NEVER_CLAIM_ROOTS = frozenset({
+    "TASK-HLR-003", "TASK-NAV-001", "TASK-NAV-002",
+    "TASK-DEC-001", "TASK-DEC-002", "TASK-DEC-003", "TASK-DEC-004",
+    "TASK-DEC-005", "TASK-DEC-006", "TASK-DEC-007", "TASK-DEC-008",
+})
 
 # Matched after normalisation so a suffixed sibling cannot slip through. The
 # repo's grammar (and this PR's parity test) admits TASK-HLR-003A and
@@ -366,24 +372,35 @@ class Worker:
             # divergence is silent, and a genuine anomaly looks like a clean
             # round. It was computed and discarded, which is the same
             # "written but never bound" shape flagged twice in review.
-            if self._corrections:
-                joined = "; ".join(self._corrections)
-                result = replace(
-                    result, detail=f"{result.detail} [cursor reconciled: {joined}]")
-            return result
+            return self._with_corrections(result)
         except (FenceLost, LeaseError, ReconcileRequired, CursorError,
                 TransportError) as error:
             # Every ambiguity funnels here. No retry, no second PR, no dispatch.
-            return RoundResult(WorkerState.RECONCILE_REQUIRED, None, str(error))
+            return self._with_corrections(
+                RoundResult(WorkerState.RECONCILE_REQUIRED, None, str(error)))
         except Exception as error:  # noqa: BLE001
             # An unexpected shape must fail closed too. Listing only the five
             # known types meant a malformed payload (base: null, say) crashed the
             # process instead of stopping the lane.
-            return RoundResult(
+            return self._with_corrections(RoundResult(
                 WorkerState.RECONCILE_REQUIRED, None,
                 f"unexpected {type(error).__name__} in round: {error}; "
                 "treated as reconcile-required",
-            )
+            ))
+
+    def _with_corrections(self, result: RoundResult) -> RoundResult:
+        """Attach this round's cursor corrections to whatever it returned.
+
+        Reconcile ran before the failure and may already have persisted the
+        corrected cursor, so dropping the list on the error paths meant the
+        write happened and its explanation did not — on precisely the rounds an
+        operator reads. Both handlers built their result from str(error) alone.
+        """
+        if not self._corrections:
+            return result
+        joined = "; ".join(self._corrections)
+        return replace(
+            result, detail=f"{result.detail} [cursor reconciled: {joined}]")
 
     def _round(
         self,
@@ -574,6 +591,15 @@ class Worker:
         # just set, with the same values, and validates them itself. Two tests
         # covered it, which made the dead step look load-bearing — the same
         # "written but never bound" shape flagged twice before.
+        #
+        # The lease already knows the PR on the adopt and renew paths, and
+        # record_round replaces every navigation field rather than merging, so
+        # omitting it there stamped `pr_number: null` over a real open PR until
+        # the round-end write restored it. The shared Issue asserted something
+        # untrue for the width of the round, and a reader arriving mid-round saw
+        # a claimed task with no PR. Fall back to what the lease holds.
+        if pr_number is None:
+            pr_number = held.record.pr_number
         return self._persist_cursor(cursor_state, main_oid, task_id,
                                     lease_ref(held.record.task_id), held.ref_oid,
                                     pr_number=pr_number, pr_head=pr_head)
