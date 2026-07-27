@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-039-host-loop-repo-wide-discovery
 revision: 2
-status: approved
+status: verified # 2026-07-27 本 verification-closure PR；closure 段见文末；approved 于 #587；r2 经 #593
 class: implementation-only
 core_change_level: none
 owner: lvye
@@ -106,3 +106,40 @@ TASK-NAV-001 与 TASK-NAV-002（见 tasks.md），均 blocked 待 approval-only
 PR merge 后逐一 readiness。**两任务均改动循环自身代码/测试面，按
 TASK-HLR-003 先例为 never-claim：由会话实现、维护者合并；循环的首次自主
 认领对象是本 change 落地后出现的下一个 D0 任务。**propose 合入 ≠ 批准。
+
+## Verification closure（2026-07-27）
+
+两任务 done 于 protected main 在案，三条 change-local AC 证据可复查；本 PR
+仅状态翻转 + 引用，零实现夹带（先例 #224/#239/#570/#571）。
+
+- **任务链**：propose #586 merge `fa4bdeaae305b7898e3412a210656842ff50e2e2`；
+  approval #587 merge `17a9574a368e518ce475ef7d72135c3a6f71f2c7`；readiness
+  r1 #589 merge `f8a04449d01e2ed1fa0b4b9bb29db1bb6fb2b14c`（NAV-001）/#590
+  merge `a0bc3ff66954a7a2560ce951fc44e1c989bf7c45`（NAV-002）；grade 行
+  （维护者亲手 commit `f621d7c2…`，OID 不变传输）#591 merge
+  `74e7cf95416ed43c781e7247bfb2fbeb068c8148`；NAV-002 r2 更正 readiness
+  #593 merge `5b376275cd958e5f3514cc46b94f487c75c2f7dd`（r1 契约①前提
+  证伪，check_pr_paths.py 转零字节 invariant）；实现 = #594 merge
+  `87e142801507f6d130404d06fcc64b1db0b26f78`（NAV-001）/#595 merge
+  `24401ddc553f72b37e66f73a322ba6e3d559c0da`（NAV-002）；post-merge
+  review-fix #597 merge `142330f5ae47fca8cbd1f1c04ec6254c4a071abb`
+  （#594 七处活体样本病灶，NAV-001 allowed paths 内闭合）；done #600
+  merge `405dbe9e6297d3c0caef29dbe6c6cb44d4acced5`（NAV-001）/#599 merge
+  `73b46580fd18b5ff7092af85e51de4fe7738bfc7`（NAV-002）。
+- **NAV-DISC-001 = PASS**：缺省 round/`--explain` 全仓枚举（关系式契约
+  测试 reported == active_change_ids）；显式 `--change` 单 change 语义
+  回归绿；跨 change 聚合每轮至多一 claim 与 change-approved 逐 change
+  判定由 `test_navigation_contract.py` 正/负 fixture 钉死；线上 unit
+  零 plist 动作经代码缺省值部署（运行机 checkout 前进即生效）。
+- **NAV-TRUTH-001 = PASS**：done-never-claim 误报回归（audit base 红探针
+  →实现后绿）；`NEVER_CLAIM_ROOTS` 三根精确集合测试；idle/claim 行 UTC
+  ISO-8601 时间戳与扫描范围格式契约测试。
+- **NAV-ARCH-001 = PASS**：`check_pr_paths.py` 零字节变更（invariant pin
+  `02332a9b…` 于实现与 flip base 双复核）；`test_support.py` 双向
+  loud-fail 与选样双过滤（id 自洽 + headers==candidates，均由真实仓
+  反例实测得出）；归档演练于 #597 合成树全绿（`git mv` chg-2026-030
+  入 archive 后 536 OK + 1 expectedFailure 零失败、三守卫 OK、#573
+  具名 1+5 error 全消、动态重采样实证）；archive-blocked 的
+  chg-2026-030/027/028 归档链解锁。
+- **suite 基线现为 536 OK + 1 expectedFailure**（482 → #594 +43 →
+  #595 +11）。
