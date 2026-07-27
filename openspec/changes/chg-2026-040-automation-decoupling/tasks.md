@@ -1247,13 +1247,42 @@ r2 显式扩权）。
 
 ## TASK-DEC-008 — minter 脚本修复与部署副本重装（D2 窗口）
 
-- Status:ready（r1 = source-only readiness,其授权的 source PR 已合 =
-  **#649**（merge `15dcbb2089bc0d93ee7828df99f6349e73491fd0`,lvye
-  APPROVED/mergedBy lvye）;**r2 = D2 重装窗口授权**,见下方「Readiness
-  r2」节。前置① approval 已合 = #598
-  `cac07003836889881994367bde7ba3e0bdca70c0`。**本任务在 r2 的七条二值
-  条件全部成立、且窗口 evidence 合入之前不得 done**——部署副本现仍运行
-  旧字节 `5b8cbc06…`,新字节 `2df746cc…` 只在仓内。）
+- Status:done（2026-07-27 D2 completion;仅在维护者 review/merge 本独立
+  `ready→done` PR 后生效。**三个授权载体齐备**:r1 source-only readiness
+  → 实现 **#649**（merge `15dcbb2089bc0d93ee7828df99f6349e73491fd0`）;
+  r2 窗口授权 **#650**（merge `1d1fb1e89a38ceb15aac36cb226bc274f0451c9f`）;
+  窗口 receipt **#652**（merge `b1a6c61ad26c172ad79d63da673c2c45f5dc121a`）
+  ——三者均 lvye APPROVED、mergedBy lvye。evidence =
+  `evidence/runs/TASK-DEC-008/implementation-source.md` 与
+  `window-d2-reinstall.md`。
+  **r2 的七条二值条件全部成立**（逐条实测见 receipt）:PEM 硬门
+  `root 600`;安装后 digest `2df746cc58cf6dcf825a01f072cea4bdfffa61b706f40695c8e0531b3f2d6103`
+  + `root:wheel` + `555`;拒绝路径干跑 `exit=2`;强制铸造 `exit=0`、
+  token `fuhanfeng 600`、**sidecar 由 `fuhanfeng 644` 翻为 `root 600`**、
+  `.mint.` 残留 0;下一次**自然到点**触发 `runs 66→67`、`last exit
+  code = 0`、判出 `fresh: … not re-minting`;全程零 plist 改动、零
+  bootout/bootstrap/kickstart;receipt 已脱敏收录。
+  **部署副本与仓内字节自此 digest 一致**,r1 接受的失配期由本窗口闭合;
+  回滚源仍在（备份 `.5b8cbc06.bak` + blob `4150401c…`）。
+  **交付面**:D-M4（trap 覆盖全部五个暂存路径,修复前「写完 token、
+  `mv` 之前」失败会把**明文 token 留在 `.mint.*`**）、D-M5（sidecar 收紧
+  为 root 600——**其线上生效由窗口的权限翻转证明,静态断言够不着**;
+  第 5 条进一步证明收紧未把 root 挡在门外）、`--pem` 属主/权限前置、
+  curl 诊断可见、缺值 flag 报名;两条弱断言按 r1 门 3 替换;新增注入式
+  harness（macOS 侧真跑三种失败注入)。变异门 **8/8 击杀 + 负对照存活**。
+  **三处自查如实记入 evidence**:①「缺值 flag 报名」变异首轮存活（修复
+  无测试驱动),补测后击杀;②首推 CI guard 红 = guard job 跑 ubuntu 而
+  脚本用 BSD `stat -f`,处置为平台门 + **所有平台都跑的结构断言**兜底
+  （拒绝给 root 执行面加兼容分支、拒绝把 `stat` 做成桩);③窗口对
+  「拒绝路径后 token 未改动」**未独立取证**,记在脚本结构与 CI 测试名下,
+  不记为窗口已验证。
+  **flip 后复核**（在翻转后的树上执行,HLR-003 r5 教训）:`check-sdd`
+  **0/0/111**、host_loop `-m unittest discover` **638 OK + 1 expected
+  failure**、`test_minter_and_explain` **44 OK**(macOS)、
+  `done_task_ids` **101** 且含 `TASK-DEC-008`、`--explain` 对本任务报
+  `never-claim` + `status 'done' is not ready`。
+  **连带效果**:**CHG-2026-040 的八个任务全部 done**,本 change 具备
+  起草 change 级 verification 的条件。）
 - Platform:macos（host-only;root 部署副本人工重装）
 - Requirements/AC:change-local `DEC-MINT-001`
 - Depends on:none（文件与全部其他任务零交集）
