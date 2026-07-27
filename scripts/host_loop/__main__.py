@@ -24,6 +24,7 @@ invokes this module.
 from __future__ import annotations
 
 import argparse
+import datetime
 import os
 import re
 import sys
@@ -51,6 +52,11 @@ EXIT_DISPATCHED = 0
 EXIT_ERROR = 1
 EXIT_NO_DISPATCH = 10
 EXIT_RECONCILE = 20
+
+# The scope label a repo-wide round reports itself under. It is a label, never a
+# change id: every candidate a repo-wide round carries names its own change, and
+# the per-change approval gate reads that, not this.
+SCOPE_ALL = "all-active-changes"
 
 _TASK_HEADER_RE = re.compile(
     r"^##\s+(TASK-[A-Z0-9]+(?:-[A-Z0-9]+)*-[0-9]{3}[A-Z]?)(?:\s|$)", re.MULTILINE
@@ -176,7 +182,64 @@ def discover_candidates(repo_root: Path, change_id: str) -> list[TaskCandidate]:
             dependencies=dependency_ids,
             allowed_paths=allowed_paths,
             base_pin=None,
+            change_id=change_id,
         ))
+    return candidates
+
+
+def active_change_ids(repo_root: Path) -> list[str]:
+    """Every active change directory holding a tasks.md, in lexicographic order.
+
+    `changes/chg-*` cannot match `changes/archive/<date>-<change>/`, so archived
+    changes are excluded by the glob itself rather than by a filter that a later
+    edit could drop. Order is deterministic because it decides which task a round
+    reaches first when several are claimable, and a round that picked a different
+    task each time for the same repository state would be untestable.
+    """
+    changes = repo_root / "openspec" / "changes"
+    return sorted(path.parent.name for path in changes.glob("chg-*/tasks.md"))
+
+
+def canonical_change_id(repo_root: Path, change_dir: str) -> str:
+    """The identifier a PR envelope must carry for this change directory.
+
+    The directory name and the change id are NOT the same string, and assuming
+    they were is a live defect this function exists to prevent: the envelope
+    validator resolves `Change` against each active proposal's front-matter
+    `id:`, and `chg-2026-026-macos-rockchip-flash-ui` declares `CHG-2026-026`.
+    The single-change round never noticed, because the change it was pinned to
+    happens to be one where the two coincide
+    (`chg-2026-030-host-loop-runtime` / `CHG-2026-030-host-loop-runtime`); a
+    repo-wide round reaches the ones where they do not, and would have rendered
+    an envelope that fails validation at claim time.
+
+    The front-matter parser is imported rather than reimplemented: a second
+    reader of the same field is exactly the drift this module keeps being bitten
+    by, and `pr_envelope` is the side that decides whether the result is valid.
+    """
+    from .pr_envelope import _frontmatter_change_id
+
+    proposal = (repo_root / "openspec" / "changes" / change_dir.lower()
+                / "proposal.md")
+    return _frontmatter_change_id(proposal.read_text(encoding="utf-8"), proposal)
+
+
+def discover_all(repo_root: Path, change_ids: list[str]) -> list[TaskCandidate]:
+    """Candidates from every named change, each tagged with its change.
+
+    This is the whole of "repo-wide discovery": the gates are unchanged and still
+    live in `rejection_reasons`, and the per-change approval check still runs —
+    `select()` reads the tag. Widening the input cannot widen what is claimable,
+    and it cannot claim more than one task, because `select()` returns on the
+    first clean candidate.
+
+    A change whose tasks.md cannot be read is not silently skipped; discovery is
+    a reader and a partial view of the repository would make an idle verdict a
+    lie about the changes it never managed to look at.
+    """
+    candidates: list[TaskCandidate] = []
+    for change_id in change_ids:
+        candidates.extend(discover_candidates(repo_root, change_id))
     return candidates
 
 
@@ -267,7 +330,15 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                            "exit; performs no network call and needs no credential")
     parser.add_argument("--repo-dir", default=os.environ.get("ARKDECK_REPO"),
                         help="path to the ArkDeck checkout")
-    parser.add_argument("--change", default="CHG-2026-030-host-loop-runtime")
+    # No default change. The literal that used to sit here was
+    # CHG-2026-030-host-loop-runtime, and once every task in it reached done the
+    # scheduled unit — whose plist passes no --change — scanned a finished change
+    # for 31 consecutive rounds and reported idle each time. Omitting the flag now
+    # means "every active change"; passing it keeps the single-change semantics
+    # every existing caller and test relies on.
+    parser.add_argument("--change", default=None,
+                        help="restrict the round to one change; omit to scan "
+                             "every active change")
     parser.add_argument("--owner", default="ArkDeck")
     parser.add_argument("--repo", default="ArkDeck")
     parser.add_argument("--cursor-issue", type=int,
@@ -278,6 +349,54 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="stable worker identity; the lease manager owns it")
     parser.add_argument("--ttl", type=int, default=900)
     return parser.parse_args(sys.argv[1:] if argv is None else argv)
+
+
+def _utc_stamp(epoch: int) -> str:
+    """UTC ISO-8601, second precision, explicit `Z`.
+
+    The round's single output line carried no time and no scope, so a log
+    holding 31 identical idle lines could not be told apart from one line a
+    stuck tail repeated, and nothing in it said how much of the repository the
+    idle verdict actually covered. Both are now on the line.
+    """
+    return datetime.datetime.fromtimestamp(
+        epoch, tz=datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _round_line(stamp: str, *, changes: int, candidates: int, result) -> str:
+    """Assemble the round's one log line. Pure, so its format is testable.
+
+    Inlined in the print it could only be checked by running a whole round,
+    which needs a credential and a network; a contract test would then either
+    not exist or assert against the source text of the print, which proves
+    nothing.
+    """
+    return (f"host-loop: {stamp} "
+            f"scope=changes:{changes},candidates:{candidates} "
+            f"{result.state.value} task={result.task_id} "
+            f"pr={result.pr_number} :: {result.detail}")
+
+
+def _candidate_body_renderer(repo_root: str, *, fallback_change: str,
+                             producer: str, run_id: str):
+    """Render the envelope under the *selected task's* change id.
+
+    `body_renderer` binds a change at construction time, but a repo-wide round
+    does not know which change it will claim from until `select()` has returned.
+    Binding the round's scope label instead would stamp every envelope with a
+    change the task does not belong to, and that field is what the PR body
+    contract and the reviewer read. So the renderer is built per call, from the
+    candidate. A candidate with no change id (a single-change round, and every
+    pre-existing caller) falls back to the round's scope, which is the change id
+    those callers passed.
+    """
+    def render(candidate, base_oid: str, head_oid: str) -> str:
+        change_dir = getattr(candidate, "change_id", "") or fallback_change
+        change_id = canonical_change_id(Path(repo_root), change_dir)
+        return body_renderer(repo_root, change_id=change_id, producer=producer,
+                             run_id=run_id)(candidate, base_oid, head_oid)
+
+    return render
 
 
 def _int_env(name: str) -> int | None:
@@ -302,48 +421,95 @@ def _explain(repo_root: Path, args, runner) -> int:
     Exit 0 when at least one candidate is claimable, 10 when none is — the same
     convention as a real round, so a scheduler wrapper can compare the two.
     """
-    from .worker import GATED_GRADES, rejection_reasons
-
-    candidates = discover_candidates(repo_root, args.change)
-    approved = _change_is_approved(repo_root, args.change)
-    done = done_task_ids(repo_root)
     # A dry run must not reach the NETWORK; a local subprocess is fine. An
     # earlier version hand-parsed .git/HEAD and crashed with NotADirectoryError,
     # because in a git worktree `.git` is a FILE holding a gitdir pointer, not a
     # directory. git itself knows where its HEAD is; ask it.
     code, out, _err = runner(["git", "rev-parse", "HEAD"])
     local_oid = out.strip() if code == 0 and OID_RE.match(out.strip()) else ""
+    done = done_task_ids(repo_root)
 
-    print(f"change={args.change} approved={approved} "
-          f"local_head={local_oid or 'unknown'} (advisory; no ls-remote)")
+    if args.change:
+        # Single-change output is unchanged, byte for byte. An explicit --change
+        # is how a human interrogates one change and how the existing contract
+        # tests drive this mode; widening its output would be a silent change to
+        # an interface those tests describe.
+        approved, claimable, only_grade, _count = _explain_change(
+            repo_root, args.change, done=done, local_oid=local_oid,
+            done_line_after_header=True)
+        if not approved:
+            print("change is not approved; nothing is dispatchable regardless")
+            return EXIT_NO_DISPATCH
+        if only_grade:
+            print(f"one Decision-Grade line from claimable: {sorted(only_grade)}")
+        print(f"claimable={sorted(claimable) or 'none'}")
+        return EXIT_DISPATCHED if claimable else EXIT_NO_DISPATCH
+
+    change_ids = active_change_ids(repo_root)
     print(f"done_task_ids={len(done)} (active + archived changes)")
     claimable: list[str] = []
+    only_grade: list[str] = []
+    total = 0
+    for change_id in change_ids:
+        _approved, change_claimable, change_only_grade, count = _explain_change(
+            repo_root, change_id, done=done, local_oid=local_oid,
+            done_line_after_header=False)
+        claimable.extend(change_claimable)
+        only_grade.extend(change_only_grade)
+        total += count
+    print(f"scanned changes={len(change_ids)} candidates={total}")
+    if only_grade:
+        print(f"one Decision-Grade line from claimable: {sorted(only_grade)}")
+    print(f"claimable={sorted(claimable) or 'none'}")
+    return EXIT_DISPATCHED if claimable else EXIT_NO_DISPATCH
+
+
+def _explain_change(repo_root: Path, change_id: str, *,
+                    done: frozenset[str], local_oid: str,
+                    done_line_after_header: bool
+                    ) -> tuple[bool, list[str], list[str], int]:
+    """Print one change's group and return (approved, claimable, only_grade, n).
+
+    Both modes render a candidate the same way because they call this one
+    function; the repo-wide mode is a loop over it plus a summary, not a second
+    renderer that could drift from the single-change one.
+
+    An unapproved change contributes nothing claimable, but its candidates are
+    still enumerated: "why is this task not moving" is a question an operator
+    asks about unapproved changes too, and a repo-wide scan that hid them would
+    make the change look absent rather than unapproved.
+    """
+    from .worker import GATED_GRADES, rejection_reasons
+
+    candidates = discover_candidates(repo_root, change_id)
+    approved = _change_is_approved(repo_root, change_id)
+    print(f"change={change_id} approved={approved} "
+          f"local_head={local_oid or 'unknown'} (advisory; no ls-remote)")
+    if done_line_after_header:
+        print(f"done_task_ids={len(done)} (active + archived changes)")
+
+    claimable: list[str] = []
+    only_grade: list[str] = []
     for candidate in candidates:
         reasons = rejection_reasons(candidate, done=done, main_oid=local_oid)
         if not reasons:
-            claimable.append(candidate.task_id)
+            if approved:
+                claimable.append(candidate.task_id)
             print(f"  {candidate.task_id}: CLAIMABLE")
             continue
         print(f"  {candidate.task_id}: rejected")
         for reason in reasons:
             print(f"      - {reason}")
-    if not approved:
-        print("change is not approved; nothing is dispatchable regardless")
-        return EXIT_NO_DISPATCH
-    only_grade = [
-        c.task_id for c in candidates
-        if len(rejection_reasons(c, done=done, main_oid=local_oid)) == 1
-        and c.decision_grade not in GATED_GRADES
-        and "decision grade" in rejection_reasons(
-            c, done=done, main_oid=local_oid)[0]
-    ]
-    if only_grade:
         # Stated loudly because it inverts the safety story: for these tasks the
         # missing Decision-Grade line is the ONLY thing standing between the loop
         # and a claim, so filling the field in is a per-task human judgement.
-        print(f"one Decision-Grade line from claimable: {sorted(only_grade)}")
-    print(f"claimable={sorted(claimable) or 'none'}")
-    return EXIT_DISPATCHED if claimable else EXIT_NO_DISPATCH
+        if (len(reasons) == 1 and candidate.decision_grade not in GATED_GRADES
+                and "decision grade" in reasons[0]):
+            only_grade.append(candidate.task_id)
+    if not approved and not done_line_after_header:
+        print(f"  change {change_id} is not approved; "
+              "nothing in it is dispatchable regardless")
+    return approved, claimable, only_grade, len(candidates)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -374,9 +540,12 @@ def main(argv: list[str] | None = None) -> int:
                               commit_writer=write_commit, ttl_seconds=args.ttl)
 
         run_id = str(uuid.uuid4())
-        candidates = discover_candidates(repo_root, args.change)
+        change_ids = ([args.change] if args.change
+                      else active_change_ids(repo_root))
+        scope = args.change or SCOPE_ALL
+        candidates = discover_all(repo_root, change_ids)
         main_oid = observed_main(runner)
-        truth = build_truth(api, runner, repo_root, args.change, main_oid, candidates)
+        truth = build_truth(api, runner, repo_root, scope, main_oid, candidates)
 
         cursor_state, cursor_body = _load_cursor(api, args.cursor_issue, main_oid)
 
@@ -387,13 +556,14 @@ def main(argv: list[str] | None = None) -> int:
             read_envelope=_envelope_reader(repo_root),
             read_lease_record=read_lease_record(str(repo_root)),
             prepare_branch=branch_preparer(refs, str(repo_root), writer=write_commit),
-            render_body=body_renderer(str(repo_root), change_id=args.change,
-                                      producer=args.owner_run, run_id=run_id),
+            render_body=_candidate_body_renderer(
+                str(repo_root), fallback_change=scope,
+                producer=args.owner_run, run_id=run_id),
             now=lambda: int(time.time()),
             cursor_issue=args.cursor_issue,
             cursor_body=cursor_body,
         )
-        result = worker.run_once(candidates, args.change, main_oid, cursor_state, truth)
+        result = worker.run_once(candidates, scope, main_oid, cursor_state, truth)
     except (BackendError, TransportError, LeaseError, CursorError,
             ReconcileRequired) as error:
         print(f"host-loop: setup/round failure: {error}", file=sys.stderr)
@@ -402,8 +572,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"host-loop: unexpected {type(error).__name__}: {error}", file=sys.stderr)
         return EXIT_ERROR
 
-    print(f"host-loop: {result.state.value} task={result.task_id} "
-          f"pr={result.pr_number} :: {result.detail}")
+    print(_round_line(_utc_stamp(int(time.time())), changes=len(change_ids),
+                      candidates=len(candidates), result=result))
     if result.state == WorkerState.RECONCILE_REQUIRED:
         return EXIT_RECONCILE
     if result.dispatched:

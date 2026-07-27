@@ -76,11 +76,14 @@ DISPATCH_MARKER = "Check-Dispatch"
 DISPATCHABLE_GRADES = frozenset({"D0"})
 GATED_GRADES = frozenset({"D1", "D2"})
 
-# The TASK-HLR-003 readiness makes this task itself a ready host-only task the
-# moment it merges. Claiming it would open a PR against work a human is already
-# implementing, so discovery excludes it unconditionally. Widening this set is a
-# governance change, not a configuration tweak.
-NEVER_CLAIM_ROOTS = frozenset({"TASK-HLR-003"})
+# A task whose implementation edits the loop's own code becomes a ready host-only
+# task the moment its readiness merges. Claiming it would open a PR against work a
+# human is already implementing, and for the navigation tasks it would additionally
+# let the loop rewrite the gate that decides what it may claim. Discovery therefore
+# excludes these roots unconditionally. Widening this set is a governance change,
+# not a configuration tweak: every entry is authorised by that task's own readiness
+# (TASK-HLR-003 r2; TASK-NAV-001 / TASK-NAV-002 r1, contract item 4).
+NEVER_CLAIM_ROOTS = frozenset({"TASK-HLR-003", "TASK-NAV-001", "TASK-NAV-002"})
 
 # Matched after normalisation so a suffixed sibling cannot slip through. The
 # repo's grammar (and this PR's parity test) admits TASK-HLR-003A and
@@ -97,6 +100,17 @@ def is_never_claim(task_id: str) -> bool:
     return bool(_NEVER_CLAIM_RE.match(task_id.strip().upper()))
 
 
+def is_ready(status: str) -> bool:
+    """The single reading of the Status field every claim gate agrees on.
+
+    Extracted because two places tested readiness and only one of them was
+    right: `rejection_reasons` used this prefix test while the never-claim
+    branch of `select()` tested nothing at all, so a done never-claim task was
+    still announced as "ready". One predicate cannot disagree with itself.
+    """
+    return isinstance(status, str) and status.startswith("ready")
+
+
 @dataclass(frozen=True)
 class TaskCandidate:
     task_id: str
@@ -106,6 +120,11 @@ class TaskCandidate:
     dependencies: tuple[str, ...]
     allowed_paths: tuple[str, ...]
     base_pin: str | None
+    # Which change declared this task. A repo-wide round aggregates candidates
+    # from every active change, and approval is a per-change fact, so the gate
+    # needs to know which proposal to consult. Defaulted because a single-change
+    # round (and every existing fixture) passes the scope label separately.
+    change_id: str = ""
 
 
 GATED_GRADE_REASON = "decision grade {grade} is human-gated (D1/D2)"
@@ -131,7 +150,7 @@ def rejection_reasons(
     reasons: list[str] = []
     if is_never_claim(candidate.task_id):
         reasons.append("never-claim: the readiness forbids claiming this task")
-    if not candidate.status.startswith("ready"):
+    if not is_ready(candidate.status):
         reasons.append(f"status {candidate.status!r} is not ready")
     if candidate.hardware_required:
         reasons.append("hardware required: device work is never host-loop work")
@@ -149,6 +168,43 @@ def rejection_reasons(
         reasons.append(
             f"decision grade {candidate.decision_grade!r} is not dispatchable")
     return tuple(reasons)
+
+
+def classify_no_claim(
+    candidates: "list[TaskCandidate]", *, done: frozenset[str] | set[str],
+    main_oid: str,
+) -> tuple[SelectionOutcome, str]:
+    """Say why nothing was claimable. One implementation, two callers.
+
+    `Worker.select()` calls it to label a round and the repo-wide navigator calls
+    it to label an idle scan across every active change. A second copy would let
+    the round and the log it prints disagree about the same candidate set — the
+    "two implementations of one contract" shape this module has already been
+    bitten by twice.
+
+    The never-claim branch filters on `ready`, which is the defect this function
+    was extracted to fix. It previously asked only `is_never_claim(task_id)`, so
+    once TASK-HLR-003 went `done` the loop still reported
+    `only never-claim tasks are ready (['TASK-HLR-003'])` — naming a task that was
+    neither ready nor the reason the round found nothing. Measured on the audit
+    base: 31 consecutive rounds carried that sentence.
+    """
+    gated = [
+        c.task_id for c in candidates
+        if rejection_reasons(c, done=done, main_oid=main_oid)
+        == (GATED_GRADE_REASON.format(grade=c.decision_grade),)
+    ]
+    if gated:
+        return (SelectionOutcome.ONLY_GATED_READY,
+                f"only gated tasks are ready ({sorted(gated)}); a D1/D2 gate is "
+                "not confirmed, so the worker records the block and starts nothing")
+    excluded = sorted(c.task_id for c in candidates
+                      if is_never_claim(c.task_id) and is_ready(c.status))
+    if excluded:
+        return (SelectionOutcome.ONLY_NEVER_CLAIM_READY,
+                f"only never-claim tasks are ready ({excluded}); discovery "
+                "excludes this task's own implementation by readiness rule")
+    return SelectionOutcome.NOTHING_READY, "no ready host-only task"
 
 
 @dataclass(frozen=True)
@@ -232,33 +288,44 @@ class Worker:
     def select(
         self, candidates: list[TaskCandidate], change_id: str, main_oid: str
     ) -> tuple[TaskCandidate | None, SelectionOutcome, str]:
-        """Pick at most one claimable task, or explain why none is claimable."""
-        if not self._change_approved(change_id):
-            return (None, SelectionOutcome.CHANGE_NOT_APPROVED,
-                    f"change {change_id} is not approved; zero dispatch")
+        """Pick at most one claimable task, or explain why none is claimable.
 
+        At most one, whether the caller passed one change's candidates or every
+        active change's: the loop returns on the first clean candidate, so
+        aggregating the input cannot aggregate the claims.
+
+        Approval is evaluated per change rather than once for the round, because
+        a repo-wide scan mixes approved and unapproved changes and a single
+        verdict would either dispatch out of an unapproved change or let one
+        unapproved change stop every other. A candidate with no change id falls
+        back to the round's scope label, which is what a single-change round
+        passes and what every pre-existing caller relies on.
+        """
+        approved: dict[str, bool] = {}
+
+        def change_approved(cid: str) -> bool:
+            if cid not in approved:
+                approved[cid] = self._change_approved(cid)
+            return approved[cid]
+
+        scope_ids = sorted({c.change_id or change_id for c in candidates}
+                           or {change_id})
+        approved_ids = {cid for cid in scope_ids if change_approved(cid)}
+        if not approved_ids:
+            detail = (f"change {change_id} is not approved; zero dispatch"
+                      if scope_ids == [change_id] else
+                      f"no approved change among {scope_ids}; zero dispatch")
+            return None, SelectionOutcome.CHANGE_NOT_APPROVED, detail
+
+        scoped = [c for c in candidates
+                  if (c.change_id or change_id) in approved_ids]
         done = self._done_tasks()
-        gated: list[str] = []
-        for candidate in candidates:
-            reasons = rejection_reasons(candidate, done=done, main_oid=main_oid)
-            if not reasons:
+        for candidate in scoped:
+            if not rejection_reasons(candidate, done=done, main_oid=main_oid):
                 return candidate, SelectionOutcome.CLAIMABLE, "claimable"
-            if reasons == (GATED_GRADE_REASON.format(grade=candidate.decision_grade),):
-                # Human-gated is only the *outcome* when the grade is the single
-                # thing standing in the way; a D1 task that is also blocked or
-                # missing dependencies is not "ready but gated".
-                gated.append(candidate.task_id)
 
-        if gated:
-            return (None, SelectionOutcome.ONLY_GATED_READY,
-                    f"only gated tasks are ready ({sorted(gated)}); a D1/D2 gate is "
-                    "not confirmed, so the worker records the block and starts nothing")
-        if any(is_never_claim(c.task_id) for c in candidates):
-            excluded = sorted(c.task_id for c in candidates if is_never_claim(c.task_id))
-            return (None, SelectionOutcome.ONLY_NEVER_CLAIM_READY,
-                    f"only never-claim tasks are ready ({excluded}); discovery "
-                    "excludes this task's own implementation by readiness rule")
-        return None, SelectionOutcome.NOTHING_READY, "no ready host-only task"
+        outcome, detail = classify_no_claim(scoped, done=done, main_oid=main_oid)
+        return None, outcome, detail
 
     # -- the round --------------------------------------------------------
     def _dispatch_checks(self, number, candidate, base_oid, head_oid):
