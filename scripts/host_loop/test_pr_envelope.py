@@ -561,5 +561,66 @@ class EnvelopeContractTests(unittest.TestCase):
             self.assertNotIn(provider_brand, source.lower())
 
 
+# ------------- DEC-REV-001: field separators must not reach across a newline
+
+class GovernedFileRegexesStayOnTheirLine(unittest.TestCase):
+    """`\\s` includes the newline, the repo's recurring separator defect.
+
+    A bare `##` followed by a line opening with a task token counted as a
+    heading, so "the Task appears exactly once in tasks.md" could be satisfied
+    by prose or double-counted against a real heading. The same shape let the
+    front-matter id match across a line break. These modules exist to refuse
+    malformed governed files, so a parser that invents structure in them is the
+    defect, not a nuisance.
+    """
+
+    def test_a_bare_hash_pair_does_not_borrow_the_next_line(self):
+        self.assertEqual(
+            pr_envelope.TASK_HEADER_RE.findall("##\nTASK-HLR-001 only-in-prose"),
+            [], "a phantom heading was minted from the following line")
+
+    def test_a_real_heading_is_still_matched(self):
+        self.assertEqual(
+            pr_envelope.TASK_HEADER_RE.findall("## TASK-HLR-001 — real"),
+            ["TASK-HLR-001"])
+
+    def test_extra_horizontal_space_is_still_a_heading(self):
+        self.assertEqual(
+            pr_envelope.TASK_HEADER_RE.findall("##\t  TASK-HLR-001 — real"),
+            ["TASK-HLR-001"])
+
+    def test_a_heading_at_end_of_input_is_matched(self):
+        self.assertEqual(
+            pr_envelope.TASK_HEADER_RE.findall("## TASK-HLR-001"),
+            ["TASK-HLR-001"])
+
+    def test_the_front_matter_id_does_not_reach_across_the_break(self):
+        self.assertIsNone(
+            pr_envelope.FRONTMATTER_ID_RE.search("id:\nCHG-2026-030-host-loop"),
+            "the id was read from the line below the key")
+
+    def test_the_front_matter_id_is_still_read_from_its_own_line(self):
+        match = pr_envelope.FRONTMATTER_ID_RE.search(
+            "---\nid: CHG-2026-030-host-loop-runtime\nstatus: verified\n---\n")
+        self.assertIsNotNone(match)
+        self.assertEqual(match.group(1), "CHG-2026-030-host-loop-runtime")
+
+    def test_no_governed_regex_in_this_module_still_uses_a_newline_class(self):
+        """Structural sweep, so the next one added is caught here.
+
+        AST rather than a text grep: a grep finds the pattern inside this very
+        docstring, which is how the sibling sweep in the navigation contract
+        first reported itself.
+        """
+        source = Path(pr_envelope.__file__).read_text(encoding="utf-8")
+        module = ast.parse(source)
+        offenders = []
+        for node in ast.walk(module):
+            if isinstance(node, ast.Constant) and isinstance(node.value, str):
+                if r"\s*" in node.value or r"\s+" in node.value:
+                    offenders.append(node.value[:60])
+        self.assertEqual(offenders, [], f"whitespace class spans lines: {offenders}")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

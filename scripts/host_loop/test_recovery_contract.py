@@ -260,5 +260,67 @@ def restart(window, **fields):
     return restart_decision(window, RestartObservation(**fields))
 
 
+# ------------------- DEC-REV-001: `(#N)` identifies a squash, not a mention
+
+class TheSubjectConventionIsAnchoredAtTheEnd(unittest.TestCase):
+    """Substring matching failed in both directions.
+
+    A later commit that merely mentions the number satisfied source B in the
+    sha-null fallback, so an unrelated commit could be confirmed as the merge;
+    and when a real squash and a mention both sat in the scan window, two
+    matches read as ambiguous and stopped the lane. GitHub puts `(#N)` at the
+    end of a squash subject, which is what "locate it uniquely" means.
+    """
+
+    MAIN = "e" * 40
+    SQUASH = "1" * 40
+    FOLLOWUP = "2" * 40
+
+    def _confirm(self, history):
+        def runner(argv):
+            if argv[:2] == ["git", "log"]:
+                return 0, history, ""
+            return 1, "", "unexpected command"
+
+        return confirm_merged({"merged": True, "merge_commit_sha": None},
+                              42, self.MAIN, runner)
+
+    def test_a_mention_alone_never_confirms(self):
+        result = self._confirm(
+            f"{self.FOLLOWUP}\tfollow-up: address feedback from (#42) (#900)\n")
+        self.assertFalse(result.confirmed,
+                         "a commit that only mentions the PR was read as its merge")
+
+    def test_a_real_squash_subject_confirms(self):
+        result = self._confirm(f"{self.SQUASH}\tfeat(TASK-X-001): do the thing (#42)\n")
+        self.assertTrue(result.confirmed)
+        self.assertEqual(result.merge_oid, self.SQUASH)
+
+    def test_a_mention_does_not_make_a_real_squash_ambiguous(self):
+        # A follow-up is itself a squash, so it ends with its OWN number and
+        # carries the reference mid-subject. That asymmetry is what the anchor
+        # exploits; a fixture where both lines end in (#42) would be asserting
+        # that two squashes of one PR are distinguishable, which they are not.
+        result = self._confirm(
+            f"{self.FOLLOWUP}\tfollow-up: address feedback from (#42) (#900)\n"
+            f"{self.SQUASH}\tfeat(TASK-X-001): do the thing (#42)\n")
+        self.assertTrue(result.confirmed,
+                        "a mention alongside the real squash stopped the lane")
+        self.assertEqual(result.merge_oid, self.SQUASH)
+
+    def test_trailing_whitespace_does_not_hide_the_anchor(self):
+        result = self._confirm(f"{self.SQUASH}\tfeat: do the thing (#42)   \n")
+        self.assertTrue(result.confirmed)
+
+    def test_a_different_number_is_not_a_match(self):
+        result = self._confirm(f"{self.SQUASH}\tfeat: something else (#420)\n")
+        self.assertFalse(result.confirmed)
+
+    def test_two_genuine_squashes_are_still_ambiguous(self):
+        result = self._confirm(
+            f"{self.SQUASH}\tfeat: one (#42)\n{self.FOLLOWUP}\tfeat: two (#42)\n")
+        self.assertFalse(result.confirmed)
+
+
 if __name__ == "__main__":
     unittest.main()
