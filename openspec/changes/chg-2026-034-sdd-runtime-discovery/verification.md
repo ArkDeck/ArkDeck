@@ -1,7 +1,7 @@
 # CHG-2026-034 Verification Plan
 
 > Change:CHG-2026-034-sdd-runtime-discovery@r1
-> Status:planned
+> Status:passed # 2026-07-27；三 AC 结论与全链 merge OID 见 proposal.md「Verification closure」段；仅在维护者 review/merge 本 verification-closure PR 后生效
 > Core baseline:CORE-2.1.0（零 Core delta）
 
 ## Environment
