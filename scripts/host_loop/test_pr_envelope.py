@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import ast
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -21,7 +22,18 @@ import check_pr_paths  # noqa: E402
 from host_loop import pr_envelope  # noqa: E402
 
 
-BASE_OID = "a" * 40
+# A synthetic base worked here only while check_pr_paths read its allowlist
+# from the working tree; it now resolves the base tree out of git
+# (TASK-DEC-004), so a fabricated base is a fail-closed error rather than an
+# unused string. HEAD stays the one commit guaranteed to exist even in the
+# depth-1 clone CI checks out. The head OID is never resolved and must
+# differ from the base, which the envelope contract requires.
+BASE_OID = subprocess.run(
+    ["git", "-C", str(REPO_ROOT), "rev-parse", "HEAD"],
+    check=True,
+    capture_output=True,
+    text=True,
+).stdout.strip()
 HEAD_OID = "b" * 40
 # Dynamically sampled: parse_and_validate binds Change to an ACTIVE
 # change directory by design, so a pinned sample breaks on archive

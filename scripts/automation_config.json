@@ -5,6 +5,10 @@
     "ArkDeckApp/**",
     "ArkDeckAppUITests/**",
     "scripts/**",
-    ".github/**"
+    ".github/**",
+    "ArkDeck.xcodeproj/**",
+    "AGENTS.md",
+    ".gitignore",
+    ".python-version"
   ]
 }

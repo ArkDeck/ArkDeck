@@ -3,17 +3,27 @@
 
 TASK-MECH-004 keeps approval semantics unchanged: this is a read-only guard
 against accidental scope expansion, not an authorization or approval oracle.
+
+Known residual (TASK-DEC-004, ledger B-H2): both workflows check out the
+head being reviewed and run *this file* from that checkout, so a task whose
+Allowed paths include `scripts/**` can change the checker and its tests in
+the same pull request the changed checker then judges. Task definitions now
+come from the base tree, which removes the allowlist half of that loop, but
+the code half remains structural and is not closed here — breaking it needs
+the guard to run from a trusted checkout, which is its own change. Until
+then the compensating control is human review of any diff touching this
+file.
 """
 
 from __future__ import annotations
 
 import argparse
 import datetime
-import fnmatch
 import json
 import re
 import subprocess
 import sys
+import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Sequence
@@ -21,7 +31,10 @@ from typing import Iterable, Sequence
 
 TASK_TOKEN_TEXT = r"TASK-[A-Z0-9]+(?:-[A-Z0-9]+)*-[0-9]{3}[A-Z]?"
 TASK_TOKEN_RE = re.compile(rf"(?<![A-Z0-9-])({TASK_TOKEN_TEXT})(?![A-Z0-9-])")
-TASK_LINE_RE = re.compile(rf"^\s*Task:\s*({TASK_TOKEN_TEXT})\s*$", re.MULTILINE)
+# `[ \t]*`, never `\s*`: a `\s*` field separator matches across a newline, so
+# a body containing a bare `Task:` line would bind whatever token starts the
+# next line.
+TASK_LINE_RE = re.compile(rf"^[ \t]*Task:[ \t]*({TASK_TOKEN_TEXT})[ \t]*$", re.MULTILINE)
 TASK_HEADER_RE = re.compile(rf"^##\s+({TASK_TOKEN_TEXT})(?:\s|$)", re.MULTILINE)
 FULL_TASK_RE = re.compile(rf"^{TASK_TOKEN_TEXT}$")
 FULL_OID_RE = re.compile(r"^[0-9a-fA-F]{40}$")
@@ -31,6 +44,23 @@ ALLOWED_PATHS_RE = re.compile(
     re.MULTILINE,
 )
 BACKTICK_PATH_RE = re.compile(r"(?:(本\s+change)\s*)?`([^`\n]+)`")
+
+# An Allowed paths block ends at the next top-level bullet or any heading. A
+# tab-indented bullet and a `*` bullet end it too: neither is the space-indented
+# `- ` sub-item the corpus uses for declaration lines.
+BLOCK_TERMINATOR_RE = re.compile(r"^(?:- |#{1,6}[ \t]|\t+[-*+] |[ \t]*\* )")
+# Sub-items and the `- Allowed paths:` line itself are declaration lines: a
+# prose prefix such as `修改`/`新增` precedes the path they declare.
+DECLARATION_LINE_RE = re.compile(r"^[ \t]+- ")
+# Annotations are parenthesised and routinely wrap across lines.
+ANNOTATION_RE = re.compile(r"（[^（）]*）|\([^()]*\)", re.DOTALL)
+PROSE_WORD_RE = re.compile(r"[A-Za-z][A-Za-z0-9./-]*|[一-鿿]+")
+# The closed connective set that may sit between two tokens of one wrapped
+# list. Anything else means prose has started and the list has ended.
+LIST_CONNECTIVES = frozenset({"与", "和"})
+# A 40-hex token is a pinned blob recorded next to the file it pins, never a
+# path: no repository path is named that way.
+PINNED_BLOB_RE = re.compile(r"^[0-9a-f]{40}$")
 
 # The sensitive-path table lives next to this script so guard code and guard
 # data travel in the same checkout and the same `scripts/**` protection domain
@@ -175,7 +205,54 @@ def load_pull_request_context(event_path: Path) -> PullRequestContext:
     pull_request = event.get("pull_request") if isinstance(event, dict) else None
     if not isinstance(pull_request, dict):
         raise CheckError("event has no pull_request object")
-    return pull_request_context_from_object(pull_request)
+    context = pull_request_context_from_object(pull_request)
+    # Shape only used to be checked here; identity was not. The consumer of
+    # this mode triggers on `edited`, and editing the base branch is an
+    # `edited` event, so an unvalidated event was a self-service way to pick
+    # which commits the guard would compare against.
+    if pull_request.get("state") != "open":
+        raise CheckError("pull_request state must be open")
+    if pull_request.get("merged") is not False:
+        raise CheckError("pull_request merged must be false")
+    base = pull_request.get("base")
+    head = pull_request.get("head")
+    base_repository = _repository_name(base.get("repo"), "base.repo")
+    head_repository = _repository_name(head.get("repo"), "head.repo")
+    if base_repository != head_repository:
+        raise CheckError(
+            "pull_request base and head repositories differ: "
+            f"{base_repository} vs {head_repository}"
+        )
+    return context
+
+
+def assert_base_is_ancestor(repo_root: Path, context: PullRequestContext) -> None:
+    """Refuse a base that is not an ancestor of the head being reviewed.
+
+    `git diff base..head` reports what head has that base lacks. Point base
+    at a side branch that already carries the offending file and the file
+    drops out of the diff entirely — measured live, the offending PR then
+    passed. A base off the head's own history is either that substitution or
+    a branch left behind by an advanced main; both are answered by rebasing.
+    """
+    completed = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(repo_root),
+            "merge-base",
+            "--is-ancestor",
+            context.base_oid,
+            context.head_oid,
+        ],
+        check=False,
+        capture_output=True,
+    )
+    if completed.returncode != 0:
+        raise CheckError(
+            f"pull_request base {context.base_oid} is not an ancestor of head "
+            f"{context.head_oid}; rebase the branch on the base commit"
+        )
 
 
 def _positive_integer(value: object, field: str) -> int:
@@ -258,7 +335,46 @@ def validate_pull_request_identity(
     return pull_request_context_from_object(pull_request)
 
 
+def _fold_confusables(text: str) -> str:
+    """NFKC plus every Unicode dash folded to ASCII `-`.
+
+    NFKC alone is not enough here: U+2011 (non-breaking hyphen) normalises
+    to U+2010, still not the ASCII hyphen the task grammar requires, so the
+    token stays invisible. Folding the whole `Pd` category catches the
+    hyphen family; look-alike letters from other scripts are a wider
+    problem this does not claim to solve.
+    """
+    folded = unicodedata.normalize("NFKC", text)
+    return "".join(
+        "-" if unicodedata.category(character) == "Pd" else character
+        for character in folded
+    )
+
+
+def _confusable_task_tokens(text: str) -> set[str]:
+    """Task tokens that appear only after confusable characters are folded.
+
+    A title carrying U+2011 instead of `-` renders as a task declaration to
+    a human while `TASK_TOKEN_RE` finds nothing, so the ambiguity check
+    cannot see the disagreement and the guard silently runs some other
+    task's allowlist. Neither reading is trustworthy: report the conflict.
+    """
+    folded = _fold_confusables(text)
+    if folded == text:
+        return set()
+    return set(TASK_TOKEN_RE.findall(folded)) - set(TASK_TOKEN_RE.findall(text))
+
+
 def resolve_task_declaration(context: PullRequestContext) -> str | None:
+    for field, text in (("title", context.title), ("body", context.body)):
+        confusable = _confusable_task_tokens(text)
+        if confusable:
+            rendered = ", ".join(sorted(confusable))
+            raise CheckError(
+                f"PR {field} contains a confusable task token that only "
+                f"resolves after Unicode normalisation: {rendered}"
+            )
+
     body_tasks = TASK_LINE_RE.findall(context.body)
     title_tasks = TASK_TOKEN_RE.findall(context.title)
     explicit_tasks = set(body_tasks) | set(title_tasks)
@@ -416,7 +532,28 @@ def load_task_definitions_at_commit(
     )
 
 
+def _mask_annotations(block: str) -> str:
+    """Blank out parenthesised annotations, preserving line structure.
+
+    Annotations wrap across lines, so the mask has to run over the whole
+    block; replacing newlines would merge lines and misalign every
+    subsequent one against its raw counterpart.
+    """
+    return ANNOTATION_RE.sub(
+        lambda match: re.sub(r"[^\n]", " ", match.group(0)), block
+    )
+
+
 def extract_allowed_patterns(repo_root: Path, task: TaskDefinition) -> tuple[str, ...]:
+    """Read the declared path patterns, refusing to absorb surrounding prose.
+
+    Every backtick token in the block used to become a glob, so a sentence
+    that merely mentions `scripts/**` handed the task that surface. The
+    block is now read as a delimited list: the `- Allowed paths:` line and
+    its `- ` sub-items are declaration lines and contribute their tokens,
+    while a wrapped continuation contributes only the tokens that precede
+    its first prose word — once prose starts, the list has ended.
+    """
     matches = list(ALLOWED_PATHS_RE.finditer(task.section))
     if not matches:
         raise CheckError(f"task {task.task_id} has no Allowed paths line")
@@ -424,19 +561,36 @@ def extract_allowed_patterns(repo_root: Path, task: TaskDefinition) -> tuple[str
         raise CheckError(f"task {task.task_id} has multiple Allowed paths lines")
 
     match = matches[0]
-    block_lines = [match.group(1)]
-    remainder = task.section[match.end() :].splitlines()
-    for line in remainder:
-        if line.startswith("- ") or line.startswith("## "):
+    raw_lines = [match.group(1)]
+    for line in task.section[match.end() :].splitlines():
+        if BLOCK_TERMINATOR_RE.match(line):
             break
-        block_lines.append(line)
-    block = "\n".join(block_lines)
+        raw_lines.append(line)
+    masked_block = _mask_annotations("\n".join(raw_lines))
+    # Matched over the whole block, not line by line: a `本 change` marker may
+    # sit at the end of one line with the token it qualifies on the next, and
+    # splitting first would silently rebase that pattern on the repository root.
+    line_starts = [0]
+    for line in masked_block.split("\n")[:-1]:
+        line_starts.append(line_starts[-1] + len(line) + 1)
 
     change_relative = task.change_directory.relative_to(repo_root).as_posix()
     patterns: list[str] = []
-    for token in BACKTICK_PATH_RE.finditer(block):
+    cursor = 0
+    ended_lines: set[int] = set()
+    for token in BACKTICK_PATH_RE.finditer(masked_block):
+        index = max(i for i, start in enumerate(line_starts) if start <= token.start(2))
+        if index in ended_lines:
+            continue
+        if index > 0 and not DECLARATION_LINE_RE.match(raw_lines[index]):
+            gap_from = max(line_starts[index], cursor)
+            gap = set(PROSE_WORD_RE.findall(masked_block[gap_from : token.start()]))
+            if gap - LIST_CONNECTIVES:
+                ended_lines.add(index)
+                continue
+        cursor = token.end()
         path_pattern = token.group(2).strip()
-        if not path_pattern:
+        if not path_pattern or PINNED_BLOB_RE.fullmatch(path_pattern):
             continue
         if token.group(1):
             path_pattern = f"{change_relative}/{path_pattern}"
@@ -447,8 +601,41 @@ def extract_allowed_patterns(repo_root: Path, task: TaskDefinition) -> tuple[str
     return tuple(patterns)
 
 
-def path_matches(path: str, patterns: Iterable[str]) -> bool:
-    return any(fnmatch.fnmatchcase(path, pattern) for pattern in patterns)
+def glob_regex(pattern: str, *, ignore_case: bool = False) -> re.Pattern[str]:
+    """Translate a path glob, with `*` confined to one path segment.
+
+    `fnmatch` lets a single `*` cross `/`, which silently widened every
+    single-star declaration into a recursive one. `**` still crosses. The
+    semantics here match `test_agent_pr_workflow._glob_regex`, the
+    independent implementation that already had it right; a parity test
+    pins the two against each other.
+    """
+    pieces = [r"\A"]
+    index = 0
+    while index < len(pattern):
+        character = pattern[index]
+        if character == "*" and pattern[index + 1 : index + 2] == "*":
+            pieces.append(".*")
+            index += 2
+            continue
+        if character == "*":
+            pieces.append("[^/]*")
+        elif character == "?":
+            pieces.append("[^/]")
+        else:
+            pieces.append(re.escape(character))
+        index += 1
+    pieces.append(r"\Z")
+    return re.compile("".join(pieces), re.IGNORECASE if ignore_case else 0)
+
+
+def path_matches(
+    path: str, patterns: Iterable[str], *, ignore_case: bool = False
+) -> bool:
+    return any(
+        glob_regex(pattern, ignore_case=ignore_case).match(path)
+        for pattern in patterns
+    )
 
 
 def _archive_child_names(entries: Iterable[GitTreeEntry]) -> set[str]:
@@ -641,8 +828,15 @@ def check_paths(
     repository_paths = tuple(changed_paths)
     task_id = resolve_task_declaration(context)
     if task_id is None:
+        # Case-insensitive on the sensitive side only. `Scripts/x.py` and
+        # `.GitHub/x.yml` are the same files to a case-insensitive checkout
+        # and were sailing past this table. The Allowed paths side stays
+        # case-sensitive: matching more loosely there would widen a task's
+        # authorised surface, the opposite direction.
         offenders = sorted(
-            path for path in repository_paths if path_matches(path, sensitive_patterns)
+            path
+            for path in repository_paths
+            if path_matches(path, sensitive_patterns, ignore_case=True)
         )
         if offenders:
             raise CheckError(
@@ -651,30 +845,33 @@ def check_paths(
             )
         return CheckResult(None, repository_paths, sensitive_patterns)
 
-    definitions = load_task_definitions(repo_root)
-    task = definitions.get(task_id)
-    relocation_paths: frozenset[str] = frozenset()
+    # The allowlist comes from the base tree, never from the tree under
+    # review. Read from head, one commit could widen its own Allowed paths
+    # to `**` and touch anything in the same breath — measured live, it
+    # passed. The head tree still supplies one bit: whether the task is
+    # still active there, which is what distinguishes an archive move from
+    # an ordinary change.
+    base_definitions = load_task_definitions_at_commit(repo_root, context.base_oid)
+    task = base_definitions.get(task_id)
     if task is None:
-        try:
-            base_definitions = load_task_definitions_at_commit(
-                repo_root, context.base_oid
-            )
-        except CheckError as error:
-            raise CheckError(
-                f"declared task {task_id} does not exist in an active change; "
-                f"base lookup failed closed: {error}"
-            ) from error
-        task = base_definitions.get(task_id)
-        if task is None:
-            raise CheckError(
-                f"declared task {task_id} does not exist in an active change or "
-                "the base active changes; archive-only tasks are not authority"
-            )
-        relocation_paths = verify_atomic_archive_fallback(repo_root, context, task)
-    else:
+        raise CheckError(
+            f"declared task {task_id} does not exist in an active change at the "
+            "base commit; archive-only tasks are not authority, and neither is a "
+            "task created or restored by the pull request under review"
+        )
+    # The head side is read from the checkout, not resolved out of git: it
+    # decides only whether this is an archive move, and both branches below
+    # re-derive everything they trust from the two trees themselves. Keeping
+    # it here also keeps the guard usable from a shallow clone, where the
+    # head commit may be the only object present.
+    head_definitions = load_task_definitions(repo_root)
+    relocation_paths: frozenset[str] = frozenset()
+    if task_id in head_definitions:
         reject_archive_copy_for_active_task(
             repo_root, context, task, repository_paths
         )
+    else:
+        relocation_paths = verify_atomic_archive_fallback(repo_root, context, task)
     allowed_patterns = extract_allowed_patterns(repo_root, task)
     offenders = sorted(
         path
@@ -769,6 +966,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             if args.identity_only:
                 raise CheckError("--identity-only is valid only with --pull-request")
             context = load_pull_request_context(args.event)
+            assert_base_is_ancestor(repo_root, context)
         else:
             expectations = _required_pull_request_expectations(args)
             pull_request = _load_json(args.pull_request, "pull_request API response")
@@ -777,7 +975,10 @@ def main(argv: Sequence[str] | None = None) -> int:
                 **expectations,
             )
             if args.identity_only:
-                print(expectations["expected_number"])
+                # Print the number carried by the validated API response, not
+                # the expectation we passed in. Echoing the input made the
+                # caller's read-back comparison true by construction.
+                print(_positive_integer(pull_request.get("number"), "number"))
                 return 0
 
         changed_paths = git_changed_paths(repo_root, context.base_oid, context.head_oid)
