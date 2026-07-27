@@ -79,6 +79,22 @@ class MinterArgumentContract(unittest.TestCase):
                 done = run_minter(*args)
                 self.assertEqual(done.returncode, 1, done.stderr)
 
+    def test_a_flag_in_last_position_without_a_value_names_itself(self):
+        """`shift 2` on a one-element list exits with the shell's message.
+
+        Under `set -e` that produced a bare non-zero exit and no indication of
+        which flag was short, so the caller had to guess.
+        """
+        for flag in ("--app-id", "--installation", "--pem", "--out",
+                     "--owner", "--margin"):
+            with self.subTest(flag=flag):
+                done = run_minter("--app-id", "1", "--installation", "2",
+                                  "--pem", "/nonexistent", "--out", "/tmp/x",
+                                  "--owner", "root", flag)
+                self.assertEqual(done.returncode, 1, done.stderr)
+                self.assertIn(flag, done.stderr)
+                self.assertIn("requires a value", done.stderr)
+
     def test_an_unknown_flag_is_refused_rather_than_ignored(self):
         done = run_minter("--app-id", "1", "--installation", "2",
                           "--pem", "/nonexistent", "--out", "/tmp/x",
@@ -213,12 +229,93 @@ class MinterSourceContract(unittest.TestCase):
                              f"root execution surface must not include {forbidden!r}")
 
     def test_every_external_command_is_a_root_owned_absolute_tool(self):
-        """PATH is pinned to system directories, so no user dir can shadow a tool."""
-        self.assertIn("PATH=/usr/bin:/bin:/usr/sbin:/sbin", self.code)
+        """PATH is pinned, and every tool invoked resolves inside it.
+
+        Asserting only that the `PATH=` line exists left the actual claim
+        untested: a tool added later that lives somewhere else would pass.
+        This resolves each command name the script invokes against the pinned
+        directories and checks the file it finds is root-owned and not
+        writable by group or other.
+        """
+        import re
+        import shutil
+
+        pinned = ["/usr/bin", "/bin", "/usr/sbin", "/sbin"]
+        self.assertIn(f"PATH={':'.join(pinned)}", self.code)
+
+        shell_builtins = {
+            "printf", "exit", "shift", "case", "esac", "eval", "set", "trap",
+            "umask", "export", "die", "b64url", "cleanup", "need_value",
+            "if", "then", "else", "fi", "for", "do", "done", "while", "return",
+            "local", "read", "test", "true", "false", "echo", ":",
+        }
+        quoted = re.compile(r"'[^']*'|\"(?:\\.|[^\"\\])*\"")
+        invoked = set()
+        for line in self.code.splitlines():
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#"):
+                continue
+            # Prose lives inside quotes; a command never does. Blanking the
+            # quoted spans first is what keeps this from "invoking" the words
+            # of an error message.
+            bare = quoted.sub(" ", stripped)
+            for chunk in re.split(r"\||\$\(|&&|;", bare):
+                match = re.match(r"^\s*([a-z][a-z0-9_-]*)\s", chunk)
+                if match and match.group(1) not in shell_builtins:
+                    invoked.add(match.group(1))
+        self.assertTrue(invoked, "no external command was detected at all")
+        for command in sorted(invoked):
+            with self.subTest(command=command):
+                resolved = shutil.which(command, path=":".join(pinned))
+                self.assertIsNotNone(
+                    resolved, f"{command} does not resolve inside the pinned PATH"
+                )
+                info = os.stat(resolved)
+                self.assertEqual(info.st_uid, 0, f"{resolved} is not root-owned")
+                self.assertFalse(
+                    info.st_mode & (stat.S_IWGRP | stat.S_IWOTH),
+                    f"{resolved} is group- or world-writable",
+                )
 
     def test_a_failed_mint_exits_two_and_says_the_token_is_untouched(self):
-        self.assertIn("existing token untouched", self.code)
-        self.assertIn("2", self.code)
+        """Exit 2 has to be the code on the mint-failure path specifically.
+
+        `assertIn("2", self.code)` was true of any script containing the
+        digit — including this one before the exit code existed. The claim is
+        that every failure after the token file could be at risk exits 2, so
+        that is what gets asserted.
+        """
+        import re
+
+        untouched = [line.strip() for line in self.code.splitlines()
+                     if "existing token untouched" in line and "die " in line]
+        self.assertTrue(untouched, "no die() carries the untouched-token promise")
+        for line in untouched:
+            with self.subTest(line=line):
+                self.assertRegex(line, r'die ".*existing token untouched.*" 2$')
+
+        # And the header still documents the code the executable text uses.
+        # `self.raw` deliberately, since `self.code` has comments stripped:
+        # this one assertion is about the documentation agreeing with the
+        # behaviour asserted above, not a substitute for asserting it.
+        self.assertIn(
+            "#   2  minting failed; any pre-existing --out is left "
+            "byte-for-byte intact",
+            self.raw,
+        )
+        # Every die() after the JWT stage must exit 2, not the default 1: a
+        # usage exit code there would tell the caller the token is intact when
+        # nothing checked that.
+        # Anchored on executable text, not the section banner: the banner is a
+        # comment and `self.code` has those stripped, so anchoring there would
+        # have been an assertion about a string that is never present.
+        jwt_stage = self.code.index("b64url() {")
+        after_jwt = self.code[jwt_stage:]
+        for line in after_jwt.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("die ") or " || die " in stripped:
+                with self.subTest(line=stripped):
+                    self.assertRegex(stripped, r'die ".*" 2$', stripped)
 
     def test_freshness_is_decided_per_run_not_by_the_schedule(self):
         """StartInterval firings are skipped across sleep, never queued."""
@@ -227,6 +324,193 @@ class MinterSourceContract(unittest.TestCase):
 
     def test_a_parsed_expiry_is_capped_by_a_conservative_horizon(self):
         self.assertIn("horizon=$((now + 3600))", self.code)
+
+    def test_every_staging_path_is_named_in_the_cleanup_trap(self):
+        """The structural half of the trap contract, run on every platform.
+
+        The behavioural proof lives in MinterCleansUpEveryStagingPath, which
+        only runs on macOS; without this, a Linux CI run would be blind to a
+        staging path dropping out of the trap.
+        """
+        code = self.code
+        body_start = code.index("cleanup() {")
+        body = code[body_start:code.index("trap cleanup", body_start)]
+        for variable in ("response", "status_file", "curl_err", "staged",
+                         "staged_meta"):
+            with self.subTest(variable=variable):
+                self.assertIn(f'${{{variable}:+"${variable}"}}', body)
+
+        # Installed before anything it protects can exist.
+        self.assertLess(code.index("trap cleanup"), code.index("mktemp"))
+        # And every staging variable is pre-initialised, or `set -u` would
+        # abort the trap itself on an early failure.
+        self.assertIn(
+            "response=''; status_file=''; curl_err=''; staged=''; staged_meta=''",
+            code,
+        )
+
+    def test_the_freshness_sidecar_is_root_only(self):
+        """Root reads expires_at_epoch to decide whether to re-mint.
+
+        At 644 and owned by $OWNER, the unprivileged account the loop runs as
+        could rewrite root's own re-mint criterion. Nothing outside this
+        script reads the sidecar, so it stays root-owned 600.
+        """
+        code = self.code
+        self.assertIn('chmod 600 "$staged_meta"', code)
+        self.assertNotIn('chmod 644', code)
+        self.assertNotIn('chown "$OWNER" "$staged_meta"', code)
+        # The token itself still goes to $OWNER: the loop has to read it.
+        self.assertIn('chown "$OWNER" "$staged"', code)
+
+    def test_the_private_key_ownership_and_mode_are_preconditions(self):
+        code = self.code
+        self.assertIn('PEM_OWNER=$(stat -f \'%Su\' "$PEM")', code)
+        self.assertIn('PEM_MODE=$(stat -f \'%Lp\' "$PEM")', code)
+        self.assertIn('[ "$PEM_OWNER" = "root" ]', code)
+        self.assertIn("600|400)", code)
+
+    def test_curls_own_diagnostic_survives_to_the_error_message(self):
+        """HTTP 000 without a reason is undiagnosable; the body stays unprinted."""
+        code = self.code
+        self.assertIn('2>"$curl_err"', code)
+        self.assertNotIn("curl --config - > \"$status_file\" 2>/dev/null", code)
+        self.assertIn('reason=$(head -1 "$curl_err"', code)
+        self.assertNotIn('"$response"', code.split("http=$(cat")[1].split("token=")[0])
+
+
+@unittest.skipUnless(
+    sys.platform == "darwin",
+    "the minter is macOS-only: it uses BSD `stat -f`, which GNU stat reads as "
+    "a filesystem query. Running it under Linux CI would test the stub, not "
+    "the script — the structural assertions above run everywhere instead.",
+)
+class MinterCleansUpEveryStagingPath(unittest.TestCase):
+    """Injected failures, run for real, must leave no `.mint.*` behind.
+
+    The full path needs root, so this drives a DERIVED copy: exactly two
+    substitutions, each asserted to match once, neutralise the root gate and
+    the pinned PATH so stub tools can stand in. Everything else — the trap,
+    the staging order, the cleanup body — is the shipped text. The fidelity
+    limit is real and is the reason the substitutions are pinned rather than
+    described: if the script's root gate or PATH line changes shape, this
+    harness fails loudly instead of testing a shape that no longer exists.
+    """
+
+    SUBSTITUTIONS = (
+        ('[ "$(id -u)" = "0" ] || die "must run as root; the PEM is root-only" 1',
+         'if [ "${STUB_SKIP_ROOT:-}" != "1" ]; then\n'
+         '    [ "$(id -u)" = "0" ] || die "must run as root; the PEM is root-only" 1\n'
+         'fi'),
+        ("PATH=/usr/bin:/bin:/usr/sbin:/sbin",
+         'PATH=${STUB_BIN:-}:/usr/bin:/bin:/usr/sbin:/sbin'),
+    )
+
+    STUBS = {
+        # openssl: signs, base64s and digests without a key.
+        "openssl": '#!/bin/sh\ncase "$1" in\n'
+                   '  base64) /usr/bin/openssl base64 -A ;;\n'
+                   '  dgst) if [ "$2" = "-sha256" ] && [ "$3" = "-r" ]; then\n'
+                   '            printf "%s  -\\n" "0123456789abcdef" ;\n'
+                   '        else printf "SIGNATUREBYTES" ; fi ;;\n'
+                   '  *) exit 1 ;;\nesac\n',
+        # curl: reads the config from stdin and honours its `output =` line,
+        # so the stub exercises the same stdin-config path the real call uses
+        # rather than being told where to write out of band.
+        "curl": '#!/bin/sh\nconfig=$(cat)\n'
+                'out=$(printf "%s\\n" "$config" | sed -n \'s/^output = "\\(.*\\)"$/\\1/p\' | head -1)\n'
+                '[ -n "$out" ] || exit 3\n'
+                'printf \'{"token":"ghs_stubtoken","expires_at":"2099-01-01T00:00:00Z"}\' > "$out"\n'
+                'printf "201"\n',
+    }
+
+    def _derived(self, directory: Path) -> Path:
+        source = MINTER.read_text()
+        for old, new in self.SUBSTITUTIONS:
+            self.assertEqual(
+                source.count(old), 1,
+                f"harness substitution no longer matches the script: {old!r}",
+            )
+            source = source.replace(old, new)
+        derived = directory / "minter.sh"
+        derived.write_text(source)
+        return derived
+
+    def _stub_bin(self, directory: Path, failing: str | None) -> Path:
+        stub_bin = directory / "stubbin"
+        stub_bin.mkdir()
+        stubs = dict(self.STUBS)
+        if failing is not None:
+            # The injected failure: the tool the atomic-install stage needs.
+            stubs[failing] = '#!/bin/sh\nprintf "injected failure\\n" >&2\nexit 9\n'
+        for name, body in stubs.items():
+            path = stub_bin / name
+            path.write_text(body)
+            path.chmod(0o755)
+        return stub_bin
+
+    def _run(self, failing: str | None):
+        directory = Path(tempfile.mkdtemp(prefix="minter-cleanup-"))
+        self.addCleanup(lambda: __import__("shutil").rmtree(directory, ignore_errors=True))
+        out_dir = directory / "out"
+        out_dir.mkdir(mode=0o700)
+        pem = directory / "key.pem"
+        pem.write_text("not-a-real-key")
+        pem.chmod(0o600)
+        derived = self._derived(directory)
+        stub_bin = self._stub_bin(directory, failing)
+        # The script asserts the PEM is root-owned; this account cannot create
+        # such a file, so that one precondition is stubbed out of the derived
+        # copy too — asserted to match once, like the others.
+        source = derived.read_text()
+        pem_gate = '[ "$PEM_OWNER" = "root" ] || die "private key must be owned by root, found $PEM_OWNER" 2'
+        self.assertEqual(source.count(pem_gate), 1)
+        derived.write_text(source.replace(pem_gate, ": # pem ownership gate stubbed for the harness"))
+
+        done = subprocess.run(
+            ["/bin/sh", str(derived),
+             "--app-id", "1", "--installation", "2", "--pem", str(pem),
+             "--out", str(out_dir / "token"), "--owner", os.environ.get("USER", "root")],
+            capture_output=True, text=True, timeout=30,
+            env={**os.environ, "STUB_SKIP_ROOT": "1", "STUB_BIN": str(stub_bin),
+                 },
+        )
+        residue = sorted(p.name for p in out_dir.iterdir()
+                         if p.name.startswith(".mint."))
+        return done, residue, out_dir
+
+    def test_the_happy_path_installs_and_leaves_nothing_staged(self):
+        done, residue, out_dir = self._run(None)
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertEqual(residue, [], f"staging residue after success: {residue}")
+        token = out_dir / "token"
+        self.assertTrue(token.is_file())
+        self.assertEqual(token.read_text(), "ghs_stubtoken")
+        self.assertEqual(stat.S_IMODE(token.stat().st_mode), 0o600)
+        sidecar = out_dir / "token.meta"
+        self.assertTrue(sidecar.is_file())
+        self.assertEqual(stat.S_IMODE(sidecar.stat().st_mode), 0o600)
+
+    def test_a_failure_in_the_install_stage_leaves_no_token_on_disk(self):
+        """The defect this covers: `$staged` holds the token in plain text.
+
+        Before the trap covered it, a failure between writing the token to the
+        staging file and renaming it left that file sitting in the output
+        directory under a `.mint.*` name.
+        """
+        for failing in ("chmod", "chown", "mv"):
+            with self.subTest(failing_tool=failing):
+                done, residue, out_dir = self._run(failing)
+                self.assertNotEqual(done.returncode, 0)
+                self.assertEqual(
+                    residue, [],
+                    f"{failing} failure left staging residue: {residue}",
+                )
+                for leftover in out_dir.iterdir():
+                    self.assertNotIn(
+                        "ghs_stubtoken", leftover.read_text(errors="replace"),
+                        f"the token survived in {leftover.name}",
+                    )
 
 
 class ExplainIsANetworkFreeDryRun(unittest.TestCase):
