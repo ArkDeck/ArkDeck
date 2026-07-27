@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-030-host-loop-runtime
 revision: 11
-status: verified # 2026-07-26 本 verification-closure PR（先例 #224/#239/#399）；七任务 done + HLR-002B tombstone 全链在案（OID 见 Verification closure）；archive 另行。原注：r1 #361…r11 已批准
+status: archived # 2026-07-27 本 archive PR（先例 #235/#241/#572）；verify #571 merge f4e1f4a8；#573 记录的两条收口条件由 CHG-2026-039 TASK-NAV-002 闭合（#595/#597，归档演练全绿在案），本 PR 即该解锁的首次真刀执行；引用扫描：目录外精确路径引用仅 chg-2026-039 的演练指令/记录文本 3 处（描述本 mv 操作本身，非活路径依赖）；测试面引用全部 archive-aware（test_support 解析/双世界断言）
 class: implementation-only
 core_change_level: none
 owner: lvye
