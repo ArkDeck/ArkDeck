@@ -1,6 +1,6 @@
 # CHG-2026-024 controlled capture execution plan
 
-> Status:plan-only (r3). Human maintainer execution only after the dedicated r3 governance PR
+> Status:plan-only (r4). Human maintainer execution only after the dedicated r3 governance PR
 > is reviewed and merged, **and only after the r3 instrument-identity precondition below is
 > resolved**. Agent/CI must not execute this plan, invoke installed HDC, inspect raw capture
 > bytes or access a real device.
@@ -164,14 +164,55 @@ pipeline or free-form wrapper:
 
 | ID | Fixed command shape | Required fact |
 | --- | --- | --- |
-| `OB-1` | `ps -axo pid,ppid,lstart,command` | exactly one pre-existing HDC server candidate; PID/start identity/executable |
+| ID | Fixed command shape | Required fact |
+| --- | --- | --- |
+| `OB-0`（r4 新增，先于 `OB-1`） | `lsof -nP -iTCP:8710 -sTCP:LISTEN` | 8710 上恰好一个 LISTEN 者；normalized endpoint `127.0.0.1:8710` |
+| `OB-1` | `ps -axo pid,ppid,lstart,command` | 恰好一个 HDC server candidate；PID/start identity/executable |
 | `OB-2` | `lsof -nP -a -p <literal-server-pid> -iTCP` | exact listener endpoint and connections |
 | `OB-3` | `shasum -a 256 <absolute-hdc-path>` and `stat <absolute-hdc-path>` | selected client executable identity |
 
-Raw `OB-*` output stays outside git. If `OB-1/OB-2` is absent, ambiguous, cannot identify the
+**r4:`OB-1` 的识别不得用宽松子串匹配。**实测反例(2026-07-27):
+`grep hdc` 命中 1Password 浏览器助手的 Chrome 扩展 ID
+`aeblfdkhhhdcdjpifhhbdiojplfjncoa`(内含 `hdc` 三字母),在真无 server 时
+产出一条假阳性。判定必须以 `OB-0` 的 8710 LISTEN 者为主,并要求 `OB-1`
+命中行的 command 以 hdc 可执行文件结尾或形如 `hdc -m -s …`;两者指向同一
+PID 才算成立。
+
+Raw `OB-*` output stays outside git. If `OB-0/OB-1/OB-2` is absent, ambiguous, cannot identify the
 exact executable/endpoint, or shows a changed server across a bracket, do not run/continue the
-HDC family. Starting, stopping, restarting, adopting or reconfiguring a server to make the
-precondition pass is prohibited.
+HDC family.
+
+### r4:server 来源与 operator-started 的显式授权
+
+r2/r3 原文禁止「starting, stopping, restarting, adopting or reconfiguring a
+server to make the precondition pass」。2026-07-27 窗口实测触发该条:19:48
+时 `OB-0/OB-1` 双向确认**零 server**;19:51:26 出现 server PID `22677`
+(`hdc -m -s ::ffff:127.0.0.1:8710`、`ppid=1`、user `fuhanfeng`,`lsof`
+normalized 为 `127.0.0.1:8710 (LISTEN)`),同刻**无 DevEco 进程**,故其来源
+= **operator 为本窗口手工启动**,而非独立工作遗留。
+
+r4 对此作**显式授权而非默许**,理由:本 family 要证的是「采集**本身**不产生
+lifecycle 效应、且观察的是已在运行的 server」。server 由 operator 于窗口前
+在 harness 之外启动,与由 DevEco 于数日前启动,对该主张**无实质差别**——只要
+它在全部 bracket 间稳定、且 harness 从不启动/停止/接管/重配它。原条款真正要
+防的是**悄悄制造前提**,故 r4 保留禁令的实质并把它改写为披露义务:
+
+- **允许**:operator 在窗口开始前、于 harness 之外启动一个 server,并在
+  session context 中记录其**来源、启动时刻、启动方式、PID/ppid/executable/
+  normalized endpoint**;
+- **仍然禁止**:窗口**期间**启动/停止/重启/接管/重配 server;为让某一步通过
+  而重启 server;以任何方式声称该 server 是「独立工作遗留的 pre-existing」;
+- **evidence 义务(二值)**:evidence 必须逐字写明「本次 server 由 operator
+  于 `<UTC>` 为本采集窗口手工启动」,并**分开陈述**两件事——(i) harness 自身
+  的 serverStart/serverStop/serverRestart/serverAdoption 计数为 0;
+  (ii) 被观察的 server 由 operator 预先启动。二者不得合并成一句"零 lifecycle
+  效应"的笼统结论;
+- **稳定性门不变**:每次 harness 调用前后 `OB-0/OB-1/OB-2` 的
+  PID/start/executable/normalized endpoint 必须逐项一致,任一变化即停。
+
+`::ffff:127.0.0.1:8710`(argv 的 bind 规格)与 `127.0.0.1:8710`
+(`lsof` 归一化后的 LISTEN 地址)在本 hdc build 上是同一端点的两种书写,
+r4 认定 normalized endpoint 门以 `lsof` 输出为准;argv 形态如实记录。
 
 ## Fixed session context
 
@@ -303,6 +344,10 @@ evidence record. The Agent never receives or reads the raw streams.
 - selected HDC hash/version drift(以 instrument-identity decision 选定值为基准);
 - (D-2) 下 registry/lock/条目命名未显式携带所采集的工具版本(`3.2.0f`),
   或 evidence 未写明与同胞 family(`3.2.0d`)的工具版本差异;
+- (r4) evidence 未披露 server 的 operator-started 来源,或把 harness 零
+  lifecycle 计数与「server 系预先启动」合并成笼统的零效应结论;
+- (r4) 窗口期间 server 被启动/停止/重启/接管/重配,或 bracket 间其
+  PID/start/executable/normalized endpoint 发生变化;
 - server absent, ambiguous, substituted, endpoint-drifted or generation-changed;
 - any lifecycle/adoption/subserver/device-migration/device-mutation/destructive effect observed
   or uncertain;
