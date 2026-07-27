@@ -1,6 +1,6 @@
 ---
 id: CHG-2026-024-hdc-device-snapshot-registration
-revision: 3
+revision: 4
 status: approved # r1 经 approval-only PR #273 合入 main `1eeb516`；r2 仅固定 human-controlled capture execution plan，须由维护者 review/merge 对应治理 PR 后生效
 class: integration
 core_change_level: none
@@ -171,3 +171,24 @@ decision 之下：(D-1) 恢复 3.2.0d 按 r2 原文执行（代价 = 刻意固�
 本 revision 不改变采集方法论（该计划本就是 falsifiable 判定而非预设结论），
 只更换被判定的对象并新增上述 gate 与两条 stop condition。TASK-I24-001 仍
 `blocked`；本 PR 合入不构成 ready，也不接受任何 provenance。
+
+## r4 注记（2026-07-27，窗口内 existing-server 前提触发；原文如实保留）
+
+窗口开启时 `OB-0`(8710 LISTEN)与 `OB-1`(ps)双向确认**零 HDC server**，
+故 r2/r3 的 existing-server 前提当场 FAIL；随后 operator 手工启动了
+server(PID `22677`、`hdc -m -s ::ffff:127.0.0.1:8710`、`ppid=1`、
+`lsof` 归一 `127.0.0.1:8710`，同刻无 DevEco 进程)。r2/r3 原文禁止
+「为让前提通过而启动 server」，故不能默许。
+
+r4 把该禁令的**实质**保留、形式改为**披露义务**:允许 operator 在窗口前于
+harness 之外启动 server 并记录其来源/时刻/方式/身份；窗口期间的任何
+lifecycle 动作仍然禁止；evidence 必须逐字披露该 server 系 operator 为本
+窗口启动，并把「harness 零 lifecycle 计数」与「server 系预先启动」**分开
+陈述**，不得合并为笼统的零效应结论。理由:本 family 要证的是采集本身不产生
+lifecycle 效应且观察对象是已在运行的 server；server 由 operator 于窗口前
+启动与由 DevEco 数日前启动，对该主张无实质差别——真正要防的是悄悄制造前提。
+
+r4 另修一处检测缺陷:`grep hdc` 会命中 1Password 扩展 ID
+`aeblfdkhhhdcdjpifhhbdiojplfjncoa`(实测假阳性)，故新增 `OB-0` 并要求
+executable 级精确匹配。TASK-I24-001 仍 `blocked`；本 PR 合入不接受任何
+provenance。

@@ -1,8 +1,11 @@
 # CHG-2026-024 Verification Plan
 
-> Change:CHG-2026-024-hdc-device-snapshot-registration@r3
+> Change:CHG-2026-024-hdc-device-snapshot-registration@r4
 > Status:planned
 > Core baseline:CORE-2.1.0（canonical Core AC 零认领）
+> Note(2026-07-27):r4 三方同步 = 窗口内 existing-server 前提 FAIL 后，把
+> 「禁止为通过前提而启动 server」改写为 operator-started 的披露义务，新增
+> `OB-0` 与 executable 级精确匹配，新增三条 stop condition。
 > Note(2026-07-27):r3 三方同步 = capture-plan instrument drift（selected HDC
 > `48395ba8…`/`3.2.0d` 不在机，当前唯一副本 `05b2bf7a…`，维护者实测
 > `Ver: 3.2.0f`），新增 instrument-identity decision gate（D-1..D-4）与两条
