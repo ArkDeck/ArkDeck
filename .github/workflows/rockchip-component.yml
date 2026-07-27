@@ -5,6 +5,10 @@ name: Rockchip Component
 # macOS runners. It never signs, packages, launches or dispatches to a device.
 
 on:
+  # TASK-BRC-002R: on-demand materialisation. The signing window (BRC-003)
+  # must be able to re-produce this unsigned input without racing a
+  # one-day artifact or touching a trigger path to provoke a build.
+  workflow_dispatch:
   push:
     branches: [main, "agent/**"]
     paths:
@@ -57,7 +61,7 @@ jobs:
           name: rockchip-${{ matrix.builder }}
           path: ${{ runner.temp }}/output-${{ matrix.builder }}
           if-no-files-found: error
-          retention-days: 1
+          retention-days: 30
 
   compare:
     needs: [unit, build]
@@ -92,7 +96,7 @@ jobs:
           name: rockchip-reproducibility
           path: ${{ runner.temp }}/reproducibility.json
           if-no-files-found: error
-          retention-days: 1
+          retention-days: 30
 
       - name: Committed metadata audit
         run: |
