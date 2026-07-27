@@ -299,8 +299,10 @@ DEC-007、`reviewer.py` 等归 DEC-006）;需要改 launchd/plist。
 
 ## TASK-DEC-006 — reviewer/envelope/recovery 硬化
 
-- Status:blocked（前置：① approval merge;② 独立 readiness 钉四文件与
-  测试 exact blob、verdict 新契约文本、历史 body 兼容清单。）
+- Status:ready（r1 implementation readiness;前置① approval 已合
+  = #598 `cac07003836889881994367bde7ba3e0bdca70c0`,前置② 即本
+  readiness。授权范围与门见下方「Readiness r1」节;任一门不满足即停,
+  不得降门执行。）
 - Platform:macos（host-only）
 - Requirements/AC:change-local `DEC-REV-001`
 - Depends on:none（与 DEC-005/007 文件分区互斥）
@@ -323,11 +325,83 @@ DEC-007、`reviewer.py` 等归 DEC-006）;需要改 launchd/plist。
 
 ### Verification
 
-- `DEC-REV-001`:尾部引用 VERDICT fixture 不再翻转（旧钉测试已反转;
-  变异门：撤销修复该 fixture 必绿=红检测）;(number,head) 去重双 fixture
-  （同 head 重放拒绝、新 head 重审）;`(#N)` 提及型 fixture 不再假确认/
-  假歧义;\s 修复的 phantom header/跨行 id fixture;confirm_merge 零
-  引用 grep;历史 PR body 语料（现存 worker PR）解析回归绿。
+- `DEC-REV-001`:尾部引用 VERDICT fixture 不再翻转（变异门:撤销修复该
+  fixture 必红）;既有 `test_parses_the_last_verdict_line` **保持绿**
+  （见 r1 更正）;(number,head) 去重双 fixture（同 head 重放拒绝、新 head
+  重审）;`(#N)` 提及型 fixture 不再假确认/假歧义;\s 修复的 phantom
+  header/跨行 id fixture;confirm_merge 零引用 grep;历史 PR body 语料
+  （现存 worker PR）解析回归绿。
+
+### Readiness r1（2026-07-27）
+
+**Audit base** = `005e1ffc321b2dbc87409895ac28c290b93f7e24`（十九 blob 与
+approval `cac07003…` 时逐一相同）。
+
+**开工基线声明（Ordering 义务,非 drift gate)**
+
+```yaml pins
+- path: scripts/host_loop/reviewer.py
+  blob: 574746eb8ec16296ddf7a0c7d5039db5e43d3e0e
+- path: scripts/host_loop/recovery.py
+  blob: d2763e59472ee676ab6231d28273448c94b8f265
+- path: scripts/host_loop/pr_envelope.py
+  blob: 2c286c8da0fa8945d512115dfce9de5150db0831
+- path: scripts/host_loop/identity.py
+  blob: d22e62946e3b5b836cbdcd9b48b57031172fe4b1
+- path: scripts/host_loop/test_reviewer_contract.py
+  blob: aa9dbe949d6498f3ed2612c8feb8d19826826f1e
+- path: scripts/host_loop/test_recovery_contract.py
+  blob: 1dbf61de9d55c0fbed4a87429a25116b4245ea03
+- path: scripts/host_loop/test_pr_envelope.py
+  blob: 47fd19f9653e2e7878668e4e7f3eb45f50da4372
+- path: scripts/host_loop/test_v3_hardening.py
+  blob: fa6a869bc4f104207bdc81275ab272cf5873a1ab
+```
+
+**r1 更正:E-H1 不是契约变更（干跑双向实测,台账已同步更正）**
+
+台账 r1 曾称 `test_parses_the_last_verdict_line` 把"翻转行为"钉成契约、
+修复须反转该测试。**该判断不成立**:该 fixture 的最后一条 `VERDICT:`
+**恰好也是最后一非空行**,两种语义在其上同解。施加最小修复（verdict 取
+最后一非空行、列 0 匹配）后实测:该测试**仍绿**、全套件 536 OK + 1 xf
+**零断言反应**,而攻击形态（`VERDICT: REQUEST_CHANGES` 之后跟附录里缩进
+的 `VERDICT: APPROVE`）由 `APPROVE` 变 `AdapterFailure` = 缺陷关闭。
+**推论:本任务无需反转任何既有测试;危险形态在现套件零覆盖,故新测试
+与变异门是唯一有效性证明。** 若实现时发现某既有测试确因修复变红,
+即停并转 r2——那意味着本更正的前提被推翻。
+
+**Pass/fail boundary**
+
+1. **每个修复配「撤销即变红」的新测试 + 正对照**,逐项覆盖
+   E-H1/E-M1/E-M2/E-M4 与 reviewer 子进程卫生项。
+2. **E-H1 双向断言**:攻击形态必须 `AdapterFailure`（→ 上游
+   `RECONCILE_REQUIRED`,**不得**降级为任何 verdict）;既有 pinned
+   fixture 必须仍绿。二者缺一即不合格。
+3. **E-M2 双向**:提及型 `(#N)` 既不得假确认（回退路径不得把跟进 commit
+   当 merge）、也不得假歧义;正对照 = 真 squash subject 尾部 `(#N)` 仍
+   唯一命中。
+4. **历史兼容是硬门**:现存 worker PR 的 body 语料必须继续解析通过。
+   evidence 须列出所取样本 PR 编号与解析结果。**E-M3 的 path 分支收紧
+   只能在 backends 渲染侧 `none:` 修复（DEC-005）已合入 main 之后进行**;
+   若 DEC-005 未合,本任务只做 path 分支的形状校验而不改 `none` 语义。
+5. `identity.confirm_merge` 退役后:生产与测试零引用（grep 为证）,且
+   `test_fault_matrix` 中原覆盖它的用例改指 `recovery.confirm_merged`
+   正本——**不得直接删测试了事**。若该迁移必须改
+   `test_fault_matrix.py`（属 DEC-005 分区）,即停并在 r2 显式扩权。
+6. 全套件 **≥536 OK + 1 expected failure**;`check-sdd` 保持 0/0/111。
+
+**Risk acceptance（首次）**：verdict 契约收紧会使"verdict 后仍有内容"的
+审阅输出从产出裁决变为 `AdapterFailure` → lane 停给人看。已接受:该方向
+正是本修复的目的,且 reviewer 尚未接线生产（live dispatch 属 HLR-005）,
+本轮为接线前的契约修复,线上零影响。回退 = revert。
+
+**Stop conditions**：任一既有测试因修复变红（前提被推翻,转 r2）;历史
+body 语料解析回归失败;需要触碰 `test_fault_matrix.py` 或其他 DEC-005/007
+分区文件;需要改 `backends.py`。
+
+**不授权**：batch digest 字段清洗（E-L6,留 Phase 4 接线前）;CRLF 楔死
+处置（仅记运维注记）;`instance.py` 收口（DEC-002）;`Decision-Grade`
+代写。
 
 ## TASK-DEC-007 — worker/discovery 解析与观测硬化
 
