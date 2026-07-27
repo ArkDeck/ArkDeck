@@ -491,11 +491,23 @@ body 语料解析回归失败;需要触碰 `test_fault_matrix.py` 或其他 DEC-
 
 ## TASK-DEC-007 — worker/discovery 解析与观测硬化
 
-- Status:ready（r1 implementation readiness;前置① approval 已合 = #598
-  `cac07003…`,前置② TASK-NAV-001 已 done（#600,chg-2026-039 已 archived
-  于 #610）,前置③ 即本 readiness。**本任务含 never-claim 守卫扩充,是
-  其余 DEC 任务被评级前的顺序前置**——见文件头 ⚠ 与下方「Readiness r1」
-  节;任一门不满足即停,不得降门执行。）
+- Status:done（2026-07-27 D0 completion;仅在维护者 review/merge 本独立
+  `ready→done` PR 后生效。实现载体 = **#623**（merge
+  `afa8614c39b7f18bb5af84d6709c33355d65c313`,lvye APPROVED @ exact head
+  `6b52df571e636b41734227a6bb9e5a8340c01cf7`,mergedBy lvye）,readiness
+  r1 载体 = #614（merge `15c1ea8ac163766d8eccded95a2bc8fb07e04c7d`）。
+  九项交付:never-claim 八根守卫、C-H1 续行/散文区分、C-H2 exit 20、
+  C-M4、C-M5、C-M6、C-M8a、C-L11、C-H3 main 位置。evidence =
+  `evidence/runs/TASK-DEC-007/implementation.md`。**flip 后复核**（在
+  翻转后的树上执行,非 flip base——HLR-003 r5 的教训）:host_loop
+  `-m unittest discover` 567 OK + 2 expected failure、`check-sdd`
+  0/0/111、`done_task_ids` 93 且含 `TASK-DEC-007`、`--explain` 对本任务
+  报 `never-claim` + `status 'done' is not ready`、`claimable=none`。
+  **顺序前置已解除:`NEVER_CLAIM_ROOTS` 已含八个 TASK-DEC 根,其余 DEC
+  任务现在可以安全评级**（评级前 `--explain` 不再把任何 TASK-DEC 列入
+  `one Decision-Grade line from claimable`）。第二个 expected failure 是
+  刻意记录的跨分区缺口:`test_v3_hardening.py` 同型 stray-main（直跑 42
+  / 模块跑 52）属 TASK-DEC-006 分区,修好后会报 unexpected success。）
 - Platform:macos（host-only）
 - Requirements/AC:change-local `DEC-NAV-001`
 - Depends on:TASK-NAV-001
