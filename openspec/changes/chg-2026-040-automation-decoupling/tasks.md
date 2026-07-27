@@ -287,9 +287,12 @@ None 的治理文件、重复 capability id、`changes/` 游离条目）。**故
 
 ## TASK-DEC-004 — check_pr_paths 信任边界与解析硬化
 
-- Status:blocked（前置：① approval merge;② TASK-DEC-001 done（同
-  文件）;③ 独立 readiness 钉 exact blob、各修复的语义决策（base 权威
-  的两 workflow 适配、glob 方言声明）与回归清单。）
+- Status:ready（r1 implementation readiness;前置① approval 已合 = #598
+  `cac07003836889881994367bde7ba3e0bdca70c0`,前置② TASK-DEC-001 已 done
+  （实现 #640 `3232377744957b71b29700d275be58bfea799ee3`,翻转 #641
+  `9e7b924917a22f53caae65330ab8f8df8081a7aa`,均 lvye APPROVED/mergedBy
+  lvye）,前置③ 即本 readiness。授权范围、语义决策与门见下方
+  「Readiness r1」节;任一门不满足即停,不得降门执行。）
 - Platform:macos（host-only）
 - Requirements/AC:change-local `DEC-PRP-001`
 - Depends on:TASK-DEC-001
@@ -303,8 +306,8 @@ None 的治理文件、重复 capability id、`changes/` 游离条目）。**故
 - Out of scope:agent-pr.yml 结构重构（B-H2 的 checkout 信任问题记台账
   为架构级观察，本任务只在 workflow 内做低成本缓解或显式记录）、
   concurrency 守卫（B-M6，noted）、swift-ci/rockchip workflow。
-- Allowed paths:`scripts/check_pr_paths.py`、`scripts/test_check_pr_paths.py`、`scripts/test_agent_pr_workflow.py`、`.github/workflows/agent-pr.yml`、本 change `evidence/**`、本 change `tasks.md`（仅本任务状态/evidence 引用）
-- Forbidden paths:`scripts/host_loop/**`、`scripts/check_sdd.py`、`.github/workflows/sdd-guard.yml`（DEC-003 已改;若 base 权威需动其 --event 调用则在 readiness 显式扩权）、`openspec/specs/**`、产品 source/tests、其他 change。
+- Allowed paths:`scripts/check_pr_paths.py`、`scripts/test_check_pr_paths.py`、`scripts/test_agent_pr_workflow.py`、`scripts/automation_config.json`、`.github/workflows/agent-pr.yml`、本 change `evidence/**`、本 change `tasks.md`（仅本任务状态/evidence 引用）
+- Forbidden paths:`scripts/host_loop/**`、`scripts/check_sdd.py`、`.github/workflows/sdd-guard.yml`（DEC-003 已改;r1 实测 base 权威**无需**改其 `--event` 调用,故不扩权——见 r1「workflow 适配」节）、`openspec/specs/**`、产品 source/tests、其他 change。
 - Risk:med（守卫语义变更;现存 5 个任务 Allowed paths 天然拒绝、8+ 全角
   冒号行等存量畸形在收紧下的行为变化须逐项清点入 evidence;回退 =
   revert）。
@@ -317,6 +320,206 @@ None 的治理文件、重复 capability id、`changes/` 游离条目）。**故
   fixture 被拒;homoglyph 标题产生歧义错误;--identity-only 对 API 读回
   篡改 fixture 变红;全部修复各有「撤销即红」对照;对现仓全部 active
   tasks.md 的解析清点报告（吸收项归零或逐项裁决）。
+
+### Readiness r1（2026-07-27）
+
+**Audit base** = `9e7b924917a22f53caae65330ab8f8df8081a7aa`（含 TASK-DEC-001
+的实现 #640 与翻转 #641）。台账 review-findings.md 的行号在更早的 audit
+base 上采集,**DEC-001 已改写 `check_pr_paths.py`,行号整体下移**;下表
+按本 base 重钉的锚以**符号名**给出,行号仅供参考。
+
+**开工基线声明（Ordering 义务,非 drift gate)**
+
+本任务的受改文件必然被本 readiness 授权的 PR 改写,故按 Ordering 义务
+记录开工字节（HLR-003 r3 的 drift-gate 自噬教训),不作「任一漂移即零
+工作」的门:
+
+```yaml pins
+- path: scripts/check_pr_paths.py
+  blob: 784b15c47cd0cb4662a0489e6c992dacb7d5020d
+- path: scripts/test_check_pr_paths.py
+  blob: 7ff31e8511ff9228320ca49f6a55c8c8dbb90017
+- path: scripts/test_agent_pr_workflow.py
+  blob: 10b32515f9590ba78eb9fa477e8fc7b0b93d15a2
+- path: scripts/automation_config.json
+  blob: aeafbc4bddd03df1c3f786d1adc5b4f3b4bbb1f2
+- path: .github/workflows/agent-pr.yml
+  blob: a514d9e539964f9e1960acbe4ffaa696629571da
+```
+
+若开工时实测与上表不符,说明另有载体先动了同一文件,停并转 r2 重钉。
+
+**授权面扩充（r1 新增一文件,理由为实测）**
+
+r1 把 `scripts/automation_config.json` 纳入 Allowed paths。理由不是预防
+性放宽:B-M4 的修复对象**就是那张表的内容与匹配语义**,而该文件由
+TASK-DEC-001（#640）在本任务卡起草**之后**创建——原 Allowed paths 写于
+表还在 `check_pr_paths.py` 里的时候。不扩充则 B-M4 无法交付,或只能改
+匹配函数而不能改表,两者都不成立。**扩充仅此一文件**;
+`.github/workflows/sdd-guard.yml` 仍在 Forbidden paths（理由见下）。
+
+**与 DEC-001 交付物的交互（必须显式处理,不是「放宽断言」）**
+
+DEC-001 交付的 `test_shipped_config_parses_to_the_r1_anchor_exactly` 以
+**精确五项**锚住配置内容。B-M4 扩项必然使该锚变红。**这是预期的内容
+变更,不是为通过而放宽**:实现须把该锚更新为扩充后的**精确内容集**
+（`len()` 型或子集型断言不作数),并在 evidence 中并列新旧两表。任何把
+该测试改为宽松形态（只断言条数、只断言包含原五项）即违反本 readiness。
+
+**语义决策（维护者以合并本 readiness 认可;实现不得自行改判）**
+
+**① B-H1 任务定义主路径改 base 权威。** 现状实测（本 base 上合成复现）:
+一个 commit 同时把 tasks.md 的 Allowed paths 改成 `**` 并新增
+`scripts/evil.py`,`check_paths` **PASS** —— 同一 commit 既被审、又供给
+判它的 allowlist。修复形态:**allowlist 取自 `context.base_oid` 的树**
+（`load_task_definitions_at_commit` 已存在,现仅作 head 缺任务时的回退),
+head 侧仅作补充校验。
+
+**回归清点（本 readiness 起草时实测,是接受该形态的依据)**:对 main 最近
+60 个 first-parent commit 中**36 个带唯一任务声明**的,分别以 head 树与
+base 树的 allowlist 判定其真实 diff——**36/36 判定完全相同,零回归**;
+其中「声明的任务在 base 树中不存在」**0 个**（即 base 权威不会打断现行
+「readiness 先合、实现后开」的 PR 链）;「同 PR 内自改 Allowed paths」
+恰 **2 个**（DEC-005 r2 #628、DEC-007 r1 #614,均为**只动 tasks.md 的
+readiness PR**,其自身 diff 在 base 表下本就合法,故不受影响）。**推论:
+base 权威在现仓语料上是零成本的,它拒绝的恰是自扩权那一格。**
+
+- **archive 路径必须保留**:`verify_atomic_archive_fallback` 现由「head
+  缺任务」触发。改 base 权威后,该触发条件仍须是「head 缺任务」（= 该
+  change 正在被归档),**不得**因为 base 总是有任务而使原子归档校验失活。
+- **base 缺任务 = fail closed**:声明的任务不在 base 树 → `CheckError`,
+  不得回退到 head 树。
+
+**② B-H4 `--event` 模式的身份与祖先校验。** 现状实测:把 `base.sha` 指
+向一个含同名越界文件的旁支 commit,两点 diff 变空 → **PASS**（越界文件
+凭空消失)。修复:`--event` 路径须断言 **`base_oid` 是 `head_oid` 的
+祖先**（`git merge-base --is-ancestor`,实测对伪 base 返非零、对真 base
+返零),并按台账补 base/repo/state 的形状校验。**`--event` 的消费者是
+`sdd-guard.yml` 的 `pull_request: [reopened, edited]` 触发,而改 base
+分支即触发 edited**——这正是该缺口的活体入口。
+
+**③ workflow 适配 = 零改动（实测推论,故 sdd-guard 保持 Forbidden)。**
+base 权威与祖先门都需要 base commit 对象在本地可解析。**该条件今天已经
+成立**:两个 workflow 的 allowed-paths job 均以 `fetch-depth: 0` checkout,
+且现行 `git_changed_paths` 已在其中执行 `git diff <base>..<head>` 并通过
+——两点 diff 要求两个对象都在本地,故 `git ls-tree <base>` 与
+`merge-base` 同样可解析。**推论:`check_pr_paths.py` 自读 base 即可,
+两个 workflow 均无需改动**,`sdd-guard.yml` 因此**不扩权**。
+`agent-pr.yml` 留在 Allowed paths 仅为 B-M8 与低成本卫生（见⑦）。
+**该推论须由实现验证**:evidence 须含以真实 event JSON 形状构造的本地
+复现（`--event` 全路径,含祖先门正负对照）。**如实记录 CI 侧缺口**:
+sdd-guard 的 allowed-paths job 只在 `reopened/edited` 触发,实现 PR 的
+常规 CI 不会跑到它;不得以「CI 绿」冒充该路径已验证。
+
+**④ B-H3 Allowed paths 定界规则（由实测语料定义,非自由裁量)。** 现状:
+块内**每个**反引号 token 变 glob。实测活体:合成散文行
+「the layout mirrors `scripts/**` and `Packages/**`」→ patterns 真含
+`scripts/**`、`Packages/**`;现仓 22 处非路径 token（commit SHA、Swift
+符号、裸词）已在生产 allowlist;chg-2026-025 tasks.md:304 的
+「`Packages/**` forbidden」按现解析是 **allowed**（该任务当前因
+「multiple Allowed paths lines」另故 fail-closed,去一行即武装）。
+
+**修复契约（三条硬门,由起草时的干跑实测确定其可满足)**:
+
+1. **路径类 token 零丢失**:对现仓 51 个 active 任务逐一复算,任何
+   *路径形态* 的 pattern（含 `**`、含 `/`、或真实存在的文件名）**必须
+   全部保留**;清点表入 evidence（每任务/每 pattern/保留或丢弃/理由)。
+2. **惰性 token 归零**:上述 22 处非路径 token 应被丢弃;起草时的干跑
+   已验证存在一种满足①②的规则形态（对 51 任务实测:路径类丢失 **0**、
+   惰性丢弃 **10**、新增 **0**）。规则的具体形态由实现选择,但**其连接
+   词/分隔符白名单须以精确内容集断言钉死**,不得用开放式启发。
+3. **攻击形态归零**:上述合成散文行产出 patterns **不含**
+   `scripts/**`/`Packages/**`;chg-2026-025:304 形态在去掉重复行后
+   **不得**把 `Packages/**` 解析为 allowed。二者各配正对照。
+
+终止符须同时覆盖台账所列弱点:`* ` bullet、tab 缩进 `- `、`### ` 标题。
+
+**⑤ B-M1 glob 方言 = 收紧单星（不写 README 声明)。** 实测:
+`Packages/ArkDeckKit/Sources/*.swift` 匹配任意深度嵌套;而
+`test_agent_pr_workflow.py` 的 `_glob_regex` 实现的是**正确的非跨越
+语义** = 两引擎分歧。**决定:把 `check_pr_paths` 的单星收紧为不跨 `/`,
+与既有正确实现对齐。** 现仓影响清点:全仓**恰 2 个** pattern 含单星段
+（`TASK-DEC-002` 的 `scripts/host_loop/*.py` 与 `test_*.py`),而
+`scripts/host_loop/` 实测**无任何子目录**,故收紧对现仓判定**零影响**,
+仅关闭未来的静默放宽。`**` 语义不变。
+
+**⑥ B-M4 敏感表扩项清单（本节即维护者认可的清单,实现不得增删)。**
+实测盲区:`Scripts/`、`.GitHub/`（大小写）、`.gitignore`、
+`.python-version`、`AGENTS.md`、`ArkDeck.xcodeproj/**` 对 task-less PR
+**全部非敏感**。
+
+- **加入 `sensitive_paths`**:`ArkDeck.xcodeproj/**`、`AGENTS.md`、
+  `.gitignore`、`.python-version`（四项;经 `git ls-tree` 复核,这是
+  仓根下尚未被覆盖的全部跟踪条目)。
+- **敏感匹配改大小写不敏感**（`Scripts/x.py`、`.GitHub/x.yml` 须被判
+  敏感);**Allowed paths 匹配保持大小写敏感**——对 allowed 面放宽大小写
+  是**放宽**方向,明确不授权。
+- **刻意不加,理由记录**:`openspec/**` 与
+  `openspec/changes/*/tasks.md` **不入表**。治理链的 propose/approval/
+  verify/archive 均是**无任务声明**且触碰 `openspec/**` 的 PR,入表即
+  一次性打断整条链;而「task-less PR 先改 tasks.md 再触产品路径」这条
+  攻击路径已由①的 base 权威关闭(改 head 侧 tasks.md 不再影响判定)。
+  `docs/**` 同理不入表。
+
+**⑦ 其余修复的形态。** B-M2:`TASK_LINE_RE` 的 `\s*` 改 `[ \t]*`
+（实测 `"Task:\nTASK-EVIL-002\n"` 现在会绑定;同族教训已在台账记过两次)。
+B-M3:homoglyph 标题 token 实测使 `TASK_TOKEN_RE.findall(title)==[]`,
+歧义检查看不见 → 须对标题中 **NFKC 归一后**出现而原文未出现的 task
+token 报**歧义错误**（不是静默接受、也不是静默采用归一值）。B-M8:
+`--identity-only` 改打印**从 API 读回并校验过的** `number`,而非入参
+回声。B-H2 只做低成本缓解或显式记录（结构重构不在本轮)。
+
+**Pass/fail boundary**
+
+1. **每个修复配「撤销即变红」的新测试 + 正对照**,逐项覆盖
+   B-H1/B-H3/B-H4/B-M1/B-M2/B-M3/B-M4/B-M8。任一撤销后套件仍全绿 =
+   该项无效,整轮作废。
+2. **B-H1 双向**:自扩权 fixture（同 PR 改 tasks.md 放宽 + 触敏感路径）
+   必被拒;**36 个历史 commit 的判定表必须逐一复算并与本 readiness 记录
+   的「36/36 相同」一致**（复算脚本与结果入 evidence);archive 原子性
+   校验保持有效（既有 archive 测试全绿,且「head 缺任务」仍触发它)。
+3. **B-H3 三门齐备**:路径类 token 零丢失（51 任务清点表入 evidence)、
+   惰性 token 丢弃逐项列出、两个攻击形态归零 + 正对照。**任一路径类
+   pattern 丢失即整轮作废。**
+4. **B-M4 清点**:扩项后对现仓**全部 active tasks.md 与最近 60 个
+   commit** 复算 task-less 判定,列出新增被拒的形态;DEC-001 的等价性
+   锚更新为**精确新内容集**并附新旧两表。
+5. **零放宽**:既有 30 个 `test_check_pr_paths` 测试与
+   `test_agent_pr_workflow.py` 的 forbidden-capability 扫描,**除本
+   readiness ④⑥显式认可的内容变更外,不得为通过而放宽任何断言**;
+   变更逐条在 evidence 说明理由。
+6. 全套件 `check_pr_paths` **30 → ≥30 OK**（直跑与 `-m unittest` 计数
+   相等);host_loop **≥624 OK + 1 expected failure**;`check-sdd` 保持
+   **0/0/111**;`test_agent_pr_workflow` 与 `test_check_sdd` 保持绿。
+7. **workflow 卫生**:若改 `agent-pr.yml`,不得新增任何 permission、
+   secret 或 `pull_request_target`;`permissions: {}` 顶层与逐 job 收窄
+   保持。
+
+**Risk acceptance（首次）**：本任务改的是**授权判定本身**的语义,且
+方向全部为收紧。已接受,理由:①B-H1 的 36/36 零回归清点证明现行 PR 链
+不受影响,而它关闭的是「同 commit 自扩权」这一整类;②B-H3 的路径类零
+丢失是硬门,惰性 token 的丢弃对现仓判定无影响（它们不匹配任何真实路径);
+③B-M1 收紧对现仓零影响（实测仅 2 个单星 pattern,目标目录无子目录);
+④B-M4 扩项使若干此前可由 task-less PR 触碰的根级文件转为需任务声明——
+**这是目的,不是副作用**。回退 = revert 实现 PR。**若实现时发现①的
+36/36 复算结果与本 readiness 不符,即停并转 r2**——那意味着本节的依据
+被推翻。
+
+**Stop conditions**：任一变异门不成立;B-H3 清点出现任何路径类 pattern
+丢失;36/36 复算不成立;需要触碰 Allowed paths 之外的文件（尤其
+`scripts/host_loop/**` 归 DEC-002/005/007、`.github/workflows/sdd-guard.yml`
+——若实现发现 base 权威确需改它,即停并转 r2 显式扩权,不得顺手改);
+需要为通过而放宽④⑥之外的任何既有断言;`sensitive_paths` 的增删超出⑥
+的清单。
+
+**不授权**：`SENSITIVE_PATTERNS`/`sensitive_paths` 超出⑥清单的增删;
+Allowed paths 匹配面的大小写放宽;B-M7（裸「本 \`tasks.md\`」改
+change-relative)——**方向为放宽,留维护者裁量**;起草时实测该 token 对
+仓内任何真实路径零匹配,故本轮的丢弃对判定零影响。B-M5（swift-ci
+pipefail)、B-M6（concurrency)、agent-pr.yml 结构重构（B-H2)、
+rockchip-component workflow 卫生 —— 均按任务卡 Out of scope 记台账。
+两 checker 文法统一;`instance.py` 收口（DEC-002）;`Decision-Grade`
+代写。
 
 ## TASK-DEC-005 — host_loop transport/lease/backends 硬化
 
