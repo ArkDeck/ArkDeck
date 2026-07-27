@@ -1,6 +1,8 @@
 # CHG-2026-040 Verification Plan
 
-> Status:planned
+> Status:passed # 2026-07-27;九条 AC 结论与全链 OID 见 proposal.md
+> 「Verification closure」段;仅在维护者 review/merge 本 verification-closure
+> PR 后生效
 > Change:CHG-2026-040-automation-decoupling@r2
 > Core baseline:CORE-2.1.0（零 Core 变更;canonical Core AC 零认领）
 
