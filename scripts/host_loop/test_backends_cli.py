@@ -417,36 +417,47 @@ class BranchPreparation(unittest.TestCase):
 
 
 class BodyRendering(unittest.TestCase):
+    """Renders against a dynamically sampled ACTIVE change: envelope
+    validation binds Change to active change directories by design, so a
+    pinned sample breaks the day its change archives (TASK-NAV-002)."""
+
+    @classmethod
+    def setUpClass(cls):
+        from host_loop.test_support import first_task_id, live_sample_change
+
+        cls.sample_change = live_sample_change(REPO_ROOT)
+        cls.sample_task = first_task_id(REPO_ROOT, cls.sample_change)
+
     def test_the_body_is_a_valid_envelope_for_a_real_task(self):
         from host_loop.pr_envelope import parse_and_validate
 
-        render = body_renderer(str(REPO_ROOT), change_id="CHG-2026-030-host-loop-runtime",
+        render = body_renderer(str(REPO_ROOT), change_id=self.sample_change,
                               producer="host-loop/worker", run_id="r-1")
-        candidate = TaskCandidate(task_id="TASK-HLR-003", status="ready",
+        candidate = TaskCandidate(task_id=self.sample_task, status="ready",
                                   decision_grade="D0", hardware_required=False,
                                   dependencies=(), allowed_paths=("scripts/host_loop/**",),
                                   base_pin=None)
         body = render(candidate, "a" * 40, "b" * 40)
         parsed = parse_and_validate(body, REPO_ROOT)
-        self.assertEqual(parsed.envelope.task, "TASK-HLR-003")
+        self.assertEqual(parsed.envelope.task, self.sample_task)
         self.assertEqual(parsed.envelope.base_oid, "a" * 40)
         self.assertEqual(parsed.envelope.head_oid, "b" * 40)
 
     def test_the_body_carries_no_dispatch_marker_so_nesting_cannot_occur(self):
         from host_loop.worker import DISPATCH_MARKER
 
-        render = body_renderer(str(REPO_ROOT), change_id="CHG-2026-030-host-loop-runtime",
+        render = body_renderer(str(REPO_ROOT), change_id=self.sample_change,
                               producer="p", run_id="r")
-        candidate = TaskCandidate(task_id="TASK-HLR-003", status="ready",
+        candidate = TaskCandidate(task_id=self.sample_task, status="ready",
                                   decision_grade="D0", hardware_required=False,
                                   dependencies=(), allowed_paths=("x/**",),
                                   base_pin=None)
         self.assertNotIn(DISPATCH_MARKER, render(candidate, "a" * 40, "b" * 40))
 
     def test_the_body_states_green_is_not_merge_permission(self):
-        render = body_renderer(str(REPO_ROOT), change_id="CHG-2026-030-host-loop-runtime",
+        render = body_renderer(str(REPO_ROOT), change_id=self.sample_change,
                               producer="p", run_id="r")
-        candidate = TaskCandidate(task_id="TASK-HLR-003", status="ready",
+        candidate = TaskCandidate(task_id=self.sample_task, status="ready",
                                   decision_grade="D0", hardware_required=False,
                                   dependencies=(), allowed_paths=("x/**",),
                                   base_pin=None)
@@ -524,11 +535,13 @@ class DiscoveryIsAReaderOnly(unittest.TestCase):
 
     def test_it_parses_the_live_change(self):
         from host_loop.__main__ import discover_candidates
+        from host_loop.test_support import first_task_id, live_sample_change
 
-        found = discover_candidates(REPO_ROOT, "CHG-2026-030-host-loop-runtime")
+        sample = live_sample_change(REPO_ROOT)
+        found = discover_candidates(REPO_ROOT, sample)
         ids = {c.task_id for c in found}
-        self.assertIn("TASK-HLR-003", ids)
-        self.assertIn("TASK-HLR-004", ids)
+        self.assertGreater(len(ids), 0)
+        self.assertIn(first_task_id(REPO_ROOT, sample), ids)
 
     def test_a_task_without_allowed_paths_is_omitted_not_defaulted(self):
         from host_loop.__main__ import discover_candidates

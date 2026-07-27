@@ -458,33 +458,51 @@ class PullRequestPathTests(unittest.TestCase):
             ),
         )
 
-    def test_current_hlr_001a_task_allows_only_the_reviewed_automation_surface(self):
+    def test_a_live_task_declaration_authorizes_only_its_reviewed_surface(self):
+        """The real-repo end-to-end: a genuine task's declaration authorizes
+        exactly its reviewed surface. The original form pinned TASK-HLR-001A,
+        which stops resolving once its change archives (an archived task must
+        not supply authority — the invariant this file pins elsewhere), so
+        the task is now sampled from a live change dynamically
+        (TASK-NAV-002)."""
+        import sys as _sys
+
         repo_root = Path(__file__).resolve().parents[1]
+        if str(repo_root / "scripts") not in _sys.path:
+            _sys.path.insert(0, str(repo_root / "scripts"))
+        from host_loop.test_support import live_sample_change
+
+        sample = live_sample_change(repo_root)
+        definitions = check_pr_paths.load_task_definitions(repo_root)
+        chosen = None
+        for task_id in sorted(definitions):
+            task = definitions[task_id]
+            if not task.tasks_file.match(f"*/{sample.lower()}/tasks.md"):
+                continue
+            patterns = check_pr_paths.extract_allowed_patterns(repo_root, task)
+            literals = [p for p in patterns if "*" not in p]
+            if literals and not check_pr_paths.path_matches(".gitignore", patterns):
+                chosen = (task_id, literals[0])
+                break
+        self.assertIsNotNone(
+            chosen, f"{sample} offers no task with a literal allowed path"
+        )
+        task_id, literal = chosen
         context = check_pr_paths.PullRequestContext(
-            title="ci(TASK-HLR-001A): automate Agent PR checks",
+            title=f"feat({task_id}): live sample surface",
             body="",
-            head_ref="agent/task-hlr-001a-auto-ci",
+            head_ref=f"agent/task-{task_id.lower()}",
             base_oid=ZERO_OID,
             head_oid=ONE_OID,
         )
-        changed = (
-            ".github/workflows/agent-pr.yml",
-            ".github/workflows/sdd-guard.yml",
-            ".github/workflows/swift-ci.yml",
-            "scripts/check_pr_paths.py",
-            "scripts/test_check_pr_paths.py",
-            "scripts/test_agent_pr_workflow.py",
-            "openspec/changes/chg-2026-030-host-loop-runtime/evidence/runs/TASK-HLR-001A/source-run.md",
-            "openspec/changes/chg-2026-030-host-loop-runtime/tasks.md",
-        )
-        result = check_pr_paths.check_paths(repo_root, context, changed)
-        self.assertEqual(result.task_id, "TASK-HLR-001A")
-        self.assertEqual(result.changed_paths, changed)
+        result = check_pr_paths.check_paths(repo_root, context, (literal,))
+        self.assertEqual(result.task_id, task_id)
+        self.assertEqual(result.changed_paths, (literal,))
 
         self.assert_error(
             "paths outside Allowed paths: .gitignore",
             lambda: check_pr_paths.check_paths(
-                repo_root, context, changed + (".gitignore",)
+                repo_root, context, (literal, ".gitignore")
             ),
         )
 
