@@ -2,9 +2,25 @@
 
 ## TASK-SDR-001 — shared SDD runtime discovery and explicit bootstrap
 
-- Status:ready（r1；仅在维护者按序 merge 前序 approval carrier 与本独立
-  readiness PR 后生效；`Decision-Grade` 行由维护者亲笔（#577 先例），本文件
-  不代写）
+- Status:done（2026-07-27 completion；仅在维护者 review/merge 本独立
+  `ready→done` PR 后生效。实现载体 = #618（merge
+  `8a3482c7ae6aa1f525ca62507e6794d8acc20dea`，mergedBy=lvye，gh 实测）：
+  resolver 四级共享发现 + fail-closed preflight、显式 `bootstrap-sdd.sh`、
+  33 项 stdlib 契约套件（含 shared-discovery removal red canary）、README
+  入口注记；evidence = `evidence/runs/TASK-SDR-001/run.md`（随载体在树）。
+  合入内容与实现分支五文件逐字节一致（diff 为空，实测）。flip base =
+  `8a3482c7ae6aa1f525ca62507e6794d8acc20dea`（#618）recheck：(a) 链
+  #523/#611/#612/#618 四 merge 均为 flip base ancestors（逐一
+  `merge-base --is-ancestor` 实测）；(b) flip 树全套门 =
+  `test_sdd_runtime_entry` 33 OK + `test_check_sdd` 19 OK +
+  `test_check_pr_paths` 24 OK + 无 venv linked worktree 裸跑
+  `./scripts/check-sdd.sh` = 0 errors / 0 warnings / 111 acceptance IDs、
+  exit 0（经由本 change 合入的 shared discovery 路径）；(c) evidence 在
+  树；(d) 本 flip 单文件；(e) 不声称 change 级 verified——那是下一独立
+  PR。post-merge findings：无。）
+- Historical Status:ready（r1 = #612 merge
+  `982b679bf3fbc71b3422031a04e0e11b1e5592d2`；其一次性实现授权已由 #618
+  全额消耗；r1 Readiness 块原文保留为历史。）
 - Historical Status:blocked（前置：① 本 change approval-only PR merge；
   ② 独立 readiness PR。① = 堆叠前序 carrier 分支
   `agent/chg-2026-034-approval`（rebase 会改其 commit OID 故不钉；squash-merge
