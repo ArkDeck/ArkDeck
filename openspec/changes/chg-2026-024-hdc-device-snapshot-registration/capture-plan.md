@@ -77,6 +77,37 @@ printf 组装时,唯一权威来源是执行工具本身(本计划中该动作�
 
 选 (D-2) 时,下列 r2 pin 由本 r3 重钉;选 (D-1)/(D-3)/(D-4) 时本节不生效。
 
+### DECISION:(D-2) selected（2026-07-27，本 PR merge 即决策生效）
+
+维护者 `lvye` 于 2026-07-27 选定 **(D-2)**:在 `Ver: 3.2.0f` /
+SHA-256 `05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83`
+上采集，接受 device-observation family 与同胞 family 的工具版本不一致。
+**理由**（如实记录）:d→f 属同 minor 线常规升级而非降级；落后的是 profile
+而非本次采集；(D-1) 需刻意固定在已不在机的更旧二进制，(D-4) 的全 profile
+迁移代价最高且不必阻塞本次采集——本采集的 evidence 恰可作为将来 (D-4) 的
+首份 3.2.0f 观测输入。
+
+r3 gate 要求「维护者在合入时于 PR 中显式选定并记录理由」；#624 的 merge
+（`46ebcc2`）带 `lvye` APPROVED 但 review/body 未载该选择，故本 PR 是该
+决策的仓内载体，**merge 即决策生效**（先例:approval-only PR「merge 即批准」）。
+
+**(D-2) 由此生效的约束**（后续 readiness/implementation/evidence 必须逐条满足）:
+
+- 本次采集的 selected HDC = 上述路径/哈希/版本；实测不符即停；
+- TASK-I24-001 的 registry、`INTEGRATION-PROFILES` lock 与条目命名**必须
+  显式携带 `3.2.0f`**（同胞 family 的条目 ID 内嵌 `3.2.0d`，两者不得混编）；
+- evidence 与 `integrations/openharmony/profile.md` 的相应记述必须写明
+  「本 family 观测自 `3.2.0f`，与 readonly-probes/trace-probes 登记的
+  `3.2.0d` 非同一工具」；
+- 同 minor 兼容性不作为免测理由:C0–C5 的 grammar/字段/行边界仍按新工具
+  重新判定；
+- 本决策**不**使 TASK-I24-001 `ready`，也不预先接受任何 provenance。
+
+窗口开启前置至此为:① 本决策载体合入；② 采集执行时 harness 四 pin 与
+fake-only 自测复核通过（Agent 已于 2026-07-27 在 main 复核:blob
+`47ee62f4…`/`dd805925…`、SHA-256 `be66c30e…`/`466d9e81…`、`50 tests OK`）；
+③ 窗口内 OB-1/OB-2 existing-server 前提成立。
+
 
 
 ## Goal and result boundary
