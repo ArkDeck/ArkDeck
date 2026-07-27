@@ -1013,5 +1013,53 @@ class ALeaseWriteNeverBlanksTheKnownPullRequest(unittest.TestCase):
         self.assertIsNone(self._captured(self._Held(None))["pr_number"])
 
 
+# ------------- DEC-LEFT-001: the base OID must come from protected main itself
+
+class ObservedMainCannotBeImpersonated(unittest.TestCase):
+    """`git ls-remote <remote> refs/heads/main` also selects any ref whose name
+    ENDS that way at a `/` boundary, so `refs/backup/refs/heads/main` matches.
+
+    Reading `out.split()[0]` took the first whitespace token of a multi-line
+    reply, and a shadow sorts ahead of the real ref -- so the round's base OID
+    came from the shadow. Everything downstream trusts it: it is the base a task
+    branch is cut from and the value a fence is reasoned about. RefPort.read was
+    fixed for the identical reason; this is the half that sat outside that
+    task's allowed paths.
+    """
+
+    REAL = "a" * 40
+    SHADOW = "6" * 40
+
+    def _observe(self, output):
+        return main_mod.observed_main(lambda argv: (0, output, ""))
+
+    def test_a_shadow_ref_sorted_first_cannot_supply_the_base(self):
+        with self.assertRaises(BackendError) as caught:
+            self._observe(f"{self.SHADOW}\trefs/backup/refs/heads/main\n"
+                          f"{self.REAL}\trefs/heads/main\n")
+        self.assertIn("ambiguous", str(caught.exception))
+
+    def test_a_lone_wrong_refname_is_refused(self):
+        with self.assertRaises(BackendError) as caught:
+            self._observe(f"{self.SHADOW}\trefs/backup/refs/heads/main\n")
+        self.assertIn("not refs/heads/main", str(caught.exception))
+
+    def test_the_exact_ref_still_supplies_the_base(self):
+        self.assertEqual(self._observe(f"{self.REAL}\trefs/heads/main\n"),
+                         self.REAL)
+
+    def test_trailing_blank_lines_do_not_make_it_ambiguous(self):
+        self.assertEqual(self._observe(f"{self.REAL}\trefs/heads/main\n\n"),
+                         self.REAL)
+
+    def test_a_malformed_line_is_still_unparsable(self):
+        with self.assertRaises(BackendError):
+            self._observe("not-an-oid\trefs/heads/main\n")
+
+    def test_an_empty_reply_is_still_refused(self):
+        with self.assertRaises(BackendError):
+            self._observe("")
+
+
 if __name__ == "__main__":
     unittest.main()

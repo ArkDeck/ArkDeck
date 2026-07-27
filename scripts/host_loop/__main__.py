@@ -313,10 +313,26 @@ def observed_main(runner) -> str:
     code, out, err = runner(["git", "ls-remote", "origin", "refs/heads/main"])
     if code != 0 or not out.strip():
         raise BackendError(f"cannot observe protected main: {err.strip()[:160]}")
-    oid = out.split()[0]
-    if not OID_RE.match(oid):
+    # `git ls-remote <remote> <pattern>` matches the pattern against the TAIL of
+    # a refname at a `/` boundary, so `refs/heads/main` also selects anything
+    # ending that way — `refs/backup/refs/heads/main`, for one. Taking
+    # `out.split()[0]` read the first whitespace token of a MULTI-line reply, and
+    # a shadow sorts ahead of the real ref, so the round's base OID came from the
+    # shadow. Every later step trusts that OID: it is the base a task branch is
+    # cut from and the value a fence is reasoned about. RefPort.read was fixed
+    # for the identical reason (TASK-DEC-005 D-H2); this is the half that sat
+    # outside its allowed paths.
+    lines = [line for line in out.split("\n") if line.strip()]
+    if len(lines) != 1:
+        raise BackendError(
+            f"ambiguous ls-remote for refs/heads/main: {len(lines)} refs matched")
+    fields = lines[0].split()
+    if len(fields) != 2 or not OID_RE.match(fields[0]):
         raise BackendError("unparsable main OID from ls-remote")
-    return oid
+    if fields[1] != "refs/heads/main":
+        raise BackendError(
+            f"ls-remote answered for {fields[1]!r}, not refs/heads/main")
+    return fields[0]
 
 
 def build_truth(api: ApiPort, runner, repo_root: Path, change_id: str,
