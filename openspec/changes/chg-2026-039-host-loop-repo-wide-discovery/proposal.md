@@ -1,6 +1,6 @@
 ---
 id: CHG-2026-039-host-loop-repo-wide-discovery
-revision: 1
+revision: 2
 status: approved
 class: implementation-only
 core_change_level: none
@@ -74,6 +74,22 @@ platforms: [macos]
 - Phase 4 cursor Issue 写入（另行授权）；
 - chg-2026-030/027/028 的 archive PR 本身（本 change done 后按既有归档
   先例独立走）。
+
+## r2 更正（2026-07-27，NAV-002 实现预检实测；原文如实保留不改写）
+
+TASK-NAV-002 原 In-scope 首项（`check_pr_paths` 查找面扩展至 archive）**前提
+被证伪**：该守卫已内建完整 archive 语义——active 查找失败时回落 **PR base
+commit 的任务宇宙**（原子归档 PR 流程，`verify_atomic_archive_fallback`），
+两侧均无才以「archive-only tasks are not authority」拒绝；且该不可见性由
+**14 条既有具名负向测试**保护（`test_archive_only_task_never_supplies_
+authority`、`test_archived_task_is_not_an_active_declaration_target`、
+atomic-archive 家族）。裸 glob 扩展在实现预检中实测打红全部 14 条 + 1
+error——「archived 任务对 lookup 不可见」是带测试的安全设计而非缺陷，本
+proposal 的 red 探针把特性测量成了缺陷。#573 在 `test_check_pr_paths` 的
+1 error 真实根因 = `test_current_hlr_001a…` 硬编码活跃期样本
+（TASK-HLR-001A + 合成 base OID 使 base 回落 fail closed），归活体样本免疫
+路线处理。r2 起：`check_pr_paths.py` **零变更**并列为 NAV-002 Forbidden；
+`NAV-ARCH-001` 同步重述；revision 1→2。NAV-001 不受影响。
 
 ## Risk
 
