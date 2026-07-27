@@ -3,9 +3,12 @@
 
 from __future__ import annotations
 
+import contextlib
+import io
 import json
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -24,13 +27,17 @@ class PullRequestPathTests(unittest.TestCase):
         title: str = "docs: governance update",
         body: str = "",
         head_ref: str = "agent/governance-update",
+        oid: str | None = None,
     ) -> check_pr_paths.PullRequestContext:
+        # The allowlist is read from the base tree, so a fixture repository's
+        # real commit has to stand behind the context; the synthetic OIDs
+        # remain for the cases that never reach a task lookup.
         return check_pr_paths.PullRequestContext(
             title=title,
             body=body,
             head_ref=head_ref,
-            base_oid=ZERO_OID,
-            head_oid=ONE_OID,
+            base_oid=oid or ZERO_OID,
+            head_oid=oid or ONE_OID,
         )
 
     def pull_request_api(
@@ -68,14 +75,26 @@ class PullRequestPathTests(unittest.TestCase):
             "user": {"login": author},
         }
 
-    def make_repo(self, task_section: str | None) -> tuple[tempfile.TemporaryDirectory, Path]:
+    def make_repo(
+        self, task_section: str | None
+    ) -> tuple[tempfile.TemporaryDirectory, Path, str]:
+        """A committed fixture repository, returning its commit OID.
+
+        A bare directory used to be enough because the checker read the
+        working tree. It now reads the base tree out of git, so the fixture
+        has to be a real repository with a real commit.
+        """
         temporary = tempfile.TemporaryDirectory(prefix="check-pr-paths-")
         root = Path(temporary.name)
+        self.run_git(root, "init", "--quiet")
+        self.run_git(root, "config", "user.name", "Contract Test")
+        self.run_git(root, "config", "user.email", "contract@example.invalid")
         if task_section is not None:
             change = root / "openspec" / "changes" / "chg-test"
             change.mkdir(parents=True)
             (change / "tasks.md").write_text(task_section, encoding="utf-8")
-        return temporary, root
+        (root / "README.md").write_text("fixture\n", encoding="utf-8")
+        return temporary, root, self.commit(root, "fixture base")
 
     def run_git(self, root: Path, *arguments: str) -> str:
         completed = subprocess.run(
@@ -244,15 +263,15 @@ class PullRequestPathTests(unittest.TestCase):
 ## TASK-HLR-002A — suffix task
 - Allowed paths:`scripts/check_pr_paths.py`
 """
-        temporary, root = self.make_repo(tasks)
+        temporary, root, oid = self.make_repo(tasks)
         self.addCleanup(temporary.cleanup)
-        context = self.context(title="feat(TASK-HLR-002A): suffix task")
+        context = self.context(title="feat(TASK-HLR-002A): suffix task", oid=oid)
         result = check_pr_paths.check_paths(
             root, context, ("scripts/check_pr_paths.py",)
         )
         self.assertEqual(result.task_id, "TASK-HLR-002A")
 
-        unknown = self.context(title="feat(TASK-M1-001R): unknown active task")
+        unknown = self.context(title="feat(TASK-M1-001R): unknown active task", oid=oid)
         self.assert_error(
             "does not exist in an active change",
             lambda: check_pr_paths.check_paths(root, unknown, ("docs/x.md",)),
@@ -265,10 +284,10 @@ class PullRequestPathTests(unittest.TestCase):
   `evidence/**`。
 - Risk:low
 """
-        temporary, root = self.make_repo(tasks)
+        temporary, root, oid = self.make_repo(tasks)
         self.addCleanup(temporary.cleanup)
         context = self.context(
-            body="Task: TASK-MECH-004\n", head_ref="agent/task-mech-004"
+            body="Task: TASK-MECH-004\n", head_ref="agent/task-mech-004", oid=oid
         )
         changed = (
             "scripts/check_pr_paths.py",
@@ -284,9 +303,9 @@ class PullRequestPathTests(unittest.TestCase):
 ## TASK-MECH-004 — path guard
 - Allowed paths:`scripts/check_pr_paths.py`
 """
-        temporary, root = self.make_repo(tasks)
+        temporary, root, oid = self.make_repo(tasks)
         self.addCleanup(temporary.cleanup)
-        context = self.context(body="Task: TASK-MECH-004\n")
+        context = self.context(body="Task: TASK-MECH-004\n", oid=oid)
         self.assert_error(
             "README.md, scripts/other.py",
             lambda: check_pr_paths.check_paths(
@@ -301,9 +320,9 @@ class PullRequestPathTests(unittest.TestCase):
 ## TASK-MECH-004 — path guard
 - Allowed paths:`scripts/**`
 """
-        temporary, root = self.make_repo(tasks)
+        temporary, root, oid = self.make_repo(tasks)
         self.addCleanup(temporary.cleanup)
-        context = self.context(body="Task: TASK-MECH-004\n")
+        context = self.context(body="Task: TASK-MECH-004\n", oid=oid)
         self.assert_error(
             r"scripts\outside.py",
             lambda: check_pr_paths.check_paths(
@@ -314,7 +333,7 @@ class PullRequestPathTests(unittest.TestCase):
         )
 
     def test_undeclared_sensitive_fails_and_docs_governance_passes(self):
-        temporary, root = self.make_repo(None)
+        temporary, root, oid = self.make_repo(None)
         self.addCleanup(temporary.cleanup)
         context = self.context()
         sensitive_paths = (
@@ -343,13 +362,14 @@ class PullRequestPathTests(unittest.TestCase):
         self.assertIsNone(result.task_id)
 
     def test_unknown_task_missing_line_and_zero_tokens_fail_closed(self):
-        context = self.context(body="Task: TASK-MECH-004\n")
-
-        temporary, root = self.make_repo(None)
+        temporary, root, oid = self.make_repo(None)
         self.addCleanup(temporary.cleanup)
         self.assert_error(
             "does not exist in an active change",
-            lambda: check_pr_paths.check_paths(root, context, ("docs/x.md",)),
+            lambda: check_pr_paths.check_paths(
+                root, self.context(body="Task: TASK-MECH-004\n", oid=oid),
+                ("docs/x.md",)
+            ),
         )
 
         for label, allowed_line, expected in (
@@ -357,26 +377,29 @@ class PullRequestPathTests(unittest.TestCase):
             ("empty", "- Allowed paths:plain prose only\n", "yields zero backtick"),
         ):
             with self.subTest(label=label):
-                case_temp, case_root = self.make_repo(
+                case_temp, case_root, case_oid = self.make_repo(
                     "## TASK-MECH-004 — path guard\n" + allowed_line
                 )
                 self.addCleanup(case_temp.cleanup)
                 self.assert_error(
                     expected,
-                    lambda root=case_root: check_pr_paths.check_paths(
-                        root, context, ("docs/x.md",)
+                    lambda root=case_root, oid=case_oid: check_pr_paths.check_paths(
+                        root,
+                        self.context(body="Task: TASK-MECH-004\n", oid=oid),
+                        ("docs/x.md",),
                     ),
                 )
 
     def test_archived_task_is_not_an_active_declaration_target(self):
-        temporary, root = self.make_repo(None)
+        temporary, root, oid = self.make_repo(None)
         self.addCleanup(temporary.cleanup)
         archived = root / "openspec" / "changes" / "archive" / "old"
         archived.mkdir(parents=True)
         (archived / "tasks.md").write_text(
             "## TASK-MECH-004 — old\n- Allowed paths:`**`\n", encoding="utf-8"
         )
-        context = self.context(body="Task: TASK-MECH-004\n")
+        oid = self.commit(root, "archive-only task")
+        context = self.context(body="Task: TASK-MECH-004\n", oid=oid)
         self.assert_error(
             "does not exist in an active change",
             lambda: check_pr_paths.check_paths(root, context, ("docs/x.md",)),
@@ -390,7 +413,7 @@ class PullRequestPathTests(unittest.TestCase):
 ## TASK-MECH-004R — later remediation
 - Allowed paths:`scripts/other.py`
 """
-        temporary, root = self.make_repo(tasks)
+        temporary, root, oid = self.make_repo(tasks)
         self.addCleanup(temporary.cleanup)
         definitions = check_pr_paths.load_task_definitions(root)
         task = definitions["TASK-MECH-004"]
@@ -409,7 +432,7 @@ class PullRequestPathTests(unittest.TestCase):
         )
         for index, allowed_line in enumerate(variants):
             with self.subTest(allowed_line=allowed_line):
-                temporary, root = self.make_repo(
+                temporary, root, oid = self.make_repo(
                     f"## TASK-MECH-{index:03d} — path guard\n" + allowed_line
                 )
                 self.addCleanup(temporary.cleanup)
@@ -425,13 +448,14 @@ class PullRequestPathTests(unittest.TestCase):
 ## TASK-MECH-004 — path guard
 - Allowed paths:`scripts/check_pr_paths.py`、本 change `tasks.md`
 """
-        temporary, root = self.make_repo(tasks)
+        temporary, root, oid = self.make_repo(tasks)
         self.addCleanup(temporary.cleanup)
 
         implementation = self.context(
             title="feat(TASK-MECH-004): implement path guard",
             body="Task: TASK-MECH-004\n",
             head_ref="agent/task-mech-004",
+            oid=oid,
         )
         check_pr_paths.check_paths(root, implementation, ("scripts/check_pr_paths.py",))
 
@@ -439,6 +463,7 @@ class PullRequestPathTests(unittest.TestCase):
             title="docs(TASK-MECH-004): mark done",
             body="Task: TASK-MECH-004\n",
             head_ref="agent/task-mech-004-done",
+            oid=oid,
         )
         check_pr_paths.check_paths(
             root, status, ("openspec/changes/chg-test/tasks.md",)
@@ -448,6 +473,7 @@ class PullRequestPathTests(unittest.TestCase):
             title="docs(CHG-TEST): propose change",
             body="",
             head_ref="agent/chg-test-proposal",
+            oid=oid,
         )
         check_pr_paths.check_paths(
             root,
@@ -488,12 +514,18 @@ class PullRequestPathTests(unittest.TestCase):
             chosen, f"{sample} offers no task with a literal allowed path"
         )
         task_id, literal = chosen
+        head_oid = subprocess.run(
+            ["git", "-C", str(repo_root), "rev-parse", "HEAD"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
         context = check_pr_paths.PullRequestContext(
             title=f"feat({task_id}): live sample surface",
             body="",
             head_ref=f"agent/task-{task_id.lower()}",
-            base_oid=ZERO_OID,
-            head_oid=ONE_OID,
+            base_oid=head_oid,
+            head_oid=head_oid,
         )
         result = check_pr_paths.check_paths(repo_root, context, (literal,))
         self.assertEqual(result.task_id, task_id)
@@ -840,10 +872,13 @@ class PullRequestPathTests(unittest.TestCase):
 class AutomationConfigTests(unittest.TestCase):
     """TASK-DEC-001: the sensitive-path table is data, loaded fail-closed."""
 
-    # Byte-for-byte anchor recorded in chg-2026-040 readiness r1: the exact
-    # five patterns the extraction moved out of this module. The shipped
-    # config must parse to precisely this tuple, in this order; any content
-    # or ordering change must turn this suite red.
+    # The exact table the shipped config must parse to, in this order; any
+    # content or ordering change must turn this suite red. The first five are
+    # the patterns TASK-DEC-001 moved out of this module byte-for-byte; the
+    # last four are the root-level entries TASK-DEC-004 added under its
+    # readiness r1 decision, which enumerated them as the approved list. This
+    # stays an exact-content anchor: a `len()` or "contains" assertion here
+    # would let the table be rewritten without a test noticing.
     R1_ANCHOR_PATTERNS = (
         "Packages/**",
         "ArkDeckApp/**",
@@ -851,6 +886,13 @@ class AutomationConfigTests(unittest.TestCase):
         "scripts/**",
         ".github/**",
     )
+    DEC_004_ADDED_PATTERNS = (
+        "ArkDeck.xcodeproj/**",
+        "AGENTS.md",
+        ".gitignore",
+        ".python-version",
+    )
+    ANCHOR_PATTERNS = R1_ANCHOR_PATTERNS + DEC_004_ADDED_PATTERNS
 
     def taskless_context(self) -> check_pr_paths.PullRequestContext:
         return check_pr_paths.PullRequestContext(
@@ -878,17 +920,17 @@ class AutomationConfigTests(unittest.TestCase):
             check_pr_paths.load_sensitive_patterns(config_path)
         self.assertIn(expected, str(caught.exception))
 
-    def test_shipped_config_parses_to_the_r1_anchor_exactly(self):
+    def test_shipped_config_parses_to_the_anchor_exactly(self):
         self.assertEqual(
             check_pr_paths.load_sensitive_patterns(),
-            self.R1_ANCHOR_PATTERNS,
+            self.ANCHOR_PATTERNS,
         )
 
     def test_malformed_configs_each_fail_closed_with_a_valid_control(self):
-        control = self.write_config(self.config_text(list(self.R1_ANCHOR_PATTERNS)))
+        control = self.write_config(self.config_text(list(self.ANCHOR_PATTERNS)))
         self.assertEqual(
             check_pr_paths.load_sensitive_patterns(control),
-            self.R1_ANCHOR_PATTERNS,
+            self.ANCHOR_PATTERNS,
         )
 
         with self.subTest(shape="missing file"):
@@ -1050,6 +1092,639 @@ class AutomationConfigTests(unittest.TestCase):
         self.assertEqual(
             missing, [], f"scripts/README.md does not mention: {missing}"
         )
+
+
+class TrustBoundaryTests(unittest.TestCase):
+    """TASK-DEC-004: what the guard trusts, and what it refuses to read."""
+
+    run_git = PullRequestPathTests.run_git
+    commit = PullRequestPathTests.commit
+    assert_error = PullRequestPathTests.assert_error
+
+    def git_repo(self) -> Path:
+        temporary = tempfile.TemporaryDirectory(prefix="check-pr-trust-")
+        self.addCleanup(temporary.cleanup)
+        root = Path(temporary.name)
+        self.run_git(root, "init", "--quiet")
+        self.run_git(root, "config", "user.name", "Contract Test")
+        self.run_git(root, "config", "user.email", "contract@example.invalid")
+        return root
+
+    def write_task(self, root: Path, allowed_line: str) -> None:
+        change = root / "openspec" / "changes" / "chg-trust"
+        change.mkdir(parents=True, exist_ok=True)
+        (change / "tasks.md").write_text(
+            f"## TASK-TRUST-001 — trust boundary fixture\n{allowed_line}",
+            encoding="utf-8",
+        )
+
+    def trust_context(self, base_oid: str, head_oid: str):
+        return check_pr_paths.PullRequestContext(
+            title="feat(TASK-TRUST-001): trust boundary",
+            body="",
+            head_ref="agent/task-trust-001",
+            base_oid=base_oid,
+            head_oid=head_oid,
+        )
+
+    # --- B-H1: the tree under review does not supply its own allowlist ---
+
+    def test_a_pull_request_cannot_widen_its_own_allowed_paths(self):
+        root = self.git_repo()
+        self.write_task(root, "- Allowed paths:`docs/note.md`\n")
+        (root / "docs").mkdir()
+        (root / "docs" / "note.md").write_text("note\n", encoding="utf-8")
+        base_oid = self.commit(root, "base")
+
+        self.write_task(root, "- Allowed paths:`**`\n")
+        (root / "scripts").mkdir()
+        (root / "scripts" / "reach.py").write_text("reach\n", encoding="utf-8")
+        head_oid = self.commit(root, "widen and reach")
+        context = self.trust_context(base_oid, head_oid)
+        changed = check_pr_paths.git_changed_paths(root, base_oid, head_oid)
+
+        with self.assertRaises(check_pr_paths.CheckError) as caught:
+            check_pr_paths.check_paths(root, context, changed)
+        message = str(caught.exception)
+        self.assertIn("paths outside Allowed paths", message)
+        self.assertIn("scripts/reach.py", message)
+
+        # Positive control: the same widening is authority once it is in the
+        # base, which is what merging the readiness first accomplishes.
+        (root / "docs" / "later.md").write_text("later\n", encoding="utf-8")
+        follow_up = self.commit(root, "later work on the widened surface")
+        self.assertEqual(
+            check_pr_paths.check_paths(
+                root,
+                self.trust_context(head_oid, follow_up),
+                ("scripts/reach.py",),
+            ).task_id,
+            "TASK-TRUST-001",
+        )
+
+    def test_a_task_only_the_head_defines_is_not_authority(self):
+        root = self.git_repo()
+        (root / "docs").mkdir()
+        (root / "docs" / "note.md").write_text("note\n", encoding="utf-8")
+        base_oid = self.commit(root, "base without the task")
+        self.write_task(root, "- Allowed paths:`**`\n")
+        head_oid = self.commit(root, "introduce the task it declares")
+
+        self.assert_error(
+            "does not exist in an active change",
+            lambda: check_pr_paths.check_paths(
+                root,
+                self.trust_context(base_oid, head_oid),
+                check_pr_paths.git_changed_paths(root, base_oid, head_oid),
+            ),
+        )
+
+    # --- B-H4: the compared base cannot be chosen by the pull request ---
+
+    def test_a_base_off_the_head_history_is_refused(self):
+        root = self.git_repo()
+        (root / "docs").mkdir()
+        (root / "docs" / "note.md").write_text("note\n", encoding="utf-8")
+        true_base = self.commit(root, "root")
+        (root / "scripts").mkdir()
+        (root / "scripts" / "reach.py").write_text("reach\n", encoding="utf-8")
+        head_oid = self.commit(root, "offending")
+
+        self.run_git(root, "checkout", "--quiet", "-b", "side", true_base)
+        (root / "scripts").mkdir(exist_ok=True)
+        (root / "scripts" / "reach.py").write_text("reach\n", encoding="utf-8")
+        side_oid = self.commit(root, "side branch carrying the same file")
+        self.run_git(root, "checkout", "--quiet", "-")
+
+        # The substitution works on the diff: against the side branch the
+        # offending file is not "new", so it vanishes from the comparison.
+        self.assertEqual(
+            check_pr_paths.git_changed_paths(root, side_oid, head_oid), ()
+        )
+        self.assertIn(
+            "scripts/reach.py",
+            check_pr_paths.git_changed_paths(root, true_base, head_oid),
+        )
+
+        self.assert_error(
+            "is not an ancestor of head",
+            lambda: check_pr_paths.assert_base_is_ancestor(
+                root, self.trust_context(side_oid, head_oid)
+            ),
+        )
+        check_pr_paths.assert_base_is_ancestor(
+            root, self.trust_context(true_base, head_oid)
+        )
+
+    def test_event_mode_run_refuses_a_substituted_base(self):
+        """Drives main(), so unhooking the gate is what turns this red.
+
+        Asserting on the helper alone would leave the call site free to
+        disappear — the shape this repository has been bitten by before.
+        """
+        root = self.git_repo()
+        (root / "docs").mkdir()
+        (root / "docs" / "note.md").write_text("note\n", encoding="utf-8")
+        true_base = self.commit(root, "root")
+        (root / "scripts").mkdir()
+        (root / "scripts" / "reach.py").write_text("reach\n", encoding="utf-8")
+        head_oid = self.commit(root, "offending")
+        self.run_git(root, "checkout", "--quiet", "-b", "side", true_base)
+        (root / "scripts").mkdir(exist_ok=True)
+        (root / "scripts" / "reach.py").write_text("reach\n", encoding="utf-8")
+        side_oid = self.commit(root, "side branch carrying the same file")
+        self.run_git(root, "checkout", "--quiet", "-")
+
+        def run(base_oid: str) -> tuple[int, str]:
+            event = root / "event.json"
+            event.write_text(
+                json.dumps(
+                    {
+                        "pull_request": {
+                            "state": "open",
+                            "merged": False,
+                            "title": "docs: governance update",
+                            "body": None,
+                            "base": {
+                                "ref": "main",
+                                "sha": base_oid,
+                                "repo": {"full_name": "ArkDeck/ArkDeck"},
+                            },
+                            "head": {
+                                "ref": "agent/docs",
+                                "sha": head_oid,
+                                "repo": {"full_name": "ArkDeck/ArkDeck"},
+                            },
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            completed = subprocess.run(
+                [
+                    sys.executable,
+                    str(Path(__file__).resolve().parent / "check_pr_paths.py"),
+                    "--repo-root",
+                    str(root),
+                    "--event",
+                    str(event),
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            return completed.returncode, completed.stderr + completed.stdout
+
+        code, output = run(side_oid)
+        self.assertEqual(code, 1, output)
+        self.assertIn("is not an ancestor of head", output)
+
+        code, output = run(true_base)
+        self.assertEqual(code, 1, output)
+        self.assertIn("touches sensitive paths: scripts/reach.py", output)
+
+    def test_event_mode_validates_identity_not_only_shape(self):
+        def event(**overrides: object) -> Path:
+            pull_request = {
+                "state": "open",
+                "merged": False,
+                "title": "docs: governance update",
+                "body": None,
+                "base": {
+                    "ref": "main",
+                    "sha": ZERO_OID,
+                    "repo": {"full_name": "ArkDeck/ArkDeck"},
+                },
+                "head": {
+                    "ref": "agent/docs",
+                    "sha": ONE_OID,
+                    "repo": {"full_name": "ArkDeck/ArkDeck"},
+                },
+            }
+            for key, value in overrides.items():
+                if key in ("base_repo", "head_repo"):
+                    pull_request[key.split("_")[0]]["repo"]["full_name"] = value
+                else:
+                    pull_request[key] = value
+            temporary = tempfile.TemporaryDirectory(prefix="check-pr-event-")
+            self.addCleanup(temporary.cleanup)
+            path = Path(temporary.name) / "event.json"
+            path.write_text(
+                json.dumps({"pull_request": pull_request}), encoding="utf-8"
+            )
+            return path
+
+        context = check_pr_paths.load_pull_request_context(event())
+        self.assertEqual(context.base_oid, ZERO_OID)
+
+        for label, overrides, expected in (
+            ("closed", {"state": "closed"}, "state must be open"),
+            ("merged", {"merged": True}, "merged must be false"),
+            ("fork head", {"head_repo": "fork/ArkDeck"}, "repositories differ"),
+            ("other base", {"base_repo": "other/ArkDeck"}, "repositories differ"),
+        ):
+            with self.subTest(label=label):
+                self.assert_error(
+                    expected,
+                    lambda overrides=overrides: (
+                        check_pr_paths.load_pull_request_context(event(**overrides))
+                    ),
+                )
+
+    # --- B-H3: the block is a list, not a paragraph to mine for tokens ---
+
+    def test_prose_around_the_declared_list_is_not_absorbed(self):
+        root = self.git_repo()
+        change = root / "openspec" / "changes" / "chg-trust"
+        change.mkdir(parents=True)
+        (change / "tasks.md").write_text(
+            "## TASK-TRUST-001 — trust boundary fixture\n"
+            "- Allowed paths:`docs/note.md`、本 change `evidence/**`。\n"
+            "  the layout mirrors `scripts/**` and `Packages/**`, keep it stable\n"
+            "- Risk:low\n",
+            encoding="utf-8",
+        )
+        oid = self.commit(root, "task with prose under its allowed paths")
+        task = check_pr_paths.load_task_definitions_at_commit(root, oid)[
+            "TASK-TRUST-001"
+        ]
+        self.assertEqual(
+            check_pr_paths.extract_allowed_patterns(root, task),
+            ("docs/note.md", "openspec/changes/chg-trust/evidence/**"),
+        )
+
+    def test_a_wrapped_list_keeps_its_paths_and_drops_the_annotation(self):
+        root = self.git_repo()
+        change = root / "openspec" / "changes" / "chg-trust"
+        change.mkdir(parents=True)
+        (change / "tasks.md").write_text(
+            "## TASK-TRUST-001 — trust boundary fixture\n"
+            "- Allowed paths:\n"
+            "  - 修改 `Packages/Kit/One.swift`\n"
+            "    `1111111111111111111111111111111111111111`（仅给 `SomeSymbol` 增加\n"
+            "    `OtherSymbol` 依赖）\n"
+            "  - 新增 `Packages/Kit/Two.swift` 与\n"
+            "    `Packages/Kit/Three.swift`；v1/v2 文件只读；\n"
+            "- Risk:low\n",
+            encoding="utf-8",
+        )
+        oid = self.commit(root, "wrapped declaration list")
+        task = check_pr_paths.load_task_definitions_at_commit(root, oid)[
+            "TASK-TRUST-001"
+        ]
+        self.assertEqual(
+            check_pr_paths.extract_allowed_patterns(root, task),
+            (
+                "Packages/Kit/One.swift",
+                "Packages/Kit/Two.swift",
+                "Packages/Kit/Three.swift",
+            ),
+        )
+
+    def test_the_block_ends_at_asterisk_tab_and_deeper_headings(self):
+        for label, terminator in (
+            ("asterisk bullet", "* `Packages/**` is forbidden here\n"),
+            ("tab bullet", "\t- `Packages/**` is forbidden here\n"),
+            ("deeper heading", "### `Packages/**` is forbidden here\n"),
+        ):
+            with self.subTest(label=label):
+                root = self.git_repo()
+                change = root / "openspec" / "changes" / "chg-trust"
+                change.mkdir(parents=True)
+                (change / "tasks.md").write_text(
+                    "## TASK-TRUST-001 — trust boundary fixture\n"
+                    "- Allowed paths:`docs/note.md`\n" + terminator,
+                    encoding="utf-8",
+                )
+                oid = self.commit(root, f"block ends at {label}")
+                task = check_pr_paths.load_task_definitions_at_commit(root, oid)[
+                    "TASK-TRUST-001"
+                ]
+                self.assertEqual(
+                    check_pr_paths.extract_allowed_patterns(root, task),
+                    ("docs/note.md",),
+                )
+
+    def test_the_live_corpus_keeps_every_path_like_pattern(self):
+        """No active task may lose a path-shaped pattern to the new parser.
+
+        Read against the repository's own tasks.md files rather than
+        fixtures: the shapes that matter here were written by hand over
+        forty changes and no synthetic corpus reproduces them.
+        """
+        repo_root = Path(__file__).resolve().parents[1]
+        definitions = check_pr_paths.load_task_definitions(repo_root)
+        self.assertGreater(len(definitions), 40, "corpus unexpectedly small")
+        path_like = 0
+        for task_id in sorted(definitions):
+            try:
+                patterns = check_pr_paths.extract_allowed_patterns(
+                    repo_root, definitions[task_id]
+                )
+            except check_pr_paths.CheckError:
+                continue
+            for pattern in patterns:
+                with self.subTest(task_id=task_id, pattern=pattern):
+                    self.assertTrue(
+                        "/" in pattern or "*" in pattern or "." in pattern,
+                        f"{task_id} kept a non-path token: {pattern!r}",
+                    )
+                path_like += 1
+        self.assertGreater(path_like, 100, "corpus census collected too little")
+
+    # --- B-M1: a single star stays inside one path segment ---
+
+    def test_a_single_star_no_longer_crosses_a_directory_boundary(self):
+        self.assertFalse(
+            check_pr_paths.path_matches(
+                "Packages/Kit/Sources/Deep/File.swift",
+                ("Packages/Kit/Sources/*.swift",),
+            )
+        )
+        self.assertTrue(
+            check_pr_paths.path_matches(
+                "Packages/Kit/Sources/File.swift",
+                ("Packages/Kit/Sources/*.swift",),
+            )
+        )
+        self.assertTrue(
+            check_pr_paths.path_matches(
+                "Packages/Kit/Sources/Deep/File.swift", ("Packages/Kit/**",)
+            )
+        )
+
+    def test_both_glob_engines_in_this_repository_agree(self):
+        """The workflow contract had the non-crossing semantics right first.
+
+        Two implementations of one dialect drift unless something compares
+        them, and the drift was live: this module's `*` crossed `/` while
+        the workflow test's did not.
+        """
+        import test_agent_pr_workflow
+
+        patterns = (
+            "scripts/**",
+            "scripts/*.py",
+            "scripts/host_loop/*.py",
+            "Packages/**",
+            "Packages/Kit/Sources/*.swift",
+            "AGENTS.md",
+            "*.md",
+            "a?c/x.py",
+        )
+        paths = (
+            "scripts/check_pr_paths.py",
+            "scripts/host_loop/worker.py",
+            "scripts/host_loop/deep/nested.py",
+            "Packages/Kit/Sources/File.swift",
+            "Packages/Kit/Sources/Deep/File.swift",
+            "AGENTS.md",
+            "docs/AGENTS.md",
+            "README.md",
+            "abc/x.py",
+            "ab/c/x.py",
+        )
+        for pattern in patterns:
+            mine = check_pr_paths.glob_regex(pattern)
+            theirs = test_agent_pr_workflow._glob_regex(pattern)
+            for path in paths:
+                with self.subTest(pattern=pattern, path=path):
+                    self.assertEqual(
+                        bool(mine.match(path)),
+                        bool(theirs.match(path)),
+                        f"glob dialects disagree on {pattern!r} vs {path!r}",
+                    )
+
+    # --- B-M4: the sensitive table sees case variants and the repository root ---
+
+    def test_case_variants_of_sensitive_prefixes_are_sensitive(self):
+        root = Path(tempfile.mkdtemp(prefix="check-pr-case-"))
+        context = check_pr_paths.PullRequestContext(
+            title="docs: governance update",
+            body="",
+            head_ref="agent/governance-update",
+            base_oid=ZERO_OID,
+            head_oid=ONE_OID,
+        )
+        for path in ("Scripts/x.py", ".GitHub/workflows/x.yml", "PACKAGES/A.swift"):
+            with self.subTest(path=path):
+                self.assert_error(
+                    f"touches sensitive paths: {path}",
+                    lambda path=path: check_pr_paths.check_paths(
+                        root, context, (path,)
+                    ),
+                )
+
+    def test_the_added_root_level_entries_are_sensitive(self):
+        root = Path(tempfile.mkdtemp(prefix="check-pr-root-"))
+        context = check_pr_paths.PullRequestContext(
+            title="docs: governance update",
+            body="",
+            head_ref="agent/governance-update",
+            base_oid=ZERO_OID,
+            head_oid=ONE_OID,
+        )
+        for path in (
+            "AGENTS.md",
+            ".gitignore",
+            ".python-version",
+            "ArkDeck.xcodeproj/project.pbxproj",
+        ):
+            with self.subTest(path=path):
+                self.assert_error(
+                    f"touches sensitive paths: {path}",
+                    lambda path=path: check_pr_paths.check_paths(
+                        root, context, (path,)
+                    ),
+                )
+
+    def test_the_governance_chain_stays_open_to_task_less_pull_requests(self):
+        """openspec/** is deliberately absent from the table.
+
+        propose, approval, verify and archive carriers all touch
+        openspec/** without declaring a task; listing it would sever the
+        chain, and the path it would protect is closed by base authority
+        instead.
+        """
+        root = Path(tempfile.mkdtemp(prefix="check-pr-governance-"))
+        result = check_pr_paths.check_paths(
+            root,
+            check_pr_paths.PullRequestContext(
+                title="governance(CHG-2026-999): propose",
+                body="",
+                head_ref="agent/chg-999-propose",
+                base_oid=ZERO_OID,
+                head_oid=ONE_OID,
+            ),
+            (
+                "openspec/changes/chg-999/proposal.md",
+                "openspec/changes/chg-999/tasks.md",
+                "docs/release/notes.md",
+            ),
+        )
+        self.assertIsNone(result.task_id)
+
+    def test_allowed_path_matching_stays_case_sensitive(self):
+        # Loosening this side would widen a task's authorised surface, so it
+        # must not follow the sensitive side into case insensitivity.
+        self.assertFalse(
+            check_pr_paths.path_matches("Scripts/x.py", ("scripts/**",))
+        )
+        self.assertTrue(check_pr_paths.path_matches("scripts/x.py", ("scripts/**",)))
+
+    # --- B-M2 / B-M3: the declaration itself cannot be smuggled ---
+
+    def test_a_task_line_separator_does_not_reach_across_a_newline(self):
+        context = check_pr_paths.PullRequestContext(
+            title="docs: governance update",
+            body="Task:\nTASK-EVIL-002\n",
+            head_ref="agent/governance-update",
+            base_oid=ZERO_OID,
+            head_oid=ONE_OID,
+        )
+        self.assertIsNone(check_pr_paths.resolve_task_declaration(context))
+        bound = check_pr_paths.PullRequestContext(
+            title="docs: governance update",
+            body="Task: TASK-EVIL-002\n",
+            head_ref="agent/governance-update",
+            base_oid=ZERO_OID,
+            head_oid=ONE_OID,
+        )
+        self.assertEqual(
+            check_pr_paths.resolve_task_declaration(bound), "TASK-EVIL-002"
+        )
+
+    def test_a_confusable_title_token_is_an_error_not_a_silent_miss(self):
+        # U+2011 non-breaking hyphen: renders as a declaration, matches no
+        # token, so the ambiguity check never saw the disagreement.
+        context = check_pr_paths.PullRequestContext(
+            title="feat(TASK‑HLR-003): looks declared, matched nothing",
+            body="Task: TASK-MECH-004\n",
+            head_ref="agent/task-mech-004",
+            base_oid=ZERO_OID,
+            head_oid=ONE_OID,
+        )
+        self.assert_error(
+            "confusable task token",
+            lambda: check_pr_paths.resolve_task_declaration(context),
+        )
+        plain = check_pr_paths.PullRequestContext(
+            title="feat(TASK-MECH-004): plain hyphens",
+            body="Task: TASK-MECH-004\n",
+            head_ref="agent/task-mech-004",
+            base_oid=ZERO_OID,
+            head_oid=ONE_OID,
+        )
+        self.assertEqual(
+            check_pr_paths.resolve_task_declaration(plain), "TASK-MECH-004"
+        )
+
+    # --- B-M8: the read-back is a read-back ---
+
+    def test_identity_only_prints_the_number_carried_by_the_api_response(self):
+        temporary = tempfile.TemporaryDirectory(prefix="check-pr-identity-")
+        self.addCleanup(temporary.cleanup)
+        payload = Path(temporary.name) / "pull.json"
+        pull_request = PullRequestPathTests.pull_request_api(
+            PullRequestPathTests()
+        )
+        payload.write_text(json.dumps(pull_request), encoding="utf-8")
+        argv = [
+            "--repo-root",
+            str(Path(__file__).resolve().parents[1]),
+            "--pull-request",
+            str(payload),
+            "--identity-only",
+            "--expected-repository",
+            "ArkDeck/ArkDeck",
+            "--expected-number",
+            "483",
+            "--expected-base-ref",
+            "main",
+            "--expected-head-ref",
+            "agent/task-hlr-001a-auto-ci",
+            "--expected-head-oid",
+            ONE_OID,
+            "--expected-author",
+            "github-actions[bot]",
+        ]
+        completed = subprocess.run(
+            [sys.executable, str(Path(__file__).resolve()).replace(
+                "test_check_pr_paths.py", "check_pr_paths.py"
+            ), *argv],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertEqual(completed.stdout.strip(), "483")
+
+        # Mismatched payload: the value printed must come from the response,
+        # so a disagreement is a rejection rather than a confirming echo.
+        pull_request["number"] = 484
+        payload.write_text(json.dumps(pull_request), encoding="utf-8")
+        completed = subprocess.run(
+            [sys.executable, str(Path(__file__).resolve()).replace(
+                "test_check_pr_paths.py", "check_pr_paths.py"
+            ), *argv],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(completed.returncode, 1)
+        self.assertIn("number does not match", completed.stderr)
+
+    def test_identity_only_reads_the_number_back_rather_than_echoing_it(self):
+        """Pins where the printed number comes from, not just its value.
+
+        With identity validation in force the echo and the read-back always
+        agree, so no black-box case can tell them apart — which is exactly
+        how a guard becomes decorative. Suspending the comparison exposes
+        the source: the echo would still print the expectation.
+        """
+        temporary = tempfile.TemporaryDirectory(prefix="check-pr-readback-")
+        self.addCleanup(temporary.cleanup)
+        payload = Path(temporary.name) / "pull.json"
+        pull_request = PullRequestPathTests.pull_request_api(
+            PullRequestPathTests(), number=901
+        )
+        payload.write_text(json.dumps(pull_request), encoding="utf-8")
+
+        original = check_pr_paths.validate_pull_request_identity
+        check_pr_paths.validate_pull_request_identity = (
+            lambda pull_request, **expectations: (
+                check_pr_paths.pull_request_context_from_object(pull_request)
+            )
+        )
+        self.addCleanup(
+            setattr, check_pr_paths, "validate_pull_request_identity", original
+        )
+
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            exit_code = check_pr_paths.main(
+                [
+                    "--repo-root",
+                    str(Path(__file__).resolve().parents[1]),
+                    "--pull-request",
+                    str(payload),
+                    "--identity-only",
+                    "--expected-repository",
+                    "ArkDeck/ArkDeck",
+                    "--expected-number",
+                    "483",
+                    "--expected-base-ref",
+                    "main",
+                    "--expected-head-ref",
+                    "agent/task-hlr-001a-auto-ci",
+                    "--expected-head-oid",
+                    ONE_OID,
+                    "--expected-author",
+                    "github-actions[bot]",
+                ]
+            )
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(buffer.getvalue().strip(), "901")
 
 
 if __name__ == "__main__":
