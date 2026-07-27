@@ -34,6 +34,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Callable, Protocol
 
+from .instance import BASE_BRANCH, TASK_NAMESPACE
 from .transport import OID_RE
 from .worker import classify_checks
 
@@ -345,8 +346,8 @@ class ReviewPhase:
         if not isinstance(head, str) or not OID_RE.match(head):
             return False, "head sha is not a full OID"
         base = (pr.get("base") or {}).get("ref")
-        if base != "main":
-            return False, f"base ref is {base!r}, not main"
+        if base != BASE_BRANCH:
+            return False, f"base ref is {base!r}, not {BASE_BRANCH}"
         if not (pr.get("body") or "").strip():
             return False, "pr body is empty; envelope metadata incomplete"
         state = classify_checks(check_runs)
@@ -458,7 +459,7 @@ class ReviewerLoop:
     def review_once(self, ready_tasks: list[str]) -> list[tuple[str, ReviewState, str]]:
         outcomes: list[tuple[str, ReviewState, str]] = []
         for task in ready_tasks:
-            head_branch = f"agent/host-loop/tasks/{task}"
+            head_branch = f"{TASK_NAMESPACE}/{task}"
             pulls = self._api.list_open_pulls_for_head(head_branch)
             if not pulls:
                 outcomes.append((task, ReviewState.NOT_ELIGIBLE, "no open task PR"))

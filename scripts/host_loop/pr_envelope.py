@@ -14,9 +14,12 @@ from pathlib import Path, PurePosixPath
 from typing import Literal, Sequence
 
 
-OPEN_MARKER = "<!-- arkdeck-pr-envelope:v1 -->"
-CLOSE_MARKER = "<!-- /arkdeck-pr-envelope -->"
-RUNTIME_ID = "host-loop/1"
+from .instance import (
+    ENVELOPE_CLOSE_MARKER as CLOSE_MARKER,
+    ENVELOPE_OPEN_MARKER as OPEN_MARKER,
+    ENVELOPE_RUNTIME_ID as RUNTIME_ID,
+    TASK_TOKEN_TEXT,
+)
 
 TASK_BOUND_TYPES = (
     "implementation",
@@ -39,7 +42,6 @@ DECISION_GRADES = frozenset(("D0", "D1", "D2"))
 # copy here silently rejected 14 of 46 active task headers. Uniqueness against
 # the active tasks.md header is enforced separately by validate_envelope, so
 # widening the token does not widen path authority.
-TASK_TOKEN_TEXT = r"TASK-[A-Z0-9]+(?:-[A-Z0-9]+)*-[0-9]{3}[A-Z]?"
 TASK_RE = re.compile(rf"^{TASK_TOKEN_TEXT}$")
 # Horizontal whitespace only. `\s+` matches a newline, so a bare `##` line
 # followed by prose that opens with a task token counted as a header: the

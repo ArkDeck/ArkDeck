@@ -32,6 +32,18 @@ import time
 import uuid
 from pathlib import Path
 
+from .instance import (
+    DEFAULT_LEASE_TTL_SECONDS,
+    DEFAULT_OWNER,
+    DEFAULT_OWNER_RUN,
+    DEFAULT_REPO,
+    ENV_CURSOR_ISSUE,
+    ENV_OWNER_RUN,
+    ENV_REPO_DIR,
+    LEASE_REF_PREFIX,
+    TASK_NAMESPACE,
+    TASK_TOKEN_TEXT,
+)
 from .backends import (
     BackendError,
     SubprocessGitRunner,
@@ -59,7 +71,7 @@ EXIT_RECONCILE = 20
 SCOPE_ALL = "all-active-changes"
 
 _TASK_HEADER_RE = re.compile(
-    r"^##\s+(TASK-[A-Z0-9]+(?:-[A-Z0-9]+)*-[0-9]{3}[A-Z]?)(?:\s|$)", re.MULTILINE
+    rf"^##\s+({TASK_TOKEN_TEXT})(?:\s|$)", re.MULTILINE
 )
 # A field value ends at whitespace OR at the punctuation the real tasks.md puts
 # straight after it. `(\S+)` was greedy to whitespace only, so
@@ -209,7 +221,7 @@ def discover_candidates(repo_root: Path, change_id: str) -> list[TaskCandidate]:
             # never take, so the task is simply not a candidate.
             continue
         dependency_ids = tuple(sorted(set(re.findall(
-            r"TASK-[A-Z0-9]+(?:-[A-Z0-9]+)*-[0-9]{3}[A-Z]?", depends_block))))
+            TASK_TOKEN_TEXT, depends_block))))
         allowed_paths = tuple(re.findall(r"`([^`]+)`", allowed_block))
         if not allowed_paths:
             continue  # a value that declares no path is not a path allowlist
@@ -340,7 +352,7 @@ def build_truth(api: ApiPort, runner, repo_root: Path, change_id: str,
     """Authoritative facts the cursor cache is validated against."""
     ready = frozenset(c.task_id for c in candidates if c.status.startswith("ready"))
     code, out, _err = runner(["git", "ls-remote", "origin",
-                              "refs/heads/agent/host-loop/leases/*"])
+                              f"{LEASE_REF_PREFIX}*"])
     # A failed observation must not shrink the truth set. It used to leave
     # lease_map empty, and since reconcile clears a lease_ref that Truth does not
     # list, one flaky ls-remote read as "the lease is gone" and dropped the fence
@@ -365,7 +377,7 @@ def build_truth(api: ApiPort, runner, repo_root: Path, change_id: str,
     # from an incomplete view; this half was constructing one deliberately.
     open_numbers: set[int] = set()
     for task in sorted({c.task_id for c in candidates}):
-        head = f"agent/host-loop/tasks/{task}"
+        head = f"{TASK_NAMESPACE}/{task}"
         try:
             for pull in api.list_open_pulls_for_head(head):
                 number = pull.get("number")
@@ -390,7 +402,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     mode.add_argument("--explain", action="store_true",
                       help="print the per-gate verdict for every candidate and "
                            "exit; performs no network call and needs no credential")
-    parser.add_argument("--repo-dir", default=os.environ.get("ARKDECK_REPO"),
+    parser.add_argument("--repo-dir", default=os.environ.get(ENV_REPO_DIR),
                         help="path to the ArkDeck checkout")
     # No default change. The literal that used to sit here was
     # CHG-2026-030-host-loop-runtime, and once every task in it reached done the
@@ -401,15 +413,15 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--change", default=None,
                         help="restrict the round to one change; omit to scan "
                              "every active change")
-    parser.add_argument("--owner", default="ArkDeck")
-    parser.add_argument("--repo", default="ArkDeck")
+    parser.add_argument("--owner", default=DEFAULT_OWNER)
+    parser.add_argument("--repo", default=DEFAULT_REPO)
     parser.add_argument("--cursor-issue", type=int,
-                        default=_int_env("ARKDECK_HOST_LOOP_CURSOR_ISSUE"),
+                        default=_int_env(ENV_CURSOR_ISSUE),
                         help="navigation Issue number; omitted means read-only cursor")
     parser.add_argument("--owner-run", default=os.environ.get(
-        "ARKDECK_HOST_LOOP_OWNER", "host-loop/worker"),
+        ENV_OWNER_RUN, DEFAULT_OWNER_RUN),
         help="stable worker identity; the lease manager owns it")
-    parser.add_argument("--ttl", type=int, default=900)
+    parser.add_argument("--ttl", type=int, default=DEFAULT_LEASE_TTL_SECONDS)
     return parser.parse_args(sys.argv[1:] if argv is None else argv)
 
 
@@ -587,7 +599,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         args = parse_args(argv)
         if not args.repo_dir:
-            raise BackendError("--repo-dir or ARKDECK_REPO is required")
+            raise BackendError(f"--repo-dir or {ENV_REPO_DIR} is required")
         repo_root = Path(args.repo_dir).resolve()
         if not (repo_root / ".git").exists():
             raise BackendError(f"{repo_root} is not a git checkout")

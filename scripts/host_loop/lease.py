@@ -25,15 +25,13 @@ import json
 from dataclasses import dataclass, replace
 from typing import Callable
 
+from .instance import (
+    LEASE_REF_PREFIX,
+    LEASE_SCHEMA,
+    LEASE_WRITE_MARGIN_SECONDS as WRITE_MARGIN_SECONDS,
+    TASK_BRANCH_PREFIX,
+)
 from .transport import OID_RE, RefPort, Refused, TransportError
-
-LEASE_REF_PREFIX = "refs/heads/agent/host-loop/leases/"
-TASK_BRANCH_PREFIX = "refs/heads/agent/host-loop/tasks/"
-LEASE_SCHEMA = "arkdeck-host-loop-lease/v1"
-
-# Must exceed the longest single external write this gate protects
-# (backends.HTTP_TIMEOUT_SECONDS = 60), with slack for the round trip.
-WRITE_MARGIN_SECONDS = 90
 
 
 _KEEP = object()

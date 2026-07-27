@@ -32,12 +32,21 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Sequence
 
+from .instance import (
+    API_ROOT,
+    ENV_TOKEN,
+    ENV_TOKEN_FILE,
+    GIT_AUTHOR_EMAIL,
+    GIT_AUTHOR_NAME,
+    GIT_COMMITTER_EMAIL,
+    GIT_COMMITTER_NAME,
+    GIT_TIMEOUT_SECONDS,
+    HTTP_TIMEOUT_SECONDS,
+    TASK_BRANCH_COMMIT_SUBJECT,
+    USER_AGENT,
+)
 from .pr_envelope import Envelope, render_envelope
 from .transport import OID_RE, TransportError
-
-API_ROOT = "https://api.github.com"
-GIT_TIMEOUT_SECONDS = 120
-HTTP_TIMEOUT_SECONDS = 60
 
 # The only variables a git child inherits. Everything else — notably the
 # GIT_CONFIG_* family and anything that steers ssh — is dropped rather than
@@ -49,11 +58,9 @@ _GIT_ENV_PASSTHROUGH = (
     "GIT_SSH_COMMAND",
 )
 
-# Environment variable names. The token may also come from a root-only staging
-# file, which is preferred on the host because the value never enters the
-# scheduler's environment block.
-ENV_TOKEN = "ARKDECK_HOST_LOOP_TOKEN"
-ENV_TOKEN_FILE = "ARKDECK_HOST_LOOP_TOKEN_FILE"
+# Environment variable names live in `instance`; the token may also come from
+# a root-only staging file, which is preferred on the host because the value
+# never enters the scheduler's environment block.
 
 _SECRET_SHAPES = (
     re.compile(r"gh[psoau]_[A-Za-z0-9]{10,}"),
@@ -187,10 +194,10 @@ def commit_writer(repo_dir: str, timeout: int = GIT_TIMEOUT_SECONDS
         # independent of the host's git config, but setdefault let an inherited
         # GIT_AUTHOR_NAME win — so lease commits became mis-attributed and
         # non-deterministic exactly when the environment was dirty.
-        env["GIT_AUTHOR_NAME"] = "arkdeck-host-loop"
-        env["GIT_AUTHOR_EMAIL"] = "host-loop@arkdeck.invalid"
-        env["GIT_COMMITTER_NAME"] = "arkdeck-host-loop"
-        env["GIT_COMMITTER_EMAIL"] = "host-loop@arkdeck.invalid"
+        env["GIT_AUTHOR_NAME"] = GIT_AUTHOR_NAME
+        env["GIT_AUTHOR_EMAIL"] = GIT_AUTHOR_EMAIL
+        env["GIT_COMMITTER_NAME"] = GIT_COMMITTER_NAME
+        env["GIT_COMMITTER_EMAIL"] = GIT_COMMITTER_EMAIL
         done = subprocess.run(argv, cwd=repo_dir, capture_output=True, text=True,
                               timeout=timeout, env=env)
         if done.returncode != 0:
@@ -217,7 +224,7 @@ class UrllibSender:
 
     token: str
     timeout: int = HTTP_TIMEOUT_SECONDS
-    user_agent: str = "arkdeck-host-loop/1"
+    user_agent: str = USER_AGENT
 
     class _NoRedirect(urllib.request.HTTPRedirectHandler):
         """Surface a 3xx as a status instead of following it.
@@ -338,7 +345,8 @@ def branch_preparer(
         if existing is not None:
             return existing
         head = writer(
-            f"chore({candidate.task_id}): host-loop task branch\n\n"
+            TASK_BRANCH_COMMIT_SUBJECT.format(task_id=candidate.task_id)
+            + "\n\n"
             f"Empty commit on the frozen base. TASK-HLR-003 delivers the\n"
             f"coordination mechanism; task content is out of its scope.\n",
             base_oid,

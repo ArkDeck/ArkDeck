@@ -27,10 +27,22 @@ import re
 from dataclasses import dataclass, field, replace
 from typing import Callable, Literal, NamedTuple, Protocol, Sequence
 
+from .instance import (
+    AGENT_NAMESPACE,
+    BASE_BRANCH,
+    REF_HEADS_PREFIX,
+    RESERVED_NAMESPACE_SEGMENTS,
+)
+
 OID_RE = re.compile(r"^[0-9a-f]{40}$")
 AGENT_REF_RE = re.compile(r"^refs/heads/agent/(?!\.\.)[A-Za-z0-9._/-]+$")
+# Built from the namespace rather than spelled out again: this pattern and
+# the lease/task prefixes are the same fact.
 RESERVED_REF_RE = re.compile(
-    r"^refs/heads/agent/host-loop/(tasks|leases|probes)/[A-Za-z0-9._-]+$"
+    r"^"
+    + re.escape(f"{REF_HEADS_PREFIX}{AGENT_NAMESPACE}/")
+    + "(" + "|".join(RESERVED_NAMESPACE_SEGMENTS) + ")"
+    + r"/[A-Za-z0-9._-]+$"
 )
 
 
@@ -314,8 +326,8 @@ class ApiPort:
         return payload
 
     def create_pull(self, *, head: str, base: str, title: str, body: str) -> dict:
-        if base != "main":
-            raise TransportError("worker may only open PRs against main")
+        if base != BASE_BRANCH:
+            raise TransportError(f"worker may only open PRs against {BASE_BRANCH}")
         payload = self._call(
             "POST",
             f"/repos/{self.owner}/{self.repo}/pulls",
