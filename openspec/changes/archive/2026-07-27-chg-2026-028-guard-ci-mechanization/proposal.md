@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-028-guard-ci-mechanization
 revision: 3
-status: verified # 2026-07-23 本 verification-closure PR(先例 #224/#239);批准链 r1 #318 / r2 #349 / r3 #353;四 task done 已合入(OID 见 Verification closure);archive 另行
+status: archived # 2026-07-27 本 archive PR（先例 #235/#241/#572）；verify #393 merge ee205537（batch-20260723-1 候选 1）；此前扫描被 chg-2026-027 tasks.md r2 pins 历史文本所挡，027 先行入档后解除；引用扫描：目录外精确路径引用 0
 class: implementation-only
 core_change_level: none
 owner: lvye
