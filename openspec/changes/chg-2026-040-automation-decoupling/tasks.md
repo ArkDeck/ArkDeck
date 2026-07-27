@@ -306,8 +306,8 @@ None 的治理文件、重复 capability id、`changes/` 游离条目）。**故
 - Out of scope:agent-pr.yml 结构重构（B-H2 的 checkout 信任问题记台账
   为架构级观察，本任务只在 workflow 内做低成本缓解或显式记录）、
   concurrency 守卫（B-M6，noted）、swift-ci/rockchip workflow。
-- Allowed paths:`scripts/check_pr_paths.py`、`scripts/test_check_pr_paths.py`、`scripts/test_agent_pr_workflow.py`、`scripts/automation_config.json`、`.github/workflows/agent-pr.yml`、本 change `evidence/**`、本 change `tasks.md`（仅本任务状态/evidence 引用）
-- Forbidden paths:`scripts/host_loop/**`、`scripts/check_sdd.py`、`.github/workflows/sdd-guard.yml`（DEC-003 已改;r1 实测 base 权威**无需**改其 `--event` 调用,故不扩权——见 r1「workflow 适配」节）、`openspec/specs/**`、产品 source/tests、其他 change。
+- Allowed paths:`scripts/check_pr_paths.py`、`scripts/test_check_pr_paths.py`、`scripts/test_agent_pr_workflow.py`、`scripts/automation_config.json`、`.github/workflows/agent-pr.yml`、`scripts/host_loop/test_pr_envelope.py`（r2;仅 `BASE_OID`/`HEAD_OID` 两常量）、本 change `evidence/**`、本 change `tasks.md`（仅本任务状态/evidence 引用）
+- Forbidden paths:`scripts/host_loop/**`（r2 例外见 Allowed paths 的单文件两常量授权）、`scripts/check_sdd.py`、`.github/workflows/sdd-guard.yml`（DEC-003 已改;r1 实测 base 权威**无需**改其 `--event` 调用,故不扩权——见 r1「workflow 适配」节）、`openspec/specs/**`、产品 source/tests、其他 change。
 - Risk:med（守卫语义变更;现存 5 个任务 Allowed paths 天然拒绝、8+ 全角
   冒号行等存量畸形在收紧下的行为变化须逐项清点入 evidence;回退 =
   revert）。
@@ -520,6 +520,53 @@ pipefail)、B-M6（concurrency)、agent-pr.yml 结构重构（B-H2)、
 rockchip-component workflow 卫生 —— 均按任务卡 Out of scope 记台账。
 两 checker 文法统一;`instance.py` 收口（DEC-002）;`Decision-Grade`
 代写。
+
+### Readiness r2（2026-07-27）— B-H1 的单文件跨分区扩权
+
+**触发**：实现开工后按 r1 要求先对 B-H1 施加**最小修复**干跑
+（`check_paths` 的任务定义由 head 树改 `context.base_oid` 树,其余一字
+未改),全套件实测**恰一条测试变红**:
+`host_loop.test_pr_envelope.EnvelopeContractTests.
+test_mech_004_reads_task_and_allowed_paths_from_complete_envelope`
+（`scripts/host_loop/test_pr_envelope.py:498`)。该文件在 r1 的 Forbidden
+paths 内（`scripts/host_loop/**`),故实现按 r1 停条件**当场停下,未改
+任何 host_loop 文件**,转本 r2 请求扩权。r1 的其余条款原文继续有效。
+
+**根因（不是测试写错,是被冻结的前提）**
+
+该测试以 `BASE_OID = "a" * 40`、`HEAD_OID = "b" * 40` 两个**合成 OID**
+对真实仓调用 `check_paths`。这在今天可行,**恰恰因为校验器从不查 base
+树**——合成 base OID 从未被解析过。base 权威使它必须解析,于是
+`git ls-tree <aaaa…>` 失败并 fail-closed。**这是仓内记录过两次的
+「测试把缺陷冻结成正确行为」同族**（cursor「陈旧即致命」六条、
+HLR-003 的 required-checks 那格);正确处置是让 fixture 适配更强的前提,
+**不是**为保住它而给校验器留「base 不可解析即回退 head」的回退路径——
+那正是本任务要关闭的 fail-open 类。
+
+**扩权面（严格最小)**
+
+- 新增 Allowed paths:`scripts/host_loop/test_pr_envelope.py`。
+- **授权仅限**把该文件的 `BASE_OID`/`HEAD_OID` 两个模块级常量改为**本
+  仓真实可解析的 OID**,并按需调整其紧邻注释。**不得改动该文件的任何
+  断言、任何用例逻辑、任何其他常量。**
+- 该文件的 owner 分区（DEC-005/006）**均已 done**,当前无并行载体;
+  唯一仍会触 `scripts/host_loop/**` 的活口是 **TASK-DEC-002**（
+  `instance.py` 常量收口 + 各 `test_*.py` 的 import 搬移),与本次两常量
+  改动无语义交集——**记录该交叠,供 DEC-002 起草 readiness 时避让同段**。
+
+**r2 追加的 Pass/fail boundary**（r1 的七条继续适用）
+
+8. 对 `test_pr_envelope.py` 的改动 diff **只含上述两常量（+ 注释)**,
+   以逐行 diff 入 evidence 示证;断言逐字不变。
+9. 改后 host_loop `-m unittest discover` 恢复 **≥624 OK + 1 expected
+   failure**,且 MECH-004 端到端用例以**真实 OID**通过（= 它现在真的
+   经过了 base 树解析这条路径,比改前覆盖更强)。
+10. B-H1 的「撤销即变红」测试**不得**依赖该文件——它须落在
+    `test_check_pr_paths.py`（自扩权 fixture + 36/36 复算)。
+
+**r2 追加的 Stop conditions**：改两常量后仍有其他 host_loop 测试变红
+（说明另有同型冻结,停并转 r3);任何需要改该文件断言的诉求;需要触碰
+`scripts/host_loop/**` 的其他文件。
 
 ## TASK-DEC-005 — host_loop transport/lease/backends 硬化
 
