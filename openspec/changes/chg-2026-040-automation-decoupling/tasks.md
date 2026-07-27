@@ -2,7 +2,16 @@
 
 > 八任务全部改动自动化自身代码/测试/CI 面，照 TASK-HLR-003 与 NAV 先例
 > 均为 never-claim（会话实现、维护者合并;`NEVER_CLAIM_ROOTS` 的
-> `TASK-DEC` 根由 TASK-DEC-005 落码）。`Decision-Grade` 行由维护者亲笔
+> `TASK-DEC` 根由 **TASK-DEC-007** 落码——r1 起草时从 DEC-005 移交,因
+> DEC-007 独占 `worker.py`,两任务并行改同一文件会真冲突）。
+> **⚠ 顺序硬约束（2026-07-27 实测)**:`NEVER_CLAIM_ROOTS` 现为
+> `{TASK-HLR-003, TASK-NAV-001, TASK-NAV-002}`,**不含 `TASK-DEC` 根**,
+> 故 `is_never_claim("TASK-DEC-003")` 实测为 `False`;而 `--explain` 对已
+> ready 的 DEC 任务打出 `one Decision-Grade line from claimable`。
+> **在 TASK-DEC-007 的实现（含本表扩充）合入 main 之前,不得为任何
+> TASK-DEC 写 `Decision-Grade` 行**——否则活循环会认领本 change 声明为
+> 会话实现的任务,且 DEC-005/007 恰是改写"决定它能认领什么"的那段代码。
+> `Decision-Grade` 行由维护者亲笔
 > （#577 先例），本文件不代写。修复对象的行号引用见 review-findings.md;
 > 该台账的行号在 audit base 上采集，各任务 readiness 时按当时 main 重钉
 > exact blob。
@@ -405,9 +414,11 @@ body 语料解析回归失败;需要触碰 `test_fault_matrix.py` 或其他 DEC-
 
 ## TASK-DEC-007 — worker/discovery 解析与观测硬化
 
-- Status:blocked（前置：① approval merge;② TASK-NAV-001 done（同文件
-  worker.py/__main__.py）;③ 独立 readiness 按 NAV-001 合入后的 main 重
-  钉 exact blob 与逐项契约。）
+- Status:ready（r1 implementation readiness;前置① approval 已合 = #598
+  `cac07003…`,前置② TASK-NAV-001 已 done（#600,chg-2026-039 已 archived
+  于 #610）,前置③ 即本 readiness。**本任务含 never-claim 守卫扩充,是
+  其余 DEC 任务被评级前的顺序前置**——见文件头 ⚠ 与下方「Readiness r1」
+  节;任一门不满足即停,不得降门执行。）
 - Platform:macos（host-only）
 - Requirements/AC:change-local `DEC-NAV-001`
 - Depends on:TASK-NAV-001
@@ -424,7 +435,7 @@ body 语料解析回归失败;需要触碰 `test_fault_matrix.py` 或其他 DEC-
 - Out of scope:NAV-001 已交付语义（全仓扫描/idle 判词/时间戳——回归
   保持不重做）、explain 双实现合并（noted）、Phase4 cursor 写授权、
   DISPATCHABLE_GRADES。
-- Allowed paths:`scripts/host_loop/__main__.py`、`scripts/host_loop/worker.py`、`scripts/host_loop/cursor.py`、`scripts/host_loop/test_discovery_contract.py`、`scripts/host_loop/test_worker_cursor.py`、`scripts/host_loop/test_cursor_contract.py`、`scripts/host_loop/test_check_verdict_contract.py`、本 change `evidence/**`、本 change `tasks.md`（仅本任务状态/evidence 引用）
+- Allowed paths(r1 扩充,见下方 readiness「授权面扩充」):`scripts/host_loop/__main__.py`、`scripts/host_loop/worker.py`、`scripts/host_loop/cursor.py`、`scripts/host_loop/test_discovery_contract.py`、`scripts/host_loop/test_worker_cursor.py`、`scripts/host_loop/test_cursor_contract.py`、`scripts/host_loop/test_check_verdict_contract.py`、`scripts/host_loop/test_navigation_contract.py`、`scripts/host_loop/test_support.py`、本 change `evidence/**`、本 change `tasks.md`（仅本任务状态/evidence 引用）
 - Forbidden paths:`scripts/host_loop/transport.py`、`scripts/host_loop/lease.py`、`scripts/host_loop/backends.py`、`scripts/host_loop/reviewer.py`、`scripts/host_loop/recovery.py`、`scripts/host_loop/pr_envelope.py`、`scripts/host_loop/identity.py`、`.github/**`、产品 source/tests、其他 change。
 - Risk:med（discovery fail-closed 收紧会使现存畸形行的任务从静默误读
   变为省略;须对全仓 active tasks.md 出清点报告——现存 8+ 全角冒号行
@@ -440,6 +451,112 @@ body 语料解析回归失败;需要触碰 `test_fault_matrix.py` 或其他 DEC-
   保持）;corrections 在 reconcile 轮 detail 可见;直跑
   test_discovery_contract 与模块跑计数相等;全仓解析清点报告入
   evidence。
+
+### Readiness r1（2026-07-27）
+
+**Audit base** = `ecd5320b35308ddd44f67fb6a825a9c5f9e3fc1b`。
+
+**开工基线声明（Ordering 义务,非 drift gate)**
+
+```yaml pins
+- path: scripts/host_loop/__main__.py
+  blob: d9e62fb7a98e052cef5bba7d3063963a7ca139f4
+- path: scripts/host_loop/worker.py
+  blob: c26b6a199dd13dbeb211ed22ad02fb7943f3c6bb
+- path: scripts/host_loop/cursor.py
+  blob: 0961ec62409644421dc8ed8eea68230e8fa93b5e
+- path: scripts/host_loop/test_discovery_contract.py
+  blob: ab51240c01e681ae30fa732c8d3999e31278b058
+- path: scripts/host_loop/test_navigation_contract.py
+  blob: 91cad318eb7a5796c32fdac8ddc0891a0abb3415
+- path: scripts/host_loop/test_support.py
+  blob: dfe9557f7eb0fe14c57b2c54da4e718598fc6e94
+- path: scripts/host_loop/test_worker_cursor.py
+  blob: 0a878006017e21580a6eebcd0c978949901a5e02
+- path: scripts/host_loop/test_cursor_contract.py
+  blob: ba969661c7b3b1a3779558e7b3e46defb2142dcb
+- path: scripts/host_loop/test_check_verdict_contract.py
+  blob: ed7429e2b4538af50127ad13c52ab593ee25a0cf
+```
+
+**授权面扩充（r1 新增两文件,理由为实测）**
+
+r1 把 `test_navigation_contract.py` 与 `test_support.py` 纳入 Allowed
+paths。理由不是预防性放宽,而是干跑结论:把 `TASK-DEC` 根加入
+`NEVER_CLAIM_ROOTS` 后,全套件**恰一条断言反应** =
+`test_navigation_contract.NeverClaimRootsArePinnedByContent.
+test_the_exact_root_set`（它以精确内容集钉死该表,正是应当反应的那条;
+同文件 `test_each_root_and_its_suffixed_siblings_are_excluded` 也逐根
+枚举）。该文件**不在原 Allowed paths 内**,不扩充则本任务必然越界,
+只能事后走 remediation（#303 同型先例）。`test_support.py` 是 NAV-002
+引入的 active-or-archive 共享 helper,discovery 解析改动可能波及,一并
+纳入。**扩充仅此两文件;其余 host_loop 测试仍属 DEC-005/006/008 分区。**
+
+**顺序前置(本任务最重要的产出)**
+
+`NEVER_CLAIM_ROOTS` 现为 `{TASK-HLR-003, TASK-NAV-001, TASK-NAV-002}`,
+`is_never_claim("TASK-DEC-003")` **实测 False**;`--explain` 对 ready 的
+DEC 任务打出 `one Decision-Grade line from claimable`。**本任务的实现
+PR 必须把八个 `TASK-DEC-00N` 根加入该表,且这应是最先落地的一项**;
+在其合入 main 前,任何 TASK-DEC 的 `Decision-Grade` 行都会使活循环可
+认领本 change 明确声明为会话实现的任务。DEC-005/DEC-007 尤甚——它们
+改写的正是"决定循环能认领什么"的代码,恰为 worker.py 注释所述禁忌。
+
+**C-H1 的修复契约（由实测语料定义,非自由裁量）**
+
+现仓 13 份活跃 tasks.md 中,空值 `- Depends on:`/`- Allowed paths:` 共
+**34 处,全部为同一种合法形态**:空值行之后紧跟缩进的反引号列表项
+（分类实测:continuation-with-backticks 34 / continuation-plain 0 /
+immediately-next-bullet 0）。因此:
+
+- **不得**用"空值即省略任务"的简化修复——那会一次性使 34 处合法声明
+  变为不可判定。
+- 正确形态 = **区分"缩进列表续行"与"散文"**:前者继续解析出非空值,
+  后者 fail-closed（既不产生依赖,也不产生 allowed_paths）。
+- **验收门**:实现后对现仓逐一复算,**34 处必须全部仍解析出非空值**
+  （清点表入 evidence,含每处 change/行号/解析结果）;同时散文 fixture
+  必须产出空集而非散文 token。任一合法处退化即整轮作废。
+
+**干跑实测（变异门依据）**
+
+- `TASK-DEC` 根加入 `NEVER_CLAIM_ROOTS`:**恰 1 条断言反应**（上文那条
+  内容集测试）,零行为失败 = 零构造点。
+- C-H2（`CursorError`/`ReconcileRequired` 由 `EXIT_ERROR` 改
+  `EXIT_RECONCILE`）:**零断言反应**（536 OK + 1 xf 不变）→ 该性质现
+  套件零覆盖,必须新增测试并配变异门。
+- C-H1 探测脚手架:零断言反应 → 同上,现套件不覆盖空值/散文区分。
+
+**Pass/fail boundary**
+
+1. 每个修复配「撤销即变红」的测试 + 正对照,逐项覆盖
+   C-H1/C-H2/C-M4/C-M5/C-M6/C-M8a/C-L11 与 never-claim 扩充。
+2. **never-claim 扩充以精确内容集断言**（更新 `test_the_exact_root_set`
+   为新的 11 根集合;`len()` 型断言不作数）,并加"每个 DEC 根及其后缀
+   兄弟被排除"的枚举对照。
+3. **C-H1 的 34 处合法语料全部保持解析**（清点表入 evidence）。
+4. C-H2 后:cursor 损坏路径 exit **20**;健康路径 exit 0/10 语义不变
+   （正对照）;`BackendError`/`TransportError`/`LeaseError` 仍 exit 1。
+5. `test_discovery_contract.py` 的 `unittest.main()` 移至文件尾后,
+   **直跑与 `-m unittest` 计数相等**（现为 19 vs 34）。
+6. 全套件 **≥536 OK + 1 expected failure**;`check-sdd` 保持 0/0/111;
+   `--explain` 在实现后对全部 DEC 任务报 never-claim 而非 grade 缺失。
+7. **NAV-001 已交付语义零回归**:全仓扫描、idle 判词、UTC 时间戳的既有
+   契约测试保持绿,不得为本任务的改动放宽。
+
+**Risk acceptance（首次）**：discovery 收紧会改变解析结果的可见性。已
+接受,因为 34 处语料的保持是硬门,散文捕获归零是目的。两 left-running
+unit **零动作**,行为经运行机 checkout 前进生效。回退 = revert。
+
+**Stop conditions**：34 处语料任一退化;never-claim 扩充后 `--explain`
+仍显示任何 DEC 任务可被 grade 解锁;需要触碰扩充后 Allowed paths 之外
+的文件（尤其 `transport.py`/`lease.py`/`backends.py` 归 DEC-005、
+`reviewer.py` 等归 DEC-006、`test_minter_and_explain.py` 归 DEC-008——
+后者虽引用 `NEVER_CLAIM_ROOTS` 但干跑零反应,若实现时它变红即停并在
+r2 显式扩权）。
+
+**不授权**：`DISPATCHABLE_GRADES` 与 GATED 语义;never-claim 政策本体
+（仅扩本 change 自己的八根）;Phase 4 cursor 写;explain 双实现合并
+（台账 noted）;`Decision-Grade` 代写。
 
 ## TASK-DEC-008 — minter 脚本修复与部署副本重装（D2 窗口）
 
