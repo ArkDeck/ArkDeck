@@ -1,0 +1,10 @@
+{
+  "schema": "arkdeck-automation-config/v1",
+  "sensitive_paths": [
+    "Packages/**",
+    "ArkDeckApp/**",
+    "ArkDeckAppUITests/**",
+    "scripts/**",
+    ".github/**"
+  ]
+}

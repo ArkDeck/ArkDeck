@@ -32,17 +32,64 @@ ALLOWED_PATHS_RE = re.compile(
 )
 BACKTICK_PATH_RE = re.compile(r"(?:(本\s+change)\s*)?`([^`\n]+)`")
 
-SENSITIVE_PATTERNS = (
-    "Packages/**",
-    "ArkDeckApp/**",
-    "ArkDeckAppUITests/**",
-    "scripts/**",
-    ".github/**",
-)
+# The sensitive-path table lives next to this script so guard code and guard
+# data travel in the same checkout and the same `scripts/**` protection domain
+# (TASK-DEC-001). Loading is fail-closed: a missing or malformed file is a
+# CheckError on every run, never a silent fallback to a built-in default.
+CONFIG_SCHEMA = "arkdeck-automation-config/v1"
+CONFIG_PATH = Path(__file__).resolve().parent / "automation_config.json"
+CONFIG_KEYS = frozenset({"schema", "sensitive_paths"})
 
 
 class CheckError(ValueError):
     """A named, user-correctable PR scope violation."""
+
+
+def load_sensitive_patterns(config_path: Path = CONFIG_PATH) -> tuple[str, ...]:
+    try:
+        raw_text = config_path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as error:
+        raise CheckError(
+            f"cannot read automation config {config_path}: {error}"
+        ) from error
+    try:
+        config = json.loads(raw_text)
+    except json.JSONDecodeError as error:
+        raise CheckError(
+            f"cannot parse automation config {config_path}: {error}"
+        ) from error
+    if not isinstance(config, dict):
+        raise CheckError(
+            f"automation config {config_path} top level must be a JSON object"
+        )
+    if config.get("schema") != CONFIG_SCHEMA:
+        raise CheckError(
+            f"automation config {config_path} schema must be {CONFIG_SCHEMA!r}"
+        )
+    unknown_keys = sorted(set(config) - CONFIG_KEYS)
+    if unknown_keys:
+        raise CheckError(
+            f"automation config {config_path} has unknown keys: "
+            + ", ".join(unknown_keys)
+        )
+    patterns = config.get("sensitive_paths")
+    if not isinstance(patterns, list) or not patterns:
+        raise CheckError(
+            f"automation config {config_path} sensitive_paths must be a "
+            "non-empty list"
+        )
+    if any(not isinstance(pattern, str) for pattern in patterns):
+        raise CheckError(
+            f"automation config {config_path} sensitive_paths entries must "
+            "all be strings"
+        )
+    duplicates = sorted({p for p in patterns if patterns.count(p) > 1})
+    if duplicates:
+        raise CheckError(
+            f"automation config {config_path} sensitive_paths has duplicate "
+            "entries: " + ", ".join(duplicates)
+        )
+    return tuple(patterns)
 
 
 @dataclass(frozen=True)
@@ -581,7 +628,12 @@ def check_paths(
     repo_root: Path,
     context: PullRequestContext,
     changed_paths: Sequence[str],
+    *,
+    config_path: Path = CONFIG_PATH,
 ) -> CheckResult:
+    # Loaded unconditionally: a broken sensitive-path table must fail every
+    # check run, including task-declared PRs that would never consult it.
+    sensitive_patterns = load_sensitive_patterns(config_path)
     # `git diff -z` already returns repository-relative paths with `/` as the
     # directory separator. On Unix a backslash is a legal filename byte, so
     # rewriting it would turn a root file such as `scripts\outside.py` into a
@@ -590,14 +642,14 @@ def check_paths(
     task_id = resolve_task_declaration(context)
     if task_id is None:
         offenders = sorted(
-            path for path in repository_paths if path_matches(path, SENSITIVE_PATTERNS)
+            path for path in repository_paths if path_matches(path, sensitive_patterns)
         )
         if offenders:
             raise CheckError(
                 "PR has no task declaration and touches sensitive paths: "
                 + ", ".join(offenders)
             )
-        return CheckResult(None, repository_paths, SENSITIVE_PATTERNS)
+        return CheckResult(None, repository_paths, sensitive_patterns)
 
     definitions = load_task_definitions(repo_root)
     task = definitions.get(task_id)
