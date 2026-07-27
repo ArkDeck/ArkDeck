@@ -837,5 +837,220 @@ class PullRequestPathTests(unittest.TestCase):
         self.assertNotIn("types: [opened, synchronize", workflow)
 
 
+class AutomationConfigTests(unittest.TestCase):
+    """TASK-DEC-001: the sensitive-path table is data, loaded fail-closed."""
+
+    # Byte-for-byte anchor recorded in chg-2026-040 readiness r1: the exact
+    # five patterns the extraction moved out of this module. The shipped
+    # config must parse to precisely this tuple, in this order; any content
+    # or ordering change must turn this suite red.
+    R1_ANCHOR_PATTERNS = (
+        "Packages/**",
+        "ArkDeckApp/**",
+        "ArkDeckAppUITests/**",
+        "scripts/**",
+        ".github/**",
+    )
+
+    def taskless_context(self) -> check_pr_paths.PullRequestContext:
+        return check_pr_paths.PullRequestContext(
+            title="docs: governance update",
+            body="",
+            head_ref="agent/governance-update",
+            base_oid=ZERO_OID,
+            head_oid=ONE_OID,
+        )
+
+    def write_config(self, text: str) -> Path:
+        temporary = tempfile.TemporaryDirectory(prefix="automation-config-")
+        self.addCleanup(temporary.cleanup)
+        config_path = Path(temporary.name) / "automation_config.json"
+        config_path.write_text(text, encoding="utf-8")
+        return config_path
+
+    def config_text(self, patterns: object) -> str:
+        return json.dumps(
+            {"schema": check_pr_paths.CONFIG_SCHEMA, "sensitive_paths": patterns}
+        )
+
+    def assert_config_error(self, expected: str, config_path: Path) -> None:
+        with self.assertRaises(check_pr_paths.CheckError) as caught:
+            check_pr_paths.load_sensitive_patterns(config_path)
+        self.assertIn(expected, str(caught.exception))
+
+    def test_shipped_config_parses_to_the_r1_anchor_exactly(self):
+        self.assertEqual(
+            check_pr_paths.load_sensitive_patterns(),
+            self.R1_ANCHOR_PATTERNS,
+        )
+
+    def test_malformed_configs_each_fail_closed_with_a_valid_control(self):
+        control = self.write_config(self.config_text(list(self.R1_ANCHOR_PATTERNS)))
+        self.assertEqual(
+            check_pr_paths.load_sensitive_patterns(control),
+            self.R1_ANCHOR_PATTERNS,
+        )
+
+        with self.subTest(shape="missing file"):
+            self.assert_config_error(
+                "cannot read automation config",
+                control.parent / "does-not-exist.json",
+            )
+
+        text_cases = (
+            ("unparseable JSON", "{", "cannot parse automation config"),
+            ("top level not an object", "[]", "top level must be a JSON object"),
+            (
+                "schema mismatch",
+                json.dumps({"schema": "other/v0", "sensitive_paths": ["scripts/**"]}),
+                "schema must be",
+            ),
+            (
+                "schema absent",
+                json.dumps({"sensitive_paths": ["scripts/**"]}),
+                "schema must be",
+            ),
+            (
+                "unknown key",
+                json.dumps(
+                    {
+                        "schema": check_pr_paths.CONFIG_SCHEMA,
+                        "sensitive_paths": ["scripts/**"],
+                        "extra": 1,
+                    }
+                ),
+                "unknown keys: extra",
+            ),
+            (
+                "sensitive_paths not a list",
+                self.config_text("scripts/**"),
+                "non-empty list",
+            ),
+            ("sensitive_paths empty", self.config_text([]), "non-empty list"),
+            (
+                "non-string entry",
+                self.config_text(["scripts/**", 7]),
+                "must all be strings",
+            ),
+            (
+                "boolean entry",
+                self.config_text([True]),
+                "must all be strings",
+            ),
+            (
+                "duplicate entries",
+                self.config_text(["scripts/**", "Packages/**", "scripts/**"]),
+                "duplicate entries: scripts/**",
+            ),
+        )
+        for label, text, expected in text_cases:
+            with self.subTest(shape=label):
+                self.assert_config_error(expected, self.write_config(text))
+
+    def test_check_paths_consults_the_config_file_not_a_builtin_default(self):
+        custom = self.write_config(self.config_text(["guarded_zone/**"]))
+        temporary = tempfile.TemporaryDirectory(prefix="check-pr-config-")
+        self.addCleanup(temporary.cleanup)
+        root = Path(temporary.name)
+        context = self.taskless_context()
+
+        with self.assertRaises(check_pr_paths.CheckError) as caught:
+            check_pr_paths.check_paths(
+                root,
+                context,
+                ("guarded_zone/pin.txt",),
+                config_path=custom,
+            )
+        self.assertIn(
+            "touches sensitive paths: guarded_zone/pin.txt", str(caught.exception)
+        )
+
+        # Paths the custom table does not name must pass, even though the
+        # shipped table names them: red here means check_paths fell back to
+        # a builtin default instead of the configured data.
+        result = check_pr_paths.check_paths(
+            root,
+            context,
+            ("scripts/x.py", "Packages/A.swift"),
+            config_path=custom,
+        )
+        self.assertIsNone(result.task_id)
+        self.assertEqual(result.allowed_patterns, ("guarded_zone/**",))
+
+    def test_a_broken_config_blocks_even_a_task_declared_pr(self):
+        temporary = tempfile.TemporaryDirectory(prefix="check-pr-broken-config-")
+        self.addCleanup(temporary.cleanup)
+        root = Path(temporary.name)
+        change = root / "openspec" / "changes" / "chg-test"
+        change.mkdir(parents=True)
+        (change / "tasks.md").write_text(
+            "## TASK-MECH-004 — path guard\n"
+            "- Allowed paths:`scripts/check_pr_paths.py`\n",
+            encoding="utf-8",
+        )
+        context = check_pr_paths.PullRequestContext(
+            title="feat(TASK-MECH-004): guarded change",
+            body="Task: TASK-MECH-004\n",
+            head_ref="agent/task-mech-004",
+            base_oid=ZERO_OID,
+            head_oid=ONE_OID,
+        )
+        with self.assertRaises(check_pr_paths.CheckError) as caught:
+            check_pr_paths.check_paths(
+                root,
+                context,
+                ("scripts/check_pr_paths.py",),
+                config_path=root / "absent.json",
+            )
+        self.assertIn("cannot read automation config", str(caught.exception))
+
+    def test_the_config_file_is_protected_by_its_own_declared_table(self):
+        patterns = check_pr_paths.load_sensitive_patterns()
+        self.assertTrue(
+            check_pr_paths.path_matches("scripts/automation_config.json", patterns)
+        )
+
+        temporary = tempfile.TemporaryDirectory(prefix="check-pr-self-guard-")
+        self.addCleanup(temporary.cleanup)
+        root = Path(temporary.name)
+        with self.assertRaises(check_pr_paths.CheckError) as caught:
+            check_pr_paths.check_paths(
+                root,
+                self.taskless_context(),
+                ("scripts/automation_config.json",),
+            )
+        self.assertIn(
+            "touches sensitive paths: scripts/automation_config.json",
+            str(caught.exception),
+        )
+
+    def test_readme_boundary_map_covers_every_first_level_scripts_entry(self):
+        repo_root = Path(__file__).resolve().parents[1]
+        readme_text = (repo_root / "scripts" / "README.md").read_text(
+            encoding="utf-8"
+        )
+        completed = subprocess.run(
+            ["git", "-C", str(repo_root), "ls-tree", "--name-only", "HEAD", "scripts/"],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        entries = [
+            line[len("scripts/") :]
+            for line in completed.stdout.splitlines()
+            if line.startswith("scripts/")
+        ]
+        self.assertTrue(entries, "git ls-tree returned no scripts/ entries")
+        missing = [
+            entry
+            for entry in entries
+            if f"`{entry}`" not in readme_text and f"`{entry}/`" not in readme_text
+        ]
+        self.assertEqual(
+            missing, [], f"scripts/README.md does not mention: {missing}"
+        )
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
