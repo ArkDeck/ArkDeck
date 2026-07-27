@@ -149,10 +149,32 @@ DEC-004 且须维护者在其 readiness 认可清单）;两 checker 文法统一
 
 ## TASK-DEC-003 — check_sdd fail-closed 修复与测试基建接线
 
-- Status:ready（r1 implementation readiness;前置① approval 已合
-  = #598 `cac07003836889881994367bde7ba3e0bdca70c0`（lvye APPROVED,
-  mergedBy lvye）,前置② 即本 readiness。授权范围与门见下方
-  「Readiness r1」节;任一门不满足即停,不得降门执行。）
+- Status:done（2026-07-27 D0 completion;仅在维护者 review/merge 本独立
+  `ready→done` PR 后生效。实现载体 = **#638**（merge
+  `2fbaba8e19cc1206ff5fc2c2473db85e619f3a1b`,lvye APPROVED,mergedBy
+  lvye）;readiness r1 = #606（merge
+  `5597a2e498fcd1ae5174b11a219236f4c3360cbf`）。evidence =
+  `evidence/runs/TASK-DEC-003/implementation.md`。
+  交付 A-H1（认领面终止于任何层级标题）、A-H2/A-M3（五处必需文档解析为
+  None 即报错）、A-M1a（Status 逐任务配对）、A-M1b（词表尾边界 +
+  `[::]`→`[:：]`）、A-M2（重复 capability id 显式报错）、A-M4（
+  present-but-null 与非 mapping front matter 由 traceback 改具名 error）、
+  A-L2（死 replace 随重写移除）、A-L5（`changes/` 游离条目报错）、
+  **A-H3 CI 接线**（guard job 新增 `test_check_sdd.py` 与
+  `unittest discover -s host_loop -t .` 两步）。
+  **存量清点在实现 base 上复算仍全零**,故收紧零 openspec 内容改动、
+  未触发停机制;收紧后真实仓 `check-sdd` 仍 0/0/111。
+  变异门 8/8 击杀 + 负对照存活。**两处自查如实记入 evidence**:
+  ①A-M1a 首版测试在测试内重实现配对循环（套套逻辑,生产检查被禁用仍绿）,
+  由变异 harness 逮到并改为驱动 `check_changes()`;②A-L5 引入的
+  `iterdir()` 在 `changes/` 缺失时抛异常（原 `glob` 返回空）,由新测试
+  当场发现,已补 `is_dir()` 守卫。
+  **flip 后复核**（在翻转后的树上执行,HLR-003 r5 教训）:`check-sdd`
+  **0/0/111**、`test_check_sdd.py` **40 tests OK**、host_loop
+  `-m unittest discover` **624 OK + 1 expected failure**、
+  `done_task_ids` **97** 且含 `TASK-DEC-003`。
+  **连带效果**:自本任务起,`sdd-guard` 的绿包含上述两套件——此前二者
+  **均无任何 workflow 运行**,其性质仅在有人记得手跑时成立。）
 - Platform:macos（host-only）
 - Requirements/AC:change-local `DEC-SDD-001`
 - Depends on:none（与 NAV/其他 DEC 任务零文件交集）
