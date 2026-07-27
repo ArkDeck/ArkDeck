@@ -842,10 +842,10 @@ readiness r2,内容须含:重装步骤逐条、新 digest、回滚 digest
 
 ## TASK-DEC-009 — 跨分区遗留收口（r2 新增）
 
-- Status:blocked（前置：① 本 change r2 修订 PR merge;② 独立 readiness
-  钉受改文件 exact blob、`observed_main` 的修复契约与「撤销即红」变异门、
-  死测试的处置形态。**本任务是 DEC-005/006/007 链条上三处如实停下的
-  分区边界的唯一载体**;三项均无其他活任务可承载。）
+- Status:ready（r1 implementation readiness;前置① r2 修订已合 = #634
+  `6ee7242decfb990f2788c6176c2c1e9ec99d3efa`（lvye APPROVED,mergedBy
+  lvye）,前置② 即本 readiness。授权范围与门见下方「Readiness r1」节;
+  任一门不满足即停,不得降门执行。）
 - Platform:macos（host-only;零设备面）
 - Requirements/AC:change-local `DEC-LEFT-001`
 - Depends on:none（DEC-005/006/007 均已 done,受改文件与 DEC-001/003/008
@@ -889,3 +889,78 @@ readiness r2,内容须含:重装步骤逐条、新 digest、回滚 digest
 
 - 本任务 done 后,CHG-2026-040 的台账中不再有已知未闭合的安全缺陷;
   余下仅 DEC-001/002/003/004/008 的既有范围。
+
+### Readiness r1（2026-07-27）
+
+**Audit base** = `6ee7242decfb990f2788c6176c2c1e9ec99d3efa`。
+
+**开工基线声明（Ordering 义务,非 drift gate)**
+
+```yaml pins
+- path: scripts/host_loop/__main__.py
+  blob: bbe92598acaf960f8d0be1878f296e69ee69f8d2
+- path: scripts/host_loop/test_worker_cursor.py
+  blob: 0a878006017e21580a6eebcd0c978949901a5e02
+- path: scripts/host_loop/test_fault_matrix.py
+  blob: fb4b968285b09d2edb84cc0b39fcfd12fe67ce9c
+- path: scripts/host_loop/test_navigation_contract.py
+  blob: 48b1f9478bc456c04b3e695c4f7bf70b0b8867f2
+```
+
+**缺陷在 audit base 上的实测复现（起草时执行）**
+
+`observed_main(runner)` 现为 `out.split()[0]`。喂入两行 ls-remote 输出
+（`refs/backup/refs/heads/main` 排在 `refs/heads/main` 之前,与 D-H2 的
+影子形态同构）实测返回**影子的 OID** 而非受保护 main 的 OID
+（`6666…` 而非 `aaaa…`）。单行精确输出仍正确返回。**该缺陷在
+`--once` 的每一轮 base 读取路径上活着**,是本 change 台账中最后一条
+未闭合的安全缺陷。
+
+**干跑实测（变异门依据）**
+
+- **①`observed_main` 最小修复（单行 + refname 等值）:零断言反应**
+  （617 OK + 1 xf 不变）。含义与 DEC-005 的 D-H2/D-H3 相同——零构造点
+  **且该性质零覆盖**。故变异门是硬条件:**没有会因 revert 变红的测试,
+  修复等于没修**。
+- **②`FakeApi` 补 `GET /issues/{n}` 路由:恰打红一条** =
+  `test_worker_cursor.CursorPersistence.test_closed_cursor_issue_is_refused`。
+  这不是回归,而是**该测试为死测试的机器证明**:它把 `__call__` 设为
+  实例属性,而 Python 在**类型**上解析 `__call__`,故其 fake 从不被调用;
+  它此前通过仅因 fake 缺该路由、回落 `{}` 恰好触发同一个
+  `state != "open"` 检查。补路由使巧合消失,测试随之暴露。
+
+**Pass/fail boundary**
+
+1. **①的验收是双向的**:影子 fixture（多行、或单行但 refname 不等）必须
+   `BackendError`;正对照（单行精确 `refs/heads/main`）必须仍返回该 OID。
+   **变异门**:撤销修复后该 fixture 必红。
+2. **②不得以删除测试收场**。修复后 `test_closed_cursor_issue_is_refused`
+   必须**真正驱动它的 fake**——以调用计数或等价断言为证,**不得仅依赖
+   回落值**;同时 `FakeApi` 的 `GET /issues/{n}` 返回真实端点恒发的
+   `number`/`state`/`title`/`body` 形状。变异门:移除该路由或还原实例
+   属性写法,该测试必红。
+3. **③ 更正后 TASK-DEC-005 段的 Allowed ∩ Forbidden = ∅**（以 grep/
+   解析清点为证）;**仅从 Forbidden 侧移除 `identity.py` 与
+   `pr_envelope.py` 两项,Allowed 侧与该任务其余文字一字不动**。
+4. 全套件 **≥617 OK + 1 expected failure**;`check-sdd` 保持 0/0/111。
+5. **NAV-001/DEC-007 已交付语义零回归**:全仓 discovery、idle 判词、
+   never-claim、C-H1 续行/散文区分的既有契约测试保持绿,不得为本任务
+   放宽。
+6. **`--explain` 与 `--once` 的既有退出码语义不变**（`observed_main` 在
+   两条路径上都被调用;修复只增加拒绝分支,不改成功路径返回值）。
+
+**Risk acceptance（首次）**：`observed_main` 在 live 循环每轮的 base 读取
+路径上,修复使「多行输出」与「refname 不等」由静默取首 token 变为
+`BackendError` → 轮次 exit 1。已接受:①正常拓扑下 `refs/heads/main` 精确
+匹配恰一行,实测正对照通过;②方向为 fail-closed,且被顶替的后果（用错误
+OID 作 base 开 PR / 比对 fence）严重于一次拒绝;③两 left-running unit
+零动作,行为经运行机 checkout 前进生效。回退 = revert。
+
+**Stop conditions**：正对照（单行精确匹配）不再返回 OID;②以删除测试
+收场,或修复后仍未真正驱动 fake;③改动溢出 Forbidden 两项之外的任何
+文字;需要触碰 Allowed paths 之外的文件（尤其 `transport.py`/`lease.py`/
+`backends.py` 归已 done 的 DEC-005、`worker.py`/`cursor.py` 归已 done 的
+DEC-007——**已 done 的任务不是新工作的载体**）。
+
+**不授权**：`observed_main` 之外的任何 `__main__.py` 行为变更;discovery/
+worker/cursor 语义;`instance.py` 收口（DEC-002）;`Decision-Grade` 代写。
