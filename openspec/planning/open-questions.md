@@ -317,6 +317,63 @@ Open question 不得以聊天记忆留存。每项记录默认决策、阻塞范
 - Affected：ADR-0003、PLATFORM-MACOS、CHG-2026-026 handoff；
   `REQ-FLASH-001/004/005/015`、`REQ-JOB-005`、`REQ-UX-007`（零 Core delta）
 
+## DEC-012 DEC-011/ADR-0003 是否覆盖 agent 无人值守 CLI 的 Rockchip execute
+
+- Status：**open（待 owner 裁决）**。本条只登记问题、双方原文与影响面,**不含结论**;
+  合并本 PR = 登记该 open question,**不**构成任何裁决。裁决另起独立 decision PR
+  (先例:登记 evidence input ≠ gap 关闭 ≠ decided,三者各自载体)。
+- Owner：product/platform owner
+- Raised：2026-07-27,起草 CHG-2026-025 `TASK-AIN-004` readiness r3 时发现。
+- Question：DEC-011/ADR-0003 的「任一 gate 未满足,Rockchip execute 保持 blocked」
+  是否覆盖 **CHG-2026-025 的 agent 无人值守 CLI 执行面**(`arkdeck` → `ArkDeckCLI`
+  → `RockchipFlashExecutionHost`),还是只覆盖 **Sandboxed macOS App** 的 execute 面?
+- 为何现在必须回答：`TASK-AIN-004`(首次无人值守真机验收,D2 destructive)的 E2 面
+  能否走 r4 完全取决于此。r3 已把全部 host 可测量事实重钉完毕并保持 blocked;本条不
+  裁决,r4 不得起草。
+- **双向零引用(实测)**：`chg-2026-025` 全目录零处提及 ADR-0003 / DEC-011 /
+  CHG-2026-035 / CHG-2026-036;`chg-2026-035`(archived)与 `chg-2026-036` 全目录亦
+  零处提及 CHG-2026-025 / TASK-AIN-004。两侧互不可见,只读任一侧文本都发现不了本
+  冲突——与 chg-026/`TASK-RKFUI-001G` 被 ADR-0003 作废时同型。
+- 支持「覆盖」(读法 b)的在案事实：
+  - DEC-011 Decision 原文写「只从**现有 typed Rockchip workflow 的 product-owned
+    composition root** 直接启动」——AIN-007 交付的 `RockchipFlashExecutionHost`
+    正是该 composition root,并非另一套;
+  - DEC-011 Rejected 首项即 `selectedExternal`,理由「user-selected file authority
+    不构成 out-of-bundle executable authority」;而 AIN-004 今日依赖的产品路径正是
+    `UserDefaults` `ArkDeck.Rockchip.ToolBookmark` +
+    `pathSource: .userSelectedSecurityScopedBookmark`;
+  - DEC-011 `Affected` 逐字列出 **`REQ-FLASH-015`**,而 REQ-FLASH-015(MODIFIED)
+    正是 CHG-2026-025 与 TASK-AIN-004 的 Requirement;
+  - CHG-2026-036 `TASK-BRC-004`(status blocked,依赖同为 blocked 的 BRC-003)的
+    Production reachability 链**逐字包含 `RockchipFlashExecutionHost`**,交付物明写
+    「删除 production route 对 user-selected executable URL/hash/bookmark … 的输入」
+    ——即 AIN-004 现行路径所依赖的那条输入。
+- 支持「不覆盖」(读法 a)的在案事实：
+  - CHG-2026-035 的 Why/scope 全文以 **Sandboxed App** 为主体:触发事实是
+    `TASK-RKFUI-001G` 的 signed Sandbox 文件选择器 run,五个候选全部围绕 App
+    bundle / entitlement / 分发形态,证据矩阵亦然;
+  - ADR-0003 的 gate 清单(source 可复现、GPL-2.0、SBOM、inside-out 签名、公证、
+    signed Sandbox E0、clean-host)全部是**分发与签名**门,与 agent 在开发宿主上以
+    CLI 执行不构成同一威胁面;
+  - DEC-011 显式写了 `CHG-2026-026 boundary`(不修改该 change 的 scope/任务状态/
+    001G evidence),却**未**对 CHG-2026-025 作任何表述——可读作「未纳入考虑」而非
+    「已纳入并覆盖」;
+  - `TASK-BRC-004` 的 Forbidden paths 逐字包含
+    `Packages/ArkDeckKit/Sources/ArkDeckCLI/**`,即该任务自身不触 CLI 面。
+- 裁决无论落哪一侧都需同时给出的两项：
+  1. `RockchipFlashExecutionHost` 由 chg-025(agent CLI 面)与 chg-036(App 面)
+     共用,BRC-004 的交付物会移除 chg-025 现行路径所依赖的输入。**两 change 对同一
+     composition root 的先后顺序与兼容义务须写明**,否则先落地者会静默打断后者;
+  2. 若判「不覆盖」,须说明 AIN-004 的 E2 在 BRC-004 合入后如何延续(重钉工具身份
+     /改走 bundled descriptor/或接受一次性历史授权),避免留下第二个"没人翻的
+     Status 行"。
+- Blocking：`CHG-2026-025` `TASK-AIN-004` 的 r4 readiness 与其 E2 设备窗口。E0 面
+  是否单独放行,亦由本裁决界定。
+- Affected：DEC-011、ADR-0003、PLATFORM-MACOS、CHG-2026-025(TASK-AIN-004)、
+  CHG-2026-036(TASK-BRC-003/004);`REQ-FLASH-015`
+- 附:本条依 DEC-011 `Reopen rule` 提出——若裁决结论改变 DEC-011 的适用范围,须按
+  该规则重开 DEC-011/ADR-0003,而非只改本条。
+
 ## RISK-001 DAYU200 恢复演练残余风险接受(检查单第 4 项)
 
 - Revision：r2 evidence-owner correction candidate；仅维护者 review/merge 本 PR 后生效
