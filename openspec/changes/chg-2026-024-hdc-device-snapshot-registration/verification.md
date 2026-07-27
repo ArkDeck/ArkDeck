@@ -1,8 +1,11 @@
 # CHG-2026-024 Verification Plan
 
-> Change:CHG-2026-024-hdc-device-snapshot-registration@r4
+> Change:CHG-2026-024-hdc-device-snapshot-registration@r5
 > Status:planned
 > Core baseline:CORE-2.1.0（canonical Core AC 零认领）
+> Note(2026-07-27):r5 三方同步 = 单次授权 virgin-server 零行观察窗口 V0
+> （二值判据；AC 重定义留待 r6，取决于实测结果）；新增一条披露义务与三条
+> stop condition。AC 集合与文本本 revision 零变化。
 > Note(2026-07-27):r4 三方同步 = 窗口内 existing-server 前提 FAIL 后，把
 > 「禁止为通过前提而启动 server」改写为 operator-started 的披露义务，新增
 > `OB-0` 与 executable 级精确匹配，新增三条 stop condition。

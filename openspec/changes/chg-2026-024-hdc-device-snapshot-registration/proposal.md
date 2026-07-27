@@ -1,6 +1,6 @@
 ---
 id: CHG-2026-024-hdc-device-snapshot-registration
-revision: 4
+revision: 5
 status: approved # r1 经 approval-only PR #273 合入 main `1eeb516`；r2 仅固定 human-controlled capture execution plan，须由维护者 review/merge 对应治理 PR 后生效
 class: integration
 core_change_level: none
@@ -192,3 +192,16 @@ r4 另修一处检测缺陷:`grep hdc` 会命中 1Password 扩展 ID
 `aeblfdkhhhdcdjpifhhbdiojplfjncoa`(实测假阳性)，故新增 `OB-0` 并要求
 executable 级精确匹配。TASK-I24-001 仍 `blocked`；本 PR 合入不接受任何
 provenance。
+
+## r5 注记（2026-07-27，virgin-server 零行观察；原文如实保留）
+
+采集会话 evidence（#656 merge `af6d64d`）证明零行在见过设备的 server 上
+不可达，同时明确未证明零行不存在。r5 单次授权 **V0 窗口**：operator 于窗口前
+确认零设备、以普通 `kill`（非 `hdc kill`）停止现役 server `22677`、双向确认零
+server、在零设备状态下启动新 server，随后以 harness 采集**恰好一次**。判据二值：
+零行则零行族存在（并声明其成立条件为 server 未见过设备），非零行则
+`observedEmpty` 必须改以「零 `Connected` 行」定义。
+
+**r5 不修改任何 AC**——`I24-HDC-DEVICE-EMPTY-001` 的重定义留待 r6，取决于 V0
+实测结果；先改 AC 再观察是本末倒置。新增一条披露义务（被停 server 的 PID 与
+时刻）与三条 stop condition。TASK-I24-001 仍 `blocked`。

@@ -1,6 +1,6 @@
 # CHG-2026-024 controlled capture execution plan
 
-> Status:plan-only (r4). Human maintainer execution only after the dedicated r3 governance PR
+> Status:plan-only (r5). Human maintainer execution only after the dedicated r3 governance PR
 > is reviewed and merged, **and only after the r3 instrument-identity precondition below is
 > resolved**. Agent/CI must not execute this plan, invoke installed HDC, inspect raw capture
 > bytes or access a real device.
@@ -109,6 +109,63 @@ fake-only 自测复核通过（Agent 已于 2026-07-27 在 main 复核:blob
 ③ 窗口内 OB-1/OB-2 existing-server 前提成立。
 
 
+
+## r5:virgin-server 零行观察窗口（V0）——单次授权
+
+**为什么需要它。**2026-07-27 采集会话（evidence #656 merge
+`af6d64d`）证明：本 hdc **从不删行**，设备离场只把状态原地翻成 `Offline`，
+且 server 记住它见过的每一台（C5 两行 ≠ C0 一行）。因此在一个见过设备的
+server 上，零行**不可达**。同一份 evidence 同时明确：这**没有**证明「零行
+输出不存在」——C0 采于一个已见过第一台设备的 server。零行是否存在，只能在
+**从未见过任何设备的 server** 上判定。
+
+**为什么必须显式授权。**取得 virgin server 必须先停掉现役 server
+（PID `22677`，已见过两台）。r4 禁止「窗口期间启动/停止/重启/接管/重配
+server」与「为让某一步通过而重启 server」。本窗口的重启**不是**为让某一步
+通过而制造前提——server 的历史状态正是本次实验的**自变量**——但字面上仍落在
+禁令射程内，故 r5 以单次、具名、带披露义务的形式显式授权，不靠解释绕过。
+
+### V0 授权内容（恰好一次观察，逾越即停）
+
+**前置（窗口之外，operator 亲手；每步留证）**
+
+1. 物理确认**零设备**接入，并以 `system_profiler SPUSBDataType` 计数为 0 佐证；
+2. 停止现役 server：对其 PID 发送普通 `kill`（**不**使用 `hdc kill` 等
+   installed-HDC 调用，避免引入一次工具 dispatch）；记录被停 server 的
+   PID/启动时刻与停止时刻；
+3. 以 `OB-0`（8710 无 LISTEN）+ executable 级 `OB-1`（无 hdc 进程）**双向**
+   确认零 server；
+4. **在零设备状态下**启动新 server（同 r4 的 operator-started 形式），记录
+   新 PID/ppid/启动时刻/executable/normalized endpoint。
+
+**窗口（harness 之内）**
+
+5. 以 `hdc-list-targets-verbose` 采集**恰好一次**，输出目录 `V0`（全新、不存在）；
+6. 采集前后各做一次 `OB-0/OB-1/OB-2`，逐项一致。
+
+**窗口期间禁止**:接入任何设备；第二次采集；任何 server lifecycle 动作；
+并发第二个 HDC 客户端。
+
+### 二值判据（无论哪一支都要如实记录，不得改写计划去迎合结果）
+
+- **A. 零行**（stdout 为 0 字节，或仅含一个不含设备行的空标记）→ 零行族
+  **存在**；记录精确字节数、SHA-256 与（若有）标记字面量。`observedEmpty`
+  可以「零行」为基础定义，但仍须声明其成立条件 = server 未见过设备。
+- **B. 非零行**（仍出现 `Offline` 行或任何设备行）→ 零行族在本工具上**不存在**；
+  `observedEmpty` 必须改以「零 `Connected` 行」定义。
+
+### 明确不在 r5 范围内
+
+- **不修改任何 AC**。`I24-HDC-DEVICE-EMPTY-001` 的重定义留待 **r6**，其内容
+  取决于 V0 的实测结果——先改 AC 再观察就是本末倒置；
+- 不注册 family、不使 TASK-I24-001 `ready`、不接受任何 provenance；
+- 不改变 (D-2) 的工具选择与全部既有 pin。
+
+### 披露义务（沿用 r4，并新增一条）
+
+evidence 必须**分开陈述**：(i) harness 自身 lifecycle 计数为 0；(ii) 被观察的
+server 由 operator 于窗口前启动；**(iii) 现役 server 由 operator 于窗口前主动
+停止，附被停 PID 与时刻**。三者不得合并为笼统结论。
 
 ## Goal and result boundary
 
@@ -348,6 +405,9 @@ evidence record. The Agent never receives or reads the raw streams.
   lifecycle 计数与「server 系预先启动」合并成笼统的零效应结论;
 - (r4) 窗口期间 server 被启动/停止/重启/接管/重配,或 bracket 间其
   PID/start/executable/normalized endpoint 发生变化;
+- (r5/V0) 前置的零设备或零 server 未经双向确认即启动新 server;V0 窗口内
+  接入任何设备、采集超过一次,或以 `hdc kill` 等 installed-HDC 调用停止
+  server;evidence 未披露被停 server 的 PID 与停止时刻;
 - server absent, ambiguous, substituted, endpoint-drifted or generation-changed;
 - any lifecycle/adoption/subserver/device-migration/device-mutation/destructive effect observed
   or uncertain;
