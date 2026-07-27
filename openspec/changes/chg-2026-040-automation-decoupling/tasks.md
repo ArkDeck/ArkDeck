@@ -839,3 +839,53 @@ r2 显式扩权）。
 readiness r2,内容须含:重装步骤逐条、新 digest、回滚 digest
 （`5b8cbc06…`）、窗口前后的双面 read-back 判据、以及 done 的二值条件。
 **在 r2 合入前,本任务不得 done。**
+
+## TASK-DEC-009 — 跨分区遗留收口（r2 新增）
+
+- Status:blocked（前置：① 本 change r2 修订 PR merge;② 独立 readiness
+  钉受改文件 exact blob、`observed_main` 的修复契约与「撤销即红」变异门、
+  死测试的处置形态。**本任务是 DEC-005/006/007 链条上三处如实停下的
+  分区边界的唯一载体**;三项均无其他活任务可承载。）
+- Platform:macos（host-only;零设备面）
+- Requirements/AC:change-local `DEC-LEFT-001`
+- Depends on:none（DEC-005/006/007 均已 done,受改文件与 DEC-001/003/008
+  零交集）
+- In scope:①**`observed_main` 的 refname 等值校验**（台账 D-H2 的另一半;
+  `out.split()[0]` 取多行输出首 token → 任何尾为 `refs/heads/main` 的 ref
+  可顶替受保护 main 的 OID,与 DEC-005 已修的 `RefPort.read` 同型）;
+  ②`FakeApi` 补 `GET /issues/{n}` 路由（返回真实端点恒发的
+  `state`/`title`/`body` 形状）+ 修复
+  `test_worker_cursor.test_closed_cursor_issue_is_refused`（该测试把
+  `__call__` 设为**实例属性**,Python 在类型上解析故其 fake 从不被调用,
+  仅靠 `{}` 回落巧合通过 = 死测试;须改为真正驱动 fake,不得删除了事）;
+  ③更正 TASK-DEC-005 记录中 `identity.py` 与 `pr_envelope.py` 同时出现在
+  Allowed 与 Forbidden 两侧的矛盾（从 Forbidden 移除,Allowed 不动）。
+- Out of scope:`observed_main` 之外的 `__main__.py` 行为变更;discovery/
+  worker/cursor 语义;`instance.py` 收口（DEC-002）;transport/lease/
+  backends（DEC-005 已 done,零触碰）;reviewer/recovery/pr_envelope
+  （DEC-006 已 done,零触碰）;`Decision-Grade` 行。
+- Allowed paths:`scripts/host_loop/__main__.py`、`scripts/host_loop/test_worker_cursor.py`、`scripts/host_loop/test_fault_matrix.py`、`scripts/host_loop/test_navigation_contract.py`、本 change `evidence/**`、本 change `tasks.md`（本任务状态/evidence 引用,以及 ③ 所述 DEC-005 段的 Forbidden paths 一处更正）
+- Forbidden paths:`scripts/host_loop/transport.py`、`scripts/host_loop/lease.py`、`scripts/host_loop/backends.py`、`scripts/host_loop/reviewer.py`、`scripts/host_loop/recovery.py`、`scripts/host_loop/pr_envelope.py`、`scripts/host_loop/identity.py`、`scripts/host_loop/worker.py`、`scripts/host_loop/cursor.py`、`scripts/host_loop/mint_installation_token.sh`、`scripts/check_sdd.py`、`scripts/check_pr_paths.py`、`.github/**`、`openspec/specs/**`、产品 source/tests、其他 change。
+- Risk:med（`observed_main` 在 live 循环的每轮 base 读取路径上;修复方向
+  为收紧——多行或 refname 不等由「取首 token」变为显式拒绝;两
+  left-running unit 零动作,行为经 checkout 前进生效;回退 = revert）。
+- Hardware required:no。
+
+### Deliverables
+
+- `observed_main` refname 等值 + 拒多行,配正/负 fixture;
+- `FakeApi` 的 `GET /issues/{n}` 路由与被修复的活测试;
+- DEC-005 段 Forbidden paths 的一处更正;
+- evidence run 记录三项的变异门结果与套件前后计数。
+
+### Verification
+
+- `DEC-LEFT-001`:见 verification.md。三项各有「撤销即红」测试与正对照;
+  死测试修复后须**真正驱动其 fake**（以调用计数或等价断言为证,不得只
+  依赖回落值）;`grep` 证明 DEC-005 段 Allowed ∩ Forbidden = ∅;全量套件
+  与 `check-sdd` 基线保持。
+
+### Notes / handoff
+
+- 本任务 done 后,CHG-2026-040 的台账中不再有已知未闭合的安全缺陷;
+  余下仅 DEC-001/002/003/004/008 的既有范围。
