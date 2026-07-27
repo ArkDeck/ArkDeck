@@ -1,6 +1,6 @@
 ---
 id: CHG-2026-036-macos-bundled-rockchip-component
-revision: 1
+revision: 2
 status: approved # 本 approval-only PR 经维护者 review/merge 后生效；r1 proposal 已由 #535 登记；六个 tasks 仍 blocked
 class: platform
 core_change_level: none
@@ -101,6 +101,31 @@ external-first 决策或 CHG-2026-026 状态的前提下，先闭合发布责任
 - Contracts/schemas：零 locked Core contract/schema 修改；新增 versioned
   Rockchip bundled-component integration registry 与 SBOM/build receipts
 - 是否需要 Core baseline bump：否；`spec-impact.md` 记录 no-op Core delta
+
+## r2 增补（2026-07-27，artifact handoff；原文如实保留不改写）
+
+**实测事实**：TASK-BRC-002 的 unsigned component（`rkdeveloptool`、
+247,488 bytes、SHA-256
+`3caee2136551b4b849daf7e9a906813354f354f8adb61e5f092de49ec7a2e56a`）按
+002 contract 不入仓，只存在于 GitHub Actions 的 transient artifact 中；
+run `30156181935` 的三个 artifact 已于 `2026-07-26T11:25:04Z`–`11:25:21Z`
+全部 `expired=true`（2026-07-27 authenticated GET 实测）。TASK-BRC-003 的
+D2 gate 明文：临时 artifact 过期、无法重新 materialize exact bytes 或只剩
+自报 hash 时均 FAIL。现行 workflow 无 `workflow_dispatch`（仅 push 触发）
+且 `retention-days: 1`，因此每次 re-materialization 都与 24 小时赛跑，且
+只能靠改动触发路径来「顺带」产出——两者都不构成 BRC-003 要求的「受控且
+可复查的 materialization/retention handoff」。
+
+**维护者 2026-07-27 决定**：采用按需 dispatch + 30 天保留（在「重跑后当天
+用掉」与「仓外长期留存」两个替代方案之外的选项 B），使签名窗口不再受 24
+小时约束，且 artifact 生命周期留在 GitHub 审计面内可复查。
+
+**r2 因此新增 TASK-BRC-002R**（handoff remediation，先例 TASK-TR-002R）：
+唯一 scope = 给 `.github/workflows/rockchip-component.yml` 增加
+`workflow_dispatch` 触发并把三处 `retention-days` 由 1 提到 30，**零构建
+逻辑/输入/registry/recipe 改动**。新增 change-local AC `BRC-HANDOFF-002`。
+BRC-003 的 D2 gate 其余两项（Developer ID identity、notary credential）
+不受影响，仍待维护者完成；**本任务 done 不使 BRC-003 ready**。
 
 ## Safety, privacy, and compatibility
 
