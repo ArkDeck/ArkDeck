@@ -1,8 +1,11 @@
 # CHG-2026-024 Verification Plan
 
-> Change:CHG-2026-024-hdc-device-snapshot-registration@r5
+> Change:CHG-2026-024-hdc-device-snapshot-registration@r6
 > Status:planned
 > Core baseline:CORE-2.1.0（canonical Core AC 零认领）
+> Note(2026-07-27):r6 三方同步 = 按 #656/#658 实测重定义 `observedEmpty` 为
+> 「零 `Connected` 行」（marker 充分不必要），并给 SNAPSHOT-001 增加 LF/CRLF
+> 双终止符与禁止残留 `CR` 的 grammar 要求。**本 revision 修改 AC 文本**。
 > Note(2026-07-27):r5 三方同步 = 单次授权 virgin-server 零行观察窗口 V0
 > （二值判据；AC 重定义留待 r6，取决于实测结果）；新增一条披露义务与三条
 > stop condition。AC 集合与文本本 revision 零变化。
@@ -31,8 +34,8 @@
 
 | AC ID | Verification method | Expected result | Minimum evidence |
 | --- | --- | --- | --- |
-| `I24-HDC-DEVICE-SNAPSHOT-001` | parameterized grammar + zero/one/many/stable/order/duplicate/adversarial contract | complete registered output yields a bounded unique pseudonym set; malformed, partial, mixed or unsupported output makes the whole snapshot unknown | platform + contract |
-| `I24-HDC-DEVICE-EMPTY-001` | successful-empty vs stderr/nonzero/truncated/timeout/cancel/identity-drift matrix | only the registered successful zero-row family yields observedEmpty; every unavailable/failure/unknown input remains distinct and cannot produce disappearance | platform + contract |
+| `I24-HDC-DEVICE-SNAPSHOT-001` | parameterized grammar + empty-marker/one/many/stable/order/duplicate/adversarial contract, **both line terminators** | complete registered output yields a bounded unique pseudonym set; the grammar accepts LF-terminated device rows **and** the CRLF-terminated empty-marker line, and no field may retain a residual `CR`; malformed, partial, mixed or unsupported output makes the whole snapshot unknown | platform + contract |
+| `I24-HDC-DEVICE-EMPTY-001` (r6 重定义) | successful-empty vs stderr/nonzero/truncated/timeout/cancel/identity-drift matrix, over **both** empty forms | `observedEmpty` = **zero `Connected` rows**, satisfied by either registered successful form — the `[Empty]` marker line (virgin server) or N rows all carrying `Offline` (server with history); the marker is sufficient but **not necessary**, and a parser that accepts only the marker must fail the matrix; `[Empty]` with a residual `CR` must NOT read as empty; every unavailable/failure/unknown input remains distinct and cannot produce disappearance | platform + contract |
 | `I24-HDC-DEVICE-PROVENANCE-001` | controlled capture lineage/effect/privacy review | exact zero/one/many and transition inputs have immutable source hashes and stable server brackets; raw identifiers stay outside the repository; fake inputs never establish support | platform |
 | `I24-HDC-DEVICE-REGISTRY-001` | profile/new-registry/lock/resource/macOS mapping closure + old-registry identity | all candidate versions, IDs, paths and hashes agree; the existing 1.0.0 readonly registry/resources remain byte-identical and old consumers gain no authority | contract |
 | `I24-HDC-DEVICE-NODISPATCH-001` | static command surface + instrumented counters | registration/Agent/CI dispatches installed HDC/device/network/server lifecycle/adoption/subserver/device mutation/destructive actions zero times; only the exact existing-server-only entry can later be adopted | contract |
