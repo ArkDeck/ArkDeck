@@ -272,10 +272,33 @@ None 的治理文件、重复 capability id、`changes/` 游离条目）。**故
 
 ## TASK-DEC-005 — host_loop transport/lease/backends 硬化
 
-- Status:ready（r1 implementation readiness;前置① approval 已合
-  = #598 `cac07003836889881994367bde7ba3e0bdca70c0`,前置② 即本
-  readiness。授权范围与门见下方「Readiness r1」节;任一门不满足即停,
-  不得降门执行。）
+- Status:done（2026-07-27 D0 completion;仅在维护者 review/merge 本独立
+  `ready→done` PR 后生效。**两个实现载体**:r1 授权面 = **#629**
+  （merge `066034af6ab48327e66f1a08bb3d5e544c84ca45`）;r2 移交三项 +
+  r1 遗留替身补全 = **#630**（merge
+  `342fdc2e456c5be16b838876b8457c85ccbb699f`）;二者均 lvye APPROVED、
+  mergedBy lvye。readiness 载体 = r1 #607、r2 #628（merge
+  `67397e249946b86ae25a39c7396a4a19247088fe`）。evidence =
+  `evidence/runs/TASK-DEC-005/implementation-r1-scope.md` 与
+  `implementation-r2-transfer.md`。
+  **flip 后复核**（在翻转后的树上执行,HLR-003 r5 教训）:host_loop
+  `-m unittest discover` **617 OK + 1 expected failure**、`check-sdd`
+  **0/0/111**、`done_task_ids` **94** 且含 `TASK-DEC-005`、`--explain`
+  对本任务报 `never-claim` + `status 'done' is not ready`。
+  **两项经 readiness 停条件如实未交付,不由本翻转掩盖**:①D-H2 的
+  `observed_main` 半侧（该函数在 `scripts/host_loop/__main__.py`,属本
+  任务 Forbidden paths;缺陷仍在——`out.split()[0]` 取多行输出首 token,
+  任何尾为 `refs/heads/main` 的 ref 可顶替受保护 main 的 OID）;
+  ②`FakeApi` 的 `GET /issues/{n}` 路由（补上会打红
+  `test_worker_cursor.test_closed_cursor_issue_is_refused`,该测试经查
+  实为死测试——`__call__` 设为实例属性故其 fake 从不被调用——但文件属
+  TASK-DEC-007 分区）。二者均需能触 DEC-007 分区的独立载体。
+  **另记一处本任务记录自身的缺陷**:r2 把 `identity.py` 与
+  `pr_envelope.py` 加入 Allowed paths 时**未从 Forbidden paths 移除**,
+  故本任务的 tasks.md 记录中这两个文件同时出现在两侧（实测确认）。
+  `check_pr_paths` 只读 Allowed 面,故实现与守卫均未受影响;但记录自相
+  矛盾。**按「状态翻转 PR 只做状态与 evidence 引用」的规矩,本 PR 不
+  夹带该修正**,留独立载体更正。）
 - Platform:macos（host-only;零设备面）
 - Requirements/AC:change-local `DEC-HL-001`
 - Depends on:none（transport/lease/backends 为 NAV Forbidden 文件，零
