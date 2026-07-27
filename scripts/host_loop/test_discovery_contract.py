@@ -364,10 +364,6 @@ class AgainstTheRealFile(unittest.TestCase):
             "maintainer-authored `- Decision-Grade:` line per task.")
 
 
-if __name__ == "__main__":
-    unittest.main(verbosity=2)
-
-
 class FieldsDoNotReachAcrossLines(unittest.TestCase):
     """`_VALUE` was preceded by `\s*`, and `\s` matches a newline.
 
@@ -577,3 +573,7 @@ class TruthIsNeverBuiltFromAnIncompleteObservation(unittest.TestCase):
         ref = "refs/heads/agent/host-loop/leases/TASK-DEMO-001"
         truth = self._build(0, f"{'a' * 40}\t{ref}\n")
         self.assertEqual(truth.lease_oid_by_ref, {ref: "a" * 40})
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)

@@ -512,7 +512,7 @@ body 语料解析回归失败;需要触碰 `test_fault_matrix.py` 或其他 DEC-
 - Out of scope:NAV-001 已交付语义（全仓扫描/idle 判词/时间戳——回归
   保持不重做）、explain 双实现合并（noted）、Phase4 cursor 写授权、
   DISPATCHABLE_GRADES。
-- Allowed paths(r1 扩充,见下方 readiness「授权面扩充」):`scripts/host_loop/__main__.py`、`scripts/host_loop/worker.py`、`scripts/host_loop/cursor.py`、`scripts/host_loop/test_discovery_contract.py`、`scripts/host_loop/test_worker_cursor.py`、`scripts/host_loop/test_cursor_contract.py`、`scripts/host_loop/test_check_verdict_contract.py`、`scripts/host_loop/test_navigation_contract.py`、`scripts/host_loop/test_support.py`、本 change `evidence/**`、本 change `tasks.md`（仅本任务状态/evidence 引用）
+- Allowed paths:`scripts/host_loop/__main__.py`、`scripts/host_loop/worker.py`、`scripts/host_loop/cursor.py`、`scripts/host_loop/test_discovery_contract.py`、`scripts/host_loop/test_worker_cursor.py`、`scripts/host_loop/test_cursor_contract.py`、`scripts/host_loop/test_check_verdict_contract.py`、`scripts/host_loop/test_navigation_contract.py`、`scripts/host_loop/test_support.py`、本 change `evidence/**`、本 change `tasks.md`（仅本任务状态/evidence 引用）
 - Forbidden paths:`scripts/host_loop/transport.py`、`scripts/host_loop/lease.py`、`scripts/host_loop/backends.py`、`scripts/host_loop/reviewer.py`、`scripts/host_loop/recovery.py`、`scripts/host_loop/pr_envelope.py`、`scripts/host_loop/identity.py`、`.github/**`、产品 source/tests、其他 change。
 - Risk:med（discovery fail-closed 收紧会使现存畸形行的任务从静默误读
   变为省略;须对全仓 active tasks.md 出清点报告——现存 8+ 全角冒号行
