@@ -319,7 +319,7 @@ None 的治理文件、重复 capability id、`changes/` 游离条目）。**故
   worker.py，本任务零触碰以免并行冲突）、minter shell（TASK-DEC-008）、
   ALLOWED_ROUTES 集合变更（零路由增删）。
 - Allowed paths:`scripts/host_loop/transport.py`、`scripts/host_loop/lease.py`、`scripts/host_loop/backends.py`、`scripts/host_loop/test_fault_matrix.py`、`scripts/host_loop/test_backends_cli.py`、`scripts/host_loop/test_token_parity.py`、`scripts/host_loop/identity.py`、`scripts/host_loop/pr_envelope.py`、`scripts/host_loop/test_pr_envelope.py`、`scripts/host_loop/test_v3_hardening.py`、`scripts/host_loop/test_navigation_contract.py`、本 change `evidence/**`、本 change `tasks.md`（仅本任务状态/evidence 引用）
-- Forbidden paths:`scripts/host_loop/worker.py`、`scripts/host_loop/reviewer.py`、`scripts/host_loop/recovery.py`、`scripts/host_loop/pr_envelope.py`、`scripts/host_loop/identity.py`、`scripts/host_loop/cursor.py`、`scripts/host_loop/__main__.py`、`scripts/host_loop/mint_installation_token.sh`、`.github/**`、`openspec/specs/**`、产品 source/tests、其他 change。
+- Forbidden paths:`scripts/host_loop/worker.py`、`scripts/host_loop/reviewer.py`、`scripts/host_loop/recovery.py`、`scripts/host_loop/cursor.py`、`scripts/host_loop/__main__.py`、`scripts/host_loop/mint_installation_token.sh`、`.github/**`、`openspec/specs/**`、产品 source/tests、其他 change。
 - Risk:med（安全修复触 live 循环的写路径;全部为收紧方向;两 left-running
   unit 零动作，行为经 checkout 前进生效;回退 = revert）。
 - Hardware required:no。

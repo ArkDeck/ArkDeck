@@ -112,6 +112,7 @@ class FakeApi:
         self.calls: list[tuple[str, str, dict | None]] = []
         self.statuses = statuses or {}
         self.check_runs = check_runs if check_runs is not None else []
+        self.issues: dict[int, dict] = {}
 
     def __call__(self, method, path, body):
         self.calls.append((method, path, body))
@@ -146,15 +147,19 @@ class FakeApi:
             return 200, {"number": 99}
         if method == "POST" and path.endswith("/issues"):
             return 201, {"number": 7, "state": "open", "title": "", "body": ""}
-        # A GET /issues/{n} route is deliberately ABSENT, and that is a defect
-        # this task could not close. Adding one (returning the state:"open"
-        # payload the real endpoint always sends) turns
-        # test_worker_cursor.test_closed_cursor_issue_is_refused red — because
-        # that test patches __call__ as an INSTANCE attribute, which Python
-        # resolves on the type, so its fake never runs and it passes only via
-        # the `{}` fallthrough below coincidentally failing the state check.
-        # The test is dead in the way the ledger records, but it lives in
-        # TASK-DEC-007's partition, so closing this needs its own carrier.
+        if method == "GET" and "/issues/" in path:
+            # Added by TASK-DEC-009. The route was absent, so every guard that
+            # reads a looked-up Issue was only ever exercised against the `{}`
+            # fallthrough below — and one test passed solely because that
+            # fallthrough happened to fail the same check it meant to assert.
+            # `issues` lets a caller stage a specific payload; the default is
+            # the shape the real endpoint always sends.
+            number = int(path.rsplit("/", 1)[1])
+            staged = self.issues.get(number)
+            if staged is not None:
+                return 200, staged
+            return 200, {"number": number, "state": "open", "title": "",
+                         "body": "", "pull_request": None}
         if method == "GET" and "/check-runs" in path:
             # The real endpoint always sends total_count. A fake that omits a
             # field the API always sends is how the r1 `skipped` stub defect

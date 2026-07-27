@@ -208,17 +208,43 @@ class CursorPersistence(unittest.TestCase):
             cursor_mod.load(api, 12345)  # FakeApi returns 404 for unknown issues
 
     def test_closed_cursor_issue_is_refused(self):
+        """A closed Issue must never be adopted as the cursor.
+
+        This test used to assign `serve` to `fake.__call__` as an INSTANCE
+        attribute. Python resolves `__call__` on the type, so `serve` was never
+        invoked: the assertion passed only because FakeApi had no
+        `GET /issues/{n}` route at all and its `{}` fallthrough happened to fail
+        the same "not open" check. It asserted nothing about a closed Issue.
+        TASK-DEC-009 added the route, which exposed it. It now stages the closed
+        payload through the fake's own surface and proves the fake was actually
+        consulted.
+        """
         fake = FakeApi()
         fake.pulls = []
-        closed = {"number": 7, "state": "closed", "body": state().render()}
-        original = fake.__call__
-        def serve(method, path, body):
-            if method == "GET" and "/issues/" in path:
-                return 200, closed
-            return original(method, path, body)
-        fake.__call__ = serve
+        fake.issues[7] = {"number": 7, "state": "closed", "title": "",
+                          "body": state().render(), "pull_request": None}
         with self.assertRaisesRegex(CursorError, r"not open"):
             cursor_mod.load(api_port(fake), 7)
+        lookups = [call for call in fake.calls
+                   if call[0] == "GET" and "/issues/" in call[1]]
+        self.assertEqual(len(lookups), 1, "the Issue lookup never happened")
+
+    def test_the_staged_issue_is_what_load_actually_reads(self):
+        """Positive control for the test above, and the reason it is trustworthy.
+
+        Counting the lookup is not enough: FakeApi records every call before it
+        routes, so the count is identical whether the staged payload was served
+        or the `{}` fallthrough was. This case fails outright unless the staged
+        Issue really reaches load(), so the refusal above is a statement about a
+        CLOSED Issue rather than about an empty one.
+        """
+        fake = FakeApi()
+        fake.pulls = []
+        fake.issues[7] = {"number": 7, "state": "open", "title": "",
+                          "body": state().render(), "pull_request": None}
+        loaded, issue = cursor_mod.load(api_port(fake), 7)
+        self.assertEqual(issue["state"], "open")
+        self.assertEqual(loaded, state())
 
     def test_unchanged_bytes_are_not_rewritten(self):
         fake = FakeApi()
