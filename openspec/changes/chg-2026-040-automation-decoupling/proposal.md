@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-040-automation-decoupling
 revision: 2
-status: approved
+status: verified
 class: implementation-only
 core_change_level: none
 owner: lvye
@@ -163,3 +163,60 @@ DEC-002 收口在 DEC-005/006/007 全部 done 之后。全部任务改动自动�
 照 TASK-HLR-003/NAV 先例为 **never-claim**（会话实现;`NEVER_CLAIM_ROOTS`
 的 `TASK-DEC` 根由 DEC-005 落码）;`Decision-Grade` 行由维护者亲笔，本
 文件不代写。propose 合入 ≠ 批准。
+
+## Verification closure（2026-07-27）
+
+九个任务全部 done 于 protected main 在案,九条 change-local AC 的证据可
+逐条复查;本 PR 仅状态翻转 + 引用,零实现夹带（先例 #224/#239/#570/#571）。
+
+- **载体链**:propose #596 `7be0ac3d7273b6f296fb3b74efe304420e2f214d`;
+  approval #598 `cac07003836889881994367bde7ba3e0bdca70c0`;
+  readiness r1 #606/#607/#608/#614/#615 与 r2 #628/#643/#650;实现
+  #623/#627/#629/#630/#636/#638/#640/#644/#647/#649;done 翻转
+  #625/#626/#631/#632/#637/#639/#641/#645/#648/#653;窗口 receipt #652
+  `b1a6c61ad26c172ad79d63da673c2c45f5dc121a`。全部 lvye APPROVED、
+  mergedBy lvye。
+- **AC 逐条结论(九条全 PASS)**:
+
+| Evidence ID | Task | 结论 | 关键证据 |
+| --- | --- | --- | --- |
+| DEC-CONF-001 | DEC-001 | **PASS** | 配置五项与钉定 blob `02332a9b…` 的 `SENSITIVE_PATTERNS` 逐字节按序相同（AST 提取比对);五类畸形各红 fixture + 合法正对照;变异门代码侧 6/6 + 数据侧 3/3;README 覆盖以 `git ls-tree` 清点固化 |
+| DEC-CONST-001 | DEC-002 | **PASS** | `instance.py` 37 常量逐一冻结（独立书写副本);单一定义清点走 **AST 非 grep**;变异 16/16,含 readiness 实测「改坏零反应」的**八项全部转为必红**;跨树 wire 值七项逐字节相同 + 旧树渲染 cursor 块由新树解析 + PR #564 body 解析 `repr` sha256 两树相同 |
+| DEC-SDD-001 | DEC-003 | **PASS** | 六修复族各配撤销即红 fixture;变异 8/8 + 负对照存活;存量清点七类全零;`sdd-guard` 首次实跑 `test_check_sdd` 与 host_loop 套件 |
+| DEC-PRP-001 | DEC-004 | **PASS** | 自扩权 fixture 被拒;散文吸收归零（51 任务路径类 pattern 丢失 **0**、惰性 24 出局);`--event` 伪 base 被拒;confusable 标题报歧义;`--identity-only` 读回改真;变异 16/16 |
+| DEC-HL-001 | DEC-005 | **PASS** | r1 授权面 #629 + r2 移交三项 #630;`ALLOWED_ROUTES` 内容集不变;真实远端只读冒烟零写入 |
+| DEC-REV-001 | DEC-006 | **PASS** | verdict 末行契约、(number,head) 去重、`(#N)` 尾锚定、`\s`→`[ \t]`;变异 8/8;历史 PR body 以 #564 `repr` sha256 `ace6adb602d6ab7b…` 前后相同为证 |
+| DEC-NAV-001 | DEC-007 | **PASS** | C-H1 34 处合法语料全保留;cursor 损坏 exit 20;`NEVER_CLAIM_ROOTS` 纳入八 `TASK-DEC` 根,循环对本 change 任务零认领 |
+| DEC-LEFT-001 | DEC-009 | **PASS** | `observed_main` 拒 refname 不等/多行;`FakeApi` 路由补齐后死测试真正驱动其 fake;DEC-005 的 Allowed/Forbidden 交集归零 |
+| DEC-MINT-001 | DEC-008 | **PASS** | trap 覆盖全部五个暂存路径 + 注入式 harness（macOS 侧真跑三种失败注入);sidecar root 600;两条弱断言替换;**D2 窗口 receipt**:双 digest `5b8cbc06…`→`2df746cc…`、干跑 `exit=2`、强制铸造 `exit=0`、**sidecar 由 `fuhanfeng 644` 翻为 `root 600`**、自然到点触发 `runs 66→67` exit 0 |
+
+- **收口时基线**:`check-sdd` **0 error / 0 warning / 111 acceptance IDs**;
+  host_loop `-m unittest discover` **638 OK + 1 expected failure**;
+  `test_check_pr_paths` **49 OK**;`test_minter_and_explain` **44 OK**
+  (macOS;Linux 下 2 条平台门 skipped);`done_task_ids` **101**。
+- **部署面**:minter 部署副本与仓内字节 digest 一致
+  （`2df746cc58cf6dcf825a01f072cea4bdfffa61b706f40695c8e0531b3f2d6103`）,
+  r1 接受的失配期已由 D2 窗口闭合;回滚源留存。
+
+**如实记录的取证边界(不影响 PASS,但不粉饰)**
+
+1. **DEC-008 的「拒绝路径后 token 未改动」窗口未独立取证**——步骤 5 后
+   未单独 stat,步骤 6 的铸造覆盖了证据;该性质记在脚本结构（在
+   `[ -f "$PEM" ]` 即退出)与 CI 测试
+   `test_nothing_is_written_by_a_refused_invocation` 名下。
+2. **失败路径零残留由 CI 注入 harness 证明,窗口只覆盖成功路径**;该
+   harness 因 guard job 跑 ubuntu 而 GNU `stat` 不支持 BSD `-f`,**在 CI
+   被平台门跳过**,补以所有平台都跑的结构断言（五个暂存变量在 cleanup
+   体内、trap 早于首个 `mktemp`、预初始化行),变异实测两条 trap 变异被
+   双杀。
+3. **DEC-002 的两项线上冒烟无实物可测**:实测远端
+   `agent/host-loop/**` 命名空间为空、无 cursor Issue;未以「无实物」当
+   通过,改以跨树对照 + 真实 PR #564 解析为替代证据。
+4. **DEC-005 有两项经其 readiness 停条件如实未交付**（`observed_main`
+   半侧、`FakeApi` 路由),二者由后续 **TASK-DEC-009** 独立收口并已 done。
+
+**台账处置**:`review-findings.md` 中 noted-not-tasked 项（B-M5 swift-ci
+pipefail、B-M6 concurrency、B-H2 结构自签环、B-M7、A-L 系列、
+rockchip-component workflow 卫生等）**不构成本 change 验收面**,其处置
+（立项/接受/搁置）由维护者裁量;B-H2 已在 `check_pr_paths.py` 的模块
+docstring 中显式记录为已知残留。
