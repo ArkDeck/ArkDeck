@@ -224,16 +224,22 @@ class OmittingTheFlagMeansEveryChange(unittest.TestCase):
         self.assertIn(f"scanned changes={len(expected)}", done.stdout)
 
     def test_the_default_dry_run_covers_more_than_the_old_default_change(self):
+        """Stated as a relation (reported == every active change) so that a
+        change archiving — including the old default itself — cannot stale
+        it (TASK-NAV-002 follow-up)."""
         done = self._explain()
         reported = set(re.findall(r"(?m)^change=(\S+) ", done.stdout))
-        self.assertIn("chg-2026-030-host-loop-runtime", reported)
+        self.assertEqual(reported, set(active_change_ids(REPO_ROOT)))
         self.assertGreater(len(reported), 1,
                            "the old default was one change; this must be all of them")
 
     def test_an_explicit_change_still_reports_only_that_change(self):
-        done = self._explain("--change", "chg-2026-030-host-loop-runtime")
+        from host_loop.test_support import live_sample_change
+
+        sample = live_sample_change(REPO_ROOT).lower()
+        done = self._explain("--change", sample)
         reported = re.findall(r"(?m)^change=(\S+) ", done.stdout)
-        self.assertEqual(reported, ["chg-2026-030-host-loop-runtime"])
+        self.assertEqual(reported, [sample])
         self.assertNotIn("scanned changes=", done.stdout)
 
 
@@ -264,8 +270,16 @@ class TheLiveRepositoryIsScannedWhole(unittest.TestCase):
         self.assertGreater(len(union), 1)
 
     def test_the_change_that_used_to_be_the_only_one_scanned_is_still_scanned(self):
-        """Widening the default must not have replaced one blind spot with another."""
-        self.assertIn("chg-2026-030-host-loop-runtime", active_change_ids(REPO_ROOT))
+        """Widening the default must not have replaced one blind spot with
+        another. Both worlds are contract bites: while the old default change
+        is active it must be scanned; once archived it must not be — archived
+        changes are not active (TASK-NAV-002 follow-up)."""
+        old_default = "chg-2026-030-host-loop-runtime"
+        active_dir = REPO_ROOT / "openspec" / "changes" / old_default
+        if active_dir.is_dir():
+            self.assertIn(old_default, active_change_ids(REPO_ROOT))
+        else:
+            self.assertNotIn(old_default, active_change_ids(REPO_ROOT))
 
     def test_a_gated_task_outside_the_old_default_change_is_now_visible(self):
         """The measured symptom: ready work in another change was unreachable.
@@ -532,13 +546,17 @@ class TheEnvelopeNamesTheTasksOwnChange(unittest.TestCase):
                 return "body"
             return render
 
+        from host_loop.test_support import live_sample_change
+
+        sample = live_sample_change(REPO_ROOT).lower()
         with unittest.mock.patch.object(main_mod, "body_renderer",
                                         fake_body_renderer):
             render = _candidate_body_renderer(
-                str(REPO_ROOT), fallback_change="chg-2026-030-host-loop-runtime",
+                str(REPO_ROOT), fallback_change=sample,
                 producer="p", run_id="r")
             render(candidate(), "a" * 40, "b" * 40)
-        self.assertEqual(rendered["change"], "CHG-2026-030-host-loop-runtime")
+        self.assertEqual(rendered["change"],
+                         canonical_change_id(REPO_ROOT, sample))
 
 
 class TheRoundLineSaysWhenAndHowMuch(unittest.TestCase):

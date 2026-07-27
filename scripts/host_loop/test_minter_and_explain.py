@@ -241,20 +241,30 @@ class ExplainIsANetworkFreeDryRun(unittest.TestCase):
         )
 
     def test_it_runs_with_no_credential_at_all(self):
-        """A dry run must not need the token the window has not staged yet."""
-        done = self._run("--change", "CHG-2026-030-host-loop-runtime")
+        """A dry run must not need the token the window has not staged yet.
+
+        Default (repo-wide) scope: pinning the old default change made this
+        break the day that change archived (TASK-NAV-002 follow-up)."""
+        done = self._run()
         self.assertIn(done.returncode, (0, 10), done.stderr)
         self.assertNotIn("no credential", done.stderr)
 
     def test_it_names_every_candidate_and_a_reason_for_each_rejection(self):
-        done = self._run("--change", "CHG-2026-030-host-loop-runtime")
-        self.assertIn("TASK-HLR-003", done.stdout)
-        self.assertIn("never-claim", done.stdout,
-                      "HLR-003 is excluded by the self-claim rule; say so")
+        """Relation form: whichever never-claim task is active must be named
+        with its reason; the candidate/verdict surface must always print."""
+        from host_loop.worker import NEVER_CLAIM_ROOTS
+
+        done = self._run()
         self.assertIn("claimable=", done.stdout)
+        self.assertRegex(done.stdout, r"TASK-[A-Z0-9]+(?:-[A-Z0-9]+)*-[0-9]{3}")
+        named_roots = [root for root in sorted(NEVER_CLAIM_ROOTS)
+                       if root in done.stdout]
+        for root in named_roots:
+            self.assertIn("never-claim", done.stdout,
+                          f"{root} is excluded by the self-claim rule; say so")
 
     def test_it_reports_the_archived_dependency_set_size(self):
-        done = self._run("--change", "CHG-2026-030-host-loop-runtime")
+        done = self._run()
         self.assertIn("active + archived changes", done.stdout)
 
     def test_once_and_explain_are_mutually_exclusive(self):

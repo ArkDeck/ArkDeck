@@ -84,3 +84,19 @@ git -C <scratch>/nav002-drill mv \
   （mv 后的 chg-2026-025 实测，headers>candidates）均被过滤器排除，
   过滤器缺失时的失败形态已于演练首轮实测（11 failures + 3 errors，
   修复后收敛至纯跨线残余）。
+
+## drill re-run（2026-07-27，跨线修复合成树；NAV-ARCH-001 change 级收口）
+
+TASK-NAV-001 两文件的 7 条同型病灶已按上报路线修复（review-fix carrier，
+`test_navigation_contract.py` 4 条改关系式/动态样本/双世界条件断言，
+`test_minter_and_explain.py` 3 条改缺省全仓 scope + never-claim 关系式；
+NAV-001 允许路径内，#301 review-fix 先例）。修复合成树上归档演练复跑：
+
+- `git mv` chg-2026-030 → `archive/2026-07-27-…` 后 host_loop 全量
+  **536 OK + 1 expectedFailure（零失败零错误）**；
+- `test_check_pr_paths.py` OK、`test_check_sdd.py` OK、`check-sdd`
+  0/0/111；
+- 常态树同套件同计数全绿（双世界均绿 = 条件断言两分支各自实证）。
+
+**`NAV-ARCH-001` 判定：PASS（change 级）**。chg-2026-030/027/028 归档链
+自此解锁（归档 PR 独立走）。
