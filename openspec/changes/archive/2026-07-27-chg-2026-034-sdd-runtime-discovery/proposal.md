@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-034-sdd-runtime-discovery
 revision: 1
-status: verified # 2026-07-27 本 verification-closure PR；closure 段见文末；approved 于 #611
+status: archived # 2026-07-27 本 archive PR（先例 #235/#241/#605/#610）；verify 于前序堆叠 carrier；引用扫描：目录外精确路径引用 0（实测 git grep）；scripts/check-sdd.sh、bootstrap-sdd.sh 与 test_sdd_runtime_entry.py 为长驻交付物不随档移动；本 change 归档后 checker 行为不变
 class: implementation-only
 core_change_level: none
 owner: lvye
