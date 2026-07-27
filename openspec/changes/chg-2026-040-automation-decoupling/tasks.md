@@ -295,7 +295,7 @@ None 的治理文件、重复 capability id、`changes/` 游离条目）。**故
   worker/__main__/cursor 含 NEVER_CLAIM_ROOTS（TASK-DEC-007 独占
   worker.py，本任务零触碰以免并行冲突）、minter shell（TASK-DEC-008）、
   ALLOWED_ROUTES 集合变更（零路由增删）。
-- Allowed paths:`scripts/host_loop/transport.py`、`scripts/host_loop/lease.py`、`scripts/host_loop/backends.py`、`scripts/host_loop/test_fault_matrix.py`、`scripts/host_loop/test_backends_cli.py`、`scripts/host_loop/test_token_parity.py`、本 change `evidence/**`、本 change `tasks.md`（仅本任务状态/evidence 引用）
+- Allowed paths:`scripts/host_loop/transport.py`、`scripts/host_loop/lease.py`、`scripts/host_loop/backends.py`、`scripts/host_loop/test_fault_matrix.py`、`scripts/host_loop/test_backends_cli.py`、`scripts/host_loop/test_token_parity.py`、`scripts/host_loop/identity.py`、`scripts/host_loop/pr_envelope.py`、`scripts/host_loop/test_pr_envelope.py`、`scripts/host_loop/test_v3_hardening.py`、`scripts/host_loop/test_navigation_contract.py`、本 change `evidence/**`、本 change `tasks.md`（仅本任务状态/evidence 引用）
 - Forbidden paths:`scripts/host_loop/worker.py`、`scripts/host_loop/reviewer.py`、`scripts/host_loop/recovery.py`、`scripts/host_loop/pr_envelope.py`、`scripts/host_loop/identity.py`、`scripts/host_loop/cursor.py`、`scripts/host_loop/__main__.py`、`scripts/host_loop/mint_installation_token.sh`、`.github/**`、`openspec/specs/**`、产品 source/tests、其他 change。
 - Risk:med（安全修复触 live 循环的写路径;全部为收紧方向;两 left-running
   unit 零动作，行为经 checkout 前进生效;回退 = revert）。
@@ -380,8 +380,58 @@ failure,零断言反应**。**这不是"改动无影响",而是两件事**:①�
 DEC-007、`reviewer.py` 等归 DEC-006）;需要改 launchd/plist。
 
 **不授权**：路由增删;minter shell 修改（DEC-008）;`instance.py` 收口
-（DEC-002）;envelope path 分支收紧（DEC-006;本任务只做 backends 渲染侧
-`none:` 的一半）;`Decision-Grade` 代写。
+（DEC-002）;`Decision-Grade` 代写。
+
+### Readiness r2（2026-07-27）— 三项跨分区移交
+
+**触发**：TASK-DEC-006 实现（#627 merge
+`0b8179daf709174162b1b4d94d06b4ca3585c4d3`）如实命中其 readiness r1 预写
+的两条停条件并停下,另有一条跨分区耦合在实现中被测出。维护者 2026-07-27
+裁决:**三项全部移交 TASK-DEC-005**（理由:它们的写入面天然落在 DEC-005
+已持有或相邻的文件上,移交不需要新的 readiness 轮次,也不制造并行冲突;
+DEC-006 按其已交付面独立 done）。r1 的其余条款原文继续有效。
+
+**移交项与其必需的授权面**
+
+1. **`identity.confirm_merge` 退役**（台账 E-dead）。该函数生产零调用,
+   语义与 `recovery.confirm_merged` 漂移（truthy `merged` 接受 `1`/
+   `"true"`、无 subject 交叉验证、sha-null 当终态）,仅由
+   `test_fault_matrix.py:822-837` 四处喂绿 = 「两分类器漂移」+「测试让
+   死代码显得在岗」双重已知类。**需要**:`identity.py`（删函数）+
+   `test_fault_matrix.py`（四用例改指 `recovery.confirm_merged` 正本,
+   **不得直接删测试了事**）。
+2. **envelope evidence path 分支收紧**（台账 E-M3 解析半侧）。r1 已授权
+   本任务做渲染半侧（`backends.py` 的 `none — ` → `none:`）;解析半侧原
+   属 DEC-006 且被顺序约束挡住。两半现在同属本任务,**渲染侧必须先于
+   解析侧落地**（同一 PR 内先后亦可）。**需要**:`pr_envelope.py` +
+   `test_pr_envelope.py`。**历史兼容是硬门**:现存 worker PR body 必须
+   继续解析通过,evidence 须列出取样 PR 编号与解析结果比对。
+3. **`test_v3_hardening.py` 的中部 `unittest.main()`**（台账 C-H3 同型）。
+   实测直跑 42 / 模块跑 52,静默漏 10 个测试。**此项必须与 TASK-DEC-007
+   在 `test_navigation_contract.py` 留下的
+   `@unittest.expectedFailure`（`test_the_out_of_partition_module_is_also
+   _whole`）与其 `_OTHER_PARTITION` 排除项在同一个 PR 内一起动**——已
+   最小复现验证:`TestResult.wasSuccessful()` 对 unexpected success 返回
+   `False`,故只修一半必然把套件打红。**需要**:`test_v3_hardening.py`
+   + `test_navigation_contract.py`（仅该 expectedFailure 与排除项两处）。
+
+**r2 追加的 Pass/fail boundary**（r1 的七条继续适用）
+
+8. 移交三项各有「撤销即变红」的测试与正对照;`identity.confirm_merge`
+   退役后生产与测试**零引用**（grep 为证）。
+9. **历史 PR body 兼容**:取线上真实 worker PR body,在改动前后两棵树上
+   `parse_envelope`,结果**逐字节相同**（先例:DEC-006 evidence 用 #564
+   的 `repr` sha256 `ace6adb602d6ab7b…` 做的比对）。
+10. `test_v3_hardening.py` 直跑与 `-m unittest` 计数**相等**;
+    `test_navigation_contract.py` 的 expectedFailure 与 `_OTHER_PARTITION`
+    排除项**一并移除**,套件无 unexpected success。
+11. 本任务对 `test_navigation_contract.py` 的授权**仅限**上述两处;任何
+    其他改动即越权,停并转 r3。
+
+**r2 追加的 Stop conditions**：历史 body 解析回归失败;`confirm_merge`
+退役后仍有引用;只改 `test_v3_hardening.py` 而未同步摘除 expectedFailure
+（或反之）;需要触碰 `reviewer.py`/`recovery.py`（仍属 DEC-006 分区,
+本次移交不含它们）。
 
 ## TASK-DEC-006 — reviewer/envelope/recovery 硬化
 
