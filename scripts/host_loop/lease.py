@@ -31,6 +31,10 @@ LEASE_REF_PREFIX = "refs/heads/agent/host-loop/leases/"
 TASK_BRANCH_PREFIX = "refs/heads/agent/host-loop/tasks/"
 LEASE_SCHEMA = "arkdeck-host-loop-lease/v1"
 
+# Must exceed the longest single external write this gate protects
+# (backends.HTTP_TIMEOUT_SECONDS = 60), with slack for the round trip.
+WRITE_MARGIN_SECONDS = 90
+
 
 _KEEP = object()
 
@@ -271,6 +275,17 @@ class LeaseManager:
         self, held: HeldLease, *, pr_number: int | None, create_attempted: bool,
         checks_dispatched_head: object = _KEEP,
     ) -> HeldLease:
+        # takeover() enforces expiry and pr_identity_requeried before it reaches
+        # this CAS; renew() did not, and _advance stamped its own owner_run
+        # unconditionally. HeldLease is a public dataclass and observe() returns
+        # exactly the (record, ref_oid) pair needed to build one, so a second
+        # worker could construct a HeldLease over someone else's UNEXPIRED lease
+        # and renew it — walking around every precondition takeover documents.
+        if held.record.owner_run != self._owner_run:
+            raise FenceLost(
+                f"renew refused for {held.record.task_id}: the lease is owned by "
+                f"{held.record.owner_run!r}, not {self._owner_run!r}; "
+                "use takeover() and its preconditions")
         nxt = replace(
             held.record,
             fence=held.record.fence + 1,
@@ -286,8 +301,6 @@ class LeaseManager:
             owner_run=self._owner_run,
         )
         nxt.validate()
-        if nxt.fence <= held.record.fence:
-            raise LeaseError("fence must strictly increase")
         new_oid = self._write_commit(nxt.serialize(), held.ref_oid)
         try:
             self._refs.compare_and_swap(lease_ref(nxt.task_id), held.ref_oid, new_oid)
@@ -380,3 +393,14 @@ class LeaseManager:
             raise FenceLost("lease task identity changed")
         if self.is_expired(record):
             raise FenceLost("lease expired before the write; re-acquire or hand off")
+        # A margin, not just non-expiry. This gate is followed by an unbounded
+        # external write (a 60s HTTP timeout), and a peer becomes takeover-
+        # eligible the instant the lease expires — so a lease with one second
+        # left could pass here and have its write land after a legitimate
+        # takeover. GitHub enforces no fence token, so the margin is the only
+        # available control.
+        remaining = record.expires_at - self._now()
+        if remaining < WRITE_MARGIN_SECONDS:
+            raise FenceLost(
+                f"lease has {remaining}s left, under the {WRITE_MARGIN_SECONDS}s "
+                "write margin; renew before writing")

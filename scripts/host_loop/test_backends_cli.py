@@ -32,7 +32,6 @@ from host_loop.backends import (  # noqa: E402
     body_renderer,
     branch_preparer,
     commit_writer,
-    mint_installation_token,
     read_lease_record,
     read_token,
 )
@@ -264,53 +263,21 @@ class CredentialContainment(unittest.TestCase):
                     assert_no_secret(probe, "test string")
         self.assertEqual(assert_no_secret("harmless", "t"), "harmless")
 
-    def test_the_token_never_reaches_a_child_process_argv(self):
+
+    def test_the_python_minter_is_gone_and_stays_gone(self):
+        """Retired by TASK-DEC-005; the live minter is the root-owned shell.
+
+        Its _openssl_sign required a NOPASSWD sudoers rule for openssl, which
+        is root escalation for the loop account and precisely the design the
+        shell minter replaced. Asserted as absence so nothing reintroduces it.
+        """
         source = Path(backends_mod.__file__).read_text()
-        signing = source.split("def _openssl_sign", 1)[1]
-        self.assertIn("input=signing_input", signing,
-                      "the payload must go over stdin")
-        self.assertNotIn("self.token", signing)
-
-    def test_jwt_signing_is_delegated_so_the_pem_never_enters_this_process(self):
-        source = Path(backends_mod.__file__).read_text()
-        self.assertIn('"sudo", "openssl", "dgst"', source)
-        self.assertNotIn("PRIVATE KEY-----\\n", source)
-        # no direct read of the PEM anywhere
-        self.assertNotIn("pem_path).read", source)
-        self.assertNotIn("open(pem_path", source)
-
-    def test_mint_discards_the_jwt_and_returns_only_sanitised_metadata(self):
-        seen = {}
-
-        def fake_sender_factory(jwt):
-            seen["jwt"] = jwt
-
-            def send(method, path, body):
-                self.assertEqual(method, "POST")
-                self.assertIn("/access_tokens", path)
-                return 201, {"token": "ghs_" + "c" * 30,
-                             "expires_at": "2026-07-25T12:00:00Z",
-                             "permissions": {"issues": "write"},
-                             "repository_selection": "selected"}
-            return send
-
-        token, meta = mint_installation_token(
-            app_id=4388667, installation_id=148855345, pem_path="/nonexistent.pem",
-            sender_factory=fake_sender_factory,
-            signer=lambda payload, path: b"signature-bytes",
-            now=lambda: 1000,
-        )
-        self.assertTrue(token.startswith("ghs_"))
-        self.assertEqual(sorted(meta), ["expires_at", "permissions",
-                                        "repository_selection"])
-        self.assertNotIn("token", meta, "the token must not be echoed in metadata")
-
-    def test_a_failed_mint_is_an_error(self):
-        with self.assertRaises(BackendError):
-            mint_installation_token(
-                app_id=1, installation_id=2, pem_path="/x.pem",
-                sender_factory=lambda jwt: (lambda m, p, b: (403, {"message": "no"})),
-                signer=lambda payload, path: b"sig", now=lambda: 1)
+        for gone in ("def mint_installation_token", "def _openssl_sign",
+                     '"sudo", "openssl"', "/access_tokens"):
+            with self.subTest(gone=gone):
+                self.assertNotIn(gone, source)
+        self.assertFalse(hasattr(backends_mod, "mint_installation_token"))
+        self.assertFalse(hasattr(backends_mod, "_openssl_sign"))
 
 
 class GitObjectWriters(unittest.TestCase):
@@ -598,6 +565,235 @@ class DiscoveryIsAReaderOnly(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmp:
             self.assertFalse(_change_is_approved(Path(tmp), "CHG-NOPE"))
+
+
+# ------------------------ DEC-HL-001: the allowlist survives a redirect
+
+class TheSenderNeverFollowsARedirect(unittest.TestCase):
+    """urllib followed 301/302/303 on GET and POST transparently.
+
+    assert_route_allowed had already run against the ORIGINAL path, so the
+    allowlist could not see where the request actually went, the Authorization
+    header — the installation token — was replayed at that host, and only the
+    final 200 came back. GitHub answers 301 after an owner or repository
+    rename, so this was reachable without an adversary.
+    """
+
+    def _servers(self):
+        import http.server
+        import json
+        import threading
+
+        seen = []
+
+        class Second(http.server.BaseHTTPRequestHandler):
+            def do_GET(self):
+                seen.append((self.path, self.headers.get("Authorization")))
+                payload = json.dumps({"message": "second host"}).encode()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(payload)))
+                self.end_headers()
+                self.wfile.write(payload)
+
+            def log_message(self, *args):
+                pass
+
+        second = http.server.HTTPServer(("127.0.0.1", 0), Second)
+        threading.Thread(target=second.serve_forever, daemon=True).start()
+        self.addCleanup(second.shutdown)
+
+        class First(http.server.BaseHTTPRequestHandler):
+            def do_GET(self):
+                self.send_response(301)
+                self.send_header(
+                    "Location",
+                    f"http://127.0.0.1:{second.server_port}/elsewhere/admin")
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+
+            def log_message(self, *args):
+                pass
+
+        first = http.server.HTTPServer(("127.0.0.1", 0), First)
+        threading.Thread(target=first.serve_forever, daemon=True).start()
+        self.addCleanup(first.shutdown)
+        return first, second, seen
+
+    def _sender(self, first):
+        original = backends_mod.API_ROOT
+        backends_mod.API_ROOT = f"http://127.0.0.1:{first.server_port}"
+        self.addCleanup(lambda: setattr(backends_mod, "API_ROOT", original))
+        return backends_mod.UrllibSender(token="SECRET-TOKEN-VALUE")
+
+    def test_a_redirect_surfaces_as_a_status(self):
+        first, _second, _seen = self._servers()
+        status, _payload = self._sender(first)("GET", "/repos/o/r/pulls/5", None)
+        self.assertEqual(status, 301, "the redirect was followed instead of reported")
+
+    def test_the_token_is_never_replayed_at_the_redirect_target(self):
+        first, _second, seen = self._servers()
+        self._sender(first)("GET", "/repos/o/r/pulls/5", None)
+        self.assertEqual(seen, [], f"the redirect target was contacted: {seen}")
+
+    def test_an_absolute_url_is_refused(self):
+        with self.assertRaises(BackendError):
+            backends_mod.UrllibSender(token="t")(
+                "GET", "https://evil.example/repos/o/r/pulls/5", None)
+
+    def test_a_protocol_relative_url_is_refused(self):
+        with self.assertRaises(BackendError):
+            backends_mod.UrllibSender(token="t")("GET", "//evil.example/x", None)
+
+
+class TheGitChildInheritsAnAllowlistedEnvironment(unittest.TestCase):
+    """GIT_CONFIG_* injection reaches arbitrary command execution.
+
+    Copying os.environ handed every git child whatever the loop account could
+    set; core.sshCommand via GIT_CONFIG_COUNT/KEY/VALUE is code execution on
+    the next Deploy-Key push. The deployed unit pins a small environment, but
+    that is the plist's property, not this module's.
+    """
+
+    def _env_of(self, environ):
+        captured = {}
+
+        def fake_run(argv, **kwargs):
+            captured.update(kwargs["env"])
+
+            class Done:
+                returncode, stdout, stderr = 0, "", ""
+
+            return Done()
+
+        with unittest.mock.patch.dict(os.environ, environ, clear=True), \
+             unittest.mock.patch.object(backends_mod.subprocess, "run", fake_run):
+            backends_mod.SubprocessGitRunner(repo_dir=".")(["git", "status"])
+        return captured
+
+    def test_injected_git_config_is_dropped(self):
+        env = self._env_of({
+            "GIT_CONFIG_COUNT": "1",
+            "GIT_CONFIG_KEY_0": "core.sshcommand",
+            "GIT_CONFIG_VALUE_0": "/tmp/attacker-ssh",
+        })
+        self.assertEqual(env.get("GIT_CONFIG_COUNT"), "0")
+        self.assertNotIn("GIT_CONFIG_KEY_0", env)
+        self.assertNotIn("GIT_CONFIG_VALUE_0", env)
+
+    def test_nosystem_cannot_be_turned_off_by_inheritance(self):
+        self.assertEqual(
+            self._env_of({"GIT_CONFIG_NOSYSTEM": "0"}).get("GIT_CONFIG_NOSYSTEM"),
+            "1")
+
+    def test_the_token_is_not_in_a_git_child_environment(self):
+        env = self._env_of({backends_mod.ENV_TOKEN: "ghs_secret",
+                            backends_mod.ENV_TOKEN_FILE: "/tmp/tok"})
+        self.assertNotIn(backends_mod.ENV_TOKEN, env)
+        self.assertNotIn(backends_mod.ENV_TOKEN_FILE, env)
+
+    def test_the_identity_is_pinned_over_an_inherited_one(self):
+        """commit_writer, not the runner: that is where the identity is set.
+
+        setdefault let an inherited GIT_AUTHOR_NAME win, so lease commits were
+        mis-attributed exactly when the environment was dirty — the opposite of
+        what the function's comment claimed.
+        """
+        with _repo() as path:
+            with unittest.mock.patch.dict(
+                    os.environ, {"GIT_AUTHOR_NAME": "somebody-else",
+                                 "GIT_COMMITTER_EMAIL": "someone@else"},
+                    clear=False):
+                oid = backends_mod.commit_writer(path)("probe record", None)
+            shown = subprocess.run(
+                ["git", "log", "-1", "--format=%an <%ae> %cn <%ce>", oid],
+                cwd=path, capture_output=True, text=True).stdout.strip()
+        self.assertNotIn("somebody-else", shown)
+        self.assertNotIn("someone@else", shown)
+        self.assertIn("arkdeck-host-loop", shown)
+
+    def test_what_the_push_needs_is_still_passed_through(self):
+        env = self._env_of({"HOME": "/home/loop", "SSH_AUTH_SOCK": "/tmp/agent",
+                            "PATH": "/usr/bin"})
+        self.assertEqual(env["HOME"], "/home/loop")
+        self.assertEqual(env["SSH_AUTH_SOCK"], "/tmp/agent")
+
+
+class LsRemoteMustAnswerAboutTheRefItWasAsked(unittest.TestCase):
+    """`git ls-remote <remote> <pattern>` matches the pattern against the TAIL
+    of a refname at a `/` boundary — it is not an exact-name lookup.
+
+    read() took line one and validated only its OID, so a shadow such as
+    `refs/backup/refs/heads/agent/host-loop/leases/T` answered for the lease and
+    won deterministically by sort order. If that shadow pins a previous lease
+    commit the record still parses, and assert_still_held then keeps passing
+    against a frozen OID after another worker took the real ref over.
+    """
+
+    REF = "refs/heads/agent/host-loop/leases/TASK-DEMO-001"
+
+    def _read(self, output):
+        return RefPort(remote="origin",
+                       _run=lambda argv: (0, output, "")).read(self.REF)
+
+    def test_a_shadow_ref_is_refused(self):
+        with self.assertRaises(TransportError) as caught:
+            self._read(f"{'6' * 40}\trefs/backup/{self.REF}\n"
+                       f"{'a' * 40}\t{self.REF}\n")
+        self.assertIn("ambiguous", str(caught.exception))
+
+    def test_a_single_wrong_refname_is_refused(self):
+        with self.assertRaises(TransportError) as caught:
+            self._read(f"{'6' * 40}\trefs/backup/{self.REF}\n")
+        self.assertIn("not the requested", str(caught.exception))
+
+    def test_the_exact_ref_still_reads(self):
+        self.assertEqual(self._read(f"{'a' * 40}\t{self.REF}\n"), "a" * 40)
+
+    def test_an_absent_ref_is_still_none(self):
+        self.assertIsNone(
+            RefPort(remote="origin", _run=lambda argv: (2, "", "")).read(self.REF))
+
+
+class RenewIsNotABackDoorAroundTakeover(unittest.TestCase):
+    """takeover() checks expiry and pr_identity_requeried; renew() checked
+    neither, and _advance stamped its own owner_run unconditionally.
+
+    HeldLease is a public dataclass and observe() returns exactly the pair
+    needed to build one, so a second worker could renew somebody else's
+    UNEXPIRED lease and walk around every precondition takeover documents.
+    """
+
+    REF = "refs/heads/agent/host-loop/leases/TASK-DEMO-001"
+
+    def _record(self, owner):
+        from host_loop.lease import LeaseRecord, task_branch
+        return LeaseRecord(
+            task_id="TASK-DEMO-001", base_oid="b" * 40, owner_run=owner,
+            fence=1, expires_at=10_000, pr_branch=task_branch("TASK-DEMO-001"),
+            pr_number=None, create_attempted=False,
+            checks_dispatched_head=None, previous_lease_oid=None)
+
+    def _manager(self, owner):
+        from host_loop.lease import LeaseManager
+        refs = RefPort(remote="origin",
+                       _run=lambda argv: (0, f"{'a' * 40}\t{self.REF}\n", ""))
+        return LeaseManager(refs, owner_run=owner, now=lambda: 1_000,
+                            commit_writer=lambda text, parent: "c" * 40)
+
+    def test_a_foreign_unexpired_lease_cannot_be_renewed(self):
+        from host_loop.lease import FenceLost, HeldLease
+        held = HeldLease(self._record("run-A"), "a" * 40)
+        with self.assertRaises(FenceLost) as caught:
+            self._manager("run-B").renew(held)
+        self.assertIn("owned by", str(caught.exception))
+
+    def test_the_owner_can_still_renew(self):
+        from host_loop.lease import HeldLease
+        held = HeldLease(self._record("run-A"), "a" * 40)
+        renewed = self._manager("run-A").renew(held)
+        self.assertEqual(renewed.record.fence, 2)
+        self.assertEqual(renewed.record.owner_run, "run-A")
 
 
 if __name__ == "__main__":
