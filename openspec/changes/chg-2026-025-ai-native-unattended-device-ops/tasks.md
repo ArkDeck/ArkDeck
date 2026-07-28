@@ -2426,9 +2426,24 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
 
 ## TASK-AIN-010 — 通用 TrustedDeviceOperationHost 与 admission
 
-- Status:ready（2026-07-28 D1 readiness；仅在维护者 review/merge 本独立 PR 后生效；
-  本翻转不构成实现、change verified、capability/authorization 接受、production
-  control-surface reachability 或任何 device dispatch authority）
+- Status:done（2026-07-29 D0 completion；仅在维护者 review/merge 本独立
+  `ready→done` PR 后生效；本翻转不构成 change verified、TASK-AIN-011
+  readiness/implementation、production control-surface reachability、真实
+  capability/authorization 接受或任何 device dispatch authority）
+- Done:2026-07-29；实现经 #758 exact head
+  `10dafe8d478fb5b3da63c2bb80554bbb35fa4841` 由维护者 `lvye` APPROVED 并合入
+  protected main（merge commit
+  `7a81662070d5dc9361152a7996ffbd96af73c83f`）。reviewed head 与 merge tree
+  零差异；fresh main 上 TASK-AIN-010 聚焦矩阵 = 18 tests / 0 failures，两套
+  AIN-009/AIN-009R stdlib validator 均 PASS，`check-sdd` = 0 errors /
+  0 warnings / 111 acceptance IDs，路径守卫 = 50/50；实现 PR 的 Agent PR、
+  SDD Guard、allowed-paths 与 Swift CI 全部 SUCCESS。evidence =
+  `evidence/runs/TASK-AIN-010/run.md`（blob
+  `bb60325031f557861dc87209d47f5c3de13f0a1e`）；本次状态复验仍为
+  contract/fake-port，真实 process/device/HDC/network dispatch 全部为 0。
+- Historical Status:ready（2026-07-28 D1 readiness；仅在维护者 review/merge
+  该独立 PR 后生效；该翻转不构成实现、change verified、capability/authorization
+  接受、production control-surface reachability 或任何 device dispatch authority）
 - Historical Status:blocked（fresh r2 audit 发现 base `Allowed paths` 漏列本 change
   `tasks.md`；已由独立 scope remediation #753 exact head
   `0985ebc4ab1cc9f02e36be6cce345c1b614d8c6f` 经 `lvye` APPROVED 并合入
