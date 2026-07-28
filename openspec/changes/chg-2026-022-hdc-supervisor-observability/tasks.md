@@ -6,7 +6,56 @@
 
 ## TASK-OBS-001 — Kit 仪表化与分类面
 
-- Status:ready(r2 readiness；仅在维护者对本独立 readiness PR exact head
+- Status:done(2026-07-28 completion;仅在维护者 review/merge 本独立
+  `ready→done` PR 后生效。**实现载体 = #687**(merge
+  `ca84cc2821e11ad691cb9d8dcdef4e2dc873d1d3`):Readiness r2 四机制全部
+  落地——(a) identity-bound successful-spawn 唯一 hook(ArkDeckProcess
+  package 级回调,public API 零变更)、(b) opaque confirmed/managed
+  permit(class-identity + TaskLocal 绑定)、(c) caller 零 origin 输入
+  (monitor 记录口 fileprivate)、(d) fake-process mutation seam;外加
+  ownership 四证据 `.external` 判定 + managed provenance
+  reconcile/retire、endpoint source 穿透与 child-env 注入清单、只读设备
+  fan-out(生产源腿仅 CHG-2026-024 registered family)。新契约文件
+  `HDCSupervisorObservabilityContractTests.swift` 25 用例 = r2 验证计划
+  附录 25 条逐条直译(C1-C8/O1-O8/E1-E4/F1-F5),四 change-local AC
+  (OBS-COUNTER/OWNERSHIP/ENDPOINT/FANOUT-001)全部可判定且逐条 PASS。
+  **授权链**:readiness r2 = #678(merge
+  `a8666bddd51b4cb469be6c8cc1f21c421508b12d`),其一次性实现授权已由
+  #687 全额消耗。**evidence** =
+  `evidence/runs/TASK-OBS-001/run.md`(blob
+  `4148b50a8d5ef6614058fdf24972d3d921f01de0`,SHA-256
+  `15eddd72a2725d610301121ef9715703e9391134cb5351ee493f4717d0ce4063`,
+  在树;含授权链、双 rebase 注记、pin 复核、25 条逐条映射与反作弊
+  自查)。
+  **flip base recheck(在翻转后的树上实测,非 /private/tmp worktree;
+  HLR-003 r5 教训)**:(a) #678 与 #687 两 merge 均为 flip base
+  ancestor;#687 之后本 change 目录零 commit 触及,本文件改前 blob
+  `ac498a4eefd4bce7c94a47158b847af72e045cc7` == #678 merge 产物(#687
+  未触本文件);(b) `swift test --filter
+  HDCSupervisorObservabilityContractTests` = `Executed 25 tests, with
+  0 failures (0 unexpected)`,exit 0;全量 swift test = `Executed 440
+  tests, with 1 test skipped and 0 failures (0 unexpected) in 63.603
+  (63.673) seconds`,exit 0(440 == #687 记录的 main 自身基线 415 +
+  新增 25,零回归、既有 skip 不变;汇总行取自完整输出文件);(c)
+  `check-sdd` = `0 error(s), 0 warning(s), 111 acceptance IDs`,
+  exit 0;(d) host_loop `done_task_ids` == 104 且含 `TASK-OBS-001`,
+  `--explain` 对本任务报 rejected(`status 'done' is not ready` +
+  decision grade D1 human-gated),不再 claimable;(e) 本 flip 单文件;
+  guard 模拟判定
+  (title 声明本任务,文件集 = 仅本文件)PASS;verification.md 无本任务
+  status 格(#150 同步形态不适用),其 `Status:planned` 为 change 级,
+  由 change verify PR 翻转。
+  **不声称**:change 级 `verified`(为下一独立 PR,前提含两 task
+  done);OBS-002/M0B-002/macOS conformance 任何进展;F 组绿不构成
+  M0B-002 真机观察进展。
+  **连带效果**:本翻转使 TASK-OBS-002 前置②「TASK-OBS-001 done」满足
+  (其前置① r2 remediation merged 此前已满足)——OBS-002 仍
+  blocked,待其前置③独立 readiness PR(须钉 OBS-001 交付 hash 与
+  XCUITest 环境复核);本 PR 不动 OBS-002 段。)
+- Historical Status:ready(r2 readiness = #678 merge
+  `a8666bddd51b4cb469be6c8cc1f21c421508b12d`;其一次性实现授权已由 #687
+  全额消耗。原 r2 Status 正文如下作历史保留。)
+- Historical Status:ready(r2 readiness；仅在维护者对本独立 readiness PR exact head
   review/merge 后生效,生效后一次性授权按下方 Readiness r2 契约的实现交付;
   r1 readiness 与 prototype #265 仍不可引用)
 - Historical Status:blocked(r2 review-remediation candidate；仅在本治理 PR 由维护者
