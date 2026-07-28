@@ -2,7 +2,22 @@
 
 ## TASK-HSO-001 — Register exact 3.2.0f commandless supervisor identity family
 
-- Status:ready
+- Status:done（2026-07-28 D0 completion；仅在维护者 review/merge 本独立
+  `ready→done` PR 后生效；本翻转不构成 change verified、TASK-HSO-002
+  readiness/implementation、production adoption、external ownership、HDC/device/
+  hardware support 或任何 dispatch authority）
+- Done:2026-07-28；实现经 #755 exact head
+  `38518eea9f487f76be2d065b882924376adbfdc3` 由维护者 `lvye` APPROVED 并合入
+  protected main（merge commit
+  `4fc0cec76638cd299e6ccbaff7c5124a048a2106`）。reviewed head 到 merge 在
+  TASK-HSO-001 的 11 个 implementation/evidence 路径零差异；fresh main 上专用
+  `HDCSupervisorObservationRegistryContractTests` = 9 tests / 0 failures，
+  `check-sdd` = 0 errors / 0 warnings / 111 acceptance IDs，路径守卫 = 50/50，
+  实现 PR 的 Agent PR、SDD Guard、allowed-paths 与 Swift CI 全部 SUCCESS。
+  evidence = `evidence/runs/TASK-HSO-001/run.md`（blob
+  `db56cd004dd78295ab7129ee01f4f658cba71c9c`）；本次状态复验仍为 host-only，
+  installed HDC、真实 process/socket/device、network、lifecycle/adoption、
+  subserver、binding/device mutation 与 destructive dispatch 全部为 0。
 - Fresh readiness review r2(2026-07-28；host-only，零 HDC/设备；仅在维护者
   review/merge 本独立 D1 readiness PR 后生效):
   - **Audit base and approval:**protected main
