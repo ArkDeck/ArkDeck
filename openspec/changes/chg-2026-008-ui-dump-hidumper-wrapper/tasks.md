@@ -31,9 +31,10 @@ r3 合入时本 change 有 4 个任务,全部 `blocked`;r6 增设 capture harnes
 r9 因 #219 首次 run 暴露的 FX-1 typed-path echo blocker 增设一个 host-only remediation
 任务后共 6 个;r10 因 Phase A token 跨生命周期与 repository-privacy provenance 冲突新增
 R2 decision 与 R2→R4 seam 两个串行任务,共 8 个;r11 因 R2 negative decision 根因未
-判定新增一个 host-only 只读诊断任务,共 9 个。现行状态一律以各任务 `Status` 行为
-准。real-device task 在其全部前置 done、独立 ready-restore PR 合入且具名设备窗口内才
-可执行。
+判定新增一个 host-only 只读诊断任务,共 9 个;r12 因该诊断的 pinned old raw 永久缺失,
+新增 R2-only 重采与 fresh-raw 重诊断两个任务,共 11 个。现行状态一律以各任务
+`Status` 行为准。real-device task 在其全部前置 done、独立 ready-restore PR 合入且具名
+设备窗口内才可执行。
 
 ## TASK-UD-CAPTURE-HARNESS-001 — Phase A/B 受控采集 harness 前置
 
@@ -745,7 +746,14 @@ R2 decision 与 R2→R4 seam 两个串行任务,共 8 个;r11 因 R2 negative de
     `TASK-UD-R2-R4-SEAM-001`/`TASK-UD-CAP-R4-001`/`TASK-UD-001`;重返 Phase B 仍须
     该分支修订另行登记的新 positive R2 structural decision 与 r10 既有 seam/R4 gate,
     #263 negative decision 及其 evidence 永不重写。
-- Forbidden now:在本 readiness PR 合入前起草任何实现/fixture/evidence,合入后越出
+  - r12 supersession:上述二选一 gate 是 r11 在 old raw 尚被假设可得时的历史计划。
+    #695 已证明 exact input 永久缺失,所以 `TASK-UD-R2-DIAG-001` 保持 blocked 且永不
+    重开;旧 raw 根因永久不可测。r12 只对 branch (b) 的“取得新事实输入”部分作 scoped
+    replacement:改由 `TASK-UD-R2-RECAPTURE-001` → `TASK-UD-R2-REDIAG-001` 新任务链
+    产生并测量 fresh raw。该 replacement 不宣称 old pipeline 根因,不授权 branch (a),
+    也不自动解锁 SEAM/R4/UD-001。
+- Forbidden now(本 task execution carrier;不约束经维护者批准的独立 proposal revision):
+  在本 readiness PR 合入前起草任何实现/fixture/evidence,合入后越出
   上方活声明起草任何文件;Agent 打开/复制 controlled raw;修改
   `scripts/ui_dump_redaction/**`、`scripts/ud_capture/**`、`decisions/**` 或任何既有
   evidence;installed HDC/device/network/GUI/mutation/destructive dispatch;把诊断输出
@@ -764,9 +772,146 @@ R2 decision 与 R2→R4 seam 两个串行任务,共 8 个;r11 因 R2 negative de
 - Evidence gate:implementation + evidence PR 合入后另起独立 status PR 起草
   `ready→done`;done 只关闭诊断事实登记,不授权任何分支;分支选择与授权只能由引用
   本任务 evidence 的后续修订(经维护者 review/merge)作出。
-- PR boundary:r11 只登记本任务;随后一个独立 readiness PR、一个 implementation +
+- Historical PR boundary(r11):r11 只登记本任务;随后一个独立 readiness PR、一个 implementation +
   evidence PR(host 侧,可含人类诊断 run 的 evidence)与一个 `ready→done` status PR;
   任何 PR 不得夹带 redactor 修改、capture plan 或 SEAM/R4 readiness。
+
+## TASK-UD-R2-RECAPTURE-001 — R2 persistent controlled 重采
+
+- Status:blocked(r12 只登记 recapture-only 任务与 closed plan;等待 r12 由维护者
+  review/merge 后的独立 D2 readiness 固定 current main base、既有 harness/tool/fixture/
+  target pins、persistent controlled-root gate、操作者与具名设备窗口。r12 PR 本身不使
+  本任务 ready,不执行 installed HDC/device/fixture/Recipe,不产生 raw/evidence,不修改
+  `scripts/**`;D2 readiness 合入前本任务全部 device dispatch 为 `0`)
+- Objective:不重跑已关闭的 R1/R3,只在 fresh fixture/window session 中用既有 closed
+  harness 重采一次 R2 sidecar,产生新的 proven-owned、complete、whole-file-hashed raw
+  origin,并把它保存在仓库外非临时 persistent controlled root,供后续独立 readiness
+  重钉的新 raw 诊断与 decision 使用。
+- Change-local closure:`INT-UD-R2-RECAPTURE-001` /
+  `TEST-INT-UD-R2-RECAPTURE-001`。
+- Canonical Safety inputs:`REQ-DUMP-002/005/006/007/008`;本 task 遵守窗口来源、origin
+  分离、owned cleanup、stale/ambiguous fail-closed 与 raw privacy,但不认领任何
+  canonical AC/Test PASS。
+- Depends on:
+  - r12 proposal revision 由维护者 review/merge;
+  - `TASK-UD-CAP-MUT-001 done`、`TASK-UD-CAPTURE-HARNESS-001 done`、
+    `TASK-UD-HARNESS-ECHO-001 done`;独立 D2 readiness 在当时 protected `main` 复核并
+    固定这些 merge OID 与 `scripts/ud_capture/{README.md,capture.py,test_capture.py}`
+    逐文件 SHA-256,existing harness tests 全绿且 command surface 无漂移;
+  - 独立 D2 readiness 重验 DAYU200 / OpenHarmony / API / USB tuple、HDC executable
+    path+SHA-256+version、fixture HAP SHA-256/module tuple、literal sidecar path、
+    `INV-1`/R2 exact argv 与 current hardware-evidence schema;任一漂移不得沿用旧 pin,
+    只得保持 blocked 或另起 revision;
+  - readiness 固定人类维护者操作者、具名连续设备窗口、窗口互斥规则与 per-device
+    typed capability evidence;Agent/CI 不执行 installed HDC;
+  - readiness 固定 persistent controlled-root predicate:realpath 位于每个 git
+    repository 与 OS temp/ephemeral roots 之外,目录 owner-only `0o700`,不使用
+    `/private/tmp`、`/private/var/tmp`、resolved `$TMPDIR` 或会被 session teardown
+    删除的位置;实际路径永不进入仓库/会话。
+- Closed execution sequence(r12 plan;仅 D2 readiness 合入后由人类执行):
+  1. host-only harness/SDD preflight与 tool/file hash复核;
+  2. `HP-0` → physical target confirmation → `HP-1`;
+  3. fixture hash复核 → `FX-1` → `FX-2` + unique foreground confirmation;
+  4. `HP-2` → `SC-1` pre → `INV-1` → `SC-1` post,仅 proven-owned new sidecar
+     才可 `SC-2`/`SC-3`/`SC-1` absent re-check;
+  5. `HP-2` → `SC-1` pre → `R2` → `SC-1` post;只有 post 证明 absent→new regular
+     file 时,才以 `SC-2` 收到同一 persistent controlled session 的 next
+     `NN-SC-2.sidecar`,随后 exact `SC-3` 与 `SC-1` absent re-check;
+  6. `FX-3` → `FX-4` → evidence assembly/sensitive scan → 对 retained R2 sidecar
+     再次 fstat/hash/length/mode/no-follow recheck。
+  任一步 target drift、timeout、truncation、drain-incomplete、sensitive gate failure、
+  sidecar absent/pre-existing/non-regular/ownership ambiguous、cleanup uncertainty 或
+  retention recheck failure即停止 further Recipe dispatch并按 runbook abort rule收口。
+- Result boundary:R2 exit `0`、完成 capture 或新 hash 都不构成 Recipe success。除已登记
+  `option ... missed` 显式失败外一律 `unknownOutput`;本 task 不运行 redactor/diagnosis,
+  不比较新旧 raw 内容/摘要,不判断旧 raw 的 raw-data/pipeline 根因。
+- Retention gate:fresh R2 sidecar 必须保持 immutable `0o600` regular file,仓库外真实
+  路径只由维护者持有;repo-facing evidence 仅记录 `<PERSISTENT_CONTROLLED_RAW_PATH>`、
+  whole-file length/SHA-256、capture sequence、source manifest hash、storage predicate
+  booleans、retention owner 与复核时间。raw 必须至少保留到
+  `TASK-UD-R2-REDIAG-001` evidence/status 及后续 decision revision 明确处置;任务
+  evidence/status carrier 不得删除、移动或改写 raw。
+- Allowed paths:
+  - 本 change `tasks.md`(仅本 task readiness/status/completion evidence)
+  - 本 change `acceptance-cases.yaml`(仅 `INT-UD-R2-RECAPTURE-001`)
+  - 本 change `verification.md`(仅本 task 对应行/status)
+  - 本 change `capture-runbook.md`(仅本 task readiness pins/status;不得改 command surface)
+  - `openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/evidence/runs/TASK-UD-R2-RECAPTURE-001/**`
+- Required evidence:`run.md`、本次命令的 `redacted-manifests/`、`capture-hashes.md`、
+  schema-valid `hardware-evidence.json`;run.md 另含 persistent-root predicate 与 retained
+  raw recheck facts。raw/full manifests/路径留仓库外;hardware evidence 记录 claimed
+  operator、physical target/serial、firmware/toolchain/transport/window、actual step kinds
+  与 repo-facing artifact hashes。
+- Hardware required:yes,human only;effect = reversible `deviceMutation`(E1),destructive
+  dispatch `0`。
+- Decision-Grade:D2。
+- Verification:`TEST-INT-UD-R2-RECAPTURE-001`:exact closed sequence;同会话 target/
+  window provenance;R2 dispatch 恰 `1`,R1/R3/R4 dispatch `0`;sidecar absent→new regular→
+  receive→exact cleanup→absent;stdout/stderr/sidecar 分立且 complete/untruncated/
+  whole-origin hashed;retained sidecar在 evidence assembly 后 hash/length/mode identity
+  不变;hardware schema、repository-sensitive scan、SDD/diff gates全 PASS;Agent/destructive
+  dispatch `0`。sidecar 未产生或 retention gate 不通过时 evidence 如实记录但 task
+  保持 blocked,不得 done。
+- Forbidden now:D2 readiness 前起草 capture evidence、安装/启动 fixture、device
+  discovery/HDC dispatch;任何时候 R1/R3/R4、fallback/split argv、shell redirection、
+  harness 外命令、全局搜索/递归删除、temp root、raw/路径入仓、修改 harness/redactor/
+  diagnosis tool、执行诊断或注册 output family。
+- PR boundary:r12 D1 revision → 独立 D2 readiness/ready-restore PR → 一个人类 capture
+  evidence PR → 独立 `ready→done` status PR。D1/D2 gate 后零投机堆叠;任一 PR 不得
+  夹带下一阶段。
+
+## TASK-UD-R2-REDIAG-001 — fresh R2 raw 非内容重诊断
+
+- Status:blocked(等待 `TASK-UD-R2-RECAPTURE-001 done` 与独立 D1 readiness 按已合入
+  recapture evidence 重钉 fresh raw exact length/SHA-256、retention recheck、diagnosis
+  tool source OID/hash、interpreter 与 exact CLI。r12 不执行诊断、不读取 raw、不产生
+  evidence,也不修改 `scripts/ui_dump_diagnosis/**`)
+- Objective:只对 r12 后 fresh、retained、proven-owned R2 sidecar 复用已合入的
+  `arkdeck-ud-raw-diagnosis-1.0.0` 非内容工具,形成按新 input pins 可复查的
+  `redactorEquivalent` 与 UTF-8/codepoint-policy measurement。该测量描述新 raw,
+  不追溯判断或改写旧 raw 根因。
+- Change-local closure:`INT-UD-R2-REDIAG-001` /
+  `TEST-INT-UD-R2-REDIAG-001`。
+- Canonical Safety inputs:`REQ-DUMP-005/008`;本 task 不认领 canonical PASS,不产出
+  derived/fixture,不解锁任何 downstream task。
+- Depends on:
+  - `TASK-UD-R2-RECAPTURE-001 done` 的 merged evidence/status OID,且 fresh raw retention
+    recheck 在 readiness drafting 时仍精确匹配 capture length/SHA-256;
+  - 独立 D1 readiness 固定新 input pins、现行
+    `scripts/ui_dump_diagnosis/{README.md,diagnose.py,test_diagnose.py}` OID/逐文件 hash、
+    redactor policyRefs、fixed interpreter 与唯一 exact CLI;任一 drift 或 raw 缺失使
+    task 保持 blocked;
+  - human maintainer 仓外亲手执行;Agent controlled-raw read `0`。
+- Required execution boundary:复用现有 stdlib-only/no-shell/no-network/no-write/
+  no-follow/regular-file/outside-repo/input-cap 与 closed output schema;CLI 形态为
+  `<ARKDECK_PYTHON> scripts/ui_dump_diagnosis/diagnose.py --input
+  <PERSISTENT_CONTROLLED_RAW_PATH> --expected-input-sha256 <FRESH_RAW_SHA256>
+  --expected-length <FRESH_RAW_LENGTH>`,其中两个值只能来自 readiness-pinned merged
+  recapture evidence。路径不得进入 conversation/repository/evidence。
+- Outcome boundary:报告可如实得到 `NONE`、`INVALID_UTF8` 或 `INVALID_UNICODE`;human
+  interpretation 只描述 fresh raw measurement。`NONE` 不自动成为 structural success
+  family,任一 rejection 也不自动授权 redactor change;无法执行、pins mismatch、输出
+  不封闭或 interpretation inconclusive 时保持 blocked。旧 #263/#267 decision 与
+  `TASK-UD-R2-DIAG-001` blocked evidence 永不重写。
+- Allowed paths:
+  - 本 change `tasks.md`(仅本 task readiness/status/completion evidence)
+  - 本 change `acceptance-cases.yaml`(仅 `INT-UD-R2-REDIAG-001`)
+  - 本 change `verification.md`(仅本 task 对应行/status)
+  - `openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/evidence/runs/TASK-UD-R2-REDIAG-001/**`
+- Hardware required:no;human host-only raw run,installed HDC/device/network/GUI/mutation/
+  destructive dispatch `0`。
+- Decision-Grade:D1。
+- Verification(candidate;由独立 readiness 精确固定):existing synthetic `37/37` 与
+  AST/policyRefs audit 在同一 source OID PASS;fresh raw input length/hash/retention gate
+  PASS;canonical JSON closed schema/value-law/sensitive final check PASS;human exact CLI 的
+  verbatim non-content report、tool/interpreter hashes与 fresh-only interpretation 进入
+  run.md;Agent raw read及全部 installed-HDC/device dispatch `0`。
+- Forbidden now:readiness 前执行 fresh raw diagnosis/evidence;Agent 打开/复制 raw;
+  修改 diagnosis/redactor/harness;把报告当作 old-root verdict、derived fixture、
+  output-family、SEAM/R4/UD-001 readiness 或 compatibility/support/conformance claim。
+- PR boundary:recapture done 后独立 D1 readiness → 一个人类 host-only evidence PR →
+  独立 status PR。status done 只关闭 fresh measurement;任何 redactor/decision/seam
+  路径仍须后续 D1 revision,不得夹带。
 
 ## TASK-UD-R2-R4-SEAM-001 — same-session private selector + R4 harness seam
 

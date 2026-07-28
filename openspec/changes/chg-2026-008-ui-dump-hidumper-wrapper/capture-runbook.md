@@ -3,16 +3,20 @@
 > Status:Phase A (`TASK-UD-CAP-MUT-001`) is done after evidence PR #248 and status PR #251.
 > R1/R2/R3 remain `unknownOutput`; Phase A R4 dispatch was `0`. r10 only defines the governance/
 > readiness boundary for human-offline R2 decision and the later host-only same-session selector +
-> R4 harness seam. Phase B remains blocked until both tasks are independently done and a separate
-> R4 ready-restore PR is merged.
+> R4 harness seam. Phase B remains blocked until a future fresh-R2 positive decision, the seam,
+> and a separate R4 ready-restore PR are independently merged.
+> r12 adds a separate R2-only persistent recapture plan after the old pinned raw became permanently
+> unavailable. That task remains blocked until an independent D2 readiness and named device window;
+> r12 itself authorizes no HDC/device dispatch.
 >
 > Real-device operator:human maintainer only. An Agent SHALL NOT execute installed `hdc`, create a
 > real device session or run any device step.
 
 ## Purpose and authority boundary
 
-This runbook fixes the candidate Recipe payload boundary and the fail-closed procedure for the two
-human capture tasks (`TASK-UD-CAP-MUT-001` Phase A, `TASK-UD-CAP-R4-001` Phase B). The
+This runbook fixes the candidate Recipe payload boundary and the fail-closed procedure for the
+human capture tasks (`TASK-UD-CAP-MUT-001` Phase A,
+`TASK-UD-R2-RECAPTURE-001` R2-only recapture, and `TASK-UD-CAP-R4-001` Phase B). The
 authorization model is the M0B precedent (TASK-M0B-001): the human maintainer personally executes a
 closed command list under this runbook, records byte-exact evidence, and the maintainer's
 review/merge of the evidence PR is the attestation. No production supervisor, durable binding
@@ -24,6 +28,13 @@ output-family decision and the pinned selector/harness seam are independently do
 runs a **fresh R2 and R4 in the same fixture/window lifetime**. The decision records the structural
 family and locator/basis; the per-run exact token exists only in a repository-external private
 selection bundle and is never copied from Phase A or committed to Git.
+
+#695 established that Phase A's pinned R2 sidecar is permanently unavailable, so its old
+raw-data-versus-pipeline root cause can never be measured. r12 does not infer that root cause and
+does not reuse or reopen the old decision/diagnosis tasks. It defines a new R2-only recapture whose
+sole purpose is to create a fresh retained input. That run uses the existing harness command surface,
+stores the session in an owner-only persistent directory outside repositories and OS
+temporary/ephemeral roots, and remains non-executable until a separate D2 readiness is merged.
 
 The reviewed OpenHarmony source is useful only for static routing analysis:
 
@@ -249,7 +260,46 @@ file); 11. for each Recipe `R1`→`R2`→`R3`: `HP-2` → `SC-1` pre → `Rn` �
 `SC-3` → `SC-1` re-check, only if owned new file); 12. `FX-3` stop; 13. `FX-4` uninstall;
 14. evidence assembly (run.md, manifests, hashes, hardware-evidence) and sensitive scan.
 
-The future Phase B sequence is separately gated and cannot execute at r10 merge. After the positive
+### r12 R2-only persistent recapture sequence (blocked pending D2 readiness)
+
+This sequence belongs only to `TASK-UD-R2-RECAPTURE-001`. r12 approval does not make it
+executable. A later independent D2 readiness must re-pin the then-current main revision, merged
+harness OID and hashes, passing harness tests, HDC/device/firmware/fixture tuple, exact command
+surface, sidecar path, hardware-evidence schema, per-device typed capability evidence, human
+operator, named exclusive device window, and storage predicate. Any drift leaves the task blocked.
+
+The controlled session root must resolve outside every Git repository and outside
+`/private/tmp`, `/private/var/tmp`, the resolved `$TMPDIR`, every teardown-owned directory, and
+any other OS temporary or ephemeral location. It is created owner-only (`0o700`); raw files remain
+`0o600`. The real path is never recorded in Git or the task conversation.
+
+Once and only once that D2 readiness is merged, the human maintainer runs:
+
+1. offline harness tests, SDD guard and tool/file-hash preflight;
+2. `HP-0`; physical target confirmation; `HP-1`;
+3. fixture HAP hash recomputation; `FX-1`; `FX-2`; unique foreground confirmation;
+4. `HP-2` → `SC-1` pre → `INV-1` → `SC-1` post → optional owned-only
+   `SC-2` → `SC-3` → `SC-1` absent re-check;
+5. `HP-2` → `SC-1` pre → exactly one `R2` → `SC-1` post → required owned-only
+   `SC-2` → `SC-3` → `SC-1` absent re-check;
+6. `FX-3`; `FX-4`; evidence assembly and repository-sensitive scan;
+7. no-follow fstat/hash/length/mode recheck of the retained R2 sidecar after evidence assembly.
+
+R1, R3 and R4 dispatch counts are `0`. R2 must change the fixed remote sidecar from absent to one
+new regular file; if it does not, no substitute output, search or fallback path is allowed and the
+task cannot finish. The received sidecar stays immutable in the persistent session until
+`TASK-UD-R2-REDIAG-001` and a later decision revision explicitly release it. Repo-facing evidence
+records only `<PERSISTENT_CONTROLLED_RAW_PATH>`, length, whole-file SHA-256, capture/manifest
+provenance, storage-predicate booleans, retention owner and recheck time. The path, raw bytes and
+full manifests remain outside Git.
+
+Completion of this sequence means only that a fresh proven-owned R2 raw origin was captured and
+retained. It does not establish Recipe success, classify the missing old raw, or authorize
+redaction, diagnosis, selection, R4, wrapper implementation, compatibility or support. Fresh raw
+diagnosis requires a later D1 readiness that pins the newly merged length/SHA-256 and the exact
+diagnosis tool/CLI.
+
+The future Phase B sequence is separately gated and remains blocked at r12. After a future positive
 decision, selector/harness seam and R4 readiness are all merged, one fresh controlled session runs:
 
 1. `HP-0`; 2. physical device confirmation; 3. `HP-1`; 4. fixture hash; 5. `FX-1`; 6. `FX-2` +
@@ -313,6 +363,13 @@ Schema validation checks structure; the truth of the claimed operator and of the
 attested by maintainer review/merge of the evidence PR — the same trust root as every other
 merge in this repository.
 
+For `TASK-UD-R2-RECAPTURE-001`, `run.md` additionally records only repository-safe retention
+facts: the `<PERSISTENT_CONTROLLED_RAW_PATH>` placeholder, fresh sidecar length/SHA-256,
+capture-manifest provenance, non-repository/non-temporary/owner-only predicate booleans, retention
+owner, and the post-evidence no-follow identity recheck time/result. The actual path and raw bytes
+remain outside Git. A missing, moved, changed, non-regular, symlinked or mode-drifted retained file
+fails the task even when all device commands exited zero.
+
 ## Sensitive raw → repository-derived chain
 
 All UI Dump raw output is sensitive by default. Raw stdout, stderr and sidecar bytes remain only in
@@ -336,10 +393,19 @@ the controlled directory. Repository golden fixtures are later produced as `deri
 `TASK-UD-001` never reads raw and never modifies the redaction toolchain. Raw/derived byte equality
 is neither expected nor claimed.
 
-## Prohibited actions at r10
+## Prohibited actions at r12
 
 - any selector/harness implementation, installed-HDC invocation, device discovery or device command
   under the blocked seam/R4 tasks;
+- any `TASK-UD-R2-RECAPTURE-001` device discovery, fixture or HDC command before its independent
+  D2 readiness merge and named window; any raw diagnosis before recapture done and an independent
+  D1 readiness has re-pinned the fresh input;
+- placing the new controlled root in a repository, `/private/tmp`, `/private/var/tmp`, resolved
+  `$TMPDIR`, a teardown-owned directory or any other ephemeral location; deleting, moving or
+  modifying the retained R2 raw before an approved downstream disposition;
+- executing R1, R3 or R4 in the recapture session, comparing fresh and old raw content/digests as
+  a root-cause proof, or treating the fresh capture as old-root, success-family or compatibility
+  evidence;
 - continuing or replaying the #219 session, reading/copying its controlled raw/full manifest,
   reclassifying it as PASS, or treating its schema-`1.0.0` evidence as a future fresh run;
 - bypassing the echo blocker by moving the HAP,shell wrapping,stdout filtering/discarding,or by
