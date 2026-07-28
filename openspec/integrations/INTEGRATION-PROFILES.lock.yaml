@@ -131,17 +131,17 @@ device_observation_probe_registries:
     tool_reported_version: 3.2.0f
     tool_executable_sha256: 05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83
     path: openspec/integrations/openharmony/device-observation-probes.yaml
-    sha256: cc9202123466931804794e606acf369740d639b3e521c25671517fc37a1fe2f5
+    sha256: 79814e45901ab7e4d9f9a271645cad62b0053a50534cba884cdff0c2e50b9d49
 
 device_observation_probe_resources:
   - id: i24-registry-bundled-copy
     version: 1.0.0
     path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Probes/DeviceObservation/1.0.0/registry.yaml
-    sha256: cc9202123466931804794e606acf369740d639b3e521c25671517fc37a1fe2f5
+    sha256: 79814e45901ab7e4d9f9a271645cad62b0053a50534cba884cdff0c2e50b9d49
   - id: i24-resources-manifest
     version: 1.0.0
     path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Probes/DeviceObservation/1.0.0/resources.json
-    sha256: 423552052766ce69a9d196f295f2b25ec1f4ba9628736d835e3af90f2e37d26f
+    sha256: 5192f30d9e38d869ab5f87ae1f0c53b68b66205f6421b9a0b613e5863e33f4d2
   - id: i24-fail-closed-controls
     version: 1.0.0
     path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Probes/DeviceObservation/1.0.0/controls/fail-closed-vectors.json

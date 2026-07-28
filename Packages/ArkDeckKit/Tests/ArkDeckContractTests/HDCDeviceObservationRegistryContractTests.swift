@@ -70,8 +70,14 @@ final class HDCDeviceObservationRegistryContractTests: XCTestCase {
       let pseudonym: String
       let presentation: String
     }
+    struct Provenance: Decodable {
+      let evidenceClass: String
+      let sourceChange: String
+      let sourceEvidence: String
+    }
     struct Entry: Decodable {
       let id: String
+      let provenance: Provenance
       let family: String
       let status: String
       let toolReportedVersion: String
@@ -373,6 +379,38 @@ final class HDCDeviceObservationRegistryContractTests: XCTestCase {
     XCTAssertEqual(try data("vectors/two-connected.bin").count, 116)
     XCTAssertEqual(try data("vectors/mixed-connected-offline.bin").count, 114)
     XCTAssertEqual(try data("vectors/all-offline-two.bin").count, 112)
+  }
+
+  // MARK: - 3b. Provenance must survive its source change being archived
+
+  /// TASK-ASP-001. The registry used to name an exact in-repo path, which is why
+  /// CHG-2026-024 could not be archived: `git mv` broke the reference and repairing it
+  /// cascaded into the lock, this pack's manifest and these assertions. The change id plus a
+  /// change-relative evidence path carry the same meaning and survive the move.
+  func testProvenanceIsArchiveStableAndNamesNoInRepoPath() throws {
+    let registry = try loadRegistry()
+    for entry in registry.entries {
+      let provenance = entry.provenance
+      XCTAssertTrue(provenance.sourceChange.hasPrefix("CHG-"),
+                    "\(entry.id): sourceChange must be a change id")
+      XCTAssertFalse(provenance.sourceEvidence.isEmpty)
+      // The whole point: no repository-rooted path, so archiving cannot break it.
+      XCTAssertFalse(provenance.sourceEvidence.hasPrefix("openspec/"),
+                     "\(entry.id): sourceEvidence must be relative to the change directory")
+      XCTAssertFalse(provenance.sourceEvidence.hasPrefix("/"))
+      XCTAssertFalse(provenance.sourceEvidence.contains("openspec/changes/"))
+      XCTAssertFalse(provenance.sourceEvidence.contains("archive/"),
+                     "\(entry.id): an archive-dated directory would break on the next rename")
+    }
+  }
+
+  /// Belt and braces: the whole registry text, not just the decoded fields.
+  func testNoRegistryByteNamesAnInRepoChangePath() throws {
+    for file in ["registry.yaml", "resources.json"] {
+      let text = String(decoding: try data(file), as: UTF8.self)
+      XCTAssertFalse(text.contains("openspec/changes/"),
+                     "\(file) still names an in-repo change path")
+    }
   }
 
   // MARK: - 4. Fail-closed and privacy

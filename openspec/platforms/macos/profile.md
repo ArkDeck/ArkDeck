@@ -180,7 +180,7 @@ clean-VM/clean-host 矩阵、自动更新 change verified)见 ADR-0002,未满足
 
 macOS adopts `OPENHARMONY-HDC-DEVICE-OBSERVATION-PROBES@1.0.0`
 (`OPENHARMONY-TOOLS@0.5.0`, lock `INTEGRATION-PROFILES-0.6.0`, registry SHA-256
-`cc9202123466931804794e606acf369740d639b3e521c25671517fc37a1fe2f5`), observed on hdc `3.2.0f` — a different tool from the `3.2.0d`
+`79814e45901ab7e4d9f9a271645cad62b0053a50534cba884cdff0c2e50b9d49`), observed on hdc `3.2.0f` — a different tool from the `3.2.0d`
 read-only and trace registries mapped above.
 
 | Probe family | macOS access / diagnostic mapping |
