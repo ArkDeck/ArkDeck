@@ -1,0 +1,29 @@
+change_id: CHG-2026-042-tasks-field-colon-parity
+change_revision: 1
+cases:
+  - acceptance_id: CM7-PARITY-001
+    test_id: TEST-CM7-PARITY-001
+    method: Cross-parser contract fixtures plus independent mutations for both field readers.
+    expected_source: openspec/changes/chg-2026-042-tasks-field-colon-parity/verification.md#cm7-parity-001
+    minimum_evidence: contract
+    expected_result: >-
+      Host-loop discovery produces byte-equivalent dependency and allowed-path values for ASCII
+      and full-width colons, and check_pr_paths produces the same Allowed paths for both forms.
+      Empty fields, prose and separators outside the closed two-character set remain rejected.
+  - acceptance_id: CM7-CORPUS-001
+    test_id: TEST-CM7-CORPUS-001
+    method: Executable before-and-after diff over every active tasks.md pinned by readiness.
+    expected_source: openspec/changes/chg-2026-042-tasks-field-colon-parity/verification.md#cm7-corpus-001
+    minimum_evidence: contract
+    expected_result: >-
+      No candidate is lost and every gained candidate is traced to a registered full-width-colon
+      field with its status, grade, hardware and dependencies recorded. At the r1 audit base the
+      only gains are TASK-BRC-001 through TASK-BRC-006, all of which are done or blocked.
+  - acceptance_id: CM7-SELF-001
+    test_id: TEST-CM7-SELF-001
+    method: Never-claim root contract with suffix, neighbour and mutation cases.
+    expected_source: openspec/changes/chg-2026-042-tasks-field-colon-parity/verification.md#cm7-self-001
+    minimum_evidence: contract
+    expected_result: >-
+      TASK-CM7-001 and its grammar-valid suffixes are never claimable, neighbouring task tokens
+      are unchanged, and removing the CM7 root makes the dedicated mutation test fail.
