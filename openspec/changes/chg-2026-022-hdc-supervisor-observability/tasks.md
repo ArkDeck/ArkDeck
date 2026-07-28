@@ -440,11 +440,12 @@
 
 ## TASK-OBS-001R — Kit App-facing fan-out remediation
 
-- Status:ready(fresh D1 readiness candidate；仅在维护者对本独立 readiness PR
-  exact head review/merge 后生效。生效后一次性授权一个标题声明本任务的独立
-  implementation/evidence PR，且只能修改本段 Allowed paths、实现下述 exact
-  contract。readiness merge 不产生 AC evidence、不翻 done、不恢复 OBS-002
-  readiness；exact head 未 merge 前仍按 blocked、零 implementation。)
+- Status:ready(fresh D1 readiness 已由 PR #709 merge
+  `c295d4a45a30ea08d7ab66440c5593d1208f222a` 生效；其一次性授权已由
+  implementation commit `60924f9d0c533908425a5b60b868f8301d13f261`
+  交付候选实现与 DP1-DP18 contract tests，run 记录见
+  `evidence/runs/TASK-OBS-001R/run.md`。本实现 PR 不翻 `done`、不恢复
+  OBS-002 readiness；`ready→done` 仍须在实现 PR merge 后走独立状态 PR。)
 - Historical Status:blocked(r3 governance 经 PR #704 merge
   `02907b69b8fd7d1347ba26822e4a1961415fbc16` 生效；其只登记 remediation
   scope，明文要求本 fresh D1 readiness。)
@@ -619,6 +620,18 @@
     readiness 标题声明本任务 + 单文件 `tasks.md` 集合的 base-tree guard 模拟
     PASS(解析 6 个 exact patterns)，`git diff --check` PASS。实现回归底线 =
     442 + DP1-DP18 / 1 skipped / 0 failures，并须在实现开工重测。
+  - **Implementation candidate(本独立 implementation/evidence PR):**
+    readiness exact head `a629432b2f023c87afbdfb7318bc7e95329d621f` 经
+    维护者 `lvye` APPROVED 并 merge 为
+    `c295d4a45a30ea08d7ab66440c5593d1208f222a`；实现从该 merge 开工，随后
+    因 main 仅有 CHG-2026-008/025/042 治理文件前进而无冲突三次 rebase 到
+    `fe13de4d319bd4fdd07f2439daf9cce8bff34897`，全部 source/invariant pins
+    复核原值。实现提交 =
+    `60924f9d0c533908425a5b60b868f8301d13f261`，文件集恰为三个授权 Sources
+    + 唯一新增 DP1-DP18 test；evidence/tasks 由其后的同任务记录提交追加。
+    结果 = DP1-DP18 `18/18`、既有 OBS-001 `25/25`、全量
+    `460 tests / 1 skipped / 0 failures`、SDD/paths/invariant 均 PASS；
+    详见上述 run.md。本段只登记候选与证据，不自行确认 done/verified。
 - Objective:在既有 production registered device-observation fan-out 与 App-only
   OBS-002 之间补齐最小 Workflows/presentation bridge：公开 immutable、带 injected
   UTC RFC 3339 timestamp 的 typed device events；production facade 持有并在显式
@@ -629,7 +642,8 @@
   `OBS-FANOUT-001` 保持 TASK-OBS-001 已完成结论，不重判)。
 - Depends on:r3 approval #704 merge(已满足)；TASK-OBS-001 done(已满足，
   #693 merge `d8287aa5558f295caa086bb5a90516b6e9892fc8`)；本 fresh D1 readiness
-  exact head 由维护者 review/merge(待本 PR)。
+  exact head 已由维护者 review 并经 #709 merge
+  `c295d4a45a30ea08d7ab66440c5593d1208f222a` 生效。
 - In scope:
   `Packages/ArkDeckKit/Sources/ArkDeckOpenHarmony/ArkDeckOpenHarmony.swift`
   (internal event 到 typed presentation 的最小桥接与 bounded buffer)；
