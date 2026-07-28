@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-042-tasks-field-colon-parity
 revision: 2
-status: verified # 2026-07-28 本 verification-closure PR；closure 段见文末
+status: archived # 2026-07-28 本 archive PR；verified closure 段见文末
 class: implementation-only
 core_change_level: none
 owner: lvye
