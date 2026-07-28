@@ -4,8 +4,12 @@
 
 ### 授权与 base
 
-readiness r1 #683（本任务段）→ **r5 #688**（实现中实测 trace-probes 亦为产品
-运行时 pin，迁移面窄化为 rockchip 一处，trace 3 处并入 deferred 登记表）。
+readiness 载体 = **r4 #685** → **r5 #688**（实现中实测 trace-probes 亦为产品
+运行时 pin，迁移面窄化为 rockchip 一处，trace 3 处并入 deferred 登记表）；本任务
+段的 r1 文本随 ASP-001 的 readiness 载体 #674/#675 一并入树，#684（r4 首版）
+因标题 TASK token 与 change 级文档冲突而 closed、未合入。
+（更正：本文件初版把 readiness 记为「r1 #683」，#683 实为另一会话的
+`feat(TASK-UD-R2-DIAG-001)`，与本 change 无关。）
 实现 base = r5 合入后的 protected `main` `663eb77`。独立 worktree
 `agent/task-asp-002-r5`，commit 前核 `git branch --show-current`。
 
