@@ -2102,9 +2102,20 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
 
 ## TASK-AIN-009R — E1 capability 与 execution-authority persistence contract freeze
 
-- Status:ready（仅在维护者 review/merge 本独立 D1 readiness PR 后生效；本翻转不构成
-  implementation、E1 capability evidence 接受、TASK-AIN-010 readiness 或 device dispatch
-  authority）
+- Status:done（2026-07-28 D0 completion；仅在维护者 review/merge 本独立
+  `ready→done` PR 后生效；本翻转不构成 change verified、E1 capability evidence
+  接受、TASK-AIN-010 readiness 或 device dispatch authority）
+- Done:2026-07-28；实现经 #750 exact head
+  `fdfe74a1aa5f1be4ea4174013e0b34073bc208bf` 由 `lvye` APPROVED 并合入
+  protected main（merge commit
+  `ec1cf659618edf96bdbfdc09a4a8182276bd3c58`）。在该 fresh main 上复验：
+  stdlib validator 与 Swift 聚焦 6 tests / 0 failures 均报告
+  `e1_profiles=11 namespaces=5 authority_kinds=3 legacy_versions=3
+  process_dispatch=0 device_dispatch=0 hdc_dispatch=0 network=0`，guard 为
+  0 errors / 0 warnings / 111 acceptance IDs；实现 PR 的 Agent PR
+  open-pr/allowed-paths、SDD Guard 与 Swift CI 均为 SUCCESS，task-local TODO 为 0，
+  十个实现/fixture blob 与 run 记录固定值逐字一致。evidence =
+  `evidence/runs/TASK-AIN-009R/run.md`
 - Historical Status:blocked（r4 scope proposal 尚未合入；该前置已由 #744 exact head
   `bf52c236b831f31a844167f1998d7121b46a91ac` 的维护者 APPROVED + merge
   `ef33f8f5f4307aebeb7f1fe592459f6787998e48` 关闭。#744 只批准本任务 scope，
