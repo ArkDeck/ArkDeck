@@ -21,6 +21,7 @@
      (归档即失效),仅显式 deferred 登记表内的文件按登记次数豁免,多于或
      少于登记值同样 fail;
  10. platform/integration lock 与 core-conformance 引用的路径存在,
+     integration profile lock 的 id/version 与 Markdown header 精确一致,
      safety_coverage 引用的 AC 存在。
 
 退出码:0 = 通过(允许 warning);1 = 存在 error。
@@ -708,25 +709,178 @@ def check_registry_change_paths(repo_root: Path | None = None, register=None):
 
 
 # ------------------------------------------------ 9. locks and conformance
+PROFILE_H1_RE = re.compile(r"^#(?!#)[ \t]+\S")
+PROFILE_METADATA_RE = re.compile(
+    r"^>[ \t]*(ID|Version)[ \t]*[:：][ \t]*(.*?)[ \t]*$"
+)
+PROFILE_METADATA_FIELDS = ("ID", "Version")
+MARKDOWN_SUFFIXES = frozenset({".md", ".markdown"})
+
+
+def profile_header_metadata(profile_path: Path):
+    """Read the first contiguous blockquote metadata block after the first H1.
+
+    Blank lines between the H1 and the metadata block are permitted. Prose,
+    later blockquotes and fuzzy key prefixes are deliberately not searched:
+    missing or malformed leading metadata must fail closed.
+    """
+    try:
+        lines = profile_path.read_text(encoding="utf-8").splitlines()
+    except (OSError, UnicodeError) as exc:
+        err(profile_path, f"profile Markdown is not readable UTF-8: {exc}")
+        return None
+
+    h1_index = next(
+        (index for index, line in enumerate(lines) if PROFILE_H1_RE.match(line)),
+        None,
+    )
+    if h1_index is None:
+        err(profile_path, "profile header is missing a Markdown H1")
+        return None
+
+    block_start = h1_index + 1
+    while block_start < len(lines) and not lines[block_start].strip():
+        block_start += 1
+    if block_start >= len(lines) or not lines[block_start].startswith(">"):
+        err(
+            profile_path,
+            "profile metadata block must be the first nonblank block after the Markdown H1",
+        )
+        return None
+
+    values: dict[str, list[str]] = {
+        field: [] for field in PROFILE_METADATA_FIELDS
+    }
+    index = block_start
+    while index < len(lines) and lines[index].startswith(">"):
+        match = PROFILE_METADATA_RE.fullmatch(lines[index])
+        if match:
+            values[match.group(1)].append(match.group(2).strip())
+        index += 1
+
+    metadata: dict[str, str] = {}
+    for field in PROFILE_METADATA_FIELDS:
+        occurrences = values[field]
+        if len(occurrences) != 1:
+            err(
+                profile_path,
+                f"profile metadata {field} must appear exactly once in the first "
+                f"blockquote block; found {len(occurrences)}",
+            )
+        elif not occurrences[0]:
+            err(profile_path, f"profile metadata {field} must be a non-empty string")
+        else:
+            metadata[field] = occurrences[0]
+    return metadata
+
+
+def check_integration_profile_entries(lock_path: Path, data, repo_root: Path):
+    """Validate integration `profiles[]` structure and referenced headers."""
+    profiles = data.get("profiles")
+    if not isinstance(profiles, list):
+        err(lock_path, "profiles must be a list")
+        return
+
+    seen_ids: dict[str, int] = {}
+    seen_paths: dict[str, int] = {}
+    repo_resolved = repo_root.resolve()
+
+    for index, entry in enumerate(profiles):
+        label = f"profiles[{index}]"
+        if not isinstance(entry, dict):
+            err(lock_path, f"{label} must be a mapping")
+            continue
+
+        valid: dict[str, str] = {}
+        for field in ("id", "version", "path"):
+            value = entry.get(field)
+            if not isinstance(value, str) or not value.strip():
+                err(lock_path, f"{label}.{field} must be a non-empty string")
+            else:
+                valid[field] = value
+
+        profile_id = valid.get("id")
+        if profile_id is not None:
+            if profile_id in seen_ids:
+                err(
+                    lock_path,
+                    f"{label}.id duplicates profiles[{seen_ids[profile_id]}].id: "
+                    f"{profile_id!r}",
+                )
+            else:
+                seen_ids[profile_id] = index
+
+        relative_path = valid.get("path")
+        if relative_path is not None:
+            if relative_path in seen_paths:
+                err(
+                    lock_path,
+                    f"{label}.path duplicates profiles[{seen_paths[relative_path]}].path: "
+                    f"{relative_path!r}",
+                )
+            else:
+                seen_paths[relative_path] = index
+
+        if relative_path is None:
+            continue
+        profile_path = repo_root / relative_path
+        try:
+            profile_path.resolve().relative_to(repo_resolved)
+        except (OSError, RuntimeError, ValueError):
+            err(lock_path, f"{label}.path must stay within the repository: {relative_path}")
+            continue
+        if profile_path.suffix.lower() not in MARKDOWN_SUFFIXES:
+            err(lock_path, f"{label}.path must reference Markdown: {relative_path}")
+            continue
+        if not profile_path.is_file():
+            err(lock_path, f"{label}.path is missing: {relative_path}")
+            continue
+
+        metadata = profile_header_metadata(profile_path)
+        if metadata is None:
+            continue
+        for field, header_field in (("id", "ID"), ("version", "Version")):
+            lock_value = valid.get(field)
+            header_value = metadata.get(header_field)
+            if lock_value is not None and header_value is not None:
+                if lock_value != header_value:
+                    err(
+                        lock_path,
+                        f"{label}.{field} {lock_value!r} does not match profile "
+                        f"metadata {header_field} {header_value!r} at {relative_path}",
+                    )
+
+
 def check_locks_and_conformance(spec_acs):
+    integration_lock = (
+        OPENSPEC / "integrations" / "INTEGRATION-PROFILES.lock.yaml"
+    )
     for lock_path, keys in (
         (OPENSPEC / "platforms" / "PLATFORM-PROFILES.lock.yaml",
          ("profile_path", "verification_path", "case_manifest_path")),
-        (OPENSPEC / "integrations" / "INTEGRATION-PROFILES.lock.yaml", ("path",)),
+        (integration_lock, ("path",)),
     ):
         data = load_yaml(lock_path, empty_is_error=True)
         if not isinstance(data, dict):
             if data is not None:
                 err(lock_path, "lock document must be a mapping")
             continue
-        # `data.get(k, [])` returns None for a key that is PRESENT with a null
-        # value, and `None + []` is a TypeError that aborted the whole run.
-        entries = (data.get("profiles") or []) + (data.get("catalogs") or [])
-        for entry in entries:
-            for key in keys:
-                value = entry.get(key)
-                if value and not (REPO / value).is_file():
-                    err(lock_path, f"referenced file missing: {value}")
+        if lock_path == integration_lock:
+            check_integration_profile_entries(lock_path, data, REPO)
+            groups = ("catalogs",)
+        else:
+            groups = ("profiles", "catalogs")
+        for group in groups:
+            entries = data.get(group)
+            if not isinstance(entries, list):
+                continue
+            for entry in entries:
+                if not isinstance(entry, dict):
+                    continue
+                for key in keys:
+                    value = entry.get(key)
+                    if isinstance(value, str) and value and not (REPO / value).is_file():
+                        err(lock_path, f"referenced file missing: {value}")
 
     conf_path = OPENSPEC / "verification" / "core-conformance.yaml"
     conf = load_yaml(conf_path, empty_is_error=True)
