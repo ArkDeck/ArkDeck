@@ -724,7 +724,44 @@
 
 ## TASK-OBS-002 — App 观察面与 signed XCUITest
 
-- Status:ready(r2 implementation/evidence candidate 已由 commit
+- Status:done(2026-07-28 completion；仅在维护者 review/merge 本独立
+  `ready→done` PR 后生效。**实现载体 = #729**：exact head
+  `ed806a64b9b740360613d2cb351b9ba990e38243` 经维护者 `lvye` 对该 head
+  APPROVED，并由同一维护者 squash merge 为
+  `48d63c060800fa2c4bb0a4e4e58db524928a3afa`。merge 树中的四个授权文件与
+  exact head 逐字节一致；implementation commit
+  `963542402c51025c9a2e7855998a60d0af3e7baa` 交付五个 exact static-text
+  字段、三个 presentation-only formatter 与 AP1–AP4 signed UI tests。
+  **授权链**：fresh D1 readiness exact head
+  `ab58d4b823f59a037dc8fd7f4fb500180c6317da` 经维护者 APPROVED，PR #724
+  merge `d42c002609177e47ef95320cb5bdc0a42f0b510e` 生效；其一次性实现授权
+  已由 #729 全额消耗。
+  **evidence** =
+  `evidence/runs/TASK-OBS-002/run.md`（merge-tree blob
+  `50acb503146f258d3bdce25626a7115f840e0927`，SHA-256
+  `6ed2734f4edb7c9c2236a7c7107aa985b38479860de570c12ced8835503997a7`；
+  含授权/base、实现落点、signed UI/全量命令、AP1–AP4 二值映射、环境偏差与
+  host-only anti-claim）。
+  **flip base recheck**（protected main
+  `1178c9f351285849499f374cc5712896372600b7`，在翻转后的树上实测）：(a)
+  #724 与 #729 merge 均为 flip base ancestor，#729 exact head 与 merge
+  的四文件 diff 为空；
+  本文件改前 blob
+  `0af807c8bae83c716151ea596148545b2fe47c8b`；(b)default-signing UI suite
+  `13 tests / 0 failures`，`xcresulttool` = `13/13/0/0`；HDC supervisor
+  `55 tests / 0 failures`，全量 `466 tests / 1 skipped / 0 failures`；
+  (c)`check-sdd` = `0 error(s), 0 warning(s), 111 acceptance IDs`，paths
+  guard 50 单测 PASS，`git diff --check` PASS；(d)host-loop
+  `done_task_ids` = `110` 且包含 `TASK-OBS-002`，`--explain --change
+  chg-2026-022-hdc-supervisor-observability` 对本任务报 rejected（status
+  `done` 非 ready，D1 human-gated）；(e)本状态 PR fileset 仅本
+  `tasks.md`，标题声明本任务的 guard 模拟 PASS。
+  **不声称**：change-level `verified`、M0B-002、任何真实设备/HDC server
+  lifecycle/subserver/device mutation/destructive 或硬件验收。
+  **连带效果**：本翻转合入后只满足后续 M0B-002 fresh readiness 的 App
+  观察面前置；不得把本状态 PR 或 host-only fixture 结果当作 M0B-002
+  readiness/实现/真机授权。)
+- Historical Status:ready(r2 implementation/evidence candidate 已由 commit
   `963542402c51025c9a2e7855998a60d0af3e7baa` 交付：五个 exact static-text
   字段、三个 presentation-only formatter 与 AP1–AP4 signed UI tests；run 记录
   见 `evidence/runs/TASK-OBS-002/run.md`。本 implementation PR 不翻 `done`、
