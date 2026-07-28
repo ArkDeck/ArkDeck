@@ -278,7 +278,29 @@
 
 ## TASK-ASP-002 — 机械守卫：registry 内禁止仓内 change 路径
 
-- Status:ready（r5 corrective readiness；实现中实测发现 **trace-probes 的
+- Status:done（2026-07-28 completion；仅在维护者 review/merge 本独立
+  `ready→done` PR 后生效。实现载体 = #689 merge
+  `e345acf3b559e1c10f3bda88688b69d77b77a2fe`：rockchip `loader-transition` 的
+  `evidencePath` 迁为 `evidenceChange` + `evidenceRelativePath`（`evidenceSHA256`
+  逐字节未动），`probe.py` 新增 active-or-archive 的 `resolve_change_directory()`
+  （0/2+ 命中 loud fail），并在 `check_sdd` 落地带**双向** deferred 登记表的
+  fail-closed 守卫（表外出现即报文件与行；表内多于/少于登记值同样 fail；
+  登记文件不存在亦 fail）。
+  flip base `e345acf3…` recheck：(a) 链 #669 `38d891cd`、#671 `e6acbca5`、
+  ASP-001 r1 #674 `6383f5b9`、r2 #675 `fd478664`、r3 #677 `16c22fae`、
+  ASP-001 实现 #680 `fc1f453b`、ASP-001 done #682 `8ce5000`、**ASP-002 r4
+  #685 `5c935568`、r5 #688 `663eb777`、实现 #689 `e345acf3`** 全为 ancestors
+  （#684 = r4 首版，因标题 TASK token 与 change 级文档冲突而 closed，未合入）；
+  (b) 守卫扫描面实测 **7 文件 / 15 处**，与登记表逐文件精确相等、表外 0；
+  rockchip 该文件字面量 = **0**；`check-sdd` 0/0/111；`test_check_sdd` 48 OK、
+  `test_probe` 31 OK、host_loop 638 OK；实现期于**非 `/private/tmp`** 检出
+  实测 Swift **415 / 1 skipped / 0 failures**（本任务零 `Packages/**` 变更）；
+  (c) evidence = `evidence/runs/TASK-ASP-002/run.md` 在树，含四条反证——
+  含**归档模拟**：把 chg-2026-026 移入 `archive/` 后迁移后形态 31 OK、
+  迁移前形态 31 全红；(d) 本 flip 仅动本文件与该 evidence 的一处 PR 引用更正；
+  (e) 不声称：change 级 `verified` 为下一独立 PR；登记表内 **15 处 / 7 文件**
+  仍是未偿债务，须由持 `Sources/**` 授权面的后续 change 重钉产品哈希后一并迁移。）
+- Historical Status:ready（r5 corrective readiness；实现中实测发现 **trace-probes 的
   registry SHA-256 同样是产品运行时 pin**——`Sources/ArkDeckOpenHarmony/
   TraceProbeAdapter.swift:10` 的 `public static let registrySHA256`，迁移它
   会打红 `TraceAdapterGoldenTests`（实测 1 失败），而 `Packages/**` 与
