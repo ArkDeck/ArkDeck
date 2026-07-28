@@ -216,6 +216,114 @@ final class HDCStatusUITests: XCTestCase {
       reopened.staticTexts["hdc.toolchain.path"], equals: fakeExecutable.path, timeout: 15)
   }
 
+  // OBS-APPFACE-001 / AP1: the complete observation summary is stable,
+  // accessible static text and renders the exact fixture presentation.
+  func testOBSAPP1_ObservationSummaryFieldsAreAccessibleStaticText() {
+    let app = launch(arguments: [])
+    let expectedEvents =
+      "2026-07-28T00:00:00.000Z appeared redacted-device-0123456789abcdef01234567"
+      + " | "
+      + "2026-07-28T00:00:01.000Z disappeared redacted-device-0123456789abcdef01234567"
+
+    assertDisplayedValue(app.staticTexts["hdc.counters.autoLifecycle"], equals: "0")
+    assertDisplayedValue(app.staticTexts["hdc.counters.autoSubserver"], equals: "0")
+    assertDisplayedValue(app.staticTexts["hdc.endpoint.source"], equals: "unknown")
+    assertDisplayedValue(app.staticTexts["hdc.ownership.basis"], equals: "unavailable")
+    assertDisplayedValue(app.staticTexts["hdc.devices.events"], equals: expectedEvents)
+  }
+
+  // OBS-APPFACE-001 / AP2: public device events preserve source order and
+  // expose only timestamps, closed kinds, and redacted identifiers.
+  func testOBSAPP2_DeviceEventsPreserveOrderShapeAndRedaction() {
+    let app = launch(arguments: [])
+    let events =
+      displayedValues(for: app.staticTexts["hdc.devices.events"])
+      .first(where: { $0.contains(" appeared ") })
+      ?? displayedText(for: app.staticTexts["hdc.devices.events"])
+    let appeared = "2026-07-28T00:00:00.000Z appeared"
+    let disappeared = "2026-07-28T00:00:01.000Z disappeared"
+    let identifier = "redacted-device-0123456789abcdef01234567"
+
+    guard let appearedRange = events.range(of: appeared),
+      let disappearedRange = events.range(of: disappeared)
+    else {
+      XCTFail("Device events must contain both exact UTC fractional RFC 3339 transitions")
+      return
+    }
+    XCTAssertLessThan(appearedRange.lowerBound, disappearedRange.lowerBound)
+    XCTAssertEqual(occurrenceCount(of: identifier, in: events), 2)
+    XCTAssertNotNil(
+      events.range(
+        of:
+          #"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z appeared redacted-device-[0-9a-f]{24} \| \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z disappeared redacted-device-[0-9a-f]{24}$"#,
+        options: .regularExpression))
+    XCTAssertFalse(events.contains("connectKey"))
+    XCTAssertFalse(events.contains("Optional("))
+    XCTAssertFalse(events.contains("internal reason"))
+  }
+
+  // OBS-APPFACE-001 / AP3: production launch renders its own fail-closed
+  // presentation and cannot inherit the deterministic UI fixture events.
+  func testOBSAPP3_ProductionLaunchContainsNoFixtureObservationValues() {
+    let app = launch(
+      arguments: [
+        "--ui-test-reset-hdc-selection",
+        "--arkdeck-hdc-user-configured-path",
+        "/usr/bin/true",
+      ],
+      fixture: false)
+    let eventsElement = app.staticTexts["hdc.devices.events"]
+    XCTAssertTrue(eventsElement.waitForExistence(timeout: 15))
+    let events = displayedText(for: eventsElement)
+
+    XCTAssertFalse(events.contains("2026-07-28T00:00:00.000Z"))
+    XCTAssertFalse(events.contains("2026-07-28T00:00:01.000Z"))
+    XCTAssertFalse(events.contains("redacted-device-0123456789abcdef01234567"))
+    XCTAssertFalse(app.buttons["hdc.lifecycle.dispatch"].exists)
+  }
+
+  // OBS-APPFACE-001 / AP4: the App consumes presentation-only values and
+  // cannot import or construct the underlying observation/process boundary.
+  func testOBSAPP4_AppSourceKeepsPresentationOnlyPackageBoundary() throws {
+    let sourceURL = repositoryRoot()
+      .appending(path: "ArkDeckApp/Features/HDC/HDCStatusView.swift")
+    let source = try String(contentsOf: sourceURL, encoding: .utf8)
+    let productImports = source.split(separator: "\n")
+      .map(String.init)
+      .filter { $0.hasPrefix("import ArkDeck") }
+
+    XCTAssertEqual(Set(productImports), ["import ArkDeckWorkflows"])
+    for forbidden in [
+      "ArkDeckOpenHarmony",
+      "HDCDeviceObservationSnapshot",
+      "HDCDeviceObservationSource",
+      "HDCDeviceObservationApplicationSession",
+      "HDCDeviceObservationPresentationBridge",
+      "HMAC",
+      "runner",
+      "argv",
+      "Process(",
+      "2026-07-28T00:00:00.000Z",
+      "2026-07-28T00:00:01.000Z",
+      "redacted-device-0123456789abcdef01234567",
+    ] {
+      XCTAssertFalse(
+        source.contains(forbidden), "App source contains forbidden capability: \(forbidden)")
+    }
+
+    let fields = [
+      ("hdc.counters.autoLifecycle", "presentation.automaticLifecycleDispatchCount"),
+      ("hdc.counters.autoSubserver", "presentation.automaticSubserverDispatchCount"),
+      ("hdc.endpoint.source", "presentation.endpointSource"),
+      ("hdc.ownership.basis", "presentation.ownershipBasis"),
+      ("hdc.devices.events", "presentation.deviceEvents"),
+    ]
+    for (identifier, presentationField) in fields {
+      XCTAssertEqual(occurrenceCount(of: identifier, in: source), 1)
+      XCTAssertTrue(source.contains(presentationField))
+    }
+  }
+
   private func launch(arguments: [String], fixture: Bool = true) -> XCUIApplication {
     let app = XCUIApplication()
     if app.state != .notRunning {
@@ -278,6 +386,11 @@ final class HDCStatusUITests: XCTestCase {
 
   private func displayedValues(for element: XCUIElement) -> [String] {
     [element.label, element.value as? String].compactMap { $0 }
+  }
+
+  private func occurrenceCount(of needle: String, in haystack: String) -> Int {
+    guard !needle.isEmpty else { return 0 }
+    return haystack.components(separatedBy: needle).count - 1
   }
 
   private func pickerFakeHDCExecutable() -> URL {

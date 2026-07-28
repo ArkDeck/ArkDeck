@@ -49,6 +49,17 @@ struct HDCStatusView: View {
         field("Authorization", authorizationText, id: "hdc.authorization")
         field("Channel protection", protectionText, id: "hdc.channelProtection")
         field("Subserver capability", subserverText, id: "hdc.subserver")
+        field(
+          "Automatic lifecycle dispatches",
+          String(presentation.automaticLifecycleDispatchCount),
+          id: "hdc.counters.autoLifecycle")
+        field(
+          "Automatic subserver dispatches",
+          String(presentation.automaticSubserverDispatchCount),
+          id: "hdc.counters.autoSubserver")
+        field("Endpoint source", endpointSourceText, id: "hdc.endpoint.source")
+        field("Ownership basis", ownershipBasisText, id: "hdc.ownership.basis")
+        field("Device events", deviceEventsText, id: "hdc.devices.events")
       }
       if onSelectUserConfiguredExecutable != nil {
         Button("Choose HDC executable…") { isSelectingExecutable = true }
@@ -169,6 +180,31 @@ struct HDCStatusView: View {
     case .unsupported: "unsupported"
     case .unknown(let reason): "unknown — \(reason)"
     }
+  }
+
+  private var endpointSourceText: String {
+    presentation.endpointSource?.rawValue ?? "unknown"
+  }
+
+  private var ownershipBasisText: String {
+    guard let basis = presentation.ownershipBasis else { return "unavailable" }
+    return [
+      "preExistingServerReceipt=\(basis.preExistingServerReceipt)",
+      "zeroAutomaticLifecycleDispatch=\(basis.zeroAutomaticLifecycleDispatch)",
+      "generationMintedFromObservation=\(basis.generationMintedFromObservation)",
+      "noActiveOrUnreconciledManagedProvenance=\(basis.noActiveOrUnreconciledManagedProvenance)",
+    ].joined(separator: "; ")
+  }
+
+  private var deviceEventsText: String {
+    guard !presentation.deviceEvents.isEmpty else { return "none" }
+    return presentation.deviceEvents.map { event in
+      var components = [event.timestamp, event.kind.rawValue]
+      if let identifier = event.redactedDeviceIdentifier {
+        components.append(identifier)
+      }
+      return components.joined(separator: " ")
+    }.joined(separator: " | ")
   }
 
   @ViewBuilder
