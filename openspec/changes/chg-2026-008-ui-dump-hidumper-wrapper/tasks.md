@@ -782,13 +782,13 @@ blocked，D2 readiness 仍须独立合入。
 
 ## TASK-UD-R2-RECAPTURE-001 — R2 persistent controlled 重采
 
-- Status:blocked(r12 已由 PR #708 merge
-  `d74c7af7179d89dc29c61e1e7b63d0ca4e7822ea`，但其后的 D2 readiness host-only
-  preflight 发现 HDC 漂移。r13 仅起草 recapture-only HDC `3.2.0f` repin；即使 r13
-  由维护者 review/merge，本任务仍等待独立 D2 readiness 固定 current main、其余
-  harness/tool/fixture/target pins、per-device typed capability evidence、persistent-root
-  gate、操作者与具名设备窗口。r13 不使任务 ready；D2 readiness 合入前 installed
-  HDC/device/fixture/Recipe dispatch 均为 `0`)
+- Status:ready(on merge of this independent D2 readiness r1；r13 已由 PR #711
+  merge `f065ac90e69ff89c9ebb8817bfb4f9ebb1b0ed7d`。本 draft/PR 合入前任务在
+  protected main 仍是 blocked，installed-HDC/device/fixture/Recipe dispatch 均为 `0`；
+  合入后只允许人类维护者 `lvye`(fuhanfeng)在
+  `UD-R2-RECAPTURE-DAYU200-20260728-001` 单次连续互斥窗口执行 closed R2-only
+  sequence。窗口/pin/capability 任一不满足即 fail closed，不得把本 ready 当作
+  Recipe success、compatibility/support/conformance 或 Agent execution authority)
 - HDC drift remediation r13(2026-07-28;host-only static audit，installed-HDC process/
   device/fixture/Recipe/raw/destructive dispatch 均为 `0`):
   - Audit base:r12 protected-main merge =
@@ -819,6 +819,93 @@ blocked，D2 readiness 仍须独立合入。
     在任何 device/fixture command 前执行 exact runtime version/hash gate。
   - Evidence:
     `evidence/runs/TASK-UD-R2-RECAPTURE-001/blocked-readiness-hdc-drift-2026-07-28.md`。
+- D2 readiness review r1(2026-07-28；host-only governance/static audit，installed-HDC
+  process/server-lifecycle/device/fixture/Recipe/raw/mutation/destructive dispatch 均为 `0`):
+  - Approval/base gate:on merge。r12 PR #708 merge
+    `d74c7af7179d89dc29c61e1e7b63d0ca4e7822ea` 与 r13 PR #711 merge
+    `f065ac90e69ff89c9ebb8817bfb4f9ebb1b0ed7d` 已满足；implementation base =
+    current main `eaa57f9281c6194e1bada0c740bde1d6e4f48fc6`。r13 后唯一 intervening
+    commit 只修改 CHG-2026-042 tasks，与本 task/tool/schema 输入零重叠。本 readiness
+    自身仅在维护者对 exact head review/merge 后生效。
+  - Dependency/tool gate:satisfied on merge。capture harness original/alignment/done =
+    `7978fa761dcd8a38b7fea6ea040dac21147d1f2a` /
+    `ba4b75b0c118a75af4415f9492f0c5e982ef138c` /
+    `0b44d5998747c7737834f04cd00c3e8db352bab0`；echo remediation implementation/done =
+    `b38d028ff821900c7c191c2bccc5951c5c719e7b` /
+    `3ac44f2d759bd8bec8f95405b85281d70f89cad0`；CAP-MUT ready-restore/evidence/done =
+    `04e061e3328893b407d31ad83d19793973b02bd6` /
+    `79b795b7916c863376b3c1f9c37456b0089283dd` /
+    `d5aded75d30fbd7ae048005b692b7f4138b23055`。
+  - Harness identity gate:source OID =
+    `b38d028ff821900c7c191c2bccc5951c5c719e7b`；current SHA-256 =
+    README `6e5db1827176a0c16b5a4b21431efa9e4d4dab041f03801a357f74b3db2f2601`,
+    capture.py `b407aaa07260e3252428bdf00431f4d1e451c30f77c55f1f6b15a5d170d19492`,
+    test_capture.py `b29c15b8fdca755f26fdfe4f5156082a8bb4a6fd80d8ceecec178419d4690070`；
+    fixed Python 3.14.6 下 existing harness `63/63` PASS，closed command surface
+    与 runbook 无漂移。
+  - HDC gate:唯一 executable =
+    `/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/toolchains/hdc`，
+    expected `Ver: 3.2.0f` / SHA-256
+    `05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83`。
+    readiness 静态 hash 命中；version mapping 来自 protected-main profile/r13，
+    未启动 executable。窗口内 `HP-0` 必须在任何 device/fixture command 前经 harness
+    复核 runtime version/hash；旧 `3.2.0d`、其他 hash、fallback 或 server lifecycle
+    mutation 全部拒绝。
+  - Target gate:唯一 target = 同一物理 DAYU200 (RK3568)，serial SHA-256
+    `958780b2ffb7090d4f22cdc1f547f9804ed0f0b605e3020f384e5d4823dc7a7e`，
+    OpenHarmony `7.0.0.34` / API `26.0.0` / USB。该 pin 来自 #248/#251 merged
+    hardware evidence，不冒充当前在线状态；窗口内操作者先 physical confirmation，
+    再以 `HP-1`/每次 `HP-2` 证明 exact single Connected target，raw serial 仍只允许
+    进入新 hardware-evidence device identity 字段。
+  - Per-device typed capability gate:本 D2 PR on merge 明确接受 #248 evidence
+    `EVD-UD-CAP-MUT-DAYU200-20260721-003` + #251 done 为上述 exact physical device
+    的 typed capability evidence，且只覆盖本 sequence 实际需要的
+    `toolchain-probe`、`target-inventory`、`fixture-install`、`fixture-start`、
+    `window-inventory`、`sidecar-inventory`、`ui-dump-capture`、
+    `remote-sidecar-capture`、`remote-sidecar-cleanup`、`fixture-stop`、
+    `fixture-uninstall`。该 evidence 的 client 为历史 `3.2.0d`；本次 D2 接受仅确认
+    相同设备/固件上这些 device-side typed operations 可作为一次人类受控 E1 候选，
+    current `3.2.0f` client identity 仍由独立 HDC/HP gates 约束。它不推断 output
+    family 或成功；任何 runtime family/argv/target 差异均停止，不得 fallback/retry。
+  - Fixture/window-selector gate:fixture =
+    `entry-default-signed.hap`，`1512003` bytes，SHA-256
+    `9453a396e81d55abfb05b4d7f9a512dea139e5843462051a6e1cc3586849fac8`；
+    bundle/ability = `com.example.waterflowdemo` / `EntryAbility`，versionCode
+    `1000000`，compileSdk `26.0.0.25`，debug signed。实际仓外路径不记录；操作者在
+    device dispatch 前确认 artifact 在场，并在 sequence 中 fresh hash/module 复核。
+    `INV-1` 只选择该 bundle/ability 的 exactly-one foreground `WinId`。
+  - Exact command/sidecar gate:`INV-1` =
+    `[HDC,"-t",CONNECT_KEY,"shell","hidumper","-s","WindowManagerService","-a","-a"]`；
+    R2 =
+    `[HDC,"-t",CONNECT_KEY,"shell","hidumper","-s","WindowManagerService","-a",
+    "-w WINDOW_ID -element -c"]`，末 payload 均为单 argv element。唯一 remote sidecar =
+    `/data/app/el2/100/base/com.example.waterflowdemo/haps/entry/files/arkui.dump`；
+    SC/FX/HP exact argv 仍以 runbook + 上述三文件 hash 为唯一面。R1/R3/R4、默认
+    target、manual HDC、shell、fallback/split/retry dispatch 全为 `0`。
+  - Evidence/schema gate:current
+    `openspec/contracts/hardware-evidence.schema.json` = schema `2.0.0`，SHA-256
+    `d31fdb1d872567a7c4b69ee833593492adc9c39ce28b3b9b0f3597cc334628b0`；
+    evidence 必须使用 acceptance `INT-UD-R2-RECAPTURE-001`、provider `none`、actual
+    stepKinds 与 repo-facing artifact hashes。schema/tool/path/command 任一漂移即新
+    readiness/revision。
+  - Persistent-root gate:实际 realpath 只由操作者持有，必须在所有 Git repository、
+    `/private/tmp`、`/private/var/tmp`、resolved `$TMPDIR`、teardown-owned 与其他
+    ephemeral root 之外；session root owner-only `0o700`，exclusive-create sidecar
+    `0o600` regular/no-follow，仓库/会话只出现
+    `<PERSISTENT_CONTROLLED_RAW_PATH>`。窗口开始前任一 predicate false = installed-HDC
+    dispatch `0`。
+  - Operator/window gate:on merge。唯一操作者 = human maintainer `lvye`(fuhanfeng)；
+    named window = `UD-R2-RECAPTURE-DAYU200-20260728-001`，从 readiness merge 后首次
+    exact preflight 开始，最迟须在 `2026-08-04T16:00:00Z` 前开始，`maxRuns=1`，
+    first installed-HDC process dispatch 即消费。窗口必须从 `HP-0` 连续、单设备、
+    单 session、互斥运行到 retained-sidecar post-evidence recheck 或 truthful abort；
+    期间其他 Agent/人工 HDC/device/flash/fixture/update 操作全为 `0`。未开始即过期、
+    abort 后重试、并发/漂移/窗口中断均须新 D2 readiness；actual start/end 与 exclusivity
+    由 run.md + evidence PR 的维护者 review/merge attest。
+  - Review boundary:本 readiness 只更新本 task 的 tasks/acceptance/verification/
+    runbook readiness 面与 host-only readiness record；不含 capture evidence/raw，
+    不修改 `scripts/**`/spec/contracts/profile/旧 evidence/decision，不启动 D2 窗口。
+    merge 后的唯一下一 PR 是人类 capture evidence；在本 D2 merge 前不得起草该 PR。
 - Objective:不重跑已关闭的 R1/R3,只在 fresh fixture/window session 中用既有 closed
   harness 重采一次 R2 sidecar,产生新的 proven-owned、complete、whole-file-hashed raw
   origin,并把它保存在仓库外非临时 persistent controlled root,供后续独立 readiness
@@ -829,8 +916,8 @@ blocked，D2 readiness 仍须独立合入。
   分离、owned cleanup、stale/ambiguous fail-closed 与 raw privacy,但不认领任何
   canonical AC/Test PASS。
 - Depends on:
-  - r12 proposal revision 已由 PR #708 merge；r13 HDC repin revision 须由维护者
-    review/merge，且其 merge 不替代后续独立 D2 readiness;
+  - r12 proposal revision 已由 PR #708 merge；r13 HDC repin revision 已由 PR #711
+    merge；本独立 D2 readiness 须由维护者 review/merge 后才生效;
   - `TASK-UD-CAP-MUT-001 done`、`TASK-UD-CAPTURE-HARNESS-001 done`、
     `TASK-UD-HARNESS-ECHO-001 done`;独立 D2 readiness 在当时 protected `main` 复核并
     固定这些 merge OID 与 `scripts/ud_capture/{README.md,capture.py,test_capture.py}`
@@ -893,9 +980,10 @@ blocked，D2 readiness 仍须独立合入。
   discovery/HDC dispatch;任何时候 R1/R3/R4、fallback/split argv、shell redirection、
   harness 外命令、全局搜索/递归删除、temp root、raw/路径入仓、修改 harness/redactor/
   diagnosis tool、执行诊断或注册 output family。
-- PR boundary:r12 D1 revision → r13 HDC repin D1 revision → 独立 D2
+- PR boundary:r12 D1 revision → r13 HDC repin D1 revision → 本独立 D2
   readiness/ready-restore PR → 一个人类 capture evidence PR → 独立 `ready→done`
-  status PR。D1/D2 gate 后零投机堆叠;任一 PR 不得夹带下一阶段。
+  status PR。D1/D2 gate 后零投机堆叠;本 readiness 合入前 capture evidence PR 不得
+  起草，任一 PR 不得夹带下一阶段。
 
 ## TASK-UD-R2-REDIAG-001 — fresh R2 raw 非内容重诊断
 
