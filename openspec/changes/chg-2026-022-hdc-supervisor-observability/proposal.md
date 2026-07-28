@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-022-hdc-supervisor-observability
 revision: 3
-status: approved # r1 经 main `1e4a7c4027ecdd1142ceab2b80f4423eec586d6d` 批准;r2 已合入;r3 App-facing remediation 仅在对应治理 PR 由维护者 review/merge 后生效
+status: verified # 2026-07-28 本 verification-closure PR；closure 段见文末，仅在维护者 review/merge 后生效
 class: platform
 core_change_level: none
 owner: lvye
@@ -173,3 +173,72 @@ TASK-M0B-002 以新 readiness PR 重钉交付形态与 pins(#250 记录的解除
   `TASK-OBS-001R` 补齐 production fan-out 到 public presentation 的桥接，并新增
   独立 change-local AC。该 revision 只在维护者 review/merge 对应治理 PR 后
   生效；merge 后任务仍 blocked，须 fresh D1 readiness。
+
+## Verification closure（2026-07-28）
+
+TASK-OBS-001、TASK-OBS-001R 与 TASK-OBS-002 已在 protected main 全部记为
+done；六条 change-local AC 均有可复查 evidence。本 PR 只翻 change /
+verification 状态并引用已合入记录，零实现、零 scope、零 acceptance 定义变化。
+Verification base = protected main
+`e2393c5d7c5aa8fe49fa92bca0ad7bdb00e2d181`；该树的本文件、`verification.md`
+与 `tasks.md` 改前 blob 分别为
+`10797acb07d650a3075f509074e12b198ff5baa6`、
+`e5c4d79c3a25b45d467ec3fb4c390bffc98bb740` 与
+`4745a88453b54a296dcff238a1c7c757fb1f262a`。
+
+### 交付链与 evidence pins
+
+| Task | Implementation | `ready→done` | Evidence |
+| --- | --- | --- | --- |
+| TASK-OBS-001 | #687 reviewed head `866d393cf30dfdb410f45a74bd4238c3f53576ce`；merge `ca84cc2821e11ad691cb9d8dcdef4e2dc873d1d3` | #693 reviewed head `412096008844288911747b10dbcacaf854ba693b`；merge `d8287aa5558f295caa086bb5a90516b6e9892fc8` | `evidence/runs/TASK-OBS-001/run.md`；blob `4148b50a8d5ef6614058fdf24972d3d921f01de0`；SHA-256 `15eddd72a2725d610301121ef9715703e9391134cb5351ee493f4717d0ce4063` |
+| TASK-OBS-001R | #716 reviewed head `6a98aa7315b09b556eb512651eca038704b8adf6`；merge `67978722a063f07adfee6c8b3fd8235076ea60c2` | #719 reviewed head `7a3aed409a1d6471276c4aa8fe39e35d592d36f5`；merge `570fe28c2d6edbad18050cfe873246fd45f0bc40` | `evidence/runs/TASK-OBS-001R/run.md`；blob `2beee035ff96d50a795b79a9677e7e6a3efb2b11`；SHA-256 `24d68f4ab6bbfea31d6145225448fe72b1d1731bb2b5e17df8e34068ea743412` |
+| TASK-OBS-002 | #729 reviewed head `ed806a64b9b740360613d2cb351b9ba990e38243`；merge `48d63c060800fa2c4bb0a4e4e58db524928a3afa` | #731 reviewed head `af6a8e308a84e4c6cc72bd46be0f68049c529228`；merge `e2393c5d7c5aa8fe49fa92bca0ad7bdb00e2d181` | `evidence/runs/TASK-OBS-002/run.md`；blob `50acb503146f258d3bdce25626a7115f840e0927`；SHA-256 `6ed2734f4edb7c9c2236a7c7107aa985b38479860de570c12ced8835503997a7` |
+
+六个 PR 的上述 exact head 均由维护者 `lvye` review/approve；逐 PR 对其授权
+文件集执行 reviewed-head 与 squash merge-tree diff，均为逐字一致。Review
+确认交付链，AC 真值仍取自表中三个已合入 run 记录及下列 closure-base 复验。
+
+### 六条 AC 二值结论
+
+- **`OBS-COUNTER-001` = PASS**：C1–C8 证明计数只落在
+  identity-bound successful-spawn hook；opaque permit + typed argv family
+  区分 confirmed/managed 与 automatic，caller 无 origin/monitor 写入口；
+  mutation 经同一真实 spawn hook 使 lifecycle/subserver 分别非零，正常腿恒零。
+- **`OBS-OWNERSHIP-001` = PASS**：O1–O8 覆盖 pre-existing receipt、零
+  automatic lifecycle、observation-minted generation、无 active/unreconciled
+  managed provenance 四证据矩阵；缺证保持 unknown 或保留 managed，未
+  reconcile/retire 的 managed 不得直转 external，external/unknown 门结果等价。
+- **`OBS-ENDPOINT-001` = PASS**：E1–E4 覆盖 explicit/inherited/default
+  source 如实穿透、child-env 注入清单精确、父进程 env 零修改以及组合后不把
+  inherited/default 伪装为 explicit。
+- **`OBS-FANOUT-001` = PASS**：F1–F5 证明生产源只接受
+  CHG-2026-024 注册的 exact device-observation snapshot family；
+  zero-to-many appeared/unchanged/disappeared 差分进入 fan-out 与有界 buffer，
+  observed empty 与 unknown 保持区分，未注册命令 fail closed。
+- **`OBS-DEVICE-PRESENTATION-001` = PASS**：DP1–DP18 证明 production
+  Workflows facade 只在 exact 3.2.0f candidate、`127.0.0.1:8710` 与 stable
+  identity bracket 下由显式 refresh 单次观察；public immutable 事件使用 injected
+  UTC RFC 3339 时间戳与 session-scoped 脱敏标识，raw connect key 零泄漏、
+  unchanged 零历史、容量 64；取消只终止 owned child，production 拒绝 fixture。
+- **`OBS-APPFACE-001` = PASS**：AP1–AP4 的 signed XCUITest 证明五个
+  observation 字段均为 exact-id static text、事件顺序/形态/脱敏正确；无 fixture
+  flag 的 production launch 不含固定 fixture 值，App 产品面只消费 Workflows
+  presentation contract。
+
+### Closure-base 复验与边界
+
+- `HDCSupervisorObservabilityContractTests` = 25/25；
+  `HDCDeviceObservationPresentationContractTests` = 18/18；
+  `HDCSupervisorContractTests` = 55/55，均 0 failure。
+- ArkDeckKit 全量 = 466 tests listed / 1 skipped / 0 failures；签名 App UI =
+  13/13 / 0 failure，xcresult summary = `Passed`，App 与 UI runner
+  `codesign --verify --deep --strict` 均 PASS。
+- 本 closure 文档树复验：`scripts/check-sdd.sh`、PR path guard 50 tests、
+  host-loop explain/status gate 与 `git diff --check` 结果见本 PR checks/body；
+  任一红灯即不得合入。
+- Core/spec/contracts/baseline、产品代码、设备/HDC、credential、E1/E2/
+  destructive dispatch 均无变化；全程 host-only，零真实硬件或外部副作用声明。
+  本结论不构成 TASK-M0B-002 的 readiness、真机观察或验收，也不授权执行它。
+- Evidence 真值源为三个已合入 run 记录与本段 closure-base 复验。本 closure
+  不把实现 PR review 单独当作 verification 批准；只有维护者 review/merge 本
+  独立 PR 后，proposal 的 `verified` 与 verification 的 `passed` 才生效。

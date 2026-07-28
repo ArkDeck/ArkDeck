@@ -1,6 +1,6 @@
 # CHG-2026-022 Verification Plan
 
-> Status:planned
+> Status:passed # 2026-07-28；六条 AC 与 merge/revalidation OID 见 proposal.md「Verification closure」；仅在维护者 review/merge 本独立 verification-closure PR 后生效
 > Change:CHG-2026-022-hdc-supervisor-observability@r3
 > Core baseline:CORE-2.1.0(零 Core 变更;canonical Core AC 零认领)
 
@@ -32,3 +32,20 @@ invalidate，不得引用为上述 AC 的通过证据。r2 本身是 plan-only r
 不产生 implementation/contract/hardware evidence。r3 同样是 plan-only
 remediation；它只登记 OBS-001R scope/AC，不产生 readiness、implementation 或
 evidence。
+
+## Result gate
+
+- [x] 三个 task 均有 merged implementation、独立 done PR 与可复查 run evidence
+- [x] 六条 change-local AC 均为 passed，逐条映射见 proposal closure
+- [x] M1-006 零自动 lifecycle、endpoint 子进程隔离、registry fail-closed 与
+  external/unknown 门等价不变量零回归
+- [x] 实现 PR、done 翻转 PR、change verify PR 保持分离
+- [x] 未把 prototype、fixture、simulation、PR review 或 CI 单独解释为硬件
+  evidence 或 verification 批准
+- [x] Core/spec/contracts/acceptance 定义、产品代码与设备执行面零变化
+
+Closure receipt:`proposal.md#verification-closure2026-07-28`；verification
+base = protected main `e2393c5d7c5aa8fe49fa92bca0ad7bdb00e2d181`；
+revalidated `2026-07-28T12:03:05Z`。本文件的 `passed` 与 proposal 的
+`verified` 只在维护者 review/merge 本独立状态 PR 后生效；本 closure 不解锁
+或执行 TASK-M0B-002。
