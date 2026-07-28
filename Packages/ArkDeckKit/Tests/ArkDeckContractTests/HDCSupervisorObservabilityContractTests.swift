@@ -20,6 +20,351 @@ import XCTest
 /// origin marker, or injects a fixture into a production path.
 final class HDCSupervisorObservabilityContractTests: XCTestCase {
 
+  // MARK: - CHG-2026-043 / TASK-HSO-002
+
+  func testHSO1_ExactCommandlessCatalogAndProductionFactoryHaveNoAuthorityInjection()
+    throws
+  {
+    XCTAssertEqual(
+      HDCSupervisorObservationProbeCatalog.registryID,
+      "OPENHARMONY-HDC-SUPERVISOR-OBSERVATION-PROBES")
+    XCTAssertEqual(HDCSupervisorObservationProbeCatalog.registryVersion, "1.0.0")
+    XCTAssertEqual(
+      HDCSupervisorObservationProbeCatalog.integrationProfile,
+      "OPENHARMONY-TOOLS@0.6.0")
+    XCTAssertEqual(HDCSupervisorObservationProbeCatalog.targetToolVersion, "3.2.0f")
+    XCTAssertEqual(
+      HDCSupervisorObservationProbeCatalog.targetExecutableSHA256,
+      "05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83")
+    XCTAssertEqual(HDCSupervisorObservationProbeCatalog.exactEndpoint, "127.0.0.1:8710")
+    XCTAssertEqual(HDCSupervisorObservationProbeCatalog.exactArguments, [])
+    XCTAssertFalse(HDCSupervisorObservationProbeCatalog.invocationAllowed)
+    XCTAssertEqual(
+      HDCSupervisorObservationProbeCatalog.targetExecutableSHA256,
+      HDCDeviceObservationProbeCatalog.targetExecutableSHA256)
+    XCTAssertEqual(
+      HDCSupervisorObservationProbeCatalog.exactEndpoint,
+      HDCDeviceObservationProbeCatalog.exactEndpoint)
+    XCTAssertNotEqual(
+      HDCSupervisorObservationProbeCatalog.registryID,
+      HDCDeviceObservationProbeCatalog.registryID)
+
+    let sourcesRoot = observabilityPackageRoot().appending(path: "Sources")
+    let observerSource = try String(
+      contentsOf: sourcesRoot.appending(
+        path: "ArkDeckOpenHarmony/HDCSupervisorObservationProbeRegistry.swift"),
+      encoding: .utf8)
+    let factoryStart = try XCTUnwrap(
+      observerSource.range(of: "package static func makeProduction("))
+    let factoryTail = observerSource[factoryStart.lowerBound...]
+    let factoryEnd = try XCTUnwrap(
+      factoryTail.range(of: "  /// Contract-only seam."))
+    let productionFactory = String(
+      factoryTail[..<factoryEnd.lowerBound])
+    let declaration = String(productionFactory.prefix { $0 != "{" })
+
+    XCTAssertTrue(declaration.contains("supervisor: HDCServerSupervisor"))
+    XCTAssertTrue(declaration.contains("toolchain: HDCCandidate"))
+    XCTAssertTrue(declaration.contains("endpointSelection: HDCServerEndpointSelection"))
+    for forbidden in [
+      "receipt", "generation", "pid", "process", "socket", "runner", "registry",
+      "identityObserver",
+    ] {
+      XCTAssertFalse(
+        declaration.localizedCaseInsensitiveContains(forbidden),
+        "production factory must not expose \(forbidden)")
+    }
+    XCTAssertEqual(matchCount("HDCProcessCommand\\(", in: observerSource), 0)
+    XCTAssertEqual(matchCount("HDCProcessCommandRunner", in: observerSource), 0)
+    XCTAssertEqual(
+      matchCount("HDCCandidateIdentityVerifier\\.matches", in: observerSource),
+      2,
+      "candidate bytes must be verified before and after the bounded scans")
+    XCTAssertEqual(matchCount("let first = scan\\(", in: observerSource), 1)
+    XCTAssertEqual(matchCount("let second = scan\\(", in: observerSource), 1)
+    XCTAssertTrue(observerSource.contains("health: .unknown"))
+    XCTAssertTrue(observerSource.contains("version: .unknown("))
+    XCTAssertTrue(observerSource.contains("recordUnverifiedServerProbeFailure("))
+  }
+
+  func testHSO2_StableReceiptUsesExactSelectedInputsAndAllFourEvidenceClassifyExternal()
+    async throws
+  {
+    let supervisor = HDCServerSupervisor(
+      auditStore: InMemoryHDCServerLifecycleAuditStore())
+    let candidate = hsoCandidate("hso2")
+    let endpointSelection = try hsoEndpointSelection()
+    let receipt = hsoIdentityReceipt(
+      candidate: candidate, endpoint: endpointSelection.endpoint)
+    let observer = HSORecordingIdentityObserver(observation: .observed(receipt))
+    let session = HDCSupervisorObservationApplicationSession.makeContract(
+      supervisor: supervisor,
+      toolchain: candidate,
+      endpointSelection: endpointSelection,
+      identityObserver: observer)
+
+    let result = await session.observe()
+
+    XCTAssertEqual(
+      result.classification,
+      .observed(generation: try XCTUnwrap(receipt.stableGeneration)))
+    XCTAssertEqual(result.identity, receipt)
+    let inputs = await observer.inputs
+    XCTAssertEqual(inputs.count, 1)
+    XCTAssertEqual(inputs.first?.endpoint, endpointSelection.endpoint)
+    XCTAssertEqual(inputs.first?.toolchain, candidate)
+    let stateValue = await supervisor.state(for: endpointSelection.endpoint)
+    let state = try XCTUnwrap(stateValue)
+    XCTAssertEqual(state.health, .unknown)
+    XCTAssertEqual(
+      state.version,
+      .unknown(
+        reason: "OPENHARMONY-TOOLS@0.6.0 has no registered HDC health or version source"))
+    XCTAssertEqual(state.generationEvidence, .known(try XCTUnwrap(receipt.stableGeneration)))
+    XCTAssertEqual(state.ownership, .external)
+    let basisValue = await supervisor.ownershipBasis(for: endpointSelection.endpoint)
+    let basis = try XCTUnwrap(basisValue)
+    XCTAssertTrue(basis.preExistingServerReceipt)
+    XCTAssertTrue(basis.zeroAutomaticLifecycleDispatch)
+    XCTAssertTrue(basis.generationMintedFromObservation)
+    XCTAssertTrue(basis.noActiveOrUnreconciledManagedProvenance)
+    XCTAssertEqual(
+      supervisor.dispatchMonitor.countersSnapshot(),
+      HDCSupervisorDispatchMonitor.CountersSnapshot(
+        automaticLifecycleDispatchCount: 0,
+        automaticSubserverDispatchCount: 0,
+        confirmedLifecycleDispatchCount: 0,
+        managedStartDispatchCount: 0))
+    XCTAssertTrue(supervisor.dispatchMonitor.spawnAuditTrail().isEmpty)
+  }
+
+  func testHSO3_WrongCandidateOrEndpointNeverReachesObserverAndRevokesStaleExternalClaim()
+    async throws
+  {
+    let exactCandidate = hsoCandidate("hso3")
+    let exactEndpoint = try hsoEndpointSelection()
+
+    for mutation in ["candidate", "endpoint"] {
+      let supervisor = HDCServerSupervisor(
+        auditStore: InMemoryHDCServerLifecycleAuditStore())
+      let observer = HSORecordingIdentityObserver(
+        observation: .observed(
+          hsoIdentityReceipt(
+            candidate: exactCandidate, endpoint: exactEndpoint.endpoint)))
+      let candidate =
+        mutation == "candidate"
+        ? HDCCandidate(
+          path: exactCandidate.path,
+          source: exactCandidate.source,
+          sha256: String(repeating: "0", count: 64))
+        : exactCandidate
+      let endpoint =
+        mutation == "endpoint"
+        ? try HDCServerEndpointSelector.select(
+          explicitEndpoint: "127.0.0.1:18710")
+        : exactEndpoint
+      await seedHSOExternalClaim(
+        supervisor: supervisor, endpoint: endpoint.endpoint)
+      let session = HDCSupervisorObservationApplicationSession.makeContract(
+        supervisor: supervisor,
+        toolchain: candidate,
+        endpointSelection: endpoint,
+        identityObserver: observer)
+
+      let result = await session.observe()
+
+      guard case .unsupported = result.classification else {
+        return XCTFail("\(mutation) must fail unsupported: \(result.classification)")
+      }
+      let observedInputs = await observer.inputs
+      XCTAssertEqual(observedInputs.count, 0)
+      let stateValue = await supervisor.state(for: endpoint.endpoint)
+      let state = try XCTUnwrap(stateValue)
+      XCTAssertEqual(state.ownership, .unknown)
+      XCTAssertEqual(state.health, .unknown)
+      guard case .unknown = state.generationEvidence else {
+        return XCTFail("the stale generation claim must be revoked")
+      }
+      XCTAssertEqual(
+        supervisor.dispatchMonitor.countersSnapshot(),
+        hsoZeroDispatchCounters())
+      XCTAssertTrue(supervisor.dispatchMonitor.spawnAuditTrail().isEmpty)
+    }
+  }
+
+  func testHSO4_EveryRawFailureAndReceiptMismatchRevokesPriorExternalClaim()
+    async throws
+  {
+    let candidate = hsoCandidate("hso4")
+    let endpointSelection = try hsoEndpointSelection()
+    let validReceipt = hsoIdentityReceipt(
+      candidate: candidate, endpoint: endpointSelection.endpoint)
+    let wrongPath = HDCServerProcessIdentityReceipt(
+      pid: validReceipt.pid,
+      startSeconds: validReceipt.startSeconds,
+      startMicroseconds: validReceipt.startMicroseconds,
+      executablePath: URL(fileURLWithPath: "/private/tmp/hso-wrong-path"),
+      executableSHA256: validReceipt.executableSHA256,
+      endpoint: validReceipt.endpoint)
+    let wrongHash = HDCServerProcessIdentityReceipt(
+      pid: validReceipt.pid,
+      startSeconds: validReceipt.startSeconds,
+      startMicroseconds: validReceipt.startMicroseconds,
+      executablePath: validReceipt.executablePath,
+      executableSHA256: String(repeating: "f", count: 64),
+      endpoint: validReceipt.endpoint)
+    let wrongEndpoint = HDCServerProcessIdentityReceipt(
+      pid: validReceipt.pid,
+      startSeconds: validReceipt.startSeconds,
+      startMicroseconds: validReceipt.startMicroseconds,
+      executablePath: validReceipt.executablePath,
+      executableSHA256: validReceipt.executableSHA256,
+      endpoint: HDCServerEndpoint("127.0.0.1:18710"))
+    let overflow = HDCServerProcessIdentityReceipt(
+      pid: validReceipt.pid,
+      startSeconds: UInt64.max,
+      startMicroseconds: UInt64.max,
+      executablePath: validReceipt.executablePath,
+      executableSHA256: validReceipt.executableSHA256,
+      endpoint: validReceipt.endpoint)
+    let invalidPID = HDCServerProcessIdentityReceipt(
+      pid: 0,
+      startSeconds: validReceipt.startSeconds,
+      startMicroseconds: validReceipt.startMicroseconds,
+      executablePath: validReceipt.executablePath,
+      executableSHA256: validReceipt.executableSHA256,
+      endpoint: validReceipt.endpoint)
+    let invalidMicroseconds = HDCServerProcessIdentityReceipt(
+      pid: validReceipt.pid,
+      startSeconds: validReceipt.startSeconds,
+      startMicroseconds: 1_000_000,
+      executablePath: validReceipt.executablePath,
+      executableSHA256: validReceipt.executableSHA256,
+      endpoint: validReceipt.endpoint)
+    let observations: [HDCServerProcessIdentityRawObservation] = [
+      .unavailable(reason: "zero listener"),
+      .unknown(reason: "multiple listener owners"),
+      .timedOut,
+      .cancelled,
+      .observed(wrongPath),
+      .observed(wrongHash),
+      .observed(wrongEndpoint),
+      .observed(overflow),
+      .observed(invalidPID),
+      .observed(invalidMicroseconds),
+    ]
+
+    for observation in observations {
+      let supervisor = HDCServerSupervisor(
+        auditStore: InMemoryHDCServerLifecycleAuditStore())
+      await seedHSOExternalClaim(
+        supervisor: supervisor, endpoint: endpointSelection.endpoint)
+      let session = HDCSupervisorObservationApplicationSession.makeContract(
+        supervisor: supervisor,
+        toolchain: candidate,
+        endpointSelection: endpointSelection,
+        identityObserver: HSORecordingIdentityObserver(observation: observation))
+
+      let result = await session.observe()
+
+      guard case .observed = result.classification else {
+        let stateValue = await supervisor.state(for: endpointSelection.endpoint)
+        let state = try XCTUnwrap(stateValue)
+        XCTAssertEqual(state.ownership, .unknown, "\(observation)")
+        XCTAssertEqual(state.health, .unknown, "\(observation)")
+        guard case .unknown = state.generationEvidence else {
+          return XCTFail("failed observation retained generation: \(observation)")
+        }
+        XCTAssertEqual(
+          supervisor.dispatchMonitor.countersSnapshot(),
+          hsoZeroDispatchCounters(),
+          "\(observation)")
+        XCTAssertTrue(supervisor.dispatchMonitor.spawnAuditTrail().isEmpty)
+        continue
+      }
+      XCTFail("failure vector unexpectedly observed: \(observation)")
+    }
+  }
+
+  func testHSO5_TimeoutAndCancellationTerminateOnlyOwnedObservationWithZeroDispatch()
+    async throws
+  {
+    let candidate = hsoCandidate("hso5")
+    let endpointSelection = try hsoEndpointSelection()
+
+    do {
+      let supervisor = HDCServerSupervisor(
+        auditStore: InMemoryHDCServerLifecycleAuditStore())
+      let spy = HSOObservationEffectSpy()
+      let session = HDCSupervisorObservationApplicationSession.makeContract(
+        supervisor: supervisor,
+        toolchain: candidate,
+        endpointSelection: endpointSelection,
+        identityObserver: HSOCancellableIdentityObserver(spy: spy),
+        timeoutMilliseconds: 10)
+
+      let result = await session.observe()
+
+      XCTAssertEqual(result.classification, .timedOut)
+      XCTAssertEqual(spy.observeCount, 1)
+      XCTAssertEqual(spy.cancelledCount, 1)
+      XCTAssertEqual(
+        supervisor.dispatchMonitor.countersSnapshot(),
+        hsoZeroDispatchCounters())
+      XCTAssertTrue(supervisor.dispatchMonitor.spawnAuditTrail().isEmpty)
+    }
+
+    do {
+      let supervisor = HDCServerSupervisor(
+        auditStore: InMemoryHDCServerLifecycleAuditStore())
+      let spy = HSOObservationEffectSpy()
+      let session = HDCSupervisorObservationApplicationSession.makeContract(
+        supervisor: supervisor,
+        toolchain: candidate,
+        endpointSelection: endpointSelection,
+        identityObserver: HSOCancellableIdentityObserver(spy: spy))
+      let task = Task { await session.observe() }
+      let started = await waitUntil { spy.observeCount == 1 }
+      XCTAssertTrue(started)
+
+      task.cancel()
+      let result = await task.value
+
+      XCTAssertEqual(result.classification, .cancelled)
+      XCTAssertEqual(spy.cancelledCount, 1)
+      XCTAssertEqual(
+        supervisor.dispatchMonitor.countersSnapshot(),
+        hsoZeroDispatchCounters())
+      XCTAssertTrue(supervisor.dispatchMonitor.spawnAuditTrail().isEmpty)
+    }
+  }
+
+  func testHSO6_ListenerNormalizationRejectsWildcardPortOnlyAndUnregisteredAddresses() {
+    XCTAssertTrue(
+      HDCExact320FSystemIdentityObserver.isRegisteredListenerAddress(
+        family: AF_INET, addressBytes: [127, 0, 0, 1]))
+    XCTAssertTrue(
+      HDCExact320FSystemIdentityObserver.isRegisteredListenerAddress(
+        family: AF_INET6,
+        addressBytes: Array(repeating: 0, count: 10) + [0xFF, 0xFF, 127, 0, 0, 1]))
+    XCTAssertFalse(
+      HDCExact320FSystemIdentityObserver.isRegisteredListenerAddress(
+        family: AF_INET, addressBytes: [0, 0, 0, 0]))
+    XCTAssertFalse(
+      HDCExact320FSystemIdentityObserver.isRegisteredListenerAddress(
+        family: AF_INET6, addressBytes: Array(repeating: 0, count: 16)))
+    XCTAssertFalse(
+      HDCExact320FSystemIdentityObserver.isRegisteredListenerAddress(
+        family: AF_INET, addressBytes: [127, 0, 0, 2]))
+    XCTAssertFalse(
+      HDCExact320FSystemIdentityObserver.isRegisteredListenerAddress(
+        family: AF_INET6,
+        addressBytes: Array(repeating: 0, count: 15) + [1]))
+    XCTAssertFalse(
+      HDCExact320FSystemIdentityObserver.isRegisteredListenerAddress(
+        family: AF_UNIX, addressBytes: [127, 0, 0, 1]))
+  }
+
   // MARK: - Group A: TEST-OBS-COUNTER-001
 
   // C1: a complete durable confirmation chain with an intact permit performs
@@ -1404,6 +1749,55 @@ final class HDCSupervisorObservabilityContractTests: XCTestCase {
       spawnTask: spawnTask)
   }
 
+  // MARK: - HSO-002 commandless observation helpers
+
+  private func hsoCandidate(_ label: String) -> HDCCandidate {
+    HDCCandidate(
+      path: URL(fileURLWithPath: "/private/tmp/arkdeck-\(label)-hdc"),
+      source: .userConfigured,
+      sha256: HDCSupervisorObservationProbeCatalog.targetExecutableSHA256)
+  }
+
+  private func hsoEndpointSelection() throws -> HDCServerEndpointSelection {
+    try HDCServerEndpointSelector.select(inheritedEnvironment: [:])
+  }
+
+  private func hsoZeroDispatchCounters() -> HDCSupervisorDispatchMonitor.CountersSnapshot {
+    HDCSupervisorDispatchMonitor.CountersSnapshot(
+      automaticLifecycleDispatchCount: 0,
+      automaticSubserverDispatchCount: 0,
+      confirmedLifecycleDispatchCount: 0,
+      managedStartDispatchCount: 0)
+  }
+
+  private func hsoIdentityReceipt(
+    candidate: HDCCandidate,
+    endpoint: HDCServerEndpoint,
+    pid: Int32 = 32_001,
+    startSeconds: UInt64 = 1_785_196_800,
+    startMicroseconds: UInt64 = 654_321
+  ) -> HDCServerProcessIdentityReceipt {
+    HDCServerProcessIdentityReceipt(
+      pid: pid,
+      startSeconds: startSeconds,
+      startMicroseconds: startMicroseconds,
+      executablePath: candidate.path.resolvingSymlinksInPath().standardizedFileURL,
+      executableSHA256: candidate.sha256,
+      endpoint: endpoint)
+  }
+
+  private func seedHSOExternalClaim(
+    supervisor: HDCServerSupervisor,
+    endpoint: HDCServerEndpoint
+  ) async {
+    await supervisor.observeRegisteredServerIdentity(
+      endpoint: endpoint,
+      health: .healthy,
+      version: .known("stale-must-be-revoked"),
+      generation: 99,
+      reason: "HSO stale-claim negative control")
+  }
+
   // MARK: - Bracket observation helpers
 
   private func bracketObservation(
@@ -1646,6 +2040,66 @@ private actor ObservabilityFixedIdentityObserver: HDCServerProcessIdentityObserv
     selectedToolchain _: HDCCandidate
   ) async -> HDCServerProcessIdentityRawObservation {
     observation
+  }
+}
+
+private actor HSORecordingIdentityObserver: HDCServerProcessIdentityObserving {
+  struct Input: Sendable, Equatable {
+    let endpoint: HDCServerEndpoint
+    let toolchain: HDCCandidate
+  }
+
+  private let observation: HDCServerProcessIdentityRawObservation
+  private var recordedInputs: [Input] = []
+
+  init(observation: HDCServerProcessIdentityRawObservation) {
+    self.observation = observation
+  }
+
+  func observe(
+    endpoint: HDCServerEndpoint,
+    selectedToolchain: HDCCandidate
+  ) async -> HDCServerProcessIdentityRawObservation {
+    recordedInputs.append(
+      Input(endpoint: endpoint, toolchain: selectedToolchain))
+    return observation
+  }
+
+  var inputs: [Input] { recordedInputs }
+}
+
+private final class HSOObservationEffectSpy: @unchecked Sendable {
+  private let lock = NSLock()
+  private var storedObserveCount = 0
+  private var storedCancelledCount = 0
+
+  func recordObservation() {
+    lock.withLock { storedObserveCount += 1 }
+  }
+
+  func recordCancellation() {
+    lock.withLock { storedCancelledCount += 1 }
+  }
+
+  var observeCount: Int { lock.withLock { storedObserveCount } }
+  var cancelledCount: Int { lock.withLock { storedCancelledCount } }
+}
+
+private struct HSOCancellableIdentityObserver: HDCServerProcessIdentityObserving {
+  let spy: HSOObservationEffectSpy
+
+  func observe(
+    endpoint _: HDCServerEndpoint,
+    selectedToolchain _: HDCCandidate
+  ) async -> HDCServerProcessIdentityRawObservation {
+    spy.recordObservation()
+    do {
+      try await Task.sleep(for: .seconds(60))
+      return .unknown(reason: "cancellable observer unexpectedly completed")
+    } catch {
+      spy.recordCancellation()
+      return .cancelled
+    }
   }
 }
 
