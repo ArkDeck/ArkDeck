@@ -1,7 +1,7 @@
 ---
 schema_version: 1.0.0
 change_id: CHG-2026-008-ui-dump-hidumper-wrapper
-change_revision: 13
+change_revision: 14
 platform: macos
 evidence_classes:
 - contract
@@ -155,45 +155,59 @@ cases:
     AC-DUMP PASS.
 - acceptance_id: INT-UD-R2-RECAPTURE-001
   test_id: TEST-INT-UD-R2-RECAPTURE-001
-  method: Human-operated R2-only persistent controlled deviceMutation recapture.
+  method: Authorized-Agent R2-only persistent controlled deviceMutation recapture after the separate Agent capture seam and fresh D2 readiness.
   expected_source: openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/verification.md#INT-UD-R2-RECAPTURE-001
   minimum_evidence: realHardware
-  expected_result: After r12, the r13 recapture-only HDC repin, and this D2
-    readiness r1 are merged, only human maintainer lvye may use the
-    already-merged closed capture harness in named exclusive window
-    UD-R2-RECAPTURE-DAYU200-20260728-001. The window has maxRuns 1, its first
-    installed-HDC process consumes the run, and it must start by
-    2026-08-04T16:00:00Z. The readiness re-pins the current main base,
-    harness hashes and tests, HDC/device/firmware/fixture tuple, exact INV-1
-    and R2 argv, sidecar path, hardware-evidence schema, per-device typed
-    capability evidence from merged PRs 248 and 251 for the exact physical
-    device and required stepKinds, operator, window, and a persistent
-    controlled-root predicate. The capability acceptance covers only the
-    listed device-side typed operations; current-client identity remains a
-    separate fail-closed HP gate and no output-family success is inferred.
-    For this task HP-0 accepts only the r13 HDC tuple at the fixed
-    DevEco path, Ver 3.2.0f and SHA-256
+  expected_result: r14 revokes the unconsumed human-only window
+    UD-R2-RECAPTURE-DAYU200-20260728-001 and returns this task to blocked.
+    No current executor may start installed HDC. A future Agent execution is
+    permitted only after TASK-UD-AGENT-CAPTURE-SEAM-001 is done, an
+    Agent-capable hardware-evidence contract is current rather than merely a
+    change-local draft, and a fresh D2 PR pins a protected-main
+    authorizationRef, durable maxRuns reservation, expiry, exact device,
+    machine model/serial-digest/firmware readback, HDC, fixture, typed command
+    surface, parser families, opaque storage handles and exclusive window.
+    The existing PR 248/251 capability evidence remains limited to the exact
+    device-side typed operations and does not prove current-client output
+    compatibility or Recipe success. HP-0 accepts only the fixed DevEco HDC,
+    Ver 3.2.0f and SHA-256
     05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83;
-    the historical 3.2.0d identity is not a fallback. The session root is
-    owner-only, outside every git repository
-    and outside /private/tmp, /private/var/tmp, the resolved TMPDIR, and every
-    teardown-controlled or otherwise ephemeral location. The exact sequence
-    performs HP-0/HP-1, fixture install/start, bracketed INV-1, and exactly one
-    bracketed R2, followed by owned-only receive/cleanup and fixture teardown;
-    R1, R3, and R4 dispatch counts are zero. Every targeted command has an
-    explicit -t from the latest same-session verbose target inventory. R2 must
-    create one absent-to-new regular sidecar; SC-2 receives it into the
-    persistent session, SC-3 removes only the proven-owned remote path, and the
-    absent re-check passes. Stdout, stderr, and sidecar are separate complete,
-    untruncated whole origins. After evidence assembly the retained sidecar is
-    rechecked no-follow as the same 0o600 regular file with unchanged length
-    and SHA-256. Repository evidence contains only redacted manifests, hashes,
-    placeholder path and retention facts plus schema-valid hardware evidence;
-    raw bytes, full manifests and the real path remain outside Git. Missing
-    sidecar, drift, ambiguity, truncation, cleanup or retention failure leaves
-    the task blocked. Exit zero and a fresh hash are not Recipe success, the
-    old raw root cause remains unknowable, and Agent/destructive dispatches are
-    zero. This case claims no canonical AC-DUMP PASS.
+    3.2.0d is not a fallback. The executor materializes the exact bracketed
+    INV-1 and one-R2 sequence with explicit same-binding -t, while R1, R3 and
+    R4 dispatch remain zero. Machine parsers must prove exactly one foreground
+    fixture window and sidecar absent-to-new-regular ownership before receive
+    and exact cleanup; unknown, stale, ambiguous, symlinked, multiple, drifted,
+    timed-out, truncated or leaking results stop without fallback or retry.
+    The persistent 0o700 session and retained 0o600 regular sidecar stay behind
+    opaque handles outside repositories and temporary roots; neither real
+    path nor raw bytes may enter Agent/model/CLI/repository output. Repository
+    evidence contains only redacted manifests, whole-origin hashes, placeholder
+    retention facts and schema-valid executor.kind=agent hardware evidence
+    with authorizationRef and machine target confirmation. Exit zero and a
+    fresh hash are not Recipe success, the old raw root cause remains
+    unknowable, and destructive dispatch is zero. This case claims no
+    canonical AC-DUMP PASS.
+- acceptance_id: INT-UD-AGENT-CAPTURE-SEAM-001
+  test_id: TEST-INT-UD-AGENT-CAPTURE-SEAM-001
+  method: Offline fake and synthetic contract for authorized-Agent UI Dump capture admission and opaque-artifact orchestration.
+  expected_source: openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/verification.md#INT-UD-AGENT-CAPTURE-SEAM-001
+  minimum_evidence: contract
+  expected_result: After the Agent-capable hardware-evidence and authorization
+    contracts become current, an independently readied host-only task builds a
+    production-shaped seam in which the Agent supplies only an authorization
+    identifier and opaque artifact handles. Protected-main authorization
+    provenance, durable maxRuns reservation, binding and machine identity/
+    firmware readback are obtained by trusted ports rather than caller facts.
+    Exact registered parsers determine a unique foreground fixture window and
+    sidecar absent/new-regular/owned/cleanup states. Raw bytes and real paths
+    never enter model, CLI text, logs, redacted manifests or repository
+    evidence. Typed argv, exclusive lane, intent/outcome, timeout, cancellation,
+    identity-drift and abort/teardown transitions are deterministic. Fake and
+    synthetic positive tests close the full seam; missing, forged, stale,
+    overused, concurrent, ambiguous, unknown, tampered, symlinked, truncated,
+    timed-out and privacy-leak cases all produce zero process/HDC/device
+    dispatch. Tests execute no installed HDC, device, fixture, network or real
+    raw and do not themselves authorize a real run.
 - acceptance_id: INT-UD-R2-REDIAG-001
   test_id: TEST-INT-UD-R2-REDIAG-001
   method: Human-executed host-only non-content diagnosis of the fresh retained R2 raw.

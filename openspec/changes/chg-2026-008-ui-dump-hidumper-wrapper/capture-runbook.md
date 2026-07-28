@@ -14,20 +14,24 @@
 > D2 readiness r1 now proposes the recapture task as ready on merge only. It accepts the limited
 > exact-device typed capability evidence and names one human-only exclusive window; the readiness
 > PR itself still performs zero HDC/device dispatch.
+> r14 supersedes that unconsumed execution window on merge:the named human window is revoked and
+> R2 recapture returns to blocked. A future Agent run requires the blocked Agent capture seam,
+> a current Agent-capable evidence contract, and a new exact-device D2 authorization/readiness.
 >
-> Real-device operator:human maintainer only. An Agent SHALL NOT execute installed `hdc`, create a
-> real device session or run any device step.
+> r14-effective R2 real-device operator:none. Historical Phase A and future Phase B remain human-operated.
+> An Agent SHALL NOT execute installed `hdc`, create a real device session or run any device step
+> until the r14 future Agent chain is independently completed and merged.
 
 ## Purpose and authority boundary
 
 This runbook fixes the candidate Recipe payload boundary and the fail-closed procedure for the
-human capture tasks (`TASK-UD-CAP-MUT-001` Phase A,
-`TASK-UD-R2-RECAPTURE-001` R2-only recapture, and `TASK-UD-CAP-R4-001` Phase B). The
-authorization model is the M0B precedent (TASK-M0B-001): the human maintainer personally executes a
-closed command list under this runbook, records byte-exact evidence, and the maintainer's
-review/merge of the evidence PR is the attestation. No production supervisor, durable binding
-workflow, journal authorization or offline receipt verifier is a prerequisite; those concepts stay
-out of this change (see tasks.md 裁剪任务记录 and the JAUTH backlog entry).
+real-device capture tasks (`TASK-UD-CAP-MUT-001` historical Phase A,
+`TASK-UD-R2-RECAPTURE-001` R2-only recapture, and `TASK-UD-CAP-R4-001` future Phase B).
+Phase A and Phase B use the M0B human precedent. r14 withdraws that precedent only for the
+unexecuted R2 recapture and records a future Agent migration path; until its Agent seam and a new
+D2 authorization/readiness are merged, R2 has no executable operator. The maintainer's
+review/merge remains the approval root and evidence attestation; same argv alone is not execution
+authority.
 
 Phase A captured only R1-R3. Phase B cannot become ready until a positive approved R2 structural
 output-family decision and the pinned selector/harness seam are independently done. Phase B then
@@ -272,7 +276,7 @@ file); 11. for each Recipe `R1`→`R2`→`R3`: `HP-2` → `SC-1` pre → `Rn` �
 `SC-3` → `SC-1` re-check, only if owned new file); 12. `FX-3` stop; 13. `FX-4` uninstall;
 14. evidence assembly (run.md, manifests, hashes, hardware-evidence) and sensitive scan.
 
-### r12/r13 R2-only persistent recapture sequence (D2 readiness r1; executable only after merge)
+### r12/r13 R2-only persistent recapture sequence (#715 historical; r14 revokes before execution)
 
 This sequence belongs only to `TASK-UD-R2-RECAPTURE-001`. Neither r12 nor r13 approval made it
 executable. r13 responded to the host-only blocker record
@@ -307,22 +311,27 @@ This independent D2 readiness r1 pins:
   `UD-R2-RECAPTURE-DAYU200-20260728-001`, `maxRuns=1`, start deadline
   `2026-08-04T16:00:00Z`. The first installed-HDC process consumes the run. The window is one
   continuous exclusive device/session interval from HP-0 through retained-raw recheck or truthful
-  abort; no concurrent HDC/device/flash/update/fixture operation and no retry are allowed.
+  abort; no concurrent HDC/device/flash/update/fixture operation and no retry are allowed. r14
+  revokes this unconsumed window on merge; these values remain historical audit facts only.
 
-These pins and the ready state take effect only when the exact D2 readiness head is reviewed and
-merged by the maintainer. Before that merge, installed-HDC/device/fixture/Recipe dispatch remains
-zero. After merge, any expired/interrupted window or pin/capability/storage mismatch requires a new
-readiness; the operator cannot continue by fallback.
+These pins and the ready state took effect when #715 was reviewed and merged. r14 supersedes only
+its executor/window authority; HDC/device/fixture/Recipe dispatch remains zero, and a future Agent
+run must obtain a new readiness instead of continuing by fallback.
 
 The controlled session root must resolve outside every Git repository and outside
 `/private/tmp`, `/private/var/tmp`, the resolved `$TMPDIR`, every teardown-owned directory, and
 any other OS temporary or ephemeral location. It is created owner-only (`0o700`); raw files remain
 `0o600`. The real path is never recorded in Git or the task conversation.
 
-Once and only once that D2 readiness is merged, the human maintainer runs:
+Historical #715 text named the human sequence below. r14 revokes that unconsumed window on merge,
+so the sequence is currently **non-executable**. A future Agent readiness may materialize the same
+typed steps only after `TASK-UD-AGENT-CAPTURE-SEAM-001 done`, current Agent-capable evidence/
+authorization contracts, machine identity+firmware readback, deterministic window/sidecar
+classification, opaque raw handles and a new one-run D2 authorization are all pinned:
 
 1. offline harness tests, SDD guard and tool/file-hash preflight;
-2. `HP-0`; physical target confirmation; `HP-1`;
+2. `HP-0`; historical human path used physical confirmation, while a future Agent path requires
+   the separately pinned machine model+serial-digest+firmware readback; `HP-1`;
 3. fixture HAP hash recomputation; `FX-1`; `FX-2`; unique foreground confirmation;
 4. `HP-2` → `SC-1` pre → `INV-1` → `SC-1` post → optional owned-only
    `SC-2` → `SC-3` → `SC-1` absent re-check;

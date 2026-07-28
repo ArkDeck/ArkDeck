@@ -1,7 +1,7 @@
 # CHG-2026-008 Verification Plan
 
 > Status:planned
-> Change:CHG-2026-008-ui-dump-hidumper-wrapper@r13
+> Change:CHG-2026-008-ui-dump-hidumper-wrapper@r14
 > Core baseline:CORE-2.0.0
 
 本文件是 r3 review-remediation verification plan(经 2026-07-20 维护者裁剪决定收敛,
@@ -51,11 +51,18 @@ process/device/fixture/Recipe/raw/destructive dispatch 均为 `0`。
 `f065ac90e69ff89c9ebb8817bfb4f9ebb1b0ed7d` 起草 `TASK-UD-R2-RECAPTURE-001
 blocked→ready`：固定 current harness/HDC/target/fixture/argv/sidecar/schema/storage
 pins，接受 #248/#251 的 exact-device typed capability evidence，并安排 human-only
-named one-run exclusive window。该状态只在 readiness exact head 由维护者 merge 后
-生效；draft 已 rebase 到 current main
+named one-run exclusive window。该状态已由 PR #715 的 exact head 经维护者 merge
+生效；其 draft 当时 rebase 到 main
 `eaa57f9281c6194e1bada0c740bde1d6e4f48fc6`，intervening CHG-2026-042 tasks 与
-本输入零重叠；draft/PR 阶段仍零 installed-HDC/device dispatch，且不包含 capture
-evidence。
+本输入零重叠；readiness PR 自身零 installed-HDC/device dispatch，且不包含 capture
+evidence。该窗口尚未消费，并由下述 r14 在 merge 时撤销。
+r14 在 #715 merge 后执行 host-only executor/risk audit：current hardware-evidence v2
+只接受 human operator，CHG-2026-025 v3 仍为未归档 change-local draft；现有 harness
+还缺 machine identity/firmware readback、授权 provenance/usage、确定性 window/sidecar
+parser 与 opaque raw handle。r14 因此在 merge 时撤销未消费的 human-only window，使
+R2 recapture 回到 blocked，并新增 blocked 的
+`TASK-UD-AGENT-CAPTURE-SEAM-001`。本 revision 零 current contract/Core 修改、零
+seam implementation、零 raw、零 installed-HDC/device dispatch。
 
 ## Readiness environment
 
@@ -68,9 +75,10 @@ evidence。
   (`HP-0..HP-2`)、exact-path 清单与结果判定规则。official source 没有 DAYU200
   target-build source/binary mapping,不能证明 output mode;R1-R4 首次 target capture
   全部保守归入 `captureRemoteFile/deviceMutation`,不存在 readOnly Recipe case。
-- 采集授权模型 = M0B 先例:runbook + 人类维护者亲手执行 + 维护者对 evidence PR 的
-  review/merge attestation。production supervisor/binding 栈、journal 授权链与 offline
-  receipt verifier 均不是本 change 前置(JAUTH 候选项见 backlog)。
+- Phase A 与 future Phase B 的采集授权模型仍是 M0B 人工先例。r14 仅对尚未执行的
+  R2 recapture 撤销该模型；在 Agent seam done、Agent-capable evidence contract
+  current 与新的 D2 authorization/readiness 前没有可执行 operator。旧 #715 window
+  与 CHG-2026-025 change-local draft 均不能被复用为 Agent authority。
 - `TASK-UD-CAP-MUT-001` 的五项 readiness 输入已由 r4 固定(fixture HAP 元组含
   SHA-256、`INV-1`/`SC-1..SC-3`/`FX-1..FX-4` 字面 argv、唯一 literal sidecar path、
   操作者与时间窗规则;见 tasks.md Readiness review 与 runbook)。r6 追加唯一剩余前置:
@@ -96,15 +104,17 @@ evidence。
 - `TASK-UD-R2-R4-SEAM-001` 保持 blocked,直到上述 decision positive done 与独立 readiness
   合入。它才可实现 same-session selector/private bundle 与 R4 harness seam;其后仍需独立
   `TASK-UD-CAP-R4-001 blocked→ready` PR。任一 gate 缺失时 R4 dispatch `0`。
-- `TASK-UD-R2-RECAPTURE-001` 在 r12/r13 merge 后由本独立 D2 readiness r1 起草
-  `ready(on merge)`。它在 protected `main` 重验 harness/tool/device/firmware/fixture/argv/
+- `TASK-UD-R2-RECAPTURE-001` 在 r12/r13 merge 后由 PR #715 的独立 D2 readiness r1
+  置为 historical human-only `ready`。该 readiness 在 protected `main` 重验 harness/tool/device/firmware/fixture/argv/
   sidecar/schema pins（HDC 单一 expected tuple =
   `/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/toolchains/hdc` /
   `Ver: 3.2.0f` /
   `05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83`）、
   per-device typed capability evidence、操作者/具名窗口与 persistent-root predicate;只可
   人类执行 R2-only sequence,R1/R3/R4 与 Agent dispatch `0`。fresh sidecar 必须在非
-  临时仓外 root 保留并在 evidence 后复核 identity。
+  临时仓外 root 保留并在 evidence 后复核 identity。该段是 #715 历史 readiness；
+  r14 merge 后窗口撤销、任务 blocked，future Agent path 改由下述 seam/current
+  contract/new D2 gates 约束。
 - `TASK-UD-R2-REDIAG-001` 等待 recapture done 与独立 D1 readiness 重钉 fresh raw
   length/SHA-256、retention、diagnosis tool OID/hash 与 CLI;只测量 fresh raw。它不能
   追溯旧 raw 根因,也不自动授权 redactor/decision/seam/R4/UD-001。
@@ -133,7 +143,8 @@ evidence。
 | r3 conservative Phase A capture | `INT-UD-CAPTURE-MUT-001` | `TEST-INT-UD-CAPTURE-MUT-001` / human runbook deviceMutation capture(经 pinned harness) | R1-R3 exact arrays + HP preflight 记录 + exact-path 清单 + 分立 raw origin + harness OID/hash + hardware evidence |
 | r10 R2 structural output-family decision | `INT-UD-R2-DECISION-001` | `TEST-INT-UD-R2-DECISION-001` / human-offline derived-fixture review | redactor receipt/hash chain + reviewed derived positive fixture + structural family/locator + failure/unknown precedence + zero token/raw/device exposure |
 | r11 R2 raw 根因只读诊断(readiness r1 固定) | `INT-UD-R2-DIAG-001` | `TEST-INT-UD-R2-DIAG-001` / human host-only read-only diagnosis + offline synthetic adversarial contract | readiness r1 pinned raw 二元组 hash gate(866256 bytes / `ec6663e6…`)+ closed 非内容 JSON 报告 `arkdeck-ud-raw-diagnosis-1.0.0` + 双普查面(UTF-8 结构/码点策略,镜像 `INVALID_UTF8=26`/`INVALID_UNICODE=27` 代码路径)+ synthetic 32 用例族与 AST/policyRefs 审计 + Agent raw read `0` 零设备 dispatch + 维护者 review/merge attest |
-| r12/r13 + D2 readiness r1 R2-only persistent recapture | `INT-UD-R2-RECAPTURE-001` | `TEST-INT-UD-R2-RECAPTURE-001` / human closed-runbook deviceMutation recapture | r13 exact HDC repin + 本独立 D2 readiness 的 exact-device capability/window acceptance + existing harness exact sequence + persistent non-temp controlled root + fresh absent→new regular R2 sidecar + separated complete origins/hash + post-evidence retention identity + R1/R3/R4 与 Agent/destructive dispatch `0` |
+| r12/r13/r14 future authorized-Agent R2-only persistent recapture | `INT-UD-R2-RECAPTURE-001` | `TEST-INT-UD-R2-RECAPTURE-001` / authorized-Agent closed deviceMutation recapture after new D2 gate | current Agent evidence contract + seam done + fresh exact-device authorization/readiness + existing typed sequence + machine identity/firmware readback + persistent non-temp opaque raw storage + fresh absent→new regular R2 sidecar + separated complete origins/hash + post-evidence retention identity + R1/R3/R4 与 destructive dispatch `0` |
+| r14 authorized-Agent capture admission seam | `INT-UD-AGENT-CAPTURE-SEAM-001` | `TEST-INT-UD-AGENT-CAPTURE-SEAM-001` / offline fake+synthetic contract | current Agent evidence/authorization consumer + protected-main provenance/durable usage + machine identity/firmware readback + deterministic window/sidecar parsers + opaque raw handle + typed intent/outcome/abort state machine；all-negative process/HDC/device dispatch `0` |
 | r12 fresh R2 raw non-content diagnosis | `INT-UD-R2-REDIAG-001` | `TEST-INT-UD-R2-REDIAG-001` / human host-only fresh-input diagnosis | recapture done + 独立 D1 readiness 重钉 fresh length/hash/tool OID + existing closed diagnosis schema与synthetic 37/37 + fresh-only measurement + Agent raw read/installed-HDC/device dispatch `0` |
 | r10 same-session selector/harness seam | `INT-UD-R2-R4-SEAM-001` | `TEST-INT-UD-R2-R4-SEAM-001` / offline synthetic adversarial contract | exactly-one selector + private bundle/receipt closed schemas + typed path/expected-hash reference + session/window/raw binding + R4 exact argv + all-negative zero dispatch/leak |
 | r3/r10 conservative Phase B R4 capture | `INT-UD-CAPTURE-R4-001` | `TEST-INT-UD-CAPTURE-R4-001` / decision-bound human deviceMutation capture | fresh same-session R2 + selector receipt/private-bundle hash + R4 exact array + HP preflight + 清单/cleanup + hardware evidence |
@@ -151,6 +162,7 @@ local capture/redactor case 不关闭 canonical Core evidence,其 canonical 输�
 | `TASK-UD-R2-DECISION-001` | `REQ-DUMP-003/005/008` → `AC-DUMP-003-01/005-01/008-01` → matching `TEST-AC-DUMP-*` | read-only Safety inputs;derived structural decision 不认领 canonical PASS,不登记 exact token |
 | `TASK-UD-R2-DIAG-001` | `REQ-DUMP-005/008` → `AC-DUMP-005-01/008-01` → matching `TEST-AC-DUMP-*` | read-only Safety inputs;非内容只读诊断不认领 canonical PASS,不产出 derived/fixture,不解锁任何复活分支 |
 | `TASK-UD-R2-RECAPTURE-001` | `REQ-DUMP-002/005/006/007/008` → `AC-DUMP-002-01/005-01/006-01/007-01/008-01` → matching `TEST-AC-DUMP-*` | Safety inputs;只贡献 fresh proven-owned R2 raw 与 retention facts,不关闭 canonical parser/artifact/cleanup/platform evidence |
+| `TASK-UD-AGENT-CAPTURE-SEAM-001` | `REQ-DUMP-002/005/006/007/008` → matching Safety AC/Test inputs | host-only authorization/readback/privacy orchestration input；fake/synthetic contract 不执行真实设备、不关闭 canonical evidence |
 | `TASK-UD-R2-REDIAG-001` | `REQ-DUMP-005/008` → `AC-DUMP-005-01/008-01` → matching `TEST-AC-DUMP-*` | read-only Safety inputs;fresh 非内容测量不认领 canonical PASS,不产出 derived/fixture,不解锁 downstream |
 | `TASK-UD-R2-R4-SEAM-001` | `REQ-DUMP-003/005/008` → `AC-DUMP-003-01/005-01/008-01` → matching `TEST-AC-DUMP-*` | read-only Safety inputs;synthetic selector/bundle contract 不认领 canonical PASS |
 | `TASK-UD-CAP-R4-001` | `REQ-DUMP-003/005/006/007/008` → `AC-DUMP-003-01/005-01/006-01/007-01/008-01` → matching `TEST-AC-DUMP-*` | read-only Safety inputs;`AC-DUMP-003-01` 只在 `TASK-UD-001` 关闭;capture task 不认领 canonical PASS |
@@ -165,7 +177,8 @@ local capture/redactor case 不关闭 canonical Core evidence,其 canonical 输�
 | INT-UD-CAPTURE-MUT-001 | human runbook Phase A first target-build deviceMutation capture | no readOnly Recipe branch;HP-0..HP-2 preflight 记录且恰一目标;每条命令显式 `-t`,connect key 只来自同会话 inventory;R1-R3 exact one-element payloads;exact-path pre/post 清单与 owned-only cleanup;stdout/stderr/sidecar 分立 raw origin 逐流 SHA-256;raw 全部留仓库外;hardware-evidence 过 schema 且 claimed operator 由维护者 review attest;destructive/Agent dispatch 0 | passed(TASK-UD-CAP-MUT-001 done;PR #248 + status PR #251;`evidence/runs/TASK-UD-CAP-MUT-001/attempt-3-complete-20260721/`) |
 | INT-UD-R2-DECISION-001 | human-offline deterministic R2 derived-fixture decision review | 固定 redactor 对 #248 R2 sidecar exact raw hash执行;receipt/schema/hash chain 与 reviewed derived fixture byte parity 完整;登记 positive structural family、failure/unknown precedence、deterministic locator 与 exactly-one candidate rule;不登记 token;Agent raw read、HDC/device/network dispatch 均为 0;若无法形成 repo-safe positive fixture或唯一 locator则 truthful negative decision且后续保持 blocked | passed(truthful-negative evidence/decision PR #263 `952b0f7` + status PR #267 `c9b3f77`;fixed redactor 返回 `INVALID_UNICODE`/27,零 derived/receipt,SEAM/R4/UD-001 保持 blocked) |
 | INT-UD-R2-DIAG-001 | human host-only read-only non-content diagnosis of the pinned R2 raw + offline synthetic adversarial contract | readiness r1 固定 exact CLI 与 closed schema `arkdeck-ud-raw-diagnosis-1.0.0`;输入门实测长度/SHA-256 精确等于 #248 pinned R2 raw 二元组(866256 bytes / `ec6663e6…077`),失配 `INPUT_HASH_MISMATCH` 零输出;报告只含非内容事实(error name/code、字节总数、invalid 偏移/长度/计数、首末偏移、字节类别直方图、十分位分布与 tail 布尔、工具/policy hash),值类型法则禁止任何 raw 子串/解码文本/内容窗口/页面文本/window/component 字面量,输出侧终检 fail closed;双普查面镜像 redactor 错误路径(`INVALID_UTF8=26`/`INVALID_UNICODE=27`);synthetic 32 用例族 + AST/policyRefs 强制审计全 PASS,零真实 raw;维护者仓外亲手执行 exact CLI,Agent raw read `0`,installed HDC/device/network/GUI/destructive dispatch 均 `0`;done 另需二值根因结论(raw-data 或 pipeline)与独立 status PR,无法判定/歧义/双因则 status 回 blocked;不授权任何复活分支 | blocked(implementation + synthetic evidence 已经 #683 merge `495c7356081a83d18538ae6fcdb3e3580134dfbf` 合入,synthetic 矩阵 37/37 PASS;humanOfflineDiagnosis 半面永久不可执行——pinned exact input 经维护者 2026-07-28 亲手离线检索证实永久不可得,四组目录区级检索全部零命中,见 `evidence/runs/TASK-UD-R2-DIAG-001/input-unavailability.md`;依 readiness r1 fail-closed 条款 status 回 blocked,旧 raw 的 raw-data vs pipeline 根因永久不可测,不引入新根因主张、不授权任何复活分支;复活须新 proposal 修订收窄到重捕分支) |
-| INT-UD-R2-RECAPTURE-001 | human R2-only persistent controlled deviceMutation recapture | r13 exact HDC repin 后，本 D2 readiness 重钉 current harness/tool/device/fixture/argv/sidecar/schema pins，接受 #248/#251 exact-device typed capability evidence，并固定 `UD-R2-RECAPTURE-DAYU200-20260728-001` human-only one-run exclusive window（start deadline `2026-08-04T16:00:00Z`）;owner-only persistent root 在 git 与 OS temp/ephemeral roots 外;exact HP/FX/INV-1/R2/SC sequence只 dispatch R2 一次,R1/R3/R4 为 0;R2 sidecar必须 absent→new regular→SC-2 receive→SC-3 exact cleanup→absent,origin 分立且 complete/untruncated/whole-hashed;repo-facing evidence 只含 redacted manifests/hash/placeholder retention facts与 schema-valid hardware evidence;post-evidence no-follow recheck 证明 retained `0o600` raw length/hash不变;Agent/destructive dispatch 0;不作 success/old-root claim | ready(on D2 readiness r1 merge；draft/PR 阶段仍 blocked/零 device dispatch) |
+| INT-UD-R2-RECAPTURE-001 | future authorized-Agent R2-only persistent controlled deviceMutation recapture | r14 撤销 #715 未消费 human window并使任务 blocked；future run 须 Agent seam done + Agent-capable current evidence contract + fresh D2 authorization/readiness，逐项固定 authorizationRef/durable usage/machine target+firmware readback/HDC/fixture/argv/parser/opaque storage；exact sequence只 dispatch R2 一次,R1/R3/R4 为 0；sidecar absent→new regular→receive→exact cleanup→absent且 origins/retention whole-hashed；raw/path零 Agent/model/repo exposure；unknown/drift/leak零 further dispatch | blocked(r14 merge 后；等待 seam/current contract/new D2 gate) |
+| INT-UD-AGENT-CAPTURE-SEAM-001 | offline fake+synthetic authorized-Agent admission/orchestration contract | Agent 只提交 authorization ID/opaque handles；trusted ports 取得 protected-main provenance、durable maxRuns、binding、machine identity/firmware；registered parsers二值化 window/sidecar；typed intent/outcome/abort/teardown 与 raw zero-leak；所有缺失/伪造/并发/unknown/tamper/timeout/leak 负例 process/HDC/device dispatch `0` | blocked(等待 current Agent-capable contracts 与独立 D1 readiness) |
 | INT-UD-R2-REDIAG-001 | human host-only non-content diagnosis of the fresh retained R2 raw | recapture done 后独立 D1 readiness 重钉 fresh length/hash、retention、tool OID/hash、policyRefs、interpreter与 exact CLI;复用 closed `arkdeck-ud-raw-diagnosis-1.0.0`,existing synthetic 37/37+AST/policyRefs与输出终检同 revision PASS;报告只登记 fresh raw 的 NONE/INVALID_UTF8/INVALID_UNICODE 非内容 measurement,路径/bytes不入仓且 Agent raw read 0;不追溯 old root、不自动授权 redactor/output-family/SEAM/R4/UD-001 | blocked(等待 recapture done 与独立 D1 readiness) |
 | INT-UD-R2-R4-SEAM-001 | offline synthetic adversarial selector/private-bundle/R4 harness contract | selector 只读 fresh same-session proven-owned complete R2 raw并依 approved decision exactly-one 选择;private `0o600` bundle含 token/256-bit nonce/decision/raw/session/window binding且不入仓不输出;repo-safe receipt不含 token/nonce;harness 只接受 typed path + expected SHA-256 reference并内部 materialize R4 one-element payload;zero/multiple/stale/tamper/symlink/mode/path/injection/drift/truncation全为零 request/process/HDC dispatch且零敏感泄漏 | blocked(等待 positive decision done 与独立 readiness) |
 | INT-UD-CAPTURE-R4-001 | decision-bound human Phase B deviceMutation capture | positive R2 structural decision与selector/harness seam均 done后,在 fresh Phase B 同一 fixture/window lifetime执行 R2→selector private bundle→R4;Phase A token 不复用,token/nonce/bundle bytes不入仓;R4 exact one-element payload与 Phase A 相同的 preflight/清单/cleanup/privacy gates;repo-safe receipt、bundle hash与hardware-evidence链闭合;destructive/Agent dispatch 0 | blocked |
@@ -176,16 +189,18 @@ local capture/redactor case 不关闭 canonical Core evidence,其 canonical 输�
 
 ## Real-hardware evidence gate
 
-`TASK-UD-CAP-MUT-001`、`TASK-UD-R2-RECAPTURE-001` 与 `TASK-UD-CAP-R4-001` 各自
-必须提交其 evidence directory 下的 `hardware-evidence.json`,并只读消费
-`openspec/contracts/hardware-evidence.schema.json`(version 2.0.0,provider none)。每份
-记录必须包含 claimed operator、physical target/serial、firmware、toolchain、transport、
-executedAt、该 task exact acceptance ID、actual step kinds 与所有 repo-facing artifact
-path/hash。RECAPTURE 另须在 run.md 记录 persistent-root predicate 与 fresh raw
-post-evidence retention recheck;raw 的实际路径/bytes 不进入 hardware evidence 或 Git。
+历史 `TASK-UD-CAP-MUT-001` 与 future human `TASK-UD-CAP-R4-001` 仍按其 readiness
+只读消费 current hardware-evidence schema。r14 后的
+`TASK-UD-R2-RECAPTURE-001` 不得再以 v2 human evidence 执行；它必须等待
+Agent-capable schema 成为 current，并提交 executor.kind=agent、可解引用
+authorizationRef 与 machine target confirmation 的 schema-valid evidence。每份记录仍须
+包含设备 identity digest、firmware、toolchain、transport、executedAt、exact acceptance
+ID、actual step kinds 与所有 repo-facing artifact path/hash。RECAPTURE 另须在 run.md
+记录 persistent-root predicate 与 fresh raw post-evidence retention recheck；raw 的实际
+路径/bytes 不进入 Agent output、hardware evidence 或 Git。
 
 evidence PR 必须运行 JSON-schema 校验并在 `run.md` 记录校验工具的 path/version(执行时
-记录,不预钉 hash)。schema 校验只证明结构;claimed operator 与 run 叙述的真实性由
+记录,不预钉 hash)。schema 校验只证明结构;claimed executor/operator 与 run 叙述的真实性由
 维护者对 evidence PR 的 review/merge attestation 保证——与本仓库其他 merge 相同的
 信任根(先例 EVD-M0B-DAYU200-20260718-001)。schema 校验失败或 artifact hash 断链时
 不构成 realHardware evidence/PASS。
@@ -196,19 +211,19 @@ evidence PR 必须运行 JSON-schema 校验并在 `run.md` 记录校验工具的
   controlled raw/full manifest。r9 remediation 与 fresh Phase A 已完成;#248/#251 只关闭
   Phase A capture protocol,没有登记 R1-R3 success family,也没有授权 R4。
 - #695 已证明 #248 R2 pinned raw 永久不可得;旧 raw 根因不得再猜测或重建。r12 仅声明
-  recapture-only 后续链,不使重采 ready。只有独立 D2 readiness 合入后,人类维护者才可
-  在具名窗口执行 R2-only sequence;fresh raw 必须落在非临时 persistent controlled root
+  recapture-only 后续链；#715 后曾存在 human-only D2 window，但 r14 merge 将其撤销。
+  future R2-only sequence 只有在 Agent seam/current contract/fresh D2 authorization
+  readiness 全部合入后才可执行；fresh raw 必须落在非临时 persistent controlled root
   并通过 retention identity recheck。随后仍须独立 D1 readiness 按新 length/hash 重钉
   diagnosis;任一步都不自动解锁 SEAM/R4/UD-001。
 - r13 只替换 recapture `HP-0` 的 expected HDC identity，不是 D2 readiness。旧
   `3.2.0d` pin 不得作为 fallback；后续 host hash或窗口内 runtime version/hash与
   `3.2.0f` / `05b2…f83` 任一不符时，fixture/device/Recipe dispatch 为 `0` 并重新
   readiness/revision。
-- 本 D2 readiness r1 只在 merge 后使任务 ready；named window =
-  `UD-R2-RECAPTURE-DAYU200-20260728-001`，human `lvye` only，`maxRuns=1`，start
-  deadline `2026-08-04T16:00:00Z`，first installed-HDC dispatch 消费。窗口前/外、
-  中断、并发、pin/capability/storage mismatch 或 retry 均为零 further dispatch 并要求
-  新 readiness；本 readiness PR 自身不执行窗口。
+- #715 D2 readiness 曾使任务 human-only ready；r14 merge 撤销其尚未消费的
+  `UD-R2-RECAPTURE-DAYU200-20260728-001`。该 window 不得开始、改名或转授
+  Agent；r14 后任何 recapture 必须等待 Agent seam/current contract 与新的 D2
+  authorization/readiness，之前 installed-HDC/device dispatch 为 `0`。
 - expected local HAP echo allowance 只属于 future schema `1.1.0` 的 `FX-1` stdout exact
   validated span。它不允许第二条/变体用户路径,不适用于 stderr/其他 command,不放宽
   key-material、timeout/truncation/drain 或 repository-facing `_assert_redacted_clean` gate。
