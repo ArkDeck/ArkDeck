@@ -574,8 +574,136 @@ change approved 前保持 blocked;approved 后每任务另需独立 readiness PR
 
 ## TASK-AIN-BKMK-001 — pinned tool 宿主前置消费与签名身份解耦(remediation)
 
-- Status:blocked（前置:本登记合入后另起独立 readiness PR;Depends on 的
-  TASK-AIN-003 done 已满足。本登记 PR 零实现、不触碰 `Packages/**`）
+- Status:blocked（r1 D1 blocked-readiness；三个登记候选均不能在本任务现有
+  scope 内同时满足「跨不同签名身份消费」正向 AC 与既有 security-scoped/
+  persistence 语义。本记录只钉定实测、输入与停止边界；合入不构成 `ready`，
+  不得开始 implementation/evidence，零 `Packages/**` 修改。）
+- Historical Status:blocked（前置:本登记合入后另起独立 readiness PR；
+  Depends on 的 TASK-AIN-003 done 已满足。本登记 PR 零实现、不触碰
+  `Packages/**`。）
+- Readiness review(r1,2026-07-28):
+  - **Approval/dependency gate:satisfied for audit only。**本 remediation 登记
+    #697 以 merge `25d504285f60e0b343ed45be2821e88c664102d9` 合入 protected
+    main；前置 TASK-AIN-003 与其 composition remediation TASK-AIN-003R 均
+    done，后者 #698 以 merge
+    `51c1d9e9edf38dcbf77638c3e5ea0eb28bc470a8` 合入。两者都是 audit base
+    的祖先；dependency done 只允许本次独立 D1 勘察，不预先接受 bookmark
+    机制、scope 扩展或 CHG-2026-036 协调。
+  - **Audit base/input pins:closed for blocked-readiness。**audit base =
+    protected main
+    `f20077a0630147be879acb5a8db5ae780ae79b2a`(#701 merge)。起草期间合入的
+    #700/#701 相对先前 main
+    `e114d9d3ae668bff68d2cfb69c59fa6f4dff00ec` 只改 CHG-2026-022
+    `tasks.md` 与 CHG-2026-042 四个 proposal 文件，下列非载体 pin 逐项未漂移。
+    任何后继治理/readiness 必须从本 blocked-readiness merge 重新核验：
+
+    ```yaml pins
+    - path: Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipFlashExecutionHost.swift
+      blob: ace82b11bec98474df2fa2e9aa834e408893cfa5
+    - path: Packages/ArkDeckKit/Sources/ArkDeckCLI/ArkDeckCLIMain.swift
+      blob: 9267e44e4a8f75e09f8152c2d26ef07a115f4ccc
+    - path: Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipDeviceDiscovery.swift
+      blob: 38e38a2afc479993588a13c3fb10a8c7393eb64b
+    - path: Packages/ArkDeckKit/Sources/ArkDeckStorage/SessionManifest.swift
+      blob: 87baadf3cd228660acb9923463cf288e90de6934
+    - path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/RockchipDeviceDiscoveryContractTests.swift
+      blob: 2a8318f6c4a54b44f7f6644d98b5c42825c988c5
+    - path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/RockchipFlashExecutionContractTests.swift
+      blob: 82629470a4e8c16e5935159fa19aa93a0a2cf43a
+    - path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/RockchipProductionCompositionContractTests.swift
+      blob: f58ac01babeb9990924e34cdbabebd50d31acc5b
+    - path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/SessionArtifactStorageContractTests.swift
+      blob: 68904a3f9ac87d70c31547c3242af86c232807a1
+    - path: openspec/changes/chg-2026-025-ai-native-unattended-device-ops/tasks.md
+      blob: ff90a8a222a8a8bc5278e994d786535b6c884160
+    - path: openspec/changes/chg-2026-025-ai-native-unattended-device-ops/verification.md
+      blob: ecca35cc41ad30286dbafaa0f22d0c26089d2b8a
+    - path: openspec/changes/chg-2026-025-ai-native-unattended-device-ops/contracts/manifest.schema.v2.1-draft.json
+      blob: 02c7f27a9d65cbbca6e8fe23535ae8e62e398e7c
+    - path: openspec/changes/chg-2026-025-ai-native-unattended-device-ops/evidence/host-prerequisites/installation-runbook.md
+      blob: 26509a32d0419246dbfa6b3e1f6cd98959a4e4aa
+    - path: openspec/changes/chg-2026-036-macos-bundled-rockchip-component/tasks.md
+      blob: de23d56688e713d90a2b12706e8d44651cffa164
+    ```
+
+  - **Primary contract/repository seam gate:binary conflict。**Apple 的
+    [security-scoped bookmark creation
+    option](https://developer.apple.com/documentation/foundation/nsurl/bookmarkcreationoptions/withsecurityscope)
+    面向采用 App Sandbox 的进程；其
+    [sandbox file-access guidance](https://developer.apple.com/documentation/security/accessing-files-from-the-macos-app-sandbox?language=objc)
+    区分「跨进程但无需持久 sandbox access」的普通 bookmark 与持久
+    security-scoped bookmark；带
+    [security scope 的 resolve
+    option](https://developer.apple.com/documentation/foundation/nsurl/bookmarkresolutionoptions/withsecurityscope?changes=_4__5__8)
+    只应用创建时已附加的 scope。现仓并非只在 Host `load()` 解一次：
+    Host:783–801 以 `[.withSecurityScope,.withoutUI]` resolve、要求
+    `startAccessingSecurityScopedResource()`，并构造
+    `userSelectedSecurityScopedBookmark`；Discovery:21–29、496–530、561–604
+    又要求 `requiresSecurityScopedBookmark=true`、同选项再 resolve 后才可能
+    `ld`；Host:540、Storage:791/987–993 与 manifest schema:164–172 则把
+    `pathSource=userSelectedSecurityScopedBookmark` 锁进证据。普通 bookmark
+    不能只改 Host/CLI 后继续诚实地冒充该类型。
+  - **Controlled matrix:ordinary direction proven, scoped replacement not
+    proven。**host = macOS 26.5.2(`25F84`) arm64、Apple Swift 6.3.3；自有最小
+    probe source SHA-256 =
+    `7b7465858f3aef46a507b67524d1f104262f2a273349ccab9757efe5cba97191`，
+    只在 `/private/tmp` 编译/读写自有 bookmark 文件，不读写产品 defaults，
+    不启动目标工具。目标实体只做 read-only hash，实测
+    `~/dayu200-rehearsal/rkdeveloptool/rkdeveloptool` SHA-256 =
+    `038a8a0ea26ef7eb77451789f310c0c9fbeaf43a78af1d6146e02311a9c23611`
+    命中 production pin：
+
+    | 创建者 | 消费者 | bookmark / resolve 实测 |
+    | --- | --- | --- |
+    | ad-hoc `creator`(Identifier `creator`，CDHash `b5718436dfbb1fe55109d9f761931e75221ea422`) | ad-hoc `consumer`(Identifier `consumer`，CDHash `91367e2a8c4b166652808226f8074138e5794d73`) | 普通 bookmark：`stale=false,file=true,absolute=true,target_match=true,scope=false` |
+    | Apple `swift` 解释器 | 上述 `consumer` | 普通 bookmark：同样 PASS |
+    | 上述 `creator` | 上述 `consumer` | 同一普通 bookmark 改以 `.withSecurityScope` resolve：`NSCocoaErrorDomain Code=256` |
+    | 显式同 Identifier `dev.arkdeck.bookmark-probe`、不同 CDHash `135f610d…` / `92802fe6…` 的两构建 | 跨构建 scoped 验证 | 当前 agent 宿主连 scoped create 都以 Code=256(`Could not open() the item`)失败，故**未形成正向证据** |
+
+    普通 bookmark 的跨身份解析结论可复现于 `/usr/bin/true` 与上述实际 pinned
+    tool；`scope=false` 是普通 bookmark 的预期观察，不是 security-scope 成功。
+    当前宿主无法创建 scoped bookmark 是勘察环境限制，不能推翻 Defect record 2
+    已记录的同身份 scoped 成功/跨身份 Code=259，也不能据此臆断稳定 Identifier
+    路线成功。
+  - **Candidate (a):BLOCKED by approved scope/contract。**普通 bookmark 已证明
+    不依赖创建者签名身份，但要让产品消费，至少必须同时修改 Discovery 的
+    path-source/access 模型、Storage/manifest canonical 值、draft schema、对应
+    tests 与 runbook。前三项实现/契约面不在当前 Allowed paths，schema 还被
+    Forbidden paths 明确禁止；只改 Host/CLI 会在 Discovery 二次 scoped resolve
+    失败，或让 persisted evidence 错称 security-scoped，均不可接受。需要先以
+    独立治理 PR 明确新的 typed pathSource、scope 与迁移/负向语义并扩充 exact
+    paths，不能由本 readiness 静默扩面。
+  - **Candidate (b):REJECTED by declared positive AC。**同一构建产物提供 install
+    子命令，只能复用同一 code-sign identity；本任务正向要求「签名身份不同的
+    两个构建产物先后消费同一已安装第 1 项前置」。把 r4 窗口收窄为同一 binary
+    不满足该二值 AC，除非先经治理修改 Objective/Verification；readiness 无权
+    降格验收。
+  - **Candidate (c):BLOCKED by cross-change dependency/evidence。**稳定签名身份
+    方向可保持现有 security-scoped/persistence 语义，但当前 controlled probe
+    无法产生其跨构建正向证据；CHG-2026-036 TASK-BRC-003 仍在 D2
+    release-environment gate（缺 Developer ID/notary/materialization handoff）
+    blocked，TASK-BRC-004 又依赖 BRC-003 done + 独立 D1，尚未迁移
+    product-owned composition。按本任务原 handoff，选择该方向前必须先用独立
+    治理 PR 协调依赖/scope，不能把未完成的签名/分发 change 当作本任务输入。
+  - **Readiness verdict:BLOCKED。**三个候选中不存在一个能在当前批准 scope/
+    inputs 下闭合 AIN-BKMK-001。下一步须由独立治理 PR 二选一并经维护者
+    review/merge：(A) 扩展本任务 scope/contract，正式采用普通 bookmark typed
+    semantics；或 (C) 固定 CHG-2026-036 的前置依赖与可复核稳定签名身份正向
+    evidence。若选择其他机制，也必须先修订 Objective/Verification/allowed
+    paths。该治理门合入后仍须 fresh D1 readiness；在此之前任务保持 blocked，
+    不开 implementation/evidence。
+  - **Baseline/effect/concurrency gate:satisfied for blocked-readiness。**
+    audit base 全量 `CI=true swift test --package-path Packages/ArkDeckKit` =
+    442 tests / 1 skipped / 0 failures；其中 AC-FLASH-015-01/02 canonical
+    摘要仍为 dispatch=0。`./scripts/check-sdd.sh` = 0 error / 0 warning /
+    111 acceptance IDs，`python3 scripts/test_check_pr_paths.py` = 49/49 PASS，
+    `git diff --check` 干净。勘察只编译/签名 `/private/tmp` 自有 ad-hoc probes、
+    解析 bookmark 与 read-only hash 工具实体；目标工具 launch、产品 defaults/
+    Keychain、产品 Process port/executor dispatch、HDC/USB/device、E1/E2/
+    deviceMutation/destructive、network 与 credential/system mutation全为 0。
+    `2026-07-28T07:06:39Z` 分页完整查询时，#700/#701 已成为本 audit base，
+    open PR 集合为空；两次 merge 与本 readiness 载体及全部 candidate surface
+    零交集。本 PR 只修改当前 `tasks.md` 的 TASK-AIN-BKMK-001 section。
 - Platform:macos
 - Requirements:REQ-FLASH-015(MODIFIED)
 - Acceptance:change-local AIN-BKMK-001(登记于 verification.md Acceptance
