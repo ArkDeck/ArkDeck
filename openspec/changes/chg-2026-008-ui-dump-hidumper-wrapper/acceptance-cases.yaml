@@ -116,6 +116,43 @@ cases:
     selector seam and R4 blocked. Agent raw-read and HDC, device, network, GUI,
     and destructive dispatch counts are zero. This case claims no canonical
     AC-DUMP PASS.
+- acceptance_id: INT-UD-R2-DIAG-001
+  test_id: TEST-INT-UD-R2-DIAG-001
+  method: Human-executed host-only read-only non-content diagnosis of the pinned R2 raw origin plus offline synthetic adversarial contract.
+  expected_source: openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/verification.md#INT-UD-R2-DIAG-001
+  minimum_evidence: realHardware
+  expected_result: After the independent readiness r1 is merged, a stdlib-only
+    host tool scripts/ui_dump_diagnosis/diagnose.py with zero shell, network,
+    or disk writes opens the controlled R2 raw read-only with no-follow,
+    refuses symlinks, non-regular files, in-repository paths, and oversized
+    input, and reports only after the measured length and SHA-256 exactly
+    equal the pinned 866256-byte raw origin whose hash is fixed by PR 248;
+    any mismatch is INPUT_HASH_MISMATCH with zero diagnostic output. The
+    stdout report is a single deterministic canonical JSON document under the
+    closed schema arkdeck-ud-raw-diagnosis-1.0.0 carrying only non-content
+    facts. It measures both the byte-level UTF-8 structure census and the
+    codepoint-level policy census mirroring the pinned
+    uidump-derived-redaction-v1 error path, in which a strict decode failure
+    is INVALID_UTF8 exit 26 while the observed INVALID_UNICODE exit 27 is
+    raised by the post-decode codepoint policy. Every value is an integer,
+    boolean, null, fixed enum literal, or 64-hex digest. Offsets, run
+    lengths, class counts, decile distributions, and tail-concentration
+    booleans never carry raw byte subsequences, decoded text, content
+    windows, page text, or window or component literals, and a fail-closed
+    output-side final check rejects any schema or value-law violation as
+    SENSITIVE_OUTPUT. The human maintainer personally executes the exact
+    pinned CLI outside every repository; the agent never opens or copies the
+    controlled raw; the raw path never enters the conversation, repository,
+    or evidence. Synthetic adversarial tests cover the readiness matrix of
+    thirty-two case families plus the AST and policy-reference audits and
+    use no real raw. Evidence records the verbatim report, tool and
+    interpreter hashes, and the maintainer's offline reading; done
+    additionally requires a binary root-cause conclusion of raw-data versus
+    pipeline and an independent status PR, while an inconclusive reading
+    returns the task to blocked. The diagnosis authorizes neither revival
+    branch, keeps SEAM, R4, and UD-001 blocked, executes zero installed HDC,
+    device, network, GUI, or destructive dispatch, and claims no canonical
+    AC-DUMP PASS.
 - acceptance_id: INT-UD-R2-R4-SEAM-001
   test_id: TEST-INT-UD-R2-R4-SEAM-001
   method: Offline synthetic adversarial contract for same-session selection bundle and R4 harness materialization.
