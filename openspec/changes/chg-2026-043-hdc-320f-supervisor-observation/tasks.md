@@ -234,17 +234,177 @@
 
 ## TASK-HSO-002 — Adopt the same exact 3.2.0f candidate in production supervisor observation
 
-- Status:blocked
+- Status:ready（2026-07-29 fresh D1 readiness；仅在维护者 review/merge 本独立
+  readiness PR 后生效；不构成 implementation、evidence、`ready→done`、
+  change verified、external ownership、health/version support、HDC/device/hardware
+  support 或任何 dispatch authority）
+- Fresh readiness review r1(2026-07-29；host-only，零 HDC/设备；仅在维护者
+  review/merge 本独立 D1 readiness PR 后生效):
+  - **Audit base, approval and dependency gate:**protected main
+    `248eb1e5348fb2bcc90c69af5d7b17c6954a99ca`，audit 开始时 open PR = 0。
+    CHG-2026-043 approval-only PR #738 exact head
+    `a95ae3f229cf0f74bcc8681c92ce9239d1e1890e` 由维护者 `lvye` APPROVED，
+    并以 `07daee30ba99636b5dc7a334bdefc3a07611acef` 合入。TASK-HSO-001
+    implementation PR #755 exact head
+    `38518eea9f487f76be2d065b882924376adbfdc3` 由 `lvye` APPROVED，并以
+    `4fc0cec76638cd299e6ccbaff7c5124a048a2106` 合入；其独立 `ready→done`
+    PR #756 exact head `30f816482a848f0943e58df5ff8bf5551257180e` 同样由 `lvye`
+    APPROVED，并以本 audit base 合入。proposal current blob
+    `51c6304f7a080f01035580fc0593fe22460c1ba4` 为 `approved`，TASK-HSO-001
+    current status 为 `done`；前置门已闭合。
+  - **Registered authority closure:**protected main 上 exact
+    `OPENHARMONY-HDC-SUPERVISOR-OBSERVATION-PROBES@1.0.0` canonical registry
+    blob `b202b9d34680a0e7bbdba1d02637279ca4819d3f` / SHA-256
+    `f1691f748da10f1bb7753167d71ff3b764a347676f97d5ec70a1e97ac35c9763`，
+    resource tree `87421493b8d353a402e0f777ef684e55db1f2981`，profile/lock/macOS
+    blobs `2ae13490e075f327bb7448ccacf908be5ba7e3aa` /
+    `836d4ccc8c34c5826b6c53dcf9004e678a506d25` /
+    `b7471666b0bbfbfade3fbd510ad831e45b3cf9b8`。它们闭合 exact macOS
+    `3.2.0f` / executable SHA-256
+    `05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83` /
+    endpoint `127.0.0.1:8710` / empty argv / invocation disallowed；
+    TASK-HSO-001 run blob
+    `db56cd004dd78295ab7129ee01f4f658cba71c9c`（SHA-256
+    `ac9554b997b94a32f5176a1a726f38a01b3523699937fe047fe881a73c2effb8`）
+    已复查。3.2.0d readonly 与 3.2.0f device canonical blobs
+    `99e8cc3d9929f9502a3e978a53cd56ad285d2aad` /
+    `399c5a102c7737bf6466e8a2c4c6a1d1b1bc0b6a` 仍是独立 authority，不得替代、
+    fallback 或跨 family 携带 receipt/generation/health/version。
+  - **Production root and single-selection proof:**current
+    `HDCApplicationDiagnosticsFacade.attachSessionIfConfigured` 在一次调用内只做一次
+    `HDCExternalFirstDiscovery.discover`，把同一 local `candidate` 和一次选择的
+    `endpoint` 先交给 supervisor composition，再交给
+    `HDCDeviceObservationApplicationSession.makeProduction`。现状 supervisor
+    只调用 exact 3.2.0d `observeRegisteredExistingServer`，所以 3.2.0f 会
+    unsupported；这正是本任务需在已声明三个 production source 路径内闭合的 gap，
+    不是 readiness 已实现的能力。实现必须以 candidate/endpoint identity spies
+    证明两个 consumer 接收同一实例/值，且 replacement、fallback、第二次 discovery、
+    第二 candidate 或第二 session 的 mutation 全部变红。
+  - **Construction and consumer boundary:**新增
+    `HDCSupervisorObservationProbeRegistry.swift` 在 audit base absent；SwiftPM target
+    已按目录自动包含 source，因此现有 `Package.swift` blob
+    `292135a2c80c63ddf7182f58e2f81ff7c7d6104d` 无需修改。production factory
+    只能接收 supervisor、已选择 candidate 与 endpoint，并在模块内构造 exact registry
+    与 system observer；不得暴露 receipt、generation、PID/start/path/hash、
+    process/socket list、command runner 或 registry injection。若 contract tests
+    需要 fake observer，只能使用 module-internal test seam，Workflows/App production
+    root 必须不可达；static source scan 与 mutation test 同时固定该边界。
+  - **One commandless observer and exact normalization:**3.2.0f supervisor identity
+    与既有 3.2.0f device production route 必须共享一个不可注入的 macOS
+    identity-observer 实现，或以行为等价的独立 mutation matrix 证明完全相同的
+    pre/post candidate-byte、PID/start/path/hash/endpoint/listener checks；本 task
+    选择前者并在允许的 `HDCProduction.swift` 与新增 source 内重构。observer 必须
+    消费 registered `listenerNormalization`：exact IPv4 loopback，以及仅当既有
+    macOS socket rule 证明等价时接受 IPv4-mapped IPv6 loopback；port-only、
+    wrong owner、unregistered address 与多义结果均 fail closed。若需要扩大
+    registry/profile/macOS mapping 或修改 forbidden readonly registry，本任务立即
+    重新 blocked，不得现场改 authority。
+  - **Four-evidence and stale-claim gate:**current
+    `HDCServerSupervisor.observeRegisteredServerIdentity` 已把 external classification
+    固定为四证据 conjunction：pre-existing observation receipt、零 auto lifecycle
+    dispatch、generation 非 ArkDeck-launched、无 active/unreconciled managed
+    provenance。production adoption 必须调用该 classifier，不得复制、缩短或绕过；
+    四项任缺一项只可 unknown。每个 unsupported/unavailable/unknown/timedOut/
+    cancelled/scan-error/mismatch/drift 路径必须调用既有
+    `recordUnverifiedServerProbeFailure` 等价失败入口，撤销 prior generation/external
+    claim；“失败但保留旧 external” mutation 必须变红。health、client/server/daemon
+    version 始终保持 typed unknown。
+  - **Closed negative/effect matrix:**tests 必须独立覆盖 wrong version/hash/path/bytes/
+    endpoint，zero/multiple/wrong-owner listener，pre/post PID/start/path/hash/endpoint/
+    listener drift，timeout、cancellation、scan error，candidate replacement/fallback，
+    caller-forged/persisted receipt/generation，四证据逐项缺失与 stale-claim retention。
+    identity bootstrap 的 command/HDC child/server start-stop-restart/adoption/subserver/
+    device/binding/destructive counters 全部为 0；只有既有显式 device refresh 可产生
+    至多一个 registered read-only child，且不能授予 supervisor ownership。
+    exact 3.2.0d route、device event/presentation 与 lifecycle safety 必须保持回归绿。
+  - **Baseline and PR boundary:**macOS 26.6 (25G72)、Xcode 26.6 (17F113)、
+    Swift 6.3.3；ArkDeckKit 全量 = 485 tests / 1 expected manual sleep-wake skip /
+    0 failures / 0 unexpected，四个相关 suites 合计 107/107 PASS（device
+    presentation 18、supervisor 55、supervisor observability 25、registry 9）。
+    `scripts/check-sdd.sh` = 0 errors / 0 warnings / 111 acceptance IDs；
+    `scripts/test_check_sdd.py` = 56/56 PASS；
+    `scripts/test_check_pr_paths.py` = 50/50 PASS；`git diff --check` = PASS。
+    本 readiness 只修改 TASK-HSO-002 状态/本段/依赖/pins，不创建 source/test/evidence，
+    不接 production route；installed HDC、真实 process/socket/device、network、
+    lifecycle/adoption、subserver、binding/device mutation 与 destructive dispatch
+    全部为 0。implementation/evidence 与后续 `ready→done` 继续使用独立 PR。
 - Platform:macos
 - Requirements:compatible implementation of `REQ-HDC-002`、`REQ-HDC-003`、
   `REQ-HDC-004`、`REQ-UX-002`
 - Acceptance:`HSO-SINGLE-CANDIDATE-001`、`HSO-NODISPATCH-001`
-- Depends on:TASK-HSO-001 `done`；独立 readiness
-- Readiness input pins:not yet established; readiness must pin TASK-HSO-001 merged registry/
-  resource/profile/lock closure, production composition root and every allowed source/test blob
-- Applicable failure patterns:readiness 时至少回答 production root 不可达、test-only
-  wiring、caller-forged authority、second-candidate fallback、failure-state retention 与
-  forbidden effect
+- Depends on:TASK-HSO-001 implementation #755 与独立 `ready→done` #756 合入
+  （已满足）；独立 fresh readiness（本 PR，merge 后满足）
+- Readiness input pins:
+
+  ```yaml pins
+  - commit: 248eb1e5348fb2bcc90c69af5d7b17c6954a99ca
+  - commit: 07daee30ba99636b5dc7a334bdefc3a07611acef
+  - commit: 4fc0cec76638cd299e6ccbaff7c5124a048a2106
+  - path: openspec/changes/chg-2026-043-hdc-320f-supervisor-observation/tasks.md
+    blob: 50cb041e687f1b5f71e61d507ab1d6a6c10a4386
+  - path: openspec/changes/chg-2026-043-hdc-320f-supervisor-observation/proposal.md
+    blob: 51c6304f7a080f01035580fc0593fe22460c1ba4
+  - path: openspec/changes/chg-2026-043-hdc-320f-supervisor-observation/design.md
+    blob: d8f25081442ea876e1d598e39cf58a0c64e72f4d
+  - path: openspec/changes/chg-2026-043-hdc-320f-supervisor-observation/verification.md
+    blob: 831fc3b3a895fa6c2cc6966a7278ac58cb5828b4
+  - path: openspec/changes/chg-2026-043-hdc-320f-supervisor-observation/acceptance-cases.yaml
+    blob: 6b7becef9571c34a89e764240138879369e6653b
+  - path: openspec/changes/chg-2026-043-hdc-320f-supervisor-observation/evidence/runs/TASK-HSO-001/run.md
+    blob: db56cd004dd78295ab7129ee01f4f658cba71c9c
+    sha256: ac9554b997b94a32f5176a1a726f38a01b3523699937fe047fe881a73c2effb8
+  - path: openspec/integrations/openharmony/supervisor-observation-probes.yaml
+    blob: b202b9d34680a0e7bbdba1d02637279ca4819d3f
+    sha256: f1691f748da10f1bb7753167d71ff3b764a347676f97d5ec70a1e97ac35c9763
+  - path: openspec/integrations/openharmony/profile.md
+    blob: 2ae13490e075f327bb7448ccacf908be5ba7e3aa
+    sha256: 8f70c070c9657f224ed019cddcc207d97f63424e9a032fef0473f58edededde0
+  - path: openspec/integrations/INTEGRATION-PROFILES.lock.yaml
+    blob: 836d4ccc8c34c5826b6c53dcf9004e678a506d25
+    sha256: 1ec25dc1afe9b57ae237afda9e454a53e9b6e3ee2231892af75969a2baa4644c
+  - path: openspec/platforms/macos/profile.md
+    blob: b7471666b0bbfbfade3fbd510ad831e45b3cf9b8
+    sha256: b91154c03d96cdf138c3e3be75bbb92f3690a4bec68dfe0712d87c575afb4b5e
+  - path: openspec/integrations/openharmony/readonly-probes.yaml
+    blob: 99e8cc3d9929f9502a3e978a53cd56ad285d2aad
+    sha256: b0ac1564109b8138c7a73cbb83684400967633f6e6b04701175a22d314d88da6
+  - path: openspec/integrations/openharmony/device-observation-probes.yaml
+    blob: 399c5a102c7737bf6466e8a2c4c6a1d1b1bc0b6a
+    sha256: 79814e45901ab7e4d9f9a271645cad62b0053a50534cba884cdff0c2e50b9d49
+  - artifact: tree:Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Probes/SupervisorObservation/1.0.0@87421493b8d353a402e0f777ef684e55db1f2981
+    commit: 248eb1e5348fb2bcc90c69af5d7b17c6954a99ca
+  - artifact: tree:Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Probes/1.0.0@f906403bc878a27dbef79736203da98c32a020eb
+    commit: 248eb1e5348fb2bcc90c69af5d7b17c6954a99ca
+  - artifact: tree:Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Probes/DeviceObservation/1.0.0@9ca93b91d18c554e4c137b7f3494550af072ebfc
+    commit: 248eb1e5348fb2bcc90c69af5d7b17c6954a99ca
+  - path: Packages/ArkDeckKit/Package.swift
+    blob: 292135a2c80c63ddf7182f58e2f81ff7c7d6104d
+  - path: Packages/ArkDeckKit/Sources/ArkDeckOpenHarmony/HDCProduction.swift
+    blob: 8055fc65dde7b95c1ab87fa52bb54ed002b024ad
+  - path: Packages/ArkDeckKit/Sources/ArkDeckOpenHarmony/ArkDeckOpenHarmony.swift
+    blob: 6c9ed05896d92624e03b39d9f1ab88422e56f6e6
+  - path: Packages/ArkDeckKit/Sources/ArkDeckOpenHarmony/HDCReadOnlyProbeRegistry.swift
+    blob: 2dfe8e9d8290d6e939b4e3531ac81bb332a7cc29
+  - path: Packages/ArkDeckKit/Sources/ArkDeckWorkflows/HDCApplicationDiagnosticsFacade.swift
+    blob: 4f32e1f6e4c9142f332f35d0001e67f379304dba
+  - path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/HDCSupervisorObservabilityContractTests.swift
+    blob: 3877c216fb985109f7bccefc1532b6a011143ac5
+  - path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/HDCSupervisorContractTests.swift
+    blob: c09f6255d50b9c7b008f82f7f696c47f352fcb9b
+  - path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/HDCDeviceObservationPresentationContractTests.swift
+    blob: 86f8e4cdbc3fa307a4986eebbdd3d1b7c43a6525
+  - artifact: absent:Packages/ArkDeckKit/Sources/ArkDeckOpenHarmony/HDCSupervisorObservationProbeRegistry.swift
+    commit: 248eb1e5348fb2bcc90c69af5d7b17c6954a99ca
+  ```
+- Applicable failure patterns:`AF-001`（production root、共享 observer consumer 与 allowed
+  paths 全闭合）、`AF-003`（system observer producer 与 caller anti-forgery boundary）、
+  `AF-005`（TASK-HSO-001 evidence freshness/class 与 host-only truthfulness）、
+  `AF-006`（完整 OID、status/version/pin 漂移）、`AF-008`（candidate/hash/path/
+  endpoint/process/listener/four-evidence/stale-claim adversarial matrix）、
+  `AF-010`（绿测试须由独立 expected mutation-red 证明 production wiring 语义）、
+  `AF-013`（不得照搬 3.2.0d command registry 或现有 test-only observer）、
+  `AF-016`（全部 pin、PR review/head/merge 从 protected main/GitHub 一手重取）、
+  `AF-018`（open PR/共享 production source 状态复核）
 - Production reachability:
   `HDCApplicationDiagnosticsFacade.attachSessionIfConfigured`
   → one selected `HDCCandidate` / one endpoint
