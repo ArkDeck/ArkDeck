@@ -733,6 +733,99 @@ class StrayEntriesUnderChangesAreReported(unittest.TestCase):
         self.assertEqual(self._errors([]), [])
 
 
+class RegistryChangePathGuardTests(unittest.TestCase):
+    """TASK-ASP-002. Provenance that spells out a whole in-repo change path
+    stops resolving the moment that change archives, so the guard forbids the
+    literal outside an explicit, two-directional deferred register."""
+
+    LITERAL = "openspec/changes/chg-2026-026-macos-rockchip-flash-ui/evidence/run.md"
+    INTEGRATIONS = Path("openspec") / "integrations"
+
+    def build(self, root: Path, files: dict[str, str]) -> None:
+        for relative, text in files.items():
+            path = root / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(text, encoding="utf-8")
+
+    def guard_errors(self, root: Path, register=None) -> list[str]:
+        start = len(check_sdd.errors)
+        try:
+            check_sdd.check_registry_change_paths(root, register or {})
+            return list(check_sdd.errors[start:])
+        finally:
+            del check_sdd.errors[start:]
+
+    def test_the_archive_stable_form_passes(self):
+        with tempfile.TemporaryDirectory(prefix="check-sdd-paths-ok-") as temp:
+            root = Path(temp)
+            self.build(root, {
+                str(self.INTEGRATIONS / "rockchip" / "registry.yaml"):
+                    '{"evidenceChange": "CHG-2026-026-macos-rockchip-flash-ui",\n'
+                    ' "evidenceRelativePath": "evidence/run.md"}\n',
+            })
+            self.assertEqual(self.guard_errors(root), [])
+
+    def test_an_unregistered_literal_fails_and_names_the_file_and_line(self):
+        with tempfile.TemporaryDirectory(prefix="check-sdd-paths-bad-") as temp:
+            root = Path(temp)
+            relative = str(self.INTEGRATIONS / "rockchip" / "registry.yaml")
+            self.build(root, {relative: f'first\n{{"evidencePath": "{self.LITERAL}"}}\n'})
+            found = self.guard_errors(root)
+            self.assertEqual(len(found), 1)
+            self.assertIn(relative, found[0])
+            self.assertIn("line 2", found[0])
+
+    def test_a_registered_file_at_its_registered_count_passes(self):
+        with tempfile.TemporaryDirectory(prefix="check-sdd-paths-deferred-") as temp:
+            root = Path(temp)
+            relative = str(self.INTEGRATIONS / "openharmony" / "pinned.yaml")
+            self.build(root, {relative: f"{self.LITERAL}\n{self.LITERAL}\n"})
+            self.assertEqual(self.guard_errors(root, {relative: (2, "pinned")}), [])
+
+    def test_more_occurrences_than_registered_fail_as_new_debt(self):
+        with tempfile.TemporaryDirectory(prefix="check-sdd-paths-more-") as temp:
+            root = Path(temp)
+            relative = str(self.INTEGRATIONS / "openharmony" / "pinned.yaml")
+            self.build(root, {relative: f"{self.LITERAL}\n{self.LITERAL}\n{self.LITERAL}\n"})
+            found = self.guard_errors(root, {relative: (2, "pinned")})
+            self.assertEqual(len(found), 1)
+            self.assertIn("carries 3 in-repo change paths but only 2", found[0])
+
+    def test_fewer_occurrences_than_registered_fail_as_a_stale_ledger(self):
+        with tempfile.TemporaryDirectory(prefix="check-sdd-paths-fewer-") as temp:
+            root = Path(temp)
+            relative = str(self.INTEGRATIONS / "openharmony" / "pinned.yaml")
+            self.build(root, {relative: f"{self.LITERAL}\n"})
+            found = self.guard_errors(root, {relative: (2, "pinned")})
+            self.assertEqual(len(found), 1)
+            self.assertIn("update", found[0])
+
+    def test_a_registered_file_that_no_longer_exists_fails(self):
+        with tempfile.TemporaryDirectory(prefix="check-sdd-paths-gone-") as temp:
+            root = Path(temp)
+            (root / self.INTEGRATIONS).mkdir(parents=True)
+            found = self.guard_errors(root, {"openspec/integrations/gone.yaml": (1, "x")})
+            self.assertEqual(len(found), 1)
+            self.assertIn("does not exist", found[0])
+
+    def test_an_undecodable_fixture_is_skipped_rather_than_crashing(self):
+        with tempfile.TemporaryDirectory(prefix="check-sdd-paths-binary-") as temp:
+            root = Path(temp)
+            blob = root / self.INTEGRATIONS / "vector.bin"
+            blob.parent.mkdir(parents=True)
+            blob.write_bytes(b"\xff\xfe" + self.LITERAL.encode("utf-16-le"))
+            self.assertEqual(self.guard_errors(root), [])
+
+    def test_the_shipped_register_matches_the_repository_exactly(self):
+        """Both directions against the real tree, so a silent migration of a
+        deferred file - or new debt hidden behind one - fails here too."""
+        self.assertEqual(
+            self.guard_errors(check_sdd.REPO, check_sdd.DEFERRED_CHANGE_PATH_REGISTER), [])
+        self.assertEqual(len(check_sdd.DEFERRED_CHANGE_PATH_REGISTER), 7)
+        self.assertEqual(
+            sum(count for count, _ in check_sdd.DEFERRED_CHANGE_PATH_REGISTER.values()), 15)
+
+
 class BothSuitesRunInCI(unittest.TestCase):
     """A-H3. Neither this suite nor the host-loop suite was executed by any
     workflow, so their properties held only when someone remembered."""

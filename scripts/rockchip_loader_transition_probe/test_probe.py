@@ -38,9 +38,19 @@ OLD_HDC_VERSION = "Ver: 3.2.0d"
 OLD_HDC_SHA256 = "48395ba8d87115dffca47df2a640a6c868bc9a2bd4eb49611e4138ff88d8d260"
 R5_AUTHORIZATION_REF = "PR#481@0f0a79aff7ede1519b9fbc0cbdca12b5c687ef07"
 R6_AUTHORIZATION_REF = "PR#491@37e16c5dd42951c02422627b9f7ca0d72a5cdafc"
-SOURCE_EVIDENCE = REPOSITORY_ROOT.joinpath(
-    *pathlib.PurePosixPath(probe.SOURCE_EVIDENCE_RELATIVE_PATH).parts
-)
+SOURCE_EVIDENCE = probe.resolve_change_directory(
+    REPOSITORY_ROOT, probe.SOURCE_EVIDENCE_CHANGE
+).joinpath(*pathlib.PurePosixPath(probe.SOURCE_EVIDENCE_RELATIVE_PATH).parts)
+
+
+def _fake_evidence_path(repo_root: pathlib.Path) -> pathlib.Path:
+    """Where the probe looks for the source evidence under a fake repo root."""
+    return repo_root.joinpath(
+        "openspec",
+        "changes",
+        probe.SOURCE_EVIDENCE_CHANGE.lower(),
+        *pathlib.PurePosixPath(probe.SOURCE_EVIDENCE_RELATIVE_PATH).parts,
+    )
 LOADER_LINE = b"DevNo=1\tVid=0x2207,Pid=0x350a,LocationID=2\tLoader\n"
 
 
@@ -141,9 +151,7 @@ class HarnessCase(unittest.TestCase):
         self.rk.write_bytes(b"fake pinned rkdeveloptool")
         self.hdc.chmod(0o755)
         self.rk.chmod(0o755)
-        self.source_evidence = self.root.joinpath(
-            *pathlib.PurePosixPath(probe.SOURCE_EVIDENCE_RELATIVE_PATH).parts
-        )
+        self.source_evidence = _fake_evidence_path(self.root)
         self.source_evidence.parent.mkdir(parents=True)
         self.source_evidence.write_bytes(SOURCE_EVIDENCE.read_bytes())
         self.state = self.root / "controlled-state"
@@ -167,9 +175,7 @@ class HarnessCase(unittest.TestCase):
         registry_path = repo_root / probe.REGISTRY_RELATIVE_PATH
         registry_path.parent.mkdir(parents=True)
         registry_path.write_text(json.dumps(registry), encoding="utf-8")
-        evidence_path = repo_root.joinpath(
-            *pathlib.PurePosixPath(probe.SOURCE_EVIDENCE_RELATIVE_PATH).parts
-        )
+        evidence_path = _fake_evidence_path(repo_root)
         evidence_path.parent.mkdir(parents=True)
         evidence_path.write_bytes(
             SOURCE_EVIDENCE.read_bytes() if evidence_bytes is None else evidence_bytes
@@ -206,7 +212,8 @@ class HarnessCase(unittest.TestCase):
                 artifact_sha256=probe.sha256_file(self.rk),
                 upstream_commit="304f073752fd25c854e1bcf05d8e7f925b1f4e14",
                 accepted_by=probe.SOURCE_ACCEPTANCE_REF,
-                evidence_path=probe.SOURCE_EVIDENCE_RELATIVE_PATH,
+                evidence_change=probe.SOURCE_EVIDENCE_CHANGE,
+                evidence_relative_path=probe.SOURCE_EVIDENCE_RELATIVE_PATH,
                 evidence_sha256=probe.SOURCE_EVIDENCE_SHA256,
             ),
             e1_arguments_template=(
@@ -314,7 +321,7 @@ class RegistryAndArgvTests(HarnessCase):
             elif label == "accepted-by":
                 provenance["acceptedBy"] = "PR#0@" + ("0" * 40)
             elif label == "evidence-path":
-                provenance["evidencePath"] = "unreviewed/source.md"
+                provenance["evidenceRelativePath"] = "unreviewed/source.md"
             elif label == "evidence-sha":
                 provenance["evidenceSHA256"] = "0" * 64
             elif label == "top-level-artifact":
@@ -382,7 +389,8 @@ class RegistryAndArgvTests(HarnessCase):
                 "upstreamCommit": config.rkdeveloptool_upstream_commit,
                 "acceptedBy": probe.SOURCE_ACCEPTANCE_REF,
                 "evidence": {
-                    "path": probe.SOURCE_EVIDENCE_RELATIVE_PATH,
+                    "change": probe.SOURCE_EVIDENCE_CHANGE,
+                    "relativePath": probe.SOURCE_EVIDENCE_RELATIVE_PATH,
                     "sha256": probe.SOURCE_EVIDENCE_SHA256,
                 },
                 "validationVerdict": "matchedProtectedMainRegistryAndEvidence",
@@ -527,7 +535,8 @@ class RegistryAndArgvTests(HarnessCase):
             "artifact": {"artifact_sha256": "0" * 64},
             "upstream": {"upstream_commit": "0" * 40},
             "accepted-by": {"accepted_by": "PR#0@" + ("0" * 40)},
-            "evidence-path": {"evidence_path": "unreviewed/source.md"},
+            "evidence-change": {"evidence_change": "CHG-0000-000-not-a-change"},
+            "evidence-path": {"evidence_relative_path": "unreviewed/source.md"},
             "evidence-sha": {"evidence_sha256": "0" * 64},
         }
         for label, fields in mutations.items():
