@@ -2,7 +2,37 @@
 
 ## TASK-OPVR-001 — Reconcile the living profile header and mechanize the invariant
 
-- Status:ready
+- Status:done
+- Done confirmation(2026-07-28；D0 机械状态推进；仅在维护者 review/merge 本
+  status-only PR 后生效):
+  - **Implementation/evidence merge:**PR #747 exact head
+    `0e3fa305cf02466404633b65351cba2beb62b9cb` 由维护者 `lvye`
+    `APPROVED`，并以
+    `5ac17f6c11664fd83858554e403e9b2fd8dfd8d9` 合入 protected main。该 PR
+    精确包含 living profile header、checker、checker tests 与 same-revision run
+    四个批准路径；Agent PR open-pr/allowed-paths、SDD Guard 与 Swift CI 均为
+    `SUCCESS`。
+  - **Evidence and AC closure:**host-only run
+    `evidence/runs/TASK-OPVR-001/run.md`（protected-main blob
+    `3570f7f04d9b6ce0afadee26121748ece148e573`）对
+    `OPVR-HEADER-LOCK-001`、`OPVR-MUTATION-001`、
+    `OPVR-NONINTERFERENCE-001` 均记录 `PASS (contract)`；显式记录
+    `0.5.0 → 0.4.0` mutation-red、恢复 green、forbidden blobs byte identity 与
+    installed HDC/device/network/lifecycle/mutation/destructive dispatch 0。
+  - **Protected-main output identity:**profile/checker/test blobs 分别为
+    `4bfe204b1c13e53b93b35f840652206274614299`、
+    `aa7dc6e34d187cb6458689d72ac28564b58fb29b`、
+    `7e6c47044b31065d2752ce78d9185b6a3869732b`；profile 删除唯一
+    `> Version...` 行后的 SHA-256 仍为
+    `ab57ba2877ed6b8bd124e8aa21f7c05a8f9b91762fb8cdf736a80d28aef6d43c`。
+    deliverables 完成、task-local TODO = 0、无 scope deviation。
+  - **Post-merge deterministic replay:**`scripts/check-sdd.sh` = 0 errors /
+    0 warnings / 111 canonical AC；`scripts/test_check_sdd.py` = 56/56 PASS；
+    `scripts/test_check_pr_paths.py` = 50/50 PASS；`git diff --check` = PASS。
+  - **Boundary:**本 PR 仅翻转本任务状态并引用已合入 evidence；零新 scope、风险接受、
+    authority、实现或 evidence。CHG-2026-044 仍未 verified，须后续独立状态 PR；
+    CHG-2026-043 `TASK-HSO-001` 仍保持 blocked 并须在 verified gate 后另做 fresh
+    D1 readiness。
 - Fresh readiness review(2026-07-28；host-only，零 HDC/设备；仅在维护者
   review/merge 本独立 D1 readiness PR 后生效):
   - **Audit base:**protected main
