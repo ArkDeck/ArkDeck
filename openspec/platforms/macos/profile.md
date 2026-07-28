@@ -191,3 +191,22 @@ This mapping publishes integration inputs only. It changes no Core Requirement/A
 does not wire the CHG-2026-022 consumer, whose cadence, fan-out and presentation remain behind
 that change's own readiness.
 
+## Commandless supervisor-observation mapping（CHG-2026-043 / TASK-HSO-001，2026-07-28）
+
+macOS adopts `OPENHARMONY-HDC-SUPERVISOR-OBSERVATION-PROBES@1.0.0`
+(`OPENHARMONY-TOOLS@0.6.0`, lock `INTEGRATION-PROFILES-0.7.0`, registry SHA-256
+`f1691f748da10f1bb7753167d71ff3b764a347676f97d5ec70a1e97ac35c9763`,
+resource manifest SHA-256
+`6bf09cabfc762b1e632d6dba2528b04b33173f6e53f2f1669d26ef8d72a4ab3d`)
+for the exact hdc `3.2.0f` executable SHA-256
+`05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83`
+and endpoint `127.0.0.1:8710`.
+
+| Probe family | macOS access / diagnostic mapping |
+| --- | --- |
+| `serverIdentityGeneration` | `platformProcessObservation` only, with empty argv and invocation disallowed. The selected executable bytes are verified before/after bounded OS process/socket scans; exactly one existing process-owned normalized listener and equality of PID/start/path/hash/endpoint/listener are required before a current receipt may mint generation. Missing, ambiguous, mismatched, drifted, timed-out, cancelled or scan-error state fails closed without HDC child or lifecycle/mutation effect. |
+
+This mapping registers no `checkserver`, health or client/server/daemon version source and grants
+no ownership by itself. It is separate from the 3.2.0d readonly and 3.2.0f device-observation
+families, forbids fallback/cross-version facts, and does not wire a production consumer.
+Platform conformance and support/release status remain unchanged.

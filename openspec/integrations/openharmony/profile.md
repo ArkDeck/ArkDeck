@@ -1,7 +1,7 @@
 # OpenHarmony Tool Integration Profile
 
 > ID：OPENHARMONY-TOOLS  
-> Version：0.5.0
+> Version：0.6.0
 > Status：in baseline CORE-2.0.0（ratification 状态见 `openspec/baselines/CORE-2.0.0.yaml`） / version-probed at runtime  
 > Core baseline：CORE-2.0.0
 
@@ -163,3 +163,36 @@ deviceMutation、destructive 全部 forbidden。
   非零 exit、截断 → 整个快照 `unknown`；timeout、cancellation、server 缺席、
   endpoint 漂移 → `unavailable`。绝不产生部分集合，也绝不制造消失事件。
 
+## Commandless supervisor-observation registry（CHG-2026-043 / TASK-HSO-001，2026-07-28）
+
+`OPENHARMONY-HDC-SUPERVISOR-OBSERVATION-PROBES@1.0.0` 登记于
+`openspec/integrations/openharmony/supervisor-observation-probes.yaml`（SHA-256
+`f1691f748da10f1bb7753167d71ff3b764a347676f97d5ec70a1e97ac35c9763`）；
+resource manifest SHA-256 =
+`6bf09cabfc762b1e632d6dba2528b04b33173f6e53f2f1669d26ef8d72a4ab3d`，
+profile `OPENHARMONY-TOOLS@0.6.0`、lock `INTEGRATION-PROFILES-0.7.0`。
+
+唯一 registered family = `serverIdentityGeneration`，只接受 exact macOS / hdc
+`3.2.0f` / executable SHA-256
+`05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83` /
+endpoint `127.0.0.1:8710`。它是 `platformProcessObservation`，`exactArgv = []`、
+`invocationAllowed = false`：不运行 HDC，只在 selected executable bytes 前后复核、
+exactly-one existing process-owned listener 与 PID/start/path/hash/endpoint/listener
+bounded pre/post equality 全部成立时生成 current observation receipt。
+
+任一 tool/path/hash/endpoint mismatch 先返回 `unsupported`；server/listener 缺失返回
+`unavailable`；multiple/ambiguous owner、pre/post drift、scan error 或 caller-supplied
+receipt/generation 返回 `unknown`；timeout/cancellation 保持 typed result。所有 HDC child、
+server lifecycle/adoption、subserver、device/binding mutation 与 destructive effect
+恒为 0，且失败不得 fallback 到 3.2.0d registry。
+
+provenance 只按维护者已受理的 CHG-2026-024 PR #656/#658 run 登记 exact tuple、OS
+process/listener field shape、normalization 与稳定性条件，并显式保留 `DEV-1`：
+per-command brackets 不完整，因此不复用任何 command output/semantics。该 family
+不证明 capture 中 server 的 pre-existing/external origin，不登记 `checkserver`、
+health 或 client/server/daemon version；external ownership 仍必须由 consumer 后续
+独立 approved task 使用既有 four-evidence classifier 判断。
+
+3.2.0d readonly、3.2.0f device-observation 与本 registry 是三个独立 authority。
+本登记只发布 integration input 与 macOS mapping；不接 production composition root，
+不改变 Core/platform conformance、hardware/support/release 状态。

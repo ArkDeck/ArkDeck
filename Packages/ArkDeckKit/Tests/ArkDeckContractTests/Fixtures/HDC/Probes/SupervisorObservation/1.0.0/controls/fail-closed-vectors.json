@@ -1,0 +1,166 @@
+{
+  "schemaVersion": "1.0.0",
+  "evidenceClass": "syntheticControlOnly",
+  "boundary": "These controls only prove fail-closed registry semantics. They do not establish HDC, process, device, ownership, health, version, or hardware support.",
+  "cases": [
+    {
+      "id": "wrong-tool-version",
+      "mutations": ["reportedVersion"],
+      "expectedDisposition": "unsupported",
+      "mayMintGeneration": false,
+      "fallbackAllowed": false
+    },
+    {
+      "id": "wrong-tool-sha256",
+      "mutations": ["executableSHA256"],
+      "expectedDisposition": "unsupported",
+      "mayMintGeneration": false,
+      "fallbackAllowed": false
+    },
+    {
+      "id": "wrong-endpoint",
+      "mutations": ["endpoint"],
+      "expectedDisposition": "unsupported",
+      "mayMintGeneration": false,
+      "fallbackAllowed": false
+    },
+    {
+      "id": "missing-provenance",
+      "mutations": ["provenance"],
+      "expectedDisposition": "unknown",
+      "mayMintGeneration": false,
+      "fallbackAllowed": false
+    },
+    {
+      "id": "changed-accepted-merge",
+      "mutations": ["provenance.acceptedMerges"],
+      "expectedDisposition": "unknown",
+      "mayMintGeneration": false,
+      "fallbackAllowed": false
+    },
+    {
+      "id": "argv-added",
+      "mutations": ["exactArgv"],
+      "expectedDisposition": "unsupported",
+      "mayMintGeneration": false,
+      "fallbackAllowed": false
+    },
+    {
+      "id": "invocation-enabled",
+      "mutations": ["invocationAllowed"],
+      "expectedDisposition": "unsupported",
+      "mayMintGeneration": false,
+      "fallbackAllowed": false
+    },
+    {
+      "id": "no-listener",
+      "mutations": ["listenerCount=0"],
+      "expectedDisposition": "unavailable",
+      "mayMintGeneration": false,
+      "fallbackAllowed": false
+    },
+    {
+      "id": "multiple-listeners",
+      "mutations": ["listenerCount>1"],
+      "expectedDisposition": "unknown",
+      "mayMintGeneration": false,
+      "fallbackAllowed": false
+    },
+    {
+      "id": "listener-wrong-owner",
+      "mutations": ["listenerOwner"],
+      "expectedDisposition": "unknown",
+      "mayMintGeneration": false,
+      "fallbackAllowed": false
+    },
+    {
+      "id": "pid-drift",
+      "mutations": ["pid"],
+      "expectedDisposition": "unknown",
+      "mayMintGeneration": false,
+      "fallbackAllowed": false
+    },
+    {
+      "id": "start-drift",
+      "mutations": ["startSeconds", "startMicroseconds"],
+      "expectedDisposition": "unknown",
+      "mayMintGeneration": false,
+      "fallbackAllowed": false
+    },
+    {
+      "id": "path-drift",
+      "mutations": ["resolvedExecutablePath"],
+      "expectedDisposition": "unknown",
+      "mayMintGeneration": false,
+      "fallbackAllowed": false
+    },
+    {
+      "id": "hash-drift",
+      "mutations": ["observedExecutableSHA256"],
+      "expectedDisposition": "unknown",
+      "mayMintGeneration": false,
+      "fallbackAllowed": false
+    },
+    {
+      "id": "endpoint-drift",
+      "mutations": ["normalizedEndpoint"],
+      "expectedDisposition": "unknown",
+      "mayMintGeneration": false,
+      "fallbackAllowed": false
+    },
+    {
+      "id": "timeout",
+      "mutations": ["timeout"],
+      "expectedDisposition": "timedOut",
+      "mayMintGeneration": false,
+      "fallbackAllowed": false
+    },
+    {
+      "id": "cancellation",
+      "mutations": ["cancelled"],
+      "expectedDisposition": "cancelled",
+      "mayMintGeneration": false,
+      "fallbackAllowed": false
+    },
+    {
+      "id": "scan-error",
+      "mutations": ["platformScanError"],
+      "expectedDisposition": "unknown",
+      "mayMintGeneration": false,
+      "fallbackAllowed": false
+    },
+    {
+      "id": "caller-supplied-receipt",
+      "mutations": ["callerReceipt"],
+      "expectedDisposition": "unknown",
+      "mayMintGeneration": false,
+      "fallbackAllowed": false
+    },
+    {
+      "id": "caller-supplied-generation",
+      "mutations": ["callerGeneration"],
+      "expectedDisposition": "unknown",
+      "mayMintGeneration": false,
+      "fallbackAllowed": false
+    },
+    {
+      "id": "cross-version-fallback-3.2.0d",
+      "mutations": ["reportedVersion", "fallbackRegistry"],
+      "expectedDisposition": "unsupported",
+      "mayMintGeneration": false,
+      "fallbackAllowed": false
+    }
+  ],
+  "expectedDispatchCounters": {
+    "hdcChild": 0,
+    "serverStart": 0,
+    "serverStop": 0,
+    "serverRestart": 0,
+    "serverAdoption": 0,
+    "subserverLifecycle": 0,
+    "deviceMigration": 0,
+    "deviceMutation": 0,
+    "bindingMutation": 0,
+    "destructive": 0
+  }
+}

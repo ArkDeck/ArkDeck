@@ -1,0 +1,51 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "hso-receipt-server-identity-generation",
+  "family": "serverIdentityGeneration",
+  "evidenceClass": "controlledCaptureRedactedStructure",
+  "boundary": "Redacted structure derived from the maintainer-accepted CHG-2026-024 capture. It is not a reusable production receipt and carries no ownership, health, version, or command-output authority.",
+  "selectedCandidate": {
+    "platform": "macos",
+    "reportedVersion": "3.2.0f",
+    "executableSHA256": "05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83",
+    "resolvedPathToken": "selected-candidate-path"
+  },
+  "endpoint": "127.0.0.1:8710",
+  "preObservation": {
+    "pidToken": "observed-pid-A",
+    "startSecondsToken": "observed-start-seconds-A",
+    "startMicrosecondsToken": "observed-start-microseconds-A",
+    "resolvedExecutablePathToken": "selected-candidate-path",
+    "executableSHA256": "05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83",
+    "normalizedEndpoint": "127.0.0.1:8710",
+    "listenerOwnerToken": "observed-pid-A",
+    "listenerCount": 1
+  },
+  "postObservation": {
+    "pidToken": "observed-pid-A",
+    "startSecondsToken": "observed-start-seconds-A",
+    "startMicrosecondsToken": "observed-start-microseconds-A",
+    "resolvedExecutablePathToken": "selected-candidate-path",
+    "executableSHA256": "05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83",
+    "normalizedEndpoint": "127.0.0.1:8710",
+    "listenerOwnerToken": "observed-pid-A",
+    "listenerCount": 1
+  },
+  "candidateByteVerification": [
+    "beforePreScan",
+    "afterPostScan"
+  ],
+  "expectedDisposition": "observed.generation",
+  "dispatchCounters": {
+    "hdcChild": 0,
+    "serverStart": 0,
+    "serverStop": 0,
+    "serverRestart": 0,
+    "serverAdoption": 0,
+    "subserverLifecycle": 0,
+    "deviceMigration": 0,
+    "deviceMutation": 0,
+    "bindingMutation": 0,
+    "destructive": 0
+  }
+}

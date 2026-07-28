@@ -1,0 +1,46 @@
+{
+  "schemaVersion": "1.0.0",
+  "packVersion": "1.0.0",
+  "registryId": "OPENHARMONY-HDC-SUPERVISOR-OBSERVATION-PROBES",
+  "registryVersion": "1.0.0",
+  "integrationProfile": "OPENHARMONY-TOOLS@0.6.0",
+  "canonicalRegistryPath": "openspec/integrations/openharmony/supervisor-observation-probes.yaml",
+  "registryCopy": {
+    "file": "registry.yaml",
+    "bytes": 7152,
+    "sha256": "f1691f748da10f1bb7753167d71ff3b764a347676f97d5ec70a1e97ac35c9763",
+    "evidenceClass": "registeredAuthorityCopy"
+  },
+  "receipt": {
+    "id": "hso-receipt-server-identity-generation",
+    "file": "receipts/server-identity-generation.json",
+    "bytes": 1927,
+    "sha256": "2edb677d25849eef8c0dede8c639a9ca21649578c7184b343870c5b79ecf1350",
+    "evidenceClass": "controlledCaptureRedactedStructure"
+  },
+  "controls": {
+    "id": "hso-fail-closed-controls",
+    "file": "controls/fail-closed-vectors.json",
+    "bytes": 4571,
+    "sha256": "13470fbd7485dd328703476da4b4626fbce21ba5bce2bbfc4aef6f9020e65bbc",
+    "evidenceClass": "syntheticControlOnly"
+  },
+  "attributes": {
+    "id": "hso-resource-attributes",
+    "file": ".gitattributes",
+    "bytes": 45,
+    "sha256": "6f4d10e6d9a40109d02dfde8373df60ad01eabc5cca17be26fee4ca961621c9a",
+    "evidenceClass": "repositoryMetadata"
+  },
+  "provenance": {
+    "sourceChange": "CHG-2026-024-hdc-device-snapshot-registration",
+    "sourceEvidence": "evidence/runs/TASK-I24-001/run.md",
+    "sourceSHA256": "ef3372dadc19c4a0e84f6f15f3ac616751d0351cfc2372fa9cf943952275318e",
+    "acceptedMerges": [
+      "af6d64d67af98c94e1f03581de6f52ecdb8a6bb2",
+      "6df25c25d0088238ce2700db07c4db6fbd92cc34"
+    ],
+    "deviation": "DEV-1 accepted only for commandless platform-process field shape, normalization, exact tuple, and stability conditions; no command output or command semantic is reused."
+  },
+  "boundary": "The redacted receipt carries structure, not a reusable production receipt. Synthetic controls can only disprove unsafe acceptance. Neither resource establishes ownership, health, client/server/daemon version, command semantics, device support, hardware support, or release support."
+}
