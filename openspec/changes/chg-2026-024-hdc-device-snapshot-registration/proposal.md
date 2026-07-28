@@ -272,3 +272,44 @@ r5 把 AC 重定义推迟到实测之后。两次窗口的 evidence（#656 merge
 - **不声称**：CHG-2026-022 消费侧的 cadence/fan-out/presentation 仍在其自身
   readiness 之后；本 change 不实现也不批准该消费者。
 
+## Archive 暂缓（2026-07-28，实测断链；AF-006 同型，先例 chg-015 / chg-030 #573）
+
+verified 后即做归档前引用扫描，**命中两处目录外精确路径引用**，故按
+「archive 前引用扫描命中即暂缓」规矩不入 `archive/`：
+
+| 引用方 | 引用内容 | 性质 |
+| --- | --- | --- |
+| `openspec/integrations/openharmony/device-observation-probes.yaml` | `entries[].provenance.sourcePath` = `openspec/changes/chg-2026-024-hdc-device-snapshot-registration/evidence/runs/TASK-I24-001/run.md` | **活体生产输入**，且其 SHA-256 被 `INTEGRATION-PROFILES.lock.yaml` 钉死 |
+| `Packages/.../Fixtures/HDC/Probes/DeviceObservation/1.0.0/registry.yaml` | 同上（bundled 逐字节副本） | 测试 pack，SHA-256 亦被 lock 与 `resources.json` 钉死 |
+
+`git mv` 会使这两处路径失效。而修正它们会改变两个文件的字节 → 连带
+`INTEGRATION-PROFILES.lock.yaml` 的两条 SHA-256、pack 的 `resources.json`
+以及契约测试的哈希断言全部级联失效，属超出「archive = git mv + status 翻转」
+的改动面，不应夹带在归档 PR 内。
+
+**根因（自陈）**：TASK-I24-001 的 registry 用**精确仓内路径**表达 provenance。
+同一 `provenance` 块其实已经携带更稳定的标识
+（`sessions[].mergeOID` = `af6d64d6…` / `6df25c25…`，以及 `acceptedBy` 的
+PR 号），路径字段属冗余且是唯一的断链源。既有同族先例
+（`readonly-probes.yaml` 指向 `changes/archive/...` 的已归档路径）说明
+「归档后再更新路径」可行，但那需要一次显式的、跨 integrations/Packages/lock
+的协调改动。
+
+**两条收口条件（任一满足即可归档，均须独立立项）**
+
+1. **provenance 去路径化（推荐）**：新起一个小 change，把 registry 的
+   `sourcePath` 改为 archive-stable 形态（保留 `mergeOID` + task id，或以
+   `archive/`-agnostic 的 change id 引用），同步更新 bundled 副本、lock 两条
+   SHA-256、`resources.json` 与契约测试哈希。此路线对**将来每一个** registry
+   都有效，不只解本次。
+2. **协调式归档**：在一个显式授权的 change 内，把 `git mv` 与上述四处 hash
+   级联更新一起做完并逐项取证。代价更高且一次性。
+
+在此之前本 change 以 `verified` 状态留在 `openspec/changes/`，作为已记录的
+决定而非遗漏。
+
+**扫描方法更正（同日实测教训）**：首轮扫描误报"零命中"，因为过滤写成
+`grep -rn … | grep -v "<change dir>/"`——`grep -rn` 的输出是
+`路径:行号:内容`，**内容里**含该路径的行也被 `-v` 滤掉了。正确形态是
+`grep -rl … | grep -v '^\./<change dir>/'`（按**文件路径**过滤，不按行内容）。
+
