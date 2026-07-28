@@ -1,7 +1,7 @@
 ---
 schema_version: 1.0.0
 change_id: CHG-2026-008-ui-dump-hidumper-wrapper
-change_revision: 12
+change_revision: 13
 platform: macos
 evidence_classes:
 - contract
@@ -158,13 +158,18 @@ cases:
   method: Human-operated R2-only persistent controlled deviceMutation recapture.
   expected_source: openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/verification.md#INT-UD-R2-RECAPTURE-001
   minimum_evidence: realHardware
-  expected_result: After r12 and a separate D2 readiness are merged, the human
+  expected_result: After r12, the r13 recapture-only HDC repin, and a separate
+    D2 readiness are merged, the human
     maintainer uses only the already-merged closed capture harness in a named,
     exclusive DAYU200 window. The readiness re-pins the current main base,
     harness hashes and tests, HDC/device/firmware/fixture tuple, exact INV-1
     and R2 argv, sidecar path, hardware-evidence schema, per-device typed
     capability evidence, operator, window, and a persistent controlled-root
-    predicate. The session root is owner-only, outside every git repository
+    predicate. For this task HP-0 accepts only the r13 HDC tuple at the fixed
+    DevEco path, Ver 3.2.0f and SHA-256
+    05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83;
+    the historical 3.2.0d identity is not a fallback. The session root is
+    owner-only, outside every git repository
     and outside /private/tmp, /private/var/tmp, the resolved TMPDIR, and every
     teardown-controlled or otherwise ephemeral location. The exact sequence
     performs HP-0/HP-1, fixture install/start, bracketed INV-1, and exactly one

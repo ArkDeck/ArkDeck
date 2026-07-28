@@ -36,6 +36,10 @@ R2 decision 与 R2→R4 seam 两个串行任务,共 8 个;r11 因 R2 negative de
 `Status` 行为准。real-device task 在其全部前置 done、独立 ready-restore PR 合入且具名
 设备窗口内才可执行。
 
+r13 不新增任务；它只在 r12 后的独立 D2 readiness preflight 发现 HDC binary drift 时，
+为 `TASK-UD-R2-RECAPTURE-001` 原子替换 expected HDC pin。该 D1 revision 合入后任务仍
+blocked，D2 readiness 仍须独立合入。
+
 ## TASK-UD-CAPTURE-HARNESS-001 — Phase A/B 受控采集 harness 前置
 
 - Status:done(TASK-UD-CAPTURE-HARNESS-001 implementation + evidence PR #143 与其
@@ -778,11 +782,43 @@ R2 decision 与 R2→R4 seam 两个串行任务,共 8 个;r11 因 R2 negative de
 
 ## TASK-UD-R2-RECAPTURE-001 — R2 persistent controlled 重采
 
-- Status:blocked(r12 只登记 recapture-only 任务与 closed plan;等待 r12 由维护者
-  review/merge 后的独立 D2 readiness 固定 current main base、既有 harness/tool/fixture/
-  target pins、persistent controlled-root gate、操作者与具名设备窗口。r12 PR 本身不使
-  本任务 ready,不执行 installed HDC/device/fixture/Recipe,不产生 raw/evidence,不修改
-  `scripts/**`;D2 readiness 合入前本任务全部 device dispatch 为 `0`)
+- Status:blocked(r12 已由 PR #708 merge
+  `d74c7af7179d89dc29c61e1e7b63d0ca4e7822ea`，但其后的 D2 readiness host-only
+  preflight 发现 HDC 漂移。r13 仅起草 recapture-only HDC `3.2.0f` repin；即使 r13
+  由维护者 review/merge，本任务仍等待独立 D2 readiness 固定 current main、其余
+  harness/tool/fixture/target pins、per-device typed capability evidence、persistent-root
+  gate、操作者与具名设备窗口。r13 不使任务 ready；D2 readiness 合入前 installed
+  HDC/device/fixture/Recipe dispatch 均为 `0`)
+- HDC drift remediation r13(2026-07-28;host-only static audit，installed-HDC process/
+  device/fixture/Recipe/raw/destructive dispatch 均为 `0`):
+  - Audit base:r12 protected-main merge =
+    `d74c7af7179d89dc29c61e1e7b63d0ca4e7822ea`；draft 已线性 rebase 到 current main
+    `c295d4a45a30ea08d7ab66440c5593d1208f222a`，中间唯一 CHG-2026-022 tasks 变更
+    与本 task/tool/schema 输入零重叠。同一 DevEco absolute path 的静态
+    SHA-256 实测为
+    `05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83`，不匹配
+    Phase A/r12 历史 `3.2.0d` /
+    `48395ba8d87115dffca47df2a640a6c868bc9a2bd4eb49611e4138ff88d8d260`；因此 D2
+    readiness 未起草，任务保持 blocked。
+  - Registered identity:protected-main `openspec/integrations/openharmony/profile.md`
+    与 CHG-2026-026 r5 merge
+    `0f0a79aff7ede1519b9fbc0cbdca12b5c687ef07` 将 exact `05b2…f83` binary 登记为
+    `Ver: 3.2.0f`。本 task 只消费该 exact identity，不从版本相似性推断任何 Recipe
+    output、compatibility 或 support。
+  - Scoped replacement(on r13 merge):仅 `TASK-UD-R2-RECAPTURE-001` 的 `HP-0`
+    expected HDC tuple 替换为 absolute path
+    `/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/toolchains/hdc`、
+    `Ver: 3.2.0f`、SHA-256
+    `05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83`。旧
+    `3.2.0d` 不作为 fallback 或第二 accepted pin；Phase A immutable evidence 与 future
+    Phase B pins 不被本 revision 重写。
+  - Still-gated boundary:r13 是 D1 pin correction，不接受 #248/#251 为本轮 E1
+    per-device typed capability evidence，不安排/消费 D2 window，不授权 device
+    dispatch。r13 merge 后须另起 D2 readiness，在当时 current main 复核全部 pins，并
+    由维护者 merge 接受 capability evidence 与 named window；实际窗口内 `HP-0` 仍须
+    在任何 device/fixture command 前执行 exact runtime version/hash gate。
+  - Evidence:
+    `evidence/runs/TASK-UD-R2-RECAPTURE-001/blocked-readiness-hdc-drift-2026-07-28.md`。
 - Objective:不重跑已关闭的 R1/R3,只在 fresh fixture/window session 中用既有 closed
   harness 重采一次 R2 sidecar,产生新的 proven-owned、complete、whole-file-hashed raw
   origin,并把它保存在仓库外非临时 persistent controlled root,供后续独立 readiness
@@ -793,13 +829,14 @@ R2 decision 与 R2→R4 seam 两个串行任务,共 8 个;r11 因 R2 negative de
   分离、owned cleanup、stale/ambiguous fail-closed 与 raw privacy,但不认领任何
   canonical AC/Test PASS。
 - Depends on:
-  - r12 proposal revision 由维护者 review/merge;
+  - r12 proposal revision 已由 PR #708 merge；r13 HDC repin revision 须由维护者
+    review/merge，且其 merge 不替代后续独立 D2 readiness;
   - `TASK-UD-CAP-MUT-001 done`、`TASK-UD-CAPTURE-HARNESS-001 done`、
     `TASK-UD-HARNESS-ECHO-001 done`;独立 D2 readiness 在当时 protected `main` 复核并
     固定这些 merge OID 与 `scripts/ud_capture/{README.md,capture.py,test_capture.py}`
     逐文件 SHA-256,existing harness tests 全绿且 command surface 无漂移;
-  - 独立 D2 readiness 重验 DAYU200 / OpenHarmony / API / USB tuple、HDC executable
-    path+SHA-256+version、fixture HAP SHA-256/module tuple、literal sidecar path、
+  - 独立 D2 readiness 重验 DAYU200 / OpenHarmony / API / USB tuple、r13 单一 HDC
+    executable path+SHA-256+version、fixture HAP SHA-256/module tuple、literal sidecar path、
     `INV-1`/R2 exact argv 与 current hardware-evidence schema;任一漂移不得沿用旧 pin,
     只得保持 blocked 或另起 revision;
   - readiness 固定人类维护者操作者、具名连续设备窗口、窗口互斥规则与 per-device
@@ -856,9 +893,9 @@ R2 decision 与 R2→R4 seam 两个串行任务,共 8 个;r11 因 R2 negative de
   discovery/HDC dispatch;任何时候 R1/R3/R4、fallback/split argv、shell redirection、
   harness 外命令、全局搜索/递归删除、temp root、raw/路径入仓、修改 harness/redactor/
   diagnosis tool、执行诊断或注册 output family。
-- PR boundary:r12 D1 revision → 独立 D2 readiness/ready-restore PR → 一个人类 capture
-  evidence PR → 独立 `ready→done` status PR。D1/D2 gate 后零投机堆叠;任一 PR 不得
-  夹带下一阶段。
+- PR boundary:r12 D1 revision → r13 HDC repin D1 revision → 独立 D2
+  readiness/ready-restore PR → 一个人类 capture evidence PR → 独立 `ready→done`
+  status PR。D1/D2 gate 后零投机堆叠;任一 PR 不得夹带下一阶段。
 
 ## TASK-UD-R2-REDIAG-001 — fresh R2 raw 非内容重诊断
 
