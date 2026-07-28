@@ -278,8 +278,81 @@
 
 ## TASK-ASP-002 — 机械守卫：registry 内禁止仓内 change 路径
 
-- Status:blocked（前置：① 本 change approval-only PR merge；② TASK-ASP-001
-  done——守卫先于迁移落地会立刻把仓打红；③ 独立 readiness。）
+- Status:ready（r1 implementation readiness；仅在维护者对本独立 readiness PR
+  exact head review/merge 后生效，**且必须在 TASK-ASP-001 的 done PR #682
+  合入之后**——若本 readiness 先于 #682 合入，其 `ready` 不生效，须待 #682。
+  只授权一个实现交付：按下方契约先迁移 trace/rockchip 的 4 处、同步其三个
+  `scripts/**` 消费方与 lock，**再**加带显式 deferred 排除表的 fail-closed
+  守卫。不授权：`readonly-probes.yaml` 及其副本与 4 个 receipt 的迁移
+  （需 `Sources/**`，本 change 全局 out of scope）、`Sources/**`、
+  `Packages/**` 任何文件、`Decision-Grade` 代写。）
+- Historical Status:blocked（前置：① approval #671；② TASK-ASP-001 done
+  （#682，排队中）；③ 本 r1。②的**实质**约束（迁移先于守卫落地）已由实现
+  #680 合入满足，形式上的 done 翻转以 #682 为准。）
+- Readiness（r1；audit base = protected `main`
+  `3e2e4ae63ea991c65c9be0b6ce88a9546403d01d`）：
+  - **Approval boundary:pending human merge + 顺序门。**本 carrier 修改本文件
+    的本任务段、verification.md 与 acceptance-cases.yaml（AC 措辞更正，见下），
+    生效另需 #682 先行合入。
+  - **守卫不可能无条件全仓（audit base 实测，r2 措辞需更正）。**当前全仓
+    registry/resource/receipt 面 `openspec/changes/` 字面量 **16 处 / 8 文件**：
+    本任务要迁的 **4 处**（`openharmony/trace-probes/1.0.0/registry.yaml` 3、
+    `rockchip/loader-transition/1.0.0/registry.yaml` 1），以及**必须不动的
+    12 处 / 6 文件**（`openharmony/readonly-probes.yaml` 4、
+    `Fixtures/HDC/Probes/1.0.0/registry.yaml` 4、同目录 4 个 receipt 各 1）
+    ——后者的 SHA-256 被产品源码 `HDCReadOnlyProbeRegistry.swift` 钉死并由
+    `HDCProduction.swift` 运行时消费（r3 已记录），迁移需 `Sources/**`。
+    **因此 r2 写的「全仓字面量为 0」不可满足**；r2 的 `ASP-GUARD-001` 措辞
+    由本 PR 一并更正为「除显式登记的 deferred 面外为 0」（三方同步，
+    change revision 3→4）。
+  - **守卫形态:binary。**新检查须携一份**显式 deferred 登记表**，逐文件写明
+    路径、**期望剩余出现次数**与原因（产品运行时 pin，待 `Sources/**` 授权的
+    后续 change）。判据三条：① 表外任何 registry/resource/receipt 出现该
+    字面量即 fail 并指名文件与行；② 表内文件的出现次数**多于**登记值亦 fail
+    （防止借豁免夹带新债）；③ 表内文件的出现次数**少于**登记值时 fail 并提示
+    更新登记表（防止 deferred 面被悄悄迁移却不更新账本）。
+  - **Source pins:closed（audit base 实测 blob，8 项）。**
+    `trace-probes/1.0.0/registry.yaml`
+    `9c59c102784661fb1f50c31916e29cbeeb6bd457`；
+    `rockchip/loader-transition/1.0.0/registry.yaml`
+    `a9b489ee7a4ed6a3382d01b036fa4d5c7f821b1a`；
+    `INTEGRATION-PROFILES.lock.yaml`
+    `9297820f25b9276859c60ba6bd89ab399066dcd0`；
+    `scripts/trace_capture/validate_registry.py`
+    `526e2ec3d5048b43f930d71efc7bc7cfb84af2d5`；
+    `scripts/rockchip_loader_transition_probe/probe.py`
+    `54140eec7557858982be1b8768ae93047867306a`；同目录 `test_probe.py`
+    `dbcc9ebb1c8fda8094da71972edd5b1d15fb3713`；`scripts/check_sdd.py`
+    `215d604741dd9d17beccdf35e7b00715d062345e`；`scripts/test_check_sdd.py`
+    `be8e394b59e36c8d8ccbfe882cde08fcab90bfcc`。
+  - **两个消费方都在磁盘上解析路径（实测，勿假设是纯文本字段）。**
+    - `validate_registry.py:196` 对 `provenance.redactedManifests` 每项做
+      `REPO_ROOT / evidence_path` 并 `read_bytes()`；迁为 change-relative 后
+      **必须**获得 active-or-archive 解析（`openspec/changes/<id 小写>/` 或
+      `openspec/changes/archive/*-<id 小写>/` 恰一处存在，0/2+ loud fail），
+      否则读文件即崩。
+    - `probe.py:35` 的常量 `SOURCE_EVIDENCE_RELATIVE_PATH` 现为**仓根相对**
+      的完整 `openspec/changes/...` 路径，`:63` 写入 provenance、`:230` 与
+      registry 值比对、`:459` 传给下游。迁移须让**常量与 registry 同步改形**
+      并保持 `:230` 的比对继续成立。
+    - `test_probe.py:317` 以 `provenance["evidencePath"] = "unreviewed/source.md"`
+      构造负例，随形态更名同步。
+  - **lock 级联。**`trace-probes/1.0.0/registry.yaml` 的 SHA-256 在 lock 中被
+    pin（audit base 实测 lock 值 `9d2a390b…` 与文件内容哈希一致），迁移后须
+    同步；`rockchip/loader-transition` **不在 lock**（实测 0 命中），无级联。
+  - **测试基线（audit base 实测，全 OK）。**`scripts/test_check_sdd.py` OK、
+    `scripts/rockchip_loader_transition_probe/test_probe.py` OK、
+    `scripts/trace_capture/test_registry.py` OK、`scripts/trace_capture/test_capture.py`
+    OK；`check-sdd` 0/0/111。Swift 面不受本任务影响（不碰 `Packages/**`），
+    实现须复跑确认仍为 **415 / 1 skipped / 0 failures**（**非 `/private/tmp`**
+    检出）。
+  - **反证要求（二值）。**① 撤销守卫后，一处人造违例不再被拦；② 保留守卫、
+    把 deferred 登记表某文件的期望次数改小 → 必红；③ 迁移后各消费方测试
+    仍 OK，且撤销 active-or-archive 解析 → `validate_registry` 必红。
+  - **Concurrency/absence:closed at drafting（2026-07-28）。**remote
+    `agent/*asp-002*` = 0；主 checkout 为共享副本，实现须用独立 worktree 并
+    commit 前核 `git branch --show-current`。
+  - **Grade 注记**：`Decision-Grade` 由维护者亲笔。
 - Platform:macos
 - Requirements/AC:change-local `ASP-GUARD-001`
 - Depends on:`TASK-ASP-001`
