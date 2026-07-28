@@ -47,7 +47,82 @@
 
 ## TASK-M0B-002 — ArkDeck HDC supervisor 真机只读观察
 
-- Status:blocked(fail-closed 回退,2026-07-21 晚;仅在维护者 review/merge 本独立
+- Status:blocked(fresh readiness r2 audit,2026-07-28;仅在维护者 review/merge
+  本独立 readiness PR 后生效。CHG-2026-022 已 verified，原四项暴露面缺口均有
+  host-only 交付；但 production App 的同一个 selected `HDCCandidate` 无法同时
+  命中 ownership/generation 的 3.2.0d registry 与 device fan-out 的 3.2.0f
+  registry。当前唯一 declared-path HDC 又已静态漂移到 3.2.0f。现有 AC /
+  matrix 未授权把两个 tool/session 的结果拼成一次 supervisor 真机观察，证据
+  因而仍不可二值判定；本任务保持 blocked，零 HDC/device dispatch。)
+- Fresh readiness r2 audit(2026-07-28;host-only static/source audit，base =
+  protected main `80ce41e2eea89b1746cfb49fa6cdda1033a5bc8e`):
+  - **Approval/dependency gate:satisfied,但不充分。**CHG-2026-022 的三个任务均
+    done，独立 verification closure PR #734 exact head
+    `947d7b9a7301cfd783e7e92aeb0242a59fe6ca42` 由维护者 `lvye` APPROVED 后
+    squash merge 为 `f6c9619d121e2f5d5b3a0da1bfcdc2c1f9e9a6fd`；该 merge 是
+    audit base ancestor。其后至 audit base 唯一 commit 只修改
+    CHG-2026-025 `tasks.md`，与本任务及观察输入零交集。CHG-2026-022 的
+    proposal/verification/task blobs =
+    `a5c8ae5397e452821def7dbce12cfb6a533b216a` /
+    `6702df7cb7a492d509ed8a0dc9a0125b33ec393f` /
+    `4745a88453b54a296dcff238a1c7c757fb1f262a`；OBS-001/001R/002 run blobs =
+    `4148b50a8d5ef6614058fdf24972d3d921f01de0` /
+    `2beee035ff96d50a795b79a9677e7e6a3efb2b11` /
+    `50acb503146f258d3bdce25626a7115f840e0927`。
+  - **Current tool gate:blocked for the historical 3.2.0d leg。**未启动 executable
+    的静态 hash 复核得到
+    `/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/toolchains/hdc`
+    = `05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83`，
+    `codesign --verify --strict` PASS；该 exact hash 已由 protected-main
+    device-observation registry 登记为 3.2.0f。`/Applications` 全量文件名扫描、
+    用户目录 metadata 搜索与已知 SDK 位置扫描只找到这一枚 HDC；未找到历史
+    3.2.0d / `48395ba8d87115dffca47df2a640a6c868bc9a2bd4eb49611e4138ff88d8d260`
+    executable。本结论只描述已扫描位置，不推断其他受控存储。
+  - **Single-candidate production proof:blocked。**App facade
+    `HDCApplicationDiagnosticsFacade.swift` blob
+    `4f32e1f6e4c9142f332f35d0001e67f379304dba` 在一次
+    `attachSessionIfConfigured()` 中只发现一个 `candidate`，并把同一值同时传给
+    `observeRegisteredExistingServer(...)` 与
+    `HDCDeviceObservationApplicationSession.makeProduction(...)`；产品没有第二
+    tool/session 拼接入口。server observation 在 `HDCProduction.swift` blob
+    `8055fc65dde7b95c1ab87fa52bb54ed002b024ad` 中要求 candidate hash 精确等于
+    readonly registry 的 3.2.0d pin，否则在任何 HDC child 前返回 unsupported；
+    device session 则要求同一 candidate 精确等于 3.2.0f pin，否则追加
+    unavailable 且 runner invocation = 0。两枚 hash 不同，不存在同时满足的
+    candidate。
+  - **Registry/AC boundary:blocked。**readonly registry/code blobs =
+    `99e8cc3d9929f9502a3e978a53cd56ad285d2aad` /
+    `2dfe8e9d8290d6e939b4e3531ac81bb332a7cc29`，只批准 3.2.0d 的
+    `serverIdentityGeneration`；device registry blob =
+    `399c5a102c7737bf6466e8a2c4c6a1d1b1bc0b6a`，只批准 3.2.0f 的
+    `deviceObservationSnapshot`，并明文禁止把两工具合并解释。现有
+    `TEST-HW-M0B-DAYU200-SUPERVISOR-001` 要求 production supervisor 同时给出
+    external ownership、两项 0 计数、endpoint isolation 与 device fan-out；
+    hardware-matrix 既有 observed 行仍钉 3.2.0d。权威文件未定义可接受的双工具/
+    双 session 证据与 matrix 归属；Agent 不自行把 AC 改释为分腿拼接。
+  - **Host revalidation:**macOS 26.6(25G72)/arm64、Apple Swift 6.3.3；
+    `HDCSupervisorObservabilityContractTests` 25/25 PASS；
+    `HDCDeviceObservationPresentationContractTests` 18/18 PASS(含 DP8 wrong
+    candidate → unavailable / zero runner)；
+    `HDCSupervisorContractTests/testRegisteredServerIdentityPreconditionRejectsFakeExecutableBeforeAnyChildLaunch`
+    1/1 PASS。上述测试确认两条 production gate 按设计 fail closed，不构成
+    realHardware evidence。
+  - **Execution boundary:**installed HDC process、HDC server lifecycle、
+    device discovery/identity、App production observation、device、mutation、
+    destructive dispatch 均为 0；未声称 DAYU200 当前在线、固件状态或 exclusive
+    window 可得，未安排/消费 D2 设备窗口。
+  - **Unblock gate:**须先由独立 approved change 登记并接线 exact 3.2.0f
+    readonly server identity/ownership，使单 candidate 覆盖四观察点；或由
+    CHG-2026-006 approved revision 明确定义双工具/双 session AC 与 matrix
+    归属。两方案均属维护者 D1 判断，任何产品/integration/AC 修改均不得塞入本
+    readiness。所选 remediation done 后仍须另起 fresh D1/D2 readiness，在当时
+    current main 重钉 App build、tool hash/version、exact DAYU200 identity/
+    firmware/USB 与 named exclusive human-operated window。
+  - **PR boundary:**本 readiness 载体只修改本 `tasks.md` 的 TASK-M0B-002 段；
+    不修改 proposal/design/verification/acceptance、integration/platform profile、
+    product/test、hardware-matrix 或既有 evidence，不自行创建后续 remediation
+    proposal。原 #243 readiness 与下方 2026-07-21 fail-closed 记录只作历史。
+- Historical Status:blocked(fail-closed 回退,2026-07-21 晚;仅在维护者 review/merge 本独立
   状态 PR 后生效。#243 readiness 的"M1-006 实际交付形态与四观察点逐项对应"复核经
   执行前深查(host-only 源码级取证路径核对)被证伪——四观察点中两点无只读取证
   路径、一点语义落差、一点仅部分可观察,而任何补暴露面的修复均越本任务 forbidden
