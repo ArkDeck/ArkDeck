@@ -439,8 +439,117 @@
 
 ## TASK-OBS-002 — App 观察面与 signed XCUITest
 
-- Status:blocked(三前置:① r2 remediation merged;② TASK-OBS-001 done;③ 独立 readiness
-  PR——须钉 OBS-001 交付 hash 与 XCUITest 环境(DevMode/repo 根硬链)复核)
+- Status:blocked(r1 D1 blocked-readiness;前置① r2 remediation merged 与②
+  TASK-OBS-001 done 均已满足，③本次独立 readiness audit 复核出
+  OBS-001→App 的设备事件投影缺口，故**不翻 `ready`**。维护者 merge 本 PR
+  只接受下述 blocker/pins 记录，不授权 implementation/evidence；先行治理
+  remediation 与其后 fresh D1 readiness 均合入前，本任务保持 blocked。)
+- Readiness review(2026-07-28;protected main
+  `e114d9d3ae668bff68d2cfb69c59fa6f4dff00ec`):
+  - **Approval/dependency gate:satisfied。**change approval
+    `1e4a7c4027ecdd1142ceab2b80f4423eec586d6d`、r2 remediation
+    `3147e33c0d4bf0f9f54e6160850a42f370c05cb6`、TASK-OBS-001 r2 readiness
+    #678 merge `a8666bddd51b4cb469be6c8cc1f21c421508b12d`、implementation
+    #687 merge `ca84cc2821e11ad691cb9d8dcdef4e2dc873d1d3` 与 done #693 merge
+    `d8287aa5558f295caa086bb5a90516b6e9892fc8` 均为 audit base ancestor；
+    #678/#687/#693 exact head 分别经维护者 `lvye` APPROVED 后 merge。
+  - **OBS-001 delivery pins:closed for this audit。**下列 full OID 来自 audit
+    base 实树；#687 之后目标 App/UITest 与所列 OBS-001 Sources/Tests 均零
+    commit 漂移。后续 remediation/fresh readiness 必须对届时 protected main
+    重钉，不能把本 blocked-readiness 当成实现授权：
+
+    ```yaml pins
+    - artifact: TASK-OBS-001 implementation merge
+      commit: ca84cc2821e11ad691cb9d8dcdef4e2dc873d1d3
+    - artifact: TASK-OBS-001 done merge
+      commit: d8287aa5558f295caa086bb5a90516b6e9892fc8
+    - path: openspec/changes/chg-2026-022-hdc-supervisor-observability/evidence/runs/TASK-OBS-001/run.md
+      blob: 4148b50a8d5ef6614058fdf24972d3d921f01de0
+      sha256: 15eddd72a2725d610301121ef9715703e9391134cb5351ee493f4717d0ce4063
+    - path: Packages/ArkDeckKit/Sources/ArkDeckOpenHarmony/ArkDeckOpenHarmony.swift
+      blob: 0d91c7d306d45909b8632f0a98ab13218c23c9cb
+    - path: Packages/ArkDeckKit/Sources/ArkDeckOpenHarmony/HDCProduction.swift
+      blob: e417f8ce1d0334455e6c6a3d4b9b5720cc33e195
+    - path: Packages/ArkDeckKit/Sources/ArkDeckWorkflows/HDCApplicationDiagnosticsFacade.swift
+      blob: df1bc2a030bbb924274377fff309ead944576698
+    - path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/HDCSupervisorObservabilityContractTests.swift
+      blob: 3877c216fb985109f7bccefc1532b6a011143ac5
+    - path: ArkDeckApp/App/ArkDeckApp.swift
+      blob: 1ec424df02550cc9f79780b7a4b61af28d7faf30
+    - path: ArkDeckApp/Features/HDC/HDCStatusView.swift
+      blob: 23379eb20fafdc79998699738ca0663da0ca921f
+    - path: ArkDeckAppUITests/HDC/HDCStatusUITests.swift
+      blob: 1118da5c64c0d921884785d8da73c44864224e61
+    - path: ArkDeck.xcodeproj/project.pbxproj
+      blob: e7943096688728a22f4b940e536a32f3b8eaaf98
+    - path: ArkDeck.xcodeproj/xcshareddata/xcschemes/ArkDeck.xcscheme
+      blob: 29d0fb995dd3a28ad535569a4cdc4c3964311def
+    ```
+
+  - **App-facing contract gate:BLOCKED。**计数四字段、`endpointSource`、
+    `childEnvironmentInjectionKeys` 与 `ownershipBasis` 已由 #687 进入 public
+    `HDCDiagnosticsPresentation`，可在 App-only scope 内渲染；设备事件则没有
+    同等交付面：
+    1. `HDCDeviceObservationEvent`/`HDCDeviceObservationFanOut`/
+       `HDCDeviceObservationComposition` 均为 `ArkDeckOpenHarmony` internal，
+       `HDCDiagnosticsPresentation` 没有 device-events property；
+    2. event 只有 appeared/unchanged/disappeared/unknown/unavailable 与脱敏标识，
+       没有 design §2 要求的时间戳；
+    3. Sources 中 `HDCDeviceObservationComposition` 只有类型定义，
+       `ArkDeckWorkflows` production facade 零引用、零 `pollOnce()` 调用；
+       production composition 的实例化/轮询/取消边界不存在。全树实际引用只在
+       `HDCSupervisorObservabilityContractTests` 的 F3/F5 测试构造；
+    4. App package-boundary contract 明确只允许 `ArkDeckCore`/
+       `ArkDeckWorkflows` import，故 App 不能绕过 facade 直接消费 internal
+       OpenHarmony feed；`--ui-test-hdc-diagnostics` fixture 同样位于当前
+       forbidden 的 `Packages/**` 且无设备事件 presentation 值。
+  - **Binary conclusion:NOT READY。**只改当前 Allowed paths 的 App/UITest 文件，
+    无法取得真实 production device event、无法显示要求的 timestamp，也无法让
+    signed XCUITest 对 fixture 值形态作非空断言。App 内伪造事件会违反
+    “生产路径零 fixture”与 design §3 的 M0B-002 取证映射；import
+    `ArkDeckOpenHarmony` 或修改 `Packages/**` 又超出已批准 TASK-OBS-002 scope。
+    这不是 UI 实现 TODO，而是前置交付/scope 缺口。
+  - **Required remediation before fresh readiness。**先以独立治理 revision
+    明确选择并批准：(a)新增前置 remediation task，或(b)扩展 OBS-002 scope；
+    至少须授权 exact Kit paths 并钉定 App-facing typed event projection
+    (timestamp + appeared/disappeared + redacted identifier)、production
+    source/composition 的实例化与 poll/cancel 生命周期、bounded presentation
+    传递、`--ui-test-hdc-diagnostics` 专用 fixture 值，以及 production 零
+    fixture/零新增 lifecycle 或 device mutation 的负向测试。该治理门 merge
+    前不得起草实现；门 merge 后仍须从届时 protected main 另起 fresh D1
+    readiness，重钉文件、风险、测试矩阵与并行 PR。
+  - **Signed XCUITest environment:satisfied,但不抵消上述 blocker。**
+    `DevToolsSecurity -status`(沙箱外) =
+    `Developer mode is currently enabled.`；host = macOS 26.5.2
+    (`25F84`) arm64，Xcode 26.6 (`17F113`)，Swift 6.3.3。当前 fake 先以
+    `CI=true swift build --package-path Packages/ArkDeckKit --product
+    ArkDeckFakeHDCFixture` 成功构建；临时 repo-root hardlink
+    `ArkDeckFakeHDCFixture-M1-006` 与 `.build/debug/ArkDeckFakeHDCFixture`
+    `cmp` 相同且 inode 同为 `99945963`，signed run 后已删除，工作树无残留。
+    默认签名、无 signing override 的
+    `xcodebuild -project ArkDeck.xcodeproj -scheme ArkDeck -configuration Debug
+    -destination 'platform=macOS,arch=arm64' -derivedDataPath
+    /private/tmp/arkdeck-obs-002-readiness.mDrPpR/DerivedData
+    -resultBundlePath
+    /private/tmp/arkdeck-obs-002-readiness.mDrPpR/ArkDeck.xcresult test`
+    = `Executed 9 tests, with 0 failures`/exit 0；`xcresulttool` =
+    Passed,total/passed/failed/skipped `9/9/0/0`。App/runner
+    `codesign --verify --deep --strict` 均 PASS，均为 `Signature=adhoc`、
+    TeamIdentifier not set；App/runner executable SHA-256 分别
+    `e73b5bb8b63a8a962c498abf8e67dfb3c3471540d4fb2d343cb010d8d7eadf0a` /
+    `dbca722416a30af32c4175711f1a85b39b87ac0b0a54328f658a73eac1ec451e`。
+  - **Concurrency/effect boundary。**audit 开始时唯一 open PR #698 只改
+    CHG-2026-025 `tasks.md`；其后以
+    `51c1d9e9edf38dcbf77638c3e5ea0eb28bc470a8` 合入；首轮 push 后 #699 又只
+    archive CHG-2026-041 并以
+    `e114d9d3ae668bff68d2cfb69c59fa6f4dff00ec` 合入，导致首轮 agent-pr
+    allowed-paths 如实因 base 前进看见反向 archive diff 而失败。本分支已再
+    rebase 到 #699 merge；上述全部 pin/blocker 断言复核零漂移，重推前 open
+    PR 只剩本 PR #700。本次只做 source/API 审计、host-side fake build 与
+    signed local XCUITest；零 installed HDC、零真实设备、零 server
+    lifecycle/subserver、零 deviceMutation/destructive、零 credential/权限
+    配置变更。本 blocked-readiness PR 只修改当前 `tasks.md` 的 TASK-OBS-002
+    段，零 implementation/evidence。
 - Objective:HDCStatusView 新增计数/endpoint source/ownership 依据/设备事件列表
   字段(static-text 可访问 id,design §2),signed XCUITest 覆盖;M0B-002 四观察
   点的 App 取证载体就位(design §3 映射)。
