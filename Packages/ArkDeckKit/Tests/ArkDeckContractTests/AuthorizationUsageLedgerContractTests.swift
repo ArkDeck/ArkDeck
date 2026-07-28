@@ -140,6 +140,105 @@ final class AuthorizationUsageLedgerContractTests: XCTestCase {
       try stable.reserve(reservation(id: "reservation-2", ordinal: 2, maxRuns: 2)))
   }
 
+  func testE1LedgerIsIndependentIdempotentBoundedAndConsumesWithoutRefund() throws {
+    let directory = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let ledger = try AgentAuthorityUsageLedger(root: directory)
+    let first = try e1Reservation(ordinal: 1, maximumUses: 2)
+    XCTAssertTrue(
+      try AgentAuthorityUsageReservation.canonicalReservationID(
+        authorizationRef: first.authorizationRef, jobID: first.jobID,
+        operationDigestSHA256: first.operationDigestSHA256,
+        targetDigestSHA256: first.targetDigestSHA256
+      ).hasPrefix("ain010-"))
+    XCTAssertEqual(try ledger.reserve(first), first)
+    XCTAssertEqual(try ledger.reserve(first), first)
+    XCTAssertFalse(
+      FileManager.default.fileExists(
+        atPath: directory.appending(path: AuthorizationUsageLedger.ledgerFileName).path))
+    XCTAssertTrue(
+      FileManager.default.fileExists(
+        atPath: directory.appending(path: AgentAuthorityUsageLedger.ledgerFileName).path))
+
+    let closed = try AgentAuthorityUsageTerminal(
+      status: .failed, closedAt: "2026-07-28T10:04:00Z",
+      externalIntentEventIDs: ["intent-1"])
+    XCTAssertEqual(
+      try ledger.close(reservationID: first.reservationID, terminal: closed).terminal,
+      closed)
+    _ = try ledger.reserve(
+      e1Reservation(ordinal: 2, maximumUses: 2))
+    XCTAssertThrowsError(
+      try ledger.reserve(
+        e1Reservation(ordinal: 3, maximumUses: 2)))
+    XCTAssertEqual(try ledger.load().reservations.count, 2)
+  }
+
+  func testE1LedgerSerializesSameTargetAndRejectsCrossKindOrClosedReserve() throws {
+    let directory = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let ledger = try AgentAuthorityUsageLedger(root: directory)
+    _ = try ledger.reserve(
+      e1Reservation(ordinal: 1, maximumUses: 2))
+    XCTAssertThrowsError(
+      try ledger.reserve(
+        e1Reservation(
+          ordinal: 2, maximumUses: 2,
+          targetDigest: String(repeating: "8", count: 64))))
+
+    XCTAssertThrowsError(
+      try AgentAuthorityUsageReservation(
+        reservationID: "ain010-e2",
+        authorizationRef: try .validatedStandingAuthorization(
+          authorizationID: "AUTH-FIXTURE",
+          mainCommitOID: String(repeating: "a", count: 40),
+          authorizationBlobOID: String(repeating: "b", count: 40),
+          approvalPRNumber: 1),
+        ordinal: 1, maximumUses: 1, jobID: "job-e2",
+        operationDigestSHA256: String(repeating: "7", count: 64),
+        targetDigestSHA256: String(repeating: "8", count: 64),
+        reservedAt: "2026-07-28T10:00:00Z",
+        forwardLeaseExpiresAt: "2026-07-28T10:01:00Z",
+        compensationLeaseExpiresAt: "2026-07-28T10:02:00Z"))
+  }
+
+  func testE1LedgerCrashWindowsRetainConsumeOnReplaceAndRejectUnknownShape() throws {
+    for point in [
+      AuthorizationUsageLedgerFaultPoint.beforeTemporaryWrite,
+      .afterFileSync,
+      .afterReplace,
+      .beforeDirectorySync,
+    ] {
+      let directory = try temporaryDirectory()
+      defer { try? FileManager.default.removeItem(at: directory) }
+      let request = try e1Reservation(ordinal: 1, maximumUses: 1)
+      let ledger = try AgentAuthorityUsageLedger(
+        root: directory,
+        faultInjector: AuthorizationUsageLedgerFaultInjector { observed in
+          if observed == point { throw UsageTestFault.injected(point) }
+        })
+      XCTAssertThrowsError(try ledger.reserve(request))
+      let recovered = try AgentAuthorityUsageLedger(root: directory)
+      let count = try recovered.load().reservations.count
+      XCTAssertEqual(
+        count,
+        point == .beforeTemporaryWrite || point == .afterFileSync ? 0 : 1)
+      XCTAssertEqual(try recovered.reserve(request), request)
+      XCTAssertEqual(try recovered.load().reservations.count, 1)
+    }
+
+    let directory = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let ledger = try AgentAuthorityUsageLedger(root: directory)
+    _ = try ledger.reserve(e1Reservation(ordinal: 1, maximumUses: 1))
+    let url = directory.appending(path: AgentAuthorityUsageLedger.ledgerFileName)
+    var object = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
+    object["unexpected"] = true
+    try JSONSerialization.data(withJSONObject: object).write(to: url)
+    XCTAssertThrowsError(try ledger.load())
+  }
+
   private func reservation(
     id: String,
     ordinal: Int,
@@ -157,6 +256,30 @@ final class AuthorizationUsageLedgerContractTests: XCTestCase {
     try AuthorizationReference(
       authorizationID: "authorization-1", mainCommitOID: String(repeating: "a", count: 40),
       authorizationBlobOID: String(repeating: "b", count: 40), approvalPRNumber: 299)
+  }
+
+  private func e1Reservation(
+    ordinal: Int,
+    maximumUses: Int,
+    targetDigest: String = String(repeating: "8", count: 64)
+  ) throws -> AgentAuthorityUsageReservation {
+    let reference = try AgentExecutionAuthorityReference.validatedDeviceCapability(
+      capabilityID: "CAP-E1-FIXTURE",
+      mainCommitOID: String(repeating: "3", count: 40),
+      capabilityBlobOID: String(repeating: "4", count: 40),
+      approvalPRNumber: 750)
+    let jobID = "job-e1-\(ordinal)"
+    let operationDigest = String(repeating: "7", count: 64)
+    let reservationID = try AgentAuthorityUsageReservation.canonicalReservationID(
+      authorizationRef: reference, jobID: jobID,
+      operationDigestSHA256: operationDigest, targetDigestSHA256: targetDigest)
+    return try AgentAuthorityUsageReservation(
+      reservationID: reservationID, authorizationRef: reference,
+      ordinal: ordinal, maximumUses: maximumUses, jobID: jobID,
+      operationDigestSHA256: operationDigest, targetDigestSHA256: targetDigest,
+      reservedAt: "2026-07-28T10:00:00Z",
+      forwardLeaseExpiresAt: "2026-07-28T10:01:00Z",
+      compensationLeaseExpiresAt: "2026-07-28T10:02:00Z")
   }
 
   private func temporaryDirectory() throws -> URL {

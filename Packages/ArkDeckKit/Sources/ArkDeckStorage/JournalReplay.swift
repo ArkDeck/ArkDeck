@@ -8,6 +8,7 @@ public struct OutstandingJournalIntent: Equatable, Sendable {
   public let attempt: Int
   public let effect: WorkflowEffect
   public let bindingRevision: Int?
+  public let agentExecutionAuthorityReference: AgentExecutionAuthorityReference?
   public let authorizationReference: AuthorizationReference?
   public let usageReservationID: String?
 }
@@ -48,6 +49,7 @@ public struct JournalReplay: Equatable, Sendable {
   public let schemaVersion: String?
   public let executionMode: String?
   public let executionAuthority: String?
+  public let agentExecutionAuthorityReference: AgentExecutionAuthorityReference?
   public let authorizationReference: AuthorizationReference?
   public let usageReservationID: String?
   public let currentState: JobState?
@@ -126,7 +128,8 @@ public enum DurableJournalRecovery {
     guard !data.isEmpty else {
       return JournalReplay(
         events: [], hasTornTail: false, schemaVersion: nil, executionMode: nil,
-        executionAuthority: nil, authorizationReference: nil, usageReservationID: nil,
+        executionAuthority: nil, agentExecutionAuthorityReference: nil,
+        authorizationReference: nil, usageReservationID: nil,
         currentState: nil,
         lastDurableSequence: nil, outstandingIntents: [], unknownOutcomes: [],
         requiredAbandonmentHazards: [],
@@ -175,6 +178,7 @@ public enum DurableJournalRecovery {
     var executionMode: String?
     var schemaVersion: String?
     var executionAuthority: String?
+    var agentExecutionAuthorityReference: AgentExecutionAuthorityReference?
     var authorizationReference: AuthorizationReference?
     var usageReservationID: String?
     var state: JobState?
@@ -262,6 +266,7 @@ public enum DurableJournalRecovery {
         }
         executionMode = event.payload.string("executionMode")
         executionAuthority = event.payload.string("executionAuthority")
+        agentExecutionAuthorityReference = event.agentExecutionAuthorityReference
         authorizationReference = event.authorizationReference
         usageReservationID = event.usageReservationID
         state = .queued
@@ -345,25 +350,36 @@ public enum DurableJournalRecovery {
         try validateAuthorizationCorrelation(
           event: event, effect: effect, executionMode: executionMode,
           executionAuthority: executionAuthority,
+          agentExecutionAuthorityReference: agentExecutionAuthorityReference,
           authorizationReference: authorizationReference,
           usageReservationID: usageReservationID)
         intents[event.eventID] = OutstandingJournalIntent(
           eventID: event.eventID, stepID: stepID, attempt: attempt, effect: effect,
           bindingRevision: event.bindingRevision,
+          agentExecutionAuthorityReference: event.agentExecutionAuthorityReference,
           authorizationReference: event.authorizationReference,
           usageReservationID: event.usageReservationID)
       case .compensationIntent:
         guard state?.permitsJournalIntent == true,
           let stepID = event.stepID, let attempt = event.attempt,
+          let effect = event.compensationEffect,
           executionMode != JobExecutionMode.planOnly.rawValue
         else {
           throw DurableFileError.sequenceViolation(
             "compensation intent is inconsistent with the current state or execution mode")
         }
+        try validateAuthorizationCorrelation(
+          event: event, effect: effect, executionMode: executionMode,
+          executionAuthority: executionAuthority,
+          agentExecutionAuthorityReference: agentExecutionAuthorityReference,
+          authorizationReference: authorizationReference,
+          usageReservationID: usageReservationID)
         intents[event.eventID] = OutstandingJournalIntent(
-          eventID: event.eventID, stepID: stepID, attempt: attempt, effect: .deviceMutation,
-          bindingRevision: event.bindingRevision, authorizationReference: nil,
-          usageReservationID: nil)
+          eventID: event.eventID, stepID: stepID, attempt: attempt, effect: effect,
+          bindingRevision: event.bindingRevision,
+          agentExecutionAuthorityReference: event.agentExecutionAuthorityReference,
+          authorizationReference: event.authorizationReference,
+          usageReservationID: event.usageReservationID)
       case .stepOutcome, .compensationOutcome:
         guard let correlation = event.correlatedIntentEventID, let intent = intents[correlation],
           !completedIntentIDs.contains(correlation),
@@ -371,7 +387,9 @@ public enum DurableJournalRecovery {
         else {
           throw DurableFileError.sequenceViolation("invalid or duplicate outcome correlation")
         }
-        guard event.authorizationReference == intent.authorizationReference,
+        guard
+          event.agentExecutionAuthorityReference == intent.agentExecutionAuthorityReference,
+          event.authorizationReference == intent.authorizationReference,
           event.usageReservationID == intent.usageReservationID
         else {
           throw DurableFileError.sequenceViolation(
@@ -527,6 +545,7 @@ public enum DurableJournalRecovery {
       schemaVersion: schemaVersion,
       executionMode: executionMode,
       executionAuthority: executionAuthority,
+      agentExecutionAuthorityReference: agentExecutionAuthorityReference,
       authorizationReference: authorizationReference,
       usageReservationID: usageReservationID,
       currentState: pendingReconcileTransition?.nextState ?? state,
@@ -553,6 +572,7 @@ struct JournalAppendValidationState {
   private var executionMode: String?
   private var schemaVersion: String?
   private var executionAuthority: String?
+  private var agentExecutionAuthorityReference: AgentExecutionAuthorityReference?
   private var authorizationReference: AuthorizationReference?
   private var usageReservationID: String?
   private var eventIDs: Set<String>
@@ -586,6 +606,7 @@ struct JournalAppendValidationState {
     executionMode = replay.executionMode
     schemaVersion = replay.schemaVersion
     executionAuthority = replay.executionAuthority
+    agentExecutionAuthorityReference = replay.agentExecutionAuthorityReference
     authorizationReference = replay.authorizationReference
     usageReservationID = replay.usageReservationID
     eventIDs = Set(replay.events.map(\.eventID))
@@ -756,22 +777,32 @@ struct JournalAppendValidationState {
         try validateAuthorizationCorrelation(
           event: event, effect: effect, executionMode: executionMode,
           executionAuthority: executionAuthority,
+          agentExecutionAuthorityReference: agentExecutionAuthorityReference,
           authorizationReference: authorizationReference,
           usageReservationID: usageReservationID)
       }
     case .compensationIntent:
       guard currentState?.permitsJournalIntent == true,
-        executionMode != JobExecutionMode.planOnly.rawValue
+        executionMode != JobExecutionMode.planOnly.rawValue,
+        let effect = event.compensationEffect
       else {
         throw DurableFileError.sequenceViolation(
           "planOnly journal cannot contain device-mutating compensation intent")
       }
+      try validateAuthorizationCorrelation(
+        event: event, effect: effect, executionMode: executionMode,
+        executionAuthority: executionAuthority,
+        agentExecutionAuthorityReference: agentExecutionAuthorityReference,
+        authorizationReference: authorizationReference,
+        usageReservationID: usageReservationID)
     case .stepOutcome, .compensationOutcome:
       guard let correlation = event.correlatedIntentEventID,
         let intent = outstanding[correlation],
         intent.stepID == event.stepID, intent.attempt == event.attempt
       else { throw DurableFileError.sequenceViolation("outcome does not match outstanding intent") }
-      guard event.authorizationReference == intent.authorizationReference,
+      guard
+        event.agentExecutionAuthorityReference == intent.agentExecutionAuthorityReference,
+        event.authorizationReference == intent.authorizationReference,
         event.usageReservationID == intent.usageReservationID
       else {
         throw DurableFileError.sequenceViolation(
@@ -863,6 +894,7 @@ struct JournalAppendValidationState {
       schemaVersion = event.schemaVersion
       executionMode = event.payload.string("executionMode")
       executionAuthority = event.payload.string("executionAuthority")
+      agentExecutionAuthorityReference = event.agentExecutionAuthorityReference
       authorizationReference = event.authorizationReference
       usageReservationID = event.usageReservationID
     case .stateTransition:
@@ -889,6 +921,7 @@ struct JournalAppendValidationState {
         let intent = OutstandingJournalIntent(
           eventID: event.eventID, stepID: stepID, attempt: attempt, effect: effect,
           bindingRevision: event.bindingRevision,
+          agentExecutionAuthorityReference: event.agentExecutionAuthorityReference,
           authorizationReference: event.authorizationReference,
           usageReservationID: event.usageReservationID)
         outstanding[event.eventID] = intent
@@ -897,11 +930,15 @@ struct JournalAppendValidationState {
         }
       }
     case .compensationIntent:
-      if let stepID = event.stepID, let attempt = event.attempt {
+      if let stepID = event.stepID, let attempt = event.attempt,
+        let effect = event.compensationEffect
+      {
         let intent = OutstandingJournalIntent(
-          eventID: event.eventID, stepID: stepID, attempt: attempt, effect: .deviceMutation,
-          bindingRevision: event.bindingRevision, authorizationReference: nil,
-          usageReservationID: nil)
+          eventID: event.eventID, stepID: stepID, attempt: attempt, effect: effect,
+          bindingRevision: event.bindingRevision,
+          agentExecutionAuthorityReference: event.agentExecutionAuthorityReference,
+          authorizationReference: event.authorizationReference,
+          usageReservationID: event.usageReservationID)
         outstanding[event.eventID] = intent
         unresolvedDeviceHazards.insert(derivedAbandonmentHazard(for: intent))
       }
@@ -965,12 +1002,49 @@ private func validateAuthorizationCorrelation(
   effect: WorkflowEffect,
   executionMode: String?,
   executionAuthority: String?,
+  agentExecutionAuthorityReference: AgentExecutionAuthorityReference?,
   authorizationReference: AuthorizationReference?,
   usageReservationID: String?
 ) throws {
   // v1 remains a byte-for-byte compatible historical reader. Its authorization limitation is
   // enforced by the locked v1 Manifest contract; later schemas add journal-level correlation.
   if event.schemaVersion == JournalEvent.schemaVersion { return }
+  if JournalEvent.usesAgentAuthorityUnion(event.schemaVersion) {
+    if effect == .hostOnly {
+      guard executionAuthority != "authorizedAgent",
+        agentExecutionAuthorityReference == nil,
+        event.agentExecutionAuthorityReference == nil,
+        event.usageReservationID == nil
+      else {
+        throw DurableFileError.sequenceViolation(
+          "hostOnly intent cannot carry device execution authority")
+      }
+      return
+    }
+    guard executionMode == JobExecutionMode.execute.rawValue,
+      executionAuthority == "authorizedAgent",
+      let agentExecutionAuthorityReference,
+      agentExecutionAuthorityReference.effect >= effect,
+      event.agentExecutionAuthorityReference == agentExecutionAuthorityReference,
+      event.usageReservationID == usageReservationID
+    else {
+      throw DurableFileError.sequenceViolation(
+        "authorizedAgent intent is missing, mismatched, or drifted authority correlation")
+    }
+    switch agentExecutionAuthorityReference.kind {
+    case .readyTask:
+      guard usageReservationID == nil else {
+        throw DurableFileError.sequenceViolation(
+          "readyTask intent cannot consume a usage reservation")
+      }
+    case .deviceCapability, .standingAuthorization:
+      guard usageReservationID != nil else {
+        throw DurableFileError.sequenceViolation(
+          "device-mutating intent requires a usage reservation")
+      }
+    }
+    return
+  }
   if effect == .destructive {
     if executionMode == "simulated" {
       throw DurableFileError.sequenceViolation(
