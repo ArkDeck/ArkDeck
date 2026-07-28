@@ -1,8 +1,9 @@
 # CHG-2026-022 Tasks
 
-> 两任务分期,各自独立 readiness/实现/done PR。本 change 首 PR 只 proposal +
-> design,零实现、零真机、零 evidence。全程 host-only;真机观察本身属
-> TASK-M0B-002(本 change done 后经新 readiness 解锁)。
+> 现为三任务分期,各自独立 readiness/实现/done PR。r1 首 PR 只 proposal +
+> design；r3 同样只做 governance remediation，零实现、零真机、零 evidence。
+> 全程 host-only;真机观察本身属 TASK-M0B-002(本 change done 后经新
+> readiness 解锁)。
 
 ## TASK-OBS-001 — Kit 仪表化与分类面
 
@@ -437,13 +438,93 @@
 - Evidence gate:实现 + evidence run 合入且全部 AC 可判定后,`ready→done` 独立
   状态 PR。
 
+## TASK-OBS-001R — Kit App-facing fan-out remediation
+
+- Status:blocked(r3 governance candidate；仅在维护者 review/merge 本独立
+  revision PR 后登记为 approved scope，merge 不构成 readiness 或实现授权。
+  生效后须从届时 protected main 另起 fresh D1 readiness，逐文件重钉并验证
+  本段矩阵；readiness 合入前零 implementation/evidence。)
+- Origin:PR #700/TASK-OBS-002 blocked-readiness(merge
+  `14fd6fede8707a46a1510ad6d7b419b76e6e2bc1`)证明 OBS-001 已交付的 device
+  fan-out 仍为 OpenHarmony internal，production Workflows facade 零 composition
+  owner/poll/cancel，public presentation 零 timestamped device events。App-only
+  OBS-002 无法越 package boundary 补齐，故采用该记录的 remediation 方案 (a)，
+  新增独立 Kit-only predecessor；不重开或重判已 done 的 TASK-OBS-001。
+- Objective:在既有 production registered device-observation fan-out 与 App-only
+  OBS-002 之间补齐最小 Workflows/presentation bridge：公开 immutable、带 injected
+  UTC RFC 3339 timestamp 的 typed device events；production facade 持有并在显式
+  `refresh()` 中单次驱动 exact registered composition；有界传递到
+  `HDCDiagnosticsPresentation`；UITest flag 下提供确定性 fixture 值。
+- Requirements/AC:change-local `OBS-DEVICE-PRESENTATION-001`(见
+  acceptance-cases.yaml；canonical Core AC 零认领；既有
+  `OBS-FANOUT-001` 保持 TASK-OBS-001 已完成结论，不重判)。
+- Depends on:change r3 由维护者 merge；TASK-OBS-001 done(已满足，
+  #693 merge `d8287aa5558f295caa086bb5a90516b6e9892fc8`)；fresh D1 readiness
+  合入(未满足)。
+- Fresh readiness 必须逐项关闭:
+  1. 以届时 protected main 重钉下列三个 production source、拟新增 contract
+     test、本 change tasks/design/verification/acceptance-cases 与 OBS-001 evidence
+     的完整 commit/blob OID；复核从 #700 到 audit base 零未裁定语义漂移。
+  2. 把 design §2 逐条转成可执行矩阵：exact 3.2.0f SHA-256 +
+     `127.0.0.1:8710` + stable identity bracket 阳性；tool/endpoint/identity
+     三类漂移各自 unavailable 且零未注册 argv；每 refresh 最多一次、无 timer/
+     retry/overlap；appeared/disappeared/status timestamp 与 unchanged 零历史；
+     64 容量/顺序；raw identifier 零泄漏；session 切换清 buffer/key；
+     cancellation 只终止 owned child；production 零 fixture/零 lifecycle/
+     subserver/device mutation。
+  3. 钉定 public type/字段名、timestamp formatter/clock injection seam、production
+     composition owner 与 session invalidation 的代码落点；若实现被证明需要越出
+     Allowed paths，必须 stop 并回治理修订，不得在 readiness 或实现 PR 自扩 scope。
+  4. 实测全量 Swift/check-sdd baseline，复核 open PR 文件交集、构建环境与
+     allowed-paths guard；不得复用 PR #700 的 9/9 XCUITest 作为本 AC evidence。
+- In scope:
+  `Packages/ArkDeckKit/Sources/ArkDeckOpenHarmony/ArkDeckOpenHarmony.swift`
+  (internal event 到 typed presentation 的最小桥接与 bounded buffer)；
+  `Packages/ArkDeckKit/Sources/ArkDeckOpenHarmony/HDCProduction.swift`
+  (`HDCDiagnosticsPresentation` public immutable event surface 与 registered
+  source/composition factory 所需最小接线)；
+  `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/HDCApplicationDiagnosticsFacade.swift`
+  (production composition owner、显式 refresh/cancel/session invalidation 与
+  UITest fixture)；新增
+  `Packages/ArkDeckKit/Tests/ArkDeckContractTests/HDCDeviceObservationPresentationContractTests.swift`；
+  本 change `evidence/runs/TASK-OBS-001R/**`；本 change `tasks.md`(仅本任务状态/
+  pins/evidence)。
+- Out of scope:`ArkDeckApp/**`/`ArkDeckAppUITests/**`(留给 OBS-002)；
+  既有 `HDCSupervisorObservabilityContractTests.swift` 与 TASK-OBS-001 evidence
+  修改；`Package.swift`；Core/Process/Runtime/Storage；integration/platform
+  registry/profile；任何新 HDC argv、timer/background poll/automatic retry；
+  lifecycle/subserver/device mutation 与真实设备执行。
+- Allowed paths:
+  - `Packages/ArkDeckKit/Sources/ArkDeckOpenHarmony/ArkDeckOpenHarmony.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckOpenHarmony/HDCProduction.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/HDCApplicationDiagnosticsFacade.swift`
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/HDCDeviceObservationPresentationContractTests.swift`
+  - 本 change `evidence/runs/TASK-OBS-001R/**`
+  - 本 change `tasks.md`(仅本任务状态/pins/evidence)
+- Risk:medium(新增 production read-only child 的 composition/lifecycle 接线，但
+  exact registry + stable identity bracket + 只读 effect + fail-closed 负向矩阵
+  保持边界)。
+- Hardware required:no(contract/fake only；fixture/host 测试不得记为真实设备
+  evidence)。
+- Decision-Grade:D1。
+- Verification:`OBS-DEVICE-PRESENTATION-001` contract PASS；新增矩阵全量
+  PASS；既有 `HDCSupervisorObservabilityContractTests` 零修改全绿；全量 Swift
+  tests + `scripts/check-sdd.sh` 零回归。
+- Evidence gate:实现 PR 只做本任务 allowed paths；run.md 记录 exact base/head、
+  命令/结果、矩阵逐条 AC 映射、零真实设备/HDC server effect 与偏差；实现 PR
+  merged 后再独立 `ready→done` PR。
+
 ## TASK-OBS-002 — App 观察面与 signed XCUITest
 
-- Status:blocked(r1 D1 blocked-readiness;前置① r2 remediation merged 与②
-  TASK-OBS-001 done 均已满足，③本次独立 readiness audit 复核出
-  OBS-001→App 的设备事件投影缺口，故**不翻 `ready`**。维护者 merge 本 PR
-  只接受下述 blocker/pins 记录，不授权 implementation/evidence；先行治理
-  remediation 与其后 fresh D1 readiness 均合入前，本任务保持 blocked。)
+- Status:blocked(r1 D1 blocked-readiness；前置① r2 remediation merged 与②
+  TASK-OBS-001 done 均已满足，但 PR #700 复核出的 OBS-001→App 设备事件投影
+  缺口尚未交付。r3 选择新增 TASK-OBS-001R；维护者 merge r3 只登记其 scope，
+  OBS-001R done 与本任务其后的 fresh D1 readiness 均合入前，本任务保持
+  blocked，零 implementation/evidence。)
+- r3 resolution:TASK-OBS-001R 承担 exact Kit bridge，OBS-002 的 App-only
+  Allowed paths 不扩张；本任务后续 fresh readiness 必须以 OBS-001R done merge
+  为 ancestor，重钉新的 public presentation shape 与 signed XCUITest fixture，
+  不得把本 r3 或 PR #700 当作实现授权。
 - Readiness review(2026-07-28;protected main
   `e114d9d3ae668bff68d2cfb69c59fa6f4dff00ec`):
   - **Approval/dependency gate:satisfied。**change approval
@@ -551,10 +632,11 @@
     配置变更。本 blocked-readiness PR 只修改当前 `tasks.md` 的 TASK-OBS-002
     段，零 implementation/evidence。
 - Objective:HDCStatusView 新增计数/endpoint source/ownership 依据/设备事件列表
-  字段(static-text 可访问 id,design §2),signed XCUITest 覆盖;M0B-002 四观察
-  点的 App 取证载体就位(design §3 映射)。
+  字段(static-text 可访问 id,design §3),signed XCUITest 覆盖;M0B-002 四观察
+  点的 App 取证载体就位(design §4 映射)。
 - Requirements/AC:change-local `OBS-APPFACE-001`(见 acceptance-cases.yaml)。
-- Depends on:approve、TASK-OBS-001 done。
+- Depends on:approve、TASK-OBS-001 done、TASK-OBS-001R done、其后 fresh D1
+  readiness。
 - In scope:`ArkDeckApp/**`、`ArkDeckAppUITests/**`、本 change `evidence/**`、
   本 change `tasks.md`(仅本任务状态)。
 - Out of scope:Kit 语义(OBS-001 已定);诊断导出接线;真机观察执行。
