@@ -1,5 +1,5 @@
 change_id: CHG-2026-042-tasks-field-colon-parity
-change_revision: 1
+change_revision: 2
 cases:
   - acceptance_id: CM7-PARITY-001
     test_id: TEST-CM7-PARITY-001
@@ -17,8 +17,10 @@ cases:
     minimum_evidence: contract
     expected_result: >-
       No candidate is lost and every gained candidate is traced to a registered full-width-colon
-      field with its status, grade, hardware and dependencies recorded. At the r1 audit base the
-      only gains are TASK-BRC-001 through TASK-BRC-006, all of which are done or blocked.
+      field with its status, grade, hardware, dependencies and allowed paths recorded. The gains
+      are exactly TASK-BRC-001 through TASK-BRC-006, all done or blocked and not dispatchable.
+      Total counts are exact-tree diagnostic snapshots, not an invariant: unrelated ASCII tasks
+      may change both sides symmetrically, but any lost or unregistered gained task fails.
   - acceptance_id: CM7-SELF-001
     test_id: TEST-CM7-SELF-001
     method: Never-claim root contract with suffix, neighbour and mutation cases.
