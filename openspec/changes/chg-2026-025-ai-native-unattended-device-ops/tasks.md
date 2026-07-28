@@ -1878,7 +1878,14 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
 
 ## TASK-AIN-009 — Agent operation 与 human blocker contract freeze
 
-- Status:blocked（等待 r3 proposal revision 经维护者 review/merge；本段不构成 readiness）
+- Status:ready（fresh D1 readiness；仅在维护者 review/merge 本独立 readiness PR
+  exact head 后生效。该合入只授权下述 change-local contract/registry、host-only
+  validator/tests 与 run evidence；不授权 TASK-AIN-010、产品 executor、control plane、
+  device/HDC/process dispatch 或任何 E0/E1/E2 真机操作）
+- Historical Status:blocked（r3 proposal revision 尚未合入；该前置已由 #730 exact
+  head `1063d693d12e8fc912da7345472e5b29a4b587d8` 的维护者 APPROVED + merge
+  `1178c9f351285849499f374cc5712896372600b7` 关闭。#730 只批准 scope/顺序，
+  不构成本任务 readiness 或后继实现授权）
 - Platform:macos
 - Requirements:REQ-WF-003、REQ-DEV-009、REQ-DUMP-009、REQ-TRACE-010、
   REQ-DEBUG-008
@@ -1890,7 +1897,10 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
 - Trusted fact sources:受保护 main 上已批准 r3 delta、current workflow step registry 与
   schema；测试 caller 不能构造 accepted contract version/effect mapping
 - Allowed paths:
-  - `openspec/changes/chg-2026-025-ai-native-unattended-device-ops/contracts/**`
+  - `openspec/changes/chg-2026-025-ai-native-unattended-device-ops/contracts/agent-device-operation.schema.v1-draft.json`
+  - `openspec/changes/chg-2026-025-ai-native-unattended-device-ops/contracts/human-action-required.schema.v1-draft.json`
+  - `openspec/changes/chg-2026-025-ai-native-unattended-device-ops/contracts/agent-device-operation-registry.schema.v1-draft.json`（new）
+  - `openspec/changes/chg-2026-025-ai-native-unattended-device-ops/contracts/agent-device-operation-registry.v1-draft.json`（new）
   - `openspec/changes/chg-2026-025-ai-native-unattended-device-ops/evidence/runs/TASK-AIN-009/**`
   - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/AgentDeviceOperationContractTests.swift`
   - `openspec/changes/chg-2026-025-ai-native-unattended-device-ops/tasks.md`（仅本任务 status/readiness pins/evidence 引用）
@@ -1902,6 +1912,169 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
 - Risk:low
 - Hardware required:no
 - Decision-Grade:D1
+
+### Readiness pins(r1,2026-07-28)
+
+- **Approval/dependency gate:satisfied。**r3 proposal #730 的 author =
+  `app/github-actions`、base = `main`、reviewer/merger = CODEOWNER `lvye`；
+  APPROVED review 精确绑定 head
+  `1063d693d12e8fc912da7345472e5b29a4b587d8`，protected-main merge =
+  `1178c9f351285849499f374cc5712896372600b7`。readiness carrier #733 的 exact
+  head `8f28d65b88d39193f07d2d3bcbef9d3e25d629bd` 亦由 `lvye` APPROVED + merge，
+  protected-main merge = `80ce41e2eea89b1746cfb49fa6cdda1033a5bc8e`。本任务
+  `Depends on:none`，但 change-level r3 approval 与 carrier 均为开工前置，现已满足；
+  本 readiness 审计 base 为 `80ce41e2eea89b1746cfb49fa6cdda1033a5bc8e`。
+  期间合入的 #731/#734 仅改 `chg-2026-022-hdc-supervisor-observability/**`，
+  与本任务输入零交集；提交前复查 GitHub open PR = 0。
+- **Objective/effect gate:fixed。**本任务只冻结 request/result、human blocker 与
+  operation/profile mapping 的 machine contract，并用 host-only validator/test 证明二值
+  行为。实现不能 import/call `ArkDeckProcess`、`ArkDeckOpenHarmony`、
+  `ArkDeckWorkflows` 的 dispatch seam，不能创建 Job/Session/device binding、不能启动
+  child process 或访问 HDC/device/network；fixture、schema accept 与 semantic PASS
+  只算 `contract` evidence。
+- **Draft input pins（完整 Git blob OID + SHA-256；实现开工逐项复核，任一漂移即停回
+  readiness）：**
+
+  | File | Git blob OID | File SHA-256 |
+  | --- | --- | --- |
+  | `contracts/agent-device-operation.schema.v1-draft.json` | `1e76c4a334a0fe0155cb1deb5bc269bd07e69599` | `7773d05d9942e6c214dec4a43810ba9c6b785d5cf16b2d37163562ca7e5b654c` |
+  | `contracts/human-action-required.schema.v1-draft.json` | `cea4402b5c0fcabc143294d9aa1e0f3822fc550a` | `60b23fa197d18840efb95b2b47151f048f0c74601f1eaab5647cbca0b478305c` |
+  | `design.md` | `bde7c336550bfd9074abf25c2510a1adc5710f1e` | `6501773077d081e294a658b7756e418f52477ef7aac790ce93598ef0ac8e2f95` |
+  | `manual-boundary-inventory.md` | `67468b5304704ec62f3a61b5ed247bb2a6190d97` | `07e5cfd4c82d8f89e8e0e7136d6f76364f6bba65cdbcc7225928c4a57920a2af` |
+
+- **Approved delta pins（只读）：**`specs/debug-workbench/spec.md`
+  `9b123e8c26a7bee95f702e514f61ea52013d30c1`、
+  `specs/device-targeting-auth/spec.md`
+  `41fafddb2e8a1233d3bd8ea6517f902fe40bee05`、`specs/trace/spec.md`
+  `c7815880d64e4fee6fc67a86a3684c27bd4f8994`、`specs/ui-dump/spec.md`
+  `923e3bdc369a3770a8abe96b657452065971bd56`、
+  `specs/workflow-journal-recovery/spec.md`
+  `a3df2d253b6882538a8e649bc11876a0032270e3`。实现不得修改这些 delta 或
+  accepted current specs 来迁就 schema/test。
+- **Current Core input pins（只读，漂移即重做 mapping 审计）：**
+  `openspec/contracts/workflow-step.schema.json`
+  `c510d96478f3192168478b1a1669b5fcd2a848f7`、
+  `workflow-step-registry.yaml`
+  `d9121ef78531560ab856dfa07468ce1ab4d42df6`（41 个 closed kind）、
+  `provider-contracts.md`
+  `ceb6709fb405fc46d72ef2126b715e252ac720ab`、
+  `journal-event.schema.json`
+  `d25b7a55e9970d301558430febd235ccc910d8b7`、
+  `WorkflowStep.swift`
+  `d96423593978f84a0db7623a1b94863e5d12de26`、
+  `JobStateMachine.swift`
+  `c7350e2f74fcbb52a6e582c09c063c5dda0f13f6`、
+  `StrictJSON.swift`
+  `d5df2a82ced6b8a06635c1e9f1887d70c693f005`。其中 Core minimum effect、
+  cancellation、binding 与 18 个 JobState 只可被新 contract 原样引用或加强，不能
+  降低、重命名或在 test-local model 中另造事实。
+- **Version/identity gate:fixed。**定稿文件名保留 `-draft` 直到 archive，但 `$id`
+  精确固定为
+  `https://arkdeck.dev/schemas/agent-device-operation-1.0.0.json`、
+  `https://arkdeck.dev/schemas/human-action-required-1.0.0.json` 与
+  `https://arkdeck.dev/schemas/agent-device-operation-registry-1.0.0.json`，
+  `schemaVersion` 均为 `1.0.0`，Draft 2020-12，所有 object
+  `additionalProperties:false`。旧/未知 version、duplicate member、未知字段与跨
+  document 字段混入全部 reject；archive 前不得写入 `openspec/contracts/**`。
+- **Request gate:fixed。**request 只允许
+  `documentType/schemaVersion/requestId/changeId/taskId/executionMode/durableTargetId/
+  operation/authorizationId/requestedOutputs/deadlineUtc`；`operation` 只含
+  `id/profileId/configurationId/configurationSha256/artifactLeaseIds`。以下 caller
+  字段在任意大小写/嵌套形态均不产生事实并须 reject：
+  `submittedBy/executor/executable/argv/shell/command/remotePath/sessionRoot/
+  authorizationBytes/authorizationPath/authorizationRef/capability/bindingRevision/
+  readback/prerequisites/usage/effect/resolvedEffect/outcome/success`。request 中的
+  `authorizationId` 只是 E2 lookup key，不是 authority；profile/configuration digest
+  只是 intent pin，不是 accepted registry 事实。
+- **Result gate:fixed。**result 是 trusted host 输出而非 request 回显：用
+  `jobState` 精确承载 current Core 18-state enum，用 closed `disposition`
+  区分 `active|humanActionRequired|policyBlocked|terminal`，并携带
+  `resolvedEffect/outcomeCertainty/executor/artifacts`。`executor.kind=agent` 与任何
+  `authorizationRef` 只能由 host mint；request 同名字段永远非法。human disposition
+  必须同时引用同 Job 的 `humanActionId` 与 `blockerCode`；非 human disposition
+  不得夹带该引用。terminal/active disposition、JobState 与 certainty 必须相容，
+  `policyBlocked` 不是伪造的 JobState。
+- **Authorization-reference gate:fixed。**result 的 `authorizationRef` 是 closed
+  discriminated union：E0 `readyTask` 固定
+  `changeId/taskId/mainCommitOID/taskBlobOID/approvalPRNumber`；E1
+  `deviceCapability` 固定
+  `capabilityId/mainCommitOID/capabilityBlobOID/approvalPRNumber`；E2
+  `standingAuthorization` 固定并复用 r2 的
+  `authorizationId/mainCommitOID/authorizationBlobOID/approvalPRNumber`。全部 OID
+  为 40 位小写 full SHA-1、PR number 为正整数，kind 与 resolved effect 必须逐项
+  匹配。只有已准入 `execute` result 可携带该 ref；`planOnly/simulated`、未知/拒绝的
+  lookup 与 `policyBlocked` 不能借 ref 宣称 authority。
+- **Operation/profile registry gate:fixed。**新增 schema + registry 实例，恰好覆盖
+  request schema 的 15 个 operation ID，零重复/零遗漏。每个 row 固定
+  `minimumEffect/permittedEffects/minimumCancellation/bindingRequirement/
+  permittedStepKinds/profilePolicy/escalationPolicy`；profile 必须是受保护 main 上
+  registered、exact ID + configuration digest 的 closed descriptor，其 emitted Step
+  只能取 row allowlist 与上述 41-kind Core registry 交集。resolved effect/cancellation/
+  binding = operation floor、profile 声明与全部 emitted Core Step minimum 的逐维最大值；
+  profile 只能加强，不能降低。未知 operation/profile/Step 或 mapping 不完整按
+  destructive/unsupported reject，不能先建 effect intent 再补判。
+- **Operation effect closure:fixed。**
+
+  | Operation | Effect floor / allowed elevation | Minimum cancellation | Binding | Authority |
+  | --- | --- | --- | --- | --- |
+  | `observeDevice` | `readOnly` only | `immediate` | `confirmedDevice` | E0 ready-task ref |
+  | `captureHilog` | `readOnly` → `deviceMutation` → `destructive`（clear/resize/device persist 逐 profile 提升） | actual Step max | `confirmedDevice` | E0/E1/E2 |
+  | `captureUIDump` | `readOnly` → `deviceMutation` | actual Step max | `confirmedDevice` | E0/E1 |
+  | `captureTrace` | `readOnly` → `deviceMutation` | actual Step max | `confirmedDevice` | E0/E1 |
+  | `installHAP` | `deviceMutation` → `destructive`（data loss/downgrade 等） | `atSafeBoundary` | `confirmedDevice` | E1/E2 |
+  | `uninstallHAP` | `destructive` only | `atSafeBoundary` | `confirmedDevice` | E2 |
+  | `deployNativeLibrary` | `deviceMutation` → `destructive`（system/vendor/root/remount/no rollback 等） | `atSafeBoundary` | `confirmedDevice` | E1/E2 |
+  | `startApplication` / `stopApplication` | `deviceMutation` only | `atSafeBoundary` | `confirmedDevice` | E1 |
+  | `sendOwnedFile` | `deviceMutation` only | `atSafeBoundary` | `confirmedDevice` | E1 |
+  | `receiveOwnedFile` | `readOnly` only | `immediate` | `confirmedDevice` | E0 |
+  | `createPortForward` / `removePortForward` | `deviceMutation` only | `atSafeBoundary` | `confirmedDevice` | E1 |
+  | `rebootDevice` | `deviceMutation` only | `atSafeBoundary` | `confirmedDevice` | E1 |
+  | `flash` | `destructive` only | `criticalNonInterruptible` | `confirmedDevice` | E2 |
+
+  E0 ref 指向 protected-main ready task/execution policy，E1 ref 指向 accepted
+  per-device typed capability，E2 ref 指向 standing authorization；三者均由 host
+  解引用。profile 混入更高 effect Step 必须按表提升；表不允许的 elevation 直接拒绝，
+  不得拆名或靠 operation label 降级。
+- **Human-boundary gate:fixed。**category 精确为
+  `physicalConnection/deviceTrustPrompt/osPermission/credentialProvisioning/
+  ambiguousIdentity/impactApproval/outcomeUnknownDecision/governanceApproval`，
+  `prohibitedAutomation` 精确取现有九项 closed enum。v1
+  `resumeProbeOperationId` 是 blocker registry 的 closed read-only probe ID，不是可由
+  request 选择的 device operation：物理连接/设备 trust/歧义 identity →
+  `observeDevice`，OS permission/credential →
+  `probeHostConfiguration`，impact approval → `probeImpactApproval`，
+  outcome unknown → `reconcileOutcome`，governance →
+  `probeGovernanceApproval`；category/probe 组合漂移即 reject。`minimumActionKey` 是
+  本地化 key，不能承载命令/argv/path/secret；human record 的
+  `actionId/jobId/stepId` 与 result 引用须一致。只有对应 fresh probe 可转
+  `resolvedByFreshProbe`，聊天文本、按钮、elapsed time 或 caller result 不能关闭
+  blocker、建 binding 或提升 authority。
+- **Vector/semantic gate:fixed。**正例至少覆盖 E0/E1/E2 request+result、15-operation
+  registry closure 与八类 human blocker；负例逐字段覆盖 Request gate 的全部禁入面，
+  并覆盖 duplicate/unknown version、unknown/duplicate/missing operation、unknown
+  profile/Step、effect/cancellation/binding 降级、非法 elevation、result disposition/
+  JobState/certainty 漂移、human category/prohibited action/resume probe/cross-reference
+  漂移。每个反例只改变一个事实，validator 输出稳定 reason code。
+- **Validator/tool gate:fixed。**实现 PR 在
+  `AgentDeviceOperationContractTests.swift` 以只读方式加载 change-local bytes，
+  复用 `StrictJSON` duplicate gate、Core `WorkflowStepRegistry` 与 `JobState` 做
+  semantic closure；不得在 test 中复制一份可漂移的 41-kind minimum table。evidence
+  路径可加入 stdlib-only Python closed-schema validator 与 JSON cases 作为独立
+  Draft-shape 复验；当前 `/usr/bin/python3` 无 `jsonschema`，因此第三方包、联网、
+  `pip`/`pipx` 不得成为 gate。测试/脚本都不得 spawn process 或接触设备。
+- **New-file/collision gate:satisfied。**两份 registry 文件、Swift test 与
+  `evidence/runs/TASK-AIN-009/` 于 audit base 均不存在；`Package.swift`
+  `292135a2c80c63ddf7182f58e2f81ff7c7d6104d` 保持 invariant，SwiftPM 自动发现新
+  test。若精确 Allowed paths 不足以闭环，须停回 blocked 并先做 scope amendment，
+  不能扩到 Sources、Package.swift、current contracts/specs、App 或 scripts。
+- **Baseline/review gate:satisfied。**macOS 26.6 (25G72)、Xcode 26.6
+  (17F113)、Apple Swift 6.3.3；`CI=true swift test --package-path
+  Packages/ArkDeckKit` = **466 tests / 1 skipped / 0 failures**，
+  `./scripts/check-sdd.sh` = **0 errors / 0 warnings / 111 acceptance IDs**。实现 PR
+  必须复跑新增焦点矩阵、full Swift、guard、strict diff/scope/no-dispatch 审计，并在
+  TASK-AIN-009 run evidence 记录 exact base/head、schema/registry SHA-256、canonical
+  PASS 行、偏差与残余风险；implementation、`ready→done` 与 TASK-AIN-010 readiness
+  各自独立 PR，D1 合入前零投机实现。
 
 ### Deliverables
 
