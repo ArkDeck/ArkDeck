@@ -322,7 +322,43 @@ change approved 前保持 blocked;approved 后每任务另需独立 readiness PR
 
 ## TASK-AIN-003R — production composition 的 discovery profile hash-pin 一致性(remediation)
 
-- Status:ready(r1 readiness;仅在维护者对本独立 readiness PR exact head
+- Status:done(2026-07-28 completion;仅在维护者 review/merge 本独立
+  `ready→done` PR 后生效。**实现载体 = #694**(reviewed head
+  `7ce8d57762878a630f8b66cc82390944e2c8254d`,merge
+  `b00c47ac3fcca63871f5736fe796bb48c7089d42`):维护者 `lvye` 对 exact head
+  APPROVED 并 merge;reviewed head 与 merge 在本任务三项交付文件的 blob
+  OID 逐项同值(Host `ace82b11…`、新契约测试 `f58ac01b…`、run
+  `d35143cc…`)。方向 A 已按 #690 readiness(merge
+  `0d36375f875fae327f32860d60f0c4727b84a58c`)落地:production
+  admission 通过 internal 命名 seam 显式注入 `.pinnedProduction`;
+  read-only 缺省 adapter、Discovery 两 pin、Facts 真值锚与既有
+  AC-FLASH-015-01/02 门均未修改。AIN-COMP-001 的正向独立 64-hex 锚 +
+  真实声明门与负向 read-only profile real-fault 两用例均在树。
+  **evidence** =
+  `evidence/runs/TASK-AIN-003R/run.md`(blob
+  `d35143cc27cf7a2de88c992a3d61df6ee18269b3`,SHA-256
+  `f0508fe8b0fe5e069c4fc2fd6ce311fa7e8fc6eb37012a0118eff5389c9990c8`)。
+  **flip base recheck**(当前 protected main
+  `25d504285f60e0b343ed45be2821e88c664102d9`,非 `/private/tmp`
+  worktree):#690/#694 均为 ancestor;#694 后 Host/Discovery/Facts/
+  新测试/run 五项零 commit、blob 零漂移;焦点
+  `RockchipProductionCompositionContractTests` = 2 tests / 0 failures,
+  两条 `TEST-AIN-COMP-001` PASS;Swift 全量 = 442 tests / 1 skipped /
+  0 failures,且三条 AC-FLASH-015-01/02 canonical PASS 摘要在位;
+  `check-sdd` = 0 errors / 0 warnings / 111 acceptance IDs;host_loop
+  `done_task_ids` = 106 且含本任务,本任务不再 claimable(status `done`
+  非 ready;`Decision-Grade` 仍为 unknown);以本 PR 标题/Task 声明和单文件
+  fileset 模拟 `check_pr_paths` = PASS。
+  本翻转是确定性 D0 状态推进,单文件且仅改本任务段;任务
+  `Decision-Grade` 行仍由维护者亲笔,本 PR 不代写。全程 host-only:
+  device/HDC/rkdeveloptool/network/destructive dispatch = 0。
+  **不声称** change 已 verified、TASK-AIN-004 E2 已可执行或
+  TASK-AIN-BKMK-001 已闭合;后者仍按其独立 blocked→readiness→实现→done
+  链推进。)
+- Historical Status:ready(r1 readiness = #690 merge
+  `0d36375f875fae327f32860d60f0c4727b84a58c`;其一次性实现授权已由 #694
+  全额消耗。原 Status 正文如下作历史保留。)
+- Historical Status:ready(r1 readiness;仅在维护者对本独立 readiness PR exact head
   review/merge 后生效,生效后一次性授权按下方 Readiness pins(r1)契约的
   实现交付)
 - Historical Status:blocked（前置:本登记合入后另起独立 readiness PR;Depends on 的
