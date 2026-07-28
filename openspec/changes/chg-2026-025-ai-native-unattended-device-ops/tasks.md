@@ -2100,27 +2100,103 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
 
 - completion 后在 `evidence/runs/TASK-AIN-009/` 记录 schema/version/hash 与测试输出。
 
+## TASK-AIN-009R — E1 capability 与 execution-authority persistence contract freeze
+
+- Status:blocked（r4 scope proposal；仅在维护者 review/merge r4 后建立任务，之后仍等待
+  独立 D1 readiness PR）
+- Platform:macos
+- Requirements:REQ-WF-003、REQ-DEV-009、REQ-JOB-002、REQ-JOB-006
+- Acceptance:AC-WF-003-02、AC-DEV-009-01、AC-JOB-002-01、AC-JOB-006-01、
+  AIN-CAP-CONTRACT-001(change-local,r4)
+- Depends on:TASK-AIN-009
+- Applicable failure patterns:AF-002、AF-003、AF-004、AF-014
+- Production reachability:not applicable（change-local contract/vector；零外部 effect）
+- Trusted fact sources:受保护 main/GitHub exact-head review metadata、AIN-009 operation
+  registry、current durable binding/Journal/Manifest contracts；fixture caller 不产生
+  capability、approval、usage 或 readback 事实
+- Allowed paths:
+  - `openspec/changes/chg-2026-025-ai-native-unattended-device-ops/contracts/agent-device-capability.schema.v1-draft.json`（new）
+  - `openspec/changes/chg-2026-025-ai-native-unattended-device-ops/contracts/agent-execution-authority.schema.v1-draft.json`（new）
+  - `openspec/changes/chg-2026-025-ai-native-unattended-device-ops/contracts/agent-authority-usage.schema.v1-draft.json`（new）
+  - `openspec/changes/chg-2026-025-ai-native-unattended-device-ops/contracts/journal-event.schema.v2.2-draft.json`（new）
+  - `openspec/changes/chg-2026-025-ai-native-unattended-device-ops/contracts/manifest.schema.v2.2-draft.json`（new）
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/AgentDeviceCapabilityContractTests.swift`（new）
+  - `openspec/changes/chg-2026-025-ai-native-unattended-device-ops/evidence/runs/TASK-AIN-009R/**`
+  - `openspec/changes/chg-2026-025-ai-native-unattended-device-ops/tasks.md`（仅本任务
+    status/readiness pins/evidence 引用）
+- Forbidden paths:
+  - `openspec/specs/**`
+  - `openspec/contracts/**`
+  - `Packages/ArkDeckKit/Sources/**`
+  - `ArkDeckApp/**`
+  - `evidence/capabilities/**`、`evidence/authorizations/**` 与任何真实 capability/
+    authorization 实例
+- Risk:high（Safety authority contract；host-only）
+- Hardware required:no
+- Decision-Grade:D1
+
+### Deliverables
+
+- closed per-device capability v1：精确 pin target identity/binding family、transport、
+  tool/profile/version/hash、operation IDs/namespace、最大 data impact/duration/concurrency/
+  uses/validity、compensation/rollback/resume probe、privilege/developer/root fresh probe 与
+  prohibited destructive adjacency；
+- protected-main carrier/registry/provenance 闭包：caller 只能给 capability ID，
+  capability bytes/path/review/readback/usage 均不得成为事实；result ref 与 AIN-009
+  `deviceCapability` 形状逐字段一致；
+- E0 ready-task/E1 capability/E2 standing-authorization 的 closed authority union、
+  E1 durable usage reservation，以及 Journal/Manifest 2.2 crash/replay correlation；
+  2.1 Rockchip historical bytes/语义继续可读且不被 2.2 伪装；
+- 正反 vectors 固定每字段 drift、expiry、usage、concurrency、provenance、unknown
+  kind/version、duplicate/unknown member 与 cross-authority substitution。
+
+### Verification
+
+- contract test 逐个加载 change-local schema/vector，正例 round-trip，单事实反例
+  fail closed；AIN-009 result authority union 与 2.2 persistence union semantic closure
+  完全相等；
+- 2.1 fixture bytes hash 不变且仍可读；2.2 缺/错 authority、usage、binding、intent/
+  outcome correlation 全 reject；
+- process/HDC/device/network dispatch=0，不创建真实 capability/authorization/usage。
+
+### Notes / handoff
+
+- readiness 必须冻结 exact schema IDs/versions、protected-main registry path、usage
+  ceiling/lease/recovery 规则和 2.1→2.2 compatibility matrix；这些值不得由实现 Agent
+  临场决定。
+- completion 后在 `evidence/runs/TASK-AIN-009R/` 记录 schema hash、vector 数量、
+  compatibility matrix 与 no-dispatch 结果；done 后 TASK-AIN-010 仍需独立 readiness。
+
 ## TASK-AIN-010 — 通用 TrustedDeviceOperationHost 与 admission
 
-- Status:blocked（等待 TASK-AIN-009 done + 独立 readiness PR）
+- Status:blocked（TASK-AIN-009 已 done；r4 readiness audit 发现 capability/persistence
+  contract 与 Allowed paths 不闭合，等待 TASK-AIN-009R done + 独立 D1 readiness PR；
+  记录 = `evidence/runs/TASK-AIN-010/readiness-blocked-r1.md`）
 - Platform:macos
 - Requirements:REQ-WF-003、REQ-DEV-009、REQ-JOB-002、REQ-JOB-005、REQ-JOB-006
 - Acceptance:AC-WF-003-02、AC-WF-003-03、AC-DEV-009-01、
   AC-JOB-002-01、AC-JOB-005-01、AC-JOB-006-01
-- Depends on:TASK-AIN-009
+- Depends on:TASK-AIN-009、TASK-AIN-009R
 - Applicable failure patterns:AF-002、AF-003、AF-004、AF-014
-- Production reachability:`ArkDeckCLI/App composition → TrustedDeviceOperationHost →
-  effect resolver/admission → journal-backed typed dispatcher`
+- Production reachability:`TASK-AIN-010 product host seam → effect resolver/admission →
+  journal-backed typed dispatcher`；`ArkDeckCLI/App → host` 的 production control-surface
+  composition 由 TASK-AIN-015 独立接线与验收
 - Trusted fact sources:protected-main contract/capability resolver、durable binding journal、
   product-owned HDC/tool observation、host storage/journal；caller request 只含 selector/ID
 - Allowed paths:
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/AgentDeviceOperations/**`
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/HumanActionRequired.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckOpenHarmony/HDCDeviceCommand.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckStorage/AuthorizationUsageLedger.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckStorage/JournalEvent.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckStorage/SessionManifest.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckStorage/JournalEventValidation.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckStorage/JournalReplay.swift`
   - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/AgentDeviceOperationHostContractTests.swift`
   - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/HumanActionRequiredContractTests.swift`
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/AuthorizationUsageLedgerContractTests.swift`
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/JournalRecoveryContractTests.swift`
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/SessionArtifactStorageContractTests.swift`
   - `openspec/changes/chg-2026-025-ai-native-unattended-device-ops/evidence/runs/TASK-AIN-010/**`
 - Forbidden paths:
   - `openspec/specs/**`
@@ -2137,6 +2213,8 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
   E1 capability/E2 authorization，并 mint one-shot execution capability；
 - E0/E1/E2 effect resolver、structured human blocker、durable Job/Session admission；
 - public surface 无 executor/argv/path/fact/grant injection；unknown 按 destructive fail closed。
+- 本任务公开可供产品 composition 使用的 host seam；CLI/App submit/status/cancel/
+  reconcile/result 接线与端到端 production reachability 只由 TASK-AIN-015 完成。
 
 ### Verification
 

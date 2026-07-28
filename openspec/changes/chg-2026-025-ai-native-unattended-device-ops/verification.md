@@ -1,12 +1,15 @@
 # Verification Plan
 
-> Change:CHG-2026-025-ai-native-unattended-device-ops@r3
+> Change:CHG-2026-025-ai-native-unattended-device-ops@r4
 > Status:planned # 结论经维护者在 PR 中确认
 > Revision review:2026-07-22 已逐项对照 r2 security-remediation、TASK-AIN-005/006/
 > 008/007 与 AIN-004 stop gate;本计划不复用 superseded #296 readiness/authorization。
 > r3 addition:2026-07-28 加入通用 Agent operation/human blocker、E0/E1 capability
 > executors、HAP/SO deployment 与闭环调试；新增任务在 r3 merge 与各自 readiness 前均
 > 不执行实现或真机。
+> r4 remediation:2026-07-28 TASK-AIN-010 readiness audit 发现 E1 capability carrier/
+> provenance/usage 与 E0/E1/E2 durable authority correlation 未冻结，新增
+> TASK-AIN-009R；009R/010 各自 readiness 合入前不执行实现或真机。
 
 ## Environment
 
@@ -21,6 +24,9 @@
 - r3 control plane:agent-device-operation `1.0.0` + human-action-required `1.0.0`；
   exact version/hash、HDC/profile、E1 capability 与真机 target 于 TASK-AIN-009—016
   各自 readiness 固定
+- r4 authority persistence:per-device capability、execution-authority/usage 与
+  Journal/Manifest 2.2 的 exact schema/version/compatibility matrix 由
+  TASK-AIN-009R readiness 固定；2.1 Rockchip historical bytes/语义保持可读且不改写
 - r3 hardware:至少一个 pinned OpenHarmony device/build/HDC 完成 E0/E1 product-path；
   人类只执行 human-boundary registry 中的物理/配置/治理动作
 
@@ -51,6 +57,7 @@
 | AC-DEBUG-008-03 | app-owned `.so` atomic publish/verify/rollback fault matrix + scoped真机 E1 run | passed | TASK-AIN-014/016 run 记录 |
 | AC-DEBUG-008-04 | analysis-generated next request 越权/过期/stale facts 全重新 admission | passed | TASK-AIN-010/014/015/016 run 记录 |
 | AIN-OP-CONTRACT-001(change-local,r3) | agent-operation/human-blocker schema 正反 vectors；operation→step/effect mapping 闭包 | passed | TASK-AIN-009 run 记录 |
+| AIN-CAP-CONTRACT-001(change-local,r4) | per-device capability/provenance/usage 每字段 vectors + E0/E1/E2 authority union 的 Journal/Manifest 2.2 round-trip、crash/replay correlation 与 2.1 compatibility matrix；真实 capability/dispatch=0 | passed | TASK-AIN-009R run 记录 |
 | AIN-CONTROL-001(change-local,r3) | submit/status/cancel/reconcile/result 与 bounded debug DAG 端到端；network/shell/raw path surface=0 | passed | TASK-AIN-015 run 记录 |
 | AIN-MANUAL-GAP-001(change-local,r3) | 活跃 change/runbook grep 与 dependency audit；非 allowlisted human-only seam=0 | passed | TASK-AIN-017 run 记录 |
 
@@ -62,6 +69,10 @@
   local worktree/main ref 篡改与伪造 GitHub carrier 均 dispatch=0；
 - `maxRuns` 并发 reservation 与 intent/outcome crash window 做确定性 fault injection，证明
   ceiling 不超发且 unknown 不退款；
+- E1 capability 的 target/binding/transport/tool/profile/operation/namespace/data-impact/
+  duration/concurrency/uses/validity/compensation/resume/privilege/destructive-adjacency 任一
+  漂移，或 E0/E1/E2 authority kind/ID/blob/usage 交叉替换 → intent/process/device
+  dispatch=0；2.1 bytes 不得被 2.2 reader 改写或伪装；
 - fake product executor 必须证明实际 argv 只来自 typed Provider plan；测试输出
   `dispatch=0` 的 handoff-only 路径不能再作为 AIN-004 readiness 依据；
 - Manifest/Journal v1/v2 不得伪装 Rockchip authorized success；2.1 toolchain
@@ -92,7 +103,7 @@
 
 ## Result gate
 
-- [ ] TASK-AIN-001/002/003/003R/BKMK-001/005/006/008/007/004/009/010/011/012/
+- [ ] TASK-AIN-001/002/003/003R/BKMK-001/005/006/008/007/004/009/009R/010/011/012/
   013/014/015/016/017 全部 done，且 AIN-004
   使用四项 host remediation 的 fresh main OID 重新 readiness（不复用 #296）
 - [ ] 所有适用 AC passed 且 evidence 可复查
