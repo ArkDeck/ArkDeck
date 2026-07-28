@@ -1,0 +1,792 @@
+{
+  "documentType": "agentCapabilityContractVectors",
+  "schemaVersion": "1.0.0",
+  "capability": {
+    "documentType": "agentDeviceCapability",
+    "schemaVersion": "1.0.0",
+    "capabilityId": "CAP-E1-ARKDECK-001",
+    "changeId": "CHG-2026-025",
+    "taskId": "TASK-AIN-010",
+    "evidenceRefs": [
+      "openspec/changes/chg-2026-025-ai-native-unattended-device-ops/evidence/runs/TASK-AIN-016/device-capability-evidence.md"
+    ],
+    "target": {
+      "durableTargetId": "device-fixture-001",
+      "model": "OpenHarmony Fixture",
+      "stableIdentitySHA256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "originalTargetSHA256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "acceptedBindingRevision": 7,
+      "transport": "usb",
+      "firmwareBuild": "OpenHarmony-6.0-fixture",
+      "firmwareFingerprintSHA256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "allowedDeviceModes": ["normal", "recovery", "updater"]
+    },
+    "tool": {
+      "kind": "hdc",
+      "profileId": "HDC-OPENHARMONY-6@1.0.0",
+      "reportedVersion": "Ver: 3.1.0a",
+      "executableSHA256": "4444444444444444444444444444444444444444444444444444444444444444"
+    },
+    "operationScopes": [
+      {
+        "operationId": "captureHilog",
+        "profileId": "hilog.device-persist-restored.v1",
+        "configurationId": "hilog.device-persist-restored.v1.config",
+        "configurationSha256": "731948848b2e3a550fc017b1461fe873ff2ac8a500ec83af2cdf9c103a9f2c18",
+        "effect": "deviceMutation",
+        "dataImpact": "reversibleDeviceConfiguration",
+        "namespace": {
+          "kind": "captureOwned",
+          "family": "hilog",
+          "rootPolicyId": "jobOwnedRemoteV1"
+        },
+        "recoveryPolicy": {
+          "strategy": "typedCompensation",
+          "requiredStepKinds": [
+            "stopRemoteCapture",
+            "resizeLogBuffer",
+            "cleanupOwnedRemotePath"
+          ],
+          "resumeProbeProfileId": "observe-device.read-only.v1"
+        }
+      },
+      {
+        "operationId": "captureUIDump",
+        "profileId": "ui-dump.owned-sidecar.v1",
+        "configurationId": "ui-dump.owned-sidecar.v1.config",
+        "configurationSha256": "24ea099cc429921558282050f84fe463cb7f687f1c2408aeab9c1144b8c65d27",
+        "effect": "deviceMutation",
+        "dataImpact": "reversibleDeviceConfiguration",
+        "namespace": {
+          "kind": "captureOwned",
+          "family": "uiDump",
+          "rootPolicyId": "jobOwnedRemoteV1"
+        },
+        "recoveryPolicy": {
+          "strategy": "typedCompensation",
+          "requiredStepKinds": ["restoreParameter", "cleanupOwnedRemotePath"],
+          "resumeProbeProfileId": "observe-device.read-only.v1"
+        }
+      },
+      {
+        "operationId": "captureTrace",
+        "profileId": "trace.owned-capture.v1",
+        "configurationId": "trace.owned-capture.v1.config",
+        "configurationSha256": "afe7a3ac3c452dd38e2fcc4fb4227c935b6ec852f6c91bfc9c31d402d3b0346a",
+        "effect": "deviceMutation",
+        "dataImpact": "reversibleDeviceConfiguration",
+        "namespace": {
+          "kind": "captureOwned",
+          "family": "trace",
+          "rootPolicyId": "jobOwnedRemoteV1"
+        },
+        "recoveryPolicy": {
+          "strategy": "typedCompensation",
+          "requiredStepKinds": [
+            "stopRemoteCapture",
+            "restoreParameter",
+            "cleanupOwnedRemotePath"
+          ],
+          "resumeProbeProfileId": "observe-device.read-only.v1"
+        }
+      },
+      {
+        "operationId": "installHAP",
+        "profileId": "hap.install-preserve-data.v1",
+        "configurationId": "hap.install-preserve-data.v1.config",
+        "configurationSha256": "1dee29b58f45b736072cddb4ad81e0f730e837ffbde5c3c0edbae8bd37299380",
+        "effect": "deviceMutation",
+        "dataImpact": "applicationDataPreserving",
+        "namespace": {
+          "kind": "bundle",
+          "bundleId": "dev.arkdeck.fixture"
+        },
+        "recoveryPolicy": {
+          "strategy": "verifiedRollback",
+          "requiredStepKinds": [],
+          "resumeProbeProfileId": "observe-device.read-only.v1"
+        }
+      },
+      {
+        "operationId": "deployNativeLibrary",
+        "profileId": "native-library.app-owned-atomic.v1",
+        "configurationId": "native-library.app-owned-atomic.v1.config",
+        "configurationSha256": "ab65411f961609f59b640f080d7986952926f18a16f0fc1a49cb37bbba24ebd8",
+        "effect": "deviceMutation",
+        "dataImpact": "applicationDataPreserving",
+        "namespace": {
+          "kind": "bundle",
+          "bundleId": "dev.arkdeck.fixture"
+        },
+        "recoveryPolicy": {
+          "strategy": "verifiedRollback",
+          "requiredStepKinds": [],
+          "resumeProbeProfileId": "observe-device.read-only.v1"
+        }
+      },
+      {
+        "operationId": "startApplication",
+        "profileId": "application.start.v1",
+        "configurationId": "application.start.v1.config",
+        "configurationSha256": "84ca533adc848551398c3139e1d7dae7168d4f64a3df297cb1b1407209dd1c68",
+        "effect": "deviceMutation",
+        "dataImpact": "ephemeralOwnedState",
+        "namespace": {
+          "kind": "bundle",
+          "bundleId": "dev.arkdeck.fixture"
+        },
+        "recoveryPolicy": {
+          "strategy": "typedCompensation",
+          "requiredStepKinds": ["stopApplication"],
+          "resumeProbeProfileId": "observe-device.read-only.v1"
+        }
+      },
+      {
+        "operationId": "stopApplication",
+        "profileId": "application.stop.v1",
+        "configurationId": "application.stop.v1.config",
+        "configurationSha256": "eff254e9d649be162a8a58751087402b1dc84867cadf5d819ab910bed2e8673e",
+        "effect": "deviceMutation",
+        "dataImpact": "ephemeralOwnedState",
+        "namespace": {
+          "kind": "bundle",
+          "bundleId": "dev.arkdeck.fixture"
+        },
+        "recoveryPolicy": {
+          "strategy": "typedCompensation",
+          "requiredStepKinds": ["startApplication"],
+          "resumeProbeProfileId": "observe-device.read-only.v1"
+        }
+      },
+      {
+        "operationId": "sendOwnedFile",
+        "profileId": "owned-file.send.v1",
+        "configurationId": "owned-file.send.v1.config",
+        "configurationSha256": "a1888b292a73f81754680a74528c9bb52576a66532fc3844c3698887b262f50a",
+        "effect": "deviceMutation",
+        "dataImpact": "ephemeralOwnedState",
+        "namespace": {
+          "kind": "jobOwnedRemote",
+          "rootPolicyId": "jobOwnedRemoteV1"
+        },
+        "recoveryPolicy": {
+          "strategy": "typedCompensation",
+          "requiredStepKinds": ["cleanupOwnedRemotePath"],
+          "resumeProbeProfileId": "observe-device.read-only.v1"
+        }
+      },
+      {
+        "operationId": "createPortForward",
+        "profileId": "port-forward.create.v1",
+        "configurationId": "port-forward.create.v1.config",
+        "configurationSha256": "fc52182639079a5713e17576f7a515045b7be602f29e2bf586b9af6f34518ab9",
+        "effect": "deviceMutation",
+        "dataImpact": "ephemeralOwnedState",
+        "namespace": {
+          "kind": "portForward",
+          "pairs": [
+            {
+              "protocol": "tcp",
+              "hostPort": 18080,
+              "devicePort": 8080
+            }
+          ]
+        },
+        "recoveryPolicy": {
+          "strategy": "typedCompensation",
+          "requiredStepKinds": ["removePortForward"],
+          "resumeProbeProfileId": "observe-device.read-only.v1"
+        }
+      },
+      {
+        "operationId": "removePortForward",
+        "profileId": "port-forward.remove.v1",
+        "configurationId": "port-forward.remove.v1.config",
+        "configurationSha256": "f90d72b6a8696f69780b83e030835499b5f5096ddcc2744ddfbbdf53fc3795ea",
+        "effect": "deviceMutation",
+        "dataImpact": "ephemeralOwnedState",
+        "namespace": {
+          "kind": "portForward",
+          "pairs": [
+            {
+              "protocol": "tcp",
+              "hostPort": 18080,
+              "devicePort": 8080
+            }
+          ]
+        },
+        "recoveryPolicy": {
+          "strategy": "typedCompensation",
+          "requiredStepKinds": ["createPortForward"],
+          "resumeProbeProfileId": "observe-device.read-only.v1"
+        }
+      },
+      {
+        "operationId": "rebootDevice",
+        "profileId": "device.reboot.v1",
+        "configurationId": "device.reboot.v1.config",
+        "configurationSha256": "98036bd61fe786e17b6d8d239df1745a859f32361ec8e3fb8d6cfdbb89b95d74",
+        "effect": "deviceMutation",
+        "dataImpact": "reversibleDeviceConfiguration",
+        "namespace": {
+          "kind": "deviceMode",
+          "allowedTargetModes": ["normal", "recovery", "updater"]
+        },
+        "recoveryPolicy": {
+          "strategy": "resumeProbeOnly",
+          "requiredStepKinds": [],
+          "resumeProbeProfileId": "observe-device.read-only.v1"
+        }
+      }
+    ],
+    "limits": {
+      "maximumDataImpact": "applicationDataPreserving",
+      "maximumJobDurationSeconds": 3600,
+      "maximumConcurrentJobs": 1,
+      "maximumUses": 4,
+      "compensationGraceSeconds": 600
+    },
+    "privilegeRequirements": {
+      "developerMode": "required",
+      "root": "forbidden",
+      "packageDebuggable": "required",
+      "freshProbeProfileId": "observe-device.read-only.v1",
+      "maximumAgeSeconds": 15
+    },
+    "prohibitedAdjacency": {
+      "effects": ["destructive"],
+      "operations": ["flash", "uninstallHAP"],
+      "profiles": [
+        "hilog.global-persist.v1",
+        "hap.install-data-impact.v1",
+        "hap.uninstall.v1",
+        "native-library.system-publish.v1",
+        "flash.rockchip-authorized.v1"
+      ],
+      "stepKinds": [
+        "mutateHDCServerLifecycle",
+        "runApprovedRemoteMutation",
+        "uninstallPackage",
+        "enterUpdater",
+        "flashPartition",
+        "updatePackage",
+        "erasePartition",
+        "formatPartition",
+        "unlockDevice"
+      ]
+    },
+    "validUntil": "2026-08-15T14:19:53Z"
+  },
+  "authorityRefs": {
+    "e0": {
+      "kind": "readyTask",
+      "changeId": "CHG-2026-025",
+      "taskId": "TASK-AIN-011",
+      "mainCommitOID": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "taskBlobOID": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "approvalPRNumber": 800
+    },
+    "e1": {
+      "kind": "deviceCapability",
+      "capabilityId": "CAP-E1-ARKDECK-001",
+      "mainCommitOID": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "capabilityBlobOID": "cccccccccccccccccccccccccccccccccccccccc",
+      "approvalPRNumber": 801
+    },
+    "e2": {
+      "kind": "standingAuthorization",
+      "authorizationId": "AUTH-ARKDECK-001",
+      "mainCommitOID": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "authorizationBlobOID": "dddddddddddddddddddddddddddddddddddddddd",
+      "approvalPRNumber": 802
+    }
+  },
+  "provenance": {
+    "repository": "ArkDeck/ArkDeck",
+    "branch": "main",
+    "registryPath": "openspec/changes/chg-2026-025-ai-native-unattended-device-ops/evidence/capabilities/CAP-E1-ARKDECK-001.json",
+    "currentMainCommitOID": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "currentMainCapabilityBlobOID": "cccccccccccccccccccccccccccccccccccccccc",
+    "headCapabilityBlobOID": "cccccccccccccccccccccccccccccccccccccccc",
+    "mergeCapabilityBlobOID": "cccccccccccccccccccccccccccccccccccccccc",
+    "codeownersBlobOID": "f4edd22f87965efcfc27ea512283a0c2252bf0fb",
+    "networkAvailable": true,
+    "offlineCacheUsed": false,
+    "acceptancePR": {
+      "number": 801,
+      "state": "MERGED",
+      "baseRefName": "main",
+      "author": "github-actions[bot]",
+      "headCommitOID": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "mergeCommitOID": "ffffffffffffffffffffffffffffffffffffffff",
+      "mergeCommitIsCurrentMainAncestor": true,
+      "reviewer": "lvye",
+      "reviewState": "APPROVED",
+      "reviewCommitOID": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "merger": "lvye",
+      "mergedAt": "2026-07-28T14:19:53Z"
+    }
+  },
+  "usage": {
+    "documentType": "agentAuthorityUsage",
+    "schemaVersion": "1.0.0",
+    "reservations": [
+      {
+        "reservationId": "reservation-e1-001",
+        "authorizationRef": {
+          "kind": "deviceCapability",
+          "capabilityId": "CAP-E1-ARKDECK-001",
+          "mainCommitOID": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "capabilityBlobOID": "cccccccccccccccccccccccccccccccccccccccc",
+          "approvalPRNumber": 801
+        },
+        "ordinal": 1,
+        "maximumUses": 4,
+        "maximumConcurrentJobs": 1,
+        "jobId": "job-e1",
+        "operationDigestSHA256": "5555555555555555555555555555555555555555555555555555555555555555",
+        "targetDigestSHA256": "6666666666666666666666666666666666666666666666666666666666666666",
+        "reservedAt": "2026-07-28T15:00:00Z",
+        "forwardLeaseExpiresAt": "2026-07-28T16:00:00Z",
+        "compensationLeaseExpiresAt": "2026-07-28T16:10:00Z",
+        "terminal": {
+          "status": "succeeded",
+          "closedAt": "2026-07-28T15:01:00Z",
+          "externalIntentEventIds": ["e1-intent", "e1-compensation-intent"]
+        }
+      }
+    ]
+  },
+  "leaseRequestDeadline": "2026-07-28T16:30:00Z",
+  "sessions": {
+    "e0": {
+      "effect": "readOnly",
+      "usageReservationId": null,
+      "journal": [
+        {
+          "schemaVersion": "2.2.0",
+          "eventId": "e0-created",
+          "sequence": 0,
+          "sessionId": "session-e0",
+          "jobId": "job-e0",
+          "timestamp": "2026-07-28T15:00:00Z",
+          "kind": "jobCreated",
+          "payload": {
+            "executionMode": "execute",
+            "executionAuthority": "authorizedAgent",
+            "initialState": "queued",
+            "coreBaseline": "CORE-2.1.0",
+            "authorizationRef": {
+              "kind": "readyTask",
+              "changeId": "CHG-2026-025",
+              "taskId": "TASK-AIN-011",
+              "mainCommitOID": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "taskBlobOID": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "approvalPRNumber": 800
+            }
+          }
+        },
+        {
+          "schemaVersion": "2.2.0",
+          "eventId": "e0-intent",
+          "sequence": 1,
+          "sessionId": "session-e0",
+          "jobId": "job-e0",
+          "timestamp": "2026-07-28T15:00:01Z",
+          "kind": "stepIntent",
+          "stepId": "step-e0",
+          "attempt": 1,
+          "bindingRevision": 7,
+          "argumentsHash": "7777777777777777777777777777777777777777777777777777777777777777",
+          "payload": {
+            "step": {
+              "id": "step-e0",
+              "kind": "probeDevice",
+              "effect": "readOnly"
+            },
+            "target": {
+              "scope": "device",
+              "targetId": "device-fixture-001",
+              "connectKey": "fixture-connect-key",
+              "identitySnapshotHash": "1111111111111111111111111111111111111111111111111111111111111111"
+            },
+            "authorizationRef": {
+              "kind": "readyTask",
+              "changeId": "CHG-2026-025",
+              "taskId": "TASK-AIN-011",
+              "mainCommitOID": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "taskBlobOID": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "approvalPRNumber": 800
+            }
+          }
+        },
+        {
+          "schemaVersion": "2.2.0",
+          "eventId": "e0-outcome",
+          "sequence": 2,
+          "sessionId": "session-e0",
+          "jobId": "job-e0",
+          "timestamp": "2026-07-28T15:00:02Z",
+          "kind": "stepOutcome",
+          "stepId": "step-e0",
+          "attempt": 1,
+          "payload": {
+            "correlatesToIntentEventId": "e0-intent",
+            "result": "succeeded",
+            "outcomeCertainty": "confirmed",
+            "authorizationRef": {
+              "kind": "readyTask",
+              "changeId": "CHG-2026-025",
+              "taskId": "TASK-AIN-011",
+              "mainCommitOID": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "taskBlobOID": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "approvalPRNumber": 800
+            }
+          }
+        }
+      ],
+      "manifest": {
+        "schemaVersion": "2.2.0",
+        "executionMode": "execute",
+        "executionAuthority": "authorizedAgent",
+        "outcomeCertainty": "confirmed",
+        "createdAt": "2026-07-28T15:00:00Z",
+        "completedAt": "2026-07-28T15:00:02Z",
+        "authorization": {
+          "authorizationRef": {
+            "kind": "readyTask",
+            "changeId": "CHG-2026-025",
+            "taskId": "TASK-AIN-011",
+            "mainCommitOID": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "taskBlobOID": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "approvalPRNumber": 800
+          },
+          "usageReservationId": null,
+          "externalIntentEventIds": ["e0-intent"]
+        },
+        "confirmations": []
+      }
+    },
+    "e1": {
+      "effect": "deviceMutation",
+      "usageReservationId": "reservation-e1-001",
+      "journal": [
+        {
+          "schemaVersion": "2.2.0",
+          "eventId": "e1-created",
+          "sequence": 0,
+          "sessionId": "session-e1",
+          "jobId": "job-e1",
+          "timestamp": "2026-07-28T15:00:00Z",
+          "kind": "jobCreated",
+          "payload": {
+            "executionMode": "execute",
+            "executionAuthority": "authorizedAgent",
+            "initialState": "queued",
+            "coreBaseline": "CORE-2.1.0",
+            "authorizationRef": {
+              "kind": "deviceCapability",
+              "capabilityId": "CAP-E1-ARKDECK-001",
+              "mainCommitOID": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "capabilityBlobOID": "cccccccccccccccccccccccccccccccccccccccc",
+              "approvalPRNumber": 801
+            },
+            "usageReservationId": "reservation-e1-001"
+          }
+        },
+        {
+          "schemaVersion": "2.2.0",
+          "eventId": "e1-intent",
+          "sequence": 1,
+          "sessionId": "session-e1",
+          "jobId": "job-e1",
+          "timestamp": "2026-07-28T15:00:01Z",
+          "kind": "stepIntent",
+          "stepId": "step-e1",
+          "attempt": 1,
+          "bindingRevision": 7,
+          "argumentsHash": "8888888888888888888888888888888888888888888888888888888888888888",
+          "payload": {
+            "step": {
+              "id": "step-e1",
+              "kind": "startApplication",
+              "effect": "deviceMutation"
+            },
+            "target": {
+              "scope": "device",
+              "targetId": "device-fixture-001",
+              "connectKey": "fixture-connect-key",
+              "identitySnapshotHash": "1111111111111111111111111111111111111111111111111111111111111111"
+            },
+            "authorizationRef": {
+              "kind": "deviceCapability",
+              "capabilityId": "CAP-E1-ARKDECK-001",
+              "mainCommitOID": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "capabilityBlobOID": "cccccccccccccccccccccccccccccccccccccccc",
+              "approvalPRNumber": 801
+            },
+            "usageReservationId": "reservation-e1-001"
+          }
+        },
+        {
+          "schemaVersion": "2.2.0",
+          "eventId": "e1-outcome",
+          "sequence": 2,
+          "sessionId": "session-e1",
+          "jobId": "job-e1",
+          "timestamp": "2026-07-28T15:00:02Z",
+          "kind": "stepOutcome",
+          "stepId": "step-e1",
+          "attempt": 1,
+          "payload": {
+            "correlatesToIntentEventId": "e1-intent",
+            "result": "succeeded",
+            "outcomeCertainty": "confirmed",
+            "authorizationRef": {
+              "kind": "deviceCapability",
+              "capabilityId": "CAP-E1-ARKDECK-001",
+              "mainCommitOID": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "capabilityBlobOID": "cccccccccccccccccccccccccccccccccccccccc",
+              "approvalPRNumber": 801
+            },
+            "usageReservationId": "reservation-e1-001"
+          }
+        },
+        {
+          "schemaVersion": "2.2.0",
+          "eventId": "e1-compensation-intent",
+          "sequence": 3,
+          "sessionId": "session-e1",
+          "jobId": "job-e1",
+          "timestamp": "2026-07-28T15:00:03Z",
+          "kind": "compensationIntent",
+          "stepId": "compensation-e1",
+          "attempt": 1,
+          "bindingRevision": 7,
+          "argumentsHash": "9999999999999999999999999999999999999999999999999999999999999999",
+          "payload": {
+            "compensationOfStepId": "step-e1",
+            "descriptor": {
+              "id": "compensation-e1",
+              "kind": "stopApplication",
+              "effect": "deviceMutation"
+            },
+            "target": {
+              "scope": "device",
+              "targetId": "device-fixture-001",
+              "connectKey": "fixture-connect-key",
+              "identitySnapshotHash": "1111111111111111111111111111111111111111111111111111111111111111"
+            },
+            "authorizationRef": {
+              "kind": "deviceCapability",
+              "capabilityId": "CAP-E1-ARKDECK-001",
+              "mainCommitOID": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "capabilityBlobOID": "cccccccccccccccccccccccccccccccccccccccc",
+              "approvalPRNumber": 801
+            },
+            "usageReservationId": "reservation-e1-001"
+          }
+        },
+        {
+          "schemaVersion": "2.2.0",
+          "eventId": "e1-compensation-outcome",
+          "sequence": 4,
+          "sessionId": "session-e1",
+          "jobId": "job-e1",
+          "timestamp": "2026-07-28T15:00:04Z",
+          "kind": "compensationOutcome",
+          "stepId": "compensation-e1",
+          "attempt": 1,
+          "payload": {
+            "compensationOfStepId": "step-e1",
+            "descriptorId": "compensation-e1",
+            "correlatesToIntentEventId": "e1-compensation-intent",
+            "result": "succeeded",
+            "outcomeCertainty": "confirmed",
+            "authorizationRef": {
+              "kind": "deviceCapability",
+              "capabilityId": "CAP-E1-ARKDECK-001",
+              "mainCommitOID": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "capabilityBlobOID": "cccccccccccccccccccccccccccccccccccccccc",
+              "approvalPRNumber": 801
+            },
+            "usageReservationId": "reservation-e1-001"
+          }
+        }
+      ],
+      "manifest": {
+        "schemaVersion": "2.2.0",
+        "executionMode": "execute",
+        "executionAuthority": "authorizedAgent",
+        "outcomeCertainty": "confirmed",
+        "createdAt": "2026-07-28T15:00:00Z",
+        "completedAt": "2026-07-28T15:00:04Z",
+        "authorization": {
+          "authorizationRef": {
+            "kind": "deviceCapability",
+            "capabilityId": "CAP-E1-ARKDECK-001",
+            "mainCommitOID": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "capabilityBlobOID": "cccccccccccccccccccccccccccccccccccccccc",
+            "approvalPRNumber": 801
+          },
+          "usageReservationId": "reservation-e1-001",
+          "externalIntentEventIds": [
+            "e1-intent",
+            "e1-compensation-intent"
+          ]
+        },
+        "confirmations": [
+          {
+            "kind": "authorizedAgent",
+            "authorizationRef": {
+              "kind": "deviceCapability",
+              "capabilityId": "CAP-E1-ARKDECK-001",
+              "mainCommitOID": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "capabilityBlobOID": "cccccccccccccccccccccccccccccccccccccccc",
+              "approvalPRNumber": 801
+            }
+          },
+          {
+            "kind": "interactiveUser"
+          }
+        ]
+      }
+    },
+    "e2": {
+      "effect": "destructive",
+      "usageReservationId": "reservation-e2-001",
+      "journal": [
+        {
+          "schemaVersion": "2.2.0",
+          "eventId": "e2-created",
+          "sequence": 0,
+          "sessionId": "session-e2",
+          "jobId": "job-e2",
+          "timestamp": "2026-07-28T15:00:00Z",
+          "kind": "jobCreated",
+          "payload": {
+            "executionMode": "execute",
+            "executionAuthority": "authorizedAgent",
+            "initialState": "queued",
+            "coreBaseline": "CORE-2.1.0",
+            "authorizationRef": {
+              "kind": "standingAuthorization",
+              "authorizationId": "AUTH-ARKDECK-001",
+              "mainCommitOID": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "authorizationBlobOID": "dddddddddddddddddddddddddddddddddddddddd",
+              "approvalPRNumber": 802
+            },
+            "usageReservationId": "reservation-e2-001"
+          }
+        },
+        {
+          "schemaVersion": "2.2.0",
+          "eventId": "e2-intent",
+          "sequence": 1,
+          "sessionId": "session-e2",
+          "jobId": "job-e2",
+          "timestamp": "2026-07-28T15:00:01Z",
+          "kind": "stepIntent",
+          "stepId": "step-e2",
+          "attempt": 1,
+          "bindingRevision": 7,
+          "argumentsHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "payload": {
+            "step": {
+              "id": "step-e2",
+              "kind": "flashPartition",
+              "effect": "destructive"
+            },
+            "target": {
+              "scope": "device",
+              "targetId": "device-fixture-001",
+              "connectKey": "fixture-connect-key",
+              "identitySnapshotHash": "1111111111111111111111111111111111111111111111111111111111111111"
+            },
+            "authorizationRef": {
+              "kind": "standingAuthorization",
+              "authorizationId": "AUTH-ARKDECK-001",
+              "mainCommitOID": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "authorizationBlobOID": "dddddddddddddddddddddddddddddddddddddddd",
+              "approvalPRNumber": 802
+            },
+            "usageReservationId": "reservation-e2-001"
+          }
+        },
+        {
+          "schemaVersion": "2.2.0",
+          "eventId": "e2-outcome",
+          "sequence": 2,
+          "sessionId": "session-e2",
+          "jobId": "job-e2",
+          "timestamp": "2026-07-28T15:00:02Z",
+          "kind": "stepOutcome",
+          "stepId": "step-e2",
+          "attempt": 1,
+          "payload": {
+            "correlatesToIntentEventId": "e2-intent",
+            "result": "succeeded",
+            "outcomeCertainty": "confirmed",
+            "authorizationRef": {
+              "kind": "standingAuthorization",
+              "authorizationId": "AUTH-ARKDECK-001",
+              "mainCommitOID": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "authorizationBlobOID": "dddddddddddddddddddddddddddddddddddddddd",
+              "approvalPRNumber": 802
+            },
+            "usageReservationId": "reservation-e2-001"
+          }
+        }
+      ],
+      "manifest": {
+        "schemaVersion": "2.2.0",
+        "executionMode": "execute",
+        "executionAuthority": "authorizedAgent",
+        "outcomeCertainty": "confirmed",
+        "createdAt": "2026-07-28T15:00:00Z",
+        "completedAt": "2026-07-28T15:00:02Z",
+        "authorization": {
+          "authorizationRef": {
+            "kind": "standingAuthorization",
+            "authorizationId": "AUTH-ARKDECK-001",
+            "mainCommitOID": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "authorizationBlobOID": "dddddddddddddddddddddddddddddddddddddddd",
+            "approvalPRNumber": 802
+          },
+          "usageReservationId": "reservation-e2-001",
+          "externalIntentEventIds": ["e2-intent"]
+        },
+        "confirmations": []
+      }
+    }
+  },
+  "legacyVersions": [
+    {
+      "version": "1.x",
+      "journalSchema": "openspec/contracts/journal-event.schema.json",
+      "journalSHA256": "21df4c44b704d249c2228384b075a331346a4731d3f0b90f66ec8092dded8b19",
+      "manifestSchema": "openspec/contracts/manifest.schema.json",
+      "manifestSHA256": "52be768697e75fc98a00a386345162af2e1a8ca3607b86f755adb766cf0ad489",
+      "authorityMeaning": "none",
+      "writeRule": "preserveDeclaredVersionAndBytes"
+    },
+    {
+      "version": "2.0.0",
+      "journalSchema": "openspec/changes/chg-2026-025-ai-native-unattended-device-ops/contracts/journal-event.schema.v2-draft.json",
+      "journalSHA256": "79e0d20d1de0e8f824b8a75fa81d787b53f3508f6b6b8e663227e9a5d4f218da",
+      "manifestSchema": "openspec/changes/chg-2026-025-ai-native-unattended-device-ops/contracts/manifest.schema.v2-draft.json",
+      "manifestSHA256": "6323c5f8aba790f9cbfb31decdcebcd4b505dbd069e4aab97202759ff2f97b03",
+      "authorityMeaning": "standingAuthorization",
+      "writeRule": "preserveDeclaredVersionAndBytes"
+    },
+    {
+      "version": "2.1.0",
+      "journalSchema": "openspec/changes/chg-2026-025-ai-native-unattended-device-ops/contracts/journal-event.schema.v2.1-draft.json",
+      "journalSHA256": "956dcb1509042890b3fb4007bf98963b8a1d7ff49fc8f8c0443419b9733d02c7",
+      "manifestSchema": "openspec/changes/chg-2026-025-ai-native-unattended-device-ops/contracts/manifest.schema.v2.1-draft.json",
+      "manifestSHA256": "396375295f190debc7c5ad092d215d50a3eb9dc3382f746573be87331456db3e",
+      "authorityMeaning": "standingAuthorization",
+      "writeRule": "preserveDeclaredVersionAndBytes"
+    }
+  ]
+}

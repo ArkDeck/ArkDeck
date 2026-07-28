@@ -1,0 +1,471 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://arkdeck.dev/schemas/journal-event-2.2.0-draft.json",
+  "title": "ArkDeck Journal Event v2.2 (change-local draft)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "eventId",
+    "sequence",
+    "sessionId",
+    "jobId",
+    "timestamp",
+    "kind",
+    "payload"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "2.2.0" },
+    "eventId": { "$ref": "#/$defs/id" },
+    "sequence": { "type": "integer", "minimum": 0 },
+    "sessionId": { "$ref": "#/$defs/id" },
+    "jobId": { "$ref": "#/$defs/id" },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "accumulatedElapsedDurationNanoseconds": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "accumulatedActiveDurationNanoseconds": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "kind": {
+      "$ref": "../../../contracts/journal-event.schema.json#/$defs/eventKind"
+    },
+    "stepId": { "type": ["string", "null"], "minLength": 1 },
+    "attempt": { "type": ["integer", "null"], "minimum": 1 },
+    "bindingRevision": { "type": ["integer", "null"], "minimum": 1 },
+    "argumentsHash": {
+      "type": ["string", "null"],
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "payload": {}
+  },
+  "oneOf": [
+    { "$ref": "#/$defs/jobCreatedEvent" },
+    { "$ref": "#/$defs/stepIntentEvent" },
+    { "$ref": "#/$defs/stepOutcomeEvent" },
+    { "$ref": "#/$defs/compensationIntentEvent" },
+    { "$ref": "#/$defs/compensationOutcomeEvent" },
+    {
+      "$ref": "../../../contracts/journal-event.schema.json#/$defs/stateTransitionEvent"
+    },
+    {
+      "$ref": "../../../contracts/journal-event.schema.json#/$defs/bindingCandidateEvent"
+    },
+    {
+      "$ref": "../../../contracts/journal-event.schema.json#/$defs/bindingConfirmedEvent"
+    },
+    {
+      "$ref": "../../../contracts/journal-event.schema.json#/$defs/bindingRejectedEvent"
+    },
+    {
+      "$ref": "../../../contracts/journal-event.schema.json#/$defs/serverGenerationChangedEvent"
+    },
+    { "$ref": "../../../contracts/journal-event.schema.json#/$defs/sleepEvent" },
+    { "$ref": "../../../contracts/journal-event.schema.json#/$defs/wakeEvent" },
+    {
+      "$ref": "../../../contracts/journal-event.schema.json#/$defs/reconcileStartedEvent"
+    },
+    {
+      "$ref": "../../../contracts/journal-event.schema.json#/$defs/reconcileOutcomeEvent"
+    },
+    {
+      "$ref": "../../../contracts/journal-event.schema.json#/$defs/abandonIntentEvent"
+    },
+    {
+      "$ref": "../../../contracts/journal-event.schema.json#/$defs/abandonOutcomeEvent"
+    },
+    { "$ref": "../../../contracts/journal-event.schema.json#/$defs/warningEvent" },
+    { "$ref": "../../../contracts/journal-event.schema.json#/$defs/errorEvent" },
+    { "$ref": "../../../contracts/journal-event.schema.json#/$defs/finalizedEvent" }
+  ],
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "authorizationRef": {
+      "$ref": "https://arkdeck.dev/schemas/agent-execution-authority-1.0.0.json"
+    },
+    "usageReservationId": { "$ref": "#/$defs/id" },
+    "jobCreatedPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "executionMode",
+        "executionAuthority",
+        "initialState",
+        "coreBaseline"
+      ],
+      "properties": {
+        "executionMode": { "enum": ["execute", "planOnly", "simulated"] },
+        "executionAuthority": {
+          "enum": [
+            "interactiveUser",
+            "standardAgent",
+            "controlledHardwareLab",
+            "authorizedAgent"
+          ]
+        },
+        "initialState": { "const": "queued" },
+        "coreBaseline": {
+          "type": "string",
+          "pattern": "^CORE-[0-9]+\\.[0-9]+\\.[0-9]+$"
+        },
+        "authorizationRef": { "$ref": "#/$defs/authorizationRef" },
+        "usageReservationId": { "$ref": "#/$defs/usageReservationId" }
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "executionMode": { "const": "execute" },
+            "executionAuthority": { "const": "authorizedAgent" },
+            "authorizationRef": {
+              "$ref": "https://arkdeck.dev/schemas/agent-execution-authority-1.0.0.json#/$defs/readyTaskAuthorizationRef"
+            }
+          },
+          "required": ["executionMode", "executionAuthority", "authorizationRef"],
+          "not": { "required": ["usageReservationId"] }
+        },
+        {
+          "properties": {
+            "executionMode": { "const": "execute" },
+            "executionAuthority": { "const": "authorizedAgent" },
+            "authorizationRef": {
+              "$ref": "https://arkdeck.dev/schemas/agent-execution-authority-1.0.0.json#/$defs/deviceCapabilityAuthorizationRef"
+            }
+          },
+          "required": [
+            "executionMode",
+            "executionAuthority",
+            "authorizationRef",
+            "usageReservationId"
+          ]
+        },
+        {
+          "properties": {
+            "executionMode": { "const": "execute" },
+            "executionAuthority": { "const": "authorizedAgent" },
+            "authorizationRef": {
+              "$ref": "https://arkdeck.dev/schemas/agent-execution-authority-1.0.0.json#/$defs/standingAuthorizationRef"
+            }
+          },
+          "required": [
+            "executionMode",
+            "executionAuthority",
+            "authorizationRef",
+            "usageReservationId"
+          ]
+        },
+        {
+          "not": {
+            "anyOf": [
+              {
+                "properties": {
+                  "executionAuthority": { "const": "authorizedAgent" }
+                },
+                "required": ["executionAuthority"]
+              },
+              { "required": ["authorizationRef"] },
+              { "required": ["usageReservationId"] }
+            ]
+          }
+        }
+      ]
+    },
+    "jobCreatedEvent": {
+      "properties": {
+        "kind": { "const": "jobCreated" },
+        "payload": { "$ref": "#/$defs/jobCreatedPayload" }
+      }
+    },
+    "stepIntentPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["step", "target"],
+      "properties": {
+        "step": {
+          "$ref": "https://arkdeck.dev/schemas/workflow-step-1.0.0.json#/$defs/workflowStep"
+        },
+        "target": {
+          "$ref": "../../../contracts/journal-event.schema.json#/$defs/target"
+        },
+        "authorizationRef": { "$ref": "#/$defs/authorizationRef" },
+        "usageReservationId": { "$ref": "#/$defs/usageReservationId" }
+      },
+      "oneOf": [
+        {
+          "not": {
+            "anyOf": [
+              { "required": ["authorizationRef"] },
+              { "required": ["usageReservationId"] }
+            ]
+          }
+        },
+        {
+          "properties": {
+            "step": {
+              "properties": { "effect": { "const": "readOnly" } },
+              "required": ["effect"]
+            },
+            "authorizationRef": {
+              "$ref": "https://arkdeck.dev/schemas/agent-execution-authority-1.0.0.json#/$defs/readyTaskAuthorizationRef"
+            }
+          },
+          "required": ["authorizationRef"],
+          "not": { "required": ["usageReservationId"] }
+        },
+        {
+          "properties": {
+            "step": {
+              "properties": { "effect": { "const": "deviceMutation" } },
+              "required": ["effect"]
+            },
+            "authorizationRef": {
+              "$ref": "https://arkdeck.dev/schemas/agent-execution-authority-1.0.0.json#/$defs/deviceCapabilityAuthorizationRef"
+            }
+          },
+          "required": ["authorizationRef", "usageReservationId"]
+        },
+        {
+          "properties": {
+            "step": {
+              "properties": { "effect": { "const": "destructive" } },
+              "required": ["effect"]
+            },
+            "authorizationRef": {
+              "$ref": "https://arkdeck.dev/schemas/agent-execution-authority-1.0.0.json#/$defs/standingAuthorizationRef"
+            }
+          },
+          "required": ["authorizationRef", "usageReservationId"]
+        }
+      ]
+    },
+    "stepIntentEvent": {
+      "required": ["stepId", "attempt", "bindingRevision", "argumentsHash"],
+      "properties": {
+        "kind": { "const": "stepIntent" },
+        "stepId": { "$ref": "#/$defs/id" },
+        "attempt": { "type": "integer", "minimum": 1 },
+        "bindingRevision": { "type": ["integer", "null"], "minimum": 1 },
+        "argumentsHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "payload": { "$ref": "#/$defs/stepIntentPayload" }
+      }
+    },
+    "correlatedOutcomePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["correlatesToIntentEventId", "result", "outcomeCertainty"],
+      "properties": {
+        "correlatesToIntentEventId": { "$ref": "#/$defs/id" },
+        "result": { "enum": ["succeeded", "failed", "cancelled", "timedOut"] },
+        "outcomeCertainty": {
+          "$ref": "../../../contracts/journal-event.schema.json#/$defs/outcomeCertainty"
+        },
+        "semanticCode": { "type": ["string", "null"] },
+        "summary": { "type": ["string", "null"] },
+        "authorizationRef": { "$ref": "#/$defs/authorizationRef" },
+        "usageReservationId": { "$ref": "#/$defs/usageReservationId" }
+      },
+      "oneOf": [
+        {
+          "not": {
+            "anyOf": [
+              { "required": ["authorizationRef"] },
+              { "required": ["usageReservationId"] }
+            ]
+          }
+        },
+        {
+          "properties": {
+            "authorizationRef": {
+              "$ref": "https://arkdeck.dev/schemas/agent-execution-authority-1.0.0.json#/$defs/readyTaskAuthorizationRef"
+            }
+          },
+          "required": ["authorizationRef"],
+          "not": { "required": ["usageReservationId"] }
+        },
+        {
+          "properties": {
+            "authorizationRef": {
+              "$ref": "https://arkdeck.dev/schemas/agent-execution-authority-1.0.0.json#/$defs/deviceCapabilityAuthorizationRef"
+            }
+          },
+          "required": ["authorizationRef", "usageReservationId"]
+        },
+        {
+          "properties": {
+            "authorizationRef": {
+              "$ref": "https://arkdeck.dev/schemas/agent-execution-authority-1.0.0.json#/$defs/standingAuthorizationRef"
+            }
+          },
+          "required": ["authorizationRef", "usageReservationId"]
+        }
+      ]
+    },
+    "stepOutcomeEvent": {
+      "required": ["stepId", "attempt"],
+      "properties": {
+        "kind": { "const": "stepOutcome" },
+        "stepId": { "$ref": "#/$defs/id" },
+        "attempt": { "type": "integer", "minimum": 1 },
+        "payload": { "$ref": "#/$defs/correlatedOutcomePayload" }
+      }
+    },
+    "compensationIntentPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["compensationOfStepId", "descriptor", "target"],
+      "properties": {
+        "compensationOfStepId": { "$ref": "#/$defs/id" },
+        "descriptor": {
+          "$ref": "https://arkdeck.dev/schemas/workflow-step-1.0.0.json#/$defs/compensationDescriptor"
+        },
+        "target": {
+          "$ref": "../../../contracts/journal-event.schema.json#/$defs/target"
+        },
+        "authorizationRef": { "$ref": "#/$defs/authorizationRef" },
+        "usageReservationId": { "$ref": "#/$defs/usageReservationId" }
+      },
+      "oneOf": [
+        {
+          "not": {
+            "anyOf": [
+              { "required": ["authorizationRef"] },
+              { "required": ["usageReservationId"] }
+            ]
+          }
+        },
+        {
+          "properties": {
+            "descriptor": {
+              "properties": { "effect": { "const": "readOnly" } },
+              "required": ["effect"]
+            },
+            "authorizationRef": {
+              "$ref": "https://arkdeck.dev/schemas/agent-execution-authority-1.0.0.json#/$defs/readyTaskAuthorizationRef"
+            }
+          },
+          "required": ["authorizationRef"],
+          "not": { "required": ["usageReservationId"] }
+        },
+        {
+          "properties": {
+            "descriptor": {
+              "properties": { "effect": { "const": "deviceMutation" } },
+              "required": ["effect"]
+            },
+            "authorizationRef": {
+              "$ref": "https://arkdeck.dev/schemas/agent-execution-authority-1.0.0.json#/$defs/deviceCapabilityAuthorizationRef"
+            }
+          },
+          "required": ["authorizationRef", "usageReservationId"]
+        },
+        {
+          "properties": {
+            "descriptor": {
+              "properties": { "effect": { "const": "destructive" } },
+              "required": ["effect"]
+            },
+            "authorizationRef": {
+              "$ref": "https://arkdeck.dev/schemas/agent-execution-authority-1.0.0.json#/$defs/standingAuthorizationRef"
+            }
+          },
+          "required": ["authorizationRef", "usageReservationId"]
+        }
+      ]
+    },
+    "compensationIntentEvent": {
+      "required": ["stepId", "attempt", "bindingRevision", "argumentsHash"],
+      "properties": {
+        "kind": { "const": "compensationIntent" },
+        "stepId": { "$ref": "#/$defs/id" },
+        "attempt": { "type": "integer", "minimum": 1 },
+        "bindingRevision": { "type": ["integer", "null"], "minimum": 1 },
+        "argumentsHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "payload": { "$ref": "#/$defs/compensationIntentPayload" }
+      }
+    },
+    "compensationOutcomePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "compensationOfStepId",
+        "descriptorId",
+        "correlatesToIntentEventId",
+        "result",
+        "outcomeCertainty"
+      ],
+      "properties": {
+        "compensationOfStepId": { "$ref": "#/$defs/id" },
+        "descriptorId": { "$ref": "#/$defs/id" },
+        "correlatesToIntentEventId": { "$ref": "#/$defs/id" },
+        "result": { "enum": ["succeeded", "failed", "cancelled", "timedOut"] },
+        "outcomeCertainty": {
+          "$ref": "../../../contracts/journal-event.schema.json#/$defs/outcomeCertainty"
+        },
+        "semanticCode": { "type": ["string", "null"] },
+        "summary": { "type": ["string", "null"] },
+        "authorizationRef": { "$ref": "#/$defs/authorizationRef" },
+        "usageReservationId": { "$ref": "#/$defs/usageReservationId" }
+      },
+      "oneOf": [
+        {
+          "not": {
+            "anyOf": [
+              { "required": ["authorizationRef"] },
+              { "required": ["usageReservationId"] }
+            ]
+          }
+        },
+        {
+          "properties": {
+            "authorizationRef": {
+              "$ref": "https://arkdeck.dev/schemas/agent-execution-authority-1.0.0.json#/$defs/readyTaskAuthorizationRef"
+            }
+          },
+          "required": ["authorizationRef"],
+          "not": { "required": ["usageReservationId"] }
+        },
+        {
+          "properties": {
+            "authorizationRef": {
+              "$ref": "https://arkdeck.dev/schemas/agent-execution-authority-1.0.0.json#/$defs/deviceCapabilityAuthorizationRef"
+            }
+          },
+          "required": ["authorizationRef", "usageReservationId"]
+        },
+        {
+          "properties": {
+            "authorizationRef": {
+              "$ref": "https://arkdeck.dev/schemas/agent-execution-authority-1.0.0.json#/$defs/standingAuthorizationRef"
+            }
+          },
+          "required": ["authorizationRef", "usageReservationId"]
+        }
+      ]
+    },
+    "compensationOutcomeEvent": {
+      "required": ["stepId", "attempt"],
+      "properties": {
+        "kind": { "const": "compensationOutcome" },
+        "stepId": { "$ref": "#/$defs/id" },
+        "attempt": { "type": "integer", "minimum": 1 },
+        "payload": { "$ref": "#/$defs/compensationOutcomePayload" }
+      }
+    }
+  },
+  "x-arkdeck-semantic-invariants": [
+    "all events in one Session use exactly one declared schemaVersion",
+    "authorizedAgent exists only with executionMode=execute and jobCreated carries exactly one authority reference",
+    "readyTask has no usage reservation; deviceCapability and standingAuthorization have the kind-correct durable reservation",
+    "every authorizedAgent effect>=readOnly step intent and outcome repeats the exact jobCreated authorization and usage pair",
+    "every authorizedAgent external compensation intent and outcome repeats the exact jobCreated authorization and usage pair",
+    "intent and outcome match event, step, attempt, binding, arguments hash, descriptor and reverse correlation",
+    "hostOnly events never borrow an authorization reference or derive live authority",
+    "an external intent without a durable outcome remains outcomeUnknown and is never automatically replayed",
+    "unknown, cross-kind, ghost, duplicate or mixed-version correlation rejects the complete Session",
+    "v1, v2.0 and v2.1 historical events remain byte-preserving and never acquire authority by import"
+  ]
+}
