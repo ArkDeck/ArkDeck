@@ -6,19 +6,19 @@ HLR/NAV/DEC 先例由会话实现：`Decision-Grade` 在实现前保持缺失；
 
 ## TASK-CM7-001 — 对齐 `tasks.md` 字段冒号文法并锁定跨解析器契约
 
-- Status:ready（r2 readiness 已由 PR #712 merge，且 #710 / #711 均按钉定
-  exact head 合入；实现开工后的全量测试揭示一个未列入 allowed paths 的既有
-  discovery census 契约，故 r2 实现授权暂停。仅在维护者对下方 r3 scope
-  remediation exact head review/merge 后，才授权恢复同一个 implementation PR；
-  不授权 `done` / `verified` 翻转）
+- Status:ready（r3 scope remediation 已由 PR #714 merge，implementation 与
+  evidence 已完成且全绿；提交前 #715 改动 active corpus，命中 r3 stop condition。
+  r4 exact head 虽已获 review，但 #716 在 r4 pin 后变更 head 才合入，故 r4
+  未 merge、未授权恢复。仅在维护者对下方 r5 exact head review/merge 后，才授权
+  恢复并提交同一个 implementation PR；不授权 `done` / `verified` 翻转）
 - Platform:macos（host-only）
 - Requirements/AC:change-local `CM7-PARITY-001`、`CM7-CORPUS-001`、
   `CM7-SELF-001`
 - Depends on:none（change approval 与 readiness 由状态/PR 门承载，不伪装为
   TASK 依赖）
-- Readiness input pins:r1 / r2 为历史快照；现行 scope 补救见下方
-  `Readiness pins(r3,2026-07-28)`。恢复实现前必须逐项复核 r2 pins、r3
-  merge ancestry 与新增 census-test blob
+- Readiness input pins:r1 / r2 / r3 / r4 为历史快照；现行提交前 corpus
+  补救见下方 `Readiness pins(r5,2026-07-28)`。恢复实现前必须复核 r3 merge、
+  #715 / #716 exact merge 与完成态 stash
 - Applicable failure patterns:`AF-004`（同一契约多消费者语义分歧）、
   `AF-010`（必须用独立 fixture 与变异反证）、`AF-015`（全仓清点同模式）
 - Production reachability:`python -m host_loop --once` →
@@ -412,3 +412,106 @@ HLR/NAV/DEC 先例由会话实现：`Decision-Grade` 在实现前保持缺失；
   漂移、并发 overlap、candidate-set 变化或新增失败都再次停止。r1/r2 的
   parity、negative、corpus、never-claim 与三项 mutation 门全部继续生效；
   implementation、`ready→done`、verified 仍为三个独立 PR。
+
+### Readiness pins(r4 commit-time corpus refresh,2026-07-28)
+
+- **触发事实。**r3 PR #714 exact head
+  `f1b94a0a52204047cfd88132349d1c92e4eb5e86` 已获维护者 review 并 merge
+  为 `eaa57f9281c6194e1bada0c740bde1d6e4f48fc6`。恢复后实现、run evidence、
+  三项 mutation 与最终全量门均已完成；但提交前 fresh open-PR 检查发现 #715
+  修改 active CHG-008 `tasks.md`，命中 r3“active corpus 漂移即停止”条件。
+  完成态 implementation 未 commit / push / 开 PR，而是保存在本地可恢复 stash
+  `02c82ee5d455054f48cdcf6725f9883d7e412251`；r4 只刷新提交时 corpus，
+  不改代码、测试、evidence、AC 或行为 scope。
+- **#715 exact merge。**PR #715 exact head
+  `5487b9ff7d21c9ac2d71ac78d61e4e12b62b7856` 已获维护者 review 并 merge
+  为最新 protected main
+  `fe13de4d319bd4fdd07f2439daf9cce8bff34897`。它只改 CHG-008
+  governance/evidence；该 active `tasks.md` 从 r3 base 的
+  `834e0f2d064468bdf841458b466a4816acf06dc4` 变为
+  `90a6e20fb0ebdd488b78289d5a4530e97a7a6036`，与 C-M7 implementation /
+  change paths 无直接 overlap。Exact merge tree 的 executable audit 仍为
+  `30→36`、`lost=[]`、gained 恰为六个 BRC，六项字段与非-ready verdict
+  均不变。
+- **唯一开放并发 PR #716。**r4 起草时 fresh open-PR 清单仅含
+  `evidence(TASK-OBS-001R)`；exact head
+  `d0ae24e98b472898dbef387ce539bc0fe5922826` 修改 Packages、CHG-022 evidence
+  及 active `tasks.md`，但不触碰 C-M7 implementation/change paths。把该 exact
+  head 与 #715 后 main 无冲突合成，CHG-022 `tasks.md` 为
+  `bfe50de28892969ad79a22664a9e71c208a51fb9`；executable audit 仍为
+  `30→36`、`lost=[]`、gained 恰为六个 BRC，六项字段/verdict 零变化。
+- **#716 终态门。**恢复完成态 implementation 前 #716 必须终止，且只接受：
+  closed-unmerged 时 protected-main CHG-022 blob 仍为
+  `3e1022c0df5faa3bb8cb55512676a883a4775c08`；或维护者对上述 exact head
+  review/merge 后 blob 精确为
+  `bfe50de28892969ad79a22664a9e71c208a51fb9`。#716 仍 open、head /
+  merge tree 变化，或出现其他改 active corpus / C-M7 paths 的 open PR 时，
+  implementation commit/push 为 0 并重新 readiness。
+- **未漂移面。**#715 与 #716 均未触碰
+  `scripts/host_loop/__main__.py`、`worker.py`、
+  `test_discovery_contract.py`、`test_navigation_contract.py`、
+  `scripts/test_check_pr_paths.py`、C-M7 proposal/verification/acceptance 或
+  evidence path。r3 所有 source/test pins、唯一新增 census-test scope、变异矩阵
+  与 forbidden paths 逐字继续有效；本 r4 不新增 allowed path。
+- **恢复/提交门。**本 r4 exact head 由维护者 review/merge 且 #716 达到上述
+  终态后，从届时 protected main 重建 implementation 分支，恢复 stash
+  `02c82ee5d455054f48cdcf6725f9883d7e412251`，确认 changed paths 只落本任务
+  Allowed paths；重新执行 live corpus、13 项聚焦、50 项 PR guard、644 项
+  host-loop、SDD `0/0/111` 与 `git diff --check`。任何集合、blob、并发或测试
+  漂移再次停止；通过后才允许创建原定的一个 implementation PR。`ready→done`
+  与 verified 继续分离。
+
+### Readiness pins(r5 final #716 merge refresh,2026-07-28)
+
+- **为何 r4 未生效。**r4 PR #718 exact head
+  `2dcf669bf897b77edde1fe793ef305a94baf55b3` 已获维护者 `lvye` exact-head
+  review，SDD Guard、allowed-paths 与 Swift CI 全绿，但未 merge。r4 钉定的
+  #716 head 为 `d0ae24e98b472898dbef387ce539bc0fe5922826`；其后 #716 追加
+  evidence/tasks 提交并以不同 head 合入，命中 r4 明文
+  “head / merge tree 变化即重新 readiness”条件。因此 r4 review 未被当作
+  implementation 授权；完成态 stash 未恢复、implementation 仍为零 commit /
+  零 push / 零 PR。
+- **最终 #716 exact merge。**PR #716 最终 exact head
+  `6a98aa7315b09b556eb512651eca038704b8adf6` 已获维护者 exact-head review，
+  merge 为最新 protected main
+  `67978722a063f07adfee6c8b3fd8235076ea60c2`。相对 #715 后 main，它只改三个
+  `Packages/ArkDeckKit/Sources/**`、新增一个 contract test，并更新 CHG-022
+  tasks/evidence；未触碰 C-M7 implementation/change paths。最终 CHG-022
+  `tasks.md` blob 为 `da3d5ecf3bed9992effeaa14b5911227b193f46b`，取代
+  r4 对旧 head 的 prospective blob。
+- **最终 active corpus。**在 protected main `67978722a063f07adfee6c8b3fd8235076ea60c2`
+  上，`active_change_ids` 仍返回同一 8 项；对应 `tasks.md` blobs 为：
+
+  | Active change | r5 audit-base blob |
+  | --- | --- |
+  | `chg-2026-006-dayu200-m0b-bringup` | `5992c706d24249350bf385b464d58f172a6b7496` |
+  | `chg-2026-008-ui-dump-hidumper-wrapper` | `90a6e20fb0ebdd488b78289d5a4530e97a7a6036` |
+  | `chg-2026-022-hdc-supervisor-observability` | `da3d5ecf3bed9992effeaa14b5911227b193f46b` |
+  | `chg-2026-025-ai-native-unattended-device-ops` | `78c48f9e8ee15bf81db170c3dccbe4883f206d5f` |
+  | `chg-2026-026-macos-rockchip-flash-ui` | `5f758fe26dac2dd2f62d362345b560fb6a3523e0` |
+  | `chg-2026-031-macos-session-settings` | `6b3656c3e637413b9bd9dfb65336ce4250a14d69` |
+  | `chg-2026-036-macos-bundled-rockchip-component` | `de23d56688e713d90a2b12706e8d44651cffa164` |
+  | `chg-2026-042-tasks-field-colon-parity` | `ff83a4db13355e9a26427415ab0bfa04c0db9c95` |
+
+  用未改 production parser 生成 before，再仅在进程内把两条目标正则替换为
+  `[:：]` 后生成 after，结果仍为 `30→36`、`lost=[]`、gained 恰为
+  `TASK-BRC-001`…`TASK-BRC-006`。六项完整字段与 r1/r4 记录相同：
+  BRC-001/002 为 done + unknown grade，BRC-003…006 为 blocked + D1/D2，
+  BRC-005 仍需 hardware；逐项真实 gate verdict 均非 dispatchable。
+- **并发与实现面。**fresh fetch 后开放 PR 仅有本 #718 自身，且只改本
+  `tasks.md`；没有其他 active-corpus 或 C-M7 implementation-path 占用。
+  #715 / #716 merge 均未改
+  `scripts/host_loop/__main__.py`、`worker.py`、
+  `test_discovery_contract.py`、`test_navigation_contract.py`、
+  `scripts/test_check_pr_paths.py`、C-M7 proposal/verification/acceptance 或
+  evidence path。r3 scope、source/test pins、变异矩阵、allowed/forbidden
+  paths 全部继续有效。
+- **r5 批准与恢复门。**只有维护者对包含本节、基于
+  `67978722a063f07adfee6c8b3fd8235076ea60c2` 的 r5 exact head 重新
+  review/merge 后，才允许从届时 protected main 重建 implementation 分支并恢复
+  stash `02c82ee5d455054f48cdcf6725f9883d7e412251`。恢复后必须确认 changed
+  paths 只落本任务 Allowed paths，并重新执行 live corpus、13 项聚焦、50 项
+  PR guard、644 项 host-loop、SDD `0/0/111` 与 `git diff --check`。恢复前或
+  提交前若 main、active corpus、C-M7 路径、开放 PR 集合或测试结果再次漂移，
+  implementation commit/push 为零并重新 readiness；`ready→done` 与 verified
+  继续分离。
