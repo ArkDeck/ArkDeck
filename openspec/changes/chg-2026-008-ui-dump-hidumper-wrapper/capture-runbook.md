@@ -8,6 +8,9 @@
 > r12 adds a separate R2-only persistent recapture plan after the old pinned raw became permanently
 > unavailable. That task remains blocked until an independent D2 readiness and named device window;
 > r12 itself authorizes no HDC/device dispatch.
+> r13 only replaces that recapture task's expected HDC identity after a host-only drift audit:
+> fixed DevEco path, `Ver: 3.2.0f`, SHA-256 `05b2bf7a…f83`. It is not the D2 readiness and
+> authorizes no HDC/device dispatch.
 >
 > Real-device operator:human maintainer only. An Agent SHALL NOT execute installed `hdc`, create a
 > real device session or run any device step.
@@ -60,10 +63,16 @@ classification is never lowered after execution.
   expected physical tuple.
 - HDC executable:
   `/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/toolchains/hdc`.
-- Expected HDC SHA-256:
+- Phase A / future Phase B expected HDC SHA-256:
   `48395ba8d87115dffca47df2a640a6c868bc9a2bd4eb49611e4138ff88d8d260`.
-- Expected HDC version:`Ver: 3.2.0d`. These facts come from merged M0B evidence; the readiness PR
-  and the run itself must re-verify hash/version and record the observed values in `run.md`.
+- Phase A / future Phase B expected HDC version:`Ver: 3.2.0d`. These facts come from merged M0B
+  evidence. `TASK-UD-R2-RECAPTURE-001` has the narrower r13 task-specific override below; r13
+  does not rewrite historical Phase A evidence or pre-authorize a future Phase B tool repin.
+- R2-only recapture expected HDC identity after r13 merge:the same absolute path, version
+  `Ver: 3.2.0f`, SHA-256
+  `05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83`.
+  Its later D2 readiness and the run itself must re-verify hash/version and record observed values
+  in `run.md`; `3.2.0d` is not a recapture fallback.
 - Raw output root:a new operator-controlled `0o700` directory outside every git repository. Raw
   files are `0o600` and never enter ArkDeck git history.
 
@@ -121,7 +130,7 @@ subserver commands (`kill`, `start`, `spawn-sub`, `killall-sub` and equivalents)
 
 | ID | Step | Required recorded result | Stop condition |
 | --- | --- | --- | --- |
-| `HP-0` | verify HDC executable hash + `hdc version` | binary SHA-256 and reported version equal the pinned M0B values (drift recorded and run stops) | hash/version mismatch |
+| `HP-0` | verify HDC executable hash + `hdc version` | binary SHA-256 and reported version equal the task-specific pinned values (Phase A/Phase B historical pin, or the r13 R2-only recapture override); drift is recorded and the run stops | hash/version mismatch |
 | `HP-1` | `hdc list targets -v` | exactly one expected DAYU200 target in `Connected` state; output recorded (redacted per capture conventions) | zero, multiple or ambiguous targets |
 | `HP-2` | re-run `hdc list targets -v` immediately before `INV-1` and before each `Rn` (four times in a full Phase A session) | same single target, same connect key | any drift |
 
@@ -260,10 +269,14 @@ file); 11. for each Recipe `R1`→`R2`→`R3`: `HP-2` → `SC-1` pre → `Rn` �
 `SC-3` → `SC-1` re-check, only if owned new file); 12. `FX-3` stop; 13. `FX-4` uninstall;
 14. evidence assembly (run.md, manifests, hashes, hardware-evidence) and sensitive scan.
 
-### r12 R2-only persistent recapture sequence (blocked pending D2 readiness)
+### r12/r13 R2-only persistent recapture sequence (blocked pending D2 readiness)
 
-This sequence belongs only to `TASK-UD-R2-RECAPTURE-001`. r12 approval does not make it
-executable. A later independent D2 readiness must re-pin the then-current main revision, merged
+This sequence belongs only to `TASK-UD-R2-RECAPTURE-001`. Neither r12 nor r13 approval makes it
+executable. r13 responds to the host-only blocker record
+`evidence/runs/TASK-UD-R2-RECAPTURE-001/blocked-readiness-hdc-drift-2026-07-28.md` by replacing
+only this task's expected HDC identity with fixed DevEco path / `Ver: 3.2.0f` /
+`05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83`; it accepts no second
+pin or fallback. A later independent D2 readiness must re-pin the then-current main revision, merged
 harness OID and hashes, passing harness tests, HDC/device/firmware/fixture tuple, exact command
 surface, sidecar path, hardware-evidence schema, per-device typed capability evidence, human
 operator, named exclusive device window, and storage predicate. Any drift leaves the task blocked.
@@ -299,7 +312,7 @@ redaction, diagnosis, selection, R4, wrapper implementation, compatibility or su
 diagnosis requires a later D1 readiness that pins the newly merged length/SHA-256 and the exact
 diagnosis tool/CLI.
 
-The future Phase B sequence is separately gated and remains blocked at r12. After a future positive
+The future Phase B sequence is separately gated and remains blocked at r13. After a future positive
 decision, selector/harness seam and R4 readiness are all merged, one fresh controlled session runs:
 
 1. `HP-0`; 2. physical device confirmation; 3. `HP-1`; 4. fixture hash; 5. `FX-1`; 6. `FX-2` +
@@ -393,7 +406,7 @@ the controlled directory. Repository golden fixtures are later produced as `deri
 `TASK-UD-001` never reads raw and never modifies the redaction toolchain. Raw/derived byte equality
 is neither expected nor claimed.
 
-## Prohibited actions at r12
+## Prohibited actions at r13
 
 - any selector/harness implementation, installed-HDC invocation, device discovery or device command
   under the blocked seam/R4 tasks;

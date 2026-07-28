@@ -1,6 +1,6 @@
 ---
 id: CHG-2026-008-ui-dump-hidumper-wrapper
-revision: 12
+revision: 13
 status: approved # r1 经 #68 批准;后续 revision 仅在对应治理 PR 由维护者 review/merge 后生效
 class: platform
 core_change_level: none
@@ -110,6 +110,23 @@ D1 readiness 按新 raw 的 length/SHA-256 重钉诊断 CLI)。新任务只测�
 追溯为旧 raw 根因。r12 本身不使任一任务 ready,不修改 harness/redactor/diagnosis
 实现,不安排设备窗口,不产生 capture/diagnosis evidence,也不执行 HDC/device dispatch。
 
+r13 是 R2-only 重采 D2 readiness 的 HDC drift remediation。r12 merge
+`d74c7af7179d89dc29c61e1e7b63d0ca4e7822ea` 后的 host-only 静态 preflight 发现
+DevEco 同一 absolute path 的 executable SHA-256 已从 Phase A 的
+`48395ba8d87115dffca47df2a640a6c868bc9a2bd4eb49611e4138ff88d8d260`
+漂移为
+`05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83`；后者已由
+protected-main 的 OpenHarmony profile 与 CHG-2026-026 r5 登记为 `Ver: 3.2.0f`，
+不能继续冒充 r12 历史 `Ver: 3.2.0d` pin。r13 只对
+`TASK-UD-R2-RECAPTURE-001` 将 `HP-0` 的 expected HDC version/hash 原子替换为
+`3.2.0f`/`05b2…f83`，不建立双 pin、fallback 或跨版本 output-family 推断；Phase A
+历史 evidence 与 future Phase B 仍保持各自既有 pin。r13 仍是 D1 proposal revision，
+不接受 E1 per-device typed capability evidence，不安排 D2 设备窗口，不使重采 ready，
+也不执行 installed HDC/device/fixture/Recipe。
+本 draft 已线性 rebase 到 current main
+`c295d4a45a30ea08d7ab66440c5593d1208f222a`；r12 merge 后新增的唯一提交只修改
+CHG-2026-022 tasks，与本 revision 的 CHG-008/tool/schema 输入零重叠。
+
 ## What changes
 
 ### In scope
@@ -158,6 +175,12 @@ D1 readiness 按新 raw 的 length/SHA-256 重钉诊断 CLI)。新任务只测�
   具名设备窗口;重诊断另需重采 done 后的独立 D1 readiness 重钉新 raw length/hash、
   diagnosis tool OID/hash 与 exact CLI。r12 不修改任一 `scripts/**` 文件,不含
   implementation/evidence,不使 SEAM/R4/UD-001 ready。
+- r13 治理修订只修复 `TASK-UD-R2-RECAPTURE-001` 的 HDC drift：固定同一 DevEco
+  absolute path 的新单一 expected tuple `Ver: 3.2.0f` /
+  `05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83`，并登记
+  host-only blocker 记录。r13 merge 后任务仍 blocked；独立 D2 readiness 必须重新固定
+  current main、接受 exact device 的 typed capability evidence、安排具名连续窗口并
+  复核其余 pins，之后设备执行才可能开始。
 
 ### Out of scope
 
@@ -204,6 +227,9 @@ D1 readiness 按新 raw 的 length/SHA-256 重钉诊断 CLI)。新任务只测�
 - 诊断工具或其 evidence 输出 raw 字节值序列、解码文本、内容窗口、页面文本、window/
   component 字面量;Agent 打开/复制 controlled raw;诊断结论歧义或双因并存时默认选择
   任一分支。
+- 把 r13 HDC repin 当作 D2 readiness、E1 capability evidence 接受或设备窗口授权；
+  为兼容旧 evidence 同时接受 `3.2.0d`/`3.2.0f`、从 binary hash 推断 Recipe output
+  family，或在后续 `HP-0` runtime version/hash 任一不匹配时继续。
 
 ## Impacted specifications
 
@@ -285,6 +311,12 @@ D1 readiness 按新 raw 的 length/SHA-256 重钉诊断 CLI)。新任务只测�
   Recipe success、旧 run 根因或 pipeline/data 归因。重诊断只能在独立 D1 readiness
   引用已合入重采 evidence 并重钉 exact input 后由维护者离线执行;它测量新 raw 的
   `redactorEquivalent`/非内容事实,不能追溯改写 #263/#267 truthful-negative。
+- r13 对 R2-only 重采采用 single exact HDC pin：absolute path 保持
+  `/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/toolchains/hdc`，
+  expected version/hash 替换为 `Ver: 3.2.0f` /
+  `05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83`。
+  该映射来自 protected-main 已登记的一手事实，但不替代未来 D2 window 内经 harness
+  `HP-0` 的 runtime 复核；任一 drift 都在 fixture/device command 前 fail closed。
 - 每个登记 output family 都必须能在干净 checkout 以 repo-safe synthetic/derived fixture
   走 production classifier 正向复验;本 change 禁止 raw byte-fingerprint/digest family;
 - 本 r3 治理 PR 本身零 HDC/device dispatch;merge 后仍没有 ready 的 real-device task。
@@ -380,3 +412,12 @@ D1 readiness 按新 raw 的 length/SHA-256 重钉诊断 CLI)。新任务只测�
   独立 D1 re-diagnosis readiness”的任务链;不含 readiness、设备窗口、实现、raw、
   evidence、decision 或任何 HDC/device dispatch,不修改旧 decision/diagnosis evidence,
   不使 SEAM/R4/UD-001 ready。
+- r13 R2-recapture HDC repin revision:本 PR 基于 r12 merge
+  `d74c7af7179d89dc29c61e1e7b63d0ca4e7822ea` 起草并线性 rebase 到 current main
+  `c295d4a45a30ea08d7ab66440c5593d1208f222a`，只修改本 change 的
+  proposal/tasks/verification/acceptance metadata、capture runbook 与本任务
+  host-only blocker evidence；将 recapture-only `HP-0` HDC pin 从 `3.2.0d` /
+  `48395…d260` 单一替换为 `3.2.0f` / `05b2…f83`。维护者 merge 只批准该 scoped
+  replacement；任务仍 blocked，D2 readiness/evidence/window/设备执行仍须后续独立
+  PR，且本 revision 的 installed-HDC process、device、fixture、Recipe、raw 与
+  destructive dispatch 均为 `0`。
