@@ -1,0 +1,119 @@
+{
+  "schemaVersion": "1.0.0",
+  "packVersion": "1.0.0",
+  "registrySerializationFormat": "json-compatible-yaml-1.2",
+  "registryId": "OPENHARMONY-HDC-DEVICE-OBSERVATION-PROBES",
+  "registryVersion": "1.0.0",
+  "integrationProfile": "OPENHARMONY-TOOLS@0.5.0",
+  "registeredBy": "CHG-2026-024-hdc-device-snapshot-registration/TASK-I24-001",
+  "canonicalRegistryPath": "openspec/integrations/openharmony/device-observation-probes.yaml",
+  "registryCopy": {
+    "file": "registry.yaml",
+    "bytes": 7250,
+    "sha256": "cc9202123466931804794e606acf369740d639b3e521c25671517fc37a1fe2f5"
+  },
+  "controls": {
+    "file": "controls/fail-closed-vectors.json",
+    "bytes": 1447,
+    "sha256": "2a7a20f6dcd1b4b2c60683bfcd12ae081a076df0b92c68f41423682672b6ad5f"
+  },
+  "vectorSynthesis": "All vectors are synthetic. No captured byte enters the repository (capture-plan boundary). Connect keys are placeholders of the measured 32-character length.",
+  "vectors": [
+    {
+      "id": "device-observation-all-offline-two",
+      "file": "vectors/all-offline-two.bin",
+      "bytes": 112,
+      "sha256": "478a651ccce01cafad18aa688f202c4916ef40988ff92a402ff19b62a794e9dc",
+      "expectedOutcome": "observedEmpty",
+      "note": "two known-but-absent rows; zero Connected"
+    },
+    {
+      "id": "device-observation-duplicate-key",
+      "file": "vectors/duplicate-key.bin",
+      "bytes": 114,
+      "sha256": "f8ddabe947127803d696c3dd3d766e04f3066eb516195a92613e9048641e83cd",
+      "expectedOutcome": "unknown",
+      "note": "same key twice; identity ambiguity"
+    },
+    {
+      "id": "device-observation-empty-marker",
+      "file": "vectors/empty-marker.bin",
+      "bytes": 9,
+      "sha256": "c769b18b5babef2903583320036d1e507ee1e80e1386b29d098721999cd20bcf",
+      "expectedOutcome": "observedEmpty",
+      "note": "virgin server marker line, CRLF"
+    },
+    {
+      "id": "device-observation-empty-stdout",
+      "file": "vectors/empty-stdout.bin",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "expectedOutcome": "unknown",
+      "note": "zero bytes is NOT the registered empty form; indistinguishable from a truncated read"
+    },
+    {
+      "id": "device-observation-marker-double-cr",
+      "file": "vectors/marker-double-cr.bin",
+      "bytes": 10,
+      "sha256": "464af7000a09a91e3e07a3ca940ea0273eeb9ce35b4eae73b5f2641110c7e58f",
+      "expectedOutcome": "unknown",
+      "note": "over-tolerant CR stripping must not read as empty"
+    },
+    {
+      "id": "device-observation-mixed-connected-offline",
+      "file": "vectors/mixed-connected-offline.bin",
+      "bytes": 114,
+      "sha256": "30048536897717381c1aed12079af0f3e356f35597795ebdecd38d83fc64acd4",
+      "expectedOutcome": "observed:1",
+      "note": "presence decided by state, not by row count"
+    },
+    {
+      "id": "device-observation-rows-crlf",
+      "file": "vectors/rows-crlf.bin",
+      "bytes": 59,
+      "sha256": "f5ede1e60bda173a98f9c96a995b33a0b0f6ca3a1cc1568f01397891e31607d3",
+      "expectedOutcome": "observed:1",
+      "note": "CRLF-terminated device row must parse; terminator tolerance"
+    },
+    {
+      "id": "device-observation-single-connected",
+      "file": "vectors/single-connected.bin",
+      "bytes": 58,
+      "sha256": "fa61841018c2ff3ccc6b888641f4d1845cc0604e3ae2d98b444b5f108b8cffb8",
+      "expectedOutcome": "observed:1",
+      "note": "one present device"
+    },
+    {
+      "id": "device-observation-single-offline",
+      "file": "vectors/single-offline.bin",
+      "bytes": 56,
+      "sha256": "0f696a788592dea3a20da0bfd1c533c279d78a95ee33791da86584d2b38c1554",
+      "expectedOutcome": "observedEmpty",
+      "note": "one known-but-absent row; zero Connected"
+    },
+    {
+      "id": "device-observation-two-connected",
+      "file": "vectors/two-connected.bin",
+      "bytes": 116,
+      "sha256": "3a34f054f994327f3186f3bf025e12055e33c85690f6627635800685b78d0f65",
+      "expectedOutcome": "observed:2",
+      "note": "two present devices"
+    },
+    {
+      "id": "device-observation-unknown-state",
+      "file": "vectors/unknown-state.bin",
+      "bytes": 56,
+      "sha256": "820ebc8473110e0dffe0feff65c16c1f80efbd888c13ebd2704cdbd634ad6c46",
+      "expectedOutcome": "unknown",
+      "note": "state literal outside the closed set"
+    },
+    {
+      "id": "device-observation-wrong-columns",
+      "file": "vectors/wrong-columns.bin",
+      "bytes": 48,
+      "sha256": "8400fe3902c34c9d7999b22c374da67d6d6c09f693ff6ebbde624a8c28fb7664",
+      "expectedOutcome": "unknown",
+      "note": "four columns instead of five"
+    }
+  ]
+}

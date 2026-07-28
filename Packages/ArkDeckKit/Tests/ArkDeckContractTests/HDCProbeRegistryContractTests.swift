@@ -367,7 +367,13 @@ final class HDCProbeRegistryContractTests: XCTestCase {
       guard try url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile == true else {
         continue
       }
-      packagedFiles.insert(url.path.replacingOccurrences(of: root.path + "/", with: ""))
+      let relative = url.path.replacingOccurrences(of: root.path + "/", with: "")
+      // TASK-I24-001 (CHG-2026-024): this pack's exactness claim covers its own version
+      // subtree. Enumerating the whole Probes root also asserted "no sibling pack may exist
+      // here", which is authority this test never meant to hold — a second registered family
+      // lives at DeviceObservation/1.0.0 and owns its own closure test.
+      guard relative.hasPrefix("1.0.0/") else { continue }
+      packagedFiles.insert(relative)
     }
     let expectedFiles = Set(manifest.resources.map(\.path)).union(["1.0.0/resources.json"])
     XCTAssertEqual(packagedFiles, expectedFiles)
