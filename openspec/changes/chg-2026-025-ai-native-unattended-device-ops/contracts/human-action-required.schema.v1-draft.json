@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://arkdeck.local/schemas/human-action-required-1.0.0-draft.json",
+  "title": "ArkDeck Human Action Required Contract 1.0.0 Draft",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "actionId",
+    "jobId",
+    "category",
+    "reasonCode",
+    "minimumActionKey",
+    "prohibitedAutomation",
+    "resumeProbeOperationId",
+    "generatedAtUtc",
+    "status"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "actionId": {
+      "$ref": "#/$defs/identifier"
+    },
+    "jobId": {
+      "$ref": "#/$defs/identifier"
+    },
+    "stepId": {
+      "$ref": "#/$defs/identifier"
+    },
+    "category": {
+      "enum": [
+        "physicalConnection",
+        "deviceTrustPrompt",
+        "osPermission",
+        "credentialProvisioning",
+        "ambiguousIdentity",
+        "impactApproval",
+        "outcomeUnknownDecision",
+        "governanceApproval"
+      ]
+    },
+    "reasonCode": {
+      "$ref": "#/$defs/identifier"
+    },
+    "minimumActionKey": {
+      "$ref": "#/$defs/identifier"
+    },
+    "prohibitedAutomation": {
+      "type": "array",
+      "uniqueItems": true,
+      "minItems": 1,
+      "items": {
+        "enum": [
+          "physicalActuation",
+          "trustPromptAcceptance",
+          "privilegeEscalation",
+          "driverOrHelperInstall",
+          "systemRuleMutation",
+          "credentialExtraction",
+          "identityGuess",
+          "outcomeGuess",
+          "selfApproval"
+        ]
+      }
+    },
+    "resumeProbeOperationId": {
+      "$ref": "#/$defs/identifier"
+    },
+    "generatedAtUtc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "expiresAtUtc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "status": {
+      "enum": [
+        "waiting",
+        "resolvedByFreshProbe",
+        "expired"
+      ]
+    }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+    }
+  }
+}

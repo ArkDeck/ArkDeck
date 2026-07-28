@@ -220,3 +220,199 @@ SHA-256 与 descriptor identity 数字字段。AIN-006 final facts 保留内部�
 这项修正不新增 command、effect、设备能力或授权来源，也不放宽 v1/v2；实现前置任务与精确
 scope 见 TASK-AIN-008。AIN-007 的 #310 readiness 因只读输入不足而失效，须在 AIN-008 done
 后基于新的 main/OID 独立重做 readiness。
+
+## §14 r3 gap analysis：规则允许，产品入口仍拒绝
+
+r3 以远端 `main` `d42c002609177e47ef95320cb5bdc0a42f0b510e` 为盘点基线。
+`workflow-step-registry.yaml` 已登记 UI Dump、Trace、HiLog、HAP、文件传输、应用生命
+周期、端口转发和 reboot 所需的大多数 typed step，且 r2 已证明可信执行宿主可以持有
+grant、facts、journal、usage 与真实 tool/device capability。然而现行入口仍有四类断层：
+
+1. `scripts/m0b_capture/capture.py`、`scripts/trace_capture/capture.py` 与
+   `scripts/ud_capture/capture.py` 在代码层声明 `Human-operated`，新 evidence 固定写成
+   `controlledHumanCapture`；脚本的安全 allowlist 无法被产品 Job/Session 复用。
+2. `TraceWorkflowContracts` 与 UI Dump harness 已有 plan/gate/fixture 逻辑，但缺少从
+   durable binding 到真实 HDC typed dispatch、Artifact publication、compensation 和
+   terminal manifest 的通用 product executor。
+3. `HDCDeviceCommand` 只 materialize 少量操作；HAP install、应用启停、file send/recv、
+   HiLog 和 HiDumper/Trace lowering 没有完整的 Agent-facing production composition。
+4. CLI 只有 Rockchip `flash --authorization-id` 的 Agent 路径；没有通用 device-operation
+   request/status/cancel/reconcile/result surface，也没有 `.so` deployment profile。
+
+r3 不把上述 Python harness 直接改为“允许 Agent 运行”。正确迁移是保留其 exact argv、
+parser、redaction 与 negative fixtures，把 effect dispatch 移入与 r2 同级的 product-owned
+executor；历史 harness 退为 fixture/golden 生成与兼容复验工具。
+
+## §15 Agent device-operation control plane
+
+产品新增本地 machine-readable control plane，最小命令集合：
+
+```text
+submit(request) -> jobId
+status(jobId) -> state/stage/blocker/artifacts
+cancel(jobId) -> acceptedAtSafeBoundary | rejected
+reconcile(jobId) -> state/blocker
+result(jobId) -> terminal manifest/evidence references
+```
+
+`request` 只表达 intent，不表达 authority 或事实：
+
+- `changeId/taskId`、operation/profile/configuration ID + digest、executionMode；
+- durable target selector（仅定位，最终 binding 由宿主读取）；
+- artifact lease/profile/configuration references 与期望输出；
+- 可选 `authorizationId`（只作 E2 grant lookup key）。
+
+以下字段结构性禁止：executable、argv、shell/command string、任意远端路径、authorization
+bytes/path/carrier、binding revision 事实、identity readback、prior usage、prerequisite
+verdict、effect override、outcome/success override、Session root。请求 schema 严格
+`additionalProperties:false`；未知 operation/profile 一律按 destructive/unsupported
+拒绝。
+
+control plane 默认只绑定本机产品进程和同一用户的受控 IPC/CLI；不新增网络监听、远程
+RPC 或自动上传。executor/peer identity 由可信宿主从受控 transport/进程上下文 mint，
+request 不接受 caller-supplied `submittedBy/executor` 作为审计事实。Agent 身份用于审计
+与 policy lookup，不因“来自 Agent”自动获得 E1/E2 权限。
+
+## §16 Human-boundary registry
+
+所有仍需人的动作必须属于封闭 registry，并返回结构化 blocker：
+
+```text
+HumanActionRequired
+  category:
+    physicalConnection | deviceTrustPrompt | osPermission |
+    credentialProvisioning | ambiguousIdentity |
+    impactApproval | outcomeUnknownDecision | governanceApproval
+  reasonCode
+  affectedJob/step
+  minimumAction
+  prohibitedAutomation
+  resumeProbe
+  expiresAt?
+```
+
+允许的人类边界：
+
+- 插拔 USB/UART、物理按键/跳线/断电、设备解锁与首次信任弹窗；
+- OS picker、Sandbox/entitlement、driver/helper、udev/group/ACL、Keychain、签名/公证
+  凭据等外部配置；ArkDeck 只诊断和给最小指导，不提权或自动修改系统；
+- TCP/UART 断线、多个 USB 候选或 Core 证据不足时的 identity diff 确认；
+- external/unknown HDC server lifecycle 的 per-generation impact confirmation，以及
+  persistent Debug parameter、全局 buffer、HAP uninstall/clear-data/downgrade 等数据影响决策；
+- `outcomeUnknown`、不可自动恢复或需要物理 recovery 时的风险决策；
+- D1/D2 review、E1 capability evidence 接受、E2 standing authorization 创建/修改/吊销。
+
+不在 registry 的“请人工运行命令/点击继续/等待设备窗口”视为缺陷。人完成动作后，Agent
+只能调用声明的 `resumeProbe` 重新获取事实；用户文本不能直接把 Job 标为成功或提升
+authority。
+
+## §17 E0/E1 trusted execution
+
+### E0
+
+E0 admission 需要 approved change + ready task、registered operation、fresh durable binding
+和 tool/server ownership 事实。无需 D2 设备窗口；可信宿主可自动完成：
+
+- HDC/server/device observation 与 capability/help probe；
+- HiDumper window inventory 和不写设备文件的 stdout Recipe；
+- HiLog host stream 与 rotation；
+- hitrace/bytrace help/tag/capability probe；
+- receive owned Artifact、hash、validate、redact、derive 与分析。
+
+E0 不得顺带执行 cleanup、parameter set、device-side persist、install、send、reboot 或
+server lifecycle mutation；计划含这些 step 时按实际最低 effect 升级，不能拆名降级。
+E0 Agent evidence 的 `authorizationRef` 由宿主写入为受保护 main 上的 ready task/
+execution-policy reference；caller 不提供也不能伪造。
+
+### E1
+
+E1 admission 另需维护者已接受的 per-device typed capability evidence，至少 pin：
+
+- target identity/binding family、transport、tool/profile/version/hash；
+- operation IDs、允许的目标 namespace（例如 Job-owned remote root 或 bundle ID）；
+- 最大数据影响、时长、并发/次数、validity、compensation/rollback 与 resume probe；
+- 需要的 privilege/developer-mode/root 状态及其 fresh probe；
+- 禁止的 destructive 邻接面。
+
+可信宿主从受保护 main/accepted registry 与 durable device facts 解引用该 capability；
+caller 不能提供 capability bytes 或自报前提。每个 E1 step 仍遵守 intent-before-effect、
+semantic outcome、binding revision、device lane、storage claim、cancel/safe boundary、
+compensation 和 crash reconcile。任一 capability/pin/fact 漂移即 dispatch=0。
+E1 Agent evidence 的 `authorizationRef` 指向该 per-device capability 的 full main/blob
+OID 与接受载体；E2 则继续指向 standing authorization。三类 ref 都由宿主解析并写入，
+不能由 request 自报。
+
+E1 默认覆盖 owned remote capture/cleanup、temporary parameter set/restore、capture
+start/stop、保留数据的 HAP install/replace、应用启停、端口转发、reboot 与 Job-owned
+staging send。HAP uninstall/clear-data/downgrade、persistent parameter/global buffer 或
+其他不可逆 data impact 必须按 profile 提升为 E2，或在现行 Core 要求时返回
+`impactApproval`；不得用一次宽泛 E1 capability 静默覆盖。若实际影响超过 profile
+（例如 data wipe、system partition overwrite、无 rollback native library 替换），Core
+effect 提升到 E2。
+
+## §18 HAP 与 `.so` deployment profile
+
+HAP/SO 的编译发生在独立、已批准的源码构建任务；ArkDeck 不接受 build shell。control
+plane 只消费 HostStorage/Artifact subsystem 已建立的 file lease、size/hash 与 provenance，
+因此 Agent 可完成“改代码/构建 → 交付 leased Artifact → ArkDeck 部署/采集/复验”，同时
+不把设备产品变成任意命令壳。
+
+### HAP
+
+Agent HAP deployment 使用 `installPackage`，输入只能是已取得 host file lease 的 Artifact。
+preflight 固定 bundle name、version、signing identity/hash、target binding、install mode、
+data impact 与已登记 output family；执行后必须读取 package/version/signing state 并与
+期待值比对。卸载、覆盖安装、清数据和 downgrade 是不同 operation/profile，不能由一个
+布尔 flag 静默改变影响。无法证明保留数据的 uninstall/replace、clear-data 与 downgrade
+必须提升为 E2 或返回 `impactApproval`。
+
+### Native library
+
+`.so` 不允许退化为 `hdc file send <caller path> <caller path>`。profile 必须声明：
+
+- ABI、ELF build ID/hash、目标 bundle/process、目标 namespace 与 canonical path；
+- 所有者、mode、SELinux/平台约束及所需 privilege；
+- 旧对象 snapshot/hash、staging path、原子 publish 方式；
+- loader/linker 验证、目标进程 stop/start 或 Ability restart；
+- rollback bytes/步骤、验证和失败后的 hazard 分类。
+
+只向 Job-owned staging path 发送且不激活属于 E1；在可证明的 app-owned writable
+namespace 内原子替换、可验证 rollback 也 MAY 为 E1。覆盖 system/vendor、修改只读挂载、
+依赖 root/remount、影响 boot/runtime 或无法证明 rollback 的 profile SHALL 为 E2，并使用
+standing authorization。未知权限、目标或 publish outcome 必须进入
+`waitingForRecovery/outcomeUnknown`，不得盲目重发或把 exit 0 当成功。
+
+## §19 Agent-native debug loop
+
+一个 debug loop 是普通 Job/Session 内的 typed DAG，不是任意脚本：
+
+```text
+observe/bind
+  → capability probe
+  → optional deploy(HAP/.so)
+  → start/restart app
+  → concurrent bounded HiLog + UI Dump/Trace
+  → immutable raw publication
+  → host-only symbolization/filter/correlation
+  → derived report + proposed next operation
+  → optional re-submit through fresh admission
+```
+
+每个 effect step 单独写 intent/outcome；并发仍受 per-device mutation lane、HDC server 和
+storage coordinator 约束。分析器可以生成下一份 typed request 草案，但不得直接携带
+authority、修改 effect、复用过期 readback 或把统计相关性写成设备成功。循环达到预算、
+deadline、连续未知结果或同一 blocker 重复阈值时停止并生成可复查结论，不无限重试。
+
+## §20 r3 migration
+
+迁移顺序固定为：
+
+1. 冻结 agent-operation/human-blocker contract 与 effect mapping；
+2. 抽取通用 trusted host admission、journal、artifact 与 process lowering；
+3. 先接 E0 observation/HiLog，再接 UI Dump、Trace；
+4. 接 HAP 与 native-library E1/E2 deployment；
+5. 接 control plane 与闭环 orchestration；
+6. 真机分别验证 E0、E1、E2，最后修订现有 change 的 human-only task/runbook。
+
+历史 raw/golden/provenance 不改写。任何 capability 在新的 product executor 验证前继续
+blocked；不允许以“先把 `Human-operated` 改成 Agent-operated”替代 trusted composition。

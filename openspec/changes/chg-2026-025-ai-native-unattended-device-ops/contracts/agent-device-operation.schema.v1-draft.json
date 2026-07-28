@@ -1,0 +1,254 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://arkdeck.local/schemas/agent-device-operation-1.0.0-draft.json",
+  "title": "ArkDeck Agent Device Operation Contract 1.0.0 Draft",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/request"
+    },
+    {
+      "$ref": "#/$defs/result"
+    }
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+    },
+    "agent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "id"
+      ],
+      "properties": {
+        "kind": {
+          "const": "agent"
+        },
+        "id": {
+          "$ref": "#/$defs/identifier"
+        }
+      }
+    },
+    "operation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "profileId",
+        "configurationId",
+        "configurationSha256"
+      ],
+      "properties": {
+        "id": {
+          "enum": [
+            "observeDevice",
+            "captureHilog",
+            "captureUIDump",
+            "captureTrace",
+            "installHAP",
+            "uninstallHAP",
+            "deployNativeLibrary",
+            "startApplication",
+            "stopApplication",
+            "sendOwnedFile",
+            "receiveOwnedFile",
+            "createPortForward",
+            "removePortForward",
+            "rebootDevice",
+            "flash"
+          ]
+        },
+        "profileId": {
+          "$ref": "#/$defs/identifier"
+        },
+        "configurationId": {
+          "$ref": "#/$defs/identifier"
+        },
+        "configurationSha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "artifactLeaseIds": {
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 32,
+          "items": {
+            "$ref": "#/$defs/identifier"
+          }
+        }
+      }
+    },
+    "request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "documentType",
+        "schemaVersion",
+        "requestId",
+        "changeId",
+        "taskId",
+        "executionMode",
+        "durableTargetId",
+        "operation"
+      ],
+      "properties": {
+        "documentType": {
+          "const": "request"
+        },
+        "schemaVersion": {
+          "const": "1.0.0"
+        },
+        "requestId": {
+          "$ref": "#/$defs/identifier"
+        },
+        "changeId": {
+          "type": "string",
+          "pattern": "^CHG-[0-9]{4}-[0-9]{3}$"
+        },
+        "taskId": {
+          "type": "string",
+          "pattern": "^TASK-[A-Z0-9]+(?:-[A-Z0-9]+)*-[0-9]{3}[A-Z]?$"
+        },
+        "executionMode": {
+          "enum": [
+            "execute",
+            "planOnly",
+            "simulated"
+          ]
+        },
+        "durableTargetId": {
+          "$ref": "#/$defs/identifier"
+        },
+        "operation": {
+          "$ref": "#/$defs/operation"
+        },
+        "authorizationId": {
+          "type": "string",
+          "pattern": "^AUTH-[A-Z0-9]+(?:-[A-Z0-9]+)*$"
+        },
+        "requestedOutputs": {
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 8,
+          "items": {
+            "enum": [
+              "rawArtifacts",
+              "derivedArtifacts",
+              "analysisReport",
+              "hardwareEvidence"
+            ]
+          }
+        },
+        "deadlineUtc": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "artifactReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifactId",
+        "sha256",
+        "sizeBytes"
+      ],
+      "properties": {
+        "artifactId": {
+          "$ref": "#/$defs/identifier"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "sizeBytes": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "documentType",
+        "schemaVersion",
+        "requestId",
+        "jobId",
+        "status",
+        "resolvedEffect",
+        "outcomeCertainty",
+        "executor",
+        "artifacts"
+      ],
+      "properties": {
+        "documentType": {
+          "const": "result"
+        },
+        "schemaVersion": {
+          "const": "1.0.0"
+        },
+        "requestId": {
+          "$ref": "#/$defs/identifier"
+        },
+        "jobId": {
+          "$ref": "#/$defs/identifier"
+        },
+        "status": {
+          "enum": [
+            "queued",
+            "running",
+            "humanActionRequired",
+            "waitingForRecovery",
+            "succeeded",
+            "failed",
+            "cancelled",
+            "interrupted",
+            "planned",
+            "policyBlocked"
+          ]
+        },
+        "resolvedEffect": {
+          "enum": [
+            "hostOnly",
+            "readOnly",
+            "deviceMutation",
+            "destructive"
+          ]
+        },
+        "outcomeCertainty": {
+          "enum": [
+            "confirmed",
+            "unknown",
+            "notApplicable"
+          ]
+        },
+        "executor": {
+          "$ref": "#/$defs/agent"
+        },
+        "manifestId": {
+          "$ref": "#/$defs/identifier"
+        },
+        "humanActionId": {
+          "$ref": "#/$defs/identifier"
+        },
+        "blockerCode": {
+          "$ref": "#/$defs/identifier"
+        },
+        "artifacts": {
+          "type": "array",
+          "maxItems": 1024,
+          "items": {
+            "$ref": "#/$defs/artifactReference"
+          }
+        }
+      }
+    }
+  }
+}

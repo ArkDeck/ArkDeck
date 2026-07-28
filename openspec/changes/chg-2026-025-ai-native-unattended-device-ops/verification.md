@@ -1,9 +1,12 @@
 # Verification Plan
 
-> Change:CHG-2026-025-ai-native-unattended-device-ops@r2
+> Change:CHG-2026-025-ai-native-unattended-device-ops@r3
 > Status:planned # 结论经维护者在 PR 中确认
 > Revision review:2026-07-22 已逐项对照 r2 security-remediation、TASK-AIN-005/006/
 > 008/007 与 AIN-004 stop gate;本计划不复用 superseded #296 readiness/authorization。
+> r3 addition:2026-07-28 加入通用 Agent operation/human blocker、E0/E1 capability
+> executors、HAP/SO deployment 与闭环调试；新增任务在 r3 merge 与各自 readiness 前均
+> 不执行实现或真机。
 
 ## Environment
 
@@ -15,6 +18,11 @@
 - authorized-agent persistence 采用 AIN-005 + AIN-008 的 closed contract：
   authorization-usage `1.0.0`，Manifest/Journal `2.1.0` Rockchip toolchain 与
   descriptor-bound executable identity；v1/v2 历史 bytes/语义不改写
+- r3 control plane:agent-device-operation `1.0.0` + human-action-required `1.0.0`；
+  exact version/hash、HDC/profile、E1 capability 与真机 target 于 TASK-AIN-009—016
+  各自 readiness 固定
+- r3 hardware:至少一个 pinned OpenHarmony device/build/HDC 完成 E0/E1 product-path；
+  人类只执行 human-boundary registry 中的物理/配置/治理动作
 
 ## Acceptance matrix
 
@@ -32,6 +40,19 @@
 | AIN-DISPATCH-001(change-local,r2) | AIN-008 descriptor-bound admission 前置 + AIN-007 fake descriptor executor 端到端：grant→reservation→intent→固定 argv→semantic outcome→manifest；handoff/external-shell dispatch=0 | passed | TASK-AIN-008/007 run 记录 |
 | AIN-COMP-001(change-local,2026-07-28 remediation) | TASK-AIN-003R contract tests：production composition 处 adapter profile hash == RockchipAuthorizationFacts 的 pinnedProduction 断言(正向)；错误 profile 注入 fail closed 且 015-01/02 无授权/不匹配 dispatch=0 不放宽(负向)；全量基线零回归 | passed | TASK-AIN-003R run 记录 |
 | AIN-BKMK-001(change-local,2026-07-28 remediation) | TASK-AIN-BKMK-001 tests：pinned tool 宿主前置消费与创建者 code-signing 身份解耦——签名身份不同的两个构建产物先后消费同一已安装第 1 项前置,load() 层消费成功(正向)；bookmark/前置缺失、stale、实体 hash 不中等既有 fail-closed 门零放宽且 015-01/02 无授权/不匹配 dispatch=0 不回退(负向)；全量基线零回归 | passed | TASK-AIN-BKMK-001 run 记录 |
+| AC-WF-003-01 | E0 fixture integration + real device observation/HiLog run；无 device window/人工代跑 | passed | TASK-AIN-011/015/016 run 记录 |
+| AC-WF-003-02 | E1 capability 每字段 real-fault、expiry/usage/concurrency/crash + 真机负探针 | passed | TASK-AIN-010/012/013/014/016 run 记录 |
+| AC-WF-003-03 | request schema/semantic adversarial vectors + public API/source audit | passed | TASK-AIN-009/010/015 run 记录 |
+| AC-DEV-009-01 | fixture trust blocker/resume + 真机首次 trust/重新 probe（不以文本建 binding） | passed | TASK-AIN-010/015/016 run 记录 |
+| AC-DUMP-009-01 | 四 Recipe fake HDC product executor + 真机 Agent UI Dump | passed | TASK-AIN-012/016 run 记录 |
+| AC-TRACE-010-01 | fake Trace capture/receive/compensation/crash matrix + 真机 Agent Trace | passed | TASK-AIN-012/016 run 记录 |
+| AC-DEBUG-008-01 | bounded HiLog fixture/ENOSPC/rotation + 真机长时 Agent capture | passed | TASK-AIN-011/013/016 run 记录 |
+| AC-DEBUG-008-02 | pinned HAP install/readback/start/diagnostics fake + 真机 Agent run | passed | TASK-AIN-013/016 run 记录 |
+| AC-DEBUG-008-03 | app-owned `.so` atomic publish/verify/rollback fault matrix + scoped真机 E1 run | passed | TASK-AIN-014/016 run 记录 |
+| AC-DEBUG-008-04 | analysis-generated next request 越权/过期/stale facts 全重新 admission | passed | TASK-AIN-010/014/015/016 run 记录 |
+| AIN-OP-CONTRACT-001(change-local,r3) | agent-operation/human-blocker schema 正反 vectors；operation→step/effect mapping 闭包 | passed | TASK-AIN-009 run 记录 |
+| AIN-CONTROL-001(change-local,r3) | submit/status/cancel/reconcile/result 与 bounded debug DAG 端到端；network/shell/raw path surface=0 | passed | TASK-AIN-015 run 记录 |
+| AIN-MANUAL-GAP-001(change-local,r3) | 活跃 change/runbook grep 与 dependency audit；非 allowlisted human-only seam=0 | passed | TASK-AIN-017 run 记录 |
 
 ## Negative and recovery tests
 
@@ -50,6 +71,20 @@
   CHG-2026-016 Loader wlx runbook(已演练);
 - privacy scan:序列号字节不入仓(只入摘要),transcript 脱敏(RF-001/002 先例);
 - 回归:Swift 全量基线不低于 readiness 钉定值,POL-* 其余不变式性质测试全绿。
+- r3 request adversarial：unknown/duplicate key、executable/argv/shell/remote path、
+  caller grant/readback/prerequisite/usage/outcome/effect override 全部在 intent/process 前拒绝；
+- E0/E1 effect confusion：E0 plan 混入 cleanup/set/install/send/reboot 恒升级或拒绝；
+  profile 不得把 system/vendor/root/remount/no-rollback `.so` publish 降为 E1；
+- UI Dump/Trace：stale/ambiguous sidecar、unknown help/tag、invalid UTF-8、timeout/truncation、
+  parameter readback mismatch、receive/restore/cleanup fault、rebind ambiguity 与 crash window；
+- Debug/deployment：wrong HAP bundle/version/signing/hash、multi-device drift、install exit0
+  semantic failure、ELF ABI/hash/target/mode/owner drift、publish/loader/rollback outcomeUnknown；
+- debug loop：analysis 越权、旧 capability/readback 复用、budget/deadline/retry exhaustion、
+  cancel、restart 与 repeated blocker；不得无限重试或从 derived report 推断 success；
+- privacy/storage：Dump/Trace/HiLog/HAP/SO raw 默认本地，序列号/connectKey/path/业务文本按
+  policy 脱敏；ENOSPC 保留 journal/partial/finalization headroom；
+- 真机 r3：人工只完成 allowlisted 物理/配置动作，capture/deploy/restore/analysis 命令
+  全由 product executor dispatch；E2/system/vendor/root/remount/flash 在 TASK-AIN-016 为 0。
 
 ## Deviations
 
@@ -57,13 +92,20 @@
 
 ## Result gate
 
-- [ ] TASK-AIN-001/002/003/003R/BKMK-001/005/006/008/007/004 全部 done，且 AIN-004
+- [ ] TASK-AIN-001/002/003/003R/BKMK-001/005/006/008/007/004/009/010/011/012/
+  013/014/015/016/017 全部 done，且 AIN-004
   使用四项 host remediation 的 fresh main OID 重新 readiness（不复用 #296）
 - [ ] 所有适用 AC passed 且 evidence 可复查
 - [ ] Simulation/fake 未计入硬件支持
 - [ ] executor.kind=agent 的 evidence 全部携带可解引用的 authorizationRef
-- [ ] Traceability updated(AC-FLASH-015-03 入 registry,111 → 112)
+- [ ] Traceability updated(AC-FLASH-015-03 + r3 十个 AC 入 registry,111 → 122)
 - [ ] AIN-AUTH-PROV/FACT/USAGE/CONTRACT/DISPATCH-001 全部有独立 run evidence，
   且 AIN-008 的 2.1 persistence/descriptor-identity regression evidence 在案
 - [ ] standardAgent/ordinary CI 与 caller-supplied context 的 destructive dispatch 恒为 0
 - [ ] AIN-004 使用的新 authorization 在执行时 fresh、未超次且由产品 executor 消费
+- [ ] E0/E1 真机 evidence 的 executor.kind=agent，人工动作全部属于 human-boundary
+  registry，且没有人类代跑 device command
+- [ ] HAP/SO/Trace/UI Dump/HiLog 的 effect mapping、capability/authorization、rollback/
+  compensation 与 outcomeUnknown evidence 全部可复查
+- [ ] 活跃任务与 runbook 中非 allowlisted human-only seam 为 0；历史
+  controlledHumanCapture/golden bytes 未改写
