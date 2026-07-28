@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-044-openharmony-profile-version-reconciliation
 revision: 1
-status: approved # 仅在维护者 review/merge 本 approval-only PR 后生效；r1 proposal 经 #742 合入 main `7d2e0b82febe38d1316db19907b575a541d73625`
+status: verified # 2026-07-28 本 verification-only PR；closure 段见文末，仅在维护者 review/merge 后生效
 class: integration
 core_change_level: none
 owner: lvye
@@ -141,3 +141,73 @@ mutation matrix；implementation/evidence、`ready→done`、change `verified` �
   protected main、lineage、allowed/forbidden paths 与 mutation matrix。批准、readiness、
   implementation/evidence、`ready→done`、change `verified` 继续分离；
   CHG-2026-043 `TASK-HSO-001` 不因本批准自动 ready。
+
+## Verification closure（2026-07-28）
+
+TASK-OPVR-001 已在 protected main 记为 done，三条 change-local AC 均有同一实现
+revision 的可复查 host-only evidence。本 PR 只翻 proposal / verification 状态并引用
+已合入记录，零实现、零 scope、零 acceptance 定义变化。
+
+Verification base = protected main
+`38f0d4514ad16d9fe040fbd083d6e2f1a72e30f4`；该树的本文件、
+`verification.md`、`tasks.md`、`acceptance-cases.yaml` 与 run evidence 改前 blobs
+分别为 `f0a8fd9e373c86e9d2417855b3390319fe09d22a`、
+`e8774b51e96510d7286fd652f693b0ffc48ce782`、
+`f00f9e02cf5249d9345ffa6f5dd879d746c79532`、
+`e0e0810b626d52c63f6dada0103a225213c9485b` 与
+`3570f7f04d9b6ce0afadee26121748ece148e573`。
+
+### Protected-main delivery chain
+
+| Stage | Exact reviewed head | Protected-main merge |
+| --- | --- | --- |
+| proposal #742 | `b3d9b8b0bb1ec4a0204a8a908bc83d1c09d32d4d` | `7d2e0b82febe38d1316db19907b575a541d73625` |
+| approval #743 | `c038444d6e944035e816c5d05dcd2584a68b2777` | `8929027501c7a33c6330c93feb580f22690bcd9b` |
+| readiness #745 | `32ca5837322b2bc26ff1fbd121573da8325c1e51` | `018b28c346c896a3d23342510f310d74a3bf6b61` |
+| implementation/evidence #747 | `0e3fa305cf02466404633b65351cba2beb62b9cb` | `5ac17f6c11664fd83858554e403e9b2fd8dfd8d9` |
+| `ready→done` #748 | `85716427b851cb4141086c869c772abfdda4039c` | `38f0d4514ad16d9fe040fbd083d6e2f1a72e30f4` |
+
+上述五个 exact head 均由维护者 `lvye` review/approve；各 PR 的 guard /
+allowed-paths 与 Swift CI 均为 `SUCCESS`。Evidence 真值源为
+`evidence/runs/TASK-OPVR-001/run.md`，不是“实现 PR 已 review”这一事实本身。
+
+### Three binary AC conclusions
+
+- **`OPVR-HEADER-LOCK-001` = PASS (`contract`)**：独立提取确认 living header、
+  `INTEGRATION-PROFILES-0.6.0` lock 与 device-observation registry 均指向既有
+  `OPENHARMONY-TOOLS@0.5.0`；profile/guard/tests blobs 为
+  `4bfe204b1c13e53b93b35f840652206274614299`、
+  `aa7dc6e34d187cb6458689d72ac28564b58fb29b`、
+  `7e6c47044b31065d2752ce78d9185b6a3869732b`。profile 删除唯一
+  `> Version...` 行后的 SHA-256 仍为
+  `ab57ba2877ed6b8bd124e8aa21f7c05a8f9b91762fb8cdf736a80d28aef6d43c`；
+  未创建 0.6.0 profile 或 0.7.0 lock。
+- **`OPVR-MUTATION-001` = PASS (`contract`)**：8 个 focused test methods 覆盖
+  ASCII/full-width clean controls、ID/version mismatch、missing/duplicate/empty/
+  fuzzy metadata、non-mapping/wrong-type entries、duplicate ID/path、missing/
+  non-Markdown/unreadable targets与后续独立 conformance 诊断；显式
+  `0.5.0 → 0.4.0` mutation-red 报稳定 version mismatch，恢复后 errors = 0。
+- **`OPVR-NONINTERFERENCE-001` = PASS (`contract`)**：integration lock、
+  device/readonly/trace registries、core conformance 与 macOS profile blobs 分别保持
+  readiness pins `9297820f25b9276859c60ba6bd89ab399066dcd0`、
+  `399c5a102c7737bf6466e8a2c4c6a1d1b1bc0b6a`、
+  `99e8cc3d9929f9502a3e978a53cd56ad285d2aad`、
+  `9c59c102784661fb1f50c31916e29cbeeb6bd457`、
+  `799d0051463f9aed50ff3c9e50045ef06f61c35e`、
+  `e4bcf6da97f94c55efaf0a13806881038efa12e0`；Core/platform/production/
+  archived bytes 未变，implementation/test 的 installed HDC、real device、network、
+  lifecycle、binding/device mutation 与 destructive dispatch 全为 0。
+
+### Closure-base replay and boundary
+
+- `scripts/check-sdd.sh` = 0 errors / 0 warnings / 111 canonical AC；
+  `scripts/test_check_sdd.py` = 56/56 PASS；
+  `scripts/test_check_pr_paths.py` = 50/50 PASS；`git diff --check` = PASS。
+- Core Requirement/AC、contracts/schema、baseline、platform conformance、
+  hardware/support/release 与 production code 零变化；本 closure 不产生真实硬件或
+  外部副作用 evidence。
+- 本 closure 只确认 CHG-2026-044。它不使 CHG-2026-043
+  `TASK-HSO-001` 自动 ready，不接受其 candidate versions、provenance 或实现范围；
+  HSO 仍须在本 verified PR 合入后另起 fresh D1 readiness。
+- 只有维护者 review/merge 本独立 verification-only PR 后，proposal 的
+  `verified` 与 verification 的 `passed` 才生效。
