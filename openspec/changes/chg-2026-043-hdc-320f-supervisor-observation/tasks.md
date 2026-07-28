@@ -234,10 +234,22 @@
 
 ## TASK-HSO-002 — Adopt the same exact 3.2.0f candidate in production supervisor observation
 
-- Status:ready（2026-07-29 fresh D1 readiness；仅在维护者 review/merge 本独立
-  readiness PR 后生效；不构成 implementation、evidence、`ready→done`、
-  change verified、external ownership、health/version support、HDC/device/hardware
-  support 或任何 dispatch authority）
+- Status:done（2026-07-29 D0 completion；仅在维护者 review/merge 本独立
+  `ready→done` PR 后生效；本翻转不构成 change verified、真实 external
+  ownership、health/version support、HDC/device/hardware support 或任何 dispatch
+  authority）
+- Done:2026-07-29；实现经 #760 exact head
+  `e0f4b908eb6454e384b85a24fd598ed994126fb1` 由维护者 `lvye` APPROVED 并合入
+  protected main（merge commit
+  `41e19225375ca65551d51251326169558c4e6980`）。reviewed head 到 merge 在
+  TASK-HSO-002 的 6 个 implementation/evidence 路径零差异；fresh main 上四个
+  HDC 聚焦 suites = 114 tests / 0 failures，`check-sdd` = 0 errors / 0 warnings /
+  111 acceptance IDs，路径守卫 = 50/50；实现 PR 的 Agent PR、SDD Guard、
+  allowed-paths 与 Swift CI 全部 SUCCESS。evidence =
+  `evidence/runs/TASK-HSO-002/run.md`（blob
+  `ba399ffb99dc3d67808c2500bcafb16ff3ff9047`）；本次状态复验仍为 host-only，
+  installed HDC、真实 process/socket/device、network、lifecycle/adoption、
+  subserver、binding/device mutation 与 destructive dispatch 全部为 0。
 - Fresh readiness review r1(2026-07-29；host-only，零 HDC/设备；仅在维护者
   review/merge 本独立 D1 readiness PR 后生效):
   - **Audit base, approval and dependency gate:**protected main
