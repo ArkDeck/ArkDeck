@@ -10,10 +10,12 @@
 > r3 段;装后四项快照**证据**由 r4 独立载体按 r3「r4 的二值前置」第 2 条入仓,
 > 本文件只给步骤、责任人、快照命令与失败/回滚注记,不预写任何快照结果。
 >
-> Base:main `6383f5b9e8c61e61c798ee7f7cf09035faff2a3d`。消费契约全部引自该树源码
-> (文件:行号),且实测 `git rev-list --count 6e45a22..HEAD --
-> Packages/ArkDeckKit/Sources/ArkDeckWorkflows/` = **0**——r3 D-1 表所依据的
-> `load()` 契约在本 base 上零漂移。
+> Implementation base:protected main
+> `f065ac90e69ff89c9ebb8817bfb4f9ebb1b0ed7d`；TASK-AIN-BKMK-001 fresh D1
+> readiness #710 merge
+> `70739c4c483232ff6a5d094d753811114e3b9702` 已为其祖先。消费契约按当前符号
+> `RockchipProductToolBookmarkStore`、`RockchipProductExecutionSettings.load()`
+> 与 `RockchipDeviceDiscoveryAdapter` 记载，不以历史行号替代源码复核。
 
 ## 1. 消费契约总表(源码为准,维护者可逐行核对)
 
@@ -30,14 +32,14 @@
 
 | # | 前置 | 精确 key/位置 | 期望(load() 层) | 源码 |
 | --- | --- | --- | --- | --- |
-| 1 | Tool bookmark | UserDefaults `ArkDeck.Rockchip.ToolBookmark` | Data;以 `[.withSecurityScope, .withoutUI]` 可解析、`stale == false`、file URL、绝对路径、`startAccessingSecurityScopedResource()` 为 true | Host:777–791 |
+| 1 | Tool bookmark | UserDefaults 新 key `ArkDeck.Rockchip.ToolOrdinaryBookmarkV1`；旧 key `ArkDeck.Rockchip.ToolBookmark` 必须不存在 | Data；以 `[.withoutUI]` 可解析、`stale == false`、绝对 canonical/non-symlink file URL；旧键只作 migration detector，legacy-only/dual-key 均拒绝 | `RockchipProductToolBookmarkStore` |
 | 2 | Quarantine 断言 | UserDefaults `ArkDeck.Rockchip.ToolQuarantinePresent` | 键存在(`object(forKey:) != nil`),按 Bool 读取 | Host:794–799 |
 | 2b | Code trust(admission 层伴生键,r3 表未列,见 §8) | UserDefaults `ArkDeck.Rockchip.ToolCodeTrust` | String,`RockchipPlatformCodeTrust` rawValue;缺省解为 `.unknown` | Host:792–793;Discovery:44–50 |
 | 3 | GitHub provenance token | Keychain generic password,service `dev.arkdeck.github-provenance`,account `protected-main-reader` | 存在、可读、UTF-8 解码后非空 | Host:807–811、829–845 |
 | 4 | Durable binding snapshot | `~/Library/Application Support/ArkDeck/rockchip-binding.json` | 恰四字段 `revision`/`serial`/`usbTopology`/`evidence`;`revision > 0`、serial 非空、usbTopology 全 ASCII 数字非空、evidence 非空且元素非空 | Host:732–737、812–823 |
 
 UserDefaults 域:`arkdeck` 是无 bundle identifier 的 CLI,`UserDefaults.standard`
-(Host:777)按 CFPreferences 惯例落**进程名域 `arkdeck`**
+按 CFPreferences 惯例落**进程名域 `arkdeck`**
 (`~/Library/Preferences/arkdeck.plist`)。r3 已实测全部真实域(含
 `com.arkdeck.desktop`)均无这些 key。本 runbook 一律对域 `arkdeck` 写入与取证;
 若 §7 探针仍报 bookmark 未安装,先重测宿主进程实际 preferences 域并修订本文件,
@@ -46,85 +48,55 @@ UserDefaults 域:`arkdeck` 是无 bundle identifier 的 CLI,`UserDefaults.standa
 辅助事实(无需安装):`load()` 自建 `~/Library/Application Support/ArkDeck/` 与
 其下 `AuthorizationUsage/`(0o700 并 chmod 强制;Host:762–775),零人工步骤。
 
-## 2. 第 1 项:security-scoped tool bookmark
+## 2. 第 1 项:ordinary tool bookmark
 
-- **契约**:key `ArkDeck.Rockchip.ToolBookmark`(Host:778)须为
-  `URL.bookmarkData(options: [.withSecurityScope])` 产物;load() 以
-  `[.withSecurityScope, .withoutUI]` 解析并要求非 stale、绝对 file URL、
-  security scope 可进入(Host:783–791)。admission 期以同字节再次解析,并断言
-  解 symlink、标准化后与 executableURL 相同(Discovery:501–527),bookmark 缺失
-  按 `requiresSecurityScopedBookmark = true` 拒绝(Discovery:29、564–566)。
-  被 bookmark 的实体必须是 destructive 面 pinned 工具
-  `~/dayu200-rehearsal/rkdeveloptool/rkdeveloptool`(r3 实测 SHA-256 命中
-  `pinnedProduction.executableSHA256` =
-  `038a8a0ea26ef7eb77451789f310c0c9fbeaf43a78af1d6146e02311a9c23611`,
-  Discovery:21–29)。**不得**用 `/opt/homebrew/bin/rkdeveloptool` 等
-  `bbd7bdc0…9923`(`pinnedReadOnlyDiscovery`,E0 只读面)实体——错装不会执行错
-  工具(prepare 期 `expectedSHA256` 与 admission 断言双 hash 门 fail closed,
-  Host:196–200;Facts:340、349–352),但 r4 会白跑。
-- **可行性依据**:r3 已单独实证非 sandbox CLI 能创建并解析 `.withSecurityScope`
-  bookmark(824 B、resolve 回原路径、stale=false、startAccessing true),故此项
-  属「未安装」而非「架构上不可能」;下述 helper 即该已证途径的固化。
-- **安装步骤**(一次性 helper,仓外临时文件,用毕即删,不入仓、不进
-  `Packages/**`):
-  1. Hash 门(不命中即停,不得继续):
-     ```sh
-     TOOL="$HOME/dayu200-rehearsal/rkdeveloptool/rkdeveloptool"
-     shasum -a 256 "$TOOL"
-     # 必须逐字 == 038a8a0ea26ef7eb77451789f310c0c9fbeaf43a78af1d6146e02311a9c23611
-     ```
-  2. 写 helper(如 `/tmp/make-bookmark.swift`),内容与 load() 的解析选项逐字
-     同构:
-     ```swift
-     // make-bookmark.swift — 一次性,用毕即删。
-     import Foundation
-     let url = URL(fileURLWithPath: CommandLine.arguments[1]).standardizedFileURL
-     let bookmark = try url.bookmarkData(
-       options: [.withSecurityScope], includingResourceValuesForKeys: nil,
-       relativeTo: nil)
-     var stale = false
-     let resolved = try URL(
-       resolvingBookmarkData: bookmark, options: [.withSecurityScope, .withoutUI],
-       relativeTo: nil, bookmarkDataIsStale: &stale)
-     guard !stale, resolved.standardizedFileURL == url,
-       resolved.startAccessingSecurityScopedResource()
-     else { fatalError("bookmark self-check failed") }
-     resolved.stopAccessingSecurityScopedResource()
-     FileHandle.standardError.write(Data("bookmark bytes: \(bookmark.count)\n".utf8))
-     print(bookmark.map { String(format: "%02x", $0) }.joined())
-     ```
-  3. 生成并写入 `arkdeck` 域(hex 编码的 bookmark 非凭据,可走 argv):
-     ```sh
-     swift /tmp/make-bookmark.swift "$TOOL" > /tmp/bookmark.hex
-     defaults write arkdeck ArkDeck.Rockchip.ToolBookmark -data "$(cat /tmp/bookmark.hex)"
-     rm /tmp/make-bookmark.swift /tmp/bookmark.hex
-     ```
-- **责任人**:维护者,或维护者监督下的有人值守宿主会话执行(无凭据、无授权
-  判断;错值双 hash 门 fail closed)。r4 快照取证与认定归维护者。
-- **装后自证快照**(存在性/类型/长度,不贴字节):
+- **契约**:唯一可消费键为
+  `ArkDeck.Rockchip.ToolOrdinaryBookmarkV1`。其值必须由产品安装入口创建，
+  `load()` 只用 `[.withoutUI]` 解析，要求非 stale、绝对 file URL，且解析原始
+  URL 的 standardized path 与解 symlink 后的 canonical path 逐字相等。
+  production discovery 以 typed `installedOrdinaryBookmark` 再次解析并要求与
+  selected executable 精确相等，且**不调用**
+  `startAccessingSecurityScopedResource()`。旧键
+  `ArkDeck.Rockchip.ToolBookmark` 永不解析；旧键单独存在或与新键并存都在
+  第 1 项 fail closed。
+- **工具实体**:必须是 destructive 面 pinned 工具
+  `~/dayu200-rehearsal/rkdeveloptool/rkdeveloptool`，SHA-256 必须逐字等于
+  `038a8a0ea26ef7eb77451789f310c0c9fbeaf43a78af1d6146e02311a9c23611`。
+  安装入口通过 descriptor-bound prepare 门独立检查 regular、executable、
+  `O_NOFOLLOW` 与该 hash，随后立即关闭 prepared token；不会 launch 工具。
+  `/opt/homebrew/bin/rkdeveloptool` 等 E0 实体不满足此 pin。
+- **安装步骤**:
   ```sh
-  defaults read-type arkdeck ArkDeck.Rockchip.ToolBookmark   # 期望:Type is data
-  defaults read arkdeck ArkDeck.Rockchip.ToolBookmark | wc -c # 长度级证明(r3 同规格 824 B 级)
+  TOOL="$HOME/dayu200-rehearsal/rkdeveloptool/rkdeveloptool"
+  swift build --package-path Packages/ArkDeckKit -c release --product arkdeck
+  Packages/ArkDeckKit/.build/release/arkdeck flash install-tool --path "$TOOL"
   ```
-- **失败/回滚**:`defaults delete arkdeck ArkDeck.Rockchip.ToolBookmark` 即回
-  fail-closed(load() 报 `pinned rkdeveloptool bookmark is not installed`,
-  Host:779–781)。工具文件被移动/重建 → bookmark 变 stale/解析失败
-  (Host:789–791 报 `stale or inaccessible`)→ 重跑本节全部步骤。bookmark 为
-  per-user 产物:创建与消费须同一 macOS 用户账户。
-- **勘误(2026-07-28;缺陷正本 = tasks.md TASK-AIN-003「Defect record 2」;
-  原文历史层保留、不删除)**:本节 helper 途径已被受控实测**证伪**——
-  `.withSecurityScope` bookmark 的 resolve **绑定创建者 code-signing 身份**
-  (ad-hoc 下 = Identifier+CDHash 粒度)。上列第 2–3 步以 `swift` 解释器进程
-  (Apple 签名 `swift-frontend`)创建的 bookmark,产品这类 ad-hoc 二进制按
-  load() 同选项 resolve 实测 = `NSCocoaErrorDomain Code=259`(bookmark 字节
-  逐字节一致仍然如此);维护者 2026-07-28 实际执行本节 + §7 探针即于该第一站
-  裸报 259(load() 的 resolve 调用裸抛,无治理文案)。上方「可行性依据」的
-  r3 实证为**同进程自证**,只在同一签名身份内成立,不覆盖「helper 创建、产品
-  消费」。SwiftPM 构建的 `arkdeck` 为 ad-hoc 签名且 Identifier 内嵌 LC_UUID
-  (签名身份逐内容不同的构建漂移),产品又无任何 bookmark 安装子命令,故改由
-  产品自建 bookmark 亦无入口、且重构建后同样失效。**第 1 项在
-  TASK-AIN-BKMK-001(tasks.md)done 前不可闭合**;本节安装步骤保留为历史层
-  记录,**不得照做**。admission/execute 面的对应出入记录 = §8 第 4 条。
+  installer 先完成 ordinary bookmark self-roundtrip/path-match，再写新键并做
+  exact Data readback；全部成功后才删除旧键。它不写 quarantine/code-trust、
+  Keychain、binding、authorization 或其他 D-1 项。
+- **跨构建语义**:普通 bookmark 不携带 security scope，允许同 basename、
+  同 `arkdeck` preferences 域但 Identifier/CDHash 不同的后续 `arkdeck` build
+  消费。创建与消费仍须是同一 macOS 用户账户。
+- **责任人**:维护者，或处于已批准 host-only 任务边界内的 Agent 会话。安装不含
+  设备/授权判断；r4 快照取证与是否满足前置的最终认定仍归维护者。
+- **装后自证快照**(只证明存在性/类型/长度，不输出 bookmark bytes):
+  ```sh
+  defaults read-type arkdeck ArkDeck.Rockchip.ToolOrdinaryBookmarkV1
+  defaults read arkdeck ArkDeck.Rockchip.ToolOrdinaryBookmarkV1 | wc -c
+  defaults read arkdeck ArkDeck.Rockchip.ToolBookmark
+  # 前两条应显示 Data/非零长度；旧键读取应以“不存在”失败
+  ```
+- **失败、迁移与恢复**:missing/wrong-type/corrupt/stale/non-canonical new key
+  均输出受控 `productionConfigurationUnavailable` 并保持 process dispatch=0。
+  legacy-only 时直接运行上述 installer；若一次迁移在删除旧键处中断，最坏为
+  dual-key，`load()` 继续拒绝，原路径重跑 installer 可完成恢复。工具移动或
+  重建后必须用新的 canonical 实体重装。明确回滚到 fail-closed:
+  `defaults delete arkdeck ArkDeck.Rockchip.ToolOrdinaryBookmarkV1`。
+- **历史勘误归档**:此前使用 Swift helper 创建
+  `.withSecurityScope` bookmark 并直写 `ArkDeck.Rockchip.ToolBookmark` 的步骤
+  已退役，**不得照做**；其跨 signing identity 的 Code=259 缺陷由
+  TASK-AIN-BKMK-001 的 ordinary route 修复，旧字节只用于迁移检测，绝不尝试
+  按普通 bookmark 猜测解析。
 
 ## 3. 第 2 项:quarantine 断言(+ admission 层伴生键 code trust)
 
@@ -335,12 +307,16 @@ swift run -c release arkdeck flash execute \
   --authorization-id AUTH-2026-025-DAYU200-002
 ```
 
-判读:输出仍含四条 `productionConfigurationUnavailable` 文案之一
-(Host:779–781/789–791/795–798/808–811/820–822)= 对应前置未装好;越过全部四条、
-止于 standing authorization/admission 拒绝且 dispatch=0 = **load() 对四项的消费
-全部成功**,同时顺带完成 §4 的 Keychain「始终允许」授权。本探针由**维护者亲手**
-执行(它调用真实执行宿主二进制;Agent 不执行,POL-AGENT-002 同向);载体翻非负
-(r4 finalize)之后**禁止**再以此命令作探针——届时同命令即真实执行入口。
+判读:第 1 项未闭合时输出受控
+`productionConfigurationUnavailable`（包括 missing/legacy/dual/wrong-type/
+corrupt/stale/non-canonical）；第 1 项消费成功而第 2 项未装时，必须精确止于
+`tool quarantine assessment is absent`。继续越过全部四项并止于 standing
+authorization/admission 拒绝且 dispatch=0，才说明 **load() 对四项的消费全部
+成功**，同时顺带完成 §4 的 Keychain「始终允许」授权。常规 D-1 联合自证由
+**维护者亲手**执行；TASK-AIN-BKMK-001 的 host-only 产品 A/B 验收是一次性例外，
+只在 old/new/quarantine 三键预检均不存在时安装第 1 项并止于上述 quarantine
+缺失门，随后删除新键。载体翻非负(r4 finalize)之后**禁止**再以此命令作探针——
+届时同命令即真实执行入口。
 
 ## 8. 与 r3 D-1 记载的出入(如实,按源码实况)
 
@@ -351,34 +327,17 @@ swift run -c release arkdeck flash execute \
    {`developerID`, `adHoc`}(`permitsPinnedDiscovery`,Discovery:63–65、573–575;
    production 组线 Host:1037–1040)。r3 表「值可为 false」只对 load() 层成立,
    不足以过 admission;r4 快照应含**五**个 key/文件而非四。
-3. **上游结构性缺口(本 runbook 无法也不得修复)**:production composition 把
-   声明为 `pinnedProduction`(`038a8a0e…`)的 `settings.tool`(Host:800–806)交给
-   `RockchipDeviceDiscoveryAdapter()` 缺省实例,而该缺省 init 钉的是
-   `pinnedReadOnlyDiscovery`(`bbd7bdc0…`;Discovery:541–544,类注释明言
-   「destructive compatibility identity is not accepted by the default adapter」
-   Discovery:4–6)。`processRequest` 的声明性 hash 门
-   `tool.sha256 == profile.executableSHA256`(Discovery:570–572)因此**恒不等**:
-   四项前置装得再对,tool/device 观测也在 `executableHashMismatch` →
-   `toolOrDeviceObservationUnavailable`(Facts:140–143)处 fail closed,E2
-   admission 今日结构性不可达。换 bookmark 到 bbd7 实体也不通:Facts:349 断言
-   观测身份必须 == `pinnedProduction`。修复属 `Packages/**`(本任务 Forbidden;
-   按任务卡「发现缺陷回 TASK-AIN-003」),归维护者裁量;本文件的安装步骤不因此
-   改变(四项仍是 load() 的必要输入),但 r4 起草者必须知道:**仅装齐宿主前置不
-   使 E2 可达,该缺口闭合前不得以「前置已装好」推定可执行**。
-4. **第二处上游结构性缺口(2026-07-28 增补;维护者实际执行 §2/§7 时发现,本
-   runbook 无法也不得修复)**:`.withSecurityScope` bookmark 的 resolve 绑定
-   **创建者 code-signing 身份**(ad-hoc 下 = Identifier+CDHash 粒度;受控
-   矩阵与行级证据 = tasks.md TASK-AIN-003「Defect record 2」)。§2 helper
-   (解释器进程)所建 bookmark,产品 ad-hoc 二进制 resolve 恒为
-   `NSCocoaErrorDomain Code=259`,且该错误在 load() 的 resolve 调用处裸抛
-   (无 `productionConfigurationUnavailable` 文案,经 CLI 顶层 `\(error)`
-   直出);产品子命令全集无任何安装入口,SwiftPM 产物签名身份逐(内容不同
-   的)构建漂移。故第 1 项今日**不存在可行安装途径**,§7 探针在缺陷闭合前恒
-   止于第一站(bookmark resolve),到不了「止于授权解析拒绝」的判读位。修复
-   属 `Packages/**`(本任务 Forbidden;按任务卡「发现缺陷回 TASK-AIN-003」),
-   由 TASK-AIN-BKMK-001(tasks.md)承载;其 done 前不得以「第 1 项已装好」
-   推定 load() 可消费,r4 的 D-1 第 1 项快照取证同以其 done 为前置(r4 前置
-   清单第 8 条)。§2 末的 dated 勘误注记为安装面的对应记录。
+3. **production profile composition 缺口已闭合**:历史版本曾把
+   `pinnedProduction` tool 交给缺省 `pinnedReadOnlyDiscovery` adapter，导致
+   hash 恒不等；TASK-AIN-003R 已把 production composition 显式注入
+   `.pinnedProduction`，而 public/E0 缺省仍保持
+   `.pinnedReadOnlyDiscovery`。本 runbook 不把该修复等同于 E2 授权或硬件就绪。
+4. **bookmark signing-identity 缺口已闭合**:历史
+   `.withSecurityScope` helper 路径会把解析绑定到创建者 signing identity，
+   跨构建报 Code=259。TASK-AIN-BKMK-001 以产品 `install-tool`、普通 bookmark、
+   新键、typed `installedOrdinaryBookmark` 与 legacy fail-closed migration
+   取代该路径；产品 A/B 验收要求 Identifier/CDHash 均不同且 B 到达下一项
+   quarantine 缺失门。旧 helper/旧键不能恢复为消费或 fallback 路径。
 
 ## 9. 脱敏红线(全文适用)
 

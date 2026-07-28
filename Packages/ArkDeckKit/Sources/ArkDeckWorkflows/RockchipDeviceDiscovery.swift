@@ -13,7 +13,7 @@ public struct RockchipDiscoveryIntegrationProfile: Sendable, Equatable {
     upstreamCommit: "304f073752fd25c854e1bcf05d8e7f925b1f4e14",
     exactArguments: ["ld"],
     timeout: 5,
-    requiresSecurityScopedBookmark: true)
+    accessPolicy: .userSelectedSecurityScopedBookmark)
 
   /// Compatibility identity consumed by the existing destructive Flash authorization,
   /// execution, and manifest surfaces. CHG-2026-026 r2 explicitly leaves this pin unchanged;
@@ -25,7 +25,7 @@ public struct RockchipDiscoveryIntegrationProfile: Sendable, Equatable {
     upstreamCommit: "304f073752fd25c854e1bcf05d8e7f925b1f4e14",
     exactArguments: ["ld"],
     timeout: 5,
-    requiresSecurityScopedBookmark: true)
+    accessPolicy: .installedOrdinaryBookmark)
 
   public let identifier: String
   public let reportedToolVersion: String
@@ -33,11 +33,52 @@ public struct RockchipDiscoveryIntegrationProfile: Sendable, Equatable {
   public let upstreamCommit: String
   public let exactArguments: [String]
   public let timeout: TimeInterval
-  let requiresSecurityScopedBookmark: Bool
+  let accessPolicy: RockchipToolAccessPolicy
+}
+
+enum RockchipToolAccessPolicy: Sendable, Equatable {
+  case userSelectedSecurityScopedBookmark
+  case installedOrdinaryBookmark
+
+  var pathSource: RockchipToolPathSource {
+    switch self {
+    case .userSelectedSecurityScopedBookmark: .userSelectedSecurityScopedBookmark
+    case .installedOrdinaryBookmark: .installedOrdinaryBookmark
+    }
+  }
+
+  var pathSourceError: RockchipToolValidationError {
+    switch self {
+    case .userSelectedSecurityScopedBookmark: .pathSourceNotUserSelected
+    case .installedOrdinaryBookmark: .pathSourceNotInstalledOrdinary
+    }
+  }
+
+  var missingBookmarkError: RockchipToolValidationError {
+    switch self {
+    case .userSelectedSecurityScopedBookmark: .securityScopedBookmarkMissing
+    case .installedOrdinaryBookmark: .ordinaryBookmarkMissing
+    }
+  }
+
+  var staleBookmarkError: RockchipToolValidationError {
+    switch self {
+    case .userSelectedSecurityScopedBookmark: .securityScopedBookmarkStale
+    case .installedOrdinaryBookmark: .ordinaryBookmarkStale
+    }
+  }
+
+  var pathMismatchError: RockchipToolValidationError {
+    switch self {
+    case .userSelectedSecurityScopedBookmark: .securityScopedBookmarkPathMismatch
+    case .installedOrdinaryBookmark: .ordinaryBookmarkPathMismatch
+    }
+  }
 }
 
 public enum RockchipToolPathSource: String, Sendable, Equatable {
   case userSelectedSecurityScopedBookmark
+  case installedOrdinaryBookmark
   case explicitSupportPath
 }
 
@@ -68,7 +109,7 @@ public struct RockchipPlatformTrustReceipt: Sendable, Equatable {
 public struct RockchipSelectedDiscoveryTool: Sendable, Equatable {
   public let executableURL: URL
   public let pathSource: RockchipToolPathSource
-  public let securityScopedBookmark: Data?
+  public let bookmarkData: Data?
   public let reportedVersion: String
   public let sha256: String
   public let platformTrust: RockchipPlatformTrustReceipt
@@ -76,14 +117,14 @@ public struct RockchipSelectedDiscoveryTool: Sendable, Equatable {
   public init(
     executableURL: URL,
     pathSource: RockchipToolPathSource,
-    securityScopedBookmark: Data?,
+    bookmarkData: Data?,
     reportedVersion: String,
     sha256: String,
     platformTrust: RockchipPlatformTrustReceipt
   ) {
     self.executableURL = executableURL
     self.pathSource = pathSource
-    self.securityScopedBookmark = securityScopedBookmark
+    self.bookmarkData = bookmarkData
     self.reportedVersion = reportedVersion
     self.sha256 = sha256
     self.platformTrust = platformTrust
@@ -93,12 +134,17 @@ public struct RockchipSelectedDiscoveryTool: Sendable, Equatable {
 public enum RockchipToolValidationError: Error, Sendable, Equatable {
   case executableMustBeAbsolute
   case pathSourceNotUserSelected
+  case pathSourceNotInstalledOrdinary
   case securityScopedBookmarkMissing
+  case ordinaryBookmarkMissing
   case reportedVersionMismatch
   case executableHashMismatch
   case platformTrustRejected
   case securityScopedBookmarkStale
   case securityScopedBookmarkPathMismatch
+  case securityScopedAccessDenied
+  case ordinaryBookmarkStale
+  case ordinaryBookmarkPathMismatch
 }
 
 public enum RockchipDeviceMode: String, Sendable, Equatable {
@@ -493,41 +539,83 @@ struct RockchipLDSemanticEvaluator: ProcessSemanticEvaluating {
   }
 }
 
-private enum RockchipSecurityScopedAccessError: Error {
-  case staleBookmark
-  case pathMismatch
+struct RockchipBookmarkResolution: Sendable {
+  let url: URL
+  let isStale: Bool
 }
 
-private final class RockchipSecurityScopedExecutableAccess {
-  private let url: URL?
+struct RockchipBookmarkAccessOperations: Sendable {
+  let resolve: @Sendable (Data, URL.BookmarkResolutionOptions) throws -> RockchipBookmarkResolution
+  let startSecurityScope: @Sendable (URL) -> Bool
+  let stopSecurityScope: @Sendable (URL) -> Void
+
+  static let foundation = RockchipBookmarkAccessOperations(
+    resolve: { bookmark, options in
+      var isStale = false
+      let url = try URL(
+        resolvingBookmarkData: bookmark,
+        options: options,
+        relativeTo: nil,
+        bookmarkDataIsStale: &isStale)
+      return RockchipBookmarkResolution(url: url, isStale: isStale)
+    },
+    startSecurityScope: { $0.startAccessingSecurityScopedResource() },
+    stopSecurityScope: { $0.stopAccessingSecurityScopedResource() })
+}
+
+final class RockchipExecutableBookmarkAccess {
+  private let scopedURL: URL?
+  private let stopSecurityScope: (URL) -> Void
   private var didStart = false
 
-  init(path: URL, bookmark: Data?) throws {
+  init(
+    path: URL,
+    bookmark: Data?,
+    policy: RockchipToolAccessPolicy,
+    operations: RockchipBookmarkAccessOperations = .foundation
+  ) throws {
     guard let bookmark else {
-      url = nil
-      return
+      throw policy.missingBookmarkError
     }
-    var isStale = false
-    let resolved = try URL(
-      resolvingBookmarkData: bookmark,
-      options: [.withSecurityScope, .withoutUI],
-      relativeTo: nil,
-      bookmarkDataIsStale: &isStale)
-    guard !isStale else { throw RockchipSecurityScopedAccessError.staleBookmark }
+    let options: URL.BookmarkResolutionOptions
+    switch policy {
+    case .userSelectedSecurityScopedBookmark:
+      options = [.withSecurityScope, .withoutUI]
+    case .installedOrdinaryBookmark:
+      options = [.withoutUI]
+    }
+    let resolution: RockchipBookmarkResolution
+    do {
+      resolution = try operations.resolve(bookmark, options)
+    } catch {
+      throw policy.staleBookmarkError
+    }
+    guard !resolution.isStale else { throw policy.staleBookmarkError }
+    let resolved = resolution.url
     guard
+      resolved.isFileURL, resolved.path.hasPrefix("/"),
       resolved.resolvingSymlinksInPath().standardizedFileURL
         == path.resolvingSymlinksInPath().standardizedFileURL
     else {
-      throw RockchipSecurityScopedAccessError.pathMismatch
+      throw policy.pathMismatchError
     }
-    url = resolved
-    didStart = resolved.startAccessingSecurityScopedResource()
+    stopSecurityScope = operations.stopSecurityScope
+    switch policy {
+    case .userSelectedSecurityScopedBookmark:
+      guard operations.startSecurityScope(resolved) else {
+        throw RockchipToolValidationError.securityScopedAccessDenied
+      }
+      scopedURL = resolved
+      didStart = true
+    case .installedOrdinaryBookmark:
+      scopedURL = nil
+    }
   }
 
   func stop() {
-    guard didStart, let url else { return }
+    guard didStart, let scopedURL else { return }
     didStart = false
-    url.stopAccessingSecurityScopedResource()
+    stopSecurityScope(scopedURL)
   }
 
   deinit { stop() }
@@ -558,11 +646,11 @@ public actor RockchipDeviceDiscoveryAdapter {
     guard tool.executableURL.isFileURL, tool.executableURL.path.hasPrefix("/") else {
       throw RockchipToolValidationError.executableMustBeAbsolute
     }
-    guard tool.pathSource == .userSelectedSecurityScopedBookmark else {
-      throw RockchipToolValidationError.pathSourceNotUserSelected
+    guard tool.pathSource == profile.accessPolicy.pathSource else {
+      throw profile.accessPolicy.pathSourceError
     }
-    guard !profile.requiresSecurityScopedBookmark || tool.securityScopedBookmark != nil else {
-      throw RockchipToolValidationError.securityScopedBookmarkMissing
+    guard tool.bookmarkData != nil else {
+      throw profile.accessPolicy.missingBookmarkError
     }
     guard tool.reportedVersion == profile.reportedToolVersion else {
       throw RockchipToolValidationError.reportedVersionMismatch
@@ -594,16 +682,16 @@ public actor RockchipDeviceDiscoveryAdapter {
       return blockedToolAttempt(.platformTrustRejected)
     }
 
-    let access: RockchipSecurityScopedExecutableAccess
+    let access: RockchipExecutableBookmarkAccess
     do {
-      access = try RockchipSecurityScopedExecutableAccess(
-        path: tool.executableURL, bookmark: tool.securityScopedBookmark)
-    } catch RockchipSecurityScopedAccessError.staleBookmark {
-      return blockedToolAttempt(.securityScopedBookmarkStale)
-    } catch RockchipSecurityScopedAccessError.pathMismatch {
-      return blockedToolAttempt(.securityScopedBookmarkPathMismatch)
+      access = try RockchipExecutableBookmarkAccess(
+        path: tool.executableURL,
+        bookmark: tool.bookmarkData,
+        policy: profile.accessPolicy)
+    } catch let error as RockchipToolValidationError {
+      return blockedToolAttempt(error)
     } catch {
-      return blockedToolAttempt(.securityScopedBookmarkStale)
+      return blockedToolAttempt(profile.accessPolicy.staleBookmarkError)
     }
     defer { access.stop() }
 

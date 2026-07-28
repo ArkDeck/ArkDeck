@@ -43,6 +43,8 @@ struct ArkDeckCommandLine {
       throw CLIError(exitCode: EX_USAGE, message: "missing flash subcommand")
     }
     switch subcommand {
+    case "install-tool":
+      try runInstallTool(Array(arguments.dropFirst()))
     case "plan":
       try runPlan(Array(arguments.dropFirst()))
     case "execute":
@@ -52,6 +54,20 @@ struct ArkDeckCommandLine {
     default:
       throw CLIError(exitCode: EX_USAGE, message: "unsupported flash subcommand")
     }
+  }
+
+  // MARK: install-tool
+
+  static func runInstallTool(_ arguments: [String]) throws {
+    let options = try CLIOptions(arguments)
+    try options.validateAllowed(["--path"])
+    guard let path = options.value("--path"), path.hasPrefix("/") else {
+      throw CLIError(
+        exitCode: EX_USAGE,
+        message: "install-tool requires --path with a canonical absolute file path")
+    }
+    try RockchipToolInstallation.install(executableURL: URL(fileURLWithPath: path))
+    print("pinned rkdeveloptool ordinary bookmark installed")
   }
 
   // MARK: plan
@@ -502,6 +518,7 @@ struct ArkDeckCommandLine {
   static func printUsage() {
     let usage = """
       usage:
+        arkdeck flash install-tool --path <absolute-rkdeveloptool-path>
         arkdeck flash plan --images <images.tar.gz> [--mode planOnly|simulated] [--out <dir>]
         arkdeck flash execute --images <images.tar.gz> --target-location-id <usb-location> \
       --operator <name> [--out <dir>]

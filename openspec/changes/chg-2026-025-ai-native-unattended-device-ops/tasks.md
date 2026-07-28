@@ -574,10 +574,14 @@ change approved 前保持 blocked;approved 后每任务另需独立 readiness PR
 
 ## TASK-AIN-BKMK-001 — pinned tool 宿主前置消费与签名身份解耦(remediation)
 
-- Status:ready（fresh D1 r2 draft；仅在维护者 review/merge 本独立 readiness
-  PR 的 exact head 后生效。届时 implementation 仍须另起一任务一实现 PR；
-  本 readiness 零 product/schema/runbook 实现，未安装正式 product key，未启动
-  目标工具，未接触设备。）
+- Status:done（2026-07-28 implementation completion；仅在维护者
+  review/merge 本独立一任务一实现 PR 后生效。实现与证据见
+  `evidence/runs/TASK-AIN-BKMK-001/run.md`；本翻转不声称 change verified、
+  TASK-AIN-004 E2 ready 或任何 hardware validation。）
+- Historical Status:ready（fresh D1 r2；#710 exact head
+  `22b2d2985fbf19e296c0b6dab3fb5fa809c7297e` 经 `lvye` APPROVED，并以
+  `70739c4c483232ff6a5d094d753811114e3b9702` 合入后生效；该一次性实现
+  authority 由本 implementation PR 消耗。）
 - Historical Status:blocked（r1 D1 blocked-readiness；#703 exact head
   `e61e99790fe49772cc80614a664585871d5176f1` 经 `lvye` APPROVED，并以
   `20aeee5653d7eece08911c0a84afc92c1fa09702` 合入；三个登记候选当时均不能在
@@ -905,6 +909,43 @@ change approved 前保持 blocked;approved 后每任务另需独立 readiness PR
     scope 内 seam、跨身份宿主机制、故障/兼容/产品 harness 与验证命令均闭合。
     只有维护者 review/merge 本 readiness exact head 后顶部 `ready` 才生效；
     implementation 必须另起 PR，且任一 pin/concurrency/scope 漂移立即停手重做 D1。
+- Implementation completion(2026-07-28；完整可复查记录 =
+  `evidence/runs/TASK-AIN-BKMK-001/run.md`):
+  - **Base/concurrency gate:satisfied。**实现从 protected main
+    `f065ac90e69ff89c9ebb8817bfb4f9ebb1b0ed7d` 开始，readiness 全部
+    implementation blob 逐项同值；最终 product/test 树 fast-forward 到
+    protected main `570fe28c2d6edbad18050cfe873246fd45f0bc40`，push 前再
+    依次 rebase 到 #720 `cd3f3e0a7b4c2055746a617110e94b2e1dc791c7` 与
+    #721 `54c3a3cfbc455b5eb0ab6710955ad994d5b57eac`（仅 CHG-2026-042
+    与 `scripts/host_loop/**`/`scripts/test_check_pr_paths.py`）。区间全部上游文件与本任务 modified paths
+    零交集，最终完整 open PR 查询为 `[]`。
+  - **Route A implementation:PASS。**唯一 product installer
+    `flash install-tool --path` 以 descriptor/hash prepare-only 门验证
+    pinned executable，创建/自解析/readback ordinary bookmark 到新 key；
+    production `load()` 只消费新键。legacy-only/dual-key/missing/wrong-type/
+    corrupt/stale/non-canonical 全受控 fail closed，legacy 删除故障留下 dual
+    且重跑可恢复。E0 scoped 与 production ordinary 由 closed typed policy
+    分离，production scope start/stop = 0。
+  - **Product cross-identity matrix:PASS。**最终 A/B 均为 basename `arkdeck`、
+    使用独立 SwiftPM scratch path；A Identifier/CDHash =
+    `dev.arkdeck.implementation.a` /
+    `171ac1b7b0b85d0956dd3ffe2b4ba6fa08dd4dc3`，B =
+    `dev.arkdeck.implementation.b` /
+    `2788255be72363f3648b740520672aeb4bc0a229`。old/new/quarantine 三键
+    缺席预检后，A 产品入口安装，B 真实 product `load()` 精确到达下一门
+    `tool quarantine assessment is absent`；清理新键后 A/B 均回到 ordinary
+    bookmark missing，最终三键全缺席。未记录 bookmark bytes/path。
+  - **Persistence/migration/security matrix:PASS。**新 Manifest 2.1 writer
+    只发 `installedOrdinaryBookmark`，历史 scoped bytes 稳定可读，unknown/
+    path/bookmarkData 拒绝；六个新测试覆盖 installer/loader/migration/
+    cross-policy single faults，全部 spawn=0。AC-FLASH-015-01/02 canonical
+    三行逐字保持 dispatch=0。
+  - **Verification/effect gate:PASS。**focused 七套 =
+    6/7/2/3/9/60/15 tests，全部 0 failures；最终全量 = 466 tests /
+    1 skipped / 0 failures；`check-sdd` = 0 error / 0 warning /
+    111 acceptance IDs，#721 后 path guard = 50/50，`git diff --check` 干净。
+    `rkdeveloptool_spawn=0,real_device=0,USB=0,E1=0,E2=0,destructive=0`。
+    本任务不自行写 `Decision-Grade`，不触碰 verification 状态。
 - Platform:macos
 - Requirements:REQ-FLASH-015(MODIFIED)
 - Acceptance:change-local AIN-BKMK-001(登记于 verification.md Acceptance

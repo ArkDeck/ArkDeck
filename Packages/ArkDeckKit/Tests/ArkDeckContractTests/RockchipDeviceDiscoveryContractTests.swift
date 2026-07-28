@@ -349,7 +349,7 @@ final class RockchipDeviceDiscoveryContractTests: XCTestCase {
     let selected = RockchipSelectedDiscoveryTool(
       executableURL: executable,
       pathSource: .userSelectedSecurityScopedBookmark,
-      securityScopedBookmark: Data([0x01]),
+      bookmarkData: Data([0x01]),
       reportedVersion: profile.reportedToolVersion,
       sha256: profile.executableSHA256,
       platformTrust: RockchipPlatformTrustReceipt(
@@ -362,7 +362,7 @@ final class RockchipDeviceDiscoveryContractTests: XCTestCase {
     let oldDestructiveIdentity = RockchipSelectedDiscoveryTool(
       executableURL: executable,
       pathSource: .userSelectedSecurityScopedBookmark,
-      securityScopedBookmark: Data([0x01]),
+      bookmarkData: Data([0x01]),
       reportedVersion: profile.reportedToolVersion,
       sha256: RockchipDiscoveryIntegrationProfile.pinnedProduction.executableSHA256,
       platformTrust: RockchipPlatformTrustReceipt(
@@ -385,14 +385,17 @@ final class RockchipDeviceDiscoveryContractTests: XCTestCase {
       upstreamCommit: String(repeating: "0", count: 40),
       exactArguments: ["ld"],
       timeout: 5,
-      requiresSecurityScopedBookmark: false)
+      accessPolicy: .installedOrdinaryBookmark)
   }
 
   private func selectedTool(executable: URL, sha256: String) -> RockchipSelectedDiscoveryTool {
     RockchipSelectedDiscoveryTool(
       executableURL: executable,
-      pathSource: .userSelectedSecurityScopedBookmark,
-      securityScopedBookmark: nil,
+      pathSource: .installedOrdinaryBookmark,
+      bookmarkData: try! executable.bookmarkData(
+        options: [],
+        includingResourceValuesForKeys: nil,
+        relativeTo: nil),
       reportedVersion: "test fixture",
       sha256: sha256,
       platformTrust: RockchipPlatformTrustReceipt(
