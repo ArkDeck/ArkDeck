@@ -724,7 +724,13 @@
 
 ## TASK-OBS-002 — App 观察面与 signed XCUITest
 
-- Status:ready(r2 fresh D1 readiness；仅在维护者 review/merge 本独立
+- Status:ready(r2 implementation/evidence candidate 已由 commit
+  `963542402c51025c9a2e7855998a60d0af3e7baa` 交付：五个 exact static-text
+  字段、三个 presentation-only formatter 与 AP1–AP4 signed UI tests；run 记录
+  见 `evidence/runs/TASK-OBS-002/run.md`。本 implementation PR 不翻 `done`、
+  不声明 M0B-002/真机 evidence 或 change-level `verified`；`ready→done` 仍须在
+  本 PR merge 后走独立状态 PR。)
+- Historical Status:ready(r2 fresh D1 readiness；仅在维护者 review/merge 本独立
   readiness PR exact head 后生效，生效后的一次性授权只覆盖下述两个现有
   App/UITest 文件与四项 executable matrix；本 PR 零 implementation/evidence，
   不得把 r3、#700 或 OBS-001R 实现 PR 当作 OBS-002 实现授权。)
