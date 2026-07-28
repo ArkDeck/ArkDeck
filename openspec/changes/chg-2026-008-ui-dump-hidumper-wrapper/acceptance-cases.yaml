@@ -158,14 +158,20 @@ cases:
   method: Human-operated R2-only persistent controlled deviceMutation recapture.
   expected_source: openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/verification.md#INT-UD-R2-RECAPTURE-001
   minimum_evidence: realHardware
-  expected_result: After r12, the r13 recapture-only HDC repin, and a separate
-    D2 readiness are merged, the human
-    maintainer uses only the already-merged closed capture harness in a named,
-    exclusive DAYU200 window. The readiness re-pins the current main base,
+  expected_result: After r12, the r13 recapture-only HDC repin, and this D2
+    readiness r1 are merged, only human maintainer lvye may use the
+    already-merged closed capture harness in named exclusive window
+    UD-R2-RECAPTURE-DAYU200-20260728-001. The window has maxRuns 1, its first
+    installed-HDC process consumes the run, and it must start by
+    2026-08-04T16:00:00Z. The readiness re-pins the current main base,
     harness hashes and tests, HDC/device/firmware/fixture tuple, exact INV-1
     and R2 argv, sidecar path, hardware-evidence schema, per-device typed
-    capability evidence, operator, window, and a persistent controlled-root
-    predicate. For this task HP-0 accepts only the r13 HDC tuple at the fixed
+    capability evidence from merged PRs 248 and 251 for the exact physical
+    device and required stepKinds, operator, window, and a persistent
+    controlled-root predicate. The capability acceptance covers only the
+    listed device-side typed operations; current-client identity remains a
+    separate fail-closed HP gate and no output-family success is inferred.
+    For this task HP-0 accepts only the r13 HDC tuple at the fixed
     DevEco path, Ver 3.2.0f and SHA-256
     05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83;
     the historical 3.2.0d identity is not a fallback. The session root is

@@ -11,6 +11,9 @@
 > r13 only replaces that recapture task's expected HDC identity after a host-only drift audit:
 > fixed DevEco path, `Ver: 3.2.0f`, SHA-256 `05b2bf7a…f83`. It is not the D2 readiness and
 > authorizes no HDC/device dispatch.
+> D2 readiness r1 now proposes the recapture task as ready on merge only. It accepts the limited
+> exact-device typed capability evidence and names one human-only exclusive window; the readiness
+> PR itself still performs zero HDC/device dispatch.
 >
 > Real-device operator:human maintainer only. An Agent SHALL NOT execute installed `hdc`, create a
 > real device session or run any device step.
@@ -269,17 +272,47 @@ file); 11. for each Recipe `R1`→`R2`→`R3`: `HP-2` → `SC-1` pre → `Rn` �
 `SC-3` → `SC-1` re-check, only if owned new file); 12. `FX-3` stop; 13. `FX-4` uninstall;
 14. evidence assembly (run.md, manifests, hashes, hardware-evidence) and sensitive scan.
 
-### r12/r13 R2-only persistent recapture sequence (blocked pending D2 readiness)
+### r12/r13 R2-only persistent recapture sequence (D2 readiness r1; executable only after merge)
 
-This sequence belongs only to `TASK-UD-R2-RECAPTURE-001`. Neither r12 nor r13 approval makes it
-executable. r13 responds to the host-only blocker record
+This sequence belongs only to `TASK-UD-R2-RECAPTURE-001`. Neither r12 nor r13 approval made it
+executable. r13 responded to the host-only blocker record
 `evidence/runs/TASK-UD-R2-RECAPTURE-001/blocked-readiness-hdc-drift-2026-07-28.md` by replacing
 only this task's expected HDC identity with fixed DevEco path / `Ver: 3.2.0f` /
 `05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83`; it accepts no second
-pin or fallback. A later independent D2 readiness must re-pin the then-current main revision, merged
-harness OID and hashes, passing harness tests, HDC/device/firmware/fixture tuple, exact command
-surface, sidecar path, hardware-evidence schema, per-device typed capability evidence, human
-operator, named exclusive device window, and storage predicate. Any drift leaves the task blocked.
+pin or fallback. This independent D2 readiness r1 re-pins the current main revision, merged harness
+OID and hashes, passing harness tests, HDC/device/firmware/fixture tuple, exact command surface,
+sidecar path, hardware-evidence schema, per-device typed capability evidence, human operator,
+named exclusive device window, and storage predicate. Any drift leaves the task blocked.
+
+This independent D2 readiness r1 pins:
+
+- base `eaa57f9281c6194e1bada0c740bde1d6e4f48fc6` (r13 merge
+  `f065ac90e69ff89c9ebb8817bfb4f9ebb1b0ed7d` is an ancestor); harness source
+  `b38d028ff821900c7c191c2bccc5951c5c719e7b` and SHA-256
+  `6e5db182…2601` / `b407aaa0…9492` / `b29c15b8…0070`; existing tests `63/63`;
+- HDC fixed path / `Ver: 3.2.0f` /
+  `05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83`;
+- exact physical DAYU200 serial SHA-256
+  `958780b2ffb7090d4f22cdc1f547f9804ed0f0b605e3020f384e5d4823dc7a7e`,
+  OpenHarmony `7.0.0.34`, API `26.0.0`, USB; fresh physical/HP confirmation remains mandatory;
+- #248/#251 exact-device typed capability evidence, limited to the listed HP/FX/INV/R2/SC
+  device-side operations. It does not establish current HDC output compatibility or Recipe
+  success; HDC identity and each runtime result stay independently fail-closed;
+- fixture `entry-default-signed.hap`, `1512003` bytes,
+  `9453a396e81d55abfb05b4d7f9a512dea139e5843462051a6e1cc3586849fac8`, plus the
+  existing module tuple; literal sidecar/argv remain exactly those already printed above;
+- hardware-evidence schema `2.0.0`, SHA-256
+  `d31fdb1d872567a7c4b69ee833593492adc9c39ce28b3b9b0f3597cc334628b0`;
+- operator human maintainer `lvye` (fuhanfeng), named window
+  `UD-R2-RECAPTURE-DAYU200-20260728-001`, `maxRuns=1`, start deadline
+  `2026-08-04T16:00:00Z`. The first installed-HDC process consumes the run. The window is one
+  continuous exclusive device/session interval from HP-0 through retained-raw recheck or truthful
+  abort; no concurrent HDC/device/flash/update/fixture operation and no retry are allowed.
+
+These pins and the ready state take effect only when the exact D2 readiness head is reviewed and
+merged by the maintainer. Before that merge, installed-HDC/device/fixture/Recipe dispatch remains
+zero. After merge, any expired/interrupted window or pin/capability/storage mismatch requires a new
+readiness; the operator cannot continue by fallback.
 
 The controlled session root must resolve outside every Git repository and outside
 `/private/tmp`, `/private/var/tmp`, the resolved `$TMPDIR`, every teardown-owned directory, and
@@ -406,7 +439,7 @@ the controlled directory. Repository golden fixtures are later produced as `deri
 `TASK-UD-001` never reads raw and never modifies the redaction toolchain. Raw/derived byte equality
 is neither expected nor claimed.
 
-## Prohibited actions at r13
+## Prohibited actions at D2 readiness r1
 
 - any selector/harness implementation, installed-HDC invocation, device discovery or device command
   under the blocked seam/R4 tasks;
