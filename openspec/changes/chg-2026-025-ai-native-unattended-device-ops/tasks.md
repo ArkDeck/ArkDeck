@@ -1878,10 +1878,16 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
 
 ## TASK-AIN-009 — Agent operation 与 human blocker contract freeze
 
-- Status:ready（fresh D1 readiness；仅在维护者 review/merge 本独立 readiness PR
-  exact head 后生效。该合入只授权下述 change-local contract/registry、host-only
-  validator/tests 与 run evidence；不授权 TASK-AIN-010、产品 executor、control plane、
-  device/HDC/process dispatch 或任何 E0/E1/E2 真机操作）
+- Status:done（2026-07-28 D0 completion；仅在维护者 review/merge 本独立
+  `ready→done` PR 后生效；本翻转不构成 change verified 或 TASK-AIN-010 readiness）
+- Done:2026-07-28；实现经 #739 exact head
+  `2ae3e741726c23a9d4388ec6d4a0ce2df0cdbba1` 由 `lvye` APPROVED 并合入
+  main（merge commit `1b886869a40b730584330b97d8af7ffa54e99415`）；done recheck
+  于最新 main `b314d6dd586744480e7a66c2fa71c4d51199ab40` 复验：stdlib validator
+  `requests=3/results=4/operations=15/profiles=21/human_blockers=8/negatives=49/
+  duplicates=2/core_steps=41` PASS，Swift 聚焦 4 tests / 0 failures，guard
+  0 error / 0 warning / 111 acceptance IDs，process/device/HDC/network dispatch
+  均为 0；evidence = `evidence/runs/TASK-AIN-009/run.md`
 - Historical Status:blocked（r3 proposal revision 尚未合入；该前置已由 #730 exact
   head `1063d693d12e8fc912da7345472e5b29a4b587d8` 的维护者 APPROVED + merge
   `1178c9f351285849499f374cc5712896372600b7` 关闭。#730 只批准 scope/顺序，
