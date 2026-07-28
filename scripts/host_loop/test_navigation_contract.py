@@ -454,6 +454,7 @@ class NeverClaimRootsArePinnedByContent(unittest.TestCase):
                 "TASK-HLR-003", "TASK-NAV-001", "TASK-NAV-002",
                 "TASK-DEC-001", "TASK-DEC-002", "TASK-DEC-003", "TASK-DEC-004",
                 "TASK-DEC-005", "TASK-DEC-006", "TASK-DEC-007", "TASK-DEC-008",
+                "TASK-CM7-001",
             }))
 
     def test_each_root_and_its_suffixed_siblings_are_excluded(self):
@@ -476,9 +477,15 @@ class NeverClaimRootsArePinnedByContent(unittest.TestCase):
             with self.subTest(task=task):
                 self.assertTrue(is_never_claim(task))
 
+    def test_cm7_root_and_suffix_are_excluded(self):
+        """The task that changes discovery cannot be claimed by discovery."""
+        for task in ("TASK-CM7-001", "TASK-CM7-001A", "TASK-CM7-001R"):
+            with self.subTest(task=task):
+                self.assertTrue(is_never_claim(task))
+
     def test_neighbours_are_not_excluded(self):
         for other in ("TASK-NAV-003", "TASK-NAV-0011", "TASK-HLR-004",
-                      "TASK-DEMO-001"):
+                      "TASK-CM7-002", "TASK-CM7-0011", "TASK-DEMO-001"):
             with self.subTest(other=other):
                 self.assertFalse(is_never_claim(other))
 
@@ -700,6 +707,98 @@ class GovernedFieldsReadListsNotProse(unittest.TestCase):
         self.assertEqual(len(found), 1)
         self.assertEqual(found[0].dependencies, ("TASK-OTHER-002",))
         self.assertEqual(found[0].allowed_paths, ("scripts/probe/**",))
+
+
+class TaskFieldColonParityTests(unittest.TestCase):
+    """Both governed discovery fields use the same closed colon grammar."""
+
+    _HEAD = ("## TASK-PROBE-001 — colon parity\n"
+             "- Status:ready\n"
+             "- Hardware required:no\n"
+             "- Decision-Grade:D0\n")
+
+    def _candidates(self, depends: str, allowed: str):
+        temporary = tempfile.TemporaryDirectory(prefix="cm7-colons-")
+        self.addCleanup(temporary.cleanup)
+        root = Path(temporary.name)
+        write_change(
+            root,
+            "chg-2026-901-colon-parity",
+            tasks=self._HEAD + depends + allowed + "- Risk:low\n",
+        )
+        return discover_candidates(root, "chg-2026-901-colon-parity")
+
+    def _one(self, depends: str, allowed: str) -> TaskCandidate:
+        found = self._candidates(depends, allowed)
+        self.assertEqual(len(found), 1)
+        return found[0]
+
+    def test_full_width_depends_colon_matches_ascii(self):
+        ascii_candidate = self._one(
+            "- Depends on:TASK-OTHER-002\n",
+            "- Allowed paths:`scripts/probe/**`\n",
+        )
+        full_width_candidate = self._one(
+            "- Depends on：TASK-OTHER-002\n",
+            "- Allowed paths:`scripts/probe/**`\n",
+        )
+        self.assertEqual(full_width_candidate, ascii_candidate)
+
+    def test_full_width_allowed_paths_colon_matches_ascii(self):
+        ascii_candidate = self._one(
+            "- Depends on:none\n",
+            "- Allowed paths:`scripts/probe/**`\n",
+        )
+        full_width_candidate = self._one(
+            "- Depends on:none\n",
+            "- Allowed paths：`scripts/probe/**`\n",
+        )
+        self.assertEqual(full_width_candidate, ascii_candidate)
+
+    def test_list_continuations_are_equivalent_for_both_colons(self):
+        ascii_candidate = self._one(
+            "- Depends on:\n  - TASK-OTHER-002\n",
+            "- Allowed paths:\n  - `scripts/probe/**`\n  - `docs/probe.md`\n",
+        )
+        full_width_candidate = self._one(
+            "- Depends on：\n  - TASK-OTHER-002\n",
+            "- Allowed paths：\n  - `scripts/probe/**`\n  - `docs/probe.md`\n",
+        )
+        self.assertEqual(full_width_candidate, ascii_candidate)
+
+    def test_separators_outside_the_closed_set_fail_closed(self):
+        self.assertEqual(
+            self._candidates(
+                "- Depends on;none\n",
+                "- Allowed paths:`scripts/probe/**`\n",
+            ),
+            [],
+        )
+        self.assertEqual(
+            self._candidates(
+                "- Depends on:none\n",
+                "- Allowed paths；`scripts/probe/**`\n",
+            ),
+            [],
+        )
+
+    def test_full_width_empty_fields_and_prose_still_fail_closed(self):
+        self.assertEqual(
+            self._candidates(
+                "- Depends on：\n"
+                "  这一段只提到 TASK-OTHER-002，不是合法列表\n",
+                "- Allowed paths：`scripts/probe/**`\n",
+            ),
+            [],
+        )
+        self.assertEqual(
+            self._candidates(
+                "- Depends on：none\n",
+                "- Allowed paths：\n"
+                "  注：`scripts/rejected/**` 只是散文\n",
+            ),
+            [],
+        )
 
 
 class TheLiveCorpusKeepsParsing(unittest.TestCase):

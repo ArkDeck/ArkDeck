@@ -105,6 +105,9 @@ HLR/NAV/DEC 先例由会话实现：`Decision-Grade` 在实现前保持缺失；
 - 本 readiness 只授权一个实现 PR；任一 input pin、活跃语料、并发路径或候选集合
   漂移均须停止并重新 fresh readiness；出现 lost、未登记 gained，或六个 BRC
   candidate 中任何一项变为 ready / 可 dispatch 时必须修订 proposal。
+- Implementation evidence:
+  `evidence/runs/TASK-CM7-001/run.md`（实现、活体语料、三项 mutation 与 AC
+  结论；本 implementation PR 内任务仍保持 `ready`，`done` 翻转另走独立 PR）。
 - implementation PR 只交付代码、测试与本任务 evidence；任务状态翻转走独立 PR。
 
 ### Readiness pins(r1,2026-07-28)
