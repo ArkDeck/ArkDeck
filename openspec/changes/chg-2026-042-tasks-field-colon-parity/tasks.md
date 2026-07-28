@@ -6,13 +6,23 @@ HLR/NAV/DEC 先例由会话实现：`Decision-Grade` 在实现前保持缺失；
 
 ## TASK-CM7-001 — 对齐 `tasks.md` 字段冒号文法并锁定跨解析器契约
 
-- Status:ready（r3 scope remediation 已由 PR #714 merge，implementation 与
-  evidence 已完成且全绿；提交前 #715 改动 active corpus，命中 r3 stop condition。
-  r4 exact head 虽已获 review，但 #716 在 r4 pin 后变更 head 才合入，故 r4
-  未 merge、未授权恢复。r5 已由 #718 merge，但 19 秒后 #719 又改动 active
-  corpus，故 r5 授权未被使用。仅在维护者对下方 r6 exact head
-  review/merge 后，才授权恢复并提交同一个 implementation PR；不授权
-  `done` / `verified` 翻转）
+- Status:done（2026-07-28 completion；仅在维护者 review/merge 本独立
+  `ready→done` PR 后生效。实现载体 PR #721 exact head
+  `4a8d552a03bcc0fb12cbb4306b63e1a719602800` 已获维护者 `lvye`
+  exact-head review，并 merge 为
+  `54c3a3cfbc455b5eb0ab6710955ad994d5b57eac`；merge tree 的 7 个授权文件与
+  reviewed head 逐字一致。证据见
+  `evidence/runs/TASK-CM7-001/run.md`：latest corpus `30→36`、
+  `lost=[]`、gained 恰为六个不可 dispatch 的 BRC；13 项聚焦、50 项 PR
+  guard、644 项 host-loop（1 expected failure）、SDD `0/0/111` 与三项
+  mutation 全部通过。本 PR 只翻本任务状态，不声称 change verified）
+- Historical Status:ready（r3 scope remediation 已由 PR #714 merge，
+  implementation 与 evidence 已完成且全绿；提交前 #715 改动 active corpus，
+  命中 r3 stop condition。r4 exact head 虽已获 review，但 #716 在 r4 pin 后
+  变更 head 才合入，故 r4 未 merge、未授权恢复。r5 已由 #718 merge，但
+  19 秒后 #719 又改动 active corpus，故 r5 授权未被使用。仅在维护者对下方
+  r6 exact head review/merge 后，才授权恢复并提交同一个 implementation PR；
+  不授权 `done` / `verified` 翻转）
 - Platform:macos（host-only）
 - Requirements/AC:change-local `CM7-PARITY-001`、`CM7-CORPUS-001`、
   `CM7-SELF-001`
