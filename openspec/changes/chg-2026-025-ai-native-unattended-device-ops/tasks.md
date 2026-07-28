@@ -2426,9 +2426,16 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
 
 ## TASK-AIN-010 — 通用 TrustedDeviceOperationHost 与 admission
 
-- Status:blocked（TASK-AIN-009 已 done；r4 readiness audit 发现 capability/persistence
-  contract 与 Allowed paths 不闭合，等待 TASK-AIN-009R done + 独立 D1 readiness PR；
-  记录 = `evidence/runs/TASK-AIN-010/readiness-blocked-r1.md`）
+- Status:blocked（2026-07-28 fresh r2 audit：TASK-AIN-009R 已 done，但 base
+  `Allowed paths` 漏列本 change `tasks.md`，路径门禁从 base 读取 allowlist，故直接
+  readiness PR 无法合法写入 status/pins。等待本独立 D1 scope remediation 合入后，
+  仍须另起 fresh D1 readiness；记录 =
+  `evidence/runs/TASK-AIN-010/readiness-blocked-r2.md`）
+- Historical Status:blocked（r4 readiness r1 发现 capability/persistence contract、
+  authority encoder/replay scope 与 production-reachability ownership 不闭合；前两项已由
+  TASK-AIN-009R #750 implementation + #751 done 关闭，reachability 已归 TASK-AIN-015；
+  记录 = `evidence/runs/TASK-AIN-010/readiness-blocked-r1.md`。这些合入均不自动构成
+  TASK-AIN-010 readiness）
 - Platform:macos
 - Requirements:REQ-WF-003、REQ-DEV-009、REQ-JOB-002、REQ-JOB-005、REQ-JOB-006
 - Acceptance:AC-WF-003-02、AC-WF-003-03、AC-DEV-009-01、
@@ -2455,6 +2462,8 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
   - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/JournalRecoveryContractTests.swift`
   - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/SessionArtifactStorageContractTests.swift`
   - `openspec/changes/chg-2026-025-ai-native-unattended-device-ops/evidence/runs/TASK-AIN-010/**`
+  - `openspec/changes/chg-2026-025-ai-native-unattended-device-ops/tasks.md`（仅本任务
+    status/readiness pins/evidence 引用）
 - Forbidden paths:
   - `openspec/specs/**`
   - `openspec/contracts/**`
