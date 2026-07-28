@@ -364,6 +364,12 @@ D-1/D-2/D-3 三项阻断全部未闭合。r4(翻 `ready` + 授权设备窗口)�
   authorization.target.bindingRevision`),因此该 pin 只能在 durable 绑定建立后确定,
   不能由 E0 读回臆造——与 r1 结论一致,但机制已由 caller-supplied context 改为 durable
   snapshot。
+- **安装载体(2026-07-28)**:四项前置的安装步骤、责任人、装后快照命令与失败/回滚
+  注记已入仓 = 本 change `evidence/host-prerequisites/installation-runbook.md`
+  ——r4 二值前置第 2 条所要求的「安装步骤与责任人有仓内载体」即该文件(其 §8 并如实
+  记载与本表的两处出入:admission 层伴生键 `ArkDeck.Rockchip.ToolCodeTrust` 与
+  composition 的 adapter profile 结构性缺口)。本条仅登记载体,不改变 D-1 blocked
+  判定:四项在宿主上仍未安装,快照证据届时随 r4 独立载体入仓。
 
 #### D-2 阻断:ADR-0003 / TASK-BRC-004 与本任务争同一 production composition
 
