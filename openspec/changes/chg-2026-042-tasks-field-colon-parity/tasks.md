@@ -8,9 +8,9 @@ HLR/NAV/DEC 先例由会话实现：`Decision-Grade` 在实现前保持缺失；
 
 - Status:ready（r1 readiness 已由 PR #707 merge，但其后 #708 改动活跃 corpus，
   命中 r1 stop condition，原一次性实现授权未消费即失效；仅在维护者对 fresh
-  readiness r2 PR exact head review/merge 且 #710 达到下方限定终态后，才重新
-  授权一个严格受 `Readiness pins(r2,2026-07-28)` 约束的实现 PR；不授权
-  `done` / `verified` 翻转）
+  readiness r2 PR exact head review/merge 且 #710 / #711 均达到下方限定终态后，
+  才重新授权一个严格受 `Readiness pins(r2,2026-07-28)` 约束的实现 PR；
+  不授权 `done` / `verified` 翻转）
 - Platform:macos（host-only）
 - Requirements/AC:change-local `CM7-PARITY-001`、`CM7-CORPUS-001`、
   `CM7-SELF-001`
@@ -18,7 +18,7 @@ HLR/NAV/DEC 先例由会话实现：`Decision-Grade` 在实现前保持缺失；
   TASK 依赖）
 - Readiness input pins:r1 为历史失效快照；现行输入见下方
   `Readiness pins(r2,2026-07-28)`。实现开工必须逐项复核 exact base ancestry、
-  实现/测试 blob、活跃 `tasks.md` 语料、#709 exact merge 与 #710 终态
+  实现/测试 blob、活跃 `tasks.md` 语料、#709 exact merge 与 #710 / #711 终态
 - Applicable failure patterns:`AF-004`（同一契约多消费者语义分歧）、
   `AF-010`（必须用独立 fixture 与变异反证）、`AF-015`（全仓清点同模式）
 - Production reachability:`python -m host_loop --once` →
@@ -322,7 +322,7 @@ HLR/NAV/DEC 先例由会话实现：`Decision-Grade` 在实现前保持缺失；
   `3e1022c0df5faa3bb8cb55512676a883a4775c08`。合入树的 executable audit 为
   `30→36`、`lost=[]`、gained 恰为六个 BRC，六项字段/verdict 零变化。
   它与 C-M7 implementation/change paths 无直接 overlap。
-- **唯一开放并发 PR #710。**提交前 fresh open-PR 清单仅含
+- **开放并发 PR #710。**第一次提交前 fresh open-PR 清单含
   `readiness(TASK-AIN-BKMK-001)`；exact head
   `22b2d2985fbf19e296c0b6dab3fb5fa809c7297e` 是 audit base 的 descendant，
   只新增 CHG-025 readiness evidence 并把该 active `tasks.md` 从
@@ -330,13 +330,20 @@ HLR/NAV/DEC 先例由会话实现：`Decision-Grade` 在实现前保持缺失；
   `78c48f9e8ee15bf81db170c3dccbe4883f206d5f`，无 C-M7
   implementation/change-path直接 overlap。Exact-head executable audit 仍为
   `30→36`、`lost=[]`、gained 恰为六个 BRC，六项字段/verdict 零变化。
-- **#710 终态门。**实现开工前 #710 必须终止，且只接受：
-  closed-unmerged 时 protected-main CHG-025 blob 仍为
-  `3ff434156a8105196a156946cd684c81bbc8bb76`；或维护者对上述 exact head
-  review/merge 后 blob 精确为
-  `78c48f9e8ee15bf81db170c3dccbe4883f206d5f`。#710 仍 open、head /
-  merge tree 变化，或出现其他改 active corpus / implementation paths 的 open PR，
-  implementation 为 0 并重新 readiness。
+- **开放并发 PR #711。**#712 初始 head 推送后又出现
+  `governance(CHG-2026-008): repin R2 recapture HDC (r13)`；exact head
+  `b7d43ac9a46bf6479e7bb92a9dd9bdc2d68b6298` 同为 audit base descendant，
+  只改 CHG-008 治理/evidence，并把该 active `tasks.md` 从
+  `aefe113e3c24188651c062b337e33ddd99290691` 改为
+  `834e0f2d064468bdf841458b466a4816acf06dc4`。它无 C-M7
+  implementation/change-path直接 overlap；exact-head audit 以及 #710 + #711
+  两 exact heads 的无冲突组合 audit 均为 `30→36`、`lost=[]`、gained 恰为六个
+  BRC，六项字段/verdict 零变化。
+- **#710 / #711 终态门。**实现开工前两者必须均终止；每项只接受
+  closed-unmerged（对应 protected-main blob 保持上段改前值），或维护者对上述
+  exact head review/merge（对应 blob 精确为上段改后值）。任一 PR 仍 open、
+  head / merge tree 变化，或出现其他改 active corpus / implementation paths 的
+  open PR，implementation 为 0 并重新 readiness。
 - **新基线与安全门。**macOS 26.5.2 build 25F84、Python 3.14.6、Git
   2.55.0；`scripts/check-sdd.sh` = 0 error / 0 warning / 111 acceptance IDs；
   `scripts/test_check_pr_paths.py` = 49 tests / 0 failures；
@@ -347,7 +354,7 @@ HLR/NAV/DEC 先例由会话实现：`Decision-Grade` 在实现前保持缺失；
   `claimable=none`。上述验证命令的 network、GitHub write、device/HDC、
   E1/E2/destructive dispatch 均为 0；本轮外部写入仅限本治理 PR 的 Git push。
 - **实现开工复核。**实现必须基于本 r2 merge 后的 protected `main`，先验证
-  r2 merge ancestry、#709 exact merge、#710 限定终态、上列
+  r2 merge ancestry、#709 exact merge、#710 / #711 限定终态、上列
   implementation/governance blobs 与 8 项 active change。`tasks.md` 因本 r2
   merge 产生的
   预期单任务段变化可接受；除此之外任一漂移、source defect 已消失、candidate
