@@ -1,7 +1,10 @@
 # CHG-2026-041 Verification Plan
 
 > Status:planned
-> Change:CHG-2026-041-archive-stable-provenance@r1
+> Change:CHG-2026-041-archive-stable-provenance@r2
+> Note(2026-07-28):r2 三方同步 = 迁移面勘察补全（另有 4 处 / 2 文件，其消费方
+> 在 `scripts/**`，故移交 ASP-002 并要求「先迁移后设卡」）；`ASP-SHAPE-001` 的
+> 零字面量断言限定到 ASP-001 的 9 个具名文件。形态设计零变化。
 > Core baseline:CORE-2.1.0（零 Core 变更；canonical Core AC 零认领）
 
 验收面全部 change-local。任何 registry 语义字段被改动、任何哈希级联不一致、
@@ -11,9 +14,9 @@
 
 | Evidence ID | Task | Method | Expected result |
 | --- | --- | --- | --- |
-| `ASP-SHAPE-001` | ASP-001 | contract | 全部 registry/resource/receipt 零 `openspec/changes/` 字面量；每条 provenance 具 `sourceChange` + `sourceEvidence` + `sourceSHA256`；active-or-archive 解析对**已归档**来源（chg-2026-015）与**未归档**来源（chg-2026-024）**两分支各**实测恰一处命中，0/2+ 命中为 loud fail |
+| `ASP-SHAPE-001` | ASP-001 | contract | **ASP-001 的 9 个具名文件**内零 `openspec/changes/` 字面量（`trace-probes` 与 `loader-transition` 的 4 处按 r2 归 ASP-002）；每条 provenance 具 `sourceChange` + `sourceEvidence` + `sourceSHA256`；active-or-archive 解析对**已归档**来源（chg-2026-015）与**未归档**来源（chg-2026-024）**两分支各**实测恰一处命中，0/2+ 命中为 loud fail |
 | `ASP-CASCADE-001` | ASP-001 | contract | 两个 pack `resources.json`、`INTEGRATION-PROFILES.lock.yaml` 与契约测试哈希断言全部一致；Swift 全量于**非 `/private/tmp`** 检出零失败；`check-sdd` 0/0/111；每条 `sourceSHA256` 与迁移前逐项相等（只改引用未改内容的机器证明）；registry 语义字段 diff 为空 |
-| `ASP-GUARD-001` | ASP-002 | contract | 迁移后仓内全绿；人造违例（任一 registry 插入一条 `openspec/changes/...`）→ `check-sdd` 报 error 并指名文件与行；撤销该检查后同一违例不再被拦（反证）；acceptance ID 计数保持 111 |
+| `ASP-GUARD-001` | ASP-002 | contract | **先迁移**移交的 4 处 / 2 文件及其 `scripts/**` 消费方，**后设卡**；其后全仓 registry/resource/receipt 面字面量为 0 且仓内全绿；人造违例（任一 registry 插入一条 `openspec/changes/...`）→ `check-sdd` 报 error 并指名文件与行；撤销该检查后同一违例不再被拦（反证）；acceptance ID 计数保持 111 |
 
 ## Gate
 

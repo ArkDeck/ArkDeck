@@ -1,6 +1,6 @@
 ---
 id: CHG-2026-041-archive-stable-provenance
-revision: 1
+revision: 2
 status: approved
 class: implementation-only
 core_change_level: none
@@ -99,3 +99,26 @@ low-medium。**风险不在语义而在哈希级联**：五类文件的 SHA-256 
 
 两任务均 host-only、零设备、零凭据；`Decision-Grade` 由维护者亲笔。
 propose 合入 ≠ 批准。
+
+## r2 注记（2026-07-28，迁移面勘察补全；原文如实保留）
+
+TASK-ASP-001 实现中实测发现 r1 的迁移面不完整：除 r1 钉定的 15 处 / 9 文件
+外，`openspec/integrations/` 下另有 **4 处 / 2 文件**同类引用——
+`openharmony/trace-probes/1.0.0/registry.yaml` 的 `provenance.redactedManifests`
+（3 条裸字符串数组）与 `rockchip/loader-transition/1.0.0/registry.yaml` 的
+`evidencePath`（1 条）。r1 起草时的扫描模式 `"source[A-Za-z]*": "openspec/changes/`
+只认「`source*` 键 + 字符串值」，既看不见裸字符串数组元素，也看不见键名不同的
+`evidencePath`；正确形态是直扫字面量再逐一归类。
+
+由此 r1 的 `ASP-SHAPE-001`（「迁移后 `integrations/**` 下为 0」）与 ASP-001 的
+scope 自相矛盾，无法自洽通过。r2 作三项更正、**形态设计零变化**：
+① 该断言限定到 ASP-001 的 9 个具名文件；② 余下 4 处移交 TASK-ASP-002；
+③ ASP-002 因此改为「**先迁移后设卡**」的二值顺序约束。
+
+移交而非并入的理由是实测约束而非偏好：这 4 处的消费方在 `scripts/**`
+（`trace_capture/validate_registry.py` 读 `redactedManifests`；
+`rockchip_loader_transition_probe/probe.py` 与其 `test_probe.py` 读写
+`evidencePath`），而 `scripts/**` 是 ASP-001 的 Forbidden path、恰为 ASP-002
+的授权面。并入 ASP-001 会取消维护者在 approval 时保留的「ASP-002 可单独
+裁掉」选项。
+
