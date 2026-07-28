@@ -574,10 +574,10 @@ change approved 前保持 blocked;approved 后每任务另需独立 readiness PR
 
 ## TASK-AIN-BKMK-001 — pinned tool 宿主前置消费与签名身份解耦(remediation)
 
-- Status:blocked（r2 Route A governance amendment；仅在维护者 review/merge
-  本独立治理 PR 后，普通 bookmark 的 typed contract、迁移边界与扩展 scope
-  才生效；合入仍不构成 `ready`，必须另做 fresh D1 readiness，当前不得开始
-  implementation/evidence。）
+- Status:ready（fresh D1 r2 draft；仅在维护者 review/merge 本独立 readiness
+  PR 的 exact head 后生效。届时 implementation 仍须另起一任务一实现 PR；
+  本 readiness 零 product/schema/runbook 实现，未安装正式 product key，未启动
+  目标工具，未接触设备。）
 - Historical Status:blocked（r1 D1 blocked-readiness；#703 exact head
   `e61e99790fe49772cc80614a664585871d5176f1` 经 `lvye` APPROVED，并以
   `20aeee5653d7eece08911c0a84afc92c1fa09702` 合入；三个登记候选当时均不能在
@@ -788,12 +788,129 @@ change approved 前保持 blocked;approved 后每任务另需独立 readiness PR
     本 PR 只修改当前 `tasks.md` 的本任务 section；零 product/schema/runbook
     实现、零 defaults/Keychain/credential/network/process/tool/HDC/USB/device/
     E1/E2/destructive effect，不自行写 `Decision-Grade`。
+- Readiness review(r2 fresh D1,2026-07-28；完整可复查记录 =
+  `evidence/runs/TASK-AIN-BKMK-001/readiness-r2/run.md`):
+  - **Approval/dependency/base gate:satisfied。**Route A 治理 PR #706 的
+    `github-actions[bot]` exact head
+    `ef2382aef3346a4ec07656b8b3dbd6475174f7d8` 于
+    `2026-07-28T07:29:23Z` 经 `lvye` APPROVED，并于
+    `2026-07-28T07:30:10Z` 由其合为
+    `14b46e3066c52f54568e97545c59b3506ffc62a4`。final fresh audit base =
+    `origin/main` =
+    `c295d4a45a30ea08d7ab66440c5593d1208f222a`；#706、#703 r1
+    blocked-readiness、#697 remediation 登记与 TASK-AIN-003R done merge
+    均为其祖先。起草期间 #707/#708/#709 只改
+    CHG-2026-042/008/022 七个文件，与本载体、allowed surface 及下列全部 pin
+    零交集。
+  - **Exact base pins:closed。**实现只能从本 readiness merge 的 main 重新复核
+    下列 base blobs；任一漂移或需要列表外实现文件即停手、重做独立 D1：
+
+    ```yaml pins
+    - path: Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipFlashExecutionHost.swift
+      blob: ace82b11bec98474df2fa2e9aa834e408893cfa5
+    - path: Packages/ArkDeckKit/Sources/ArkDeckCLI/ArkDeckCLIMain.swift
+      blob: 9267e44e4a8f75e09f8152c2d26ef07a115f4ccc
+    - path: Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipDeviceDiscovery.swift
+      blob: 38e38a2afc479993588a13c3fb10a8c7393eb64b
+    - path: Packages/ArkDeckKit/Sources/ArkDeckStorage/SessionManifest.swift
+      blob: 87baadf3cd228660acb9923463cf288e90de6934
+    - path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/RockchipDeviceDiscoveryContractTests.swift
+      blob: 2a8318f6c4a54b44f7f6644d98b5c42825c988c5
+    - path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/RockchipFlashExecutionContractTests.swift
+      blob: 82629470a4e8c16e5935159fa19aa93a0a2cf43a
+    - path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/RockchipFlashExecutionFaultContractTests.swift
+      blob: 4a67cf7f7a50b41327049fa176ee84a11d112aba
+    - path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/RockchipProductionCompositionContractTests.swift
+      blob: f58ac01babeb9990924e34cdbabebd50d31acc5b
+    - path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/RockchipRockUSBFlashProviderContractTests.swift
+      blob: db5986dda762286bda6872ed1b938299045e08fa
+    - path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/SessionArtifactStorageContractTests.swift
+      blob: 68904a3f9ac87d70c31547c3242af86c232807a1
+    - path: openspec/changes/chg-2026-025-ai-native-unattended-device-ops/contracts/manifest.schema.v2.1-draft.json
+      blob: 02c7f27a9d65cbbca6e8fe23535ae8e62e398e7c
+    - path: openspec/changes/chg-2026-025-ai-native-unattended-device-ops/evidence/host-prerequisites/installation-runbook.md
+      blob: 26509a32d0419246dbfa6b3e1f6cd98959a4e4aa
+    - path: openspec/changes/chg-2026-025-ai-native-unattended-device-ops/tasks.md
+      blob: 3ff434156a8105196a156946cd684c81bbc8bb76
+    - path: openspec/changes/chg-2026-025-ai-native-unattended-device-ops/verification.md
+      blob: ecca35cc41ad30286dbafaa0f22d0c26089d2b8a
+    - path: Packages/ArkDeckKit/Package.swift
+      blob: 292135a2c80c63ddf7182f58e2f81ff7c7d6104d
+    - path: Packages/ArkDeckKit/Sources/ArkDeckProcess/ArkDeckProcess.swift
+      blob: d68939a5446a7026db7607086b58ba700d642701
+    - path: Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipAuthorizationFacts.swift
+      blob: 971fe98feb9c9f5debf4abef948420383570f8ef
+    - path: Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipFlashAuthorization.swift
+      blob: a3fb1711271d32119db861a351ce2f2aa70c94fd
+    - path: Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipRockUSBFlashProvider.swift
+      blob: 8a30eb828773260d8b02b854d03a63ecf2da124f
+    - path: openspec/integrations/rockchip/rockusb-discovery/1.0.0/registry.yaml
+      blob: 394e2a8c588c531208cd3154a1dc8638ad77010e
+    ```
+
+    末五项及 integration registry 是 read-only stop pins，不因列入本表获得修改
+    authority；Allowed/Forbidden paths 仍为唯一实现边界。
+  - **Production reachability:closed to CLI production。**Sources/App 全树
+    实测唯一产品链 =
+    `ArkDeckCLI:116 RockchipFlashExecutionHost()` →
+    `Host:671 RockchipProductExecutionSettings.load()` →
+    `Host:1011 RockchipDeviceDiscoveryAdapter(profile:.pinnedProduction)`；
+    `ArkDeckApp/**` 零引用。public 缺省 adapter 继续
+    `.pinnedReadOnlyDiscovery`，E0 registry 的 scoped pathSource/hash/argv
+    保持上述 read-only blob；ordinary 分支不得由 E0/App 到达。
+  - **Installer/load/test seam:closed inside scope。**CLI 现有 closed flash
+    subcommand + option parser 可容纳唯一 `install-tool --path`；
+    Workflows 已依赖 Process，且
+    `FoundationProcessExecutor.prepareIdentityBoundLaunch` 是 package seam，
+    实测其 `lstat`/`O_NOFOLLOW`/regular/executable/descriptor/hash 门只 prepare
+    可关闭 token、无需 spawn。实现将 production-only public installer facade 与
+    internal preferences/bookmark-codec/verifier、first-prerequisite loader seams
+    放在 Host allowed file；test target 已依赖 Workflows，可用 `@testable`
+    覆盖而无需修改 `Package.swift`/Process。Discovery 只把 Bool 改 closed typed
+    policy、bookmark 字段改中性 carrier；Foundation process port 删除 scoped URL
+    retention；无新 caller hash/pathSource/launch capability。
+  - **Same-domain cross-identity host matrix:PASS。**macOS 26.5.2(`25F84`)
+    arm64/Swift 6.3.3；checked-in probe SHA-256 =
+    `08135e76baff4485235dd50074a20bad3fa68e969dd6e3f012cd3af5f917909b`。
+    两个 basename 均为 `arkdeck` 的 ad-hoc build：
+    A Identifier `dev.arkdeck.readiness.a` / CDHash
+    `94d3566dcfcd45bcf4afcb2cf4af0aea223bb16b`，B Identifier
+    `dev.arkdeck.readiness.b` / CDHash
+    `235f395b1d6ef047c893948bbc3709b07ed21416`。A 在 `UserDefaults.standard`
+    写线程唯一非产品 key 的 1060-byte ordinary bookmark；B 以
+    `[.withoutUI]` 得 `stale=false,target_match=true`。B 删除后 A/B 均复查
+    `present=false`。目标只做 read-only hash且精确命中
+    `038a8a0e…3611`；正式 old/new product key、tool launch 与设备均零触碰。
+    本 primitive 不是产品验收；实现 run 必须按记录中 exact harness 由 product A
+    `install-tool` 写正式新 key、不同 Identifier/CDHash 的 product B 经真实
+    `load()` 到达下一项缺失 quarantine 门，再清理新 key，方可 done。
+  - **Fault/schema/test/evidence matrix:closed。**记录逐项钉定 loader 的
+    missing/wrong-type/corrupt/stale/path-mismatch/legacy-only/dual-key，installer
+    的 path/symlink/hash/create/self-roundtrip/write/readback/legacy-delete，
+    dual-key crash + rerun recovery，E0 scoped/production ordinary 混用拒绝，
+    2.1 new-writer/historical-byte-stable/unknown 拒绝矩阵；新
+    `RockchipToolBookmarkContractTests` 使用隔离 defaults suite 与 single-fault
+    seams，全部负向 spawn=0。focused 七套、全量 Swift、check-sdd、path guard、
+    diff-check 命令及 run record 字段均已 exact pin。
+  - **Baseline/concurrency/effect gate:satisfied。**base 全量
+    `CI=true swift test --package-path Packages/ArkDeckKit` =
+    442 tests / 1 skipped / 0 failures；`./scripts/check-sdd.sh` =
+    0 error / 0 warning / 111 acceptance IDs；
+    `python3 scripts/test_check_pr_paths.py` = 49/49 PASS。
+    `2026-07-28T07:49:42Z` 分页完整 open PR 集为 `[]`。本 readiness 只改本
+    task status/pins/evidence 引用并新增 change-local readiness record/probe；
+    `rkdeveloptool_spawn=0,real_device=0,USB=0,E1=0,E2=0,destructive=0`，
+    credential/Keychain/network/product formal defaults 均零接触。
+  - **Readiness verdict:READY after maintainer merge。**治理依赖、来源可达性、
+    scope 内 seam、跨身份宿主机制、故障/兼容/产品 harness 与验证命令均闭合。
+    只有维护者 review/merge 本 readiness exact head 后顶部 `ready` 才生效；
+    implementation 必须另起 PR，且任一 pin/concurrency/scope 漂移立即停手重做 D1。
 - Platform:macos
 - Requirements:REQ-FLASH-015(MODIFIED)
 - Acceptance:change-local AIN-BKMK-001(登记于 verification.md Acceptance
   matrix;AC-FLASH-015-01/02 行为不回退是其负向底线)
 - Depends on:TASK-AIN-003(done,#292/#293;缺陷见其 Defect record 2)+ r2
-  Route A governance merge + 独立 fresh D1 readiness
+  Route A governance merge(done,#706)+ fresh D1 readiness r2(本 PR，合入后满足)
 - Allowed paths:
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipFlashExecutionHost.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckCLI/ArkDeckCLIMain.swift`
@@ -869,8 +986,9 @@ change approved 前保持 blocked;approved 后每任务另需独立 readiness PR
 - r2 已选择 ordinary Route A；CHG-2026-036 的 bundled/signed/App 路线保持
   独立且 read-only，不是本任务 dependency，也不得借本任务提前实现其 BRC-004
   composition。
-- 独立 readiness 须以当时 main 钉定待改文件 blob(全 OID)与实现方向,并复核
-  缺陷仍在——若届时上游已另行修复,如实记录并按实况处置,不重复实现。
+- 独立 fresh D1 readiness r2 已以上述 base/full blob OID、产品 harness 与
+  fault/schema matrix 钉定；实现必须以本 readiness merge 后 main 复核全部 pin。
+  若上游已修复或任一 pin/并发/scope 漂移，如实停手重做 D1，不重复或越界实现。
 - Decision-Grade 行由维护者亲笔(TASK-BRC-002R 先例)。
 
 ## TASK-AIN-004 — 首次无人值守真机验收(DAYU200)
