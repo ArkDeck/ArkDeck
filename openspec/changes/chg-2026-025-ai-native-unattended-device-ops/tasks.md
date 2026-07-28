@@ -1893,6 +1893,7 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
   - `openspec/changes/chg-2026-025-ai-native-unattended-device-ops/contracts/**`
   - `openspec/changes/chg-2026-025-ai-native-unattended-device-ops/evidence/runs/TASK-AIN-009/**`
   - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/AgentDeviceOperationContractTests.swift`
+  - `openspec/changes/chg-2026-025-ai-native-unattended-device-ops/tasks.md`（仅本任务 status/readiness pins/evidence 引用）
 - Forbidden paths:
   - `openspec/specs/**`
   - `openspec/contracts/**`
