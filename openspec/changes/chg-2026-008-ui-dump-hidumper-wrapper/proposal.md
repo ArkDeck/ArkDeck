@@ -1,6 +1,6 @@
 ---
 id: CHG-2026-008-ui-dump-hidumper-wrapper
-revision: 11
+revision: 12
 status: approved # r1 经 #68 批准;后续 revision 仅在对应治理 PR 由维护者 review/merge 后生效
 class: platform
 core_change_level: none
@@ -98,6 +98,18 @@ readiness),其诊断工具只允许输出 error name/code、字节偏移、字�
 其 truthful-negative 记录,不使 SEAM/R4/UD-001 解锁,也不含任何实现、fixture、evidence
 或 HDC/device/network dispatch。
 
+r12 是 pinned old raw 永久缺失后的 recapture-only revival revision。#683 已交付
+`scripts/ui_dump_diagnosis/` 与 synthetic `37/37` PASS,但 #695 的维护者离线检索证明
+#248 R2 sidecar exact raw origin 已永久不可得;因此旧 raw 的 raw-data vs pipeline 根因
+永久不可测,r11 的 branch (a)/(b) 二选一前置无法完成。r12 不追溯猜测旧根因,只收窄到
+一个可重新取得事实输入的方向:新增 `TASK-UD-R2-RECAPTURE-001`(`blocked`,等待独立
+D2 readiness、具名设备窗口与人类维护者执行),仅复用已合入 harness 执行 fresh
+`INV-1` + `R2` 闭合子序列,并把新 R2 sidecar 保存在非临时、owner-only、仓库外的
+持久 controlled root;再新增 `TASK-UD-R2-REDIAG-001`(`blocked`,等待重采 done 后的独立
+D1 readiness 按新 raw 的 length/SHA-256 重钉诊断 CLI)。新任务只测量新 raw,不得把结果
+追溯为旧 raw 根因。r12 本身不使任一任务 ready,不修改 harness/redactor/diagnosis
+实现,不安排设备窗口,不产生 capture/diagnosis evidence,也不执行 HDC/device dispatch。
+
 ## What changes
 
 ### In scope
@@ -138,6 +150,14 @@ readiness),其诊断工具只允许输出 error name/code、字节偏移、字�
   且都以诊断 done 与维护者 review/merge 的后续修订为前置。本 revision 对
   acceptance-cases.yaml 与 verification.md 仅做 revision 同步;诊断任务的 change-local
   acceptance case 与 verification 行由其独立 readiness revision 一并固定。
+- r12 治理修订引用 #695 `pinned-input-unavailable` evidence,明确旧 raw 根因永久不可测,
+  并以新任务而非重开旧任务的方式收窄到重采路径:声明 blocked 的
+  `TASK-UD-R2-RECAPTURE-001` 与 `TASK-UD-R2-REDIAG-001`,在 runbook 登记只含既有
+  `HP-*`/`FX-*`/`INV-1`/`R2`/`SC-*` command ids 的 R2-only closed sequence,并要求
+  fresh sidecar 留在非临时 persistent controlled root。重采另需独立 D2 readiness 与
+  具名设备窗口;重诊断另需重采 done 后的独立 D1 readiness 重钉新 raw length/hash、
+  diagnosis tool OID/hash 与 exact CLI。r12 不修改任一 `scripts/**` 文件,不含
+  implementation/evidence,不使 SEAM/R4/UD-001 ready。
 
 ### Out of scope
 
@@ -176,10 +196,11 @@ readiness),其诊断工具只允许输出 error name/code、字节偏移、字�
   token;把 token/随机 nonce/private selector bundle 入仓;允许 CLI/env/ad-hoc token;
   在 `TASK-UD-R2-DECISION-001 done` 与 `TASK-UD-R2-R4-SEAM-001 done`、独立 R4
   ready-restore PR 全部合入前执行 Phase B R2/R4 或修改 harness 白名单。
-- 重开、重跑或重判 `TASK-UD-R2-DECISION-001`,修改其 decision/evidence 既有文件的任何
-  字节;在 `TASK-UD-R2-DIAG-001 done` 且对应后续修订获批前实施任一复活分支——包括
-  修改 `scripts/ui_dump_redaction/**`、起草新 capture plan 或执行设备窗口重捕;把诊断
-  结果直接当作 SEAM/R4/UD-001 的解锁条件或任何 output-family/compatibility 结论;
+- 重开、重跑或重判 `TASK-UD-R2-DECISION-001`/`TASK-UD-R2-DIAG-001`,修改其
+  decision/evidence 既有文件的任何字节,或把新重采/重诊断结果追溯为旧 raw 根因;
+  除 r12 新增任务在独立 readiness 合入后的精确授权面外实施设备重捕/新 raw 诊断;
+  修改 `scripts/ui_dump_redaction/**`,或把任一新结果直接当作 SEAM/R4/UD-001 的解锁
+  条件、output-family/compatibility 结论;
 - 诊断工具或其 evidence 输出 raw 字节值序列、解码文本、内容窗口、页面文本、window/
   component 字面量;Agent 打开/复制 controlled raw;诊断结论歧义或双因并存时默认选择
   任一分支。
@@ -253,6 +274,17 @@ readiness),其诊断工具只允许输出 error name/code、字节偏移、字�
   统计等非内容事实,输出侧敏感终检 fail closed;诊断 run 由人类维护者执行,Agent raw
   read count 保持 `0`。诊断结论(数据根因/管道根因/歧义)只有经维护者 review/merge 的
   后续修订才能转化为任一分支的授权;歧义或双因并存时两分支均保持未授权。
+- #695 已证明 r11 pinned old raw 永久不可得,所以 r12 不再要求或允许对旧 raw 补做
+  根因结论。新的 R2-only capture 仍按 conservative `captureRemoteFile/deviceMutation`
+  执行,只可由人类维护者在独立 D2 readiness 固定的设备窗口内经已合入 harness dispatch;
+  Agent dispatch 恒为 `0`。controlled session root 必须是仓库外、非 OS 临时/易失目录、
+  owner-only `0o700`;fresh sidecar 必须为 `0o600` regular file,以新 length/SHA-256
+  pin 保留到 `TASK-UD-R2-REDIAG-001` 及其后续 decision 明确释放。仓库只记录占位路径、
+  hash/length、retention recheck 与 redacted evidence,不记录 raw/path/content。
+- r12 的重采完成只证明产生了一个 fresh、proven-owned、complete R2 raw origin,不证明
+  Recipe success、旧 run 根因或 pipeline/data 归因。重诊断只能在独立 D1 readiness
+  引用已合入重采 evidence 并重钉 exact input 后由维护者离线执行;它测量新 raw 的
+  `redactorEquivalent`/非内容事实,不能追溯改写 #263/#267 truthful-negative。
 - 每个登记 output family 都必须能在干净 checkout 以 repo-safe synthetic/derived fixture
   走 production classifier 正向复验;本 change 禁止 raw byte-fingerprint/digest family;
 - 本 r3 治理 PR 本身零 HDC/device dispatch;merge 后仍没有 ready 的 real-device task。
@@ -341,3 +373,10 @@ readiness),其诊断工具只允许输出 error name/code、字节偏移、字�
   network/GUI/mutation/destructive 操作。仅在维护者 review/merge 后生效;merge 不使
   任何任务 ready,不重开 `TASK-UD-R2-DECISION-001`,不预设诊断结论,也不授权任一
   复活分支。
+- r12 recapture-only governance revision:本 PR 只修改本 change 的 proposal/tasks/
+  verification/acceptance metadata 与 capture runbook,引用 #695 证明旧 raw 根因永久
+  不可测,新增 blocked 的 `TASK-UD-R2-RECAPTURE-001` 与
+  `TASK-UD-R2-REDIAG-001`。merge 只批准“独立 D2 readiness → 人类 R2-only 重采 →
+  独立 D1 re-diagnosis readiness”的任务链;不含 readiness、设备窗口、实现、raw、
+  evidence、decision 或任何 HDC/device dispatch,不修改旧 decision/diagnosis evidence,
+  不使 SEAM/R4/UD-001 ready。

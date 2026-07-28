@@ -1,7 +1,7 @@
 ---
 schema_version: 1.0.0
 change_id: CHG-2026-008-ui-dump-hidumper-wrapper
-change_revision: 11
+change_revision: 12
 platform: macos
 evidence_classes:
 - contract
@@ -153,6 +153,59 @@ cases:
     branch, keeps SEAM, R4, and UD-001 blocked, executes zero installed HDC,
     device, network, GUI, or destructive dispatch, and claims no canonical
     AC-DUMP PASS.
+- acceptance_id: INT-UD-R2-RECAPTURE-001
+  test_id: TEST-INT-UD-R2-RECAPTURE-001
+  method: Human-operated R2-only persistent controlled deviceMutation recapture.
+  expected_source: openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/verification.md#INT-UD-R2-RECAPTURE-001
+  minimum_evidence: realHardware
+  expected_result: After r12 and a separate D2 readiness are merged, the human
+    maintainer uses only the already-merged closed capture harness in a named,
+    exclusive DAYU200 window. The readiness re-pins the current main base,
+    harness hashes and tests, HDC/device/firmware/fixture tuple, exact INV-1
+    and R2 argv, sidecar path, hardware-evidence schema, per-device typed
+    capability evidence, operator, window, and a persistent controlled-root
+    predicate. The session root is owner-only, outside every git repository
+    and outside /private/tmp, /private/var/tmp, the resolved TMPDIR, and every
+    teardown-controlled or otherwise ephemeral location. The exact sequence
+    performs HP-0/HP-1, fixture install/start, bracketed INV-1, and exactly one
+    bracketed R2, followed by owned-only receive/cleanup and fixture teardown;
+    R1, R3, and R4 dispatch counts are zero. Every targeted command has an
+    explicit -t from the latest same-session verbose target inventory. R2 must
+    create one absent-to-new regular sidecar; SC-2 receives it into the
+    persistent session, SC-3 removes only the proven-owned remote path, and the
+    absent re-check passes. Stdout, stderr, and sidecar are separate complete,
+    untruncated whole origins. After evidence assembly the retained sidecar is
+    rechecked no-follow as the same 0o600 regular file with unchanged length
+    and SHA-256. Repository evidence contains only redacted manifests, hashes,
+    placeholder path and retention facts plus schema-valid hardware evidence;
+    raw bytes, full manifests and the real path remain outside Git. Missing
+    sidecar, drift, ambiguity, truncation, cleanup or retention failure leaves
+    the task blocked. Exit zero and a fresh hash are not Recipe success, the
+    old raw root cause remains unknowable, and Agent/destructive dispatches are
+    zero. This case claims no canonical AC-DUMP PASS.
+- acceptance_id: INT-UD-R2-REDIAG-001
+  test_id: TEST-INT-UD-R2-REDIAG-001
+  method: Human-executed host-only non-content diagnosis of the fresh retained R2 raw.
+  expected_source: openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/verification.md#INT-UD-R2-REDIAG-001
+  minimum_evidence: realHardware
+  expected_result: Only after TASK-UD-R2-RECAPTURE-001 is done, a separate D1
+    readiness pins the merged capture evidence OIDs, fresh raw exact length
+    and SHA-256, a current retention recheck, diagnosis-tool source OID and
+    per-file hashes, redactor policy references, interpreter, and the unique
+    CLI. The human maintainer runs the existing stdlib-only, no-write,
+    no-follow arkdeck-ud-raw-diagnosis-1.0.0 tool over that exact persistent
+    raw outside every repository. Any missing or mismatched input produces no
+    report. A successful run emits only the deterministic closed-schema
+    non-content JSON and records a fresh-only NONE, INVALID_UTF8, or
+    INVALID_UNICODE measurement, with the existing synthetic 37/37 matrix,
+    AST audit, policy-reference audit, value law and sensitive-output final
+    check all passing at the pinned source. The raw path and bytes never enter
+    the repository or conversation, and the Agent raw-read count is zero. The
+    result neither reconstructs the old raw root cause nor automatically
+    authorizes redactor changes, a structural output family, selector seam,
+    R4, TASK-UD-001, compatibility, support, conformance, or release claims.
+    Installed HDC, device, network, GUI, mutation, and destructive dispatches
+    are zero. This case claims no canonical AC-DUMP PASS.
 - acceptance_id: INT-UD-R2-R4-SEAM-001
   test_id: TEST-INT-UD-R2-R4-SEAM-001
   method: Offline synthetic adversarial contract for same-session selection bundle and R4 harness materialization.
