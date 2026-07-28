@@ -1,6 +1,6 @@
 ---
 id: CHG-2026-008-ui-dump-hidumper-wrapper
-revision: 13
+revision: 14
 status: approved # r1 经 #68 批准;后续 revision 仅在对应治理 PR 由维护者 review/merge 后生效
 class: platform
 core_change_level: none
@@ -127,6 +127,30 @@ protected-main 的 OpenHarmony profile 与 CHG-2026-026 r5 登记为 `Ver: 3.2.0
 `c295d4a45a30ea08d7ab66440c5593d1208f222a`；r12 merge 后新增的唯一提交只修改
 CHG-2026-022 tasks，与本 revision 的 CHG-008/tool/schema 输入零重叠。
 
+r14 是 executor/risk 审计与 fail-closed 迁移修订。#715 已将
+`TASK-UD-R2-RECAPTURE-001` 置为 human-only `ready`，但维护者随后要求把没有风险的
+未完成工作交给 Agent，并审查 real-device recapture 是否也可迁移。审计结论是：相同
+argv 不等于相同授权/evidence。当前锁定的
+`openspec/contracts/hardware-evidence.schema.json` `2.0.0` 只接受人类 `operator`，
+明文拒绝 Agent identity；CHG-2026-025 的 v3 Agent schema 仍是其 change-local draft，
+且该 Core change 尚未 archive，不能被本 platform change 当作 current contract。
+现有 human harness 还缺少 Agent 所需的 machine identity/firmware readback、确定性
+foreground-window 与 sidecar-ownership 判定、受保护 main 授权解引用/用量门，以及不把
+controlled raw path 输出到 Agent 会话的 opaque handle。因此 recapture 仍是 E1，不是
+“无风险”任务。
+
+r14 在 merge 时撤销尚未消费的
+`UD-R2-RECAPTURE-DAYU200-20260728-001` human-only window，并使 recapture
+`ready → blocked`；新增 blocked 的 host-only
+`TASK-UD-AGENT-CAPTURE-SEAM-001`，只登记未来 Agent capture admission/opaque-artifact
+seam 的 contract 范围。它不采用未归档 v3 draft、不创建 authorization、不实现 seam、
+不读取 raw，也不执行 installed HDC/device/fixture/Recipe。其余未完成任务逐项分类：
+永久缺输入的旧诊断不重开；fresh-raw 诊断仍由人类执行；两个纯 host implementation
+任务可在其事实前置与独立 readiness 满足后由 Agent 实现；R4 real-device capture 仍为
+E1 human-only。任何 future Agent R2 capture 必须等待 current v3-compatible evidence
+contract、Agent seam done 与一份新的 D2 exact-device authorization/readiness，不能复用
+#715 的人类窗口。
+
 ## What changes
 
 ### In scope
@@ -181,12 +205,19 @@ CHG-2026-022 tasks，与本 revision 的 CHG-008/tool/schema 输入零重叠。
   host-only blocker 记录。r13 merge 后任务仍 blocked；独立 D2 readiness 必须重新固定
   current main、接受 exact device 的 typed capability evidence、安排具名连续窗口并
   复核其余 pins，之后设备执行才可能开始。
+- r14 只做 executor/risk audit、撤销 #715 的未消费 human-only 窗口，并新增 blocked 的
+  `TASK-UD-AGENT-CAPTURE-SEAM-001`。该 task 的 future implementation 只可建立
+  host-only fake/synthetic contract seam：current authorized-agent evidence contract、
+  protected-main authorization provenance/usage、machine target+firmware readback、
+  deterministic window/sidecar classification、opaque raw handle 与 zero-leak abort/
+  teardown。r14 不把 E1 重采降级为 E0，不消费 CHG-2026-025 change-local draft，不
+  创建 authorization，不使任何 Agent real-device task ready。
 
 ### Out of scope
 
 - 兼容性/支持声明、matrix 行推进(真机复核属未来 M0B-002 之后的观察);
-- Flash/Trace/Debug capability;Agent 执行真实 `hdc`(golden 采集由人类按 runbook
-  先例执行);
+- Flash/Trace/Debug capability；在 r14 Agent seam、current evidence contract 与新的
+  exact-device D2 authorization/readiness 全部合入前由 Agent 执行真实 `hdc`；
 - 依据公开示例推断目标 build 的单参数 `-a` 边界,或把 `--help`/`-ls` 输出当作 Recipe
   success family;用自造 marker/fake 输出关闭验收;
 - 在采集任务仍 blocked 时执行任何 HDC/Recipe,或把 R1-R4 首次 target capture 降级为
@@ -317,6 +348,15 @@ CHG-2026-022 tasks，与本 revision 的 CHG-008/tool/schema 输入零重叠。
   `05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83`。
   该映射来自 protected-main 已登记的一手事实，但不替代未来 D2 window 内经 harness
   `HP-0` 的 runtime 复核；任一 drift 都在 fixture/device command 前 fail closed。
+- r14 executor audit 不改变任何 Core/spec/current contract。current hardware-evidence
+  v2 schema blob `98443833b5bef36f4a1e0fdea9dbaaccf057f4d1` /
+  SHA-256 `d31fdb1d872567a7c4b69ee833593492adc9c39ce28b3b9b0f3597cc334628b0`
+  仍只接受人类 operator；CHG-2026-025 v3 draft blob
+  `492aa3d5107c6790f56df1fff336280578494364` /
+  SHA-256 `4dee32ff9a067511efeb110b4fe21c46fdaa00eee092c46ce8406fd1c886eba5`
+  只是未归档 change-local artifact，不能为本 change 授权。r14 merge 撤销旧 human
+  window 并使 recapture blocked；future Agent execution 另需 current contract +
+  machine-verifiable seam + 新 D2 authorization/readiness，任何一项缺失均零 dispatch。
 - 每个登记 output family 都必须能在干净 checkout 以 repo-safe synthetic/derived fixture
   走 production classifier 正向复验;本 change 禁止 raw byte-fingerprint/digest family;
 - 本 r3 治理 PR 本身零 HDC/device dispatch;merge 后仍没有 ready 的 real-device task。
@@ -421,3 +461,12 @@ CHG-2026-022 tasks，与本 revision 的 CHG-008/tool/schema 输入零重叠。
   replacement；任务仍 blocked，D2 readiness/evidence/window/设备执行仍须后续独立
   PR，且本 revision 的 installed-HDC process、device、fixture、Recipe、raw 与
   destructive dispatch 均为 `0`。
+- r14 executor/risk audit revision:本 PR 基于 #715 merge
+  `fe13de4d319bd4fdd07f2439daf9cce8bff34897` 与 current main
+  `78da3e3cca1fe66fddf5171f7a9d1c13b37a08bb` 起草；中间提交推进
+  CHG-2026-022/025/042 与 observation/bookmark/host-loop 实现和测试，但未修改
+  CHG-008、capture harness、current hardware-evidence schema 或 CHG-2026-025 的
+  v3 hardware-evidence draft。`TASK-AIN-BKMK-001` 已 done，但
+  `TASK-AIN-004` 仍 blocked，CHG-2026-025 仍未 verified/archive。维护者 merge 本 PR 构成 D2
+  human-window revocation 与 D1 executor matrix/新 blocked seam task 的批准；不构成
+  Agent authorization、seam readiness、capture evidence 或任何 HDC/device dispatch。

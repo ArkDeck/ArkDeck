@@ -1,7 +1,8 @@
 # Tasks — CHG-2026-008 ui-dump HiDumper wrapper integration
 
 > V2 治理:本文件是任务的唯一事实源;任务状态变更仅在维护者 review/merge 后
-> 生效。全部真机采集由人类维护者执行,Agent 不执行真实 `hdc`。
+> 生效。r14 merge 后没有 ready 的真机任务；Agent 只能执行明确 ready 的 host-only
+> 工作，installed `hdc`/device dispatch 在新的 D2 Agent readiness 合入前恒为 `0`。
 
 ## r3 remediation 边界与裁剪记录
 
@@ -39,6 +40,14 @@ R2 decision 与 R2→R4 seam 两个串行任务,共 8 个;r11 因 R2 negative de
 r13 不新增任务；它只在 r12 后的独立 D2 readiness preflight 发现 HDC binary drift 时，
 为 `TASK-UD-R2-RECAPTURE-001` 原子替换 expected HDC pin。该 D1 revision 合入后任务仍
 blocked，D2 readiness 仍须独立合入。
+
+r14 新增一个 blocked 的 `TASK-UD-AGENT-CAPTURE-SEAM-001`，并撤销 #715 尚未消费的
+human-only one-run window。它不把 deviceMutation 降级为 readOnly；只把未完成任务的
+executor/risk 分类显式化。`TASK-UD-R2-R4-SEAM-001` 与 `TASK-UD-001` 是未来可由
+Agent 执行的 host-only implementation，但仍受各自事实前置与独立 readiness 阻断；
+`TASK-UD-R2-REDIAG-001` 触及 sensitive raw，仍由人类执行；
+`TASK-UD-R2-RECAPTURE-001`/`TASK-UD-CAP-R4-001` 均为 E1，只有前者登记 future Agent
+迁移路径，后者保持 human-only；旧 raw 永久缺失的 `TASK-UD-R2-DIAG-001` 不重开。
 
 ## TASK-UD-CAPTURE-HARNESS-001 — Phase A/B 受控采集 harness 前置
 
@@ -448,6 +457,9 @@ blocked，D2 readiness 仍须独立合入。
 
 ## TASK-UD-R2-DIAG-001 — R2 raw INVALID_UNICODE 根因只读诊断
 
+- r14 executor verdict:no executor。该 task 的唯一 pinned raw 已永久不可得，既不能
+  人工执行，也不能改由 Agent 对替代输入执行；其已合入 synthetic implementation/
+  evidence 保留，真实 raw run 永不重开。
 - Status:blocked(pinned-input-unavailable fail-closed 收口,2026-07-28;仅在维护者
   review/merge 本独立状态 carrier 后生效。已交付面不受影响:r1 #679(merge
   `d9aa14a6d8e73f16fabb7434db351c5e734923fe`)+ r2 addendum #686(merge
@@ -782,13 +794,15 @@ blocked，D2 readiness 仍须独立合入。
 
 ## TASK-UD-R2-RECAPTURE-001 — R2 persistent controlled 重采
 
-- Status:ready(on merge of this independent D2 readiness r1；r13 已由 PR #711
-  merge `f065ac90e69ff89c9ebb8817bfb4f9ebb1b0ed7d`。本 draft/PR 合入前任务在
-  protected main 仍是 blocked，installed-HDC/device/fixture/Recipe dispatch 均为 `0`；
-  合入后只允许人类维护者 `lvye`(fuhanfeng)在
-  `UD-R2-RECAPTURE-DAYU200-20260728-001` 单次连续互斥窗口执行 closed R2-only
-  sequence。窗口/pin/capability 任一不满足即 fail closed，不得把本 ready 当作
-  Recipe success、compatibility/support/conformance 或 Agent execution authority)
+- Status:blocked(on merge of r14 executor/risk audit；#715 曾使本任务 human-only
+  `ready`，但 `UD-R2-RECAPTURE-DAYU200-20260728-001` 在首次 installed-HDC
+  dispatch 前即由 r14 撤销，不得再消费。current hardware-evidence v2 不接受 Agent，
+  且现有 human harness 缺 machine identity/firmware readback、authorization usage、
+  deterministic window/sidecar decision 与 opaque raw-handle seam。future Agent
+  recapture 须等待 `TASK-UD-AGENT-CAPTURE-SEAM-001 done`、Agent-compatible evidence
+  contract 成为 current，以及新的 exact-device D2 authorization/readiness 合入；
+  本 r14 PR 合入前仍以 protected main 的 #715 human-only ready 为事实源，但本 PR
+  自身及其后 installed-HDC/device/fixture/Recipe dispatch 均为 `0`)
 - HDC drift remediation r13(2026-07-28;host-only static audit，installed-HDC process/
   device/fixture/Recipe/raw/destructive dispatch 均为 `0`):
   - Audit base:r12 protected-main merge =
@@ -906,6 +920,30 @@ blocked，D2 readiness 仍须独立合入。
     runbook readiness 面与 host-only readiness record；不含 capture evidence/raw，
     不修改 `scripts/**`/spec/contracts/profile/旧 evidence/decision，不启动 D2 窗口。
     merge 后的唯一下一 PR 是人类 capture evidence；在本 D2 merge 前不得起草该 PR。
+- r14 executor/risk audit(2026-07-28；host-only，全部 installed-HDC/device/raw
+  dispatch=`0`):
+  - Window revocation:on merge。#715 named human window 尚无 capture/evidence/abort
+    record，也未消费 first installed-HDC dispatch；r14 merge 后该 window 不得开始、
+    复用或转换为 Agent window。任何执行都须另起 D2 readiness。
+  - Current-contract blocker:
+    `openspec/contracts/hardware-evidence.schema.json` v2 blob
+    `98443833b5bef36f4a1e0fdea9dbaaccf057f4d1` / SHA-256
+    `d31fdb1d872567a7c4b69ee833593492adc9c39ce28b3b9b0f3597cc334628b0`
+    要求 human `operator` 且声明 Agent identity invalid。CHG-2026-025 的 v3 draft
+    blob `492aa3d5107c6790f56df1fff336280578494364` /
+    SHA-256 `4dee32ff9a067511efeb110b4fe21c46fdaa00eee092c46ce8406fd1c886eba5`
+    尚未 archive，不能由本 change 越权消费。
+  - Machine-gate blocker:现有 harness 的 `HP-1/HP-2` 只证明 same-session target
+    token/Connected state，不生成 Agent evidence 所需的 machine model+serial-digest+
+    firmware readback；`INV-1` foreground selection、sidecar absent→new regular ownership
+    与 abort/teardown 仍依赖人类判读。
+  - Privacy/authority blocker:现有 CLI 会打印 controlled output path，且没有
+    protected-main authorization resolution、durable maxRuns reservation 或不向 Agent
+    暴露 raw/path 的 opaque handle。相同 argv/exit code/manifest 不能替代这些门。
+  - Future unblock chain:`TASK-UD-AGENT-CAPTURE-SEAM-001 done` → current
+    Agent-compatible evidence contract + authorization form → 独立 D2 Agent readiness
+    重钉当时 main/HDC/device/fixture/schema/seam hashes、authorizationRef、machine
+    readback、window/maxRuns/expiry。任一缺失为零 dispatch。
 - Objective:不重跑已关闭的 R1/R3,只在 fresh fixture/window session 中用既有 closed
   harness 重采一次 R2 sidecar,产生新的 proven-owned、complete、whole-file-hashed raw
   origin,并把它保存在仓库外非临时 persistent controlled root,供后续独立 readiness
@@ -917,7 +955,8 @@ blocked，D2 readiness 仍须独立合入。
   canonical AC/Test PASS。
 - Depends on:
   - r12 proposal revision 已由 PR #708 merge；r13 HDC repin revision 已由 PR #711
-    merge；本独立 D2 readiness 须由维护者 review/merge 后才生效;
+    merge；历史 human-only D2 readiness 已由 PR #715 merge，r14 merge 时撤销其
+    未消费窗口并恢复 blocked;
   - `TASK-UD-CAP-MUT-001 done`、`TASK-UD-CAPTURE-HARNESS-001 done`、
     `TASK-UD-HARNESS-ECHO-001 done`;独立 D2 readiness 在当时 protected `main` 复核并
     固定这些 merge OID 与 `scripts/ud_capture/{README.md,capture.py,test_capture.py}`
@@ -926,13 +965,16 @@ blocked，D2 readiness 仍须独立合入。
     executable path+SHA-256+version、fixture HAP SHA-256/module tuple、literal sidecar path、
     `INV-1`/R2 exact argv 与 current hardware-evidence schema;任一漂移不得沿用旧 pin,
     只得保持 blocked 或另起 revision;
-  - readiness 固定人类维护者操作者、具名连续设备窗口、窗口互斥规则与 per-device
-    typed capability evidence;Agent/CI 不执行 installed HDC;
+  - r14 merge 后 `TASK-UD-AGENT-CAPTURE-SEAM-001 done`、Agent-compatible
+    hardware-evidence contract 已成为 current，并有新的 D2 readiness 固定 Agent
+    executor/authorizationRef、具名连续设备窗口、窗口互斥规则与 per-device typed
+    capability evidence；在此之前 Agent/CI 不执行 installed HDC；
   - readiness 固定 persistent controlled-root predicate:realpath 位于每个 git
     repository 与 OS temp/ephemeral roots 之外,目录 owner-only `0o700`,不使用
     `/private/tmp`、`/private/var/tmp`、resolved `$TMPDIR` 或会被 session teardown
     删除的位置;实际路径永不进入仓库/会话。
-- Closed execution sequence(r12 plan;仅 D2 readiness 合入后由人类执行):
+- Closed execution sequence(r12 historical command plan；r14 merge 后不可由旧 human
+  window 执行，future Agent readiness 只可在 machine-verifiable seam 中等价 materialize):
   1. host-only harness/SDD preflight与 tool/file hash复核;
   2. `HP-0` → physical target confirmation → `HP-1`;
   3. fixture hash复核 → `FX-1` → `FX-2` + unique foreground confirmation;
@@ -950,7 +992,8 @@ blocked，D2 readiness 仍须独立合入。
   `option ... missed` 显式失败外一律 `unknownOutput`;本 task 不运行 redactor/diagnosis,
   不比较新旧 raw 内容/摘要,不判断旧 raw 的 raw-data/pipeline 根因。
 - Retention gate:fresh R2 sidecar 必须保持 immutable `0o600` regular file,仓库外真实
-  路径只由维护者持有;repo-facing evidence 仅记录 `<PERSISTENT_CONTROLLED_RAW_PATH>`、
+  路径只由受控 executor 持有且不得进入 Agent model/tool text；repo-facing evidence
+  仅记录 `<PERSISTENT_CONTROLLED_RAW_PATH>`、
   whole-file length/SHA-256、capture sequence、source manifest hash、storage predicate
   booleans、retention owner 与复核时间。raw 必须至少保留到
   `TASK-UD-R2-REDIAG-001` evidence/status 及后续 decision revision 明确处置;任务
@@ -962,28 +1005,86 @@ blocked，D2 readiness 仍须独立合入。
   - 本 change `capture-runbook.md`(仅本 task readiness pins/status;不得改 command surface)
   - `openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/evidence/runs/TASK-UD-R2-RECAPTURE-001/**`
 - Required evidence:`run.md`、本次命令的 `redacted-manifests/`、`capture-hashes.md`、
-  schema-valid `hardware-evidence.json`;run.md 另含 persistent-root predicate 与 retained
-  raw recheck facts。raw/full manifests/路径留仓库外;hardware evidence 记录 claimed
-  operator、physical target/serial、firmware/toolchain/transport/window、actual step kinds
-  与 repo-facing artifact hashes。
-- Hardware required:yes,human only;effect = reversible `deviceMutation`(E1),destructive
+  schema-valid Agent-capable `hardware-evidence.json`;run.md 另含 persistent-root predicate
+  与 retained raw recheck facts。raw/full manifests/路径留仓库外；Agent evidence 必须
+  记录 executor identity、可解引用 authorizationRef、machine target confirmation、
+  firmware/toolchain/transport/window、actual step kinds 与 repo-facing artifact hashes。
+- Hardware required:yes；effect = reversible `deviceMutation`(E1)，不是 no-risk/E0；
+  r14 后 future executor=Agent 仅可经新的 D2 authorization/readiness；destructive
   dispatch `0`。
 - Decision-Grade:D2。
 - Verification:`TEST-INT-UD-R2-RECAPTURE-001`:exact closed sequence;同会话 target/
   window provenance;R2 dispatch 恰 `1`,R1/R3/R4 dispatch `0`;sidecar absent→new regular→
   receive→exact cleanup→absent;stdout/stderr/sidecar 分立且 complete/untruncated/
   whole-origin hashed;retained sidecar在 evidence assembly 后 hash/length/mode identity
-  不变;hardware schema、repository-sensitive scan、SDD/diff gates全 PASS;Agent/destructive
-  dispatch `0`。sidecar 未产生或 retention gate 不通过时 evidence 如实记录但 task
-  保持 blocked,不得 done。
-- Forbidden now:D2 readiness 前起草 capture evidence、安装/启动 fixture、device
+  不变;Agent-capable hardware schema、authorization provenance/usage、machine readback、
+  opaque-path、repository-sensitive scan、SDD/diff gates全 PASS；destructive dispatch
+  `0`。sidecar 未产生或 retention gate 不通过时 evidence 如实记录但 task 保持
+  blocked,不得 done。
+- Forbidden now:r14 后在 fresh Agent D2 readiness 前起草 capture evidence、安装/启动
+  fixture、device
   discovery/HDC dispatch;任何时候 R1/R3/R4、fallback/split argv、shell redirection、
   harness 外命令、全局搜索/递归删除、temp root、raw/路径入仓、修改 harness/redactor/
-  diagnosis tool、执行诊断或注册 output family。
-- PR boundary:r12 D1 revision → r13 HDC repin D1 revision → 本独立 D2
-  readiness/ready-restore PR → 一个人类 capture evidence PR → 独立 `ready→done`
-  status PR。D1/D2 gate 后零投机堆叠;本 readiness 合入前 capture evidence PR 不得
-  起草，任一 PR 不得夹带下一阶段。
+  diagnosis tool、执行诊断或注册 output family；复用/改名 #715 human window，或用
+  CHG-2026-025 change-local v3 draft 伪装 current contract。
+- PR boundary:r12 D1 revision → r13 HDC repin D1 revision → #715 human D2 readiness
+  → r14 revocation/executor audit → `TASK-UD-AGENT-CAPTURE-SEAM-001` readiness/
+  implementation/done → fresh Agent D2 authorization/readiness → Agent capture evidence
+  PR → 独立 `ready→done` status PR。D1/D2 gate 后零投机堆叠，任一 PR 不得夹带
+  下一阶段。
+
+## TASK-UD-AGENT-CAPTURE-SEAM-001 — Agent-safe UI Dump capture admission seam
+
+- Status:blocked(等待 CHG-2026-025 将 Agent-capable hardware-evidence contract archive
+  为 current，且等待本 r14 由维护者 review/merge；随后仍须独立 D1 readiness 精确固定
+  consumer contracts、实现范围与 fake/synthetic verification。当前零实现、零 raw、
+  零 installed-HDC/device dispatch)
+- Objective:为 CHG-008 的 future Agent R2 capture 建立不依赖模型临场判断的
+  machine-verifiable admission/orchestration seam；只交付 host-only production-shaped
+  contract 与 fake/synthetic tests，不执行真实设备。
+- Change-local closure:`INT-UD-AGENT-CAPTURE-SEAM-001` /
+  `TEST-INT-UD-AGENT-CAPTURE-SEAM-001`。
+- Depends on:
+  - CHG-2026-025 verified/archive，Agent-capable hardware-evidence schema 成为 current；
+  - protected-main authorization provenance、durable usage reservation 与 executor identity
+    contract 可由本 task 只读消费，且适用于 E1 `deviceMutation`；
+  - 独立 readiness 在当时 main 固定这些 current contracts/OID/hash，不得消费
+    change-local draft 或 caller-supplied authorization facts。
+- Required seam:
+  - executor 只接收 authorization ID/opaque artifact handles；authorization bytes、
+    approvedBy/carrier、prior-run count、binding/identity facts 与 raw path 均不由 Agent
+    或 CLI 注入；
+  - protected-main provenance resolution + durable `maxRuns` reservation 在首个 HDC
+    process 前完成，失败/过期/并发/漂移均零 dispatch；
+  - machine readback 同时证明 exact model、serial digest、firmware、transport 与 durable
+    binding；不能以 `Connected`/相似型号/历史 evidence 代替；
+  - foreground window 与 sidecar absent/new-regular/owned/cleanup 分类由封闭 parser
+    family 决定；unknown/zero/multiple/stale/symlink/ambiguous 均停止；
+  - persistent session/raw path 只存在于受控 executor，模型、CLI stdout/stderr、
+    repo-facing manifest 与 conversation 均只见 opaque handle/placeholder；
+  - exact typed argv、exclusive device lane、intent/outcome、timeout/cancel、identity
+    drift与非身份类 teardown 状态机均可由 fake/synthetic fault tests 二值复验。
+- Allowed paths(由独立 readiness 进一步收窄):
+  - `scripts/ud_agent_capture/**` 或经 readiness 选定的 production-owned typed executor
+    路径，二者不可在实现时临场二选一
+  - 本 change `tasks.md`(仅本 task 状态/evidence)
+  - 本 change `acceptance-cases.yaml`(仅 `INT-UD-AGENT-CAPTURE-SEAM-001`)
+  - 本 change `verification.md`(仅本 task 行/status)
+  - `openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/evidence/runs/TASK-UD-AGENT-CAPTURE-SEAM-001/**`
+- Forbidden paths/current actions:current specs/contracts/baselines、CHG-2026-025 draft
+  修改或复制、authorization carrier、真实 raw/full manifest/path、installed HDC/device/
+  fixture/network/GUI、E0/E1/E2/destructive dispatch；不得把 external-shell handoff、
+  fake output 或 Agent 自报事实记为真实 authority/evidence。
+- Risk:high design / host-only implementation。真实执行风险仍为 E1，且不在本 task。
+- Hardware required:no；所有 tests 使用 injected fake runner/ports。
+- Decision-Grade:D1。
+- Verification:`TEST-INT-UD-AGENT-CAPTURE-SEAM-001` 证明授权/usage/readback/window/
+  sidecar/raw-privacy/intent-outcome/abort-teardown 正向闭环；每项缺失、篡改、unknown、
+  timeout、并发与泄漏负例的 process/HDC/device dispatch 均为 `0`；全量现有 harness
+  tests、SDD guard、AST no-shell/no-network 与 sensitive scan 全绿。
+- PR boundary:r14 proposal revision → 独立 D1 readiness → implementation + synthetic
+  evidence PR → 独立 done status PR。done 仍不授权真实设备；其后另起 D2 Agent
+  authorization/readiness。
 
 ## TASK-UD-R2-REDIAG-001 — fresh R2 raw 非内容重诊断
 
@@ -991,6 +1092,10 @@ blocked，D2 readiness 仍须独立合入。
   recapture evidence 重钉 fresh raw exact length/SHA-256、retention recheck、diagnosis
   tool source OID/hash、interpreter 与 exact CLI。r12 不执行诊断、不读取 raw、不产生
   evidence,也不修改 `scripts/ui_dump_diagnosis/**`)
+- r14 executor verdict:human-only host-side sensitive analysis。虽然零设备副作用，
+  该任务会打开 fresh raw，真实路径与 bytes 不得进入 Agent model/tool output；当前
+  没有 opaque raw-handle executor。它不是“无风险 Agent task”，不得因 E0/host-only
+  标签移除 human gate。
 - Objective:只对 r12 后 fresh、retained、proven-owned R2 sidecar 复用已合入的
   `arkdeck-ud-raw-diagnosis-1.0.0` 非内容工具,形成按新 input pins 可复查的
   `redactorEquivalent` 与 UTF-8/codepoint-policy measurement。该测量描述新 raw,
@@ -1042,6 +1147,9 @@ blocked，D2 readiness 仍须独立合入。
 
 - Status:blocked(等待 `TASK-UD-R2-DECISION-001` positive done 与独立 readiness PR;当前
   `scripts/ud_capture/` closed allowlist 明确不含 R4,不得提前修改或 dispatch)
+- r14 executor verdict:Agent-eligible when ready。该 task 的实现与验证全部
+  fake/synthetic、hardware required=no、真实 raw/HDC/device dispatch=`0`；但 current
+  truthful-negative decision 未满足 positive prerequisite，因此目前仍不可开工。
 - Allowed paths（readiness/status 载体面；实现面见 Candidate allowed paths）：
   - 本 change `tasks.md`（仅本 task 段的 readiness/status 更新）
   - 本 change `verification.md`（仅本 task 对应 verification 行的 status 同步）
@@ -1082,8 +1190,8 @@ blocked，D2 readiness 仍须独立合入。
 - Forbidden now:任何实现/fixture/evidence、读取真实 raw、HDC/device/network/GUI、R2/R4
   dispatch、exact token/nonce/bundle 入仓、放宽 raw digest family或 repo-sensitive gate。
 - Hardware required:no;future implementation/tests synthetic-only,installed-HDC/device/network/
-- Decision-Grade:D1。
   destructive dispatch `0`。
+- Decision-Grade:D1。
 - Verification(candidate):decision-manifest parser contract、bundle/receipt closed-schema +
   deterministic serialization、OS randomness/permission/path gates、same-session binding、R4 exact
   argv equality与 all-negative zero request/dispatch,existing 63 harness tests不回归;
@@ -1096,6 +1204,9 @@ blocked，D2 readiness 仍须独立合入。
 
 - Status:blocked(`R4` dispatch count 必须为 `0`;Phase A token 不可跨 fixture/window 生命周期
   复用,十进制格式或 hash 不构成 component provenance)
+- r14 executor verdict:human-only E1。该 task 依赖 fresh same-session sensitive R2
+  selector/private bundle 与 R4 deviceMutation，当前没有针对 Phase B 的 Agent
+  authorization/machine-decision seam；r14 不为其新增 Agent 路径。
 - Change-local closure:`INT-UD-CAPTURE-R4-001` / `TEST-INT-UD-CAPTURE-R4-001`。
 - Canonical Safety inputs:`REQ-DUMP-003/005/006/007/008`(`AC-DUMP-003-01` 仍由
   `TASK-UD-001` 的 canonical contract test 关闭;其余 disposition 同上表;本 task 不认领
@@ -1233,6 +1344,9 @@ blocked，D2 readiness 仍须独立合入。
 - Status:blocked(r3 review-remediation candidate;仅在本治理 PR 由维护者 review/merge
   后生效。本 PR 不执行 TASK-UD-001,不产生 implementation/acceptance evidence,也不使
   CHG-008 verified)
+- r14 executor verdict:Agent-eligible when ready。实现、fake/adversarial tests 与
+  integration registration 均为 host-only，真实 raw/HDC/device dispatch=`0`；但
+  CAP-R4/positive decision/derived-golden 前置尚未满足，当前不得开工。
 - Blocking review(2026-07-19 初判,2026-07-20 裁剪后复核;只读审计,零真实 HDC/device
   dispatch):
   - Capture/decision blocker:`EVD-M0B-DAYU200-20260718-001` 只含 `hidumper --help` 与
@@ -1339,8 +1453,8 @@ task 按 M0B 先例由人类直接使用 installed `hdc`,同样不消费 M1-006 
 - Risk:medium(固定新的 argv/output-family 语义并导入 derived fixture;必须以 redaction
   receipt hash 链 + 维护者逐字审读闭环隐私,以 fake 对抗测试覆盖 exit-0 陷阱)。
 - Hardware required:no。真机输入只来自两个具名前置 realHardware task 的已合入
-- Decision-Grade:D1。
   evidence;本实现/contract verification 必须 headless、无设备。
+- Decision-Grade:D1。
 - Required environment:锁屏 macOS headless shell;Swift 6.3.3、`xcrun swift-format`
   6.3.0、SwiftPM;固定 Python `<ARKDECK_ROOT>/.venv-sdd/bin/python`(Python 3.14.6 +
   PyYAML 6.0.3),执行时在 run.md 记录实际 path/version/hash 并设 `ARKDECK_PYTHON`。
