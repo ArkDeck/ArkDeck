@@ -1,0 +1,33 @@
+---
+schema_version: 1.0.0
+change_id: CHG-2026-044-openharmony-profile-version-reconciliation
+change_revision: 1
+platform: macos
+evidence_classes:
+- contract
+cases:
+- acceptance_id: OPVR-HEADER-LOCK-001
+  test_id: TEST-OPVR-HEADER-LOCK-001
+  method: Independent profile-header extraction and current lock/body/device-registry lineage audit.
+  expected_source: openspec/changes/chg-2026-044-openharmony-profile-version-reconciliation/verification.md#opvr-header-lock-001
+  minimum_evidence: contract
+  expected_result: >-
+    The living profile header and current integration lock agree on the already-registered
+    OPENHARMONY-TOOLS@0.5.0 lineage, while the lock, profile body and device registry remain
+    unchanged and no new profile or lock version is created.
+- acceptance_id: OPVR-MUTATION-001
+  test_id: TEST-OPVR-MUTATION-001
+  method: Isolated checker tests with version, ID, missing, duplicate and malformed mutations.
+  expected_source: openspec/changes/chg-2026-044-openharmony-profile-version-reconciliation/verification.md#opvr-mutation-001
+  minimum_evidence: contract
+  expected_result: >-
+    Every header/lock mismatch and malformed or duplicate metadata form produces a deterministic
+    SDD error without aborting later checks, while the exact clean control is green.
+- acceptance_id: OPVR-NONINTERFERENCE-001
+  test_id: TEST-OPVR-NONINTERFERENCE-001
+  method: Forbidden-path blob audit, full SDD suite and external-dispatch declaration.
+  expected_source: openspec/changes/chg-2026-044-openharmony-profile-version-reconciliation/verification.md#opvr-noninterference-001
+  minimum_evidence: contract
+  expected_result: >-
+    The integration lock, registries, profile body, Core, platform and production bytes remain
+    unchanged, and no HDC, device, network, lifecycle, mutation or destructive effect is dispatched.
