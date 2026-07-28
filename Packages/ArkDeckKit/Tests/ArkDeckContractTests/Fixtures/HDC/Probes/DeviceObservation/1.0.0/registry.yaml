@@ -1,0 +1,220 @@
+{
+  "schemaVersion": "1.0.0",
+  "serializationFormat": "json-compatible-yaml-1.2",
+  "registryId": "OPENHARMONY-HDC-DEVICE-OBSERVATION-PROBES",
+  "registryVersion": "1.0.0",
+  "integrationProfile": "OPENHARMONY-TOOLS@0.5.0",
+  "registeredBy": "CHG-2026-024-hdc-device-snapshot-registration/TASK-I24-001",
+  "unknownFamilyDisposition": "unknown",
+  "toolContext": {
+    "platform": "macos",
+    "reportedVersion": "3.2.0f",
+    "executableSHA256": "05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83",
+    "divergenceNote": "Observed on hdc 3.2.0f. The sibling registries (openharmony/readonly-probes.yaml and openharmony/trace-probes/1.0.0) and the hardware matrix register hdc 3.2.0d. These are NOT the same tool; entries here carry 3.2.0f in their identifiers and must never be merged with 3.2.0d entries."
+  },
+  "entries": [
+    {
+      "id": "openharmony-hdc-device-observation-snapshot-3.2.0f-macos",
+      "family": "deviceObservationSnapshot",
+      "status": "supported",
+      "probeKind": "hdcCommand",
+      "platform": "macos",
+      "toolReportedVersion": "3.2.0f",
+      "executableIdentityPolicy": {
+        "required": true,
+        "sha256": "05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83",
+        "pathSource": "selectedToolchainSnapshot",
+        "replacementInvalidatesReceipt": true
+      },
+      "exactArgv": [
+        "list",
+        "targets",
+        "-v"
+      ],
+      "invocationAllowed": true,
+      "preconditions": [
+        "existingServerOnExactEndpointRequired",
+        "stablePreAndPostServerIdentityRequired"
+      ],
+      "endpointPolicy": {
+        "requiresExactEndpoint": true,
+        "exactEndpoint": "127.0.0.1:8710",
+        "existingServerRequired": true,
+        "serverAbsentDisposition": "unavailable",
+        "note": "The server's own argv may spell the bind as ::ffff:127.0.0.1:8710; the normalized lsof LISTEN address is authoritative."
+      },
+      "effectClassification": "readOnly",
+      "forbiddenEffects": [
+        "serverStart",
+        "serverStop",
+        "serverRestart",
+        "serverAdoption",
+        "subserverLifecycle",
+        "deviceMigration",
+        "deviceMutation",
+        "destructive"
+      ],
+      "inputContract": {
+        "rawFamily": "tabDelimitedDeviceRowsOrEmptyMarker",
+        "stream": "stdout",
+        "exitCode": 0,
+        "stderrMustBeEmpty": true,
+        "encoding": "utf-8",
+        "lineTerminators": [
+          "LF",
+          "CRLF"
+        ],
+        "residualCarriageReturnForbidden": true,
+        "emptyMarker": {
+          "literal": "[Empty]",
+          "observedTerminator": "CRLF",
+          "observedBytes": 9,
+          "tabFieldCount": 0,
+          "sufficiency": "sufficient but NOT necessary: a server that has already seen a device never emits it again"
+        },
+        "row": {
+          "delimiter": "TAB",
+          "columnCount": 5,
+          "columns": [
+            {
+              "index": 0,
+              "name": "connectKey",
+              "dynamic": true,
+              "observedLength": 32,
+              "identifierBearing": true
+            },
+            {
+              "index": 1,
+              "name": "deviceName",
+              "dynamic": true,
+              "mayBeEmpty": true
+            },
+            {
+              "index": 2,
+              "name": "transport",
+              "closedSet": [
+                "USB"
+              ]
+            },
+            {
+              "index": 3,
+              "name": "state",
+              "closedSet": [
+                "Connected",
+                "Offline"
+              ]
+            },
+            {
+              "index": 4,
+              "name": "hostTag",
+              "closedSet": [
+                "localhost"
+              ]
+            }
+          ],
+          "observedTerminator": "LF",
+          "observedBytes": {
+            "Offline": 56,
+            "Connected": 58
+          },
+          "duplicateKeyDisposition": "unknown",
+          "orderIsPresentationOnly": true
+        }
+      },
+      "semanticMappings": [
+        {
+          "input": "emptyMarkerLine",
+          "result": "observedEmpty"
+        },
+        {
+          "input": "rowsWithZeroConnected",
+          "result": "observedEmpty"
+        },
+        {
+          "input": "rowsWithOneOrMoreConnected",
+          "result": "observed.connectedSet"
+        },
+        {
+          "input": "unknownStateOrTransportOrHostLiteral",
+          "result": "unknown"
+        },
+        {
+          "input": "columnCountMismatch",
+          "result": "unknown"
+        },
+        {
+          "input": "duplicateConnectKey",
+          "result": "unknown"
+        },
+        {
+          "input": "residualCarriageReturnInAnyField",
+          "result": "unknown"
+        },
+        {
+          "input": "zeroByteStdout",
+          "result": "unknown"
+        },
+        {
+          "input": "stderrNonEmptyOrNonZeroExitOrTruncated",
+          "result": "unknown"
+        },
+        {
+          "input": "timeoutOrCancellationOrServerAbsentOrEndpointDrift",
+          "result": "unavailable"
+        }
+      ],
+      "presenceRule": "Presence is decided by the state column. This tool never deletes a row: departure is an in-place flip to Offline, proved byte-identical modulo the state literal. Row appearance/disappearance must never be used as a presence signal.",
+      "authorityLimit": {
+        "mayEstablish": [
+          "zero-to-many device presence on the exact endpoint at observation time"
+        ],
+        "mustMatch": [
+          "exact tool sha256",
+          "exact endpoint",
+          "stable pre/post server identity"
+        ],
+        "neverEstablish": [
+          "authorization or trust state",
+          "device capability",
+          "cross-session identity correlation",
+          "disappearance events (a consumer concern, not this family)"
+        ]
+      },
+      "identityPolicy": {
+        "rawIdentifiersLeaveAdapter": false,
+        "pseudonym": "per-session HMAC-SHA-256 over the connect key",
+        "presentation": "redacted-device-<24 lowercase hex>",
+        "crossSessionCorrelation": "not promised"
+      },
+      "timeout": {
+        "milliseconds": 15000,
+        "resultOnExpiry": "unavailable"
+      },
+      "cancellation": {
+        "result": "unavailable",
+        "mayTerminateOwnedObservation": true,
+        "mayKillHDCServer": false,
+        "cleanup": "none; the observation owns no remote state"
+      },
+      "provenance": {
+        "evidenceClass": "controlledHumanCapture",
+        "sourcePath": "openspec/changes/chg-2026-024-hdc-device-snapshot-registration/evidence/runs/TASK-I24-001/run.md",
+        "sessions": [
+          {
+            "id": "capture-session-1",
+            "acceptedBy": "maintainer review and merge of PR #656",
+            "mergeOID": "af6d64d67af98c94e1f03581de6f52ecdb8a6bb2"
+          },
+          {
+            "id": "V0-virgin-server",
+            "acceptedBy": "maintainer review and merge of PR #658",
+            "mergeOID": "6df25c25d0088238ce2700db07c4db6fbd92cc34"
+          }
+        ],
+        "rawLocation": "operator-controlled, outside the repository",
+        "repositoryGoldenFixture": false
+      },
+      "unsupportedReason": null
+    }
+  ]
+}

@@ -175,3 +175,19 @@ clean-VM/clean-host 矩阵、自动更新 change verified)见 ADR-0002,未满足
 - Settings 管理 HDC/Provider path、输出根目录、Profile、隐私和清理；
 - String Catalog 提供 `zh-Hans`/`en`；
 - UI Dump 必须使用完整名称；plan-only/simulated 使用持续 badge。
+
+## Device-observation family mapping（CHG-2026-024 / TASK-I24-001，2026-07-27）
+
+macOS adopts `OPENHARMONY-HDC-DEVICE-OBSERVATION-PROBES@1.0.0`
+(`OPENHARMONY-TOOLS@0.5.0`, lock `INTEGRATION-PROFILES-0.6.0`, registry SHA-256
+`cc9202123466931804794e606acf369740d639b3e521c25671517fc37a1fe2f5`), observed on hdc `3.2.0f` — a different tool from the `3.2.0d`
+read-only and trace registries mapped above.
+
+| Probe family | macOS access / diagnostic mapping |
+| --- | --- |
+| `deviceObservationSnapshot` | Supported for the exact `list targets -v` argv against a pre-existing server on the exact `127.0.0.1:8710` endpoint, with bracketed pre/post server identity. Presence is read from the state column only: `observedEmpty` means zero `Connected` rows, satisfied either by the CRLF-terminated `[Empty]` marker a server emits before it has ever seen a device, or by rows that are all `Offline`. This tool never deletes a row, so the UI must not treat a vanished row as a departure nor a surviving row as presence. Unknown literal, column-count mismatch, duplicate key, residual `CR`, zero-byte stdout, stderr, nonzero exit or truncation make the whole snapshot unknown; timeout, cancellation, server absence and endpoint drift make it unavailable. No partial set is ever emitted. |
+
+This mapping publishes integration inputs only. It changes no Core Requirement/AC semantics and
+does not wire the CHG-2026-022 consumer, whose cadence, fan-out and presentation remain behind
+that change's own readiness.
+

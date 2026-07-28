@@ -129,3 +129,37 @@ adapter，不改变任何 `AC-HDC-*`、platform conformance、hardware/support/r
 
 0.2.0 consumer 不认识本 registry，也不得从 0.3.0 文档局部借用 argv 或 authority。采用
 `OPENHARMONY-TOOLS@0.3.0` 必须由 consumer 的独立 approved task 固定完整 registry/hash closure。
+
+## Device-observation registry（CHG-2026-024 / TASK-I24-001，2026-07-27）
+
+`OPENHARMONY-HDC-DEVICE-OBSERVATION-PROBES@1.0.0` 登记于
+`openspec/integrations/openharmony/device-observation-probes.yaml`（SHA-256 `cc9202123466931804794e606acf369740d639b3e521c25671517fc37a1fe2f5`），profile `OPENHARMONY-TOOLS@0.5.0`、
+lock `INTEGRATION-PROFILES-0.6.0`。
+
+**工具版本差异声明（必读）**：本 family 观测自 hdc **`3.2.0f`**（executable
+SHA-256 `05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83`）。本文件上方登记的 readonly-probes、
+`trace-probes/1.0.0` 与 `openspec/verification/hardware-matrix.md` 记的是 hdc
+**`3.2.0d`**——**不是同一个工具**。条目 id 显式携带 `3.2.0f`；两个工具版本的
+条目不得混编，跨版本推断不成立。
+
+registered family = `deviceObservationSnapshot`：argv 恒为 `list targets -v`，
+existing-server-only（exact endpoint `127.0.0.1:8710`）、`readOnly`，
+serverStart/Stop/Restart/Adoption、subserverLifecycle、deviceMigration、
+deviceMutation、destructive 全部 forbidden。
+
+**语义（实测导出；来源 evidence PR #656 与 #658）**
+
+- `observedEmpty` = **零 `Connected` 行**，两种已登记成功形态均满足：CRLF 终止的
+  `[Empty]` 标记行（只出现在从未见过设备的 server），以及 N 行状态全 `Offline`。
+  标记**充分不必要**——见过设备的 server 不再输出它。
+- 设备离场**不删行**，只在行内把状态翻为 `Offline`（还原后与在场快照逐字节相等）。
+  presence 一律由 state 列判定，**禁止**以行的出现/消失作判据。
+- 设备行 = 制表分隔 **5 列**（connectKey / deviceName / transport / state /
+  hostTag），**LF** 终止；`Offline` 行 56 B、`Connected` 行 58 B（key 32 字符时）。
+- 解析器必须**同时接受 LF 与 CRLF**，且任何字段**不得残留 `CR`**——
+  `[Empty]` 后带残留 `CR` 不得读作空。
+- **零字节 stdout 不是空**，判 `unknown`（与截断读不可区分）。
+- 未知 state/transport/hostTag 字面量、列数不符、重复 connectKey、stderr 非空、
+  非零 exit、截断 → 整个快照 `unknown`；timeout、cancellation、server 缺席、
+  endpoint 漂移 → `unavailable`。绝不产生部分集合，也绝不制造消失事件。
+

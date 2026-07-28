@@ -1,12 +1,12 @@
 # Integration adapter 输入的版本登记(V2:普通 profile 不逐文件 hash pin;历史对比用 git;
 # golden fixture 与 production probe resource 例外:逐文件 SHA-256 pin)
-lock: INTEGRATION-PROFILES-0.5.0
+lock: INTEGRATION-PROFILES-0.6.0
 status: current
-updated_at: 2026-07-22
+updated_at: 2026-07-27
 
 profiles:
   - id: OPENHARMONY-TOOLS
-    version: 0.4.0
+    version: 0.5.0
     path: openspec/integrations/openharmony/profile.md
 
 catalogs:
@@ -124,9 +124,94 @@ trace_probe_resources:
     path: openspec/integrations/openharmony/trace-probes/1.0.0/.gitattributes
     sha256: 98e891fbdca73bd8cfaaf860c0e5d5183385c256787cc03088990b1ae8c1f429
 
+device_observation_probe_registries:
+  - id: openharmony-hdc-device-observation-probes
+    version: 1.0.0
+    profile: OPENHARMONY-TOOLS@0.5.0
+    tool_reported_version: 3.2.0f
+    tool_executable_sha256: 05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83
+    path: openspec/integrations/openharmony/device-observation-probes.yaml
+    sha256: cc9202123466931804794e606acf369740d639b3e521c25671517fc37a1fe2f5
+
+device_observation_probe_resources:
+  - id: i24-registry-bundled-copy
+    version: 1.0.0
+    path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Probes/DeviceObservation/1.0.0/registry.yaml
+    sha256: cc9202123466931804794e606acf369740d639b3e521c25671517fc37a1fe2f5
+  - id: i24-resources-manifest
+    version: 1.0.0
+    path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Probes/DeviceObservation/1.0.0/resources.json
+    sha256: 423552052766ce69a9d196f295f2b25ec1f4ba9628736d835e3af90f2e37d26f
+  - id: i24-fail-closed-controls
+    version: 1.0.0
+    path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Probes/DeviceObservation/1.0.0/controls/fail-closed-vectors.json
+    sha256: 2a7a20f6dcd1b4b2c60683bfcd12ae081a076df0b92c68f41423682672b6ad5f
+  - id: i24-resource-attributes
+    version: 1.0.0
+    path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Probes/DeviceObservation/1.0.0/.gitattributes
+    sha256: 4f663333cfe82511abda6bab713642b7e0c783392b3bdca42fd256e48d56e55b
+  - id: i24-vector-all-offline-two
+    version: 1.0.0
+    path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Probes/DeviceObservation/1.0.0/vectors/all-offline-two.bin
+    sha256: 478a651ccce01cafad18aa688f202c4916ef40988ff92a402ff19b62a794e9dc
+  - id: i24-vector-duplicate-key
+    version: 1.0.0
+    path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Probes/DeviceObservation/1.0.0/vectors/duplicate-key.bin
+    sha256: f8ddabe947127803d696c3dd3d766e04f3066eb516195a92613e9048641e83cd
+  - id: i24-vector-empty-marker
+    version: 1.0.0
+    path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Probes/DeviceObservation/1.0.0/vectors/empty-marker.bin
+    sha256: c769b18b5babef2903583320036d1e507ee1e80e1386b29d098721999cd20bcf
+  - id: i24-vector-empty-stdout
+    version: 1.0.0
+    path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Probes/DeviceObservation/1.0.0/vectors/empty-stdout.bin
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - id: i24-vector-marker-double-cr
+    version: 1.0.0
+    path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Probes/DeviceObservation/1.0.0/vectors/marker-double-cr.bin
+    sha256: 464af7000a09a91e3e07a3ca940ea0273eeb9ce35b4eae73b5f2641110c7e58f
+  - id: i24-vector-mixed-connected-offline
+    version: 1.0.0
+    path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Probes/DeviceObservation/1.0.0/vectors/mixed-connected-offline.bin
+    sha256: 30048536897717381c1aed12079af0f3e356f35597795ebdecd38d83fc64acd4
+  - id: i24-vector-rows-crlf
+    version: 1.0.0
+    path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Probes/DeviceObservation/1.0.0/vectors/rows-crlf.bin
+    sha256: f5ede1e60bda173a98f9c96a995b33a0b0f6ca3a1cc1568f01397891e31607d3
+  - id: i24-vector-single-connected
+    version: 1.0.0
+    path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Probes/DeviceObservation/1.0.0/vectors/single-connected.bin
+    sha256: fa61841018c2ff3ccc6b888641f4d1845cc0604e3ae2d98b444b5f108b8cffb8
+  - id: i24-vector-single-offline
+    version: 1.0.0
+    path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Probes/DeviceObservation/1.0.0/vectors/single-offline.bin
+    sha256: 0f696a788592dea3a20da0bfd1c533c279d78a95ee33791da86584d2b38c1554
+  - id: i24-vector-two-connected
+    version: 1.0.0
+    path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Probes/DeviceObservation/1.0.0/vectors/two-connected.bin
+    sha256: 3a34f054f994327f3186f3bf025e12055e33c85690f6627635800685b78d0f65
+  - id: i24-vector-unknown-state
+    version: 1.0.0
+    path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Probes/DeviceObservation/1.0.0/vectors/unknown-state.bin
+    sha256: 820ebc8473110e0dffe0feff65c16c1f80efbd888c13ebd2704cdbd634ad6c46
+  - id: i24-vector-wrong-columns
+    version: 1.0.0
+    path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Probes/DeviceObservation/1.0.0/vectors/wrong-columns.bin
+    sha256: 8400fe3902c34c9d7999b22c374da67d6d6c09f693ff6ebbde624a8c28fb7664
+
 adoption_boundary:
-  previous_lock: INTEGRATION-PROFILES-0.4.0
-  previous_openharmony_profile: OPENHARMONY-TOOLS@0.3.0
+  previous_lock: INTEGRATION-PROFILES-0.5.0
+  previous_openharmony_profile: OPENHARMONY-TOOLS@0.4.0
+  device_observation_rule: >-
+    The device-observation registry is observed on hdc 3.2.0f and is available only to a
+    consumer that explicitly adopts OPENHARMONY-TOOLS@0.5.0 and the complete
+    OPENHARMONY-HDC-DEVICE-OBSERVATION-PROBES@1.0.0 registry/resource hash closure through an
+    independently approved task. It is not the same tool as the 3.2.0d read-only and trace
+    registries; entries must never be merged across the two tool versions, and neither existing
+    registry gains any authority from this one. CHG-2026-022 consumer wiring stays out of scope
+    until its own readiness.
+  historic_previous_lock: INTEGRATION-PROFILES-0.4.0
+  historic_previous_openharmony_profile: OPENHARMONY-TOOLS@0.3.0
   rule: >-
     Existing consumers retain their pinned authority. The trace registry is available only to
     a consumer that explicitly adopts OPENHARMONY-TOOLS@0.4.0 and the complete

@@ -298,3 +298,88 @@ lifecycle 计数 0 / server 由 operator 窗口前启动 / 现役 server 由 ope
 - 零设备状态由 operator 物理确认并经 USB 枚举计数 0 佐证；窗口期间未接入
   任何设备、未运行第二个 HDC 客户端、未开启 DevEco；
 - `accepted-by: pending maintainer evidence-PR review`。
+
+---
+
+## implementation（2026-07-27/28；registry、fixture pack、mapping、契约测试）
+
+### 授权与 base
+
+readiness r1 #662 `88465abd…` + r2 #663 `04afc7c…`（跨契约冲突的最小 scope
+更正）。实现 base = r2 合入后的 protected `main`；r1 的全部 source pin 于该
+base 复核零漂移（`profile.md` `bba3bd5d…`、`INTEGRATION-PROFILES.lock.yaml`
+`8a19f1aa…`、`macos/profile.md` `d27264ab…`），三项 absence pin 在改动前均
+成立。
+
+### 交付物
+
+| 面 | 内容 |
+| --- | --- |
+| canonical registry | `openspec/integrations/openharmony/device-observation-probes.yaml`（SHA-256 `cc9202123466931804794e606acf369740d639b3e521c25671517fc37a1fe2f5`），`OPENHARMONY-HDC-DEVICE-OBSERVATION-PROBES@1.0.0` / `OPENHARMONY-TOOLS@0.5.0`；`toolContext` = macos / `3.2.0f` / `05b2bf7a…` + 差异声明 |
+| bundled 副本 | `Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Probes/DeviceObservation/1.0.0/registry.yaml`（与正本逐字节相同） |
+| 合成向量 | 12 个 `vectors/*.bin`，覆盖两种 empty 形态、one/many、mixed、CRLF 行、marker 过度容忍、未知 state、列数错、重复 key、零字节 |
+| fail-closed 控制 | `controls/fail-closed-vectors.json`，10 条非 stdout 输入全部映射 unknown/unavailable |
+| pack 清单 | `resources.json`（逐文件 bytes + SHA-256） |
+| 契约测试 | `HDCDeviceObservationRegistryContractTests.swift`，13 用例 |
+| 登记 | lock `INTEGRATION-PROFILES-0.6.0`、profile `OPENHARMONY-TOOLS@0.5.0`、openharmony profile 新节、macOS mapping 新节 |
+
+### 合成而非采集（capture-plan boundary 履行）
+
+**零真实采集字节入仓。**连接键为显式占位符（`aaaa…a1` / `bbbb…b2`），长度取
+实测的 32 字符。合成向量的字节数与真机实测**逐格吻合**，这是文法正确性的
+交叉验证：`single-offline` 56 B、`single-connected` 58 B、
+`two-connected` 116 B（2×58）、`mixed-connected-offline` 114 B（58+56）、
+`all-offline-two` 112 B（2×56）、`empty-marker` 9 B（`[Empty]` + CRLF）。
+`.gitattributes` 以 `*.bin binary` 保护 CRLF 不被 git 规范化。
+
+### (D-2) 义务履行
+
+entry id = `openharmony-hdc-device-observation-snapshot-3.2.0f-macos`（显式携带
+工具版本）；registry `toolContext.divergenceNote`、lock `device_observation_rule`、
+openharmony profile 与 macOS mapping 四处均写明「观测自 3.2.0f，与
+readonly-probes / trace-probes / hardware-matrix 登记的 3.2.0d **非同一工具**，
+条目不得混编」。契约测试 `testToolIdentityIsPinnedAndCarriedInEveryEntryIdentifier`
+同时断言 id 含 `3.2.0f` 且**不含** `3.2.0d`。
+
+### 跨契约冲突与其最小更正（r2 授权）
+
+`HDCProbeRegistryContractTests` 递归枚举整个 `Fixtures/HDC/Probes/` 并断言等于
+自身 1.0.0 清单，等价于"此目录下不得存在第二包"。按 r2 授权只做一处收窄：
+枚举结果以 `1.0.0/` 前缀过滤后再比对（diff = +7/−1，其余断言、hash pin、
+fail-closed 向量、隐私断言逐字未动）。**反证实测**：撤销该 guard 行 →
+`HDCProbeRegistryContractTests` 立刻 1 失败；还原 → 0 失败。
+
+### 验证（全部在**非 `/private/tmp`** 检出 `~/i24-verify` 实测）
+
+- Swift 全量 **413 tests / 1 skipped / 0 failures（0 unexpected）**
+  = r1 钉定基线 400 + 新增 13；
+- `check-sdd` **0 error / 0 warning / 111 acceptance IDs**；
+- `host_loop` 套件 OK（1 expected failure，属 chg-030 在案标记）；
+- `test_check_pr_paths.py` OK；
+- 新契约测试的**四项变异全部被杀**（marker 改 LF 终止、删 `rowsWithZeroConnected`
+  映射、entry id 去掉版本串、篡改旧只读 pack 一字节），还原后归零。
+
+**方法注记**：首轮在 `/private/tmp` worktree 判定时，Golden 与 ProbeRegistry
+双双变红且移走新 pack 后仍红——该路径的已知改写掩盖信号。改到
+`~/i24-verify` 复测才分离出真相（Golden 纯环境性、ProbeRegistry 真冲突）。
+凡契约测试红绿判定，一律以非 `/private/tmp` 检出为准。
+
+### change-local AC 结论（实现面；change 级 verify 另 PR）
+
+| AC | 结论 |
+| --- | --- |
+| `I24-HDC-DEVICE-SNAPSHOT-001` | **PASS**：文法闭合有界（5 列、closed set、LF/CRLF 双终止符、禁残留 `CR`）；zero（两形态）/one/many/order/duplicate/adversarial 逐项由向量与用例覆盖 |
+| `I24-HDC-DEVICE-EMPTY-001` | **PASS**（r6 定义）：`observedEmpty` = 零 `Connected` 行，marker 与全 `Offline` 双形态均命中；`[Empty]` 带残留 `CR` 与零字节 stdout 均判非空；10 条 fail-closed 控制无一产生 empty |
+| `I24-HDC-DEVICE-PROVENANCE-001` | **PASS**：registry `provenance` 指向本 run 的两次 session 并附 #656/#658 merge OID；raw 全在仓外；`repositoryGoldenFixture: false` |
+| `I24-HDC-DEVICE-REGISTRY-001` | **PASS**：profile/registry/lock/resource/macOS mapping 版本与 hash 闭合一致；旧 1.0.0 registry 与 `readonly-probes.yaml` invariant blob 前后逐字节相等，旧消费者零新增权威 |
+| `I24-HDC-DEVICE-NODISPATCH-001` | **PASS**：本实现 Agent 侧 installed-HDC / device / network / server-lifecycle / subserver / mutation / destructive dispatch **全为 0**（无任何设备命令执行；全部输入为仓内合成字节） |
+
+### 偏差与遗留
+
+- **遗留（如实记录，非本任务可闭合）**：canonical registry 与其 bundled 副本的
+  **正本↔副本字节一致守卫缺自动化**。同族先例（#305）把该守卫放在
+  `scripts/**` 的授权层，而 `scripts/**` 不在本任务 allowed paths 内。当前由
+  lock 中相邻记录的两个 SHA-256 与 review 兜底；建议下次授权 `scripts/**` 时
+  补一条跨文件字节一致断言（与 HDC/Trace 同族的既有遗留同型）。
+- 无其他偏差：diff 恰在 r1+r2 的 allowed paths 内，未触碰 `Sources/**`、
+  `Package.swift`、App/xcodeproj、Core/specs/contracts/baselines。

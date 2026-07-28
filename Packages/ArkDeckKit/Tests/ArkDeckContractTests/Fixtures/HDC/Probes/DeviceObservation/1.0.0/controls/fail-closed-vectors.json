@@ -1,0 +1,56 @@
+{
+  "schemaVersion": "1.0.0",
+  "note": "Non-stdout inputs. None of these may ever produce observedEmpty or a partial set; each collapses the snapshot so absence can never be manufactured.",
+  "cases": [
+    {
+      "id": "stderr-non-empty",
+      "input": "exit 0 with non-empty stderr",
+      "expected": "unknown"
+    },
+    {
+      "id": "nonzero-exit",
+      "input": "nonzero exit code",
+      "expected": "unknown"
+    },
+    {
+      "id": "stdout-truncated",
+      "input": "truncated stdout flag set",
+      "expected": "unknown"
+    },
+    {
+      "id": "timeout",
+      "input": "command timed out",
+      "expected": "unavailable"
+    },
+    {
+      "id": "cancelled",
+      "input": "observation cancelled",
+      "expected": "unavailable"
+    },
+    {
+      "id": "server-absent",
+      "input": "no existing server on the exact endpoint",
+      "expected": "unavailable"
+    },
+    {
+      "id": "endpoint-drift",
+      "input": "listener endpoint differs from the exact endpoint",
+      "expected": "unavailable"
+    },
+    {
+      "id": "server-identity-drift",
+      "input": "pre/post server PID or start identity differs",
+      "expected": "unknown"
+    },
+    {
+      "id": "executable-identity-drift",
+      "input": "selected hdc sha256 != 05b2bf7ad30201c0…",
+      "expected": "unavailable"
+    },
+    {
+      "id": "invalid-encoding",
+      "input": "stdout is not valid UTF-8",
+      "expected": "unknown"
+    }
+  ]
+}
