@@ -443,15 +443,46 @@ R2 decision 与 R2→R4 seam 两个串行任务,共 8 个;r11 因 R2 negative de
 
 ## TASK-UD-R2-DIAG-001 — R2 raw INVALID_UNICODE 根因只读诊断
 
-- Status:ready(r1 implementation readiness;仅在维护者对本独立 readiness PR exact
-  head review/merge 后生效。只授权一个 host-only implementation + evidence 交付与
-  一个独立 `ready→done` status PR:按下方 Readiness(r1)契约新建
+- Status:blocked(pinned-input-unavailable fail-closed 收口,2026-07-28;仅在维护者
+  review/merge 本独立状态 carrier 后生效。已交付面不受影响:r1 #679(merge
+  `d9aa14a6d8e73f16fabb7434db351c5e734923fe`)+ r2 addendum #686(merge
+  `56d6dffb6ee85ebf163d2f6fd41c08b82294fa7a`)固定的 implementation + synthetic
+  evidence 已由 #683 merge `495c7356081a83d18538ae6fcdb3e3580134dfbf` 合入,
+  synthetic 矩阵 37/37 PASS——工具三文件与该 evidence 不被本收口否定。阻断事实:
+  r1 执行模型唯一授权的 real-raw 诊断 run 所需的 pinned exact input(#248 capture
+  sequence 16 remote sidecar `16-SC-2.sidecar`,`866256` bytes,SHA-256
+  `ec6663e6b7d42053ba089ccbfa89df74cb183a5a583f80a69f103b047014b077`)经维护者
+  2026-07-28 亲手离线检索证实永久不可得——四组检索(host 临时目录区按当时文件名
+  +精确字节数;`/private/tmp` 与 `/private/var/tmp` 按精确字节数全量 SHA-256 过滤;
+  两临时目录区按 `*.sidecar` 文件名;用户主目录按精确字节数过滤 + Spotlight 字节数
+  索引)全部零命中;receive 落点属 host 临时目录区,macOS 对其周期回收(约 3 天
+  未访问)且重启即清、不入 Time Machine,capture(2026-07-21)至检索历时 7 天。
+  evidence = `evidence/runs/TASK-UD-R2-DIAG-001/input-unavailability.md`
+  (evidence class `humanOfflineSearch`,SHA-256
+  `4dbe43837a8bfe5ea00ab232665b7e72f6f080782f31a147cf815a270d514272`)。判定:
+  这比"执行后无法判定"更强——run 本身
+  永久不可执行(输入门 `INPUT_HASH_MISMATCH` 对任何替代输入零输出,gate 按设计
+  工作),按 r1 done 判定的 fail-closed 方向(无法判定 ⇒ 只得 `ready→blocked`)与
+  M0B-002/#158 stop-and-propose 先例回 blocked。旧 raw 的 raw-data vs pipeline
+  二值根因就此永久不可测;本收口不引入任何新根因主张,不选择、不授权任何复活
+  分支,不重判 #263/#267 truthful negative 与 #248 capture evidence。解除前置:
+  任何复活只能由引用本 evidence 的新 proposal 修订(维护者 review/merge)作出——
+  该修订须如实登记「旧 raw 根因永久不可测」并把复活路径收窄到重捕分支(新
+  capture plan 与设备窗口产生新 pinned raw 与新诊断对象,根因测量须另行 readiness
+  重钉输入 pins),本 carrier 不做该修订。Agent/human controlled-raw read `0`;
+  installed HDC/device/network/GUI/mutation/destructive dispatch `0`)
+- Historical Status:ready(r1 implementation readiness;仅在维护者对本独立 readiness
+  PR exact head review/merge 后生效。只授权一个 host-only implementation + evidence
+  交付与一个独立 `ready→done` status PR:按下方 Readiness(r1)契约新建
   `scripts/ui_dump_diagnosis/` 三文件与 `evidence/runs/TASK-UD-R2-DIAG-001/**`
   evidence,并由人类维护者在仓库外执行一次固定 CLI 诊断 run。不授权:Agent 打开/
   复制 controlled raw;修改 `scripts/ui_dump_redaction/**`、`scripts/ud_capture/**`、
   `decisions/**` 或任何既有 evidence;任一复活分支的实施或 SEAM/R4/UD-001 解锁;
   installed HDC/device/network/GUI/mutation/destructive dispatch;把诊断输出当作
-  output family、复活授权或任何 compatibility/support/conformance 结论)
+  output family、复活授权或任何 compatibility/support/conformance 结论——其
+  implementation + evidence 交付授权已由 #683 兑现;其唯一独立 status PR 授权按
+  done 判定的 fail-closed 分支以上方 blocked 收口 carrier 落地,不产生 done;r1/r2
+  Readiness 记录原文保留于下,历史不改写)
 - Historical Status:blocked(r11 只登记本任务;等待 r11 合入后的独立 readiness PR 固定
   implementation base、closed files、诊断输出 schema 与 exact host CLI。本治理 PR 不含
   实现/fixture/evidence,不执行诊断,Agent controlled-raw read count 保持 `0`。——该
