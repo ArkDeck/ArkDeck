@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-025-ai-native-unattended-device-ops
-revision: 3
-status: approved # r1 经 #281 正式批准；r2 已合入；r3 全设备工作台扩展仅在维护者 review/merge 本修订 PR 后生效
+revision: 4
+status: approved # r1 经 #281 正式批准；r2/r3 已合入；r4 contract/scope remediation 仅在维护者 review/merge 本修订 PR 后生效
 class: core
 core_change_level: major
 owner: lvye
@@ -10,6 +10,14 @@ platforms: [macos]
 ---
 
 # AI Native 无人值守设备操作:授权从"人类亲手执行"上移为"人类批准计划"
+
+> r4 contract/scope stop gate（2026-07-28）：TASK-AIN-010 readiness 静态审计发现
+> r3 只冻结了 result 中的 E1 `deviceCapability` 引用形状，没有冻结可机器解析的
+> per-device capability 载体、protected-main provenance/registry、usage/concurrency/
+> expiry 语义；现行 Journal/Manifest 2.1 又只能持久化 E2 风格 authorization，
+> TASK-AIN-010 的 Allowed paths 不包含 authority 编码/回放所需源码。r4 新增
+> TASK-AIN-009R 先冻结该闭包，并修订 TASK-AIN-010 精确 scope；本 revision 合入不使
+> 009R/010 ready，不接受任何真实设备 capability evidence，也不授权 device dispatch。
 
 > r3 expansion stop gate（2026-07-28）：r2 已闭合 Rockchip destructive executor 的
 > host 侧实现，但最新 `main` `d42c002609177e47ef95320cb5bdc0a42f0b510e`
@@ -134,6 +142,23 @@ r3 把同一可信宿主从“只支持 Rockchip E2”扩展为通用 Agent devi
   不改写，新 run 使用 `realHardwareE0ReadOnly`、`realHardwareE1DeviceMutation` 或
   `realHardwareE2Destructive` 如实分类。
 
+### r4 capability/persistence remediation
+
+r4 不改变 r3 的 E0/E1/E2 产品边界，只补齐 TASK-AIN-010 开工前缺失的机器契约和
+可评审 scope：
+
+- **TASK-AIN-009R — capability/authority persistence contract freeze**：冻结 closed
+  per-device capability carrier、受保护 main provenance/registry、E1 usage/
+  concurrency/expiry 以及 E0/E1/E2 authority 在 Journal/Manifest 中的可恢复关联；
+  历史 2.1 Rockchip bytes/语义保持可读且不改写。本任务只产生 contract/vector/test，
+  不创建或接受任何真实 capability 实例。
+- **TASK-AIN-010 scope correction**：允许修改 authority 编码、Journal replay、
+  usage ledger 与 Manifest 的精确源码/回归测试；010 只交付可由后续 AIN-015 组合的
+  product host seam，CLI/App control surface 仍归 AIN-015，避免一项任务同时声称
+  “生产入口已接线”又禁止修改入口。
+- **顺序门**：009R 必须依次完成独立 readiness、implementation、done；其 done 合入后
+  010 仍需新的 D1 readiness。任一门前不得实现 010 或后续 executor。
+
 Out of scope / Non-goals:
 
 - `POL-AGENT-001`(Agent 不得自批规则/范围/授权)零改动;
@@ -183,7 +208,9 @@ Observable behavior before/after:
   manifest/journal/provider contract 的 authorized-agent delta 与新增
   authorization-usage contract；r3 新增 agent-device-operation 1.0.0 与
   human-action-required 1.0.0 contracts，并扩展 workflow step/catalog 的封闭部署面
-  （版本号由 TASK-AIN-009/010 readiness 精确钉定）
+  （版本号由 TASK-AIN-009 readiness 精确钉定）；r4 新增 per-device capability、
+  execution-authority/usage 与可恢复 Journal/Manifest correlation drafts（版本号由
+  TASK-AIN-009R readiness 精确钉定）
 - Core baseline bump:**需要,CORE-2.1.0 → CORE-3.0.0**(MAJOR:改变既有 Safety
   Requirement 的执行边界)
 
@@ -276,3 +303,15 @@ ratify CORE-3.0.0)仍各自使用独立 PR。
 - 与活跃 change 的消费关系通过后续 revision 明确处理：CHG-2026-006/008/026 中已存在的
   human-only evidence task 在 r3 executor ready 前保持 blocked；不得在本 proposal PR
   越界改写其他 change 的 task status 或复用旧人工授权窗口。
+
+## r4 approval boundary
+
+- r4 是 D1 proposal/scope remediation：只修改本 change 的 proposal/tasks/
+  verification，并新增 TASK-AIN-010 host-only readiness-blocked audit record；不修改
+  current specs/contracts、`Packages/**`、`ArkDeckApp/**`、授权/capability 实例，不执行
+  process/HDC/device/network。
+- 维护者 merge r4 只批准 TASK-AIN-009R 的 contract scope、TASK-AIN-010 的精确源码
+  scope/依赖与 AIN-015 承担 production control-surface wiring；不使 009R/010 ready，
+  不接受 E1 capability evidence，不创建 E2 standing authorization。
+- 009R 与 010 各自仍须独立 readiness/implementation/done PR。009R 的 D1 gate 合入前
+  010 零投机实现；010 done 前 011—017 的既有依赖门保持不变。
