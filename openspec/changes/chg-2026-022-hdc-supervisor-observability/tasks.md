@@ -440,16 +440,185 @@
 
 ## TASK-OBS-001R — Kit App-facing fan-out remediation
 
-- Status:blocked(r3 governance candidate；仅在维护者 review/merge 本独立
-  revision PR 后登记为 approved scope，merge 不构成 readiness 或实现授权。
-  生效后须从届时 protected main 另起 fresh D1 readiness，逐文件重钉并验证
-  本段矩阵；readiness 合入前零 implementation/evidence。)
+- Status:ready(fresh D1 readiness candidate；仅在维护者对本独立 readiness PR
+  exact head review/merge 后生效。生效后一次性授权一个标题声明本任务的独立
+  implementation/evidence PR，且只能修改本段 Allowed paths、实现下述 exact
+  contract。readiness merge 不产生 AC evidence、不翻 done、不恢复 OBS-002
+  readiness；exact head 未 merge 前仍按 blocked、零 implementation。)
+- Historical Status:blocked(r3 governance 经 PR #704 merge
+  `02907b69b8fd7d1347ba26822e4a1961415fbc16` 生效；其只登记 remediation
+  scope，明文要求本 fresh D1 readiness。)
 - Origin:PR #700/TASK-OBS-002 blocked-readiness(merge
   `14fd6fede8707a46a1510ad6d7b419b76e6e2bc1`)证明 OBS-001 已交付的 device
   fan-out 仍为 OpenHarmony internal，production Workflows facade 零 composition
   owner/poll/cancel，public presentation 零 timestamped device events。App-only
   OBS-002 无法越 package boundary 补齐，故采用该记录的 remediation 方案 (a)，
   新增独立 Kit-only predecessor；不重开或重判已 done 的 TASK-OBS-001。
+- Readiness(fresh D1；audit base = protected main
+  `14b46e3066c52f54568e97545c59b3506ffc62a4`,2026-07-28):
+  - **Approval/dependency gate:satisfied。**r3 exact head
+    `7a5da66fdf4e1cf09018a538312523899dacdeba` 经维护者 `lvye` APPROVED，
+    PR #704 由同一维护者 merge 为
+    `02907b69b8fd7d1347ba26822e4a1961415fbc16`，该 merge 为上述 audit base
+    ancestor；TASK-OBS-001 implementation #687 merge
+    `ca84cc2821e11ad691cb9d8dcdef4e2dc873d1d3` 与 done #693 merge
+    `d8287aa5558f295caa086bb5a90516b6e9892fc8` 均实测为 ancestor。PR #700
+    blocker merge `14fd6fede8707a46a1510ad6d7b419b76e6e2bc1` 同为 ancestor。
+  - **Drift/concurrency gate:satisfied。**PR #700 的 source audit base
+    `e114d9d3ae668bff68d2cfb69c59fa6f4dff00ec` 到本 audit base，三个目标
+    production source、既有 OBS-001 contract 与 `Package.swift` 的 diff 均为空，
+    故 #700 blocker 仍逐项成立且无未裁定代码漂移。起草末端 #705/#706
+    合入后只触碰 CHG-2026-042/025，rebase audit 对本 change、Packages 与
+    integration registry 的 diff 仍为空；重基前后 open PR 均为 0。
+    开工前须再次 fetch protected main、复核 pins 与 open-PR 文件交集，任一漂移
+    立即停回 readiness。
+  - **Exact base pins(完整 Git blob OID + file SHA-256；实现开工逐项复核，
+    invariant 必须逐字节不变):**
+
+    | File | Git blob OID / state | File SHA-256 | 性质 |
+    | --- | --- | --- | --- |
+    | `Packages/ArkDeckKit/Sources/ArkDeckOpenHarmony/ArkDeckOpenHarmony.swift` | `0d91c7d306d45909b8632f0a98ab13218c23c9cb` | `0de8ebbdc862b9394f4d1fd133d6849a4cfc0d844f9d192a2fa144f6219d8838` | 待改：internal event → package bridge/buffer |
+    | `Packages/ArkDeckKit/Sources/ArkDeckOpenHarmony/HDCProduction.swift` | `e417f8ce1d0334455e6c6a3d4b9b5720cc33e195` | `6df378121d5f4f4f87f90b67dd6f1ad9831b81586e331de3e04d4ab894093acd` | 待改：public projection + exact production factory |
+    | `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/HDCApplicationDiagnosticsFacade.swift` | `df1bc2a030bbb924274377fff309ead944576698` | `3d6b08ca1744fe91ba0399e0a3eb7b0d44ec7be002beb48eddf71db5d42adf84` | 待改：production owner/refresh/reset + fixture |
+    | `Packages/ArkDeckKit/Tests/ArkDeckContractTests/HDCDeviceObservationPresentationContractTests.swift` | absent at audit base | absent | 只允许新增 |
+    | `Packages/ArkDeckKit/Tests/ArkDeckContractTests/HDCSupervisorObservabilityContractTests.swift` | `3877c216fb985109f7bccefc1532b6a011143ac5` | `79ee77d04c67ef68ec097039625d2a7ce2314400160b20c39aa11a6e31653f8b` | invariant；既有 25 tests 零修改 |
+    | `Packages/ArkDeckKit/Sources/ArkDeckProcess/ArkDeckProcess.swift` | `d68939a5446a7026db7607086b58ba700d642701` | `fa47356760ff18cf0cfca943c8c1615b52daae9759879711ae0549ee23c379c9` | invariant；owned-child cancellation 机制 |
+    | `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/HDCServerLifecycleJournalAdapter.swift` | `9f8de3c6a707b1506df9e3c760ab359a80e22ed9` | `d1d9ebfdf99842bd305ef63373215f2416a872c3fcd7ed85c5810927d6f8ff01` | invariant；不改 lifecycle host |
+    | `Packages/ArkDeckKit/Package.swift` | `292135a2c80c63ddf7182f58e2f81ff7c7d6104d` | `be071dcfc5ad717120332d09bb2774fcd93143486a9e4bd8de32ee2a2c436ec7` | invariant；test target 自动纳入新文件 |
+    | `openspec/integrations/openharmony/device-observation-probes.yaml` | `399c5a102c7737bf6466e8a2c4c6a1d1b1bc0b6a` | `79814e45901ab7e4d9f9a271645cad62b0053a50534cba884cdff0c2e50b9d49` | invariant；registry 不修改 |
+    | 本 change `proposal.md` | `10797acb07d650a3075f509074e12b198ff5baa6` | `8684b99a4af56b939b405a521d897e0b971827d85049173071b219eefdc3220b` | invariant |
+    | 本 change `design.md` | `ffb1fb636c3c419eda0cbcaf063215e0d4928ed1` | `392727d825cba5b3cd265af8ed2d0a3977fb00f4ef874da1d85e5c7fca489d59` | invariant |
+    | 本 change `verification.md` | `e5c4d79c3a25b45d467ec3fb4c390bffc98bb740` | `f35b7ddff0b0aaa0050a6c0ed69bac4f19ce6eeeae1bfc2100840e6a2ce67ffb` | invariant |
+    | 本 change `acceptance-cases.yaml` | `f8f4d913f8e9ccd9acfcff9a75225778a5750c11` | `cc336e77476cdf153d67cd65e4d6676bae90ece1993c461e944e8ace1a564b71` | invariant |
+    | TASK-OBS-001 `evidence/runs/TASK-OBS-001/run.md` | `4148b50a8d5ef6614058fdf24972d3d921f01de0` | `15eddd72a2725d610301121ef9715703e9391134cb5351ee493f4717d0ce4063` | invariant；只作前置交付证据 |
+    | 本 change `tasks.md`(本 PR 改前) | `ea4a5348b8a7fd5749703ea6e8ef0fc51c4acd3d` | `bc73ca9496685404980be9419eac36504046b5d7b2fe807ced0e0797867f31cf` | 本 readiness 唯一载体 |
+
+  - **Public shape pin(实现不得另做产品决策):**
+    `HDCDeviceObservationPresentationKind` 为 public closed raw-string enum，
+    exact cases = `appeared`/`disappeared`/`observationUnknown`/
+    `observationUnavailable`；`HDCDeviceObservationPresentationEvent` 为 public
+    immutable `Sendable,Equatable` value，exact readable fields =
+    `timestamp:String`、`kind`、`redactedDeviceIdentifier:String?`，构造器仅
+    package。`HDCDiagnosticsPresentation` 新增 public immutable
+    `deviceEvents:[HDCDeviceObservationPresentationEvent]`，public initializer
+    参数默认 `[]`，全部既有 caller source-compatible；App 得到只读值，不能构造
+    source/composition/HMAC key。
+  - **Timestamp/identity pin:**bridge 注入 `@Sendable () -> Date` clock；每个被
+    接受的 public event 在 ingest 时以 UTC、Internet date-time + fractional
+    seconds 格式化为 RFC 3339，fixture 用固定 Date，不接受 caller-supplied 已格式化
+    字符串冒充 clock。`.unchanged` 不调用 clock、不追加 public history。
+    appeared/disappeared 只接受 exact
+    `redacted-device-[0-9a-f]{24}`；任何不合形 identifier fail closed 为
+    `observationUnknown` + nil identifier，raw 字节不得进入 public value/error/log。
+    unknown/unavailable 同样 nil identifier，reason 保留 internal、不进 public。
+  - **Production composition pin:**在 `HDCProduction.swift` 内新增 package-only
+    application session/factory，production factory **不接受 source/runner/argv
+    注入**；它先校验 candidate SHA-256 ==
+    `05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83`
+    且 endpoint == `127.0.0.1:8710`，不匹配则每次显式 refresh 只追加一条
+    unavailable、child dispatch = 0。匹配时由该文件内部唯一构造
+    `HDCRegisteredDeviceObservationSource` + `HDCDeviceObservationComposition`
+    (capacity 64)；source 继续执行 registry exact `list targets -v` 与 stable
+    pre/post identity bracket，拥有单一随机 session HMAC key。contract-only mapper/
+    source seam 可以 package/internal 存在，但 production factory 与 Workflows
+    production 路径不得引用它。
+  - **Refresh/overlap/cancel pin:**Workflows production actor 为当前
+    `(candidate canonical identity,endpoint,execution session identity)` 持有唯一
+    observation session；既有显式 `refresh()` 每次最多调用其一次，再用 package-only
+    copy/overlay helper 把完整 0...64 events 放进同一 base presentation。session
+    actor 在 await 前设置 in-flight gate；并发 refresh 只 coalesce/返回当前 buffer，
+    绝不启动第二 child、排队自动 retry 或新增 timer。Task cancellation 沿既有
+    `FoundationProcessExecutor` cancellation handler 只 SIGTERM ArkDeck-owned
+    observation process group，结果映射 unavailable；HDC server、lifecycle/
+    subserver/device mutation dispatch = 0。user-selected executable、candidate/
+    endpoint/execution identity 变化或 bootstrap failure 均先丢弃旧 session、
+    buffer 与 HMAC key。
+  - **Fixture pin:**`HDCApplicationDiagnosticsFacade.make` 只有包含 exact
+    `--ui-test-hdc-diagnostics` 才选择 fixture provider；fixture 经同一 public
+    presentation type 固定给两条 ordered events：
+    `2026-07-28T00:00:00.000Z appeared redacted-device-0123456789abcdef01234567`
+    与
+    `2026-07-28T00:00:01.000Z disappeared redacted-device-0123456789abcdef01234567`。
+    无 flag 的 production provider/source 不含这些值；fixture 仍无 process/
+    lifecycle/device capability，不能作为真实设备或 M0B-002 evidence。
+  - **Scope feasibility:closed。**base 实树已验证：
+    (a) internal snapshot/event/fan-out/composition 与 capacity-64 production
+    constructor 位于 `ArkDeckOpenHarmony.swift` L2128-2279，可在同文件加 mapper/
+    package wrapper而不开放 raw 类型；
+    (b) registry constants、raw parser、source/runner/identity observer 同位于
+    `HDCProduction.swift` L2168-2324，故 exact production factory 不需要暴露或
+    修改 Process/lifecycle adapter；当前 source 只查 family+endpoint，**尚未查
+    registered target SHA**，该缺口只能在新 production factory dispatch 前修复，
+    不得直接收紧 source 从而破坏 OBS-001 F3 fixture；
+    (c) public presentation 的 additive-default init 位于同文件 L1746-1866；
+    (d) Workflows production actor 已持 candidate/endpoint/execution identity，
+    refresh/selection/reset 落点在
+    `HDCApplicationDiagnosticsFacade.swift` L44-150，fixture 落点 L225-309；
+    (e) Process cancellation handler 位于 invariant
+    `ArkDeckProcess.swift` L557-578；
+    (f) SwiftPM test target 自动收录新增 `.swift`，`Package.swift` 无需修改。
+    因此 exact task 可在一个独立 PR 闭环；若实现证伪任一项，stop 回 governance，
+    不得触碰额外文件。
+  - **Executable verification matrix(18 cases；全部进入唯一新增 test file，
+    既有 OBS-001 25 tests 零修改):**
+    - DP1 public type exact cases/fields/access：App-facing fields 可读，raw
+      snapshot/source/composition/HMAC 构造能力零暴露。
+    - DP2 presentation initializer 默认 events = `[]`；既有
+      `.unprobed`/`.loading` 与所有旧 caller 值不变。
+    - DP3 appeared/disappeared 各用 injected Date 生成 exact UTC RFC 3339
+      fractional timestamp，identifier exact regex。
+    - DP4 `.unchanged` 更新 internal presence 但 public count/clock-call count
+      均 +0。
+    - DP5 unknown/unavailable 各追加一条、identifier nil、internal reason 不出
+      public value。
+    - DP6 malformed/non-redacted identifier 输入不泄漏，转 unknown + nil。
+    - DP7 public capacity 输入 64+K 后 count == 64 且等于最新 64、稳定顺序。
+    - DP8 wrong candidate SHA：unavailable + child/argv log 0。
+    - DP9 wrong endpoint：unavailable + child/argv log 0。
+    - DP10 before identity unavailable：unavailable + child/argv log 0。
+    - DP11 stable bracket 阳性沿 OBS-001 F3 registered source腿：exact argv
+      `list targets -v` 一次，raw connect key 不进入 public event。
+    - DP12 post identity drift：exact child 一次但 payload 丢弃，只呈
+      unavailable；不产生 appeared/disappeared。
+    - DP13 production factory API/source scan：无 source/runner/argv 参数，
+      test-only factory/source 不能被 Workflows production 路径引用。
+    - DP14 sequential explicit refresh：每次最多一次 poll，typed transitions
+      逐次追加并 overlay 到同一 diagnostics presentation。
+    - DP15 two concurrent refreshes：in-flight spy 最大值 = 1、observe count = 1，
+      无隐式排队第二次/retry。
+    - DP16 cancellation：cancelled in-flight source 得 unavailable；owned child
+      被终止，server/lifecycle/subserver/device mutation spy 全 0；既有 Process
+      cancellation contract 保持绿。
+    - DP17 candidate/endpoint/execution session change：旧 buffer 清空；同一 raw
+      key 在两个固定 test HMAC key 下 pseudonym 不同，证明不承诺跨 session 关联。
+    - DP18 facade flag matrix：exact UITest flag 得两条 pinned fixture；无 flag
+      production 路径零 fixture literals/test-only source，且显式 refresh 之外
+      poll/timer/retry callsite = 0。
+  - **Anti-cheat/fail criteria:**任一 public raw connect key/reason；把
+    `.unchanged` 记作新 history；用 caller-supplied timestamp string；hash/
+    endpoint/identity mismatch 后 child >0；production 接受 test source/runner/
+    argv；并发或 timer/retry 产生第二 poll；cancel 影响 HDC server 或任何 mutation；
+    修改 invariant/既有 OBS-001 test/registry/profile；均使
+    `OBS-DEVICE-PRESENTATION-001` 整体 FAIL。
+  - **Environment/baseline:**Apple Swift 6.3.3
+    (`swiftlang-6.3.3.1.3`,arm64-apple-macosx26.0)，Xcode 26.6 (`17F113`)，
+    macOS 26.5.2 (`25F84`) arm64。首次 local full run 发现 `.build` 生成物
+    `ArkDeckFakeHDCFixture` 单独残留 `com.apple.quarantine`
+    (`0082;6a684fbb;ArkDeck;`，其余生成 executable 无该 xattr)，导致 macOS
+    SIGKILL fixture 并制造 HDC timeout；该 run 与随后用于定位的 targeted run
+    明确 invalidated，不作 baseline。只清除这个 ignored `.build` 文件的 quarantine
+    后，手工 `list targets -v` 立即 exit 0；同一源码重跑
+    `swift test --filter HDCSupervisorObservabilityContractTests` =
+    `Executed 25 tests, with 0 failures`，exit 0。随后 full build+test exit 0，
+    再以 `swift test --skip-build` 提取精确汇总 =
+    `Executed 442 tests, with 1 test skipped and 0 failures (0 unexpected)`，
+    exit 0；重基到上述 exact audit base 后再次 `--skip-build` 得同一汇总
+    (50.417 seconds)，exit 0。此本地 xattr 清理零 tracked diff、不触碰产品源码
+    或系统级权限配置；CI 必须在 clean runner 独立复验。`./scripts/check-sdd.sh` =
+    `0 error(s), 0 warning(s), 111 acceptance IDs`；paths guard 49 单测 PASS，
+    readiness 标题声明本任务 + 单文件 `tasks.md` 集合的 base-tree guard 模拟
+    PASS(解析 6 个 exact patterns)，`git diff --check` PASS。实现回归底线 =
+    442 + DP1-DP18 / 1 skipped / 0 failures，并须在实现开工重测。
 - Objective:在既有 production registered device-observation fan-out 与 App-only
   OBS-002 之间补齐最小 Workflows/presentation bridge：公开 immutable、带 injected
   UTC RFC 3339 timestamp 的 typed device events；production facade 持有并在显式
@@ -458,25 +627,9 @@
 - Requirements/AC:change-local `OBS-DEVICE-PRESENTATION-001`(见
   acceptance-cases.yaml；canonical Core AC 零认领；既有
   `OBS-FANOUT-001` 保持 TASK-OBS-001 已完成结论，不重判)。
-- Depends on:change r3 由维护者 merge；TASK-OBS-001 done(已满足，
-  #693 merge `d8287aa5558f295caa086bb5a90516b6e9892fc8`)；fresh D1 readiness
-  合入(未满足)。
-- Fresh readiness 必须逐项关闭:
-  1. 以届时 protected main 重钉下列三个 production source、拟新增 contract
-     test、本 change tasks/design/verification/acceptance-cases 与 OBS-001 evidence
-     的完整 commit/blob OID；复核从 #700 到 audit base 零未裁定语义漂移。
-  2. 把 design §2 逐条转成可执行矩阵：exact 3.2.0f SHA-256 +
-     `127.0.0.1:8710` + stable identity bracket 阳性；tool/endpoint/identity
-     三类漂移各自 unavailable 且零未注册 argv；每 refresh 最多一次、无 timer/
-     retry/overlap；appeared/disappeared/status timestamp 与 unchanged 零历史；
-     64 容量/顺序；raw identifier 零泄漏；session 切换清 buffer/key；
-     cancellation 只终止 owned child；production 零 fixture/零 lifecycle/
-     subserver/device mutation。
-  3. 钉定 public type/字段名、timestamp formatter/clock injection seam、production
-     composition owner 与 session invalidation 的代码落点；若实现被证明需要越出
-     Allowed paths，必须 stop 并回治理修订，不得在 readiness 或实现 PR 自扩 scope。
-  4. 实测全量 Swift/check-sdd baseline，复核 open PR 文件交集、构建环境与
-     allowed-paths guard；不得复用 PR #700 的 9/9 XCUITest 作为本 AC evidence。
+- Depends on:r3 approval #704 merge(已满足)；TASK-OBS-001 done(已满足，
+  #693 merge `d8287aa5558f295caa086bb5a90516b6e9892fc8`)；本 fresh D1 readiness
+  exact head 由维护者 review/merge(待本 PR)。
 - In scope:
   `Packages/ArkDeckKit/Sources/ArkDeckOpenHarmony/ArkDeckOpenHarmony.swift`
   (internal event 到 typed presentation 的最小桥接与 bounded buffer)；
