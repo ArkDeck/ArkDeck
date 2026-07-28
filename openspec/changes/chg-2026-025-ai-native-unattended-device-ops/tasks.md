@@ -254,7 +254,10 @@ change approved 前保持 blocked;approved 后每任务另需独立 readiness PR
 
 ## TASK-AIN-003R — production composition 的 discovery profile hash-pin 一致性(remediation)
 
-- Status:blocked（前置:本登记合入后另起独立 readiness PR;Depends on 的
+- Status:ready(r1 readiness;仅在维护者对本独立 readiness PR exact head
+  review/merge 后生效,生效后一次性授权按下方 Readiness pins(r1)契约的
+  实现交付)
+- Historical Status:blocked（前置:本登记合入后另起独立 readiness PR;Depends on 的
   TASK-AIN-003 done 已满足。本登记 PR 零实现、不触碰 `Packages/**`）
 - Platform:macos
 - Requirements:REQ-FLASH-015(MODIFIED)
@@ -306,6 +309,164 @@ change approved 前保持 blocked;approved 后每任务另需独立 readiness PR
 - 独立 readiness 须以当时 main 钉定待改文件 blob(全 OID)与实现方向,并复核
   缺陷仍在——若届时上游已另行修复,如实记录并按实况处置,不重复实现。
 - Decision-Grade 行由维护者亲笔(TASK-BRC-002R 先例)。
+
+### Readiness pins(r1,2026-07-28)
+
+- Base(audit base):protected main
+  `663eb77788bad86c77704769345d47a01d321c86`(#688 merge)。起草于该 base 的
+  独立非 /private/tmp worktree(`~/wt-ain003r-readiness`;CHG-2026-024 r2
+  教训:/private/tmp 检出内 Swift 契约测试红绿不可作结论),Apple Swift 6.3.3
+  (arm64-apple-macosx26.0);下列全部 OID/行号/基线均为本次于该 base 实测,
+  零处引用未实测数字。
+- **Approval boundary:pending human merge。**本 readiness 仅在维护者对本独立
+  readiness PR 的 exact head review/merge 后生效;载体只改本文件的本任务段。
+  生效后一次性授权一个实现交付:按下方钉定方向与验证计划完成实现 + contract
+  测试 + `evidence/runs/TASK-AIN-003R/` run 记录,载体 = 另一个标题声明本任务
+  的独立 agent/* PR;`ready→done` 翻转再独立,Decision-Grade 行由维护者亲笔
+  (任务卡既有条款)。本 readiness 不宣称任何 AC PASS,不触碰
+  `verification.md`(AIN-COMP-001 行已由 #681 登记)。
+- Dependency gate(逐项实测,均为 audit base ancestor):
+  - TASK-AIN-003 done:实现 #292 merge
+    `0a5c9fd99c3cc7f6bcf4e44044706de7c9d2215f`、done 载体 #293 merge
+    `8b3847279621b49d784c31dbbc2e0bf408636e83`;
+  - 本任务与 AIN-COMP-001 的登记正本 #681 merge
+    `3e2e4ae63ea991c65c9be0b6ce88a9546403d01d`;
+  - 缺陷证据正本 #676 merge
+    `d17d303714257a6551c8630a460a61f4b2917d1a`(runbook §8 第 3 条);
+  - E0 面边界裁定 DEC-012 判 (a) #670 merge
+    `0da31ea74e88ab7f183c7aac593f51f401d9eb70`。
+- 缺陷复核(audit base 源码实测:缺陷仍在,无上游另行修复):
+  - 漂移面:`Packages/ArkDeckKit/Sources/ArkDeckWorkflows/` 自 `d17d303`
+    (#676)至 audit base rev-list 实测 **0 commit**;`3e2e4ae`(#681)至
+    audit base 对 `Packages/ArkDeckKit/` 亦 0。Defect record 全部行级引用因此
+    在 audit base 重测,逐处命中:
+  - Host(`RockchipFlashExecutionHost.swift`):production composition
+    `RockchipProductionExecutionComposition.make()`(669–679)把
+    `settings.tool`(800–806 按 `pinnedProduction` 声明,804 =
+    `.executableSHA256`)交给 admission port(677–679);
+    `RockchipProductionAdmissionPort.admit`(1026,类 1000)组装
+    `RockchipDiscoveryToolDeviceFactPort`(1037–1040)时用**缺省**
+    `RockchipDeviceDiscoveryAdapter()`(1039);prepare 期同 pin(196–200,
+    200 = expectedSHA256)。
+  - Discovery(`RockchipDeviceDiscovery.swift`):缺省 `public init()` 钉
+    `.pinnedReadOnlyDiscovery`(542–545);两 pin 常量 static let 实测区间 =
+    9–16(`bbd7bdc0…9923`,行 12)与 21–28(`038a8a0e…3611`,行 24)——
+    Defect record 所记 9–17/22–29 与实测区间差一行边界,两 hash 常量行 12/24
+    均落在所记区间内、构造逐字同一(目录零漂移),缺陷实质不受影响;声明门
+    `tool.sha256 == profile.executableSHA256`(570–572)比较上述两编译期常量
+    **恒不等**;类注释 4–6、`permitsPinnedDiscovery`(63–65、573–575)同
+    复核成立。
+  - Facts(`RockchipAuthorizationFacts.swift`):观测失败 →
+    `toolOrDeviceObservationUnavailable`(140–143);
+    `expectedToolSHA256 = pinnedProduction.executableSHA256`(340)+
+    profileIdentifier / executableIdentity 双断言(345–348、349–352)——换
+    bbd7 实体两头恒拒,与 Defect record 逐字一致。
+- 修复方向裁定(本 readiness 核心职责;#681 明文不预设,此处钉死):
+  - **选定 = 方向 A:composition 处显式注入正确 profile。**Host:1039 的
+    `RockchipDeviceDiscoveryAdapter()` 改为经 Discovery:547–553 **既有**
+    internal `init(profile:executor:)` 注入 `.pinnedProduction`,并把该组装
+    点提为 Host 文件内一个 internal 命名 seam(工厂或常量;1039 为唯一生产
+    调用方),使「composition 实际所用 profile」对契约测试可观测(internal
+    注入 init 的 @testable 消费先例 =
+    `RockchipDeviceDiscoveryContractTests.swift:316`,access 面零变化)。
+    Discovery 预期零修改;缺省 init 语义、两 pin 常量、声明门逐字不变。
+  - 拒 B(Discovery 增接受 038a 的产品 profile 构造子):触碰面为 A 的严格
+    超集(Host:1039 仍必改),且与 547–553 既有注入能力功能重复,零新增
+    收益。
+  - 拒 C(缺省 init 改钉 038a):放宽 read-only 缺省语义,违 Discovery:4–6
+    类注释与本任务底线「不放宽 read-only profile 既有语义」,并将实测翻红
+    既有 `testDefaultAdapterUsesOnlyTheCleanReadOnlyDiscoveryIdentity`
+    (`RockchipDeviceDiscoveryContractTests.swift:345` 起,pin 缺省 =
+    bbd7);E0 面亦被污染。
+  - 拒 D(Host:800–806 改声明 bbd7 或双 pin 放行):Facts:340/345–352 双
+    断言 + prepare 期 Host:196–200 同 pin 恒拒;Facts 有意不在活声明内
+    (断言侧是真值锚,remediation 不得靠改断言过门),不动 Facts 而放行
+    bbd7 唯有新增 admission 放行路径,违负向底线。
+  - 越界检查:方向 A 全落本任务活声明内(Host + `Tests/**`;
+    `Package.swift` 零接触——新用例入 ArkDeckContractTests 既有 target,
+    #678 先例)。不存在「必须越出活声明」情形,无停手事由。
+  - 测试冲突面(base 实测):`Tests/**` 全量 grep
+    `toolOrDeviceObservationUnavailable` **零命中**——无既有用例 pin 当前
+    缺陷行为;RockchipFlashExecution{,Fault}ContractTests 经
+    `RockchipExecutionAdmissionPort` protocol fake(Recording/Rejecting)
+    与 production composition 零耦合;缺省 adapter 语义用例与方向 A 零冲突。
+- Input pins(audit base `git ls-tree` 实测完整 blob OID;实现开工须逐项复核
+  零漂移,标注 invariant 者实现前后字节不变):
+
+  | File | Git blob OID(audit base) | 性质 |
+  | --- | --- | --- |
+  | `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipFlashExecutionHost.swift` | `50c23bf2b431bcae0fa4beb90f315a456957cc0c` | 待改:仅 1039 组装行 + 同文件 internal seam;196–200/800–806 等其余语义零变更 |
+  | `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipDeviceDiscovery.swift` | `38e38a2afc479993588a13c3fb10a8c7393eb64b` | 预期零修改;4–6/9–28/542–553/555–575 为行级 invariant |
+  | `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipAuthorizationFacts.swift` | `971fe98feb9c9f5debf4abef948420383570f8ef` | invariant:只读真值锚,活声明外,实现禁触 |
+  | `Packages/ArkDeckKit/Tests/ArkDeckContractTests/RockchipDeviceDiscoveryContractTests.swift` | `2a8318f6c4a54b44f7f6644d98b5c42825c988c5` | 仅新增用例,既有用例零修改 |
+  | `Packages/ArkDeckKit/Tests/ArkDeckContractTests/RockchipRockUSBFlashProviderContractTests.swift` | `db5986dda762286bda6872ed1b938299045e08fa` | invariant(015-01/02 腿) |
+  | `Packages/ArkDeckKit/Tests/ArkDeckContractTests/StandingAuthorizationContractTests.swift` | `d3750b771062c7ae2b9108cd6e8267772343471f` | invariant(015-01/02 腿) |
+  | `Packages/ArkDeckKit/Tests/ArkDeckContractTests/RockchipFlashExecutionContractTests.swift` | `82629470a4e8c16e5935159fa19aa93a0a2cf43a` | invariant(protocol fake 面) |
+  | `Packages/ArkDeckKit/Tests/ArkDeckContractTests/RockchipFlashExecutionFaultContractTests.swift` | `4a67cf7f7a50b41327049fa176ee84a11d112aba` | invariant(同上) |
+  | 本 change `tasks.md`(本 PR 改前) | `6de7ebe1d481be41c74de0f816cda8538fb80d05` | 本 PR 载体 |
+
+  hash 常量行级锚(实测):`038a8a0e…3611` = Discovery:24(定义)、
+  Host:804(声明)、Host:200(prepare)、Facts:340(断言,349 消费);
+  `bbd7bdc0…9923` = Discovery:12(定义)、Discovery:543(缺省 init 绑定)。
+  新契约测试文件若新增,落
+  `Packages/ArkDeckKit/Tests/ArkDeckContractTests/` 既有 target 目录。
+- 验证计划(全部二值,可直译 XCTest;real-fault = 注入真实错误 profile 实体
+  走真实声明门,禁 fake 常量分支,TR-002R 先例):
+  1. 正向(AIN-COMP-001 正腿):测试侧以完整 64-hex **字面量**独立 pin
+     `038a8a0ea26ef7eb77451789f310c0c9fbeaf43a78af1d6146e02311a9c23611`;
+     断言 production seam 返回的 adapter 对按 Host:800–806 形态声明的 tool
+     走真实 `processRequest`(Discovery:555–575)成功,返回
+     `ProcessIdentityBoundRequest.expectedSHA256` == 该字面量,且该字面量 ==
+     `RockchipDiscoveryIntegrationProfile.pinnedProduction.executableSHA256`
+     (即 Facts:340 所读同一常量)——composition/Facts/测试三方一致。禁写成
+     `pinnedProduction == pinnedProduction` 的套套断言:字面量是测试侧独立
+     锚,常量漂移即红。
+  2. 负向(AIN-COMP-001 负腿,real-fault):以 Discovery:547–553 init 注入
+     `.pinnedReadOnlyDiscovery`(= 今日缺陷组合)对同一声明 tool:
+     `processRequest` 抛 `.executableHashMismatch`(570–572);并经
+     `RockchipDiscoveryToolDeviceFactPort`(Facts:115,internal init)走
+     `observeToolAndDevice()` 抛
+     `RockchipAuthorizationFactError.toolOrDeviceObservationUnavailable`
+     (Facts:140–143)——错误形态与既有类型逐字一致,不新增任何放行路径;
+     声明门失败即 `blockedToolAttempt`(discover 585 起,592)零进程
+     spawn,用例封闭。
+  3. 015-01/02 不放宽(零修改腿):
+     `RockchipRockUSBFlashProviderContractTests.swift` 与
+     `StandingAuthorizationContractTests.swift` 的 015-01/02 用例零修改,
+     base 实测三条 PASS 行逐字保持:
+     `TEST-AC-FLASH-015-01 PASS destructive_dispatch=0 job=policyBlocked handoff=controlled`、
+     `TEST-AC-FLASH-015-01 PASS agent=policyBlocked ci=policyBlocked planOnly=allowed dispatch=0`、
+     `TEST-AC-FLASH-015-02 PASS mismatch_fields=8 stale_plan_blocked=1 real_dispatch=0 realhardware_evidence=none`。
+  4. 全量零回归:base 于本 worktree 实测 **Executed 415 tests, with 1 test
+     skipped and 0 failures (0 unexpected)**,exit 0;汇总行取自完整输出
+     文件、不经管道截断(AIN-004 r3 方法学注记沿用;`swift test` 末尾
+     swift-testing「0 tests in 0 suites」行非汇总权威,以 XCTest Executed
+     行为准)。实现后 = 415 + 新增 / 1 skipped / 0 failures,既有用例零
+     修改;满足任务卡底线(不低于 400/1/0);实现开工须以届时 main 重测
+     基线(在飞 #687 合入会增计数,底线随实测上移)。
+- E0/E2 边界:约束 = TASK-AIN-004 r4 前置清单第 7 条(不复述):本任务
+  done 前 E2 面不可达,E0 面不受本缺陷约束(DEC-012 判 (a),#670)。本
+  readiness 与方向 A 实现均零 E0 面接触(缺省 adapter 语义不动)。
+- 交集/环境(起草时实测):open PR = #689(scripts/chg-2026-041 面)与
+  #687(chg-2026-022 的 HDC/Process/专属测试文件面)——两者与本 PR 文件集
+  及本任务 pinned 实现面全部零交集(gh files 实测);实现开工时须以当时
+  在飞集合重测。
+- rebase 注记:起草期间 #683(TASK-UD-R2-DIAG-001 实现)合入 main,首推
+  判定按当时 main 头把该 merge 的五文件计入本 PR 差集而红;载体遂 rebase
+  到 `495c7356081a83d18538ae6fcdb3e3580134dfbf`(#683 merge)。audit
+  base → 该 OID 区间实测**仅**五个 chg-2026-008/`scripts/**` 文件,与本
+  PR 文件集及本任务 pinned 实现面零交集,`Packages/` 差集为 0;上表九项
+  blob pin 已在该 OID 逐项 `ls-tree` 复核同值,行号锚与 Swift/check-sdd
+  基线因此可迁移(#678 rebase 注记同型)。
+- 守卫与自检(本 head 实测):base 树 `check_pr_paths` 对本任务解析恰得
+  5 条声明、全仓 46 个 active 任务解析零异常;编辑后 tasks.md 复跑同值
+  (无 AIN-004 型 multiple 声明行形态);本地以 fake event(base = rebase
+  后 main 头,head = 本 commit)模拟判定 PASS;`./scripts/check-sdd.sh`
+  0 error / 0 warning / 111 acceptance IDs;`git diff --check` 干净。
+- stop gate:实现若需上述 pinned 集之外文件(含
+  `Packages/ArkDeckKit/Package.swift`、`RockchipAuthorizationFacts.swift`、
+  `openspec/specs/**`、`openspec/contracts/**`、`scripts/**`),停手、先以
+  独立治理 PR 修订本任务 scope,不得静默扩展(CHG-2026-024 r2 先例)。
 
 ## TASK-AIN-004 — 首次无人值守真机验收(DAYU200)
 
