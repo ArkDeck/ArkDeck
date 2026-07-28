@@ -574,10 +574,15 @@ change approved 前保持 blocked;approved 后每任务另需独立 readiness PR
 
 ## TASK-AIN-BKMK-001 — pinned tool 宿主前置消费与签名身份解耦(remediation)
 
-- Status:blocked（r1 D1 blocked-readiness；三个登记候选均不能在本任务现有
-  scope 内同时满足「跨不同签名身份消费」正向 AC 与既有 security-scoped/
-  persistence 语义。本记录只钉定实测、输入与停止边界；合入不构成 `ready`，
-  不得开始 implementation/evidence，零 `Packages/**` 修改。）
+- Status:blocked（r2 Route A governance amendment；仅在维护者 review/merge
+  本独立治理 PR 后，普通 bookmark 的 typed contract、迁移边界与扩展 scope
+  才生效；合入仍不构成 `ready`，必须另做 fresh D1 readiness，当前不得开始
+  implementation/evidence。）
+- Historical Status:blocked（r1 D1 blocked-readiness；#703 exact head
+  `e61e99790fe49772cc80614a664585871d5176f1` 经 `lvye` APPROVED，并以
+  `20aeee5653d7eece08911c0a84afc92c1fa09702` 合入；三个登记候选当时均不能在
+  既有 scope 内同时满足跨身份正向 AC 与 scoped/persistence 语义。合入明确
+  不构成 `ready`，其事实与停止边界保留如下。）
 - Historical Status:blocked（前置:本登记合入后另起独立 readiness PR；
   Depends on 的 TASK-AIN-003 done 已满足。本登记 PR 零实现、不触碰
   `Packages/**`。）
@@ -704,24 +709,118 @@ change approved 前保持 blocked;approved 后每任务另需独立 readiness PR
     `2026-07-28T07:06:39Z` 分页完整查询时，#700/#701 已成为本 audit base，
     open PR 集合为空；两次 merge 与本 readiness 载体及全部 candidate surface
     零交集。本 PR 只修改当前 `tasks.md` 的 TASK-AIN-BKMK-001 section。
+- Governance route amendment(r2,2026-07-28;**only effective after maintainer
+  review/merge this exact head**):
+  - **Route decision:A / ordinary bookmark。**r1 已证明普通 bookmark 可被
+    signing identity 不同的进程消费；方向 (b) 不满足既定跨身份 AC，方向 (c)
+    仍被 CHG-2026-036 BRC-003/BRC-004 阻断。r2 因此选择 A，但只用于当前
+    non-sandbox `arkdeck` CLI 的 `pinnedProduction` execution prerequisite；
+    不把普通 bookmark 扩到 sandbox App，不改变 E0 read-only discovery。
+  - **Typed access contract:closed。**`RockchipToolPathSource` 新增
+    `installedOrdinaryBookmark`；selected tool 的 bookmark bytes 字段必须改为
+    中性命名/typed carrier，不能继续称为 `securityScopedBookmark`。
+    discovery profile 必须以 closed typed access policy 分别固定
+    `pinnedReadOnlyDiscovery → userSelectedSecurityScopedBookmark` 与
+    `pinnedProduction → installedOrdinaryBookmark`，不得用单个
+    `requiresSecurityScopedBookmark` Bool 或 caller-supplied label 模糊两条路。
+    production ordinary 分支只以 `[.withoutUI]` resolve，要求 non-stale、
+    absolute file URL、resolved/canonical path 与 selected executable 精确相等；
+    该分支不得调用或要求 `startAccessingSecurityScopedResource()`。E0 scoped
+    分支继续以 `[.withSecurityScope,.withoutUI]` resolve、要求 scope start，
+    其 registry/profile/hash/argv 与既有 tests 逐字保持。
+  - **Install/storage contract:closed。**新增唯一 product-owned install 入口
+    `arkdeck flash install-tool --path <absolute-path>`。它只接受 regular、
+    non-symlink、canonical absolute file，先独立计算并要求 SHA-256 精确等于
+    `pinnedProduction`，创建 ordinary bookmark 后以 ordinary options
+    self-roundtrip/path-match，再写新 key
+    `ArkDeck.Rockchip.ToolOrdinaryBookmarkV1`；任一步失败均不得留下可消费的新
+    key。installer 不写 code-trust/quarantine、Keychain、binding、authorization
+    或其他 D-1 项，不启动工具/Process port，不接触 USB/device。CLI path 只是
+    安装输入，后续 admission 仍以 bookmark resolve + descriptor-bound hash/
+    identity receipt 为事实，caller 不获得 launch capability。
+  - **Legacy/migration gate:fail closed。**旧 key
+    `ArkDeck.Rockchip.ToolBookmark` 只可作为 migration detector，永不再进入
+    production resolve；legacy-only、legacy+new 并存、new key 缺失/非 Data/
+    corrupt/stale/path mismatch 均在 `load()` 第 1 项阻断并输出受控
+    `productionConfigurationUnavailable` 文案，产品 Process port/executor
+    dispatch=0。installer 只有在新 bookmark 已 self-check/write/readback 成功
+    后才删除 legacy key；中途 crash 最坏留下 dual-key，而 dual-key 必须继续
+    fail closed，重跑 installer 可完成恢复。不得把旧 scoped bytes 按 ordinary
+    options 猜测消费，也不得回退外部 PATH/Homebrew/裸 path。
+  - **Persistence compatibility gate:closed widening。**新产生的 authorized
+    Rockchip Manifest `2.1.0` 必须写
+    `pathSource:"installedOrdinaryBookmark"`；既有
+    `pathSource:"userSelectedSecurityScopedBookmark"` 的历史 2.1 Manifest
+    bytes 保持可读、不可改写。change-local
+    `manifest.schema.v2.1-draft.json` 与 locked validator 只把这两个值作为 closed
+    enum 接受；新 production writer 只能发出新值，未知值继续拒绝。Manifest/
+    journal/export 仍禁止绝对 path、bookmark bytes、argv/environment；schema
+    version、profile/version/hash/descriptor identity、authorization/usage/
+    intent correlation 与 v1/v2 历史语义全部不变。
+  - **Security/authority gate:unchanged。**ordinary bookmark 只替换 D-1 第 1 项的
+    locator persistence，不授予 authority。platform trust/quarantine、production
+    hash pin、descriptor identity、fresh protected-main grant、usage reservation、
+    binding/readback、plan/firmware/step pins、intent-before-dispatch 与
+    AC-FLASH-015-01/02 dispatch=0 全部原样；bookmark bytes、defaults 与安装 path
+    均不得成为 authorization/evidence truth。
+  - **Exact implementation surface after fresh readiness:closed。**Route A
+    实现只能修改下方扩展后的 Allowed paths；尤其 current specs/contracts、
+    RockUSB E0 integration registry、CHG-2026-036、App/Xcode、Package.swift、
+    Process/authorization/provider/journal/retention、scripts 与任何设备面均
+    read-only。若实现需要这些文件之一，停手并先开新的独立治理 PR，不在
+    readiness/implementation 中扩面。
+  - **Fresh D1 gate:required。**本治理 PR merge 后仍须独立 readiness：
+    从届时 main pin 全部 implementation blobs；重新做 open-PR intersection 与
+    production source-reachability，证明 ordinary route 只可由 CLI
+    `pinnedProduction` 到达而 E0/App 不可达；钉定 installer/load 可测试 seam、
+    同 executable basename/`arkdeck` defaults domain 但
+    different-Identifier/CDHash 的 two-product-build matrix、legacy/dual-key/
+    crash migration fault matrix、2.1 old/new schema compatibility matrix、
+    exact focused/full Swift commands与 run evidence shape。任何 seam 需要超出本 scope，
+    或跨身份正向无法在**产品路径**复现，任务继续 blocked。
+  - **This governance PR effect/concurrency boundary。**base =
+    `02907b69b8fd7d1347ba26822e4a1961415fbc16`(#704 merge)；#703 exact head
+    于 `2026-07-28T07:13:51Z` 经 `lvye` APPROVED，并于
+    `2026-07-28T07:13:57Z` 由其以
+    `20aeee5653d7eece08911c0a84afc92c1fa09702` 合入，且为本 base 祖先。
+    起草期间 #704 合入的五个 CHG-2026-022 proposal 文件与本载体/后继
+    surface 零交集；`2026-07-28T07:23:10Z` 分页完整查询的 open PR 集合为空。
+    本 PR 只修改当前 `tasks.md` 的本任务 section；零 product/schema/runbook
+    实现、零 defaults/Keychain/credential/network/process/tool/HDC/USB/device/
+    E1/E2/destructive effect，不自行写 `Decision-Grade`。
 - Platform:macos
 - Requirements:REQ-FLASH-015(MODIFIED)
 - Acceptance:change-local AIN-BKMK-001(登记于 verification.md Acceptance
   matrix;AC-FLASH-015-01/02 行为不回退是其负向底线)
-- Depends on:TASK-AIN-003(done,#292/#293;缺陷见其 Defect record 2)+ 独立
-  readiness
+- Depends on:TASK-AIN-003(done,#292/#293;缺陷见其 Defect record 2)+ r2
+  Route A governance merge + 独立 fresh D1 readiness
 - Allowed paths:
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipFlashExecutionHost.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckCLI/ArkDeckCLIMain.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipDeviceDiscovery.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckStorage/SessionManifest.swift`
   - `Packages/ArkDeckKit/Tests/**`
+  - 本 change `contracts/manifest.schema.v2.1-draft.json`
+  - 本 change `evidence/host-prerequisites/installation-runbook.md`
   - 本 change `tasks.md`（仅本任务段的状态/pins/evidence 引用）
   - 本 change `evidence/runs/TASK-AIN-BKMK-001/**`
 - Forbidden paths:
   - `openspec/specs/**`
   - `openspec/contracts/**`
+  - `openspec/integrations/**`
+  - 本 change 其余 `contracts/**`
+  - `Packages/ArkDeckKit/Package.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckProcess/**`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipFlashAuthorization.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipAuthorizationFacts.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckStorage/Journal*.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckStorage/RetentionAndExport.swift`
+  - `ArkDeckApp/**`
+  - `ArkDeck.xcodeproj/**`
+  - `openspec/changes/chg-2026-036-macos-bundled-rockchip-component/**`
   - `scripts/**`
-- Risk:medium（宿主前置消费机制与 CLI 面;零授权门语义变更、零设备 effect、
-  凭据面零接触）
+- Risk:medium（宿主 locator、CLI install 与 2.1 persistence closed widening；
+  零授权门语义变更、零设备 effect、凭据面零接触）
 - Hardware required:no
 
 ### Deliverables
@@ -729,21 +828,31 @@ change approved 前保持 blocked;approved 后每任务另需独立 readiness PR
 - Objective:使 pinned tool 的宿主前置(D-1 第 1 项)**不依赖创建者
   code-signing 身份**即可被产品稳定消费——跨进程且跨(签名身份不同的)构建,
   `load()` 对第 1 项的消费不再因创建者/消费者签名身份差异而失败(缺陷正本 =
-  TASK-AIN-003「Defect record 2」与 runbook §2/§8 勘误注记)。方向候选**仅
-  登记、不预设**,由独立 readiness 实测钉定其一(或如实另裁):
-  (a) 非沙箱 CLI 改用普通(非 security-scoped)bookmark——`.withSecurityScope`
-  对非沙箱进程并无沙箱语义;(b) 产品新增安装子命令,以「r4 执行窗口与安装用
-  同一构建产物」纪律消费 security-scoped bookmark;(c) 稳定签名身份(涉
-  CHG-2026-036 签名/分发面,重,须先与该 change 协调 scope)。
+  TASK-AIN-003「Defect record 2」与 runbook §2/§8 勘误注记)。r2 选择
+  **Route A**：non-sandbox CLI 以 product install 入口创建 ordinary bookmark，
+  后续不同 signing identity 的 build 仍可消费；E0 security-scoped 与未来
+  bundled/App 路线不变。
+- closed typed access policy + 新 ordinary bookmark key/installer + legacy
+  fail-closed migration；不得把普通 bytes 标成 scoped；
+- Manifest 2.1 new writer 发出 `installedOrdinaryBookmark`，历史
+  `userSelectedSecurityScopedBookmark` 保持可读不改写；
 - 跨签名身份消费的 contract/受控测试(正向)+ 既有 fail-closed 门零放宽的
   负向测试;
 - `evidence/runs/TASK-AIN-BKMK-001/` run 记录(全量测试基线对比)。
 
 ### Verification
 
-- 正向(二值):签名身份不同的两个构建产物先后消费同一已安装第 1 项前置,
-  `load()` 层消费成功(具体测试形态由独立 readiness 钉定;Defect record 2 的
-  矩阵红行按新机制复测为绿);
+- 正向(二值):同 basename/`arkdeck` defaults domain 的 build A 经 product
+  install 入口安装 ordinary bookmark 后，Identifier/CDHash 均不同的 build B
+  在**产品 `load()`/Discovery 路径**消费同一已安装第 1 项前置成功；Defect
+  record 2 的跨身份红行转绿，且不是 probe-only 或同身份自证（exact harness
+  由 fresh readiness 钉定）;
+- persistence(二值):新 2.1 Manifest 只发出 `installedOrdinaryBookmark`，历史
+  2.1 scoped 值仍可读且 canonical bytes 不改写；unknown pathSource、普通/scoped
+  混用与 bookmark bytes/absolute path 入 Manifest 全拒绝;
+- migration(二值):legacy-only、legacy+new、new missing/wrong type/corrupt/stale/
+  path mismatch、installer hash/symlink/self-roundtrip/write-readback fault 全在
+  product spawn 前阻断；重跑 installer 可从 dual-key crash state 恢复;
 - 负向(二值):既有 fail-closed 门零放宽——bookmark/前置缺失、stale、实体
   hash 不中等一切既有拒绝路径语义保持,AC-FLASH-015-01/02 无授权/不匹配 →
   dispatch=0 逐字保持,不新增任何 admission 放行路径;
@@ -757,8 +866,9 @@ change approved 前保持 blocked;approved 后每任务另需独立 readiness PR
   `-[0-9]{3}[A-Z]?`),故取本 token,实测依据见 Defect record 2 命名注记。
 - 本任务 done 前:TASK-AIN-004 的 D-1 第 1 项不可闭合,runbook §7 探针恒止于
   第一站(其 r4 前置清单第 8 条);E0 面零消费 `load()`,不受本缺陷约束。
-- 方向 (c) 触碰 CHG-2026-036 的签名/分发面:若 readiness 裁定走 (c),须先以
-  独立治理 PR 与该 change 协调 scope,不得在本任务活声明外静默扩面。
+- r2 已选择 ordinary Route A；CHG-2026-036 的 bundled/signed/App 路线保持
+  独立且 read-only，不是本任务 dependency，也不得借本任务提前实现其 BRC-004
+  composition。
 - 独立 readiness 须以当时 main 钉定待改文件 blob(全 OID)与实现方向,并复核
   缺陷仍在——若届时上游已另行修复,如实记录并按实况处置,不重复实现。
 - Decision-Grade 行由维护者亲笔(TASK-BRC-002R 先例)。
