@@ -86,9 +86,14 @@ final class RockchipFlashExecutionContractTests: XCTestCase {
     XCTAssertGreaterThanOrEqual(manifest.artifacts.count, 12)
     XCTAssertTrue(manifest.artifacts.allSatisfy { $0.role == .raw })
     let manifestText = String(decoding: manifest.canonicalData, as: UTF8.self)
+    let manifestRoot = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: manifest.canonicalData) as? [String: Any])
+    let toolchain = try XCTUnwrap(manifestRoot["toolchain"] as? [String: Any])
+    XCTAssertEqual(toolchain["pathSource"] as? String, "installedOrdinaryBookmark")
     XCTAssertFalse(manifestText.contains(fixture.executable.path))
     XCTAssertFalse(manifestText.contains(fixture.archive.path))
     XCTAssertFalse(manifestText.contains("/.vol/"))
+    XCTAssertFalse(manifestText.contains("bookmarkData"))
     XCTAssertFalse(manifestText.contains("contractFake"))
 
     let records = try persistence.auditRecordsForTesting(
@@ -100,7 +105,8 @@ final class RockchipFlashExecutionContractTests: XCTestCase {
     XCTAssertEqual(admission.closedIntentIDs.count, 9)
     print(
       "TEST-AIN-DISPATCH-001 PASS argv=1ld+1ppt+9wlx+1rd schema=2.1.0 "
-        + "evidence=contractFake realDevice=0 hdc=0 network=0 shell=0")
+        + "pathSource=installedOrdinaryBookmark evidence=contractFake "
+        + "realDevice=0 hdc=0 network=0 shell=0")
   }
 
   func testPublicRequestRejectsAuthorityAndSelectorInjection() throws {

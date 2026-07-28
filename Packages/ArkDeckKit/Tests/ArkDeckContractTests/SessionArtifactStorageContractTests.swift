@@ -144,14 +144,17 @@ final class SessionArtifactStorageContractTests: XCTestCase {
     let fixture = try await makeSession(
       sessionID: "session-rockchip-v21", jobID: "job-rockchip-v21")
     defer { try? FileManager.default.removeItem(at: fixture.base) }
-    let manifest = try SessionManifestDocument(
-      data: authorizedManifestData(
-        sessionID: fixture.layout.sessionID, jobID: fixture.layout.jobID,
-        step: manifestStep, reference: reference,
-        destructiveIntentEventIDs: ["rockchip-intent"],
-        schemaVersion: JournalEvent.rockchipAuthorizedAgentSchemaVersion,
-        toolchain: toolchain))
+    let historicalScopedData = try authorizedManifestData(
+      sessionID: fixture.layout.sessionID, jobID: fixture.layout.jobID,
+      step: manifestStep, reference: reference,
+      destructiveIntentEventIDs: ["rockchip-intent"],
+      schemaVersion: JournalEvent.rockchipAuthorizedAgentSchemaVersion,
+      toolchain: toolchain)
+    let manifest = try SessionManifestDocument(data: historicalScopedData)
     XCTAssertEqual(manifest.schemaVersion, "2.1.0")
+    XCTAssertEqual(
+      manifest.canonicalData, historicalScopedData,
+      "historical security-scoped manifests must remain byte-stable")
     let canonicalRoot = try jsonObject(manifest.canonicalData)
     let canonicalToolchain = try XCTUnwrap(canonicalRoot["toolchain"] as? [String: Any])
     XCTAssertEqual(
@@ -166,6 +169,21 @@ final class SessionArtifactStorageContractTests: XCTestCase {
     XCTAssertEqual(canonicalDescriptor["inode"] as? Int, 29)
     XCTAssertEqual(canonicalDescriptor["fileSize"] as? Int, 4_096)
     XCTAssertEqual(canonicalDescriptor["mode"] as? Int, 0o100755)
+    var ordinaryToolchain = toolchain
+    ordinaryToolchain["pathSource"] = "installedOrdinaryBookmark"
+    let ordinaryManifest = try SessionManifestDocument(
+      data: authorizedManifestData(
+        sessionID: fixture.layout.sessionID, jobID: fixture.layout.jobID,
+        step: manifestStep, reference: reference,
+        destructiveIntentEventIDs: ["rockchip-intent"],
+        schemaVersion: JournalEvent.rockchipAuthorizedAgentSchemaVersion,
+        toolchain: ordinaryToolchain))
+    let ordinaryRoot = try jsonObject(ordinaryManifest.canonicalData)
+    let ordinaryCanonicalToolchain = try XCTUnwrap(
+      ordinaryRoot["toolchain"] as? [String: Any])
+    XCTAssertEqual(
+      ordinaryCanonicalToolchain["pathSource"] as? String,
+      "installedOrdinaryBookmark")
     try appendAuthorizedTerminalJournal(
       layout: fixture.layout, manifest: manifest, workflowStep: workflowStep,
       reference: reference, intentEventID: "rockchip-intent",
@@ -321,6 +339,7 @@ final class SessionArtifactStorageContractTests: XCTestCase {
     print(
       "TEST-AIN-ROCKCHIP-PERSISTENCE-001 manifest=2.1.0 journal=2.1.0 "
         + "identity=descriptor-bound "
+        + "path_sources=historical-scoped,new-ordinary historical_bytes=stable "
         + "export=non-sensitive negatives=closed-shape mixed-version=rejected dispatch=0")
   }
 

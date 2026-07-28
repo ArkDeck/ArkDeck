@@ -10,8 +10,8 @@ import XCTest
 /// `RockchipAuthorizationFacts` asserts. The negative leg injects the exact
 /// pre-remediation defect (the read-only E0 profile behind the
 /// production-declared tool) and proves it stays fail closed with the existing
-/// error vocabulary and zero process spawn. The suite never launches a process
-/// and never touches a device.
+/// typed path-source error vocabulary and zero process spawn. The suite never
+/// launches a process and never touches a device.
 final class RockchipProductionCompositionContractTests: XCTestCase {
   /// Independent test-side anchor for the destructive production tool pin.
   /// Deliberately a literal rather than a read of the production constant:
@@ -64,9 +64,9 @@ final class RockchipProductionCompositionContractTests: XCTestCase {
 
     do {
       _ = try await defectiveAdapter.processRequest(for: tool)
-      XCTFail("the declarative hash gate must reject the read-only profile for this tool")
+      XCTFail("the typed path-source gate must reject the read-only profile for this tool")
     } catch {
-      XCTAssertEqual(error as? RockchipToolValidationError, .executableHashMismatch)
+      XCTAssertEqual(error as? RockchipToolValidationError, .pathSourceNotUserSelected)
     }
 
     let port = RockchipDiscoveryToolDeviceFactPort(
@@ -84,21 +84,21 @@ final class RockchipProductionCompositionContractTests: XCTestCase {
       launches.value, 0, "a blocked declaration gate must never spawn a process")
     print(
       "TEST-AIN-COMP-001 PASS leg=negative real_fault=readOnlyProfileInjection "
-        + "gate=executableHashMismatch admission=toolOrDeviceObservationUnavailable "
+        + "gate=pathSourceNotUserSelected admission=toolOrDeviceObservationUnavailable "
         + "spawn=0 device_dispatch=0")
   }
 
   // MARK: - Helpers
 
   /// A tool declared exactly in the production shape
-  /// (`RockchipProductExecutionSettings.load()`): user-selected
-  /// security-scoped bookmark, `pinnedProduction` reported version and
+  /// (`RockchipProductExecutionSettings.load()`): installed ordinary
+  /// bookmark, `pinnedProduction` reported version and
   /// executable hash, non-quarantined platform trust.
   private func productionDeclaredTool() -> RockchipSelectedDiscoveryTool {
     RockchipSelectedDiscoveryTool(
       executableURL: URL(fileURLWithPath: "/usr/bin/true"),
-      pathSource: .userSelectedSecurityScopedBookmark,
-      securityScopedBookmark: Data([0x01]),
+      pathSource: .installedOrdinaryBookmark,
+      bookmarkData: Data([0x01]),
       reportedVersion: RockchipDiscoveryIntegrationProfile.pinnedProduction.reportedToolVersion,
       sha256: RockchipDiscoveryIntegrationProfile.pinnedProduction.executableSHA256,
       platformTrust: RockchipPlatformTrustReceipt(

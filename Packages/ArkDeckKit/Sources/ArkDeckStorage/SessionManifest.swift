@@ -788,7 +788,10 @@ private enum LockedSessionManifestValidator {
   private static let rockchipReportedVersion = "rkdeveloptool ver 1.32"
   private static let rockchipExecutableSHA256 =
     "038a8a0ea26ef7eb77451789f310c0c9fbeaf43a78af1d6146e02311a9c23611"
-  private static let rockchipPathSource = "userSelectedSecurityScopedBookmark"
+  private static let rockchipPathSources: Set<String> = [
+    "userSelectedSecurityScopedBookmark",
+    "installedOrdinaryBookmark",
+  ]
 
   private static let topLevelKeys: Set<String> = [
     "schemaVersion", "appVersion", "coreSpecBaseline", "platformProfile", "sessionId",
@@ -990,7 +993,7 @@ private enum LockedSessionManifestValidator {
       guard try object.manifestString("profileIdentifier") == rockchipProfileIdentifier,
         try object.manifestString("reportedVersion") == rockchipReportedVersion,
         try object.manifestString("sha256") == rockchipExecutableSHA256,
-        try object.manifestString("pathSource") == rockchipPathSource
+        rockchipPathSources.contains(try object.manifestString("pathSource"))
       else { throw failure("rockchip toolchain does not match the pinned integration profile") }
       let identity = try object.manifestObject("descriptorIdentity")
       try identity.manifestRequireKeys(["device", "inode", "fileSize", "mode"])

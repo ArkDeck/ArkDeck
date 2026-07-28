@@ -169,7 +169,12 @@
         "profileIdentifier": { "const": "ROCKCHIP-ROCKUSB-DISCOVERY@1.0.0" },
         "reportedVersion": { "const": "rkdeveloptool ver 1.32" },
         "sha256": { "const": "038a8a0ea26ef7eb77451789f310c0c9fbeaf43a78af1d6146e02311a9c23611" },
-        "pathSource": { "const": "userSelectedSecurityScopedBookmark" },
+        "pathSource": {
+          "enum": [
+            "userSelectedSecurityScopedBookmark",
+            "installedOrdinaryBookmark"
+          ]
+        },
         "descriptorIdentity": { "$ref": "#/$defs/rockchipDescriptorIdentity" }
       }
     },

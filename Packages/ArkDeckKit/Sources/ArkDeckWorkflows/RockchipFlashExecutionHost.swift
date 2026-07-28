@@ -7,6 +7,12 @@ import Foundation
 import IOKit
 import Security
 
+public enum RockchipToolInstallation {
+  public static func install(executableURL: URL) throws {
+    try RockchipProductToolBookmarkStore.production.install(executableURL: executableURL)
+  }
+}
+
 public struct RockchipFlashExecutionHost: Sendable {
   private let executor: RockchipFlashExecutor
 
@@ -179,15 +185,11 @@ final class FoundationRockchipExecutionProcessPort: @unchecked Sendable,
 {
   private let executableURL: URL
   private let executor: FoundationProcessExecutor
-  private let securityScopedURL: URL?
 
-  init(executableURL: URL, securityScopedURL: URL?, executor: FoundationProcessExecutor) {
+  init(executableURL: URL, executor: FoundationProcessExecutor) {
     self.executableURL = executableURL
-    self.securityScopedURL = securityScopedURL
     self.executor = executor
   }
-
-  deinit { securityScopedURL?.stopAccessingSecurityScopedResource() }
 
   func prepare(
     command: RockchipClosedCommand,
@@ -537,7 +539,7 @@ final class RockchipDurableExecutionPersistence: @unchecked Sendable,
           RockchipDiscoveryIntegrationProfile.pinnedProduction.reportedToolVersion),
         "sha256": .string(
           RockchipDiscoveryIntegrationProfile.pinnedProduction.executableSHA256),
-        "pathSource": .string("userSelectedSecurityScopedBookmark"),
+        "pathSource": .string("installedOrdinaryBookmark"),
         "descriptorIdentity": .object([
           "device": .unsignedInteger(admission.executableIdentity.device),
           "inode": .unsignedInteger(admission.executableIdentity.inode),
@@ -679,7 +681,6 @@ private enum RockchipProductionExecutionComposition {
       tool: settings.tool, clock: clock, usbProbe: usbProbe)
     let process = FoundationRockchipExecutionProcessPort(
       executableURL: settings.tool.executableURL,
-      securityScopedURL: settings.securityScopedURL,
       executor: FoundationProcessExecutor())
     let postflight = RockchipProductPostflightPort(probe: usbProbe)
     let coordinator = storage.context.coordinator
@@ -736,23 +737,202 @@ private struct RockchipProductBindingSnapshot: Codable, Sendable {
   let evidence: [String]
 }
 
+struct RockchipToolBookmarkPreferences {
+  let object: (String) -> Any?
+  let setObject: (Any, String) throws -> Void
+  let removeObject: (String) throws -> Void
+
+  static func userDefaults(_ defaults: UserDefaults) -> RockchipToolBookmarkPreferences {
+    RockchipToolBookmarkPreferences(
+      object: { defaults.object(forKey: $0) },
+      setObject: { value, key in defaults.set(value, forKey: key) },
+      removeObject: { defaults.removeObject(forKey: $0) })
+  }
+}
+
+struct RockchipOrdinaryBookmarkCodec: Sendable {
+  let create: @Sendable (URL) throws -> Data
+  let resolve: @Sendable (Data) throws -> RockchipBookmarkResolution
+
+  static let foundation = RockchipOrdinaryBookmarkCodec(
+    create: {
+      try $0.bookmarkData(
+        options: [],
+        includingResourceValuesForKeys: nil,
+        relativeTo: nil)
+    },
+    resolve: {
+      var isStale = false
+      let url = try URL(
+        resolvingBookmarkData: $0,
+        options: [.withoutUI],
+        relativeTo: nil,
+        bookmarkDataIsStale: &isStale)
+      return RockchipBookmarkResolution(url: url, isStale: isStale)
+    })
+}
+
+struct RockchipPinnedExecutableVerifier: Sendable {
+  let verify: @Sendable (URL) throws -> Void
+
+  static let production = RockchipPinnedExecutableVerifier { executableURL in
+    let request = ProcessIdentityBoundRequest(
+      process: ProcessRequest(executable: executableURL),
+      expectedSHA256: RockchipDiscoveryIntegrationProfile.pinnedProduction.executableSHA256)
+    let prepared = try FoundationProcessExecutor().prepareIdentityBoundLaunch(request)
+    prepared.close()
+  }
+}
+
+struct RockchipInstalledToolLocator {
+  let executableURL: URL
+  let bookmarkData: Data
+}
+
+struct RockchipProductToolBookmarkStore {
+  static let legacyKey = "ArkDeck.Rockchip.ToolBookmark"
+  static let ordinaryKey = "ArkDeck.Rockchip.ToolOrdinaryBookmarkV1"
+
+  let preferences: RockchipToolBookmarkPreferences
+  let codec: RockchipOrdinaryBookmarkCodec
+  let verifier: RockchipPinnedExecutableVerifier
+
+  static var production: RockchipProductToolBookmarkStore {
+    RockchipProductToolBookmarkStore(
+      preferences: .userDefaults(.standard),
+      codec: .foundation,
+      verifier: .production)
+  }
+
+  func install(executableURL: URL) throws {
+    let canonicalURL = try canonicalInstallURL(executableURL)
+    do {
+      try verifier.verify(canonicalURL)
+    } catch {
+      throw configurationError("pinned rkdeveloptool executable validation failed")
+    }
+
+    let bookmark: Data
+    do {
+      bookmark = try codec.create(canonicalURL)
+      _ = try resolve(bookmark, expectedURL: canonicalURL)
+    } catch let error as RockchipFlashExecutionError {
+      throw error
+    } catch {
+      throw configurationError("ordinary rkdeveloptool bookmark self-check failed")
+    }
+
+    let previousNewValue = preferences.object(Self.ordinaryKey)
+    do {
+      try preferences.setObject(bookmark, Self.ordinaryKey)
+      guard let readback = preferences.object(Self.ordinaryKey) as? Data,
+        readback == bookmark
+      else {
+        throw configurationError("ordinary rkdeveloptool bookmark write-readback failed")
+      }
+      _ = try resolve(readback, expectedURL: canonicalURL)
+    } catch {
+      restoreOrdinaryValue(previousNewValue)
+      if let error = error as? RockchipFlashExecutionError { throw error }
+      throw configurationError("ordinary rkdeveloptool bookmark persistence failed")
+    }
+
+    guard preferences.object(Self.legacyKey) != nil else { return }
+    do {
+      try preferences.removeObject(Self.legacyKey)
+      guard preferences.object(Self.legacyKey) == nil else {
+        throw configurationError("legacy rkdeveloptool bookmark deletion failed")
+      }
+    } catch let error as RockchipFlashExecutionError {
+      // A dual-key crash/fault state is intentionally retained. `load()` rejects it,
+      // and rerunning this installer can finish the migration.
+      throw error
+    } catch {
+      throw configurationError("legacy rkdeveloptool bookmark deletion failed")
+    }
+  }
+
+  func load() throws -> RockchipInstalledToolLocator {
+    let legacyPresent = preferences.object(Self.legacyKey) != nil
+    let newValue = preferences.object(Self.ordinaryKey)
+    if legacyPresent {
+      let detail =
+        newValue == nil
+        ? "legacy pinned rkdeveloptool bookmark requires product reinstall"
+        : "conflicting legacy and ordinary rkdeveloptool bookmarks require product reinstall"
+      throw configurationError(detail)
+    }
+    guard let newValue else {
+      throw configurationError("pinned rkdeveloptool ordinary bookmark is not installed")
+    }
+    guard let bookmark = newValue as? Data else {
+      throw configurationError("pinned rkdeveloptool ordinary bookmark has the wrong type")
+    }
+    let executableURL = try resolve(bookmark, expectedURL: nil)
+    return RockchipInstalledToolLocator(executableURL: executableURL, bookmarkData: bookmark)
+  }
+
+  private func canonicalInstallURL(_ url: URL) throws -> URL {
+    guard url.isFileURL, url.path.hasPrefix("/") else {
+      throw configurationError("rkdeveloptool install path must be an absolute file URL")
+    }
+    let standardized = url.standardizedFileURL
+    let canonical = standardized.resolvingSymlinksInPath().standardizedFileURL
+    guard url.path == standardized.path, standardized.path == canonical.path else {
+      throw configurationError("rkdeveloptool install path must be canonical and non-symlinked")
+    }
+    return canonical
+  }
+
+  private func resolve(_ bookmark: Data, expectedURL: URL?) throws -> URL {
+    let resolution: RockchipBookmarkResolution
+    do {
+      resolution = try codec.resolve(bookmark)
+    } catch {
+      throw configurationError("pinned rkdeveloptool ordinary bookmark is corrupt or inaccessible")
+    }
+    let standardized = resolution.url.standardizedFileURL
+    let canonical = standardized.resolvingSymlinksInPath().standardizedFileURL
+    guard !resolution.isStale, resolution.url.isFileURL, resolution.url.path.hasPrefix("/"),
+      standardized.path == canonical.path
+    else {
+      throw configurationError("pinned rkdeveloptool ordinary bookmark is stale or non-canonical")
+    }
+    if let expectedURL {
+      guard canonical == expectedURL.resolvingSymlinksInPath().standardizedFileURL else {
+        throw configurationError("pinned rkdeveloptool ordinary bookmark path mismatched")
+      }
+    }
+    return canonical
+  }
+
+  private func restoreOrdinaryValue(_ previousValue: Any?) {
+    if let previousValue {
+      try? preferences.setObject(previousValue, Self.ordinaryKey)
+    } else {
+      try? preferences.removeObject(Self.ordinaryKey)
+    }
+  }
+
+  private func configurationError(_ detail: String) -> RockchipFlashExecutionError {
+    .productionConfigurationUnavailable(detail)
+  }
+}
+
 private final class RockchipProductExecutionSettings: @unchecked Sendable {
   let usageRoot: URL
   let tool: RockchipSelectedDiscoveryTool
-  let securityScopedURL: URL
   let githubToken: String
   let binding: RockchipProductBindingSnapshot
 
   private init(
     usageRoot: URL,
     tool: RockchipSelectedDiscoveryTool,
-    securityScopedURL: URL,
     githubToken: String,
     binding: RockchipProductBindingSnapshot
   ) {
     self.usageRoot = usageRoot
     self.tool = tool
-    self.securityScopedURL = securityScopedURL
     self.githubToken = githubToken
     self.binding = binding
   }
@@ -775,37 +955,27 @@ private final class RockchipProductExecutionSettings: @unchecked Sendable {
     }
 
     let defaults = UserDefaults.standard
-    guard let bookmark = defaults.data(forKey: "ArkDeck.Rockchip.ToolBookmark") else {
-      throw RockchipFlashExecutionError.productionConfigurationUnavailable(
-        "pinned rkdeveloptool bookmark is not installed")
-    }
-    var stale = false
-    let executableURL = try URL(
-      resolvingBookmarkData: bookmark, options: [.withSecurityScope, .withoutUI],
-      relativeTo: nil, bookmarkDataIsStale: &stale)
-    guard !stale, executableURL.isFileURL, executableURL.path.hasPrefix("/"),
-      executableURL.startAccessingSecurityScopedResource()
-    else {
-      throw RockchipFlashExecutionError.productionConfigurationUnavailable(
-        "rkdeveloptool bookmark is stale or inaccessible")
-    }
+    let locator = try RockchipProductToolBookmarkStore(
+      preferences: .userDefaults(defaults),
+      codec: .foundation,
+      verifier: .production
+    ).load()
+    let executableURL = locator.executableURL
     let trustRaw = defaults.string(forKey: "ArkDeck.Rockchip.ToolCodeTrust")
     let trust = trustRaw.flatMap(RockchipPlatformCodeTrust.init(rawValue:)) ?? .unknown
     guard defaults.object(forKey: "ArkDeck.Rockchip.ToolQuarantinePresent") != nil else {
-      executableURL.stopAccessingSecurityScopedResource()
       throw RockchipFlashExecutionError.productionConfigurationUnavailable(
         "tool quarantine assessment is absent")
     }
     let quarantine = defaults.bool(forKey: "ArkDeck.Rockchip.ToolQuarantinePresent")
     let selectedTool = RockchipSelectedDiscoveryTool(
-      executableURL: executableURL, pathSource: .userSelectedSecurityScopedBookmark,
-      securityScopedBookmark: bookmark,
+      executableURL: executableURL, pathSource: .installedOrdinaryBookmark,
+      bookmarkData: locator.bookmarkData,
       reportedVersion: RockchipDiscoveryIntegrationProfile.pinnedProduction.reportedToolVersion,
       sha256: RockchipDiscoveryIntegrationProfile.pinnedProduction.executableSHA256,
       platformTrust: RockchipPlatformTrustReceipt(
         codeTrust: trust, quarantinePresent: quarantine))
     guard let token = try productKeychainToken(), !token.isEmpty else {
-      executableURL.stopAccessingSecurityScopedResource()
       throw RockchipFlashExecutionError.productionConfigurationUnavailable(
         "product GitHub provenance credential is not installed in Keychain")
     }
@@ -817,13 +987,12 @@ private final class RockchipProductExecutionSettings: @unchecked Sendable {
       binding.usbTopology.utf8.allSatisfy({ (48...57).contains($0) }),
       !binding.evidence.isEmpty, binding.evidence.allSatisfy({ !$0.isEmpty })
     else {
-      executableURL.stopAccessingSecurityScopedResource()
       throw RockchipFlashExecutionError.productionConfigurationUnavailable(
         "durable Rockchip binding snapshot is invalid")
     }
     return RockchipProductExecutionSettings(
       usageRoot: usage, tool: selectedTool,
-      securityScopedURL: executableURL, githubToken: token, binding: binding)
+      githubToken: token, binding: binding)
   }
 
   private static func productKeychainToken() throws -> String? {
