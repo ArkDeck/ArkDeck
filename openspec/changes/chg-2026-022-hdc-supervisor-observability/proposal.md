@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-022-hdc-supervisor-observability
-revision: 2
-status: approved # r1 经 main `1e4a7c4027ecdd1142ceab2b80f4423eec586d6d` 批准;r2 review-remediation 仅在对应治理 PR 由维护者 review/merge 后生效
+revision: 3
+status: approved # r1 经 main `1e4a7c4027ecdd1142ceab2b80f4423eec586d6d` 批准;r2 已合入;r3 App-facing remediation 仅在对应治理 PR 由维护者 review/merge 后生效
 class: platform
 core_change_level: none
 owner: lvye
@@ -10,6 +10,27 @@ platforms: [macos]
 ---
 
 # HDC supervisor 可观察性:仪表化计数、设备 fan-out 面、endpoint source 与 ownership 判定
+
+## Revision r3 App-facing fan-out remediation
+
+TASK-OBS-002 readiness(PR #700,merge
+`14fd6fede8707a46a1510ad6d7b419b76e6e2bc1`)在已交付 OBS-001 上复核出一项
+跨 package 前置缺口：设备 observation/fan-out 类型仍是
+`ArkDeckOpenHarmony` internal，production `ArkDeckWorkflows` facade 没有实例化
+或驱动该 composition，public `HDCDiagnosticsPresentation` 也没有带时间戳的设备
+事件投影。App 按 package-boundary contract 只能 import `ArkDeckCore`/
+`ArkDeckWorkflows`，所以既有 App-only TASK-OBS-002 scope 无法诚实实现
+`hdc.devices.events`。
+
+r3 采用 PR #700 预先列明的 remediation 方案 (a)：新增窄范围、Kit-only 的
+`TASK-OBS-001R`，补齐 App-facing typed event projection、production
+source/composition 的 refresh/cancel 生命周期、有界 presentation 传递以及
+UITest fixture 值；TASK-OBS-002 保持 App-only。新增
+`OBS-DEVICE-PRESENTATION-001` 单独验收该前置交付，不重判已完成的
+`OBS-FANOUT-001`。本 r3 只修订治理/设计/验证并登记 blocked task；不包含实现、
+不产生 evidence、不执行 HDC 或设备命令。维护者 merge 本 revision 只批准
+remediation scope，`TASK-OBS-001R` 仍须独立 fresh D1 readiness 后才可开工；
+其 done 后 TASK-OBS-002 还须再次独立 readiness。
 
 ## Revision r2 review remediation
 
@@ -60,7 +81,7 @@ blocked(#250):执行前源码级深查证伪了四个观察点的取证路径—
 
 ## What changes
 
-两任务分期,均 host-only(零设备、零真机;真机观察本身留在 TASK-M0B-002):
+三任务分期,均 host-only(零设备、零真机;真机观察本身留在 TASK-M0B-002):
 
 - **TASK-OBS-001 — Kit 仪表化与分类面**(`Packages/ArkDeckKit`):
   - 自动 lifecycle/subserver dispatch 计数器:只在 identity-bound spawn 成功后
@@ -77,7 +98,18 @@ blocked(#250):执行前源码级深查证伪了四个观察点的取证路径—
     supervisor fan-out 与 presentation;不引入任何设备 mutation 路径)；其生产
     producer 必须来自先行 approved/done 的独立 OpenHarmony integration change，
     不得把 selected-device authorization capture 当成任意设备枚举。
-- **TASK-OBS-002 — App 观察面**(`ArkDeckApp`,依赖 OBS-001):
+- **TASK-OBS-001R — App-facing fan-out remediation**
+  (`Packages/ArkDeckKit`,依赖 OBS-001):
+  - 把 internal fan-out 事件转换为 public、immutable、带 RFC 3339 时间戳的
+    presentation event；出现/消失只含 session-scoped 脱敏标识，raw connect key
+    不得越出 adapter；
+  - production Workflows facade 在既有显式 `refresh()` 中按已注册 exact
+    3.2.0f/`127.0.0.1:8710` family 做一次只读 observation，持有有界 buffer；
+    不新增 timer/background poll，不并发叠加 observation；取消只终止本次 owned
+    child，绝不触碰 HDC server；
+  - `--ui-test-hdc-diagnostics` 在同一 public presentation contract 提供确定性
+    事件值；production composition 拒绝 fixture/test-only source。
+- **TASK-OBS-002 — App 观察面**(`ArkDeckApp`,依赖 OBS-001R done):
   - HDCStatusView 增加计数快照、endpoint source、ownership 判定依据字段与设备
     事件列表(全部 static-text 可访问,Accessibility 可读、截图可取证);
   - signed XCUITest 覆盖新字段(M1-006 XCUITest 模型)。
@@ -94,8 +126,10 @@ blocked(#250):执行前源码级深查证伪了四个观察点的取证路径—
 
 ## Approval and flow
 
-V2 治理:本 propose PR 合入仅登记提案;批准须独立 approval-only PR;两任务各自
-独立 readiness/实现/done PR(OBS-002 依赖 OBS-001 done)。本 change done 后:
+V2 治理:r1 propose PR 合入仅登记提案,批准经独立 approval-only PR；r2/r3
+批准后 remediation 由各自维护者 review/merge 生效。三个任务各自独立
+readiness/实现/done PR；OBS-001R 依赖 OBS-001 done，OBS-002 依赖 OBS-001R
+done。本 change done 后:
 TASK-M0B-002 以新 readiness PR 重钉交付形态与 pins(#250 记录的解除前置 (b)),
 再约设备窗口。
 
@@ -122,6 +156,10 @@ TASK-M0B-002 以新 readiness PR 重钉交付形态与 pins(#250 记录的解除
 - r2 是批准后 scope/design remediation；维护者 review/merge 本 r2 PR 即批准
   收紧后的 AC 与 blocker，并使 TASK-OBS-001 的 `ready→blocked` 生效。它不恢复
   readiness，也不批准 #265。
+- r3 是 OBS-002 blocked-readiness 后的 scope/design remediation；维护者
+  review/merge 本 r3 PR 即批准新增 TASK-OBS-001R 及
+  `OBS-DEVICE-PRESENTATION-001`。它不恢复 OBS-002 readiness，也不授权
+  OBS-001R implementation。
 
 ## Revision history
 
@@ -131,3 +169,7 @@ TASK-M0B-002 以新 readiness PR 重钉交付形态与 pins(#250 记录的解除
 - r2(2026-07-21)依据 prototype review remediation 收紧 counter/ownership/fan-out
   与 pin 规则，并把 TASK-OBS-001 恢复为 blocked。本 revision 仅在维护者
   review/merge 对应治理 PR 后生效；#265 不构成实现完成或 acceptance evidence。
+- r3(2026-07-28)依据 PR #700 的 blocked-readiness 结论，选择新增 Kit-only
+  `TASK-OBS-001R` 补齐 production fan-out 到 public presentation 的桥接，并新增
+  独立 change-local AC。该 revision 只在维护者 review/merge 对应治理 PR 后
+  生效；merge 后任务仍 blocked，须 fresh D1 readiness。

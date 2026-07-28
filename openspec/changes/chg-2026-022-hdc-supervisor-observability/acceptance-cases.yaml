@@ -1,7 +1,7 @@
 ---
 schema_version: 1.0.0
 change_id: CHG-2026-022-hdc-supervisor-observability
-change_revision: 2
+change_revision: 3
 platform: macos
 evidence_classes:
 - contract
@@ -55,6 +55,23 @@ cases:
     Supervisor fan-out and bounded presentation buffer, distinguishes an empty
     successful snapshot from unknown/failure, and issues no unregistered device
     command. Test-only snapshot injection cannot satisfy this case by itself.
+- acceptance_id: OBS-DEVICE-PRESENTATION-001
+  test_id: TEST-OBS-DEVICE-PRESENTATION-001
+  method: Production-to-public device event presentation contract.
+  expected_source: openspec/changes/chg-2026-022-hdc-supervisor-observability/verification.md#OBS-DEVICE-PRESENTATION-001
+  minimum_evidence: contract
+  expected_result: >-
+    On an explicit provider refresh, the production Workflows facade performs
+    at most one observation only for the exact registered 3.2.0f candidate,
+    127.0.0.1:8710 endpoint, and stable existing-server identity bracket. Its
+    immutable public buffer contains timestamped appeared, disappeared,
+    observation-unknown, and observation-unavailable events, never appends an
+    unchanged event, retains the newest 64 items in stable order, and exposes
+    only redacted-device-<24 lowercase hex> identifiers. Cancellation may
+    terminate only the owned observation child and cannot affect the HDC
+    server or dispatch lifecycle, subserver, or device mutations. Deterministic
+    fixture events exist only behind --ui-test-hdc-diagnostics, and production
+    rejects fixture or test-only sources.
 - acceptance_id: OBS-APPFACE-001
   test_id: TEST-OBS-APPFACE-001
   method: Signed XCUITest over the new observation fields.
