@@ -278,7 +278,15 @@
 
 ## TASK-ASP-002 — 机械守卫：registry 内禁止仓内 change 路径
 
-- Status:ready（r1 implementation readiness；仅在维护者对本独立 readiness PR
+- Status:ready（r5 corrective readiness；实现中实测发现 **trace-probes 的
+  registry SHA-256 同样是产品运行时 pin**——`Sources/ArkDeckOpenHarmony/
+  TraceProbeAdapter.swift:10` 的 `public static let registrySHA256`，迁移它
+  会打红 `TraceAdapterGoldenTests`（实测 1 失败），而 `Packages/**` 与
+  `Sources/**` 均为本任务 Forbidden。故 r5 把迁移面窄化为 **rockchip 一处**
+  （实测无任何 Sources pin），trace-probes 的 3 处**并入 deferred 登记表**
+  与 readonly 面同批推迟。守卫与登记表机制不变——**它恰恰是本任务的主要
+  价值**。原 r1 授权文字如下续：
+- Historical Status:ready（r1 implementation readiness；仅在维护者对本独立 readiness PR
   exact head review/merge 后生效，**且必须在 TASK-ASP-001 的 done PR #682
   合入之后**——若本 readiness 先于 #682 合入，其 `ready` 不生效，须待 #682。
   只授权一个实现交付：按下方契约先迁移 trace/rockchip 的 4 处、同步其三个
@@ -294,6 +302,28 @@
   - **Approval boundary:pending human merge + 顺序门。**本 carrier 修改本文件
     的本任务段、verification.md 与 acceptance-cases.yaml（AC 措辞更正，见下），
     生效另需 #682 先行合入。
+  - **r5:trace-probes 亦为产品 pin（实现中实测）。**
+    `openspec/integrations/openharmony/trace-probes/1.0.0/registry.yaml` 的
+    内容哈希 `9d2a390b…` 被 `Sources/ArkDeckOpenHarmony/TraceProbeAdapter.swift`
+    第 10–11 行的 `public static let registrySHA256` 钉死；迁移其字节会使
+    `TraceAdapterGoldenTests.testAdoptedProfileMatchesTheCompleteTR001Registry`
+    `ResourceClosure` 变红（非 `/private/tmp` 检出实测 1 失败）。修它需
+    `Sources/**` 或 `Packages/**`，两者皆为本任务 Forbidden、且 `Sources/**`
+    是整个 change 的 Out of scope（r3 已就 readonly 面确立同一结论）。
+    **rockchip `loader-transition` 实测无任何 Sources/Packages pin，也不在
+    lock**，故其迁移在授权内。
+    **自陈**：该 pin 的存在我在 ASP-001 勘察期的一次 grep 输出里就见过
+    （`TraceProbeAdapter.swift:10: public static let registrySHA256`），却
+    未把它与 trace registry 关联，属看到了而没接上，不是工具没查到。
+  - **r5 迁移面（唯一变化）= rockchip 1 处**：
+    `openspec/integrations/rockchip/loader-transition/1.0.0/registry.yaml`
+    的 `evidencePath` → `evidenceChange` + `evidenceRelativePath`，同步
+    `scripts/rockchip_loader_transition_probe/probe.py`（常量、
+    `SourceProvenance` 字段、receipt 形状、解析器）与 `test_probe.py`。
+    trace-probes、`validate_registry.py` 与 lock 的 trace 条目**不再改动**。
+  - **deferred 登记表相应扩为 7 文件 / 15 处**：readonly 面 6 文件 12 处
+    （r4 记录）+ `trace-probes/1.0.0/registry.yaml` 3 处，理由同为产品运行时
+    pin（`TraceProbeAdapter.swift`），待 `Sources/**` 授权的后续 change。
   - **守卫不可能无条件全仓（audit base 实测，r2 措辞需更正）。**当前全仓
     registry/resource/receipt 面 `openspec/changes/` 字面量 **16 处 / 8 文件**：
     本任务要迁的 **4 处**（`openharmony/trace-probes/1.0.0/registry.yaml` 3、
@@ -357,15 +387,13 @@
 - Requirements/AC:change-local `ASP-GUARD-001`
 - Depends on:`TASK-ASP-001`
 - In scope（r2 扩列）:
-  - **先迁移**（ASP-001 移交的 4 处 / 2 文件，因其消费方在 `scripts/**`）：
-    `openspec/integrations/openharmony/trace-probes/1.0.0/registry.yaml` 的
-    `provenance.redactedManifests`（3 条裸字符串）与
+  - **先迁移（r5 窄化为 rockchip 一处）**：
     `openspec/integrations/rockchip/loader-transition/1.0.0/registry.yaml` 的
-    `evidencePath`（1 条），迁为与 ASP-001 同族的 change-relative 形态；
-    同步其消费方 `scripts/trace_capture/validate_registry.py`、
-    `scripts/rockchip_loader_transition_probe/probe.py` 与
-    `scripts/rockchip_loader_transition_probe/test_probe.py`，以及 lock 中
-    trace-probes 的 SHA-256。
+    `evidencePath`（1 条）迁为与 ASP-001 同族的 change-relative 形态，同步
+    `scripts/rockchip_loader_transition_probe/probe.py` 与其 `test_probe.py`。
+    **trace-probes 的 3 处按 r5 并入 deferred 登记表**（产品运行时 pin），
+    `scripts/trace_capture/validate_registry.py` 与 lock 的 trace 条目
+    **不改动**。
   - **后设卡**：在既有 SDD 守卫面新增一条检查——`openspec/integrations/**`
     与 `Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/**` 下的
     registry/resource/receipt 文件内出现 `openspec/changes/` 字面量即 fail，
