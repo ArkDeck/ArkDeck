@@ -1,0 +1,50 @@
+---
+schema_version: 1.0.0
+change_id: CHG-2026-043-hdc-320f-supervisor-observation
+change_revision: 1
+platform: macos
+evidence_classes:
+- contract
+- platform
+cases:
+- acceptance_id: HSO-REGISTRY-001
+  test_id: TEST-HSO-REGISTRY-001
+  method: Exact commandless registry, resource, profile, lock, macOS mapping and provenance closure.
+  expected_source: openspec/changes/chg-2026-043-hdc-320f-supervisor-observation/verification.md#HSO-REGISTRY-001
+  minimum_evidence: platform
+  expected_result: >-
+    The registry supports only exact macOS hdc 3.2.0f, the pinned executable SHA-256 and
+    127.0.0.1:8710 as a platformProcessObservation with empty argv and invocation disallowed.
+    IDs, versions, hashes and accepted CHG-2026-024 provenance references agree, and synthetic
+    controls do not establish support.
+- acceptance_id: HSO-SEPARATION-001
+  test_id: TEST-HSO-SEPARATION-001
+  method: Existing-registry byte identity plus cross-version substitution and fallback mutation matrix.
+  expected_source: openspec/changes/chg-2026-043-hdc-320f-supervisor-observation/verification.md#HSO-SEPARATION-001
+  minimum_evidence: contract
+  expected_result: >-
+    The 3.2.0d readonly registry and the 3.2.0f device-observation registry and resources remain
+    byte-identical to readiness pins. No candidate, receipt, family or semantic fact crosses
+    versions, mismatch never falls through, and the new family claims no checkserver, hdc -v,
+    health or version authority.
+- acceptance_id: HSO-SINGLE-CANDIDATE-001
+  test_id: TEST-HSO-SINGLE-CANDIDATE-001
+  method: Production composition-root reachability with candidate identity spies and ownership matrix.
+  expected_source: openspec/changes/chg-2026-043-hdc-320f-supervisor-observation/verification.md#HSO-SINGLE-CANDIDATE-001
+  minimum_evidence: contract
+  expected_result: >-
+    One production-selected exact 3.2.0f candidate and endpoint feed both the internally
+    constructed commandless supervisor observer and the existing device-observation session.
+    A stable platform receipt mints generation, external ownership requires all four existing
+    evidence items, no second discovery or candidate exists, and unregistered health and version
+    fields remain typed unknown.
+- acceptance_id: HSO-NODISPATCH-001
+  test_id: TEST-HSO-NODISPATCH-001
+  method: Static command-surface audit, failure injection and instrumented effect counters.
+  expected_source: openspec/changes/chg-2026-043-hdc-320f-supervisor-observation/verification.md#HSO-NODISPATCH-001
+  minimum_evidence: contract
+  expected_result: >-
+    Identity bootstrap launches zero HDC child for success and every failure vector, and server
+    lifecycle, adoption, subserver, device or binding mutation and destructive counters remain
+    zero. Only an explicit refresh may launch at most one already-registered list targets -v
+    child, and its result grants no supervisor ownership authority.
