@@ -1,0 +1,610 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://arkdeck.dev/schemas/agent-device-capability-1.0.0.json",
+  "title": "ArkDeck Per-Device E1 Capability v1 (change-local draft)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "documentType",
+    "schemaVersion",
+    "capabilityId",
+    "changeId",
+    "taskId",
+    "evidenceRefs",
+    "target",
+    "tool",
+    "operationScopes",
+    "limits",
+    "privilegeRequirements",
+    "prohibitedAdjacency",
+    "validUntil"
+  ],
+  "properties": {
+    "documentType": { "const": "agentDeviceCapability" },
+    "schemaVersion": { "const": "1.0.0" },
+    "capabilityId": {
+      "type": "string",
+      "pattern": "^CAP-E1-[A-Z0-9]+(?:-[A-Z0-9]+)*$"
+    },
+    "changeId": { "$ref": "#/$defs/changeId" },
+    "taskId": { "$ref": "#/$defs/taskId" },
+    "evidenceRefs": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 32,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1, "maxLength": 512 }
+    },
+    "target": { "$ref": "#/$defs/target" },
+    "tool": { "$ref": "#/$defs/tool" },
+    "operationScopes": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 11,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/operationScope" }
+    },
+    "limits": { "$ref": "#/$defs/limits" },
+    "privilegeRequirements": { "$ref": "#/$defs/privilegeRequirements" },
+    "prohibitedAdjacency": { "$ref": "#/$defs/prohibitedAdjacency" },
+    "validUntil": { "type": "string", "format": "date-time" }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+    },
+    "changeId": {
+      "type": "string",
+      "pattern": "^CHG-[0-9]{4}-[0-9]{3}$"
+    },
+    "taskId": {
+      "type": "string",
+      "pattern": "^TASK-[A-Z0-9]+(?:-[A-Z0-9]+)*-[0-9]{3}[A-Z]?$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "deviceMode": {
+      "enum": ["normal", "recovery", "updater"]
+    },
+    "dataImpact": {
+      "enum": [
+        "ephemeralOwnedState",
+        "reversibleDeviceConfiguration",
+        "applicationDataPreserving"
+      ]
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "durableTargetId",
+        "model",
+        "stableIdentitySHA256",
+        "originalTargetSHA256",
+        "acceptedBindingRevision",
+        "transport",
+        "firmwareBuild",
+        "firmwareFingerprintSHA256",
+        "allowedDeviceModes"
+      ],
+      "properties": {
+        "durableTargetId": { "$ref": "#/$defs/identifier" },
+        "model": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "stableIdentitySHA256": { "$ref": "#/$defs/sha256" },
+        "originalTargetSHA256": { "$ref": "#/$defs/sha256" },
+        "acceptedBindingRevision": { "type": "integer", "minimum": 1 },
+        "transport": { "enum": ["usb", "tcp", "uart"] },
+        "firmwareBuild": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "firmwareFingerprintSHA256": { "$ref": "#/$defs/sha256" },
+        "allowedDeviceModes": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 3,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/deviceMode" }
+        }
+      }
+    },
+    "tool": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "profileId", "reportedVersion", "executableSHA256"],
+      "properties": {
+        "kind": { "const": "hdc" },
+        "profileId": { "$ref": "#/$defs/identifier" },
+        "reportedVersion": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "executableSHA256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "captureOwnedNamespace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "family", "rootPolicyId"],
+      "properties": {
+        "kind": { "const": "captureOwned" },
+        "family": { "enum": ["hilog", "uiDump", "trace"] },
+        "rootPolicyId": { "const": "jobOwnedRemoteV1" }
+      }
+    },
+    "bundleNamespace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "bundleId"],
+      "properties": {
+        "kind": { "const": "bundle" },
+        "bundleId": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_]*(?:\\.[A-Za-z][A-Za-z0-9_]*)+$",
+          "maxLength": 255
+        }
+      }
+    },
+    "jobOwnedRemoteNamespace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "rootPolicyId"],
+      "properties": {
+        "kind": { "const": "jobOwnedRemote" },
+        "rootPolicyId": { "const": "jobOwnedRemoteV1" }
+      }
+    },
+    "portForwardPair": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["protocol", "hostPort", "devicePort"],
+      "properties": {
+        "protocol": { "const": "tcp" },
+        "hostPort": { "type": "integer", "minimum": 1, "maximum": 65535 },
+        "devicePort": { "type": "integer", "minimum": 1, "maximum": 65535 }
+      }
+    },
+    "portForwardNamespace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "pairs"],
+      "properties": {
+        "kind": { "const": "portForward" },
+        "pairs": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/portForwardPair" }
+        }
+      }
+    },
+    "deviceModeNamespace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "allowedTargetModes"],
+      "properties": {
+        "kind": { "const": "deviceMode" },
+        "allowedTargetModes": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 3,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/deviceMode" }
+        }
+      }
+    },
+    "namespace": {
+      "oneOf": [
+        { "$ref": "#/$defs/captureOwnedNamespace" },
+        { "$ref": "#/$defs/bundleNamespace" },
+        { "$ref": "#/$defs/jobOwnedRemoteNamespace" },
+        { "$ref": "#/$defs/portForwardNamespace" },
+        { "$ref": "#/$defs/deviceModeNamespace" }
+      ]
+    },
+    "recoveryHilog": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["strategy", "requiredStepKinds", "resumeProbeProfileId"],
+      "properties": {
+        "strategy": { "const": "typedCompensation" },
+        "requiredStepKinds": {
+          "const": ["stopRemoteCapture", "resizeLogBuffer", "cleanupOwnedRemotePath"]
+        },
+        "resumeProbeProfileId": { "const": "observe-device.read-only.v1" }
+      }
+    },
+    "recoveryUIDump": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["strategy", "requiredStepKinds", "resumeProbeProfileId"],
+      "properties": {
+        "strategy": { "const": "typedCompensation" },
+        "requiredStepKinds": {
+          "const": ["restoreParameter", "cleanupOwnedRemotePath"]
+        },
+        "resumeProbeProfileId": { "const": "observe-device.read-only.v1" }
+      }
+    },
+    "recoveryTrace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["strategy", "requiredStepKinds", "resumeProbeProfileId"],
+      "properties": {
+        "strategy": { "const": "typedCompensation" },
+        "requiredStepKinds": {
+          "const": ["stopRemoteCapture", "restoreParameter", "cleanupOwnedRemotePath"]
+        },
+        "resumeProbeProfileId": { "const": "observe-device.read-only.v1" }
+      }
+    },
+    "recoveryHAPRollback": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["strategy", "requiredStepKinds", "resumeProbeProfileId"],
+      "properties": {
+        "strategy": { "const": "verifiedRollback" },
+        "requiredStepKinds": { "type": "array", "maxItems": 0 },
+        "resumeProbeProfileId": { "const": "observe-device.read-only.v1" }
+      }
+    },
+    "recoveryNativeLibraryRollback": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["strategy", "requiredStepKinds", "resumeProbeProfileId"],
+      "properties": {
+        "strategy": { "const": "verifiedRollback" },
+        "requiredStepKinds": { "type": "array", "maxItems": 0 },
+        "resumeProbeProfileId": { "const": "observe-device.read-only.v1" }
+      }
+    },
+    "recoveryStopApplication": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["strategy", "requiredStepKinds", "resumeProbeProfileId"],
+      "properties": {
+        "strategy": { "const": "typedCompensation" },
+        "requiredStepKinds": { "const": ["stopApplication"] },
+        "resumeProbeProfileId": { "const": "observe-device.read-only.v1" }
+      }
+    },
+    "recoveryStartApplication": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["strategy", "requiredStepKinds", "resumeProbeProfileId"],
+      "properties": {
+        "strategy": { "const": "typedCompensation" },
+        "requiredStepKinds": { "const": ["startApplication"] },
+        "resumeProbeProfileId": { "const": "observe-device.read-only.v1" }
+      }
+    },
+    "recoveryCleanupOwnedRemotePath": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["strategy", "requiredStepKinds", "resumeProbeProfileId"],
+      "properties": {
+        "strategy": { "const": "typedCompensation" },
+        "requiredStepKinds": { "const": ["cleanupOwnedRemotePath"] },
+        "resumeProbeProfileId": { "const": "observe-device.read-only.v1" }
+      }
+    },
+    "recoveryRemovePortForward": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["strategy", "requiredStepKinds", "resumeProbeProfileId"],
+      "properties": {
+        "strategy": { "const": "typedCompensation" },
+        "requiredStepKinds": { "const": ["removePortForward"] },
+        "resumeProbeProfileId": { "const": "observe-device.read-only.v1" }
+      }
+    },
+    "recoveryCreatePortForward": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["strategy", "requiredStepKinds", "resumeProbeProfileId"],
+      "properties": {
+        "strategy": { "const": "typedCompensation" },
+        "requiredStepKinds": { "const": ["createPortForward"] },
+        "resumeProbeProfileId": { "const": "observe-device.read-only.v1" }
+      }
+    },
+    "recoveryResumeProbeOnly": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["strategy", "requiredStepKinds", "resumeProbeProfileId"],
+      "properties": {
+        "strategy": { "const": "resumeProbeOnly" },
+        "requiredStepKinds": { "type": "array", "maxItems": 0 },
+        "resumeProbeProfileId": { "const": "observe-device.read-only.v1" }
+      }
+    },
+    "recoveryPolicy": {
+      "oneOf": [
+        { "$ref": "#/$defs/recoveryHilog" },
+        { "$ref": "#/$defs/recoveryUIDump" },
+        { "$ref": "#/$defs/recoveryTrace" },
+        { "$ref": "#/$defs/recoveryHAPRollback" },
+        { "$ref": "#/$defs/recoveryNativeLibraryRollback" },
+        { "$ref": "#/$defs/recoveryStopApplication" },
+        { "$ref": "#/$defs/recoveryStartApplication" },
+        { "$ref": "#/$defs/recoveryCleanupOwnedRemotePath" },
+        { "$ref": "#/$defs/recoveryRemovePortForward" },
+        { "$ref": "#/$defs/recoveryCreatePortForward" },
+        { "$ref": "#/$defs/recoveryResumeProbeOnly" }
+      ]
+    },
+    "operationScope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operationId",
+        "profileId",
+        "configurationId",
+        "configurationSha256",
+        "effect",
+        "dataImpact",
+        "namespace",
+        "recoveryPolicy"
+      ],
+      "properties": {
+        "operationId": { "$ref": "#/$defs/identifier" },
+        "profileId": { "$ref": "#/$defs/identifier" },
+        "configurationId": { "$ref": "#/$defs/identifier" },
+        "configurationSha256": { "$ref": "#/$defs/sha256" },
+        "effect": { "const": "deviceMutation" },
+        "dataImpact": { "$ref": "#/$defs/dataImpact" },
+        "namespace": { "$ref": "#/$defs/namespace" },
+        "recoveryPolicy": { "$ref": "#/$defs/recoveryPolicy" }
+      },
+      "oneOf": [
+        {
+          "required": ["operationId", "profileId", "configurationId", "configurationSha256", "effect", "dataImpact", "namespace", "recoveryPolicy"],
+          "properties": {
+            "operationId": { "const": "captureHilog" },
+            "profileId": { "const": "hilog.device-persist-restored.v1" },
+            "configurationId": { "const": "hilog.device-persist-restored.v1.config" },
+            "configurationSha256": { "const": "731948848b2e3a550fc017b1461fe873ff2ac8a500ec83af2cdf9c103a9f2c18" },
+            "dataImpact": { "const": "reversibleDeviceConfiguration" },
+            "namespace": {
+              "properties": { "kind": { "const": "captureOwned" }, "family": { "const": "hilog" } },
+              "required": ["kind", "family"]
+            },
+            "recoveryPolicy": { "$ref": "#/$defs/recoveryHilog" }
+          }
+        },
+        {
+          "required": ["operationId", "profileId", "configurationId", "configurationSha256", "effect", "dataImpact", "namespace", "recoveryPolicy"],
+          "properties": {
+            "operationId": { "const": "captureUIDump" },
+            "profileId": { "const": "ui-dump.owned-sidecar.v1" },
+            "configurationId": { "const": "ui-dump.owned-sidecar.v1.config" },
+            "configurationSha256": { "const": "24ea099cc429921558282050f84fe463cb7f687f1c2408aeab9c1144b8c65d27" },
+            "dataImpact": { "const": "reversibleDeviceConfiguration" },
+            "namespace": {
+              "properties": { "kind": { "const": "captureOwned" }, "family": { "const": "uiDump" } },
+              "required": ["kind", "family"]
+            },
+            "recoveryPolicy": { "$ref": "#/$defs/recoveryUIDump" }
+          }
+        },
+        {
+          "required": ["operationId", "profileId", "configurationId", "configurationSha256", "effect", "dataImpact", "namespace", "recoveryPolicy"],
+          "properties": {
+            "operationId": { "const": "captureTrace" },
+            "profileId": { "const": "trace.owned-capture.v1" },
+            "configurationId": { "const": "trace.owned-capture.v1.config" },
+            "configurationSha256": { "const": "afe7a3ac3c452dd38e2fcc4fb4227c935b6ec852f6c91bfc9c31d402d3b0346a" },
+            "dataImpact": { "const": "reversibleDeviceConfiguration" },
+            "namespace": {
+              "properties": { "kind": { "const": "captureOwned" }, "family": { "const": "trace" } },
+              "required": ["kind", "family"]
+            },
+            "recoveryPolicy": { "$ref": "#/$defs/recoveryTrace" }
+          }
+        },
+        {
+          "required": ["operationId", "profileId", "configurationId", "configurationSha256", "effect", "dataImpact", "namespace", "recoveryPolicy"],
+          "properties": {
+            "operationId": { "const": "installHAP" },
+            "profileId": { "const": "hap.install-preserve-data.v1" },
+            "configurationId": { "const": "hap.install-preserve-data.v1.config" },
+            "configurationSha256": { "const": "1dee29b58f45b736072cddb4ad81e0f730e837ffbde5c3c0edbae8bd37299380" },
+            "dataImpact": { "const": "applicationDataPreserving" },
+            "namespace": { "properties": { "kind": { "const": "bundle" } }, "required": ["kind"] },
+            "recoveryPolicy": { "$ref": "#/$defs/recoveryHAPRollback" }
+          }
+        },
+        {
+          "required": ["operationId", "profileId", "configurationId", "configurationSha256", "effect", "dataImpact", "namespace", "recoveryPolicy"],
+          "properties": {
+            "operationId": { "const": "deployNativeLibrary" },
+            "profileId": { "const": "native-library.app-owned-atomic.v1" },
+            "configurationId": { "const": "native-library.app-owned-atomic.v1.config" },
+            "configurationSha256": { "const": "ab65411f961609f59b640f080d7986952926f18a16f0fc1a49cb37bbba24ebd8" },
+            "dataImpact": { "const": "applicationDataPreserving" },
+            "namespace": { "properties": { "kind": { "const": "bundle" } }, "required": ["kind"] },
+            "recoveryPolicy": { "$ref": "#/$defs/recoveryNativeLibraryRollback" }
+          }
+        },
+        {
+          "required": ["operationId", "profileId", "configurationId", "configurationSha256", "effect", "dataImpact", "namespace", "recoveryPolicy"],
+          "properties": {
+            "operationId": { "const": "startApplication" },
+            "profileId": { "const": "application.start.v1" },
+            "configurationId": { "const": "application.start.v1.config" },
+            "configurationSha256": { "const": "84ca533adc848551398c3139e1d7dae7168d4f64a3df297cb1b1407209dd1c68" },
+            "dataImpact": { "const": "ephemeralOwnedState" },
+            "namespace": { "properties": { "kind": { "const": "bundle" } }, "required": ["kind"] },
+            "recoveryPolicy": { "$ref": "#/$defs/recoveryStopApplication" }
+          }
+        },
+        {
+          "required": ["operationId", "profileId", "configurationId", "configurationSha256", "effect", "dataImpact", "namespace", "recoveryPolicy"],
+          "properties": {
+            "operationId": { "const": "stopApplication" },
+            "profileId": { "const": "application.stop.v1" },
+            "configurationId": { "const": "application.stop.v1.config" },
+            "configurationSha256": { "const": "eff254e9d649be162a8a58751087402b1dc84867cadf5d819ab910bed2e8673e" },
+            "dataImpact": { "const": "ephemeralOwnedState" },
+            "namespace": { "properties": { "kind": { "const": "bundle" } }, "required": ["kind"] },
+            "recoveryPolicy": { "$ref": "#/$defs/recoveryStartApplication" }
+          }
+        },
+        {
+          "required": ["operationId", "profileId", "configurationId", "configurationSha256", "effect", "dataImpact", "namespace", "recoveryPolicy"],
+          "properties": {
+            "operationId": { "const": "sendOwnedFile" },
+            "profileId": { "const": "owned-file.send.v1" },
+            "configurationId": { "const": "owned-file.send.v1.config" },
+            "configurationSha256": { "const": "a1888b292a73f81754680a74528c9bb52576a66532fc3844c3698887b262f50a" },
+            "dataImpact": { "const": "ephemeralOwnedState" },
+            "namespace": { "properties": { "kind": { "const": "jobOwnedRemote" } }, "required": ["kind"] },
+            "recoveryPolicy": { "$ref": "#/$defs/recoveryCleanupOwnedRemotePath" }
+          }
+        },
+        {
+          "required": ["operationId", "profileId", "configurationId", "configurationSha256", "effect", "dataImpact", "namespace", "recoveryPolicy"],
+          "properties": {
+            "operationId": { "const": "createPortForward" },
+            "profileId": { "const": "port-forward.create.v1" },
+            "configurationId": { "const": "port-forward.create.v1.config" },
+            "configurationSha256": { "const": "fc52182639079a5713e17576f7a515045b7be602f29e2bf586b9af6f34518ab9" },
+            "dataImpact": { "const": "ephemeralOwnedState" },
+            "namespace": { "properties": { "kind": { "const": "portForward" } }, "required": ["kind"] },
+            "recoveryPolicy": { "$ref": "#/$defs/recoveryRemovePortForward" }
+          }
+        },
+        {
+          "required": ["operationId", "profileId", "configurationId", "configurationSha256", "effect", "dataImpact", "namespace", "recoveryPolicy"],
+          "properties": {
+            "operationId": { "const": "removePortForward" },
+            "profileId": { "const": "port-forward.remove.v1" },
+            "configurationId": { "const": "port-forward.remove.v1.config" },
+            "configurationSha256": { "const": "f90d72b6a8696f69780b83e030835499b5f5096ddcc2744ddfbbdf53fc3795ea" },
+            "dataImpact": { "const": "ephemeralOwnedState" },
+            "namespace": { "properties": { "kind": { "const": "portForward" } }, "required": ["kind"] },
+            "recoveryPolicy": { "$ref": "#/$defs/recoveryCreatePortForward" }
+          }
+        },
+        {
+          "required": ["operationId", "profileId", "configurationId", "configurationSha256", "effect", "dataImpact", "namespace", "recoveryPolicy"],
+          "properties": {
+            "operationId": { "const": "rebootDevice" },
+            "profileId": { "const": "device.reboot.v1" },
+            "configurationId": { "const": "device.reboot.v1.config" },
+            "configurationSha256": { "const": "98036bd61fe786e17b6d8d239df1745a859f32361ec8e3fb8d6cfdbb89b95d74" },
+            "dataImpact": { "const": "reversibleDeviceConfiguration" },
+            "namespace": { "properties": { "kind": { "const": "deviceMode" } }, "required": ["kind"] },
+            "recoveryPolicy": { "$ref": "#/$defs/recoveryResumeProbeOnly" }
+          }
+        }
+      ]
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "maximumDataImpact",
+        "maximumJobDurationSeconds",
+        "maximumConcurrentJobs",
+        "maximumUses",
+        "compensationGraceSeconds"
+      ],
+      "properties": {
+        "maximumDataImpact": { "$ref": "#/$defs/dataImpact" },
+        "maximumJobDurationSeconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 86400
+        },
+        "maximumConcurrentJobs": { "const": 1 },
+        "maximumUses": { "type": "integer", "minimum": 1, "maximum": 32 },
+        "compensationGraceSeconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1800
+        }
+      }
+    },
+    "privilegeRequirements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "developerMode",
+        "root",
+        "packageDebuggable",
+        "freshProbeProfileId",
+        "maximumAgeSeconds"
+      ],
+      "properties": {
+        "developerMode": { "enum": ["required", "notRequired"] },
+        "root": { "const": "forbidden" },
+        "packageDebuggable": { "enum": ["required", "notRequired"] },
+        "freshProbeProfileId": { "const": "observe-device.read-only.v1" },
+        "maximumAgeSeconds": { "type": "integer", "minimum": 1, "maximum": 30 }
+      }
+    },
+    "prohibitedAdjacency": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["effects", "operations", "profiles", "stepKinds"],
+      "properties": {
+        "effects": { "const": ["destructive"] },
+        "operations": { "const": ["flash", "uninstallHAP"] },
+        "profiles": {
+          "const": [
+            "hilog.global-persist.v1",
+            "hap.install-data-impact.v1",
+            "hap.uninstall.v1",
+            "native-library.system-publish.v1",
+            "flash.rockchip-authorized.v1"
+          ]
+        },
+        "stepKinds": {
+          "const": [
+            "mutateHDCServerLifecycle",
+            "runApprovedRemoteMutation",
+            "uninstallPackage",
+            "enterUpdater",
+            "flashPartition",
+            "updatePackage",
+            "erasePartition",
+            "formatPartition",
+            "unlockDevice"
+          ]
+        }
+      }
+    }
+  },
+  "x-arkdeck-data-impact-order": [
+    "ephemeralOwnedState",
+    "reversibleDeviceConfiguration",
+    "applicationDataPreserving"
+  ],
+  "x-arkdeck-protected-main-provenance": {
+    "repository": "ArkDeck/ArkDeck",
+    "branch": "main",
+    "registryPath": "openspec/changes/chg-2026-025-ai-native-unattended-device-ops/evidence/capabilities/<capabilityId>.json",
+    "codeownersBlobOID": "f4edd22f87965efcfc27ea512283a0c2252bf0fb",
+    "author": "github-actions[bot]",
+    "reviewer": "lvye",
+    "merger": "lvye",
+    "offlineCache": false
+  },
+  "x-arkdeck-semantic-invariants": [
+    "the capability blob at current protected main equals the acceptance PR exact-head blob and merge-commit blob",
+    "the acceptance PR is merged to main, created by github-actions[bot], exact-head approved by lvye and merged by lvye with actor separation",
+    "validUntil is canonical UTC, later than GitHub mergedAt and no later than mergedAt plus 31 days",
+    "runtime target ID, transport, stable identity and firmware all match; accepted binding revision never regresses and the durable rebind chain has no gap",
+    "TCP and UART still require the Core fresh human reconfirmation rule",
+    "tool identity is re-probed from a product-owned descriptor and exact executable hash; path, bookmark and caller PATH are not pins",
+    "operation configuration IDs and hashes exactly match the current AIN-009 registry and emitted Steps remain within that profile",
+    "operation/profile and namespace kind or family match the closed 11-tuple table",
+    "maximumDataImpact is not below any operation scope dataImpact",
+    "missing, stale, permissionDenied or mismatched fresh privilege facts reject before dispatch",
+    "capability deletion, byte drift, supersession or revocation invalidates every older reference",
+    "a plan adjacent to any prohibited effect, operation, profile or Step kind is rejected as a whole",
+    "carrier evidenceRefs are audit links and never create approval, usage, readback or authority facts",
+    "capability instances never contain raw serial, connectKey, paths, argv, caller readback, usage or outcome"
+  ]
+}

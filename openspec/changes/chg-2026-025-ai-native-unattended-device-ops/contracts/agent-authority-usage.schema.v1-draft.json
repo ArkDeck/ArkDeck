@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://arkdeck.dev/schemas/agent-authority-usage-1.0.0.json",
+  "title": "ArkDeck Agent E1 Authority Usage Ledger v1 (change-local draft)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["documentType", "schemaVersion", "reservations"],
+  "properties": {
+    "documentType": { "const": "agentAuthorityUsage" },
+    "schemaVersion": { "const": "1.0.0" },
+    "reservations": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/reservation" }
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "terminal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "closedAt", "externalIntentEventIds"],
+      "properties": {
+        "status": {
+          "enum": [
+            "succeeded",
+            "failed",
+            "cancelled",
+            "interrupted",
+            "outcomeUnknown"
+          ]
+        },
+        "closedAt": { "type": "string", "format": "date-time" },
+        "externalIntentEventIds": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/id" }
+        }
+      }
+    },
+    "reservation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reservationId",
+        "authorizationRef",
+        "ordinal",
+        "maximumUses",
+        "maximumConcurrentJobs",
+        "jobId",
+        "operationDigestSHA256",
+        "targetDigestSHA256",
+        "reservedAt",
+        "forwardLeaseExpiresAt",
+        "compensationLeaseExpiresAt",
+        "terminal"
+      ],
+      "properties": {
+        "reservationId": { "$ref": "#/$defs/id" },
+        "authorizationRef": {
+          "$ref": "https://arkdeck.dev/schemas/agent-execution-authority-1.0.0.json#/$defs/deviceCapabilityAuthorizationRef"
+        },
+        "ordinal": { "type": "integer", "minimum": 1 },
+        "maximumUses": { "type": "integer", "minimum": 1, "maximum": 32 },
+        "maximumConcurrentJobs": { "const": 1 },
+        "jobId": { "$ref": "#/$defs/id" },
+        "operationDigestSHA256": { "$ref": "#/$defs/sha256" },
+        "targetDigestSHA256": { "$ref": "#/$defs/sha256" },
+        "reservedAt": { "type": "string", "format": "date-time" },
+        "forwardLeaseExpiresAt": { "type": "string", "format": "date-time" },
+        "compensationLeaseExpiresAt": { "type": "string", "format": "date-time" },
+        "terminal": {
+          "oneOf": [
+            { "$ref": "#/$defs/terminal" },
+            { "type": "null" }
+          ]
+        }
+      }
+    }
+  },
+  "x-arkdeck-semantic-invariants": [
+    "this ledger accepts only kind=deviceCapability; E0 has no reservation and E2 remains in authorization-usage 1.0.0",
+    "reservation is durable before the first deviceMutation intent using a host-wide lock, atomic replace and file plus directory durability",
+    "reservationId is globally unique; retry is idempotent only when every field is byte-for-byte equivalent",
+    "ordinals for one capability are unique, monotonic and contiguous from 1 and never exceed maximumUses",
+    "a durable reservation permanently consumes its ordinal and is never refunded",
+    "only one terminal=null E1 reservation may exist for the same stable target",
+    "forwardLeaseExpiresAt equals min(request deadline, capability validUntil, reservedAt plus maximumJobDurationSeconds)",
+    "compensationLeaseExpiresAt equals min(capability validUntil plus grace, forwardLeaseExpiresAt plus grace)",
+    "an intent without an outcome closes as outcomeUnknown and is never automatically replayed",
+    "uncertain lease or terminal persistence preserves consumed usage and blocks dispatch"
+  ]
+}

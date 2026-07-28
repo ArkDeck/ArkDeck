@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://arkdeck.dev/schemas/agent-execution-authority-1.0.0.json",
+  "title": "ArkDeck Agent Execution Authority v1 (change-local draft)",
+  "description": "Inline audit-reference union. A serialized reference is not a live dispatch capability.",
+  "oneOf": [
+    { "$ref": "#/$defs/readyTaskAuthorizationRef" },
+    { "$ref": "#/$defs/deviceCapabilityAuthorizationRef" },
+    { "$ref": "#/$defs/standingAuthorizationRef" }
+  ],
+  "$defs": {
+    "gitOID": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "changeId": {
+      "type": "string",
+      "pattern": "^CHG-[0-9]{4}-[0-9]{3}$"
+    },
+    "taskId": {
+      "type": "string",
+      "pattern": "^TASK-[A-Z0-9]+(?:-[A-Z0-9]+)*-[0-9]{3}[A-Z]?$"
+    },
+    "readyTaskAuthorizationRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "changeId",
+        "taskId",
+        "mainCommitOID",
+        "taskBlobOID",
+        "approvalPRNumber"
+      ],
+      "properties": {
+        "kind": { "const": "readyTask" },
+        "changeId": { "$ref": "#/$defs/changeId" },
+        "taskId": { "$ref": "#/$defs/taskId" },
+        "mainCommitOID": { "$ref": "#/$defs/gitOID" },
+        "taskBlobOID": { "$ref": "#/$defs/gitOID" },
+        "approvalPRNumber": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "deviceCapabilityAuthorizationRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "capabilityId",
+        "mainCommitOID",
+        "capabilityBlobOID",
+        "approvalPRNumber"
+      ],
+      "properties": {
+        "kind": { "const": "deviceCapability" },
+        "capabilityId": {
+          "type": "string",
+          "pattern": "^CAP-E1-[A-Z0-9]+(?:-[A-Z0-9]+)*$"
+        },
+        "mainCommitOID": { "$ref": "#/$defs/gitOID" },
+        "capabilityBlobOID": { "$ref": "#/$defs/gitOID" },
+        "approvalPRNumber": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "standingAuthorizationRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "authorizationId",
+        "mainCommitOID",
+        "authorizationBlobOID",
+        "approvalPRNumber"
+      ],
+      "properties": {
+        "kind": { "const": "standingAuthorization" },
+        "authorizationId": {
+          "type": "string",
+          "pattern": "^AUTH-[A-Z0-9]+(?:-[A-Z0-9]+)*$"
+        },
+        "mainCommitOID": { "$ref": "#/$defs/gitOID" },
+        "authorizationBlobOID": { "$ref": "#/$defs/gitOID" },
+        "approvalPRNumber": { "type": "integer", "minimum": 1 }
+      }
+    }
+  },
+  "x-arkdeck-authority-effect": {
+    "readyTask": "readOnly",
+    "deviceCapability": "deviceMutation",
+    "standingAuthorization": "destructive"
+  },
+  "x-arkdeck-semantic-invariants": [
+    "the three reference field sets exactly match agent-device-operation result authorizationRef",
+    "readyTask resolves a fresh protected-main ready task block and never consumes a usage reservation",
+    "deviceCapability resolves a current protected-main accepted capability blob and consumes agent-authority-usage",
+    "standingAuthorization resolves the existing r2 protected-main authorization and consumes authorization-usage",
+    "caller bytes, paths, historical commits and deserialized references never mint live dispatch authority"
+  ]
+}
