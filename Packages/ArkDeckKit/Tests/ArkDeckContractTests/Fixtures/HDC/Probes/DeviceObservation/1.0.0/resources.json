@@ -9,8 +9,8 @@
   "canonicalRegistryPath": "openspec/integrations/openharmony/device-observation-probes.yaml",
   "registryCopy": {
     "file": "registry.yaml",
-    "bytes": 7250,
-    "sha256": "cc9202123466931804794e606acf369740d639b3e521c25671517fc37a1fe2f5"
+    "bytes": 7264,
+    "sha256": "79814e45901ab7e4d9f9a271645cad62b0053a50534cba884cdff0c2e50b9d49"
   },
   "controls": {
     "file": "controls/fail-closed-vectors.json",

@@ -198,7 +198,8 @@
       },
       "provenance": {
         "evidenceClass": "controlledHumanCapture",
-        "sourcePath": "openspec/changes/chg-2026-024-hdc-device-snapshot-registration/evidence/runs/TASK-I24-001/run.md",
+        "sourceChange": "CHG-2026-024-hdc-device-snapshot-registration",
+        "sourceEvidence": "evidence/runs/TASK-I24-001/run.md",
         "sessions": [
           {
             "id": "capture-session-1",

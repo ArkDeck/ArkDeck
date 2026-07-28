@@ -133,7 +133,7 @@ adapter，不改变任何 `AC-HDC-*`、platform conformance、hardware/support/r
 ## Device-observation registry（CHG-2026-024 / TASK-I24-001，2026-07-27）
 
 `OPENHARMONY-HDC-DEVICE-OBSERVATION-PROBES@1.0.0` 登记于
-`openspec/integrations/openharmony/device-observation-probes.yaml`（SHA-256 `cc9202123466931804794e606acf369740d639b3e521c25671517fc37a1fe2f5`），profile `OPENHARMONY-TOOLS@0.5.0`、
+`openspec/integrations/openharmony/device-observation-probes.yaml`（SHA-256 `79814e45901ab7e4d9f9a271645cad62b0053a50534cba884cdff0c2e50b9d49`），profile `OPENHARMONY-TOOLS@0.5.0`、
 lock `INTEGRATION-PROFILES-0.6.0`。
 
 **工具版本差异声明（必读）**：本 family 观测自 hdc **`3.2.0f`**（executable
