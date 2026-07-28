@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-041-archive-stable-provenance
-revision: 5
-status: approved
+revision: 6
+status: verified # 2026-07-28 本 verification-closure PR；closure 段见文末
 class: implementation-only
 core_change_level: none
 owner: lvye
@@ -179,4 +179,49 @@ pin、不在 lock），trace-probes 的 3 处并入 deferred 登记表，与 rea
 grep 输出里，是看到了没接上。教训已记录，通用规矩是：**凡迁移 registry/
 fixture 类数据文件，先对其内容哈希在 `Sources`/`Tests`/`scripts`/lock 全量
 反查，再定 scope。**
+
+## Verification closure（2026-07-28）
+
+两任务 done 于 protected `main` 在案；三条 change-local AC 的证据可复查。
+本 PR 仅状态翻转 + 引用 + 一处 r6 措辞补正，零实现夹带。
+
+- **任务链（十一 merge）**：propose #669 `38d891cd`；approval #671
+  `e6acbca5`；ASP-001 readiness r1 #674 `6383f5b9`、r2 #675 `fd478664`、
+  r3 #677 `16c22fae`；ASP-001 实现 #680 `fc1f453b`、done #682 `8ce5000`；
+  ASP-002 readiness r4 #685 `5c935568`、r5 #688 `663eb777`；ASP-002 实现
+  #689 `e345acf3`、done（本 closure 之前的独立 flip PR）。#684 = ASP-002 r4
+  首版，因标题 TASK token 与 change 级文档冲突而 closed、未合入。
+- **`ASP-SHAPE-001` = PASS**：device-observation 一对内 `openspec/changes/`
+  字面量 = 0，每条 provenance 具 `sourceChange` + `sourceEvidence`；
+  `HDCDeviceObservationRegistryContractTests` 补了两条形态断言（迁移前该
+  测试完全不解码 `provenance`，不补即无守卫），两项变异全杀（回退仓内路径
+  3 红、删 `sourceChange` 11 红）；active-or-archive 解析对**已归档**来源
+  （chg-2026-015）与**未归档**来源（chg-2026-024）两分支各实测恰一处命中。
+- **`ASP-CASCADE-001` = PASS**：pack `resources.json`、lock 三条与契约测试
+  哈希断言一致，正副本仍字节相同；`check-sdd` 0/0/111；Swift 于**非
+  `/private/tmp`** 检出 **415 / 1 skipped / 0 failures**。
+- **`ASP-GUARD-001` = PASS**（r6 措辞）：先迁 rockchip 1 处（`evidencePath`
+  → `evidenceChange` + `evidenceRelativePath`，`evidenceSHA256` 逐字节未动）
+  并同步 `probe.py` / `test_probe.py`，**后**设卡；守卫扫描面实测 **7 文件 /
+  15 处**，与 deferred 登记表逐文件精确相等、表外为 0；登记表**双向**校验
+  （多于 = 夹带新债、少于 = 还债不更账、登记文件不存在，三者皆 fail）。
+  四条反证全部如预期：人造违例 → `ERROR …registry.yaml: line 43 names a
+  whole in-repo change path`，删掉 `main()` 里那一行调用、违例原样保留 →
+  0 error（拦住它的确是新检查）；trace 登记值 3→2 → 必红；撤销
+  active-or-archive 解析 → `test_probe` FAILED（5 failures / 2 errors）；
+  **归档模拟**——把 chg-2026-026 移入 `archive/2026-07-28-…/` 后，迁移后形态
+  31 OK 且解析器落在归档目录、evidence 哈希仍等于 registry pin，迁移前形态
+  31 全红。acceptance ID 计数 111 不变。
+- **本 change 的目的已达成**：`CHG-2026-024` 的归档死结在 ASP-001 落地时即
+  解除，其 archive 由自身独立 PR 走既有流程，不在本 change 载体内。
+- **遗留（不阻 verified，如实带入 archive）**：deferred 登记表内 **15 处 /
+  7 文件**（readonly 面 12 + trace-probes 3）仍是**未偿债务**——其内容哈希
+  被 `HDCReadOnlyProbeRegistry.swift` 与 `TraceProbeAdapter.swift` 钉死，
+  迁移须由一个持 `Sources/**` 授权面的后续 change 重钉产品哈希后一并完成。
+  守卫的「少于登记值也 fail」这一条保证那次迁移不能不更账。
+- **过程如实在案**：本 change 的 readiness 连改六版，其中四次同一根因——
+  迁一个 hash-pinned 数据文件前没把「谁钉了它的哈希」查到 `Sources/`。
+  由此立的通用规矩（迁 registry/fixture 类数据文件前先对其内容哈希在
+  `Sources`/`Tests`/`scripts`/lock 全量反查再定 scope）已写入 r5 注记，
+  并在 ASP-002 实现期第一次照做——正是它证明了 rockchip 可迁、trace 不可迁。
 
