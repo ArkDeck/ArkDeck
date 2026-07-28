@@ -1,7 +1,7 @@
 # CHG-2026-024 Verification Plan
 
 > Change:CHG-2026-024-hdc-device-snapshot-registration@r6
-> Status:planned
+> Status:passed # 2026-07-28；五条 AC 结论与全链 OID 见 proposal.md「Verification closure」段；仅在维护者 review/merge 本 verification-closure PR 后生效
 > Core baseline:CORE-2.1.0（canonical Core AC 零认领）
 > Note(2026-07-27):r6 三方同步 = 按 #656/#658 实测重定义 `observedEmpty` 为
 > 「零 `Connected` 行」（marker 充分不必要），并给 SNAPSHOT-001 增加 LF/CRLF
