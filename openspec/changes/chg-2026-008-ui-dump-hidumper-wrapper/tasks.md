@@ -621,13 +621,40 @@ R2 decision 与 R2→R4 seam 两个串行任务,共 8 个;r11 因 R2 negative de
     PyYAML `6.0.3`(经 check-sdd.sh 的 TASK-SDR-001 共享发现解析);本 readiness
     起草时 `scripts/check-sdd.sh` = 0 error / 0 warning / 111 acceptance IDs
     (change-local acceptance case 不进 canonical 计数)。
-- Allowed paths（readiness/status 载体面 + readiness r1 固定的实现面）：
+- Readiness(r2 addendum;只闭合一条 r1 起草盲区的 CI 契约缺口,r1 其余条款
+  逐字有效、零重写;仅在维护者对本独立 addendum PR exact head review/merge 后
+  生效,合入前 implementation PR 不得触碰 `scripts/README.md`):
+  - **缺口实测(2026-07-28,implementation PR #683 exact-head checks):**r1
+    起草前一日 TASK-DEC-001(#640,merge
+    `3232377ec00654556e8e34b6ded4694322176c8f`)新增了 `scripts/README.md`
+    边界地图与 guard 契约测试
+    `test_readme_boundary_map_covers_every_first_level_scripts_entry`
+    (agent-pr / sdd-guard 的 allowed-paths job 第一步,先于
+    `check_pr_paths` 判定执行):head 树 `scripts/` 的每个一级条目必须在
+    `scripts/README.md` 以反引号被提及。r1 的 closed 实现面(仅三新文件 +
+    evidence)在任何创建 `scripts/ui_dump_diagnosis/` 的 head 上必然使该步
+    FAIL,而在活声明之外改 `scripts/README.md` 又必然使第二步(base 树活
+    声明判定)FAIL——两步互斥,r1 实现面不可能过 CI。实测:#683 head
+    `80fe8980ec80c24d787d0f2305378ae395b90c93` 上 49 tests 恰 1 fail(仅该
+    boundary-map 测试;swift / open-pr / guard 均 PASS),本地在 README 增补
+    一行后 49/49 OK;`check_pr_paths` 对 #683 四路径的 base 树模拟判定单独
+    为 PASS。
+  - **修正(最小、closed、零其他自由度):**Allowed paths 增列
+    `scripts/README.md`,仅授权 implementation PR 在既有 boundary-map 表内
+    按字典序于 `ud_capture/` 行与 `ui_dump_redaction/` 行之间新增恰一个表
+    行:第一列为反引号包裹的 `ui_dump_diagnosis/`,第二列为
+    `R2 raw INVALID_UNICODE 只读非内容诊断(TASK-UD-R2-DIAG-001)`;该文件
+    任何其他行不得增删改。活声明解析由 7 patterns 变为 8。r1 的全部 input
+    pins、CLI closed 契约、输出 schema、验证计划、执行模型、done 判定与
+    禁令零变化。
+- Allowed paths（readiness/status 载体面 + r1 实现面 + r2 boundary-map 行）：
   - 本 change `tasks.md`（仅本 task 段的 readiness/status 更新）
   - 本 change `acceptance-cases.yaml`（仅 `INT-UD-R2-DIAG-001` 登记）
   - 本 change `verification.md`（仅本 task 对应 verification 行）
   - `scripts/ui_dump_diagnosis/README.md`（r1 固定；仅 implementation PR 使用）
   - `scripts/ui_dump_diagnosis/diagnose.py`（r1 固定；仅 implementation PR 使用）
   - `scripts/ui_dump_diagnosis/test_diagnose.py`（r1 固定；仅 implementation PR 使用）
+  - `scripts/README.md`（r2 addendum 固定；仅 implementation PR 依上方 r2 修正条款新增恰一个 boundary-map 表行）
   - `openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/evidence/runs/TASK-UD-R2-DIAG-001/**`
 - Objective:在任何复活分支被授权之前判定 `TASK-UD-R2-DECISION-001` truthful-negative
   的根因。已固定事实(#248/#263):`uidump-derived-redaction-v1` 对 R2 sidecar exact raw
