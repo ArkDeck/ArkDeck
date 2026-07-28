@@ -997,6 +997,21 @@ private struct RockchipProductPostflightPort: RockchipExecutionPostflightPort {
   }
 }
 
+/// TASK-AIN-003R composition seam. Admission-time tool/device observation must
+/// hand the declarative discovery gate an adapter whose profile carries the
+/// same `pinnedProduction` executable hash pin that
+/// `RockchipAuthorizationFacts` asserts; the default
+/// `RockchipDeviceDiscoveryAdapter()` deliberately pins the read-only E0
+/// discovery identity instead, which made the gate structurally unsatisfiable
+/// here. Naming the assembly point keeps the actually composed profile
+/// observable to contract tests; `RockchipProductionAdmissionPort.admit` is
+/// its only production caller.
+enum RockchipProductionDiscoveryComposition {
+  static func admissionDiscoveryAdapter() -> RockchipDeviceDiscoveryAdapter {
+    RockchipDeviceDiscoveryAdapter(profile: .pinnedProduction)
+  }
+}
+
 private final class RockchipProductionAdmissionPort: @unchecked Sendable,
   RockchipExecutionAdmissionPort
 {
@@ -1036,7 +1051,8 @@ private final class RockchipProductionAdmissionPort: @unchecked Sendable,
         sessionID: sessionID, jobID: jobID, targetID: targetID, snapshot: binding),
       toolDevicePort: RockchipDiscoveryToolDeviceFactPort(
         sessionID: sessionID, jobID: jobID, targetID: targetID,
-        observationSequence: sequence, adapter: RockchipDeviceDiscoveryAdapter(),
+        observationSequence: sequence,
+        adapter: RockchipProductionDiscoveryComposition.admissionDiscoveryAdapter(),
         tool: tool, clock: clock),
       prerequisitePort: RockchipProductPrerequisitePort(
         sessionID: sessionID, jobID: jobID, targetID: targetID,
