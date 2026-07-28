@@ -1887,6 +1887,12 @@ public enum HDCSessionDiagnosticsBootstrap {
       intentStore: intentStore,
       toolchainIntent: toolchainIntent,
       finalizer: adapter)
+    // Only key names are exposed. The set is exactly what ArkDeck overlays on
+    // its own child processes: caller-supplied diagnostics/test inputs plus
+    // the selected endpoint key; the parent environment is never modified.
+    let childEnvironmentInjectionKeys = Set(additionalChildEnvironment.keys)
+      .union(endpoint.childEnvironment.keys)
+      .sorted()
     return makeDiagnostics(
       supervisor: supervisor, snapshot: snapshot, authorization: authorization,
       channelProtection: channelProtection, keyAccessError: keyAccessError,
@@ -1894,7 +1900,8 @@ public enum HDCSessionDiagnosticsBootstrap {
       lifecycle: lifecycle,
       toolchainIntent: toolchainIntent,
       lifecycleRecoveryUnavailableReason: persistedRecoveryGate?.reason
-        ?? lifecycleRecoveryUnavailableReason)
+        ?? lifecycleRecoveryUnavailableReason,
+      childEnvironmentInjectionKeys: childEnvironmentInjectionKeys)
   }
 
   /// Attaches a Session's read-only diagnostics use case to the one
@@ -1929,13 +1936,15 @@ public enum HDCSessionDiagnosticsBootstrap {
     subserverCapability: HDCSubserverCapability,
     lifecycle: HDCSessionLifecycleUseCase?,
     toolchainIntent: JobToolchainIntent?,
-    lifecycleRecoveryUnavailableReason: String?
+    lifecycleRecoveryUnavailableReason: String?,
+    childEnvironmentInjectionKeys: [String] = []
   ) -> HDCSessionDiagnosticsComposition {
     let diagnostics = HDCServerDiagnosticsUseCase(
       supervisor: supervisor, snapshot: snapshot, authorization: authorization,
       channelProtection: channelProtection, keyAccessError: keyAccessError,
       subserverCapability: subserverCapability,
-      lifecycleRecoveryUnavailableReason: lifecycleRecoveryUnavailableReason)
+      lifecycleRecoveryUnavailableReason: lifecycleRecoveryUnavailableReason,
+      childEnvironmentInjectionKeys: childEnvironmentInjectionKeys)
     return HDCSessionDiagnosticsComposition(
       supervisor: supervisor,
       diagnostics: diagnostics,

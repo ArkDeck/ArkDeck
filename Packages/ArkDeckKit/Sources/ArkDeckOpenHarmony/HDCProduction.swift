@@ -153,6 +153,13 @@ public enum HDCRegisteredCommandFamily: Sendable, Equatable {
   /// mutation is proved only by the post-dispatch server observation.
   case lifecycleRestart
   case lifecycleStop
+  /// Endpoint-bound subserver mutation argv. Like the lifecycle families it
+  /// has no registered success byte family and stays fail-closed at the
+  /// semantic gate; the sealed classification exists so the identity-bound
+  /// spawn hook can attribute a subserver invocation to the automatic
+  /// subserver counter. The registry `subserverCapability` family remains
+  /// unsupported and no production caller dispatches this argv.
+  case subserver
   case unregistered
 }
 
@@ -260,7 +267,7 @@ package struct HDCRegisteredSemanticProfile: Sendable, Equatable {
       expectedStdoutSHA256 = versionSHA256
     case .selectedDeviceAuthorization:
       expectedStdoutSHA256 = selectedDeviceAuthorizationSHA256
-    case .lifecycleRestart, .lifecycleStop:
+    case .lifecycleRestart, .lifecycleStop, .subserver:
       expectedStdoutSHA256 = nil
     case .unregistered:
       return nil
@@ -355,7 +362,7 @@ public struct HDCRegisteredSemanticEvaluator: ProcessSemanticEvaluating {
         ? .success
         : .unknownOutput
     case .checkserver, .selectedDeviceAuthorization, .lifecycleRestart, .lifecycleStop,
-      .unregistered:
+      .subserver, .unregistered:
       return .unknownOutput
     }
   }
@@ -387,9 +394,137 @@ private final class HDCPreparedProcessCommand: @unchecked Sendable {
   deinit { close() }
 }
 
+/// Opaque, Supervisor-minted dispatch permit. Authenticity is class identity:
+/// the only initializer is file-private to this file, so neither a value copy
+/// nor a caller-constructed lookalike can satisfy the spawn-hook verification.
+/// A permit carries no authorization; the lifecycle gates are unchanged and
+/// this token exists purely so the observability counters can distinguish
+/// confirmed/managed dispatch from an automatic invocation.
+final class HDCServerDispatchPermit: @unchecked Sendable {
+  fileprivate init() {}
+}
+
+/// Task-local carrier that associates the permit supplied to one runner
+/// execution with the identity-bound spawn hook that fires inside the same
+/// task. Concurrent executions in separate tasks observe only their own
+/// binding, so no pid/argv post-hoc synthesis is needed.
+enum HDCServerDispatchPermitBinding {
+  @TaskLocal static var current: HDCServerDispatchPermit?
+}
+
+/// Package-level fault seam between permit minting and spawn-hook
+/// verification. The default has no effect; the mutation contract uses
+/// `removePermitBeforeSpawn` to prove that the same real spawn without its
+/// permit is counted as automatic.
+package enum HDCDispatchInstrumentationFault: Sendable, Equatable {
+  case none
+  case removePermitBeforeSpawn
+}
+
+/// Sums observed identity-bound spawns per Supervisor. Counters increment only
+/// inside `recordIdentityBoundSpawn`, whose only caller is the spawn-hook
+/// closure installed by `HDCProcessCommandRunner` in this file; the entry
+/// point is deliberately file-private so no production or test caller can
+/// record a dispatch that did not really spawn.
+final class HDCSupervisorDispatchMonitor: @unchecked Sendable {
+  struct CountersSnapshot: Sendable, Equatable {
+    let automaticLifecycleDispatchCount: Int
+    let automaticSubserverDispatchCount: Int
+    let confirmedLifecycleDispatchCount: Int
+    let managedStartDispatchCount: Int
+  }
+
+  enum PermitKind: Sendable, Equatable {
+    case confirmedLifecycle
+    case managedStart
+  }
+
+  struct SpawnAuditRecord: Sendable, Equatable {
+    let commandFamily: HDCRegisteredCommandFamily
+    let permitKind: PermitKind?
+    let processIdentifier: pid_t
+    let arguments: [String]
+  }
+
+  private let lock = NSLock()
+  private var automaticLifecycleDispatchCount = 0
+  private var automaticSubserverDispatchCount = 0
+  private var confirmedLifecycleDispatchCount = 0
+  private var managedStartDispatchCount = 0
+  private var mintedPermits: [ObjectIdentifier: PermitKind] = [:]
+  private var spawnAudit: [SpawnAuditRecord] = []
+  private static let auditCapacity = 256
+
+  init() {}
+
+  func mintConfirmedLifecycleDispatchPermit() -> HDCServerDispatchPermit {
+    let permit = HDCServerDispatchPermit()
+    lock.withLock { mintedPermits[ObjectIdentifier(permit)] = .confirmedLifecycle }
+    return permit
+  }
+
+  func mintManagedStartDispatchPermit() -> HDCServerDispatchPermit {
+    let permit = HDCServerDispatchPermit()
+    lock.withLock { mintedPermits[ObjectIdentifier(permit)] = .managedStart }
+    return permit
+  }
+
+  func countersSnapshot() -> CountersSnapshot {
+    lock.withLock {
+      CountersSnapshot(
+        automaticLifecycleDispatchCount: automaticLifecycleDispatchCount,
+        automaticSubserverDispatchCount: automaticSubserverDispatchCount,
+        confirmedLifecycleDispatchCount: confirmedLifecycleDispatchCount,
+        managedStartDispatchCount: managedStartDispatchCount)
+    }
+  }
+
+  func spawnAuditTrail() -> [SpawnAuditRecord] {
+    lock.withLock { spawnAudit }
+  }
+
+  fileprivate func recordIdentityBoundSpawn(
+    receipt _: ProcessExecutableIdentityReceipt,
+    request: ProcessRequest,
+    processIdentifier: pid_t,
+    permit: HDCServerDispatchPermit?
+  ) {
+    let commandFamily = hdcRegisteredCommandFamily(arguments: request.arguments)
+    lock.withLock {
+      // One-shot: a permit matches exactly one successful spawn.
+      let permitKind = permit.flatMap { mintedPermits.removeValue(forKey: ObjectIdentifier($0)) }
+      switch (commandFamily, permitKind) {
+      case (_, .managedStart):
+        managedStartDispatchCount += 1
+      case (.lifecycleRestart, .confirmedLifecycle), (.lifecycleStop, .confirmedLifecycle):
+        confirmedLifecycleDispatchCount += 1
+      case (.lifecycleRestart, nil), (.lifecycleStop, nil):
+        automaticLifecycleDispatchCount += 1
+      case (.subserver, nil), (.subserver, .confirmedLifecycle):
+        // A confirmed lifecycle permit does not cover a subserver argv; the
+        // invocation has no matching permit and counts as automatic.
+        automaticSubserverDispatchCount += 1
+      case (.uninstall, _), (.checkserver, _), (.version, _),
+        (.selectedDeviceAuthorization, _), (.unregistered, _):
+        break
+      }
+      spawnAudit.append(
+        SpawnAuditRecord(
+          commandFamily: commandFamily,
+          permitKind: permitKind,
+          processIdentifier: processIdentifier,
+          arguments: request.arguments))
+      if spawnAudit.count > Self.auditCapacity {
+        spawnAudit.removeFirst(spawnAudit.count - Self.auditCapacity)
+      }
+    }
+  }
+}
+
 package final class HDCProcessCommandRunner: @unchecked Sendable {
   private let executor: FoundationProcessExecutor
   private let semanticProfile: HDCRegisteredSemanticProfile
+  private let dispatchInstrumentationFault: HDCDispatchInstrumentationFault
 
   package init(
     executor: FoundationProcessExecutor = FoundationProcessExecutor(),
@@ -397,23 +532,57 @@ package final class HDCProcessCommandRunner: @unchecked Sendable {
   ) {
     self.executor = executor
     self.semanticProfile = semanticProfile
+    dispatchInstrumentationFault = .none
+  }
+
+  /// Builds a runner whose executor reports every identity-bound successful
+  /// spawn to the Supervisor dispatch monitor. The hook closure created here
+  /// is the only holder of the monitor's file-private record entry point.
+  /// Module-internal on purpose: composition inside this module wires the
+  /// monitor; no package or public caller can install one.
+  init(
+    semanticProfile: HDCRegisteredSemanticProfile = .pinnedProduction,
+    dispatchMonitor: HDCSupervisorDispatchMonitor,
+    dispatchInstrumentationFault: HDCDispatchInstrumentationFault = .none,
+    identityBoundFinalLaunchHook:
+      @escaping @Sendable (ProcessExecutableIdentityReceipt) async throws -> Void = { _ in },
+    launchObserver: @escaping @Sendable (pid_t) -> Void = { _ in }
+  ) {
+    executor = FoundationProcessExecutor(
+      identityBoundPreSpawnHook: { _ in },
+      identityBoundFinalLaunchHook: identityBoundFinalLaunchHook,
+      launchObserver: launchObserver,
+      identityBoundSpawnObserver: { receipt, request, processIdentifier in
+        dispatchMonitor.recordIdentityBoundSpawn(
+          receipt: receipt,
+          request: request,
+          processIdentifier: processIdentifier,
+          permit: HDCServerDispatchPermitBinding.current)
+      })
+    self.semanticProfile = semanticProfile
+    self.dispatchInstrumentationFault = dispatchInstrumentationFault
   }
 
   func execute(
     _ command: HDCProcessCommand,
     launchGate: ProcessAtomicLaunchGate? = nil,
+    dispatchPermit: HDCServerDispatchPermit? = nil,
     onOutput: @escaping ProcessOutputHandler = { _ in }
   ) async throws -> SemanticallyEvaluatedIdentityBoundProcessResult<HDCCommandSemanticResult> {
     let prepared = try prepare(command)
     defer { prepared.close() }
     if let launchGate {
       return try await executePrepared(
-        prepared, launchGate: launchGate, onOutput: onOutput)
+        prepared, launchGate: launchGate, dispatchPermit: dispatchPermit, onOutput: onOutput)
     }
-    return try await executor.executePreparedIdentityBoundLaunch(
-      prepared.process,
-      evaluating: HDCRegisteredSemanticEvaluator(binding: prepared.semanticBinding),
-      onOutput: onOutput)
+    return try await HDCServerDispatchPermitBinding.$current.withValue(
+      effectiveDispatchPermit(dispatchPermit)
+    ) {
+      try await executor.executePreparedIdentityBoundLaunch(
+        prepared.process,
+        evaluating: HDCRegisteredSemanticEvaluator(binding: prepared.semanticBinding),
+        onOutput: onOutput)
+    }
   }
 
   fileprivate func prepare(_ command: HDCProcessCommand) throws -> HDCPreparedProcessCommand {
@@ -448,13 +617,24 @@ package final class HDCProcessCommandRunner: @unchecked Sendable {
   fileprivate func executePrepared(
     _ prepared: HDCPreparedProcessCommand,
     launchGate: ProcessAtomicLaunchGate,
+    dispatchPermit: HDCServerDispatchPermit? = nil,
     onOutput: @escaping ProcessOutputHandler = { _ in }
   ) async throws -> SemanticallyEvaluatedIdentityBoundProcessResult<HDCCommandSemanticResult> {
-    try await executor.executePreparedIdentityBoundLaunch(
-      prepared.process,
-      gate: launchGate,
-      evaluating: HDCRegisteredSemanticEvaluator(binding: prepared.semanticBinding),
-      onOutput: onOutput)
+    try await HDCServerDispatchPermitBinding.$current.withValue(
+      effectiveDispatchPermit(dispatchPermit)
+    ) {
+      try await executor.executePreparedIdentityBoundLaunch(
+        prepared.process,
+        gate: launchGate,
+        evaluating: HDCRegisteredSemanticEvaluator(binding: prepared.semanticBinding),
+        onOutput: onOutput)
+    }
+  }
+
+  private func effectiveDispatchPermit(
+    _ dispatchPermit: HDCServerDispatchPermit?
+  ) -> HDCServerDispatchPermit? {
+    dispatchInstrumentationFault == .removePermitBeforeSpawn ? nil : dispatchPermit
   }
 }
 
@@ -477,6 +657,9 @@ private func hdcRegisteredCommandFamily(arguments: [String]) -> HDCRegisteredCom
       return .unregistered
     }
     if arguments.count == 3, arguments[2] == "checkserver" { return .checkserver }
+    if arguments.count == 3, arguments[2] == "spawn-sub" || arguments[2] == "killall-sub" {
+      return .subserver
+    }
     guard arguments[2] == "kill" else { return .unregistered }
     if arguments.count == 4, arguments[3] == "-r" { return .lifecycleRestart }
     if arguments.count == 3 { return .lifecycleStop }
@@ -588,7 +771,8 @@ public actor HDCServerProcessSupervisor {
   ) {
     self.supervisor = supervisor
     let semanticProfile = HDCRegisteredSemanticProfile.pinnedProduction
-    let runner = HDCProcessCommandRunner(semanticProfile: semanticProfile)
+    let runner = HDCProcessCommandRunner(
+      semanticProfile: semanticProfile, dispatchMonitor: supervisor.dispatchMonitor)
     self.runner = runner
     clientVersionProbe = HDCClientVersionProcessProbe(
       runner: runner, additionalChildEnvironment: additionalChildEnvironment)
@@ -606,7 +790,8 @@ public actor HDCServerProcessSupervisor {
     identityObserver: any HDCServerProcessIdentityObserving
   ) {
     self.supervisor = supervisor
-    let runner = HDCProcessCommandRunner(semanticProfile: semanticProfile)
+    let runner = HDCProcessCommandRunner(
+      semanticProfile: semanticProfile, dispatchMonitor: supervisor.dispatchMonitor)
     self.runner = runner
     clientVersionProbe = HDCClientVersionProcessProbe(
       runner: runner, additionalChildEnvironment: additionalChildEnvironment)
@@ -1008,7 +1193,8 @@ package actor HDCProcessLifecycleExecutor: HDCServerLifecycleExecutor {
     supervisor: HDCServerSupervisor,
     postDispatchProbe: @escaping PostDispatchProbe
   ) {
-    runner = HDCProcessCommandRunner(semanticProfile: semanticProfile)
+    runner = HDCProcessCommandRunner(
+      semanticProfile: semanticProfile, dispatchMonitor: supervisor.dispatchMonitor)
     self.toolchain = toolchain
     self.endpointSelection = endpointSelection
     self.additionalChildEnvironment = additionalChildEnvironment
@@ -1104,7 +1290,7 @@ package actor HDCProcessLifecycleExecutor: HDCServerLifecycleExecutor {
     }
     do {
       let result = try await runner.executePrepared(
-        prepared, launchGate: lease.launchGate)
+        prepared, launchGate: lease.launchGate, dispatchPermit: lease.dispatchPermit)
       let observation = await postDispatchProbe(step)
       guard result.execution.termination == .exited(0) else {
         return receipt(
@@ -1581,6 +1767,23 @@ public struct HDCDiagnosticsPresentation: Sendable, Equatable {
   /// remain in `HDCServerSupervisor` and cannot be created by this value.
   public let lifecycleImpactPreview: HDCServerImpactSnapshot?
   public let criticalGateMessage: String?
+  /// Mirrors of the Supervisor dispatch monitor. The automatic counters are
+  /// measured at the unique identity-bound spawn hook; the confirmed and
+  /// managed counts stay independent fields and are never subtracted from or
+  /// renamed into an automatic value.
+  public let automaticLifecycleDispatchCount: Int
+  public let automaticSubserverDispatchCount: Int
+  public let confirmedLifecycleDispatchCount: Int
+  public let managedStartDispatchCount: Int
+  /// The endpoint selection source as originally selected; nil when no
+  /// selection has been established for this presentation.
+  public let endpointSource: HDCServerEndpointSource?
+  /// Sorted names of environment keys injected into ArkDeck-owned child
+  /// processes only. Values are deliberately not exposed; the parent process
+  /// environment is never modified.
+  public let childEnvironmentInjectionKeys: [String]
+  /// Per-evidence ownership classification basis for the presented endpoint.
+  public let ownershipBasis: HDCServerOwnershipBasis?
 
   public init(
     absolutePath: String,
@@ -1601,7 +1804,14 @@ public struct HDCDiagnosticsPresentation: Sendable, Equatable {
     subserverCapability: HDCSubserverCapability,
     lifecycleImpactPreview: HDCServerImpactSnapshot? = nil,
     lifecycleRecovery: HDCLifecycleRecoveryPresentation? = nil,
-    criticalGateMessage: String? = nil
+    criticalGateMessage: String? = nil,
+    automaticLifecycleDispatchCount: Int = 0,
+    automaticSubserverDispatchCount: Int = 0,
+    confirmedLifecycleDispatchCount: Int = 0,
+    managedStartDispatchCount: Int = 0,
+    endpointSource: HDCServerEndpointSource? = nil,
+    childEnvironmentInjectionKeys: [String] = [],
+    ownershipBasis: HDCServerOwnershipBasis? = nil
   ) {
     self.absolutePath = absolutePath
     self.source = source
@@ -1619,6 +1829,13 @@ public struct HDCDiagnosticsPresentation: Sendable, Equatable {
     self.tcpUnprotectedWarning = tcpUnprotectedWarning
     self.keyAccessError = keyAccessError
     self.subserverCapability = subserverCapability
+    self.automaticLifecycleDispatchCount = automaticLifecycleDispatchCount
+    self.automaticSubserverDispatchCount = automaticSubserverDispatchCount
+    self.confirmedLifecycleDispatchCount = confirmedLifecycleDispatchCount
+    self.managedStartDispatchCount = managedStartDispatchCount
+    self.endpointSource = endpointSource
+    self.childEnvironmentInjectionKeys = childEnvironmentInjectionKeys
+    self.ownershipBasis = ownershipBasis
     let resolvedRecovery =
       lifecycleRecovery
       ?? lifecycleImpactPreview.map {
@@ -1695,7 +1912,8 @@ public actor HDCReadOnlyDiagnosticsUseCase: HDCDiagnosticsStateProviding {
         "Key access diagnostics are unsupported without a configured or user-approved locator.",
       subserverCapability: .unsupported,
       lifecycleRecovery: .unavailable(
-        reason: "Recovery requires a verified endpoint and a Session-backed durable audit"))
+        reason: "Recovery requires a verified endpoint and a Session-backed durable audit"),
+      endpointSource: endpoint.source)
   }
 
   public func requestRecoveryImpactPreview() async -> HDCDiagnosticsPresentation {
@@ -1802,6 +2020,7 @@ public actor HDCServerDiagnosticsUseCase: HDCDiagnosticsStateProviding {
   private let channelProtection: HDCChannelProtectionState
   private let keyAccessError: String?
   private let subserverCapability: HDCSubserverCapability
+  private let childEnvironmentInjectionKeys: [String]
   private let configuredLifecycleRecoveryUnavailableReason: String?
   private var runtimeLifecycleRecoveryRequiredReason: String?
   private var lifecycleRecovery: HDCLifecycleRecoveryPresentation
@@ -1813,7 +2032,8 @@ public actor HDCServerDiagnosticsUseCase: HDCDiagnosticsStateProviding {
     channelProtection: HDCChannelProtectionState,
     keyAccessError: String? = nil,
     subserverCapability: HDCSubserverCapability = .unsupported,
-    lifecycleRecoveryUnavailableReason: String? = nil
+    lifecycleRecoveryUnavailableReason: String? = nil,
+    childEnvironmentInjectionKeys: [String] = []
   ) {
     self.supervisor = supervisor
     self.snapshot = snapshot
@@ -1821,6 +2041,7 @@ public actor HDCServerDiagnosticsUseCase: HDCDiagnosticsStateProviding {
     self.channelProtection = channelProtection
     self.keyAccessError = keyAccessError
     self.subserverCapability = subserverCapability
+    self.childEnvironmentInjectionKeys = childEnvironmentInjectionKeys.sorted()
     configuredLifecycleRecoveryUnavailableReason = lifecycleRecoveryUnavailableReason
     runtimeLifecycleRecoveryRequiredReason = nil
     lifecycleRecovery = .unavailable(
@@ -1900,6 +2121,11 @@ public actor HDCServerDiagnosticsUseCase: HDCDiagnosticsStateProviding {
     let state = await supervisor.state(for: endpoint)
     let serverVersion =
       state.map { diagnosticText($0.version) } ?? diagnosticText(snapshot.serverVersion)
+    // The counter mirror is a verbatim snapshot of the monitor: automatic
+    // values stay measured, and the confirmed/managed counts remain the
+    // independent audit values without subtraction or renaming.
+    let dispatchCounters = supervisor.dispatchMonitor.countersSnapshot()
+    let ownershipBasis = await supervisor.ownershipBasis(for: endpoint)
     return HDCDiagnosticsPresentation(
       absolutePath: snapshot.path.path, source: snapshot.source.rawValue, hash: snapshot.sha256,
       platformTrust: diagnosticText(snapshot.platformTrust),
@@ -1914,13 +2140,186 @@ public actor HDCServerDiagnosticsUseCase: HDCDiagnosticsStateProviding {
         ? "Channel protection is unverified. Use TCP only on a trusted, isolated network."
         : nil,
       keyAccessError: keyAccessError, subserverCapability: subserverCapability,
-      lifecycleRecovery: lifecycleRecovery)
+      lifecycleRecovery: lifecycleRecovery,
+      automaticLifecycleDispatchCount: dispatchCounters.automaticLifecycleDispatchCount,
+      automaticSubserverDispatchCount: dispatchCounters.automaticSubserverDispatchCount,
+      confirmedLifecycleDispatchCount: dispatchCounters.confirmedLifecycleDispatchCount,
+      managedStartDispatchCount: dispatchCounters.managedStartDispatchCount,
+      endpointSource: snapshot.endpointSource,
+      childEnvironmentInjectionKeys: childEnvironmentInjectionKeys,
+      ownershipBasis: ownershipBasis)
   }
 
   private func diagnosticText<T>(_ value: HDCProbeValue<T>) -> String {
     switch value {
     case .known(let value): String(describing: value)
     case .unknown(let reason): "unknown (\(reason))"
+    }
+  }
+}
+
+// MARK: - Registered zero-to-many device observation family
+
+/// Closed Sources-side adoption of the single supported entry of
+/// `OPENHARMONY-HDC-DEVICE-OBSERVATION-PROBES@1.0.0`
+/// (`openspec/integrations/openharmony/device-observation-probes.yaml`).
+/// The registered tool context is hdc 3.2.0f; it is deliberately a different
+/// tool than the 3.2.0d read-only registry and the two must never be merged.
+enum HDCDeviceObservationProbeCatalog {
+  static let registryID = "OPENHARMONY-HDC-DEVICE-OBSERVATION-PROBES"
+  static let registryVersion = "1.0.0"
+  static let integrationProfile = "OPENHARMONY-TOOLS@0.5.0"
+  static let entryID = "openharmony-hdc-device-observation-snapshot-3.2.0f-macos"
+  static let family = "deviceObservationSnapshot"
+  static let statusSupported = true
+  static let invocationAllowed = true
+  static let exactArguments = ["list", "targets", "-v"]
+  static let exactEndpoint = "127.0.0.1:8710"
+  static let targetToolVersion = "3.2.0f"
+  static let targetExecutableSHA256 =
+    "05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83"
+  static let timeoutMilliseconds = 15_000
+  static let emptyMarkerLine = "[Empty]\r\n"
+
+  /// The zero-to-many family exists only while the registered entry stays
+  /// supported and invocable with a non-empty exact argv. Absence must surface
+  /// as a hard failure in the fan-out contract, never as a skip.
+  static var familyIsRegistered: Bool {
+    statusSupported && invocationAllowed && !exactArguments.isEmpty
+  }
+}
+
+/// Parses the registered `tabDelimitedDeviceRowsOrEmptyMarker` raw family.
+/// Presence is decided by the `state` column per the registered presence rule;
+/// the parser itself never interprets row disappearance.
+enum HDCDeviceObservationRawFamilyParser {
+  static func parse(
+    execution: ProcessExecutionResult,
+    pseudonymize: (String) -> HDCObservedDeviceIdentifier
+  ) -> HDCDeviceObservationSnapshot {
+    if execution.termination == .timedOut {
+      return .unavailable(reason: "device observation timed out")
+    }
+    if execution.termination == .cancelled {
+      return .unavailable(reason: "device observation was cancelled")
+    }
+    guard execution.termination == .exited(0),
+      execution.stderr.totalByteCount == 0,
+      !execution.stdout.wasTruncated
+    else {
+      return .unknown(reason: "stderr was not empty, the exit was nonzero, or stdout truncated")
+    }
+    let data = execution.stdout.data
+    guard !data.isEmpty else {
+      return .unknown(reason: "zero-byte stdout is outside the registered raw family")
+    }
+    if data == Data(HDCDeviceObservationProbeCatalog.emptyMarkerLine.utf8) {
+      return .observedEmpty
+    }
+    guard let text = String(data: data, encoding: .utf8), text.hasSuffix("\n") else {
+      return .unknown(reason: "stdout is not a terminated UTF-8 row family")
+    }
+    var connectKeys: Set<String> = []
+    var connected: [HDCObservedDeviceIdentifier] = []
+    for var line in text.dropLast().components(separatedBy: "\n") {
+      if line.hasSuffix("\r") { line = String(line.dropLast()) }
+      guard !line.contains("\r") else {
+        return .unknown(reason: "residual carriage return inside a device row field")
+      }
+      let columns = line.components(separatedBy: "\t")
+      guard columns.count == 5 else {
+        return .unknown(reason: "device row column count is outside the registered family")
+      }
+      let connectKey = columns[0]
+      guard !connectKey.isEmpty,
+        columns[2] == "USB",
+        columns[3] == "Connected" || columns[3] == "Offline",
+        columns[4] == "localhost"
+      else {
+        return .unknown(reason: "device row literal is outside the registered closed sets")
+      }
+      guard connectKeys.insert(connectKey).inserted else {
+        return .unknown(reason: "duplicate connect key rows are outside the registered family")
+      }
+      if columns[3] == "Connected" {
+        connected.append(pseudonymize(connectKey))
+      }
+    }
+    guard !connected.isEmpty else { return .observedEmpty }
+    return .observedConnectedSet(connected.sorted())
+  }
+}
+
+/// Production source leg of the read-only device fan-out. It can only issue
+/// the registered exact argv against the registered exact endpoint after a
+/// stable pre/post existing-server identity bracket; every deviation is an
+/// unavailable/unknown snapshot rather than a different command. Raw connect
+/// keys never leave this adapter: identifiers are per-session HMAC-SHA-256
+/// pseudonyms in the registered `redacted-device-<24 hex>` presentation.
+actor HDCRegisteredDeviceObservationSource: HDCDeviceObservationSnapshotProviding {
+  nonisolated let authority = HDCDeviceObservationSourceAuthority.integrationRegistered
+
+  private let runner: HDCProcessCommandRunner
+  private let toolchain: HDCCandidate
+  private let endpointSelection: HDCServerEndpointSelection
+  private let identityObserver: any HDCServerProcessIdentityObserving
+  private let additionalChildEnvironment: [String: String]
+  private let pseudonymKey: SymmetricKey
+
+  init(
+    runner: HDCProcessCommandRunner,
+    toolchain: HDCCandidate,
+    endpointSelection: HDCServerEndpointSelection,
+    identityObserver: any HDCServerProcessIdentityObserving,
+    additionalChildEnvironment: [String: String] = [:],
+    pseudonymKey: SymmetricKey = SymmetricKey(size: .bits256)
+  ) {
+    self.runner = runner
+    self.toolchain = toolchain
+    self.endpointSelection = endpointSelection
+    self.identityObserver = identityObserver
+    self.additionalChildEnvironment = additionalChildEnvironment
+    self.pseudonymKey = pseudonymKey
+  }
+
+  func observe() async -> HDCDeviceObservationSnapshot {
+    guard HDCDeviceObservationProbeCatalog.familyIsRegistered else {
+      return .unavailable(
+        reason: "the zero-to-many device observation family is not registered")
+    }
+    guard
+      endpointSelection.endpoint.rawValue == HDCDeviceObservationProbeCatalog.exactEndpoint
+    else {
+      return .unavailable(reason: "endpoint differs from the registered exact endpoint")
+    }
+    let before = await identityObserver.observe(
+      endpoint: endpointSelection.endpoint, selectedToolchain: toolchain)
+    guard case .observed(let beforeReceipt) = before else {
+      return .unavailable(reason: "existing-server identity precondition is unavailable")
+    }
+    let evaluated: SemanticallyEvaluatedIdentityBoundProcessResult<HDCCommandSemanticResult>
+    do {
+      evaluated = try await runner.execute(
+        HDCProcessCommand(
+          toolchain: toolchain,
+          endpoint: endpointSelection,
+          arguments: HDCDeviceObservationProbeCatalog.exactArguments,
+          additionalChildEnvironment: additionalChildEnvironment,
+          timeout: TimeInterval(HDCDeviceObservationProbeCatalog.timeoutMilliseconds) / 1_000))
+    } catch {
+      return .unavailable(reason: "device observation process could not run")
+    }
+    let after = await identityObserver.observe(
+      endpoint: endpointSelection.endpoint, selectedToolchain: toolchain)
+    guard case .observed(let afterReceipt) = after, afterReceipt == beforeReceipt else {
+      return .unavailable(reason: "server identity changed across the device observation")
+    }
+    return HDCDeviceObservationRawFamilyParser.parse(execution: evaluated.execution) {
+      connectKey in
+      let code = HMAC<SHA256>.authenticationCode(
+        for: Data(connectKey.utf8), using: pseudonymKey)
+      let digest = code.map { String(format: "%02x", $0) }.joined().prefix(24)
+      return HDCObservedDeviceIdentifier(redactedKey: "redacted-device-\(digest)")
     }
   }
 }

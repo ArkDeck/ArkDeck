@@ -126,6 +126,7 @@ private actor HDCProductionApplicationDiagnostics: HDCApplicationDiagnosticsProv
     let snapshot = HDCJobToolchainSnapshot(
       candidate: candidate,
       endpoint: endpoint.endpoint.rawValue,
+      endpointSource: endpoint.source,
       details: HDCProbeDetails(
         platformTrust: .unknown(reason: "ToolTrustInspector has not run"),
         clientVersion: .unknown(
