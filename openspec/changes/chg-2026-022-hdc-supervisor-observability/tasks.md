@@ -440,7 +440,48 @@
 
 ## TASK-OBS-001R — Kit App-facing fan-out remediation
 
-- Status:ready(fresh D1 readiness 已由 PR #709 merge
+- Status:done(2026-07-28 completion；仅在维护者 review/merge 本独立
+  `ready→done` PR 后生效。**实现载体 = #716**：exact head
+  `6a98aa7315b09b556eb512651eca038704b8adf6` 经维护者 `lvye` 对该 head
+  APPROVED，并由同一维护者 squash merge 为
+  `67978722a063f07adfee6c8b3fd8235076ea60c2`。merge 树中的六个授权文件与
+  exact head 逐字节一致；implementation commit
+  `60924f9d0c533908425a5b60b868f8301d13f261` 交付 public immutable
+  timestamped device events、严格 redaction、独立 capacity-64 buffer、exact
+  candidate SHA/endpoint/stable-identity fail-closed production session、
+  显式 refresh/coalesce/cancel/reset 与 exact UITest fixture，DP1-DP18
+  `18/18`，既有 OBS-001 `25/25`，全量 `460 tests / 1 skipped /
+  0 failures`。
+  **授权链**：fresh D1 readiness exact head
+  `a629432b2f023c87afbdfb7318bc7e95329d621f` 经维护者 APPROVED，PR #709
+  merge `c295d4a45a30ea08d7ab66440c5593d1208f222a` 生效；其一次性实现授权
+  已由 #716 全额消耗。
+  **evidence** =
+  `evidence/runs/TASK-OBS-001R/run.md`（merge-tree blob
+  `2beee035ff96d50a795b79a9677e7e6a3efb2b11`，SHA-256
+  `24d68f4ab6bbfea31d6145225448fe72b1d1731bb2b5e17df8e34068ea743412`；
+  含授权/base 漂移、实现落点、命令结果、DP1-DP18 二值映射、偏差与
+  host-only anti-claim）。
+  **flip base recheck**（在翻转后的树上实测）：(a) #709 与 #716 merge
+  均为 flip base ancestor，#716 exact head 与 merge 的六文件 diff 为空；
+  本文件改前 blob
+  `da3d5ecf3bed9992effeaa14b5911227b193f46b`；(b)新 DP suite
+  `18 tests / 0 failures`、既有 OBS suite `25 tests / 0 failures`、全量
+  `460 tests / 1 skipped / 0 failures`；(c)`check-sdd` =
+  `0 error(s), 0 warning(s), 111 acceptance IDs`，paths guard 49 单测
+  PASS，`git diff --check` PASS；(d)host-loop `done_task_ids` =
+  `107` 且包含 `TASK-OBS-001R`，`--explain --change
+  chg-2026-022-hdc-supervisor-observability` 对本任务报
+  rejected（status `done` 非 ready，D1 human-gated）；(e)本状态 PR
+  fileset 仅本 `tasks.md`，标题声明本任务的 guard 模拟 PASS。
+  **不声称**：change-level `verified`、TASK-OBS-002 readiness/implementation、
+  M0B-002 或任何真机/硬件验收。
+  **连带效果**：本翻转合入后满足 TASK-OBS-002 前置
+  `TASK-OBS-001R done`；TASK-OBS-002 仍保持 blocked，须从届时 protected
+  main 起草并由维护者 merge 独立 fresh D1 readiness，本 PR 不修改其段落。)
+- Historical Status:ready(fresh D1 readiness 与 implementation/evidence
+  候选已交付；原状态正文如下保留。)
+- Historical Status:ready(fresh D1 readiness 已由 PR #709 merge
   `c295d4a45a30ea08d7ab66440c5593d1208f222a` 生效；其一次性授权已由
   implementation commit `60924f9d0c533908425a5b60b868f8301d13f261`
   交付候选实现与 DP1-DP18 contract tests，run 记录见
