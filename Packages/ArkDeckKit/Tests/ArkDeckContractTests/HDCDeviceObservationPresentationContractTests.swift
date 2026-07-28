@@ -5,8 +5,8 @@ import XCTest
 @testable import ArkDeckOpenHarmony
 @testable import ArkDeckWorkflows
 
-/// CHG-2026-022 / TASK-OBS-001R
-/// TEST-OBS-DEVICE-PRESENTATION-001, DP1-DP18.
+/// CHG-2026-022 / TASK-OBS-001R and CHG-2026-043 / TASK-HSO-002
+/// TEST-OBS-DEVICE-PRESENTATION-001, DP1-DP19.
 ///
 /// All executable observations use the repository fake with a contract-only
 /// source seam. Production-factory negative tests stop before runner entry.
@@ -462,6 +462,92 @@ final class HDCDeviceObservationPresentationContractTests: XCTestCase {
       occurrences(of: "deviceObservationSession.refresh()", in: productionSection),
       1,
       "only the explicit facade refresh drives one observation")
+  }
+
+  func testDP19_ProductionRootSharesOneCandidateEndpointAndOneExact320FObserver()
+    throws
+  {
+    let production = try sourceText("Sources/ArkDeckOpenHarmony/HDCProduction.swift")
+    let supervisorObservation = try sourceText(
+      "Sources/ArkDeckOpenHarmony/HDCSupervisorObservationProbeRegistry.swift")
+    let workflows = try sourceText(
+      "Sources/ArkDeckWorkflows/HDCApplicationDiagnosticsFacade.swift")
+    let fixtureBoundary = try XCTUnwrap(
+      workflows.range(of: "private actor HDCFixtureApplicationDiagnostics"))
+    let productionWorkflows = String(workflows[..<fixtureBoundary.lowerBound])
+
+    XCTAssertEqual(
+      occurrences(
+        of: "HDCExternalFirstDiscovery.discover(request)",
+        in: productionWorkflows),
+      1,
+      "one bootstrap must discover exactly once")
+    XCTAssertEqual(
+      occurrences(
+        of: "HDCSupervisorObservationApplicationSession.makeProduction(",
+        in: productionWorkflows),
+      1)
+    XCTAssertEqual(
+      occurrences(
+        of: "HDCDeviceObservationApplicationSession.makeProduction(",
+        in: productionWorkflows),
+      1)
+    XCTAssertTrue(
+      productionWorkflows.contains(
+        """
+        let session = HDCSupervisorObservationApplicationSession.makeProduction(
+                supervisor: supervisor,
+                toolchain: candidate,
+                endpointSelection: endpoint)
+        """))
+    XCTAssertTrue(
+      productionWorkflows.contains(
+        """
+        deviceObservationSession = HDCDeviceObservationApplicationSession.makeProduction(
+              toolchain: candidate, endpointSelection: endpoint)
+        """))
+    XCTAssertFalse(
+      productionWorkflows.contains(
+        "HDCSupervisorObservationApplicationSession.makeContract("))
+    XCTAssertFalse(productionWorkflows.contains("HDCServerProcessIdentityObserving"))
+    XCTAssertFalse(productionWorkflows.contains("HDCProcessCommandRunner"))
+    XCTAssertTrue(
+      productionWorkflows.contains(
+        "let processSupervisor = HDCServerProcessSupervisor(supervisor: supervisor)"),
+      "the exact 3.2.0d route remains the separate fallback arm for non-3.2.0f candidates")
+
+    XCTAssertFalse(production.contains("HDCDeviceObservationSystemIdentityObserver"))
+    XCTAssertEqual(
+      occurrences(
+        of:
+          "HDCExact320FSystemIdentityObserver.deviceObservationProduction",
+        in: production),
+      1,
+      "device observation must use the shared exact-3.2.0f system observer")
+    XCTAssertEqual(
+      occurrences(
+        of: "struct HDCExact320FSystemIdentityObserver:",
+        in: supervisorObservation),
+      1)
+    XCTAssertEqual(
+      occurrences(
+        of:
+          "HDCExact320FSystemIdentityObserver.supervisorObservationProduction",
+        in: supervisorObservation),
+      1,
+      "supervisor production construction must use the same observer implementation")
+    XCTAssertEqual(
+      occurrences(
+        of: "static let deviceObservationProduction =",
+        in: supervisorObservation),
+      1,
+      "the device factory keeps its independent registry tuple")
+    XCTAssertEqual(
+      occurrences(
+        of: "static let supervisorObservationProduction =",
+        in: supervisorObservation),
+      1,
+      "the supervisor factory keeps its independent registry tuple")
   }
 
   private func contractSession(

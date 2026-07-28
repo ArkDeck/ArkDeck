@@ -181,14 +181,13 @@ private actor HDCProductionApplicationDiagnostics: HDCApplicationDiagnosticsProv
           for: endpoint.endpoint),
         postDispatchProbe: { step in
           await lifecyclePostDispatchProbe.observe(after: step)
-        })
+      })
       activeExecutionIdentity = executionIdentity
       activeCandidateCatalogID = candidateCatalogID
-      let processSupervisor = HDCServerProcessSupervisor(supervisor: composition.supervisor)
-      let registeredObservation = await processSupervisor.observeRegisteredExistingServer(
-        endpoint: endpoint, toolchain: candidate)
-      if case .observed = registeredObservation.classification,
-        let identity = registeredObservation.identity
+      if let identity = await observeRegisteredServerIdentity(
+        supervisor: composition.supervisor,
+        candidate: candidate,
+        endpoint: endpoint)
       {
         registeredToolchain = candidate
         registeredEndpoint = endpoint
@@ -211,6 +210,30 @@ private actor HDCProductionApplicationDiagnostics: HDCApplicationDiagnosticsProv
       clearDeviceObservationSession()
       await provider.detachSessionDiagnostics()
     }
+  }
+
+  private func observeRegisteredServerIdentity(
+    supervisor: HDCServerSupervisor,
+    candidate: HDCCandidate,
+    endpoint: HDCServerEndpointSelection
+  ) async -> HDCServerProcessIdentityReceipt? {
+    if candidate.sha256
+      == HDCSupervisorObservationProbeCatalog.targetExecutableSHA256
+    {
+      let session = HDCSupervisorObservationApplicationSession.makeProduction(
+        supervisor: supervisor,
+        toolchain: candidate,
+        endpointSelection: endpoint)
+      let observation = await session.observe()
+      guard case .observed = observation.classification else { return nil }
+      return observation.identity
+    }
+
+    let processSupervisor = HDCServerProcessSupervisor(supervisor: supervisor)
+    let observation = await processSupervisor.observeRegisteredExistingServer(
+      endpoint: endpoint, toolchain: candidate)
+    guard case .observed = observation.classification else { return nil }
+    return observation.identity
   }
 
   private func clearRegisteredObservation() {
