@@ -724,7 +724,11 @@
 
 ## TASK-OBS-002 — App 观察面与 signed XCUITest
 
-- Status:blocked(r1 D1 blocked-readiness；前置① r2 remediation merged 与②
+- Status:ready(r2 fresh D1 readiness；仅在维护者 review/merge 本独立
+  readiness PR exact head 后生效，生效后的一次性授权只覆盖下述两个现有
+  App/UITest 文件与四项 executable matrix；本 PR 零 implementation/evidence，
+  不得把 r3、#700 或 OBS-001R 实现 PR 当作 OBS-002 实现授权。)
+- Historical Status:blocked(r1 D1 blocked-readiness；前置① r2 remediation merged 与②
   TASK-OBS-001 done 均已满足，但 PR #700 复核出的 OBS-001→App 设备事件投影
   缺口尚未交付。r3 选择新增 TASK-OBS-001R；维护者 merge r3 只登记其 scope，
   OBS-001R done 与本任务其后的 fresh D1 readiness 均合入前，本任务保持
@@ -733,7 +737,186 @@
   Allowed paths 不扩张；本任务后续 fresh readiness 必须以 OBS-001R done merge
   为 ancestor，重钉新的 public presentation shape 与 signed XCUITest fixture，
   不得把本 r3 或 PR #700 当作实现授权。
-- Readiness review(2026-07-28;protected main
+- Readiness r2(fresh D1；audit base = protected main
+  `176d6b353546b685f858752407143f9c5f494db3`,2026-07-28):
+  - **Approval/dependency gate:satisfied。**r3 governance #704 merge
+    `02907b69b8fd7d1347ba26822e4a1961415fbc16`、OBS-001R fresh readiness
+    #709 merge `c295d4a45a30ea08d7ab66440c5593d1208f222a`、implementation
+    #716 merge `67978722a063f07adfee6c8b3fd8235076ea60c2` 与 done #719 merge
+    `570fe28c2d6edbad18050cfe873246fd45f0bc40` 均实测为 audit base
+    ancestor。#716 exact head
+    `6a98aa7315b09b556eb512651eca038704b8adf6` 与 #719 exact head
+    `7a3aed409a1d6471276c4aa8fe39e35d592d36f5` 均由维护者 `lvye`
+    APPROVED 后由同一维护者 merge；#716 为 squash merge，但其六个授权文件
+    与 approved exact head 逐字节一致。TASK-OBS-001 与本 change approval/r2
+    前置保持已满足。
+  - **r1 blocker closure:CLOSED。**从 #700 audit base
+    `e114d9d3ae668bff68d2cfb69c59fa6f4dff00ec` 到本 base，三个 App/XCUITest
+    目标与 project/scheme diff 均为空；唯一相关代码变化恰为 #716 的三个 Kit
+    Sources、新增 DP1-DP18 contract 与 evidence。实树复核证明：
+    1. `HDCDiagnosticsPresentation.deviceEvents` 已是 public immutable
+       `[HDCDeviceObservationPresentationEvent]`；元素 exact readable fields =
+       RFC 3339 fractional `timestamp`、closed `kind`、optional
+       `redactedDeviceIdentifier`，Workflows public aliases 让 App 无需 import
+       `ArkDeckOpenHarmony` 即可只读消费；
+    2. production Workflows facade 已为 candidate/endpoint/execution session
+       持有唯一 observation session，并仅在既有显式 `refresh()` 单次驱动；
+       mismatch/stable-identity drift fail closed，concurrent refresh coalesce，
+       cancel 只影响 owned observation child；
+    3. presentation buffer 容量 64、`.unchanged` 零 public history、raw key/
+       internal reason 零外泄；DP1-DP18 `18/18` 已由 #716 merged evidence
+       判定；
+    4. exact `--ui-test-hdc-diagnostics` fixture 已经同一 public type提供两条
+       ordered event，production factory/无 flag 路径零 fixture/test source。
+    因此 #700 的跨 package 前置缺口已由 approved/done predecessor 精确关闭，
+    App-only scope 现可诚实完成 `OBS-APPFACE-001`。
+  - **Exact base pins(完整 Git blob OID + SHA-256；实现开工逐项复核，标记
+    invariant 者必须逐字节不变):**
+
+    | File | Git blob OID | File SHA-256 | 性质 |
+    | --- | --- | --- | --- |
+    | `ArkDeckApp/Features/HDC/HDCStatusView.swift` | `23379eb20fafdc79998699738ca0663da0ca921f` | `12c53c1dc447a05254aa6379bf130341bfc04960848d05405bc1d6ee94a6e7c5` | 唯一 App 待改文件 |
+    | `ArkDeckAppUITests/HDC/HDCStatusUITests.swift` | `1118da5c64c0d921884785d8da73c44864224e61` | `015e4ae9fddac0f10c3ff8266941632b59dd82deab03beb2d847e8627528796b` | 唯一 UITest 待改文件；当前 9 tests |
+    | `ArkDeckApp/App/ArkDeckApp.swift` | `1ec424df02550cc9f79780b7a4b61af28d7faf30` | `f0a48f7c2b87cc95c0d1c053bb487034bd212466e80ad528ae8b4f314ef655fe` | invariant；既有 startup refresh/composition 足够 |
+    | `ArkDeck.xcodeproj/project.pbxproj` | `e7943096688728a22f4b940e536a32f3b8eaaf98` | `442fe6009ab93fdbefe41fa6e6761427c93ed587500f77e3dc6d184b10013318` | invariant；现有 test file 已在 target |
+    | `ArkDeck.xcodeproj/xcshareddata/xcschemes/ArkDeck.xcscheme` | `29d0fb995dd3a28ad535569a4cdc4c3964311def` | `1a76681f2f3ffa77d2fdf4c696d89e8e6cf5c97e818301f470eb0499c6daa4ba` | invariant；signed UI target 已在 TestAction |
+    | `Packages/ArkDeckKit/Sources/ArkDeckOpenHarmony/ArkDeckOpenHarmony.swift` | `6c9ed05896d92624e03b39d9f1ab88422e56f6e6` | `8b7220b9cd20a1eaad6e76afe63a7e04794ef98edbf085f9de6b0148cdf97231` | invariant；internal fan-out |
+    | `Packages/ArkDeckKit/Sources/ArkDeckOpenHarmony/HDCProduction.swift` | `8055fc65dde7b95c1ab87fa52bb54ed002b024ad` | `545058f7caa6753e33e24c033464b92b5b78361e6d642c4fbbeee31a9d78a840` | invariant；public presentation/session |
+    | `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/HDCApplicationDiagnosticsFacade.swift` | `4f32e1f6e4c9142f332f35d0001e67f379304dba` | `c406e65a16f843c10c799ba7287de7e842601a5438becec48a8f010b55aea6e7` | invariant；production owner + fixture |
+    | `Packages/ArkDeckKit/Tests/ArkDeckContractTests/HDCDeviceObservationPresentationContractTests.swift` | `86f8e4cdbc3fa307a4986eebbdd3d1b7c43a6525` | `789d0ae792dd5f1083d9551d790c94a1a50588445b1c00e0546f094f5d454791` | invariant；DP1-DP18 |
+    | `evidence/runs/TASK-OBS-001R/run.md` | `2beee035ff96d50a795b79a9677e7e6a3efb2b11` | `24d68f4ab6bbfea31d6145225448fe72b1d1731bb2b5e17df8e34068ea743412` | invariant；前置交付证据 |
+    | 本 change `proposal.md` | `10797acb07d650a3075f509074e12b198ff5baa6` | `8684b99a4af56b939b405a521d897e0b971827d85049173071b219eefdc3220b` | invariant |
+    | 本 change `design.md` | `ffb1fb636c3c419eda0cbcaf063215e0d4928ed1` | `392727d825cba5b3cd265af8ed2d0a3977fb00f4ef874da1d85e5c7fca489d59` | invariant |
+    | 本 change `verification.md` | `e5c4d79c3a25b45d467ec3fb4c390bffc98bb740` | `f35b7ddff0b0aaa0050a6c0ed69bac4f19ce6eeeae1bfc2100840e6a2ce67ffb` | invariant |
+    | 本 change `acceptance-cases.yaml` | `f8f4d913f8e9ccd9acfcff9a75225778a5750c11` | `cc336e77476cdf153d67cd65e4d6676bae90ece1993c461e944e8ace1a564b71` | invariant |
+    | 本 change `tasks.md`(本 PR 改前) | `b2688926e2d691ae141e5b735f4b2066e33bc331` | `a1623f2c5388efb58e82c892674f39a22dd0587c391a5957bd5a1a665f633c6b` | 本 readiness 唯一载体 |
+
+  - **App presentation pin(实现不得另做产品决策):**
+    `HDCStatusView` 在既有 diagnostics Grid 内新增五个 value 位置，全部继续使用
+    既有 `field` helper 生成 static text：
+    `hdc.counters.autoLifecycle` = automatic lifecycle `Int` 的十进制字符串；
+    `hdc.counters.autoSubserver` = automatic subserver `Int` 的十进制字符串；
+    `hdc.endpoint.source` = endpoint source exact raw value
+    (`explicit`/`inheritedEnvironment`/`default`)，nil = `unknown`；
+    `hdc.ownership.basis` = 四项 basis 按
+    `preExistingServerReceipt`、`zeroAutomaticLifecycleDispatch`、
+    `generationMintedFromObservation`、
+    `noActiveOrUnreconciledManagedProvenance` 固定顺序输出
+    `name=true|false`，以 `; ` 分隔，nil = `unavailable`；
+    `hdc.devices.events` = ordered event 的单一 static-text 值，每项 exact
+    `timestamp kind`，仅 identifier 非 nil 时再追加一个空格与
+    `redacted-device-[0-9a-f]{24}`，多项以 ` | ` 分隔，empty = `none`。
+    field labels exact = `Automatic lifecycle dispatches`/
+    `Automatic subserver dispatches`/`Endpoint source`/`Ownership basis`/
+    `Device events`。App 不重算计数/ownership，不验证或生成 pseudonym，不把
+    nil 伪造成 positive evidence。
+  - **Fixture/production pin:**现有 exact flag fixture 的期望值 =
+    counters `0`/`0`、endpoint source `unknown`、ownership basis
+    `unavailable`，以及
+    `2026-07-28T00:00:00.000Z appeared redacted-device-0123456789abcdef01234567`
+    后接 ` | ` 与
+    `2026-07-28T00:00:01.000Z disappeared redacted-device-0123456789abcdef01234567`。
+    这些值只由 merged Workflows fixture 提供；App 文件不得含固定 timestamp/
+    identifier 或自行构造 presentation event。无 flag production launch 必须
+    渲染当前 production presentation，并证明上述两个 fixture timestamp 与
+    identifier 均不出现。
+  - **Package/effect boundary:**App 继续只 import `ArkDeckCore`/
+    `ArkDeckWorkflows`，只读取 immutable presentation；零
+    `ArkDeckOpenHarmony` import、零 raw snapshot/source/composition/HMAC/
+    runner/argv/process/lifecycle/device capability。实现不得新增 refresh/timer/
+    retry 或更改现有 startup refresh；零 HDC command/server lifecycle/subserver/
+    device mutation/destructive。`childEnvironmentInjectionKeys` 与 confirmed/
+    managed counters 不在 design §3 本 task 的新增 ID 集合，本 readiness 不静默
+    扩张 UI scope。
+  - **Scope feasibility:closed。**base 实树证明：
+    (a)`HDCStatusView.swift` L37-52 已有 diagnostics Grid，L135-144 的 `field`
+    helper 已稳定产生 static-text identifier；新增五行与三个只读 formatter
+    即可闭环；
+    (b)`ArkDeckApp.swift` L9/L56 已把 production/fixture facade presentation
+    交给同一 view，startup 已显式 refresh，无需修改；
+    (c)`HDCStatusUITests.swift` L219-252 的 launcher 只有 exact fixture flag，
+    同文件已有 production `fixture:false` 路径与 exact value helper；
+    (d)现有 UITest 文件已进入 `ArkDeckHDCUITests` target/scheme，无 project/
+    scheme 修改；(e)Workflows L6-14 已提供 public aliases，fixture L361-370
+    提供 exact 两事件。因此 implementation 文件上限恰为两个现有文件；任一
+    证伪即 stop 回 governance。
+  - **Executable verification matrix(仅在现有
+    `HDCStatusUITests.swift` 新增 exact 四个方法；9 baseline + 4 = 13):**
+    - AP1 `testOBSAPP1_ObservationSummaryFieldsAreAccessibleStaticText`：
+      exact flag 下五个 ID 均为 `staticTexts`，值分别为 `0`/`0`/`unknown`/
+      `unavailable`/上述完整 ordered fixture string。
+    - AP2 `testOBSAPP2_DeviceEventsPreserveOrderShapeAndRedaction`：
+      同一单值中 appeared 在 disappeared 前；两个 timestamp 为 UTC fractional
+      RFC 3339；identifier 均匹配 exact redacted 形态，零 raw connect key、
+      `Optional(...)`、internal reason。
+    - AP3 `testOBSAPP3_ProductionLaunchContainsNoFixtureObservationValues`：
+      `fixture:false` + 既有 `/usr/bin/true` fail-closed production launch；
+      `hdc.devices.events` 存在但不含两个固定 timestamp 或固定 redacted
+      identifier，零 HDC probe/lifecycle dispatch 权限扩张。
+    - AP4 `testOBSAPP4_AppSourceKeepsPresentationOnlyPackageBoundary`：
+      从 `#filePath` 定位 App view source；product module import 只允许
+      Core/Workflows（系统 UI module 不受此项限制），拒绝 OpenHarmony 与 raw
+      snapshot/source/composition/HMAC/runner/argv/process 能力，App source
+      零 fixture literals；五个 ID 各恰一处且只读 presentation 字段均被消费。
+  - **Signed XCUITest environment:satisfied。**完整 run 直接位于 final audit
+    base 的产品父树 `78da3e3cca1fe66fddf5171f7a9d1c13b37a08bb`，不沿用 #722 前的
+    旧二进制结果；其后的 #727 只把 CHG-2026-042 五个 governance 文件移动到
+    archive，#726 只改 CHG-2026-008 governance/evidence，App/Packages/
+    project/scheme 与全部构建输入逐字节不变。
+    `DevToolsSecurity -status` 在 sandbox 外 =
+    `Developer mode is currently enabled.`；macOS 26.5.2 (`25F84`) arm64，
+    Xcode 26.6 (`17F113`)，Swift 6.3.3。`CI=true swift build
+    --package-path Packages/ArkDeckKit --product ArkDeckFakeHDCFixture` PASS；
+    临时 repo-root hardlink 与 build product `cmp` 相同且 inode 均
+    `99945963`。默认签名、零 signing override 的 exact `xcodebuild -project
+    ArkDeck.xcodeproj -scheme ArkDeck -configuration Debug -destination
+    'platform=macOS,arch=arm64' ... test` PASS：`Executed 9 tests, with
+    0 failures`；`xcresulttool` = Passed,total/passed/failed/skipped
+    `9/9/0/0`。App/runner `codesign --verify --deep --strict` 均 PASS，
+    identifier 分别 `com.arkdeck.desktop`/
+    `com.arkdeck.desktop.hdcuitests.xctrunner`，均 `Signature=adhoc`、
+    `TeamIdentifier=not set`；可执行 SHA-256 =
+    `91e24396fa0005817ba055e922d30745f10e8d8b64e17ac86cc388c149d01ce9` /
+    `25cba9c3a2868a2959b7702f87fa3dfa66e2cb529bf3ee5d85f96e28d59c0bd7`。
+    hardlink/DerivedData/xcresult 已删除，工作树零生成物。
+  - **Baseline/concurrency gate:satisfied。**audit 开始/起草前 open PR = 0；
+    起草期间 #720 仅修改 CHG-2026-042 `tasks.md` 并 merge 为
+    `cd3f3e0a7b4c2055746a617110e94b2e1dc791c7`；随后 #721 只修改
+    CHG-2026-042 与 `scripts/host_loop`/path-guard tests；#723 与 #725 只改
+    CHG-2026-042 `tasks.md`；#722 改 Rockchip ordinary-bookmark/Storage/
+    CLI/Package tests 与 CHG-2026-025；#727 只归档 CHG-2026-042；#726 只改
+    CHG-2026-008 governance/evidence。上述 merge 形成 final base
+    `176d6b353546b685f858752407143f9c5f494db3`。本分支五次无冲突
+    rebase；逐文件复核本任务两个实现文件、本 change 与表中全部 App/HDC
+    pins 均零 diff。#722 会改变 App 链接产物，故已在 final base 重跑上述
+    signed UI 并记录新 hash，而非把旧 run 推断为可复用。final pre-push open
+    PR 仅本 PR #724，无外部并发候选。
+    final host-loop `--explain` 对 ready 的 TASK-OBS-002 只报 D1
+    human-gated，claimable = none；推送与实现开工仍须各自重新 fetch/复核。
+    初次全量因 ignored `.build` 的 `ArkDeckFakeHDCFixture` 单独带
+    `com.apple.quarantine` 而发生 fixture 零调用，判为无效环境 run；仅清除该
+    生成物 xattr 后，`HDCSupervisorContractTests` = `55/55`、DP11 exact
+    复验 = `1/1`，串行 `swift test --package-path Packages/ArkDeckKit` =
+    `466 tests / 1 skipped / 0 failures`，零 tracked diff。`check-sdd` =
+    `0 error(s), 0 warning(s), 111 acceptance IDs`；final #721 path guard
+    50 单测
+    PASS，`git diff --check` PASS。实现开工前必须重新 fetch protected main、
+    逐项复核 pins 与 open-PR 文件交集；任一 App/Kit/project/scheme 漂移或
+    signed UI 环境失效均停回 readiness。本 readiness 只做 source/API/host
+    审计与 signed fixture XCUITest；零 installed HDC、零真实设备、零 HDC
+    server lifecycle/subserver/device mutation/destructive，测试值不构成
+    M0B-002 evidence。
+  - **Anti-cheat/fail criteria:**任一非 static-text/不稳定 ID；App 构造或硬编码
+    fixture/event/计数/basis；import OpenHarmony 或取得 raw/process/lifecycle
+    capability；重排/丢弃 events、显示 raw key/internal reason；nil 被显示为
+    positive evidence；无 flag 出现固定 fixture；修改任一 invariant、额外 App
+    文件、project/scheme/Packages；新增 command/timer/poll/retry/mutation；任一
+    signed UI/全量/SDD 回归；均使 `OBS-APPFACE-001` 整体 FAIL。
+  - **Binary conclusion:READY only after this PR merges。**依赖、public
+    contract、App composition、signed UI 环境、exact files/values/matrix 与
+    并行窗口均闭合；维护者 merge 本 readiness exact head 才产生一次性
+    implementation 授权，未 merge 前零实现。
+- Historical Readiness review r1(2026-07-28;protected main
   `e114d9d3ae668bff68d2cfb69c59fa6f4dff00ec`):
   - **Approval/dependency gate:satisfied。**change approval
     `1e4a7c4027ecdd1142ceab2b80f4423eec586d6d`、r2 remediation
@@ -843,16 +1026,17 @@
   字段(static-text 可访问 id,design §3),signed XCUITest 覆盖;M0B-002 四观察
   点的 App 取证载体就位(design §4 映射)。
 - Requirements/AC:change-local `OBS-APPFACE-001`(见 acceptance-cases.yaml)。
-- Depends on:approve、TASK-OBS-001 done、TASK-OBS-001R done、其后 fresh D1
-  readiness。
-- In scope:`ArkDeckApp/**`、`ArkDeckAppUITests/**`、本 change `evidence/**`、
-  本 change `tasks.md`(仅本任务状态)。
+- Depends on:approve、TASK-OBS-001 done、TASK-OBS-001R done 均已满足；
+  本 fresh D1 readiness 仅在本 PR merge 后满足。
+- In scope:`ArkDeckApp/Features/HDC/HDCStatusView.swift`、
+  `ArkDeckAppUITests/HDC/HDCStatusUITests.swift`、本 change
+  `evidence/runs/TASK-OBS-002/**`、本 change `tasks.md`(仅本任务状态/pins/evidence)。
 - Out of scope:Kit 语义(OBS-001 已定);诊断导出接线;真机观察执行。
 - Allowed paths:
-  - `ArkDeckApp/**`
-  - `ArkDeckAppUITests/**`
-  - 本 change `evidence/**`
-  - 本 change `tasks.md`(仅本任务状态)
+  - `ArkDeckApp/Features/HDC/HDCStatusView.swift`
+  - `ArkDeckAppUITests/HDC/HDCStatusUITests.swift`
+  - 本 change `evidence/runs/TASK-OBS-002/**`
+  - 本 change `tasks.md`(仅本任务状态/pins/evidence)
 - Risk:low-medium(UI 面;XCUITest 环境依赖如实记录)。
 - Hardware required:no(XCUITest 用 fixture 门;真机观察属 M0B-002)。
 - Decision-Grade:D1。
