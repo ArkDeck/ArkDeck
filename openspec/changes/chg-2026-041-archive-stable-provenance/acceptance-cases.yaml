@@ -1,0 +1,32 @@
+change_id: CHG-2026-041-archive-stable-provenance
+change_revision: 1
+cases:
+  - acceptance_id: ASP-SHAPE-001
+    test_id: TEST-ASP-SHAPE-001
+    method: Registry provenance shape and active-or-archive resolution matrix.
+    expected_source: openspec/changes/chg-2026-041-archive-stable-provenance/verification.md#ASP-SHAPE-001
+    minimum_evidence: contract
+    expected_result: >-
+      No registry, resource manifest or receipt contains an openspec/changes literal. Every
+      provenance block carries sourceChange, sourceEvidence and the unchanged sourceSHA256, and
+      the change directory resolves to exactly one location for both an archived source
+      (chg-2026-015) and a still-active one (chg-2026-024); zero or multiple matches fail loudly.
+  - acceptance_id: ASP-CASCADE-001
+    test_id: TEST-ASP-CASCADE-001
+    method: Hash cascade closure across registries, packs, lock and contract assertions.
+    expected_source: openspec/changes/chg-2026-041-archive-stable-provenance/verification.md#ASP-CASCADE-001
+    minimum_evidence: contract
+    expected_result: >-
+      Both pack resource manifests, the integration lock and the contract tests agree on every
+      hash; the Swift suite is green in a checkout outside /private/tmp; check-sdd stays
+      0/0/111; each sourceSHA256 equals its pre-migration value, proving only the reference form
+      changed; registry semantic fields show an empty diff.
+  - acceptance_id: ASP-GUARD-001
+    test_id: TEST-ASP-GUARD-001
+    method: Fail-closed guard with a planted violation and a counter-proof.
+    expected_source: openspec/changes/chg-2026-041-archive-stable-provenance/verification.md#ASP-GUARD-001
+    minimum_evidence: contract
+    expected_result: >-
+      The migrated repository passes; a planted openspec/changes path inside any registry makes
+      check-sdd fail and names the file and line; removing the guard lets the same violation
+      through, proving the guard is what catches it. Acceptance ID count stays 111.
