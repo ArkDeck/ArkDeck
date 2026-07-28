@@ -2,17 +2,59 @@
 
 ## TASK-I24-001 — register the parameterized device-observation snapshot family
 
-- Status:ready（r1 implementation readiness；仅在维护者对本独立 readiness PR
-  exact head review/merge 后生效。只授权一个实现交付：按下方契约注册
+- Status:ready（r2 corrective readiness；仅在维护者对本独立 readiness PR
+  exact head review/merge 后生效。r1 的实现契约在实现预检中撞上一处**跨契约
+  冲突**并按任务条款停手（见 Readiness（r2）Collision record）；r2 只做**最小
+  scope 更正** = 多授权一个既有契约测试文件，其余条款原文有效、r1 实现成果
+  可复用。只授权一个实现交付：按下方契约注册
   device-observation family（新 registry + profile/lock/macOS mapping + 受控
   provenance receipt + fake/adversarial 向量 + 契约测试 + evidence run），载体
   = 常规会话 agent/* PR。不授权：任何 `Packages/ArkDeckKit/Sources/**`、
-  App/xcodeproj、Core/specs/contracts/baselines 变更；对既有
-  `readonly-probes.yaml` 与 `Probes/1.0.0/**` 的任何字节改动；新的设备/HDC
-  采集；CHG-2026-022 消费侧接线；`Decision-Grade` 代写。）
+  `Package.swift`、App/xcodeproj、Core/specs/contracts/baselines 变更；对既有
+  `readonly-probes.yaml` 与 `Probes/1.0.0/**` 的任何**数据**字节改动；
+  `HDCProbeRegistryContractTests.swift` 中除枚举作用域外的任何改动；新的设备/
+  HDC 采集；CHG-2026-022 消费侧接线；`Decision-Grade` 代写。）
 - Historical Status:blocked（change approval #273 已满足；r2 capture plan
   #275 已合；此后 authoritative capture 与 readiness 未完成。两项现已闭合，
   见下方 Unblock 逐条核验。）
+- Readiness（r2；audit base = protected `main`
+  `88465abd`… 即 r1 #662 合入后的 head；r1 全部 pin 于此 base 复核零漂移，
+  下方 r1 段除被本段显式取代者外原文有效）：
+  - **Collision record（实现预检实测，2026-07-27）。**按 r1 契约实现后，
+    既有 `HDCProbeRegistryContractTests.testPackContainsExactPinnedResourceSet`
+    `AndHashes` 变红。根因不是新 pack 有错，而是该测试**递归枚举整个
+    `Fixtures/HDC/Probes/` 根**并断言其等于 1.0.0 清单的精确文件集
+    （`HDCProbeRegistryContractTests.swift:373`）：它把「我这一包是精确的」
+    写成了「`Probes/` 下不得存在第二包」。r1 把新 fixture 钉在
+    `Probes/DeviceObservation/1.0.0/**`（design §2 亦如此指定），因此必然
+    冲突，而该测试文件**不在 r1 的 allowed paths 内** → 按任务 Unblock 条款
+    「如需任何超出 exact list 的文件，先修订 scope，不能静默扩展」停手，
+    零推送、零绕过。
+    **因果隔离已实测**：在 `/private/tmp` worktree 内该测试与 Golden 测试
+    双双变红，但移走新 pack 后仍红——`/private/tmp` 的已知路径改写会掩盖
+    信号；改在 `~/i24-verify`（非 `/private/tmp`）复测得出真相:
+    **Golden 测试通过**（纯环境性），**ProbeRegistry 一条真红**且失败集合逐项
+    列出 `DeviceObservation/1.0.0/**`。**教训:凡在 `/private/tmp` worktree
+    判定契约测试红绿，必须换到非 `/private/tmp` 路径复测后才可下结论。**
+  - **r2 的最小更正（唯一变化）。**allowed paths 增加
+    `Packages/ArkDeckKit/Tests/ArkDeckContractTests/HDCProbeRegistryContractTests.swift`，
+    且**只授权一处语义收窄**：把该测试的枚举作用域从「`Probes/` 全树」限定为
+    「其自身的 `1.0.0/` 子树」，使其继续对自己那一包保持精确断言，同时不再对
+    兄弟包主张权威。**不授权**该文件的任何其他改动（其余断言、hash pin、
+    fail-closed 向量、隐私断言逐字不动），亦不授权放宽任何既有精确性。
+  - **为何不换位置。**把新 pack 移出 `Probes/`（如 `Fixtures/HDC/
+    DeviceObservation/`）需要在 `Package.swift` 增 `.copy(...)` 声明，而
+    `Package.swift` 同样不在授权内且属更重的共享面；相较之下，收窄一处
+    过宽断言是更小、更正确的改动。已实测确认 `Package.swift` 现有
+    `.copy("Fixtures/HDC/Probes")` 会自动纳入新子目录，故保持 r1 的位置。
+  - **验收增补（二值）。**实现后：`HDCProbeRegistryContractTests` 全部用例
+    在**非 `/private/tmp`** 检出中绿；该文件 diff 仅含枚举作用域一处；
+    `Probes/1.0.0/**` 与 `readonly-probes.yaml` 的 invariant blob pin 仍逐字节
+    相等（r1 已钉，未变）。
+  - **r1 其余条款全部保留**：版本候选（profile 0.5.0 / lock 0.6.0）、
+    (D-2) 命名义务、三态语义、LF/CRLF 文法与 `[Empty]\r` 负向测试、
+    fixtures 必须合成、DEV-1 受理裁定、privacy gate、Swift 基线
+    400/1skip/0 与其 provenance 注、grade 注记，均原文有效。
 - Readiness（r1；audit base = protected `main`
   `6e45a224cc7d5a758fe2f5661effe3c2ae726baf`）：
   - **Approval boundary:pending human merge。**本 carrier 只修改本文件的本任务
@@ -160,6 +202,9 @@
     不改变 Core/platform conformance）
   - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Probes/DeviceObservation/1.0.0/**`
   - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/HDCDeviceObservationRegistryContractTests.swift`
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/HDCProbeRegistryContractTests.swift`
+    （r2 新增；**仅**授权把其 packaged-file 枚举作用域收窄到自身 `1.0.0/`
+    子树，其余逐字不动）
   - `openspec/changes/chg-2026-024-hdc-device-snapshot-registration/evidence/**`
   - 本 change `tasks.md`（仅本任务状态/evidence 引用）
 - Forbidden paths:
