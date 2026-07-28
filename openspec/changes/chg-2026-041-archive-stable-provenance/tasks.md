@@ -6,9 +6,93 @@
 
 ## TASK-ASP-001 — 定义 archive-stable provenance 并完成迁移与哈希级联
 
-- Status:blocked（前置：① 本 change approval-only PR merge；② 独立 readiness
-  PR 钉定迁移前每个受影响文件的 exact blob、迁移后期望形态、`sourceSHA256`
-  不变的机器证明方式，以及 Swift/SDD 基线与二值 test matrix。）
+- Status:ready（r1 implementation readiness；仅在维护者对本独立 readiness PR
+  exact head review/merge 后生效。只授权一个实现交付：按下方契约把 15 处
+  仓内 change 路径迁移为 archive-stable 形态，并在**同一 PR** 内完成哈希
+  级联与契约测试形态更新；载体 = 常规会话 agent/* PR。不授权：任何 registry
+  语义字段变更、`scripts/**`（属 ASP-002）、`Sources/**`/`Package.swift`/
+  App/xcodeproj/Core 面、chg-2026-024 的 archive PR、`Decision-Grade` 代写。）
+- Historical Status:blocked（前置：① approval #671；② 本 r1。）
+- Readiness（r1；audit base = protected `main`
+  `5427fbccd0cd83d95d4d8dde029841763b0f4204`）：
+  - **Approval boundary:pending human merge。**本 carrier 只修改本文件的本任务
+    段；生效条件 = `lvye` 对 exact head APPROVED、checks terminal success、
+    `mergedBy=lvye`、squash merge 进 protected main。
+  - **Dependency gate:closed。**propose #669、approval #671 均已合入且为
+    audit base 祖先；ASP-002 依赖本任务 done，顺序不可颠倒（守卫先落地会
+    立刻把仓打红）。
+  - **Source pins:closed（audit base 实测 blob，13 项）。**
+    `readonly-probes.yaml` **与** `Probes/1.0.0/registry.yaml`
+    `99e8cc3d9929f9502a3e978a53cd56ad285d2aad`（**同 blob** = 正副本字节一致，
+    先例 #305）；`device-observation-probes.yaml` **与**
+    `Probes/DeviceObservation/1.0.0/registry.yaml`
+    `1130ca663f686d9f202f53ceb8814320ebc862bd`（**同 blob**）；
+    `INTEGRATION-PROFILES.lock.yaml`
+    `129abc6216593d73e401167181f61924addf602f`；
+    `Probes/1.0.0/resources.json` `5796449dee4a7166746d9b0d7245d26bd2b21aae`；
+    `Probes/DeviceObservation/1.0.0/resources.json`
+    `72618f79e12dcdc3ecd6c09537a28be2bfa8572e`；
+    `HDCProbeRegistryContractTests.swift`
+    `6f83b54e4d01148005a7348786c886cf4b7c7ade`；
+    `HDCDeviceObservationRegistryContractTests.swift`
+    `a7264626a6a93e06008ece9ec73fae32343c0291`；四个 receipt =
+    `122e4e06…`（selected-device-authorization-binding）/ `d1bc481e…`
+    （server-identity-generation）/ `9cdb8b6e…`（subserver-capability）/
+    `82b873ef…`（key-access-diagnostics）。任一漂移即停并重钉。
+  - **迁移面:binary（audit base 逐文件实测计数）。**`openspec/changes/`
+    字面量**恰 15 处，分布 9 个文件**：`readonly-probes.yaml` 4、
+    `Probes/1.0.0/registry.yaml` 4、`device-observation-probes.yaml` 1、
+    `Probes/DeviceObservation/1.0.0/registry.yaml` 1、四个 receipt 各 1、
+    `HDCProbeRegistryContractTests.swift` 1（第 280 行的
+    `hasPrefix("openspec/changes/")` 形态断言）。迁移后该字面量在
+    `openspec/integrations/**` 与 `Fixtures/**` 下**必须为 0**；实现若发现
+    第 16 处，停并重 readiness（说明勘察面有遗漏）。
+  - **两个 registry 的 provenance 形态不同，分别规定（实测，勿假设对称）：**
+    - `readonly-probes.yaml`（4 entry）现有
+      `{evidenceClass, sourcePath, sourceSHA256, acceptedBy}`；迁移为
+      `{evidenceClass, sourceChange, sourceEvidence, sourceSHA256, acceptedBy}`。
+      **`sourceSHA256` 四条逐字不变**（三个 distinct 值 `6bb63426…`/
+      `7949d8a2…`×2/`a06cc989…`）——这是「只改引用未改内容」的机器证明。
+    - `device-observation-probes.yaml`（1 entry）现有
+      `{evidenceClass, sourcePath, sessions[{id,acceptedBy,mergeOID}],
+      rawLocation, repositoryGoldenFixture}`，**无 `sourceSHA256`**；迁移为
+      以 `sourceChange` + `sourceEvidence` 取代 `sourcePath`，其余字段
+      逐字保留（其内容锚是 lock/resources 的哈希与两个 mergeOID）。
+    - 四个 receipt 的 `source.path` 同步改形，并保持与其 entry 的交叉一致
+      （契约测试第 419 行的比对必须继续成立，只换字段名/形态）。
+  - **正副本字节一致必须保持。**迁移后
+    `readonly-probes.yaml` 与 `Probes/1.0.0/registry.yaml` **仍须同 blob**，
+    `device-observation-probes.yaml` 与其副本亦然（二值门：`git rev-parse`
+    两侧相等）。这同时是对 CHG-2026-024 记录的「无自动化守卫」遗留的部分
+    缓解——但**不**声称已闭合该遗留（其自动化属 ASP-002 面的可选项）。
+  - **解析规则（形态定义的一部分）。**change 目录 =
+    `openspec/changes/<id 小写>/` 或 `openspec/changes/archive/*-<id 小写>/`
+    **恰一处**存在；0 或 2+ 为 loud fail。与
+    `scripts/host_loop/test_support.py` 的 active-or-archive 解析同构（该
+    文件属 ASP-002/其他授权面，本任务**不**修改它，只复用其规则）。
+  - **两分支各须实测。**现存两个来源 change 恰好一活一档：
+    `CHG-2026-015-hdc-readonly-probe-registration`（**已归档**于
+    `archive/2026-07-22-…`）与 `CHG-2026-024-hdc-device-snapshot-registration`
+    （**未归档**）。契约测试须对**两者各**断言解析成功且恰一处命中；只测
+    一边不满足 `ASP-SHAPE-001`。
+  - **测试基线。**Swift 全量 = **413 tests / 1 skipped / 0 failures**
+    （2026-07-27 于 `ffca996f` 实测；已机器核验 `ffca996f..origin/main` 在
+    `Packages`/`ArkDeckApp`/`ArkDeck.xcodeproj` 下 **0 文件差异**，故对本
+    audit base 有效）。实现后 = 413 + 新增数 / 1 skipped / **0 failures**。
+    **必须在非 `/private/tmp` 检出复测**——`/private/tmp` 的已知路径改写会
+    使 `HDCGoldenResourceContractTests` 与 `HDCProbeRegistryContractTests`
+    双双假红并掩盖真实信号（CHG-2026-024 实现期实证）。
+    `check-sdd` 保持 **0/0/111**。
+  - **迁移方式。**由**可重跑脚本**完成（草稿入本 change `evidence/**`，
+    **不**入 `scripts/**`），禁止逐文件手工编辑；evidence 须给出迁移前后
+    每文件 blob 对照与 `sourceSHA256` 逐条相等的证明。
+  - **Concurrency/absence:closed at drafting（2026-07-28）。**remote
+    `agent/*asp*` 分支 = 0（推送前实测）。**主 checkout 为共享工作副本**
+    （近期曾被另一会话切至其他分支），实现须在独立 worktree 内进行且 commit
+    前核 `git branch --show-current`。
+  - **Grade 注记**：`Decision-Grade` 由维护者亲笔（#577 载体先例）。本契约
+    已机器可判定（15 处精确计数 + 13 blob pin + 二值哈希门），符合 D0 三
+    条件；但本任务改动共享 registry 与契约测试，载体为常规会话 PR。
 - Platform:macos（纯数据与测试面；零 runtime、零设备）
 - Requirements/AC:change-local `ASP-SHAPE-001`、`ASP-CASCADE-001`
 - Depends on:none
