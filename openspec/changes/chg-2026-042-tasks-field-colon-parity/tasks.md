@@ -6,16 +6,19 @@ HLR/NAV/DEC 先例由会话实现：`Decision-Grade` 在实现前保持缺失；
 
 ## TASK-CM7-001 — 对齐 `tasks.md` 字段冒号文法并锁定跨解析器契约
 
-- Status:ready（仅在维护者对本独立 readiness PR exact head review/merge 后生效；
-  一次性授权严格受下方 `Readiness pins(r1,2026-07-28)` 约束的实现 PR，不授权
+- Status:ready（r1 readiness 已由 PR #707 merge，但其后 #708 改动活跃 corpus，
+  命中 r1 stop condition，原一次性实现授权未消费即失效；仅在维护者对 fresh
+  readiness r2 PR exact head review/merge 且 #710 达到下方限定终态后，才重新
+  授权一个严格受 `Readiness pins(r2,2026-07-28)` 约束的实现 PR；不授权
   `done` / `verified` 翻转）
 - Platform:macos（host-only）
 - Requirements/AC:change-local `CM7-PARITY-001`、`CM7-CORPUS-001`、
   `CM7-SELF-001`
 - Depends on:none（change approval 与 readiness 由状态/PR 门承载，不伪装为
   TASK 依赖）
-- Readiness input pins:见下方 `Readiness pins(r1,2026-07-28)`；实现开工必须逐项
-  复核 exact base ancestry、实现/测试 blob、活跃 `tasks.md` 语料与并发 PR
+- Readiness input pins:r1 为历史失效快照；现行输入见下方
+  `Readiness pins(r2,2026-07-28)`。实现开工必须逐项复核 exact base ancestry、
+  实现/测试 blob、活跃 `tasks.md` 语料、#709 exact merge 与 #710 终态
 - Applicable failure patterns:`AF-004`（同一契约多消费者语义分歧）、
   `AF-010`（必须用独立 fixture 与变异反证）、`AF-015`（全仓清点同模式）
 - Production reachability:`python -m host_loop --once` →
@@ -255,3 +258,99 @@ HLR/NAV/DEC 先例由会话实现：`Decision-Grade` 在实现前保持缺失；
   不等于六个 BRC task，或六项中出现 ready / 可 dispatch，均 fail closed：
   不写实现、不补 evidence、不自行扩 scope，回到新的 readiness 或 proposal
   revision。实现、`ready→done` 与 change verified 继续各自独立 PR。
+
+### Readiness pins(r2,2026-07-28)
+
+- **为何 r1 失效。**PR #707 exact head
+  `568bc596b89dc890b6a8c13d4597689fd110c896` 已获维护者 review 并 merge
+  为 `c3ad721f1119d7cbf73022a89dd1b502bb92289a`，但 9 秒后 PR #708
+  exact head `92d6edc6c20229166e7d3ece2c8d5afdff080d25` merge 为
+  `d74c7af7179d89dc29c61e1e7b63d0ca4e7822ea`，修改了活跃 CHG-008 的
+  `tasks.md`。这命中 r1“任一 active corpus blob 漂移即停手”的明文条件；
+  r1 实现授权未被使用，本轮未写任何 production/test/evidence 文件。r2 只重钉
+  readiness 输入，不改 proposal scope、AC、allowed paths 或实现方向。
+- **Approval boundary。**Audit base 为 fresh fetch 后 protected `main`
+  `c295d4a45a30ea08d7ab66440c5593d1208f222a`
+  （2026-07-28T07:52:20Z）；#702 approval、#705 proposal r2、#707
+  readiness r1、#708 与 #709 均为其 ancestor。本 r2 仍是独立 D1 readiness：
+  只有维护者对本 PR exact head review/merge 后才生效，不宣称 AC passed、
+  task done 或 change verified。
+- **未漂移的实现面。**Audit base 的实现/测试/只读生产输入与 r1 逐 blob
+  相同：`scripts/host_loop/__main__.py` =
+  `ac3386457245c20507d6da3a16b63b39423b0387`；
+  `worker.py` = `fd7aa86aede863fb5077fb703fab14f1fb17f8b0`；
+  `test_navigation_contract.py` =
+  `63e2e0f6e3d634b9316f99b0810da9c71e1adb56`；
+  `test_token_parity.py` =
+  `efb937541d8da2049819267acc45bf94f3f3be64`；
+  `scripts/test_check_pr_paths.py` =
+  `4490daaf59bee14c4fe1d000606709fa9a355af4`；
+  invariant `scripts/check_pr_paths.py` =
+  `d3c3fe299487c7c8512569c75ba1827b7f3433b9`；
+  invariant `scripts/host_loop/instance.py` =
+  `0e7e16451e0e92a13d9cdfbfe18985e335bc8818`。Proposal、verification 与
+  acceptance blobs 也仍分别为
+  `b1ee27ce0fc0eafdaefe2dff3822d76e28bb75a8`、
+  `d641c76cb99d2f85f56c1cd46d2bd53c5257567b`、
+  `319b4ae4c9e0102e8c50c1a035d430529a1f3126`。本 `tasks.md` 改前 blob
+  为 `4ce0c016d32bee1eccad1c4926788c23aa397b7d`，只作为 r2 载体 pin。
+- **现行 active corpus。**活跃 change 集合仍为 r1 的 8 项；audit-base
+  `tasks.md` blobs 如下：
+
+  | Active change | r2 audit-base blob |
+  | --- | --- |
+  | `chg-2026-006-dayu200-m0b-bringup` | `5992c706d24249350bf385b464d58f172a6b7496` |
+  | `chg-2026-008-ui-dump-hidumper-wrapper` | `aefe113e3c24188651c062b337e33ddd99290691` |
+  | `chg-2026-022-hdc-supervisor-observability` | `3e1022c0df5faa3bb8cb55512676a883a4775c08` |
+  | `chg-2026-025-ai-native-unattended-device-ops` | `3ff434156a8105196a156946cd684c81bbc8bb76` |
+  | `chg-2026-026-macos-rockchip-flash-ui` | `5f758fe26dac2dd2f62d362345b560fb6a3523e0` |
+  | `chg-2026-031-macos-session-settings` | `6b3656c3e637413b9bd9dfb65336ce4250a14d69` |
+  | `chg-2026-036-macos-bundled-rockchip-component` | `de23d56688e713d90a2b12706e8d44651cffa164` |
+  | `chg-2026-042-tasks-field-colon-parity` | `4ce0c016d32bee1eccad1c4926788c23aa397b7d` |
+
+  #708 只登记 ASCII 冒号的 `TASK-UD-R2-RECAPTURE-001` 与
+  `TASK-UD-R2-REDIAG-001`，因此两侧各对称增加 2。真实 discovery before 与仅在
+  进程内替换两条目标正则后的 after 为 `30→36`、`lost=[]`、`gained` 仍恰为
+  `TASK-BRC-001`…`TASK-BRC-006`。CHG-036 blob 未漂移，故 r1 的六项完整
+  status / grade / hardware / dependencies / allowed paths 记录逐字段仍成立：
+  BRC-001/002 为 done，BRC-003…006 为 blocked，全部不 ready / 不可 dispatch。
+- **#709 已闭合的并发输入。**PR #709 exact head
+  `a629432b2f023c87afbdfb7318bc7e95329d621f` 已获维护者 exact-head review
+  并 merge 为 audit base
+  `c295d4a45a30ea08d7ab66440c5593d1208f222a`；它只改 CHG-022
+  `tasks.md`，最终 blob 精确命中事前 prospective pin
+  `3e1022c0df5faa3bb8cb55512676a883a4775c08`。合入树的 executable audit 为
+  `30→36`、`lost=[]`、gained 恰为六个 BRC，六项字段/verdict 零变化。
+  它与 C-M7 implementation/change paths 无直接 overlap。
+- **唯一开放并发 PR #710。**提交前 fresh open-PR 清单仅含
+  `readiness(TASK-AIN-BKMK-001)`；exact head
+  `22b2d2985fbf19e296c0b6dab3fb5fa809c7297e` 是 audit base 的 descendant，
+  只新增 CHG-025 readiness evidence 并把该 active `tasks.md` 从
+  `3ff434156a8105196a156946cd684c81bbc8bb76` 改为
+  `78c48f9e8ee15bf81db170c3dccbe4883f206d5f`，无 C-M7
+  implementation/change-path直接 overlap。Exact-head executable audit 仍为
+  `30→36`、`lost=[]`、gained 恰为六个 BRC，六项字段/verdict 零变化。
+- **#710 终态门。**实现开工前 #710 必须终止，且只接受：
+  closed-unmerged 时 protected-main CHG-025 blob 仍为
+  `3ff434156a8105196a156946cd684c81bbc8bb76`；或维护者对上述 exact head
+  review/merge 后 blob 精确为
+  `78c48f9e8ee15bf81db170c3dccbe4883f206d5f`。#710 仍 open、head /
+  merge tree 变化，或出现其他改 active corpus / implementation paths 的 open PR，
+  implementation 为 0 并重新 readiness。
+- **新基线与安全门。**macOS 26.5.2 build 25F84、Python 3.14.6、Git
+  2.55.0；`scripts/check-sdd.sh` = 0 error / 0 warning / 111 acceptance IDs；
+  `scripts/test_check_pr_paths.py` = 49 tests / 0 failures；
+  `cd scripts && python3 -m unittest discover -s host_loop -t .` =
+  638 tests / 1 expected failure / 0 unexpected failures；独立 PR-guard parity
+  fixture 对两种冒号均返回 `('x/**',)`；`git diff --check` = PASS。
+  `python -m host_loop --explain` 仍因 `Decision-Grade=unknown` 拒绝本任务，
+  `claimable=none`。上述验证命令的 network、GitHub write、device/HDC、
+  E1/E2/destructive dispatch 均为 0；本轮外部写入仅限本治理 PR 的 Git push。
+- **实现开工复核。**实现必须基于本 r2 merge 后的 protected `main`，先验证
+  r2 merge ancestry、#709 exact merge、#710 限定终态、上列
+  implementation/governance blobs 与 8 项 active change。`tasks.md` 因本 r2
+  merge 产生的
+  预期单任务段变化可接受；除此之外任一漂移、source defect 已消失、candidate
+  lost、未登记 gained，或任一 BRC 变为 ready / 可 dispatch，均停止且不写实现。
+  r1 的完整变异矩阵继续逐项有效；implementation、`ready→done` 与 verified
+  PR 仍严格分离。
