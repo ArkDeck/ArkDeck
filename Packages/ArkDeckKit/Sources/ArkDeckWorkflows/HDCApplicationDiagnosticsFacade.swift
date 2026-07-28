@@ -6,6 +6,10 @@ import Foundation
 /// App-facing aliases keep OpenHarmony implementation types behind the
 /// Workflows product boundary. The App links and imports Workflows only.
 public typealias HDCDiagnosticsPresentation = ArkDeckOpenHarmony.HDCDiagnosticsPresentation
+public typealias HDCDeviceObservationPresentationKind =
+  ArkDeckOpenHarmony.HDCDeviceObservationPresentationKind
+public typealias HDCDeviceObservationPresentationEvent =
+  ArkDeckOpenHarmony.HDCDeviceObservationPresentationEvent
 public typealias HDCServerOtherClientDetection =
   ArkDeckOpenHarmony.HDCServerOtherClientDetection
 
@@ -38,6 +42,12 @@ public enum HDCApplicationDiagnosticsFacade {
   }
 }
 
+private struct HDCDeviceObservationSessionKey: Sendable, Equatable {
+  let candidateCanonicalIdentity: String
+  let endpoint: HDCServerEndpointSelection
+  let executionSessionIdentity: String
+}
+
 /// Normal App composition. Discovery, read-only probes, durable Session
 /// diagnostics, and Supervisor attachment stay inside Workflows so the App
 /// cannot construct an HDC command or lifecycle capability.
@@ -53,33 +63,39 @@ private actor HDCProductionApplicationDiagnostics: HDCApplicationDiagnosticsProv
   private var registeredServerIdentity: HDCServerProcessIdentityReceipt?
   private var activeExecutionIdentity: HDCApplicationDiagnosticsExecutionIdentity?
   private var activeCandidateCatalogID: String?
+  private var deviceObservationSession: HDCDeviceObservationApplicationSession?
+  private var deviceObservationSessionKey: HDCDeviceObservationSessionKey?
 
   func refresh() async -> HDCDiagnosticsPresentation {
     await attachSessionIfConfigured()
-    return await provider.refresh()
+    let presentation = await provider.refresh()
+    guard let deviceObservationSession else { return presentation }
+    return presentation.overlayingDeviceEvents(await deviceObservationSession.refresh())
   }
 
   func requestRecoveryImpactPreview() async -> HDCDiagnosticsPresentation {
     await attachSessionIfConfigured()
-    return await provider.requestRecoveryImpactPreview()
+    return await overlayCurrentDeviceEvents(
+      on: provider.requestRecoveryImpactPreview())
   }
 
   func confirmRecoveryImpactPreview() async -> HDCDiagnosticsPresentation {
     await attachSessionIfConfigured()
-    return await provider.confirmRecoveryImpactPreview()
+    return await overlayCurrentDeviceEvents(
+      on: provider.confirmRecoveryImpactPreview())
   }
 
   func dispatchConfirmedRecovery() async -> HDCDiagnosticsPresentation {
     guard let sessionDiagnostics, let sessionLifecycle else {
-      return await provider.refresh()
+      return await overlayCurrentDeviceEvents(on: provider.refresh())
     }
     let current = await sessionDiagnostics.refresh()
     guard case .confirmed(let confirmation) = current.lifecycleRecovery else {
-      return current
+      return await overlayCurrentDeviceEvents(on: current)
     }
     let result = await sessionLifecycle.dispatch(confirmation: confirmation)
     await sessionDiagnostics.applyLifecycleDispatchResult(result)
-    return await sessionDiagnostics.refresh()
+    return await overlayCurrentDeviceEvents(on: sessionDiagnostics.refresh())
   }
 
   func refreshAuthorization(
@@ -89,7 +105,7 @@ private actor HDCProductionApplicationDiagnostics: HDCApplicationDiagnosticsProv
     guard let sessionDiagnostics, let registeredToolchain, let registeredEndpoint,
       let registeredServerIdentity
     else {
-      return await provider.refresh()
+      return await overlayCurrentDeviceEvents(on: provider.refresh())
     }
     let result = await HDCSelectedDeviceAuthorizationProbe().probe(
       endpoint: registeredEndpoint,
@@ -97,7 +113,7 @@ private actor HDCProductionApplicationDiagnostics: HDCApplicationDiagnosticsProv
       serverIdentity: registeredServerIdentity,
       durableBinding: durableBinding)
     await sessionDiagnostics.applyRegisteredAuthorization(result.authorization)
-    return await provider.refresh()
+    return await overlayCurrentDeviceEvents(on: provider.refresh())
   }
 
   func selectUserConfiguredExecutable(_ url: URL) async throws -> HDCDiagnosticsPresentation {
@@ -106,10 +122,11 @@ private actor HDCProductionApplicationDiagnostics: HDCApplicationDiagnosticsProv
     sessionDiagnostics = nil
     sessionLifecycle = nil
     clearRegisteredObservation()
+    clearDeviceObservationSession()
     await provider.configure(
       discoveryRequest: HDCApplicationDiagnosticsConfiguration.discoveryRequest())
     await attachSessionIfConfigured()
-    return await provider.refresh()
+    return await overlayCurrentDeviceEvents(on: provider.refresh())
   }
 
   private func attachSessionIfConfigured() async {
@@ -120,6 +137,8 @@ private actor HDCProductionApplicationDiagnostics: HDCApplicationDiagnosticsProv
     guard let candidate = HDCExternalFirstDiscovery.discover(request).candidates.first,
       let endpoint = try? HDCServerEndpointSelector.select()
     else {
+      clearRegisteredObservation()
+      clearDeviceObservationSession()
       return
     }
 
@@ -177,6 +196,10 @@ private actor HDCProductionApplicationDiagnostics: HDCApplicationDiagnosticsProv
       } else {
         clearRegisteredObservation()
       }
+      replaceDeviceObservationSessionIfNeeded(
+        candidate: candidate,
+        endpoint: endpoint,
+        executionIdentity: executionIdentity)
       sessionDiagnostics = composition.diagnostics
       sessionLifecycle = composition.lifecycle
       await provider.attachSessionDiagnostics(composition.diagnostics)
@@ -185,6 +208,7 @@ private actor HDCProductionApplicationDiagnostics: HDCApplicationDiagnosticsProv
       sessionDiagnostics = nil
       sessionLifecycle = nil
       clearRegisteredObservation()
+      clearDeviceObservationSession()
       await provider.detachSessionDiagnostics()
     }
   }
@@ -193,6 +217,34 @@ private actor HDCProductionApplicationDiagnostics: HDCApplicationDiagnosticsProv
     registeredToolchain = nil
     registeredEndpoint = nil
     registeredServerIdentity = nil
+  }
+
+  private func replaceDeviceObservationSessionIfNeeded(
+    candidate: HDCCandidate,
+    endpoint: HDCServerEndpointSelection,
+    executionIdentity: HDCApplicationDiagnosticsExecutionIdentity
+  ) {
+    let key = HDCDeviceObservationSessionKey(
+      candidateCanonicalIdentity: HDCApplicationDiagnosticsSessionScope.catalogIdentifier(
+        for: candidate),
+      endpoint: endpoint,
+      executionSessionIdentity: executionIdentity.sessionID)
+    guard key != deviceObservationSessionKey else { return }
+    deviceObservationSession = HDCDeviceObservationApplicationSession.makeProduction(
+      toolchain: candidate, endpointSelection: endpoint)
+    deviceObservationSessionKey = key
+  }
+
+  private func clearDeviceObservationSession() {
+    deviceObservationSession = nil
+    deviceObservationSessionKey = nil
+  }
+
+  private func overlayCurrentDeviceEvents(
+    on presentation: HDCDiagnosticsPresentation
+  ) async -> HDCDiagnosticsPresentation {
+    guard let deviceObservationSession else { return presentation }
+    return presentation.overlayingDeviceEvents(await deviceObservationSession.currentEvents())
   }
 
   private func sessionCatalogRoot() throws -> URL {
@@ -305,7 +357,17 @@ private actor HDCFixtureApplicationDiagnostics: HDCApplicationDiagnosticsProvidi
       lifecycleRecovery: recovery,
       criticalGateMessage: criticalGate
         ? "Blocked by Job job-hdc, Step flash-system. Wait for the flash checkpoint safe boundary."
-        : nil)
+        : nil,
+      deviceEvents: [
+        HDCDeviceObservationPresentationEvent(
+          acceptedAt: Date(timeIntervalSince1970: 1_785_196_800),
+          kind: .appeared,
+          redactedDeviceIdentifier: "redacted-device-0123456789abcdef01234567"),
+        HDCDeviceObservationPresentationEvent(
+          acceptedAt: Date(timeIntervalSince1970: 1_785_196_801),
+          kind: .disappeared,
+          redactedDeviceIdentifier: "redacted-device-0123456789abcdef01234567"),
+      ])
   }
 
   private static func fixturePreview() -> HDCServerLifecycleImpactPreview {

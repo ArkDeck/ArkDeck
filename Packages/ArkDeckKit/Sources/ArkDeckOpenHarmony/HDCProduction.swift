@@ -1,5 +1,6 @@
 import ArkDeckProcess
 import CryptoKit
+import Darwin
 import Foundation
 
 /// The HDC port deliberately models endpoint selection as data.  Selection is
@@ -191,6 +192,7 @@ enum HDCRegisteredGoldenFingerprint {
 package struct HDCRegisteredSemanticProfile: Sendable, Equatable {
   package enum Authority: Sendable, Equatable {
     case pinnedProduction
+    case deviceObservationProduction
     case testOnlyFake
   }
 
@@ -201,6 +203,13 @@ package struct HDCRegisteredSemanticProfile: Sendable, Equatable {
     targetExecutableSHA256: HDCReadOnlyProbeRegistry.targetExecutableSHA256,
     selectedDeviceAuthorizationSHA256: HDCReadOnlyProbeRegistry.pinnedProduction
       .entry(for: .selectedDeviceAuthorizationBinding).rawSHA256)
+
+  static let deviceObservationProduction = HDCRegisteredSemanticProfile(
+    authority: .deviceObservationProduction,
+    integrationProfile: HDCDeviceObservationProbeCatalog.integrationProfile,
+    toolVersion: HDCDeviceObservationProbeCatalog.targetToolVersion,
+    targetExecutableSHA256: HDCDeviceObservationProbeCatalog.targetExecutableSHA256,
+    selectedDeviceAuthorizationSHA256: nil)
 
   package let authority: Authority
   package let integrationProfile: String
@@ -230,7 +239,8 @@ package struct HDCRegisteredSemanticProfile: Sendable, Equatable {
   }
 
   /// Available to package contract composition only. Production initializers
-  /// never select this authority and always use `pinnedProduction`.
+  /// select one of the two closed registered production authorities and never
+  /// select this fake authority.
   package static func testOnlyFake(
     executableSHA256: String,
     selectedDeviceAuthorizationSHA256: String
@@ -251,6 +261,19 @@ package struct HDCRegisteredSemanticProfile: Sendable, Equatable {
     descriptorSHA256: String,
     commandFamily: HDCRegisteredCommandFamily
   ) -> HDCRegisteredSemanticBinding? {
+    if authority == .deviceObservationProduction {
+      guard integrationProfile == HDCDeviceObservationProbeCatalog.integrationProfile,
+        toolVersion == HDCDeviceObservationProbeCatalog.targetToolVersion,
+        descriptorSHA256 == HDCDeviceObservationProbeCatalog.targetExecutableSHA256,
+        commandFamily == .selectedDeviceAuthorization
+      else { return nil }
+      return HDCRegisteredSemanticBinding(
+        integrationProfile: integrationProfile,
+        toolVersion: toolVersion,
+        executableSHA256: descriptorSHA256,
+        commandFamily: commandFamily,
+        expectedStdoutSHA256: nil)
+    }
     guard integrationProfile == HDCReadOnlyProbeRegistry.integrationProfile,
       toolVersion == HDCReadOnlyProbeRegistry.targetToolVersion,
       descriptorSHA256 == targetExecutableSHA256,
@@ -1741,6 +1764,38 @@ public enum HDCApplicationDiagnosticsConfiguration {
   }
 }
 
+/// Closed App-facing projection of the internal device-observation event
+/// vocabulary. Internal reasons, raw snapshots, and unchanged transitions are
+/// deliberately absent.
+public enum HDCDeviceObservationPresentationKind: String, Sendable, Equatable {
+  case appeared
+  case disappeared
+  case observationUnknown
+  case observationUnavailable
+}
+
+/// Immutable presentation event. The package-only initializer accepts a Date,
+/// not a caller-formatted timestamp, so every timestamp is created at the
+/// event-acceptance boundary in one exact UTC RFC 3339 form.
+public struct HDCDeviceObservationPresentationEvent: Sendable, Equatable {
+  public let timestamp: String
+  public let kind: HDCDeviceObservationPresentationKind
+  public let redactedDeviceIdentifier: String?
+
+  package init(
+    acceptedAt: Date,
+    kind: HDCDeviceObservationPresentationKind,
+    redactedDeviceIdentifier: String?
+  ) {
+    let formatter = ISO8601DateFormatter()
+    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    formatter.timeZone = TimeZone(secondsFromGMT: 0)
+    timestamp = formatter.string(from: acceptedAt)
+    self.kind = kind
+    self.redactedDeviceIdentifier = redactedDeviceIdentifier
+  }
+}
+
 /// Presentation-only state for the minimal HDC diagnostics surface.  The view
 /// receives this immutable value and has no process or lifecycle authority.
 public struct HDCDiagnosticsPresentation: Sendable, Equatable {
@@ -1784,6 +1839,10 @@ public struct HDCDiagnosticsPresentation: Sendable, Equatable {
   public let childEnvironmentInjectionKeys: [String]
   /// Per-evidence ownership classification basis for the presented endpoint.
   public let ownershipBasis: HDCServerOwnershipBasis?
+  /// Bounded App-facing history produced by the registered read-only device
+  /// observation session. Raw connect keys and internal reasons never enter
+  /// this value.
+  public let deviceEvents: [HDCDeviceObservationPresentationEvent]
 
   public init(
     absolutePath: String,
@@ -1811,7 +1870,8 @@ public struct HDCDiagnosticsPresentation: Sendable, Equatable {
     managedStartDispatchCount: Int = 0,
     endpointSource: HDCServerEndpointSource? = nil,
     childEnvironmentInjectionKeys: [String] = [],
-    ownershipBasis: HDCServerOwnershipBasis? = nil
+    ownershipBasis: HDCServerOwnershipBasis? = nil,
+    deviceEvents: [HDCDeviceObservationPresentationEvent] = []
   ) {
     self.absolutePath = absolutePath
     self.source = source
@@ -1836,6 +1896,7 @@ public struct HDCDiagnosticsPresentation: Sendable, Equatable {
     self.endpointSource = endpointSource
     self.childEnvironmentInjectionKeys = childEnvironmentInjectionKeys
     self.ownershipBasis = ownershipBasis
+    self.deviceEvents = deviceEvents
     let resolvedRecovery =
       lifecycleRecovery
       ?? lifecycleImpactPreview.map {
@@ -1845,6 +1906,41 @@ public struct HDCDiagnosticsPresentation: Sendable, Equatable {
     self.lifecycleRecovery = resolvedRecovery
     self.lifecycleImpactPreview = resolvedRecovery.impactPreview
     self.criticalGateMessage = criticalGateMessage
+  }
+
+  /// Package-only immutable overlay used by Workflows after one explicit
+  /// observation refresh. It copies the complete diagnostics value and cannot
+  /// manufacture a source, runner, argv, or lifecycle capability.
+  package func overlayingDeviceEvents(
+    _ events: [HDCDeviceObservationPresentationEvent]
+  ) -> HDCDiagnosticsPresentation {
+    HDCDiagnosticsPresentation(
+      absolutePath: absolutePath,
+      source: source,
+      hash: hash,
+      platformTrust: platformTrust,
+      clientVersion: clientVersion,
+      serverVersion: serverVersion,
+      daemonVersion: daemonVersion,
+      endpoint: endpoint,
+      serverHealth: serverHealth,
+      generation: generation,
+      ownership: ownership,
+      authorization: authorization,
+      channelProtection: channelProtection,
+      tcpUnprotectedWarning: tcpUnprotectedWarning,
+      keyAccessError: keyAccessError,
+      subserverCapability: subserverCapability,
+      lifecycleRecovery: lifecycleRecovery,
+      criticalGateMessage: criticalGateMessage,
+      automaticLifecycleDispatchCount: automaticLifecycleDispatchCount,
+      automaticSubserverDispatchCount: automaticSubserverDispatchCount,
+      confirmedLifecycleDispatchCount: confirmedLifecycleDispatchCount,
+      managedStartDispatchCount: managedStartDispatchCount,
+      endpointSource: endpointSource,
+      childEnvironmentInjectionKeys: childEnvironmentInjectionKeys,
+      ownershipBasis: ownershipBasis,
+      deviceEvents: events)
   }
 
   public static let unprobed = HDCDiagnosticsPresentation(
@@ -2265,6 +2361,7 @@ actor HDCRegisteredDeviceObservationSource: HDCDeviceObservationSnapshotProvidin
   private let identityObserver: any HDCServerProcessIdentityObserving
   private let additionalChildEnvironment: [String: String]
   private let pseudonymKey: SymmetricKey
+  private var runnerInvocationCount = 0
 
   init(
     runner: HDCProcessCommandRunner,
@@ -2299,6 +2396,7 @@ actor HDCRegisteredDeviceObservationSource: HDCDeviceObservationSnapshotProvidin
     }
     let evaluated: SemanticallyEvaluatedIdentityBoundProcessResult<HDCCommandSemanticResult>
     do {
+      runnerInvocationCount += 1
       evaluated = try await runner.execute(
         HDCProcessCommand(
           toolchain: toolchain,
@@ -2321,5 +2419,262 @@ actor HDCRegisteredDeviceObservationSource: HDCDeviceObservationSnapshotProvidin
       let digest = code.map { String(format: "%02x", $0) }.joined().prefix(24)
       return HDCObservedDeviceIdentifier(redactedKey: "redacted-device-\(digest)")
     }
+  }
+
+  func observedRunnerInvocationCount() -> Int {
+    runnerInvocationCount
+  }
+}
+
+/// Device-observation-specific commandless identity observer. The existing
+/// read-only observer is intentionally pinned to hdc 3.2.0d; this observer
+/// repeats the same process/listener proof while binding it to the separately
+/// registered 3.2.0f device-observation executable.
+private struct HDCDeviceObservationSystemIdentityObserver:
+  HDCServerProcessIdentityObserving
+{
+  func observe(
+    endpoint: HDCServerEndpoint,
+    selectedToolchain: HDCCandidate
+  ) async -> HDCServerProcessIdentityRawObservation {
+    guard !Task.isCancelled else { return .cancelled }
+    guard endpoint.rawValue == HDCDeviceObservationProbeCatalog.exactEndpoint,
+      selectedToolchain.sha256 == HDCDeviceObservationProbeCatalog.targetExecutableSHA256,
+      HDCCandidateIdentityVerifier.matches(selectedToolchain)
+    else {
+      return .unknown(
+        reason: "selected HDC executable or endpoint does not match the device registry")
+    }
+
+    let first = scan(endpoint: endpoint, selectedToolchain: selectedToolchain)
+    guard case .observed(let firstReceipt) = first else { return first }
+    guard !Task.isCancelled else { return .cancelled }
+    let second = scan(endpoint: endpoint, selectedToolchain: selectedToolchain)
+    guard case .observed(let secondReceipt) = second else { return second }
+    guard firstReceipt == secondReceipt,
+      HDCCandidateIdentityVerifier.matches(selectedToolchain)
+    else {
+      return .unknown(reason: "server process/listener identity changed during observation")
+    }
+    return .observed(secondReceipt)
+  }
+
+  private func scan(
+    endpoint: HDCServerEndpoint,
+    selectedToolchain: HDCCandidate
+  ) -> HDCServerProcessIdentityRawObservation {
+    let matches = allProcessIDs().compactMap { pid -> HDCServerProcessIdentityReceipt? in
+      guard let path = executablePath(for: pid),
+        path == selectedToolchain.path.resolvingSymlinksInPath().standardizedFileURL,
+        ownsListeningEndpoint(endpoint, pid: pid),
+        let start = startIdentity(for: pid)
+      else { return nil }
+      return HDCServerProcessIdentityReceipt(
+        pid: pid,
+        startSeconds: start.seconds,
+        startMicroseconds: start.microseconds,
+        executablePath: path,
+        executableSHA256: selectedToolchain.sha256,
+        endpoint: endpoint)
+    }
+    switch matches.count {
+    case 0:
+      return .unavailable(reason: "no existing selected HDC process owns the exact endpoint")
+    case 1:
+      return .observed(matches[0])
+    default:
+      return .unknown(reason: "multiple selected HDC processes own the endpoint")
+    }
+  }
+
+  private func allProcessIDs() -> [Int32] {
+    let estimatedCount = max(Int(proc_listallpids(nil, 0)), 64)
+    var values = [pid_t](repeating: 0, count: estimatedCount + 64)
+    let count = values.withUnsafeMutableBytes { bytes in
+      proc_listallpids(bytes.baseAddress, Int32(bytes.count))
+    }
+    guard count > 0 else { return [] }
+    return values.prefix(Int(count)).filter { $0 > 0 }
+  }
+
+  private func executablePath(for pid: Int32) -> URL? {
+    var buffer = [CChar](repeating: 0, count: 4 * 1_024)
+    guard proc_pidpath(pid, &buffer, UInt32(buffer.count)) > 0,
+      let terminator = buffer.firstIndex(of: 0)
+    else { return nil }
+    let path = String(
+      decoding: buffer[..<terminator].map { UInt8(bitPattern: $0) },
+      as: UTF8.self)
+    return URL(fileURLWithPath: path).resolvingSymlinksInPath().standardizedFileURL
+  }
+
+  private func startIdentity(for pid: Int32) -> (seconds: UInt64, microseconds: UInt64)? {
+    var info = proc_bsdinfo()
+    let size = Int32(MemoryLayout<proc_bsdinfo>.size)
+    guard proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, &info, size) == size else { return nil }
+    return (UInt64(info.pbi_start_tvsec), UInt64(info.pbi_start_tvusec))
+  }
+
+  private func ownsListeningEndpoint(_ endpoint: HDCServerEndpoint, pid: Int32) -> Bool {
+    guard let selectedPort = localIPv4Port(endpoint) else { return false }
+    let requiredBytes = proc_pidinfo(pid, PROC_PIDLISTFDS, 0, nil, 0)
+    guard requiredBytes > 0 else { return false }
+    var descriptors = [proc_fdinfo](
+      repeating: proc_fdinfo(),
+      count: Int(requiredBytes) / MemoryLayout<proc_fdinfo>.stride + 8)
+    let actualBytes = descriptors.withUnsafeMutableBytes { buffer in
+      proc_pidinfo(pid, PROC_PIDLISTFDS, 0, buffer.baseAddress, Int32(buffer.count))
+    }
+    guard actualBytes >= MemoryLayout<proc_fdinfo>.stride else { return false }
+    for descriptor in descriptors.prefix(Int(actualBytes) / MemoryLayout<proc_fdinfo>.stride)
+    where descriptor.proc_fdtype == UInt32(PROX_FDTYPE_SOCKET) {
+      var socket = socket_fdinfo()
+      let socketBytes = withUnsafeMutablePointer(to: &socket) { pointer in
+        proc_pidfdinfo(
+          pid,
+          descriptor.proc_fd,
+          PROC_PIDFDSOCKETINFO,
+          pointer,
+          Int32(MemoryLayout<socket_fdinfo>.size))
+      }
+      guard socketBytes == MemoryLayout<socket_fdinfo>.size,
+        socket.psi.soi_family == AF_INET || socket.psi.soi_family == AF_INET6,
+        socket.psi.soi_protocol == IPPROTO_TCP,
+        socket.psi.soi_kind == SOCKINFO_TCP,
+        socket.psi.soi_proto.pri_tcp.tcpsi_state == TSI_S_LISTEN
+      else { continue }
+      let port = UInt16(
+        bigEndian: UInt16(
+          truncatingIfNeeded: socket.psi.soi_proto.pri_tcp.tcpsi_ini.insi_lport))
+      if port == selectedPort, isLoopbackOrWildcardListener(socket.psi) {
+        return true
+      }
+    }
+    return false
+  }
+
+  private func isLoopbackOrWildcardListener(_ socket: socket_info) -> Bool {
+    let address = socket.soi_proto.pri_tcp.tcpsi_ini.insi_laddr
+    if socket.soi_family == AF_INET {
+      let value = address.ina_46.i46a_addr4.s_addr
+      return value == in_addr_t(INADDR_ANY) || value == inet_addr("127.0.0.1")
+    }
+    let bytes = withUnsafeBytes(of: address.ina_6) { Array($0) }
+    let wildcard = bytes.allSatisfy { $0 == 0 }
+    let mappedLoopback =
+      bytes.count == 16
+      && bytes[0..<10].allSatisfy { $0 == 0 }
+      && bytes[10] == 0xFF && bytes[11] == 0xFF
+      && Array(bytes[12..<16]) == [127, 0, 0, 1]
+    return wildcard || mappedLoopback
+  }
+
+  private func localIPv4Port(_ endpoint: HDCServerEndpoint) -> UInt16? {
+    guard let separator = endpoint.rawValue.lastIndex(of: ":"),
+      endpoint.rawValue[..<separator] == "127.0.0.1",
+      let port = UInt16(endpoint.rawValue[endpoint.rawValue.index(after: separator)...]),
+      port > 0
+    else { return nil }
+    return port
+  }
+}
+
+/// One bounded application observation session. The production factory has no
+/// source, runner, argv, clock, or pseudonym-key injection surface; it creates
+/// the exact registered source internally only after the candidate and
+/// endpoint gates pass. The separately named internal contract factory cannot
+/// be referenced from ArkDeckWorkflows.
+package actor HDCDeviceObservationApplicationSession {
+  private let composition: HDCDeviceObservationComposition?
+  private let productionSource: HDCRegisteredDeviceObservationSource?
+  private let unavailableReason: String?
+  private let unavailableBridge: HDCDeviceObservationPresentationBridge?
+  private var refreshIsInFlight = false
+
+  package static func makeProduction(
+    toolchain: HDCCandidate,
+    endpointSelection: HDCServerEndpointSelection
+  ) -> HDCDeviceObservationApplicationSession {
+    guard toolchain.sha256 == HDCDeviceObservationProbeCatalog.targetExecutableSHA256 else {
+      return HDCDeviceObservationApplicationSession(
+        unavailableReason: "candidate SHA-256 differs from the registered device observation tool")
+    }
+    guard endpointSelection.endpoint.rawValue == HDCDeviceObservationProbeCatalog.exactEndpoint
+    else {
+      return HDCDeviceObservationApplicationSession(
+        unavailableReason: "endpoint differs from the registered device observation endpoint")
+    }
+
+    let source = HDCRegisteredDeviceObservationSource(
+      runner: HDCProcessCommandRunner(semanticProfile: .deviceObservationProduction),
+      toolchain: toolchain,
+      endpointSelection: endpointSelection,
+      identityObserver: HDCDeviceObservationSystemIdentityObserver())
+    guard
+      let composition = try? HDCDeviceObservationComposition.makeProduction(
+        source: source, capacity: 64)
+    else {
+      return HDCDeviceObservationApplicationSession(
+        unavailableReason: "registered device observation composition is unavailable")
+    }
+    return HDCDeviceObservationApplicationSession(
+      composition: composition, productionSource: source)
+  }
+
+  static func makeContract(
+    source: any HDCDeviceObservationSnapshotProviding,
+    capacity: Int = 64,
+    clock: @escaping @Sendable () -> Date
+  ) throws -> HDCDeviceObservationApplicationSession {
+    HDCDeviceObservationApplicationSession(
+      composition: try HDCDeviceObservationComposition.makeProduction(
+        source: source, capacity: capacity, clock: clock),
+      productionSource: nil)
+  }
+
+  private init(
+    composition: HDCDeviceObservationComposition,
+    productionSource: HDCRegisteredDeviceObservationSource?
+  ) {
+    self.composition = composition
+    self.productionSource = productionSource
+    unavailableReason = nil
+    unavailableBridge = nil
+  }
+
+  private init(unavailableReason: String) {
+    composition = nil
+    productionSource = nil
+    self.unavailableReason = unavailableReason
+    unavailableBridge = HDCDeviceObservationPresentationBridge(capacity: 64)
+  }
+
+  package func refresh() async -> [HDCDeviceObservationPresentationEvent] {
+    guard !refreshIsInFlight else { return await currentEvents() }
+    refreshIsInFlight = true
+    defer { refreshIsInFlight = false }
+
+    if let composition {
+      await composition.pollOnce()
+      return await composition.presentationEvents()
+    }
+    if let unavailableReason, let unavailableBridge {
+      await unavailableBridge.ingest([
+        .observationUnavailable(reason: unavailableReason)
+      ])
+      return await unavailableBridge.events()
+    }
+    return []
+  }
+
+  package func currentEvents() async -> [HDCDeviceObservationPresentationEvent] {
+    if let composition {
+      return await composition.presentationEvents()
+    }
+    return await unavailableBridge?.events() ?? []
+  }
+
+  func observedRunnerInvocationCount() async -> Int {
+    await productionSource?.observedRunnerInvocationCount() ?? 0
   }
 }

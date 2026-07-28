@@ -2246,6 +2246,96 @@ actor HDCDeviceObservationFanOut {
   }
 }
 
+/// Converts internal fan-out events into the only App-facing representation.
+/// The clock is injected at the acceptance point, unchanged transitions are
+/// discarded before the clock is read, and the public history is independently
+/// bounded so internal diagnostic reasons can never leak through it.
+actor HDCDeviceObservationPresentationBridge {
+  private let capacity: Int
+  private let clock: @Sendable () -> Date
+  private var buffer: [HDCDeviceObservationPresentationEvent] = []
+
+  init(
+    capacity: Int = 64,
+    clock: @escaping @Sendable () -> Date = { Date() }
+  ) {
+    precondition(capacity > 0, "the device presentation buffer must be bounded and non-empty")
+    self.capacity = capacity
+    self.clock = clock
+  }
+
+  @discardableResult
+  func ingest(
+    _ events: [HDCDeviceObservationEvent]
+  ) -> [HDCDeviceObservationPresentationEvent] {
+    var accepted: [HDCDeviceObservationPresentationEvent] = []
+    for event in events {
+      let projection: HDCDeviceObservationPresentationEvent
+      switch event {
+      case .unchanged:
+        continue
+      case .appeared(let identifier):
+        guard Self.isValidRedactedIdentifier(identifier.redactedKey) else {
+          projection = HDCDeviceObservationPresentationEvent(
+            acceptedAt: clock(),
+            kind: .observationUnknown,
+            redactedDeviceIdentifier: nil)
+          break
+        }
+        projection = HDCDeviceObservationPresentationEvent(
+          acceptedAt: clock(),
+          kind: .appeared,
+          redactedDeviceIdentifier: identifier.redactedKey)
+      case .disappeared(let identifier):
+        guard Self.isValidRedactedIdentifier(identifier.redactedKey) else {
+          projection = HDCDeviceObservationPresentationEvent(
+            acceptedAt: clock(),
+            kind: .observationUnknown,
+            redactedDeviceIdentifier: nil)
+          break
+        }
+        projection = HDCDeviceObservationPresentationEvent(
+          acceptedAt: clock(),
+          kind: .disappeared,
+          redactedDeviceIdentifier: identifier.redactedKey)
+      case .observationUnknown:
+        projection = HDCDeviceObservationPresentationEvent(
+          acceptedAt: clock(),
+          kind: .observationUnknown,
+          redactedDeviceIdentifier: nil)
+      case .observationUnavailable:
+        projection = HDCDeviceObservationPresentationEvent(
+          acceptedAt: clock(),
+          kind: .observationUnavailable,
+          redactedDeviceIdentifier: nil)
+      }
+      accepted.append(projection)
+      buffer.append(projection)
+    }
+    if buffer.count > capacity {
+      buffer.removeFirst(buffer.count - capacity)
+    }
+    return accepted
+  }
+
+  func events() -> [HDCDeviceObservationPresentationEvent] {
+    buffer
+  }
+
+  private static func isValidRedactedIdentifier(_ value: String) -> Bool {
+    let prefix = "redacted-device-"
+    guard value.hasPrefix(prefix) else { return false }
+    let suffix = value.dropFirst(prefix.count)
+    guard suffix.count == 24 else { return false }
+    return suffix.unicodeScalars.allSatisfy { scalar in
+      switch scalar.value {
+      case 48...57, 97...102: true
+      default: false
+      }
+    }
+  }
+}
+
 enum HDCDeviceObservationCompositionError: Error, Equatable {
   case testOnlySnapshotSourceRejected
 }
@@ -2256,25 +2346,41 @@ enum HDCDeviceObservationCompositionError: Error, Equatable {
 struct HDCDeviceObservationComposition: Sendable {
   let feed: HDCDeviceObservationFanOut
   private let source: any HDCDeviceObservationSnapshotProviding
+  private let presentationBridge: HDCDeviceObservationPresentationBridge
 
   static func makeProduction(
     source: any HDCDeviceObservationSnapshotProviding,
-    capacity: Int = 64
+    capacity: Int = 64,
+    clock: @escaping @Sendable () -> Date = { Date() }
   ) throws -> HDCDeviceObservationComposition {
     guard source.authority == .integrationRegistered else {
       throw HDCDeviceObservationCompositionError.testOnlySnapshotSourceRejected
     }
     return HDCDeviceObservationComposition(
-      feed: HDCDeviceObservationFanOut(capacity: capacity), source: source)
+      feed: HDCDeviceObservationFanOut(capacity: capacity),
+      source: source,
+      presentationBridge: HDCDeviceObservationPresentationBridge(
+        capacity: capacity, clock: clock))
   }
 
-  private init(feed: HDCDeviceObservationFanOut, source: any HDCDeviceObservationSnapshotProviding) {
+  private init(
+    feed: HDCDeviceObservationFanOut,
+    source: any HDCDeviceObservationSnapshotProviding,
+    presentationBridge: HDCDeviceObservationPresentationBridge
+  ) {
     self.feed = feed
     self.source = source
+    self.presentationBridge = presentationBridge
   }
 
   @discardableResult
   func pollOnce() async -> [HDCDeviceObservationEvent] {
-    await feed.ingest(await source.observe())
+    let events = await feed.ingest(await source.observe())
+    await presentationBridge.ingest(events)
+    return events
+  }
+
+  func presentationEvents() async -> [HDCDeviceObservationPresentationEvent] {
+    await presentationBridge.events()
   }
 }
