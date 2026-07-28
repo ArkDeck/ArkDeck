@@ -6,7 +6,11 @@
 
 ## TASK-ASP-001 — 定义 archive-stable provenance 并完成迁移与哈希级联
 
-- Status:ready（r1 implementation readiness；仅在维护者对本独立 readiness PR
+- Status:ready（r2 corrective readiness；r1 的迁移面勘察不完整且其 AC 与
+  自身 scope 自相矛盾，实现中实测发现后停手（见 Readiness（r2）Survey gap）。
+  r2 只做**范围与判据的更正**，不改形态设计；r1 已完成的迁移成果为严格子集，
+  可复用。原 r1 授权文字如下续：
+- Historical Status:ready（r1 implementation readiness；仅在维护者对本独立 readiness PR
   exact head review/merge 后生效。只授权一个实现交付：按下方契约把 15 处
   仓内 change 路径迁移为 archive-stable 形态，并在**同一 PR** 内完成哈希
   级联与契约测试形态更新；载体 = 常规会话 agent/* PR。不授权：任何 registry
@@ -39,14 +43,46 @@
     `122e4e06…`（selected-device-authorization-binding）/ `d1bc481e…`
     （server-identity-generation）/ `9cdb8b6e…`（subserver-capability）/
     `82b873ef…`（key-access-diagnostics）。任一漂移即停并重钉。
-  - **迁移面:binary（audit base 逐文件实测计数）。**`openspec/changes/`
-    字面量**恰 15 处，分布 9 个文件**：`readonly-probes.yaml` 4、
+- Readiness（r2；audit base = protected `main`
+  `6383f5b`… 即 r1 #674 合入后的 head；r1 的 13 项 source pin 于此 base
+  复核 **13/13 零漂移**，形态设计、解析规则、正副本字节一致门、测试基线与
+  非 `/private/tmp` 验证要求全部原文有效）：
+  - **Survey gap（实现中实测，2026-07-28）。**r1 把迁移面钉为「恰 15 处 /
+    9 文件」，同时把 `ASP-SHAPE-001` 写成「迁移后 `openspec/integrations/**`
+    与 `Fixtures/**` 下字面量为 0」。**两者不可同时成立**：全仓实测另有
+    **4 处 / 2 文件**同类引用，且都在 `openspec/integrations/**` 下——
+    `openharmony/trace-probes/1.0.0/registry.yaml` 的
+    `provenance.redactedManifests`（3 条**裸字符串数组**，指向已归档
+    chg-2026-021）与 `rockchip/loader-transition/1.0.0/registry.yaml` 的
+    `evidencePath`（1 条，指向未归档 chg-2026-026）。
+    **勘察为何漏**：r1 起草时用 `"source[A-Za-z]*": "openspec/changes/`
+    模式扫描，该模式只认「`source*` 键 + 字符串值」，**看不见**裸字符串
+    数组元素，也看不见键名不叫 `source*` 的 `evidencePath`。正确形态是
+    直接扫字面量 `openspec/changes/` 再逐一归类。
+  - **为何不并入 ASP-001（实测约束，非偏好）。**这 4 处的迁移**必须改
+    `scripts/**`**：`scripts/trace_capture/validate_registry.py:196` 读
+    `provenance.redactedManifests`；
+    `scripts/rockchip_loader_transition_probe/probe.py:63,459`
+    读写 `evidencePath`（并有常量 `SOURCE_EVIDENCE_RELATIVE_PATH`），
+    其 `test_probe.py:317` 亦以该键构造负例。而 `scripts/**` 是 ASP-001 的
+    **Forbidden path**、恰是 ASP-002 持有的授权面。把它们并入 ASP-001 会
+    取消维护者在 approval 时保留的「ASP-002 可单独裁掉」选项。
+  - **r2 的更正（三项，形态设计零变化）。**
+    ① `ASP-SHAPE-001` 的零字面量断言**限定到 ASP-001 的 9 个具名文件**
+    （verification.md 与 acceptance-cases 同步更正）；
+    ② 余下 4 处 / 2 文件**显式移交 TASK-ASP-002**，其 In scope 相应扩列；
+    ③ 由此，**ASP-002 的守卫必须「先迁移后设卡」**：在同一任务内先把这
+    4 处迁完再启用仓级守卫，否则守卫落地即把仓打红（该顺序约束写入
+    ASP-002）。
+  - **迁移面:binary（r2 限定为 ASP-001 的 9 文件）。**`openspec/changes/`
+    字面量**恰 15 处**：`readonly-probes.yaml` 4、
     `Probes/1.0.0/registry.yaml` 4、`device-observation-probes.yaml` 1、
     `Probes/DeviceObservation/1.0.0/registry.yaml` 1、四个 receipt 各 1、
     `HDCProbeRegistryContractTests.swift` 1（第 280 行的
-    `hasPrefix("openspec/changes/")` 形态断言）。迁移后该字面量在
-    `openspec/integrations/**` 与 `Fixtures/**` 下**必须为 0**；实现若发现
-    第 16 处，停并重 readiness（说明勘察面有遗漏）。
+    `hasPrefix("openspec/changes/")` 形态断言）。迁移后该字面量**在这 9 个
+    文件中必须为 0**；`trace-probes` 与 `rockchip/loader-transition` 的 4 处
+    按 r2 移交 ASP-002，不在本任务判据内。实现若在这 9 文件外再发现同类
+    引用，停并重 readiness。
   - **两个 registry 的 provenance 形态不同，分别规定（实测，勿假设对称）：**
     - `readonly-probes.yaml`（4 entry）现有
       `{evidenceClass, sourcePath, sourceSHA256, acceptedBy}`；迁移为
@@ -169,15 +205,33 @@
 - Platform:macos
 - Requirements/AC:change-local `ASP-GUARD-001`
 - Depends on:`TASK-ASP-001`
-- In scope:在既有 SDD 守卫面新增一条检查——`openspec/integrations/**` 与
-  `Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/**` 下的
-  registry/resource/receipt 文件内出现 `openspec/changes/` 字面量即 fail，
-  报告文件与行；配**反证**（撤销该检查后以一处人造违例证明其必红）。
+- In scope（r2 扩列）:
+  - **先迁移**（ASP-001 移交的 4 处 / 2 文件，因其消费方在 `scripts/**`）：
+    `openspec/integrations/openharmony/trace-probes/1.0.0/registry.yaml` 的
+    `provenance.redactedManifests`（3 条裸字符串）与
+    `openspec/integrations/rockchip/loader-transition/1.0.0/registry.yaml` 的
+    `evidencePath`（1 条），迁为与 ASP-001 同族的 change-relative 形态；
+    同步其消费方 `scripts/trace_capture/validate_registry.py`、
+    `scripts/rockchip_loader_transition_probe/probe.py` 与
+    `scripts/rockchip_loader_transition_probe/test_probe.py`，以及 lock 中
+    trace-probes 的 SHA-256。
+  - **后设卡**：在既有 SDD 守卫面新增一条检查——`openspec/integrations/**`
+    与 `Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/**` 下的
+    registry/resource/receipt 文件内出现 `openspec/changes/` 字面量即 fail，
+    报告文件与行；配**反证**（撤销该检查后以一处人造违例证明其必红）。
+  - **顺序是二值约束**：守卫先于迁移启用会立刻把仓打红，二者必须同 PR 内
+    先迁后卡。
 - Out of scope:守卫之外的任何行为；registry 数据（属 ASP-001）；
   `check_pr_paths` / host_loop 面。
-- Allowed paths:`scripts/check_sdd.py`、`scripts/test_check_sdd.py`、
+- Allowed paths（r2 扩列）:`scripts/check_sdd.py`、`scripts/test_check_sdd.py`、
+  `scripts/trace_capture/validate_registry.py`、
+  `scripts/rockchip_loader_transition_probe/probe.py`、
+  `scripts/rockchip_loader_transition_probe/test_probe.py`、
+  `openspec/integrations/openharmony/trace-probes/1.0.0/registry.yaml`、
+  `openspec/integrations/rockchip/loader-transition/1.0.0/registry.yaml`、
+  `openspec/integrations/INTEGRATION-PROFILES.lock.yaml`、
   本 change `evidence/**`、本 change `tasks.md`（仅本任务状态/evidence 引用）
-- Forbidden paths:`scripts/` 其余文件、`openspec/integrations/**`、
+- Forbidden paths:`scripts/` 其余文件、`openspec/integrations/` 其余文件、
   `Packages/**`、`.github/**`、其他 change。
 - Risk:low（只加一条 fail-closed 检查；回退 = revert）。
 - Hardware required:no
@@ -189,9 +243,11 @@
 
 ### Verification
 
-- `ASP-GUARD-001`：迁移后的仓全绿；人造违例（任一 registry 插入一条
-  `openspec/changes/...` 路径）→ `check-sdd` 报 error 并指名文件；撤销检查
-  后该违例不再被拦（反证）。`check-sdd` acceptance ID 计数保持 111。
+- `ASP-GUARD-001`（r2）：**先迁移**——`trace-probes` 与
+  `loader-transition` 的 4 处迁完且其 `scripts/**` 消费方同步通过各自测试；
+  **后设卡**——全仓 registry/resource/receipt 面 `openspec/changes/` 字面量
+  为 0，仓全绿；人造违例 → `check-sdd` 报 error 并指名文件与行；撤销检查后
+  该违例不再被拦（反证）。`check-sdd` acceptance ID 计数保持 111。
 
 ### Notes / handoff
 
