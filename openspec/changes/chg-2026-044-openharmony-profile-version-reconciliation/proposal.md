@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-044-openharmony-profile-version-reconciliation
 revision: 1
-status: proposed
+status: approved # 仅在维护者 review/merge 本 approval-only PR 后生效；r1 proposal 经 #742 合入 main `7d2e0b82febe38d1316db19907b575a541d73625`
 class: integration
 core_change_level: none
 owner: lvye
@@ -116,3 +116,28 @@ mutation matrix；implementation/evidence、`ready→done`、change `verified` �
 
 只有本 change verified 后，CHG-2026-043 `TASK-HSO-001` 才可另起 fresh D1 readiness；
 本 change 的任一合入都不自动接受 HSO provenance、candidate versions 或实现范围。
+
+## Approval
+
+- r1 proposal 经 PR #742 合入 protected main（squash
+  `7d2e0b82febe38d1316db19907b575a541d73625`，`status: proposed`）；维护者
+  `lvye` 对 exact head `b3d9b8b0bb1ec4a0204a8a908bc83d1c09d32d4d` 的 review
+  状态为 `APPROVED`。
+- 正式批准：仅在维护者 review/merge 本 approval-only PR 后，本 change 的
+  `status: approved` 才生效。该 D1 merge 表示维护者接受以下封闭裁决：
+  - living profile header 的候选修复是 `OPENHARMONY-TOOLS 0.4.0 → 0.5.0`；
+    `INTEGRATION-PROFILES-0.6.0` lock、profile 正文与 device/readonly/trace
+    registries/resources 保持 byte-identical；
+  - SDD Guard 只新增 integration lock `profiles[]` entry 与 referenced Markdown
+    profile header 的 generic exact ID/version consistency check，malformed、missing、
+    duplicate 或 mismatch input fail closed 且不中止其他诊断；
+  - implementation 必须用独立 mutation-red/green tests 证明 guard，不创建或占用
+    `OPENHARMONY-TOOLS@0.6.0`、`INTEGRATION-PROFILES-0.7.0`，不修改 Core、
+    conformance、platform、production、archived evidence 或任何 HDC/device authority；
+  - canonical Core Requirement/AC 零认领、Core baseline 保持 `CORE-2.1.0`，三条
+    `OPVR-*` change-local AC 与 proposal 中的 rollback/PR boundary 保持完整。
+- 本批准不执行 remediation、不接受 readiness pins 或 AC evidence：
+  `TASK-OPVR-001` 继续保持 `blocked`，须下一独立 D1 readiness PR 重钉当时
+  protected main、lineage、allowed/forbidden paths 与 mutation matrix。批准、readiness、
+  implementation/evidence、`ready→done`、change `verified` 继续分离；
+  CHG-2026-043 `TASK-HSO-001` 不因本批准自动 ready。
