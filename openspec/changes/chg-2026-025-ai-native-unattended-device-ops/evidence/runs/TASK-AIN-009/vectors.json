@@ -1,0 +1,854 @@
+{
+  "schemaVersion": "1.0.0",
+  "requests": {
+    "e0": {
+      "documentType": "request",
+      "schemaVersion": "1.0.0",
+      "requestId": "request-e0",
+      "changeId": "CHG-2026-025",
+      "taskId": "TASK-AIN-009",
+      "executionMode": "execute",
+      "durableTargetId": "target-dayu200",
+      "operation": {
+        "id": "observeDevice",
+        "profileId": "observe-device.read-only.v1",
+        "configurationId": "observe-device.read-only.v1.config",
+        "configurationSha256": "875b1b50cebf0b5008703922936b4c33341fde11b5433ae41f93c15d355c4378"
+      },
+      "requestedOutputs": [
+        "hardwareEvidence"
+      ],
+      "deadlineUtc": "2026-07-29T00:00:00Z"
+    },
+    "e1": {
+      "documentType": "request",
+      "schemaVersion": "1.0.0",
+      "requestId": "request-e1",
+      "changeId": "CHG-2026-025",
+      "taskId": "TASK-AIN-009",
+      "executionMode": "execute",
+      "durableTargetId": "target-dayu200",
+      "operation": {
+        "id": "installHAP",
+        "profileId": "hap.install-preserve-data.v1",
+        "configurationId": "hap.install-preserve-data.v1.config",
+        "configurationSha256": "1dee29b58f45b736072cddb4ad81e0f730e837ffbde5c3c0edbae8bd37299380",
+        "artifactLeaseIds": [
+          "lease-hap"
+        ]
+      },
+      "requestedOutputs": [
+        "hardwareEvidence"
+      ]
+    },
+    "e2": {
+      "documentType": "request",
+      "schemaVersion": "1.0.0",
+      "requestId": "request-e2",
+      "changeId": "CHG-2026-025",
+      "taskId": "TASK-AIN-009",
+      "executionMode": "execute",
+      "durableTargetId": "target-dayu200",
+      "operation": {
+        "id": "flash",
+        "profileId": "flash.rockchip-authorized.v1",
+        "configurationId": "flash.rockchip-authorized.v1.config",
+        "configurationSha256": "d6a3c21faab82c0d36d3b1e986809cdbd03a5757a55600f1b74da7577fee616c",
+        "artifactLeaseIds": [
+          "lease-firmware"
+        ]
+      },
+      "authorizationId": "AUTH-2026-025-DAYU200-001",
+      "requestedOutputs": [
+        "hardwareEvidence"
+      ]
+    }
+  },
+  "results": {
+    "e0": {
+      "documentType": "result",
+      "schemaVersion": "1.0.0",
+      "requestId": "request-e0",
+      "jobId": "job-e0",
+      "executionMode": "execute",
+      "jobState": "succeeded",
+      "disposition": "terminal",
+      "resolvedEffect": "readOnly",
+      "outcomeCertainty": "confirmed",
+      "executor": {
+        "kind": "agent",
+        "id": "arkdeck-agent"
+      },
+      "manifestId": "manifest-e0",
+      "authorizationRef": {
+        "kind": "readyTask",
+        "changeId": "CHG-2026-025",
+        "taskId": "TASK-AIN-009",
+        "mainCommitOID": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "taskBlobOID": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "approvalPRNumber": 735
+      },
+      "artifacts": [
+        {
+          "artifactId": "hardware-evidence-e0",
+          "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "sizeBytes": 128
+        }
+      ]
+    },
+    "e1": {
+      "documentType": "result",
+      "schemaVersion": "1.0.0",
+      "requestId": "request-e1",
+      "jobId": "job-e1",
+      "executionMode": "execute",
+      "jobState": "running",
+      "disposition": "active",
+      "resolvedEffect": "deviceMutation",
+      "outcomeCertainty": "notApplicable",
+      "executor": {
+        "kind": "agent",
+        "id": "arkdeck-agent"
+      },
+      "authorizationRef": {
+        "kind": "deviceCapability",
+        "capabilityId": "capability-dayu200-hap",
+        "mainCommitOID": "dddddddddddddddddddddddddddddddddddddddd",
+        "capabilityBlobOID": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "approvalPRNumber": 736
+      },
+      "artifacts": []
+    },
+    "e2": {
+      "documentType": "result",
+      "schemaVersion": "1.0.0",
+      "requestId": "request-e2",
+      "jobId": "job-e2",
+      "executionMode": "execute",
+      "jobState": "succeeded",
+      "disposition": "terminal",
+      "resolvedEffect": "destructive",
+      "outcomeCertainty": "confirmed",
+      "executor": {
+        "kind": "agent",
+        "id": "arkdeck-agent"
+      },
+      "manifestId": "manifest-e2",
+      "authorizationRef": {
+        "kind": "standingAuthorization",
+        "authorizationId": "AUTH-2026-025-DAYU200-001",
+        "mainCommitOID": "ffffffffffffffffffffffffffffffffffffffff",
+        "authorizationBlobOID": "1111111111111111111111111111111111111111",
+        "approvalPRNumber": 737
+      },
+      "artifacts": [
+        {
+          "artifactId": "hardware-evidence-e2",
+          "sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "sizeBytes": 256
+        }
+      ]
+    },
+    "human": {
+      "documentType": "result",
+      "schemaVersion": "1.0.0",
+      "requestId": "request-e0",
+      "jobId": "job-human",
+      "executionMode": "execute",
+      "jobState": "waitingForDevice",
+      "disposition": "humanActionRequired",
+      "resolvedEffect": "readOnly",
+      "outcomeCertainty": "notApplicable",
+      "executor": {
+        "kind": "agent",
+        "id": "arkdeck-agent"
+      },
+      "humanActionId": "human-physicalConnection",
+      "blockerCode": "DEVICE_NOT_CONNECTED",
+      "authorizationRef": {
+        "kind": "readyTask",
+        "changeId": "CHG-2026-025",
+        "taskId": "TASK-AIN-009",
+        "mainCommitOID": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "taskBlobOID": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "approvalPRNumber": 735
+      },
+      "artifacts": []
+    }
+  },
+  "humanActions": [
+    {
+      "documentType": "humanActionRequired",
+      "schemaVersion": "1.0.0",
+      "actionId": "human-physicalConnection",
+      "jobId": "job-human",
+      "stepId": "step-probe-device",
+      "category": "physicalConnection",
+      "reasonCode": "DEVICE_NOT_CONNECTED",
+      "minimumActionKey": "human.connect_device",
+      "prohibitedAutomation": [
+        "physicalActuation"
+      ],
+      "resumeProbeOperationId": "observeDevice",
+      "generatedAtUtc": "2026-07-28T12:00:00Z",
+      "status": "waiting"
+    },
+    {
+      "documentType": "humanActionRequired",
+      "schemaVersion": "1.0.0",
+      "actionId": "human-deviceTrustPrompt",
+      "jobId": "job-deviceTrustPrompt",
+      "category": "deviceTrustPrompt",
+      "reasonCode": "DEVICE_TRUST_REQUIRED",
+      "minimumActionKey": "human.accept_device_trust",
+      "prohibitedAutomation": [
+        "trustPromptAcceptance"
+      ],
+      "resumeProbeOperationId": "observeDevice",
+      "generatedAtUtc": "2026-07-28T12:00:00Z",
+      "status": "waiting"
+    },
+    {
+      "documentType": "humanActionRequired",
+      "schemaVersion": "1.0.0",
+      "actionId": "human-osPermission",
+      "jobId": "job-osPermission",
+      "category": "osPermission",
+      "reasonCode": "HOST_PERMISSION_REQUIRED",
+      "minimumActionKey": "human.configure_host_permission",
+      "prohibitedAutomation": [
+        "privilegeEscalation",
+        "driverOrHelperInstall",
+        "systemRuleMutation"
+      ],
+      "resumeProbeOperationId": "probeHostConfiguration",
+      "generatedAtUtc": "2026-07-28T12:00:00Z",
+      "status": "waiting"
+    },
+    {
+      "documentType": "humanActionRequired",
+      "schemaVersion": "1.0.0",
+      "actionId": "human-credentialProvisioning",
+      "jobId": "job-credentialProvisioning",
+      "category": "credentialProvisioning",
+      "reasonCode": "SIGNING_CREDENTIAL_REQUIRED",
+      "minimumActionKey": "human.provision_credential",
+      "prohibitedAutomation": [
+        "credentialExtraction"
+      ],
+      "resumeProbeOperationId": "probeHostConfiguration",
+      "generatedAtUtc": "2026-07-28T12:00:00Z",
+      "status": "waiting"
+    },
+    {
+      "documentType": "humanActionRequired",
+      "schemaVersion": "1.0.0",
+      "actionId": "human-ambiguousIdentity",
+      "jobId": "job-ambiguousIdentity",
+      "category": "ambiguousIdentity",
+      "reasonCode": "MULTIPLE_TARGETS",
+      "minimumActionKey": "human.confirm_identity_diff",
+      "prohibitedAutomation": [
+        "identityGuess"
+      ],
+      "resumeProbeOperationId": "observeDevice",
+      "generatedAtUtc": "2026-07-28T12:00:00Z",
+      "status": "waiting"
+    },
+    {
+      "documentType": "humanActionRequired",
+      "schemaVersion": "1.0.0",
+      "actionId": "human-impactApproval",
+      "jobId": "job-impactApproval",
+      "category": "impactApproval",
+      "reasonCode": "DATA_IMPACT_APPROVAL_REQUIRED",
+      "minimumActionKey": "human.approve_data_impact",
+      "prohibitedAutomation": [
+        "selfApproval"
+      ],
+      "resumeProbeOperationId": "probeImpactApproval",
+      "generatedAtUtc": "2026-07-28T12:00:00Z",
+      "status": "waiting"
+    },
+    {
+      "documentType": "humanActionRequired",
+      "schemaVersion": "1.0.0",
+      "actionId": "human-outcomeUnknownDecision",
+      "jobId": "job-outcomeUnknownDecision",
+      "category": "outcomeUnknownDecision",
+      "reasonCode": "OUTCOME_UNKNOWN",
+      "minimumActionKey": "human.decide_unknown_outcome",
+      "prohibitedAutomation": [
+        "outcomeGuess"
+      ],
+      "resumeProbeOperationId": "reconcileOutcome",
+      "generatedAtUtc": "2026-07-28T12:00:00Z",
+      "status": "waiting"
+    },
+    {
+      "documentType": "humanActionRequired",
+      "schemaVersion": "1.0.0",
+      "actionId": "human-governanceApproval",
+      "jobId": "job-governanceApproval",
+      "category": "governanceApproval",
+      "reasonCode": "CAPABILITY_APPROVAL_REQUIRED",
+      "minimumActionKey": "human.review_capability",
+      "prohibitedAutomation": [
+        "selfApproval"
+      ],
+      "resumeProbeOperationId": "probeGovernanceApproval",
+      "generatedAtUtc": "2026-07-28T12:00:00Z",
+      "status": "resolvedByFreshProbe",
+      "resolution": {
+        "probeOperationId": "probeGovernanceApproval",
+        "probeReceiptId": "receipt-governance-fresh",
+        "observedAtUtc": "2026-07-28T12:01:00Z"
+      }
+    }
+  ],
+  "negativeMutations": [
+    {
+      "id": "request-forbidden-submittedBy",
+      "base": "request:e0",
+      "operation": "set",
+      "path": [
+        "submittedBy"
+      ],
+      "value": "caller",
+      "reasonCode": "REQUEST_FORBIDDEN_FIELD"
+    },
+    {
+      "id": "request-forbidden-executor",
+      "base": "request:e0",
+      "operation": "set",
+      "path": [
+        "executor"
+      ],
+      "value": {
+        "kind": "agent",
+        "id": "caller"
+      },
+      "reasonCode": "REQUEST_FORBIDDEN_FIELD"
+    },
+    {
+      "id": "request-forbidden-executable",
+      "base": "request:e0",
+      "operation": "set",
+      "path": [
+        "executable"
+      ],
+      "value": "hdc"
+      ,
+      "reasonCode": "REQUEST_FORBIDDEN_FIELD"
+    },
+    {
+      "id": "request-forbidden-argv",
+      "base": "request:e0",
+      "operation": "set",
+      "path": [
+        "argv"
+      ],
+      "value": [
+        "shell"
+      ],
+      "reasonCode": "REQUEST_FORBIDDEN_FIELD"
+    },
+    {
+      "id": "request-forbidden-shell",
+      "base": "request:e0",
+      "operation": "set",
+      "path": [
+        "shell"
+      ],
+      "value": true,
+      "reasonCode": "REQUEST_FORBIDDEN_FIELD"
+    },
+    {
+      "id": "request-forbidden-command",
+      "base": "request:e0",
+      "operation": "set",
+      "path": [
+        "command"
+      ],
+      "value": "hidumper",
+      "reasonCode": "REQUEST_FORBIDDEN_FIELD"
+    },
+    {
+      "id": "request-forbidden-remotePath",
+      "base": "request:e0",
+      "operation": "set",
+      "path": [
+        "remotePath"
+      ],
+      "value": "/data/local/tmp/out",
+      "reasonCode": "REQUEST_FORBIDDEN_FIELD"
+    },
+    {
+      "id": "request-forbidden-sessionRoot",
+      "base": "request:e0",
+      "operation": "set",
+      "path": [
+        "sessionRoot"
+      ],
+      "value": "/tmp/session",
+      "reasonCode": "REQUEST_FORBIDDEN_FIELD"
+    },
+    {
+      "id": "request-forbidden-authorizationBytes",
+      "base": "request:e0",
+      "operation": "set",
+      "path": [
+        "authorizationBytes"
+      ],
+      "value": "forged",
+      "reasonCode": "REQUEST_FORBIDDEN_FIELD"
+    },
+    {
+      "id": "request-forbidden-authorizationPath",
+      "base": "request:e0",
+      "operation": "set",
+      "path": [
+        "authorizationPath"
+      ],
+      "value": "/tmp/grant",
+      "reasonCode": "REQUEST_FORBIDDEN_FIELD"
+    },
+    {
+      "id": "request-forbidden-authorizationRef",
+      "base": "request:e0",
+      "operation": "set",
+      "path": [
+        "authorizationRef"
+      ],
+      "value": {
+        "kind": "readyTask"
+      },
+      "reasonCode": "REQUEST_FORBIDDEN_FIELD"
+    },
+    {
+      "id": "request-forbidden-capability",
+      "base": "request:e0",
+      "operation": "set",
+      "path": [
+        "capability"
+      ],
+      "value": "forged",
+      "reasonCode": "REQUEST_FORBIDDEN_FIELD"
+    },
+    {
+      "id": "request-forbidden-bindingRevision",
+      "base": "request:e0",
+      "operation": "set",
+      "path": [
+        "bindingRevision"
+      ],
+      "value": 1,
+      "reasonCode": "REQUEST_FORBIDDEN_FIELD"
+    },
+    {
+      "id": "request-forbidden-readback",
+      "base": "request:e0",
+      "operation": "set",
+      "path": [
+        "readback"
+      ],
+      "value": {
+        "serial": "caller"
+      },
+      "reasonCode": "REQUEST_FORBIDDEN_FIELD"
+    },
+    {
+      "id": "request-forbidden-prerequisites",
+      "base": "request:e0",
+      "operation": "set",
+      "path": [
+        "prerequisites"
+      ],
+      "value": "satisfied",
+      "reasonCode": "REQUEST_FORBIDDEN_FIELD"
+    },
+    {
+      "id": "request-forbidden-usage",
+      "base": "request:e0",
+      "operation": "set",
+      "path": [
+        "usage"
+      ],
+      "value": 0,
+      "reasonCode": "REQUEST_FORBIDDEN_FIELD"
+    },
+    {
+      "id": "request-forbidden-effect",
+      "base": "request:e0",
+      "operation": "set",
+      "path": [
+        "effect"
+      ],
+      "value": "readOnly",
+      "reasonCode": "REQUEST_FORBIDDEN_FIELD"
+    },
+    {
+      "id": "request-forbidden-resolvedEffect",
+      "base": "request:e0",
+      "operation": "set",
+      "path": [
+        "resolvedEffect"
+      ],
+      "value": "readOnly",
+      "reasonCode": "REQUEST_FORBIDDEN_FIELD"
+    },
+    {
+      "id": "request-forbidden-outcome",
+      "base": "request:e0",
+      "operation": "set",
+      "path": [
+        "outcome"
+      ],
+      "value": "succeeded",
+      "reasonCode": "REQUEST_FORBIDDEN_FIELD"
+    },
+    {
+      "id": "request-forbidden-success",
+      "base": "request:e0",
+      "operation": "set",
+      "path": [
+        "success"
+      ],
+      "value": true,
+      "reasonCode": "REQUEST_FORBIDDEN_FIELD"
+    },
+    {
+      "id": "request-forbidden-nested-argv",
+      "base": "request:e0",
+      "operation": "set",
+      "path": [
+        "operation",
+        "argv"
+      ],
+      "value": [
+        "shell"
+      ],
+      "reasonCode": "REQUEST_FORBIDDEN_FIELD"
+    },
+    {
+      "id": "request-forbidden-case-variant",
+      "base": "request:e0",
+      "operation": "set",
+      "path": [
+        "operation",
+        "Executable"
+      ],
+      "value": "hdc",
+      "reasonCode": "REQUEST_FORBIDDEN_FIELD"
+    },
+    {
+      "id": "request-unknown-version",
+      "base": "request:e0",
+      "operation": "set",
+      "path": [
+        "schemaVersion"
+      ],
+      "value": "2.0.0",
+      "reasonCode": "UNKNOWN_SCHEMA_VERSION"
+    },
+    {
+      "id": "request-unknown-operation",
+      "base": "request:e0",
+      "operation": "set",
+      "path": [
+        "operation",
+        "id"
+      ],
+      "value": "runRawCommand",
+      "reasonCode": "UNKNOWN_OPERATION"
+    },
+    {
+      "id": "request-unknown-profile",
+      "base": "request:e0",
+      "operation": "set",
+      "path": [
+        "operation",
+        "profileId"
+      ],
+      "value": "observe-device.unregistered.v1",
+      "reasonCode": "UNKNOWN_PROFILE"
+    },
+    {
+      "id": "request-configuration-digest-drift",
+      "base": "request:e0",
+      "operation": "set",
+      "path": [
+        "operation",
+        "configurationSha256"
+      ],
+      "value": "9999999999999999999999999999999999999999999999999999999999999999",
+      "reasonCode": "CONFIGURATION_DIGEST_MISMATCH"
+    },
+    {
+      "id": "result-terminal-state-drift",
+      "base": "result:e0",
+      "operation": "set",
+      "path": [
+        "jobState"
+      ],
+      "value": "running",
+      "reasonCode": "RESULT_DISPOSITION_STATE_MISMATCH"
+    },
+    {
+      "id": "result-active-state-drift",
+      "base": "result:e1",
+      "operation": "set",
+      "path": [
+        "jobState"
+      ],
+      "value": "succeeded",
+      "reasonCode": "RESULT_DISPOSITION_STATE_MISMATCH"
+    },
+    {
+      "id": "result-certainty-drift",
+      "base": "result:e0",
+      "operation": "set",
+      "path": [
+        "outcomeCertainty"
+      ],
+      "value": "unknown",
+      "reasonCode": "RESULT_CERTAINTY_MISMATCH"
+    },
+    {
+      "id": "result-policy-blocked-authority",
+      "base": "result:e1",
+      "operation": "set",
+      "path": [
+        "disposition"
+      ],
+      "value": "policyBlocked",
+      "reasonCode": "RESULT_POLICY_BLOCKED_AUTHORITY"
+    },
+    {
+      "id": "result-authority-effect-drift",
+      "base": "result:e1",
+      "operation": "set",
+      "path": [
+        "resolvedEffect"
+      ],
+      "value": "readOnly",
+      "reasonCode": "RESULT_AUTHORITY_EFFECT_MISMATCH"
+    },
+    {
+      "id": "result-plan-only-authority",
+      "base": "result:e0",
+      "operation": "set",
+      "path": [
+        "executionMode"
+      ],
+      "value": "planOnly",
+      "reasonCode": "RESULT_NON_EXECUTE_AUTHORITY"
+    },
+    {
+      "id": "human-unknown-category",
+      "base": "human:physicalConnection",
+      "operation": "set",
+      "path": [
+        "category"
+      ],
+      "value": "runCommandForMe",
+      "reasonCode": "HUMAN_UNKNOWN_CATEGORY"
+    },
+    {
+      "id": "human-unknown-prohibited-action",
+      "base": "human:physicalConnection",
+      "operation": "set",
+      "path": [
+        "prohibitedAutomation",
+        "0"
+      ],
+      "value": "autoClick",
+      "reasonCode": "HUMAN_UNKNOWN_PROHIBITED_AUTOMATION"
+    },
+    {
+      "id": "human-resume-probe-drift",
+      "base": "human:physicalConnection",
+      "operation": "set",
+      "path": [
+        "resumeProbeOperationId"
+      ],
+      "value": "probeHostConfiguration",
+      "reasonCode": "HUMAN_RESUME_PROBE_MISMATCH"
+    },
+    {
+      "id": "human-fresh-probe-missing",
+      "base": "human:governanceApproval",
+      "operation": "remove",
+      "path": [
+        "resolution"
+      ],
+      "reasonCode": "HUMAN_FRESH_PROBE_REQUIRED"
+    },
+    {
+      "id": "human-fresh-probe-drift",
+      "base": "human:governanceApproval",
+      "operation": "set",
+      "path": [
+        "resolution",
+        "probeOperationId"
+      ],
+      "value": "observeDevice",
+      "reasonCode": "HUMAN_FRESH_PROBE_MISMATCH"
+    },
+    {
+      "id": "human-minimum-action-command",
+      "base": "human:physicalConnection",
+      "operation": "set",
+      "path": [
+        "minimumActionKey"
+      ],
+      "value": "run hdc shell",
+      "reasonCode": "HUMAN_MINIMUM_ACTION_KEY_INVALID"
+    },
+    {
+      "id": "human-result-cross-reference-drift",
+      "base": "result:human",
+      "operation": "set",
+      "path": [
+        "humanActionId"
+      ],
+      "value": "human-other",
+      "reasonCode": "HUMAN_CROSS_REFERENCE_MISMATCH"
+    },
+    {
+      "id": "registry-unknown-operation",
+      "base": "registry",
+      "operation": "set",
+      "path": [
+        "operations",
+        "0",
+        "id"
+      ],
+      "value": "runRawCommand",
+      "reasonCode": "REGISTRY_OPERATION_CLOSURE"
+    },
+    {
+      "id": "registry-duplicate-operation",
+      "base": "registry",
+      "operation": "appendCopy",
+      "path": [
+        "operations"
+      ],
+      "copyFrom": [
+        "operations",
+        "0"
+      ],
+      "reasonCode": "REGISTRY_OPERATION_CLOSURE"
+    },
+    {
+      "id": "registry-missing-operation",
+      "base": "registry",
+      "operation": "remove",
+      "path": [
+        "operations",
+        "0"
+      ],
+      "reasonCode": "REGISTRY_OPERATION_CLOSURE"
+    },
+    {
+      "id": "registry-unknown-step",
+      "base": "registry",
+      "operation": "set",
+      "path": [
+        "operations",
+        "0",
+        "profiles",
+        "0",
+        "emittedStepKinds",
+        "0"
+      ],
+      "value": "runRawCommand",
+      "reasonCode": "REGISTRY_UNKNOWN_STEP"
+    },
+    {
+      "id": "registry-effect-downgrade",
+      "base": "registry",
+      "operation": "set",
+      "path": [
+        "operations",
+        "4",
+        "profiles",
+        "0",
+        "declaredEffect"
+      ],
+      "value": "readOnly",
+      "reasonCode": "REGISTRY_EFFECT_DOWNGRADE"
+    },
+    {
+      "id": "registry-cancellation-downgrade",
+      "base": "registry",
+      "operation": "set",
+      "path": [
+        "operations",
+        "4",
+        "profiles",
+        "0",
+        "declaredCancellation"
+      ],
+      "value": "immediate",
+      "reasonCode": "REGISTRY_CANCELLATION_DOWNGRADE"
+    },
+    {
+      "id": "registry-binding-downgrade",
+      "base": "registry",
+      "operation": "set",
+      "path": [
+        "operations",
+        "4",
+        "profiles",
+        "0",
+        "declaredBindingRequirement"
+      ],
+      "value": "none",
+      "reasonCode": "REGISTRY_BINDING_DOWNGRADE"
+    },
+    {
+      "id": "registry-illegal-elevation",
+      "base": "registry",
+      "operation": "set",
+      "path": [
+        "operations",
+        "0",
+        "profiles",
+        "0",
+        "declaredEffect"
+      ],
+      "value": "destructive",
+      "reasonCode": "REGISTRY_ILLEGAL_ELEVATION"
+    },
+    {
+      "id": "registry-incomplete-authority-map",
+      "base": "registry",
+      "operation": "remove",
+      "path": [
+        "operations",
+        "1",
+        "authorityByEffect",
+        "deviceMutation"
+      ],
+      "reasonCode": "REGISTRY_AUTHORITY_MAPPING"
+    },
+    {
+      "id": "registry-duplicate-profile",
+      "base": "registry",
+      "operation": "appendCopy",
+      "path": [
+        "operations",
+        "0",
+        "profiles"
+      ],
+      "copyFrom": [
+        "operations",
+        "0",
+        "profiles",
+        "0"
+      ],
+      "reasonCode": "REGISTRY_DUPLICATE_PROFILE"
+    }
+  ]
+}

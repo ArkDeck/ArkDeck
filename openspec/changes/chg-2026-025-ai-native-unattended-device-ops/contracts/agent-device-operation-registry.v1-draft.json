@@ -1,0 +1,739 @@
+{
+  "schemaVersion": "1.0.0",
+  "registryId": "arkdeck-agent-device-operations",
+  "workflowStepSchemaId": "https://arkdeck.dev/schemas/workflow-step-1.0.0.json",
+  "unknownOperationDisposition": "rejectAsDestructiveUnsupported",
+  "unknownProfileDisposition": "rejectAsDestructiveUnsupported",
+  "unknownStepDisposition": "rejectAsDestructiveUnsupported",
+  "effectOrder": [
+    "hostOnly",
+    "readOnly",
+    "deviceMutation",
+    "destructive"
+  ],
+  "cancellationOrder": [
+    "immediate",
+    "atSafeBoundary",
+    "criticalNonInterruptible"
+  ],
+  "bindingOrder": [
+    "none",
+    "confirmedDevice"
+  ],
+  "operations": [
+    {
+      "id": "observeDevice",
+      "minimumEffect": "readOnly",
+      "permittedEffects": [
+        "readOnly"
+      ],
+      "minimumCancellation": "immediate",
+      "bindingRequirement": "confirmedDevice",
+      "permittedStepKinds": [
+        "probeDevice",
+        "waitForDisconnect",
+        "waitForReconnect",
+        "verifyRemoteState"
+      ],
+      "profilePolicy": "protectedMainExactDescriptor",
+      "escalationPolicy": "noElevation",
+      "authorityByEffect": {
+        "readOnly": "readyTask"
+      },
+      "profiles": [
+        {
+          "id": "observe-device.read-only.v1",
+          "configurationId": "observe-device.read-only.v1.config",
+          "configurationSha256": "875b1b50cebf0b5008703922936b4c33341fde11b5433ae41f93c15d355c4378",
+          "declaredEffect": "readOnly",
+          "declaredCancellation": "immediate",
+          "declaredBindingRequirement": "confirmedDevice",
+          "emittedStepKinds": [
+            "probeDevice"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "captureHilog",
+      "minimumEffect": "readOnly",
+      "permittedEffects": [
+        "readOnly",
+        "deviceMutation",
+        "destructive"
+      ],
+      "minimumCancellation": "immediate",
+      "bindingRequirement": "confirmedDevice",
+      "permittedStepKinds": [
+        "captureRemoteStdout",
+        "clearLogBuffer",
+        "resizeLogBuffer",
+        "startDeviceLogPersist",
+        "stopRemoteCapture",
+        "receiveFile",
+        "verifyArtifact",
+        "postprocessArtifact",
+        "cleanupOwnedRemotePath"
+      ],
+      "profilePolicy": "protectedMainExactDescriptor",
+      "escalationPolicy": "profileMayElevateWithinPermittedEffects",
+      "authorityByEffect": {
+        "readOnly": "readyTask",
+        "deviceMutation": "deviceCapability",
+        "destructive": "standingAuthorization"
+      },
+      "profiles": [
+        {
+          "id": "hilog.host-stream.v1",
+          "configurationId": "hilog.host-stream.v1.config",
+          "configurationSha256": "e3a315cb4815ab4cd3f94dfcfeccc846f81942fa545bbb63dcd6a067f2d1d879",
+          "declaredEffect": "readOnly",
+          "declaredCancellation": "immediate",
+          "declaredBindingRequirement": "confirmedDevice",
+          "emittedStepKinds": [
+            "captureRemoteStdout",
+            "verifyArtifact",
+            "postprocessArtifact"
+          ]
+        },
+        {
+          "id": "hilog.device-persist-restored.v1",
+          "configurationId": "hilog.device-persist-restored.v1.config",
+          "configurationSha256": "731948848b2e3a550fc017b1461fe873ff2ac8a500ec83af2cdf9c103a9f2c18",
+          "declaredEffect": "deviceMutation",
+          "declaredCancellation": "atSafeBoundary",
+          "declaredBindingRequirement": "confirmedDevice",
+          "emittedStepKinds": [
+            "clearLogBuffer",
+            "resizeLogBuffer",
+            "startDeviceLogPersist",
+            "stopRemoteCapture",
+            "receiveFile",
+            "verifyArtifact",
+            "cleanupOwnedRemotePath"
+          ]
+        },
+        {
+          "id": "hilog.global-persist.v1",
+          "configurationId": "hilog.global-persist.v1.config",
+          "configurationSha256": "dfa99a46626d1b723a082fd5418d96d816d60e6db8af4305e94e7a352b2f4eb8",
+          "declaredEffect": "destructive",
+          "declaredCancellation": "atSafeBoundary",
+          "declaredBindingRequirement": "confirmedDevice",
+          "emittedStepKinds": [
+            "clearLogBuffer",
+            "resizeLogBuffer",
+            "startDeviceLogPersist",
+            "stopRemoteCapture",
+            "receiveFile",
+            "verifyArtifact",
+            "cleanupOwnedRemotePath"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "captureUIDump",
+      "minimumEffect": "readOnly",
+      "permittedEffects": [
+        "readOnly",
+        "deviceMutation"
+      ],
+      "minimumCancellation": "immediate",
+      "bindingRequirement": "confirmedDevice",
+      "permittedStepKinds": [
+        "captureRemoteStdout",
+        "captureRemoteFile",
+        "receiveFile",
+        "verifyArtifact",
+        "postprocessArtifact",
+        "cleanupOwnedRemotePath",
+        "snapshotParameter",
+        "setParameter",
+        "restoreParameter"
+      ],
+      "profilePolicy": "protectedMainExactDescriptor",
+      "escalationPolicy": "profileMayElevateWithinPermittedEffects",
+      "authorityByEffect": {
+        "readOnly": "readyTask",
+        "deviceMutation": "deviceCapability"
+      },
+      "profiles": [
+        {
+          "id": "ui-dump.stdout.v1",
+          "configurationId": "ui-dump.stdout.v1.config",
+          "configurationSha256": "ff94e9334a9baab79883276ce58d065b91cfc0c1c4b010fe53ee3e224500d48d",
+          "declaredEffect": "readOnly",
+          "declaredCancellation": "immediate",
+          "declaredBindingRequirement": "confirmedDevice",
+          "emittedStepKinds": [
+            "captureRemoteStdout",
+            "verifyArtifact",
+            "postprocessArtifact"
+          ]
+        },
+        {
+          "id": "ui-dump.owned-sidecar.v1",
+          "configurationId": "ui-dump.owned-sidecar.v1.config",
+          "configurationSha256": "24ea099cc429921558282050f84fe463cb7f687f1c2408aeab9c1144b8c65d27",
+          "declaredEffect": "deviceMutation",
+          "declaredCancellation": "atSafeBoundary",
+          "declaredBindingRequirement": "confirmedDevice",
+          "emittedStepKinds": [
+            "snapshotParameter",
+            "setParameter",
+            "captureRemoteFile",
+            "receiveFile",
+            "verifyArtifact",
+            "cleanupOwnedRemotePath",
+            "restoreParameter",
+            "postprocessArtifact"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "captureTrace",
+      "minimumEffect": "readOnly",
+      "permittedEffects": [
+        "readOnly",
+        "deviceMutation"
+      ],
+      "minimumCancellation": "immediate",
+      "bindingRequirement": "confirmedDevice",
+      "permittedStepKinds": [
+        "snapshotParameter",
+        "runApprovedRemoteRead",
+        "setParameter",
+        "rebootDevice",
+        "waitForDisconnect",
+        "waitForReconnect",
+        "captureRemoteFile",
+        "stopRemoteCapture",
+        "receiveFile",
+        "verifyArtifact",
+        "cleanupOwnedRemotePath",
+        "restoreParameter",
+        "postprocessArtifact"
+      ],
+      "profilePolicy": "protectedMainExactDescriptor",
+      "escalationPolicy": "profileMayElevateWithinPermittedEffects",
+      "authorityByEffect": {
+        "readOnly": "readyTask",
+        "deviceMutation": "deviceCapability"
+      },
+      "profiles": [
+        {
+          "id": "trace.read-only-probe.v1",
+          "configurationId": "trace.read-only-probe.v1.config",
+          "configurationSha256": "b5edc6fa79f17d049ea38a4cce8386118c7c694ed8fe59cea7867fc8a63ba8a0",
+          "declaredEffect": "readOnly",
+          "declaredCancellation": "immediate",
+          "declaredBindingRequirement": "confirmedDevice",
+          "emittedStepKinds": [
+            "snapshotParameter",
+            "runApprovedRemoteRead"
+          ]
+        },
+        {
+          "id": "trace.owned-capture.v1",
+          "configurationId": "trace.owned-capture.v1.config",
+          "configurationSha256": "afe7a3ac3c452dd38e2fcc4fb4227c935b6ec852f6c91bfc9c31d402d3b0346a",
+          "declaredEffect": "deviceMutation",
+          "declaredCancellation": "atSafeBoundary",
+          "declaredBindingRequirement": "confirmedDevice",
+          "emittedStepKinds": [
+            "snapshotParameter",
+            "setParameter",
+            "rebootDevice",
+            "waitForDisconnect",
+            "waitForReconnect",
+            "captureRemoteFile",
+            "stopRemoteCapture",
+            "receiveFile",
+            "verifyArtifact",
+            "cleanupOwnedRemotePath",
+            "restoreParameter",
+            "postprocessArtifact"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "installHAP",
+      "minimumEffect": "deviceMutation",
+      "permittedEffects": [
+        "deviceMutation",
+        "destructive"
+      ],
+      "minimumCancellation": "atSafeBoundary",
+      "bindingRequirement": "confirmedDevice",
+      "permittedStepKinds": [
+        "preflightDeviceStorage",
+        "installPackage",
+        "verifyRemoteState"
+      ],
+      "profilePolicy": "protectedMainExactDescriptor",
+      "escalationPolicy": "profileMayElevateWithinPermittedEffects",
+      "authorityByEffect": {
+        "deviceMutation": "deviceCapability",
+        "destructive": "standingAuthorization"
+      },
+      "profiles": [
+        {
+          "id": "hap.install-preserve-data.v1",
+          "configurationId": "hap.install-preserve-data.v1.config",
+          "configurationSha256": "1dee29b58f45b736072cddb4ad81e0f730e837ffbde5c3c0edbae8bd37299380",
+          "declaredEffect": "deviceMutation",
+          "declaredCancellation": "atSafeBoundary",
+          "declaredBindingRequirement": "confirmedDevice",
+          "emittedStepKinds": [
+            "preflightDeviceStorage",
+            "installPackage",
+            "verifyRemoteState"
+          ]
+        },
+        {
+          "id": "hap.install-data-impact.v1",
+          "configurationId": "hap.install-data-impact.v1.config",
+          "configurationSha256": "f71f8af591a91faafb0c765c682ef791b03f13ebb1287f61dd95e87b15234988",
+          "declaredEffect": "destructive",
+          "declaredCancellation": "atSafeBoundary",
+          "declaredBindingRequirement": "confirmedDevice",
+          "emittedStepKinds": [
+            "preflightDeviceStorage",
+            "installPackage",
+            "verifyRemoteState"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "uninstallHAP",
+      "minimumEffect": "destructive",
+      "permittedEffects": [
+        "destructive"
+      ],
+      "minimumCancellation": "atSafeBoundary",
+      "bindingRequirement": "confirmedDevice",
+      "permittedStepKinds": [
+        "requestConfirmation",
+        "uninstallPackage",
+        "verifyRemoteState"
+      ],
+      "profilePolicy": "protectedMainExactDescriptor",
+      "escalationPolicy": "destructiveOnly",
+      "authorityByEffect": {
+        "destructive": "standingAuthorization"
+      },
+      "profiles": [
+        {
+          "id": "hap.uninstall.v1",
+          "configurationId": "hap.uninstall.v1.config",
+          "configurationSha256": "da370ed185c3894ef6a2793e26e490efa00e11d9a41574637508edec84f56afd",
+          "declaredEffect": "destructive",
+          "declaredCancellation": "atSafeBoundary",
+          "declaredBindingRequirement": "confirmedDevice",
+          "emittedStepKinds": [
+            "requestConfirmation",
+            "uninstallPackage",
+            "verifyRemoteState"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "deployNativeLibrary",
+      "minimumEffect": "deviceMutation",
+      "permittedEffects": [
+        "deviceMutation",
+        "destructive"
+      ],
+      "minimumCancellation": "atSafeBoundary",
+      "bindingRequirement": "confirmedDevice",
+      "permittedStepKinds": [
+        "preflightDeviceStorage",
+        "receiveFile",
+        "sendFile",
+        "stopApplication",
+        "runApprovedRemoteMutation",
+        "verifyRemoteState",
+        "startApplication",
+        "cleanupOwnedRemotePath"
+      ],
+      "profilePolicy": "protectedMainExactDescriptor",
+      "escalationPolicy": "profileMayElevateWithinPermittedEffects",
+      "authorityByEffect": {
+        "deviceMutation": "deviceCapability",
+        "destructive": "standingAuthorization"
+      },
+      "profiles": [
+        {
+          "id": "native-library.app-owned-atomic.v1",
+          "configurationId": "native-library.app-owned-atomic.v1.config",
+          "configurationSha256": "ab65411f961609f59b640f080d7986952926f18a16f0fc1a49cb37bbba24ebd8",
+          "declaredEffect": "deviceMutation",
+          "declaredCancellation": "atSafeBoundary",
+          "declaredBindingRequirement": "confirmedDevice",
+          "emittedStepKinds": [
+            "preflightDeviceStorage",
+            "receiveFile",
+            "sendFile",
+            "stopApplication",
+            "verifyRemoteState",
+            "startApplication",
+            "cleanupOwnedRemotePath"
+          ]
+        },
+        {
+          "id": "native-library.system-publish.v1",
+          "configurationId": "native-library.system-publish.v1.config",
+          "configurationSha256": "06fd627849410f667e83a4df953563e35d7f2b8013430a0163f19268495130f2",
+          "declaredEffect": "destructive",
+          "declaredCancellation": "atSafeBoundary",
+          "declaredBindingRequirement": "confirmedDevice",
+          "emittedStepKinds": [
+            "preflightDeviceStorage",
+            "receiveFile",
+            "sendFile",
+            "stopApplication",
+            "runApprovedRemoteMutation",
+            "verifyRemoteState",
+            "startApplication",
+            "cleanupOwnedRemotePath"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "startApplication",
+      "minimumEffect": "deviceMutation",
+      "permittedEffects": [
+        "deviceMutation"
+      ],
+      "minimumCancellation": "atSafeBoundary",
+      "bindingRequirement": "confirmedDevice",
+      "permittedStepKinds": [
+        "startApplication",
+        "verifyRemoteState"
+      ],
+      "profilePolicy": "protectedMainExactDescriptor",
+      "escalationPolicy": "noElevation",
+      "authorityByEffect": {
+        "deviceMutation": "deviceCapability"
+      },
+      "profiles": [
+        {
+          "id": "application.start.v1",
+          "configurationId": "application.start.v1.config",
+          "configurationSha256": "84ca533adc848551398c3139e1d7dae7168d4f64a3df297cb1b1407209dd1c68",
+          "declaredEffect": "deviceMutation",
+          "declaredCancellation": "atSafeBoundary",
+          "declaredBindingRequirement": "confirmedDevice",
+          "emittedStepKinds": [
+            "startApplication",
+            "verifyRemoteState"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "stopApplication",
+      "minimumEffect": "deviceMutation",
+      "permittedEffects": [
+        "deviceMutation"
+      ],
+      "minimumCancellation": "atSafeBoundary",
+      "bindingRequirement": "confirmedDevice",
+      "permittedStepKinds": [
+        "stopApplication",
+        "verifyRemoteState"
+      ],
+      "profilePolicy": "protectedMainExactDescriptor",
+      "escalationPolicy": "noElevation",
+      "authorityByEffect": {
+        "deviceMutation": "deviceCapability"
+      },
+      "profiles": [
+        {
+          "id": "application.stop.v1",
+          "configurationId": "application.stop.v1.config",
+          "configurationSha256": "eff254e9d649be162a8a58751087402b1dc84867cadf5d819ab910bed2e8673e",
+          "declaredEffect": "deviceMutation",
+          "declaredCancellation": "atSafeBoundary",
+          "declaredBindingRequirement": "confirmedDevice",
+          "emittedStepKinds": [
+            "stopApplication",
+            "verifyRemoteState"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sendOwnedFile",
+      "minimumEffect": "deviceMutation",
+      "permittedEffects": [
+        "deviceMutation"
+      ],
+      "minimumCancellation": "atSafeBoundary",
+      "bindingRequirement": "confirmedDevice",
+      "permittedStepKinds": [
+        "preflightDeviceStorage",
+        "sendFile",
+        "verifyRemoteState"
+      ],
+      "profilePolicy": "protectedMainExactDescriptor",
+      "escalationPolicy": "noElevation",
+      "authorityByEffect": {
+        "deviceMutation": "deviceCapability"
+      },
+      "profiles": [
+        {
+          "id": "owned-file.send.v1",
+          "configurationId": "owned-file.send.v1.config",
+          "configurationSha256": "a1888b292a73f81754680a74528c9bb52576a66532fc3844c3698887b262f50a",
+          "declaredEffect": "deviceMutation",
+          "declaredCancellation": "atSafeBoundary",
+          "declaredBindingRequirement": "confirmedDevice",
+          "emittedStepKinds": [
+            "preflightDeviceStorage",
+            "sendFile",
+            "verifyRemoteState"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "receiveOwnedFile",
+      "minimumEffect": "readOnly",
+      "permittedEffects": [
+        "readOnly"
+      ],
+      "minimumCancellation": "immediate",
+      "bindingRequirement": "confirmedDevice",
+      "permittedStepKinds": [
+        "receiveFile",
+        "verifyArtifact"
+      ],
+      "profilePolicy": "protectedMainExactDescriptor",
+      "escalationPolicy": "noElevation",
+      "authorityByEffect": {
+        "readOnly": "readyTask"
+      },
+      "profiles": [
+        {
+          "id": "owned-file.receive.v1",
+          "configurationId": "owned-file.receive.v1.config",
+          "configurationSha256": "8dd2cfe98c2ca36b1a8cba42874c150dc7da5d6a337314599181d37d681fc199",
+          "declaredEffect": "readOnly",
+          "declaredCancellation": "immediate",
+          "declaredBindingRequirement": "confirmedDevice",
+          "emittedStepKinds": [
+            "receiveFile",
+            "verifyArtifact"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "createPortForward",
+      "minimumEffect": "deviceMutation",
+      "permittedEffects": [
+        "deviceMutation"
+      ],
+      "minimumCancellation": "atSafeBoundary",
+      "bindingRequirement": "confirmedDevice",
+      "permittedStepKinds": [
+        "createPortForward",
+        "verifyRemoteState"
+      ],
+      "profilePolicy": "protectedMainExactDescriptor",
+      "escalationPolicy": "noElevation",
+      "authorityByEffect": {
+        "deviceMutation": "deviceCapability"
+      },
+      "profiles": [
+        {
+          "id": "port-forward.create.v1",
+          "configurationId": "port-forward.create.v1.config",
+          "configurationSha256": "fc52182639079a5713e17576f7a515045b7be602f29e2bf586b9af6f34518ab9",
+          "declaredEffect": "deviceMutation",
+          "declaredCancellation": "atSafeBoundary",
+          "declaredBindingRequirement": "confirmedDevice",
+          "emittedStepKinds": [
+            "createPortForward",
+            "verifyRemoteState"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "removePortForward",
+      "minimumEffect": "deviceMutation",
+      "permittedEffects": [
+        "deviceMutation"
+      ],
+      "minimumCancellation": "atSafeBoundary",
+      "bindingRequirement": "confirmedDevice",
+      "permittedStepKinds": [
+        "removePortForward",
+        "verifyRemoteState"
+      ],
+      "profilePolicy": "protectedMainExactDescriptor",
+      "escalationPolicy": "noElevation",
+      "authorityByEffect": {
+        "deviceMutation": "deviceCapability"
+      },
+      "profiles": [
+        {
+          "id": "port-forward.remove.v1",
+          "configurationId": "port-forward.remove.v1.config",
+          "configurationSha256": "f90d72b6a8696f69780b83e030835499b5f5096ddcc2744ddfbbdf53fc3795ea",
+          "declaredEffect": "deviceMutation",
+          "declaredCancellation": "atSafeBoundary",
+          "declaredBindingRequirement": "confirmedDevice",
+          "emittedStepKinds": [
+            "removePortForward",
+            "verifyRemoteState"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rebootDevice",
+      "minimumEffect": "deviceMutation",
+      "permittedEffects": [
+        "deviceMutation"
+      ],
+      "minimumCancellation": "atSafeBoundary",
+      "bindingRequirement": "confirmedDevice",
+      "permittedStepKinds": [
+        "rebootDevice",
+        "waitForDisconnect",
+        "waitForReconnect",
+        "verifyRemoteState"
+      ],
+      "profilePolicy": "protectedMainExactDescriptor",
+      "escalationPolicy": "noElevation",
+      "authorityByEffect": {
+        "deviceMutation": "deviceCapability"
+      },
+      "profiles": [
+        {
+          "id": "device.reboot.v1",
+          "configurationId": "device.reboot.v1.config",
+          "configurationSha256": "98036bd61fe786e17b6d8d239df1745a859f32361ec8e3fb8d6cfdbb89b95d74",
+          "declaredEffect": "deviceMutation",
+          "declaredCancellation": "atSafeBoundary",
+          "declaredBindingRequirement": "confirmedDevice",
+          "emittedStepKinds": [
+            "rebootDevice",
+            "waitForDisconnect",
+            "waitForReconnect",
+            "verifyRemoteState"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "flash",
+      "minimumEffect": "destructive",
+      "permittedEffects": [
+        "destructive"
+      ],
+      "minimumCancellation": "criticalNonInterruptible",
+      "bindingRequirement": "confirmedDevice",
+      "permittedStepKinds": [
+        "probeDevice",
+        "enterUpdater",
+        "waitForDisconnect",
+        "waitForReconnect",
+        "flashPartition",
+        "verifyRemoteState"
+      ],
+      "profilePolicy": "protectedMainExactDescriptor",
+      "escalationPolicy": "destructiveOnly",
+      "authorityByEffect": {
+        "destructive": "standingAuthorization"
+      },
+      "profiles": [
+        {
+          "id": "flash.rockchip-authorized.v1",
+          "configurationId": "flash.rockchip-authorized.v1.config",
+          "configurationSha256": "d6a3c21faab82c0d36d3b1e986809cdbd03a5757a55600f1b74da7577fee616c",
+          "declaredEffect": "destructive",
+          "declaredCancellation": "criticalNonInterruptible",
+          "declaredBindingRequirement": "confirmedDevice",
+          "emittedStepKinds": [
+            "probeDevice",
+            "enterUpdater",
+            "waitForDisconnect",
+            "waitForReconnect",
+            "flashPartition",
+            "verifyRemoteState"
+          ]
+        }
+      ]
+    }
+  ],
+  "humanBlockerRules": [
+    {
+      "category": "physicalConnection",
+      "resumeProbeOperationId": "observeDevice",
+      "requiredProhibitedAutomation": [
+        "physicalActuation"
+      ]
+    },
+    {
+      "category": "deviceTrustPrompt",
+      "resumeProbeOperationId": "observeDevice",
+      "requiredProhibitedAutomation": [
+        "trustPromptAcceptance"
+      ]
+    },
+    {
+      "category": "osPermission",
+      "resumeProbeOperationId": "probeHostConfiguration",
+      "requiredProhibitedAutomation": [
+        "privilegeEscalation",
+        "driverOrHelperInstall",
+        "systemRuleMutation"
+      ]
+    },
+    {
+      "category": "credentialProvisioning",
+      "resumeProbeOperationId": "probeHostConfiguration",
+      "requiredProhibitedAutomation": [
+        "credentialExtraction"
+      ]
+    },
+    {
+      "category": "ambiguousIdentity",
+      "resumeProbeOperationId": "observeDevice",
+      "requiredProhibitedAutomation": [
+        "identityGuess"
+      ]
+    },
+    {
+      "category": "impactApproval",
+      "resumeProbeOperationId": "probeImpactApproval",
+      "requiredProhibitedAutomation": [
+        "selfApproval"
+      ]
+    },
+    {
+      "category": "outcomeUnknownDecision",
+      "resumeProbeOperationId": "reconcileOutcome",
+      "requiredProhibitedAutomation": [
+        "outcomeGuess"
+      ]
+    },
+    {
+      "category": "governanceApproval",
+      "resumeProbeOperationId": "probeGovernanceApproval",
+      "requiredProhibitedAutomation": [
+        "selfApproval"
+      ]
+    }
+  ]
+}

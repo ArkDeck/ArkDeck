@@ -1,0 +1,16 @@
+{
+  "documentType": "request",
+  "schemaVersion": "1.0.0",
+  "requestId": "request-duplicate",
+  "request\u0049d": "request-shadow",
+  "changeId": "CHG-2026-025",
+  "taskId": "TASK-AIN-009",
+  "executionMode": "execute",
+  "durableTargetId": "target-dayu200",
+  "operation": {
+    "id": "observeDevice",
+    "profileId": "observe-device.read-only.v1",
+    "configurationId": "observe-device.read-only.v1.config",
+    "configurationSha256": "875b1b50cebf0b5008703922936b4c33341fde11b5433ae41f93c15d355c4378"
+  }
+}
