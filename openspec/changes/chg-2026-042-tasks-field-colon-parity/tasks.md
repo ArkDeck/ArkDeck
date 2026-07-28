@@ -6,8 +6,9 @@ HLR/NAV/DEC 先例由会话实现：`Decision-Grade` 在实现前保持缺失；
 
 ## TASK-CM7-001 — 对齐 `tasks.md` 字段冒号文法并锁定跨解析器契约
 
-- Status:blocked（等待 CHG-2026-042 人类 approval 与独立 D1 readiness；
-  proposal 合入不使本任务 ready）
+- Status:blocked（r1 approval 已由 PR #702 merge
+  `3703a96ea334dc2ec2598008bd9c070190832127` 满足；本 r2 只更正计数门，
+  r2 与其后的独立 D1 readiness 均合入前，本任务不 ready）
 - Platform:macos（host-only）
 - Requirements/AC:change-local `CM7-PARITY-001`、`CM7-CORPUS-001`、
   `CM7-SELF-001`
@@ -76,10 +77,16 @@ HLR/NAV/DEC 先例由会话实现：`Decision-Grade` 在实现前保持缺失；
   的 `TaskCandidate`；`check_pr_paths` 对两种 `Allowed paths` 写法产生相同路径；
   既有 ASCII、续行、空值与散文排除测试保持全绿；非法第三种分隔符仍 fail closed。
 - `CM7-CORPUS-001`：readiness 钉定的全部活跃 `tasks.md` 做实现前后 executable
-  diff，lost 为 0，gained 仅来自已登记的全角冒号字段；r1 audit base
-  `e114d9d3ae668bff68d2cfb69c59fa6f4dff00ec` 的已知结果为 26→32，新增恰为
-  `TASK-BRC-001`…`TASK-BRC-006`，且六项均 done/blocked。若 fresh readiness
-  与此不符，停止并走 proposal revision，不就地扩大解释。
+  diff，lost 为 0，gained 恰为 `TASK-BRC-001`…`TASK-BRC-006`，且六项均
+  done/blocked、不得 ready / 可 dispatch。总数是绑定 exact tree 的诊断快照而非
+  语义 pin：pre-proposal `e114d9d3ae668bff68d2cfb69c59fa6f4dff00ec` =
+  26→32；approved-main `20aeee5653d7eece08911c0a84afc92c1fa09702` =
+  27→33（新增本 TASK-CM7-001）；open PR #704 exact head
+  `7a5da66fdf4e1cf09018a538312523899dacdeba` = 28→34（再新增 ASCII
+  TASK-OBS-001R）；三者 lost/gained
+  集合完全相同。后续无关 ASCII task 可使两侧对称增减；任何 lost、未登记
+  gained、或六个 gained task 中出现 ready / 可 dispatch，仍须停止并走
+  proposal revision。
 - `CM7-SELF-001`：`is_never_claim("TASK-CM7-001")` 及合法 suffix 恒为 true，
   相邻非本任务 token 不受影响；撤销该 root 时专属测试必须红。
 - 全量门：`scripts/check-sdd.sh` 保持 0 error / 0 warning / 111 acceptance IDs；

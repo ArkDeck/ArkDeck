@@ -1,6 +1,6 @@
 # CHG-2026-042 Verification Plan
 
-> Change:CHG-2026-042-tasks-field-colon-parity@r1
+> Change:CHG-2026-042-tasks-field-colon-parity@r2
 > Status:planned
 > Core baseline:CORE-2.1.0（零 Core 变更；canonical Core AC 零认领）
 
@@ -20,7 +20,7 @@
 | AC ID | Verification method | Expected result | Evidence |
 | --- | --- | --- | --- |
 | `CM7-PARITY-001` | contract + mutation | host-loop 对 `Depends on` / `Allowed paths` 的 `:` 与 `：` 输出逐字段相同；PR guard 的 `Allowed paths` 两种写法同样等价；非法分隔符、空值与散文不产生候选/路径；分别撤销两个全角分支时对应测试必红 | `evidence/runs/TASK-CM7-001/run.md` |
-| `CM7-CORPUS-001` | protected-main 活体语料 before/after executable diff | lost = 0；gained 只包含逐项登记的全角冒号任务，且每项 status/grade/hardware/dependency 被记录；r1 audit base 的已知集合为 `TASK-BRC-001`…`006`，六项均 done/blocked | `evidence/runs/TASK-CM7-001/run.md` |
+| `CM7-CORPUS-001` | protected-main 活体语料 before/after executable diff | lost = 0；gained 恰为 `TASK-BRC-001`…`006`，且每项 status/grade/hardware/dependency/allowed paths 被记录、六项均非 ready / 不可 dispatch；总数只作 exact-tree 诊断快照，无关 ASCII task 可令两侧对称增减 | `evidence/runs/TASK-CM7-001/run.md` |
 | `CM7-SELF-001` | never-claim contract + mutation | 本任务及合法 suffix 永不被循环认领，相邻 task token 不受影响；撤销 root 时专属测试必红 | `evidence/runs/TASK-CM7-001/run.md` |
 
 ## Negative and regression tests
@@ -32,6 +32,9 @@
   base pin、Decision-Grade 与 never-claim 之外的 claim gate零语义变化；
 - before/after 差分若出现任何 lost、未登记 gained 或新 ready/可 dispatch
   候选，AC 失败并触发 proposal revision；
+- 计数快照须绑定 exact tree 并如实记录：r1 pre-proposal 26→32、
+  approved-main 27→33、PR #704 prospective 28→34；不得把总数变化单独判为
+  解析语义漂移，也不得用总数相等掩盖 lost/gained 集合变化；
 - 分别撤销 `_DEPENDS_RE`、`_ALLOWED_RE` 的全角支持以及 CM7 never-claim root，
   三项变异必须被不同的专属测试击杀；仅改注释的负对照应存活。
 

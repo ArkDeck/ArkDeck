@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-042-tasks-field-colon-parity
-revision: 1
-status: approved
+revision: 2
+status: approved # r1 approval = PR #702 merge 3703a96ea334dc2ec2598008bd9c070190832127；r2 计数门更正仅在维护者 review/merge 后生效
 class: implementation-only
 core_change_level: none
 owner: lvye
@@ -33,6 +33,35 @@ CHG-2026-040 的冻结体检台账将 **C-M7** 记录为尚未立项的残余缺
   新增恰为 `TASK-BRC-001` 至 `TASK-BRC-006`，零候选丢失；
 - 这 6 项当前均为 `done` 或 `blocked`，所以该语法修正不会在当前基线上新增
   可 dispatch 的 ready task；它只恢复循环对真实治理状态的可见性。
+
+## Revision r2：候选总数是快照，不是语义不变量
+
+TASK-CM7-001 fresh readiness 在 protected `main`
+`20aeee5653d7eece08911c0a84afc92c1fa09702` 复算时，r1 写下的固定总数
+26→32 已自然变为 **27→33**：proposal 合入后，本 change 自己新增的
+`TASK-CM7-001` 同时出现在 before 与 after，故两侧各加 1。语义差分完全不变：
+`lost=[]`，`gained` 仍恰为 `TASK-BRC-001`…`TASK-BRC-006`，六项仍全部
+`done` / `blocked`。
+
+同轮并发检查发现唯一 open PR #704 会新增一个使用 ASCII 冒号的
+`TASK-OBS-001R`。在其 exact head
+`7a5da66fdf4e1cf09018a538312523899dacdeba` 上执行同一差分为 **28→34**，
+`lost` 与 `gained` 集合仍与上段逐项相同。由此证明固定总数会被无关、合法的
+ASCII task 增减扰动，不能充当 C-M7 的 pass/fail 边界。
+
+r2 只更正验证算术，不改变 scope、实现文件、解析行为或 AC ID：
+
+- **语义不变量**：`lost=[]`；`gained` 恰为已登记的六个 BRC task；六项均不得
+  变为 ready / 可 dispatch，且其 status、grade、hardware、dependency 与
+  allowed paths 必须逐项入 evidence；
+- **诊断快照**：26→32、27→33、28→34 三组计数全部保留并绑定各自 exact tree，
+  只用于复查语料演进，不要求后续总数恒定；
+- 新增/删除无关 ASCII task 只要 before/after 两侧对称、语义不变量仍成立即可；
+  任何 lost、未登记 gained、或六项中出现 ready / 可 dispatch 仍须停下并走
+  proposal revision。
+
+本 r2 是 D1 proposal revision；维护者 merge 只批准上述计数门更正。
+`TASK-CM7-001` 继续 `blocked`，不构成 readiness 或实现授权。
 
 ## What changes
 
@@ -87,5 +116,5 @@ CHG-2026-040 的冻结体检台账将 **C-M7** 记录为尚未立项的残余缺
 ## Tasks
 
 - **TASK-CM7-001** — 对齐字段冒号文法、补跨解析器/活体语料回归，并将本任务
-  加入 never-claim 根。任务在 change approval 与独立 D1 readiness 合入前保持
-  `blocked`；proposal 合入不构成 approval 或 readiness。
+  加入 never-claim 根。r1 change approval 已由 PR #702 合入；任务在独立 D1
+  readiness 合入前保持 `blocked`，r2 合入也不构成 readiness。
