@@ -9,16 +9,18 @@ HLR/NAV/DEC 先例由会话实现：`Decision-Grade` 在实现前保持缺失；
 - Status:ready（r3 scope remediation 已由 PR #714 merge，implementation 与
   evidence 已完成且全绿；提交前 #715 改动 active corpus，命中 r3 stop condition。
   r4 exact head 虽已获 review，但 #716 在 r4 pin 后变更 head 才合入，故 r4
-  未 merge、未授权恢复。仅在维护者对下方 r5 exact head review/merge 后，才授权
-  恢复并提交同一个 implementation PR；不授权 `done` / `verified` 翻转）
+  未 merge、未授权恢复。r5 已由 #718 merge，但 19 秒后 #719 又改动 active
+  corpus，故 r5 授权未被使用。仅在维护者对下方 r6 exact head
+  review/merge 后，才授权恢复并提交同一个 implementation PR；不授权
+  `done` / `verified` 翻转）
 - Platform:macos（host-only）
 - Requirements/AC:change-local `CM7-PARITY-001`、`CM7-CORPUS-001`、
   `CM7-SELF-001`
 - Depends on:none（change approval 与 readiness 由状态/PR 门承载，不伪装为
   TASK 依赖）
-- Readiness input pins:r1 / r2 / r3 / r4 为历史快照；现行提交前 corpus
-  补救见下方 `Readiness pins(r5,2026-07-28)`。恢复实现前必须复核 r3 merge、
-  #715 / #716 exact merge 与完成态 stash
+- Readiness input pins:r1 / r2 / r3 / r4 / r5 为历史快照；现行提交前
+  corpus 补救见下方 `Readiness pins(r6,2026-07-28)`。恢复实现前必须复核
+  r3 merge、#715 / #716 / #718 / #719 merge 与完成态 stash
 - Applicable failure patterns:`AF-004`（同一契约多消费者语义分歧）、
   `AF-010`（必须用独立 fixture 与变异反证）、`AF-015`（全仓清点同模式）
 - Production reachability:`python -m host_loop --once` →
@@ -511,6 +513,51 @@ HLR/NAV/DEC 先例由会话实现：`Decision-Grade` 在实现前保持缺失；
   review/merge 后，才允许从届时 protected main 重建 implementation 分支并恢复
   stash `02c82ee5d455054f48cdcf6725f9883d7e412251`。恢复后必须确认 changed
   paths 只落本任务 Allowed paths，并重新执行 live corpus、13 项聚焦、50 项
+  PR guard、644 项 host-loop、SDD `0/0/111` 与 `git diff --check`。恢复前或
+  提交前若 main、active corpus、C-M7 路径、开放 PR 集合或测试结果再次漂移，
+  implementation commit/push 为零并重新 readiness；`ready→done` 与 verified
+  继续分离。
+
+### Readiness pins(r6 post-#719 corpus refresh,2026-07-28)
+
+- **为何 r5 未被使用。**r5 PR #718 final head
+  `85d1cb7f71250d4490cec1de8b3bcf26fb809123` 已经 protected-main squash
+  merge 为 `0185bf52b8e908560867bccaeb5f6a96d2cedf02`，其 fileset 仅为本
+  `tasks.md`；按 V2 governance，合入 protected main 即构成人类批准。但
+  19 秒后 PR #719 又合入 active CHG-022 `tasks.md`，发生在本会话恢复 stash
+  之前，命中 r5 的 active-corpus 漂移停止条件。r5 一次性实现授权未被使用；
+  stash `02c82ee5d455054f48cdcf6725f9883d7e412251` 仍未恢复，implementation
+  仍为零 commit / 零 push / 零 PR。
+- **#719 exact merge。**PR #719 exact head
+  `7a3aed409a1d6471276c4aa8fe39e35d592d36f5` 已获维护者 `lvye`
+  exact-head review，并 merge 为最新 protected main
+  `570fe28c2d6edbad18050cfe873246fd45f0bc40`。它只把
+  `TASK-OBS-001R` 从 ready 翻为 done 并追加同任务 completion 记录，fileset
+  仅为 CHG-022 `tasks.md`；该 blob 从
+  `da3d5ecf3bed9992effeaa14b5911227b193f46b` 变为
+  `b2688926e2d691ae141e5b735f4b2066e33bc331`。它未触碰 C-M7
+  implementation/change paths。
+- **r6 corpus 与 pins。**protected main
+  `570fe28c2d6edbad18050cfe873246fd45f0bc40` 的 active change 集合仍为
+  r5 的 8 项。除两个预期变化外，r5 表内 blobs 均逐字不变：C-M7
+  `tasks.md` 因 #718 从 `ff83a4db13355e9a26427415ab0bfa04c0db9c95`
+  变为 `776140894aa258b95178f581180eaba6b55acdf9`；CHG-022 因 #719
+  变为上述 `b2688926e2d691ae141e5b735f4b2066e33bc331`。在该 exact tree 上，
+  未改 parser 的 before 与仅在进程内把 `_DEPENDS_RE` / `_ALLOWED_RE`
+  分隔符替换为 `[:：]` 的 after 仍为 `30→36`、`lost=[]`、gained 恰为
+  `TASK-BRC-001`…`TASK-BRC-006`。六项完整字段/verdict 逐字不变：
+  BRC-001/002 done，BRC-003…006 blocked，全部非 ready / 不可 dispatch。
+- **并发与未漂移面。**fresh fetch 后开放 PR 为空；#718 / #719 均未改
+  `scripts/host_loop/__main__.py`、`worker.py`、
+  `test_discovery_contract.py`、`test_navigation_contract.py`、
+  `scripts/test_check_pr_paths.py`、C-M7 proposal/verification/acceptance 或
+  evidence path。r3 唯一新增 census-test scope、source/test pins、变异矩阵、
+  allowed/forbidden paths 全部继续有效。
+- **r6 批准与恢复门。**只有维护者对基于
+  `570fe28c2d6edbad18050cfe873246fd45f0bc40`、包含本节的 r6 exact head
+  review/merge 后，才允许从届时 protected main 重建 implementation 分支并恢复
+  stash `02c82ee5d455054f48cdcf6725f9883d7e412251`。恢复后须确认 changed
+  paths 只落本任务 Allowed paths，并重跑 live corpus、13 项聚焦、50 项
   PR guard、644 项 host-loop、SDD `0/0/111` 与 `git diff --check`。恢复前或
   提交前若 main、active corpus、C-M7 路径、开放 PR 集合或测试结果再次漂移，
   implementation commit/push 为零并重新 readiness；`ready→done` 与 verified
