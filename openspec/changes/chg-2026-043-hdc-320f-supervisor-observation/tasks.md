@@ -2,91 +2,135 @@
 
 ## TASK-HSO-001 — Register exact 3.2.0f commandless supervisor identity family
 
-- Status:blocked
-- Fresh readiness review(2026-07-28;host-only,零 HDC/设备；仅在维护者
-  review/merge 本独立 readiness PR 后成为 current):
-  - **Audit base:**protected main
-    `07daee30ba99636b5dc7a334bdefc3a07611acef`（approval-only PR #738 merge）。
-    #738 exact head `a95ae3f229cf0f74bcc8681c92ce9239d1e1890e` 由维护者
-    `lvye` APPROVED；proposal #737 与 approval tree 均已逐路径复核 merge 后一致。
-  - **Approval/dependency gate:**CHG-2026-043 已为 `approved`；CHG-2026-024 已
-    verified/archived，accepted capture merges #656
-    `af6d64d67af98c94e1f03581de6f52ecdb8a6bb2` 与 #658
-    `6df25c25d0088238ce2700db07c4db6fbd92cc34` 均在 git 历史。其 current
-    run blob = `931d8c0009ab999b1f4e84741887132c07d4df05`（SHA-256
-    `ef3372dadc19c4a0e84f6f15f3ac616751d0351cfc2372fa9cf943952275318e`）。
-    这些事实满足 change approval 与 evidence 可寻址性，**不自动接受 provenance
-    对新 family 的充分性**。
-  - **Hard blocker — authoritative profile version conflict:**current
-    `openspec/integrations/openharmony/profile.md` blob
-    `8889864cb023e43a745862e99a3f307d168e410c`（SHA-256
-    `6bcf7e8ed5ee74215bc72963a5b0a7e862010e48bad03438445ae442c235cfd2`）
-    的 header 仍是 `Version：0.4.0`；同一文件 device-observation 节却声明
-    `OPENHARMONY-TOOLS@0.5.0`。current lock blob
-    `9297820f25b9276859c60ba6bd89ab399066dcd0`（SHA-256
-    `802d87819b8ce39f197b7b59bfffde24d074cf7db33c3e80c89f9f8b3a5f8b46`）
-    又把 `OPENHARMONY-TOOLS` 登记为 `0.5.0`；device registry blob
-    `399c5a102c7737bf6466e8a2c4c6a1d1b1bc0b6a` 也绑定
-    `OPENHARMONY-TOOLS@0.5.0`。profile header / profile 正文 / lock / registry
-    不一致，直接违反本任务 `HSO-REGISTRY-001` 的 version closure 前置。
-  - **Lineage proof:**`git blame` 显示 profile header 的 `0.4.0` 最后来自
-    `171a269d`；CHG-2026-024 implementation `ffca996f41be37d27137e7245c8fba3645fb0fb4`
-    只新增 device-observation 节并把 lock bump 到 0.6.0 / profile entry 0.5.0，
-    没有修改 header。故这不是两个历史 profile 并存的有意表达，而是 living
-    integration authority 的漏同步。现有
-    `HDCDeviceObservationRegistryContractTests` 15/15 与
-    `HDCProbeRegistryContractTests` 7/7 PASS、`check-sdd` 0/0/111，也只说明当前
-    guard 未覆盖 header↔lock 一致性，不能把绿灯升级为冲突已消失。
-  - **Why candidate versions cannot be pinned:**proposal 的
-    `OPENHARMONY-TOOLS@0.6.0` / `INTEGRATION-PROFILES-0.7.0` 在 change 外未占用，
-    三个新 deliverable 路径在 audit base 均 absent；但选择 profile 0.6.0 会隐式
-    采信 lock 的 0.5.0 而覆盖 header 的 0.4.0，选择 0.5.0 又与已登记 device
-    profile 相撞。Agent 不得在权威冲突中自行选择更方便的解释，因此不产生可供
-    implementation 使用的 candidate-version pin。
-  - **Other preflight results:**open PR = 0；Package.swift blob
-    `292135a2c80c63ddf7182f58e2f81ff7c7d6104d` 已 `.copy("Fixtures/HDC/Probes")`；
-    legacy probe test blob `6f83b54e4d01148005a7348786c886cf4b7c7ade`
-    已把枚举限制在自身 `1.0.0/` 子树。故新增 sibling pack 无需修改
-    `Package.swift` 或 legacy test，当前 allowed paths 在该面完整。readonly
-    registry blob `99e8cc3d9929f9502a3e978a53cd56ad285d2aad` 与 device registry
-    上述 blob 已重取，未发现 open-PR overlap；这些无阻塞结论不能覆盖版本冲突。
-  - **Provenance gate:not adjudicated。**#656/#658 的 exact 3.2.0f
-    tool/endpoint 与四次稳定 process/start/executable/listener observation 仍 current，
-    `DEV-1`（非逐 command 完整 bracket）仍须在冲突修复后的 fresh readiness
-    独立裁决。由于本 task 是 commandless family，不能把“无 HDC argv”反过来当作
-    evidence 自动充分。
-  - **Unblock gate:**先用独立 approved integration change 协调 living
-    `OPENHARMONY-TOOLS` profile header、lock 与 device registry 的 current version
-    lineage，并增加能在 header/lock 漂移时变红的 contract/guard；archived
-    CHG-2026-024 evidence 不改写。该 remediation `done` 后，本任务仍须另起 fresh
-    D1 readiness，重钉当时 main、候选版本、全部输入与 provenance 充分性。
-  - **PR boundary:**本 readiness 仅修改 TASK-HSO-001 的本段/依赖描述，状态保持
-    `blocked`；不夹带 profile/lock/test 修复，不创建新 registry/resource，不修改
-    proposal/design/verification/acceptance，不开始 TASK-HSO-002，也不创建后续
-    remediation proposal。installed HDC、真实设备、server lifecycle/adoption、
-    subserver/device/binding/destructive dispatch 全部为 0。
+- Status:ready
+- Fresh readiness review r2(2026-07-28；host-only，零 HDC/设备；仅在维护者
+  review/merge 本独立 D1 readiness PR 后生效):
+  - **Audit base and approval:**protected main
+    `d029cc4ebb9b91c647e904d943a65bef5ee95001`。CHG-2026-043 approval-only
+    PR #738 exact head `a95ae3f229cf0f74bcc8681c92ce9239d1e1890e` 由维护者
+    `lvye` APPROVED，并以
+    `07daee30ba99636b5dc7a334bdefc3a07611acef` 合入；change current
+    proposal blob `51c6304f7a080f01035580fc0593fe22460c1ba4` 为 `approved`。
+    历史 blocked readiness #740 merge
+    `b314d6dd586744480e7a66c2fa71c4d51199ab40` 识别的唯一 hard blocker 已由
+    CHG-2026-044 清除；audit 时 open PR = 0。#749 后的 #750/#751 只修改
+    CHG-2026-025 contracts/tests/tasks，与本 task、共享 integration/profile/fixture
+    路径零交集。
+  - **Reconciliation dependency satisfied:**CHG-2026-044 verification-only
+    PR #749 exact head `83df97af1e95cd4e38b6ac7ea924043d321db668` 由 `lvye`
+    APPROVED，并以 `672262ede8f2fe2c212264dafff1f7a387defdbc` 合入。
+    其 proposal/verification/tasks/run protected-main blobs 分别为
+    `2075f98770c9d86bb2731ecb6de5c94ec94627e2`、
+    `7367a03badfb4d29251a8a12bf8d3620e4f9e9e5`、
+    `f00f9e02cf5249d9345ffa6f5dd879d746c79532`、
+    `3570f7f04d9b6ce0afadee26121748ece148e573`，状态为
+    `verified`/`passed`/`done`。current OpenHarmony profile blob
+    `4bfe204b1c13e53b93b35f840652206274614299` 的 header、正文与 current lock
+    `INTEGRATION-PROFILES-0.6.0`/device registry 已一致指向
+    `OPENHARMONY-TOOLS@0.5.0`；generic header↔lock guard 已在 SDD Guard 的
+    production call path，旧冲突不再存在。
+  - **Candidate version and absence pins:**在 audit base 上
+    `OPENHARMONY-TOOLS@0.6.0`、`INTEGRATION-PROFILES-0.7.0` 与
+    `OPENHARMONY-HDC-SUPERVISOR-OBSERVATION-PROBES@1.0.0` 仅出现在本 change
+    的候选声明或 CHG-2026-044 的“不占用”说明中，没有 current authority
+    collision。canonical registry、`SupervisorObservation/1.0.0/` resource pack 与
+    `HDCSupervisorObservationRegistryContractTests.swift` 三个 deliverable 路径均
+    absent。因此本轮固定 proposal 的 `0.6.0` profile、`0.7.0` lock 与 `1.0.0`
+    registry；任一 implementation-base collision 或 header/lock drift 都使 task
+    重新 blocked，不得现场改号或覆盖。
+  - **Provenance D1 acceptance (narrow):**#656 exact head
+    `48de853d984e5781510c3d38ddc473d0d36e8373` / merge
+    `af6d64d67af98c94e1f03581de6f52ecdb8a6bb2` 与 #658 exact head
+    `76ef464bf18f536ea304076768a85391fc9d7b5e` / merge
+    `6df25c25d0088238ce2700db07c4db6fbd92cc34` 均由 `lvye` 精确
+    APPROVED。archived run blob
+    `931d8c0009ab999b1f4e84741887132c07d4df05`（SHA-256
+    `ef3372dadc19c4a0e84f6f15f3ac616751d0351cfc2372fa9cf943952275318e`）
+    固定 exact macOS/hdc `3.2.0f`/executable SHA-256
+    `05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83`/
+    endpoint `127.0.0.1:8710`，并含跨 19:51–20:29 窗口四次一致的
+    PID/start/executable/listener 观测。
+  - **DEV-1 disposition:**该 accepted run 没有为每次 HDC command 留完整 pre/post
+    bracket；本 D1 只接受它支撑 `platformProcessObservation` 的字段、exact tuple、
+    listener normalization 与稳定性条件。新 family 固定 `exactArgv: []`、
+    `invocationAllowed: false`，不消费 capture 中任何 command output；正式 observer
+    仍须在每次使用时自行完成 bounded pre/post OS scan 与 candidate-byte 复核。
+    该受理**不证明**被采集 server 的 pre-existing/external origin，不登记
+    `checkserver`、health 或 client/server/daemon version，也不允许从 capture
+    直接铸造 production receipt/generation。若实现需要以上任一事实，立即 blocked
+    并另走维护者受控 capture/change；不得扩大本次 provenance。
+  - **Shared consumer/resource closure:**`Package.swift` blob
+    `292135a2c80c63ddf7182f58e2f81ff7c7d6104d` 已复制整个
+    `Fixtures/HDC/Probes`；legacy/device registry tests blobs
+    `6f83b54e4d01148005a7348786c886cf4b7c7ade` /
+    `ff7dab950caa390c0b982c0c765c39606190e80f` 分别只闭合自己的
+    `1.0.0/` 与 `DeviceObservation/1.0.0/` 子树。两个既有 pack 的 git tree
+    OID 分别为 `f906403bc878a27dbef79736203da98c32a020eb` 与
+    `9ca93b91d18c554e4c137b7f3494550af072ebfc`；新增 sibling pack 无需修改
+    `Package.swift` 或旧 tests，implementation 必须证明两个 tree 与 readonly/device
+    canonical registry blobs `99e8cc3d9929f9502a3e978a53cd56ad285d2aad` /
+    `399c5a102c7737bf6466e8a2c4c6a1d1b1bc0b6a` 全部不变。
+  - **Closed registration and mutation contract:**新 registry/resource 只含一个
+    `serverIdentityGeneration` entry：exact tool tuple/endpoint、
+    `platformProcessObservation`、empty argv、invocation disallowed、existing exact
+    one-listener owner 与 bounded pre/post equality。resource pack 只含 canonical
+    byte-identical copy、manifest、redacted structured receipt/control；provenance 使用
+    archive-stable change id + relative evidence path并钉 #656/#658 merge OID/DEV-1，
+    不含 raw process/device identifier。contract 至少使下列 mutation 变红：
+    tool version/hash/endpoint/profile/registry/resource hash、argv/invocation/effect、
+    accepted merge OID/DEV-1 disclosure、3.2.0d cross-version substitution、old-pack
+    byte drift；zero/multiple listener、wrong owner、PID/start/path/hash/listener drift、
+    timeout/cancel/scan error、caller receipt/generation 与 fallback 均只能
+    unsupported/unavailable/unknown，且所有 HDC/lifecycle/mutation counters 为 0。
+  - **Baseline and PR boundary:**`scripts/check-sdd.sh` = 0 errors / 0 warnings /
+    111 canonical AC；`scripts/test_check_sdd.py` = 56/56 PASS；
+    `scripts/test_check_pr_paths.py` = 50/50 PASS；existing device/readonly registry
+    focused suites = 15/15 + 7/7 PASS；`git diff --check` = PASS。本 readiness 只修改
+    TASK-HSO-001 状态/本段/依赖/pins；不创建 registry/resource、不修改 profile/lock/
+    macOS mapping/test/evidence，不开始 TASK-HSO-002。installed HDC、真实设备、
+    network、server lifecycle/adoption、subserver/device/binding/destructive dispatch
+    全部为 0；implementation/evidence 与后续 `ready→done` 继续使用独立 PR。
 - Platform:macos
 - Requirements:change-local integration authority compatible with `REQ-HDC-002`/
   `REQ-HDC-003`/`REQ-HDC-004`
 - Acceptance:`HSO-REGISTRY-001`、`HSO-SEPARATION-001`、`HSO-NODISPATCH-001`
 - Depends on:本 change proposal 与独立 approval-only PR 合入（已满足）；
-  CHG-2026-024 verified evidence（已满足可寻址性，充分性待 fresh readiness）；
-  living OpenHarmony profile/header/lock version reconciliation change `done`（未满足）；
-  独立 fresh readiness（本轮 blocked）
-- Readiness input pins:本轮只固定用于复查 blocker 的 audit inputs，不授权
-  implementation：
+  CHG-2026-044 profile/header/lock reconciliation `verified`（已满足）；
+  CHG-2026-024 #656/#658 accepted provenance（已满足，且本 D1 仅按上列窄边界
+  接受 commandless family 充分性）；独立 fresh readiness（本 PR，merge 后满足）
+- Readiness input pins:
 
   ```yaml pins
+  - commit: d029cc4ebb9b91c647e904d943a65bef5ee95001
+  - commit: 07daee30ba99636b5dc7a334bdefc3a07611acef
+  - commit: b314d6dd586744480e7a66c2fa71c4d51199ab40
+  - commit: 672262ede8f2fe2c212264dafff1f7a387defdbc
+  - commit: af6d64d67af98c94e1f03581de6f52ecdb8a6bb2
+  - commit: 6df25c25d0088238ce2700db07c4db6fbd92cc34
   - path: openspec/changes/chg-2026-043-hdc-320f-supervisor-observation/proposal.md
     blob: 51c6304f7a080f01035580fc0593fe22460c1ba4
   - path: openspec/changes/chg-2026-043-hdc-320f-supervisor-observation/verification.md
     blob: 831fc3b3a895fa6c2cc6966a7278ac58cb5828b4
+  - path: openspec/changes/chg-2026-043-hdc-320f-supervisor-observation/design.md
+    blob: d8f25081442ea876e1d598e39cf58a0c64e72f4d
+  - path: openspec/changes/chg-2026-043-hdc-320f-supervisor-observation/acceptance-cases.yaml
+    blob: 6b7becef9571c34a89e764240138879369e6653b
+  - path: openspec/changes/chg-2026-044-openharmony-profile-version-reconciliation/proposal.md
+    blob: 2075f98770c9d86bb2731ecb6de5c94ec94627e2
+  - path: openspec/changes/chg-2026-044-openharmony-profile-version-reconciliation/verification.md
+    blob: 7367a03badfb4d29251a8a12bf8d3620e4f9e9e5
+  - path: openspec/changes/chg-2026-044-openharmony-profile-version-reconciliation/tasks.md
+    blob: f00f9e02cf5249d9345ffa6f5dd879d746c79532
+  - path: openspec/changes/chg-2026-044-openharmony-profile-version-reconciliation/evidence/runs/TASK-OPVR-001/run.md
+    blob: 3570f7f04d9b6ce0afadee26121748ece148e573
   - path: openspec/changes/archive/2026-07-28-chg-2026-024-hdc-device-snapshot-registration/evidence/runs/TASK-I24-001/run.md
     blob: 931d8c0009ab999b1f4e84741887132c07d4df05
   - path: openspec/integrations/openharmony/profile.md
-    blob: 8889864cb023e43a745862e99a3f307d168e410c
+    blob: 4bfe204b1c13e53b93b35f840652206274614299
+    sha256: 477373827f026376e91d6629fa2eb95f87d5b9b99e61dafaf815e86689fc4824
   - path: openspec/integrations/INTEGRATION-PROFILES.lock.yaml
     blob: 9297820f25b9276859c60ba6bd89ab399066dcd0
+    sha256: 802d87819b8ce39f197b7b59bfffde24d074cf7db33c3e80c89f9f8b3a5f8b46
   - path: openspec/integrations/openharmony/readonly-probes.yaml
     blob: 99e8cc3d9929f9502a3e978a53cd56ad285d2aad
   - path: openspec/integrations/openharmony/device-observation-probes.yaml
@@ -99,13 +143,28 @@
     blob: ff7dab950caa390c0b982c0c765c39606190e80f
   - path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/HDCProbeRegistryContractTests.swift
     blob: 6f83b54e4d01148005a7348786c886cf4b7c7ade
+  - path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Probes/1.0.0/resources.json
+    blob: 5796449dee4a7166746d9b0d7245d26bd2b21aae
+  - path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Probes/DeviceObservation/1.0.0/resources.json
+    blob: c231cdccc99be3f4154cf4e9a11b15fbdb251b94
+  - path: scripts/check_sdd.py
+    blob: aa7dc6e34d187cb6458689d72ac28564b58fb29b
+  - path: scripts/test_check_sdd.py
+    blob: 7e6c47044b31065d2752ce78d9185b6a3869732b
+  - artifact: absent:openspec/integrations/openharmony/supervisor-observation-probes.yaml
+    commit: d029cc4ebb9b91c647e904d943a65bef5ee95001
+  - artifact: absent:Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Probes/SupervisorObservation/1.0.0
+    commit: d029cc4ebb9b91c647e904d943a65bef5ee95001
+  - artifact: absent:Packages/ArkDeckKit/Tests/ArkDeckContractTests/HDCSupervisorObservationRegistryContractTests.swift
+    commit: d029cc4ebb9b91c647e904d943a65bef5ee95001
   ```
 - Applicable failure patterns:`AF-001`（共享 profile/lock consumer 与 allowed paths）、
   `AF-003`（accepted capture producer 与 caller boundary）、`AF-005`（evidence
   freshness/class/DEV-1）、`AF-006`（完整 OID、status/version/pin 漂移）、
   `AF-008`（hash/path/endpoint/identity adversarial matrix）、`AF-010`（绿测试未覆盖
-  header↔lock 漂移，须有 mutation-red）、`AF-013`（不得把 3.2.0d registry
-  形态直接照搬到 3.2.0f）、`AF-016`（全部 pin 从 protected main 一手重取）、
+  新 registry/resource/provenance 语义，须有独立 expected mutation-red）、
+  `AF-013`（不得把 3.2.0d registry 形态直接照搬到 3.2.0f）、
+  `AF-016`（全部 pin 从 protected main 一手重取）、
   `AF-018`（open PR/共享状态复核）
 - Production reachability:not applicable for this registration task；只登记 integration
   authority，不接 production composition root、不执行 effect
