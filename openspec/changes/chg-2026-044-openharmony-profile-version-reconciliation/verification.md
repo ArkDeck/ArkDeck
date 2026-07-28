@@ -1,7 +1,7 @@
 # CHG-2026-044 Verification Plan
 
 > Change:CHG-2026-044-openharmony-profile-version-reconciliation@r1
-> Status:planned
+> Status:passed # 2026-07-28；三条 AC 与完整交付链见 proposal.md「Verification closure」；仅在维护者 review/merge 本 verification-only PR 后生效
 > Core baseline:CORE-2.1.0（canonical Core AC 零认领）
 
 ## Environment
@@ -74,7 +74,12 @@ implementation PR 中静默扩大范围。
 
 ## Result gate
 
-- [ ] 三条 change-local AC 均有 same-revision、可复查 host-only evidence。
-- [ ] proposal/approval/readiness/implementation/done/verified PR boundary 保持分离。
-- [ ] forbidden-path pins 与外部 dispatch 0 均有明确记录。
-- [ ] change `verified` 由独立状态 PR 引用具体 run；随后 HSO 仍走 fresh readiness。
+- [x] 三条 change-local AC 均有 same-revision、可复查 host-only evidence。
+- [x] proposal/approval/readiness/implementation/done/verified PR boundary 保持分离。
+- [x] forbidden-path pins 与外部 dispatch 0 均有明确记录。
+- [x] change `verified` 由独立状态 PR 引用具体 run；随后 HSO 仍走 fresh readiness。
+
+Closure receipt:`proposal.md#verification-closure2026-07-28`；verification base =
+protected main `38f0d4514ad16d9fe040fbd083d6e2f1a72e30f4`；revalidated
+`2026-07-28T14:58:12Z`。本文件的 `passed` 与 proposal 的 `verified` 只在维护者
+review/merge 本独立状态 PR 后生效；本 closure 不修改或执行 CHG-2026-043。
