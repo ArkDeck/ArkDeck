@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-043-hdc-320f-supervisor-observation
 revision: 1
-status: proposed
+status: approved # 2026-07-28 本 approval-only PR；r1 proposal 经 #737 合入 main `84728f1d16eb3dcd07fd869bee835b3d2397f118`；批准仅由维护者 review/merge 本 PR 生效
 class: integration
 core_change_level: none
 owner: lvye
@@ -138,3 +138,31 @@ or overwrite a concurrent version.
 implementation/evidence 与 `ready→done` 各自独立；然后才能对依赖它的
 `TASK-HSO-002` 走独立 readiness（D1）。本 change 全部 AC 通过后的 `verified`
 翻转，以及 CHG-2026-006 `TASK-M0B-002` 的新一轮 readiness，也都必须使用独立 PR。
+
+## Approval
+
+- r1 proposal 经 PR #737 合入 protected main（squash
+  `84728f1d16eb3dcd07fd869bee835b3d2397f118`，`status: proposed`）；维护者
+  `lvye` 对 exact head `77efc7c078ae66c7465ae35f9feb1d6cfce0dbce` 的 review
+  状态为 `APPROVED`。
+- 正式批准：仅在维护者 review/merge 本 approval-only PR 后，本 change 的
+  `status: approved` 才生效。该 D1 merge 表示维护者接受以下封闭范围：
+  - **任务顺序**：`TASK-HSO-001` 先登记独立 exact 3.2.0f commandless supervisor
+    identity authority；只有它经独立 implementation/evidence 与 `done` PR 合入后，
+    `TASK-HSO-002` 才可进入自己的 readiness 并接 production；
+  - **authority 与 composition 边界**：`serverIdentityGeneration` 仅允许
+    `platformProcessObservation`、空 argv、不可调用；同一 production-selected
+    candidate/endpoint 同时进入 supervisor 与既有 device route，不允许第二候选、
+    fallback、跨版本事实拼接或 caller-supplied receipt/generation；
+  - **语义与 effect 边界**：3.2.0f 不登记或推断 `checkserver`、`hdc -v`、health
+    或 client/server/daemon version；既有 3.2.0d readonly 与 3.2.0f device
+    registries/resources 保持独立且 byte-identical；identity bootstrap 的 HDC child
+    与 lifecycle/adoption/subserver/device/binding/destructive dispatch 全部为 0；
+  - **provenance 与验收边界**：CHG-2026-024 #656/#658 evidence 能否支撑新 family
+    仍由 `TASK-HSO-001` readiness 独立判断，不足即保持 blocked；四条 `HSO-*`
+    change-local AC、canonical Core AC 零认领、Core baseline 不升版，macOS mapping
+    不产生 conformance transition。
+- 本批准不执行 task、不接受 provenance 充分性、不固定 readiness pins，也不构成
+  HDC/设备/hardware/support/release evidence。两个 task 继续保持 `blocked`；
+  `TASK-HSO-001` 须下一独立 D1 readiness PR，`TASK-HSO-002` 仍受前者 `done` 门阻塞；
+  CHG-2026-006 `TASK-M0B-002` 不因本批准自动 ready。
