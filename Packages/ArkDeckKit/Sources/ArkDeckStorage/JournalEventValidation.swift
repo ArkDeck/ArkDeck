@@ -85,6 +85,8 @@ enum JournalEventSemanticValidator {
         baseKeys, optional: ["authorizationRef", "usageReservationId"])
     }
     try event.payload.requireEnum("executionMode", ["execute", "planOnly", "simulated"])
+    let executionMode = try event.payload.requiredString(
+      "executionMode", context: "jobCreated")
     let authority = try event.payload.requiredString("executionAuthority", context: "jobCreated")
     let allowedAuthorities: Set<String> = [
       "interactiveUser", "standardAgent", "controlledHardwareLab", "authorizedAgent",
@@ -94,7 +96,17 @@ enum JournalEventSemanticValidator {
         || authority != "authorizedAgent"
     else { throw payload(event, "executionAuthority is not supported by this schemaVersion") }
     if authority == "authorizedAgent" {
-      _ = try event.requiredAuthorizationCorrelation(context: "jobCreated")
+      guard
+        !JournalEvent.usesAgentAuthorityUnion(event.schemaVersion)
+          || executionMode == "execute"
+      else {
+        throw payload(event, "schemaVersion 2.2.0 authorizedAgent requires execute mode")
+      }
+      if JournalEvent.usesAgentAuthorityUnion(event.schemaVersion) {
+        _ = try event.requiredAgentAuthorizationCorrelation(context: "jobCreated")
+      } else {
+        _ = try event.requiredAuthorizationCorrelation(context: "jobCreated")
+      }
     } else if event.payload["authorizationRef"] != nil
       || event.payload["usageReservationId"] != nil
     {
@@ -152,7 +164,8 @@ enum JournalEventSemanticValidator {
     try validateTarget(
       targetValue, bindingRequirement: step.bindingRequirement,
       bindingRevision: event.bindingRevision, event: event)
-    try event.validateOptionalAuthorizationCorrelation(context: "stepIntent")
+    try event.validateOptionalAuthorizationCorrelation(
+      context: "stepIntent", effect: step.effect)
   }
 
   private static func validateStepOutcome(_ event: JournalEvent) throws {
@@ -168,12 +181,15 @@ enum JournalEventSemanticValidator {
     try event.payload.requireEnum("outcomeCertainty", ["confirmed", "outcomeUnknown"])
     try event.payload.validateNullableString("semanticCode", context: "stepOutcome")
     try event.payload.validateNullableString("summary", context: "stepOutcome")
-    try event.validateOptionalAuthorizationCorrelation(context: "stepOutcome")
+    try event.validateOptionalAuthorizationCorrelation(context: "stepOutcome", effect: nil)
   }
 
   private static func validateCompensationIntent(_ event: JournalEvent) throws {
     try event.requireStepEnvelope(requiresArgumentsHash: true)
-    try event.payload.requireKeys(["compensationOfStepId", "descriptor", "target"])
+    try event.payload.requireKeys(
+      ["compensationOfStepId", "descriptor", "target"],
+      optional: JournalEvent.supportsAuthorizationCorrelation(event.schemaVersion)
+        ? ["authorizationRef", "usageReservationId"] : [])
     _ = try event.payload.requiredNonemptyString(
       "compensationOfStepId", context: "compensationIntent")
     guard let descriptorValue = event.payload["descriptor"],
@@ -197,6 +213,8 @@ enum JournalEventSemanticValidator {
     try validateTarget(
       targetValue, bindingRequirement: descriptor.bindingRequirement,
       bindingRevision: event.bindingRevision, event: event)
+    try event.validateOptionalAuthorizationCorrelation(
+      context: "compensationIntent", effect: descriptor.effect)
   }
 
   private static func validateCompensationOutcome(_ event: JournalEvent) throws {
@@ -205,7 +223,10 @@ enum JournalEventSemanticValidator {
       [
         "compensationOfStepId", "descriptorId", "correlatesToIntentEventId", "result",
         "outcomeCertainty",
-      ], optional: ["semanticCode", "summary"])
+      ],
+      optional: JournalEvent.supportsAuthorizationCorrelation(event.schemaVersion)
+        ? ["semanticCode", "summary", "authorizationRef", "usageReservationId"]
+        : ["semanticCode", "summary"])
     _ = try event.payload.requiredNonemptyString(
       "compensationOfStepId", context: "compensationOutcome")
     let descriptorID = try event.payload.requiredNonemptyString(
@@ -219,6 +240,8 @@ enum JournalEventSemanticValidator {
     try event.payload.requireEnum("outcomeCertainty", ["confirmed", "outcomeUnknown"])
     try event.payload.validateNullableString("semanticCode", context: "compensationOutcome")
     try event.payload.validateNullableString("summary", context: "compensationOutcome")
+    try event.validateOptionalAuthorizationCorrelation(
+      context: "compensationOutcome", effect: nil)
   }
 
   private static func validateBindingCandidate(_ event: JournalEvent) throws {
@@ -522,9 +545,68 @@ extension JournalEvent {
     return (reference, reservationID)
   }
 
-  fileprivate func validateOptionalAuthorizationCorrelation(context: String) throws {
+  fileprivate func requiredAgentAuthorizationCorrelation(
+    context: String
+  ) throws -> (AgentExecutionAuthorityReference, String?) {
+    guard let value = payload["authorizationRef"] else {
+      throw JournalEventValidationError.malformedPayload(
+        kind: kind, detail: "\(context) is missing authorizationRef")
+    }
+    let reference: AgentExecutionAuthorityReference
+    do {
+      reference = try AgentExecutionAuthorityReference(
+        jsonValue: value, context: "\(context).authorizationRef")
+    } catch {
+      throw JournalEventValidationError.malformedPayload(
+        kind: kind, detail: "\(context) authorizationRef is malformed")
+    }
+    let reservationID: String?
+    if let value = payload["usageReservationId"] {
+      guard case .string(let candidate) = value,
+        candidate.matches("^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
+      else {
+        throw JournalEventValidationError.malformedPayload(
+          kind: kind, detail: "\(context) usageReservationId is malformed")
+      }
+      reservationID = candidate
+    } else {
+      reservationID = nil
+    }
+    switch reference.kind {
+    case .readyTask:
+      guard reservationID == nil else {
+        throw JournalEventValidationError.malformedPayload(
+          kind: kind, detail: "\(context) readyTask cannot carry usageReservationId")
+      }
+    case .deviceCapability, .standingAuthorization:
+      guard reservationID != nil else {
+        throw JournalEventValidationError.malformedPayload(
+          kind: kind, detail: "\(context) is missing usageReservationId")
+      }
+    }
+    return (reference, reservationID)
+  }
+
+  fileprivate func validateOptionalAuthorizationCorrelation(
+    context: String,
+    effect: WorkflowEffect?
+  ) throws {
     let hasReference = payload["authorizationRef"] != nil
     let hasReservation = payload["usageReservationId"] != nil
+    if Self.usesAgentAuthorityUnion(schemaVersion) {
+      guard hasReference || !hasReservation else {
+        throw JournalEventValidationError.malformedPayload(
+          kind: kind, detail: "\(context) authorization correlation is incomplete")
+      }
+      if hasReference {
+        let (reference, _) = try requiredAgentAuthorizationCorrelation(context: context)
+        if let effect, reference.effect < effect {
+          throw JournalEventValidationError.malformedPayload(
+            kind: kind, detail: "\(context) authorization effect is below the operation")
+        }
+      }
+      return
+    }
     guard hasReference == hasReservation else {
       throw JournalEventValidationError.malformedPayload(
         kind: kind, detail: "\(context) authorization correlation is incomplete")
