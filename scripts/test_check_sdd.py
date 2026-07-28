@@ -660,6 +660,266 @@ class DuplicateCapabilityIdsAreReported(unittest.TestCase):
         self.assertFalse(any("duplicate capability id" in e for e in errors))
 
 
+class IntegrationProfileHeaderLockTests(unittest.TestCase):
+    PROFILE_PATH = "openspec/integrations/fixture/profile.md"
+
+    @staticmethod
+    def profile(
+        profile_id: str = "OPENHARMONY-TOOLS",
+        version: str = "0.5.0",
+        colon: str = "：",
+    ) -> str:
+        return (
+            "# Fixture Integration Profile\n\n"
+            f"> ID{colon}{profile_id}  \n"
+            f"> Version{colon}{version}  \n"
+            "> Status：fixture\n\n"
+            "Body version hints are not metadata.\n"
+        )
+
+    def lock(self, **overrides):
+        entry = {
+            "id": "OPENHARMONY-TOOLS",
+            "version": "0.5.0",
+            "path": self.PROFILE_PATH,
+        }
+        entry.update(overrides)
+        return {"profiles": [entry], "catalogs": []}
+
+    def errors_for(
+        self,
+        lock,
+        profiles: dict[str, str | bytes] | None = None,
+        *,
+        core_count: int = 0,
+    ) -> list[str]:
+        profiles = profiles or {self.PROFILE_PATH: self.profile()}
+        with tempfile.TemporaryDirectory(prefix="check-sdd-profile-lock-") as raw:
+            repo = Path(raw)
+            openspec = repo / "openspec"
+            (openspec / "platforms").mkdir(parents=True)
+            (openspec / "integrations").mkdir(parents=True)
+            (openspec / "verification").mkdir(parents=True)
+            (openspec / "platforms" / "PLATFORM-PROFILES.lock.yaml").write_text(
+                "profiles: []\ncatalogs: []\n", encoding="utf-8"
+            )
+            lock_text = lock if isinstance(lock, str) else yaml.safe_dump(
+                lock, sort_keys=False
+            )
+            (
+                openspec / "integrations" / "INTEGRATION-PROFILES.lock.yaml"
+            ).write_text(lock_text, encoding="utf-8")
+            (
+                openspec / "verification" / "core-conformance.yaml"
+            ).write_text(
+                yaml.safe_dump(
+                    {
+                        "acceptance_index": {"count": core_count},
+                        "acceptance_cases": {},
+                        "safety_coverage": [],
+                        "shared_inputs": {},
+                    },
+                    sort_keys=False,
+                ),
+                encoding="utf-8",
+            )
+            for relative, content in profiles.items():
+                path = repo / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                if isinstance(content, bytes):
+                    path.write_bytes(content)
+                else:
+                    path.write_text(content, encoding="utf-8")
+
+            saved_repo, saved_openspec = check_sdd.REPO, check_sdd.OPENSPEC
+            saved_errors = list(check_sdd.errors)
+            check_sdd.errors.clear()
+            check_sdd.REPO, check_sdd.OPENSPEC = repo, openspec
+            try:
+                check_sdd.check_locks_and_conformance(set())
+                result = list(check_sdd.errors)
+            finally:
+                check_sdd.REPO, check_sdd.OPENSPEC = saved_repo, saved_openspec
+                check_sdd.errors[:] = saved_errors
+            return result
+
+    def test_clean_full_width_and_ascii_colon_controls_are_green(self):
+        for colon in ("：", ":"):
+            with self.subTest(colon=colon):
+                errors = self.errors_for(
+                    self.lock(),
+                    {self.PROFILE_PATH: self.profile(colon=colon)},
+                )
+                self.assertEqual(errors, [])
+
+    def test_version_and_id_mutations_are_red_then_version_restores_green(self):
+        version_errors = self.errors_for(
+            self.lock(),
+            {self.PROFILE_PATH: self.profile(version="0.4.0")},
+        )
+        self.assertTrue(
+            any(
+                "version '0.5.0' does not match profile metadata Version '0.4.0'"
+                in error
+                for error in version_errors
+            )
+        )
+        id_errors = self.errors_for(
+            self.lock(),
+            {self.PROFILE_PATH: self.profile(profile_id="WRONG-PROFILE")},
+        )
+        self.assertTrue(
+            any(
+                "id 'OPENHARMONY-TOOLS' does not match profile metadata "
+                "ID 'WRONG-PROFILE'" in error
+                for error in id_errors
+            )
+        )
+        self.assertEqual(self.errors_for(self.lock()), [])
+
+    def test_missing_duplicate_and_empty_metadata_fail_closed(self):
+        cases = {
+            "missing ID": (
+                "# Fixture\n\n> Version：0.5.0\n",
+                "metadata ID must appear exactly once",
+            ),
+            "missing Version": (
+                "# Fixture\n\n> ID：OPENHARMONY-TOOLS\n",
+                "metadata Version must appear exactly once",
+            ),
+            "duplicate ID": (
+                "# Fixture\n\n> ID：OPENHARMONY-TOOLS\n"
+                "> ID: OPENHARMONY-TOOLS\n> Version：0.5.0\n",
+                "metadata ID must appear exactly once",
+            ),
+            "duplicate Version": (
+                "# Fixture\n\n> ID：OPENHARMONY-TOOLS\n"
+                "> Version：0.5.0\n> Version: 0.5.0\n",
+                "metadata Version must appear exactly once",
+            ),
+            "empty ID": (
+                "# Fixture\n\n> ID：   \n> Version：0.5.0\n",
+                "metadata ID must be a non-empty string",
+            ),
+            "empty Version": (
+                "# Fixture\n\n> ID：OPENHARMONY-TOOLS\n> Version：   \n",
+                "metadata Version must be a non-empty string",
+            ),
+            "malformed Version key": (
+                "# Fixture\n\n> ID：OPENHARMONY-TOOLS\n"
+                "> Version note：0.5.0\n",
+                "metadata Version must appear exactly once",
+            ),
+        }
+        for name, (profile, expected) in cases.items():
+            with self.subTest(name=name):
+                errors = self.errors_for(
+                    self.lock(), {self.PROFILE_PATH: profile}
+                )
+                self.assertTrue(any(expected in error for error in errors), errors)
+
+    def test_body_and_later_blockquote_are_not_metadata_sources(self):
+        cases = {
+            "prose before block": """\
+# Fixture
+
+Body Version: 0.5.0
+
+> ID：OPENHARMONY-TOOLS
+> Version：0.5.0
+""",
+            "later block": """\
+# Fixture
+
+> ID：OPENHARMONY-TOOLS
+> Status：fixture
+
+Body Version: 0.5.0
+
+> Version：0.5.0
+""",
+        }
+        for name, profile in cases.items():
+            with self.subTest(name=name):
+                errors = self.errors_for(
+                    self.lock(), {self.PROFILE_PATH: profile}
+                )
+                if name == "prose before block":
+                    expected = "metadata block must be the first nonblank block"
+                else:
+                    expected = "metadata Version must appear exactly once"
+                self.assertTrue(any(expected in error for error in errors), errors)
+
+    def test_lock_entry_shape_and_field_types_fail_closed(self):
+        cases = {
+            "non-mapping": (
+                {"profiles": ["not-a-mapping"], "catalogs": []},
+                "profiles[0] must be a mapping",
+            ),
+            "id type": (
+                self.lock(id=7),
+                "profiles[0].id must be a non-empty string",
+            ),
+            "version type": (
+                self.lock(version=[]),
+                "profiles[0].version must be a non-empty string",
+            ),
+            "path type": (
+                self.lock(path=None),
+                "profiles[0].path must be a non-empty string",
+            ),
+            "empty id": (
+                self.lock(id="  "),
+                "profiles[0].id must be a non-empty string",
+            ),
+        }
+        for name, (lock, expected) in cases.items():
+            with self.subTest(name=name):
+                errors = self.errors_for(lock)
+                self.assertTrue(any(expected in error for error in errors), errors)
+
+    def test_duplicate_id_and_path_are_each_rejected(self):
+        first = self.lock()["profiles"][0]
+        second = dict(first)
+        errors = self.errors_for(
+            {"profiles": [first, second], "catalogs": []}
+        )
+        self.assertTrue(any("profiles[1].id duplicates profiles[0].id" in e for e in errors))
+        self.assertTrue(
+            any("profiles[1].path duplicates profiles[0].path" in e for e in errors)
+        )
+
+    def test_missing_non_markdown_and_unreadable_paths_are_rejected(self):
+        missing = self.errors_for(self.lock(path="openspec/integrations/missing.md"))
+        self.assertTrue(any(".path is missing" in error for error in missing))
+
+        text_path = "openspec/integrations/fixture/profile.txt"
+        non_markdown = self.errors_for(
+            self.lock(path=text_path),
+            {text_path: self.profile()},
+        )
+        self.assertTrue(
+            any(".path must reference Markdown" in error for error in non_markdown)
+        )
+
+        unreadable = self.errors_for(
+            self.lock(),
+            {self.PROFILE_PATH: b"\xff\xfe"},
+        )
+        self.assertTrue(
+            any("profile Markdown is not readable UTF-8" in error for error in unreadable)
+        )
+
+    def test_bad_profile_does_not_suppress_independent_conformance_error(self):
+        errors = self.errors_for(
+            self.lock(),
+            {self.PROFILE_PATH: self.profile(version="0.4.0")},
+            core_count=1,
+        )
+        self.assertTrue(any("does not match profile metadata Version" in e for e in errors))
+        self.assertTrue(any("acceptance count 1 != actual 0" in e for e in errors))
+
+
 class PresentButNullFieldsDoNotCrashTheRun(unittest.TestCase):
     """A-M4. `data.get(k, [])` returns None for a key present with a null
     value, so `None + []` and `for x in None` aborted the whole run at the
