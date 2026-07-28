@@ -1,7 +1,7 @@
 # CHG-2026-042 Verification Plan
 
 > Change:CHG-2026-042-tasks-field-colon-parity@r2
-> Status:planned
+> Status:passed # 2026-07-28；三条 AC 与 merge/revalidation OID 见 proposal.md「Verification closure」；仅在维护者 review/merge 本独立 verification-closure PR 后生效
 > Core baseline:CORE-2.1.0（零 Core 变更；canonical Core AC 零认领）
 
 验收面全部 change-local。核心判据不是“正则改成了 `[:：]`”，而是两个生产
@@ -49,8 +49,13 @@
 
 ## Result gate
 
-- [ ] 三条 change-local AC 全部 passed 且 evidence 可复查
-- [ ] candidate-set 扩张逐项解释，零 lost、零未登记 gained
-- [ ] 变异门三项全被击杀，负对照存活
-- [ ] 任务实现 PR、done 翻转 PR、change verify PR 保持分离
-- [ ] 未把 proposal/CI 通过解释为 approval、ready、done 或 verified
+- [x] 三条 change-local AC 全部 passed 且 evidence 可复查
+- [x] candidate-set 扩张逐项解释，零 lost、零未登记 gained
+- [x] 变异门三项全被击杀，负对照存活
+- [x] 任务实现 PR、done 翻转 PR、change verify PR 保持分离
+- [x] 未把 proposal/CI 通过解释为 approval、ready、done 或 verified
+
+Closure receipt:`proposal.md#verification-closure2026-07-28`；verification
+base = protected main `7b05ccdaea47acc647ba235c630c3899a952c9c3`；
+revalidated `2026-07-28T09:09:12Z`。本文件的 `passed` 与 proposal 的
+`verified` 只在维护者 review/merge 本独立状态 PR 后生效。
