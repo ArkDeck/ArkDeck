@@ -218,6 +218,95 @@ change approved 前保持 blocked;approved 后每任务另需独立 readiness PR
   (change 目录)零文件交集,可并行;三 readiness PR 同改本 tasks.md 不同段,
   后合者如冲突需 rebase(#255/#256 先例)。
 
+### Defect record(2026-07-28,done 后发现;done 历史与 evidence 不改写)
+
+- 缺陷定性:production composition 与 hash pin **不一致**(接线缺陷),非授权门
+  语义回退——AC-FLASH-015-01/02 的 fail-closed 行为、本任务 done 结论与 evidence
+  均保持原状,不据此重开本任务;修复由下方新增 remediation 任务
+  **TASK-AIN-003R** 承载(TASK-AIN-004 Forbidden paths 条款「实现已冻结,发现
+  缺陷回 TASK-AIN-003」的落点;形态先例 = 本 change r2 security remediation 的
+  「done 历史不改写、新任务闭缺口」,及 TASK-BRC-002R/TASK-SSET-001R)。
+- 证据正本 = #676(merge `d17d303714257a6551c8630a460a61f4b2917d1a`)合入的本
+  change `evidence/host-prerequisites/installation-runbook.md` §8 第 3 条(源码
+  行级)。全部行号已于 2026-07-28 在 main `d17d303` 逐处复核成立
+  (`Packages/ArkDeckKit/Sources/ArkDeckWorkflows/` 自 runbook base
+  `6383f5b9e8c61e61c798ee7f7cf09035faff2a3d` 起 rev-list 0 commit,零漂移;
+  下记 Host/Discovery/Facts 分别 =
+  该目录下 `RockchipFlashExecutionHost.swift` / `RockchipDeviceDiscovery.swift` /
+  `RockchipAuthorizationFacts.swift`):
+  - `RockchipProductionAdmissionPort.admit`(Host:1026)把声明为
+    `pinnedProduction`(`executableSHA256` = `038a8a0e…3611`,声明处
+    Host:800–806,pin 定义 Discovery:22–29)的 `settings.tool` 交给缺省
+    `RockchipDeviceDiscoveryAdapter()`(Host:1039);
+  - 缺省 init 钉的是 `pinnedReadOnlyDiscovery`(`bbd7bdc0…9923`,
+    Discovery:542–544,pin 定义 Discovery:9–17;类注释 Discovery:4–6 明言
+    destructive 身份不被缺省 adapter 接受);
+  - 声明性 hash 门 `tool.sha256 == profile.executableSHA256`
+    (Discovery:570–572)比较的即上述两个编译期常量,**恒不等** →
+    `executableHashMismatch` → admission 于
+    `toolOrDeviceObservationUnavailable`(Facts:140–143)fail closed:宿主
+    前置装得再全,E2 admission 也结构性不可达;
+  - 反向同样堵死:改用 bbd7 实体过不了 Facts:340、345–352 的
+    `pinnedProduction` 断言(prepare 期 Host:196–200 同 pin)——两头恒拒。
+- 影响边界:仅堵死 E2(admission→dispatch)面的真机可达性
+  (AC-FLASH-015-03 realHardware 面,归 TASK-AIN-004);E0 只读面不经该
+  composition,不受影响(runbook §8 边界记录)。
+
+## TASK-AIN-003R — production composition 的 discovery profile hash-pin 一致性(remediation)
+
+- Status:blocked（前置:本登记合入后另起独立 readiness PR;Depends on 的
+  TASK-AIN-003 done 已满足。本登记 PR 零实现、不触碰 `Packages/**`）
+- Platform:macos
+- Requirements:REQ-FLASH-015(MODIFIED)
+- Acceptance:change-local AIN-COMP-001(登记于 verification.md Acceptance
+  matrix;AC-FLASH-015-01/02 行为不回退是其负向底线)
+- Depends on:TASK-AIN-003(done,#292/#293;缺陷见其 Defect record)+ 独立
+  readiness
+- Allowed paths:
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipFlashExecutionHost.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipDeviceDiscovery.swift`
+  - `Packages/ArkDeckKit/Tests/**`
+  - 本 change `tasks.md`（仅本任务段的状态/pins/evidence 引用）
+  - 本 change `evidence/runs/TASK-AIN-003R/**`
+- Forbidden paths:
+  - `openspec/specs/**`
+  - `openspec/contracts/**`
+  - `scripts/**`
+- Risk:medium（production composition 接线与契约测试;零授权门语义变更、零设备
+  effect、零新能力）
+- Hardware required:no
+
+### Deliverables
+
+- Objective:使 production composition 的 discovery adapter 与 `pinnedProduction`
+  tool 的 hash pin 一致——admission 期 adapter 所持 profile 的 `executableSHA256`
+  必须与 `RockchipAuthorizationFacts` 断言的
+  `038a8a0ea26ef7eb77451789f310c0c9fbeaf43a78af1d6146e02311a9c23611` 为同一
+  pin(修 composition 或显式注入正确 profile,方向由独立 readiness 钉定,本段
+  不预设实现方案;缺陷正本 = TASK-AIN-003 Defect record 与 runbook §8 第 3 条);
+- composition/hash-pin 一致性 contract test(正向)+ 错误 profile 注入
+  fail-closed contract test(负向,real-fault 注入,TR-002R 先例);
+- `evidence/runs/TASK-AIN-003R/` run 记录(全量测试基线对比)。
+
+### Verification
+
+- 正向(二值):契约测试证明 composition 处 adapter 的 profile hash ==
+  `RockchipAuthorizationFacts` 的 `pinnedProduction` 断言(Facts:340/349 同一
+  常量)→ PASS;
+- 负向(二值):错误 profile 注入必须 fail closed(`executableHashMismatch` →
+  `toolOrDeviceObservationUnavailable` 语义保持),且不放宽任何既有 admission 门
+  (015-01/02 无授权/不匹配 → dispatch=0 逐字保持);
+- 零其他语义变更;Swift 全量基线零回归(不低于 AIN-004 r3 基线 400 tests /
+  1 skipped / 0 failures)。
+
+### Notes / handoff
+
+- 本任务 done 前,TASK-AIN-004 的 E2 面不可达(其 r4 前置清单第 7 条);E0 面
+  不受本缺陷约束(DEC-012 判 (a),#670;runbook §8 边界记录)。
+- 独立 readiness 须以当时 main 钉定待改文件 blob(全 OID)与实现方向,并复核
+  缺陷仍在——若届时上游已另行修复,如实记录并按实况处置,不重复实现。
+- Decision-Grade 行由维护者亲笔(TASK-BRC-002R 先例)。
+
 ## TASK-AIN-004 — 首次无人值守真机验收(DAYU200)
 
 - Status:blocked（r2 security review 发现 P0-AUTH/FACT/DISPATCH/CONTRACT 缺口；#296
@@ -435,6 +524,13 @@ D-1/D-2/D-3 三项阻断全部未闭合。r4(翻 `ready` + 授权设备窗口)�
    基线(0/0/111、400 tests 0 failures、15/15);
 6. 新载体 `AUTH-2026-025-DAYU200-002.json` 经 `github-actions[bot]` 作者、`lvye` 对
    exact head approve 并 merge,`carrier` 字段由 PENDING 改为该 PR 引用。
+7. (2026-07-28 增补)TASK-AIN-003R done:#676 runbook §8 第 3 条实测发现
+   production composition 把 `pinnedProduction`(`038a8a0e…`)tool 交给缺省
+   adapter(钉 `bbd7bdc0…`),声明性 hash 门恒不等,E2 admission 结构性 fail
+   closed(缺陷正本与行级证据 = TASK-AIN-003「Defect record」)。本条仅约束
+   E2 面:E2 执行前 TASK-AIN-003R 必须 done;仅含 E0 面的 r4 不被本条阻断——
+   E0 不经该 composition(runbook §8 边界记录),agent CLI 面适用性已由
+   DEC-012 判 (a) 界定(#670)。
 
 ### Historical readiness pins(r1 host-complete,2026-07-22; superseded)
 
