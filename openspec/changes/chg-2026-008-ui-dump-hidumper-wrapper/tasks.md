@@ -446,6 +446,10 @@ R2 decision 与 R2→R4 seam 两个串行任务,共 8 个;r11 因 R2 negative de
 - Status:blocked(r11 只登记本任务;等待 r11 合入后的独立 readiness PR 固定
   implementation base、closed files、诊断输出 schema 与 exact host CLI。本治理 PR 不含
   实现/fixture/evidence,不执行诊断,Agent controlled-raw read count 保持 `0`)
+- Allowed paths（readiness/status 载体面；实现面见 Candidate allowed paths）：
+  - 本 change `tasks.md`（仅本 task 段的 readiness/status 更新）
+  - 本 change `acceptance-cases.yaml`（仅 `INT-UD-R2-DIAG-001` 登记）
+  - 本 change `verification.md`（仅本 task 对应 verification 行）
 - Objective:在任何复活分支被授权之前判定 `TASK-UD-R2-DECISION-001` truthful-negative
   的根因。已固定事实(#248/#263):`uidump-derived-redaction-v1` 对 R2 sidecar exact raw
   origin(`866256` bytes,SHA-256
@@ -524,6 +528,9 @@ R2 decision 与 R2→R4 seam 两个串行任务,共 8 个;r11 因 R2 negative de
 
 - Status:blocked(等待 `TASK-UD-R2-DECISION-001` positive done 与独立 readiness PR;当前
   `scripts/ud_capture/` closed allowlist 明确不含 R4,不得提前修改或 dispatch)
+- Allowed paths（readiness/status 载体面；实现面见 Candidate allowed paths）：
+  - 本 change `tasks.md`（仅本 task 段的 readiness/status 更新）
+  - 本 change `verification.md`（仅本 task 对应 verification 行的 status 同步）
 - Objective:依 approved R2 decision 实现 stdlib-only host selector 与 capture-harness R4
   typed seam:从每次 Phase B fresh R2 raw 产生 repository-external private selection bundle,
   再由 harness 通过 path + expected SHA-256 的 typed reference 验证 decision/session/
