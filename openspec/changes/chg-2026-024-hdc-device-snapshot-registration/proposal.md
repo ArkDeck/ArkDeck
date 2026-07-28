@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-024-hdc-device-snapshot-registration
 revision: 6
-status: approved # r1 经 approval-only PR #273 合入 main `1eeb516`；r2 仅固定 human-controlled capture execution plan，须由维护者 review/merge 对应治理 PR 后生效
+status: verified # 2026-07-28 本 verification-closure PR；closure 段见文末
 class: integration
 core_change_level: none
 owner: lvye
@@ -228,3 +228,47 @@ r5 把 AC 重定义推迟到实测之后。两次窗口的 evidence（#656 merge
 
 零新增任务、零 scope 扩张、不触碰工具选择与既有 pin；TASK-I24-001 仍 `blocked`
 （其 readiness 为下一步）。
+
+## Verification closure（2026-07-28）
+
+单任务 TASK-I24-001 done 于 protected main 在案；五条 change-local AC 的证据
+可复查。本 PR 仅状态翻转 + 引用，零实现夹带（先例 #224/#239/#570/#601）。
+
+- **任务链（十四 merge）**：propose #272 `cdfc181f`；approval #273
+  `1eeb5168`；capture plan r2 #275 `c8d9ba27`、r3 #624 `46ebcc22`、
+  (D-2) instrument 决策 #626 `36af5533`、r4 #651 `180367fc`、r5 #657
+  `98d1f885`、r6 #659 `6e45a224`；capture evidence #656 `af6d64d6`（session
+  #1，S0+C0–C5）与 #658 `6df25c25`（V0 virgin server）；readiness r1 #662
+  `88465abc` 与 r2 #663 `04afc7cf`；实现 #664 `ffca996f`；done #665（本
+  closure 之前的独立 flip PR）。
+- **`I24-HDC-DEVICE-SNAPSHOT-001` = PASS**：注册文法闭合有界（制表 5 列、
+  transport/state/hostTag 闭合字面量集、LF 与 CRLF 双终止符、字段禁残留
+  `CR`）；zero（两形态）/one/many/order/duplicate/adversarial 由 12 个合成
+  向量与 13 条契约测试逐项覆盖；无部分集合。
+- **`I24-HDC-DEVICE-EMPTY-001` = PASS**（r6 定义）：`observedEmpty` = 零
+  `Connected` 行，marker 行与全 `Offline` 行集双形态命中；`[Empty]` 带残留
+  `CR`、零字节 stdout 均判非空；10 条非 stdout 控制（stderr/非零/截断/
+  timeout/cancel/server 缺席/endpoint 漂移/身份漂移/编码非法）无一产生
+  empty 或消失事件。
+- **`I24-HDC-DEVICE-PROVENANCE-001` = PASS**：两次受控采集的来源哈希、工具
+  身份与稳定 server 括号在案，raw 全留仓外，`repositoryGoldenFixture:
+  false`。受理含 r1 记录的 DEV-1 裁定（括号 4 次而非逐调用，理由与接受方式
+  写在 r1，维护者以 merge 裁定）。
+- **`I24-HDC-DEVICE-REGISTRY-001` = PASS**：profile `OPENHARMONY-TOOLS@0.5.0`
+  / registry `@1.0.0` / lock `INTEGRATION-PROFILES-0.6.0` / resource 清单 /
+  macOS mapping 版本与 hash 闭合一致；旧 `readonly-probes.yaml` 与
+  `Probes/1.0.0/**` invariant 逐字节未变，旧消费者零新增权威。
+- **`I24-HDC-DEVICE-NODISPATCH-001` = PASS**：注册与 Agent/CI 侧 installed
+  HDC / device / network / server lifecycle / adoption / subserver / device
+  mutation / destructive dispatch **全为 0**；窗口内的全部 HDC 调用均由
+  operator 亲手经受控 harness 发出。
+- **工具版本差异已登记**：本 family 观测自 hdc `3.2.0f`，与 readonly-probes /
+  trace-probes / hardware-matrix 登记的 `3.2.0d` 非同一工具；条目 id 携版本
+  且有测试禁止混编（(D-2) 义务履行）。
+- **遗留（不阻 verified，如实带入 archive）**：canonical registry 与 bundled
+  副本的字节一致守卫无自动化，其载体属 `scripts/**`（本 change 未授权）；
+  当前由 lock 相邻两个 SHA-256 与 review 兜底，建议下次授权 `scripts/**`
+  时补齐（与 HDC/Trace 同族既有遗留同型）。
+- **不声称**：CHG-2026-022 消费侧的 cadence/fan-out/presentation 仍在其自身
+  readiness 之后；本 change 不实现也不批准该消费者。
+
