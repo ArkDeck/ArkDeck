@@ -319,17 +319,54 @@ Open question 不得以聊天记忆留存。每项记录默认决策、阻塞范
 
 ## DEC-012 DEC-011/ADR-0003 是否覆盖 agent 无人值守 CLI 的 Rockchip execute
 
-- Status：**open（待 owner 裁决）**。本条只登记问题、双方原文与影响面,**不含结论**;
-  合并本 PR = 登记该 open question,**不**构成任何裁决。裁决另起独立 decision PR
-  (先例:登记 evidence input ≠ gap 关闭 ≠ decided,三者各自载体)。
+- Status：decided（2026-07-28;裁决 = **读法 (a)**,由维护者作出;裁决效力由维护者
+  review/merge 本 decision PR 构成——merge 即 attestation,V2 治理,先例
+  DEC-001/002/004/006。问题于 2026-07-27 经 #661 登记;该登记载体明示「登记 ≠ 裁决、
+  裁决另起独立 decision PR」,本 PR 即该独立裁决载体）
 - Owner：product/platform owner
 - Raised：2026-07-27,起草 CHG-2026-025 `TASK-AIN-004` readiness r3 时发现。
-- Question：DEC-011/ADR-0003 的「任一 gate 未满足,Rockchip execute 保持 blocked」
-  是否覆盖 **CHG-2026-025 的 agent 无人值守 CLI 执行面**(`arkdeck` → `ArkDeckCLI`
-  → `RockchipFlashExecutionHost`),还是只覆盖 **Sandboxed macOS App** 的 execute 面?
-- 为何现在必须回答：`TASK-AIN-004`(首次无人值守真机验收,D2 destructive)的 E2 面
-  能否走 r4 完全取决于此。r3 已把全部 host 可测量事实重钉完毕并保持 blocked;本条不
-  裁决,r4 不得起草。
+- Question（历史）：DEC-011/ADR-0003 的「任一 gate 未满足,Rockchip execute 保持
+  blocked」是否覆盖 **CHG-2026-025 的 agent 无人值守 CLI 执行面**(`arkdeck` →
+  `ArkDeckCLI` → `RockchipFlashExecutionHost`),还是只覆盖 **Sandboxed macOS App**
+  的 execute 面?
+- 为何现在必须回答（历史,r3 时点）：`TASK-AIN-004`(首次无人值守真机验收,D2
+  destructive)的 E2 面能否走 r4 完全取决于此。r3 已把全部 host 可测量事实重钉完毕
+  并保持 blocked;本条不裁决,r4 不得起草。**(2026-07-28 已回答,见下 Decision)**
+- Decision：**读法 (a)**——DEC-011/ADR-0003 的「任一 gate 未满足,Rockchip execute
+  保持 blocked」,其主语是 **Sandboxed macOS App 的 execute 面**;CHG-2026-025 的
+  agent 无人值守 CLI 执行面(`arkdeck` → `ArkDeckCLI` → `RockchipFlashExecutionHost`)
+  **不在该阻断语义之内**。DEC-011 的 Decision、gates 与 Reopen rule 在 App execute
+  面上原文继续有效——本裁决是对其既有适用范围的确认,不修改其任何条款,故不触发
+  DEC-011/ADR-0003 重开(对应下方附注)。
+- 依据（= 下方「支持『不覆盖』(读法 a)」的四项在案事实,#661 登记原文,本裁决不另
+  造论据）：CHG-2026-035 的 Why/scope 全文以 Sandboxed App 为主体(触发事实是
+  RKFUI-001G 的 signed Sandbox 文件选择器 run,候选与证据矩阵均围绕 App bundle/
+  entitlement/分发形态);ADR-0003 的 gate 清单全部是分发与签名门,与 agent 在开发
+  宿主上以 CLI 执行不构成同一威胁面;DEC-011 显式写了 CHG-2026-026 boundary 却未对
+  CHG-2026-025 作任何表述;TASK-BRC-004 的 Forbidden paths 逐字包含 ArkDeckCLI 面。
+  「支持『覆盖』(读法 b)」的四项在案事实(见下)如实保留、不因本裁决删改;其指向
+  的共用 composition root 交叉风险不视为已消除,由下方 Boundary 两项承接。
+- Boundary（对应下方「裁决无论落哪一侧都需同时给出的两项」）：
+  1. **共用 composition root 的先后与兼容**:`RockchipFlashExecutionHost` 由
+     CHG-2026-025(agent CLI 面)与 CHG-2026-036(App 面)共用;CHG-2026-036
+     `TASK-BRC-004`(status blocked,依赖同为 blocked 的 `TASK-BRC-003`)未来删除
+     production route 对 user-selected executable URL/hash/bookmark 输入时,与
+     CHG-2026-025 执行面的交叉**须在当时的 BRC-004 落地载体重判**(readiness/
+     revision),不得静默打断彼时仍依赖该输入的 CHG-2026-025 路径;本裁决不预判该
+     重判的结论,两 change 之间不设强制先后。
+  2. **AIN-004 E2 的延续**:原条目登记的三条候选延续路径(重钉工具身份/改走
+     bundled descriptor/接受一次性历史授权)保持在案,由第 1 项所述当时载体择定;
+     BRC-004 落地之前,AIN-004 现行 user-selected 路径在 CLI 面上不被 DEC-011 阻断
+     (本裁决),其今日在本机的不可达性属 r3 D-1 登记的四项宿主前置缺席,不由本条
+     处置。
+- Unblocked by this decision：CHG-2026-025 `TASK-AIN-004` 的 **E0 与 E2 面均不再被
+  ADR-0003/DEC-011 阻断**(r3 D-2 段所要求的维护者书面裁决即本条,该阻断随本 PR
+  merge 关闭;E0 面无需单独放行条款)。r4 readiness 仍须满足 r3(#660)登记的其余
+  二值前置——D-1 产品执行宿主四项前置、D-3 hdc 工具身份重钉等,以该清单原文为准,
+  本条不复述、不放宽。
+- Reopen rule：CLI 执行面进入 App bundle 分发形态、BRC-004 类载体落地使两面共享同
+  一 executable authority 输入、或 DEC-011/ADR-0003 依其自身 Reopen rule 修订而改
+  变主语,均须经 governance PR 重开/修订本条。
 - **双向零引用(实测)**：`chg-2026-025` 全目录零处提及 ADR-0003 / DEC-011 /
   CHG-2026-035 / CHG-2026-036;`chg-2026-035`(archived)与 `chg-2026-036` 全目录亦
   零处提及 CHG-2026-025 / TASK-AIN-004。两侧互不可见,只读任一侧文本都发现不了本
@@ -360,19 +397,24 @@ Open question 不得以聊天记忆留存。每项记录默认决策、阻塞范
     「已纳入并覆盖」;
   - `TASK-BRC-004` 的 Forbidden paths 逐字包含
     `Packages/ArkDeckKit/Sources/ArkDeckCLI/**`,即该任务自身不触 CLI 面。
-- 裁决无论落哪一侧都需同时给出的两项：
+- 裁决无论落哪一侧都需同时给出的两项（历史要求;2026-07-28 均已由本裁决给出）：
   1. `RockchipFlashExecutionHost` 由 chg-025(agent CLI 面)与 chg-036(App 面)
      共用,BRC-004 的交付物会移除 chg-025 现行路径所依赖的输入。**两 change 对同一
      composition root 的先后顺序与兼容义务须写明**,否则先落地者会静默打断后者;
+     **(已给出——见上 Boundary 第 1 项)**
   2. 若判「不覆盖」,须说明 AIN-004 的 E2 在 BRC-004 合入后如何延续(重钉工具身份
      /改走 bundled descriptor/或接受一次性历史授权),避免留下第二个"没人翻的
-     Status 行"。
-- Blocking：`CHG-2026-025` `TASK-AIN-004` 的 r4 readiness 与其 E2 设备窗口。E0 面
-  是否单独放行,亦由本裁决界定。
+     Status 行"。**(已给出——见上 Boundary 第 2 项)**
+- Blocking（历史,登记时点）：`CHG-2026-025` `TASK-AIN-004` 的 r4 readiness 与其
+  E2 设备窗口。E0 面是否单独放行,亦由本裁决界定。**(2026-07-28 已界定——E0/E2
+  同判不受阻断,D-2 裁决阻断随本 PR merge 解除;r4 其余二值前置 D-1/D-3 不受本条
+  影响,见上 Unblocked)**
 - Affected：DEC-011、ADR-0003、PLATFORM-MACOS、CHG-2026-025(TASK-AIN-004)、
   CHG-2026-036(TASK-BRC-003/004);`REQ-FLASH-015`
 - 附:本条依 DEC-011 `Reopen rule` 提出——若裁决结论改变 DEC-011 的适用范围,须按
-  该规则重开 DEC-011/ADR-0003,而非只改本条。
+  该规则重开 DEC-011/ADR-0003,而非只改本条。**(2026-07-28 注:裁决为读法 (a),
+  属对 DEC-011 既有适用范围的确认而非改变,不触发该重开;DEC-011/ADR-0003 原文
+  不动)**
 
 ## RISK-001 DAYU200 恢复演练残余风险接受(检查单第 4 项)
 
