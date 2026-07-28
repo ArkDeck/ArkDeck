@@ -2102,8 +2102,13 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
 
 ## TASK-AIN-009R — E1 capability 与 execution-authority persistence contract freeze
 
-- Status:blocked（r4 scope proposal；仅在维护者 review/merge r4 后建立任务，之后仍等待
-  独立 D1 readiness PR）
+- Status:ready（仅在维护者 review/merge 本独立 D1 readiness PR 后生效；本翻转不构成
+  implementation、E1 capability evidence 接受、TASK-AIN-010 readiness 或 device dispatch
+  authority）
+- Historical Status:blocked（r4 scope proposal 尚未合入；该前置已由 #744 exact head
+  `bf52c236b831f31a844167f1998d7121b46a91ac` 的维护者 APPROVED + merge
+  `ef33f8f5f4307aebeb7f1fe592459f6787998e48` 关闭。#744 只批准本任务 scope，
+  不构成本 readiness）
 - Platform:macos
 - Requirements:REQ-WF-003、REQ-DEV-009、REQ-JOB-002、REQ-JOB-006
 - Acceptance:AC-WF-003-02、AC-DEV-009-01、AC-JOB-002-01、AC-JOB-006-01、
@@ -2134,6 +2139,247 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
 - Risk:high（Safety authority contract；host-only）
 - Hardware required:no
 - Decision-Grade:D1
+
+### Readiness pins(r1,2026-07-28)
+
+- **Approval/dependency/base gate:satisfied。**r4 scope PR #744 由
+  `github-actions[bot]` 创建，CODEOWNER `lvye` 的 APPROVED review 精确绑定 head
+  `bf52c236b831f31a844167f1998d7121b46a91ac`，protected-main merge =
+  `ef33f8f5f4307aebeb7f1fe592459f6787998e48`；本 readiness 审计 base 即该 merge。
+  TASK-AIN-009 implementation #739 merge
+  `1b886869a40b730584330b97d8af7ffa54e99415` 与 done #741 merge
+  `e5a4267a062f97d50e0583ff7df1551e27420863` 均为 base 祖先，故 Depends on
+  TASK-AIN-009 已满足。当前 open PR #745 只修改 CHG-2026-044 `tasks.md`，与本任务
+  全部输入/输出路径零重叠。
+- **Objective/effect gate:fixed。**本任务只冻结五份 change-local draft 与一个
+  read-only Swift contract test；不实现 resolver/admission/ledger/Journal writer，不创建
+  Job/Session/binding，不读取或写入 capability/authorization 实例，不启动 child process、
+  HDC/device/network。全部 evidence 分类为 `contract`，process/HDC/device/mutation/
+  destructive/network dispatch 均须为 0。
+- **Schema identity gate:fixed。**五个文件均使用 JSON Schema Draft 2020-12，
+  filename 保留 `-draft` 直到 archive；精确 `$id` / document version 为：
+  - capability:
+    `https://arkdeck.dev/schemas/agent-device-capability-1.0.0.json` /
+    `schemaVersion=1.0.0` / `documentType=agentDeviceCapability`；
+  - execution authority:
+    `https://arkdeck.dev/schemas/agent-execution-authority-1.0.0.json`
+    （inline union，无 caller 可写 document wrapper）；
+  - E1 usage:
+    `https://arkdeck.dev/schemas/agent-authority-usage-1.0.0.json` /
+    `schemaVersion=1.0.0` / `documentType=agentAuthorityUsage`；
+  - Journal:
+    `https://arkdeck.dev/schemas/journal-event-2.2.0-draft.json` /
+    `schemaVersion=2.2.0`；
+  - Manifest:
+    `https://arkdeck.dev/schemas/session-manifest-2.2.0-draft.json` /
+    `schemaVersion=2.2.0`。
+  所有 object（含 inline/conditional branch）`additionalProperties:false`；duplicate
+  member（含 Unicode escaped 同名）、unknown/missing member、未知 version/kind 与非规范
+  OID/SHA/timestamp 在 semantic correlation 前拒绝。schema 只使用仓内相对 ref 或已固定
+  `$id`，不得联网解析 `$ref`。
+- **Capability carrier top-level gate:fixed。**root required keys 精确为
+  `documentType/schemaVersion/capabilityId/changeId/taskId/evidenceRefs/target/tool/
+  operationScopes/limits/privilegeRequirements/prohibitedAdjacency/validUntil`；
+  `capabilityId` 精确匹配 `^CAP-E1-[A-Z0-9]+(?:-[A-Z0-9]+)*$`，其余 identifier 复用
+  AIN-009 closed syntax；`evidenceRefs` 非空、unique、最多 32 项，只是审计链接，不能
+  单独产生 authority。carrier 不含 `approvedBy/carrier/path/argv/readback/usage/outcome`
+  或 raw serial/connectKey。
+- **Target/tool pin gate:fixed。**`target` 精确包含
+  `durableTargetId/model/stableIdentitySHA256/originalTargetSHA256/
+  acceptedBindingRevision/transport/firmwareBuild/firmwareFingerprintSHA256/
+  allowedDeviceModes`；transport 仅 `usb|tcp|uart`，modes 仅
+  `normal|recovery|updater` 的非空 unique 子集，所有 digest 为 64 位小写 SHA-256。
+  runtime binding 必须 target ID/transport/stable identity/firmware 全匹配，revision
+  不小于 accepted revision，且中间 rebind chain 全部 durable、无 ambiguous/rejected gap；
+  TCP/UART 仍按 Core fresh 人工 reconfirm，capability 不降低门槛。`tool` 精确为
+  `kind=hdc/profileId/reportedVersion/executableSHA256`；路径、bookmark、descriptor、
+  caller PATH 或“版本相似”均不是 pin，执行前仍须 product-owned descriptor/hash probe。
+- **E1 operation/profile closure:fixed。**`operationScopes` 非空、unique、最多 11 项；
+  每项精确含
+  `operationId/profileId/configurationId/configurationSha256/effect/dataImpact/
+  namespace/recoveryPolicy`，effect 恒为 `deviceMutation`。只允许 AIN-009 registry 中
+  下列 11 个 exact tuple；其他 operation/profile、同 operation 的 E0/E2 profile、
+  configuration digest 漂移或 emitted Step 超出 registry 均拒绝：
+
+  | Operation/profile | Namespace kind | Data impact | Recovery strategy / minimum typed set |
+  | --- | --- | --- | --- |
+  | `captureHilog` / `hilog.device-persist-restored.v1` | `captureOwned(hilog)` | `reversibleDeviceConfiguration` | `typedCompensation`:stop/resize/cleanup |
+  | `captureUIDump` / `ui-dump.owned-sidecar.v1` | `captureOwned(uiDump)` | `reversibleDeviceConfiguration` | `typedCompensation`:restore/cleanup |
+  | `captureTrace` / `trace.owned-capture.v1` | `captureOwned(trace)` | `reversibleDeviceConfiguration` | `typedCompensation`:stop/restore/cleanup |
+  | `installHAP` / `hap.install-preserve-data.v1` | `bundle` | `applicationDataPreserving` | `verifiedRollback` |
+  | `deployNativeLibrary` / `native-library.app-owned-atomic.v1` | `bundle` | `applicationDataPreserving` | `verifiedRollback` |
+  | `startApplication` / `application.start.v1` | `bundle` | `ephemeralOwnedState` | `typedCompensation`:stop |
+  | `stopApplication` / `application.stop.v1` | `bundle` | `ephemeralOwnedState` | `typedCompensation`:start |
+  | `sendOwnedFile` / `owned-file.send.v1` | `jobOwnedRemote` | `ephemeralOwnedState` | `typedCompensation`:cleanup |
+  | `createPortForward` / `port-forward.create.v1` | `portForward` | `ephemeralOwnedState` | `typedCompensation`:remove |
+  | `removePortForward` / `port-forward.remove.v1` | `portForward` | `ephemeralOwnedState` | `typedCompensation`:create exact pair |
+  | `rebootDevice` / `device.reboot.v1` | `deviceMode` | `reversibleDeviceConfiguration` | `resumeProbeOnly` |
+
+  profile 的 `configurationId/configurationSha256` 必须逐字等于 AIN-009 registry；test
+  直接读取 registry，不复制第二份 hash 表。`dataImpact` 风险序固定
+  `ephemeralOwnedState < reversibleDeviceConfiguration <
+  applicationDataPreserving`；任何 data loss、uninstall/downgrade/clear-data、
+  system/vendor/root/remount 或无 verified rollback 均不在 E1 vocabulary。
+- **Namespace gate:fixed。**namespace 是 closed union：
+  `captureOwned{family:hilog|uiDump|trace,rootPolicyId:jobOwnedRemoteV1}`、
+  `bundle{bundleId}`、`jobOwnedRemote{rootPolicyId:jobOwnedRemoteV1}`、
+  `portForward{pairs:[{protocol:tcp,hostPort,devicePort}]}`（unique、1...32，
+  port 1...65535）或
+  `deviceMode{allowedTargetModes:[normal|recovery|updater]}`。operation/profile 与
+  namespace kind/family 必须按上表相等；carrier/request 均无 absolute/relative remote
+  path、host path、connectKey 或任意 namespace string。
+- **Limits/fresh-fact gate:fixed。**`limits` 精确为
+  `maximumDataImpact/maximumJobDurationSeconds/maximumConcurrentJobs/maximumUses/
+  compensationGraceSeconds`；duration 为 `1...86400`，concurrency 恒为 `1`，
+  uses 为 `1...32`，grace 为 `1...1800` 秒，global impact 不得低于 scope impact 且
+  不存在 destructive 值。`validUntil` 必须 canonical UTC，晚于 GitHub `mergedAt`
+  且不超过 `mergedAt + 31 days`。`privilegeRequirements` 精确为
+  `developerMode:required|notRequired`、`root:forbidden`、
+  `packageDebuggable:required|notRequired`、`freshProbeProfileId` 与
+  `maximumAgeSeconds:1...30`；missing/unknown/stale/permissionDenied 或 runtime root
+  状态不符均 dispatch=0。E1 不允许通过 capability 请求 root。
+- **Compensation/adjacency gate:fixed。**每个 scope 的 `recoveryPolicy` 精确为
+  `strategy/requiredStepKinds/resumeProbeProfileId`；strategy 只允许
+  `typedCompensation|verifiedRollback|resumeProbeOnly`，resume probe 固定
+  `observe-device.read-only.v1`，required Step 集合按上表及 Core descriptor 校验。
+  `prohibitedAdjacency` 必须精确声明：
+  - effects:`[destructive]`；
+  - destructive-only operations:`[flash,uninstallHAP]`；
+  - E2 profiles:`hilog.global-persist.v1`、`hap.install-data-impact.v1`、
+    `hap.uninstall.v1`、`native-library.system-publish.v1`、
+    `flash.rockchip-authorized.v1`；
+  - prohibited Step kinds:`mutateHDCServerLifecycle`、`runApprovedRemoteMutation`、
+    `uninstallPackage`、`enterUpdater`、`flashPartition`、`updatePackage`、
+    `erasePartition`、`formatPartition`、`unlockDevice`。
+  任一遗漏/增改或计划邻接上述面即整体拒绝，不拆分低风险子计划继续。
+- **Protected-main provenance gate:fixed。**registry 路径固定为
+  `openspec/changes/chg-2026-025-ai-native-unattended-device-ops/evidence/capabilities/
+  <capabilityId>.json`；009R 不创建该目录/实例。resolver 固定
+  `ArkDeck/ArkDeck` + protected `main`，本首版无离线 cache；API/rate-limit/network
+  不可用即 fail closed。capability blob 必须与 current main、acceptance PR exact head
+  和 merge commit 三者同 OID；PR merged/base=main、author=`github-actions[bot]`、
+  merge 为 current main 祖先，reviewer/merger 均 `lvye`，APPROVED review commit =
+  exact head，actor separation 成立；CODEOWNERS pin =
+  `f4edd22f87965efcfc27ea512283a0c2252bf0fb`（`* @lvye`）。删除、改字节或后续
+  supersession/revocation 使旧 ref 失效。carrier 自报 metadata/evidenceRefs 不替代
+  GitHub provenance。
+- **Execution-authority union gate:fixed。**union 与 AIN-009 result 的三种 ref
+  字段集合逐字相等：E0
+  `readyTask{changeId,taskId,mainCommitOID,taskBlobOID,approvalPRNumber}`、E1
+  `deviceCapability{capabilityId,mainCommitOID,capabilityBlobOID,approvalPRNumber}`、
+  E2 `standingAuthorization{authorizationId,mainCommitOID,authorizationBlobOID,
+  approvalPRNumber}`。kind/effect 精确为 readyTask/readOnly、
+  deviceCapability/deviceMutation、standingAuthorization/destructive。serialized ref
+  只是 audit identity，不能反序列化为 dispatch capability。
+  - E0 `mainCommitOID/taskBlobOID` 指 admission 时 fresh protected-main commit 与
+    tasks blob；`approvalPRNumber` 指使该 task ready 的 PR。host 必须解析当前 task
+    仍为 ready、依赖仍 done，并证明该 task block 相对 readiness merge 未漂移；
+    tasks 文件内其他 block 漂移不授权也不撤销本 block。
+  - E1/E2 继续要求 current-main blob 与 acceptance/authorization exact reviewed blob
+    相等并分别应用本 readiness 与 r2 provenance rules。caller ref/bytes/path 一律非法。
+- **E1 usage/lease gate:fixed。**`agent-authority-usage` 只记录
+  `kind=deviceCapability`，E0 无 reservation，E2 继续唯一消费现行
+  `authorization-usage 1.0.0`，不得拆成第二套额度。E1 reservation required keys =
+  `reservationId/authorizationRef/ordinal/maximumUses/maximumConcurrentJobs/jobId/
+  operationDigestSHA256/targetDigestSHA256/reservedAt/forwardLeaseExpiresAt/
+  compensationLeaseExpiresAt/terminal`；terminal 为 null 或
+  `status:succeeded|failed|cancelled|interrupted|outcomeUnknown` +
+  `closedAt/externalIntentEventIds`。规则固定：
+  - reserve 在首个 deviceMutation intent 前以 host-wide lock + atomic replace +
+    file/directory durability 完成；durable reserve 永久消费 ordinal、不退款；
+  - ordinal 从 1 连续唯一且不超过 carrier `maximumUses`；同 stable target 同时最多
+    一个 terminal=null E1 reservation；同 reservation retry 仅 exact fields 幂等；
+  - `forwardLeaseExpiresAt=min(request deadline,capability validUntil,
+    reservedAt+maximumJobDuration)`；过期后零新 forward intent；
+    `compensationLeaseExpiresAt=min(capability validUntil+grace,
+    forwardLeaseExpiresAt+grace)`，只允许已 durable descriptor 的 exact compensation；
+  - reservation 后、首个 effect intent 前崩溃可由同 Job/同 reservation 在 lease 内
+    fresh re-admission；任一 E1 intent 无 outcome 则 `outcomeUnknown`，不自动重发或
+    猜测 compensation；lease/terminal write 不确定时保留 consumed + blocked。
+- **Journal/Manifest 2.2 gate:fixed。**字段名继续使用规范中的
+  `authorizationRef`（虽覆盖三种 authority），不另造 caller `authority` 字段。
+  - Journal `authorizedAgent` 只允许 `executionMode=execute`；`jobCreated` 必带 exact
+    ref，E0 禁止 usage ID，E1/E2 必带 kind-correct durable reservation ID。每个
+    `effect>=readOnly` 的 stepIntent/stepOutcome 及每个 external
+    compensationIntent/compensationOutcome 必须携带与 jobCreated 完全相同的 ref/
+    usage pair、binding 与反向 correlation；hostOnly event 不得借 ref 派生权限。
+  - Manifest 2.2 保留 required nullable root key `authorization`；authorizedAgent 时
+    固定为 `{authorizationRef,usageReservationId,externalIntentEventIds}`，E0 usage
+    为 null，E1/E2 为 exact string，intent set 精确等于 Journal 中 executed 或
+    outcomeUnknown 的 readOnly/deviceMutation/destructive step + external compensation
+    intents。其他 executionAuthority 的 authorization 恒为 null。
+  - authorizedAgent confirmation actor ref 必须与 root/Journal/usage 完全一致；人类
+    blocker/impact/recovery 决策仍为 interactiveUser，Agent ref 不能伪造人类判断。
+  - unknown/missing/cross-kind ref、ghost/duplicate intent、usage kind 漂移、mixed
+    schema Session 或 final Manifest 隐藏 outstanding intent 全 reject。
+- **Compatibility gate:fixed。**
+
+  | Stored version | Reader/authority meaning | Write/migration rule |
+  | --- | --- | --- |
+  | Manifest/Journal 1.x | current locked semantics；无 autonomous authority success | bytes/hash 不改写，不补 ref |
+  | 2.0.0 | r2 E2 authorization correlation | existing reader exact；不转写 2.2 |
+  | 2.1.0 | r2 E2 + Rockchip descriptor identity | existing reader exact；不转写 2.2 |
+  | 2.2.0 | E0/E1/E2 union + external step/compensation correlation | 新 Agent Job only；不得降写旧版 |
+
+  2.2 reader 可按 declared version 调用对应旧 validator 并在内存暴露 read-only normalized
+  view，但 round-trip/export 必须保持原 version 与 canonical bytes；单 Session 版本恒一，
+  不允许把 2.0/2.1 E2 ref 猜成 E1、把 v1 standardAgent 猜成 E0，或通过 import 获得
+  live authority。2.1 E2 usage 继续由原 ledger 计数，2.2 不重置 ceiling。
+- **Pinned authority/contract inputs。**实现开工时下列 full Git blob 任一漂移即停回
+  readiness：
+  - AIN-009 operation schema `b2f41f6d14f18621561acbe93dbfccc3621405f4`、
+    registry schema `f75e5d97130d15f3133cb19b73420438db0bfc18`、registry
+    `f101619358b08ffb818ccc8eac72b06c7b2062fe`；
+  - r2 authorization usage `b232db49d2d76fc2eb96fed6b7d0230455d99345`、
+    Journal 2.0 `6285acd4ca0350d427aa624afa91be3107769a64` / 2.1
+    `ef71f22c45a7bc06bcde35b0606e94fb6bb79037`、Manifest 2.0
+    `9ac334013968a5aba1a0bd77fe2acc982ba0e680` / 2.1
+    `1fdb14da2ea8c0b45f88c3d5eef277b37e540976`；
+  - current locked workflow-step schema
+    `c510d96478f3192168478b1a1669b5fcd2a848f7` / registry
+    `d9121ef78531560ab856dfa07468ce1ab4d42df6`、Journal v1
+    `d25b7a55e9970d301558430febd235ccc910d8b7`、Manifest v1
+    `1100b951f8c7565e10f403d576acfe260e401155`；
+  - approved r4 proposal `88093c32728eebd145ce0713b78af747a48331c1`、design
+    `bde7c336550bfd9074abf25c2510a1adc5710f1e`、workflow delta
+    `a3df2d253b6882538a8e649bc11876a0032270e3`、device-auth delta
+    `41fafddb2e8a1233d3bd8ea6517f902fe40bee05`、verification
+    `75a89dbcd4e91b717c374a52dbdd8d1357a4d16b`。
+- **Test/tool input gate。**只读 Core `WorkflowStep.swift`
+  `d96423593978f84a0db7623a1b94863e5d12de26`、`JobStateMachine.swift`
+  `c7350e2f74fcbb52a6e582c09c063c5dda0f13f6`、Storage `StrictJSON.swift`
+  `d5df2a82ced6b8a06635c1e9f1887d70c693f005`；现有 test blobs：
+  `AgentDeviceOperationContractTests.swift`
+  `ed0f22af9341149cf4e812e94ecc5599937aeded`、
+  `AuthorizationUsageLedgerContractTests.swift`
+  `90e9790eca6bf8f397337b8f4cafa56fc7fb9ef6`、
+  `JournalRecoveryContractTests.swift`
+  `274cc929d7eee30af2a8b05cae3b92672efe101b`、
+  `SessionArtifactStorageContractTests.swift`
+  `335dc5fc62a7c30c6d0e209f1539b0c78d0caff8`。009R 只新增自己的 test，
+  不修改上述 sources/tests；SwiftPM 自动发现，`Package.swift`
+  `292135a2c80c63ddf7182f58e2f81ff7c7d6104d` 保持不变。
+- **Vector/binary verification gate:fixed。**正例必须覆盖 11 个 E1 tuple、五种
+  namespace、三种 authority ref、E1 reservation、E0/E1/E2 Journal+Manifest 2.2
+  correlation 与 v1/2.0/2.1 historical read；单事实负例覆盖 capability 每个字段/
+  limit/provenance、11-tuple omission/duplicate/drift、namespace mismatch、root、
+  destructive adjacency、expiry/lease/usage/concurrency、三类 ref 互换、step 与
+  compensation ghost/missing/outcomeUnknown、mixed version。Swift test 复用 StrictJSON/
+  Core registry，并可在 run path 增加 stdlib-only Python validator/vectors；不得依赖
+  `jsonschema`/pip/联网。canonical PASS 必须报告
+  `e1_profiles=11 namespaces=5 authority_kinds=3 legacy_versions=3
+  process_dispatch=0 device_dispatch=0 hdc_dispatch=0 network=0`。
+- **New-file/baseline/review gate:satisfied。**五份 draft、新 Swift test 与
+  `evidence/runs/TASK-AIN-009R/` 在 base 均不存在；`evidence/capabilities/**` 亦不存在且
+  为 Forbidden path。macOS 26.6 (25G72)、Xcode 26.6 (17F113)、Apple Swift 6.3.3；
+  `CI=true swift test --package-path Packages/ArkDeckKit` =
+  **470 tests / 1 skipped / 0 failures**，AIN-009 stdlib validator =
+  `requests=3/results=4/operations=15/profiles=21/human_blockers=8/negatives=49/
+  duplicates=2/core_steps=41` PASS，guard = **0 errors / 0 warnings /
+  111 acceptance IDs**。实现 PR 必须复跑新增焦点、AIN-009、legacy
+  usage/Journal/Manifest regression、full Swift、guard、strict diff/scope/privacy/
+  no-dispatch 审计并记录 exact base/head/hash/count/偏差/残余风险；implementation、
+  `ready→done` 与 TASK-AIN-010 readiness 各自独立 PR，D1 合入前零投机实现。
 
 ### Deliverables
 
