@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-041-archive-stable-provenance
 revision: 6
-status: verified # 2026-07-28 本 verification-closure PR；closure 段见文末
+status: archived # 2026-07-28 本 archive PR；verified closure 段见文末
 class: implementation-only
 core_change_level: none
 owner: lvye
@@ -224,4 +224,3 @@ fixture 类数据文件，先对其内容哈希在 `Sources`/`Tests`/`scripts`/l
   由此立的通用规矩（迁 registry/fixture 类数据文件前先对其内容哈希在
   `Sources`/`Tests`/`scripts`/lock 全量反查再定 scope）已写入 r5 注记，
   并在 ASP-002 实现期第一次照做——正是它证明了 rockchip 可迁、trace 不可迁。
-
