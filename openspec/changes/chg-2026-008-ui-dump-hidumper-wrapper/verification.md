@@ -1,7 +1,7 @@
 # CHG-2026-008 Verification Plan
 
 > Status:planned
-> Change:CHG-2026-008-ui-dump-hidumper-wrapper@r10
+> Change:CHG-2026-008-ui-dump-hidumper-wrapper@r11
 > Core baseline:CORE-2.0.0
 
 本文件是 r3 review-remediation verification plan(经 2026-07-20 维护者裁剪决定收敛,
@@ -29,7 +29,13 @@ Phase A evidence PR #248、独立 done status PR #251 也已合入;R1/R2/R3 均�
 `unknownOutput`,R4 dispatch `0`。r10 只固定 R2 structural decision 与 future Phase B
 same-session R2 → private selector bundle → R4 provenance 边界:新增一个 human-offline
 decision task(`ready` candidate)和一个 host-only selector/harness seam task(`blocked`),不含
-derived bytes、decision、实现、真实 raw 读取或 HDC/device dispatch。
+derived bytes、decision、实现、真实 raw 读取或 HDC/device dispatch。r10 决策任务经
+#263(`952b0f7`)登记 truthful-negative(`INVALID_UNICODE` / exit `27`,零 derived/
+receipt)并经 #267(`c9b3f77`)done;SEAM/R4/UD-001 按 r10 gate 全部保持 blocked。
+r11 只登记 truthful-negative 之后的复活路径:新增 `blocked` 的 host-only 只读诊断任务
+`TASK-UD-R2-DIAG-001`(根因判定,非内容输出)与两条互斥、均须诊断 done 后由后续
+修订授权的分支;本文件在 r11 仅做 revision 同步,该任务的 verification 行与 acceptance
+case 由其独立 readiness revision 一并固定。
 
 ## Readiness environment
 

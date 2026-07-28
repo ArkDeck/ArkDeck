@@ -30,7 +30,8 @@ production supervisor/binding 栈前置、offline receipt verifier 与 7 任务�
 r3 合入时本 change 有 4 个任务,全部 `blocked`;r6 增设 capture harness 任务后共 5 个;
 r9 因 #219 首次 run 暴露的 FX-1 typed-path echo blocker 增设一个 host-only remediation
 任务后共 6 个;r10 因 Phase A token 跨生命周期与 repository-privacy provenance 冲突新增
-R2 decision 与 R2→R4 seam 两个串行任务,共 8 个。现行状态一律以各任务 `Status` 行为
+R2 decision 与 R2→R4 seam 两个串行任务,共 8 个;r11 因 R2 negative decision 根因未
+判定新增一个 host-only 只读诊断任务,共 9 个。现行状态一律以各任务 `Status` 行为
 准。real-device task 在其全部前置 done、独立 ready-restore PR 合入且具名设备窗口内才
 可执行。
 
@@ -439,6 +440,85 @@ R2 decision 与 R2→R4 seam 两个串行任务,共 8 个。现行状态一律�
   decision 永久保持后续 blocked。
 - PR boundary:一个 human evidence + decision PR;`ready→done` 独立状态 PR;不得夹带
   selector/harness 实现或 R4 readiness。
+
+## TASK-UD-R2-DIAG-001 — R2 raw INVALID_UNICODE 根因只读诊断
+
+- Status:blocked(r11 只登记本任务;等待 r11 合入后的独立 readiness PR 固定
+  implementation base、closed files、诊断输出 schema 与 exact host CLI。本治理 PR 不含
+  实现/fixture/evidence,不执行诊断,Agent controlled-raw read count 保持 `0`)
+- Objective:在任何复活分支被授权之前判定 `TASK-UD-R2-DECISION-001` truthful-negative
+  的根因。已固定事实(#248/#263):`uidump-derived-redaction-v1` 对 R2 sidecar exact raw
+  origin(`866256` bytes,SHA-256
+  `ec6663e6b7d42053ba089ccbfa89df74cb183a5a583f80a69f103b047014b077`)报
+  `INVALID_UNICODE` / exit `27`。该失败既可能源于 raw 本身含非法 UTF-8 字节(数据根因
+  ——重捕无意义,须先修订 redactor 字节处理策略),也可能源于 capture 管道截断/编码
+  缺陷(管道根因——须新 capture plan 与设备窗口重捕)。本任务交付 host-only 只读诊断
+  工具与一次由人类维护者执行的诊断 run,产出仅含非内容事实的 repo-safe 诊断记录,为
+  后续修订选择分支提供事实输入;本任务自身不选择分支、不实施任何修复。
+- Change-local closure:`INT-UD-R2-DIAG-001` / `TEST-INT-UD-R2-DIAG-001`(其 acceptance
+  case 与 verification 行由独立 readiness revision 一并固定登记)。
+- Canonical Safety inputs:`REQ-DUMP-005/008`(raw/derived 分离与 raw 隐私边界的
+  read-only Safety 输入;本 task 不认领任何 canonical AC/Test PASS)。
+- Depends on:
+  - r11 经维护者 review/merge 合入;
+  - 独立 readiness PR 固定 implementation base、closed files、非内容输出 schema、exact
+    host CLI 与人类执行步骤;该 PR 合入前本 task 不可执行,任何诊断输出不得产生。
+- Required implementation boundary(candidate;仅 future readiness 合入后生效):
+  1. 诊断工具 stdlib-only、零联网、零 shell;对 controlled raw 只读打开(no-follow、不
+     复制、不写缓存、不落任何仓库内路径),先复核输入实测 SHA-256 精确等于上述
+     pinned raw-origin hash,失配即拒绝且零输出;raw 任何路径不得修改/覆盖;
+  2. 输出面为封闭 deterministic schema,只允许非内容事实:error name/code、字节总数、
+     invalid 序列的偏移/长度/计数、首个与末个 invalid 偏移、字节类别统计(如 ASCII/
+     合法多字节序列/continuation/control/NUL 的计数直方图)、invalid 偏移分布摘要
+     (如是否集中于文件尾部)与工具/policy hash。任何 raw 字节值序列、解码文本、
+     内容窗口、页面文本、window/component 字面量一律不得出现在 stdout/stderr/文件/
+     evidence;输出侧敏感终检 fail closed;
+  3. 执行模型沿用 `TASK-UD-R2-DECISION-001` 先例:人类维护者在仓库外对 controlled
+     raw 运行固定 CLI,Agent 不打开/复制 controlled raw;raw 语义判读(例如判断该
+     dump 是否本就非文本格式)只能由维护者离线进行,其结论只以散文+上述非内容
+     事实进入 evidence;
+  4. synthetic-only tests 覆盖 valid UTF-8、尾部截断多字节序列、中部散布 invalid 字节、
+     NUL/control、超长输入、hash 失配拒绝、输出 schema 封闭性与敏感终检负例;测试
+     不使用任何真实 raw。
+- Candidate allowed paths(future readiness 必须逐一固定):
+  - `scripts/ui_dump_diagnosis/{README.md,diagnose.py,test_diagnose.py}`
+  - `openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/evidence/runs/TASK-UD-R2-DIAG-001/**`
+  - 本 `tasks.md`(仅该 task 的独立 status/completion evidence 更新)
+- Read-only inputs:`decisions/r2-element-tree-v1.{md,json}`、
+  `evidence/runs/TASK-UD-R2-DECISION-001/run.md`、
+  `evidence/runs/TASK-UD-CAP-MUT-001/attempt-3-complete-20260721/` 的 repo-safe
+  manifest/hash facts、`scripts/ui_dump_redaction/**`(只读对照;修改属分支 (a) 的
+  未来修订)。
+- Follow-up branches(仅登记;均不在 r11 或本 task 内授权):
+  - (a) 数据根因(raw 本身含非法 UTF-8 字节):由后续修订授权 redactor 字节处理
+    策略 revision;该修订合入前 `uidump-derived-redaction-v1` 保持唯一固定 redactor;
+  - (b) 管道根因(capture 截断/编码缺陷):由后续修订授权新 capture plan 与设备窗口
+    重捕;该修订合入前零新增设备执行;
+  - 两分支互斥;诊断结论歧义或双因并存时两分支均保持未授权,须由新的修订裁定。
+    任一分支均以 `TASK-UD-R2-DIAG-001 done` 为前置,且不自动解锁
+    `TASK-UD-R2-R4-SEAM-001`/`TASK-UD-CAP-R4-001`/`TASK-UD-001`;重返 Phase B 仍须
+    该分支修订另行登记的新 positive R2 structural decision 与 r10 既有 seam/R4 gate,
+    #263 negative decision 及其 evidence 永不重写。
+- Forbidden now:任何实现/fixture/evidence 起草;Agent 打开/复制 controlled raw;修改
+  `scripts/ui_dump_redaction/**`、`scripts/ud_capture/**`、`decisions/**` 或任何既有
+  evidence;installed HDC/device/network/GUI/mutation/destructive dispatch;把诊断输出
+  当作 output family、复活授权或任何 compatibility/support/conformance 结论。
+- Risk:medium(对敏感 controlled raw 新增一个只读诊断面;必须以非内容输出 schema、
+  输入 hash gate、输出侧敏感终检与 synthetic 对抗测试收口)。
+- Hardware required:no;installed HDC、device/network/GUI/destructive dispatch 均为 `0`。
+- Required environment:固定 Python 3.14.6 + PyYAML 6.0.3
+  (`<ARKDECK_ROOT>/.venv-sdd/bin/python`);执行时在 run.md 记录实际 path/version/
+  hash;不得联网安装或回落默认解释器。
+- Verification(candidate):`TEST-INT-UD-R2-DIAG-001`:synthetic 正负矩阵、输入 hash
+  gate、输出 schema 封闭性、敏感终检与零内容泄漏全部二值 PASS;
+  `scripts/check-sdd.sh`;`git diff --check`;AST no-shell/no-network 审计;人类诊断 run
+  的非内容事实与 claimed 维护者判读由 evidence PR 的维护者 review/merge attest。
+- Evidence gate:implementation + evidence PR 合入后另起独立 status PR 起草
+  `ready→done`;done 只关闭诊断事实登记,不授权任何分支;分支选择与授权只能由引用
+  本任务 evidence 的后续修订(经维护者 review/merge)作出。
+- PR boundary:r11 只登记本任务;随后一个独立 readiness PR、一个 implementation +
+  evidence PR(host 侧,可含人类诊断 run 的 evidence)与一个 `ready→done` status PR;
+  任何 PR 不得夹带 redactor 修改、capture plan 或 SEAM/R4 readiness。
 
 ## TASK-UD-R2-R4-SEAM-001 — same-session private selector + R4 harness seam
 
