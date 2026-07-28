@@ -1875,3 +1875,409 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
   process/runtime/storage/journal 回归与全量 Swift，strict format/diff/scope/privacy/no-live-
   dispatch 审计，并在 `evidence/runs/TASK-AIN-007/` 记录命令、结果、偏差与残余风险；任务
   completion/change verified 仍使用后续独立 PR。
+
+## TASK-AIN-009 — Agent operation 与 human blocker contract freeze
+
+- Status:blocked（等待 r3 proposal revision 经维护者 review/merge；本段不构成 readiness）
+- Platform:macos
+- Requirements:REQ-WF-003、REQ-DEV-009、REQ-DUMP-009、REQ-TRACE-010、
+  REQ-DEBUG-008
+- Acceptance:AC-WF-003-01/02/03、AC-DEV-009-01、AC-DUMP-009-01、
+  AC-TRACE-010-01、AC-DEBUG-008-01/02/03/04
+- Depends on:none
+- Applicable failure patterns:AF-004、AF-009、AF-014、AF-016
+- Production reachability:not applicable（change-local contract/validator，零外部 effect）
+- Trusted fact sources:受保护 main 上已批准 r3 delta、current workflow step registry 与
+  schema；测试 caller 不能构造 accepted contract version/effect mapping
+- Allowed paths:
+  - `openspec/changes/chg-2026-025-ai-native-unattended-device-ops/contracts/**`
+  - `openspec/changes/chg-2026-025-ai-native-unattended-device-ops/evidence/runs/TASK-AIN-009/**`
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/AgentDeviceOperationContractTests.swift`
+- Forbidden paths:
+  - `openspec/specs/**`
+  - `openspec/contracts/**`
+  - `Packages/ArkDeckKit/Sources/**`
+  - `ArkDeckApp/**`
+- Risk:low
+- Hardware required:no
+- Decision-Grade:D1
+
+### Deliverables
+
+- 定稿 `agent-device-operation` 与 `human-action-required` 1.0.0 draft；
+- change-local operation/profile → typed step/effect/cancellation/binding mapping，明确 E0/E1/E2
+  及 `.so` deployment 的提升规则；
+- 正反 JSON Schema vectors：禁止 executable/argv/shell/path/facts/outcome/effect override，
+  strict unknown-field rejection 与跨 contract 引用。
+
+### Verification
+
+- 所有正例 schema/semantic validator accept；每个禁止字段、未知 operation、effect 降级、
+  blocker category 漂移反例 reject；
+- contract test 只读 change-local bytes，process/device/HDC dispatch=0。
+
+### Notes / handoff
+
+- completion 后在 `evidence/runs/TASK-AIN-009/` 记录 schema/version/hash 与测试输出。
+
+## TASK-AIN-010 — 通用 TrustedDeviceOperationHost 与 admission
+
+- Status:blocked（等待 TASK-AIN-009 done + 独立 readiness PR）
+- Platform:macos
+- Requirements:REQ-WF-003、REQ-DEV-009、REQ-JOB-002、REQ-JOB-005、REQ-JOB-006
+- Acceptance:AC-WF-003-02、AC-WF-003-03、AC-DEV-009-01、
+  AC-JOB-002-01、AC-JOB-005-01、AC-JOB-006-01
+- Depends on:TASK-AIN-009
+- Applicable failure patterns:AF-002、AF-003、AF-004、AF-014
+- Production reachability:`ArkDeckCLI/App composition → TrustedDeviceOperationHost →
+  effect resolver/admission → journal-backed typed dispatcher`
+- Trusted fact sources:protected-main contract/capability resolver、durable binding journal、
+  product-owned HDC/tool observation、host storage/journal；caller request 只含 selector/ID
+- Allowed paths:
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/AgentDeviceOperations/**`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/HumanActionRequired.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckOpenHarmony/HDCDeviceCommand.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckStorage/SessionManifest.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckStorage/JournalEventValidation.swift`
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/AgentDeviceOperationHostContractTests.swift`
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/HumanActionRequiredContractTests.swift`
+  - `openspec/changes/chg-2026-025-ai-native-unattended-device-ops/evidence/runs/TASK-AIN-010/**`
+- Forbidden paths:
+  - `openspec/specs/**`
+  - `openspec/contracts/**`
+  - `ArkDeckApp/**`
+  - 真实 device/HDC/rkdeveloptool dispatch 与 authorization 载体
+- Risk:high（真实 effect composition；实现验证仅 fake/fixture）
+- Hardware required:no
+- Decision-Grade:D1
+
+### Deliverables
+
+- product-owned host 解析 operation contract、从可信源解析 ready task/binding/tool facts/
+  E1 capability/E2 authorization，并 mint one-shot execution capability；
+- E0/E1/E2 effect resolver、structured human blocker、durable Job/Session admission；
+- public surface 无 executor/argv/path/fact/grant injection；unknown 按 destructive fail closed。
+
+### Verification
+
+- caller field/provenance/fact injection、stale binding、unknown operation、缺/错 E1/E2 permit →
+  intent/process/device dispatch=0；
+- fake port 正例证明 E0/E1 capability 只能由 trusted host mint 且 intent 在 effect 前 durable；
+- crash/finalization fault matrix 保持 outcomeUnknown 不重放。
+
+### Notes / handoff
+
+- 本任务不接具体 Dump/Trace/Debug argv；只交付可被后续 executor 消费的通用 authority。
+
+## TASK-AIN-011 — E0 observation、HiLog 与 Artifact executor
+
+- Status:blocked（等待 TASK-AIN-010 done + 独立 readiness PR）
+- Platform:macos
+- Requirements:REQ-WF-003、REQ-DEBUG-001、REQ-DEBUG-007、REQ-ART-001、
+  REQ-ART-002、REQ-ART-003
+- Acceptance:AC-WF-003-01、AC-DEBUG-001-01、AC-DEBUG-007-01、
+  AC-ART-001-01、AC-ART-002-01、AC-ART-003-01、AC-DEBUG-008-01
+- Depends on:TASK-AIN-010
+- Applicable failure patterns:AF-002、AF-005、AF-011、AF-013
+- Production reachability:`Agent request → TrustedDeviceOperationHost(E0) → registered
+  HDC read-only lowering/HiLog stream → Session Artifact writer`
+- Trusted fact sources:durable binding、registered HDC/profile/golden、server identity/
+  ownership 与 HostStorageCoordinator；caller target/config 只用于 cross-check
+- Allowed paths:
+  - `Packages/ArkDeckKit/Sources/ArkDeckOpenHarmony/AgentReadOnlyOperations/**`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/AgentDeviceOperations/E0/**`
+  - `Packages/ArkDeckKit/Sources/ArkDeckStorage/**`
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/AgentE0OperationContractTests.swift`
+  - `Packages/ArkDeckKit/Tests/ArkDeckFakeHDCFixture/**`
+  - `openspec/changes/chg-2026-025-ai-native-unattended-device-ops/evidence/runs/TASK-AIN-011/**`
+- Forbidden paths:
+  - `openspec/specs/**`
+  - `openspec/contracts/**`
+  - `scripts/m0b_capture/**`
+  - `scripts/trace_capture/**`
+  - `scripts/ud_capture/**`
+  - 真实设备 evidence/hardware matrix
+- Risk:medium（production E0 composition；实现验证仅 fixture）
+- Hardware required:no
+- Decision-Grade:D1
+
+### Deliverables
+
+- device/tool/help/HiDumper/Trace probe 与 bounded HiLog stream 的 product executor；
+- raw stdout/stderr/shards 分离、rotation、partial/ENOSPC、atomic publication、redaction/
+  derived processing 与 terminal manifest；
+- E0 计划中出现 mutation/destructive step 时整体拒绝，不能静默跳过或降级。
+
+### Verification
+
+- fixture 端到端 `submit→result`，HiLog 超配额仍有界、顺序/hash 完整；
+- timeout/truncation/invalid UTF-8/unknown golden/ENOSPC/server drift/binding drift →
+  诚实 partial/failed，mutation/destructive dispatch=0。
+
+## TASK-AIN-012 — Agent-owned ArkUI UI Dump 与 Trace E1 executor
+
+- Status:blocked（等待 TASK-AIN-011 done + 独立 readiness PR）
+- Platform:macos
+- Requirements:REQ-DUMP-002/003/004/005/006/007/009、REQ-TRACE-001/002/003/
+  004/005/006/007/008/009/010、REQ-WF-003
+- Acceptance:AC-DUMP-002-01、AC-DUMP-003-01、AC-DUMP-004-01、
+  AC-DUMP-005-01、AC-DUMP-006-01、AC-DUMP-007-01、AC-DUMP-009-01、
+  AC-TRACE-001-01、AC-TRACE-002-01、AC-TRACE-003-01、AC-TRACE-004-01、
+  AC-TRACE-005-01、AC-TRACE-006-01、AC-TRACE-007-01、AC-TRACE-008-01、
+  AC-TRACE-009-01、AC-TRACE-010-01
+- Depends on:TASK-AIN-011
+- Applicable failure patterns:AF-002、AF-004、AF-011、AF-013、AF-014
+- Production reachability:`Agent request → trusted E0/E1 admission → UI Dump/Trace typed
+  plans → journal-backed HDC dispatcher → Artifact/compensation finalization`
+- Trusted fact sources:registered Recipe/Trace family、durable binding、per-device E1
+  capability、parameter readback、owned-path receipt；caller IDs/analysis 不是 capability
+- Allowed paths:
+  - `Packages/ArkDeckKit/Sources/ArkDeckOpenHarmony/UIDumpAgentAdapter.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckOpenHarmony/TraceProbeAdapter.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/AgentDeviceOperations/UIDump/**`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/AgentDeviceOperations/Trace/**`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/Trace*.swift`
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/AgentUIDumpOperationContractTests.swift`
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/AgentTraceOperationContractTests.swift`
+  - `Packages/ArkDeckKit/Tests/ArkDeckFakeHDCFixture/**`
+  - `openspec/changes/chg-2026-025-ai-native-unattended-device-ops/evidence/runs/TASK-AIN-012/**`
+- Forbidden paths:
+  - `openspec/specs/**`
+  - `openspec/contracts/**`
+  - `scripts/ud_capture/**`
+  - `scripts/trace_capture/**`
+  - 真实设备 evidence/hardware matrix
+- Risk:high（E1 semantics；实现验证仅 fixture）
+- Hardware required:no
+- Decision-Grade:D1
+
+### Deliverables
+
+- 四个 UI Dump Recipe 与 Trace probe/config/capture/receive/postprocess/cleanup/restore 的
+  product-owned executor；
+- stdout/sidecar/raw/derived origin 隔离，UUID-owned path 与 verified-before-cleanup；
+- parameter/reboot/rebind/stop/restore compensation、cancel/safe boundary 与 crash recovery。
+
+### Verification
+
+- fake HDC 完整正例覆盖四 Recipe 与 Trace lifecycle；
+- stale/ambiguous sidecar、unsupported tag/flag、readback mismatch、receive interruption、
+  restore/cleanup failure、rebind ambiguity、outcomeUnknown 全 fail closed，其他 Session
+  remote files untouched。
+
+## TASK-AIN-013 — HiLog、HAP 与应用生命周期 Agent executor
+
+- Status:blocked（等待 TASK-AIN-011 done + 独立 readiness PR）
+- Platform:macos
+- Requirements:REQ-DEBUG-001/002/003/004/006/007/008、REQ-WF-003
+- Acceptance:AC-DEBUG-001-01、AC-DEBUG-002-01、AC-DEBUG-003-01、
+  AC-DEBUG-004-01、AC-DEBUG-006-01、AC-DEBUG-007-01、
+  AC-DEBUG-008-01、AC-DEBUG-008-02、AC-DEBUG-008-04
+- Depends on:TASK-AIN-011
+- Applicable failure patterns:AF-002、AF-003、AF-011、AF-014
+- Production reachability:`Agent request → trusted E0/E1 admission → package/app/log/forward
+  typed lowering → journal-backed HDC dispatcher`
+- Trusted fact sources:leased HAP bytes/hash/signature、durable binding、registered output
+  family、per-device E1 capability 与 post-install package readback
+- Allowed paths:
+  - `Packages/ArkDeckKit/Sources/ArkDeckOpenHarmony/AgentDebugOperations/**`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/AgentDeviceOperations/Debug/**`
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/AgentDebugOperationContractTests.swift`
+  - `Packages/ArkDeckKit/Tests/ArkDeckFakeHDCFixture/**`
+  - `openspec/changes/chg-2026-025-ai-native-unattended-device-ops/evidence/runs/TASK-AIN-013/**`
+- Forbidden paths:
+  - `openspec/specs/**`
+  - `openspec/contracts/**`
+  - 任意 shell/PTY、未登记 remote command 或真实设备 evidence
+- Risk:high（E1 semantics；实现验证仅 fixture）
+- Hardware required:no
+- Decision-Grade:D1
+
+### Deliverables
+
+- HAP install/replace/uninstall、package readback、Ability start/stop、forward create/remove
+  与 HiLog 组合 executor；uninstall/clear-data/downgrade/data-loss profile 提升为 E2 或
+  impact blocker；
+- install/replace/downgrade/clear-data 分离 operation，data impact 与 compensation 可审计；
+- semantic parser、multi-device binding、cancel/crash/partial evidence。
+
+### Verification
+
+- HAP pin 全匹配正例 `install→readback→start→HiLog→stop` 完整；
+- 错 bundle/version/signature/hash/binding/output family、未授权 downgrade/clear-data、
+  invalid port → 后续 dispatch=0；exit 0 缺 semantic marker 不成功。
+
+## TASK-AIN-014 — Profiled native-library deployment
+
+- Status:blocked（等待 TASK-AIN-010、TASK-AIN-013 done + 独立 readiness PR）
+- Platform:macos
+- Requirements:REQ-DEBUG-008、REQ-WF-003、REQ-JOB-002/004/006
+- Acceptance:AC-DEBUG-008-03、AC-DEBUG-008-04、AC-WF-003-02/03、
+  AC-JOB-002-01、AC-JOB-004-01、AC-JOB-006-01
+- Depends on:TASK-AIN-010、TASK-AIN-013
+- Applicable failure patterns:AF-002、AF-003、AF-011、AF-014
+- Production reachability:`Agent request → deployment profile/effect resolver → E1 capability
+  or E2 standing authorization → staged descriptor-bound publish → verify/rollback`
+- Trusted fact sources:host-leased ELF bytes/ABI/build ID/hash、protected-main profile、
+  durable target/binding、fresh privilege/target snapshot 与 publish/loader readback
+- Allowed paths:
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/AgentDeviceOperations/NativeDeployment/**`
+  - `Packages/ArkDeckKit/Sources/ArkDeckOpenHarmony/NativeDeploymentAdapter.swift`
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/AgentNativeDeploymentContractTests.swift`
+  - `Packages/ArkDeckKit/Tests/ArkDeckFakeHDCFixture/**`
+  - `openspec/changes/chg-2026-025-ai-native-unattended-device-ops/evidence/runs/TASK-AIN-014/**`
+- Forbidden paths:
+  - `openspec/specs/**`
+  - `openspec/contracts/**`
+  - caller-provided remote path/argv、自动 root/smode/remount、真实设备 dispatch
+- Risk:destructive semantics（实现验证仅 fake；E2 真机另需 standing authorization）
+- Hardware required:no
+- Decision-Grade:D1
+
+### Deliverables
+
+- `.so` profile validator、ABI/ELF/hash/target snapshot、owned staging、atomic publish、
+  loader verification、process restart、rollback 与 hazard classification；
+- effect promotion：system/vendor/root/remount/no-rollback/boot-runtime impact 恒为 E2；
+- E1/E2 authority 与 profile scope 逐项相关，Agent request 不能传 remote path。
+
+### Verification
+
+- app-owned rollback-capable E1 正例与 E2 promotion 正例；
+- target replacement、mode/owner/ABI/hash drift、publish/verify/rollback crash windows、
+  outcomeUnknown → 不盲目重发，replay dispatch=0，状态/Artifact 如实。
+
+## TASK-AIN-015 — Agent control surface 与有界自动调试闭环
+
+- Status:blocked（等待 TASK-AIN-012/013/014 done + 独立 readiness PR）
+- Platform:macos
+- Requirements:REQ-WF-003、REQ-DEV-009、REQ-DUMP-009、REQ-TRACE-010、
+  REQ-DEBUG-008、REQ-JOB-001、REQ-STO-003
+- Acceptance:AC-WF-003-01/02/03、AC-DEV-009-01、AC-DUMP-009-01、
+  AC-TRACE-010-01、AC-DEBUG-008-01/02/03/04、AC-JOB-001-02/03、
+  AC-STO-003-01
+- Depends on:TASK-AIN-012、TASK-AIN-013、TASK-AIN-014
+- Applicable failure patterns:AF-002、AF-004、AF-005、AF-011
+- Production reachability:`arkdeck agent submit/status/cancel/reconcile/result or App local
+  surface → TrustedDeviceOperationHost → capability executors`
+- Trusted fact sources:host-generated Job/Session IDs、terminal manifest、Artifact store 与
+  operation executors；analysis output only drafts the next request
+- Allowed paths:
+  - `Packages/ArkDeckKit/Sources/ArkDeckCLI/ArkDeckCLIMain.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/AgentDeviceOperations/ControlPlane/**`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/AgentDeviceOperations/DebugLoop/**`
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/AgentControlPlaneContractTests.swift`
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/AgentDebugLoopContractTests.swift`
+  - `openspec/changes/chg-2026-025-ai-native-unattended-device-ops/evidence/runs/TASK-AIN-015/**`
+- Forbidden paths:
+  - `openspec/specs/**`
+  - `openspec/contracts/**`
+  - network listener/remote RPC、arbitrary shell/PTY、真实设备 evidence
+- Risk:high（production orchestration；实现验证仅 fixture）
+- Hardware required:no
+- Decision-Grade:D1
+
+### Deliverables
+
+- strict JSON stdin/stdout 或等价同用户本地 IPC 的 submit/status/cancel/reconcile/result；
+- bounded typed DAG：observe→optional deploy→start→HiLog+Dump/Trace→analysis→next request；
+- budget/deadline/retry ceiling、human blocker、lane/storage coordination 与 terminal result。
+
+### Verification
+
+- fixture 端到端闭环与并发资源竞争；
+- analysis 建议越权、旧 capability/readback 复用、循环超预算、取消、crash/restart、
+  repeated blocker → fresh admission 或停止，绝不无限重试/自报成功。
+
+## TASK-AIN-016 — E0/E1 Agent 真机验收
+
+- Status:blocked（等待 TASK-AIN-015 done + 独立 D2 readiness；不得复用旧人工窗口）
+- Platform:macos
+- Requirements:REQ-WF-003、REQ-DEV-009、REQ-DUMP-009、REQ-TRACE-010、
+  REQ-DEBUG-008
+- Acceptance:AC-WF-003-01/02、AC-DEV-009-01、AC-DUMP-009-01、
+  AC-TRACE-010-01、AC-DEBUG-008-01/02/03/04
+- Depends on:TASK-AIN-015
+- Applicable failure patterns:AF-005、AF-006、AF-011、AF-012
+- Production reachability:`real Agent control request → production trusted host → pinned HDC/
+  device → E0/E1 executor → real Session/evidence`
+- Trusted fact sources:fresh real device/tool/server/binding probes、merged E1 capability、
+  product journal/Artifact/outcome；人工只完成 allowlisted prerequisite
+- Allowed paths:
+  - `openspec/changes/chg-2026-025-ai-native-unattended-device-ops/evidence/runs/TASK-AIN-016/**`
+  - `openspec/verification/hardware-matrix.md`
+  - `openspec/changes/chg-2026-025-ai-native-unattended-device-ops/tasks.md`
+- Forbidden paths:
+  - `Packages/**`
+  - `ArkDeckApp/**`
+  - `openspec/specs/**`
+  - `openspec/contracts/**`
+- Risk:high（真实 E0/E1；E2/native system path dispatch=0）
+- Hardware required:yes（pinned OpenHarmony device/HDC/build；人工仅配置/信任/物理动作）
+- Decision-Grade:D2
+
+### Deliverables
+
+- Agent 无人值守完成 E0 observation/HiLog、四 Recipe UI Dump、Trace lifecycle、HAP
+  install/start/diagnostics/readback 与 rollback-capable app-owned `.so` E1 profile；
+- human blocker 实测：首次 trust/物理动作后由 Agent resume probe 自动续跑；
+- schema-compliant executor.kind=agent evidence、脱敏 transcript、negative dispatch counts。
+
+### Verification
+
+- 每个 AC 有真实 product-path evidence；人类不复制命令、不运行 capture/deploy harness；
+- E1 capability 缺失/漂移、错误 binding/profile/HAP/SO、ambiguous identity、restore/
+  rollback fault → effect dispatch=0 或诚实 recovery；
+- E2/system/vendor/root/remount/flash dispatch=0（Flash 真机仍归 TASK-AIN-004）。
+
+## TASK-AIN-017 — 移除活跃流程中的非必要 human-only 门
+
+- Status:blocked（等待 TASK-AIN-004 与 TASK-AIN-016 done + 独立 D1 revision PR）
+- Platform:macos
+- Requirements:REQ-WF-003、REQ-DEV-009
+- Acceptance:AC-WF-003-01/02/03、AC-DEV-009-01
+- Depends on:TASK-AIN-004、TASK-AIN-016
+- Applicable failure patterns:AF-005、AF-006、AF-015、AF-016
+- Production reachability:not applicable（governance/runbook revision；零 effect）
+- Trusted fact sources:TASK-AIN-004/016 merged realHardware evidence 与 protected-main
+  product executor OID；不以 proposal 或 fake test 宣告 human gate 已移除
+- Allowed paths:
+  - `openspec/changes/chg-2026-006-dayu200-m0b-bringup/proposal.md`
+  - `openspec/changes/chg-2026-006-dayu200-m0b-bringup/design.md`
+  - `openspec/changes/chg-2026-006-dayu200-m0b-bringup/tasks.md`
+  - `openspec/changes/chg-2026-006-dayu200-m0b-bringup/verification.md`
+  - `openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/proposal.md`
+  - `openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/tasks.md`
+  - `openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/verification.md`
+  - `openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/capture-runbook.md`
+  - `openspec/changes/chg-2026-026-macos-rockchip-flash-ui/proposal.md`
+  - `openspec/changes/chg-2026-026-macos-rockchip-flash-ui/design.md`
+  - `openspec/changes/chg-2026-026-macos-rockchip-flash-ui/tasks.md`
+  - `openspec/changes/chg-2026-026-macos-rockchip-flash-ui/verification.md`
+  - `scripts/m0b_capture/README.md`
+  - `scripts/trace_capture/README.md`
+  - `scripts/ud_capture/README.md`
+  - `scripts/e0_readback/README.md`
+  - `openspec/changes/chg-2026-025-ai-native-unattended-device-ops/evidence/runs/TASK-AIN-017/**`
+- Forbidden paths:
+  - `openspec/specs/**`
+  - `openspec/contracts/**`
+  - `Packages/**`
+  - `ArkDeckApp/**`
+- Risk:medium（跨 change D1 scope/status revision；零真机 dispatch）
+- Hardware required:no
+- Decision-Grade:D1
+
+### Deliverables
+
+- 逐项修订 CHG-006/008/026 的未完成 task/runbook：E0/E1 改为 Agent product executor，
+  只保留 §16 human-boundary registry 中的人工动作；
+- human harness 标注为 historical fixture/provenance，不再是新真机 evidence 的执行入口；
+- repository-wide inventory 证明活跃流程无“人工代跑命令/设备窗口”残留；确需人工者均
+  引用结构化 blocker category。
+
+### Verification
+
+- 全仓 grep + task dependency/status review + SDD guard；
+- 历史 evidence/raw/golden hash 零改写；未取得产品真机 evidence 的 capability 不提前
+  标 ready/done/verified。
