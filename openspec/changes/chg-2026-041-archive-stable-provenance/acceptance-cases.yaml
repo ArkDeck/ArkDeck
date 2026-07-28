@@ -1,5 +1,5 @@
 change_id: CHG-2026-041-archive-stable-provenance
-change_revision: 2
+change_revision: 3
 cases:
   - acceptance_id: ASP-SHAPE-001
     test_id: TEST-ASP-SHAPE-001
@@ -7,9 +7,11 @@ cases:
     expected_source: openspec/changes/chg-2026-041-archive-stable-provenance/verification.md#ASP-SHAPE-001
     minimum_evidence: contract
     expected_result: >-
-      None of TASK-ASP-001's nine named files contains an openspec/changes literal; the four
-      remaining occurrences in trace-probes and rockchip loader-transition move to TASK-ASP-002
-      because their consumers live under scripts/**. Every
+      Neither the device-observation registry nor its bundled copy contains an openspec/changes
+      literal, and the contract test gains a shape assertion because it decoded no provenance at
+      all before. readonly-probes, its copy and the four receipts leave this change entirely:
+      their hash is pinned in product source consumed at runtime, which needs Sources/**. The
+      trace-probes and rockchip occurrences stay with TASK-ASP-002. Every
       provenance block carries sourceChange, sourceEvidence and the unchanged sourceSHA256, and
       the change directory resolves to exactly one location for both an archived source
       (chg-2026-015) and a still-active one (chg-2026-024); zero or multiple matches fail loudly.
@@ -32,6 +34,7 @@ cases:
       The four handed-over occurrences and their scripts/** consumers are migrated first and the
       guard is enabled second, in that order, since enabling it first would redden the repository.
       Afterwards no registry, resource manifest or receipt anywhere contains an openspec/changes
-      literal; a planted openspec/changes path inside any registry makes
+      literal outside the deferred readonly surface; a planted openspec/changes path inside any
+      registry makes
       check-sdd fail and names the file and line; removing the guard lets the same violation
       through, proving the guard is what catches it. Acceptance ID count stays 111.

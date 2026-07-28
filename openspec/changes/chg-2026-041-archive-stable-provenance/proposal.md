@@ -1,6 +1,6 @@
 ---
 id: CHG-2026-041-archive-stable-provenance
-revision: 2
+revision: 3
 status: approved
 class: implementation-only
 core_change_level: none
@@ -121,4 +121,28 @@ scope 自相矛盾，无法自洽通过。r2 作三项更正、**形态设计零
 `evidencePath`），而 `scripts/**` 是 ASP-001 的 Forbidden path、恰为 ASP-002
 的授权面。并入 ASP-001 会取消维护者在 approval 时保留的「ASP-002 可单独
 裁掉」选项。
+
+## r3 注记（2026-07-28，产品 pin 发现；原文如实保留）
+
+r2 之后实现继续，实测撞上更硬的约束：`readonly-probes.yaml` 的 SHA-256 被
+**产品源码**常量钉死——`Sources/ArkDeckOpenHarmony/HDCReadOnlyProbeRegistry.swift`
+的 `registrySHA256`/`resourceManifestSHA256`/`controlVectorSHA256`，由
+`HDCProduction.swift` 在运行时消费——迁移它会打破产品契约并连带打红
+`HDCSupervisorContractTests`（实测 8 assertion / 3 test）。`Sources/**` 是本
+change 的全局 Out of scope。
+
+**本 proposal 的 Risk 段写「纯数据与测试面，零 runtime 面」——该判断对
+readonly-probes 不成立**，如实更正于此：它的迁移是产品改动。
+
+r3 因此把 ASP-001 窄化到 **device-observation 一对（恰 2 处字面量）**，实测
+其**零产品消费方**；这恰好是解开 CHG-2026-024 归档所需的**全部**。
+readonly-probes + 其副本 + 4 个 receipt + 相关测试与产品常量**移出本 change**，
+需另立带 `Sources/**` 的 change 或经 revision 扩列；trace/rockchip 4 处仍按
+r2 归 ASP-002。
+
+**范围建议（供 approval 判断）**：本 change 的初衷是解 chg-024 的归档死结，
+窄化后的 ASP-001 已完全达成该目标。移出的部分**当前不阻塞任何事**
+（readonly 与 trace 指向的 change 早已归档，rockchip 指向的 chg-2026-026
+短期不归档），属既有技术债而非活口。是否值得为它开一个触碰产品运行时 pin
+的 change，建议单独判断，不必绑在本 change 上。
 

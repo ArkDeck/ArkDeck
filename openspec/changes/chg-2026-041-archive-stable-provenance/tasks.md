@@ -6,7 +6,13 @@
 
 ## TASK-ASP-001 — 定义 archive-stable provenance 并完成迁移与哈希级联
 
-- Status:ready（r2 corrective readiness；r1 的迁移面勘察不完整且其 AC 与
+- Status:ready（r3 corrective readiness；r2 之后实现继续，实测又撞上**产品
+  运行时 pin**：`readonly-probes.yaml` 的 SHA-256 被
+  `Packages/ArkDeckKit/Sources/ArkDeckOpenHarmony/HDCReadOnlyProbeRegistry.swift`
+  钉死并由 `HDCProduction.swift` 消费，而 `Sources/**` 是本 change 全局
+  Out of scope。故 r3 把 ASP-001 **窄化到 device-observation 一对**——它恰是
+  解开 CHG-2026-024 归档所需的全部，且实测**零产品消费方**。原 r2 文字如下续：
+- Historical Status:ready（r2 corrective readiness；r1 的迁移面勘察不完整且其 AC 与
   自身 scope 自相矛盾，实现中实测发现后停手（见 Readiness（r2）Survey gap）。
   r2 只做**范围与判据的更正**，不改形态设计；r1 已完成的迁移成果为严格子集，
   可复用。原 r1 授权文字如下续：
@@ -43,7 +49,56 @@
     `122e4e06…`（selected-device-authorization-binding）/ `d1bc481e…`
     （server-identity-generation）/ `9cdb8b6e…`（subserver-capability）/
     `82b873ef…`（key-access-diagnostics）。任一漂移即停并重钉。
-- Readiness（r2；audit base = protected `main`
+- Readiness（r3；audit base = protected `main`
+  `fd47866`… 即 r2 #675 合入后的 head。r1 的形态设计、解析规则、正副本字节
+  一致门、非 `/private/tmp` 验证要求原文有效；r2 的移交条款保留）：
+  - **Production-pin discovery（实现中实测，2026-07-28）。**迁移
+    `readonly-probes.yaml` 会改变其字节 → 打破三处**产品源码**常量：
+    `HDCReadOnlyProbeRegistry.registrySHA256` / `.resourceManifestSHA256` /
+    `.controlVectorSHA256`（`Sources/ArkDeckOpenHarmony/`，由
+    `HDCProduction.swift` 消费），并连带打红 `HDCSupervisorContractTests`
+    （亦不在授权内）。实测失败面 = 8 assertion / 3 test。
+    **本 change 的 proposal 把风险描述为「纯数据与测试面，零 runtime 面」——
+    该描述对 readonly-probes 不成立**，其迁移是产品改动而非文档改动。
+  - **r3 窄化（唯一变化）。**ASP-001 的迁移面 = **device-observation 一对，
+    恰 2 处字面量**：`openspec/integrations/openharmony/device-observation-probes.yaml`
+    与其 bundled 副本。**实测其零产品消费方**（`Sources/**` 全无引用；
+    唯一同名命中是不相关的 `RockchipDeviceObservation` 类型）。
+  - **完整消费面（本次穷举，前三轮返工皆因少看一层）。**迁移该 registry 触及
+    且**仅**触及：① canonical registry；② bundled 副本（须仍字节一致）；
+    ③ `Fixtures/HDC/Probes/DeviceObservation/1.0.0/resources.json` 的
+    `registryCopy` 哈希；④ `INTEGRATION-PROFILES.lock.yaml` 两条 SHA-256；
+    ⑤ **`openspec/integrations/openharmony/profile.md`**（引用该哈希）；
+    ⑥ **`openspec/platforms/macos/profile.md`**（引用该哈希）；
+    ⑦ `HDCDeviceObservationRegistryContractTests.swift`（须**新增**新形态
+    断言——该测试当前**完全不解码 `provenance`**，实测 `grep -c provenance`
+    = 0，故迁移不会被它发现；不补断言等于无守卫）。⑤⑥ 为 r3 新增授权。
+  - **移交（不在 ASP-001）。**`readonly-probes.yaml` + 其副本 + 4 个 receipt
+    + `HDCProbeRegistryContractTests` 形态断言 + `HDCSupervisorContractTests`
+    + `Sources/.../HDCReadOnlyProbeRegistry.swift` 三常量 +
+    `HDCDeviceObservationRegistryContractTests` 的 sibling 哈希常量
+    （`b0ac1564…`）→ **需要 `Sources/**` 授权，超出本 change 的 Out of
+    scope，须另立 change 或经 change revision 扩列**；r2 已移交 ASP-002 的
+    trace/rockchip 4 处不受影响。
+  - **判据相应窄化。**`ASP-SHAPE-001` 的零字面量断言限定为**上述 2 处**；
+    `sourceSHA256` 不变的证明对 device-observation **不适用**（其 provenance
+    本就无该字段，内容锚是 lock/resources 哈希与两个 capture merge OID），
+    改以「语义字段 diff 为空 + 正副本仍字节一致 + 两 profile 哈希同步」为
+    等价判据。
+  - **Source pins（r3 面，audit base 实测）。**
+    `device-observation-probes.yaml` 与其副本同 blob
+    `1130ca663f686d9f202f53ceb8814320ebc862bd`；
+    `DeviceObservation/1.0.0/resources.json`
+    `72618f79e12dcdc3ecd6c09537a28be2bfa8572e`；
+    `INTEGRATION-PROFILES.lock.yaml`
+    `129abc6216593d73e401167181f61924addf602f`；
+    `HDCDeviceObservationRegistryContractTests.swift`
+    `a7264626a6a93e06008ece9ec73fae32343c0291`；两 profile 见下 Allowed
+    paths（其 blob 于实现开工时复核）。
+  - **其余 r1/r2 条款有效**：形态设计、active-or-archive 解析规则、
+    可重跑脚本要求、Swift 基线 413/1skip/0 与非 `/private/tmp` 验证、
+    grade 注记。
+- Historical Readiness（r2；audit base = protected `main`
   `6383f5b`… 即 r1 #674 合入后的 head；r1 的 13 项 source pin 于此 base
   复核 **13/13 零漂移**，形态设计、解析规则、正副本字节一致门、测试基线与
   非 `/private/tmp` 验证要求全部原文有效）：
@@ -161,9 +216,11 @@
   `rockchip` registry（实测无 `sourcePath`）；`Sources/**`、`Package.swift`、
   App/xcodeproj、Core/specs/contracts/baselines；chg-2026-024 的 archive PR；
   `scripts/**`（属 ASP-002）。
-- Allowed paths:
-  - `openspec/integrations/openharmony/readonly-probes.yaml`
+- Allowed paths（r3）:
   - `openspec/integrations/openharmony/device-observation-probes.yaml`
+  - `openspec/integrations/openharmony/profile.md`（r3 新增；仅同步该 registry 的
+    SHA-256 引用）
+  - `openspec/platforms/macos/profile.md`（r3 新增；同上）
   - `openspec/integrations/INTEGRATION-PROFILES.lock.yaml`
   - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Probes/**`
   - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/HDCProbeRegistryContractTests.swift`
