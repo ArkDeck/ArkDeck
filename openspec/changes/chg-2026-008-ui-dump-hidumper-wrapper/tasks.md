@@ -443,13 +443,192 @@ R2 decision 与 R2→R4 seam 两个串行任务,共 8 个;r11 因 R2 negative de
 
 ## TASK-UD-R2-DIAG-001 — R2 raw INVALID_UNICODE 根因只读诊断
 
-- Status:blocked(r11 只登记本任务;等待 r11 合入后的独立 readiness PR 固定
+- Status:ready(r1 implementation readiness;仅在维护者对本独立 readiness PR exact
+  head review/merge 后生效。只授权一个 host-only implementation + evidence 交付与
+  一个独立 `ready→done` status PR:按下方 Readiness(r1)契约新建
+  `scripts/ui_dump_diagnosis/` 三文件与 `evidence/runs/TASK-UD-R2-DIAG-001/**`
+  evidence,并由人类维护者在仓库外执行一次固定 CLI 诊断 run。不授权:Agent 打开/
+  复制 controlled raw;修改 `scripts/ui_dump_redaction/**`、`scripts/ud_capture/**`、
+  `decisions/**` 或任何既有 evidence;任一复活分支的实施或 SEAM/R4/UD-001 解锁;
+  installed HDC/device/network/GUI/mutation/destructive dispatch;把诊断输出当作
+  output family、复活授权或任何 compatibility/support/conformance 结论)
+- Historical Status:blocked(r11 只登记本任务;等待 r11 合入后的独立 readiness PR 固定
   implementation base、closed files、诊断输出 schema 与 exact host CLI。本治理 PR 不含
-  实现/fixture/evidence,不执行诊断,Agent controlled-raw read count 保持 `0`)
-- Allowed paths（readiness/status 载体面；实现面见 Candidate allowed paths）：
+  实现/fixture/evidence,不执行诊断,Agent controlled-raw read count 保持 `0`。——该
+  等待项已由本 r1 逐项闭合,见下方 Readiness 的 Unblock 核验;r11 的"任何实现/
+  fixture/evidence 起草"禁令自本 readiness 合入起被其授权面取代,其余禁令原文有效)
+- Readiness(r1;audit base = protected `main`
+  `d17d303714257a6551c8630a460a61f4b2917d1a`;全部 pin 均对该 base 实测。初稿曾
+  以 `6383f5b9…` 为 base,因 main 在 PR 创建窗口内推进(#675/#676/#677)被
+  allowed-paths 守卫按 stale-base 判红;本 head 为同一三文件变更 rebase 至新
+  base 后逐项重测,契约内容零变化):
+  - **Approval boundary:pending human merge。**本 carrier 只修改本 change 的
+    `tasks.md`(本任务段)、`acceptance-cases.yaml`(仅新增 `INT-UD-R2-DIAG-001`)
+    与 `verification.md`(仅本任务对应行);仅在维护者对本独立 readiness PR exact
+    head review/merge 后,本 readiness 及其固定的实现面才生效。
+  - **Unblock 前置逐项核验(全部实测为 audit base 祖先):**
+    1. r11 已合入:#668 merge `a1bded349d089fa521fca1868ce9978e51facbdc`
+       → satisfied;
+    2. guard 载体活声明已合入:#673 merge
+       `11f83f6e4bfcc7c4cb656e57ee2fdee903e234af`(本任务在 base 树恰 1 条
+       Allowed paths 活声明,解析 = 三载体文件,实测 3 patterns)→ satisfied;
+    3. 独立 readiness 固定 implementation base、closed files、非内容输出 schema 与
+       exact host CLI → 本 PR。
+    negative-decision 链同测为祖先:#248
+    `79b795b7916c863376b3c1f9c37456b0089283dd`、#251
+    `d5aded75d30fbd7ae048005b692b7f4138b23055`、#263
+    `952b0f70a697fb17568a693e1cb6c9f8aa2e8053`、#267
+    `c9b3f775821e4027252c99eeb350674f05aa6d02`。
+  - **Input pins:closed(实测)。**
+    - 诊断对象 = 仓库外 controlled R2 raw,#248 登记的 exact raw origin(remote
+      sidecar,capture sequence `16`):长度 `866256` bytes,SHA-256
+      `ec6663e6b7d42053ba089ccbfa89df74cb183a5a583f80a69f103b047014b077`。该
+      二元组经实测与 `decisions/r2-element-tree-v1.md`、
+      `evidence/runs/TASK-UD-R2-DECISION-001/run.md` 与 proposal r11 段逐字一致。
+      诊断 CLI 必须先实测长度与 SHA-256 并要求与该二元组精确相等,任一失配 =
+      `INPUT_HASH_MISMATCH` 拒绝且零诊断输出。
+    - redactor 对照版本 = `uidump-derived-redaction-v1`,四文件 SHA-256 于 audit
+      base 实测,与 `TASK-UD-R2-DECISION-001` run.md 的 pin 表逐字相等(零漂移):
+      `redact.py`
+      `938cc117da97304b5ede66ff55c84dd9ce0a987600d4a1ecec2c3e01351f53e1`、
+      `algorithm-v1.json`
+      `a75778fdf525050c4c0bcf11579e5f09f99a6fa70697bcf79026656a71f20185`、
+      `safe-literals-v1.txt`
+      `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`、
+      `redaction-receipt.schema.json`
+      `f4bffe70a51dc3f6228f24d41b814dc47cc2d6f0cde5f00445070f86cd1ec4b6`。
+    - INVALID_UNICODE 错误路径精确引用(audit base 实测代码路径):观测事实 =
+      `redact: INVALID_UNICODE` / exit `27`(DECISION-001 run.md 原文)。
+      `redact.py` 的 `ERROR_CODES`(65-79 行)固定 `INVALID_UTF8 = 26` 与
+      `INVALID_UNICODE = 27`;`transform()`(564 行起)先对 raw 严格 UTF-8
+      decode,解码失败 → `INVALID_UTF8`(568-570 行);解码成功后
+      `_validate_unicode(text, allow_line_endings=True)`(453-469 行)拒绝
+      non-NFC、`0x7F`、除 LF/CR 外一切 `<0x20` 码点(含 TAB/NUL)、Unicode 类别
+      `Cc/Cf/Cs/Co/Cn` 与 confusable 名称前缀(ARMENIAN/CHEROKEE/CYRILLIC/
+      FULLWIDTH/GREEK/MATHEMATICAL/SMALL)→ `INVALID_UNICODE`。含义 pin 为已
+      固定代码路径事实(不改写 r11 的二值根因框架):观测到 27 而非 26,说明该
+      raw 当时通过严格 UTF-8 解码、败于解码后码点策略;诊断工具必须同时实测
+      字节级 UTF-8 结构与码点级策略两个普查面,重新测量而非假设,使无论 raw
+      实际违反哪个面,二值根因判定都有事实输入。
+  - **诊断 CLI closed 契约(实现逐条满足,输出面零自由度):**
+    ① 载体 = `scripts/ui_dump_diagnosis/diagnose.py`,Python stdlib-only(禁第三方
+    依赖;PyYAML 只属 check-sdd 环境,工具不得 import);AST 审计零 shell/
+    subprocess/socket/network/exec/eval;零写盘——不产生任何文件,报告只写
+    stdout,稳定错误只写 stderr 单行 `diagnose: <ERROR_NAME>`;
+    ② exact CLI(执行时唯一非 pinned 参数是 raw 路径):
+    `<ARKDECK_ROOT>/.venv-sdd/bin/python scripts/ui_dump_diagnosis/diagnose.py
+    --input <CONTROLLED_RAW_PATH> --expected-input-sha256
+    ec6663e6b7d42053ba089ccbfa89df74cb183a5a583f80a69f103b047014b077
+    --expected-length 866256`;
+    ③ 输入门(全部 fail closed,失败时零报告输出):`O_RDONLY|O_NOFOLLOW` 打开、
+    fstat 必须 regular file、输入路径不得位于工具源两级祖先仓库根之内(镜像
+    redactor pathPolicy)、单遍流式读入内存且不复制/不缓存/不写任何路径、实测
+    长度与 SHA-256 精确等于 ② 的 pinned 值;错误码沿用 redactor 数字命名空间:
+    `INPUT_HASH_MISMATCH=24`、`INPUT_TOO_LARGE=25`(固定上限 `16777216`
+    bytes)、`SENSITIVE_OUTPUT=31`(输出终检)、`IO_ERROR=32`(含 symlink/非
+    regular/仓内路径),argparse 用法错误 = exit `2`;诊断完成(无论 raw 是否
+    违规)= exit `0` + 单行 canonical JSON 报告;
+    ④ 报告 schema id = `arkdeck-ud-raw-diagnosis-1.0.0`,closed keys 恰为:
+    `schema`;`tool{name,sha256}`;`policyRefs{redactPySha256,
+    algorithmManifestSha256}`(嵌入常量,测试断言其等于上方 redactor pin);
+    `input{expectedSha256,measuredSha256,expectedLength,measuredLength}`;
+    `byteHistogram{nul,tab,lf,cr,otherC0,asciiPrintable,del,lead2,lead3,lead4,
+    continuation,invalidByte}`(计数总和 = `measuredLength`);
+    `utf8Structure{decodable,invalidSequenceCount,invalidByteCount,
+    firstInvalidOffset,lastInvalidOffset,classCounts,runs,runsTruncated,
+    decileCounts,tailConcentrated}`,run class 枚举 =
+    `STRAY_CONTINUATION/INVALID_LEAD/OVERLONG/SURROGATE_ENCODING/OUT_OF_RANGE/
+    TRUNCATED_SEQUENCE_MID/TRUNCATED_SEQUENCE_EOF`;
+    `codepointPolicy{evaluated,nfc,combiningMarkCount,violationCount,
+    firstViolationByteOffset,lastViolationByteOffset,classCounts,runs,
+    runsTruncated,decileCounts,tailConcentrated}`(`evaluated` =
+    `utf8Structure.decodable`,false 时其余字段取零值/null/空列表),violation
+    class 枚举按 redactor 条件顺序取首个命中 = `DEL_7F/CONTROL_C0/CATEGORY_CC/
+    CATEGORY_CF/CATEGORY_CS/CATEGORY_CO/CATEGORY_CN/CONFUSABLE_NAME_PREFIX`,
+    LF/CR 豁免(镜像 `allow_line_endings=True`),偏移一律为字节偏移;
+    `redactorEquivalent{errorName,errorCode}`,`errorName` ∈
+    `{NONE,INVALID_UTF8,INVALID_UNICODE}`、`errorCode` ∈ `{null,26,27}`,推导
+    规则固定:不可解码 → `INVALID_UTF8/26`;可解码且(非 NFC 或
+    violationCount>0)→ `INVALID_UNICODE/27`;否则 `NONE/null`;
+    ⑤ 确定性与封闭性:`runs` 每面只保留前 32 + 后 32 条 `{offset,length,class}`
+    并以 `runsTruncated` 如实标注,计数字段始终精确;`decileCounts` = 按字节
+    偏移十等分的 10 个整数;`tailConcentrated` := `2*decileCounts[9] >= 总数`
+    (总数为 0 时 false);JSON 以 `sort_keys=True, ensure_ascii=True` 与固定
+    separators 序列化,同输入两次运行输出字节相同;
+    ⑥ 值类型法则(泄漏面收口):报告任何值只可为 int/bool/null/固定枚举字符串/
+    64-hex 摘要/上述之列表或对象;任何字段不得携带来自输入的字节子串、解码
+    文本、内容窗口、页面文本或 window/component 字面量;打印前的输出侧终检
+    walk 整棵报告树校验 key 封闭与值类型法则,违例 = `SENSITIVE_OUTPUT` 拒绝
+    输出。
+  - **实现边界(r1 固定,取代 Candidate 行的待固定状态):**新建且只可新建
+    `scripts/ui_dump_diagnosis/README.md`、`scripts/ui_dump_diagnosis/diagnose.py`
+    与 `scripts/ui_dump_diagnosis/test_diagnose.py` 三文件(上方活声明已逐文件
+    固定;`scripts/**` 属 sensitive 表,implementation PR 必须声明本任务);
+    evidence 面 = `evidence/runs/TASK-UD-R2-DIAG-001/**`;absence 于 audit base
+    实测:`scripts/ui_dump_diagnosis/` 与该 evidence 目录均不存在。实现开工时须
+    在自身 worktree 重验:四 redactor hash、raw 二元组三处一致、上述 absence 与
+    活声明解析(7 patterns);任一漂移即停手重 readiness。
+  - **验证计划(TEST-INT-UD-R2-DIAG-001 synthetic 正负矩阵 = 32 个用例族 + 2 项
+    强制审计测试,可增不可减,逐条二值 PASS,零真实 raw):**
+    gates(7):hash 失配拒绝、长度失配拒绝、超上限拒绝、symlink 拒绝、非
+    regular file 拒绝、仓内路径拒绝、`--expected-length` 非正整数用法错误;
+    clean 正例(3):纯 ASCII+LF、合法多字节(2/3/4 字节)+CRLF、CR-only 行尾,
+    均全零违规且 lead/continuation 计数精确;
+    UTF-8 结构负例(7):尾部截断多字节(EOF)、中部截断多字节、stray
+    continuation、invalid lead(`0xFE/0xFF`)、overlong(`0xC0 0xAF`)、
+    surrogate 编码(`0xED 0xA0 0x80`)、越界(`0xF4 0x90 0x80 0x80`),逐条
+    class/偏移/计数断言;
+    码点策略负例(8):NUL、TAB+其他 C0、DEL、`Cf`(如 U+200B)、`Co`、`Cn`、
+    confusable 前缀(如 CYRILLIC/FULLWIDTH 码点)、非 NFC 组合序列,逐条
+    class/字节偏移断言,并含 LF/CR 单独出现不判违规的豁免镜像负控;
+    分布与摘要(2):全部违规集中末十分位 → `decileCounts[9]=总数` 且
+    `tailConcentrated=true`;均匀散布 → `false`;
+    输出纪律(5):closed-key 校验、注入未知 key → `SENSITIVE_OUTPUT`、注入
+    自由字符串值 → `SENSITIVE_OUTPUT`、同输入两次运行字节相同、>64 违规时
+    `runsTruncated=true` 且计数仍精确;
+    强制审计(2):AST 审计(diagnose.py 与 test_diagnose.py 零 shell/subprocess/
+    socket/network,diagnose.py 另加零写盘)、`policyRefs` 嵌入常量 = 仓内
+    redactor 文件实测 hash 一致性。
+  - **执行模型(沿用 `TASK-UD-R2-DECISION-001` 先例):**diagnose.py 的受控 run
+    由人类维护者在仓库外亲手执行(exact CLI 见 ②),Agent 不打开/不复制
+    controlled raw,Agent raw read count 保持 `0`;controlled raw 路径不得进入
+    会话/仓库/evidence(DECISION-001 的 privacy deviation 先例在此 pin 为硬
+    规则,evidence 一律用 `<CONTROLLED_RAW_PATH>` 占位);raw 语义判读(如
+    "该 dump 是否本就非文本格式")只能由维护者离线进行,结论以散文 + 报告
+    非内容事实进入 evidence,不得引用任何内容片段。run.md 记录形态(逐项
+    必填):change/task/test id 与 evidence class(humanOfflineDiagnosis over
+    previously merged real-hardware raw);本 readiness merge OID;interpreter
+    实际 path/version/hash 与 preflight;工具/测试文件逐一 SHA-256 与执行时
+    source OID;synthetic 矩阵结果;exact CLI(raw 路径占位);stdout JSON 报告
+    逐字粘贴;维护者判读散文;二值根因结论或如实的"无法判定";Agent/human 的
+    raw-read 与 installed HDC/device/network/GUI/destructive dispatch 计数
+    (除维护者本次 host-only run 外全部为 `0`);`check-sdd` 与
+    `git diff --check` 结果。
+  - **done 判定(二值):**done ⇔ implementation + evidence PR(synthetic 矩阵
+    全绿 + 人类 run 报告 + 维护者根因结论)经维护者 review/merge 合入,且独立
+    status PR 起草 `ready→done` 并经维护者 review/merge。根因结论必须恰为
+    raw-data 或 pipeline 之一才可 done;结论为"无法判定"、歧义或双因并存时,
+    evidence 照实合入,但 status PR 只得起草 `ready→blocked`(等待新的修订裁定
+    或增强诊断),不得 done。无论 done 与否,两条复活分支保持未授权,分支授权
+    仅属引用本任务 evidence 的后续修订(经维护者 review/merge)。
+  - **Concurrency/absence:closed at drafting(2026-07-28,rebase 后复测)。**
+    remote `agent/*` 分支除本分支外实测 2 条(chg-2026-022 / chg-2026-040),
+    零 diag/ud/chg-2026-008 相关;当日 main 高频推进(本 readiness 首个 head 即
+    被 base 推进判红),实现开工前必须先 fetch 并对当时 main 重验 pins;主工作
+    副本为共享 checkout,实现必须在独立 worktree 内进行且 commit 前核对
+    `git branch --show-current`。
+  - **SDD 环境 gate(实测):**shared `.venv-sdd/bin/python` = Python `3.14.6` +
+    PyYAML `6.0.3`(经 check-sdd.sh 的 TASK-SDR-001 共享发现解析);本 readiness
+    起草时 `scripts/check-sdd.sh` = 0 error / 0 warning / 111 acceptance IDs
+    (change-local acceptance case 不进 canonical 计数)。
+- Allowed paths（readiness/status 载体面 + readiness r1 固定的实现面）：
   - 本 change `tasks.md`（仅本 task 段的 readiness/status 更新）
   - 本 change `acceptance-cases.yaml`（仅 `INT-UD-R2-DIAG-001` 登记）
   - 本 change `verification.md`（仅本 task 对应 verification 行）
+  - `scripts/ui_dump_diagnosis/README.md`（r1 固定；仅 implementation PR 使用）
+  - `scripts/ui_dump_diagnosis/diagnose.py`（r1 固定；仅 implementation PR 使用）
+  - `scripts/ui_dump_diagnosis/test_diagnose.py`（r1 固定；仅 implementation PR 使用）
+  - `openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/evidence/runs/TASK-UD-R2-DIAG-001/**`
 - Objective:在任何复活分支被授权之前判定 `TASK-UD-R2-DECISION-001` truthful-negative
   的根因。已固定事实(#248/#263):`uidump-derived-redaction-v1` 对 R2 sidecar exact raw
   origin(`866256` bytes,SHA-256
@@ -460,14 +639,18 @@ R2 decision 与 R2→R4 seam 两个串行任务,共 8 个;r11 因 R2 negative de
   工具与一次由人类维护者执行的诊断 run,产出仅含非内容事实的 repo-safe 诊断记录,为
   后续修订选择分支提供事实输入;本任务自身不选择分支、不实施任何修复。
 - Change-local closure:`INT-UD-R2-DIAG-001` / `TEST-INT-UD-R2-DIAG-001`(其 acceptance
-  case 与 verification 行由独立 readiness revision 一并固定登记)。
+  case 与 verification 行已由本独立 readiness r1 一并固定登记)。
 - Canonical Safety inputs:`REQ-DUMP-005/008`(raw/derived 分离与 raw 隐私边界的
   read-only Safety 输入;本 task 不认领任何 canonical AC/Test PASS)。
 - Depends on:
-  - r11 经维护者 review/merge 合入;
+  - r11 经维护者 review/merge 合入(已满足:#668 merge
+    `a1bded349d089fa521fca1868ce9978e51facbdc`;guard 载体活声明另经 #673 merge
+    `11f83f6e4bfcc7c4cb656e57ee2fdee903e234af` 先行合入);
   - 独立 readiness PR 固定 implementation base、closed files、非内容输出 schema、exact
-    host CLI 与人类执行步骤;该 PR 合入前本 task 不可执行,任何诊断输出不得产生。
-- Required implementation boundary(candidate;仅 future readiness 合入后生效):
+    host CLI 与人类执行步骤(= 本 r1);该 PR 合入前本 task 不可执行,任何诊断输出
+    不得产生。
+- Required implementation boundary(r1 已固定;仅在本 readiness PR 经维护者
+  review/merge 合入后生效,细化条款见上方 Readiness 的 CLI closed 契约):
   1. 诊断工具 stdlib-only、零联网、零 shell;对 controlled raw 只读打开(no-follow、不
      复制、不写缓存、不落任何仓库内路径),先复核输入实测 SHA-256 精确等于上述
      pinned raw-origin hash,失配即拒绝且零输出;raw 任何路径不得修改/覆盖;
@@ -484,7 +667,8 @@ R2 decision 与 R2→R4 seam 两个串行任务,共 8 个;r11 因 R2 negative de
   4. synthetic-only tests 覆盖 valid UTF-8、尾部截断多字节序列、中部散布 invalid 字节、
      NUL/control、超长输入、hash 失配拒绝、输出 schema 封闭性与敏感终检负例;测试
      不使用任何真实 raw。
-- Candidate allowed paths(future readiness 必须逐一固定):
+- Candidate allowed paths(已由本 readiness r1 逐文件固定进上方 Allowed paths
+  活声明;本行保留为历史记录,不再是待固定项):
   - `scripts/ui_dump_diagnosis/{README.md,diagnose.py,test_diagnose.py}`
   - `openspec/changes/chg-2026-008-ui-dump-hidumper-wrapper/evidence/runs/TASK-UD-R2-DIAG-001/**`
   - 本 `tasks.md`(仅该 task 的独立 status/completion evidence 更新)
@@ -503,7 +687,8 @@ R2 decision 与 R2→R4 seam 两个串行任务,共 8 个;r11 因 R2 negative de
     `TASK-UD-R2-R4-SEAM-001`/`TASK-UD-CAP-R4-001`/`TASK-UD-001`;重返 Phase B 仍须
     该分支修订另行登记的新 positive R2 structural decision 与 r10 既有 seam/R4 gate,
     #263 negative decision 及其 evidence 永不重写。
-- Forbidden now:任何实现/fixture/evidence 起草;Agent 打开/复制 controlled raw;修改
+- Forbidden now:在本 readiness PR 合入前起草任何实现/fixture/evidence,合入后越出
+  上方活声明起草任何文件;Agent 打开/复制 controlled raw;修改
   `scripts/ui_dump_redaction/**`、`scripts/ud_capture/**`、`decisions/**` 或任何既有
   evidence;installed HDC/device/network/GUI/mutation/destructive dispatch;把诊断输出
   当作 output family、复活授权或任何 compatibility/support/conformance 结论。
@@ -513,7 +698,8 @@ R2 decision 与 R2→R4 seam 两个串行任务,共 8 个;r11 因 R2 negative de
 - Required environment:固定 Python 3.14.6 + PyYAML 6.0.3
   (`<ARKDECK_ROOT>/.venv-sdd/bin/python`);执行时在 run.md 记录实际 path/version/
   hash;不得联网安装或回落默认解释器。
-- Verification(candidate):`TEST-INT-UD-R2-DIAG-001`:synthetic 正负矩阵、输入 hash
+- Verification(r1 固定;矩阵细目见上方 Readiness 验证计划):
+  `TEST-INT-UD-R2-DIAG-001`:synthetic 正负矩阵、输入 hash
   gate、输出 schema 封闭性、敏感终检与零内容泄漏全部二值 PASS;
   `scripts/check-sdd.sh`;`git diff --check`;AST no-shell/no-network 审计;人类诊断 run
   的非内容事实与 claimed 维护者判读由 evidence PR 的维护者 review/merge attest。
