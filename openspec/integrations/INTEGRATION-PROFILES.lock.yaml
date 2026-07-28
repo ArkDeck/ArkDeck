@@ -1,12 +1,12 @@
 # Integration adapter 输入的版本登记(V2:普通 profile 不逐文件 hash pin;历史对比用 git;
 # golden fixture 与 production probe resource 例外:逐文件 SHA-256 pin)
-lock: INTEGRATION-PROFILES-0.6.0
+lock: INTEGRATION-PROFILES-0.7.0
 status: current
-updated_at: 2026-07-27
+updated_at: 2026-07-28
 
 profiles:
   - id: OPENHARMONY-TOOLS
-    version: 0.5.0
+    version: 0.6.0
     path: openspec/integrations/openharmony/profile.md
 
 catalogs:
@@ -199,9 +199,50 @@ device_observation_probe_resources:
     path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Probes/DeviceObservation/1.0.0/vectors/wrong-columns.bin
     sha256: 8400fe3902c34c9d7999b22c374da67d6d6c09f693ff6ebbde624a8c28fb7664
 
+supervisor_observation_probe_registries:
+  - id: OPENHARMONY-HDC-SUPERVISOR-OBSERVATION-PROBES
+    version: 1.0.0
+    profile: OPENHARMONY-TOOLS@0.6.0
+    tool_reported_version: 3.2.0f
+    tool_executable_sha256: 05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83
+    endpoint: 127.0.0.1:8710
+    path: openspec/integrations/openharmony/supervisor-observation-probes.yaml
+    sha256: f1691f748da10f1bb7753167d71ff3b764a347676f97d5ec70a1e97ac35c9763
+
+supervisor_observation_probe_resources:
+  - id: hso-registry-bundled-copy
+    version: 1.0.0
+    path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Probes/SupervisorObservation/1.0.0/registry.yaml
+    sha256: f1691f748da10f1bb7753167d71ff3b764a347676f97d5ec70a1e97ac35c9763
+  - id: hso-resources-manifest
+    version: 1.0.0
+    path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Probes/SupervisorObservation/1.0.0/resources.json
+    sha256: 6bf09cabfc762b1e632d6dba2528b04b33173f6e53f2f1669d26ef8d72a4ab3d
+  - id: hso-receipt-server-identity-generation
+    version: 1.0.0
+    path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Probes/SupervisorObservation/1.0.0/receipts/server-identity-generation.json
+    sha256: 2edb677d25849eef8c0dede8c639a9ca21649578c7184b343870c5b79ecf1350
+  - id: hso-fail-closed-controls
+    version: 1.0.0
+    path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Probes/SupervisorObservation/1.0.0/controls/fail-closed-vectors.json
+    sha256: 13470fbd7485dd328703476da4b4626fbce21ba5bce2bbfc4aef6f9020e65bbc
+  - id: hso-resource-attributes
+    version: 1.0.0
+    path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Probes/SupervisorObservation/1.0.0/.gitattributes
+    sha256: 6f4d10e6d9a40109d02dfde8373df60ad01eabc5cca17be26fee4ca961621c9a
+
 adoption_boundary:
-  previous_lock: INTEGRATION-PROFILES-0.5.0
-  previous_openharmony_profile: OPENHARMONY-TOOLS@0.4.0
+  previous_lock: INTEGRATION-PROFILES-0.6.0
+  previous_openharmony_profile: OPENHARMONY-TOOLS@0.5.0
+  supervisor_observation_rule: >-
+    The commandless supervisor-observation registry is available only to a consumer that
+    explicitly adopts OPENHARMONY-TOOLS@0.6.0 and the complete
+    OPENHARMONY-HDC-SUPERVISOR-OBSERVATION-PROBES@1.0.0 registry/resource hash closure through
+    an independently approved task. It launches no HDC command and grants no checkserver,
+    health, client/server/daemon version, lifecycle, ownership, device, binding, destructive, or
+    cross-version fallback authority. The accepted CHG-2026-024 provenance is limited to the
+    exact 3.2.0f tuple and commandless OS process/listener observation conditions with DEV-1
+    disclosed.
   device_observation_rule: >-
     The device-observation registry is observed on hdc 3.2.0f and is available only to a
     consumer that explicitly adopts OPENHARMONY-TOOLS@0.5.0 and the complete
@@ -210,6 +251,8 @@ adoption_boundary:
     registries; entries must never be merged across the two tool versions, and neither existing
     registry gains any authority from this one. CHG-2026-022 consumer wiring stays out of scope
     until its own readiness.
+  historic_device_observation_previous_lock: INTEGRATION-PROFILES-0.5.0
+  historic_device_observation_previous_profile: OPENHARMONY-TOOLS@0.4.0
   historic_previous_lock: INTEGRATION-PROFILES-0.4.0
   historic_previous_openharmony_profile: OPENHARMONY-TOOLS@0.3.0
   rule: >-

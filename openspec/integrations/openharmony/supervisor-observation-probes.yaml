@@ -1,0 +1,193 @@
+{
+  "schemaVersion": "1.0.0",
+  "serializationFormat": "json-compatible-yaml-1.2",
+  "registryId": "OPENHARMONY-HDC-SUPERVISOR-OBSERVATION-PROBES",
+  "registryVersion": "1.0.0",
+  "integrationProfile": "OPENHARMONY-TOOLS@0.6.0",
+  "registeredBy": "CHG-2026-043/TASK-HSO-001",
+  "unknownFamilyDisposition": "unsupported",
+  "toolContext": {
+    "platform": "macos",
+    "reportedVersion": "3.2.0f",
+    "executableSHA256": "05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83",
+    "endpoint": "127.0.0.1:8710",
+    "divergenceNote": "This exact 3.2.0f commandless supervisor authority is separate from the 3.2.0d readonly and trace registries and from the 3.2.0f device-observation registry. No entry, receipt, command result, candidate, endpoint, health fact, or version fact may cross those registry boundaries."
+  },
+  "entries": [
+    {
+      "id": "openharmony-hdc-supervisor-identity-generation-3.2.0f-macos",
+      "family": "serverIdentityGeneration",
+      "status": "supported",
+      "probeKind": "platformProcessObservation",
+      "platform": "macos",
+      "toolReportedVersion": "3.2.0f",
+      "executableIdentityPolicy": {
+        "required": true,
+        "sha256": "05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83",
+        "pathSource": "selectedToolchainSnapshot",
+        "verifyBytesBeforePreScan": true,
+        "verifyBytesAfterPostScan": true,
+        "replacementInvalidatesReceipt": true
+      },
+      "exactArgv": [],
+      "invocationAllowed": false,
+      "preconditions": [
+        "selectedToolchainSnapshotPinned",
+        "exactEndpoint127.0.0.1:8710",
+        "exactlyOneExistingServerProcess",
+        "exactlyOneNormalizedListener",
+        "listenerOwnedByObservedProcess",
+        "selectedExecutableBytesVerifiedBeforeAndAfter"
+      ],
+      "endpointPolicy": {
+        "requiresExactEndpoint": true,
+        "endpoint": "127.0.0.1:8710",
+        "existingServerRequired": true,
+        "serverAbsentDisposition": "unavailable",
+        "multipleOrAmbiguousDisposition": "unknown",
+        "fallbackAllowed": false
+      },
+      "observationContract": {
+        "requiredListenerCount": 1,
+        "listenerMustBeOwnedByObservedProcess": true,
+        "boundedPrePostScanRequired": true,
+        "prePostEqualityFields": [
+          "pid",
+          "startSeconds",
+          "startMicroseconds",
+          "resolvedExecutablePath",
+          "executableSHA256",
+          "normalizedEndpoint",
+          "listenerOwner"
+        ],
+        "listenerNormalization": [
+          "exactIPv4Loopback",
+          "IPv4MappedIPv6LoopbackOnlyWhenMacOSSocketRuleProvesEquivalence"
+        ],
+        "portOnlyMatchAllowed": false
+      },
+      "inputContract": {
+        "rawFamily": "redactedPlatformIdentityReceipt",
+        "stream": "none",
+        "exitCode": null,
+        "receiptId": "hso-receipt-server-identity-generation",
+        "receiptPath": "SupervisorObservation/1.0.0/receipts/server-identity-generation.json",
+        "receiptSHA256": "2edb677d25849eef8c0dede8c639a9ca21649578c7184b343870c5b79ecf1350",
+        "receiptIsReusableProductionAuthority": false
+      },
+      "semanticMappings": [
+        {
+          "input": "exactTupleAndOneStableOwnedListener",
+          "result": "observed.generation"
+        },
+        {
+          "input": "noListener",
+          "result": "unavailable"
+        },
+        {
+          "input": "multipleOrAmbiguousListenerOwner",
+          "result": "unknown"
+        },
+        {
+          "input": "toolPathHashOrEndpointMismatch",
+          "result": "unsupported"
+        },
+        {
+          "input": "pidStartPathHashEndpointOrListenerDrift",
+          "result": "unknown"
+        },
+        {
+          "input": "timeout",
+          "result": "timedOut"
+        },
+        {
+          "input": "cancellation",
+          "result": "cancelled"
+        },
+        {
+          "input": "platformScanErrorOrCallerSuppliedAuthority",
+          "result": "unknown"
+        }
+      ],
+      "generationPolicy": {
+        "mintedOnlyFromCurrentPlatformObserverReceipt": true,
+        "callerReceiptAllowed": false,
+        "callerGenerationAllowed": false,
+        "persistedReceiptMayMint": false,
+        "deviceSnapshotMayMint": false,
+        "failedObservationRetainsExternalClaim": false
+      },
+      "effectClassification": "readOnly",
+      "forbiddenEffects": [
+        "hdcChild",
+        "serverStart",
+        "serverStop",
+        "serverRestart",
+        "serverAdoption",
+        "subserverLifecycle",
+        "deviceMigration",
+        "deviceMutation",
+        "bindingMutation",
+        "destructive"
+      ],
+      "authorityLimit": {
+        "mayEstablish": [
+          "current existing process and start identity",
+          "selected executable identity",
+          "exact normalized listener endpoint owned by that process",
+          "stable identity tuple across the bounded current observation"
+        ],
+        "mustMatch": [
+          "selected toolchain snapshot",
+          "exact executable bytes before and after",
+          "exact endpoint",
+          "one process-owned listener",
+          "all pre/post equality fields"
+        ],
+        "neverEstablish": [
+          "pre-existing or external origin from the accepted capture",
+          "external ownership without the existing four-evidence classifier",
+          "health",
+          "client version",
+          "server version",
+          "daemon version",
+          "checkserver or hdc -v command semantics",
+          "server lifecycle or adoption authority",
+          "subserver, device, binding, or destructive authority",
+          "authority from a caller-provided or persisted receipt or generation",
+          "fallback to the 3.2.0d readonly registry"
+        ]
+      },
+      "timeout": {
+        "milliseconds": 1000,
+        "resultOnExpiry": "timedOut"
+      },
+      "cancellation": {
+        "result": "cancelled",
+        "mayTerminateOwnedObservation": true,
+        "mayKillHDCServer": false,
+        "cleanup": "release platform observation handles only"
+      },
+      "provenance": {
+        "evidenceClass": "controlledHumanCapture",
+        "sourceChange": "CHG-2026-024-hdc-device-snapshot-registration",
+        "sourceEvidence": "evidence/runs/TASK-I24-001/run.md",
+        "sourceSHA256": "ef3372dadc19c4a0e84f6f15f3ac616751d0351cfc2372fa9cf943952275318e",
+        "acceptedHeads": [
+          "48de853d984e5781510c3d38ddc473d0d36e8373",
+          "76ef464bf18f536ea304076768a85391fc9d7b5e"
+        ],
+        "acceptedMerges": [
+          "af6d64d67af98c94e1f03581de6f52ecdb8a6bb2",
+          "6df25c25d0088238ce2700db07c4db6fbd92cc34"
+        ],
+        "acceptedBy": "maintainer lvye exact-head review and merge of PR #656 and PR #658",
+        "deviation": {
+          "id": "DEV-1",
+          "disposition": "Accepted only for commandless platform-process field shape, normalization, exact tuple, and stability conditions. Per-command pre/post brackets were incomplete, so no HDC command output or command semantic is reused."
+        },
+        "repositoryGoldenFixture": false
+      }
+    }
+  ]
+}
