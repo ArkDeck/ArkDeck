@@ -111,6 +111,20 @@ UserDefaults 域:`arkdeck` 是无 bundle identifier 的 CLI,`UserDefaults.standa
   Host:779–781)。工具文件被移动/重建 → bookmark 变 stale/解析失败
   (Host:789–791 报 `stale or inaccessible`)→ 重跑本节全部步骤。bookmark 为
   per-user 产物:创建与消费须同一 macOS 用户账户。
+- **勘误(2026-07-28;缺陷正本 = tasks.md TASK-AIN-003「Defect record 2」;
+  原文历史层保留、不删除)**:本节 helper 途径已被受控实测**证伪**——
+  `.withSecurityScope` bookmark 的 resolve **绑定创建者 code-signing 身份**
+  (ad-hoc 下 = Identifier+CDHash 粒度)。上列第 2–3 步以 `swift` 解释器进程
+  (Apple 签名 `swift-frontend`)创建的 bookmark,产品这类 ad-hoc 二进制按
+  load() 同选项 resolve 实测 = `NSCocoaErrorDomain Code=259`(bookmark 字节
+  逐字节一致仍然如此);维护者 2026-07-28 实际执行本节 + §7 探针即于该第一站
+  裸报 259(load() 的 resolve 调用裸抛,无治理文案)。上方「可行性依据」的
+  r3 实证为**同进程自证**,只在同一签名身份内成立,不覆盖「helper 创建、产品
+  消费」。SwiftPM 构建的 `arkdeck` 为 ad-hoc 签名且 Identifier 内嵌 LC_UUID
+  (签名身份逐内容不同的构建漂移),产品又无任何 bookmark 安装子命令,故改由
+  产品自建 bookmark 亦无入口、且重构建后同样失效。**第 1 项在
+  TASK-AIN-BKMK-001(tasks.md)done 前不可闭合**;本节安装步骤保留为历史层
+  记录,**不得照做**。admission/execute 面的对应出入记录 = §8 第 4 条。
 
 ## 3. 第 2 项:quarantine 断言(+ admission 层伴生键 code trust)
 
@@ -351,6 +365,20 @@ swift run -c release arkdeck flash execute \
    按任务卡「发现缺陷回 TASK-AIN-003」),归维护者裁量;本文件的安装步骤不因此
    改变(四项仍是 load() 的必要输入),但 r4 起草者必须知道:**仅装齐宿主前置不
    使 E2 可达,该缺口闭合前不得以「前置已装好」推定可执行**。
+4. **第二处上游结构性缺口(2026-07-28 增补;维护者实际执行 §2/§7 时发现,本
+   runbook 无法也不得修复)**:`.withSecurityScope` bookmark 的 resolve 绑定
+   **创建者 code-signing 身份**(ad-hoc 下 = Identifier+CDHash 粒度;受控
+   矩阵与行级证据 = tasks.md TASK-AIN-003「Defect record 2」)。§2 helper
+   (解释器进程)所建 bookmark,产品 ad-hoc 二进制 resolve 恒为
+   `NSCocoaErrorDomain Code=259`,且该错误在 load() 的 resolve 调用处裸抛
+   (无 `productionConfigurationUnavailable` 文案,经 CLI 顶层 `\(error)`
+   直出);产品子命令全集无任何安装入口,SwiftPM 产物签名身份逐(内容不同
+   的)构建漂移。故第 1 项今日**不存在可行安装途径**,§7 探针在缺陷闭合前恒
+   止于第一站(bookmark resolve),到不了「止于授权解析拒绝」的判读位。修复
+   属 `Packages/**`(本任务 Forbidden;按任务卡「发现缺陷回 TASK-AIN-003」),
+   由 TASK-AIN-BKMK-001(tasks.md)承载;其 done 前不得以「第 1 项已装好」
+   推定 load() 可消费,r4 的 D-1 第 1 项快照取证同以其 done 为前置(r4 前置
+   清单第 8 条)。§2 末的 dated 勘误注记为安装面的对应记录。
 
 ## 9. 脱敏红线(全文适用)
 
