@@ -2,7 +2,33 @@
 
 ## TASK-I24-001 — register the parameterized device-observation snapshot family
 
-- Status:ready（r2 corrective readiness；仅在维护者对本独立 readiness PR
+- Status:done（2026-07-28 completion；仅在维护者 review/merge 本独立
+  `ready→done` PR 后生效。实现载体 = #664 merge
+  `ffca996f41be37d27137e7245c8fba3645fb0fb4`：registry
+  `OPENHARMONY-HDC-DEVICE-OBSERVATION-PROBES@1.0.0` +
+  bundled pack（12 合成向量 / 10 fail-closed 控制 / resources 清单）+
+  profile `OPENHARMONY-TOOLS@0.5.0` + lock `INTEGRATION-PROFILES-0.6.0` +
+  macOS mapping + 13 条契约测试，并按 r2 唯一授权把
+  `HDCProbeRegistryContractTests` 的 packaged 枚举收窄至自身 `1.0.0/` 子树。
+  flip base `ffca996f…` recheck：(a) 全链十三 merge 均为 ancestors
+  （propose #272 `cdfc181f`、approval #273 `1eeb5168`、capture plan r2 #275
+  `c8d9ba27`、r3 #624 `46ebcc22`、(D-2) 决策 #626 `36af5533`、r4 #651
+  `180367fc`、r5 #657 `98d1f885`、r6 #659 `6e45a224`、evidence #656
+  `af6d64d6` 与 #658 `6df25c25`、readiness r1 #662 `88465abc` 与 r2 #663
+  `04afc7cf`、实现 #664 `ffca996f`）；(b) Swift 413 tests / 1 skipped /
+  0 failures（**非 `/private/tmp`** 检出实测；r1 钉定基线 400 + 新增 13）、
+  `check-sdd` 0/0/111、host_loop 与 `check_pr_paths` 套件 OK；(c) evidence =
+  `evidence/runs/TASK-I24-001/run.md`（capture session #1 / V0 / implementation
+  三节）在树；(d) 本 flip 单文件；(e) 不声称：change 级 `verified` 为下一
+  独立 PR，CHG-2026-022 消费侧接线仍在其自身 readiness 之后。
+  遗留如实在案：canonical registry 与 bundled 副本的字节一致守卫无自动化
+  （其载体属 `scripts/**`，不在本任务授权内），当前由 lock 相邻两个 SHA-256
+  与 review 兜底。）
+- Historical Status:ready（r2 corrective readiness = #663 merge
+  `04afc7cf31fc37f9ef8b16f3ea4dcda3712065f8`；其一次性实现授权已由 #664
+  全额消耗。r1 = #662 merge `88465abc8dd500e6bd0746f91aed9c6714dd0e6c`，
+  其条款除被 r2 显式更正者外全程有效。原 r2 Status 块正文如下作历史保留。）
+- Historical Status:ready（r2 corrective readiness；仅在维护者对本独立 readiness PR
   exact head review/merge 后生效。r1 的实现契约在实现预检中撞上一处**跨契约
   冲突**并按任务条款停手（见 Readiness（r2）Collision record）；r2 只做**最小
   scope 更正** = 多授权一个既有契约测试文件，其余条款原文有效、r1 实现成果
