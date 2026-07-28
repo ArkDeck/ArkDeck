@@ -1,6 +1,6 @@
 ---
 id: CHG-2026-041-archive-stable-provenance
-revision: 4
+revision: 5
 status: approved
 class: implementation-only
 core_change_level: none
@@ -158,4 +158,25 @@ receipt），后者的哈希是产品运行时 pin（r3 已记录），迁移需
 为 0」，并要求该表逐文件登记期望出现次数、**双向**校验：多于登记值 fail
 （防借豁免夹带新债），少于登记值亦 fail（防 deferred 面被悄悄迁移而账本
 不更新）。这样豁免是**有账可查且会过期**的，而不是一个永久的例外洞。
+
+## r5 注记（2026-07-28，trace-probes 亦为产品 pin；原文如实保留）
+
+实现 TASK-ASP-002 时实测：`trace-probes/1.0.0/registry.yaml` 的内容哈希被
+`Sources/ArkDeckOpenHarmony/TraceProbeAdapter.swift` 的
+`public static let registrySHA256` 钉死，迁移其字节使
+`TraceAdapterGoldenTests` 变红。与 r3 就 readonly 面确立的结论同型：这是
+产品改动，需 `Sources/**`，而后者是本 change 的全局 Out of scope。
+
+r5 因此把 ASP-002 的迁移面窄化为 **rockchip 一处**（实测无 Sources/Packages
+pin、不在 lock），trace-probes 的 3 处并入 deferred 登记表，与 readonly 面
+同批等待一个带 `Sources/**` 授权的后续 change；登记表由 6 文件 12 处扩为
+**7 文件 15 处**。守卫与其双向校验机制不变——**守卫本就是本任务的主要价值，
+它使这个形态不能再悄悄回来**。
+
+**范围坦白**：本 change 的 readiness 已连改五版（r1→r5），四次都是同一根因
+——迁移一个 hash-pinned 数据文件前，没有把「谁钉了它的哈希」查到
+`Sources/`。其中 trace 这次尤其不该：该 pin 曾出现在 ASP-001 勘察期的一次
+grep 输出里，是看到了没接上。教训已记录，通用规矩是：**凡迁移 registry/
+fixture 类数据文件，先对其内容哈希在 `Sources`/`Tests`/`scripts`/lock 全量
+反查，再定 scope。**
 

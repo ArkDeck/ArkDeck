@@ -1,5 +1,5 @@
 change_id: CHG-2026-041-archive-stable-provenance
-change_revision: 4
+change_revision: 5
 cases:
   - acceptance_id: ASP-SHAPE-001
     test_id: TEST-ASP-SHAPE-001
@@ -34,8 +34,9 @@ cases:
       The four handed-over occurrences and their scripts/** consumers are migrated first and the
       guard is enabled second, in that order, since enabling it first would redden the repository.
       Afterwards no registry, resource manifest or receipt anywhere contains an openspec/changes
-      literal outside an explicit deferred register, which lists the readonly surface - twelve
-      occurrences across six files whose hash is a product runtime pin - with a per-file expected
+      literal outside an explicit deferred register, which lists the readonly surface and
+      trace-probes - fifteen occurrences across seven files whose hashes are product runtime
+      pins - with a per-file expected
       count checked in both directions, so neither smuggling new debt under the exemption nor
       silently migrating an exempt file without updating the ledger can pass. A planted
       openspec/changes path inside any registry makes
