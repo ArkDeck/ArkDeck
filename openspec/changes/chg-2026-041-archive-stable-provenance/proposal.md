@@ -1,6 +1,6 @@
 ---
 id: CHG-2026-041-archive-stable-provenance
-revision: 3
+revision: 4
 status: approved
 class: implementation-only
 core_change_level: none
@@ -145,4 +145,17 @@ r2 归 ASP-002。
 （readonly 与 trace 指向的 change 早已归档，rockchip 指向的 chg-2026-026
 短期不归档），属既有技术债而非活口。是否值得为它开一个触碰产品运行时 pin
 的 change，建议单独判断，不必绑在本 change 上。
+
+## r4 注记（2026-07-28，守卫判据可满足性更正；原文如实保留）
+
+起草 TASK-ASP-002 readiness 时实测：全仓 registry/resource/receipt 面现有
+`openspec/changes/` 字面量 **16 处 / 8 文件**——ASP-002 要迁的 4 处，加上
+**必须留存的 12 处 / 6 文件**（readonly-probes 及其 bundled 副本与 4 个
+receipt），后者的哈希是产品运行时 pin（r3 已记录），迁移需 `Sources/**`。
+
+因此 r2 为 `ASP-GUARD-001` 写下的「迁移后全仓字面量为 0」**不可满足**——
+守卫一旦无条件全仓启用，仓即刻变红。r4 改为「**显式 deferred 登记表以外**
+为 0」，并要求该表逐文件登记期望出现次数、**双向**校验：多于登记值 fail
+（防借豁免夹带新债），少于登记值亦 fail（防 deferred 面被悄悄迁移而账本
+不更新）。这样豁免是**有账可查且会过期**的，而不是一个永久的例外洞。
 
