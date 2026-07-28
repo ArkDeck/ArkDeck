@@ -21,6 +21,7 @@ enum FixtureMode: String {
   case mismatch
   case managedServer
   case selectedDeviceReady
+  case subserver
 }
 
 let suppliedArguments = Array(CommandLine.arguments.dropFirst())
@@ -52,6 +53,11 @@ if suppliedArguments.first == "uninstall" {
   mode = .version
 } else if endpointBoundArguments == ["list", "targets", "-v"] {
   mode = .selectedDeviceReady
+} else if endpointBoundArguments == ["spawn-sub"] || endpointBoundArguments == ["killall-sub"] {
+  // Sealed subserver family stand-in. Like the lifecycle families it has no
+  // registered success byte family: the fixture exits zero with no output and
+  // the semantic gate stays fail-closed at unknownOutput.
+  mode = .subserver
 } else if suppliedArguments.contains("kill") {
   // Lifecycle success is established only by the post-dispatch probe, never
   // by treating arbitrary command output as a registered semantic family.
@@ -116,6 +122,8 @@ case .endpoint:
   FileHandle.standardOutput.write(Data("endpoint-port=\(selected)\n".utf8))
 case .unknown:
   FileHandle.standardOutput.write(Data("unregistered fixture output\n".utf8))
+case .subserver:
+  break
 case .managedServer:
   guard let endpointIndex = suppliedArguments.firstIndex(of: "-s"),
     suppliedArguments.indices.contains(endpointIndex + 1),

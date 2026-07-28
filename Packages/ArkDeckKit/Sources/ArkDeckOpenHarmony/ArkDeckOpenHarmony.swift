@@ -244,17 +244,27 @@ public struct HDCJobToolchainSnapshot: Sendable, Equatable {
   public let source: HDCCandidateSource
   public let sha256: String
   public let endpoint: String
+  /// The source of the original endpoint selection. Composition must carry
+  /// this value through verbatim: re-deriving a selection from the endpoint
+  /// string alone would falsely present every endpoint as explicit.
+  public let endpointSource: HDCServerEndpointSource?
   public let platformTrust: HDCProbeValue<String>
   public let clientVersion: HDCProbeValue<String>
   public let serverVersion: HDCProbeValue<String>
   public let daemonVersion: HDCProbeValue<String>
   public let serverGeneration: HDCProbeValue<Int>
 
-  public init(candidate: HDCCandidate, endpoint: String, details: HDCProbeDetails) {
+  public init(
+    candidate: HDCCandidate,
+    endpoint: String,
+    endpointSource: HDCServerEndpointSource? = nil,
+    details: HDCProbeDetails
+  ) {
     self.path = candidate.path
     self.source = candidate.source
     self.sha256 = candidate.sha256
     self.endpoint = endpoint
+    self.endpointSource = endpointSource
     self.platformTrust = details.platformTrust
     self.clientVersion = details.clientVersion
     self.serverVersion = details.serverVersion
@@ -376,6 +386,48 @@ public enum HDCServerOwnership: String, Sendable, Equatable {
   case external
   case arkDeckManaged
   case unknown
+}
+
+/// Per-evidence basis of the most recent ownership classification for one
+/// endpoint. Every item stays independently readable; aggregating them into a
+/// single boolean is deliberately not offered so a presentation cannot hide
+/// which evidence was missing. The initializer is module-internal: callers
+/// outside the package can read a basis but never mint one.
+public struct HDCServerOwnershipBasis: Sendable, Equatable {
+  /// ① The server existed before the probe, proved by the bracketed
+  /// pre-existing process/listener identity receipt.
+  public let preExistingServerReceipt: Bool
+  /// ② This session's automatic lifecycle dispatch count was zero at
+  /// judgment time.
+  public let zeroAutomaticLifecycleDispatch: Bool
+  /// ③ The generation was minted from the observation receipt rather than an
+  /// ArkDeck-started server (confirmed lifecycle result or managed launch).
+  public let generationMintedFromObservation: Bool
+  /// ④ The supervisor holds no active or unreconciled managed-launch
+  /// provenance for this endpoint.
+  public let noActiveOrUnreconciledManagedProvenance: Bool
+}
+
+/// Lifecycle of a recorded managed-launch claim. `unreconciled` is an explicit
+/// state: a claim whose live evidence stopped verifying without a reconcile or
+/// retire record keeps blocking external classification, because forgetting a
+/// managed launch is not the same as clearing it.
+enum HDCManagedLaunchProvenanceState: String, Sendable, Equatable {
+  case active
+  case unreconciled
+  case reconciled
+  case retired
+}
+
+struct HDCManagedLaunchProvenance: Sendable, Equatable {
+  let evidence: HDCManagedServerLaunchEvidence
+  var state: HDCManagedLaunchProvenanceState
+}
+
+/// Read-only observability projection of a managed-launch provenance record.
+struct HDCManagedProvenanceObservation: Sendable, Equatable {
+  let state: HDCManagedLaunchProvenanceState
+  let evidenceLive: Bool
 }
 
 public enum HDCServerHealth: String, Sendable, Equatable {
@@ -934,10 +986,31 @@ struct HDCServerLifecycleDispatchLease: Sendable, Equatable {
   let auditID: UUID
   let endpoint: HDCServerEndpoint
   let launchGate: ProcessAtomicLaunchGate
+  /// Opaque confirmed-lifecycle dispatch permit minted in the same actor turn
+  /// as the lease. Observability only: the launch gate and lease consumption
+  /// remain the sole dispatch authorities.
+  let dispatchPermit: HDCServerDispatchPermit?
+
+  init(
+    id: UUID,
+    stepID: UUID,
+    auditID: UUID,
+    endpoint: HDCServerEndpoint,
+    launchGate: ProcessAtomicLaunchGate,
+    dispatchPermit: HDCServerDispatchPermit? = nil
+  ) {
+    self.id = id
+    self.stepID = stepID
+    self.auditID = auditID
+    self.endpoint = endpoint
+    self.launchGate = launchGate
+    self.dispatchPermit = dispatchPermit
+  }
 
   static func == (lhs: Self, rhs: Self) -> Bool {
     lhs.id == rhs.id && lhs.stepID == rhs.stepID && lhs.auditID == rhs.auditID
       && lhs.endpoint == rhs.endpoint && lhs.launchGate === rhs.launchGate
+      && lhs.dispatchPermit === rhs.dispatchPermit
   }
 }
 
@@ -1127,6 +1200,20 @@ public enum HDCServerLifecycleDispatchResult: Sendable, Equatable {
 struct HDCManagedStartAuthorization: Sendable, Equatable, Hashable {
   let id: UUID
   let endpoint: HDCServerEndpoint
+  /// Opaque managed-start dispatch permit minted together with the
+  /// absent-endpoint authorization. It only feeds the observability counters;
+  /// it is not itself a launch authorization.
+  let dispatchPermit: HDCServerDispatchPermit
+
+  static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.id == rhs.id && lhs.endpoint == rhs.endpoint
+      && lhs.dispatchPermit === rhs.dispatchPermit
+  }
+
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(id)
+    hasher.combine(endpoint)
+  }
 }
 
 /// The only host-wide owner of HDC server state. It deliberately has no
@@ -1148,6 +1235,19 @@ public actor HDCServerSupervisor: HDCServerLifecycleDispatchLeaseValidating {
   private var managedStartAuthorizations: [UUID: HDCManagedStartAuthorization] = [:]
   private var activeDispatchLeases: [UUID: HDCServerLifecycleDispatchLease] = [:]
   private let permitsImplicitTestFixtureReliability: Bool
+  /// Observability spine: counts identity-bound spawns and registers the
+  /// opaque permits this actor mints. It has no dispatch authority.
+  nonisolated let dispatchMonitor = HDCSupervisorDispatchMonitor()
+  /// Retained managed-launch provenance per endpoint. Records persist across
+  /// ownership degradation; only explicit reconcile/retire records close them.
+  private var managedProvenance: [HDCServerEndpoint: HDCManagedLaunchProvenance] = [:]
+  /// Generations proved to originate from an ArkDeck-started server: applied
+  /// confirmed lifecycle results and recorded managed launches. An observation
+  /// whose receipt reproduces one of these generations is observing a server
+  /// ArkDeck started, so evidence ③ is absent for it.
+  private var arkDeckLaunchedGenerations: [HDCServerEndpoint: Set<Int>] = [:]
+  /// Most recent per-evidence classification basis per endpoint.
+  private var ownershipBases: [HDCServerEndpoint: HDCServerOwnershipBasis] = [:]
 
   /// Legacy `@testable` module contracts predate the production participant
   /// inventory. Keeping that behavior module-internal prevents Workflows and
@@ -1236,7 +1336,15 @@ public actor HDCServerSupervisor: HDCServerLifecycleDispatchLeaseValidating {
   }
 
   func observeExistingServer(_ observation: HDCExistingServerObservation, reason: String) {
-    let next = observation.state
+    applyObservedServerState(observation.state, reason: reason)
+  }
+
+  /// Shared state application for observation results. Callers stay
+  /// responsible for the ownership rules: existing-server observations pass
+  /// through `HDCExistingServerObservation` (which forbids minting managed
+  /// ownership), while the managed-retention path may re-apply an already
+  /// live-verified `.arkDeckManaged` state.
+  private func applyObservedServerState(_ next: HDCServerState, reason: String) {
     invalidateDispatchLeases(for: next.endpoint)
     let previous = endpoints[next.endpoint]
     endpoints[next.endpoint] = next
@@ -1287,12 +1395,37 @@ public actor HDCServerSupervisor: HDCServerLifecycleDispatchLeaseValidating {
   ) -> HDCServerState {
     let previous = endpoints[endpoint]
     let generation = previous?.generation ?? 0
+    let generationEvidenceReason =
+      "checkserver does not provide a verifiable server identity or generation"
+    // An identityless probe cannot displace a managed claim whose recorded
+    // launch evidence still verifies against the live process table. A claim
+    // whose evidence stopped verifying degrades to unknown and is explicitly
+    // marked unreconciled instead of being silently forgotten.
+    if previous?.ownership == .arkDeckManaged,
+      let provenance = managedProvenance[endpoint], provenance.state == .active
+    {
+      if managedProcessInspector.matches(provenance.evidence) {
+        ownershipBases[endpoint] = classificationBasis(
+          for: endpoint, preExistingServerReceipt: false,
+          generationMintedFromObservation: false)
+        let retained = HDCServerState(
+          endpoint: endpoint, health: health, version: version, generation: generation,
+          generationEvidence: .unknown(reason: generationEvidenceReason),
+          ownership: .arkDeckManaged)
+        impactReliability[endpoint] = false
+        applyObservedServerState(retained, reason: reason)
+        return retained
+      }
+      managedProvenance[endpoint]?.state = .unreconciled
+    }
     let next = HDCServerState(
       endpoint: endpoint, health: health, version: version, generation: generation,
-      generationEvidence: .unknown(
-        reason: "checkserver does not provide a verifiable server identity or generation"),
+      generationEvidence: .unknown(reason: generationEvidenceReason),
       ownership: .unknown)
     impactReliability[endpoint] = false
+    ownershipBases[endpoint] = classificationBasis(
+      for: endpoint, preExistingServerReceipt: false,
+      generationMintedFromObservation: false)
     observeExistingServer(HDCExistingServerObservation(state: next), reason: reason)
     if previous?.ownership == .arkDeckManaged {
       broadcast(
@@ -1316,13 +1449,106 @@ public actor HDCServerSupervisor: HDCServerLifecycleDispatchLeaseValidating {
     generation: Int,
     reason: String
   ) -> HDCServerState {
+    // This path is only reached by the bracketed pre-existing process/listener
+    // observation, so evidence ① holds by construction here.
+    let generationMintedFromObservation =
+      !arkDeckLaunchedGenerations[endpoint, default: []].contains(generation)
+    // A live managed claim is retained rather than overwritten: the recorded
+    // launch evidence is re-verified against the live process table first.
+    if let provenance = managedProvenance[endpoint], provenance.state == .active {
+      if managedProcessInspector.matches(provenance.evidence) {
+        ownershipBases[endpoint] = classificationBasis(
+          for: endpoint, preExistingServerReceipt: true,
+          generationMintedFromObservation: generationMintedFromObservation)
+        let retained = HDCServerState(
+          endpoint: endpoint, health: health, version: version,
+          generation: generation, generationEvidence: .known(generation),
+          ownership: .arkDeckManaged)
+        impactReliability[endpoint] = true
+        applyObservedServerState(retained, reason: reason)
+        return retained
+      }
+      managedProvenance[endpoint]?.state = .unreconciled
+    }
+    let basis = classificationBasis(
+      for: endpoint, preExistingServerReceipt: true,
+      generationMintedFromObservation: generationMintedFromObservation)
+    ownershipBases[endpoint] = basis
+    // The four-evidence judgment is the only production path that can mint
+    // external ownership; any missing evidence keeps the endpoint unknown.
+    let ownership =
+      basis.preExistingServerReceipt
+      && basis.zeroAutomaticLifecycleDispatch
+      && basis.generationMintedFromObservation
+      && basis.noActiveOrUnreconciledManagedProvenance
+      ? HDCServerOwnership.external : HDCServerOwnership.unknown
     let next = HDCServerState(
       endpoint: endpoint, health: health, version: version,
       generation: generation, generationEvidence: .known(generation),
-      ownership: .unknown)
+      ownership: ownership)
     impactReliability[endpoint] = true
     observeExistingServer(HDCExistingServerObservation(state: next), reason: reason)
     return next
+  }
+
+  private func classificationBasis(
+    for endpoint: HDCServerEndpoint,
+    preExistingServerReceipt: Bool,
+    generationMintedFromObservation: Bool
+  ) -> HDCServerOwnershipBasis {
+    let provenanceClear: Bool
+    switch managedProvenance[endpoint]?.state {
+    case nil, .reconciled, .retired:
+      provenanceClear = true
+    case .active, .unreconciled:
+      provenanceClear = false
+    }
+    return HDCServerOwnershipBasis(
+      preExistingServerReceipt: preExistingServerReceipt,
+      zeroAutomaticLifecycleDispatch:
+        dispatchMonitor.countersSnapshot().automaticLifecycleDispatchCount == 0,
+      generationMintedFromObservation: generationMintedFromObservation,
+      noActiveOrUnreconciledManagedProvenance: provenanceClear)
+  }
+
+  /// Read-only exposure of the most recent per-evidence classification basis.
+  func ownershipBasis(for endpoint: HDCServerEndpoint) -> HDCServerOwnershipBasis? {
+    ownershipBases[endpoint]
+  }
+
+  /// Read-only projection of the retained managed-launch provenance with a
+  /// point-in-time liveness verdict of its recorded evidence.
+  func managedProvenanceObservation(
+    for endpoint: HDCServerEndpoint
+  ) -> HDCManagedProvenanceObservation? {
+    managedProvenance[endpoint].map {
+      HDCManagedProvenanceObservation(
+        state: $0.state,
+        evidenceLive: managedProcessInspector.matches($0.evidence))
+    }
+  }
+
+  /// Explicit reconcile record for a managed-launch claim. Only an explicit
+  /// record closes provenance; overwriting or forgetting a claim never does.
+  @discardableResult
+  func recordManagedProvenanceReconciled(at endpoint: HDCServerEndpoint) -> Bool {
+    guard var provenance = managedProvenance[endpoint],
+      provenance.state == .active || provenance.state == .unreconciled
+    else { return false }
+    provenance.state = .reconciled
+    managedProvenance[endpoint] = provenance
+    return true
+  }
+
+  /// Explicit retire record for a managed-launch claim.
+  @discardableResult
+  func recordManagedProvenanceRetired(at endpoint: HDCServerEndpoint) -> Bool {
+    guard var provenance = managedProvenance[endpoint],
+      provenance.state == .active || provenance.state == .unreconciled
+    else { return false }
+    provenance.state = .retired
+    managedProvenance[endpoint] = provenance
+    return true
   }
 
   /// A tool identity error, launch failure, registered failure response, or
@@ -1353,7 +1579,9 @@ public actor HDCServerSupervisor: HDCServerLifecycleDispatchLeaseValidating {
   /// all verify after the managed launch.
   func authorizeManagedStart(at endpoint: HDCServerEndpoint) -> HDCManagedStartAuthorization? {
     guard endpoints[endpoint] == nil else { return nil }
-    let authorization = HDCManagedStartAuthorization(id: UUID(), endpoint: endpoint)
+    let authorization = HDCManagedStartAuthorization(
+      id: UUID(), endpoint: endpoint,
+      dispatchPermit: dispatchMonitor.mintManagedStartDispatchPermit())
     managedStartAuthorizations[authorization.id] = authorization
     return authorization
   }
@@ -1386,6 +1614,13 @@ public actor HDCServerSupervisor: HDCServerLifecycleDispatchLeaseValidating {
         reason: "managed process identity does not prove the server generation"),
       ownership: .arkDeckManaged
     )
+    // Retain queryable provenance for the verified claim. The recorded
+    // generation is ArkDeck-started, so a later observation reproducing it
+    // cannot count as independent external evidence.
+    managedProvenance[authorization.endpoint] = HDCManagedLaunchProvenance(
+      evidence: evidence, state: .active)
+    arkDeckLaunchedGenerations[authorization.endpoint, default: []].insert(evidence.generation)
+    ownershipBases[authorization.endpoint] = nil
     return true
   }
 
@@ -1527,9 +1762,12 @@ public actor HDCServerSupervisor: HDCServerLifecycleDispatchLeaseValidating {
       return await recordPostIntentBlock(step: step, block: .criticalJobs(postIntentBlockers))
     }
 
+    // The confirmed dispatch permit is minted in the same actor turn as the
+    // lease: durable confirmation plus the current lease are its only source.
     let lease = HDCServerLifecycleDispatchLease(
       id: UUID(), stepID: step.id, auditID: step.auditID, endpoint: step.endpoint,
-      launchGate: ProcessAtomicLaunchGate())
+      launchGate: ProcessAtomicLaunchGate(),
+      dispatchPermit: dispatchMonitor.mintConfirmedLifecycleDispatchPermit())
     activeDispatchLeases[lease.id] = lease
     let executorResult = await executor.execute(step, lease: lease)
     activeDispatchLeases.removeValue(forKey: lease.id)
@@ -1616,6 +1854,10 @@ public actor HDCServerSupervisor: HDCServerLifecycleDispatchLeaseValidating {
     if let current = endpoints[step.endpoint] {
       switch outcome {
       case .succeeded(let resultingGeneration):
+        // The resulting generation was established by an ArkDeck-dispatched
+        // lifecycle mutation, so it cannot later serve as evidence of an
+        // independently started external server.
+        arkDeckLaunchedGenerations[step.endpoint, default: []].insert(resultingGeneration)
         endpoints[step.endpoint] = HDCServerState(
           endpoint: current.endpoint,
           health: .healthy,
@@ -1864,5 +2106,175 @@ public actor HDCServerSupervisor: HDCServerLifecycleDispatchLeaseValidating {
       lease.launchGate.invalidate()
     }
     activeDispatchLeases = activeDispatchLeases.filter { $0.value.endpoint != endpoint }
+  }
+}
+
+// MARK: - Read-only device observation fan-out
+
+/// Pseudonymized identifier of one observed device. Raw connect keys never
+/// reach this type: the registered identity policy keeps them inside the
+/// observation adapter and exposes only the redacted presentation form.
+struct HDCObservedDeviceIdentifier: Sendable, Equatable, Hashable, Comparable {
+  let redactedKey: String
+
+  static func < (lhs: Self, rhs: Self) -> Bool {
+    lhs.redactedKey < rhs.redactedKey
+  }
+}
+
+/// One typed result of the registered zero-to-many device observation family.
+/// An empty successful snapshot is a known state and deliberately distinct
+/// from unknown or unavailable observations.
+enum HDCDeviceObservationSnapshot: Sendable, Equatable {
+  case observedConnectedSet([HDCObservedDeviceIdentifier])
+  case observedEmpty
+  case unknown(reason: String)
+  case unavailable(reason: String)
+}
+
+/// Provenance marker of a snapshot source. Only the integration-registered
+/// production source may enter the production differential composition;
+/// test-only injection can never satisfy the fan-out contract by itself.
+enum HDCDeviceObservationSourceAuthority: Sendable, Equatable {
+  case integrationRegistered
+  case testOnlyFake
+}
+
+protocol HDCDeviceObservationSnapshotProviding: Sendable {
+  var authority: HDCDeviceObservationSourceAuthority { get }
+  func observe() async -> HDCDeviceObservationSnapshot
+}
+
+/// Differential device event derived from successive typed snapshots.
+/// Presence follows the registered presence rule (the state column decides;
+/// row disappearance is never a presence signal), which the source applies
+/// before a snapshot reaches this feed.
+enum HDCDeviceObservationEvent: Sendable, Equatable {
+  case appeared(HDCObservedDeviceIdentifier)
+  case unchanged(HDCObservedDeviceIdentifier)
+  case disappeared(HDCObservedDeviceIdentifier)
+  case observationUnknown(reason: String)
+  case observationUnavailable(reason: String)
+}
+
+/// Known-presence projection of the feed. `knownEmpty` is proof of an empty
+/// successful observation; `unknown` means the last observation could not
+/// establish the device set at all.
+enum HDCDeviceObservationPresence: Sendable, Equatable {
+  case unknown
+  case knownEmpty
+  case knownConnected(Set<HDCObservedDeviceIdentifier>)
+}
+
+/// Bounded diff/broadcast/presentation buffer for read-only device
+/// observations. Its recipient registry is deliberately separate from the
+/// supervisor's lifecycle critical-participant registry: registering a device
+/// consumer can never change a lifecycle impact scope, and device consumers
+/// never receive lifecycle broadcasts.
+actor HDCDeviceObservationFanOut {
+  private let capacity: Int
+  private var presentationBuffer: [HDCDeviceObservationEvent] = []
+  /// nil = presence unknown; empty set = known-empty.
+  private var knownConnected: Set<HDCObservedDeviceIdentifier>?
+  private var consumerQueues: [String: [HDCDeviceObservationEvent]] = [:]
+
+  init(capacity: Int) {
+    precondition(capacity > 0, "the device observation buffer must be bounded and non-empty")
+    self.capacity = capacity
+  }
+
+  var presence: HDCDeviceObservationPresence {
+    guard let knownConnected else { return .unknown }
+    return knownConnected.isEmpty ? .knownEmpty : .knownConnected(knownConnected)
+  }
+
+  func register(consumerID: String) {
+    consumerQueues[consumerID] = consumerQueues[consumerID] ?? []
+  }
+
+  func takeDeliveredEvents(for consumerID: String) -> [HDCDeviceObservationEvent] {
+    let events = consumerQueues[consumerID] ?? []
+    consumerQueues[consumerID] = []
+    return events
+  }
+
+  func bufferedEvents() -> [HDCDeviceObservationEvent] {
+    presentationBuffer
+  }
+
+  @discardableResult
+  func ingest(_ snapshot: HDCDeviceObservationSnapshot) -> [HDCDeviceObservationEvent] {
+    let events: [HDCDeviceObservationEvent]
+    switch snapshot {
+    case .observedConnectedSet(let devices):
+      let next = Set(devices)
+      let previous = knownConnected ?? []
+      events =
+        next.subtracting(previous).sorted().map { HDCDeviceObservationEvent.appeared($0) }
+        + next.intersection(previous).sorted().map { .unchanged($0) }
+        + previous.subtracting(next).sorted().map { .disappeared($0) }
+      knownConnected = next
+    case .observedEmpty:
+      // A successful empty snapshot proves every previously known device is
+      // gone and leaves the presence known-and-empty.
+      let previous = knownConnected ?? []
+      events = previous.sorted().map { .disappeared($0) }
+      knownConnected = []
+    case .unknown(let reason):
+      // Unknown is not empty: no disappearance may be derived from it, and
+      // the previously known presence stops being known.
+      events = [.observationUnknown(reason: reason)]
+      knownConnected = nil
+    case .unavailable(let reason):
+      events = [.observationUnavailable(reason: reason)]
+      knownConnected = nil
+    }
+    for event in events {
+      presentationBuffer.append(event)
+      for consumerID in consumerQueues.keys {
+        consumerQueues[consumerID]?.append(event)
+      }
+    }
+    if presentationBuffer.count > capacity {
+      presentationBuffer.removeFirst(presentationBuffer.count - capacity)
+    }
+    for consumerID in consumerQueues.keys where (consumerQueues[consumerID]?.count ?? 0) > capacity {
+      let overflow = (consumerQueues[consumerID]?.count ?? 0) - capacity
+      consumerQueues[consumerID]?.removeFirst(overflow)
+    }
+    return events
+  }
+}
+
+enum HDCDeviceObservationCompositionError: Error, Equatable {
+  case testOnlySnapshotSourceRejected
+}
+
+/// Production differential composition binding one snapshot source to one
+/// bounded fan-out feed. Construction fails closed for any source that is not
+/// integration-registered.
+struct HDCDeviceObservationComposition: Sendable {
+  let feed: HDCDeviceObservationFanOut
+  private let source: any HDCDeviceObservationSnapshotProviding
+
+  static func makeProduction(
+    source: any HDCDeviceObservationSnapshotProviding,
+    capacity: Int = 64
+  ) throws -> HDCDeviceObservationComposition {
+    guard source.authority == .integrationRegistered else {
+      throw HDCDeviceObservationCompositionError.testOnlySnapshotSourceRejected
+    }
+    return HDCDeviceObservationComposition(
+      feed: HDCDeviceObservationFanOut(capacity: capacity), source: source)
+  }
+
+  private init(feed: HDCDeviceObservationFanOut, source: any HDCDeviceObservationSnapshotProviding) {
+    self.feed = feed
+    self.source = source
+  }
+
+  @discardableResult
+  func pollOnce() async -> [HDCDeviceObservationEvent] {
+    await feed.ingest(await source.observe())
   }
 }

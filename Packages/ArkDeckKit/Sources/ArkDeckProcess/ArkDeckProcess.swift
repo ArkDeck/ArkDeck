@@ -344,12 +344,20 @@ public final class FoundationProcessExecutor: @unchecked Sendable {
     @Sendable (ProcessExecutableIdentityReceipt) async throws -> Void
   private let launchObserver: @Sendable (pid_t) -> Void
   private let identityBoundLaunchFault: ProcessIdentityBoundLaunchFault
+  /// The unique identity-bound successful-spawn observation point. It fires
+  /// exactly once per successful identity-bound `posix_spawn`, after the
+  /// kernel launch succeeded and before any output is collected. The public
+  /// initializer installs a no-op: external callers cannot observe or supply
+  /// this hook, and it carries no authorization of any kind.
+  private let identityBoundSpawnObserver:
+    @Sendable (ProcessExecutableIdentityReceipt, ProcessRequest, pid_t) -> Void
 
   public init() {
     identityBoundPreSpawnHook = { _ in }
     identityBoundFinalLaunchHook = { _ in }
     launchObserver = { _ in }
     identityBoundLaunchFault = .none
+    identityBoundSpawnObserver = { _, _, _ in }
   }
 
   package init(
@@ -359,12 +367,16 @@ public final class FoundationProcessExecutor: @unchecked Sendable {
     identityBoundFinalLaunchHook:
       @escaping @Sendable (ProcessExecutableIdentityReceipt) async throws -> Void = { _ in },
     launchObserver: @escaping @Sendable (pid_t) -> Void,
-    identityBoundLaunchFault: ProcessIdentityBoundLaunchFault = .none
+    identityBoundLaunchFault: ProcessIdentityBoundLaunchFault = .none,
+    identityBoundSpawnObserver:
+      @escaping @Sendable (ProcessExecutableIdentityReceipt, ProcessRequest, pid_t) -> Void =
+        { _, _, _ in }
   ) {
     self.identityBoundPreSpawnHook = identityBoundPreSpawnHook
     self.identityBoundFinalLaunchHook = identityBoundFinalLaunchHook
     self.launchObserver = launchObserver
     self.identityBoundLaunchFault = identityBoundLaunchFault
+    self.identityBoundSpawnObserver = identityBoundSpawnObserver
   }
 
   public func execute(
@@ -647,6 +659,8 @@ public final class FoundationProcessExecutor: @unchecked Sendable {
         executablePath: executable.inodeLaunchPath)
     }
     let spawned = try gate.map { try $0.consume(launch) } ?? launch()
+    identityBoundSpawnObserver(
+      executable.receipt, prepared.request.process, spawned.processIdentifier)
     let execution = await collectExecution(
       of: spawned,
       request: prepared.request.process,
