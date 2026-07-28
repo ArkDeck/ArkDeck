@@ -6,7 +6,28 @@
 
 ## TASK-ASP-001 — 定义 archive-stable provenance 并完成迁移与哈希级联
 
-- Status:ready（r3 corrective readiness；r2 之后实现继续，实测又撞上**产品
+- Status:done（2026-07-28 completion；仅在维护者 review/merge 本独立
+  `ready→done` PR 后生效。实现载体 = #680 merge
+  `fc1f453bf73b3cb1a5bb605ce8ba71300d82e8e4`：device-observation registry 及其
+  bundled 副本的 `provenance.sourcePath` 迁为 `sourceChange` +
+  `sourceEvidence`，并同步 pack manifest、lock 三条、两个 profile 的哈希引用；
+  契约测试新增两条形态断言（迁移前该测试完全不解码 `provenance`，不补即
+  无守卫），两项变异全杀（回退仓内路径 3 红、删 `sourceChange` 11 红）。
+  flip base `fc1f453b…` recheck：(a) 链 #669 `38d891cd`、#671 `e6acbca5`、
+  r1 #674 `6383f5b9`、r2 #675 `fd478664`、r3 #677 `16c22fae`、实现 #680
+  `fc1f453b` 六 merge 全为 ancestors；(b) device-observation 一对
+  `openspec/changes/` 字面量 = **0**、正副本仍同哈希
+  `79814e45901ab7e4…`、`check-sdd` 0/0/111；实现期于**非 `/private/tmp`**
+  检出实测 Swift **415 / 1 skipped / 0 failures**（413 + 新增 2）；
+  (c) evidence = `evidence/runs/TASK-ASP-001/run.md` 在树；(d) 本 flip
+  单文件；(e) 不声称：change 级 `verified` 为下一独立 PR；
+  **CHG-2026-024 的归档死结自此解除**，其 archive 由独立 PR 走。
+  移出面如实在案：`readonly-probes.yaml` + 副本 + 4 receipt 需 `Sources/**`
+  （产品运行时 pin），trace/rockchip 4 处归 TASK-ASP-002。）
+- Historical Status:ready（r3 = #677 merge
+  `16c22fae`…；r1 #674 `6383f5b9`、r2 #675 `fd478664` 的条款除被 r3 显式
+  窄化者外全程有效。原 r3 Status 正文如下作历史保留。）
+- Historical Status:ready（r3 corrective readiness；r2 之后实现继续，实测又撞上**产品
   运行时 pin**：`readonly-probes.yaml` 的 SHA-256 被
   `Packages/ArkDeckKit/Sources/ArkDeckOpenHarmony/HDCReadOnlyProbeRegistry.swift`
   钉死并由 `HDCProduction.swift` 消费，而 `Sources/**` 是本 change 全局
