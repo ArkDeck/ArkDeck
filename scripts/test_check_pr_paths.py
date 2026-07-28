@@ -14,6 +14,7 @@ import unittest
 from pathlib import Path
 
 import check_pr_paths
+from host_loop import __main__ as host_loop_main
 
 
 ZERO_OID = "0" * 40
@@ -442,6 +443,49 @@ class PullRequestPathTests(unittest.TestCase):
                     check_pr_paths.extract_allowed_patterns(root, task),
                     ("scripts/a.py",),
                 )
+
+    def test_task_field_colons_are_equivalent_across_both_production_readers(self):
+        results = {}
+        for shape in ("inline", "list"):
+            for colon in (":", "："):
+                with self.subTest(shape=shape, colon=colon):
+                    if shape == "inline":
+                        depends = f"- Depends on{colon}TASK-OTHER-002\n"
+                        allowed = f"- Allowed paths{colon}`scripts/a.py`\n"
+                    else:
+                        depends = (
+                            f"- Depends on{colon}\n"
+                            "  - TASK-OTHER-002\n"
+                        )
+                        allowed = (
+                            f"- Allowed paths{colon}\n"
+                            "  - `scripts/a.py`\n"
+                            "  - `docs/a.md`\n"
+                        )
+                    tasks = (
+                        "## TASK-MECH-004 — cross-parser colon fixture\n"
+                        "- Status:ready\n"
+                        + depends
+                        + allowed
+                        + "- Hardware required:no\n"
+                        "- Decision-Grade:D0\n"
+                        "- Risk:low\n"
+                    )
+                    temporary, root, oid = self.make_repo(tasks)
+                    self.addCleanup(temporary.cleanup)
+                    task = check_pr_paths.load_task_definitions_at_commit(
+                        root, oid
+                    )["TASK-MECH-004"]
+                    guard_paths = check_pr_paths.extract_allowed_patterns(
+                        root, task
+                    )
+                    candidates = host_loop_main.discover_candidates(
+                        root, "chg-test"
+                    )
+                    self.assertEqual(len(candidates), 1)
+                    results[(shape, colon)] = (guard_paths, candidates[0])
+
+            self.assertEqual(results[(shape, "：")], results[(shape, ":")])
 
     def test_real_shape_implementation_status_and_propose_cases(self):
         tasks = """\

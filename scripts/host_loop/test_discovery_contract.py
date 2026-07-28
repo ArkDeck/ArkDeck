@@ -43,6 +43,7 @@ one this reader must not fix.
 
 from __future__ import annotations
 
+import re
 import sys
 import unittest
 from pathlib import Path
@@ -461,8 +462,9 @@ class DependenciesAreDeclaredNotAssumed(unittest.TestCase):
         if not REAL_TASKS.is_file():
             self.skipTest("real tasks.md absent")
         sample = live_sample_change(REPO_ROOT)
-        declared = change_tasks_path(REPO_ROOT, sample).read_text(
-            encoding="utf-8").count("\n- Depends on:")
+        text = change_tasks_path(REPO_ROOT, sample).read_text(encoding="utf-8")
+        declared = len(re.findall(
+            r"(?m)^-[ \t]*Depends on[:：]", text))
         self.assertEqual(len(discover_candidates(REPO_ROOT, sample)), declared)
 
 

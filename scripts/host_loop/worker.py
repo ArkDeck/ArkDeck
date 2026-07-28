@@ -85,11 +85,13 @@ GATED_GRADES = frozenset({"D1", "D2"})
 # not a configuration tweak: every entry is authorised by that task's own readiness
 # (TASK-HLR-003 r2; TASK-NAV-001 / TASK-NAV-002 r1, contract item 4;
 # TASK-DEC-001..008 r1, CHG-2026-040 — every task in that change edits this
-# loop's own code, tests or CI, and DEC-005/DEC-007 edit the claim gate itself).
+# loop's own code, tests or CI, and DEC-005/DEC-007 edit the claim gate itself;
+# TASK-CM7-001 r2 — it changes discovery's own task-field grammar).
 NEVER_CLAIM_ROOTS = frozenset({
     "TASK-HLR-003", "TASK-NAV-001", "TASK-NAV-002",
     "TASK-DEC-001", "TASK-DEC-002", "TASK-DEC-003", "TASK-DEC-004",
     "TASK-DEC-005", "TASK-DEC-006", "TASK-DEC-007", "TASK-DEC-008",
+    "TASK-CM7-001",
 })
 
 # Matched after normalisation so a suffixed sibling cannot slip through. The

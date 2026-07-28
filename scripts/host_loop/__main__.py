@@ -105,15 +105,13 @@ _FIELD_RE = {
 # that decides whether an unattended loop may touch a task at all.
 _HARDWARE_YES = frozenset({"yes", "true", "required", "是", "需要", "必需"})
 _HARDWARE_NO = frozenset({"no", "false", "none", "否", "不需要", "无"})
-# The colon class stays ASCII-only, deliberately. `status`, `hardware` and
-# `grade` above accept `：` as well, and the live corpus writes `Depends on：`
-# for the six TASK-BRC-* tasks, so these two fields silently drop them. That
-# divergence is a real defect (ledger C-M7) but it is not in this task's scope,
-# and widening the class here would enlarge the candidate set as a side effect
-# of a fail-closed fix. Recorded for a separate carrier; behaviour preserved.
-_DEPENDS_RE = re.compile(r"^-[ \t]*Depends on:" + _GAP + r"([^\n]*)$",
+# The task-field grammar has one closed colon class. `status`, `hardware` and
+# `grade` already accept both spellings, and `check_pr_paths` applies the same
+# class to `Allowed paths`; keeping the two discovery-only fields aligned avoids
+# silently hiding an otherwise valid task from the host loop.
+_DEPENDS_RE = re.compile(r"^-[ \t]*Depends on[:：]" + _GAP + r"([^\n]*)$",
                          re.MULTILINE)
-_ALLOWED_RE = re.compile(r"^-[ \t]*Allowed paths:" + _GAP + r"([^\n]*)$",
+_ALLOWED_RE = re.compile(r"^-[ \t]*Allowed paths[:：]" + _GAP + r"([^\n]*)$",
                          re.MULTILINE)
 # A continuation line only carries field content when it is an indented list
 # item. Both fields are legitimately written with an empty value followed by an
