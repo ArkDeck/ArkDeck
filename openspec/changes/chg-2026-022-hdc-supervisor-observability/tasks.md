@@ -59,6 +59,11 @@
   对应 Tests、本 change `evidence/**`、本 change `tasks.md`(仅本任务状态)。
 - Out of scope:任何 lifecycle/dispatch/安全门语义变更;App UI(OBS-002);Core
   contract/schema;M1-009 导出接线。
+- Allowed paths:
+  - `Packages/ArkDeckKit/Sources/**`(OpenHarmony/Workflows 可观察性面)
+  - `Packages/ArkDeckKit/Tests/**`(对应 Tests)
+  - 本 change `evidence/**`
+  - 本 change `tasks.md`(仅本任务状态)
 - Risk:medium(触碰 supervisor 生产文件;不变量 = 零语义变更,须既有全量测试
   零回归 + 新增门语义 diff 测试背书)。
 - Hardware required:no。
@@ -82,6 +87,11 @@
 - In scope:`ArkDeckApp/**`、`ArkDeckAppUITests/**`、本 change `evidence/**`、
   本 change `tasks.md`(仅本任务状态)。
 - Out of scope:Kit 语义(OBS-001 已定);诊断导出接线;真机观察执行。
+- Allowed paths:
+  - `ArkDeckApp/**`
+  - `ArkDeckAppUITests/**`
+  - 本 change `evidence/**`
+  - 本 change `tasks.md`(仅本任务状态)
 - Risk:low-medium(UI 面;XCUITest 环境依赖如实记录)。
 - Hardware required:no(XCUITest 用 fixture 门;真机观察属 M0B-002)。
 - Decision-Grade:D1。
