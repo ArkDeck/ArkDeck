@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-042-tasks-field-colon-parity
 revision: 2
-status: approved # r1 approval = PR #702 merge 3703a96ea334dc2ec2598008bd9c070190832127；r2 计数门更正仅在维护者 review/merge 后生效
+status: verified # 2026-07-28 本 verification-closure PR；closure 段见文末
 class: implementation-only
 core_change_level: none
 owner: lvye
@@ -118,3 +118,52 @@ r2 只更正验证算术，不改变 scope、实现文件、解析行为或 AC I
 - **TASK-CM7-001** — 对齐字段冒号文法、补跨解析器/活体语料回归，并将本任务
   加入 never-claim 根。r1 change approval 已由 PR #702 合入；任务在独立 D1
   readiness 合入前保持 `blocked`，r2 合入也不构成 readiness。
+
+## Verification closure（2026-07-28）
+
+唯一任务 TASK-CM7-001 已在 protected main 记为 done；三条 change-local AC
+均有可复查 evidence。本 PR 只翻 change / verification 状态并引用已合入记录，
+零实现、零 scope、零 acceptance 定义变化。
+
+- **治理与交付链**：proposal #701 merge
+  `f20077a0630147be879acb5a8db5ae780ae79b2a`；approval #702
+  `3703a96ea334dc2ec2598008bd9c070190832127`；proposal r2 #705
+  `7c75dec6bb2f8f8a468a0c05001e35c43d998e22`；readiness r1 #707
+  `c3ad721f1119d7cbf73022a89dd1b502bb92289a`、r2 #712
+  `0c35f35e1afdb3ffe1e3602d7d1b87b2ed4e37f8`、scope remediation r3
+  #714 `eaa57f9281c6194e1bada0c740bde1d6e4f48fc6`、final corpus r5 #718
+  `0185bf52b8e908560867bccaeb5f6a96d2cedf02`、r6 #720
+  `cd3f3e0a7b4c2055746a617110e94b2e1dc791c7`；implementation #721
+  `54c3a3cfbc455b5eb0ab6710955ad994d5b57eac`；done #723
+  `de324711463030a4ae3ff3daae9ffaeeb1f5cd70`。#721 reviewed head
+  `4a8d552a03bcc0fb12cbb4306b63e1a719602800` 与 merge tree 的 7 个
+  授权文件逐字一致；#723 reviewed head
+  `e4439178c7a2699092aa111eea171b65b5d088fc` 与 merge-tree `tasks.md`
+  逐字一致。
+- **`CM7-PARITY-001` = PASS**：host-loop 的 `Depends on` /
+  `Allowed paths` 与 PR guard 对 `:` / `：` 的 inline、合法缩进续行输出
+  等价；空值、散文、`;` / `；` 继续 fail closed。分别撤销两条 parser
+  全角分支时对应专属测试均以 `0 != 1` 变红。
+- **`CM7-CORPUS-001` = PASS**：run 记录逐项登记六个 gained candidate 的
+  status、grade、hardware、dependencies 与 allowed paths；原始实现 base、
+  r6 submission base 以及 verification base protected main
+  `7b05ccdaea47acc647ba235c630c3899a952c9c3` 均为 `30→36`、
+  `lost=[]`、gained 恰为 `TASK-BRC-001`…`TASK-BRC-006`。BRC-001/002
+  done，BRC-003…006 blocked，六项均非 ready / 不可 dispatch。开放
+  PR #724 exact head `3523087c21850e7885222ccf4d158ce6d6b9abd2`
+  与 verification base 的无冲突 prospective tree 也得到同一结果。
+- **`CM7-SELF-001` = PASS**：TASK-CM7-001 exact root 与合法 `A` / `R`
+  suffix 永不 claim，相邻 `TASK-CM7-002` / `TASK-CM7-0011` 不受影响；
+  移除 root 时 exact / `A` / `R` 三项专属断言全红。done 树中本任务同时被
+  never-claim、status done 与 unknown-grade 拒绝，`claimable=none`。
+- **closure 复验（`7b05ccda…`）**：13 项 colon/census/never-claim =
+  13/13；PR guard = 50/50；host-loop 全量 = 644 tests / 1 expected failure /
+  0 unexpected failures；`check-sdd` = 0 error / 0 warning /
+  111 acceptance IDs；`git diff --check` PASS。既有 localhost 测试的
+  `ResourceWarning` 与 line-369 `SyntaxWarning` 仍为非失败输出，不影响 AC。
+- **边界结论**：Core/spec/contracts/baseline、产品代码、设备/HDC、credential、
+  E1/E2/destructive dispatch 均无变化；无真实硬件或外部副作用声明。
+  Evidence 真值源为已合入
+  `evidence/runs/TASK-CM7-001/run.md`，本 closure 不把实现 PR 的 review
+  单独当作 verification 批准；只有维护者 merge 本独立 PR 后 `verified`
+  才生效。
