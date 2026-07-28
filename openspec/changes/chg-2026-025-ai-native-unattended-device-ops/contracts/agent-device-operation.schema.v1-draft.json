@@ -1,7 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://arkdeck.local/schemas/agent-device-operation-1.0.0-draft.json",
-  "title": "ArkDeck Agent Device Operation Contract 1.0.0 Draft",
+  "$id": "https://arkdeck.dev/schemas/agent-device-operation-1.0.0.json",
+  "title": "ArkDeck Agent Device Operation Contract 1.0.0",
+  "description": "Strict caller intent and trusted-host result documents. Requests cannot carry authority, executable material, device facts, effects, or outcomes.",
   "oneOf": [
     {
       "$ref": "#/$defs/request"
@@ -15,27 +16,105 @@
       "type": "string",
       "pattern": "^[0-9a-f]{64}$"
     },
+    "gitOID": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
     "identifier": {
       "type": "string",
       "minLength": 1,
       "maxLength": 128,
       "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
     },
-    "agent": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "kind",
-        "id"
-      ],
-      "properties": {
-        "kind": {
-          "const": "agent"
-        },
-        "id": {
-          "$ref": "#/$defs/identifier"
-        }
-      }
+    "changeId": {
+      "type": "string",
+      "pattern": "^CHG-[0-9]{4}-[0-9]{3}$"
+    },
+    "taskId": {
+      "type": "string",
+      "pattern": "^TASK-[A-Z0-9]+(?:-[A-Z0-9]+)*-[0-9]{3}[A-Z]?$"
+    },
+    "operationId": {
+      "enum": [
+        "observeDevice",
+        "captureHilog",
+        "captureUIDump",
+        "captureTrace",
+        "installHAP",
+        "uninstallHAP",
+        "deployNativeLibrary",
+        "startApplication",
+        "stopApplication",
+        "sendOwnedFile",
+        "receiveOwnedFile",
+        "createPortForward",
+        "removePortForward",
+        "rebootDevice",
+        "flash"
+      ]
+    },
+    "executionMode": {
+      "enum": [
+        "execute",
+        "planOnly",
+        "simulated"
+      ]
+    },
+    "effect": {
+      "enum": [
+        "hostOnly",
+        "readOnly",
+        "deviceMutation",
+        "destructive"
+      ]
+    },
+    "jobState": {
+      "enum": [
+        "queued",
+        "preflight",
+        "running",
+        "waitingForDevice",
+        "awaitingRebindConfirmation",
+        "planning",
+        "cancelRequested",
+        "cancellingAtSafeBoundary",
+        "waitingForRecovery",
+        "reconciling",
+        "resumeAtConfirmedSafeBoundary",
+        "userAbandonRequested",
+        "finalizing",
+        "planned",
+        "succeeded",
+        "failed",
+        "cancelled",
+        "interrupted"
+      ]
+    },
+    "terminalJobState": {
+      "enum": [
+        "planned",
+        "succeeded",
+        "failed",
+        "cancelled",
+        "interrupted"
+      ]
+    },
+    "nonTerminalJobState": {
+      "enum": [
+        "queued",
+        "preflight",
+        "running",
+        "waitingForDevice",
+        "awaitingRebindConfirmation",
+        "planning",
+        "cancelRequested",
+        "cancellingAtSafeBoundary",
+        "waitingForRecovery",
+        "reconciling",
+        "resumeAtConfirmedSafeBoundary",
+        "userAbandonRequested",
+        "finalizing"
+      ]
     },
     "operation": {
       "type": "object",
@@ -48,23 +127,7 @@
       ],
       "properties": {
         "id": {
-          "enum": [
-            "observeDevice",
-            "captureHilog",
-            "captureUIDump",
-            "captureTrace",
-            "installHAP",
-            "uninstallHAP",
-            "deployNativeLibrary",
-            "startApplication",
-            "stopApplication",
-            "sendOwnedFile",
-            "receiveOwnedFile",
-            "createPortForward",
-            "removePortForward",
-            "rebootDevice",
-            "flash"
-          ]
+          "$ref": "#/$defs/operationId"
         },
         "profileId": {
           "$ref": "#/$defs/identifier"
@@ -109,19 +172,13 @@
           "$ref": "#/$defs/identifier"
         },
         "changeId": {
-          "type": "string",
-          "pattern": "^CHG-[0-9]{4}-[0-9]{3}$"
+          "$ref": "#/$defs/changeId"
         },
         "taskId": {
-          "type": "string",
-          "pattern": "^TASK-[A-Z0-9]+(?:-[A-Z0-9]+)*-[0-9]{3}[A-Z]?$"
+          "$ref": "#/$defs/taskId"
         },
         "executionMode": {
-          "enum": [
-            "execute",
-            "planOnly",
-            "simulated"
-          ]
+          "$ref": "#/$defs/executionMode"
         },
         "durableTargetId": {
           "$ref": "#/$defs/identifier"
@@ -152,6 +209,22 @@
         }
       }
     },
+    "executor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "id"
+      ],
+      "properties": {
+        "kind": {
+          "const": "agent"
+        },
+        "id": {
+          "$ref": "#/$defs/identifier"
+        }
+      }
+    },
     "artifactReference": {
       "type": "object",
       "additionalProperties": false,
@@ -173,6 +246,111 @@
         }
       }
     },
+    "readyTaskAuthorizationRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "changeId",
+        "taskId",
+        "mainCommitOID",
+        "taskBlobOID",
+        "approvalPRNumber"
+      ],
+      "properties": {
+        "kind": {
+          "const": "readyTask"
+        },
+        "changeId": {
+          "$ref": "#/$defs/changeId"
+        },
+        "taskId": {
+          "$ref": "#/$defs/taskId"
+        },
+        "mainCommitOID": {
+          "$ref": "#/$defs/gitOID"
+        },
+        "taskBlobOID": {
+          "$ref": "#/$defs/gitOID"
+        },
+        "approvalPRNumber": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "deviceCapabilityAuthorizationRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "capabilityId",
+        "mainCommitOID",
+        "capabilityBlobOID",
+        "approvalPRNumber"
+      ],
+      "properties": {
+        "kind": {
+          "const": "deviceCapability"
+        },
+        "capabilityId": {
+          "$ref": "#/$defs/identifier"
+        },
+        "mainCommitOID": {
+          "$ref": "#/$defs/gitOID"
+        },
+        "capabilityBlobOID": {
+          "$ref": "#/$defs/gitOID"
+        },
+        "approvalPRNumber": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "standingAuthorizationRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "authorizationId",
+        "mainCommitOID",
+        "authorizationBlobOID",
+        "approvalPRNumber"
+      ],
+      "properties": {
+        "kind": {
+          "const": "standingAuthorization"
+        },
+        "authorizationId": {
+          "type": "string",
+          "pattern": "^AUTH-[A-Z0-9]+(?:-[A-Z0-9]+)*$"
+        },
+        "mainCommitOID": {
+          "$ref": "#/$defs/gitOID"
+        },
+        "authorizationBlobOID": {
+          "$ref": "#/$defs/gitOID"
+        },
+        "approvalPRNumber": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "authorizationRef": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/readyTaskAuthorizationRef"
+        },
+        {
+          "$ref": "#/$defs/deviceCapabilityAuthorizationRef"
+        },
+        {
+          "$ref": "#/$defs/standingAuthorizationRef"
+        }
+      ]
+    },
     "result": {
       "type": "object",
       "additionalProperties": false,
@@ -181,7 +359,9 @@
         "schemaVersion",
         "requestId",
         "jobId",
-        "status",
+        "executionMode",
+        "jobState",
+        "disposition",
         "resolvedEffect",
         "outcomeCertainty",
         "executor",
@@ -200,27 +380,22 @@
         "jobId": {
           "$ref": "#/$defs/identifier"
         },
-        "status": {
+        "executionMode": {
+          "$ref": "#/$defs/executionMode"
+        },
+        "jobState": {
+          "$ref": "#/$defs/jobState"
+        },
+        "disposition": {
           "enum": [
-            "queued",
-            "running",
+            "active",
             "humanActionRequired",
-            "waitingForRecovery",
-            "succeeded",
-            "failed",
-            "cancelled",
-            "interrupted",
-            "planned",
-            "policyBlocked"
+            "policyBlocked",
+            "terminal"
           ]
         },
         "resolvedEffect": {
-          "enum": [
-            "hostOnly",
-            "readOnly",
-            "deviceMutation",
-            "destructive"
-          ]
+          "$ref": "#/$defs/effect"
         },
         "outcomeCertainty": {
           "enum": [
@@ -230,7 +405,7 @@
           ]
         },
         "executor": {
-          "$ref": "#/$defs/agent"
+          "$ref": "#/$defs/executor"
         },
         "manifestId": {
           "$ref": "#/$defs/identifier"
@@ -241,6 +416,9 @@
         "blockerCode": {
           "$ref": "#/$defs/identifier"
         },
+        "authorizationRef": {
+          "$ref": "#/$defs/authorizationRef"
+        },
         "artifacts": {
           "type": "array",
           "maxItems": 1024,
@@ -248,7 +426,266 @@
             "$ref": "#/$defs/artifactReference"
           }
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "disposition": {
+                "const": "humanActionRequired"
+              }
+            },
+            "required": [
+              "disposition"
+            ]
+          },
+          "then": {
+            "required": [
+              "humanActionId",
+              "blockerCode"
+            ],
+            "properties": {
+              "jobState": {
+                "$ref": "#/$defs/nonTerminalJobState"
+              }
+            }
+          },
+          "else": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "humanActionId"
+                  ]
+                },
+                {
+                  "required": [
+                    "blockerCode"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "disposition": {
+                "const": "terminal"
+              }
+            },
+            "required": [
+              "disposition"
+            ]
+          },
+          "then": {
+            "properties": {
+              "jobState": {
+                "$ref": "#/$defs/terminalJobState"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "jobState": {
+                "$ref": "#/$defs/nonTerminalJobState"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "disposition": {
+                "enum": [
+                  "active",
+                  "policyBlocked"
+                ]
+              }
+            },
+            "required": [
+              "disposition"
+            ]
+          },
+          "then": {
+            "properties": {
+              "outcomeCertainty": {
+                "const": "notApplicable"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "jobState": {
+                "const": "planned"
+              }
+            },
+            "required": [
+              "jobState"
+            ]
+          },
+          "then": {
+            "properties": {
+              "outcomeCertainty": {
+                "const": "notApplicable"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "jobState": {
+                "enum": [
+                  "succeeded",
+                  "failed",
+                  "cancelled"
+                ]
+              }
+            },
+            "required": [
+              "jobState"
+            ]
+          },
+          "then": {
+            "properties": {
+              "outcomeCertainty": {
+                "const": "confirmed"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "executionMode": {
+                "enum": [
+                  "planOnly",
+                  "simulated"
+                ]
+              }
+            },
+            "required": [
+              "executionMode"
+            ]
+          },
+          "then": {
+            "not": {
+              "required": [
+                "authorizationRef"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "disposition": {
+                "const": "policyBlocked"
+              }
+            },
+            "required": [
+              "disposition"
+            ]
+          },
+          "then": {
+            "not": {
+              "required": [
+                "authorizationRef"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "authorizationRef": {
+                "properties": {
+                  "kind": {
+                    "const": "readyTask"
+                  }
+                },
+                "required": [
+                  "kind"
+                ]
+              }
+            },
+            "required": [
+              "authorizationRef"
+            ]
+          },
+          "then": {
+            "properties": {
+              "executionMode": {
+                "const": "execute"
+              },
+              "resolvedEffect": {
+                "const": "readOnly"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "authorizationRef": {
+                "properties": {
+                  "kind": {
+                    "const": "deviceCapability"
+                  }
+                },
+                "required": [
+                  "kind"
+                ]
+              }
+            },
+            "required": [
+              "authorizationRef"
+            ]
+          },
+          "then": {
+            "properties": {
+              "executionMode": {
+                "const": "execute"
+              },
+              "resolvedEffect": {
+                "const": "deviceMutation"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "authorizationRef": {
+                "properties": {
+                  "kind": {
+                    "const": "standingAuthorization"
+                  }
+                },
+                "required": [
+                  "kind"
+                ]
+              }
+            },
+            "required": [
+              "authorizationRef"
+            ]
+          },
+          "then": {
+            "properties": {
+              "executionMode": {
+                "const": "execute"
+              },
+              "resolvedEffect": {
+                "const": "destructive"
+              }
+            }
+          }
+        }
+      ]
     }
   }
 }

@@ -1,0 +1,320 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://arkdeck.dev/schemas/agent-device-operation-registry-1.0.0.json",
+  "title": "ArkDeck Agent Device Operation Registry 1.0.0",
+  "description": "Closed operation/profile mapping over the Core workflow-step registry. Profiles may strengthen but never lower effect, cancellation, or binding.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "registryId",
+    "workflowStepSchemaId",
+    "unknownOperationDisposition",
+    "unknownProfileDisposition",
+    "unknownStepDisposition",
+    "effectOrder",
+    "cancellationOrder",
+    "bindingOrder",
+    "operations",
+    "humanBlockerRules"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "registryId": {
+      "const": "arkdeck-agent-device-operations"
+    },
+    "workflowStepSchemaId": {
+      "const": "https://arkdeck.dev/schemas/workflow-step-1.0.0.json"
+    },
+    "unknownOperationDisposition": {
+      "const": "rejectAsDestructiveUnsupported"
+    },
+    "unknownProfileDisposition": {
+      "const": "rejectAsDestructiveUnsupported"
+    },
+    "unknownStepDisposition": {
+      "const": "rejectAsDestructiveUnsupported"
+    },
+    "effectOrder": {
+      "const": [
+        "hostOnly",
+        "readOnly",
+        "deviceMutation",
+        "destructive"
+      ]
+    },
+    "cancellationOrder": {
+      "const": [
+        "immediate",
+        "atSafeBoundary",
+        "criticalNonInterruptible"
+      ]
+    },
+    "bindingOrder": {
+      "const": [
+        "none",
+        "confirmedDevice"
+      ]
+    },
+    "operations": {
+      "type": "array",
+      "minItems": 15,
+      "maxItems": 15,
+      "items": {
+        "$ref": "#/$defs/operation"
+      }
+    },
+    "humanBlockerRules": {
+      "type": "array",
+      "minItems": 8,
+      "maxItems": 8,
+      "items": {
+        "$ref": "#/$defs/humanBlockerRule"
+      }
+    }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "operationId": {
+      "enum": [
+        "observeDevice",
+        "captureHilog",
+        "captureUIDump",
+        "captureTrace",
+        "installHAP",
+        "uninstallHAP",
+        "deployNativeLibrary",
+        "startApplication",
+        "stopApplication",
+        "sendOwnedFile",
+        "receiveOwnedFile",
+        "createPortForward",
+        "removePortForward",
+        "rebootDevice",
+        "flash"
+      ]
+    },
+    "effect": {
+      "enum": [
+        "hostOnly",
+        "readOnly",
+        "deviceMutation",
+        "destructive"
+      ]
+    },
+    "cancellation": {
+      "enum": [
+        "immediate",
+        "atSafeBoundary",
+        "criticalNonInterruptible"
+      ]
+    },
+    "binding": {
+      "enum": [
+        "none",
+        "confirmedDevice"
+      ]
+    },
+    "stepKind": {
+      "$ref": "https://arkdeck.dev/schemas/workflow-step-1.0.0.json#/$defs/kind"
+    },
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "configurationId",
+        "configurationSha256",
+        "declaredEffect",
+        "declaredCancellation",
+        "declaredBindingRequirement",
+        "emittedStepKinds"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "configurationId": {
+          "$ref": "#/$defs/identifier"
+        },
+        "configurationSha256": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            }
+          ],
+          "description": "SHA-256 of canonical sorted-key JSON containing configurationId, declaredBindingRequirement, declaredCancellation, declaredEffect, and emittedStepKinds in registry order."
+        },
+        "declaredEffect": {
+          "$ref": "#/$defs/effect"
+        },
+        "declaredCancellation": {
+          "$ref": "#/$defs/cancellation"
+        },
+        "declaredBindingRequirement": {
+          "$ref": "#/$defs/binding"
+        },
+        "emittedStepKinds": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/stepKind"
+          }
+        }
+      }
+    },
+    "authorityByEffect": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "readOnly": {
+          "const": "readyTask"
+        },
+        "deviceMutation": {
+          "const": "deviceCapability"
+        },
+        "destructive": {
+          "const": "standingAuthorization"
+        }
+      },
+      "minProperties": 1
+    },
+    "operation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "minimumEffect",
+        "permittedEffects",
+        "minimumCancellation",
+        "bindingRequirement",
+        "permittedStepKinds",
+        "profilePolicy",
+        "escalationPolicy",
+        "authorityByEffect",
+        "profiles"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/operationId"
+        },
+        "minimumEffect": {
+          "$ref": "#/$defs/effect"
+        },
+        "permittedEffects": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/effect"
+          }
+        },
+        "minimumCancellation": {
+          "$ref": "#/$defs/cancellation"
+        },
+        "bindingRequirement": {
+          "$ref": "#/$defs/binding"
+        },
+        "permittedStepKinds": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/stepKind"
+          }
+        },
+        "profilePolicy": {
+          "const": "protectedMainExactDescriptor"
+        },
+        "escalationPolicy": {
+          "enum": [
+            "noElevation",
+            "profileMayElevateWithinPermittedEffects",
+            "destructiveOnly"
+          ]
+        },
+        "authorityByEffect": {
+          "$ref": "#/$defs/authorityByEffect"
+        },
+        "profiles": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/profile"
+          }
+        }
+      }
+    },
+    "humanBlockerCategory": {
+      "enum": [
+        "physicalConnection",
+        "deviceTrustPrompt",
+        "osPermission",
+        "credentialProvisioning",
+        "ambiguousIdentity",
+        "impactApproval",
+        "outcomeUnknownDecision",
+        "governanceApproval"
+      ]
+    },
+    "prohibitedAutomation": {
+      "enum": [
+        "physicalActuation",
+        "trustPromptAcceptance",
+        "privilegeEscalation",
+        "driverOrHelperInstall",
+        "systemRuleMutation",
+        "credentialExtraction",
+        "identityGuess",
+        "outcomeGuess",
+        "selfApproval"
+      ]
+    },
+    "resumeProbeOperationId": {
+      "enum": [
+        "observeDevice",
+        "probeHostConfiguration",
+        "probeImpactApproval",
+        "reconcileOutcome",
+        "probeGovernanceApproval"
+      ]
+    },
+    "humanBlockerRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "category",
+        "resumeProbeOperationId",
+        "requiredProhibitedAutomation"
+      ],
+      "properties": {
+        "category": {
+          "$ref": "#/$defs/humanBlockerCategory"
+        },
+        "resumeProbeOperationId": {
+          "$ref": "#/$defs/resumeProbeOperationId"
+        },
+        "requiredProhibitedAutomation": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/prohibitedAutomation"
+          }
+        }
+      }
+    }
+  }
+}

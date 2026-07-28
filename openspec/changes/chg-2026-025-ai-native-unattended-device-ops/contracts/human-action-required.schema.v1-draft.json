@@ -1,10 +1,12 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://arkdeck.local/schemas/human-action-required-1.0.0-draft.json",
-  "title": "ArkDeck Human Action Required Contract 1.0.0 Draft",
+  "$id": "https://arkdeck.dev/schemas/human-action-required-1.0.0.json",
+  "title": "ArkDeck Human Action Required Contract 1.0.0",
+  "description": "Closed human boundary. A user action never resolves a blocker by assertion; resolved records require a fresh registered read-only probe receipt.",
   "type": "object",
   "additionalProperties": false,
   "required": [
+    "documentType",
     "schemaVersion",
     "actionId",
     "jobId",
@@ -17,6 +19,9 @@
     "status"
   ],
   "properties": {
+    "documentType": {
+      "const": "humanActionRequired"
+    },
     "schemaVersion": {
       "const": "1.0.0"
     },
@@ -30,16 +35,7 @@
       "$ref": "#/$defs/identifier"
     },
     "category": {
-      "enum": [
-        "physicalConnection",
-        "deviceTrustPrompt",
-        "osPermission",
-        "credentialProvisioning",
-        "ambiguousIdentity",
-        "impactApproval",
-        "outcomeUnknownDecision",
-        "governanceApproval"
-      ]
+      "$ref": "#/$defs/category"
     },
     "reasonCode": {
       "$ref": "#/$defs/identifier"
@@ -52,21 +48,11 @@
       "uniqueItems": true,
       "minItems": 1,
       "items": {
-        "enum": [
-          "physicalActuation",
-          "trustPromptAcceptance",
-          "privilegeEscalation",
-          "driverOrHelperInstall",
-          "systemRuleMutation",
-          "credentialExtraction",
-          "identityGuess",
-          "outcomeGuess",
-          "selfApproval"
-        ]
+        "$ref": "#/$defs/prohibitedAutomation"
       }
     },
     "resumeProbeOperationId": {
-      "$ref": "#/$defs/identifier"
+      "$ref": "#/$defs/resumeProbeOperationId"
     },
     "generatedAtUtc": {
       "type": "string",
@@ -82,14 +68,200 @@
         "resolvedByFreshProbe",
         "expired"
       ]
+    },
+    "resolution": {
+      "$ref": "#/$defs/freshProbeResolution"
     }
   },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "category": {
+            "enum": [
+              "physicalConnection",
+              "deviceTrustPrompt",
+              "ambiguousIdentity"
+            ]
+          }
+        },
+        "required": [
+          "category"
+        ]
+      },
+      "then": {
+        "properties": {
+          "resumeProbeOperationId": {
+            "const": "observeDevice"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "category": {
+            "enum": [
+              "osPermission",
+              "credentialProvisioning"
+            ]
+          }
+        },
+        "required": [
+          "category"
+        ]
+      },
+      "then": {
+        "properties": {
+          "resumeProbeOperationId": {
+            "const": "probeHostConfiguration"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "category": {
+            "const": "impactApproval"
+          }
+        },
+        "required": [
+          "category"
+        ]
+      },
+      "then": {
+        "properties": {
+          "resumeProbeOperationId": {
+            "const": "probeImpactApproval"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "category": {
+            "const": "outcomeUnknownDecision"
+          }
+        },
+        "required": [
+          "category"
+        ]
+      },
+      "then": {
+        "properties": {
+          "resumeProbeOperationId": {
+            "const": "reconcileOutcome"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "category": {
+            "const": "governanceApproval"
+          }
+        },
+        "required": [
+          "category"
+        ]
+      },
+      "then": {
+        "properties": {
+          "resumeProbeOperationId": {
+            "const": "probeGovernanceApproval"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "resolvedByFreshProbe"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "required": [
+          "resolution"
+        ]
+      },
+      "else": {
+        "not": {
+          "required": [
+            "resolution"
+          ]
+        }
+      }
+    }
+  ],
   "$defs": {
     "identifier": {
       "type": "string",
       "minLength": 1,
       "maxLength": 128,
       "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+    },
+    "category": {
+      "enum": [
+        "physicalConnection",
+        "deviceTrustPrompt",
+        "osPermission",
+        "credentialProvisioning",
+        "ambiguousIdentity",
+        "impactApproval",
+        "outcomeUnknownDecision",
+        "governanceApproval"
+      ]
+    },
+    "prohibitedAutomation": {
+      "enum": [
+        "physicalActuation",
+        "trustPromptAcceptance",
+        "privilegeEscalation",
+        "driverOrHelperInstall",
+        "systemRuleMutation",
+        "credentialExtraction",
+        "identityGuess",
+        "outcomeGuess",
+        "selfApproval"
+      ]
+    },
+    "resumeProbeOperationId": {
+      "enum": [
+        "observeDevice",
+        "probeHostConfiguration",
+        "probeImpactApproval",
+        "reconcileOutcome",
+        "probeGovernanceApproval"
+      ]
+    },
+    "freshProbeResolution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "probeOperationId",
+        "probeReceiptId",
+        "observedAtUtc"
+      ],
+      "properties": {
+        "probeOperationId": {
+          "$ref": "#/$defs/resumeProbeOperationId"
+        },
+        "probeReceiptId": {
+          "$ref": "#/$defs/identifier"
+        },
+        "observedAtUtc": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
     }
   }
 }
