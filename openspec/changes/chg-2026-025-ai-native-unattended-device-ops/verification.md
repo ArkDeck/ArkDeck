@@ -31,6 +31,7 @@
 | AIN-CONTRACT-001(change-local,r2) | authorizedAgent manifest/journal/usage round-trip + AIN-008 Manifest/Journal 2.1 Rockchip persistence/identity regression；standardAgent destructive success 与无 ref intent 全 reject；v1/v2 历史仍可读 | passed | TASK-AIN-005/008 run 记录 |
 | AIN-DISPATCH-001(change-local,r2) | AIN-008 descriptor-bound admission 前置 + AIN-007 fake descriptor executor 端到端：grant→reservation→intent→固定 argv→semantic outcome→manifest；handoff/external-shell dispatch=0 | passed | TASK-AIN-008/007 run 记录 |
 | AIN-COMP-001(change-local,2026-07-28 remediation) | TASK-AIN-003R contract tests：production composition 处 adapter profile hash == RockchipAuthorizationFacts 的 pinnedProduction 断言(正向)；错误 profile 注入 fail closed 且 015-01/02 无授权/不匹配 dispatch=0 不放宽(负向)；全量基线零回归 | passed | TASK-AIN-003R run 记录 |
+| AIN-BKMK-001(change-local,2026-07-28 remediation) | TASK-AIN-BKMK-001 tests：pinned tool 宿主前置消费与创建者 code-signing 身份解耦——签名身份不同的两个构建产物先后消费同一已安装第 1 项前置,load() 层消费成功(正向)；bookmark/前置缺失、stale、实体 hash 不中等既有 fail-closed 门零放宽且 015-01/02 无授权/不匹配 dispatch=0 不回退(负向)；全量基线零回归 | passed | TASK-AIN-BKMK-001 run 记录 |
 
 ## Negative and recovery tests
 
@@ -56,8 +57,8 @@
 
 ## Result gate
 
-- [ ] TASK-AIN-001/002/003/003R/005/006/008/007/004 全部 done，且 AIN-004 使用四项
-  host remediation 的 fresh main OID 重新 readiness（不复用 #296）
+- [ ] TASK-AIN-001/002/003/003R/BKMK-001/005/006/008/007/004 全部 done，且 AIN-004
+  使用四项 host remediation 的 fresh main OID 重新 readiness（不复用 #296）
 - [ ] 所有适用 AC passed 且 evidence 可复查
 - [ ] Simulation/fake 未计入硬件支持
 - [ ] executor.kind=agent 的 evidence 全部携带可解引用的 authorizationRef

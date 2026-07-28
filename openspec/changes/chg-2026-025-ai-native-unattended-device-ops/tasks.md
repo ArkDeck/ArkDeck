@@ -252,6 +252,74 @@ change approved 前保持 blocked;approved 后每任务另需独立 readiness PR
   (AC-FLASH-015-03 realHardware 面,归 TASK-AIN-004);E0 只读面不经该
   composition,不受影响(runbook §8 边界记录)。
 
+### Defect record 2(2026-07-28,宿主前置安装实际执行时发现;done 历史与 evidence 不改写)
+
+- 缺陷定性:宿主前置消费机制对**进程 code-signing 身份**的隐含依赖未被设计与
+  实证覆盖(机制缺陷),非授权门语义回退——AC-FLASH-015-01/02 的 fail-closed
+  行为、本任务 done 结论与 evidence 均保持原状,不据此重开本任务;修复由下方
+  新增 remediation 任务 **TASK-AIN-BKMK-001** 承载(TASK-AIN-004 Forbidden
+  paths 条款「实现已冻结,发现缺陷回 TASK-AIN-003」的落点;形态先例 = 上方
+  Defect record 与 TASK-AIN-003R)。命名注记:自然名 TASK-AIN-003R2 **不是
+  合法任务 token**——`check_pr_paths.TASK_TOKEN_TEXT` 要求结尾
+  `-[0-9]{3}[A-Z]?`(至多一个字母尾缀),实测
+  `FULL_TASK_RE.fullmatch("TASK-AIN-003R2")` 为 None,`## TASK-AIN-003R2`
+  段头将不被守卫识别、其段身(含 Allowed paths 行)会被并入前一任务段并毒化
+  其活声明解析,故取家族形 token TASK-AIN-BKMK-001。
+- 触发观察(维护者宿主,2026-07-28):按 #676(merge
+  `d17d303714257a6551c8630a460a61f4b2917d1a`)runbook §2 安装第 1 项后执行
+  §7 探针,`arkdeck flash execute` 报**裸 `NSCocoaErrorDomain Code=259`**
+  (NSFileReadCorruptFileError),无任何 `productionConfigurationUnavailable`
+  治理文案。
+- 根因矩阵(本登记起草时受控复现,2026-07-28,main
+  `b00c47ac3fcca63871f5736fe796bb48c7089d42`(#694 merge)树;Apple Swift
+  6.3.3,macOS 26.5.2;探针 = 自有最小 install/resolve 程序,只动探针自有
+  defaults key,bookmark 字节跨 defaults 域转移逐 base64 比对同一,零产品
+  key、零 dispatch、零设备接触):
+
+  | 创建者(签名身份) | 消费者(签名身份) | resolve 实测 |
+  | --- | --- | --- |
+  | `swift` 解释器(Apple 签名 `swift-frontend`;= runbook §2 helper 形态) | 同解释器再跑一次 | ok(stale=false、scope=true) |
+  | 同上 | 编译 ad-hoc 二进制(CDHash `eb29a0815f4faeb11ac1de01d6e743b96c181819`),字节同一数据 | **`NSCocoaErrorDomain Code=259`** |
+  | 该 ad-hoc 二进制(自建 bookmark) | 同一二进制新进程(跨进程重启) | ok(stale=false、scope=true) |
+  | 同上 | 同源同名重编译产物(实测与原产物**字节级同一**,同 CDHash) | ok |
+  | 同上 | 同源异名编译产物(仅签名 Identifier 异,CDHash `6dc6bb58cbaa73580be69c05d1b7fe6d73f22c74`),字节同一数据 | **`NSCocoaErrorDomain Code=259`** |
+
+- 矩阵结论:`.withSecurityScope` bookmark 的 resolve **绑定创建者
+  code-signing 身份**(ad-hoc 下 = Identifier+CDHash 粒度:字节级同一的产物
+  同身份可解,任何签名身份差异即 259)。r3 D-1 段「非 sandbox CLI 能创建并
+  解析 `.withSecurityScope` bookmark」的实证是**同进程自证**,只在同一签名
+  身份内成立,未覆盖跨身份消费——该可行性结论对「helper 创建、产品消费」的
+  安装途径不成立,runbook §2 helper(解释器进程)途径对产品**永不可行**。
+- 产品面事实(同树实测):SwiftPM 构建的 `arkdeck` 为 **ad-hoc 签名**且签名
+  Identifier 内嵌 LC_UUID(本次构建实测 Identifier =
+  `arkdeck-555549440a814e09db9a394f9ec2b4dd1c28a330`(`55554944` = ASCII
+  "UUID"),CDHash `556aab9ebb4fd0370c018e365cced9e8f83e83d1`)——签名身份逐
+  (内容不同的)构建漂移,即便产品自建 bookmark,重构建后亦不可解析;且产品
+  CLI 子命令全集 = `flash {plan, execute, postflight}`、
+  `update-feed {prepare, assemble}`(`ArkDeckCLIMain.swift`:22–31、41–55、
+  253–264,default 分支一律 usage 退出),**无任何 bookmark/宿主前置安装
+  入口**。
+- 行级证据(main `b00c47a` 实测;Host =
+  `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipFlashExecutionHost.swift`,
+  #694 对该文件的两个 hunk 起于旧 997/1036 行,均在 load() 区间之后,
+  load() 零漂移):`load()`
+  (Host:760–827)的第 1 项消费路径(Host:777–791)中,bookmark 缺失
+  (Host:778–781)与 stale/非 file URL/scope 失败(Host:786–791)均有
+  `productionConfigurationUnavailable` 治理文案,唯 resolve 调用本身
+  (Host:783–785,`try URL(resolvingBookmarkData:options:[.withSecurityScope,
+  .withoutUI])`)裸抛 Foundation 错误,经 CLI 顶层 catch-all
+  (`ArkDeckCLIMain.swift`:35–37 的 `\(error)` 打印)直出——即维护者看到的
+  裸 259。(load() 其余裸抛点 Host:762、768、813、814 属其他前置项的消费,
+  非本缺陷面。)
+- 影响边界:仅 E2 execute 面。`load()` 为 E2 专用消费面——实测唯一调用链 =
+  `arkdeck flash execute --authorization-id`(`ArkDeckCLIMain.swift`:116)→
+  `RockchipFlashExecutionHost.init`(Host:17–19)→
+  `RockchipProductionExecutionComposition.make()`(Host:669–671)→
+  `load()`,Sources 全树零其他引用;E0 面(`scripts/e0_readback/` crib、
+  TR-001 harness)零消费,不受影响。本缺陷闭合前 runbook §7 探针恒止于第一站
+  (bookmark resolve),D-1 第 1 项不可闭合(runbook §2/§8 已加 dated 勘误
+  注记,同 PR)。
+
 ## TASK-AIN-003R — production composition 的 discovery profile hash-pin 一致性(remediation)
 
 - Status:ready(r1 readiness;仅在维护者对本独立 readiness PR exact head
@@ -467,6 +535,69 @@ change approved 前保持 blocked;approved 后每任务另需独立 readiness PR
   `Packages/ArkDeckKit/Package.swift`、`RockchipAuthorizationFacts.swift`、
   `openspec/specs/**`、`openspec/contracts/**`、`scripts/**`),停手、先以
   独立治理 PR 修订本任务 scope,不得静默扩展(CHG-2026-024 r2 先例)。
+
+## TASK-AIN-BKMK-001 — pinned tool 宿主前置消费与签名身份解耦(remediation)
+
+- Status:blocked（前置:本登记合入后另起独立 readiness PR;Depends on 的
+  TASK-AIN-003 done 已满足。本登记 PR 零实现、不触碰 `Packages/**`）
+- Platform:macos
+- Requirements:REQ-FLASH-015(MODIFIED)
+- Acceptance:change-local AIN-BKMK-001(登记于 verification.md Acceptance
+  matrix;AC-FLASH-015-01/02 行为不回退是其负向底线)
+- Depends on:TASK-AIN-003(done,#292/#293;缺陷见其 Defect record 2)+ 独立
+  readiness
+- Allowed paths:
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipFlashExecutionHost.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckCLI/ArkDeckCLIMain.swift`
+  - `Packages/ArkDeckKit/Tests/**`
+  - 本 change `tasks.md`（仅本任务段的状态/pins/evidence 引用）
+  - 本 change `evidence/runs/TASK-AIN-BKMK-001/**`
+- Forbidden paths:
+  - `openspec/specs/**`
+  - `openspec/contracts/**`
+  - `scripts/**`
+- Risk:medium（宿主前置消费机制与 CLI 面;零授权门语义变更、零设备 effect、
+  凭据面零接触）
+- Hardware required:no
+
+### Deliverables
+
+- Objective:使 pinned tool 的宿主前置(D-1 第 1 项)**不依赖创建者
+  code-signing 身份**即可被产品稳定消费——跨进程且跨(签名身份不同的)构建,
+  `load()` 对第 1 项的消费不再因创建者/消费者签名身份差异而失败(缺陷正本 =
+  TASK-AIN-003「Defect record 2」与 runbook §2/§8 勘误注记)。方向候选**仅
+  登记、不预设**,由独立 readiness 实测钉定其一(或如实另裁):
+  (a) 非沙箱 CLI 改用普通(非 security-scoped)bookmark——`.withSecurityScope`
+  对非沙箱进程并无沙箱语义;(b) 产品新增安装子命令,以「r4 执行窗口与安装用
+  同一构建产物」纪律消费 security-scoped bookmark;(c) 稳定签名身份(涉
+  CHG-2026-036 签名/分发面,重,须先与该 change 协调 scope)。
+- 跨签名身份消费的 contract/受控测试(正向)+ 既有 fail-closed 门零放宽的
+  负向测试;
+- `evidence/runs/TASK-AIN-BKMK-001/` run 记录(全量测试基线对比)。
+
+### Verification
+
+- 正向(二值):签名身份不同的两个构建产物先后消费同一已安装第 1 项前置,
+  `load()` 层消费成功(具体测试形态由独立 readiness 钉定;Defect record 2 的
+  矩阵红行按新机制复测为绿);
+- 负向(二值):既有 fail-closed 门零放宽——bookmark/前置缺失、stale、实体
+  hash 不中等一切既有拒绝路径语义保持,AC-FLASH-015-01/02 无授权/不匹配 →
+  dispatch=0 逐字保持,不新增任何 admission 放行路径;
+- 零其他语义变更;Swift 全量基线零回归(不低于 TASK-AIN-003R 实现后基线
+  442 tests / 1 skipped / 0 failures,#694;以届时 main 实测为准)。
+
+### Notes / handoff
+
+- 命名:本任务即 TASK-AIN-003 第二缺陷(bookmark identity)的 remediation;
+  自然名 TASK-AIN-003R2 非合法任务 token(守卫语法要求结尾
+  `-[0-9]{3}[A-Z]?`),故取本 token,实测依据见 Defect record 2 命名注记。
+- 本任务 done 前:TASK-AIN-004 的 D-1 第 1 项不可闭合,runbook §7 探针恒止于
+  第一站(其 r4 前置清单第 8 条);E0 面零消费 `load()`,不受本缺陷约束。
+- 方向 (c) 触碰 CHG-2026-036 的签名/分发面:若 readiness 裁定走 (c),须先以
+  独立治理 PR 与该 change 协调 scope,不得在本任务活声明外静默扩面。
+- 独立 readiness 须以当时 main 钉定待改文件 blob(全 OID)与实现方向,并复核
+  缺陷仍在——若届时上游已另行修复,如实记录并按实况处置,不重复实现。
+- Decision-Grade 行由维护者亲笔(TASK-BRC-002R 先例)。
 
 ## TASK-AIN-004 — 首次无人值守真机验收(DAYU200)
 
@@ -692,6 +823,19 @@ D-1/D-2/D-3 三项阻断全部未闭合。r4(翻 `ready` + 授权设备窗口)�
    E2 面:E2 执行前 TASK-AIN-003R 必须 done;仅含 E0 面的 r4 不被本条阻断——
    E0 不经该 composition(runbook §8 边界记录),agent CLI 面适用性已由
    DEC-012 判 (a) 界定(#670)。
+8. (2026-07-28 增补)TASK-AIN-BKMK-001 done:维护者按 runbook §2/§7 实际执行
+   D-1 安装时,`arkdeck flash execute` 探针于第一站裸报
+   `NSCocoaErrorDomain Code=259`;受控矩阵钉死 `.withSecurityScope` bookmark
+   的 resolve 绑定创建者 code-signing 身份(ad-hoc = Identifier+CDHash
+   粒度),runbook §2 helper 途径对产品永不可行,产品又无 bookmark 安装
+   入口——D-1 第 1 项(tool bookmark)的可消费性以 TASK-AIN-BKMK-001 done 为
+   前置,其 done 前第 2 条的第 1 项快照不可能取得(缺陷正本与矩阵 =
+   TASK-AIN-003「Defect record 2」;runbook §2/§8 dated 勘误注记)。本条仅
+   约束 E2 面:`RockchipProductExecutionSettings.load()` 为 E2 execute 面
+   专用消费——实测唯一调用链 = `arkdeck flash execute --authorization-id`
+   (`ArkDeckCLIMain.swift`:116)→ host init → production composition →
+   `load()`,Sources 全树零其他引用;E0 面(`scripts/e0_readback/` crib、
+   TR-001 harness)零消费——仅含 E0 面的 r4 不被本条阻断(与第 7 条同界)。
 
 ### Historical readiness pins(r1 host-complete,2026-07-22; superseded)
 
