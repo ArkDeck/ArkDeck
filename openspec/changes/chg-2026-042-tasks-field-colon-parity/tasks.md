@@ -6,19 +6,19 @@ HLR/NAV/DEC 先例由会话实现：`Decision-Grade` 在实现前保持缺失；
 
 ## TASK-CM7-001 — 对齐 `tasks.md` 字段冒号文法并锁定跨解析器契约
 
-- Status:ready（r1 readiness 已由 PR #707 merge，但其后 #708 改动活跃 corpus，
-  命中 r1 stop condition，原一次性实现授权未消费即失效；仅在维护者对 fresh
-  readiness r2 PR exact head review/merge 且 #710 / #711 均达到下方限定终态后，
-  才重新授权一个严格受 `Readiness pins(r2,2026-07-28)` 约束的实现 PR；
+- Status:ready（r2 readiness 已由 PR #712 merge，且 #710 / #711 均按钉定
+  exact head 合入；实现开工后的全量测试揭示一个未列入 allowed paths 的既有
+  discovery census 契约，故 r2 实现授权暂停。仅在维护者对下方 r3 scope
+  remediation exact head review/merge 后，才授权恢复同一个 implementation PR；
   不授权 `done` / `verified` 翻转）
 - Platform:macos（host-only）
 - Requirements/AC:change-local `CM7-PARITY-001`、`CM7-CORPUS-001`、
   `CM7-SELF-001`
 - Depends on:none（change approval 与 readiness 由状态/PR 门承载，不伪装为
   TASK 依赖）
-- Readiness input pins:r1 为历史失效快照；现行输入见下方
-  `Readiness pins(r2,2026-07-28)`。实现开工必须逐项复核 exact base ancestry、
-  实现/测试 blob、活跃 `tasks.md` 语料、#709 exact merge 与 #710 / #711 终态
+- Readiness input pins:r1 / r2 为历史快照；现行 scope 补救见下方
+  `Readiness pins(r3,2026-07-28)`。恢复实现前必须逐项复核 r2 pins、r3
+  merge ancestry 与新增 census-test blob
 - Applicable failure patterns:`AF-004`（同一契约多消费者语义分歧）、
   `AF-010`（必须用独立 fixture 与变异反证）、`AF-015`（全仓清点同模式）
 - Production reachability:`python -m host_loop --once` →
@@ -31,6 +31,7 @@ HLR/NAV/DEC 先例由会话实现：`Decision-Grade` 在实现前保持缺失；
 - Allowed paths:
   - `scripts/host_loop/__main__.py`
   - `scripts/host_loop/worker.py`
+  - `scripts/host_loop/test_discovery_contract.py`
   - `scripts/host_loop/test_navigation_contract.py`
   - `scripts/host_loop/test_token_parity.py`
   - `scripts/test_check_pr_paths.py`
@@ -361,3 +362,53 @@ HLR/NAV/DEC 先例由会话实现：`Decision-Grade` 在实现前保持缺失；
   lost、未登记 gained，或任一 BRC 变为 ready / 可 dispatch，均停止且不写实现。
   r1 的完整变异矩阵继续逐项有效；implementation、`ready→done` 与 verified
   PR 仍严格分离。
+
+### Readiness pins(r3 scope remediation,2026-07-28)
+
+- **触发事实。**r2 readiness PR #712 exact head
+  `0352c0fbd2da678c9bec2eb6e0ae9d85f521bb12` 已获维护者 review 并 merge
+  为 `0c35f35e1afdb3ffe1e3602d7d1b87b2ed4e37f8`；#710 / #711 也分别按
+  r2 钉定 exact heads 合入为
+  `70739c4c483232ff6a5d094d753811114e3b9702` /
+  `f065ac90e69ff89c9ebb8817bfb4f9ebb1b0ed7d`。在最终 protected-main
+  `f065ac90e69ff89c9ebb8817bfb4f9ebb1b0ed7d` 上，全部 implementation、
+  governance 与 active-corpus blobs 精确命中 r2，open PR 为空，故实现合法开工。
+- **可复现 blocker。**在 r2 已批准的四个文件中完成最小草稿
+  （两条 parser regex、never-claim root、navigation / cross-parser tests）后，
+  聚焦 colon/never-claim = 12 tests / 0 failures，
+  `scripts/test_check_pr_paths.py` = 50 tests / 0 failures，活体语料 =
+  `30→36`、`lost=[]`、gained 恰为六个 BRC 且六项均非 ready；但
+  `cd scripts && python3 -m unittest discover -s host_loop -t .` 为
+  644 tests / 1 expected failure / **1 unexpected failure**：
+  `DependenciesAreDeclaredNotAssumed.
+  test_the_real_file_declares_dependencies_for_every_task` 报 `7 != 1`。
+- **根因与真值方向。**失败断言位于
+  `scripts/host_loop/test_discovery_contract.py:461-466`；生产实现改前 blob
+  `0d8ad4c98fb302b8fb9bb46cc9eef502553e36ff`。它用
+  `.count("\n- Depends on:")` 独立统计活体 change 的依赖声明，仍是
+  ASCII-only 文法；修复后 `live_sample_change` 选到 CHG-036，真实 discovery
+  正确返回 7 个 candidate，但 counter 只看见其中 1 个 ASCII 字段并错误返回 1。
+  让生产 parser 迁就该断言会重新隐藏六个 BRC task，直接违反
+  `CM7-PARITY-001` / `CM7-CORPUS-001`，不可采用。
+- **唯一 scope 补救。**TASK-CM7-001 Allowed paths 新增且只新增
+  `scripts/host_loop/test_discovery_contract.py`。恢复实现时只允许把上述 census
+  counter 收敛为独立、行锚定的封闭 `Depends on[:：]` 字段计数；不得导入生产
+  `_DEPENDS_RE`、不得改 fixture/task 选择逻辑、不得修改其他 discovery contract
+  tests。该断言必须在完整 suite 中从 `7 != 1` 变为通过，并保持“不漏真实
+  dependency field”的原验证目的。
+- **为何不是 proposal r3。**Proposal r2 已明确要求 ASCII / 全角字段等价、
+  全部活跃 corpus executable diff 与相关 contract tests；本次不改行为 scope、
+  AC、实现文件、候选集合或总数门，只补登记一个被全量 suite 证明直接消费同一
+  文法的既有测试载体。按仓库“scope 变化显式修订 tasks.md”规则，由本独立 D1
+  readiness 承载即可；proposal revision 保持 2。
+- **隔离与批准边界。**触发 blocker 的实现草稿只保存在本地可恢复 stash
+  `6fdae757beba184b86e3153d616ac751f49c4405`，未 commit、未 push、未形成 PR；
+  本 r3 PR 只改本 `tasks.md`，不夹带 production/test/evidence。只有维护者对
+  本 r3 exact head review/merge 后才允许恢复草稿并修改新增路径；此前
+  implementation 为 0。
+- **恢复开工门。**恢复时从 r3 merge 后 protected `main` 重建 implementation
+  分支并复核：r2/r3 merge ancestry、原实现/测试 pins、新增 census-test blob、
+  8 项 active corpus、open PR files。除本 r3 对 `tasks.md` 的预期变化外，任何
+  漂移、并发 overlap、candidate-set 变化或新增失败都再次停止。r1/r2 的
+  parity、negative、corpus、never-claim 与三项 mutation 门全部继续生效；
+  implementation、`ready→done`、verified 仍为三个独立 PR。
