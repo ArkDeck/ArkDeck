@@ -41,6 +41,7 @@ TASK-DEC-001(chg-2026-040)交付的一页索引:`scripts/` 下每个一级条目
 | `rockchip_loader_transition_probe/` | HDC → Loader 转换特征化探针(CHG-2026-026) |
 | `trace_capture/` | TR-001 trace 探针/最小采集 runbook(CHG-2026-021,人工执行) |
 | `ud_capture/` | 受控 UI Dump 采集 harness(CHG-2026-008) |
+| `ui_dump_diagnosis/` | R2 raw INVALID_UNICODE 只读非内容诊断(TASK-UD-R2-DIAG-001) |
 | `ui_dump_redaction/` | UI Dump 派生 golden 脱敏器(host-only 隐私边界) |
 
 产品工具的实例参数(设备身份、镜像 pins、fixtures、脱敏词表)一律钉在
