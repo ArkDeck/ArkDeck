@@ -17,7 +17,10 @@
      archive/** 豁免;
   8. active changes 中精确 `yaml pins` fenced block 使用封闭 schema 与
      完整 40/64-hex digest,其他 info string 与 archive/** 不扫描;
-  9. platform/integration lock 与 core-conformance 引用的路径存在,
+  9. integration registry 与 fixture pack 内不出现整条仓内 change 路径
+     (归档即失效),仅显式 deferred 登记表内的文件按登记次数豁免,多于或
+     少于登记值同样 fail;
+ 10. platform/integration lock 与 core-conformance 引用的路径存在,
      safety_coverage 引用的 AC 存在。
 
 退出码:0 = 通过(允许 warning);1 = 存在 error。
@@ -617,6 +620,93 @@ def check_structured_pins(changes_dir: Path | None = None):
                     )
 
 
+# --------------------------------- 9b. registry provenance change paths
+CHANGE_PATH_LITERAL = "openspec/changes/"
+
+# Where provenance data lives: integration registries and the bundled fixture
+# packs the contract tests read. Every decodable file under these roots is
+# scanned, which is deliberately a superset of "registry/resource/receipt" -
+# a new provenance file must not be able to slip in under a name nobody
+# thought to enumerate.
+REGISTRY_SURFACE_ROOTS = (
+    Path("openspec") / "integrations",
+    Path("Packages") / "ArkDeckKit" / "Tests" / "ArkDeckContractTests" / "Fixtures",
+)
+
+_READONLY_PIN = (
+    "content hash pinned by Sources/ArkDeckOpenHarmony/HDCReadOnlyProbeRegistry.swift "
+    "and consumed at runtime; migrating needs a change owning Sources/**"
+)
+_TRACE_PIN = (
+    "content hash pinned by Sources/ArkDeckOpenHarmony/TraceProbeAdapter.swift; "
+    "migrating needs a change owning Sources/**"
+)
+_FIXTURES = "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Probes/1.0.0"
+
+# Files still allowed to name a whole in-repo change path, with the exact
+# number of occurrences each may keep and why. Such a path breaks the moment
+# its change is archived, so the register is a debt ledger, not an exemption:
+# every entry is a file whose bytes cannot be rewritten inside a change that
+# does not own `Sources/**` (CHG-2026-041 r3/r5). The count is checked in both
+# directions - more occurrences means new debt smuggled in behind the
+# exemption, fewer means the debt was paid without updating the ledger.
+DEFERRED_CHANGE_PATH_REGISTER: dict[str, tuple[int, str]] = {
+    "openspec/integrations/openharmony/readonly-probes.yaml": (4, _READONLY_PIN),
+    "openspec/integrations/openharmony/trace-probes/1.0.0/registry.yaml": (3, _TRACE_PIN),
+    f"{_FIXTURES}/registry.yaml": (4, _READONLY_PIN),
+    f"{_FIXTURES}/receipts/key-access-diagnostics.json": (1, _READONLY_PIN),
+    f"{_FIXTURES}/receipts/selected-device-authorization-binding.json": (1, _READONLY_PIN),
+    f"{_FIXTURES}/receipts/server-identity-generation.json": (1, _READONLY_PIN),
+    f"{_FIXTURES}/receipts/subserver-capability.json": (1, _READONLY_PIN),
+}
+
+
+def check_registry_change_paths(repo_root: Path | None = None, register=None):
+    """Forbid whole in-repo change paths inside registry/fixture provenance.
+
+    Provenance that spells out `openspec/changes/<id>/...` stops resolving the
+    moment that change is archived. The archive-stable form names the change
+    and a change-relative path and resolves active-or-archive at read time.
+    """
+    repo_root = repo_root or REPO
+    register = DEFERRED_CHANGE_PATH_REGISTER if register is None else register
+    observed: dict[str, int] = {}
+
+    for root in REGISTRY_SURFACE_ROOTS:
+        for path in sorted((repo_root / root).rglob("*")):
+            if not path.is_file():
+                continue
+            try:
+                text = path.read_text(encoding="utf-8")
+            except (UnicodeDecodeError, ValueError):
+                continue  # binary fixture: no textual provenance to carry
+            relative = path.relative_to(repo_root).as_posix()
+            count = text.count(CHANGE_PATH_LITERAL)
+            if count:
+                observed[relative] = count
+            if relative in register:
+                continue
+            for number, line in enumerate(text.splitlines(), start=1):
+                if CHANGE_PATH_LITERAL in line:
+                    err(relative, f"line {number} names a whole in-repo change path; "
+                                  f"use the change id plus a change-relative path so the "
+                                  f"reference survives archiving")
+
+    for relative, (expected, reason) in sorted(register.items()):
+        count = observed.get(relative, 0)
+        if not (repo_root / relative).is_file():
+            err(relative, "is registered as deferred but does not exist; "
+                          "remove the entry from DEFERRED_CHANGE_PATH_REGISTER")
+        elif count > expected:
+            err(relative, f"carries {count} in-repo change paths but only {expected} "
+                          f"are registered as deferred ({reason}); the extra ones are "
+                          f"new debt and must use the archive-stable form")
+        elif count < expected:
+            err(relative, f"carries {count} in-repo change paths but {expected} are "
+                          f"registered as deferred; update "
+                          f"DEFERRED_CHANGE_PATH_REGISTER to match")
+
+
 # ------------------------------------------------ 9. locks and conformance
 def check_locks_and_conformance(spec_acs):
     for lock_path, keys in (
@@ -674,6 +764,7 @@ def main():
     check_change_revision_consistency()
     check_change_scope_coverage()
     check_structured_pins()
+    check_registry_change_paths()
     check_locks_and_conformance(spec_acs)
 
     for w in warnings:

@@ -32,9 +32,11 @@ REGISTRY_RELATIVE_PATH = pathlib.Path(
 )
 SOURCE_PROVENANCE_KIND = "protectedMainArtifactDigestToUpstreamCommit"
 SOURCE_ACCEPTANCE_REF = "PR#445@cbad982cc211c7d8579a025b8c35f4ed1a519f16"
+SOURCE_EVIDENCE_CHANGE = "CHG-2026-026-macos-rockchip-flash-ui"
+# Relative to the change directory, not the repository root: archiving a change
+# moves that directory, and a whole in-repo path would break at the move.
 SOURCE_EVIDENCE_RELATIVE_PATH = (
-    "openspec/changes/chg-2026-026-macos-rockchip-flash-ui/evidence/runs/"
-    "TASK-RKFUI-001/clean-discovery-repin-2026-07-24.md"
+    "evidence/runs/TASK-RKFUI-001/clean-discovery-repin-2026-07-24.md"
 )
 SOURCE_EVIDENCE_SHA256 = (
     "d0b5089954e19a4aba354846fe6108b2d5c89bfc12ab0396c2cd7eb4a082189a"
@@ -60,7 +62,8 @@ EXPECTED_SOURCE_PROVENANCE = {
     "artifactSHA256": "bbd7bdc0fb121d414fb61085e77211cc1fdd9a3b6c6b285c54380f70e56c9923",
     "upstreamCommit": "304f073752fd25c854e1bcf05d8e7f925b1f4e14",
     "acceptedBy": SOURCE_ACCEPTANCE_REF,
-    "evidencePath": SOURCE_EVIDENCE_RELATIVE_PATH,
+    "evidenceChange": SOURCE_EVIDENCE_CHANGE,
+    "evidenceRelativePath": SOURCE_EVIDENCE_RELATIVE_PATH,
     "evidenceSHA256": SOURCE_EVIDENCE_SHA256,
 }
 EXPECTED_ROCKUSB_OBSERVATION = {
@@ -128,7 +131,8 @@ class SourceProvenance:
     artifact_sha256: str
     upstream_commit: str
     accepted_by: str
-    evidence_path: str
+    evidence_change: str
+    evidence_relative_path: str
     evidence_sha256: str
 
     def receipt(self) -> dict[str, Any]:
@@ -138,7 +142,8 @@ class SourceProvenance:
             "upstreamCommit": self.upstream_commit,
             "acceptedBy": self.accepted_by,
             "evidence": {
-                "path": self.evidence_path,
+                "change": self.evidence_change,
+                "relativePath": self.evidence_relative_path,
                 "sha256": self.evidence_sha256,
             },
             "validationVerdict": "matchedProtectedMainRegistryAndEvidence",
@@ -226,14 +231,41 @@ def sha256_file(path: pathlib.Path) -> str:
     return digest.hexdigest()
 
 
-def _source_evidence_path(repo_root: pathlib.Path, relative_path: str) -> pathlib.Path:
+def resolve_change_directory(repo_root: pathlib.Path, change_id: str) -> pathlib.Path:
+    """Resolve a change id to its single on-disk directory, active or archived.
+
+    A change lives at `openspec/changes/<id>` while it is active and moves to
+    `openspec/changes/archive/<date>-<id>` when it is archived. Exactly one of
+    those must exist; zero or both is a loud failure rather than a silent pick.
+    """
+    changes_root = repo_root / "openspec" / "changes"
+    lowered = change_id.lower()
+    candidates = [changes_root / lowered]
+    candidates.extend(sorted(changes_root.glob(f"archive/*-{lowered}")))
+    present = [candidate for candidate in candidates if candidate.is_dir()]
+    if len(present) != 1:
+        raise ProbeError(
+            f"change {change_id} resolves to {len(present)} directories, "
+            "expected exactly one active or archived directory"
+        )
+    return present[0]
+
+
+def _source_evidence_path(
+    repo_root: pathlib.Path, change_id: str, relative_path: str
+) -> pathlib.Path:
+    if change_id != SOURCE_EVIDENCE_CHANGE:
+        raise ProbeError("rkdeveloptool source evidence change drifted")
     if relative_path != SOURCE_EVIDENCE_RELATIVE_PATH:
         raise ProbeError("rkdeveloptool source evidence path drifted")
     pure_path = pathlib.PurePosixPath(relative_path)
     if pure_path.is_absolute() or any(part in ("", ".", "..") for part in pure_path.parts):
-        raise ProbeError("rkdeveloptool source evidence path is not a safe repo-relative path")
+        raise ProbeError(
+            "rkdeveloptool source evidence path is not a safe change-relative path"
+        )
     resolved_root = repo_root.resolve()
-    resolved_evidence = resolved_root.joinpath(*pure_path.parts).resolve()
+    change_directory = resolve_change_directory(resolved_root, change_id)
+    resolved_evidence = change_directory.joinpath(*pure_path.parts).resolve()
     try:
         resolved_evidence.relative_to(resolved_root)
     except ValueError as error:
@@ -253,13 +285,17 @@ def validate_source_provenance(config: Config) -> dict[str, Any]:
         raise ProbeError("rkdeveloptool artifact/source provenance commit tuple mismatch")
     if provenance.accepted_by != SOURCE_ACCEPTANCE_REF:
         raise ProbeError("rkdeveloptool source acceptance ref drifted")
+    if provenance.evidence_change != SOURCE_EVIDENCE_CHANGE:
+        raise ProbeError("rkdeveloptool source evidence change drifted")
     if provenance.evidence_sha256 != SOURCE_EVIDENCE_SHA256:
         raise ProbeError("rkdeveloptool source evidence SHA-256 pin drifted")
     if not re.fullmatch(r"[0-9a-f]{64}", provenance.artifact_sha256):
         raise ProbeError("rkdeveloptool source artifact SHA-256 is malformed")
     if not re.fullmatch(r"[0-9a-f]{40}", provenance.upstream_commit):
         raise ProbeError("rkdeveloptool source upstream commit is malformed")
-    evidence_path = _source_evidence_path(config.repo_root, provenance.evidence_path)
+    evidence_path = _source_evidence_path(
+        config.repo_root, provenance.evidence_change, provenance.evidence_relative_path
+    )
     observed_evidence_sha256 = sha256_file(evidence_path)
     if observed_evidence_sha256 != provenance.evidence_sha256:
         raise ProbeError("rkdeveloptool reviewed source evidence bytes drifted")
@@ -456,7 +492,8 @@ def load_config(
             artifact_sha256=source_provenance["artifactSHA256"],
             upstream_commit=source_provenance["upstreamCommit"],
             accepted_by=source_provenance["acceptedBy"],
-            evidence_path=source_provenance["evidencePath"],
+            evidence_change=source_provenance["evidenceChange"],
+            evidence_relative_path=source_provenance["evidenceRelativePath"],
             evidence_sha256=source_provenance["evidenceSHA256"],
         ),
         e1_arguments_template=tuple(operation["exactArgvTemplate"]),

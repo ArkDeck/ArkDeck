@@ -39,7 +39,8 @@
       "artifactSHA256": "bbd7bdc0fb121d414fb61085e77211cc1fdd9a3b6c6b285c54380f70e56c9923",
       "upstreamCommit": "304f073752fd25c854e1bcf05d8e7f925b1f4e14",
       "acceptedBy": "PR#445@cbad982cc211c7d8579a025b8c35f4ed1a519f16",
-      "evidencePath": "openspec/changes/chg-2026-026-macos-rockchip-flash-ui/evidence/runs/TASK-RKFUI-001/clean-discovery-repin-2026-07-24.md",
+      "evidenceChange": "CHG-2026-026-macos-rockchip-flash-ui",
+      "evidenceRelativePath": "evidence/runs/TASK-RKFUI-001/clean-discovery-repin-2026-07-24.md",
       "evidenceSHA256": "d0b5089954e19a4aba354846fe6108b2d5c89bfc12ab0396c2cd7eb4a082189a"
     },
     "signatureClass": "adHoc",
