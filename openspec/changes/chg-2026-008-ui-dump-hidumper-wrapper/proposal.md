@@ -1,6 +1,6 @@
 ---
 id: CHG-2026-008-ui-dump-hidumper-wrapper
-revision: 10
+revision: 11
 status: approved # r1 经 #68 批准;后续 revision 仅在对应治理 PR 由维护者 review/merge 后生效
 class: platform
 core_change_level: none
@@ -80,6 +80,24 @@ raw→derived/decision,Agent 不读 raw)与 `TASK-UD-R2-R4-SEAM-001`(`blocked`,�
 done 后实现 selector + R4 harness seam);R4 仍 blocked。本 revision 不含 derived bytes、
 decision、selector/harness 实现或任何 HDC/device dispatch。
 
+r11 是 truthful-negative 之后的 revival-path governance revision。#263/#267 已把
+`TASK-UD-R2-DECISION-001` 的 negative decision 与 `done` 状态合入(`952b0f7`、
+`c9b3f77`):固定 `uidump-derived-redaction-v1` 处理 #248 R2 sidecar exact raw origin
+(`866256` bytes,SHA-256
+`ec6663e6b7d42053ba089ccbfa89df74cb183a5a583f80a69f103b047014b077`)时以
+`INVALID_UNICODE` / exit `27` fail closed,产不出 derived fixture;按 r10 evidence gate,
+negative decision 使 `TASK-UD-R2-R4-SEAM-001`、`TASK-UD-CAP-R4-001` 与 `TASK-UD-001`
+在现行修订体系内全部保持 blocked。该 negative 的根因至今未判定:`INVALID_UNICODE`
+既可能是该 raw 本身含非法 UTF-8 字节(数据根因——重捕无意义,须先另行修订 redactor
+字节处理策略),也可能是 capture 管道截断/编码缺陷(管道根因——须新 capture plan 与
+设备窗口重捕)。r11 因此只登记"复活前必须先诊断根因",不预设任一结论:新增 host-only
+只读诊断任务 `TASK-UD-R2-DIAG-001`(`blocked`,等待本 revision 合入后的独立
+readiness),其诊断工具只允许输出 error name/code、字节偏移、字节类别统计等非内容
+事实,Agent 不打开/复制 controlled raw,raw 语义判读仍只属维护者;同时登记两条互斥、
+均须诊断 done 后由后续修订授权的分支。r11 不重开 `TASK-UD-R2-DECISION-001`,不修改
+其 truthful-negative 记录,不使 SEAM/R4/UD-001 解锁,也不含任何实现、fixture、evidence
+或 HDC/device/network dispatch。
+
 ## What changes
 
 ### In scope
@@ -113,6 +131,13 @@ decision、selector/harness 实现或任何 HDC/device dispatch。
   host-only seam implementation,由 selector 从同一 Phase B 会话的新 R2 raw 生成带随机
   nonce 的 private bundle,并由 capture harness 验证 bundle/session/raw-origin binding 后
   才 materialize R4 argv。implementation/done/R4 readiness 继续各自独立 PR。
+- r11 治理修订只登记 truthful-negative 之后的复活路径:声明 `blocked` 的 host-only 只读
+  诊断任务 `TASK-UD-R2-DIAG-001`(非内容输出边界:仅 error name/code、字节偏移、字节
+  类别统计等事实)与两条互斥后续分支——(a) 数据根因→redactor 字节处理策略修订;
+  (b) 管道根因→新 capture plan+设备窗口重捕。两分支均只登记、不在本 revision 授权,
+  且都以诊断 done 与维护者 review/merge 的后续修订为前置。本 revision 对
+  acceptance-cases.yaml 与 verification.md 仅做 revision 同步;诊断任务的 change-local
+  acceptance case 与 verification 行由其独立 readiness revision 一并固定。
 
 ### Out of scope
 
@@ -151,6 +176,13 @@ decision、selector/harness 实现或任何 HDC/device dispatch。
   token;把 token/随机 nonce/private selector bundle 入仓;允许 CLI/env/ad-hoc token;
   在 `TASK-UD-R2-DECISION-001 done` 与 `TASK-UD-R2-R4-SEAM-001 done`、独立 R4
   ready-restore PR 全部合入前执行 Phase B R2/R4 或修改 harness 白名单。
+- 重开、重跑或重判 `TASK-UD-R2-DECISION-001`,修改其 decision/evidence 既有文件的任何
+  字节;在 `TASK-UD-R2-DIAG-001 done` 且对应后续修订获批前实施任一复活分支——包括
+  修改 `scripts/ui_dump_redaction/**`、起草新 capture plan 或执行设备窗口重捕;把诊断
+  结果直接当作 SEAM/R4/UD-001 的解锁条件或任何 output-family/compatibility 结论;
+- 诊断工具或其 evidence 输出 raw 字节值序列、解码文本、内容窗口、页面文本、window/
+  component 字面量;Agent 打开/复制 controlled raw;诊断结论歧义或双因并存时默认选择
+  任一分支。
 
 ## Impacted specifications
 
@@ -213,6 +245,14 @@ decision、selector/harness 实现或任何 HDC/device dispatch。
   bundle reference materialize token,禁止 CLI/env/manual/file-without-schema 输入。
   zero/multiple candidates、family mismatch、bundle/session/raw hash drift、token format failure
   或任何 truncation/cleanup ambiguity 均使 R4 dispatch `0`。
+- r11 把复活决策分为"先诊断、后授权"两层。诊断任务 host-only、只读、零 HDC/device/
+  network/GUI dispatch,固定 Python 3.14.6 + PyYAML 6.0.3;诊断工具对 controlled raw
+  只读打开,先复核输入 SHA-256 精确等于 #248 登记的 R2 raw-origin hash
+  (`ec6663e6b7d42053ba089ccbfa89df74cb183a5a583f80a69f103b047014b077`),失配即拒绝
+  且零输出;输出面为封闭 schema,只含 error name/code、字节偏移/长度/计数、字节类别
+  统计等非内容事实,输出侧敏感终检 fail closed;诊断 run 由人类维护者执行,Agent raw
+  read count 保持 `0`。诊断结论(数据根因/管道根因/歧义)只有经维护者 review/merge 的
+  后续修订才能转化为任一分支的授权;歧义或双因并存时两分支均保持未授权。
 - 每个登记 output family 都必须能在干净 checkout 以 repo-safe synthetic/derived fixture
   走 production classifier 正向复验;本 change 禁止 raw byte-fingerprint/digest family;
 - 本 r3 治理 PR 本身零 HDC/device dispatch;merge 后仍没有 ready 的 real-device task。
@@ -290,3 +330,14 @@ decision、selector/harness 实现或任何 HDC/device dispatch。
   再声明一个 blocked host-only seam task;不读取/复制 controlled raw,不提交 derived/
   receipt/decision,不修改 `scripts/**`,不执行 installed HDC/device/network/GUI/mutation/
   destructive 操作。仅在维护者 review/merge 后生效;merge 不会使 R4 ready。
+- truthful-negative decision:evidence + decision PR #263 已合入 `main`
+  `952b0f70a697fb17568a693e1cb6c9f8aa2e8053`,独立状态 PR #267 已合入
+  `c9b3f775821e4027252c99eeb350674f05aa6d02` 并使 `TASK-UD-R2-DECISION-001 done`
+  (truthful-negative branch);SEAM/R4/UD-001 按 r10 gate 保持 blocked。
+- r11 revival-path governance revision:本 PR 只修改本 change 的 proposal/tasks 并对
+  acceptance-cases.yaml/verification.md 做 revision 同步,新增一个 `blocked` 的 host-only
+  只读诊断任务并登记两条互斥后续分支;不读取/复制 controlled raw,不含实现/fixture/
+  evidence,不修改既有 decisions/evidence/`scripts/**` 文件,不执行 installed HDC/device/
+  network/GUI/mutation/destructive 操作。仅在维护者 review/merge 后生效;merge 不使
+  任何任务 ready,不重开 `TASK-UD-R2-DECISION-001`,不预设诊断结论,也不授权任一
+  复活分支。
