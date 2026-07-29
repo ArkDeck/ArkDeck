@@ -17,7 +17,7 @@
 | `URB-PROV-001` | provider 契约测试 + 注入负向 | typed action 封闭:API 面无 executable/argv/shell 载体;HDC 与 Rockchip adapter 在同一引擎注册;verify 基于语义判定(exit0+空输出≠成功);reconcile 面存在且 fail-closed | contract |
 | `URB-HDC-001` | 拆分前后全量套件 + profile parser 矩阵 | `HDCProduction.swift` 拆为职责组件且既有 HDC/golden/supervisor 测试零修改零回归;观察族输出经版本 profile+语义解析(空白/诊断文本差异不误红);未知版本 → unsupported fail-closed | contract |
 | `URB-DAEMON-001` | UDS 集成测试(双客户端并发)+ 权限/协议负向 | 两个独立客户端可同时查询同一 daemon;重复启动返回既有实例信息;socket 目录 0700/socket 0600;协议未知主版本拒绝;transport 与 handler 分离(handler 可用内存 transport 测试) | contract |
-| `URB-JOB-001` | fake integration + 进程级 crash-window fixture | dispatch 前 durable intent(WAL gate 生产接线);intent 后 crash → 重启不重发、状态 waitingForRecovery/outcomeUnknown;同 idempotencyKey 返回原 job 零新副作用;同设备两 mutation 不并发;cancel 只在安全边界;job timeline 含 intent/dispatch/verify/reconcile | contract |
+| `URB-JOB-001` | fake integration + 进程级 crash-window fixture | dispatch 前 durable intent(WAL gate 生产接线);intent 后 crash → 重启不重发、状态 waitingForRecovery/outcomeUnknown;同 idempotencyKey 返回原 job 零新副作用;mutation 互斥接线经既有 lane(端到端计数证明递延至首个可运行 mutation op);cancel 只在安全边界;job timeline 含 intent/dispatch/verify/reconcile | contract |
 | `URB-COMPAT-001` | 全量既有套件 + adapter 等价 | Swift 全量零回归(含 chg-2026-022/043 supervisor 契约与全部 golden);`RockchipFlashExecutionHost`/`HDCApplicationDiagnosticsFacade` 公有面不变;脚本套件全绿 | contract |
 
 ## `URB-PROV-001`
@@ -56,15 +56,23 @@
 
 - WAL:引擎 dispatch 必经 `WriteAheadIntentGate`;fixture 在
   「intent 已持久、dispatch 未发」与「dispatch 已发、outcome 未记」两窗口
-  SIGKILL,重启后:窗口一可安全重做或继续;窗口二 → outcomeUnknown +
-  零自动重发(计数器证明);
+  SIGKILL,重启后:两窗口均入 waitingForRecovery + outcomeUnknown、
+  零自动重发(计数器证明);只读族经 provider reconcile 判定安全后清除
+  unknown,重跑决策留给调用方,永不自动重放;
 - idempotency:同 key 二次 submit → 同 jobID、副作用计数不变;不同 key
   → 新 job;ledger 重启后仍生效;
-- 互斥:同 targetID 两个 mutation job → 第二个排队/拒绝,不并发(fake
-  provider 计数证明);E0 并发按 catalog concurrencyKey 放行;
+- 互斥:引擎对 mutation 级 operation 的执行路径经
+  `DeviceMutationLaneCoordinator.withMutationLane`(接线为实现事实,
+  代码审阅可证);lane 语义本身由既有 Core 套件覆盖。**端到端双 job
+  并发计数证明递延**:MU-2 无可运行到 dispatch 的 mutation operation
+  (HDC mutation action 属 T13,Rockchip 全链属 T17/T18),首个可运行
+  mutation op 落地的 MU 补该实测——本 AC 在此前以"接线 + lane 既有
+  覆盖"为通过判据;
 - cancel:running 中 cancel → 安全边界后 cancelled;critical step 不强杀;
-- timeline:job 记录含 request、resolved binding revision、provider
-  facts、bundle digest、capability usage、per-step intent/receipt/outcome。
+- timeline:job 记录含 request、binding revision 期望、catalog digest、
+  per-step intent/verify/outcome 时间线;capability 消耗凭据在 store 侧
+  (reservation = idempotencyKey,与 job 可关联);provider facts 快照
+  随 MU-3 真实 facts 解析并入 job 记录。
 
 ## `URB-COMPAT-001`
 

@@ -35,11 +35,17 @@ ArkDeckAgentClient ──UDS(JSON 行协议 v1)── arkdeck-agentd(exec)
 
 ## 3. T06 HDC Foundation 拆分(`ArkDeckOpenHarmony/`)
 
-- 纯移动:`HDCProduction.swift` → `HDCExecutableDescriptor.swift`、
-  `HDCServerSupervision.swift`、`HDCProcessDispatch.swift`、
-  `HDCSemanticEvaluation.swift`、`HDCDiagnosticsUseCases.swift` 等;
-  同 target 内 internal 可见性不变 ⇒ 编译面零语义改动;既有测试文件
-  一个字节不动是"纯移动"的机械判据。
+- 纯移动(实测定界):`HDCProduction.swift` → `HDCEndpointSelection.swift`
+  (endpoint source/selection/selector)与
+  `HDCAuthorizationAndSecurity.swift`(设备授权工作流、channel
+  protection、安全呈现)。**两段留守是发现的硬约束而非偷懒**:
+  ① dispatch-security 核心(semantic binding → prepared command →
+  dispatch permit → lifecycle executor)由 `private`/`fileprivate` 织成
+  **反伪造边界**(permit 的 fileprivate-only init 即防伪机制),拆开必须
+  放宽可见性 = 安全语义弱化;② 诊断用例段与设备观察族被兄弟 change 的
+  源码扫描守卫(DP1/DP13/DP19、C6)**钉在该文件路径**,迁移需其修订
+  同意——两者均记入文件内 NOTE,物理迁移递延 T23。既有测试文件
+  一个字节不动是"纯移动"的机械判据(159 项 HDC 套件零修改零回归)。
 - 新增(增量,不改旧判定):`HDCCompatibilityProfile.swift` ——
   版本 profile 注册表(3.2.0d/3.2.0f 族)+ 观察族 semantic parser:
   `list targets -v`/`checkserver`/`-v` 输出的**结构化解析**(行序无关、

@@ -13,10 +13,14 @@ let package = Package(
     .library(name: "ArkDeckWorkflows", targets: ["ArkDeckWorkflows"]),
     .library(name: "ArkDeckStorage", targets: ["ArkDeckStorage"]),
     .executable(name: "arkdeck", targets: ["ArkDeckCLI"]),
+    .library(name: "ArkDeckAgentDaemon", targets: ["ArkDeckAgentDaemon"]),
+    .library(name: "ArkDeckAgentClient", targets: ["ArkDeckAgentClient"]),
+    .executable(name: "arkdeck-agentd", targets: ["ArkDeckAgentDaemonMain"]),
     .executable(name: "ArkDeckJournalCrashFixture", targets: ["ArkDeckJournalCrashFixture"]),
     .executable(name: "ArkDeckRuntimePortFixture", targets: ["ArkDeckRuntimePortFixture"]),
     .executable(name: "ArkDeckFakeHDCFixture", targets: ["ArkDeckFakeHDCFixture"]),
     .executable(name: "ArkDeckFakeRockchipFixture", targets: ["ArkDeckFakeRockchipFixture"]),
+    .executable(name: "ArkDeckEngineCrashFixture", targets: ["ArkDeckEngineCrashFixture"]),
   ],
   targets: [
     .target(name: "ArkDeckCore"),
@@ -33,6 +37,18 @@ let package = Package(
     .executableTarget(
       name: "ArkDeckCLI",
       dependencies: ["ArkDeckCore", "ArkDeckWorkflows"]
+    ),
+    .target(
+      name: "ArkDeckAgentDaemon",
+      dependencies: ["ArkDeckCore", "ArkDeckStorage", "ArkDeckWorkflows"]
+    ),
+    .target(
+      name: "ArkDeckAgentClient",
+      dependencies: ["ArkDeckCore"]
+    ),
+    .executableTarget(
+      name: "ArkDeckAgentDaemonMain",
+      dependencies: ["ArkDeckAgentDaemon", "ArkDeckStorage", "ArkDeckWorkflows"]
     ),
     .executableTarget(
       name: "ArkDeckJournalCrashFixture",
@@ -52,6 +68,11 @@ let package = Package(
       name: "ArkDeckFakeRockchipFixture",
       path: "Tests/ArkDeckFakeRockchipFixture"
     ),
+    .executableTarget(
+      name: "ArkDeckEngineCrashFixture",
+      dependencies: ["ArkDeckCore", "ArkDeckOpenHarmony", "ArkDeckStorage", "ArkDeckWorkflows"],
+      path: "Tests/ArkDeckEngineCrashFixture"
+    ),
     .testTarget(name: "ArkDeckCoreTests", dependencies: ["ArkDeckCore"]),
     .testTarget(
       name: "ArkDeckContractTests",
@@ -62,6 +83,8 @@ let package = Package(
         "ArkDeckOpenHarmony",
         "ArkDeckWorkflows",
         "ArkDeckStorage",
+        "ArkDeckAgentDaemon",
+        "ArkDeckAgentClient",
         "ArkDeckFakeHDCFixture",
         "ArkDeckFakeRockchipFixture",
       ],
