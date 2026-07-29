@@ -6,6 +6,10 @@
 > r2 scope reconciliation:T11 的 change-local 闭环止于 succeeded +
 > durable timeline/restart query；artifact 文件发布与 `artifact.*` 读取
 > 递延 T14(CHG-2026-049)，不作为本任务完成或验证的依据。
+>
+> r3 verification audit:TASK-BER-001 的历史交付/PR 记录不改写，但
+> binding admission 与 formal hardware evidence 尚未满足现行 AC；
+> T11 gate 重新打开，由 TASK-BER-002 顺序补救。
 
 ## TASK-BER-001 — MU-3 垂直交付:Bootstrap + E0 Action Pack + 真实 walking skeleton
 
@@ -65,3 +69,61 @@
 - Risk:medium-high(生产 dispatch 首次接线——以 descriptor 校验、
   E0 默认策略、profile fail-closed 三层约束;bootstrap 为新 admission
   面——以结构性 E0-only 约束)
+
+## TASK-BER-002 — binding admission 与 formal hardware evidence 补救
+
+- Status:blocked（PR #804 已批准 `CHG-2026-051@r2` 独占
+  exact-target/model/firmware typed preflight、hardware-evidence V3 与
+  Runtime receipt/projector；必须等待其 TASK-AHE-001 done 且 change
+  verified/archive，再以独立 r4 D1 fresh-readiness 恢复。blocked 期间
+  implementation PR、D2 window 与 device dispatch 均为 0）
+- Grade:D1（dependency/fresh-readiness 与必要 remediation；
+  未来真实设备窗口安排仍是独立 D2 决策）
+- Platform:macos
+- Objective:在不放宽 `BER-SKEL-001`/`BER-HW-002`、不抢占
+  CHG-2026-051 ownership 的前提下，消费其晋升后的 current
+  target/evidence contract，关闭本 change 的 drift/restart 验证并取得
+  fresh schema-valid realHardware evidence。
+- Acceptance:`BER-SKEL-001`（binding/identity drift contract 负向）、
+  `BER-HW-002`（non-terminal restart、rebind、mismatch fail-closed）；
+  `BER-HW-001` 的既有真机成功只作历史输入，新窗口仍须产生一份完整
+  schema record，不能借旧字段猜填。
+- Depends on:r3 proposal revision merge；r2 PR #802 merge
+  `34204b304efa9887dc811e7d99420df4519168ea`（满足）；
+  CHG-2026-051 r2 PR #804 merge
+  `a09d3243b8bdec133198f843d4c258d39f54aa34`（proposal only，任务与
+  change gate 未满足）；CHG-2026-046/047 已 archived（满足）。
+- Scope while blocked:
+  1. 零代码/Catalog/schema/current spec 修改，零 D2 window、零设备执行；
+  2. 只记录 dependency 与 verification blocker，不把 CHG-2026-051 的
+     approved scoped delta 当作 current contract。
+- Resume scope（仅在 dependency verified/archive 后，由 r4 批准）:
+  1. fresh pin current baseline、hardware-evidence schema、三个 operation
+     Catalog、generated Swift、production facts/engine/receipt/projector；
+  2. 重放 missing target、wrong revision、live identity mismatch、
+     matching happy path、descriptor drift、non-terminal restart contracts；
+  3. 若 current 实现仍不满足本 AC，r4 列出最小 remediation + allowed
+     paths；否则只交付复验 run；
+  4. contract 合入后另开 D2 window PR，按届时 current executor/evidence
+     模型 fresh 运行并提交 schema-valid record；旧 #784 不追认。
+- Verification:见 `verification.md` r3；blocked 期间只允许 read-only
+  dependency audit。恢复后的具体命令、pins 与 evidence schema 由 r4
+  固定，r3 不提前猜测。
+- Stop conditions:CHG-2026-051 未 archived；需要借用其 change-local
+  delta；current target/evidence contract 仍无法二值化本 AC；负向仍有
+  未允许的后续推进；只能靠旧 run/人工补字段/fixture 充当真机——任一
+  命中即保持 blocked，不弱化 AC、不猜 evidence。
+- Hardware required:yes（仅在 dependency + r4 + contract/remediation
+  gates 全部合入后的独立 D2 窗口）
+- Allowed paths while blocked:
+  - `openspec/changes/chg-2026-048-bootstrap-and-real-e0/**`
+- Forbidden paths:
+  - `Packages/**`、`Catalog/**`、`openspec/specs/**`、
+    `openspec/contracts/**`、`openspec/verification/**`（全局）、
+    `openspec/integrations/**`、`openspec/platforms/**`、
+    `openspec/baselines/**`
+  - `scripts/**`、`.github/**`、`AGENTS.md`、`ArkDeck.xcodeproj/**`、
+    `ArkDeckApp/**`、其他 change 目录
+- Risk:medium-high（跨 change Core/current-contract dependency；以
+  ownership 单一、archive 后 fresh pin、旧 evidence 不追认、D2 延后
+  四层约束）
