@@ -1,6 +1,6 @@
 # CHG-2026-052 Verification Plan
 
-> Change:CHG-2026-052-sdd-acceptance-count-currency@r1
+> Change:CHG-2026-052-sdd-acceptance-count-currency@r2
 > Status:planned
 > Core baseline:CORE-2.1.0
 

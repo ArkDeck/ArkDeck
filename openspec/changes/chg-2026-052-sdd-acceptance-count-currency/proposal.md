@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-052-sdd-acceptance-count-currency
-revision: 1
-status: approved # 本 proposal/ready carrier；仅在维护者 review/merge 本 PR 后生效
+revision: 2
+status: approved # r2 Allowed-path grammar correction；仅在维护者 review/merge 本 PR 后生效
 class: implementation-only
 core_change_level: none
 owner: lvye
@@ -10,6 +10,15 @@ platforms: [macos, windows, linux]
 ---
 
 # Keep the SDD real-baseline assertion current across Core AC-count changes
+
+## r2 mechanical correction
+
+PR #818 首个 implementation head 的 SDD Guard 已通过，但 Agent PR allowed-paths
+正确拒绝 `tasks.md`：r1 写成“本 `tasks.md`”，而已批准的机械 grammar 只把
+“本 change `tasks.md`”解析为 change-relative path。r2 仅修正这个载体语法，
+并把 readiness audit base 前移到 #817 merge；实现文件、evidence path、Forbidden
+paths、reader 行为、Acceptance 与风险边界全部不变。#818 必须在本 r2 由维护者
+review/merge 后 rebase，不能从 head 自行扩权。
 
 ## Why
 

@@ -22,7 +22,7 @@
     blob: 1ab1db896b4ee83207e006b2720cdbe1c0d27e70
   ```
 
-  Audit base:`dd3b110daed9311f9c2c732c7c971c21482bed59`。任一 pin 漂移时停止，
+  Audit base:`8a9bfef4d4794ff4289cc1e35d1b50e4c1d816b6`。任一 pin 漂移时停止，
   重新确认 reader contract 与 CI 调用面；不得猜测兼容。
 - Applicable failure patterns:none（单文件离线 test reader；主要风险由
   invalid-shape matrix、固定 Allowed paths 与真实 subprocess test 直接覆盖）
@@ -35,7 +35,7 @@
 - Allowed paths:
   - `scripts/test_check_sdd.py`
   - `openspec/changes/chg-2026-052-sdd-acceptance-count-currency/evidence/**`
-  - 本 `tasks.md`（仅本任务状态与 evidence 引用）
+  - 本 change `tasks.md`（仅本任务状态与 evidence 引用）
 - Forbidden paths:
   - `scripts/check_sdd.py`
   - `scripts/check-sdd.sh`

@@ -1,6 +1,6 @@
 # CHG-2026-052 Spec Impact
 
-> Change:CHG-2026-052-sdd-acceptance-count-currency@r1
+> Change:CHG-2026-052-sdd-acceptance-count-currency@r2
 > Core baseline:CORE-2.1.0
 
 ## No-op Core delta
