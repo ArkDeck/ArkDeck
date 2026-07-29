@@ -5,7 +5,11 @@
 
 ## TASK-URB-001 — MU-2 垂直交付:Provider Contract + HDC Foundation + agentd + Job Engine
 
-- Status:ready
+- Status:done
+- Done evidence:`evidence/runs/TASK-URB-001/run-r1.md`(2026-07-29;
+  swift 583/1 skipped/0 failures 含 crash-window 矩阵;check-sdd 0/0/111;
+  脚本套件 62+50+8+644 OK)。状态随本实现 PR 翻转,生效以维护者 merge
+  为准。
 - Grade:D1(纯代码 + 契约/fake 测试;零真实设备 dispatch、零 E2 面变更、
   零既有安全门放宽)
 - Platform:macos
