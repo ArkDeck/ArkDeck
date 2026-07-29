@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-049-diagnostics-and-hap
-revision: 1
-status: approved # 合并本 PR 即维护者批准(CHG-2026-046 垂直 PR 模型)
+revision: 2
+status: approved # r2 合并即批准 blocker 关闭后的 fresh readiness；合并前任务仍 blocked
 class: capability
 core_change_level: none
 owner: lvye
@@ -10,6 +10,15 @@ platforms: [macos]
 ---
 
 # Agent-operated diagnostics, HAP debug and the unified artifact model (MU-4)
+
+> r2 fresh-readiness revision（2026-07-29）：功能 scope、Acceptance、
+> allowed/forbidden paths、E0/E1/E2 边界与硬件分层零变化。
+> `CHG-2026-050/TASK-WSC-001` 已由维护者以 PR #789 合入
+> `d13dfec6d395dd73662494f16ead9674711fe6ff`，为所有 published
+> `captureRemoteStdout` step 增加 closed generated `actionRef`，并使
+> diagnostics HiLog/component-tree pair 在 Catalog、generator、JSON Schema
+> 与 Swift validator 间闭合。r2 记录 fresh pins、草稿迁移约束和依赖复验；
+> 合入 r2 前 `TASK-DHA-001` 仍不得恢复实现。
 
 ## Why
 
@@ -156,6 +165,8 @@ Agent 自动化验收。
 
 ## Approval and flow
 
-本 proposal PR 合并即批准。TASK-DHA-001 以 ready 建立;实现 PR 交付
-代码+测试+文档+evidence(contract 面)+状态翻转(hardware-pending);
-真机与 E1 capability 由后续独立载体处理。
+r1 proposal PR 合并构成初始批准；随后命中的 typed stdout blocker 已按
+stop condition 中止实现。r2 proposal revision 合并构成对 fresh pins、依赖闭合
+和恢复边界的 D1 readiness 批准，并使 `TASK-DHA-001` 恢复为 ready。实现 PR
+仍交付代码+测试+文档+evidence(contract 面)+状态翻转
+(hardware-pending)；真机窗口与 E1 capability 仍由后续独立 D2 载体处理。

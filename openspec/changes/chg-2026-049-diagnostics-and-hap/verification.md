@@ -1,6 +1,6 @@
 # CHG-2026-049 Verification Plan
 
-> Change:CHG-2026-049-diagnostics-and-hap@r1
+> Change:CHG-2026-049-diagnostics-and-hap@r2
 > Status:planned
 > Core baseline:CORE-2.1.0 (canonical Core AC not claimed)
 
