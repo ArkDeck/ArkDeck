@@ -1,0 +1,69 @@
+---
+schema_version: 1.0.0
+change_id: CHG-2026-048-bootstrap-and-real-e0
+change_revision: 1
+platform: macos
+evidence_classes:
+- contract
+- realHardware
+cases:
+- acceptance_id: BER-BOOT-001
+  test_id: TEST-BER-BOOT-001
+  method: >-
+    Bootstrap state-machine contract tests plus structural mutation
+    negatives, multi-candidate and physical-trust fixtures, idempotent
+    re-adopt and restart recovery.
+  expected_source: openspec/changes/chg-2026-048-bootstrap-and-real-e0/verification.md#ber-boot-001
+  minimum_evidence: contract
+  expected_result: >-
+    A clean environment reaches candidate observation with zero prior
+    binding; mutation is structurally impossible inside bootstrap;
+    unauthorized devices park in waitingForHuman and resume after trust;
+    re-adoption is idempotent.
+- acceptance_id: BER-E0-001
+  test_id: TEST-BER-E0-001
+  method: >-
+    Typed E0 action pack contract matrix: bounds, allowlists,
+    provider-owned remote temp naming, semantic parser degenerate grid and
+    artifact hash/cleanup accounting.
+  expected_source: openspec/changes/chg-2026-048-bootstrap-and-real-e0/verification.md#ber-e0-001
+  minimum_evidence: contract
+  expected_result: >-
+    Every E0 action is callable only through bounded typed requests; remote
+    temp paths are provider-generated and collision-free; degenerate
+    outputs get explicit outcomes; artifact receive verifies hashes and
+    records remote cleanup or debt.
+- acceptance_id: BER-SKEL-001
+  test_id: TEST-BER-SKEL-001
+  method: >-
+    Fake-integration walking skeleton over the fixture HDC tool with
+    descriptor-verified dispatch, restart recovery and identity-mismatch
+    negatives.
+  expected_source: openspec/changes/chg-2026-048-bootstrap-and-real-e0/verification.md#ber-skel-001
+  minimum_evidence: contract
+  expected_result: >-
+    Client-to-daemon observe.device@1 produces the four artifacts and a
+    queryable post-restart history; governance fields are rejected;
+    binding or descriptor drift fails closed.
+- acceptance_id: BER-HW-001
+  test_id: TEST-BER-HW-001
+  method: >-
+    Maintainer device window: adopt plus observe.device@1 against a real
+    DAYU200 through production HDC, transcript pasted back and audited.
+  expected_source: openspec/changes/chg-2026-048-bootstrap-and-real-e0/verification.md#ber-hw-001--ber-hw-002realhardware窗口后补记
+  minimum_evidence: realHardware
+  expected_result: >-
+    One adopt plus one observe run end-to-end with a full job timeline and
+    all four artifacts, with no manual command beyond the device-side
+    trust prompt.
+- acceptance_id: BER-HW-002
+  test_id: TEST-BER-HW-002
+  method: >-
+    Maintainer device window: daemon restart mid-history and device
+    replug, verifying recovery and rebind evidence.
+  expected_source: openspec/changes/chg-2026-048-bootstrap-and-real-e0/verification.md#ber-hw-001--ber-hw-002realhardware窗口后补记
+  minimum_evidence: realHardware
+  expected_result: >-
+    Restart recovers or safely redoes read-only observation; replug
+    re-identifies the binding only through rebind evidence and mismatches
+    fail closed.
