@@ -1,9 +1,41 @@
 # CHG-2026-049 Design — MU-4 诊断、HAP 调试与统一 Artifact
 
-实现顺序 **T14 → T12 → T13**:后两者都要往 artifact 面写产物,先把
-归宿建好,避免两次改写。
+实现顺序 **T00 → T14 → T12 → T13**:先把 Agent→Runtime 交接钉死,
+再建立后续采集的 artifact 归宿与 operation 编排。
 
-## 1. T14 统一 Artifact(`ArkDeckWorkflows/Artifacts/`)
+## 1. T00 Device Runtime Agent runner
+
+```swift
+public struct RuntimeAgentExecutionReceipt: Codable, Sendable, Equatable {
+  let executor: RuntimeExecutorKind       // 固定 .agent
+  let operationReference: String
+  let jobID: String
+  let targetID: String
+  let bindingRevision: Int
+  let catalogDigest: String
+  let authorityReference: String          // E0 policy ref 或 E1 capability ID
+  let humanActions: [RuntimeHumanActionReceipt]
+  let terminalState: String
+}
+```
+
+- `ArkDeckAgentClient/AgentRuntimeExecutor` 封闭组合 health/target/job/
+  artifact API;CLI 提供 `arkdeck agent run --operation ... --json`,
+  供 AI 一次调用,不要求维护者依次复制命令;
+- runner 不解析或生成 HDC 命令,不接受 executable/argv/shell/raw path,
+  不直连 provider;一个 invocation 最多提交一个 catalog operation;
+- E0 authority = default read-only policy + catalog digest;E1 只接受已在
+  Runtime 中可 inspect 的 capability ID。Agent surface 不包含 capability
+  install/create/modify/revoke 或 capability JSON;
+- unauthorized/offline、多候选与物理重连转为 closed
+  `RuntimeHumanAction` + durable resume token;人类完成物理动作后 Agent
+  继续同一 target/binding,不把人类变成 host executor;
+- receipt 自动脱敏并落 runtime state/evidence;人工 host transcript
+  不得替代 `executor=.agent` receipt;
+- 这只是一次 published operation 的受限执行器,不做多轮模型推理、
+  改代码或无限 debug loop。
+
+## 2. T14 统一 Artifact(`ArkDeckWorkflows/Artifacts/`)
 
 ```swift
 public struct RuntimeArtifactMetadata: Codable, Sendable, Equatable {
@@ -43,8 +75,11 @@ public struct RuntimeArtifactMetadata: Codable, Sendable, Equatable {
   发布产物;`observe.device@1` 的 device-facts/tool-facts/
   binding-snapshot/manifest 四项由此真正落盘。
 
-## 2. T12 `capture.diagnostics@1`
+## 3. T12 `capture.diagnostics@1`
 
+- 引擎在授权前按 inputs 解析实际选中的步骤,以最大 step effect 作为
+  effective effect;无 remote trace 时 E0,选择 `captureRemoteFile`/
+  `cleanupOwnedRemotePath` 时 E1,缺 capability 零 dispatch;
 - 引擎按 catalog steps 执行;**optional 步骤失败不终止 job**,而是登记
   `ArtifactStatus.missing(reason)` 并继续;
 - `capture-summary.json` 汇总每个声明产物的最终状态,job 结果据此判定:
@@ -58,7 +93,7 @@ public struct RuntimeArtifactMetadata: Codable, Sendable, Equatable {
 - 远端:trace 走 provider 铸造的 owned path,receive 后 cleanup;
   cleanup 失败 → `CleanupDebtLedger`。
 
-## 3. T13 E1 Action Pack 与 `debug.hap@1`
+## 4. T13 E1 Action Pack 与 `debug.hap@1`
 
 新增 `HDCProviderAction` case(全部 typed,零路径/argv 入参):
 
@@ -89,8 +124,10 @@ case removePortForward(HDCPortForwardSpec)
   `waitingForRecovery`,后续 mutation 一律不 dispatch(journal 校验器
   本就禁止 unknown 后继续 intent,此处再加编排层显式停止)。
 
-## 4. 测试布局
+## 5. 测试布局
 
+- `ArkDeckContractTests/AgentRuntimeExecutorContractTests.swift`(T00:
+  typed-only 调用、structured pause/resume、receipt、无 capability 管理面)
 - `ArkDeckContractTests/RuntimeArtifactContractTests.swift`(T14:元数据、
   安全负向、GC/quota、redaction、observe 四产物端到端)
 - `ArkDeckContractTests/CaptureDiagnosticsContractTests.swift`(T12:
@@ -102,7 +139,10 @@ case removePortForward(HDCPortForwardSpec)
   这一关键区分(**替身必须能表达被测代码所做的区分**——MU-3 的
   checkserver 教训)。
 
-## 5. ADR
+## 6. ADR
 
 `docs/adr/0007-artifact-lifecycle.md`:artifact ID/lease 访问、内容寻址
 命名、privacy/retention 与"拒新不毁旧"的 quota 策略之持久决策。
+`docs/adr/0008-agent-runtime-execution.md`:Repo Agent 与 Device Runtime
+Agent 的交接、humanAction 边界与“人工 host transcript 不构成 Agent
+自动化验收”的持久决策。
