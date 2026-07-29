@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-045-hdc-observation-refresh
 revision: 1
-status: approved # 2026-07-29 本 approval-only PR；r1 proposal 经 #766 合入 main `7938cf67a2749a8d7ddb3c86b44fd244705d3974`；批准仅由维护者 review/merge 本 PR 生效
+status: verified # 2026-07-29 本 verification closure；仅在维护者 review/merge 本 PR 后生效
 class: platform
 core_change_level: none
 owner: lvye
@@ -180,3 +180,79 @@ CHG-2026-006 `TASK-M0B-002` fresh D2 readiness each remain separate PRs.
   readiness PR is merged; implementation/evidence, `ready→done`, change
   verification and later CHG-2026-006 hardware readiness remain separate
   decisions.
+
+## Verification closure（2026-07-29）
+
+`TASK-HOR-001` 的实现与 same-revision evidence 已由 PR #772 合入 protected
+main。四条 change-local AC 均有可复查的 `contract` / signed macOS
+`platform` evidence。本 PR 只翻转 task/change/verification 状态、更新 evidence
+索引并引用已合入 run 与本次复验记录；零产品实现、零 scope、零 acceptance
+定义或 authority 变化。
+
+Verification base = protected main
+`c2dd6412d42be259623d5922e82eb43b4b36af74`。改前 proposal、tasks、
+verification、acceptance cases 与 implementation run blobs 分别为
+`695d4317b6e017da77b17ac6984ad0fc422a0ab9`、
+`bf346551b508bab815303f4ffbcee72adf8ebeff`、
+`69aa73e0eac697e9c0f71a1492a946f56b128925`、
+`b99e627b2bce9166cc9fd8abaae9e4ce5c30a141` 与
+`c8e104d809d6bcc9813b9ea5977ae64592a27680`。
+
+### Protected-main delivery chain
+
+| Stage | Exact reviewed head | Protected-main merge |
+| --- | --- | --- |
+| proposal #766 | `4e898ce54b37fafbef776da7c0722a8b728046d5` | `7938cf67a2749a8d7ddb3c86b44fd244705d3974` |
+| approval #768 | `7441fd4075830f3169e35715da459f01a2d2dede` | `f1214137bd80c2544209dcd95ac32a869982ec06` |
+| readiness #770 | `7a1c4222a241bb1d3b25f57b549d2e5820df614f` | `333eec928cbbd7f273abffeebb3970f15ed33554` |
+| implementation/evidence #772 | `25a0d4a3789fdda985f9f13057e7e0dd8f217bde` | `7125cda045cb45ccb992997bcbe43fa5da90bdb3` |
+
+四个 exact heads 均由维护者 `lvye` review/approve；#772 的 Agent PR
+open-pr/allowed-paths、SDD Guard 与 Swift CI 均为 `SUCCESS`。AC 真值源是
+`evidence/runs/TASK-HOR-001/implementation-r1.md`，不是实现 PR 被 review
+这一事实本身。
+
+### Four binary AC conclusions
+
+- **`HOR-UI-001` = PASS (`platform` + `contract`)**：#772 run 的 signed
+  macOS HDC UI suite 16/16，覆盖 English / Simplified Chinese、稳定 AX
+  identifier、mouse 与 Command-R，以及 production App callback reachability。
+- **`HOR-SESSION-001` = PASS (`contract`)**：同一 actor 的 sequential
+  snapshots 产生 ordered `appeared` → `disappeared`；candidate canonical
+  identity、endpoint、execution-session identity、pseudonym 与 capacity-64
+  buffer 保持不变，零跨 session stitching。
+- **`HOR-BOUNDED-001` = PASS (`platform` + `contract`)**：App admission
+  同步置位，每个 accepted action 恰一次 provider call；十秒 delayed fixture
+  中 duplicate action 零额外 call/transition，refresh 与 executable selection
+  在途禁用；production 无 timer/retry/queue。
+- **`HOR-SAFETY-001` = PASS (`contract`)**：六个实现 blobs 与
+  `HDCProduction.swift`、OpenHarmony registries/profile/lock、macOS profile
+  自 #772 后零漂移；provider protocol 与 production section 零变化。run
+  记录 installed HDC、真实设备、server lifecycle、subserver、authorization/
+  adoption、binding/device mutation、destructive 与 non-loopback product
+  network dispatch 全为 0。
+
+### Closure-base replay and boundary
+
+复验记录见
+`evidence/runs/TASK-HOR-001/verification-r1.md`：五个聚焦 HDC suites
+132/132；ArkDeckKit 全量 557 tests、一个既有 opt-in manual sleep/wake skip、
+零失败；check-sdd 0 errors / 0 warnings / 111 IDs；checker 62/62、
+allowed-paths 50/50、localization parse/compile 与 `git diff --check` 均通过。
+当前重建 App/runner 的 strict codesign 通过。
+
+额外 signed UI replay 因主机处于锁屏状态，被 macOS LocalAuthentication 在
+0 tests 执行前拒绝；该尝试不计为 PASS，也未请求或授予任何系统权限。Closure
+的 UI 结论只引用 protected-main 上 exact implementation revision 的 16/16
+signed evidence；六个相关实现/test blobs 与 production authority inputs 均保持
+字节一致。
+
+PR #772 于 enforcement 2.2.0 / CHG-2026-046 生效前合入，按当时规则未携带
+`ready→done`。现行 2.2.0 已废止 done-only PR；因此本 verification-only
+closure 在不夹带实现的前提下同时对齐 task `done`，内容仍仅为状态与 evidence
+引用。
+
+本 closure 不产生 installed-HDC、real-device 或 hardware evidence，不改变
+Core/platform conformance/support/release。只有维护者 review/merge 本 PR 后，
+`verified` / `passed` / `done` 才生效。CHG-2026-006 `TASK-M0B-002` 仍须另走
+fresh D2 readiness，不能由本 closure 自动推进。
