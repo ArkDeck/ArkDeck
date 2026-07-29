@@ -14,6 +14,59 @@ import yaml
 import check_sdd
 
 
+def declared_core_acceptance_count(manifest_path: Path) -> int:
+    try:
+        manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, yaml.YAMLError) as error:
+        raise AssertionError(
+            f"cannot read Core conformance manifest {manifest_path}: {error}"
+        ) from error
+    if not isinstance(manifest, dict):
+        raise AssertionError("Core conformance manifest must be a mapping")
+    acceptance_index = manifest.get("acceptance_index")
+    if not isinstance(acceptance_index, dict):
+        raise AssertionError("Core conformance acceptance_index must be a mapping")
+    count = acceptance_index.get("count")
+    if isinstance(count, bool) or not isinstance(count, int) or count <= 0:
+        raise AssertionError(
+            "Core conformance acceptance_index.count must be a positive integer"
+        )
+    return count
+
+
+class AcceptanceCountCurrencyTests(unittest.TestCase):
+    def test_manifest_count_reader_accepts_only_a_positive_integer(self):
+        with tempfile.TemporaryDirectory(prefix="check-sdd-count-") as temp:
+            manifest_path = Path(temp) / "core-conformance.yaml"
+            manifest_path.write_text(
+                yaml.safe_dump({"acceptance_index": {"count": 114}}),
+                encoding="utf-8",
+            )
+            self.assertEqual(declared_core_acceptance_count(manifest_path), 114)
+
+            invalid_documents = (
+                None,
+                [],
+                {},
+                {"acceptance_index": None},
+                {"acceptance_index": {}},
+                {"acceptance_index": {"count": None}},
+                {"acceptance_index": {"count": True}},
+                {"acceptance_index": {"count": "114"}},
+                {"acceptance_index": {"count": 114.0}},
+                {"acceptance_index": {"count": 0}},
+                {"acceptance_index": {"count": -1}},
+            )
+            for document in invalid_documents:
+                with self.subTest(document=document):
+                    manifest_path.write_text(
+                        yaml.safe_dump(document),
+                        encoding="utf-8",
+                    )
+                    with self.assertRaises(AssertionError):
+                        declared_core_acceptance_count(manifest_path)
+
+
 class ScopeCoverageTests(unittest.TestCase):
     def make_change(
         self,
@@ -182,8 +235,12 @@ class ScopeCoverageTests(unittest.TestCase):
             text=True,
         )
         self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
+        acceptance_count = declared_core_acceptance_count(
+            check_sdd.OPENSPEC / "verification" / "core-conformance.yaml"
+        )
         self.assertIn(
-            "check_sdd: 0 error(s), 0 warning(s), 111 acceptance IDs",
+            f"check_sdd: 0 error(s), 0 warning(s), "
+            f"{acceptance_count} acceptance IDs",
             completed.stdout,
         )
 
