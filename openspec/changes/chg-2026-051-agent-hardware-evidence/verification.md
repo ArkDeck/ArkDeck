@@ -1,6 +1,6 @@
 # CHG-2026-051 Verification Plan
 
-> Change:CHG-2026-051-agent-hardware-evidence@r1
+> Change:CHG-2026-051-agent-hardware-evidence@r2
 > Status:planned
 > Core baseline:CORE-2.1.0
 
@@ -9,6 +9,8 @@
 - protected-main checkout, macOS arm64, Swift toolchain；
 - JSON Schema draft 2020-12 contract + deterministic local validator/vectors；
 - fake/in-memory daemon target/job/provider/artifact facts，零 HDC/device dispatch；
+- production Catalog/generated Swift + descriptor-bound fake HDC process fixture，验证 exact
+  target-list/model/firmware 三步 preflight 与 `-t` target selection，仍零真实设备；
 - existing V2 evidence 作为 immutable compatibility fixture，只读不迁移。
 
 ## Acceptance matrix
@@ -31,6 +33,12 @@ fixture 必须由 product-owned fake ports 分别产生并关联同一 job/targe
 - durable step intents/outcomes：实际执行 step kinds，max effect = E0；
 - immutable Artifact metadata/bytes：stable reference 与 SHA-256。
 
+同一正例还必须走 production composition shape：target store 只提供内部
+connectKey/identity/binding/tool，Catalog 的三条 required preflight 通过 descriptor-bound
+fake process 分别返回 exact target、model 与 firmware；不得由 fake facts port 直接把
+最终 observation 整包塞入 job。`debug.hap@1` 的首个 E1 dispatch 计数在三条 preflight
+outcome durable 之前恒为 0。
+
 projector 输出必须通过 V3 JSON Schema、Swift decode/encode 与 semantic parity，
 且 V3 中所有 duplicated correlation fields（target identity/binding/job）一致。
 
@@ -49,6 +57,10 @@ projector 输出必须通过 V3 JSON Schema、Swift decode/encode 与 semantic p
 - stale prior-run receipt、旧 target adoption 或旧 capability 被复用；
 - legacy target-store record 缺少新字段时仍可读取，但在 fresh typed preflight 前
   evidence publication 为 0；
+- target-list 对 durable connectKey 为 0 match / multiple match、transport/state 列未知，
+  或 property lowering 未携带 exact `-t` target 时，后续 capture/E1 dispatch 为 0；
+- 任一 Catalog 缺三步 required prefix、顺序漂移、generated Swift/remote action mapping
+  漂移；
 - job 为 simulated/planOnly，或 effect/outcome unknown。
 
 全部向量必须在 evidence publication 前失败；不能用空值、`unknown` 字符串、旧事实或
@@ -88,6 +100,7 @@ fake/simulation 计为 realHardware。
 
 - [ ] `AC-WF-004-01/02/03` 全部 contract PASS
 - [ ] V3 JSON Schema / Swift / semantic validator parity PASS
+- [ ] production Catalog preflight / exact target / generated drift contracts PASS
 - [ ] evidence publication 与 effect dispatch separation PASS
 - [ ] V2 compatibility、privacy/secret scan PASS
 - [ ] `scripts/check-sdd.sh` 与完整 Swift suite PASS
