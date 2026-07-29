@@ -146,6 +146,10 @@
     {
       "stepID": "capture-post-flash-diagnostics",
       "kind": "captureRemoteStdout",
+      "actionRef": {
+        "catalogId": "arkdeck-diagnostics",
+        "actionId": "boundedHilog"
+      },
       "effect": "readOnly",
       "cancellation": "immediate",
       "binding": "confirmedDevice",

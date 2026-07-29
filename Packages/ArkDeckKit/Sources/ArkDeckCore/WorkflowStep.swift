@@ -880,15 +880,27 @@ private enum WorkflowStepValidator {
     case .probeDevice:
       try reader.identifier("evidencePolicy")
     case .captureRemoteStdout:
-      try reader.constant("catalogId", value: "arkui-ui-dump")
-      _ = try reader.enumeration(
-        "actionId",
-        allowed: [
-          "nodeSummary", "elementTree", "fullDefaultTree", "componentDetail",
-          "renderTreeLegacy",
-        ]
-      )
-      try reader.validatedOptions("parameters")
+      let catalog = try reader.enumeration(
+        "catalogId", allowed: ["arkui-ui-dump", "arkdeck-diagnostics"])
+      if catalog == "arkui-ui-dump" {
+        _ = try reader.enumeration(
+          "actionId",
+          allowed: [
+            "nodeSummary", "elementTree", "fullDefaultTree", "componentDetail",
+            "renderTreeLegacy",
+          ]
+        )
+        try reader.validatedOptions("parameters")
+      } else {
+        let action = try reader.enumeration(
+          "actionId", allowed: ["boundedHilog", "componentTree"])
+        let parameters = try reader.validatedOptions("parameters")
+        if action == "boundedHilog" {
+          try reader.diagnosticsHilogParameters(parameters, key: "parameters")
+        } else {
+          try reader.diagnosticsComponentTreeParameters(parameters, key: "parameters")
+        }
+      }
       try reader.identifier("artifactId")
     case .captureRemoteFile:
       let catalog = try reader.enumeration(
@@ -1240,7 +1252,8 @@ private enum WorkflowStepValidator {
       }
     }
 
-    func validatedOptions(_ key: String) throws {
+    @discardableResult
+    func validatedOptions(_ key: String) throws -> [String: JSONValue] {
       guard case .object(let options) = arguments[key], options.count <= 128 else {
         throw invalid(key, "validated options object with at most 128 properties")
       }
@@ -1258,11 +1271,77 @@ private enum WorkflowStepValidator {
         }
         try validateOptionValue(options[optionKey]!, path: "\(key).\(optionKey)")
       }
+      return options
     }
 
     func optionalValidatedOptions(_ key: String) throws {
       guard arguments[key] != nil else { return }
       try validatedOptions(key)
+    }
+
+    func diagnosticsHilogParameters(
+      _ options: [String: JSONValue],
+      key: String
+    ) throws {
+      try exactOptionKeys(
+        options, key: key, required: ["durationSeconds", "filters", "byteBudget"])
+      try optionInteger(
+        options, key: key, name: "durationSeconds", minimum: 1, maximum: 600)
+      try optionInteger(
+        options, key: key, name: "byteBudget", minimum: 1024, maximum: 134_217_728)
+      guard case .array(let filters) = options["filters"], filters.count <= 16 else {
+        throw invalid("\(key).filters", "array with at most 16 filter tokens")
+      }
+      for (index, value) in filters.enumerated() {
+        guard case .string(let filter) = value,
+          (1...200).contains(filter.unicodeScalars.count),
+          filter.unicodeScalars.allSatisfy({
+            WorkflowStepValidator.isASCIIAlphaNumeric($0)
+              || ":*./_-".unicodeScalars.contains($0)
+          })
+        else {
+          throw invalid(
+            "\(key).filters[\(index)]",
+            "1...200 ASCII letters, digits, or :*./_-")
+        }
+      }
+    }
+
+    func diagnosticsComponentTreeParameters(
+      _ options: [String: JSONValue],
+      key: String
+    ) throws {
+      try exactOptionKeys(options, key: key, required: ["byteBudget"])
+      try optionInteger(
+        options, key: key, name: "byteBudget", minimum: 1024, maximum: 67_108_864)
+    }
+
+    private func exactOptionKeys(
+      _ options: [String: JSONValue],
+      key: String,
+      required: Set<String>
+    ) throws {
+      let actual = Set(options.keys)
+      guard actual == required else {
+        throw invalid(
+          key,
+          "exact keys \(required.sorted().joined(separator: ", "))")
+      }
+    }
+
+    private func optionInteger(
+      _ options: [String: JSONValue],
+      key: String,
+      name: String,
+      minimum: Int64,
+      maximum: Int64
+    ) throws {
+      guard let value = options[name],
+        integerIsInRange(value, minimum: minimum, maximum: maximum)
+      else {
+        throw invalid(
+          "\(key).\(name)", "integer in \(minimum)...\(maximum)")
+      }
     }
 
     private func validateOptionValue(_ value: JSONValue, path: String) throws {

@@ -30,6 +30,11 @@ def _first_operation() -> dict:
     return copy.deepcopy(next(op for op in operations if op["id"] == "observe.device"))
 
 
+def _stdout_operation() -> dict:
+    operations, _ = _real_operations()
+    return copy.deepcopy(next(op for op in operations if op["id"] == "capture.diagnostics"))
+
+
 class RealCatalogTests(unittest.TestCase):
     def test_real_catalog_validates_and_cross_references(self):
         operations, profiles = _real_operations()
@@ -80,6 +85,37 @@ class RealCatalogTests(unittest.TestCase):
             self.assertEqual(doc["authorization"], {"destructive": "oneShotExactPlan"}, op_id)
         system = next(op for op in operations if op["id"] == "deploy.native-library.system")
         self.assertEqual(system.get("defaultPolicyIssuance"), "disabled")
+
+    def test_every_stdout_step_has_an_exact_registered_action(self):
+        operations, _ = _real_operations()
+        registry = generate.load_stdout_action_registry()
+        observed = {}
+        for operation in operations:
+            for step in operation["steps"]:
+                if step["kind"] != "captureRemoteStdout":
+                    self.assertNotIn("actionRef", step)
+                    continue
+                action_ref = step["actionRef"]
+                pair = (action_ref["catalogId"], action_ref["actionId"])
+                self.assertIn(pair[1], registry[pair[0]])
+                observed[f"{operation['id']}@{operation['version']}/{step['stepID']}"] = pair
+        self.assertEqual(
+            observed,
+            {
+                "capture.diagnostics@1/capture-hilog": (
+                    "arkdeck-diagnostics", "boundedHilog"
+                ),
+                "capture.diagnostics@1/capture-ui-dump": (
+                    "arkdeck-diagnostics", "componentTree"
+                ),
+                "debug.hap@1/capture-diagnostics": (
+                    "arkdeck-diagnostics", "boundedHilog"
+                ),
+                "flash.dayu200@1/capture-post-flash-diagnostics": (
+                    "arkdeck-diagnostics", "boundedHilog"
+                ),
+            },
+        )
 
 
 class ValidatorNegativeTests(unittest.TestCase):
@@ -170,6 +206,42 @@ class ValidatorNegativeTests(unittest.TestCase):
         doc["authorization"]["deviceMutation"] = "standingCapability"
         self._assert_rejected(doc, "cover exactly")
 
+    def test_stdout_step_requires_action_reference(self):
+        doc = _stdout_operation()
+        del next(step for step in doc["steps"] if step["kind"] == "captureRemoteStdout")[
+            "actionRef"
+        ]
+        self._assert_rejected(doc, "requires actionRef")
+
+    def test_stdout_step_rejects_unknown_catalog_and_action(self):
+        for catalog_id, action_id in (
+            ("unknown-diagnostics", "boundedHilog"),
+            ("arkdeck-diagnostics", "unknownAction"),
+            ("arkui-ui-dump", "boundedHilog"),
+        ):
+            doc = _stdout_operation()
+            step = next(step for step in doc["steps"] if step["kind"] == "captureRemoteStdout")
+            step["actionRef"] = {"catalogId": catalog_id, "actionId": action_id}
+            self._assert_rejected(doc, "unregistered stdout action")
+
+    def test_non_stdout_step_rejects_action_reference(self):
+        for action_ref in (
+            {
+                "catalogId": "arkdeck-diagnostics",
+                "actionId": "boundedHilog",
+            },
+            None,
+        ):
+            doc = _first_operation()
+            doc["steps"][0]["actionRef"] = action_ref
+            self._assert_rejected(doc, "only captureRemoteStdout")
+
+    def test_action_reference_is_closed(self):
+        doc = _stdout_operation()
+        step = next(step for step in doc["steps"] if step["kind"] == "captureRemoteStdout")
+        step["actionRef"]["command"] = "hilog"
+        self._assert_rejected(doc, "unknown keys")
+
 
 class SchemaVocabularyLockstepTests(unittest.TestCase):
     """The JSON Schema file and the python validator must not drift apart."""
@@ -195,6 +267,13 @@ class SchemaVocabularyLockstepTests(unittest.TestCase):
             set(step["properties"]),
             set(generate.STEP_REQUIRED) | set(generate.STEP_OPTIONAL),
         )
+        self.assertEqual(
+            step["properties"]["actionRef"], {"$ref": "#/$defs/actionRef"})
+        condition = step["allOf"][0]
+        self.assertEqual(
+            condition["if"]["properties"]["kind"]["const"], "captureRemoteStdout")
+        self.assertEqual(condition["then"]["required"], ["actionRef"])
+        self.assertEqual(condition["else"]["not"]["required"], ["actionRef"])
 
     def test_field_vocabulary_matches(self):
         field = self.schema["$defs"]["field"]
@@ -246,6 +325,21 @@ class SchemaVocabularyLockstepTests(unittest.TestCase):
         for needle in ("\"argv\":", "\"shell\":", "\"command\":", "\"executable\":"):
             self.assertNotIn(needle, text.replace("argv$", "").replace("shell$", ""))
 
+    def test_action_reference_schema_matches_registered_pairs(self):
+        action_ref = self.schema["$defs"]["actionRef"]
+        schema_pairs = {
+            arm["properties"]["catalogId"]["const"]: set(
+                arm["properties"]["actionId"]["enum"])
+            for arm in action_ref["oneOf"]
+        }
+        self.assertEqual(
+            schema_pairs,
+            {
+                key: set(value)
+                for key, value in generate.load_stdout_action_registry().items()
+            },
+        )
+
 
 class GeneratedSwiftShapeTests(unittest.TestCase):
     def test_generated_swift_mentions_every_operation_once(self):
@@ -262,6 +356,24 @@ class GeneratedSwiftShapeTests(unittest.TestCase):
         swift = generate.generate_swift(operations, digest)
         self.assertIn(f'catalogDigest = "{digest}"', swift)
         self.assertRegex(digest, r"^[0-9a-f]{64}$")
+
+    def test_generated_swift_carries_exact_stdout_action_references(self):
+        operations, _ = _real_operations()
+        swift = generate.generate_swift(operations, generate.catalog_digest(operations))
+        self.assertEqual(
+            swift.count(
+                'actionReference: CatalogActionReference('
+                'catalogID: "arkdeck-diagnostics", actionID: "boundedHilog")'
+            ),
+            3,
+        )
+        self.assertEqual(
+            swift.count(
+                'actionReference: CatalogActionReference('
+                'catalogID: "arkdeck-diagnostics", actionID: "componentTree")'
+            ),
+            1,
+        )
 
 
 if __name__ == "__main__":

@@ -29,6 +29,10 @@ CATALOG_DIR = REPO_ROOT / "Catalog"
 OPERATIONS_DIR = CATALOG_DIR / "operations"
 PROFILES_DIR = CATALOG_DIR / "profiles"
 STEP_REGISTRY_PATH = REPO_ROOT / "openspec" / "contracts" / "workflow-step-registry.yaml"
+DUMP_RECIPES_PATH = REPO_ROOT / "openspec" / "contracts" / "catalogs" / "dump-recipes.yaml"
+DIAGNOSTICS_STDOUT_PATH = (
+    REPO_ROOT / "openspec" / "contracts" / "catalogs" / "diagnostics-stdout.yaml"
+)
 GENERATED_SWIFT_PATH = (
     REPO_ROOT
     / "Packages"
@@ -84,7 +88,7 @@ TOP_LEVEL_REQUIRED = (
 )
 TOP_LEVEL_OPTIONAL = ("defaultPolicyIssuance",)
 STEP_REQUIRED = ("stepID", "kind", "effect", "cancellation", "binding", "compensation")
-STEP_OPTIONAL = ("optional", "notes")
+STEP_OPTIONAL = ("actionRef", "optional", "notes")
 FIELD_REQUIRED = ("type", "required")
 FIELD_OPTIONAL = (
     "description",
@@ -122,6 +126,53 @@ def load_step_registry(path: Path = STEP_REGISTRY_PATH) -> dict[str, dict[str, s
     if not registry:
         raise CatalogError(f"{path}: empty step registry")
     return registry
+
+
+def load_stdout_action_registry(
+    dump_recipes_path: Path = DUMP_RECIPES_PATH,
+    diagnostics_path: Path = DIAGNOSTICS_STDOUT_PATH,
+) -> dict[str, frozenset[str]]:
+    dump = yaml.safe_load(dump_recipes_path.read_text(encoding="utf-8"))
+    if not isinstance(dump, dict) or dump.get("catalog") != "arkui-ui-dump":
+        raise CatalogError(f"{dump_recipes_path}: unexpected stdout recipe catalog")
+    dump_rows = dump.get("recipes", []) + dump.get("legacy_fallbacks", [])
+    if not dump_rows or not all(isinstance(row, dict) and isinstance(row.get("id"), str) for row in dump_rows):
+        raise CatalogError(f"{dump_recipes_path}: malformed stdout recipes")
+
+    diagnostics = yaml.safe_load(diagnostics_path.read_text(encoding="utf-8"))
+    if not isinstance(diagnostics, dict) or set(diagnostics) != {
+        "schema_version", "catalog", "actions", "rules", "behavior_specs"
+    }:
+        raise CatalogError(f"{diagnostics_path}: unexpected diagnostics stdout catalog shape")
+    if diagnostics["schema_version"] != "1.0.0" or diagnostics["catalog"] != "arkdeck-diagnostics":
+        raise CatalogError(f"{diagnostics_path}: unsupported diagnostics stdout catalog")
+    actions = diagnostics["actions"]
+    if not isinstance(actions, list) or not actions:
+        raise CatalogError(f"{diagnostics_path}: actions must be a non-empty list")
+    action_ids: list[str] = []
+    for index, action in enumerate(actions):
+        where = f"{diagnostics_path}.actions[{index}]"
+        if not isinstance(action, dict) or set(action) != {
+            "id", "step_kind", "output_mode", "required_inputs", "limits"
+        }:
+            raise CatalogError(f"{where}: malformed diagnostics stdout action")
+        if action["step_kind"] != "captureRemoteStdout" or action["output_mode"] != "stdout":
+            raise CatalogError(f"{where}: action must be captureRemoteStdout/stdout")
+        action_id = action["id"]
+        if not isinstance(action_id, str) or not action_id:
+            raise CatalogError(f"{where}.id: must be a non-empty string")
+        if not isinstance(action["required_inputs"], list) or not isinstance(action["limits"], dict):
+            raise CatalogError(f"{where}: malformed parameter contract")
+        if set(action["required_inputs"]) != set(action["limits"]):
+            raise CatalogError(f"{where}: required_inputs and limits must match exactly")
+        action_ids.append(action_id)
+    if len(action_ids) != len(set(action_ids)):
+        raise CatalogError(f"{diagnostics_path}: duplicate action ids")
+
+    return {
+        "arkui-ui-dump": frozenset(row["id"] for row in dump_rows),
+        "arkdeck-diagnostics": frozenset(action_ids),
+    }
 
 
 def _require_keys(doc: dict, required, optional, where: str) -> None:
@@ -176,7 +227,12 @@ def _validate_field_table(table, where: str) -> None:
                 raise CatalogError(f"{field_where}.enum: malformed enum list")
 
 
-def _validate_step(step, registry: dict[str, dict[str, str]], where: str) -> None:
+def _validate_step(
+    step,
+    registry: dict[str, dict[str, str]],
+    stdout_actions: dict[str, frozenset[str]],
+    where: str,
+) -> None:
     if not isinstance(step, dict):
         raise CatalogError(f"{where}: step must be an object")
     _require_keys(step, STEP_REQUIRED, STEP_OPTIONAL, where)
@@ -205,9 +261,31 @@ def _validate_step(step, registry: dict[str, dict[str, str]], where: str) -> Non
         )
     if "optional" in step and not isinstance(step["optional"], bool):
         raise CatalogError(f"{where}.optional: must be a boolean")
+    action_ref = step.get("actionRef")
+    if kind == "captureRemoteStdout":
+        if not isinstance(action_ref, dict):
+            raise CatalogError(f"{where}: captureRemoteStdout requires actionRef")
+        _require_keys(action_ref, ("catalogId", "actionId"), (), f"{where}.actionRef")
+        catalog_id = action_ref["catalogId"]
+        action_id = action_ref["actionId"]
+        if (
+            not isinstance(catalog_id, str)
+            or not isinstance(action_id, str)
+            or action_id not in stdout_actions.get(catalog_id, frozenset())
+        ):
+            raise CatalogError(
+                f"{where}.actionRef: unregistered stdout action {catalog_id!r}/{action_id!r}"
+            )
+    elif "actionRef" in step:
+        raise CatalogError(f"{where}.actionRef: only captureRemoteStdout may carry actionRef")
 
 
-def validate_operation(doc, registry: dict[str, dict[str, str]], where: str) -> None:
+def validate_operation(
+    doc,
+    registry: dict[str, dict[str, str]],
+    where: str,
+    stdout_actions: dict[str, frozenset[str]] | None = None,
+) -> None:
     if not isinstance(doc, dict):
         raise CatalogError(f"{where}: document must be an object")
     _require_keys(doc, TOP_LEVEL_REQUIRED, TOP_LEVEL_OPTIONAL, where)
@@ -272,13 +350,16 @@ def validate_operation(doc, registry: dict[str, dict[str, str]], where: str) -> 
     _validate_field_table(doc["inputs"], f"{where}.inputs")
     _validate_field_table(doc["outputs"], f"{where}.outputs")
 
+    if stdout_actions is None:
+        stdout_actions = load_stdout_action_registry()
+
     steps = doc["steps"]
     if not isinstance(steps, list) or not (1 <= len(steps) <= 32):
         raise CatalogError(f"{where}.steps: must be a list of 1..32 steps")
     step_ids = []
     step_effect_max = "hostOnly"
     for index, step in enumerate(steps):
-        _validate_step(step, registry, f"{where}.steps[{index}]")
+        _validate_step(step, registry, stdout_actions, f"{where}.steps[{index}]")
         step_ids.append(step["stepID"])
         if _rank(step["effect"], EFFECTS) > _rank(step_effect_max, EFFECTS):
             step_effect_max = step["effect"]
@@ -356,10 +437,13 @@ def load_catalog(
     registry_path: Path = STEP_REGISTRY_PATH,
 ) -> tuple[list[dict], list[dict]]:
     registry = load_step_registry(registry_path)
+    stdout_actions = load_stdout_action_registry()
     operations = []
     for path in sorted(operations_dir.glob("*.json")):
         doc = json.loads(path.read_text(encoding="utf-8"))
-        validate_operation(doc, registry, str(path.relative_to(REPO_ROOT)))
+        validate_operation(
+            doc, registry, str(path.relative_to(REPO_ROOT)), stdout_actions=stdout_actions
+        )
         expected_name = f"{doc['id']}.v{doc['version']}.json"
         if path.name != expected_name:
             raise CatalogError(f"{path}: file name must be {expected_name}")
@@ -438,6 +522,13 @@ def _swift_step(step: dict) -> str:
         f"isOptional: {'true' if step.get('optional', False) else 'false'}",
         f"compensation: .{step['compensation']}",
     ]
+    if "actionRef" in step:
+        action_ref = step["actionRef"]
+        parts.append(
+            "actionReference: CatalogActionReference("
+            f"catalogID: {_swift_string(action_ref['catalogId'])}, "
+            f"actionID: {_swift_string(action_ref['actionId'])})"
+        )
     return "CatalogStepDescriptor(" + ", ".join(parts) + ")"
 
 
