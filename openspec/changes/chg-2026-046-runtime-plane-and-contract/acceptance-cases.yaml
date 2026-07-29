@@ -1,0 +1,65 @@
+---
+schema_version: 1.0.0
+change_id: CHG-2026-046-runtime-plane-and-contract
+change_revision: 1
+platform: macos
+evidence_classes:
+- contract
+cases:
+- acceptance_id: RTC-GOV-001
+  test_id: TEST-RTC-GOV-001
+  method: >-
+    Governance text review plus diff audit: plane separation, approval-needed
+    change classes, D0/D1/D2 grading, status-only PR abolition, host_loop
+    boundary, with zero weakening of existing D2/E2 rules.
+  expected_source: openspec/changes/chg-2026-046-runtime-plane-and-contract/verification.md#rtc-gov-001
+  minimum_evidence: contract
+  expected_result: >-
+    AGENTS.md, project.md and enforcement.md 2.2.0 define both planes and the
+    vertical-PR delivery model; every existing D2/E2 gate survives verbatim or
+    strengthened; host_loop code is untouched.
+- acceptance_id: RTC-API-001
+  test_id: TEST-RTC-API-001
+  method: >-
+    Runtime API v2 round-trip contract tests plus a governance-field rejection
+    matrix and version fail-closed tests.
+  expected_source: openspec/changes/chg-2026-046-runtime-plane-and-contract/verification.md#rtc-api-001
+  minimum_evidence: contract
+  expected_result: >-
+    A valid v2 request needs only target, operation and typed inputs; any
+    top-level repository governance key is rejected with a stable error code;
+    unknown major versions fail closed while minor-version unknown keys stay
+    forward compatible.
+- acceptance_id: RTC-CAP-001
+  test_id: TEST-RTC-CAP-001
+  method: >-
+    RuntimeCapability invariant tests plus durable store contract tests with
+    atomic consumption and crash-retry idempotency.
+  expected_source: openspec/changes/chg-2026-046-runtime-plane-and-contract/verification.md#rtc-cap-001
+  minimum_evidence: contract
+  expected_result: >-
+    E1 authorization works without any task ID yet fails closed when the
+    capability is missing, expired, revoked, exhausted, out of scope or above
+    the effect ceiling; consumption is atomic and never doubled on retry.
+- acceptance_id: RTC-CAT-001
+  test_id: TEST-RTC-CAT-001
+  method: >-
+    Catalog schema validation, closed step-kind vocabulary checks, generator
+    determinism and bidirectional drift detection wired into check-sdd.
+  expected_source: openspec/changes/chg-2026-046-runtime-plane-and-contract/verification.md#rtc-cat-001
+  minimum_evidence: contract
+  expected_result: >-
+    All six operations validate; every step kind is registry-closed; no
+    generic shell step is expressible; catalog and generated artifacts cannot
+    drift apart without a red check.
+- acceptance_id: RTC-COMPAT-001
+  test_id: TEST-RTC-COMPAT-001
+  method: >-
+    Full existing Swift and script suites plus v1-to-v2 adapter parity
+    vectors.
+  expected_source: openspec/changes/chg-2026-046-runtime-plane-and-contract/verification.md#rtc-compat-001
+  minimum_evidence: contract
+  expected_result: >-
+    Zero regression against the PRE-00 baseline; v1 requests upgrade to
+    semantically equivalent v2 requests with governance identifiers demoted to
+    deprecated provenance annotations.
