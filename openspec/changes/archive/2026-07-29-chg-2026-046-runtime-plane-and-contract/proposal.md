@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-046-runtime-plane-and-contract
 revision: 1
-status: verified # 2026-07-29 verification closure；仅在维护者 review/merge 本 PR 后生效
+status: archived # 2026-07-29 archive PR；verification #793 merge 05a1b585b3a9e79ce69e0a09f0124d80433e70d5；Core/spec/contract/canonical acceptance delta 均为空；目录外活路径引用 0；仅在维护者 review/merge 本 PR 后生效
 class: capability
 core_change_level: none
 owner: lvye
