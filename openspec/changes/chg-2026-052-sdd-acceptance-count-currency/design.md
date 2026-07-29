@@ -2,7 +2,8 @@
 
 ## Context and constraints
 
-- Audit base:`dd3b110daed9311f9c2c732c7c971c21482bed59`
+- Approved proposal revision:r2（只修正 change-relative Allowed-path grammar）
+- Audit base:`8a9bfef4d4794ff4289cc1e35d1b50e4c1d816b6`
 - Core baseline:`CORE-2.1.0`
 - Current producer:`openspec/verification/core-conformance.yaml`
   `acceptance_index.count = 111`
