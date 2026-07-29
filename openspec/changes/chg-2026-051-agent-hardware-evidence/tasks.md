@@ -2,25 +2,27 @@
 
 ## TASK-AHE-001 — Promote V3 and close trusted Runtime evidence projection
 
-- Status:ready（仅在 r4 proposal PR 被维护者 review + merge 后生效；合并前 current
-  main 的 r3 任务因下述 durable journal registry stop condition 保持 blocked）
+- Status:ready（仅在 r5 proposal PR 被维护者 review + merge 后生效；合并前 current
+  main 的 r4 任务因下述 schema/crash-fixture parity stop condition 保持 blocked）
 - Historical Status:blocked（r1 开工后审计发现唯一生产 facts port 与 Catalog
   preflight 不可闭合 model/firmware/transport/fresh time；r2 开工后审计发现
   `runApprovedRemoteRead` actionRef 无法由 current Catalog schema/generator 表达，
   derived matrix 与受影响 fixtures 又不在 Allowed paths；r3 首次实现编译发现
   `WorkflowStep.runApprovedRemoteRead` 的独立 sealed action registry 不接受新增
-  `deviceModel` / `firmwareBuild`，且源码/测试不在 Allowed paths）
+  `deviceModel` / `firmwareBuild`，且源码/测试不在 Allowed paths；r4 合入后预检发现
+  workflow-step JSON Schema 仍为旧 allowlist，且 engine crash fixture 无法到达原
+  WAL crash point，两者也不在 Allowed paths）
 - Grade:D1
 - Platform:macos
 - Requirements:`REQ-WF-004`
 - Acceptance:`AC-WF-004-01`、`AC-WF-004-02`、`AC-WF-004-03`
 - Depends on:
-  - r4 proposal PR 合并；
+  - r5 proposal PR 合并；
   - `CHG-2026-046` archived；
   - `CHG-2026-049/TASK-DHA-001` implementation 已合入；
   - `CHG-2026-025/TASK-AIN-002` done（只作为 schema migration 输入，不借用其
     scoped delta）
-- Readiness base:`0eb95fe9e34105571a93947cd5c7fd07e91c1092`
+- Readiness base:`76c4607f6ac331ac82ddc05f0362d76c34093855`
 - Readiness input pins:
 
   ```yaml pins
@@ -38,6 +40,8 @@
     blob: fe3841d992bbae89bb8f954a1bcdeab0c4f714d1
   - path: openspec/contracts/hardware-evidence.schema.json
     blob: 98443833b5bef36f4a1e0fdea9dbaaccf057f4d1
+  - path: openspec/contracts/workflow-step.schema.json
+    blob: 91146408bae344df493a1ea21338e2c37114fa45
   - path: openspec/changes/chg-2026-025-ai-native-unattended-device-ops/contracts/hardware-evidence.schema.v3-draft.json
     blob: 492aa3d5107c6790f56df1fff336280578494364
   - path: openspec/specs/workflow-journal-recovery/spec.md
@@ -92,6 +96,8 @@
     blob: 15c0df7363b2549f7a64230ef2c7a7f1c2d60861
   - path: Packages/ArkDeckKit/Tests/ArkDeckFakeHDCFixture/main.swift
     blob: bd4b0beb792b8a7989930679a28db9b6ec4db42a
+  - path: Packages/ArkDeckKit/Tests/ArkDeckEngineCrashFixture/main.swift
+    blob: a674ca2566a6387240ab34cb06cf36c5dceeb8f4
   - path: scripts/catalog_gen/generate.py
     blob: d17aaa56616cd5149d1d16b3b8d084bddc715f62
   - path: scripts/catalog_gen/test_generate.py
@@ -138,6 +144,7 @@
 - Allowed paths:
   - `AGENTS.md`
   - `openspec/contracts/hardware-evidence.schema.json`
+  - `openspec/contracts/workflow-step.schema.json`
   - `openspec/contracts/catalogs/remote-operations.yaml`
   - `Catalog/operations/observe.device.v1.json`
   - `Catalog/operations/capture.diagnostics.v1.json`
@@ -174,6 +181,7 @@
   - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/RuntimeOperationCatalogContractTests.swift`
   - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/WorkflowStepContractTests.swift`
   - `Packages/ArkDeckKit/Tests/ArkDeckFakeHDCFixture/main.swift`
+  - `Packages/ArkDeckKit/Tests/ArkDeckEngineCrashFixture/main.swift`
   - `openspec/changes/chg-2026-051-agent-hardware-evidence/**`
 - Forbidden paths:
   - `openspec/constitution.md`
@@ -199,7 +207,9 @@
   `arkdeck-remote-operations` 中 step-kind 精确匹配的 action；两个 generated outputs
   零 drift，unknown/missing/cross-kind reference 均拒绝；
 - durable WorkflowStep registry 精确接受 `deviceModel` / `firmwareBuild`，journal
-  intent 与 Catalog/provider action 零漂移，unknown action 仍拒绝；
+  intent 与 Catalog/provider action/JSON Schema 零漂移，unknown action 仍拒绝；
+- engine crash fixture 使用 production-shaped preflight facts 到达两个原 WAL crash
+  window，保留 outcome-unknown 与 zero-redispatch 断言；
 - 三个 production operation 的 exact-target/model/firmware typed preflight 在任何
   artifact capture/E1 step 前完成；Catalog/generated Swift/remote-operation mapping
   零 drift，未知/歧义 target 零后续 dispatch；

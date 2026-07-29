@@ -1,6 +1,6 @@
 # CHG-2026-051 Verification Plan
 
-> Change:CHG-2026-051-agent-hardware-evidence@r4
+> Change:CHG-2026-051-agent-hardware-evidence@r5
 > Status:planned
 > Core baseline:CORE-2.1.0
 
@@ -15,7 +15,10 @@
   `runApprovedRemoteRead` actionRef 的 required、exact-kind 与 generated matrix
   digest 同步；
 - durable `WorkflowStep.runApprovedRemoteRead` registry 正反例，验证新增的
-  `deviceModel` / `firmwareBuild` intent 可构造且 unknown action 仍拒绝；
+  `deviceModel` / `firmwareBuild` intent 可构造、JSON Schema parity 且 unknown
+  action 仍拒绝；
+- existing process-level engine crash fixture 继续到达两个原有 WAL crash window，
+  recovery 后 outcome unknown 且零 redispatch；
 - existing V2 evidence 作为 immutable compatibility fixture，只读不迁移。
 
 ## Acceptance matrix
@@ -74,6 +77,8 @@ projector 输出必须通过 V3 JSON Schema、Swift decode/encode 与 semantic p
   step-kind 不匹配 action，或其他 step kind 非法携带 remote action reference；
 - durable WorkflowStep registry 缺少两个新 action、接受 unknown action，或 journal
   intent action 与 Catalog/provider action 不一致；
+- workflow-step Swift/JSON Schema allowlist 漂移，或 crash fixture 在 WAL crash point
+  之前因不完整 target facts 退出；
 - job 为 simulated/planOnly，或 effect/outcome unknown。
 
 全部向量必须在 evidence publication 前失败；不能用空值、`unknown` 字符串、旧事实或

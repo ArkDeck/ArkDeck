@@ -1,4 +1,4 @@
-# CHG-2026-051 r4 Design — Production evidence preflight
+# CHG-2026-051 r5 Design — Production evidence preflight
 
 ## 1. Why r1 cannot reach production
 
@@ -68,14 +68,24 @@ PR.
 ### 2.2 Durable journal action registry
 
 `WorkflowStep.runApprovedRemoteRead` separately validates the `catalogId` / `actionId` written
-into every durable intent. Its sealed action vocabulary SHALL add exactly `deviceModel` and
-`firmwareBuild` beside the five existing `arkdeck-remote-operations` actions. The engine SHALL
-write the Catalog step's exact actionRef into the journal; it must not substitute an older action,
-derive one from the step ID, or omit the typed registry validation.
+into every durable intent. Its Swift registry and `workflow-step.schema.json` SHALL both add
+exactly `deviceModel` and `firmwareBuild` beside the five existing
+`arkdeck-remote-operations` actions. The engine SHALL write the Catalog step's exact actionRef
+into the journal; it must not substitute an older action, derive one from the step ID, or omit
+the typed registry validation.
 
 `WorkflowStepContractTests` SHALL prove both new actions construct valid
 `runApprovedRemoteRead` steps and an unknown action remains rejected. No other WorkflowStep kind,
 argument rule or effect/binding invariant changes.
+
+### 2.3 Crash-window fixture parity
+
+The existing process-level `ArkDeckEngineCrashFixture` remains the authority for
+after-intent/before-dispatch and after-dispatch/before-outcome recovery windows. Its fake facts
+port SHALL provide the same target ID, binding revision, stable identity and internal connect key
+shape required by production preflight, and its request SHALL correlate the binding revision.
+The dispatcher still stops at the first device preflight dispatch; marker timing, SIGSTOP/SIGKILL,
+journal recovery and zero-redispatch assertions remain unchanged.
 
 ## 3. Exact target and provider lowering
 
