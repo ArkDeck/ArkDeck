@@ -1,7 +1,7 @@
 # CHG-2026-051 Verification Plan
 
 > Change:CHG-2026-051-agent-hardware-evidence@r6
-> Status:planned
+> Status:passed # 2026-07-29；仅在维护者 review/merge verification PR 后生效
 > Core baseline:CORE-2.1.0
 
 ## Environment
@@ -116,12 +116,18 @@ fake/simulation 计为 realHardware。
 
 ## Result gate
 
-- [ ] `AC-WF-004-01/02/03` 全部 contract PASS
-- [ ] V3 JSON Schema / Swift / semantic validator parity PASS
-- [ ] production Catalog preflight / exact target / generated drift contracts PASS
-- [ ] evidence publication 与 effect dispatch separation PASS
-- [ ] V2 compatibility、privacy/secret scan PASS
-- [ ] `scripts/check-sdd.sh` 与完整 Swift suite PASS
-- [ ] implementation run evidence 可复查
-- [ ] 未执行真实设备，未追认 `DHA-HW-001` attempt#2
+- [x] `AC-WF-004-01/02/03` 全部 contract PASS
+- [x] V3 JSON Schema / Swift / semantic validator parity PASS
+- [x] production Catalog preflight / exact target / generated drift contracts PASS
+- [x] evidence publication 与 effect dispatch separation PASS
+- [x] V2 compatibility、privacy/secret scan PASS
+- [x] `scripts/check-sdd.sh` 与完整 Swift suite PASS
+- [x] implementation run evidence 可复查
+- [x] 未执行真实设备，未追认 `DHA-HW-001` attempt#2
 - [ ] archive 时 traceability 与 next MAJOR baseline 精确更新
+
+Closure receipt:`proposal.md#verification-closure2026-07-29`。实现 evidence =
+`evidence/runs/TASK-AHE-001/run.md`；latest-main 复验 =
+`evidence/runs/TASK-AHE-001/verification-r1.md`。`passed` 与 proposal
+`verified` 只在维护者 review/merge 本 verification PR 后生效。archive traceability
+与 next MAJOR baseline 保持为 archive PR 的独立结果门。
