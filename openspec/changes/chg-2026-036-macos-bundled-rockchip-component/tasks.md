@@ -841,13 +841,58 @@
 
 ## TASK-BRC-003 — 闭合 nested component 打包、签名与公证
 
-- Status:ready（r2 fresh D1 readiness；仅在维护者对本 readiness/evidence PR 的
-  exact head review/merge 后生效。`TASK-BRC-002R` 已闭合按需 materialization
-  handoff，维护者已在隔离 release environment 亲手完成 Developer ID/notary D2
-  configuration；本 PR 只接受其 sanitized、非秘密 preflight evidence 并重新 pin
-  current inputs/工具/失败门，不执行 package/sign/notarize/staple/install/upload，
-  不携 credential/private key/profile path/App/DMG/binary，也不开始
-  implementation/evidence。）
+- Status:done（按 Governance Enforcement 2.2.0 的“一个垂直交付单元一个 PR”
+  起草；只有维护者对本 TASK-BRC-003 implementation/test/docs/evidence/status
+  exact head review/merge 后生效。本状态不构成 change verified、TASK-BRC-004
+  readiness、发布或运行时/硬件批准。）
+- Historical Status:ready（r2 fresh D1 readiness #771 exact head 经维护者
+  APPROVED，并以 `2e1fe11e0c5860599bde03448a1f48d9ee596b80` 合入后生效；
+  `TASK-BRC-002R` 已闭合按需 materialization handoff，维护者已在隔离 release
+  environment 亲手完成 Developer ID/notary D2 configuration。）
+- Completion record:
+  - **Carrier migration:closed for review。**r2 readiness 合入时的旧规则要求
+    implementation 保持 `ready`、另开 D0 status-only PR；其后 protected main
+    合入 CHG-2026-046 / Governance Enforcement 2.2.0，明确废止 done-only PR，
+    要求实现、测试、文档、evidence 与任务状态同一垂直 PR。本 PR 仅据更高层
+    current governance 增加本状态翻转。package 工具落在原任务已声明且仓库已
+    建立一级边界索引的 `scripts/rockchip_component/**` 内；不修改
+    `scripts/README.md`，也不增加新的 `scripts/` 一级目录。该 carrier 调整不改
+    r2 readiness 的风险/pin/窗口事实，不扩产品、package、runtime 或 device
+    scope。
+  - **Exact input and package tuple:closed。**唯一输入仍是 workflow run
+    `30233237693` / head `01e6f9a6605f4a3a9463dcab2bf5731bd012ef48` /
+    artifact ID `8640763234`，unsigned component 247,488 bytes、SHA-256
+    `3caee2136551b4b849daf7e9a906813354f354f8adb61e5f092de49ec7a2e56a`。
+    final App = `com.arkdeck.desktop` `0.1.0 (1)`，child =
+    `Contents/MacOS/rkdeveloptool` / `com.arkdeck.desktop.rkdeveloptool`，
+    App/child 均 arm64、minimum macOS 14.0、同一 Developer ID leaf/Team、
+    Hardened Runtime 与 secure timestamp；App exact 六项、child exact 两项
+    entitlement；五份 reviewed metadata exact。
+  - **Notary/package acceptance:closed。**outer DMG submission
+    `aacc4d5e-9aa2-40c7-b78b-4244d0afb720` = `Accepted` / issue count 0；
+    staple validate、DMG Gatekeeper、read-only mount 后 contained App
+    Gatekeeper 与 `codesign --verify --deep --strict` 均 PASS。final stapled DMG
+    SHA-256 =
+    `934c768dd8e44e3e2b9478b10005a0d0002f67b818f8dd9e191dc4c9dc69aa76`，
+    atomic tuple SHA-256 =
+    `23a566bfcf6ad875475202d08dc7c61db630d04b7aaa6b89968283c678f28654`。
+    sanitized immutable records 见
+    `evidence/runs/TASK-BRC-003/{run.md,package-receipt.json,notary-log.json}`。
+  - **Fail-closed verification:closed。**repo-owned matrix 覆盖 85 个 explicit
+    negative mutations；Xcode Release archive、no-sign/no-launch Debug build、
+    Swift package tests、SDD/path guards、JSON/plist/diff/secret scans 均 PASS。
+    开发中三次未闭合 package 尝试、一次 Debug exclusion 回归及被删除候选全部
+    如实记录在 run；无失败 submission 或 self-reported field 被计为
+    acceptance。
+  - **Effect/privacy boundary:closed。**App/component launch、install、release
+    upload、HDC/USB/device、E1/E2/deviceMutation/destructive、helper/privilege/
+    system-rule/group/ACL dispatch 全为 0；credential/private key/account/
+    Keychain profile name/path 与临时绝对路径零入仓。binary/App/DMG/archive/
+    raw notary log/证书 extracts/DerivedData 均已从临时目录删除。
+  - **Acceptance slice:closed。**`BRC-PACKAGE-001` PASS；`AC-JOB-005-01`、
+    `AC-UX-007-01`、`AC-FLASH-013-01` 仅本 package handoff slice PASS，不声明
+    successor runtime composition、clean-host distribution、E0/硬件或 device
+    recovery。TASK-BRC-004 仍受独立 readiness/依赖门约束，不在本 PR 开工。
 - Historical Status:blocked（r1 D1 blocked-readiness；本记录只固定 package/sign/notary
   contract 并如实记录 release environment 与 unsigned artifact handoff 缺口。合入
   不构成 `ready`，不得开始 implementation/evidence。维护者完成下述 D2
@@ -1044,7 +1089,7 @@
     implementation/evidence PR 的 changed paths 才可精确限定为
     `ArkDeck.xcodeproj/project.pbxproj`、
     `ArkDeckApp/RockchipComponent.entitlements`、
-    `scripts/release/{README.md,rockchip_component_package.py,test_rockchip_component_package.py}`、
+    `scripts/rockchip_component/{PACKAGING.md,rockchip_component_package.py,test_rockchip_component_package.py}`、
     `docs/release/rockchip-component-packaging.md`、
     `openspec/integrations/rockchip/bundled-component/1.0.0/package.json` 与
     `evidence/runs/TASK-BRC-003/{run.md,package-receipt.json,notary-log.json}`。
