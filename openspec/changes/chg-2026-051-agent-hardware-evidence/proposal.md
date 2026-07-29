@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-051-agent-hardware-evidence
-revision: 1
-status: approved # 本 proposal PR 合并即批准；合并前 TASK-AHE-001 不得开工
+revision: 2
+status: approved # r2 proposal PR 合并即批准；合并前 TASK-AHE-001 保持 blocked
 class: core
 core_change_level: major
 owner: lvye
@@ -30,6 +30,15 @@ current `openspec/contracts/hardware-evidence.schema.json` 仍是 V2：
 
 该冲突已在 `CHG-2026-049` 的 `DHA-HW-001` attempt#2 实际命中：E0 runtime Job
 成功，但不能把不满足 current schema 的 receipt 伪装为验收 PASS。
+
+r1 合入后的 production-reachability 审计又发现：唯一生产 composition
+`ArkDeckAgentDaemonMain/main.swift` 的 `TargetStoreFactsPort` 只返回旧 target
+identity/tool，明确把 model/firmware 留空，也没有 fresh source time、transport 或
+binding correlation；当前三个 evidence-eligible operation 也没有一组在 artifact capture
+与 E1 step 前完成的 typed model + firmware + exact-target preflight。只在 fake
+`ProviderFacts` 中填字段可以让 contract 变绿，却会让下一次真实 E0 run 原样
+`evidenceIncomplete`。这命中 r1 `AF-004` 与“需要改变 Catalog/provider 语义即停止”的
+stop condition；未完成实现已保存为不计 evidence 的 WIP，不得以 r1 scope 宣告 done。
 
 `CHG-2026-025` 已批准“eligible typed operation 由 Agent 执行”的总体方向，也已完成
 一个 change-local V3 draft；但其 proposal 明确禁止其他 change 在该大型 change
@@ -63,6 +72,23 @@ In scope:
   evidence packaging 层只可补充不授予权限的 claim metadata（`evidenceId`、
   `acceptanceIds`、`validUntil`、`notes`），且其 AC 归属仍由 verification plan 与
   维护者 review 判定。
+- **Production typed preflight closure（r2）**：
+  - `observe.device@1`、`capture.diagnostics@1` 与 `debug.hap@1` 在任何
+    evidence-bearing capture / E1 step 前依次执行 descriptor-bound `probeDevice`
+    exact-target confirmation、`runApprovedRemoteRead(deviceModel)` 与
+    `runApprovedRemoteRead(firmwareBuild)`；
+  - 三个 read 均是 reviewed Catalog step，各自有 durable intent/outcome，不通过
+    synthetic side-channel、bootstrap adoption time 或 `job.evidence` 事后补跑；
+  - HDC target-list parser 必须按 pinned family 解析并选中 target-store 的 exact
+    `connectKey`，在 provider 内立即散列 serial 并返回 transport；0 个/多个 match、
+    binding/identity drift 或未知列形态一律失败；
+  - property read 使用已有 closed `HDCAllowlistedProperty`，lowering 为
+    executable + argument array 且显式 `-t <connectKey>`；caller 不能选择 property
+    key、connectKey 或命令；
+  - Runtime 将三条 outcome 与 target-store identity/binding、tool discovery 合并为
+    一份 job-local observation，最后一条 preflight outcome durable 后才允许后续
+    capture/E1 step；旧 target row 缺 transport 等字段时由本次 typed preflight
+    重建 job observation，不改写历史 evidence。
 - **Fail closed evidence publication**：任一 required fact 缺失、unknown、stale、
   binding 不一致、authority/effect 不匹配或 Artifact bytes/hash 不可验证时，runner
   返回结构化 `evidenceIncomplete` blocker；不得发布 schema-valid realHardware
@@ -84,12 +110,13 @@ Observable behavior:
 
 ## Out of scope
 
-- 本 proposal PR 不修改 current schema、Runtime 代码或 current specs，不执行
+- 本 r2 proposal PR 不修改 current schema、Catalog/Runtime 代码或 current specs，不执行
   device/HDC/tool，不产生或追认任何 realHardware evidence。
 - 不追溯改写 V2 历史记录；`DHA-HW-001` attempt#2 继续保持“runtime succeeded /
   formal acceptance blocked”，不得补写字段后追认为 PASS。
-- 不新增 operation、provider、integration/device profile，不改变 Catalog effect、
-  typed step 或 RuntimeCapability 的签发/消费语义。
+- 不新增 operation、provider、integration/device profile，不改变 Catalog effect
+  level、现有非 preflight step 的语义或 RuntimeCapability 的签发/消费语义；r2 列明的
+  三条 required preflight prefix 与两个 exact remote-read action 是唯一 Catalog 变化。
 - 不修改 E2 execution policy、standing authorization、Constitution
   `POL-AGENT-002` 或 `REQ-FLASH-015`；schema 只能记录授权依据，不能授权 dispatch。
 - 不把所有 legacy human harness 机械改名为 Agent。产品 executor 与真机 evidence
@@ -105,6 +132,10 @@ Observable behavior:
 - Contracts/schemas:
   - `openspec/contracts/hardware-evidence.schema.json` 2.0.0 → 3.0.0
   - `RuntimeAgentExecutionReceipt` 与 hardware-evidence projection contract
+  - 三个已发布 operation 增加 required E0 evidence-preflight steps（同版本
+    breaking modification，经本 Core MAJOR change 批准）
+  - `arkdeck-remote-operations` 增加无 caller 参数的 exact `deviceModel` /
+    `firmwareBuild` action
 - Core baseline bump:需要。以 current `CORE-2.1.0` 为基线时 candidate 为
   `CORE-3.0.0`（MAJOR：替换 schema required fields、收紧 realHardware evidence
   publication）。若 `CHG-2026-050` 或其他 Core change 先 archive，archive PR 必须按
@@ -125,6 +156,10 @@ Observable behavior:
   但必须在后续 evidence-bearing capture 以及任何 E1/E2 effect 前完成。
   step kinds/effect 来自 durable execution record；authority 来自
   admission decision；Artifact hash 来自已发布 bytes。caller 不能同时构造事实与证明。
+- **Exact target**：target-store 只提供内部寻址 `connectKey` 与既有 identity/binding；
+  provider 在 typed target-list outcome 中精确匹配后才使用 `-t` 做 property read。
+  `connectKey`/raw serial 不进入 daemon evidence wire、projector 或 Git；target-list
+  0/multiple match 不猜测默认设备。
 - **Fail closed**：missing/unknown/stale/mismatch 一律 `evidenceIncomplete`，不得用
   target ID、exit 0、相似型号、旧 receipt 或人工补写推断。
 - **Authorization separation**：evidence 是执行结果记录，不是 capability。事后
@@ -141,8 +176,9 @@ Observable behavior:
 
 ## Approval and flow
 
-本 proposal PR 同时承载 `CHG-2026-051` r1 approval 与 `CHG-2026-025` r6 的
-contract ownership 修订，属于 D1。维护者 review + merge 后，`TASK-AHE-001` 才可按
-固定 pins 开工；合并 proposal 不构成 contract 激活、真机窗口、E1 capability 或 E2
-authorization。实现、测试、文档、run evidence 与任务状态翻转同车交付；随后 change
-级 verification 与 archive 分别使用独立 PR。
+r1 proposal PR 已承载 `CHG-2026-051` 初始 approval 与 `CHG-2026-025` r6 ownership
+修订。本文 r2 是 production-reachability stop condition 后的 D1 scope/readiness
+修订；维护者 review + merge r2 exact head 后，`TASK-AHE-001` 才可按新 pins 恢复。
+r2 合并不构成 contract 激活、真机窗口、E1 capability 或 E2 authorization。实现、
+测试、文档、run evidence 与任务状态翻转仍同车交付；随后 change 级 verification 与
+archive 分别使用独立 PR。
