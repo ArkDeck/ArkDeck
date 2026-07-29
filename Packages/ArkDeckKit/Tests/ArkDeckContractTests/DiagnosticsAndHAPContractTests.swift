@@ -309,6 +309,56 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
         issuer: .init(kind: .maintainerMergedPR, reference: "PR#test")))
   }
 
+  /// Regression for the blocker maintainer review raised: an earlier
+  /// version of the journal argument table labelled the HiLog step with a
+  /// UI-dump action because that was the only thing the old schema
+  /// allowed. The durable intent would then have recorded an action the
+  /// step never performed - fabricated evidence, not a naming slip. The
+  /// identity must come from the catalog's own actionRef.
+  func testJournalIntentRecordsTheCatalogsOwnActionIdentity() async throws {
+    let dispatcher = ScriptedDispatcher()
+    let (engine, _, _) = try makeEngine(dispatcher: dispatcher)
+    let acceptance = try await engine.submit(
+      captureRequest(withTrace: false, key: "idem-identity-01"))
+    _ = try await engine.run(jobID: acceptance.jobID)
+
+    let journalURL = stateDirectory
+      .appendingPathComponent("jobs/\(acceptance.jobID)/journal.jsonl")
+    let journal = try String(contentsOf: journalURL, encoding: .utf8)
+
+    // The HiLog step must carry the diagnostics action, and no step may
+    // carry a UI-dump action it does not have.
+    XCTAssertTrue(journal.contains("\"boundedHilog\""), "HiLog intent must name its own action")
+    XCTAssertTrue(journal.contains("\"arkdeck-diagnostics\""))
+    XCTAssertFalse(
+      journal.contains("\"nodeSummary\""),
+      "no step may borrow a UI-dump action id: \(journal.prefix(400))")
+
+    // And the catalog is where that identity comes from.
+    let descriptor = try XCTUnwrap(
+      RuntimeOperationCatalog.descriptor(reference: "capture.diagnostics@1"))
+    let hilog = try XCTUnwrap(descriptor.steps.first { $0.stepID == "capture-hilog" })
+    XCTAssertEqual(hilog.actionReference?.actionID, "boundedHilog")
+    XCTAssertEqual(hilog.actionReference?.catalogID, "arkdeck-diagnostics")
+  }
+
+  /// A stdout-capturing step with no declared action must stop the run
+  /// rather than have one invented for its durable intent.
+  func testStdoutStepWithoutADeclaredActionIsRefused() throws {
+    let undeclared = CatalogStepDescriptor(
+      stepID: "capture-mystery", kind: .captureRemoteStdout, effect: .readOnly,
+      cancellation: .immediate, binding: .confirmedDevice, isOptional: false,
+      compensation: .none, actionReference: nil)
+    XCTAssertThrowsError(
+      try RuntimeJobEngine.journalStep(for: undeclared, jobID: "job-1", inputs: [:])
+    ) { error in
+      guard case RuntimeJobEngineError.internalFailure(let detail) = error else {
+        return XCTFail("expected internalFailure, got \(error)")
+      }
+      XCTAssertTrue(detail.contains("refusing to invent"), detail)
+    }
+  }
+
   // MARK: - DHA-HAP-001
 
   func testHAPSuccessRequiresBothReadbacks() async throws {

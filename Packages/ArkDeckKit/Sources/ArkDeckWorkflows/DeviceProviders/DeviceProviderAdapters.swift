@@ -96,10 +96,12 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
   private func captureAction(
     for step: CatalogStepDescriptor, inputs: [String: JSONValue]
   ) throws -> TypedProviderAction {
-    switch step.stepID {
-    case "capture-ui-dump":
+    // Selected by the catalog's declared action, not by step-name
+    // convention: renaming a step must not silently change what runs.
+    switch step.actionReference?.actionID {
+    case "componentTree":
       return .hdc(.captureUIDump(try HDCUIDumpRequest()))
-    default:
+    case "boundedHilog", nil:
       var duration = 30
       if case .integer(let requested)? = inputs["durationSeconds"] {
         duration = max(1, min(Int(requested), HDCHilogCaptureRequest.maximumDurationSeconds))
@@ -115,6 +117,9 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
       }
       return .hdc(
         .captureHilog(try HDCHilogCaptureRequest(durationSeconds: duration, filters: filters)))
+    case .some(let unknown):
+      throw DeviceProviderError.unsupportedAction(
+        "unregistered stdout action \(unknown) for \(step.stepID)")
     }
   }
 

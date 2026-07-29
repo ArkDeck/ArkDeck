@@ -1085,10 +1085,51 @@ public actor RuntimeJobEngine {
         "requiredBytes": .integer(1_048_576),
       ]
     case .captureRemoteStdout:
+      // The action identity comes from the catalog's own actionRef, never
+      // from a guess here. CHG-2026-050 exists because an earlier version
+      // of this table labelled the HiLog step with a UI-dump action: the
+      // journal would then have recorded an intent the step never had,
+      // which is fabricated evidence rather than a naming slip.
+      guard let reference = step.actionReference else {
+        throw RuntimeJobEngineError.internalFailure(
+          "\(step.stepID) captures stdout but declares no catalog action; "
+            + "refusing to invent one for the durable intent")
+      }
+      var parameters: [String: JSONValue] = [:]
+      switch reference.actionID {
+      case "boundedHilog":
+        var duration = 30
+        if case .integer(let requested)? = inputs["durationSeconds"] {
+          duration = max(1, min(Int(requested), 600))
+        } else if case .integer(let requested)? = inputs["diagnosticsDurationSeconds"] {
+          duration = max(1, min(Int(requested), 600))
+        }
+        var filters: [JSONValue] = []
+        if case .array(let requested)? = inputs["hilogFilters"] {
+          filters = requested.filter {
+            if case .string = $0 { return true }
+            return false
+          }
+        }
+        var budget = 16 * 1024 * 1024
+        if case .integer(let requested)? = inputs["totalArtifactByteBudget"] {
+          budget = max(1024, min(Int(requested), 134_217_728))
+        }
+        parameters = [
+          "durationSeconds": .integer(Int64(duration)),
+          "filters": .array(Array(filters.prefix(16))),
+          "byteBudget": .integer(Int64(budget)),
+        ]
+      case "componentTree":
+        parameters = ["byteBudget": .integer(8 * 1024 * 1024)]
+      default:
+        throw RuntimeJobEngineError.internalFailure(
+          "unregistered stdout action \(reference.actionID) for \(step.stepID)")
+      }
       arguments = [
-        "catalogId": .string("arkui-ui-dump"),
-        "actionId": .string(step.stepID == "capture-ui-dump" ? "elementTree" : "nodeSummary"),
-        "parameters": .object([:]),
+        "catalogId": .string(reference.catalogID),
+        "actionId": .string(reference.actionID),
+        "parameters": .object(parameters),
         "artifactId": .string("artifact-\(step.stepID)"),
       ]
     case .captureRemoteFile:

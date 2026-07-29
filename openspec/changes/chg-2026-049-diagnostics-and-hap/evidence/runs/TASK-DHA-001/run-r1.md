@@ -7,6 +7,39 @@
 - **Hardware status:`hardware-pending`** —— `DHA-HW-001`/`DHA-HW-002`
   未主张;后者另需维护者签发的 E1 capability
 
+## ⚠ 任务状态:blocked(维护者 2026-07-29 停手)+ 契约修正后的实现更新
+
+维护者在实现 `capture-hilog` 的 durable intent 时命中 stop condition 并
+把本任务设为 **blocked**:当时的 `captureRemoteStdout` schema/validator
+只允许 `arkui-ui-dump` 系列 action,**无法如实表示 Catalog 已发布的
+HiLog step**;而我先前的 journal 参数表正是用 `arkui-ui-dump` +
+`nodeSummary` 顶替了 HiLog 步骤——那会让 durable journal 记下该步骤
+从未执行过的 action 身份,属**伪造 evidence**,不是命名瑕疵。
+
+契约缺口已由 **CHG-2026-050**(`TASK-WSC-001`,#787/#788/#789 已合入
+main `d13dfec`)补齐:新增 `openspec/contracts/catalogs/
+diagnostics-stdout.yaml`(`arkdeck-diagnostics` catalog,`boundedHilog`
+与 `componentTree` 两个 action 及其参数上下界),step 增 `actionRef`,
+`captureRemoteStdout` 的 validator 按 action 逐项校验参数。
+
+**本次实现更新(按新契约)**:
+
+- journal intent 的 action 身份**只从 catalog 的 `actionRef` 读取**;
+  stdout 步骤若未声明 action,引擎**拒绝执行**而非替它编一个
+  (`refusing to invent`)——这是把"不许冒充"变成结构约束;
+- `boundedHilog` 的 parameters 按新契约填 duration/filters/byteBudget
+  并逐项夹在上下界内;`componentTree` 填 byteBudget;
+- provider 的 capture action 选择改**按 actionRef**,不再按 stepID 猜
+  (改名不该悄悄改变执行内容);
+- 回归测试两条:①真机路径的 journal 必须出现 `boundedHilog` /
+  `arkdeck-diagnostics` 且**不得出现** `nodeSummary`;②无 actionRef 的
+  stdout 步骤必须被拒。
+
+**状态不由本 PR 翻转**:按维护者裁定,CHG-2026-050 合入后本任务仍需
+**独立的 fresh readiness PR** 才可从 blocked 恢复 ready;本 PR 只做
+allowed paths 内的实现修正与 evidence 记录,`tasks.md` 的 Status 行保持
+`blocked` 不动。
+
 ## 维护者 review 期的两项修订(#785 合并版 proposal)
 
 维护者在批准 proposal 时重写了 scope,加入 **T00 Device Runtime Agent
@@ -50,10 +83,11 @@
 
 ## 测试结果
 
-- `swift test` 全量:**643 / 1 skipped / 0 failures**(新增 34 项:
+- `swift test` 全量:**650 / 1 skipped / 0 failures**(在 main `d13dfec`
+  即 CHG-2026-050 合入后复跑;新增 36 项:
   RuntimeArtifactContractTests 12、DiagnosticsAndHAPContractTests 11、
   AgentRuntimeExecutorContractTests 6、EffectiveEffectContractTests 4、
-  daemon artifact 协议面 1)
+  daemon artifact 协议面 1、action 身份回归 2)
 - `scripts/check-sdd.sh`:0 error / 0 warning / 111 AC
 
 ## 实现期抓到的真缺陷(测试驱动,已修)
