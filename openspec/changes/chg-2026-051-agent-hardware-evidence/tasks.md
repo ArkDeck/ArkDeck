@@ -228,7 +228,7 @@
 
 ### Stop conditions
 
-- 需要改变 r3 已列明之外的 Catalog operation/effect/typed step 或 provider/profile
+- 需要改变 r4 已列明之外的 Catalog operation/effect/typed step 或 provider/profile
   语义；
 - 需要修改 E2 execution policy、创建/修改 capability/authorization；
 - model/firmware/confirmation/step/artifact 任一事实只能由 caller 提供；
@@ -243,5 +243,5 @@
 实现完成后在 `evidence/runs/TASK-AHE-001/` 追加 run 记录。change verified/archive
 后，`CHG-2026-049` 仍须 fresh readiness 和新 E0 run；不得复用 attempt#2。
 r1/r2 scope 下的未完成代码只作为本地可恢复 WIP，不是 run evidence、实现提交或
-Acceptance 结论；r3 合入后必须在 fresh base 重放并按完整 Catalog contract +
+Acceptance 结论；r4 合入后必须在 fresh base 重放并按完整 Catalog contract +
 typed preflight 设计复审。
