@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-052-sdd-acceptance-count-currency
 revision: 2
-status: approved # r2 Allowed-path grammar correction；仅在维护者 review/merge 本 PR 后生效
+status: verified # 2026-07-30 verification PR；仅在维护者 review/merge 后生效
 class: implementation-only
 core_change_level: none
 owner: lvye
@@ -86,3 +86,43 @@ Observable behavior:
   CI blocker，但不影响产品运行时。
 - macOS/Windows/Linux 产品 conformance 状态均不改变；GitHub CI runner 上的 host
   contract test 是唯一受影响执行面。
+
+## Verification closure（2026-07-30）
+
+`TASK-GCC-001` 的 implementation、tests、same-revision evidence 与 `done` 状态已由
+PR #818 合入 protected main。本 verification PR 只翻转 change/verification 状态并
+新增 latest-main 复验记录，零产品实现、零 scope、零 Acceptance、Core、authority
+或 platform 状态变化。
+
+### Protected-main delivery chain
+
+| Stage | Exact reviewed head | Protected-main merge |
+| --- | --- | --- |
+| r1 proposal #817 | `237fb1e5b694606ee0ce161c724b0cecf54f8354` | `8a9bfef4d4794ff4289cc1e35d1b50e4c1d816b6` |
+| r2 path correction #819 | `e70316b2f07deeb7760ca27405333c972734b7fe` | `04190f73f69d06ad2046997a7532b48eb3afb966` |
+| implementation/evidence #818 | `a7bb8963c58970e89c440f224c38caef332cf253` | `55110476658df9b7955f4bd807f56b3071660c17` |
+
+三个 exact heads 均由维护者 `lvye` review/approve；各 PR 的 Agent PR、SDD Guard、
+allowed-path 与 Swift CI 所需 checks 均为 `SUCCESS`。批准/合入事实建立 authority；
+`GUARD-COUNT-CURRENCY-001` 的真值源仍是
+`evidence/runs/TASK-GCC-001/run.md` 与
+`evidence/runs/TASK-GCC-001/verification-r1.md`，不是实现 PR 被 review 本身。
+
+### Binary AC conclusion
+
+- `GUARD-COUNT-CURRENCY-001` = PASS（contract）：strict reader 的 `114` 正例与
+  11 个 malformed/type/range 反例通过；current main 的 111 manifest 通过完整
+  SDD suite；从 #818 merge OID 叠加 #816 archive candidate 后，同一
+  `scripts/test_check_sdd.py` blob 在 114 manifest 下仍通过完整 suite，未发生测试
+  源码编辑。subprocess 非零、actual/declared count mismatch、errors 或 warnings
+  非零继续 fail closed。
+
+复验环境、输入 blob、命令与结果见
+`evidence/runs/TASK-GCC-001/verification-r1.md`。复验只使用 host-only/offline
+contract 路径，未运行 product Runtime、HDC、设备、capability 或网络操作，不产生
+hardware/platform support 主张。
+
+只有维护者 review/merge 本 PR 后，proposal `verified` 与 verification `passed`
+才生效；archive 仍是后续独立 PR。若合并前 protected main 改变本 change 的 test、
+guard、manifest、workflow 或对应 contract 输入，必须先重放受影响验证，不能从本
+记录推断通过。
