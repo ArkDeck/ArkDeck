@@ -1,5 +1,12 @@
 # CHG-2026-048 Design — MU-3 Bootstrap 与真实 E0
 
+> r2 override（2026-07-29）：§3 的 artifact 四文件落盘/`artifact.*`
+> 读取 bullet 与 §4 fake-integration 的 `artifacts` 环节不再属于本
+> change；该面递延 T14（CHG-2026-049）。
+> T11 在本 change 的闭环是 production descriptor-bound dispatch、
+> succeeded + durable timeline、restart query 与 drift fail-closed。
+> 其余设计不变。
+
 ## 1. T09 Bootstrap(`ArkDeckWorkflows/Bootstrap/`)
 
 ```swift

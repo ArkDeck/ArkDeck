@@ -1,6 +1,6 @@
 # CHG-2026-048 Verification Plan
 
-> Change:CHG-2026-048-bootstrap-and-real-e0@r1
+> Change:CHG-2026-048-bootstrap-and-real-e0@r2
 > Status:planned
 > Core baseline:CORE-2.1.0 (canonical Core AC not claimed)
 
@@ -49,7 +49,7 @@
 - fixture 工具驱动全链:adopt(bootstrap)→ submit(v2,零治理字段)
   → engine → provider lower → dispatcher(**真实 spawn**,identity-bound
   路径,fixture 工具字节)→ 语义 verify → durable journal;
-- daemon stop → 新进程 recover → job/result/artifact 元数据可查;
+- daemon stop → 新进程 recover → job/result/timeline 可查;
 - 治理字段(changeId 等)在 daemon 边界即被拒;
 - descriptor 字节漂移(fixture 工具替换)→ dispatch 拒绝。
 

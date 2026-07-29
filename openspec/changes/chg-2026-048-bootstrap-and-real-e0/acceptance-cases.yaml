@@ -1,7 +1,7 @@
 ---
 schema_version: 1.0.0
 change_id: CHG-2026-048-bootstrap-and-real-e0
-change_revision: 1
+change_revision: 2
 platform: macos
 evidence_classes:
 - contract
@@ -42,9 +42,10 @@ cases:
   expected_source: openspec/changes/chg-2026-048-bootstrap-and-real-e0/verification.md#ber-skel-001
   minimum_evidence: contract
   expected_result: >-
-    Client-to-daemon observe.device@1 produces the four artifacts and a
-    queryable post-restart history; governance fields are rejected;
-    binding or descriptor drift fails closed.
+    Client-to-daemon observe.device@1 reaches succeeded with a full durable
+    timeline and queryable post-restart history; governance fields are
+    rejected; binding or descriptor drift fails closed. Artifact file
+    publication belongs to T14 and is not claimed by this acceptance case.
 - acceptance_id: BER-HW-001
   test_id: TEST-BER-HW-001
   method: >-
