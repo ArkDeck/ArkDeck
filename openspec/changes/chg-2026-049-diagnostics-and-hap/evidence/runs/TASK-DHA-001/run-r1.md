@@ -1,0 +1,75 @@
+# TASK-DHA-001 run r1 — MU-4 垂直交付(contract 面)
+
+- Date:2026-07-29
+- Executor:agent(实现;真机与 E1 capability 属维护者)
+- Base:main `45f03dc`(#784 之后,T11 门槛已关闭)
+- Evidence class:contract / fake integration
+- **Hardware status:`hardware-pending`** —— `DHA-HW-001`/`DHA-HW-002`
+  未主张;后者另需维护者签发的 E1 capability
+
+## 交付面
+
+- **T14 统一 artifact**:`Artifacts/RuntimeArtifactStore.swift` ——
+  内容寻址身份(ID = 内容 SHA-256 前缀,磁盘名即 ID)、完整元数据
+  (job/session/step、hash、privacy、retention、binding snapshot、
+  source operation)、仅 ID/lease 访问(协议面无路径参数)、
+  quota"拒新不毁旧"、GC 跳过 active/pinned、默认脱敏并留痕
+  (`redactionApplied`)、cleanup debt 台账。daemon 增
+  `artifact.list/inspect/read`;引擎在 verify 成功后按 catalog 声明发布
+  产物——**MU-3 递延的 `observe.device@1` 四产物落盘由此补齐**。
+- **T12 `capture.diagnostics@1`**:optional 步骤成为部分成功面;
+  缺失产物以 `missing(reason)` 入索引并在 `capture-summary.json` 逐项
+  列出;finalize 兜底补记"声明了但从未产出"的产物;上游跳过则下游跳过
+  (见下方缺陷);byte budget 与 quota 双层约束。
+- **T13 E1 pack + `debug.hap@1`**:新增 send/install/readback/start/
+  verify/stop/uninstall/port-forward 九个 typed action(全部无路径/argv
+  入参,staging 路径由 provider 铸造);**install 与 start 的 verify 永不
+  返回 `.verified`**——它们把判定交给配对的 readback 步骤,readback 失败
+  即整体失败;E1 capability 一次授权整个 recipe。
+
+## 测试结果
+
+- `swift test` 全量:**631 / 1 skipped / 0 failures**(新增 22 项:
+  RuntimeArtifactContractTests 12、DiagnosticsAndHAPContractTests 9、
+  daemon artifact 协议面 1)
+- `scripts/check-sdd.sh`:0 error / 0 warning / 111 AC
+
+## 实现期抓到的真缺陷(测试驱动,已修)
+
+**采集失败却发布了产物**:trace 采集步骤失败后,下游的
+`receive-trace-artifact` 仍被执行并"成功"发布了 `trace.htrace` ——
+一次失败的采集因此看起来完整。这正是本 change 要防的"部分失败被洗白
+成成功"形态。修法两层:①optional 步骤链显式登记依赖,上游跳过则下游
+跳过;②finalize 阶段兜底补记所有"声明了但索引里没有"的产物,**不依赖
+步骤映射的完整性**(失败的往往正是上游)。下游跳过的原因如实引用上游
+根因,而非复述自身条件。
+
+另修正一条 MU-3 遗留断言:`testHDCActionMappingIsClosedAndFailClosed`
+断言 `installPackage` 无注册 action;T13 实现后该失败模式**移位而非
+消失**(缺 `bundleName` 输入仍被拒),已改写为断言新契约,并补一条
+真正无注册 action 的 kind(`flashPartition`)保持原意图覆盖。
+
+## AC 结论
+
+- `DHA-ART-001` PASS(元数据完整;仅 ID 访问;恶意名与畸形 jobID 均不
+  落盘外;导出拒覆盖并清洗名;sensitive 需 opt-in;脱敏留痕;quota
+  拒新不毁旧;GC 跳过 active/pinned;索引重开后仍在)
+- `DHA-CAP-001` PASS(无 trace 请求 → trace 记 missing 且 summary 逐项
+  标注;trace 失败 → 降级为 missing 且 required 产物照常发布;required
+  产物失败 → 整体不 succeeded)
+- `DHA-HAP-001` PASS(双 readback 齐全才 succeeded;install 干净退出但
+  readback 为空 → 失败且**不启动应用**;start 干净退出但无进程 → 失败;
+  无 capability → 零 dispatch;跨 operation scope → 拒绝;整个 recipe
+  只消耗一次 capability)
+- `DHA-HW-001`/`DHA-HW-002` **未主张(hardware-pending)**
+
+## 偏差与遗留
+
+- `debug.hap@1` 的 `capture-diagnostics` 步骤复用 HiLog action;完整的
+  "嵌套 capture.diagnostics"组合留待 T19 的 AI loop 需要时再评估。
+- artifact `export` 的 daemon 方法未接线(store 层已实现并测试),CLI
+  `artifact export` 随 T20 完整 CLI 一并交付;`artifact list/inspect/read`
+  与 `capability list/install/revoke`、`job submit --request-file` 已随本
+  change 交付并 host 自测(设备窗口需要它们)。
+- retention deadline 目前只在 GC 侧消费,尚未按 operation 声明自动计算
+  到期时间——T24 的可观测性/维护面统一处理。

@@ -31,6 +31,10 @@ struct ArkDeckCommandLine {
         try RuntimeCLI.runDevice(Array(arguments.dropFirst()))
       case "job":
         try RuntimeCLI.runJob(Array(arguments.dropFirst()))
+      case "capability":
+        try RuntimeCLI.runCapability(Array(arguments.dropFirst()))
+      case "artifact":
+        try RuntimeCLI.runArtifact(Array(arguments.dropFirst()))
       default:
         printUsage()
         exit(EX_USAGE)
@@ -540,6 +544,9 @@ struct ArkDeckCommandLine {
         arkdeck device list|show|adopt [--candidate <connect-key>] [--socket <path>] [--json]
         arkdeck job submit --target <id> --operation <id@version> [--wait] [--json]
         arkdeck job status --job <id> [--json] | arkdeck job list [--json]
+        arkdeck job submit --request-file <request.json> [--wait] [--json]
+        arkdeck capability list|install --file <cap.json>|revoke --capability <id> [--json]
+        arkdeck artifact list|inspect|read --job <id> [--artifact <id>] [--allow-sensitive]
 
       doctor/device/job talk only to arkdeck-agentd over its user-private socket: this CLI
       holds no HDC or Rockchip executor and cannot build a device command itself.

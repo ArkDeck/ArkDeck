@@ -363,6 +363,30 @@ final class AgentDaemonContractTests: XCTestCase {
     XCTAssertEqual(recoveredState, "succeeded")
   }
 
+  /// The artifact surface is ID-only by construction: there is no path
+  /// parameter anywhere in the protocol, and a store-less composition
+  /// refuses rather than answering with an empty list (which would read as
+  /// "this job produced nothing").
+  func testArtifactMethodsAreIDOnlyAndFailClosedWithoutAStore() async throws {
+    let (handler, _) = try makeStack()
+    for method in ["artifact.list", "artifact.inspect", "artifact.read"] {
+      let response = await handler.handleFrame(
+        Data(
+          """
+          {"protocolVersion":"1.0.0","id":"a","method":"\(method)",          "params":{"jobId":"job-1","artifactId":"ART-1"}}
+          """.utf8))
+      XCTAssertFalse(response.ok, method)
+      XCTAssertEqual(response.error?.code, "internalError", method)
+      XCTAssertTrue(
+        (response.error?.message ?? "").contains("artifact store"),
+        response.error?.message ?? "-")
+    }
+    // Missing identifiers are refused rather than defaulted.
+    let noJob = await handler.handleFrame(
+      Data("{\"protocolVersion\":\"1.0.0\",\"id\":\"b\",\"method\":\"artifact.list\"}".utf8))
+    XCTAssertFalse(noJob.ok)
+  }
+
   func testWireProtocolCarriesNoArgvSurface() async throws {
     // The strongest injection defense is structural: the entire protocol
     // vocabulary is JSON strings routed to closed methods; assert the

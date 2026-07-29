@@ -29,6 +29,17 @@ public enum HDCProviderAction: Sendable, Equatable {
   case captureTrace(HDCTraceCaptureRequest, into: HDCOwnedRemotePath)
   case receiveOwnedArtifact(HDCOwnedRemoteArtifact)
   case cleanupOwnedRemotePath(HDCOwnedRemotePath)
+  // E1 mutation family (T13). Success for the mutating members is decided
+  // by their paired readback, never by the mutation's own exit code.
+  case sendArtifactToStaging(HDCStagedArtifact)
+  case installPackage(HDCStagedArtifact, bundle: HDCBundleReference)
+  case queryPackageReadback(HDCBundleReference)
+  case startAbility(HDCAbilityReference)
+  case verifyProcessState(HDCBundleReference)
+  case stopAbility(HDCAbilityReference)
+  case uninstallPackage(HDCBundleReference)
+  case createPortForward(HDCPortForwardSpec)
+  case removePortForward(HDCPortForwardSpec)
 }
 
 /// Rockchip actions in MU-2: the one adapter-compat action wrapping the
@@ -49,7 +60,12 @@ public enum TypedProviderAction: Sendable, Equatable {
     case .hdc(.listDeviceCandidates), .hdc(.observeDevice), .hdc(.queryProperty),
       .hdc(.captureHilog), .hdc(.captureUIDump), .hdc(.receiveOwnedArtifact):
       return .readOnly
-    case .hdc(.captureTrace), .hdc(.cleanupOwnedRemotePath):
+    case .hdc(.queryPackageReadback), .hdc(.verifyProcessState):
+      return .readOnly
+    case .hdc(.captureTrace), .hdc(.cleanupOwnedRemotePath),
+      .hdc(.sendArtifactToStaging), .hdc(.installPackage), .hdc(.startAbility),
+      .hdc(.stopAbility), .hdc(.uninstallPackage), .hdc(.createPortForward),
+      .hdc(.removePortForward):
       // Writing/removing the provider-owned remote temp file is a bounded
       // deviceMutation per the step registry; the operation-level effect
       // envelope (capture.diagnostics permitted set) already models it.

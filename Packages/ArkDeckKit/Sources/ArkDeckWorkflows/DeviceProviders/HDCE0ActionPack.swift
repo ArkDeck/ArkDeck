@@ -167,3 +167,79 @@ public enum HDCRemoteCleanupState: Sendable, Equatable {
   case cleaned
   case cleanupDebt(reason: String)
 }
+
+// MARK: - E1 mutation surface (CHG-2026-049, T13)
+
+/// A HAP staged under a provider-owned path. As with the E0 pack, the
+/// remote location is minted by the provider; a caller supplies only an
+/// artifact lease, never a device path.
+public struct HDCStagedArtifact: Sendable, Equatable {
+  public let path: HDCOwnedRemotePath
+  public let artifactLeaseID: String
+  public let expectedSHA256: String?
+
+  package init(path: HDCOwnedRemotePath, artifactLeaseID: String, expectedSHA256: String?) {
+    self.path = path
+    self.artifactLeaseID = artifactLeaseID
+    self.expectedSHA256 = expectedSHA256
+  }
+}
+
+public struct HDCBundleReference: Sendable, Equatable {
+  public let bundleName: String
+
+  public init(bundleName: String) throws {
+    guard !bundleName.isEmpty, bundleName.count <= 200,
+      bundleName.contains("."),
+      bundleName.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "." || $0 == "_") })
+    else {
+      throw HDCE0RequestError.malformed(
+        field: "bundleName", detail: "reverse-DNS identifier expected")
+    }
+    self.bundleName = bundleName
+  }
+}
+
+public struct HDCAbilityReference: Sendable, Equatable {
+  public let bundle: HDCBundleReference
+  public let abilityName: String
+
+  public init(bundle: HDCBundleReference, abilityName: String) throws {
+    guard !abilityName.isEmpty, abilityName.count <= 200,
+      abilityName.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "." || $0 == "_") })
+    else {
+      throw HDCE0RequestError.malformed(field: "abilityName", detail: "identifier expected")
+    }
+    self.bundle = bundle
+    self.abilityName = abilityName
+  }
+}
+
+public struct HDCPortForwardSpec: Sendable, Equatable {
+  public let localPort: Int
+  public let remotePort: Int
+
+  public init(localPort: Int, remotePort: Int) throws {
+    for (value, field) in [(localPort, "localPort"), (remotePort, "remotePort")] {
+      guard (1024...65535).contains(value) else {
+        throw HDCE0RequestError.outOfBounds(field: field, detail: "1024...65535")
+      }
+    }
+    self.localPort = localPort
+    self.remotePort = remotePort
+  }
+}
+
+/// What a package readback found. `installed == false` with a clean exit
+/// is exactly the case that must never be reported as a successful
+/// install - real hardware has shown `hdc install` exiting zero without
+/// having installed anything.
+public struct HDCPackageReadback: Sendable, Equatable {
+  public let bundleName: String
+  public let installed: Bool
+}
+
+public struct HDCProcessReadback: Sendable, Equatable {
+  public let bundleName: String
+  public let running: Bool
+}
