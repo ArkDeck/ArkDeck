@@ -48,12 +48,154 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
       return .hdc(.observeServer)
     case .probeDevice:
       return .hdc(.observeDevice(connectKey: "resolved-by-binding"))
+    case .sendFile, .installPackage, .startApplication, .stopApplication, .uninstallPackage:
+      return try debugHAPAction(for: step, inputs: inputs)
+    case .runApprovedRemoteRead, .verifyRemoteState:
+      // Shared by debug.hap readbacks and future deploy verification;
+      // routed by operation so a step kind never means two things at once.
+      guard descriptorIsDebugHAP(operation) else {
+        throw DeviceProviderError.unsupportedStepKind(
+          "\(step.kind.rawValue) has no registered action for \(operation.reference)")
+      }
+      return try debugHAPAction(for: step, inputs: inputs)
+    case .preflightDeviceStorage:
+      // Device-side preflight for capture: an allowlisted read, not a
+      // generic shell probe.
+      return .hdc(.queryProperty(.productModel))
+    case .captureRemoteStdout:
+      return try captureAction(for: step, inputs: inputs)
+    case .captureRemoteFile:
+      return .hdc(
+        .captureTrace(
+          try traceRequest(from: inputs),
+          into: mintOwnedRemotePath(jobID: "job", stepID: step.stepID)))
+    case .receiveFile:
+      return .hdc(
+        .receiveOwnedArtifact(
+          HDCOwnedRemoteArtifact(
+            path: mintOwnedRemotePath(jobID: "job", stepID: step.stepID),
+            expectedSHA256: nil, maximumBytes: 64 * 1024 * 1024)))
+    case .cleanupOwnedRemotePath:
+      return .hdc(
+        .cleanupOwnedRemotePath(mintOwnedRemotePath(jobID: "job", stepID: step.stepID)))
     case .finalizeSession, .preflightHostStorage, .postprocessArtifact:
       throw DeviceProviderError.unsupportedStepKind(
         "\(step.kind.rawValue) is engine-internal, not a provider action")
     default:
       throw DeviceProviderError.unsupportedStepKind(
         "\(step.kind.rawValue) has no registered HDC action in MU-2 (arrives with T10)")
+    }
+  }
+
+  private func descriptorIsDebugHAP(_ operation: CatalogOperationDescriptor) -> Bool {
+    operation.id == "debug.hap"
+  }
+
+  /// capture.diagnostics@1 and debug.hap@1 both capture stdout; the step
+  /// id says which product is being gathered.
+  private func captureAction(
+    for step: CatalogStepDescriptor, inputs: [String: JSONValue]
+  ) throws -> TypedProviderAction {
+    // Selected by the catalog's declared action, not by step-name
+    // convention: renaming a step must not silently change what runs.
+    // A step with no declared action gets no fallback - guessing one from
+    // the step id is exactly what produced a HiLog intent labelled with a
+    // UI-dump action, and the readiness forbids keeping such a path.
+    guard let actionID = step.actionReference?.actionID else {
+      throw DeviceProviderError.unsupportedAction(
+        "\(step.stepID) declares no catalog action; refusing to infer one")
+    }
+    switch actionID {
+    case "componentTree":
+      return .hdc(.captureUIDump(try HDCUIDumpRequest()))
+    case "boundedHilog":
+      var duration = 30
+      if case .integer(let requested)? = inputs["durationSeconds"] {
+        duration = max(1, min(Int(requested), HDCHilogCaptureRequest.maximumDurationSeconds))
+      } else if case .integer(let requested)? = inputs["diagnosticsDurationSeconds"] {
+        duration = max(1, min(Int(requested), HDCHilogCaptureRequest.maximumDurationSeconds))
+      }
+      var filters: [String] = []
+      if case .array(let requested)? = inputs["hilogFilters"] {
+        filters = requested.compactMap {
+          if case .string(let value) = $0 { return value }
+          return nil
+        }
+      }
+      return .hdc(
+        .captureHilog(try HDCHilogCaptureRequest(durationSeconds: duration, filters: filters)))
+    default:
+      throw DeviceProviderError.unsupportedAction(
+        "unregistered stdout action \(actionID) for \(step.stepID)")
+    }
+  }
+
+  private func traceRequest(from inputs: [String: JSONValue]) throws -> HDCTraceCaptureRequest {
+    var categories = ["ohos"]
+    if case .array(let requested)? = inputs["traceCategories"] {
+      let parsed = requested.compactMap { value -> String? in
+        if case .string(let text) = value { return text }
+        return nil
+      }
+      if !parsed.isEmpty { categories = parsed }
+    }
+    var duration = 10
+    if case .integer(let requested)? = inputs["durationSeconds"] {
+      duration = max(1, min(Int(requested), HDCTraceCaptureRequest.maximumDurationSeconds))
+    }
+    var buffer = 8192
+    if case .integer(let requested)? = inputs["traceBufferKB"] {
+      buffer = max(1024, min(Int(requested), 65536))
+    }
+    return try HDCTraceCaptureRequest(
+      durationSeconds: duration, categories: categories, bufferKB: buffer)
+  }
+
+  /// Maps debug.hap@1's steps onto typed actions. The inputs are the
+  /// catalog-declared ones; nothing here accepts a device path.
+  private func debugHAPAction(
+    for step: CatalogStepDescriptor, inputs: [String: JSONValue]
+  ) throws -> TypedProviderAction {
+    guard case .string(let bundleName)? = inputs["bundleName"] else {
+      throw DeviceProviderError.unsupportedAction("bundleName input is required")
+    }
+    let bundle = try HDCBundleReference(bundleName: bundleName)
+    switch step.kind {
+    case .sendFile:
+      guard case .string(let lease)? = inputs["hapArtifactLease"] else {
+        throw DeviceProviderError.unsupportedAction("hapArtifactLease input is required")
+      }
+      return .hdc(
+        .sendArtifactToStaging(
+          mintStagedArtifact(
+            jobID: "job", stepID: step.stepID, artifactLeaseID: lease, expectedSHA256: nil)))
+    case .installPackage:
+      guard case .string(let lease)? = inputs["hapArtifactLease"] else {
+        throw DeviceProviderError.unsupportedAction("hapArtifactLease input is required")
+      }
+      return .hdc(
+        .installPackage(
+          mintStagedArtifact(
+            jobID: "job", stepID: step.stepID, artifactLeaseID: lease, expectedSHA256: nil),
+          bundle: bundle))
+    case .runApprovedRemoteRead:
+      return .hdc(.queryPackageReadback(bundle))
+    case .startApplication:
+      guard case .string(let abilityName)? = inputs["abilityName"] else {
+        throw DeviceProviderError.unsupportedAction("abilityName input is required")
+      }
+      return .hdc(.startAbility(try HDCAbilityReference(bundle: bundle, abilityName: abilityName)))
+    case .verifyRemoteState:
+      return .hdc(.verifyProcessState(bundle))
+    case .stopApplication:
+      guard case .string(let abilityName)? = inputs["abilityName"] else {
+        throw DeviceProviderError.unsupportedAction("abilityName input is required")
+      }
+      return .hdc(.stopAbility(try HDCAbilityReference(bundle: bundle, abilityName: abilityName)))
+    case .uninstallPackage:
+      return .hdc(.uninstallPackage(bundle))
+    default:
+      throw DeviceProviderError.unsupportedStepKind(step.kind.rawValue)
     }
   }
 
@@ -124,7 +266,77 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
         kind: .process(
           executableSHA256: "resolved-at-dispatch",
           argumentSummary: ["shell", "rm", "-f", path.remotePath], timeoutSeconds: 15))
+    case .sendArtifactToStaging(let staged):
+      return TypedProcessPlan(
+        action: action,
+        kind: .process(
+          executableSHA256: "resolved-at-dispatch",
+          argumentSummary: ["file", "send", "<artifact-lease>", staged.path.remotePath],
+          timeoutSeconds: 300))
+    case .installPackage(let staged, _):
+      return TypedProcessPlan(
+        action: action,
+        kind: .process(
+          executableSHA256: "resolved-at-dispatch",
+          argumentSummary: ["install", staged.path.remotePath], timeoutSeconds: 300))
+    case .queryPackageReadback(let bundle):
+      return TypedProcessPlan(
+        action: action,
+        kind: .process(
+          executableSHA256: "resolved-at-dispatch",
+          argumentSummary: ["shell", "bm", "dump", "-n", bundle.bundleName],
+          timeoutSeconds: 30))
+    case .startAbility(let ability):
+      return TypedProcessPlan(
+        action: action,
+        kind: .process(
+          executableSHA256: "resolved-at-dispatch",
+          argumentSummary: [
+            "shell", "aa", "start", "-b", ability.bundle.bundleName, "-a", ability.abilityName,
+          ], timeoutSeconds: 60))
+    case .verifyProcessState(let bundle):
+      return TypedProcessPlan(
+        action: action,
+        kind: .process(
+          executableSHA256: "resolved-at-dispatch",
+          argumentSummary: ["shell", "pidof", bundle.bundleName], timeoutSeconds: 30))
+    case .stopAbility(let ability):
+      return TypedProcessPlan(
+        action: action,
+        kind: .process(
+          executableSHA256: "resolved-at-dispatch",
+          argumentSummary: ["shell", "aa", "force-stop", ability.bundle.bundleName],
+          timeoutSeconds: 60))
+    case .uninstallPackage(let bundle):
+      return TypedProcessPlan(
+        action: action,
+        kind: .process(
+          executableSHA256: "resolved-at-dispatch",
+          argumentSummary: ["uninstall", bundle.bundleName], timeoutSeconds: 120))
+    case .createPortForward(let spec):
+      return TypedProcessPlan(
+        action: action,
+        kind: .process(
+          executableSHA256: "resolved-at-dispatch",
+          argumentSummary: ["fport", "tcp:\(spec.localPort)", "tcp:\(spec.remotePort)"],
+          timeoutSeconds: 30))
+    case .removePortForward(let spec):
+      return TypedProcessPlan(
+        action: action,
+        kind: .process(
+          executableSHA256: "resolved-at-dispatch",
+          argumentSummary: ["fport", "rm", "tcp:\(spec.localPort)"], timeoutSeconds: 30))
     }
+  }
+
+  /// Mints a provider-owned staging path for an artifact lease. As with
+  /// remote temp paths, the caller never supplies a device location.
+  public func mintStagedArtifact(
+    jobID: String, stepID: String, artifactLeaseID: String, expectedSHA256: String?
+  ) -> HDCStagedArtifact {
+    HDCStagedArtifact(
+      path: mintOwnedRemotePath(jobID: jobID, stepID: stepID),
+      artifactLeaseID: artifactLeaseID, expectedSHA256: expectedSHA256)
   }
 
   /// Mints a provider-owned remote temp path bound to job/step. The only
@@ -260,6 +472,72 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
         return .failed(code: "cleanupDebt", detail: "remote cleanup failed for \(path.remotePath)")
       }
       return .verified(summary: ["cleaned": path.remotePath])
+
+    case .sendArtifactToStaging(let staged):
+      guard receipt.exitStatus == 0 else {
+        return .failed(code: "sendFailed", detail: "artifact transfer did not complete")
+      }
+      return .verified(summary: ["stagedAt": staged.path.remotePath])
+
+    case .installPackage:
+      // Deliberately never `.verified`: an install is only as true as its
+      // readback, and hardware has shown `hdc install` exiting zero
+      // without installing. The orchestration requires the paired
+      // queryPackageReadback step to decide.
+      guard receipt.exitStatus != nil else {
+        return .unknown(reason: "install produced no process result")
+      }
+      return .unknown(reason: "install requires package readback before it can be believed")
+
+    case .queryPackageReadback(let bundle):
+      guard !receipt.stdoutTruncated else {
+        return .failed(code: "truncated", detail: "package readback exceeded its budget")
+      }
+      guard let text = String(data: receipt.stdout, encoding: .utf8) else {
+        return .failed(code: "invalidEncoding", detail: "package readback is not UTF-8")
+      }
+      let installed = text.contains(bundle.bundleName)
+      guard installed else {
+        return .failed(
+          code: "packageNotInstalled",
+          detail: "readback does not list \(bundle.bundleName)")
+      }
+      return .verified(summary: ["bundleName": bundle.bundleName, "installed": "true"])
+
+    case .startAbility:
+      guard receipt.exitStatus != nil else {
+        return .unknown(reason: "start produced no process result")
+      }
+      return .unknown(reason: "start requires process readback before it can be believed")
+
+    case .verifyProcessState(let bundle):
+      guard let text = String(data: receipt.stdout, encoding: .utf8) else {
+        return .failed(code: "invalidEncoding", detail: "process readback is not UTF-8")
+      }
+      let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+      guard !trimmed.isEmpty, trimmed.rangeOfCharacter(from: .decimalDigits) != nil else {
+        return .failed(
+          code: "processNotRunning", detail: "no live process for \(bundle.bundleName)")
+      }
+      return .verified(summary: ["bundleName": bundle.bundleName, "running": "true"])
+
+    case .stopAbility(let ability):
+      guard receipt.exitStatus == 0 else {
+        return .failed(code: "stopFailed", detail: "could not stop \(ability.bundle.bundleName)")
+      }
+      return .verified(summary: ["stopped": ability.bundle.bundleName])
+
+    case .uninstallPackage(let bundle):
+      guard receipt.exitStatus == 0 else {
+        return .failed(code: "uninstallFailed", detail: "could not uninstall \(bundle.bundleName)")
+      }
+      return .verified(summary: ["uninstalled": bundle.bundleName])
+
+    case .createPortForward(let spec), .removePortForward(let spec):
+      guard receipt.exitStatus == 0 else {
+        return .failed(code: "portForwardFailed", detail: "tcp:\(spec.localPort)")
+      }
+      return .verified(summary: ["localPort": String(spec.localPort)])
     }
   }
 
@@ -277,11 +555,20 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
       .hdc(.captureUIDump), .hdc(.receiveOwnedArtifact):
       // Read-only families: re-observation is always safe.
       return .confirmedNotExecuted
+    case .hdc(.queryPackageReadback), .hdc(.verifyProcessState):
+      return .confirmedNotExecuted
     case .hdc(.captureTrace), .hdc(.cleanupOwnedRemotePath):
       // Remote-temp mutations reconcile by re-listing the owned path in a
       // later read; without that evidence the outcome stays unknown.
       return .stillUnknown(
         reason: "owned-path mutation needs a re-observation pass to conclude")
+    case .hdc(.sendArtifactToStaging), .hdc(.installPackage), .hdc(.startAbility),
+      .hdc(.stopAbility), .hdc(.uninstallPackage), .hdc(.createPortForward),
+      .hdc(.removePortForward):
+      // Device mutations need positive readback evidence to conclude; a
+      // reconcile pass that has none must stay unknown rather than guess.
+      return .stillUnknown(
+        reason: "device mutation needs a readback pass before it can be concluded")
     default:
       return .stillUnknown(reason: "no reconcile evidence source for \(intent.action)")
     }

@@ -177,11 +177,15 @@ Task.detached {
         targetStore: targetStore, executablePath: configuredHDC ?? "-",
         executableSHA256: executableSHA))
     let providers = DeviceProviderRegistry(providers: [provider])
+    let artifactStore = try RuntimeArtifactStore(
+      rootURL: resolvedStateDirectory.appendingPathComponent("artifacts", isDirectory: true),
+      nowUTC: utcNow)
     let engine = try RuntimeJobEngine(
       configuration: .init(stateDirectory: resolvedStateDirectory),
       providers: providers,
       dispatcher: dispatcher,
       capabilityStore: capabilityStore,
+      artifactStore: artifactStore,
       nowUTC: utcNow)
     let bootstrap = DeviceBootstrapMachine(
       observation: ProviderBootstrapObservation(provider: provider, dispatcher: dispatcher),
@@ -198,7 +202,8 @@ Task.detached {
       providerIDs: providers.registeredProviderIDs,
       nowUTC: utcNow,
       targetStore: targetStore,
-      bootstrap: bootstrap)
+      bootstrap: bootstrap,
+      artifactStore: artifactStore)
     let server = AgentDaemonServer(
       stateDirectory: resolvedStateDirectory, handler: handler, nowUTC: utcNow)
     switch try server.start() {

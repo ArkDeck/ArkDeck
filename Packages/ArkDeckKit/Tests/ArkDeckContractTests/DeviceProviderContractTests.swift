@@ -56,10 +56,21 @@ final class DeviceProviderContractTests: XCTestCase {
     } else {
       XCTFail("probeDevice must map to observeDevice")
     }
-    // A mutation kind has no HDC action in MU-2: fail closed, never guess.
+    // T13 (CHG-2026-049) implemented the mutation family, so the failure
+    // mode moved rather than disappeared: an install without its declared
+    // inputs is still refused, never guessed at.
     let debug = try XCTUnwrap(RuntimeOperationCatalog.descriptor(reference: "debug.hap@1"))
     let install = debug.steps.first { $0.kind == .installPackage }!
     XCTAssertThrowsError(try hdc.action(for: install, operation: debug, inputs: [:])) { error in
+      guard case DeviceProviderError.unsupportedAction(let detail) = error else {
+        return XCTFail("expected unsupportedAction, got \(error)")
+      }
+      XCTAssertTrue(detail.contains("bundleName"), detail)
+    }
+    // A kind with no registered action at all still fails closed.
+    let flash = try XCTUnwrap(RuntimeOperationCatalog.descriptor(reference: "flash.dayu200@1"))
+    let flashStep = flash.steps.first { $0.kind == .flashPartition }!
+    XCTAssertThrowsError(try hdc.action(for: flashStep, operation: flash, inputs: [:])) { error in
       guard case DeviceProviderError.unsupportedStepKind = error else {
         return XCTFail("expected unsupportedStepKind, got \(error)")
       }

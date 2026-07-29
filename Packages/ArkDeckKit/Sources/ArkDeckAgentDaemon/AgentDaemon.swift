@@ -67,6 +67,10 @@ public struct RuntimeControlPlaneHandler: Sendable {
   private let nowUTC: @Sendable () -> String
   private let targetStore: RuntimeTargetStore?
   private let bootstrap: DeviceBootstrapMachine?
+  private let artifactStore: RuntimeArtifactStore?
+  /// Test seam: records which methods a client invoked. Production passes
+  /// nil, so this cannot affect behaviour.
+  private let methodObserver: (@Sendable (String) -> Void)?
 
   public init(
     engine: RuntimeJobEngine,
@@ -74,7 +78,9 @@ public struct RuntimeControlPlaneHandler: Sendable {
     providerIDs: [String],
     nowUTC: @escaping @Sendable () -> String,
     targetStore: RuntimeTargetStore? = nil,
-    bootstrap: DeviceBootstrapMachine? = nil
+    bootstrap: DeviceBootstrapMachine? = nil,
+    artifactStore: RuntimeArtifactStore? = nil,
+    methodObserver: (@Sendable (String) -> Void)? = nil
   ) {
     self.engine = engine
     self.capabilityStore = capabilityStore
@@ -82,6 +88,8 @@ public struct RuntimeControlPlaneHandler: Sendable {
     self.nowUTC = nowUTC
     self.targetStore = targetStore
     self.bootstrap = bootstrap
+    self.artifactStore = artifactStore
+    self.methodObserver = methodObserver
   }
 
   public func handleLine(_ line: Data) async -> Data {
@@ -109,6 +117,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
   }
 
   private func dispatch(_ request: AgentWireProtocol.Request) async -> AgentWireProtocol.Response {
+    methodObserver?(request.method)
     switch request.method {
     case "health":
       return success(
@@ -269,6 +278,80 @@ public struct RuntimeControlPlaneHandler: Sendable {
       }
       return success(id: request.id, result: .object(report))
 
+    case "artifact.list":
+      guard let artifactStore else {
+        return failure(
+          id: request.id, code: .internalError, message: "artifact store is not configured")
+      }
+      guard case .string(let jobID)? = request.params?["jobId"] else {
+        return failure(id: request.id, code: .invalidParams, message: "jobId is required")
+      }
+      do {
+        let artifacts = try await artifactStore.list(jobID: jobID)
+        return success(
+          id: request.id,
+          result: .array(artifacts.map(Self.encodeArtifact)))
+      } catch {
+        return failure(id: request.id, code: .internalError, message: "\(error)")
+      }
+
+    case "artifact.inspect":
+      guard let artifactStore else {
+        return failure(
+          id: request.id, code: .internalError, message: "artifact store is not configured")
+      }
+      guard case .string(let jobID)? = request.params?["jobId"],
+        case .string(let artifactID)? = request.params?["artifactId"]
+      else {
+        return failure(
+          id: request.id, code: .invalidParams, message: "jobId and artifactId are required")
+      }
+      do {
+        let metadata = try await artifactStore.inspect(jobID: jobID, artifactID: artifactID)
+        return success(id: request.id, result: Self.encodeArtifact(metadata))
+      } catch {
+        return failure(id: request.id, code: .notFound, message: "\(error)")
+      }
+
+    case "artifact.read":
+      guard let artifactStore else {
+        return failure(
+          id: request.id, code: .internalError, message: "artifact store is not configured")
+      }
+      guard case .string(let jobID)? = request.params?["jobId"],
+        case .string(let artifactID)? = request.params?["artifactId"]
+      else {
+        return failure(
+          id: request.id, code: .invalidParams, message: "jobId and artifactId are required")
+      }
+      var maximumBytes = 1 << 20
+      if case .integer(let requested)? = request.params?["maxBytes"] {
+        maximumBytes = max(1, min(Int(requested), 1 << 22))
+      }
+      var allowSensitive = false
+      if case .bool(let flag)? = request.params?["allowSensitive"] { allowSensitive = flag }
+      do {
+        let data = try await artifactStore.read(
+          jobID: jobID, artifactID: artifactID, maximumBytes: maximumBytes,
+          allowSensitive: allowSensitive)
+        return success(
+          id: request.id,
+          result: .object([
+            "artifactId": .string(artifactID),
+            "byteCount": .integer(Int64(data.count)),
+            "base64": .string(data.base64EncodedString()),
+          ]))
+      } catch let error as RuntimeArtifactError {
+        if case .sensitiveAccessRequiresOptIn = error {
+          return failure(
+            id: request.id, code: .rejected,
+            message: "artifact is sensitive; pass allowSensitive to read it")
+        }
+        return failure(id: request.id, code: .notFound, message: "\(error)")
+      } catch {
+        return failure(id: request.id, code: .internalError, message: "\(error)")
+      }
+
     case "target.list":
       guard let targetStore else {
         return failure(
@@ -334,6 +417,33 @@ public struct RuntimeControlPlaneHandler: Sendable {
       return failure(
         id: request.id, code: .unknownMethod, message: "unknown method \(request.method)")
     }
+  }
+
+  private static func encodeArtifact(_ metadata: RuntimeArtifactMetadata) -> JSONValue {
+    var status = "published"
+    var detail: JSONValue = .null
+    switch metadata.status {
+    case .published: break
+    case .missing(let reason):
+      status = "missing"
+      detail = .string(reason)
+    case .truncated(let atBytes):
+      status = "truncated"
+      detail = .integer(Int64(atBytes))
+    }
+    return .object([
+      "artifactId": .string(metadata.artifactID),
+      "name": .string(metadata.name),
+      "mediaType": .string(metadata.mediaType),
+      "byteCount": .integer(Int64(metadata.byteCount)),
+      "sha256": .string(metadata.sha256),
+      "privacy": .string(metadata.privacy.rawValue),
+      "status": .string(status),
+      "statusDetail": detail,
+      "sourceOperation": .string(metadata.sourceOperation),
+      "createdAtUtc": .string(metadata.createdAtUTC),
+      "redactionApplied": .bool(metadata.redactionApplied),
+    ])
   }
 
   private static func encodeStatus(_ status: RuntimeJobStatus) -> JSONValue {
