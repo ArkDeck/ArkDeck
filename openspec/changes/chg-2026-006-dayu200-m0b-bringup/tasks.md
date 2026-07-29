@@ -47,13 +47,96 @@
 
 ## TASK-M0B-002 — ArkDeck HDC supervisor 真机只读观察
 
-- Status:blocked(fresh readiness r2 audit,2026-07-28;仅在维护者 review/merge
-  本独立 readiness PR 后生效。CHG-2026-022 已 verified，原四项暴露面缺口均有
-  host-only 交付；但 production App 的同一个 selected `HDCCandidate` 无法同时
-  命中 ownership/generation 的 3.2.0d registry 与 device fan-out 的 3.2.0f
-  registry。当前唯一 declared-path HDC 又已静态漂移到 3.2.0f。现有 AC /
-  matrix 未授权把两个 tool/session 的结果拼成一次 supervisor 真机观察，证据
-  因而仍不可二值判定；本任务保持 blocked，零 HDC/device dispatch。)
+- Status:blocked(fresh readiness r3 audit,2026-07-29;仅在维护者 review/merge
+  本独立 readiness PR 后生效。CHG-2026-043 已 verified，r2 的 exact
+  3.2.0d/3.2.0f 单候选冲突已解除；但 production App 只在 view `.task` 启动时
+  调用一次 diagnostics `refresh()`，HDC UI 没有可达的显式 refresh action。
+  选择 executable、recovery preview/confirm 等现有 UI 动作只读取
+  `currentEvents()`，不会在同一 device-observation session 再 poll。因而一次
+  人类 App 窗口不能同时取得 Connected→`appeared` 与 Offline→`disappeared`
+  的差分证据，`HW-M0B-DAYU200-SUPERVISOR-001` 仍不可二值判定；本任务保持
+  blocked，零 HDC/device/window dispatch。)
+- Fresh readiness r3 audit(2026-07-29；host-only static/source/build audit，base =
+  protected main `7a7f9db3de389b94c72e9a0d0a57fe4e0c488788`):
+  - **Approval/dependency/remediation gate:satisfied,但不充分。**CHG-2026-043
+    verification-only PR #762 exact head
+    `60cac06c995345abf036079a7492c0770d4109e3` 由维护者 `lvye`
+    APPROVED 后 merge 为本 audit base；其 proposal/verification current blobs =
+    `2c124bd781c4efba5da71b1349cdb23979e04325` /
+    `abebdd8b72a7d57cd9e14eed9ac755b1526593b1`，状态为
+    `verified` / `passed`。TASK-HSO-001/002 均 done，run blobs =
+    `db56cd004dd78295ab7129ee01f4f658cba71c9c` /
+    `ba399ffb99dc3d67808c2500bcafb16ff3ff9047`。原依赖
+    TASK-M1-006 与 TASK-M0B-001 的 done 结论未漂移；#762 后至 current base
+    唯一新增 commit 为 #763 exact head
+    `8f3f791ba937e0b7fd88118e249dae4bea4bcdf4` / merge
+    `7a7f9db3de389b94c72e9a0d0a57fe4e0c488788`，只修改 CHG-2026-025 的
+    proposal/tasks/verification/evidence，与本 task/readiness/product 输入零交集。
+  - **Exact tool/registry gate:satisfied statically。**SDK 扫描只找到
+    `/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/toolchains/hdc`；
+    未启动 executable 的 SHA-256 =
+    `05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83`，
+    `codesign --verify --strict` PASS。它逐字命中 exact 3.2.0f supervisor 与
+    device registries；canonical supervisor/device/readonly blobs =
+    `b202b9d34680a0e7bbdba1d02637279ca4819d3f` /
+    `399c5a102c7737bf6466e8a2c4c6a1d1b1bc0b6a` /
+    `99e8cc3d9929f9502a3e978a53cd56ad285d2aad`，三者 authority 继续分离，
+    未把 3.2.0d facts 拼入本候选。
+  - **Single-candidate supervisor path:satisfied statically。**production facade /
+    supervisor observer / HDC production blobs =
+    `fa0bc651382c9b5d1a36a46c59a11af65bc84249` /
+    `589dfec329044b58f4fefec3a70d4af7f9cfd15e` /
+    `c7f71e5af90bc3d468d5f0817734d297f0c339a2`。一次
+    `attachSessionIfConfigured()` 只 discovery 一个 candidate/endpoint；exact
+    3.2.0f candidate 进入 commandless supervisor observation，再由同一 local
+    value 构造 device session。稳定 receipt 只进入既有 four-evidence
+    classifier；health/version 保持 typed unknown；supervisor identity leg 的 HDC
+    child/lifecycle/subserver/device mutation 均为 0。r2 的 hard blocker 已实质解除。
+  - **Production refresh reachability:blocked。**App composition root
+    `ArkDeckApp.swift` blob
+    `1ec424df02550cc9f79780b7a4b61af28d7faf30` 只在 `AppShellView.task`
+    调用一次 `hdcDiagnostics.refresh()`；`HDCStatusView.swift` blob
+    `476769d4b5b242a91b2bb4d0661cdb0fb7359d44` 没有 diagnostics refresh
+    callback/button。Workflows 只有 public provider `refresh()` 会调用
+    `deviceObservationSession.refresh()`；选择 executable 会清空/替换 session 后
+    只 overlay `currentEvents()`，recovery preview/confirm/dispatch 也只 overlay
+    current events。contract DP14 证明同一 actor 被连续显式调用时可以逐次 poll，
+    但 App 用户没有到第二次调用的 production route。
+  - **AC consequence:blocked。**registered 3.2.0f presence rule 要用同一 session 的
+    连续 snapshots 才能把 Connected 集合差分为 `appeared`，再把全 Offline
+    差分为 `disappeared`。单次 startup refresh 至多产生其中一边；重启 App、
+    重建 window、重选 executable 或跨 session 拼接均会重置 session/buffer/HMAC，
+    且权威文件没有把这些未定义生命周期技巧登记为观察方法。fixture、直接调用
+    private view model、contract fake 或两个 session 拼接都不能充当 realHardware
+    App 证据。ownership、两项仪表计数、endpoint source 与现有单次 device event
+    虽可展示，缺 `disappeared` 仍使整条 Test ID FAIL/不可判定。
+  - **Build/revalidation:**macOS 26.6(25G72)/arm64、Xcode 26.6(17F113)、
+    Apple Swift 6.3.3；与 current base 产品树逐字相同的 #762 merge base 上，
+    ad-hoc signed Debug App build PASS，
+    `codesign --verify --deep --strict` PASS，arm64 executable SHA-256
+    `0a908f0a9e47c00f7fbb0e1020baac4d012392e72c98defd560eaec5e2ad4bbc`
+    （仅 readiness compile proof，不是后续 hardware execution pin/support
+    artifact）。四个 HDC 聚焦 suites = 114/114 PASS；ArkDeckKit 全量 =
+    506 tests / 1 个既有人工 sleep-wake skip / 0 failures / 0 unexpected；
+    `check-sdd` = 0 errors / 0 warnings / 111 acceptance IDs，
+    checker/path contracts = 56/56 与 50/50 PASS；`git diff --check` PASS。
+  - **Execution boundary:**installed HDC process、HDC server lifecycle、App
+    production launch、device discovery/identity、USB/device、App/product
+    non-loopback network、mutation、destructive dispatch 均为 0；未声称 DAYU200
+    当前在线或固件未漂移，未创建、安排或消费 named D2 window。HDC 检查仅为
+    filesystem hash/codesign；GitHub control-plane 审计不计入产品执行面。
+  - **Unblock gate:**须先由独立 approved change 在 production HDC UI 增加明确的
+    user-triggered diagnostics refresh route，并以 signed App contract 证明每次动作
+    复用同一 selected candidate/endpoint/device-observation session、至多执行一次
+    已登记的 `list targets -v`、能在同一 bounded buffer 形成
+    appeared→disappeared，且无 timer/background poll、第二 discovery/candidate、
+    fixture 或 lifecycle/mutation 扩权。该 remediation done/verified 后仍须另起
+    fresh D2 readiness，在当时 current main 重钉 signed App build、exact HDC
+    tuple、DAYU200 identity/firmware/USB 与 named exclusive human-operated window。
+  - **PR boundary:**本 readiness 载体只修改本 `tasks.md` 的 TASK-M0B-002 段；
+    不修改 proposal/design/verification/acceptance、product/test、integration/
+    platform profile、hardware-matrix 或既有 evidence，不自行夹带 remediation
+    proposal。下方 r2/r1 记录保留为历史。
 - Fresh readiness r2 audit(2026-07-28;host-only static/source audit，base =
   protected main `80ce41e2eea89b1746cfb49fa6cdda1033a5bc8e`):
   - **Approval/dependency gate:satisfied,但不充分。**CHG-2026-022 的三个任务均
