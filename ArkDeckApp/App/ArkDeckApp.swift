@@ -55,6 +55,8 @@ private struct AppShellView: View {
             .foregroundStyle(.secondary)
           HDCStatusView(
             presentation: hdcDiagnostics.presentation,
+            onRefresh: hdcDiagnostics.refresh,
+            isRefreshInFlight: hdcDiagnostics.isRefreshInFlight,
             onRequestRecoveryImpactPreview: hdcDiagnostics.requestRecoveryImpactPreview,
             onConfirmRecoveryImpactPreview: hdcDiagnostics.confirmRecoveryImpactPreview,
             onDispatchConfirmedRecovery: hdcDiagnostics.dispatchConfirmedRecoveryAction,
@@ -260,6 +262,7 @@ private struct FinderUpdateArtifactRevealer: UpdateArtifactRevealing {
 private final class HDCStatusViewModel: ObservableObject {
   @Published private(set) var presentation: HDCDiagnosticsPresentation = .loading
   @Published private(set) var configurationError: String?
+  @Published private(set) var isRefreshInFlight = false
   let lifecycleDispatchIsProductionComposed: Bool
   private let provider: any HDCApplicationDiagnosticsProviding
 
@@ -269,7 +272,16 @@ private final class HDCStatusViewModel: ObservableObject {
   }
 
   func refresh() {
-    load { provider in await provider.refresh() }
+    guard !isRefreshInFlight else { return }
+    isRefreshInFlight = true
+    let provider = provider
+    Task { [weak self] in
+      let next = await provider.refresh()
+      guard let self else { return }
+      defer { self.isRefreshInFlight = false }
+      guard !Task.isCancelled else { return }
+      self.presentation = next
+    }
   }
 
   func requestRecoveryImpactPreview() {
@@ -290,6 +302,7 @@ private final class HDCStatusViewModel: ObservableObject {
   }
 
   func selectUserConfiguredExecutable(_ url: URL) {
+    guard !isRefreshInFlight else { return }
     let provider = provider
     Task { [weak self] in
       do {

@@ -305,20 +305,32 @@ private actor HDCFixtureApplicationDiagnostics: HDCApplicationDiagnosticsProvidi
   private let denied: Bool
   private let timedOut: Bool
   private let criticalGate: Bool
+  private let delayedRefresh: Bool
   private var recovery: HDCLifecycleRecoveryPresentation
+  private var refreshCallCount = 0
+  private var latestCompletedRefreshCallCount = 0
 
   init(arguments: [String]) {
     keyAccessDenied = arguments.contains("--ui-test-hdc-key-access-denied")
     denied = arguments.contains("--ui-test-hdc-denied")
     timedOut = arguments.contains("--ui-test-hdc-timed-out")
     criticalGate = arguments.contains("--ui-test-hdc-critical-gate")
+    delayedRefresh = arguments.contains("--ui-test-hdc-refresh-delay")
     recovery =
       arguments.contains("--ui-test-hdc-impact-preview")
       ? .preview(Self.fixturePreview())
       : .unavailable(reason: "No recovery impact preview has been requested")
   }
 
-  func refresh() async -> HDCDiagnosticsPresentation { presentation() }
+  func refresh() async -> HDCDiagnosticsPresentation {
+    refreshCallCount += 1
+    let acceptedCall = refreshCallCount
+    if delayedRefresh, acceptedCall == 2 {
+      try? await Task.sleep(for: .seconds(10))
+    }
+    latestCompletedRefreshCallCount = max(latestCompletedRefreshCallCount, acceptedCall)
+    return presentation()
+  }
 
   func requestRecoveryImpactPreview() async -> HDCDiagnosticsPresentation {
     recovery = .preview(Self.fixturePreview())
@@ -381,17 +393,27 @@ private actor HDCFixtureApplicationDiagnostics: HDCApplicationDiagnosticsProvidi
       criticalGateMessage: criticalGate
         ? "Blocked by Job job-hdc, Step flash-system. Wait for the flash checkpoint safe boundary."
         : nil,
-      deviceEvents: [
-        HDCDeviceObservationPresentationEvent(
-          acceptedAt: Date(timeIntervalSince1970: 1_785_196_800),
-          kind: .appeared,
-          redactedDeviceIdentifier: "redacted-device-0123456789abcdef01234567"),
-        HDCDeviceObservationPresentationEvent(
-          acceptedAt: Date(timeIntervalSince1970: 1_785_196_801),
-          kind: .disappeared,
-          redactedDeviceIdentifier: "redacted-device-0123456789abcdef01234567"),
-      ])
+      deviceEvents: Array(
+        Self.fixtureDeviceEvents.prefix(
+          min(
+            max(latestCompletedRefreshCallCount, 1),
+            Self.fixtureDeviceEvents.count))))
   }
+
+  private static let fixtureDeviceEvents = [
+    HDCDeviceObservationPresentationEvent(
+      acceptedAt: Date(timeIntervalSince1970: 1_785_196_800),
+      kind: .appeared,
+      redactedDeviceIdentifier: "redacted-device-0123456789abcdef01234567"),
+    HDCDeviceObservationPresentationEvent(
+      acceptedAt: Date(timeIntervalSince1970: 1_785_196_801),
+      kind: .disappeared,
+      redactedDeviceIdentifier: "redacted-device-0123456789abcdef01234567"),
+    HDCDeviceObservationPresentationEvent(
+      acceptedAt: Date(timeIntervalSince1970: 1_785_196_802),
+      kind: .observationUnknown,
+      redactedDeviceIdentifier: nil),
+  ]
 
   private static func fixturePreview() -> HDCServerLifecycleImpactPreview {
     HDCServerLifecycleImpactPreview(
