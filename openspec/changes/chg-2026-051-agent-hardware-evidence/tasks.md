@@ -2,8 +2,8 @@
 
 ## TASK-AHE-001 — Promote V3 and close trusted Runtime evidence projection
 
-- Status:ready（仅在 r5 proposal PR 被维护者 review + merge 后生效；合并前 current
-  main 的 r4 任务因下述 schema/crash-fixture parity stop condition 保持 blocked）
+- Status:ready（仅在 r6 proposal PR 被维护者 review + merge 后生效；合并前 current
+  main 的 r5 任务因 generator Allowed-path 漏项保持 blocked）
 - Historical Status:blocked（r1 开工后审计发现唯一生产 facts port 与 Catalog
   preflight 不可闭合 model/firmware/transport/fresh time；r2 开工后审计发现
   `runApprovedRemoteRead` actionRef 无法由 current Catalog schema/generator 表达，
@@ -11,18 +11,19 @@
   `WorkflowStep.runApprovedRemoteRead` 的独立 sealed action registry 不接受新增
   `deviceModel` / `firmwareBuild`，且源码/测试不在 Allowed paths；r4 合入后预检发现
   workflow-step JSON Schema 仍为旧 allowlist，且 engine crash fixture 无法到达原
-  WAL crash point，两者也不在 Allowed paths）
+  WAL crash point，两者也不在 Allowed paths；r5 最终审计发现两个已批准且
+  exact-pinned 的 generator source/test 文件未列入 Allowed paths）
 - Grade:D1
 - Platform:macos
 - Requirements:`REQ-WF-004`
 - Acceptance:`AC-WF-004-01`、`AC-WF-004-02`、`AC-WF-004-03`
 - Depends on:
-  - r5 proposal PR 合并；
+  - r6 proposal PR 合并；
   - `CHG-2026-046` archived；
   - `CHG-2026-049/TASK-DHA-001` implementation 已合入；
   - `CHG-2026-025/TASK-AIN-002` done（只作为 schema migration 输入，不借用其
     scoped delta）
-- Readiness base:`76c4607f6ac331ac82ddc05f0362d76c34093855`
+- Readiness base:`40712017d248f4d0ae36a3d660e17d6f22f5ac54`
 - Readiness input pins:
 
   ```yaml pins
@@ -182,6 +183,8 @@
   - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/WorkflowStepContractTests.swift`
   - `Packages/ArkDeckKit/Tests/ArkDeckFakeHDCFixture/main.swift`
   - `Packages/ArkDeckKit/Tests/ArkDeckEngineCrashFixture/main.swift`
+  - `scripts/catalog_gen/generate.py`
+  - `scripts/catalog_gen/test_generate.py`
   - `openspec/changes/chg-2026-051-agent-hardware-evidence/**`
 - Forbidden paths:
   - `openspec/constitution.md`
@@ -238,7 +241,7 @@
 
 ### Stop conditions
 
-- 需要改变 r5 已列明之外的 Catalog operation/effect/typed step 或 provider/profile
+- 需要改变 r6 已列明之外的 Catalog operation/effect/typed step 或 provider/profile
   语义；
 - 需要修改 E2 execution policy、创建/修改 capability/authorization；
 - model/firmware/confirmation/step/artifact 任一事实只能由 caller 提供；
@@ -253,5 +256,5 @@
 实现完成后在 `evidence/runs/TASK-AHE-001/` 追加 run 记录。change verified/archive
 后，`CHG-2026-049` 仍须 fresh readiness 和新 E0 run；不得复用 attempt#2。
 r1/r2 scope 下的未完成代码只作为本地可恢复 WIP，不是 run evidence、实现提交或
-Acceptance 结论；r5 合入后必须在 fresh base 重放并按完整 Catalog contract +
+Acceptance 结论；r6 合入后必须在 fresh base 重放并按完整 Catalog contract +
 typed preflight 设计复审。
