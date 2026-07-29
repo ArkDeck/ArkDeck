@@ -2755,8 +2755,14 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
 
 ## TASK-AIN-010P — Agent E0 registration capture for OpenHarmony probes
 
-- Status:blocked（r5 scope proposal；CHG-2026-043 TASK-HSO-002 已由 #760
-  implementation + #761 done 合入，但仅在维护者 review/merge r5 后建立本任务，
+- Status:blocked（2026-07-29 fresh r1 readiness：r5 已由 #763 exact-head review
+  后合入，但当前 host 没有可由 production resolver 解引用的 durable HDC binding，
+  ArkDeck 的 HDC 配置仍指向已不存在的旧 fake fixture，且 exact 3.2.0f existing
+  server/listener 不存在；因此 device/build tuple、binding revision 与 machine target
+  confirmation 无法固定。任务不转 ready、不运行 HDC/device；记录 =
+  `evidence/runs/TASK-AIN-010P/readiness-blocked-r1.md`）
+- Historical Status:blocked（r5 scope proposal；CHG-2026-043 TASK-HSO-002 已由
+  #760 implementation + #761 done 合入，但仅在维护者 review/merge r5 后建立本任务，
   之后仍须 fresh D1 readiness。proposal 不批准 exact argv/设备 tuple，不构成
   integration support 或 device dispatch authority）
 - Platform:macos
@@ -2801,6 +2807,55 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
 - Hardware required:yes（readiness-pinned OpenHarmony device/HDC；人工只允许接线/
   供电、解锁/信任、系统权限/凭据配置与物理断连恢复，Agent 执行全部命令）
 - Decision-Grade:D1
+
+### Readiness audit r1（2026-07-29，blocked）
+
+- **Approval/dependency/collision gate:satisfied。**r5 PR #763 exact head
+  `8f3f791ba937e0b7fd88118e249dae4bea4bcdf4` 经维护者 `lvye` APPROVED，以
+  protected-main merge `7a7f9db3de389b94c72e9a0d0a57fe4e0c488788` 合入；
+  TASK-AIN-010 与 CHG-2026-043 TASK-HSO-002 均已 done。审计时 open PR 数为 0，
+  三个 allowed new-source 目录、task-local test 与本 task run 目录均不存在，无
+  new-file collision。
+- **Exact tool bytes gate:satisfied；production selection gate:blocked。**DevEco HDC
+  system path 文件存在、mode `0755`、size `6,016,944`，SHA-256 精确为
+  `05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83`
+  （registered `3.2.0f` tuple）。但 `com.arkdeck.desktop` 的 persisted
+  `ArkDeck.HDC.userConfiguredPaths` 仍解析为一个已不存在的旧 fake fixture，
+  DevEco/OpenHarmony SDK path preferences 均未配置；production discovery 当前不能
+  选择上述 real candidate。偏好值的用户绝对路径未写入仓库。
+- **Server/tool environment gate:blocked。**exact endpoint `127.0.0.1:8710` 没有
+  listener，也没有 selected-executable server process。TASK-HSO-002 production
+  observer 只接受 existing commandless identity，任务又禁止 server start/stop/
+  restart/adoption 及人工 HDC 命令；运行任一候选 child 会违反 existing-server
+  precondition 并可能隐式启动 server，所以本审计保持 HDC/process/device dispatch=0。
+- **Durable target/build gate:blocked。**`~/Library/Application Support/ArkDeck/`
+  没有 Session/device-binding/target-selection 文件；current product 只有调用方已持有
+  `session root + target ID` 时才能 reopen 的 per-Session
+  `DeviceBindingJournalAdapter`，而 registrar caller 明确不能提供这些值。server
+  prerequisite 未满足，因此 registered `list targets -v` 也未运行，当前 device presence、
+  serial digest、binding revision 与 firmware/build 均 unknown。历史 DAYU200/
+  OpenHarmony 7.0.0.34 与旧 3.2.0d evidence 不能替代 fresh 3.2.0f machine confirmation。
+- **Storage/host seam gate:implementable but insufficient。**现有
+  `TrustedDeviceOperationHost`、`HostStorageCoordinator`、`SessionLayout` 与
+  `SessionArtifactStore` 可由 allowed new directories 组合，且 V3 draft 可表达 E0
+  ready-task ref；这些 host-only seam 不能制造缺失的 production candidate、existing
+  server、durable binding 或 build fact。
+- **Candidate command review:not authority。**后继 readiness 可审的候选固定面为
+  `hilogHelp = -t <binding-key> shell hilog --help`、
+  `hilogHostStream = -t <binding-key> hilog`、
+  `hidumperHelp = -t <binding-key> shell hidumper --help`、
+  `hidumperInventory = -t <binding-key> shell hidumper -ls`，
+  hitrace/bytrace 各为 `-t <binding-key> shell <tool> --help|-l`。这些只来自
+  upstream/历史 capture 的候选形状，尚未被本 D1 review 接受，也不建立 3.2.0f
+  output/support authority；不得据此实现或 dispatch。
+- **Required remediation before another readiness。**独立 D1 scope revision 须决定并
+  授权 product-owned bootstrap：从 protected configuration 选择 exact HDC、在不借人工
+  命令的前提下处理 absent server（若复用 destructive server lifecycle，另需 D2 standing
+  authorization）、建立/解引用 maintainer-selected durable target，并加入可固定
+  firmware/build 的 closed E0 readback/provenance。人工仍只负责 OS picker/permission、
+  接线/供电、解锁/信任与歧义 identity 确认。该 revision、必要 bootstrap task 与配置/
+  硬件到位后，010P 再走新的 D1 readiness 固定 exact argv、budgets、storage layout、
+  V3 instance 与 privacy allowlist。
 
 ### Deliverables
 
