@@ -1,6 +1,6 @@
 # CHG-2026-050 Verification Plan
 
-> Change:CHG-2026-050-diagnostics-step-contract@r1
+> Change:CHG-2026-050-diagnostics-step-contract@r2
 > Status:planned
 > Core baseline:CORE-2.1.0
 

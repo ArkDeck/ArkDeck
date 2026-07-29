@@ -7,7 +7,8 @@
 - Platform:macos
 - Requirements:`REQ-WF-001`
 - Acceptance:`AC-WF-001-01`、`AC-WF-001-02`
-- Depends on:本 proposal PR 合并(即批准)
+- Depends on:本 revision 2 proposal PR 合并(即批准纠正后的 MAJOR scope；
+  r1 的 MINOR readiness classification 无效)
 - Readiness input pins:
 
   ```yaml pins

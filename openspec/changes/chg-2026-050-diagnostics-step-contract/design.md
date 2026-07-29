@@ -2,7 +2,7 @@
 
 ## Context and constraints
 
-- Approval input:CHG-2026-050 revision 1
+- Approval input:CHG-2026-050 revision 2
 - Core baseline:CORE-2.1.0
 - Related authority:`REQ-WF-001`、`REQ-JOB-002`、
   `POL-WORKFLOW-001`、workflow-step schema、operation Catalog
