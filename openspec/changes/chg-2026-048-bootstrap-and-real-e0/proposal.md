@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-048-bootstrap-and-real-e0
-revision: 1
-status: approved # 合并本 PR 即维护者批准(CHG-2026-046 垂直 PR 模型)
+revision: 2
+status: approved # r1 由 #779 批准；本 r2 仅在维护者 review/merge 后生效
 class: capability
 core_change_level: none
 owner: lvye
@@ -82,6 +82,27 @@ MU-3(T09-T11)是全清单的**强制门槛**:真实 `observe.device@1` 走通之
 - Change-local acceptance:`BER-BOOT-001`、`BER-E0-001`、`BER-SKEL-001`
   (contract/fake)+ `BER-HW-001`、`BER-HW-002`(真机,窗口后补记)
 - Core baseline bump:no
+
+## r2 scope reconciliation（2026-07-29）
+
+本节是 D1 proposal revision；它只在维护者 review/merge 本 PR 后生效。
+它修复 r1 proposal/design 与实现 PR #781 中 verification/acceptance
+判据之间的冲突，不把该冲突包装成 D0 verification 结论。
+
+- r1 `What changes` 的 T11 句子中
+  `device-facts/tool-facts/binding-snapshot/manifest artifacts`、
+  `design.md` §3 的四文件落盘/`artifact.*` 读取 bullet，以及
+  `tasks.md` T11 scope 中的 `artifacts`，均由本 r2 **替换**为：
+  `observe.device@1` 经 production descriptor-bound dispatcher 得到
+  succeeded + 完整 durable job timeline，daemon 重启后仍可查询；
+  identity/binding/descriptor drift 与治理字段继续 fail closed。
+- artifact 文件发布与 `artifact.*` 读取不属于 CHG-2026-048 的
+  `BER-SKEL-001`/`BER-HW-001` 判据，递延 T14（CHG-2026-049）。
+  CHG-2026-048 verification 不得借用 CHG-2026-049 的后续实现或证据，
+  也不得声称四文件已经由本 change 交付。
+- `BER-BOOT-001`、`BER-E0-001`、`BER-HW-002` 以及 T09/T10 的范围、
+  安全边界和证据等级均不变；不修改 Core、catalog、代码、硬件 evidence
+  或既有 run 记录。
 
 ## Platform impact
 

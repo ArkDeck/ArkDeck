@@ -2,6 +2,10 @@
 
 > 垂直 PR 模型(CHG-2026-046):实现、测试、文档、evidence 与状态翻转
 > 由一个实现 PR 交付;真机 evidence 由设备窗口后 evidence-only PR 补记。
+>
+> r2 scope reconciliation:T11 的 change-local 闭环止于 succeeded +
+> durable timeline/restart query；artifact 文件发布与 `artifact.*` 读取
+> 递延 T14(CHG-2026-049)，不作为本任务完成或验证的依据。
 
 ## TASK-BER-001 — MU-3 垂直交付:Bootstrap + E0 Action Pack + 真实 walking skeleton
 
@@ -36,7 +40,8 @@
      provider-owned remote temp);
   3. **T11**:生产 dispatcher(descriptor 绑定)+ HDC 生产 facts/
      lowering 组合 + observe.device@1 端到端(CLI→daemon→engine→
-     artifacts→restart 可查;identity mismatch fail-closed)。
+     succeeded + durable timeline→restart 可查;identity mismatch
+     fail-closed)。
 - Verification:见 `verification.md`;contract/fake 随 PR,真机两条
   窗口后补记
 - Stop conditions:任何既有测试无法在不弱化断言的前提下保持通过;
