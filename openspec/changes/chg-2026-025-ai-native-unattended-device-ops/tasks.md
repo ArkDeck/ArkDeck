@@ -108,8 +108,10 @@ change approved 前保持 blocked;approved 后每任务另需独立 readiness PR
 
 ### Notes / handoff
 
-- archive PR 将定稿替换 `openspec/contracts/hardware-evidence.schema.json` 并同步
-  `verification/core-conformance.yaml` 的 operator 注记。
+- r6 ownership transfer 后，本 draft/fixtures/run 只作为历史 migration input；
+  `CHG-2026-051-agent-hardware-evidence` 独占 current schema 激活、conformance
+  同步与 Runtime receipt/projection。CHG-2026-025 archive 不得再替换
+  `openspec/contracts/hardware-evidence.schema.json`。
 
 ### Readiness pins(r1,2026-07-22)
 
@@ -2770,7 +2772,7 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
   REQ-ART-001/002/003 的后继 integration/executor 提供 provenance，不声称其 AC 已通过
 - Acceptance:AIN-E0-CAPTURE-001(change-local,r5)
 - Depends on:TASK-AIN-010 done、CHG-2026-043 TASK-HSO-002 done（均已满足）、
-  r5 merge；之后独立 D1 readiness
+  r5 merge、`CHG-2026-051` archived；之后独立 D1 readiness
 - Applicable failure patterns:AF-002、AF-003、AF-005、AF-006、AF-011、AF-013、
   AF-014、AF-016、AF-018
 - Production reachability:
@@ -2837,9 +2839,9 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
   OpenHarmony 7.0.0.34 与旧 3.2.0d evidence 不能替代 fresh 3.2.0f machine confirmation。
 - **Storage/host seam gate:implementable but insufficient。**现有
   `TrustedDeviceOperationHost`、`HostStorageCoordinator`、`SessionLayout` 与
-  `SessionArtifactStore` 可由 allowed new directories 组合，且 V3 draft 可表达 E0
-  ready-task ref；这些 host-only seam 不能制造缺失的 production candidate、existing
-  server、durable binding 或 build fact。
+  `SessionArtifactStore` 可由 allowed new directories 组合；r6 后必须消费
+  CHG-2026-051 archived current V3，而不再借用本 change draft。这些 host-only seam
+  不能制造缺失的 production candidate、existing server、durable binding 或 build fact。
 - **Candidate command review:not authority。**后继 readiness 可审的候选固定面为
   `hilogHelp = -t <binding-key> shell hilog --help`、
   `hilogHostStream = -t <binding-key> hilog`、
@@ -2868,8 +2870,8 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
 - plan effect ceiling 固定 readOnly；出现 remote write/cleanup、set/clear/resize/
   persist、send/install/uninstall、reboot、lifecycle/subserver 或 unknown step 时
   whole-plan reject，process/device dispatch=0。
-- Agent-executed、change-local V3 schema-valid 的 `realHardwareE0ReadOnly`
-  evidence：`executor.kind=agent`、E0 ready-task `authorizationRef`、machine target
+- Agent-executed、current V3 schema-valid 的 `realHardwareE0ReadOnly`
+  evidence：`executor.kind=agent`、E0 default-read-only authority reference、machine target
   confirmation、pre/post facts、人工 boundary、exact typed command transcript、
   stdout/stderr counts/hashes/result 与全部 effect counters。
 - raw HiLog/工具输出只写 HostStorageCoordinator 管理的本地 Artifact；仓内只存脱敏
@@ -3130,13 +3132,14 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
 
 ## TASK-AIN-016 — E0/E1 Agent 真机验收
 
-- Status:blocked（等待 TASK-AIN-015 done + 独立 D2 readiness；不得复用旧人工窗口）
+- Status:blocked（等待 TASK-AIN-015 done、`CHG-2026-051` archived + 独立 D2
+  readiness；不得复用旧人工窗口）
 - Platform:macos
 - Requirements:REQ-WF-003、REQ-DEV-009、REQ-DUMP-009、REQ-TRACE-010、
   REQ-DEBUG-008
 - Acceptance:AC-WF-003-01/02、AC-DEV-009-01、AC-DUMP-009-01、
   AC-TRACE-010-01、AC-DEBUG-008-01/02/03/04
-- Depends on:TASK-AIN-015
+- Depends on:TASK-AIN-015、`CHG-2026-051` archived
 - Applicable failure patterns:AF-005、AF-006、AF-011、AF-012
 - Production reachability:`real Agent control request → production trusted host → pinned HDC/
   device → E0/E1 executor → real Session/evidence`

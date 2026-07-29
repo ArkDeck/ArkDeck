@@ -2,6 +2,12 @@
 
 > Change:CHG-2026-025-ai-native-unattended-device-ops
 > Status:draft(随 propose PR 登记;approval PR merge 后本设计约束生效)
+>
+> r6 ownership note（2026-07-29）：§4 的 r1 schema shape 已由
+> `CHG-2026-051-agent-hardware-evidence` 接管并替换；本 design 继续拥有
+> E0/E1/E2 execution、capability、standing authorization 与 human-boundary，
+> hardware-evidence current contract/Runtime projection 以 CHG-2026-051 archived
+> V3 为准。
 
 ## §0 设计原则
 
@@ -80,14 +86,17 @@ authorization:
 失败注入要求:门 2/3 的每个比对分支都必须有 contract test 用真实(非 fake 常量)
 不一致输入证伪(TR-002R real-fault 注入先例)。
 
-## §4 evidence schema 3.0.0
+## §4 evidence schema 3.0.0（r6 ownership transfer）
 
-- `operator: string`(仅人类)→ `executor: { kind: human|agent, id,
-  authorizationRef? }`;`kind=agent` 时 `authorizationRef` 必填(指向 merged PR +
-  授权块路径/OID);
-- `physicalTargetConfirmation` 保留,agent 场景语义 = pre-dispatch 设备身份读回;
-- 其余字段、诚实分类规则(simulation/fake 永不入 realHardware)不变;
-- v2 历史记录不迁移;`schemaVersion` 判别并存。
+- r1/AIN-002 的 `executor.authorizationRef + physicalTargetConfirmation` draft 作为
+  历史 migration input 保留，不再由本 change archive 到 current contract。
+- current V3 shape、Runtime trusted-fact projection、actor-neutral target confirmation
+  与 effect-aware authority mapping 由 `CHG-2026-051` 独占：
+  E0=`defaultReadOnlyPolicy`、E1=`runtimeCapability`、
+  E2=`standingAuthorization`。
+- schema validity 只记录 provenance，不授予 execution authority；本 change 的 E2
+  standing-authorization gate 与 fail-closed 规则不变。
+- v2 历史记录不迁移；simulation/fake 永不进入 realHardware。
 
 ## §5 不变式清单(本 change 明确不动的防线)
 
@@ -321,8 +330,9 @@ E0 admission 需要 approved change + ready task、registered operation、fresh 
 
 E0 不得顺带执行 cleanup、parameter set、device-side persist、install、send、reboot 或
 server lifecycle mutation；计划含这些 step 时按实际最低 effect 升级，不能拆名降级。
-E0 Agent evidence 的 `authorizationRef` 由宿主写入为受保护 main 上的 ready task/
-execution-policy reference；caller 不提供也不能伪造。
+E0 Agent evidence 使用 CHG-2026-051 current V3 的
+`defaultReadOnlyPolicy` authority reference；该 reference 由宿主从 reviewed
+execution policy/catalog fact 写入，caller 不提供也不能伪造。
 
 ### E1
 
@@ -338,9 +348,10 @@ E1 admission 另需维护者已接受的 per-device typed capability evidence，
 caller 不能提供 capability bytes 或自报前提。每个 E1 step 仍遵守 intent-before-effect、
 semantic outcome、binding revision、device lane、storage claim、cancel/safe boundary、
 compensation 和 crash reconcile。任一 capability/pin/fact 漂移即 dispatch=0。
-E1 Agent evidence 的 `authorizationRef` 指向该 per-device capability 的 full main/blob
-OID 与接受载体；E2 则继续指向 standing authorization。三类 ref 都由宿主解析并写入，
-不能由 request 自报。
+E1 Agent evidence 使用 CHG-2026-051 current V3 的 `runtimeCapability` authority
+reference，指向该 per-device capability 的 full main/blob OID 与接受载体；E2 使用
+`standingAuthorization`。三类 authority reference 都由宿主解析并写入，不能由
+request 自报。
 
 E1 默认覆盖 owned remote capture/cleanup、temporary parameter set/restore、capture
 start/stop、保留数据的 HAP install/replace、应用启停、端口转发、reboot 与 Job-owned

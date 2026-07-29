@@ -1,0 +1,41 @@
+---
+schema_version: 1.0.0
+change_id: CHG-2026-051-agent-hardware-evidence
+change_revision: 1
+platform: all
+evidence_classes:
+- contract
+cases:
+- acceptance_id: AC-WF-004-01
+  test_id: TEST-AC-WF-004-01
+  method: >-
+    Agent E0 Runtime receipt to hardware-evidence V3 projection with JSON
+    Schema, Swift round-trip and semantic correlation checks.
+  expected_source: openspec/changes/chg-2026-051-agent-hardware-evidence/verification.md#ac-wf-004-01-positive-vector
+  minimum_evidence: contract
+  expected_result: >-
+    Product-owned facts for one target, binding and job produce a complete V3
+    record containing executor, E0 authority, fresh target confirmation,
+    device firmware, tool/provider/transport, actual steps and artifact hashes.
+- acceptance_id: AC-WF-004-02
+  test_id: TEST-AC-WF-004-02
+  method: >-
+    Required-fact provenance, absence, staleness, mismatch, caller-injection,
+    raw-identity and artifact-integrity negative matrix.
+  expected_source: openspec/changes/chg-2026-051-agent-hardware-evidence/verification.md#ac-wf-004-02-negative-matrix
+  minimum_evidence: contract
+  expected_result: >-
+    Every incomplete or untrusted vector returns evidenceIncomplete before
+    publication; callers cannot supply replacement facts and raw serial bytes
+    remain unrepresentable.
+- acceptance_id: AC-WF-004-03
+  test_id: TEST-AC-WF-004-03
+  method: >-
+    Executor and actual-effect to authority-reference matrix with independent
+    evidence-publication and device-dispatch counters.
+  expected_source: openspec/changes/chg-2026-051-agent-hardware-evidence/verification.md#ac-wf-004-03-authority-matrix
+  minimum_evidence: contract
+  expected_result: >-
+    Agent E0, E1 and E2 evidence only accepts the matching authority kind;
+    missing or mismatched authority publishes nothing, and schema validation
+    never grants authority or dispatches an effect.
