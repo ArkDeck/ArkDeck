@@ -1,0 +1,79 @@
+---
+id: CHG-2026-052-sdd-acceptance-count-currency
+revision: 1
+status: approved # 本 proposal/ready carrier；仅在维护者 review/merge 本 PR 后生效
+class: implementation-only
+core_change_level: none
+owner: lvye
+core_baseline: CORE-2.1.0
+platforms: [macos, windows, linux]
+---
+
+# Keep the SDD real-baseline assertion current across Core AC-count changes
+
+## Why
+
+CHG-2026-051 的 archive candidate 将 canonical Core Acceptance 数从 111 增至
+114。本地 `scripts/check-sdd.sh` 已对 current specs/index/cases 精确校验并报告
+`114 acceptance IDs`，但 PR #816 的 SDD Guard 在
+`ScopeCoverageTests.test_real_baseline_has_active_covered_scope_and_main_passes`
+失败：`scripts/test_check_sdd.py` 把成功摘要的数量字面量写死为 111。
+
+直接在 CHG-2026-051 archive PR 中把该字面量改成 114 不合法：
+`scripts/test_check_sdd.py` 不在 `TASK-AHE-001` 已批准 Allowed paths 内，PR #816
+exact head `ee33d996fd9adce4ef32d8527e49ae87da100143` 的 Agent PR
+allowed-paths job 已按预期 fail closed。修改 archived task 追认扩权同样被
+atomic-archive guard 禁止。
+
+根因不是 CHG-2026-051 的 delta，而是 real-baseline contract test 把一个会随
+批准后的 Core archive 正常变化的声明复制进 Python 字面量，制造了一个无法在
+原 archive scope 内闭合的双写点。
+
+## What changes
+
+In scope:
+
+- 仅修改 `scripts/test_check_sdd.py`：从 accepted
+  `openspec/verification/core-conformance.yaml` 的
+  `acceptance_index.count` 读取 real-baseline 期望数量，再断言
+  `check_sdd.py` 的成功摘要精确匹配。
+- reader 对缺失、布尔、字符串、零或负数 fail closed；合成 contract test 固定
+  valid/invalid 矩阵。
+- 保留真实仓库测试的全部既有门：subprocess exit 必须为 0，errors/warnings 必须
+  精确为 0，reported count 必须与 accepted conformance manifest 一致。
+- implementation/evidence PR 只交付上述 reader/test、同车 run evidence 和
+  `TASK-GCC-001 ready → done`。
+
+Out of scope:
+
+- 不修改 `scripts/check_sdd.py`、SDD Guard workflow、allowed-path guard 或
+  automation config；
+- 不修改 current spec、canonical Acceptance index/cases、Core conformance
+  manifest、baseline、CHG-2026-051 或 PR #816 内容；
+- 不允许通过接受任意数量、正则忽略 count、删除真实仓库 subprocess 断言、
+  `skip`、`xfail` 或 `|| true` 使 CI 变绿；
+- 零 product/runtime/device/HDC/network 行为。
+
+Observable behavior:
+
+- Before：每次批准的 canonical AC-count 变化都要求额外修改一个未必属于该
+  archive Allowed paths 的 Python 字面量。
+- After：真实仓库 contract test 仍精确校验 count，但期望值来自 accepted
+  conformance manifest；合法 baseline archive 不再需要越界修改测试源码。
+
+## Scope（Requirement/AC）
+
+- Change-local Acceptance:`GUARD-COUNT-CURRENCY-001`
+- Core Requirement/AC/schema/index/cases:零修改
+- Core baseline bump:不需要；保持 `CORE-2.1.0`
+
+## Safety, privacy, and compatibility
+
+- 这是 host-only/offline test-infrastructure change；零 device dispatch、零 authority
+  或 evidence schema 影响。
+- `core-conformance.yaml` 已由 `check_sdd.py` 校验 shape、三方集合与 declared
+  count；本 change 只移除测试代码中的冗余副本，不改变 canonical source。
+- 回退为 revert 单个 implementation PR；回退后下一次 AC-count 变化会重新命中同一
+  CI blocker，但不影响产品运行时。
+- macOS/Windows/Linux 产品 conformance 状态均不改变；GitHub CI runner 上的 host
+  contract test 是唯一受影响执行面。
