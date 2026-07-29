@@ -118,16 +118,23 @@ No deviation may be hidden in the implementation PR.
 
 - [x] all four change-local AC have same-revision, reproducible evidence;
 - [x] signed fixture/platform evidence is not reported as hardware evidence;
-- [x] forbidden production/authority inputs remain byte-identical;
+- [x] CHG-045 App/UI/fixture and registry/profile inputs remain
+      byte-identical; #777's HDC production file split has a fresh
+      current-main contract + signed-platform replay;
 - [x] #772 implementation/evidence predates enforcement 2.2.0; the
       implementation-free verification closure reconciles task `done`
       without creating the now-forbidden done-only carrier;
 - [x] change `verified` is confirmed in a separate status/evidence-reference
       PR citing the concrete implementation and closure records.
 
-Closure receipt:`proposal.md#verification-closure2026-07-29`; verification
-base = protected main
+Closure receipt:`proposal.md#verification-closure2026-07-29`; original
+verification base =
 `c2dd6412d42be259623d5922e82eb43b4b36af74`; implementation evidence =
 `evidence/runs/TASK-HOR-001/implementation-r1.md`; closure replay =
-`evidence/runs/TASK-HOR-001/verification-r1.md`. `passed`, task `done` and
-proposal `verified` take effect only after maintainer review/merge.
+`evidence/runs/TASK-HOR-001/verification-r1.md`. Maintainer-approved PR #778
+merged as `eb24e6625a345578108781649ed19b2598024ade`, making `passed`, task
+`done` and proposal `verified` effective. Because #777 merged immediately
+before #778 and changed the pinned HDC production file identity, the required
+post-merge current-main replay is
+`evidence/runs/TASK-HOR-001/verification-r2.md`; archive remains held until
+that D0 evidence rerun is reviewed and merged.
