@@ -42,7 +42,8 @@ readiness capture 时 `gh pr list --state open` 返回空集合。未发现与�
 
 ## Repository pins
 
-r1 readiness YAML 中的 12 个产品/集成/发布输入逐项重算，全部保持原 blob：
+r1 readiness YAML 中的 11 个产品/集成/发布输入逐项重算，全部保持原 blob；r2
+另把 current component workflow 作为第 12 行新 pin：
 
 | Path | Blob |
 | --- | --- |
@@ -129,8 +130,9 @@ notary credential 的 sanitized read-only preflight：
 | returned submission count | `0`（新账号正常；不构成 notarization acceptance） |
 | credential/private material exposed | `0` |
 
-证书/credential 只存在于维护者控制的 release environment；未写入 repository、
-GitHub Actions、environment variable、CLI password argument、日志或 evidence。
+证书私钥与本机 credential reference 由维护者控制；本 readiness 未把它们写入
+repository、GitHub Actions、environment variable、CLI password argument、日志或
+evidence。
 本记录不保存 Apple account、credential value、private key、password、token、
 Keychain/profile path/name 或 raw notary history。每次 signing/notary 前重跑
 identity count/SHA-1/Team/expiry/chain 与 authentication preflight；任一不等即停。

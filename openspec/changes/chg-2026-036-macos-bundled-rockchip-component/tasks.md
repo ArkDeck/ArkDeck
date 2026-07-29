@@ -868,7 +868,7 @@
     `5a40e8968586232468a8691039d674c9e83d7526` 全部是 audit base 祖先。
   - **Repository/input pins:closed。**r1 YAML block 中 registry/recipe/SBOM/
     notices/source-manifest、BRC-002 run、Xcode project/scheme、App entitlement 与
-    两份 release doc 的 12 个 blob 在 audit base 上全部逐项不变；current
+    两份 release doc 的 11 个 blob 在 audit base 上全部逐项不变；current
     `tasks.md` base blob =
     `de23d56688e713d90a2b12706e8d44651cffa164`，current component workflow
     blob = `6242d0b4f3a1b8b15020803073b017c6a6911a61`。任一实现 base/pin 不等即停止并
