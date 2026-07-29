@@ -5,7 +5,8 @@
 
 ## TASK-GCC-001 — Derive the real-baseline expected count from accepted conformance
 
-- Status:ready # proposal/ready candidate；仅在维护者 review/merge 后生效
+- Status:done # TASK-GCC-001 implementation/evidence PR；仅在维护者 review/merge
+  本 PR 后生效；不构成 change 级 verified/archive
 - Platform:all
 - Requirements/AC:`GUARD-COUNT-CURRENCY-001`
 - Depends on:none
@@ -78,3 +79,4 @@
 - implementation、tests、run evidence 与 `ready → done` 同一 PR。
 - change 级 verified 与 archive 仍使用各自独立 PR。
 - 在本 proposal/ready PR 合入前不得修改 `scripts/test_check_sdd.py`。
+- Completion evidence:`evidence/runs/TASK-GCC-001/run.md`。
