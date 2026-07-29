@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-043-hdc-320f-supervisor-observation
 revision: 1
-status: approved # 2026-07-28 本 approval-only PR；r1 proposal 经 #737 合入 main `84728f1d16eb3dcd07fd869bee835b3d2397f118`；批准仅由维护者 review/merge 本 PR 生效
+status: verified # 2026-07-29 本 verification-only PR；closure 段见文末，仅在维护者 review/merge 后生效
 class: integration
 core_change_level: none
 owner: lvye
@@ -166,3 +166,95 @@ implementation/evidence 与 `ready→done` 各自独立；然后才能对依赖�
   HDC/设备/hardware/support/release evidence。两个 task 继续保持 `blocked`；
   `TASK-HSO-001` 须下一独立 D1 readiness PR，`TASK-HSO-002` 仍受前者 `done` 门阻塞；
   CHG-2026-006 `TASK-M0B-002` 不因本批准自动 ready。
+
+## Verification closure（2026-07-29）
+
+TASK-HSO-001 与 TASK-HSO-002 已在 protected main 依序记为 done，四条 change-local
+AC 均有同一 revision 的可复查 host-only evidence。本 PR 只翻 proposal /
+verification 状态并引用已合入记录，零实现、零 scope、零 acceptance 定义变化。
+
+Verification base = protected main
+`205cfadcd296db7ec2fdc3f62d09e5047e5e5fa7`；该树的本文件、
+`verification.md`、`tasks.md`、`acceptance-cases.yaml`、TASK-HSO-001 run 与
+TASK-HSO-002 run 改前 blobs 分别为
+`51c6304f7a080f01035580fc0593fe22460c1ba4`、
+`831fc3b3a895fa6c2cc6966a7278ac58cb5828b4`、
+`295e7a854764f35e81850c64b3a771caa2024c7b`、
+`6b7becef9571c34a89e764240138879369e6653b`、
+`db56cd004dd78295ab7129ee01f4f658cba71c9c` 与
+`ba399ffb99dc3d67808c2500bcafb16ff3ff9047`。
+
+### Protected-main delivery chain
+
+| Stage | Exact reviewed head | Protected-main merge |
+| --- | --- | --- |
+| proposal #737 | `77efc7c078ae66c7465ae35f9feb1d6cfce0dbce` | `84728f1d16eb3dcd07fd869bee835b3d2397f118` |
+| approval #738 | `a95ae3f229cf0f74bcc8681c92ce9239d1e1890e` | `07daee30ba99636b5dc7a334bdefc3a07611acef` |
+| TASK-HSO-001 readiness #752 | `e49f9ba2161c72d4ef1e9c9bf5e25faf5c4b65d0` | `a2c275581ca6dce29414a47aafa59f6d7fa29f91` |
+| TASK-HSO-001 implementation/evidence #755 | `38518eea9f487f76be2d065b882924376adbfdc3` | `4fc0cec76638cd299e6ccbaff7c5124a048a2106` |
+| TASK-HSO-001 `ready→done` #756 | `30f816482a848f0943e58df5ff8bf5551257180e` | `248eb1e5348fb2bcc90c69af5d7b17c6954a99ca` |
+| TASK-HSO-002 readiness #757 | `1b838caa4ebda5e5c31a830165e0c0fab8d0df5a` | `a6cd29318b8c86dcd02f13937b897aa64fa3a160` |
+| TASK-HSO-002 implementation/evidence #760 | `e0f4b908eb6454e384b85a24fd598ed994126fb1` | `41e19225375ca65551d51251326169558c4e6980` |
+| TASK-HSO-002 `ready→done` #761 | `93d2fdeafb87fcb9cf068a3fe68c5bc66309b979` | `205cfadcd296db7ec2fdc3f62d09e5047e5e5fa7` |
+
+上述八个 exact head 均由维护者 `lvye` review/approve；各 PR 的 Agent PR /
+SDD Guard / allowed-paths 与 Swift CI 均为 `SUCCESS`。Evidence 真值源为
+`evidence/runs/TASK-HSO-001/run.md` 与
+`evidence/runs/TASK-HSO-002/run.md`，不是“实现 PR 已 review”这一事实本身。
+
+### Four binary AC conclusions
+
+- **`HSO-REGISTRY-001` = PASS (`platform` + `contract`)**：TASK-HSO-001 run
+  固定 exact commandless registry/resource/profile/lock/macOS/provenance closure；
+  canonical registry、profile、lock、macOS mapping 与 dedicated contract test blobs
+  分别为 `b202b9d34680a0e7bbdba1d02637279ca4819d3f`、
+  `2ae13490e075f327bb7448ccacf908be5ba7e3aa`、
+  `836d4ccc8c34c5826b6c53dcf9004e678a506d25`、
+  `b7471666b0bbfbfade3fbd510ad831e45b3cf9b8`、
+  `956a57fbe334248c4db3a13a7dab8d2561c02d63`，resource tree 为
+  `87421493b8d353a402e0f777ef684e55db1f2981`。唯一 entry 固定 exact macOS
+  hdc `3.2.0f` / executable SHA-256
+  `05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83` /
+  `127.0.0.1:8710` / empty argv / invocation forbidden，并保留 #656/#658 与
+  `DEV-1` 窄边界。
+- **`HSO-SEPARATION-001` = PASS (`contract`)**：3.2.0d readonly 与 3.2.0f
+  device canonical registry blobs 保持
+  `99e8cc3d9929f9502a3e978a53cd56ad285d2aad` /
+  `399c5a102c7737bf6466e8a2c4c6a1d1b1bc0b6a`，resource trees 保持
+  `f906403bc878a27dbef79736203da98c32a020eb` /
+  `9ca93b91d18c554e4c137b7f3494550af072ebfc`；cross-version substitution、
+  fallback、caller receipt/generation 与 semantic-authority mutation 全部 fail closed。
+- **`HSO-SINGLE-CANDIDATE-001` = PASS (`contract`)**：TASK-HSO-002 run 与
+  DP19/HSO contracts 固定一次 production discovery/endpoint selection、同一
+  candidate/endpoint 进入 commandless supervisor 与既有 device session、共享
+  exact-3.2.0f system observer implementation及独立 catalog policy；production
+  source/test blobs 为 `589dfec329044b58f4fefec3a70d4af7f9cfd15e`、
+  `c7f71e5af90bc3d468d5f0817734d297f0c339a2`、
+  `fa0bc651382c9b5d1a36a46c59a11af65bc84249`、
+  `e6556e053680550325491a5deac5c7eac9a09d96` 与
+  `a54b950a67af564260efe55fb159e63a1847b59d`。stable receipt 只进入既有
+  four-evidence classifier，任一证据缺失保持 unknown，health/version typed unknown。
+- **`HSO-NODISPATCH-001` = PASS (`contract`)**：两个 run 共同覆盖 empty argv /
+  invocation false、21 个 registry failure controls、10 个 effect counters、
+  supervisor success/mismatch/failure/timeout/cancel 的零 dispatch 与 empty spawn
+  audit；只有显式 device refresh 可产生至多一个既有 registered read-only child，
+  且不授予 supervisor ownership。installed HDC、真实 process/socket/device、
+  network、lifecycle/adoption、subserver、binding/device mutation 与 destructive
+  dispatch 全部为 0。
+
+### Closure-base replay and boundary
+
+- macOS 26.6 (25G72)、Xcode 26.6 (17F113)、Swift 6.3.3 上四个 HDC 聚焦
+  suites = 114 tests / 0 failures；ArkDeckKit 全量 = 506 tests / 1 个既有人工
+  sleep/wake skip / 0 failures / 0 unexpected。
+- `scripts/check-sdd.sh` = 0 errors / 0 warnings / 111 acceptance IDs；
+  `scripts/test_check_sdd.py` = 56/56 PASS；
+  `scripts/test_check_pr_paths.py` = 50/50 PASS；`git diff --check` = PASS。
+- Core Requirement/AC、contracts/schema、baseline、platform conformance、
+  hardware/support/release 与 production code 在本 closure PR 中零变化；host-only
+  registration/fake/system-observer contract 不重分类为真实 HDC、设备或 hardware
+  evidence。
+- 本 closure 只确认 CHG-2026-043。它不自动推进或解除 CHG-2026-006
+  `TASK-M0B-002`；后者仍须在本 verified PR 合入后另走 fresh readiness。
+- 只有维护者 review/merge 本独立 verification-only PR 后，proposal 的
+  `verified` 与 verification 的 `passed` 才生效。

@@ -1,7 +1,7 @@
 # CHG-2026-043 Verification Plan
 
 > Change:CHG-2026-043-hdc-320f-supervisor-observation@r1
-> Status:planned
+> Status:passed # 2026-07-29；四条 AC 与完整交付链见 proposal.md「Verification closure」；仅在维护者 review/merge 本 verification-only PR 后生效
 > Core baseline:CORE-2.1.0（canonical Core AC 零认领）
 
 ## Environment
@@ -88,10 +88,18 @@ change；不得隐式豁免。
 
 ## Result gate
 
-- [ ] 四条 change-local AC 均有 same-revision、可复查 evidence。
-- [ ] 两个 task 的 implementation/evidence 与 `ready→done` 均为独立 PR。
-- [ ] 3.2.0d readonly 与 3.2.0f device registry/resource invariant pins 未漂移。
-- [ ] Simulation/fake/system-observer contract 未记为真实 HDC、设备、hardware 或 release
+- [x] 四条 change-local AC 均有 same-revision、可复查 evidence。
+- [x] 两个 task 的 implementation/evidence 与 `ready→done` 均为独立 PR。
+- [x] 3.2.0d readonly 与 3.2.0f device registry/resource invariant pins 未漂移。
+- [x] Simulation/fake/system-observer contract 未记为真实 HDC、设备、hardware 或 release
       支持。
-- [ ] change `verified` 由独立状态 PR 引用具体 run 记录；不自动推进
+- [x] change `verified` 由独立状态 PR 引用具体 run 记录；不自动推进
       CHG-2026-006 `TASK-M0B-002`。
+
+Closure receipt:`proposal.md#verification-closure2026-07-29`；verification base =
+protected main `205cfadcd296db7ec2fdc3f62d09e5047e5e5fa7`；revalidated
+`2026-07-28T23:58:19Z`。TASK-HSO-001 / TASK-HSO-002 run blobs =
+`db56cd004dd78295ab7129ee01f4f658cba71c9c` /
+`ba399ffb99dc3d67808c2500bcafb16ff3ff9047`。本文件的 `passed` 与 proposal
+的 `verified` 只在维护者 review/merge 本独立状态 PR 后生效；本 closure 不修改或
+执行 CHG-2026-006。
