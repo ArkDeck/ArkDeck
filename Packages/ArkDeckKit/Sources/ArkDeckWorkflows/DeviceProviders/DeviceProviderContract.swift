@@ -14,14 +14,21 @@ import Foundation
 
 // MARK: - Typed actions (closed)
 
-/// HDC actions available in MU-2: the read-only observation family needed
-/// by the walking skeleton. T10 (MU-3) extends this enum; extension is a
-/// catalog + provider decision, never a caller-supplied string.
+/// The closed HDC action vocabulary. MU-2 delivered the observation
+/// family; MU-3 (T10) completes the E0 pack. Every payload is a validated
+/// typed request - extension is a catalog + provider decision, never a
+/// caller-supplied string. Reboot deliberately stays outside E0.
 public enum HDCProviderAction: Sendable, Equatable {
   case observeTool
   case observeServer
   case listDeviceCandidates
   case observeDevice(connectKey: String)
+  case queryProperty(HDCAllowlistedProperty)
+  case captureHilog(HDCHilogCaptureRequest)
+  case captureUIDump(HDCUIDumpRequest)
+  case captureTrace(HDCTraceCaptureRequest, into: HDCOwnedRemotePath)
+  case receiveOwnedArtifact(HDCOwnedRemoteArtifact)
+  case cleanupOwnedRemotePath(HDCOwnedRemotePath)
 }
 
 /// Rockchip actions in MU-2: the one adapter-compat action wrapping the
@@ -39,8 +46,14 @@ public enum TypedProviderAction: Sendable, Equatable {
     switch self {
     case .hdc(.observeTool), .hdc(.observeServer):
       return .hostOnly
-    case .hdc(.listDeviceCandidates), .hdc(.observeDevice):
+    case .hdc(.listDeviceCandidates), .hdc(.observeDevice), .hdc(.queryProperty),
+      .hdc(.captureHilog), .hdc(.captureUIDump), .hdc(.receiveOwnedArtifact):
       return .readOnly
+    case .hdc(.captureTrace), .hdc(.cleanupOwnedRemotePath):
+      // Writing/removing the provider-owned remote temp file is a bounded
+      // deviceMutation per the step registry; the operation-level effect
+      // envelope (capture.diagnostics permitted set) already models it.
+      return .deviceMutation
     case .rockchip(.executeFlashPlan):
       return .destructive
     }

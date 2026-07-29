@@ -53,9 +53,9 @@ cases:
   expected_source: openspec/changes/chg-2026-048-bootstrap-and-real-e0/verification.md#ber-hw-001--ber-hw-002realhardware窗口后补记
   minimum_evidence: realHardware
   expected_result: >-
-    One adopt plus one observe run end-to-end with a full job timeline and
-    all four artifacts, with no manual command beyond the device-side
-    trust prompt.
+    One adopt plus one observe run end-to-end on real hardware with a
+    succeeded state and a full job timeline, with no manual command beyond
+    the device-side trust prompt (artifact files land with T14).
 - acceptance_id: BER-HW-002
   test_id: TEST-BER-HW-002
   method: >-

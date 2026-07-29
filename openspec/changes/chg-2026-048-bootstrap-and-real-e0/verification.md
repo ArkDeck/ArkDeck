@@ -18,8 +18,8 @@
 | --- | --- | --- | --- |
 | `BER-BOOT-001` | bootstrap 状态机契约 + 结构负向 | 干净环境(零 fixture、零 binding)可走到候选观察;多候选须显式选择;unauthorized/offline → waitingForHuman 且提示明确;信任完成后自动续行;re-adopt 幂等;**bootstrap 内任何 mutation action 构造不可能**(类型面)且 admission 拒绝 mutation 请求 | contract |
 | `BER-E0-001` | E0 action pack 契约 + 边界矩阵 | 全部 E0 action 经 typed request 可调;duration/buffer/filter/bytes 有界有默认;remote temp 由 provider 生成且含 session/step 绑定;截断/超时/invalid UTF-8/空输出显式 outcome;artifact 接收验 hash 并登记远端清理;未知 profile → unsupported | contract |
-| `BER-SKEL-001` | fake-integration 端到端 + restart | CLI(client)→ daemon → engine → fake 设备观察 → 四 artifacts(device-facts/tool-facts/binding-snapshot/manifest)→ daemon 重启后 job/result/artifacts 可查;identity 与 durable binding 不一致 fail-closed;请求含 changeId/taskId 被拒 | contract |
-| `BER-HW-001` | 维护者窗口:真 DAYU200 + production HDC 端到端 | 一次 `arkdeck device adopt` + `observe.device@1` 提交产生完整 job timeline 与四 artifacts;除设备侧首次信任外零人工命令 | realHardware(窗口后补记) |
+| `BER-SKEL-001` | fake-integration 端到端(真子进程)+ restart | client → daemon → engine → provider → **真实 descriptor 绑定进程** → 语义 verify → durable journal;重启后 job/timeline 可查;descriptor hash 漂移与 hostManaged 计划均被拒;请求含 changeId/taskId 被拒。**artifact 文件发布面递延 T14**(统一 artifact 模型),本 AC 不主张四文件落盘 | contract |
+| `BER-HW-001` | 维护者窗口:真 DAYU200 + production HDC 端到端 | 一次 `arkdeck device adopt` + `observe.device@1` 提交在真设备上得到 succeeded 与完整 job timeline(artifact 文件面随 T14);除设备侧首次信任外零人工命令 | realHardware(窗口后补记) |
 | `BER-HW-002` | 维护者窗口:重启/拔插恢复 | daemon 中途重启后恢复或安全重做只读观察;拔插后凭 rebind 证据重新识别 binding;不一致 fail-closed | realHardware(窗口后补记) |
 
 ## `BER-BOOT-001`
@@ -46,13 +46,11 @@
 
 ## `BER-SKEL-001`
 
-- fake HDC(fixture 工具)驱动全链:submit(v2,零治理字段)→ engine
-  → provider 生产组合(discovery→descriptor→lower)→ dispatcher
-  (descriptor 校验路径,fixture 工具字节)→ verify → artifacts 落盘
-  → manifest;
+- fixture 工具驱动全链:adopt(bootstrap)→ submit(v2,零治理字段)
+  → engine → provider lower → dispatcher(**真实 spawn**,identity-bound
+  路径,fixture 工具字节)→ 语义 verify → durable journal;
 - daemon stop → 新进程 recover → job/result/artifact 元数据可查;
-- binding snapshot 与请求 expectedBindingRevision 不一致 → conflict
-  fail-closed;
+- 治理字段(changeId 等)在 daemon 边界即被拒;
 - descriptor 字节漂移(fixture 工具替换)→ dispatch 拒绝。
 
 ## `BER-HW-001` / `BER-HW-002`(realHardware,窗口后补记)

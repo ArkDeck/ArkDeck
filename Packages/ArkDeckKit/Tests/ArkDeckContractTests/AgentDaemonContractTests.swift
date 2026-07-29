@@ -133,12 +133,24 @@ final class AgentDaemonContractTests: XCTestCase {
     XCTAssertEqual(fields["provider"], .string("rockchip"))
   }
 
-  func testTargetAdoptIsExplicitlyDeferredToMU3() async throws {
+  /// MU-3 (CHG-2026-048) implemented adoption; this composition still
+  /// omits the bootstrap machine, so adoption must fail closed rather than
+  /// silently succeed with no target store behind it.
+  func testTargetAdoptFailsClosedWithoutBootstrapComposition() async throws {
     let (handler, _) = try makeStack()
     let adopt = await handler.handleFrame(
       Data("{\"protocolVersion\":\"1.0.0\",\"id\":\"a\",\"method\":\"target.adopt\"}".utf8))
     XCTAssertFalse(adopt.ok)
-    XCTAssertEqual(adopt.error?.code, "notImplementedUntilMU3")
+    XCTAssertEqual(adopt.error?.code, "internalError")
+    XCTAssertTrue(
+      (adopt.error?.message ?? "").contains("bootstrap"),
+      "the refusal must name the missing composition: \(adopt.error?.message ?? "-")")
+    // target.list is equally unavailable without a store - never an empty
+    // list, which would read as "no devices adopted".
+    let list = await handler.handleFrame(
+      Data("{\"protocolVersion\":\"1.0.0\",\"id\":\"l\",\"method\":\"target.list\"}".utf8))
+    XCTAssertFalse(list.ok)
+    XCTAssertEqual(list.error?.code, "internalError")
   }
 
   // MARK: - UDS integration
@@ -185,6 +197,36 @@ final class AgentDaemonContractTests: XCTestCase {
     XCTAssertEqual(socketStat.st_mode & S_IFMT, S_IFSOCK)
   }
 
+  /// Found by self-testing the device-window plan: a deep state directory
+  /// pushed the socket past Darwin's 104-byte sun_path limit and the error
+  /// said only "too long". The limit is a platform fact; the actionable
+  /// message is the contract.
+  func testOverlongSocketPathFailsWithAnActionableMessage() throws {
+    let (handler, _) = try makeStack()
+    let deep = stateDirectory.appendingPathComponent(
+      String(repeating: "d", count: 120), isDirectory: true)
+    let server = AgentDaemonServer(
+      stateDirectory: deep, handler: handler, nowUTC: { "2026-07-29T00:00:00Z" })
+    do {
+      _ = try server.start()
+      XCTFail("an overlong socket path must fail closed")
+    } catch let error as AgentDaemonError {
+      guard case .io(let message) = error else { return XCTFail("unexpected \(error)") }
+      XCTAssertTrue(message.contains("platform limit"), message)
+      XCTAssertTrue(message.contains("--state-dir"), "the fix must be named: \(message)")
+    }
+    let client = AgentClient(socketPath: deep.appendingPathComponent("agentd.sock").path)
+    do {
+      _ = try client.request(method: "health")
+      XCTFail("client must refuse an overlong socket path too")
+    } catch let error as AgentClientError {
+      guard case .connectFailed(let message) = error else {
+        return XCTFail("unexpected \(error)")
+      }
+      XCTAssertTrue(message.contains("platform limit"), message)
+    }
+  }
+
   func testSecondInstanceReturnsExistingInfo() throws {
     let (handler, _) = try makeStack()
     let first = try startServer(handler)
@@ -197,6 +239,67 @@ final class AgentDaemonContractTests: XCTestCase {
     XCTAssertEqual(instance.pid, getpid())
     XCTAssertEqual(instance.socketPath, first.socketURL.path)
     XCTAssertEqual(instance.protocolVersion, AgentWireProtocol.version)
+  }
+
+  /// Process-level: the in-process server tests all passed while the real
+  /// arkdeck-agentd binary died the instant it printed "listening" -
+  /// `dispatchMain()` pthread_exits the main thread out from under an
+  /// async top level. Only running the actual binary catches that class of
+  /// defect, so this test spawns it and talks to it over the socket.
+  func testDaemonBinaryStaysAliveAndServesRequests() throws {
+    let binary = productsDirectory.appendingPathComponent("arkdeck-agentd")
+    guard FileManager.default.fileExists(atPath: binary.path) else {
+      throw XCTSkip("arkdeck-agentd binary not built")
+    }
+    // Short path: sun_path is 104 bytes, and the default temp directory
+    // plus a UUID already crowds it.
+    let shortState = URL(fileURLWithPath: NSHomeDirectory())
+      .appendingPathComponent(".arkdeck-test-\(UInt32.random(in: 0..<100_000))", isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: shortState) }
+
+    let process = Process()
+    process.executableURL = binary
+    process.arguments = ["--state-dir", shortState.path]
+    let output = Pipe()
+    process.standardOutput = output
+    process.standardError = output
+    try process.run()
+    defer {
+      if process.isRunning { process.terminate() }
+    }
+
+    let socketURL = shortState.appendingPathComponent("agentd.sock")
+    let deadline = Date().addingTimeInterval(20)
+    while !FileManager.default.fileExists(atPath: socketURL.path) {
+      guard Date() < deadline, process.isRunning else { break }
+      usleep(50_000)
+    }
+    XCTAssertTrue(
+      FileManager.default.fileExists(atPath: socketURL.path), "daemon never created its socket")
+
+    // The defect signature: alive at socket creation, dead a moment later.
+    usleep(500_000)
+    XCTAssertTrue(process.isRunning, "daemon exited right after announcing itself")
+
+    let client = AgentClient(socketPath: socketURL.path)
+    guard case .object(let health) = try client.request(method: "health") else {
+      return XCTFail("health must answer from the real binary")
+    }
+    XCTAssertEqual(health["status"], .string("ok"))
+
+    process.terminate()
+    let stopDeadline = Date().addingTimeInterval(10)
+    while process.isRunning && Date() < stopDeadline { usleep(50_000) }
+    XCTAssertFalse(process.isRunning, "SIGTERM must stop the daemon")
+  }
+
+  private var productsDirectory: URL {
+    #if os(macOS)
+      for bundle in Bundle.allBundles where bundle.bundlePath.hasSuffix(".xctest") {
+        return bundle.bundleURL.deletingLastPathComponent()
+      }
+    #endif
+    return Bundle.main.bundleURL
   }
 
   func testJobHistorySurvivesDaemonRestart() async throws {

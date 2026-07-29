@@ -25,6 +25,12 @@ struct ArkDeckCommandLine {
         try await runFlash(Array(arguments.dropFirst()))
       case "update-feed":
         try runUpdateFeed(Array(arguments.dropFirst()))
+      case "doctor":
+        try RuntimeCLI.runDoctor(Array(arguments.dropFirst()))
+      case "device":
+        try RuntimeCLI.runDevice(Array(arguments.dropFirst()))
+      case "job":
+        try RuntimeCLI.runJob(Array(arguments.dropFirst()))
       default:
         printUsage()
         exit(EX_USAGE)
@@ -530,6 +536,13 @@ struct ArkDeckCommandLine {
       --artifact <ArkDeck.dmg> --artifact-url <https-url> --notes <summary> --out <dir>
         arkdeck update-feed assemble --payload <payload.json> --signature <signature.bin> \
       --out <feed.json>
+        arkdeck doctor [--socket <path>] [--json]
+        arkdeck device list|show|adopt [--candidate <connect-key>] [--socket <path>] [--json]
+        arkdeck job submit --target <id> --operation <id@version> [--wait] [--json]
+        arkdeck job status --job <id> [--json] | arkdeck job list [--json]
+
+      doctor/device/job talk only to arkdeck-agentd over its user-private socket: this CLI
+      holds no HDC or Rockchip executor and cannot build a device command itself.
 
       A human operator at a TTY gets a handoff whose commands they run personally. The AI
       surface accepts only an authorization ID, archive path and target-location selector; the
