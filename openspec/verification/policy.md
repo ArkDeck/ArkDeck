@@ -82,7 +82,7 @@ openspec/changes/<change>/evidence/
 ```
 
 - run 记录轻量但如实:执行了什么、结果如何、哪些 AC 通过/失败、simulation 还是真实环境。
-- 真实硬件 evidence 按 `contracts/hardware-evidence.schema.json` 记录设备身份、固件、操作者与时间。
+- 真实硬件 evidence 按 `contracts/hardware-evidence.schema.json` 记录 executor、与实际 effect 匹配的 authority provenance、设备身份/binding、固件、目标确认时间、typed step 与 Artifact hash；schema validation 不授予执行权限。
 - raw 证据不改写;派生物注明来源。
 
 ## Stop conditions

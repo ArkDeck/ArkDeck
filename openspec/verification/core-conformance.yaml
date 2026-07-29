@@ -127,7 +127,8 @@ evidence_policy:
   hardware_claim_rule: >-
     Any real-device support statement additionally requires a matching, unexpired
     hardware-evidence record for device, firmware, HDC, transport, privilege and
-    Provider, produced by a human operator (see governance/enforcement.md).
+    Provider, produced by a human or Agent executor with effect-matched authority
+    provenance and trusted Runtime facts (see governance/enforcement.md).
 
 safety_coverage:
   - invariants: [POL-HDC-001]

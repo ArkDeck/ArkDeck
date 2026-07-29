@@ -39,19 +39,30 @@ public struct RuntimeHumanActionReceipt: Codable, Sendable, Equatable {
 
 public struct RuntimeAgentExecutionReceipt: Codable, Sendable, Equatable {
   public let executor: RuntimeExecutorKind
+  public let executorID: String
   public let operationReference: String
   public let jobID: String?
   public let targetID: String?
   public let bindingRevision: Int?
   public let catalogDigest: String
-  /// `default-read-only-policy` for E0, or the referenced capability ID
-  /// for E1. The runner never mints either.
-  public let authorityReference: String
+  public let providerID: String
+  public let executionMode: String
+  public let actualEffect: RuntimeHardwareEvidenceEffectLevel?
+  public let authority: RuntimeHardwareEvidenceAuthority?
+  public let stepKinds: [String]
+  public let evidenceObservation: RuntimeHardwareEvidenceObservation?
+  public let firstEvidenceStepAtUTC: String?
+  public let outcomeUnknown: Bool
   public let humanActions: [RuntimeHumanActionReceipt]
   public let terminalState: String
-  public let artifacts: [String]
+  public let artifacts: [RuntimeHardwareEvidenceArtifact]
+  public let evidenceBlockers: [String]
   public let startedAtUTC: String
   public let finishedAtUTC: String
+
+  public var authorityReference: String {
+    authority?.reference ?? ""
+  }
 }
 
 public enum RuntimeAgentExecutionOutcome: Sendable, Equatable {
@@ -131,35 +142,64 @@ public struct AgentRuntimeExecutor: Sendable {
 
     func receipt(
       jobID: String?, targetID: String?, bindingRevision: Int?, state: String,
-      artifacts: [String] = []
+      trustedFacts: RuntimeHardwareEvidenceTrustedFacts? = nil,
+      blockers: [String] = []
     ) -> RuntimeAgentExecutionReceipt {
-      RuntimeAgentExecutionReceipt(
+      let evidenceBindingRevision: Int?
+      let evidenceStartedAtUTC: String
+      let evidenceFinishedAtUTC: String
+      if let trustedFacts {
+        // Once the daemon returned its product-owned snapshot, absence is
+        // evidence absence. Never replace it with target-list or runner
+        // timestamps, which would turn local context into trusted facts.
+        evidenceBindingRevision = trustedFacts.bindingRevision
+        evidenceStartedAtUTC = trustedFacts.startedAtUTC ?? ""
+        evidenceFinishedAtUTC = trustedFacts.finishedAtUTC ?? ""
+      } else {
+        evidenceBindingRevision = bindingRevision
+        evidenceStartedAtUTC = startedAt
+        evidenceFinishedAtUTC = nowUTC()
+      }
+      return RuntimeAgentExecutionReceipt(
         executor: .agent,
-        operationReference: request.reference,
-        jobID: jobID,
-        targetID: targetID,
-        bindingRevision: bindingRevision,
-        catalogDigest: catalogDigest,
-        authorityReference: request.capabilityReference ?? "default-read-only-policy",
+        executorID: "arkdeck-device-runtime-agent",
+        operationReference: trustedFacts?.operationReference ?? request.reference,
+        jobID: trustedFacts?.jobID ?? jobID,
+        targetID: trustedFacts?.targetID ?? targetID,
+        bindingRevision: evidenceBindingRevision,
+        catalogDigest: trustedFacts?.catalogDigest ?? catalogDigest,
+        providerID: trustedFacts?.providerID ?? "",
+        executionMode: trustedFacts?.executionMode ?? "execute",
+        actualEffect: trustedFacts?.actualEffect,
+        authority: trustedFacts?.authority,
+        stepKinds: trustedFacts?.actualStepKinds ?? [],
+        evidenceObservation: trustedFacts?.observation,
+        firstEvidenceStepAtUTC: trustedFacts?.firstEvidenceStepAtUTC,
+        outcomeUnknown: trustedFacts?.outcomeUnknown ?? false,
         humanActions: humanActions,
-        terminalState: state,
-        artifacts: artifacts,
-        startedAtUTC: startedAt,
-        finishedAtUTC: nowUTC())
+        terminalState: trustedFacts?.terminalState ?? state,
+        artifacts: trustedFacts?.artifacts ?? [],
+        evidenceBlockers: blockers + (trustedFacts?.blockers ?? []),
+        startedAtUTC: evidenceStartedAtUTC,
+        finishedAtUTC: evidenceFinishedAtUTC)
     }
 
     // Resolve the target: an explicit one, an already adopted one, or
     // adoption - which is where a human may be needed.
     var targetID = request.targetID
     var bindingRevision: Int?
-    if targetID == nil {
-      let listed = try client.request(method: "target.list")
-      if case .array(let rows) = listed, let first = rows.first,
-        case .object(let fields) = first, case .string(let existing)? = fields["targetId"]
-      {
-        targetID = existing
-        if case .integer(let revision)? = fields["bindingRevision"] {
-          bindingRevision = Int(revision)
+    let listed = try client.request(method: "target.list")
+    if case .array(let rows) = listed {
+      for row in rows {
+        guard case .object(let fields) = row,
+          case .string(let existing)? = fields["targetId"]
+        else { continue }
+        if targetID == nil || targetID == existing {
+          targetID = existing
+          if case .integer(let revision)? = fields["bindingRevision"] {
+            bindingRevision = Int(revision)
+          }
+          break
         }
       }
     }
@@ -221,12 +261,16 @@ public struct AgentRuntimeExecutor: Sendable {
 
     // Build the typed request. Governance identifiers do not exist on
     // this surface, so none can leak into a runtime job.
+    var target: [String: JSONValue] = ["targetId": .string(resolvedTarget)]
+    if let bindingRevision {
+      target["expectedBindingRevision"] = .integer(Int64(bindingRevision))
+    }
     var payload: [String: JSONValue] = [
       "documentType": .string("runtime-operation-request"),
       "schemaVersion": .string("2.0.0"),
       "requestId": .string("agent-\(UUID().uuidString.prefix(8).lowercased())"),
       "idempotencyKey": .string("agent-\(UUID().uuidString.lowercased())"),
-      "target": .object(["targetId": .string(resolvedTarget)]),
+      "target": .object(target),
       "operation": .object([
         "id": .string(request.operationID),
         "version": .integer(Int64(request.operationVersion)),
@@ -271,21 +315,23 @@ public struct AgentRuntimeExecutor: Sendable {
       throw RuntimeAgentExecutorError.malformedResponse("run returned no state")
     }
 
-    var artifactIDs: [String] = []
-    if let listed = try? client.request(
-      method: "artifact.list", params: ["jobId": .string(jobID)]),
-      case .array(let rows) = listed
-    {
-      for row in rows {
-        if case .object(let fields) = row, case .string(let identifier)? = fields["artifactId"] {
-          artifactIDs.append(identifier)
-        }
-      }
+    var trustedFacts: RuntimeHardwareEvidenceTrustedFacts?
+    var evidenceBlockers: [String] = []
+    do {
+      let evidence = try client.request(
+        method: "job.evidence", params: ["jobId": .string(jobID)])
+      let encoder = JSONEncoder()
+      encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+      let data = try encoder.encode(evidence)
+      trustedFacts = try JSONDecoder().decode(
+        RuntimeHardwareEvidenceTrustedFacts.self, from: data)
+    } catch {
+      evidenceBlockers.append("trustedEvidenceQuery:\(error)")
     }
 
     let final = receipt(
       jobID: jobID, targetID: resolvedTarget, bindingRevision: bindingRevision,
-      state: state, artifacts: artifactIDs)
+      state: state, trustedFacts: trustedFacts, blockers: evidenceBlockers)
     if state == "succeeded" { return .completed(final) }
     if state == "waitingForRecovery" {
       // An unknown outcome is not something the agent may resolve on its

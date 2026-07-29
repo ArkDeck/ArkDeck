@@ -161,6 +161,36 @@ final class DeviceBootstrapContractTests: XCTestCase {
     XCTAssertEqual(try reopened.list().count, 1)
   }
 
+  func testLegacyTargetRecordRemainsReadableWithoutCachedEvidenceFields() throws {
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    let legacy = Data(
+      """
+      {
+        "schemaVersion": "1.0.0",
+        "targets": [{
+          "targetID": "TGT-LEGACY",
+          "stablePhysicalIdentitySHA256": "\(String(repeating: "a", count: 64))",
+          "bindingRevision": 1,
+          "connectKey": "legacy-address",
+          "toolVersion": "3.2.0f",
+          "adoptedAtUTC": "2026-07-01T00:00:00Z"
+        }]
+      }
+      """.utf8)
+    try legacy.write(to: directory.appendingPathComponent("targets.json"))
+    let store = try RuntimeTargetStore(directoryURL: directory)
+    let record = try XCTUnwrap(store.find(targetID: "TGT-LEGACY"))
+    XCTAssertEqual(record.bindingRevision, 1)
+    XCTAssertEqual(record.connectKey, "legacy-address")
+    XCTAssertEqual(
+      Set(Mirror(reflecting: record).children.compactMap(\.label)),
+      Set([
+        "targetID", "stablePhysicalIdentitySHA256", "bindingRevision", "connectKey",
+        "toolVersion", "adoptedAtUTC",
+      ]),
+      "the target store must not cache or synthesize same-operation evidence facts")
+  }
+
   func testBootstrapActionVocabularyIsObservationOnly() {
     // Structural E0: every case of the bootstrap action enum maps to a
     // provider action whose effect is at most readOnly. A future mutation

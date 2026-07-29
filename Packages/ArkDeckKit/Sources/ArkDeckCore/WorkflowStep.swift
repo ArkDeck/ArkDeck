@@ -1023,6 +1023,7 @@ private enum WorkflowStepValidator {
         "actionId",
         allowed: [
           "deviceSummary", "systemProperties", "processList", "packageInfo", "storageUsage",
+          "deviceModel", "firmwareBuild",
         ]
       )
       try reader.validatedOptions("parameters")

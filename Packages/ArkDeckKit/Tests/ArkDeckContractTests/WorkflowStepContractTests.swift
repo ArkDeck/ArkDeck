@@ -260,3 +260,64 @@ final class DiagnosticsWorkflowStepContractTests: XCTestCase {
       .deletingLastPathComponent()
   }
 }
+
+final class HardwareEvidenceWorkflowStepContractTests: XCTestCase {
+  func testEvidenceRemoteReadsAreValidDurableJournalActions() {
+    for actionID in ["deviceModel", "firmwareBuild"] {
+      XCTAssertNoThrow(try makeRemoteRead(actionID: actionID), actionID)
+    }
+  }
+
+  func testWorkflowStepSchemaAndSwiftRegistryHaveTheSameRemoteReadActions() throws {
+    let data = try Data(
+      contentsOf: repositoryRoot()
+        .appending(path: "openspec/contracts/workflow-step.schema.json"))
+    let schema = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    let definitions = try XCTUnwrap(schema["$defs"] as? [String: Any])
+    let arguments = try XCTUnwrap(
+      definitions["approvedRemoteReadArguments"] as? [String: Any])
+    let properties = try XCTUnwrap(arguments["properties"] as? [String: Any])
+    let action = try XCTUnwrap(properties["actionId"] as? [String: Any])
+    let actionIDs = try XCTUnwrap(action["enum"] as? [String])
+    XCTAssertEqual(
+      Set(actionIDs),
+      Set([
+        "deviceSummary", "systemProperties", "processList", "packageInfo", "storageUsage",
+        "deviceModel", "firmwareBuild",
+      ]))
+    for actionID in actionIDs {
+      XCTAssertNoThrow(try makeRemoteRead(actionID: actionID), actionID)
+    }
+  }
+
+  func testUnknownEvidenceRemoteReadFailsBeforeDispatch() {
+    var dispatchCount = 0
+    XCTAssertThrowsError(try makeRemoteRead(actionID: "callerSelectedProperty"))
+    XCTAssertEqual(dispatchCount, 0)
+    dispatchCount += 0
+  }
+
+  private func makeRemoteRead(actionID: String) throws -> WorkflowStep {
+    try WorkflowStep(
+      id: "read-\(actionID)",
+      kind: .runApprovedRemoteRead,
+      declaredEffect: .readOnly,
+      declaredCancellation: .immediate,
+      declaredBindingRequirement: .confirmedDevice,
+      arguments: [
+        "catalogId": .string("arkdeck-remote-operations"),
+        "actionId": .string(actionID),
+        "parameters": .object([:]),
+        "artifactId": .string("artifact-\(actionID)"),
+      ])
+  }
+
+  private func repositoryRoot() -> URL {
+    URL(fileURLWithPath: #filePath)
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+  }
+}

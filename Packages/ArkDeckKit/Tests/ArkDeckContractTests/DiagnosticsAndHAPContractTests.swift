@@ -25,7 +25,11 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
       ProviderFacts(
         providerID: "hdc", toolVersion: "3.2.0f",
         toolSHA256: String(repeating: "a", count: 64), serverFacts: [:],
-        deviceIdentitySHA256: nil, deviceMode: nil, buildFingerprint: nil,
+        targetID: targetID, bindingRevision: 7,
+        deviceIdentitySHA256:
+          "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+        executionConnectKey: "150100424a544e4600",
+        deviceMode: nil, buildFingerprint: nil,
         profileID: "openharmony-standard@1", collectedAtUTC: "2026-07-29T00:00:00Z")
     }
   }
@@ -39,6 +43,9 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
       var packageInstalled = true
       var processRunning = true
       var hilogEmpty = false
+      var targetRows = "150100424a544e4600\t\tUSB\tConnected\tlocalhost\n"
+      var modelValue = "DAYU200\n"
+      var firmwareValue = "OpenHarmony-4.1-release\n"
     }
 
     let script: Script
@@ -71,7 +78,7 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
         return receipt("Client version:Ver: 3.2.0f, server version:Ver: 3.2.0f\n")
       case .observeDevice, .listDeviceCandidates:
         note("observeDevice")
-        return receipt("150100424a544e4600\t\tUSB\tConnected\tlocalhost\n")
+        return receipt(script.targetRows)
       case .captureHilog:
         note("captureHilog")
         return receipt(script.hilogEmpty ? "" : "01-01 00:00:00 I app: hello\n")
@@ -114,9 +121,15 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
       case .uninstallPackage:
         note("uninstallPackage")
         return receipt("")
+      case .queryProperty(.productModel):
+        note("evidenceModel")
+        return receipt(script.modelValue)
+      case .queryProperty(.fullBuildVersion):
+        note("evidenceFirmware")
+        return receipt(script.firmwareValue)
       case .queryProperty:
         note("queryProperty")
-        return receipt("DAYU200\n")
+        return receipt("provider-property\n")
       case .createPortForward, .removePortForward:
         note("portForward")
         return receipt("")
@@ -156,7 +169,7 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
         "schemaVersion": "2.0.0",
         "requestId": "req-capture",
         "idempotencyKey": "\(key)",
-        "target": { "targetId": "TGT-1" },
+        "target": { "targetId": "TGT-1", "expectedBindingRevision": 7 },
         "operation": { "id": "capture.diagnostics", "version": 1 },
         \(auth)
         "inputs": { \(trace) "durationSeconds": 5 }
@@ -175,7 +188,7 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
         "schemaVersion": "2.0.0",
         "requestId": "req-hap",
         "idempotencyKey": "\(key)",
-        "target": { "targetId": "TGT-1" },
+        "target": { "targetId": "TGT-1", "expectedBindingRevision": 7 },
         "operation": { "id": "debug.hap", "version": 1 },
         \(auth)
         "inputs": {
@@ -330,6 +343,8 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
     // carry a UI-dump action it does not have.
     XCTAssertTrue(journal.contains("\"boundedHilog\""), "HiLog intent must name its own action")
     XCTAssertTrue(journal.contains("\"arkdeck-diagnostics\""))
+    XCTAssertTrue(journal.contains("\"deviceModel\""))
+    XCTAssertTrue(journal.contains("\"firmwareBuild\""))
     XCTAssertFalse(
       journal.contains("\"nodeSummary\""),
       "no step may borrow a UI-dump action id: \(journal.prefix(400))")
@@ -340,6 +355,32 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
     let hilog = try XCTUnwrap(descriptor.steps.first { $0.stepID == "capture-hilog" })
     XCTAssertEqual(hilog.actionReference?.actionID, "boundedHilog")
     XCTAssertEqual(hilog.actionReference?.catalogID, "arkdeck-diagnostics")
+  }
+
+  func testIncompleteEvidencePreflightDispatchesNoHAPMutation() async throws {
+    let vectors: [ScriptedDispatcher.Script] = [
+      .init(targetRows: "different\t\tUSB\tConnected\tlocalhost\n"),
+      .init(
+        targetRows:
+          "150100424a544e4600\t\tUSB\tConnected\tlocalhost\n"
+          + "150100424a544e4600\t\tUSB\tConnected\tlocalhost\n"),
+      .init(targetRows: "150100424a544e4600\t\tBLUETOOTH\tConnected\tlocalhost\n"),
+      .init(modelValue: "\n"),
+      .init(firmwareValue: "\n"),
+    ]
+    for (index, script) in vectors.enumerated() {
+      let dispatcher = ScriptedDispatcher(script: script)
+      let (engine, capabilities, _) = try makeEngine(dispatcher: dispatcher)
+      if index == 0 { try await installE1Capability(capabilities) }
+      let acceptance = try await engine.submit(
+        hapRequest(key: "idem-hap-preflight-\(index)"))
+      let status = try await engine.run(jobID: acceptance.jobID)
+      XCTAssertNotEqual(status.state, "succeeded", "vector \(index)")
+      XCTAssertFalse(
+        dispatcher.dispatchedActions.contains("sendArtifact"),
+        "no E1 dispatch is allowed before complete preflight: vector \(index)")
+      XCTAssertFalse(dispatcher.dispatchedActions.contains("installPackage"), "vector \(index)")
+    }
   }
 
   /// The readiness requires the constructed WorkflowStep to carry the

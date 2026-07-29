@@ -2,8 +2,8 @@
 
 ## TASK-AHE-001 — Promote V3 and close trusted Runtime evidence projection
 
-- Status:ready（仅在 r6 proposal PR 被维护者 review + merge 后生效；合并前 current
-  main 的 r5 任务因 generator Allowed-path 漏项保持 blocked）
+- Status:done（实现、contract/fake verification 与 run evidence 随同一 PR 交付；
+  change 级 verified 仍须维护者在独立 PR 确认）
 - Historical Status:blocked（r1 开工后审计发现唯一生产 facts port 与 Catalog
   preflight 不可闭合 model/firmware/transport/fresh time；r2 开工后审计发现
   `runApprovedRemoteRead` actionRef 无法由 current Catalog schema/generator 表达，

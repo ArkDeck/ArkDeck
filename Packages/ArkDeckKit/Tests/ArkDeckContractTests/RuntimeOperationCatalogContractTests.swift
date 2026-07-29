@@ -9,7 +9,9 @@ final class DiagnosticsRuntimeOperationCatalogContractTests: XCTestCase {
     for operation in RuntimeOperationCatalog.operations {
       for step in operation.steps {
         let key = "\(operation.reference)/\(step.stepID)"
-        if step.kind == .captureRemoteStdout {
+        if step.kind == .captureRemoteStdout
+          || (step.kind == .runApprovedRemoteRead && step.actionReference != nil)
+        {
           guard let actionReference = step.actionReference else {
             return XCTFail("\(key) has no generated action reference")
           }
@@ -17,7 +19,7 @@ final class DiagnosticsRuntimeOperationCatalogContractTests: XCTestCase {
         } else {
           XCTAssertNil(
             step.actionReference,
-            "\(key) must not carry a stdout action reference")
+            "\(key) must not carry an action reference")
         }
       }
     }
@@ -31,6 +33,20 @@ final class DiagnosticsRuntimeOperationCatalogContractTests: XCTestCase {
           catalogID: "arkdeck-diagnostics", actionID: "componentTree"),
         "debug.hap@1/capture-diagnostics": CatalogActionReference(
           catalogID: "arkdeck-diagnostics", actionID: "boundedHilog"),
+        "observe.device@1/read-evidence-model": CatalogActionReference(
+          catalogID: "arkdeck-remote-operations", actionID: "deviceModel"),
+        "observe.device@1/read-evidence-firmware": CatalogActionReference(
+          catalogID: "arkdeck-remote-operations", actionID: "firmwareBuild"),
+        "capture.diagnostics@1/read-evidence-model": CatalogActionReference(
+          catalogID: "arkdeck-remote-operations", actionID: "deviceModel"),
+        "capture.diagnostics@1/read-evidence-firmware": CatalogActionReference(
+          catalogID: "arkdeck-remote-operations", actionID: "firmwareBuild"),
+        "debug.hap@1/read-evidence-model": CatalogActionReference(
+          catalogID: "arkdeck-remote-operations", actionID: "deviceModel"),
+        "debug.hap@1/read-evidence-firmware": CatalogActionReference(
+          catalogID: "arkdeck-remote-operations", actionID: "firmwareBuild"),
+        "debug.hap@1/package-readback": CatalogActionReference(
+          catalogID: "arkdeck-remote-operations", actionID: "packageInfo"),
         "flash.dayu200@1/capture-post-flash-diagnostics": CatalogActionReference(
           catalogID: "arkdeck-diagnostics", actionID: "boundedHilog"),
       ])

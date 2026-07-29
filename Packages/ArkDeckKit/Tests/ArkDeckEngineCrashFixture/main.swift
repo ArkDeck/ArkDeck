@@ -36,8 +36,12 @@ struct FixtureFactsPort: HDCObservationFactsPort {
     ProviderFacts(
       providerID: "hdc", toolVersion: "3.2.0f",
       toolSHA256: String(repeating: "a", count: 64), serverFacts: [:],
-      deviceIdentitySHA256: nil, deviceMode: nil, buildFingerprint: nil,
-      profileID: "openharmony-standard@1", collectedAtUTC: "2026-07-29T00:00:00Z")
+      targetID: targetID, bindingRevision: 7,
+      deviceIdentitySHA256: "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+      executionConnectKey: String(repeating: "a", count: 32),
+      deviceModel: nil, deviceMode: "hdc", buildFingerprint: nil, transport: nil,
+      profileID: "openharmony-standard@1", collectedAtUTC: "2026-07-29T00:00:00Z",
+      sourceObservedAtUTC: "2026-07-29T00:00:00Z")
   }
 }
 
@@ -100,7 +104,7 @@ let request = Data(
     "schemaVersion": "2.0.0",
     "requestId": "req-crash",
     "idempotencyKey": "idem-crash-0001",
-    "target": { "targetId": "TGT-CRASH-01" },
+    "target": { "targetId": "TGT-CRASH-01", "expectedBindingRevision": 7 },
     "operation": { "id": "observe.device", "version": 1 }
   }
   """.utf8)

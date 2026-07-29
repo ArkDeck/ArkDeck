@@ -65,6 +65,7 @@ public struct HDCParsedServerCheck: Sendable, Equatable {
 
 public struct HDCParsedTargetLine: Sendable, Equatable {
   public let connectKey: String
+  public let transport: String
   public let state: String
 }
 
@@ -162,8 +163,8 @@ public enum HDCObservationSemanticParser {
   }
 
   /// Parses `hdc list targets -v` output. Each target line is
-  /// `<connectKey>\t...<state>...` (columns whitespace-separated); the exact
-  /// `[Empty]` sentinel parses to an empty list. Line order is irrelevant to
+  /// `<connectKey>\t\t<transport>\t<state>\tlocalhost`; the exact `[Empty]`
+  /// sentinel parses to an empty list. Line order is irrelevant to
   /// equality of the parsed value's set semantics; the parser preserves
   /// input order for display but callers compare normalized sets.
   public static func parseTargetList(
@@ -186,16 +187,27 @@ public enum HDCObservationSemanticParser {
     }
     var targets: [HDCParsedTargetLine] = []
     for line in lines {
-      let columns = line.split(whereSeparator: { $0 == "\t" || $0 == " " })
+      let columns = line.split(separator: "\t", omittingEmptySubsequences: false)
         .map(String.init)
-      guard columns.count >= 2 else {
-        return .malformed(reason: "target line with fewer than 2 columns")
+      guard columns.count == 5, columns[1].isEmpty, columns[4] == "localhost" else {
+        return .malformed(reason: "target line is not the registered 5-column family")
       }
       let key = columns[0]
-      guard !key.isEmpty, key.count <= 128 else {
+      guard !key.isEmpty, key.utf8.count <= 128,
+        key.unicodeScalars.allSatisfy({ $0.isASCII && !$0.properties.isWhitespace })
+      else {
         return .malformed(reason: "connect key length out of bounds")
       }
-      targets.append(HDCParsedTargetLine(connectKey: key, state: columns[1]))
+      let transport = columns[2]
+      guard ["USB", "TCP", "UART"].contains(transport) else {
+        return .malformed(reason: "unregistered target transport \(transport)")
+      }
+      let state = columns[3]
+      guard ["Connected", "Unauthorized", "Offline"].contains(state) else {
+        return .malformed(reason: "unregistered target state \(state)")
+      }
+      targets.append(
+        HDCParsedTargetLine(connectKey: key, transport: transport.lowercased(), state: state))
     }
     return .parsed(HDCParsedTargetList(targets: targets))
   }

@@ -243,6 +243,31 @@ public struct RuntimeControlPlaneHandler: Sendable {
         return failure(id: request.id, code: .notFound, message: "unknown job \(jobID)")
       }
 
+    case "job.evidence":
+      guard case .string(let jobID)? = request.params?["jobId"] else {
+        return failure(id: request.id, code: .invalidParams, message: "jobId is required")
+      }
+      do {
+        let snapshot = try await engine.evidenceSnapshot(jobID: jobID)
+        var artifacts: [RuntimeVerifiedArtifactEvidence] = []
+        var blockers: [String] = []
+        if let artifactStore {
+          do {
+            artifacts = try await artifactStore.verifiedEvidenceArtifacts(jobID: jobID)
+          } catch {
+            blockers.append("artifactVerification:\(error)")
+          }
+        } else {
+          blockers.append("artifactStoreUnavailable")
+        }
+        return success(
+          id: request.id,
+          result: Self.encodeEvidence(
+            snapshot: snapshot, artifacts: artifacts, blockers: blockers))
+      } catch {
+        return failure(id: request.id, code: .notFound, message: "unknown job \(jobID)")
+      }
+
     case "job.cancel":
       guard case .string(let jobID)? = request.params?["jobId"] else {
         return failure(id: request.id, code: .invalidParams, message: "jobId is required")
@@ -455,6 +480,98 @@ public struct RuntimeControlPlaneHandler: Sendable {
       "waitingForHuman": .bool(status.waitingForHuman),
       "outcomeUnknown": .bool(status.outcomeUnknown),
       "timeline": .array(status.timeline.map(JSONValue.string)),
+    ])
+  }
+
+  private static func encodeEvidence(
+    snapshot: RuntimeJobEvidenceSnapshot,
+    artifacts: [RuntimeVerifiedArtifactEvidence],
+    blockers: [String]
+  ) -> JSONValue {
+    func optionalString(_ value: String?) -> JSONValue {
+      value.map(JSONValue.string) ?? .null
+    }
+    func optionalInteger(_ value: Int?) -> JSONValue {
+      value.map { .integer(Int64($0)) } ?? .null
+    }
+    let effectLevel: String?
+    switch snapshot.actualEffect {
+    case "hostOnly", "readOnly": effectLevel = "E0"
+    case "deviceMutation": effectLevel = "E1"
+    case "destructive": effectLevel = "E2"
+    default: effectLevel = nil
+    }
+    let authority: JSONValue
+    if let value = snapshot.authority {
+      authority = .object([
+        "kind": .string(value.kind.rawValue),
+        "reference": .string(value.reference),
+        "admittedAtUtc": .string(value.admittedAtUTC),
+        "validUntilUtc": optionalString(value.validUntilUTC),
+        "consumptionFingerprintSha256": optionalString(
+          value.consumptionFingerprintSHA256),
+      ])
+    } else {
+      authority = .null
+    }
+    let observation: JSONValue
+    if let value = snapshot.observation {
+      observation = .object([
+        "targetId": optionalString(value.targetID),
+        "bindingRevision": optionalInteger(value.bindingRevision),
+        "stableIdentitySha256": optionalString(value.stableIdentitySHA256),
+        "model": optionalString(value.model),
+        "firmware": optionalString(value.firmware),
+        "transport": optionalString(value.transport),
+        "providerId": .string(value.providerID),
+        "toolVersion": .string(value.toolVersion),
+        "toolSha256": .string(value.toolSHA256),
+        "confirmedAtUtc": optionalString(value.confirmedAtUTC),
+        "confirmationMethod": .string(value.confirmationMethod),
+        "preflightSteps": .array(
+          value.preflightSteps.map {
+            .object([
+              "stepId": .string($0.stepID),
+              "stepKind": .string($0.stepKind),
+              "outcomeAtUtc": .string($0.outcomeAtUTC),
+            ])
+          }),
+      ])
+    } else {
+      observation = .null
+    }
+    return .object([
+      "jobId": .string(snapshot.jobID),
+      "operationReference": .string(snapshot.operationReference),
+      "catalogDigest": .string(snapshot.catalogDigest),
+      "targetId": .string(snapshot.targetID),
+      "bindingRevision": optionalInteger(snapshot.bindingRevision),
+      "providerId": .string(snapshot.providerID),
+      "actualEffect": optionalString(effectLevel),
+      "authority": authority,
+      "observation": observation,
+      "actualStepKinds": .array(snapshot.actualStepKinds.map(JSONValue.string)),
+      "executionMode": .string(snapshot.executionMode),
+      "terminalState": .string(snapshot.terminalState),
+      "outcomeUnknown": .bool(snapshot.outcomeUnknown),
+      "startedAtUtc": optionalString(snapshot.startedAtUTC),
+      "firstEvidenceStepAtUtc": optionalString(snapshot.firstEvidenceStepAtUTC),
+      "finishedAtUtc": optionalString(snapshot.finishedAtUTC),
+      "artifacts": .array(
+        artifacts.map { artifact in
+          .object([
+            "reference": .string(artifact.reference),
+            "sha256": .string(artifact.sha256),
+            "jobId": .string(artifact.jobID),
+            "targetId": .string(artifact.targetID),
+            "bindingRevision": optionalInteger(artifact.bindingRevision),
+            "stableIdentitySha256": optionalString(artifact.stableIdentitySHA256),
+            "providerId": .string(artifact.providerID),
+            "byteCount": .integer(Int64(artifact.byteCount)),
+            "bytesVerified": .bool(true),
+          ])
+        }),
+      "blockers": .array(blockers.map(JSONValue.string)),
     ])
   }
 

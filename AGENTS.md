@@ -56,7 +56,7 @@
 ## Agent 禁令
 
 - 不得为让实现或测试通过而修改 accepted Core requirement、Safety invariant 或 Acceptance Scenario;此类变化必须走 change proposal 并由人类批准合并。
-- 对真实设备的 destructive 操作(Flash、erase、format、unlock、真实 update)只能在持有维护者经 merged PR 预先批准、与待执行计划逐项精确一致的 standing authorization 时执行(POL-AGENT-002 执行分级 E2);授权缺失、过期或任一项不匹配时执行门必须 fail closed(零 dispatch)。只读采集与 host 侧分析(E0)在 approved change 的 ready 任务范围内可无人值守执行;可逆 deviceMutation(E1)另需 per-device typed capability evidence。evidence 必须如实记录 executor 身份(human|agent)、authorizationRef(agent 执行必填)、目标确认与时间。Agent 不得自行创建、修改或批准 standing authorization。
+- 对真实设备的 destructive 操作(Flash、erase、format、unlock、真实 update)只能在持有维护者经 merged PR 预先批准、与待执行计划逐项精确一致的 standing authorization 时执行(POL-AGENT-002 执行分级 E2);授权缺失、过期或任一项不匹配时执行门必须 fail closed(零 dispatch)。只读采集与 host 侧分析(E0)在 approved change 的 ready 任务范围内可无人值守执行;可逆 deviceMutation(E1)另需 per-device typed capability evidence。evidence 必须如实记录 executor 身份(human|agent)、按实际 effect 匹配的 authority reference（Agent E0 = default read-only policy，E1 = RuntimeCapability，E2 = standing authorization）、目标确认与时间。Agent 不得自行创建、修改或批准 standing authorization。
 - 不得把 simulation、fake、plan-only 结果记为真实设备或硬件验收;evidence 必须如实分类。
 - 不得在设备身份、外部副作用结果或 destructive step 状态不确定时猜测继续(fail closed)。
 - 不得使用 host shell 字符串拼接外部命令。

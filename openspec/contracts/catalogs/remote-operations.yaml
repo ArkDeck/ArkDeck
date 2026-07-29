@@ -34,6 +34,16 @@ operations:
     minimum_effect: readOnly
     cancellation: immediate
     binding: confirmedDevice
+  - id: deviceModel
+    step_kind: runApprovedRemoteRead
+    minimum_effect: readOnly
+    cancellation: immediate
+    binding: confirmedDevice
+  - id: firmwareBuild
+    step_kind: runApprovedRemoteRead
+    minimum_effect: readOnly
+    cancellation: immediate
+    binding: confirmedDevice
   - id: requestRootMode
     step_kind: runApprovedRemoteMutation
     minimum_effect: deviceMutation
