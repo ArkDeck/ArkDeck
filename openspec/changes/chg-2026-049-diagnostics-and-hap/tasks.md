@@ -6,12 +6,14 @@
 
 ## TASK-DHA-001 — MU-4 垂直交付:Agent runner + Artifact + diagnostics/HAP
 
-- Status:ready（**仅在**承载
-  `evidence/runs/TASK-DHA-001/window-attempt-2-plan.md` 的独立 D2 window
-  PR 经维护者 review/merge 后生效；attempt#2 只恢复一次
-  `DHA-HW-001` E0 Agent execution。attempt#1 的 blocked evidence 已由
-  PR #791 合入 `d037768f5e92850861219cd64edf53bfbb4b56ae`；
-  contract/fake 结论不变，`DHA-HW-002` 仍未执行）
+- Status:blocked（`DHA-HW-001` attempt#2 的 E0 runtime job 于
+  2026-07-29 succeeded，但现行
+  `openspec/contracts/hardware-evidence.schema.json` V2 强制 human
+  `operator` 且缺少 Agent `executor/authorizationRef`，receipt 又未提供
+  schema 必填 firmware/target-confirmation 时间，故不能伪装成有效
+  realHardware acceptance evidence，AC **未宣告 PASS**；见
+  `evidence/runs/TASK-DHA-001/window-attempt-2.md`。contract/fake 结论
+  不变，`DHA-HW-002` 未执行）
 - Grade:D1(代码/契约/fake 面。真机 host Runtime 由 Device Runtime Agent
   执行;**E1 capability 的签发/接受是 D2 决策**,独立载体,Agent 不得
   自签或自批;人类只提供必要物理协助)
