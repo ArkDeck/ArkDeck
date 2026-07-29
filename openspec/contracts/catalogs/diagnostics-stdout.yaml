@@ -1,0 +1,31 @@
+schema_version: 1.0.0
+catalog: arkdeck-diagnostics
+
+actions:
+  - id: boundedHilog
+    step_kind: captureRemoteStdout
+    output_mode: stdout
+    required_inputs: [durationSeconds, filters, byteBudget]
+    limits:
+      durationSeconds: { type: integer, minimum: 1, maximum: 600 }
+      filters:
+        { type: stringArray, maximum_items: 16, maximum_length: 200,
+          token_pattern: "^[A-Za-z0-9:*./_-]+$" }
+      byteBudget: { type: integer, minimum: 1024, maximum: 134217728 }
+  - id: componentTree
+    step_kind: captureRemoteStdout
+    output_mode: stdout
+    required_inputs: [byteBudget]
+    limits:
+      byteBudget: { type: integer, minimum: 1024, maximum: 67108864 }
+
+rules:
+  unknown_action: reject
+  executable_fields: forbidden
+  caller_remote_path: forbidden
+  lowering: exact-action-id-only
+  parameters: reject-undeclared-or-out-of-bounds
+
+behavior_specs:
+  - openspec/specs/debug-workbench/spec.md
+  - openspec/specs/ui-dump/spec.md

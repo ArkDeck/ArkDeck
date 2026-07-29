@@ -124,13 +124,67 @@
           "type": "string",
           "pattern": "^[a-z][a-zA-Z0-9]*$"
         },
+        "actionRef": { "$ref": "#/$defs/actionRef" },
         "effect": { "$ref": "#/$defs/effect" },
         "cancellation": { "$ref": "#/$defs/cancellation" },
         "binding": { "$ref": "#/$defs/binding" },
         "optional": { "type": "boolean" },
         "compensation": { "$ref": "#/$defs/compensation" },
         "notes": { "type": "string", "maxLength": 400 }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "kind": { "const": "captureRemoteStdout" } },
+            "required": ["kind"]
+          },
+          "then": { "required": ["actionRef"] },
+          "else": { "not": { "required": ["actionRef"] } }
+        }
+      ]
+    },
+    "actionRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["catalogId", "actionId"],
+      "properties": {
+        "catalogId": {
+          "enum": ["arkui-ui-dump", "arkdeck-diagnostics"]
+        },
+        "actionId": {
+          "enum": [
+            "nodeSummary",
+            "elementTree",
+            "fullDefaultTree",
+            "componentDetail",
+            "renderTreeLegacy",
+            "boundedHilog",
+            "componentTree"
+          ]
+        }
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "catalogId": { "const": "arkui-ui-dump" },
+            "actionId": {
+              "enum": [
+                "nodeSummary",
+                "elementTree",
+                "fullDefaultTree",
+                "componentDetail",
+                "renderTreeLegacy"
+              ]
+            }
+          }
+        },
+        {
+          "properties": {
+            "catalogId": { "const": "arkdeck-diagnostics" },
+            "actionId": { "enum": ["boundedHilog", "componentTree"] }
+          }
+        }
+      ]
     },
     "fieldTable": {
       "type": "object",

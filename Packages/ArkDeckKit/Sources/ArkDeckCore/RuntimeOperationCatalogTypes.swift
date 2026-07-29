@@ -28,6 +28,16 @@ public enum CatalogStepCompensation: String, CaseIterable, Codable, Sendable {
   case rollbackPublished
 }
 
+public struct CatalogActionReference: Equatable, Sendable {
+  public let catalogID: String
+  public let actionID: String
+
+  public init(catalogID: String, actionID: String) {
+    self.catalogID = catalogID
+    self.actionID = actionID
+  }
+}
+
 public enum CatalogFieldType: String, CaseIterable, Codable, Sendable {
   case string
   case integer
@@ -98,6 +108,7 @@ public struct CatalogStepDescriptor: Equatable, Sendable {
   public let binding: WorkflowBindingRequirement
   public let isOptional: Bool
   public let compensation: CatalogStepCompensation
+  public let actionReference: CatalogActionReference?
 
   public init(
     stepID: String,
@@ -106,7 +117,8 @@ public struct CatalogStepDescriptor: Equatable, Sendable {
     cancellation: WorkflowCancellationPolicy,
     binding: WorkflowBindingRequirement,
     isOptional: Bool,
-    compensation: CatalogStepCompensation
+    compensation: CatalogStepCompensation,
+    actionReference: CatalogActionReference? = nil
   ) {
     self.stepID = stepID
     self.kind = kind
@@ -115,6 +127,7 @@ public struct CatalogStepDescriptor: Equatable, Sendable {
     self.binding = binding
     self.isOptional = isOptional
     self.compensation = compensation
+    self.actionReference = actionReference
   }
 }
 

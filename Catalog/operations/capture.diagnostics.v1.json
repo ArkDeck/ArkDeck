@@ -83,6 +83,10 @@
     {
       "stepID": "capture-hilog",
       "kind": "captureRemoteStdout",
+      "actionRef": {
+        "catalogId": "arkdeck-diagnostics",
+        "actionId": "boundedHilog"
+      },
       "effect": "readOnly",
       "cancellation": "immediate",
       "binding": "confirmedDevice",
@@ -92,6 +96,10 @@
     {
       "stepID": "capture-ui-dump",
       "kind": "captureRemoteStdout",
+      "actionRef": {
+        "catalogId": "arkdeck-diagnostics",
+        "actionId": "componentTree"
+      },
       "effect": "readOnly",
       "cancellation": "immediate",
       "binding": "confirmedDevice",

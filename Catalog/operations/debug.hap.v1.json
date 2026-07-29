@@ -117,6 +117,10 @@
     {
       "stepID": "capture-diagnostics",
       "kind": "captureRemoteStdout",
+      "actionRef": {
+        "catalogId": "arkdeck-diagnostics",
+        "actionId": "boundedHilog"
+      },
       "effect": "readOnly",
       "cancellation": "immediate",
       "binding": "confirmedDevice",

@@ -2,7 +2,12 @@
 
 ## TASK-WSC-001 — Close typed diagnostics stdout action identity
 
-- Status:ready
+- Status:done
+- Done evidence:
+  `evidence/runs/TASK-WSC-001/implementation-2026-07-29/run.md`
+  (Catalog action identity、generator/JSON Schema/Swift 闭包与零 dispatch
+  negatives；Swift 614 tests / 1 skipped / 0 failures；状态随本实现 PR
+  翻转，生效以维护者 merge 为准)
 - Grade:D1
 - Platform:macos
 - Requirements:`REQ-WF-001`
