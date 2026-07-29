@@ -841,11 +841,81 @@
 
 ## TASK-BRC-003 — 闭合 nested component 打包、签名与公证
 
-- Status:blocked（r1 D1 blocked-readiness；本记录只固定 package/sign/notary
+- Status:ready（r2 fresh D1 readiness；仅在维护者对本 readiness/evidence PR 的
+  exact head review/merge 后生效。`TASK-BRC-002R` 已闭合按需 materialization
+  handoff，维护者已在隔离 release environment 亲手完成 Developer ID/notary D2
+  configuration；本 PR 只接受其 sanitized、非秘密 preflight evidence 并重新 pin
+  current inputs/工具/失败门，不执行 package/sign/notarize/staple/install/upload，
+  不携 credential/private key/profile path/App/DMG/binary，也不开始
+  implementation/evidence。）
+- Historical Status:blocked（r1 D1 blocked-readiness；本记录只固定 package/sign/notary
   contract 并如实记录 release environment 与 unsigned artifact handoff 缺口。合入
   不构成 `ready`，不得开始 implementation/evidence。维护者完成下述 D2
   configuration 后，必须另开 fresh D1 readiness 并经 review/merge，才可开工。）
-- Readiness review:
+- Fresh readiness review（r2；audit base =
+  `333eec928cbbd7f273abffeebb3970f15ed33554`）：
+  - **Carrier/approval boundary:closed for review。**protected `main` 的 GitHub API
+    OID 与本地 `origin/main`/branch base 均为上述完整 OID；本 PR 只允许修改当前
+    `tasks.md` 与
+    `evidence/runs/TASK-BRC-003/readiness-r2.md`。`ready` 只在维护者 review/merge
+    后生效；D1 后零投机实现保持成立。
+  - **Approval/dependency ancestry:closed。**TASK-BRC-002 implementation
+    `182757cdc9ca191f2ce0a2d61dfce78440c74cd9`、done
+    `e9848ba274123bea46b98e39cbf989bd93dfc225`，以及 TASK-BRC-002R
+    readiness `90085a9fc1341e13a5b59ba1afb676b10907d976`、implementation
+    `9ff769d79df261f72c2b4dbcef5e48d68d8e520e`、evidence
+    `01e6f9a6605f4a3a9463dcab2bf5731bd012ef48`、done
+    `5a40e8968586232468a8691039d674c9e83d7526` 全部是 audit base 祖先。
+  - **Repository/input pins:closed。**r1 YAML block 中 registry/recipe/SBOM/
+    notices/source-manifest、BRC-002 run、Xcode project/scheme、App entitlement 与
+    两份 release doc 的 12 个 blob 在 audit base 上全部逐项不变；current
+    `tasks.md` base blob =
+    `de23d56688e713d90a2b12706e8d44651cffa164`，current component workflow
+    blob = `6242d0b4f3a1b8b15020803073b017c6a6911a61`。任一实现 base/pin 不等即停止并
+    fresh D1。
+  - **Unsigned artifact/materialization gate:closed for this window。**维护者
+    dispatch run `30233237693`（event `workflow_dispatch`、head
+    `01e6f9a6605f4a3a9463dcab2bf5731bd012ef48`、success）的 builder-A artifact
+    `8640763234`，API archive digest =
+    `sha256:3dc014b6e81a68942d9415a1bdb73faabbbb2472297d1ae14d7648a547628e67`，
+    `expired=false`，expires `2026-08-26T02:53:55Z`。r2 audit 从 GitHub
+    authenticated download 到 fresh `/private/tmp` 后独立检查并清理：component
+    247,488 bytes、SHA-256
+    `3caee2136551b4b849daf7e9a906813354f354f8adb61e5f092de49ec7a2e56a`、
+    regular arm64 Mach-O、minimum macOS 14.0、unsigned、零非 system dylib；
+    registry/SBOM/notices/source-manifest 与仓内副本逐字节一致。implementation
+    只能 materialize 此 exact artifact 到 fresh staging、先复验全部字段再签名；
+    artifact 过期/不可下载/API digest 或任一 extracted field 不等即零 archive/
+    sign/notary 并 fresh D1。artifact、staging 与绝对路径不入仓/evidence。
+  - **D2 release environment gate:closed by maintainer action。**opaque environment
+    ref = `maintainer-local-release-env-2026-07-29`；macOS 26.6 (`25G72`) arm64、
+    Xcode 26.6 (`17F113`)、`notarytool 1.1.2 (41)`。独立只读检查列出恰一条有效
+    `Developer ID Application` identity：SHA-1
+    `38E3B7650DF0CE1DEC0CC8C403614AA0C38B0B4C`、Team ID `8AQTYW5FKR`、
+    validity `2026-07-29T01:38:03Z`–`2027-02-01T22:12:15Z`、issuer Apple
+    Developer ID Certification Authority，valid-chain verdict PASS；opaque
+    Keychain notary profile 的 sanitized `notarytool history` preflight =
+    authentication PASS、submission count 0。零 credential value、Apple account、
+    private key、password、token、keychain/profile path/name 或 raw history 入仓。
+    每次 sign/notary 前必须重跑 identity/expiry/chain/auth preflight；任一不等即
+    fail closed 并 fresh D1。
+  - **Apple primary contract/tool gate:closed。**`2026-07-29` 重读 r1 列出的四份
+    Apple primary docs；current contract 仍要求 standard nested-code location、
+    inside-out Developer ID signing、secure timestamp、Hardened Runtime、
+    outermost DMG `notarytool` submission/log/ticket/staple，且禁止用签名
+    `--deep` 替代逐项签名。App Sandbox/Hardened Runtime entitlement 属现行
+    unrestricted entitlement，本 exact entitlement 集不引入 distribution
+    provisioning profile。system `xcodebuild`/`codesign`/`security`/`hdiutil`/
+    `spctl`/`shasum`/`file`/`otool` 与 Xcode `notarytool`/`stapler`/`vtool`/`lipo`
+    均可得；实现不得引入 PATH/Homebrew/动态下载 fallback。
+  - **Scope/privacy/concurrency gate:closed。**readiness capture 时 GitHub open PR
+    集合为空；本审计只做 source/GitHub metadata/Apple docs/credential
+    authentication 与临时 unsigned artifact inspection。component/App launch、
+    archive/package/sign/notary submission/staple/install/upload/update、
+    HDC/USB/device/E1/E2/deviceMutation/destructive/privilege/system mutation
+    counters 全为 0；临时 materialization 已删除。完整 sanitized record 与命令
+    结论见 `evidence/runs/TASK-BRC-003/readiness-r2.md`。
+- Historical readiness review（r1 blocked）:
   - **Approval/dependency gate:satisfied。**TASK-BRC-002 implementation/evidence
     #542 exact head `4d02b9945ecfe2db1e8af7adc98251a1b0ef9589` 经 `lvye` 于
     `2026-07-25T11:58:55Z` APPROVED，并以
@@ -1029,9 +1099,10 @@
   `REQ-UX-007`
 - Acceptance：`BRC-PACKAGE-001`、`AC-FLASH-013-01`、
   `AC-JOB-005-01`、`AC-UX-007-01`
-- Depends on：`TASK-BRC-002` done；独立 D1 readiness
-- Readiness input pins：见上方 r1 D1 blocked-readiness；D2
-  release-environment/artifact handoff 完成后仍须 fresh D1 才可实例化为 ready
+- Depends on：`TASK-BRC-002` done；`TASK-BRC-002R` done；独立 D1 readiness
+- Readiness input pins：见上方 r2 fresh readiness；任一 repository/artifact/
+  certificate/notary/tool pin 漂移、artifact 过期或本 readiness 未经维护者合入，
+  都保持/恢复 `blocked`
 - Applicable failure patterns：`AF-001`、`AF-002`、`AF-003`、`AF-007`、
   `AF-009`、`AF-010`、`AF-017`
 - Production reachability：ArkDeck Xcode/archive root → fixed nested component copy →
