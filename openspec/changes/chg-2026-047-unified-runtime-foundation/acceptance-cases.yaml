@@ -1,0 +1,65 @@
+---
+schema_version: 1.0.0
+change_id: CHG-2026-047-unified-runtime-foundation
+change_revision: 1
+platform: macos
+evidence_classes:
+- contract
+cases:
+- acceptance_id: URB-PROV-001
+  test_id: TEST-URB-PROV-001
+  method: >-
+    Device provider contract tests plus injection negatives across both
+    provider adapters registered in one engine.
+  expected_source: openspec/changes/chg-2026-047-unified-runtime-foundation/verification.md#urb-prov-001
+  minimum_evidence: contract
+  expected_result: >-
+    Typed actions are closed with no executable/argv surface; HDC and
+    Rockchip register under one job engine; verification is semantic and
+    reconcile fails closed.
+- acceptance_id: URB-HDC-001
+  test_id: TEST-URB-HDC-001
+  method: >-
+    Pure-move split audit with the full existing HDC suites unchanged, plus
+    a compatibility-profile parser matrix.
+  expected_source: openspec/changes/chg-2026-047-unified-runtime-foundation/verification.md#urb-hdc-001
+  minimum_evidence: contract
+  expected_result: >-
+    HDCProduction.swift is decomposed with zero behavior change; observation
+    outputs are judged by version profile plus semantic parsing with
+    explicit truncation/UTF-8/empty outcomes; unknown versions stay
+    unsupported and destructive pins stay exact.
+- acceptance_id: URB-DAEMON-001
+  test_id: TEST-URB-DAEMON-001
+  method: >-
+    UDS daemon integration with two concurrent clients, permission and
+    protocol negatives, restart and single-instance probes.
+  expected_source: openspec/changes/chg-2026-047-unified-runtime-foundation/verification.md#urb-daemon-001
+  minimum_evidence: contract
+  expected_result: >-
+    Two independent clients share one daemon; duplicate startup returns the
+    existing instance; socket is user-private with zero network listeners;
+    unknown protocol majors and malformed frames are rejected structurally;
+    history survives daemon restart.
+- acceptance_id: URB-JOB-001
+  test_id: TEST-URB-JOB-001
+  method: >-
+    Fake-integration engine tests plus a process-level crash-window fixture
+    around the write-ahead intent gate.
+  expected_source: openspec/changes/chg-2026-047-unified-runtime-foundation/verification.md#urb-job-001
+  minimum_evidence: contract
+  expected_result: >-
+    Intent is durable before dispatch; post-intent crashes never blind-redispatch;
+    idempotency keys dedupe jobs durably; per-device mutation is exclusive;
+    cancel lands only at safe boundaries and timelines carry
+    intent/dispatch/verify/reconcile.
+- acceptance_id: URB-COMPAT-001
+  test_id: TEST-URB-COMPAT-001
+  method: >-
+    Full existing Swift and script suites against the MU-1 baseline with
+    zero modifications to existing contract files.
+  expected_source: openspec/changes/chg-2026-047-unified-runtime-foundation/verification.md#urb-compat-001
+  minimum_evidence: contract
+  expected_result: >-
+    Zero regression; existing Rockchip/HDC/supervisor/journal contract test
+    files and public facades stay byte-identical.
