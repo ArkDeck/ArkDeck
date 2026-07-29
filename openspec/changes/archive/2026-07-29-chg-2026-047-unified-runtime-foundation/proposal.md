@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-047-unified-runtime-foundation
 revision: 1
-status: verified # 2026-07-29 verification closure；仅在维护者 review/merge verification PR 后生效
+status: archived # 2026-07-29 archive PR；verification #799 merge 09a0017d80c085ce4d9ff959c88fe16ffc8d3961；Core/spec/contract/canonical acceptance delta 均为空；目录外活路径引用 0；仅在维护者 review/merge 本 PR 后生效
 class: capability
 core_change_level: none
 owner: lvye
