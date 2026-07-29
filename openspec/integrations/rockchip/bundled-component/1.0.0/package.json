@@ -1,0 +1,111 @@
+{
+  "app": {
+    "architectures": [
+      "arm64"
+    ],
+    "buildVersion": "1",
+    "bundleIdentifier": "com.arkdeck.desktop",
+    "entitlements": {
+      "com.apple.security.app-sandbox": true,
+      "com.apple.security.device.serial": true,
+      "com.apple.security.device.usb": true,
+      "com.apple.security.files.bookmarks.app-scope": true,
+      "com.apple.security.files.user-selected.read-write": true,
+      "com.apple.security.network.client": true
+    },
+    "minimumMacOS": "14.0",
+    "name": "ArkDeck",
+    "target": "ArkDeck",
+    "version": "0.1.0"
+  },
+  "component": {
+    "architectures": [
+      "arm64"
+    ],
+    "bundlePath": "Contents/MacOS/rkdeveloptool",
+    "dependencies": [
+      "/System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation",
+      "/System/Library/Frameworks/IOKit.framework/Versions/A/IOKit",
+      "/System/Library/Frameworks/Security.framework/Versions/A/Security",
+      "/usr/lib/libSystem.B.dylib",
+      "/usr/lib/libc++.1.dylib",
+      "/usr/lib/libiconv.2.dylib",
+      "/usr/lib/libobjc.A.dylib"
+    ],
+    "entitlements": {
+      "com.apple.security.app-sandbox": true,
+      "com.apple.security.inherit": true
+    },
+    "identifier": "com.arkdeck.desktop.rkdeveloptool",
+    "minimumMacOS": "14.0",
+    "name": "rkdeveloptool",
+    "sha256": "3caee2136551b4b849daf7e9a906813354f354f8adb61e5f092de49ec7a2e56a",
+    "size": 247488,
+    "unsigned": true,
+    "version": "1.32"
+  },
+  "distribution": {
+    "dmgFilesystem": "HFS+",
+    "dmgFormat": "UDZO",
+    "dmgName": "ArkDeck-0.1.0-arm64.dmg",
+    "notarizationTarget": "outermost-dmg",
+    "rootEntries": [
+      "ArkDeck.app",
+      "THIRD-PARTY-NOTICES.txt"
+    ],
+    "volumeName": "ArkDeck"
+  },
+  "metadata": {
+    "bundlePath": "Contents/Resources/RockchipComponent/1.0.0",
+    "files": [
+      {
+        "name": "registry.yaml",
+        "sha256": "0649cb6f0974107e15cb39e75844532dc9dbaff33a7099d0a64cc7c248e07f54"
+      },
+      {
+        "name": "recipe.json",
+        "sha256": "8b42fdc29d26f597f4c40506f581fd06b5df1fdc1a9cc8eac225e706ce3998f6"
+      },
+      {
+        "name": "sbom.spdx.json",
+        "sha256": "05ae1fa74cbabe55dac1ff0bca59607b555b60fb2dbfc556e3af95671e3100ed"
+      },
+      {
+        "name": "THIRD-PARTY-NOTICES.txt",
+        "sha256": "33383934a0db7a5b833c280e0d2904405772f01cc16fea7bf26c18d84f038e2a"
+      },
+      {
+        "name": "source-distribution-manifest.json",
+        "sha256": "558282ba42f6dfdfd21599f5987206bb9f6370180b1653676f826559e61dc563"
+      }
+    ]
+  },
+  "packageId": "arkdeck-rockchip-component-package@1.0.0",
+  "schemaVersion": "1.0.0",
+  "signing": {
+    "certificateNotAfter": "2027-02-01T22:12:15Z",
+    "certificateNotBefore": "2026-07-29T01:38:03Z",
+    "certificateSHA1": "38E3B7650DF0CE1DEC0CC8C403614AA0C38B0B4C",
+    "hardenedRuntime": true,
+    "identityKind": "Developer ID Application",
+    "insideOut": true,
+    "secureTimestamp": true,
+    "teamIdentifier": "8AQTYW5FKR"
+  },
+  "sourceArtifact": {
+    "artifactArchiveDigest": "sha256:3dc014b6e81a68942d9415a1bdb73faabbbb2472297d1ae14d7648a547628e67",
+    "artifactExpiresAt": "2026-08-26T02:53:55Z",
+    "artifactId": "8640763234",
+    "artifactName": "rockchip-builder-a",
+    "runHead": "01e6f9a6605f4a3a9463dcab2bf5731bd012ef48",
+    "workflowRun": "30233237693"
+  },
+  "xcode": {
+    "archiveConfiguration": "Release",
+    "codeSignInjectBaseEntitlements": false,
+    "componentCopyPhase": "Embed Rockchip Component",
+    "metadataCopyPhase": "Embed Rockchip Component Metadata",
+    "project": "ArkDeck.xcodeproj",
+    "scheme": "ArkDeck"
+  }
+}

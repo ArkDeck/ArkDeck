@@ -13,6 +13,12 @@
 		A10000000000000000000013 /* HDCStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000024 /* HDCStatusView.swift */; };
 		A10000000000000000000016 /* ArkDeckWorkflows in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000093 /* ArkDeckWorkflows */; };
 		A10000000000000000000015 /* HDCStatusUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000025 /* HDCStatusUITests.swift */; };
+		A10000000000000000000017 /* rkdeveloptool in Embed Rockchip Component */ = {isa = PBXBuildFile; fileRef = A10000000000000000000027 /* rkdeveloptool */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		A10000000000000000000018 /* registry.yaml in Embed Rockchip Component Metadata */ = {isa = PBXBuildFile; fileRef = A10000000000000000000028 /* registry.yaml */; };
+		A10000000000000000000019 /* recipe.json in Embed Rockchip Component Metadata */ = {isa = PBXBuildFile; fileRef = A10000000000000000000029 /* recipe.json */; };
+		A1000000000000000000001A /* sbom.spdx.json in Embed Rockchip Component Metadata */ = {isa = PBXBuildFile; fileRef = A1000000000000000000002A /* sbom.spdx.json */; };
+		A1000000000000000000001B /* THIRD-PARTY-NOTICES.txt in Embed Rockchip Component Metadata */ = {isa = PBXBuildFile; fileRef = A1000000000000000000002B /* THIRD-PARTY-NOTICES.txt */; };
+		A1000000000000000000001C /* source-distribution-manifest.json in Embed Rockchip Component Metadata */ = {isa = PBXBuildFile; fileRef = A1000000000000000000002C /* source-distribution-manifest.json */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -23,6 +29,13 @@
 		A10000000000000000000024 /* HDCStatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HDCStatusView.swift; sourceTree = "<group>"; };
 		A10000000000000000000025 /* HDCStatusUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HDCStatusUITests.swift; sourceTree = "<group>"; };
 		A10000000000000000000026 /* ArkDeckHDCUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ArkDeckHDCUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A10000000000000000000027 /* rkdeveloptool */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.executable"; name = rkdeveloptool; path = "$(ROCKCHIP_COMPONENT_INPUT)"; sourceTree = "<absolute>"; };
+		A10000000000000000000028 /* registry.yaml */ = {isa = PBXFileReference; lastKnownFileType = text.yaml; path = openspec/integrations/rockchip/bundled-component/1.0.0/registry.yaml; sourceTree = SOURCE_ROOT; };
+		A10000000000000000000029 /* recipe.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = openspec/integrations/rockchip/bundled-component/1.0.0/recipe.json; sourceTree = SOURCE_ROOT; };
+		A1000000000000000000002A /* sbom.spdx.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = openspec/integrations/rockchip/bundled-component/1.0.0/sbom.spdx.json; sourceTree = SOURCE_ROOT; };
+		A1000000000000000000002B /* THIRD-PARTY-NOTICES.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = openspec/integrations/rockchip/bundled-component/1.0.0/THIRD-PARTY-NOTICES.txt; sourceTree = SOURCE_ROOT; };
+		A1000000000000000000002C /* source-distribution-manifest.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = openspec/integrations/rockchip/bundled-component/1.0.0/source-distribution-manifest.json; sourceTree = SOURCE_ROOT; };
+		A1000000000000000000002D /* RockchipComponent.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = RockchipComponent.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -50,6 +63,7 @@
 			children = (
 				A10000000000000000000031 /* ArkDeckApp */,
 				A10000000000000000000036 /* HDC UI Tests */,
+				A10000000000000000000037 /* Rockchip Component Package Inputs */,
 				A10000000000000000000033 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -61,6 +75,7 @@
 				A10000000000000000000034 /* Resources */,
 				A10000000000000000000035 /* Features */,
 				A10000000000000000000023 /* ArkDeckApp.entitlements */,
+				A1000000000000000000002D /* RockchipComponent.entitlements */,
 			);
 			path = ArkDeckApp;
 			sourceTree = "<group>";
@@ -106,6 +121,19 @@
 			path = ArkDeckAppUITests/HDC;
 			sourceTree = "<group>";
 		};
+		A10000000000000000000037 /* Rockchip Component Package Inputs */ = {
+			isa = PBXGroup;
+			children = (
+				A10000000000000000000027 /* rkdeveloptool */,
+				A10000000000000000000028 /* registry.yaml */,
+				A10000000000000000000029 /* recipe.json */,
+				A1000000000000000000002A /* sbom.spdx.json */,
+				A1000000000000000000002B /* THIRD-PARTY-NOTICES.txt */,
+				A1000000000000000000002C /* source-distribution-manifest.json */,
+			);
+			name = "Rockchip Component Package Inputs";
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -116,6 +144,8 @@
 				A10000000000000000000042 /* Sources */,
 				A10000000000000000000040 /* Frameworks */,
 				A10000000000000000000041 /* Resources */,
+				A10000000000000000000045 /* Embed Rockchip Component */,
+				A10000000000000000000046 /* Embed Rockchip Component Metadata */,
 			);
 			buildRules = (
 			);
@@ -197,6 +227,35 @@
 		};
 /* End PBXResourcesBuildPhase section */
 
+/* Begin PBXCopyFilesBuildPhase section */
+		A10000000000000000000045 /* Embed Rockchip Component */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 6;
+			files = (
+				A10000000000000000000017 /* rkdeveloptool in Embed Rockchip Component */,
+			);
+			name = "Embed Rockchip Component";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A10000000000000000000046 /* Embed Rockchip Component Metadata */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = RockchipComponent/1.0.0;
+			dstSubfolderSpec = 7;
+			files = (
+				A10000000000000000000018 /* registry.yaml in Embed Rockchip Component Metadata */,
+				A10000000000000000000019 /* recipe.json in Embed Rockchip Component Metadata */,
+				A1000000000000000000001A /* sbom.spdx.json in Embed Rockchip Component Metadata */,
+				A1000000000000000000001B /* THIRD-PARTY-NOTICES.txt in Embed Rockchip Component Metadata */,
+				A1000000000000000000001C /* source-distribution-manifest.json in Embed Rockchip Component Metadata */,
+			);
+			name = "Embed Rockchip Component Metadata";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		A10000000000000000000042 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
@@ -256,8 +315,10 @@
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
 				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				ARCHS = arm64;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				ONLY_ACTIVE_ARCH = NO;
 				SDKROOT = macosx;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
@@ -285,6 +346,8 @@
 				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.arkdeck.desktop;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				ROCKCHIP_COMPONENT_INPUT = /usr/bin/false;
+				EXCLUDED_SOURCE_FILE_NAMES = false;
 				SUPPORTED_PLATFORMS = macosx;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_STRICT_CONCURRENCY = complete;
@@ -295,14 +358,17 @@
 		A10000000000000000000073 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ARCHS = arm64;
 				CODE_SIGN_ENTITLEMENTS = ArkDeckApp/ArkDeckApp.entitlements;
-				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_IDENTITY = "Developer ID Application";
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Manual;
 				CODE_SIGNING_ALLOWED = YES;
 				CODE_SIGNING_REQUIRED = YES;
 				CURRENT_PROJECT_VERSION = 1;
-				ENABLE_HARDENED_RUNTIME = NO;
+				COPY_PHASE_STRIP = NO;
+				DEVELOPMENT_TEAM = 8AQTYW5FKR;
+				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = NO;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -311,8 +377,11 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 0.1.0;
+				ONLY_ACTIVE_ARCH = NO;
+				OTHER_CODE_SIGN_FLAGS = "--timestamp";
 				PRODUCT_BUNDLE_IDENTIFIER = com.arkdeck.desktop;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRIP_INSTALLED_PRODUCT = NO;
 				SUPPORTED_PLATFORMS = macosx;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
