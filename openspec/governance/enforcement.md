@@ -1,6 +1,6 @@
 # Governance Enforcement
 
-> Version:2.1.0(git-native;2.1.0 = CHG-2026-027 TASK-BAP-001 于"批准语义"节 ADDED 决策分级与批次审批协议两小节,2026-07-22)
+> Version:2.2.0(git-native;2.2.0 = CHG-2026-046 ADDED"控制平面分离"节、MODIFIED"批准语义"的 PR 载体规则为垂直交付单元形态,2026-07-29;2.1.0 = CHG-2026-027 TASK-BAP-001 于"批准语义"节 ADDED 决策分级与批次审批协议两小节,2026-07-22)
 > Status:current
 > 取代 V1 密码学治理链;背景与事故记录见 `openspec/planning/postmortem-2026-07-governance.md`。
 
@@ -18,10 +18,31 @@
 - **合并进 main = 人类批准**。change 的 approved、任务的 ready、baseline 的 ratified 都通过维护者批准对应 PR 生效。
 - 状态写在文档 front matter/正文中(如 proposal.md 的 `status:`),经 PR 修改;Agent 在自己的分支上可以起草状态变化,但只有维护者合并后才生效。
 - Git revision 引用一律使用完整 commit OID;branch、tag 名、缩写不构成固定引用。
-- **PR 载体与内容一致(一任务一实现 PR)**:每个任务的实现以该任务命名的独立 PR 交付;readiness、remediation 或状态 PR 不得携带超出其标题/描述所声明范围的实现内容。"合并即批准"的前提是维护者知道自己批准的是什么——载体与内容不符会使批准失真,发现后须在 evidence 或 postmortem 中记录。
+- **PR 载体与内容一致(一个垂直交付单元一个 PR;2.2.0 = CHG-2026-046 MODIFIED)**:每个垂直交付单元(一个任务的实现 + 测试 + 文档 + evidence + 该任务的状态翻转)以声明该任务的独立 PR 交付;PR 不得携带超出其标题/描述所声明范围的内容。**readiness-only、status-only、done-only、verified-only 独立 PR 形态废止**:readiness 结论(pins、风险确认、边界)并入 proposal 或交付 PR 正文;任务 done 状态随实现 PR 翻转。例外保持独立载体的恰两类——change 级 `verified`/archive(独立决策,见下一条),与 D2 窗口/授权载体(其本身是 D2 决策)。proposal 可携带 `status: approved` 落地:维护者 review + merge 该 proposal PR 即构成批准,无需再开 approval-only PR。"合并即批准"的前提是维护者知道自己批准的是什么——载体与内容不符会使批准失真,发现后须在 evidence 或 postmortem 中记录。
 - **验证确认与实现分离**:change 的 `verified` 翻转不得只依附实现 PR 的 review;翻转 `verified` 的 PR 应只包含状态与 evidence 引用(run 记录、复验记录),使验证判断可与实现批准分开追溯。
 - **作废 PR 立即 close**:被治理裁定作废或被后续 PR 取代的 open PR(如被 supersede 的 remediation 草案、失效的实现尝试),维护者应在裁定生效时立即 close,并在取代 PR 的描述中记录取代关系;"body 里写着 do-not-merge"不构成防线——open 列表中的作废 PR 是误合事故隐患(2026-07-20 #126 误合、#133 revert 教训)。
 - **merge 载体可核验**:维护者合并 PR 时应使用 GitHub squash merge(commit subject 携带 `(#N)`),或在本地 merge 后于 commit subject 补记 `(#N)`,使 git 账本单独可核验每次合并的 PR 关联。当 git 历史中出现无 `(#N)` 的合并时,审计者不得仅凭 git 账本断言"绕过信任根",必须先以 `gh pr view <n> --json reviews,mergedBy` 核验 GitHub 侧的 review/merge 元数据再下结论(2026-07-19 #117-#123 窗口曾致三个独立审查者误判)。
+
+## 控制平面分离(Repo/Runtime;2.2.0 = CHG-2026-046 ADDED)
+
+- **Repo Agent Plane**:代码、契约、`Catalog/`、provider、profile 与安全策略
+  的一切变更,载体是 OpenSpec change + PR,信任根与批准语义不变。**恰四类
+  变化需要 OpenSpec/PR 审批**:新 operation 或对已发布 operation 的破坏性
+  修改;新 provider;新 integration/device profile;E2 安全策略变化。
+- **Device Agent Runtime Plane**:执行已合入 main 的 catalog 所定义的 typed
+  operation。**已发布 operation 的每次执行只生成 runtime job 记录(job/
+  session/artifact),不生成 Git task、不开 PR**;runtime 请求不携带也不
+  要求 `changeId`/`taskId`/PR OID/主干 commit OID,仓库溯源只作为已发布
+  operation bundle 的可选构建来源信息存在。
+- 运行时授权凭据是 **Runtime Capability**(CHG-2026-046 T03):E0 由默认
+  只读策略允许(仍受 target/timeout/bytes/privacy 约束);E1 需 scope/
+  期限/次数受限的 standing capability;E2 需绑定精确 plan digest 与
+  artifact hash 的一次性 capability。**E2 capability 与既有 standing
+  authorization 的信任根相同**:创建/修改/吊销的唯一载体仍是维护者 merge
+  的 PR,本节不弱化"真实硬件与 destructive 操作"节的任何规则。
+- 两平面的分界由 catalog 承载:operation 的 effect/授权/步骤/预算只在
+  catalog 中定义一份,发布(merge)后 Runtime Plane 照 catalog 执行;
+  catalog 之外不存在可执行的 operation。
 
 ### 决策分级(D0/D1/D2)
 
@@ -34,9 +55,9 @@ PR/决策维度,与执行分级 E0/E1/E2(设备维度,CHG-2026-025)正交。分�
   确定性检查(guard、测试套件、merged OID 复核、引用扫描、hash/pin 比对)
   完全决定,不依赖新的人类判断;(b) diff 零新 scope、零新风险接受、零新
   授权;(c) 不改变任何权威文件(constitution/specs/contracts/enforcement/
-  AGENTS.md)的语义。三条件缺一即非 D0;**拿不准按 D1**。典型:任务 done
-  翻转、change verify 翻转、archive、evidence rerun/复验记录、pins 无漂移
-  复核。
+  AGENTS.md)的语义。三条件缺一即非 D0;**拿不准按 D1**。典型:change
+  verify 翻转、archive、evidence rerun/复验记录、pins 无漂移复核(任务
+  done 翻转自 2.2.0 起随垂直交付 PR 同车,不再单独成 PR/决策点)。
 - **D1 — 人类判断**(封闭列举,扩列须经治理 PR):change approval、readiness
   (首次风险接受 + pins 锁定 + 窗口/边界确认)、DEC-* 产品决策、ADR、Core
   delta 与 baseline ratification、proposal revision(r2+)、机制冻结例外、

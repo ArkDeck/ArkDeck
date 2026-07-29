@@ -67,6 +67,17 @@ UI 和对外文档必须使用完整术语，不能把三类能力都暗示为�
 - 不确定 destructive outcome 不自动重放。
 - 总体工期保持 `TBD / 待硬件确认`，M0B 之后再锁定 Flash 估算。
 
+## 控制平面与 Operation Catalog(CHG-2026-046)
+
+设备运行走 Device Agent Runtime Plane:App/CLI/AI 只提交 `Catalog/` 中已
+发布 operation 的 typed request,不拼接 HDC/Rockchip/shell 命令;每次执行
+只产生 runtime job/session/artifact,不产生 OpenSpec task 或 PR。operation
+的 effect、输入、步骤、补偿、产物与授权要求只在 `Catalog/` 定义一份,经
+`scripts/catalog_gen` 生成 Swift 常量与 effect/authorization matrix,由
+check-sdd 做双向 drift 校验。新 operation、新 provider、新 profile 与 E2
+策略变化仍走 OpenSpec change(Repo Agent Plane);详见
+`openspec/governance/enforcement.md`"控制平面分离"节。
+
 ## 规范与实现边界
 
 Cross-platform spec 只描述可观察行为、状态、数据 contract 和验收。Swift Actor、SwiftUI、WinUI、GTK/Qt、Foundation Process、Windows Process API、POSIX spawn、flock/Mutex、IOPM/Power Request/systemd inhibitor 等内容属于 platform profile 或 design。Core 的物理复用模型是共享 language-neutral contracts/fixtures/conformance vectors、各平台 native conforming implementation；见 `architecture/core-portability.md`。

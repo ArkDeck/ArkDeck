@@ -1,0 +1,169 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "deploy.native-library.app-owned",
+  "version": 1,
+  "title": "Atomically publish an app-owned native library with verification and rollback",
+  "provider": "hdc",
+  "effect": { "minimum": "deviceMutation", "permitted": ["deviceMutation"] },
+  "authorization": { "deviceMutation": "standingCapability" },
+  "binding": "confirmedDevice",
+  "concurrencyKey": "device-exclusive",
+  "inputs": {
+    "fields": {
+      "libraryArtifactLease": {
+        "type": "artifactLease",
+        "required": true,
+        "description": "The .so must come from an artifact lease; arbitrary local paths are rejected."
+      },
+      "targetBundle": {
+        "type": "string",
+        "required": true,
+        "pattern": "^[a-zA-Z][a-zA-Z0-9_]*(?:\\.[a-zA-Z][a-zA-Z0-9_]*)+$",
+        "maxLength": 200,
+        "description": "Remote destination is derived from this bundle's app-owned profile directory; callers cannot submit a remote path."
+      },
+      "libraryLogicalName": {
+        "type": "string",
+        "required": true,
+        "pattern": "^lib[a-zA-Z0-9_.-]+\\.so$",
+        "maxLength": 128
+      },
+      "expectedABI": {
+        "type": "string",
+        "required": true,
+        "enum": ["arm64-v8a", "armeabi-v7a", "x86_64"]
+      },
+      "restartProfile": {
+        "type": "string",
+        "required": false,
+        "enum": ["restartAbility", "restartProcess", "none"],
+        "default": "restartAbility"
+      },
+      "verificationProfile": {
+        "type": "string",
+        "required": false,
+        "enum": ["hashOnly", "hashAndProcess", "hashProcessAndMaps"],
+        "default": "hashAndProcess"
+      },
+      "rollbackPolicy": {
+        "type": "string",
+        "required": false,
+        "enum": ["autoRollback", "retainBackup"],
+        "default": "autoRollback"
+      }
+    }
+  },
+  "outputs": {
+    "fields": {
+      "publishReport": { "type": "artifactReference", "required": true },
+      "verificationReport": { "type": "artifactReference", "required": true }
+    }
+  },
+  "steps": [
+    {
+      "stepID": "verify-elf-locally",
+      "kind": "verifyArtifact",
+      "effect": "hostOnly",
+      "cancellation": "immediate",
+      "binding": "none",
+      "compensation": "none",
+      "notes": "ELF magic, ABI/bitness/machine, build-id and hash against the lease."
+    },
+    {
+      "stepID": "hash-library",
+      "kind": "hashFile",
+      "effect": "hostOnly",
+      "cancellation": "immediate",
+      "binding": "none",
+      "compensation": "none"
+    },
+    {
+      "stepID": "send-to-staging",
+      "kind": "sendFile",
+      "effect": "deviceMutation",
+      "cancellation": "atSafeBoundary",
+      "binding": "confirmedDevice",
+      "compensation": "bestEffortCleanup",
+      "notes": "Unique provider-owned staging path inside the app-owned area."
+    },
+    {
+      "stepID": "verify-remote-staging",
+      "kind": "runApprovedRemoteRead",
+      "effect": "readOnly",
+      "cancellation": "immediate",
+      "binding": "confirmedDevice",
+      "compensation": "none",
+      "notes": "Remote size/hash/build-id must match before publish."
+    },
+    {
+      "stepID": "backup-current-version",
+      "kind": "runApprovedRemoteMutation",
+      "effect": "deviceMutation",
+      "cancellation": "atSafeBoundary",
+      "binding": "confirmedDevice",
+      "compensation": "rollbackPublished"
+    },
+    {
+      "stepID": "atomic-publish",
+      "kind": "runApprovedRemoteMutation",
+      "effect": "deviceMutation",
+      "cancellation": "atSafeBoundary",
+      "binding": "confirmedDevice",
+      "compensation": "rollbackPublished",
+      "notes": "Profile-supported atomic rename/symlink strategy only; unsupported profiles fail closed. Unknown publish outcome enters reconcile and never re-publishes automatically."
+    },
+    {
+      "stepID": "restart-target",
+      "kind": "stopApplication",
+      "effect": "deviceMutation",
+      "cancellation": "atSafeBoundary",
+      "binding": "confirmedDevice",
+      "compensation": "rollbackPublished",
+      "notes": "Selected by restartProfile."
+    },
+    {
+      "stepID": "start-target",
+      "kind": "startApplication",
+      "effect": "deviceMutation",
+      "cancellation": "atSafeBoundary",
+      "binding": "confirmedDevice",
+      "compensation": "rollbackPublished"
+    },
+    {
+      "stepID": "verify-loaded-library",
+      "kind": "verifyRemoteState",
+      "effect": "readOnly",
+      "cancellation": "immediate",
+      "binding": "confirmedDevice",
+      "compensation": "none",
+      "notes": "Process alive plus loaded-library/build-id verification per verificationProfile; failure triggers rollback and re-verification of the previous version."
+    },
+    {
+      "stepID": "cleanup-staging-and-backup",
+      "kind": "cleanupOwnedRemotePath",
+      "effect": "deviceMutation",
+      "cancellation": "atSafeBoundary",
+      "binding": "confirmedDevice",
+      "optional": true,
+      "compensation": "bestEffortCleanup",
+      "notes": "Backup removal governed by rollbackPolicy."
+    },
+    {
+      "stepID": "finalize-session",
+      "kind": "finalizeSession",
+      "effect": "hostOnly",
+      "cancellation": "atSafeBoundary",
+      "binding": "none",
+      "compensation": "none"
+    }
+  ],
+  "timeoutSeconds": 600,
+  "outputByteBudget": 134217728,
+  "retry": { "preflightAttempts": 2, "mutationAttempts": 1 },
+  "unknownOutcome": "reconcileRequired",
+  "artifacts": [
+    { "name": "publish-report.json", "role": "derived", "mediaType": "application/json", "privacy": "standard", "required": true },
+    { "name": "verification-report.json", "role": "derived", "mediaType": "application/json", "privacy": "standard", "required": true }
+  ],
+  "profiles": ["openharmony-standard@1", "dayu200@1"]
+}

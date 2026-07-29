@@ -22,7 +22,10 @@
      少于登记值同样 fail;
  10. platform/integration lock 与 core-conformance 引用的路径存在,
      integration profile lock 的 id/version 与 Markdown header 精确一致,
-     safety_coverage 引用的 AC 存在。
+     safety_coverage 引用的 AC 存在;
+ 11. Operation Catalog(CHG-2026-046):Catalog/ 文档经 scripts/catalog_gen
+     校验(封闭 schema、步骤词表封闭、E2/重试/未知结果不变量),生成的
+     Swift 常量与 effect/authorization matrix 与 catalog 双向零 drift。
 
 退出码:0 = 通过(允许 warning);1 = 存在 error。
 """
@@ -851,6 +854,41 @@ def check_integration_profile_entries(lock_path: Path, data, repo_root: Path):
                     )
 
 
+# ------------------------------------------------- 11. operation catalog
+def check_operation_catalog(repo_root: Path | None = None):
+    """Catalog 文档校验 + 生成物双向 drift(CHG-2026-046 T04)。
+
+    校验权威是 scripts/catalog_gen/generate.py(与本检查同解释器、同
+    PyYAML pin);这里只汇报,不写仓库。generator 缺失、加载失败、文档
+    违约、生成物缺失或与 catalog 漂移(双向)都是 error。
+    """
+    repo_root = repo_root or REPO
+    catalog_dir = repo_root / "Catalog"
+    generator_path = repo_root / "scripts" / "catalog_gen" / "generate.py"
+    if not catalog_dir.is_dir():
+        err(catalog_dir, "Catalog directory is missing (CHG-2026-046)")
+        return
+    if not generator_path.is_file():
+        err(generator_path, "catalog generator is missing (CHG-2026-046)")
+        return
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("arkdeck_catalog_gen", generator_path)
+    module = importlib.util.module_from_spec(spec)
+    try:
+        spec.loader.exec_module(module)
+    except Exception as error:  # fail closed on any generator defect
+        err(generator_path, f"catalog generator failed to load: {error}")
+        return
+    try:
+        problems = module.drift_report()
+    except Exception as error:
+        err(catalog_dir, f"catalog drift check crashed: {error}")
+        return
+    for problem in problems:
+        err(catalog_dir, problem)
+
+
 def check_locks_and_conformance(spec_acs):
     integration_lock = (
         OPENSPEC / "integrations" / "INTEGRATION-PROFILES.lock.yaml"
@@ -919,6 +957,7 @@ def main():
     check_change_scope_coverage()
     check_structured_pins()
     check_registry_change_paths()
+    check_operation_catalog()
     check_locks_and_conformance(spec_acs)
 
     for w in warnings:

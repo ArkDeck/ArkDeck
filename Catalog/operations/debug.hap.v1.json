@@ -1,0 +1,171 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "debug.hap",
+  "version": 1,
+  "title": "Install, start, observe, stop and optionally uninstall a HAP from an artifact lease",
+  "provider": "hdc",
+  "effect": { "minimum": "deviceMutation", "permitted": ["deviceMutation"] },
+  "authorization": { "deviceMutation": "standingCapability" },
+  "binding": "confirmedDevice",
+  "concurrencyKey": "device-exclusive",
+  "inputs": {
+    "fields": {
+      "hapArtifactLease": {
+        "type": "artifactLease",
+        "required": true,
+        "description": "HAP must come from an artifact lease; arbitrary local paths are rejected."
+      },
+      "bundleName": {
+        "type": "string",
+        "required": true,
+        "pattern": "^[a-zA-Z][a-zA-Z0-9_]*(?:\\.[a-zA-Z][a-zA-Z0-9_]*)+$",
+        "maxLength": 200
+      },
+      "abilityName": {
+        "type": "string",
+        "required": true,
+        "pattern": "^[a-zA-Z][a-zA-Z0-9_.]*$",
+        "maxLength": 200
+      },
+      "installPolicy": {
+        "type": "string",
+        "required": false,
+        "enum": ["installOrReplace", "installFresh"],
+        "default": "installOrReplace"
+      },
+      "cleanupPolicy": {
+        "type": "string",
+        "required": false,
+        "enum": ["uninstall", "retain", "restorePrevious"],
+        "default": "uninstall"
+      },
+      "captureDiagnostics": { "type": "boolean", "required": false, "default": true },
+      "diagnosticsDurationSeconds": {
+        "type": "integer",
+        "required": false,
+        "minimum": 1,
+        "maximum": 300,
+        "default": 30
+      },
+      "portForwardProfile": {
+        "type": "string",
+        "required": false,
+        "enum": ["none", "debugger-default"],
+        "default": "none"
+      }
+    }
+  },
+  "outputs": {
+    "fields": {
+      "installReadback": { "type": "artifactReference", "required": true },
+      "processReadback": { "type": "artifactReference", "required": true },
+      "diagnostics": { "type": "artifactReference", "required": false }
+    }
+  },
+  "steps": [
+    {
+      "stepID": "verify-hap-artifact",
+      "kind": "verifyArtifact",
+      "effect": "hostOnly",
+      "cancellation": "immediate",
+      "binding": "none",
+      "compensation": "none"
+    },
+    {
+      "stepID": "send-hap",
+      "kind": "sendFile",
+      "effect": "deviceMutation",
+      "cancellation": "atSafeBoundary",
+      "binding": "confirmedDevice",
+      "compensation": "bestEffortCleanup",
+      "notes": "Provider-owned staging path; caller cannot choose the remote destination."
+    },
+    {
+      "stepID": "install-hap",
+      "kind": "installPackage",
+      "effect": "deviceMutation",
+      "cancellation": "atSafeBoundary",
+      "binding": "confirmedDevice",
+      "compensation": "rollbackPublished",
+      "notes": "Success is decided by the package readback step, never by exit code alone."
+    },
+    {
+      "stepID": "package-readback",
+      "kind": "runApprovedRemoteRead",
+      "effect": "readOnly",
+      "cancellation": "immediate",
+      "binding": "confirmedDevice",
+      "compensation": "none"
+    },
+    {
+      "stepID": "start-ability",
+      "kind": "startApplication",
+      "effect": "deviceMutation",
+      "cancellation": "atSafeBoundary",
+      "binding": "confirmedDevice",
+      "compensation": "rollbackPublished"
+    },
+    {
+      "stepID": "process-readback",
+      "kind": "verifyRemoteState",
+      "effect": "readOnly",
+      "cancellation": "immediate",
+      "binding": "confirmedDevice",
+      "compensation": "none",
+      "notes": "Start success requires an observable process/ability state signal."
+    },
+    {
+      "stepID": "capture-diagnostics",
+      "kind": "captureRemoteStdout",
+      "effect": "readOnly",
+      "cancellation": "immediate",
+      "binding": "confirmedDevice",
+      "optional": true,
+      "compensation": "none"
+    },
+    {
+      "stepID": "stop-ability",
+      "kind": "stopApplication",
+      "effect": "deviceMutation",
+      "cancellation": "atSafeBoundary",
+      "binding": "confirmedDevice",
+      "compensation": "none"
+    },
+    {
+      "stepID": "cleanup-uninstall",
+      "kind": "uninstallPackage",
+      "effect": "deviceMutation",
+      "cancellation": "atSafeBoundary",
+      "binding": "confirmedDevice",
+      "optional": true,
+      "compensation": "none",
+      "notes": "Selected by cleanupPolicy."
+    },
+    {
+      "stepID": "cleanup-remote-staging",
+      "kind": "cleanupOwnedRemotePath",
+      "effect": "deviceMutation",
+      "cancellation": "atSafeBoundary",
+      "binding": "confirmedDevice",
+      "compensation": "bestEffortCleanup"
+    },
+    {
+      "stepID": "finalize-session",
+      "kind": "finalizeSession",
+      "effect": "hostOnly",
+      "cancellation": "atSafeBoundary",
+      "binding": "none",
+      "compensation": "none"
+    }
+  ],
+  "timeoutSeconds": 600,
+  "outputByteBudget": 67108864,
+  "retry": { "preflightAttempts": 2, "mutationAttempts": 1 },
+  "unknownOutcome": "reconcileRequired",
+  "artifacts": [
+    { "name": "install-readback.json", "role": "derived", "mediaType": "application/json", "privacy": "standard", "required": true },
+    { "name": "process-readback.json", "role": "derived", "mediaType": "application/json", "privacy": "standard", "required": true },
+    { "name": "debug-hilog.txt", "role": "raw", "mediaType": "text/plain", "privacy": "sensitive", "required": false }
+  ],
+  "profiles": ["openharmony-standard@1", "dayu200@1"]
+}

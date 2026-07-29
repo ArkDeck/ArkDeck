@@ -22,6 +22,7 @@ TASK-DEC-001(chg-2026-040)交付的一页索引:`scripts/` 下每个一级条目
 | `test_sdd_runtime_entry.py` | TASK-SDR-001 契约套件:共享运行时发现矩阵 | 无(纯测试) |
 | `host_loop/` | 常驻循环(discovery/lease/worker/reviewer/recovery/transport):认领 ready 任务、开 agent PR、观测与调和 | owner/repo/API root/lease 命名空间/env 名等仍散在各模块;收口为 `instance.py` 属 TASK-DEC-002(待做) |
 | `test_agent_pr_workflow.py` | `.github/workflows/` Agent PR 命名空间分区的封闭契约(禁能力扫描) | 无(纯测试) |
+| `catalog_gen/` | Operation Catalog 校验/生成器(CHG-2026-046 T04):校验 `Catalog/` 文档、生成 `RuntimeOperationCatalogGenerated.swift` 与 effect/authorization matrix;check_sdd family 11 调用其零写 drift 检查 | catalog 数据正本 = 仓库顶层 `Catalog/`;生成物路径常量在模块内 |
 | `README.md` | 本文件 | — |
 
 框架的消费侧在 `.github/workflows/agent-pr.yml` 与 `sdd-guard.yml`

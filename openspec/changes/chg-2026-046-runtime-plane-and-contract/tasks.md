@@ -6,7 +6,11 @@
 
 ## TASK-RTC-001 — MU-1 垂直交付:治理两平面 + Runtime API v2 + Capability + Catalog v1
 
-- Status:ready
+- Status:done
+- Done evidence:`evidence/runs/TASK-RTC-001/run-r1.md`(2026-07-29;
+  swift 557/1 skipped/0 failures;check-sdd 0/0/111 含 family 11;脚本套件
+  62+50+8+33+644 OK;catalog_gen 27 OK)。状态随本实现 PR 翻转,生效以
+  维护者 merge 为准(本 change T01 交付的垂直 PR 模型)。
 - Grade:D1(治理文本 + 纯契约代码 + catalog 数据与生成器;零设备执行、
   零 E2 面变更、零既有安全门放宽)
 - Platform:macos(契约保持 Foundation-neutral)

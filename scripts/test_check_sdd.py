@@ -1109,5 +1109,84 @@ class BothSuitesRunInCI(unittest.TestCase):
         self.assertNotIn("contents: write", text)
 
 
+class OperationCatalogFamilyTests(unittest.TestCase):
+    """Family 11 (CHG-2026-046): catalog validation + bidirectional drift.
+
+    The full validator/generator suite lives in scripts/catalog_gen/
+    test_generate.py; running it here as a subprocess wires it into the same
+    CI entry point as this file (sdd-guard runs test_check_sdd.py directly).
+    """
+
+    def collected_errors(self, repo_root=None):
+        saved = list(check_sdd.errors)
+        del check_sdd.errors[:]
+        try:
+            check_sdd.check_operation_catalog(repo_root)
+            return list(check_sdd.errors)
+        finally:
+            del check_sdd.errors[:]
+            check_sdd.errors.extend(saved)
+
+    def test_real_repo_catalog_is_clean(self):
+        self.assertEqual(self.collected_errors(), [])
+
+    def test_missing_catalog_directory_is_an_error(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            errors = self.collected_errors(Path(tmp))
+            self.assertEqual(len(errors), 1)
+            self.assertIn("Catalog directory is missing", errors[0])
+
+    def test_missing_generator_is_an_error(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "Catalog").mkdir()
+            errors = self.collected_errors(root)
+            self.assertEqual(len(errors), 1)
+            self.assertIn("catalog generator is missing", errors[0])
+
+    def test_semantic_drift_turns_the_check_red(self):
+        import shutil
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for entry in ("Catalog", "scripts", "openspec", "Packages"):
+                shutil.copytree(
+                    check_sdd.REPO / entry,
+                    root / entry,
+                    ignore=shutil.ignore_patterns(
+                        ".build", "host_loop", "*.venv*", "__pycache__",
+                        "archive", "Tests"
+                    ),
+                )
+            target = root / "Catalog" / "operations" / "observe.device.v1.json"
+            target.write_text(
+                target.read_text(encoding="utf-8").replace(
+                    '"timeoutSeconds": 60,', '"timeoutSeconds": 61,'
+                ),
+                encoding="utf-8",
+            )
+            errors = self.collected_errors(root)
+            self.assertTrue(errors, "semantic catalog change must produce drift errors")
+            self.assertTrue(any("drift" in error for error in errors))
+
+    def test_generator_suite_passes(self):
+        completed = subprocess.run(
+            [
+                sys.executable,
+                str(check_sdd.REPO / "scripts" / "catalog_gen" / "test_generate.py"),
+            ],
+            cwd=check_sdd.REPO,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
+
+    def test_family_is_wired_into_main(self):
+        source = (check_sdd.REPO / "scripts" / "check_sdd.py").read_text(encoding="utf-8")
+        main_body = source.split("def main():", 1)[1]
+        self.assertIn("check_operation_catalog()", main_body)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
