@@ -1,7 +1,7 @@
 # CHG-2026-047 Verification Plan
 
 > Change:CHG-2026-047-unified-runtime-foundation@r1
-> Status:planned
+> Status:passed # 2026-07-29；仅在维护者 review/merge verification PR 后生效
 > Core baseline:CORE-2.1.0 (canonical Core AC not claimed)
 
 ## Environment
@@ -79,3 +79,26 @@
 - 全量 `swift test` 与 PRE-00/MU-1 基线对账零回归;
 - 既有 Rockchip/HDC/supervisor/golden/journal/binding 契约测试文件零修改;
 - 脚本套件(check-sdd/62/50/8/33/host_loop 644)全绿。
+
+## Result gate
+
+- [x] `URB-PROV-001` 有 current-main provider API、双 adapter、语义
+      verify/reconcile 聚焦合约回归；
+- [x] `URB-HDC-001` 有未漂移 HDC production/golden 输入审计和 current
+      compatibility-profile parser 矩阵；
+- [x] `URB-DAEMON-001` 有双客户端、single instance、0700/0600、
+      AF_UNIX 零 TCP、协议负向与 restart persistence 聚焦回归；
+- [x] `URB-JOB-001` 有 WAL crash-window、durable idempotency、
+      outcomeUnknown/reconcile、cancel/timeline 聚焦回归，并有两个同
+      target 可运行 mutation job 的 fake 端到端计数
+      (`total_dispatches=18`,`same_target_max=1`)；
+- [x] `URB-COMPAT-001` 有 ArkDeckKit 全量与全部声明脚本套件回归；
+- [x] evidence 准确分类为 `contract` / fake integration，未冒充真实设备
+      或 hardware evidence；
+- [x] change `verified` 由独立 verification PR 翻转，只引用具体 run/复验
+      记录，不夹带产品实现。
+
+Closure receipt:`proposal.md#verification-closure2026-07-29`。实现 evidence =
+`evidence/runs/TASK-URB-001/run-r1.md`；latest-main 复验 =
+`evidence/runs/TASK-URB-001/verification-r1.md`。`passed` 与 proposal
+`verified` 只在维护者 review/merge 本 verification PR 后生效。
