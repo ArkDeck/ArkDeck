@@ -6,7 +6,7 @@
 
 ## TASK-DHA-001 — MU-4 垂直交付:Agent runner + Artifact + diagnostics/HAP
 
-- Status:ready
+- Status:blocked
 - Grade:D1(代码/契约/fake 面。真机 host Runtime 由 Device Runtime Agent
   执行;**E1 capability 的签发/接受是 D2 决策**,独立载体,Agent 不得
   自签或自批;人类只提供必要物理协助)
@@ -38,6 +38,12 @@
   发现 E1 判定无法在不看 exit code 的前提下成立;发现 remote trace/
   cleanup 无法在 dispatch 前升级 effective effect;发现真机 AC 只能靠
   维护者代跑 host CLI——任一命中即停,登记 blocked 并说明
+- Blocker(2026-07-29):实现 `capture-hilog` durable typed intent 时确认
+  current `captureRemoteStdout` schema/Swift validator 只允许
+  `arkui-ui-dump` action，无法如实表示 Catalog 已发布的 HiLog step；
+  以 UI Dump action 冒充会伪造 journal evidence。已按 stop condition
+  停止并起草 `CHG-2026-050-diagnostics-step-contract`。该 change 完成并
+  合入后，本任务仍需 fresh readiness PR 才可恢复为 ready。
 - Hardware required:yes(仅 `DHA-HW-*` 两条;contract/fake 面不需要。
   硬件存在不等于人工执行:`DHA-HW-001` 由 Agent 直接走 E0;
   `DHA-HW-002` 在维护者签发/接受 E1 capability 后由 Agent 执行。
