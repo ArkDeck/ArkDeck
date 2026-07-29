@@ -1,0 +1,21 @@
+---
+schema_version: 1.0.0
+change_id: CHG-2026-050-diagnostics-step-contract
+change_revision: 1
+platform: all
+evidence_classes:
+- contract
+cases:
+- acceptance_id: AC-WF-001-02
+  test_id: TEST-AC-WF-001-02
+  method: >-
+    Catalog stdout action-reference closure plus JSON Schema/Swift validator
+    parity, including missing, unknown, misplaced, drifted and command-shaped
+    negative vectors.
+  expected_source: openspec/changes/chg-2026-050-diagnostics-step-contract/verification.md#ac-wf-001-02
+  minimum_evidence: contract
+  expected_result: >-
+    Every published captureRemoteStdout step identifies an exact registered
+    action that can become a valid typed workflow intent; any absent, unknown
+    or unrepresentable binding fails before generation and provider dispatch,
+    while executable, argv, shell and raw command surfaces remain impossible.
