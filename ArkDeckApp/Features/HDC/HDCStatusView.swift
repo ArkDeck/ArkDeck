@@ -8,6 +8,8 @@ import UniformTypeIdentifiers
 /// preview, confirmation, and dispatch requests back to that use case.
 struct HDCStatusView: View {
   let presentation: HDCDiagnosticsPresentation
+  let onRefresh: (() -> Void)?
+  let isRefreshInFlight: Bool
   let onRequestRecoveryImpactPreview: (() -> Void)?
   let onConfirmRecoveryImpactPreview: (() -> Void)?
   let onDispatchConfirmedRecovery: (() -> Void)?
@@ -18,6 +20,8 @@ struct HDCStatusView: View {
 
   init(
     presentation: HDCDiagnosticsPresentation,
+    onRefresh: (() -> Void)? = nil,
+    isRefreshInFlight: Bool = false,
     onRequestRecoveryImpactPreview: (() -> Void)? = nil,
     onConfirmRecoveryImpactPreview: (() -> Void)? = nil,
     onDispatchConfirmedRecovery: (() -> Void)? = nil,
@@ -25,6 +29,8 @@ struct HDCStatusView: View {
     configurationError: String? = nil
   ) {
     self.presentation = presentation
+    self.onRefresh = onRefresh
+    self.isRefreshInFlight = isRefreshInFlight
     self.onRequestRecoveryImpactPreview = onRequestRecoveryImpactPreview
     self.onConfirmRecoveryImpactPreview = onConfirmRecoveryImpactPreview
     self.onDispatchConfirmedRecovery = onDispatchConfirmedRecovery
@@ -61,9 +67,16 @@ struct HDCStatusView: View {
         field("Ownership basis", ownershipBasisText, id: "hdc.ownership.basis")
         field("Device events", deviceEventsText, id: "hdc.devices.events")
       }
+      if let onRefresh {
+        Button("hdc.devices.refresh", action: onRefresh)
+          .keyboardShortcut("r", modifiers: [.command])
+          .accessibilityIdentifier("hdc.devices.refresh")
+          .disabled(isRefreshInFlight)
+      }
       if onSelectUserConfiguredExecutable != nil {
         Button("Choose HDC executable…") { isSelectingExecutable = true }
           .accessibilityIdentifier("hdc.toolchain.chooseExecutable")
+          .disabled(isRefreshInFlight)
       }
       if let error = configurationError ?? importerError {
         Text(error)

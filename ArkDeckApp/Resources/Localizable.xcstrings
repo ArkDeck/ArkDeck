@@ -1,6 +1,12 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "hdc.devices.refresh" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Refresh Devices" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "刷新设备" } }
+      }
+    },
     "update.automaticChecks" : {
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Check automatically when ArkDeck starts (at most once every 24 hours)" } },

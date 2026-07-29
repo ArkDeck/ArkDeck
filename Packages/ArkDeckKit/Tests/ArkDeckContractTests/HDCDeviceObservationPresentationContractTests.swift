@@ -6,7 +6,7 @@ import XCTest
 @testable import ArkDeckWorkflows
 
 /// CHG-2026-022 / TASK-OBS-001R and CHG-2026-043 / TASK-HSO-002
-/// TEST-OBS-DEVICE-PRESENTATION-001, DP1-DP19.
+/// TEST-OBS-DEVICE-PRESENTATION-001, DP1-DP19, and CHG-2026-045 HOR1-HOR3.
 ///
 /// All executable observations use the repository fake with a contract-only
 /// source seam. Production-factory negative tests stop before runner entry.
@@ -426,16 +426,25 @@ final class HDCDeviceObservationPresentationContractTests: XCTestCase {
     let fixture = HDCApplicationDiagnosticsFacade.make(arguments: [
       "ArkDeck", "--ui-test-hdc-diagnostics",
     ])
-    let fixturePresentation = await fixture.refresh()
+    let firstFixturePresentation = await fixture.refresh()
+    let secondFixturePresentation = await fixture.refresh()
 
     XCTAssertFalse(fixture.lifecycleDispatchIsProductionComposed)
-    XCTAssertEqual(fixturePresentation.deviceEvents.map(\.timestamp), [
-      "2026-07-28T00:00:00.000Z",
-      "2026-07-28T00:00:01.000Z",
-    ])
-    XCTAssertEqual(fixturePresentation.deviceEvents.map(\.kind), [.appeared, .disappeared])
     XCTAssertEqual(
-      fixturePresentation.deviceEvents.compactMap(\.redactedDeviceIdentifier),
+      firstFixturePresentation.deviceEvents.map(\.timestamp),
+      [
+        "2026-07-28T00:00:00.000Z"
+      ])
+    XCTAssertEqual(firstFixturePresentation.deviceEvents.map(\.kind), [.appeared])
+    XCTAssertEqual(
+      secondFixturePresentation.deviceEvents.map(\.timestamp),
+      [
+        "2026-07-28T00:00:00.000Z",
+        "2026-07-28T00:00:01.000Z",
+      ])
+    XCTAssertEqual(secondFixturePresentation.deviceEvents.map(\.kind), [.appeared, .disappeared])
+    XCTAssertEqual(
+      secondFixturePresentation.deviceEvents.compactMap(\.redactedDeviceIdentifier),
       Array(
         repeating: "redacted-device-0123456789abcdef01234567",
         count: 2))
@@ -548,6 +557,107 @@ final class HDCDeviceObservationPresentationContractTests: XCTestCase {
         in: supervisorObservation),
       1,
       "the supervisor factory keeps its independent registry tuple")
+  }
+
+  func testHOR1_DelayedFixtureMakesEveryAcceptedRefreshObservable() async {
+    let fixture = HDCApplicationDiagnosticsFacade.make(arguments: [
+      "ArkDeck", "--ui-test-hdc-diagnostics", "--ui-test-hdc-refresh-delay",
+    ])
+    let first = await fixture.refresh()
+    let second = await fixture.refresh()
+    let third = await fixture.refresh()
+
+    XCTAssertEqual(first.deviceEvents.map(\.kind), [.appeared])
+    XCTAssertEqual(second.deviceEvents.map(\.kind), [.appeared, .disappeared])
+    XCTAssertEqual(
+      third.deviceEvents.map(\.kind),
+      [.appeared, .disappeared, .observationUnknown],
+      "a duplicate that reaches the fixture is a visible third transition")
+    XCTAssertEqual(second.automaticLifecycleDispatchCount, 0)
+    XCTAssertEqual(second.automaticSubserverDispatchCount, 0)
+  }
+
+  func testHOR2_AppWiringHasSynchronousSingleCallAdmissionAndNoQueue() throws {
+    let app = try repositorySourceText("ArkDeckApp/App/ArkDeckApp.swift")
+    let view = try repositorySourceText("ArkDeckApp/Features/HDC/HDCStatusView.swift")
+    let modelStart = try XCTUnwrap(app.range(of: "private final class HDCStatusViewModel"))
+    let model = String(app[modelStart.lowerBound...])
+
+    XCTAssertEqual(occurrences(of: "onRefresh: hdcDiagnostics.refresh", in: app), 1)
+    XCTAssertEqual(
+      occurrences(of: "isRefreshInFlight: hdcDiagnostics.isRefreshInFlight", in: app),
+      1)
+    XCTAssertEqual(occurrences(of: "let next = await provider.refresh()", in: model), 1)
+
+    let guardIndex = try XCTUnwrap(
+      model.range(of: "guard !isRefreshInFlight else { return }")?.lowerBound)
+    let admitIndex = try XCTUnwrap(model.range(of: "isRefreshInFlight = true")?.lowerBound)
+    let taskIndex = try XCTUnwrap(model.range(of: "Task { [weak self] in")?.lowerBound)
+    let providerIndex = try XCTUnwrap(
+      model.range(of: "let next = await provider.refresh()")?.lowerBound)
+    let releaseIndex = try XCTUnwrap(
+      model.range(of: "defer { self.isRefreshInFlight = false }")?.lowerBound)
+    XCTAssertLessThan(guardIndex, admitIndex)
+    XCTAssertLessThan(admitIndex, taskIndex)
+    XCTAssertLessThan(taskIndex, providerIndex)
+    XCTAssertLessThan(providerIndex, releaseIndex)
+
+    XCTAssertFalse(model.contains("Timer"))
+    XCTAssertFalse(model.contains("Task.sleep"))
+    XCTAssertFalse(model.localizedCaseInsensitiveContains("automatic retry"))
+    XCTAssertEqual(occurrences(of: "Button(\"hdc.devices.refresh\"", in: view), 1)
+    XCTAssertEqual(
+      occurrences(of: ".accessibilityIdentifier(\"hdc.devices.refresh\")", in: view),
+      1)
+    XCTAssertEqual(
+      occurrences(of: ".keyboardShortcut(\"r\", modifiers: [.command])", in: view),
+      1)
+    XCTAssertEqual(occurrences(of: ".disabled(isRefreshInFlight)", in: view), 2)
+  }
+
+  func testHOR3_RefreshLocalizationIsCompleteAndFixtureStaysBelowBoundary() throws {
+    let data = try Data(
+      contentsOf: repositoryRoot()
+        .appending(path: "ArkDeckApp/Resources/Localizable.xcstrings"))
+    let catalog = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: data) as? [String: Any])
+    let strings = try XCTUnwrap(catalog["strings"] as? [String: Any])
+    let refresh = try XCTUnwrap(strings["hdc.devices.refresh"] as? [String: Any])
+    let localizations = try XCTUnwrap(refresh["localizations"] as? [String: Any])
+
+    func localizedValue(_ locale: String) throws -> String {
+      let localization = try XCTUnwrap(localizations[locale] as? [String: Any])
+      let unit = try XCTUnwrap(localization["stringUnit"] as? [String: Any])
+      return try XCTUnwrap(unit["value"] as? String)
+    }
+
+    XCTAssertEqual(try localizedValue("en"), "Refresh Devices")
+    XCTAssertEqual(try localizedValue("zh-Hans"), "刷新设备")
+    XCTAssertEqual(Set(localizations.keys), ["en", "zh-Hans"])
+
+    let workflows = try sourceText(
+      "Sources/ArkDeckWorkflows/HDCApplicationDiagnosticsFacade.swift")
+    let boundary = try XCTUnwrap(
+      workflows.range(of: "private actor HDCFixtureApplicationDiagnostics"))
+    let production = String(workflows[..<boundary.lowerBound])
+    let fixture = String(workflows[boundary.lowerBound...])
+    for fixtureOnly in [
+      "--ui-test-hdc-refresh-delay",
+      "refreshCallCount",
+      "latestCompletedRefreshCallCount",
+      "fixtureDeviceEvents",
+      "Task.sleep",
+      "1_785_196_802",
+    ] {
+      XCTAssertFalse(production.contains(fixtureOnly))
+      XCTAssertTrue(fixture.contains(fixtureOnly))
+    }
+    XCTAssertEqual(
+      occurrences(of: "deviceObservationSession.refresh()", in: production),
+      1)
+    XCTAssertEqual(
+      occurrences(of: "HDCExternalFirstDiscovery.discover(request)", in: production),
+      1)
   }
 
   private func contractSession(
@@ -666,6 +776,18 @@ final class HDCDeviceObservationPresentationContractTests: XCTestCase {
   private func sourceText(_ packageRelativePath: String) throws -> String {
     try String(
       contentsOf: packageRoot().appending(path: packageRelativePath),
+      encoding: .utf8)
+  }
+
+  private func repositoryRoot() -> URL {
+    packageRoot()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+  }
+
+  private func repositorySourceText(_ repositoryRelativePath: String) throws -> String {
+    try String(
+      contentsOf: repositoryRoot().appending(path: repositoryRelativePath),
       encoding: .utf8)
   }
 

@@ -222,8 +222,6 @@ final class HDCStatusUITests: XCTestCase {
     let app = launch(arguments: [])
     let expectedEvents =
       "2026-07-28T00:00:00.000Z appeared redacted-device-0123456789abcdef01234567"
-      + " | "
-      + "2026-07-28T00:00:01.000Z disappeared redacted-device-0123456789abcdef01234567"
 
     assertDisplayedValue(app.staticTexts["hdc.counters.autoLifecycle"], equals: "0")
     assertDisplayedValue(app.staticTexts["hdc.counters.autoSubserver"], equals: "0")
@@ -236,6 +234,7 @@ final class HDCStatusUITests: XCTestCase {
   // expose only timestamps, closed kinds, and redacted identifiers.
   func testOBSAPP2_DeviceEventsPreserveOrderShapeAndRedaction() {
     let app = launch(arguments: [])
+    app.buttons["hdc.devices.refresh"].tap()
     let events =
       displayedValues(for: app.staticTexts["hdc.devices.events"])
       .first(where: { $0.contains(" appeared ") })
@@ -324,6 +323,68 @@ final class HDCStatusUITests: XCTestCase {
     }
   }
 
+  // HOR-UI-001: the English control is visible through the real App wiring
+  // and one user action advances the deterministic presentation.
+  func testHORUI1_EnglishRefreshIsAccessibleAndAdvancesPresentation() {
+    let app = launch(arguments: ["-AppleLanguages", "(en)"])
+    let refresh = app.buttons["hdc.devices.refresh"]
+    XCTAssertTrue(refresh.waitForExistence(timeout: 5))
+    XCTAssertEqual(refresh.label, "Refresh Devices")
+    XCTAssertTrue(refresh.isEnabled)
+    assertDisplayedValue(
+      app.staticTexts["hdc.devices.events"],
+      equals: appearedFixtureEvent)
+
+    refresh.tap()
+
+    assertDisplayedValue(
+      app.staticTexts["hdc.devices.events"],
+      equals: appearedAndDisappearedFixtureEvents)
+  }
+
+  // HOR-UI-001: Simplified Chinese is complete and the keyboard shortcut
+  // reaches the same App callback.
+  func testHORUI2_SimplifiedChineseKeyboardRefreshAdvancesPresentation() {
+    let app = launch(arguments: ["-AppleLanguages", "(zh-Hans)"])
+    let refresh = app.buttons["hdc.devices.refresh"]
+    XCTAssertTrue(refresh.waitForExistence(timeout: 5))
+    XCTAssertEqual(refresh.label, "刷新设备")
+    XCTAssertTrue(refresh.isEnabled)
+
+    app.typeKey("r", modifierFlags: .command)
+
+    assertDisplayedValue(
+      app.staticTexts["hdc.devices.events"],
+      equals: appearedAndDisappearedFixtureEvents)
+  }
+
+  // HOR-BOUNDED-001: admission is synchronous, both executable reselection
+  // and refresh are disabled in flight, and a duplicate shortcut never
+  // reaches the fixture's deliberately visible third transition.
+  func testHORBOUNDED1_InFlightDuplicateIsRejectedWithoutThirdTransition() {
+    let app = launch(arguments: ["--ui-test-hdc-refresh-delay"])
+    let refresh = app.buttons["hdc.devices.refresh"]
+    let chooser = app.buttons["hdc.toolchain.chooseExecutable"]
+    XCTAssertTrue(refresh.waitForExistence(timeout: 5))
+    XCTAssertTrue(chooser.exists)
+
+    refresh.tap()
+
+    XCTAssertFalse(refresh.isEnabled)
+    XCTAssertFalse(chooser.isEnabled)
+    app.typeKey("r", modifierFlags: .command)
+    assertDisplayedValue(
+      app.staticTexts["hdc.devices.events"],
+      equals: appearedAndDisappearedFixtureEvents,
+      timeout: 15)
+    assertEnabled(refresh, equals: true)
+    assertEnabled(chooser, equals: true)
+    Thread.sleep(forTimeInterval: 1)
+    let events = displayedText(for: app.staticTexts["hdc.devices.events"])
+    XCTAssertFalse(events.contains("observationUnknown"))
+    XCTAssertFalse(events.contains("2026-07-28T00:00:02.000Z"))
+  }
+
   private func launch(arguments: [String], fixture: Bool = true) -> XCUIApplication {
     let app = XCUIApplication()
     if app.state != .notRunning {
@@ -386,6 +447,30 @@ final class HDCStatusUITests: XCTestCase {
 
   private func displayedValues(for element: XCUIElement) -> [String] {
     [element.label, element.value as? String].compactMap { $0 }
+  }
+
+  private var appearedFixtureEvent: String {
+    "2026-07-28T00:00:00.000Z appeared redacted-device-0123456789abcdef01234567"
+  }
+
+  private var appearedAndDisappearedFixtureEvents: String {
+    appearedFixtureEvent
+      + " | "
+      + "2026-07-28T00:00:01.000Z disappeared redacted-device-0123456789abcdef01234567"
+  }
+
+  private func assertEnabled(
+    _ element: XCUIElement,
+    equals expected: Bool,
+    timeout: TimeInterval = 5,
+    file: StaticString = #filePath,
+    line: UInt = #line
+  ) {
+    let predicate = NSPredicate { _, _ in element.isEnabled == expected }
+    let expectation = expectation(for: predicate, evaluatedWith: element)
+    let result = XCTWaiter.wait(for: [expectation], timeout: timeout)
+    XCTAssertEqual(result, .completed, file: file, line: line)
+    XCTAssertEqual(element.isEnabled, expected, file: file, line: line)
   }
 
   private func occurrenceCount(of needle: String, in haystack: String) -> Int {
