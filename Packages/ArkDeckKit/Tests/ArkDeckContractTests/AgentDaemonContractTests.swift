@@ -36,10 +36,17 @@ final class AgentDaemonContractTests: XCTestCase {
   private struct HappyDispatcher: RuntimeProcessDispatching {
     func dispatch(_ plan: TypedProcessPlan) async throws -> ProviderProcessReceipt {
       switch plan.action {
-      case .hdc(.observeTool), .hdc(.observeServer):
+      case .hdc(.observeTool):
         return ProviderProcessReceipt(
           exitStatus: 0, stdout: Data("Ver: 3.2.0f\n".utf8), stderr: Data(),
           stdoutTruncated: false, durationSeconds: 0.01)
+      case .hdc(.observeServer):
+        // checkserver has its own shape; a fake that returned the `-v`
+        // shape here is what let the real defect through to hardware.
+        return ProviderProcessReceipt(
+          exitStatus: 0,
+          stdout: Data("Client version:Ver: 3.2.0f, server version:Ver: 3.2.0f\n".utf8),
+          stderr: Data(), stdoutTruncated: false, durationSeconds: 0.01)
       default:
         return ProviderProcessReceipt(
           exitStatus: 0, stdout: Data("[Empty]\n".utf8), stderr: Data(),
@@ -291,6 +298,15 @@ final class AgentDaemonContractTests: XCTestCase {
     let stopDeadline = Date().addingTimeInterval(10)
     while process.isRunning && Date() < stopDeadline { usleep(50_000) }
     XCTAssertFalse(process.isRunning, "SIGTERM must stop the daemon")
+    // "It stopped" was too weak an assertion: the first device window
+    // showed the daemon dying on SIGTRAP (exit 133) because a signal
+    // arriving while the async main task was suspended trapped the
+    // concurrency runtime before any handler ran. Shutdown must be a
+    // clean exit(0), not a crash.
+    XCTAssertEqual(
+      process.terminationReason, .exit,
+      "SIGTERM must be a clean shutdown, not a signal death")
+    XCTAssertEqual(process.terminationStatus, 0, "clean shutdown exits zero")
   }
 
   private var productsDirectory: URL {

@@ -50,12 +50,17 @@ struct StoppingDispatcher: RuntimeProcessDispatching {
 
   func dispatch(_ plan: TypedProcessPlan) async throws -> ProviderProcessReceipt {
     switch plan.action {
-    case .hdc(.observeTool), .hdc(.observeServer):
+    case .hdc(.observeTool):
       // Earlier host probes complete normally so the crash lands on the
       // device-probe step.
       return ProviderProcessReceipt(
         exitStatus: 0, stdout: Data("Ver: 3.2.0f\n".utf8), stderr: Data(),
         stdoutTruncated: false, durationSeconds: 0.01)
+    case .hdc(.observeServer):
+      return ProviderProcessReceipt(
+        exitStatus: 0,
+        stdout: Data("Client version:Ver: 3.2.0f, server version:Ver: 3.2.0f\n".utf8),
+        stderr: Data(), stdoutTruncated: false, durationSeconds: 0.01)
     default:
       break
     }

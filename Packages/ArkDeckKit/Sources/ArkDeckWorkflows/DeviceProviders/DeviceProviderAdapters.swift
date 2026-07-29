@@ -143,7 +143,33 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
       throw DeviceProviderError.unsupportedAction("non-HDC action given to hdc provider")
     }
     switch hdcAction {
-    case .observeTool, .observeServer:
+    case .observeServer:
+      // `checkserver` has its own output shape; the first device window
+      // proved that reusing the `-v` parser here fails on real hardware.
+      switch HDCObservationSemanticParser.parseServerCheck(
+        stdout: receipt.stdout, profile: profile, truncated: receipt.stdoutTruncated)
+      {
+      case .parsed(let check):
+        guard check.versionsAgree else {
+          return .failed(
+            code: "serverVersionMismatch",
+            detail: "client \(check.clientVersion) vs server \(check.serverVersion)")
+        }
+        return .verified(summary: [
+          "clientVersion": check.clientVersion, "serverVersion": check.serverVersion,
+        ])
+      case .unsupportedVersion(let version):
+        return .unsupported(reason: "unregistered HDC version \(version)")
+      case .invalidEncoding:
+        return .failed(code: "invalidEncoding", detail: "stdout is not valid UTF-8")
+      case .truncated:
+        return .failed(code: "truncated", detail: "stdout exceeded its byte budget")
+      case .empty:
+        return .unknown(reason: "empty server check output")
+      case .malformed(let reason):
+        return .unknown(reason: reason)
+      }
+    case .observeTool:
       switch HDCObservationSemanticParser.parseClientVersion(
         stdout: receipt.stdout, profile: profile, truncated: receipt.stdoutTruncated)
       {

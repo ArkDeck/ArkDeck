@@ -61,7 +61,10 @@ final class ObserveDeviceSkeletonContractTests: XCTestCase {
       }
       let mode: String
       switch plan.action {
-      case .hdc(.observeTool), .hdc(.observeServer): mode = "version"
+      case .hdc(.observeTool): mode = "version"
+      // The fixture implements checkserver for real, so the skeleton
+      // exercises the same output shape production hardware emits.
+      case .hdc(.observeServer): mode = "checkserver"
       default: mode = "selectedDeviceReady"
       }
       return try await inner.dispatch(

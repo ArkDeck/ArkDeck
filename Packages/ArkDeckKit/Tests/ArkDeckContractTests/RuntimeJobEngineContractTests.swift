@@ -48,10 +48,15 @@ final class RuntimeJobEngineContractTests: XCTestCase {
       switch (script, plan.action) {
       case (.outcomeUnknownOnDeviceProbe, .hdc(.observeDevice)):
         throw RuntimeDispatchFailure.outcomeUnknown("dispatcher lost the child process")
-      case (_, .hdc(.observeTool)), (_, .hdc(.observeServer)):
+      case (_, .hdc(.observeTool)):
         return ProviderProcessReceipt(
           exitStatus: 0, stdout: Data("Ver: 3.2.0f\n".utf8), stderr: Data(),
           stdoutTruncated: false, durationSeconds: 0.01)
+      case (_, .hdc(.observeServer)):
+        return ProviderProcessReceipt(
+          exitStatus: 0,
+          stdout: Data("Client version:Ver: 3.2.0f, server version:Ver: 3.2.0f\n".utf8),
+          stderr: Data(), stdoutTruncated: false, durationSeconds: 0.01)
       case (_, .hdc(.observeDevice)), (_, .hdc(.listDeviceCandidates)):
         return ProviderProcessReceipt(
           exitStatus: 0, stdout: Data("[Empty]\n".utf8), stderr: Data(),

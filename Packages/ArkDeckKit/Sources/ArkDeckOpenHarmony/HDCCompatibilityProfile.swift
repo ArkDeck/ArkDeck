@@ -51,6 +51,18 @@ public struct HDCParsedClientVersion: Sendable, Equatable {
   public let version: String
 }
 
+/// `hdc checkserver` reports both sides at once:
+/// `Client version:Ver: X, server version:Ver: Y`. It is deliberately a
+/// distinct shape from `hdc -v` - reusing the version parser here is the
+/// defect the first device window exposed (it looked for lines starting
+/// with "Ver:" and found none).
+public struct HDCParsedServerCheck: Sendable, Equatable {
+  public let clientVersion: String
+  public let serverVersion: String
+
+  public var versionsAgree: Bool { clientVersion == serverVersion }
+}
+
 public struct HDCParsedTargetLine: Sendable, Equatable {
   public let connectKey: String
   public let state: String
@@ -100,6 +112,53 @@ public enum HDCObservationSemanticParser {
       return .unsupportedVersion(version)
     }
     return .parsed(HDCParsedClientVersion(version: version))
+  }
+
+  /// Parses `hdc checkserver` output. A client/server version disagreement
+  /// is a named failure, never a pass: the two sides speaking different
+  /// protocol versions is exactly the condition this probe exists to find.
+  public static func parseServerCheck(
+    stdout: Data,
+    profile: HDCCompatibilityProfile,
+    truncated: Bool
+  ) -> HDCObservationParseOutcome<HDCParsedServerCheck> {
+    if truncated { return .truncated }
+    guard let text = String(data: stdout, encoding: .utf8) else {
+      return .invalidEncoding
+    }
+    let lines = normalizedLines(text)
+    guard !lines.isEmpty else { return .empty }
+    guard
+      let line = lines.first(where: {
+        $0.hasPrefix("Client version:") && $0.contains("server version:")
+      })
+    else {
+      // A `[Fail] …` diagnostic line is a legible failure, not a parse bug.
+      if let failure = lines.first(where: { $0.hasPrefix("[Fail]") }) {
+        return .malformed(reason: "server check reported: \(failure)")
+      }
+      return .malformed(reason: "no client/server version line in checkserver output")
+    }
+    let segments = line.split(separator: ",", maxSplits: 1)
+    guard segments.count == 2 else {
+      return .malformed(reason: "checkserver line is missing its server segment")
+    }
+
+    func version(of segment: Substring, marker: String) -> String? {
+      guard let range = segment.range(of: marker) else { return nil }
+      let value = segment[range.upperBound...].trimmingCharacters(in: .whitespaces)
+      return value.isEmpty ? nil : value
+    }
+
+    guard let client = version(of: segments[0], marker: "Ver:"),
+      let server = version(of: segments[1], marker: "Ver:")
+    else {
+      return .malformed(reason: "checkserver versions could not be read")
+    }
+    for value in [client, server] where !profile.covers(version: value) {
+      return .unsupportedVersion(value)
+    }
+    return .parsed(HDCParsedServerCheck(clientVersion: client, serverVersion: server))
   }
 
   /// Parses `hdc list targets -v` output. Each target line is

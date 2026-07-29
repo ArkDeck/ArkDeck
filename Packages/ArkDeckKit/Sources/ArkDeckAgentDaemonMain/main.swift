@@ -135,90 +135,113 @@ struct ProviderBootstrapObservation: BootstrapObservationPort {
   }
 }
 
-do {
-  let capabilityStore = try RuntimeCapabilityStore(
-    directoryURL: stateDirectory.appendingPathComponent("capabilities", isDirectory: true))
-  let targetStore = try RuntimeTargetStore(
-    directoryURL: stateDirectory.appendingPathComponent("targets", isDirectory: true))
+// Synchronous top level on purpose. With an async top level the Swift
+// concurrency runtime owns the main thread, and a signal arriving while
+// the main task is suspended traps the process before any handler runs
+// (observed as SIGTRAP / exit 133 in the first device window, with the
+// SIGTERM handler never entered). The async setup work runs inside a Task
+// that the main thread waits on, then `dispatchMain()` parks the daemon
+// the way a daemon is normally parked.
+// Snapshot the resolved paths so the detached task holds immutable values
+// instead of reaching back into main-actor-isolated top-level variables.
+let resolvedStateDirectory = stateDirectory
+let ready = DispatchSemaphore(value: 0)
+nonisolated(unsafe) var startupFailure: (any Error)?
+nonisolated(unsafe) var startedServer: AgentDaemonServer?
 
-  // The HDC executable is supplied explicitly (no PATH search, no guess):
-  // absent configuration means dispatch stays refused, never degraded.
-  let configuredHDC = ProcessInfo.processInfo.environment["ARKDECK_HDC_PATH"]
-  var dispatcher: any RuntimeProcessDispatching = RefusingDispatcher(
-    reason: "no HDC executable configured (set ARKDECK_HDC_PATH); dispatch stays fail-closed")
-  var executableSHA = ""
-  if let configuredHDC {
-    let resolver = try FixedExecutableResolver.hashing(path: configuredHDC, providerID: "hdc")
-    executableSHA = try resolver.resolveExecutable(providerID: "hdc").sha256
-    dispatcher = DescriptorBoundProcessDispatcher(resolver: resolver)
-  }
+// Detached on purpose: the top level is @MainActor-isolated, so a plain
+// `Task { }` would inherit the main actor and deadlock against the
+// semaphore wait below.
+Task.detached {
+  defer { ready.signal() }
+  do {
+    let capabilityStore = try RuntimeCapabilityStore(
+      directoryURL: resolvedStateDirectory.appendingPathComponent("capabilities", isDirectory: true))
+    let targetStore = try RuntimeTargetStore(
+      directoryURL: resolvedStateDirectory.appendingPathComponent("targets", isDirectory: true))
 
-  let provider = HDCObservationProviderAdapter(
-    factsPort: TargetStoreFactsPort(
-      targetStore: targetStore, executablePath: configuredHDC ?? "-",
-      executableSHA256: executableSHA))
-  let providers = DeviceProviderRegistry(providers: [provider])
-  let engine = try RuntimeJobEngine(
-    configuration: .init(stateDirectory: stateDirectory),
-    providers: providers,
-    dispatcher: dispatcher,
-    capabilityStore: capabilityStore,
-    nowUTC: utcNow)
-  let bootstrap = DeviceBootstrapMachine(
-    observation: ProviderBootstrapObservation(provider: provider, dispatcher: dispatcher),
-    targetStore: targetStore,
-    nowUTC: utcNow)
-  let recovered = try await engine.recoverPersistedJobs()
-  if !recovered.isEmpty {
-    print("recovered \(recovered.count) persisted job(s); unknown outcomes parked")
-    fflush(stdout)
+    // The HDC executable is supplied explicitly (no PATH search, no guess):
+    // absent configuration means dispatch stays refused, never degraded.
+    let configuredHDC = ProcessInfo.processInfo.environment["ARKDECK_HDC_PATH"]
+    var dispatcher: any RuntimeProcessDispatching = RefusingDispatcher(
+      reason: "no HDC executable configured (set ARKDECK_HDC_PATH); dispatch stays fail-closed")
+    var executableSHA = ""
+    if let configuredHDC {
+      let resolver = try FixedExecutableResolver.hashing(path: configuredHDC, providerID: "hdc")
+      executableSHA = try resolver.resolveExecutable(providerID: "hdc").sha256
+      dispatcher = DescriptorBoundProcessDispatcher(resolver: resolver)
+    }
+
+    let provider = HDCObservationProviderAdapter(
+      factsPort: TargetStoreFactsPort(
+        targetStore: targetStore, executablePath: configuredHDC ?? "-",
+        executableSHA256: executableSHA))
+    let providers = DeviceProviderRegistry(providers: [provider])
+    let engine = try RuntimeJobEngine(
+      configuration: .init(stateDirectory: resolvedStateDirectory),
+      providers: providers,
+      dispatcher: dispatcher,
+      capabilityStore: capabilityStore,
+      nowUTC: utcNow)
+    let bootstrap = DeviceBootstrapMachine(
+      observation: ProviderBootstrapObservation(provider: provider, dispatcher: dispatcher),
+      targetStore: targetStore,
+      nowUTC: utcNow)
+    let recovered = try await engine.recoverPersistedJobs()
+    if !recovered.isEmpty {
+      print("recovered \(recovered.count) persisted job(s); unknown outcomes parked")
+      fflush(stdout)
+    }
+    let handler = RuntimeControlPlaneHandler(
+      engine: engine,
+      capabilityStore: capabilityStore,
+      providerIDs: providers.registeredProviderIDs,
+      nowUTC: utcNow,
+      targetStore: targetStore,
+      bootstrap: bootstrap)
+    let server = AgentDaemonServer(
+      stateDirectory: resolvedStateDirectory, handler: handler, nowUTC: utcNow)
+    switch try server.start() {
+    case .started:
+      startedServer = server
+      print("arkdeck-agentd listening on \(server.socketURL.path)")
+      // Redirected stdout is block-buffered: without this flush an operator
+      // tailing the log sees nothing until the daemon exits.
+      fflush(stdout)
+    case .alreadyRunning(let instance):
+      print(
+        "arkdeck-agentd already running: pid \(instance.pid), socket \(instance.socketPath), "
+          + "protocol \(instance.protocolVersion)")
+      fflush(stdout)
+    }
+  } catch {
+    startupFailure = error
   }
-  let handler = RuntimeControlPlaneHandler(
-    engine: engine,
-    capabilityStore: capabilityStore,
-    providerIDs: providers.registeredProviderIDs,
-    nowUTC: utcNow,
-    targetStore: targetStore,
-    bootstrap: bootstrap)
-  let server = AgentDaemonServer(
-    stateDirectory: stateDirectory, handler: handler, nowUTC: utcNow)
-  switch try server.start() {
-  case .started:
-    print("arkdeck-agentd listening on \(server.socketURL.path)")
-    // Redirected stdout is block-buffered: without this flush an operator
-    // tailing the log sees nothing until the daemon exits.
-    fflush(stdout)
-    signal(SIGINT, SIG_IGN)
-    signal(SIGTERM, SIG_IGN)
-    let signalSource = DispatchSource.makeSignalSource(signal: SIGTERM, queue: .global())
-    signalSource.setEventHandler {
-      server.stop()
-      exit(0)
-    }
-    signalSource.resume()
-    let interruptSource = DispatchSource.makeSignalSource(signal: SIGINT, queue: .global())
-    interruptSource.setEventHandler {
-      server.stop()
-      exit(0)
-    }
-    interruptSource.resume()
-    // Park the async main task forever. `dispatchMain()` cannot be used
-    // here: this is an async top level, and dispatch_main() pthread_exits
-    // the main thread out from under the Swift concurrency executor, so
-    // the daemon printed "listening" and then died immediately. A parked
-    // continuation would work but reports a leak on exit; sleeping keeps
-    // the log clean. The signal handlers above are the only exit path.
-    while true {
-      try? await Task.sleep(nanoseconds: 3_600 * 1_000_000_000)
-    }
-  case .alreadyRunning(let instance):
-    print(
-      "arkdeck-agentd already running: pid \(instance.pid), socket \(instance.socketPath), "
-        + "protocol \(instance.protocolVersion)")
+}
+
+ready.wait()
+
+if let startupFailure {
+  FileHandle.standardError.write(Data("arkdeck-agentd failed to start: \(startupFailure)\n".utf8))
+  exit(1)
+}
+guard let server = startedServer else {
+  // Second instance: the existing one keeps serving.
+  exit(0)
+}
+
+signal(SIGINT, SIG_IGN)
+signal(SIGTERM, SIG_IGN)
+let signalSources = [SIGTERM, SIGINT].map { signalNumber -> DispatchSourceSignal in
+  let source = DispatchSource.makeSignalSource(signal: signalNumber, queue: .main)
+  source.setEventHandler {
+    server.stop()
+    print("arkdeck-agentd stopped")
     fflush(stdout)
     exit(0)
   }
-} catch {
-  FileHandle.standardError.write(Data("arkdeck-agentd failed to start: \(error)\n".utf8))
-  exit(1)
+  source.resume()
+  return source
 }
+_ = signalSources
+dispatchMain()

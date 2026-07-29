@@ -96,6 +96,42 @@ final class DeviceProviderContractTests: XCTestCase {
     }
   }
 
+  func testObserveServerUsesItsOwnShapeNotTheVersionShape() throws {
+    // The `-v` output must NOT verify a server check: that conflation is
+    // exactly what reached hardware and produced outcomeUnknown.
+    let versionShape = ProviderProcessReceipt(
+      exitStatus: 0, stdout: Data("Ver: 3.2.0f\n".utf8), stderr: Data(),
+      stdoutTruncated: false, durationSeconds: 0.1)
+    guard case .unknown = try hdc.verify(
+      receipt: versionShape, action: .hdc(.observeServer), context: context)
+    else {
+      return XCTFail("the -v shape must not satisfy a server check")
+    }
+    let serverShape = ProviderProcessReceipt(
+      exitStatus: 0,
+      stdout: Data("Client version:Ver: 3.2.0f, server version:Ver: 3.2.0f\n".utf8),
+      stderr: Data(), stdoutTruncated: false, durationSeconds: 0.1)
+    guard case .verified(let summary) = try hdc.verify(
+      receipt: serverShape, action: .hdc(.observeServer), context: context)
+    else {
+      return XCTFail("the real checkserver shape must verify")
+    }
+    XCTAssertEqual(summary["clientVersion"], "3.2.0f")
+    XCTAssertEqual(summary["serverVersion"], "3.2.0f")
+
+    // Client/server disagreement is a named failure, never success.
+    let mismatch = ProviderProcessReceipt(
+      exitStatus: 0,
+      stdout: Data("Client version:Ver: 3.2.0f, server version:Ver: 3.2.0d\n".utf8),
+      stderr: Data(), stdoutTruncated: false, durationSeconds: 0.1)
+    guard case .failed(let code, _) = try hdc.verify(
+      receipt: mismatch, action: .hdc(.observeServer), context: context)
+    else {
+      return XCTFail("a version mismatch must fail, not pass")
+    }
+    XCTAssertEqual(code, "serverVersionMismatch")
+  }
+
   func testRockchipVerifyRequiresDurableRecordReference() throws {
     let rockchip = RockchipFlashProviderAdapter(executionPort: FlashPort())
     let action = TypedProviderAction.rockchip(.executeFlashPlan(authorizationID: "AUTH-1"))
@@ -191,6 +227,53 @@ final class HDCCompatibilityProfileTests: XCTestCase {
     {
     } else {
       XCTFail("two Ver: lines must be malformed")
+    }
+  }
+
+  /// Regression for the first device window: `hdc checkserver` answers
+  /// `Client version:Ver: X, server version:Ver: Y`, which the `-v` parser
+  /// read as zero "Ver:" lines and turned into outcomeUnknown on real
+  /// hardware. These are the exact shapes the fixture and the device emit.
+  func testServerCheckParsing() {
+    let healthy = HDCObservationSemanticParser.parseServerCheck(
+      stdout: Data("Client version:Ver: 3.2.0f, server version:Ver: 3.2.0f\n".utf8),
+      profile: profile, truncated: false)
+    XCTAssertEqual(
+      healthy,
+      .parsed(HDCParsedServerCheck(clientVersion: "3.2.0f", serverVersion: "3.2.0f")))
+    if case .parsed(let check) = healthy { XCTAssertTrue(check.versionsAgree) }
+
+    // Both registered versions, and the disagreement the probe exists for.
+    let mismatch = HDCObservationSemanticParser.parseServerCheck(
+      stdout: Data("Client version:Ver: 3.2.0f, server version:Ver: 3.2.0d\n".utf8),
+      profile: profile, truncated: false)
+    guard case .parsed(let mismatched) = mismatch else {
+      return XCTFail("a version disagreement still parses, then fails semantically")
+    }
+    XCTAssertFalse(mismatched.versionsAgree)
+
+    // An unregistered version on either side is unsupported, not a pass.
+    XCTAssertEqual(
+      HDCObservationSemanticParser.parseServerCheck(
+        stdout: Data("Client version:Ver: 3.2.0f, server version:Ver: 9.9.9z\n".utf8),
+        profile: profile, truncated: false),
+      .unsupportedVersion("9.9.9z"))
+
+    // Degenerate shapes stay explicit.
+    XCTAssertEqual(
+      HDCObservationSemanticParser.parseServerCheck(
+        stdout: Data(), profile: profile, truncated: false),
+      .empty)
+    XCTAssertEqual(
+      HDCObservationSemanticParser.parseServerCheck(
+        stdout: Data("Ver: 3.2.0f\n".utf8), profile: profile, truncated: false),
+      .malformed(reason: "no client/server version line in checkserver output"))
+    if case .malformed(let reason) = HDCObservationSemanticParser.parseServerCheck(
+      stdout: Data("[Fail] Offline after transfer\n".utf8), profile: profile, truncated: false)
+    {
+      XCTAssertTrue(reason.contains("Offline"), "a device-side failure must be legible: \(reason)")
+    } else {
+      XCTFail("a [Fail] line must surface as a named malformed outcome")
     }
   }
 
