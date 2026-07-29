@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-051-agent-hardware-evidence
 revision: 6
-status: approved # r6 proposal PR 合并即批准；合并前 TASK-AHE-001 保持 blocked
+status: verified # 2026-07-29 verification PR；仅在维护者 review/merge 后生效
 class: core
 core_change_level: major
 owner: lvye
@@ -251,3 +251,47 @@ parity。本文 r6 是 generator Allowed-path 漏项后的 D1 机械范围/readi
 E1 capability 或 E2 authorization。实现、
 测试、文档、run evidence 与任务状态翻转仍同车交付；随后 change 级 verification 与
 archive 分别使用独立 PR。
+
+## Verification closure（2026-07-29）
+
+`TASK-AHE-001` 的实现、contract/fake 测试与 same-revision evidence 已由 PR #814
+合入 protected main。`AC-WF-004-01/02/03` 均有可复查 evidence；本 verification
+PR 只翻转 change/verification 状态并新增 latest-main 复验记录，零产品实现、零
+scope、零 Acceptance 定义或 authority 变化。
+
+### Protected-main delivery chain
+
+| Stage | Exact reviewed head | Protected-main merge |
+| --- | --- | --- |
+| r6 proposal #813 | `674f4e112e2cb908b8e53fb669a67fe5e31a2696` | `1836ab149e1520665cfcbc087552baba1ad212d9` |
+| implementation/evidence #814 | `7cf1ad90939be8da7e0de74fdcec536ecf406f28` | `858a8d4c272827bcaa2a2a5379115f810e24d915` |
+
+两个 exact heads 均由维护者 `lvye` review/approve；Agent PR、SDD Guard、allowed-path
+与 Swift CI 所需 checks 均为 `SUCCESS`。AC 真值源是
+`evidence/runs/TASK-AHE-001/run.md` 与
+`evidence/runs/TASK-AHE-001/verification-r1.md`，不是实现 PR 被 review 这一事实
+本身。
+
+### Binary AC conclusions
+
+- `AC-WF-004-01` = PASS：Agent E0 receipt → V3 projector 的 production-shaped
+  contract 路径闭合同一 job/target/binding 的 executor、default-read-only
+  authority、fresh confirmation、model/firmware、provider/tool/transport、actual
+  steps 与 Artifact hashes；JSON Schema 与 Swift round-trip 通过。
+- `AC-WF-004-02` = PASS：required-fact/correlation、stale/mismatch、caller
+  injection、raw identity、simulation/unknown 与 Artifact integrity 负向矩阵全部
+  fail closed，schema-valid realHardware publication count = 0。
+- `AC-WF-004-03` = PASS：E0/E1/E2 只接受与 actual effect 精确匹配的
+  defaultReadOnlyPolicy/runtimeCapability/standingAuthorization provenance；
+  missing/wrong/expired/drifted authority 拒绝，schema/projector 不 mint capability
+  且不增加 provider/device dispatch。
+
+复验记录与精确环境、命令见
+`evidence/runs/TASK-AHE-001/verification-r1.md`。复验只使用 contract/fake 路径，
+未执行安装态 HDC、真实设备、device mutation 或 destructive 操作，未追认
+`DHA-HW-001` attempt#2，也不产生 hardware/platform support 主张。
+
+只有维护者 review/merge 本 PR 后，proposal `verified` 与 verification `passed`
+才生效；archive 仍是后续独立 PR。若合并前 protected main 改变本 change 的
+schema、Catalog/generator、Runtime/projector、provider/preflight 或对应测试输入，
+必须先重放受影响验证，不能从本记录推断通过。
