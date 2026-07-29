@@ -1,0 +1,20 @@
+---
+schema_version: 1.0.0
+change_id: CHG-2026-052-sdd-acceptance-count-currency
+change_revision: 1
+platform: all
+evidence_classes:
+- contract
+cases:
+- acceptance_id: GUARD-COUNT-CURRENCY-001
+  test_id: TEST-GUARD-COUNT-CURRENCY-001
+  method: >-
+    Strict core-conformance count reader, malformed-shape matrix, current-main
+    subprocess assertion and CHG-2026-051 114-count downstream replay.
+  expected_source: openspec/changes/chg-2026-052-sdd-acceptance-count-currency/verification.md#acceptance-matrix
+  minimum_evidence: contract
+  expected_result: >-
+    The real-baseline SDD test accepts only the positive integer declared by
+    core-conformance, still requires a zero-error zero-warning subprocess result,
+    rejects malformed or mismatched counts, and needs no source edit when a
+    reviewed Core archive changes the canonical Acceptance count.
