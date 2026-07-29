@@ -1,15 +1,23 @@
 ---
 id: CHG-2026-050-diagnostics-step-contract
-revision: 1
-status: approved # 合并本 PR 即维护者批准；合并前不产生实现授权
+revision: 2
+status: approved # r2 合并即批准纠正后的 MAJOR scope；合并前 TASK-WSC-001 不开工
 class: core
-core_change_level: minor
+core_change_level: major
 owner: lvye
 core_baseline: CORE-2.1.0
 platforms: [macos, windows, linux]
 ---
 
 # Close the Catalog → typed stdout-step contract
+
+> r2 governance correction（2026-07-29）：r1 把新增 conditional required
+> `actionRef`、收紧既有 Catalog validation 并新增验收结果误标为 MINOR。
+> Constitution 的版本规则明确把“收紧”“schema required field”或改变验收
+> 结果归为 MAJOR；低层 approved proposal 不能覆盖该规则。r2 零改变功能
+> scope、delta、allowed paths 与测试矩阵，只把 change level、baseline
+> candidate 与平台 disposition 修正为符合 Constitution。r2 合并前
+> `TASK-WSC-001` 不得实现。
 
 ## Why
 
@@ -92,16 +100,18 @@ Observable behavior:
   - `openspec/contracts/workflow-step.schema.json`
   - new diagnostics stdout recipe catalog
   - generated Swift Catalog descriptor
-- Core baseline bump:需要，archive 时 `CORE-2.1.0 → CORE-2.2.0`
-  (MINOR：收紧 published Catalog 的 fail-closed 校验并新增 action identity，
-  不放宽既有 safety invariant)
+- Core baseline bump:需要；以 current `CORE-2.1.0` 为基线时 archive
+  candidate 为 `CORE-3.0.0`（MAJOR：收紧 published Catalog 的
+  fail-closed 校验、增加 conditional required action identity 并新增验收
+  结果）。若 archive 前已有其他 Core baseline ratify，archive PR 必须按届时
+  current baseline 重新计算下一个 MAJOR 版本，不得复用已占用版本号。
 
 ## Platform impact
 
 | Platform | Disposition | Reason |
 | --- | --- | --- |
-| macOS | implementation + contract reverify | 当前 Runtime 实现平台，需验证 Catalog→Swift→WAL 构造闭包 |
-| Windows / Linux | not started / contract applies | 共用 Core Catalog 与 workflow contract；不产生平台支持声明 |
+| macOS | notStarted / contract implementation | current conformance 尚未开始；实现 Catalog→Swift→WAL 闭包，不产生已支持声明 |
+| Windows / Linux | notStarted / contract applies | 共用 Core Catalog 与 workflow contract；不产生平台支持声明 |
 
 ## Safety, privacy, and compatibility
 
@@ -116,6 +126,7 @@ Observable behavior:
 
 ## Approval and flow
 
-本 proposal PR 合并即批准 `TASK-WSC-001`。实现 PR 完成 schema、Catalog、
+本 revision 2 proposal PR 合并即批准纠正后的 MAJOR scope，并使
+`TASK-WSC-001` 可按既有 ready 声明开工。实现 PR 完成 schema、Catalog、
 generator、Swift parity 与 contract evidence 后，另起 verification/archive
 载体。`TASK-DHA-001` 在本 change 完成且经 fresh readiness 前保持 blocked。

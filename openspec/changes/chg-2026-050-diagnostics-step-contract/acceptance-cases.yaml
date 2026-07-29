@@ -1,7 +1,7 @@
 ---
 schema_version: 1.0.0
 change_id: CHG-2026-050-diagnostics-step-contract
-change_revision: 1
+change_revision: 2
 platform: all
 evidence_classes:
 - contract
