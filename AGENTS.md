@@ -24,6 +24,28 @@
 
 低层文件不得覆盖或放宽高层规则。发现两个权威文件冲突时,停止受影响工作,标记 blocked 并创建 change proposal;不得自行选择更方便的解释。
 
+## 控制平面:Repo Agent 与 Device Agent Runtime(CHG-2026-046)
+
+本仓库区分两个控制平面,职责与载体不同:
+
+- **Repo Agent Plane(仓库治理面)**:修改代码、契约、`Catalog/`、provider、
+  integration/device profile 与安全策略。载体是 OpenSpec change + PR,信任根
+  不变(维护者 review/merge)。**恰以下四类变化需要 OpenSpec/PR 审批**:
+  新 operation 或对已发布 operation 的破坏性修改;新 provider;新
+  integration/device profile;E2 安全策略变化。
+- **Device Agent Runtime Plane(设备运行面)**:执行已发布(已合入 main 的
+  catalog 所定义)的 typed operation,维护 runtime job/session/artifact。
+  **已发布 operation 的每次执行只产生 runtime job 记录,不产生 Git task、
+  不开 PR、不要求 `changeId`/`taskId`**;运行时授权凭据是 Runtime
+  Capability(E0 默认只读策略;E1 standing capability;E2 一次性
+  exact-plan capability,其创建/修改/吊销仍走维护者 merged PR,见下方禁令)。
+- 风险分级 D0/D1/D2(决策维度,见 enforcement"决策分级")与执行分级
+  E0/E1/E2(设备效果维度)正交;Runtime Plane 的日常 E0 与已授权 E1 执行
+  不构成 D* 决策点。
+- `scripts/host_loop` 属 Repo Plane:仅领取仓库开发任务;其既有硬件门
+  (`Hardware required` 任务拒领、仅 D0 可派发)即设备执行禁令的机械承载,
+  host_loop 不得执行 HDC、刷机、日志/trace 采集或任何设备 runtime job。
+
 ## 信任与批准
 
 - 唯一信任根是**受保护的 `main` 分支 + 人类维护者(@lvye)的 PR review**。
@@ -45,10 +67,10 @@
 
 - 只执行 approved change 的 `tasks.md` 中状态为 ready 的任务;一次专注一个任务,在任务声明的 allowed paths 内工作。
 - 每个任务开始前确认:所属 change 已 approved、依赖任务已完成、验证方法明确、所需工具/硬件可得;缺任一项即 blocked。
-- 每个任务结束时在 change 的 `evidence/` 下追加简短 run 记录(做了什么、命令、结果、AC 结论、偏差与遗留风险),并更新 tasks.md 状态;PR review 是对记录真实性的把关。
+- 每个任务结束时在 change 的 `evidence/` 下追加简短 run 记录(做了什么、命令、结果、AC 结论、偏差与遗留风险),并更新 tasks.md 状态;run 记录与状态更新**随实现 PR 同车提交**,PR review 是对记录真实性的把关。
 - 任务完成 ≠ 验证通过:change 的 verified 状态需要 `verification.md` 中全部 AC 有可复查证据,并由维护者在 PR 中确认。
-- 一任务一实现 PR:任务实现不得混入 readiness、remediation 或状态 PR;PR 标题与描述必须如实覆盖其全部内容,超出声明范围的内容一律拆分成独立 PR。
-- 起草 change `verified` 翻转时,该 PR 只做状态翻转与 evidence 引用,不夹带实现;验证依据必须指向具体 run/复验记录,而非"实现 PR 已被 review"。
+- **一个垂直交付单元一个 PR(CHG-2026-046)**:实现、测试、文档、evidence 与该单元的任务状态翻转在同一 PR 内交付;PR 标题与描述必须如实覆盖其全部内容,超出声明范围的内容一律拆分成独立 PR。**不再创建 readiness-only、status-only、done-only、verified-only 独立 PR**;readiness 结论(pins、风险确认、窗口边界)写入该单元 PR 或其 proposal,D2 窗口授权仍须独立载体(其本身是 D2 决策)。proposal 可携带 `status: approved` 落地,维护者 review + merge 该 proposal PR 即批准。
+- change 级 `verified` 翻转与 archive 仍是独立 PR(各自是独立决策):`verified` 翻转只做状态与 evidence 引用,不夹带实现;验证依据必须指向具体 run/复验记录,而非"实现 PR 已被 review"。
 - 批次协作(enforcement"决策分级"与"批次审批协议"节,CHG-2026-027):lane 推进到人类判断门(D1/D2)时生成 digest 入批次队列并转入其他 lane,不逐个催合;**D1/D2 门之后的成 PR 工作在该门合入前不得开工**(判断门后零投机堆叠;门后唯一允许的预跑 = 不产生 PR 的采集/勘察);D0 机械状态推进可同 lane 连续排入。批次内每次合并仍是维护者逐 PR 批准,digest 无批准语义,不存在任何等级的 auto-merge;守望会话以 merge OID 确认合并,不确定即暂停。
 - Windows/Linux 是同一产品的未来平台端口(现状 not started):平台实现不得改变 HDC server 保护、device binding 边界、Job 状态机/journal/recovery 语义、typed step 与 effect 等级、Artifact/隐私规则。
 

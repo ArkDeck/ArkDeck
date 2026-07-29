@@ -1,0 +1,160 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "capture.diagnostics",
+  "version": 1,
+  "title": "Capture bounded HiLog, UI dump and trace with a structured artifact index",
+  "provider": "hdc",
+  "effect": { "minimum": "readOnly", "permitted": ["readOnly", "deviceMutation"] },
+  "authorization": {
+    "readOnly": "defaultReadOnly",
+    "deviceMutation": "standingCapability"
+  },
+  "binding": "confirmedDevice",
+  "concurrencyKey": "device-exclusive",
+  "inputs": {
+    "fields": {
+      "durationSeconds": {
+        "type": "integer",
+        "required": true,
+        "minimum": 1,
+        "maximum": 600,
+        "description": "Bounded HiLog capture window."
+      },
+      "hilogFilters": {
+        "type": "stringArray",
+        "required": false,
+        "maxItems": 16,
+        "maxLength": 200,
+        "description": "Typed HiLog filter expressions; no shell fragments."
+      },
+      "traceCategories": {
+        "type": "stringArray",
+        "required": false,
+        "maxItems": 24,
+        "maxLength": 64,
+        "description": "Trace categories; presence selects the remote-file trace leg and escalates the effective effect to deviceMutation."
+      },
+      "traceBufferKB": {
+        "type": "integer",
+        "required": false,
+        "minimum": 1024,
+        "maximum": 65536,
+        "default": 8192
+      },
+      "uiDump": { "type": "boolean", "required": false, "default": true },
+      "totalArtifactByteBudget": {
+        "type": "integer",
+        "required": false,
+        "minimum": 1048576,
+        "maximum": 536870912,
+        "default": 134217728
+      },
+      "redactionProfile": {
+        "type": "string",
+        "required": false,
+        "enum": ["standard", "strict"],
+        "default": "standard"
+      }
+    }
+  },
+  "outputs": {
+    "fields": {
+      "artifactIndex": { "type": "artifactReference", "required": true },
+      "captureSummary": { "type": "artifactReference", "required": true }
+    }
+  },
+  "steps": [
+    {
+      "stepID": "preflight-host-storage",
+      "kind": "preflightHostStorage",
+      "effect": "hostOnly",
+      "cancellation": "immediate",
+      "binding": "none",
+      "compensation": "none"
+    },
+    {
+      "stepID": "preflight-device-storage",
+      "kind": "preflightDeviceStorage",
+      "effect": "readOnly",
+      "cancellation": "immediate",
+      "binding": "confirmedDevice",
+      "compensation": "none"
+    },
+    {
+      "stepID": "capture-hilog",
+      "kind": "captureRemoteStdout",
+      "effect": "readOnly",
+      "cancellation": "immediate",
+      "binding": "confirmedDevice",
+      "compensation": "none",
+      "notes": "Bounded by durationSeconds and per-stream byte budget; partial success is recorded per artifact."
+    },
+    {
+      "stepID": "capture-ui-dump",
+      "kind": "captureRemoteStdout",
+      "effect": "readOnly",
+      "cancellation": "immediate",
+      "binding": "confirmedDevice",
+      "optional": true,
+      "compensation": "none"
+    },
+    {
+      "stepID": "capture-trace",
+      "kind": "captureRemoteFile",
+      "effect": "deviceMutation",
+      "cancellation": "atSafeBoundary",
+      "binding": "confirmedDevice",
+      "optional": true,
+      "compensation": "bestEffortCleanup",
+      "notes": "Provider-owned unique remote temp path bound to session/step; selected only when traceCategories is present."
+    },
+    {
+      "stepID": "receive-trace-artifact",
+      "kind": "receiveFile",
+      "effect": "readOnly",
+      "cancellation": "immediate",
+      "binding": "confirmedDevice",
+      "optional": true,
+      "compensation": "none",
+      "notes": "Size/hash verified on receive."
+    },
+    {
+      "stepID": "cleanup-remote-temp",
+      "kind": "cleanupOwnedRemotePath",
+      "effect": "deviceMutation",
+      "cancellation": "atSafeBoundary",
+      "binding": "confirmedDevice",
+      "optional": true,
+      "compensation": "bestEffortCleanup",
+      "notes": "Failure records cleanup debt for later reconcile; never silently dropped."
+    },
+    {
+      "stepID": "postprocess-index",
+      "kind": "postprocessArtifact",
+      "effect": "hostOnly",
+      "cancellation": "immediate",
+      "binding": "none",
+      "compensation": "none"
+    },
+    {
+      "stepID": "finalize-session",
+      "kind": "finalizeSession",
+      "effect": "hostOnly",
+      "cancellation": "atSafeBoundary",
+      "binding": "none",
+      "compensation": "none"
+    }
+  ],
+  "timeoutSeconds": 900,
+  "outputByteBudget": 536870912,
+  "retry": { "preflightAttempts": 2, "mutationAttempts": 1 },
+  "unknownOutcome": "reconcileRequired",
+  "artifacts": [
+    { "name": "hilog.txt", "role": "raw", "mediaType": "text/plain", "privacy": "sensitive", "required": true },
+    { "name": "ui-dump.json", "role": "raw", "mediaType": "application/json", "privacy": "sensitive", "required": false },
+    { "name": "trace.htrace", "role": "raw", "mediaType": "application/octet-stream", "privacy": "sensitive", "required": false },
+    { "name": "artifact-index.json", "role": "derived", "mediaType": "application/json", "privacy": "standard", "required": true },
+    { "name": "capture-summary.json", "role": "derived", "mediaType": "application/json", "privacy": "standard", "required": true }
+  ],
+  "profiles": ["openharmony-standard@1", "dayu200@1"]
+}

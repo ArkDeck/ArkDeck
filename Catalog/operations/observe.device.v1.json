@@ -1,0 +1,73 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "observe.device",
+  "version": 1,
+  "title": "Observe host tool, HDC server and bound device facts",
+  "provider": "hdc",
+  "effect": { "minimum": "readOnly", "permitted": ["readOnly"] },
+  "authorization": { "readOnly": "defaultReadOnly" },
+  "binding": "confirmedDevice",
+  "concurrencyKey": "device-shared-readonly",
+  "inputs": {
+    "fields": {
+      "refreshServerFacts": {
+        "type": "boolean",
+        "required": false,
+        "description": "Re-probe HDC server facts even when a fresh snapshot exists.",
+        "default": true
+      }
+    }
+  },
+  "outputs": {
+    "fields": {
+      "deviceFacts": { "type": "artifactReference", "required": true },
+      "toolFacts": { "type": "artifactReference", "required": true },
+      "bindingSnapshot": { "type": "artifactReference", "required": true }
+    }
+  },
+  "steps": [
+    {
+      "stepID": "probe-host-tool",
+      "kind": "probeHostTool",
+      "effect": "hostOnly",
+      "cancellation": "immediate",
+      "binding": "none",
+      "compensation": "none"
+    },
+    {
+      "stepID": "probe-hdc-server",
+      "kind": "probeHDCServer",
+      "effect": "hostOnly",
+      "cancellation": "immediate",
+      "binding": "none",
+      "compensation": "none"
+    },
+    {
+      "stepID": "probe-device",
+      "kind": "probeDevice",
+      "effect": "readOnly",
+      "cancellation": "immediate",
+      "binding": "confirmedDevice",
+      "compensation": "none",
+      "notes": "Verifies durable binding identity against currently observed device facts; identity drift fails closed."
+    },
+    {
+      "stepID": "finalize-session",
+      "kind": "finalizeSession",
+      "effect": "hostOnly",
+      "cancellation": "atSafeBoundary",
+      "binding": "none",
+      "compensation": "none"
+    }
+  ],
+  "timeoutSeconds": 60,
+  "outputByteBudget": 1048576,
+  "retry": { "preflightAttempts": 2, "mutationAttempts": 1 },
+  "unknownOutcome": "reconcileRequired",
+  "artifacts": [
+    { "name": "device-facts.json", "role": "raw", "mediaType": "application/json", "privacy": "sensitive", "required": true },
+    { "name": "tool-facts.json", "role": "raw", "mediaType": "application/json", "privacy": "standard", "required": true },
+    { "name": "binding-snapshot.json", "role": "derived", "mediaType": "application/json", "privacy": "sensitive", "required": true }
+  ],
+  "profiles": ["openharmony-standard@1", "dayu200@1"]
+}

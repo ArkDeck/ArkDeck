@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "openharmony-standard",
+  "version": 1,
+  "provider": "hdc",
+  "title": "Standard OpenHarmony device over external-first HDC",
+  "constraints": {
+    "toolFamily": "hdc",
+    "transport": ["usb"],
+    "atomicPublishStrategies": ["renameWithinAppOwnedDirectory"],
+    "notes": "Provider facts (tool version/hash, server facts, device identity/mode/build) are resolved at runtime and pinned per session; this profile never carries executable paths or argv."
+  },
+  "supportedOperations": [
+    "observe.device@1",
+    "capture.diagnostics@1",
+    "debug.hap@1",
+    "deploy.native-library.app-owned@1",
+    "deploy.native-library.system@1"
+  ]
+}
