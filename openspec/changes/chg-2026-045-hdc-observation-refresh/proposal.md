@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-045-hdc-observation-refresh
 revision: 1
-status: proposed
+status: approved # only after maintainer review/merge of this approval-only PR
 class: platform
 core_change_level: none
 owner: lvye
@@ -148,3 +148,42 @@ that re-pins current protected-main sources, exact signed-App test
 environment, complete allowed paths and the mutation/negative matrix.
 Implementation/evidence, `ready→done`, change `verified`, and the subsequent
 CHG-2026-006 `TASK-M0B-002` fresh D2 readiness each remain separate PRs.
+
+## Approval
+
+- The r1 proposal was added to protected main by PR #766: exact reviewed head
+  `4e898ce54b37fafbef776da7c0722a8b728046d5`, squash merge
+  `7938cf67a2749a8d7ddb3c86b44fd244705d3974`. Maintainer `lvye` recorded an
+  `APPROVED` review on that exact proposal head.
+- Formal approval takes effect only when the maintainer reviews and merges
+  this approval-only PR. That D1 decision accepts the following closed scope:
+  - **User and App boundary:**macOS adds one localized, keyboard/AX-reachable
+    HDC diagnostics refresh action. Startup and manual requests enter the
+    same App-owned method; one request is admitted at a time and an in-flight
+    duplicate causes no second provider call.
+  - **Session and effect boundary:**the action calls the existing diagnostics
+    provider `refresh()` exactly once and retains the current candidate,
+    endpoint, execution identity, `HDCDeviceObservationApplicationSession`,
+    capacity-64 buffer and session pseudonym. Each accepted action may invoke
+    at most the existing exact registered 3.2.0f `list targets -v` source
+    once.
+  - **Authority and safety boundary:**the App gains no candidate, endpoint,
+    runner, argv, receipt, generation or lifecycle authority. No timer,
+    background/automatic retry, second discovery/candidate/session,
+    cross-session stitching, server lifecycle/adoption, subserver,
+    authorization, binding/device mutation or destructive path is added.
+    Core, canonical AC, contracts/schema, baseline, integration/platform
+    profile, registry/resource and OpenHarmony production bytes remain
+    unchanged.
+  - **Verification boundary:**`HOR-UI-001`, `HOR-SESSION-001`,
+    `HOR-BOUNDED-001` and `HOR-SAFETY-001` require the layered signed UI,
+    session/composition, mutation and forbidden-effect evidence defined in
+    `verification.md`. Presentation-only fixture results are
+    `platform/contract`, never real-HDC or hardware evidence.
+- This approval does not execute the task, accept source/environment pins,
+  prove fixture design or tests sufficient, or authorize installed HDC,
+  production App, real device or D2-window execution. `TASK-HOR-001` remains
+  `blocked` and must receive a fresh independent D1 readiness on then-current
+  protected main before any implementation/evidence PR. Its subsequent
+  `ready→done`, change `verified`, and CHG-2026-006 fresh D2 readiness remain
+  separate decisions.
