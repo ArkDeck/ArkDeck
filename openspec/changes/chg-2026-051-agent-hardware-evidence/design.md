@@ -1,4 +1,4 @@
-# CHG-2026-051 r5 Design — Production evidence preflight
+# CHG-2026-051 r6 Design — Production evidence preflight
 
 ## 1. Why r1 cannot reach production
 
@@ -86,6 +86,14 @@ port SHALL provide the same target ID, binding revision, stable identity and int
 shape required by production preflight, and its request SHALL correlate the binding revision.
 The dispatcher still stops at the first device preflight dispatch; marker timing, SIGSTOP/SIGKILL,
 journal recovery and zero-redispatch assertions remain unchanged.
+
+### 2.4 Generator implementation path parity
+
+The r3 design already requires the stdlib Catalog generator to validate remote action references
+and its tests to pin the positive/negative matrix. Both files are exact readiness pins, but the
+task's Allowed paths omitted them. r6 adds exactly those two implementation paths. It does not
+change the generator behavior, accepted registry, operation vocabulary or generated outputs
+described in §2.1.
 
 ## 3. Exact target and provider lowering
 

@@ -1,6 +1,6 @@
 # CHG-2026-051 Verification Plan
 
-> Change:CHG-2026-051-agent-hardware-evidence@r5
+> Change:CHG-2026-051-agent-hardware-evidence@r6
 > Status:planned
 > Core baseline:CORE-2.1.0
 

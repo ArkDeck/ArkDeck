@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-051-agent-hardware-evidence
-revision: 5
-status: approved # r5 proposal PR 合并即批准；合并前 TASK-AHE-001 保持 blocked
+revision: 6
+status: approved # r6 proposal PR 合并即批准；合并前 TASK-AHE-001 保持 blocked
 class: core
 core_change_level: major
 owner: lvye
@@ -67,6 +67,14 @@ preflight，导致 fixture 在预期 WAL crash window 之前退出。前者不�
 实现制造 schema drift，后者不能靠跳过既有 crash assertions 让 CI 变绿。本文 r5
 一次性把这两个 parity/fixture 路径加入 pins/Allowed paths；fixture 只补
 descriptor-bound target/binding/connect-key facts，不改变 crash window 或断言。
+
+r5 合入并完成实现后的最终 allowed-path 机械审计发现：r3 已把
+`scripts/catalog_gen/generate.py` 与 `scripts/catalog_gen/test_generate.py` 纳入
+exact pins，proposal/design/deliverables 也明确要求修改 generator 及其正反例，但
+`tasks.md` 的 Allowed paths 漏列这两个文件。继续提交会违反任务边界；删除 generator
+实现又会造成 Catalog contract/generated outputs 无法验证。本文 r6 只把这两个已经
+列明且 pinned 的实现路径补入 Allowed paths，不增加 operation、action、effect、
+provider、schema 语义或 Acceptance。
 
 `CHG-2026-025` 已批准“eligible typed operation 由 Agent 执行”的总体方向，也已完成
 一个 change-local V3 draft；但其 proposal 明确禁止其他 change 在该大型 change
@@ -139,6 +147,9 @@ In scope:
   `deviceModel` / `firmwareBuild`；进程级 engine crash fixture 使用
   production-shaped target/binding/connect-key facts 到达原有 WAL crash 点。不得
   跳过、缩短或放宽 crash recovery assertions。
+- **Generator Allowed-path parity（r6）**：
+  将 r3 已批准且已 exact-pinned 的 generator implementation 与 test 文件补入
+  TASK-AHE-001 Allowed paths；不改变 r3 定义的 validator/generator 行为。
 - **Fail closed evidence publication**：任一 required fact 缺失、unknown、stale、
   binding 不一致、authority/effect 不匹配或 Artifact bytes/hash 不可验证时，runner
   返回结构化 `evidenceIncomplete` blocker；不得发布 schema-valid realHardware
@@ -160,7 +171,7 @@ Observable behavior:
 
 ## Out of scope
 
-- 本 r5 proposal PR 不修改 current schema、Catalog/Runtime 代码或 current specs，不执行
+- 本 r6 proposal PR 不修改 current schema、Catalog/Runtime 代码或 current specs，不执行
   device/HDC/tool，不产生或追认任何 realHardware evidence。
 - 不追溯改写 V2 历史记录；`DHA-HW-001` attempt#2 继续保持“runtime succeeded /
   formal acceptance blocked”，不得补写字段后追认为 PASS。
@@ -233,10 +244,10 @@ Observable behavior:
 
 r1 proposal PR 已承载 `CHG-2026-051` 初始 approval 与 `CHG-2026-025` r6 ownership
 修订，r2 承载 production preflight scope，r3 承载 Catalog contract/generator
-closure，r4 承载 durable journal Swift registry。本文 r5 是 schema parity 与
-crash-fixture stop condition 后的 D1 机械范围/readiness 修订；维护者 review +
-merge r5 exact head 后，`TASK-AHE-001` 才可按新 pins 恢复。r5 合并不构成
-contract 激活、真机窗口、
+closure，r4 承载 durable journal Swift registry，r5 承载 schema/crash-fixture
+parity。本文 r6 是 generator Allowed-path 漏项后的 D1 机械范围/readiness 修订；
+维护者 review + merge r6 exact head 后，`TASK-AHE-001` 才可按新边界恢复。r6
+合并不构成 contract 激活、真机窗口、
 E1 capability 或 E2 authorization。实现、
 测试、文档、run evidence 与任务状态翻转仍同车交付；随后 change 级 verification 与
 archive 分别使用独立 PR。
