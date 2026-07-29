@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-045-hdc-observation-refresh
 revision: 1
-status: verified # 2026-07-29 本 verification closure；仅在维护者 review/merge 本 PR 后生效
+status: archived # 2026-07-29 本 archive PR；verification #778 merge eb24e6625a345578108781649ed19b2598024ade；post-merge replay #780 merge f7cf5e3dcdfd63cb7865e5d9c8bdeb175fdf825a；Core/spec/contract/canonical acceptance delta 均为空；目录外活路径引用 0；仅在维护者 review/merge 本 PR 后生效
 class: platform
 core_change_level: none
 owner: lvye
