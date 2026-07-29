@@ -1,7 +1,7 @@
 # CHG-2026-052 Verification Plan
 
 > Change:CHG-2026-052-sdd-acceptance-count-currency@r2
-> Status:planned
+> Status:passed # 2026-07-30；仅在维护者 review/merge verification PR 后生效
 > Core baseline:CORE-2.1.0
 
 ## Environment
@@ -32,10 +32,16 @@ manifest/guard in the same implementation PR, or skipping CI is failure.
 
 ## Result gate
 
-- [ ] strict reader valid/invalid matrix PASS
-- [ ] full `scripts/test_check_sdd.py` PASS on current 111 manifest
-- [ ] `scripts/test_check_pr_paths.py` and `scripts/check-sdd.sh` PASS
-- [ ] CHG-2026-051 archive candidate reports 114 and SDD Guard PASS without another
+- [x] strict reader valid/invalid matrix PASS
+- [x] full `scripts/test_check_sdd.py` PASS on current 111 manifest
+- [x] `scripts/test_check_pr_paths.py` and `scripts/check-sdd.sh` PASS
+- [x] CHG-2026-051 archive candidate reports 114 and SDD Guard PASS without another
       `scripts/test_check_sdd.py` edit
-- [ ] implementation run evidence is same-revision and reviewable
-- [ ] zero product/device/network dispatch; no platform/hardware support claim
+- [x] implementation run evidence is same-revision and reviewable
+- [x] zero product/device/network dispatch; no platform/hardware support claim
+
+Closure receipt:`proposal.md#verification-closure2026-07-30`。实现 evidence =
+`evidence/runs/TASK-GCC-001/run.md`；latest-main 复验 =
+`evidence/runs/TASK-GCC-001/verification-r1.md`。`passed` 与 proposal
+`verified` 只在维护者 review/merge 本 verification PR 后生效；archive 保持为后续
+独立决策门。
