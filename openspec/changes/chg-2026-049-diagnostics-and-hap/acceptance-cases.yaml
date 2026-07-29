@@ -1,0 +1,71 @@
+---
+schema_version: 1.0.0
+change_id: CHG-2026-049-diagnostics-and-hap
+change_revision: 1
+platform: macos
+evidence_classes:
+- contract
+- realHardware
+cases:
+- acceptance_id: DHA-ART-001
+  test_id: TEST-DHA-ART-001
+  method: >-
+    Artifact model contract tests plus path-traversal and symlink
+    negatives, GC/quota/retention matrix, and an end-to-end
+    observe.device@1 publication read back through the daemon.
+  expected_source: openspec/changes/chg-2026-049-diagnostics-and-hap/verification.md#dha-art-001
+  minimum_evidence: contract
+  expected_result: >-
+    Artifacts carry complete metadata and are reachable only by ID or
+    lease; traversal and symlink escapes fail closed; GC spares active and
+    pinned entries; a full quota refuses new capture without damaging
+    existing artifacts; observe.device@1 publishes its four artifacts.
+- acceptance_id: DHA-CAP-001
+  test_id: TEST-DHA-CAP-001
+  method: >-
+    capture.diagnostics@1 orchestration contract with partial-failure,
+    cancellation, byte-budget and remote-cleanup-debt scenarios.
+  expected_source: openspec/changes/chg-2026-049-diagnostics-and-hap/verification.md#dha-cap-001
+  minimum_evidence: contract
+  expected_result: >-
+    One request yields the hilog, ui-dump, trace, index and summary set;
+    a missing artifact is reported per item and never as overall success;
+    cancellation collects completed artifacts at a safe boundary; budget
+    overruns truncate or fail without exhausting disk; failed remote
+    cleanup becomes reconcilable debt.
+- acceptance_id: DHA-HAP-001
+  test_id: TEST-DHA-HAP-001
+  method: >-
+    debug.hap@1 orchestration contract with readback-only success
+    judgement, E1 capability scope negatives, compensation and
+    unknown-outcome halting.
+  expected_source: openspec/changes/chg-2026-049-diagnostics-and-hap/verification.md#dha-hap-001
+  minimum_evidence: contract
+  expected_result: >-
+    Install and start succeed only on package and process readback, never
+    on exit code; missing or out-of-scope capabilities dispatch nothing;
+    failures compensate per cleanup policy; an unknown outcome halts
+    further mutation with zero automatic replay; the HAP comes only from
+    an artifact lease.
+- acceptance_id: DHA-HW-001
+  test_id: TEST-DHA-HW-001
+  method: >-
+    Maintainer device window: capture.diagnostics@1 against a real
+    DAYU200, transcript pasted back and audited.
+  expected_source: openspec/changes/chg-2026-049-diagnostics-and-hap/verification.md#dha-hw-001--dha-hw-002realhardware窗口后补记
+  minimum_evidence: realHardware
+  expected_result: >-
+    One submission produces the expected artifact set readable through the
+    daemon artifact surface, with duration, filter and category bounds in
+    effect and remote temporary files cleaned or recorded as debt.
+- acceptance_id: DHA-HW-002
+  test_id: TEST-DHA-HW-002
+  method: >-
+    Maintainer device window plus a maintainer-issued E1 capability:
+    debug.hap@1 against a real DAYU200.
+  expected_source: openspec/changes/chg-2026-049-diagnostics-and-hap/verification.md#dha-hw-001--dha-hw-002realhardware窗口后补记
+  minimum_evidence: realHardware
+  expected_result: >-
+    One runtime request installs, starts, captures and stops the HAP with
+    readback evidence at each mutating step; the capability is consumed
+    once for the whole recipe; without it the run dispatches nothing.
