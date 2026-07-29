@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-052-sdd-acceptance-count-currency
 revision: 2
-status: verified # 2026-07-30 verification PR；仅在维护者 review/merge 后生效
+status: archived # 2026-07-30 archive PR；verification #820 merge cef348ceab6e82d817ece34d53cdcf03af8b94bf；Core/spec/contract/canonical Acceptance delta 均为空；目录外活路径引用 0；仅在维护者 review/merge 本 PR 后生效
 class: implementation-only
 core_change_level: none
 owner: lvye
