@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-051-agent-hardware-evidence
 revision: 6
-status: verified # 2026-07-29 verification PR；仅在维护者 review/merge 后生效
+status: archived # 2026-07-30 archive PR；verification #815 merge dd3b110daed9311f9c2c732c7c971c21482bed59；ratify CORE-3.0.0 + 114 canonical AC；仅在维护者 review/merge 本 PR 后生效
 class: core
 core_change_level: major
 owner: lvye

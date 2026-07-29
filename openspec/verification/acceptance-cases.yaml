@@ -1,5 +1,5 @@
-registry: CORE-ACCEPTANCE-CASES-2.0.0
-status: accepted  # 随 CORE-2.0.0 ratification
+registry: CORE-ACCEPTANCE-CASES-3.0.0
+status: accepted  # 随 CORE-3.0.0 ratification
 expected_result_rule: >-
   expected_source identifies the normative Scenario block; all GIVEN/WHEN/THEN/AND
   clauses in that block are the binary expected result and may not be restated or
@@ -135,3 +135,6 @@ cases:
 
   - { acceptance_id: AC-WF-001-01, test_id: TEST-AC-WF-001-01, method: workflowSchemaContract, expected_source: openspec/specs/workflow-journal-recovery/spec.md#AC-WF-001-01, minimum_evidence: contract }
   - { acceptance_id: AC-WF-002-01, test_id: TEST-AC-WF-002-01, method: effectLatticeProperty, expected_source: openspec/specs/workflow-journal-recovery/spec.md#AC-WF-002-01, minimum_evidence: contract }
+  - { acceptance_id: AC-WF-004-01, test_id: TEST-AC-WF-004-01, method: hardwareEvidenceProjectionContract, expected_source: openspec/specs/workflow-journal-recovery/spec.md#AC-WF-004-01, minimum_evidence: contract }
+  - { acceptance_id: AC-WF-004-02, test_id: TEST-AC-WF-004-02, method: hardwareEvidenceFailClosedContract, expected_source: openspec/specs/workflow-journal-recovery/spec.md#AC-WF-004-02, minimum_evidence: contract }
+  - { acceptance_id: AC-WF-004-03, test_id: TEST-AC-WF-004-03, method: hardwareEvidenceAuthoritySeparationContract, expected_source: openspec/specs/workflow-journal-recovery/spec.md#AC-WF-004-03, minimum_evidence: contract }

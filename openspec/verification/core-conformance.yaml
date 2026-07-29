@@ -1,15 +1,15 @@
-suite: CORE-CONFORMANCE-2.1.0
-status: accepted  # 2.1.0 随 CHG-2026-018 archive PR ratify CORE-2.1.0 生效;单一事实源为 openspec/baselines/CORE-2.1.0.yaml
-core_baseline: CORE-2.1.0
+suite: CORE-CONFORMANCE-3.0.0
+status: accepted  # 随 CHG-2026-051 archive PR ratify CORE-3.0.0 生效;单一事实源为 openspec/baselines/CORE-3.0.0.yaml
+core_baseline: CORE-3.0.0
 
 acceptance_index:
   path: openspec/verification/acceptance-index.txt
-  count: 111
+  count: 114
   selector: all-current-core-acceptance-ids
 
 acceptance_cases:
   path: openspec/verification/acceptance-cases.yaml
-  count: 111
+  count: 114
   expected_result: normative-scenario-then-and-clauses
 
 applicability:
@@ -82,6 +82,8 @@ shared_inputs:
       version: 1.0.0
     - path: openspec/contracts/workflow-step.schema.json
       version: 1.0.0
+    - path: openspec/contracts/hardware-evidence.schema.json
+      version: 3.0.0
     - path: openspec/contracts/workflow-step-registry.yaml
       version: 1.0.0
     - path: openspec/contracts/manifest.schema.json
@@ -170,6 +172,7 @@ safety_coverage:
     requirements:
       - REQ-WF-001
       - REQ-WF-002
+      - REQ-WF-004
       - REQ-JOB-001
       - REQ-JOB-002
       - REQ-JOB-003
@@ -178,6 +181,7 @@ safety_coverage:
     normal:
       - AC-WF-001-01
       - AC-WF-002-01
+      - AC-WF-004-01
       - AC-JOB-001-01
       - AC-JOB-001-06
     refusal_or_failure:
@@ -185,6 +189,8 @@ safety_coverage:
       - AC-JOB-001-04
       - AC-JOB-002-01
       - AC-JOB-003-01
+      - AC-WF-004-02
+      - AC-WF-004-03
     recovery_or_restart:
       - AC-JOB-001-03
       - AC-JOB-001-05
