@@ -1,6 +1,6 @@
 # Verification Plan
 
-> Change:CHG-2026-025-ai-native-unattended-device-ops@r4
+> Change:CHG-2026-025-ai-native-unattended-device-ops@r5
 > Status:planned # 结论经维护者在 PR 中确认
 > Revision review:2026-07-22 已逐项对照 r2 security-remediation、TASK-AIN-005/006/
 > 008/007 与 AIN-004 stop gate;本计划不复用 superseded #296 readiness/authorization。
@@ -10,6 +10,10 @@
 > r4 remediation:2026-07-28 TASK-AIN-010 readiness audit 发现 E1 capability carrier/
 > provenance/usage 与 E0/E1/E2 durable authority correlation 未冻结，新增
 > TASK-AIN-009R；009R/010 各自 readiness 合入前不执行实现或真机。
+> r5 remediation:2026-07-29 TASK-AIN-011 readiness audit 发现 exact E0 collection
+> integration authority/production lowering 与 status path 不闭合；新增
+> TASK-AIN-010P 先由 Agent 在本 scoped V3 contract 下执行 registration capture，
+> 后继独立 integration change 再登记/adopt；各门合入前不执行后续实现。
 
 ## Environment
 
@@ -27,6 +31,9 @@
 - r4 authority persistence:per-device capability、execution-authority/usage 与
   Journal/Manifest 2.2 的 exact schema/version/compatibility matrix 由
   TASK-AIN-009R readiness 固定；2.1 Rockchip historical bytes/语义保持可读且不改写
+- r5 registration capture:exact device/build/HDC、八个 E0 typed argv、time/byte
+  budgets、human boundary、change-local V3 evidence instance 与 privacy allowlist 由
+  TASK-AIN-010P readiness 固定；capture 不建立 integration support
 - r3 hardware:至少一个 pinned OpenHarmony device/build/HDC 完成 E0/E1 product-path；
   人类只执行 human-boundary registry 中的物理/配置/治理动作
 
@@ -58,6 +65,7 @@
 | AC-DEBUG-008-04 | analysis-generated next request 越权/过期/stale facts 全重新 admission | passed | TASK-AIN-010/014/015/016 run 记录 |
 | AIN-OP-CONTRACT-001(change-local,r3) | agent-operation/human-blocker schema 正反 vectors；operation→step/effect mapping 闭包 | passed | TASK-AIN-009 run 记录 |
 | AIN-CAP-CONTRACT-001(change-local,r4) | per-device capability/provenance/usage 每字段 vectors + E0/E1/E2 authority union 的 Journal/Manifest 2.2 round-trip、crash/replay correlation 与 2.1 compatibility matrix；真实 capability/dispatch=0 | passed | TASK-AIN-009R run 记录 |
+| AIN-E0-CAPTURE-001(change-local,r5) | typed registration runner contract/fault matrix + Agent real-device E0 run + V3 schema/privacy/effect audit；人工仅做 allowlisted 物理/配置动作 | passed | TASK-AIN-010P run + 脱敏 V3 hardware evidence；raw Artifact 受控本地引用 |
 | AIN-CONTROL-001(change-local,r3) | submit/status/cancel/reconcile/result 与 bounded debug DAG 端到端；network/shell/raw path surface=0 | passed | TASK-AIN-015 run 记录 |
 | AIN-MANUAL-GAP-001(change-local,r3) | 活跃 change/runbook grep 与 dependency audit；非 allowlisted human-only seam=0 | passed | TASK-AIN-017 run 记录 |
 
@@ -96,6 +104,10 @@
   policy 脱敏；ENOSPC 保留 journal/partial/finalization headroom；
 - 真机 r3：人工只完成 allowlisted 物理/配置动作，capture/deploy/restore/analysis 命令
   全由 product executor dispatch；E2/system/vendor/root/remount/flash 在 TASK-AIN-016 为 0。
+- r5 registration：caller target/argv/fact/receipt/support、跨 HDC version result、
+  stale/ambiguous binding、server/device drift、unknown step、timeout/cancel/truncation/
+  invalid UTF-8/ENOSPC/privacy failure 全部 fail closed/partial；remote write/cleanup、
+  buffer/parameter mutation、lifecycle、E1/E2 dispatch 恒为 0，crash 不自动重放。
 
 ## Deviations
 
@@ -103,7 +115,7 @@
 
 ## Result gate
 
-- [ ] TASK-AIN-001/002/003/003R/BKMK-001/005/006/008/007/004/009/009R/010/011/012/
+- [ ] TASK-AIN-001/002/003/003R/BKMK-001/005/006/008/007/004/009/009R/010/010P/011/012/
   013/014/015/016/017 全部 done，且 AIN-004
   使用四项 host remediation 的 fresh main OID 重新 readiness（不复用 #296）
 - [ ] 所有适用 AC passed 且 evidence 可复查
@@ -116,6 +128,9 @@
 - [ ] AIN-004 使用的新 authorization 在执行时 fresh、未超次且由产品 executor 消费
 - [ ] E0/E1 真机 evidence 的 executor.kind=agent，人工动作全部属于 human-boundary
   registry，且没有人类代跑 device command
+- [ ] TASK-AIN-010P 的 raw registration Artifact 不入仓、V3 evidence 可解引用且
+  后继 integration change 明确区分 supported/unsupported；capture 本身未被当成
+  AIN-011 production dispatch authority
 - [ ] HAP/SO/Trace/UI Dump/HiLog 的 effect mapping、capability/authorization、rollback/
   compensation 与 outcomeUnknown evidence 全部可复查
 - [ ] 活跃任务与 runbook 中非 allowlisted human-only seam 为 0；历史

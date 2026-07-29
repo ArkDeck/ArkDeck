@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-025-ai-native-unattended-device-ops
-revision: 4
-status: approved # r1 经 #281 正式批准；r2/r3 已合入；r4 contract/scope remediation 仅在维护者 review/merge 本修订 PR 后生效
+revision: 5
+status: approved # r1 经 #281 正式批准；r2/r3/r4 已合入；r5 E0 registration-capture scope 仅在维护者 review/merge 本修订 PR 后生效
 class: core
 core_change_level: major
 owner: lvye
@@ -10,6 +10,15 @@ platforms: [macos]
 ---
 
 # AI Native 无人值守设备操作:授权从"人类亲手执行"上移为"人类批准计划"
+
+> r5 E0 registration stop gate（2026-07-29）：TASK-AIN-010 已 done，但
+> TASK-AIN-011 readiness 审计发现 current OpenHarmony profile 未登记 exact HiLog
+> host-stream/HiDumper/current-Trace probe family，production HDC semantic profile 也无
+> 对应 typed lowering；AIN-011 又漏列自己的 tasks status path。独立 integration
+> change 不能借用本 change 尚未 archive 的 Agent-capable hardware-evidence V3 去采集
+> 新 provenance。r5 因此先新增 TASK-AIN-010P：由 Agent 在本 approved delta 下执行
+> 封闭 E0 registration capture，人工只做物理/配置动作；随后再由独立 integration
+> change 登记/adopt accepted bytes。本 revision 不使 010P/011 ready，不运行设备。
 
 > r4 contract/scope stop gate（2026-07-28）：TASK-AIN-010 readiness 静态审计发现
 > r3 只冻结了 result 中的 E1 `deviceCapability` 引用形状，没有冻结可机器解析的
@@ -159,6 +168,33 @@ r4 不改变 r3 的 E0/E1/E2 产品边界，只补齐 TASK-AIN-010 开工前缺�
 - **顺序门**：009R 必须依次完成独立 readiness、implementation、done；其 done 合入后
   010 仍需新的 D1 readiness。任一门前不得实现 010 或后续 executor。
 
+### r5 Agent E0 registration-capture remediation
+
+r5 不改变 r3/r4 的产品行为或 E0 effect boundary，只修复 AIN-011 开工前的 provenance
+与 change-ownership 顺序：
+
+- **事实缺口**：current `OPENHARMONY-TOOLS@0.6.0` 对 HiLog 只有原则说明；HiDumper
+  只有样例/旧 human capture；Trace pack 绑定 hdc 3.2.0d，而 current production
+  device/supervisor candidate 是 exact 3.2.0f。跨版本借用、exit 0 或 help-shaped
+  output 均不能建立 production command authority。
+- **契约归属**：current `hardware-evidence.schema.json` 2.0.0 只允许人类 operator；
+  Agent executor V3 仍是本 approved change 的 scoped delta。另一个 integration change
+  不得在 archive 前把该草案当成自己的 current contract。
+- **TASK-AIN-010P — Agent E0 registration capture**：在本 change 内新增 reusable
+  typed capture runner。它只从 durable binding、production HDC discovery、registered
+  server/device observation 与 ready-task resolver 取得事实，不接受 caller target/
+  argv/receipt/classification。Agent 执行 HiLog help/bounded stream、HiDumper help/
+  inventory 与 hitrace/bytrace help/tags 的封闭只读计划，产出 V3 realHardware E0
+  evidence、受控本地 raw Artifact 和可供后继 integration change 评审的脱敏 provenance。
+- **人工边界**：人工只允许设备接线/供电、解锁/信任提示、系统权限/凭据配置、
+  物理断连恢复与 PR review；人工 HDC/tool 命令恒为 0。
+- **integration ownership**：010P 不修改 living profile/lock/registry 或 production
+  semantic profile。其 done 后另建独立 integration change 登记 exact family/resource
+  并接 production port；该 change verified 后再修订 AIN-011 dependency 并做 fresh
+  readiness。
+- **AIN-011 scope correction**：先补入本 change `tasks.md` 的 status/readiness
+  写入路径；任务保持 blocked，不能在同一 PR 自授 ready。
+
 Out of scope / Non-goals:
 
 - `POL-AGENT-001`(Agent 不得自批规则/范围/授权)零改动;
@@ -239,6 +275,9 @@ Observable behavior before/after:
 - r3 平台影响：macOS 纳入 CORE-3.0.0 `needsReverification` 的新增面包括 E0/E1
   production executor、Agent control plane、HAP/SO deployment 与真机闭环；Windows/Linux
   仍 deferred，且未来端口必须实现相同 contract/AC，不能恢复 human-only 作为 Core 豁免。
+- r5 不在本 change 登记/修改 OpenHarmony integration profile、lock、registry/
+  resource 或 production HDC semantic family；010P 的 raw/provenance 不能在后继
+  integration review 前授予 AIN-011 dispatch authority。
 
 ## r1 approval and flow history
 
@@ -315,3 +354,19 @@ ratify CORE-3.0.0)仍各自使用独立 PR。
   不接受 E1 capability evidence，不创建 E2 standing authorization。
 - 009R 与 010 各自仍须独立 readiness/implementation/done PR。009R 的 D1 gate 合入前
   010 零投机实现；010 done 前 011—017 的既有依赖门保持不变。
+
+## r5 approval boundary
+
+- r5 是 D1 proposal/scope remediation：只修改本 change 的 proposal/tasks/
+  verification，并新增 TASK-AIN-011 host-only readiness-blocked audit record；不修改
+  current specs/contracts、change-local schema bytes、`Packages/**`、integration/
+  platform profile、授权/capability 实例，不执行 process/HDC/device/network。
+- 维护者 merge r5 只批准 TASK-AIN-010P 的 typed Agent E0 capture objective、
+  allowed/forbidden paths、人工边界、V3 evidence/privacy 要求，以及 AIN-011 的
+  readiness status path；不批准 exact argv/设备 tuple，不使 010P/011 ready，也不
+  建立任何 integration support。
+- CHG-2026-043 TASK-HSO-002 已由 #760 implementation + #761 done 合入；该依赖
+  只证明 server observation port 可用，不自动使 010P ready。TASK-AIN-010P 仍须等
+  r5 合入后走独立 D1 readiness，implementation/evidence 与 `ready→done` 分离。
+  其后独立 integration change 的 proposal/approval/registration/adoption/
+  verification 继续分门；AIN-011 在这些门全部合入前零实现。
