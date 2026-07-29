@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-046-runtime-plane-and-contract
 revision: 1
-status: approved # 合并本 PR 即维护者批准(V2 "merge 即批准");本 change 同时交付该合并语义的成文化(见 What changes / T01)
+status: verified # 2026-07-29 verification closure；仅在维护者 review/merge 本 PR 后生效
 class: capability
 core_change_level: none
 owner: lvye
@@ -170,3 +170,47 @@ PRE-00 基线映射(baseline `2e1fe11e0c5860599bde03448a1f48d9ee596b80`,
 信任根一致,不再有独立 approval-only PR)。TASK-RTC-001 以 `ready` 建立,
 其实现、测试、evidence 与状态翻转由**一个**垂直实现 PR 交付;change 级
 verify 与 archive 仍为独立后续动作。
+
+## Verification closure（2026-07-29）
+
+`TASK-RTC-001` 的实现、测试与 same-revision evidence 已由 PR #774 合入
+protected main。五条 change-local AC 均有可复查的 `contract` evidence；
+本 verification PR 只翻转 change/verification 状态并新增 latest-main 复验
+记录，零产品实现、零 scope、零 acceptance 定义或 authority 变化。
+
+### Protected-main delivery chain
+
+| Stage | Exact reviewed head | Protected-main merge |
+| --- | --- | --- |
+| proposal #773 | `84324ccc308b625f8ebebbb09a7956519fdbf0bf` | `30caed6f9e0776a43df8e0b4e03b8bd99757497a` |
+| implementation/evidence #774 | `d45b3090976fef6e1b47ea9ddbbec688edd6b383` | `4ef6932a53f86a0c8ef53367ecb3c091cf9e3442` |
+
+两个 exact heads 均由维护者 `lvye` review/approve；Agent PR、SDD Guard 与
+Swift CI 所需 checks 均为 `SUCCESS`。AC 真值源是
+`evidence/runs/TASK-RTC-001/run-r1.md` 与
+`evidence/runs/TASK-RTC-001/verification-r1.md`，不是实现 PR 被 review
+这一事实本身。
+
+### Five binary AC conclusions
+
+- `RTC-GOV-001` = PASS：两平面、恰四类 Repo Plane 变化、D*/E* 正交、
+  垂直 PR 模型与 host_loop 禁止设备执行边界仍由 current governance 文本
+  明确定义，D2/E2 门未弱化。
+- `RTC-API-001` = PASS：v2 round-trip、治理字段拒绝、版本门、重复键与
+  前向兼容矩阵在 current main 全量契约回归中通过。
+- `RTC-CAP-001` = PASS：scope/effect/expiry/revocation/exhaustion/
+  exact-plan 门与 durable atomic/idempotent consume 契约保持通过。
+- `RTC-CAT-001` = PASS：后续 MU 对 catalog/schema/generator 的已批准扩展
+  通过 current schema、词表封闭、E2 不变量、确定性生成与双向 drift 检查。
+- `RTC-COMPAT-001` = PASS：ArkDeckKit 全量 651 tests（1 个既有 opt-in
+  manual sleep/wake skip）零失败；SDD 与全部声明脚本套件全绿。
+
+复验记录与精确环境、命令、后续输入漂移审计见
+`evidence/runs/TASK-RTC-001/verification-r1.md`。复验只使用 contract/fake
+路径，未执行安装态 HDC、真实设备、device mutation 或 destructive 操作，
+不产生 hardware/support/conformance 主张。
+
+只有维护者 review/merge 本 PR 后，proposal `verified` 与 verification
+`passed` 才生效；archive 仍是后续独立 PR。若合并前 protected main 再次
+改变本 change 的 governance、Runtime API/Capability、catalog/generator
+或对应测试输入，则必须先重放受影响验证，不能从本记录推断通过。

@@ -1,7 +1,7 @@
 # CHG-2026-046 Verification Plan
 
 > Change:CHG-2026-046-runtime-plane-and-contract@r1
-> Status:planned
+> Status:passed # 2026-07-29；仅在维护者 review/merge verification PR 后生效
 > Core baseline:CORE-2.1.0 (canonical Core AC not claimed)
 
 ## Environment
@@ -74,3 +74,19 @@
 - v1→v2 adapter:v1 合法请求向量升级后,target/operation/inputs 语义等价,
   changeID/taskID 仅出现在 clientContext provenance 注记且标记 deprecated;
 - v1 契约测试(AgentDeviceOperationContractTests 等)零修改零回归。
+
+## Result gate
+
+- [x] `RTC-GOV-001` 有 current-governance 文本审计与完整脚本回归；
+- [x] `RTC-API-001` 有 v2/legacy adapter current-main 契约回归；
+- [x] `RTC-CAP-001` 有模型与 durable store current-main 契约回归；
+- [x] `RTC-CAT-001` 有 schema/词表/生成器/drift current-main 回归；
+- [x] `RTC-COMPAT-001` 有 ArkDeckKit 全量与全部声明脚本套件回归；
+- [x] evidence 准确分类为 `contract`，未冒充真实设备或 hardware evidence；
+- [x] change `verified` 由独立 verification PR 翻转，仅引用具体 run/复验
+      记录，不夹带产品实现。
+
+Closure receipt:`proposal.md#verification-closure2026-07-29`。实现 evidence =
+`evidence/runs/TASK-RTC-001/run-r1.md`；latest-main 复验 =
+`evidence/runs/TASK-RTC-001/verification-r1.md`。`passed` 与 proposal
+`verified` 只在维护者 review/merge 本 verification PR 后生效。
