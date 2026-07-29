@@ -6,10 +6,12 @@
 
 ## TASK-DHA-001 — MU-4 垂直交付:Agent runner + Artifact + diagnostics/HAP
 
-- Status:blocked（2026-07-29 `DHA-HW-001` device window attempt#1 在
-  job 创建与 operation step dispatch 前因缺少 Catalog 必填输入
-  `durationSeconds` 被拒；contract/fake 结论不变，`DHA-HW-002` 未执行。
-  见 `evidence/runs/TASK-DHA-001/window-attempt-1.md`）
+- Status:ready（**仅在**承载
+  `evidence/runs/TASK-DHA-001/window-attempt-2-plan.md` 的独立 D2 window
+  PR 经维护者 review/merge 后生效；attempt#2 只恢复一次
+  `DHA-HW-001` E0 Agent execution。attempt#1 的 blocked evidence 已由
+  PR #791 合入 `d037768f5e92850861219cd64edf53bfbb4b56ae`；
+  contract/fake 结论不变，`DHA-HW-002` 仍未执行）
 - Grade:D1(代码/契约/fake 面。真机 host Runtime 由 Device Runtime Agent
   执行;**E1 capability 的签发/接受是 D2 决策**,独立载体,Agent 不得
   自签或自批;人类只提供必要物理协助)

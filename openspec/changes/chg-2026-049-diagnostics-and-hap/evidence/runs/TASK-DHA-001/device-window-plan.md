@@ -4,41 +4,81 @@
 > 经 merged PR 签发的 E1 capability(见 §3)。
 >
 > **执行模型(#785 修订)**:host Runtime 调用由 **Device Runtime Agent**
-> 执行(`arkdeck agent run`),不再由维护者逐条复制命令。维护者只需
-> ①启动 daemon、②签发/安装 E1 capability、③在 Agent 报出
+> 执行(`arkdeck agent run`),不再由维护者逐条复制命令。DHA-HW-001 的
+> daemon 也由 Agent 启动；维护者只需①为 DHA-HW-002 签发/安装 E1
+> capability、②在 Agent 报出
 > `humanAction` 时完成设备屏幕信任、歧义选择或物理拔插。**人工代跑
 > host CLI 不满足 `DHA-HW-*`**;若环境没有可用 Agent,AC 保持 blocked。
+>
+> **attempt#2 修订**:attempt#1 因窗口命令漏传 Catalog 必填的
+> `durationSeconds` 在 job 创建前 fail closed（PR #791 /
+> `d037768f5e92850861219cd64edf53bfbb4b56ae`）。attempt#2 使用本目录下
+> reviewed 的 `dha-hw-001-attempt-2-inputs.json`，只补齐该必填 bounded
+> 输入；文件中不存在 `traceCategories`，因此 effective effect 仍为 E0。
+> 独立 D2 window PR 合入前不得执行。
 
 ## 1. 前置
 
 1. main 已含 TASK-DHA-001 实现 PR 的合并 commit;
-2. 二进制按该 main 重建:`swift build --product arkdeck-agentd --product
-   arkdeck`(在 `Packages/ArkDeckKit`);
+2. 二进制按该 main 分别重建（SwiftPM 的重复 `--product` 只构建最后一个
+   值）：在 `Packages/ArkDeckKit` 依次执行
+   `swift build --product arkdeck` 与
+   `swift build --product arkdeck-agentd`;
 3. HDC 与设备同 MU-3 窗口(`Ver: 3.2.0f`,hash
    `05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83`);
-4. 状态目录**必须短**(UDS 104 字节上限),例如 `~/adw4`;
-5. `DHA-HW-002` 还需:一个可安装的 **debug HAP** 文件,以及 §3 的
+4. 状态目录**必须短**(UDS 104 字节上限);DHA-HW-001 attempt#2 固定
+   `/private/tmp/adw4` 且 mode `0700`;
+5. `DHA-HW-001` attempt#2 还需:承载
+   `window-attempt-2-plan.md` 的 D2 window PR 已由维护者 review/merge，
+   且当前时间、设备、HDC、inputs hash 与该 plan 逐项匹配；
+6. `DHA-HW-002` 还需:一个可安装的 **debug HAP** 文件,以及 §3 的
    capability 已 merge。
 
 ## 2. DHA-HW-001(E0 采集,无需新 capability)
 
-daemon 启动同 MU-3 窗口(`ARKDECK_HDC_PATH` + `--state-dir ~/adw4`)。
+daemon 由 Agent 启动，参数同 MU-3 窗口(`ARKDECK_HDC_PATH` +
+`--state-dir /private/tmp/adw4`)。
 
-由 Agent 执行(维护者只启动 daemon):
+attempt#2 的 reviewed typed inputs 是：
 
-```bash
-"$BIN/arkdeck" agent run --socket "$HOME/adw4/agentd.sock" \
-  --operation "capture.diagnostics@1" --json
+```json
+{
+  "durationSeconds": 5
+}
 ```
 
-**不要传 `--inputs-file` 带 traceCategories**:那会把 plan 升为 E1 并
-要求 capability,不属于 `DHA-HW-001` 的 E0 面(remote-file trace 的真机
-执行须另持 E1 capability,不得混入 E0 证据)。
+文件：
+`evidence/runs/TASK-DHA-001/dha-hw-001-attempt-2-inputs.json`；
+SHA-256：
+`277918e3016edb145aaee46cb33ee1f0d4a31a70a9a2d160e5d5128ed61585ba`。
+Agent 在 dispatch 前必须重算 hash 并逐字确认 JSON **没有**
+`traceCategories`；不匹配即零 dispatch、记录 blocked-attempt。
 
-预期:`state: succeeded`;随后
+由 Agent 执行：
 
 ```bash
-"$BIN/arkdeck" job status --socket "$HOME/adw4/agentd.sock" --job "<jobId>" --json
+"$BIN/arkdeck" agent run --socket "/private/tmp/adw4/agentd.sock" \
+  --operation "capture.diagnostics@1" \
+  --inputs-file \
+  "openspec/changes/chg-2026-049-diagnostics-and-hap/evidence/runs/TASK-DHA-001/dha-hw-001-attempt-2-inputs.json" \
+  --json
+```
+
+**不得添加 `traceCategories` 或替换 inputs 文件**:那会把 plan 升为 E1
+并要求 capability，不属于 `DHA-HW-001` 的 E0 面(remote-file trace 的
+真机执行须另持 E1 capability，不得混入 E0 证据)。
+
+预期 receipt 的 `terminalState: "succeeded"`；随后由 Agent 核对：
+
+```bash
+"$BIN/arkdeck" job status --socket "/private/tmp/adw4/agentd.sock" \
+  --job "<jobId>" --json
+"$BIN/arkdeck" artifact list --socket "/private/tmp/adw4/agentd.sock" \
+  --job "<jobId>" --json
+"$BIN/arkdeck" artifact inspect --socket "/private/tmp/adw4/agentd.sock" \
+  --job "<jobId>" --artifact "<capture-summary artifactId>" --json
+"$BIN/arkdeck" artifact read --socket "/private/tmp/adw4/agentd.sock" \
+  --job "<jobId>" --artifact "<capture-summary artifactId>" --json
 ```
 
 timeline 应含 `artifact hilog.txt -> ART-…`;若 trace 未请求,
