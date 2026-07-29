@@ -1,0 +1,53 @@
+---
+schema_version: 1.0.0
+change_id: CHG-2026-045-hdc-observation-refresh
+change_revision: 1
+platform: macos
+evidence_classes:
+- contract
+- platform
+cases:
+- acceptance_id: HOR-UI-001
+  test_id: TEST-HOR-UI-001
+  method: >-
+    Signed localized macOS UI test, accessibility lookup and App callback
+    reachability mutation.
+  expected_source: openspec/changes/chg-2026-045-hdc-observation-refresh/verification.md#hor-ui-001
+  minimum_evidence: platform
+  expected_result: >-
+    The HDC diagnostics panel exposes one keyboard/accessibility-reachable
+    localized refresh action, and activating it reaches exactly the existing
+    diagnostics provider through production App wiring.
+- acceptance_id: HOR-SESSION-001
+  test_id: TEST-HOR-SESSION-001
+  method: >-
+    Sequential snapshot session contract plus production-root candidate,
+    endpoint, execution identity and source audit.
+  expected_source: openspec/changes/chg-2026-045-hdc-observation-refresh/verification.md#hor-session-001
+  minimum_evidence: contract
+  expected_result: >-
+    Sequential accepted refreshes retain one candidate, endpoint,
+    device-observation session, bounded buffer and pseudonym key, producing
+    appeared then disappeared without rediscovery or cross-session stitching.
+- acceptance_id: HOR-BOUNDED-001
+  test_id: TEST-HOR-BOUNDED-001
+  method: >-
+    Delayed presentation fixture, provider/source invocation counters and
+    duplicate-action, timer and retry mutations.
+  expected_source: openspec/changes/chg-2026-045-hdc-observation-refresh/verification.md#hor-bounded-001
+  minimum_evidence: platform
+  expected_result: >-
+    One accepted action calls the provider once and permits at most one
+    registered read-only snapshot, while an in-flight duplicate produces no
+    additional call and no automatic polling path exists.
+- acceptance_id: HOR-SAFETY-001
+  test_id: TEST-HOR-SAFETY-001
+  method: >-
+    Forbidden-effect counters, fixture/production separation, exact-source
+    blob audit and full HDC regression suites.
+  expected_source: openspec/changes/chg-2026-045-hdc-observation-refresh/verification.md#hor-safety-001
+  minimum_evidence: contract
+  expected_result: >-
+    The App gains no candidate, runner or lifecycle authority; registered
+    argv and OpenHarmony authority remain unchanged, forbidden effect counts
+    are zero, and no raw identifier or fixture value reaches production.
