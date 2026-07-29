@@ -2,10 +2,34 @@
 
 ## TASK-HOR-001 — Add and verify the explicit in-session HDC refresh route
 
-- Status:ready
-- Previous status:blocked until the proposal, approval-only and independent
-  D1 readiness gates were each closed. This status becomes effective only
-  when the maintainer reviews and merges this readiness PR.
+- Status:done
+- Done confirmation(2026-07-29; verification-only closure; only effective
+  after maintainer review/merge):
+  - **Implementation/evidence merge:**PR #772 exact head
+    `25a0d4a3789fdda985f9f13057e7e0dd8f217bde` was approved by maintainer
+    `lvye` and merged as protected-main
+    `7125cda045cb45ccb992997bcbe43fa5da90bdb3`. Its Agent PR
+    open-pr/allowed-paths, SDD Guard and Swift CI checks were `SUCCESS`.
+  - **Evidence and AC closure:**protected-main
+    `evidence/runs/TASK-HOR-001/implementation-r1.md` (blob
+    `c8e104d809d6bcc9813b9ea5977ae64592a27680`) records
+    `HOR-UI-001`, `HOR-SESSION-001`, `HOR-BOUNDED-001` and
+    `HOR-SAFETY-001` as PASS with accurately separated signed
+    `platform` and `contract` evidence. Closure replay is recorded in
+    `evidence/runs/TASK-HOR-001/verification-r1.md`.
+  - **No drift/no effect:**the six implementation blobs, production
+    `HDCProduction.swift`, OpenHarmony registries/profile/lock and macOS
+    profile match the #772 evidence. Installed HDC, real device, lifecycle,
+    subserver, authorization/adoption, binding/device mutation, destructive
+    and non-loopback product-network dispatch remain 0.
+  - **Governance transition:**#772 merged before enforcement 2.2.0 made task
+    status part of the vertical implementation carrier. Because 2.2.0 now
+    forbids a done-only PR, this implementation-free verification closure
+    reconciles `ready→done` using only status and concrete evidence
+    references. It creates no new scope, risk acceptance or authority.
+- Previous status:ready after maintainer review/merge of readiness PR #770;
+  before that, blocked until the proposal, approval and D1 readiness gates
+  were each closed.
 - Fresh readiness review(2026-07-29; contract + signed macOS fixture only;
   zero installed-HDC/device dispatch):
   - **Trust/dependency gate:**proposal PR #766 exact head
@@ -235,11 +259,12 @@
 
 ### Notes / handoff
 
-- Proposal, approval, readiness, implementation/evidence, `ready→done` and
-  change `verified` use separate PRs.
+- Proposal, approval, readiness and implementation/evidence used the
+  then-current separate carriers. The 2.2.0 transition and final task/change
+  status reconciliation are recorded in the verification closure.
 - After this change is verified, CHG-2026-006 `TASK-M0B-002` still requires a
   fresh D2 readiness that pins the signed App, exact HDC/device/firmware/USB
   tuple and named exclusive human-operated window.
-- Add the implementation run under
-  `evidence/runs/TASK-HOR-001/run.md`; fixture/platform results must be
-  labeled accurately and cannot close a hardware AC.
+- Implementation and closure records are under
+  `evidence/runs/TASK-HOR-001/`; fixture/platform results remain non-hardware
+  evidence and cannot close a hardware AC.

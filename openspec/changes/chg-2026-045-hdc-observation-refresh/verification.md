@@ -1,7 +1,7 @@
 # CHG-2026-045 Verification Plan
 
 > Change:CHG-2026-045-hdc-observation-refresh@r1
-> Status:planned
+> Status:passed # 2026-07-29; concrete run/closure references in proposal.md; only effective after maintainer review/merge
 > Core baseline:CORE-2.1.0 (canonical Core AC not claimed)
 
 ## Environment
@@ -116,9 +116,18 @@ No deviation may be hidden in the implementation PR.
 
 ## Result gate
 
-- [ ] all four change-local AC have same-revision, reproducible evidence;
-- [ ] signed fixture/platform evidence is not reported as hardware evidence;
-- [ ] forbidden production/authority inputs remain byte-identical;
-- [ ] implementation/evidence and `ready→done` are separate PRs;
-- [ ] change `verified` is confirmed in a separate status PR that cites the
-      concrete run record.
+- [x] all four change-local AC have same-revision, reproducible evidence;
+- [x] signed fixture/platform evidence is not reported as hardware evidence;
+- [x] forbidden production/authority inputs remain byte-identical;
+- [x] #772 implementation/evidence predates enforcement 2.2.0; the
+      implementation-free verification closure reconciles task `done`
+      without creating the now-forbidden done-only carrier;
+- [x] change `verified` is confirmed in a separate status/evidence-reference
+      PR citing the concrete implementation and closure records.
+
+Closure receipt:`proposal.md#verification-closure2026-07-29`; verification
+base = protected main
+`c2dd6412d42be259623d5922e82eb43b4b36af74`; implementation evidence =
+`evidence/runs/TASK-HOR-001/implementation-r1.md`; closure replay =
+`evidence/runs/TASK-HOR-001/verification-r1.md`. `passed`, task `done` and
+proposal `verified` take effect only after maintainer review/merge.
