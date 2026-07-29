@@ -35,10 +35,26 @@ diagnostics-stdout.yaml`(`arkdeck-diagnostics` catalog,`boundedHilog`
   `arkdeck-diagnostics` 且**不得出现** `nodeSummary`;②无 actionRef 的
   stdout 步骤必须被拒。
 
-**状态不由本 PR 翻转**:按维护者裁定,CHG-2026-050 合入后本任务仍需
-**独立的 fresh readiness PR** 才可从 blocked 恢复 ready;本 PR 只做
-allowed paths 内的实现修正与 evidence 记录,`tasks.md` 的 Status 行保持
-`blocked` 不动。
+**fresh readiness 已合入(#790,main `3da3986`)**,任务恢复 ready。其
+`Saved-draft handoff` 提出两条硬要求,本 PR 逐条落实并各配测试:
+
+1. **禁止按 `stepID` 猜 catalog/action 的 fallback**:上一版仍留有
+   `case "boundedHilog", nil:` 的 nil 分支——那正是被点名禁止的猜测
+   路径。现改为:无 `actionReference` 即**拒绝**(provider 与 engine
+   两侧一致),不存在任何按步骤名推断的回退。
+2. **构造的 `WorkflowStep` 须携带 diagnostics contract 的 exact typed
+   parameters/bounds**:`boundedHilog` 填 duration/filters/byteBudget 并
+   **钳制到契约上下界**,`componentTree` 只带 byteBudget。新增测试用
+   越界输入(duration 99999、40 个 filter、budget 1)驱动**真实
+   validator**,断言落到 600 / 16 / 1024 且步骤仍合法。
+
+**readiness pins 复核(22 条)**:17 条逐字未动;5 条是本 PR 声明的目标
+文件(RuntimeJobEngine/DeviceProviderAdapters/DeviceProviderContract/
+HDCE0ActionPack/AgentDaemon);**零意外漂移**。base 为
+fresh-readiness base 之后的 main `3da3986`。
+
+`tasks.md` 的 Status 行本 PR 不触碰(readiness 已置 ready;done 翻转
+待硬件面处置后另行决定)。
 
 ## 维护者 review 期的两项修订(#785 合并版 proposal)
 
@@ -83,11 +99,11 @@ allowed paths 内的实现修正与 evidence 记录,`tasks.md` 的 Status 行保
 
 ## 测试结果
 
-- `swift test` 全量:**650 / 1 skipped / 0 failures**(在 main `d13dfec`
-  即 CHG-2026-050 合入后复跑;新增 36 项:
+- `swift test` 全量:**651 / 1 skipped / 0 failures**(在 main `3da3986`
+  即 fresh readiness 合入后复跑;新增 37 项:
   RuntimeArtifactContractTests 12、DiagnosticsAndHAPContractTests 11、
   AgentRuntimeExecutorContractTests 6、EffectiveEffectContractTests 4、
-  daemon artifact 协议面 1、action 身份回归 2)
+  daemon artifact 协议面 1、action 身份与契约边界回归 3)
 - `scripts/check-sdd.sh`:0 error / 0 warning / 111 AC
 
 ## 实现期抓到的真缺陷(测试驱动,已修)

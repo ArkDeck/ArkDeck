@@ -342,6 +342,46 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
     XCTAssertEqual(hilog.actionReference?.catalogID, "arkdeck-diagnostics")
   }
 
+  /// The readiness requires the constructed WorkflowStep to carry the
+  /// diagnostics contract's exact typed parameters and bounds - not merely
+  /// the right action name. These drive the real validator, so a parameter
+  /// the contract rejects cannot reach a durable intent.
+  func testConstructedIntentCarriesContractExactParameters() throws {
+    let descriptor = try XCTUnwrap(
+      RuntimeOperationCatalog.descriptor(reference: "capture.diagnostics@1"))
+    let hilog = try XCTUnwrap(descriptor.steps.first { $0.stepID == "capture-hilog" })
+
+    // Out-of-range inputs are clamped into the declared bounds rather than
+    // passed through: the step still validates.
+    let clamped = try RuntimeJobEngine.journalStep(
+      for: hilog, jobID: "job-1",
+      inputs: [
+        "durationSeconds": .integer(99_999),
+        "hilogFilters": .array((0..<40).map { .string("tag\($0):E") }),
+        "totalArtifactByteBudget": .integer(1),
+      ])
+    guard case .object(let parameters)? = clamped.arguments["parameters"] else {
+      return XCTFail("the intent must carry typed parameters")
+    }
+    XCTAssertEqual(parameters["durationSeconds"], .integer(600), "clamped to the contract maximum")
+    XCTAssertEqual(parameters["byteBudget"], .integer(1024), "clamped to the contract minimum")
+    guard case .array(let filters)? = parameters["filters"] else {
+      return XCTFail("filters must be present")
+    }
+    XCTAssertEqual(filters.count, 16, "trimmed to the contract's 16-filter ceiling")
+    XCTAssertEqual(clamped.arguments["catalogId"], .string("arkdeck-diagnostics"))
+    XCTAssertEqual(clamped.arguments["actionId"], .string("boundedHilog"))
+
+    // The UI-dump step carries its own action's parameter set, not HiLog's.
+    let uiDump = try XCTUnwrap(descriptor.steps.first { $0.stepID == "capture-ui-dump" })
+    let uiStep = try RuntimeJobEngine.journalStep(for: uiDump, jobID: "job-1", inputs: [:])
+    XCTAssertEqual(uiStep.arguments["actionId"], .string("componentTree"))
+    guard case .object(let uiParameters)? = uiStep.arguments["parameters"] else {
+      return XCTFail("the ui-dump intent must carry typed parameters")
+    }
+    XCTAssertEqual(Set(uiParameters.keys), ["byteBudget"], "componentTree declares only a budget")
+  }
+
   /// A stdout-capturing step with no declared action must stop the run
   /// rather than have one invented for its durable intent.
   func testStdoutStepWithoutADeclaredActionIsRefused() throws {

@@ -98,10 +98,17 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
   ) throws -> TypedProviderAction {
     // Selected by the catalog's declared action, not by step-name
     // convention: renaming a step must not silently change what runs.
-    switch step.actionReference?.actionID {
+    // A step with no declared action gets no fallback - guessing one from
+    // the step id is exactly what produced a HiLog intent labelled with a
+    // UI-dump action, and the readiness forbids keeping such a path.
+    guard let actionID = step.actionReference?.actionID else {
+      throw DeviceProviderError.unsupportedAction(
+        "\(step.stepID) declares no catalog action; refusing to infer one")
+    }
+    switch actionID {
     case "componentTree":
       return .hdc(.captureUIDump(try HDCUIDumpRequest()))
-    case "boundedHilog", nil:
+    case "boundedHilog":
       var duration = 30
       if case .integer(let requested)? = inputs["durationSeconds"] {
         duration = max(1, min(Int(requested), HDCHilogCaptureRequest.maximumDurationSeconds))
@@ -117,9 +124,9 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
       }
       return .hdc(
         .captureHilog(try HDCHilogCaptureRequest(durationSeconds: duration, filters: filters)))
-    case .some(let unknown):
+    default:
       throw DeviceProviderError.unsupportedAction(
-        "unregistered stdout action \(unknown) for \(step.stepID)")
+        "unregistered stdout action \(actionID) for \(step.stepID)")
     }
   }
 
