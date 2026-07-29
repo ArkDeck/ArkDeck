@@ -1,6 +1,6 @@
 # CHG-2026-051 Verification Plan
 
-> Change:CHG-2026-051-agent-hardware-evidence@r3
+> Change:CHG-2026-051-agent-hardware-evidence@r4
 > Status:planned
 > Core baseline:CORE-2.1.0
 
@@ -14,6 +14,8 @@
 - Catalog schema/generator/remote-operation registry 正反例，验证
   `runApprovedRemoteRead` actionRef 的 required、exact-kind 与 generated matrix
   digest 同步；
+- durable `WorkflowStep.runApprovedRemoteRead` registry 正反例，验证新增的
+  `deviceModel` / `firmwareBuild` intent 可构造且 unknown action 仍拒绝；
 - existing V2 evidence 作为 immutable compatibility fixture，只读不迁移。
 
 ## Acceptance matrix
@@ -70,6 +72,8 @@ projector 输出必须通过 V3 JSON Schema、Swift decode/encode 与 semantic p
   漂移，或 generated matrix digest 漂移；
 - `runApprovedRemoteRead` 缺 `actionRef`、引用 unknown remote action、引用
   step-kind 不匹配 action，或其他 step kind 非法携带 remote action reference；
+- durable WorkflowStep registry 缺少两个新 action、接受 unknown action，或 journal
+  intent action 与 Catalog/provider action 不一致；
 - job 为 simulated/planOnly，或 effect/outcome unknown。
 
 全部向量必须在 evidence publication 前失败；不能用空值、`unknown` 字符串、旧事实或

@@ -2,23 +2,25 @@
 
 ## TASK-AHE-001 — Promote V3 and close trusted Runtime evidence projection
 
-- Status:ready（仅在 r3 proposal PR 被维护者 review + merge 后生效；合并前 current
-  main 的 r2 任务因下述 Catalog contract/generator stop condition 保持 blocked）
+- Status:ready（仅在 r4 proposal PR 被维护者 review + merge 后生效；合并前 current
+  main 的 r3 任务因下述 durable journal registry stop condition 保持 blocked）
 - Historical Status:blocked（r1 开工后审计发现唯一生产 facts port 与 Catalog
   preflight 不可闭合 model/firmware/transport/fresh time；r2 开工后审计发现
   `runApprovedRemoteRead` actionRef 无法由 current Catalog schema/generator 表达，
-  derived matrix 与受影响 fixtures 又不在 Allowed paths）
+  derived matrix 与受影响 fixtures 又不在 Allowed paths；r3 首次实现编译发现
+  `WorkflowStep.runApprovedRemoteRead` 的独立 sealed action registry 不接受新增
+  `deviceModel` / `firmwareBuild`，且源码/测试不在 Allowed paths）
 - Grade:D1
 - Platform:macos
 - Requirements:`REQ-WF-004`
 - Acceptance:`AC-WF-004-01`、`AC-WF-004-02`、`AC-WF-004-03`
 - Depends on:
-  - r3 proposal PR 合并；
+  - r4 proposal PR 合并；
   - `CHG-2026-046` archived；
   - `CHG-2026-049/TASK-DHA-001` implementation 已合入；
   - `CHG-2026-025/TASK-AIN-002` done（只作为 schema migration 输入，不借用其
     scoped delta）
-- Readiness base:`a09d3243b8bdec133198f843d4c258d39f54aa34`
+- Readiness base:`0eb95fe9e34105571a93947cd5c7fd07e91c1092`
 - Readiness input pins:
 
   ```yaml pins
@@ -46,6 +48,8 @@
     blob: c4f22f82ab983dc6ae8a119d52598aed50d9f434
   - path: Packages/ArkDeckKit/Sources/ArkDeckCore/RuntimeOperationCatalogTypes.swift
     blob: f51d5f327a12f8f0b681a651c3d435107ccd318e
+  - path: Packages/ArkDeckKit/Sources/ArkDeckCore/WorkflowStep.swift
+    blob: 6aae31f911ca56f14676c5ae94fd975576daea0f
   - path: Packages/ArkDeckKit/Sources/ArkDeckAgentDaemon/AgentDaemon.swift
     blob: df101a19617eba7af1ffe1e3bc71a887b8d5accf
   - path: Packages/ArkDeckKit/Sources/ArkDeckAgentDaemonMain/main.swift
@@ -84,6 +88,8 @@
     blob: b917578af44e06d031f904d6ed453b4bffc2466d
   - path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/RuntimeOperationCatalogContractTests.swift
     blob: 431aa5259527ceec64f171bac881ac0da8ba8cd0
+  - path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/WorkflowStepContractTests.swift
+    blob: 15c0df7363b2549f7a64230ef2c7a7f1c2d60861
   - path: Packages/ArkDeckKit/Tests/ArkDeckFakeHDCFixture/main.swift
     blob: bd4b0beb792b8a7989930679a28db9b6ec4db42a
   - path: scripts/catalog_gen/generate.py
@@ -145,6 +151,7 @@
   - `Packages/ArkDeckKit/Sources/ArkDeckAgentClient/AgentRuntimeExecutor.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckAgentClient/HardwareEvidenceProjector.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckCore/RuntimeOperationCatalogGenerated.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckCore/WorkflowStep.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckAgentDaemon/AgentDaemon.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckAgentDaemonMain/main.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckOpenHarmony/HDCCompatibilityProfile.swift`
@@ -165,6 +172,7 @@
   - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/HDCE0ActionPackContractTests.swift`
   - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/ObserveDeviceSkeletonContractTests.swift`
   - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/RuntimeOperationCatalogContractTests.swift`
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/WorkflowStepContractTests.swift`
   - `Packages/ArkDeckKit/Tests/ArkDeckFakeHDCFixture/main.swift`
   - `openspec/changes/chg-2026-051-agent-hardware-evidence/**`
 - Forbidden paths:
@@ -190,6 +198,8 @@
 - Catalog schema/generator 只允许 `runApprovedRemoteRead` 引用
   `arkdeck-remote-operations` 中 step-kind 精确匹配的 action；两个 generated outputs
   零 drift，unknown/missing/cross-kind reference 均拒绝；
+- durable WorkflowStep registry 精确接受 `deviceModel` / `firmwareBuild`，journal
+  intent 与 Catalog/provider action 零漂移，unknown action 仍拒绝；
 - 三个 production operation 的 exact-target/model/firmware typed preflight 在任何
   artifact capture/E1 step 前完成；Catalog/generated Swift/remote-operation mapping
   零 drift，未知/歧义 target 零后续 dispatch；

@@ -1,4 +1,4 @@
-# CHG-2026-051 r3 Design — Production evidence preflight
+# CHG-2026-051 r4 Design — Production evidence preflight
 
 ## 1. Why r1 cannot reach production
 
@@ -64,6 +64,18 @@ The generator continues to emit both `RuntimeOperationCatalogGenerated.swift` an
 `Catalog/generated/effect-authorization-matrix.md`. Since the digest covers complete operation
 semantics, both generated files change with the required prefix and travel in the implementation
 PR.
+
+### 2.2 Durable journal action registry
+
+`WorkflowStep.runApprovedRemoteRead` separately validates the `catalogId` / `actionId` written
+into every durable intent. Its sealed action vocabulary SHALL add exactly `deviceModel` and
+`firmwareBuild` beside the five existing `arkdeck-remote-operations` actions. The engine SHALL
+write the Catalog step's exact actionRef into the journal; it must not substitute an older action,
+derive one from the step ID, or omit the typed registry validation.
+
+`WorkflowStepContractTests` SHALL prove both new actions construct valid
+`runApprovedRemoteRead` steps and an unknown action remains rejected. No other WorkflowStep kind,
+argument rule or effect/binding invariant changes.
 
 ## 3. Exact target and provider lowering
 

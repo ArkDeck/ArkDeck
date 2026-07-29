@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-051-agent-hardware-evidence
-revision: 3
-status: approved # r3 proposal PR 合并即批准；合并前 TASK-AHE-001 保持 blocked
+revision: 4
+status: approved # r4 proposal PR 合并即批准；合并前 TASK-AHE-001 保持 blocked
 class: core
 core_change_level: major
 owner: lvye
@@ -49,6 +49,15 @@ digest，并强制同步 `Catalog/generated/effect-authorization-matrix.md`；�
 受影响的既有 diagnostics/HAP contract fixture 均未列入 r2 Allowed paths。绕过 schema、
 保留 step-ID 猜测或提交 generated drift 都不合法，因此 r2 实现 WIP 再次保存，本文
 r3 只补齐这组机械必需的 contract/generated/test 路径与 pins。
+
+r3 合入后的首次实现编译又揭示一份独立的 durable-journal registry：
+`ArkDeckCore/WorkflowStep.swift` 对 `runApprovedRemoteRead.arguments.actionId` 保持旧的
+5-action 封闭 allowlist，尚不接受 r3 新增的 `deviceModel` / `firmwareBuild`。因此，
+即使 Catalog、generated descriptor 与 provider 已精确一致，journal intent 的构造仍会
+在 dispatch 前拒绝这两个 action。把 journal action 伪装为旧 action 会造成 durable
+intent 与真实 provider action 不一致；直接修改该文件又超出 r3 Allowed paths。本文
+r4 只把这份既有 journal registry 及其精确 contract test 纳入 pins/Allowed paths，
+不扩大 operation、effect、provider 或 evidence 语义。
 
 `CHG-2026-025` 已批准“eligible typed operation 由 Agent 执行”的总体方向，也已完成
 一个 change-local V3 draft；但其 proposal 明确禁止其他 change 在该大型 change
@@ -111,6 +120,11 @@ In scope:
     fixture 增加 exact `-t <connectKey> shell param get <closed-property>` 的 model/
     firmware 响应，既有 diagnostics/HAP contract fixtures 只做新 required prefix
     的 production-shaped 适配，不放宽其原断言。
+- **Durable journal action-registry closure（r4）**：
+  `WorkflowStep.runApprovedRemoteRead` 的 sealed `actionId` allowlist 同车增加
+  `deviceModel` / `firmwareBuild`，使 durable intent 与 Catalog actionRef、provider
+  typed action 三者精确相同；其他 action、参数形态与 step kind 继续 fail closed。
+  对应 `WorkflowStepContractTests` 增加两个正例与 unknown action 反例。
 - **Fail closed evidence publication**：任一 required fact 缺失、unknown、stale、
   binding 不一致、authority/effect 不匹配或 Artifact bytes/hash 不可验证时，runner
   返回结构化 `evidenceIncomplete` blocker；不得发布 schema-valid realHardware
@@ -132,7 +146,7 @@ Observable behavior:
 
 ## Out of scope
 
-- 本 r3 proposal PR 不修改 current schema、Catalog/Runtime 代码或 current specs，不执行
+- 本 r4 proposal PR 不修改 current schema、Catalog/Runtime 代码或 current specs，不执行
   device/HDC/tool，不产生或追认任何 realHardware evidence。
 - 不追溯改写 V2 历史记录；`DHA-HW-001` attempt#2 继续保持“runtime succeeded /
   formal acceptance blocked”，不得补写字段后追认为 PASS。
@@ -160,6 +174,7 @@ Observable behavior:
     `firmwareBuild` action
   - Operation Catalog schema/generator 对 `runApprovedRemoteRead` 的 exact
     registered action reference 支持，以及既有 generated outputs 同步
+  - durable WorkflowStep registry 对同一 remote action vocabulary 的精确支持
 - Core baseline bump:需要。以 current `CORE-2.1.0` 为基线时 candidate 为
   `CORE-3.0.0`（MAJOR：替换 schema required fields、收紧 realHardware evidence
   publication）。若 `CHG-2026-050` 或其他 Core change 先 archive，archive PR 必须按
@@ -201,9 +216,10 @@ Observable behavior:
 ## Approval and flow
 
 r1 proposal PR 已承载 `CHG-2026-051` 初始 approval 与 `CHG-2026-025` r6 ownership
-修订，r2 承载 production preflight scope。本文 r3 是 Catalog contract/generator
-stop condition 后的 D1 机械范围/readiness 修订；维护者 review + merge r3 exact head
-后，`TASK-AHE-001` 才可按新 pins 恢复。r3 合并不构成 contract 激活、真机窗口、
+修订，r2 承载 production preflight scope，r3 承载 Catalog contract/generator
+closure。本文 r4 是 durable journal registry stop condition 后的 D1
+机械范围/readiness 修订；维护者 review + merge r4 exact head
+后，`TASK-AHE-001` 才可按新 pins 恢复。r4 合并不构成 contract 激活、真机窗口、
 E1 capability 或 E2 authorization。实现、
 测试、文档、run evidence 与任务状态翻转仍同车交付；随后 change 级 verification 与
 archive 分别使用独立 PR。
