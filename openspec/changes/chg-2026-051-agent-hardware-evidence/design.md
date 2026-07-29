@@ -1,4 +1,4 @@
-# CHG-2026-051 r2 Design — Production evidence preflight
+# CHG-2026-051 r3 Design — Production evidence preflight
 
 ## 1. Why r1 cannot reach production
 
@@ -46,6 +46,24 @@ capture or mutation; it is not an optional evidence-only leg.
 These are breaking modifications to published version-1 operations and are intentionally carried
 by this Core MAJOR change. No effect is lowered: the added steps are E0 and the operation's
 existing maximum/effective effect remains unchanged.
+
+### 2.1 Action-reference contract
+
+The Catalog schema and generator currently reserve `actionRef` for `captureRemoteStdout`. The
+production preflight must not work around that rule by inferring a remote read from a step ID.
+They SHALL be extended as one closed contract:
+
+- `captureRemoteStdout` continues to require an action from its existing stdout registries;
+- `runApprovedRemoteRead` requires an action from `arkdeck-remote-operations`, whose registered
+  `step_kind` is exactly `runApprovedRemoteRead`;
+- every other step kind continues to reject `actionRef`;
+- an unknown catalog/action, a cross-kind reference, or a missing reference on either supported
+  kind fails validation and generation.
+
+The generator continues to emit both `RuntimeOperationCatalogGenerated.swift` and
+`Catalog/generated/effect-authorization-matrix.md`. Since the digest covers complete operation
+semantics, both generated files change with the required prefix and travel in the implementation
+PR.
 
 ## 3. Exact target and provider lowering
 
@@ -116,3 +134,16 @@ mismatch, unknown outcome, non-execute mode, missing artifact or byte/hash misma
 - Existing target/job JSON decodes with absent optional V3 fields.
 - Reverting the implementation PR restores V2 + blocked Agent evidence behavior as one unit.
 - No implementation in this change may alter E2 authorization policy or mint a capability.
+
+## 7. Production-shaped fixtures
+
+The descriptor-bound fake HDC executable accepts only the two new exact property argv shapes,
+including `-t <fixture-connect-key>`, and returns distinct bounded model and firmware values. It
+rejects a missing/altered target selector and unknown property. The Runtime contract test resolves
+that executable through `FixedExecutableResolver`, so lowering, executable identity verification,
+argv dispatch and semantic parsing all run through the production composition shape with no real
+device.
+
+Existing diagnostics/HAP orchestration tests gain only the three required preflight outcomes and
+durable target facts needed by the breaking Catalog prefix. Their original partial-success,
+readback-only success and capability assertions remain unchanged.

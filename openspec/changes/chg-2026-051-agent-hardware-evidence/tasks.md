@@ -2,21 +2,23 @@
 
 ## TASK-AHE-001 — Promote V3 and close trusted Runtime evidence projection
 
-- Status:ready（仅在 r2 proposal PR 被维护者 review + merge 后生效；合并前 current
-  main 的 r1 任务仍因下述 production-reachability stop condition 保持 blocked）
+- Status:ready（仅在 r3 proposal PR 被维护者 review + merge 后生效；合并前 current
+  main 的 r2 任务因下述 Catalog contract/generator stop condition 保持 blocked）
 - Historical Status:blocked（r1 开工后审计发现唯一生产 facts port 与 Catalog
-  preflight 不可闭合 model/firmware/transport/fresh time）
+  preflight 不可闭合 model/firmware/transport/fresh time；r2 开工后审计发现
+  `runApprovedRemoteRead` actionRef 无法由 current Catalog schema/generator 表达，
+  derived matrix 与受影响 fixtures 又不在 Allowed paths）
 - Grade:D1
 - Platform:macos
 - Requirements:`REQ-WF-004`
 - Acceptance:`AC-WF-004-01`、`AC-WF-004-02`、`AC-WF-004-03`
 - Depends on:
-  - r2 proposal PR 合并；
+  - r3 proposal PR 合并；
   - `CHG-2026-046` archived；
   - `CHG-2026-049/TASK-DHA-001` implementation 已合入；
   - `CHG-2026-025/TASK-AIN-002` done（只作为 schema migration 输入，不借用其
     scoped delta）
-- Readiness base:`e5f864f8e4764470d11cafe6d7080f6ec1c0c4fe`
+- Readiness base:`a09d3243b8bdec133198f843d4c258d39f54aa34`
 - Readiness input pins:
 
   ```yaml pins
@@ -26,6 +28,10 @@
     blob: 37ce723faf58780e00c11f5718f78a4271aef5ae
   - path: Catalog/operations/debug.hap.v1.json
     blob: 1189c9f5d4e73eab71c8ec3d52e7aa53eadf1627
+  - path: Catalog/schema/operation.schema.json
+    blob: d0320ec62c6346fb59e6fa21d59533e851ce52d0
+  - path: Catalog/generated/effect-authorization-matrix.md
+    blob: 7dde378010da7acb85b4bd75206389a0904c8905
   - path: openspec/contracts/catalogs/remote-operations.yaml
     blob: fe3841d992bbae89bb8f954a1bcdeab0c4f714d1
   - path: openspec/contracts/hardware-evidence.schema.json
@@ -66,6 +72,8 @@
     blob: 5e3d41a6c6cb2a081fc821f6b22ec5981231125f
   - path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/DeviceProviderContractTests.swift
     blob: e6ca2052ea28276dce0c554a652bfe6e383a638b
+  - path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/DiagnosticsAndHAPContractTests.swift
+    blob: 38e0470a410ced2ed79e490769fac7ab22617551
   - path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/HDCE0ActionPackContractTests.swift
     blob: bdffd2f27b5d0bf2ae55442e236356e899723665
   - path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/ObserveDeviceSkeletonContractTests.swift
@@ -76,6 +84,8 @@
     blob: b917578af44e06d031f904d6ed453b4bffc2466d
   - path: Packages/ArkDeckKit/Tests/ArkDeckContractTests/RuntimeOperationCatalogContractTests.swift
     blob: 431aa5259527ceec64f171bac881ac0da8ba8cd0
+  - path: Packages/ArkDeckKit/Tests/ArkDeckFakeHDCFixture/main.swift
+    blob: bd4b0beb792b8a7989930679a28db9b6ec4db42a
   - path: scripts/catalog_gen/generate.py
     blob: d17aaa56616cd5149d1d16b3b8d084bddc715f62
   - path: scripts/catalog_gen/test_generate.py
@@ -126,6 +136,8 @@
   - `Catalog/operations/observe.device.v1.json`
   - `Catalog/operations/capture.diagnostics.v1.json`
   - `Catalog/operations/debug.hap.v1.json`
+  - `Catalog/schema/operation.schema.json`
+  - `Catalog/generated/effect-authorization-matrix.md`
   - `openspec/governance/enforcement.md`
   - `openspec/verification/policy.md`
   - `openspec/verification/core-conformance.yaml`
@@ -149,15 +161,17 @@
   - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/RuntimeArtifactContractTests.swift`
   - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/RuntimeJobEngineContractTests.swift`
   - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/DeviceProviderContractTests.swift`
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/DiagnosticsAndHAPContractTests.swift`
   - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/HDCE0ActionPackContractTests.swift`
   - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/ObserveDeviceSkeletonContractTests.swift`
   - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/RuntimeOperationCatalogContractTests.swift`
+  - `Packages/ArkDeckKit/Tests/ArkDeckFakeHDCFixture/main.swift`
   - `openspec/changes/chg-2026-051-agent-hardware-evidence/**`
 - Forbidden paths:
   - `openspec/constitution.md`
   - `openspec/specs/**`
   - `openspec/baselines/**`
-  - `Catalog/**`（上列三个 operation 除外）
+  - `Catalog/**`（上列三个 operation、operation schema 与 generated matrix 除外）
   - `openspec/integrations/**`
   - `openspec/platforms/**`
   - `openspec/changes/**`（本 change 除外）
@@ -173,6 +187,9 @@
 ### Deliverables
 
 - current hardware-evidence V3 schema 与 stdlib/既有测试栈可运行的正反例 validator；
+- Catalog schema/generator 只允许 `runApprovedRemoteRead` 引用
+  `arkdeck-remote-operations` 中 step-kind 精确匹配的 action；两个 generated outputs
+  零 drift，unknown/missing/cross-kind reference 均拒绝；
 - 三个 production operation 的 exact-target/model/firmware typed preflight 在任何
   artifact capture/E1 step 前完成；Catalog/generated Swift/remote-operation mapping
   零 drift，未知/歧义 target 零后续 dispatch；
@@ -201,7 +218,7 @@
 
 ### Stop conditions
 
-- 需要改变 r2 已列明之外的 Catalog operation/effect/typed step 或 provider/profile
+- 需要改变 r3 已列明之外的 Catalog operation/effect/typed step 或 provider/profile
   语义；
 - 需要修改 E2 execution policy、创建/修改 capability/authorization；
 - model/firmware/confirmation/step/artifact 任一事实只能由 caller 提供；
@@ -215,5 +232,6 @@
 
 实现完成后在 `evidence/runs/TASK-AHE-001/` 追加 run 记录。change verified/archive
 后，`CHG-2026-049` 仍须 fresh readiness 和新 E0 run；不得复用 attempt#2。
-r1 scope 下的未完成代码只作为本地可恢复 WIP，不是 run evidence、实现提交或
-Acceptance 结论；r2 合入后必须在 fresh base 重放并按新 typed preflight 设计复审。
+r1/r2 scope 下的未完成代码只作为本地可恢复 WIP，不是 run evidence、实现提交或
+Acceptance 结论；r3 合入后必须在 fresh base 重放并按完整 Catalog contract +
+typed preflight 设计复审。

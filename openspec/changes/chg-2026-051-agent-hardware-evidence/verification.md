@@ -1,6 +1,6 @@
 # CHG-2026-051 Verification Plan
 
-> Change:CHG-2026-051-agent-hardware-evidence@r2
+> Change:CHG-2026-051-agent-hardware-evidence@r3
 > Status:planned
 > Core baseline:CORE-2.1.0
 
@@ -11,6 +11,9 @@
 - fake/in-memory daemon target/job/provider/artifact facts，零 HDC/device dispatch；
 - production Catalog/generated Swift + descriptor-bound fake HDC process fixture，验证 exact
   target-list/model/firmware 三步 preflight 与 `-t` target selection，仍零真实设备；
+- Catalog schema/generator/remote-operation registry 正反例，验证
+  `runApprovedRemoteRead` actionRef 的 required、exact-kind 与 generated matrix
+  digest 同步；
 - existing V2 evidence 作为 immutable compatibility fixture，只读不迁移。
 
 ## Acceptance matrix
@@ -39,6 +42,10 @@ fake process 分别返回 exact target、model 与 firmware；不得由 fake fac
 最终 observation 整包塞入 job。`debug.hap@1` 的首个 E1 dispatch 计数在三条 preflight
 outcome durable 之前恒为 0。
 
+fake executable 必须检查 property argv 精确为
+`-t <fixture-connect-key> shell param get const.product.model|const.ohos.fullname`；
+缺失/改变 `-t`、未知 property 或 default-target form 均不得产生 verified outcome。
+
 projector 输出必须通过 V3 JSON Schema、Swift decode/encode 与 semantic parity，
 且 V3 中所有 duplicated correlation fields（target identity/binding/job）一致。
 
@@ -60,7 +67,9 @@ projector 输出必须通过 V3 JSON Schema、Swift decode/encode 与 semantic p
 - target-list 对 durable connectKey 为 0 match / multiple match、transport/state 列未知，
   或 property lowering 未携带 exact `-t` target 时，后续 capture/E1 dispatch 为 0；
 - 任一 Catalog 缺三步 required prefix、顺序漂移、generated Swift/remote action mapping
-  漂移；
+  漂移，或 generated matrix digest 漂移；
+- `runApprovedRemoteRead` 缺 `actionRef`、引用 unknown remote action、引用
+  step-kind 不匹配 action，或其他 step kind 非法携带 remote action reference；
 - job 为 simulated/planOnly，或 effect/outcome unknown。
 
 全部向量必须在 evidence publication 前失败；不能用空值、`unknown` 字符串、旧事实或
