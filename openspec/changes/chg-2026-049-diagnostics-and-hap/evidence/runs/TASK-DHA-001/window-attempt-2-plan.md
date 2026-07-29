@@ -5,6 +5,12 @@
 > 本文件由 Agent 起草，不自行产生批准语义。只有承载本文件、task
 > `ready` 草案与 exact inputs 的 PR 经维护者对 exact head review/merge 后，
 > attempt#2 窗口才打开；合入前设备 runtime dispatch 必须为 0。
+>
+> **Post-run consumption（2026-07-29）**:窗口已由唯一一次
+> `arkdeck agent run` 消耗，job
+> `job-3db66f2d-f0c0-47c1-8d8a-91d82dd7975d`；剩余 run budget = 0。
+> runtime succeeded，但 formal evidence blocker 见
+> `window-attempt-2.md`。本窗口不得再次使用。
 
 ## 前序事实
 
