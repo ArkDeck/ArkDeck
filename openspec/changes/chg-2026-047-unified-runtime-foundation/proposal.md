@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-047-unified-runtime-foundation
 revision: 1
-status: approved # 合并本 PR 即维护者批准(CHG-2026-046 交付的垂直 PR 模型)
+status: verified # 2026-07-29 verification closure；仅在维护者 review/merge verification PR 后生效
 class: capability
 core_change_level: none
 owner: lvye
@@ -113,3 +113,55 @@ App/CLI 各自直接持有执行栈。清单 MU-2(T05-T08)要求在真实 E0 走
 本 proposal PR 合并即批准。TASK-URB-001 以 ready 建立;实现、测试、
 evidence 与状态翻转由一个垂直实现 PR 交付;change 级 verify/archive 为
 后续独立动作。
+
+## Verification closure（2026-07-29）
+
+`TASK-URB-001` 的实现、测试与 same-revision evidence 已由 PR #777 合入
+protected main。五条 change-local AC 均有可复查的 `contract` /
+fake-integration evidence；本 verification PR 只翻转 change/verification
+状态并新增 latest-main 复验记录，零产品实现、零 scope、零 acceptance 定义
+或 authority 变化。
+
+### Protected-main delivery chain
+
+| Stage | Exact reviewed head | Protected-main merge |
+| --- | --- | --- |
+| proposal #775 | `de09ffd510080d39e7bd7025c7b03d0dd9226efd` | `610af3071a0f1b246a4214f043d0d71383913c98` |
+| implementation/evidence #777 | `5c30a59f88446050cd69cbec62e39476d0588747` | `031ad5a0c7f186c389d5789acfb553e3f37a2ac6` |
+
+两个 exact heads 均由维护者 `lvye` review/approve；Agent PR、SDD Guard 与
+Swift CI 所需 checks 均为 `SUCCESS`。AC 真值源是
+`evidence/runs/TASK-URB-001/run-r1.md` 与
+`evidence/runs/TASK-URB-001/verification-r1.md`，不是实现 PR 被 review
+这一事实本身。
+
+### Five binary AC conclusions
+
+- `URB-PROV-001` = PASS：当前 provider protocol 为 typed/closed
+  resolveFacts/action/lower/verify/reconcile 五方法面；双 provider 注册、
+  无 raw command 请求面、语义 verify 与 fail-closed reconcile 的聚焦测试
+  全部通过。
+- `URB-HDC-001` = PASS：原拆分出的 HDC production/supervisor 安全面及
+  既有 golden 输入未漂移；后续 MU 扩展后的 compatibility profile 在当前
+  parser 矩阵中保持登记版本可解析、退化输入显式分类与未知版本
+  fail-closed。
+- `URB-DAEMON-001` = PASS：当前 daemon 聚焦测试覆盖双客户端、single
+  instance、0700/0600、AF_UNIX 零 TCP、协议负向、二进制存活与重启后
+  job 历史。
+- `URB-JOB-001` = PASS：当前引擎聚焦测试覆盖 durable idempotency、
+  WAL crash windows、outcomeUnknown/waitingForRecovery 零重发、
+  reconcile、mutation capability、timeline 与安全边界 cancel；另以两个
+  同 target 的可运行 `debug.hap@1` fake job 实测 18 次 dispatch 的最大并发
+  为 1，兑现原 verification plan 的递延 mutation-lane 计数。
+- `URB-COMPAT-001` = PASS：ArkDeckKit 全量 651 tests（1 个既有 opt-in
+  manual sleep/wake skip）零失败；SDD 与全部声明脚本套件全绿。
+
+复验记录与精确环境、命令、后续输入漂移审计见
+`evidence/runs/TASK-URB-001/verification-r1.md`。复验只使用
+contract/fake 路径，未执行安装态 HDC、真实设备、device mutation 或
+destructive 操作，不产生 hardware/support/conformance 主张。
+
+只有维护者 review/merge 本 PR 后，proposal `verified` 与 verification
+`passed` 才生效；archive 仍是后续独立 PR。若合并前 protected main 再次
+改变本 change 的 provider/HDC/daemon/job-engine 或对应测试输入，则必须
+先重放受影响验证，不能从本记录推断通过。
