@@ -2753,15 +2753,113 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
 
 - 本任务不接具体 Dump/Trace/Debug argv；只交付可被后续 executor 消费的通用 authority。
 
+## TASK-AIN-010P — Agent E0 registration capture for OpenHarmony probes
+
+- Status:blocked（r5 scope proposal；CHG-2026-043 TASK-HSO-002 已由 #760
+  implementation + #761 done 合入，但仅在维护者 review/merge r5 后建立本任务，
+  之后仍须 fresh D1 readiness。proposal 不批准 exact argv/设备 tuple，不构成
+  integration support 或 device dispatch authority）
+- Platform:macos
+- Requirements:REQ-WF-003、REQ-DEV-009；为 REQ-DEBUG-001/007 与
+  REQ-ART-001/002/003 的后继 integration/executor 提供 provenance，不声称其 AC 已通过
+- Acceptance:AIN-E0-CAPTURE-001(change-local,r5)
+- Depends on:TASK-AIN-010 done、CHG-2026-043 TASK-HSO-002 done（均已满足）、
+  r5 merge；之后独立 D1 readiness
+- Applicable failure patterns:AF-002、AF-003、AF-005、AF-006、AF-011、AF-013、
+  AF-014、AF-016、AF-018
+- Production reachability:
+  `Agent request/task authority → ArkDeckE0ProbeRegistrar → TrustedDeviceOperationHost(E0) →
+  durable binding + production HDC candidate/server/device facts → closed typed read-only plan →
+  identity-bound process → HostStorageCoordinator local raw Artifact + redacted provenance`
+- Trusted fact sources:ready task 来自 protected main resolver；target/binding revision
+  来自 durable storage；HDC candidate/executable bytes 来自 production discovery +
+  descriptor revalidation；server identity/ownership 来自 TASK-HSO-002 production
+  commandless observer；device row 来自 registered exact `list targets -v`。caller 只给
+  request/task ID，不能给 executable/argv/endpoint/connectKey/binding/fact/receipt/
+  output/support
+- Allowed paths after readiness:
+  - `Packages/ArkDeckKit/Package.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckOpenHarmony/AgentReadOnlyRegistration/**`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/AgentDeviceOperations/E0Registration/**`
+  - `Packages/ArkDeckKit/Sources/ArkDeckE0ProbeRegistrar/**`
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/AgentE0RegistrationCaptureContractTests.swift`
+  - `openspec/changes/chg-2026-025-ai-native-unattended-device-ops/evidence/runs/TASK-AIN-010P/**`
+  - `openspec/changes/chg-2026-025-ai-native-unattended-device-ops/tasks.md`（仅本任务
+    status/readiness pins/evidence 引用）
+- Forbidden paths:
+  - `openspec/specs/**`、`openspec/contracts/**`、`openspec/baselines/**`
+  - `openspec/integrations/**`、`openspec/platforms/**`
+  - `Packages/ArkDeckKit/Sources/ArkDeckOpenHarmony/HDCProduction.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckOpenHarmony/HDCReadOnlyProbeRegistry.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckOpenHarmony/HDCSupervisorObservationProbeRegistry.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckStorage/**`
+  - `scripts/m0b_capture/**`、`scripts/trace_capture/**`、`scripts/ud_capture/**`
+  - current hardware-evidence V2、change-local V3 schema bytes 与任何 authorization/
+    capability instance
+  - integration registry/resource/profile/lock、hardware matrix、其他 change tasks/evidence
+- Risk:medium（真实设备 E0 + privacy-sensitive live logs；零 mutation/destructive）
+- Hardware required:yes（readiness-pinned OpenHarmony device/HDC；人工只允许接线/
+  供电、解锁/信任、系统权限/凭据配置与物理断连恢复，Agent 执行全部命令）
+- Decision-Grade:D1
+
+### Deliverables
+
+- reusable `ArkDeckE0ProbeRegistrar` package executable 与 closed production-fact session；
+  no shell/PATH fallback，无 raw argv/target/receipt/classification 注入口。
+- readiness-pinned typed E0 plan：`hilogHelp`、bounded `hilogHostStream`、
+  `hidumperHelp`/`hidumperInventory`、`hitraceHelp`/`hitraceTags`、
+  `bytraceHelp`/`bytraceTags`；逐 step 与总 time/byte budget、cancel/termination/
+  privacy rules。
+- plan effect ceiling 固定 readOnly；出现 remote write/cleanup、set/clear/resize/
+  persist、send/install/uninstall、reboot、lifecycle/subserver 或 unknown step 时
+  whole-plan reject，process/device dispatch=0。
+- Agent-executed、change-local V3 schema-valid 的 `realHardwareE0ReadOnly`
+  evidence：`executor.kind=agent`、E0 ready-task `authorizationRef`、machine target
+  confirmation、pre/post facts、人工 boundary、exact typed command transcript、
+  stdout/stderr counts/hashes/result 与全部 effect counters。
+- raw HiLog/工具输出只写 HostStorageCoordinator 管理的本地 Artifact；仓内只存脱敏
+  receipt、hash/count/redaction statistics 和受控位置引用。connectKey/serial/raw log
+  rows/业务文本/用户绝对路径/大二进制不入仓。
+- 供后继 independent integration change 消费的 provenance bundle；本任务不创建/
+  修改 registry/profile/lock，不把 capture 自动标为 supported。
+
+### Verification
+
+- `AIN-E0-CAPTURE-001` → typed contract/fault suite + Agent real-device run +
+  V3 schema/privacy/effect audit → 人工 device command=0；八个 typed probe 全由 Agent
+  执行或诚实返回 unsupported/partial；E1/E2/server lifecycle dispatch=0。
+- caller target/argv/fact/receipt/support 注入、stale/ambiguous binding、wrong candidate/
+  hash/endpoint、server/device drift、timeout/cancel/truncation/invalid UTF-8、ENOSPC/
+  privacy rejection → fail closed/partial，禁止 fallback 或自动重放。
+- crash 在 terminal receipt 前只允许 outcomeUnknown/partial + reconcile；fresh request/
+  facts 前不得再次执行 device command。
+
+### Notes / handoff
+
+- readiness 必须固定 exact device/build/HDC tuple、八个 typed argv、每步与总 budgets、
+  HostStorageCoordinator layout、V3 evidence instance、human boundary 和 privacy
+  allowlist；缺任一项即保持 blocked。
+- implementation/evidence 与 `ready→done` 分离。done 只证明 accepted capture
+  provenance 存在；随后仍须独立 integration change 登记/adopt exact family。
+
 ## TASK-AIN-011 — E0 observation、HiLog 与 Artifact executor
 
-- Status:blocked（等待 TASK-AIN-010 done + 独立 readiness PR）
+- Status:blocked（2026-07-29 fresh r1 audit：TASK-AIN-010 已 done，但 current
+  integration authority 未登记 exact HiLog/HiDumper/current-Trace E0 family，
+  production semantic profile 无对应 lowering，且 base Allowed paths 漏列本 change
+  `tasks.md`。等待 r5 scope remediation、TASK-AIN-010P done、后继独立 integration
+  change registration/adoption/verification 与再次 scope remediation 后，仍须 fresh
+  D1 readiness；记录 =
+  `evidence/runs/TASK-AIN-011/readiness-blocked-r1.md`）
+- Historical Status:blocked（原始依赖为 TASK-AIN-010 done + 独立 readiness；010
+  已由 #758 implementation + #759 done 关闭，但不自动建立本任务 readiness）
 - Platform:macos
 - Requirements:REQ-WF-003、REQ-DEBUG-001、REQ-DEBUG-007、REQ-ART-001、
   REQ-ART-002、REQ-ART-003
 - Acceptance:AC-WF-003-01、AC-DEBUG-001-01、AC-DEBUG-007-01、
   AC-ART-001-01、AC-ART-002-01、AC-ART-003-01、AC-DEBUG-008-01
-- Depends on:TASK-AIN-010
+- Depends on:TASK-AIN-010、TASK-AIN-010P、后继独立 OpenHarmony E0 integration
+  registration/adoption（change/task ID 待其 proposal 合入后由独立 scope revision 固定）
 - Applicable failure patterns:AF-002、AF-005、AF-011、AF-013
 - Production reachability:`Agent request → TrustedDeviceOperationHost(E0) → registered
   HDC read-only lowering/HiLog stream → Session Artifact writer`
@@ -2774,6 +2872,8 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
   - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/AgentE0OperationContractTests.swift`
   - `Packages/ArkDeckKit/Tests/ArkDeckFakeHDCFixture/**`
   - `openspec/changes/chg-2026-025-ai-native-unattended-device-ops/evidence/runs/TASK-AIN-011/**`
+  - `openspec/changes/chg-2026-025-ai-native-unattended-device-ops/tasks.md`（仅本任务
+    status/readiness pins/evidence 引用）
 - Forbidden paths:
   - `openspec/specs/**`
   - `openspec/contracts/**`
