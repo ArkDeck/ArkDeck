@@ -5,7 +5,16 @@
 
 ## TASK-BER-001 — MU-3 垂直交付:Bootstrap + E0 Action Pack + 真实 walking skeleton
 
-- Status:ready
+- Status:done
+- Done scope(**代码面 done,硬件面 pending**):`BER-BOOT-001`/
+  `BER-E0-001`/`BER-SKEL-001` 由实现 PR 交付并通过
+  (`evidence/runs/TASK-BER-001/run-r1.md`;swift 607/1 skipped/0
+  failures,含 24 项新测试与两条自测发现缺陷的回归+变异对照;
+  check-sdd 0/0/111)。**`BER-HW-001`/`BER-HW-002` 仍未满足
+  (hardware-pending)**:需维护者设备窗口,计划见
+  `evidence/runs/TASK-BER-001/device-window-plan.md`,窗口后以
+  evidence-only PR 补记。**T11 是清单强制门槛:两条真机 AC 关闭前
+  不开工 MU-4。**
 - Grade:D1(代码/契约/fake 面;真机执行属设备窗口,由维护者亲手运行,
   Agent 零设备命令——窗口安排本身是 D2 决策,独立载体)
 - Platform:macos

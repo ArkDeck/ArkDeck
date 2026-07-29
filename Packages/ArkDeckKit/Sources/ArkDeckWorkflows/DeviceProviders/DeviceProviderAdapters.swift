@@ -84,7 +84,54 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
         kind: .process(
           executableSHA256: "resolved-at-dispatch",
           argumentSummary: ["list", "targets", "-v"], timeoutSeconds: 15))
+    case .queryProperty(let property):
+      return TypedProcessPlan(
+        action: action,
+        kind: .process(
+          executableSHA256: "resolved-at-dispatch",
+          argumentSummary: ["shell", "param", "get", property.rawValue], timeoutSeconds: 15))
+    case .captureHilog(let request):
+      return TypedProcessPlan(
+        action: action,
+        kind: .process(
+          executableSHA256: "resolved-at-dispatch",
+          argumentSummary: ["shell", "hilog", "-x"] + request.filters,
+          timeoutSeconds: request.durationSeconds + 15))
+    case .captureUIDump(let request):
+      return TypedProcessPlan(
+        action: action,
+        kind: .process(
+          executableSHA256: "resolved-at-dispatch",
+          argumentSummary: ["shell", "hidumper", "-s", request.scope.rawValue],
+          timeoutSeconds: 30))
+    case .captureTrace(let request, let path):
+      return TypedProcessPlan(
+        action: action,
+        kind: .process(
+          executableSHA256: "resolved-at-dispatch",
+          argumentSummary: ["shell", "hitrace", "-t", String(request.durationSeconds), "-b",
+            String(request.bufferKB)] + request.categories + ["-o", path.remotePath],
+          timeoutSeconds: request.durationSeconds + 30))
+    case .receiveOwnedArtifact(let artifact):
+      return TypedProcessPlan(
+        action: action,
+        kind: .process(
+          executableSHA256: "resolved-at-dispatch",
+          argumentSummary: ["file", "recv", artifact.path.remotePath], timeoutSeconds: 60))
+    case .cleanupOwnedRemotePath(let path):
+      return TypedProcessPlan(
+        action: action,
+        kind: .process(
+          executableSHA256: "resolved-at-dispatch",
+          argumentSummary: ["shell", "rm", "-f", path.remotePath], timeoutSeconds: 15))
     }
+  }
+
+  /// Mints a provider-owned remote temp path bound to job/step. The only
+  /// construction point outside tests; callers cannot supply device paths.
+  public func mintOwnedRemotePath(jobID: String, stepID: String) -> HDCOwnedRemotePath {
+    HDCOwnedRemotePath(
+      jobID: jobID, stepID: stepID, nonce: UUID().uuidString.prefix(8).lowercased())
   }
 
   public func verify(
@@ -122,7 +169,13 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
         truncated: receipt.stdoutTruncated)
       {
       case .parsed(let list):
-        return .verified(summary: ["targetCount": String(list.targets.count)])
+        // connectKeys lets the composition root drive bootstrap selection
+        // without re-parsing device output outside the provider.
+        return .verified(summary: [
+          "targetCount": String(list.targets.count),
+          "connectKeys": list.targets.map { "\($0.connectKey)=\($0.state)" }
+            .joined(separator: ","),
+        ])
       case .unsupportedVersion(let version):
         return .unsupported(reason: "unregistered HDC version \(version)")
       case .invalidEncoding:
@@ -134,6 +187,53 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
       case .malformed(let reason):
         return .unknown(reason: reason)
       }
+    case .queryProperty:
+      guard !receipt.stdoutTruncated else {
+        return .failed(code: "truncated", detail: "property output exceeded budget")
+      }
+      guard let text = String(data: receipt.stdout, encoding: .utf8) else {
+        return .failed(code: "invalidEncoding", detail: "property output is not UTF-8")
+      }
+      let value = text.trimmingCharacters(in: .whitespacesAndNewlines)
+      guard !value.isEmpty, value.count <= 400 else {
+        return .unknown(reason: "property value empty or oversized")
+      }
+      return .verified(summary: ["value": value])
+    case .captureHilog, .captureUIDump:
+      guard !receipt.stdoutTruncated else {
+        return .failed(code: "truncated", detail: "capture exceeded its byte budget")
+      }
+      guard String(data: receipt.stdout, encoding: .utf8) != nil else {
+        return .failed(code: "invalidEncoding", detail: "capture output is not UTF-8")
+      }
+      guard !receipt.stdout.isEmpty else {
+        return .unknown(reason: "empty capture output")
+      }
+      return .verified(summary: ["byteCount": String(receipt.stdout.count)])
+    case .captureTrace:
+      // Trace success is decided by the subsequent artifact receive with
+      // its size/hash checks; here only process-level sanity applies.
+      guard receipt.exitStatus == 0 else {
+        return .unknown(reason: "trace capture process did not report clean completion")
+      }
+      return .verified(summary: ["remoteCaptured": "pending-receive"])
+    case .receiveOwnedArtifact(let artifact):
+      guard let localReference = receipt.hostManagedRecordID else {
+        return .unknown(reason: "receive produced no local artifact reference")
+      }
+      if let expected = artifact.expectedSHA256 {
+        return .verified(summary: [
+          "localArtifact": localReference, "expectedSha256": expected,
+        ])
+      }
+      return .verified(summary: ["localArtifact": localReference])
+    case .cleanupOwnedRemotePath(let path):
+      guard receipt.exitStatus == 0 else {
+        // Cleanup failure is debt, never silently dropped - the engine
+        // records it for later reconcile.
+        return .failed(code: "cleanupDebt", detail: "remote cleanup failed for \(path.remotePath)")
+      }
+      return .verified(summary: ["cleaned": path.remotePath])
     }
   }
 
@@ -147,8 +247,15 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
     // stillUnknown unless positive evidence exists.
     switch intent.action {
     case .hdc(.observeTool), .hdc(.observeServer), .hdc(.listDeviceCandidates),
-      .hdc(.observeDevice):
+      .hdc(.observeDevice), .hdc(.queryProperty), .hdc(.captureHilog),
+      .hdc(.captureUIDump), .hdc(.receiveOwnedArtifact):
+      // Read-only families: re-observation is always safe.
       return .confirmedNotExecuted
+    case .hdc(.captureTrace), .hdc(.cleanupOwnedRemotePath):
+      // Remote-temp mutations reconcile by re-listing the owned path in a
+      // later read; without that evidence the outcome stays unknown.
+      return .stillUnknown(
+        reason: "owned-path mutation needs a re-observation pass to conclude")
     default:
       return .stillUnknown(reason: "no reconcile evidence source for \(intent.action)")
     }

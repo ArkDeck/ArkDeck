@@ -34,7 +34,10 @@ public struct AgentClient: Sendable {
     var address = sockaddr_un()
     address.sun_family = sa_family_t(AF_UNIX)
     guard socketPath.utf8.count < MemoryLayout.size(ofValue: address.sun_path) else {
-      throw AgentClientError.connectFailed("socket path too long")
+      throw AgentClientError.connectFailed(
+        "socket path is \(socketPath.utf8.count) bytes but the platform limit is "
+          + "\(MemoryLayout.size(ofValue: address.sun_path) - 1); "
+          + "run the daemon with a shorter --state-dir")
     }
     withUnsafeMutableBytes(of: &address.sun_path) { buffer in
       socketPath.utf8CString.withUnsafeBytes { source in

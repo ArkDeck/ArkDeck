@@ -65,17 +65,23 @@ public struct RuntimeControlPlaneHandler: Sendable {
   private let capabilityStore: RuntimeCapabilityStore
   private let providerIDs: [String]
   private let nowUTC: @Sendable () -> String
+  private let targetStore: RuntimeTargetStore?
+  private let bootstrap: DeviceBootstrapMachine?
 
   public init(
     engine: RuntimeJobEngine,
     capabilityStore: RuntimeCapabilityStore,
     providerIDs: [String],
-    nowUTC: @escaping @Sendable () -> String
+    nowUTC: @escaping @Sendable () -> String,
+    targetStore: RuntimeTargetStore? = nil,
+    bootstrap: DeviceBootstrapMachine? = nil
   ) {
     self.engine = engine
     self.capabilityStore = capabilityStore
     self.providerIDs = providerIDs
     self.nowUTC = nowUTC
+    self.targetStore = targetStore
+    self.bootstrap = bootstrap
   }
 
   public func handleLine(_ line: Data) async -> Data {
@@ -250,15 +256,79 @@ public struct RuntimeControlPlaneHandler: Sendable {
         return failure(id: request.id, code: .notFound, message: "unknown job \(jobID)")
       }
 
+    case "doctor":
+      var report: [String: JSONValue] = [
+        "protocolVersion": .string(AgentWireProtocol.version),
+        "catalogDigest": .string(RuntimeOperationCatalog.catalogDigest),
+        "providers": .array(providerIDs.map(JSONValue.string)),
+        "targetStore": .string(targetStore == nil ? "unavailable" : "ready"),
+        "bootstrap": .string(bootstrap == nil ? "unavailable" : "ready"),
+      ]
+      if let targetStore, let targets = try? targetStore.list() {
+        report["adoptedTargetCount"] = .integer(Int64(targets.count))
+      }
+      return success(id: request.id, result: .object(report))
+
     case "target.list":
-      // Durable target adoption arrives with the MU-3 bootstrap state
-      // machine; the method exists so clients can rely on the surface.
-      return success(id: request.id, result: .array([]))
+      guard let targetStore else {
+        return failure(
+          id: request.id, code: .internalError, message: "target store is not configured")
+      }
+      do {
+        let targets = try targetStore.list()
+        return success(
+          id: request.id,
+          result: .array(
+            targets.map { record in
+              .object([
+                "targetId": .string(record.targetID),
+                "bindingRevision": .integer(Int64(record.bindingRevision)),
+                "toolVersion": .string(record.toolVersion),
+                "adoptedAtUtc": .string(record.adoptedAtUTC),
+              ])
+            }))
+      } catch {
+        return failure(id: request.id, code: .internalError, message: "\(error)")
+      }
 
     case "target.adopt":
-      return failure(
-        id: request.id, code: .notImplementedUntilMU3,
-        message: "device adoption arrives with the E0 bootstrap state machine (T09)")
+      guard let bootstrap else {
+        return failure(
+          id: request.id, code: .internalError,
+          message: "bootstrap is not configured in this composition")
+      }
+      var selected: String?
+      if case .string(let candidate)? = request.params?["candidate"] {
+        selected = candidate
+      }
+      switch await bootstrap.advance(selectedConnectKey: selected) {
+      case .adopted(let record):
+        return success(
+          id: request.id,
+          result: .object([
+            "outcome": .string("adopted"),
+            "targetId": .string(record.targetID),
+            "bindingRevision": .integer(Int64(record.bindingRevision)),
+          ]))
+      case .needsSelection(let candidates):
+        return success(
+          id: request.id,
+          result: .object([
+            "outcome": .string("needsSelection"),
+            "candidates": .array(
+              candidates.map {
+                .object(["candidate": .string($0.connectKey), "state": .string($0.state)])
+              }),
+          ]))
+      case .waitingForHuman(let prompt):
+        return success(
+          id: request.id,
+          result: .object([
+            "outcome": .string("waitingForHuman"), "prompt": .string(prompt),
+          ]))
+      case .failed(let reason):
+        return failure(id: request.id, code: .rejected, message: reason)
+      }
 
     default:
       return failure(
@@ -355,8 +425,13 @@ public final class AgentDaemonServer: @unchecked Sendable {
     var address = sockaddr_un()
     address.sun_family = sa_family_t(AF_UNIX)
     let path = socketURL.path
+    // sun_path is 104 bytes on Darwin: a deep state directory silently
+    // becomes an unusable socket, so say exactly what to do about it.
     guard path.utf8.count < MemoryLayout.size(ofValue: address.sun_path) else {
-      throw AgentDaemonError.io("socket path too long")
+      throw AgentDaemonError.io(
+        "socket path is \(path.utf8.count) bytes but the platform limit is "
+          + "\(MemoryLayout.size(ofValue: address.sun_path) - 1); "
+          + "choose a shorter --state-dir (the socket is <state-dir>/agentd.sock)")
     }
     withUnsafeMutableBytes(of: &address.sun_path) { buffer in
       path.utf8CString.withUnsafeBytes { source in

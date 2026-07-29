@@ -36,7 +36,7 @@ let package = Package(
     .target(name: "ArkDeckStorage", dependencies: ["ArkDeckCore"]),
     .executableTarget(
       name: "ArkDeckCLI",
-      dependencies: ["ArkDeckCore", "ArkDeckWorkflows"]
+      dependencies: ["ArkDeckCore", "ArkDeckWorkflows", "ArkDeckAgentClient"]
     ),
     .target(
       name: "ArkDeckAgentDaemon",
