@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-051-agent-hardware-evidence
-revision: 2
-status: approved # r2 proposal PR 合并即批准；合并前 TASK-AHE-001 保持 blocked
+revision: 3
+status: approved # r3 proposal PR 合并即批准；合并前 TASK-AHE-001 保持 blocked
 class: core
 core_change_level: major
 owner: lvye
@@ -39,6 +39,16 @@ binding correlation；当前三个 evidence-eligible operation 也没有一组�
 `ProviderFacts` 中填字段可以让 contract 变绿，却会让下一次真实 E0 run 原样
 `evidenceIncomplete`。这命中 r1 `AF-004` 与“需要改变 Catalog/provider 语义即停止”的
 stop condition；未完成实现已保存为不计 evidence 的 WIP，不得以 r1 scope 宣告 done。
+
+r2 合入后的 Catalog contract 审计进一步发现：r2 要求给
+`runApprovedRemoteRead` 写入 exact `actionRef`，但 current
+`Catalog/schema/operation.schema.json` 与 `scripts/catalog_gen/generate.py`
+明确只允许 `captureRemoteStdout` 携带 `actionRef`，且 generator 尚未读取
+`arkdeck-remote-operations` registry。任何 operation JSON 改动还会改变 catalog
+digest，并强制同步 `Catalog/generated/effect-authorization-matrix.md`；该生成物与
+受影响的既有 diagnostics/HAP contract fixture 均未列入 r2 Allowed paths。绕过 schema、
+保留 step-ID 猜测或提交 generated drift 都不合法，因此 r2 实现 WIP 再次保存，本文
+r3 只补齐这组机械必需的 contract/generated/test 路径与 pins。
 
 `CHG-2026-025` 已批准“eligible typed operation 由 Agent 执行”的总体方向，也已完成
 一个 change-local V3 draft；但其 proposal 明确禁止其他 change 在该大型 change
@@ -89,6 +99,18 @@ In scope:
     一份 job-local observation，最后一条 preflight outcome durable 后才允许后续
     capture/E1 step；旧 target row 缺 transport 等字段时由本次 typed preflight
     重建 job observation，不改写历史 evidence。
+- **Catalog action-reference closure（r3）**：
+  - operation schema 与 stdlib generator 只对
+    `runApprovedRemoteRead` 新增 `actionRef` 能力；该引用必须来自
+    `arkdeck-remote-operations` registry，且 action 的 `step_kind` 必须精确为
+    `runApprovedRemoteRead`；
+  - `captureRemoteStdout` 的既有 registry/验证行为保持不变，其他 step kind 仍禁止
+    `actionRef`；unknown catalog/action、step-kind mismatch 与缺失 required
+    `actionRef` 均 fail closed；
+  - Catalog digest 变化同步两个既有 generated outputs；descriptor-bound fake HDC
+    fixture 增加 exact `-t <connectKey> shell param get <closed-property>` 的 model/
+    firmware 响应，既有 diagnostics/HAP contract fixtures 只做新 required prefix
+    的 production-shaped 适配，不放宽其原断言。
 - **Fail closed evidence publication**：任一 required fact 缺失、unknown、stale、
   binding 不一致、authority/effect 不匹配或 Artifact bytes/hash 不可验证时，runner
   返回结构化 `evidenceIncomplete` blocker；不得发布 schema-valid realHardware
@@ -110,7 +132,7 @@ Observable behavior:
 
 ## Out of scope
 
-- 本 r2 proposal PR 不修改 current schema、Catalog/Runtime 代码或 current specs，不执行
+- 本 r3 proposal PR 不修改 current schema、Catalog/Runtime 代码或 current specs，不执行
   device/HDC/tool，不产生或追认任何 realHardware evidence。
 - 不追溯改写 V2 历史记录；`DHA-HW-001` attempt#2 继续保持“runtime succeeded /
   formal acceptance blocked”，不得补写字段后追认为 PASS。
@@ -136,6 +158,8 @@ Observable behavior:
     breaking modification，经本 Core MAJOR change 批准）
   - `arkdeck-remote-operations` 增加无 caller 参数的 exact `deviceModel` /
     `firmwareBuild` action
+  - Operation Catalog schema/generator 对 `runApprovedRemoteRead` 的 exact
+    registered action reference 支持，以及既有 generated outputs 同步
 - Core baseline bump:需要。以 current `CORE-2.1.0` 为基线时 candidate 为
   `CORE-3.0.0`（MAJOR：替换 schema required fields、收紧 realHardware evidence
   publication）。若 `CHG-2026-050` 或其他 Core change 先 archive，archive PR 必须按
@@ -177,8 +201,9 @@ Observable behavior:
 ## Approval and flow
 
 r1 proposal PR 已承载 `CHG-2026-051` 初始 approval 与 `CHG-2026-025` r6 ownership
-修订。本文 r2 是 production-reachability stop condition 后的 D1 scope/readiness
-修订；维护者 review + merge r2 exact head 后，`TASK-AHE-001` 才可按新 pins 恢复。
-r2 合并不构成 contract 激活、真机窗口、E1 capability 或 E2 authorization。实现、
+修订，r2 承载 production preflight scope。本文 r3 是 Catalog contract/generator
+stop condition 后的 D1 机械范围/readiness 修订；维护者 review + merge r3 exact head
+后，`TASK-AHE-001` 才可按新 pins 恢复。r3 合并不构成 contract 激活、真机窗口、
+E1 capability 或 E2 authorization。实现、
 测试、文档、run evidence 与任务状态翻转仍同车交付；随后 change 级 verification 与
 archive 分别使用独立 PR。

@@ -1,7 +1,7 @@
 ---
 schema_version: 1.0.0
 change_id: CHG-2026-051-agent-hardware-evidence
-change_revision: 2
+change_revision: 3
 platform: all
 evidence_classes:
 - contract
@@ -9,9 +9,9 @@ cases:
 - acceptance_id: AC-WF-004-01
   test_id: TEST-AC-WF-004-01
   method: >-
-    Production-shaped Agent E0 Catalog preflight and Runtime receipt to
-    hardware-evidence V3 projection with JSON Schema, Swift round-trip and
-    semantic correlation checks.
+    Production-shaped Agent E0 Catalog preflight, exact registered remote-read
+    action references and Runtime receipt to hardware-evidence V3 projection
+    with JSON Schema, Swift round-trip and semantic correlation checks.
   expected_source: openspec/changes/chg-2026-051-agent-hardware-evidence/verification.md#ac-wf-004-01-positive-vector
   minimum_evidence: contract
   expected_result: >-
