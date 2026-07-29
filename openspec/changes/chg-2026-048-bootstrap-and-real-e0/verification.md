@@ -1,6 +1,6 @@
 # CHG-2026-048 Verification Plan
 
-> Change:CHG-2026-048-bootstrap-and-real-e0@r2
+> Change:CHG-2026-048-bootstrap-and-real-e0@r3
 > Status:planned
 > Core baseline:CORE-2.1.0 (canonical Core AC not claimed)
 
@@ -11,6 +11,9 @@
 - realHardware 面:维护者设备窗口(DAYU200 + 本机安装态 HDC),按
   Agent 起草的窗口步骤亲手执行并贴回 transcript;evidence 分类
   realHardware,序列号/connect key 字节脱敏后入仓。
+- r3 blocker:CHG-2026-051 verified/archive + 本 change r4 fresh-readiness
+  前，本节 realHardware 环境只作历史描述，不授权新窗口；届时 executor、
+  evidence schema 与 trusted-fact 来源以 fresh-pinned current contract 为准。
 
 ## Acceptance matrix
 
@@ -18,7 +21,7 @@
 | --- | --- | --- | --- |
 | `BER-BOOT-001` | bootstrap 状态机契约 + 结构负向 | 干净环境(零 fixture、零 binding)可走到候选观察;多候选须显式选择;unauthorized/offline → waitingForHuman 且提示明确;信任完成后自动续行;re-adopt 幂等;**bootstrap 内任何 mutation action 构造不可能**(类型面)且 admission 拒绝 mutation 请求 | contract |
 | `BER-E0-001` | E0 action pack 契约 + 边界矩阵 | 全部 E0 action 经 typed request 可调;duration/buffer/filter/bytes 有界有默认;remote temp 由 provider 生成且含 session/step 绑定;截断/超时/invalid UTF-8/空输出显式 outcome;artifact 接收验 hash 并登记远端清理;未知 profile → unsupported | contract |
-| `BER-SKEL-001` | fake-integration 端到端(真子进程)+ restart | client → daemon → engine → provider → **真实 descriptor 绑定进程** → 语义 verify → durable journal;重启后 job/timeline 可查;descriptor hash 漂移与 hostManaged 计划均被拒;请求含 changeId/taskId 被拒。**artifact 文件发布面递延 T14**(统一 artifact 模型),本 AC 不主张四文件落盘 | contract |
+| `BER-SKEL-001` | fake-integration 端到端(真子进程)+ restart | client → daemon → engine → provider → **真实 descriptor 绑定进程** → 语义 verify → durable journal;target/revision mismatch 零 dispatch,live identity mismatch 后 operation 零推进且 journal 无 binding placeholder;重启后 job/timeline 可查;descriptor hash 漂移与 hostManaged 计划均被拒;请求含 changeId/taskId 被拒。**artifact 文件发布面递延 T14**(统一 artifact 模型),本 AC 不主张四文件落盘 | contract |
 | `BER-HW-001` | 维护者窗口:真 DAYU200 + production HDC 端到端 | 一次 `arkdeck device adopt` + `observe.device@1` 提交在真设备上得到 succeeded 与完整 job timeline(artifact 文件面随 T14);除设备侧首次信任外零人工命令 | realHardware(窗口后补记) |
 | `BER-HW-002` | 维护者窗口:重启/拔插恢复 | daemon 中途重启后恢复或安全重做只读观察;拔插后凭 rebind 证据重新识别 binding;不一致 fail-closed | realHardware(窗口后补记) |
 
@@ -49,6 +52,12 @@
 - fixture 工具驱动全链:adopt(bootstrap)→ submit(v2,零治理字段)
   → engine → provider lower → dispatcher(**真实 spawn**,identity-bound
   路径,fixture 工具字节)→ 语义 verify → durable journal;
+- target 不存在或 `expectedBindingRevision` 与 durable target 不同 →
+  provider dispatch=0、step intent=0、稳定 conflict；
+- live facts identity 缺失/歧义/与 durable stable identity 不同 →
+  只允许 descriptor-bound E0 identity observation，之后 operation step
+  intent/dispatch=0；匹配时 device-bound journal 必须写真实 binding
+  revision/identity hash，禁止 `pending-binding`/全零 placeholder；
 - daemon stop → 新进程 recover → job/result/timeline 可查;
 - 治理字段(changeId 等)在 daemon 边界即被拒;
 - descriptor 字节漂移(fixture 工具替换)→ dispatch 拒绝。
@@ -57,5 +66,14 @@
 
 - 窗口步骤由 Agent 起草(host 侧自测一切可测项后交付),维护者亲手
   执行并贴回 transcript;Agent 核验后以 evidence-only 追加补记;
+- `BER-HW-002` 必须覆盖：preflight 非终态 job 在 daemon restart 后以
+  同一 idempotency/job 安全续行；拔插后 live identity gate 重新核验并
+  保持同一 target/binding；错误 expected revision 在 provider dispatch/
+  step intent 前拒绝；
+- 正式记录必须通过届时 fresh-pinned current
+  `openspec/contracts/hardware-evidence.schema.json`；target
+  confirmation、firmware、executor/authority/time/toolchain/provider/
+  stepKinds 均来自 product-owned trusted facts，不得从旧 run 或 caller
+  字段猜填；
 - 序列号/connect key 以摘要脱敏形式入仓;raw 产物留 daemon 私有目录;
 - 任一步失败如实记 blocked-attempt,不降级、不以 simulation 顶替。

@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-048-bootstrap-and-real-e0
-revision: 2
-status: approved # r1 由 #779 批准；本 r2 仅在维护者 review/merge 后生效
+revision: 3
+status: approved # r2 由 #802 批准；本 r3 仅在维护者 review/merge 后生效
 class: capability
 core_change_level: none
 owner: lvye
@@ -103,6 +103,61 @@ MU-3(T09-T11)是全清单的**强制门槛**:真实 `observe.device@1` 走通之
 - `BER-BOOT-001`、`BER-E0-001`、`BER-HW-002` 以及 T09/T10 的范围、
   安全边界和证据等级均不变；不修改 Core、catalog、代码、硬件 evidence
   或既有 run 记录。
+
+## r3 binding/evidence remediation（2026-07-29）
+
+本节是 D1 proposal revision；它只在维护者 review/merge 本 PR 后生效。
+r2 merge OID 为
+`34204b304efa9887dc811e7d99420df4519168ea`。r2 明确保留
+identity/binding drift fail-closed，但合后 verification audit 发现该判据
+与正式硬件证据仍未闭环，故 T11 gate 重新打开，不得直接翻 `verified`：
+
+1. `RuntimeJobEngine` 当前从未调用 `DeviceProvider.resolveFacts`；
+   `expectedBindingRevision` 只做 `>= 1` 的 wire validation，并被写入
+   context/journal，却没有与 `RuntimeTargetStore.bindingRevision` 比较；
+2. production `TargetStoreFactsPort` 只把 durable target record 回显为
+   `ProviderFacts`，没有用 descriptor-bound E0 observation 证明当前连接
+   的设备身份；device-bound intent 仍写 `pending-binding` 与全零 identity
+   hash；
+3. `ObserveDeviceSkeletonContractTests` 只有 descriptor drift 负向，没有
+   target-not-found、binding revision drift 或 live identity mismatch 的
+   零推进断言；
+4. PR #784 的 Markdown 记录没有形成
+   `openspec/contracts/hardware-evidence.schema.json` V2 record，缺
+   `evidenceId`、physical confirmation time、firmware、`executedAt`、
+   typed stepKinds/provider 等必填字段；其 restart 是 terminal job 后
+   history query，replug 只比较 targetId，没有覆盖非终态安全恢复与
+   mismatch fail-closed。
+
+r3 **不放宽** `BER-SKEL-001`/`BER-HW-002`。但最新 main 又由
+PR #804 合入 `CHG-2026-051@r2`（merge
+`a09d3243b8bdec133198f843d4c258d39f54aa34`），该 approved change 已
+明确独占以下闭环：hardware-evidence V3 current contract、三个 operation
+的 exact-target/model/firmware typed preflight、production provider facts、
+runtime receipt/projector 与 current Core baseline 晋升。它同时规定消费方
+change 只能在其 verification/archive 后 fresh readiness + fresh run。
+
+因此本 r3 新增 `TASK-BER-002`，状态为 **blocked**，而不是在
+CHG-2026-048 内复制或抢先实现同一 gate：
+
+- `CHG-2026-051/TASK-AHE-001` done 且 change verified/archive 前，
+  CHG-2026-048 不修改 Runtime/Catalog/schema，不起草 D2 window、不执行
+  设备命令、不借用其 scoped delta；
+- 依赖关闭后，CHG-2026-048 必须以独立 r4 D1 fresh-readiness pin 当时
+  current baseline/schema/Catalog/runtime，确认 exact-target preflight、
+  binding journal 与 evidence projector 已成为可消费 current contract；
+- r4 后重放 `BER-SKEL-001` 的 target/revision/live-identity 负向与
+  restart contract；任一不满足时在 r4 显式列出本 change 仍需的最小
+  remediation，不得假设 CHG-2026-051 自动证明本 AC；
+- contract 通过后再开独立 D2 window PR，按届时 current evidence schema
+  与 executor 模型 fresh 执行，覆盖 preflight 非终态重启/同
+  idempotency 安全续行、物理拔插 rebind、错误 revision 零推进，并产生
+  schema-valid record + 脱敏 run。PR #784 只作历史输入，不追认。
+
+本 revision 不修改 Core、catalog、operation、provider/effect 分类、
+hardware-evidence schema、代码或既有 raw evidence。dependency、
+fresh-readiness、必要实现、D2 window、硬件 evidence 与 change
+verification 均是顺序独立载体，前一门未合入时后一门零投机开工。
 
 ## Platform impact
 

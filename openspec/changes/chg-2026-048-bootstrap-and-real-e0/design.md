@@ -7,6 +7,13 @@
 > succeeded + durable timeline、restart query 与 drift fail-closed。
 > 其余设计不变。
 
+> r3 dependency（2026-07-29）：verification audit 确认现有 production
+> binding/facts gate 未闭环；但 PR #804 已批准 CHG-2026-051@r2 独占
+> exact-target/model/firmware typed preflight、hardware-evidence V3 与
+> receipt projector。本 change 不复制该设计。`TASK-BER-002` 在
+> CHG-2026-051 verified/archive 前保持 blocked；之后须经 r4 fresh
+> readiness pin current contract，再重放本 change 的 drift/restart AC。
+
 ## 1. T09 Bootstrap(`ArkDeckWorkflows/Bootstrap/`)
 
 ```swift
@@ -76,6 +83,9 @@ case cleanupOwnedRemotePath(HDCOwnedRemotePath)       // 只认自家路径类�
 
 - contract:bootstrap 状态机、action pack 边界、parser 矩阵;
 - fake-integration:fixture HDC 工具全链(submit→artifacts→restart);
+- post-CHG-2026-051 fresh contract:target missing / wrong expected
+  revision 均零推进；live identity mismatch 在 typed preflight 后零后续
+  operation dispatch；matching binding 的 journal 不含 placeholder；
 - realHardware(窗口):BER-HW-001/002,Agent 起草窗口步骤
   (host 自测后交付),维护者亲手执行,evidence-only 补记。
 
