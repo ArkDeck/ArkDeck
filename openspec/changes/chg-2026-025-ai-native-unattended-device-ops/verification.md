@@ -1,6 +1,6 @@
 # Verification Plan
 
-> Change:CHG-2026-025-ai-native-unattended-device-ops@r5
+> Change:CHG-2026-025-ai-native-unattended-device-ops@r6
 > Status:planned # 结论经维护者在 PR 中确认
 > Revision review:2026-07-22 已逐项对照 r2 security-remediation、TASK-AIN-005/006/
 > 008/007 与 AIN-004 stop gate;本计划不复用 superseded #296 readiness/authorization。
@@ -14,11 +14,14 @@
 > integration authority/production lowering 与 status path 不闭合；新增
 > TASK-AIN-010P 先由 Agent 在本 scoped V3 contract 下执行 registration capture，
 > 后继独立 integration change 再登记/adopt；各门合入前不执行后续实现。
+> r6 ownership transfer:hardware-evidence current V3 与 Runtime receipt/projection
+> 转交 CHG-2026-051；AIN-002 历史 bytes 保留，010P/016 等待其 archive 后消费
+> current V3，不再借用本 scoped draft。
 
 ## Environment
 
-- Core baseline:CORE-2.1.0 + 本 change approved delta overlay;archive 时 ratify
-  CORE-3.0.0
+- Core baseline:CORE-2.1.0 + 本 change approved delta overlay；archive 时按届时
+  current baseline ratify next MAJOR
 - Host:macOS(现行 Swift 全量基线为回归底线);Device:DAYU200(RK3568),
   pinned 参考镜像 7.0.0.33
 - toolchain/HDC/Provider 版本与全部 hash 于各任务 readiness PR 钉定(全 OID)
@@ -31,9 +34,9 @@
 - r4 authority persistence:per-device capability、execution-authority/usage 与
   Journal/Manifest 2.2 的 exact schema/version/compatibility matrix 由
   TASK-AIN-009R readiness 固定；2.1 Rockchip historical bytes/语义保持可读且不改写
-- r5 registration capture:exact device/build/HDC、八个 E0 typed argv、time/byte
-  budgets、human boundary、change-local V3 evidence instance 与 privacy allowlist 由
-  TASK-AIN-010P readiness 固定；capture 不建立 integration support
+- r5/r6 registration capture:exact device/build/HDC、八个 E0 typed argv、time/byte
+  budgets、human boundary、CHG-2026-051 archived current V3 evidence instance 与
+  privacy allowlist 由 TASK-AIN-010P readiness 固定；capture 不建立 integration support
 - r3 hardware:至少一个 pinned OpenHarmony device/build/HDC 完成 E0/E1 product-path；
   人类只执行 human-boundary registry 中的物理/配置/治理动作
 
@@ -120,7 +123,8 @@
   使用四项 host remediation 的 fresh main OID 重新 readiness（不复用 #296）
 - [ ] 所有适用 AC passed 且 evidence 可复查
 - [ ] Simulation/fake 未计入硬件支持
-- [ ] executor.kind=agent 的 evidence 全部携带可解引用的 authorizationRef
+- [ ] executor.kind=agent 的 evidence 全部符合 CHG-2026-051 archived current V3，
+  并携带与实际 effect 匹配且可解引用的 authority reference
 - [ ] Traceability updated(AC-FLASH-015-03 + r3 十个 AC 入 registry,111 → 122)
 - [ ] AIN-AUTH-PROV/FACT/USAGE/CONTRACT/DISPATCH-001 全部有独立 run evidence，
   且 AIN-008 的 2.1 persistence/descriptor-identity regression evidence 在案

@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-025-ai-native-unattended-device-ops
-revision: 5
-status: approved # r1 经 #281 正式批准；r2/r3/r4 已合入；r5 E0 registration-capture scope 仅在维护者 review/merge 本修订 PR 后生效
+revision: 6
+status: approved # r1 经 #281 正式批准；r2-r5 已合入；r6 contract ownership transfer 以维护者 review/merge 本修订 PR 生效
 class: core
 core_change_level: major
 owner: lvye
@@ -10,6 +10,16 @@ platforms: [macos]
 ---
 
 # AI Native 无人值守设备操作:授权从"人类亲手执行"上移为"人类批准计划"
+
+> r6 hardware-evidence ownership transfer（2026-07-29）：`CHG-2026-049`
+> `DHA-HW-001` 已证明 Agent E0 Runtime 可成功执行，但 current V2 schema 与
+> `RuntimeAgentExecutionReceipt` 无法形成有效 evidence。为避免等待本 change 的
+> E1/E2/executor/human-boundary 全部完成，`CHG-2026-051-agent-hardware-evidence`
+> 独占接管 hardware-evidence V3 current-contract 激活、effect-aware authority
+> mapping 与 Runtime trusted-fact receipt/projection。本 change 保留 AIN-002 的历史
+> bytes/evidence，但 archive 不再覆盖 current hardware-evidence schema；010P/016 的
+> 新 Agent evidence 必须等待 CHG-2026-051 archive 并使用其 current V3。本 revision
+> 不修改 schema/code，不运行设备，不使任何 blocked task ready。
 
 > r5 E0 registration stop gate（2026-07-29）：TASK-AIN-010 已 done，但
 > TASK-AIN-011 readiness 审计发现 current OpenHarmony profile 未登记 exact HiLog
@@ -84,9 +94,11 @@ In scope:
 - **`specs/flashing` REQ-FLASH-015 MODIFIED**(载体 `specs/flashing/spec.md`):
   保留 AC-FLASH-015-01/02(fail-closed 面,语义收敛为"无授权/授权不匹配即阻断"),
   ADDED AC-FLASH-015-03(有效授权下的无人值守执行产生有效 realHardware evidence)。
-- **`contracts/hardware-evidence.schema.json` 2.0.0 → 3.0.0**(草案
-  `contracts/hardware-evidence.schema.v3-draft.json`):`operator` 字符串(仅人类)
-  替换为 `executor` 对象(`kind: human|agent`;agent 必须携带 `authorizationRef`)。
+- **Hardware-evidence consumer contract**：原 AIN-002 V3 draft 作为历史输入保留；
+  current `hardware-evidence.schema.json` 2.0.0 → 3.0.0、effect-aware Agent
+  authority 与 Runtime receipt/projection 已转交
+  `CHG-2026-051-agent-hardware-evidence`。本 change 的 Agent hardware tasks 必须
+  消费其 archived current V3，不得在 archive 时重新覆盖。
 - **治理文档面同步**(TASK-AIN-001):AGENTS.md 禁令、enforcement.md、
   verification/policy.md、hardware-matrix.md 序言、change 模板中"只能由人类执行"
   表述按新模型改写。
@@ -177,9 +189,10 @@ r5 不改变 r3/r4 的产品行为或 E0 effect boundary，只修复 AIN-011 开
   只有样例/旧 human capture；Trace pack 绑定 hdc 3.2.0d，而 current production
   device/supervisor candidate 是 exact 3.2.0f。跨版本借用、exit 0 或 help-shaped
   output 均不能建立 production command authority。
-- **契约归属**：current `hardware-evidence.schema.json` 2.0.0 只允许人类 operator；
-  Agent executor V3 仍是本 approved change 的 scoped delta。另一个 integration change
-  不得在 archive 前把该草案当成自己的 current contract。
+- **契约归属（r6 superseded）**：r5 的“V3 仅属本 change、其他 change 不得消费”
+  stop gate 已由 `CHG-2026-051` ownership transfer 取代。current V2 在
+  CHG-2026-051 implementation/archive 前仍只允许 human operator；之后 010P 与后继
+  integration change 只消费新的 current V3，不再借用本目录 draft。
 - **TASK-AIN-010P — Agent E0 registration capture**：在本 change 内新增 reusable
   typed capture runner。它只从 durable binding、production HDC discovery、registered
   server/device observation 与 ready-task resolver 取得事实，不接受 caller target/
@@ -240,15 +253,16 @@ Observable behavior before/after:
   (ADDED);r3 ADDED AC-WF-003-01/02/03、AC-DEV-009-01、
   AC-DUMP-009-01、AC-TRACE-010-01、AC-DEBUG-008-01/02/03/04
   (archive 时 acceptance registry 111 → 122)
-- Contracts/schemas:hardware-evidence.schema.json 2.0.0 → 3.0.0；r2 另纳入
+- Contracts/schemas:hardware-evidence V3 current-contract 与 Runtime projection 由
+  `CHG-2026-051` 独占，本 change 只消费；r2 另纳入
   manifest/journal/provider contract 的 authorized-agent delta 与新增
   authorization-usage contract；r3 新增 agent-device-operation 1.0.0 与
   human-action-required 1.0.0 contracts，并扩展 workflow step/catalog 的封闭部署面
   （版本号由 TASK-AIN-009 readiness 精确钉定）；r4 新增 per-device capability、
   execution-authority/usage 与可恢复 Journal/Manifest correlation drafts（版本号由
   TASK-AIN-009R readiness 精确钉定）
-- Core baseline bump:**需要,CORE-2.1.0 → CORE-3.0.0**(MAJOR:改变既有 Safety
-  Requirement 的执行边界)
+- Core baseline bump:**需要,next MAJOR**(改变既有 Safety Requirement 的执行边界；
+  archive 时基于届时 current baseline 计算，不与 CHG-2026-050/051 复用版本号)
 
 ## Safety, privacy, and compatibility
 
@@ -259,7 +273,7 @@ Observable behavior before/after:
 - Data/schema compatibility:既有 v2 evidence 记录不迁移不改写;v3 只用于新记录;
   两版 schema 并存,`schemaVersion` 判别。r2 的 manifest/journal 新版本同样与 v1 历史
   并存，不原地重写；旧 schema 永远不能承载 authorized-agent destructive success。
-- 平台影响:macOS 在 CORE-3.0.0 ratify 后按 POL-PLATFORM-002 转
+- 平台影响:macOS 在 next MAJOR baseline ratify 后按 POL-PLATFORM-002 转
   `needsReverification`;r2 修改 REQ-FLASH-015，r3 只新增五个 Requirement、不改写其他
   accepted Requirement。重验面 = 现行 Swift 全量基线 + TASK-AIN-003 历史回归 +
   TASK-AIN-005/006/007 新 contract/executor tests + TASK-AIN-004 真机验收 +
@@ -272,7 +286,7 @@ Observable behavior before/after:
   只读保留，不批量改写；新 contract 使用新 schemaVersion。Agent control plane 可整体
   feature-disable 回退到现有人类/UI 路径，但不得因回滚把已持久化 intent/outcome 或
   unresolved hazard 隐藏。
-- r3 平台影响：macOS 纳入 CORE-3.0.0 `needsReverification` 的新增面包括 E0/E1
+- r3 平台影响：macOS 纳入 next MAJOR baseline `needsReverification` 的新增面包括 E0/E1
   production executor、Agent control plane、HAP/SO deployment 与真机闭环；Windows/Linux
   仍 deferred，且未来端口必须实现相同 contract/AC，不能恢复 human-only 作为 Core 豁免。
 - r5 不在本 change 登记/修改 OpenHarmony integration profile、lock、registry/
@@ -284,8 +298,9 @@ Observable behavior before/after:
 以下记录描述 r1 已完成的 propose/approval 流程，不是 r2 的现行执行许可。r1 以独立
 approval-only PR 批准原四任务 scope 与 delta 方向；每个任务仍须独立 readiness。r2 复审
 已证明“approve + 旧 AIN-004 readiness”不足以形成可信执行闭环，因此 AIN-004 当前必须按
-下方 r2 boundary 保持 blocked。verified 翻转与 archive(合入 constitution/specs/schema、
-ratify CORE-3.0.0)仍各自使用独立 PR。
+下方 r2 boundary 保持 blocked。verified 翻转与 archive（合入本 change 的
+constitution/spec delta 并 ratify next MAJOR；hardware-evidence schema 归
+CHG-2026-051）仍各自使用独立 PR。
 
 ## r1 approval record
 
@@ -312,9 +327,10 @@ ratify CORE-3.0.0)仍各自使用独立 PR。
 - r1 批准本身不产生任务执行:原四任务须独立 readiness PR 转 `ready`。
   **r1 批准亦不构成任何一次具体真机执行的 standing authorization**——
   TASK-AIN-004 的授权块须由其 readiness PR 承载并逐项 pin,先例 pins 惯例
-  (全 OID/全 hash)适用。delta 与 schema 于 archive PR 合入 current
-  specs/contracts 并 ratify CORE-3.0.0;在此之前 current specs 原文不变,
-  实现期以 approved delta overlay 为有效规格。
+  (全 OID/全 hash)适用。r6 后本 change 的 spec/constitution delta 于 archive PR
+  合入 current specs 并 ratify next MAJOR Core baseline；hardware-evidence schema
+  由 CHG-2026-051 独立实现/archive。在此之前 current specs 原文不变，实现期以
+  approved delta overlay 为有效规格。
 
 ## r2 approval boundary
 
@@ -370,3 +386,15 @@ ratify CORE-3.0.0)仍各自使用独立 PR。
   r5 合入后走独立 D1 readiness，implementation/evidence 与 `ready→done` 分离。
   其后独立 integration change 的 proposal/approval/registration/adoption/
   verification 继续分门；AIN-011 在这些门全部合入前零实现。
+
+## r6 approval boundary
+
+- r6 与 `CHG-2026-051` r1 proposal 同车，是 D1 contract ownership revision；只修改
+  proposal/design/tasks/verification 的归属、依赖与结果门，不修改 current schema/spec、
+  `Packages/**`、authorization/capability，不执行 process/HDC/device。
+- 维护者 merge 只批准 hardware-evidence current contract/Runtime projection 转交
+  CHG-2026-051，并使本 change 的 010P/016 evidence 依赖其 archive；不使
+  010P/011/016/017 ready，不追认旧 run，不创建 E1/E2 authority。
+- AIN-002 历史 draft、fixtures 与 run evidence 保持不可变；CHG-2026-025 archive
+  不得把该旧 draft 写回 current contract。E2 policy、executor 与 human-boundary
+  工作仍归本 change，未被 CHG-2026-051 接管。
