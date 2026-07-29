@@ -144,8 +144,11 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
     return (engine, capabilityStore, artifactStore)
   }
 
-  private func captureRequest(withTrace: Bool, key: String = "idem-capture-01") -> Data {
+  private func captureRequest(
+    withTrace: Bool, key: String = "idem-capture-01", capability: String? = nil
+  ) -> Data {
     let trace = withTrace ? "\"traceCategories\": [\"ohos\"]," : ""
+    let auth = capability.map { "\"authorization\": { \"capabilityId\": \"\($0)\" }," } ?? ""
     return Data(
       """
       {
@@ -155,6 +158,7 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
         "idempotencyKey": "\(key)",
         "target": { "targetId": "TGT-1" },
         "operation": { "id": "capture.diagnostics", "version": 1 },
+        \(auth)
         "inputs": { \(trace) "durationSeconds": 5 }
       }
       """.utf8)
@@ -229,8 +233,12 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
 
   func testFailingOptionalTraceDegradesInsteadOfFailingTheJob() async throws {
     let dispatcher = ScriptedDispatcher(script: .init(traceFails: true))
-    let (engine, _, artifacts) = try makeEngine(dispatcher: dispatcher)
-    let acceptance = try await engine.submit(captureRequest(withTrace: true))
+    let (engine, capabilities, artifacts) = try makeEngine(dispatcher: dispatcher)
+    // Selecting the remote-file trace makes this plan mutate the device,
+    // so it needs an E1 capability - see the escalation test below.
+    try await installCaptureCapability(capabilities)
+    let acceptance = try await engine.submit(
+      captureRequest(withTrace: true, capability: "CAP-RT-CAPTURE-001"))
     let status = try await engine.run(jobID: acceptance.jobID)
     XCTAssertEqual(status.state, "succeeded", status.timeline.joined(separator: " | "))
     XCTAssertTrue(status.timeline.contains { $0.hasPrefix("skipped capture-trace") })
@@ -256,6 +264,49 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
     // hilog is required; an empty capture is unknown, which halts.
     XCTAssertNotEqual(status.state, "succeeded")
     XCTAssertTrue(status.outcomeUnknown || status.state == "failed", status.state)
+  }
+
+  /// The defect maintainer review caught: charging the operation's minimum
+  /// effect would have let a device-mutating plan through on the default
+  /// read-only policy. Selecting the remote trace must demand E1.
+  func testCaptureWithRemoteTraceRequiresE1AndDispatchesNothingWithout() async throws {
+    let dispatcher = ScriptedDispatcher()
+    let (engine, _, _) = try makeEngine(dispatcher: dispatcher)
+    do {
+      _ = try await engine.submit(captureRequest(withTrace: true, key: "idem-trace-nocap"))
+      XCTFail("a trace-selecting capture mutates the device and must require a capability")
+    } catch let error as RuntimeJobEngineError {
+      guard case .rejected(.authorizationRequired, let message) = error else {
+        return XCTFail("expected authorizationRequired, got \(error)")
+      }
+      XCTAssertTrue(message.contains("deviceMutation"), message)
+    }
+    XCTAssertTrue(dispatcher.dispatchedActions.isEmpty, "zero dispatch on refusal")
+  }
+
+  /// ...while the same operation without the trace stays E0 and needs no
+  /// capability at all. The pair is what makes the rule meaningful.
+  func testCaptureWithoutTraceStaysE0AndNeedsNoCapability() async throws {
+    let dispatcher = ScriptedDispatcher()
+    let (engine, _, _) = try makeEngine(dispatcher: dispatcher)
+    let acceptance = try await engine.submit(
+      captureRequest(withTrace: false, key: "idem-trace-e0"))
+    XCTAssertFalse(acceptance.deduplicated)
+    let status = try await engine.run(jobID: acceptance.jobID)
+    XCTAssertEqual(status.state, "succeeded")
+  }
+
+  private func installCaptureCapability(_ store: RuntimeCapabilityStore) async throws {
+    try await store.install(
+      try RuntimeCapability(
+        capabilityID: "CAP-RT-CAPTURE-001",
+        targetScope: .anyTarget,
+        operationScope: [.init(operationID: "capture.diagnostics", version: 1)],
+        effectCeiling: .deviceMutation,
+        issuedAtUTC: "2026-07-01T00:00:00Z",
+        expiresAtUTC: "2026-12-31T00:00:00Z",
+        maximumUses: 5,
+        issuer: .init(kind: .maintainerMergedPR, reference: "PR#test")))
   }
 
   // MARK: - DHA-HAP-001

@@ -7,8 +7,29 @@
 - **Hardware status:`hardware-pending`** —— `DHA-HW-001`/`DHA-HW-002`
   未主张;后者另需维护者签发的 E1 capability
 
+## 维护者 review 期的两项修订(#785 合并版 proposal)
+
+维护者在批准 proposal 时重写了 scope,加入 **T00 Device Runtime Agent
+执行交接**与 `DHA-AGENT-001`,并指出 T12 的一个**真实授权缺陷**。两项均
+已落实:
+
+1. **T00**:`ArkDeckAgentClient/AgentRuntimeExecutor` + `arkdeck agent
+   run`。Agent 自己完成 health→target→submit→run→artifact 并产出
+   `RuntimeAgentExecutionReceipt`(executor=agent);人只在设备信任/歧义
+   选择/物理拔插三处作为 `physicalAssistant`,每处是可恢复的
+   `RuntimeHumanAction`。runner 无 capability 管理面——该约束由**行为
+   测试**钉死(记录实际调用的方法名),不用源码文本检查(那会被自身
+   注释里的词误判,已实测)。
+2. **effective effect 缺陷(维护者审出)**:引擎原先按
+   `descriptor.minimumEffect` 授权,于是 `capture.diagnostics@1` 选了
+   remote-file trace(deviceMutation)仍会走 E0 默认只读策略放行。改为
+   按**实际选中步骤的最大 effect** 计算,授权与执行共用同一条纯选择
+   规则(不可能各算各的)。配对测试:选 trace → 要 E1 且无 capability
+   时零 dispatch;不选 trace → 仍 E0 免 capability。
+
 ## 交付面
 
+- **T00 Agent runner**:见上;新增 `docs/adr/0008-agent-runtime-execution.md`。
 - **T14 统一 artifact**:`Artifacts/RuntimeArtifactStore.swift` ——
   内容寻址身份(ID = 内容 SHA-256 前缀,磁盘名即 ID)、完整元数据
   (job/session/step、hash、privacy、retention、binding snapshot、
@@ -29,8 +50,9 @@
 
 ## 测试结果
 
-- `swift test` 全量:**631 / 1 skipped / 0 failures**(新增 22 项:
-  RuntimeArtifactContractTests 12、DiagnosticsAndHAPContractTests 9、
+- `swift test` 全量:**643 / 1 skipped / 0 failures**(新增 34 项:
+  RuntimeArtifactContractTests 12、DiagnosticsAndHAPContractTests 11、
+  AgentRuntimeExecutorContractTests 6、EffectiveEffectContractTests 4、
   daemon artifact 协议面 1)
 - `scripts/check-sdd.sh`:0 error / 0 warning / 111 AC
 
@@ -49,14 +71,31 @@
 消失**(缺 `bundleName` 输入仍被拒),已改写为断言新契约,并补一条
 真正无注册 action 的 kind(`flashPartition`)保持原意图覆盖。
 
+## Host 自测(窗口前必做,已完成)
+
+- `arkdeck agent run --operation observe.device@1`:未配置
+  `ARKDECK_HDC_PATH` 时**结构化拒绝并仍产出 receipt**
+  (`executor: "agent"`、`terminalState: "adoptRefused"`、
+  `authorityReference: "default-read-only-policy"`、catalog digest 在位),
+  退出码 1。自测中发现首版在该路径上直接抛错、不出 receipt——与
+  ADR-0008"receipt 是运行载体"相悖,已修。
+- `capability list/install/revoke`、`job submit --request-file`、
+  `artifact list` 均对真 daemon 实跑通过(见窗口计划 §6)。
+
 ## AC 结论
 
+- `DHA-AGENT-001` PASS(Agent 经 typed daemon API 完成 adopt→submit→
+  artifact 查询;receipt 记录 executor=agent/authority/job/binding;
+  unauthorized → 可恢复 trustDevice,多候选 → selectTarget,均不猜;
+  行为测试证明只调用已发布 runtime 方法、零 capability 管理;一次
+  invocation 恰一个 job)
 - `DHA-ART-001` PASS(元数据完整;仅 ID 访问;恶意名与畸形 jobID 均不
   落盘外;导出拒覆盖并清洗名;sensitive 需 opt-in;脱敏留痕;quota
   拒新不毁旧;GC 跳过 active/pinned;索引重开后仍在)
-- `DHA-CAP-001` PASS(无 trace 请求 → trace 记 missing 且 summary 逐项
-  标注;trace 失败 → 降级为 missing 且 required 产物照常发布;required
-  产物失败 → 整体不 succeeded)
+- `DHA-CAP-001` PASS(**effective effect**:选 trace → E1 且缺 capability
+  零 dispatch,不选 trace → E0 免 capability;无 trace 请求 → trace 记
+  missing 且 summary 逐项标注;trace 失败 → 降级为 missing 且 required
+  产物照常发布;required 产物失败 → 整体不 succeeded)
 - `DHA-HAP-001` PASS(双 readback 齐全才 succeeded;install 干净退出但
   readback 为空 → 失败且**不启动应用**;start 干净退出但无进程 → 失败;
   无 capability → 零 dispatch;跨 operation scope → 拒绝;整个 recipe

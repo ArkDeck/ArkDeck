@@ -68,6 +68,9 @@ public struct RuntimeControlPlaneHandler: Sendable {
   private let targetStore: RuntimeTargetStore?
   private let bootstrap: DeviceBootstrapMachine?
   private let artifactStore: RuntimeArtifactStore?
+  /// Test seam: records which methods a client invoked. Production passes
+  /// nil, so this cannot affect behaviour.
+  private let methodObserver: (@Sendable (String) -> Void)?
 
   public init(
     engine: RuntimeJobEngine,
@@ -76,7 +79,8 @@ public struct RuntimeControlPlaneHandler: Sendable {
     nowUTC: @escaping @Sendable () -> String,
     targetStore: RuntimeTargetStore? = nil,
     bootstrap: DeviceBootstrapMachine? = nil,
-    artifactStore: RuntimeArtifactStore? = nil
+    artifactStore: RuntimeArtifactStore? = nil,
+    methodObserver: (@Sendable (String) -> Void)? = nil
   ) {
     self.engine = engine
     self.capabilityStore = capabilityStore
@@ -85,6 +89,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
     self.targetStore = targetStore
     self.bootstrap = bootstrap
     self.artifactStore = artifactStore
+    self.methodObserver = methodObserver
   }
 
   public func handleLine(_ line: Data) async -> Data {
@@ -112,6 +117,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
   }
 
   private func dispatch(_ request: AgentWireProtocol.Request) async -> AgentWireProtocol.Response {
+    methodObserver?(request.method)
     switch request.method {
     case "health":
       return success(

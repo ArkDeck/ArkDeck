@@ -192,7 +192,14 @@ public actor RuntimeJobEngine {
     }
     try validateInputs(request.inputs, against: descriptor)
 
-    let effectiveEffect = descriptor.minimumEffect
+    // Authorization must reflect what this request will actually do, not
+    // the operation's floor. capture.diagnostics@1 is readOnly until the
+    // inputs select the remote-file trace and its cleanup, at which point
+    // it mutates the device and needs an E1 capability. Charging the
+    // minimum effect here would let a mutating plan through on the default
+    // read-only policy.
+    let effectiveEffect = Self.effectiveEffect(
+      descriptor: descriptor, inputs: request.inputs)
     try await authorize(request: request, descriptor: descriptor, effect: effectiveEffect)
 
     let jobID = "job-\(UUID().uuidString.lowercased())"
@@ -259,7 +266,9 @@ public actor RuntimeJobEngine {
 
     try transition(&runtime, from: .preflight, to: .running, reason: "steps-start")
 
-    let isMutation = descriptor.minimumEffect >= .deviceMutation
+    let isMutation =
+      Self.effectiveEffect(
+        descriptor: descriptor, inputs: runtime.record.request.inputs) >= .deviceMutation
     let targetID = runtime.record.request.target.targetID
     do {
       if isMutation {
@@ -386,6 +395,44 @@ public actor RuntimeJobEngine {
     }
   }
 
+  /// The effect this request will actually reach: the maximum effect over
+  /// the steps its inputs select. Optional steps that will not run do not
+  /// raise the bar, and steps that will run cannot duck under it.
+  static func effectiveEffect(
+    descriptor: CatalogOperationDescriptor, inputs: [String: JSONValue]
+  ) -> WorkflowEffect {
+    var effect = descriptor.minimumEffect
+    for step in descriptor.steps {
+      if step.isOptional && !optionalStepIsSelected(step, descriptor: descriptor, inputs: inputs) {
+        continue
+      }
+      if step.effect > effect { effect = step.effect }
+    }
+    return effect
+  }
+
+  /// Pure selection rule, shared by authorization (before a job exists)
+  /// and execution (after it does), so the two can never disagree about
+  /// which steps count.
+  static func optionalStepIsSelected(
+    _ step: CatalogStepDescriptor,
+    descriptor: CatalogOperationDescriptor,
+    inputs: [String: JSONValue]
+  ) -> Bool {
+    switch step.stepID {
+    case "capture-trace", "receive-trace-artifact", "cleanup-remote-temp":
+      if case .array(let categories)? = inputs["traceCategories"] {
+        return !categories.isEmpty
+      }
+      return false
+    case "capture-ui-dump":
+      if case .bool(let enabled)? = inputs["uiDump"] { return enabled }
+      return true  // the catalog default
+    default:
+      return true
+    }
+  }
+
   /// Steps whose success is decided by a paired readback rather than by
   /// their own result. The readback step is required, so nothing here can
   /// let an unverified mutation pass as success - it only moves the
@@ -420,18 +467,7 @@ public actor RuntimeJobEngine {
       return false
     }
     let inputs = jobs[jobID]?.record.request.inputs ?? [:]
-    switch step.stepID {
-    case "capture-trace", "receive-trace-artifact", "cleanup-remote-temp":
-      if case .array(let categories)? = inputs["traceCategories"] {
-        return !categories.isEmpty
-      }
-      return false
-    case "capture-ui-dump":
-      if case .bool(let enabled)? = inputs["uiDump"] { return enabled }
-      return true  // the catalog default
-    default:
-      return true
-    }
+    return Self.optionalStepIsSelected(step, descriptor: descriptor, inputs: inputs)
   }
 
   /// Which optional step depends on which. Kept explicit rather than

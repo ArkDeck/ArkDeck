@@ -1,8 +1,13 @@
 # TASK-DHA-001 设备窗口计划(DHA-HW-001 / DHA-HW-002)
 
 > **本文件不是授权载体。** 窗口安排属 D2 决策;`DHA-HW-002` 另需维护者
-> 经 merged PR 签发的 E1 capability(见 §3)。Agent 零设备命令、零
-> capability 签发:以下命令全部由维护者亲手执行并贴回 transcript。
+> 经 merged PR 签发的 E1 capability(见 §3)。
+>
+> **执行模型(#785 修订)**:host Runtime 调用由 **Device Runtime Agent**
+> 执行(`arkdeck agent run`),不再由维护者逐条复制命令。维护者只需
+> ①启动 daemon、②签发/安装 E1 capability、③在 Agent 报出
+> `humanAction` 时完成设备屏幕信任、歧义选择或物理拔插。**人工代跑
+> host CLI 不满足 `DHA-HW-*`**;若环境没有可用 Agent,AC 保持 blocked。
 
 ## 1. 前置
 
@@ -19,20 +24,16 @@
 
 daemon 启动同 MU-3 窗口(`ARKDECK_HDC_PATH` + `--state-dir ~/adw4`)。
 
-```bash
-"$BIN/arkdeck" job submit --socket "$HOME/adw4/agentd.sock" \
-  --target "<targetId>" --operation "capture.diagnostics@1" --wait --json
-```
-
-需要非默认 duration/filter/trace 时,用 Agent 事先起草的请求文件:
+由 Agent 执行(维护者只启动 daemon):
 
 ```bash
-"$BIN/arkdeck" job submit --socket "$HOME/adw4/agentd.sock" \
-  --request-file <capture-request.json> --wait --json
+"$BIN/arkdeck" agent run --socket "$HOME/adw4/agentd.sock" \
+  --operation "capture.diagnostics@1" --json
 ```
 
-(`--request-file` 已随本 change 交付并 host 自测:请求原样透传给
-daemon,校验仍在 daemon 侧。)
+**不要传 `--inputs-file` 带 traceCategories**:那会把 plan 升为 E1 并
+要求 capability,不属于 `DHA-HW-001` 的 E0 面(remote-file trace 的真机
+执行须另持 E1 capability,不得混入 E0 证据)。
 
 预期:`state: succeeded`;随后
 
@@ -74,12 +75,16 @@ timeline 应含 `artifact hilog.txt -> ART-…`;若 trace 未请求,
 
 ## 4. DHA-HW-002(E1 调试)
 
+由 Agent 执行,引用维护者已安装的 capability:
+
 ```bash
-"$BIN/arkdeck" job submit --socket "$HOME/adw4/agentd.sock" \
-  --target "<targetId>" --operation "debug.hap@1" --wait --json
+"$BIN/arkdeck" agent run --socket "$HOME/adw4/agentd.sock" \
+  --operation "debug.hap@1" --capability CAP-RT-DAYU200-HAP-001 \
+  --inputs-file <hap-inputs.json> --json
 ```
 
-预期 timeline 关键点(缺任一即不通过):
+receipt 应记 `executor: "agent"`、`authorityReference` 为该 capability ID;
+job timeline 关键点(缺任一即不通过):
 
 - `dispatched install-hap; awaiting readback`
 - `verified package-readback ["bundleName", "installed"]`

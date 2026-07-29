@@ -85,6 +85,88 @@ enum RuntimeCLI {
     }
   }
 
+  /// `arkdeck agent run` - the Device Runtime Agent entry point. One
+  /// invocation, one published operation, a receipt at the end. The agent
+  /// drives the runtime itself instead of a person pasting host commands.
+  static func runAgent(_ arguments: [String]) throws {
+    guard arguments.first == "run" else {
+      throw CLIError(exitCode: EX_USAGE, message: "usage: arkdeck agent run --operation <id@v>")
+    }
+    var rest = Array(arguments.dropFirst())
+    let json = rest.contains("--json")
+    let client = client(&rest)
+    guard let operationIndex = rest.firstIndex(of: "--operation"),
+      operationIndex + 1 < rest.count
+    else {
+      throw CLIError(exitCode: EX_USAGE, message: "agent run requires --operation <id@version>")
+    }
+    let parts = rest[operationIndex + 1].split(separator: "@")
+    guard parts.count == 2, let version = Int(parts[1]) else {
+      throw CLIError(exitCode: EX_USAGE, message: "operation must be <id>@<version>")
+    }
+    var inputs: [String: JSONValue] = [:]
+    if let index = rest.firstIndex(of: "--inputs-file"), index + 1 < rest.count {
+      let url = URL(fileURLWithPath: rest[index + 1])
+      guard let data = try? Data(contentsOf: url),
+        let decoded = try? JSONDecoder().decode([String: JSONValue].self, from: data)
+      else {
+        throw CLIError(exitCode: EX_USAGE, message: "cannot read typed inputs from \(url.path)")
+      }
+      inputs = decoded
+    }
+    var capability: String?
+    if let index = rest.firstIndex(of: "--capability"), index + 1 < rest.count {
+      capability = rest[index + 1]
+    }
+    var target: String?
+    if let index = rest.firstIndex(of: "--target"), index + 1 < rest.count {
+      target = rest[index + 1]
+    }
+
+    let executor = AgentRuntimeExecutor(client: client, nowUTC: RuntimeCLI.utcNow)
+    let outcome = try executor.run(
+      RuntimeAgentExecutionRequest(
+        operationID: String(parts[0]), operationVersion: version, inputs: inputs,
+        capabilityReference: capability, targetID: target))
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys, .prettyPrinted, .withoutEscapingSlashes]
+
+    switch outcome {
+    case .completed(let receipt):
+      if json, let data = try? encoder.encode(receipt),
+        let text = String(data: data, encoding: .utf8)
+      {
+        print(text)
+      } else {
+        print("completed \(receipt.operationReference) job=\(receipt.jobID ?? "-")")
+      }
+    case .awaitingHumanAction(let action, let receipt):
+      if json, let data = try? encoder.encode(receipt),
+        let text = String(data: data, encoding: .utf8)
+      {
+        print(text)
+      }
+      FileHandle.standardError.write(
+        Data("human action required (\(action.kind.rawValue)): \(action.prompt)\n".utf8))
+      throw CLIError(exitCode: 75, message: "paused for physical assistance; re-run to resume")
+    case .failed(let reason, let receipt):
+      if json, let data = try? encoder.encode(receipt),
+        let text = String(data: data, encoding: .utf8)
+      {
+        print(text)
+      }
+      throw CLIError(exitCode: 1, message: reason)
+    }
+  }
+
+  static func utcNow() -> String {
+    let formatter = DateFormatter()
+    formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss'Z'"
+    formatter.timeZone = TimeZone(identifier: "UTC")
+    formatter.locale = Locale(identifier: "en_US_POSIX")
+    return formatter.string(from: Date())
+  }
+
   static func runCapability(_ arguments: [String]) throws {
     guard let subcommand = arguments.first else {
       throw CLIError(
