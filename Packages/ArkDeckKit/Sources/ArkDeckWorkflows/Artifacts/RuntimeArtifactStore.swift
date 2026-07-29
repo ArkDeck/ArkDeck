@@ -24,6 +24,7 @@ public enum RuntimeArtifactError: Error, Equatable, Sendable {
   case quotaExceeded(requestedBytes: Int, remainingBytes: Int)
   case sensitiveAccessRequiresOptIn(String)
   case exportDestinationRejected(String)
+  case evidenceVerificationFailed(String)
 }
 
 public enum ArtifactStatus: Sendable, Equatable, Codable {
@@ -80,6 +81,37 @@ public struct RuntimeArtifactMetadata: Sendable, Equatable, Codable {
   public let retention: ArtifactRetention
   public let status: ArtifactStatus
   public let redactionApplied: Bool
+}
+
+public struct RuntimeVerifiedArtifactEvidence: Sendable, Equatable, Codable {
+  public let reference: String
+  public let sha256: String
+  public let jobID: String
+  public let targetID: String
+  public let bindingRevision: Int?
+  public let stableIdentitySHA256: String?
+  public let providerID: String
+  public let byteCount: Int
+
+  public init(
+    reference: String,
+    sha256: String,
+    jobID: String,
+    targetID: String,
+    bindingRevision: Int?,
+    stableIdentitySHA256: String?,
+    providerID: String,
+    byteCount: Int
+  ) {
+    self.reference = reference
+    self.sha256 = sha256
+    self.jobID = jobID
+    self.targetID = targetID
+    self.bindingRevision = bindingRevision
+    self.stableIdentitySHA256 = stableIdentitySHA256
+    self.providerID = providerID
+    self.byteCount = byteCount
+  }
 }
 
 private struct ArtifactIndexDocument: Codable, Equatable {
@@ -275,6 +307,51 @@ public actor RuntimeArtifactStore {
       throw RuntimeArtifactError.artifactNotFound(artifactID)
     }
     return match
+  }
+
+  /// Re-hashes the immutable bytes immediately before evidence projection.
+  /// Metadata alone is not sufficient: missing, truncated, moved or
+  /// changed bytes fail the whole evidence query closed.
+  public func verifiedEvidenceArtifacts(
+    jobID: String
+  ) throws -> [RuntimeVerifiedArtifactEvidence] {
+    let artifacts = try loadIndex(jobID: jobID).artifacts
+    guard !artifacts.isEmpty else {
+      throw RuntimeArtifactError.evidenceVerificationFailed(
+        "job \(jobID) has no published artifact metadata")
+    }
+    return try artifacts.map { metadata in
+      guard metadata.status.isPublished else {
+        throw RuntimeArtifactError.evidenceVerificationFailed(
+          "artifact \(metadata.artifactID) is not published")
+      }
+      let url = try directory(for: jobID).appendingPathComponent(metadata.artifactID)
+      guard FileManager.default.fileExists(atPath: url.path) else {
+        throw RuntimeArtifactError.evidenceVerificationFailed(
+          "artifact \(metadata.artifactID) bytes are missing")
+      }
+      let bytes: Data
+      do {
+        bytes = try Data(contentsOf: url)
+      } catch {
+        throw RuntimeArtifactError.evidenceVerificationFailed(
+          "artifact \(metadata.artifactID) bytes cannot be read")
+      }
+      let digest = SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
+      guard digest == metadata.sha256, bytes.count == metadata.byteCount else {
+        throw RuntimeArtifactError.evidenceVerificationFailed(
+          "artifact \(metadata.artifactID) bytes/hash metadata mismatch")
+      }
+      return RuntimeVerifiedArtifactEvidence(
+        reference: "arkdeck-artifact://\(jobID)/\(metadata.artifactID)",
+        sha256: digest,
+        jobID: metadata.jobID,
+        targetID: metadata.bindingSnapshot.targetID,
+        bindingRevision: metadata.bindingSnapshot.bindingRevision,
+        stableIdentitySHA256: metadata.bindingSnapshot.stableIdentitySHA256,
+        providerID: metadata.providerID,
+        byteCount: bytes.count)
+    }
   }
 
   public func read(

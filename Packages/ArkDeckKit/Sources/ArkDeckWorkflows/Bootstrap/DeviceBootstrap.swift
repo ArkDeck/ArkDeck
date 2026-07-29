@@ -79,6 +79,22 @@ public struct RuntimeTargetRecord: Sendable, Equatable, Codable {
   public let connectKey: String
   public let toolVersion: String
   public let adoptedAtUTC: String
+
+  public init(
+    targetID: String,
+    stablePhysicalIdentitySHA256: String,
+    bindingRevision: Int,
+    connectKey: String,
+    toolVersion: String,
+    adoptedAtUTC: String
+  ) {
+    self.targetID = targetID
+    self.stablePhysicalIdentitySHA256 = stablePhysicalIdentitySHA256
+    self.bindingRevision = bindingRevision
+    self.connectKey = connectKey
+    self.toolVersion = toolVersion
+    self.adoptedAtUTC = adoptedAtUTC
+  }
 }
 
 private struct TargetStoreDocument: Codable, Equatable {

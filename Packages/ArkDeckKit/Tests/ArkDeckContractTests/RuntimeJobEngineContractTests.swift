@@ -23,8 +23,13 @@ final class RuntimeJobEngineContractTests: XCTestCase {
       ProviderFacts(
         providerID: "hdc", toolVersion: "3.2.0f",
         toolSHA256: String(repeating: "a", count: 64), serverFacts: [:],
-        deviceIdentitySHA256: nil, deviceMode: nil, buildFingerprint: nil,
-        profileID: "openharmony-standard@1", collectedAtUTC: "2026-07-29T00:00:00Z")
+        targetID: targetID, bindingRevision: 7,
+        deviceIdentitySHA256: "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+        executionConnectKey: String(repeating: "a", count: 32),
+        deviceModel: nil, deviceMode: "hdc",
+        buildFingerprint: nil, transport: nil,
+        profileID: "openharmony-standard@1", collectedAtUTC: "2026-07-29T00:00:00Z",
+        sourceObservedAtUTC: "2026-07-29T00:00:00Z")
     }
   }
 
@@ -59,7 +64,17 @@ final class RuntimeJobEngineContractTests: XCTestCase {
           stderr: Data(), stdoutTruncated: false, durationSeconds: 0.01)
       case (_, .hdc(.observeDevice)), (_, .hdc(.listDeviceCandidates)):
         return ProviderProcessReceipt(
-          exitStatus: 0, stdout: Data("[Empty]\n".utf8), stderr: Data(),
+          exitStatus: 0,
+          stdout: Data(
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\t\tUSB\tConnected\tlocalhost\n".utf8),
+          stderr: Data(), stdoutTruncated: false, durationSeconds: 0.01)
+      case (_, .hdc(.queryProperty(.productModel))):
+        return ProviderProcessReceipt(
+          exitStatus: 0, stdout: Data("DAYU200\n".utf8), stderr: Data(),
+          stdoutTruncated: false, durationSeconds: 0.01)
+      case (_, .hdc(.queryProperty(.fullBuildVersion))):
+        return ProviderProcessReceipt(
+          exitStatus: 0, stdout: Data("OpenHarmony-4.1-release\n".utf8), stderr: Data(),
           stdoutTruncated: false, durationSeconds: 0.01)
       default:
         throw RuntimeDispatchFailure.failed("unscripted action")
@@ -93,7 +108,7 @@ final class RuntimeJobEngineContractTests: XCTestCase {
         "schemaVersion": "2.0.0",
         "requestId": "\(requestID)",
         "idempotencyKey": "\(idempotencyKey)",
-        "target": { "targetId": "TGT-DAYU200-01" },
+        "target": { "targetId": "TGT-DAYU200-01", "expectedBindingRevision": 7 },
         "operation": { "id": "observe.device", "version": 1 }
       }
       """.utf8)
@@ -109,13 +124,23 @@ final class RuntimeJobEngineContractTests: XCTestCase {
     let status = try await engine.run(jobID: acceptance.jobID)
     XCTAssertEqual(status.state, "succeeded")
     XCTAssertFalse(status.outcomeUnknown)
-    XCTAssertEqual(dispatcher.dispatchCount, 3, "three provider-dispatched probe steps")
+    XCTAssertEqual(dispatcher.dispatchCount, 5, "three evidence preflight steps are dispatched")
     XCTAssertTrue(status.timeline.contains("jobCreated"))
     XCTAssertTrue(status.timeline.contains("queued->preflight"))
     XCTAssertTrue(status.timeline.contains("intent probe-host-tool"))
-    XCTAssertTrue(status.timeline.contains { $0.hasPrefix("verified probe-device") })
+    XCTAssertTrue(status.timeline.contains { $0.hasPrefix("verified confirm-evidence-target") })
     XCTAssertTrue(status.timeline.contains("running->finalizing"))
     XCTAssertTrue(status.timeline.contains("finalizing->succeeded"))
+    let evidence = try await engine.evidenceSnapshot(jobID: acceptance.jobID)
+    XCTAssertEqual(evidence.actualEffect, "readOnly")
+    XCTAssertEqual(evidence.authority?.kind, .defaultReadOnlyPolicy)
+    XCTAssertEqual(evidence.authority?.reference, "default-read-only-policy")
+    XCTAssertEqual(evidence.observation?.bindingRevision, 7)
+    XCTAssertEqual(evidence.observation?.model, "DAYU200")
+    XCTAssertEqual(evidence.observation?.firmware, "OpenHarmony-4.1-release")
+    XCTAssertTrue(evidence.actualStepKinds.contains("probeDevice"))
+    XCTAssertNotNil(evidence.startedAtUTC)
+    XCTAssertNotNil(evidence.finishedAtUTC)
     // The journal itself carries the intents: replay sees a clean history.
     let journalURL = stateDirectory
       .appendingPathComponent("jobs/\(acceptance.jobID)/journal.jsonl")

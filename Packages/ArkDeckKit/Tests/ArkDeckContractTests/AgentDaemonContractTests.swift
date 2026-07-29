@@ -28,7 +28,11 @@ final class AgentDaemonContractTests: XCTestCase {
       ProviderFacts(
         providerID: "hdc", toolVersion: "3.2.0f",
         toolSHA256: String(repeating: "a", count: 64), serverFacts: [:],
-        deviceIdentitySHA256: nil, deviceMode: nil, buildFingerprint: nil,
+        targetID: targetID, bindingRevision: 7,
+        deviceIdentitySHA256:
+          "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+        executionConnectKey: "150100424a544e4600",
+        deviceMode: nil, buildFingerprint: nil,
         profileID: "openharmony-standard@1", collectedAtUTC: "2026-07-29T00:00:00Z")
     }
   }
@@ -47,10 +51,21 @@ final class AgentDaemonContractTests: XCTestCase {
           exitStatus: 0,
           stdout: Data("Client version:Ver: 3.2.0f, server version:Ver: 3.2.0f\n".utf8),
           stderr: Data(), stdoutTruncated: false, durationSeconds: 0.01)
-      default:
+      case .hdc(.observeDevice), .hdc(.listDeviceCandidates):
         return ProviderProcessReceipt(
-          exitStatus: 0, stdout: Data("[Empty]\n".utf8), stderr: Data(),
+          exitStatus: 0,
+          stdout: Data("150100424a544e4600\t\tUSB\tConnected\tlocalhost\n".utf8),
+          stderr: Data(), stdoutTruncated: false, durationSeconds: 0.01)
+      case .hdc(.queryProperty(.productModel)):
+        return ProviderProcessReceipt(
+          exitStatus: 0, stdout: Data("DAYU200\n".utf8), stderr: Data(),
           stdoutTruncated: false, durationSeconds: 0.01)
+      case .hdc(.queryProperty(.fullBuildVersion)):
+        return ProviderProcessReceipt(
+          exitStatus: 0, stdout: Data("OpenHarmony-4.1-release\n".utf8), stderr: Data(),
+          stdoutTruncated: false, durationSeconds: 0.01)
+      default:
+        throw RuntimeDispatchFailure.failed("unexpected action")
       }
     }
   }
@@ -325,7 +340,7 @@ final class AgentDaemonContractTests: XCTestCase {
     let request = """
       {"documentType":"runtime-operation-request","schemaVersion":"2.0.0",\
       "requestId":"req-restart","idempotencyKey":"idem-restart-01",\
-      "target":{"targetId":"TGT-RESTART-01"},\
+      "target":{"targetId":"TGT-RESTART-01","expectedBindingRevision":7},\
       "operation":{"id":"observe.device","version":1}}
       """
     guard

@@ -78,37 +78,65 @@ public enum TypedProviderAction: Sendable, Equatable {
 
 // MARK: - Facts, plans, receipts, outcomes
 
-public struct ProviderFacts: Sendable, Equatable, Codable {
+public struct ProviderFacts: Sendable, Equatable {
   public let providerID: String
   public let toolVersion: String
   public let toolSHA256: String
   public let serverFacts: [String: String]
+  /// Correlation fields are optional for compatibility with pre-V3 fact
+  /// producers. Hardware evidence treats every absent field as
+  /// incomplete; the runtime never fills one from a target ID or caller
+  /// input.
+  public let targetID: String?
+  public let bindingRevision: Int?
   public let deviceIdentitySHA256: String?
+  /// Private execution routing material. This type is deliberately not
+  /// Codable so a raw device key cannot leak into a job record, receipt or
+  /// evidence artifact by accidental serialization.
+  public let executionConnectKey: String?
+  public let deviceModel: String?
   public let deviceMode: String?
   public let buildFingerprint: String?
+  public let transport: String?
   public let profileID: String
   public let collectedAtUTC: String
+  /// Time at which the device facts themselves were read. This is
+  /// deliberately separate from `collectedAtUTC`: reopening a cached
+  /// target record "now" must not make an old observation fresh.
+  public let sourceObservedAtUTC: String?
 
   public init(
     providerID: String,
     toolVersion: String,
     toolSHA256: String,
     serverFacts: [String: String],
+    targetID: String? = nil,
+    bindingRevision: Int? = nil,
     deviceIdentitySHA256: String?,
+    executionConnectKey: String? = nil,
+    deviceModel: String? = nil,
     deviceMode: String?,
     buildFingerprint: String?,
+    transport: String? = nil,
     profileID: String,
-    collectedAtUTC: String
+    collectedAtUTC: String,
+    sourceObservedAtUTC: String? = nil
   ) {
     self.providerID = providerID
     self.toolVersion = toolVersion
     self.toolSHA256 = toolSHA256
     self.serverFacts = serverFacts
+    self.targetID = targetID
+    self.bindingRevision = bindingRevision
     self.deviceIdentitySHA256 = deviceIdentitySHA256
+    self.executionConnectKey = executionConnectKey
+    self.deviceModel = deviceModel
     self.deviceMode = deviceMode
     self.buildFingerprint = buildFingerprint
+    self.transport = transport
     self.profileID = profileID
     self.collectedAtUTC = collectedAtUTC
+    self.sourceObservedAtUTC = sourceObservedAtUTC
   }
 }
 
@@ -178,15 +206,33 @@ public struct ProviderExecutionContext: Sendable, Equatable {
   public let stepID: String
   public let targetID: String
   public let bindingRevision: Int?
+  /// Provider-private routing and correlation facts resolved from the
+  /// adopted target. They never originate in request inputs.
+  public let connectKey: String?
+  public let expectedIdentitySHA256: String?
+  public let toolVersion: String?
+  public let toolSHA256: String?
   public let nowUTC: String
 
   public init(
-    jobID: String, stepID: String, targetID: String, bindingRevision: Int?, nowUTC: String
+    jobID: String,
+    stepID: String,
+    targetID: String,
+    bindingRevision: Int?,
+    connectKey: String? = nil,
+    expectedIdentitySHA256: String? = nil,
+    toolVersion: String? = nil,
+    toolSHA256: String? = nil,
+    nowUTC: String
   ) {
     self.jobID = jobID
     self.stepID = stepID
     self.targetID = targetID
     self.bindingRevision = bindingRevision
+    self.connectKey = connectKey
+    self.expectedIdentitySHA256 = expectedIdentitySHA256
+    self.toolVersion = toolVersion
+    self.toolSHA256 = toolSHA256
     self.nowUTC = nowUTC
   }
 }
@@ -257,6 +303,15 @@ public struct DeviceProviderRegistry: Sendable {
 
   public func provider(id: String) -> (any DeviceProvider)? {
     providers[id]
+  }
+
+  public func resolveFacts(
+    providerID: String, targetID: String
+  ) async throws -> ProviderFacts {
+    guard let provider = providers[providerID] else {
+      throw DeviceProviderError.factsUnavailable("provider \(providerID) is not registered")
+    }
+    return try await provider.resolveFacts(targetID: targetID)
   }
 
   public var registeredProviderIDs: [String] {

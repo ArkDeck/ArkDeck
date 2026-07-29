@@ -32,6 +32,10 @@ final class DeviceProviderContractTests: XCTestCase {
   private var context: ProviderExecutionContext {
     ProviderExecutionContext(
       jobID: "job-1", stepID: "step-1", targetID: "TGT-1", bindingRevision: 1,
+      connectKey: "150100424a544e4600",
+      expectedIdentitySHA256:
+        "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+      toolVersion: "3.2.0f", toolSHA256: String(repeating: "a", count: 64),
       nowUTC: "2026-07-29T00:00:00Z")
   }
 
@@ -192,6 +196,68 @@ final class DeviceProviderContractTests: XCTestCase {
       try hdc.lower(
         action: .rockchip(.executeFlashPlan(authorizationID: "A")), context: context))
   }
+
+  func testEvidencePropertyReadsUseExactDescriptorBoundTarget() throws {
+    let model = try hdc.lower(
+      action: .hdc(.queryProperty(.productModel)), context: context)
+    let firmware = try hdc.lower(
+      action: .hdc(.queryProperty(.fullBuildVersion)), context: context)
+    guard case .process(_, let modelArgv, _) = model.kind,
+      case .process(_, let firmwareArgv, _) = firmware.kind
+    else {
+      return XCTFail("property reads must lower to descriptor-bound process plans")
+    }
+    XCTAssertEqual(
+      modelArgv,
+      ["-t", "150100424a544e4600", "shell", "param", "get", "const.product.model"])
+    XCTAssertEqual(
+      firmwareArgv,
+      ["-t", "150100424a544e4600", "shell", "param", "get", "const.ohos.fullname"])
+    let missingTarget = ProviderExecutionContext(
+      jobID: "job-1", stepID: "read-evidence-model", targetID: "TGT-1",
+      bindingRevision: 1, nowUTC: "2026-07-29T00:00:00Z")
+    XCTAssertThrowsError(
+      try hdc.lower(action: .hdc(.queryProperty(.productModel)), context: missingTarget))
+  }
+
+  func testExactTargetConfirmationRejectsZeroMultipleAndUnknownRows() throws {
+    func receipt(_ rows: String) -> ProviderProcessReceipt {
+      ProviderProcessReceipt(
+        exitStatus: 0, stdout: Data(rows.utf8), stderr: Data(),
+        stdoutTruncated: false, durationSeconds: 0.1)
+    }
+    let action = TypedProviderAction.hdc(.observeDevice(connectKey: "resolved-by-binding"))
+    guard case .verified(let summary) = try hdc.verify(
+      receipt: receipt("150100424a544e4600\t\tUSB\tConnected\tlocalhost\n"),
+      action: action, context: context)
+    else {
+      return XCTFail("the one exact registered target row must verify")
+    }
+    XCTAssertEqual(summary["transport"], "usb")
+    XCTAssertEqual(
+      summary["deviceIdentitySHA256"],
+      "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1")
+    XCTAssertNil(summary["connectKeys"], "runtime target confirmation must not expose raw keys")
+
+    guard case .failed(let zeroCode, _) = try hdc.verify(
+      receipt: receipt("different\t\tUSB\tConnected\tlocalhost\n"),
+      action: action, context: context)
+    else { return XCTFail("zero exact matches must fail") }
+    XCTAssertEqual(zeroCode, "targetConfirmationMismatch")
+
+    let duplicate =
+      "150100424a544e4600\t\tUSB\tConnected\tlocalhost\n"
+      + "150100424a544e4600\t\tUSB\tConnected\tlocalhost\n"
+    guard case .failed(let duplicateCode, _) = try hdc.verify(
+      receipt: receipt(duplicate), action: action, context: context)
+    else { return XCTFail("multiple exact matches must fail") }
+    XCTAssertEqual(duplicateCode, "targetConfirmationMismatch")
+
+    guard case .unknown = try hdc.verify(
+      receipt: receipt("150100424a544e4600\t\tBLUETOOTH\tConnected\tlocalhost\n"),
+      action: action, context: context)
+    else { return XCTFail("an unregistered transport row must fail closed") }
+  }
 }
 
 final class HDCCompatibilityProfileTests: XCTestCase {
@@ -295,12 +361,20 @@ final class HDCCompatibilityProfileTests: XCTestCase {
         truncated: false),
       .parsed(HDCParsedTargetList(targets: [])))
     let listed = HDCObservationSemanticParser.parseTargetList(
-      stdout: Data("150100424a544e4600\tConnected\n".utf8), profile: profile,
+      stdout: Data("150100424a544e4600\t\tUSB\tConnected\tlocalhost\n".utf8), profile: profile,
       toolVersion: "3.2.0f", truncated: false)
     guard case .parsed(let list) = listed, list.targets.count == 1 else {
       return XCTFail("one target line must parse, got \(listed)")
     }
     XCTAssertEqual(list.targets[0].state, "Connected")
+    XCTAssertEqual(list.targets[0].transport, "usb")
+    if case .malformed = HDCObservationSemanticParser.parseTargetList(
+      stdout: Data("150100424a544e4600\tConnected\n".utf8), profile: profile,
+      toolVersion: "3.2.0f", truncated: false)
+    {
+    } else {
+      XCTFail("the legacy two-column guess must no longer parse")
+    }
     XCTAssertEqual(
       HDCObservationSemanticParser.parseTargetList(
         stdout: Data("[Empty]\n".utf8), profile: profile, toolVersion: "9.9.9z",

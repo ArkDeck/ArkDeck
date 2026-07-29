@@ -43,13 +43,37 @@
       "compensation": "none"
     },
     {
-      "stepID": "probe-device",
+      "stepID": "confirm-evidence-target",
       "kind": "probeDevice",
       "effect": "readOnly",
       "cancellation": "immediate",
       "binding": "confirmedDevice",
       "compensation": "none",
       "notes": "Verifies durable binding identity against currently observed device facts; identity drift fails closed."
+    },
+    {
+      "stepID": "read-evidence-model",
+      "kind": "runApprovedRemoteRead",
+      "actionRef": {
+        "catalogId": "arkdeck-remote-operations",
+        "actionId": "deviceModel"
+      },
+      "effect": "readOnly",
+      "cancellation": "immediate",
+      "binding": "confirmedDevice",
+      "compensation": "none"
+    },
+    {
+      "stepID": "read-evidence-firmware",
+      "kind": "runApprovedRemoteRead",
+      "actionRef": {
+        "catalogId": "arkdeck-remote-operations",
+        "actionId": "firmwareBuild"
+      },
+      "effect": "readOnly",
+      "cancellation": "immediate",
+      "binding": "confirmedDevice",
+      "compensation": "none"
     },
     {
       "stepID": "finalize-session",

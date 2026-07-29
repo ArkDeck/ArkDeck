@@ -29,11 +29,17 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
   private struct FactsPort: HDCObservationFactsPort {
     let store: RuntimeTargetStore
     func currentFacts(targetID: String) async throws -> ProviderFacts {
-      ProviderFacts(
+      let target = try store.find(targetID: targetID)
+      return ProviderFacts(
         providerID: "hdc", toolVersion: "3.2.0f",
         toolSHA256: String(repeating: "a", count: 64), serverFacts: [:],
-        deviceIdentitySHA256: nil, deviceMode: "hdc", buildFingerprint: nil,
-        profileID: "openharmony-standard@1", collectedAtUTC: "2026-07-29T00:00:00Z")
+        targetID: target?.targetID, bindingRevision: target?.bindingRevision,
+        deviceIdentitySHA256: target?.stablePhysicalIdentitySHA256,
+        executionConnectKey: target?.connectKey,
+        deviceModel: nil, deviceMode: "hdc",
+        buildFingerprint: nil, transport: nil,
+        profileID: "openharmony-standard@1", collectedAtUTC: "2026-07-29T00:00:00Z",
+        sourceObservedAtUTC: "2026-07-29T00:00:00Z")
     }
   }
 
@@ -51,7 +57,14 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
       case .observeTool: return receipt("Ver: 3.2.0f\n")
       case .observeServer:
         return receipt("Client version:Ver: 3.2.0f, server version:Ver: 3.2.0f\n")
-      default: return receipt("150100424a544e4600\t\tUSB\tConnected\tlocalhost\n")
+      case .observeDevice, .listDeviceCandidates:
+        return receipt("150100424a544e4600\t\tUSB\tConnected\tlocalhost\n")
+      case .queryProperty(.productModel):
+        return receipt("DAYU200\n")
+      case .queryProperty(.fullBuildVersion):
+        return receipt("OpenHarmony-4.1-release\n")
+      default:
+        throw RuntimeDispatchFailure.failed("unexpected action \(action)")
       }
     }
   }
@@ -122,9 +135,21 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
     XCTAssertNotNil(receipt.jobID)
     XCTAssertTrue(receipt.targetID?.hasPrefix("TGT-") == true)
     XCTAssertEqual(receipt.authorityReference, "default-read-only-policy")
+    XCTAssertEqual(receipt.actualEffect, .E0)
+    XCTAssertNotNil(receipt.evidenceObservation)
     XCTAssertFalse(receipt.catalogDigest.isEmpty)
     XCTAssertTrue(receipt.humanActions.isEmpty, "nothing physical was needed here")
     XCTAssertFalse(receipt.artifacts.isEmpty, "the run's products are referenced by ID")
+    guard case .published(let evidence) = HardwareEvidenceProjector.project(
+      receipt: receipt,
+      claims: HardwareEvidenceClaimMetadata(
+        evidenceID: "EVD-AHE-RUNNER-001",
+        acceptanceIDs: ["AC-WF-004-01"]))
+    else {
+      return XCTFail("complete daemon-owned receipt must project to V3")
+    }
+    XCTAssertEqual(evidence.runtime.jobId, receipt.jobID)
+    XCTAssertEqual(evidence.device.bindingRevision, receipt.bindingRevision)
   }
 
   func testUnauthorizedDeviceBecomesAResumableHumanActionNotAFailure() throws {
@@ -175,7 +200,7 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
     XCTAssertTrue(
       called.allSatisfy { method in
         ["health", "target.list", "target.adopt", "job.submit", "job.run", "job.status",
-          "artifact.list"].contains(method)
+          "artifact.list", "job.evidence"].contains(method)
       },
       "the agent may only use the published runtime surface: \(called)")
 

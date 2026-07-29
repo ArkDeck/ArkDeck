@@ -45,7 +45,24 @@ if let invocationLog = ProcessInfo.processInfo.environment["ARKDECK_FAKE_HDC_INV
   }
 }
 let mode: FixtureMode
-if suppliedArguments.first == "uninstall" {
+let fixtureConnectKey = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+if endpointBoundArguments
+  == ["-t", fixtureConnectKey, "shell", "param", "get", "const.product.model"]
+{
+  FileHandle.standardOutput.write(Data("DAYU200\n".utf8))
+  exit(0)
+} else if endpointBoundArguments
+  == ["-t", fixtureConnectKey, "shell", "param", "get", "const.ohos.fullname"]
+{
+  FileHandle.standardOutput.write(Data("OpenHarmony-4.1-release\n".utf8))
+  exit(0)
+} else if endpointBoundArguments.count >= 6,
+  endpointBoundArguments[0] == "-t",
+  endpointBoundArguments[2...4] == ["shell", "param", "get"]
+{
+  FileHandle.standardError.write(Data("unregistered target/property fixture invocation\n".utf8))
+  exit(23)
+} else if suppliedArguments.first == "uninstall" {
   mode = .success
 } else if suppliedArguments.first == "managed-server" {
   mode = .managedServer

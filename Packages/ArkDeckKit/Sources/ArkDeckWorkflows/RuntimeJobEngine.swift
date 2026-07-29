@@ -34,6 +34,138 @@ public struct RuntimeJobStatus: Sendable, Equatable, Codable {
   public let timeline: [String]
 }
 
+public enum RuntimeEvidenceAuthorityKind: String, Sendable, Equatable, Codable {
+  case defaultReadOnlyPolicy
+  case runtimeCapability
+  case standingAuthorization
+}
+
+/// The admission decision actually consumed by this job. This record is
+/// audit provenance only: reading or projecting it cannot mint an
+/// authority or reach the dispatch port.
+public struct RuntimeAdmissionEvidence: Sendable, Equatable, Codable {
+  public let kind: RuntimeEvidenceAuthorityKind
+  public let reference: String
+  public let admittedAtUTC: String
+  public let validUntilUTC: String?
+  public let consumptionFingerprintSHA256: String?
+
+  public init(
+    kind: RuntimeEvidenceAuthorityKind,
+    reference: String,
+    admittedAtUTC: String,
+    validUntilUTC: String?,
+    consumptionFingerprintSHA256: String?
+  ) {
+    self.kind = kind
+    self.reference = reference
+    self.admittedAtUTC = admittedAtUTC
+    self.validUntilUTC = validUntilUTC
+    self.consumptionFingerprintSHA256 = consumptionFingerprintSHA256
+  }
+}
+
+public struct RuntimeEvidencePreflightStep: Sendable, Equatable, Codable {
+  public let stepID: String
+  public let stepKind: String
+  public let outcomeAtUTC: String
+
+  public init(stepID: String, stepKind: String, outcomeAtUTC: String) {
+    self.stepID = stepID
+    self.stepKind = stepKind
+    self.outcomeAtUTC = outcomeAtUTC
+  }
+}
+
+/// Facts assembled only from the three independently journaled, verified
+/// typed preflight outcomes belonging to this same job.
+public struct RuntimeEvidenceObservation: Sendable, Equatable, Codable {
+  public let targetID: String?
+  public let bindingRevision: Int?
+  public let stableIdentitySHA256: String?
+  public let model: String?
+  public let firmware: String?
+  public let transport: String?
+  public let providerID: String
+  public let toolVersion: String
+  public let toolSHA256: String
+  public let confirmedAtUTC: String?
+  public let confirmationMethod: String
+  public let preflightSteps: [RuntimeEvidencePreflightStep]
+
+  public init(
+    targetID: String?,
+    bindingRevision: Int?,
+    stableIdentitySHA256: String?,
+    model: String?,
+    firmware: String?,
+    transport: String?,
+    providerID: String,
+    toolVersion: String,
+    toolSHA256: String,
+    confirmedAtUTC: String?,
+    confirmationMethod: String,
+    preflightSteps: [RuntimeEvidencePreflightStep]
+  ) {
+    self.targetID = targetID
+    self.bindingRevision = bindingRevision
+    self.stableIdentitySHA256 = stableIdentitySHA256
+    self.model = model
+    self.firmware = firmware
+    self.transport = transport
+    self.providerID = providerID
+    self.toolVersion = toolVersion
+    self.toolSHA256 = toolSHA256
+    self.confirmedAtUTC = confirmedAtUTC
+    self.confirmationMethod = confirmationMethod
+    self.preflightSteps = preflightSteps
+  }
+}
+
+/// Durable, job-local assembly state. It is never exported as evidence
+/// until all three fragments are present and correlated.
+public struct RuntimeEvidencePreflightAccumulator: Sendable, Equatable, Codable {
+  public let targetID: String
+  public let bindingRevision: Int
+  public let stableIdentitySHA256: String
+  public let providerID: String
+  public let toolVersion: String
+  public let toolSHA256: String
+  public var transport: String?
+  public var confirmedAtUTC: String?
+  public var model: String?
+  public var firmware: String?
+  public var steps: [RuntimeEvidencePreflightStep]
+
+  public var isComplete: Bool {
+    transport != nil && confirmedAtUTC != nil && model != nil && firmware != nil
+      && steps.map(\.stepID)
+        == ["confirm-evidence-target", "read-evidence-model", "read-evidence-firmware"]
+  }
+}
+
+/// Product-owned durable facts exposed through the daemon's read-only
+/// evidence query. It intentionally contains no claim metadata such as
+/// evidence ID or Acceptance IDs.
+public struct RuntimeJobEvidenceSnapshot: Sendable, Equatable, Codable {
+  public let jobID: String
+  public let operationReference: String
+  public let catalogDigest: String
+  public let targetID: String
+  public let bindingRevision: Int?
+  public let providerID: String
+  public let actualEffect: String?
+  public let authority: RuntimeAdmissionEvidence?
+  public let observation: RuntimeEvidenceObservation?
+  public let actualStepKinds: [String]
+  public let executionMode: String
+  public let terminalState: String
+  public let outcomeUnknown: Bool
+  public let startedAtUTC: String?
+  public let firstEvidenceStepAtUTC: String?
+  public let finishedAtUTC: String?
+}
+
 public struct RuntimeJobAcceptance: Sendable, Equatable {
   public let jobID: String
   public let deduplicated: Bool
@@ -200,7 +332,8 @@ public actor RuntimeJobEngine {
     // read-only policy.
     let effectiveEffect = Self.effectiveEffect(
       descriptor: descriptor, inputs: request.inputs)
-    try await authorize(request: request, descriptor: descriptor, effect: effectiveEffect)
+    let admission = try await authorize(
+      request: request, descriptor: descriptor, effect: effectiveEffect)
 
     let jobID = "job-\(UUID().uuidString.lowercased())"
     let fingerprint = Self.fingerprint(of: requestData)
@@ -230,7 +363,9 @@ public actor RuntimeJobEngine {
       operationReference: descriptor.reference,
       catalogDigest: RuntimeOperationCatalog.catalogDigest,
       providerID: descriptor.provider.rawValue,
-      createdAtUTC: timestamp)
+      createdAtUTC: timestamp,
+      actualEffect: effectiveEffect.rawValue,
+      admissionEvidence: admission)
     try journal.appendAndSynchronize(
       JournalEvent.jobCreated(
         eventID: "job-created", sequence: 0, sessionID: record.sessionID, jobID: jobID,
@@ -264,6 +399,7 @@ public actor RuntimeJobEngine {
       throw RuntimeJobEngineError.internalFailure("catalog or provider vanished for \(jobID)")
     }
 
+    runtime.record.startedAtUTC = nowUTC()
     try transition(&runtime, from: .preflight, to: .running, reason: "steps-start")
 
     let isMutation =
@@ -289,6 +425,7 @@ public actor RuntimeJobEngine {
         try transition(
           &current, from: .running, to: .waitingForRecovery, reason: "outcomeUnknown: \(reason)")
         current.record.outcomeUnknown = true
+        current.record.finishedAtUTC = nowUTC()
         try current.record.persist(
           into: jobDirectory(for: jobID))
         jobs[jobID] = current
@@ -298,6 +435,7 @@ public actor RuntimeJobEngine {
         // finalizing: a job always gets its wrap-up phase, success or not.
         try transition(&current, from: .running, to: .finalizing, reason: reason)
         try transition(&current, from: .finalizing, to: .failed, reason: reason)
+        current.record.finishedAtUTC = nowUTC()
         try current.record.persist(into: jobDirectory(for: jobID))
         jobs[jobID] = current
         return status(of: current.record)
@@ -320,6 +458,7 @@ public actor RuntimeJobEngine {
       current = jobs[jobID] ?? current
       try transition(&current, from: .finalizing, to: .succeeded, reason: "finalized")
     }
+    current.record.finishedAtUTC = nowUTC()
     try current.record.persist(into: jobDirectory(for: jobID))
     jobs[jobID] = current
     return status(of: current.record)
@@ -374,16 +513,57 @@ public actor RuntimeJobEngine {
           reason: "provider has no action for this step")
         continue
       }
+      let targetID = jobs[jobID]?.record.request.target.targetID ?? ""
+      let expectedBinding = jobs[jobID]?.record.request.target.expectedBindingRevision
+      var resolvedFacts: ProviderFacts?
+      if step.binding == .confirmedDevice {
+        do {
+          resolvedFacts = try await providers.resolveFacts(
+            providerID: descriptor.provider.rawValue, targetID: targetID)
+        } catch {
+          if Self.requiresEvidencePreflight(descriptor),
+            Self.isEvidencePreflightStep(step)
+          {
+            throw RuntimeDispatchFailure.failed(
+              "evidenceIncomplete: descriptor-bound target facts unavailable: \(error)")
+          }
+          appendTimeline(jobID: jobID, entry: "target facts unavailable: \(error)")
+        }
+      }
+      if Self.requiresEvidencePreflight(descriptor), Self.isEvidencePreflightStep(step) {
+        try Self.validateEvidenceFacts(
+          resolvedFacts, targetID: targetID, bindingRevision: expectedBinding,
+          providerID: descriptor.provider.rawValue)
+      } else if Self.requiresEvidencePreflight(descriptor),
+        step.binding == .confirmedDevice
+      {
+        try requireCompleteEvidencePreflight(jobID: jobID, beforeStepID: step.stepID)
+      }
       let context = ProviderExecutionContext(
         jobID: jobID, stepID: step.stepID,
-        targetID: jobs[jobID]?.record.request.target.targetID ?? "",
-        bindingRevision: jobs[jobID]?.record.request.target.expectedBindingRevision,
+        targetID: targetID,
+        bindingRevision: expectedBinding,
+        connectKey: resolvedFacts?.executionConnectKey,
+        expectedIdentitySHA256: resolvedFacts?.deviceIdentitySHA256,
+        toolVersion: resolvedFacts?.toolVersion,
+        toolSHA256: resolvedFacts?.toolSHA256,
         nowUTC: nowUTC())
-      let plan = try provider.lower(action: action, context: context)
+      let plan: TypedProcessPlan
+      do {
+        plan = try provider.lower(action: action, context: context)
+      } catch {
+        if Self.requiresEvidencePreflight(descriptor),
+          Self.isEvidencePreflightStep(step)
+        {
+          throw RuntimeDispatchFailure.failed(
+            "evidenceIncomplete: typed preflight could not be lowered: \(error)")
+        }
+        throw error
+      }
       do {
         try await dispatchWithWAL(
           jobID: jobID, step: step, action: action, plan: plan, provider: provider,
-          context: context, descriptor: descriptor)
+          context: context, descriptor: descriptor, evidenceFacts: resolvedFacts)
       } catch let failure as RuntimeDispatchFailure {
         // An unknown outcome always halts, optional or not: we cannot
         // continue past an effect whose result we do not know.
@@ -392,6 +572,10 @@ public actor RuntimeJobEngine {
         try await recordSkippedOptionalStep(
           jobID: jobID, step: step, descriptor: descriptor, reason: "\(failure)")
       }
+    }
+    if Self.requiresEvidencePreflight(descriptor) {
+      try requireCompleteEvidencePreflight(
+        jobID: jobID, beforeStepID: "finish-operation")
     }
   }
 
@@ -453,6 +637,66 @@ public actor RuntimeJobEngine {
     ]
   ]
 
+  static let evidenceEligibleOperations: Set<String> = [
+    "observe.device@1", "capture.diagnostics@1", "debug.hap@1",
+  ]
+
+  static func requiresEvidencePreflight(_ descriptor: CatalogOperationDescriptor) -> Bool {
+    evidenceEligibleOperations.contains(descriptor.reference)
+  }
+
+  static func isEvidencePreflightStep(_ step: CatalogStepDescriptor) -> Bool {
+    switch step.stepID {
+    case "confirm-evidence-target":
+      return step.kind == .probeDevice
+    case "read-evidence-model":
+      return step.kind == .runApprovedRemoteRead
+        && step.actionReference?.catalogID == "arkdeck-remote-operations"
+        && step.actionReference?.actionID == "deviceModel"
+    case "read-evidence-firmware":
+      return step.kind == .runApprovedRemoteRead
+        && step.actionReference?.catalogID == "arkdeck-remote-operations"
+        && step.actionReference?.actionID == "firmwareBuild"
+    default:
+      return false
+    }
+  }
+
+  private static func validateEvidenceFacts(
+    _ facts: ProviderFacts?,
+    targetID: String,
+    bindingRevision: Int?,
+    providerID: String
+  ) throws {
+    guard let facts,
+      facts.targetID == targetID,
+      let expectedBinding = bindingRevision,
+      facts.bindingRevision == expectedBinding,
+      facts.providerID == providerID,
+      let connectKey = facts.executionConnectKey,
+      !connectKey.isEmpty,
+      let identity = facts.deviceIdentitySHA256,
+      isLowercaseSHA256(identity),
+      !facts.toolVersion.isEmpty,
+      isLowercaseSHA256(facts.toolSHA256)
+    else {
+      throw RuntimeDispatchFailure.failed(
+        "evidenceIncomplete: target/binding/routing/tool facts are absent or mismatched")
+    }
+  }
+
+  private func requireCompleteEvidencePreflight(
+    jobID: String, beforeStepID: String
+  ) throws {
+    guard let record = jobs[jobID]?.record,
+      record.evidencePreflight?.isComplete == true,
+      record.evidenceObservation != nil
+    else {
+      throw RuntimeDispatchFailure.failed(
+        "evidenceIncomplete: three-step typed preflight is incomplete before \(beforeStepID)")
+    }
+  }
+
   /// Optional steps are selected by the inputs that make them meaningful -
   /// e.g. a trace capture only runs when trace categories were requested.
   private func isOptionalStepSelected(
@@ -495,10 +739,7 @@ public actor RuntimeJobEngine {
     guard let artifactStore, let runtime = jobs[jobID],
       let names = Self.artifactMapping[descriptor.reference]?[step.stepID]
     else { return }
-    let binding = ArtifactBindingSnapshot(
-      targetID: runtime.record.request.target.targetID,
-      bindingRevision: runtime.record.request.target.expectedBindingRevision,
-      stableIdentitySHA256: nil)
+    let binding = Self.artifactBindingSnapshot(for: runtime.record)
     for name in names {
       guard let declaration = descriptor.artifacts.first(where: { $0.name == name }) else {
         continue
@@ -518,7 +759,8 @@ public actor RuntimeJobEngine {
     plan: TypedProcessPlan,
     provider: any DeviceProvider,
     context: ProviderExecutionContext,
-    descriptor: CatalogOperationDescriptor
+    descriptor: CatalogOperationDescriptor,
+    evidenceFacts: ProviderFacts?
   ) async throws {
     guard var runtime = jobs[jobID] else {
       throw RuntimeJobEngineError.jobNotFound(jobID)
@@ -526,10 +768,10 @@ public actor RuntimeJobEngine {
     let workflowStep = try Self.journalStep(
       for: step, jobID: jobID, inputs: runtime.record.request.inputs)
     let intentEventID = "intent-\(step.stepID)"
-    // Journal target evidence mirrors the step's binding requirement: host
-    // steps carry no binding revision, device steps carry the placeholder
-    // binding evidence until MU-3 wires real fact resolution.
+    // Journal target evidence mirrors the descriptor-bound facts without
+    // persisting the raw connect key.
     let isDeviceBound = step.binding == .confirmedDevice
+    let journalIdentity = context.expectedIdentitySHA256 ?? String(repeating: "0", count: 64)
     let intent = try JournalEvent.stepIntent(
       eventID: intentEventID, sequence: runtime.nextSequence,
       sessionID: runtime.record.sessionID, jobID: jobID,
@@ -537,8 +779,8 @@ public actor RuntimeJobEngine {
       target: JournalTarget(
         scope: isDeviceBound ? "device" : "host",
         targetID: runtime.record.request.target.targetID,
-        connectKey: isDeviceBound ? "pending-binding" : nil,
-        identitySnapshotHash: isDeviceBound ? String(repeating: "0", count: 64) : nil),
+        connectKey: isDeviceBound ? "sha256:\(journalIdentity)" : nil,
+        identitySnapshotHash: isDeviceBound ? journalIdentity : nil),
       attempt: 1,
       bindingRevision: isDeviceBound
         ? (runtime.record.request.target.expectedBindingRevision ?? 1) : nil)
@@ -548,6 +790,17 @@ public actor RuntimeJobEngine {
     try gate.dispatch(intent: intent) { () }
     runtime.nextSequence += 1
     runtime.record.timeline.append("intent \(step.stepID)")
+    if runtime.record.actualStepKinds?.contains(step.kind.rawValue) != true {
+      var kinds = runtime.record.actualStepKinds ?? []
+      kinds.append(step.kind.rawValue)
+      runtime.record.actualStepKinds = kinds
+    }
+    if runtime.record.firstEvidenceStepAtUTC == nil,
+      step.binding == .confirmedDevice,
+      !Self.isEvidencePreflightStep(step)
+    {
+      runtime.record.firstEvidenceStepAtUTC = context.nowUTC
+    }
     jobs[jobID] = runtime
 
     let receipt: ProviderProcessReceipt
@@ -581,16 +834,21 @@ public actor RuntimeJobEngine {
     var current = jobs[jobID] ?? runtime
     switch outcome {
     case .verified(let summary):
+      let outcomeAt = nowUTC()
       try current.journal.appendAndSynchronize(
         JournalEvent.stepOutcome(
           eventID: "outcome-\(step.stepID)", sequence: current.nextSequence,
-          sessionID: current.record.sessionID, jobID: jobID, timestamp: nowUTC(),
+          sessionID: current.record.sessionID, jobID: jobID, timestamp: outcomeAt,
           stepID: step.stepID, attempt: 1,
           correlatesToIntentEventID: intentEventID,
           result: "succeeded", outcomeCertainty: .confirmed))
       current.nextSequence += 1
       current.record.timeline.append("verified \(step.stepID) \(summary.keys.sorted())")
       jobs[jobID] = current
+      try captureEvidencePreflightFragmentIfEligible(
+        jobID: jobID, step: step, action: action, summary: summary,
+        context: context, facts: evidenceFacts, outcomeAtUTC: outcomeAt,
+        descriptor: descriptor)
       try await publishDeclaredArtifacts(
         jobID: jobID, step: step, summary: summary, receipt: receipt)
     case .failed(let code, let detail):
@@ -636,6 +894,138 @@ public actor RuntimeJobEngine {
     }
   }
 
+  /// Consumes a fragment only after its successful outcome is durable.
+  /// Failure to correlate or persist any fragment fails closed before a
+  /// capture or mutation can be dispatched.
+  private func captureEvidencePreflightFragmentIfEligible(
+    jobID: String,
+    step: CatalogStepDescriptor,
+    action: TypedProviderAction,
+    summary: [String: String],
+    context: ProviderExecutionContext,
+    facts: ProviderFacts?,
+    outcomeAtUTC: String,
+    descriptor: CatalogOperationDescriptor
+  ) throws {
+    guard Self.requiresEvidencePreflight(descriptor),
+      Self.isEvidencePreflightStep(step)
+    else { return }
+    try Self.validateEvidenceFacts(
+      facts, targetID: context.targetID, bindingRevision: context.bindingRevision,
+      providerID: descriptor.provider.rawValue)
+    guard let facts,
+      let bindingRevision = facts.bindingRevision,
+      let identity = facts.deviceIdentitySHA256
+    else {
+      throw RuntimeDispatchFailure.failed(
+        "evidenceIncomplete: validated preflight facts disappeared")
+    }
+    guard var runtime = jobs[jobID] else {
+      throw RuntimeJobEngineError.jobNotFound(jobID)
+    }
+
+    var accumulator =
+      runtime.record.evidencePreflight
+      ?? RuntimeEvidencePreflightAccumulator(
+        targetID: context.targetID,
+        bindingRevision: bindingRevision,
+        stableIdentitySHA256: identity,
+        providerID: facts.providerID,
+        toolVersion: facts.toolVersion,
+        toolSHA256: facts.toolSHA256,
+        transport: nil,
+        confirmedAtUTC: nil,
+        model: nil,
+        firmware: nil,
+        steps: [])
+    guard accumulator.targetID == context.targetID,
+      accumulator.bindingRevision == bindingRevision,
+      accumulator.stableIdentitySHA256 == identity,
+      accumulator.providerID == facts.providerID,
+      accumulator.toolVersion == facts.toolVersion,
+      accumulator.toolSHA256 == facts.toolSHA256
+    else {
+      throw RuntimeDispatchFailure.failed(
+        "evidenceIncomplete: preflight fragments do not share one target/tool correlation")
+    }
+
+    let expectedStepIDs = [
+      "confirm-evidence-target", "read-evidence-model", "read-evidence-firmware",
+    ]
+    guard accumulator.steps.count < expectedStepIDs.count,
+      expectedStepIDs[accumulator.steps.count] == step.stepID
+    else {
+      throw RuntimeDispatchFailure.failed(
+        "evidenceIncomplete: preflight outcome is duplicated or out of order")
+    }
+    switch (step.stepID, action) {
+    case ("confirm-evidence-target", .hdc(.observeDevice)):
+      guard let observedIdentity = summary["deviceIdentitySHA256"],
+        observedIdentity == identity,
+        let transport = summary["transport"],
+        ["usb", "tcp", "uart"].contains(transport)
+      else {
+        throw RuntimeDispatchFailure.failed(
+          "evidenceIncomplete: target confirmation summary is incomplete or mismatched")
+      }
+      accumulator.transport = transport
+    case ("read-evidence-model", .hdc(.queryProperty(.productModel))):
+      guard let value = summary["value"], !value.isEmpty else {
+        throw RuntimeDispatchFailure.failed(
+          "evidenceIncomplete: model readback is empty")
+      }
+      accumulator.model = value
+    case ("read-evidence-firmware", .hdc(.queryProperty(.fullBuildVersion))):
+      guard let value = summary["value"], !value.isEmpty else {
+        throw RuntimeDispatchFailure.failed(
+          "evidenceIncomplete: firmware readback is empty")
+      }
+      accumulator.firmware = value
+      // The evidence confirmation becomes fresh only when the complete
+      // required prefix is durable, not when its first fragment was read.
+      accumulator.confirmedAtUTC = outcomeAtUTC
+    default:
+      throw RuntimeDispatchFailure.failed(
+        "evidenceIncomplete: preflight action does not match its catalog step")
+    }
+    accumulator.steps.append(
+      RuntimeEvidencePreflightStep(
+        stepID: step.stepID, stepKind: step.kind.rawValue, outcomeAtUTC: outcomeAtUTC))
+    runtime.record.evidencePreflight = accumulator
+    runtime.record.timeline.append("evidence-preflight \(step.stepID)")
+
+    if accumulator.isComplete {
+      runtime.record.evidenceObservation = RuntimeEvidenceObservation(
+        targetID: accumulator.targetID,
+        bindingRevision: accumulator.bindingRevision,
+        stableIdentitySHA256: accumulator.stableIdentitySHA256,
+        model: accumulator.model,
+        firmware: accumulator.firmware,
+        transport: accumulator.transport,
+        providerID: accumulator.providerID,
+        toolVersion: accumulator.toolVersion,
+        toolSHA256: accumulator.toolSHA256,
+        confirmedAtUTC: accumulator.confirmedAtUTC,
+        confirmationMethod: "machineReadback",
+        preflightSteps: accumulator.steps)
+      // observe.device publishes its evidence-bearing products from the
+      // final preflight outcome itself; the other operations set this at
+      // their first post-preflight device step.
+      if descriptor.reference == "observe.device@1",
+        runtime.record.firstEvidenceStepAtUTC == nil
+      {
+        runtime.record.firstEvidenceStepAtUTC = outcomeAtUTC
+      }
+    }
+    do {
+      try runtime.record.persist(into: jobDirectory(for: jobID))
+      jobs[jobID] = runtime
+    } catch {
+      throw RuntimeDispatchFailure.failed(
+        "evidenceIncomplete: could not persist preflight fragment: \(error)")
+    }
+  }
+
   /// Publishes the products a verified step is responsible for. The
   /// mapping is declared in the catalog, so a step cannot invent an
   /// artifact and a declared artifact cannot silently vanish - anything
@@ -653,10 +1043,7 @@ public actor RuntimeJobEngine {
     guard let mapping = Self.artifactMapping[descriptor.reference]?[step.stepID] else {
       return  // this step owns no declared product
     }
-    let binding = ArtifactBindingSnapshot(
-      targetID: runtime.record.request.target.targetID,
-      bindingRevision: runtime.record.request.target.expectedBindingRevision,
-      stableIdentitySHA256: nil)
+    let binding = Self.artifactBindingSnapshot(for: runtime.record)
     for name in mapping {
       guard let declaration = descriptor.artifacts.first(where: { $0.name == name }) else {
         continue
@@ -693,7 +1080,7 @@ public actor RuntimeJobEngine {
   static let artifactMapping: [String: [String: [String]]] = [
     "observe.device@1": [
       "probe-host-tool": ["tool-facts.json"],
-      "probe-device": ["device-facts.json", "binding-snapshot.json"],
+      "read-evidence-firmware": ["device-facts.json", "binding-snapshot.json"],
     ],
     "capture.diagnostics@1": [
       "capture-hilog": ["hilog.txt"],
@@ -723,10 +1110,7 @@ public actor RuntimeJobEngine {
     guard let artifactStore, let runtime = jobs[jobID],
       let names = Self.finalizeArtifacts[descriptor.reference]
     else { return }
-    let binding = ArtifactBindingSnapshot(
-      targetID: runtime.record.request.target.targetID,
-      bindingRevision: runtime.record.request.target.expectedBindingRevision,
-      stableIdentitySHA256: nil)
+    let binding = Self.artifactBindingSnapshot(for: runtime.record)
 
     // Backstop: every declared product that never reached the index gets
     // recorded as missing here, whichever step should have produced it.
@@ -834,6 +1218,14 @@ public actor RuntimeJobEngine {
     for (key, value) in summary {
       fields[key] = .string(value)
     }
+    if let observation = record.evidenceObservation {
+      if let model = observation.model { fields["model"] = .string(model) }
+      if let firmware = observation.firmware { fields["firmware"] = .string(firmware) }
+      if let transport = observation.transport { fields["transport"] = .string(transport) }
+      if let identity = observation.stableIdentitySHA256 {
+        fields["stableIdentitySha256"] = .string(identity)
+      }
+    }
     if name == "binding-snapshot.json" {
       fields["targetId"] = .string(record.request.target.targetID)
       if let revision = record.request.target.expectedBindingRevision {
@@ -843,6 +1235,15 @@ public actor RuntimeJobEngine {
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.sortedKeys, .prettyPrinted, .withoutEscapingSlashes]
     return (try? encoder.encode(fields)) ?? Data("{}".utf8)
+  }
+
+  private static func artifactBindingSnapshot(
+    for record: RuntimeJobRecord
+  ) -> ArtifactBindingSnapshot {
+    ArtifactBindingSnapshot(
+      targetID: record.request.target.targetID,
+      bindingRevision: record.request.target.expectedBindingRevision,
+      stableIdentitySHA256: record.evidenceObservation?.stableIdentitySHA256)
   }
 
   // MARK: Cancel / status / recovery
@@ -855,6 +1256,30 @@ public actor RuntimeJobEngine {
   public func status(jobID: String) throws -> RuntimeJobStatus {
     guard let runtime = jobs[jobID] else { throw RuntimeJobEngineError.jobNotFound(jobID) }
     return status(of: runtime.record)
+  }
+
+  public func evidenceSnapshot(jobID: String) throws -> RuntimeJobEvidenceSnapshot {
+    guard let runtime = jobs[jobID] else {
+      throw RuntimeJobEngineError.jobNotFound(jobID)
+    }
+    let record = runtime.record
+    return RuntimeJobEvidenceSnapshot(
+      jobID: record.jobID,
+      operationReference: record.operationReference,
+      catalogDigest: record.catalogDigest,
+      targetID: record.request.target.targetID,
+      bindingRevision: record.request.target.expectedBindingRevision,
+      providerID: record.providerID,
+      actualEffect: record.actualEffect,
+      authority: record.admissionEvidence,
+      observation: record.evidenceObservation,
+      actualStepKinds: record.actualStepKinds ?? [],
+      executionMode: "execute",
+      terminalState: record.outcomeUnknown ? "outcomeUnknown" : record.state,
+      outcomeUnknown: record.outcomeUnknown,
+      startedAtUTC: record.startedAtUTC,
+      firstEvidenceStepAtUTC: record.firstEvidenceStepAtUTC,
+      finishedAtUTC: record.finishedAtUTC)
   }
 
   public func listJobs() -> [RuntimeJobStatus] {
@@ -931,7 +1356,8 @@ public actor RuntimeJobEngine {
     request: RuntimeOperationRequest,
     descriptor: CatalogOperationDescriptor,
     effect: WorkflowEffect
-  ) async throws {
+  ) async throws -> RuntimeAdmissionEvidence {
+    let admittedAt = nowUTC()
     if effect <= .readOnly {
       let decision = configuration.defaultReadOnlyPolicy.evaluate(
         effect: effect,
@@ -941,7 +1367,12 @@ public actor RuntimeJobEngine {
         throw RuntimeJobEngineError.rejected(
           .authorizationRequired, "default read-only policy denied: \(decision)")
       }
-      return
+      return RuntimeAdmissionEvidence(
+        kind: .defaultReadOnlyPolicy,
+        reference: "default-read-only-policy",
+        admittedAtUTC: admittedAt,
+        validUntilUTC: nil,
+        consumptionFingerprintSHA256: nil)
     }
     guard let authorization = request.authorization else {
       throw RuntimeJobEngineError.rejected(
@@ -956,11 +1387,22 @@ public actor RuntimeJobEngine {
       planDigest: nil,
       inputs: request.inputs)
     do {
-      _ = try await capabilityStore.consume(
+      let consumption = try await capabilityStore.consume(
         capabilityID: authorization.capabilityID,
         reservationID: request.idempotencyKey,
         query: query,
-        nowUTC: nowUTC())
+        nowUTC: admittedAt)
+      guard let status = try await capabilityStore.inspect(
+        capabilityID: authorization.capabilityID)
+      else {
+        throw RuntimeCapabilityStoreError.capabilityNotFound(authorization.capabilityID)
+      }
+      return RuntimeAdmissionEvidence(
+        kind: effect == .destructive ? .standingAuthorization : .runtimeCapability,
+        reference: authorization.capabilityID,
+        admittedAtUTC: consumption.consumedAtUTC,
+        validUntilUTC: status.capability.expiresAtUTC,
+        consumptionFingerprintSHA256: consumption.queryFingerprintSHA256)
     } catch let error as RuntimeCapabilityStoreError {
       throw RuntimeJobEngineError.rejected(
         .authorizationRequired, "capability denied: \(error)")
@@ -1053,6 +1495,12 @@ public actor RuntimeJobEngine {
 
   private static func fingerprint(of data: Data) -> String {
     RuntimeJobRecord.sha256Hex(data)
+  }
+
+  private static func isLowercaseSHA256(_ value: String) -> Bool {
+    value.count == 64 && value.allSatisfy {
+      ("0"..."9").contains(String($0)) || ("a"..."f").contains(String($0))
+    }
   }
 
   /// Journal-grade WorkflowStep for the kinds the engine exercises in MU-2.
@@ -1171,9 +1619,15 @@ public actor RuntimeJobEngine {
         "abilityName": .string(abilityName ?? "EntryAbility"),
       ]
     case .runApprovedRemoteRead:
+      guard let reference = step.actionReference,
+        reference.catalogID == "arkdeck-remote-operations"
+      else {
+        throw RuntimeJobEngineError.internalFailure(
+          "\(step.stepID) has no arkdeck-remote-operations actionRef")
+      }
       arguments = [
-        "catalogId": .string("arkdeck-remote-operations"),
-        "actionId": .string("packageInfo"),
+        "catalogId": .string(reference.catalogID),
+        "actionId": .string(reference.actionID),
         "parameters": .object([:]),
         "artifactId": .string("artifact-\(step.stepID)"),
       ]
@@ -1205,9 +1659,17 @@ public struct RuntimeJobRecord: Codable, Sendable, Equatable {
   public let catalogDigest: String
   public let providerID: String
   public let createdAtUTC: String
+  public let actualEffect: String?
+  public let admissionEvidence: RuntimeAdmissionEvidence?
   public var state: String = "queued"
   public var outcomeUnknown: Bool = false
   public var timeline: [String] = []
+  public var evidencePreflight: RuntimeEvidencePreflightAccumulator?
+  public var evidenceObservation: RuntimeEvidenceObservation?
+  public var actualStepKinds: [String]?
+  public var startedAtUTC: String?
+  public var firstEvidenceStepAtUTC: String?
+  public var finishedAtUTC: String?
   /// Why a step did not run, keyed by step id, so a downstream skip can
   /// cite the original cause instead of restating its own condition.
   public var skipReasons: [String: String] = [:]

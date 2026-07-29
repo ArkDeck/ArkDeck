@@ -107,6 +107,33 @@
       "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]*@[0-9]+$" }
     }
   },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "id": {
+            "enum": ["observe.device", "capture.diagnostics", "debug.hap"]
+          }
+        },
+        "required": ["id"]
+      },
+      "then": {
+        "properties": {
+          "steps": {
+            "items": {
+              "if": {
+                "properties": {
+                  "kind": { "const": "runApprovedRemoteRead" }
+                },
+                "required": ["kind"]
+              },
+              "then": { "required": ["actionRef"] }
+            }
+          }
+        }
+      }
+    }
+  ],
   "$defs": {
     "effect": { "enum": ["hostOnly", "readOnly", "deviceMutation", "destructive"] },
     "authorizationPolicy": { "enum": ["defaultReadOnly", "standingCapability", "oneShotExactPlan"] },
@@ -138,8 +165,34 @@
             "properties": { "kind": { "const": "captureRemoteStdout" } },
             "required": ["kind"]
           },
-          "then": { "required": ["actionRef"] },
-          "else": { "not": { "required": ["actionRef"] } }
+          "then": {
+            "required": ["actionRef"],
+            "properties": {
+              "actionRef": {
+                "properties": {
+                  "catalogId": {
+                    "enum": ["arkui-ui-dump", "arkdeck-diagnostics"]
+                  }
+                }
+              }
+            }
+          },
+          "else": {
+            "if": {
+              "properties": { "kind": { "const": "runApprovedRemoteRead" } },
+              "required": ["kind"]
+            },
+            "then": {
+              "properties": {
+                "actionRef": {
+                  "properties": {
+                    "catalogId": { "const": "arkdeck-remote-operations" }
+                  }
+                }
+              }
+            },
+            "else": { "not": { "required": ["actionRef"] } }
+          }
         }
       ]
     },
@@ -149,7 +202,7 @@
       "required": ["catalogId", "actionId"],
       "properties": {
         "catalogId": {
-          "enum": ["arkui-ui-dump", "arkdeck-diagnostics"]
+          "enum": ["arkui-ui-dump", "arkdeck-diagnostics", "arkdeck-remote-operations"]
         },
         "actionId": {
           "enum": [
@@ -159,7 +212,14 @@
             "componentDetail",
             "renderTreeLegacy",
             "boundedHilog",
-            "componentTree"
+            "componentTree",
+            "deviceSummary",
+            "systemProperties",
+            "processList",
+            "packageInfo",
+            "storageUsage",
+            "deviceModel",
+            "firmwareBuild"
           ]
         }
       },
@@ -182,6 +242,22 @@
           "properties": {
             "catalogId": { "const": "arkdeck-diagnostics" },
             "actionId": { "enum": ["boundedHilog", "componentTree"] }
+          }
+        },
+        {
+          "properties": {
+            "catalogId": { "const": "arkdeck-remote-operations" },
+            "actionId": {
+              "enum": [
+                "deviceSummary",
+                "systemProperties",
+                "processList",
+                "packageInfo",
+                "storageUsage",
+                "deviceModel",
+                "firmwareBuild"
+              ]
+            }
           }
         }
       ]

@@ -329,7 +329,17 @@
       "required": ["catalogId", "actionId", "parameters", "artifactId"],
       "properties": {
         "catalogId": { "const": "arkdeck-remote-operations" },
-        "actionId": { "enum": ["deviceSummary", "systemProperties", "processList", "packageInfo", "storageUsage"] },
+        "actionId": {
+          "enum": [
+            "deviceSummary",
+            "systemProperties",
+            "processList",
+            "packageInfo",
+            "storageUsage",
+            "deviceModel",
+            "firmwareBuild"
+          ]
+        },
         "parameters": { "$ref": "#/$defs/validatedOptions" },
         "artifactId": { "$ref": "#/$defs/id" },
         "semanticResultPolicy": { "$ref": "#/$defs/id" }

@@ -44,34 +44,11 @@ final class ObserveDeviceSkeletonContractTests: XCTestCase {
       return ProviderFacts(
         providerID: "hdc", toolVersion: record.toolVersion,
         toolSHA256: String(repeating: "a", count: 64), serverFacts: [:],
-        deviceIdentitySHA256: record.stablePhysicalIdentitySHA256, deviceMode: "hdc",
+        targetID: record.targetID, bindingRevision: record.bindingRevision,
+        deviceIdentitySHA256: record.stablePhysicalIdentitySHA256,
+        executionConnectKey: record.connectKey, deviceMode: "hdc",
         buildFingerprint: nil, profileID: "openharmony-standard@1",
         collectedAtUTC: "2026-07-29T00:00:00Z")
-    }
-  }
-
-  /// Rewrites observation argv onto the fixture's mode vocabulary so a real
-  /// process produces registered-shaped output.
-  private struct FixtureModeDispatcher: RuntimeProcessDispatching {
-    let inner: DescriptorBoundProcessDispatcher
-
-    func dispatch(_ plan: TypedProcessPlan) async throws -> ProviderProcessReceipt {
-      guard case .process(let sha, _, let timeout) = plan.kind else {
-        return try await inner.dispatch(plan)
-      }
-      let mode: String
-      switch plan.action {
-      case .hdc(.observeTool): mode = "version"
-      // The fixture implements checkserver for real, so the skeleton
-      // exercises the same output shape production hardware emits.
-      case .hdc(.observeServer): mode = "checkserver"
-      default: mode = "selectedDeviceReady"
-      }
-      return try await inner.dispatch(
-        TypedProcessPlan(
-          action: plan.action,
-          kind: .process(
-            executableSHA256: sha, argumentSummary: [mode], timeoutSeconds: timeout)))
     }
   }
 
@@ -84,8 +61,7 @@ final class ObserveDeviceSkeletonContractTests: XCTestCase {
       directoryURL: stateDirectory.appendingPathComponent("targets", isDirectory: true))
     let resolver = try FixedExecutableResolver.hashing(
       path: toolURL.path, providerID: "hdc")
-    let dispatcher = FixtureModeDispatcher(
-      inner: DescriptorBoundProcessDispatcher(resolver: resolver))
+    let dispatcher = DescriptorBoundProcessDispatcher(resolver: resolver)
     let provider = HDCObservationProviderAdapter(
       factsPort: StoreFactsPort(store: targetStore))
     let providers = DeviceProviderRegistry(providers: [provider])
@@ -107,7 +83,7 @@ final class ObserveDeviceSkeletonContractTests: XCTestCase {
   private struct ScriptedBootstrap: BootstrapObservationPort {
     func observeToolVersion() async throws -> String { "3.2.0f" }
     func listCandidates() async throws -> [BootstrapCandidate] {
-      [BootstrapCandidate(connectKey: "150100424A544E4600", state: "Connected")]
+      [BootstrapCandidate(connectKey: String(repeating: "a", count: 32), state: "Connected")]
     }
     func observeDeviceIdentity(connectKey: String) async throws -> [String: String] {
       ["serial": connectKey]
@@ -118,7 +94,7 @@ final class ObserveDeviceSkeletonContractTests: XCTestCase {
     """
     {"documentType":"runtime-operation-request","schemaVersion":"2.0.0",\
     "requestId":"req-skeleton","idempotencyKey":"\(key)",\
-    "target":{"targetId":"\(targetID)"},\
+    "target":{"targetId":"\(targetID)","expectedBindingRevision":1},\
     "operation":{"id":"observe.device","version":1}}
     """
   }
@@ -154,7 +130,8 @@ final class ObserveDeviceSkeletonContractTests: XCTestCase {
     XCTAssertEqual(status.state, "succeeded", status.timeline.joined(separator: " | "))
     XCTAssertFalse(status.outcomeUnknown)
     XCTAssertTrue(status.timeline.contains("intent probe-host-tool"))
-    XCTAssertTrue(status.timeline.contains { $0.hasPrefix("verified probe-device") })
+    XCTAssertTrue(
+      status.timeline.contains { $0.hasPrefix("verified confirm-evidence-target") })
 
     // durable history survives a fresh engine over the same state
     let (_, reopened, _) = try makeStack()

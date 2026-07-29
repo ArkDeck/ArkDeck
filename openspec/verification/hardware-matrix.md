@@ -4,8 +4,9 @@
 > Rule：simulation、fake 和 plan-only 不得进入 verified hardware rows
 
 本文件是人类可读视图，不是权威证据源。机器事实来自各 change `evidence/` 下符合
-`contracts/hardware-evidence.schema.json` 的记录（由执行者产生——人类操作者或持
-standing authorization 的自主 Agent——经维护者 PR review）；
+`contracts/hardware-evidence.schema.json` 的记录（由 human 或 Agent executor
+产生；Agent authority 按实际 effect 分别记录 default read-only policy、
+RuntimeCapability 或 standing authorization，并经维护者 PR review）；
 表格文字本身不能让硬件验收通过。
 
 ## Required dimensions
@@ -17,7 +18,8 @@ standing authorization 的自主 Agent——经维护者 PR review）；
 - HDC client/server/daemon version 与 tool hash；
 - transport；
 - Provider/Profile/version；
-- executor（human 或 agent；agent 另记 authorizationRef）、执行前的目标确认
+- executor（human 或 agent）、实际 effect/typed step kinds 与 effect-matched
+  authority reference、执行前的目标确认
   （人工物理确认或机器身份读回）、稳定 device identity 与 binding revision；
 - UI Dump/Trace/Debug/Flash capability；
 - prerequisite 和 recovery tool/path；
@@ -42,4 +44,4 @@ standing authorization 的自主 Agent——经维护者 PR review）；
 - `nonConformant`：明确无法满足适用 Core Requirement。
 
 支持声明不得外推到未测试的相近型号、固件或工具版本。
-`verified` 记录必须与人工确认的 plan、target、固件、transport、HDC 与 Provider 一致；事后补写表格或 evidence JSON 不能补发执行授权，也不能把旧 case 的通过结果解释成已修改 case 的证据。超过 `validUntil` 或验收标准变化后，记录回到 expired,需重验。
+`verified` 记录必须与适用的 admission authority、plan、target、固件、transport、HDC 与 Provider 一致；事后补写表格或 evidence JSON 不能补发执行授权，也不能把旧 case 的通过结果解释成已修改 case 的证据。超过 `validUntil` 或验收标准变化后，记录回到 expired,需重验。

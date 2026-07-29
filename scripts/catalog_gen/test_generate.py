@@ -93,7 +93,6 @@ class RealCatalogTests(unittest.TestCase):
         for operation in operations:
             for step in operation["steps"]:
                 if step["kind"] != "captureRemoteStdout":
-                    self.assertNotIn("actionRef", step)
                     continue
                 action_ref = step["actionRef"]
                 pair = (action_ref["catalogId"], action_ref["actionId"])
@@ -116,6 +115,75 @@ class RealCatalogTests(unittest.TestCase):
                 ),
             },
         )
+
+    def test_evidence_remote_reads_have_exact_registered_actions(self):
+        operations, _ = _real_operations()
+        registry = generate.load_remote_action_registry()
+        observed = {}
+        for operation in operations:
+            if operation["id"] not in generate.ACTION_REFERENCE_REQUIRED_OPERATIONS:
+                continue
+            for step in operation["steps"]:
+                if step["kind"] != "runApprovedRemoteRead":
+                    continue
+                action_ref = step["actionRef"]
+                self.assertEqual(action_ref["catalogId"], "arkdeck-remote-operations")
+                self.assertEqual(registry[action_ref["actionId"]], step["kind"])
+                observed[
+                    f"{operation['id']}@{operation['version']}/{step['stepID']}"
+                ] = action_ref["actionId"]
+        self.assertEqual(
+            observed,
+            {
+                "capture.diagnostics@1/read-evidence-model": "deviceModel",
+                "capture.diagnostics@1/read-evidence-firmware": "firmwareBuild",
+                "debug.hap@1/read-evidence-model": "deviceModel",
+                "debug.hap@1/read-evidence-firmware": "firmwareBuild",
+                "debug.hap@1/package-readback": "packageInfo",
+                "observe.device@1/read-evidence-model": "deviceModel",
+                "observe.device@1/read-evidence-firmware": "firmwareBuild",
+            },
+        )
+
+    def test_evidence_preflight_is_the_first_three_device_bound_steps(self):
+        operations, _ = _real_operations()
+        expected = [
+            ("confirm-evidence-target", "probeDevice", None),
+            (
+                "read-evidence-model",
+                "runApprovedRemoteRead",
+                ("arkdeck-remote-operations", "deviceModel"),
+            ),
+            (
+                "read-evidence-firmware",
+                "runApprovedRemoteRead",
+                ("arkdeck-remote-operations", "firmwareBuild"),
+            ),
+        ]
+        for operation in operations:
+            if operation["id"] not in generate.ACTION_REFERENCE_REQUIRED_OPERATIONS:
+                continue
+            device_steps = [
+                step for step in operation["steps"]
+                if step["binding"] == "confirmedDevice"
+            ]
+            observed = []
+            for step in device_steps[:3]:
+                action_ref = step.get("actionRef")
+                observed.append(
+                    (
+                        step["stepID"],
+                        step["kind"],
+                        None if action_ref is None else (
+                            action_ref["catalogId"], action_ref["actionId"]
+                        ),
+                    )
+                )
+            self.assertEqual(observed, expected, operation["id"])
+            self.assertTrue(
+                all(not step.get("optional", False) for step in device_steps[:3]),
+                operation["id"],
+            )
 
 
 class ValidatorNegativeTests(unittest.TestCase):
@@ -234,7 +302,34 @@ class ValidatorNegativeTests(unittest.TestCase):
         ):
             doc = _first_operation()
             doc["steps"][0]["actionRef"] = action_ref
-            self._assert_rejected(doc, "only captureRemoteStdout")
+            self._assert_rejected(
+                doc, "only captureRemoteStdout or runApprovedRemoteRead")
+
+    def test_evidence_remote_read_requires_action_reference(self):
+        doc = _first_operation()
+        step = next(
+            step for step in doc["steps"]
+            if step["kind"] == "runApprovedRemoteRead")
+        del step["actionRef"]
+        self._assert_rejected(doc, "evidence-eligible operation requires actionRef")
+
+    def test_remote_read_rejects_unknown_or_cross_catalog_action(self):
+        for action_ref, fragment in (
+            (
+                {"catalogId": "arkdeck-remote-operations", "actionId": "unknownRead"},
+                "unregistered remote action",
+            ),
+            (
+                {"catalogId": "arkdeck-diagnostics", "actionId": "boundedHilog"},
+                "requires arkdeck-remote-operations",
+            ),
+        ):
+            doc = _first_operation()
+            step = next(
+                step for step in doc["steps"]
+                if step["kind"] == "runApprovedRemoteRead")
+            step["actionRef"] = action_ref
+            self._assert_rejected(doc, fragment)
 
     def test_action_reference_is_closed(self):
         doc = _stdout_operation()
@@ -273,7 +368,18 @@ class SchemaVocabularyLockstepTests(unittest.TestCase):
         self.assertEqual(
             condition["if"]["properties"]["kind"]["const"], "captureRemoteStdout")
         self.assertEqual(condition["then"]["required"], ["actionRef"])
-        self.assertEqual(condition["else"]["not"]["required"], ["actionRef"])
+        remote_condition = condition["else"]
+        self.assertEqual(
+            remote_condition["if"]["properties"]["kind"]["const"],
+            "runApprovedRemoteRead")
+        self.assertNotIn("required", remote_condition["then"])
+        self.assertEqual(
+            remote_condition["else"]["not"]["required"], ["actionRef"])
+        selected = self.schema["allOf"][0]
+        self.assertEqual(
+            set(selected["if"]["properties"]["id"]["enum"]),
+            set(generate.ACTION_REFERENCE_REQUIRED_OPERATIONS),
+        )
 
     def test_field_vocabulary_matches(self):
         field = self.schema["$defs"]["field"]
@@ -335,8 +441,15 @@ class SchemaVocabularyLockstepTests(unittest.TestCase):
         self.assertEqual(
             schema_pairs,
             {
-                key: set(value)
-                for key, value in generate.load_stdout_action_registry().items()
+                **{
+                    key: set(value)
+                    for key, value in generate.load_stdout_action_registry().items()
+                },
+                "arkdeck-remote-operations": set(
+                    action_id
+                    for action_id, step_kind
+                    in generate.load_remote_action_registry().items()
+                    if step_kind == "runApprovedRemoteRead"),
             },
         )
 
@@ -371,6 +484,27 @@ class GeneratedSwiftShapeTests(unittest.TestCase):
             swift.count(
                 'actionReference: CatalogActionReference('
                 'catalogID: "arkdeck-diagnostics", actionID: "componentTree")'
+            ),
+            1,
+        )
+        self.assertEqual(
+            swift.count(
+                'actionReference: CatalogActionReference('
+                'catalogID: "arkdeck-remote-operations", actionID: "deviceModel")'
+            ),
+            3,
+        )
+        self.assertEqual(
+            swift.count(
+                'actionReference: CatalogActionReference('
+                'catalogID: "arkdeck-remote-operations", actionID: "firmwareBuild")'
+            ),
+            3,
+        )
+        self.assertEqual(
+            swift.count(
+                'actionReference: CatalogActionReference('
+                'catalogID: "arkdeck-remote-operations", actionID: "packageInfo")'
             ),
             1,
         )

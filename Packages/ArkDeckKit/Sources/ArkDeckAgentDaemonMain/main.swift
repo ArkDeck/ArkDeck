@@ -42,9 +42,9 @@ while let argument = arguments.first {
   }
 }
 
-/// Facts resolved from the adopted target record plus a live tool probe.
-/// Full provider-side fact collection lands with the device window's
-/// evidence; what the daemon needs today is the target's own identity.
+/// Private execution facts resolved from the adopted target record. Model,
+/// firmware and transport are intentionally absent here: the same operation
+/// must establish them through its durable typed preflight outcomes.
 struct TargetStoreFactsPort: HDCObservationFactsPort {
   let targetStore: RuntimeTargetStore
   let executablePath: String
@@ -59,7 +59,10 @@ struct TargetStoreFactsPort: HDCObservationFactsPort {
       toolVersion: record.toolVersion,
       toolSHA256: executableSHA256,
       serverFacts: [:],
+      targetID: record.targetID,
+      bindingRevision: record.bindingRevision,
       deviceIdentitySHA256: record.stablePhysicalIdentitySHA256,
+      executionConnectKey: record.connectKey,
       deviceMode: "hdc",
       buildFingerprint: nil,
       profileID: "openharmony-standard@1",

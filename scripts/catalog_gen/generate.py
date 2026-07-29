@@ -33,6 +33,9 @@ DUMP_RECIPES_PATH = REPO_ROOT / "openspec" / "contracts" / "catalogs" / "dump-re
 DIAGNOSTICS_STDOUT_PATH = (
     REPO_ROOT / "openspec" / "contracts" / "catalogs" / "diagnostics-stdout.yaml"
 )
+REMOTE_OPERATIONS_PATH = (
+    REPO_ROOT / "openspec" / "contracts" / "catalogs" / "remote-operations.yaml"
+)
 GENERATED_SWIFT_PATH = (
     REPO_ROOT
     / "Packages"
@@ -50,6 +53,9 @@ AUTHORIZATION_POLICIES = ("defaultReadOnly", "standingCapability", "oneShotExact
 PROVIDERS = ("hdc", "rockchip")
 CONCURRENCY_KEYS = ("device-exclusive", "device-shared-readonly")
 COMPENSATIONS = ("none", "bestEffortCleanup", "rollbackPublished")
+ACTION_REFERENCE_REQUIRED_OPERATIONS = frozenset(
+    {"observe.device", "capture.diagnostics", "debug.hap"}
+)
 FIELD_TYPES = (
     "string",
     "integer",
@@ -175,6 +181,39 @@ def load_stdout_action_registry(
     }
 
 
+def load_remote_action_registry(
+    path: Path = REMOTE_OPERATIONS_PATH,
+) -> dict[str, str]:
+    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict) or set(data) != {
+        "schema_version", "catalog", "version", "rules", "operations", "behavior_spec"
+    }:
+        raise CatalogError(f"{path}: unexpected remote-operation catalog shape")
+    if data["schema_version"] != "1.0.0" or data["catalog"] != "arkdeck-remote-operations":
+        raise CatalogError(f"{path}: unsupported remote-operation catalog")
+    operations = data["operations"]
+    if not isinstance(operations, list) or not operations:
+        raise CatalogError(f"{path}: operations must be a non-empty list")
+    registry: dict[str, str] = {}
+    required = ("id", "step_kind", "minimum_effect", "cancellation", "binding")
+    optional = ("confirmation",)
+    for index, action in enumerate(operations):
+        where = f"{path}.operations[{index}]"
+        if not isinstance(action, dict):
+            raise CatalogError(f"{where}: action must be an object")
+        _require_keys(action, required, optional, where)
+        action_id = action["id"]
+        step_kind = action["step_kind"]
+        if not isinstance(action_id, str) or not action_id:
+            raise CatalogError(f"{where}.id: must be a non-empty string")
+        if not isinstance(step_kind, str) or not step_kind:
+            raise CatalogError(f"{where}.step_kind: must be a non-empty string")
+        if action_id in registry:
+            raise CatalogError(f"{path}: duplicate remote action id {action_id}")
+        registry[action_id] = step_kind
+    return registry
+
+
 def _require_keys(doc: dict, required, optional, where: str) -> None:
     keys = set(doc)
     missing = [key for key in required if key not in keys]
@@ -231,6 +270,7 @@ def _validate_step(
     step,
     registry: dict[str, dict[str, str]],
     stdout_actions: dict[str, frozenset[str]],
+    remote_actions: dict[str, str],
     where: str,
 ) -> None:
     if not isinstance(step, dict):
@@ -276,8 +316,27 @@ def _validate_step(
             raise CatalogError(
                 f"{where}.actionRef: unregistered stdout action {catalog_id!r}/{action_id!r}"
             )
+    elif kind == "runApprovedRemoteRead" and action_ref is not None:
+        if not isinstance(action_ref, dict):
+            raise CatalogError(f"{where}.actionRef: must be an object")
+        _require_keys(action_ref, ("catalogId", "actionId"), (), f"{where}.actionRef")
+        catalog_id = action_ref["catalogId"]
+        action_id = action_ref["actionId"]
+        if catalog_id != "arkdeck-remote-operations":
+            raise CatalogError(
+                f"{where}.actionRef: runApprovedRemoteRead requires "
+                "arkdeck-remote-operations")
+        if not isinstance(action_id, str) or action_id not in remote_actions:
+            raise CatalogError(
+                f"{where}.actionRef: unregistered remote action {catalog_id!r}/{action_id!r}")
+        if remote_actions[action_id] != kind:
+            raise CatalogError(
+                f"{where}.actionRef: remote action {action_id!r} is registered for "
+                f"{remote_actions[action_id]!r}, not {kind!r}")
     elif "actionRef" in step:
-        raise CatalogError(f"{where}.actionRef: only captureRemoteStdout may carry actionRef")
+        raise CatalogError(
+            f"{where}.actionRef: only captureRemoteStdout or "
+            "runApprovedRemoteRead may carry actionRef")
 
 
 def validate_operation(
@@ -285,6 +344,7 @@ def validate_operation(
     registry: dict[str, dict[str, str]],
     where: str,
     stdout_actions: dict[str, frozenset[str]] | None = None,
+    remote_actions: dict[str, str] | None = None,
 ) -> None:
     if not isinstance(doc, dict):
         raise CatalogError(f"{where}: document must be an object")
@@ -352,6 +412,8 @@ def validate_operation(
 
     if stdout_actions is None:
         stdout_actions = load_stdout_action_registry()
+    if remote_actions is None:
+        remote_actions = load_remote_action_registry()
 
     steps = doc["steps"]
     if not isinstance(steps, list) or not (1 <= len(steps) <= 32):
@@ -359,10 +421,20 @@ def validate_operation(
     step_ids = []
     step_effect_max = "hostOnly"
     for index, step in enumerate(steps):
-        _validate_step(step, registry, stdout_actions, f"{where}.steps[{index}]")
+        _validate_step(
+            step, registry, stdout_actions, remote_actions, f"{where}.steps[{index}]")
         step_ids.append(step["stepID"])
         if _rank(step["effect"], EFFECTS) > _rank(step_effect_max, EFFECTS):
             step_effect_max = step["effect"]
+    if doc["id"] in ACTION_REFERENCE_REQUIRED_OPERATIONS:
+        missing_action_refs = [
+            step["stepID"] for step in steps
+            if step["kind"] == "runApprovedRemoteRead" and "actionRef" not in step
+        ]
+        if missing_action_refs:
+            raise CatalogError(
+                f"{where}.steps: evidence-eligible operation requires actionRef on "
+                f"runApprovedRemoteRead steps {missing_action_refs}")
     if len(set(step_ids)) != len(step_ids):
         raise CatalogError(f"{where}.steps: duplicate stepIDs")
     if step_effect_max not in permitted:
@@ -438,11 +510,13 @@ def load_catalog(
 ) -> tuple[list[dict], list[dict]]:
     registry = load_step_registry(registry_path)
     stdout_actions = load_stdout_action_registry()
+    remote_actions = load_remote_action_registry()
     operations = []
     for path in sorted(operations_dir.glob("*.json")):
         doc = json.loads(path.read_text(encoding="utf-8"))
         validate_operation(
-            doc, registry, str(path.relative_to(REPO_ROOT)), stdout_actions=stdout_actions
+            doc, registry, str(path.relative_to(REPO_ROOT)),
+            stdout_actions=stdout_actions, remote_actions=remote_actions
         )
         expected_name = f"{doc['id']}.v{doc['version']}.json"
         if path.name != expected_name:

@@ -8,6 +8,7 @@
 
 import ArkDeckCore
 import ArkDeckOpenHarmony
+import CryptoKit
 import Foundation
 
 // MARK: - HDC observation adapter
@@ -50,9 +51,9 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
       return .hdc(.observeDevice(connectKey: "resolved-by-binding"))
     case .sendFile, .installPackage, .startApplication, .stopApplication, .uninstallPackage:
       return try debugHAPAction(for: step, inputs: inputs)
-    case .runApprovedRemoteRead, .verifyRemoteState:
-      // Shared by debug.hap readbacks and future deploy verification;
-      // routed by operation so a step kind never means two things at once.
+    case .runApprovedRemoteRead:
+      return try approvedRemoteReadAction(for: step, inputs: inputs)
+    case .verifyRemoteState:
       guard descriptorIsDebugHAP(operation) else {
         throw DeviceProviderError.unsupportedStepKind(
           "\(step.kind.rawValue) has no registered action for \(operation.reference)")
@@ -89,6 +90,33 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
 
   private func descriptorIsDebugHAP(_ operation: CatalogOperationDescriptor) -> Bool {
     operation.id == "debug.hap"
+  }
+
+  /// Maps only the exact published remote action reference. There is no
+  /// step-name, operation-name or default fallback.
+  private func approvedRemoteReadAction(
+    for step: CatalogStepDescriptor, inputs: [String: JSONValue]
+  ) throws -> TypedProviderAction {
+    guard let reference = step.actionReference,
+      reference.catalogID == "arkdeck-remote-operations"
+    else {
+      throw DeviceProviderError.unsupportedAction(
+        "\(step.stepID) has no arkdeck-remote-operations actionRef")
+    }
+    switch reference.actionID {
+    case "deviceModel":
+      return .hdc(.queryProperty(.productModel))
+    case "firmwareBuild":
+      return .hdc(.queryProperty(.fullBuildVersion))
+    case "packageInfo":
+      guard case .string(let bundleName)? = inputs["bundleName"] else {
+        throw DeviceProviderError.unsupportedAction("bundleName input is required")
+      }
+      return .hdc(.queryPackageReadback(try HDCBundleReference(bundleName: bundleName)))
+    default:
+      throw DeviceProviderError.unsupportedAction(
+        "unregistered remote action \(reference.actionID) for \(step.stepID)")
+    }
   }
 
   /// capture.diagnostics@1 and debug.hap@1 both capture stdout; the step
@@ -227,11 +255,17 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
           executableSHA256: "resolved-at-dispatch",
           argumentSummary: ["list", "targets", "-v"], timeoutSeconds: 15))
     case .queryProperty(let property):
+      guard let connectKey = context.connectKey, !connectKey.isEmpty else {
+        throw DeviceProviderError.factsUnavailable(
+          "\(context.stepID) has no descriptor-bound target connect key")
+      }
       return TypedProcessPlan(
         action: action,
         kind: .process(
           executableSHA256: "resolved-at-dispatch",
-          argumentSummary: ["shell", "param", "get", property.rawValue], timeoutSeconds: 15))
+          argumentSummary: [
+            "-t", connectKey, "shell", "param", "get", property.rawValue,
+          ], timeoutSeconds: 15))
     case .captureHilog(let request):
       return TypedProcessPlan(
         action: action,
@@ -398,7 +432,7 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
       case .malformed(let reason):
         return .unknown(reason: reason)
       }
-    case .listDeviceCandidates, .observeDevice:
+    case .listDeviceCandidates:
       // Target-list verification needs the tool version fact to select the
       // profile arm; absent facts are unknown, never assumed.
       switch HDCObservationSemanticParser.parseTargetList(
@@ -413,6 +447,55 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
           "targetCount": String(list.targets.count),
           "connectKeys": list.targets.map { "\($0.connectKey)=\($0.state)" }
             .joined(separator: ","),
+        ])
+      case .unsupportedVersion(let version):
+        return .unsupported(reason: "unregistered HDC version \(version)")
+      case .invalidEncoding:
+        return .failed(code: "invalidEncoding", detail: "stdout is not valid UTF-8")
+      case .truncated:
+        return .failed(code: "truncated", detail: "stdout exceeded its byte budget")
+      case .empty:
+        return .unknown(reason: "empty observation output")
+      case .malformed(let reason):
+        return .unknown(reason: reason)
+      }
+    case .observeDevice(let actionConnectKey):
+      switch HDCObservationSemanticParser.parseTargetList(
+        stdout: receipt.stdout, profile: profile,
+        toolVersion: context.toolVersion ?? profile.registeredVersions.sorted().last ?? "",
+        truncated: receipt.stdoutTruncated)
+      {
+      case .parsed(let list):
+        let expectedConnectKey =
+          actionConnectKey == "resolved-by-binding" ? context.connectKey : actionConnectKey
+        guard let expectedConnectKey, !expectedConnectKey.isEmpty else {
+          return .failed(
+            code: "targetFactsUnavailable",
+            detail: "descriptor-bound connect key is absent")
+        }
+        let matches = list.targets.filter { $0.connectKey == expectedConnectKey }
+        guard matches.count == 1, let match = matches.first else {
+          return .failed(
+            code: "targetConfirmationMismatch",
+            detail: "expected exactly one matching target row, saw \(matches.count)")
+        }
+        guard match.state == "Connected" else {
+          return .failed(
+            code: "targetNotConnected", detail: "matching target state is \(match.state)")
+        }
+        let identity = SHA256.hash(data: Data(expectedConnectKey.lowercased().utf8))
+          .map { String(format: "%02x", $0) }.joined()
+        if let expectedIdentity = context.expectedIdentitySHA256,
+          identity != expectedIdentity.lowercased()
+        {
+          return .failed(
+            code: "targetIdentityMismatch",
+            detail: "matching target row does not match the adopted stable identity")
+        }
+        return .verified(summary: [
+          "deviceIdentitySHA256": identity,
+          "transport": match.transport,
+          "state": match.state,
         ])
       case .unsupportedVersion(let version):
         return .unsupported(reason: "unregistered HDC version \(version)")

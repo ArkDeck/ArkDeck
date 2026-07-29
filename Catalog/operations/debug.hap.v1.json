@@ -72,6 +72,38 @@
       "compensation": "none"
     },
     {
+      "stepID": "confirm-evidence-target",
+      "kind": "probeDevice",
+      "effect": "readOnly",
+      "cancellation": "immediate",
+      "binding": "confirmedDevice",
+      "compensation": "none"
+    },
+    {
+      "stepID": "read-evidence-model",
+      "kind": "runApprovedRemoteRead",
+      "actionRef": {
+        "catalogId": "arkdeck-remote-operations",
+        "actionId": "deviceModel"
+      },
+      "effect": "readOnly",
+      "cancellation": "immediate",
+      "binding": "confirmedDevice",
+      "compensation": "none"
+    },
+    {
+      "stepID": "read-evidence-firmware",
+      "kind": "runApprovedRemoteRead",
+      "actionRef": {
+        "catalogId": "arkdeck-remote-operations",
+        "actionId": "firmwareBuild"
+      },
+      "effect": "readOnly",
+      "cancellation": "immediate",
+      "binding": "confirmedDevice",
+      "compensation": "none"
+    },
+    {
       "stepID": "send-hap",
       "kind": "sendFile",
       "effect": "deviceMutation",
@@ -92,6 +124,10 @@
     {
       "stepID": "package-readback",
       "kind": "runApprovedRemoteRead",
+      "actionRef": {
+        "catalogId": "arkdeck-remote-operations",
+        "actionId": "packageInfo"
+      },
       "effect": "readOnly",
       "cancellation": "immediate",
       "binding": "confirmedDevice",

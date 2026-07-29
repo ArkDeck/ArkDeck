@@ -240,6 +240,20 @@ final class RuntimeArtifactContractTests: XCTestCase {
     let reopenedList = try await reopened.list(jobID: "job-1")
     XCTAssertEqual(reopenedList, [published])
   }
+
+  func testEvidenceProjectionRehashesControlledArtifactBytes() async throws {
+    let store = try makeStore()
+    let metadata = try await store.publish(request())
+    let verified = try await store.verifiedEvidenceArtifacts(jobID: "job-1")
+    XCTAssertEqual(verified.count, 1)
+    XCTAssertEqual(verified[0].sha256, metadata.sha256)
+    XCTAssertTrue(verified[0].reference.hasPrefix("arkdeck-artifact://job-1/"))
+
+    let bytesURL = root.appendingPathComponent("job-1/\(metadata.artifactID)")
+    try Data("tampered".utf8).write(to: bytesURL)
+    await XCTAssertThrowsErrorAsync(
+      try await store.verifiedEvidenceArtifacts(jobID: "job-1"))
+  }
 }
 
 func XCTAssertThrowsErrorAsync<T>(
