@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-045-hdc-observation-refresh
 revision: 1
-status: proposed
+status: approved # 2026-07-29 本 approval-only PR；r1 proposal 经 #766 合入 main `7938cf67a2749a8d7ddb3c86b44fd244705d3974`；批准仅由维护者 review/merge 本 PR 生效
 class: platform
 core_change_level: none
 owner: lvye
@@ -148,3 +148,35 @@ that re-pins current protected-main sources, exact signed-App test
 environment, complete allowed paths and the mutation/negative matrix.
 Implementation/evidence, `ready→done`, change `verified`, and the subsequent
 CHG-2026-006 `TASK-M0B-002` fresh D2 readiness each remain separate PRs.
+
+## Approval
+
+- The r1 proposal was merged to protected main by PR #766 (squash
+  `7938cf67a2749a8d7ddb3c86b44fd244705d3974`, `status: proposed`);
+  maintainer `lvye` approved exact head
+  `4e898ce54b37fafbef776da7c0722a8b728046d5`.
+- Formal approval takes effect only when the maintainer reviews and merges
+  this approval-only PR. That D1 decision accepts only the following closed
+  scope:
+  - **route:**one visible, localized and accessible user action may call the
+    existing diagnostics provider `refresh()`; startup and manual requests
+    share one synchronous App admission gate;
+  - **identity and bounds:**an accepted refresh retains the production-selected
+    candidate, endpoint, execution identity, observation actor, capacity-64
+    buffer and session pseudonym key, and permits at most the one existing
+    registered read-only `list targets -v` snapshot;
+  - **forbidden effects:**no timer, retry, background polling, second
+    discovery/session/source, new provider API or HDC argv, server lifecycle
+    or adoption, subserver, authorization, binding/device mutation,
+    destructive effect, raw identifier exposure or Core/profile/registry
+    change;
+  - **evidence boundary:**`HOR-UI-001`, `HOR-SESSION-001`,
+    `HOR-BOUNDED-001` and `HOR-SAFETY-001` are change-local only; signed UI
+    fixture evidence remains `platform`, contract evidence remains
+    `contract`, and neither is hardware evidence or a CHG-2026-006
+    acceptance result.
+- This approval does not execute a task, accept readiness pins or validate an
+  implementation. `TASK-HOR-001` remains `blocked` until a separate D1
+  readiness PR is merged; implementation/evidence, `ready→done`, change
+  verification and later CHG-2026-006 hardware readiness remain separate
+  decisions.
