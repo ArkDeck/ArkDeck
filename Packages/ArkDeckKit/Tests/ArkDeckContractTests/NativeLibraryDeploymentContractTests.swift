@@ -33,6 +33,7 @@ enum NativeLibraryTestFixture {
       UInt8(buildID.dropFirst(index).prefix(2), radix: 16)!
     }
     bytes.replaceSubrange(144..<164, with: buildIDBytes)
+    appendSyntheticCodeSignBlock(to: &bytes)
     return bytes
   }
 
@@ -55,6 +56,42 @@ enum NativeLibraryTestFixture {
     for index in 0..<8 {
       data[offset + index] = UInt8((value >> UInt64(index * 8)) & 0xFF)
     }
+  }
+
+  private static func appendSyntheticCodeSignBlock(to data: inout Data) {
+    let signedDataSize = data.count
+    let infoOffset = 20
+    let signatureSize = 16
+    let infoPrefixSize = 264
+    let blockSize = infoOffset + infoPrefixSize + signatureSize
+    var block = Data(repeating: 0, count: blockSize)
+    write16(3, to: &block, at: 0)
+    write32(UInt32(infoOffset - 8), to: &block, at: 8)
+    write32(2, to: &block, at: 12)
+    write32(0, to: &block, at: 16)
+    write32(1, to: &block, at: infoOffset)
+    write32(
+      UInt32(infoPrefixSize - 8 + signatureSize),
+      to: &block, at: infoOffset + 4)
+    block[infoOffset + 8] = 1
+    block[infoOffset + 9] = 1
+    block[infoOffset + 10] = 12
+    write32(UInt32(signatureSize), to: &block, at: infoOffset + 12)
+    write64(UInt64(signedDataSize), to: &block, at: infoOffset + 16)
+    block.replaceSubrange(
+      (infoOffset + 24)..<(infoOffset + 56),
+      with: Data(repeating: 0x42, count: 32))
+    block[infoOffset + 263] = 1
+    block.replaceSubrange(
+      (infoOffset + infoPrefixSize)..<(infoOffset + infoPrefixSize + signatureSize),
+      with: Data(repeating: 0x30, count: signatureSize))
+    data.append(block)
+    data.append(Data("elf sign block  ".utf8))
+    data.append(Data("1000".utf8))
+    var headerTail = Data(repeating: 0, count: 12)
+    write32(UInt32(blockSize), to: &headerTail, at: 0)
+    write32(1, to: &headerTail, at: 4)
+    data.append(headerTail)
   }
 }
 
@@ -159,16 +196,17 @@ final class NativeLibraryDeploymentContractTests: XCTestCase {
       lock.withLock { actions.append(name) }
 
       switch action {
-      case .sendNativeLibraryToStaging:
-        return ProviderProcessReceipt(
-          exitStatus: 0, stdout: Data(), stderr: Data(),
-          stdoutTruncated: false, durationSeconds: 0.01)
+      case .sendNativeLibraryToStaging(let deployment):
+        return receipt([
+          sub(), sub(), sub(), sub(),
+          sub("\(deployment.codeSignHelperFacts!.sha256)  helper\n"),
+        ])
       case .inspectNativeLibrary(_, .stagingMatchesArtifact):
         return receipt([sub("\(newHash)  staging\n"), sub("-rw------- staging\n")])
       case .backupNativeLibrary:
         return receipt([
           sub("drwx------ native\n"), sub("-rw------- target\n"),
-          sub("\(oldHash)  target\n"), sub(),
+          sub("\(oldHash)  target\n"), sub(), sub(),
           sub("\(oldHash)  backup\n"), sub("-rw------- backup\n"),
           sub("total 4\ndrwx------ libs\n"),
         ])
@@ -178,10 +216,10 @@ final class NativeLibraryDeploymentContractTests: XCTestCase {
             "publish child completion was lost")
         }
         return receipt([
-          sub("-rw------- 1 20010050 20010050 16 old\n"), sub(), sub(),
-          sub("-rw------- 1 20010050 20010050 256 prepared\n"),
-          sub("\(newHash)  prepared\n"), sub(),
+          sub("-rw------- 1 20010050 20010050 16 old\n"),
+          sub("ARKDECK_CODE_SIGN_PUBLISHED sha256:\(oldHash)\n"),
           sub("\(newHash)  target\n"),
+          sub("ARKDECK_CODE_SIGN_VERIFIED sha256:\(oldHash)\n"),
           sub("-rw------- 1 20010050 20010050 256 target\n"),
         ])
       case .stopNativeTarget:
@@ -190,40 +228,53 @@ final class NativeLibraryDeploymentContractTests: XCTestCase {
         return receipt([sub(), sub(), sub("4321\n")])
       case .inspectNativeLibrary(_, .targetLoaded):
         if mode == .loaderFailure {
-          return receipt([sub("\(newHash)  target\n"), sub(exit: 1)])
-        }
-        return receipt([sub("\(newHash)  target\n"), sub("4321\n")])
-      case .inspectNativeLibrary(_, .targetMatchesArtifact):
-        return receipt([sub("\(newHash)  target\n")])
-      case .inspectNativeLibrary(_, .cleanupComplete):
-        if mode == .cleanupContinuation {
           return receipt([
-            sub("-rw------- staging\n"), sub("drwx------ staging-directory\n"),
-            absent("rollback"), absent("backup"),
+            sub("\(newHash)  target\n"),
+            sub("ARKDECK_CODE_SIGN_VERIFIED sha256:\(oldHash)\n"),
+            sub(exit: 1),
           ])
         }
         return receipt([
-          absent("staging"), absent("staging-directory"),
-          absent("rollback"), absent("backup"),
+          sub("\(newHash)  target\n"),
+          sub("ARKDECK_CODE_SIGN_VERIFIED sha256:\(oldHash)\n"),
+          sub("4321\n"),
+        ])
+      case .inspectNativeLibrary(_, .targetMatchesArtifact):
+        return receipt([
+          sub("\(newHash)  target\n"),
+          sub("ARKDECK_CODE_SIGN_VERIFIED sha256:\(oldHash)\n"),
+        ])
+      case .inspectNativeLibrary(_, .cleanupComplete):
+        if mode == .cleanupContinuation {
+          return receipt([
+            sub("-rw------- staging\n"), sub("-rwx------ helper\n"),
+            sub("drwx------ staging-directory\n"), absent("rollback"),
+            absent("backup"),
+          ])
+        }
+        return receipt([
+          absent("staging"), absent("helper"),
+          absent("staging-directory"), absent("rollback"), absent("backup"),
         ])
       case .rollbackNativeLibrary(let deployment):
         return receipt([
           sub("\(oldHash)  backup\n"), sub(), sub("4321\n"), sub(),
-          sub("\r\n"), sub(), sub("\(oldHash)  rollback\n"), sub(),
-          sub("\(oldHash)  target\n"), sub(), sub(), sub("4321\n"),
+          sub("\r\n"), sub(), sub(), sub(), sub("\(oldHash)  target\n"),
+          sub(), sub(), sub("4321\n"),
           sub("/proc/4321/maps:7f000 \(deployment.loaderVisiblePath)\n"),
         ])
       case .cleanupNativeLibrary:
         if mode == .cleanupFailure {
           return receipt([
-            sub(), sub(), sub(), sub(),
-            sub("-rw------- staging\n"), sub("drwx------ staging-directory\n"),
-            absent("rollback"), absent("backup"),
+            sub(), sub(), sub(), sub(), sub(),
+            sub("-rw------- staging\n"), sub("-rwx------ helper\n"),
+            sub("drwx------ staging-directory\n"), absent("rollback"),
+            absent("backup"),
           ])
         }
         return receipt([
-          sub(), sub(), sub(), sub(),
-          absent("staging"), absent("staging-directory"),
+          sub(), sub(), sub(), sub(), sub(),
+          absent("staging"), absent("helper"), absent("staging-directory"),
           absent("rollback"), absent("backup"),
         ])
       default:
@@ -241,6 +292,16 @@ final class NativeLibraryDeploymentContractTests: XCTestCase {
     XCTAssertEqual(facts.elfClassBits, 64)
     XCTAssertEqual(facts.buildID, NativeLibraryTestFixture.buildID)
     XCTAssertEqual(facts.sha256, NativeLibraryTestFixture.sha256(bytes))
+    XCTAssertEqual(facts.codeSign?.formatVersion, 1)
+    XCTAssertEqual(facts.codeSign?.signedDataByteCount, 256)
+    XCTAssertNoThrow(
+      try NativeLibraryArtifactValidator.validate(
+        bytes, expectedABI: .arm64,
+        requireOpenHarmonyCodeSignature: true))
+    XCTAssertThrowsError(
+      try NativeLibraryArtifactValidator.validate(
+        bytes.dropLast(332), expectedABI: .arm64,
+        requireOpenHarmonyCodeSignature: true))
     XCTAssertThrowsError(
       try NativeLibraryArtifactValidator.validate(bytes, expectedABI: .arm32))
 
@@ -248,6 +309,16 @@ final class NativeLibraryDeploymentContractTests: XCTestCase {
     noBuildID[68] = 1
     XCTAssertThrowsError(
       try NativeLibraryArtifactValidator.validate(noBuildID, expectedABI: .arm64))
+  }
+
+  func testBundledCodeSignHelperIsAValidatedStaticArm64Executable() throws {
+    let helper = try HDCNativeCodeSignHelperArtifact.bundled()
+    let contents = try Data(contentsOf: helper.fileURL)
+
+    XCTAssertEqual(helper.facts.abi, .arm64)
+    XCTAssertEqual(helper.facts.byteCount, contents.count)
+    XCTAssertEqual(helper.facts.sha256, NativeLibraryTestFixture.sha256(contents))
+    XCTAssertEqual(helper.facts.buildID.count, 40)
   }
 
   func testNativeProviderPlanIsAvailablePathClosedAndDescriptorBound() throws {
@@ -300,15 +371,16 @@ final class NativeLibraryDeploymentContractTests: XCTestCase {
       invocations.map { Array($0.arguments.dropFirst(2)) },
       [
         ["shell", "ls", "-ln", deployment.targetPath],
-        ["shell", "cp", "-p", deployment.targetPath, deployment.rollbackStagingPath],
-        ["shell", "cp", deployment.stagingPath, deployment.rollbackStagingPath],
-        ["shell", "ls", "-ln", deployment.rollbackStagingPath],
-        ["shell", "sha256sum", deployment.rollbackStagingPath],
         [
-          "shell", "mv", "-f", deployment.rollbackStagingPath,
-          deployment.targetPath,
+          "shell", deployment.codeSignHelperRemotePath!, "publish",
+          deployment.stagingPath, deployment.targetPath,
+          deployment.rollbackStagingPath,
         ],
         ["shell", "sha256sum", deployment.targetPath],
+        [
+          "shell", deployment.codeSignHelperRemotePath!, "verify",
+          deployment.targetPath,
+        ],
         ["shell", "ls", "-ln", deployment.targetPath],
       ])
     let allArguments = invocations.flatMap(\.arguments).joined(separator: " ")
@@ -331,7 +403,7 @@ final class NativeLibraryDeploymentContractTests: XCTestCase {
     guard case .processSequence(_, let sendInvocations) = sendPlan.kind else {
       return XCTFail("native send must prepare a stable app-owned staging directory")
     }
-    XCTAssertEqual(sendInvocations.count, 2)
+    XCTAssertEqual(sendInvocations.count, 5)
     XCTAssertEqual(
       sendInvocations[0].arguments,
       [
@@ -344,6 +416,15 @@ final class NativeLibraryDeploymentContractTests: XCTestCase {
         "-t", "150100424a544e4600", "file", "send", file.path,
         deployment.stagingPath,
       ])
+    XCTAssertEqual(
+      sendInvocations[2].arguments.last,
+      deployment.codeSignHelperRemotePath!)
+    XCTAssertEqual(
+      Array(sendInvocations[3].arguments.suffix(3)),
+      ["chmod", "700", deployment.codeSignHelperRemotePath!])
+    XCTAssertEqual(
+      Array(sendInvocations[4].arguments.suffix(2)),
+      ["sha256sum", deployment.codeSignHelperRemotePath!])
     let stopAction = TypedProviderAction.hdc(.stopNativeTarget(deployment))
     let stopPlan = try provider.lower(action: stopAction, context: context)
     guard case .processSequence(_, let stopInvocations) = stopPlan.kind else {
@@ -409,35 +490,39 @@ final class NativeLibraryDeploymentContractTests: XCTestCase {
     XCTAssertEqual(stderrCode, "nativeTargetStillRunning")
   }
 
-  func testProductionNativeOperationFailsClosedBeforeCapabilityOrDispatch() async throws {
+  func testProductionNativeOperationIsAvailableAndUnresolvedInputFailsBeforeCapability()
+    async throws
+  {
     let descriptor = try XCTUnwrap(
       RuntimeOperationCatalog.descriptor(
         reference: "deploy.native-library.app-owned@1"))
     let provider = HDCObservationProviderAdapter(factsPort: FactsPort())
-    guard case .unavailable(let reason) = provider.runtimeAvailability(for: descriptor) else {
-      return XCTFail("production native deployment must stay unavailable without XPM enablement")
-    }
-    XCTAssertTrue(reason.contains("XPM/fs-verity"))
+    XCTAssertEqual(provider.runtimeAvailability(for: descriptor), .available)
 
     let capabilityStore = try RuntimeCapabilityStore(
       directoryURL: stateDirectory.appendingPathComponent(
         "capabilities-unavailable", isDirectory: true))
     let dispatcher = NativeDispatcher(
       mode: .success, newHash: String(repeating: "a", count: 64))
+    let artifactStore = try RuntimeArtifactStore(
+      rootURL: stateDirectory.appendingPathComponent(
+        "artifacts-unavailable", isDirectory: true),
+      nowUTC: { "2026-07-30T00:00:00Z" })
     let engine = try RuntimeJobEngine(
       configuration: .init(
         stateDirectory: stateDirectory.appendingPathComponent(
           "engine-unavailable", isDirectory: true)),
       providers: DeviceProviderRegistry(providers: [provider]),
       dispatcher: dispatcher, capabilityStore: capabilityStore,
+      artifactStore: artifactStore,
       nowUTC: { "2026-07-30T00:00:00Z" })
     let operationAvailability = await engine.operationAvailability()
     let availability = try XCTUnwrap(
       operationAvailability.first {
         $0.reference == descriptor.reference
       })
-    XCTAssertEqual(availability.state, .unavailable)
-    XCTAssertTrue(availability.reasons.contains(reason))
+    XCTAssertEqual(availability.state, .available)
+    XCTAssertTrue(availability.reasons.isEmpty)
 
     let request = try RuntimeOperationRequest(
       requestID: "request-native-unavailable",
@@ -456,9 +541,9 @@ final class NativeLibraryDeploymentContractTests: XCTestCase {
     encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
     do {
       _ = try await engine.submit(try encoder.encode(request))
-      XCTFail("runtime-unavailable native deployment must reject")
+      XCTFail("unresolved native Artifact must reject")
     } catch {
-      XCTAssertTrue(String(describing: error).contains("runtime unavailable"))
+      XCTAssertTrue(String(describing: error).contains("Artifact"))
     }
     XCTAssertTrue(dispatcher.actionNames().isEmpty)
     let capabilities = try await capabilityStore.list()

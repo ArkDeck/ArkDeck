@@ -151,6 +151,21 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
       if deployment.stagingDirectoryIsJobOwned {
         arguments["stagingDirectoryPath"] = .string(deployment.stagingDirectoryPath)
       }
+      if let codeSign = deployment.artifactFacts.codeSign {
+        arguments["codeSignFormatVersion"] = .integer(Int64(codeSign.formatVersion))
+        arguments["codeSignVersion"] = .integer(Int64(codeSign.codeSignVersion))
+        arguments["signedDataByteCount"] = .integer(Int64(codeSign.signedDataByteCount))
+        arguments["signatureByteCount"] = .integer(Int64(codeSign.signatureByteCount))
+      }
+      if let helper = deployment.codeSignHelperFacts,
+        let helperRemotePath = deployment.codeSignHelperRemotePath
+      {
+        arguments["codeSignHelperABI"] = .string(helper.abi.rawValue)
+        arguments["codeSignHelperBuildId"] = .string(helper.buildID)
+        arguments["codeSignHelperSha256"] = .string(helper.sha256)
+        arguments["codeSignHelperByteCount"] = .integer(Int64(helper.byteCount))
+        arguments["codeSignHelperRemotePath"] = .string(helperRemotePath)
+      }
       return arguments
     }
     switch action {
@@ -332,6 +347,14 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
       }
       return text
     }
+    func optionalInteger(_ key: String) throws -> Int? {
+      guard let value = arguments[key] else { return nil }
+      guard case .integer(let number) = value, let exact = Int(exactly: number) else {
+        throw DeviceProviderError.unsupportedAction(
+          "persisted \(kind).\(key) is not an integer")
+      }
+      return exact
+    }
     func path() throws -> HDCOwnedRemotePath {
       let reconstructed = try HDCOwnedRemotePath(
         jobID: string("jobId"), stepID: string("stepId"), nonce: string("nonce"))
@@ -368,6 +391,42 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
         throw DeviceProviderError.unsupportedAction(
           "persisted \(kind) native ELF machine is outside UInt16")
       }
+      let codeSign: HDCNativeLibraryCodeSignFacts?
+      if let formatVersion = try optionalInteger("codeSignFormatVersion") {
+        guard let codeSignVersion = try optionalInteger("codeSignVersion"),
+          let signedDataByteCount = try optionalInteger("signedDataByteCount"),
+          let signatureByteCount = try optionalInteger("signatureByteCount")
+        else {
+          throw DeviceProviderError.unsupportedAction(
+            "persisted \(kind) carries incomplete native code-sign facts")
+        }
+        codeSign = HDCNativeLibraryCodeSignFacts(
+          formatVersion: formatVersion,
+          codeSignVersion: codeSignVersion,
+          signedDataByteCount: signedDataByteCount,
+          signatureByteCount: signatureByteCount)
+      } else {
+        codeSign = nil
+      }
+      let helperFacts: HDCNativeCodeSignHelperFacts?
+      if let helperABIValue = try optionalString("codeSignHelperABI") {
+        guard let helperABI = HDCNativeLibraryABI(rawValue: helperABIValue),
+          let helperBuildID = try optionalString("codeSignHelperBuildId"),
+          let helperSHA256 = try optionalString("codeSignHelperSha256"),
+          let helperByteCount = try optionalInteger("codeSignHelperByteCount"),
+          try optionalString("codeSignHelperRemotePath") != nil
+        else {
+          throw DeviceProviderError.unsupportedAction(
+            "persisted \(kind) carries incomplete code-sign helper facts")
+        }
+        helperFacts = HDCNativeCodeSignHelperFacts(
+          abi: helperABI,
+          buildID: helperBuildID,
+          sha256: helperSHA256,
+          byteCount: helperByteCount)
+      } else {
+        helperFacts = nil
+      }
       let deployment = try HDCAppOwnedNativeLibraryDeployment(
         jobID: string("jobId"),
         artifactLeaseID: string("artifactLeaseId"),
@@ -380,10 +439,12 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
           machine: machine,
           buildID: string("buildId"),
           sha256: string("sha256"),
-          byteCount: integer("byteCount")),
+          byteCount: integer("byteCount"),
+          codeSign: codeSign),
         restartProfile: restart,
         verificationProfile: verification,
         rollbackPolicy: rollback,
+        codeSignHelperFacts: helperFacts,
         exactPaths: HDCAppOwnedNativeLibraryExactPaths(
           directoryPath: try string("directoryPath"),
           targetPath: try string("targetPath"),
@@ -391,7 +452,9 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
           stagingDirectoryPath: try optionalString("stagingDirectoryPath"),
           stagingPath: try string("stagingPath"),
           backupPath: try string("backupPath"),
-          rollbackStagingPath: try string("rollbackStagingPath")))
+          rollbackStagingPath: try string("rollbackStagingPath"),
+          codeSignHelperRemotePath: try optionalString(
+            "codeSignHelperRemotePath")))
       return deployment
     }
 

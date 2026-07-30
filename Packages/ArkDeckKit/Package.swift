@@ -32,6 +32,9 @@ let package = Package(
       dependencies: [
         "ArkDeckCore", "ArkDeckProcess", "ArkDeckRuntime", "ArkDeckOpenHarmony",
         "ArkDeckStorage",
+      ],
+      resources: [
+        .copy("Resources/OpenHarmonyNativeCodeSign"),
       ]),
     .target(name: "ArkDeckStorage", dependencies: ["ArkDeckCore"]),
     .executableTarget(

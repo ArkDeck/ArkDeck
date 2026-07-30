@@ -147,7 +147,8 @@ actor NativeLibraryArtifactImportCoordinator {
     }
     let facts: HDCNativeLibraryArtifactFacts
     do {
-      facts = try NativeLibraryArtifactValidator.validate(session.contents)
+      facts = try NativeLibraryArtifactValidator.validate(
+        session.contents, requireOpenHarmonyCodeSignature: true)
     } catch {
       sessions.removeValue(forKey: uploadID)
       throw NativeLibraryArtifactImportError.invalidELF("\(error)")

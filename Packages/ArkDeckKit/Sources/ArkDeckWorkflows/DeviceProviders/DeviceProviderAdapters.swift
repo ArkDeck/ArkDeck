@@ -31,18 +31,24 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
   private let factsPort: any HDCObservationFactsPort
   private let profile: HDCCompatibilityProfile
   private let appOwnedNativeLibraryAvailability: ProviderOperationAvailability
+  private let nativeCodeSignHelper: HDCNativeCodeSignHelperArtifact?
 
   public init(
     factsPort: any HDCObservationFactsPort,
     profile: HDCCompatibilityProfile = .openHarmony320Family,
-    appOwnedNativeLibraryAvailability: ProviderOperationAvailability = .unavailable(
-      reason:
-        "app-owned native-library replacement cannot enable OpenHarmony XPM/fs-verity "
-        + "code signing for the published file")
+    appOwnedNativeLibraryAvailability: ProviderOperationAvailability? = nil
   ) {
     self.factsPort = factsPort
     self.profile = profile
-    self.appOwnedNativeLibraryAvailability = appOwnedNativeLibraryAvailability
+    let helper = try? HDCNativeCodeSignHelperArtifact.bundled()
+    self.nativeCodeSignHelper = helper
+    self.appOwnedNativeLibraryAvailability =
+      appOwnedNativeLibraryAvailability
+      ?? (helper == nil
+        ? .unavailable(
+          reason:
+            "bundled arm64 OpenHarmony code-sign helper cannot be verified")
+        : .available)
   }
 
   public func resolveFacts(targetID: String) async throws -> ProviderFacts {
@@ -369,10 +375,15 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
     }
     let bytes = try Data(contentsOf: resolved.fileURL, options: [.mappedIfSafe])
     let facts = try NativeLibraryArtifactValidator.validate(
-      bytes, expectedABI: expectedABI)
+      bytes, expectedABI: expectedABI,
+      requireOpenHarmonyCodeSignature: true)
     guard facts.sha256 == resolved.sha256, facts.byteCount == resolved.byteCount else {
       throw DeviceProviderError.unsupportedAction(
         "leased native Artifact bytes drifted during materialization")
+    }
+    guard let nativeCodeSignHelper else {
+      throw DeviceProviderError.unsupportedAction(
+        "native deployment code-sign helper is unavailable")
     }
     let deployment = try HDCAppOwnedNativeLibraryDeployment(
       jobID: context.jobID,
@@ -383,7 +394,8 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
       artifactFacts: facts,
       restartProfile: restart,
       verificationProfile: verification,
-      rollbackPolicy: rollback)
+      rollbackPolicy: rollback,
+      codeSignHelperFacts: nativeCodeSignHelper.facts)
     switch step.stepID {
     case "send-to-staging":
       return .hdc(.sendNativeLibraryToStaging(deployment))
@@ -636,7 +648,11 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
         deployment.artifactID == resolved.artifactID,
         deployment.artifactFacts.sha256 == resolved.sha256,
         deployment.artifactFacts.byteCount == resolved.byteCount,
-        deployment.stagingDirectoryIsJobOwned
+        deployment.stagingDirectoryIsJobOwned,
+        let expectedHelper = deployment.codeSignHelperFacts,
+        let helperRemotePath = deployment.codeSignHelperRemotePath,
+        let nativeCodeSignHelper,
+        nativeCodeSignHelper.facts == expectedHelper
       else {
         throw DeviceProviderError.unsupportedAction(
           "native send requires the same engine-resolved Artifact and a job-owned staging directory")
@@ -646,6 +662,12 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
         commands: [
           (["shell", "mkdir", "-p", deployment.stagingDirectoryPath], false, 30),
           (["file", "send", resolved.fileURL.path, deployment.stagingPath], false, 300),
+          ([
+            "file", "send", nativeCodeSignHelper.fileURL.path,
+            helperRemotePath,
+          ], false, 60),
+          (["shell", "chmod", "700", helperRemotePath], false, 30),
+          (["shell", "sha256sum", helperRemotePath], false, 30),
         ])
     case .backupNativeLibrary(let deployment):
       return try nativeSequence(
@@ -654,32 +676,33 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
           (["shell", "ls", "-ld", deployment.directoryPath], false, 15),
           (["shell", "ls", "-l", deployment.targetPath], false, 15),
           (["shell", "sha256sum", deployment.targetPath], false, 30),
-          (["shell", "cp", "-p", deployment.targetPath, deployment.backupPath], true, 60),
-          (["shell", "sha256sum", deployment.backupPath], true, 30),
-          (["shell", "ls", "-l", deployment.backupPath], true, 15),
+          (["shell", "rm", "-f", deployment.backupPath], false, 30),
+          (["shell", "ln", deployment.targetPath, deployment.backupPath], false, 30),
+          (["shell", "sha256sum", deployment.backupPath], false, 30),
+          (["shell", "ls", "-l", deployment.backupPath], false, 15),
           // Keep firmware-layout diagnosis inside this typed provider action.
           // Failure reporting only exposes a bounded hex prefix.
           (["shell", "ls", "-la", deployment.nativeLibrariesRootPath], true, 15),
         ])
     case .publishNativeLibrary(let deployment):
+      guard let helperRemotePath = deployment.codeSignHelperRemotePath,
+        deployment.codeSignHelperFacts != nil
+      else {
+        throw DeviceProviderError.unsupportedAction(
+          "native publish has no persisted code-sign helper identity")
+      }
       return try nativeSequence(
         action: action, context: context,
         commands: [
           (["shell", "ls", "-ln", deployment.targetPath], false, 15),
           ([
-            "shell", "cp", "-p", deployment.targetPath,
-            deployment.rollbackStagingPath,
-          ], false, 60),
-          ([
-            "shell", "cp", deployment.stagingPath, deployment.rollbackStagingPath,
-          ], false, 60),
-          (["shell", "ls", "-ln", deployment.rollbackStagingPath], false, 15),
-          (["shell", "sha256sum", deployment.rollbackStagingPath], false, 30),
-          ([
-            "shell", "mv", "-f", deployment.rollbackStagingPath,
-            deployment.targetPath,
+            "shell", helperRemotePath, "publish", deployment.stagingPath,
+            deployment.targetPath, deployment.rollbackStagingPath,
           ], false, 60),
           (["shell", "sha256sum", deployment.targetPath], false, 30),
+          ([
+            "shell", helperRemotePath, "verify", deployment.targetPath,
+          ], false, 30),
           (["shell", "ls", "-ln", deployment.targetPath], false, 15),
         ])
     case .stopNativeTarget(let deployment):
@@ -706,6 +729,9 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
       var commands: [([String], Bool, Int)] = [
         (["shell", "rm", "-f", deployment.stagingPath], true, 30),
       ]
+      if let helperRemotePath = deployment.codeSignHelperRemotePath {
+        commands.append((["shell", "rm", "-f", helperRemotePath], true, 30))
+      }
       if deployment.stagingDirectoryIsJobOwned {
         commands.append(
           (["shell", "rmdir", deployment.stagingDirectoryPath], true, 30))
@@ -716,6 +742,9 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
         commands.append((["shell", "rm", "-f", deployment.backupPath], true, 30))
       }
       commands.append((["shell", "ls", "-ld", deployment.stagingPath], true, 15))
+      if let helperRemotePath = deployment.codeSignHelperRemotePath {
+        commands.append((["shell", "ls", "-ld", helperRemotePath], true, 15))
+      }
       if deployment.stagingDirectoryIsJobOwned {
         commands.append(
           (["shell", "ls", "-ld", deployment.stagingDirectoryPath], true, 15))
@@ -734,12 +763,13 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
           (["shell", "pidof", deployment.bundle.bundleName], true, 30),
           (["shell", "sleep", "2"], true, 5),
           (["shell", "pidof", deployment.bundle.bundleName], true, 30),
+          (["shell", "rm", "-f", deployment.rollbackStagingPath], true, 30),
           ([
-            "shell", "cp", "-p", deployment.backupPath, deployment.rollbackStagingPath,
+            "shell", "ln", deployment.backupPath, deployment.rollbackStagingPath,
           ], true, 60),
-          (["shell", "sha256sum", deployment.rollbackStagingPath], true, 30),
           ([
-            "shell", "mv", "-f", deployment.rollbackStagingPath, deployment.targetPath,
+            "shell", "mv", "-f", deployment.rollbackStagingPath,
+            deployment.targetPath,
           ], true, 60),
           (["shell", "sha256sum", deployment.targetPath], true, 30),
           ([
@@ -795,16 +825,26 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
         (["shell", "sha256sum", deployment.backupPath], true, 30),
       ]
     case .targetMatchesArtifact:
+      guard let helperRemotePath = deployment.codeSignHelperRemotePath else {
+        throw DeviceProviderError.unsupportedAction(
+          "native target inspection has no persisted code-sign helper path")
+      }
       commands = [
-        (["shell", "sha256sum", deployment.targetPath], true, 30)
+        (["shell", "sha256sum", deployment.targetPath], true, 30),
+        (["shell", helperRemotePath, "verify", deployment.targetPath], true, 30),
       ]
     case .targetStopped, .targetStarted:
       commands = [
         (["shell", "pidof", deployment.bundle.bundleName], true, 30)
       ]
     case .targetLoaded:
+      guard let helperRemotePath = deployment.codeSignHelperRemotePath else {
+        throw DeviceProviderError.unsupportedAction(
+          "native loader inspection has no persisted code-sign helper path")
+      }
       var selected: [([String], Bool, Int)] = [
-        (["shell", "sha256sum", deployment.targetPath], true, 30)
+        (["shell", "sha256sum", deployment.targetPath], true, 30),
+        (["shell", helperRemotePath, "verify", deployment.targetPath], true, 30),
       ]
       if deployment.verificationProfile != .hashOnly {
         selected.append(
@@ -821,6 +861,10 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
       var selected: [([String], Bool, Int)] = [
         (["shell", "ls", "-ld", deployment.stagingPath], true, 15),
       ]
+      if let helperRemotePath = deployment.codeSignHelperRemotePath {
+        selected.append(
+          (["shell", "ls", "-ld", helperRemotePath], true, 15))
+      }
       if deployment.stagingDirectoryIsJobOwned {
         selected.append(
           (["shell", "ls", "-ld", deployment.stagingDirectoryPath], true, 15))
@@ -1128,21 +1172,26 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
       }
       return .verified(summary: ["stagedAt": staged.path.remotePath])
 
-    case .sendNativeLibraryToStaging:
-      guard receipt.exitStatus == 0 else {
+    case .sendNativeLibraryToStaging(let deployment):
+      guard receipt.exitStatus == 0,
+        receipt.subprocesses.count == 5,
+        let expectedHelper = deployment.codeSignHelperFacts,
+        sha256(receipt.subprocesses[4]) == expectedHelper.sha256
+      else {
         return .failed(
           code: "nativeSendFailed",
-          detail: "native library transfer did not complete")
+          detail:
+            "native library and the pinned code-sign helper did not both transfer cleanly")
       }
       return .unknown(
         reason: "native staging send requires remote hash readback")
 
     case .backupNativeLibrary(let deployment):
-      guard receipt.subprocesses.count == 7 else {
+      guard receipt.subprocesses.count == 8 else {
         return .unknown(reason: "native backup did not produce its complete readback sequence")
       }
       let observedTargetHash = sha256(receipt.subprocesses[2])
-      let observedBackupHash = sha256(receipt.subprocesses[4])
+      let observedBackupHash = sha256(receipt.subprocesses[5])
       let observedBackupMatches =
         observedBackupHash != nil && observedBackupHash == observedTargetHash
       guard isDirectoryListing(receipt.subprocesses[0]),
@@ -1150,7 +1199,9 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
         let targetHash = observedTargetHash,
         let backupHash = observedBackupHash,
         targetHash == backupHash,
-        isRegularFileListing(receipt.subprocesses[5])
+        receipt.subprocesses[3].exitStatus == 0,
+        receipt.subprocesses[4].exitStatus == 0,
+        isRegularFileListing(receipt.subprocesses[6])
       else {
         let diagnostics = receipt.subprocesses.enumerated().map {
           "\($0.offset):\(boundedProcessDiagnostic($0.element))"
@@ -1165,11 +1216,12 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
             + "targetListed=\(isRegularFileListing(receipt.subprocesses[1])), "
             + "targetHashExit=\(exitSummary(receipt.subprocesses[2])), "
             + "targetHashPresent=\(observedTargetHash != nil), "
-            + "copyExit=\(exitSummary(receipt.subprocesses[3])), "
-            + "backupHashExit=\(exitSummary(receipt.subprocesses[4])), "
+            + "removeOldBackupExit=\(exitSummary(receipt.subprocesses[3])), "
+            + "hardLinkExit=\(exitSummary(receipt.subprocesses[4])), "
+            + "backupHashExit=\(exitSummary(receipt.subprocesses[5])), "
             + "backupHashMatches=\(observedBackupMatches), "
-            + "backupExit=\(exitSummary(receipt.subprocesses[5])), "
-            + "backupListed=\(isRegularFileListing(receipt.subprocesses[5])), "
+            + "backupExit=\(exitSummary(receipt.subprocesses[6])), "
+            + "backupListed=\(isRegularFileListing(receipt.subprocesses[6])), "
             + "diagnostics=\(diagnostics))")
       }
       return .verified(summary: [
@@ -1178,25 +1230,33 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
       ])
 
     case .publishNativeLibrary(let deployment):
-      guard receipt.subprocesses.count == 8,
+      guard receipt.subprocesses.count == 5,
         let originalIdentity = nativeFileIdentity(receipt.subprocesses[0]),
-        let preparedIdentity = nativeFileIdentity(receipt.subprocesses[3]),
-        let publishedIdentity = nativeFileIdentity(receipt.subprocesses[7]),
-        originalIdentity == preparedIdentity,
-        preparedIdentity == publishedIdentity,
-        sha256(receipt.subprocesses[4]) == deployment.artifactFacts.sha256,
-        sha256(receipt.subprocesses[6]) == deployment.artifactFacts.sha256
+        let publishedIdentity = nativeFileIdentity(receipt.subprocesses[4]),
+        originalIdentity == publishedIdentity,
+        let publishedCodeSignDigest = codeSignDigest(
+          receipt.subprocesses[1], marker: "ARKDECK_CODE_SIGN_PUBLISHED"),
+        sha256(receipt.subprocesses[2]) == deployment.artifactFacts.sha256,
+        codeSignDigest(
+          receipt.subprocesses[3], marker: "ARKDECK_CODE_SIGN_VERIFIED")
+          == publishedCodeSignDigest
       else {
+        let diagnostics = receipt.subprocesses.enumerated().map {
+          "\($0.offset):\(boundedProcessDiagnostic($0.element))"
+        }.joined(separator: ";")
         return .failed(
           code: "nativePublishMismatch",
           detail:
             "atomic publish did not preserve app-owned mode/uid/gid "
-            + "or read back the leased ELF hash")
+            + "or read back the leased ELF hash and fs-verity state "
+            + "(subprocessCount=\(receipt.subprocesses.count), "
+            + "diagnostics=\(diagnostics))")
       }
       return .verified(summary: [
         "publishedSha256": deployment.artifactFacts.sha256,
         "buildId": deployment.artifactFacts.buildID,
         "targetPath": deployment.targetPath,
+        "fsVerityDigest": publishedCodeSignDigest,
         "mode": originalIdentity.mode,
         "uid": String(originalIdentity.userID),
         "gid": String(originalIdentity.groupID),
@@ -1238,6 +1298,7 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
     case .cleanupNativeLibrary(let deployment):
       let absenceCount =
         2 + (deployment.stagingDirectoryIsJobOwned ? 1 : 0)
+        + (deployment.codeSignHelperRemotePath == nil ? 0 : 1)
         + (deployment.rollbackPolicy == .autoRollback ? 1 : 0)
       guard receipt.subprocesses.count >= absenceCount,
         receipt.subprocesses.suffix(absenceCount).allSatisfy(pathIsAbsent)
@@ -1258,7 +1319,6 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
       }
       let backupHash = sha256(receipt.subprocesses[0])
       let stopReadback = receipt.subprocesses[4]
-      let rollbackHash = sha256(receipt.subprocesses[6])
       let restoredHash = sha256(receipt.subprocesses[8])
       let pids = processIDs(receipt.subprocesses[11])
       let mapsMatched =
@@ -1269,7 +1329,6 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
         } ?? false
       guard let backupHash,
         processIsAbsent(stopReadback),
-        rollbackHash == backupHash,
         restoredHash == backupHash,
         let pids, !pids.isEmpty,
         mapsMatched
@@ -1281,7 +1340,6 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
             + "(forceStopExit=\(exitSummary(receipt.subprocesses[1])), "
             + "pidofExit=\(exitSummary(stopReadback)), "
             + "stopPids=\(pidSummary(stopReadback)), "
-            + "rollbackHashMatches=\(rollbackHash != nil && rollbackHash == backupHash), "
             + "targetHashMatches=\(restoredHash != nil && restoredHash == backupHash), "
             + "startExit=\(exitSummary(receipt.subprocesses[9])), "
             + "startedPids=\(pids?.map(String.init).joined(separator: ",") ?? "none"), "
@@ -1478,13 +1536,19 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
       }
       return .verified(summary: ["backupSha256": targetHash])
     case .targetMatchesArtifact:
-      guard subprocesses.count == 1,
-        sha256(subprocesses[0]) == deployment.artifactFacts.sha256
+      guard subprocesses.count == 2,
+        sha256(subprocesses[0]) == deployment.artifactFacts.sha256,
+        let digest = codeSignDigest(
+          subprocesses[1], marker: "ARKDECK_CODE_SIGN_VERIFIED")
       else {
         return .failed(
-          code: "nativeTargetHashMismatch", detail: "published target hash differs")
+          code: "nativeTargetHashMismatch",
+          detail: "published target hash or fs-verity state differs")
       }
-      return .verified(summary: ["publishedSha256": deployment.artifactFacts.sha256])
+      return .verified(summary: [
+        "publishedSha256": deployment.artifactFacts.sha256,
+        "fsVerityDigest": digest,
+      ])
     case .targetStopped:
       guard subprocesses.count == 1, processIsAbsent(subprocesses[0]) else {
         return .failed(
@@ -1503,7 +1567,10 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
       ])
     case .targetLoaded:
       guard !subprocesses.isEmpty,
-        sha256(subprocesses[0]) == deployment.artifactFacts.sha256
+        sha256(subprocesses[0]) == deployment.artifactFacts.sha256,
+        subprocesses.count >= 2,
+        let verityDigest = codeSignDigest(
+          subprocesses[1], marker: "ARKDECK_CODE_SIGN_VERIFIED")
       else {
         return .failed(
           code: "nativeTargetHashMismatch",
@@ -1513,10 +1580,11 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
         "publishedSha256": deployment.artifactFacts.sha256,
         "buildId": deployment.artifactFacts.buildID,
         "abi": deployment.artifactFacts.abi.rawValue,
+        "fsVerityDigest": verityDigest,
       ]
       if deployment.verificationProfile != .hashOnly {
-        guard subprocesses.count >= 2,
-          let pids = processIDs(subprocesses[1]), !pids.isEmpty
+        guard subprocesses.count >= 3,
+          let pids = processIDs(subprocesses[2]), !pids.isEmpty
         else {
           return .failed(
             code: "nativeTargetNotRunning",
@@ -1524,9 +1592,9 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
         }
         summary["processIds"] = pids.map(String.init).joined(separator: ",")
         if deployment.verificationProfile == .hashProcessAndMaps {
-          guard subprocesses.count == 3,
+          guard subprocesses.count == 4,
             mapsContain(
-              subprocesses[2], targetPath: deployment.loaderVisiblePath,
+              subprocesses[3], targetPath: deployment.loaderVisiblePath,
               pids: pids)
           else {
             return .failed(
@@ -1540,6 +1608,7 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
     case .cleanupComplete:
       let expectedCount =
         2 + (deployment.stagingDirectoryIsJobOwned ? 1 : 0)
+        + (deployment.codeSignHelperRemotePath == nil ? 0 : 1)
         + (deployment.rollbackPolicy == .autoRollback ? 1 : 0)
       guard subprocesses.count == expectedCount,
         subprocesses.allSatisfy(pathIsAbsent)
@@ -1586,6 +1655,34 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
       return nil
     }
     return value
+  }
+
+  private func codeSignDigest(
+    _ receipt: ProviderSubprocessReceipt,
+    marker: String
+  ) -> String? {
+    guard receipt.exitStatus == 0, !receipt.stdoutTruncated,
+      receipt.stderr.isEmpty,
+      let text = String(data: receipt.stdout, encoding: .utf8)
+    else {
+      return nil
+    }
+    let lines = text.split(
+      omittingEmptySubsequences: true, whereSeparator: \.isNewline)
+    guard lines.count == 1 else { return nil }
+    let fields = lines[0].split(whereSeparator: \.isWhitespace)
+    guard fields.count == 2, fields[0] == Substring(marker),
+      fields[1].hasPrefix("sha256:")
+    else {
+      return nil
+    }
+    let digest = String(fields[1].dropFirst("sha256:".count))
+    guard digest.count == 64,
+      digest.allSatisfy({ $0.isNumber || ("a"..."f").contains(String($0)) })
+    else {
+      return nil
+    }
+    return digest
   }
 
   private func processIDs(_ receipt: ProviderSubprocessReceipt) -> [UInt32]? {
