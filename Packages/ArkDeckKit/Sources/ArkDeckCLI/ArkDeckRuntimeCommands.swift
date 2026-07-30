@@ -8,6 +8,8 @@
 
 import ArkDeckAgentClient
 import ArkDeckCore
+import CryptoKit
+import Darwin
 import Foundation
 
 enum RuntimeCLI {
@@ -231,11 +233,74 @@ enum RuntimeCLI {
   static func runArtifact(_ arguments: [String]) throws {
     guard let subcommand = arguments.first else {
       throw CLIError(
-        exitCode: EX_USAGE, message: "missing artifact subcommand (list|inspect|read|export)")
+        exitCode: EX_USAGE,
+        message: "missing artifact subcommand (import-hap|list|inspect|read|export)")
     }
     var rest = Array(arguments.dropFirst())
     let json = rest.contains("--json")
     let client = client(&rest)
+    if subcommand == "import-hap" {
+      guard let targetIndex = rest.firstIndex(of: "--target"), targetIndex + 1 < rest.count,
+        let fileIndex = rest.firstIndex(of: "--file"), fileIndex + 1 < rest.count
+      else {
+        throw CLIError(
+          exitCode: EX_USAGE,
+          message: "artifact import-hap requires --target <id> --file <signed.hap>")
+      }
+      let targetID = rest[targetIndex + 1]
+      let payload = try readHAPImportPayload(path: rest[fileIndex + 1])
+      let begin = try client.request(
+        method: "artifact.importHap.begin",
+        params: [
+          "targetId": .string(targetID),
+          "name": .string(payload.name),
+          "byteCount": .integer(Int64(payload.contents.count)),
+          "sha256": .string(payload.sha256),
+        ])
+      guard case .object(let beginFields) = begin,
+        case .string(let uploadID)? = beginFields["uploadId"],
+        case .integer(let maximumChunkValue)? = beginFields["maximumChunkBytes"],
+        maximumChunkValue > 0, maximumChunkValue <= Int64(Int.max)
+      else {
+        throw AgentClientError.malformedResponse(
+          "artifact.importHap.begin returned no bounded upload identity")
+      }
+      var committed = false
+      defer {
+        if !committed {
+          _ = try? client.request(
+            method: "artifact.importHap.abort",
+            params: ["uploadId": .string(uploadID)])
+        }
+      }
+      let maximumChunk = Int(maximumChunkValue)
+      var offset = 0
+      while offset < payload.contents.count {
+        let end = min(payload.contents.count, offset + maximumChunk)
+        let chunk = payload.contents.subdata(in: offset..<end)
+        let appended = try client.request(
+          method: "artifact.importHap.append",
+          params: [
+            "uploadId": .string(uploadID),
+            "offset": .integer(Int64(offset)),
+            "base64": .string(chunk.base64EncodedString()),
+          ])
+        guard case .object(let fields) = appended,
+          case .integer(let nextOffset)? = fields["nextOffset"],
+          nextOffset == Int64(end)
+        else {
+          throw AgentClientError.malformedResponse(
+            "artifact.importHap.append returned a mismatched offset")
+        }
+        offset = end
+      }
+      let result = try client.request(
+        method: "artifact.importHap.commit",
+        params: ["uploadId": .string(uploadID)])
+      committed = true
+      emit(result, json: json)
+      return
+    }
     guard let jobIndex = rest.firstIndex(of: "--job"), jobIndex + 1 < rest.count else {
       throw CLIError(exitCode: EX_USAGE, message: "artifact commands require --job <id>")
     }
@@ -270,6 +335,76 @@ enum RuntimeCLI {
     default:
       throw CLIError(exitCode: EX_USAGE, message: "unsupported artifact subcommand")
     }
+  }
+
+  private struct HAPImportPayload {
+    let name: String
+    let contents: Data
+    let sha256: String
+  }
+
+  private static func readHAPImportPayload(path: String) throws -> HAPImportPayload {
+    let url = URL(fileURLWithPath: path).standardizedFileURL
+    let name = url.lastPathComponent
+    guard name.count <= 128,
+      name.range(
+        of: #"^[A-Za-z0-9][A-Za-z0-9._-]*\.hap$"#,
+        options: .regularExpression) != nil
+    else {
+      throw CLIError(
+        exitCode: EX_USAGE, message: "HAP file must have a safe .hap basename")
+    }
+    let descriptor = Darwin.open(url.path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW)
+    guard descriptor >= 0 else {
+      throw CLIError(
+        exitCode: EX_USAGE, message: "cannot open HAP file (errno \(errno))")
+    }
+    defer { Darwin.close(descriptor) }
+    var before = stat()
+    let maximumBytes = 64 * 1_024 * 1_024
+    guard fstat(descriptor, &before) == 0,
+      before.st_mode & S_IFMT == S_IFREG,
+      before.st_size > 0,
+      before.st_size <= maximumBytes
+    else {
+      throw CLIError(
+        exitCode: EX_USAGE,
+        message: "HAP must be a non-empty regular file no larger than \(maximumBytes) bytes")
+    }
+    var contents = Data()
+    contents.reserveCapacity(Int(before.st_size))
+    var buffer = [UInt8](repeating: 0, count: 1_024 * 1_024)
+    while true {
+      let count = Darwin.read(descriptor, &buffer, buffer.count)
+      if count < 0, errno == EINTR { continue }
+      guard count >= 0 else {
+        throw CLIError(
+          exitCode: EX_USAGE, message: "HAP read failed (errno \(errno))")
+      }
+      if count == 0 { break }
+      contents.append(contentsOf: buffer[0..<count])
+    }
+    var after = stat()
+    guard fstat(descriptor, &after) == 0,
+      contents.count == Int(before.st_size),
+      after.st_dev == before.st_dev,
+      after.st_ino == before.st_ino,
+      after.st_size == before.st_size,
+      after.st_mtimespec.tv_sec == before.st_mtimespec.tv_sec,
+      after.st_mtimespec.tv_nsec == before.st_mtimespec.tv_nsec,
+      after.st_ctimespec.tv_sec == before.st_ctimespec.tv_sec,
+      after.st_ctimespec.tv_nsec == before.st_ctimespec.tv_nsec
+    else {
+      throw CLIError(
+        exitCode: EX_USAGE, message: "HAP changed while it was being imported")
+    }
+    guard contents.starts(with: [0x50, 0x4b, 0x03, 0x04]) else {
+      throw CLIError(
+        exitCode: EX_USAGE, message: "HAP is not a ZIP-based .hap container")
+    }
+    let digest = SHA256.hash(data: contents)
+      .map { String(format: "%02x", $0) }.joined()
+    return HAPImportPayload(name: name, contents: contents, sha256: digest)
   }
 
   private static func json2Bool(_ arguments: [String]) -> Bool {

@@ -548,6 +548,7 @@ struct ArkDeckCommandLine {
         arkdeck job status --job <id> [--json] | arkdeck job list [--json]
         arkdeck job submit --request-file <request.json> [--wait] [--json]
         arkdeck capability list|install --file <cap.json>|revoke --capability <id> [--json]
+        arkdeck artifact import-hap --target <id> --file <signed.hap> [--json]
         arkdeck artifact list|inspect|read|export --job <id> [--artifact <id>] \
       [--destination <directory>] [--allow-sensitive]
         arkdeck agent run --operation <id@version> [--target <id>] [--inputs-file <path>] \

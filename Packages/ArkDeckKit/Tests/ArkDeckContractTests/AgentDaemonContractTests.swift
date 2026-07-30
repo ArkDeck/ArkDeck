@@ -1,4 +1,5 @@
 import XCTest
+import CryptoKit
 
 @testable import ArkDeckAgentClient
 @testable import ArkDeckAgentDaemon
@@ -70,7 +71,10 @@ final class AgentDaemonContractTests: XCTestCase {
     }
   }
 
-  private func makeStack() throws -> (RuntimeControlPlaneHandler, RuntimeJobEngine) {
+  private func makeStack(
+    targetStore: RuntimeTargetStore? = nil,
+    artifactStore: RuntimeArtifactStore? = nil
+  ) throws -> (RuntimeControlPlaneHandler, RuntimeJobEngine) {
     let capabilityStore = try RuntimeCapabilityStore(
       directoryURL: stateDirectory.appendingPathComponent("capabilities", isDirectory: true))
     let providers = DeviceProviderRegistry(providers: [
@@ -82,12 +86,25 @@ final class AgentDaemonContractTests: XCTestCase {
       providers: providers,
       dispatcher: HappyDispatcher(),
       capabilityStore: capabilityStore,
+      artifactStore: artifactStore,
       nowUTC: { "2026-07-29T00:00:00Z" })
     let handler = RuntimeControlPlaneHandler(
       engine: engine, capabilityStore: capabilityStore,
       providerIDs: providers.registeredProviderIDs,
-      nowUTC: { "2026-07-29T00:00:00Z" })
+      nowUTC: { "2026-07-29T00:00:00Z" },
+      targetStore: targetStore,
+      artifactStore: artifactStore)
     return (handler, engine)
+  }
+
+  private func request(
+    _ handler: RuntimeControlPlaneHandler,
+    method: String,
+    params: [String: JSONValue]? = nil
+  ) async throws -> AgentWireProtocol.Response {
+    let frame = try JSONEncoder().encode(
+      AgentWireProtocol.Request(id: UUID().uuidString, method: method, params: params))
+    return await handler.handleFrame(frame)
   }
 
   private func startServer(_ handler: RuntimeControlPlaneHandler) throws -> AgentDaemonServer {
@@ -408,7 +425,11 @@ final class AgentDaemonContractTests: XCTestCase {
   /// "this job produced nothing").
   func testArtifactMethodsAreIDOnlyAndFailClosedWithoutAStore() async throws {
     let (handler, _) = try makeStack()
-    for method in ["artifact.list", "artifact.inspect", "artifact.read", "artifact.export"] {
+    for method in [
+      "artifact.importHap.begin", "artifact.importHap.append",
+      "artifact.importHap.commit", "artifact.list", "artifact.inspect",
+      "artifact.read", "artifact.export",
+    ] {
       let response = await handler.handleFrame(
         Data(
           """
@@ -424,6 +445,169 @@ final class AgentDaemonContractTests: XCTestCase {
     let noJob = await handler.handleFrame(
       Data("{\"protocolVersion\":\"1.0.0\",\"id\":\"b\",\"method\":\"artifact.list\"}".utf8))
     XCTAssertFalse(noJob.ok)
+  }
+
+  func testChunkedHAPImportPublishesATargetBoundIDOnlyLease() async throws {
+    let targetStore = try RuntimeTargetStore(
+      directoryURL: stateDirectory.appendingPathComponent("targets", isDirectory: true))
+    let stableIdentity = String(repeating: "a", count: 64)
+    let target = try targetStore.adopt(
+      stableIdentitySHA256: stableIdentity,
+      connectKey: "150100424a544e4600",
+      toolVersion: "3.2.0f",
+      nowUTC: "2026-07-29T00:00:00Z").record
+    let artifactStore = try RuntimeArtifactStore(
+      rootURL: stateDirectory.appendingPathComponent("artifacts", isDirectory: true),
+      nowUTC: { "2026-07-29T00:00:00Z" })
+    let (handler, _) = try makeStack(
+      targetStore: targetStore, artifactStore: artifactStore)
+    let hap = Data([0x50, 0x4b, 0x03, 0x04]) + Data(repeating: 0x41, count: 700_000)
+    let digest = SHA256.hash(data: hap)
+      .map { String(format: "%02x", $0) }.joined()
+
+    let begin = try await request(
+      handler,
+      method: "artifact.importHap.begin",
+      params: [
+        "targetId": .string(target.targetID),
+        "name": .string("entry-default-signed.hap"),
+        "byteCount": .integer(Int64(hap.count)),
+        "sha256": .string(digest),
+      ])
+    XCTAssertTrue(begin.ok, begin.error?.message ?? "-")
+    guard case .object(let beginFields)? = begin.result,
+      case .string(let uploadID)? = beginFields["uploadId"]
+    else {
+      return XCTFail("begin must return an upload identity")
+    }
+
+    let boundary = 400_000
+    for (offset, bytes) in [
+      (0, hap.subdata(in: 0..<boundary)),
+      (boundary, hap.subdata(in: boundary..<hap.count)),
+    ] {
+      let append = try await request(
+        handler,
+        method: "artifact.importHap.append",
+        params: [
+          "uploadId": .string(uploadID),
+          "offset": .integer(Int64(offset)),
+          "base64": .string(bytes.base64EncodedString()),
+        ])
+      XCTAssertTrue(append.ok, append.error?.message ?? "-")
+    }
+
+    let commit = try await request(
+      handler,
+      method: "artifact.importHap.commit",
+      params: ["uploadId": .string(uploadID)])
+    XCTAssertTrue(commit.ok, commit.error?.message ?? "-")
+    guard case .object(let fields)? = commit.result,
+      case .string(let jobID)? = fields["jobId"],
+      case .string(let artifactID)? = fields["artifactId"],
+      case .string(let lease)? = fields["lease"],
+      case .string(let returnedDigest)? = fields["sha256"],
+      case .string(let returnedTarget)? = fields["targetId"],
+      case .integer(let returnedRevision)? = fields["bindingRevision"]
+    else {
+      return XCTFail("commit must return the Artifact identity and lease")
+    }
+    XCTAssertEqual(returnedDigest, digest)
+    XCTAssertEqual(returnedTarget, target.targetID)
+    XCTAssertEqual(returnedRevision, Int64(target.bindingRevision))
+    XCTAssertEqual(lease, "lease-v1:\(jobID):\(artifactID)")
+    XCTAssertFalse(lease.contains(stateDirectory.path))
+
+    let metadata = try await artifactStore.inspect(
+      jobID: jobID, artifactID: artifactID)
+    XCTAssertEqual(metadata.bindingSnapshot.targetID, target.targetID)
+    XCTAssertEqual(metadata.bindingSnapshot.bindingRevision, target.bindingRevision)
+    XCTAssertEqual(metadata.bindingSnapshot.stableIdentitySHA256, stableIdentity)
+    XCTAssertEqual(metadata.mediaType, "application/vnd.openharmony.hap")
+    let resolution = try await artifactStore.resolveLease(lease)
+    XCTAssertEqual(resolution.sha256, digest)
+    XCTAssertEqual(resolution.byteCount, hap.count)
+    XCTAssertEqual(try Data(contentsOf: resolution.fileURL), hap)
+
+    let inspect = try await request(
+      handler,
+      method: "artifact.inspect",
+      params: ["jobId": .string(jobID), "artifactId": .string(artifactID)])
+    guard case .object(let inspectFields)? = inspect.result else {
+      return XCTFail("Artifact inspection must return durable binding metadata")
+    }
+    XCTAssertEqual(inspectFields["jobId"], .string(jobID))
+    XCTAssertEqual(inspectFields["targetId"], .string(target.targetID))
+    XCTAssertEqual(
+      inspectFields["bindingRevision"], .integer(Int64(target.bindingRevision)))
+    XCTAssertEqual(inspectFields["stableIdentitySha256"], .string(stableIdentity))
+  }
+
+  func testHAPImportRejectsUnknownTargetAndInvalidContainerWithoutPublication() async throws {
+    let targetStore = try RuntimeTargetStore(
+      directoryURL: stateDirectory.appendingPathComponent("targets", isDirectory: true))
+    let target = try targetStore.adopt(
+      stableIdentitySHA256: String(repeating: "b", count: 64),
+      connectKey: "150100424a544e4600",
+      toolVersion: "3.2.0f",
+      nowUTC: "2026-07-29T00:00:00Z").record
+    let artifactStore = try RuntimeArtifactStore(
+      rootURL: stateDirectory.appendingPathComponent("artifacts", isDirectory: true),
+      nowUTC: { "2026-07-29T00:00:00Z" })
+    let (handler, _) = try makeStack(
+      targetStore: targetStore, artifactStore: artifactStore)
+    let bytes = Data("not-a-hap".utf8)
+    let digest = SHA256.hash(data: bytes)
+      .map { String(format: "%02x", $0) }.joined()
+
+    let unknown = try await request(
+      handler,
+      method: "artifact.importHap.begin",
+      params: [
+        "targetId": .string("TGT-unknown"),
+        "name": .string("bad.hap"),
+        "byteCount": .integer(Int64(bytes.count)),
+        "sha256": .string(digest),
+      ])
+    XCTAssertFalse(unknown.ok)
+    XCTAssertEqual(unknown.error?.code, "notFound")
+
+    let begin = try await request(
+      handler,
+      method: "artifact.importHap.begin",
+      params: [
+        "targetId": .string(target.targetID),
+        "name": .string("bad.hap"),
+        "byteCount": .integer(Int64(bytes.count)),
+        "sha256": .string(digest),
+      ])
+    guard case .object(let beginFields)? = begin.result,
+      case .string(let uploadID)? = beginFields["uploadId"]
+    else {
+      return XCTFail("begin must return an upload identity")
+    }
+    let append = try await request(
+      handler,
+      method: "artifact.importHap.append",
+      params: [
+        "uploadId": .string(uploadID),
+        "offset": .integer(0),
+        "base64": .string(bytes.base64EncodedString()),
+      ])
+    XCTAssertTrue(append.ok)
+    let commit = try await request(
+      handler,
+      method: "artifact.importHap.commit",
+      params: ["uploadId": .string(uploadID)])
+    XCTAssertFalse(commit.ok)
+    XCTAssertEqual(commit.error?.code, "rejected")
+    XCTAssertTrue((commit.error?.message ?? "").contains("ZIP-based"))
+
+    let expectedJob =
+      "input-hap-\(target.targetID)-r\(target.bindingRevision)-"
+      + String(digest.prefix(16))
+    let artifacts = try await artifactStore.list(jobID: expectedJob)
+    XCTAssertTrue(artifacts.isEmpty)
   }
 
   func testWireProtocolCarriesNoArgvSurface() async throws {
