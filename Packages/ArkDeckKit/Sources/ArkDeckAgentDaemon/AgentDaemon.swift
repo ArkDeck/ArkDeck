@@ -268,7 +268,9 @@ public struct RuntimeControlPlaneHandler: Sendable {
         var blockers: [String] = []
         if let artifactStore {
           do {
-            artifacts = try await artifactStore.verifiedEvidenceArtifacts(jobID: jobID)
+            let omitted = try await engine.intentionallyOmittedArtifactNames(jobID: jobID)
+            artifacts = try await artifactStore.verifiedEvidenceArtifacts(
+              jobID: jobID, intentionallyOmittedNames: omitted)
           } catch {
             blockers.append("artifactVerification:\(error)")
           }
@@ -515,11 +517,13 @@ public struct RuntimeControlPlaneHandler: Sendable {
                 .object(["candidate": .string($0.connectKey), "state": .string($0.state)])
               }),
           ]))
-      case .waitingForHuman(let prompt):
+      case .waitingForHuman(let kind, let prompt):
         return success(
           id: request.id,
           result: .object([
-            "outcome": .string("waitingForHuman"), "prompt": .string(prompt),
+            "outcome": .string("waitingForHuman"),
+            "humanActionKind": .string(kind.rawValue),
+            "prompt": .string(prompt),
           ]))
       case .failed(let reason):
         return failure(id: request.id, code: .rejected, message: reason)
