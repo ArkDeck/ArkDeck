@@ -398,6 +398,13 @@ public actor RuntimeJobEngine {
     let steps: [MaterializedPlanStep]
   }
 
+  /// Authorization binds the typed plan template, not the per-execution
+  /// Job identifier embedded in owned temporary paths. Runtime dispatch
+  /// still materializes each path with its real Job ID, preserving
+  /// isolation; this stable context lets the same reviewed envelope cover
+  /// repeated executions of the unchanged semantic plan.
+  private static let authorizationPlanJobID = "job-authorization-envelope"
+
   private let configuration: Configuration
   private let providers: DeviceProviderRegistry
   private let dispatcher: any RuntimeProcessDispatching
@@ -464,7 +471,8 @@ public actor RuntimeJobEngine {
     _ requestData: Data,
     issuedAtUTC: String,
     expiresAtUTC: String,
-    issuerReference: String
+    issuerReference: String,
+    maximumUses: Int = 1
   ) async throws -> RuntimeCapabilityDraft {
     let request: RuntimeOperationRequest
     do {
@@ -487,9 +495,13 @@ public actor RuntimeJobEngine {
         .authorizationRequired,
         "automatic capability drafting is limited to E1 deviceMutation operations")
     }
+    guard (1...32).contains(maximumUses) else {
+      throw RuntimeJobEngineError.rejected(
+        .invalidInput, "E1 authorization envelope maximumUses must be between 1 and 32")
+    }
 
     var seed = requestData
-    seed.append(Data("\n\(issuedAtUTC)\n\(expiresAtUTC)".utf8))
+    seed.append(Data("\n\(issuedAtUTC)\n\(expiresAtUTC)\n\(maximumUses)".utf8))
     let seedDigest = RuntimeJobRecord.sha256Hex(seed)
     let timestamp = issuedAtUTC.filter {
       $0.isASCII && ($0.isNumber || $0 == "T" || $0 == "Z")
@@ -520,11 +532,9 @@ public actor RuntimeJobEngine {
         "cannot encode the materialized authorization request: \(error)")
     }
     let requestFingerprint = Self.fingerprint(of: authorizedData)
-    let jobID = Self.stableJobID(
-      idempotencyKey: request.idempotencyKey,
-      requestFingerprint: requestFingerprint)
     let materialized = try await materializeTypedPlanBeforeAuthorization(
-      request: authorizedRequest, descriptor: descriptor, jobID: jobID)
+      request: authorizedRequest, descriptor: descriptor,
+      jobID: Self.authorizationPlanJobID)
     let capability: RuntimeCapability
     do {
       capability = try RuntimeCapability(
@@ -539,7 +549,7 @@ public actor RuntimeJobEngine {
         inputConstraints: Self.exactCapabilityConstraints(for: request.inputs),
         issuedAtUTC: issuedAtUTC,
         expiresAtUTC: expiresAtUTC,
-        maximumUses: 1,
+        maximumUses: maximumUses,
         issuer: RuntimeCapabilityIssuer(
           kind: .maintainerMergedPR, reference: issuerReference),
         exactPlanDigest: materialized.planDigest,
@@ -616,7 +626,8 @@ public actor RuntimeJobEngine {
     let jobID = Self.stableJobID(
       idempotencyKey: request.idempotencyKey, requestFingerprint: fingerprint)
     let materialized = try await materializeTypedPlanBeforeAuthorization(
-      request: request, descriptor: descriptor, jobID: jobID)
+      request: request, descriptor: descriptor,
+      jobID: Self.authorizationPlanJobID)
     let admission = try await preauthorize(
       request: request, descriptor: descriptor, effect: effectiveEffect,
       materialized: materialized)
@@ -740,6 +751,9 @@ public actor RuntimeJobEngine {
         try current.record.persist(
           into: jobDirectory(for: jobID))
         jobs[jobID] = current
+        try await recordCapabilityOutcome(
+          for: current.record, outcome: .outcomeUnknown,
+          state: JobState.waitingForRecovery.rawValue)
         return status(of: current.record)
       case .failed(let reason):
         // The state graph routes every terminal outcome through
@@ -749,6 +763,9 @@ public actor RuntimeJobEngine {
         current.record.finishedAtUTC = nowUTC()
         try current.record.persist(into: jobDirectory(for: jobID))
         jobs[jobID] = current
+        try await recordCapabilityOutcome(
+          for: current.record, outcome: .confirmed,
+          state: JobState.failed.rawValue)
         return status(of: current.record)
       }
     } catch let failure as RuntimeArtifactPublicationFailure {
@@ -759,8 +776,12 @@ public actor RuntimeJobEngine {
       try transition(
         &current, from: .finalizing, to: .failed,
         reason: "artifact publication failed: \(failure.detail)")
+      current.record.finishedAtUTC = nowUTC()
       try current.record.persist(into: jobDirectory(for: jobID))
       jobs[jobID] = current
+      try await recordCapabilityOutcome(
+        for: current.record, outcome: .confirmed,
+        state: JobState.failed.rawValue)
       return status(of: current.record)
     }
 
@@ -783,8 +804,12 @@ public actor RuntimeJobEngine {
         try transition(
           &current, from: .finalizing, to: .failed,
           reason: "artifact finalization failed: \(failure.detail)")
+        current.record.finishedAtUTC = nowUTC()
         try current.record.persist(into: jobDirectory(for: jobID))
         jobs[jobID] = current
+        try await recordCapabilityOutcome(
+          for: current.record, outcome: .confirmed,
+          state: JobState.failed.rawValue)
         return status(of: current.record)
       }
       current = jobs[jobID] ?? current
@@ -793,6 +818,8 @@ public actor RuntimeJobEngine {
     current.record.finishedAtUTC = nowUTC()
     try current.record.persist(into: jobDirectory(for: jobID))
     jobs[jobID] = current
+    try await recordCapabilityOutcome(
+      for: current.record, outcome: .confirmed, state: current.record.state)
     return status(of: current.record)
   }
 
@@ -2090,7 +2117,7 @@ public actor RuntimeJobEngine {
   /// park unknowns. Clean journals retain their exact confirmed provider
   /// boundary and can be resumed explicitly. Recovery itself never
   /// dispatches anything.
-  public func recoverPersistedJobs() throws -> [RuntimeJobStatus] {
+  public func recoverPersistedJobs() async throws -> [RuntimeJobStatus] {
     let jobsRoot = configuration.stateDirectory.appendingPathComponent("jobs", isDirectory: true)
     let entries =
       (try? FileManager.default.contentsOfDirectory(
@@ -2174,6 +2201,14 @@ public actor RuntimeJobEngine {
         record: record, journal: journal,
         nextSequence: nextSequence,
         completedStepIDs: Self.confirmedSucceededStepIDs(in: inspection))
+      if record.outcomeUnknown {
+        try await recordCapabilityOutcome(
+          for: record, outcome: .outcomeUnknown,
+          state: JobState.waitingForRecovery.rawValue)
+      } else if JobState(rawValue: record.state)?.isTerminal == true {
+        try await recordCapabilityOutcome(
+          for: record, outcome: .confirmed, state: record.state)
+      }
     }
     return recovered
   }
@@ -2225,6 +2260,9 @@ public actor RuntimeJobEngine {
       runtime.record.finishedAtUTC = nowUTC()
       try runtime.record.persist(into: jobDirectory(for: jobID))
       jobs[jobID] = runtime
+      try await recordCapabilityOutcome(
+        for: runtime.record, outcome: .confirmed,
+        state: JobState.failed.rawValue)
       return status(of: runtime.record)
     }
     guard inspection.unknownOutcomes.isEmpty else {
@@ -2336,7 +2374,7 @@ public actor RuntimeJobEngine {
         else {
           outcome = .stillUnknown(
             reason: "mutation has no dedicated readback; original not resent")
-          return try finishReconcile(
+          return try await finishReconcile(
             runtime: &runtime, inspection: inspection,
             intentEventID: intentEventID, stepID: stepID,
             recoveryAttemptID: recoveryAttemptID, outcome: outcome,
@@ -2356,7 +2394,7 @@ public actor RuntimeJobEngine {
     } else {
       outcome = try await provider.reconcile(intent: reference, context: context)
     }
-    return try finishReconcile(
+    return try await finishReconcile(
       runtime: &runtime, inspection: inspection,
       intentEventID: intentEventID, stepID: stepID,
       recoveryAttemptID: recoveryAttemptID, outcome: outcome,
@@ -2371,7 +2409,7 @@ public actor RuntimeJobEngine {
     recoveryAttemptID: String,
     outcome: ProviderReconcileOutcome,
     bindingRevision: Int?
-  ) throws -> RuntimeJobStatus {
+  ) async throws -> RuntimeJobStatus {
     let jobID = runtime.record.jobID
     let hasDurableResolution = inspection.events.contains { event in
       event.kind == .stepOutcome && event.correlatedIntentEventID == intentEventID
@@ -2484,6 +2522,20 @@ public actor RuntimeJobEngine {
     }
     try runtime.record.persist(into: jobDirectory(for: jobID))
     jobs[jobID] = runtime
+    switch outcome {
+    case .confirmedNotExecuted:
+      try await recordCapabilityOutcome(
+        for: runtime.record, outcome: .confirmed,
+        state: JobState.failed.rawValue)
+    case .stillUnknown:
+      try await recordCapabilityOutcome(
+        for: runtime.record, outcome: .outcomeUnknown,
+        state: JobState.waitingForRecovery.rawValue)
+    case .confirmedCompleted:
+      // This Job still owns the same reservation and must finish the
+      // remaining plan before its lineage node can authorize another Job.
+      break
+    }
     return status(of: runtime.record)
   }
 
@@ -2745,6 +2797,23 @@ public actor RuntimeJobEngine {
       {
         throw RuntimeCapabilityStoreError.denied(denial)
       }
+      guard status.lineageAllowsNewExecution else {
+        throw RuntimeCapabilityStoreError.lineageBlocked(
+          status.lineageBlocker ?? "previous authorization lineage is not confirmed")
+      }
+      if let first = status.lineage.first {
+        let operationReference = "\(query.operationID)@\(query.operationVersion)"
+        guard first.operationReference == operationReference,
+          first.effect == query.effect.rawValue,
+          first.targetStableIdentitySHA256 == query.targetStableIdentitySHA256,
+          first.bindingRevision == query.targetBindingRevision,
+          first.materializedPlanDigest == query.planDigest
+        else {
+          throw RuntimeCapabilityStoreError.lineageBlocked(
+            "operation, effect, target, binding or typed plan drifted from "
+              + "authorization lineage use 1")
+        }
+      }
       return nil
     } catch let error as RuntimeCapabilityStoreError {
       throw RuntimeJobEngineError.rejected(
@@ -2808,6 +2877,7 @@ public actor RuntimeJobEngine {
       let consumption = try await capabilityStore.consume(
         capabilityID: authorization.capabilityID,
         reservationID: runtime.record.request.idempotencyKey,
+        jobID: jobID,
         query: query,
         nowUTC: nowUTC())
       runtime.record.admissionEvidence = RuntimeAdmissionEvidence(
@@ -2832,6 +2902,30 @@ public actor RuntimeJobEngine {
     } catch {
       throw RuntimeDispatchFailure.failed(
         "authorizationRequired: capability admission could not become durable: \(error)")
+    }
+  }
+
+  private func recordCapabilityOutcome(
+    for record: RuntimeJobRecord,
+    outcome: RuntimeCapabilityUseOutcome,
+    state: String
+  ) async throws {
+    guard let evidence = record.admissionEvidence,
+      evidence.kind == .runtimeCapability || evidence.kind == .standingAuthorization
+    else {
+      return
+    }
+    do {
+      try await capabilityStore.recordOutcome(
+        capabilityID: evidence.reference,
+        reservationID: record.request.idempotencyKey,
+        jobID: record.jobID,
+        outcome: outcome,
+        terminalState: state,
+        atUTC: nowUTC())
+    } catch let error as RuntimeCapabilityStoreError {
+      throw RuntimeJobEngineError.internalFailure(
+        "authorization lineage could not become durable: \(error)")
     }
   }
 
