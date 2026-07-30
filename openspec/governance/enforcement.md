@@ -3,6 +3,15 @@
 > Version:2.2.0(git-native;2.2.0 = CHG-2026-046 ADDED"控制平面分离"节、MODIFIED"批准语义"的 PR 载体规则为垂直交付单元形态,2026-07-29;2.1.0 = CHG-2026-027 TASK-BAP-001 于"批准语义"节 ADDED 决策分级与批次审批协议两小节,2026-07-22)
 > Status:current
 > 取代 V1 密码学治理链;背景与事故记录见 `openspec/planning/postmortem-2026-07-governance.md`。
+>
+> **适用范围收窄(2026-07-30,产品闭环优先阶段)**:本文件的信任模型与「合并进
+> main = 人类批准」语义全局有效;其余流程条款(决策分级、批次审批协议、change 级
+> `verified`/archive 独立载体、验证确认与实现分离)仅适用于安全内核治理——恰四类
+> Repo 审批(新 operation/破坏性修改、新 provider、新 profile、E2 安全策略)与
+> `PRODUCT-LOOP.md` §3 安全条件触发的治理工作。日常产品交付按仓库根
+> `PRODUCT-LOOP.md` 执行:一个问题一个垂直产品 PR,不再产生 readiness/status/
+> verified/archive-only 载体;与本文件冲突时以 `PRODUCT-LOOP.md` 为准
+> (`AGENTS.md` 权威顺序)。
 
 ## 信任模型
 
