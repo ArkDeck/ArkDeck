@@ -41,6 +41,19 @@ public enum HDCProviderAction: Sendable, Equatable {
   case uninstallPackage(HDCBundleReference)
   case createPortForward(HDCPortForwardSpec)
   case removePortForward(HDCPortForwardSpec)
+  // App-owned native-library deployment. The deployment value carries a
+  // provider-derived namespace and host-verified ELF facts, never a caller
+  // path. Every mutation has a dedicated typed inspection used both in the
+  // forward path and durable reconciliation.
+  case sendNativeLibraryToStaging(HDCAppOwnedNativeLibraryDeployment)
+  case backupNativeLibrary(HDCAppOwnedNativeLibraryDeployment)
+  case publishNativeLibrary(HDCAppOwnedNativeLibraryDeployment)
+  case stopNativeTarget(HDCAppOwnedNativeLibraryDeployment)
+  case startNativeTarget(HDCAppOwnedNativeLibraryDeployment)
+  case cleanupNativeLibrary(HDCAppOwnedNativeLibraryDeployment)
+  case rollbackNativeLibrary(HDCAppOwnedNativeLibraryDeployment)
+  case inspectNativeLibrary(
+    HDCAppOwnedNativeLibraryDeployment, expectation: HDCNativeLibraryInspection)
   // Recovery-only, read-only judgements. These are never substitutes for
   // the original mutation and therefore cannot resend it.
   case readPackagePresence(HDCBundleReference)
@@ -71,12 +84,16 @@ public enum TypedProviderAction: Sendable, Equatable {
     case .hdc(.queryPackageReadback), .hdc(.verifyProcessState):
       return .readOnly
     case .hdc(.readPackagePresence), .hdc(.readProcessPresence),
-      .hdc(.readOwnedPathPresence), .hdc(.readPortForwardPresence):
+      .hdc(.readOwnedPathPresence), .hdc(.readPortForwardPresence),
+      .hdc(.inspectNativeLibrary):
       return .readOnly
     case .hdc(.captureTrace), .hdc(.cleanupOwnedRemotePath),
       .hdc(.sendArtifactToStaging), .hdc(.installPackage), .hdc(.startAbility),
       .hdc(.stopAbility), .hdc(.uninstallPackage), .hdc(.createPortForward),
-      .hdc(.removePortForward):
+      .hdc(.removePortForward), .hdc(.sendNativeLibraryToStaging),
+      .hdc(.backupNativeLibrary), .hdc(.publishNativeLibrary),
+      .hdc(.stopNativeTarget), .hdc(.startNativeTarget),
+      .hdc(.cleanupNativeLibrary), .hdc(.rollbackNativeLibrary):
       // Writing/removing the provider-owned remote temp file is a bounded
       // deviceMutation per the step registry; the operation-level effect
       // envelope (capture.diagnostics permitted set) already models it.
@@ -105,6 +122,36 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
     }
     func optional(_ value: String?, into arguments: inout [String: JSONValue], key: String) {
       if let value { arguments[key] = .string(value) }
+    }
+    func nativeArguments(
+      _ deployment: HDCAppOwnedNativeLibraryDeployment
+    ) -> [String: JSONValue] {
+      var arguments: [String: JSONValue] = [
+        "jobId": .string(deployment.jobID),
+        "artifactLeaseId": .string(deployment.artifactLeaseID),
+        "artifactId": .string(deployment.artifactID),
+        "bundleName": .string(deployment.bundle.bundleName),
+        "libraryLogicalName": .string(deployment.libraryLogicalName),
+        "abi": .string(deployment.artifactFacts.abi.rawValue),
+        "elfClassBits": .integer(Int64(deployment.artifactFacts.elfClassBits)),
+        "machine": .integer(Int64(deployment.artifactFacts.machine)),
+        "buildId": .string(deployment.artifactFacts.buildID),
+        "sha256": .string(deployment.artifactFacts.sha256),
+        "byteCount": .integer(Int64(deployment.artifactFacts.byteCount)),
+        "restartProfile": .string(deployment.restartProfile.rawValue),
+        "verificationProfile": .string(deployment.verificationProfile.rawValue),
+        "rollbackPolicy": .string(deployment.rollbackPolicy.rawValue),
+        "directoryPath": .string(deployment.directoryPath),
+        "targetPath": .string(deployment.targetPath),
+        "loaderVisiblePath": .string(deployment.loaderVisiblePath),
+        "stagingPath": .string(deployment.stagingPath),
+        "backupPath": .string(deployment.backupPath),
+        "rollbackStagingPath": .string(deployment.rollbackStagingPath),
+      ]
+      if deployment.stagingDirectoryIsJobOwned {
+        arguments["stagingDirectoryPath"] = .string(deployment.stagingDirectoryPath)
+      }
+      return arguments
     }
     switch action {
     case .hdc(.observeTool):
@@ -219,6 +266,24 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
           "localPort": .integer(Int64(spec.localPort)),
           "remotePort": .integer(Int64(spec.remotePort)),
         ])
+    case .hdc(.sendNativeLibraryToStaging(let deployment)):
+      self.init(kind: "hdc.sendNativeLibraryToStaging", arguments: nativeArguments(deployment))
+    case .hdc(.backupNativeLibrary(let deployment)):
+      self.init(kind: "hdc.backupNativeLibrary", arguments: nativeArguments(deployment))
+    case .hdc(.publishNativeLibrary(let deployment)):
+      self.init(kind: "hdc.publishNativeLibrary", arguments: nativeArguments(deployment))
+    case .hdc(.stopNativeTarget(let deployment)):
+      self.init(kind: "hdc.stopNativeTarget", arguments: nativeArguments(deployment))
+    case .hdc(.startNativeTarget(let deployment)):
+      self.init(kind: "hdc.startNativeTarget", arguments: nativeArguments(deployment))
+    case .hdc(.cleanupNativeLibrary(let deployment)):
+      self.init(kind: "hdc.cleanupNativeLibrary", arguments: nativeArguments(deployment))
+    case .hdc(.rollbackNativeLibrary(let deployment)):
+      self.init(kind: "hdc.rollbackNativeLibrary", arguments: nativeArguments(deployment))
+    case .hdc(.inspectNativeLibrary(let deployment, let expectation)):
+      var arguments = nativeArguments(deployment)
+      arguments["expectation"] = .string(expectation.rawValue)
+      self.init(kind: "hdc.inspectNativeLibrary", arguments: arguments)
     case .rockchip(.executeFlashPlan(let authorizationID)):
       self.init(
         kind: "rockchip.executeFlashPlan",
@@ -288,6 +353,47 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
         path: try path(), artifactLeaseID: try string("artifactLeaseId"),
         expectedSHA256: try optionalString("expectedSha256"))
     }
+    func nativeDeployment() throws -> HDCAppOwnedNativeLibraryDeployment {
+      guard let abi = HDCNativeLibraryABI(rawValue: try string("abi")),
+        let restart = HDCNativeRestartProfile(rawValue: try string("restartProfile")),
+        let verification = HDCNativeVerificationProfile(
+          rawValue: try string("verificationProfile")),
+        let rollback = HDCNativeRollbackPolicy(rawValue: try string("rollbackPolicy"))
+      else {
+        throw DeviceProviderError.unsupportedAction(
+          "persisted \(kind) carries an unknown native deployment profile")
+      }
+      let machineValue = try integer("machine")
+      guard let machine = UInt16(exactly: machineValue) else {
+        throw DeviceProviderError.unsupportedAction(
+          "persisted \(kind) native ELF machine is outside UInt16")
+      }
+      let deployment = try HDCAppOwnedNativeLibraryDeployment(
+        jobID: string("jobId"),
+        artifactLeaseID: string("artifactLeaseId"),
+        artifactID: string("artifactId"),
+        bundle: bundle(),
+        libraryLogicalName: string("libraryLogicalName"),
+        artifactFacts: HDCNativeLibraryArtifactFacts(
+          abi: abi,
+          elfClassBits: integer("elfClassBits"),
+          machine: machine,
+          buildID: string("buildId"),
+          sha256: string("sha256"),
+          byteCount: integer("byteCount")),
+        restartProfile: restart,
+        verificationProfile: verification,
+        rollbackPolicy: rollback,
+        exactPaths: HDCAppOwnedNativeLibraryExactPaths(
+          directoryPath: try string("directoryPath"),
+          targetPath: try string("targetPath"),
+          loaderVisiblePath: try string("loaderVisiblePath"),
+          stagingDirectoryPath: try optionalString("stagingDirectoryPath"),
+          stagingPath: try string("stagingPath"),
+          backupPath: try string("backupPath"),
+          rollbackStagingPath: try string("rollbackStagingPath")))
+      return deployment
+    }
 
     switch kind {
     case "hdc.observeTool": return .hdc(.observeTool)
@@ -355,6 +461,29 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
     case "hdc.readPortForwardPresence":
       return .hdc(.readPortForwardPresence(try HDCPortForwardSpec(
         localPort: integer("localPort"), remotePort: integer("remotePort"))))
+    case "hdc.sendNativeLibraryToStaging":
+      return .hdc(.sendNativeLibraryToStaging(try nativeDeployment()))
+    case "hdc.backupNativeLibrary":
+      return .hdc(.backupNativeLibrary(try nativeDeployment()))
+    case "hdc.publishNativeLibrary":
+      return .hdc(.publishNativeLibrary(try nativeDeployment()))
+    case "hdc.stopNativeTarget":
+      return .hdc(.stopNativeTarget(try nativeDeployment()))
+    case "hdc.startNativeTarget":
+      return .hdc(.startNativeTarget(try nativeDeployment()))
+    case "hdc.cleanupNativeLibrary":
+      return .hdc(.cleanupNativeLibrary(try nativeDeployment()))
+    case "hdc.rollbackNativeLibrary":
+      return .hdc(.rollbackNativeLibrary(try nativeDeployment()))
+    case "hdc.inspectNativeLibrary":
+      guard let expectation = HDCNativeLibraryInspection(
+        rawValue: try string("expectation"))
+      else {
+        throw DeviceProviderError.unsupportedAction(
+          "persisted native inspection expectation is unknown")
+      }
+      return .hdc(.inspectNativeLibrary(
+        try nativeDeployment(), expectation: expectation))
     case "rockchip.executeFlashPlan":
       return .rockchip(.executeFlashPlan(authorizationID: try string("authorizationId")))
     default:
@@ -432,9 +561,28 @@ public struct ProviderFacts: Sendable, Equatable {
 /// (descriptor-bound); `hostManaged` marks an adapter-compat execution the
 /// provider runs under its own proven host (Rockchip migration mode).
 /// Construction is package-only: clients cannot mint plans.
+public struct TypedProcessInvocation: Sendable, Equatable {
+  public let arguments: [String]
+  public let timeoutSeconds: Int?
+  /// A mutating command can report non-zero after partially taking effect.
+  /// Those invocations must still reach their dedicated readback.
+  public let continueAfterNonZero: Bool
+
+  package init(
+    arguments: [String],
+    timeoutSeconds: Int?,
+    continueAfterNonZero: Bool = false
+  ) {
+    self.arguments = arguments
+    self.timeoutSeconds = timeoutSeconds
+    self.continueAfterNonZero = continueAfterNonZero
+  }
+}
+
 public struct TypedProcessPlan: Sendable, Equatable {
   public enum Kind: Sendable, Equatable {
     case process(executableSHA256: String, argumentSummary: [String], timeoutSeconds: Int?)
+    case processSequence(executableSHA256: String, invocations: [TypedProcessInvocation])
     case hostManaged(descriptor: String)
   }
 
@@ -447,6 +595,28 @@ public struct TypedProcessPlan: Sendable, Equatable {
   }
 }
 
+public struct ProviderSubprocessReceipt: Sendable, Equatable {
+  public let exitStatus: Int32?
+  public let stdout: Data
+  public let stderr: Data
+  public let stdoutTruncated: Bool
+  public let durationSeconds: Double
+
+  public init(
+    exitStatus: Int32?,
+    stdout: Data,
+    stderr: Data,
+    stdoutTruncated: Bool,
+    durationSeconds: Double
+  ) {
+    self.exitStatus = exitStatus
+    self.stdout = stdout
+    self.stderr = stderr
+    self.stdoutTruncated = stdoutTruncated
+    self.durationSeconds = durationSeconds
+  }
+}
+
 public struct ProviderProcessReceipt: Sendable, Equatable {
   public let exitStatus: Int32?
   public let stdout: Data
@@ -456,6 +626,9 @@ public struct ProviderProcessReceipt: Sendable, Equatable {
   /// Present when the plan was host-managed: an opaque reference to the
   /// provider-owned durable record (e.g. Rockchip session manifest ID).
   public let hostManagedRecordID: String?
+  /// Ordered receipts for a provider-owned command/readback sequence. Empty
+  /// for the existing single-process surface.
+  public let subprocesses: [ProviderSubprocessReceipt]
 
   public init(
     exitStatus: Int32?,
@@ -463,7 +636,8 @@ public struct ProviderProcessReceipt: Sendable, Equatable {
     stderr: Data,
     stdoutTruncated: Bool,
     durationSeconds: Double,
-    hostManagedRecordID: String? = nil
+    hostManagedRecordID: String? = nil,
+    subprocesses: [ProviderSubprocessReceipt] = []
   ) {
     self.exitStatus = exitStatus
     self.stdout = stdout
@@ -471,6 +645,7 @@ public struct ProviderProcessReceipt: Sendable, Equatable {
     self.stdoutTruncated = stdoutTruncated
     self.durationSeconds = durationSeconds
     self.hostManagedRecordID = hostManagedRecordID
+    self.subprocesses = subprocesses
   }
 }
 

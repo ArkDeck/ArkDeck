@@ -69,7 +69,21 @@ public struct DescriptorBoundProcessDispatcher: RuntimeProcessDispatching {
   }
 
   public func dispatch(_ plan: TypedProcessPlan) async throws -> ProviderProcessReceipt {
-    guard case .process(_, let argv, let timeoutSeconds) = plan.kind else {
+    let invocations: [TypedProcessInvocation]
+    let isSequence: Bool
+    switch plan.kind {
+    case .process(_, let argv, let timeoutSeconds):
+      isSequence = false
+      invocations = [
+        TypedProcessInvocation(arguments: argv, timeoutSeconds: timeoutSeconds)
+      ]
+    case .processSequence(_, let sequence):
+      isSequence = true
+      guard !sequence.isEmpty else {
+        throw RuntimeDispatchFailure.failed("provider produced an empty process sequence")
+      }
+      invocations = sequence
+    case .hostManaged:
       throw RuntimeDispatchFailure.failed(
         "hostManaged plans execute inside their own host, not this dispatcher")
     }
@@ -79,10 +93,39 @@ public struct DescriptorBoundProcessDispatcher: RuntimeProcessDispatching {
     case .rockchip: providerID = "rockchip"
     }
     let executable = try resolver.resolveExecutable(providerID: providerID)
+    var subprocesses: [ProviderSubprocessReceipt] = []
+    var aggregateStdout = Data()
+    var aggregateStderr = Data()
+    var anyTruncated = false
+    for invocation in invocations {
+      let subreceipt = try await execute(
+        invocation, executable: executable)
+      subprocesses.append(subreceipt)
+      aggregateStdout.append(subreceipt.stdout)
+      aggregateStderr.append(subreceipt.stderr)
+      anyTruncated = anyTruncated || subreceipt.stdoutTruncated
+      if subreceipt.exitStatus != 0, !invocation.continueAfterNonZero {
+        break
+      }
+    }
+    let last = subprocesses.last
+    return ProviderProcessReceipt(
+      exitStatus: last?.exitStatus,
+      stdout: aggregateStdout,
+      stderr: aggregateStderr,
+      stdoutTruncated: anyTruncated,
+      durationSeconds: subprocesses.reduce(0) { $0 + $1.durationSeconds },
+      subprocesses: isSequence ? subprocesses : [])
+  }
+
+  private func execute(
+    _ invocation: TypedProcessInvocation,
+    executable: ResolvedExecutable
+  ) async throws -> ProviderSubprocessReceipt {
     let request = ProcessRequest(
       executable: URL(fileURLWithPath: executable.path),
-      arguments: argv,
-      timeout: timeoutSeconds.map(TimeInterval.init))
+      arguments: invocation.arguments,
+      timeout: invocation.timeoutSeconds.map(TimeInterval.init))
     let executor = FoundationProcessExecutor()
     let result: ProcessIdentityBoundExecutionResult
     do {
@@ -101,14 +144,13 @@ public struct DescriptorBoundProcessDispatcher: RuntimeProcessDispatching {
     let execution = result.execution
     switch execution.termination {
     case .exited(let status):
-      return ProviderProcessReceipt(
+      return ProviderSubprocessReceipt(
         exitStatus: status,
         stdout: execution.stdout.data,
         stderr: execution.stderr.data,
         stdoutTruncated: execution.stdout.wasTruncated,
         durationSeconds: 0)
     case .timedOut:
-      // A timeout says nothing about whether the device-side effect ran.
       throw RuntimeDispatchFailure.outcomeUnknown("process timed out before completion")
     case .cancelled:
       throw RuntimeDispatchFailure.outcomeUnknown("process cancelled mid-flight")

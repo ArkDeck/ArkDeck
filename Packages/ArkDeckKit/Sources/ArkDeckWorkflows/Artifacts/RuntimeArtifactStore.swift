@@ -245,12 +245,20 @@ public struct RuntimeArtifactLeaseResolution: Sendable, Equatable {
   public let fileURL: URL
   public let sha256: String
   public let byteCount: Int
+  public let bindingSnapshot: ArtifactBindingSnapshot
 
-  public init(artifactID: String, fileURL: URL, sha256: String, byteCount: Int) {
+  public init(
+    artifactID: String,
+    fileURL: URL,
+    sha256: String,
+    byteCount: Int,
+    bindingSnapshot: ArtifactBindingSnapshot
+  ) {
     self.artifactID = artifactID
     self.fileURL = fileURL
     self.sha256 = sha256
     self.byteCount = byteCount
+    self.bindingSnapshot = bindingSnapshot
   }
 }
 
@@ -556,7 +564,7 @@ public actor RuntimeArtifactStore {
     let fileURL = try storedFileURL(for: metadata)
     return RuntimeArtifactLeaseResolution(
       artifactID: artifactID, fileURL: fileURL, sha256: metadata.sha256,
-      byteCount: metadata.byteCount)
+      byteCount: metadata.byteCount, bindingSnapshot: metadata.bindingSnapshot)
   }
 
   // MARK: - Lifecycle

@@ -391,7 +391,15 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
   }
 
   func testE1RunWithoutCapabilityReachesTheJobUnderAutomaticPolicy() async throws {
-    let client = try startDaemon()
+    let connectKey = "150100424a544e4600"
+    let client = try startDaemon(preAdoptedConnectKey: connectKey)
+    guard case .array(let targets) = try client.request(method: "target.list"),
+      case .object(let target)? = targets.first,
+      case .string(let targetID)? = target["targetId"],
+      case .integer(let bindingRevision)? = target["bindingRevision"]
+    else {
+      return XCTFail("pre-adopted target must be listed")
+    }
     let store = try XCTUnwrap(artifactStore)
     let artifact = try await store.publish(
       RuntimeArtifactPublicationRequest(
@@ -401,7 +409,9 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
         retentionClass: .pinnedUntilVerified,
         sourceOperation: "build.hap@1", providerID: "host",
         bindingSnapshot: ArtifactBindingSnapshot(
-          targetID: "TGT-INPUT", bindingRevision: 1, stableIdentitySHA256: nil),
+          targetID: targetID, bindingRevision: Int(bindingRevision),
+          stableIdentitySHA256:
+            DeviceBootstrapMachine.stableIdentitySHA256(serial: connectKey)),
         contents: Data("signed-hap-fixture".utf8)))
     let lease = try await store.leaseReference(
       jobID: artifact.jobID, artifactID: artifact.artifactID)
