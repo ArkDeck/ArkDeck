@@ -1,4 +1,4 @@
-# CORE-CONFORMANCE-2.0.0 acceptance IDs; sorted, one ID per line.
+# CORE-CONFORMANCE-3.0.0 acceptance IDs; sorted, one ID per line.
 AC-ART-001-01
 AC-ART-002-01
 AC-ART-003-01
@@ -110,3 +110,6 @@ AC-UX-006-01
 AC-UX-007-01
 AC-WF-001-01
 AC-WF-002-01
+AC-WF-004-01
+AC-WF-004-02
+AC-WF-004-03

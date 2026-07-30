@@ -1,0 +1,30 @@
+# Core baseline 版本记录 —— ratification 状态的单一事实源。
+# V2 治理:ratification = 维护者批准包含本状态变更的 archive PR 并合入受保护 main;
+# 本文件在该 PR 合入前仅是待批准的 ratification 声明。
+baseline: CORE-3.0.0
+status: ratified
+ratified_at: 2026-07-30
+ratified_by: lvye (CODEOWNER review and merge of the archive PR)
+supersedes: CORE-2.1.0
+change: CHG-2026-051-agent-hardware-evidence
+core_change_level: major
+scope: >-
+  继承 CORE-2.1.0 的全部未变 scope，并纳入 CHG-2026-051 对
+  openspec/specs/workflow-journal-recovery/spec.md 新增的 REQ-WF-004 与
+  AC-WF-004-01/02/03、hardware-evidence 3.0.0 required-field contract、
+  三个既有 published operation 的 trusted-fact preflight、registered remote-read
+  action closure，以及 verification/acceptance-index.txt 与
+  acceptance-cases.yaml 登记的 114 条 Core AC。
+change_rule: >-
+  ratified 后对 scope 内文件的语义修改必须走 approved change delta,
+  经 archive PR 合入 current specs 并升版 CORE-x.y.z;不原地改写本记录。
+platform_disposition: >-
+  macOS conformance_status 进入 needsReverification；本 change 的 contract/fake
+  evidence 不构成 platform 或 hardware support。Windows/Linux 保持 deferred/not
+  started，不产生支持声明。
+notes: >-
+  本 MAJOR baseline 将 realHardware evidence writer 从 human-only V2 提升为
+  effect-aware human/Agent V3，并收紧为仅由同 run、同 binding 的 trusted Runtime
+  facts 投影；缺失、stale、mismatch、authority/effect 漂移或 Artifact hash 不可验证
+  时 publication 为 0。Schema validity 只记录 provenance，不 mint capability、
+  不批准 E2 plan，也不触发 device dispatch；V2 历史 bytes 保持不可变。

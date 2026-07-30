@@ -124,10 +124,12 @@ fake/simulation 计为 realHardware。
 - [x] `scripts/check-sdd.sh` 与完整 Swift suite PASS
 - [x] implementation run evidence 可复查
 - [x] 未执行真实设备，未追认 `DHA-HW-001` attempt#2
-- [ ] archive 时 traceability 与 next MAJOR baseline 精确更新
+- [x] archive 时 traceability 与 next MAJOR baseline 精确更新
 
 Closure receipt:`proposal.md#verification-closure2026-07-29`。实现 evidence =
 `evidence/runs/TASK-AHE-001/run.md`；latest-main 复验 =
 `evidence/runs/TASK-AHE-001/verification-r1.md`。`passed` 与 proposal
-`verified` 只在维护者 review/merge 本 verification PR 后生效。archive traceability
-与 next MAJOR baseline 保持为 archive PR 的独立结果门。
+`verified` 已由维护者 review/merge PR #815 生效。archive PR 将 approved delta
+逐字合入 current workflow spec，登记 114 条 canonical AC，ratify `CORE-3.0.0`，
+同步 conformance/traceability/platform revalidation debt，并移动完整 change
+目录；这些 archive 结论仅在维护者 review/merge archive PR 后生效。

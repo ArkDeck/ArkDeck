@@ -1,7 +1,7 @@
 # 平台交付/conformance 状态的唯一事实源(V2:不再逐文件 hash pin;历史对比用 git)
-lock: PLATFORM-PROFILES-0.3.0
+lock: PLATFORM-PROFILES-0.4.0
 status: current
-updated_at: 2026-07-21
+updated_at: 2026-07-30
 current_delivery_platforms: [macos]
 not_started_platforms: [windows, linux]
 
@@ -12,7 +12,7 @@ profiles:
     profile_path: openspec/platforms/macos/profile.md
     verification_path: openspec/platforms/macos/verification.md
     case_manifest_path: openspec/platforms/macos/conformance-cases.yaml
-    conformance_status: notStarted
+    conformance_status: needsReverification
     last_verified: null
   - id: PLATFORM-WINDOWS
     platform: windows
