@@ -94,6 +94,15 @@
   真实设备验证(适用时)+ 最小必要文档更新 + 完成结论同车交付;PR 标题与描述必须如实
   覆盖其全部内容。**不再创建 readiness-only、status-only、done-only、verified-only、
   archive-only PR**;不为同一问题追加 readiness/verification/archive 载体。
+- **Agent PR 声明必须在 push 前闭合**:`agent/**` 分支的最终 commit subject 必须包含
+  一个 base 上已存在的完整 Task ID,例如
+  `fix(TASK-DHA-001): close GJ-2 debug loop`;禁止只写 `GJ-*`/`CHG-*` 而省略
+  Task ID。最终 commit 完成后、push 前必须运行
+  `python3 scripts/check_pr_paths.py --repo-root . --preflight
+  --base-revision origin/main --head-revision HEAD`;该命令只接受 Allowed paths 覆盖完整
+  diff 的 base-tree active Task。不得声明仅由当前 head 新建/恢复的 Task,不得为通过门禁
+  扩张 Allowed paths。`agent-pr` workflow 使用同一 preflight 结果创建初始 PR 正文,
+  Agent 不得先 push 再依赖编辑 PR 正文补 `Task:`。
 - **产品工作不需要治理载体**:修复 Golden Journey 产品缺陷不要求 ready 任务包、不创建新
   OpenSpec change、不刷新旧任务状态。CI 的任务声明(`scripts/check_pr_paths.py`)仅是
   路径护栏:产品 PR 声明一个 base 上已存在、allowed paths 覆盖其改动的 active 任务

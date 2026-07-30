@@ -912,6 +912,196 @@ class PullRequestPathTests(unittest.TestCase):
         )
         self.assertNotIn("types: [opened, synchronize", workflow)
 
+    def test_preflight_accepts_an_explicit_base_tree_task(self):
+        tasks = """\
+## TASK-DHA-001 — product-loop fixture
+- Allowed paths:`Packages/**`、`docs/adr/**`
+"""
+        temporary, root, base_oid = self.make_repo(tasks)
+        self.addCleanup(temporary.cleanup)
+        source = root / "Packages" / "ArkDeckKit" / "Runtime.swift"
+        source.parent.mkdir(parents=True)
+        source.write_text("runtime\n", encoding="utf-8")
+        note = root / "docs" / "adr" / "runtime.md"
+        note.parent.mkdir(parents=True)
+        note.write_text("decision\n", encoding="utf-8")
+        head_oid = self.commit(
+            root, "fix(TASK-DHA-001): close the product loop"
+        )
+        # Local preflight is commit-to-commit: an unrelated dirty working-tree
+        # edit must not make the committed task appear archived or restored.
+        (root / "openspec" / "changes" / "chg-test" / "tasks.md").unlink()
+
+        result = check_pr_paths.preflight_paths(root, base_oid, head_oid)
+
+        self.assertEqual(result.declaration_source, "explicit")
+        self.assertEqual(result.check.task_id, "TASK-DHA-001")
+        self.assertEqual(
+            result.check.changed_paths,
+            (
+                "Packages/ArkDeckKit/Runtime.swift",
+                "docs/adr/runtime.md",
+            ),
+        )
+
+    def test_preflight_uniquely_infers_the_historical_gj_shape(self):
+        tasks = """\
+## TASK-DHA-001 — product-loop fixture
+- Allowed paths:`Packages/ArkDeckKit/**`、`docs/adr/**`
+## TASK-DOC-001 — unrelated documentation
+- Allowed paths:`docs/**`
+"""
+        temporary, root, base_oid = self.make_repo(tasks)
+        self.addCleanup(temporary.cleanup)
+        for relative in (
+            "Packages/ArkDeckKit/Sources/Runtime.swift",
+            "Packages/ArkDeckKit/Tests/RuntimeTests.swift",
+            "docs/adr/gj-2.md",
+        ):
+            path = root / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("changed\n", encoding="utf-8")
+        head_oid = self.commit(root, "fix(GJ-2): close automated HAP debug loop")
+
+        local_stderr = io.StringIO()
+        local_stdout = io.StringIO()
+        with (
+            contextlib.redirect_stderr(local_stderr),
+            contextlib.redirect_stdout(local_stdout),
+        ):
+            local_exit_code = check_pr_paths.main(
+                [
+                    "--repo-root",
+                    str(root),
+                    "--preflight",
+                    "--base-revision",
+                    base_oid,
+                    "--head-revision",
+                    head_oid,
+                ]
+            )
+        self.assertEqual(local_exit_code, 1)
+        self.assertEqual(local_stdout.getvalue(), "")
+        self.assertIn(
+            "final commit subject has no explicit Task ID; inferred TASK-DHA-001",
+            local_stderr.getvalue(),
+        )
+
+        stderr = io.StringIO()
+        stdout = io.StringIO()
+        with contextlib.redirect_stderr(stderr), contextlib.redirect_stdout(stdout):
+            exit_code = check_pr_paths.main(
+                [
+                    "--repo-root",
+                    str(root),
+                    "--preflight",
+                    "--base-revision",
+                    base_oid,
+                    "--head-revision",
+                    head_oid,
+                    "--infer-task",
+                ]
+            )
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(stdout.getvalue().strip(), "TASK-DHA-001")
+        self.assertIn(
+            "inferred TASK-DHA-001 from base-tree Allowed paths",
+            stderr.getvalue(),
+        )
+
+    def test_preflight_rejects_zero_and_multiple_full_diff_candidates(self):
+        cases = (
+            (
+                """\
+## TASK-DOC-001 — docs only
+- Allowed paths:`docs/**`
+""",
+                "no base-tree active task",
+            ),
+            (
+                """\
+## TASK-ONE-001 — first broad task
+- Allowed paths:`Packages/**`
+## TASK-TWO-001 — second broad task
+- Allowed paths:`Packages/**`
+""",
+                "multiple base-tree active tasks",
+            ),
+        )
+        for tasks, expected in cases:
+            with self.subTest(expected=expected):
+                temporary, root, base_oid = self.make_repo(tasks)
+                self.addCleanup(temporary.cleanup)
+                source = root / "Packages" / "ArkDeckKit" / "Runtime.swift"
+                source.parent.mkdir(parents=True)
+                source.write_text("runtime\n", encoding="utf-8")
+                head_oid = self.commit(root, "fix(GJ-2): product work")
+
+                self.assert_error(
+                    expected,
+                    lambda root=root, base_oid=base_oid, head_oid=head_oid: (
+                        check_pr_paths.preflight_paths(root, base_oid, head_oid)
+                    ),
+                )
+
+    def test_preflight_requires_one_task_to_cover_the_entire_diff(self):
+        tasks = """\
+## TASK-DHA-001 — packages only
+- Allowed paths:`Packages/**`
+"""
+        temporary, root, base_oid = self.make_repo(tasks)
+        self.addCleanup(temporary.cleanup)
+        source = root / "Packages" / "ArkDeckKit" / "Runtime.swift"
+        source.parent.mkdir(parents=True)
+        source.write_text("runtime\n", encoding="utf-8")
+        (root / "README.md").write_text("out of scope\n", encoding="utf-8")
+        head_oid = self.commit(root, "fix(GJ-2): mixed scope")
+
+        self.assert_error(
+            "README.md",
+            lambda: check_pr_paths.preflight_paths(root, base_oid, head_oid),
+        )
+
+    def test_preflight_never_accepts_a_task_created_by_the_head(self):
+        temporary, root, base_oid = self.make_repo(None)
+        self.addCleanup(temporary.cleanup)
+        task_file = root / "openspec" / "changes" / "chg-head" / "tasks.md"
+        task_file.parent.mkdir(parents=True)
+        task_file.write_text(
+            "## TASK-HEAD-001 — self-authorizing fixture\n"
+            "- Allowed paths:`**`\n",
+            encoding="utf-8",
+        )
+        source = root / "Packages" / "ArkDeckKit" / "Runtime.swift"
+        source.parent.mkdir(parents=True)
+        source.write_text("runtime\n", encoding="utf-8")
+        head_oid = self.commit(
+            root, "fix(TASK-HEAD-001): create and consume one task"
+        )
+
+        self.assert_error(
+            "does not exist in an active change at the base commit",
+            lambda: check_pr_paths.preflight_paths(root, base_oid, head_oid),
+        )
+
+    def test_preflight_allows_taskless_non_sensitive_diff_and_rejects_empty_diff(self):
+        temporary, root, base_oid = self.make_repo(None)
+        self.addCleanup(temporary.cleanup)
+        note = root / "docs" / "note.md"
+        note.parent.mkdir(parents=True)
+        note.write_text("note\n", encoding="utf-8")
+        head_oid = self.commit(root, "docs: update note")
+
+        result = check_pr_paths.preflight_paths(root, base_oid, head_oid)
+        self.assertEqual(result.declaration_source, "none")
+        self.assertIsNone(result.check.task_id)
+
+        self.assert_error(
+            "is empty",
+            lambda: check_pr_paths.preflight_paths(root, head_oid, head_oid),
+        )
+
 
 class AutomationConfigTests(unittest.TestCase):
     """TASK-DEC-001: the sensitive-path table is data, loaded fail-closed."""

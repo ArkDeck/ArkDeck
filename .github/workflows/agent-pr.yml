@@ -30,6 +30,8 @@ jobs:
       pr-number: ${{ steps.validate.outputs.pr-number }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Create or find and validate github-actions bot PR
         id: validate
@@ -39,6 +41,23 @@ jobs:
           HEAD_SHA: ${{ github.sha }}
         run: |
           set -eu
+          TASK_ID=$(
+            python scripts/check_pr_paths.py \
+              --repo-root "$GITHUB_WORKSPACE" \
+              --preflight \
+              --base-revision origin/main \
+              --head-revision "$HEAD_SHA" \
+              --infer-task
+          )
+          case "$TASK_ID" in
+            none|TASK-*)
+              ;;
+            *)
+              echo "::error::preflight returned an invalid task declaration"
+              exit 1
+              ;;
+          esac
+
           CANDIDATES="$RUNNER_TEMP/pull-candidates-before.json"
           gh api --method GET --paginate --slurp \
             "/repos/$GITHUB_REPOSITORY/pulls" \
@@ -54,7 +73,11 @@ jobs:
           if [ "$PR_NUMBER" = "none" ]; then
             TITLE=$(git log -1 --pretty=%s)
             BODY="$RUNNER_TEMP/pull-request-body.md"
-            printf 'Agent-drafted change from `%s`.\n\n- Review per AGENTS.md authority order; approval by the human CODEOWNER constitutes the governance decision.\n- Required exact-head checks are attached by push workflows.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n' "$BRANCH" > "$BODY"
+            : > "$BODY"
+            if [ "$TASK_ID" != "none" ]; then
+              printf 'Task: %s\n\n' "$TASK_ID" >> "$BODY"
+            fi
+            printf 'Agent-drafted change from `%s`.\n\n- Review per AGENTS.md authority order; approval by the human CODEOWNER constitutes the governance decision.\n- Required exact-head checks are attached by push workflows.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n' "$BRANCH" >> "$BODY"
             gh pr create \
               --repo "$GITHUB_REPOSITORY" \
               --head "$BRANCH" \

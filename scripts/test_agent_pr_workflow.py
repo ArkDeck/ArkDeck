@@ -240,6 +240,13 @@ def validate_automatic_check_contract(
     required_open = (
         "    permissions:\n      contents: read\n      pull-requests: write\n",
         "    outputs:\n      pr-number: ${{ steps.validate.outputs.pr-number }}\n",
+        "          fetch-depth: 0\n",
+        "--preflight",
+        "--base-revision origin/main",
+        '--head-revision "$HEAD_SHA"',
+        "--infer-task",
+        'if [ "$TASK_ID" != "none" ]; then',
+        "printf 'Task: %s\\n\\n' \"$TASK_ID\" >> \"$BODY\"",
         "gh api --method GET --paginate --slurp",
         "--pull-list \"$CANDIDATES\"",
         "--identity-only",
@@ -265,6 +272,13 @@ def validate_automatic_check_contract(
             raise WorkflowContractError(
                 f"allowed-paths job missing contract token: {token}"
             )
+    preflight_index = open_job.index("--preflight")
+    task_body_index = open_job.index("printf 'Task: %s\\n\\n'")
+    create_index = open_job.index("gh pr create")
+    if not preflight_index < task_body_index < create_index:
+        raise WorkflowContractError(
+            "Agent PR must preflight and write Task before creating the PR"
+        )
 
     forbidden = (
         "pull_request_target:",
