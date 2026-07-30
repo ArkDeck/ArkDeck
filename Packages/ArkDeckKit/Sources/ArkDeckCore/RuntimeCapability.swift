@@ -22,6 +22,7 @@ public enum RuntimeCapabilityValidationError: Error, Equatable, Sendable {
   case destructiveRequiresSingleUse
   case exactPlanDigestOnlyForDestructive
   case malformedPlanDigest(String)
+  case malformedBindingRevision(Int)
   case malformedTimestamp(String)
   case expiryNotAfterIssue
   case invalidMaximumUses(Int)
@@ -245,7 +246,8 @@ public enum RuntimeCapabilityRevocation: Equatable, Sendable, Codable {
 }
 
 /// One authorization question posed to a capability: may `operation` run at
-/// `effect` against `target` with `inputs` (and, for E2, exactly `planDigest`)?
+/// `effect` against `target` with `inputs` and any exact materialization
+/// pins carried by the capability?
 public struct RuntimeCapabilityAuthorizationQuery: Sendable {
   public let operationID: String
   public let operationVersion: Int
@@ -285,6 +287,7 @@ public struct RuntimeCapability: Equatable, Sendable, Codable {
   public let maximumUses: Int
   public let issuer: RuntimeCapabilityIssuer
   public let exactPlanDigest: String?
+  public let exactBindingRevision: Int?
   public let revocation: RuntimeCapabilityRevocation
 
   public init(
@@ -298,6 +301,7 @@ public struct RuntimeCapability: Equatable, Sendable, Codable {
     maximumUses: Int,
     issuer: RuntimeCapabilityIssuer,
     exactPlanDigest: String? = nil,
+    exactBindingRevision: Int? = nil,
     revocation: RuntimeCapabilityRevocation = .active
   ) throws {
     self.capabilityID = capabilityID
@@ -310,6 +314,7 @@ public struct RuntimeCapability: Equatable, Sendable, Codable {
     self.maximumUses = maximumUses
     self.issuer = issuer
     self.exactPlanDigest = exactPlanDigest
+    self.exactBindingRevision = exactBindingRevision
     self.revocation = revocation
     try validate()
   }
@@ -328,6 +333,8 @@ public struct RuntimeCapability: Equatable, Sendable, Codable {
     self.maximumUses = try container.decode(Int.self, forKey: .maximumUses)
     self.issuer = try container.decode(RuntimeCapabilityIssuer.self, forKey: .issuer)
     self.exactPlanDigest = try container.decodeIfPresent(String.self, forKey: .exactPlanDigest)
+    self.exactBindingRevision = try container.decodeIfPresent(
+      Int.self, forKey: .exactBindingRevision)
     self.revocation = try container.decode(RuntimeCapabilityRevocation.self, forKey: .revocation)
     do {
       try validate()
@@ -407,11 +414,12 @@ public struct RuntimeCapability: Equatable, Sendable, Codable {
       guard maximumUses == 1 else {
         throw RuntimeCapabilityValidationError.destructiveRequiresSingleUse
       }
-    } else if exactPlanDigest != nil {
-      throw RuntimeCapabilityValidationError.exactPlanDigestOnlyForDestructive
     }
     if let digest = exactPlanDigest, !Self.isHexDigest(digest) {
       throw RuntimeCapabilityValidationError.malformedPlanDigest(digest)
+    }
+    if let bindingRevision = exactBindingRevision, bindingRevision < 1 {
+      throw RuntimeCapabilityValidationError.malformedBindingRevision(bindingRevision)
     }
     guard Self.isFixedFormatUTC(issuedAtUTC) else {
       throw RuntimeCapabilityValidationError.malformedTimestamp(issuedAtUTC)
@@ -493,10 +501,21 @@ public struct RuntimeCapability: Equatable, Sendable, Codable {
           .init(reason: .targetScopeMismatch, detail: "stable identity does not match scope"))
       }
     }
-    if effectCeiling == .destructive {
-      guard let expected = exactPlanDigest else {
-        return .failure(.init(reason: .planDigestRequired, detail: "capability carries no plan digest"))
+    if let expectedBindingRevision = exactBindingRevision {
+      guard let actualBindingRevision = query.targetBindingRevision else {
+        return .failure(
+          .init(
+            reason: .targetScopeMismatch,
+            detail: "query carries no target binding revision"))
       }
+      guard actualBindingRevision == expectedBindingRevision else {
+        return .failure(
+          .init(
+            reason: .targetScopeMismatch,
+            detail: "target binding revision differs"))
+      }
+    }
+    if let expected = exactPlanDigest {
       guard let actual = query.planDigest else {
         return .failure(.init(reason: .planDigestRequired, detail: "query carries no plan digest"))
       }

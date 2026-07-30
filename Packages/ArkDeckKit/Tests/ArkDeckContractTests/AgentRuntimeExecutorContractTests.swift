@@ -83,9 +83,9 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
   }
 
   private struct ScriptedBootstrap: BootstrapObservationPort {
-    let candidates: [BootstrapCandidate]
+    let candidates: @Sendable () -> [BootstrapCandidate]
     func observeToolVersion() async throws -> String { "3.2.0f" }
-    func listCandidates() async throws -> [BootstrapCandidate] { candidates }
+    func listCandidates() async throws -> [BootstrapCandidate] { candidates() }
     func observeDeviceIdentity(connectKey: String) async throws -> [String: String] {
       ["serial": connectKey]
     }
@@ -95,12 +95,21 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
     candidates: [BootstrapCandidate] = [
       BootstrapCandidate(connectKey: "150100424a544e4600", state: "Connected")
     ],
+    candidateSource: (@Sendable () -> [BootstrapCandidate])? = nil,
+    preAdoptedConnectKey: String? = nil,
     observer: (@Sendable (String) -> Void)? = nil
   ) throws -> AgentClient {
     let capabilityStore = try RuntimeCapabilityStore(
       directoryURL: stateDirectory.appendingPathComponent("capabilities", isDirectory: true))
     let targetStore = try RuntimeTargetStore(
       directoryURL: stateDirectory.appendingPathComponent("targets", isDirectory: true))
+    if let preAdoptedConnectKey {
+      _ = try targetStore.adopt(
+        stableIdentitySHA256: DeviceBootstrapMachine.stableIdentitySHA256(
+          serial: preAdoptedConnectKey),
+        connectKey: preAdoptedConnectKey, toolVersion: "3.2.0f",
+        nowUTC: "2026-07-29T00:00:00Z")
+    }
     let artifactStore = try RuntimeArtifactStore(
       rootURL: stateDirectory.appendingPathComponent("artifacts", isDirectory: true),
       nowUTC: { "2026-07-29T00:00:00Z" })
@@ -114,7 +123,8 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
       capabilityStore: capabilityStore, artifactStore: artifactStore,
       nowUTC: { "2026-07-29T00:00:00Z" })
     let bootstrap = DeviceBootstrapMachine(
-      observation: ScriptedBootstrap(candidates: candidates), targetStore: targetStore,
+      observation: ScriptedBootstrap(candidates: candidateSource ?? { candidates }),
+      targetStore: targetStore,
       nowUTC: { "2026-07-29T00:00:00Z" })
     let handler = RuntimeControlPlaneHandler(
       engine: engine, capabilityStore: capabilityStore,
@@ -215,6 +225,69 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
     XCTAssertEqual(action.kind, .physicalReconnect)
     XCTAssertTrue(action.prompt.contains("Reconnect"), action.prompt)
     XCTAssertFalse(action.prompt.contains("trust"), action.prompt)
+  }
+
+  func testExplicitAdoptedOfflineTargetPausesBeforeJobAndResumesSameExecution() throws {
+    final class CandidateState: @unchecked Sendable {
+      private let lock = NSLock()
+      private var current = [
+        BootstrapCandidate(connectKey: "150100424a544e4600", state: "Offline")
+      ]
+
+      func snapshot() -> [BootstrapCandidate] {
+        lock.withLock { current }
+      }
+
+      func connect() {
+        lock.withLock {
+          current = [
+            BootstrapCandidate(connectKey: "150100424a544e4600", state: "Connected")
+          ]
+        }
+      }
+    }
+
+    let candidateState = CandidateState()
+    let client = try startDaemon(
+      candidateSource: { candidateState.snapshot() },
+      preAdoptedConnectKey: "150100424a544e4600")
+    guard case .array(let targets) = try client.request(method: "target.list"),
+      case .object(let target)? = targets.first,
+      case .string(let targetID)? = target["targetId"]
+    else {
+      return XCTFail("pre-adopted target must be listed")
+    }
+
+    let executor = self.executor(client)
+    let paused = try executor.run(
+      RuntimeAgentExecutionRequest(
+        operationID: "observe.device", operationVersion: 1,
+        targetID: targetID, executionID: "explicit-offline-resume-001"))
+    guard case .awaitingHumanAction(let action, _) = paused else {
+      return XCTFail("an explicit offline target must pause before submit: \(paused)")
+    }
+    XCTAssertEqual(action.kind, .physicalReconnect)
+    guard case .array(let jobsBeforeReconnect) = try client.request(method: "job.list") else {
+      return XCTFail("job.list must answer")
+    }
+    XCTAssertTrue(
+      jobsBeforeReconnect.isEmpty,
+      "offline target confirmation must not create a failed runtime Job")
+
+    candidateState.connect()
+    let resumed = try executor.resume(resumeToken: action.resumeToken)
+    guard case .completed(let receipt) = resumed else {
+      return XCTFail("physical reconnect must continue the persisted execution: \(resumed)")
+    }
+    XCTAssertEqual(receipt.targetID, targetID)
+    XCTAssertEqual(receipt.humanActions.count, 1)
+    XCTAssertNotNil(receipt.humanActions[0].resolvedAtUTC)
+    guard case .array(let jobsAfterReconnect) = try client.request(method: "job.list") else {
+      return XCTFail("job.list must answer")
+    }
+    XCTAssertEqual(
+      jobsAfterReconnect.count, 1,
+      "resume must submit exactly one Job after the target is reachable")
   }
 
   func testAmbiguousCandidatesAskForSelectionRatherThanGuessing() throws {

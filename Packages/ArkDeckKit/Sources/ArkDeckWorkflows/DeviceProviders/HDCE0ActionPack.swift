@@ -166,7 +166,16 @@ public struct HDCOwnedRemotePath: Sendable, Equatable {
     // A flat file under the existing /data/local/tmp directory requires no
     // undeclared mkdir mutation. The job/step/nonce tuple still provides
     // the required per-job isolation.
-    let remotePath = "/data/local/tmp/arkdeck-\(jobID)-\(stepID)-\(nonce)"
+    let suffix: String
+    switch stepID {
+    case "send-hap":
+      suffix = ".hap"
+    case "capture-trace":
+      suffix = ".htrace"
+    default:
+      suffix = ""
+    }
+    let remotePath = "/data/local/tmp/arkdeck-\(jobID)-\(stepID)-\(nonce)\(suffix)"
     guard remotePath.utf8.count <= 255 else {
       throw HDCE0RequestError.outOfBounds(
         field: "remotePath", detail: "provider-owned path must be at most 255 bytes")

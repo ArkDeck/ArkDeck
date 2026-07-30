@@ -547,7 +547,10 @@ struct ArkDeckCommandLine {
         arkdeck job submit --target <id> --operation <id@version> [--wait] [--json]
         arkdeck job status --job <id> [--json] | arkdeck job list [--json]
         arkdeck job submit --request-file <request.json> [--wait] [--json]
-        arkdeck capability list|install --file <cap.json>|revoke --capability <id> [--json]
+        arkdeck capability list [--json]
+        arkdeck capability draft --target <id> --operation <id@version> --inputs-file <inputs.json> --output-directory <dir> [--validity-seconds <n>] [--execution-id <id>] [--json]
+        arkdeck capability install --file <cap.json> [--json]
+        arkdeck capability revoke --capability <id> [--json]
         arkdeck artifact import-hap --target <id> --file <signed.hap> [--json]
         arkdeck artifact list|inspect|read|export --job <id> [--artifact <id>] \
       [--destination <directory>] [--allow-sensitive]

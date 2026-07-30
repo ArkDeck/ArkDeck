@@ -2,19 +2,21 @@
 
 ## Current result
 
-`GJ-2 HAP Debug`: **IMPLEMENTING**
+`GJ-2 HAP Debug`: **REAL_DEVICE_PASS**
 
 The production CLI imported a real signed HAP into the daemon-owned Artifact
 store, returned an ID-only lease bound to the adopted DAYU200, and resolved the
 same Artifact after a daemon restart. A subsequent request without an E1
-capability failed closed before job creation or HDC dispatch. The
-maintainer-accepted capability from PR #828 was then installed and used for
-one real `debug.hap@1` attempt. That attempt exposed an offline-target
-admission defect before any mutation; the production fix and regression tests
-are included in the same GJ-2 product PR as this record.
+capability failed closed before job creation or HDC dispatch. Four
+maintainer-reviewed capabilities then drove a traceable correction sequence:
+offline preflight, remote-path install semantics, non-UTF-8 HiLog Artifact
+handling, and the final complete run. No uncertain mutation was retried.
 
-No person or Agent ran an HDC command directly. No send, install, start, stop,
-uninstall or remote cleanup was dispatched in the failed attempt.
+The final Runtime Job sent the HAP, installed it with replacement enabled,
+verified package presence, started the ability, verified its process, published
+the readback and HiLog Artifacts, stopped the ability, uninstalled the package,
+cleaned the job-owned remote staging path, and remained queryable after a clean
+daemon restart. No person or Agent ran an HDC command directly.
 
 ## Runtime and input
 
@@ -30,8 +32,12 @@ uninstall or remote cleanup was dispatched in the failed attempt.
 | HAP | `entry-default-signed.hap`, 1,512,003 bytes |
 | HAP SHA-256 | `9453a396e81d55abfb05b4d7f9a512dea139e5843462051a6e1cc3586849fac8` |
 | Bundle / Ability | `com.example.waterflowdemo` / `EntryAbility` |
+| Final authorization main | `0e205b1e68e173c9dab60820bbafba8619413fec` (PR #832) |
+| Final capability | `CAP-RT-AUTO-20260730T061514Z-410D442011C6` |
+| Final exact plan digest | `791c36c323e5fc25037581b8fc24cc468a12594fdfa1c36d097b3505d70b8813` |
+| Final Job | `job-3a4aa8b2f2d5c46817e4a603582734c2` |
 
-## Capability-backed real attempt
+## First capability-backed real attempt
 
 PR #828 merged the maintainer-authored
 `CAP-RT-DAYU200-HAP-001` capability. The runtime installation returned
@@ -126,32 +132,73 @@ bundle and ability but no capability returned
 The durable job count stayed at three before and after the request, confirming
 zero job creation and zero device dispatch.
 
+## Generated authorization and correction sequence
+
+Each authorization came from a maintainer-reviewed protected-main PR. The
+Runtime recorded its exact stable target, binding revision, materialized plan
+and use. Consumed capabilities were never reset or replayed.
+
+| PR / capability | Durable result | Product finding |
+| --- | --- | --- |
+| #828 / `CAP-RT-DAYU200-HAP-001` | `job-01e0044e411c54372de074c05ca6bad1`, failed before mutation, `outcomeUnknown=false` | Offline target was detected too late and the primary error was masked; #829 moved consumption to the last verified pre-mutation boundary. |
+| #830 / `CAP-RT-AUTO-20260730T045821Z-8A30FD002EFA` | `job-6704ee2391f2264f798957762aa52f7e`, failed package readback, cleanup completed, `outcomeUnknown=false` | Host-path `hdc install` could not consume the job-owned remote path; lowering now uses descriptor-bound `shell bm install -p <same .hap path> -r`. |
+| #831 / `CAP-RT-AUTO-20260730T051705Z-0A5CC0F7F3C9` | `job-924cebae44c0e5f9e780761188fda619`, mutation and cleanup succeeded, `outcomeUnknown=false` | Real HiLog contained non-UTF-8 bytes, so the requested diagnostic Artifact was missing; HiLog is now accepted as bounded sensitive raw bytes while UI Dump remains UTF-8 checked. |
+| #832 / `CAP-RT-AUTO-20260730T061514Z-410D442011C6` | `job-3a4aa8b2f2d5c46817e4a603582734c2`, succeeded, `outcomeUnknown=false` | Final artifact-complete run; no further product defect was observed. |
+
+## Final authorized real run
+
+At `2026-07-30T06:29:18Z`, the Device Runtime Agent admitted the #832
+capability against:
+
+- stable identity
+  `958780b2ffb7090d4f22cdc1f547f9804ed0f0b605e3020f384e5d4823dc7a7e`;
+- binding revision `1`;
+- exact plan digest
+  `791c36c323e5fc25037581b8fc24cc468a12594fdfa1c36d097b3505d70b8813`;
+- exact lease, bundle `com.example.waterflowdemo`, ability `EntryAbility`,
+  `installOrReplace`, five-second diagnostics and uninstall cleanup;
+- consumption fingerprint
+  `eec8e888236fc8c5c9f28b7909d4be8907960152e97943d56f4fce74ec54fd8a`.
+
+The complete durable timeline contains typed intents and verified outcomes for
+target/model/firmware preflight, HAP send, install plus package readback, start
+plus process readback, diagnostics capture, stop, uninstall and remote staging
+cleanup. The capability changed from one remaining use to zero immediately
+before the first mutation. The terminal receipt reported `actualEffect=E1`,
+`succeeded`, `outcomeUnknown=false`, zero evidence blockers and zero human
+actions.
+
+Published Artifacts:
+
+| Name | Artifact | Bytes | Privacy / redaction |
+| --- | --- | ---: | --- |
+| `install-readback.json` | `ART-818f9a0b0ca7e2b379b8f93839ae8fd3` | 460 | standard / false |
+| `process-readback.json` | `ART-98db48f407640d6847aba0cf2da95182` | 458 | standard / false |
+| `debug-hilog.txt` | `ART-09e6f5afb6701f4cc2311b81310ad4ac` | 673,380 | sensitive / true |
+
+Only Artifact metadata was inspected; sensitive HiLog content was not read or
+exported. After a clean daemon stop and restart, the daemon recovered 15
+persisted jobs. The same final Job remained `succeeded/outcomeUnknown=false`,
+its timeline appended `recovered: journal clean`, all three Artifacts retained
+the same IDs, byte counts and hashes, and the capability remained consumed.
+There was no automatic mutation replay.
+
 ## Verification
 
-- `swift test --package-path Packages/ArkDeckKit --filter
-  DiagnosticsAndHAPContractTests`: 37 tests, 0 failures for the
-  pre-consumption target confirmation and primary-failure preservation fix;
-- `swift test --package-path Packages/ArkDeckKit`: 710 tests, 1 skipped,
-  0 failures on the final product diff;
-- `swift test --package-path Packages/ArkDeckKit --filter
-  AgentDaemonContractTests`: 13 tests, 0 failures after the final public
-  binding-readback addition;
-- rebased verification on `main@7625d66c2ccdc4a83b50e0377e6970eacea41ad5`:
-  `swift test --package-path Packages/ArkDeckKit`: 707 tests, 1 skipped,
-  0 failures for the complete import implementation;
-- `scripts/check-sdd.sh`: 0 errors, 0 warnings, 114 Acceptance IDs.
+- `swift test --package-path Packages/ArkDeckKit`: 713 tests, 1 skipped,
+  0 failures;
+- focused non-UTF-8 HiLog / UTF-8 UI Dump contract: 1 test, 0 failures;
+- HAP non-UTF-8 raw Artifact, readback and required-capture contracts:
+  3 tests, 0 failures;
+- `scripts/check-sdd.sh`: 0 errors, 0 warnings, 114 Acceptance IDs;
+- `git diff --check`: clean.
 
-## Remaining execution boundary
+## Remaining boundary
 
-The first capability was truthfully consumed by the failed pre-fix attempt and
-must not be retried or rewritten. GJ-2 remains `IMPLEMENTING` until this
-product fix is merged, the DAYU200 is online, and a new maintainer-authored,
-maintainer-accepted one-use capability authorizes `debug.hap@1` for stable identity
-`958780b2ffb7090d4f22cdc1f547f9804ed0f0b605e3020f384e5d4823dc7a7e`
-and bundle `com.example.waterflowdemo`. The Agent cannot create, modify or
-approve that replacement. Once present, the same production Agent can continue
-with send/install/readback/start/capture/stop/cleanup; any unknown mutation
-outcome remains non-retriable.
+GJ-2 is complete. The final capability is consumed and will not be reused.
+Remote Trace, strict redaction, `installFresh`, `restorePrevious` and
+debugger-default remain production unavailable and fail closed before
+capability consumption. No new proposal or governance state was created.
 
 This record changes no Acceptance ID, acceptance count, governance state or
 OpenSpec change.

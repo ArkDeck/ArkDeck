@@ -140,6 +140,7 @@ public actor RuntimeCapabilityStore {
           maximumUses: existing.maximumUses,
           issuer: existing.issuer,
           exactPlanDigest: existing.exactPlanDigest,
+          exactBindingRevision: existing.exactBindingRevision,
           revocation: .revoked(atUTC: atUTC, reason: reason))
       } catch {
         throw RuntimeCapabilityStoreError.storeCorrupted(

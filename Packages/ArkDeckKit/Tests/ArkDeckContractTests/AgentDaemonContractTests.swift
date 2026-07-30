@@ -195,6 +195,138 @@ final class AgentDaemonContractTests: XCTestCase {
     XCTAssertFalse(reasons.isEmpty)
   }
 
+  func testCapabilityDraftMaterializesExactPlanButCannotInstallBeforeMergedPR() async throws {
+    let artifactStore = try RuntimeArtifactStore(
+      rootURL: stateDirectory.appendingPathComponent("artifacts", isDirectory: true),
+      nowUTC: { "2026-07-29T00:00:00Z" })
+    let artifact = try await artifactStore.publish(
+      RuntimeArtifactPublicationRequest(
+        jobID: "input-hap-target-001", sessionID: "session-input-hap-target-001",
+        stepID: "import-hap", name: "demo.hap",
+        mediaType: "application/vnd.openharmony.hap",
+        privacy: .standard, retentionClass: .pinnedUntilVerified,
+        sourceOperation: "artifact.import-hap", providerID: "host",
+        bindingSnapshot: ArtifactBindingSnapshot(
+          targetID: "TGT-001", bindingRevision: 7,
+          stableIdentitySHA256:
+            "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1"),
+        contents: Data("PK\u{03}\u{04}signed-hap".utf8)))
+    let lease = try await artifactStore.leaseReference(
+      jobID: artifact.jobID, artifactID: artifact.artifactID)
+    let (handler, engine) = try makeStack(artifactStore: artifactStore)
+    let operationRequest = try RuntimeOperationRequest(
+      requestID: "agent-request-capability-draft-001",
+      idempotencyKey: "agent-execution-capability-draft-001",
+      target: DurableTargetReference(targetID: "TGT-001", expectedBindingRevision: 7),
+      operation: RuntimeOperationReference(id: "debug.hap", version: 1),
+      inputs: [
+        "hapArtifactLease": .string(lease),
+        "bundleName": .string("com.example.demo"),
+        "abilityName": .string("EntryAbility"),
+        "installPolicy": .string("installOrReplace"),
+        "cleanupPolicy": .string("uninstall"),
+        "captureDiagnostics": .bool(true),
+        "diagnosticsDurationSeconds": .integer(5),
+        "portForwardProfile": .string("none"),
+      ])
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+    let operationData = try encoder.encode(operationRequest)
+    let operationJSON = try XCTUnwrap(String(data: operationData, encoding: .utf8))
+    let drafted = try await request(
+      handler, method: "capability.draft",
+      params: [
+        "requestJson": .string(operationJSON),
+        "validitySeconds": .integer(3_600),
+      ])
+    XCTAssertTrue(drafted.ok, drafted.error?.message ?? "-")
+    guard case .object(let draft)? = drafted.result,
+      case .object(let capabilityFields)? = draft["capability"],
+      case .string(let capabilityID)? = capabilityFields["capabilityID"],
+      case .string(let planDigest)? = draft["materializedPlanDigest"],
+      case .string(let requestFingerprint)? = draft["requestFingerprintSHA256"]
+    else {
+      return XCTFail("capability.draft must return the exact review payload")
+    }
+    XCTAssertTrue(capabilityID.hasPrefix("CAP-RT-AUTO-"))
+    XCTAssertEqual(planDigest.count, 64)
+    XCTAssertEqual(requestFingerprint.count, 64)
+    XCTAssertEqual(draft["bindingRevision"], .integer(7))
+    XCTAssertEqual(capabilityFields["exactPlanDigest"], .string(planDigest))
+    XCTAssertEqual(capabilityFields["exactBindingRevision"], .integer(7))
+    XCTAssertEqual(
+      draft["stableIdentitySHA256"],
+      .string("83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1"))
+    let jobsAfterDraft = await engine.listJobs()
+    XCTAssertTrue(jobsAfterDraft.isEmpty, "drafting must not admit a Job")
+
+    let capabilityData = try encoder.encode(JSONValue.object(capabilityFields))
+    let capabilityJSON = try XCTUnwrap(String(data: capabilityData, encoding: .utf8))
+    let pendingInstall = try await request(
+      handler, method: "capability.install",
+      params: ["capabilityJson": .string(capabilityJSON)])
+    XCTAssertFalse(pendingInstall.ok)
+    XCTAssertEqual(pendingInstall.error?.code, "invalidParams")
+    XCTAssertTrue(
+      (pendingInstall.error?.message ?? "").contains("maintainer-merged PR"))
+
+    let pending = try JSONDecoder().decode(RuntimeCapability.self, from: capabilityData)
+    let approved = try RuntimeCapability(
+      capabilityID: pending.capabilityID,
+      targetScope: pending.targetScope,
+      operationScope: pending.operationScope,
+      effectCeiling: pending.effectCeiling,
+      inputConstraints: pending.inputConstraints,
+      issuedAtUTC: pending.issuedAtUTC,
+      expiresAtUTC: pending.expiresAtUTC,
+      maximumUses: pending.maximumUses,
+      issuer: RuntimeCapabilityIssuer(kind: .maintainerMergedPR, reference: "PR#830"),
+      exactPlanDigest: pending.exactPlanDigest,
+      exactBindingRevision: pending.exactBindingRevision,
+      revocation: pending.revocation)
+    let approvedData = try encoder.encode(approved)
+    let approvedJSON = try XCTUnwrap(String(data: approvedData, encoding: .utf8))
+    let installed = try await request(
+      handler, method: "capability.install",
+      params: ["capabilityJson": .string(approvedJSON)])
+    XCTAssertTrue(installed.ok, installed.error?.message ?? "-")
+    let statuses = try await request(handler, method: "capability.list")
+    guard case .array(let values)? = statuses.result,
+      case .object(let status)? = values.first
+    else {
+      return XCTFail("approved capability must become listable")
+    }
+    XCTAssertEqual(status["capabilityId"], .string(capabilityID))
+    XCTAssertEqual(status["remainingUses"], .integer(1))
+
+    // The Agent surface intentionally omits fields that decode to request
+    // defaults. Its semantically identical request must still derive the
+    // exact plan that the draft showed to the maintainer.
+    let agentShapedRequest = JSONValue.object([
+      "documentType": .string("runtime-operation-request"),
+      "schemaVersion": .string("2.0.0"),
+      "requestId": .string(operationRequest.requestID),
+      "idempotencyKey": .string(operationRequest.idempotencyKey),
+      "target": .object([
+        "targetId": .string("TGT-001"),
+        "expectedBindingRevision": .integer(7),
+      ]),
+      "operation": .object([
+        "id": .string("debug.hap"),
+        "version": .integer(1),
+      ]),
+      "inputs": .object(operationRequest.inputs),
+      "authorization": .object(["capabilityId": .string(capabilityID)]),
+    ])
+    let accepted = try await engine.submit(encoder.encode(agentShapedRequest))
+    let recordData = try Data(
+      contentsOf: stateDirectory.appendingPathComponent(
+        "engine/jobs/\(accepted.jobID)/job-record.json"))
+    let record = try JSONDecoder().decode(RuntimeJobRecord.self, from: recordData)
+    XCTAssertEqual(record.materializedPlanDigest, planDigest)
+    XCTAssertEqual(record.materializedBindingRevision, 7)
+  }
+
   /// MU-3 (CHG-2026-048) implemented adoption; this composition still
   /// omits the bootstrap machine, so adoption must fail closed rather than
   /// silently succeed with no target store behind it.

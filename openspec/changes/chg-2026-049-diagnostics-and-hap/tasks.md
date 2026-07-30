@@ -1,20 +1,22 @@
 # Tasks
 
 > 垂直 PR 模型(CHG-2026-046):实现、测试、文档、evidence 与状态翻转
-> 由一个实现 PR 交付;真机 evidence 与 E1 capability 由后续独立载体
-> 补记/签发。
+> 由一个实现 PR 交付;E1 capability 由独立维护者审批 PR 签发，真机
+> evidence 与发现问题后的产品修复仍随对应 Golden Journey 垂直 PR 同车。
 
 ## TASK-DHA-001 — MU-4 垂直交付:Agent runner + Artifact + diagnostics/HAP
 
-- Status:blocked（仅剩真实 DAYU200 两条 Golden Journey 尚未按
-  2026-07-30 产品闭环要求完成同车记录：`DHA-HW-001` attempt#2 的旧
-  observable result 不提升为 formal PASS，`DHA-HW-002` 未执行。
-  #798 已补齐 descriptor-bound HDC、Runtime Availability、授权前完整
-  materialization、stable identity/binding revision/plan digest admission、
-  exact-action durable recovery、dedicated mutation readback 与 cleanup
-  debt query/continue；remote Trace、strict redaction、installFresh、
-  restorePrevious、debugger-default 按本阶段要求 production unavailable
-  并在 capability 消耗前 fail closed，不再拆 proposal）
+- Status:done（2026-07-30 两条真实 DAYU200 Golden Journey 均由 Device
+  Runtime Agent 完成；GJ-1 覆盖 observe.device、HiLog、UI Dump、
+  Artifact 与 daemon restart，GJ-2 覆盖 HAP send/install/readback/start/
+  capture/stop/uninstall/remote cleanup 与 daemon restart。除既有设备信任
+  外人工 HDC 命令为 0。#798 及本垂直交付补齐 descriptor-bound HDC、
+  Runtime Availability、授权前完整 materialization、stable identity/
+  binding revision/plan digest admission、exact-action durable recovery、
+  dedicated mutation readback、cleanup debt query/continue、自动 capability
+  draft 与真实 HiLog 原始字节 Artifact。remote Trace、strict redaction、
+  installFresh、restorePrevious、debugger-default 保持 production unavailable
+  并在 capability 消耗前 fail closed）
 - Grade:D1(代码/契约/fake 面。真机 host Runtime 由 Device Runtime Agent
   执行;**E1 capability 的签发/接受是 D2 决策**,独立载体,Agent 不得
   自签或自批;人类只提供必要物理协助)
@@ -119,14 +121,15 @@
   change/proposal；前四类保持 production unavailable / pre-consumption
   fail closed，第五类已在 #798 同车实现 exact-action readback reconcile
   与 cleanup debt query/continue。详见 `run-r2-hardening.md` 续修记录。
-- Current hardware evidence blocker(2026-07-29,attempt#2):Agent 已在
-  approved D2 window 内完成唯一一次 E0 `capture.diagnostics@1`,runtime
-  observable result succeeded 且人工 host CLI 为 0。但 authoritative
-  hardware-evidence V2 强制 human `operator`,缺
-  `executor/authorizationRef`,本次 receipt 也没有 schema 必填 firmware/
-  target-confirmation 时间;因此 formal `DHA-HW-001` 仍 BLOCKED /
-  NOT CLAIMED,不得猜填或把维护者写成 executor。详见
-  `window-attempt-2.md`;`DHA-HW-002` 未执行。
+- Hardware closure(2026-07-30):旧 attempt#2 仍按原记录保持
+  `BLOCKED / NOT CLAIMED`，未被重写或升级。新的产品闭环 GJ-1 由 Runtime
+  receipt 原生记录 `executor=agent`、default read-only authority、firmware、
+  target confirmation 与 Artifact，并在 daemon restart 后读回；GJ-2 使用
+  PR #832 合入的 exact E1 capability，最终 Job
+  `job-3a4aa8b2f2d5c46817e4a603582734c2` 为 `succeeded`、
+  `outcomeUnknown=false`，install/process/HiLog 三项 Artifact 发布且
+  stop、uninstall、remote cleanup 全部完成。详见
+  `gj1-device-observe-2026-07-30.md` 与 `gj2-hap-debug-2026-07-30.md`。
 - Saved-draft handoff:原 `agent/task-dha-001` 工作树保留 10 个 tracked
   修改和 5 个 untracked 新文件，未提交、未计 evidence；与
   `dac5f82..d13dfec` 的 main 改动路径交集为 0。r2 合入后恢复时必须先把

@@ -279,14 +279,34 @@ public struct AgentRuntimeExecutor: Sendable {
       target = selectedTarget
     } else if let explicitTargetID = request.targetID {
       let listed = try listTargets(deadline: deadline)
-      guard let explicit = listed.first(where: { $0.targetID == explicitTargetID }) else {
+      guard listed.contains(where: { $0.targetID == explicitTargetID }) else {
         return try pause(
           request: request, kind: .physicalReconnect,
           prompt: "Reconnect the selected target before resuming this execution.",
           mode: .reconnectTarget, catalogDigest: catalogDigest,
           startedAtUTC: startedAtUTC, humanActions: humanActions)
       }
-      target = explicit
+      // A durable target record proves identity, not current reachability.
+      // Refresh through the typed bootstrap port before submit so an offline
+      // device pauses the same execution without creating a doomed Job.
+      switch try adopt(
+        request: request, candidate: nil, catalogDigest: catalogDigest,
+        startedAtUTC: startedAtUTC, humanActions: humanActions,
+        deadline: deadline)
+      {
+      case .target(let refreshed) where refreshed.targetID == explicitTargetID:
+        target = refreshed
+      case .target:
+        return try pause(
+          request: request, kind: .physicalReconnect,
+          prompt:
+            "The selected target is not the connected physical device; "
+            + "reconnect the selected target before resuming this execution.",
+          mode: .reconnectTarget, catalogDigest: catalogDigest,
+          startedAtUTC: startedAtUTC, humanActions: humanActions)
+      case .paused(let outcome):
+        return outcome
+      }
     } else {
       let listed = try listTargets(deadline: deadline)
       if listed.count == 1 {

@@ -47,6 +47,7 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
       var installExit: Int32 = 0
       var startExit: Int32 = 0
       var hilogPayloadBytes: Int?
+      var hilogPayload: Data?
       var packageReadbackText: String?
       var processReadbackText: String?
       var ownedPathPresent = true
@@ -96,6 +97,11 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
             + "/dev/block/data 1048576 1024 \(script.availableStorageKB) 1% /data\n")
       case .captureHilog:
         note("captureHilog")
+        if let payload = script.hilogPayload {
+          return ProviderProcessReceipt(
+            exitStatus: 0, stdout: payload, stderr: Data(),
+            stdoutTruncated: false, durationSeconds: 0.01)
+        }
         if let bytes = script.hilogPayloadBytes {
           return receipt(String(repeating: "I", count: bytes))
         }
@@ -620,8 +626,11 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
     }
     XCTAssertEqual(
       installArguments,
-      ["-t", "150100424a544e4600", "install", "-r", staged.path.remotePath],
-      "installOrReplace must not silently lower to a fresh-only install")
+      [
+        "-t", "150100424a544e4600", "shell", "bm", "install", "-p",
+        staged.path.remotePath, "-r",
+      ],
+      "installOrReplace must use the staged remote path and replacement mode")
   }
 
   /// A stdout-capturing step with no declared action must stop the run
@@ -660,6 +669,27 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
     XCTAssertTrue(recorded.contains { $0.name == "install-readback.json" })
   }
 
+  func testHAPPreservesNonUTF8HilogAsSensitiveRawArtifact() async throws {
+    let raw = Data([0x49, 0x20, 0xff, 0xfe, 0x0a])
+    let dispatcher = ScriptedDispatcher(script: .init(hilogPayload: raw))
+    let (engine, capabilities, artifacts) = try makeEngine(dispatcher: dispatcher)
+    let lease = try await publishHAPLease(artifacts)
+    try await installE1Capability(capabilities)
+    let acceptance = try await engine.submit(
+      hapRequest(lease: lease, key: "idem-hap-non-utf8-hilog"))
+    let status = try await engine.run(jobID: acceptance.jobID)
+    XCTAssertEqual(status.state, "succeeded", status.timeline.joined(separator: " | "))
+    let recorded = try await artifacts.list(jobID: acceptance.jobID)
+    let hilog = try XCTUnwrap(recorded.first { $0.name == "debug-hilog.txt" })
+    XCTAssertEqual(hilog.status, .published)
+    XCTAssertEqual(hilog.privacy, .sensitive)
+    XCTAssertFalse(hilog.redactionApplied)
+    let stored = try await artifacts.read(
+      jobID: acceptance.jobID, artifactID: hilog.artifactID,
+      allowSensitive: true)
+    XCTAssertEqual(stored, raw)
+  }
+
   func testHAPDurableIntentUsesTheResolvedArtifactAndExactOwnedPath() async throws {
     let dispatcher = ScriptedDispatcher()
     let (engine, capabilities, artifacts) = try makeEngine(dispatcher: dispatcher)
@@ -676,7 +706,7 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
         "jobs/\(acceptance.jobID)/journal.jsonl"),
       encoding: .utf8)
     let ownedPath =
-      "/data/local/tmp/arkdeck-\(acceptance.jobID)-send-hap-owned"
+      "/data/local/tmp/arkdeck-\(acceptance.jobID)-send-hap-owned.hap"
     XCTAssertTrue(journal.contains(resolved.artifactID), journal)
     XCTAssertTrue(journal.contains(resolved.sha256), journal)
     XCTAssertTrue(journal.contains(ownedPath), journal)
