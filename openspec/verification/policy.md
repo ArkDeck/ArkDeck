@@ -2,6 +2,14 @@
 
 > Version:2.0.0
 > Baseline:CORE-2.0.0(ratification 状态见 `openspec/baselines/CORE-2.0.0.yaml`)
+>
+> **适用范围收窄(2026-07-30,产品闭环优先阶段)**:Verification layers、Core
+> property invariants 与真实性要求(simulation/fake 不证明硬件支持、destructive
+> 授权 fail closed)全局有效。Definition of Ready / Definition of Done / Change
+> gates / Stop conditions 仅适用于安全内核治理 change(恰四类 Repo 审批与
+> `PRODUCT-LOOP.md` §3 安全条件);日常产品交付的门槛按 `PRODUCT-LOOP.md` §4
+> 垂直交付 + §11 真实运行验证执行,进度以 Golden Journey 四态衡量,不再要求
+> ready 任务包;流程冲突以 `PRODUCT-LOOP.md` 为准(`AGENTS.md` 权威顺序)。
 
 ## Verification layers
 

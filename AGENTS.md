@@ -3,26 +3,45 @@
 本文件是所有 AI Agent、自动化工具和人工贡献者进入 ArkDeck 仓库后的第一读取入口。
 
 > 治理模型:V2(git-native)。2026-07-14 起,V1 的密码学审批链(detached signature、claim service、identity ledger、supersession barrier)已废止;事故与决策记录见 `openspec/planning/postmortem-2026-07-governance.md`。
+>
+> **当前阶段:产品闭环优先(2026-07-30 起)**。执行优先级正本 = 仓库根
+> `PRODUCT-LOOP.md`;进度唯一指标 = 其 §6 的五条 Golden Journey。治理系统退出
+> 日常设备操作与产品开发的关键路径;安全内核(本文件「Agent 禁令」与
+> Constitution Safety invariants / POL-*)完整保留。
 
 ## 必读顺序
 
-1. `openspec/constitution.md`
-2. `openspec/project.md`
-3. `openspec/governance/enforcement.md` 与 `openspec/verification/policy.md`
-4. 当前任务所属 change 的 `proposal.md`/`tasks.md`/`verification.md`
-5. 任务涉及的 `openspec/specs/**/spec.md`、contracts 与 integration/platform profile
+1. `PRODUCT-LOOP.md`(产品闭环优先总指令:优先级、Golden Journey、工作方式)
+2. 本文件(信任模型与安全禁令)
+3. `openspec/constitution.md` 的 Safety invariants 与 POL-*(安全内核)
+4. 当前工作涉及的代码、`Catalog/`、contracts 与 integration/platform profile
+5. 仅当工作命中安全内核治理(见「执行规则」的治理载体适用范围)时:
+   `openspec/governance/enforcement.md`、`openspec/verification/policy.md`
+   与所属 change 的 `proposal.md`/`tasks.md`/`verification.md`
 
 `docs/PLAN.md` 是 SDD 迁移输入和历史设计记录,不是实现规则的事实源;冲突时以 living specs 为准。
 
 ## 权威顺序
 
-1. Constitution
-2. Current specs 与 contracts(叠加当前任务所属 approved change 的 scoped delta;delta 只替换其中列明的 Requirement/AC)
-3. 与规格兼容的 integration profile 与 platform profile
-4. 已批准 change 的 design/verification plan
-5. 代码和代码注释
+1. Constitution 的 Safety invariants 与 POL-*(设备安全边界、E0/E1/E2 授权、
+   fail-closed、typed-only、隐私;任何低层文件——包括 `PRODUCT-LOOP.md`——不得
+   解释为放宽本层)
+2. `PRODUCT-LOOP.md`(执行优先级与工作方式)
+3. 本文件
+4. Current specs 与 contracts(接口与数据形态的事实源;叠加当前任务所属 approved
+   change 的 scoped delta)
+5. 与规格兼容的 integration profile 与 platform profile
+6. enforcement/policy 等流程文档(适用范围收窄至安全内核治理)与已批准 change 的
+   design/verification plan
+7. 代码和代码注释
 
-低层文件不得覆盖或放宽高层规则。发现两个权威文件冲突时,停止受影响工作,标记 blocked 并创建 change proposal;不得自行选择更方便的解释。
+低层文件不得覆盖或放宽高层规则。冲突处理:
+
+- 涉及第 1 层安全不变量的冲突:停止受影响工作,fail closed,交维护者裁决;
+- 流程类文档(第 6 层)与 `PRODUCT-LOOP.md` 的冲突:以 `PRODUCT-LOOP.md` 为准,
+  在交付 PR 中记录一行兼容说明,继续工作;不进入 blocked,不自动创建 change proposal;
+- 其余同层冲突:选择对 Golden Journey 推进最小风险的解释并在 PR 中说明,由
+  维护者 review 裁决。
 
 ## 控制平面:Repo Agent 与 Device Agent Runtime(CHG-2026-046)
 
@@ -45,6 +64,8 @@
 - `scripts/host_loop` 属 Repo Plane:仅领取仓库开发任务;其既有硬件门
   (`Hardware required` 任务拒领、仅 D0 可派发)即设备执行禁令的机械承载,
   host_loop 不得执行 HDC、刷机、日志/trace 采集或任何设备 runtime job。
+  产品闭环阶段 host_loop 不用于派发治理状态任务;产品缺陷修复由交互式
+  Agent 会话按 `PRODUCT-LOOP.md` 直接执行。
 
 ## 信任与批准
 
@@ -63,18 +84,42 @@
 - 不得静默扩展任务范围;范围或 AC 需要变化时,停止并在 change 中显式修订 tasks.md(经 PR review 合入)。
 - 平台不能满足 Core 时标记 `blocked` 或 `nonConformant`,不得把平台限制写成 Core 豁免。
 
-## 执行规则
+## 执行规则(产品闭环阶段)
 
-- 只执行 approved change 的 `tasks.md` 中状态为 ready 的任务;一次专注一个任务,在任务声明的 allowed paths 内工作。
-- 每个任务开始前确认:所属 change 已 approved、依赖任务已完成、验证方法明确、所需工具/硬件可得;缺任一项即 blocked。
-- 每个任务结束时在 change 的 `evidence/` 下追加简短 run 记录(做了什么、命令、结果、AC 结论、偏差与遗留风险),并更新 tasks.md 状态;run 记录与状态更新**随实现 PR 同车提交**,PR review 是对记录真实性的把关。
-- 任务完成 ≠ 验证通过:change 的 verified 状态需要 `verification.md` 中全部 AC 有可复查证据,并由维护者在 PR 中确认。
-- **一个垂直交付单元一个 PR(CHG-2026-046)**:实现、测试、文档、evidence 与该单元的任务状态翻转在同一 PR 内交付;PR 标题与描述必须如实覆盖其全部内容,超出声明范围的内容一律拆分成独立 PR。**不再创建 readiness-only、status-only、done-only、verified-only 独立 PR**;readiness 结论(pins、风险确认、窗口边界)写入该单元 PR 或其 proposal,D2 窗口授权仍须独立载体(其本身是 D2 决策)。proposal 可携带 `status: approved` 落地,维护者 review + merge 该 proposal PR 即批准。
-- change 级 `verified` 翻转与 archive 仍是独立 PR(各自是独立决策):`verified` 翻转只做状态与 evidence 引用,不夹带实现;验证依据必须指向具体 run/复验记录,而非"实现 PR 已被 review"。
-- 批次协作(enforcement"决策分级"与"批次审批协议"节,CHG-2026-027):lane 推进到人类判断门(D1/D2)时生成 digest 入批次队列并转入其他 lane,不逐个催合;**D1/D2 门之后的成 PR 工作在该门合入前不得开工**(判断门后零投机堆叠;门后唯一允许的预跑 = 不产生 PR 的采集/勘察);D0 机械状态推进可同 lane 连续排入。批次内每次合并仍是维护者逐 PR 批准,digest 无批准语义,不存在任何等级的 auto-merge;守望会话以 merge OID 确认合并,不确定即暂停。
+- **进度唯一指标 = Golden Journey**(`PRODUCT-LOOP.md` §6):每轮工作必须映射到
+  GJ-1~GJ-5 之一;状态只能取 `NOT_STARTED`/`IMPLEMENTING`/`BLOCKED_BY_PRODUCT_DEFECT`/
+  `REAL_DEVICE_PASS`,文档完成、schema 完成或 fake test 通过不构成 `REAL_DEVICE_PASS`。
+  每轮结束按 §19 汇报格式汇报。
+- **一个问题 = 一个垂直产品任务 = 一个 PR**(§4):根因说明 + 产品代码修复 + 必要测试 +
+  真实设备验证(适用时)+ 最小必要文档更新 + 完成结论同车交付;PR 标题与描述必须如实
+  覆盖其全部内容。**不再创建 readiness-only、status-only、done-only、verified-only、
+  archive-only PR**;不为同一问题追加 readiness/verification/archive 载体。
+- **产品工作不需要治理载体**:修复 Golden Journey 产品缺陷不要求 ready 任务包、不创建新
+  OpenSpec change、不刷新旧任务状态。CI 的任务声明(`scripts/check_pr_paths.py`)仅是
+  路径护栏:产品 PR 声明一个 base 上已存在、allowed paths 覆盖其改动的 active 任务
+  (如 `TASK-BER-002`/`TASK-DHA-001` 覆盖 `Packages/ArkDeckKit/**` 与 `docs/adr/**`)即可,
+  该声明不触发被声明任务的任何治理连锁义务。真实运行结果(命令、退出码、artifact
+  hash、脱敏设备标识)随交付 PR 正文或 run 记录如实提交;simulation/fake 不得记为真实
+  设备结果。
+- **治理载体适用范围(恰四类 + 安全条件)**:仅新 operation 或对已发布 operation 的
+  破坏性修改、新 provider、新 integration/device profile、E2 安全策略变化仍走 OpenSpec
+  change + PR 审批,且与对应 Golden Journey 交付同车;此外仅 `PRODUCT-LOOP.md` §3 所列
+  安全条件允许优先治理工作,处理方式仍是 Runtime 安全代码优先。change 级 `verified`
+  翻转与 archive 独立 PR、批次协作(digest 队列、D1/D2 门序)与设备窗口约定,仅在上述
+  安全内核治理范围内保留;**历史 change 的批量归档整理冻结**(§20)。D2 窗口授权仍须
+  独立载体(其本身是 D2 决策),E2 授权语义不变。
+- **新任务强制自检**(§17 五问 + §5 重复搜索):创建任何新任务前先搜索现有 Backlog、
+  打开 PR、最近提交、`Catalog/operations/`、DeviceProviders、旧 OpenSpec Task 与既有
+  测试;能并入现有任务的不得新建;判断重复以产品结果为准,不以任务名称为准。
+- **治理循环即刻退出**(§18):命中任一信号(连续两个 PR 无生产代码、准备创建
+  readiness/archive-only PR、因 schema 不足停止真机修复等)时,立即停止治理工作,
+  选择最高优先级产品缺陷直接修复。
+- **旧 OpenSpec Task = 历史设计记录**(§16):不重启、不刷新 readiness、不补
+  verification、不因旧任务 blocked 而停止当前实现;其中真正未完成的产品能力以垂直
+  产品任务重做。
 - Windows/Linux 是同一产品的未来平台端口(现状 not started):平台实现不得改变 HDC server 保护、device binding 边界、Job 状态机/journal/recovery 语义、typed step 与 effect 等级、Artifact/隐私规则。
 
-详细流程见 `openspec/verification/policy.md` 与 `openspec/changes/README.md`。
+安全内核治理的详细流程见 `openspec/verification/policy.md` 与 `openspec/changes/README.md`(二者适用范围注记见各自文件头)。
 
 ## 工具环境约定
 
