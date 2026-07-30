@@ -3054,8 +3054,11 @@ public actor RuntimeJobEngine {
               effect: step.effect.rawValue, cancellation: step.cancellation.rawValue,
               binding: step.binding.rawValue, isOptional: step.isOptional,
               journalArguments: workflowStep.arguments, processKind: "hostManaged",
-              executableSHA256: nil, argumentSummary: nil, processInvocations: nil,
-              timeoutSeconds: nil, hostManagedDescriptor: descriptor))
+              executableSHA256: descriptor.providerExecutableSHA256,
+              argumentSummary: nil, processInvocations: nil,
+              timeoutSeconds: nil,
+              hostManagedDescriptor:
+                "\(descriptor.identifier)#action-sha256:\(descriptor.actionSHA256)"))
         }
       }
       if descriptor.reference == "deploy.native-library.app-owned@1" {

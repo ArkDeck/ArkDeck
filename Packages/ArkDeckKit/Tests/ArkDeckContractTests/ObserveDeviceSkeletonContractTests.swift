@@ -196,7 +196,10 @@ final class ObserveDeviceSkeletonContractTests: XCTestCase {
     let plan = try rockchip.lower(
       action: .rockchip(.enterLoader(connectKey: "fixture-connect-key")),
       context: ProviderExecutionContext(
-        jobID: "j", stepID: "s", targetID: "t", bindingRevision: nil,
+        jobID: "j", stepID: "s", targetID: "t", bindingRevision: 1,
+        connectKey: "fixture-connect-key",
+        expectedIdentitySHA256: String(repeating: "a", count: 64),
+        toolSHA256: try resolver.resolveExecutable(providerID: "rockchip").sha256,
         nowUTC: "2026-07-29T00:00:00Z"))
     do {
       _ = try await dispatcher.dispatch(plan)

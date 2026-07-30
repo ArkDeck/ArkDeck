@@ -153,9 +153,42 @@ public struct TargetStoreRockchipRuntimeFactsPort: RockchipRuntimeFactsPort {
 /// host (which would consume a second legacy authorization).
 public struct BundledRockchipRuntimeDispatcher: RuntimeProcessDispatching {
   private let resolver: any RuntimeExecutableResolving
+  private let host: any RockchipRuntimeActionHosting
+  private let destructiveExecutableSHA256: String
 
   public init(resolver: any RuntimeExecutableResolving) {
     self.resolver = resolver
+    host = RefusingRockchipRuntimeActionHost(
+      reason:
+        "the per-action RockUSB host requires descriptor-bound HDC and a product state directory")
+    destructiveExecutableSHA256 =
+      BundledRockchipComponent.destructiveProfileExecutableSHA256
+  }
+
+  public init(
+    resolver: any RuntimeExecutableResolving,
+    hdcResolver: any RuntimeExecutableResolving,
+    stateDirectory: URL
+  ) {
+    self.resolver = resolver
+    host = DurableRockchipRuntimeActionHost(
+      executor: FoundationRockchipRuntimeActionExecutor(
+        hdcResolver: hdcResolver),
+      records: RockchipRuntimeActionRecordStore(
+        rootURL: stateDirectory.appendingPathComponent(
+          "rockchip-runtime", isDirectory: true)))
+    destructiveExecutableSHA256 =
+      BundledRockchipComponent.destructiveProfileExecutableSHA256
+  }
+
+  init(
+    resolver: any RuntimeExecutableResolving,
+    host: any RockchipRuntimeActionHosting,
+    destructiveExecutableSHA256: String
+  ) {
+    self.resolver = resolver
+    self.host = host
+    self.destructiveExecutableSHA256 = destructiveExecutableSHA256
   }
 
   public func unavailableReason(providerID: String) -> String? {
@@ -168,29 +201,56 @@ public struct BundledRockchipRuntimeDispatcher: RuntimeProcessDispatching {
     } catch {
       return "product-owned Rockchip component is unavailable: \(error)"
     }
-    let destructive = BundledRockchipComponent.destructiveProfileExecutableSHA256
+    let destructive = destructiveExecutableSHA256
     guard component.sha256 == destructive else {
       return
         "bundled Rockchip component \(BundledRockchipComponent.packageID) has identity "
         + "\(component.sha256), but flash.dayu200@1 is pinned to the hardware-verified "
         + "destructive identity \(destructive); dispatch remains fail-closed"
     }
-    return
-      "bundled Rockchip identity matches, but the per-action durable RockUSB host is "
-      + "not registered; dispatch remains fail-closed"
+    return host.unavailableReason()
   }
 
   public func dispatch(_ plan: TypedProcessPlan) async throws -> ProviderProcessReceipt {
-    guard case .rockchip = plan.action else {
+    guard case .rockchip(let action) = plan.action else {
       throw RuntimeDispatchFailure.failed(
         "bundled Rockchip dispatcher received a non-Rockchip action")
     }
-    guard case .hostManaged = plan.kind else {
+    guard case .hostManaged(let descriptor) = plan.kind else {
       throw RuntimeDispatchFailure.failed(
         "Rockchip runtime actions must use their closed host-managed descriptors")
     }
-    throw RuntimeDispatchFailure.failed(
-      unavailableReason(providerID: "rockchip")
-        ?? "bundled Rockchip dispatch is unavailable")
+    if let reason = unavailableReason(providerID: "rockchip") {
+      throw RuntimeDispatchFailure.failed(reason)
+    }
+    let executable: ResolvedExecutable
+    do {
+      executable = try resolver.resolveExecutable(providerID: "rockchip")
+    } catch {
+      throw RuntimeDispatchFailure.failed(
+        "product-owned Rockchip component is unavailable: \(error)")
+    }
+    guard executable.sha256 == destructiveExecutableSHA256 else {
+      throw RuntimeDispatchFailure.failed(
+        "bundled Rockchip executable identity changed after availability materialization")
+    }
+    let result = try await host.execute(
+      action: action,
+      descriptor: descriptor,
+      rockchipExecutable: executable)
+    guard let recordID = result.summary["recordID"], !recordID.isEmpty else {
+      throw RuntimeDispatchFailure.outcomeUnknown(
+        "Rockchip host returned no durable job/step receipt")
+    }
+    return ProviderProcessReceipt(
+      exitStatus: 0,
+      stdout: result.stdout,
+      stderr: result.stderr,
+      stdoutTruncated: result.stdoutTruncated,
+      durationSeconds: result.subprocesses.reduce(0) {
+        $0 + $1.durationSeconds
+      },
+      hostManagedRecordID: recordID,
+      subprocesses: result.subprocesses)
   }
 }

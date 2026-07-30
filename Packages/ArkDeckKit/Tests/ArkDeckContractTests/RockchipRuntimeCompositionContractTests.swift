@@ -6,6 +6,230 @@ import XCTest
 @testable import ArkDeckWorkflows
 
 final class RockchipRuntimeCompositionContractTests: XCTestCase {
+  private actor ActionLog {
+    private var actions: [RockchipProviderAction] = []
+    private var intentWasDurable: [Bool] = []
+
+    func append(_ action: RockchipProviderAction, intentExists: Bool) {
+      actions.append(action)
+      intentWasDurable.append(intentExists)
+    }
+
+    func snapshot() -> ([RockchipProviderAction], [Bool]) {
+      (actions, intentWasDurable)
+    }
+  }
+
+  private struct SuccessfulActionExecutor: RockchipRuntimeActionExecuting {
+    let log: ActionLog
+
+    func unavailableReason() -> String? { nil }
+
+    func execute(
+      action: RockchipProviderAction,
+      descriptor _: HostManagedProcessDescriptor,
+      rockchipExecutable _: ResolvedExecutable,
+      actionDirectory: URL
+    ) async throws -> RockchipRuntimeActionExecutionResult {
+      await log.append(
+        action,
+        intentExists: FileManager.default.fileExists(
+          atPath: actionDirectory.appendingPathComponent("intent.json").path))
+      return RockchipRuntimeActionExecutionResult(
+        summary: ["semantic": "verified"],
+        stdout: Data("verified\n".utf8),
+        stderr: Data(),
+        stdoutTruncated: false,
+        subprocesses: [
+          ProviderSubprocessReceipt(
+            exitStatus: 0,
+            stdout: Data("verified\n".utf8),
+            stderr: Data(),
+            stdoutTruncated: false,
+            durationSeconds: 0)
+        ])
+    }
+  }
+
+  private actor CommandLog {
+    struct Invocation: Sendable, Equatable {
+      let executable: String
+      let arguments: [String]
+      let criticalNonInterruptible: Bool
+    }
+
+    private var invocations: [Invocation] = []
+    private var listCount = 0
+
+    func run(
+      executable: ResolvedExecutable,
+      arguments: [String],
+      criticalNonInterruptible: Bool
+    ) -> ProviderSubprocessReceipt {
+      invocations.append(
+        Invocation(
+          executable: executable.path,
+          arguments: arguments,
+          criticalNonInterruptible: criticalNonInterruptible))
+      let stdout: String
+      switch arguments {
+      case ["list", "targets", "-v"]:
+        listCount += 1
+        stdout =
+          listCount == 1
+          ? "[Empty]\n"
+          : "device-1\t\tUSB\tConnected\tlocalhost\n"
+      case ["ld"]:
+        stdout = "DevNo=1\tVid=0x2207,Pid=0x350a,LocationID=42\tLoader\n"
+      case ["ppt"]:
+        stdout = Self.partitionTable
+      case ["rd"]:
+        stdout = "Reset Device OK.\n"
+      case let value
+      where value.suffix(4)
+        == ["shell", "param", "get", HDCAllowlistedProperty.productModel.rawValue]:
+        stdout = "const.product.model = DAYU200\n"
+      case let value
+      where value.suffix(4)
+        == ["shell", "param", "get", HDCAllowlistedProperty.fullBuildVersion.rawValue]:
+        stdout = "const.ohos.fullname = OpenHarmony-7.0.0.33\n"
+      case let value where value.count >= 3 && value.suffix(3) == ["shell", "hilog", "-x"]:
+        stdout = "post-flash hilog\n"
+      case let value where value.first == "wlx":
+        stdout = "Write LBA from file (100%)\n"
+      default:
+        stdout = ""
+      }
+      return ProviderSubprocessReceipt(
+        exitStatus: 0,
+        stdout: Data(stdout.utf8),
+        stderr: Data(),
+        stdoutTruncated: false,
+        durationSeconds: 0)
+    }
+
+    func snapshot() -> [Invocation] { invocations }
+
+    private static let partitionTable =
+      """
+      **********Partition Info(GPT)**********
+      NO  LBA       Name
+      00  00002000  uboot
+      01  00004000  misc
+      02  00006000  bootctrl
+      03  00007000  resource
+      04  0000A000  boot_linux
+      05  0003A000  ramdisk
+      06  0003C000  system
+      07  0043C000  vendor
+      08  0063C000  sys-prod
+      09  00655000  chip-prod
+      10  0066E000  updater
+      11  0067E000  eng_system
+      12  00686000  eng_chipset
+      13  0069E000  chip_ckm
+      14  01308000  userdata
+      """
+  }
+
+  private struct ScriptedCommandRunner: RockchipRuntimeCommandRunning {
+    let log: CommandLog
+
+    func run(
+      executable: ResolvedExecutable,
+      arguments: [String],
+      timeoutSeconds _: Int?,
+      outputByteBudget _: Int,
+      criticalNonInterruptible: Bool
+    ) async throws -> ProviderSubprocessReceipt {
+      await log.run(
+        executable: executable,
+        arguments: arguments,
+        criticalNonInterruptible: criticalNonInterruptible)
+    }
+  }
+
+  private struct FixedUSBProbe: RockchipRuntimeUSBProbing {
+    let identity: String
+
+    func singleLoader(
+      stableIdentitySHA256: String
+    ) throws -> RockchipRuntimeLoaderIdentity {
+      guard stableIdentitySHA256 == identity else {
+        throw RuntimeDispatchFailure.failed("identity mismatch")
+      }
+      return RockchipRuntimeLoaderIdentity(
+        serialDigestSHA256: identity,
+        topology: "42")
+    }
+  }
+
+  private actor ReadbackLog {
+    private var partitions: [String] = []
+
+    func append(_ partition: String) {
+      partitions.append(partition)
+    }
+
+    func snapshot() -> [String] { partitions }
+  }
+
+  private struct VerifiedPartitionReadback:
+    RockchipRuntimePartitionReadbackVerifying
+  {
+    let log: ReadbackLog
+
+    func verify(
+      mapping: RockchipMappedPartition,
+      member _: RockchipImagesArchiveMember,
+      executable _: ResolvedExecutable,
+      outputDirectory _: URL
+    ) async throws -> [ProviderSubprocessReceipt] {
+      await log.append(mapping.partitionName)
+      return [
+        ProviderSubprocessReceipt(
+          exitStatus: 0,
+          stdout: Data("Read LBA from device (100%)\n".utf8),
+          stderr: Data(),
+          stdoutTruncated: false,
+          durationSeconds: 0)
+      ]
+    }
+  }
+
+  private struct MaterializingReadbackRunner: RockchipRuntimeCommandRunning {
+    let imageBytes: Data
+    let baseSector: Int64
+
+    func run(
+      executable _: ResolvedExecutable,
+      arguments: [String],
+      timeoutSeconds _: Int?,
+      outputByteBudget _: Int,
+      criticalNonInterruptible _: Bool
+    ) async throws -> ProviderSubprocessReceipt {
+      guard arguments.count == 4, arguments[0] == "rl",
+        let sectorCount = Int(arguments[2])
+      else {
+        throw RuntimeDispatchFailure.failed("unexpected readback argv")
+      }
+      let offsetSectors = try XCTUnwrap(Int64(arguments[1]))
+      let byteOffset = Int((offsetSectors - baseSector) * 512)
+      let byteCount = min(sectorCount * 512, imageBytes.count - byteOffset)
+      var materialized = imageBytes.subdata(
+        in: byteOffset..<(byteOffset + byteCount))
+      materialized.append(
+        Data(repeating: 0, count: sectorCount * 512 - byteCount))
+      try materialized.write(to: URL(fileURLWithPath: arguments[3]))
+      return ProviderSubprocessReceipt(
+        exitStatus: 0,
+        stdout: Data("Read LBA from device (100%)\n".utf8),
+        stderr: Data(),
+        stdoutTruncated: false,
+        durationSeconds: 0)
+    }
+  }
+
   private struct HDCFacts: HDCObservationFactsPort {
     func currentFacts(targetID: String) async throws -> ProviderFacts {
       ProviderFacts(
@@ -58,6 +282,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       jobID: "job-router", stepID: "route", targetID: "TGT-ROUTER",
       bindingRevision: 1, connectKey: "device-1",
       expectedIdentitySHA256: String(repeating: "a", count: 64),
+      toolSHA256: String(repeating: "b", count: 64),
       nowUTC: "2026-07-31T00:00:00Z")
     let hdcAction = TypedProviderAction.hdc(
       .queryProperty(HDCAllowlistedProperty.productModel))
@@ -165,7 +390,10 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       action: .rockchip(.enterLoader(connectKey: "device-1")),
       context: ProviderExecutionContext(
         jobID: "job-1", stepID: "enter-loader", targetID: "TGT-1",
-        bindingRevision: 1, nowUTC: "2026-07-31T00:00:00Z"))
+        bindingRevision: 1, connectKey: "device-1",
+        expectedIdentitySHA256: String(repeating: "a", count: 64),
+        toolSHA256: BundledRockchipComponent.signedExecutableSHA256,
+        nowUTC: "2026-07-31T00:00:00Z"))
     do {
       _ = try await dispatcher.dispatch(plan)
       XCTFail("identity drift must dispatch zero processes")
@@ -175,6 +403,307 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       }
       XCTAssertEqual(detail, reason)
     }
+  }
+
+  func testDurableHostCoversClosedActionSurfaceAndRefusesDuplicateStep() async throws {
+    let root = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let componentSHA = String(repeating: "c", count: 64)
+    let component = ResolvedExecutable(
+      path: "/product/Contents/MacOS/rkdeveloptool",
+      sha256: componentSHA)
+    let log = ActionLog()
+    let dispatcher = BundledRockchipRuntimeDispatcher(
+      resolver: FixedExecutableResolver(table: ["rockchip": component]),
+      host: DurableRockchipRuntimeActionHost(
+        executor: SuccessfulActionExecutor(log: log),
+        records: RockchipRuntimeActionRecordStore(
+          rootURL: root.appendingPathComponent(
+            "rockchip-runtime", isDirectory: true))),
+      destructiveExecutableSHA256: componentSHA)
+    let identity = String(repeating: "a", count: 64)
+    let bundle = flashBundle()
+    let actions: [RockchipProviderAction] = [
+      .enterLoader(connectKey: "device-1"),
+      .waitForHDCDisconnect(connectKey: "device-1"),
+      .waitForLoader(stableIdentitySHA256: identity),
+      .rebindLoader(stableIdentitySHA256: identity),
+      .flashPartitions(bundle),
+      .verifyFlashReadback(bundle),
+      .rebootToNormal(stableIdentitySHA256: identity),
+      .waitForHDCReconnect(connectKey: "device-1"),
+      .verifyBuild(connectKey: "device-1"),
+      .capturePostFlashDiagnostics(
+        connectKey: "device-1",
+        request: try HDCHilogCaptureRequest(
+          durationSeconds: 1, byteBudget: 1024)),
+    ]
+
+    var firstPlan: TypedProcessPlan?
+    for (index, action) in actions.enumerated() {
+      let stepID = "step-\(index)"
+      let plan = try rockchipPlan(
+        action: action, stepID: stepID, toolSHA256: componentSHA)
+      if firstPlan == nil { firstPlan = plan }
+      let receipt = try await dispatcher.dispatch(plan)
+      XCTAssertEqual(
+        receipt.hostManagedRecordID,
+        "rockchip-runtime/job-host/\(stepID)/receipt.json")
+      let directory =
+        root
+        .appendingPathComponent("rockchip-runtime/job-host/\(stepID)")
+      XCTAssertTrue(
+        FileManager.default.fileExists(
+          atPath: directory.appendingPathComponent("intent.json").path))
+      XCTAssertTrue(
+        FileManager.default.fileExists(
+          atPath: directory.appendingPathComponent("receipt.json").path))
+      let intent =
+        try JSONSerialization.jsonObject(
+          with: Data(
+            contentsOf: directory.appendingPathComponent("intent.json")))
+        as? [String: Any]
+      XCTAssertEqual(intent?["jobID"] as? String, "job-host")
+      XCTAssertEqual(intent?["stepID"] as? String, stepID)
+      XCTAssertEqual(intent?["bindingRevision"] as? Int, 7)
+      XCTAssertEqual(intent?["actionSHA256"] as? String, hostDescriptor(plan).actionSHA256)
+    }
+    let snapshot = await log.snapshot()
+    XCTAssertEqual(snapshot.0, actions)
+    XCTAssertEqual(snapshot.1, Array(repeating: true, count: actions.count))
+
+    do {
+      _ = try await dispatcher.dispatch(try XCTUnwrap(firstPlan))
+      XCTFail("the same durable job/step must never dispatch twice")
+    } catch let failure as RuntimeDispatchFailure {
+      guard case .failed(let detail) = failure else {
+        return XCTFail("duplicate refusal must be definite, got \(failure)")
+      }
+      XCTAssertTrue(detail.contains("duplicate dispatch"), detail)
+    }
+    let snapshotAfterDuplicate = await log.snapshot()
+    XCTAssertEqual(snapshotAfterDuplicate.0.count, actions.count)
+
+    let original = hostDescriptor(try XCTUnwrap(firstPlan))
+    let driftedDescriptor = HostManagedProcessDescriptor(
+      identifier: original.identifier,
+      jobID: original.jobID,
+      stepID: "action-digest-drift",
+      targetID: original.targetID,
+      bindingRevision: original.bindingRevision,
+      connectKey: original.connectKey,
+      expectedIdentitySHA256: original.expectedIdentitySHA256,
+      providerExecutableSHA256: original.providerExecutableSHA256,
+      actionSHA256: String(repeating: "0", count: 64))
+    let driftedPlan = TypedProcessPlan(
+      action: try XCTUnwrap(firstPlan).action,
+      kind: .hostManaged(driftedDescriptor))
+    do {
+      _ = try await dispatcher.dispatch(driftedPlan)
+      XCTFail("an action digest changed after admission must dispatch zero processes")
+    } catch let failure as RuntimeDispatchFailure {
+      guard case .failed(let detail) = failure else {
+        return XCTFail("action drift refusal must be definite, got \(failure)")
+      }
+      XCTAssertTrue(detail.contains("action digest drifted"), detail)
+    }
+    let snapshotAfterDrift = await log.snapshot()
+    XCTAssertEqual(snapshotAfterDrift.0.count, actions.count)
+  }
+
+  func testDurableHostIsUnavailableBeforeAdmissionWhenRecordRootCannotMaterialize()
+    throws
+  {
+    let root = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let occupiedRoot = root.appendingPathComponent("occupied")
+    try Data("not-a-directory".utf8).write(to: occupiedRoot)
+    let host = DurableRockchipRuntimeActionHost(
+      executor: SuccessfulActionExecutor(log: ActionLog()),
+      records: RockchipRuntimeActionRecordStore(rootURL: occupiedRoot))
+
+    let reason = try XCTUnwrap(host.unavailableReason())
+    XCTAssertTrue(reason.contains("record root is unavailable"), reason)
+  }
+
+  func testProductionExecutorUsesDescriptorBoundHDCAndClosedRockUSBCommands() async throws {
+    let root = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let actionDirectory = root.appendingPathComponent(
+      "action", isDirectory: true)
+    try FileManager.default.createDirectory(
+      at: actionDirectory,
+      withIntermediateDirectories: false,
+      attributes: [.posixPermissions: 0o700])
+    let identity = String(repeating: "a", count: 64)
+    let rockchipSHA = String(repeating: "c", count: 64)
+    let hdcSHA = String(repeating: "b", count: 64)
+    let rockchip = ResolvedExecutable(
+      path: "/product/rkdeveloptool", sha256: rockchipSHA)
+    let commandLog = CommandLog()
+    let readbackLog = ReadbackLog()
+    let executor = FoundationRockchipRuntimeActionExecutor(
+      hdcResolver: FixedExecutableResolver(
+        table: [
+          "hdc": ResolvedExecutable(path: "/product/hdc", sha256: hdcSHA)
+        ]),
+      runner: ScriptedCommandRunner(log: commandLog),
+      usbProbe: FixedUSBProbe(identity: identity),
+      readback: VerifiedPartitionReadback(log: readbackLog),
+      stage: { _, _ in
+        Dictionary(
+          uniqueKeysWithValues:
+            RockchipFlashProfile.dayu200.mappedPartitions.map { mapping in
+              let member = RockchipFlashProfile.dayu200.member(
+                named: mapping.imageMemberName)!
+              return (
+                mapping.imageMemberName,
+                RockchipRuntimeStagedImageHandle(
+                  memberName: member.name,
+                  partitionName: mapping.partitionName,
+                  sizeBytes: member.sizeBytes,
+                  sha256: member.sha256,
+                  stableDescriptorPath: "/private/tmp/\(member.name)",
+                  validation: {})
+              )
+            })
+      })
+    XCTAssertNil(executor.unavailableReason())
+
+    let bundle = flashBundle()
+    let actions: [RockchipProviderAction] = [
+      .enterLoader(connectKey: "device-1"),
+      .waitForHDCDisconnect(connectKey: "device-1"),
+      .waitForLoader(stableIdentitySHA256: identity),
+      .rebindLoader(stableIdentitySHA256: identity),
+      .flashPartitions(bundle),
+      .verifyFlashReadback(bundle),
+      .rebootToNormal(stableIdentitySHA256: identity),
+      .waitForHDCReconnect(connectKey: "device-1"),
+      .verifyBuild(connectKey: "device-1"),
+      .capturePostFlashDiagnostics(
+        connectKey: "device-1",
+        request: try HDCHilogCaptureRequest(
+          durationSeconds: 1, byteBudget: 1024)),
+    ]
+    for (index, action) in actions.enumerated() {
+      let plan = try rockchipPlan(
+        action: action,
+        stepID: "production-\(index)",
+        toolSHA256: rockchipSHA)
+      _ = try await executor.execute(
+        action: action,
+        descriptor: hostDescriptor(plan),
+        rockchipExecutable: rockchip,
+        actionDirectory: actionDirectory)
+    }
+
+    let invocations = await commandLog.snapshot()
+    let hdcDeviceInvocations = invocations.filter {
+      $0.executable == "/product/hdc" && $0.arguments.first != "list"
+    }
+    XCTAssertFalse(hdcDeviceInvocations.isEmpty)
+    XCTAssertTrue(
+      hdcDeviceInvocations.allSatisfy {
+        $0.arguments.starts(with: ["-t", "device-1"])
+      })
+    XCTAssertTrue(invocations.contains { $0.arguments == ["ld"] })
+    XCTAssertTrue(invocations.contains { $0.arguments == ["ppt"] })
+    XCTAssertTrue(invocations.contains { $0.arguments == ["rd"] })
+    let writes = invocations.filter { $0.arguments.first == "wlx" }
+    XCTAssertEqual(
+      writes.map { $0.arguments[1] },
+      RockchipFlashProfile.dayu200.mappedPartitions.map(\.partitionName))
+    XCTAssertTrue(writes.allSatisfy(\.criticalNonInterruptible))
+    let readbackPartitions = await readbackLog.snapshot()
+    XCTAssertEqual(
+      readbackPartitions,
+      RockchipFlashProfile.dayu200.mappedPartitions.map(\.partitionName))
+    let firstMapping = try XCTUnwrap(
+      RockchipFlashProfile.dayu200.mappedPartitions.first)
+    let firstMember = try XCTUnwrap(
+      RockchipFlashProfile.dayu200.member(named: firstMapping.imageMemberName))
+    XCTAssertEqual(
+      FoundationRockchipRuntimePartitionReadback.arguments(
+        mapping: firstMapping,
+        member: firstMember,
+        outputURL: URL(fileURLWithPath: "/private/tmp/readback.img")),
+      [
+        "rl", String(firstMapping.offsetSectors),
+        String((firstMember.sizeBytes + 511) / 512),
+        "/private/tmp/readback.img",
+      ])
+  }
+
+  func testPartitionReadbackHashesExactImagePrefixAndRemovesRawCopy() async throws {
+    let root = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let image = Data(repeating: 0x41, count: 700)
+    let member = RockchipImagesArchiveMember(
+      name: "exact.img",
+      sizeBytes: Int64(image.count),
+      sha256: SHA256.hash(data: image).map {
+        String(format: "%02x", $0)
+      }.joined(),
+      classification: .mappedPartitionImage)
+    let mapping = RockchipMappedPartition(
+      writeOrder: 1,
+      partitionName: "exact",
+      imageMemberName: member.name,
+      offsetSectors: 8192)
+    let verifier = FoundationRockchipRuntimePartitionReadback(
+      runner: MaterializingReadbackRunner(
+        imageBytes: image, baseSector: mapping.offsetSectors),
+      maximumChunkSectors: 1)
+    let receipts = try await verifier.verify(
+      mapping: mapping,
+      member: member,
+      executable: ResolvedExecutable(
+        path: "/product/rkdeveloptool",
+        sha256: String(repeating: "c", count: 64)),
+      outputDirectory: root)
+    XCTAssertEqual(receipts.count, 2)
+    XCTAssertEqual(
+      try FileManager.default.contentsOfDirectory(atPath: root.path), [])
+  }
+
+  private func rockchipPlan(
+    action: RockchipProviderAction,
+    stepID: String,
+    toolSHA256: String
+  ) throws -> TypedProcessPlan {
+    try RockchipFlashProviderAdapter(availability: .available).lower(
+      action: .rockchip(action),
+      context: ProviderExecutionContext(
+        jobID: "job-host",
+        stepID: stepID,
+        targetID: "TGT-HOST",
+        bindingRevision: 7,
+        connectKey: "device-1",
+        expectedIdentitySHA256: String(repeating: "a", count: 64),
+        toolVersion: BundledRockchipComponent.reportedVersion,
+        toolSHA256: toolSHA256,
+        nowUTC: "2026-07-31T00:00:00Z"))
+  }
+
+  private func hostDescriptor(
+    _ plan: TypedProcessPlan
+  ) -> HostManagedProcessDescriptor {
+    guard case .hostManaged(let descriptor) = plan.kind else {
+      preconditionFailure("expected host-managed plan")
+    }
+    return descriptor
+  }
+
+  private func flashBundle() -> RockchipRuntimeFlashBundle {
+    RockchipRuntimeFlashBundle(
+      artifactLeaseID: "lease:flash-artifact",
+      artifactID: "flash-artifact",
+      fileURL: URL(fileURLWithPath: "/private/tmp/images.tar.gz"),
+      sha256: RockchipFlashProfile.dayu200.archiveSHA256,
+      byteCount: Int(RockchipFlashProfile.dayu200.archiveSizeBytes),
+      partitionNames: RockchipFlashProfile.dayu200.mappedPartitions.map(
+        \.partitionName))
   }
 
   private func temporaryDirectory() throws -> URL {

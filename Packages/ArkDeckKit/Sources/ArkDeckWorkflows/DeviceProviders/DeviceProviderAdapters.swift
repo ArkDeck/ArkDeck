@@ -2111,9 +2111,32 @@ public struct RockchipFlashProviderAdapter: DeviceProvider {
     case .capturePostFlashDiagnostics:
       descriptor = "rockchip.hdc.capture-post-flash-hilog.v1"
     }
+    guard let bindingRevision = context.bindingRevision,
+      let connectKey = context.connectKey, !connectKey.isEmpty,
+      let expectedIdentitySHA256 = context.expectedIdentitySHA256,
+      let providerExecutableSHA256 = context.toolSHA256
+    else {
+      throw DeviceProviderError.factsUnavailable(
+        "\(context.stepID) has no complete host-managed target/tool correlation")
+    }
+    let actionEncoder = JSONEncoder()
+    actionEncoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+    let encodedAction = try actionEncoder.encode(PersistedTypedProviderAction(action))
+    let actionSHA256 = SHA256.hash(data: encodedAction)
+      .map { String(format: "%02x", $0) }.joined()
     return TypedProcessPlan(
       action: action,
-      kind: .hostManaged(descriptor: descriptor))
+      kind: .hostManaged(
+        HostManagedProcessDescriptor(
+          identifier: descriptor,
+          jobID: context.jobID,
+          stepID: context.stepID,
+          targetID: context.targetID,
+          bindingRevision: bindingRevision,
+          connectKey: connectKey,
+          expectedIdentitySHA256: expectedIdentitySHA256,
+          providerExecutableSHA256: providerExecutableSHA256,
+          actionSHA256: actionSHA256)))
   }
 
   public func verify(

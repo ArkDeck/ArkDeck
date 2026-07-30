@@ -171,10 +171,12 @@ Task.detached {
     let configuredHDC = ProcessInfo.processInfo.environment["ARKDECK_HDC_PATH"]
     var hdcDispatcher: any RuntimeProcessDispatching = RefusingDispatcher(
       reason: "no HDC executable configured (set ARKDECK_HDC_PATH); dispatch stays fail-closed")
+    var hdcExecutableResolver: (any RuntimeExecutableResolving)?
     var executableSHA = ""
     if let configuredHDC {
       let resolver = try FixedExecutableResolver.hashing(path: configuredHDC, providerID: "hdc")
       executableSHA = try resolver.resolveExecutable(providerID: "hdc").sha256
+      hdcExecutableResolver = resolver
       hdcDispatcher = DescriptorBoundProcessDispatcher(resolver: resolver)
     }
 
@@ -183,7 +185,16 @@ Task.detached {
         targetStore: targetStore, executablePath: configuredHDC ?? "-",
         executableSHA256: executableSHA))
     let rockchipResolver = BundledRockchipExecutableResolver()
-    let rockchipDispatcher = BundledRockchipRuntimeDispatcher(resolver: rockchipResolver)
+    let rockchipDispatcher: BundledRockchipRuntimeDispatcher
+    if let hdcExecutableResolver {
+      rockchipDispatcher = BundledRockchipRuntimeDispatcher(
+        resolver: rockchipResolver,
+        hdcResolver: hdcExecutableResolver,
+        stateDirectory: resolvedStateDirectory)
+    } else {
+      rockchipDispatcher = BundledRockchipRuntimeDispatcher(
+        resolver: rockchipResolver)
+    }
     let rockchipAvailability: ProviderOperationAvailability
     if let reason = rockchipDispatcher.unavailableReason(providerID: "rockchip") {
       rockchipAvailability = .unavailable(reason: reason)

@@ -790,11 +790,49 @@ public struct TypedProcessInvocation: Sendable, Equatable {
   }
 }
 
+/// Engine-derived correlation carried to a provider-owned host. Every field
+/// comes from the same target facts and typed action that were materialized
+/// before Runtime capability admission; callers cannot construct or mutate
+/// this value outside ArkDeckWorkflows.
+public struct HostManagedProcessDescriptor: Sendable, Equatable {
+  public let identifier: String
+  public let jobID: String
+  public let stepID: String
+  public let targetID: String
+  public let bindingRevision: Int
+  public let connectKey: String
+  public let expectedIdentitySHA256: String
+  public let providerExecutableSHA256: String
+  public let actionSHA256: String
+
+  package init(
+    identifier: String,
+    jobID: String,
+    stepID: String,
+    targetID: String,
+    bindingRevision: Int,
+    connectKey: String,
+    expectedIdentitySHA256: String,
+    providerExecutableSHA256: String,
+    actionSHA256: String
+  ) {
+    self.identifier = identifier
+    self.jobID = jobID
+    self.stepID = stepID
+    self.targetID = targetID
+    self.bindingRevision = bindingRevision
+    self.connectKey = connectKey
+    self.expectedIdentitySHA256 = expectedIdentitySHA256
+    self.providerExecutableSHA256 = providerExecutableSHA256
+    self.actionSHA256 = actionSHA256
+  }
+}
+
 public struct TypedProcessPlan: Sendable, Equatable {
   public enum Kind: Sendable, Equatable {
     case process(executableSHA256: String, argumentSummary: [String], timeoutSeconds: Int?)
     case processSequence(executableSHA256: String, invocations: [TypedProcessInvocation])
-    case hostManaged(descriptor: String)
+    case hostManaged(HostManagedProcessDescriptor)
   }
 
   public let action: TypedProviderAction
