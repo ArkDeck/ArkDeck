@@ -679,7 +679,8 @@ enum RuntimeCLI {
         message: "native library changed while it was being imported")
     }
     do {
-      _ = try NativeLibraryArtifactValidator.validate(contents)
+      _ = try NativeLibraryArtifactValidator.validate(
+        contents, requireOpenHarmonyCodeSignature: true)
     } catch {
       throw CLIError(
         exitCode: EX_DATAERR,

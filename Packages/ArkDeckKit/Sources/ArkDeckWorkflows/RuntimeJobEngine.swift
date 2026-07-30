@@ -2790,7 +2790,8 @@ public actor RuntimeJobEngine {
     let facts: HDCNativeLibraryArtifactFacts
     do {
       facts = try NativeLibraryArtifactValidator.validate(
-        bytes, expectedABI: expectedABI)
+        bytes, expectedABI: expectedABI,
+        requireOpenHarmonyCodeSignature: true)
     } catch {
       throw RuntimeDispatchFailure.failed(
         "native host verification rejected the leased ELF: \(error)")

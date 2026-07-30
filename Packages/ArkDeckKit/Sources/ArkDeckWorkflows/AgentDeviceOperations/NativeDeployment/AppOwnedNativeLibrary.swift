@@ -14,6 +14,7 @@ public struct HDCNativeLibraryArtifactFacts: Sendable, Equatable {
   public let buildID: String
   public let sha256: String
   public let byteCount: Int
+  public let codeSign: HDCNativeLibraryCodeSignFacts?
 
   public init(
     abi: HDCNativeLibraryABI,
@@ -21,7 +22,8 @@ public struct HDCNativeLibraryArtifactFacts: Sendable, Equatable {
     machine: UInt16,
     buildID: String,
     sha256: String,
-    byteCount: Int
+    byteCount: Int,
+    codeSign: HDCNativeLibraryCodeSignFacts? = nil
   ) {
     self.abi = abi
     self.elfClassBits = elfClassBits
@@ -29,6 +31,26 @@ public struct HDCNativeLibraryArtifactFacts: Sendable, Equatable {
     self.buildID = buildID
     self.sha256 = sha256
     self.byteCount = byteCount
+    self.codeSign = codeSign
+  }
+}
+
+public struct HDCNativeLibraryCodeSignFacts: Sendable, Equatable {
+  public let formatVersion: Int
+  public let codeSignVersion: Int
+  public let signedDataByteCount: Int
+  public let signatureByteCount: Int
+
+  public init(
+    formatVersion: Int,
+    codeSignVersion: Int,
+    signedDataByteCount: Int,
+    signatureByteCount: Int
+  ) {
+    self.formatVersion = formatVersion
+    self.codeSignVersion = codeSignVersion
+    self.signedDataByteCount = signedDataByteCount
+    self.signatureByteCount = signatureByteCount
   }
 }
 
@@ -39,6 +61,8 @@ public enum NativeLibraryArtifactValidationError: Error, Equatable, CustomString
   case classMachineMismatch
   case abiMismatch(expected: HDCNativeLibraryABI, actual: HDCNativeLibraryABI)
   case missingBuildID
+  case missingOpenHarmonyCodeSignBlock
+  case invalidOpenHarmonyCodeSignBlock
 
   public var description: String {
     switch self {
@@ -54,6 +78,10 @@ public enum NativeLibraryArtifactValidationError: Error, Equatable, CustomString
       return "native library ABI \(actual.rawValue) does not match expected \(expected.rawValue)"
     case .missingBuildID:
       return "native library has no GNU ELF build ID"
+    case .missingOpenHarmonyCodeSignBlock:
+      return "native library has no OpenHarmony V1 ELF code-sign block"
+    case .invalidOpenHarmonyCodeSignBlock:
+      return "native library has a malformed OpenHarmony V1 ELF code-sign block"
     }
   }
 }
@@ -66,7 +94,8 @@ public enum NativeLibraryArtifactValidator {
 
   public static func validate(
     _ data: Data,
-    expectedABI: HDCNativeLibraryABI? = nil
+    expectedABI: HDCNativeLibraryABI? = nil,
+    requireOpenHarmonyCodeSignature: Bool = false
   ) throws -> HDCNativeLibraryArtifactFacts {
     guard (64...maximumBytes).contains(data.count),
       data[0] == 0x7f, data[1] == 0x45, data[2] == 0x4c, data[3] == 0x46
@@ -110,6 +139,8 @@ public enum NativeLibraryArtifactValidator {
     guard let buildID = buildID(in: data, elfClass: elfClass) else {
       throw NativeLibraryArtifactValidationError.missingBuildID
     }
+    let codeSign = try openHarmonyCodeSignFacts(
+      in: data, required: requireOpenHarmonyCodeSignature)
     let sha256 = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
     return HDCNativeLibraryArtifactFacts(
       abi: abi,
@@ -117,7 +148,109 @@ public enum NativeLibraryArtifactValidator {
       machine: machine,
       buildID: buildID,
       sha256: sha256,
-      byteCount: data.count)
+      byteCount: data.count,
+      codeSign: codeSign)
+  }
+
+  private static func openHarmonyCodeSignFacts(
+    in data: Data,
+    required: Bool
+  ) throws -> HDCNativeLibraryCodeSignFacts? {
+    let headerSize = 32
+    let signMagic = Data("elf sign block  ".utf8)
+    let version = Data("1000".utf8)
+    guard data.count >= headerSize else {
+      if required {
+        throw NativeLibraryArtifactValidationError.missingOpenHarmonyCodeSignBlock
+      }
+      return nil
+    }
+    let headerOffset = data.count - headerSize
+    guard data.subdata(in: headerOffset..<(headerOffset + 16)) == signMagic else {
+      if required {
+        throw NativeLibraryArtifactValidationError.missingOpenHarmonyCodeSignBlock
+      }
+      return nil
+    }
+    guard data.subdata(in: (headerOffset + 16)..<(headerOffset + 20)) == version,
+      let blockSizeValue = readUInt32(data, at: headerOffset + 20),
+      let blockCountValue = readUInt32(data, at: headerOffset + 24)
+    else {
+      throw NativeLibraryArtifactValidationError.invalidOpenHarmonyCodeSignBlock
+    }
+    let blockSize = Int(blockSizeValue)
+    let blockCount = Int(blockCountValue)
+    guard (1...2).contains(blockCount),
+      blockSize >= blockCount * 12,
+      blockSize <= 16 * 1_024 * 1_024,
+      blockSize <= headerOffset
+    else {
+      throw NativeLibraryArtifactValidationError.invalidOpenHarmonyCodeSignBlock
+    }
+    let blockOffset = headerOffset - blockSize
+    var signInfoOffset: Int?
+    for index in 0..<blockCount {
+      let offset = blockOffset + index * 12
+      guard let type = readUInt16(data, at: offset),
+        let candidateValue = readUInt32(data, at: offset + 8)
+      else {
+        throw NativeLibraryArtifactValidationError.invalidOpenHarmonyCodeSignBlock
+      }
+      if type == 3 {
+        signInfoOffset = Int(candidateValue)
+        break
+      }
+    }
+    guard let merkleRelativeOffset = signInfoOffset,
+      merkleRelativeOffset > 0,
+      merkleRelativeOffset <= blockSize - 8
+    else {
+      throw NativeLibraryArtifactValidationError.invalidOpenHarmonyCodeSignBlock
+    }
+    let merkleOffset = blockOffset + merkleRelativeOffset
+    guard readUInt32(data, at: merkleOffset) == 2,
+      let merkleLengthValue = readUInt32(data, at: merkleOffset + 4)
+    else {
+      throw NativeLibraryArtifactValidationError.invalidOpenHarmonyCodeSignBlock
+    }
+    let merkleLength = Int(merkleLengthValue)
+    guard merkleLength <= blockSize - merkleRelativeOffset - 8 else {
+      throw NativeLibraryArtifactValidationError.invalidOpenHarmonyCodeSignBlock
+    }
+    let infoRelativeOffset = merkleRelativeOffset + 8 + merkleLength
+    let infoPrefixSize = 264
+    guard infoRelativeOffset <= blockSize,
+      blockSize - infoRelativeOffset >= infoPrefixSize
+    else {
+      throw NativeLibraryArtifactValidationError.invalidOpenHarmonyCodeSignBlock
+    }
+    let infoOffset = blockOffset + infoRelativeOffset
+    guard readUInt32(data, at: infoOffset) == 1,
+      let lengthValue = readUInt32(data, at: infoOffset + 4),
+      data[infoOffset + 8] == 1,
+      data[infoOffset + 9] == 1,
+      data[infoOffset + 10] == 12,
+      data[infoOffset + 11] <= 32,
+      let signatureSizeValue = readUInt32(data, at: infoOffset + 12),
+      let signedDataSizeValue = readUInt64(data, at: infoOffset + 16)
+    else {
+      throw NativeLibraryArtifactValidationError.invalidOpenHarmonyCodeSignBlock
+    }
+    let length = Int(lengthValue)
+    let signatureSize = Int(signatureSizeValue)
+    guard signatureSize > 0, signatureSize <= 4 * 1_024 * 1_024,
+      length <= blockSize - infoRelativeOffset - 8,
+      infoPrefixSize + signatureSize <= 8 + length,
+      signedDataSizeValue == UInt64(blockOffset),
+      data[infoOffset + 263] == 1
+    else {
+      throw NativeLibraryArtifactValidationError.invalidOpenHarmonyCodeSignBlock
+    }
+    return HDCNativeLibraryCodeSignFacts(
+      formatVersion: 1,
+      codeSignVersion: 1,
+      signedDataByteCount: Int(signedDataSizeValue),
+      signatureByteCount: signatureSize)
   }
 
   private static func buildID(in data: Data, elfClass: UInt8) -> String? {
@@ -289,6 +422,7 @@ package struct HDCAppOwnedNativeLibraryExactPaths: Sendable, Equatable {
   package let stagingPath: String
   package let backupPath: String
   package let rollbackStagingPath: String
+  package let codeSignHelperRemotePath: String?
 
   package init(
     directoryPath: String,
@@ -297,7 +431,8 @@ package struct HDCAppOwnedNativeLibraryExactPaths: Sendable, Equatable {
     stagingDirectoryPath: String?,
     stagingPath: String,
     backupPath: String,
-    rollbackStagingPath: String
+    rollbackStagingPath: String,
+    codeSignHelperRemotePath: String? = nil
   ) {
     self.directoryPath = directoryPath
     self.targetPath = targetPath
@@ -306,6 +441,26 @@ package struct HDCAppOwnedNativeLibraryExactPaths: Sendable, Equatable {
     self.stagingPath = stagingPath
     self.backupPath = backupPath
     self.rollbackStagingPath = rollbackStagingPath
+    self.codeSignHelperRemotePath = codeSignHelperRemotePath
+  }
+}
+
+public struct HDCNativeCodeSignHelperFacts: Sendable, Equatable {
+  public let abi: HDCNativeLibraryABI
+  public let buildID: String
+  public let sha256: String
+  public let byteCount: Int
+
+  public init(
+    abi: HDCNativeLibraryABI,
+    buildID: String,
+    sha256: String,
+    byteCount: Int
+  ) {
+    self.abi = abi
+    self.buildID = buildID
+    self.sha256 = sha256
+    self.byteCount = byteCount
   }
 }
 
@@ -334,6 +489,8 @@ public struct HDCAppOwnedNativeLibraryDeployment: Sendable, Equatable {
   public let stagingPath: String
   public let backupPath: String
   public let rollbackStagingPath: String
+  public let codeSignHelperFacts: HDCNativeCodeSignHelperFacts?
+  public let codeSignHelperRemotePath: String?
 
   package init(
     jobID: String,
@@ -345,6 +502,7 @@ public struct HDCAppOwnedNativeLibraryDeployment: Sendable, Equatable {
     restartProfile: HDCNativeRestartProfile,
     verificationProfile: HDCNativeVerificationProfile,
     rollbackPolicy: HDCNativeRollbackPolicy,
+    codeSignHelperFacts: HDCNativeCodeSignHelperFacts? = nil,
     exactPaths: HDCAppOwnedNativeLibraryExactPaths? = nil
   ) throws {
     guard jobID.range(
@@ -369,6 +527,7 @@ public struct HDCAppOwnedNativeLibraryDeployment: Sendable, Equatable {
     self.restartProfile = restartProfile
     self.verificationProfile = verificationProfile
     self.rollbackPolicy = rollbackPolicy
+    self.codeSignHelperFacts = codeSignHelperFacts
 
     let currentABIDirectory: String
     let acceptedABIDirectories: Set<String>
@@ -401,6 +560,9 @@ public struct HDCAppOwnedNativeLibraryDeployment: Sendable, Equatable {
         exactPaths.stagingDirectoryPath == nil
         && exactPaths.stagingPath
           == "\(exactPaths.directoryPath)/.\(libraryLogicalName).arkdeck-\(jobID).staging"
+      let expectedHelperPath =
+        usesJobOwnedStagingDirectory && codeSignHelperFacts != nil
+        ? "\(stagingDirectory)/arkdeck-code-sign-enable" : nil
       guard
         let abiDirectory = acceptedABIDirectories.first(where: {
           exactPaths.directoryPath == "\(librariesRoot)/\($0)"
@@ -413,7 +575,8 @@ public struct HDCAppOwnedNativeLibraryDeployment: Sendable, Equatable {
         exactPaths.backupPath
           == "\(exactPaths.directoryPath)/.\(libraryLogicalName).arkdeck-\(jobID).backup",
         exactPaths.rollbackStagingPath
-          == "\(exactPaths.directoryPath)/.\(libraryLogicalName).arkdeck-\(jobID).rollback"
+          == "\(exactPaths.directoryPath)/.\(libraryLogicalName).arkdeck-\(jobID).rollback",
+        exactPaths.codeSignHelperRemotePath == expectedHelperPath
       else {
         throw DeviceProviderError.unsupportedAction(
           "persisted native deployment paths escape the provider-owned namespace")
@@ -427,6 +590,7 @@ public struct HDCAppOwnedNativeLibraryDeployment: Sendable, Equatable {
       self.stagingPath = exactPaths.stagingPath
       self.backupPath = exactPaths.backupPath
       self.rollbackStagingPath = exactPaths.rollbackStagingPath
+      self.codeSignHelperRemotePath = exactPaths.codeSignHelperRemotePath
     } else {
       let directory = "\(librariesRoot)/\(currentABIDirectory)"
       self.directoryPath = directory
@@ -440,6 +604,9 @@ public struct HDCAppOwnedNativeLibraryDeployment: Sendable, Equatable {
         "\(directory)/.\(libraryLogicalName).arkdeck-\(jobID).backup"
       self.rollbackStagingPath =
         "\(directory)/.\(libraryLogicalName).arkdeck-\(jobID).rollback"
+      self.codeSignHelperRemotePath =
+        codeSignHelperFacts == nil
+        ? nil : "\(stagingDirectory)/arkdeck-code-sign-enable"
     }
   }
 
