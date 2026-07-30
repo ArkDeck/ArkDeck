@@ -8,11 +8,11 @@
 //
 // The `debugCrash` handler here is fully deterministic and needs no model.
 // That is a design commitment, not a placeholder: egress to a model
-// defaults to deny (TASK-HTP-004), so the loop must be able to converge on
-// evidence collection with nothing but repository code. What it cannot do
-// yet is analyse: the evaluator is TASK-HTP-002, so once evidence is
-// collected this handler stops honestly and asks for a human instead of
-// guessing or declaring anything fixed.
+// defaults to deny (TASK-HTP-004), so the loop must be able to converge with
+// nothing but repository code. Since TASK-HTP-002 it plans against the
+// evaluator's verdict - collect another sample while the criteria are
+// undecidable, hand a human the verdict when they genuinely failed - and it
+// still never judges evidence itself and never reports a fix (HTP-INV-2).
 
 import ArkDeckCore
 import Foundation
@@ -49,6 +49,10 @@ public protocol HarnessTaskHandler: Sendable {
 public struct DebugCrashTaskHandler: HarnessTaskHandler {
   public static let observeDevice = "observe.device@1"
   public static let captureDiagnostics = "capture.diagnostics@1"
+  /// The artifact `capture.diagnostics@1` declares for bounded HiLog. The
+  /// criteria name it, so a capture that did not publish it cannot support a
+  /// verdict about crashes.
+  public static let hilogArtifact = "hilog.txt"
 
   public init() {}
 
@@ -69,21 +73,29 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
         comparator: .equalTo,
         expected: .integer(0),
         mandatory: true,
-        minimumSamples: 5),
+        // Five clean runs, not one: a crash that reproduces intermittently
+        // would otherwise pass on the first quiet capture.
+        minimumSamples: 5,
+        evidenceRequirements: [Self.hilogArtifact],
+        inconclusivePolicy: .collectMoreEvidence),
       HarnessSuccessCriterion(
         criterionID: "DC-2-application-liveness",
         metric: "applicationLiveness",
         comparator: .equalTo,
         expected: .string("healthy"),
         mandatory: true,
-        minimumSamples: 1),
+        minimumSamples: 1,
+        evidenceRequirements: [Self.hilogArtifact],
+        inconclusivePolicy: .collectMoreEvidence),
       HarnessSuccessCriterion(
         criterionID: "DC-3-no-new-fatal-signature",
         metric: "newFatalSignatureCount",
         comparator: .equalTo,
         expected: .integer(0),
         mandatory: true,
-        minimumSamples: 1),
+        minimumSamples: 1,
+        evidenceRequirements: [Self.hilogArtifact],
+        inconclusivePolicy: .collectMoreEvidence),
     ]
   }
 
@@ -111,23 +123,75 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
         reasonCode: "collectDeclaredEvidence",
         phaseOnDispatch: nil)
     case .collecting, .analyzing, .verifying:
-      // Evidence exists; judging it is the evaluator's job and the
-      // evaluator does not exist yet. Stopping here is the honest move:
-      // this handler will not classify a crash, and it will never report
-      // a fix (HTP-INV-2).
-      return HarnessPlannedStep(
-        decision: HarnessDecision(
-          decisionID: decisionID,
-          htaskID: snapshot.htaskID,
-          round: round,
-          kind: .requestHuman,
+      switch snapshot.observed.latestVerdict {
+      case .inconclusive:
+        // The evaluator asked for more of the same evidence (missing samples
+        // or a capture that did not verify). Another bounded capture is the
+        // one thing that can change the answer.
+        return invoke(
+          snapshot, decisionID: decisionID, round: round, nowUTC: nowUTC,
+          operation: Self.captureDiagnostics,
           hypothesis:
-            "Evidence for this round is collected; deciding whether the goal is met "
-            + "requires the evaluation engine.",
-          reasonCode: "evaluationEngineUnavailable",
-          producer: producerID,
-          createdAtUTC: nowUTC),
-        phaseOnDispatch: nil)
+            "The declared criteria are not yet decidable on the evidence collected so far; "
+            + "another bounded capture adds the missing sample.",
+          reasonCode: "collectAdditionalSample",
+          phaseOnDispatch: snapshot.phase == .collecting ? nil : .collecting)
+      case .fail:
+        // A real, evidence-backed failure. Repairing it needs the workspace
+        // operations (TASK-HTP-005); until they exist the honest move is to
+        // hand a human the verdict instead of looping.
+        return HarnessPlannedStep(
+          decision: HarnessDecision(
+            decisionID: decisionID,
+            htaskID: snapshot.htaskID,
+            round: round,
+            kind: .requestHuman,
+            hypothesis:
+              "The evaluator judged the declared criteria failed on verified evidence; "
+              + "repairing it requires source and build operations this task type cannot run.",
+            reasonCode: "criteriaFailedNoRepairCapability",
+            producer: producerID,
+            createdAtUTC: nowUTC),
+          phaseOnDispatch: nil)
+      case .none:
+        // Nothing has been judged yet - either the first capture is still
+        // pending or no evaluator is configured in this composition. Either
+        // way the next useful step is evidence.
+        return invoke(
+          snapshot, decisionID: decisionID, round: round, nowUTC: nowUTC,
+          operation: Self.captureDiagnostics,
+          hypothesis: "No evidence has been evaluated yet for the declared criteria.",
+          reasonCode: "collectDeclaredEvidence",
+          phaseOnDispatch: snapshot.phase == .collecting ? nil : .collecting)
+      case .pass:
+        // Unreachable in practice: a passing evaluation ends the task before
+        // planning runs. Fail closed rather than invent a next step.
+        return HarnessPlannedStep(
+          decision: HarnessDecision(
+            decisionID: decisionID,
+            htaskID: snapshot.htaskID,
+            round: round,
+            kind: .noSafeAction,
+            hypothesis: "The criteria already passed; no further step is defined.",
+            reasonCode: "criteriaAlreadyPassed",
+            producer: producerID,
+            createdAtUTC: nowUTC),
+          phaseOnDispatch: nil)
+      case .error:
+        return HarnessPlannedStep(
+          decision: HarnessDecision(
+            decisionID: decisionID,
+            htaskID: snapshot.htaskID,
+            round: round,
+            kind: .requestHuman,
+            hypothesis:
+              "Evidence integrity failed verification; another capture cannot be trusted "
+              + "until that is understood.",
+            reasonCode: "evidenceIntegrityUnresolved",
+            producer: producerID,
+            createdAtUTC: nowUTC),
+          phaseOnDispatch: nil)
+      }
     case .patching, .building, .deploying:
       // Reachable only if a future handler revision moves here; today
       // nothing in this type can, so it fails closed rather than

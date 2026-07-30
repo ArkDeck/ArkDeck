@@ -35,6 +35,10 @@ public enum HarnessReconcileAction: String, Sendable, Codable {
   case stoppedNoSafeAction
   case stoppedBudgetExhausted
   case stoppedJobFailed
+  case evaluatedSucceeded
+  case evaluatedFailedCriteria
+  case evaluatedInconclusive
+  case stoppedEvidenceIntegrity
 }
 
 public struct HarnessReconcileOutcome: Sendable, Equatable {
@@ -69,28 +73,39 @@ public enum HarnessCoordinatorError: Error, Equatable, Sendable {
 public actor HarnessTaskCoordinator {
   private let store: HarnessTaskStore
   private let jobPort: any HarnessRuntimeJobPort
+  /// Absent means no evidence can be read, so no task can ever be judged.
+  /// The loop then stops honestly at the handler's "evaluation unavailable"
+  /// step instead of pretending a verdict.
+  private let artifactPort: (any HarnessArtifactPort)?
   private let handlers: [HarnessTaskType: any HarnessTaskHandler]
   private let nowUTC: @Sendable () -> String
   private let taskIDFactory: @Sendable () -> String
   private let decisionIDFactory: @Sendable () -> String
+  private let evaluationIDFactory: @Sendable () -> String
 
   public init(
     store: HarnessTaskStore,
     jobPort: any HarnessRuntimeJobPort,
+    artifactPort: (any HarnessArtifactPort)? = nil,
     handlers: [any HarnessTaskHandler] = [DebugCrashTaskHandler()],
     nowUTC: @escaping @Sendable () -> String,
     taskIDFactory: @escaping @Sendable () -> String = { HarnessTaskCoordinator.freshTaskID() },
     decisionIDFactory: @escaping @Sendable () -> String = {
       HarnessTaskCoordinator.freshDecisionID()
+    },
+    evaluationIDFactory: @escaping @Sendable () -> String = {
+      HarnessTaskCoordinator.freshEvaluationID()
     }
   ) {
     self.store = store
     self.jobPort = jobPort
+    self.artifactPort = artifactPort
     self.handlers = Dictionary(
       handlers.map { ($0.type, $0) }, uniquingKeysWith: { first, _ in first })
     self.nowUTC = nowUTC
     self.taskIDFactory = taskIDFactory
     self.decisionIDFactory = decisionIDFactory
+    self.evaluationIDFactory = evaluationIDFactory
   }
 
   public static func freshTaskID() -> String {
@@ -110,6 +125,11 @@ public actor HarnessTaskCoordinator {
 
   public static func freshDecisionID() -> String {
     "dec-\(UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased().prefix(12))"
+  }
+
+  public static func freshEvaluationID() -> String {
+    let hex = UUID().uuidString.replacingOccurrences(of: "-", with: "").uppercased()
+    return "EVAL-\(hex.prefix(12))"
   }
 
   // MARK: - Task lifecycle
@@ -148,6 +168,13 @@ public actor HarnessTaskCoordinator {
   public func events(_ taskID: String) async throws -> [HarnessTaskEvent] {
     _ = try await load(taskID)
     return try await store.events(taskID)
+  }
+
+  /// Durable verdict records. A human deciding on a stopped task reads
+  /// these, not a summary string.
+  public func evaluations(_ taskID: String) async throws -> [HarnessEvaluation] {
+    _ = try await load(taskID)
+    return try await store.evaluations(taskID)
   }
 
   public func result(_ taskID: String) async throws -> HarnessTaskResult? {
@@ -567,8 +594,170 @@ public actor HarnessTaskCoordinator {
       transition(
         snapshot, causation: .jobObserved, reasonCode: "operationSucceeded:\(operationReference)",
         status: .running, phase: nextPhase, activeJob: .cleared, jobID: observation.jobID))
-    return HarnessReconcileOutcome(
-      snapshot: advanced, action: .observedJob, reasonCode: observation.state)
+    // Evidence exists now, so it gets judged now: the evaluator is the only
+    // component that may end this task successfully, and it runs on the bytes
+    // the job just published rather than on the decision that asked for them.
+    switch try await evaluate(advanced, jobID: observation.jobID) {
+    case .ended(let outcome):
+      return outcome
+    case .continues(let evaluated):
+      // The evaluation wrote observed state, so the caller must plan against
+      // the *new* version. Handing back a stale snapshot here is what made
+      // the next commit fail on an optimistic-lock conflict.
+      return HarnessReconcileOutcome(
+        snapshot: evaluated, action: .observedJob, reasonCode: observation.state)
+    }
+  }
+
+  // MARK: - Evaluation
+
+  private enum EvaluationStep {
+    /// The verdict ended this wake: success, an integrity stop, or an
+    /// escalation the loop must not walk past.
+    case ended(HarnessReconcileOutcome)
+    /// The loop may keep planning this wake, against this snapshot version.
+    case continues(HarnessTaskSnapshot)
+  }
+
+  private func evaluate(
+    _ snapshot: HarnessTaskSnapshot,
+    jobID: String
+  ) async throws -> EvaluationStep {
+    guard let artifactPort else {
+      // No evidence port in this composition, so nothing can ever be judged.
+      // Stop for a human at the point a verdict would be needed rather than
+      // capturing on a loop until the round budget runs out - the reason a
+      // task stopped has to be the real one.
+      guard [.collecting, .analyzing, .verifying].contains(snapshot.phase) else {
+        return .continues(snapshot)
+      }
+      let reason = "evaluationEngineUnavailable"
+      let blocked = try await commit(
+        snapshot,
+        transition(
+          snapshot, causation: .humanBlocked, reasonCode: reason, status: .humanRequired,
+          activeJob: .cleared,
+          result: HarnessTaskResult(
+            outcome: .humanRequired, reasonCode: reason,
+            summary:
+              "Evidence was collected but this composition has no artifact port, so no "
+              + "criterion can be judged.",
+            artifactRefs: snapshot.artifactRefs)))
+      return .ended(
+        HarnessReconcileOutcome(
+          snapshot: blocked, action: .stoppedForHuman, reasonCode: reason))
+    }
+    let builder = HarnessObservationBuilder(artifacts: artifactPort)
+    var declaredSignature: String?
+    if case .string(let value)? = snapshot.goal.desiredState["crashSignature"] {
+      declaredSignature = value
+    }
+    let required = Set(snapshot.successCriteria.flatMap(\.evidenceRequirements))
+    let round = try await builder.observe(
+      round: snapshot.activeRound, jobID: jobID, declaredCrashSignature: declaredSignature,
+      requiredEvidence: required)
+
+    let merged = snapshot.observed.merging(round)
+    let evaluation = HarnessCriteriaEvaluator.evaluate(
+      criteria: snapshot.successCriteria, observed: merged, round: round,
+      evaluationID: evaluationIDFactory(), htaskID: snapshot.htaskID, nowUTC: nowUTC())
+    try await store.putEvaluation(evaluation)
+    let observedState = merged.recording(verdict: evaluation.verdict, blockers: evaluation.blockers)
+
+    let artifactRefs = Self.mergedArtifactRefs(snapshot, round)
+    switch evaluation.verdict {
+    case .pass:
+      let succeeded = try await commit(
+        snapshot,
+        transition(
+          snapshot, causation: .evaluation, reasonCode: "criteriaPassed",
+          status: .succeeded, activeJob: .cleared, evaluationID: evaluation.evaluationID,
+          artifactRefs: artifactRefs, observedState: observedState.asJSON,
+          result: HarnessTaskResult(
+            outcome: .succeeded, reasonCode: "criteriaPassed",
+            summary: Self.summary(of: evaluation), evaluationID: evaluation.evaluationID,
+            artifactRefs: artifactRefs)))
+      return .ended(
+        HarnessReconcileOutcome(
+          snapshot: succeeded, action: .evaluatedSucceeded, reasonCode: "criteriaPassed"))
+    case .error:
+      // Unverifiable evidence is not a product verdict. Stop for a human
+      // instead of letting a hash mismatch look like a failing fix.
+      let reason = "evidenceIntegrity:\(evaluation.blockers.first ?? "unknown")"
+      let blocked = try await commit(
+        snapshot,
+        transition(
+          snapshot, causation: .evaluation, reasonCode: reason, status: .humanRequired,
+          activeJob: .cleared, evaluationID: evaluation.evaluationID,
+          artifactRefs: artifactRefs, observedState: observedState.asJSON,
+          result: HarnessTaskResult(
+            outcome: .humanRequired, reasonCode: reason,
+            summary: Self.summary(of: evaluation), evaluationID: evaluation.evaluationID,
+            artifactRefs: artifactRefs)))
+      return .ended(
+        HarnessReconcileOutcome(
+          snapshot: blocked, action: .stoppedEvidenceIntegrity, reasonCode: reason))
+    case .inconclusive:
+      let escalation = HarnessCriteriaEvaluator.escalation(
+        for: evaluation, criteria: snapshot.successCriteria)
+      switch escalation {
+      case .requestHuman, .failTask:
+        let terminalStatus: HarnessTaskStatus = escalation == .failTask ? .failed : .humanRequired
+        let reason = "inconclusive:\(escalation == .failTask ? "failTask" : "requestHuman")"
+        let stopped = try await commit(
+          snapshot,
+          transition(
+            snapshot, causation: .evaluation, reasonCode: reason, status: terminalStatus,
+            activeJob: .cleared, evaluationID: evaluation.evaluationID,
+            artifactRefs: artifactRefs, observedState: observedState.asJSON,
+            result: HarnessTaskResult(
+              outcome: terminalStatus, reasonCode: reason,
+              summary: Self.summary(of: evaluation), evaluationID: evaluation.evaluationID,
+              artifactRefs: artifactRefs)))
+        return .ended(
+          HarnessReconcileOutcome(
+            snapshot: stopped,
+            action: terminalStatus == .failed ? .stoppedNoSafeAction : .stoppedForHuman,
+            reasonCode: reason))
+      case .collectMoreEvidence, .none:
+        let updated = try await commit(
+          snapshot,
+          transition(
+            snapshot, causation: .evaluation, reasonCode: "inconclusive:collectMoreEvidence",
+            status: .running, evaluationID: evaluation.evaluationID,
+            artifactRefs: artifactRefs, observedState: observedState.asJSON))
+        return .continues(updated)
+      }
+    case .fail:
+      // A real, evidence-backed failure: keep the task running so this wake
+      // can plan against it, bounded by the budget.
+      let updated = try await commit(
+        snapshot,
+        transition(
+          snapshot, causation: .evaluation, reasonCode: "criteriaFailed", status: .running,
+          evaluationID: evaluation.evaluationID, artifactRefs: artifactRefs,
+          observedState: observedState.asJSON))
+      return .continues(updated)
+    }
+  }
+
+  private static func mergedArtifactRefs(
+    _ snapshot: HarnessTaskSnapshot,
+    _ round: HarnessRoundObservation
+  ) -> [String] {
+    var refs = snapshot.artifactRefs
+    for record in round.evidence where !refs.contains(record.artifactID) {
+      refs.append(record.artifactID)
+    }
+    return refs
+  }
+
+  private static func summary(of evaluation: HarnessEvaluation) -> String {
+    let parts = evaluation.criterionResults.map { result in
+      "\(result.criterionID)=\(result.verdict.rawValue)"
+        + (result.blockers.isEmpty ? "" : "(\(result.blockers.joined(separator: ";")))")
+    }
+    return "verdict=\(evaluation.verdict.rawValue) " + parts.joined(separator: " ")
   }
 
   // MARK: - Budgets
@@ -654,6 +843,9 @@ public actor HarnessTaskCoordinator {
     consumedBudget: HarnessConsumedBudget? = nil,
     cancelRequested: Bool? = nil,
     jobID: String? = nil,
+    evaluationID: String? = nil,
+    artifactRefs: [String]? = nil,
+    observedState: [String: JSONValue]? = nil,
     result: HarnessTaskResult? = nil
   ) -> HarnessTaskTransition {
     HarnessTaskTransition(
@@ -665,7 +857,9 @@ public actor HarnessTaskCoordinator {
       activeJobID: activeJob.resolve(snapshot.activeJobID),
       consumedBudget: consumedBudget ?? snapshot.consumedBudget,
       jobID: jobID,
-      artifactRefs: snapshot.artifactRefs,
+      evaluationID: evaluationID,
+      artifactRefs: artifactRefs ?? snapshot.artifactRefs,
+      observedState: observedState,
       cancelRequested: cancelRequested ?? snapshot.cancelRequested,
       result: result,
       atUTC: nowUTC())

@@ -74,6 +74,13 @@ extension RuntimeControlPlaneHandler {
         let events = try await harness.events(id)
         return success(id: request.id, result: .array(events.map(Self.encode)))
 
+      case "task.evaluations":
+        guard let id = taskID() else {
+          return failure(id: request.id, code: .invalidParams, message: "htaskId is required")
+        }
+        let evaluations = try await harness.evaluations(id)
+        return success(id: request.id, result: .array(evaluations.map(Self.encode)))
+
       case "task.reconcile":
         guard let id = taskID() else {
           return failure(id: request.id, code: .invalidParams, message: "htaskId is required")
@@ -187,13 +194,20 @@ extension RuntimeControlPlaneHandler {
       maxArtifactBytes: integer("maxArtifactBytes") ?? defaults.maxArtifactBytes,
       maxE1Mutations: integer("maxE1Mutations") ?? defaults.maxE1Mutations)
 
+    // The declared crash signature is what makes "matching crash" a
+    // checkable statement instead of a judgement call. Absent, the evaluator
+    // counts every fatal as a new fatal and can never confirm a specific fix.
+    var desiredState: [String: JSONValue] = [:]
+    if let signature = text("crashSignature") {
+      desiredState["crashSignature"] = .string(signature)
+    }
     return HarnessTaskSubmission(
       type: type,
       intakeDescription: text("intake"),
       projectRef: text("projectRef"),
       target: HarnessTaskTargetReference(
         targetID: targetID, expectedBindingRevision: integer("expectedBindingRevision")),
-      goal: HarnessTaskGoal(summary: goal),
+      goal: HarnessTaskGoal(summary: goal, desiredState: desiredState),
       budgets: budgets,
       policy: policy)
   }
