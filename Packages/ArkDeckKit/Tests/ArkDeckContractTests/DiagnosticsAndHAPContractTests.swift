@@ -175,12 +175,20 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
           exit: script.processRunning ? 0 : 1)
       case .readOwnedPathPresence:
         note("reconcileOwnedPathPresence")
-        return receipt("", exit: script.ownedPathPresent ? 0 : 1)
+        return receipt(
+          script.ownedPathPresent
+            ? "-rw------- owned\n"
+            : "ls: owned: No such file or directory\n")
       case .readPortForwardPresence(let spec):
         note("reconcilePortForwardPresence")
         return receipt(
           script.portForwardPresent
             ? "tcp:\(spec.localPort) tcp:\(spec.remotePort)\n" : "")
+      case .sendNativeLibraryToStaging, .backupNativeLibrary,
+        .publishNativeLibrary, .stopNativeTarget, .startNativeTarget,
+        .cleanupNativeLibrary, .rollbackNativeLibrary, .inspectNativeLibrary:
+        throw RuntimeDispatchFailure.failed(
+          "native deployment is outside the diagnostics/HAP fixture")
       }
     }
   }
@@ -274,7 +282,9 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
         retentionClass: .pinnedUntilVerified,
         sourceOperation: "build.hap@1", providerID: "host",
         bindingSnapshot: ArtifactBindingSnapshot(
-          targetID: "TGT-1", bindingRevision: 1, stableIdentitySHA256: nil),
+          targetID: "TGT-1", bindingRevision: 7,
+          stableIdentitySHA256:
+            "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1"),
         contents: Data("signed-hap-fixture".utf8)))
     return try await store.leaseReference(
       jobID: metadata.jobID, artifactID: metadata.artifactID)

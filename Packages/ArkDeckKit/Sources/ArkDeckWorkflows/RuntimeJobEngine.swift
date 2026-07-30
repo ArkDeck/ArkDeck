@@ -388,8 +388,15 @@ public actor RuntimeJobEngine {
     let processKind: String
     let executableSHA256: String?
     let argumentSummary: [String]?
+    let processInvocations: [MaterializedProcessInvocation]?
     let timeoutSeconds: Int?
     let hostManagedDescriptor: String?
+  }
+
+  private struct MaterializedProcessInvocation: Codable {
+    let arguments: [String]
+    let timeoutSeconds: Int?
+    let continueAfterNonZero: Bool
   }
 
   private struct MaterializedPlanDocument: Codable {
@@ -458,7 +465,10 @@ public actor RuntimeJobEngine {
       if let reason = dispatcher.unavailableReason(providerID: descriptor.provider.rawValue) {
         reasons.append(reason)
       }
-      if descriptor.reference == "debug.hap@1", artifactStore == nil {
+      if (descriptor.reference == "debug.hap@1"
+        || descriptor.reference == "deploy.native-library.app-owned@1"),
+        artifactStore == nil
+      {
         reasons.append("Artifact lease store is not configured")
       }
       return RuntimeOperationAvailability(
@@ -886,8 +896,12 @@ public actor RuntimeJobEngine {
         }
         appendTimeline(jobID: jobID, entry: "host-step \(step.stepID)")
         continue
-      case .postprocessArtifact, .finalizeSession, .hashFile,
-        .verifyArtifact, .requestConfirmation:
+      case .verifyArtifact, .hashFile:
+        try await verifyHostInputArtifact(
+          jobID: jobID, descriptor: descriptor, step: step)
+        appendTimeline(jobID: jobID, entry: "host-step \(step.stepID)")
+        continue
+      case .postprocessArtifact, .finalizeSession, .requestConfirmation:
         // Remaining engine-internal host steps do not dispatch a provider.
         appendTimeline(jobID: jobID, entry: "host-step \(step.stepID)")
         continue
@@ -917,6 +931,7 @@ public actor RuntimeJobEngine {
       do {
         resolvedArtifact =
           step.kind == .sendFile
+            || descriptor.reference == "deploy.native-library.app-owned@1"
           ? try await resolvedInputArtifact(jobID: jobID) : nil
       } catch {
         throw RuntimeDispatchFailure.failed(
@@ -947,6 +962,13 @@ public actor RuntimeJobEngine {
         step.binding == .confirmedDevice
       {
         try requireCompleteEvidencePreflight(jobID: jobID, beforeStepID: step.stepID)
+      }
+      if descriptor.reference == "deploy.native-library.app-owned@1",
+        step.binding == .confirmedDevice
+      {
+        try Self.validateMaterializedTargetFacts(
+          resolvedFacts, record: jobs[jobID]?.record,
+          providerID: descriptor.provider.rawValue)
       }
       let context = ProviderExecutionContext(
         jobID: jobID, stepID: step.stepID,
@@ -988,7 +1010,8 @@ public actor RuntimeJobEngine {
             jobID: jobID, descriptor: descriptor,
             effect: Self.effectiveEffect(
               descriptor: descriptor,
-              inputs: jobs[jobID]?.record.request.inputs ?? [:]))
+              inputs: jobs[jobID]?.record.request.inputs ?? [:]),
+            validatedFacts: resolvedFacts)
         }
         try await dispatchWithWAL(
           jobID: jobID, step: step, action: action, plan: plan, provider: provider,
@@ -1007,10 +1030,10 @@ public actor RuntimeJobEngine {
             jobID: jobID, step: step, descriptor: descriptor, reason: "\(failure)")
           if step.kind == .cleanupOwnedRemotePath,
             let artifactStore,
-            case .hdc(.cleanupOwnedRemotePath(let path)) = action
+            let remotePath = Self.cleanupDebtRemotePath(for: action)
           {
             try? await artifactStore.recordCleanupDebt(
-              jobID: jobID, stepID: step.stepID, remotePath: path.remotePath,
+              jobID: jobID, stepID: step.stepID, remotePath: remotePath,
               reason: "\(failure)", action: action)
           }
           continue
@@ -1022,8 +1045,150 @@ public actor RuntimeJobEngine {
             jobID: jobID, descriptor: descriptor, provider: provider,
             completedStepIDs: completedStepIDs, failedStepID: step.stepID)
         }
+        if descriptor.reference == "deploy.native-library.app-owned@1",
+          let deployment = Self.nativeDeployment(from: action)
+        {
+          try await compensateNativeLibrary(
+            jobID: jobID, descriptor: descriptor, provider: provider,
+            deployment: deployment, completedStepIDs: completedStepIDs,
+            failedStepID: step.stepID, originalFailure: failure)
+        }
         throw failure
       }
+    }
+  }
+
+  private func compensateNativeLibrary(
+    jobID: String,
+    descriptor: CatalogOperationDescriptor,
+    provider: any DeviceProvider,
+    deployment: HDCAppOwnedNativeLibraryDeployment,
+    completedStepIDs: Set<String>,
+    failedStepID: String,
+    originalFailure: RuntimeDispatchFailure
+  ) async throws {
+    guard let runtime = jobs[jobID] else {
+      throw RuntimeJobEngineError.jobNotFound(jobID)
+    }
+    let facts = try await providers.resolveFacts(
+      providerID: descriptor.provider.rawValue,
+      targetID: runtime.record.request.target.targetID)
+    try Self.validateMaterializedTargetFacts(
+      facts, record: runtime.record, providerID: descriptor.provider.rawValue)
+    let publishIndex =
+      descriptor.steps.firstIndex(where: { $0.stepID == "atomic-publish" })
+    let failedIndex =
+      descriptor.steps.firstIndex(where: { $0.stepID == failedStepID })
+    let publishWasAttempted =
+      completedStepIDs.contains("atomic-publish")
+      || (publishIndex != nil && failedIndex != nil && failedIndex! >= publishIndex!)
+
+    if publishWasAttempted {
+      let step = CatalogStepDescriptor(
+        stepID: "rollback-native-library",
+        kind: .runApprovedRemoteMutation,
+        effect: .deviceMutation,
+        cancellation: .atSafeBoundary,
+        binding: .confirmedDevice,
+        isOptional: false,
+        compensation: .none)
+      let context = ProviderExecutionContext(
+        jobID: jobID, stepID: step.stepID,
+        targetID: runtime.record.request.target.targetID,
+        bindingRevision: runtime.record.request.target.expectedBindingRevision,
+        connectKey: facts.executionConnectKey,
+        expectedIdentitySHA256: facts.deviceIdentitySHA256,
+        toolVersion: facts.toolVersion,
+        toolSHA256: facts.toolSHA256,
+        nowUTC: nowUTC())
+      let action = TypedProviderAction.hdc(.rollbackNativeLibrary(deployment))
+      let plan = try provider.lower(action: action, context: context)
+      do {
+        try await dispatchWithWAL(
+          jobID: jobID, step: step, action: action, plan: plan,
+          provider: provider, context: context, descriptor: descriptor,
+          evidenceFacts: facts)
+        appendTimeline(
+          jobID: jobID,
+          entry: "native deployment failure restored previous library")
+      } catch let failure as RuntimeDispatchFailure {
+        appendTimeline(
+          jobID: jobID, entry: "native rollback failed closed: \(failure)")
+        throw failure
+      }
+    }
+
+    let cleanupStep = CatalogStepDescriptor(
+      stepID: "cleanup-native-library-compensation",
+      kind: .cleanupOwnedRemotePath,
+      effect: .deviceMutation,
+      cancellation: .atSafeBoundary,
+      binding: .confirmedDevice,
+      isOptional: true,
+      compensation: .bestEffortCleanup)
+    let cleanupContext = ProviderExecutionContext(
+      jobID: jobID, stepID: cleanupStep.stepID,
+      targetID: runtime.record.request.target.targetID,
+      bindingRevision: runtime.record.request.target.expectedBindingRevision,
+      connectKey: facts.executionConnectKey,
+      expectedIdentitySHA256: facts.deviceIdentitySHA256,
+      toolVersion: facts.toolVersion,
+      toolSHA256: facts.toolSHA256,
+      nowUTC: nowUTC())
+    let cleanupAction = TypedProviderAction.hdc(.cleanupNativeLibrary(deployment))
+    let cleanupPlan = try provider.lower(action: cleanupAction, context: cleanupContext)
+    do {
+      try await dispatchWithWAL(
+        jobID: jobID, step: cleanupStep, action: cleanupAction,
+        plan: cleanupPlan, provider: provider, context: cleanupContext,
+        descriptor: descriptor, evidenceFacts: facts)
+      appendTimeline(jobID: jobID, entry: "native compensation cleanup complete")
+    } catch let cleanupFailure as RuntimeDispatchFailure {
+      if let artifactStore {
+        try? await artifactStore.recordCleanupDebt(
+          jobID: jobID, stepID: cleanupStep.stepID,
+          remotePath: deployment.stagingPath,
+          reason: "\(cleanupFailure)", action: cleanupAction)
+      }
+      appendTimeline(
+        jobID: jobID, entry: "native compensation cleanup debt: \(cleanupFailure)")
+      if case .outcomeUnknown = cleanupFailure {
+        throw cleanupFailure
+      }
+    }
+    if case .failed(let reason) = originalFailure {
+      appendTimeline(jobID: jobID, entry: "native deployment failed: \(reason)")
+    }
+  }
+
+  private static func nativeDeployment(
+    from action: TypedProviderAction
+  ) -> HDCAppOwnedNativeLibraryDeployment? {
+    switch action {
+    case .hdc(.sendNativeLibraryToStaging(let deployment)),
+      .hdc(.backupNativeLibrary(let deployment)),
+      .hdc(.publishNativeLibrary(let deployment)),
+      .hdc(.stopNativeTarget(let deployment)),
+      .hdc(.startNativeTarget(let deployment)),
+      .hdc(.cleanupNativeLibrary(let deployment)),
+      .hdc(.rollbackNativeLibrary(let deployment)),
+      .hdc(.inspectNativeLibrary(let deployment, _)):
+      return deployment
+    default:
+      return nil
+    }
+  }
+
+  private static func cleanupDebtRemotePath(
+    for action: TypedProviderAction
+  ) -> String? {
+    switch action {
+    case .hdc(.cleanupOwnedRemotePath(let path)):
+      return path.remotePath
+    case .hdc(.cleanupNativeLibrary(let deployment)):
+      return deployment.stagingPath
+    default:
+      return nil
     }
   }
 
@@ -1178,7 +1343,10 @@ public actor RuntimeJobEngine {
     "debug.hap@1": [
       "install-hap": "package-readback",
       "start-ability": "process-readback",
-    ]
+    ],
+    "deploy.native-library.app-owned@1": [
+      "send-to-staging": "verify-remote-staging"
+    ],
   ]
 
   static let evidenceEligibleOperations: Set<String> = [
@@ -1226,6 +1394,32 @@ public actor RuntimeJobEngine {
     else {
       throw RuntimeDispatchFailure.failed(
         "evidenceIncomplete: target/binding/routing/tool facts are absent or mismatched")
+    }
+  }
+
+  private static func validateMaterializedTargetFacts(
+    _ facts: ProviderFacts?,
+    record: RuntimeJobRecord?,
+    providerID: String
+  ) throws {
+    guard let record else {
+      throw RuntimeDispatchFailure.failed(
+        "materialized target binding is unavailable")
+    }
+    try validateEvidenceFacts(
+      facts,
+      targetID: record.request.target.targetID,
+      bindingRevision: record.request.target.expectedBindingRevision,
+      providerID: providerID)
+    guard let facts,
+      let materializedIdentity =
+        record.materializedStableTargetIdentitySHA256,
+      let materializedRevision = record.materializedBindingRevision,
+      facts.deviceIdentitySHA256 == materializedIdentity,
+      facts.bindingRevision == materializedRevision
+    else {
+      throw RuntimeDispatchFailure.failed(
+        "target identity or binding revision drifted after plan materialization")
     }
   }
 
@@ -1704,6 +1898,10 @@ public actor RuntimeJobEngine {
       "process-readback": ["process-readback.json"],
       "capture-diagnostics": ["debug-hilog.txt"],
     ],
+    "deploy.native-library.app-owned@1": [
+      "atomic-publish": ["publish-report.json"],
+      "verify-loaded-library": ["verification-report.json"],
+    ],
   ]
 
   /// Products the engine synthesises at finalize time rather than from a
@@ -1915,7 +2113,8 @@ public actor RuntimeJobEngine {
     ArtifactBindingSnapshot(
       targetID: record.request.target.targetID,
       bindingRevision: record.request.target.expectedBindingRevision,
-      stableIdentitySHA256: record.evidenceObservation?.stableIdentitySHA256)
+      stableIdentitySHA256: record.evidenceObservation?.stableIdentitySHA256
+        ?? record.materializedStableTargetIdentitySHA256)
   }
 
   // MARK: Cancel / status / recovery
@@ -2031,8 +2230,7 @@ public actor RuntimeJobEngine {
         "cleanup debt has no persisted exact typed action")
     }
     let action = try persisted.materialize()
-    guard case .hdc(.cleanupOwnedRemotePath(let ownedPath)) = action,
-      ownedPath.remotePath == remotePath
+    guard Self.cleanupDebtRemotePath(for: action) == remotePath
     else {
       throw RuntimeJobEngineError.internalFailure(
         "cleanup debt action does not match its recorded remote path")
@@ -2566,20 +2764,94 @@ public actor RuntimeJobEngine {
 
   // MARK: Helpers
 
+  private func verifyHostInputArtifact(
+    jobID: String,
+    descriptor: CatalogOperationDescriptor,
+    step: CatalogStepDescriptor
+  ) async throws {
+    guard descriptor.reference == "deploy.native-library.app-owned@1" else {
+      return
+    }
+    guard let runtime = jobs[jobID],
+      case .string(let abiValue)? = runtime.record.request.inputs["expectedABI"],
+      let expectedABI = HDCNativeLibraryABI(rawValue: abiValue),
+      let resolved = try await resolvedInputArtifact(jobID: jobID)
+    else {
+      throw RuntimeDispatchFailure.failed(
+        "native host verification cannot resolve its typed Artifact lease")
+    }
+    let bytes: Data
+    do {
+      bytes = try Data(contentsOf: resolved.fileURL, options: [.mappedIfSafe])
+    } catch {
+      throw RuntimeDispatchFailure.failed(
+        "native host verification cannot read the leased ELF: \(error)")
+    }
+    let facts: HDCNativeLibraryArtifactFacts
+    do {
+      facts = try NativeLibraryArtifactValidator.validate(
+        bytes, expectedABI: expectedABI)
+    } catch {
+      throw RuntimeDispatchFailure.failed(
+        "native host verification rejected the leased ELF: \(error)")
+    }
+    guard facts.sha256 == resolved.sha256,
+      facts.byteCount == resolved.byteCount
+    else {
+      throw RuntimeDispatchFailure.failed(
+        "native Artifact bytes drifted from the leased hash/size")
+    }
+    appendTimeline(
+      jobID: jobID,
+      entry: "\(step.stepID) abi=\(facts.abi.rawValue) "
+        + "buildId=\(facts.buildID) sha256=\(facts.sha256)")
+  }
+
   private func resolvedInputArtifact(jobID: String) async throws
     -> ProviderResolvedInputArtifact?
   {
-    guard let runtime = jobs[jobID],
-      runtime.record.operationReference == "debug.hap@1",
-      let artifactStore,
-      case .string(let lease)? = runtime.record.request.inputs["hapArtifactLease"]
-    else {
+    guard let runtime = jobs[jobID], let artifactStore else {
+      return nil
+    }
+    let lease: String
+    switch runtime.record.operationReference {
+    case "debug.hap@1":
+      guard case .string(let value)? =
+        runtime.record.request.inputs["hapArtifactLease"]
+      else { return nil }
+      lease = value
+    case "deploy.native-library.app-owned@1":
+      guard case .string(let value)? =
+        runtime.record.request.inputs["libraryArtifactLease"]
+      else { return nil }
+      lease = value
+    default:
       return nil
     }
     let resolved = try await artifactStore.resolveLease(lease)
+    try Self.validateArtifactBinding(
+      resolved.bindingSnapshot, request: runtime.record.request,
+      materializedStableIdentitySHA256:
+        runtime.record.materializedStableTargetIdentitySHA256)
     return ProviderResolvedInputArtifact(
       artifactID: resolved.artifactID, fileURL: resolved.fileURL,
       sha256: resolved.sha256, byteCount: resolved.byteCount)
+  }
+
+  private static func validateArtifactBinding(
+    _ binding: ArtifactBindingSnapshot,
+    request: RuntimeOperationRequest,
+    materializedStableIdentitySHA256: String?
+  ) throws {
+    guard binding.targetID == request.target.targetID,
+      binding.bindingRevision == request.target.expectedBindingRevision,
+      let expectedIdentity = materializedStableIdentitySHA256,
+      binding.stableIdentitySHA256 == expectedIdentity
+    else {
+      throw RuntimeJobEngineError.rejected(
+        .invalidInput,
+        "Artifact lease target/binding/identity does not match the materialized request")
+    }
   }
 
   private func materializeTypedPlanBeforeAuthorization(
@@ -2619,21 +2891,38 @@ public actor RuntimeJobEngine {
         "target facts cannot materialize the typed plan before authorization: \(error)")
     }
     let resolved: ProviderResolvedInputArtifact?
-    if descriptor.reference == "debug.hap@1" {
+    let leaseInputName: String?
+    let artifactLabel: String
+    switch descriptor.reference {
+    case "debug.hap@1":
+      leaseInputName = "hapArtifactLease"
+      artifactLabel = "HAP"
+    case "deploy.native-library.app-owned@1":
+      leaseInputName = "libraryArtifactLease"
+      artifactLabel = "native library"
+    default:
+      leaseInputName = nil
+      artifactLabel = "input"
+    }
+    if let leaseInputName {
       guard let artifactStore,
-        case .string(let lease)? = request.inputs["hapArtifactLease"]
+        case .string(let lease)? = request.inputs[leaseInputName]
       else {
         throw RuntimeJobEngineError.rejected(
-          .invalidInput, "debug.hap@1 requires a configured Artifact lease store")
+          .invalidInput,
+          "\(descriptor.reference) requires a configured Artifact lease store")
       }
       do {
         let artifact = try await artifactStore.resolveLease(lease)
+        try Self.validateArtifactBinding(
+          artifact.bindingSnapshot, request: request,
+          materializedStableIdentitySHA256: facts.deviceIdentitySHA256)
         resolved = ProviderResolvedInputArtifact(
           artifactID: artifact.artifactID, fileURL: artifact.fileURL,
           sha256: artifact.sha256, byteCount: artifact.byteCount)
       } catch {
         throw RuntimeJobEngineError.rejected(
-          .invalidInput, "HAP Artifact lease is not resolvable: \(error)")
+          .invalidInput, "\(artifactLabel) Artifact lease is not resolvable: \(error)")
       }
     } else {
       resolved = nil
@@ -2651,7 +2940,8 @@ public actor RuntimeJobEngine {
               binding: step.binding.rawValue, isOptional: step.isOptional,
               journalArguments: nil, processKind: "engine",
               executableSHA256: nil, argumentSummary: nil,
-              timeoutSeconds: nil, hostManagedDescriptor: nil))
+              processInvocations: nil, timeoutSeconds: nil,
+              hostManagedDescriptor: nil))
           continue
         default:
           break
@@ -2690,8 +2980,24 @@ public actor RuntimeJobEngine {
               binding: step.binding.rawValue, isOptional: step.isOptional,
               journalArguments: workflowStep.arguments, processKind: "process",
               executableSHA256: executableSHA256,
-              argumentSummary: argumentSummary, timeoutSeconds: timeoutSeconds,
+              argumentSummary: argumentSummary, processInvocations: nil,
+              timeoutSeconds: timeoutSeconds,
               hostManagedDescriptor: nil))
+        case .processSequence(let executableSHA256, let invocations):
+          materializedSteps.append(
+            MaterializedPlanStep(
+              stepID: step.stepID, kind: step.kind.rawValue,
+              effect: step.effect.rawValue, cancellation: step.cancellation.rawValue,
+              binding: step.binding.rawValue, isOptional: step.isOptional,
+              journalArguments: workflowStep.arguments, processKind: "processSequence",
+              executableSHA256: executableSHA256, argumentSummary: nil,
+              processInvocations: invocations.map {
+                MaterializedProcessInvocation(
+                  arguments: $0.arguments,
+                  timeoutSeconds: $0.timeoutSeconds,
+                  continueAfterNonZero: $0.continueAfterNonZero)
+              },
+              timeoutSeconds: nil, hostManagedDescriptor: nil))
         case .hostManaged(let descriptor):
           materializedSteps.append(
             MaterializedPlanStep(
@@ -2699,9 +3005,76 @@ public actor RuntimeJobEngine {
               effect: step.effect.rawValue, cancellation: step.cancellation.rawValue,
               binding: step.binding.rawValue, isOptional: step.isOptional,
               journalArguments: workflowStep.arguments, processKind: "hostManaged",
-              executableSHA256: nil, argumentSummary: nil,
+              executableSHA256: nil, argumentSummary: nil, processInvocations: nil,
               timeoutSeconds: nil, hostManagedDescriptor: descriptor))
         }
+      }
+      if descriptor.reference == "deploy.native-library.app-owned@1" {
+        guard let publishStep = descriptor.steps.first(where: {
+          $0.stepID == "atomic-publish"
+        }) else {
+          throw RuntimeJobEngineError.internalFailure(
+            "native deployment catalog has no atomic publish step")
+        }
+        let rollbackStep = CatalogStepDescriptor(
+          stepID: "rollback-native-library",
+          kind: .runApprovedRemoteMutation,
+          effect: .deviceMutation,
+          cancellation: .atSafeBoundary,
+          binding: .confirmedDevice,
+          isOptional: false,
+          compensation: .none)
+        let context = ProviderExecutionContext(
+          jobID: jobID, stepID: rollbackStep.stepID,
+          targetID: request.target.targetID,
+          bindingRevision: request.target.expectedBindingRevision,
+          connectKey: facts.executionConnectKey,
+          expectedIdentitySHA256: facts.deviceIdentitySHA256,
+          toolVersion: facts.toolVersion,
+          toolSHA256: facts.toolSHA256,
+          nowUTC: nowUTC(), resolvedInputArtifact: resolved)
+        let publishAction = try provider.action(
+          for: publishStep, operation: descriptor, inputs: request.inputs,
+          context: context)
+        guard let deployment = Self.nativeDeployment(from: publishAction) else {
+          throw RuntimeJobEngineError.internalFailure(
+            "native deployment provider did not materialize its rollback payload")
+        }
+        let rollbackAction =
+          TypedProviderAction.hdc(.rollbackNativeLibrary(deployment))
+        let rollbackPlan = try provider.lower(
+          action: rollbackAction, context: context)
+        guard rollbackPlan.action == rollbackAction else {
+          throw RuntimeJobEngineError.internalFailure(
+            "native rollback lowering returned a different typed action")
+        }
+        let workflowStep = try Self.journalStep(
+          for: rollbackStep, jobID: context.jobID, inputs: request.inputs,
+          action: rollbackAction, resolvedInputArtifact: resolved)
+        guard case .processSequence(
+          let executableSHA256, let invocations) = rollbackPlan.kind
+        else {
+          throw RuntimeJobEngineError.internalFailure(
+            "native rollback did not lower to an exact process sequence")
+        }
+        materializedSteps.append(
+          MaterializedPlanStep(
+            stepID: rollbackStep.stepID, kind: rollbackStep.kind.rawValue,
+            effect: rollbackStep.effect.rawValue,
+            cancellation: rollbackStep.cancellation.rawValue,
+            binding: rollbackStep.binding.rawValue,
+            isOptional: rollbackStep.isOptional,
+            journalArguments: workflowStep.arguments,
+            processKind: "processSequence",
+            executableSHA256: executableSHA256,
+            argumentSummary: nil,
+            processInvocations: invocations.map {
+              MaterializedProcessInvocation(
+                arguments: $0.arguments,
+                timeoutSeconds: $0.timeoutSeconds,
+                continueAfterNonZero: $0.continueAfterNonZero)
+            },
+            timeoutSeconds: nil, hostManagedDescriptor: nil))
       }
       guard let stableIdentity = facts.deviceIdentitySHA256,
         let bindingRevision = facts.bindingRevision
@@ -2748,6 +3121,17 @@ public actor RuntimeJobEngine {
         throw RuntimeJobEngineError.rejected(
           .invalidInput,
           "strict redaction has no published implementation; refusing before authorization")
+      }
+      return
+    }
+    if descriptor.reference == "deploy.native-library.app-owned@1" {
+      if case .string(let profile)? = inputs["restartProfile"],
+        profile != HDCNativeRestartProfile.restartAbility.rawValue
+      {
+        throw RuntimeJobEngineError.rejected(
+          .invalidInput,
+          "\(profile) has no complete app-owned restart/readback plan; "
+            + "refusing before authorization")
       }
       return
     }
@@ -2973,7 +3357,8 @@ public actor RuntimeJobEngine {
   private func consumeCapabilityBeforeMutation(
     jobID: String,
     descriptor: CatalogOperationDescriptor,
-    effect: WorkflowEffect
+    effect: WorkflowEffect,
+    validatedFacts: ProviderFacts?
   ) async throws {
     guard var runtime = jobs[jobID] else {
       throw RuntimeDispatchFailure.failed("job disappeared before capability consumption")
@@ -3002,8 +3387,10 @@ public actor RuntimeJobEngine {
       let planDigest = runtime.record.materializedPlanDigest,
       Self.isLowercaseSHA256(planDigest),
       runtime.record.request.target.expectedBindingRevision == bindingRevision,
-      runtime.record.evidenceObservation?.stableIdentitySHA256 == stableIdentity,
-      runtime.record.evidenceObservation?.bindingRevision == bindingRevision
+      validatedFacts?.targetID == runtime.record.request.target.targetID,
+      validatedFacts?.bindingRevision == bindingRevision,
+      validatedFacts?.deviceIdentitySHA256 == stableIdentity,
+      validatedFacts?.providerID == descriptor.provider.rawValue
     else {
       throw RuntimeDispatchFailure.failed(
         "authorizationRequired: materialized plan or verified target binding is absent or drifted")
@@ -3440,6 +3827,8 @@ public actor RuntimeJobEngine {
       let path: String
       if case .hdc(.cleanupOwnedRemotePath(let owned))? = action {
         path = owned.remotePath
+      } else if case .hdc(.cleanupNativeLibrary(let deployment))? = action {
+        path = deployment.stagingPath
       } else {
         let ownerStep = step.stepID == "cleanup-remote-staging" ? "send-hap" : "capture-trace"
         let suffix = ownerStep == "send-hap" ? ".hap" : ".htrace"
@@ -3456,6 +3845,14 @@ public actor RuntimeJobEngine {
         arguments = [
           "sourceArtifactId": .string(resolvedInputArtifact.artifactID),
           "remotePath": .string(staged.path.remotePath),
+          "sourceSha256": .string(resolvedInputArtifact.sha256),
+        ]
+      } else if case .hdc(.sendNativeLibraryToStaging(let deployment))? = action,
+        let resolvedInputArtifact
+      {
+        arguments = [
+          "sourceArtifactId": .string(resolvedInputArtifact.artifactID),
+          "remotePath": .string(deployment.stagingPath),
           "sourceSha256": .string(resolvedInputArtifact.sha256),
         ]
       } else {
@@ -3482,11 +3879,37 @@ public actor RuntimeJobEngine {
     case .uninstallPackage:
       arguments = ["packageName": .string(bundleName ?? "com.example.app")]
     case .startApplication, .stopApplication:
-      arguments = [
-        "bundleName": .string(bundleName ?? "com.example.app"),
-        "abilityName": .string(abilityName ?? "EntryAbility"),
-      ]
+      if case .hdc(.startNativeTarget(let deployment))? = action {
+        arguments = [
+          "bundleName": .string(deployment.bundle.bundleName),
+          "abilityName": .string(HDCAppOwnedNativeLibraryDeployment.entryAbility),
+        ]
+      } else if case .hdc(.stopNativeTarget(let deployment))? = action {
+        arguments = [
+          "bundleName": .string(deployment.bundle.bundleName),
+          "abilityName": .string(HDCAppOwnedNativeLibraryDeployment.entryAbility),
+        ]
+      } else {
+        arguments = [
+          "bundleName": .string(bundleName ?? "com.example.app"),
+          "abilityName": .string(abilityName ?? "EntryAbility"),
+        ]
+      }
     case .runApprovedRemoteRead:
+      if case .hdc(.inspectNativeLibrary(let deployment, let expectation))? = action {
+        arguments = [
+          "catalogId": .string("arkdeck-remote-operations"),
+          "actionId": .string("nativeLibraryInspection"),
+          "parameters": .object([
+            "expectation": .string(expectation.rawValue),
+            "targetPath": .string(deployment.targetPath),
+            "expectedSha256": .string(deployment.artifactFacts.sha256),
+            "buildId": .string(deployment.artifactFacts.buildID),
+          ]),
+          "artifactId": .string("native-library-readback"),
+        ]
+        break
+      }
       guard let reference = step.actionReference,
         reference.catalogID == "arkdeck-remote-operations"
       else {
@@ -3503,10 +3926,48 @@ public actor RuntimeJobEngine {
         "parameters": .object(parameters),
         "artifactId": .string("artifact-\(step.stepID)"),
       ]
+    case .runApprovedRemoteMutation:
+      let deployment: HDCAppOwnedNativeLibraryDeployment
+      let actionID: String
+      switch action {
+      case .hdc(.backupNativeLibrary(let value)):
+        deployment = value
+        actionID = "nativeLibraryBackup"
+      case .hdc(.publishNativeLibrary(let value)):
+        deployment = value
+        actionID = "nativeLibraryAtomicPublish"
+      case .hdc(.rollbackNativeLibrary(let value)):
+        deployment = value
+        actionID = "nativeLibraryRollback"
+      default:
+        throw RuntimeJobEngineError.internalFailure(
+          "\(step.stepID) has no exact typed native mutation action")
+      }
+      arguments = [
+        "catalogId": .string("arkdeck-remote-operations"),
+        "actionId": .string(actionID),
+        "parameters": .object([
+          "targetPath": .string(deployment.targetPath),
+          "stagingPath": .string(deployment.stagingPath),
+          "backupPath": .string(deployment.backupPath),
+          "rollbackStagingPath": .string(deployment.rollbackStagingPath),
+          "expectedSha256": .string(deployment.artifactFacts.sha256),
+          "buildId": .string(deployment.artifactFacts.buildID),
+        ]),
+        "artifactId": .string("native-library-mutation"),
+        "confirmationId": .string("runtime-capability-admission"),
+      ]
     case .verifyRemoteState:
       let probeID: String
       if case .hdc(.verifyProcessState(let bundle))? = action {
         probeID = "process.\(bundle.bundleName)"
+      } else if case .hdc(.inspectNativeLibrary(let deployment, .targetLoaded))? = action {
+        arguments = [
+          "probeId": .string("native-library-loader"),
+          "expectedState": .string(
+            "loaded:\(deployment.artifactFacts.sha256)"),
+        ]
+        break
       } else {
         probeID = "process-state"
       }

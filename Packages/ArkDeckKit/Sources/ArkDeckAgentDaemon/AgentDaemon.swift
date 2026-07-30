@@ -72,6 +72,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
   /// `task.*` then fails closed instead of half-existing.
   let harnessCoordinator: HarnessTaskCoordinator?
   private let hapImports: HAPArtifactImportCoordinator
+  private let nativeLibraryImports: NativeLibraryArtifactImportCoordinator
   /// Test seam: records which methods a client invoked. Production passes
   /// nil, so this cannot affect behaviour.
   private let methodObserver: (@Sendable (String) -> Void)?
@@ -96,6 +97,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
     self.artifactStore = artifactStore
     self.harnessCoordinator = harnessCoordinator
     self.hapImports = HAPArtifactImportCoordinator()
+    self.nativeLibraryImports = NativeLibraryArtifactImportCoordinator()
     self.methodObserver = methodObserver
   }
 
@@ -575,6 +577,151 @@ public struct RuntimeControlPlaneHandler: Sendable {
         return failure(id: request.id, code: .invalidParams, message: "uploadId is required")
       }
       let aborted = await hapImports.abort(uploadID: uploadID)
+      return success(
+        id: request.id, result: .object(["aborted": .bool(aborted)]))
+
+    case "artifact.importNativeLibrary.begin":
+      guard artifactStore != nil, let targetStore else {
+        return failure(
+          id: request.id, code: .internalError,
+          message: "artifact store and target store are required for native library import")
+      }
+      guard case .string(let targetID)? = request.params?["targetId"],
+        case .string(let name)? = request.params?["name"],
+        case .integer(let byteCountValue)? = request.params?["byteCount"],
+        case .string(let sha256)? = request.params?["sha256"],
+        byteCountValue >= 0, byteCountValue <= Int64(Int.max)
+      else {
+        return failure(
+          id: request.id, code: .invalidParams,
+          message: "targetId, name, byteCount and sha256 are required")
+      }
+      do {
+        guard let target = try targetStore.find(targetID: targetID) else {
+          return failure(
+            id: request.id, code: .notFound, message: "unknown target \(targetID)")
+        }
+        let uploadID = try await nativeLibraryImports.begin(
+          target: target, name: name, byteCount: Int(byteCountValue),
+          sha256: sha256)
+        return success(
+          id: request.id,
+          result: .object([
+            "uploadId": .string(uploadID),
+            "maximumChunkBytes": .integer(
+              Int64(NativeLibraryArtifactImportCoordinator.maximumChunkBytes)),
+            "targetId": .string(target.targetID),
+            "bindingRevision": .integer(Int64(target.bindingRevision)),
+          ]))
+      } catch let error as NativeLibraryArtifactImportError {
+        return failure(id: request.id, code: .invalidParams, message: error.description)
+      } catch {
+        return failure(id: request.id, code: .internalError, message: "\(error)")
+      }
+
+    case "artifact.importNativeLibrary.append":
+      guard artifactStore != nil, targetStore != nil else {
+        return failure(
+          id: request.id, code: .internalError,
+          message: "artifact store and target store are required for native library import")
+      }
+      guard case .string(let uploadID)? = request.params?["uploadId"],
+        case .integer(let offsetValue)? = request.params?["offset"],
+        offsetValue >= 0, offsetValue <= Int64(Int.max),
+        case .string(let base64)? = request.params?["base64"],
+        base64.utf8.count
+          <= ((NativeLibraryArtifactImportCoordinator.maximumChunkBytes + 2) / 3) * 4,
+        let chunk = Data(base64Encoded: base64, options: [])
+      else {
+        return failure(
+          id: request.id, code: .invalidParams,
+          message: "uploadId, non-negative offset and a bounded base64 chunk are required")
+      }
+      do {
+        let nextOffset = try await nativeLibraryImports.append(
+          uploadID: uploadID, offset: Int(offsetValue), chunk: chunk)
+        return success(
+          id: request.id,
+          result: .object(["nextOffset": .integer(Int64(nextOffset))]))
+      } catch let error as NativeLibraryArtifactImportError {
+        return failure(id: request.id, code: .rejected, message: error.description)
+      } catch {
+        return failure(id: request.id, code: .internalError, message: "\(error)")
+      }
+
+    case "artifact.importNativeLibrary.commit":
+      guard let artifactStore, let targetStore else {
+        return failure(
+          id: request.id, code: .internalError,
+          message: "artifact store and target store are required for native library import")
+      }
+      guard case .string(let uploadID)? = request.params?["uploadId"] else {
+        return failure(id: request.id, code: .invalidParams, message: "uploadId is required")
+      }
+      do {
+        let completed = try await nativeLibraryImports.commit(uploadID: uploadID)
+        guard let currentTarget = try targetStore.find(
+          targetID: completed.target.targetID),
+          currentTarget.bindingRevision == completed.target.bindingRevision,
+          currentTarget.stablePhysicalIdentitySHA256
+            == completed.target.stablePhysicalIdentitySHA256
+        else {
+          return failure(
+            id: request.id, code: .conflict,
+            message: "target binding changed during native library import")
+        }
+        let jobID =
+          "input-so-\(currentTarget.targetID)-r\(currentTarget.bindingRevision)-"
+          + String(completed.sha256.prefix(16))
+        let metadata = try await artifactStore.publish(
+          RuntimeArtifactPublicationRequest(
+            jobID: jobID, sessionID: "session-\(jobID)",
+            stepID: "import-native-library", name: completed.name,
+            mediaType: "application/x-elf",
+            privacy: .standard, retentionClass: .pinnedUntilVerified,
+            sourceOperation: "artifact.import-native-library",
+            providerID: "host",
+            bindingSnapshot: ArtifactBindingSnapshot(
+              targetID: currentTarget.targetID,
+              bindingRevision: currentTarget.bindingRevision,
+              stableIdentitySHA256:
+                currentTarget.stablePhysicalIdentitySHA256),
+            contents: completed.contents))
+        let lease = try await artifactStore.leaseReference(
+          jobID: metadata.jobID, artifactID: metadata.artifactID)
+        return success(
+          id: request.id,
+          result: .object([
+            "jobId": .string(metadata.jobID),
+            "artifactId": .string(metadata.artifactID),
+            "lease": .string(lease),
+            "name": .string(metadata.name),
+            "byteCount": .integer(Int64(metadata.byteCount)),
+            "sha256": .string(metadata.sha256),
+            "abi": .string(completed.facts.abi.rawValue),
+            "elfClassBits": .integer(
+              Int64(completed.facts.elfClassBits)),
+            "machine": .integer(Int64(completed.facts.machine)),
+            "buildId": .string(completed.facts.buildID),
+            "targetId": .string(currentTarget.targetID),
+            "bindingRevision": .integer(
+              Int64(currentTarget.bindingRevision)),
+            "stableIdentitySha256": .string(
+              currentTarget.stablePhysicalIdentitySHA256),
+          ]))
+      } catch let error as NativeLibraryArtifactImportError {
+        return failure(id: request.id, code: .rejected, message: error.description)
+      } catch let error as RuntimeArtifactError {
+        return failure(id: request.id, code: .rejected, message: "\(error)")
+      } catch {
+        return failure(id: request.id, code: .internalError, message: "\(error)")
+      }
+
+    case "artifact.importNativeLibrary.abort":
+      guard case .string(let uploadID)? = request.params?["uploadId"] else {
+        return failure(id: request.id, code: .invalidParams, message: "uploadId is required")
+      }
+      let aborted = await nativeLibraryImports.abort(uploadID: uploadID)
       return success(
         id: request.id, result: .object(["aborted": .bool(aborted)]))
 

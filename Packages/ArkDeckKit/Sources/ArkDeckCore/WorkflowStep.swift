@@ -1025,7 +1025,7 @@ private enum WorkflowStepValidator {
         "actionId",
         allowed: [
           "deviceSummary", "systemProperties", "processList", "packageInfo", "storageUsage",
-          "deviceModel", "firmwareBuild",
+          "deviceModel", "firmwareBuild", "nativeLibraryInspection",
         ]
       )
       try reader.validatedOptions("parameters")
@@ -1033,7 +1033,12 @@ private enum WorkflowStepValidator {
       try reader.optionalIdentifier("semanticResultPolicy")
     case .runApprovedRemoteMutation:
       try reader.constant("catalogId", value: "arkdeck-remote-operations")
-      try reader.constant("actionId", value: "requestRootMode")
+      _ = try reader.enumeration(
+        "actionId",
+        allowed: [
+          "requestRootMode", "nativeLibraryBackup", "nativeLibraryAtomicPublish",
+          "nativeLibraryRollback",
+        ])
       try reader.validatedOptions("parameters")
       try reader.identifier("artifactId")
       try reader.identifier("confirmationId")

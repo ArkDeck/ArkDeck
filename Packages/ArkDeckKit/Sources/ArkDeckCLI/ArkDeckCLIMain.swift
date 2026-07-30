@@ -555,6 +555,7 @@ struct ArkDeckCommandLine {
         arkdeck capability install --file <cap.json> [--json]
         arkdeck capability revoke --capability <id> [--json]
         arkdeck artifact import-hap --target <id> --file <signed.hap> [--json]
+        arkdeck artifact import-native-library --target <id> --file <libname.so> [--json]
         arkdeck task submit --target <id> --goal <text> [--intake <text>] [--project <ref>] \
       [--max-rounds <n>] [--max-wall-clock-seconds <n>] [--json]
         arkdeck task list|status|result|events|reconcile|pause|cancel --task <HTASK-id> [--json]

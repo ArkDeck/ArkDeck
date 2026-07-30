@@ -134,8 +134,9 @@ final class RuntimeJobEngineContractTests: XCTestCase {
         retentionClass: .pinnedUntilVerified,
         sourceOperation: "build.hap@1", providerID: "host",
         bindingSnapshot: ArtifactBindingSnapshot(
-          targetID: "TGT-DAYU200-01", bindingRevision: 1,
-          stableIdentitySHA256: nil),
+          targetID: "TGT-DAYU200-01", bindingRevision: 7,
+          stableIdentitySHA256:
+            "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547"),
         contents: Data("signed-hap-fixture".utf8)))
     return try await artifactStore.leaseReference(
       jobID: hapArtifact.jobID, artifactID: hapArtifact.artifactID)
@@ -345,8 +346,9 @@ final class RuntimeJobEngineContractTests: XCTestCase {
         retentionClass: .pinnedUntilVerified,
         sourceOperation: "build.hap@1", providerID: "host",
         bindingSnapshot: ArtifactBindingSnapshot(
-          targetID: "TGT-DAYU200-01", bindingRevision: 1,
-          stableIdentitySHA256: nil),
+          targetID: "TGT-DAYU200-01", bindingRevision: 7,
+          stableIdentitySHA256:
+            "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547"),
         contents: Data("signed-hap-fixture".utf8)))
     let lease = try await artifactStore.leaseReference(
       jobID: hapArtifact.jobID, artifactID: hapArtifact.artifactID)

@@ -373,7 +373,9 @@ enum RuntimeCLI {
     guard let subcommand = arguments.first else {
       throw CLIError(
         exitCode: EX_USAGE,
-        message: "missing artifact subcommand (import-hap|list|inspect|read|export)")
+        message:
+          "missing artifact subcommand "
+          + "(import-hap|import-native-library|list|inspect|read|export)")
     }
     var rest = Array(arguments.dropFirst())
     let json = rest.contains("--json")
@@ -435,6 +437,74 @@ enum RuntimeCLI {
       }
       let result = try client.request(
         method: "artifact.importHap.commit",
+        params: ["uploadId": .string(uploadID)])
+      committed = true
+      emit(result, json: json)
+      return
+    }
+    if subcommand == "import-native-library" {
+      guard let targetIndex = rest.firstIndex(of: "--target"),
+        targetIndex + 1 < rest.count,
+        let fileIndex = rest.firstIndex(of: "--file"),
+        fileIndex + 1 < rest.count
+      else {
+        throw CLIError(
+          exitCode: EX_USAGE,
+          message:
+            "artifact import-native-library requires "
+            + "--target <id> --file <libname.so>")
+      }
+      let targetID = rest[targetIndex + 1]
+      let payload = try readNativeLibraryImportPayload(
+        path: rest[fileIndex + 1])
+      let begin = try client.request(
+        method: "artifact.importNativeLibrary.begin",
+        params: [
+          "targetId": .string(targetID),
+          "name": .string(payload.name),
+          "byteCount": .integer(Int64(payload.contents.count)),
+          "sha256": .string(payload.sha256),
+        ])
+      guard case .object(let beginFields) = begin,
+        case .string(let uploadID)? = beginFields["uploadId"],
+        case .integer(let maximumChunkValue)? =
+          beginFields["maximumChunkBytes"],
+        maximumChunkValue > 0, maximumChunkValue <= Int64(Int.max)
+      else {
+        throw AgentClientError.malformedResponse(
+          "artifact.importNativeLibrary.begin returned no bounded upload identity")
+      }
+      var committed = false
+      defer {
+        if !committed {
+          _ = try? client.request(
+            method: "artifact.importNativeLibrary.abort",
+            params: ["uploadId": .string(uploadID)])
+        }
+      }
+      let maximumChunk = Int(maximumChunkValue)
+      var offset = 0
+      while offset < payload.contents.count {
+        let end = min(payload.contents.count, offset + maximumChunk)
+        let chunk = payload.contents.subdata(in: offset..<end)
+        let appended = try client.request(
+          method: "artifact.importNativeLibrary.append",
+          params: [
+            "uploadId": .string(uploadID),
+            "offset": .integer(Int64(offset)),
+            "base64": .string(chunk.base64EncodedString()),
+          ])
+        guard case .object(let fields) = appended,
+          case .integer(let nextOffset)? = fields["nextOffset"],
+          nextOffset == Int64(end)
+        else {
+          throw AgentClientError.malformedResponse(
+            "artifact.importNativeLibrary.append returned a mismatched offset")
+        }
+        offset = end
+      }
+      let result = try client.request(
+        method: "artifact.importNativeLibrary.commit",
         params: ["uploadId": .string(uploadID)])
       committed = true
       emit(result, json: json)
@@ -540,6 +610,80 @@ enum RuntimeCLI {
     guard contents.starts(with: [0x50, 0x4b, 0x03, 0x04]) else {
       throw CLIError(
         exitCode: EX_USAGE, message: "HAP is not a ZIP-based .hap container")
+    }
+    let digest = SHA256.hash(data: contents)
+      .map { String(format: "%02x", $0) }.joined()
+    return HAPImportPayload(name: name, contents: contents, sha256: digest)
+  }
+
+  private static func readNativeLibraryImportPayload(
+    path: String
+  ) throws -> HAPImportPayload {
+    let url = URL(fileURLWithPath: path).standardizedFileURL
+    let name = url.lastPathComponent
+    guard name.count <= 128,
+      name.range(
+        of: #"^lib[A-Za-z0-9_.-]+\.so$"#,
+        options: .regularExpression) != nil
+    else {
+      throw CLIError(
+        exitCode: EX_USAGE,
+        message: "native library file must have a safe lib*.so basename")
+    }
+    let descriptor = Darwin.open(url.path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW)
+    guard descriptor >= 0 else {
+      throw CLIError(
+        exitCode: EX_USAGE,
+        message: "cannot open native library file (errno \(errno))")
+    }
+    defer { Darwin.close(descriptor) }
+    var before = stat()
+    let maximumBytes = NativeLibraryArtifactValidator.maximumBytes
+    guard fstat(descriptor, &before) == 0,
+      before.st_mode & S_IFMT == S_IFREG,
+      before.st_size >= 64,
+      before.st_size <= maximumBytes
+    else {
+      throw CLIError(
+        exitCode: EX_USAGE,
+        message:
+          "native library must be a regular file of 64...\(maximumBytes) bytes")
+    }
+    var contents = Data()
+    contents.reserveCapacity(Int(before.st_size))
+    var buffer = [UInt8](repeating: 0, count: 1_024 * 1_024)
+    while true {
+      let count = Darwin.read(descriptor, &buffer, buffer.count)
+      if count < 0, errno == EINTR { continue }
+      guard count >= 0 else {
+        throw CLIError(
+          exitCode: EX_USAGE,
+          message: "native library read failed (errno \(errno))")
+      }
+      if count == 0 { break }
+      contents.append(contentsOf: buffer[0..<count])
+    }
+    var after = stat()
+    guard fstat(descriptor, &after) == 0,
+      contents.count == Int(before.st_size),
+      after.st_dev == before.st_dev,
+      after.st_ino == before.st_ino,
+      after.st_size == before.st_size,
+      after.st_mtimespec.tv_sec == before.st_mtimespec.tv_sec,
+      after.st_mtimespec.tv_nsec == before.st_mtimespec.tv_nsec,
+      after.st_ctimespec.tv_sec == before.st_ctimespec.tv_sec,
+      after.st_ctimespec.tv_nsec == before.st_ctimespec.tv_nsec
+    else {
+      throw CLIError(
+        exitCode: EX_USAGE,
+        message: "native library changed while it was being imported")
+    }
+    do {
+      _ = try NativeLibraryArtifactValidator.validate(contents)
+    } catch {
+      throw CLIError(
+        exitCode: EX_DATAERR,
+        message: "native library failed ELF validation: \(error)")
     }
     let digest = SHA256.hash(data: contents)
       .map { String(format: "%02x", $0) }.joined()

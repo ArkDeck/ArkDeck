@@ -575,7 +575,9 @@ final class AgentDaemonContractTests: XCTestCase {
     let (handler, _) = try makeStack()
     for method in [
       "artifact.importHap.begin", "artifact.importHap.append",
-      "artifact.importHap.commit", "artifact.list", "artifact.inspect",
+      "artifact.importHap.commit", "artifact.importNativeLibrary.begin",
+      "artifact.importNativeLibrary.append",
+      "artifact.importNativeLibrary.commit", "artifact.list", "artifact.inspect",
       "artifact.read", "artifact.export",
     ] {
       let response = await handler.handleFrame(
@@ -756,6 +758,102 @@ final class AgentDaemonContractTests: XCTestCase {
       + String(digest.prefix(16))
     let artifacts = try await artifactStore.list(jobID: expectedJob)
     XCTAssertTrue(artifacts.isEmpty)
+  }
+
+  func testNativeLibraryImportValidatesELFAndPublishesBoundLease() async throws {
+    let targetStore = try RuntimeTargetStore(
+      directoryURL: stateDirectory.appendingPathComponent(
+        "targets-native", isDirectory: true))
+    let stableIdentity = String(repeating: "d", count: 64)
+    let target = try targetStore.adopt(
+      stableIdentitySHA256: stableIdentity,
+      connectKey: "150100424a544e4600",
+      toolVersion: "3.2.0f",
+      nowUTC: "2026-07-30T00:00:00Z").record
+    let artifactStore = try RuntimeArtifactStore(
+      rootURL: stateDirectory.appendingPathComponent(
+        "artifacts-native", isDirectory: true),
+      nowUTC: { "2026-07-30T00:00:00Z" })
+    let (handler, _) = try makeStack(
+      targetStore: targetStore, artifactStore: artifactStore)
+    let library = NativeLibraryTestFixture.arm64ELF()
+    let digest = NativeLibraryTestFixture.sha256(library)
+
+    let begin = try await request(
+      handler, method: "artifact.importNativeLibrary.begin",
+      params: [
+        "targetId": .string(target.targetID),
+        "name": .string("libarkdeck_gj.so"),
+        "byteCount": .integer(Int64(library.count)),
+        "sha256": .string(digest),
+      ])
+    XCTAssertTrue(begin.ok, begin.error?.message ?? "-")
+    guard case .object(let beginFields)? = begin.result,
+      case .string(let uploadID)? = beginFields["uploadId"]
+    else {
+      return XCTFail("native begin must return an upload identity")
+    }
+    let append = try await request(
+      handler, method: "artifact.importNativeLibrary.append",
+      params: [
+        "uploadId": .string(uploadID),
+        "offset": .integer(0),
+        "base64": .string(library.base64EncodedString()),
+      ])
+    XCTAssertTrue(append.ok, append.error?.message ?? "-")
+    let commit = try await request(
+      handler, method: "artifact.importNativeLibrary.commit",
+      params: ["uploadId": .string(uploadID)])
+    XCTAssertTrue(commit.ok, commit.error?.message ?? "-")
+    guard case .object(let fields)? = commit.result,
+      case .string(let jobID)? = fields["jobId"],
+      case .string(let artifactID)? = fields["artifactId"],
+      case .string(let lease)? = fields["lease"]
+    else {
+      return XCTFail("native commit must return an ID-only lease")
+    }
+    XCTAssertEqual(fields["abi"], .string("arm64-v8a"))
+    XCTAssertEqual(fields["buildId"], .string(NativeLibraryTestFixture.buildID))
+    XCTAssertEqual(fields["sha256"], .string(digest))
+    XCTAssertEqual(lease, "lease-v1:\(jobID):\(artifactID)")
+    XCTAssertFalse(lease.contains(stateDirectory.path))
+    let metadata = try await artifactStore.inspect(
+      jobID: jobID, artifactID: artifactID)
+    XCTAssertEqual(metadata.mediaType, "application/x-elf")
+    XCTAssertEqual(metadata.bindingSnapshot.targetID, target.targetID)
+    XCTAssertEqual(metadata.bindingSnapshot.bindingRevision, target.bindingRevision)
+    XCTAssertEqual(
+      metadata.bindingSnapshot.stableIdentitySHA256, stableIdentity)
+
+    let invalid = Data(repeating: 0x41, count: 128)
+    let invalidDigest = NativeLibraryTestFixture.sha256(invalid)
+    let invalidBegin = try await request(
+      handler, method: "artifact.importNativeLibrary.begin",
+      params: [
+        "targetId": .string(target.targetID),
+        "name": .string("libinvalid.so"),
+        "byteCount": .integer(Int64(invalid.count)),
+        "sha256": .string(invalidDigest),
+      ])
+    guard case .object(let invalidFields)? = invalidBegin.result,
+      case .string(let invalidUploadID)? = invalidFields["uploadId"]
+    else {
+      return XCTFail("bounded invalid bytes should reach commit validation")
+    }
+    _ = try await request(
+      handler, method: "artifact.importNativeLibrary.append",
+      params: [
+        "uploadId": .string(invalidUploadID),
+        "offset": .integer(0),
+        "base64": .string(invalid.base64EncodedString()),
+      ])
+    let invalidCommit = try await request(
+      handler, method: "artifact.importNativeLibrary.commit",
+      params: ["uploadId": .string(invalidUploadID)])
+    XCTAssertFalse(invalidCommit.ok)
+    XCTAssertEqual(invalidCommit.error?.code, "rejected")
+    XCTAssertTrue(
+      (invalidCommit.error?.message ?? "").contains("ELF validation"))
   }
 
   func testWireProtocolCarriesNoArgvSurface() async throws {

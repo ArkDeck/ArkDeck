@@ -20,17 +20,29 @@ public protocol HDCObservationFactsPort: Sendable {
   func currentFacts(targetID: String) async throws -> ProviderFacts
 }
 
+private struct HDCNativeFileIdentity: Equatable {
+  let mode: String
+  let userID: UInt32
+  let groupID: UInt32
+}
+
 public struct HDCObservationProviderAdapter: DeviceProvider {
   public let providerID = "hdc"
   private let factsPort: any HDCObservationFactsPort
   private let profile: HDCCompatibilityProfile
+  private let appOwnedNativeLibraryAvailability: ProviderOperationAvailability
 
   public init(
     factsPort: any HDCObservationFactsPort,
-    profile: HDCCompatibilityProfile = .openHarmony320Family
+    profile: HDCCompatibilityProfile = .openHarmony320Family,
+    appOwnedNativeLibraryAvailability: ProviderOperationAvailability = .unavailable(
+      reason:
+        "app-owned native-library replacement cannot enable OpenHarmony XPM/fs-verity "
+        + "code signing for the published file")
   ) {
     self.factsPort = factsPort
     self.profile = profile
+    self.appOwnedNativeLibraryAvailability = appOwnedNativeLibraryAvailability
   }
 
   public func resolveFacts(targetID: String) async throws -> ProviderFacts {
@@ -43,6 +55,8 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
     switch operation.reference {
     case "observe.device@1", "capture.diagnostics@1", "debug.hap@1":
       return .available
+    case "deploy.native-library.app-owned@1":
+      return appOwnedNativeLibraryAvailability
     default:
       return .unavailable(
         reason: "HDC provider has no complete production typed plan for "
@@ -68,6 +82,10 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
     inputs: [String: JSONValue],
     context: ProviderExecutionContext
   ) throws -> TypedProviderAction {
+    if descriptorIsAppOwnedNativeLibrary(operation) {
+      return try nativeLibraryAction(
+        for: step, inputs: inputs, context: context)
+    }
     switch step.kind {
     case .probeHostTool:
       return .hdc(.observeTool)
@@ -130,6 +148,12 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
 
   private func descriptorIsDebugHAP(_ operation: CatalogOperationDescriptor) -> Bool {
     operation.id == "debug.hap"
+  }
+
+  private func descriptorIsAppOwnedNativeLibrary(
+    _ operation: CatalogOperationDescriptor
+  ) -> Bool {
+    operation.id == "deploy.native-library.app-owned"
   }
 
   /// Maps only the exact published remote action reference. There is no
@@ -281,6 +305,100 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
       return .hdc(.uninstallPackage(bundle))
     default:
       throw DeviceProviderError.unsupportedStepKind(step.kind.rawValue)
+    }
+  }
+
+  private func nativeLibraryAction(
+    for step: CatalogStepDescriptor,
+    inputs: [String: JSONValue],
+    context: ProviderExecutionContext
+  ) throws -> TypedProviderAction {
+    guard case .string(let lease)? = inputs["libraryArtifactLease"] else {
+      throw DeviceProviderError.unsupportedAction("libraryArtifactLease input is required")
+    }
+    guard case .string(let targetBundle)? = inputs["targetBundle"] else {
+      throw DeviceProviderError.unsupportedAction("targetBundle input is required")
+    }
+    guard case .string(let logicalName)? = inputs["libraryLogicalName"] else {
+      throw DeviceProviderError.unsupportedAction("libraryLogicalName input is required")
+    }
+    guard case .string(let abiValue)? = inputs["expectedABI"],
+      let expectedABI = HDCNativeLibraryABI(rawValue: abiValue)
+    else {
+      throw DeviceProviderError.unsupportedAction("expectedABI input is invalid")
+    }
+    let restartValue: String
+    if case .string(let value)? = inputs["restartProfile"] {
+      restartValue = value
+    } else {
+      restartValue = HDCNativeRestartProfile.restartAbility.rawValue
+    }
+    let verificationValue: String
+    if case .string(let value)? = inputs["verificationProfile"] {
+      verificationValue = value
+    } else {
+      verificationValue = HDCNativeVerificationProfile.hashAndProcess.rawValue
+    }
+    let rollbackValue: String
+    if case .string(let value)? = inputs["rollbackPolicy"] {
+      rollbackValue = value
+    } else {
+      rollbackValue = HDCNativeRollbackPolicy.autoRollback.rawValue
+    }
+    guard let restart = HDCNativeRestartProfile(rawValue: restartValue),
+      let verification = HDCNativeVerificationProfile(rawValue: verificationValue),
+      let rollback = HDCNativeRollbackPolicy(rawValue: rollbackValue)
+    else {
+      throw DeviceProviderError.unsupportedAction("native deployment profile is invalid")
+    }
+    guard restart == .restartAbility else {
+      throw DeviceProviderError.unsupportedAction(
+        "\(restart.rawValue) has no complete app-owned restart/readback plan; refusing before authorization")
+    }
+    guard let resolved = context.resolvedInputArtifact,
+      lease.hasSuffix(":\(resolved.artifactID)")
+    else {
+      throw DeviceProviderError.unsupportedAction(
+        "native deployment requires an engine-resolved Artifact lease")
+    }
+    let bytes = try Data(contentsOf: resolved.fileURL, options: [.mappedIfSafe])
+    let facts = try NativeLibraryArtifactValidator.validate(
+      bytes, expectedABI: expectedABI)
+    guard facts.sha256 == resolved.sha256, facts.byteCount == resolved.byteCount else {
+      throw DeviceProviderError.unsupportedAction(
+        "leased native Artifact bytes drifted during materialization")
+    }
+    let deployment = try HDCAppOwnedNativeLibraryDeployment(
+      jobID: context.jobID,
+      artifactLeaseID: lease,
+      artifactID: resolved.artifactID,
+      bundle: try HDCBundleReference(bundleName: targetBundle),
+      libraryLogicalName: logicalName,
+      artifactFacts: facts,
+      restartProfile: restart,
+      verificationProfile: verification,
+      rollbackPolicy: rollback)
+    switch step.stepID {
+    case "send-to-staging":
+      return .hdc(.sendNativeLibraryToStaging(deployment))
+    case "verify-remote-staging":
+      return .hdc(.inspectNativeLibrary(
+        deployment, expectation: .stagingMatchesArtifact))
+    case "backup-current-version":
+      return .hdc(.backupNativeLibrary(deployment))
+    case "atomic-publish":
+      return .hdc(.publishNativeLibrary(deployment))
+    case "restart-target":
+      return .hdc(.stopNativeTarget(deployment))
+    case "start-target":
+      return .hdc(.startNativeTarget(deployment))
+    case "verify-loaded-library":
+      return .hdc(.inspectNativeLibrary(deployment, expectation: .targetLoaded))
+    case "cleanup-staging-and-backup":
+      return .hdc(.cleanupNativeLibrary(deployment))
+    default:
+      throw DeviceProviderError.unsupportedStepKind(
+        "\(step.stepID) has no app-owned native-library action")
     }
   }
 
@@ -493,7 +611,7 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
         kind: .process(
           executableSHA256: "resolved-at-dispatch",
           argumentSummary: try deviceArguments(
-            ["shell", "test", "-e", path.remotePath], context: context),
+            ["shell", "ls", "-ld", path.remotePath], context: context),
           timeoutSeconds: 15))
     case .readPortForwardPresence:
       return TypedProcessPlan(
@@ -502,7 +620,222 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
           executableSHA256: "resolved-at-dispatch",
           argumentSummary: try deviceArguments(["fport", "ls"], context: context),
           timeoutSeconds: 30))
+    case .sendNativeLibraryToStaging(let deployment):
+      guard let resolved = context.resolvedInputArtifact,
+        deployment.artifactID == resolved.artifactID,
+        deployment.artifactFacts.sha256 == resolved.sha256,
+        deployment.artifactFacts.byteCount == resolved.byteCount,
+        deployment.stagingDirectoryIsJobOwned
+      else {
+        throw DeviceProviderError.unsupportedAction(
+          "native send requires the same engine-resolved Artifact and a job-owned staging directory")
+      }
+      return try nativeSequence(
+        action: action, context: context,
+        commands: [
+          (["shell", "mkdir", "-p", deployment.stagingDirectoryPath], false, 30),
+          (["file", "send", resolved.fileURL.path, deployment.stagingPath], false, 300),
+        ])
+    case .backupNativeLibrary(let deployment):
+      return try nativeSequence(
+        action: action, context: context,
+        commands: [
+          (["shell", "ls", "-ld", deployment.directoryPath], false, 15),
+          (["shell", "ls", "-l", deployment.targetPath], false, 15),
+          (["shell", "sha256sum", deployment.targetPath], false, 30),
+          (["shell", "cp", "-p", deployment.targetPath, deployment.backupPath], true, 60),
+          (["shell", "sha256sum", deployment.backupPath], true, 30),
+          (["shell", "ls", "-l", deployment.backupPath], true, 15),
+          // Keep firmware-layout diagnosis inside this typed provider action.
+          // Failure reporting only exposes a bounded hex prefix.
+          (["shell", "ls", "-la", deployment.nativeLibrariesRootPath], true, 15),
+        ])
+    case .publishNativeLibrary(let deployment):
+      return try nativeSequence(
+        action: action, context: context,
+        commands: [
+          (["shell", "ls", "-ln", deployment.targetPath], false, 15),
+          ([
+            "shell", "cp", "-p", deployment.targetPath,
+            deployment.rollbackStagingPath,
+          ], false, 60),
+          ([
+            "shell", "cp", deployment.stagingPath, deployment.rollbackStagingPath,
+          ], false, 60),
+          (["shell", "ls", "-ln", deployment.rollbackStagingPath], false, 15),
+          (["shell", "sha256sum", deployment.rollbackStagingPath], false, 30),
+          ([
+            "shell", "mv", "-f", deployment.rollbackStagingPath,
+            deployment.targetPath,
+          ], false, 60),
+          (["shell", "sha256sum", deployment.targetPath], false, 30),
+          (["shell", "ls", "-ln", deployment.targetPath], false, 15),
+        ])
+    case .stopNativeTarget(let deployment):
+      return try nativeSequence(
+        action: action, context: context,
+        commands: [
+          (["shell", "aa", "force-stop", deployment.bundle.bundleName], true, 60),
+          (["shell", "pidof", deployment.bundle.bundleName], true, 30),
+          (["shell", "sleep", "2"], true, 5),
+          (["shell", "pidof", deployment.bundle.bundleName], true, 30),
+        ])
+    case .startNativeTarget(let deployment):
+      return try nativeSequence(
+        action: action, context: context,
+        commands: [
+          ([
+            "shell", "aa", "start", "-b", deployment.bundle.bundleName, "-a",
+            HDCAppOwnedNativeLibraryDeployment.entryAbility,
+          ], true, 60),
+          (["shell", "sleep", "2"], true, 5),
+          (["shell", "pidof", deployment.bundle.bundleName], true, 30),
+        ])
+    case .cleanupNativeLibrary(let deployment):
+      var commands: [([String], Bool, Int)] = [
+        (["shell", "rm", "-f", deployment.stagingPath], true, 30),
+      ]
+      if deployment.stagingDirectoryIsJobOwned {
+        commands.append(
+          (["shell", "rmdir", deployment.stagingDirectoryPath], true, 30))
+      }
+      commands.append(
+        (["shell", "rm", "-f", deployment.rollbackStagingPath], true, 30))
+      if deployment.rollbackPolicy == .autoRollback {
+        commands.append((["shell", "rm", "-f", deployment.backupPath], true, 30))
+      }
+      commands.append((["shell", "ls", "-ld", deployment.stagingPath], true, 15))
+      if deployment.stagingDirectoryIsJobOwned {
+        commands.append(
+          (["shell", "ls", "-ld", deployment.stagingDirectoryPath], true, 15))
+      }
+      commands.append((["shell", "ls", "-ld", deployment.rollbackStagingPath], true, 15))
+      if deployment.rollbackPolicy == .autoRollback {
+        commands.append((["shell", "ls", "-ld", deployment.backupPath], true, 15))
+      }
+      return try nativeSequence(action: action, context: context, commands: commands)
+    case .rollbackNativeLibrary(let deployment):
+      return try nativeSequence(
+        action: action, context: context,
+        commands: [
+          (["shell", "sha256sum", deployment.backupPath], false, 30),
+          (["shell", "aa", "force-stop", deployment.bundle.bundleName], true, 60),
+          (["shell", "pidof", deployment.bundle.bundleName], true, 30),
+          (["shell", "sleep", "2"], true, 5),
+          (["shell", "pidof", deployment.bundle.bundleName], true, 30),
+          ([
+            "shell", "cp", "-p", deployment.backupPath, deployment.rollbackStagingPath,
+          ], true, 60),
+          (["shell", "sha256sum", deployment.rollbackStagingPath], true, 30),
+          ([
+            "shell", "mv", "-f", deployment.rollbackStagingPath, deployment.targetPath,
+          ], true, 60),
+          (["shell", "sha256sum", deployment.targetPath], true, 30),
+          ([
+            "shell", "aa", "start", "-b", deployment.bundle.bundleName, "-a",
+            HDCAppOwnedNativeLibraryDeployment.entryAbility,
+          ], true, 60),
+          (["shell", "sleep", "2"], true, 5),
+          (["shell", "pidof", deployment.bundle.bundleName], true, 30),
+          ([
+            "shell", "grep", "-F", deployment.loaderVisiblePath, "/proc/*/maps",
+          ], true, 30),
+        ])
+    case .inspectNativeLibrary(let deployment, let expectation):
+      return try nativeInspectionPlan(
+        action: action, deployment: deployment,
+        expectation: expectation, context: context)
     }
+  }
+
+  private func nativeSequence(
+    action: TypedProviderAction,
+    context: ProviderExecutionContext,
+    commands: [([String], Bool, Int)]
+  ) throws -> TypedProcessPlan {
+    TypedProcessPlan(
+      action: action,
+      kind: .processSequence(
+        executableSHA256: "resolved-at-dispatch",
+        invocations: try commands.map { command in
+          TypedProcessInvocation(
+            arguments: try deviceArguments(command.0, context: context),
+            timeoutSeconds: command.2,
+            continueAfterNonZero: command.1)
+        }))
+  }
+
+  private func nativeInspectionPlan(
+    action: TypedProviderAction,
+    deployment: HDCAppOwnedNativeLibraryDeployment,
+    expectation: HDCNativeLibraryInspection,
+    context: ProviderExecutionContext
+  ) throws -> TypedProcessPlan {
+    let commands: [([String], Bool, Int)]
+    switch expectation {
+    case .stagingMatchesArtifact:
+      commands = [
+        (["shell", "sha256sum", deployment.stagingPath], true, 30),
+        (["shell", "ls", "-l", deployment.stagingPath], true, 15),
+      ]
+    case .backupMatchesTarget:
+      commands = [
+        (["shell", "sha256sum", deployment.targetPath], true, 30),
+        (["shell", "sha256sum", deployment.backupPath], true, 30),
+      ]
+    case .targetMatchesArtifact:
+      commands = [
+        (["shell", "sha256sum", deployment.targetPath], true, 30)
+      ]
+    case .targetStopped, .targetStarted:
+      commands = [
+        (["shell", "pidof", deployment.bundle.bundleName], true, 30)
+      ]
+    case .targetLoaded:
+      var selected: [([String], Bool, Int)] = [
+        (["shell", "sha256sum", deployment.targetPath], true, 30)
+      ]
+      if deployment.verificationProfile != .hashOnly {
+        selected.append(
+          (["shell", "pidof", deployment.bundle.bundleName], true, 30))
+      }
+      if deployment.verificationProfile == .hashProcessAndMaps {
+        selected.append(
+          ([
+            "shell", "grep", "-F", deployment.loaderVisiblePath, "/proc/*/maps",
+          ], true, 30))
+      }
+      commands = selected
+    case .cleanupComplete:
+      var selected: [([String], Bool, Int)] = [
+        (["shell", "ls", "-ld", deployment.stagingPath], true, 15),
+      ]
+      if deployment.stagingDirectoryIsJobOwned {
+        selected.append(
+          (["shell", "ls", "-ld", deployment.stagingDirectoryPath], true, 15))
+      }
+      selected.append(
+        (["shell", "ls", "-ld", deployment.rollbackStagingPath], true, 15))
+      if deployment.rollbackPolicy == .autoRollback {
+        selected.append(
+          (["shell", "ls", "-ld", deployment.backupPath], true, 15))
+      }
+      commands = selected
+    case .rollbackRestored:
+      var selected: [([String], Bool, Int)] = [
+        (["shell", "sha256sum", deployment.targetPath], true, 30),
+        (["shell", "sha256sum", deployment.backupPath], true, 30),
+        (["shell", "pidof", deployment.bundle.bundleName], true, 30),
+      ]
+      if deployment.verificationProfile == .hashProcessAndMaps {
+        selected.append(
+          ([
+            "shell", "grep", "-F", deployment.loaderVisiblePath, "/proc/*/maps",
+          ], true, 30))
+      }
+      commands = selected
+    }
+    return try nativeSequence(action: action, context: context, commands: commands)
   }
 
   private func deviceArguments(
@@ -764,6 +1097,175 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
       }
       return .verified(summary: ["stagedAt": staged.path.remotePath])
 
+    case .sendNativeLibraryToStaging:
+      guard receipt.exitStatus == 0 else {
+        return .failed(
+          code: "nativeSendFailed",
+          detail: "native library transfer did not complete")
+      }
+      return .unknown(
+        reason: "native staging send requires remote hash readback")
+
+    case .backupNativeLibrary(let deployment):
+      guard receipt.subprocesses.count == 7 else {
+        return .unknown(reason: "native backup did not produce its complete readback sequence")
+      }
+      let observedTargetHash = sha256(receipt.subprocesses[2])
+      let observedBackupHash = sha256(receipt.subprocesses[4])
+      let observedBackupMatches =
+        observedBackupHash != nil && observedBackupHash == observedTargetHash
+      guard isDirectoryListing(receipt.subprocesses[0]),
+        isRegularFileListing(receipt.subprocesses[1]),
+        let targetHash = observedTargetHash,
+        let backupHash = observedBackupHash,
+        targetHash == backupHash,
+        isRegularFileListing(receipt.subprocesses[5])
+      else {
+        let diagnostics = receipt.subprocesses.enumerated().map {
+          "\($0.offset):\(boundedProcessDiagnostic($0.element))"
+        }.joined(separator: ";")
+        return .failed(
+          code: "nativeBackupMismatch",
+          detail:
+            "app-owned directory, original file or verified backup snapshot is invalid "
+            + "(directoryExit=\(exitSummary(receipt.subprocesses[0])), "
+            + "directoryListed=\(isDirectoryListing(receipt.subprocesses[0])), "
+            + "targetExit=\(exitSummary(receipt.subprocesses[1])), "
+            + "targetListed=\(isRegularFileListing(receipt.subprocesses[1])), "
+            + "targetHashExit=\(exitSummary(receipt.subprocesses[2])), "
+            + "targetHashPresent=\(observedTargetHash != nil), "
+            + "copyExit=\(exitSummary(receipt.subprocesses[3])), "
+            + "backupHashExit=\(exitSummary(receipt.subprocesses[4])), "
+            + "backupHashMatches=\(observedBackupMatches), "
+            + "backupExit=\(exitSummary(receipt.subprocesses[5])), "
+            + "backupListed=\(isRegularFileListing(receipt.subprocesses[5])), "
+            + "diagnostics=\(diagnostics))")
+      }
+      return .verified(summary: [
+        "backupSha256": backupHash,
+        "backupPath": deployment.backupPath,
+      ])
+
+    case .publishNativeLibrary(let deployment):
+      guard receipt.subprocesses.count == 8,
+        let originalIdentity = nativeFileIdentity(receipt.subprocesses[0]),
+        let preparedIdentity = nativeFileIdentity(receipt.subprocesses[3]),
+        let publishedIdentity = nativeFileIdentity(receipt.subprocesses[7]),
+        originalIdentity == preparedIdentity,
+        preparedIdentity == publishedIdentity,
+        sha256(receipt.subprocesses[4]) == deployment.artifactFacts.sha256,
+        sha256(receipt.subprocesses[6]) == deployment.artifactFacts.sha256
+      else {
+        return .failed(
+          code: "nativePublishMismatch",
+          detail:
+            "atomic publish did not preserve app-owned mode/uid/gid "
+            + "or read back the leased ELF hash")
+      }
+      return .verified(summary: [
+        "publishedSha256": deployment.artifactFacts.sha256,
+        "buildId": deployment.artifactFacts.buildID,
+        "targetPath": deployment.targetPath,
+        "mode": originalIdentity.mode,
+        "uid": String(originalIdentity.userID),
+        "gid": String(originalIdentity.groupID),
+      ])
+
+    case .stopNativeTarget(let deployment):
+      guard receipt.subprocesses.count == 4 else {
+        return .unknown(
+          reason: "native stop did not produce its complete bounded readback sequence")
+      }
+      let forceStop = receipt.subprocesses[0]
+      let finalReadback = receipt.subprocesses[3]
+      guard processIsAbsent(finalReadback) else {
+        return .failed(
+          code: "nativeTargetStillRunning",
+          detail:
+            "\(deployment.bundle.bundleName) remained live after stop "
+            + "(forceStopExit=\(exitSummary(forceStop)), "
+            + "pidofExit=\(exitSummary(finalReadback)), "
+            + "pids=\(pidSummary(finalReadback)), "
+            + "stdoutBytes=\(finalReadback.stdout.count), "
+            + "stderrBytes=\(finalReadback.stderr.count))")
+      }
+      return .verified(summary: ["stopped": deployment.bundle.bundleName])
+
+    case .startNativeTarget(let deployment):
+      guard receipt.subprocesses.count == 3,
+        let pids = processIDs(receipt.subprocesses[2]), !pids.isEmpty
+      else {
+        return .failed(
+          code: "nativeTargetNotRunning",
+          detail: "\(deployment.bundle.bundleName) did not start")
+      }
+      return .verified(summary: [
+        "started": deployment.bundle.bundleName,
+        "processIds": pids.map(String.init).joined(separator: ","),
+      ])
+
+    case .cleanupNativeLibrary(let deployment):
+      let absenceCount =
+        2 + (deployment.stagingDirectoryIsJobOwned ? 1 : 0)
+        + (deployment.rollbackPolicy == .autoRollback ? 1 : 0)
+      guard receipt.subprocesses.count >= absenceCount,
+        receipt.subprocesses.suffix(absenceCount).allSatisfy(pathIsAbsent)
+      else {
+        return .failed(
+          code: "cleanupDebt",
+          detail: "native staging or backup path remains after cleanup")
+      }
+      return .verified(summary: [
+        "cleaned": deployment.stagingPath,
+        "backupRetained": String(deployment.rollbackPolicy == .retainBackup),
+      ])
+
+    case .rollbackNativeLibrary(let deployment):
+      guard receipt.subprocesses.count == 13 else {
+        return .unknown(
+          reason: "native rollback did not produce its complete bounded readback sequence")
+      }
+      let backupHash = sha256(receipt.subprocesses[0])
+      let stopReadback = receipt.subprocesses[4]
+      let rollbackHash = sha256(receipt.subprocesses[6])
+      let restoredHash = sha256(receipt.subprocesses[8])
+      let pids = processIDs(receipt.subprocesses[11])
+      let mapsMatched =
+        pids.map {
+          mapsContain(
+            receipt.subprocesses[12],
+            targetPath: deployment.loaderVisiblePath, pids: $0)
+        } ?? false
+      guard let backupHash,
+        processIsAbsent(stopReadback),
+        rollbackHash == backupHash,
+        restoredHash == backupHash,
+        let pids, !pids.isEmpty,
+        mapsMatched
+      else {
+        return .failed(
+          code: "nativeRollbackVerificationFailed",
+          detail:
+            "previous library bytes and loader state were not both restored "
+            + "(forceStopExit=\(exitSummary(receipt.subprocesses[1])), "
+            + "pidofExit=\(exitSummary(stopReadback)), "
+            + "stopPids=\(pidSummary(stopReadback)), "
+            + "rollbackHashMatches=\(rollbackHash != nil && rollbackHash == backupHash), "
+            + "targetHashMatches=\(restoredHash != nil && restoredHash == backupHash), "
+            + "startExit=\(exitSummary(receipt.subprocesses[9])), "
+            + "startedPids=\(pids?.map(String.init).joined(separator: ",") ?? "none"), "
+            + "mapsMatched=\(mapsMatched))")
+      }
+      return .verified(summary: [
+        "restoredSha256": backupHash,
+        "restored": "true",
+        "processIds": pids.map(String.init).joined(separator: ","),
+      ])
+
+    case .inspectNativeLibrary(let deployment, let expectation):
+      return verifyNativeInspection(
+        receipt, deployment: deployment, expectation: expectation)
+
     case .installPackage:
       // Deliberately never `.verified`: an install is only as true as its
       // readback, and hardware has shown `hdc install` exiting zero
@@ -870,17 +1372,16 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
       }
       return .verified(summary: ["present": "true"])
     case .readOwnedPathPresence:
-      guard !receipt.stdoutTruncated else {
-        return .unknown(reason: "owned-path presence readback was truncated")
-      }
-      switch receipt.exitStatus {
-      case 0:
-        return .verified(summary: ["present": "true"])
-      case 1:
-        return .verified(summary: ["present": "false"])
-      default:
+      guard
+        let present = pathPresence(
+          exitStatus: receipt.exitStatus,
+          stdout: receipt.stdout,
+          stderr: receipt.stderr,
+          stdoutTruncated: receipt.stdoutTruncated)
+      else {
         return .unknown(reason: "owned-path presence readback has no definite result")
       }
+      return .verified(summary: ["present": present ? "true" : "false"])
     case .readPortForwardPresence(let spec):
       guard receipt.exitStatus == 0, !receipt.stdoutTruncated,
         let text = String(data: receipt.stdout, encoding: .utf8)
@@ -894,6 +1395,303 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
       }
       return .verified(summary: ["present": present ? "true" : "false"])
     }
+  }
+
+  private func verifyNativeInspection(
+    _ receipt: ProviderProcessReceipt,
+    deployment: HDCAppOwnedNativeLibraryDeployment,
+    expectation: HDCNativeLibraryInspection
+  ) -> ProviderSemanticOutcome {
+    let subprocesses = receipt.subprocesses
+    switch expectation {
+    case .stagingMatchesArtifact:
+      let observedStagingHash = subprocesses.first.flatMap(sha256)
+      let observedHashExit = subprocesses.first.map(exitSummary) ?? "missing"
+      let observedListing = subprocesses.dropFirst().first
+      let observedListingExit = observedListing.map(exitSummary) ?? "missing"
+      let observedRegularFile = observedListing.map(isRegularFileListing) ?? false
+      guard subprocesses.count == 2,
+        observedStagingHash == deployment.artifactFacts.sha256,
+        isRegularFileListing(subprocesses[1])
+      else {
+        return .failed(
+          code: "nativeStagingMismatch",
+          detail:
+            "remote staging bytes do not match the leased ELF "
+            + "(hashExit=\(observedHashExit), "
+            + "hashMatches=\(observedStagingHash == deployment.artifactFacts.sha256), "
+            + "listingExit=\(observedListingExit), "
+            + "regularFile=\(observedRegularFile))")
+      }
+      return .verified(summary: [
+        "remoteSha256": deployment.artifactFacts.sha256,
+        "remoteByteCount": String(deployment.artifactFacts.byteCount),
+        "buildId": deployment.artifactFacts.buildID,
+      ])
+    case .backupMatchesTarget:
+      guard subprocesses.count == 2,
+        let targetHash = sha256(subprocesses[0]),
+        sha256(subprocesses[1]) == targetHash
+      else {
+        return .failed(
+          code: "nativeBackupMismatch", detail: "backup differs from the current target")
+      }
+      return .verified(summary: ["backupSha256": targetHash])
+    case .targetMatchesArtifact:
+      guard subprocesses.count == 1,
+        sha256(subprocesses[0]) == deployment.artifactFacts.sha256
+      else {
+        return .failed(
+          code: "nativeTargetHashMismatch", detail: "published target hash differs")
+      }
+      return .verified(summary: ["publishedSha256": deployment.artifactFacts.sha256])
+    case .targetStopped:
+      guard subprocesses.count == 1, processIsAbsent(subprocesses[0]) else {
+        return .failed(
+          code: "nativeTargetStillRunning", detail: "target process is still present")
+      }
+      return .verified(summary: ["running": "false"])
+    case .targetStarted:
+      guard subprocesses.count == 1,
+        let pids = processIDs(subprocesses[0]), !pids.isEmpty
+      else {
+        return .failed(
+          code: "nativeTargetNotRunning", detail: "target process is absent")
+      }
+      return .verified(summary: [
+        "running": "true", "processIds": pids.map(String.init).joined(separator: ","),
+      ])
+    case .targetLoaded:
+      guard !subprocesses.isEmpty,
+        sha256(subprocesses[0]) == deployment.artifactFacts.sha256
+      else {
+        return .failed(
+          code: "nativeTargetHashMismatch",
+          detail: "loader verification target hash differs from the leased ELF")
+      }
+      var summary = [
+        "publishedSha256": deployment.artifactFacts.sha256,
+        "buildId": deployment.artifactFacts.buildID,
+        "abi": deployment.artifactFacts.abi.rawValue,
+      ]
+      if deployment.verificationProfile != .hashOnly {
+        guard subprocesses.count >= 2,
+          let pids = processIDs(subprocesses[1]), !pids.isEmpty
+        else {
+          return .failed(
+            code: "nativeTargetNotRunning",
+            detail: "loader verification found no target process")
+        }
+        summary["processIds"] = pids.map(String.init).joined(separator: ",")
+        if deployment.verificationProfile == .hashProcessAndMaps {
+          guard subprocesses.count == 3,
+            mapsContain(
+              subprocesses[2], targetPath: deployment.loaderVisiblePath,
+              pids: pids)
+          else {
+            return .failed(
+              code: "nativeLibraryNotLoaded",
+              detail: "target process maps do not contain the published app-owned library")
+          }
+          summary["loaderVerified"] = "true"
+        }
+      }
+      return .verified(summary: summary)
+    case .cleanupComplete:
+      let expectedCount =
+        2 + (deployment.stagingDirectoryIsJobOwned ? 1 : 0)
+        + (deployment.rollbackPolicy == .autoRollback ? 1 : 0)
+      guard subprocesses.count == expectedCount,
+        subprocesses.allSatisfy(pathIsAbsent)
+      else {
+        return .failed(
+          code: "nativeCleanupIncomplete",
+          detail: "one or more provider-owned native paths still exist")
+      }
+      return .verified(summary: ["cleanupComplete": "true"])
+    case .rollbackRestored:
+      let expectedCount =
+        deployment.verificationProfile == .hashProcessAndMaps ? 4 : 3
+      guard subprocesses.count == expectedCount,
+        let targetHash = sha256(subprocesses[0]),
+        sha256(subprocesses[1]) == targetHash,
+        let pids = processIDs(subprocesses[2]), !pids.isEmpty
+      else {
+        return .unknown(reason: "rollback readback cannot prove restored bytes and process")
+      }
+      if deployment.verificationProfile == .hashProcessAndMaps,
+        !mapsContain(
+          subprocesses[3], targetPath: deployment.loaderVisiblePath, pids: pids)
+      {
+        return .unknown(reason: "rollback bytes exist but restored loader state is unproven")
+      }
+      return .verified(summary: [
+        "restoredSha256": targetHash,
+        "restored": "true",
+      ])
+    }
+  }
+
+  private func sha256(_ receipt: ProviderSubprocessReceipt) -> String? {
+    guard receipt.exitStatus == 0, !receipt.stdoutTruncated,
+      let text = String(data: receipt.stdout, encoding: .utf8),
+      let token = text.split(whereSeparator: \.isWhitespace).first
+    else {
+      return nil
+    }
+    let value = String(token)
+    guard value.count == 64,
+      value.allSatisfy({ $0.isNumber || ("a"..."f").contains(String($0)) })
+    else {
+      return nil
+    }
+    return value
+  }
+
+  private func processIDs(_ receipt: ProviderSubprocessReceipt) -> [UInt32]? {
+    guard receipt.exitStatus == 0, !receipt.stdoutTruncated,
+      let text = String(data: receipt.stdout, encoding: .utf8)
+    else {
+      return nil
+    }
+    let values = text.split(whereSeparator: \.isWhitespace).compactMap { UInt32($0) }
+    guard !values.isEmpty,
+      values.allSatisfy({ $0 > 0 }),
+      values.count == text.split(whereSeparator: \.isWhitespace).count
+    else {
+      return nil
+    }
+    return values
+  }
+
+  private func processIsAbsent(_ receipt: ProviderSubprocessReceipt) -> Bool {
+    guard let exitStatus = receipt.exitStatus,
+      exitStatus == 0 || exitStatus == 1,
+      !receipt.stdoutTruncated,
+      receipt.stderr.isEmpty,
+      let text = String(data: receipt.stdout, encoding: .utf8)
+    else {
+      return false
+    }
+    return text.split(whereSeparator: \.isWhitespace).isEmpty
+  }
+
+  private func exitSummary(_ receipt: ProviderSubprocessReceipt) -> String {
+    receipt.exitStatus.map(String.init) ?? "unknown"
+  }
+
+  /// Provider diagnostics are persisted in job failures, so expose only a
+  /// bounded byte representation. Hex preserves enough information to
+  /// distinguish remote "not found" and permission failures without copying
+  /// arbitrary device text into logs or creating a general shell-output
+  /// surface.
+  private func boundedProcessDiagnostic(
+    _ receipt: ProviderSubprocessReceipt
+  ) -> String {
+    let byteLimit = 512
+    func field(_ data: Data) -> String {
+      data.prefix(byteLimit).map { String(format: "%02x", $0) }.joined()
+    }
+    return
+      "outBytes=\(receipt.stdout.count),outHex=\(field(receipt.stdout)),"
+      + "errBytes=\(receipt.stderr.count),errHex=\(field(receipt.stderr)),"
+      + "truncated=\(receipt.stdoutTruncated)"
+  }
+
+  private func pidSummary(_ receipt: ProviderSubprocessReceipt) -> String {
+    processIDs(receipt)?.map(String.init).joined(separator: ",") ?? "none"
+  }
+
+  private func pathIsAbsent(_ receipt: ProviderSubprocessReceipt) -> Bool {
+    pathPresence(
+      exitStatus: receipt.exitStatus,
+      stdout: receipt.stdout,
+      stderr: receipt.stderr,
+      stdoutTruncated: receipt.stdoutTruncated) == false
+  }
+
+  /// HDC 3.2 reports the client transport exit status, not the remote
+  /// command's status. A remote `test -e` therefore appears as exit 0 for
+  /// both present and absent paths. Use one exact `ls -ld` observation and
+  /// accept only its closed listing or not-found grammar.
+  private func pathPresence(
+    exitStatus: Int32?,
+    stdout: Data,
+    stderr: Data,
+    stdoutTruncated: Bool
+  ) -> Bool? {
+    guard exitStatus == 0,
+      !stdoutTruncated,
+      stderr.isEmpty,
+      let text = String(data: stdout, encoding: .utf8)
+    else {
+      return nil
+    }
+    if stdout.count >= 2,
+      let first = stdout.first,
+      [UInt8(ascii: "-"), UInt8(ascii: "d"), UInt8(ascii: "l"),
+        UInt8(ascii: "b"), UInt8(ascii: "c"), UInt8(ascii: "p"),
+        UInt8(ascii: "s")].contains(first),
+      stdout[stdout.startIndex + 1] == UInt8(ascii: "r")
+        || stdout[stdout.startIndex + 1] == UInt8(ascii: "-")
+    {
+      return true
+    }
+    let lines = text.split(omittingEmptySubsequences: true, whereSeparator: \.isNewline)
+    guard lines.count == 1 else { return nil }
+    let line = String(lines[0])
+    guard line.hasPrefix("ls: "),
+      line.hasSuffix(": No such file or directory")
+    else {
+      return nil
+    }
+    return false
+  }
+
+  private func isDirectoryListing(_ receipt: ProviderSubprocessReceipt) -> Bool {
+    receipt.exitStatus == 0 && !receipt.stdoutTruncated
+      && receipt.stdout.first == 0x64
+  }
+
+  private func isRegularFileListing(_ receipt: ProviderSubprocessReceipt) -> Bool {
+    receipt.exitStatus == 0 && !receipt.stdoutTruncated
+      && receipt.stdout.first == 0x2D
+  }
+
+  private func nativeFileIdentity(
+    _ receipt: ProviderSubprocessReceipt
+  ) -> HDCNativeFileIdentity? {
+    guard receipt.exitStatus == 0,
+      !receipt.stdoutTruncated,
+      receipt.stderr.isEmpty,
+      let text = String(data: receipt.stdout, encoding: .utf8)
+    else {
+      return nil
+    }
+    let fields = text.split(whereSeparator: \.isWhitespace)
+    guard fields.count >= 4,
+      fields[0].first == "-",
+      let userID = UInt32(fields[2]),
+      let groupID = UInt32(fields[3])
+    else {
+      return nil
+    }
+    return HDCNativeFileIdentity(
+      mode: String(fields[0]), userID: userID, groupID: groupID)
+  }
+
+  private func mapsContain(
+    _ receipt: ProviderSubprocessReceipt,
+    targetPath: String,
+    pids: [UInt32]
+  ) -> Bool {
+    guard receipt.exitStatus == 0, !receipt.stdoutTruncated,
+      let text = String(data: receipt.stdout, encoding: .utf8),
+      text.contains(targetPath)
+    else {
+      return false
+    }
+    return pids.contains { text.contains("/proc/\($0)/maps:") }
   }
 
   public func reconciliationReadback(
@@ -912,6 +1710,27 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
       readback = .hdc(.readProcessPresence(ability.bundle))
     case .hdc(.createPortForward(let spec)), .hdc(.removePortForward(let spec)):
       readback = .hdc(.readPortForwardPresence(spec))
+    case .hdc(.sendNativeLibraryToStaging(let deployment)):
+      readback = .hdc(.inspectNativeLibrary(
+        deployment, expectation: .stagingMatchesArtifact))
+    case .hdc(.backupNativeLibrary(let deployment)):
+      readback = .hdc(.inspectNativeLibrary(
+        deployment, expectation: .backupMatchesTarget))
+    case .hdc(.publishNativeLibrary(let deployment)):
+      readback = .hdc(.inspectNativeLibrary(
+        deployment, expectation: .targetMatchesArtifact))
+    case .hdc(.stopNativeTarget(let deployment)):
+      readback = .hdc(.inspectNativeLibrary(
+        deployment, expectation: .targetStopped))
+    case .hdc(.startNativeTarget(let deployment)):
+      readback = .hdc(.inspectNativeLibrary(
+        deployment, expectation: .targetStarted))
+    case .hdc(.cleanupNativeLibrary(let deployment)):
+      readback = .hdc(.inspectNativeLibrary(
+        deployment, expectation: .cleanupComplete))
+    case .hdc(.rollbackNativeLibrary(let deployment)):
+      readback = .hdc(.inspectNativeLibrary(
+        deployment, expectation: .rollbackRestored))
     default:
       return nil
     }
@@ -928,6 +1747,41 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
     }
     let semantic = try verify(
       receipt: receipt, action: plan.action, context: context)
+    if case .hdc(let original) = intent.action {
+      switch original {
+      case .sendNativeLibraryToStaging, .backupNativeLibrary,
+        .stopNativeTarget, .startNativeTarget, .cleanupNativeLibrary:
+        switch semantic {
+        case .verified(let summary):
+          return .confirmedCompleted(summary: summary)
+        case .failed:
+          return .confirmedNotExecuted
+        case .unknown(let reason), .unsupported(let reason):
+          return .stillUnknown(reason: reason)
+        }
+      case .publishNativeLibrary:
+        switch semantic {
+        case .verified(let summary):
+          return .confirmedCompleted(summary: summary)
+        case .failed(let code, let detail):
+          return .stillUnknown(
+            reason: "\(code): \(detail); publish state is not safe to replay")
+        case .unknown(let reason), .unsupported(let reason):
+          return .stillUnknown(reason: reason)
+        }
+      case .rollbackNativeLibrary:
+        switch semantic {
+        case .verified(let summary):
+          return .confirmedCompleted(summary: summary)
+        case .failed(let code, let detail):
+          return .stillUnknown(reason: "\(code): \(detail)")
+        case .unknown(let reason), .unsupported(let reason):
+          return .stillUnknown(reason: reason)
+        }
+      default:
+        break
+      }
+    }
     guard case .verified(let summary) = semantic,
       let raw = summary["present"],
       let present = Bool(raw)
@@ -973,11 +1827,16 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
         reason: "owned-path mutation needs a re-observation pass to conclude")
     case .hdc(.sendArtifactToStaging), .hdc(.installPackage), .hdc(.startAbility),
       .hdc(.stopAbility), .hdc(.uninstallPackage), .hdc(.createPortForward),
-      .hdc(.removePortForward):
+      .hdc(.removePortForward), .hdc(.sendNativeLibraryToStaging),
+      .hdc(.backupNativeLibrary), .hdc(.publishNativeLibrary),
+      .hdc(.stopNativeTarget), .hdc(.startNativeTarget),
+      .hdc(.cleanupNativeLibrary), .hdc(.rollbackNativeLibrary):
       // Device mutations need positive readback evidence to conclude; a
       // reconcile pass that has none must stay unknown rather than guess.
       return .stillUnknown(
         reason: "device mutation needs a readback pass before it can be concluded")
+    case .hdc(.inspectNativeLibrary):
+      return .confirmedNotExecuted
     default:
       return .stillUnknown(reason: "no reconcile evidence source for \(intent.action)")
     }
