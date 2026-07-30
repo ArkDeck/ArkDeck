@@ -1,0 +1,55 @@
+{
+  "capabilityID": "CAP-RT-DAYU200-HAP-001",
+  "targetScope": {
+    "kind": "stablePhysicalIdentity",
+    "sha256": "958780b2ffb7090d4f22cdc1f547f9804ed0f0b605e3020f384e5d4823dc7a7e"
+  },
+  "operationScope": [
+    {
+      "operationID": "debug.hap",
+      "version": 1
+    }
+  ],
+  "effectCeiling": "deviceMutation",
+  "inputConstraints": {
+    "hapArtifactLease": {
+      "kind": "exactString",
+      "value": "lease-v1:input-hap-TGT-958780b2ffb7-r1-9453a396e81d55ab:ART-8d5b85963670977fa1def2734b77fe67"
+    },
+    "bundleName": {
+      "kind": "exactString",
+      "value": "com.example.waterflowdemo"
+    },
+    "abilityName": {
+      "kind": "exactString",
+      "value": "EntryAbility"
+    },
+    "installPolicy": {
+      "kind": "exactString",
+      "value": "installOrReplace"
+    },
+    "cleanupPolicy": {
+      "kind": "exactString",
+      "value": "uninstall"
+    },
+    "diagnosticsDurationSeconds": {
+      "kind": "integerRange",
+      "minimum": 5,
+      "maximum": 5
+    },
+    "portForwardProfile": {
+      "kind": "exactString",
+      "value": "none"
+    }
+  },
+  "issuedAtUTC": "2026-07-30T03:21:06Z",
+  "expiresAtUTC": "2026-07-30T05:21:37Z",
+  "maximumUses": 1,
+  "issuer": {
+    "kind": "maintainerMergedPR",
+    "reference": "PR#828"
+  },
+  "revocation": {
+    "state": "active"
+  }
+}
