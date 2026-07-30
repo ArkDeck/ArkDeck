@@ -1,6 +1,14 @@
 # Change Package Workflow
 
-Current specs 不能直接修改。任何行为、contract、平台设计或实现工作都从 change package 开始。
+Current specs 不能直接修改。
+
+> **适用范围收窄(2026-07-30,产品闭环优先阶段)**:change package 仅在安全内核
+> 治理时必需——恰四类 Repo 审批(新 operation 或对已发布 operation 的破坏性修改、
+> 新 provider、新 integration/device profile、E2 安全策略变化)与 `PRODUCT-LOOP.md`
+> §3 安全条件。其余产品实现工作(修复 Golden Journey 产品缺陷、provider lowering、
+> artifact 收集、真机失败修复)以一个垂直产品 PR 直接交付,不创建 change package;
+> 原「任何实现工作都从 change package 开始」对产品工作不再适用。冲突以仓库根
+> `PRODUCT-LOOP.md` 为准(`AGENTS.md` 权威顺序)。
 
 ## 命名与状态
 

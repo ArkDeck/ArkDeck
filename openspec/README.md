@@ -116,10 +116,17 @@ AND SHALL NOT 派发任何 deviceMutation 或 destructive step。
 > 使用前人工运行一次 `scripts/bootstrap-sdd.sh`**(在主 checkout 创建
 > ignored `.venv-sdd` 并安装 `scripts/requirements-sdd.txt`;checker
 > 只提示、永不调用它)。
-2. 在 approved change 的 `tasks.md` 中选择一个 ready 且依赖已满足的任务;
-3. 在任务允许路径内工作;需要改变规则时停止并创建 delta,不能在实现任务中改 Core;
-4. 把 AC 结果和 evidence 写入 change package,更新 tasks.md 状态;
-5. 通过 `agent/**` 分支 → PR → 维护者 review 合入;verification/archive 同样经 PR 由维护者确认。
+2. 读取仓库根 `PRODUCT-LOOP.md`,确认当前阻塞最高优先级 Golden Journey 的产品缺陷;
+3. 按 `PRODUCT-LOOP.md` §4 组装一个垂直产品任务(根因 + 产品代码修复 + 必要测试 +
+   适用时真机验证 + 最小文档更新);仅安全内核治理(恰四类 Repo 审批与
+   `PRODUCT-LOOP.md` §3 安全条件)才进入 change package 流程;
+4. 真实运行结果随交付 PR 如实记录(simulation/fake 不得记为真实设备结果);
+   不能在实现中放宽 Constitution 安全不变量;
+5. 通过 `agent/**` 分支 → PR → 维护者 review 合入。产品 PR 的任务声明仅作
+   `check_pr_paths` 路径护栏,不触发治理连锁义务(见 `PRODUCT-LOOP.md` §16)。
+
+> 兼容注记(2026-07-30):原步骤 2「选择 ready 任务」与步骤 4「更新 tasks.md
+> 状态」自产品闭环优先阶段起对产品工作不再适用,仅在安全内核治理 change 内保留。
 
 ## 旧计划
 
