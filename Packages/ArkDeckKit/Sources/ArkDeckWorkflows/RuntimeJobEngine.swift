@@ -171,6 +171,45 @@ public struct RuntimeJobAcceptance: Sendable, Equatable {
   public let deduplicated: Bool
 }
 
+/// A non-authoritative, non-installed capability proposal derived from the
+/// same fully materialized request that will later execute.
+public struct RuntimeCapabilityDraft: Sendable, Equatable, Codable {
+  public let capability: RuntimeCapability
+  public let requestID: String
+  public let idempotencyKey: String
+  public let requestFingerprintSHA256: String
+  public let operationReference: String
+  public let targetID: String
+  public let bindingRevision: Int
+  public let stableIdentitySHA256: String
+  public let materializedPlanDigest: String
+  public let catalogDigest: String
+
+  public init(
+    capability: RuntimeCapability,
+    requestID: String,
+    idempotencyKey: String,
+    requestFingerprintSHA256: String,
+    operationReference: String,
+    targetID: String,
+    bindingRevision: Int,
+    stableIdentitySHA256: String,
+    materializedPlanDigest: String,
+    catalogDigest: String
+  ) {
+    self.capability = capability
+    self.requestID = requestID
+    self.idempotencyKey = idempotencyKey
+    self.requestFingerprintSHA256 = requestFingerprintSHA256
+    self.operationReference = operationReference
+    self.targetID = targetID
+    self.bindingRevision = bindingRevision
+    self.stableIdentitySHA256 = stableIdentitySHA256
+    self.materializedPlanDigest = materializedPlanDigest
+    self.catalogDigest = catalogDigest
+  }
+}
+
 public enum RuntimeAvailabilityState: String, Sendable, Equatable {
   case available
   case unavailable
@@ -417,6 +456,111 @@ public actor RuntimeJobEngine {
     }.sorted { $0.reference < $1.reference }
   }
 
+  /// Produces an exact, reviewable E1 proposal without installing a
+  /// capability, admitting a Job or dispatching a provider action. Provider
+  /// availability, target facts, Artifact leases and every selected typed
+  /// plan step must materialize before a draft is returned.
+  public func draftCapability(
+    _ requestData: Data,
+    issuedAtUTC: String,
+    expiresAtUTC: String,
+    issuerReference: String
+  ) async throws -> RuntimeCapabilityDraft {
+    let request: RuntimeOperationRequest
+    do {
+      request = try RuntimeOperationCodec.decodeRequest(requestData)
+    } catch let rejection as RuntimeOperationRequestRejection {
+      throw RuntimeJobEngineError.rejected(rejection.code, rejection.message)
+    }
+    guard
+      let descriptor = RuntimeOperationCatalog.descriptor(
+        id: request.operation.id, version: request.operation.version)
+    else {
+      throw RuntimeJobEngineError.rejected(
+        .unknownOperation, "operation \(request.operation.reference) is not in the catalog")
+    }
+    try validateInputs(request.inputs, against: descriptor)
+    try validateSupportedPlanInputs(request.inputs, descriptor: descriptor)
+    let effect = Self.effectiveEffect(descriptor: descriptor, inputs: request.inputs)
+    guard effect == .deviceMutation else {
+      throw RuntimeJobEngineError.rejected(
+        .authorizationRequired,
+        "automatic capability drafting is limited to E1 deviceMutation operations")
+    }
+
+    var seed = requestData
+    seed.append(Data("\n\(issuedAtUTC)\n\(expiresAtUTC)".utf8))
+    let seedDigest = RuntimeJobRecord.sha256Hex(seed)
+    let timestamp = issuedAtUTC.filter {
+      $0.isASCII && ($0.isNumber || $0 == "T" || $0 == "Z")
+    }
+    let capabilityID =
+      "CAP-RT-AUTO-\(timestamp)-\(seedDigest.prefix(12).uppercased())"
+    let authorizedRequest: RuntimeOperationRequest
+    do {
+      authorizedRequest = try RuntimeOperationRequest(
+        requestID: request.requestID,
+        idempotencyKey: request.idempotencyKey,
+        target: request.target,
+        operation: request.operation,
+        inputs: request.inputs,
+        requestedOutputs: request.requestedOutputs,
+        authorization: RuntimeCapabilityReference(capabilityID: capabilityID),
+        clientContext: request.clientContext)
+    } catch let rejection as RuntimeOperationRequestRejection {
+      throw RuntimeJobEngineError.rejected(rejection.code, rejection.message)
+    }
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+    let authorizedData: Data
+    do {
+      authorizedData = try encoder.encode(authorizedRequest)
+    } catch {
+      throw RuntimeJobEngineError.internalFailure(
+        "cannot encode the materialized authorization request: \(error)")
+    }
+    let requestFingerprint = Self.fingerprint(of: authorizedData)
+    let jobID = Self.stableJobID(
+      idempotencyKey: request.idempotencyKey,
+      requestFingerprint: requestFingerprint)
+    let materialized = try await materializeTypedPlanBeforeAuthorization(
+      request: authorizedRequest, descriptor: descriptor, jobID: jobID)
+    let capability: RuntimeCapability
+    do {
+      capability = try RuntimeCapability(
+        capabilityID: capabilityID,
+        targetScope: .stablePhysicalIdentity(
+          sha256: materialized.stableTargetIdentitySHA256),
+        operationScope: [
+          RuntimeCapabilityOperationScope(
+            operationID: descriptor.id, version: descriptor.version)
+        ],
+        effectCeiling: .deviceMutation,
+        inputConstraints: Self.exactCapabilityConstraints(for: request.inputs),
+        issuedAtUTC: issuedAtUTC,
+        expiresAtUTC: expiresAtUTC,
+        maximumUses: 1,
+        issuer: RuntimeCapabilityIssuer(
+          kind: .maintainerMergedPR, reference: issuerReference),
+        exactPlanDigest: materialized.planDigest,
+        exactBindingRevision: materialized.bindingRevision)
+    } catch {
+      throw RuntimeJobEngineError.rejected(
+        .invalidInput, "generated capability would be invalid: \(error)")
+    }
+    return RuntimeCapabilityDraft(
+      capability: capability,
+      requestID: request.requestID,
+      idempotencyKey: request.idempotencyKey,
+      requestFingerprintSHA256: requestFingerprint,
+      operationReference: descriptor.reference,
+      targetID: request.target.targetID,
+      bindingRevision: materialized.bindingRevision,
+      stableIdentitySHA256: materialized.stableTargetIdentitySHA256,
+      materializedPlanDigest: materialized.planDigest,
+      catalogDigest: RuntimeOperationCatalog.catalogDigest)
+  }
+
   // MARK: Submit
 
   public func submit(_ requestData: Data) async throws -> RuntimeJobAcceptance {
@@ -439,7 +583,16 @@ public actor RuntimeJobEngine {
     // A retry/conflict is decided before capability consumption. Otherwise
     // a conflicting request could consume a different capability and then
     // be rejected by the idempotency ledger.
-    let fingerprint = Self.fingerprint(of: requestData)
+    let canonicalRequestData: Data
+    do {
+      let encoder = JSONEncoder()
+      encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+      canonicalRequestData = try encoder.encode(request)
+    } catch {
+      throw RuntimeJobEngineError.internalFailure(
+        "cannot canonicalize the typed request: \(error)")
+    }
+    let fingerprint = Self.fingerprint(of: canonicalRequestData)
     switch try idempotencyLedger.lookup(
       key: request.idempotencyKey, fingerprint: fingerprint)
     {
@@ -2821,6 +2974,33 @@ public actor RuntimeJobEngine {
     RuntimeJobRecord.sha256Hex(data)
   }
 
+  private static func exactCapabilityConstraints(
+    for inputs: [String: JSONValue]
+  ) -> [String: RuntimeCapabilityInputConstraint] {
+    var constraints: [String: RuntimeCapabilityInputConstraint] = [:]
+    for (key, value) in inputs {
+      switch value {
+      case .string(let text):
+        constraints[key] = .exactString(text)
+      case .integer(let raw):
+        if let exact = Int(exactly: raw) {
+          constraints[key] = .integerRange(minimum: exact, maximum: exact)
+        }
+      case .unsignedInteger(let raw):
+        if let exact = Int(exactly: raw) {
+          constraints[key] = .integerRange(minimum: exact, maximum: exact)
+        }
+      case .number(let raw) where raw.isFinite && raw.rounded(.towardZero) == raw:
+        if let exact = Int(exactly: raw) {
+          constraints[key] = .integerRange(minimum: exact, maximum: exact)
+        }
+      default:
+        break
+      }
+    }
+    return constraints
+  }
+
   private static func stableJobID(
     idempotencyKey: String, requestFingerprint: String
   ) -> String {
@@ -2955,7 +3135,7 @@ public actor RuntimeJobEngine {
           "parameters": .object([:]),
           "artifactId": .string("artifact-\(step.stepID)"),
           "ownedRemotePath": .string(
-            "/data/local/tmp/arkdeck-\(jobID)-capture-trace-owned"),
+            "/data/local/tmp/arkdeck-\(jobID)-capture-trace-owned.htrace"),
         ]
       }
     case .receiveFile:
@@ -2972,7 +3152,7 @@ public actor RuntimeJobEngine {
       } else {
         arguments = [
           "remotePath": .string(
-            "/data/local/tmp/arkdeck-\(jobID)-capture-trace-owned"),
+            "/data/local/tmp/arkdeck-\(jobID)-capture-trace-owned.htrace"),
           "artifactId": .string("artifact-\(step.stepID)"),
           "localRelativePath": .string("artifacts/raw/trace.htrace"),
         ]
@@ -2983,7 +3163,8 @@ public actor RuntimeJobEngine {
         path = owned.remotePath
       } else {
         let ownerStep = step.stepID == "cleanup-remote-staging" ? "send-hap" : "capture-trace"
-        path = "/data/local/tmp/arkdeck-\(jobID)-\(ownerStep)-owned"
+        let suffix = ownerStep == "send-hap" ? ".hap" : ".htrace"
+        path = "/data/local/tmp/arkdeck-\(jobID)-\(ownerStep)-owned\(suffix)"
       }
       arguments = [
         "remotePath": .string(path),
@@ -3001,7 +3182,7 @@ public actor RuntimeJobEngine {
       } else {
         arguments = [
           "sourceArtifactId": .string("hap-artifact"),
-          "remotePath": .string("/data/local/tmp/arkdeck-\(jobID)-send-hap-owned"),
+          "remotePath": .string("/data/local/tmp/arkdeck-\(jobID)-send-hap-owned.hap"),
           "sourceSha256": .string(String(repeating: "0", count: 64)),
         ]
       }

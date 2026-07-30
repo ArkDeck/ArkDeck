@@ -8,6 +8,7 @@
 
 import ArkDeckAgentClient
 import ArkDeckCore
+import ArkDeckWorkflows
 import CryptoKit
 import Darwin
 import Foundation
@@ -142,11 +143,16 @@ enum RuntimeCLI {
       if let index = rest.firstIndex(of: "--target"), index + 1 < rest.count {
         target = rest[index + 1]
       }
+      var executionID: String?
+      if let index = rest.firstIndex(of: "--execution-id"), index + 1 < rest.count {
+        executionID = rest[index + 1]
+      }
 
       outcome = try executor.run(
         RuntimeAgentExecutionRequest(
           operationID: String(parts[0]), operationVersion: version, inputs: inputs,
-          capabilityReference: capability, targetID: target))
+          capabilityReference: capability, targetID: target,
+          executionID: executionID ?? UUID().uuidString.lowercased()))
     }
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.sortedKeys, .prettyPrinted, .withoutEscapingSlashes]
@@ -196,7 +202,7 @@ enum RuntimeCLI {
   static func runCapability(_ arguments: [String]) throws {
     guard let subcommand = arguments.first else {
       throw CLIError(
-        exitCode: EX_USAGE, message: "missing capability subcommand (list|install|revoke)")
+        exitCode: EX_USAGE, message: "missing capability subcommand (list|draft|install|revoke)")
     }
     var rest = Array(arguments.dropFirst())
     let json = rest.contains("--json")
@@ -204,6 +210,95 @@ enum RuntimeCLI {
     switch subcommand {
     case "list":
       emit(try client.request(method: "capability.list"), json: json)
+    case "draft":
+      guard let targetIndex = rest.firstIndex(of: "--target"),
+        targetIndex + 1 < rest.count,
+        let operationIndex = rest.firstIndex(of: "--operation"),
+        operationIndex + 1 < rest.count,
+        let outputIndex = rest.firstIndex(of: "--output-directory"),
+        outputIndex + 1 < rest.count
+      else {
+        throw CLIError(
+          exitCode: EX_USAGE,
+          message:
+            "capability draft requires --target <id> --operation <id@version> "
+            + "--output-directory <path>")
+      }
+      let operationParts = rest[operationIndex + 1].split(separator: "@")
+      guard operationParts.count == 2, let operationVersion = Int(operationParts[1]) else {
+        throw CLIError(exitCode: EX_USAGE, message: "operation must be <id>@<version>")
+      }
+      var inputs: [String: JSONValue] = [:]
+      if let index = rest.firstIndex(of: "--inputs-file"), index + 1 < rest.count {
+        let url = URL(fileURLWithPath: rest[index + 1])
+        guard let data = try? Data(contentsOf: url),
+          let decoded = try? JSONDecoder().decode([String: JSONValue].self, from: data)
+        else {
+          throw CLIError(exitCode: EX_USAGE, message: "cannot read typed inputs from \(url.path)")
+        }
+        inputs = decoded
+      }
+      let executionID: String
+      if let index = rest.firstIndex(of: "--execution-id"), index + 1 < rest.count {
+        executionID = rest[index + 1]
+      } else {
+        executionID = UUID().uuidString.lowercased()
+      }
+      let validitySeconds: Int
+      if let index = rest.firstIndex(of: "--validity-seconds"), index + 1 < rest.count {
+        guard let parsed = Int(rest[index + 1]) else {
+          throw CLIError(exitCode: EX_USAGE, message: "validity-seconds must be an integer")
+        }
+        validitySeconds = parsed
+      } else {
+        validitySeconds = 3_600
+      }
+      let request = try RuntimeOperationRequest(
+        requestID: "agent-request-\(executionID)",
+        idempotencyKey: "agent-execution-\(executionID)",
+        target: DurableTargetReference(
+          targetID: rest[targetIndex + 1],
+          expectedBindingRevision: try bindingRevision(
+            targetID: rest[targetIndex + 1], client: client)),
+        operation: RuntimeOperationReference(
+          id: String(operationParts[0]), version: operationVersion),
+        inputs: inputs)
+      let encoder = JSONEncoder()
+      encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+      let requestData = try encoder.encode(request)
+      guard let requestJSON = String(data: requestData, encoding: .utf8) else {
+        throw CLIError(exitCode: EX_SOFTWARE, message: "cannot encode capability draft request")
+      }
+      let draft = try client.request(
+        method: "capability.draft",
+        params: [
+          "requestJson": .string(requestJSON),
+          "validitySeconds": .integer(Int64(validitySeconds)),
+        ])
+      guard case .object(var draftFields) = draft,
+        case .object(let capabilityFields)? = draftFields["capability"],
+        case .string(let capabilityID)? = capabilityFields["capabilityID"]
+      else {
+        throw AgentClientError.malformedResponse(
+          "capability.draft returned no capability document")
+      }
+      let outputDirectory = URL(
+        fileURLWithPath: rest[outputIndex + 1], isDirectory: true
+      ).standardizedFileURL
+      try FileManager.default.createDirectory(
+        at: outputDirectory, withIntermediateDirectories: true,
+        attributes: [.posixPermissions: 0o700])
+      let outputURL = outputDirectory.appendingPathComponent("\(capabilityID).json")
+      guard !FileManager.default.fileExists(atPath: outputURL.path) else {
+        throw CLIError(
+          exitCode: EX_CANTCREAT,
+          message: "refusing to overwrite existing capability draft \(outputURL.path)")
+      }
+      let capabilityData = try encoder.encode(JSONValue.object(capabilityFields))
+      try capabilityData.write(to: outputURL, options: [.atomic])
+      draftFields["draftFile"] = .string(outputURL.path)
+      draftFields["executionID"] = .string(executionID)
+      emit(.object(draftFields), json: json)
     case "install":
       guard let index = rest.firstIndex(of: "--file"), index + 1 < rest.count else {
         throw CLIError(exitCode: EX_USAGE, message: "capability install requires --file <path>")
@@ -228,6 +323,28 @@ enum RuntimeCLI {
     default:
       throw CLIError(exitCode: EX_USAGE, message: "unsupported capability subcommand")
     }
+  }
+
+  private static func bindingRevision(targetID: String, client: AgentClient) throws -> Int {
+    guard case .array(let targets) = try client.request(method: "target.list"),
+      let match = targets.first(where: { value in
+        guard case .object(let fields) = value,
+          case .string(let listed)? = fields["targetId"]
+        else {
+          return false
+        }
+        return listed == targetID
+      }),
+      case .object(let fields) = match,
+      case .integer(let revision)? = fields["bindingRevision"],
+      let exact = Int(exactly: revision),
+      exact > 0
+    else {
+      throw CLIError(
+        exitCode: EX_DATAERR,
+        message: "target \(targetID) has no durable binding revision")
+    }
+    return exact
   }
 
   static func runArtifact(_ arguments: [String]) throws {

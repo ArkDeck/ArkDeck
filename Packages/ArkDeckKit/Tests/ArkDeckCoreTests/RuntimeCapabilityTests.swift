@@ -12,7 +12,9 @@ final class RuntimeCapabilityTests: XCTestCase {
     inputConstraints: [String: RuntimeCapabilityInputConstraint] = [:],
     issuedAtUTC: String = "2026-07-01T00:00:00Z",
     expiresAtUTC: String = "2026-12-31T00:00:00Z",
-    maximumUses: Int = 10
+    maximumUses: Int = 10,
+    exactPlanDigest: String? = nil,
+    exactBindingRevision: Int? = nil
   ) throws -> RuntimeCapability {
     try RuntimeCapability(
       capabilityID: "CAP-RT-DAYU200-DEBUG-001",
@@ -23,7 +25,9 @@ final class RuntimeCapabilityTests: XCTestCase {
       issuedAtUTC: issuedAtUTC,
       expiresAtUTC: expiresAtUTC,
       maximumUses: maximumUses,
-      issuer: .init(kind: .maintainerMergedPR, reference: "PR#800 deadbeef"))
+      issuer: .init(kind: .maintainerMergedPR, reference: "PR#800 deadbeef"),
+      exactPlanDigest: exactPlanDigest,
+      exactBindingRevision: exactBindingRevision)
   }
 
   private func makeE2(
@@ -46,6 +50,7 @@ final class RuntimeCapabilityTests: XCTestCase {
     version: Int = 1,
     effect: WorkflowEffect = .deviceMutation,
     target: String? = String(repeating: "a", count: 64),
+    bindingRevision: Int? = 7,
     planDigest: String? = nil,
     inputs: [String: JSONValue] = [:]
   ) -> RuntimeCapabilityAuthorizationQuery {
@@ -54,7 +59,7 @@ final class RuntimeCapabilityTests: XCTestCase {
       operationVersion: version,
       effect: effect,
       targetStableIdentitySHA256: target,
-      targetBindingRevision: 7,
+      targetBindingRevision: bindingRevision,
       planDigest: planDigest,
       inputs: inputs)
   }
@@ -129,22 +134,26 @@ final class RuntimeCapabilityTests: XCTestCase {
     }
   }
 
-  func testPlanDigestOnDeviceMutationIsRejected() {
-    XCTAssertThrowsError(
-      try RuntimeCapability(
-        capabilityID: "CAP-RT-X-001",
-        targetScope: .anyTarget,
-        operationScope: [.init(operationID: "debug.hap", version: 1)],
-        effectCeiling: .deviceMutation,
-        issuedAtUTC: "2026-07-01T00:00:00Z",
-        expiresAtUTC: "2026-08-01T00:00:00Z",
-        maximumUses: 5,
-        issuer: .init(kind: .maintainerMergedPR, reference: "PR#1"),
-        exactPlanDigest: String(repeating: "b", count: 64))
-    ) { error in
-      XCTAssertEqual(
-        error as? RuntimeCapabilityValidationError, .exactPlanDigestOnlyForDestructive)
-    }
+  func testDeviceMutationCanBindExactPlanAndBindingRevision() throws {
+    let capability = try makeE1(
+      maximumUses: 1,
+      exactPlanDigest: String(repeating: "b", count: 64),
+      exactBindingRevision: 7)
+    XCTAssertNoThrow(
+      try capability.authorizes(
+        query(planDigest: String(repeating: "b", count: 64)),
+        nowUTC: "2026-07-15T00:00:00Z", remainingUses: 1
+      ).get())
+    assertDenied(
+      capability.authorizes(
+        query(bindingRevision: 8, planDigest: String(repeating: "b", count: 64)),
+        nowUTC: "2026-07-15T00:00:00Z", remainingUses: 1),
+      .targetScopeMismatch)
+    assertDenied(
+      capability.authorizes(
+        query(planDigest: String(repeating: "c", count: 64)),
+        nowUTC: "2026-07-15T00:00:00Z", remainingUses: 1),
+      .planDigestMismatch)
   }
 
   func testMalformedTimestampAndExpiryOrderingAreRejected() {

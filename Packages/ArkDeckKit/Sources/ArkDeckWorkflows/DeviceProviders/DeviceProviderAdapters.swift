@@ -405,7 +405,9 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
         kind: .process(
           executableSHA256: "resolved-at-dispatch",
           argumentSummary: try deviceArguments(
-            ["install", "-r", staged.path.remotePath], context: context),
+            [
+              "shell", "bm", "install", "-p", staged.path.remotePath, "-r",
+            ], context: context),
           timeoutSeconds: 300))
     case .queryPackageReadback(let bundle):
       return TypedProcessPlan(
@@ -707,12 +709,25 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
           detail: "requires \(request.requiredBytes) bytes; \(availableBytes) available")
       }
       return .verified(summary: ["availableBytes": String(availableBytes)])
-    case .captureHilog, .captureUIDump:
+    case .captureHilog:
+      guard !receipt.stdoutTruncated else {
+        return .failed(code: "truncated", detail: "capture exceeded its byte budget")
+      }
+      guard !receipt.stdout.isEmpty else {
+        return .unknown(reason: "empty capture output")
+      }
+      // HiLog is a raw sensitive Artifact. Real DAYU200 output can contain
+      // non-UTF-8 payload bytes from applications; rejecting those bytes
+      // silently drops the requested evidence. Preserve them byte-for-byte
+      // under the sensitive read gate. Strict-redaction requests remain
+      // unavailable before authorization elsewhere in the engine.
+      return .verified(summary: ["byteCount": String(receipt.stdout.count)])
+    case .captureUIDump:
       guard !receipt.stdoutTruncated else {
         return .failed(code: "truncated", detail: "capture exceeded its byte budget")
       }
       guard String(data: receipt.stdout, encoding: .utf8) != nil else {
-        return .failed(code: "invalidEncoding", detail: "capture output is not UTF-8")
+        return .failed(code: "invalidEncoding", detail: "UI dump is not UTF-8")
       }
       guard !receipt.stdout.isEmpty else {
         return .unknown(reason: "empty capture output")

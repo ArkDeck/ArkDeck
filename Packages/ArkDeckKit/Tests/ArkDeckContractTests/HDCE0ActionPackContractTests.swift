@@ -126,13 +126,22 @@ final class HDCE0ActionPackContractTests: XCTestCase {
     }
     XCTAssertEqual(code, "truncated")
 
-    let invalid = ProviderProcessReceipt(
+    let nonUTF8Hilog = ProviderProcessReceipt(
       exitStatus: 0, stdout: Data([0xFF, 0xFE]), stderr: Data(),
       stdoutTruncated: false, durationSeconds: 1)
-    guard case .failed(let invalidCode, _) = try provider.verify(
-      receipt: invalid, action: action, context: context)
+    guard case .verified(let rawSummary) = try provider.verify(
+      receipt: nonUTF8Hilog, action: action, context: context)
     else {
-      return XCTFail("invalid UTF-8 must fail explicitly")
+      return XCTFail("HiLog must preserve non-UTF-8 bytes as a sensitive raw artifact")
+    }
+    XCTAssertEqual(rawSummary["byteCount"], "2")
+
+    let uiDumpAction = TypedProviderAction.hdc(
+      .captureUIDump(try HDCUIDumpRequest(scope: .windowList)))
+    guard case .failed(let invalidCode, _) = try provider.verify(
+      receipt: nonUTF8Hilog, action: uiDumpAction, context: context)
+    else {
+      return XCTFail("invalid UTF-8 UI dump must fail explicitly")
     }
     XCTAssertEqual(invalidCode, "invalidEncoding")
 

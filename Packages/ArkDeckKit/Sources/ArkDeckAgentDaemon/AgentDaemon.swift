@@ -185,6 +185,44 @@ public struct RuntimeControlPlaneHandler: Sendable {
         return failure(id: request.id, code: .internalError, message: "\(error)")
       }
 
+    case "capability.draft":
+      guard case .string(let requestJson)? = request.params?["requestJson"] else {
+        return failure(id: request.id, code: .invalidParams, message: "requestJson is required")
+      }
+      let validitySeconds: Int
+      if case .integer(let raw)? = request.params?["validitySeconds"],
+        let exact = Int(exactly: raw)
+      {
+        validitySeconds = exact
+      } else {
+        validitySeconds = 3_600
+      }
+      guard (300...86_400).contains(validitySeconds) else {
+        return failure(
+          id: request.id, code: .invalidParams,
+          message: "validitySeconds must be between 300 and 86400")
+      }
+      let issuedAt = nowUTC()
+      guard let expiresAt = Self.addingUTCSeconds(validitySeconds, to: issuedAt) else {
+        return failure(
+          id: request.id, code: .internalError,
+          message: "daemon clock cannot produce a fixed-format UTC capability window")
+      }
+      do {
+        let draft = try await engine.draftCapability(
+          Data(requestJson.utf8),
+          issuedAtUTC: issuedAt,
+          expiresAtUTC: expiresAt,
+          issuerReference: "PENDING-MAINTAINER-PR")
+        let encoded = try JSONEncoder().encode(draft)
+        let json = try JSONDecoder().decode(JSONValue.self, from: encoded)
+        return success(id: request.id, result: json)
+      } catch let error as RuntimeJobEngineError {
+        return failure(id: request.id, code: .rejected, message: "\(error)")
+      } catch {
+        return failure(id: request.id, code: .internalError, message: "\(error)")
+      }
+
     case "capability.install":
       guard case .string(let json)? = request.params?["capabilityJson"] else {
         return failure(id: request.id, code: .invalidParams, message: "capabilityJson is required")
@@ -192,6 +230,13 @@ public struct RuntimeControlPlaneHandler: Sendable {
       do {
         let capability = try JSONDecoder().decode(
           RuntimeCapability.self, from: Data(json.utf8))
+        guard Self.isMergedPRIssuerReference(capability.issuer.reference) else {
+          return failure(
+            id: request.id, code: .invalidParams,
+            message:
+              "capability draft is not installable until issuer.reference names "
+              + "a maintainer-merged PR")
+        }
         try await capabilityStore.install(capability)
         return success(id: request.id, result: .object(["installed": .bool(true)]))
       } catch let error as RuntimeCapabilityStoreError {
@@ -834,6 +879,26 @@ public struct RuntimeControlPlaneHandler: Sendable {
     AgentWireProtocol.Response(
       id: id, ok: false, result: nil,
       error: AgentWireProtocol.WireError(code: code.rawValue, message: message))
+  }
+
+  private static func addingUTCSeconds(_ seconds: Int, to value: String) -> String? {
+    let formatter = DateFormatter()
+    formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss'Z'"
+    formatter.locale = Locale(identifier: "en_US_POSIX")
+    formatter.timeZone = TimeZone(secondsFromGMT: 0)
+    guard let date = formatter.date(from: value) else { return nil }
+    return formatter.string(from: date.addingTimeInterval(TimeInterval(seconds)))
+  }
+
+  private static func isMergedPRIssuerReference(_ reference: String) -> Bool {
+    guard let token = reference.split(separator: " ").first,
+      token.hasPrefix("PR#"),
+      let number = Int(token.dropFirst(3)),
+      number > 0
+    else {
+      return false
+    }
+    return true
   }
 }
 
