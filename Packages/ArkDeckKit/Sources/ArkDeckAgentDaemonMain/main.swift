@@ -161,27 +161,42 @@ Task.detached {
   defer { ready.signal() }
   do {
     let capabilityStore = try RuntimeCapabilityStore(
-      directoryURL: resolvedStateDirectory.appendingPathComponent("capabilities", isDirectory: true))
+      directoryURL: resolvedStateDirectory.appendingPathComponent("capabilities", isDirectory: true)
+    )
     let targetStore = try RuntimeTargetStore(
       directoryURL: resolvedStateDirectory.appendingPathComponent("targets", isDirectory: true))
 
     // The HDC executable is supplied explicitly (no PATH search, no guess):
     // absent configuration means dispatch stays refused, never degraded.
     let configuredHDC = ProcessInfo.processInfo.environment["ARKDECK_HDC_PATH"]
-    var dispatcher: any RuntimeProcessDispatching = RefusingDispatcher(
+    var hdcDispatcher: any RuntimeProcessDispatching = RefusingDispatcher(
       reason: "no HDC executable configured (set ARKDECK_HDC_PATH); dispatch stays fail-closed")
     var executableSHA = ""
     if let configuredHDC {
       let resolver = try FixedExecutableResolver.hashing(path: configuredHDC, providerID: "hdc")
       executableSHA = try resolver.resolveExecutable(providerID: "hdc").sha256
-      dispatcher = DescriptorBoundProcessDispatcher(resolver: resolver)
+      hdcDispatcher = DescriptorBoundProcessDispatcher(resolver: resolver)
     }
 
-    let provider = HDCObservationProviderAdapter(
+    let hdcProvider = HDCObservationProviderAdapter(
       factsPort: TargetStoreFactsPort(
         targetStore: targetStore, executablePath: configuredHDC ?? "-",
         executableSHA256: executableSHA))
-    let providers = DeviceProviderRegistry(providers: [provider])
+    let rockchipResolver = BundledRockchipExecutableResolver()
+    let rockchipDispatcher = BundledRockchipRuntimeDispatcher(resolver: rockchipResolver)
+    let rockchipAvailability: ProviderOperationAvailability
+    if let reason = rockchipDispatcher.unavailableReason(providerID: "rockchip") {
+      rockchipAvailability = .unavailable(reason: reason)
+    } else {
+      rockchipAvailability = .available
+    }
+    let rockchipProvider = RockchipFlashProviderAdapter(
+      factsPort: TargetStoreRockchipRuntimeFactsPort(
+        targetStore: targetStore, resolver: rockchipResolver, nowUTC: utcNow),
+      availability: rockchipAvailability)
+    let providers = DeviceProviderRegistry(providers: [hdcProvider, rockchipProvider])
+    let dispatcher = RuntimeProcessDispatcherRouter(
+      hdc: hdcDispatcher, rockchip: rockchipDispatcher)
     let artifactStore = try RuntimeArtifactStore(
       rootURL: resolvedStateDirectory.appendingPathComponent("artifacts", isDirectory: true),
       nowUTC: utcNow)
@@ -193,7 +208,8 @@ Task.detached {
       artifactStore: artifactStore,
       nowUTC: utcNow)
     let bootstrap = DeviceBootstrapMachine(
-      observation: ProviderBootstrapObservation(provider: provider, dispatcher: dispatcher),
+      observation: ProviderBootstrapObservation(
+        provider: hdcProvider, dispatcher: hdcDispatcher),
       targetStore: targetStore,
       nowUTC: utcNow)
     let recovered = try await engine.recoverPersistedJobs()
