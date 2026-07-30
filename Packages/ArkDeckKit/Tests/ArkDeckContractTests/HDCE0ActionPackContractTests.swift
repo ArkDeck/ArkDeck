@@ -183,6 +183,39 @@ final class HDCE0ActionPackContractTests: XCTestCase {
     XCTAssertEqual(summary["value"], "DAYU200")
   }
 
+  /// `param get` answers either bare or as `<key> = <value>` depending on the
+  /// device build; the echoed key must never reach the summary as part of the
+  /// value. Stripping is anchored on the requested key so a value that
+  /// legitimately contains `=` survives intact.
+  func testPropertyVerificationStripsOnlyTheRequestedParamKeyPrefix() throws {
+    let action = TypedProviderAction.hdc(.queryProperty(.productModel))
+    let cases: [(String, String)] = [
+      ("DAYU200\n", "DAYU200"),
+      ("const.product.model = DAYU200\n", "DAYU200"),
+      ("const.product.model=DAYU200\n", "DAYU200"),
+      ("  const.product.model\t=\tDAYU200  \n", "DAYU200"),
+      // A different key is not this step's echo: keep it verbatim rather than
+      // silently reinterpreting another property's answer.
+      ("const.product.name = rk3568\n", "const.product.name = rk3568"),
+      // Values carrying `=` must not be cut at the first one.
+      ("YnVpbGQ=\n", "YnVpbGQ="),
+      ("const.product.model = YnVpbGQ=\n", "YnVpbGQ="),
+    ]
+    for (stdout, expected) in cases {
+      let receipt = ProviderProcessReceipt(
+        exitStatus: 0, stdout: Data(stdout.utf8), stderr: Data(),
+        stdoutTruncated: false, durationSeconds: 0.1)
+      guard case .verified(let summary) = try provider.verify(
+        receipt: receipt, action: action, context: context)
+      else {
+        return XCTFail("property output \(stdout.debugDescription) must verify")
+      }
+      XCTAssertEqual(
+        summary["value"], expected,
+        "unexpected value for stdout \(stdout.debugDescription)")
+    }
+  }
+
   func testArtifactReceiveAndCleanupAccounting() throws {
     let path = try provider.mintOwnedRemotePath(jobID: "job-1", stepID: "receive")
     let artifact = HDCOwnedRemoteArtifact(

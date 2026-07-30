@@ -201,14 +201,20 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
     case "windowInventory":
       return .hdc(.captureUIDump(try HDCUIDumpRequest(scope: .windowList)))
     case "componentTree":
-      // Every device-validated component-tree dump form requires a windowId
-      // the published contract does not carry (diagnostics-stdout.yaml,
-      // CHG-2026-053). Refusing here keeps the journal from recording an
-      // intent no honest command can execute.
+      // No hidumper component-tree form is windowId-free, and the published
+      // contract carries no windowId (diagnostics-stdout.yaml, CHG-2026-053).
+      // The known windowId-free route is `uitest dumpLayout -p <remote.json>`,
+      // which writes a device-side file rather than stdout, so it cannot be
+      // expressed by a captureRemoteStdout step at all: adopting it needs a
+      // captureRemoteFile + receiveFile + cleanup step shape, i.e. a contract
+      // and Catalog change. See `DEVICE-COMMAND-FACTS.md` §7 before spending
+      // another round on hidumper flag archaeology. Refusing here keeps the
+      // journal from recording an intent no honest command can execute.
       throw DeviceProviderError.unsupportedAction(
-        "componentTree has no windowId-free hidumper form; the published "
-          + "contract carries no windowId, so there is no honest lowering — "
-          + "capture windowInventory instead")
+        "componentTree has no windowId-free hidumper form and the published "
+          + "contract carries no windowId; the windowId-free dumpLayout route "
+          + "produces a device file, which a captureRemoteStdout step cannot "
+          + "carry — capture windowInventory instead")
     case "boundedHilog":
       var duration = 30
       if case .integer(let requested)? = inputs["durationSeconds"] {
@@ -409,9 +415,10 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
     guard case .hdc(let hdcAction) = action else {
       throw DeviceProviderError.unsupportedAction("non-HDC action given to hdc provider")
     }
-    // The concrete argv/executable stays provider-internal. MU-2 exposes
-    // only the audited summary; the dispatch integration that binds the
-    // real descriptor arrives with the MU-3 production composition.
+    // The argv stays provider-internal in the sense that no caller can supply
+    // or extend it — but it is not a summary any more: since CHG-2026-048 T11
+    // `DescriptorBoundProcessDispatcher` spawns exactly this array. Treat
+    // every element below as executed, not as documentation.
     switch hdcAction {
     case .observeTool:
       return TypedProcessPlan(
@@ -468,12 +475,16 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
               context: context),
             timeoutSeconds: 30))
       case .componentTree:
-        // The scope's real forms are window-scoped (-w <windowId> …) and the
+        // The hidumper forms are window-scoped (-w <windowId> …) and the
         // published contract carries no windowId; a scope.rawValue service
-        // name is not a hidumper service and would capture error text.
+        // name is not a hidumper service and would capture error text. The
+        // windowId-free alternative (`uitest dumpLayout`) is file-producing,
+        // not stdout-producing, so it needs a different step kind — see
+        // `DEVICE-COMMAND-FACTS.md` §7 and D1 in its §10 ledger.
         throw DeviceProviderError.unsupportedAction(
-          "componentTree UI dump has no honest windowId-free lowering; "
-            + "use windowList until the windowId contract revision lands")
+          "componentTree UI dump has no honest windowId-free stdout lowering; "
+            + "use windowList until the windowId contract revision or a "
+            + "file-producing dumpLayout step shape lands")
       }
     case .captureTrace(let request, let path):
       return TypedProcessPlan(
@@ -849,6 +860,25 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
     return ["-t", connectKey] + arguments
   }
 
+  /// `param get <key>` answers either with the bare value or with
+  /// `<key> = <value>`, depending on the device's init/param build. Recording
+  /// the echoed form verbatim puts `const.product.model = DAYU200` into
+  /// evidence where the value belongs (see `DEVICE-COMMAND-FACTS.md` §3.5).
+  ///
+  /// The prefix is stripped only when the output actually begins with the key
+  /// this step asked for: a blind "cut at the first `=`" would truncate any
+  /// value that legitimately contains one.
+  static func propertyValue(
+    fromParamGetOutput output: String, requestedKey: String
+  ) -> String {
+    let trimmed = output.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard trimmed.hasPrefix(requestedKey) else { return trimmed }
+    let remainder = trimmed.dropFirst(requestedKey.count)
+      .drop(while: { $0 == " " || $0 == "\t" })
+    guard remainder.first == "=" else { return trimmed }
+    return remainder.dropFirst().trimmingCharacters(in: .whitespacesAndNewlines)
+  }
+
   /// Mints a provider-owned staging path for an artifact lease. As with
   /// remote temp paths, the caller never supplies a device location.
   public func mintStagedArtifact(
@@ -1003,14 +1033,15 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
       case .malformed(let reason):
         return .unknown(reason: reason)
       }
-    case .queryProperty:
+    case .queryProperty(let property):
       guard !receipt.stdoutTruncated else {
         return .failed(code: "truncated", detail: "property output exceeded budget")
       }
       guard let text = String(data: receipt.stdout, encoding: .utf8) else {
         return .failed(code: "invalidEncoding", detail: "property output is not UTF-8")
       }
-      let value = text.trimmingCharacters(in: .whitespacesAndNewlines)
+      let value = Self.propertyValue(
+        fromParamGetOutput: text, requestedKey: property.rawValue)
       guard !value.isEmpty, value.count <= 400 else {
         return .unknown(reason: "property value empty or oversized")
       }
@@ -1323,6 +1354,15 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
       }
       return .verified(summary: ["bundleName": bundle.bundleName, "running": "true"])
 
+    // Known-weak pair (D2 in `DEVICE-COMMAND-FACTS.md` §10): unlike install and
+    // start above, these two still believe the exit status alone, and the
+    // exit status of an `hdc shell aa`/`bm` invocation is the client's, not
+    // the remote command's. `bm uninstall` in particular answers
+    // `uninstall missing installed bundle` on a clean exit when the bundle
+    // was never there. Closing this needs one of: a device window that pins
+    // the status strings, or a readback step after stop/uninstall
+    // (debug.hap@1 has none today, so returning `.unknown` here would drive
+    // every run into reconcileRequired). Do not guess the strings.
     case .stopAbility(let ability):
       guard receipt.exitStatus == 0 else {
         return .failed(code: "stopFailed", detail: "could not stop \(ability.bundle.bundleName)")
