@@ -502,7 +502,7 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
     for (index, script) in vectors.enumerated() {
       let dispatcher = ScriptedDispatcher(script: script)
       let (engine, capabilities, artifacts) = try makeEngine(dispatcher: dispatcher)
-      if index == 0 { try await installE1Capability(capabilities) }
+      try await installE1Capability(capabilities)
       let lease = try await publishHAPLease(artifacts)
       let acceptance = try await engine.submit(
         hapRequest(lease: lease, key: "idem-hap-preflight-\(index)"))
@@ -512,6 +512,10 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
         dispatcher.dispatchedActions.contains("sendArtifact"),
         "no E1 dispatch is allowed before complete preflight: vector \(index)")
       XCTAssertFalse(dispatcher.dispatchedActions.contains("installPackage"), "vector \(index)")
+      let capability = try await capabilities.inspect(capabilityID: "CAP-RT-HAP-001")
+      XCTAssertEqual(
+        capability?.consumptionCount, 0,
+        "incomplete target/model/firmware preflight must not consume E1: vector \(index)")
     }
   }
 
@@ -781,6 +785,66 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
     XCTAssertTrue(dispatcher.dispatchedActions.isEmpty, "zero dispatch on refusal")
   }
 
+  func testOfflineTargetFailsDurablyBeforeCapabilityConsumptionOrMutation() async throws {
+    let dispatcher = ScriptedDispatcher(
+      script: .init(
+        targetRows: "150100424a544e4600\t\tUSB\tOffline\tlocalhost\n"))
+    let (engine, capabilities, artifacts) = try makeEngine(dispatcher: dispatcher)
+    let lease = try await publishHAPLease(artifacts)
+    try await installE1Capability(capabilities)
+
+    let acceptance = try await engine.submit(
+      hapRequest(lease: lease, key: "idem-hap-offline-before-consume"))
+
+    let beforeRun = try await capabilities.inspect(capabilityID: "CAP-RT-HAP-001")
+    XCTAssertEqual(beforeRun?.consumptionCount, 0)
+    XCTAssertTrue(
+      dispatcher.dispatchedActions.isEmpty,
+      "submit may materialize and preauthorize, but every external probe needs a durable job intent")
+    let status = try await engine.run(jobID: acceptance.jobID)
+
+    XCTAssertEqual(status.state, "failed", status.timeline.joined(separator: " | "))
+    XCTAssertTrue(
+      status.timeline.contains { $0.contains("targetNotConnected") },
+      status.timeline.joined(separator: " | "))
+    XCTAssertFalse(
+      status.timeline.contains { $0.contains("three-step typed preflight is incomplete") },
+      "a no-mutation target failure must not be overwritten by compensation preflight")
+    let capability = try await capabilities.inspect(capabilityID: "CAP-RT-HAP-001")
+    XCTAssertEqual(capability?.consumptionCount, 0)
+    XCTAssertEqual(capability?.remainingUses, 5)
+    XCTAssertEqual(
+      dispatcher.dispatchedActions, ["observeDevice"],
+      "only the journaled descriptor-bound target confirmation may dispatch")
+    let jobs = await engine.listJobs()
+    XCTAssertEqual(jobs.map(\.jobID), [acceptance.jobID])
+  }
+
+  func testRuntimeTargetFailurePreservesPrimaryReasonWithoutFalseCompensation() async throws {
+    let dispatcher = ScriptedDispatcher(
+      script: .init(targetRows: "different\t\tUSB\tConnected\tlocalhost\n"))
+    let (engine, capabilities, artifacts) = try makeEngine(dispatcher: dispatcher)
+    let lease = try await publishHAPLease(artifacts)
+    try await installE1Capability(capabilities)
+    let acceptance = try await engine.submit(
+      hapRequest(lease: lease, key: "idem-hap-offline-after-consume"))
+
+    let status = try await engine.run(jobID: acceptance.jobID)
+
+    XCTAssertEqual(status.state, "failed", status.timeline.joined(separator: " | "))
+    XCTAssertTrue(
+      status.timeline.contains { $0.contains("targetConfirmationMismatch") },
+      status.timeline.joined(separator: " | "))
+    XCTAssertFalse(
+      status.timeline.contains { $0.contains("three-step typed preflight is incomplete") },
+      "a no-mutation target failure must not be overwritten by compensation preflight")
+    XCTAssertFalse(dispatcher.dispatchedActions.contains("sendArtifact"))
+    XCTAssertFalse(dispatcher.dispatchedActions.contains("installPackage"))
+    XCTAssertFalse(dispatcher.dispatchedActions.contains("uninstallPackage"))
+    let capability = try await capabilities.inspect(capabilityID: "CAP-RT-HAP-001")
+    XCTAssertEqual(capability?.consumptionCount, 0)
+  }
+
   func testHAPLeaseDriftBeforeSendFailsWithoutDispatchOrStuckRunningState() async throws {
     let dispatcher = ScriptedDispatcher()
     let (engine, capabilities, artifacts) = try makeEngine(dispatcher: dispatcher)
@@ -841,6 +905,32 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
     XCTAssertEqual(status?.consumptionCount, 1)
   }
 
+  func testDeferredCapabilityConsumptionSurvivesRestartBeforeRun() async throws {
+    let submitDispatcher = ScriptedDispatcher()
+    let (engine, capabilities, artifacts) = try makeEngine(dispatcher: submitDispatcher)
+    let lease = try await publishHAPLease(artifacts)
+    try await installE1Capability(capabilities)
+    let acceptance = try await engine.submit(
+      hapRequest(lease: lease, key: "idem-hap-deferred-restart"))
+    let beforeRestart = try await capabilities.inspect(capabilityID: "CAP-RT-HAP-001")
+    XCTAssertEqual(beforeRestart?.consumptionCount, 0)
+    XCTAssertTrue(submitDispatcher.dispatchedActions.isEmpty)
+
+    let recoveredDispatcher = ScriptedDispatcher()
+    let (recovered, recoveredCapabilities, _) = try makeEngine(
+      dispatcher: recoveredDispatcher)
+    _ = try await recovered.recoverPersistedJobs()
+    let status = try await recovered.run(jobID: acceptance.jobID)
+
+    XCTAssertEqual(status.state, "succeeded", status.timeline.joined(separator: " | "))
+    let afterRun = try await recoveredCapabilities.inspect(
+      capabilityID: "CAP-RT-HAP-001")
+    XCTAssertEqual(afterRun?.consumptionCount, 1)
+    XCTAssertTrue(
+      status.timeline.contains { $0 == "capability consumed before first mutation" })
+    XCTAssertTrue(recoveredDispatcher.dispatchedActions.contains("sendArtifact"))
+  }
+
   func testIdempotencyConflictCannotConsumeASecondCapability() async throws {
     let dispatcher = ScriptedDispatcher()
     let (engine, capabilities, artifacts) = try makeEngine(dispatcher: dispatcher)
@@ -857,7 +947,7 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
         maximumUses: 5,
         issuer: .init(kind: .maintainerMergedPR, reference: "PR#test")))
 
-    _ = try await engine.submit(
+    let firstAcceptance = try await engine.submit(
       hapRequest(lease: lease, key: "idem-hap-conflict"))
     do {
       _ = try await engine.submit(
@@ -872,8 +962,13 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
     }
     let firstCapability = try await capabilities.inspect(capabilityID: "CAP-RT-HAP-001")
     let secondCapability = try await capabilities.inspect(capabilityID: "CAP-RT-HAP-002")
-    XCTAssertEqual(firstCapability?.consumptionCount, 1)
+    XCTAssertEqual(
+      firstCapability?.consumptionCount, 0,
+      "submit preauthorizes but does not consume before journaled target preflight")
     XCTAssertEqual(secondCapability?.consumptionCount, 0)
+    _ = try await engine.run(jobID: firstAcceptance.jobID)
+    let consumedFirst = try await capabilities.inspect(capabilityID: "CAP-RT-HAP-001")
+    XCTAssertEqual(consumedFirst?.consumptionCount, 1)
   }
 
   func testRetainAndDisabledDiagnosticsDoNotDispatchThoseOptionalSteps() async throws {

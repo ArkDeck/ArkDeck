@@ -464,7 +464,7 @@ public actor RuntimeJobEngine {
       idempotencyKey: request.idempotencyKey, requestFingerprint: fingerprint)
     let materialized = try await materializeTypedPlanBeforeAuthorization(
       request: request, descriptor: descriptor, jobID: jobID)
-    let admission = try await authorize(
+    let admission = try await preauthorize(
       request: request, descriptor: descriptor, effect: effectiveEffect,
       materialized: materialized)
 
@@ -496,7 +496,11 @@ public actor RuntimeJobEngine {
       providerID: descriptor.provider.rawValue,
       createdAtUTC: timestamp,
       actualEffect: effectiveEffect.rawValue,
-      admissionEvidence: admission)
+      admissionEvidence: admission,
+      materializedPlanDigest: materialized.planDigest,
+      materializedStableTargetIdentitySHA256:
+        materialized.stableTargetIdentitySHA256,
+      materializedBindingRevision: materialized.bindingRevision)
     try journal.appendAndSynchronize(
       JournalEvent.jobCreated(
         eventID: "job-created", sequence: 0, sessionID: record.sessionID, jobID: jobID,
@@ -774,6 +778,13 @@ public actor RuntimeJobEngine {
         throw error
       }
       do {
+        if step.effect >= .deviceMutation {
+          try await consumeCapabilityBeforeMutation(
+            jobID: jobID, descriptor: descriptor,
+            effect: Self.effectiveEffect(
+              descriptor: descriptor,
+              inputs: jobs[jobID]?.record.request.inputs ?? [:]))
+        }
         try await dispatchWithWAL(
           jobID: jobID, step: step, action: action, plan: plan, provider: provider,
           context: context, descriptor: descriptor, evidenceFacts: resolvedFacts)
@@ -799,7 +810,9 @@ public actor RuntimeJobEngine {
           }
           continue
         }
-        if descriptor.reference == "debug.hap@1" {
+        if descriptor.reference == "debug.hap@1",
+          Self.debugHAPNeedsCompensation(completedStepIDs: completedStepIDs)
+        {
           try await compensateDebugHAP(
             jobID: jobID, descriptor: descriptor, provider: provider,
             completedStepIDs: completedStepIDs, failedStepID: step.stepID)
@@ -887,6 +900,14 @@ public actor RuntimeJobEngine {
       try requireCompleteEvidencePreflight(
         jobID: jobID, beforeStepID: "finish-operation")
     }
+  }
+
+  private static func debugHAPNeedsCompensation(
+    completedStepIDs: Set<String>
+  ) -> Bool {
+    !completedStepIDs.isDisjoint(with: [
+      "send-hap", "install-hap", "start-ability",
+    ])
   }
 
   /// The effect this request will actually reach: the maximum effect over
@@ -1209,6 +1230,8 @@ public actor RuntimeJobEngine {
       current.record.recoveryStepID = nil
       current.record.recoveryIntentEventID = nil
       current.record.recoveryAction = nil
+      current.record.timeline.append(
+        "failed \(step.stepID): \(code): \(detail)")
       jobs[jobID] = current
       throw RuntimeDispatchFailure.failed("\(code): \(detail)")
     case .unknown(let reason), .unsupported(let reason):
@@ -2516,12 +2539,17 @@ public actor RuntimeJobEngine {
     }
   }
 
-  private func authorize(
+  /// Performs every pure authorization check at submit, after the complete
+  /// typed plan has materialized. E1/E2 uses are deliberately not consumed
+  /// here: the job's descriptor-bound preflight must first execute through
+  /// the durable write-ahead journal. Consumption happens at the last safe
+  /// boundary immediately before the first mutation dispatch.
+  private func preauthorize(
     request: RuntimeOperationRequest,
     descriptor: CatalogOperationDescriptor,
     effect: WorkflowEffect,
     materialized: MaterializedAdmission
-  ) async throws -> RuntimeAdmissionEvidence {
+  ) async throws -> RuntimeAdmissionEvidence? {
     let admittedAt = nowUTC()
     if effect <= .readOnly {
       let decision = configuration.defaultReadOnlyPolicy.evaluate(
@@ -2553,26 +2581,104 @@ public actor RuntimeJobEngine {
       planDigest: materialized.planDigest,
       inputs: request.inputs)
     do {
-      let consumption = try await capabilityStore.consume(
-        capabilityID: authorization.capabilityID,
-        reservationID: request.idempotencyKey,
-        query: query,
-        nowUTC: admittedAt)
       guard
         let status = try await capabilityStore.inspect(
           capabilityID: authorization.capabilityID)
       else {
         throw RuntimeCapabilityStoreError.capabilityNotFound(authorization.capabilityID)
       }
-      return RuntimeAdmissionEvidence(
+      if case .failure(let denial) = status.capability.authorizes(
+        query, nowUTC: admittedAt, remainingUses: status.remainingUses)
+      {
+        throw RuntimeCapabilityStoreError.denied(denial)
+      }
+      return nil
+    } catch let error as RuntimeCapabilityStoreError {
+      throw RuntimeJobEngineError.rejected(
+        .authorizationRequired, "capability denied: \(error)")
+    }
+  }
+
+  private func consumeCapabilityBeforeMutation(
+    jobID: String,
+    descriptor: CatalogOperationDescriptor,
+    effect: WorkflowEffect
+  ) async throws {
+    guard var runtime = jobs[jobID] else {
+      throw RuntimeDispatchFailure.failed("job disappeared before capability consumption")
+    }
+    if let evidence = runtime.record.admissionEvidence {
+      guard
+        evidence.kind == (effect == .destructive
+          ? RuntimeEvidenceAuthorityKind.standingAuthorization
+          : RuntimeEvidenceAuthorityKind.runtimeCapability),
+        evidence.reference == runtime.record.request.authorization?.capabilityID
+      else {
+        throw RuntimeDispatchFailure.failed(
+          "authorizationRequired: persisted admission evidence does not match the mutation")
+      }
+      return
+    }
+    guard let authorization = runtime.record.request.authorization else {
+      throw RuntimeDispatchFailure.failed(
+        "authorizationRequired: mutation has no runtime capability reference")
+    }
+    guard
+      let stableIdentity = runtime.record.materializedStableTargetIdentitySHA256,
+      Self.isLowercaseSHA256(stableIdentity),
+      let bindingRevision = runtime.record.materializedBindingRevision,
+      bindingRevision > 0,
+      let planDigest = runtime.record.materializedPlanDigest,
+      Self.isLowercaseSHA256(planDigest),
+      runtime.record.request.target.expectedBindingRevision == bindingRevision,
+      runtime.record.evidenceObservation?.stableIdentitySHA256 == stableIdentity,
+      runtime.record.evidenceObservation?.bindingRevision == bindingRevision
+    else {
+      throw RuntimeDispatchFailure.failed(
+        "authorizationRequired: materialized plan or verified target binding is absent or drifted")
+    }
+    let query = RuntimeCapabilityAuthorizationQuery(
+      operationID: descriptor.id,
+      operationVersion: descriptor.version,
+      effect: effect,
+      targetStableIdentitySHA256: stableIdentity,
+      targetBindingRevision: bindingRevision,
+      planDigest: planDigest,
+      inputs: runtime.record.request.inputs)
+    do {
+      guard
+        let status = try await capabilityStore.inspect(
+          capabilityID: authorization.capabilityID)
+      else {
+        throw RuntimeCapabilityStoreError.capabilityNotFound(authorization.capabilityID)
+      }
+      let consumption = try await capabilityStore.consume(
+        capabilityID: authorization.capabilityID,
+        reservationID: runtime.record.request.idempotencyKey,
+        query: query,
+        nowUTC: nowUTC())
+      runtime.record.admissionEvidence = RuntimeAdmissionEvidence(
         kind: effect == .destructive ? .standingAuthorization : .runtimeCapability,
         reference: authorization.capabilityID,
         admittedAtUTC: consumption.consumedAtUTC,
         validUntilUTC: status.capability.expiresAtUTC,
         consumptionFingerprintSHA256: consumption.queryFingerprintSHA256)
+      runtime.record.timeline.append(
+        "capability consumed before first mutation")
+      // Keep the consumed evidence in the actor snapshot before the disk
+      // write. If that write fails, run() can still persist the same
+      // evidence while finalizing the fail-closed job; after a process
+      // crash, the store's reservation-idempotent receipt reconstructs it.
+      jobs[jobID] = runtime
+      try runtime.record.persist(into: jobDirectory(for: jobID))
     } catch let error as RuntimeCapabilityStoreError {
-      throw RuntimeJobEngineError.rejected(
-        .authorizationRequired, "capability denied: \(error)")
+      throw RuntimeDispatchFailure.failed(
+        "authorizationRequired: capability denied before mutation: \(error)")
+    } catch let failure as RuntimeDispatchFailure {
+      throw failure
+    } catch {
+      throw RuntimeDispatchFailure.failed(
+        "authorizationRequired: capability admission could not become durable: \(error)")
     }
   }
 
@@ -2972,7 +3078,13 @@ public struct RuntimeJobRecord: Codable, Sendable, Equatable {
   public let providerID: String
   public let createdAtUTC: String
   public let actualEffect: String?
-  public let admissionEvidence: RuntimeAdmissionEvidence?
+  public var admissionEvidence: RuntimeAdmissionEvidence?
+  /// Exact submit-time materialization persisted for deferred capability
+  /// consumption. Optional only so records created by older builds remain
+  /// readable; a pending mutation with any field absent fails closed.
+  public let materializedPlanDigest: String?
+  public let materializedStableTargetIdentitySHA256: String?
+  public let materializedBindingRevision: Int?
   public var state: String = "queued"
   public var outcomeUnknown: Bool = false
   /// Original catalog step whose durable outcome must be reconciled.

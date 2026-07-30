@@ -231,7 +231,9 @@ final class RuntimeJobEngineContractTests: XCTestCase {
         return XCTFail("expected authorizationRequired, got \(error)")
       }
     }
-    // Install a matching E1 capability: submit is admitted (no taskID anywhere).
+    // Install a matching E1 capability: submit is admitted (no taskID
+    // anywhere), but the use is deferred until journaled target preflight
+    // completes and the first mutation is ready to dispatch.
     try await capabilityStore.install(
       try RuntimeCapability(
         capabilityID: "CAP-RT-ENGINE-001",
@@ -247,11 +249,16 @@ final class RuntimeJobEngineContractTests: XCTestCase {
     XCTAssertFalse(acceptance.deduplicated)
     let status = try await engine.status(jobID: acceptance.jobID)
     XCTAssertEqual(status.state, "preflight")
-    // A use was consumed atomically at admission.
-    let capabilityStatus = try await capabilityStore.inspect(capabilityID: "CAP-RT-ENGINE-001")
-    XCTAssertEqual(capabilityStatus?.remainingUses, 4)
-    let evidence = try await engine.evidenceSnapshot(jobID: acceptance.jobID)
-    XCTAssertNotNil(evidence.authority?.consumptionFingerprintSHA256)
+    let beforeRun = try await capabilityStore.inspect(capabilityID: "CAP-RT-ENGINE-001")
+    XCTAssertEqual(beforeRun?.remainingUses, 5)
+    let beforeEvidence = try await engine.evidenceSnapshot(jobID: acceptance.jobID)
+    XCTAssertNil(beforeEvidence.authority)
+
+    _ = try await engine.run(jobID: acceptance.jobID)
+    let afterRun = try await capabilityStore.inspect(capabilityID: "CAP-RT-ENGINE-001")
+    XCTAssertEqual(afterRun?.remainingUses, 4)
+    let afterEvidence = try await engine.evidenceSnapshot(jobID: acceptance.jobID)
+    XCTAssertNotNil(afterEvidence.authority?.consumptionFingerprintSHA256)
   }
 
   func testMissingRequiredInputIsRejected() async throws {
