@@ -68,6 +68,9 @@ public struct RuntimeControlPlaneHandler: Sendable {
   private let targetStore: RuntimeTargetStore?
   private let bootstrap: DeviceBootstrapMachine?
   private let artifactStore: RuntimeArtifactStore?
+  /// Absent means the harness plane is not configured in this composition;
+  /// `task.*` then fails closed instead of half-existing.
+  let harnessCoordinator: HarnessTaskCoordinator?
   private let hapImports: HAPArtifactImportCoordinator
   /// Test seam: records which methods a client invoked. Production passes
   /// nil, so this cannot affect behaviour.
@@ -81,6 +84,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
     targetStore: RuntimeTargetStore? = nil,
     bootstrap: DeviceBootstrapMachine? = nil,
     artifactStore: RuntimeArtifactStore? = nil,
+    harnessCoordinator: HarnessTaskCoordinator? = nil,
     methodObserver: (@Sendable (String) -> Void)? = nil
   ) {
     self.engine = engine
@@ -90,6 +94,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
     self.targetStore = targetStore
     self.bootstrap = bootstrap
     self.artifactStore = artifactStore
+    self.harnessCoordinator = harnessCoordinator
     self.hapImports = HAPArtifactImportCoordinator()
     self.methodObserver = methodObserver
   }
@@ -747,6 +752,9 @@ public struct RuntimeControlPlaneHandler: Sendable {
         return failure(id: request.id, code: .rejected, message: reason)
       }
 
+    case let method where method.hasPrefix("task."):
+      return await handleTaskMethod(method, request)
+
     default:
       return failure(
         id: request.id, code: .unknownMethod, message: "unknown method \(request.method)")
@@ -902,11 +910,14 @@ public struct RuntimeControlPlaneHandler: Sendable {
     ])
   }
 
-  private func success(id: String, result: JSONValue) -> AgentWireProtocol.Response {
+  // Internal, not private: the `task.*` methods live in a sibling file so
+  // this file stays the closed method table rather than growing a second
+  // plane inside it.
+  func success(id: String, result: JSONValue) -> AgentWireProtocol.Response {
     AgentWireProtocol.Response(id: id, ok: true, result: result, error: nil)
   }
 
-  private func failure(
+  func failure(
     id: String, code: AgentDaemonErrorCode, message: String
   ) -> AgentWireProtocol.Response {
     AgentWireProtocol.Response(

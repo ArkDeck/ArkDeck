@@ -624,4 +624,79 @@ enum RuntimeCLI {
       throw CLIError(exitCode: EX_USAGE, message: "unsupported job subcommand")
     }
   }
+
+  // `arkdeck task` (CHG-2026-054, TASK-HTP-001): the autonomous debug face.
+  //
+  // A caller states a target and a goal. There is no flag here that can
+  // carry an operation argv, a remote path or a device selector - the
+  // daemon's harness decides the next typed operation, one per wake, and
+  // the engine still owns admission and execution.
+  static func runTask(_ arguments: [String]) throws {
+    guard let subcommand = arguments.first else {
+      throw CLIError(
+        exitCode: EX_USAGE,
+        message: "missing task subcommand (submit|list|status|result|events|reconcile|pause|resume|cancel)")
+    }
+    var rest = Array(arguments.dropFirst())
+    let json = rest.contains("--json")
+    let client = client(&rest)
+
+    func value(_ flag: String) -> String? {
+      guard let index = rest.firstIndex(of: flag), index + 1 < rest.count else { return nil }
+      return rest[index + 1]
+    }
+    func requiredTask() throws -> String {
+      guard let id = value("--task") else {
+        throw CLIError(exitCode: EX_USAGE, message: "task \(subcommand) requires --task <HTASK-id>")
+      }
+      return id
+    }
+
+    switch subcommand {
+    case "submit":
+      guard let target = value("--target"), let goal = value("--goal") else {
+        throw CLIError(
+          exitCode: EX_USAGE, message: "task submit requires --target <id> --goal <text>")
+      }
+      var params: [String: JSONValue] = [
+        "targetId": .string(target),
+        "goal": .string(goal),
+      ]
+      if let intake = value("--intake") { params["intake"] = .string(intake) }
+      if let project = value("--project") { params["projectRef"] = .string(project) }
+      if let rounds = value("--max-rounds"), let parsed = Int64(rounds) {
+        params["maxRounds"] = .integer(parsed)
+      }
+      if let seconds = value("--max-wall-clock-seconds"), let parsed = Int64(seconds) {
+        params["maxWallClockSeconds"] = .integer(parsed)
+      }
+      if let revision = value("--expected-binding-revision"), let parsed = Int64(revision) {
+        params["expectedBindingRevision"] = .integer(parsed)
+      }
+      emit(try client.request(method: "task.submit", params: params), json: json)
+    case "list":
+      emit(try client.request(method: "task.list"), json: json)
+    case "status", "result", "events", "reconcile", "pause", "cancel":
+      emit(
+        try client.request(
+          method: "task.\(subcommand)", params: ["htaskId": .string(try requiredTask())]),
+        json: json)
+    case "resume":
+      guard let resolution = value("--resolution") else {
+        throw CLIError(
+          exitCode: EX_USAGE,
+          message: "task resume requires --resolution <typed reason>: a human block is only left "
+            + "through a recorded decision")
+      }
+      emit(
+        try client.request(
+          method: "task.resume",
+          params: [
+            "htaskId": .string(try requiredTask()), "resolution": .string(resolution),
+          ]),
+        json: json)
+    default:
+      throw CLIError(exitCode: EX_USAGE, message: "unsupported task subcommand")
+    }
+  }
 }

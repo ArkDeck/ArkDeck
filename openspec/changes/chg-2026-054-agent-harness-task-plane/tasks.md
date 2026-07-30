@@ -15,13 +15,18 @@
 
 ## TASK-HTP-001 — Harness Task 平面骨架:typed task、reducer、reconcile、task.* 接口
 
-- Status:ready
+- Status:done
+- Done:2026-07-30;随本实现 PR 合入生效(维护者 review + merge 即批准)。
+  HTP-AC-1..4 全部 PASS,evidence = `evidence/runs/TASK-HTP-001/run-r1.md`
+  (库层 748 tests/1 skip/0 fail,新增 20 例;host 侧进程级实跑真实 UDS + 真实引擎,
+  零 dispatch/零 job/零 capability 消耗)。真实设备收敛仍属 TASK-HTP-006。
 - Platform:macos
 - Requirements/AC:proposal What 1/2/7(typed task 模型与 store、reconciler 与
   reducer、`task.*` daemon 方法与 CLI);change-local HTP-AC-1、HTP-AC-2、
   HTP-AC-3、HTP-AC-4,登记于 `verification.md`
-- Gate:GJ-1 与 GJ-2 均 `REAL_DEVICE_PASS`;或维护者显式提前解冻(本任务 E0-only、
-  零设备 mutation、零源码写入,只消费 GJ-1 已有产物),实现 PR 须写明依据
+- Gate:**已满足**——维护者 2026-07-30 在会话中显式提前解冻 TASK-HTP-001/002
+  (§20 提前解冻;依据:E0-only、零设备 mutation、零源码写入,只消费 GJ-1 已有产物)。
+  GJ-1/GJ-2 的 `REAL_DEVICE_PASS` 硬门仍对 TASK-HTP-006 有效
 - Depends on:none(change 随本 proposal PR 合入即 approved)
 - Hardware required:no(离线 fake provider + 固定 artifact 样本即可交付;真机收敛留
   TASK-HTP-006)
@@ -50,7 +55,8 @@
 - Platform:macos
 - Requirements/AC:proposal What 3(evaluation engine、criterion 模型、observation
   builder);change-local HTP-AC-5、HTP-AC-6、HTP-AC-7,登记于 `verification.md`
-- Gate:同 TASK-HTP-001;且 TASK-HTP-001 已 done(需要 task/round 载体)
+- Gate:**已满足**——同 TASK-HTP-001 的维护者提前解冻(2026-07-30);
+  前置 TASK-HTP-001 已 done
 - Depends on:TASK-HTP-001
 - Hardware required:no(用真机已产出的 artifact 字节样本 + fake 供给;真机复验在
   TASK-HTP-006)

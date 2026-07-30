@@ -37,6 +37,8 @@ struct ArkDeckCommandLine {
         try RuntimeCLI.runCapability(Array(arguments.dropFirst()))
       case "artifact":
         try RuntimeCLI.runArtifact(Array(arguments.dropFirst()))
+      case "task":
+        try RuntimeCLI.runTask(Array(arguments.dropFirst()))
       default:
         printUsage()
         exit(EX_USAGE)
@@ -553,6 +555,10 @@ struct ArkDeckCommandLine {
         arkdeck capability install --file <cap.json> [--json]
         arkdeck capability revoke --capability <id> [--json]
         arkdeck artifact import-hap --target <id> --file <signed.hap> [--json]
+        arkdeck task submit --target <id> --goal <text> [--intake <text>] [--project <ref>] \
+      [--max-rounds <n>] [--max-wall-clock-seconds <n>] [--json]
+        arkdeck task list|status|result|events|reconcile|pause|cancel --task <HTASK-id> [--json]
+        arkdeck task resume --task <HTASK-id> --resolution <typed reason> [--json]
         arkdeck artifact list|inspect|read|export --job <id> [--artifact <id>] \
       [--destination <directory>] [--allow-sensitive]
         arkdeck agent run --operation <id@version> [--target <id>] [--inputs-file <path>] \

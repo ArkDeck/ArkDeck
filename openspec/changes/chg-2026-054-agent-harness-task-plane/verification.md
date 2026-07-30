@@ -1,9 +1,10 @@
 # Verification — CHG-2026-054
 
 > Change:CHG-2026-054-agent-harness-task-plane@r1
-> Status:planned # 本 PR 只落审批与验证计划(openspec-only,零产品代码)。每条 AC 的
-> 结论由其所属任务的实现 PR 写入本文件;维护者 review/merge 该实现 PR 即确认。
-> 不为本 change 追加独立 verification/archive 载体(PRODUCT-LOOP §4/§20)。
+> Status:in_progress # 2026-07-30:HTP-AC-1..4 随 TASK-HTP-001 实现 PR 通过;
+> AC-5..17 pending(各自任务未开工),AC-18/19 pending-hardware。每条结论由其所属
+> 任务的实现 PR 写入本文件;维护者 review/merge 该实现 PR 即确认。不为本 change
+> 追加独立 verification/archive 载体(PRODUCT-LOOP §4/§20)。
 
 约定:
 
@@ -19,7 +20,12 @@
   active job 未进终态时 reconcile 不派发新 job 且不消耗预算;单 task 同时最多一个
   effectful active job。
 - Evidence:实现 PR 内测试 + 全量套件结果。
-- 结论:pending
+- **结论(2026-07-30):PASS** — `testOneWakeDispatchesAtMostOneEffectfulJob` 断言首个
+  唤醒 dispatch 一次(按 idempotencyKey 计侧效应 = 1),随后三次唤醒均
+  `waitedForActiveJob` 且 submit 计数不变;`testConcurrentWakesStillDispatchOnce`
+  用 6 个并发 caller 断言 `dispatched` 恰一次、jobDispatched 事件恰一条。
+  reducer 侧另有 `jobAlreadyActive` 负例(状态模型层同一不变量)。
+  全量 748 tests / 1 skipped / 0 failures。
 
 ## HTP-AC-2 dispatch intent 崩溃恢复零重复副作用(TASK-HTP-001)
 
@@ -28,7 +34,19 @@
   引擎返回 deduplicated 同 jobId、TaskJobLink 补齐、副作用只发生一次
   (沿用 MU-2 T08 的崩溃两窗口范式)。
 - Evidence:实现 PR 内测试 + 全量套件结果。
-- 结论:pending
+- **结论(2026-07-30):PASS** — 两个窗口各有独立用例:
+  (a) 引擎已收到、答复丢失(`testRecoveryReusesTheKeyWhenTheEngineAlreadyReceivedTheSubmit`):
+  intent 停在 `submitted`、无 jobId、无 jobDispatched 事件;恢复后**同一
+  idempotencyKey** 重投,port 回 `deduplicated`,侧效应总数仍为 1;
+  (b) 未达引擎(`testRecoveryResubmitsTheSameKeyWhenTheEngineNeverReceivedIt`):
+  恢复后同 key 重投、`fresh`、侧效应 1。
+  `testANewCoordinatorRecoversTheLostDispatchIntent` 用**新建 store + 新 coordinator**
+  (等价进程重启)跑 `recoverTasks()`,断言 link 补齐、reasonCode
+  `recoveredDispatchIntent:deduplicated`、侧效应仍为 1。
+  `testRejectedAdmissionIsNotRetriedByRecovery` 断言引擎拒绝 → intent 落 `rejected`、
+  不进恢复集合、零副作用、任务停在 humanRequired 且不自解。
+  `testOutcomeUnknownStopsAndNeverResendsTheSideEffect` 断言 outcomeUnknown 立即停止
+  且后续唤醒零重发(HTP-INV-5)。
 
 ## HTP-AC-3 状态迁移只经 reducer 且逐项留痕(TASK-HTP-001)
 
@@ -36,15 +54,27 @@
   causation/jobId/evaluationId/artifactRefs/consumedBudget/version;版本冲突写入被拒;
   reducer 之外的路径无法改变状态(断言无其它写入点)。
 - Evidence:实现 PR 内测试。
-- 结论:pending
+- **结论(2026-07-30):PASS** — `testReducerRejectsIllegalTransitions` 逐项断言:
+  `successRequiresEvaluation`(非 evaluation causation 无法进 succeeded——「只有
+  evaluator 能宣布成功」的结构形式)、`illegalPhase`(initializing → verifying)、
+  `jobAlreadyActive`、`budgetRegressed`、`artifactRefsShrank`、`cancelPending`、
+  `cancelRequestWithdrawn`、`terminal`。`testStaleVersionCommitIsRejected` 断言乐观锁
+  (过期 expectedVersion 写入被拒);`testEveryTransitionCarriesCausationAndJoinsItsVersion`
+  断言每条事件 sequence 连续、`resulting.version == sequence + 1`、reasonCode 非空、
+  dispatch 事件带 jobId。唯一写路径:coordinator 的所有状态变更都经私有 `commit()`
+  → reducer。
 
 ## HTP-AC-4 daemon 重启后 task 时间线逐字保持(TASK-HTP-001)
 
 - 方法:提交 task、跑若干轮、重启 daemon,断言 `task.status`/`task.events`/`task.result`
   逐字一致,active job 与未完成 dispatch intent 被正确恢复(与 T11 真机"重启后历史逐字
   保持"同一断言口径)。
-- Evidence:实现 PR 内测试 + 进程级自测输出。
-- 结论:pending
+- Evidence:实现 PR 内测试 + 进程级自测输出(`evidence/runs/TASK-HTP-001/run-r1.md`)。
+- **结论(2026-07-30):PASS** — `testTaskTimelineSurvivesARestartVerbatim` 断言新 store +
+  新 coordinator 读到的事件序列与快照逐字相等、result 可读回、读取不改写日志字节;
+  并把 `task.json` 回滚到首版后断言 `load()` 由事件重放得到同一状态(快照是日志的缓存)。
+  进程级:daemon SIGTERM 重启后 `arkdeck task list` 仍为 `humanRequired v3`,typed
+  `resume` 记入事件 3,事件日志 4 行、sha256 前 32 位 `278c44ec4ee816691f6475b28836252e`。
 
 ## HTP-AC-5 只有 evaluator 能宣布成功(TASK-HTP-002)
 
