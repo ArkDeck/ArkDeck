@@ -195,7 +195,7 @@ final class AgentDaemonContractTests: XCTestCase {
     XCTAssertFalse(reasons.isEmpty)
   }
 
-  func testCapabilityDraftMaterializesExactPlanButCannotInstallBeforeMergedPR() async throws {
+  func testCapabilityDraftPreviewsPlanAndProducesStandingE1Envelope() async throws {
     let artifactStore = try RuntimeArtifactStore(
       rootURL: stateDirectory.appendingPathComponent("artifacts", isDirectory: true),
       nowUTC: { "2026-07-29T00:00:00Z" })
@@ -253,7 +253,9 @@ final class AgentDaemonContractTests: XCTestCase {
     XCTAssertEqual(planDigest.count, 64)
     XCTAssertEqual(requestFingerprint.count, 64)
     XCTAssertEqual(draft["bindingRevision"], .integer(7))
-    XCTAssertEqual(capabilityFields["exactPlanDigest"], .string(planDigest))
+    XCTAssertNil(
+      capabilityFields["exactPlanDigest"],
+      "E1 draft must not turn each implementation-level plan change into a new approval")
     XCTAssertEqual(capabilityFields["exactBindingRevision"], .integer(7))
     XCTAssertEqual(capabilityFields["maximumUses"], .integer(3))
     XCTAssertEqual(
@@ -314,8 +316,8 @@ final class AgentDaemonContractTests: XCTestCase {
     XCTAssertTrue(inspectedLineage.isEmpty)
 
     // The Agent surface intentionally omits fields that decode to request
-    // defaults. Its semantically identical request must still derive the
-    // exact plan that the draft showed to the maintainer.
+    // defaults. Its semantically identical request still materializes and
+    // durably binds the exact plan shown as the draft preview.
     let agentShapedRequest = JSONValue.object([
       "documentType": .string("runtime-operation-request"),
       "schemaVersion": .string("2.0.0"),

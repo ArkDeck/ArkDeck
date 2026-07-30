@@ -1,10 +1,13 @@
 // Durable Runtime Capability store (CHG-2026-046, T03).
 //
 // A capability is installed once as a bounded authorization envelope.
-// Every use appends a hash-linked execution node. A different reservation
-// may consume the next use only after the preceding node has a confirmed
-// outcome. A pending, legacy-unverified or outcomeUnknown node therefore
-// fails closed, while retrying the same reservation remains idempotent.
+// Every use appends a hash-linked execution node. E1 standing envelopes
+// may admit a newly materialized plan while operation, effect, target,
+// binding and typed inputs stay identical; every node still binds its exact
+// plan digest. A different reservation may consume the next use only after
+// the preceding node has a confirmed outcome. A pending, legacy-unverified
+// or outcomeUnknown node therefore fails closed, while retrying the same
+// reservation remains idempotent.
 //
 // All writes are atomic (temp + fsync + rename + directory sync) under an
 // exclusive flock, so a crash between any two syscalls leaves either the
@@ -59,6 +62,7 @@ public struct RuntimeCapabilityLineageEntry: Equatable, Sendable, Codable {
   public let targetStableIdentitySHA256: String?
   public let bindingRevision: Int?
   public let materializedPlanDigest: String?
+  public let authorizationScopeFingerprintSHA256: String?
   public let queryFingerprintSHA256: String
   public let remainingUsesAfter: Int
   public let previousLineageSHA256: String?
@@ -115,6 +119,7 @@ private struct StoredConsumption: Equatable, Codable {
   let targetStableIdentitySHA256: String?
   let bindingRevision: Int?
   let materializedPlanDigest: String?
+  let authorizationScopeFingerprintSHA256: String?
   let queryFingerprintSHA256: String
   let remainingUsesAfter: Int
   let previousLineageSHA256: String?
@@ -221,6 +226,28 @@ public actor RuntimeCapabilityStore {
     }
   }
 
+  /// Validates an execution against both the installed envelope and its
+  /// durable lineage without reserving a use. Submit uses this after the
+  /// complete typed plan materializes, so a scope or recovery blocker is
+  /// reported before a Job can reach mutation dispatch.
+  public func validateNewExecution(
+    capabilityID: String,
+    query: RuntimeCapabilityAuthorizationQuery,
+    nowUTC: String
+  ) throws {
+    try withExclusiveLock {
+      let document = try loadDocument()
+      guard
+        let record = document.records.first(where: {
+          $0.capability.capabilityID == capabilityID
+        })
+      else {
+        throw RuntimeCapabilityStoreError.capabilityNotFound(capabilityID)
+      }
+      try Self.validateNewExecution(record: record, query: query, nowUTC: nowUTC)
+    }
+  }
+
   public func revoke(capabilityID: String, atUTC: String, reason: String) throws {
     try withExclusiveLock {
       var document = try loadDocument()
@@ -296,26 +323,8 @@ public actor RuntimeCapabilityStore {
           capabilityID: capabilityID, consumption: existing)
       }
       let record = document.records[index]
-      if let unresolved = record.consumptions.first(where: {
-        $0.currentOutcome != .confirmed
-      })
-      {
-        throw RuntimeCapabilityStoreError.lineageBlocked(
-          "previous use \(unresolved.ordinal) is \(unresolved.currentOutcome.rawValue); "
-            + "new mutation dispatch is forbidden")
-      }
-      if let first = record.consumptions.first,
-        first.queryFingerprintSHA256 != fingerprint
-      {
-        throw RuntimeCapabilityStoreError.lineageBlocked(
-          "operation, effect, target, binding, typed plan or inputs drifted from "
-            + "authorization lineage use 1")
-      }
-      if case .failure(let denial) = record.capability.authorizes(
-        query, nowUTC: nowUTC, remainingUses: record.remainingUses)
-      {
-        throw RuntimeCapabilityStoreError.denied(denial)
-      }
+      try Self.validateNewExecution(record: record, query: query, nowUTC: nowUTC)
+      let authorizationScopeFingerprint = Self.authorizationScopeFingerprint(of: query)
       let ordinal = record.consumptions.count + 1
       let remainingAfter = record.remainingUses - 1
       let previousLineageSHA256 = record.consumptions.last?.lineageTipSHA256
@@ -330,6 +339,7 @@ public actor RuntimeCapabilityStore {
         targetStableIdentitySHA256: query.targetStableIdentitySHA256,
         bindingRevision: query.targetBindingRevision,
         materializedPlanDigest: query.planDigest,
+        authorizationScopeFingerprintSHA256: authorizationScopeFingerprint,
         queryFingerprintSHA256: fingerprint,
         remainingUsesAfter: remainingAfter,
         previousLineageSHA256: previousLineageSHA256)
@@ -343,6 +353,8 @@ public actor RuntimeCapabilityStore {
         targetStableIdentitySHA256: immutable.targetStableIdentitySHA256,
         bindingRevision: immutable.bindingRevision,
         materializedPlanDigest: immutable.materializedPlanDigest,
+        authorizationScopeFingerprintSHA256:
+          immutable.authorizationScopeFingerprintSHA256,
         queryFingerprintSHA256: immutable.queryFingerprintSHA256,
         remainingUsesAfter: immutable.remainingUsesAfter,
         previousLineageSHA256: immutable.previousLineageSHA256,
@@ -452,6 +464,7 @@ public actor RuntimeCapabilityStore {
     let targetStableIdentitySHA256: String?
     let bindingRevision: Int?
     let materializedPlanDigest: String?
+    let authorizationScopeFingerprintSHA256: String?
     let queryFingerprintSHA256: String
     let remainingUsesAfter: Int
     let previousLineageSHA256: String?
@@ -498,6 +511,7 @@ public actor RuntimeCapabilityStore {
       targetStableIdentitySHA256: use.targetStableIdentitySHA256,
       bindingRevision: use.bindingRevision,
       materializedPlanDigest: use.materializedPlanDigest,
+      authorizationScopeFingerprintSHA256: use.authorizationScopeFingerprintSHA256,
       queryFingerprintSHA256: use.queryFingerprintSHA256,
       remainingUsesAfter: use.remainingUsesAfter,
       previousLineageSHA256: use.previousLineageSHA256,
@@ -532,13 +546,28 @@ public actor RuntimeCapabilityStore {
   private static func fingerprint(
     of query: RuntimeCapabilityAuthorizationQuery
   ) -> String {
+    fingerprint(of: query, includePlan: true)
+  }
+
+  private static func authorizationScopeFingerprint(
+    of query: RuntimeCapabilityAuthorizationQuery
+  ) -> String {
+    fingerprint(of: query, includePlan: false)
+  }
+
+  private static func fingerprint(
+    of query: RuntimeCapabilityAuthorizationQuery,
+    includePlan: Bool
+  ) -> String {
     var components: [String] = [
       "operation=\(query.operationID)@\(query.operationVersion)",
       "effect=\(query.effect.rawValue)",
       "target=\(query.targetStableIdentitySHA256 ?? "-")",
       "bindingRevision=\(query.targetBindingRevision.map(String.init) ?? "-")",
-      "plan=\(query.planDigest ?? "-")",
     ]
+    if includePlan {
+      components.append("plan=\(query.planDigest ?? "-")")
+    }
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
     if let inputs = try? encoder.encode(query.inputs),
@@ -549,6 +578,63 @@ public actor RuntimeCapabilityStore {
       components.append("inputs=unencodable")
     }
     return SHA256Digest.hex(of: Data(components.joined(separator: "\n").utf8))
+  }
+
+  private static func validateNewExecution(
+    record: StoredRecord,
+    query: RuntimeCapabilityAuthorizationQuery,
+    nowUTC: String
+  ) throws {
+    guard
+      let stableIdentity = query.targetStableIdentitySHA256,
+      isLowercaseSHA256(stableIdentity),
+      let bindingRevision = query.targetBindingRevision,
+      bindingRevision > 0
+    else {
+      throw RuntimeCapabilityStoreError.denied(
+        RuntimeCapabilityDenial(
+          reason: .targetIdentityRequired,
+          detail: "stable target identity and binding revision are required"))
+    }
+    guard let planDigest = query.planDigest, isLowercaseSHA256(planDigest) else {
+      throw RuntimeCapabilityStoreError.denied(
+        RuntimeCapabilityDenial(
+          reason: .planDigestRequired,
+          detail: "a complete materialized plan digest is required"))
+    }
+    if let unresolved = record.consumptions.first(where: {
+      $0.currentOutcome != .confirmed
+    }) {
+      throw RuntimeCapabilityStoreError.lineageBlocked(
+        "previous use \(unresolved.ordinal) is \(unresolved.currentOutcome.rawValue); "
+          + "new mutation dispatch is forbidden")
+    }
+    if let first = record.consumptions.first {
+      if let expectedScope = first.authorizationScopeFingerprintSHA256 {
+        guard expectedScope == authorizationScopeFingerprint(of: query) else {
+          throw RuntimeCapabilityStoreError.lineageBlocked(
+            "operation, effect, target, binding or typed inputs drifted from "
+              + "authorization lineage use 1")
+        }
+      } else {
+        // Pre-upgrade lineage nodes did not persist a plan-independent scope
+        // fingerprint. Preserve their stricter exact-query behavior.
+        guard first.queryFingerprintSHA256 == fingerprint(of: query) else {
+          throw RuntimeCapabilityStoreError.lineageBlocked(
+            "legacy authorization lineage scope cannot be proven unchanged")
+        }
+      }
+    }
+    if case .failure(let denial) = record.capability.authorizes(
+      query, nowUTC: nowUTC, remainingUses: record.remainingUses)
+    {
+      throw RuntimeCapabilityStoreError.denied(denial)
+    }
+  }
+
+  private static func isLowercaseSHA256(_ value: String) -> Bool {
+    value.count == 64
+      && value.allSatisfy { ("0"..."9").contains($0) || ("a"..."f").contains($0) }
   }
 
   private static func digest<T: Encodable>(_ value: T) -> String {
@@ -628,6 +714,7 @@ public actor RuntimeCapabilityStore {
             }(),
             bindingRevision: legacyRecord.capability.exactBindingRevision,
             materializedPlanDigest: legacyRecord.capability.exactPlanDigest,
+            authorizationScopeFingerprintSHA256: nil,
             queryFingerprintSHA256: old.queryFingerprintSHA256,
             remainingUsesAfter: old.remainingUsesAfter,
             previousLineageSHA256: previousTip)
@@ -653,6 +740,7 @@ public actor RuntimeCapabilityStore {
             targetStableIdentitySHA256: material.targetStableIdentitySHA256,
             bindingRevision: material.bindingRevision,
             materializedPlanDigest: material.materializedPlanDigest,
+            authorizationScopeFingerprintSHA256: nil,
             queryFingerprintSHA256: old.queryFingerprintSHA256,
             remainingUsesAfter: old.remainingUsesAfter,
             previousLineageSHA256: material.previousLineageSHA256,
@@ -710,6 +798,7 @@ public actor RuntimeCapabilityStore {
           targetStableIdentitySHA256: use.targetStableIdentitySHA256,
           bindingRevision: use.bindingRevision,
           materializedPlanDigest: use.materializedPlanDigest,
+          authorizationScopeFingerprintSHA256: use.authorizationScopeFingerprintSHA256,
           queryFingerprintSHA256: use.queryFingerprintSHA256,
           remainingUsesAfter: use.remainingUsesAfter,
           previousLineageSHA256: use.previousLineageSHA256)

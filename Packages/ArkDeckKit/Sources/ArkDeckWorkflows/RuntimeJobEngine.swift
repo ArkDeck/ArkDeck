@@ -463,10 +463,12 @@ public actor RuntimeJobEngine {
     }.sorted { $0.reference < $1.reference }
   }
 
-  /// Produces an exact, reviewable E1 proposal without installing a
-  /// capability, admitting a Job or dispatching a provider action. Provider
-  /// availability, target facts, Artifact leases and every selected typed
-  /// plan step must materialize before a draft is returned.
+  /// Produces a reviewable E1 standing authorization envelope without
+  /// installing a capability, admitting a Job or dispatching a provider
+  /// action. Provider availability, target facts, Artifact leases and every
+  /// selected typed plan step must materialize before a draft is returned.
+  /// The current plan digest is returned as a preview; each later admission
+  /// binds its own exact materialized digest in the durable lineage.
   public func draftCapability(
     _ requestData: Data,
     issuedAtUTC: String,
@@ -552,7 +554,7 @@ public actor RuntimeJobEngine {
         maximumUses: maximumUses,
         issuer: RuntimeCapabilityIssuer(
           kind: .maintainerMergedPR, reference: issuerReference),
-        exactPlanDigest: materialized.planDigest,
+        exactPlanDigest: nil,
         exactBindingRevision: materialized.bindingRevision)
     } catch {
       throw RuntimeJobEngineError.rejected(
@@ -2786,34 +2788,10 @@ public actor RuntimeJobEngine {
       planDigest: materialized.planDigest,
       inputs: request.inputs)
     do {
-      guard
-        let status = try await capabilityStore.inspect(
-          capabilityID: authorization.capabilityID)
-      else {
-        throw RuntimeCapabilityStoreError.capabilityNotFound(authorization.capabilityID)
-      }
-      if case .failure(let denial) = status.capability.authorizes(
-        query, nowUTC: admittedAt, remainingUses: status.remainingUses)
-      {
-        throw RuntimeCapabilityStoreError.denied(denial)
-      }
-      guard status.lineageAllowsNewExecution else {
-        throw RuntimeCapabilityStoreError.lineageBlocked(
-          status.lineageBlocker ?? "previous authorization lineage is not confirmed")
-      }
-      if let first = status.lineage.first {
-        let operationReference = "\(query.operationID)@\(query.operationVersion)"
-        guard first.operationReference == operationReference,
-          first.effect == query.effect.rawValue,
-          first.targetStableIdentitySHA256 == query.targetStableIdentitySHA256,
-          first.bindingRevision == query.targetBindingRevision,
-          first.materializedPlanDigest == query.planDigest
-        else {
-          throw RuntimeCapabilityStoreError.lineageBlocked(
-            "operation, effect, target, binding or typed plan drifted from "
-              + "authorization lineage use 1")
-        }
-      }
+      try await capabilityStore.validateNewExecution(
+        capabilityID: authorization.capabilityID,
+        query: query,
+        nowUTC: admittedAt)
       return nil
     } catch let error as RuntimeCapabilityStoreError {
       throw RuntimeJobEngineError.rejected(

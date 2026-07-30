@@ -23,7 +23,9 @@ final class RuntimeCapabilityStoreContractTests: XCTestCase {
   }
 
   private func e1Capability(
-    id: String = "CAP-RT-STORE-001", maximumUses: Int = 2
+    id: String = "CAP-RT-STORE-001",
+    maximumUses: Int = 2,
+    exactPlanDigest: String? = nil
   ) throws -> RuntimeCapability {
     try RuntimeCapability(
       capabilityID: id,
@@ -33,13 +35,14 @@ final class RuntimeCapabilityStoreContractTests: XCTestCase {
       issuedAtUTC: "2026-07-01T00:00:00Z",
       expiresAtUTC: "2026-12-31T00:00:00Z",
       maximumUses: maximumUses,
-      issuer: .init(kind: .maintainerMergedPR, reference: "PR#800 deadbeef"))
+      issuer: .init(kind: .maintainerMergedPR, reference: "PR#800 deadbeef"),
+      exactPlanDigest: exactPlanDigest)
   }
 
   private func query(
     effect: WorkflowEffect = .deviceMutation,
     bindingRevision: Int? = 7,
-    planDigest: String? = nil,
+    planDigest: String? = String(repeating: "b", count: 64),
     inputs: [String: JSONValue] = [:]
   ) -> RuntimeCapabilityAuthorizationQuery {
     .init(
@@ -186,6 +189,46 @@ final class RuntimeCapabilityStoreContractTests: XCTestCase {
     XCTAssertEqual(retry, second)
   }
 
+  func testStandingE1LineageAllowsNewPlanAndBindsEveryMaterialization() async throws {
+    let store = try makeStore()
+    try await store.install(try e1Capability(maximumUses: 3))
+    let firstPlan = String(repeating: "b", count: 64)
+    let secondPlan = String(repeating: "c", count: 64)
+    let inputs: [String: JSONValue] = [
+      "bundleName": .string("com.example.demo"),
+      "abilityName": .string("EntryAbility"),
+    ]
+    _ = try await store.consume(
+      capabilityID: "CAP-RT-STORE-001", reservationID: "res-plan-1",
+      jobID: "job-plan-1",
+      query: query(planDigest: firstPlan, inputs: inputs),
+      nowUTC: "2026-07-15T00:00:00Z")
+    try await store.recordOutcome(
+      capabilityID: "CAP-RT-STORE-001", reservationID: "res-plan-1",
+      jobID: "job-plan-1", outcome: .confirmed, terminalState: "failed",
+      atUTC: "2026-07-15T00:00:30Z")
+
+    _ = try await store.consume(
+      capabilityID: "CAP-RT-STORE-001", reservationID: "res-plan-2",
+      jobID: "job-plan-2",
+      query: query(planDigest: secondPlan, inputs: inputs),
+      nowUTC: "2026-07-15T00:01:00Z")
+
+    let inspected = try await store.inspect(capabilityID: "CAP-RT-STORE-001")
+    let status = try XCTUnwrap(inspected)
+    XCTAssertEqual(status.lineage.map(\.materializedPlanDigest), [firstPlan, secondPlan])
+    XCTAssertEqual(
+      status.lineage.map(\.authorizationScopeFingerprintSHA256).compactMap { $0 }.count,
+      2)
+    XCTAssertEqual(
+      status.lineage[0].authorizationScopeFingerprintSHA256,
+      status.lineage[1].authorizationScopeFingerprintSHA256)
+    XCTAssertNotEqual(
+      status.lineage[0].queryFingerprintSHA256,
+      status.lineage[1].queryFingerprintSHA256)
+    XCTAssertEqual(status.remainingUses, 1)
+  }
+
   func testDedicatedReadbackCanResolveUnknownWithoutASecondConsumption() async throws {
     let store = try makeStore()
     try await store.install(try e1Capability(maximumUses: 2))
@@ -236,6 +279,70 @@ final class RuntimeCapabilityStoreContractTests: XCTestCase {
     let status = try await store.inspect(capabilityID: "CAP-RT-STORE-001")
     XCTAssertEqual(status?.remainingUses, 1)
     XCTAssertEqual(status?.consumptionCount, 1)
+  }
+
+  func testConfirmedLineageStillRejectsTypedInputDriftWithoutConsuming() async throws {
+    let store = try makeStore()
+    try await store.install(try e1Capability(maximumUses: 2))
+    let firstInputs: [String: JSONValue] = [
+      "bundleName": .string("com.example.demo")
+    ]
+    _ = try await store.consume(
+      capabilityID: "CAP-RT-STORE-001", reservationID: "res-input-first",
+      jobID: "job-input-first",
+      query: query(planDigest: String(repeating: "b", count: 64), inputs: firstInputs),
+      nowUTC: "2026-07-15T00:00:00Z")
+    try await store.recordOutcome(
+      capabilityID: "CAP-RT-STORE-001", reservationID: "res-input-first",
+      jobID: "job-input-first", outcome: .confirmed, terminalState: "succeeded",
+      atUTC: "2026-07-15T00:00:30Z")
+
+    do {
+      _ = try await store.consume(
+        capabilityID: "CAP-RT-STORE-001", reservationID: "res-input-drift",
+        jobID: "job-input-drift",
+        query: query(
+          planDigest: String(repeating: "c", count: 64),
+          inputs: ["bundleName": .string("com.example.other")]),
+        nowUTC: "2026-07-15T00:01:00Z")
+      XCTFail("confirmed history cannot silently expand its typed input scope")
+    } catch let error as RuntimeCapabilityStoreError {
+      guard case .lineageBlocked(let detail) = error else {
+        return XCTFail("expected lineageBlocked, got \(error)")
+      }
+      XCTAssertTrue(detail.contains("typed inputs"))
+    }
+    let status = try await store.inspect(capabilityID: "CAP-RT-STORE-001")
+    XCTAssertEqual(status?.remainingUses, 1)
+    XCTAssertEqual(status?.consumptionCount, 1)
+  }
+
+  func testExactPlanPinnedCapabilityStillRejectsPlanDrift() async throws {
+    let exactPlan = String(repeating: "b", count: 64)
+    let store = try makeStore()
+    try await store.install(
+      try e1Capability(maximumUses: 2, exactPlanDigest: exactPlan))
+    _ = try await store.consume(
+      capabilityID: "CAP-RT-STORE-001", reservationID: "res-exact-first",
+      jobID: "job-exact-first", query: query(planDigest: exactPlan),
+      nowUTC: "2026-07-15T00:00:00Z")
+    try await store.recordOutcome(
+      capabilityID: "CAP-RT-STORE-001", reservationID: "res-exact-first",
+      jobID: "job-exact-first", outcome: .confirmed, terminalState: "succeeded",
+      atUTC: "2026-07-15T00:00:30Z")
+
+    do {
+      try await store.validateNewExecution(
+        capabilityID: "CAP-RT-STORE-001",
+        query: query(planDigest: String(repeating: "c", count: 64)),
+        nowUTC: "2026-07-15T00:01:00Z")
+      XCTFail("an explicitly exact-plan capability must remain exact")
+    } catch let error as RuntimeCapabilityStoreError {
+      guard case .denied(let denial) = error else {
+        return XCTFail("expected plan denial, got \(error)")
+      }
+      XCTAssertEqual(denial.reason, .planDigestMismatch)
+    }
   }
 
   func testConsumeRetryWithSameReservationIsIdempotent() async throws {
@@ -315,6 +422,25 @@ final class RuntimeCapabilityStoreContractTests: XCTestCase {
         return XCTFail("expected denial, got \(error)")
       }
       XCTAssertEqual(denial.reason, .effectAboveCeiling)
+    }
+    let status = try await store.inspect(capabilityID: "CAP-RT-STORE-001")
+    XCTAssertEqual(status?.remainingUses, 2)
+    XCTAssertEqual(status?.consumptionCount, 0)
+  }
+
+  func testMissingMaterializedPlanDigestConsumesNothing() async throws {
+    let store = try makeStore()
+    try await store.install(try e1Capability())
+    do {
+      _ = try await store.consume(
+        capabilityID: "CAP-RT-STORE-001", reservationID: "res-no-plan",
+        query: query(planDigest: nil), nowUTC: "2026-07-15T00:00:00Z")
+      XCTFail("E1 admission must bind a complete materialized plan digest")
+    } catch let error as RuntimeCapabilityStoreError {
+      guard case .denied(let denial) = error else {
+        return XCTFail("expected denial, got \(error)")
+      }
+      XCTAssertEqual(denial.reason, .planDigestRequired)
     }
     let status = try await store.inspect(capabilityID: "CAP-RT-STORE-001")
     XCTAssertEqual(status?.remainingUses, 2)
