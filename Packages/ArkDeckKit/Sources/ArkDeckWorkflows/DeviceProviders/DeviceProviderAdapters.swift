@@ -1982,32 +1982,40 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
 
 // MARK: - Rockchip adapter
 
-/// Execution port so contract tests can fake the host; production wires
-/// `RockchipFlashExecutionHost.execute` behind it unchanged.
-public protocol RockchipFlashExecutionPort: Sendable {
-  func executeFlash(authorizationID: String) async throws -> (
-    manifestID: String, succeeded: Bool, waitingForRecovery: Bool
-  )
+public protocol RockchipRuntimeFactsPort: Sendable {
+  func currentFacts(targetID: String) async throws -> ProviderFacts
 }
 
 public struct RockchipFlashProviderAdapter: DeviceProvider {
   public let providerID = "rockchip"
-  private let executionPort: any RockchipFlashExecutionPort
+  private let factsPort: (any RockchipRuntimeFactsPort)?
+  private let availability: ProviderOperationAvailability
 
-  public init(executionPort: any RockchipFlashExecutionPort) {
-    self.executionPort = executionPort
+  public init(
+    factsPort: (any RockchipRuntimeFactsPort)? = nil,
+    availability: ProviderOperationAvailability = .unavailable(
+      reason: "production Rockchip dispatcher is not registered")
+  ) {
+    self.factsPort = factsPort
+    self.availability = availability
   }
 
   public func runtimeAvailability(
     for operation: CatalogOperationDescriptor
   ) -> ProviderOperationAvailability {
-    .unavailable(
-      reason: "Rockchip migration is not production available in this recovery phase")
+    guard operation.reference == "flash.dayu200@1" else {
+      return .unavailable(
+        reason: "Rockchip provider has no typed plan for \(operation.reference)")
+    }
+    return availability
   }
 
   public func resolveFacts(targetID: String) async throws -> ProviderFacts {
-    throw DeviceProviderError.factsUnavailable(
-      "rockchip facts resolve inside the execution host during migration (T17)")
+    guard let factsPort else {
+      throw DeviceProviderError.factsUnavailable(
+        "production Rockchip target facts are not registered")
+    }
+    return try await factsPort.currentFacts(targetID: targetID)
   }
 
   public func action(
@@ -2015,16 +2023,57 @@ public struct RockchipFlashProviderAdapter: DeviceProvider {
     operation: CatalogOperationDescriptor,
     inputs: [String: JSONValue]
   ) throws -> TypedProviderAction {
-    switch step.kind {
-    case .flashPartition:
-      guard case .string(let authorizationID)? = inputs["authorizationId"] else {
-        throw DeviceProviderError.unsupportedAction(
-          "flash requires a standing authorization id input during migration")
-      }
-      return .rockchip(.executeFlashPlan(authorizationID: authorizationID))
+    throw DeviceProviderError.unsupportedAction(
+      "\(step.stepID) requires engine-resolved target and Artifact facts")
+  }
+
+  public func action(
+    for step: CatalogStepDescriptor,
+    operation: CatalogOperationDescriptor,
+    inputs: [String: JSONValue],
+    context: ProviderExecutionContext
+  ) throws -> TypedProviderAction {
+    guard operation.reference == "flash.dayu200@1" else {
+      throw DeviceProviderError.unsupportedStepKind(
+        "\(step.kind.rawValue) has no Rockchip action for \(operation.reference)")
+    }
+    guard let connectKey = context.connectKey, !connectKey.isEmpty,
+      let identity = context.expectedIdentitySHA256,
+      identity.count == 64,
+      identity.allSatisfy({ $0.isHexDigit && !$0.isUppercase })
+    else {
+      throw DeviceProviderError.unsupportedAction(
+        "\(step.stepID) requires a descriptor-bound target identity")
+    }
+    switch (step.stepID, step.kind) {
+    case ("enter-loader-mode", .enterUpdater):
+      return .rockchip(.enterLoader(connectKey: connectKey))
+    case ("wait-loader-disconnect", .waitForDisconnect):
+      return .rockchip(.waitForHDCDisconnect(connectKey: connectKey))
+    case ("wait-loader-reconnect", .waitForReconnect):
+      return .rockchip(.waitForLoader(stableIdentitySHA256: identity))
+    case ("rebind-loader-identity", .probeDevice):
+      return .rockchip(.rebindLoader(stableIdentitySHA256: identity))
+    case ("flash-partitions", .flashPartition):
+      return .rockchip(.flashPartitions(
+        try flashBundle(inputs: inputs, context: context)))
+    case ("verify-flash-readback", .verifyRemoteState):
+      return .rockchip(.verifyFlashReadback(
+        try flashBundle(inputs: inputs, context: context)))
+    case ("reboot-device", .rebootDevice):
+      return .rockchip(.rebootToNormal(stableIdentitySHA256: identity))
+    case ("wait-for-hdc", .waitForReconnect):
+      return .rockchip(.waitForHDCReconnect(connectKey: connectKey))
+    case ("rebind-and-verify-build", .probeDevice):
+      return .rockchip(.verifyBuild(connectKey: connectKey))
+    case ("capture-post-flash-diagnostics", .captureRemoteStdout):
+      return .rockchip(.capturePostFlashDiagnostics(
+        connectKey: connectKey,
+        request: try HDCHilogCaptureRequest(
+          durationSeconds: 30, filters: [], byteBudget: 16 * 1024 * 1024)))
     default:
       throw DeviceProviderError.unsupportedStepKind(
-        "\(step.kind.rawValue) has no registered Rockchip action in MU-2 (arrives with T17/T18)")
+        "\(step.stepID) has no registered Rockchip runtime action")
     }
   }
 
@@ -2032,12 +2081,39 @@ public struct RockchipFlashProviderAdapter: DeviceProvider {
     action: TypedProviderAction,
     context: ProviderExecutionContext
   ) throws -> TypedProcessPlan {
-    guard case .rockchip(.executeFlashPlan(let authorizationID)) = action else {
+    guard case .rockchip(let rockchipAction) = action else {
       throw DeviceProviderError.unsupportedAction("non-Rockchip action given to rockchip provider")
+    }
+    let descriptor: String
+    switch rockchipAction {
+    case .enterLoader:
+      descriptor = "rockchip.hdc.enter-loader.v1"
+    case .waitForHDCDisconnect:
+      descriptor = "rockchip.hdc.wait-disconnect.v1"
+    case .waitForLoader:
+      descriptor = "rockchip.rockusb.wait-loader.v1"
+    case .rebindLoader:
+      descriptor = "rockchip.rockusb.rebind-loader.v1"
+    case .flashPartitions(let bundle):
+      descriptor =
+        "rockchip.rockusb.flash-dayu200.v1:"
+        + String(bundle.sha256.prefix(16))
+    case .verifyFlashReadback(let bundle):
+      descriptor =
+        "rockchip.rockusb.verify-dayu200.v1:"
+        + String(bundle.sha256.prefix(16))
+    case .rebootToNormal:
+      descriptor = "rockchip.rockusb.reboot-normal.v1"
+    case .waitForHDCReconnect:
+      descriptor = "rockchip.hdc.wait-reconnect.v1"
+    case .verifyBuild:
+      descriptor = "rockchip.hdc.verify-build.v1"
+    case .capturePostFlashDiagnostics:
+      descriptor = "rockchip.hdc.capture-post-flash-hilog.v1"
     }
     return TypedProcessPlan(
       action: action,
-      kind: .hostManaged(descriptor: "rockchip-flash-host:\(authorizationID)"))
+      kind: .hostManaged(descriptor: descriptor))
   }
 
   public func verify(
@@ -2045,23 +2121,70 @@ public struct RockchipFlashProviderAdapter: DeviceProvider {
     action: TypedProviderAction,
     context: ProviderExecutionContext
   ) throws -> ProviderSemanticOutcome {
-    guard receipt.hostManagedRecordID != nil else {
-      // A flash without its durable manifest reference can never verify.
+    guard let recordID = receipt.hostManagedRecordID, !recordID.isEmpty else {
+      // No step can verify from a bare exit status. The production
+      // dispatcher must return its correlated durable semantic receipt.
       return .unknown(reason: "host-managed execution returned no durable record reference")
     }
     guard case .rockchip = action else {
       throw DeviceProviderError.unsupportedAction("non-Rockchip action given to rockchip provider")
     }
-    return .verified(summary: ["manifestId": receipt.hostManagedRecordID ?? ""])
+    return .verified(summary: ["recordId": recordID])
   }
 
   public func reconcile(
     intent: ProviderDurableIntentReference,
     context: ProviderExecutionContext
   ) async throws -> ProviderReconcileOutcome {
-    // Destructive: without the host's own recovery verdict there is no
-    // safe claim in either direction.
-    return .stillUnknown(
-      reason: "rockchip reconcile is owned by the execution host's recovery flow (T17)")
+    if intent.action.effect <= .readOnly {
+      return .confirmedNotExecuted
+    }
+    return .stillUnknown(reason: "Rockchip mutation has no completed dedicated readback")
+  }
+
+  private func flashBundle(
+    inputs: [String: JSONValue],
+    context: ProviderExecutionContext
+  ) throws -> RockchipRuntimeFlashBundle {
+    guard case .string("dayu200@1")? = inputs["deviceProfile"] else {
+      throw DeviceProviderError.unsupportedAction(
+        "flash requires the exact dayu200@1 device profile")
+    }
+    guard case .string(let artifactLeaseID)? = inputs["imageBundleLease"],
+      !artifactLeaseID.isEmpty
+    else {
+      throw DeviceProviderError.unsupportedAction(
+        "flash requires the engine-resolved imageBundleLease")
+    }
+    guard case .array(let values)? = inputs["partitionPlan"] else {
+      throw DeviceProviderError.unsupportedAction(
+        "flash requires an ordered partitionPlan")
+    }
+    let partitions: [String] = try values.map { value in
+      guard case .string(let name) = value else {
+        throw DeviceProviderError.unsupportedAction(
+          "partitionPlan contains a non-string value")
+      }
+      return name
+    }
+    let expected = RockchipFlashProfile.dayu200.mappedPartitions.map(\.partitionName)
+    guard partitions == expected else {
+      throw DeviceProviderError.unsupportedAction(
+        "partitionPlan must exactly match the pinned DAYU200 order")
+    }
+    guard let artifact = context.resolvedInputArtifact,
+      artifact.sha256 == RockchipFlashProfile.dayu200.archiveSHA256,
+      artifact.byteCount == Int(RockchipFlashProfile.dayu200.archiveSizeBytes)
+    else {
+      throw DeviceProviderError.unsupportedAction(
+        "flash requires the engine-resolved pinned DAYU200 image bundle")
+    }
+    return RockchipRuntimeFlashBundle(
+      artifactLeaseID: artifactLeaseID,
+      artifactID: artifact.artifactID,
+      fileURL: artifact.fileURL,
+      sha256: artifact.sha256,
+      byteCount: artifact.byteCount,
+      partitionNames: partitions)
   }
 }

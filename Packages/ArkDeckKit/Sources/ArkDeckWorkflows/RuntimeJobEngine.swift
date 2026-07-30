@@ -933,6 +933,7 @@ public actor RuntimeJobEngine {
         resolvedArtifact =
           step.kind == .sendFile
             || step.kind == .flashPartition
+            || descriptor.reference == "flash.dayu200@1"
             || descriptor.reference == "deploy.native-library.app-owned@1"
           ? try await resolvedInputArtifact(jobID: jobID) : nil
       } catch {
@@ -1321,6 +1322,11 @@ public actor RuntimeJobEngine {
     case "cleanup-uninstall":
       if case .string(let policy)? = inputs["cleanupPolicy"] {
         return policy == "uninstall"
+      }
+      return true
+    case "capture-post-flash-diagnostics":
+      if case .string(let profile)? = inputs["postFlashVerification"] {
+        return profile == "full"
       }
       return true
     default:
@@ -3763,7 +3769,39 @@ public actor RuntimeJobEngine {
         "clientIdentity": .string("arkdeck-agentd"),
       ]
     case .probeDevice:
-      arguments = ["evidencePolicy": .string("coreMinimum")]
+      switch action {
+      case .rockchip(.rebindLoader):
+        arguments = ["evidencePolicy": .string("rockusbLoaderIdentity")]
+      case .rockchip(.verifyBuild):
+        arguments = ["evidencePolicy": .string("postFlashBuild")]
+      default:
+        arguments = ["evidencePolicy": .string("coreMinimum")]
+      }
+    case .waitForDisconnect:
+      guard case .rockchip(.waitForHDCDisconnect)? = action else {
+        throw RuntimeJobEngineError.internalFailure(
+          "\(step.stepID) has no exact HDC disconnect action")
+      }
+      arguments = [
+        "deadlineMilliseconds": .integer(15_000),
+        "reason": .string("enterLoader"),
+      ]
+    case .waitForReconnect:
+      switch action {
+      case .rockchip(.waitForLoader):
+        arguments = [
+          "deadlineMilliseconds": .integer(45_000),
+          "reason": .string("loaderReconnect"),
+        ]
+      case .rockchip(.waitForHDCReconnect):
+        arguments = [
+          "deadlineMilliseconds": .integer(120_000),
+          "reason": .string("normalModeReconnect"),
+        ]
+      default:
+        throw RuntimeJobEngineError.internalFailure(
+          "\(step.stepID) has no exact reconnect action")
+      }
     case .preflightDeviceStorage:
       if case .hdc(.observeStorage(let request))? = action {
         arguments = [
@@ -4002,7 +4040,13 @@ public actor RuntimeJobEngine {
       ]
     case .verifyRemoteState:
       let probeID: String
-      if case .hdc(.verifyProcessState(let bundle))? = action {
+      if case .rockchip(.verifyFlashReadback(let bundle))? = action {
+        arguments = [
+          "probeId": .string("rockusb-partition-readback"),
+          "expectedState": .string("mapped-set:\(bundle.sha256)"),
+        ]
+        break
+      } else if case .hdc(.verifyProcessState(let bundle))? = action {
         probeID = "process.\(bundle.bundleName)"
       } else if case .hdc(.inspectNativeLibrary(let deployment, .targetLoaded))? = action {
         arguments = [
@@ -4017,6 +4061,39 @@ public actor RuntimeJobEngine {
       arguments = [
         "probeId": .string(probeID),
         "expectedState": .string("running"),
+      ]
+    case .enterUpdater:
+      guard case .rockchip(.enterLoader)? = action else {
+        throw RuntimeJobEngineError.internalFailure(
+          "\(step.stepID) has no exact Loader transition action")
+      }
+      arguments = [
+        "providerOperationId": .string("rockusb.enter-loader"),
+        "expectedMode": .string("Loader"),
+        "reconnectDeadlineMilliseconds": .integer(45_000),
+      ]
+    case .flashPartition:
+      guard case .rockchip(.flashPartitions(let bundle))? = action else {
+        throw RuntimeJobEngineError.internalFailure(
+          "\(step.stepID) has no exact Rockchip flash action")
+      }
+      arguments = [
+        "providerOperationId": .string("rockusb.wlx-write"),
+        "partition": .string("dayu200_mapped_set"),
+        "imageArtifactId": .string(bundle.artifactID),
+        "imageSha256": .string(bundle.sha256),
+        "imageSize": .integer(Int64(bundle.byteCount)),
+        "confirmationId": .string("runtimeE2Admission"),
+        "safeBoundaryId": .string("perPartitionWriteBoundary"),
+      ]
+    case .rebootDevice:
+      guard case .rockchip(.rebootToNormal)? = action else {
+        throw RuntimeJobEngineError.internalFailure(
+          "\(step.stepID) has no exact Rockchip reboot action")
+      }
+      arguments = [
+        "targetMode": .string("normal"),
+        "reason": .string("rockusbResetAfterFlash"),
       ]
     default:
       throw RuntimeJobEngineError.internalFailure(

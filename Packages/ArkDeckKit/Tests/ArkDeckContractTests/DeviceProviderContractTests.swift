@@ -17,11 +17,17 @@ final class DeviceProviderContractTests: XCTestCase {
     }
   }
 
-  private struct FlashPort: RockchipFlashExecutionPort {
-    func executeFlash(authorizationID: String) async throws -> (
-      manifestID: String, succeeded: Bool, waitingForRecovery: Bool
-    ) {
-      ("manifest-1", true, false)
+  private struct RockchipFactsPort: RockchipRuntimeFactsPort {
+    func currentFacts(targetID: String) async throws -> ProviderFacts {
+      ProviderFacts(
+        providerID: "rockchip", toolVersion: "rkdeveloptool ver 1.32",
+        toolSHA256: String(repeating: "c", count: 64), serverFacts: [:],
+        targetID: targetID, bindingRevision: 1,
+        deviceIdentitySHA256:
+          "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+        executionConnectKey: "150100424a544e4600",
+        deviceMode: "hdc", buildFingerprint: nil,
+        profileID: "dayu200@1", collectedAtUTC: "2026-07-30T00:00:00Z")
     }
   }
 
@@ -41,7 +47,7 @@ final class DeviceProviderContractTests: XCTestCase {
 
   func testRegistryHoldsBothProviders() {
     let registry = DeviceProviderRegistry(providers: [
-      hdc, RockchipFlashProviderAdapter(executionPort: FlashPort()),
+      hdc, RockchipFlashProviderAdapter(factsPort: RockchipFactsPort()),
     ])
     XCTAssertEqual(registry.registeredProviderIDs, ["hdc", "rockchip"])
     XCTAssertNotNil(registry.provider(id: "hdc"))
@@ -148,8 +154,9 @@ final class DeviceProviderContractTests: XCTestCase {
   }
 
   func testRockchipVerifyRequiresDurableRecordReference() throws {
-    let rockchip = RockchipFlashProviderAdapter(executionPort: FlashPort())
-    let action = TypedProviderAction.rockchip(.executeFlashPlan(authorizationID: "AUTH-1"))
+    let rockchip = RockchipFlashProviderAdapter(factsPort: RockchipFactsPort())
+    let action = TypedProviderAction.rockchip(
+      .enterLoader(connectKey: "150100424a544e4600"))
     let withoutRecord = ProviderProcessReceipt(
       exitStatus: 0, stdout: Data(), stderr: Data(), stdoutTruncated: false, durationSeconds: 1)
     guard case .unknown = try rockchip.verify(
@@ -165,7 +172,7 @@ final class DeviceProviderContractTests: XCTestCase {
     else {
       return XCTFail("host-managed record must verify")
     }
-    XCTAssertEqual(summary["manifestId"], "manifest-1")
+    XCTAssertEqual(summary["recordId"], "manifest-1")
   }
 
   func testReconcileSemantics() async throws {
@@ -174,10 +181,10 @@ final class DeviceProviderContractTests: XCTestCase {
     let outcome = try await hdc.reconcile(intent: reference, context: context)
     XCTAssertEqual(outcome, .confirmedNotExecuted, "read-only re-observation is always safe")
 
-    let rockchip = RockchipFlashProviderAdapter(executionPort: FlashPort())
+    let rockchip = RockchipFlashProviderAdapter(factsPort: RockchipFactsPort())
     let flashIntent = ProviderDurableIntentReference(
       jobID: "job-1", stepID: "s", intentEventID: "i",
-      action: .rockchip(.executeFlashPlan(authorizationID: "AUTH-1")))
+      action: .rockchip(.flashPartitions(flashBundle)))
     let flashOutcome = try await rockchip.reconcile(intent: flashIntent, context: context)
     guard case .stillUnknown = flashOutcome else {
       return XCTFail("destructive reconcile without host evidence must stay unknown")
@@ -194,7 +201,104 @@ final class DeviceProviderContractTests: XCTestCase {
     // Mismatched provider/action pairs fail closed.
     XCTAssertThrowsError(
       try hdc.lower(
-        action: .rockchip(.executeFlashPlan(authorizationID: "A")), context: context))
+        action: .rockchip(.enterLoader(connectKey: "150100424a544e4600")),
+        context: context))
+  }
+
+  func testRockchipMaterializesEveryPublishedRuntimeStepWithoutLegacyAuthorization() throws {
+    let descriptor = try XCTUnwrap(
+      RuntimeOperationCatalog.descriptor(reference: "flash.dayu200@1"))
+    let provider = RockchipFlashProviderAdapter(
+      factsPort: RockchipFactsPort(), availability: .available)
+    let inputs: [String: JSONValue] = [
+      "deviceProfile": .string("dayu200@1"),
+      "imageBundleLease": .string("lease:flash-artifact"),
+      "partitionPlan": .array(
+        RockchipFlashProfile.dayu200.mappedPartitions.map {
+          .string($0.partitionName)
+        }),
+      "postFlashVerification": .string("full"),
+    ]
+    let engineSteps = Set([
+      "verify-image-bundle", "hash-images", "confirm-flash-intent", "finalize-session",
+    ])
+    for step in descriptor.steps where !engineSteps.contains(step.stepID) {
+      let action = try provider.action(
+        for: step, operation: descriptor, inputs: inputs, context: flashContext)
+      XCTAssertEqual(action.effect, step.effect, step.stepID)
+      let plan = try provider.lower(action: action, context: flashContext)
+      XCTAssertEqual(plan.action, action, step.stepID)
+      XCTAssertEqual(
+        try PersistedTypedProviderAction(action).materialize(), action,
+        "\(step.stepID) did not survive exact-action persistence")
+      _ = try RuntimeJobEngine.journalStep(
+        for: step, jobID: flashContext.jobID, inputs: inputs, action: action,
+        resolvedInputArtifact: flashContext.resolvedInputArtifact)
+      guard case .hostManaged(let runtimeDescriptor) = plan.kind else {
+        return XCTFail("\(step.stepID) did not produce a host-managed typed plan")
+      }
+      XCTAssertTrue(runtimeDescriptor.hasSuffix(".v1")
+        || runtimeDescriptor.contains(".v1:"), runtimeDescriptor)
+    }
+  }
+
+  func testRockchipRejectsPartitionDriftBeforeAuthorization() throws {
+    let descriptor = try XCTUnwrap(
+      RuntimeOperationCatalog.descriptor(reference: "flash.dayu200@1"))
+    let provider = RockchipFlashProviderAdapter(
+      factsPort: RockchipFactsPort(), availability: .available)
+    let flashStep = try XCTUnwrap(
+      descriptor.steps.first { $0.stepID == "flash-partitions" })
+    XCTAssertThrowsError(
+      try provider.action(
+        for: flashStep, operation: descriptor,
+        inputs: [
+          "deviceProfile": .string("dayu200@1"),
+          "partitionPlan": .array([.string("userdata")]),
+        ],
+        context: flashContext))
+  }
+
+  func testRockchipRecoveryRejectsNonCanonicalArtifactPath() throws {
+    let persisted = PersistedTypedProviderAction(
+      .rockchip(.flashPartitions(flashBundle)))
+    let encoded = try JSONEncoder().encode(persisted)
+    var object = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+    var arguments = try XCTUnwrap(object["arguments"] as? [String: Any])
+    arguments["artifactPath"] = "/private/tmp/nested/../images.tar.gz"
+    object["arguments"] = arguments
+    let tampered = try JSONSerialization.data(withJSONObject: object)
+    let decoded = try JSONDecoder().decode(
+      PersistedTypedProviderAction.self, from: tampered)
+
+    XCTAssertThrowsError(try decoded.materialize())
+  }
+
+  private var flashBundle: RockchipRuntimeFlashBundle {
+    RockchipRuntimeFlashBundle(
+      artifactLeaseID: "lease:flash-artifact",
+      artifactID: "flash-artifact",
+      fileURL: URL(fileURLWithPath: "/private/tmp/images.tar.gz"),
+      sha256: RockchipFlashProfile.dayu200.archiveSHA256,
+      byteCount: Int(RockchipFlashProfile.dayu200.archiveSizeBytes),
+      partitionNames: RockchipFlashProfile.dayu200.mappedPartitions.map(\.partitionName))
+  }
+
+  private var flashContext: ProviderExecutionContext {
+    ProviderExecutionContext(
+      jobID: "job-flash", stepID: "flash", targetID: "TGT-1", bindingRevision: 1,
+      connectKey: "150100424a544e4600",
+      expectedIdentitySHA256:
+        "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+      toolVersion: "rkdeveloptool ver 1.32",
+      toolSHA256: String(repeating: "c", count: 64),
+      nowUTC: "2026-07-30T00:00:00Z",
+      resolvedInputArtifact: ProviderResolvedInputArtifact(
+        artifactID: "flash-artifact",
+        fileURL: URL(fileURLWithPath: "/private/tmp/images.tar.gz"),
+        sha256: RockchipFlashProfile.dayu200.archiveSHA256,
+        byteCount: Int(RockchipFlashProfile.dayu200.archiveSizeBytes)))
   }
 
   func testEvidencePropertyReadsUseExactDescriptorBoundTarget() throws {
