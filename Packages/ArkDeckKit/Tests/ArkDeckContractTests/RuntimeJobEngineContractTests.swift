@@ -88,13 +88,14 @@ final class RuntimeJobEngineContractTests: XCTestCase {
   }
 
   private func makeEngine(
-    dispatcher: ScriptedDispatcher
+    dispatcher: ScriptedDispatcher,
+    nowUTC: String = "2026-07-29T00:00:00Z"
   ) throws -> (RuntimeJobEngine, RuntimeCapabilityStore) {
     let capabilityStore = try RuntimeCapabilityStore(
       directoryURL: stateDirectory.appendingPathComponent("capabilities", isDirectory: true))
     let artifactStore = try RuntimeArtifactStore(
       rootURL: stateDirectory.appendingPathComponent("artifacts", isDirectory: true),
-      nowUTC: { "2026-07-29T00:00:00Z" })
+      nowUTC: { nowUTC })
     self.artifactStore = artifactStore
     let engine = try RuntimeJobEngine(
       configuration: .init(stateDirectory: stateDirectory),
@@ -104,14 +105,14 @@ final class RuntimeJobEngineContractTests: XCTestCase {
       dispatcher: dispatcher,
       capabilityStore: capabilityStore,
       artifactStore: artifactStore,
-      nowUTC: { "2026-07-29T00:00:00Z" })
+      nowUTC: { nowUTC })
     return (engine, capabilityStore)
   }
 
   private func observeRequest(
     idempotencyKey: String = "idem-observe-0001", requestID: String = "req-1"
   ) -> Data {
-    Data(
+    return Data(
       """
       {
         "documentType": "runtime-operation-request",
@@ -144,9 +145,16 @@ final class RuntimeJobEngineContractTests: XCTestCase {
     lease: String,
     requestID: String,
     idempotencyKey: String,
-    capabilityID: String
+    capabilityID: String? = nil
   ) -> Data {
-    Data(
+    let authorization =
+      capabilityID.map {
+        """
+        ,
+        "authorization": { "capabilityId": "\($0)" }
+        """
+      } ?? ""
+    return Data(
       """
       {
         "documentType": "runtime-operation-request",
@@ -162,8 +170,7 @@ final class RuntimeJobEngineContractTests: XCTestCase {
           "hapArtifactLease": "\(lease)",
           "bundleName": "com.example.demo",
           "abilityName": "EntryAbility"
-        },
-        "authorization": { "capabilityId": "\(capabilityID)" }
+        }\(authorization)
       }
       """.utf8)
   }
@@ -252,7 +259,82 @@ final class RuntimeJobEngineContractTests: XCTestCase {
 
   // MARK: - Authorization
 
-  func testMutationWithoutCapabilityIsRejectedAndE1CapabilityAdmits() async throws {
+  func testMutationWithoutAuthorizationGetsDurableAutomaticE1Capability() async throws {
+    let dispatcher = ScriptedDispatcher(script: .observationHappy)
+    let (engine, capabilityStore) = try makeEngine(dispatcher: dispatcher)
+    let lease = try await publishHAPLease()
+    let acceptance = try await engine.submit(
+      hapRequest(
+        lease: lease,
+        requestID: "req-hap-auto",
+        idempotencyKey: "idem-hap-auto-0001"))
+
+    XCTAssertEqual(dispatcher.dispatchCount, 0, "submit materializes but never dispatches")
+    let submittedStatus = try await engine.status(jobID: acceptance.jobID)
+    XCTAssertEqual(submittedStatus.state, "preflight")
+    let statuses = try await capabilityStore.list()
+    XCTAssertEqual(statuses.count, 1)
+    let status = try XCTUnwrap(statuses.first)
+    XCTAssertTrue(status.capability.capabilityID.hasPrefix("CAP-RT-POLICY-"))
+    XCTAssertEqual(status.capability.issuer.kind, .runtimeDefaultPolicy)
+    XCTAssertEqual(status.capability.effectCeiling, .deviceMutation)
+    XCTAssertEqual(status.capability.exactBindingRevision, 7)
+    XCTAssertEqual(
+      status.capability.exactInputs,
+      [
+        "hapArtifactLease": .string(lease),
+        "bundleName": .string("com.example.demo"),
+        "abilityName": .string("EntryAbility"),
+      ])
+    XCTAssertEqual(status.remainingUses, 10_000)
+    XCTAssertEqual(status.consumptionCount, 0)
+
+    let record = try RuntimeJobRecord.load(
+      from: stateDirectory.appendingPathComponent(
+        "jobs/\(acceptance.jobID)", isDirectory: true))
+    XCTAssertEqual(
+      record.request.authorization?.capabilityID,
+      status.capability.capabilityID,
+      "the daemon-owned reference must survive restart in the persisted typed request")
+  }
+
+  func testAutomaticE1CapabilityRenewsWithoutHumanAuthorization() async throws {
+    let (firstEngine, firstStore) = try makeEngine(
+      dispatcher: ScriptedDispatcher(script: .observationHappy),
+      nowUTC: "2026-07-29T00:00:00Z")
+    let lease = try await publishHAPLease()
+    _ = try await firstEngine.submit(
+      hapRequest(
+        lease: lease,
+        requestID: "req-hap-auto-renew-1",
+        idempotencyKey: "idem-hap-auto-renew-1"))
+    let firstStatuses = try await firstStore.list()
+    XCTAssertEqual(firstStatuses.map(\.capability.capabilityID).count, 1)
+    XCTAssertEqual(
+      firstStatuses.first?.capability.expiresAtUTC,
+      "2026-08-28T00:00:00Z")
+
+    let (renewedEngine, renewedStore) = try makeEngine(
+      dispatcher: ScriptedDispatcher(script: .observationHappy),
+      nowUTC: "2026-09-01T00:00:00Z")
+    _ = try await renewedEngine.submit(
+      hapRequest(
+        lease: lease,
+        requestID: "req-hap-auto-renew-2",
+        idempotencyKey: "idem-hap-auto-renew-2"))
+    let renewedStatuses = try await renewedStore.list()
+    XCTAssertEqual(renewedStatuses.count, 2)
+    XCTAssertEqual(
+      renewedStatuses.map(\.capability.issuer.kind),
+      [.runtimeDefaultPolicy, .runtimeDefaultPolicy])
+    XCTAssertTrue(
+      renewedStatuses.contains {
+        $0.capability.capabilityID.hasSuffix("-G2")
+          && $0.capability.issuedAtUTC == "2026-09-01T00:00:00Z"
+      })
+  }
+
+  func testExplicitMissingCapabilityIsRejectedAndE1CapabilityAdmits() async throws {
     let dispatcher = ScriptedDispatcher(script: .observationHappy)
     let (engine, capabilityStore) = try makeEngine(dispatcher: dispatcher)
     let hapArtifact = try await artifactStore.publish(
@@ -351,26 +433,32 @@ final class RuntimeJobEngineContractTests: XCTestCase {
     let dispatcher = ScriptedDispatcher(script: .outcomeUnknownOnHAPSend)
     let (engine, capabilityStore) = try makeEngine(dispatcher: dispatcher)
     let lease = try await publishHAPLease()
-    try await installHAPCapability(
-      capabilityStore, capabilityID: "CAP-RT-ENGINE-UNKNOWN-001", maximumUses: 3)
     let firstRequest = hapRequest(
       lease: lease, requestID: "req-hap-unknown-1",
-      idempotencyKey: "idem-hap-unknown-1",
-      capabilityID: "CAP-RT-ENGINE-UNKNOWN-001")
+      idempotencyKey: "idem-hap-unknown-1")
     let first = try await engine.submit(firstRequest)
+    let automaticStatuses = try await capabilityStore.list()
+    let automaticCapabilityID = try XCTUnwrap(
+      automaticStatuses.first?.capability.capabilityID)
     let parked = try await engine.run(jobID: first.jobID)
     XCTAssertTrue(parked.outcomeUnknown)
     XCTAssertEqual(parked.state, "waitingForRecovery")
     let dispatchCountAtPark = dispatcher.dispatchCount
     let lineage = try await capabilityStore.inspect(
-      capabilityID: "CAP-RT-ENGINE-UNKNOWN-001")
+      capabilityID: automaticCapabilityID)
     XCTAssertEqual(lineage?.lineage.first?.outcome, .outcomeUnknown)
-    XCTAssertEqual(lineage?.remainingUses, 2)
+    XCTAssertEqual(lineage?.remainingUses, 9_999)
 
-    let secondRequest = hapRequest(
-      lease: lease, requestID: "req-hap-unknown-2",
-      idempotencyKey: "idem-hap-unknown-2",
-      capabilityID: "CAP-RT-ENGINE-UNKNOWN-001")
+    let secondRequest = Data(
+      String(
+        decoding: hapRequest(
+          lease: lease, requestID: "req-hap-unknown-2",
+          idempotencyKey: "idem-hap-unknown-2"),
+        as: UTF8.self
+      ).replacingOccurrences(
+        of: "com.example.demo",
+        with: "com.example.changed"
+      ).utf8)
     do {
       _ = try await engine.submit(secondRequest)
       XCTFail("outcomeUnknown must block a new Job before dispatch")
@@ -398,8 +486,8 @@ final class RuntimeJobEngineContractTests: XCTestCase {
     }
     XCTAssertEqual(recoveredDispatcher.dispatchCount, 0)
     let recoveredCapability = try await recoveredStore.inspect(
-      capabilityID: "CAP-RT-ENGINE-UNKNOWN-001")
-    XCTAssertEqual(recoveredCapability?.remainingUses, 2)
+      capabilityID: automaticCapabilityID)
+    XCTAssertEqual(recoveredCapability?.remainingUses, 9_999)
   }
 
   func testMissingRequiredInputIsRejected() async throws {

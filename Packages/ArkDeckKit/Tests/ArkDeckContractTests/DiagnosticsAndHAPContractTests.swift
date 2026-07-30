@@ -799,20 +799,33 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
     XCTAssertEqual(processStatus.state, "failed")
   }
 
-  func testHAPWithoutCapabilityDispatchesNothing() async throws {
+  func testHAPWithoutCapabilityUsesAutomaticE1Policy() async throws {
     let dispatcher = ScriptedDispatcher()
-    let (engine, _, artifacts) = try makeEngine(dispatcher: dispatcher)
+    let (engine, capabilities, artifacts) = try makeEngine(dispatcher: dispatcher)
     let lease = try await publishHAPLease(artifacts)
-    do {
-      _ = try await engine.submit(
-        hapRequest(lease: lease, key: "idem-hap-nocap", capability: nil))
-      XCTFail("an E1 operation without a capability must be rejected")
-    } catch let error as RuntimeJobEngineError {
-      guard case .rejected(.authorizationRequired, _) = error else {
-        return XCTFail("expected authorizationRequired, got \(error)")
-      }
-    }
-    XCTAssertTrue(dispatcher.dispatchedActions.isEmpty, "zero dispatch on refusal")
+    let acceptance = try await engine.submit(
+      hapRequest(lease: lease, key: "idem-hap-auto-policy", capability: nil))
+    XCTAssertTrue(
+      dispatcher.dispatchedActions.isEmpty,
+      "automatic issuance happens after materialization but before any dispatch")
+
+    let automaticStatuses = try await capabilities.list()
+    let automatic = try XCTUnwrap(automaticStatuses.first)
+    XCTAssertEqual(automatic.capability.issuer.kind, .runtimeDefaultPolicy)
+    XCTAssertEqual(automatic.consumptionCount, 0)
+    let status = try await engine.run(jobID: acceptance.jobID)
+    XCTAssertEqual(status.state, "succeeded", status.timeline.joined(separator: " | "))
+    XCTAssertTrue(dispatcher.dispatchedActions.contains("sendArtifact"))
+    XCTAssertTrue(dispatcher.dispatchedActions.contains("installPackage"))
+
+    let consumed = try await capabilities.inspect(
+      capabilityID: automatic.capability.capabilityID)
+    XCTAssertEqual(consumed?.consumptionCount, 1)
+    XCTAssertEqual(consumed?.remainingUses, 9_999)
+    XCTAssertEqual(consumed?.lineage.first?.outcome, .confirmed)
+    let evidence = try await engine.evidenceSnapshot(jobID: acceptance.jobID)
+    XCTAssertEqual(evidence.authority?.kind, .runtimeCapability)
+    XCTAssertEqual(evidence.authority?.reference, automatic.capability.capabilityID)
   }
 
   func testOfflineTargetFailsDurablyBeforeCapabilityConsumptionOrMutation() async throws {

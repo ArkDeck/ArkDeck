@@ -11,6 +11,11 @@ platforms: [macos]
 
 # Agent-operated diagnostics, HAP debug and the unified artifact model (MU-4)
 
+> 产品闭环兼容说明（2026-07-30）：已发布、Catalog
+> `defaultPolicyIssuance=enabled` 的 E1 operation 由 Runtime 在完整
+> materialization 后自动签发并持久化 capability；不再要求人工文件、安装或
+> review。下文 r2 的人工 E1 capability 描述保留为历史批准记录；E2 不变。
+
 > r2 fresh-readiness revision（2026-07-29）：功能 scope、Acceptance、
 > allowed/forbidden paths、E0/E1/E2 边界与硬件分层零变化。
 > `CHG-2026-050/TASK-WSC-001` 已由维护者以 PR #789 合入

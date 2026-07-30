@@ -4,12 +4,13 @@
 // Runtime Plane. A capability is a durable, revocable, scope/expiry/use
 // bounded credential:
 //   E0 needs no capability (default read-only policy, still bounded);
-//   E1 needs a standing capability (deviceMutation ceiling);
+//   E1 uses a runtime-owned standing capability (deviceMutation ceiling);
 //   E2 needs a one-shot capability pinned to an exact plan digest.
 // Every check in this file fails closed: an uncertain or missing condition
-// is a denial, never a pass. Issuance authority is unchanged from the
-// existing trust root - the only carrier for creating/modifying/revoking a
-// destructive-ceiling capability is a maintainer-merged PR.
+// is a denial, never a pass. Published Catalog policy may issue E1
+// capabilities automatically after complete plan materialization. The only
+// carrier for creating/modifying/revoking a destructive-ceiling capability
+// remains a maintainer-merged PR.
 
 public enum RuntimeCapabilityValidationError: Error, Equatable, Sendable {
   case malformedCapabilityID(String)
@@ -20,6 +21,8 @@ public enum RuntimeCapabilityValidationError: Error, Equatable, Sendable {
   case destructiveRequiresStableIdentityTarget
   case destructiveRequiresExactPlanDigest
   case destructiveRequiresSingleUse
+  case destructiveRequiresMaintainerIssuer
+  case runtimePolicyRequiresExactInputs
   case exactPlanDigestOnlyForDestructive
   case malformedPlanDigest(String)
   case malformedBindingRevision(Int)
@@ -190,9 +193,13 @@ public enum RuntimeCapabilityInputConstraint: Equatable, Sendable, Codable {
 
 public struct RuntimeCapabilityIssuer: Equatable, Sendable, Codable {
   public enum Kind: String, Codable, Sendable {
-    /// The only kind: the capability document was accepted through a
+    /// An optional externally supplied capability accepted through a
     /// maintainer-merged PR (git history is the audit ledger).
     case maintainerMergedPR
+    /// An E1 capability deterministically issued by the production runtime
+    /// from a published Catalog policy after target and plan materialization.
+    /// This kind is never legal for a destructive ceiling.
+    case runtimeDefaultPolicy
   }
 
   public let kind: Kind
@@ -282,6 +289,9 @@ public struct RuntimeCapability: Equatable, Sendable, Codable {
   public let operationScope: [RuntimeCapabilityOperationScope]
   public let effectCeiling: WorkflowEffect
   public let inputConstraints: [String: RuntimeCapabilityInputConstraint]
+  /// Exact typed-input map for a runtime-issued E1 envelope. This also binds
+  /// optional-field absence, which per-field constraints cannot express.
+  public let exactInputs: [String: JSONValue]?
   public let issuedAtUTC: String
   public let expiresAtUTC: String
   public let maximumUses: Int
@@ -296,6 +306,7 @@ public struct RuntimeCapability: Equatable, Sendable, Codable {
     operationScope: [RuntimeCapabilityOperationScope],
     effectCeiling: WorkflowEffect,
     inputConstraints: [String: RuntimeCapabilityInputConstraint] = [:],
+    exactInputs: [String: JSONValue]? = nil,
     issuedAtUTC: String,
     expiresAtUTC: String,
     maximumUses: Int,
@@ -309,6 +320,7 @@ public struct RuntimeCapability: Equatable, Sendable, Codable {
     self.operationScope = operationScope
     self.effectCeiling = effectCeiling
     self.inputConstraints = inputConstraints
+    self.exactInputs = exactInputs
     self.issuedAtUTC = issuedAtUTC
     self.expiresAtUTC = expiresAtUTC
     self.maximumUses = maximumUses
@@ -328,6 +340,8 @@ public struct RuntimeCapability: Equatable, Sendable, Codable {
     self.effectCeiling = try container.decode(WorkflowEffect.self, forKey: .effectCeiling)
     self.inputConstraints = try container.decode(
       [String: RuntimeCapabilityInputConstraint].self, forKey: .inputConstraints)
+    self.exactInputs = try container.decodeIfPresent(
+      [String: JSONValue].self, forKey: .exactInputs)
     self.issuedAtUTC = try container.decode(String.self, forKey: .issuedAtUTC)
     self.expiresAtUTC = try container.decode(String.self, forKey: .expiresAtUTC)
     self.maximumUses = try container.decode(Int.self, forKey: .maximumUses)
@@ -405,6 +419,9 @@ public struct RuntimeCapability: Equatable, Sendable, Codable {
       throw RuntimeCapabilityValidationError.malformedStableIdentity(sha256)
     }
     if effectCeiling == .destructive {
+      guard issuer.kind == .maintainerMergedPR else {
+        throw RuntimeCapabilityValidationError.destructiveRequiresMaintainerIssuer
+      }
       guard case .stablePhysicalIdentity = targetScope else {
         throw RuntimeCapabilityValidationError.destructiveRequiresStableIdentityTarget
       }
@@ -414,6 +431,9 @@ public struct RuntimeCapability: Equatable, Sendable, Codable {
       guard maximumUses == 1 else {
         throw RuntimeCapabilityValidationError.destructiveRequiresSingleUse
       }
+    }
+    if issuer.kind == .runtimeDefaultPolicy, exactInputs == nil {
+      throw RuntimeCapabilityValidationError.runtimePolicyRequiresExactInputs
     }
     if let digest = exactPlanDigest, !Self.isHexDigest(digest) {
       throw RuntimeCapabilityValidationError.malformedPlanDigest(digest)
@@ -522,6 +542,12 @@ public struct RuntimeCapability: Equatable, Sendable, Codable {
       guard actual == expected else {
         return .failure(.init(reason: .planDigestMismatch, detail: "plan digest differs"))
       }
+    }
+    if let exactInputs, query.inputs != exactInputs {
+      return .failure(
+        .init(
+          reason: .inputConstraintViolated,
+          detail: "typed inputs differ from the runtime-issued envelope"))
     }
     for (key, constraint) in inputConstraints {
       guard let value = query.inputs[key] else {

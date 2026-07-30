@@ -269,6 +269,7 @@ public actor RuntimeCapabilityStore {
           operationScope: existing.operationScope,
           effectCeiling: existing.effectCeiling,
           inputConstraints: existing.inputConstraints,
+          exactInputs: existing.exactInputs,
           issuedAtUTC: existing.issuedAtUTC,
           expiresAtUTC: existing.expiresAtUTC,
           maximumUses: existing.maximumUses,

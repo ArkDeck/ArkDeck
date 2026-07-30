@@ -390,7 +390,7 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
     XCTAssertEqual(jobs.count, 1, "one invocation submits exactly one job, never a loop")
   }
 
-  func testMissingCapabilityIsReportedAsRejectionWithAReceipt() async throws {
+  func testE1RunWithoutCapabilityReachesTheJobUnderAutomaticPolicy() async throws {
     let client = try startDaemon()
     let store = try XCTUnwrap(artifactStore)
     let artifact = try await store.publish(
@@ -414,12 +414,15 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
           "abilityName": .string("EntryAbility"),
         ]))
     guard case .failed(let reason, let receipt) = outcome else {
-      return XCTFail("an E1 operation without a capability must be refused: \(outcome)")
+      return XCTFail(
+        "the fixture lacks E1 actions, so the admitted Job must fail later: \(outcome)")
     }
-    XCTAssertTrue(reason.contains("authorizationRequired"), reason)
-    XCTAssertEqual(receipt.terminalState, "rejected")
-    XCTAssertNil(receipt.jobID, "a refused submission produces no job")
+    XCTAssertFalse(reason.contains("authorizationRequired"), reason)
+    XCTAssertEqual(receipt.terminalState, "failed")
+    XCTAssertNotNil(receipt.jobID, "automatic E1 authorization must admit a durable job")
     XCTAssertEqual(receipt.executor, .agent)
+    XCTAssertEqual(receipt.authority?.kind, .runtimeCapability)
+    XCTAssertTrue(receipt.authorityReference.hasPrefix("CAP-RT-POLICY-"))
   }
 
   private func packageRoot() -> URL {

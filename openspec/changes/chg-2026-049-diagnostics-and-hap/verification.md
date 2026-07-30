@@ -1,5 +1,10 @@
 # CHG-2026-049 Verification Plan
 
+> 产品闭环兼容说明（2026-07-30）：当前 E1 生产路径由 Runtime 按已发布
+> Catalog 自动签发 durable capability，不再等待人工文件或 review；target、
+> binding、typed inputs、plan digest、lineage 与 `outcomeUnknown` 门保持。
+> 下文 r2 的人工 capability 步骤是历史计划；E2 不变。
+
 > Change:CHG-2026-049-diagnostics-and-hap@r2
 > Status:planned
 > Core baseline:CORE-2.1.0 (canonical Core AC not claimed)
