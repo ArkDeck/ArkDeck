@@ -240,6 +240,18 @@ def validate_automatic_check_contract(
     required_open = (
         "    permissions:\n      contents: read\n      pull-requests: write\n",
         "    outputs:\n      pr-number: ${{ steps.validate.outputs.pr-number }}\n",
+        "          fetch-depth: 0\n",
+        "--preflight",
+        "--base-revision origin/main",
+        '--head-revision "$HEAD_SHA"',
+        '--expected-head-ref "$BRANCH"',
+        "--allow-bootstrap",
+        "--infer-task",
+        'none|bootstrap|TASK-*)',
+        'if [ "$TASK_ID" = "bootstrap" ]; then',
+        "maintainer-authorized one-time base/head/path tuple",
+        'if [ "$TASK_ID" != "none" ]; then',
+        "printf 'Task: %s\\n\\n' \"$TASK_ID\" >> \"$BODY\"",
         "gh api --method GET --paginate --slurp",
         "--pull-list \"$CANDIDATES\"",
         "--identity-only",
@@ -256,6 +268,7 @@ def validate_automatic_check_contract(
         '"/repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER"',
         "--pull-request \"$PULL_REQUEST\"",
         "--expected-head-oid \"$HEAD_SHA\"",
+        "--allow-bootstrap",
     )
     for token in required_open:
         if token not in open_job:
@@ -265,6 +278,17 @@ def validate_automatic_check_contract(
             raise WorkflowContractError(
                 f"allowed-paths job missing contract token: {token}"
             )
+    preflight_index = open_job.index("--preflight")
+    task_body_index = open_job.index("printf 'Task: %s\\n\\n'")
+    create_index = open_job.index("gh pr create")
+    if not preflight_index < task_body_index < create_index:
+        raise WorkflowContractError(
+            "Agent PR must preflight and write Task before creating the PR"
+        )
+    if agent_text.count("--allow-bootstrap") != 2:
+        raise WorkflowContractError(
+            "one-time bootstrap must be wired exactly once per Agent PR job"
+        )
 
     forbidden = (
         "pull_request_target:",
