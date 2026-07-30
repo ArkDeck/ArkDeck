@@ -16,6 +16,8 @@
   - `Packages/ArkDeckKit/**`
   - `Catalog/**`
   - `openspec/contracts/catalogs/diagnostics-stdout.yaml`
+  - `openspec/contracts/workflow-step.schema.json`(schema 与 Swift validator
+    的 action 对必须同步,否则两面契约漂移)
   - `openspec/changes/chg-2026-053-ui-dump-honest-lowering/**`
   - `docs/adr/**`
 - Forbidden paths:

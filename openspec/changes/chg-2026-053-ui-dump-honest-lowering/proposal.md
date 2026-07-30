@@ -31,9 +31,10 @@ Availability First。
 
 ## What(同车交付面)
 
-1. **契约新增 `windowInventory` action**(`diagnostics-stdout.yaml`):
-   `captureRemoteStdout`/stdout,required_inputs `[byteBudget]`。语义 = 全窗口
-   清单,对应 CHG-2026-008 真机验证过的 INV-1 形态
+1. **契约新增 `windowInventory` action**(`diagnostics-stdout.yaml` 与
+   `workflow-step.schema.json` 的 stdout 分支同步,参数面与 componentTree
+   相同 = 仅 byteBudget):`captureRemoteStdout`/stdout。语义 = 全窗口清单,
+   对应 CHG-2026-008 真机验证过的 INV-1 形态
    `hidumper -s WindowManagerService -a -a`,无需额外输入。
 2. **`capture.diagnostics@1` 的 `capture-ui-dump` 步骤 actionRef 切换**
    `arkdeck-diagnostics/componentTree` → `arkdeck-diagnostics/windowInventory`
