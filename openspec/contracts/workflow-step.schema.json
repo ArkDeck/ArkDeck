@@ -288,6 +288,13 @@
             "actionId": { "const": "componentTree" },
             "parameters": { "$ref": "#/$defs/diagnosticsComponentTreeParameters" }
           }
+        },
+        {
+          "properties": {
+            "catalogId": { "const": "arkdeck-diagnostics" },
+            "actionId": { "const": "windowInventory" },
+            "parameters": { "$ref": "#/$defs/diagnosticsComponentTreeParameters" }
+          }
         }
       ]
     },

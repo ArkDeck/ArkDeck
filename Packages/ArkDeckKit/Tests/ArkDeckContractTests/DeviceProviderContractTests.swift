@@ -251,7 +251,10 @@ final class DeviceProviderContractTests: XCTestCase {
       .hdc(.queryProperty(.productModel)),
       .hdc(.observeStorage(try HDCStoragePreflightRequest(requiredBytes: 1024))),
       .hdc(.captureHilog(try HDCHilogCaptureRequest(durationSeconds: 1))),
-      .hdc(.captureUIDump(try HDCUIDumpRequest())),
+      // windowList is the only scope with a published honest lowering
+      // (CHG-2026-053); componentTree's fail-closed path is pinned in
+      // DeviceProviderArgvContractTests.
+      .hdc(.captureUIDump(try HDCUIDumpRequest(scope: .windowList))),
       .hdc(
         .captureTrace(
           try HDCTraceCaptureRequest(durationSeconds: 1, categories: ["ohos"]),

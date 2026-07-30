@@ -30,7 +30,7 @@ final class DiagnosticsRuntimeOperationCatalogContractTests: XCTestCase {
         "capture.diagnostics@1/capture-hilog": CatalogActionReference(
           catalogID: "arkdeck-diagnostics", actionID: "boundedHilog"),
         "capture.diagnostics@1/capture-ui-dump": CatalogActionReference(
-          catalogID: "arkdeck-diagnostics", actionID: "componentTree"),
+          catalogID: "arkdeck-diagnostics", actionID: "windowInventory"),
         "debug.hap@1/capture-diagnostics": CatalogActionReference(
           catalogID: "arkdeck-diagnostics", actionID: "boundedHilog"),
         "observe.device@1/read-evidence-model": CatalogActionReference(

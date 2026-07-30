@@ -4,7 +4,10 @@
 
 ## TASK-UDR-001 — capture-ui-dump 诚实执行垂直修复
 
-- Status:ready
+- Status:done
+- Done:2026-07-30;随本实现 PR 合入生效(维护者 review + merge 即批准);
+  UDR-AC-1..3 PASS、UDR-AC-4 pending-hardware(定义为不阻塞 done),
+  evidence = `evidence/runs/TASK-UDR-001/run-r1.md`
 - Platform:macos
 - Requirements:proposal What 1-5(契约 windowInventory、step 切换与重生成、
   componentTree fail-closed 背线、真实 INV-1 lowering、argv 层测试)

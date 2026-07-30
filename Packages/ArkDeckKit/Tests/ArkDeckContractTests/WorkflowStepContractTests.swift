@@ -39,6 +39,18 @@ final class DiagnosticsWorkflowStepContractTests: XCTestCase {
           actionID: "componentTree",
           parameters: ["byteBudget": .integer(67_108_864)])
       ),
+      (
+        "window-inventory-min",
+        diagnosticsArguments(
+          actionID: "windowInventory",
+          parameters: ["byteBudget": .integer(1024)])
+      ),
+      (
+        "window-inventory-max",
+        diagnosticsArguments(
+          actionID: "windowInventory",
+          parameters: ["byteBudget": .integer(67_108_864)])
+      ),
     ]
 
     for (id, arguments) in vectors {
@@ -134,6 +146,18 @@ final class DiagnosticsWorkflowStepContractTests: XCTestCase {
           parameters: ["byteBudget": .integer(67_108_865)])
       ),
       (
+        "window-inventory-budget-low",
+        diagnosticsArguments(
+          actionID: "windowInventory",
+          parameters: ["byteBudget": .integer(1023)])
+      ),
+      (
+        "window-inventory-budget-high",
+        diagnosticsArguments(
+          actionID: "windowInventory",
+          parameters: ["byteBudget": .integer(67_108_865)])
+      ),
+      (
         "caller-remote-path",
         diagnosticsArguments(
           actionID: "boundedHilog",
@@ -179,6 +203,7 @@ final class DiagnosticsWorkflowStepContractTests: XCTestCase {
       [
         "boundedHilog": "#/$defs/diagnosticsHilogParameters",
         "componentTree": "#/$defs/diagnosticsComponentTreeParameters",
+        "windowInventory": "#/$defs/diagnosticsComponentTreeParameters",
       ])
 
     let hilog = try XCTUnwrap(definitions["diagnosticsHilogParameters"] as? [String: Any])

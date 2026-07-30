@@ -213,6 +213,7 @@
             "renderTreeLegacy",
             "boundedHilog",
             "componentTree",
+            "windowInventory",
             "deviceSummary",
             "systemProperties",
             "processList",
@@ -241,7 +242,7 @@
         {
           "properties": {
             "catalogId": { "const": "arkdeck-diagnostics" },
-            "actionId": { "enum": ["boundedHilog", "componentTree"] }
+            "actionId": { "enum": ["boundedHilog", "componentTree", "windowInventory"] }
           }
         },
         {

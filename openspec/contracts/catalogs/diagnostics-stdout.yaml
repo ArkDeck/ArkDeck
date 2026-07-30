@@ -18,6 +18,15 @@ actions:
     required_inputs: [byteBudget]
     limits:
       byteBudget: { type: integer, minimum: 1024, maximum: 67108864 }
+  # windowInventory is the only window-family action with a device-validated
+  # windowId-free invocation (CHG-2026-008 INV-1). componentTree stays
+  # published but has no honest lowering until a windowId revision lands.
+  - id: windowInventory
+    step_kind: captureRemoteStdout
+    output_mode: stdout
+    required_inputs: [byteBudget]
+    limits:
+      byteBudget: { type: integer, minimum: 1024, maximum: 67108864 }
 
 rules:
   unknown_action: reject

@@ -130,7 +130,7 @@
       "kind": "captureRemoteStdout",
       "actionRef": {
         "catalogId": "arkdeck-diagnostics",
-        "actionId": "componentTree"
+        "actionId": "windowInventory"
       },
       "effect": "readOnly",
       "cancellation": "immediate",

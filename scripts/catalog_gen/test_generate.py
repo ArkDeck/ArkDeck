@@ -105,7 +105,7 @@ class RealCatalogTests(unittest.TestCase):
                     "arkdeck-diagnostics", "boundedHilog"
                 ),
                 "capture.diagnostics@1/capture-ui-dump": (
-                    "arkdeck-diagnostics", "componentTree"
+                    "arkdeck-diagnostics", "windowInventory"
                 ),
                 "debug.hap@1/capture-diagnostics": (
                     "arkdeck-diagnostics", "boundedHilog"
@@ -483,9 +483,16 @@ class GeneratedSwiftShapeTests(unittest.TestCase):
         self.assertEqual(
             swift.count(
                 'actionReference: CatalogActionReference('
-                'catalogID: "arkdeck-diagnostics", actionID: "componentTree")'
+                'catalogID: "arkdeck-diagnostics", actionID: "windowInventory")'
             ),
             1,
+        )
+        self.assertEqual(
+            swift.count(
+                'actionReference: CatalogActionReference('
+                'catalogID: "arkdeck-diagnostics", actionID: "componentTree")'
+            ),
+            0,
         )
         self.assertEqual(
             swift.count(

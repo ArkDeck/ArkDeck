@@ -2817,7 +2817,7 @@ public actor RuntimeJobEngine {
           "filters": .array(Array(filters.prefix(16))),
           "byteBudget": .integer(Int64(budget)),
         ]
-      case "componentTree":
+      case "componentTree", "windowInventory":
         parameters = ["byteBudget": .integer(8 * 1024 * 1024)]
       default:
         throw RuntimeJobEngineError.internalFailure(

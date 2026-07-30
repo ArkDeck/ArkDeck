@@ -548,11 +548,11 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
     // The UI-dump step carries its own action's parameter set, not HiLog's.
     let uiDump = try XCTUnwrap(descriptor.steps.first { $0.stepID == "capture-ui-dump" })
     let uiStep = try RuntimeJobEngine.journalStep(for: uiDump, jobID: "job-1", inputs: [:])
-    XCTAssertEqual(uiStep.arguments["actionId"], .string("componentTree"))
+    XCTAssertEqual(uiStep.arguments["actionId"], .string("windowInventory"))
     guard case .object(let uiParameters)? = uiStep.arguments["parameters"] else {
       return XCTFail("the ui-dump intent must carry typed parameters")
     }
-    XCTAssertEqual(Set(uiParameters.keys), ["byteBudget"], "componentTree declares only a budget")
+    XCTAssertEqual(Set(uiParameters.keys), ["byteBudget"], "windowInventory declares only a budget")
   }
 
   func testPairedRemoteActionsShareTheRealJobBoundProviderPath() throws {
