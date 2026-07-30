@@ -29,6 +29,11 @@
   **702 tests / 1 skipped / 0 failures**;
 - `scripts/check-sdd.sh`:**0 error / 0 warning / 114 acceptance IDs**;
 - `catalog_gen generate.py --check`:**exit 0(零 drift)**;
+- 首次 CI guard 红(实证):`catalog_gen/test_generate.py` 钉死 stdout
+  action 引用集与 `Catalog/schema/operation.schema.json` 词表——三条 pin
+  (observed step 映射、generated Swift 引用计数、schema 词表 lockstep)
+  随本 PR 同步更新;复跑 `test_generate.py` **38 OK**、
+  `test_check_sdd.py` **63 OK**;
 - E0 只读发现(`hdc list targets -v`,host 级命令):一台 DAYU200 候选
   USB 可见、状态 `Offline`(设备侧信任未完成)→ UDR-AC-4 如实 pending。
 
