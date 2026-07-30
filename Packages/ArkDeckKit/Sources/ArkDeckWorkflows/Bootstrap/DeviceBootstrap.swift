@@ -56,10 +56,15 @@ public struct BootstrapCandidate: Sendable, Equatable, Codable {
   }
 }
 
+public enum BootstrapHumanActionKind: String, Sendable, Equatable {
+  case trustDevice
+  case physicalReconnect
+}
+
 public enum BootstrapProgress: Sendable, Equatable {
   case adopted(RuntimeTargetRecord)
   case needsSelection([BootstrapCandidate])
-  case waitingForHuman(prompt: String)
+  case waitingForHuman(kind: BootstrapHumanActionKind, prompt: String)
   case failed(reason: String)
 }
 
@@ -253,10 +258,18 @@ public actor DeviceBootstrapMachine {
       }
       if selected.needsPhysicalTrust {
         phase = .waitForPhysicalTrust
+        if selected.state == "Unauthorized" {
+          return .waitingForHuman(
+            kind: .trustDevice,
+            prompt:
+              "Confirm the debugging trust prompt on the device screen "
+              + "(state: \(selected.state)); bootstrap resumes automatically.")
+        }
         return .waitingForHuman(
+          kind: .physicalReconnect,
           prompt:
-            "Confirm the debugging trust prompt on the device screen "
-            + "(state: \(selected.state)), then re-run adopt; bootstrap resumes automatically.")
+            "Reconnect the device until it reports Connected "
+            + "(state: \(selected.state)); bootstrap resumes automatically.")
       }
       phase = .observeSelectedDevice
       let identity = try await observation.observeDeviceIdentity(

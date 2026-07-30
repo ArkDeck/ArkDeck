@@ -88,9 +88,10 @@ final class DeviceBootstrapContractTests: XCTestCase {
       BootstrapCandidate(connectKey: "AAA", state: "Unauthorized")
     ])
     let (machine, store) = try makeMachine(observation)
-    guard case .waitingForHuman(let prompt) = await machine.advance() else {
+    guard case .waitingForHuman(let kind, let prompt) = await machine.advance() else {
       return XCTFail("unauthorized device must park for physical trust")
     }
+    XCTAssertEqual(kind, .trustDevice)
     XCTAssertTrue(prompt.contains("trust"), "prompt must name the physical action")
     let parkedPhase = await machine.phase
     XCTAssertEqual(parkedPhase, .waitForPhysicalTrust)
@@ -108,9 +109,12 @@ final class DeviceBootstrapContractTests: XCTestCase {
       BootstrapCandidate(connectKey: "AAA", state: "Offline")
     ])
     let (machine, _) = try makeMachine(observation)
-    guard case .waitingForHuman = await machine.advance() else {
+    guard case .waitingForHuman(let kind, let prompt) = await machine.advance() else {
       return XCTFail("offline device must park, never adopt")
     }
+    XCTAssertEqual(kind, .physicalReconnect)
+    XCTAssertTrue(prompt.contains("Reconnect"), prompt)
+    XCTAssertFalse(prompt.contains("trust"), prompt)
   }
 
   func testReAdoptIsIdempotent() async throws {

@@ -469,11 +469,17 @@ public struct AgentRuntimeExecutor: Sendable {
       if case .string(let value)? = fields["prompt"] {
         prompt = value
       } else {
-        prompt = "Confirm device trust, then resume this execution."
+        prompt = "Complete the requested physical device action, then resume this execution."
+      }
+      guard case .string(let kindRaw)? = fields["humanActionKind"],
+        let kind = RuntimeHumanActionKind(rawValue: kindRaw)
+      else {
+        throw RuntimeAgentExecutorError.malformedResponse(
+          "adopt returned no recognized human action kind")
       }
       return .paused(
         try pause(
-          request: request, kind: .trustDevice, prompt: prompt,
+          request: request, kind: kind, prompt: prompt,
           mode: .retryAdoption, catalogDigest: catalogDigest,
           startedAtUTC: startedAtUTC, humanActions: humanActions))
     case "needsSelection":

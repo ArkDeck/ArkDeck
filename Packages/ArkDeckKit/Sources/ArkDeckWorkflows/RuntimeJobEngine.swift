@@ -1726,6 +1726,39 @@ public actor RuntimeJobEngine {
       finishedAtUTC: record.finishedAtUTC)
   }
 
+  /// Artifact names omitted by the exact materialized request, including
+  /// downstream optional products whose upstream was not selected. This
+  /// is derived from the persisted typed inputs, not from artifact status
+  /// text, so an artifact that was selected but failed remains an evidence
+  /// blocker.
+  public func intentionallyOmittedArtifactNames(jobID: String) throws -> Set<String> {
+    guard let runtime = jobs[jobID] else {
+      throw RuntimeJobEngineError.jobNotFound(jobID)
+    }
+    guard
+      let descriptor = RuntimeOperationCatalog.descriptor(
+        reference: runtime.record.operationReference)
+    else {
+      throw RuntimeJobEngineError.internalFailure(
+        "persisted operation \(runtime.record.operationReference) is unavailable")
+    }
+    let inputs = runtime.record.request.inputs
+    var omittedSteps: Set<String> = []
+    for step in descriptor.steps where step.isOptional {
+      if let upstream = Self.optionalStepUpstream[descriptor.reference]?[step.stepID],
+        omittedSteps.contains(upstream)
+      {
+        omittedSteps.insert(step.stepID)
+      } else if !Self.optionalStepIsSelected(step, descriptor: descriptor, inputs: inputs) {
+        omittedSteps.insert(step.stepID)
+      }
+    }
+    return Set(
+      omittedSteps.flatMap {
+        Self.artifactMapping[descriptor.reference]?[$0] ?? []
+      })
+  }
+
   public func listJobs() -> [RuntimeJobStatus] {
     jobs.values.map { status(of: $0.record) }.sorted { $0.jobID < $1.jobID }
   }

@@ -68,6 +68,14 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
         return receipt("DAYU200\n")
       case .queryProperty(.fullBuildVersion):
         return receipt("OpenHarmony-4.1-release\n")
+      case .observeStorage:
+        return receipt(
+          "Filesystem 1K-blocks Used Available Use% Mounted on\n"
+            + "/dev/block/data 1048576 1024 1047552 1% /data\n")
+      case .captureHilog:
+        return receipt("01-01 00:00:00 I app: hello\n")
+      case .captureUIDump:
+        return receipt("{\"windows\":[]}\n")
       default:
         throw RuntimeDispatchFailure.failed("unexpected action \(action)")
       }
@@ -158,6 +166,26 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
     XCTAssertEqual(evidence.device.bindingRevision, receipt.bindingRevision)
   }
 
+  func testUnselectedOptionalTraceDoesNotBlockPublishedCaptureEvidence() throws {
+    let client = try startDaemon()
+    let outcome = try executor(client).run(
+      RuntimeAgentExecutionRequest(
+        operationID: "capture.diagnostics", operationVersion: 1,
+        inputs: ["durationSeconds": .integer(1)]))
+    guard case .completed(let receipt) = outcome else {
+      return XCTFail("the E0 capture must complete: \(outcome)")
+    }
+    XCTAssertEqual(receipt.terminalState, "succeeded")
+    XCTAssertTrue(receipt.evidenceBlockers.isEmpty, "\(receipt.evidenceBlockers)")
+    XCTAssertEqual(
+      receipt.artifacts.count, 4,
+      "HiLog, UI dump, index and summary are evidence; unselected Trace is not")
+    XCTAssertTrue(receipt.artifacts.allSatisfy(\.bytesVerified))
+    XCTAssertFalse(
+      receipt.artifacts.contains { $0.reference.contains("ART-MISSING-") },
+      "an honest optional omission is index metadata, not an evidence artifact")
+  }
+
   func testUnauthorizedDeviceBecomesAResumableHumanActionNotAFailure() throws {
     let client = try startDaemon(candidates: [
       BootstrapCandidate(connectKey: "150100424a544e4600", state: "Unauthorized")
@@ -173,6 +201,20 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
     XCTAssertEqual(receipt.terminalState, "awaitingHumanAction")
     XCTAssertEqual(receipt.humanActions.count, 1)
     XCTAssertEqual(receipt.executor, .agent)
+  }
+
+  func testOfflineDeviceRequestsReconnectInsteadOfTrust() throws {
+    let client = try startDaemon(candidates: [
+      BootstrapCandidate(connectKey: "150100424a544e4600", state: "Offline")
+    ])
+    let outcome = try executor(client).run(
+      RuntimeAgentExecutionRequest(operationID: "observe.device", operationVersion: 1))
+    guard case .awaitingHumanAction(let action, _) = outcome else {
+      return XCTFail("an offline device must pause for reconnect: \(outcome)")
+    }
+    XCTAssertEqual(action.kind, .physicalReconnect)
+    XCTAssertTrue(action.prompt.contains("Reconnect"), action.prompt)
+    XCTAssertFalse(action.prompt.contains("trust"), action.prompt)
   }
 
   func testAmbiguousCandidatesAskForSelectionRatherThanGuessing() throws {

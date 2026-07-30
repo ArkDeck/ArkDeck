@@ -410,18 +410,27 @@ public actor RuntimeArtifactStore {
   }
 
   /// Re-hashes the immutable bytes immediately before evidence projection.
-  /// Metadata alone is not sufficient: missing, truncated, moved or
-  /// changed bytes fail the whole evidence query closed.
+  /// Metadata alone is not sufficient: selected artifacts that are
+  /// missing, truncated, moved or changed fail the whole evidence query
+  /// closed. An optional product omitted by the persisted materialized
+  /// request remains visible in the Artifact index but is not itself an
+  /// evidence-bearing artifact.
   public func verifiedEvidenceArtifacts(
-    jobID: String
+    jobID: String,
+    intentionallyOmittedNames: Set<String> = []
   ) throws -> [RuntimeVerifiedArtifactEvidence] {
     let artifacts = try loadIndex(jobID: jobID).artifacts
     guard !artifacts.isEmpty else {
       throw RuntimeArtifactError.evidenceVerificationFailed(
         "job \(jobID) has no published artifact metadata")
     }
-    return try artifacts.map { metadata in
-      guard metadata.status.isPublished else {
+    let verified = try artifacts.compactMap { metadata -> RuntimeVerifiedArtifactEvidence? in
+      switch metadata.status {
+      case .published:
+        break
+      case .missing where intentionallyOmittedNames.contains(metadata.name):
+        return nil
+      case .missing, .truncated:
         throw RuntimeArtifactError.evidenceVerificationFailed(
           "artifact \(metadata.artifactID) is not published")
       }
@@ -452,6 +461,11 @@ public actor RuntimeArtifactStore {
         providerID: metadata.providerID,
         byteCount: bytes.count)
     }
+    guard !verified.isEmpty else {
+      throw RuntimeArtifactError.evidenceVerificationFailed(
+        "job \(jobID) has no published evidence artifacts")
+    }
+    return verified
   }
 
   public func read(

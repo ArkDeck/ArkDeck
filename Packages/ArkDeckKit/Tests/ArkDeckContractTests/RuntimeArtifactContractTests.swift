@@ -393,6 +393,26 @@ final class RuntimeArtifactContractTests: XCTestCase {
     await XCTAssertThrowsErrorAsync(
       try await store.verifiedEvidenceArtifacts(jobID: "job-1"))
   }
+
+  func testEvidenceProjectionSkipsOnlyExplicitlyOmittedOptionalProduct() async throws {
+    let store = try makeStore()
+    let published = try await store.publish(request(name: "hilog.txt"))
+    _ = try await store.recordMissing(
+      jobID: "job-1", sessionID: "session-job-1", stepID: "receive-trace-artifact",
+      name: "trace.htrace", mediaType: "application/octet-stream", privacy: .sensitive,
+      retentionClass: .default, sourceOperation: "capture.diagnostics@1",
+      providerID: "hdc",
+      bindingSnapshot: ArtifactBindingSnapshot(
+        targetID: "TGT-1", bindingRevision: 1, stableIdentitySHA256: nil),
+      reason: "step not selected by the request inputs")
+
+    let verified = try await store.verifiedEvidenceArtifacts(
+      jobID: "job-1", intentionallyOmittedNames: ["trace.htrace"])
+    XCTAssertEqual(verified.map(\.sha256), [published.sha256])
+
+    await XCTAssertThrowsErrorAsync(
+      try await store.verifiedEvidenceArtifacts(jobID: "job-1"))
+  }
 }
 
 func XCTAssertThrowsErrorAsync<T>(
