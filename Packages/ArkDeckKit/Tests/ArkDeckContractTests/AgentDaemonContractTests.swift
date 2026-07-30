@@ -503,6 +503,22 @@ final class AgentDaemonContractTests: XCTestCase {
       return XCTFail("health must answer from the real binary")
     }
     XCTAssertEqual(health["status"], .string("ok"))
+    guard case .array(let operations) = try client.request(method: "operation.list"),
+      case .object(let flash)? = operations.first(where: { item in
+        guard case .object(let fields) = item else { return false }
+        return fields["reference"] == .string("flash.dayu200@1")
+      }),
+      case .array(let reasons)? = flash["reasons"]
+    else {
+      return XCTFail("production daemon must publish flash.dayu200@1 availability")
+    }
+    XCTAssertEqual(flash["availability"], .string("unavailable"))
+    XCTAssertTrue(
+      reasons.contains { reason in
+        guard case .string(let text) = reason else { return false }
+        return text.contains("product-owned Rockchip component")
+      },
+      "production daemon must expose the bundled-component blocker, not provider_not_registered")
 
     process.terminate()
     let stopDeadline = Date().addingTimeInterval(10)

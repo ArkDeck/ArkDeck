@@ -161,3 +161,40 @@ public struct DescriptorBoundProcessDispatcher: RuntimeProcessDispatching {
     }
   }
 }
+
+/// Production routing stays on the typed action, never on a caller string or
+/// on the host-managed descriptor's display text. This lets HDC and Rockchip
+/// have independent executable/host gates while the Runtime keeps one
+/// dispatch port.
+public struct RuntimeProcessDispatcherRouter: RuntimeProcessDispatching {
+  private let hdc: any RuntimeProcessDispatching
+  private let rockchip: any RuntimeProcessDispatching
+
+  public init(
+    hdc: any RuntimeProcessDispatching,
+    rockchip: any RuntimeProcessDispatching
+  ) {
+    self.hdc = hdc
+    self.rockchip = rockchip
+  }
+
+  public func unavailableReason(providerID: String) -> String? {
+    switch providerID {
+    case "hdc":
+      return hdc.unavailableReason(providerID: providerID)
+    case "rockchip":
+      return rockchip.unavailableReason(providerID: providerID)
+    default:
+      return "no dispatcher route is registered for provider \(providerID)"
+    }
+  }
+
+  public func dispatch(_ plan: TypedProcessPlan) async throws -> ProviderProcessReceipt {
+    switch plan.action {
+    case .hdc:
+      return try await hdc.dispatch(plan)
+    case .rockchip:
+      return try await rockchip.dispatch(plan)
+    }
+  }
+}
