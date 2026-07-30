@@ -5,11 +5,13 @@
 > execution policy，也不创造任何批准、授权、就绪、完成或平台支持语义。
 >
 > **冲突处置。**本手册的任何建议与
+> [`PRODUCT-LOOP.md`](../../PRODUCT-LOOP.md)、
 > [`AGENTS.md`](../../AGENTS.md)、[`constitution.md`](../constitution.md)、
 > [`enforcement.md`](../governance/enforcement.md)、
 > [`verification/policy.md`](../verification/policy.md)、current specs 或
 > contracts 冲突时，**忽略本手册**，按 [`AGENTS.md` 的权威顺序](../../AGENTS.md#权威顺序)
-> 处理；无法裁决时任务 `blocked`，而不是由本手册选择更方便的解释。
+> 处理（流程类冲突不再进入 `blocked`，按 `PRODUCT-LOOP.md` §2 记录一行兼容说明
+> 后继续工作；安全不变量冲突仍 fail closed）。
 >
 > **只链接，不复制。**每条案例只给出可定位的引用（形式见下条）与完整 40-hex
 > Git OID。本手册不复制 raw evidence、hash 表、transcript、secret、真实设备标识、

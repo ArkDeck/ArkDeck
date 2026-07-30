@@ -49,4 +49,10 @@ Windows/Linux follow the same dependency graph after W0/L0 and reuse language-ne
 
 ## Entry rule
 
-Milestone text is not an executable Task. Work begins only from an approved change with `ready` Task packets.
+Milestone text is not an executable Task.
+
+> 兼容注记(2026-07-30,产品闭环优先阶段):原规则「Work begins only from an
+> approved change with `ready` Task packets」仅对安全内核治理 change 保留。产品
+> 工作的入口 = 仓库根 `PRODUCT-LOOP.md` §6 Golden Journey 的当前最高优先级产品
+> 缺陷,以垂直产品 PR 直接交付;本 roadmap 的 milestone 表保留为历史规划参考,
+> 优先级正本见 `PRODUCT-LOOP.md` §7。
