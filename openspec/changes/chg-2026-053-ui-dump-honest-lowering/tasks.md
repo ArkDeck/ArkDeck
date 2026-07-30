@@ -18,14 +18,17 @@
   - `openspec/contracts/catalogs/diagnostics-stdout.yaml`
   - `openspec/contracts/workflow-step.schema.json`(schema 与 Swift validator
     的 action 对必须同步,否则两面契约漂移)
+  - `scripts/catalog_gen/test_generate.py`(生成器契约钉死 stdout action
+    引用集与 schema 词表;action 集变更必须同 PR 更新 pin,先例
+    CHG-2026-050 TASK-WSC-001 授权面)
   - `openspec/changes/chg-2026-053-ui-dump-honest-lowering/**`
   - `docs/adr/**`
 - Forbidden paths:
   - `openspec/constitution.md`、`openspec/specs/**`、
     `openspec/verification/**`(全局)、`openspec/baselines/**`、
     `openspec/contracts/workflow-step-registry.yaml`
-  - `scripts/**`、`.github/**`、`AGENTS.md`、
-    `ArkDeck.xcodeproj/**`、`ArkDeckApp/**`
+  - `scripts/**`(仅上列 `catalog_gen/test_generate.py` 单文件除外)、
+    `.github/**`、`AGENTS.md`、`ArkDeck.xcodeproj/**`、`ArkDeckApp/**`
   - 其他 change 目录
 - Risk:medium(已发布 operation 的 step actionRef 变更——journal 身份与真实
   命令自此一致;E0-only,零 mutation 面;componentTree 转为结构性拒绝,
