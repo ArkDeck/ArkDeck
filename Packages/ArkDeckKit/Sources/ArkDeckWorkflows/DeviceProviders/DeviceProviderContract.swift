@@ -62,11 +62,49 @@ public enum HDCProviderAction: Sendable, Equatable {
   case readPortForwardPresence(HDCPortForwardSpec)
 }
 
-/// Rockchip actions in MU-2: the one adapter-compat action wrapping the
-/// existing execution host whole (its internal journal/manifest/recovery
-/// semantics stay authoritative during migration).
+/// Engine-resolved flash input. The URL is not supplied by a Runtime
+/// request: it is the descriptor-backed file owned by the Artifact store
+/// after the lease, target identity and binding revision have all matched.
+public struct RockchipRuntimeFlashBundle: Sendable, Equatable {
+  public let artifactLeaseID: String
+  public let artifactID: String
+  public let fileURL: URL
+  public let sha256: String
+  public let byteCount: Int
+  public let partitionNames: [String]
+
+  public init(
+    artifactLeaseID: String,
+    artifactID: String,
+    fileURL: URL,
+    sha256: String,
+    byteCount: Int,
+    partitionNames: [String]
+  ) {
+    self.artifactLeaseID = artifactLeaseID
+    self.artifactID = artifactID
+    self.fileURL = fileURL
+    self.sha256 = sha256
+    self.byteCount = byteCount
+    self.partitionNames = partitionNames
+  }
+}
+
+/// Closed actions for the published DAYU200 runtime plan. Authorization is
+/// deliberately absent: the Runtime consumes the E2 capability immediately
+/// before the first mutation and the Provider cannot request a second,
+/// legacy authorization token.
 public enum RockchipProviderAction: Sendable, Equatable {
-  case executeFlashPlan(authorizationID: String)
+  case enterLoader(connectKey: String)
+  case waitForHDCDisconnect(connectKey: String)
+  case waitForLoader(stableIdentitySHA256: String)
+  case rebindLoader(stableIdentitySHA256: String)
+  case flashPartitions(RockchipRuntimeFlashBundle)
+  case verifyFlashReadback(RockchipRuntimeFlashBundle)
+  case rebootToNormal(stableIdentitySHA256: String)
+  case waitForHDCReconnect(connectKey: String)
+  case verifyBuild(connectKey: String)
+  case capturePostFlashDiagnostics(connectKey: String, request: HDCHilogCaptureRequest)
 }
 
 public enum TypedProviderAction: Sendable, Equatable {
@@ -98,7 +136,14 @@ public enum TypedProviderAction: Sendable, Equatable {
       // deviceMutation per the step registry; the operation-level effect
       // envelope (capture.diagnostics permitted set) already models it.
       return .deviceMutation
-    case .rockchip(.executeFlashPlan):
+    case .rockchip(.enterLoader), .rockchip(.rebootToNormal):
+      return .deviceMutation
+    case .rockchip(.waitForHDCDisconnect), .rockchip(.waitForLoader),
+      .rockchip(.rebindLoader), .rockchip(.verifyFlashReadback),
+      .rockchip(.waitForHDCReconnect), .rockchip(.verifyBuild),
+      .rockchip(.capturePostFlashDiagnostics):
+      return .readOnly
+    case .rockchip(.flashPartitions):
       return .destructive
     }
   }
@@ -299,11 +344,65 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
       var arguments = nativeArguments(deployment)
       arguments["expectation"] = .string(expectation.rawValue)
       self.init(kind: "hdc.inspectNativeLibrary", arguments: arguments)
-    case .rockchip(.executeFlashPlan(let authorizationID)):
+    case .rockchip(.enterLoader(let connectKey)):
       self.init(
-        kind: "rockchip.executeFlashPlan",
-        arguments: ["authorizationId": .string(authorizationID)])
+        kind: "rockchip.enterLoader",
+        arguments: ["connectKey": .string(connectKey)])
+    case .rockchip(.waitForHDCDisconnect(let connectKey)):
+      self.init(
+        kind: "rockchip.waitForHDCDisconnect",
+        arguments: ["connectKey": .string(connectKey)])
+    case .rockchip(.waitForLoader(let identity)):
+      self.init(
+        kind: "rockchip.waitForLoader",
+        arguments: ["stableIdentitySha256": .string(identity)])
+    case .rockchip(.rebindLoader(let identity)):
+      self.init(
+        kind: "rockchip.rebindLoader",
+        arguments: ["stableIdentitySha256": .string(identity)])
+    case .rockchip(.flashPartitions(let bundle)):
+      self.init(
+        kind: "rockchip.flashPartitions",
+        arguments: Self.rockchipBundleArguments(bundle))
+    case .rockchip(.verifyFlashReadback(let bundle)):
+      self.init(
+        kind: "rockchip.verifyFlashReadback",
+        arguments: Self.rockchipBundleArguments(bundle))
+    case .rockchip(.rebootToNormal(let identity)):
+      self.init(
+        kind: "rockchip.rebootToNormal",
+        arguments: ["stableIdentitySha256": .string(identity)])
+    case .rockchip(.waitForHDCReconnect(let connectKey)):
+      self.init(
+        kind: "rockchip.waitForHDCReconnect",
+        arguments: ["connectKey": .string(connectKey)])
+    case .rockchip(.verifyBuild(let connectKey)):
+      self.init(
+        kind: "rockchip.verifyBuild",
+        arguments: ["connectKey": .string(connectKey)])
+    case .rockchip(.capturePostFlashDiagnostics(let connectKey, let request)):
+      self.init(
+        kind: "rockchip.capturePostFlashDiagnostics",
+        arguments: [
+          "connectKey": .string(connectKey),
+          "durationSeconds": .integer(Int64(request.durationSeconds)),
+          "filters": .array(request.filters.map(JSONValue.string)),
+          "byteBudget": .integer(Int64(request.byteBudget)),
+        ])
     }
+  }
+
+  private static func rockchipBundleArguments(
+    _ bundle: RockchipRuntimeFlashBundle
+  ) -> [String: JSONValue] {
+    [
+      "artifactLeaseId": .string(bundle.artifactLeaseID),
+      "artifactId": .string(bundle.artifactID),
+      "artifactPath": .string(bundle.fileURL.path),
+      "artifactSha256": .string(bundle.sha256),
+      "artifactByteCount": .integer(Int64(bundle.byteCount)),
+      "partitionNames": .array(bundle.partitionNames.map(JSONValue.string)),
+    ]
   }
 
   private init(kind: String, arguments: [String: JSONValue]) {
@@ -354,6 +453,29 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
           "persisted \(kind).\(key) is not an integer")
       }
       return exact
+    }
+    func rockchipBundle() throws -> RockchipRuntimeFlashBundle {
+      let byteCount = try integer("artifactByteCount")
+      guard byteCount > 0 else {
+        throw DeviceProviderError.unsupportedAction(
+          "persisted \(kind) carries an invalid Artifact byte count")
+      }
+      let pathValue = try string("artifactPath")
+      let fileURL = URL(fileURLWithPath: pathValue)
+      guard
+        pathValue.hasPrefix("/"),
+        fileURL.standardizedFileURL.path == pathValue
+      else {
+        throw DeviceProviderError.unsupportedAction(
+          "persisted \(kind) carries a non-canonical Artifact path")
+      }
+      return RockchipRuntimeFlashBundle(
+        artifactLeaseID: try string("artifactLeaseId"),
+        artifactID: try string("artifactId"),
+        fileURL: fileURL,
+        sha256: try string("artifactSha256"),
+        byteCount: byteCount,
+        partitionNames: try stringArray("partitionNames"))
     }
     func path() throws -> HDCOwnedRemotePath {
       let reconstructed = try HDCOwnedRemotePath(
@@ -547,8 +669,34 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
       }
       return .hdc(.inspectNativeLibrary(
         try nativeDeployment(), expectation: expectation))
-    case "rockchip.executeFlashPlan":
-      return .rockchip(.executeFlashPlan(authorizationID: try string("authorizationId")))
+    case "rockchip.enterLoader":
+      return .rockchip(.enterLoader(connectKey: try string("connectKey")))
+    case "rockchip.waitForHDCDisconnect":
+      return .rockchip(.waitForHDCDisconnect(connectKey: try string("connectKey")))
+    case "rockchip.waitForLoader":
+      return .rockchip(.waitForLoader(
+        stableIdentitySHA256: try string("stableIdentitySha256")))
+    case "rockchip.rebindLoader":
+      return .rockchip(.rebindLoader(
+        stableIdentitySHA256: try string("stableIdentitySha256")))
+    case "rockchip.flashPartitions":
+      return .rockchip(.flashPartitions(try rockchipBundle()))
+    case "rockchip.verifyFlashReadback":
+      return .rockchip(.verifyFlashReadback(try rockchipBundle()))
+    case "rockchip.rebootToNormal":
+      return .rockchip(.rebootToNormal(
+        stableIdentitySHA256: try string("stableIdentitySha256")))
+    case "rockchip.waitForHDCReconnect":
+      return .rockchip(.waitForHDCReconnect(connectKey: try string("connectKey")))
+    case "rockchip.verifyBuild":
+      return .rockchip(.verifyBuild(connectKey: try string("connectKey")))
+    case "rockchip.capturePostFlashDiagnostics":
+      return .rockchip(.capturePostFlashDiagnostics(
+        connectKey: try string("connectKey"),
+        request: try HDCHilogCaptureRequest(
+          durationSeconds: integer("durationSeconds"),
+          filters: stringArray("filters"),
+          byteBudget: integer("byteBudget"))))
     default:
       throw DeviceProviderError.unsupportedAction(
         "persisted typed provider action kind \(kind) is unknown")

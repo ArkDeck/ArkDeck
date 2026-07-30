@@ -192,9 +192,9 @@ final class ObserveDeviceSkeletonContractTests: XCTestCase {
   func testHostManagedPlansAreRefusedByThisDispatcher() async throws {
     let resolver = try FixedExecutableResolver.hashing(path: toolURL.path, providerID: "rockchip")
     let dispatcher = DescriptorBoundProcessDispatcher(resolver: resolver)
-    let rockchip = RockchipFlashProviderAdapter(executionPort: RefusingFlashPort())
+    let rockchip = RockchipFlashProviderAdapter()
     let plan = try rockchip.lower(
-      action: .rockchip(.executeFlashPlan(authorizationID: "AUTH-1")),
+      action: .rockchip(.enterLoader(connectKey: "fixture-connect-key")),
       context: ProviderExecutionContext(
         jobID: "j", stepID: "s", targetID: "t", bindingRevision: nil,
         nowUTC: "2026-07-29T00:00:00Z"))
@@ -205,14 +205,6 @@ final class ObserveDeviceSkeletonContractTests: XCTestCase {
       guard case .failed = failure else {
         return XCTFail("expected a definite refusal, got \(failure)")
       }
-    }
-  }
-
-  private struct RefusingFlashPort: RockchipFlashExecutionPort {
-    func executeFlash(authorizationID: String) async throws -> (
-      manifestID: String, succeeded: Bool, waitingForRecovery: Bool
-    ) {
-      throw RuntimeDispatchFailure.failed("tests never flash")
     }
   }
 
