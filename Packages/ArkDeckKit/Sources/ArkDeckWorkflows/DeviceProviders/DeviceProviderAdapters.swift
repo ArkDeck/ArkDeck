@@ -174,8 +174,17 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
         "\(step.stepID) declares no catalog action; refusing to infer one")
     }
     switch actionID {
+    case "windowInventory":
+      return .hdc(.captureUIDump(try HDCUIDumpRequest(scope: .windowList)))
     case "componentTree":
-      return .hdc(.captureUIDump(try HDCUIDumpRequest()))
+      // Every device-validated component-tree dump form requires a windowId
+      // the published contract does not carry (diagnostics-stdout.yaml,
+      // CHG-2026-053). Refusing here keeps the journal from recording an
+      // intent no honest command can execute.
+      throw DeviceProviderError.unsupportedAction(
+        "componentTree has no windowId-free hidumper form; the published "
+          + "contract carries no windowId, so there is no honest lowering — "
+          + "capture windowInventory instead")
     case "boundedHilog":
       var duration = 30
       if case .integer(let requested)? = inputs["durationSeconds"] {
@@ -328,13 +337,26 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
             ["shell", "hilog", "-x"] + request.filters, context: context),
           timeoutSeconds: request.durationSeconds + 15))
     case .captureUIDump(let request):
-      return TypedProcessPlan(
-        action: action,
-        kind: .process(
-          executableSHA256: "resolved-at-dispatch",
-          argumentSummary: try deviceArguments(
-            ["shell", "hidumper", "-s", request.scope.rawValue], context: context),
-          timeoutSeconds: 30))
+      switch request.scope {
+      case .windowList:
+        // Device-validated INV-1 form (CHG-2026-008): the only window-family
+        // hidumper invocation that needs no windowId.
+        return TypedProcessPlan(
+          action: action,
+          kind: .process(
+            executableSHA256: "resolved-at-dispatch",
+            argumentSummary: try deviceArguments(
+              ["shell", "hidumper", "-s", "WindowManagerService", "-a", "-a"],
+              context: context),
+            timeoutSeconds: 30))
+      case .componentTree:
+        // The scope's real forms are window-scoped (-w <windowId> …) and the
+        // published contract carries no windowId; a scope.rawValue service
+        // name is not a hidumper service and would capture error text.
+        throw DeviceProviderError.unsupportedAction(
+          "componentTree UI dump has no honest windowId-free lowering; "
+            + "use windowList until the windowId contract revision lands")
+      }
     case .captureTrace(let request, let path):
       return TypedProcessPlan(
         action: action,

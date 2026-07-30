@@ -893,11 +893,13 @@ private enum WorkflowStepValidator {
         try reader.validatedOptions("parameters")
       } else {
         let action = try reader.enumeration(
-          "actionId", allowed: ["boundedHilog", "componentTree"])
+          "actionId", allowed: ["boundedHilog", "componentTree", "windowInventory"])
         let parameters = try reader.validatedOptions("parameters")
         if action == "boundedHilog" {
           try reader.diagnosticsHilogParameters(parameters, key: "parameters")
         } else {
+          // componentTree and windowInventory share the byteBudget-only
+          // parameter contract (diagnostics-stdout.yaml).
           try reader.diagnosticsComponentTreeParameters(parameters, key: "parameters")
         }
       }
