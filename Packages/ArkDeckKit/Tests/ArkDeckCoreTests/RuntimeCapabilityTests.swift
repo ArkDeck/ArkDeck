@@ -54,6 +54,7 @@ final class RuntimeCapabilityTests: XCTestCase {
       operationVersion: version,
       effect: effect,
       targetStableIdentitySHA256: target,
+      targetBindingRevision: 7,
       planDigest: planDigest,
       inputs: inputs)
   }

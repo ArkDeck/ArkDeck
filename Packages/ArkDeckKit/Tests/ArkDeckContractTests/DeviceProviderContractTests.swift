@@ -220,6 +220,73 @@ final class DeviceProviderContractTests: XCTestCase {
       try hdc.lower(action: .hdc(.queryProperty(.productModel)), context: missingTarget))
   }
 
+  func testEveryDeviceScopedHDCPlanUsesDescriptorBoundTarget() throws {
+    let artifactID = "ART-0123456789abcdef0123456789abcdef"
+    let artifact = ProviderResolvedInputArtifact(
+      artifactID: artifactID,
+      fileURL: URL(fileURLWithPath: "/private/tmp/input.hap"),
+      sha256: String(repeating: "c", count: 64),
+      byteCount: 128)
+    let boundContext = ProviderExecutionContext(
+      jobID: "job-1", stepID: "device-step", targetID: "TGT-1",
+      bindingRevision: 1, connectKey: "150100424a544e4600",
+      expectedIdentitySHA256: String(repeating: "b", count: 64),
+      toolVersion: "3.2.0f", toolSHA256: String(repeating: "a", count: 64),
+      nowUTC: "2026-07-29T00:00:00Z", resolvedInputArtifact: artifact)
+    let missingBinding = ProviderExecutionContext(
+      jobID: "job-1", stepID: "device-step", targetID: "TGT-1",
+      bindingRevision: 1, nowUTC: "2026-07-29T00:00:00Z",
+      resolvedInputArtifact: artifact)
+    let ownedPath = try hdc.mintOwnedRemotePath(jobID: "job-1", stepID: "device-step")
+    let ownedArtifact = HDCOwnedRemoteArtifact(
+      path: ownedPath, expectedSHA256: nil, maximumBytes: 1024)
+    let staged = try hdc.mintStagedArtifact(
+      jobID: "job-1", stepID: "send-hap",
+      artifactLeaseID: "lease-v1:job-input:\(artifactID)",
+      expectedSHA256: artifact.sha256)
+    let bundle = try HDCBundleReference(bundleName: "com.example.demo")
+    let ability = try HDCAbilityReference(bundle: bundle, abilityName: "EntryAbility")
+    let port = try HDCPortForwardSpec(localPort: 2345, remotePort: 3456)
+    let actions: [TypedProviderAction] = [
+      .hdc(.queryProperty(.productModel)),
+      .hdc(.observeStorage(try HDCStoragePreflightRequest(requiredBytes: 1024))),
+      .hdc(.captureHilog(try HDCHilogCaptureRequest(durationSeconds: 1))),
+      .hdc(.captureUIDump(try HDCUIDumpRequest())),
+      .hdc(
+        .captureTrace(
+          try HDCTraceCaptureRequest(durationSeconds: 1, categories: ["ohos"]),
+          into: ownedPath)),
+      .hdc(.receiveOwnedArtifact(ownedArtifact)),
+      .hdc(.cleanupOwnedRemotePath(ownedPath)),
+      .hdc(.sendArtifactToStaging(staged)),
+      .hdc(.installPackage(staged, bundle: bundle)),
+      .hdc(.queryPackageReadback(bundle)),
+      .hdc(.startAbility(ability)),
+      .hdc(.verifyProcessState(bundle)),
+      .hdc(.stopAbility(ability)),
+      .hdc(.uninstallPackage(bundle)),
+      .hdc(.createPortForward(port)),
+      .hdc(.removePortForward(port)),
+      .hdc(.readPackagePresence(bundle)),
+      .hdc(.readProcessPresence(bundle)),
+      .hdc(.readOwnedPathPresence(ownedPath)),
+      .hdc(.readPortForwardPresence(port)),
+    ]
+
+    for action in actions {
+      let plan = try hdc.lower(action: action, context: boundContext)
+      guard case .process(_, let argv, _) = plan.kind else {
+        return XCTFail("\(action) must lower to a process plan")
+      }
+      XCTAssertEqual(
+        Array(argv.prefix(2)), ["-t", "150100424a544e4600"],
+        "\(action) must not depend on HDC's default device")
+      XCTAssertThrowsError(
+        try hdc.lower(action: action, context: missingBinding),
+        "\(action) must fail before process launch when no descriptor-bound connect key exists")
+    }
+  }
+
   func testExactTargetConfirmationRejectsZeroMultipleAndUnknownRows() throws {
     func receipt(_ rows: String) -> ProviderProcessReceipt {
       ProviderProcessReceipt(

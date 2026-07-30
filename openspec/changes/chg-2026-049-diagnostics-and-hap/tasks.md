@@ -6,14 +6,15 @@
 
 ## TASK-DHA-001 — MU-4 垂直交付:Agent runner + Artifact + diagnostics/HAP
 
-- Status:blocked（`DHA-HW-001` attempt#2 的 E0 runtime job 于
-  2026-07-29 succeeded，但现行
-  `openspec/contracts/hardware-evidence.schema.json` V2 强制 human
-  `operator` 且缺少 Agent `executor/authorizationRef`，receipt 又未提供
-  schema 必填 firmware/target-confirmation 时间，故不能伪装成有效
-  realHardware acceptance evidence，AC **未宣告 PASS**；见
-  `evidence/runs/TASK-DHA-001/window-attempt-2.md`。contract/fake 结论
-  不变，`DHA-HW-002` 未执行）
+- Status:blocked（仅剩真实 DAYU200 两条 Golden Journey 尚未按
+  2026-07-30 产品闭环要求完成同车记录：`DHA-HW-001` attempt#2 的旧
+  observable result 不提升为 formal PASS，`DHA-HW-002` 未执行。
+  #798 已补齐 descriptor-bound HDC、Runtime Availability、授权前完整
+  materialization、stable identity/binding revision/plan digest admission、
+  exact-action durable recovery、dedicated mutation readback 与 cleanup
+  debt query/continue；remote Trace、strict redaction、installFresh、
+  restorePrevious、debugger-default 按本阶段要求 production unavailable
+  并在 capability 消耗前 fail closed，不再拆 proposal）
 - Grade:D1(代码/契约/fake 面。真机 host Runtime 由 Device Runtime Agent
   执行;**E1 capability 的签发/接受是 D2 决策**,独立载体,Agent 不得
   自签或自批;人类只提供必要物理协助)
@@ -102,6 +103,30 @@
   并使 `arkdeck-diagnostics/boundedHilog|componentTree` 在 JSON Schema 和
   Swift validator 中可如实表达。generator/WorkflowStep 合约与 exact merged
   tree 已复验通过；原 blocker 关闭。
+- Superseded blocker(2026-07-29,run-r2):合入后的深检发现五类未闭环:
+  四类 published
+  输入缺真实执行链:①remote trace 的 `file recv` 没有 engine-controlled
+  host destination、remote stat/size/hash/header 验证;②strict redaction
+  没有独立实现;③`installFresh` 没有安装前 absence readback;④
+  `restorePrevious`/`debugger-default` 没有 snapshot/restore 或
+  port-forward step。当前实现均在 capability 消耗与 dispatch 前拒绝,
+  避免 fake-only 路径或静默降级。⑤cleanup debt 已能持久化和显式
+  settle,unknown 也会保留原 typed step,但 runtime reconcile 尚无携带
+  原 job authority 的 durable start/outcome/transition 与 typed
+  re-observe/remove/settle/continue 流程,不得把 ledger API 或只改
+  job-record 冒充自动恢复。
+  该结论已被 2026-07-30 产品闭环恢复指令取代：禁止为这些发现新建
+  change/proposal；前四类保持 production unavailable / pre-consumption
+  fail closed，第五类已在 #798 同车实现 exact-action readback reconcile
+  与 cleanup debt query/continue。详见 `run-r2-hardening.md` 续修记录。
+- Current hardware evidence blocker(2026-07-29,attempt#2):Agent 已在
+  approved D2 window 内完成唯一一次 E0 `capture.diagnostics@1`,runtime
+  observable result succeeded 且人工 host CLI 为 0。但 authoritative
+  hardware-evidence V2 强制 human `operator`,缺
+  `executor/authorizationRef`,本次 receipt 也没有 schema 必填 firmware/
+  target-confirmation 时间;因此 formal `DHA-HW-001` 仍 BLOCKED /
+  NOT CLAIMED,不得猜填或把维护者写成 executor。详见
+  `window-attempt-2.md`;`DHA-HW-002` 未执行。
 - Saved-draft handoff:原 `agent/task-dha-001` 工作树保留 10 个 tracked
   修改和 5 个 untracked 新文件，未提交、未计 evidence；与
   `dac5f82..d13dfec` 的 main 改动路径交集为 0。r2 合入后恢复时必须先把

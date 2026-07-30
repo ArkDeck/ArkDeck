@@ -39,10 +39,20 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
   /// readback shows nothing happened.
   private final class ScriptedDispatcher: RuntimeProcessDispatching, @unchecked Sendable {
     struct Script: Sendable {
-      var traceFails = false
       var packageInstalled = true
       var processRunning = true
       var hilogEmpty = false
+      var sendOutcomeUnknown = false
+      var availableStorageKB = 1_047_552
+      var installExit: Int32 = 0
+      var startExit: Int32 = 0
+      var hilogPayloadBytes: Int?
+      var packageReadbackText: String?
+      var processReadbackText: String?
+      var ownedPathPresent = true
+      var portForwardPresent = false
+      var cleanupExit: Int32 = 0
+      var cleanupOutcomeUnknown = false
       var targetRows = "150100424a544e4600\t\tUSB\tConnected\tlocalhost\n"
       var modelValue = "DAYU200\n"
       var firmwareValue = "OpenHarmony-4.1-release\n"
@@ -79,17 +89,22 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
       case .observeDevice, .listDeviceCandidates:
         note("observeDevice")
         return receipt(script.targetRows)
+      case .observeStorage:
+        note("observeStorage")
+        return receipt(
+          "Filesystem 1K-blocks Used Available Use% Mounted on\n"
+            + "/dev/block/data 1048576 1024 \(script.availableStorageKB) 1% /data\n")
       case .captureHilog:
         note("captureHilog")
+        if let bytes = script.hilogPayloadBytes {
+          return receipt(String(repeating: "I", count: bytes))
+        }
         return receipt(script.hilogEmpty ? "" : "01-01 00:00:00 I app: hello\n")
       case .captureUIDump:
         note("captureUIDump")
         return receipt("{\"windows\":[]}\n")
       case .captureTrace:
         note("captureTrace")
-        if script.traceFails {
-          throw RuntimeDispatchFailure.failed("trace category unsupported on this build")
-        }
         return receipt("")
       case .receiveOwnedArtifact:
         note("receiveArtifact")
@@ -98,23 +113,32 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
           stdoutTruncated: false, durationSeconds: 0.01, hostManagedRecordID: "local-trace")
       case .cleanupOwnedRemotePath:
         note("cleanup")
-        return receipt("")
+        if script.cleanupOutcomeUnknown {
+          throw RuntimeDispatchFailure.outcomeUnknown("cleanup completion is unobservable")
+        }
+        return receipt("", exit: script.cleanupExit)
       case .sendArtifactToStaging:
         note("sendArtifact")
+        if script.sendOutcomeUnknown {
+          throw RuntimeDispatchFailure.outcomeUnknown("send completion is unobservable")
+        }
         return receipt("FileTransfer finish")
       case .installPackage:
         note("installPackage")
         // Clean exit either way: the readback is what decides.
-        return receipt("install bundle successfully")
+        return receipt("install bundle", exit: script.installExit)
       case .queryPackageReadback(let bundle):
         note("packageReadback")
-        return receipt(script.packageInstalled ? "bundleName: \(bundle.bundleName)\n" : "")
+        return receipt(
+          script.packageReadbackText
+            ?? (script.packageInstalled ? "bundleName: \(bundle.bundleName)\n" : ""))
       case .startAbility:
         note("startAbility")
-        return receipt("start ability successfully")
+        return receipt("start ability successfully", exit: script.startExit)
       case .verifyProcessState:
         note("processReadback")
-        return receipt(script.processRunning ? "3421\n" : "")
+        return receipt(
+          script.processReadbackText ?? (script.processRunning ? "3421\n" : ""))
       case .stopAbility:
         note("stopAbility")
         return receipt("")
@@ -133,17 +157,37 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
       case .createPortForward, .removePortForward:
         note("portForward")
         return receipt("")
+      case .readPackagePresence(let bundle):
+        note("reconcilePackagePresence")
+        return receipt(
+          script.packageReadbackText
+            ?? (script.packageInstalled ? "bundleName: \(bundle.bundleName)\n" : ""))
+      case .readProcessPresence:
+        note("reconcileProcessPresence")
+        return receipt(
+          script.processReadbackText ?? (script.processRunning ? "3421\n" : ""),
+          exit: script.processRunning ? 0 : 1)
+      case .readOwnedPathPresence:
+        note("reconcileOwnedPathPresence")
+        return receipt("", exit: script.ownedPathPresent ? 0 : 1)
+      case .readPortForwardPresence(let spec):
+        note("reconcilePortForwardPresence")
+        return receipt(
+          script.portForwardPresent
+            ? "tcp:\(spec.localPort) tcp:\(spec.remotePort)\n" : "")
       }
     }
   }
 
   private func makeEngine(
-    dispatcher: ScriptedDispatcher
+    dispatcher: ScriptedDispatcher,
+    artifactQuota: ArtifactQuota = ArtifactQuota()
   ) throws -> (RuntimeJobEngine, RuntimeCapabilityStore, RuntimeArtifactStore) {
     let capabilityStore = try RuntimeCapabilityStore(
       directoryURL: stateDirectory.appendingPathComponent("capabilities", isDirectory: true))
     let artifactStore = try RuntimeArtifactStore(
       rootURL: stateDirectory.appendingPathComponent("artifacts", isDirectory: true),
+      quota: artifactQuota,
       nowUTC: { "2026-07-29T00:00:00Z" })
     let engine = try RuntimeJobEngine(
       configuration: .init(stateDirectory: stateDirectory),
@@ -158,10 +202,18 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
   }
 
   private func captureRequest(
-    withTrace: Bool, key: String = "idem-capture-01", capability: String? = nil
+    withTrace: Bool,
+    key: String = "idem-capture-01",
+    capability: String? = nil,
+    totalArtifactByteBudget: Int? = nil,
+    redactionProfile: String? = nil
   ) -> Data {
     let trace = withTrace ? "\"traceCategories\": [\"ohos\"]," : ""
     let auth = capability.map { "\"authorization\": { \"capabilityId\": \"\($0)\" }," } ?? ""
+    let budget =
+      totalArtifactByteBudget.map { "\"totalArtifactByteBudget\": \($0)," } ?? ""
+    let redaction =
+      redactionProfile.map { "\"redactionProfile\": \"\($0)\"," } ?? ""
     return Data(
       """
       {
@@ -172,12 +224,18 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
         "target": { "targetId": "TGT-1", "expectedBindingRevision": 7 },
         "operation": { "id": "capture.diagnostics", "version": 1 },
         \(auth)
-        "inputs": { \(trace) "durationSeconds": 5 }
+        "inputs": { \(trace) \(budget) \(redaction) "durationSeconds": 5 }
       }
       """.utf8)
   }
 
-  private func hapRequest(key: String = "idem-hap-01", capability: String? = "CAP-RT-HAP-001")
+  private func hapRequest(
+    lease: String,
+    key: String = "idem-hap-01",
+    capability: String? = "CAP-RT-HAP-001",
+    bundleName: String = "com.example.demo",
+    extraInputs: String = ""
+  )
     -> Data
   {
     let auth = capability.map { "\"authorization\": { \"capabilityId\": \"\($0)\" }," } ?? ""
@@ -192,12 +250,28 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
         "operation": { "id": "debug.hap", "version": 1 },
         \(auth)
         "inputs": {
-          "hapArtifactLease": "lease-1",
-          "bundleName": "com.example.demo",
+          "hapArtifactLease": "\(lease)",
+          "bundleName": "\(bundleName)",
           "abilityName": "EntryAbility"
+          \(extraInputs)
         }
       }
       """.utf8)
+  }
+
+  private func publishHAPLease(_ store: RuntimeArtifactStore) async throws -> String {
+    let metadata = try await store.publish(
+      RuntimeArtifactPublicationRequest(
+        jobID: "job-input-hap", sessionID: "session-input-hap",
+        stepID: "publish-hap", name: "demo.hap",
+        mediaType: "application/octet-stream", privacy: .standard,
+        retentionClass: .pinnedUntilVerified,
+        sourceOperation: "build.hap@1", providerID: "host",
+        bindingSnapshot: ArtifactBindingSnapshot(
+          targetID: "TGT-1", bindingRevision: 1, stableIdentitySHA256: nil),
+        contents: Data("signed-hap-fixture".utf8)))
+    return try await store.leaseReference(
+      jobID: metadata.jobID, artifactID: metadata.artifactID)
   }
 
   private func installE1Capability(_ store: RuntimeCapabilityStore) async throws {
@@ -226,47 +300,31 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
     let recorded = try await artifacts.list(jobID: acceptance.jobID)
     let byName = Dictionary(uniqueKeysWithValues: recorded.map { ($0.name, $0) })
     XCTAssertEqual(byName["hilog.txt"]?.status, .published)
+    let hilogID = try XCTUnwrap(byName["hilog.txt"]?.artifactID)
+    let hilog = try await artifacts.read(
+      jobID: acceptance.jobID, artifactID: hilogID, allowSensitive: true)
+    XCTAssertEqual(
+      String(data: hilog, encoding: .utf8),
+      "01-01 00:00:00 I app: hello\n",
+      "the Artifact must contain the captured log, not a byte-count summary")
     // The absent trace is present in the index WITH a reason: this is the
     // whole point - a partial capture cannot look complete.
     guard case .missing(let reason)? = byName["trace.htrace"]?.status else {
-      return XCTFail("the trace must be recorded as missing, got \(String(describing: byName["trace.htrace"]))")
+      return XCTFail(
+        "the trace must be recorded as missing, got \(String(describing: byName["trace.htrace"]))")
     }
     XCTAssertFalse(reason.isEmpty)
 
     // And the summary says so in one place a caller can read.
     let summaryID = try XCTUnwrap(byName["capture-summary.json"]?.artifactID)
-    let summaryText = String(
-      data: try await artifacts.read(jobID: acceptance.jobID, artifactID: summaryID),
-      encoding: .utf8) ?? ""
+    let summaryText =
+      String(
+        data: try await artifacts.read(jobID: acceptance.jobID, artifactID: summaryID),
+        encoding: .utf8) ?? ""
     XCTAssertTrue(summaryText.contains("trace.htrace"), summaryText)
     XCTAssertTrue(summaryText.contains("missing"), summaryText)
     // trace.htrace is an optional product, so overall completeness holds.
     XCTAssertTrue(summaryText.contains("\"completeness\" : \"complete\""), summaryText)
-  }
-
-  func testFailingOptionalTraceDegradesInsteadOfFailingTheJob() async throws {
-    let dispatcher = ScriptedDispatcher(script: .init(traceFails: true))
-    let (engine, capabilities, artifacts) = try makeEngine(dispatcher: dispatcher)
-    // Selecting the remote-file trace makes this plan mutate the device,
-    // so it needs an E1 capability - see the escalation test below.
-    try await installCaptureCapability(capabilities)
-    let acceptance = try await engine.submit(
-      captureRequest(withTrace: true, capability: "CAP-RT-CAPTURE-001"))
-    let status = try await engine.run(jobID: acceptance.jobID)
-    XCTAssertEqual(status.state, "succeeded", status.timeline.joined(separator: " | "))
-    XCTAssertTrue(status.timeline.contains { $0.hasPrefix("skipped capture-trace") })
-
-    let recorded = try await artifacts.list(jobID: acceptance.jobID)
-    let trace = recorded.first { $0.name == "trace.htrace" }
-    guard case .missing(let reason)? = trace?.status else {
-      return XCTFail(
-        "a failed optional capture must be recorded as missing; index: "
-          + recorded.map { "\($0.name)=\($0.status)" }.joined(separator: ", ")
-          + " | timeline: " + status.timeline.joined(separator: " | "))
-    }
-    XCTAssertTrue(reason.contains("unsupported"), reason)
-    // The required products still published.
-    XCTAssertEqual(recorded.first { $0.name == "hilog.txt" }?.status, .published)
   }
 
   func testRequiredCaptureFailureFailsTheJob() async throws {
@@ -279,22 +337,43 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
     XCTAssertTrue(status.outcomeUnknown || status.state == "failed", status.state)
   }
 
-  /// The defect maintainer review caught: charging the operation's minimum
-  /// effect would have let a device-mutating plan through on the default
-  /// read-only policy. Selecting the remote trace must demand E1.
-  func testCaptureWithRemoteTraceRequiresE1AndDispatchesNothingWithout() async throws {
+  func testRemoteTraceFailsClosedBeforeCapabilityConsumptionOrDispatch() async throws {
+    let dispatcher = ScriptedDispatcher()
+    let (engine, capabilities, _) = try makeEngine(dispatcher: dispatcher)
+    try await installCaptureCapability(capabilities)
+    do {
+      _ = try await engine.submit(
+        captureRequest(
+          withTrace: true, key: "idem-trace-unimplemented",
+          capability: "CAP-RT-CAPTURE-001"))
+      XCTFail("trace cannot run without a verified host-managed receive path")
+    } catch let error as RuntimeJobEngineError {
+      guard case .rejected(.invalidInput, let message) = error else {
+        return XCTFail("expected invalidInput, got \(error)")
+      }
+      XCTAssertTrue(message.contains("host-managed receive"), message)
+    }
+    let capability = try await capabilities.inspect(capabilityID: "CAP-RT-CAPTURE-001")
+    XCTAssertEqual(capability?.consumptionCount, 0)
+    XCTAssertTrue(dispatcher.dispatchedActions.isEmpty, "zero dispatch on refusal")
+  }
+
+  func testUnimplementedStrictRedactionFailsClosedBeforeDispatch() async throws {
     let dispatcher = ScriptedDispatcher()
     let (engine, _, _) = try makeEngine(dispatcher: dispatcher)
     do {
-      _ = try await engine.submit(captureRequest(withTrace: true, key: "idem-trace-nocap"))
-      XCTFail("a trace-selecting capture mutates the device and must require a capability")
+      _ = try await engine.submit(
+        captureRequest(
+          withTrace: false, key: "idem-strict-redaction",
+          redactionProfile: "strict"))
+      XCTFail("strict cannot be silently treated as standard redaction")
     } catch let error as RuntimeJobEngineError {
-      guard case .rejected(.authorizationRequired, let message) = error else {
-        return XCTFail("expected authorizationRequired, got \(error)")
+      guard case .rejected(.invalidInput, let message) = error else {
+        return XCTFail("expected invalidInput, got \(error)")
       }
-      XCTAssertTrue(message.contains("deviceMutation"), message)
+      XCTAssertTrue(message.contains("strict redaction"), message)
     }
-    XCTAssertTrue(dispatcher.dispatchedActions.isEmpty, "zero dispatch on refusal")
+    XCTAssertTrue(dispatcher.dispatchedActions.isEmpty)
   }
 
   /// ...while the same operation without the trace stays E0 and needs no
@@ -307,6 +386,57 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
     XCTAssertFalse(acceptance.deduplicated)
     let status = try await engine.run(jobID: acceptance.jobID)
     XCTAssertEqual(status.state, "succeeded")
+  }
+
+  func testDeviceStoragePreflightIsRealAndBlocksCaptureWhenInsufficient() async throws {
+    let dispatcher = ScriptedDispatcher(
+      script: .init(availableStorageKB: 512))
+    let (engine, _, _) = try makeEngine(dispatcher: dispatcher)
+    let acceptance = try await engine.submit(
+      captureRequest(withTrace: false, key: "idem-storage-preflight"))
+    let status = try await engine.run(jobID: acceptance.jobID)
+    XCTAssertEqual(status.state, "failed", status.timeline.joined(separator: " | "))
+    XCTAssertEqual(
+      dispatcher.dispatchedActions,
+      ["observeDevice", "evidenceModel", "evidenceFirmware", "observeStorage"])
+  }
+
+  func testJobArtifactBudgetStopsPublicationWithoutFillingTheStore() async throws {
+    let budget = 1_048_576
+    let dispatcher = ScriptedDispatcher(
+      script: .init(hilogPayloadBytes: budget + 1))
+    let (engine, _, artifacts) = try makeEngine(dispatcher: dispatcher)
+    let acceptance = try await engine.submit(
+      captureRequest(
+        withTrace: false, key: "idem-artifact-budget",
+        totalArtifactByteBudget: budget))
+    let status = try await engine.run(jobID: acceptance.jobID)
+    XCTAssertEqual(status.state, "failed", status.timeline.joined(separator: " | "))
+    let recorded = try await artifacts.list(jobID: acceptance.jobID)
+    XCTAssertFalse(recorded.contains { $0.name == "hilog.txt" && $0.status.isPublished })
+    XCTAssertLessThanOrEqual(
+      recorded.filter { $0.status.isPublished }.reduce(0) { $0 + $1.byteCount },
+      budget)
+    XCTAssertFalse(dispatcher.dispatchedActions.contains("captureUIDump"))
+  }
+
+  func testHostStoragePreflightRefusesCollectionBeforeDeviceDispatch() async throws {
+    let dispatcher = ScriptedDispatcher()
+    let (engine, _, _) = try makeEngine(
+      dispatcher: dispatcher,
+      artifactQuota: ArtifactQuota(totalBytes: 512 * 1024))
+    let acceptance = try await engine.submit(
+      captureRequest(
+        withTrace: false, key: "idem-capture-host-preflight",
+        totalArtifactByteBudget: 1_048_576))
+
+    let status = try await engine.run(jobID: acceptance.jobID)
+
+    XCTAssertEqual(status.state, "failed")
+    XCTAssertTrue(dispatcher.dispatchedActions.isEmpty)
+    XCTAssertTrue(
+      status.timeline.contains { $0.contains("host storage preflight refused") },
+      status.timeline.joined(separator: " | "))
   }
 
   private func installCaptureCapability(_ store: RuntimeCapabilityStore) async throws {
@@ -335,7 +465,8 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
       captureRequest(withTrace: false, key: "idem-identity-01"))
     _ = try await engine.run(jobID: acceptance.jobID)
 
-    let journalURL = stateDirectory
+    let journalURL =
+      stateDirectory
       .appendingPathComponent("jobs/\(acceptance.jobID)/journal.jsonl")
     let journal = try String(contentsOf: journalURL, encoding: .utf8)
 
@@ -370,10 +501,11 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
     ]
     for (index, script) in vectors.enumerated() {
       let dispatcher = ScriptedDispatcher(script: script)
-      let (engine, capabilities, _) = try makeEngine(dispatcher: dispatcher)
+      let (engine, capabilities, artifacts) = try makeEngine(dispatcher: dispatcher)
       if index == 0 { try await installE1Capability(capabilities) }
+      let lease = try await publishHAPLease(artifacts)
       let acceptance = try await engine.submit(
-        hapRequest(key: "idem-hap-preflight-\(index)"))
+        hapRequest(lease: lease, key: "idem-hap-preflight-\(index)"))
       let status = try await engine.run(jobID: acceptance.jobID)
       XCTAssertNotEqual(status.state, "succeeded", "vector \(index)")
       XCTAssertFalse(
@@ -423,6 +555,71 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
     XCTAssertEqual(Set(uiParameters.keys), ["byteBudget"], "componentTree declares only a budget")
   }
 
+  func testPairedRemoteActionsShareTheRealJobBoundProviderPath() throws {
+    let provider = HDCObservationProviderAdapter(factsPort: FactsPort())
+    let context = ProviderExecutionContext(
+      jobID: "job-runtime-123", stepID: "test", targetID: "TGT-1",
+      bindingRevision: 7, connectKey: "150100424a544e4600",
+      nowUTC: "2026-07-29T00:00:00Z")
+
+    let capture = try XCTUnwrap(
+      RuntimeOperationCatalog.descriptor(reference: "capture.diagnostics@1"))
+    let trace = try provider.action(
+      for: XCTUnwrap(capture.steps.first { $0.stepID == "capture-trace" }),
+      operation: capture, inputs: [:], context: context)
+    let receive = try provider.action(
+      for: XCTUnwrap(capture.steps.first { $0.stepID == "receive-trace-artifact" }),
+      operation: capture, inputs: [:], context: context)
+    let captureCleanup = try provider.action(
+      for: XCTUnwrap(capture.steps.first { $0.stepID == "cleanup-remote-temp" }),
+      operation: capture, inputs: [:], context: context)
+
+    guard case .hdc(.captureTrace(_, let tracePath)) = trace,
+      case .hdc(.receiveOwnedArtifact(let remoteArtifact)) = receive,
+      case .hdc(.cleanupOwnedRemotePath(let cleanupPath)) = captureCleanup
+    else {
+      return XCTFail("capture actions must retain their typed path payloads")
+    }
+    XCTAssertEqual(tracePath, remoteArtifact.path)
+    XCTAssertEqual(tracePath, cleanupPath)
+    XCTAssertEqual(tracePath.jobID, "job-runtime-123")
+
+    let debug = try XCTUnwrap(
+      RuntimeOperationCatalog.descriptor(reference: "debug.hap@1"))
+    let inputs: [String: JSONValue] = [
+      "hapArtifactLease": .string("lease-v1:job-input:ART-0123456789abcdef0123456789abcdef"),
+      "bundleName": .string("com.example.demo"),
+      "abilityName": .string("EntryAbility"),
+    ]
+    let send = try provider.action(
+      for: XCTUnwrap(debug.steps.first { $0.stepID == "send-hap" }),
+      operation: debug, inputs: inputs, context: context)
+    let install = try provider.action(
+      for: XCTUnwrap(debug.steps.first { $0.stepID == "install-hap" }),
+      operation: debug, inputs: inputs, context: context)
+    let stagingCleanup = try provider.action(
+      for: XCTUnwrap(debug.steps.first { $0.stepID == "cleanup-remote-staging" }),
+      operation: debug, inputs: inputs, context: context)
+
+    guard case .hdc(.sendArtifactToStaging(let staged)) = send,
+      case .hdc(.installPackage(let installed, _)) = install,
+      case .hdc(.cleanupOwnedRemotePath(let stagingPath)) = stagingCleanup
+    else {
+      return XCTFail("debug actions must retain their typed staging payloads")
+    }
+    XCTAssertEqual(staged.path, installed.path)
+    XCTAssertEqual(staged.path, stagingPath)
+    XCTAssertEqual(staged.path.jobID, "job-runtime-123")
+    let installPlan = try provider.lower(action: install, context: context)
+    guard case .process(_, let installArguments, _) = installPlan.kind else {
+      return XCTFail("install must lower to a process plan")
+    }
+    XCTAssertEqual(
+      installArguments,
+      ["-t", "150100424a544e4600", "install", "-r", staged.path.remotePath],
+      "installOrReplace must not silently lower to a fresh-only install")
+  }
+
   /// A stdout-capturing step with no declared action must stop the run
   /// rather than have one invented for its durable intent.
   func testStdoutStepWithoutADeclaredActionIsRefused() throws {
@@ -445,8 +642,9 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
   func testHAPSuccessRequiresBothReadbacks() async throws {
     let dispatcher = ScriptedDispatcher()
     let (engine, capabilities, artifacts) = try makeEngine(dispatcher: dispatcher)
+    let lease = try await publishHAPLease(artifacts)
     try await installE1Capability(capabilities)
-    let acceptance = try await engine.submit(hapRequest())
+    let acceptance = try await engine.submit(hapRequest(lease: lease))
     let status = try await engine.run(jobID: acceptance.jobID)
     XCTAssertEqual(status.state, "succeeded", status.timeline.joined(separator: " | "))
     XCTAssertTrue(dispatcher.dispatchedActions.contains("packageReadback"))
@@ -458,13 +656,38 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
     XCTAssertTrue(recorded.contains { $0.name == "install-readback.json" })
   }
 
+  func testHAPDurableIntentUsesTheResolvedArtifactAndExactOwnedPath() async throws {
+    let dispatcher = ScriptedDispatcher()
+    let (engine, capabilities, artifacts) = try makeEngine(dispatcher: dispatcher)
+    let lease = try await publishHAPLease(artifacts)
+    let resolved = try await artifacts.resolveLease(lease)
+    try await installE1Capability(capabilities)
+    let acceptance = try await engine.submit(
+      hapRequest(lease: lease, key: "idem-hap-exact-intent"))
+    let status = try await engine.run(jobID: acceptance.jobID)
+    XCTAssertEqual(status.state, "succeeded")
+
+    let journal = try String(
+      contentsOf: stateDirectory.appendingPathComponent(
+        "jobs/\(acceptance.jobID)/journal.jsonl"),
+      encoding: .utf8)
+    let ownedPath =
+      "/data/local/tmp/arkdeck-\(acceptance.jobID)-send-hap-owned"
+    XCTAssertTrue(journal.contains(resolved.artifactID), journal)
+    XCTAssertTrue(journal.contains(resolved.sha256), journal)
+    XCTAssertTrue(journal.contains(ownedPath), journal)
+    XCTAssertFalse(journal.contains("<artifact-lease>"), journal)
+  }
+
   func testCleanInstallExitWithEmptyReadbackFailsTheJob() async throws {
     // The exact hardware-observed hazard: `hdc install` exits zero without
     // having installed. Success must not follow from the exit code.
     let dispatcher = ScriptedDispatcher(script: .init(packageInstalled: false))
-    let (engine, capabilities, _) = try makeEngine(dispatcher: dispatcher)
+    let (engine, capabilities, artifacts) = try makeEngine(dispatcher: dispatcher)
+    let lease = try await publishHAPLease(artifacts)
     try await installE1Capability(capabilities)
-    let acceptance = try await engine.submit(hapRequest(key: "idem-hap-noinstall"))
+    let acceptance = try await engine.submit(
+      hapRequest(lease: lease, key: "idem-hap-noinstall"))
     let status = try await engine.run(jobID: acceptance.jobID)
     XCTAssertNotEqual(status.state, "succeeded", status.timeline.joined(separator: " | "))
     XCTAssertTrue(dispatcher.dispatchedActions.contains("packageReadback"))
@@ -472,21 +695,83 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
     XCTAssertFalse(dispatcher.dispatchedActions.contains("startAbility"))
   }
 
+  func testNonzeroInstallFailsBeforeAnExistingPackageCanFakeTheReadback() async throws {
+    let dispatcher = ScriptedDispatcher(script: .init(installExit: 1))
+    let (engine, capabilities, artifacts) = try makeEngine(dispatcher: dispatcher)
+    let lease = try await publishHAPLease(artifacts)
+    try await installE1Capability(capabilities)
+    let acceptance = try await engine.submit(
+      hapRequest(lease: lease, key: "idem-hap-install-failed"))
+    let status = try await engine.run(jobID: acceptance.jobID)
+    XCTAssertEqual(status.state, "failed", status.timeline.joined(separator: " | "))
+    XCTAssertFalse(
+      dispatcher.dispatchedActions.contains("packageReadback"),
+      "an already-installed old package must not turn a failed install into success")
+  }
+
+  func testNonzeroStartFailsBeforeAnExistingProcessCanFakeTheReadback() async throws {
+    let dispatcher = ScriptedDispatcher(script: .init(processRunning: true, startExit: 1))
+    let (engine, capabilities, artifacts) = try makeEngine(dispatcher: dispatcher)
+    let lease = try await publishHAPLease(artifacts)
+    try await installE1Capability(capabilities)
+    let acceptance = try await engine.submit(
+      hapRequest(lease: lease, key: "idem-hap-start-failed"))
+
+    let status = try await engine.run(jobID: acceptance.jobID)
+
+    XCTAssertEqual(status.state, "failed", status.timeline.joined(separator: " | "))
+    XCTAssertFalse(
+      dispatcher.dispatchedActions.contains("processReadback"),
+      "an old live process must not turn a failed start into success")
+    XCTAssertTrue(dispatcher.dispatchedActions.contains("uninstallPackage"))
+  }
+
   func testCleanStartExitWithNoProcessFailsTheJob() async throws {
     let dispatcher = ScriptedDispatcher(script: .init(processRunning: false))
-    let (engine, capabilities, _) = try makeEngine(dispatcher: dispatcher)
+    let (engine, capabilities, artifacts) = try makeEngine(dispatcher: dispatcher)
+    let lease = try await publishHAPLease(artifacts)
     try await installE1Capability(capabilities)
-    let acceptance = try await engine.submit(hapRequest(key: "idem-hap-nostart"))
+    let acceptance = try await engine.submit(
+      hapRequest(lease: lease, key: "idem-hap-nostart"))
     let status = try await engine.run(jobID: acceptance.jobID)
     XCTAssertNotEqual(status.state, "succeeded", status.timeline.joined(separator: " | "))
     XCTAssertTrue(dispatcher.dispatchedActions.contains("processReadback"))
   }
 
+  func testPackageReadbackRejectsBundleNameSubstrings() async throws {
+    let packageDispatcher = ScriptedDispatcher(
+      script: .init(packageReadbackText: "bundleName: com.example.demo.other\n"))
+    let (packageEngine, packageCapabilities, packageArtifacts) =
+      try makeEngine(dispatcher: packageDispatcher)
+    let packageLease = try await publishHAPLease(packageArtifacts)
+    try await installE1Capability(packageCapabilities)
+    let packageJob = try await packageEngine.submit(
+      hapRequest(lease: packageLease, key: "idem-hap-package-substring"))
+    let packageStatus = try await packageEngine.run(jobID: packageJob.jobID)
+    XCTAssertEqual(packageStatus.state, "failed")
+    XCTAssertFalse(packageDispatcher.dispatchedActions.contains("startAbility"))
+  }
+
+  func testProcessReadbackRejectsNonnumericPidNoise() async throws {
+    let processDispatcher = ScriptedDispatcher(
+      script: .init(processReadbackText: "error 404\n"))
+    let (processEngine, processCapabilities, processArtifacts) =
+      try makeEngine(dispatcher: processDispatcher)
+    let processLease = try await publishHAPLease(processArtifacts)
+    try await installE1Capability(processCapabilities)
+    let processJob = try await processEngine.submit(
+      hapRequest(lease: processLease, key: "idem-hap-pid-noise"))
+    let processStatus = try await processEngine.run(jobID: processJob.jobID)
+    XCTAssertEqual(processStatus.state, "failed")
+  }
+
   func testHAPWithoutCapabilityDispatchesNothing() async throws {
     let dispatcher = ScriptedDispatcher()
-    let (engine, _, _) = try makeEngine(dispatcher: dispatcher)
+    let (engine, _, artifacts) = try makeEngine(dispatcher: dispatcher)
+    let lease = try await publishHAPLease(artifacts)
     do {
-      _ = try await engine.submit(hapRequest(key: "idem-hap-nocap", capability: nil))
+      _ = try await engine.submit(
+        hapRequest(lease: lease, key: "idem-hap-nocap", capability: nil))
       XCTFail("an E1 operation without a capability must be rejected")
     } catch let error as RuntimeJobEngineError {
       guard case .rejected(.authorizationRequired, _) = error else {
@@ -496,9 +781,28 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
     XCTAssertTrue(dispatcher.dispatchedActions.isEmpty, "zero dispatch on refusal")
   }
 
+  func testHAPLeaseDriftBeforeSendFailsWithoutDispatchOrStuckRunningState() async throws {
+    let dispatcher = ScriptedDispatcher()
+    let (engine, capabilities, artifacts) = try makeEngine(dispatcher: dispatcher)
+    let lease = try await publishHAPLease(artifacts)
+    try await installE1Capability(capabilities)
+    let acceptance = try await engine.submit(
+      hapRequest(lease: lease, key: "idem-hap-lease-drift"))
+    let resolved = try await artifacts.resolveLease(lease)
+    try FileManager.default.removeItem(at: resolved.fileURL)
+
+    let status = try await engine.run(jobID: acceptance.jobID)
+    XCTAssertEqual(status.state, "failed", status.timeline.joined(separator: " | "))
+    XCTAssertFalse(
+      dispatcher.dispatchedActions.contains("sendArtifact"),
+      "no mutation may use drifted Artifact bytes")
+    XCTAssertFalse(dispatcher.dispatchedActions.contains("installPackage"))
+  }
+
   func testCapabilityScopedToAnotherOperationIsRejected() async throws {
     let dispatcher = ScriptedDispatcher()
-    let (engine, capabilities, _) = try makeEngine(dispatcher: dispatcher)
+    let (engine, capabilities, artifacts) = try makeEngine(dispatcher: dispatcher)
+    let lease = try await publishHAPLease(artifacts)
     try await capabilities.install(
       try RuntimeCapability(
         capabilityID: "CAP-RT-HAP-001",
@@ -511,7 +815,7 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
         maximumUses: 5,
         issuer: .init(kind: .maintainerMergedPR, reference: "PR#test")))
     do {
-      _ = try await engine.submit(hapRequest(key: "idem-hap-scope"))
+      _ = try await engine.submit(hapRequest(lease: lease, key: "idem-hap-scope"))
       XCTFail("an out-of-scope capability must be rejected")
     } catch let error as RuntimeJobEngineError {
       guard case .rejected(.authorizationRequired, let message) = error else {
@@ -524,14 +828,273 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
 
   func testCapabilityIsConsumedOncePerRecipeNotPerStep() async throws {
     let dispatcher = ScriptedDispatcher()
-    let (engine, capabilities, _) = try makeEngine(dispatcher: dispatcher)
+    let (engine, capabilities, artifacts) = try makeEngine(dispatcher: dispatcher)
+    let lease = try await publishHAPLease(artifacts)
     try await installE1Capability(capabilities)
-    let acceptance = try await engine.submit(hapRequest(key: "idem-hap-once"))
+    let acceptance = try await engine.submit(
+      hapRequest(lease: lease, key: "idem-hap-once"))
     _ = try await engine.run(jobID: acceptance.jobID)
     let status = try await capabilities.inspect(capabilityID: "CAP-RT-HAP-001")
     XCTAssertEqual(
       status?.remainingUses, 4,
       "one recipe consumes exactly one use, however many mutating steps it has")
     XCTAssertEqual(status?.consumptionCount, 1)
+  }
+
+  func testIdempotencyConflictCannotConsumeASecondCapability() async throws {
+    let dispatcher = ScriptedDispatcher()
+    let (engine, capabilities, artifacts) = try makeEngine(dispatcher: dispatcher)
+    let lease = try await publishHAPLease(artifacts)
+    try await installE1Capability(capabilities)
+    try await capabilities.install(
+      try RuntimeCapability(
+        capabilityID: "CAP-RT-HAP-002",
+        targetScope: .anyTarget,
+        operationScope: [.init(operationID: "debug.hap", version: 1)],
+        effectCeiling: .deviceMutation,
+        issuedAtUTC: "2026-07-01T00:00:00Z",
+        expiresAtUTC: "2026-12-31T00:00:00Z",
+        maximumUses: 5,
+        issuer: .init(kind: .maintainerMergedPR, reference: "PR#test")))
+
+    _ = try await engine.submit(
+      hapRequest(lease: lease, key: "idem-hap-conflict"))
+    do {
+      _ = try await engine.submit(
+        hapRequest(
+          lease: lease, key: "idem-hap-conflict",
+          capability: "CAP-RT-HAP-002", bundleName: "com.example.other"))
+      XCTFail("drifted request must conflict")
+    } catch let error as RuntimeJobEngineError {
+      guard case .idempotencyConflict = error else {
+        return XCTFail("expected idempotencyConflict, got \(error)")
+      }
+    }
+    let firstCapability = try await capabilities.inspect(capabilityID: "CAP-RT-HAP-001")
+    let secondCapability = try await capabilities.inspect(capabilityID: "CAP-RT-HAP-002")
+    XCTAssertEqual(firstCapability?.consumptionCount, 1)
+    XCTAssertEqual(secondCapability?.consumptionCount, 0)
+  }
+
+  func testRetainAndDisabledDiagnosticsDoNotDispatchThoseOptionalSteps() async throws {
+    let dispatcher = ScriptedDispatcher()
+    let (engine, capabilities, artifacts) = try makeEngine(dispatcher: dispatcher)
+    let lease = try await publishHAPLease(artifacts)
+    try await installE1Capability(capabilities)
+    let acceptance = try await engine.submit(
+      hapRequest(
+        lease: lease, key: "idem-hap-retain",
+        extraInputs: """
+          ,
+          "cleanupPolicy": "retain",
+          "captureDiagnostics": false
+          """))
+    let status = try await engine.run(jobID: acceptance.jobID)
+    XCTAssertEqual(status.state, "succeeded", status.timeline.joined(separator: " | "))
+    XCTAssertFalse(dispatcher.dispatchedActions.contains("captureHilog"))
+    XCTAssertFalse(dispatcher.dispatchedActions.contains("uninstallPackage"))
+    XCTAssertTrue(dispatcher.dispatchedActions.contains("cleanup"))
+  }
+
+  func testUnsupportedHAPModesFailBeforeCapabilityConsumption() async throws {
+    let dispatcher = ScriptedDispatcher()
+    let (engine, capabilities, artifacts) = try makeEngine(dispatcher: dispatcher)
+    let lease = try await publishHAPLease(artifacts)
+    try await installE1Capability(capabilities)
+
+    let unsupported: [(String, String, String)] = [
+      (
+        "restore", "\"cleanupPolicy\": \"restorePrevious\"",
+        "snapshot/restore"
+      ),
+      (
+        "forward", "\"portForwardProfile\": \"debugger-default\"",
+        "port-forward"
+      ),
+      (
+        "fresh", "\"installPolicy\": \"installFresh\"",
+        "pre-install absence"
+      ),
+    ]
+    for (suffix, input, expectedDetail) in unsupported {
+      do {
+        _ = try await engine.submit(
+          hapRequest(
+            lease: lease, key: "idem-hap-\(suffix)",
+            extraInputs: ",\n\(input)"))
+        XCTFail("\(suffix) cannot be silently downgraded")
+      } catch let error as RuntimeJobEngineError {
+        guard case .rejected(.invalidInput, let detail) = error else {
+          return XCTFail("expected invalidInput, got \(error)")
+        }
+        XCTAssertTrue(detail.contains(expectedDetail), detail)
+      }
+    }
+    let capability = try await capabilities.inspect(capabilityID: "CAP-RT-HAP-001")
+    XCTAssertEqual(capability?.consumptionCount, 0)
+    XCTAssertTrue(dispatcher.dispatchedActions.isEmpty)
+  }
+
+  func testInvalidCatalogBoundFailsBeforeCapabilityConsumption() async throws {
+    let dispatcher = ScriptedDispatcher()
+    let (engine, capabilities, artifacts) = try makeEngine(dispatcher: dispatcher)
+    let lease = try await publishHAPLease(artifacts)
+    try await installE1Capability(capabilities)
+    do {
+      _ = try await engine.submit(
+        hapRequest(
+          lease: lease, key: "idem-hap-duration",
+          extraInputs: """
+            ,
+            "diagnosticsDurationSeconds": 999
+            """))
+      XCTFail("out-of-range catalog input must be rejected")
+    } catch let error as RuntimeJobEngineError {
+      guard case .rejected(.invalidInput, _) = error else {
+        return XCTFail("expected invalidInput, got \(error)")
+      }
+    }
+    let capability = try await capabilities.inspect(capabilityID: "CAP-RT-HAP-001")
+    XCTAssertEqual(capability?.consumptionCount, 0)
+  }
+
+  func testReadbackFailureRunsTypedCompensation() async throws {
+    let dispatcher = ScriptedDispatcher(script: .init(processRunning: false))
+    let (engine, capabilities, artifacts) = try makeEngine(dispatcher: dispatcher)
+    let lease = try await publishHAPLease(artifacts)
+    try await installE1Capability(capabilities)
+    let acceptance = try await engine.submit(
+      hapRequest(lease: lease, key: "idem-hap-compensate"))
+    let status = try await engine.run(jobID: acceptance.jobID)
+    XCTAssertEqual(status.state, "failed", status.timeline.joined(separator: " | "))
+    XCTAssertTrue(dispatcher.dispatchedActions.contains("stopAbility"))
+    XCTAssertTrue(dispatcher.dispatchedActions.contains("uninstallPackage"))
+    XCTAssertTrue(dispatcher.dispatchedActions.contains("cleanup"))
+    XCTAssertTrue(status.timeline.contains { $0.contains("compensated cleanup-uninstall") })
+  }
+
+  func testReconcileUsesTheOriginalUnknownMutationAction() async throws {
+    let dispatcher = ScriptedDispatcher(script: .init(sendOutcomeUnknown: true))
+    let (engine, capabilities, artifacts) = try makeEngine(dispatcher: dispatcher)
+    let lease = try await publishHAPLease(artifacts)
+    try await installE1Capability(capabilities)
+    let acceptance = try await engine.submit(
+      hapRequest(lease: lease, key: "idem-hap-reconcile"))
+    let parked = try await engine.run(jobID: acceptance.jobID)
+    XCTAssertEqual(parked.state, "waitingForRecovery")
+    XCTAssertTrue(parked.outcomeUnknown)
+    let parkedReplay = try DurableJournalRecovery.inspect(
+      url:
+        stateDirectory
+        .appendingPathComponent("jobs/\(acceptance.jobID)/journal.jsonl"))
+    XCTAssertEqual(
+      parkedReplay.outstandingIntents.map(\.stepID), ["send-hap"],
+      "an unknown dispatch must retain the original durable intent")
+    XCTAssertTrue(
+      parkedReplay.unknownOutcomes.isEmpty,
+      "recovery must not manufacture an outcomeUnknown step outcome")
+
+    let recoveryDispatcher = ScriptedDispatcher()
+    let (recoveredEngine, _, _) = try makeEngine(dispatcher: recoveryDispatcher)
+    _ = try await recoveredEngine.recoverPersistedJobs()
+    let reconciled = try await recoveredEngine.reconcile(jobID: acceptance.jobID)
+    XCTAssertFalse(
+      reconciled.outcomeUnknown,
+      "the persisted send action must reconcile through its job-owned path readback")
+    XCTAssertTrue(
+      reconciled.timeline.contains { $0.contains("reconciled") },
+      reconciled.timeline.joined(separator: " | "))
+    XCTAssertEqual(
+      recoveryDispatcher.dispatchedActions, ["reconcileOwnedPathPresence"],
+      "restart recovery must dispatch only the dedicated readback, never resend the mutation")
+    let resumed = try await recoveredEngine.run(jobID: acceptance.jobID)
+    XCTAssertEqual(resumed.state, "succeeded", resumed.timeline.joined(separator: " | "))
+    XCTAssertFalse(
+      recoveryDispatcher.dispatchedActions.contains("sendArtifact"),
+      "the reconciled mutation must be skipped from durable journal progress")
+    let completedReplay = try DurableJournalRecovery.inspect(
+      url:
+        stateDirectory
+        .appendingPathComponent("jobs/\(acceptance.jobID)/journal.jsonl"))
+    XCTAssertTrue(completedReplay.outstandingIntents.isEmpty)
+    XCTAssertTrue(completedReplay.unknownOutcomes.isEmpty)
+  }
+
+  func testSemanticUnknownPersistsItsOriginalStepForReconcile() async throws {
+    let dispatcher = ScriptedDispatcher(script: .init(hilogEmpty: true))
+    let (engine, _, _) = try makeEngine(dispatcher: dispatcher)
+    let acceptance = try await engine.submit(
+      captureRequest(withTrace: false, key: "idem-capture-semantic-unknown"))
+    let parked = try await engine.run(jobID: acceptance.jobID)
+    XCTAssertEqual(parked.state, "waitingForRecovery")
+    XCTAssertTrue(parked.outcomeUnknown)
+
+    let reconciled = try await engine.reconcile(jobID: acceptance.jobID)
+    XCTAssertFalse(reconciled.outcomeUnknown)
+    XCTAssertEqual(
+      reconciled.state, "failed",
+      "confirmed non-execution is terminal and must not auto-resend even a read-only action")
+    XCTAssertTrue(
+      reconciled.timeline.contains { $0.contains("reconciled") },
+      reconciled.timeline.joined(separator: " | "))
+  }
+
+  func testCleanupDebtCanBeQueriedAndExplicitlyContinued() async throws {
+    let dispatcher = ScriptedDispatcher(
+      script: .init(processRunning: false, cleanupExit: 1))
+    let (engine, capabilities, artifacts) = try makeEngine(dispatcher: dispatcher)
+    let lease = try await publishHAPLease(artifacts)
+    try await installE1Capability(capabilities)
+    let acceptance = try await engine.submit(
+      hapRequest(lease: lease, key: "idem-cleanup-debt-continue"))
+    _ = try await engine.run(jobID: acceptance.jobID)
+    let debts = try await engine.listCleanupDebt()
+    let debt = try XCTUnwrap(debts.first)
+    XCTAssertEqual(debt.jobID, acceptance.jobID)
+
+    let continuationDispatcher = ScriptedDispatcher()
+    let (recovered, _, _) = try makeEngine(dispatcher: continuationDispatcher)
+    _ = try await recovered.recoverPersistedJobs()
+    let result = try await recovered.continueCleanupDebt(
+      jobID: debt.jobID, remotePath: debt.remotePath)
+    XCTAssertEqual(result.state, .settled)
+    XCTAssertEqual(
+      continuationDispatcher.dispatchedActions,
+      ["reconcileOwnedPathPresence", "cleanup"])
+    let remainingDebt = try await recovered.listCleanupDebt()
+    XCTAssertTrue(remainingDebt.isEmpty)
+  }
+
+  func testUnknownCleanupContinuationNeverResendsMutation() async throws {
+    let dispatcher = ScriptedDispatcher(
+      script: .init(processRunning: false, cleanupExit: 1))
+    let (engine, capabilities, artifacts) = try makeEngine(dispatcher: dispatcher)
+    let lease = try await publishHAPLease(artifacts)
+    try await installE1Capability(capabilities)
+    let acceptance = try await engine.submit(
+      hapRequest(lease: lease, key: "idem-cleanup-debt-unknown"))
+    _ = try await engine.run(jobID: acceptance.jobID)
+    let recordedDebt = try await engine.listCleanupDebt()
+    let debt = try XCTUnwrap(recordedDebt.first)
+
+    let unknownDispatcher = ScriptedDispatcher(script: .init(cleanupOutcomeUnknown: true))
+    let (firstRecovery, _, _) = try makeEngine(dispatcher: unknownDispatcher)
+    _ = try await firstRecovery.recoverPersistedJobs()
+    let unknown = try await firstRecovery.continueCleanupDebt(
+      jobID: debt.jobID, remotePath: debt.remotePath)
+    XCTAssertEqual(unknown.state, .outcomeUnknown)
+    XCTAssertEqual(
+      unknownDispatcher.dispatchedActions,
+      ["reconcileOwnedPathPresence", "cleanup"])
+
+    let noResendDispatcher = ScriptedDispatcher()
+    let (secondRecovery, _, _) = try makeEngine(dispatcher: noResendDispatcher)
+    _ = try await secondRecovery.recoverPersistedJobs()
+    let refused = try await secondRecovery.continueCleanupDebt(
+      jobID: debt.jobID, remotePath: debt.remotePath)
+    XCTAssertEqual(refused.state, .outcomeUnknown)
+    XCTAssertEqual(
+      noResendDispatcher.dispatchedActions, ["reconcileOwnedPathPresence"],
+      "an outcomeUnknown cleanup retry may only be read back, never resent")
   }
 }

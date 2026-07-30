@@ -22,6 +22,7 @@ final class HDCE0ActionPackContractTests: XCTestCase {
   private var context: ProviderExecutionContext {
     ProviderExecutionContext(
       jobID: "job-1", stepID: "step-1", targetID: "TGT-1", bindingRevision: 1,
+      connectKey: "150100424a544e4600",
       nowUTC: "2026-07-29T00:00:00Z")
   }
 
@@ -72,26 +73,36 @@ final class HDCE0ActionPackContractTests: XCTestCase {
 
   // MARK: - Provider-owned remote temp paths
 
-  func testRemoteTempPathsAreProviderOwnedAndCollisionFree() {
+  func testRemoteTempPathsAreProviderOwnedAndCollisionFree() throws {
     let adapter = provider
-    let first = adapter.mintOwnedRemotePath(jobID: "job-1", stepID: "capture-trace")
-    let second = adapter.mintOwnedRemotePath(jobID: "job-1", stepID: "capture-trace")
+    let first = try adapter.mintOwnedRemotePath(jobID: "job-1", stepID: "capture-trace")
+    let second = try adapter.mintOwnedRemotePath(jobID: "job-1", stepID: "capture-trace")
     XCTAssertNotEqual(first.remotePath, second.remotePath, "nonce prevents collisions")
     for path in [first, second] {
-      XCTAssertTrue(path.remotePath.hasPrefix("/data/local/tmp/arkdeck/"))
+      XCTAssertTrue(path.remotePath.hasPrefix("/data/local/tmp/arkdeck-"))
       XCTAssertTrue(path.remotePath.contains("job-1"))
       XCTAssertTrue(path.remotePath.contains("capture-trace"))
     }
     // A different job cannot land on another job's path.
-    let otherJob = adapter.mintOwnedRemotePath(jobID: "job-2", stepID: "capture-trace")
-    XCTAssertFalse(otherJob.remotePath.contains("/job-1/"))
+    let otherJob = try adapter.mintOwnedRemotePath(jobID: "job-2", stepID: "capture-trace")
+    XCTAssertFalse(otherJob.remotePath.contains("arkdeck-job-1-"))
+    XCTAssertThrowsError(
+      try adapter.mintOwnedRemotePath(jobID: "../escape", stepID: "capture-trace"))
+  }
+
+  func testRemoteTempPathRejectsAnOversizedFilesystemComponent() {
+    XCTAssertThrowsError(
+      try HDCOwnedRemotePath(
+        jobID: String(repeating: "j", count: 128),
+        stepID: String(repeating: "s", count: 128),
+        nonce: String(repeating: "n", count: 128)))
   }
 
   func testCleanupOnlyAcceptsOwnedPathType() throws {
     // Structural: cleanupOwnedRemotePath takes HDCOwnedRemotePath, which
     // has no public initializer - a raw string cannot reach it. The
     // lowered plan therefore always references a provider-minted path.
-    let path = provider.mintOwnedRemotePath(jobID: "job-1", stepID: "cleanup")
+    let path = try provider.mintOwnedRemotePath(jobID: "job-1", stepID: "cleanup")
     let plan = try provider.lower(
       action: .hdc(.cleanupOwnedRemotePath(path)), context: context)
     guard case .process(_, let argv, _) = plan.kind else {
@@ -164,7 +175,7 @@ final class HDCE0ActionPackContractTests: XCTestCase {
   }
 
   func testArtifactReceiveAndCleanupAccounting() throws {
-    let path = provider.mintOwnedRemotePath(jobID: "job-1", stepID: "receive")
+    let path = try provider.mintOwnedRemotePath(jobID: "job-1", stepID: "receive")
     let artifact = HDCOwnedRemoteArtifact(
       path: path, expectedSHA256: String(repeating: "b", count: 64), maximumBytes: 1024)
     let action = TypedProviderAction.hdc(.receiveOwnedArtifact(artifact))
@@ -195,7 +206,7 @@ final class HDCE0ActionPackContractTests: XCTestCase {
       TypedProviderAction.hdc(.captureHilog(try HDCHilogCaptureRequest(durationSeconds: 5)))
         .effect, .readOnly)
     XCTAssertEqual(TypedProviderAction.hdc(.captureUIDump(try HDCUIDumpRequest())).effect, .readOnly)
-    let path = provider.mintOwnedRemotePath(jobID: "job-1", stepID: "trace")
+    let path = try provider.mintOwnedRemotePath(jobID: "job-1", stepID: "trace")
     XCTAssertEqual(
       TypedProviderAction.hdc(
         .captureTrace(
@@ -207,7 +218,7 @@ final class HDCE0ActionPackContractTests: XCTestCase {
   }
 
   func testMutatingRemoteActionsDoNotReconcileWithoutEvidence() async throws {
-    let path = provider.mintOwnedRemotePath(jobID: "job-1", stepID: "trace")
+    let path = try provider.mintOwnedRemotePath(jobID: "job-1", stepID: "trace")
     let reference = ProviderDurableIntentReference(
       jobID: "job-1", stepID: "trace", intentEventID: "i",
       action: .hdc(.cleanupOwnedRemotePath(path)))

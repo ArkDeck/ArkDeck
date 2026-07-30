@@ -1,5 +1,11 @@
 # TASK-DHA-001 run r1 — MU-4 垂直交付(contract 面)
 
+> Correction(2026-07-29):合入后深检在本记录所依据的实现中发现
+> resume token 未持久化、HAP lease 未解析、跨步骤 remote path 不一致、
+> 补偿未执行及 symlink/index 覆盖不足。本记录中相应的 PASS/实现描述
+> 不再作为最终依据;修正、可复查命令与剩余 blocker 见 `run-r2-hardening.md`。
+> 保留原文用于审计,不回写成当时并不存在的能力。
+
 - Date:2026-07-29
 - Executor:agent(实现;真机与 E1 capability 属维护者)
 - Base:main `45f03dc`(#784 之后,T11 门槛已关闭)

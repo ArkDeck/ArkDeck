@@ -24,6 +24,7 @@ public enum HDCProviderAction: Sendable, Equatable {
   case listDeviceCandidates
   case observeDevice(connectKey: String)
   case queryProperty(HDCAllowlistedProperty)
+  case observeStorage(HDCStoragePreflightRequest)
   case captureHilog(HDCHilogCaptureRequest)
   case captureUIDump(HDCUIDumpRequest)
   case captureTrace(HDCTraceCaptureRequest, into: HDCOwnedRemotePath)
@@ -40,6 +41,12 @@ public enum HDCProviderAction: Sendable, Equatable {
   case uninstallPackage(HDCBundleReference)
   case createPortForward(HDCPortForwardSpec)
   case removePortForward(HDCPortForwardSpec)
+  // Recovery-only, read-only judgements. These are never substitutes for
+  // the original mutation and therefore cannot resend it.
+  case readPackagePresence(HDCBundleReference)
+  case readProcessPresence(HDCBundleReference)
+  case readOwnedPathPresence(HDCOwnedRemotePath)
+  case readPortForwardPresence(HDCPortForwardSpec)
 }
 
 /// Rockchip actions in MU-2: the one adapter-compat action wrapping the
@@ -58,9 +65,13 @@ public enum TypedProviderAction: Sendable, Equatable {
     case .hdc(.observeTool), .hdc(.observeServer):
       return .hostOnly
     case .hdc(.listDeviceCandidates), .hdc(.observeDevice), .hdc(.queryProperty),
+      .hdc(.observeStorage),
       .hdc(.captureHilog), .hdc(.captureUIDump), .hdc(.receiveOwnedArtifact):
       return .readOnly
     case .hdc(.queryPackageReadback), .hdc(.verifyProcessState):
+      return .readOnly
+    case .hdc(.readPackagePresence), .hdc(.readProcessPresence),
+      .hdc(.readOwnedPathPresence), .hdc(.readPortForwardPresence):
       return .readOnly
     case .hdc(.captureTrace), .hdc(.cleanupOwnedRemotePath),
       .hdc(.sendArtifactToStaging), .hdc(.installPackage), .hdc(.startAbility),
@@ -72,6 +83,283 @@ public enum TypedProviderAction: Sendable, Equatable {
       return .deviceMutation
     case .rockchip(.executeFlashPlan):
       return .destructive
+    }
+  }
+}
+
+/// Durable, closed representation of the exact typed action placed behind
+/// a write-ahead intent. Recovery decodes this record; it never asks the
+/// current catalog/provider mapping to invent the old intent again.
+struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
+  let kind: String
+  let arguments: [String: JSONValue]
+
+  init(_ action: TypedProviderAction) {
+    func pathArguments(_ path: HDCOwnedRemotePath) -> [String: JSONValue] {
+      [
+        "jobId": .string(path.jobID),
+        "stepId": .string(path.stepID),
+        "nonce": .string(path.nonce),
+        "remotePath": .string(path.remotePath),
+      ]
+    }
+    func optional(_ value: String?, into arguments: inout [String: JSONValue], key: String) {
+      if let value { arguments[key] = .string(value) }
+    }
+    switch action {
+    case .hdc(.observeTool):
+      self.init(kind: "hdc.observeTool", arguments: [:])
+    case .hdc(.observeServer):
+      self.init(kind: "hdc.observeServer", arguments: [:])
+    case .hdc(.listDeviceCandidates):
+      self.init(kind: "hdc.listDeviceCandidates", arguments: [:])
+    case .hdc(.observeDevice(let connectKey)):
+      self.init(
+        kind: "hdc.observeDevice", arguments: ["connectKey": .string(connectKey)])
+    case .hdc(.queryProperty(let property)):
+      self.init(
+        kind: "hdc.queryProperty", arguments: ["property": .string(property.rawValue)])
+    case .hdc(.observeStorage(let request)):
+      self.init(
+        kind: "hdc.observeStorage",
+        arguments: ["requiredBytes": .integer(Int64(request.requiredBytes))])
+    case .hdc(.captureHilog(let request)):
+      self.init(
+        kind: "hdc.captureHilog",
+        arguments: [
+          "durationSeconds": .integer(Int64(request.durationSeconds)),
+          "filters": .array(request.filters.map(JSONValue.string)),
+          "byteBudget": .integer(Int64(request.byteBudget)),
+        ])
+    case .hdc(.captureUIDump(let request)):
+      self.init(
+        kind: "hdc.captureUIDump",
+        arguments: [
+          "scope": .string(request.scope.rawValue),
+          "byteBudget": .integer(Int64(request.byteBudget)),
+        ])
+    case .hdc(.captureTrace(let request, let path)):
+      var arguments = pathArguments(path)
+      arguments["durationSeconds"] = .integer(Int64(request.durationSeconds))
+      arguments["categories"] = .array(request.categories.map(JSONValue.string))
+      arguments["bufferKB"] = .integer(Int64(request.bufferKB))
+      self.init(kind: "hdc.captureTrace", arguments: arguments)
+    case .hdc(.receiveOwnedArtifact(let artifact)):
+      var arguments = pathArguments(artifact.path)
+      arguments["maximumBytes"] = .integer(Int64(artifact.maximumBytes))
+      optional(artifact.expectedSHA256, into: &arguments, key: "expectedSha256")
+      self.init(kind: "hdc.receiveOwnedArtifact", arguments: arguments)
+    case .hdc(.cleanupOwnedRemotePath(let path)):
+      self.init(kind: "hdc.cleanupOwnedRemotePath", arguments: pathArguments(path))
+    case .hdc(.sendArtifactToStaging(let artifact)):
+      var arguments = pathArguments(artifact.path)
+      arguments["artifactLeaseId"] = .string(artifact.artifactLeaseID)
+      optional(artifact.expectedSHA256, into: &arguments, key: "expectedSha256")
+      self.init(kind: "hdc.sendArtifactToStaging", arguments: arguments)
+    case .hdc(.installPackage(let artifact, let bundle)):
+      var arguments = pathArguments(artifact.path)
+      arguments["artifactLeaseId"] = .string(artifact.artifactLeaseID)
+      arguments["bundleName"] = .string(bundle.bundleName)
+      optional(artifact.expectedSHA256, into: &arguments, key: "expectedSha256")
+      self.init(kind: "hdc.installPackage", arguments: arguments)
+    case .hdc(.queryPackageReadback(let bundle)):
+      self.init(
+        kind: "hdc.queryPackageReadback",
+        arguments: ["bundleName": .string(bundle.bundleName)])
+    case .hdc(.startAbility(let ability)):
+      self.init(
+        kind: "hdc.startAbility",
+        arguments: [
+          "bundleName": .string(ability.bundle.bundleName),
+          "abilityName": .string(ability.abilityName),
+        ])
+    case .hdc(.verifyProcessState(let bundle)):
+      self.init(
+        kind: "hdc.verifyProcessState",
+        arguments: ["bundleName": .string(bundle.bundleName)])
+    case .hdc(.stopAbility(let ability)):
+      self.init(
+        kind: "hdc.stopAbility",
+        arguments: [
+          "bundleName": .string(ability.bundle.bundleName),
+          "abilityName": .string(ability.abilityName),
+        ])
+    case .hdc(.uninstallPackage(let bundle)):
+      self.init(
+        kind: "hdc.uninstallPackage",
+        arguments: ["bundleName": .string(bundle.bundleName)])
+    case .hdc(.createPortForward(let spec)):
+      self.init(
+        kind: "hdc.createPortForward",
+        arguments: [
+          "localPort": .integer(Int64(spec.localPort)),
+          "remotePort": .integer(Int64(spec.remotePort)),
+        ])
+    case .hdc(.removePortForward(let spec)):
+      self.init(
+        kind: "hdc.removePortForward",
+        arguments: [
+          "localPort": .integer(Int64(spec.localPort)),
+          "remotePort": .integer(Int64(spec.remotePort)),
+        ])
+    case .hdc(.readPackagePresence(let bundle)):
+      self.init(
+        kind: "hdc.readPackagePresence",
+        arguments: ["bundleName": .string(bundle.bundleName)])
+    case .hdc(.readProcessPresence(let bundle)):
+      self.init(
+        kind: "hdc.readProcessPresence",
+        arguments: ["bundleName": .string(bundle.bundleName)])
+    case .hdc(.readOwnedPathPresence(let path)):
+      self.init(kind: "hdc.readOwnedPathPresence", arguments: pathArguments(path))
+    case .hdc(.readPortForwardPresence(let spec)):
+      self.init(
+        kind: "hdc.readPortForwardPresence",
+        arguments: [
+          "localPort": .integer(Int64(spec.localPort)),
+          "remotePort": .integer(Int64(spec.remotePort)),
+        ])
+    case .rockchip(.executeFlashPlan(let authorizationID)):
+      self.init(
+        kind: "rockchip.executeFlashPlan",
+        arguments: ["authorizationId": .string(authorizationID)])
+    }
+  }
+
+  private init(kind: String, arguments: [String: JSONValue]) {
+    self.kind = kind
+    self.arguments = arguments
+  }
+
+  func materialize() throws -> TypedProviderAction {
+    func string(_ key: String) throws -> String {
+      guard case .string(let value)? = arguments[key] else {
+        throw DeviceProviderError.unsupportedAction(
+          "persisted \(kind) is missing string \(key)")
+      }
+      return value
+    }
+    func integer(_ key: String) throws -> Int {
+      guard case .integer(let value)? = arguments[key], let exact = Int(exactly: value) else {
+        throw DeviceProviderError.unsupportedAction(
+          "persisted \(kind) is missing integer \(key)")
+      }
+      return exact
+    }
+    func stringArray(_ key: String) throws -> [String] {
+      guard case .array(let values)? = arguments[key] else {
+        throw DeviceProviderError.unsupportedAction(
+          "persisted \(kind) is missing array \(key)")
+      }
+      return try values.map { value in
+        guard case .string(let item) = value else {
+          throw DeviceProviderError.unsupportedAction(
+            "persisted \(kind).\(key) contains a non-string")
+        }
+        return item
+      }
+    }
+    func optionalString(_ key: String) throws -> String? {
+      guard let value = arguments[key] else { return nil }
+      guard case .string(let text) = value else {
+        throw DeviceProviderError.unsupportedAction(
+          "persisted \(kind).\(key) is not a string")
+      }
+      return text
+    }
+    func path() throws -> HDCOwnedRemotePath {
+      let reconstructed = try HDCOwnedRemotePath(
+        jobID: string("jobId"), stepID: string("stepId"), nonce: string("nonce"))
+      let recordedRemotePath = try string("remotePath")
+      guard reconstructed.remotePath == recordedRemotePath else {
+        throw DeviceProviderError.unsupportedAction(
+          "persisted \(kind) remote path does not match its owned components")
+      }
+      return reconstructed
+    }
+    func bundle() throws -> HDCBundleReference {
+      try HDCBundleReference(bundleName: string("bundleName"))
+    }
+    func ability() throws -> HDCAbilityReference {
+      try HDCAbilityReference(bundle: bundle(), abilityName: string("abilityName"))
+    }
+    func staged() throws -> HDCStagedArtifact {
+      HDCStagedArtifact(
+        path: try path(), artifactLeaseID: try string("artifactLeaseId"),
+        expectedSHA256: try optionalString("expectedSha256"))
+    }
+
+    switch kind {
+    case "hdc.observeTool": return .hdc(.observeTool)
+    case "hdc.observeServer": return .hdc(.observeServer)
+    case "hdc.listDeviceCandidates": return .hdc(.listDeviceCandidates)
+    case "hdc.observeDevice":
+      return .hdc(.observeDevice(connectKey: try string("connectKey")))
+    case "hdc.queryProperty":
+      guard let property = HDCAllowlistedProperty(rawValue: try string("property")) else {
+        throw DeviceProviderError.unsupportedAction("persisted query property is not allowlisted")
+      }
+      return .hdc(.queryProperty(property))
+    case "hdc.observeStorage":
+      return .hdc(.observeStorage(try HDCStoragePreflightRequest(
+        requiredBytes: integer("requiredBytes"))))
+    case "hdc.captureHilog":
+      return .hdc(.captureHilog(try HDCHilogCaptureRequest(
+        durationSeconds: integer("durationSeconds"),
+        filters: stringArray("filters"), byteBudget: integer("byteBudget"))))
+    case "hdc.captureUIDump":
+      guard let scope = HDCUIDumpRequest.Scope(rawValue: try string("scope")) else {
+        throw DeviceProviderError.unsupportedAction("persisted UI dump scope is invalid")
+      }
+      return .hdc(.captureUIDump(try HDCUIDumpRequest(
+        scope: scope, byteBudget: integer("byteBudget"))))
+    case "hdc.captureTrace":
+      return .hdc(.captureTrace(
+        try HDCTraceCaptureRequest(
+          durationSeconds: integer("durationSeconds"),
+          categories: stringArray("categories"), bufferKB: integer("bufferKB")),
+        into: try path()))
+    case "hdc.receiveOwnedArtifact":
+      return .hdc(.receiveOwnedArtifact(
+        HDCOwnedRemoteArtifact(
+          path: try path(), expectedSHA256: try optionalString("expectedSha256"),
+          maximumBytes: try integer("maximumBytes"))))
+    case "hdc.cleanupOwnedRemotePath":
+      return .hdc(.cleanupOwnedRemotePath(try path()))
+    case "hdc.sendArtifactToStaging":
+      return .hdc(.sendArtifactToStaging(try staged()))
+    case "hdc.installPackage":
+      return .hdc(.installPackage(try staged(), bundle: try bundle()))
+    case "hdc.queryPackageReadback":
+      return .hdc(.queryPackageReadback(try bundle()))
+    case "hdc.startAbility":
+      return .hdc(.startAbility(try ability()))
+    case "hdc.verifyProcessState":
+      return .hdc(.verifyProcessState(try bundle()))
+    case "hdc.stopAbility":
+      return .hdc(.stopAbility(try ability()))
+    case "hdc.uninstallPackage":
+      return .hdc(.uninstallPackage(try bundle()))
+    case "hdc.createPortForward":
+      return .hdc(.createPortForward(try HDCPortForwardSpec(
+        localPort: integer("localPort"), remotePort: integer("remotePort"))))
+    case "hdc.removePortForward":
+      return .hdc(.removePortForward(try HDCPortForwardSpec(
+        localPort: integer("localPort"), remotePort: integer("remotePort"))))
+    case "hdc.readPackagePresence":
+      return .hdc(.readPackagePresence(try bundle()))
+    case "hdc.readProcessPresence":
+      return .hdc(.readProcessPresence(try bundle()))
+    case "hdc.readOwnedPathPresence":
+      return .hdc(.readOwnedPathPresence(try path()))
+    case "hdc.readPortForwardPresence":
+      return .hdc(.readPortForwardPresence(try HDCPortForwardSpec(
+        localPort: integer("localPort"), remotePort: integer("remotePort"))))
+    case "rockchip.executeFlashPlan":
+      return .rockchip(.executeFlashPlan(authorizationID: try string("authorizationId")))
+    default:
+      throw DeviceProviderError.unsupportedAction(
+        "persisted typed provider action kind \(kind) is unknown")
     }
   }
 }
@@ -213,6 +501,7 @@ public struct ProviderExecutionContext: Sendable, Equatable {
   public let toolVersion: String?
   public let toolSHA256: String?
   public let nowUTC: String
+  public let resolvedInputArtifact: ProviderResolvedInputArtifact?
 
   public init(
     jobID: String,
@@ -223,7 +512,8 @@ public struct ProviderExecutionContext: Sendable, Equatable {
     expectedIdentitySHA256: String? = nil,
     toolVersion: String? = nil,
     toolSHA256: String? = nil,
-    nowUTC: String
+    nowUTC: String,
+    resolvedInputArtifact: ProviderResolvedInputArtifact? = nil
   ) {
     self.jobID = jobID
     self.stepID = stepID
@@ -234,6 +524,24 @@ public struct ProviderExecutionContext: Sendable, Equatable {
     self.toolVersion = toolVersion
     self.toolSHA256 = toolSHA256
     self.nowUTC = nowUTC
+    self.resolvedInputArtifact = resolvedInputArtifact
+  }
+}
+
+/// Host-side bytes resolved from an Artifact lease by the engine. Providers
+/// can consume this typed value, but operation input can never supply a
+/// local path directly.
+public struct ProviderResolvedInputArtifact: Sendable, Equatable {
+  public let artifactID: String
+  public let fileURL: URL
+  public let sha256: String
+  public let byteCount: Int
+
+  public init(artifactID: String, fileURL: URL, sha256: String, byteCount: Int) {
+    self.artifactID = artifactID
+    self.fileURL = fileURL
+    self.sha256 = sha256
+    self.byteCount = byteCount
   }
 }
 
@@ -259,8 +567,19 @@ public enum DeviceProviderError: Error, Equatable, Sendable {
 
 // MARK: - The provider protocol
 
+public enum ProviderOperationAvailability: Sendable, Equatable {
+  case available
+  case unavailable(reason: String)
+}
+
 public protocol DeviceProvider: Sendable {
   var providerID: String { get }
+
+  /// Catalog presence is only a description. A provider must separately
+  /// publish whether its complete typed implementation is production-ready.
+  func runtimeAvailability(
+    for operation: CatalogOperationDescriptor
+  ) -> ProviderOperationAvailability
 
   func resolveFacts(targetID: String) async throws -> ProviderFacts
 
@@ -270,6 +589,16 @@ public protocol DeviceProvider: Sendable {
     for step: CatalogStepDescriptor,
     operation: CatalogOperationDescriptor,
     inputs: [String: JSONValue]
+  ) throws -> TypedProviderAction
+
+  /// Context-aware mapping used by the runtime. The default preserves
+  /// adapters that do not mint job-bound resources; HDC overrides it so
+  /// capture/staging paths are bound to the real durable job.
+  func action(
+    for step: CatalogStepDescriptor,
+    operation: CatalogOperationDescriptor,
+    inputs: [String: JSONValue],
+    context: ProviderExecutionContext
   ) throws -> TypedProviderAction
 
   func lower(
@@ -287,6 +616,54 @@ public protocol DeviceProvider: Sendable {
     intent: ProviderDurableIntentReference,
     context: ProviderExecutionContext
   ) async throws -> ProviderReconcileOutcome
+
+  /// Returns a dedicated read-only judgement plan for an unknown mutation.
+  /// `nil` means no safe readback exists; callers must leave the outcome
+  /// unknown and must never redispatch the original action.
+  func reconciliationReadback(
+    intent: ProviderDurableIntentReference,
+    context: ProviderExecutionContext
+  ) throws -> TypedProcessPlan?
+
+  func verifyReconciliationReadback(
+    receipt: ProviderProcessReceipt,
+    intent: ProviderDurableIntentReference,
+    context: ProviderExecutionContext
+  ) throws -> ProviderReconcileOutcome
+}
+
+extension DeviceProvider {
+  public func runtimeAvailability(
+    for operation: CatalogOperationDescriptor
+  ) -> ProviderOperationAvailability {
+    .unavailable(
+      reason: "provider \(providerID) has not published runtime availability "
+        + "for \(operation.reference)")
+  }
+
+  public func action(
+    for step: CatalogStepDescriptor,
+    operation: CatalogOperationDescriptor,
+    inputs: [String: JSONValue],
+    context: ProviderExecutionContext
+  ) throws -> TypedProviderAction {
+    try action(for: step, operation: operation, inputs: inputs)
+  }
+
+  public func reconciliationReadback(
+    intent: ProviderDurableIntentReference,
+    context: ProviderExecutionContext
+  ) throws -> TypedProcessPlan? {
+    nil
+  }
+
+  public func verifyReconciliationReadback(
+    receipt: ProviderProcessReceipt,
+    intent: ProviderDurableIntentReference,
+    context: ProviderExecutionContext
+  ) throws -> ProviderReconcileOutcome {
+    .stillUnknown(reason: "provider has no dedicated reconciliation readback")
+  }
 }
 
 /// Closed provider registry keyed by providerID ("hdc", "rockchip").

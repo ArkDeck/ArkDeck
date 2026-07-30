@@ -38,6 +38,8 @@ final class RuntimeCapabilityStoreContractTests: XCTestCase {
 
   private func query(
     effect: WorkflowEffect = .deviceMutation,
+    bindingRevision: Int? = 7,
+    planDigest: String? = nil,
     inputs: [String: JSONValue] = [:]
   ) -> RuntimeCapabilityAuthorizationQuery {
     .init(
@@ -45,7 +47,8 @@ final class RuntimeCapabilityStoreContractTests: XCTestCase {
       operationVersion: 1,
       effect: effect,
       targetStableIdentitySHA256: String(repeating: "a", count: 64),
-      planDigest: nil,
+      targetBindingRevision: bindingRevision,
+      planDigest: planDigest,
       inputs: inputs)
   }
 
@@ -136,6 +139,34 @@ final class RuntimeCapabilityStoreContractTests: XCTestCase {
         return XCTFail("expected reservationConflict, got \(error)")
       }
     }
+  }
+
+  func testConsumptionFingerprintBindsRevisionAndMaterializedPlanDigest() async throws {
+    let store = try makeStore()
+    try await store.install(try e1Capability(maximumUses: 2))
+    let digest = String(repeating: "b", count: 64)
+    _ = try await store.consume(
+      capabilityID: "CAP-RT-STORE-001", reservationID: "res-bound-plan",
+      query: query(planDigest: digest), nowUTC: "2026-07-15T00:00:00Z")
+
+    for drifted in [
+      query(bindingRevision: 8, planDigest: digest),
+      query(planDigest: String(repeating: "c", count: 64)),
+    ] {
+      do {
+        _ = try await store.consume(
+          capabilityID: "CAP-RT-STORE-001", reservationID: "res-bound-plan",
+          query: drifted, nowUTC: "2026-07-15T00:01:00Z")
+        XCTFail("binding revision or materialized plan drift must conflict")
+      } catch let error as RuntimeCapabilityStoreError {
+        guard case .reservationConflict = error else {
+          return XCTFail("expected reservationConflict, got \(error)")
+        }
+      }
+    }
+    let status = try await store.inspect(capabilityID: "CAP-RT-STORE-001")
+    XCTAssertEqual(status?.remainingUses, 1)
+    XCTAssertEqual(status?.consumptionCount, 1)
   }
 
   func testDenialConsumesNothing() async throws {
