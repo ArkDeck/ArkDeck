@@ -73,7 +73,8 @@ final class AgentDaemonContractTests: XCTestCase {
 
   private func makeStack(
     targetStore: RuntimeTargetStore? = nil,
-    artifactStore: RuntimeArtifactStore? = nil
+    artifactStore: RuntimeArtifactStore? = nil,
+    flashBundleImportPolicy: FlashBundleImportPolicy = .production
   ) throws -> (RuntimeControlPlaneHandler, RuntimeJobEngine) {
     let capabilityStore = try RuntimeCapabilityStore(
       directoryURL: stateDirectory.appendingPathComponent("capabilities", isDirectory: true))
@@ -93,7 +94,13 @@ final class AgentDaemonContractTests: XCTestCase {
       providerIDs: providers.registeredProviderIDs,
       nowUTC: { "2026-07-29T00:00:00Z" },
       targetStore: targetStore,
-      artifactStore: artifactStore)
+      bootstrap: nil,
+      artifactStore: artifactStore,
+      flashBundleImportDirectory: stateDirectory.appendingPathComponent(
+        "flash-bundle-imports-\(UUID().uuidString)", isDirectory: true),
+      flashBundleImportPolicy: flashBundleImportPolicy,
+      harnessCoordinator: nil,
+      methodObserver: nil)
     return (handler, engine)
   }
 
@@ -577,7 +584,9 @@ final class AgentDaemonContractTests: XCTestCase {
       "artifact.importHap.begin", "artifact.importHap.append",
       "artifact.importHap.commit", "artifact.importNativeLibrary.begin",
       "artifact.importNativeLibrary.append",
-      "artifact.importNativeLibrary.commit", "artifact.list", "artifact.inspect",
+      "artifact.importNativeLibrary.commit", "artifact.importFlashBundle.begin",
+      "artifact.importFlashBundle.append", "artifact.importFlashBundle.commit",
+      "artifact.list", "artifact.inspect",
       "artifact.read", "artifact.export",
     ] {
       let response = await handler.handleFrame(
@@ -758,6 +767,137 @@ final class AgentDaemonContractTests: XCTestCase {
       + String(digest.prefix(16))
     let artifacts = try await artifactStore.list(jobID: expectedJob)
     XCTAssertTrue(artifacts.isEmpty)
+  }
+
+  func testChunkedFlashBundleImportPublishesATargetBoundFileLease() async throws {
+    let targetStore = try RuntimeTargetStore(
+      directoryURL: stateDirectory.appendingPathComponent(
+        "targets-flash", isDirectory: true))
+    let stableIdentity = String(repeating: "e", count: 64)
+    let target = try targetStore.adopt(
+      stableIdentitySHA256: stableIdentity,
+      connectKey: "150100424a544e4600",
+      toolVersion: "3.2.0f",
+      nowUTC: "2026-07-30T00:00:00Z").record
+    let artifactStore = try RuntimeArtifactStore(
+      rootURL: stateDirectory.appendingPathComponent(
+        "artifacts-flash", isDirectory: true),
+      nowUTC: { "2026-07-30T00:00:00Z" })
+    let bytes = Data("fixture-flash-bundle".utf8)
+    let digest =
+      SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
+    let policy = FlashBundleImportPolicy(
+      expectedByteCount: bytes.count,
+      expectedSHA256: digest
+    ) { url in
+      guard try Data(contentsOf: url) == bytes else {
+        throw FlashBundleArtifactImportError.invalidBundle("fixture bytes")
+      }
+      return FlashBundleImportValidation(
+        byteCount: bytes.count, sha256: digest)
+    }
+    let (handler, _) = try makeStack(
+      targetStore: targetStore, artifactStore: artifactStore,
+      flashBundleImportPolicy: policy)
+
+    let begin = try await request(
+      handler, method: "artifact.importFlashBundle.begin",
+      params: [
+        "targetId": .string(target.targetID),
+        "name": .string("images.tar.gz"),
+        "byteCount": .integer(Int64(bytes.count)),
+        "sha256": .string(digest),
+      ])
+    XCTAssertTrue(begin.ok, begin.error?.message ?? "-")
+    guard case .object(let beginFields)? = begin.result,
+      case .string(let uploadID)? = beginFields["uploadId"],
+      case .integer(let maximumChunk)? = beginFields["maximumChunkBytes"]
+    else {
+      return XCTFail("flash begin must return a bounded upload identity")
+    }
+    XCTAssertEqual(
+      maximumChunk,
+      Int64(FlashBundleArtifactImportCoordinator.maximumChunkBytes))
+
+    let wrongOffset = try await request(
+      handler, method: "artifact.importFlashBundle.append",
+      params: [
+        "uploadId": .string(uploadID),
+        "offset": .integer(1),
+        "base64": .string(bytes.prefix(4).base64EncodedString()),
+      ])
+    XCTAssertFalse(wrongOffset.ok)
+    XCTAssertTrue((wrongOffset.error?.message ?? "").contains("offset mismatch"))
+
+    let split = 7
+    for (offset, chunk) in [
+      (0, bytes.subdata(in: 0..<split)),
+      (split, bytes.subdata(in: split..<bytes.count)),
+    ] {
+      let appended = try await request(
+        handler, method: "artifact.importFlashBundle.append",
+        params: [
+          "uploadId": .string(uploadID),
+          "offset": .integer(Int64(offset)),
+          "base64": .string(chunk.base64EncodedString()),
+        ])
+      XCTAssertTrue(appended.ok, appended.error?.message ?? "-")
+    }
+    let commit = try await request(
+      handler, method: "artifact.importFlashBundle.commit",
+      params: ["uploadId": .string(uploadID)])
+    XCTAssertTrue(commit.ok, commit.error?.message ?? "-")
+    guard case .object(let fields)? = commit.result,
+      case .string(let jobID)? = fields["jobId"],
+      case .string(let artifactID)? = fields["artifactId"],
+      case .string(let lease)? = fields["lease"]
+    else {
+      return XCTFail("flash commit must return an ID-only Artifact lease")
+    }
+    XCTAssertEqual(fields["sha256"], .string(digest))
+    XCTAssertEqual(fields["byteCount"], .integer(Int64(bytes.count)))
+    XCTAssertEqual(fields["targetId"], .string(target.targetID))
+    XCTAssertEqual(
+      fields["bindingRevision"], .integer(Int64(target.bindingRevision)))
+    XCTAssertFalse(lease.contains(stateDirectory.path))
+    let metadata = try await artifactStore.inspect(
+      jobID: jobID, artifactID: artifactID)
+    XCTAssertEqual(metadata.mediaType, "application/gzip")
+    XCTAssertEqual(metadata.bindingSnapshot.targetID, target.targetID)
+    XCTAssertEqual(metadata.bindingSnapshot.bindingRevision, target.bindingRevision)
+    XCTAssertEqual(metadata.bindingSnapshot.stableIdentitySHA256, stableIdentity)
+    let resolved = try await artifactStore.resolveLease(lease)
+    XCTAssertEqual(try Data(contentsOf: resolved.fileURL), bytes)
+  }
+
+  func testProductionFlashBundleImportRejectsUnpinnedFactsBeforeUpload() async throws {
+    let targetStore = try RuntimeTargetStore(
+      directoryURL: stateDirectory.appendingPathComponent(
+        "targets-flash-negative", isDirectory: true))
+    let target = try targetStore.adopt(
+      stableIdentitySHA256: String(repeating: "f", count: 64),
+      connectKey: "150100424a544e4600",
+      toolVersion: "3.2.0f",
+      nowUTC: "2026-07-30T00:00:00Z"
+    ).record
+    let artifactStore = try RuntimeArtifactStore(
+      rootURL: stateDirectory.appendingPathComponent(
+        "artifacts-flash-negative", isDirectory: true),
+      nowUTC: { "2026-07-30T00:00:00Z" })
+    let (handler, _) = try makeStack(
+      targetStore: targetStore, artifactStore: artifactStore)
+
+    let response = try await request(
+      handler, method: "artifact.importFlashBundle.begin",
+      params: [
+        "targetId": .string(target.targetID),
+        "name": .string("images.tar.gz"),
+        "byteCount": .integer(1),
+        "sha256": .string(String(repeating: "0", count: 64)),
+      ])
+    XCTAssertFalse(response.ok)
+    XCTAssertEqual(response.error?.code, "invalidParams")
+    XCTAssertTrue((response.error?.message ?? "").contains("pinned DAYU200"))
   }
 
   func testNativeLibraryImportValidatesELFAndPublishesBoundLease() async throws {

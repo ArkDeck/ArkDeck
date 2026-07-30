@@ -240,6 +240,49 @@ public struct RuntimeArtifactPublicationRequest: Sendable {
   }
 }
 
+/// File-backed publication for inputs that are intentionally much larger
+/// than an in-memory diagnostic product (for example a 733 MB flash
+/// bundle). The caller supplies only a local staging file plus its already
+/// declared immutable facts; the store re-opens it without following
+/// symlinks, hashes it through the descriptor, and copies it into the
+/// product-owned Artifact root.
+public struct RuntimeArtifactFilePublicationRequest: Sendable {
+  public let jobID: String
+  public let sessionID: String
+  public let stepID: String
+  public let name: String
+  public let mediaType: String
+  public let privacy: CatalogArtifactPrivacy
+  public let retentionClass: CatalogArtifactRetentionClass
+  public let sourceOperation: String
+  public let providerID: String
+  public let bindingSnapshot: ArtifactBindingSnapshot
+  public let sourceFileURL: URL
+  public let expectedByteCount: Int
+  public let expectedSHA256: String
+
+  public init(
+    jobID: String, sessionID: String, stepID: String, name: String, mediaType: String,
+    privacy: CatalogArtifactPrivacy, retentionClass: CatalogArtifactRetentionClass,
+    sourceOperation: String, providerID: String, bindingSnapshot: ArtifactBindingSnapshot,
+    sourceFileURL: URL, expectedByteCount: Int, expectedSHA256: String
+  ) {
+    self.jobID = jobID
+    self.sessionID = sessionID
+    self.stepID = stepID
+    self.name = name
+    self.mediaType = mediaType
+    self.privacy = privacy
+    self.retentionClass = retentionClass
+    self.sourceOperation = sourceOperation
+    self.providerID = providerID
+    self.bindingSnapshot = bindingSnapshot
+    self.sourceFileURL = sourceFileURL
+    self.expectedByteCount = expectedByteCount
+    self.expectedSHA256 = expectedSHA256
+  }
+}
+
 public struct RuntimeArtifactLeaseResolution: Sendable, Equatable {
   public let artifactID: String
   public let fileURL: URL
@@ -372,6 +415,101 @@ public actor RuntimeArtifactStore {
     // reaches the filesystem path.
     if !destinationExists {
       try atomicWrite(payload, to: destination, directory: jobDirectory)
+    }
+    try upsert(metadata, jobID: request.jobID)
+    return metadata
+  }
+
+  /// Publishes a large binary without ever materializing the whole file as
+  /// `Data`. Source identity is checked before and after both the hash pass
+  /// and descriptor-to-descriptor copy. The destination is made visible
+  /// only after its bytes are synchronized and its digest is confirmed.
+  public func publishFile(
+    _ request: RuntimeArtifactFilePublicationRequest
+  ) throws -> RuntimeArtifactMetadata {
+    guard request.sourceFileURL.isFileURL,
+      request.sourceFileURL.path.hasPrefix("/"),
+      request.expectedByteCount > 0,
+      request.expectedSHA256.range(
+        of: #"^[0-9a-f]{64}$"#, options: .regularExpression) != nil,
+      !request.mediaType.hasPrefix("text/"),
+      request.mediaType != "application/json"
+    else {
+      throw RuntimeArtifactError.ioFailure(
+        "file-backed publication requires an absolute binary file with exact size and SHA-256")
+    }
+    let sourceFD = Darwin.open(
+      request.sourceFileURL.path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW)
+    guard sourceFD >= 0 else {
+      throw RuntimeArtifactError.ioFailure(
+        "cannot open file-backed Artifact source (errno \(errno))")
+    }
+    defer { Darwin.close(sourceFD) }
+    var sourceBefore = stat()
+    guard fstat(sourceFD, &sourceBefore) == 0,
+      sourceBefore.st_mode & S_IFMT == S_IFREG,
+      sourceBefore.st_size == Int64(request.expectedByteCount)
+    else {
+      throw RuntimeArtifactError.ioFailure(
+        "file-backed Artifact source is not the declared regular file")
+    }
+    let digest = request.expectedSHA256
+
+    let identityInput = Data(
+      "\(request.jobID)\u{0}\(request.name)\u{0}\(digest)".utf8)
+    let identity =
+      SHA256.hash(data: identityInput).map { String(format: "%02x", $0) }.joined()
+    let artifactID = "ART-\(identity.prefix(32))"
+    let createdAtUTC = nowUTC()
+    let retention = try retentionPolicy.retention(
+      for: request.retentionClass, createdAtUTC: createdAtUTC)
+    let metadata = RuntimeArtifactMetadata(
+      artifactID: artifactID,
+      jobID: request.jobID,
+      sessionID: request.sessionID,
+      stepID: request.stepID,
+      name: request.name,
+      mediaType: request.mediaType,
+      byteCount: request.expectedByteCount,
+      sha256: digest,
+      createdAtUTC: createdAtUTC,
+      providerID: request.providerID,
+      sourceOperation: request.sourceOperation,
+      bindingSnapshot: request.bindingSnapshot,
+      privacy: request.privacy,
+      retention: retention,
+      status: .published,
+      redactionApplied: false)
+
+    let jobDirectory = try directory(for: request.jobID)
+    if let existing = try loadIndex(jobID: request.jobID).artifacts.first(where: {
+      $0.name == request.name
+    }), existing.status.isPublished {
+      guard
+        existing.artifactID == artifactID || Self.isLegacyArtifactID(existing.artifactID),
+        Self.sameImmutablePublication(existing, metadata)
+      else {
+        throw RuntimeArtifactError.artifactConflict(
+          "artifact name \(request.name) is already bound to immutable metadata or bytes")
+      }
+      _ = try storedFileURL(for: existing)
+      return existing
+    }
+
+    let destination = jobDirectory.appendingPathComponent(artifactID)
+    if FileManager.default.fileExists(atPath: destination.path) {
+      _ = try validateStoredPayload(metadata, at: destination)
+    } else {
+      let used = try totalBytesUsed()
+      guard used + request.expectedByteCount <= quota.totalBytes else {
+        throw RuntimeArtifactError.quotaExceeded(
+          requestedBytes: request.expectedByteCount,
+          remainingBytes: max(0, quota.totalBytes - used))
+      }
+      try copyFileDescriptor(
+        sourceFD, sourceBefore: sourceBefore, expectedSHA256: digest,
+        expectedByteCount: request.expectedByteCount,
+        destination: destination, directory: jobDirectory)
     }
     try upsert(metadata, jobID: request.jobID)
     return metadata
@@ -856,6 +994,92 @@ public actor RuntimeArtifactStore {
     }
   }
 
+  private func copyFileDescriptor(
+    _ sourceFD: Int32,
+    sourceBefore: stat,
+    expectedSHA256: String,
+    expectedByteCount: Int,
+    destination: URL,
+    directory: URL
+  ) throws {
+    guard Darwin.lseek(sourceFD, 0, SEEK_SET) == 0 else {
+      throw RuntimeArtifactError.ioFailure(
+        "cannot rewind file-backed Artifact source (errno \(errno))")
+    }
+    let temporary = directory.appendingPathComponent(
+      ".tmp-file-\(UUID().uuidString.prefix(12).lowercased())")
+    let destinationFD = Darwin.open(
+      temporary.path, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, 0o600)
+    guard destinationFD >= 0 else {
+      throw RuntimeArtifactError.ioFailure(
+        "cannot create file-backed Artifact destination (errno \(errno))")
+    }
+    var destinationIsOpen = true
+    defer {
+      if destinationIsOpen { Darwin.close(destinationFD) }
+      _ = Darwin.unlink(temporary.path)
+    }
+
+    var hasher = SHA256()
+    var copied = 0
+    var buffer = [UInt8](repeating: 0, count: 1 << 20)
+    while true {
+      let count = Darwin.read(sourceFD, &buffer, buffer.count)
+      if count < 0, errno == EINTR { continue }
+      guard count >= 0 else {
+        throw RuntimeArtifactError.ioFailure(
+          "cannot read file-backed Artifact source (errno \(errno))")
+      }
+      if count == 0 { break }
+      copied += count
+      hasher.update(data: Data(buffer[0..<count]))
+      var offset = 0
+      while offset < count {
+        let written = buffer.withUnsafeBytes { bytes in
+          Darwin.write(
+            destinationFD, bytes.baseAddress!.advanced(by: offset), count - offset)
+        }
+        if written < 0, errno == EINTR { continue }
+        guard written > 0 else {
+          throw RuntimeArtifactError.ioFailure(
+            "cannot write file-backed Artifact destination (errno \(errno))")
+        }
+        offset += written
+      }
+    }
+    var sourceAfter = stat()
+    let copiedDigest =
+      hasher.finalize().map { String(format: "%02x", $0) }.joined()
+    guard copied == expectedByteCount,
+      copiedDigest == expectedSHA256,
+      fstat(sourceFD, &sourceAfter) == 0,
+      Self.sameFileIdentityAndContent(sourceBefore, sourceAfter)
+    else {
+      throw RuntimeArtifactError.ioFailure(
+        "file-backed Artifact source changed while being published")
+    }
+    guard fsync(destinationFD) == 0 else {
+      throw RuntimeArtifactError.ioFailure(
+        "cannot synchronize file-backed Artifact destination (errno \(errno))")
+    }
+    Darwin.close(destinationFD)
+    destinationIsOpen = false
+    guard Darwin.link(temporary.path, destination.path) == 0 else {
+      throw RuntimeArtifactError.ioFailure(
+        "cannot publish file-backed Artifact without overwrite (errno \(errno))")
+    }
+    guard Darwin.unlink(temporary.path) == 0 else {
+      throw RuntimeArtifactError.ioFailure(
+        "cannot remove file-backed Artifact staging link (errno \(errno))")
+    }
+    let directoryFD = Darwin.open(
+      directory.path, O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW)
+    if directoryFD >= 0 {
+      _ = Darwin.fsync(directoryFD)
+      Darwin.close(directoryFD)
+    }
+  }
+
   private func storedFileURL(for metadata: RuntimeArtifactMetadata) throws -> URL {
     guard Self.isSafeArtifactID(metadata.artifactID) else {
       throw RuntimeArtifactError.indexCorrupted("unsafe artifact identifier in index")
@@ -946,6 +1170,17 @@ public actor RuntimeArtifactStore {
       hasher.update(data: chunk)
     }
     return hasher.finalize().map { String(format: "%02x", $0) }.joined()
+  }
+
+  private static func sameFileIdentityAndContent(_ lhs: stat, _ rhs: stat) -> Bool {
+    lhs.st_dev == rhs.st_dev
+      && lhs.st_ino == rhs.st_ino
+      && lhs.st_mode == rhs.st_mode
+      && lhs.st_size == rhs.st_size
+      && lhs.st_mtimespec.tv_sec == rhs.st_mtimespec.tv_sec
+      && lhs.st_mtimespec.tv_nsec == rhs.st_mtimespec.tv_nsec
+      && lhs.st_ctimespec.tv_sec == rhs.st_ctimespec.tv_sec
+      && lhs.st_ctimespec.tv_nsec == rhs.st_ctimespec.tv_nsec
   }
 
   private static func isExpired(deadlineUTC: String?, currentUTC: String) throws -> Bool {

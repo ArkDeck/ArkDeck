@@ -1,3 +1,4 @@
+import CryptoKit
 import XCTest
 
 @testable import ArkDeckCore
@@ -202,6 +203,64 @@ final class RuntimeArtifactContractTests: XCTestCase {
     XCTAssertEqual(resolved.artifactID, metadata.artifactID)
     XCTAssertEqual(resolved.sha256, metadata.sha256)
     XCTAssertEqual(try Data(contentsOf: resolved.fileURL), Data("hap-bytes".utf8))
+  }
+
+  func testFileBackedPublicationStreamsIntoATargetBoundLease() async throws {
+    let store = try makeStore()
+    let source = root.deletingLastPathComponent()
+      .appendingPathComponent("flash-source-\(UUID().uuidString).tar.gz")
+    let bytes = Data(repeating: 0xab, count: 3 * 1_024 * 1_024 + 17)
+    try bytes.write(to: source)
+    defer { try? FileManager.default.removeItem(at: source) }
+    let digest =
+      SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
+    let request = RuntimeArtifactFilePublicationRequest(
+      jobID: "input-flash-target-1", sessionID: "session-input-flash-target-1",
+      stepID: "import-flash-bundle", name: "images.tar.gz",
+      mediaType: "application/gzip", privacy: .standard,
+      retentionClass: .pinnedUntilVerified,
+      sourceOperation: "artifact.import-flash-bundle", providerID: "host",
+      bindingSnapshot: ArtifactBindingSnapshot(
+        targetID: "TGT-1", bindingRevision: 3,
+        stableIdentitySHA256: String(repeating: "a", count: 64)),
+      sourceFileURL: source, expectedByteCount: bytes.count,
+      expectedSHA256: digest)
+
+    let published = try await store.publishFile(request)
+    let repeated = try await store.publishFile(request)
+    XCTAssertEqual(repeated, published)
+    XCTAssertEqual(published.byteCount, bytes.count)
+    XCTAssertEqual(published.sha256, digest)
+    XCTAssertTrue(published.retention.pinned)
+    XCTAssertEqual(published.bindingSnapshot.bindingRevision, 3)
+    let lease = try await store.leaseReference(
+      jobID: published.jobID, artifactID: published.artifactID)
+    XCTAssertFalse(lease.contains(source.path))
+    let resolved = try await store.resolveLease(lease)
+    XCTAssertEqual(try Data(contentsOf: resolved.fileURL), bytes)
+  }
+
+  func testFileBackedPublicationRejectsDigestDriftWithoutPublishing() async throws {
+    let store = try makeStore()
+    let source = root.deletingLastPathComponent()
+      .appendingPathComponent("flash-tampered-\(UUID().uuidString).tar.gz")
+    try Data("wrong-flash-bundle".utf8).write(to: source)
+    defer { try? FileManager.default.removeItem(at: source) }
+    let request = RuntimeArtifactFilePublicationRequest(
+      jobID: "input-flash-target-2", sessionID: "session-input-flash-target-2",
+      stepID: "import-flash-bundle", name: "images.tar.gz",
+      mediaType: "application/gzip", privacy: .standard,
+      retentionClass: .pinnedUntilVerified,
+      sourceOperation: "artifact.import-flash-bundle", providerID: "host",
+      bindingSnapshot: ArtifactBindingSnapshot(
+        targetID: "TGT-2", bindingRevision: 4,
+        stableIdentitySHA256: String(repeating: "b", count: 64)),
+      sourceFileURL: source, expectedByteCount: 18,
+      expectedSHA256: String(repeating: "0", count: 64))
+
+    await XCTAssertThrowsErrorAsync(try await store.publishFile(request))
+    let listed = try await store.list(jobID: "input-flash-target-2")
+    XCTAssertTrue(listed.isEmpty)
   }
 
   func testExportRefusesOverwriteAndSanitizesName() async throws {
