@@ -1,8 +1,13 @@
 #!/usr/bin/env python3
-"""Fail closed when a pull request exceeds its declared task paths.
+"""Preflight and fail closed when a pull request exceeds declared task paths.
 
 TASK-MECH-004 keeps approval semantics unchanged: this is a read-only guard
 against accidental scope expansion, not an authorization or approval oracle.
+
+``--preflight`` compares two commits before push/PR creation. A local run
+requires an explicit Task in the final commit subject; the Agent PR workflow
+may use ``--infer-task`` only as a fail-closed fallback when exactly one
+base-tree active Task covers the complete diff.
 
 Known residual (TASK-DEC-004, ledger B-H2): both workflows check out the
 head being reviewed and run *this file* from that checkout, so a task whose
@@ -69,6 +74,20 @@ PINNED_BLOB_RE = re.compile(r"^[0-9a-f]{40}$")
 CONFIG_SCHEMA = "arkdeck-automation-config/v1"
 CONFIG_PATH = Path(__file__).resolve().parent / "automation_config.json"
 CONFIG_KEYS = frozenset({"schema", "sensitive_paths"})
+
+# Maintainer-authorized one-time bootstrap for the change that introduces
+# preflight itself. It is deliberately a three-part fuse: exact old main,
+# exact agent branch, and exact complete diff. Once this pull request lands,
+# main moves away from this OID and the exception can never match again.
+BOOTSTRAP_EXCEPTION_BASE_OID = "f5a37c22db3539db3c1ba6f331103bd66fe8e0d8"
+BOOTSTRAP_EXCEPTION_HEAD_REF = "agent/pr-path-preflight"
+BOOTSTRAP_EXCEPTION_PATHS = (
+    ".github/workflows/agent-pr.yml",
+    "AGENTS.md",
+    "scripts/check_pr_paths.py",
+    "scripts/test_agent_pr_workflow.py",
+    "scripts/test_check_pr_paths.py",
+)
 
 
 class CheckError(ValueError):
@@ -155,6 +174,12 @@ class CheckResult:
     task_id: str | None
     changed_paths: tuple[str, ...]
     allowed_patterns: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class PreflightResult:
+    check: CheckResult
+    declaration_source: str
 
 
 def _string(value: object, field: str) -> str:
@@ -817,6 +842,7 @@ def check_paths(
     changed_paths: Sequence[str],
     *,
     config_path: Path = CONFIG_PATH,
+    head_definitions: dict[str, TaskDefinition] | None = None,
 ) -> CheckResult:
     # Loaded unconditionally: a broken sensitive-path table must fail every
     # check run, including task-declared PRs that would never consult it.
@@ -864,7 +890,8 @@ def check_paths(
     # re-derive everything they trust from the two trees themselves. Keeping
     # it here also keeps the guard usable from a shallow clone, where the
     # head commit may be the only object present.
-    head_definitions = load_task_definitions(repo_root)
+    if head_definitions is None:
+        head_definitions = load_task_definitions(repo_root)
     relocation_paths: frozenset[str] = frozenset()
     if task_id in head_definitions:
         reject_archive_copy_for_active_task(
@@ -884,6 +911,27 @@ def check_paths(
             + ", ".join(offenders)
         )
     return CheckResult(task_id, repository_paths, allowed_patterns)
+
+
+def one_time_bootstrap_result(
+    context: PullRequestContext,
+    changed_paths: Sequence[str],
+    *,
+    config_path: Path = CONFIG_PATH,
+) -> CheckResult | None:
+    """Return the pinned bootstrap exception, or ``None`` on any mismatch."""
+
+    # Keep the configuration fail-closed even on the one authorized exception.
+    load_sensitive_patterns(config_path)
+    repository_paths = tuple(changed_paths)
+    if (
+        context.base_oid != BOOTSTRAP_EXCEPTION_BASE_OID
+        or context.head_ref != BOOTSTRAP_EXCEPTION_HEAD_REF
+        or tuple(sorted(repository_paths))
+        != tuple(sorted(BOOTSTRAP_EXCEPTION_PATHS))
+    ):
+        return None
+    return CheckResult(None, repository_paths, BOOTSTRAP_EXCEPTION_PATHS)
 
 
 def git_changed_paths(repo_root: Path, base_oid: str, head_oid: str) -> tuple[str, ...]:
@@ -912,6 +960,206 @@ def git_changed_paths(repo_root: Path, base_oid: str, head_oid: str) -> tuple[st
     return tuple(path for path in decoded.split("\0") if path)
 
 
+def resolve_git_revision(repo_root: Path, revision: str) -> str:
+    if not revision:
+        raise CheckError("git revision must not be empty")
+    raw_oid = _run_git(
+        repo_root,
+        [
+            "rev-parse",
+            "--verify",
+            "--end-of-options",
+            f"{revision}^{{commit}}",
+        ],
+        context=f"git rev-parse {revision}",
+    )
+    try:
+        oid = raw_oid.decode("ascii").strip()
+    except UnicodeDecodeError as error:
+        raise CheckError(
+            f"git revision {revision!r} resolved to non-ASCII output"
+        ) from error
+    if not FULL_OID_RE.fullmatch(oid):
+        raise CheckError(
+            f"git revision {revision!r} did not resolve to one full commit OID"
+        )
+    return oid.lower()
+
+
+def git_commit_declaration_text(repo_root: Path, oid: str) -> tuple[str, str]:
+    raw_message = _run_git(
+        repo_root,
+        ["show", "-s", "--format=%s%x00%b", oid],
+        context=f"git show declaration text for {oid}",
+    )
+    try:
+        message = raw_message.decode("utf-8")
+    except UnicodeDecodeError as error:
+        raise CheckError(f"commit {oid} message is not UTF-8") from error
+    title, separator, body = message.partition("\0")
+    if not separator:
+        raise CheckError(f"commit {oid} declaration text has no field separator")
+    return title.rstrip("\n"), body.rstrip("\n")
+
+
+def _base_task_coverage(
+    repo_root: Path,
+    base_oid: str,
+    changed_paths: Sequence[str],
+) -> tuple[tuple[str, tuple[str, ...]], ...]:
+    coverage: list[tuple[str, tuple[str, ...]]] = []
+    definitions = load_task_definitions_at_commit(repo_root, base_oid)
+    for task_id, task in definitions.items():
+        try:
+            patterns = extract_allowed_patterns(repo_root, task)
+        except CheckError:
+            # A malformed or path-less task cannot be an inferred authority.
+            # Explicitly declaring it still returns its precise parse error
+            # through check_paths().
+            continue
+        offenders = tuple(
+            path for path in changed_paths if not path_matches(path, patterns)
+        )
+        coverage.append((task_id, offenders))
+    return tuple(coverage)
+
+
+def _coverage_hint(
+    coverage: Sequence[tuple[str, tuple[str, ...]]],
+    changed_count: int,
+) -> str:
+    exact = sorted(task_id for task_id, offenders in coverage if not offenders)
+    if exact:
+        return "base-tree task(s) covering the full diff: " + ", ".join(exact)
+
+    partial = sorted(
+        (
+            len(offenders),
+            task_id,
+            offenders,
+        )
+        for task_id, offenders in coverage
+        if len(offenders) < changed_count
+    )
+    if not partial:
+        return "no base-tree active task covers any part of the diff"
+
+    rendered: list[str] = []
+    for _, task_id, offenders in partial[:3]:
+        outside = ", ".join(offenders[:5])
+        if len(offenders) > 5:
+            outside += f", ... (+{len(offenders) - 5})"
+        rendered.append(f"{task_id} (outside: {outside})")
+    return "closest base-tree task(s): " + "; ".join(rendered)
+
+
+def preflight_paths(
+    repo_root: Path,
+    base_oid: str,
+    head_oid: str,
+    *,
+    head_ref: str = "",
+    allow_bootstrap: bool = False,
+    config_path: Path = CONFIG_PATH,
+) -> PreflightResult:
+    title, body = git_commit_declaration_text(repo_root, head_oid)
+    declaration_context = PullRequestContext(
+        title=title,
+        body=body,
+        # Preflight intentionally ignores the legacy descriptive branch
+        # fallback. The generated PR body carries the exact selected Task, so
+        # a branch suffix can neither invent a task nor override the commit.
+        head_ref="",
+        base_oid=base_oid,
+        head_oid=head_oid,
+    )
+    assert_base_is_ancestor(repo_root, declaration_context)
+    changed_paths = git_changed_paths(repo_root, base_oid, head_oid)
+    if not changed_paths:
+        raise CheckError(
+            f"preflight diff {base_oid}..{head_oid} is empty; no PR should be created"
+        )
+
+    explicit_task = resolve_task_declaration(declaration_context)
+    coverage = _base_task_coverage(repo_root, base_oid, changed_paths)
+    committed_head_definitions = load_task_definitions_at_commit(repo_root, head_oid)
+    if explicit_task is not None:
+        try:
+            result = check_paths(
+                repo_root,
+                declaration_context,
+                changed_paths,
+                config_path=config_path,
+                head_definitions=committed_head_definitions,
+            )
+        except CheckError as error:
+            hint = _coverage_hint(coverage, len(changed_paths))
+            raise CheckError(f"{error}; {hint}") from error
+        return PreflightResult(result, "explicit")
+
+    if allow_bootstrap:
+        bootstrap_context = PullRequestContext(
+            title=title,
+            body=body,
+            head_ref=head_ref,
+            base_oid=base_oid,
+            head_oid=head_oid,
+        )
+        bootstrap = one_time_bootstrap_result(
+            bootstrap_context,
+            changed_paths,
+            config_path=config_path,
+        )
+        if bootstrap is not None:
+            return PreflightResult(bootstrap, "bootstrap")
+
+    sensitive_patterns = load_sensitive_patterns(config_path)
+    sensitive_paths = tuple(
+        path
+        for path in changed_paths
+        if path_matches(path, sensitive_patterns, ignore_case=True)
+    )
+    if not sensitive_paths:
+        return PreflightResult(
+            CheckResult(None, changed_paths, sensitive_patterns),
+            "none",
+        )
+
+    candidates = sorted(task_id for task_id, offenders in coverage if not offenders)
+    if not candidates:
+        hint = _coverage_hint(coverage, len(changed_paths))
+        raise CheckError(
+            "preflight found no base-tree active task whose Allowed paths "
+            "cover the full diff; sensitive paths: "
+            + ", ".join(sensitive_paths)
+            + f"; {hint}"
+        )
+    if len(candidates) > 1:
+        raise CheckError(
+            "preflight found multiple base-tree active tasks whose Allowed paths "
+            "cover the full diff: "
+            + ", ".join(candidates)
+            + "; add exactly one Task ID to the final commit subject"
+        )
+
+    inferred_task = candidates[0]
+    inferred_context = PullRequestContext(
+        title=title,
+        body=f"Task: {inferred_task}\n",
+        head_ref="",
+        base_oid=base_oid,
+        head_oid=head_oid,
+    )
+    result = check_paths(
+        repo_root,
+        inferred_context,
+        changed_paths,
+        config_path=config_path,
+        head_definitions=committed_head_definitions,
+    )
+    return PreflightResult(result, "inferred")
+
+
 def parse_args(argv: Sequence[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo-root", type=Path, required=True)
@@ -919,6 +1167,35 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
     source.add_argument("--event", type=Path)
     source.add_argument("--pull-request", type=Path)
     source.add_argument("--pull-list", type=Path)
+    source.add_argument(
+        "--preflight",
+        action="store_true",
+        help="validate a commit range before push or PR creation",
+    )
+    parser.add_argument(
+        "--base-revision",
+        help="base commit/ref for --preflight; must be an ancestor of head",
+    )
+    parser.add_argument(
+        "--head-revision",
+        help="head commit/ref whose message and complete diff are preflighted",
+    )
+    parser.add_argument(
+        "--infer-task",
+        action="store_true",
+        help=(
+            "workflow-only fallback: accept exactly one full-diff base-tree "
+            "Task candidate when the commit subject omits Task"
+        ),
+    )
+    parser.add_argument(
+        "--allow-bootstrap",
+        action="store_true",
+        help=(
+            "permit only the pinned one-time preflight bootstrap tuple; "
+            "all base/head/path mismatches fall through to the normal guard"
+        ),
+    )
     parser.add_argument("--allow-zero", action="store_true")
     parser.add_argument("--identity-only", action="store_true")
     parser.add_argument("--expected-repository")
@@ -951,7 +1228,62 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(sys.argv[1:] if argv is None else argv)
     repo_root = args.repo_root.resolve()
     try:
+        if args.preflight:
+            if args.allow_zero or args.identity_only:
+                raise CheckError(
+                    "--allow-zero/--identity-only are invalid with --preflight"
+                )
+            if args.base_revision is None or args.head_revision is None:
+                raise CheckError(
+                    "--preflight requires --base-revision and --head-revision"
+                )
+            base_oid = resolve_git_revision(repo_root, args.base_revision)
+            head_oid = resolve_git_revision(repo_root, args.head_revision)
+            preflight = preflight_paths(
+                repo_root,
+                base_oid,
+                head_oid,
+                head_ref=args.expected_head_ref or "",
+                allow_bootstrap=args.allow_bootstrap,
+            )
+            if preflight.declaration_source == "inferred":
+                if not args.infer_task:
+                    raise CheckError(
+                        "final commit subject has no explicit Task ID; inferred "
+                        f"{preflight.check.task_id}; amend the subject, for example "
+                        f"`fix({preflight.check.task_id}): ...`"
+                    )
+                print(
+                    "check_pr_paths: PREFLIGHT: inferred "
+                    f"{preflight.check.task_id} from base-tree Allowed paths; "
+                    "workflow fallback will add it to the initial PR body",
+                    file=sys.stderr,
+                )
+            elif preflight.declaration_source == "bootstrap":
+                print(
+                    "check_pr_paths: PREFLIGHT: matched the maintainer-authorized "
+                    "one-time base/head/path bootstrap tuple",
+                    file=sys.stderr,
+                )
+            print(
+                "bootstrap"
+                if preflight.declaration_source == "bootstrap"
+                else preflight.check.task_id or "none"
+            )
+            return 0
+
+        if (
+            args.base_revision is not None
+            or args.head_revision is not None
+            or args.infer_task
+        ):
+            raise CheckError(
+                "--base-revision/--head-revision/--infer-task are valid only "
+                "with --preflight"
+            )
         if args.pull_list is not None:
+            if args.allow_bootstrap:
+                raise CheckError("--allow-bootstrap is invalid with --pull-list")
             if args.identity_only:
                 raise CheckError("--identity-only is invalid with --pull-list")
             number = select_unique_pull_request_number(
@@ -963,6 +1295,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.allow_zero:
             raise CheckError("--allow-zero is valid only with --pull-list")
         if args.event is not None:
+            if args.allow_bootstrap:
+                raise CheckError("--allow-bootstrap is invalid with --event")
             if args.identity_only:
                 raise CheckError("--identity-only is valid only with --pull-request")
             context = load_pull_request_context(args.event)
@@ -982,12 +1316,25 @@ def main(argv: Sequence[str] | None = None) -> int:
                 return 0
 
         changed_paths = git_changed_paths(repo_root, context.base_oid, context.head_oid)
-        result = check_paths(repo_root, context, changed_paths)
+        bootstrap_matched = False
+        if args.allow_bootstrap:
+            bootstrap_result = one_time_bootstrap_result(context, changed_paths)
+            if bootstrap_result is not None:
+                result = bootstrap_result
+                bootstrap_matched = True
+            else:
+                result = check_paths(repo_root, context, changed_paths)
+        else:
+            result = check_paths(repo_root, context, changed_paths)
     except CheckError as error:
         print(f"check_pr_paths: ERROR: {error}", file=sys.stderr)
         return 1
 
-    declaration = result.task_id or "none (docs/governance-only)"
+    declaration = (
+        "none (one-time bootstrap)"
+        if bootstrap_matched
+        else result.task_id or "none (docs/governance-only)"
+    )
     print(
         "check_pr_paths: PASS; "
         f"task={declaration}; changed_paths={len(result.changed_paths)}"
