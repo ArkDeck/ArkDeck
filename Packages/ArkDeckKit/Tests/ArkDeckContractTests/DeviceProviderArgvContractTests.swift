@@ -93,4 +93,36 @@ final class DeviceProviderArgvContractTests: XCTestCase {
       XCTAssertTrue("\(error)".contains("windowId"), "unexpected reason: \(error)")
     }
   }
+
+  // The refusal is permanent only for the stdout step shape. Naming the
+  // file-producing dumpLayout route in the reason is what stops the next
+  // reader from re-deriving it from hidumper flags (DEVICE-COMMAND-FACTS.md
+  // §7); losing that pointer is a silent regression, so pin it.
+  func testComponentTreeRefusalNamesTheFileProducingRoute() throws {
+    let descriptor = try XCTUnwrap(
+      RuntimeOperationCatalog.descriptor(reference: "capture.diagnostics@1"))
+    let synthetic = CatalogStepDescriptor(
+      stepID: "capture-ui-dump", kind: .captureRemoteStdout, effect: .readOnly,
+      cancellation: .immediate, binding: .confirmedDevice, isOptional: true,
+      compensation: .none,
+      actionReference: CatalogActionReference(
+        catalogID: "arkdeck-diagnostics", actionID: "componentTree"))
+    for refusal in [
+      { _ = try self.provider.action(
+        for: synthetic, operation: descriptor, inputs: [:], context: self.context) },
+      { _ = try self.provider.lower(
+        action: .hdc(.captureUIDump(try HDCUIDumpRequest(scope: .componentTree))),
+        context: self.context) },
+    ] as [() throws -> Void] {
+      XCTAssertThrowsError(try refusal()) { error in
+        let reason = "\(error)"
+        XCTAssertTrue(
+          reason.contains("dumpLayout"),
+          "refusal must name the known route: \(reason)")
+        XCTAssertTrue(
+          reason.lowercased().contains("stdout"),
+          "refusal must name the product-shape blocker: \(reason)")
+      }
+    }
+  }
 }
