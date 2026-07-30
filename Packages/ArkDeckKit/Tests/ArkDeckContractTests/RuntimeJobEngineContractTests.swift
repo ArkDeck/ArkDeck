@@ -39,6 +39,7 @@ final class RuntimeJobEngineContractTests: XCTestCase {
     enum Script {
       case observationHappy
       case outcomeUnknownOnDeviceProbe
+      case outcomeUnknownOnHAPSend
     }
 
     private let script: Script
@@ -54,6 +55,9 @@ final class RuntimeJobEngineContractTests: XCTestCase {
       switch (script, plan.action) {
       case (.outcomeUnknownOnDeviceProbe, .hdc(.observeDevice)):
         throw RuntimeDispatchFailure.outcomeUnknown("dispatcher lost the child process")
+      case (.outcomeUnknownOnHAPSend, .hdc(.sendArtifactToStaging)):
+        throw RuntimeDispatchFailure.outcomeUnknown(
+          "dispatcher lost the HAP send child process")
       case (_, .hdc(.observeTool)):
         return ProviderProcessReceipt(
           exitStatus: 0, stdout: Data("Ver: 3.2.0f\n".utf8), stderr: Data(),
@@ -118,6 +122,68 @@ final class RuntimeJobEngineContractTests: XCTestCase {
         "operation": { "id": "observe.device", "version": 1 }
       }
       """.utf8)
+  }
+
+  private func publishHAPLease() async throws -> String {
+    let hapArtifact = try await artifactStore.publish(
+      RuntimeArtifactPublicationRequest(
+        jobID: "job-input-hap", sessionID: "session-input-hap",
+        stepID: "publish-hap", name: "demo.hap",
+        mediaType: "application/octet-stream", privacy: .standard,
+        retentionClass: .pinnedUntilVerified,
+        sourceOperation: "build.hap@1", providerID: "host",
+        bindingSnapshot: ArtifactBindingSnapshot(
+          targetID: "TGT-DAYU200-01", bindingRevision: 1,
+          stableIdentitySHA256: nil),
+        contents: Data("signed-hap-fixture".utf8)))
+    return try await artifactStore.leaseReference(
+      jobID: hapArtifact.jobID, artifactID: hapArtifact.artifactID)
+  }
+
+  private func hapRequest(
+    lease: String,
+    requestID: String,
+    idempotencyKey: String,
+    capabilityID: String
+  ) -> Data {
+    Data(
+      """
+      {
+        "documentType": "runtime-operation-request",
+        "schemaVersion": "2.0.0",
+        "requestId": "\(requestID)",
+        "idempotencyKey": "\(idempotencyKey)",
+        "target": {
+          "targetId": "TGT-DAYU200-01",
+          "expectedBindingRevision": 7
+        },
+        "operation": { "id": "debug.hap", "version": 1 },
+        "inputs": {
+          "hapArtifactLease": "\(lease)",
+          "bundleName": "com.example.demo",
+          "abilityName": "EntryAbility"
+        },
+        "authorization": { "capabilityId": "\(capabilityID)" }
+      }
+      """.utf8)
+  }
+
+  private func installHAPCapability(
+    _ store: RuntimeCapabilityStore,
+    capabilityID: String,
+    maximumUses: Int
+  ) async throws {
+    try await store.install(
+      try RuntimeCapability(
+        capabilityID: capabilityID,
+        targetScope: .stablePhysicalIdentity(
+          sha256: "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547"),
+        operationScope: [.init(operationID: "debug.hap", version: 1)],
+        effectCeiling: .deviceMutation,
+        issuedAtUTC: "2026-07-01T00:00:00Z",
+        expiresAtUTC: "2026-12-31T00:00:00Z",
+        maximumUses: maximumUses,
+        issuer: .init(kind: .maintainerMergedPR, reference: "PR#test")))
   }
 
   // MARK: - Happy path + timeline
@@ -257,8 +323,83 @@ final class RuntimeJobEngineContractTests: XCTestCase {
     _ = try await engine.run(jobID: acceptance.jobID)
     let afterRun = try await capabilityStore.inspect(capabilityID: "CAP-RT-ENGINE-001")
     XCTAssertEqual(afterRun?.remainingUses, 4)
+    XCTAssertEqual(afterRun?.lineage.first?.outcome, .confirmed)
+    XCTAssertTrue(afterRun?.lineageAllowsNewExecution == true)
     let afterEvidence = try await engine.evidenceSnapshot(jobID: acceptance.jobID)
     XCTAssertNotNil(afterEvidence.authority?.consumptionFingerprintSHA256)
+
+    // A different execution ID of the same typed plan reuses the reviewed
+    // envelope. Its real Job-owned remote path differs, while the
+    // authorization plan template digest remains stable.
+    let secondRequest = Data(
+      String(decoding: hapRequest, as: UTF8.self)
+        .replacingOccurrences(of: "\"req-hap\"", with: "\"req-hap-2\"")
+        .replacingOccurrences(
+          of: "\"idem-hap-0001\"", with: "\"idem-hap-0002\"").utf8)
+    let second = try await engine.submit(secondRequest)
+    _ = try await engine.run(jobID: second.jobID)
+    let afterSecond = try await capabilityStore.inspect(
+      capabilityID: "CAP-RT-ENGINE-001")
+    XCTAssertEqual(afterSecond?.remainingUses, 3)
+    XCTAssertEqual(afterSecond?.lineage.map(\.ordinal), [1, 2])
+    XCTAssertEqual(
+      afterSecond?.lineage[1].previousLineageSHA256,
+      afterSecond?.lineage[0].lineageTipSHA256)
+  }
+
+  func testMutationOutcomeUnknownBlocksNewExecutionAcrossDaemonRecovery() async throws {
+    let dispatcher = ScriptedDispatcher(script: .outcomeUnknownOnHAPSend)
+    let (engine, capabilityStore) = try makeEngine(dispatcher: dispatcher)
+    let lease = try await publishHAPLease()
+    try await installHAPCapability(
+      capabilityStore, capabilityID: "CAP-RT-ENGINE-UNKNOWN-001", maximumUses: 3)
+    let firstRequest = hapRequest(
+      lease: lease, requestID: "req-hap-unknown-1",
+      idempotencyKey: "idem-hap-unknown-1",
+      capabilityID: "CAP-RT-ENGINE-UNKNOWN-001")
+    let first = try await engine.submit(firstRequest)
+    let parked = try await engine.run(jobID: first.jobID)
+    XCTAssertTrue(parked.outcomeUnknown)
+    XCTAssertEqual(parked.state, "waitingForRecovery")
+    let dispatchCountAtPark = dispatcher.dispatchCount
+    let lineage = try await capabilityStore.inspect(
+      capabilityID: "CAP-RT-ENGINE-UNKNOWN-001")
+    XCTAssertEqual(lineage?.lineage.first?.outcome, .outcomeUnknown)
+    XCTAssertEqual(lineage?.remainingUses, 2)
+
+    let secondRequest = hapRequest(
+      lease: lease, requestID: "req-hap-unknown-2",
+      idempotencyKey: "idem-hap-unknown-2",
+      capabilityID: "CAP-RT-ENGINE-UNKNOWN-001")
+    do {
+      _ = try await engine.submit(secondRequest)
+      XCTFail("outcomeUnknown must block a new Job before dispatch")
+    } catch let error as RuntimeJobEngineError {
+      guard case .rejected(.authorizationRequired, let detail) = error else {
+        return XCTFail("expected authorizationRequired, got \(error)")
+      }
+      XCTAssertTrue(detail.contains("outcomeUnknown"))
+    }
+    XCTAssertEqual(dispatcher.dispatchCount, dispatchCountAtPark)
+
+    let recoveredDispatcher = ScriptedDispatcher(script: .observationHappy)
+    let (recoveredEngine, recoveredStore) = try makeEngine(
+      dispatcher: recoveredDispatcher)
+    let recovered = try await recoveredEngine.recoverPersistedJobs()
+    XCTAssertEqual(recovered.map(\.jobID), [first.jobID])
+    XCTAssertTrue(try XCTUnwrap(recovered.first).outcomeUnknown)
+    do {
+      _ = try await recoveredEngine.submit(secondRequest)
+      XCTFail("restart must preserve the unknown-outcome lineage block")
+    } catch let error as RuntimeJobEngineError {
+      guard case .rejected(.authorizationRequired, _) = error else {
+        return XCTFail("expected authorizationRequired, got \(error)")
+      }
+    }
+    XCTAssertEqual(recoveredDispatcher.dispatchCount, 0)
+    let recoveredCapability = try await recoveredStore.inspect(
+      capabilityID: "CAP-RT-ENGINE-UNKNOWN-001")
+    XCTAssertEqual(recoveredCapability?.remainingUses, 2)
   }
 
   func testMissingRequiredInputIsRejected() async throws {

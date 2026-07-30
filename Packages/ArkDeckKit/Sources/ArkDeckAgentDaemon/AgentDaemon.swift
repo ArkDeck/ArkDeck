@@ -178,9 +178,28 @@ public struct RuntimeControlPlaneHandler: Sendable {
               .object([
                 "capabilityId": .string(status.capability.capabilityID),
                 "effectCeiling": .string(status.capability.effectCeiling.rawValue),
+                "maximumUses": .integer(Int64(status.capability.maximumUses)),
                 "remainingUses": .integer(Int64(status.remainingUses)),
+                "consumptionCount": .integer(Int64(status.consumptionCount)),
+                "lineageAllowsNewExecution": .bool(status.lineageAllowsNewExecution),
+                "lineageBlocker": status.lineageBlocker.map(JSONValue.string) ?? .null,
               ])
             }))
+      } catch {
+        return failure(id: request.id, code: .internalError, message: "\(error)")
+      }
+
+    case "capability.inspect":
+      guard case .string(let capabilityID)? = request.params?["capabilityId"] else {
+        return failure(id: request.id, code: .invalidParams, message: "capabilityId is required")
+      }
+      do {
+        guard let status = try await capabilityStore.inspect(capabilityID: capabilityID) else {
+          return failure(id: request.id, code: .notFound, message: "unknown capability")
+        }
+        let encoded = try JSONEncoder().encode(status)
+        let json = try JSONDecoder().decode(JSONValue.self, from: encoded)
+        return success(id: request.id, result: json)
       } catch {
         return failure(id: request.id, code: .internalError, message: "\(error)")
       }
@@ -202,6 +221,19 @@ public struct RuntimeControlPlaneHandler: Sendable {
           id: request.id, code: .invalidParams,
           message: "validitySeconds must be between 300 and 86400")
       }
+      let maximumUses: Int
+      if case .integer(let raw)? = request.params?["maximumUses"],
+        let exact = Int(exactly: raw)
+      {
+        maximumUses = exact
+      } else {
+        maximumUses = 1
+      }
+      guard (1...32).contains(maximumUses) else {
+        return failure(
+          id: request.id, code: .invalidParams,
+          message: "maximumUses must be between 1 and 32")
+      }
       let issuedAt = nowUTC()
       guard let expiresAt = Self.addingUTCSeconds(validitySeconds, to: issuedAt) else {
         return failure(
@@ -213,7 +245,8 @@ public struct RuntimeControlPlaneHandler: Sendable {
           Data(requestJson.utf8),
           issuedAtUTC: issuedAt,
           expiresAtUTC: expiresAt,
-          issuerReference: "PENDING-MAINTAINER-PR")
+          issuerReference: "PENDING-MAINTAINER-PR",
+          maximumUses: maximumUses)
         let encoded = try JSONEncoder().encode(draft)
         let json = try JSONDecoder().decode(JSONValue.self, from: encoded)
         return success(id: request.id, result: json)

@@ -86,12 +86,22 @@ final class RuntimeCapabilityStoreContractTests: XCTestCase {
     try await store.install(try e1Capability(maximumUses: 2))
     let first = try await store.consume(
       capabilityID: "CAP-RT-STORE-001", reservationID: "res-1",
+      jobID: "job-1",
       query: query(), nowUTC: "2026-07-15T00:00:00Z")
     XCTAssertEqual(first.remainingUsesAfter, 1)
+    try await store.recordOutcome(
+      capabilityID: "CAP-RT-STORE-001", reservationID: "res-1", jobID: "job-1",
+      outcome: .confirmed, terminalState: "succeeded",
+      atUTC: "2026-07-15T00:00:30Z")
     let second = try await store.consume(
       capabilityID: "CAP-RT-STORE-001", reservationID: "res-2",
+      jobID: "job-2",
       query: query(), nowUTC: "2026-07-15T00:01:00Z")
     XCTAssertEqual(second.remainingUsesAfter, 0)
+    try await store.recordOutcome(
+      capabilityID: "CAP-RT-STORE-001", reservationID: "res-2", jobID: "job-2",
+      outcome: .confirmed, terminalState: "failed",
+      atUTC: "2026-07-15T00:01:30Z")
     do {
       _ = try await store.consume(
         capabilityID: "CAP-RT-STORE-001", reservationID: "res-3",
@@ -103,6 +113,129 @@ final class RuntimeCapabilityStoreContractTests: XCTestCase {
       }
       XCTAssertEqual(denial.reason, .exhausted)
     }
+  }
+
+  func testPendingAndOutcomeUnknownBlockDifferentReservationWithoutConsuming() async throws {
+    let store = try makeStore()
+    try await store.install(try e1Capability(maximumUses: 3))
+    let first = try await store.consume(
+      capabilityID: "CAP-RT-STORE-001", reservationID: "res-first",
+      jobID: "job-first", query: query(), nowUTC: "2026-07-15T00:00:00Z")
+    XCTAssertEqual(first.ordinal, 1)
+
+    do {
+      _ = try await store.consume(
+        capabilityID: "CAP-RT-STORE-001", reservationID: "res-second",
+        jobID: "job-second", query: query(), nowUTC: "2026-07-15T00:01:00Z")
+      XCTFail("a pending predecessor must block a new reservation")
+    } catch let error as RuntimeCapabilityStoreError {
+      guard case .lineageBlocked(let detail) = error else {
+        return XCTFail("expected lineageBlocked, got \(error)")
+      }
+      XCTAssertTrue(detail.contains("pending"))
+    }
+    try await store.recordOutcome(
+      capabilityID: "CAP-RT-STORE-001", reservationID: "res-first", jobID: "job-first",
+      outcome: .outcomeUnknown, terminalState: "waitingForRecovery",
+      atUTC: "2026-07-15T00:02:00Z")
+    do {
+      _ = try await store.consume(
+        capabilityID: "CAP-RT-STORE-001", reservationID: "res-second",
+        jobID: "job-second", query: query(), nowUTC: "2026-07-15T00:03:00Z")
+      XCTFail("outcomeUnknown must block a new reservation")
+    } catch let error as RuntimeCapabilityStoreError {
+      guard case .lineageBlocked(let detail) = error else {
+        return XCTFail("expected lineageBlocked, got \(error)")
+      }
+      XCTAssertTrue(detail.contains("outcomeUnknown"))
+    }
+    let inspected = try await store.inspect(capabilityID: "CAP-RT-STORE-001")
+    let status = try XCTUnwrap(inspected)
+    XCTAssertEqual(status.remainingUses, 2)
+    XCTAssertFalse(status.lineageAllowsNewExecution)
+    XCTAssertEqual(status.lineage.last?.outcome, .outcomeUnknown)
+  }
+
+  func testConfirmedOutcomeCreatesHashLinkedAuthorizationLineage() async throws {
+    let store = try makeStore()
+    try await store.install(try e1Capability(maximumUses: 3))
+    let first = try await store.consume(
+      capabilityID: "CAP-RT-STORE-001", reservationID: "res-first",
+      jobID: "job-first", query: query(), nowUTC: "2026-07-15T00:00:00Z")
+    try await store.recordOutcome(
+      capabilityID: "CAP-RT-STORE-001", reservationID: "res-first", jobID: "job-first",
+      outcome: .confirmed, terminalState: "succeeded",
+      atUTC: "2026-07-15T00:00:30Z")
+    let inspectedAfterFirst = try await store.inspect(capabilityID: "CAP-RT-STORE-001")
+    let afterFirst = try XCTUnwrap(inspectedAfterFirst)
+    XCTAssertTrue(afterFirst.lineageAllowsNewExecution)
+    let firstTip = try XCTUnwrap(afterFirst.lineage.first?.lineageTipSHA256)
+
+    let second = try await store.consume(
+      capabilityID: "CAP-RT-STORE-001", reservationID: "res-second",
+      jobID: "job-second", query: query(), nowUTC: "2026-07-15T00:01:00Z")
+    XCTAssertEqual(second.ordinal, 2)
+    XCTAssertEqual(second.previousLineageSHA256, firstTip)
+    XCTAssertNotEqual(second.receiptSHA256, first.receiptSHA256)
+
+    // A crash retry of the same Job retains its exact receipt even while
+    // the second node is pending.
+    let retry = try await store.consume(
+      capabilityID: "CAP-RT-STORE-001", reservationID: "res-second",
+      jobID: "job-second", query: query(), nowUTC: "2026-07-15T09:00:00Z")
+    XCTAssertEqual(retry, second)
+  }
+
+  func testDedicatedReadbackCanResolveUnknownWithoutASecondConsumption() async throws {
+    let store = try makeStore()
+    try await store.install(try e1Capability(maximumUses: 2))
+    _ = try await store.consume(
+      capabilityID: "CAP-RT-STORE-001", reservationID: "res-reconcile",
+      jobID: "job-reconcile", query: query(), nowUTC: "2026-07-15T00:00:00Z")
+    try await store.recordOutcome(
+      capabilityID: "CAP-RT-STORE-001", reservationID: "res-reconcile",
+      jobID: "job-reconcile", outcome: .outcomeUnknown,
+      terminalState: "waitingForRecovery", atUTC: "2026-07-15T00:01:00Z")
+    try await store.recordOutcome(
+      capabilityID: "CAP-RT-STORE-001", reservationID: "res-reconcile",
+      jobID: "job-reconcile", outcome: .confirmed,
+      terminalState: "succeeded", atUTC: "2026-07-15T00:02:00Z")
+
+    let inspected = try await store.inspect(capabilityID: "CAP-RT-STORE-001")
+    let status = try XCTUnwrap(inspected)
+    XCTAssertEqual(status.consumptionCount, 1)
+    XCTAssertEqual(
+      status.lineage.first?.outcomeHistory.map(\.outcome),
+      [.outcomeUnknown, .confirmed])
+    XCTAssertTrue(status.lineageAllowsNewExecution)
+  }
+
+  func testConfirmedLineageStillRejectsScopeDriftWithoutConsuming() async throws {
+    let store = try makeStore()
+    try await store.install(try e1Capability(maximumUses: 2))
+    _ = try await store.consume(
+      capabilityID: "CAP-RT-STORE-001", reservationID: "res-first",
+      jobID: "job-first", query: query(), nowUTC: "2026-07-15T00:00:00Z")
+    try await store.recordOutcome(
+      capabilityID: "CAP-RT-STORE-001", reservationID: "res-first", jobID: "job-first",
+      outcome: .confirmed, terminalState: "succeeded",
+      atUTC: "2026-07-15T00:00:30Z")
+
+    do {
+      _ = try await store.consume(
+        capabilityID: "CAP-RT-STORE-001", reservationID: "res-drift",
+        jobID: "job-drift", query: query(bindingRevision: 8),
+        nowUTC: "2026-07-15T00:01:00Z")
+      XCTFail("confirmed history cannot silently expand its binding scope")
+    } catch let error as RuntimeCapabilityStoreError {
+      guard case .lineageBlocked(let detail) = error else {
+        return XCTFail("expected lineageBlocked, got \(error)")
+      }
+      XCTAssertTrue(detail.contains("drifted"))
+    }
+    let status = try await store.inspect(capabilityID: "CAP-RT-STORE-001")
+    XCTAssertEqual(status?.remainingUses, 1)
+    XCTAssertEqual(status?.consumptionCount, 1)
   }
 
   func testConsumeRetryWithSameReservationIsIdempotent() async throws {
@@ -256,6 +389,89 @@ final class RuntimeCapabilityStoreContractTests: XCTestCase {
         return XCTFail("expected storeCorrupted, got \(error)")
       }
     }
+  }
+
+  func testTamperedLineageDigestFailsClosed() async throws {
+    do {
+      let store = try makeStore()
+      try await store.install(try e1Capability())
+      _ = try await store.consume(
+        capabilityID: "CAP-RT-STORE-001", reservationID: "res-tamper",
+        jobID: "job-tamper", query: query(), nowUTC: "2026-07-15T00:00:00Z")
+    }
+    let documentURL = directoryURL.appendingPathComponent("runtime-capabilities.json")
+    let original = try String(contentsOf: documentURL, encoding: .utf8)
+    let corrupted = original.replacingOccurrences(
+      of: "\"receiptSHA256\" : \"", with: "\"receiptSHA256\" : \"0")
+    XCTAssertNotEqual(corrupted, original, "fixture assumption: receipt digest is present")
+    try corrupted.write(to: documentURL, atomically: true, encoding: .utf8)
+    do {
+      _ = try await makeStore().list()
+      XCTFail("tampered lineage must fail closed")
+    } catch let error as RuntimeCapabilityStoreError {
+      guard case .storeCorrupted = error else {
+        return XCTFail("expected storeCorrupted, got \(error)")
+      }
+    }
+  }
+
+  func testV1ConsumptionMigratesAsLegacyUnverifiedAndCannotAuthorizeReuse() async throws {
+    let capability = try e1Capability(maximumUses: 2)
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+    let capabilityJSON = try XCTUnwrap(
+      String(data: encoder.encode(capability), encoding: .utf8))
+    let legacy = """
+      {
+        "schemaVersion":"1.0.0",
+        "records":[{
+          "capability":\(capabilityJSON),
+          "remainingUses":1,
+          "consumptions":[{
+            "reservationID":"legacy-reservation",
+            "consumedAtUTC":"2026-07-15T00:00:00Z",
+            "operationReference":"debug.hap@1",
+            "queryFingerprintSHA256":"\(String(repeating: "b", count: 64))",
+            "remainingUsesAfter":1
+          }]
+        }]
+      }
+      """
+    try FileManager.default.createDirectory(
+      at: directoryURL, withIntermediateDirectories: true)
+    try Data(legacy.utf8).write(
+      to: directoryURL.appendingPathComponent("runtime-capabilities.json"))
+    let store = try makeStore()
+    let inspected = try await store.inspect(capabilityID: "CAP-RT-STORE-001")
+    let status = try XCTUnwrap(inspected)
+    XCTAssertEqual(status.lineage.first?.outcome, .legacyUnverified)
+    XCTAssertFalse(status.lineageAllowsNewExecution)
+    do {
+      _ = try await store.consume(
+        capabilityID: "CAP-RT-STORE-001", reservationID: "new-reservation",
+        jobID: "new-job", query: query(), nowUTC: "2026-07-15T00:01:00Z")
+      XCTFail("legacy entries without outcomes must not authorize reuse")
+    } catch let error as RuntimeCapabilityStoreError {
+      guard case .lineageBlocked = error else {
+        return XCTFail("expected lineageBlocked, got \(error)")
+      }
+    }
+
+    // A durable Job record recovered by the engine may resolve the old
+    // reservation. Until that exact recovery happens, the migrated row
+    // above remains fail-closed.
+    try await store.recordOutcome(
+      capabilityID: "CAP-RT-STORE-001",
+      reservationID: "legacy-reservation",
+      jobID: "job-recovered-from-durable-record",
+      outcome: .confirmed,
+      terminalState: "succeeded",
+      atUTC: "2026-07-15T00:02:00Z")
+    let resolved = try await store.inspect(capabilityID: "CAP-RT-STORE-001")
+    XCTAssertEqual(resolved?.lineage.first?.outcome, .confirmed)
+    XCTAssertEqual(
+      resolved?.lineage.first?.outcomeHistory.last?.jobID,
+      "job-recovered-from-durable-record")
   }
 
   func testUnknownCapabilityConsumeFails() async throws {

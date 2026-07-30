@@ -202,7 +202,8 @@ enum RuntimeCLI {
   static func runCapability(_ arguments: [String]) throws {
     guard let subcommand = arguments.first else {
       throw CLIError(
-        exitCode: EX_USAGE, message: "missing capability subcommand (list|draft|install|revoke)")
+        exitCode: EX_USAGE,
+        message: "missing capability subcommand (list|inspect|draft|install|revoke)")
     }
     var rest = Array(arguments.dropFirst())
     let json = rest.contains("--json")
@@ -210,6 +211,16 @@ enum RuntimeCLI {
     switch subcommand {
     case "list":
       emit(try client.request(method: "capability.list"), json: json)
+    case "inspect":
+      guard let index = rest.firstIndex(of: "--capability"), index + 1 < rest.count else {
+        throw CLIError(
+          exitCode: EX_USAGE, message: "capability inspect requires --capability <id>")
+      }
+      emit(
+        try client.request(
+          method: "capability.inspect",
+          params: ["capabilityId": .string(rest[index + 1])]),
+        json: json)
     case "draft":
       guard let targetIndex = rest.firstIndex(of: "--target"),
         targetIndex + 1 < rest.count,
@@ -253,6 +264,16 @@ enum RuntimeCLI {
       } else {
         validitySeconds = 3_600
       }
+      let maximumUses: Int
+      if let index = rest.firstIndex(of: "--maximum-uses"), index + 1 < rest.count {
+        guard let parsed = Int(rest[index + 1]), (1...32).contains(parsed) else {
+          throw CLIError(
+            exitCode: EX_USAGE, message: "maximum-uses must be an integer between 1 and 32")
+        }
+        maximumUses = parsed
+      } else {
+        maximumUses = 1
+      }
       let request = try RuntimeOperationRequest(
         requestID: "agent-request-\(executionID)",
         idempotencyKey: "agent-execution-\(executionID)",
@@ -274,6 +295,7 @@ enum RuntimeCLI {
         params: [
           "requestJson": .string(requestJSON),
           "validitySeconds": .integer(Int64(validitySeconds)),
+          "maximumUses": .integer(Int64(maximumUses)),
         ])
       guard case .object(var draftFields) = draft,
         case .object(let capabilityFields)? = draftFields["capability"],

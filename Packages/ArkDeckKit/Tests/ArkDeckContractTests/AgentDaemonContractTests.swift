@@ -238,6 +238,7 @@ final class AgentDaemonContractTests: XCTestCase {
       params: [
         "requestJson": .string(operationJSON),
         "validitySeconds": .integer(3_600),
+        "maximumUses": .integer(3),
       ])
     XCTAssertTrue(drafted.ok, drafted.error?.message ?? "-")
     guard case .object(let draft)? = drafted.result,
@@ -254,6 +255,7 @@ final class AgentDaemonContractTests: XCTestCase {
     XCTAssertEqual(draft["bindingRevision"], .integer(7))
     XCTAssertEqual(capabilityFields["exactPlanDigest"], .string(planDigest))
     XCTAssertEqual(capabilityFields["exactBindingRevision"], .integer(7))
+    XCTAssertEqual(capabilityFields["maximumUses"], .integer(3))
     XCTAssertEqual(
       draft["stableIdentitySHA256"],
       .string("83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1"))
@@ -297,7 +299,19 @@ final class AgentDaemonContractTests: XCTestCase {
       return XCTFail("approved capability must become listable")
     }
     XCTAssertEqual(status["capabilityId"], .string(capabilityID))
-    XCTAssertEqual(status["remainingUses"], .integer(1))
+    XCTAssertEqual(status["maximumUses"], .integer(3))
+    XCTAssertEqual(status["remainingUses"], .integer(3))
+    XCTAssertEqual(status["lineageAllowsNewExecution"], .bool(true))
+    let inspected = try await request(
+      handler, method: "capability.inspect",
+      params: ["capabilityId": .string(capabilityID)])
+    guard case .object(let inspectedFields)? = inspected.result,
+      case .array(let inspectedLineage)? = inspectedFields["lineage"]
+    else {
+      return XCTFail("capability.inspect must return the durable envelope and lineage")
+    }
+    XCTAssertEqual(inspectedFields["remainingUses"], .integer(3))
+    XCTAssertTrue(inspectedLineage.isEmpty)
 
     // The Agent surface intentionally omits fields that decode to request
     // defaults. Its semantically identical request must still derive the
