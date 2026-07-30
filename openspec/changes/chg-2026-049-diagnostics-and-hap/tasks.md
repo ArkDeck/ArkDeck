@@ -131,14 +131,17 @@
   stop、uninstall、remote cleanup 全部完成。详见
   `gj1-device-observe-2026-07-30.md` 与 `gj2-hap-debug-2026-07-30.md`。
 - Product follow-up(2026-07-30):为减少同一 E1 typed plan 的重复签发，
-  本产品 PR 将 Runtime Capability 落为有界持久 authorization envelope：
-  draft 可声明 `maximumUses=1...32`，每次 Job 消费追加绑定 target、
-  binding revision、typed-plan digest 与 effect 的 hash-linked lineage；
+  本产品 PR 将 Runtime Capability 落为有界持久 authorization envelope，
+  并由 daemon 对 Catalog 允许默认签发的 E1 operation 自动创建、续期和
+  持久化；调用者无需 capability JSON、安装命令或 reviewer：
+  每代 envelope 有效 30 天/10,000 次且绑定完整 typed-input map，每次
+  Job 消费追加绑定 target、binding revision、typed-plan digest 与 effect
+  的 hash-linked lineage；
   只有前一节点 outcome confirmed 且范围无漂移时才允许下一次执行。
   pending、legacy-unverified 与 `outcomeUnknown` 均阻止新 reservation，同一
   Job 的 crash/reconcile reservation 保持幂等且不自动重发；E2 仍强制
   one-shot。兼容与测试记录见
-  `runtime-authorization-envelope-2026-07-30.md`。该跟进不改变两条
+  `runtime-authorization-standing-plan-lineage-2026-07-30.md`。该跟进不改变两条
   Golden Journey 状态，也不新增 change、Acceptance 或治理状态。
 - Saved-draft handoff:原 `agent/task-dha-001` 工作树保留 10 个 tracked
   修改和 5 个 untracked 新文件，未提交、未计 evidence；与

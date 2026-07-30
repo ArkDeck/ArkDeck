@@ -69,6 +69,69 @@ final class RuntimeCapabilityTests: XCTestCase {
   func testValidE1AndE2Construct() throws {
     _ = try makeE1()
     _ = try makeE2()
+    _ = try RuntimeCapability(
+      capabilityID: "CAP-RT-POLICY-DEBUG-001",
+      targetScope: .stablePhysicalIdentity(sha256: String(repeating: "a", count: 64)),
+      operationScope: [.init(operationID: "debug.hap", version: 1)],
+      effectCeiling: .deviceMutation,
+      exactInputs: [:],
+      issuedAtUTC: "1970-01-01T00:00:00Z",
+      expiresAtUTC: "9999-12-31T23:59:59Z",
+      maximumUses: 10_000,
+      issuer: .init(kind: .runtimeDefaultPolicy, reference: "catalog:test:debug.hap@1"))
+  }
+
+  func testRuntimePolicyBindsCompleteTypedInputMap() throws {
+    let capability = try RuntimeCapability(
+      capabilityID: "CAP-RT-POLICY-DEBUG-INPUTS-001",
+      targetScope: .stablePhysicalIdentity(sha256: String(repeating: "a", count: 64)),
+      operationScope: [.init(operationID: "debug.hap", version: 1)],
+      effectCeiling: .deviceMutation,
+      exactInputs: ["captureDiagnostics": .bool(true)],
+      issuedAtUTC: "2026-07-01T00:00:00Z",
+      expiresAtUTC: "2026-08-01T00:00:00Z",
+      maximumUses: 10_000,
+      issuer: .init(kind: .runtimeDefaultPolicy, reference: "catalog:test:debug.hap@1"))
+
+    XCTAssertNoThrow(
+      try capability.authorizes(
+        query(inputs: ["captureDiagnostics": .bool(true)]),
+        nowUTC: "2026-07-02T00:00:00Z",
+        remainingUses: 10
+      ).get())
+    XCTAssertThrowsError(
+      try capability.authorizes(
+        query(
+          inputs: [
+            "captureDiagnostics": .bool(true),
+            "cleanupPolicy": .string("retain"),
+          ]),
+        nowUTC: "2026-07-02T00:00:00Z",
+        remainingUses: 10
+      ).get()
+    ) { error in
+      XCTAssertEqual(
+        (error as? RuntimeCapabilityDenial)?.reason,
+        .inputConstraintViolated)
+    }
+  }
+
+  func testRuntimePolicyWithoutExactInputsIsRejected() {
+    XCTAssertThrowsError(
+      try RuntimeCapability(
+        capabilityID: "CAP-RT-POLICY-DEBUG-UNBOUND-001",
+        targetScope: .stablePhysicalIdentity(sha256: String(repeating: "a", count: 64)),
+        operationScope: [.init(operationID: "debug.hap", version: 1)],
+        effectCeiling: .deviceMutation,
+        issuedAtUTC: "2026-07-01T00:00:00Z",
+        expiresAtUTC: "2026-08-01T00:00:00Z",
+        maximumUses: 10_000,
+        issuer: .init(kind: .runtimeDefaultPolicy, reference: "catalog:test:debug.hap@1"))
+    ) { error in
+      XCTAssertEqual(
+        error as? RuntimeCapabilityValidationError,
+        .runtimePolicyRequiresExactInputs)
+    }
   }
 
   func testReadOnlyCeilingIsRejected() {
@@ -89,6 +152,22 @@ final class RuntimeCapabilityTests: XCTestCase {
   }
 
   func testDestructiveRequiresExactPlanDigestSingleUseAndStableTarget() throws {
+    XCTAssertThrowsError(
+      try RuntimeCapability(
+        capabilityID: "CAP-RT-X-001",
+        targetScope: .stablePhysicalIdentity(sha256: String(repeating: "a", count: 64)),
+        operationScope: [.init(operationID: "flash.dayu200", version: 1)],
+        effectCeiling: .destructive,
+        issuedAtUTC: "2026-07-01T00:00:00Z",
+        expiresAtUTC: "2026-08-01T00:00:00Z",
+        maximumUses: 1,
+        issuer: .init(kind: .runtimeDefaultPolicy, reference: "catalog:test"),
+        exactPlanDigest: String(repeating: "b", count: 64))
+    ) { error in
+      XCTAssertEqual(
+        error as? RuntimeCapabilityValidationError,
+        .destructiveRequiresMaintainerIssuer)
+    }
     XCTAssertThrowsError(
       try RuntimeCapability(
         capabilityID: "CAP-RT-X-001",
