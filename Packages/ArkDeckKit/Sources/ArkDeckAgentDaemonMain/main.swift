@@ -76,6 +76,8 @@ struct RefusingDispatcher: RuntimeProcessDispatching {
   // rather than pretending to run anything.
   let reason: String
 
+  func unavailableReason(providerID: String) -> String? { reason }
+
   func dispatch(_ plan: TypedProcessPlan) async throws -> ProviderProcessReceipt {
     throw RuntimeDispatchFailure.failed(reason)
   }

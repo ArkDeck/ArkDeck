@@ -26,6 +26,23 @@ public enum HDCAllowlistedProperty: String, CaseIterable, Sendable, Codable {
   case fullBuildVersion = "const.ohos.fullname"
 }
 
+/// Fixed-root free-space observation for Catalog preflightDeviceStorage.
+/// The request carries no caller-selected remote path.
+public struct HDCStoragePreflightRequest: Sendable, Equatable {
+  public static let remotePath = "/data/local/tmp"
+  public static let maximumRequiredBytes = 8 * 1024 * 1024 * 1024
+
+  public let requiredBytes: Int
+
+  public init(requiredBytes: Int) throws {
+    guard (1...Self.maximumRequiredBytes).contains(requiredBytes) else {
+      throw HDCE0RequestError.outOfBounds(
+        field: "requiredBytes", detail: "1...\(Self.maximumRequiredBytes)")
+    }
+    self.requiredBytes = requiredBytes
+  }
+}
+
 public struct HDCHilogCaptureRequest: Sendable, Equatable {
   public static let maximumDurationSeconds = 600
   public static let maximumFilters = 16
@@ -135,11 +152,26 @@ public struct HDCOwnedRemotePath: Sendable, Equatable {
   /// Full remote path under the provider's fixed staging root.
   public let remotePath: String
 
-  package init(jobID: String, stepID: String, nonce: String) {
+  package init(jobID: String, stepID: String, nonce: String) throws {
+    let componentPattern = #"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"#
+    for (field, value) in [("jobID", jobID), ("stepID", stepID), ("nonce", nonce)] {
+      guard value.range(of: componentPattern, options: .regularExpression) != nil else {
+        throw HDCE0RequestError.malformed(
+          field: field, detail: "provider-owned path components must be bounded identifiers")
+      }
+    }
     self.jobID = jobID
     self.stepID = stepID
     self.nonce = nonce
-    self.remotePath = "/data/local/tmp/arkdeck/\(jobID)/\(stepID)-\(nonce)"
+    // A flat file under the existing /data/local/tmp directory requires no
+    // undeclared mkdir mutation. The job/step/nonce tuple still provides
+    // the required per-job isolation.
+    let remotePath = "/data/local/tmp/arkdeck-\(jobID)-\(stepID)-\(nonce)"
+    guard remotePath.utf8.count <= 255 else {
+      throw HDCE0RequestError.outOfBounds(
+        field: "remotePath", detail: "provider-owned path must be at most 255 bytes")
+    }
+    self.remotePath = remotePath
   }
 }
 

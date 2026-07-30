@@ -251,6 +251,7 @@ public struct RuntimeCapabilityAuthorizationQuery: Sendable {
   public let operationVersion: Int
   public let effect: WorkflowEffect
   public let targetStableIdentitySHA256: String?
+  public let targetBindingRevision: Int?
   public let planDigest: String?
   public let inputs: [String: JSONValue]
 
@@ -259,6 +260,7 @@ public struct RuntimeCapabilityAuthorizationQuery: Sendable {
     operationVersion: Int,
     effect: WorkflowEffect,
     targetStableIdentitySHA256: String?,
+    targetBindingRevision: Int?,
     planDigest: String?,
     inputs: [String: JSONValue]
   ) {
@@ -266,6 +268,7 @@ public struct RuntimeCapabilityAuthorizationQuery: Sendable {
     self.operationVersion = operationVersion
     self.effect = effect
     self.targetStableIdentitySHA256 = targetStableIdentitySHA256
+    self.targetBindingRevision = targetBindingRevision
     self.planDigest = planDigest
     self.inputs = inputs
   }

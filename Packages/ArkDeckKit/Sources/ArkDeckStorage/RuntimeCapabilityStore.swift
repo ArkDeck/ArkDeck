@@ -231,6 +231,7 @@ public actor RuntimeCapabilityStore {
       "operation=\(query.operationID)@\(query.operationVersion)",
       "effect=\(query.effect.rawValue)",
       "target=\(query.targetStableIdentitySHA256 ?? "-")",
+      "bindingRevision=\(query.targetBindingRevision.map(String.init) ?? "-")",
       "plan=\(query.planDigest ?? "-")",
     ]
     let encoder = JSONEncoder()

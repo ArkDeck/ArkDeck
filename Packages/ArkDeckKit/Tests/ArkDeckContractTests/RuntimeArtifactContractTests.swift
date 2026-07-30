@@ -59,20 +59,61 @@ final class RuntimeArtifactContractTests: XCTestCase {
     XCTAssertEqual(metadata.bindingSnapshot.bindingRevision, 1)
     XCTAssertEqual(metadata.privacy, .standard)
     XCTAssertEqual(metadata.status, .published)
+    XCTAssertNotNil(metadata.retention.deadlineUTC)
+    XCTAssertFalse(metadata.retention.pinned)
     XCTAssertGreaterThan(metadata.byteCount, 0)
     XCTAssertEqual(metadata.sha256.count, 64)
     XCTAssertFalse(metadata.createdAtUTC.isEmpty)
   }
 
-  func testArtifactIDIsContentDerivedAndRepublishIsIdempotent() async throws {
+  func testArtifactIDBindsDeclaredProductAndRepublishIsIdempotent() async throws {
     let store = try makeStore()
     let first = try await store.publish(request())
     let same = try await store.publish(request())
     XCTAssertEqual(first.artifactID, same.artifactID, "same content, same identity")
-    let different = try await store.publish(request(contents: "{\"serial\":\"other\"}"))
+    let different = try await store.publish(
+      request(name: "binding-snapshot.json", contents: "{\"serial\":\"other\"}"))
     XCTAssertNotEqual(first.artifactID, different.artifactID)
     let listed = try await store.list(jobID: "job-1")
     XCTAssertEqual(listed.count, 2, "the idempotent republish adds no duplicate row")
+  }
+
+  func testEqualBytesForDifferentDeclaredProductsKeepDistinctIdentities() async throws {
+    let store = try makeStore()
+    let first = try await store.publish(
+      request(name: "device-facts.json", contents: "{}"))
+    let second = try await store.publish(
+      request(name: "binding-snapshot.json", contents: "{}"))
+    XCTAssertNotEqual(
+      first.artifactID, second.artifactID,
+      "content deduplication must not overwrite a different declared product")
+    let listed = try await store.list(jobID: "job-1")
+    XCTAssertEqual(listed.count, 2)
+  }
+
+  func testPublishedNameCannotBeOverwrittenWithDifferentBytes() async throws {
+    let store = try makeStore()
+    let original = try await store.publish(
+      request(name: "device-facts.json", contents: "{\"serial\":\"first\"}"))
+    await XCTAssertThrowsErrorAsync(
+      try await store.publish(
+        request(name: "device-facts.json", contents: "{\"serial\":\"second\"}")))
+    let listed = try await store.list(jobID: "job-1")
+    XCTAssertEqual(listed, [original])
+    let originalBytes = try await store.read(
+      jobID: "job-1", artifactID: original.artifactID)
+    XCTAssertEqual(originalBytes, Data("{\"serial\":\"first\"}".utf8))
+  }
+
+  func testIdempotentRepublishCannotDowngradeImmutableMetadata() async throws {
+    let store = try makeStore()
+    let original = try await store.publish(request(privacy: .sensitive))
+    await XCTAssertThrowsErrorAsync(
+      try await store.publish(request(privacy: .standard)))
+    let listed = try await store.list(jobID: "job-1")
+    XCTAssertEqual(listed, [original])
+    await XCTAssertThrowsErrorAsync(
+      try await store.read(jobID: "job-1", artifactID: original.artifactID))
   }
 
   // MARK: - Access is by ID only
@@ -88,6 +129,10 @@ final class RuntimeArtifactContractTests: XCTestCase {
     let clipped = try await store.read(
       jobID: "job-1", artifactID: metadata.artifactID, maximumBytes: 4)
     XCTAssertEqual(clipped.count, 4)
+    await XCTAssertThrowsErrorAsync(
+      try await store.read(
+        jobID: "job-1", artifactID: metadata.artifactID,
+        maximumBytes: 4 * 1024 * 1024 + 1))
     await XCTAssertThrowsErrorAsync(
       try await store.inspect(jobID: "job-1", artifactID: "ART-nope"))
   }
@@ -108,6 +153,55 @@ final class RuntimeArtifactContractTests: XCTestCase {
     // A malformed job identifier is rejected outright.
     await XCTAssertThrowsErrorAsync(
       try await store.publish(request(jobID: "../escape")))
+  }
+
+  func testSymlinkedJobDirectoryIsRejected() async throws {
+    let store = try makeStore()
+    let outside = root.deletingLastPathComponent()
+      .appendingPathComponent("arkdeck-artifact-outside-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: outside, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: outside) }
+    try FileManager.default.createSymbolicLink(
+      at: root.appendingPathComponent("job-symlink"), withDestinationURL: outside)
+
+    await XCTAssertThrowsErrorAsync(
+      try await store.publish(request(jobID: "job-symlink")))
+    XCTAssertTrue(
+      (try FileManager.default.contentsOfDirectory(atPath: outside.path)).isEmpty,
+      "a poisoned job directory must not redirect Artifact writes")
+  }
+
+  func testPayloadAndIndexDriftFailClosedOnReopen() async throws {
+    let store = try makeStore()
+    let metadata = try await store.publish(request())
+    let payload = root.appendingPathComponent("job-1/\(metadata.artifactID)")
+    try Data("tampered".utf8).write(to: payload)
+    await XCTAssertThrowsErrorAsync(try await store.list(jobID: "job-1"))
+
+    try FileManager.default.removeItem(at: root)
+    let fresh = try makeStore()
+    _ = try await fresh.publish(request())
+    let jobDirectory = root.appendingPathComponent("job-1", isDirectory: true)
+    let index = jobDirectory.appendingPathComponent("index.json")
+    let outside = root.appendingPathComponent("outside-index.json")
+    try FileManager.default.copyItem(at: index, to: outside)
+    try FileManager.default.removeItem(at: index)
+    try FileManager.default.createSymbolicLink(at: index, withDestinationURL: outside)
+    await XCTAssertThrowsErrorAsync(try await fresh.list(jobID: "job-1"))
+  }
+
+  func testArtifactLeaseResolvesImmutableBytesWithoutExposingAnInputPath() async throws {
+    let store = try makeStore()
+    let metadata = try await store.publish(
+      request(name: "demo.hap", contents: "hap-bytes"))
+    let lease = try await store.leaseReference(
+      jobID: metadata.jobID, artifactID: metadata.artifactID)
+    XCTAssertTrue(lease.hasPrefix("lease-v1:"))
+    XCTAssertFalse(lease.contains(root.path))
+    let resolved = try await store.resolveLease(lease)
+    XCTAssertEqual(resolved.artifactID, metadata.artifactID)
+    XCTAssertEqual(resolved.sha256, metadata.sha256)
+    XCTAssertEqual(try Data(contentsOf: resolved.fileURL), Data("hap-bytes".utf8))
   }
 
   func testExportRefusesOverwriteAndSanitizesName() async throws {
@@ -187,7 +281,8 @@ final class RuntimeArtifactContractTests: XCTestCase {
     let store = try makeStore(quota: ArtifactQuota(totalBytes: 64))
     let first = try await store.publish(request(contents: String(repeating: "a", count: 40)))
     do {
-      _ = try await store.publish(request(contents: String(repeating: "b", count: 40)))
+      _ = try await store.publish(
+        request(name: "binding-snapshot.json", contents: String(repeating: "b", count: 40)))
       XCTFail("exceeding the quota must be refused")
     } catch let error as RuntimeArtifactError {
       guard case .quotaExceeded = error else { return XCTFail("unexpected \(error)") }
@@ -202,16 +297,33 @@ final class RuntimeArtifactContractTests: XCTestCase {
   func testGarbageCollectionSparesActiveAndPinnedArtifacts() async throws {
     let store = try makeStore()
     _ = try await store.publish(request(jobID: "job-active"))
+    let expired = try await store.publish(request(jobID: "job-expired"))
     let pinned = try await store.publish(
       request(jobID: "job-old", name: "backup-receipt.json", retentionClass: .pinnedUntilVerified))
     XCTAssertTrue(pinned.retention.pinned)
     let removed = try await store.collectGarbage(
       activeJobIDs: ["job-active"], nowUTC: "2027-01-01T00:00:00Z")
-    XCTAssertTrue(removed.isEmpty, "nothing has a lapsed deadline yet: \(removed)")
+    XCTAssertEqual(removed, [expired.artifactID])
     let activeList = try await store.list(jobID: "job-active")
     let oldList = try await store.list(jobID: "job-old")
+    let expiredList = try await store.list(jobID: "job-expired")
     XCTAssertEqual(activeList.count, 1)
     XCTAssertEqual(oldList.count, 1)
+    XCTAssertTrue(expiredList.isEmpty)
+  }
+
+  func testGarbageCollectionComparesParsedUTCInsteadOfTimestampText() async throws {
+    let store = try RuntimeArtifactStore(
+      rootURL: root,
+      retentionPolicy: ArtifactRetentionPolicy(
+        defaultLifetimeSeconds: 1, shortLivedLifetimeSeconds: 1),
+      nowUTC: { "2026-07-29T00:00:00Z" })
+    let artifact = try await store.publish(request(jobID: "job-fractional-gc"))
+
+    let removed = try await store.collectGarbage(
+      activeJobIDs: [], nowUTC: "2026-07-29T00:00:01.500Z")
+
+    XCTAssertEqual(removed, [artifact.artifactID])
   }
 
   // MARK: - Cleanup debt
@@ -239,6 +351,33 @@ final class RuntimeArtifactContractTests: XCTestCase {
     let reopened = try makeStore()
     let reopenedList = try await reopened.list(jobID: "job-1")
     XCTAssertEqual(reopenedList, [published])
+  }
+
+  func testLegacyShortArtifactIDRemainsReadableAndIdempotent() async throws {
+    let store = try makeStore()
+    let published = try await store.publish(request())
+    let jobDirectory = root.appendingPathComponent("job-1", isDirectory: true)
+    let legacyID = "ART-\(published.sha256.prefix(16))"
+    try FileManager.default.moveItem(
+      at: jobDirectory.appendingPathComponent(published.artifactID),
+      to: jobDirectory.appendingPathComponent(legacyID))
+    let indexURL = jobDirectory.appendingPathComponent("index.json")
+    var index = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: Data(contentsOf: indexURL))
+        as? [String: Any])
+    var artifacts = try XCTUnwrap(index["artifacts"] as? [[String: Any]])
+    artifacts[0]["artifactID"] = legacyID
+    index["artifacts"] = artifacts
+    try JSONSerialization.data(withJSONObject: index, options: [.sortedKeys])
+      .write(to: indexURL)
+
+    let reopened = try makeStore()
+    let listed = try await reopened.list(jobID: "job-1")
+    XCTAssertEqual(listed.map(\.artifactID), [legacyID])
+    let bytes = try await reopened.read(jobID: "job-1", artifactID: legacyID)
+    XCTAssertFalse(bytes.isEmpty)
+    let idempotent = try await reopened.publish(request())
+    XCTAssertEqual(idempotent.artifactID, legacyID)
   }
 
   func testEvidenceProjectionRehashesControlledArtifactBytes() async throws {

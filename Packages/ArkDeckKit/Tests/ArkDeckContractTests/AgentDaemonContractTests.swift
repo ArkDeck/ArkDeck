@@ -142,6 +142,24 @@ final class AgentDaemonContractTests: XCTestCase {
       return XCTFail("operation.list must return an array")
     }
     XCTAssertEqual(values.count, RuntimeOperationCatalog.operations.count)
+    let rows = values.compactMap { value -> [String: JSONValue]? in
+      guard case .object(let row) = value else { return nil }
+      return row
+    }
+    XCTAssertEqual(rows.count, values.count, "every operation must carry runtime availability")
+    let observe = rows.first { $0["reference"] == .string("observe.device@1") }
+    XCTAssertEqual(observe?["availability"], .string("available"))
+    XCTAssertEqual(observe?["reasons"], .array([]))
+    let flash = rows.first { $0["reference"] == .string("flash.dayu200@1") }
+    XCTAssertEqual(flash?["availability"], .string("unavailable"))
+    guard case .array(let flashReasons)? = flash?["reasons"] else {
+      return XCTFail("unavailable operation must explain why")
+    }
+    XCTAssertTrue(
+      flashReasons.contains { value in
+        guard case .string(let reason) = value else { return false }
+        return reason.contains("rockchip") && reason.contains("not registered")
+      })
     let describe = await handler.handleFrame(
       Data(
         """
@@ -153,6 +171,11 @@ final class AgentDaemonContractTests: XCTestCase {
     }
     XCTAssertEqual(fields["minimumEffect"], .string("destructive"))
     XCTAssertEqual(fields["provider"], .string("rockchip"))
+    XCTAssertEqual(fields["availability"], .string("unavailable"))
+    guard case .array(let reasons)? = fields["availabilityReasons"] else {
+      return XCTFail("describe must include availability reasons")
+    }
+    XCTAssertFalse(reasons.isEmpty)
   }
 
   /// MU-3 (CHG-2026-048) implemented adoption; this composition still
@@ -378,13 +401,14 @@ final class AgentDaemonContractTests: XCTestCase {
     XCTAssertEqual(recoveredState, "succeeded")
   }
 
-  /// The artifact surface is ID-only by construction: there is no path
-  /// parameter anywhere in the protocol, and a store-less composition
+  /// Artifact identity is ID-only by construction. Export accepts only a
+  /// destination directory; no caller path can substitute the stored source.
+  /// A store-less composition
   /// refuses rather than answering with an empty list (which would read as
   /// "this job produced nothing").
   func testArtifactMethodsAreIDOnlyAndFailClosedWithoutAStore() async throws {
     let (handler, _) = try makeStack()
-    for method in ["artifact.list", "artifact.inspect", "artifact.read"] {
+    for method in ["artifact.list", "artifact.inspect", "artifact.read", "artifact.export"] {
       let response = await handler.handleFrame(
         Data(
           """

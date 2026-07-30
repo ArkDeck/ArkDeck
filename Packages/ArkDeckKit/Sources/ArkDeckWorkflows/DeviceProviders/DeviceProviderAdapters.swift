@@ -37,10 +37,36 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
     try await factsPort.currentFacts(targetID: targetID)
   }
 
+  public func runtimeAvailability(
+    for operation: CatalogOperationDescriptor
+  ) -> ProviderOperationAvailability {
+    switch operation.reference {
+    case "observe.device@1", "capture.diagnostics@1", "debug.hap@1":
+      return .available
+    default:
+      return .unavailable(
+        reason: "HDC provider has no complete production typed plan for "
+          + operation.reference)
+    }
+  }
+
   public func action(
     for step: CatalogStepDescriptor,
     operation: CatalogOperationDescriptor,
     inputs: [String: JSONValue]
+  ) throws -> TypedProviderAction {
+    try action(
+      for: step, operation: operation, inputs: inputs,
+      context: ProviderExecutionContext(
+        jobID: "preflight", stepID: step.stepID, targetID: "preflight",
+        bindingRevision: nil, nowUTC: "1970-01-01T00:00:00Z"))
+  }
+
+  public func action(
+    for step: CatalogStepDescriptor,
+    operation: CatalogOperationDescriptor,
+    inputs: [String: JSONValue],
+    context: ProviderExecutionContext
   ) throws -> TypedProviderAction {
     switch step.kind {
     case .probeHostTool:
@@ -50,35 +76,49 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
     case .probeDevice:
       return .hdc(.observeDevice(connectKey: "resolved-by-binding"))
     case .sendFile, .installPackage, .startApplication, .stopApplication, .uninstallPackage:
-      return try debugHAPAction(for: step, inputs: inputs)
+      return try debugHAPAction(for: step, inputs: inputs, context: context)
     case .runApprovedRemoteRead:
+      if descriptorIsDebugHAP(operation), step.actionReference?.actionID == "packageInfo" {
+        return try debugHAPAction(for: step, inputs: inputs, context: context)
+      }
       return try approvedRemoteReadAction(for: step, inputs: inputs)
     case .verifyRemoteState:
       guard descriptorIsDebugHAP(operation) else {
         throw DeviceProviderError.unsupportedStepKind(
           "\(step.kind.rawValue) has no registered action for \(operation.reference)")
       }
-      return try debugHAPAction(for: step, inputs: inputs)
+      return try debugHAPAction(for: step, inputs: inputs, context: context)
     case .preflightDeviceStorage:
-      // Device-side preflight for capture: an allowlisted read, not a
-      // generic shell probe.
-      return .hdc(.queryProperty(.productModel))
+      let requiredBytes: Int
+      if case .integer(let requested)? = inputs["totalArtifactByteBudget"] {
+        requiredBytes = Int(requested)
+      } else {
+        requiredBytes = 128 * 1024 * 1024
+      }
+      return .hdc(
+        .observeStorage(
+          try HDCStoragePreflightRequest(requiredBytes: requiredBytes)))
     case .captureRemoteStdout:
       return try captureAction(for: step, inputs: inputs)
     case .captureRemoteFile:
       return .hdc(
         .captureTrace(
           try traceRequest(from: inputs),
-          into: mintOwnedRemotePath(jobID: "job", stepID: step.stepID)))
+          into: try mintStableOwnedRemotePath(
+            jobID: context.jobID, stepID: "capture-trace")))
     case .receiveFile:
       return .hdc(
         .receiveOwnedArtifact(
           HDCOwnedRemoteArtifact(
-            path: mintOwnedRemotePath(jobID: "job", stepID: step.stepID),
+            path: try mintStableOwnedRemotePath(
+              jobID: context.jobID, stepID: "capture-trace"),
             expectedSHA256: nil, maximumBytes: 64 * 1024 * 1024)))
     case .cleanupOwnedRemotePath:
+      let ownerStepID =
+        operation.reference == "debug.hap@1" ? "send-hap" : "capture-trace"
       return .hdc(
-        .cleanupOwnedRemotePath(mintOwnedRemotePath(jobID: "job", stepID: step.stepID)))
+        .cleanupOwnedRemotePath(
+          try mintStableOwnedRemotePath(jobID: context.jobID, stepID: ownerStepID)))
     case .finalizeSession, .preflightHostStorage, .postprocessArtifact:
       throw DeviceProviderError.unsupportedStepKind(
         "\(step.kind.rawValue) is engine-internal, not a provider action")
@@ -182,7 +222,9 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
   /// Maps debug.hap@1's steps onto typed actions. The inputs are the
   /// catalog-declared ones; nothing here accepts a device path.
   private func debugHAPAction(
-    for step: CatalogStepDescriptor, inputs: [String: JSONValue]
+    for step: CatalogStepDescriptor,
+    inputs: [String: JSONValue],
+    context: ProviderExecutionContext
   ) throws -> TypedProviderAction {
     guard case .string(let bundleName)? = inputs["bundleName"] else {
       throw DeviceProviderError.unsupportedAction("bundleName input is required")
@@ -195,16 +237,22 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
       }
       return .hdc(
         .sendArtifactToStaging(
-          mintStagedArtifact(
-            jobID: "job", stepID: step.stepID, artifactLeaseID: lease, expectedSHA256: nil)))
+          HDCStagedArtifact(
+            path: try mintStableOwnedRemotePath(
+              jobID: context.jobID, stepID: "send-hap"),
+            artifactLeaseID: lease,
+            expectedSHA256: context.resolvedInputArtifact?.sha256)))
     case .installPackage:
       guard case .string(let lease)? = inputs["hapArtifactLease"] else {
         throw DeviceProviderError.unsupportedAction("hapArtifactLease input is required")
       }
       return .hdc(
         .installPackage(
-          mintStagedArtifact(
-            jobID: "job", stepID: step.stepID, artifactLeaseID: lease, expectedSHA256: nil),
+          HDCStagedArtifact(
+            path: try mintStableOwnedRemotePath(
+              jobID: context.jobID, stepID: "send-hap"),
+            artifactLeaseID: lease,
+            expectedSHA256: context.resolvedInputArtifact?.sha256),
           bundle: bundle))
     case .runApprovedRemoteRead:
       return .hdc(.queryPackageReadback(bundle))
@@ -255,129 +303,219 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
           executableSHA256: "resolved-at-dispatch",
           argumentSummary: ["list", "targets", "-v"], timeoutSeconds: 15))
     case .queryProperty(let property):
-      guard let connectKey = context.connectKey, !connectKey.isEmpty else {
-        throw DeviceProviderError.factsUnavailable(
-          "\(context.stepID) has no descriptor-bound target connect key")
-      }
       return TypedProcessPlan(
         action: action,
         kind: .process(
           executableSHA256: "resolved-at-dispatch",
-          argumentSummary: [
-            "-t", connectKey, "shell", "param", "get", property.rawValue,
-          ], timeoutSeconds: 15))
+          argumentSummary: try deviceArguments(
+            ["shell", "param", "get", property.rawValue], context: context),
+          timeoutSeconds: 15))
+    case .observeStorage:
+      return TypedProcessPlan(
+        action: action,
+        kind: .process(
+          executableSHA256: "resolved-at-dispatch",
+          argumentSummary: try deviceArguments(
+            ["shell", "df", "-k", HDCStoragePreflightRequest.remotePath],
+            context: context),
+          timeoutSeconds: 30))
     case .captureHilog(let request):
       return TypedProcessPlan(
         action: action,
         kind: .process(
           executableSHA256: "resolved-at-dispatch",
-          argumentSummary: ["shell", "hilog", "-x"] + request.filters,
+          argumentSummary: try deviceArguments(
+            ["shell", "hilog", "-x"] + request.filters, context: context),
           timeoutSeconds: request.durationSeconds + 15))
     case .captureUIDump(let request):
       return TypedProcessPlan(
         action: action,
         kind: .process(
           executableSHA256: "resolved-at-dispatch",
-          argumentSummary: ["shell", "hidumper", "-s", request.scope.rawValue],
+          argumentSummary: try deviceArguments(
+            ["shell", "hidumper", "-s", request.scope.rawValue], context: context),
           timeoutSeconds: 30))
     case .captureTrace(let request, let path):
       return TypedProcessPlan(
         action: action,
         kind: .process(
           executableSHA256: "resolved-at-dispatch",
-          argumentSummary: ["shell", "hitrace", "-t", String(request.durationSeconds), "-b",
-            String(request.bufferKB)] + request.categories + ["-o", path.remotePath],
+          argumentSummary: try deviceArguments(
+            ["shell", "hitrace", "-t", String(request.durationSeconds), "-b",
+              String(request.bufferKB)] + request.categories + ["-o", path.remotePath],
+            context: context),
           timeoutSeconds: request.durationSeconds + 30))
     case .receiveOwnedArtifact(let artifact):
       return TypedProcessPlan(
         action: action,
         kind: .process(
           executableSHA256: "resolved-at-dispatch",
-          argumentSummary: ["file", "recv", artifact.path.remotePath], timeoutSeconds: 60))
+          argumentSummary: try deviceArguments(
+            ["file", "recv", artifact.path.remotePath], context: context),
+          timeoutSeconds: 60))
     case .cleanupOwnedRemotePath(let path):
       return TypedProcessPlan(
         action: action,
         kind: .process(
           executableSHA256: "resolved-at-dispatch",
-          argumentSummary: ["shell", "rm", "-f", path.remotePath], timeoutSeconds: 15))
+          argumentSummary: try deviceArguments(
+            ["shell", "rm", "-f", path.remotePath], context: context),
+          timeoutSeconds: 15))
     case .sendArtifactToStaging(let staged):
+      guard let resolved = context.resolvedInputArtifact,
+        staged.artifactLeaseID.hasSuffix(":\(resolved.artifactID)"),
+        staged.expectedSHA256 == resolved.sha256
+      else {
+        throw DeviceProviderError.unsupportedAction(
+          "sendFile requires an engine-resolved Artifact lease")
+      }
       return TypedProcessPlan(
         action: action,
         kind: .process(
           executableSHA256: "resolved-at-dispatch",
-          argumentSummary: ["file", "send", "<artifact-lease>", staged.path.remotePath],
+          argumentSummary: try deviceArguments(
+            ["file", "send", resolved.fileURL.path, staged.path.remotePath],
+            context: context),
           timeoutSeconds: 300))
     case .installPackage(let staged, _):
       return TypedProcessPlan(
         action: action,
         kind: .process(
           executableSHA256: "resolved-at-dispatch",
-          argumentSummary: ["install", staged.path.remotePath], timeoutSeconds: 300))
+          argumentSummary: try deviceArguments(
+            ["install", "-r", staged.path.remotePath], context: context),
+          timeoutSeconds: 300))
     case .queryPackageReadback(let bundle):
       return TypedProcessPlan(
         action: action,
         kind: .process(
           executableSHA256: "resolved-at-dispatch",
-          argumentSummary: ["shell", "bm", "dump", "-n", bundle.bundleName],
+          argumentSummary: try deviceArguments(
+            ["shell", "bm", "dump", "-n", bundle.bundleName], context: context),
           timeoutSeconds: 30))
     case .startAbility(let ability):
       return TypedProcessPlan(
         action: action,
         kind: .process(
           executableSHA256: "resolved-at-dispatch",
-          argumentSummary: [
-            "shell", "aa", "start", "-b", ability.bundle.bundleName, "-a", ability.abilityName,
-          ], timeoutSeconds: 60))
+          argumentSummary: try deviceArguments(
+            [
+              "shell", "aa", "start", "-b", ability.bundle.bundleName, "-a",
+              ability.abilityName,
+            ],
+            context: context),
+          timeoutSeconds: 60))
     case .verifyProcessState(let bundle):
       return TypedProcessPlan(
         action: action,
         kind: .process(
           executableSHA256: "resolved-at-dispatch",
-          argumentSummary: ["shell", "pidof", bundle.bundleName], timeoutSeconds: 30))
+          argumentSummary: try deviceArguments(
+            ["shell", "pidof", bundle.bundleName], context: context),
+          timeoutSeconds: 30))
     case .stopAbility(let ability):
       return TypedProcessPlan(
         action: action,
         kind: .process(
           executableSHA256: "resolved-at-dispatch",
-          argumentSummary: ["shell", "aa", "force-stop", ability.bundle.bundleName],
+          argumentSummary: try deviceArguments(
+            ["shell", "aa", "force-stop", ability.bundle.bundleName],
+            context: context),
           timeoutSeconds: 60))
     case .uninstallPackage(let bundle):
       return TypedProcessPlan(
         action: action,
         kind: .process(
           executableSHA256: "resolved-at-dispatch",
-          argumentSummary: ["uninstall", bundle.bundleName], timeoutSeconds: 120))
+          argumentSummary: try deviceArguments(
+            ["uninstall", bundle.bundleName], context: context),
+          timeoutSeconds: 120))
     case .createPortForward(let spec):
       return TypedProcessPlan(
         action: action,
         kind: .process(
           executableSHA256: "resolved-at-dispatch",
-          argumentSummary: ["fport", "tcp:\(spec.localPort)", "tcp:\(spec.remotePort)"],
+          argumentSummary: try deviceArguments(
+            ["fport", "tcp:\(spec.localPort)", "tcp:\(spec.remotePort)"],
+            context: context),
           timeoutSeconds: 30))
     case .removePortForward(let spec):
       return TypedProcessPlan(
         action: action,
         kind: .process(
           executableSHA256: "resolved-at-dispatch",
-          argumentSummary: ["fport", "rm", "tcp:\(spec.localPort)"], timeoutSeconds: 30))
+          argumentSummary: try deviceArguments(
+            ["fport", "rm", "tcp:\(spec.localPort)"], context: context),
+          timeoutSeconds: 30))
+    case .readPackagePresence(let bundle):
+      return TypedProcessPlan(
+        action: action,
+        kind: .process(
+          executableSHA256: "resolved-at-dispatch",
+          argumentSummary: try deviceArguments(
+            ["shell", "bm", "dump", "-n", bundle.bundleName], context: context),
+          timeoutSeconds: 30))
+    case .readProcessPresence(let bundle):
+      return TypedProcessPlan(
+        action: action,
+        kind: .process(
+          executableSHA256: "resolved-at-dispatch",
+          argumentSummary: try deviceArguments(
+            ["shell", "pidof", bundle.bundleName], context: context),
+          timeoutSeconds: 30))
+    case .readOwnedPathPresence(let path):
+      return TypedProcessPlan(
+        action: action,
+        kind: .process(
+          executableSHA256: "resolved-at-dispatch",
+          argumentSummary: try deviceArguments(
+            ["shell", "test", "-e", path.remotePath], context: context),
+          timeoutSeconds: 15))
+    case .readPortForwardPresence:
+      return TypedProcessPlan(
+        action: action,
+        kind: .process(
+          executableSHA256: "resolved-at-dispatch",
+          argumentSummary: try deviceArguments(["fport", "ls"], context: context),
+          timeoutSeconds: 30))
     }
+  }
+
+  private func deviceArguments(
+    _ arguments: [String],
+    context: ProviderExecutionContext
+  ) throws -> [String] {
+    guard let connectKey = context.connectKey, !connectKey.isEmpty else {
+      throw DeviceProviderError.factsUnavailable(
+        "\(context.stepID) has no descriptor-bound target connect key")
+    }
+    return ["-t", connectKey] + arguments
   }
 
   /// Mints a provider-owned staging path for an artifact lease. As with
   /// remote temp paths, the caller never supplies a device location.
   public func mintStagedArtifact(
     jobID: String, stepID: String, artifactLeaseID: String, expectedSHA256: String?
-  ) -> HDCStagedArtifact {
+  ) throws -> HDCStagedArtifact {
     HDCStagedArtifact(
-      path: mintOwnedRemotePath(jobID: jobID, stepID: stepID),
+      path: try mintOwnedRemotePath(jobID: jobID, stepID: stepID),
       artifactLeaseID: artifactLeaseID, expectedSHA256: expectedSHA256)
   }
 
   /// Mints a provider-owned remote temp path bound to job/step. The only
   /// construction point outside tests; callers cannot supply device paths.
-  public func mintOwnedRemotePath(jobID: String, stepID: String) -> HDCOwnedRemotePath {
-    HDCOwnedRemotePath(
+  public func mintOwnedRemotePath(jobID: String, stepID: String) throws -> HDCOwnedRemotePath {
+    try HDCOwnedRemotePath(
       jobID: jobID, stepID: stepID, nonce: UUID().uuidString.prefix(8).lowercased())
+  }
+
+  /// Reconstructible path for a durable job recipe. All paired actions
+  /// (capture/receive/cleanup or send/install/cleanup) derive the same
+  /// provider-owned path without persisting or accepting a raw path.
+  private func mintStableOwnedRemotePath(
+    jobID: String, stepID: String
+  ) throws -> HDCOwnedRemotePath {
+    try HDCOwnedRemotePath(jobID: jobID, stepID: stepID, nonce: "owned")
   }
 
   public func verify(
@@ -520,6 +658,33 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
         return .unknown(reason: "property value empty or oversized")
       }
       return .verified(summary: ["value": value])
+    case .observeStorage(let request):
+      guard !receipt.stdoutTruncated else {
+        return .failed(code: "truncated", detail: "storage output exceeded budget")
+      }
+      guard let text = String(data: receipt.stdout, encoding: .utf8) else {
+        return .failed(code: "invalidEncoding", detail: "storage output is not UTF-8")
+      }
+      let availableKilobytes = text.split(whereSeparator: \.isNewline)
+        .dropFirst()
+        .compactMap { line -> UInt64? in
+          let fields = line.split(whereSeparator: \.isWhitespace)
+          guard fields.count >= 4 else { return nil }
+          return UInt64(fields[3])
+        }
+        .last
+      guard let availableKilobytes,
+        availableKilobytes <= UInt64.max / 1024
+      else {
+        return .unknown(reason: "storage output has no bounded available-byte observation")
+      }
+      let availableBytes = availableKilobytes * 1024
+      guard availableBytes >= UInt64(request.requiredBytes) else {
+        return .failed(
+          code: "insufficientDeviceStorage",
+          detail: "requires \(request.requiredBytes) bytes; \(availableBytes) available")
+      }
+      return .verified(summary: ["availableBytes": String(availableBytes)])
     case .captureHilog, .captureUIDump:
       guard !receipt.stdoutTruncated else {
         return .failed(code: "truncated", detail: "capture exceeded its byte budget")
@@ -567,8 +732,11 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
       // readback, and hardware has shown `hdc install` exiting zero
       // without installing. The orchestration requires the paired
       // queryPackageReadback step to decide.
-      guard receipt.exitStatus != nil else {
+      guard let exitStatus = receipt.exitStatus else {
         return .unknown(reason: "install produced no process result")
+      }
+      guard exitStatus == 0 else {
+        return .failed(code: "installFailed", detail: "install process reported failure")
       }
       return .unknown(reason: "install requires package readback before it can be believed")
 
@@ -579,7 +747,11 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
       guard let text = String(data: receipt.stdout, encoding: .utf8) else {
         return .failed(code: "invalidEncoding", detail: "package readback is not UTF-8")
       }
-      let installed = text.contains(bundle.bundleName)
+      let escaped = NSRegularExpression.escapedPattern(for: bundle.bundleName)
+      let installed =
+        text.range(
+          of: "(^|[^A-Za-z0-9_.])\(escaped)([^A-Za-z0-9_.]|$)",
+          options: .regularExpression) != nil
       guard installed else {
         return .failed(
           code: "packageNotInstalled",
@@ -588,8 +760,11 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
       return .verified(summary: ["bundleName": bundle.bundleName, "installed": "true"])
 
     case .startAbility:
-      guard receipt.exitStatus != nil else {
+      guard let exitStatus = receipt.exitStatus else {
         return .unknown(reason: "start produced no process result")
+      }
+      guard exitStatus == 0 else {
+        return .failed(code: "startFailed", detail: "start process reported failure")
       }
       return .unknown(reason: "start requires process readback before it can be believed")
 
@@ -597,8 +772,13 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
       guard let text = String(data: receipt.stdout, encoding: .utf8) else {
         return .failed(code: "invalidEncoding", detail: "process readback is not UTF-8")
       }
-      let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-      guard !trimmed.isEmpty, trimmed.rangeOfCharacter(from: .decimalDigits) != nil else {
+      let processIDs = text.split(whereSeparator: \.isWhitespace)
+      guard !processIDs.isEmpty,
+        processIDs.allSatisfy({ token in
+          guard let value = UInt32(token) else { return false }
+          return value > 0
+        })
+      else {
         return .failed(
           code: "processNotRunning", detail: "no live process for \(bundle.bundleName)")
       }
@@ -621,7 +801,116 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
         return .failed(code: "portForwardFailed", detail: "tcp:\(spec.localPort)")
       }
       return .verified(summary: ["localPort": String(spec.localPort)])
+    case .readPackagePresence(let bundle):
+      guard receipt.exitStatus == 0, !receipt.stdoutTruncated,
+        let text = String(data: receipt.stdout, encoding: .utf8)
+      else {
+        return .unknown(reason: "package presence readback is not trustworthy")
+      }
+      let escaped = NSRegularExpression.escapedPattern(for: bundle.bundleName)
+      let present =
+        text.range(
+          of: "(^|[^A-Za-z0-9_.])\(escaped)([^A-Za-z0-9_.]|$)",
+          options: .regularExpression) != nil
+      return .verified(summary: ["present": present ? "true" : "false"])
+    case .readProcessPresence:
+      guard !receipt.stdoutTruncated,
+        let text = String(data: receipt.stdout, encoding: .utf8)
+      else {
+        return .unknown(reason: "process presence readback is not trustworthy")
+      }
+      let tokens = text.split(whereSeparator: \.isWhitespace)
+      if receipt.exitStatus == 1, tokens.isEmpty {
+        return .verified(summary: ["present": "false"])
+      }
+      guard receipt.exitStatus == 0, !tokens.isEmpty,
+        tokens.allSatisfy({ token in
+          guard let value = UInt32(token) else { return false }
+          return value > 0
+        })
+      else {
+        return .unknown(reason: "process presence readback is ambiguous")
+      }
+      return .verified(summary: ["present": "true"])
+    case .readOwnedPathPresence:
+      guard !receipt.stdoutTruncated else {
+        return .unknown(reason: "owned-path presence readback was truncated")
+      }
+      switch receipt.exitStatus {
+      case 0:
+        return .verified(summary: ["present": "true"])
+      case 1:
+        return .verified(summary: ["present": "false"])
+      default:
+        return .unknown(reason: "owned-path presence readback has no definite result")
+      }
+    case .readPortForwardPresence(let spec):
+      guard receipt.exitStatus == 0, !receipt.stdoutTruncated,
+        let text = String(data: receipt.stdout, encoding: .utf8)
+      else {
+        return .unknown(reason: "port-forward presence readback is not trustworthy")
+      }
+      let expected = ["tcp:\(spec.localPort)", "tcp:\(spec.remotePort)"]
+      let present = text.split(whereSeparator: \.isNewline).contains { line in
+        let fields = line.split(whereSeparator: \.isWhitespace).map(String.init)
+        return expected.allSatisfy(fields.contains)
+      }
+      return .verified(summary: ["present": present ? "true" : "false"])
     }
+  }
+
+  public func reconciliationReadback(
+    intent: ProviderDurableIntentReference,
+    context: ProviderExecutionContext
+  ) throws -> TypedProcessPlan? {
+    let readback: TypedProviderAction
+    switch intent.action {
+    case .hdc(.captureTrace(_, let path)), .hdc(.cleanupOwnedRemotePath(let path)):
+      readback = .hdc(.readOwnedPathPresence(path))
+    case .hdc(.sendArtifactToStaging(let staged)):
+      readback = .hdc(.readOwnedPathPresence(staged.path))
+    case .hdc(.installPackage(_, let bundle)), .hdc(.uninstallPackage(let bundle)):
+      readback = .hdc(.readPackagePresence(bundle))
+    case .hdc(.startAbility(let ability)), .hdc(.stopAbility(let ability)):
+      readback = .hdc(.readProcessPresence(ability.bundle))
+    case .hdc(.createPortForward(let spec)), .hdc(.removePortForward(let spec)):
+      readback = .hdc(.readPortForwardPresence(spec))
+    default:
+      return nil
+    }
+    return try lower(action: readback, context: context)
+  }
+
+  public func verifyReconciliationReadback(
+    receipt: ProviderProcessReceipt,
+    intent: ProviderDurableIntentReference,
+    context: ProviderExecutionContext
+  ) throws -> ProviderReconcileOutcome {
+    guard let plan = try reconciliationReadback(intent: intent, context: context) else {
+      return .stillUnknown(reason: "original action has no dedicated readback")
+    }
+    let semantic = try verify(
+      receipt: receipt, action: plan.action, context: context)
+    guard case .verified(let summary) = semantic,
+      let raw = summary["present"],
+      let present = Bool(raw)
+    else {
+      return .stillUnknown(reason: "dedicated readback did not produce a definite presence")
+    }
+    let desiredPresence: Bool
+    switch intent.action {
+    case .hdc(.captureTrace), .hdc(.sendArtifactToStaging), .hdc(.installPackage),
+      .hdc(.startAbility), .hdc(.createPortForward):
+      desiredPresence = true
+    case .hdc(.cleanupOwnedRemotePath), .hdc(.stopAbility), .hdc(.uninstallPackage),
+      .hdc(.removePortForward):
+      desiredPresence = false
+    default:
+      return .stillUnknown(reason: "readback was not paired with a mutation")
+    }
+    return present == desiredPresence
+      ? .confirmedCompleted(summary: ["postconditionPresent": String(present)])
+      : .confirmedNotExecuted
   }
 
   public func reconcile(
@@ -634,7 +923,7 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
     // stillUnknown unless positive evidence exists.
     switch intent.action {
     case .hdc(.observeTool), .hdc(.observeServer), .hdc(.listDeviceCandidates),
-      .hdc(.observeDevice), .hdc(.queryProperty), .hdc(.captureHilog),
+      .hdc(.observeDevice), .hdc(.queryProperty), .hdc(.observeStorage), .hdc(.captureHilog),
       .hdc(.captureUIDump), .hdc(.receiveOwnedArtifact):
       // Read-only families: re-observation is always safe.
       return .confirmedNotExecuted
@@ -674,6 +963,13 @@ public struct RockchipFlashProviderAdapter: DeviceProvider {
 
   public init(executionPort: any RockchipFlashExecutionPort) {
     self.executionPort = executionPort
+  }
+
+  public func runtimeAvailability(
+    for operation: CatalogOperationDescriptor
+  ) -> ProviderOperationAvailability {
+    .unavailable(
+      reason: "Rockchip migration is not production available in this recovery phase")
   }
 
   public func resolveFacts(targetID: String) async throws -> ProviderFacts {

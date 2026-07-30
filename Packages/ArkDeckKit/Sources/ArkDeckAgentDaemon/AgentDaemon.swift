@@ -130,8 +130,17 @@ public struct RuntimeControlPlaneHandler: Sendable {
         ]))
 
     case "operation.list":
-      let references = RuntimeOperationCatalog.operations.map(\.reference).sorted()
-      return success(id: request.id, result: .array(references.map(JSONValue.string)))
+      let availability = await engine.operationAvailability()
+      return success(
+        id: request.id,
+        result: .array(
+          availability.map { item in
+            .object([
+              "reference": .string(item.reference),
+              "availability": .string(item.state.rawValue),
+              "reasons": .array(item.reasons.map(JSONValue.string)),
+            ])
+          }))
 
     case "operation.describe":
       guard case .string(let reference)? = request.params?["reference"],
@@ -139,6 +148,8 @@ public struct RuntimeControlPlaneHandler: Sendable {
       else {
         return failure(id: request.id, code: .notFound, message: "unknown operation reference")
       }
+      let availability = await engine.operationAvailability()
+        .first { $0.reference == descriptor.reference }
       return success(
         id: request.id,
         result: .object([
@@ -149,6 +160,10 @@ public struct RuntimeControlPlaneHandler: Sendable {
           "binding": .string(descriptor.binding.rawValue),
           "timeoutSeconds": .integer(Int64(descriptor.timeoutSeconds)),
           "stepCount": .integer(Int64(descriptor.steps.count)),
+          "availability": .string(availability?.state.rawValue ?? "unavailable"),
+          "availabilityReasons": .array(
+            (availability?.reasons ?? ["runtime availability could not be resolved"])
+              .map(JSONValue.string)),
         ]))
 
     case "capability.list":
@@ -290,6 +305,41 @@ public struct RuntimeControlPlaneHandler: Sendable {
         return failure(id: request.id, code: .notFound, message: "unknown job \(jobID)")
       }
 
+    case "cleanupDebt.list":
+      do {
+        let debts = try await engine.listCleanupDebt()
+        return success(
+          id: request.id,
+          result: .array(debts.map(Self.encodeCleanupDebt)))
+      } catch {
+        return failure(id: request.id, code: .internalError, message: "\(error)")
+      }
+
+    case "cleanupDebt.continue":
+      guard case .string(let jobID)? = request.params?["jobId"],
+        case .string(let remotePath)? = request.params?["remotePath"]
+      else {
+        return failure(
+          id: request.id, code: .invalidParams,
+          message: "jobId and remotePath are required")
+      }
+      do {
+        let result = try await engine.continueCleanupDebt(
+          jobID: jobID, remotePath: remotePath)
+        return success(
+          id: request.id,
+          result: .object([
+            "jobId": .string(result.jobID),
+            "remotePath": .string(result.remotePath),
+            "state": .string(result.state.rawValue),
+            "detail": .string(result.detail),
+          ]))
+      } catch let error as RuntimeJobEngineError {
+        return failure(id: request.id, code: .rejected, message: "\(error)")
+      } catch {
+        return failure(id: request.id, code: .internalError, message: "\(error)")
+      }
+
     case "doctor":
       var report: [String: JSONValue] = [
         "protocolVersion": .string(AgentWireProtocol.version),
@@ -373,6 +423,43 @@ public struct RuntimeControlPlaneHandler: Sendable {
             message: "artifact is sensitive; pass allowSensitive to read it")
         }
         return failure(id: request.id, code: .notFound, message: "\(error)")
+      } catch {
+        return failure(id: request.id, code: .internalError, message: "\(error)")
+      }
+
+    case "artifact.export":
+      guard let artifactStore else {
+        return failure(
+          id: request.id, code: .internalError, message: "artifact store is not configured")
+      }
+      guard case .string(let jobID)? = request.params?["jobId"],
+        case .string(let artifactID)? = request.params?["artifactId"],
+        case .string(let destination)? = request.params?["destinationDirectory"]
+      else {
+        return failure(
+          id: request.id, code: .invalidParams,
+          message: "jobId, artifactId and destinationDirectory are required")
+      }
+      var allowSensitive = false
+      if case .bool(let flag)? = request.params?["allowSensitive"] { allowSensitive = flag }
+      do {
+        let exported = try await artifactStore.export(
+          jobID: jobID, artifactID: artifactID,
+          destinationDirectory: URL(fileURLWithPath: destination, isDirectory: true),
+          allowSensitive: allowSensitive)
+        return success(
+          id: request.id,
+          result: .object([
+            "artifactId": .string(artifactID),
+            "exportedPath": .string(exported.path),
+          ]))
+      } catch let error as RuntimeArtifactError {
+        if case .sensitiveAccessRequiresOptIn = error {
+          return failure(
+            id: request.id, code: .rejected,
+            message: "artifact is sensitive; pass allowSensitive to export it")
+        }
+        return failure(id: request.id, code: .rejected, message: "\(error)")
       } catch {
         return failure(id: request.id, code: .internalError, message: "\(error)")
       }
@@ -468,6 +555,18 @@ public struct RuntimeControlPlaneHandler: Sendable {
       "sourceOperation": .string(metadata.sourceOperation),
       "createdAtUtc": .string(metadata.createdAtUTC),
       "redactionApplied": .bool(metadata.redactionApplied),
+    ])
+  }
+
+  private static func encodeCleanupDebt(_ debt: CleanupDebtRecord) -> JSONValue {
+    .object([
+      "jobId": .string(debt.jobID),
+      "stepId": .string(debt.stepID),
+      "remotePath": .string(debt.remotePath),
+      "reason": .string(debt.reason),
+      "recordedAtUtc": .string(debt.recordedAtUTC),
+      "retryOutcomeUnknown": .bool(
+        debt.retryOutcomeUnknown == true || debt.retryAttemptStartedAtUTC != nil),
     ])
   }
 

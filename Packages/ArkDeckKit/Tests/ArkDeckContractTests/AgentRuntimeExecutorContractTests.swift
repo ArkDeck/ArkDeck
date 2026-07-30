@@ -13,6 +13,7 @@ import XCTest
 final class AgentRuntimeExecutorContractTests: XCTestCase {
   private var stateDirectory: URL!
   private var server: AgentDaemonServer?
+  private var artifactStore: RuntimeArtifactStore?
 
   override func setUpWithError() throws {
     stateDirectory = URL(fileURLWithPath: NSHomeDirectory())
@@ -23,6 +24,7 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
   override func tearDownWithError() throws {
     server?.stop()
     server = nil
+    artifactStore = nil
     if let stateDirectory { try? FileManager.default.removeItem(at: stateDirectory) }
   }
 
@@ -58,7 +60,10 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
       case .observeServer:
         return receipt("Client version:Ver: 3.2.0f, server version:Ver: 3.2.0f\n")
       case .observeDevice, .listDeviceCandidates:
-        return receipt("150100424a544e4600\t\tUSB\tConnected\tlocalhost\n")
+        return receipt(
+          "150100424a544e4600\t\tUSB\tConnected\tlocalhost\n"
+            + "AAA\t\tUSB\tConnected\tlocalhost\n"
+            + "BBB\t\tUSB\tConnected\tlocalhost\n")
       case .queryProperty(.productModel):
         return receipt("DAYU200\n")
       case .queryProperty(.fullBuildVersion):
@@ -91,6 +96,7 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
     let artifactStore = try RuntimeArtifactStore(
       rootURL: stateDirectory.appendingPathComponent("artifacts", isDirectory: true),
       nowUTC: { "2026-07-29T00:00:00Z" })
+    self.artifactStore = artifactStore
     let provider = HDCObservationProviderAdapter(factsPort: FactsPort(store: targetStore))
     let providers = DeviceProviderRegistry(providers: [provider])
     let engine = try RuntimeJobEngine(
@@ -181,6 +187,35 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
     }
     XCTAssertEqual(action.kind, .selectTarget)
     XCTAssertTrue(action.prompt.contains("candidates"), action.prompt)
+    XCTAssertEqual(action.selectionOptions, ["AAA", "BBB"])
+  }
+
+  func testSelectionResumeContinuesThePersistedExecutionInsteadOfRestarting() throws {
+    let client = try startDaemon(candidates: [
+      BootstrapCandidate(connectKey: "AAA", state: "Connected"),
+      BootstrapCandidate(connectKey: "BBB", state: "Connected"),
+    ])
+    let executor = self.executor(client)
+    let request = RuntimeAgentExecutionRequest(
+      operationID: "observe.device", operationVersion: 1,
+      executionID: "resume-contract-001")
+    let paused = try executor.run(request)
+    guard case .awaitingHumanAction(let action, _) = paused else {
+      return XCTFail("ambiguous adoption must pause")
+    }
+    XCTAssertEqual(action.selectionOptions, ["AAA", "BBB"])
+
+    let resumed = try executor.resume(
+      resumeToken: action.resumeToken, selection: "AAA")
+    guard case .completed(let receipt) = resumed else {
+      return XCTFail("selection must continue the persisted run: \(resumed)")
+    }
+    XCTAssertEqual(receipt.humanActions.count, 1)
+    XCTAssertNotNil(receipt.humanActions[0].resolvedAtUTC)
+    guard case .array(let jobs) = try client.request(method: "job.list") else {
+      return XCTFail("job.list must answer")
+    }
+    XCTAssertEqual(jobs.count, 1, "resume must not duplicate runtime jobs")
   }
 
   func testAgentSurfaceCannotManageCapabilitiesOrCarryCommands() throws {
@@ -240,13 +275,26 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
     XCTAssertEqual(jobs.count, 1, "one invocation submits exactly one job, never a loop")
   }
 
-  func testMissingCapabilityIsReportedAsRejectionWithAReceipt() throws {
+  func testMissingCapabilityIsReportedAsRejectionWithAReceipt() async throws {
     let client = try startDaemon()
+    let store = try XCTUnwrap(artifactStore)
+    let artifact = try await store.publish(
+      RuntimeArtifactPublicationRequest(
+        jobID: "job-agent-input", sessionID: "session-agent-input",
+        stepID: "publish-hap", name: "demo.hap",
+        mediaType: "application/octet-stream", privacy: .standard,
+        retentionClass: .pinnedUntilVerified,
+        sourceOperation: "build.hap@1", providerID: "host",
+        bindingSnapshot: ArtifactBindingSnapshot(
+          targetID: "TGT-INPUT", bindingRevision: 1, stableIdentitySHA256: nil),
+        contents: Data("signed-hap-fixture".utf8)))
+    let lease = try await store.leaseReference(
+      jobID: artifact.jobID, artifactID: artifact.artifactID)
     let outcome = try executor(client).run(
       RuntimeAgentExecutionRequest(
         operationID: "debug.hap", operationVersion: 1,
         inputs: [
-          "hapArtifactLease": .string("lease-1"),
+          "hapArtifactLease": .string(lease),
           "bundleName": .string("com.example.demo"),
           "abilityName": .string("EntryAbility"),
         ]))

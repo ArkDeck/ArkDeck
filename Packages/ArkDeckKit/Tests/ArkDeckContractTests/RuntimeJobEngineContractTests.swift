@@ -7,6 +7,7 @@ import XCTest
 
 final class RuntimeJobEngineContractTests: XCTestCase {
   private var stateDirectory: URL!
+  private var artifactStore: RuntimeArtifactStore!
 
   override func setUpWithError() throws {
     stateDirectory = FileManager.default.temporaryDirectory
@@ -87,6 +88,10 @@ final class RuntimeJobEngineContractTests: XCTestCase {
   ) throws -> (RuntimeJobEngine, RuntimeCapabilityStore) {
     let capabilityStore = try RuntimeCapabilityStore(
       directoryURL: stateDirectory.appendingPathComponent("capabilities", isDirectory: true))
+    let artifactStore = try RuntimeArtifactStore(
+      rootURL: stateDirectory.appendingPathComponent("artifacts", isDirectory: true),
+      nowUTC: { "2026-07-29T00:00:00Z" })
+    self.artifactStore = artifactStore
     let engine = try RuntimeJobEngine(
       configuration: .init(stateDirectory: stateDirectory),
       providers: DeviceProviderRegistry(providers: [
@@ -94,6 +99,7 @@ final class RuntimeJobEngineContractTests: XCTestCase {
       ]),
       dispatcher: dispatcher,
       capabilityStore: capabilityStore,
+      artifactStore: artifactStore,
       nowUTC: { "2026-07-29T00:00:00Z" })
     return (engine, capabilityStore)
   }
@@ -142,7 +148,8 @@ final class RuntimeJobEngineContractTests: XCTestCase {
     XCTAssertNotNil(evidence.startedAtUTC)
     XCTAssertNotNil(evidence.finishedAtUTC)
     // The journal itself carries the intents: replay sees a clean history.
-    let journalURL = stateDirectory
+    let journalURL =
+      stateDirectory
       .appendingPathComponent("jobs/\(acceptance.jobID)/journal.jsonl")
     let inspection = try DurableJournalRecovery.inspect(url: journalURL)
     XCTAssertTrue(inspection.outstandingIntents.isEmpty)
@@ -182,6 +189,19 @@ final class RuntimeJobEngineContractTests: XCTestCase {
   func testMutationWithoutCapabilityIsRejectedAndE1CapabilityAdmits() async throws {
     let dispatcher = ScriptedDispatcher(script: .observationHappy)
     let (engine, capabilityStore) = try makeEngine(dispatcher: dispatcher)
+    let hapArtifact = try await artifactStore.publish(
+      RuntimeArtifactPublicationRequest(
+        jobID: "job-input-hap", sessionID: "session-input-hap",
+        stepID: "publish-hap", name: "demo.hap",
+        mediaType: "application/octet-stream", privacy: .standard,
+        retentionClass: .pinnedUntilVerified,
+        sourceOperation: "build.hap@1", providerID: "host",
+        bindingSnapshot: ArtifactBindingSnapshot(
+          targetID: "TGT-DAYU200-01", bindingRevision: 1,
+          stableIdentitySHA256: nil),
+        contents: Data("signed-hap-fixture".utf8)))
+    let lease = try await artifactStore.leaseReference(
+      jobID: hapArtifact.jobID, artifactID: hapArtifact.artifactID)
     let hapRequest = Data(
       """
       {
@@ -189,10 +209,13 @@ final class RuntimeJobEngineContractTests: XCTestCase {
         "schemaVersion": "2.0.0",
         "requestId": "req-hap",
         "idempotencyKey": "idem-hap-0001",
-        "target": { "targetId": "TGT-DAYU200-01" },
+        "target": {
+          "targetId": "TGT-DAYU200-01",
+          "expectedBindingRevision": 7
+        },
         "operation": { "id": "debug.hap", "version": 1 },
         "inputs": {
-          "hapArtifactLease": "lease-1",
+          "hapArtifactLease": "\(lease)",
           "bundleName": "com.example.demo",
           "abilityName": "EntryAbility"
         },
@@ -212,7 +235,8 @@ final class RuntimeJobEngineContractTests: XCTestCase {
     try await capabilityStore.install(
       try RuntimeCapability(
         capabilityID: "CAP-RT-ENGINE-001",
-        targetScope: .anyTarget,
+        targetScope: .stablePhysicalIdentity(
+          sha256: "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547"),
         operationScope: [.init(operationID: "debug.hap", version: 1)],
         effectCeiling: .deviceMutation,
         issuedAtUTC: "2026-07-01T00:00:00Z",
@@ -226,6 +250,8 @@ final class RuntimeJobEngineContractTests: XCTestCase {
     // A use was consumed atomically at admission.
     let capabilityStatus = try await capabilityStore.inspect(capabilityID: "CAP-RT-ENGINE-001")
     XCTAssertEqual(capabilityStatus?.remainingUses, 4)
+    let evidence = try await engine.evidenceSnapshot(jobID: acceptance.jobID)
+    XCTAssertNotNil(evidence.authority?.consumptionFingerprintSHA256)
   }
 
   func testMissingRequiredInputIsRejected() async throws {
@@ -356,7 +382,41 @@ final class RuntimeJobEngineContractTests: XCTestCase {
     }
   }
 
+  func testCleanCrashResumesAfterLastConfirmedTypedProviderAction() async throws {
+    let originalDispatcher = ScriptedDispatcher(script: .observationHappy)
+    let (original, _) = try makeEngine(dispatcher: originalDispatcher)
+    let acceptance = try await original.submit(
+      observeRequest(idempotencyKey: "idem-clean-resume-01"))
+    let completed = try await original.run(jobID: acceptance.jobID)
+    XCTAssertEqual(completed.state, "succeeded")
 
+    // Recreate the exact durable bytes of a process loss immediately
+    // after the last provider outcome, before running->finalizing.
+    let journalURL =
+      stateDirectory
+      .appendingPathComponent("jobs/\(acceptance.jobID)/journal.jsonl")
+    let fullReplay = try DurableJournalRecovery.inspect(url: journalURL)
+    let boundary = try XCTUnwrap(
+      fullReplay.events.last {
+        $0.kind == .stepOutcome && $0.stepID == "read-evidence-firmware"
+      }?.sequence)
+    let lines = try String(contentsOf: journalURL, encoding: .utf8)
+      .split(separator: "\n", omittingEmptySubsequences: false)
+    let durablePrefix = lines.prefix(boundary + 1).joined(separator: "\n") + "\n"
+    try Data(durablePrefix.utf8).write(to: journalURL)
+
+    let resumedDispatcher = ScriptedDispatcher(script: .observationHappy)
+    let (recoveredEngine, _) = try makeEngine(dispatcher: resumedDispatcher)
+    let recovered = try await recoveredEngine.recoverPersistedJobs()
+    XCTAssertEqual(recovered.map(\.state), ["running"])
+    XCTAssertFalse(try XCTUnwrap(recovered.first).outcomeUnknown)
+
+    let resumed = try await recoveredEngine.run(jobID: acceptance.jobID)
+    XCTAssertEqual(resumed.state, "succeeded", resumed.timeline.joined(separator: " | "))
+    XCTAssertEqual(
+      resumedDispatcher.dispatchCount, 0,
+      "journal-confirmed typed provider actions must not be dispatched again")
+  }
 
   private var productsDirectory: URL {
     #if os(macOS)

@@ -59,6 +59,15 @@ public struct DescriptorBoundProcessDispatcher: RuntimeProcessDispatching {
     self.outputByteBudget = outputByteBudget
   }
 
+  public func unavailableReason(providerID: String) -> String? {
+    do {
+      _ = try resolver.resolveExecutable(providerID: providerID)
+      return nil
+    } catch {
+      return "provider executable is unavailable: \(error)"
+    }
+  }
+
   public func dispatch(_ plan: TypedProcessPlan) async throws -> ProviderProcessReceipt {
     guard case .process(_, let argv, let timeoutSeconds) = plan.kind else {
       throw RuntimeDispatchFailure.failed(

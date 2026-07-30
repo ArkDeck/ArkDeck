@@ -548,9 +548,11 @@ struct ArkDeckCommandLine {
         arkdeck job status --job <id> [--json] | arkdeck job list [--json]
         arkdeck job submit --request-file <request.json> [--wait] [--json]
         arkdeck capability list|install --file <cap.json>|revoke --capability <id> [--json]
-        arkdeck artifact list|inspect|read --job <id> [--artifact <id>] [--allow-sensitive]
+        arkdeck artifact list|inspect|read|export --job <id> [--artifact <id>] \
+      [--destination <directory>] [--allow-sensitive]
         arkdeck agent run --operation <id@version> [--target <id>] [--inputs-file <path>] \
       [--capability <CAP-RT-...>] [--json]
+        arkdeck agent resume --resume-token <token> [--selection <target-or-candidate>] [--json]
 
       doctor/device/job talk only to arkdeck-agentd over its user-private socket: this CLI
       holds no HDC or Rockchip executor and cannot build a device command itself.

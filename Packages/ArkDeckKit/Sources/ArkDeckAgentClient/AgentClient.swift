@@ -26,11 +26,26 @@ public struct AgentClient: Sendable {
   /// One request per connection: simple, race-free, and cheap at local
   /// UDS latencies. Pooling can come later without changing callers.
   public func request(
-    method: String, params: [String: JSONValue]? = nil, id: String = UUID().uuidString
+    method: String, params: [String: JSONValue]? = nil, id: String = UUID().uuidString,
+    timeoutSeconds: Int? = nil
   ) throws -> JSONValue {
     let fd = socket(AF_UNIX, SOCK_STREAM, 0)
     guard fd >= 0 else { throw AgentClientError.connectFailed("cannot create socket") }
     defer { close(fd) }
+    if let timeoutSeconds {
+      guard timeoutSeconds > 0 else {
+        throw AgentClientError.transport("timeout must be positive")
+      }
+      var timeout = timeval(tv_sec: timeoutSeconds, tv_usec: 0)
+      guard
+        setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &timeout, socklen_t(MemoryLayout.size(ofValue: timeout)))
+          == 0,
+        setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, socklen_t(MemoryLayout.size(ofValue: timeout)))
+          == 0
+      else {
+        throw AgentClientError.transport("cannot configure bounded socket timeout")
+      }
+    }
     var address = sockaddr_un()
     address.sun_family = sa_family_t(AF_UNIX)
     guard socketPath.utf8.count < MemoryLayout.size(ofValue: address.sun_path) else {
@@ -75,7 +90,12 @@ public struct AgentClient: Sendable {
     var chunk = [UInt8](repeating: 0, count: 64 * 1024)
     while !buffer.contains(0x0A) {
       let count = read(fd, &chunk, chunk.count)
-      if count <= 0 { throw AgentClientError.transport("connection closed before response") }
+      if count <= 0 {
+        if errno == EAGAIN || errno == EWOULDBLOCK {
+          throw AgentClientError.transport("request timed out before response")
+        }
+        throw AgentClientError.transport("connection closed before response")
+      }
       buffer.append(contentsOf: chunk[0..<count])
       if buffer.count > 8 * 1024 * 1024 {
         throw AgentClientError.transport("oversized response")
