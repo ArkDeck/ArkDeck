@@ -201,6 +201,21 @@ Task.detached {
       print("recovered \(recovered.count) persisted job(s); unknown outcomes parked")
       fflush(stdout)
     }
+    // Harness task plane (CHG-2026-054): one composition root, not a second
+    // daemon. It reaches execution only through the engine port below.
+    let harnessStore = try HarnessTaskStore(
+      rootURL: resolvedStateDirectory.appendingPathComponent("harness", isDirectory: true))
+    let harness = HarnessTaskCoordinator(
+      store: harnessStore,
+      jobPort: RuntimeJobEngineHarnessPort(engine: engine),
+      nowUTC: utcNow)
+    // Recovery resolves dispatch intents whose outcome was lost; it starts
+    // no new work, so a restart cannot become a burst of dispatches.
+    let recoveredTasks = try await harness.recoverTasks()
+    if !recoveredTasks.isEmpty {
+      print("recovered \(recoveredTasks.count) harness task dispatch intent(s)")
+      fflush(stdout)
+    }
     let handler = RuntimeControlPlaneHandler(
       engine: engine,
       capabilityStore: capabilityStore,
@@ -208,7 +223,8 @@ Task.detached {
       nowUTC: utcNow,
       targetStore: targetStore,
       bootstrap: bootstrap,
-      artifactStore: artifactStore)
+      artifactStore: artifactStore,
+      harnessCoordinator: harness)
     let server = AgentDaemonServer(
       stateDirectory: resolvedStateDirectory, handler: handler, nowUTC: utcNow)
     switch try server.start() {
