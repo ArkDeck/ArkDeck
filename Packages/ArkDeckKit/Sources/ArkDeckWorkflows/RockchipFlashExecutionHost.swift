@@ -1014,23 +1014,35 @@ private final class RockchipProductExecutionSettings: @unchecked Sendable {
   }
 }
 
-private struct RockchipProductUSBIdentity: Sendable, Equatable {
+struct RockchipProductUSBIdentity: Sendable, Equatable {
   let serial: String
   let vendorID: UInt16
   let productID: UInt16
   let topology: String
 }
 
-private struct RockchipProductUSBProbe: Sendable {
+struct RockchipProductUSBProbe: Sendable {
   func singleLoader(selector: String? = nil) throws -> RockchipProductUSBIdentity {
-    try single(selector: selector, requiresLoader: true)
+    try single(selector: selector, serialDigestSHA256: nil, requiresLoader: true)
+  }
+
+  func singleLoader(
+    stableIdentitySHA256: String
+  ) throws -> RockchipProductUSBIdentity {
+    try single(
+      selector: nil, serialDigestSHA256: stableIdentitySHA256,
+      requiresLoader: true)
   }
 
   func singleConnected(selector: String) throws -> RockchipProductUSBIdentity {
-    try single(selector: selector, requiresLoader: false)
+    try single(selector: selector, serialDigestSHA256: nil, requiresLoader: false)
   }
 
-  private func single(selector: String?, requiresLoader: Bool) throws
+  private func single(
+    selector: String?,
+    serialDigestSHA256: String?,
+    requiresLoader: Bool
+  ) throws
     -> RockchipProductUSBIdentity
   {
     var iterator: io_iterator_t = 0
@@ -1056,7 +1068,13 @@ private struct RockchipProductUSBProbe: Sendable {
       let identity = RockchipProductUSBIdentity(
         serial: serial, vendorID: vendor.uint16Value,
         productID: product.uint16Value, topology: String(location.uint64Value))
-      if selector == nil || selector == identity.topology { matches.append(identity) }
+      let digest = SHA256.hash(data: Data(serial.utf8))
+        .map { String(format: "%02x", $0) }.joined()
+      if (selector == nil || selector == identity.topology)
+        && (serialDigestSHA256 == nil || serialDigestSHA256 == digest)
+      {
+        matches.append(identity)
+      }
     }
     guard matches.count == 1, let match = matches.first else {
       throw RockchipFlashExecutionError.admissionRejected(

@@ -190,7 +190,7 @@ struct RockchipCommandSemanticEvaluator: ProcessSemanticEvaluating {
     }
   }
 
-  private static func matchesPinnedPartitionTable(_ text: String) -> Bool {
+  static func matchesPinnedPartitionTable(_ text: String) -> Bool {
     let expectedRows = [
       "00  00002000  uboot", "01  00004000  misc", "02  00006000  bootctrl",
       "03  00007000  resource", "04  0000A000  boot_linux", "05  0003A000  ramdisk",

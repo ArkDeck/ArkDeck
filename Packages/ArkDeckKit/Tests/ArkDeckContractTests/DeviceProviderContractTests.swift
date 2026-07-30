@@ -223,10 +223,21 @@ final class DeviceProviderContractTests: XCTestCase {
       "verify-image-bundle", "hash-images", "confirm-flash-intent", "finalize-session",
     ])
     for step in descriptor.steps where !engineSteps.contains(step.stepID) {
+      let stepContext = ProviderExecutionContext(
+        jobID: flashContext.jobID,
+        stepID: step.stepID,
+        targetID: flashContext.targetID,
+        bindingRevision: flashContext.bindingRevision,
+        connectKey: flashContext.connectKey,
+        expectedIdentitySHA256: flashContext.expectedIdentitySHA256,
+        toolVersion: flashContext.toolVersion,
+        toolSHA256: flashContext.toolSHA256,
+        nowUTC: flashContext.nowUTC,
+        resolvedInputArtifact: flashContext.resolvedInputArtifact)
       let action = try provider.action(
-        for: step, operation: descriptor, inputs: inputs, context: flashContext)
+        for: step, operation: descriptor, inputs: inputs, context: stepContext)
       XCTAssertEqual(action.effect, step.effect, step.stepID)
-      let plan = try provider.lower(action: action, context: flashContext)
+      let plan = try provider.lower(action: action, context: stepContext)
       XCTAssertEqual(plan.action, action, step.stepID)
       XCTAssertEqual(
         try PersistedTypedProviderAction(action).materialize(), action,
@@ -237,8 +248,19 @@ final class DeviceProviderContractTests: XCTestCase {
       guard case .hostManaged(let runtimeDescriptor) = plan.kind else {
         return XCTFail("\(step.stepID) did not produce a host-managed typed plan")
       }
-      XCTAssertTrue(runtimeDescriptor.hasSuffix(".v1")
-        || runtimeDescriptor.contains(".v1:"), runtimeDescriptor)
+      XCTAssertTrue(
+        runtimeDescriptor.identifier.hasSuffix(".v1")
+          || runtimeDescriptor.identifier.contains(".v1:"), runtimeDescriptor.identifier)
+      XCTAssertEqual(runtimeDescriptor.jobID, stepContext.jobID)
+      XCTAssertEqual(runtimeDescriptor.stepID, step.stepID)
+      XCTAssertEqual(runtimeDescriptor.targetID, stepContext.targetID)
+      XCTAssertEqual(runtimeDescriptor.bindingRevision, stepContext.bindingRevision)
+      XCTAssertEqual(runtimeDescriptor.connectKey, stepContext.connectKey)
+      XCTAssertEqual(
+        runtimeDescriptor.expectedIdentitySHA256,
+        stepContext.expectedIdentitySHA256)
+      XCTAssertEqual(runtimeDescriptor.providerExecutableSHA256, stepContext.toolSHA256)
+      XCTAssertEqual(runtimeDescriptor.actionSHA256.count, 64)
     }
   }
 

@@ -1,0 +1,1217 @@
+// Product-owned per-action RockUSB host for flash.dayu200@1.
+//
+// RuntimeJobEngine owns capability admission and the outer write-ahead
+// intent. This host does not construct another authorization/session model:
+// it executes only the already-materialized closed action, binds every child
+// to a reviewed executable identity, and writes a job/step-correlated receipt.
+
+import ArkDeckOpenHarmony
+import ArkDeckProcess
+import CryptoKit
+import Darwin
+import Foundation
+
+struct RockchipRuntimeActionExecutionResult: Sendable {
+  let summary: [String: String]
+  let stdout: Data
+  let stderr: Data
+  let stdoutTruncated: Bool
+  let subprocesses: [ProviderSubprocessReceipt]
+}
+
+protocol RockchipRuntimeActionExecuting: Sendable {
+  func unavailableReason() -> String?
+  func execute(
+    action: RockchipProviderAction,
+    descriptor: HostManagedProcessDescriptor,
+    rockchipExecutable: ResolvedExecutable,
+    actionDirectory: URL
+  ) async throws -> RockchipRuntimeActionExecutionResult
+}
+
+protocol RockchipRuntimeActionHosting: Sendable {
+  func unavailableReason() -> String?
+  func execute(
+    action: RockchipProviderAction,
+    descriptor: HostManagedProcessDescriptor,
+    rockchipExecutable: ResolvedExecutable
+  ) async throws -> RockchipRuntimeActionExecutionResult
+}
+
+struct RefusingRockchipRuntimeActionHost: RockchipRuntimeActionHosting {
+  let reason: String
+
+  func unavailableReason() -> String? { reason }
+
+  func execute(
+    action _: RockchipProviderAction,
+    descriptor _: HostManagedProcessDescriptor,
+    rockchipExecutable _: ResolvedExecutable
+  ) async throws -> RockchipRuntimeActionExecutionResult {
+    throw RuntimeDispatchFailure.failed(reason)
+  }
+}
+
+protocol RockchipRuntimeCommandRunning: Sendable {
+  func run(
+    executable: ResolvedExecutable,
+    arguments: [String],
+    timeoutSeconds: Int?,
+    outputByteBudget: Int,
+    criticalNonInterruptible: Bool
+  ) async throws -> ProviderSubprocessReceipt
+}
+
+struct FoundationRockchipRuntimeCommandRunner: RockchipRuntimeCommandRunning {
+  func run(
+    executable: ResolvedExecutable,
+    arguments: [String],
+    timeoutSeconds: Int?,
+    outputByteBudget: Int,
+    criticalNonInterruptible: Bool
+  ) async throws -> ProviderSubprocessReceipt {
+    let operation: @Sendable () async throws -> ProviderSubprocessReceipt = {
+      let request = ProcessIdentityBoundRequest(
+        process: ProcessRequest(
+          executable: URL(fileURLWithPath: executable.path),
+          arguments: arguments,
+          environment: [:],
+          timeout: timeoutSeconds.map(TimeInterval.init)),
+        expectedSHA256: executable.sha256)
+      let result: ProcessIdentityBoundExecutionResult
+      do {
+        result = try await FoundationProcessExecutor().executeIdentityBound(
+          request, captureLimit: outputByteBudget)
+      } catch let error as ProcessExecutionError {
+        // All thrown ProcessExecutionError cases happen before a child has
+        // been observed as spawned. They are definite zero-dispatch refusals.
+        throw RuntimeDispatchFailure.failed("dispatch refused: \(error)")
+      } catch {
+        throw RuntimeDispatchFailure.outcomeUnknown(
+          "dispatch outcome unobservable: \(error)")
+      }
+      switch result.execution.termination {
+      case .exited(let status):
+        return ProviderSubprocessReceipt(
+          exitStatus: status,
+          stdout: result.execution.stdout.data,
+          stderr: result.execution.stderr.data,
+          stdoutTruncated: result.execution.stdout.wasTruncated,
+          durationSeconds: 0)
+      case .timedOut:
+        throw RuntimeDispatchFailure.outcomeUnknown(
+          "process timed out before completion")
+      case .cancelled:
+        throw RuntimeDispatchFailure.outcomeUnknown(
+          "process cancelled mid-flight")
+      case .signalled(let signal):
+        throw RuntimeDispatchFailure.outcomeUnknown(
+          "process died on signal \(signal)")
+      case .waitFailed(let code), .unrecognizedWaitStatus(let code):
+        throw RuntimeDispatchFailure.outcomeUnknown(
+          "process wait status unresolved (\(code))")
+      }
+    }
+    if criticalNonInterruptible {
+      // A parent cancellation is observed only after one wlx child reaches
+      // its semantic boundary. No later partition is started after that.
+      return try await Task.detached(operation: operation).value
+    }
+    return try await operation()
+  }
+}
+
+struct RockchipRuntimeLoaderIdentity: Sendable, Equatable {
+  let serialDigestSHA256: String
+  let topology: String
+}
+
+protocol RockchipRuntimeUSBProbing: Sendable {
+  func singleLoader(
+    stableIdentitySHA256: String
+  ) throws -> RockchipRuntimeLoaderIdentity
+}
+
+struct ProductRockchipRuntimeUSBProbe: RockchipRuntimeUSBProbing {
+  private let probe = RockchipProductUSBProbe()
+
+  func singleLoader(
+    stableIdentitySHA256: String
+  ) throws -> RockchipRuntimeLoaderIdentity {
+    let identity = try probe.singleLoader(
+      stableIdentitySHA256: stableIdentitySHA256)
+    return RockchipRuntimeLoaderIdentity(
+      serialDigestSHA256: SHA256.hash(data: Data(identity.serial.utf8))
+        .map { String(format: "%02x", $0) }.joined(),
+      topology: identity.topology)
+  }
+}
+
+final class RockchipRuntimeStagedImageHandle: @unchecked Sendable {
+  let memberName: String
+  let partitionName: String
+  let sizeBytes: Int64
+  let sha256: String
+  let stableDescriptorPath: String
+  private let validation: @Sendable () throws -> Void
+
+  init(
+    memberName: String,
+    partitionName: String,
+    sizeBytes: Int64,
+    sha256: String,
+    stableDescriptorPath: String,
+    validation: @escaping @Sendable () throws -> Void
+  ) {
+    self.memberName = memberName
+    self.partitionName = partitionName
+    self.sizeBytes = sizeBytes
+    self.sha256 = sha256
+    self.stableDescriptorPath = stableDescriptorPath
+    self.validation = validation
+  }
+
+  func revalidate() throws {
+    try validation()
+  }
+}
+
+typealias RockchipRuntimeStaging =
+  @Sendable (RockchipRuntimeFlashBundle, URL) throws
+    -> [String: RockchipRuntimeStagedImageHandle]
+
+protocol RockchipRuntimePartitionReadbackVerifying: Sendable {
+  func verify(
+    mapping: RockchipMappedPartition,
+    member: RockchipImagesArchiveMember,
+    executable: ResolvedExecutable,
+    outputDirectory: URL
+  ) async throws -> [ProviderSubprocessReceipt]
+}
+
+struct FoundationRockchipRuntimePartitionReadback:
+  RockchipRuntimePartitionReadbackVerifying
+{
+  private let runner: any RockchipRuntimeCommandRunning
+  private let maximumChunkSectors: Int64
+
+  init(
+    runner: any RockchipRuntimeCommandRunning,
+    maximumChunkSectors: Int64 = 131_072
+  ) {
+    precondition(maximumChunkSectors > 0)
+    self.runner = runner
+    self.maximumChunkSectors = maximumChunkSectors
+  }
+
+  func verify(
+    mapping: RockchipMappedPartition,
+    member: RockchipImagesArchiveMember,
+    executable: ResolvedExecutable,
+    outputDirectory: URL
+  ) async throws -> [ProviderSubprocessReceipt] {
+    var hasher = SHA256()
+    var remainingBytes = member.sizeBytes
+    var consumedSectors: Int64 = 0
+    var chunkIndex = 0
+    var receipts: [ProviderSubprocessReceipt] = []
+    while remainingBytes > 0 {
+      let sectors = min(
+        maximumChunkSectors, Self.sectorCount(remainingBytes))
+      let bytes = min(remainingBytes, sectors * 512)
+      let outputURL = outputDirectory.appendingPathComponent(
+        "\(mapping.writeOrder)-\(mapping.partitionName)-\(chunkIndex).part")
+      guard !FileManager.default.fileExists(atPath: outputURL.path) else {
+        throw RuntimeDispatchFailure.failed(
+          "RockUSB readback destination already exists")
+      }
+      let receipt = try await runner.run(
+        executable: executable,
+        arguments: Self.arguments(
+          offsetSectors: mapping.offsetSectors + consumedSectors,
+          sectorCount: sectors,
+          outputURL: outputURL),
+        timeoutSeconds: nil,
+        outputByteBudget: 64 * 1024,
+        criticalNonInterruptible: false)
+      guard receipt.exitStatus == 0,
+        !receipt.stdoutTruncated,
+        receipt.stderr.isEmpty
+      else {
+        throw RuntimeDispatchFailure.failed(
+          "RockUSB partition readback did not complete cleanly")
+      }
+      try Self.hashPrefix(
+        fileURL: outputURL,
+        byteCount: bytes,
+        exactFileSize: sectors * 512,
+        into: &hasher)
+      do {
+        try FileManager.default.removeItem(at: outputURL)
+      } catch {
+        throw RuntimeDispatchFailure.failed(
+          "verified RockUSB readback chunk could not be removed: \(error)")
+      }
+      receipts.append(receipt)
+      remainingBytes -= bytes
+      consumedSectors += sectors
+      chunkIndex += 1
+    }
+    let observed = hasher.finalize()
+      .map { String(format: "%02x", $0) }.joined()
+    guard observed == member.sha256 else {
+      throw RuntimeDispatchFailure.failed(
+        "RockUSB readback hash mismatch for \(mapping.partitionName)")
+    }
+    return receipts
+  }
+
+  static func arguments(
+    mapping: RockchipMappedPartition,
+    member: RockchipImagesArchiveMember,
+    outputURL: URL
+  ) -> [String] {
+    arguments(
+      offsetSectors: mapping.offsetSectors,
+      sectorCount: sectorCount(member.sizeBytes),
+      outputURL: outputURL)
+  }
+
+  private static func arguments(
+    offsetSectors: Int64,
+    sectorCount: Int64,
+    outputURL: URL
+  ) -> [String] {
+    [
+      "rl",
+      String(offsetSectors),
+      String(sectorCount),
+      outputURL.path,
+    ]
+  }
+
+  private static func sectorCount(_ byteCount: Int64) -> Int64 {
+    (byteCount + 511) / 512
+  }
+
+  private static func hashPrefix(
+    fileURL: URL,
+    byteCount: Int64,
+    exactFileSize: Int64,
+    into hasher: inout SHA256
+  ) throws {
+    let descriptor = Darwin.open(
+      fileURL.path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW)
+    guard descriptor >= 0 else {
+      throw RuntimeDispatchFailure.failed(
+        "RockUSB readback cannot be opened without following links")
+    }
+    defer { Darwin.close(descriptor) }
+    var metadata = stat()
+    guard fstat(descriptor, &metadata) == 0,
+      metadata.st_mode & S_IFMT == S_IFREG,
+      metadata.st_size == exactFileSize
+    else {
+      throw RuntimeDispatchFailure.failed(
+        "RockUSB readback file size or type is invalid")
+    }
+    var remaining = byteCount
+    var buffer = [UInt8](repeating: 0, count: 1 << 20)
+    while remaining > 0 {
+      let requested = min(Int64(buffer.count), remaining)
+      let count = Darwin.read(descriptor, &buffer, Int(requested))
+      if count > 0 {
+        hasher.update(data: Data(buffer[0..<count]))
+        remaining -= Int64(count)
+      } else if count < 0, errno == EINTR {
+        continue
+      } else {
+        throw RuntimeDispatchFailure.failed(
+          "RockUSB readback ended before the expected image bytes")
+      }
+    }
+  }
+}
+
+struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
+  private let hdcResolver: any RuntimeExecutableResolving
+  private let runner: any RockchipRuntimeCommandRunning
+  private let usbProbe: any RockchipRuntimeUSBProbing
+  private let stage: RockchipRuntimeStaging
+  private let readback: any RockchipRuntimePartitionReadbackVerifying
+
+  init(
+    hdcResolver: any RuntimeExecutableResolving,
+    runner: any RockchipRuntimeCommandRunning = FoundationRockchipRuntimeCommandRunner(),
+    usbProbe: any RockchipRuntimeUSBProbing = ProductRockchipRuntimeUSBProbe(),
+    readback: (any RockchipRuntimePartitionReadbackVerifying)? = nil,
+    stage: @escaping RockchipRuntimeStaging = { bundle, sessionRoot in
+      let staged = try RockchipFlashExecutionStager.stage(
+        archiveURL: bundle.fileURL,
+        sessionRoot: sessionRoot,
+        profile: .dayu200)
+      return Dictionary(
+        uniqueKeysWithValues: staged.map { memberName, image in
+          (
+            memberName,
+            RockchipRuntimeStagedImageHandle(
+              memberName: image.memberName,
+              partitionName: image.partitionName,
+              sizeBytes: image.sizeBytes,
+              sha256: image.sha256,
+              stableDescriptorPath: image.stableDescriptorPath,
+              validation: { try image.revalidate() })
+          )
+        })
+    }
+  ) {
+    self.hdcResolver = hdcResolver
+    self.runner = runner
+    self.usbProbe = usbProbe
+    self.stage = stage
+    self.readback =
+      readback ?? FoundationRockchipRuntimePartitionReadback(runner: runner)
+  }
+
+  func unavailableReason() -> String? {
+    do {
+      _ = try hdcResolver.resolveExecutable(providerID: "hdc")
+      return nil
+    } catch {
+      return "descriptor-bound HDC executable is unavailable to the Rockchip host: \(error)"
+    }
+  }
+
+  func execute(
+    action: RockchipProviderAction,
+    descriptor: HostManagedProcessDescriptor,
+    rockchipExecutable: ResolvedExecutable,
+    actionDirectory: URL
+  ) async throws -> RockchipRuntimeActionExecutionResult {
+    switch action {
+    case .enterLoader(let connectKey):
+      let hdc = try resolveHDC()
+      let receipt = try await run(
+        executable: hdc,
+        arguments: ["-t", connectKey, "shell", "reboot", "loader"],
+        timeoutSeconds: 20,
+        budget: 64 * 1024,
+        effectMayHaveOccurred: true)
+      return result(
+        summary: ["transition": "normal-to-loader"], receipts: [receipt])
+
+    case .waitForHDCDisconnect(let connectKey):
+      let receipts = try await waitForHDC(
+        connectKey: connectKey, expectedConnected: false, timeoutSeconds: 15)
+      return result(
+        summary: ["hdcState": "disconnected"], receipts: receipts)
+
+    case .waitForLoader(let stableIdentitySHA256):
+      let (identity, receipt) = try await waitForLoader(
+        stableIdentitySHA256: stableIdentitySHA256,
+        rockchipExecutable: rockchipExecutable,
+        timeoutSeconds: 45)
+      return result(
+        summary: [
+          "loaderIdentitySha256": identity.serialDigestSHA256,
+          "usbTopology": identity.topology,
+        ],
+        receipts: [receipt])
+
+    case .rebindLoader(let stableIdentitySHA256):
+      let identity = try exactLoaderIdentity(
+        stableIdentitySHA256: stableIdentitySHA256)
+      let receipt = try await observeLoader(executable: rockchipExecutable)
+      return result(
+        summary: [
+          "loaderIdentitySha256": identity.serialDigestSHA256,
+          "usbTopology": identity.topology,
+          "bindingRevision": String(descriptor.bindingRevision),
+        ],
+        receipts: [receipt])
+
+    case .flashPartitions(let bundle):
+      return try await flash(
+        bundle: bundle,
+        descriptor: descriptor,
+        rockchipExecutable: rockchipExecutable,
+        actionDirectory: actionDirectory)
+
+    case .verifyFlashReadback(let bundle):
+      guard bundle.sha256 == RockchipFlashProfile.dayu200.archiveSHA256,
+        bundle.byteCount == Int(RockchipFlashProfile.dayu200.archiveSizeBytes),
+        bundle.partitionNames
+          == RockchipFlashProfile.dayu200.mappedPartitions.map(\.partitionName)
+      else {
+        throw RuntimeDispatchFailure.failed(
+          "readback action drifted from the pinned DAYU200 bundle/profile")
+      }
+      let identity = try exactLoaderIdentity(
+        stableIdentitySHA256: descriptor.expectedIdentitySHA256)
+      let loader = try await observeLoader(executable: rockchipExecutable)
+      let partitionTable = try await observePartitionTable(
+        executable: rockchipExecutable)
+      let outputDirectory = actionDirectory.appendingPathComponent(
+        "readback", isDirectory: true)
+      do {
+        try FileManager.default.createDirectory(
+          at: outputDirectory,
+          withIntermediateDirectories: false,
+          attributes: [.posixPermissions: 0o700])
+      } catch {
+        throw RuntimeDispatchFailure.failed(
+          "cannot create job-owned partition readback directory: \(error)")
+      }
+      var receipts = [loader, partitionTable]
+      for mapping in RockchipFlashProfile.dayu200.mappedPartitions {
+        guard let member = RockchipFlashProfile.dayu200.member(
+          named: mapping.imageMemberName)
+        else {
+          throw RuntimeDispatchFailure.failed(
+            "pinned readback member is missing for \(mapping.partitionName)")
+        }
+        receipts.append(
+          contentsOf: try await readback.verify(
+            mapping: mapping,
+            member: member,
+            executable: rockchipExecutable,
+            outputDirectory: outputDirectory))
+      }
+      do {
+        try FileManager.default.removeItem(at: outputDirectory)
+      } catch {
+        throw RuntimeDispatchFailure.failed(
+          "verified partition readback directory could not be removed: \(error)")
+      }
+      return result(
+        summary: [
+          "bundleSha256": bundle.sha256,
+          "loaderIdentitySha256": identity.serialDigestSHA256,
+          "partitionHashesVerified": String(bundle.partitionNames.count),
+          "partitionTable": "pinned-dayu200-match",
+          "usbTopology": identity.topology,
+        ],
+        receipts: receipts)
+
+    case .rebootToNormal(let stableIdentitySHA256):
+      _ = try exactLoaderIdentity(
+        stableIdentitySHA256: stableIdentitySHA256)
+      let receipt = try await run(
+        executable: rockchipExecutable,
+        arguments: ["rd"],
+        timeoutSeconds: 15,
+        budget: 64 * 1024,
+        effectMayHaveOccurred: true,
+        successMarker: RockchipRockUSBFlashProvider.resetSuccessMarker)
+      return result(
+        summary: ["transition": "loader-to-normal"], receipts: [receipt])
+
+    case .waitForHDCReconnect(let connectKey):
+      let receipts = try await waitForHDC(
+        connectKey: connectKey, expectedConnected: true, timeoutSeconds: 120)
+      return result(
+        summary: ["hdcState": "connected"], receipts: receipts)
+
+    case .verifyBuild(let connectKey):
+      let hdc = try resolveHDC()
+      let modelReceipt = try await run(
+        executable: hdc,
+        arguments: [
+          "-t", connectKey, "shell", "param", "get",
+          HDCAllowlistedProperty.productModel.rawValue,
+        ],
+        timeoutSeconds: 15, budget: 64 * 1024)
+      let versionReceipt = try await run(
+        executable: hdc,
+        arguments: [
+          "-t", connectKey, "shell", "param", "get",
+          HDCAllowlistedProperty.fullBuildVersion.rawValue,
+        ],
+        timeoutSeconds: 15, budget: 64 * 1024)
+      let model = try property(
+        modelReceipt, key: HDCAllowlistedProperty.productModel.rawValue)
+      let version = try property(
+        versionReceipt, key: HDCAllowlistedProperty.fullBuildVersion.rawValue)
+      guard model.localizedCaseInsensitiveContains("dayu200") else {
+        throw RuntimeDispatchFailure.failed(
+          "post-flash model readback is not DAYU200")
+      }
+      return result(
+        summary: ["model": model, "firmware": version],
+        receipts: [modelReceipt, versionReceipt])
+
+    case .capturePostFlashDiagnostics(let connectKey, let request):
+      let hdc = try resolveHDC()
+      let receipt = try await run(
+        executable: hdc,
+        arguments: ["-t", connectKey, "shell", "hilog", "-x"] + request.filters,
+        timeoutSeconds: request.durationSeconds + 15,
+        budget: request.byteBudget)
+      guard !receipt.stdout.isEmpty else {
+        throw RuntimeDispatchFailure.failed(
+          "post-flash HiLog capture returned no bytes")
+      }
+      return RockchipRuntimeActionExecutionResult(
+        summary: ["byteCount": String(receipt.stdout.count)],
+        stdout: receipt.stdout,
+        stderr: receipt.stderr,
+        stdoutTruncated: receipt.stdoutTruncated,
+        subprocesses: [receipt])
+    }
+  }
+
+  private func flash(
+    bundle: RockchipRuntimeFlashBundle,
+    descriptor: HostManagedProcessDescriptor,
+    rockchipExecutable: ResolvedExecutable,
+    actionDirectory: URL
+  ) async throws -> RockchipRuntimeActionExecutionResult {
+    guard bundle.sha256 == RockchipFlashProfile.dayu200.archiveSHA256,
+      bundle.byteCount == Int(RockchipFlashProfile.dayu200.archiveSizeBytes),
+      bundle.partitionNames
+        == RockchipFlashProfile.dayu200.mappedPartitions.map(\.partitionName)
+    else {
+      throw RuntimeDispatchFailure.failed(
+        "flash action drifted from the pinned DAYU200 bundle/profile")
+    }
+    _ = try exactLoaderIdentity(
+      stableIdentitySHA256: descriptor.expectedIdentitySHA256)
+
+    let work = actionDirectory.appendingPathComponent(
+      "work", isDirectory: true)
+    do {
+      try FileManager.default.createDirectory(
+        at: work, withIntermediateDirectories: false,
+        attributes: [.posixPermissions: 0o700])
+    } catch {
+      throw RuntimeDispatchFailure.failed(
+        "cannot create job-owned Rockchip staging root: \(error)")
+    }
+    var staged: [String: RockchipRuntimeStagedImageHandle]
+    do {
+      staged = try stage(bundle, work)
+    } catch {
+      throw RuntimeDispatchFailure.failed(
+        "pinned flash bundle staging failed before RockUSB writes: \(error)")
+    }
+
+    var receipts: [ProviderSubprocessReceipt] = []
+    receipts.append(try await observeLoader(executable: rockchipExecutable))
+    receipts.append(try await observePartitionTable(executable: rockchipExecutable))
+    for mapping in RockchipFlashProfile.dayu200.mappedPartitions {
+      guard
+        let member = RockchipFlashProfile.dayu200.member(
+          named: mapping.imageMemberName),
+        let image = staged[mapping.imageMemberName],
+        image.memberName == member.name,
+        image.partitionName == mapping.partitionName,
+        image.sizeBytes == member.sizeBytes,
+        image.sha256 == member.sha256
+      else {
+        throw RuntimeDispatchFailure.failed(
+          "staged image set does not match \(mapping.partitionName)")
+      }
+      do {
+        try image.revalidate()
+      } catch {
+        throw RuntimeDispatchFailure.failed(
+          "staged image identity changed before \(mapping.partitionName): \(error)")
+      }
+      let receipt = try await runner.run(
+        executable: rockchipExecutable,
+        arguments: ["wlx", mapping.partitionName, image.stableDescriptorPath],
+        timeoutSeconds: nil,
+        outputByteBudget: 64 * 1024,
+        criticalNonInterruptible: true)
+      try requireSemanticSuccess(
+        receipt,
+        effectMayHaveOccurred: true,
+        successMarker: RockchipRockUSBFlashProvider.writeSuccessMarker)
+      receipts.append(receipt)
+      if Task.isCancelled {
+        throw RuntimeDispatchFailure.outcomeUnknown(
+          "flash cancellation observed at the \(mapping.partitionName) safe boundary")
+      }
+    }
+
+    // Release the open descriptors before removing only the host-created
+    // staging directory. A failed removal is recorded as local cleanup debt;
+    // it does not make the already-observed device writes unknowable.
+    staged.removeAll()
+    let cleanup: String
+    do {
+      try FileManager.default.removeItem(at: work)
+      cleanup = "completed"
+    } catch {
+      cleanup = "required:\(error)"
+    }
+    return result(
+      summary: [
+        "bundleSha256": bundle.sha256,
+        "partitionCount": String(bundle.partitionNames.count),
+        "stagingCleanup": cleanup,
+      ],
+      receipts: receipts)
+  }
+
+  private func waitForHDC(
+    connectKey: String,
+    expectedConnected: Bool,
+    timeoutSeconds: Int
+  ) async throws -> [ProviderSubprocessReceipt] {
+    let hdc = try resolveHDC()
+    let deadline = ContinuousClock.now.advanced(by: .seconds(timeoutSeconds))
+    var receipts: [ProviderSubprocessReceipt] = []
+    while ContinuousClock.now < deadline {
+      let receipt = try await run(
+        executable: hdc,
+        arguments: ["list", "targets", "-v"],
+        timeoutSeconds: 15,
+        budget: 64 * 1024)
+      receipts.append(receipt)
+      switch HDCObservationSemanticParser.parseTargetList(
+        stdout: receipt.stdout,
+        profile: .openHarmony320Family,
+        toolVersion: "3.2.0f",
+        truncated: receipt.stdoutTruncated)
+      {
+      case .parsed(let list):
+        let matches = list.targets.filter {
+          $0.connectKey == connectKey && $0.state == "Connected"
+        }
+        if expectedConnected ? matches.count == 1 : matches.isEmpty {
+          return receipts
+        }
+      case .unsupportedVersion(let version):
+        throw RuntimeDispatchFailure.failed(
+          "HDC target parser does not support \(version)")
+      case .invalidEncoding:
+        throw RuntimeDispatchFailure.failed(
+          "HDC target list is not UTF-8")
+      case .truncated:
+        throw RuntimeDispatchFailure.failed(
+          "HDC target list exceeded its byte budget")
+      case .empty:
+        break
+      case .malformed(let reason):
+        throw RuntimeDispatchFailure.failed(
+          "HDC target list is malformed: \(reason)")
+      }
+      try await Task.sleep(for: .seconds(1))
+    }
+    throw RuntimeDispatchFailure.failed(
+      expectedConnected
+        ? "descriptor-bound HDC target did not reconnect before the deadline"
+        : "descriptor-bound HDC target did not disconnect before the deadline")
+  }
+
+  private func waitForLoader(
+    stableIdentitySHA256: String,
+    rockchipExecutable: ResolvedExecutable,
+    timeoutSeconds: Int
+  ) async throws -> (RockchipRuntimeLoaderIdentity, ProviderSubprocessReceipt) {
+    let deadline = ContinuousClock.now.advanced(by: .seconds(timeoutSeconds))
+    while ContinuousClock.now < deadline {
+      if let identity = try? exactLoaderIdentity(
+        stableIdentitySHA256: stableIdentitySHA256),
+        let receipt = try? await observeLoader(executable: rockchipExecutable)
+      {
+        return (identity, receipt)
+      }
+      try await Task.sleep(for: .seconds(1))
+    }
+    throw RuntimeDispatchFailure.failed(
+      "the bound DAYU200 did not appear as one exact Loader target")
+  }
+
+  private func exactLoaderIdentity(
+    stableIdentitySHA256: String
+  ) throws -> RockchipRuntimeLoaderIdentity {
+    do {
+      let identity = try usbProbe.singleLoader(
+        stableIdentitySHA256: stableIdentitySHA256)
+      guard identity.serialDigestSHA256 == stableIdentitySHA256 else {
+        throw RuntimeDispatchFailure.failed(
+          "Loader USB serial does not match the adopted target identity")
+      }
+      return identity
+    } catch let failure as RuntimeDispatchFailure {
+      throw failure
+    } catch {
+      throw RuntimeDispatchFailure.failed(
+        "bound Loader USB identity is unavailable or ambiguous: \(error)")
+    }
+  }
+
+  private func observeLoader(
+    executable: ResolvedExecutable
+  ) async throws -> ProviderSubprocessReceipt {
+    let receipt = try await run(
+      executable: executable,
+      arguments: ["ld"],
+      timeoutSeconds: 15,
+      budget: 64 * 1024)
+    guard
+      case .observations(let observations) = RockchipLDOutputParser.parse(
+        stdout: receipt.stdout,
+        stderr: receipt.stderr,
+        termination: .exited(receipt.exitStatus ?? -1)),
+      observations.count == 1,
+      let observation = observations.first,
+      observation.usbVendorID == RockchipProbeEvidence.rockUSBVendorID,
+      observation.usbProductID == RockchipProbeEvidence.dayu200LoaderProductID,
+      observation.mode == .loader
+    else {
+      throw RuntimeDispatchFailure.failed(
+        "rkdeveloptool ld did not report exactly one DAYU200 Loader")
+    }
+    return receipt
+  }
+
+  private func observePartitionTable(
+    executable: ResolvedExecutable
+  ) async throws -> ProviderSubprocessReceipt {
+    let receipt = try await run(
+      executable: executable,
+      arguments: ["ppt"],
+      timeoutSeconds: 15,
+      budget: 64 * 1024)
+    guard let text = String(data: receipt.stdout, encoding: .utf8),
+      RockchipCommandSemanticEvaluator.matchesPinnedPartitionTable(text)
+    else {
+      throw RuntimeDispatchFailure.failed(
+        "RockUSB partition-table readback does not match the pinned DAYU200 table")
+    }
+    return receipt
+  }
+
+  private func property(
+    _ receipt: ProviderSubprocessReceipt,
+    key: String
+  ) throws -> String {
+    guard let text = String(data: receipt.stdout, encoding: .utf8) else {
+      throw RuntimeDispatchFailure.failed(
+        "post-flash property \(key) is not UTF-8")
+    }
+    let value = HDCObservationProviderAdapter.propertyValue(
+      fromParamGetOutput: text, requestedKey: key)
+    guard !value.isEmpty, value.count <= 400 else {
+      throw RuntimeDispatchFailure.failed(
+        "post-flash property \(key) is empty or oversized")
+    }
+    return value
+  }
+
+  private func resolveHDC() throws -> ResolvedExecutable {
+    do {
+      return try hdcResolver.resolveExecutable(providerID: "hdc")
+    } catch {
+      throw RuntimeDispatchFailure.failed(
+        "descriptor-bound HDC executable is unavailable: \(error)")
+    }
+  }
+
+  private func run(
+    executable: ResolvedExecutable,
+    arguments: [String],
+    timeoutSeconds: Int?,
+    budget: Int,
+    effectMayHaveOccurred: Bool = false,
+    successMarker: String? = nil
+  ) async throws -> ProviderSubprocessReceipt {
+    let receipt = try await runner.run(
+      executable: executable,
+      arguments: arguments,
+      timeoutSeconds: timeoutSeconds,
+      outputByteBudget: budget,
+      criticalNonInterruptible: false)
+    try requireSemanticSuccess(
+      receipt,
+      effectMayHaveOccurred: effectMayHaveOccurred,
+      successMarker: successMarker)
+    return receipt
+  }
+
+  private func requireSemanticSuccess(
+    _ receipt: ProviderSubprocessReceipt,
+    effectMayHaveOccurred: Bool,
+    successMarker: String? = nil
+  ) throws {
+    let clean =
+      receipt.exitStatus == 0 && !receipt.stdoutTruncated && receipt.stderr.isEmpty
+    let markerMatches: Bool
+    if let successMarker {
+      markerMatches =
+        String(data: receipt.stdout, encoding: .utf8)?.contains(successMarker) == true
+    } else {
+      markerMatches = true
+    }
+    guard clean, markerMatches else {
+      let detail =
+        "typed command lacked a clean, complete semantic receipt"
+      if effectMayHaveOccurred {
+        throw RuntimeDispatchFailure.outcomeUnknown(detail)
+      }
+      throw RuntimeDispatchFailure.failed(detail)
+    }
+  }
+
+  private func result(
+    summary: [String: String],
+    receipts: [ProviderSubprocessReceipt]
+  ) -> RockchipRuntimeActionExecutionResult {
+    var stdout = Data()
+    var stderr = Data()
+    for receipt in receipts {
+      stdout.append(receipt.stdout)
+      stderr.append(receipt.stderr)
+    }
+    return RockchipRuntimeActionExecutionResult(
+      summary: summary,
+      stdout: stdout,
+      stderr: stderr,
+      stdoutTruncated: receipts.contains(where: \.stdoutTruncated),
+      subprocesses: receipts)
+  }
+}
+
+private struct RockchipRuntimeHostIntentRecord: Codable {
+  let schemaVersion: String
+  let jobID: String
+  let stepID: String
+  let targetID: String
+  let bindingRevision: Int
+  let stableIdentitySHA256: String
+  let providerExecutableSHA256: String
+  let actionSHA256: String
+  let action: PersistedTypedProviderAction
+}
+
+private struct RockchipRuntimeHostReceiptRecord: Codable {
+  let schemaVersion: String
+  let jobID: String
+  let stepID: String
+  let targetID: String
+  let bindingRevision: Int
+  let stableIdentitySHA256: String
+  let providerExecutableSHA256: String
+  let actionSHA256: String
+  let summary: [String: String]
+  let stdoutSHA256: String
+  let stdoutByteCount: Int
+  let stderrSHA256: String
+  let stderrByteCount: Int
+  let stdoutTruncated: Bool
+  let subprocessCount: Int
+}
+
+struct RockchipRuntimeActionRecordStore: Sendable {
+  let rootURL: URL
+
+  func unavailableReason() -> String? {
+    do {
+      try prepareDirectory(rootURL, allowExisting: true)
+      return nil
+    } catch {
+      return "durable Rockchip host record root is unavailable: \(error)"
+    }
+  }
+
+  func begin(
+    descriptor: HostManagedProcessDescriptor,
+    action: TypedProviderAction
+  ) throws -> URL {
+    try validateComponent(descriptor.jobID, field: "jobID")
+    try validateComponent(descriptor.stepID, field: "stepID")
+    try prepareDirectory(rootURL, allowExisting: true)
+    let jobDirectory = rootURL.appendingPathComponent(
+      descriptor.jobID, isDirectory: true)
+    try prepareDirectory(jobDirectory, allowExisting: true)
+    let actionDirectory = jobDirectory.appendingPathComponent(
+      descriptor.stepID, isDirectory: true)
+    try prepareDirectory(actionDirectory, allowExisting: false)
+    let record = RockchipRuntimeHostIntentRecord(
+      schemaVersion: "1.0.0",
+      jobID: descriptor.jobID,
+      stepID: descriptor.stepID,
+      targetID: descriptor.targetID,
+      bindingRevision: descriptor.bindingRevision,
+      stableIdentitySHA256: descriptor.expectedIdentitySHA256,
+      providerExecutableSHA256: descriptor.providerExecutableSHA256,
+      actionSHA256: descriptor.actionSHA256,
+      action: PersistedTypedProviderAction(action))
+    do {
+      try write(record, to: actionDirectory.appendingPathComponent("intent.json"))
+    } catch {
+      throw RuntimeDispatchFailure.failed(
+        "cannot persist Rockchip host intent before dispatch: \(error)")
+    }
+    return actionDirectory
+  }
+
+  func finish(
+    descriptor: HostManagedProcessDescriptor,
+    result: RockchipRuntimeActionExecutionResult,
+    actionDirectory: URL
+  ) throws -> String {
+    let record = RockchipRuntimeHostReceiptRecord(
+      schemaVersion: "1.0.0",
+      jobID: descriptor.jobID,
+      stepID: descriptor.stepID,
+      targetID: descriptor.targetID,
+      bindingRevision: descriptor.bindingRevision,
+      stableIdentitySHA256: descriptor.expectedIdentitySHA256,
+      providerExecutableSHA256: descriptor.providerExecutableSHA256,
+      actionSHA256: descriptor.actionSHA256,
+      summary: result.summary,
+      stdoutSHA256: Self.sha256(result.stdout),
+      stdoutByteCount: result.stdout.count,
+      stderrSHA256: Self.sha256(result.stderr),
+      stderrByteCount: result.stderr.count,
+      stdoutTruncated: result.stdoutTruncated,
+      subprocessCount: result.subprocesses.count)
+    try write(record, to: actionDirectory.appendingPathComponent("receipt.json"))
+    return "rockchip-runtime/\(descriptor.jobID)/\(descriptor.stepID)/receipt.json"
+  }
+
+  private func prepareDirectory(
+    _ url: URL,
+    allowExisting: Bool
+  ) throws {
+    guard url.isFileURL, url.path.hasPrefix("/"),
+      url.standardizedFileURL.path == url.path
+    else {
+      throw RuntimeDispatchFailure.failed(
+        "Rockchip record path is not canonical")
+    }
+    let created = Darwin.mkdir(url.path, 0o700) == 0
+    if !created {
+      if !allowExisting, errno == EEXIST {
+        throw RuntimeDispatchFailure.failed(
+          "durable Rockchip action directory already exists; refusing duplicate dispatch")
+      }
+      guard allowExisting, errno == EEXIST else {
+        throw RuntimeDispatchFailure.failed(
+          "cannot create Rockchip record directory (errno \(errno))")
+      }
+    }
+    var metadata = stat()
+    guard lstat(url.path, &metadata) == 0,
+      metadata.st_mode & S_IFMT == S_IFDIR,
+      metadata.st_mode & 0o077 == 0
+    else {
+      throw RuntimeDispatchFailure.failed(
+        "Rockchip record directory is not an owner-only real directory")
+    }
+    if created {
+      try synchronizeDirectory(url.deletingLastPathComponent())
+    }
+  }
+
+  private func validateComponent(_ value: String, field: String) throws {
+    let pattern = #"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"#
+    guard value.range(of: pattern, options: .regularExpression) != nil else {
+      throw RuntimeDispatchFailure.failed(
+        "\(field) is not a bounded path component")
+    }
+  }
+
+  private func write<T: Encodable>(_ value: T, to url: URL) throws {
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+    let data = try encoder.encode(value)
+    let temporary = url.deletingLastPathComponent().appendingPathComponent(
+      ".\(url.lastPathComponent).\(UUID().uuidString.lowercased()).tmp")
+    let descriptor = Darwin.open(
+      temporary.path,
+      O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW,
+      0o600)
+    guard descriptor >= 0 else {
+      throw RuntimeDispatchFailure.failed(
+        "cannot create owner-only Rockchip record (errno \(errno))")
+    }
+    do {
+      try data.withUnsafeBytes { bytes in
+        var offset = 0
+        while offset < bytes.count {
+          let count = Darwin.write(
+            descriptor,
+            bytes.baseAddress!.advanced(by: offset),
+            bytes.count - offset)
+          if count > 0 {
+            offset += count
+          } else if count < 0, errno == EINTR {
+            continue
+          } else {
+            throw RuntimeDispatchFailure.failed(
+              "cannot write Rockchip record (errno \(errno))")
+          }
+        }
+      }
+      guard fsync(descriptor) == 0 else {
+        throw RuntimeDispatchFailure.failed(
+          "cannot synchronize Rockchip record (errno \(errno))")
+      }
+    } catch {
+      Darwin.close(descriptor)
+      unlink(temporary.path)
+      throw error
+    }
+    guard Darwin.close(descriptor) == 0 else {
+      unlink(temporary.path)
+      throw RuntimeDispatchFailure.failed(
+        "cannot close Rockchip record (errno \(errno))")
+    }
+    guard rename(temporary.path, url.path) == 0 else {
+      unlink(temporary.path)
+      throw RuntimeDispatchFailure.failed(
+        "cannot publish Rockchip record (errno \(errno))")
+    }
+    try synchronizeDirectory(url.deletingLastPathComponent())
+  }
+
+  private func synchronizeDirectory(_ url: URL) throws {
+    let directoryDescriptor = Darwin.open(
+      url.path, O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW)
+    guard directoryDescriptor >= 0 else {
+      throw RuntimeDispatchFailure.failed(
+        "cannot open Rockchip record directory for synchronization")
+    }
+    defer { Darwin.close(directoryDescriptor) }
+    guard fsync(directoryDescriptor) == 0 else {
+      throw RuntimeDispatchFailure.failed(
+        "cannot synchronize Rockchip record directory (errno \(errno))")
+    }
+  }
+
+  private static func sha256(_ data: Data) -> String {
+    SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+  }
+}
+
+struct DurableRockchipRuntimeActionHost: RockchipRuntimeActionHosting {
+  private let executor: any RockchipRuntimeActionExecuting
+  private let records: RockchipRuntimeActionRecordStore
+
+  init(
+    executor: any RockchipRuntimeActionExecuting,
+    records: RockchipRuntimeActionRecordStore
+  ) {
+    self.executor = executor
+    self.records = records
+  }
+
+  func unavailableReason() -> String? {
+    executor.unavailableReason() ?? records.unavailableReason()
+  }
+
+  func execute(
+    action: RockchipProviderAction,
+    descriptor: HostManagedProcessDescriptor,
+    rockchipExecutable: ResolvedExecutable
+  ) async throws -> RockchipRuntimeActionExecutionResult {
+    let typedAction = TypedProviderAction.rockchip(action)
+    try validate(
+      action: typedAction,
+      descriptor: descriptor,
+      executable: rockchipExecutable)
+    let actionDirectory = try records.begin(
+      descriptor: descriptor, action: typedAction)
+    let result = try await executor.execute(
+      action: action,
+      descriptor: descriptor,
+      rockchipExecutable: rockchipExecutable,
+      actionDirectory: actionDirectory)
+    do {
+      let recordID = try records.finish(
+        descriptor: descriptor,
+        result: result,
+        actionDirectory: actionDirectory)
+      var summary = result.summary
+      summary["recordID"] = recordID
+      return RockchipRuntimeActionExecutionResult(
+        summary: summary,
+        stdout: result.stdout,
+        stderr: result.stderr,
+        stdoutTruncated: result.stdoutTruncated,
+        subprocesses: result.subprocesses)
+    } catch {
+      if typedAction.effect >= .deviceMutation {
+        throw RuntimeDispatchFailure.outcomeUnknown(
+          "external effect completed but its durable host receipt could not be persisted: \(error)")
+      }
+      throw RuntimeDispatchFailure.failed(
+        "read-only host receipt could not be persisted: \(error)")
+    }
+  }
+
+  private func validate(
+    action: TypedProviderAction,
+    descriptor: HostManagedProcessDescriptor,
+    executable: ResolvedExecutable
+  ) throws {
+    guard descriptor.bindingRevision > 0,
+      descriptor.expectedIdentitySHA256.count == 64,
+      descriptor.expectedIdentitySHA256.allSatisfy({
+        $0.isHexDigit && !$0.isUppercase
+      }),
+      descriptor.providerExecutableSHA256 == executable.sha256
+    else {
+      throw RuntimeDispatchFailure.failed(
+        "host-managed target/binding/executable correlation is incomplete or drifted")
+    }
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+    let encoded = try encoder.encode(PersistedTypedProviderAction(action))
+    let digest = SHA256.hash(data: encoded)
+      .map { String(format: "%02x", $0) }.joined()
+    guard digest == descriptor.actionSHA256 else {
+      throw RuntimeDispatchFailure.failed(
+        "host-managed typed action digest drifted after materialization")
+    }
+    guard actionMatchesDescriptor(action, descriptor: descriptor) else {
+      throw RuntimeDispatchFailure.failed(
+        "host-managed typed action does not match its target/descriptor")
+    }
+  }
+
+  private func actionMatchesDescriptor(
+    _ action: TypedProviderAction,
+    descriptor: HostManagedProcessDescriptor
+  ) -> Bool {
+    switch action {
+    case .rockchip(.enterLoader(let connectKey)):
+      return connectKey == descriptor.connectKey
+        && descriptor.identifier == "rockchip.hdc.enter-loader.v1"
+    case .rockchip(.waitForHDCDisconnect(let connectKey)):
+      return connectKey == descriptor.connectKey
+        && descriptor.identifier == "rockchip.hdc.wait-disconnect.v1"
+    case .rockchip(.waitForLoader(let identity)):
+      return identity == descriptor.expectedIdentitySHA256
+        && descriptor.identifier == "rockchip.rockusb.wait-loader.v1"
+    case .rockchip(.rebindLoader(let identity)):
+      return identity == descriptor.expectedIdentitySHA256
+        && descriptor.identifier == "rockchip.rockusb.rebind-loader.v1"
+    case .rockchip(.flashPartitions(let bundle)):
+      return descriptor.identifier
+        == "rockchip.rockusb.flash-dayu200.v1:\(bundle.sha256.prefix(16))"
+    case .rockchip(.verifyFlashReadback(let bundle)):
+      return descriptor.identifier
+        == "rockchip.rockusb.verify-dayu200.v1:\(bundle.sha256.prefix(16))"
+    case .rockchip(.rebootToNormal(let identity)):
+      return identity == descriptor.expectedIdentitySHA256
+        && descriptor.identifier == "rockchip.rockusb.reboot-normal.v1"
+    case .rockchip(.waitForHDCReconnect(let connectKey)):
+      return connectKey == descriptor.connectKey
+        && descriptor.identifier == "rockchip.hdc.wait-reconnect.v1"
+    case .rockchip(.verifyBuild(let connectKey)):
+      return connectKey == descriptor.connectKey
+        && descriptor.identifier == "rockchip.hdc.verify-build.v1"
+    case .rockchip(.capturePostFlashDiagnostics(let connectKey, _)):
+      return connectKey == descriptor.connectKey
+        && descriptor.identifier == "rockchip.hdc.capture-post-flash-hilog.v1"
+    case .hdc:
+      return false
+    }
+  }
+}
