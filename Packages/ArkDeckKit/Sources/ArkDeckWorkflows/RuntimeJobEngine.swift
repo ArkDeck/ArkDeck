@@ -465,8 +465,9 @@ public actor RuntimeJobEngine {
       if let reason = dispatcher.unavailableReason(providerID: descriptor.provider.rawValue) {
         reasons.append(reason)
       }
-      if (descriptor.reference == "debug.hap@1"
-        || descriptor.reference == "deploy.native-library.app-owned@1"),
+      if descriptor.reference == "debug.hap@1"
+        || descriptor.reference == "deploy.native-library.app-owned@1"
+        || descriptor.reference == "flash.dayu200@1",
         artifactStore == nil
       {
         reasons.append("Artifact lease store is not configured")
@@ -931,6 +932,7 @@ public actor RuntimeJobEngine {
       do {
         resolvedArtifact =
           step.kind == .sendFile
+            || step.kind == .flashPartition
             || descriptor.reference == "deploy.native-library.app-owned@1"
           ? try await resolvedInputArtifact(jobID: jobID) : nil
       } catch {
@@ -2769,6 +2771,38 @@ public actor RuntimeJobEngine {
     descriptor: CatalogOperationDescriptor,
     step: CatalogStepDescriptor
   ) async throws {
+    if descriptor.reference == "flash.dayu200@1" {
+      guard let resolved = try await resolvedInputArtifact(jobID: jobID) else {
+        throw RuntimeDispatchFailure.failed(
+          "flash host verification cannot resolve its typed imageBundleLease")
+      }
+      let summary: GzipTarArchiveSummary
+      do {
+        summary = try GzipTarArchiveReader.summarize(fileAt: resolved.fileURL)
+      } catch {
+        throw RuntimeDispatchFailure.failed(
+          "flash host verification cannot read the leased archive: \(error)")
+      }
+      guard summary.archiveSHA256 == resolved.sha256,
+        summary.archiveSizeBytes == Int64(resolved.byteCount)
+      else {
+        throw RuntimeDispatchFailure.failed(
+          "flash bundle bytes drifted from the leased hash/size")
+      }
+      switch RockchipFlashProfile.dayu200.validate(summary.archiveObservation()) {
+      case .valid:
+        appendTimeline(
+          jobID: jobID,
+          entry:
+            "\(step.stepID) profile=dayu200@1 "
+            + "sha256=\(summary.archiveSHA256)")
+        return
+      case .blocked(let violations):
+        throw RuntimeDispatchFailure.failed(
+          "flash bundle violates the pinned DAYU200 profile: "
+            + violations.map(\.description).joined(separator: "; "))
+      }
+    }
     guard descriptor.reference == "deploy.native-library.app-owned@1" else {
       return
     }
@@ -2824,6 +2858,11 @@ public actor RuntimeJobEngine {
     case "deploy.native-library.app-owned@1":
       guard case .string(let value)? =
         runtime.record.request.inputs["libraryArtifactLease"]
+      else { return nil }
+      lease = value
+    case "flash.dayu200@1":
+      guard case .string(let value)? =
+        runtime.record.request.inputs["imageBundleLease"]
       else { return nil }
       lease = value
     default:
@@ -2901,6 +2940,9 @@ public actor RuntimeJobEngine {
     case "deploy.native-library.app-owned@1":
       leaseInputName = "libraryArtifactLease"
       artifactLabel = "native library"
+    case "flash.dayu200@1":
+      leaseInputName = "imageBundleLease"
+      artifactLabel = "flash bundle"
     default:
       leaseInputName = nil
       artifactLabel = "input"

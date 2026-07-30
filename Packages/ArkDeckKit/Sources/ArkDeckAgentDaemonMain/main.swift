@@ -224,6 +224,8 @@ Task.detached {
       targetStore: targetStore,
       bootstrap: bootstrap,
       artifactStore: artifactStore,
+      flashBundleImportDirectory: resolvedStateDirectory.appendingPathComponent(
+        "flash-bundle-imports", isDirectory: true),
       harnessCoordinator: harness)
     let server = AgentDaemonServer(
       stateDirectory: resolvedStateDirectory, handler: handler, nowUTC: utcNow)

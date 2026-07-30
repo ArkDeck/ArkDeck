@@ -375,11 +375,15 @@ enum RuntimeCLI {
         exitCode: EX_USAGE,
         message:
           "missing artifact subcommand "
-          + "(import-hap|import-native-library|list|inspect|read|export)")
+          + "(import-hap|import-flash-bundle|import-native-library|list|inspect|read|export)")
     }
     var rest = Array(arguments.dropFirst())
     let json = rest.contains("--json")
     let client = client(&rest)
+    if subcommand == "import-flash-bundle" {
+      try importFlashBundle(rest, client: client, json: json)
+      return
+    }
     if subcommand == "import-hap" {
       guard let targetIndex = rest.firstIndex(of: "--target"), targetIndex + 1 < rest.count,
         let fileIndex = rest.firstIndex(of: "--file"), fileIndex + 1 < rest.count
@@ -544,6 +548,132 @@ enum RuntimeCLI {
     default:
       throw CLIError(exitCode: EX_USAGE, message: "unsupported artifact subcommand")
     }
+  }
+
+  private static func importFlashBundle(
+    _ arguments: [String],
+    client: AgentClient,
+    json: Bool
+  ) throws {
+    guard let targetIndex = arguments.firstIndex(of: "--target"),
+      targetIndex + 1 < arguments.count,
+      let fileIndex = arguments.firstIndex(of: "--file"),
+      fileIndex + 1 < arguments.count
+    else {
+      throw CLIError(
+        exitCode: EX_USAGE,
+        message:
+          "artifact import-flash-bundle requires "
+          + "--target <id> --file <images.tar.gz>")
+    }
+    let targetID = arguments[targetIndex + 1]
+    let url = URL(fileURLWithPath: arguments[fileIndex + 1]).standardizedFileURL
+    guard url.lastPathComponent == "images.tar.gz" else {
+      throw CLIError(
+        exitCode: EX_USAGE,
+        message: "flash bundle file must have the exact basename images.tar.gz")
+    }
+    let descriptor = Darwin.open(url.path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW)
+    guard descriptor >= 0 else {
+      throw CLIError(
+        exitCode: EX_USAGE,
+        message: "cannot open flash bundle file (errno \(errno))")
+    }
+    defer { Darwin.close(descriptor) }
+    let profile = RockchipFlashProfile.dayu200
+    var before = stat()
+    guard fstat(descriptor, &before) == 0,
+      before.st_mode & S_IFMT == S_IFREG,
+      before.st_size == profile.archiveSizeBytes
+    else {
+      throw CLIError(
+        exitCode: EX_DATAERR,
+        message:
+          "flash bundle must be the pinned DAYU200 regular archive of "
+          + "\(profile.archiveSizeBytes) bytes")
+    }
+
+    let begin = try client.request(
+      method: "artifact.importFlashBundle.begin",
+      params: [
+        "targetId": .string(targetID),
+        "name": .string("images.tar.gz"),
+        "byteCount": .integer(profile.archiveSizeBytes),
+        "sha256": .string(profile.archiveSHA256),
+      ])
+    guard case .object(let beginFields) = begin,
+      case .string(let uploadID)? = beginFields["uploadId"],
+      case .integer(let maximumChunkValue)? = beginFields["maximumChunkBytes"],
+      maximumChunkValue > 0, maximumChunkValue <= Int64(Int.max)
+    else {
+      throw AgentClientError.malformedResponse(
+        "artifact.importFlashBundle.begin returned no bounded upload identity")
+    }
+    var committed = false
+    defer {
+      if !committed {
+        _ = try? client.request(
+          method: "artifact.importFlashBundle.abort",
+          params: ["uploadId": .string(uploadID)])
+      }
+    }
+
+    let maximumChunk = Int(maximumChunkValue)
+    var buffer = [UInt8](repeating: 0, count: maximumChunk)
+    var hasher = SHA256()
+    var offset = 0
+    while true {
+      let count = Darwin.read(descriptor, &buffer, buffer.count)
+      if count < 0, errno == EINTR { continue }
+      guard count >= 0 else {
+        throw CLIError(
+          exitCode: EX_IOERR,
+          message: "flash bundle read failed (errno \(errno))")
+      }
+      if count == 0 { break }
+      let chunk = Data(buffer[0..<count])
+      hasher.update(data: chunk)
+      let appended = try client.request(
+        method: "artifact.importFlashBundle.append",
+        params: [
+          "uploadId": .string(uploadID),
+          "offset": .integer(Int64(offset)),
+          "base64": .string(chunk.base64EncodedString()),
+        ])
+      let expectedNextOffset = offset + count
+      guard case .object(let fields) = appended,
+        case .integer(let nextOffset)? = fields["nextOffset"],
+        nextOffset == Int64(expectedNextOffset)
+      else {
+        throw AgentClientError.malformedResponse(
+          "artifact.importFlashBundle.append returned a mismatched offset")
+      }
+      offset = expectedNextOffset
+    }
+    var after = stat()
+    let digest =
+      hasher.finalize().map { String(format: "%02x", $0) }.joined()
+    guard offset == Int(profile.archiveSizeBytes),
+      digest == profile.archiveSHA256,
+      fstat(descriptor, &after) == 0,
+      after.st_dev == before.st_dev,
+      after.st_ino == before.st_ino,
+      after.st_size == before.st_size,
+      after.st_mtimespec.tv_sec == before.st_mtimespec.tv_sec,
+      after.st_mtimespec.tv_nsec == before.st_mtimespec.tv_nsec,
+      after.st_ctimespec.tv_sec == before.st_ctimespec.tv_sec,
+      after.st_ctimespec.tv_nsec == before.st_ctimespec.tv_nsec
+    else {
+      throw CLIError(
+        exitCode: EX_DATAERR,
+        message:
+          "flash bundle changed during import or does not match the pinned DAYU200 SHA-256")
+    }
+    let result = try client.request(
+      method: "artifact.importFlashBundle.commit",
+      params: ["uploadId": .string(uploadID)])
+    committed = true
+    emit(result, json: json)
   }
 
   private struct HAPImportPayload {
