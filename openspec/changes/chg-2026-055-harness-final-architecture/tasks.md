@@ -260,8 +260,10 @@
 - Depends on:TASK-HFA-001(判定面先稳定,再把解析搬到 provider);
   CHG-2026-054 TASK-HTP-007(host-only 准入路径,done)
 - Hardware required:no
-- Scope:新 provider `arkdeck-analyzer`(`CatalogProvider` 新增 case + registry 注册 +
-  host concurrency key)与三个 operation:`analyzer.extractCrashSignature@1`、
+- Scope(r1 追加:承接 TASK-HFA-008 移交的 `workspace.parseBuildFailure@1` 与
+  `collectBuildOutputs@1` —— 两者消费既有 artifact 并发布 derived artifact,与本任务的
+  analyzer/derived-artifact 流水线同一套 plumbing):新 provider `arkdeck-analyzer`
+  (`CatalogProvider` 新增 case + registry 注册 + host concurrency key)与三个 operation:`analyzer.extractCrashSignature@1`、
   `analyzer.summarizeHilog@1`、`analyzer.summarizeTrace@1`(全部 E0、`binding: none`、
   经既有 `DescriptorBoundProcessDispatcher`);derived artifact 必须带
   sourceArtifactIds/hashes、analyzerRef@version、toolchainFingerprint、
@@ -293,18 +295,40 @@
   并断言零 drift——CHG-2026-050/053/HTP-007 先例。分析错误会把错误事实送进判定,
   故 analyzer 确定性与版本化各有用例,原始 artifact 一律保留)
 
-## TASK-HFA-008 — workspace 只读族:定位证据的八个 typed operation
+## TASK-HFA-008 — workspace 只读族:定位证据的 typed operation
 
-- Status:ready
+- Status:done
+- Done:2026-07-31;随本实现 PR 合入生效(维护者 review + merge 即批准)。
+  HFA-AC-17 PASS,evidence = `evidence/runs/TASK-HFA-008/run-r1.md`
+  (库层 973 tests/1 skip/0 fail,新增 14 例;catalog_gen 39/39 零 drift;
+  check-sdd 0/0/114;catalog digest 更新)。
+  **Gate**:§20 冻结门由维护者 2026-07-31 在会话中显式提前解冻(指令:完成全部 HFA);
+  本任务 host-only、零设备命令、零源码写入,风险面与 TASK-HTP-007 同级。
+  **交付 4 个新 operation**:`workspace.inspect-git-status@1`、`inspect-diff@1`、
+  `read-source-range@1`、`create-checkpoint@1`。
+  **标题从「八个」改为按实际能力交付,三条依据逐条如实登记(§5:判重以产品结果为准,
+  不以任务名为准)**:
+  ① `searchSource@1` **已存在** —— 就是已发布的 `workspace.inspect-source@1`
+  (pinned grep + symbol + glob,argv 逐 token 已钉死)。再发一个语义相同的 operation
+  属重复能力,不做;
+  ② `inspectSymbol@1` = `inspect-source@1`(定位)+ 本任务的 `read-source-range@1`
+  (取上下文)的**组合**,不是第三个 operation。handler 侧组合属 TASK-HFA-003 的规划面;
+  ③ `parseBuildFailure@1` / `collectBuildOutputs@1` **移交 TASK-HFA-007**:两者都
+  **消费既有 artifact 并发布 derived artifact**,依赖的是 analyzer/derived-artifact
+  流水线与 artifact input resolver,而不是本任务的 workspace 读取面。放在这里会先
+  造一套只此一处使用的 artifact 消费路径,与 007 重复。
+  **一处如实登记的命名偏离**:终版 §18.3 把产物写成 `git-status.json` / `diff-summary.json`,
+  而 git 的实际输出是文本(`--porcelain=v1`、`--stat`),故产物名用 `.txt`。
+  把文本命名为 `.json` 会让下游按 JSON 解析并失败——这是不实描述,不是格式选择。
 - Platform:macos
 - Requirements/AC:proposal What 8(workspace 只读族);change-local HFA-AC-17,
   登记于 `verification.md`
 - Gate:GJ-5 `REAL_DEVICE_PASS`(TASK-HFA-005 done)或维护者显式提前解冻;host-only
 - Depends on:CHG-2026-054 TASK-HTP-007(host-only 准入 + provider 骨架,done)
 - Hardware required:no
-- Scope:`workspace.inspectGitStatus@1`、`inspectDiff@1`、`searchSource@1`、
-  `readSourceRange@1`、`inspectSymbol@1`、`parseBuildFailure@1`、`collectBuildOutputs@1`
-  七个 E0 operation 与 `createCheckpoint@1`(E1,`REQUIRES_READBACK`);
+- Scope(r1 修订,依据见上方 Done 的三条登记):`workspace.inspect-git-status@1`、
+  `inspect-diff@1`、`read-source-range@1` 三个 E0 读取 operation 与
+  `create-checkpoint@1`(写 git 对象、不动 ref/index/worktree);
   全部经 ProjectProfile 声明的 scope 与 preset lowering,调用方零 argv、零路径;
   每个 operation 声明 typed inputs/outputs、byte budget、artifact 与 retry safety;
   argv 逐 token 契约测试;provider/工具不可用时 `UNAVAILABLE` 带机器可读原因且零

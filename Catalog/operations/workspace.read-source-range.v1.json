@@ -1,0 +1,80 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "workspace.read-source-range",
+  "version": 1,
+  "title": "Read a bounded line range of declared workspace source",
+  "provider": "workspace",
+  "effect": {
+    "minimum": "hostOnly",
+    "permitted": [
+      "hostOnly"
+    ]
+  },
+  "authorization": {
+    "hostOnly": "defaultReadOnly"
+  },
+  "binding": "none",
+  "concurrencyKey": "host-exclusive",
+  "inputs": {
+    "fields": {
+      "projectRef": {
+        "type": "string",
+        "required": true,
+        "description": "Declared project this read belongs to; the provider resolves its root."
+      },
+      "filePath": {
+        "type": "string",
+        "required": true,
+        "description": "Repository-relative path the ProjectProfile already declares readable."
+      },
+      "lineStart": {
+        "type": "integer",
+        "required": true,
+        "description": "First line to read, one-based."
+      },
+      "lineEnd": {
+        "type": "integer",
+        "required": true,
+        "description": "Last line to read; the provider bounds the span."
+      }
+    }
+  },
+  "outputs": {
+    "fields": {
+      "inspection": {
+        "type": "artifactReference",
+        "required": true
+      }
+    }
+  },
+  "timeoutSeconds": 60,
+  "outputByteBudget": 1048576,
+  "retry": {
+    "preflightAttempts": 1,
+    "mutationAttempts": 1
+  },
+  "unknownOutcome": "reconcileRequired",
+  "artifacts": [
+    {
+      "name": "source-range.txt",
+      "role": "raw",
+      "mediaType": "text/plain",
+      "privacy": "standard",
+      "required": true
+    }
+  ],
+  "profiles": [
+    "workspace-host@1"
+  ],
+  "steps": [
+    {
+      "stepID": "read-source-range",
+      "kind": "readWorkspaceSourceRange",
+      "effect": "hostOnly",
+      "cancellation": "immediate",
+      "binding": "none",
+      "compensation": "none",
+      "notes": "Reads a bounded range inside the resolved project root; writes nothing."
+    }
+  ]
+}

@@ -1,0 +1,65 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "workspace.create-checkpoint",
+  "version": 1,
+  "title": "Create a rollback checkpoint object for declared workspace source",
+  "provider": "workspace",
+  "effect": {
+    "minimum": "hostOnly",
+    "permitted": [
+      "hostOnly"
+    ]
+  },
+  "authorization": {
+    "hostOnly": "defaultReadOnly"
+  },
+  "binding": "none",
+  "concurrencyKey": "host-exclusive",
+  "inputs": {
+    "fields": {
+      "projectRef": {
+        "type": "string",
+        "required": true,
+        "description": "Declared project to checkpoint; the provider resolves its root."
+      }
+    }
+  },
+  "outputs": {
+    "fields": {
+      "inspection": {
+        "type": "artifactReference",
+        "required": true
+      }
+    }
+  },
+  "timeoutSeconds": 120,
+  "outputByteBudget": 1048576,
+  "retry": {
+    "preflightAttempts": 1,
+    "mutationAttempts": 1
+  },
+  "unknownOutcome": "reconcileRequired",
+  "artifacts": [
+    {
+      "name": "checkpoint.txt",
+      "role": "raw",
+      "mediaType": "text/plain",
+      "privacy": "standard",
+      "required": true
+    }
+  ],
+  "profiles": [
+    "workspace-host@1"
+  ],
+  "steps": [
+    {
+      "stepID": "create-checkpoint",
+      "kind": "createWorkspaceCheckpoint",
+      "effect": "hostOnly",
+      "cancellation": "atSafeBoundary",
+      "binding": "none",
+      "compensation": "none",
+      "notes": "Writes a git object and moves no ref, index or worktree."
+    }
+  ]
+}

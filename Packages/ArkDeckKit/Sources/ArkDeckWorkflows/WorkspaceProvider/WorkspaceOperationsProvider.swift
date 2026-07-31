@@ -79,6 +79,13 @@ public struct WorkspaceProjectProfile: Sendable, Equatable {
   public let projectRoot: String
   public let allowedFileGlobs: [String]
   public let inspectionPreset: WorkspaceCommandPreset
+  /// Pinned source-control tool. Absent means the read-only git operations
+  /// report unavailable rather than falling back to whatever `git` is on
+  /// PATH (CHG-2026-055, TASK-HFA-008).
+  public let sourceControlPreset: WorkspaceCommandPreset?
+  /// Pinned reader for bounded source ranges. Absent means the operation is
+  /// unavailable rather than falling back to reading files in-process.
+  public let sourceReaderPreset: WorkspaceCommandPreset?
   public let patchPreset: WorkspaceCommandPreset
   public let buildPresets: [String: WorkspaceCommandPreset]
   public let testPresets: [String: WorkspaceCommandPreset]
@@ -94,6 +101,8 @@ public struct WorkspaceProjectProfile: Sendable, Equatable {
     projectRoot: String,
     allowedFileGlobs: [String],
     inspectionPreset: WorkspaceCommandPreset,
+    sourceControlPreset: WorkspaceCommandPreset? = nil,
+    sourceReaderPreset: WorkspaceCommandPreset? = nil,
     patchPreset: WorkspaceCommandPreset,
     buildPresets: [String: WorkspaceCommandPreset],
     testPresets: [String: WorkspaceCommandPreset],
@@ -128,6 +137,8 @@ public struct WorkspaceProjectProfile: Sendable, Equatable {
     self.projectRoot = canonical
     self.allowedFileGlobs = allowedFileGlobs
     self.inspectionPreset = inspectionPreset
+    self.sourceControlPreset = sourceControlPreset
+    self.sourceReaderPreset = sourceReaderPreset
     self.patchPreset = patchPreset
     self.buildPresets = buildPresets
     self.testPresets = testPresets
@@ -214,6 +225,8 @@ public struct WorkspaceProjectProfile: Sendable, Equatable {
     var values: Set<WorkspaceExecutableIdentity> = [
       inspectionPreset.executable, patchPreset.executable,
     ]
+    if let sourceControl = sourceControlPreset { values.insert(sourceControl.executable) }
+    if let sourceReader = sourceReaderPreset { values.insert(sourceReader.executable) }
     for preset in buildPresets.values { values.insert(preset.executable) }
     for preset in testPresets.values { values.insert(preset.executable) }
     for preset in symbolPresets.values { values.insert(preset.executable) }
@@ -330,7 +343,8 @@ extension WorkspaceProviderAction {
     case .inspectSource:
       return nil
     case .buildOpenHarmony(let value), .runTests(let value),
-      .symbolizeCrash(let value):
+      .symbolizeCrash(let value), .inspectGitStatus(let value), .inspectDiff(let value),
+      .readSourceRange(let value), .createCheckpoint(let value):
       return value
     case .applyPatch(let value):
       return value.invocation
@@ -545,6 +559,11 @@ public struct WorkspaceOperationsProvider: DeviceProvider {
       hasPreset = !profile.testPresets.isEmpty
     case "workspace.symbolize-crash@1":
       hasPreset = !profile.symbolPresets.isEmpty
+    case "workspace.inspect-git-status@1", "workspace.inspect-diff@1",
+      "workspace.create-checkpoint@1":
+      hasPreset = profile.sourceControlPreset != nil
+    case "workspace.read-source-range@1":
+      hasPreset = profile.sourceReaderPreset != nil
     default:
       return .unavailable(reason: "workspace.unsupportedOperation")
     }
@@ -668,6 +687,72 @@ public struct WorkspaceOperationsProvider: DeviceProvider {
             operation: operation.reference, preset: preset,
             arguments: preset.fixedArguments + [artifact.fileURL.path])))
 
+    case ("workspace.inspect-git-status@1", .inspectWorkspaceGitStatus):
+      guard let preset = profile.sourceControlPreset else {
+        throw DeviceProviderError.unsupportedAction("workspace.sourceControlPresetUnavailable")
+      }
+      // `-C <root>` first: git runs in the root this provider resolved, so
+      // no input can move it elsewhere.
+      return .workspace(
+        .inspectGitStatus(
+          resolved(
+            operation: operation.reference, preset: preset,
+            arguments: preset.fixedArguments
+              + ["-C", profile.projectRoot, "status", "--porcelain=v1", "--untracked-files=all"])))
+
+    case ("workspace.inspect-diff@1", .inspectWorkspaceDiff):
+      guard let preset = profile.sourceControlPreset else {
+        throw DeviceProviderError.unsupportedAction("workspace.sourceControlPresetUnavailable")
+      }
+      let baseRevision = try string("baseRevision", in: inputs)
+      let pathScope = try string("pathScope", in: inputs)
+      try WorkspaceProviderSupport.validateRevisionExpression(baseRevision)
+      try WorkspaceProviderSupport.validatePathScope(pathScope)
+      // `--` terminates options, so neither value can become a flag, and the
+      // pathspec is relative to the root git was pointed at.
+      return .workspace(
+        .inspectDiff(
+          resolved(
+            operation: operation.reference, preset: preset,
+            arguments: preset.fixedArguments
+              + ["-C", profile.projectRoot, "diff", "--stat", baseRevision, "--", pathScope])))
+
+    case ("workspace.read-source-range@1", .readWorkspaceSourceRange):
+      guard let preset = profile.sourceReaderPreset else {
+        throw DeviceProviderError.unsupportedAction("workspace.sourceReaderPresetUnavailable")
+      }
+      let filePath = try string("filePath", in: inputs)
+      let start = try integer("lineStart", in: inputs)
+      let end = try integer("lineEnd", in: inputs)
+      guard start >= 1, end >= start, end - start < 2000 else {
+        // An unbounded range is how a "read" becomes "ship the repository":
+        // the span is part of the contract, not a caller's discretion.
+        throw DeviceProviderError.unsupportedAction("workspace.malformedLineRange")
+      }
+      // The path is resolved against the root this provider owns and checked
+      // against the ProjectProfile globs, so a caller cannot address a file
+      // the profile never declared.
+      let resolvedPath = try WorkspaceProviderSupport.resolvedReadablePath(
+        filePath, root: profile.projectRoot, profileGlobs: profile.allowedFileGlobs)
+      return .workspace(
+        .readSourceRange(
+          resolved(
+            operation: operation.reference, preset: preset,
+            arguments: preset.fixedArguments + ["-n", "\(start),\(end)p", resolvedPath])))
+
+    case ("workspace.create-checkpoint@1", .createWorkspaceCheckpoint):
+      guard let preset = profile.sourceControlPreset else {
+        throw DeviceProviderError.unsupportedAction("workspace.sourceControlPresetUnavailable")
+      }
+      // `stash create` writes a commit object and moves nothing - no ref, no
+      // index, no worktree - so a checkpoint cannot disturb the tree the
+      // repair leg is about to patch.
+      return .workspace(
+        .createCheckpoint(
+          resolved(
+            operation: operation.reference, preset: preset,
+            arguments: preset.fixedArguments + ["-C", profile.projectRoot, "stash", "create"])))
+
     case ("workspace.revert-patch@1", .revertWorkspacePatch):
       let reference = try string("patchAttemptRef", in: inputs)
       let attempt = try attempts.load(reference)
@@ -747,6 +832,47 @@ public struct WorkspaceOperationsProvider: DeviceProvider {
     switch workspace {
     case .inspectSource:
       return .unsupported(reason: "inspection belongs to TASK-HTP-007 provider path")
+    case .inspectGitStatus:
+      guard receipt.exitStatus == 0 else {
+        return failed("workspace.gitStatusFailed", receipt)
+      }
+      // A clean tree prints nothing. That is an observation, not a failure -
+      // the evaluator has to be able to tell "no local changes" from
+      // "the read broke".
+      var statusSummary = outputSummary(receipt)
+      statusSummary["dirty"] = receipt.stdout.isEmpty ? "false" : "true"
+      return .verified(summary: statusSummary)
+    case .inspectDiff:
+      guard receipt.exitStatus == 0 else {
+        return failed("workspace.diffFailed", receipt)
+      }
+      var diffSummary = outputSummary(receipt)
+      diffSummary["changed"] = receipt.stdout.isEmpty ? "false" : "true"
+      return .verified(summary: diffSummary)
+    case .readSourceRange:
+      guard receipt.exitStatus == 0 else {
+        return failed("workspace.sourceRangeFailed", receipt)
+      }
+      var rangeSummary = outputSummary(receipt)
+      rangeSummary["empty"] = receipt.stdout.isEmpty ? "true" : "false"
+      return .verified(summary: rangeSummary)
+    case .createCheckpoint:
+      // No object id on stdout means no checkpoint exists, and calling that
+      // success would let the repair leg believe it can roll back.
+      guard receipt.exitStatus == 0 else {
+        return failed("workspace.checkpointFailed", receipt)
+      }
+      let oid = String(decoding: receipt.stdout, as: UTF8.self)
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+      guard oid.count == 40, oid.allSatisfy({ $0.isHexDigit && ($0.isNumber || $0.isLowercase) })
+      else {
+        return .failed(
+          code: "workspace.checkpointEmpty",
+          detail: "git produced no checkpoint object for this workspace")
+      }
+      var checkpointSummary = outputSummary(receipt)
+      checkpointSummary["checkpointObject"] = oid
+      return .verified(summary: checkpointSummary)
     case .buildOpenHarmony:
       guard receipt.exitStatus == 0 else {
         return failed("workspace.buildFailed", receipt)
@@ -820,6 +946,16 @@ public struct WorkspaceOperationsProvider: DeviceProvider {
       return .stillUnknown(reason: "workspace reconcile received a foreign action")
     }
     switch workspace {
+    case .inspectGitStatus, .inspectDiff, .readSourceRange:
+      // A read writes nothing, so there is no external effect for recovery
+      // to confirm and re-running it cannot double anything.
+      return .confirmedNotExecuted
+    case .createCheckpoint:
+      // A checkpoint object is content-addressed: re-running produces the
+      // same object for the same tree and changes nothing observable. It is
+      // still not "not executed", so recovery must not claim either way.
+      return .stillUnknown(
+        reason: "workspace checkpoint object cannot be observed without re-reading git")
     case .applyPatch(let patch):
       let current = try WorkspaceProviderSupport.snapshots(
         relativePaths: patch.before.map(\.relativePath), root: profile.projectRoot)
@@ -878,6 +1014,15 @@ public struct WorkspaceOperationsProvider: DeviceProvider {
       throw DeviceProviderError.unsupportedAction("workspace input \(key) is missing")
     }
     return value
+  }
+
+  private func integer(
+    _ key: String, in inputs: [String: JSONValue]
+  ) throws -> Int {
+    guard case .integer(let value)? = inputs[key] else {
+      throw DeviceProviderError.unsupportedAction("workspace input \(key) is missing")
+    }
+    return Int(value)
   }
 
   private func stringArray(
@@ -1074,6 +1219,50 @@ enum WorkspaceProviderSupport {
       !path.hasPrefix(".git/"), path != ".git"
     else { return nil }
     return path
+  }
+
+  /// A repository-relative path that the ProjectProfile already declares
+  /// readable. Traversal, absolute paths and leading dashes are refused
+  /// rather than normalised, and the returned value is the joined path the
+  /// argv carries.
+  static func resolvedReadablePath(
+    _ relativePath: String, root: String, profileGlobs: [String]
+  ) throws -> String {
+    guard !relativePath.isEmpty, relativePath.count <= 240,
+      !relativePath.hasPrefix("-"), !relativePath.hasPrefix("/"),
+      !relativePath.contains(".."), !relativePath.contains("\u{0}")
+    else {
+      throw DeviceProviderError.unsupportedAction("workspace.malformedFilePath")
+    }
+    guard profileGlobs.contains(where: { matches(relativePath, glob: $0) }) else {
+      throw DeviceProviderError.unsupportedAction("workspace.pathOutsideProfileScope")
+    }
+    return URL(fileURLWithPath: root).appendingPathComponent(relativePath).path
+  }
+
+  /// A git revision expression, not a path and not an option. Anything that
+  /// could become a flag or reach the filesystem is refused rather than
+  /// escaped.
+  static func validateRevisionExpression(_ value: String) throws {
+    guard !value.isEmpty, value.count <= 120, !value.hasPrefix("-"),
+      !value.contains(".."), !value.contains("/"),
+      value.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || "._-^~@{}".contains($0)) })
+    else {
+      throw DeviceProviderError.unsupportedAction("workspace.malformedRevision")
+    }
+  }
+
+  /// A pathspec relative to the resolved root: no parent traversal, no
+  /// absolute path, no leading dash.
+  static func validatePathScope(_ value: String) throws {
+    guard !value.isEmpty, value.count <= 120, !value.hasPrefix("-"),
+      !value.hasPrefix("/"), !value.contains(".."),
+      value.allSatisfy({
+        $0.isASCII && ($0.isLetter || $0.isNumber || "*?.-_[]/".contains($0))
+      })
+    else {
+      throw DeviceProviderError.unsupportedAction("workspace.malformedPathScope")
+    }
   }
 
   static func validate(

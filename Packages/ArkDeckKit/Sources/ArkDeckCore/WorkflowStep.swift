@@ -151,6 +151,15 @@ public enum WorkflowStepKind: String, CaseIterable, Codable, Sendable {
   case runWorkspaceTests
   case symbolizeWorkspaceCrash
   case revertWorkspacePatch
+  /// Read-only source-control observations (CHG-2026-055, TASK-HFA-008).
+  /// They write nothing, so recovery has nothing to confirm and a repeat is
+  /// safe by construction.
+  case inspectWorkspaceGitStatus
+  case inspectWorkspaceDiff
+  case readWorkspaceSourceRange
+  /// Writes a git object and moves nothing: no ref, no index, no worktree.
+  /// It is the least invasive checkpoint the repair leg can roll back to.
+  case createWorkspaceCheckpoint
 }
 
 public struct WorkflowStepMetadata: Equatable, Sendable {
@@ -332,6 +341,16 @@ public enum WorkflowStepRegistry {
       ])
     case .inspectWorkspaceSource:
       host(required: ["projectRef", "symbol", "fileScope", "artifactId"])
+    case .inspectWorkspaceGitStatus:
+      host(required: ["projectRef", "artifactId"])
+    case .inspectWorkspaceDiff:
+      host(required: ["projectRef", "baseRevision", "pathScope", "artifactId"])
+    case .readWorkspaceSourceRange:
+      host(required: ["projectRef", "filePath", "lineStart", "lineEnd", "artifactId"])
+    case .createWorkspaceCheckpoint:
+      metadata(
+        .hostOnly, .atSafeBoundary, .none,
+        required: ["projectRef", "artifactId"])
     case .applyWorkspacePatch:
       metadata(
         .hostOnly, .atSafeBoundary, .none,
@@ -1114,6 +1133,28 @@ private enum WorkflowStepValidator {
       try reader.identifier("confirmationId")
       try reader.sha256("scopeHash")
       try reader.identifier("safeBoundaryId")
+    case .inspectWorkspaceGitStatus:
+      try reader.identifier("projectRef")
+      try reader.identifier("artifactId")
+    case .inspectWorkspaceDiff:
+      try reader.identifier("projectRef")
+      // A revision expression, not a path: the provider passes it to git
+      // after `-C <root>`, and git resolves it inside that repository.
+      _ = try reader.string("baseRevision", minimumLength: 1, maximumLength: 120)
+      // A pathspec the provider joins to the root it resolved itself.
+      _ = try reader.string("pathScope", minimumLength: 1, maximumLength: 120)
+      try reader.identifier("artifactId")
+    case .readWorkspaceSourceRange:
+      try reader.identifier("projectRef")
+      // A repository-relative path the provider joins to the root it
+      // resolved itself; traversal and absolute paths are refused there.
+      _ = try reader.string("filePath", minimumLength: 1, maximumLength: 240)
+      try reader.integer("lineStart", minimum: 1, maximum: 1_000_000)
+      try reader.integer("lineEnd", minimum: 1, maximum: 1_000_000)
+      try reader.identifier("artifactId")
+    case .createWorkspaceCheckpoint:
+      try reader.identifier("projectRef")
+      try reader.identifier("artifactId")
     case .inspectWorkspaceSource:
       try reader.identifier("projectRef")
       _ = try reader.string("symbol", minimumLength: 1, maximumLength: 200)
