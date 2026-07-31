@@ -1,7 +1,11 @@
 ---
 id: CHG-2026-054-agent-harness-task-plane
-revision: 1
+revision: 2
 status: approved # 携 approved 落地:维护者 review + merge 本 PR 即批准(enforcement 批准语义);merge 前任务不开工。范围过大时在 review 中要求削减并在同一 change 内修订,不新建 change。
+# r2(2026-07-31,维护者决定):TASK-HTP-005 开工前发现 host-only(无 target)operation
+# 在引擎准入面并不存在 —— catalog schema 允许 operation 级 `binding: none`,准入却对每个
+# job 无条件校验设备事实。故拆出 TASK-HTP-007 先行(准入语义 + 唯一消费者
+# workspace.inspectSource@1),005 收缩为其余五个 workspace operation。见 What 6/7。
 class: capability
 core_change_level: none
 owner: lvye
@@ -98,16 +102,27 @@ Framework、不新建第二套 Runtime、不新建守护进程**。
    输出 = 四类之一 `INVOKE_OPERATION | PROPOSE_PATCH | REQUEST_HUMAN | NO_SAFE_ACTION`,
    经严格 schema 校验后才可能进入 Policy Guard。**出站默认 deny**;未开启出站时
    harness 退化为确定性内建策略仍可跑 E0 收敛闭环(即模型不可用不等于闭环停摆)。
-6. **新 provider `arkdeck-workspace` + `workspace.*` operations**(本 change 的
-   审批核心之一):`inspectSource` / `applyPatch` / `buildOpenHarmony` / `runTests` /
-   `symbolizeCrash` / `revertPatch`。全部经 **ProjectProfile 内的 preset** lowering,
-   参数由 provider 生成;LLM/CLI/App 提交零 argv。这是"AI 自动化推进项目"的执行面:
-   AI 能在本机完成 patch → build → test 并产出可 review 的分支与证据包,
-   **push/PR/merge 仍然是人**。
-7. **`task.*` daemon 方法与 CLI**:`submit`/`list`/`status`/`result`/`cancel`/
+6. **host-only(无 target)准入语义**(r2 新增,TASK-HTP-007):引擎当前对**每个** job
+   无条件解析并校验真实设备事实(`materializeTypedPlanBeforeAuthorization` →
+   `validateEvidenceFacts`:要求匹配 targetID、**非空 expectedBindingRevision**、非空
+   connectKey、合法 deviceIdentity sha256、工具版本与 hash)。而 catalog schema 里
+   operation 级 `binding: none` 是合法值 —— 也就是说 schema 承诺了一个准入面从未实现的
+   形态。workspace 面全是 host 操作,没有 connectKey、没有设备身份,因此**不是加法**:
+   先要有这条路径 —— `binding: none` 的准入语义、无 target 的 facts/journal/concurrency
+   规则,以及「host-only operation 里出现任何设备 step 即 fail closed」。与**唯一消费者**
+   `workspace.inspectSource@1` 同车交付(引擎只从生成的静态 catalog 取 descriptor,
+   没有真实 operation 就测不到这条路径)。
+   **设备绑定不放宽**:`binding: confirmedDevice` 的准入逐条不变,新路径只对声明
+   `binding: none` 的 operation 可达。
+7. **新 provider `arkdeck-workspace` 的其余 `workspace.*` operations**(TASK-HTP-005):
+   `applyPatch` / `buildOpenHarmony` / `runTests` / `symbolizeCrash` / `revertPatch`。
+   全部经 **ProjectProfile 内的 preset** lowering,参数由 provider 生成;LLM/CLI/App
+   提交零 argv。这是"AI 自动化推进项目"的执行面:AI 能在本机完成 patch → build → test
+   并产出可 review 的分支与证据包,**push/PR/merge 仍然是人**。
+8. **`task.*` daemon 方法与 CLI**:`submit`/`list`/`status`/`result`/`cancel`/
    `pause`/`resume`/`reconcile`/`events`/`humanAction.resolve`。`job.*` 原样保留为
    底层安全执行原语。
-8. **三层 Memory**:task / project / failure。写入需证据引用(jobId、artifactId、
+9. **三层 Memory**:task / project / failure。写入需证据引用(jobId、artifactId、
    evaluationId、workspace revision);project memory 只接收 evaluator PASS 或人工
    确认过的结论。检索用精确指纹 + 既有文件索引,不引入检索基础设施。
 
@@ -185,6 +200,14 @@ Framework、不新建第二套 Runtime、不新建守护进程**。
   proposal 不自行放宽,实现 PR 必须写明依据。
 
 门的判定**不通过 status-only PR 维护**:任务保持 `ready`,由实现 PR 一次翻 `done`。
+
+r2 交付顺序(001–004 已合入):
+
+```text
+007 host-only 准入 + workspace.inspectSource@1(唯一消费者同车)
+  → 005 其余 workspace.*(applyPatch / build / runTests / symbolize / revert)+ preset
+  → 006 真机端到端 GJ-5 收敛(硬门:GJ-1/GJ-2 REAL_DEVICE_PASS)
+```
 
 ## 重复搜索结论(§5)
 

@@ -151,23 +151,67 @@
 - Risk:high(唯一的外部不可信输入面 + 唯一的出站面;拒绝面与脱敏面必须由负例钉死,
   不得依赖模型自律)
 
-## TASK-HTP-005 — 新 provider `arkdeck-workspace` 与 workspace.* typed operations
+## TASK-HTP-007 — host-only 准入语义与首个 host-only operation
 
 - Status:ready
 - Platform:macos
-- Requirements/AC:proposal What 6(新 provider 与六个 workspace operation、preset
+- Requirements/AC:proposal What 6(host-only 准入语义 + 唯一消费者
+  `workspace.inspectSource@1`);change-local HTP-AC-20、HTP-AC-21、HTP-AC-22,
+  登记于 `verification.md`
+- Gate:**已满足**——同 TASK-HTP-001 的维护者提前解冻(2026-07-30);本任务 host-only、
+  零设备命令、零源码写入。r2 拆分依据:005 开工前实测发现引擎准入对每个 job 无条件校验
+  设备事实,而 catalog schema 允许 operation 级 `binding: none` —— schema 与实现不一致,
+  必须先补齐(维护者 2026-07-31 决定拆分)
+- Depends on:TASK-HTP-003(guard 的 effect/availability 面已在位)
+- Hardware required:no(host-only,按定义不碰设备)
+- Scope:引擎 `binding: none` 准入路径(不解析设备 facts、不查 target store、拒绝携带
+  `expectedBindingRevision` 的请求、journal/artifact 的 binding 快照不带 revision 与
+  设备身份);**fail closed 背线**:host-only operation 里出现任何 `binding:
+  confirmedDevice` 步骤或高于 `hostOnly` 的 effect 即拒绝;`binding: confirmedDevice`
+  的既有准入逐条不变(回归断言);契约面新增 `inspectWorkspaceSource` step kind
+  (registry + workflow-step schema + Swift validator 三方同步)、`provider: workspace`
+  与 host concurrency key(operation schema + Core 枚举 + 生成器常量);新 operation
+  `workspace.inspectSource@1` + 最小 `arkdeck-workspace` provider(经既有
+  `DescriptorBoundProcessDispatcher` 真 spawn;工具未配置即 `UNAVAILABLE` 带机器可读
+  原因且零 capability 消耗);catalog 重生成与 digest 更新 + 生成器 pin 同步
+- Allowed paths:
+  - `Packages/ArkDeckKit/**`
+  - `Catalog/**`
+  - `openspec/contracts/workflow-step.schema.json`
+  - `openspec/contracts/workflow-step-registry.yaml`
+  - `openspec/contracts/provider-contracts.md`
+  - `scripts/catalog_gen/**`
+  - `openspec/changes/chg-2026-054-agent-harness-task-plane/**`
+  - `docs/adr/**`
+- Forbidden paths:
+  - `openspec/constitution.md`、`openspec/specs/**`、`openspec/verification/**`、
+    `openspec/baselines/**`、`openspec/contracts/capability-registry.yaml`
+  - `scripts/**`(仅上列 `scripts/catalog_gen/**` 除外)、`.github/**`、`AGENTS.md`、
+    `PRODUCT-LOOP.md`、`ArkDeck.xcodeproj/**`、`ArkDeckApp/**`
+  - 其他 change 目录
+- Risk:high(改动安全内核的准入路径。缓解:设备绑定分支逐条不变并有回归断言;
+  新路径只对声明 `binding: none` 的 operation 可达;host-only operation 内的设备 step
+  与超 `hostOnly` effect 双向 fail closed;词表 lockstep 同 PR 更新并断言零 drift)
+
+## TASK-HTP-005 — `arkdeck-workspace` 的其余 workspace.* typed operations
+
+- Status:ready
+- Platform:macos
+- Requirements/AC:proposal What 7(其余五个 workspace operation、preset
   lowering、patch 范围与回滚);change-local HTP-AC-15、HTP-AC-16、HTP-AC-17,
   登记于 `verification.md`
-- Gate:**已满足**——同 TASK-HTP-001 的维护者提前解冻;TASK-HTP-003 已 done
-  (源码写入必须先有 Policy Guard 与预算面)
-- Depends on:TASK-HTP-003
+- Gate:**已满足**——同 TASK-HTP-001 的维护者提前解冻;且 TASK-HTP-003 已 done
+  (源码写入必须先有 Policy Guard 与预算面)、TASK-HTP-007 已 done
+  (host-only 准入路径与 provider 骨架必须先在位)
+- Depends on:TASK-HTP-003、TASK-HTP-007
 - Hardware required:no(host 面 provider;真机部署复验在 TASK-HTP-006)
-- Scope:`arkdeck-workspace` provider 与 `workspace.inspectSource / applyPatch /
-  buildOpenHarmony / runTests / symbolizeCrash / revertPatch` 六个 typed operation
-  (catalog 描述符 + 契约 action 与参数面 + 生成器重生成 + digest 更新);ProjectProfile
-  build/test/symbol preset;经既有 `DescriptorBoundProcessDispatcher` 真 spawn;
-  patch artifact → glob 校验 → applied-patch artifact → revert;provider 不可用时
-  `UNAVAILABLE` 带机器可读原因且零 capability 消耗;零 `git push`/`merge`/PR 路径
+- Scope:`workspace.applyPatch / buildOpenHarmony / runTests / symbolizeCrash /
+  revertPatch` 五个 typed operation(catalog 描述符 + step kind 与参数面 + 生成器重生成
+  + digest 更新);ProjectProfile build/test/symbol preset;经既有
+  `DescriptorBoundProcessDispatcher` 真 spawn;patch artifact → glob 校验 →
+  applied-patch artifact → revert;provider 不可用时 `UNAVAILABLE` 带机器可读原因且零
+  capability 消耗;零 `git push`/`merge`/PR 路径。`workspace.inspectSource@1` 与
+  host-only 准入已由 TASK-HTP-007 交付,不在本任务范围
 - Allowed paths:
   - `Packages/ArkDeckKit/**`
   - `Catalog/**`
@@ -194,8 +238,9 @@
 - Requirements/AC:proposal 全部交付面的真机复验;change-local HTP-AC-18、
   HTP-AC-19,登记于 `verification.md`
 - Gate:GJ-1 与 GJ-2 均 `REAL_DEVICE_PASS`(硬门,不接受提前解冻);TASK-HTP-001..005
-  已 done
-- Depends on:TASK-HTP-001、TASK-HTP-002、TASK-HTP-003、TASK-HTP-004、TASK-HTP-005
+  与 TASK-HTP-007 已 done
+- Depends on:TASK-HTP-001、TASK-HTP-002、TASK-HTP-003、TASK-HTP-004、TASK-HTP-005、
+  TASK-HTP-007
 - Hardware required:yes(已接管 DAYU200 + 当前 catalog digest;E1 段需维护者经
   merged PR 已签发的 standing capability,Agent 不得自签)
 - Scope:在已接管设备上一次 `task.submit` 驱动 `DEBUG_CRASH` 自动完成 运行 → 采集 →

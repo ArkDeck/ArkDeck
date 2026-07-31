@@ -1,10 +1,11 @@
 # Verification — CHG-2026-054
 
-> Change:CHG-2026-054-agent-harness-task-plane@r1
-> Status:in_progress # 2026-07-31:HTP-AC-1..14 通过(AC-7 的真机字节面如实
-> pending-hardware);AC-15..17 pending(TASK-HTP-005 未开工),AC-18/19 pending-hardware。每条结论由其所属任务的实现 PR 写入本文件;维护者
-> review/merge 该实现 PR 即确认。不为本 change 追加独立 verification/archive 载体
-> (PRODUCT-LOOP §4/§20)。
+> Change:CHG-2026-054-agent-harness-task-plane@r2
+> Status:in_progress # 2026-07-31(r2):HTP-AC-1..14 通过(AC-7 的真机字节面如实
+> pending-hardware);AC-20..22 为 r2 新增的 host-only 准入面;AC-15..17 pending
+> (TASK-HTP-005 待 007 之后开工),AC-18/19 pending-hardware。每条结论由其所属任务的
+> 实现 PR 写入本文件;维护者 review/merge 该实现 PR 即确认。不为本 change 追加独立
+> verification/archive 载体(PRODUCT-LOOP §4/§20)。
 
 约定:
 
@@ -103,7 +104,9 @@
   端到端断言 5 样本要求 + 3 轮预算 → 任务以 `maxRoundsExhausted` 转 `failed`、
   全程未进 `succeeded`、最终 verdict 仍 `inconclusive`;
   `testComparatorsAndEscalationSelection`(escalation 取最严策略)断言
-  requestHuman 不被 collectMoreEvidence 稀释。 observation 来自真实字节且缺证据 fail closed(TASK-HTP-002)
+  requestHuman 不被 collectMoreEvidence 稀释。
+
+## HTP-AC-7 observation 来自真实字节且缺证据 fail closed(TASK-HTP-002)
 
 - 方法:用真机已产出的 hilog/ui-dump/build 产物字节样本驱动 observation builder,
   断言 crash signature、liveness、artifact digest 一致性的提取结果;artifact 为空、
@@ -241,10 +244,40 @@
   (第一版实际会在设备未观测前先跑 capture,被本 AC 的等价性测试照出),内建生产者就是
   handler 本身,端口只留给仓外生产者;文件内注明理由防止回退。
 
-## HTP-AC-15 workspace provider availability 与零 raw 命令(TASK-HTP-005)
+## HTP-AC-20 host-only 准入不碰设备面(TASK-HTP-007)
 
-- 方法:六个 `workspace.*` operation 的 lowering **逐 token** 断言由 preset 生成的完整
-  argv(与 `DeviceProviderArgvContractTests` 同范式);LLM/CLI 提交 argv 一律被拒;
+- 方法:对声明 `binding: none` 的 operation 断言准入路径**不解析设备 facts、不查
+  target store、不要求 connectKey/设备身份**;携带 `expectedBindingRevision` 的请求被
+  拒(host-only 没有绑定可言);job 记录与 artifact 的 binding 快照不带 bindingRevision
+  与 stableIdentity;journal 的 binding-none 步骤规则不被破坏。
+- Evidence:实现 PR 内测试 + 全量套件结果。
+- 结论:pending
+
+## HTP-AC-21 设备绑定准入逐条不变(TASK-HTP-007)
+
+- 方法:回归断言 `binding: confirmedDevice` 的既有准入行为不变——facts 缺失/targetID
+  不匹配/缺 `expectedBindingRevision`/缺 connectKey/身份摘要非法时仍以同样的
+  `evidenceIncomplete` 语义拒绝,且拒绝发生在授权之前(capability 不被消耗)。
+  新路径只对 `binding: none` 可达:断言设备 operation 走不进 host-only 分支。
+- Evidence:实现 PR 内测试(正反例)。
+- 结论:pending
+
+## HTP-AC-22 host-only operation 的双向 fail closed 与首个消费者(TASK-HTP-007)
+
+- 方法:①契约层断言 host-only operation 内出现 `binding: confirmedDevice` 步骤或高于
+  `hostOnly` 的 effect 时被拒(生成器与运行期双面);②`workspace.inspectSource@1` 的
+  lowering **逐 token** 断言完整 argv(零 shell、零拼接),工具未配置时
+  `operation.list` 返回 `UNAVAILABLE` + 机器可读原因且零 capability 消耗;
+  ③三方词表(registry / workflow-step schema / Swift validator)与生成器 pin 同步、
+  `generate.py --check` 零 drift、catalog digest 更新。
+- Evidence:实现 PR 内测试 + 生成器 `--check` 输出 + `operation.list` 输出。
+- 结论:pending
+
+## HTP-AC-15 其余 workspace operation 的 availability 与零 raw 命令(TASK-HTP-005)
+
+- 方法:五个 `workspace.*` operation(applyPatch/build/runTests/symbolize/revert)的
+  lowering **逐 token** 断言由 preset 生成的完整 argv(与
+  `DeviceProviderArgvContractTests` 同范式);LLM/CLI 提交 argv 一律被拒;
   preset 或工具链缺失时 `operation.list` 返回 `UNAVAILABLE` + 机器可读 reasonCode,
   且 capability 不被消耗。
 - Evidence:实现 PR 内测试 + `operation.list` 输出。
