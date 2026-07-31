@@ -1,0 +1,56 @@
+{
+  "capabilityID": "CAP-RT-AUTO-20260731T072452Z-DA607C97EE79",
+  "effectCeiling": "deviceMutation",
+  "exactBindingRevision": 1,
+  "expiresAtUTC": "2026-07-31T11:24:52Z",
+  "inputConstraints": {
+    "abilityName": {
+      "kind": "exactString",
+      "value": "EntryAbility"
+    },
+    "bundleName": {
+      "kind": "exactString",
+      "value": "com.example.waterflowdemo"
+    },
+    "cleanupPolicy": {
+      "kind": "exactString",
+      "value": "retain"
+    },
+    "diagnosticsDurationSeconds": {
+      "kind": "integerRange",
+      "maximum": 5,
+      "minimum": 5
+    },
+    "hapArtifactLease": {
+      "kind": "exactString",
+      "value": "lease-v1:input-hap-TGT-958780b2ffb7-r1-e873aeb0a0da520e:ART-effd30d8d2da276a4a63a647f82c27ec"
+    },
+    "installPolicy": {
+      "kind": "exactString",
+      "value": "installOrReplace"
+    },
+    "postRunAbilityState": {
+      "kind": "exactString",
+      "value": "running"
+    }
+  },
+  "issuedAtUTC": "2026-07-31T07:24:52Z",
+  "issuer": {
+    "kind": "maintainerMergedPR",
+    "reference": "PR#881"
+  },
+  "maximumUses": 1,
+  "operationScope": [
+    {
+      "operationID": "debug.hap",
+      "version": 1
+    }
+  ],
+  "revocation": {
+    "state": "active"
+  },
+  "targetScope": {
+    "kind": "stablePhysicalIdentity",
+    "sha256": "958780b2ffb7090d4f22cdc1f547f9804ed0f0b605e3020f384e5d4823dc7a7e"
+  }
+}

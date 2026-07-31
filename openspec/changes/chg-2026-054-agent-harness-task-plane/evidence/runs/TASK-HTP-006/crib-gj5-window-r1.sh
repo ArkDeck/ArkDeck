@@ -284,6 +284,7 @@ cat >"${STATE_DIR}/l2-inputs.json" <<JSON
   "abilityName": "${ABILITY}",
   "installPolicy": "installOrReplace",
   "cleanupPolicy": "retain",
+  "postRunAbilityState": "running",
   "captureDiagnostics": true,
   "diagnosticsDurationSeconds": 5
 }
@@ -364,8 +365,8 @@ printf 'the package is retained; debug.hap@1 always runs stop-ability, so the ap
   if [[ "${PHASE}" == "l1l2" ]]; then
     say "phase l1l2 complete"
     printf 'state dir (pass it to the next phase): %s\n' "${STATE_DIR}"
-    printf '\nHUMAN STEP before --phase l3: start %s on the device and leave it on the\n' "${BUNDLE}"
-    printf 'WaterFlow screen WITHOUT reproducing the crash.\n'
+    printf '\nthe application is already running (postRunAbilityState=running), so --phase l3\n'
+    printf 'can follow immediately. Do not reproduce the crash until L3 has passed.\n'
     exit 0
   fi
 else

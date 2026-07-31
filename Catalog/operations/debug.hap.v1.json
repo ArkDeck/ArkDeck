@@ -45,6 +45,13 @@
         "enum": ["uninstall", "retain", "restorePrevious"],
         "default": "uninstall"
       },
+      "postRunAbilityState": {
+        "type": "string",
+        "required": false,
+        "enum": ["stopped", "running"],
+        "default": "stopped",
+        "description": "Whether the started ability is stopped before cleanup. `running` skips stop-ability so the application is still live when the job succeeds, which is what an external observer needs; the operator then owns stopping it. A failed job still stops the ability during compensation."
+      },
       "captureDiagnostics": { "type": "boolean", "required": false, "default": true },
       "diagnosticsDurationSeconds": {
         "type": "integer",
