@@ -1897,11 +1897,24 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
   /// Three-valued reading of a `pidof <bundleName>` probe: running, not
   /// running, or `nil` when the output proves neither.
   ///
-  /// `pidof` answers exit 1 with no output for a name it cannot find, which
-  /// is the only shape that proves absence. Anything else — noise, a partial
-  /// read, a non-numeric token — is ambiguous and must stay that way: a stop
-  /// that reports success because the probe was unreadable is the exact
-  /// failure this readback exists to prevent.
+  /// Absence is empty output, and the exit status is deliberately not
+  /// consulted. The 2026-07-31 device window measured all three shapes on
+  /// DAYU200/hdc 3.2.0f:
+  ///
+  ///     pidof <running>   -> exit 0, "443"
+  ///     pidof <stopped>   -> exit 0, ""
+  ///     pidof <nonsense>  -> exit 0, ""
+  ///
+  /// `pidof` itself exits 1 for a name it cannot find, but `hdc shell`
+  /// reports the *client's* status, so that 1 never crosses the transport —
+  /// the same fact that makes exit codes useless for `aa`/`bm`. An earlier
+  /// version of this helper required exit 1 for the absent case, a shape
+  /// production could never produce, so every successful stop landed in
+  /// `.unknown` and wedged the target's automatic-E1 lineage.
+  ///
+  /// Noise (a non-numeric token) still yields `nil`: a stop that reports
+  /// success because the probe was unreadable is what this readback exists
+  /// to prevent.
   static func processPresence(_ receipt: ProviderSubprocessReceipt) -> Bool? {
     guard !receipt.stdoutTruncated,
       let text = String(data: receipt.stdout, encoding: .utf8)
@@ -1909,8 +1922,8 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
       return nil
     }
     let tokens = text.split(whereSeparator: \.isWhitespace)
-    if receipt.exitStatus == 1, tokens.isEmpty { return false }
-    guard receipt.exitStatus == 0, !tokens.isEmpty,
+    if tokens.isEmpty { return false }
+    guard
       tokens.allSatisfy({ token in
         guard let value = UInt32(token) else { return false }
         return value > 0

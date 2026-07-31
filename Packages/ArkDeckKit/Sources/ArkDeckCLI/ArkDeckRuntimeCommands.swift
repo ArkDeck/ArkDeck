@@ -845,7 +845,9 @@ enum RuntimeCLI {
 
   static func runJob(_ arguments: [String]) throws {
     guard let subcommand = arguments.first else {
-      throw CLIError(exitCode: EX_USAGE, message: "missing job subcommand (submit|status|list)")
+      throw CLIError(
+        exitCode: EX_USAGE,
+        message: "missing job subcommand (submit|status|list|reconcile)")
     }
     var rest = Array(arguments.dropFirst())
     let json = rest.contains("--json")
@@ -859,6 +861,19 @@ enum RuntimeCLI {
       }
       emit(
         try client.request(method: "job.status", params: ["jobId": .string(rest[index + 1])]),
+        json: json)
+    case "reconcile":
+      // The daemon has owned `job.reconcile` since MU-4; the CLI did not
+      // expose it, so a job left in `waitingForRecovery` had no operator
+      // path to resolution — and an unresolved mutation use blocks every
+      // later automatic E1 on that target (2026-07-31 device window). This
+      // asks the daemon to run the read-only readback that settles the
+      // outstanding intent; it never redispatches the mutation.
+      guard let index = rest.firstIndex(of: "--job"), index + 1 < rest.count else {
+        throw CLIError(exitCode: EX_USAGE, message: "job reconcile requires --job <id>")
+      }
+      emit(
+        try client.request(method: "job.reconcile", params: ["jobId": .string(rest[index + 1])]),
         json: json)
     case "submit":
       // A prepared request file carries typed inputs the flag form cannot

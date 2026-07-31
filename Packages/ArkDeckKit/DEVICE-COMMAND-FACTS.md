@@ -77,7 +77,7 @@ hdc -t <connectKey> <...>                           # 每条设备命令都显�
    | 命令 | 判定串 |
    | --- | --- |
    | `bm install -p …` | `install bundle successfully.` |
-   | `bm uninstall -n …` | 成功 `uninstall bundle successfully`;**未安装** `uninstall missing installed bundle` |
+   | `bm uninstall -n …` | 成功 `uninstall bundle successfully.`;**未安装** deveco 记为 `uninstall missing installed bundle`,但 **OH 3.2 DAYU200 实测 `[R]` 是 `error: failed to uninstall bundle.` + `code:9568386`** —— 串不通用,别按串判 |
    | `hdc file send` / `file recv` | stdout 以 `FileTransfer finish` 开头 |
    | `bm quickfix …` | 匹配 `/succe(ed|ss)/i` |
    | `uitest uiInput …` | exit 0 且 stdout 不含 `illegal`/`fail`/`error`/`incorrect`/`please confirm that the coordinate values are correct`(白名单 `no error`) |
@@ -121,8 +121,22 @@ hdc -t <k> shell pidof <bundleName>
 
 - **多包应用必须一次装完**:entry + feature + 远端 HSP 依赖全部 send 进同一目录,
   由**一条** `bm install -p <dir>` 安装;逐个装单文件不是等价操作。
-  ArkDeck 现在只 lower 单文件 + `-r`,单 HAP 场景之外未覆盖。
+  **两种形态都已真机确认 `[R]`**(2026-07-31):`bm install -p <dir>` 与
+  `bm install -p <file> -r` 都回 `install bundle successfully.`,单 HAP 用现形态没错;
+  多包的阻塞在 `debug.hap@1` 只收一个 `hapArtifactLease`(input 面,见 D5)。
 - `pidof` 可能返回多个空格分隔 PID;进程名等于 bundleName 只对主进程成立。
+- **`hdc shell` 只回客户端退出码,远端命令的退出码不过桥 `[R]`**(2026-07-31 实测):
+
+  ```text
+  pidof <running>   -> exit 0, "443"
+  pidof <stopped>   -> exit 0, ""
+  pidof <nonsense>  -> exit 0, ""
+  bm dump -n <missing>            -> exit 0, "error: failed to get information..."
+  bm uninstall -n <not installed> -> exit 0, "error: failed to uninstall bundle." + "code:9568386"
+  ```
+
+  → 任何"用远端退出码判成败"的写法在这条传输上都是死代码。判据只能来自 stdout
+  内容:`pidof` 的**空输出**即不在,`bm dump` 的输出**是否含 bundle 名**即在否。
 - `error:install sign info inconsistent` = 签名主体变了,先卸载再装。
 - **真机不接受未签名包**:deveco 在 host 侧先判 `-signed.hap` / `-signed.hsp` 后缀,
   不满足直接报错、不下发。注意该后缀是 DevEco 构建约定而非设备要求,只能当作
@@ -245,16 +259,16 @@ hdc -t <k> shell rm -f <remote.png>
 | --- | --- | --- | --- |
 | D3 | `param get` 结果直接 trim 后入 summary | 输出可能是 `key = value` | **本车已落地**(仅剥"请求键 + `=`"前缀) |
 | D1 | `capture-ui-dump` = `captureRemoteStdout` + `windowInventory`;`componentTree` lowering fail closed | `uitest dumpLayout` 写设备文件 + `file recv` | **需契约或 Catalog 变更**(本车只把拒绝原因从"无 windowId-free 形态"更正为"stdout 步骤形态无法承载文件型产物",并指向本文件 §7) |
-| D2 | `stopAbility` / `uninstallPackage` verify **仅**看 exit status 就判 `verified` | `aa`/`bm` 家族有短状态行可判;`bm uninstall` 有 `uninstall missing installed bundle` 这种"0 但没做" | **本车已落地**(两条 mutation 各自降为「mutation + presence readback」序列:stop 后 `pidof`、uninstall 后 `bm dump -n`,判据取 readback 三值——不在=verified、还在=`stopIneffective`/`uninstallIneffective` failed、读不出=unknown;**没有**去解析 `aa`/`bm` 的状态串,所以不占用"待真机证据"的额度。probe 解析与 reconcile 路径共用同一份 helper) |
+| D2 | `stopAbility` / `uninstallPackage` verify **仅**看 exit status 就判 `verified` | `aa`/`bm` 家族有短状态行可判;`bm uninstall` 有 `uninstall missing installed bundle` 这种"0 但没做" | **本车已落地**(两条 mutation 各自降为「mutation + presence readback」序列:stop 后 `pidof`、uninstall 后 `bm dump -n`,判据取 readback 三值——不在=verified、还在=`stopIneffective`/`uninstallIneffective` failed、读不出=unknown;**没有**去解析 `aa`/`bm` 的状态串,所以不占用"待真机证据"的额度。probe 解析与 reconcile 路径共用同一份 helper。**2026-07-31 真机修正**:首版 `processPresence` 要求 `exitStatus == 1` 才判进程不在,而 `hdc shell` 只回客户端退出码,该 shape 生产上永不出现 —— 每次成功的 stop 都落 `.unknown`。已改为按**空输出**判不在、完全不看退出码,并经真机 reconcile 复验) |
 | D4 | `receiveOwnedArtifact` lower 为 `["file","recv",<remote>]`(**无本地目标**),且其 verify 要求 `receipt.hostManagedRecordID`,而 process 收据从不携带该字段 → 永远 `.unknown` | recv 本地目标语义不稳,必须按内容校验 | **本车已落地**(argv 补 host 目标;dispatcher 按 `HostLandingExpectation` 实测落地文件的大小与 SHA-256;verdict 全部来自磁盘字节:无文件=`.unknown`、空=`.failed`、超预算=`.failed` 且不做哈希、pin 了哈希则真比对;`trace.htrace` 改从收到的文件发布,不再用 `receipt.stdout`) |
 | D10 | trace 腿在 `validateSupportedPlanInputs` 处按 `traceCategories` 整体拒绝(admission 前) | `hitrace -o <file>` 的产物存在性/大小只能由设备侧 `ls -l` 第 5 字段判(同 §8) | **本车已落地**(`capture-trace` 降为 `hitrace` + `ls -l` 两段序列,判据取 listing 的 size 字段而非退出码:>0 verified、=0 `emptyTrace` failed、非常规文件/读不出 unknown;admission 拒绝解除,trace 腿改由 E1 授权路径管辖)|
 | D11 | trace 腿现在会真下发,但从未在真机上跑过;`ls -l` 字段序与 `file recv` 落地形态都只有 `[S]` 来源 | deveco 的 `ls -l` 第 5 字段判据取自截屏路径(§8),不是 hitrace 路径 | **已真机确认**(2026-07-31 窗口:DAYU200 / hdc 3.2.0f / toybox 0.8.12,`capture.diagnostics@1` 带 `traceCategories` 一次跑通,`trace.htrace` 12,456 字节且首字节为 `# tracer: nop`;两项来源均由 `[S]` 升为 `[R]`。证据:`evidence/runs/TASK-DHA-001/trace-leg-window-2026-07-31.md`) |
 | D12 | `cleanup-uninstall` 在 catalog 里是 optional,所以卸载判失败后 job 仍记 `succeeded`(时间线有 `failed cleanup-uninstall: uninstallIneffective`) | — | 需契约或 Catalog 变更(要让"清理没做成"改变 job 结果,得动 `debug.hap@1` 的 step optional 语义;D2 只保证它不再冒充干净卸载) |
-| D5 | `bm install -p <单文件> -r` | 多包必须同目录 + 一条 `bm install -p <dir>` | 待真机证据(单 HAP 之外未覆盖) |
+| D5 | `bm install -p <单文件> -r` | 多包必须同目录 + 一条 `bm install -p <dir>` | **需契约或 Catalog 变更**(2026-07-31 真机:目录形与单文件形**都成立**,单 HAP 用现形态没错;多包的阻塞在 `debug.hap@1` 的 input 只收一个 `hapArtifactLease`,是 input 面变更,lowering 补不了。窗口记录见 `evidence/runs/TASK-DHA-001/d5-d9-window-2026-07-31.md`) |
 | D6 | retry 仅 `preflightAttempts: 2 / mutationAttempts: 1` | transient 串表 + 800/1500/2500 退避 | 待真机证据(transient 分类进判定前需 pin) |
 | D7 | 无签名前置判断 | host 侧判 `-signed.*` 后缀 | 待真机证据(后缀是构建约定,只能当提示) |
 | D8 | 无 screenshot operation | `snapshot_display` + size 判据 + PNG 魔数 | 需契约或 Catalog 变更(新 operation) |
-| D9 | crash 采集形态未定(GJ-3 需要) | `hidumper -s 1201 -a "-p Faultlogger[ -f <file>]"` | 待真机证据 |
+| D9 | crash 采集形态未定(GJ-3 需要) | `hidumper -s 1201 -a "-p Faultlogger[ -f <file>]"` | 待真机证据(**命令形与空态输出已 pin `[R]`**:service 1201 = HiviewService,无崩溃时回 `No fault log exist.` 与 `******` 空列表;缺口收窄为需要一次真实崩溃才能 pin 条目格式与 `-f <file>` 形态 —— GJ-3 会自然产生,不必造崩溃) |
 
 ## 11. 明确不适用(不要抄进来)
 

@@ -394,11 +394,15 @@ final class DeviceProviderContractTests: XCTestCase {
     XCTAssertEqual(summary["stopped"], "com.example.demo")
   }
 
-  func testAmbiguousStopProbeStaysUnknown() throws {
+  /// Only unreadable output is ambiguous. Empty output is absence and a pid
+  /// list is presence — the exit status decides nothing, because `hdc shell`
+  /// reports the client's status and the device window measured exit 0 for
+  /// every `pidof` shape including "not found".
+  func testOnlyUnreadableStopProbeOutputStaysUnknown() throws {
     let ability = try HDCAbilityReference(
       bundle: try HDCBundleReference(bundleName: "com.example.demo"),
       abilityName: "EntryAbility")
-    for (probe, exit) in [("error 404\n", Int32(0)), ("", Int32(0)), ("3421\n", Int32(1))] {
+    for (probe, exit) in [("error 404\n", Int32(0)), ("pid 3421\n", Int32(0))] {
       let outcome = try hdc.verify(
         receipt: mutationReceipt(
           mutation: "", mutationExit: 0, probe: probe, probeExit: exit),
@@ -407,6 +411,33 @@ final class DeviceProviderContractTests: XCTestCase {
         return XCTFail("probe \(probe.debugDescription)/\(exit) gave \(outcome)")
       }
     }
+  }
+
+  /// The exact shape the real device returns after a successful stop —
+  /// exit 0 with no output. The first implementation demanded exit 1 here,
+  /// which `hdc shell` never produces, so every real stop went `.unknown`
+  /// and blocked the target's automatic-E1 lineage (2026-07-31 window,
+  /// `job-5e666e27…`).
+  func testStopProbeMatchesTheDeviceShapeForAStoppedProcess() throws {
+    let ability = try HDCAbilityReference(
+      bundle: try HDCBundleReference(bundleName: "com.example.demo"),
+      abilityName: "EntryAbility")
+    let outcome = try hdc.verify(
+      receipt: mutationReceipt(mutation: "", mutationExit: 0, probe: "", probeExit: 0),
+      action: .hdc(.stopAbility(ability)), context: context)
+    guard case .verified(let summary) = outcome else {
+      return XCTFail("exit 0 with no pid is a stopped process, got \(outcome)")
+    }
+    XCTAssertEqual(summary["stopped"], "com.example.demo")
+
+    // And the running shape the same device returns, through the same probe.
+    let running = try hdc.verify(
+      receipt: mutationReceipt(mutation: "", mutationExit: 0, probe: "443\n", probeExit: 0),
+      action: .hdc(.stopAbility(ability)), context: context)
+    guard case .failed(let code, _) = running else {
+      return XCTFail("a live pid must fail the stop, got \(running)")
+    }
+    XCTAssertEqual(code, "stopIneffective")
   }
 
   /// `bm uninstall` answers `uninstall missing installed bundle` on a clean
