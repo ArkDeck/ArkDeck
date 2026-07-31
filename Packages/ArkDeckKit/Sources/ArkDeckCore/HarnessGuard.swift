@@ -87,6 +87,23 @@ public struct HarnessFailureFingerprint: Equatable, Sendable, Codable {
       .map { String(format: "%02X", $0) }.joined()
     return "FAIL-\(hex.prefix(16))"
   }
+
+  /// Semantic build/test/revision failures cannot become action retries. The
+  /// same bytes or command against the same facts will not improve; the next
+  /// decision must change strategy (TASK-HFA-003).
+  public var retryDisposition: HarnessFailureRetryDisposition {
+    switch errorClassification {
+    case "BUILD_SEMANTIC_FAILURE", "TEST_FAILURE", "WORKSPACE_REVISION_CONFLICT":
+      return .alternativeRequired
+    default:
+      return .actionRetryAllowed
+    }
+  }
+}
+
+public enum HarnessFailureRetryDisposition: String, CaseIterable, Codable, Sendable {
+  case actionRetryAllowed = "ACTION_RETRY_ALLOWED"
+  case alternativeRequired = "ALTERNATIVE_REQUIRED"
 }
 
 public enum HarnessRetryStance: String, CaseIterable, Codable, Sendable {

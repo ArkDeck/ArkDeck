@@ -83,6 +83,10 @@ public struct WorkspaceProjectProfile: Sendable, Equatable {
   public let buildPresets: [String: WorkspaceCommandPreset]
   public let testPresets: [String: WorkspaceCommandPreset]
   public let symbolPresets: [String: WorkspaceCommandPreset]
+  /// A build preset may declare one deployable product whose bytes are read
+  /// back after a successful build.  The path belongs to repository-managed
+  /// configuration, never to a model proposal or task input.
+  public let buildProducts: [String: String]
 
   public init(
     profileID: String,
@@ -93,7 +97,8 @@ public struct WorkspaceProjectProfile: Sendable, Equatable {
     patchPreset: WorkspaceCommandPreset,
     buildPresets: [String: WorkspaceCommandPreset],
     testPresets: [String: WorkspaceCommandPreset],
-    symbolPresets: [String: WorkspaceCommandPreset]
+    symbolPresets: [String: WorkspaceCommandPreset],
+    buildProducts: [String: String] = [:]
   ) throws {
     let canonical = URL(fileURLWithPath: projectRoot)
       .resolvingSymlinksInPath().standardizedFileURL.path
@@ -112,7 +117,9 @@ public struct WorkspaceProjectProfile: Sendable, Equatable {
       allowedFileGlobs.allSatisfy(WorkspaceProviderSupport.isSafeGlob),
       buildPresets.allSatisfy({ $0.key == $0.value.presetID }),
       testPresets.allSatisfy({ $0.key == $0.value.presetID }),
-      symbolPresets.allSatisfy({ $0.key == $0.value.presetID })
+      symbolPresets.allSatisfy({ $0.key == $0.value.presetID }),
+      buildProducts.keys.allSatisfy({ buildPresets[$0] != nil }),
+      buildProducts.values.allSatisfy(WorkspaceProviderSupport.isSafeRelativePath)
     else {
       throw DeviceProviderError.factsUnavailable("workspace ProjectProfile is malformed")
     }
@@ -125,6 +132,7 @@ public struct WorkspaceProjectProfile: Sendable, Equatable {
     self.buildPresets = buildPresets
     self.testPresets = testPresets
     self.symbolPresets = symbolPresets
+    self.buildProducts = buildProducts
   }
 
   /// Built-in profile for this repository. An explicit root override is
@@ -933,6 +941,15 @@ enum WorkspaceProviderSupport {
       && !value.split(separator: "/", omittingEmptySubsequences: false)
         .contains(where: { $0 == ".." || $0.isEmpty })
       && !value.hasPrefix(".git") && !value.contains("/.git/")
+  }
+
+  static func isSafeRelativePath(_ value: String) -> Bool {
+    !value.isEmpty && value.utf8.count <= 512 && !value.hasPrefix("/") && !value.contains("\\")
+      && !value.contains(where: { "*?[]".contains($0) })
+      && !value.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) })
+      && !value.split(separator: "/", omittingEmptySubsequences: false)
+        .contains(where: { $0 == "." || $0 == ".." || $0.isEmpty })
+      && value != ".git" && !value.hasPrefix(".git/") && !value.contains("/.git/")
   }
 
   static func matches(_ path: String, glob: String) -> Bool {

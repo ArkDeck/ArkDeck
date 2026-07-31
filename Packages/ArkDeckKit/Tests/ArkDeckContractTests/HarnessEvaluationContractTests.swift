@@ -748,7 +748,7 @@ final class HarnessEvaluationContractTests: XCTestCase {
     XCTAssertEqual(failed.snapshot.observed.latestVerdict, .fail)
     XCTAssertEqual(failed.snapshot.observed.measurements["matchingCrashCount"], .integer(1))
     XCTAssertEqual(failed.action, .stoppedForHuman)
-    XCTAssertEqual(failed.reasonCode, "criteriaFailedNoRepairCapability")
+    XCTAssertEqual(failed.reasonCode, "patchProposalRequired")
     XCTAssertEqual(failed.snapshot.status, .humanRequired)
     XCTAssertNotEqual(failed.snapshot.status, .succeeded)
 

@@ -1830,7 +1830,15 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
           code: "packageNotInstalled",
           detail: "readback does not list \(bundle.bundleName)")
       }
-      return .verified(summary: ["bundleName": bundle.bundleName, "installed": "true"])
+      var summary = ["bundleName": bundle.bundleName, "installed": "true"]
+      // Bind the package readback to the exact immutable Artifact whose lease
+      // this job resolved.  The harness repair leg compares this value with
+      // the build-output digest before it may enter VERIFYING; an install exit
+      // code or bundle-name match alone is not that gate (TASK-HFA-003).
+      if let digest = context.resolvedInputArtifact?.sha256 {
+        summary["deployedArtifactSha256"] = digest
+      }
+      return .verified(summary: summary)
 
     case .startAbility:
       guard let exitStatus = receipt.exitStatus else {

@@ -34,6 +34,7 @@ public enum HarnessDispatchState: String, CaseIterable, Codable, Sendable {
 
 public enum HarnessDecisionKind: String, CaseIterable, Codable, Sendable {
   case invokeOperation
+  case proposePatch
   case requestHuman
   case noSafeAction
 }
@@ -53,6 +54,7 @@ public struct HarnessDecision: Equatable, Sendable, Codable {
   public let kind: HarnessDecisionKind
   public let operationReference: String?
   public let inputs: [String: JSONValue]
+  public let patchProposal: HarnessPatchProposal?
   public let hypothesis: String
   public let reasonCode: String
   public let producer: String
@@ -75,6 +77,7 @@ public struct HarnessDecision: Equatable, Sendable, Codable {
     case kind
     case operationReference
     case inputs
+    case patchProposal
     case hypothesis
     case reasonCode
     case producer
@@ -90,6 +93,7 @@ public struct HarnessDecision: Equatable, Sendable, Codable {
     kind: HarnessDecisionKind,
     operationReference: String? = nil,
     inputs: [String: JSONValue] = [:],
+    patchProposal: HarnessPatchProposal? = nil,
     hypothesis: String,
     reasonCode: String,
     producer: String,
@@ -104,6 +108,7 @@ public struct HarnessDecision: Equatable, Sendable, Codable {
     self.kind = kind
     self.operationReference = operationReference
     self.inputs = inputs
+    self.patchProposal = patchProposal
     self.hypothesis = hypothesis
     self.reasonCode = reasonCode
     self.producer = producer
@@ -126,6 +131,8 @@ public struct HarnessDecision: Equatable, Sendable, Codable {
       String.self, forKey: .operationReference)
     self.inputs =
       try container.decodeIfPresent([String: JSONValue].self, forKey: .inputs) ?? [:]
+    self.patchProposal = try container.decodeIfPresent(
+      HarnessPatchProposal.self, forKey: .patchProposal)
     self.hypothesis = try container.decode(String.self, forKey: .hypothesis)
     self.reasonCode = try container.decode(String.self, forKey: .reasonCode)
     self.producer = try container.decode(String.self, forKey: .producer)
@@ -147,6 +154,7 @@ public struct HarnessDecision: Equatable, Sendable, Codable {
       kind: kind,
       operationReference: operationReference,
       inputs: inputs,
+      patchProposal: patchProposal,
       hypothesis: hypothesis,
       reasonCode: reasonCode,
       producer: producer,

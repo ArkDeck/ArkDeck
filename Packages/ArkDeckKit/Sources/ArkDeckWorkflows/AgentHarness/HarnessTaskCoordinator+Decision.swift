@@ -32,7 +32,7 @@ extension HarnessTaskCoordinator {
     handler: any HarnessTaskHandler
   ) -> [String] {
     snapshot.policy.allowedOperations
-      .filter { handler.permittedOperations.contains($0) }
+      .filter { handler.offeredOperations(for: snapshot).contains($0) }
       .sorted()
   }
 
@@ -96,6 +96,7 @@ extension HarnessTaskCoordinator {
         do {
           let proposal = try HarnessDecisionProposal.parse(
             bytes, offeredOperations: Set(context.availableOperations))
+          try Self.validateModelProposal(proposal, against: deterministic.decision)
           let decision = HarnessDecision(
             decisionID: decisionIDFactory(),
             htaskID: snapshot.htaskID,
@@ -103,6 +104,7 @@ extension HarnessTaskCoordinator {
             kind: proposal.kind,
             operationReference: proposal.operationReference,
             inputs: proposal.inputs,
+            patchProposal: proposal.patchProposal,
             hypothesis: proposal.hypothesis,
             reasonCode: proposal.reasonCode,
             producer: decisionGateway.producerID,
@@ -113,7 +115,8 @@ extension HarnessTaskCoordinator {
               decision: decision,
               // Phase movement stays the handler's: a producer proposes a step,
               // not a debug-journey transition.
-              phaseOnDispatch: deterministic.phaseOnDispatch),
+              phaseOnDispatch: proposal.kind == .proposePatch
+                ? .patching : deterministic.phaseOnDispatch),
             producer: decisionGateway.producerID,
             rejection: nil)
         } catch let rejection as HarnessDecisionRejection {
@@ -139,6 +142,40 @@ extension HarnessTaskCoordinator {
           step: deterministic, producer: deterministic.decision.producer,
           rejection: "gatewayFailure")
       }
+    }
+  }
+
+  /// Repair orchestration owns all typed inputs after a patch proposal. The
+  /// model may provide bounded patch data only when the handler is explicitly
+  /// asking for it; it cannot substitute another artifact lease, preset,
+  /// bundle, ability, or rollback reference.
+  static func validateModelProposal(
+    _ proposal: HarnessDecisionProposal,
+    against deterministic: HarnessDecision
+  ) throws {
+    if proposal.kind == .proposePatch {
+      guard deterministic.kind == .requestHuman,
+        deterministic.reasonCode == "patchProposalRequired"
+      else {
+        throw HarnessDecisionRejection.operationNotExpected(DebugCrashTaskHandler.applyPatch)
+      }
+      return
+    }
+    let orchestrated: Set<String> = [
+      DebugCrashTaskHandler.applyPatch, DebugCrashTaskHandler.buildOpenHarmony,
+      DebugCrashTaskHandler.runTests, DebugCrashTaskHandler.revertPatch,
+      DebugCrashTaskHandler.deployHAP,
+    ]
+    guard proposal.kind == .invokeOperation,
+      let operation = proposal.operationReference,
+      orchestrated.contains(operation)
+    else { return }
+    guard operation != DebugCrashTaskHandler.applyPatch,
+      deterministic.kind == .invokeOperation,
+      deterministic.operationReference == operation,
+      deterministic.inputs == proposal.inputs
+    else {
+      throw HarnessDecisionRejection.operationNotExpected(operation)
     }
   }
 

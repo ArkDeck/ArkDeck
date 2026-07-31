@@ -796,7 +796,12 @@ final class HarnessTaskPlaneContractTests: XCTestCase {
     XCTAssertEqual(field(submitted, "status"), .string("created"))
     XCTAssertEqual(
       field(submitted, "allowedOperations"),
-      .array([.string("capture.diagnostics@1"), .string("observe.device@1")]))
+      .array([
+        .string("capture.diagnostics@1"), .string("debug.hap@1"),
+        .string("observe.device@1"), .string("workspace.apply-patch@1"),
+        .string("workspace.build-openharmony@1"), .string("workspace.revert-patch@1"),
+        .string("workspace.run-tests@1"),
+      ]))
 
     let reconciled = try await call("task.reconcile", ["htaskId": .string(taskID)])
     XCTAssertEqual(field(reconciled, "action"), .string("dispatched"))

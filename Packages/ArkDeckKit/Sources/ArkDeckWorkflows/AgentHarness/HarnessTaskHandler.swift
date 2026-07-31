@@ -34,6 +34,9 @@ public protocol HarnessTaskHandler: Sendable {
   /// The closed set of operation references this task type may submit.
   /// A submission may narrow it; nothing may widen it.
   var permittedOperations: Set<String> { get }
+  /// Operations a model may choose in this exact persisted phase. This is a
+  /// further narrowing of `permittedOperations`, never an expansion.
+  func offeredOperations(for snapshot: HarnessTaskSnapshot) -> Set<String>
   /// Default criteria for a submission that declares none. They are
   /// recorded, not evaluated, until TASK-HTP-002 lands the evaluator.
   func defaultSuccessCriteria() -> [HarnessSuccessCriterion]
@@ -46,9 +49,20 @@ public protocol HarnessTaskHandler: Sendable {
     -> HarnessTaskPhase
 }
 
+extension HarnessTaskHandler {
+  public func offeredOperations(for snapshot: HarnessTaskSnapshot) -> Set<String> {
+    permittedOperations
+  }
+}
+
 public struct DebugCrashTaskHandler: HarnessTaskHandler {
   public static let observeDevice = "observe.device@1"
   public static let captureDiagnostics = "capture.diagnostics@1"
+  public static let applyPatch = "workspace.apply-patch@1"
+  public static let buildOpenHarmony = "workspace.build-openharmony@1"
+  public static let runTests = "workspace.run-tests@1"
+  public static let revertPatch = "workspace.revert-patch@1"
+  public static let deployHAP = "debug.hap@1"
   /// The artifact `capture.diagnostics@1` declares for bounded HiLog. It
   /// supports the *liveness* criterion only: TASK-HTP-006's r6 window
   /// measured zero fault blocks in 887 KB of real `hilog -x` taken right
@@ -76,11 +90,41 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
 
   public var type: HarnessTaskType { .debugCrash }
 
-  /// E0 only. A crash-debug task cannot reach a device mutation in
-  /// TASK-HTP-001: the operations that mutate a device are not in this
-  /// set, so no budget or capability discussion can make them reachable.
+  /// The repair leg remains closed: source changes use the published
+  /// workspace operations and the only device mutation is the existing typed
+  /// HAP deployment, still guarded by the runtime capability store.
   public var permittedOperations: Set<String> {
-    [Self.observeDevice, Self.captureDiagnostics]
+    [
+      Self.observeDevice, Self.captureDiagnostics, Self.applyPatch,
+      Self.buildOpenHarmony, Self.runTests, Self.revertPatch, Self.deployHAP,
+    ]
+  }
+
+  public func offeredOperations(for snapshot: HarnessTaskSnapshot) -> Set<String> {
+    if let repair = snapshot.repairAttempt, repair.patchAttemptRef != nil, !repair.reverted,
+      repair.rollbackRequired
+        || (repair.deployedDigest != nil && snapshot.observed.latestVerdict == .fail)
+    {
+      return [Self.revertPatch]
+    }
+    switch snapshot.phase {
+    case .initializing:
+      return [Self.observeDevice]
+    case .deviceReady, .reproducing, .collecting, .verifying:
+      return [Self.captureDiagnostics]
+    case .analyzing:
+      return snapshot.observed.latestVerdict == .fail
+        ? [Self.applyPatch] : [Self.captureDiagnostics]
+    case .patching:
+      return []
+    case .building:
+      guard let repair = snapshot.repairAttempt else { return [] }
+      if repair.buildSourceRevision == nil { return [Self.buildOpenHarmony] }
+      if !repair.testsPassed { return [Self.runTests] }
+      return [Self.deployHAP]
+    case .deploying:
+      return []
+    }
   }
 
   public func defaultSuccessCriteria() -> [HarnessSuccessCriterion] {
@@ -124,6 +168,23 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
     nowUTC: String
   ) -> HarnessPlannedStep {
     let round = snapshot.activeRound + 1
+    if let repair = snapshot.repairAttempt, let patchAttemptRef = repair.patchAttemptRef,
+      !repair.reverted,
+      repair.rollbackRequired
+        || (repair.deployedDigest != nil && snapshot.observed.latestVerdict == .fail)
+    {
+      return invoke(
+        snapshot, decisionID: decisionID, round: round, nowUTC: nowUTC,
+        operation: Self.revertPatch,
+        inputs: [
+          "projectRef": .string(snapshot.projectRef ?? ""),
+          "patchAttemptRef": .string(patchAttemptRef),
+        ],
+        hypothesis:
+          "Deployment or verification failed; restore the exact durable patch preimage before "
+          + "another strategy is considered.",
+        reasonCode: "rollbackFailedRepair", phaseOnDispatch: .analyzing)
+    }
     switch snapshot.phase {
     case .initializing:
       return invoke(
@@ -156,9 +217,9 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
           reasonCode: "collectAdditionalSample",
           phaseOnDispatch: snapshot.phase == .collecting ? nil : .collecting)
       case .fail:
-        // A real, evidence-backed failure. Repairing it needs the workspace
-        // operations (TASK-HTP-005); until they exist the honest move is to
-        // hand a human the verdict instead of looping.
+        // A model-backed producer may replace this deterministic fallback with
+        // a strictly parsed PROPOSE_PATCH. Without patch bytes there is
+        // nothing safe for the built-in strategy to invent.
         return HarnessPlannedStep(
           decision: HarnessDecision(
             decisionID: decisionID,
@@ -167,8 +228,8 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
             kind: .requestHuman,
             hypothesis:
               "The evaluator judged the declared criteria failed on verified evidence; "
-              + "repairing it requires source and build operations this task type cannot run.",
-            reasonCode: "criteriaFailedNoRepairCapability",
+              + "repairing it requires a bounded PROPOSE_PATCH decision.",
+            reasonCode: "patchProposalRequired",
             producer: producerID,
             createdAtUTC: nowUTC),
           phaseOnDispatch: nil)
@@ -211,21 +272,76 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
             createdAtUTC: nowUTC),
           phaseOnDispatch: nil)
       }
-    case .patching, .building, .deploying:
-      // Reachable only if a future handler revision moves here; today
-      // nothing in this type can, so it fails closed rather than
-      // pretending a workspace operation exists.
-      return HarnessPlannedStep(
-        decision: HarnessDecision(
-          decisionID: decisionID,
-          htaskID: snapshot.htaskID,
-          round: round,
-          kind: .noSafeAction,
-          hypothesis: "No workspace operation is available to this task type.",
-          reasonCode: "workspaceOperationsUnavailable",
-          producer: producerID,
-          createdAtUTC: nowUTC),
-        phaseOnDispatch: nil)
+    case .patching:
+      return noSafeAction(
+        snapshot, decisionID: decisionID, round: round, nowUTC: nowUTC,
+        reasonCode: "patchReadbackUnavailable",
+        hypothesis: "The patching phase has no active job or verified applied-patch readback.")
+    case .building:
+      guard let repair = snapshot.repairAttempt else {
+        return noSafeAction(
+          snapshot, decisionID: decisionID, round: round, nowUTC: nowUTC,
+          reasonCode: "repairAttemptUnavailable",
+          hypothesis: "Build cannot start without an evidence-derived patch attempt.")
+      }
+      if repair.buildSourceRevision == nil {
+        return invoke(
+          snapshot, decisionID: decisionID, round: round, nowUTC: nowUTC,
+          operation: Self.buildOpenHarmony,
+          inputs: [
+            "projectRef": .string(snapshot.projectRef ?? ""),
+            "buildPresetRef": .string(desiredString("buildPresetRef", snapshot) ?? "arkdeck-debug"),
+          ],
+          hypothesis:
+            "Build the exact patched workspace; its source revision and output digest must be "
+            + "read back before deployment.",
+          reasonCode: "buildPatchedWorkspace", phaseOnDispatch: nil)
+      }
+      if !repair.testsPassed {
+        return invoke(
+          snapshot, decisionID: decisionID, round: round, nowUTC: nowUTC,
+          operation: Self.runTests,
+          inputs: [
+            "projectRef": .string(snapshot.projectRef ?? ""),
+            "testPresetRef": .string(desiredString("testPresetRef", snapshot) ?? "arkdeck-tests"),
+          ],
+          hypothesis: "Run the declared tests against the same patch revision before deployment.",
+          reasonCode: "testPatchedWorkspace", phaseOnDispatch: nil)
+      }
+      guard let lease = repair.buildOutputArtifactLease,
+        let bundle = desiredString("bundleName", snapshot),
+        let ability = desiredString("abilityName", snapshot)
+      else {
+        return noSafeAction(
+          snapshot, decisionID: decisionID, round: round, nowUTC: nowUTC,
+          reasonCode: "deploymentInputsUnavailable",
+          hypothesis:
+            "The verified build output lease, bundle name and ability name are required for "
+            + "the typed deployment leg.")
+      }
+      guard snapshot.consumedBudget.e1Mutations + 2 <= snapshot.budgets.maxE1Mutations else {
+        return noSafeAction(
+          snapshot, decisionID: decisionID, round: round, nowUTC: nowUTC,
+          reasonCode: "deploymentRollbackBudgetUnavailable",
+          hypothesis:
+            "Deployment is not admitted unless the E1 budget can pay for both deployment and "
+            + "a possible rollback.")
+      }
+      return invoke(
+        snapshot, decisionID: decisionID, round: round, nowUTC: nowUTC,
+        operation: Self.deployHAP,
+        inputs: [
+          "hapArtifactLease": .string(lease), "bundleName": .string(bundle),
+          "abilityName": .string(ability), "cleanupPolicy": .string("retain"),
+          "postRunAbilityState": .string("running"),
+        ],
+        hypothesis: "Deploy only the immutable output whose digest passed the build gate.",
+        reasonCode: "deployVerifiedBuildOutput", phaseOnDispatch: .deploying)
+    case .deploying:
+      return noSafeAction(
+        snapshot, decisionID: decisionID, round: round, nowUTC: nowUTC,
+        reasonCode: "deploymentReadbackUnavailable",
+        hypothesis: "Deployment may advance only through an equal artifact-digest readback.")
     }
   }
 
@@ -237,6 +353,9 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
     case (Self.observeDevice, .initializing): return .deviceReady
     case (Self.captureDiagnostics, .deviceReady): return .collecting
     case (Self.captureDiagnostics, .reproducing): return .collecting
+    case (Self.applyPatch, .patching): return .building
+    case (Self.deployHAP, .deploying): return .verifying
+    case (Self.revertPatch, .deploying), (Self.revertPatch, .verifying): return .analyzing
     default: return phase
     }
   }
@@ -277,12 +396,36 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
     }
   }
 
+  private func desiredString(_ key: String, _ snapshot: HarnessTaskSnapshot) -> String? {
+    guard case .string(let value)? = snapshot.goal.desiredState[key], !value.isEmpty else {
+      return nil
+    }
+    return value
+  }
+
+  private func noSafeAction(
+    _ snapshot: HarnessTaskSnapshot,
+    decisionID: String,
+    round: Int,
+    nowUTC: String,
+    reasonCode: String,
+    hypothesis: String
+  ) -> HarnessPlannedStep {
+    HarnessPlannedStep(
+      decision: HarnessDecision(
+        decisionID: decisionID, htaskID: snapshot.htaskID, round: round,
+        kind: .noSafeAction, hypothesis: hypothesis, reasonCode: reasonCode,
+        producer: producerID, createdAtUTC: nowUTC),
+      phaseOnDispatch: nil)
+  }
+
   private func invoke(
     _ snapshot: HarnessTaskSnapshot,
     decisionID: String,
     round: Int,
     nowUTC: String,
     operation: String,
+    inputs: [String: JSONValue]? = nil,
     hypothesis: String,
     reasonCode: String,
     phaseOnDispatch: HarnessTaskPhase?
@@ -299,7 +442,7 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
         // here (HTP-INV-11). What the operation declares *required* has to be
         // present, or admission refuses the step: an empty map is not a
         // conservative default, it is an unrunnable one.
-        inputs: Self.typedInputs(for: operation, snapshot: snapshot),
+        inputs: inputs ?? Self.typedInputs(for: operation, snapshot: snapshot),
         hypothesis: hypothesis,
         reasonCode: reasonCode,
         producer: producerID,
