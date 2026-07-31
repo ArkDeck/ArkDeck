@@ -89,6 +89,9 @@ public actor HarnessTaskCoordinator {
   let decisionGateway: (any HarnessDecisionGateway)?
   /// Denied by default: enabling egress is an explicit per-project act.
   let egressPolicy: HarnessEgressPolicy
+  /// Privacy-sensitive artifact names an operator allowed this composition to
+  /// measure. Empty by default; see `HarnessObservationBuilder`.
+  let sensitiveEvidenceAllowList: Set<String>
 
   public init(
     store: HarnessTaskStore,
@@ -111,7 +114,8 @@ public actor HarnessTaskCoordinator {
     },
     policyGuard: HarnessPolicyGuard = HarnessPolicyGuard(),
     decisionGateway: (any HarnessDecisionGateway)? = nil,
-    egressPolicy: HarnessEgressPolicy = .deniedByDefault
+    egressPolicy: HarnessEgressPolicy = .deniedByDefault,
+    sensitiveEvidenceAllowList: Set<String> = []
   ) {
     self.store = store
     self.jobPort = jobPort
@@ -127,6 +131,7 @@ public actor HarnessTaskCoordinator {
     self.policyGuard = policyGuard
     self.decisionGateway = decisionGateway
     self.egressPolicy = egressPolicy
+    self.sensitiveEvidenceAllowList = sensitiveEvidenceAllowList
   }
 
   public static func freshTaskID() -> String {
@@ -744,7 +749,8 @@ public actor HarnessTaskCoordinator {
         HarnessReconcileOutcome(
           snapshot: blocked, action: .stoppedForHuman, reasonCode: reason))
     }
-    let builder = HarnessObservationBuilder(artifacts: artifactPort)
+    let builder = HarnessObservationBuilder(
+      artifacts: artifactPort, sensitiveEvidenceAllowList: sensitiveEvidenceAllowList)
     var declaredSignature: String?
     if case .string(let value)? = snapshot.goal.desiredState["crashSignature"] {
       declaredSignature = value

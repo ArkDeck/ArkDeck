@@ -42,13 +42,28 @@ public struct HarnessObservationBuilder: Sendable {
 
   private let artifacts: any HarnessArtifactPort
   private let maximumEvaluationBytes: Int
+  /// Artifact *names* an operator has allowed this composition to measure
+  /// even though the catalog marks them privacy-sensitive. Empty by default,
+  /// which is the only safe default: the evaluator cannot decide to look.
+  ///
+  /// Why a list rather than a flag: `capture.diagnostics@1` declares
+  /// `hilog.txt` both required evidence *and* sensitive, so with no opt-in the
+  /// three crash criteria can never be judged and a debug task can only ever
+  /// burn its rounds and stop. An operator naming `hilog.txt` says which
+  /// evidence may be measured on this host - it does not widen what leaves
+  /// it: only digests, byte counts and metrics are recorded, and the decision
+  /// context still carries artifact identity without content
+  /// (TASK-HTP-004).
+  private let sensitiveEvidenceAllowList: Set<String>
 
   public init(
     artifacts: any HarnessArtifactPort,
-    maximumEvaluationBytes: Int = HarnessObservationBuilder.defaultEvaluationReadBytes
+    maximumEvaluationBytes: Int = HarnessObservationBuilder.defaultEvaluationReadBytes,
+    sensitiveEvidenceAllowList: Set<String> = []
   ) {
     self.artifacts = artifacts
     self.maximumEvaluationBytes = maximumEvaluationBytes
+    self.sensitiveEvidenceAllowList = sensitiveEvidenceAllowList
   }
 
   public func observe(
@@ -77,9 +92,11 @@ public struct HarnessObservationBuilder: Sendable {
         evidence.append(record(descriptor, verified: false, blocker: blocker))
         continue
       }
-      if descriptor.sensitive {
-        // Reading it would need an explicit opt-in the harness does not
-        // have; report it rather than pretend the evidence was considered.
+      let sensitiveOptIn = descriptor.sensitive
+        && sensitiveEvidenceAllowList.contains(descriptor.name)
+      if descriptor.sensitive, !sensitiveOptIn {
+        // No operator named this artifact, so the evaluator does not look:
+        // report it rather than pretend the evidence was considered.
         let blocker = "artifactSensitiveNotOptedIn:\(descriptor.name)"
         collectionBlockers.append(blocker)
         evidence.append(record(descriptor, verified: false, blocker: blocker))
@@ -88,7 +105,8 @@ public struct HarnessObservationBuilder: Sendable {
       if descriptor.byteCount == 0 {
         let blocker = "artifactEmpty:\(descriptor.name)"
         collectionBlockers.append(blocker)
-        evidence.append(record(descriptor, verified: false, blocker: blocker))
+        evidence.append(
+          record(descriptor, verified: false, blocker: blocker, sensitiveOptIn: sensitiveOptIn))
         continue
       }
       if descriptor.byteCount > maximumEvaluationBytes {
@@ -96,7 +114,8 @@ public struct HarnessObservationBuilder: Sendable {
           "artifactExceedsEvaluationBound:\(descriptor.name):"
           + "\(descriptor.byteCount)>\(maximumEvaluationBytes)"
         collectionBlockers.append(blocker)
-        evidence.append(record(descriptor, verified: false, blocker: blocker))
+        evidence.append(
+          record(descriptor, verified: false, blocker: blocker, sensitiveOptIn: sensitiveOptIn))
         continue
       }
       let data: Data
@@ -107,17 +126,20 @@ public struct HarnessObservationBuilder: Sendable {
       } catch {
         let blocker = "artifactUnreadable:\(descriptor.name)"
         integrityBlockers.append(blocker)
-        evidence.append(record(descriptor, verified: false, blocker: blocker))
+        evidence.append(
+          record(descriptor, verified: false, blocker: blocker, sensitiveOptIn: sensitiveOptIn))
         continue
       }
       let digest = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
       guard data.count == descriptor.byteCount, digest == descriptor.sha256 else {
         let blocker = "artifactHashMismatch:\(descriptor.name)"
         integrityBlockers.append(blocker)
-        evidence.append(record(descriptor, verified: false, blocker: blocker))
+        evidence.append(
+          record(descriptor, verified: false, blocker: blocker, sensitiveOptIn: sensitiveOptIn))
         continue
       }
-      evidence.append(record(descriptor, verified: true, blocker: nil))
+      evidence.append(
+        record(descriptor, verified: true, blocker: nil, sensitiveOptIn: sensitiveOptIn))
       verifiedBytes.append((descriptor.name, descriptor.mediaType, data))
     }
 
@@ -140,12 +162,13 @@ public struct HarnessObservationBuilder: Sendable {
   private func record(
     _ descriptor: HarnessArtifactDescriptor,
     verified: Bool,
-    blocker: String?
+    blocker: String?,
+    sensitiveOptIn: Bool = false
   ) -> HarnessEvidenceRecord {
     HarnessEvidenceRecord(
       artifactID: descriptor.artifactID, name: descriptor.name,
       byteCount: descriptor.byteCount, sha256: descriptor.sha256, verified: verified,
-      blocker: blocker)
+      blocker: blocker, sensitiveOptIn: sensitiveOptIn)
   }
 
   // MARK: - Measurement
@@ -283,9 +306,16 @@ public struct HarnessObservationBuilder: Sendable {
   }
 
   private static func hasApplicationOutput(_ text: String) -> Bool {
-    // Any hilog line at all counts as "the application produced output":
-    // the capture is app-scoped by the operation that collected it, so a
-    // non-empty log without a fault block is a live application.
+    // Any hilog line at all counts as output. Stated precisely, because the
+    // earlier comment here claimed more than the code does: this measures
+    // "the capture came back with log lines", and `capture.diagnostics@1`
+    // scopes a capture to an application only when the caller passes
+    // `hilogFilters`, which the debug-crash handler does not. On an idle
+    // device with the application under debug not running,
+    // `applicationLiveness` reports `healthy` from unrelated output - so a
+    // criterion built on it says "the device is logging", not "my app is
+    // alive". A criterion that needs the stronger claim has to name the
+    // application, which is an input-surface change, not a scan change.
     text.split(separator: "\n").contains { line in
       !line.trimmingCharacters(in: .whitespaces).isEmpty
     }

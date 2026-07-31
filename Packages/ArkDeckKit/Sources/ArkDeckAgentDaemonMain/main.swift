@@ -308,6 +308,17 @@ Task.detached {
         .split(separator: ",")
         .map { $0.trimmingCharacters(in: .whitespaces) }
         .filter { !$0.isEmpty })
+    let sensitiveEvidence = Set(
+      (ProcessInfo.processInfo.environment["ARKDECK_HARNESS_SENSITIVE_EVIDENCE"] ?? "")
+        .split(separator: ",")
+        .map { $0.trimmingCharacters(in: .whitespaces) }
+        .filter { !$0.isEmpty })
+    if !sensitiveEvidence.isEmpty {
+      print(
+        "harness may measure sensitive evidence: "
+          + sensitiveEvidence.sorted().joined(separator: ","))
+      fflush(stdout)
+    }
     if !egressProjects.isEmpty {
       print("harness decision egress enabled for \(egressProjects.sorted().joined(separator: ","))")
       fflush(stdout)
@@ -326,7 +337,14 @@ Task.detached {
       // No adapter ships in this composition yet: the port exists, and a
       // model-backed producer is configured by whoever supplies one.
       decisionGateway: nil,
-      egressPolicy: HarnessEgressPolicy(enabledProjects: egressProjects))
+      egressPolicy: HarnessEgressPolicy(enabledProjects: egressProjects),
+      // Privacy-sensitive evidence the operator allows this run to measure,
+      // by artifact name: `ARKDECK_HARNESS_SENSITIVE_EVIDENCE=hilog.txt`.
+      // With none named the evaluator reports every sensitive artifact as a
+      // collection blocker instead of reading it, which is why a crash task
+      // whose criteria require `hilog.txt` cannot be judged at all until an
+      // operator says it may be (TASK-HTP-006).
+      sensitiveEvidenceAllowList: sensitiveEvidence)
     // Recovery resolves dispatch intents whose outcome was lost; it starts
     // no new work, so a restart cannot become a burst of dispatches.
     let recoveredTasks = try await harness.recoverTasks()
@@ -354,6 +372,26 @@ Task.detached {
       // Redirected stdout is block-buffered: without this flush an operator
       // tailing the log sees nothing until the daemon exits.
       fflush(stdout)
+      // Auto-drive turns the harness crank so a single `task.submit`
+      // converges without anyone poking `task.reconcile`. Off unless the
+      // operator sets an interval: a daemon that dispatches on a timer is a
+      // different posture from one that only answers requests, and that is
+      // the operator's call, not a default (TASK-HTP-006).
+      if let interval = HarnessAutoDriveTicker.configuredIntervalSeconds(
+        ProcessInfo.processInfo.environment)
+      {
+        print("harness auto-drive every \(interval)s")
+        fflush(stdout)
+        let ticker = HarnessAutoDriveTicker(
+          target: harness, intervalSeconds: interval,
+          log: { message in
+            print(message)
+            fflush(stdout)
+          })
+        // Started only after the socket is serving, so a failure to bind
+        // cannot leave a timer dispatching against a daemon nobody can reach.
+        Task.detached { await ticker.run() }
+      }
     case .alreadyRunning(let instance):
       print(
         "arkdeck-agentd already running: pid \(instance.pid), socket \(instance.socketPath), "

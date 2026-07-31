@@ -95,6 +95,12 @@ public struct HarnessEvidenceRecord: Equatable, Sendable, Codable {
   public let sha256: String
   public let verified: Bool
   public let blocker: String?
+  /// True when this artifact is privacy-sensitive and was measured only
+  /// because an operator named it in the run's opt-in. It is recorded so a
+  /// reviewer can tell "the evaluator never saw these bytes" from "an
+  /// operator allowed the evaluator to measure them", which are different
+  /// claims about the same digest.
+  public let sensitiveOptIn: Bool
 
   enum CodingKeys: String, CodingKey {
     case artifactID = "artifactId"
@@ -103,6 +109,7 @@ public struct HarnessEvidenceRecord: Equatable, Sendable, Codable {
     case sha256
     case verified
     case blocker
+    case sensitiveOptIn
   }
 
   public init(
@@ -111,7 +118,8 @@ public struct HarnessEvidenceRecord: Equatable, Sendable, Codable {
     byteCount: Int,
     sha256: String,
     verified: Bool,
-    blocker: String? = nil
+    blocker: String? = nil,
+    sensitiveOptIn: Bool = false
   ) {
     self.artifactID = artifactID
     self.name = name
@@ -119,6 +127,22 @@ public struct HarnessEvidenceRecord: Equatable, Sendable, Codable {
     self.sha256 = sha256
     self.verified = verified
     self.blocker = blocker
+    self.sensitiveOptIn = sensitiveOptIn
+  }
+
+  /// Records written before the opt-in existed carry no flag; decoding them
+  /// as "not opted in" is the truthful reading, since at the time nothing
+  /// could be.
+  public init(from decoder: any Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    artifactID = try container.decode(String.self, forKey: .artifactID)
+    name = try container.decode(String.self, forKey: .name)
+    byteCount = try container.decode(Int.self, forKey: .byteCount)
+    sha256 = try container.decode(String.self, forKey: .sha256)
+    verified = try container.decode(Bool.self, forKey: .verified)
+    blocker = try container.decodeIfPresent(String.self, forKey: .blocker)
+    sensitiveOptIn =
+      try container.decodeIfPresent(Bool.self, forKey: .sensitiveOptIn) ?? false
   }
 }
 
