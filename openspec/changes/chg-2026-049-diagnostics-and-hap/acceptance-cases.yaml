@@ -1,7 +1,7 @@
 ---
 schema_version: 1.0.0
 change_id: CHG-2026-049-diagnostics-and-hap
-change_revision: 4
+change_revision: 5
 platform: macos
 evidence_classes:
 - contract
@@ -163,3 +163,37 @@ cases:
     A multi-module app installs as one application from one directory;
     the earlier window's single-HAP directory install is not evidence
     for this.
+- acceptance_id: DHA-SHOT-001
+  test_id: TEST-DHA-SHOT-001
+  method: >-
+    Argv contract test pinning the screenshot lowering token for token,
+    including the mandatory -t png and a provider-minted owned path that
+    ends in .png, plus the fail-closed path without a connect key.
+  expected_source: openspec/changes/chg-2026-049-diagnostics-and-hap/verification.md#dha-shot-001
+  minimum_evidence: contract
+  expected_result: >-
+    The device validates the file suffix against the type, so -t png and
+    the .png suffix are both load-bearing rather than cosmetic.
+- acceptance_id: DHA-SHOT-002
+  test_id: TEST-DHA-SHOT-002
+  method: >-
+    Contract tests asserting a request without uiScreenshot keeps its
+    selected steps, plan effect and authorization path unchanged and
+    publishes no screenshot, while a request with it escalates to
+    deviceMutation through the existing capability path.
+  expected_source: openspec/changes/chg-2026-049-diagnostics-and-hap/verification.md#dha-shot-002
+  minimum_evidence: contract
+  expected_result: >-
+    The screenshot leg is opt-in and changes nothing for callers that do
+    not ask for it.
+- acceptance_id: DHA-SHOT-003
+  test_id: TEST-DHA-SHOT-003
+  method: >-
+    Contract tests for the zero-byte device file, a landed file whose
+    magic is not PNG, and the healthy path; plus one real-device agent
+    run capturing a screenshot and cleaning up after itself.
+  expected_source: openspec/changes/chg-2026-049-diagnostics-and-hap/verification.md#dha-shot-003
+  minimum_evidence: realHardware
+  expected_result: >-
+    A screenshot is published only when the device wrote bytes, the host
+    measured them, and they begin with the PNG magic.

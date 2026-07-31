@@ -238,3 +238,31 @@
   operation 的 send/install/cleanup 三条腿。三层约束:未提供附加租约时逐字节
   不变、N 条租约逐条过既有绑定校验且任一不符即零 dispatch、清理只用
   `rm -f`+`rmdir` —— **禁止 `rm -rf`**,沿用 native 族的既有安全形态)
+
+## TASK-DHA-004 — 屏幕截图作为文件型产物(r5)
+
+- Status:ready
+- Platform:macos
+- Requirements:proposal r5 What 1-5(三个 optional 步骤、`uiScreenshot` 输入与
+  `screenshot.png` 产物、`-t png` 的真机确认形式与 `.png` owned 后缀、
+  设备侧 size + host 侧 size/SHA-256 + PNG 魔数三层判定、file-backed 发布)
+- Acceptance:change-local `DHA-SHOT-001`..`DHA-SHOT-003`,登记于 `verification.md`
+- Depends on:TASK-DHA-003(done);r5 proposal 合入即 approved
+- Hardware required:no(contract 面即可交付)。`DHA-SHOT-003` 需一次真机运行,
+  设备与素材均已具备(截图不需要额外素材),预期同车关闭
+- Allowed paths:
+  - `Packages/ArkDeckKit/**`
+  - `Catalog/**`
+  - `scripts/catalog_gen/**`
+  - `openspec/changes/chg-2026-049-diagnostics-and-hap/**`
+  - `docs/adr/**`
+- Forbidden paths:
+  - `openspec/constitution.md`、`openspec/specs/**`、
+    `openspec/verification/**`(全局)、`openspec/baselines/**`、
+    `openspec/contracts/**`
+  - `scripts/**`(仅上列 `catalog_gen/**` 除外)、`.github/**`、`AGENTS.md`、
+    `PRODUCT-LOOP.md`、`ArkDeck.xcodeproj/**`、`ArkDeckApp/**`
+  - 其他 change 目录
+- Risk:medium(第三条文件型采集腿,形态与 r2/r4 已验证的两条相同;
+  唯一新面是 PNG 魔数校验与"设备按后缀校验类型"这条真机约束。
+  三层约束:未请求时逐字节不变、魔数不符不发布、清理失败按 r3 residue 记录)

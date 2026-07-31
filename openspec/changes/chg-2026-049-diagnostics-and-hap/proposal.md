@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-049-diagnostics-and-hap
-revision: 4
-status: approved # r2/r3 已交付；r4 携 approved 落地：维护者 review + merge 本 PR 即批准
+revision: 5
+status: approved # r2/r3/r4 已交付；r5 携 approved 落地：维护者 review + merge 本 PR 即批准
 class: capability
 core_change_level: none
 owner: lvye
@@ -24,6 +24,65 @@ platforms: [macos]
 > diagnostics HiLog/component-tree pair 在 Catalog、generator、JSON Schema
 > 与 Swift validator 间闭合。r2 记录 fresh pins、草稿迁移约束和依赖复验；
 > 合入 r2 前 `TASK-DHA-001` 仍不得恢复实现。
+
+## r5(2026-07-31):屏幕截图作为第三个文件型产物
+
+### 真机先行,又推翻了事实表一条 `[S]`
+
+事实表 §8 写的是 `snapshot_display [-i displayId] -f <remote.png> [-t png]`,
+把 `-t png` 记成"失败后重试一次"的可选项。2026-07-31 DAYU200(OH 3.2)实测 `[R]`:
+
+```text
+shell which snapshot_display  -> /bin/snapshot_display
+usage: snapshot_display [-i displayId] [-f output_file] [-w width] [-h height] [-t type] [-m]
+
+-f <x>.png          -> error: fileName … invalid, suffix must be .jpeg     # 直接拒绝
+-f <x>.jpeg         -> file type: jpeg, width: 720, height: 1280;  40,941 B
+-t png -f <x>.png   -> file type: png,  width: 720, height: 1280; 449,830 B
+recv 后本地魔数      -> 89 50 4E 47 0D 0A 1A 0A(真 PNG)
+```
+
+即**这台设备的默认类型是 jpeg,且文件名后缀要与类型匹配**;要 PNG 就**必须**带
+`-t png`,不是可选重试。deveco 的"先不带 `-t` 再重试"正是这条规则的症状,
+但照它的命令行写实现会第一次就被设备拒绝。§8 该行随实现 PR 更正。
+
+顺带三条新事实:`-w/-h` 可改尺寸、`-m` 存在(语义未探)、stdout 会打印
+`process: display 0, file type: png, width: 720, height: 1280` 这样的状态行 ——
+按本表 §3 的规矩,该状态行**不作判据**,判据仍是文件。
+
+### What(r5 交付面)
+
+不新增 operation。截图是又一个**文件型采集产物**,与 r2 的组件树同形:
+
+1. **`capture.diagnostics@1` 新增三个 optional 步骤**:`capture-screenshot`
+   (`captureRemoteFile` / `deviceMutation`)、`receive-screenshot`
+   (`receiveFile` / `readOnly`)、`cleanup-screenshot-temp`
+   (`cleanupOwnedRemotePath` / `deviceMutation`),均无 actionRef(按 kind 映射)。
+2. **新增输入 `uiScreenshot: boolean, default false`** 与声明产物
+   `screenshot.png`(`image/png`、`privacy: sensitive`、`required: false`)。
+   effect 随输入升级,未请求时计划与授权面逐字节不变 —— 与 r2/r4 同一形态。
+3. **lowering 用真机确认的形式**:`shell snapshot_display -t png -f <owned>.png`。
+   provider 铸的 owned path 后缀必须是 `.png` —— 该后缀在这里**不是装饰**,
+   设备会按它校验。
+4. **判定分两层**:设备侧 `ls -l` 判文件大小 > 0(D10 形态),host 侧由 D4 的
+   `HostLandingExpectation` 实测落地大小与 SHA-256;**再加一层 PNG 魔数校验**
+   (§8 自己的规矩,现已 `[R]`),魔数不符即 `.failed`,不发布。
+5. **发布走 file-backed 路径**(与 `trace.htrace` 同,不是组件树那条):PNG 是二进制,
+   `publishFile` 不拒绝 `image/png`,也没有可脱敏的文本。`privacy: sensitive`
+   控制的是读取授权,不是脱敏 —— 这一点 r2 已经区分清楚。
+
+### 尺寸这件事要写进提案
+
+PNG 450KB / JPEG 41KB,同一屏差 11 倍。AI 循环里每轮一张截图,这是真实的
+artifact 预算问题。r5 **只交付 PNG**:魔数可校验、无损、判据便宜。JPEG 形态
+(以及 `-w/-h` 缩放)留待有真实预算压力时再议,不在本 r5。
+
+## Out of scope(r5)
+
+- JPEG 形态与 `-w/-h` 缩放;
+- `-i displayId` 多显示屏(本设备单屏,未验证多屏行为);
+- `-m` 参数(语义未探,不猜);
+- 截图与组件树/窗口清单的关联分析。
 
 ## r4(2026-07-31):多包应用按"一个目录、一条 install"安装
 

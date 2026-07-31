@@ -5,7 +5,7 @@
 > binding、typed inputs、plan digest、lineage 与 `outcomeUnknown` 门保持。
 > 下文 r2 的人工 capability 步骤是历史计划；E2 不变。
 
-> Change:CHG-2026-049-diagnostics-and-hap@r4
+> Change:CHG-2026-049-diagnostics-and-hap@r5
 > Status:planned
 > Core baseline:CORE-2.1.0 (canonical Core AC not claimed)
 
@@ -194,3 +194,30 @@
   `cleanup-remote-staging` 判 `cleaned`,`outstandingResidueCount: 0`。
   **设备读回 `installed modules: ['entry', 'feature1']`** —— 两个模块作为一个应用
   从一个目录装成。窗口结束设备已还原。
+
+## `DHA-SHOT-001` 截图 argv 与 owned 后缀
+
+- 方法:contract 测试断言 `capture-screenshot` 的**完整 argv** 为
+  `["-t", <connectKey>, "shell", "snapshot_display", "-t", "png", "-f", <owned>.png]`
+  —— 逐 token,`-t png` 必须在场(设备按后缀校验类型,缺它会被拒);断言 owned
+  path 以 `.png` 结尾且由 provider 自铸;缺 connectKey fail closed。
+- Evidence:实现 PR 内测试 + 全量套件结果。
+- 结论:pending。
+
+## `DHA-SHOT-002` 未请求即逐字节不变,请求则升 E1
+
+- 方法:(a) 不带 `uiScreenshot` 的请求,其选中步骤集、plan effect 与授权路径与
+  r5 之前相同,`screenshot.png` 不得 published;(b) 带 `uiScreenshot: true` 时
+  effect 升 `deviceMutation` 并走既有 capability 路径。
+- Evidence:实现 PR 内测试。
+- 结论:pending。
+
+## `DHA-SHOT-003` 三层判定与魔数把关(含真机)
+
+- 方法:contract 面断言 (a) 设备侧 `ls -l` size = 0 → `.failed`;
+  (b) 落地文件魔数不是 `89 50 4E 47 0D 0A 1A 0A` → `.failed` 且**不发布**;
+  (c) 正常路径 → `screenshot.png` published 且字节即收到的字节。
+  真机面:一次 `capture.diagnostics@1` 带 `uiScreenshot: true` 的 Agent 执行,
+  产物可解析为 PNG、远端临时文件被清理、人工步骤 0。
+- Evidence:实现 PR 内测试 + `evidence/runs/TASK-DHA-004/`。
+- 结论:pending。
