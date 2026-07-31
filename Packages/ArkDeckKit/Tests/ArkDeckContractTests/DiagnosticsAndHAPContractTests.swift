@@ -1394,6 +1394,19 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
         .appendingPathComponent("jobs/\(acceptance.jobID)/journal.jsonl"))
     XCTAssertTrue(completedReplay.outstandingIntents.isEmpty)
     XCTAssertTrue(completedReplay.unknownOutcomes.isEmpty)
+
+    // Settling the authorization lineage is what the resume is *for*: a
+    // `confirmedCompleted` reconcile deliberately keeps the reservation
+    // (the job still owns it), so only finishing the plan may record the
+    // confirmed use. Until the 2026-07-31 device window the CLI had no way
+    // to run this resume, and a reconciled target stayed blocked for every
+    // later automatic E1.
+    let settled = try await capabilities.inspect(capabilityID: "CAP-RT-HAP-001")
+    XCTAssertTrue(try XCTUnwrap(settled).lineageAllowsNewExecution)
+    let outcomes = try XCTUnwrap(settled).lineage.flatMap(\.outcomeHistory).map(\.outcome)
+    XCTAssertEqual(
+      outcomes, [.outcomeUnknown, .confirmed],
+      "the ledger keeps the unknown and appends its resolution; it never rewrites it")
   }
 
   func testSemanticUnknownPersistsItsOriginalStepForReconcile() async throws {

@@ -847,7 +847,7 @@ enum RuntimeCLI {
     guard let subcommand = arguments.first else {
       throw CLIError(
         exitCode: EX_USAGE,
-        message: "missing job subcommand (submit|status|list|reconcile)")
+        message: "missing job subcommand (submit|status|list|run|reconcile)")
     }
     var rest = Array(arguments.dropFirst())
     let json = rest.contains("--json")
@@ -861,6 +861,20 @@ enum RuntimeCLI {
       }
       emit(
         try client.request(method: "job.status", params: ["jobId": .string(rest[index + 1])]),
+        json: json)
+    case "run":
+      // Resuming a reconciled job is what settles its authorization lineage.
+      // `reconcile` deliberately leaves a `confirmedCompleted` decision
+      // holding its reservation — the job still owns it until the remaining
+      // plan (cleanup, finalize) runs — but nothing could run it: `job.run`
+      // accepts `resumeAtConfirmedSafeBoundary` and the CLI only ever
+      // reached it through `submit --wait`. Without this, every reconciled
+      // job left the target blocked for automatic E1 forever.
+      guard let index = rest.firstIndex(of: "--job"), index + 1 < rest.count else {
+        throw CLIError(exitCode: EX_USAGE, message: "job run requires --job <id>")
+      }
+      emit(
+        try client.request(method: "job.run", params: ["jobId": .string(rest[index + 1])]),
         json: json)
     case "reconcile":
       // The daemon has owned `job.reconcile` since MU-4; the CLI did not
