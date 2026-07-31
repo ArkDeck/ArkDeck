@@ -127,9 +127,6 @@ public struct HarnessGuardInput: Sendable {
 }
 
 public struct HarnessPolicyGuard: Sendable {
-  /// Consecutive rounds without progress the loop tolerates before it stops.
-  public static let noProgressLimit = 2
-
   private let availability: (any HarnessOperationAvailabilityPort)?
   private let capabilities: (any HarnessCapabilityPort)?
 
@@ -215,8 +212,15 @@ public struct HarnessPolicyGuard: Sendable {
       }
     }
 
-    // 8. Progress.
-    if input.consecutiveNoProgressRounds >= Self.noProgressLimit {
+    // 8. Progress. A different operation/input/phase is allowed to become a
+    // new strategy; the same strategy may not spend another round after its
+    // task-declared patience is exhausted.
+    let proposed = HarnessStrategySignature(
+      operationReference: input.operationReference, inputsDigest: input.inputsDigest,
+      phase: snapshot.phase)
+    if input.consecutiveNoProgressRounds >= snapshot.budgets.maxNoProgressRounds,
+      input.previousStrategy == proposed
+    {
       return .refuse(.noProgress(rounds: input.consecutiveNoProgressRounds))
     }
 

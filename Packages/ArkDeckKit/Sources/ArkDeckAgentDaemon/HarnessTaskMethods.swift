@@ -17,7 +17,8 @@ import Foundation
 
 extension RuntimeControlPlaneHandler {
   static let harnessDefaultBudgets = HarnessTaskBudgets(
-    maxRounds: 8, maxWallClockSeconds: 1800, maxArtifactBytes: 64 << 20, maxE1Mutations: 0)
+    maxRounds: 8, maxWallClockSeconds: 1800, maxArtifactBytes: 64 << 20, maxE1Mutations: 0,
+    maxNoProgressRounds: 2, maxActionRetriesPerRun: 2)
 
   func handleTaskMethod(
     _ method: String,
@@ -80,6 +81,13 @@ extension RuntimeControlPlaneHandler {
         }
         let evaluations = try await harness.evaluations(id)
         return success(id: request.id, result: .array(evaluations.map(Self.encode)))
+
+      case "task.attempts":
+        guard let id = taskID() else {
+          return failure(id: request.id, code: .invalidParams, message: "htaskId is required")
+        }
+        let attempts = try await harness.attempts(id)
+        return success(id: request.id, result: .array(attempts.map(Self.encode)))
 
       case "task.humanActions":
         guard let id = taskID() else {
@@ -206,7 +214,10 @@ extension RuntimeControlPlaneHandler {
       maxRounds: integer("maxRounds") ?? defaults.maxRounds,
       maxWallClockSeconds: integer("maxWallClockSeconds") ?? defaults.maxWallClockSeconds,
       maxArtifactBytes: integer("maxArtifactBytes") ?? defaults.maxArtifactBytes,
-      maxE1Mutations: integer("maxE1Mutations") ?? defaults.maxE1Mutations)
+      maxE1Mutations: integer("maxE1Mutations") ?? defaults.maxE1Mutations,
+      maxNoProgressRounds: integer("maxNoProgressRounds") ?? defaults.maxNoProgressRounds,
+      maxActionRetriesPerRun: integer("maxActionRetriesPerRun")
+        ?? defaults.maxActionRetriesPerRun)
 
     // The declared crash signature is what makes "matching crash" a
     // checkable statement instead of a judgement call. Absent, the evaluator

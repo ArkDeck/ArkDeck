@@ -204,6 +204,100 @@ public actor HarnessTaskStore {
     try intents(taskID).filter { $0.state == .pending || $0.state == .submitted }
   }
 
+  // MARK: - Strategy attempts (TASK-HFA-004)
+
+  public static func isWellFormed(attemptID: String) -> Bool {
+    guard attemptID.hasPrefix("ATTEMPT-"), attemptID.count <= 40 else { return false }
+    let body = attemptID.dropFirst("ATTEMPT-".count)
+    guard !body.isEmpty else { return false }
+    return body.allSatisfy { character in
+      character.isASCII && (character.isNumber || ("A"..."F").contains(String(character)))
+    }
+  }
+
+  /// Append an immutable attempt event. The event log is the truth; each
+  /// event carries the complete resulting Attempt, so a torn final append is
+  /// ignored and no separate mutable cache can diverge from it.
+  public func recordAttempt(
+    _ attempt: HarnessAttempt,
+    kind: HarnessAttemptEventKind,
+    reasonCode: String
+  ) throws {
+    guard Self.isWellFormed(attemptID: attempt.attemptID) else {
+      throw HarnessTaskStoreError.corrupt("malformed attempt id \(attempt.attemptID)")
+    }
+    let directoryURL = try existingDirectory(attempt.htaskID)
+    try withLock(directoryURL) {
+      let events = try readAttemptEventsLocked(directoryURL)
+      let current = events.last(where: { $0.attemptID == attempt.attemptID })?.resulting
+      switch kind {
+      case .created:
+        guard current == nil else {
+          throw HarnessTaskStoreError.corrupt("attempt \(attempt.attemptID) already exists")
+        }
+        guard attempt.ordinal >= 1,
+          !events.contains(where: { $0.resulting.ordinal == attempt.ordinal }),
+          attempt.outcome == .active,
+          attempt.strategyFingerprint == attempt.strategy.fingerprint,
+          attempt.baseRevision == attempt.strategy.baseWorkspaceRevision
+        else {
+          throw HarnessTaskStoreError.corrupt("invalid created attempt \(attempt.attemptID)")
+        }
+      case .actionRunRecorded, .patchRevisionObserved, .failureRecorded, .evaluationRecorded,
+        .closed:
+        guard let current else {
+          throw HarnessTaskStoreError.corrupt("unknown attempt \(attempt.attemptID)")
+        }
+        guard current.htaskID == attempt.htaskID,
+          current.ordinal == attempt.ordinal,
+          current.strategyFingerprint == attempt.strategyFingerprint,
+          current.baseRevision == attempt.baseRevision,
+          Set(current.actionRunIDs).isSubset(of: Set(attempt.actionRunIDs)),
+          Set(current.evaluationIDs).isSubset(of: Set(attempt.evaluationIDs)),
+          Set(current.confirmedFacts).isSubset(of: Set(attempt.confirmedFacts)),
+          Set(current.disprovedFacts).isSubset(of: Set(attempt.disprovedFacts)),
+          !(current.outcome.isClosed && attempt.outcome == .active)
+        else {
+          throw HarnessTaskStoreError.corrupt(
+            "attempt \(attempt.attemptID) update regressed an immutable field")
+        }
+      }
+      let event = HarnessAttemptEvent(
+        sequence: (events.last?.sequence ?? 0) + 1,
+        kind: kind,
+        reasonCode: reasonCode,
+        atUTC: attempt.updatedAtUTC,
+        resulting: attempt)
+      try appendJSONLine(
+        event, to: directoryURL.appendingPathComponent("attempt-events.jsonl"))
+    }
+  }
+
+  public func attemptEvents(_ taskID: String) throws -> [HarnessAttemptEvent] {
+    let directoryURL = try existingDirectory(taskID)
+    return try withLock(directoryURL) {
+      try readAttemptEventsLocked(directoryURL)
+    }
+  }
+
+  public func attempts(_ taskID: String) throws -> [HarnessAttempt] {
+    let events = try attemptEvents(taskID)
+    var latest: [String: HarnessAttempt] = [:]
+    for event in events { latest[event.attemptID] = event.resulting }
+    return latest.values.sorted { ($0.ordinal, $0.attemptID) < ($1.ordinal, $1.attemptID) }
+  }
+
+  private func readAttemptEventsLocked(_ directoryURL: URL) throws -> [HarnessAttemptEvent] {
+    let events: [HarnessAttemptEvent] = try readJSONLines(
+      HarnessAttemptEvent.self,
+      from: directoryURL.appendingPathComponent("attempt-events.jsonl"))
+    for (index, event) in events.enumerated() where event.sequence != index + 1 {
+      throw HarnessTaskStoreError.corrupt(
+        "attempt event sequence \(event.sequence) does not follow \(index)")
+    }
+    return events
+  }
+
   // MARK: - Model runs
 
   /// A model run id is a file name, so its grammar excludes separators for

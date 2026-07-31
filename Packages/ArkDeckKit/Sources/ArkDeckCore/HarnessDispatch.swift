@@ -55,6 +55,10 @@ public struct HarnessDecision: Equatable, Sendable, Codable {
   public let operationReference: String?
   public let inputs: [String: JSONValue]
   public let patchProposal: HarnessPatchProposal?
+  /// Stable prerequisite identities and expected readback. They are data for
+  /// strategy identity only; neither may carry bytes, paths or commands.
+  public let requiredArtifacts: [String]
+  public let expectedObservation: String?
   public let hypothesis: String
   public let reasonCode: String
   public let producer: String
@@ -78,6 +82,8 @@ public struct HarnessDecision: Equatable, Sendable, Codable {
     case operationReference
     case inputs
     case patchProposal
+    case requiredArtifacts
+    case expectedObservation
     case hypothesis
     case reasonCode
     case producer
@@ -94,6 +100,8 @@ public struct HarnessDecision: Equatable, Sendable, Codable {
     operationReference: String? = nil,
     inputs: [String: JSONValue] = [:],
     patchProposal: HarnessPatchProposal? = nil,
+    requiredArtifacts: [String] = [],
+    expectedObservation: String? = nil,
     hypothesis: String,
     reasonCode: String,
     producer: String,
@@ -109,6 +117,8 @@ public struct HarnessDecision: Equatable, Sendable, Codable {
     self.operationReference = operationReference
     self.inputs = inputs
     self.patchProposal = patchProposal
+    self.requiredArtifacts = requiredArtifacts
+    self.expectedObservation = expectedObservation
     self.hypothesis = hypothesis
     self.reasonCode = reasonCode
     self.producer = producer
@@ -133,6 +143,10 @@ public struct HarnessDecision: Equatable, Sendable, Codable {
       try container.decodeIfPresent([String: JSONValue].self, forKey: .inputs) ?? [:]
     self.patchProposal = try container.decodeIfPresent(
       HarnessPatchProposal.self, forKey: .patchProposal)
+    self.requiredArtifacts =
+      try container.decodeIfPresent([String].self, forKey: .requiredArtifacts) ?? []
+    self.expectedObservation = try container.decodeIfPresent(
+      String.self, forKey: .expectedObservation)
     self.hypothesis = try container.decode(String.self, forKey: .hypothesis)
     self.reasonCode = try container.decode(String.self, forKey: .reasonCode)
     self.producer = try container.decode(String.self, forKey: .producer)
@@ -155,6 +169,8 @@ public struct HarnessDecision: Equatable, Sendable, Codable {
       operationReference: operationReference,
       inputs: inputs,
       patchProposal: patchProposal,
+      requiredArtifacts: requiredArtifacts,
+      expectedObservation: expectedObservation,
       hypothesis: hypothesis,
       reasonCode: reasonCode,
       producer: producer,
@@ -362,6 +378,14 @@ public struct HarnessTaskSubmission: Equatable, Sendable, Codable {
     else {
       throw HarnessTaskSubmissionError.budgetOutOfRange("maxE1Mutations")
     }
+    try validateBudget(
+      budgets.maxNoProgressRounds,
+      ceiling: HarnessTaskBudgets.ceiling.maxNoProgressRounds,
+      "maxNoProgressRounds")
+    try validateBudget(
+      budgets.maxActionRetriesPerRun,
+      ceiling: HarnessTaskBudgets.ceiling.maxActionRetriesPerRun,
+      "maxActionRetriesPerRun")
     var seen = Set<String>()
     for criterion in successCriteria {
       guard seen.insert(criterion.criterionID).inserted else {

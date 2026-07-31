@@ -183,17 +183,52 @@ public struct HarnessTaskBudgets: Equatable, Sendable, Codable {
   public let maxWallClockSeconds: Int
   public let maxArtifactBytes: Int
   public let maxE1Mutations: Int
+  /// Consecutive evidence rounds that may make no measurable progress before
+  /// the active strategy is closed. This is task data, not a process-global
+  /// constant, so restart and daemon composition cannot change the bound.
+  public let maxNoProgressRounds: Int
+  /// Confirmed retries of one identical ActionRun. The first dispatch is not
+  /// a retry; crash recovery reuses it and therefore does not consume this.
+  public let maxActionRetriesPerRun: Int
+
+  enum CodingKeys: String, CodingKey {
+    case maxRounds
+    case maxWallClockSeconds
+    case maxArtifactBytes
+    case maxE1Mutations
+    case maxNoProgressRounds
+    case maxActionRetriesPerRun
+  }
 
   public init(
     maxRounds: Int,
     maxWallClockSeconds: Int,
     maxArtifactBytes: Int,
-    maxE1Mutations: Int
+    maxE1Mutations: Int,
+    maxNoProgressRounds: Int = 2,
+    maxActionRetriesPerRun: Int = 2
   ) {
     self.maxRounds = maxRounds
     self.maxWallClockSeconds = maxWallClockSeconds
     self.maxArtifactBytes = maxArtifactBytes
     self.maxE1Mutations = maxE1Mutations
+    self.maxNoProgressRounds = maxNoProgressRounds
+    self.maxActionRetriesPerRun = maxActionRetriesPerRun
+  }
+
+  /// Historical task snapshots predate the two strategy budgets. They remain
+  /// readable under the strict defaults instead of silently becoming
+  /// unbounded or failing recovery.
+  public init(from decoder: any Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    self.maxRounds = try container.decode(Int.self, forKey: .maxRounds)
+    self.maxWallClockSeconds = try container.decode(Int.self, forKey: .maxWallClockSeconds)
+    self.maxArtifactBytes = try container.decode(Int.self, forKey: .maxArtifactBytes)
+    self.maxE1Mutations = try container.decode(Int.self, forKey: .maxE1Mutations)
+    self.maxNoProgressRounds =
+      try container.decodeIfPresent(Int.self, forKey: .maxNoProgressRounds) ?? 2
+    self.maxActionRetriesPerRun =
+      try container.decodeIfPresent(Int.self, forKey: .maxActionRetriesPerRun) ?? 2
   }
 
   /// Ceilings are part of the model, not of a caller's judgement: an
@@ -201,7 +236,7 @@ public struct HarnessTaskBudgets: Equatable, Sendable, Codable {
   /// whole plane exists to prevent.
   public static let ceiling = HarnessTaskBudgets(
     maxRounds: 64, maxWallClockSeconds: 24 * 3600, maxArtifactBytes: 2 << 30,
-    maxE1Mutations: 32)
+    maxE1Mutations: 32, maxNoProgressRounds: 32, maxActionRetriesPerRun: 16)
 }
 
 public struct HarnessConsumedBudget: Equatable, Sendable, Codable {

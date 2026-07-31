@@ -105,6 +105,8 @@ extension HarnessTaskCoordinator {
             operationReference: proposal.operationReference,
             inputs: proposal.inputs,
             patchProposal: proposal.patchProposal,
+            requiredArtifacts: proposal.requiredArtifacts,
+            expectedObservation: proposal.expectedObservation,
             hypothesis: proposal.hypothesis,
             reasonCode: proposal.reasonCode,
             producer: decisionGateway.producerID,
@@ -185,18 +187,30 @@ extension HarnessTaskCoordinator {
     limits: HarnessDecisionContextLimits
   ) async throws -> HarnessDecisionContext {
     let offered = offeredOperations(snapshot, handler: handler)
-    let events = (try? await store.events(snapshot.htaskID)) ?? []
-    let attempts = events.compactMap { event -> HarnessContextAttempt? in
-      guard event.causation == .jobDispatched || event.causation == .jobObserved,
-        let jobID = event.jobID
-      else { return nil }
-      return HarnessContextAttempt(
-        round: event.resulting.activeRound,
-        // The operation is named by the reason code the transition recorded;
-        // job ids are meaningless to a producer that cannot address them.
-        operationReference: Self.operationReference(fromReason: event.reasonCode) ?? "-",
-        outcome: event.causation == .jobDispatched ? "dispatched" : "observed",
-        reasonCode: event.reasonCode.replacingOccurrences(of: jobID, with: "job"))
+    let durableAttempts = (try? await store.attempts(snapshot.htaskID)) ?? []
+    let attempts: [HarnessContextAttempt]
+    if !durableAttempts.isEmpty {
+      attempts = durableAttempts.map { attempt in
+        HarnessContextAttempt(
+          round: attempt.ordinal,
+          operationReference: attempt.strategy.selectedOperationFamily,
+          outcome: attempt.outcome.rawValue,
+          reasonCode: "strategy:\(attempt.strategyFingerprint)")
+      }
+    } else {
+      // Forward-readable fallback for tasks created before Attempt events
+      // existed. New tasks never synthesize strategy identity from prose.
+      let events = (try? await store.events(snapshot.htaskID)) ?? []
+      attempts = events.compactMap { event -> HarnessContextAttempt? in
+        guard event.causation == .jobDispatched || event.causation == .jobObserved,
+          let jobID = event.jobID
+        else { return nil }
+        return HarnessContextAttempt(
+          round: event.resulting.activeRound,
+          operationReference: Self.operationReference(fromReason: event.reasonCode) ?? "-",
+          outcome: event.causation == .jobDispatched ? "dispatched" : "observed",
+          reasonCode: event.reasonCode.replacingOccurrences(of: jobID, with: "job"))
+      }
     }
     let failures = ((try? await store.failureRecords()) ?? [])
       .filter { offered.contains($0.fingerprint.operationReference) }

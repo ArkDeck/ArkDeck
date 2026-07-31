@@ -117,7 +117,10 @@ public struct HarnessDecisionContextAssembler: Sendable {
       artifactBytesRemaining: max(
         0, snapshot.budgets.maxArtifactBytes - snapshot.consumedBudget.artifactBytes),
       e1MutationsRemaining: max(
-        0, snapshot.budgets.maxE1Mutations - snapshot.consumedBudget.e1Mutations))
+        0, snapshot.budgets.maxE1Mutations - snapshot.consumedBudget.e1Mutations),
+      noProgressRoundsRemaining: max(
+        0, snapshot.budgets.maxNoProgressRounds - snapshot.noProgressRounds),
+      actionRetriesPerRun: snapshot.budgets.maxActionRetriesPerRun)
 
     let context = HarnessDecisionContext(
       targetPseudonym: HarnessDecisionContext.pseudonym(forTargetID: snapshot.target.targetID),

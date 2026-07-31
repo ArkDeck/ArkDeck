@@ -97,6 +97,7 @@ public actor HarnessTaskCoordinator {
   let actionIDFactory: @Sendable () -> String
   let memoryIDFactory: @Sendable () -> String
   let modelRunIDFactory: @Sendable () -> String
+  let attemptIDFactory: @Sendable () -> String
   let policyGuard: HarnessPolicyGuard
   /// Absent means no model path exists in this composition at all.
   let decisionGateway: (any HarnessDecisionGateway)?
@@ -129,6 +130,9 @@ public actor HarnessTaskCoordinator {
     modelRunIDFactory: @escaping @Sendable () -> String = {
       HarnessTaskCoordinator.freshModelRunID()
     },
+    attemptIDFactory: @escaping @Sendable () -> String = {
+      HarnessTaskCoordinator.freshAttemptID()
+    },
     policyGuard: HarnessPolicyGuard = HarnessPolicyGuard(),
     decisionGateway: (any HarnessDecisionGateway)? = nil,
     egressPolicy: HarnessEgressPolicy = .deniedByDefault,
@@ -147,6 +151,7 @@ public actor HarnessTaskCoordinator {
     self.actionIDFactory = actionIDFactory
     self.memoryIDFactory = memoryIDFactory
     self.modelRunIDFactory = modelRunIDFactory
+    self.attemptIDFactory = attemptIDFactory
     self.policyGuard = policyGuard
     self.decisionGateway = decisionGateway
     self.egressPolicy = egressPolicy
@@ -193,6 +198,11 @@ public actor HarnessTaskCoordinator {
     return "MRUN-\(hex.prefix(12))"
   }
 
+  public static func freshAttemptID() -> String {
+    let hex = UUID().uuidString.replacingOccurrences(of: "-", with: "").uppercased()
+    return "ATTEMPT-\(hex.prefix(12))"
+  }
+
   // MARK: - Task lifecycle
 
   public func submit(_ submission: HarnessTaskSubmission) async throws -> HarnessTaskSnapshot {
@@ -236,6 +246,12 @@ public actor HarnessTaskCoordinator {
   public func evaluations(_ taskID: String) async throws -> [HarnessEvaluation] {
     _ = try await load(taskID)
     return try await store.evaluations(taskID)
+  }
+
+  /// Strategy-level attempts, distinct from runtime ActionRuns/dispatches.
+  public func attempts(_ taskID: String) async throws -> [HarnessAttempt] {
+    _ = try await load(taskID)
+    return try await store.attempts(taskID)
   }
 
   public func result(_ taskID: String) async throws -> HarnessTaskResult? {
@@ -295,6 +311,8 @@ public actor HarnessTaskCoordinator {
     let snapshot = try await load(taskID)
     if snapshot.status.isTerminal { return snapshot }
     guard let activeJobID = snapshot.activeJobID else {
+      try await closeAttempt(
+        snapshot.htaskID, outcome: .cancelled, reason: "operatorCancel")
       return try await commit(
         snapshot,
         transition(
@@ -429,6 +447,9 @@ public actor HarnessTaskCoordinator {
 
     switch step.decision.kind {
     case .requestHuman:
+      try await closeAttempt(
+        snapshot.htaskID, outcome: .humanRequired,
+        reason: step.decision.reasonCode)
       let blocked = try await commit(
         snapshot,
         transition(
@@ -440,6 +461,9 @@ public actor HarnessTaskCoordinator {
       return HarnessReconcileOutcome(
         snapshot: blocked, action: .stoppedForHuman, reasonCode: step.decision.reasonCode)
     case .noSafeAction:
+      try await closeAttempt(
+        snapshot.htaskID, outcome: .failed,
+        reason: step.decision.reasonCode)
       let stopped = try await commit(
         snapshot,
         transition(
@@ -494,6 +518,18 @@ public actor HarnessTaskCoordinator {
       return HarnessReconcileOutcome(
         snapshot: blocked.snapshot, action: .stoppedForHuman, reasonCode: reason)
     }
+    do {
+      _ = try await beginStrategyAttempt(
+        decision: proposalDecision, proposal: proposal, snapshot: snapshot)
+    } catch let error as HarnessAttemptAdmissionError {
+      let blocked = try await recordBlock(
+        snapshot, block: .strategyExhausted, reasonCode: error.reasonCode,
+        round: proposalDecision.round, jobID: nil,
+        requestID: proposalDecision.decisionID)
+      return HarnessReconcileOutcome(
+        snapshot: blocked.snapshot, action: .stoppedForHuman,
+        reasonCode: error.reasonCode)
+    }
     let prepared: HarnessPreparedPatch
     do {
       prepared = try await repairPort.preparePatch(
@@ -506,9 +542,12 @@ public actor HarnessTaskCoordinator {
         errorClassification: error.reasonCode == "WORKSPACE_REVISION_CONFLICT"
           ? "WORKSPACE_REVISION_CONFLICT" : "patchProposalRejected",
         semanticErrorCode: error.reasonCode)
-      _ = try await recordFailure(
+      let record = try await recordFailure(
         snapshot, fingerprint: print, reasonCode: error.reasonCode,
         jobID: nil, requestID: nil)
+      try await recordAttemptFailure(
+        taskID: snapshot.htaskID, fingerprint: record.fingerprint,
+        outcome: .failed)
       let blocked = try await recordBlock(
         snapshot, block: .environmentUnavailable, reasonCode: error.reasonCode,
         round: proposalDecision.round, jobID: nil, requestID: nil)
@@ -528,6 +567,8 @@ public actor HarnessTaskCoordinator {
       operationReference: DebugCrashTaskHandler.applyPatch,
       inputs: prepared.inputs,
       patchProposal: proposal,
+      requiredArtifacts: proposalDecision.requiredArtifacts,
+      expectedObservation: proposalDecision.expectedObservation,
       hypothesis: proposalDecision.hypothesis,
       reasonCode: proposalDecision.reasonCode,
       producer: proposalDecision.producer,
@@ -620,6 +661,35 @@ public actor HarnessTaskCoordinator {
       jobID: nil,
       createdAtUTC: now,
       updatedAtUTC: now)
+    // The pending intent is written before the Attempt link. If the process
+    // dies between them, recovery has the complete typed operation and the
+    // original key needed to append the missing link without guessing.
+    try await store.putIntent(intent)
+    do {
+      try await recordAttemptActionRun(
+        snapshot: snapshot, operationReference: operationReference,
+        inputsDigest: digest, actionRunID: identity.requestID)
+    } catch let error as HarnessAttemptAdmissionError {
+      // Harness admission happened before any engine submission. Close the
+      // intent so recovery cannot later turn this refusal into an effect.
+      try await store.putIntent(intent.withState(.rejected, atUTC: nowUTC()))
+      switch error {
+      case .duplicateStrategy:
+        let blocked = try await recordBlock(
+          snapshot, block: .strategyExhausted, reasonCode: error.reasonCode,
+          round: decision.round, jobID: nil, requestID: decision.decisionID)
+        return HarnessReconcileOutcome(
+          snapshot: blocked.snapshot, action: .stoppedForHuman,
+          reasonCode: error.reasonCode)
+      case .actionRetryBudgetExhausted:
+        try await closeAttempt(
+          snapshot.htaskID, outcome: .failed, reason: error.reasonCode)
+        return try await stop(
+          snapshot, refusal: .budgetExhausted(.actionRetriesPerRun),
+          round: decision.round, requestID: decision.decisionID, jobID: nil,
+          decisionID: decision.decisionID)
+      }
+    }
     // Intent before effect, in two records: `pending` proves nothing was
     // handed to the engine yet, `submitted` proves it may have been. Both
     // recover through the same key, but the log stays honest about which
@@ -709,9 +779,12 @@ public actor HarnessTaskCoordinator {
         snapshot, operationReference: intent.operationReference,
         inputsDigest: intent.inputsDigestSHA256, errorClassification: "admissionRejected",
         semanticErrorCode: Self.semanticCode(from: message))
-      _ = try await recordFailure(
+      let record = try await recordFailure(
         snapshot, fingerprint: print, reasonCode: "submissionRejected", jobID: nil,
         requestID: intent.requestID)
+      try await recordAttemptFailure(
+        taskID: snapshot.htaskID, fingerprint: record.fingerprint,
+        outcome: .humanRequired)
       let blocked = try await recordBlock(
         snapshot, block: .environmentUnavailable,
         reasonCode: "submissionRejected:\(Self.semanticCode(from: message))",
@@ -732,6 +805,32 @@ public actor HarnessTaskCoordinator {
   ) async throws -> HarnessReconcileOutcome {
     guard let decision = try await store.decision(snapshot.htaskID, round: intent.round) else {
       throw HarnessCoordinatorError.missingDecisionRecord(round: intent.round)
+    }
+    // A pending intent may be the crash window between intent persistence
+    // and Attempt association. Replaying this append is idempotent and keeps
+    // the original ActionRun/key; it is not a confirmed retry.
+    do {
+      try await recordAttemptActionRun(
+        snapshot: snapshot, operationReference: intent.operationReference,
+        inputsDigest: intent.inputsDigestSHA256, actionRunID: intent.requestID)
+    } catch let error as HarnessAttemptAdmissionError {
+      try await store.putIntent(intent.withState(.rejected, atUTC: nowUTC()))
+      switch error {
+      case .duplicateStrategy:
+        let blocked = try await recordBlock(
+          snapshot, block: .strategyExhausted, reasonCode: error.reasonCode,
+          round: intent.round, jobID: nil, requestID: intent.requestID)
+        return HarnessReconcileOutcome(
+          snapshot: blocked.snapshot, action: .stoppedForHuman,
+          reasonCode: error.reasonCode)
+      case .actionRetryBudgetExhausted:
+        try await closeAttempt(
+          snapshot.htaskID, outcome: .failed, reason: error.reasonCode)
+        return try await stop(
+          snapshot, refusal: .budgetExhausted(.actionRetriesPerRun),
+          round: intent.round, requestID: intent.requestID, jobID: nil,
+          decisionID: intent.decisionID)
+      }
     }
     let submitting =
       intent.state == .pending ? intent.withState(.submitted, atUTC: nowUTC()) : intent
@@ -809,6 +908,8 @@ public actor HarnessTaskCoordinator {
         // particular PATCH_NOT_APPLIED is not permission to send the same
         // mutation again: an unknown execution outcome owns this round.
         let reason = "patchOutcomeReadback:\(classification)"
+        try await closeAttempt(
+          snapshot.htaskID, outcome: .humanRequired, reason: reason)
         let blocked = try await recordBlock(
           snapshot, block: .outcomeUnknown, reasonCode: reason,
           round: snapshot.activeRound, jobID: observation.jobID, requestID: nil)
@@ -820,6 +921,8 @@ public actor HarnessTaskCoordinator {
       // the closed human-action vocabulary describes exactly, so a typed
       // HumanActionRequired is produced with it.
       let reason = "outcomeUnknown:\(operationReference)"
+      try await closeAttempt(
+        snapshot.htaskID, outcome: .humanRequired, reason: reason)
       let blocked = try await recordBlock(
         snapshot, block: .outcomeUnknown, reasonCode: reason, round: snapshot.activeRound,
         jobID: observation.jobID, requestID: nil)
@@ -828,6 +931,9 @@ public actor HarnessTaskCoordinator {
     }
 
     if snapshot.cancelRequested {
+      try await closeAttempt(
+        snapshot.htaskID, outcome: .cancelled,
+        reason: "cancelCompletedAfterActiveJob")
       let cancelled = try await commit(
         snapshot,
         transition(
@@ -864,6 +970,25 @@ public actor HarnessTaskCoordinator {
         errorClassification: failureClassification, semanticErrorCode: observation.state)
       let record = try await recordFailure(
         snapshot, fingerprint: print, reasonCode: reason, jobID: observation.jobID)
+      let attemptOutcome: HarnessAttemptOutcome
+      if operationReference == DebugCrashTaskHandler.deployHAP {
+        // The same Attempt remains open until its required rollback is read
+        // back; closing it now would orphan that ActionRun.
+        attemptOutcome = .active
+      } else if operationReference == DebugCrashTaskHandler.applyPatch
+        || operationReference == DebugCrashTaskHandler.revertPatch
+      {
+        attemptOutcome = .humanRequired
+      } else if record.fingerprint.retryDisposition == .actionRetryAllowed,
+        Self.isActionRetrySafe(operationReference)
+      {
+        attemptOutcome = .active
+      } else {
+        attemptOutcome = .failed
+      }
+      try await recordAttemptFailure(
+        taskID: snapshot.htaskID, fingerprint: record.fingerprint,
+        outcome: attemptOutcome)
       if record.stance == .prohibited {
         // Third time: the loop has nothing new to try, so it stops for a
         // human rather than burning the rest of the budget on repetition.
@@ -918,6 +1043,20 @@ public actor HarnessTaskCoordinator {
         return HarnessReconcileOutcome(
           snapshot: blocked.snapshot, action: .stoppedForHuman,
           reasonCode: blocked.action.reasonCode)
+      }
+      if record.fingerprint.retryDisposition == .actionRetryAllowed,
+        Self.isActionRetrySafe(operationReference),
+        try await activeAttempt(snapshot.htaskID) != nil
+      {
+        let retryable = try await commit(
+          snapshot,
+          transition(
+            snapshot, causation: .jobObserved,
+            reasonCode: "TRANSIENT:ACTION_RETRY_ALLOWED",
+            status: .running, activeJob: .cleared, jobID: observation.jobID))
+        return HarnessReconcileOutcome(
+          snapshot: retryable, action: .observedJob,
+          reasonCode: "TRANSIENT:ACTION_RETRY_ALLOWED")
       }
       let stopped = try await commit(
         snapshot,
@@ -1003,6 +1142,8 @@ public actor HarnessTaskCoordinator {
         nextAttempt = HarnessRepairAttempt(
           proposal: proposal, patchAttemptRef: readback.patchAttemptRef,
           patchRevision: readback.patchRevision)
+        try await recordAttemptPatchRevision(
+          readback.patchRevision, taskID: snapshot.htaskID)
         nextPhase = .building
 
       case DebugCrashTaskHandler.buildOpenHarmony:
@@ -1050,6 +1191,9 @@ public actor HarnessTaskCoordinator {
           throw HarnessRepairPortError.malformedReadback("revertAttempt")
         }
         nextAttempt = current.updating(rollbackRequired: false, reverted: true)
+        try await closeAttempt(
+          snapshot.htaskID, outcome: .reverted,
+          reason: "repairRollbackReadback")
         nextPhase = .analyzing
 
       default:
@@ -1068,10 +1212,13 @@ public actor HarnessTaskCoordinator {
         let print = fingerprint(
           snapshot, operationReference: operationReference, inputsDigest: digest,
           errorClassification: classification, semanticErrorCode: error.reasonCode)
-        _ = try await recordFailure(
+        let record = try await recordFailure(
           snapshot, fingerprint: print,
           reasonCode: "\(classification):ALTERNATIVE_REQUIRED",
           jobID: observation.jobID)
+        try await recordAttemptFailure(
+          taskID: snapshot.htaskID, fingerprint: record.fingerprint,
+          outcome: .failed)
         let alternative = try await commit(
           snapshot,
           transition(
@@ -1124,7 +1271,8 @@ public actor HarnessTaskCoordinator {
         snapshot, causation: .jobObserved,
         reasonCode: "repairStageSucceeded:\(operationReference)",
         status: .running, phase: nextPhase, activeJob: .cleared,
-        jobID: observation.jobID, observedState: observed))
+        jobID: observation.jobID, observedState: observed,
+        noProgressRounds: operationReference == DebugCrashTaskHandler.applyPatch ? 0 : nil))
 
     guard operationReference == DebugCrashTaskHandler.deployHAP else {
       return HarnessReconcileOutcome(
@@ -1223,6 +1371,8 @@ public actor HarnessTaskCoordinator {
       e1Mutations: snapshot.consumedBudget.e1Mutations)
     switch evaluation.verdict {
     case .pass:
+      try await recordAttemptEvaluation(
+        taskID: snapshot.htaskID, evaluation: evaluation, outcome: .succeeded)
       let succeeded = try await commit(
         snapshot,
         transition(
@@ -1246,6 +1396,8 @@ public actor HarnessTaskCoordinator {
       // and stop for a human instead of letting a hash mismatch look like a
       // failing fix.
       let reason = "evidenceIntegrity:\(evaluation.blockers.first ?? "unknown")"
+      try await recordAttemptEvaluation(
+        taskID: snapshot.htaskID, evaluation: evaluation, outcome: .humanRequired)
       let recorded = try await commit(
         snapshot,
         transition(
@@ -1265,6 +1417,9 @@ public actor HarnessTaskCoordinator {
       case .requestHuman, .failTask:
         let terminalStatus: HarnessTaskStatus = escalation == .failTask ? .failed : .humanRequired
         let reason = "inconclusive:\(escalation == .failTask ? "failTask" : "requestHuman")"
+        try await recordAttemptEvaluation(
+          taskID: snapshot.htaskID, evaluation: evaluation,
+          outcome: escalation == .failTask ? .failed : .humanRequired)
         let stopped = try await commit(
           snapshot,
           transition(
@@ -1282,6 +1437,10 @@ public actor HarnessTaskCoordinator {
             action: terminalStatus == .failed ? .stoppedNoSafeAction : .stoppedForHuman,
             reasonCode: reason))
       case .collectMoreEvidence, .none:
+        try await recordAttemptEvaluation(
+          taskID: snapshot.htaskID, evaluation: evaluation)
+        let noProgress = Self.nextNoProgressRounds(
+          before: snapshot, after: observedState, artifactRefs: artifactRefs)
         let updated = try await commit(
           snapshot,
           transition(
@@ -1289,21 +1448,33 @@ public actor HarnessTaskCoordinator {
             status: .running, consumedBudget: consumed,
             evaluationID: evaluation.evaluationID,
             artifactRefs: artifactRefs, observedState: observedStateJSON,
-            noProgressRounds: Self.nextNoProgressRounds(before: snapshot, after: observedState,
-              artifactRefs: artifactRefs)))
+            noProgressRounds: noProgress))
+        if noProgress >= snapshot.budgets.maxNoProgressRounds,
+          snapshot.repairAttempt?.deployedDigest == nil
+        {
+          try await closeAttemptForNoProgress(snapshot.htaskID, rounds: noProgress)
+        }
         return .continues(updated)
       }
     case .fail:
       // A real, evidence-backed failure: keep the task running so this wake
       // can plan against it, bounded by the budget.
+      try await recordAttemptEvaluation(
+        taskID: snapshot.htaskID, evaluation: evaluation)
+      let noProgress = Self.nextNoProgressRounds(
+        before: snapshot, after: observedState, artifactRefs: artifactRefs)
       let updated = try await commit(
         snapshot,
         transition(
           snapshot, causation: .evaluation, reasonCode: "criteriaFailed", status: .running,
           consumedBudget: consumed, evaluationID: evaluation.evaluationID,
           artifactRefs: artifactRefs, observedState: observedStateJSON,
-          noProgressRounds: Self.nextNoProgressRounds(before: snapshot, after: observedState,
-            artifactRefs: artifactRefs)))
+          noProgressRounds: noProgress))
+      if noProgress >= snapshot.budgets.maxNoProgressRounds,
+        snapshot.repairAttempt?.deployedDigest == nil
+      {
+        try await closeAttemptForNoProgress(snapshot.htaskID, rounds: noProgress)
+      }
       return .continues(updated)
     }
   }

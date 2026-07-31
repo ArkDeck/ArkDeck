@@ -25,6 +25,8 @@ public enum HarnessBudgetKind: String, CaseIterable, Codable, Sendable {
   case wallClock
   case artifactBytes
   case e1Mutations
+  case noProgressRounds
+  case actionRetriesPerRun
 
   public var reasonCode: String {
     switch self {
@@ -32,6 +34,8 @@ public enum HarnessBudgetKind: String, CaseIterable, Codable, Sendable {
     case .wallClock: return "maxWallClockExhausted"
     case .artifactBytes: return "maxArtifactBytesExhausted"
     case .e1Mutations: return "maxE1MutationsExhausted"
+    case .noProgressRounds: return "maxNoProgressRoundsExhausted"
+    case .actionRetriesPerRun: return "maxActionRetriesPerRunExhausted"
     }
   }
 }
@@ -209,6 +213,18 @@ public struct HarnessProgressVector: Equatable, Sendable, Codable {
   public let phaseChanged: Bool
   public let newFailureCount: Int
   public let resolvedFailureCount: Int
+  public let workspaceRevisionChanged: Bool
+
+  enum CodingKeys: String, CodingKey {
+    case verdictChanged
+    case evaluationRecorded
+    case newVerifiedEvidenceCount
+    case sampleDelta
+    case phaseChanged
+    case newFailureCount
+    case resolvedFailureCount
+    case workspaceRevisionChanged
+  }
 
   public init(
     verdictChanged: Bool,
@@ -217,7 +233,8 @@ public struct HarnessProgressVector: Equatable, Sendable, Codable {
     sampleDelta: Int,
     phaseChanged: Bool,
     newFailureCount: Int,
-    resolvedFailureCount: Int
+    resolvedFailureCount: Int,
+    workspaceRevisionChanged: Bool = false
   ) {
     self.verdictChanged = verdictChanged
     self.evaluationRecorded = evaluationRecorded
@@ -226,13 +243,30 @@ public struct HarnessProgressVector: Equatable, Sendable, Codable {
     self.phaseChanged = phaseChanged
     self.newFailureCount = newFailureCount
     self.resolvedFailureCount = resolvedFailureCount
+    self.workspaceRevisionChanged = workspaceRevisionChanged
   }
 
-  /// New analysis prose is not progress; new *evidence*, a changed verdict,
-  /// a new sample, a phase move or a resolved failure is.
+  public init(from decoder: any Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    verdictChanged = try container.decode(Bool.self, forKey: .verdictChanged)
+    evaluationRecorded = try container.decode(Bool.self, forKey: .evaluationRecorded)
+    newVerifiedEvidenceCount = try container.decode(
+      Int.self, forKey: .newVerifiedEvidenceCount)
+    sampleDelta = try container.decode(Int.self, forKey: .sampleDelta)
+    phaseChanged = try container.decode(Bool.self, forKey: .phaseChanged)
+    newFailureCount = try container.decode(Int.self, forKey: .newFailureCount)
+    resolvedFailureCount = try container.decode(Int.self, forKey: .resolvedFailureCount)
+    workspaceRevisionChanged =
+      try container.decodeIfPresent(Bool.self, forKey: .workspaceRevisionChanged) ?? false
+  }
+
+  /// New analysis prose, another evaluation row, a phase move, or another
+  /// decision fingerprint is not progress. Only evidence, a changed verdict,
+  /// a sample, an actually changed workspace revision, or a resolved failure
+  /// moves the vector.
   public var isProgress: Bool {
-    verdictChanged || newVerifiedEvidenceCount > 0 || sampleDelta > 0 || phaseChanged
-      || resolvedFailureCount > 0
+    verdictChanged || newVerifiedEvidenceCount > 0 || sampleDelta > 0
+      || resolvedFailureCount > 0 || workspaceRevisionChanged
   }
 }
 

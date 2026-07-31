@@ -1028,7 +1028,7 @@ enum RuntimeCLI {
         exitCode: EX_USAGE,
         message:
           "missing task subcommand (submit|list|status|result|events|evaluations|"
-          + "humanActions|memory|reconcile|pause|resume|cancel)")
+          + "attempts|humanActions|memory|reconcile|pause|resume|cancel)")
     }
     var rest = Array(arguments.dropFirst())
     let json = rest.contains("--json")
@@ -1066,14 +1066,20 @@ enum RuntimeCLI {
       if let seconds = value("--max-wall-clock-seconds"), let parsed = Int64(seconds) {
         params["maxWallClockSeconds"] = .integer(parsed)
       }
+      if let rounds = value("--max-no-progress-rounds"), let parsed = Int64(rounds) {
+        params["maxNoProgressRounds"] = .integer(parsed)
+      }
+      if let retries = value("--max-action-retries-per-run"), let parsed = Int64(retries) {
+        params["maxActionRetriesPerRun"] = .integer(parsed)
+      }
       if let revision = value("--expected-binding-revision"), let parsed = Int64(revision) {
         params["expectedBindingRevision"] = .integer(parsed)
       }
       emit(try client.request(method: "task.submit", params: params), json: json)
     case "list":
       emit(try client.request(method: "task.list"), json: json)
-    case "status", "result", "events", "evaluations", "humanActions", "memory", "reconcile",
-      "pause", "cancel":
+    case "status", "result", "events", "evaluations", "attempts", "humanActions", "memory",
+      "reconcile", "pause", "cancel":
       emit(
         try client.request(
           method: "task.\(subcommand)", params: ["htaskId": .string(try requiredTask())]),
