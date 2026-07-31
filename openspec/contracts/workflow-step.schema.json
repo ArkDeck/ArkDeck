@@ -47,17 +47,30 @@
         "erasePartition",
         "formatPartition",
         "unlockDevice",
-        "finalizeSession"
+        "finalizeSession",
+        "inspectWorkspaceSource"
       ]
     },
     "effect": {
-      "enum": ["hostOnly", "readOnly", "deviceMutation", "destructive"]
+      "enum": [
+        "hostOnly",
+        "readOnly",
+        "deviceMutation",
+        "destructive"
+      ]
     },
     "cancellation": {
-      "enum": ["immediate", "atSafeBoundary", "criticalNonInterruptible"]
+      "enum": [
+        "immediate",
+        "atSafeBoundary",
+        "criticalNonInterruptible"
+      ]
     },
     "bindingRequirement": {
-      "enum": ["none", "confirmedDevice"]
+      "enum": [
+        "none",
+        "confirmedDevice"
+      ]
     },
     "sha256": {
       "type": "string",
@@ -92,18 +105,34 @@
     },
     "optionValue": {
       "oneOf": [
-        { "type": "string", "maxLength": 4096 },
-        { "type": "number" },
-        { "type": "boolean" },
-        { "type": "null" },
+        {
+          "type": "string",
+          "maxLength": 4096
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        },
         {
           "type": "array",
           "maxItems": 256,
           "items": {
             "oneOf": [
-              { "type": "string", "maxLength": 4096 },
-              { "type": "number" },
-              { "type": "boolean" }
+              {
+                "type": "string",
+                "maxLength": 4096
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              }
             ]
           }
         }
@@ -114,7 +143,9 @@
       "maxProperties": 128,
       "propertyNames": {
         "allOf": [
-          { "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,63}$" },
+          {
+            "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,63}$"
+          },
           {
             "not": {
               "pattern": "^(?:[aA][rR][gG][vV]|[cC][oO][mM][mM][aA][nN][dD]|[cC][oO][mM][mM][aA][nN][dD][lL][iI][nN][eE]|[eE][xX][eE][cC][uU][tT][aA][bB][lL][eE]|[hH][dD][cC][aA][rR][gG][uU][mM][eE][nN][tT][sS]|[rR][aA][wW][aA][rR][gG][uU][mM][eE][nN][tT][sS]|[sS][hH][eE][lL][lL])$"
@@ -122,23 +153,53 @@
           }
         ]
       },
-      "additionalProperties": { "$ref": "#/$defs/optionValue" },
+      "additionalProperties": {
+        "$ref": "#/$defs/optionValue"
+      },
       "not": {
         "anyOf": [
-          { "required": ["argv"] },
-          { "required": ["command"] },
-          { "required": ["executable"] },
-          { "required": ["hdcArguments"] },
-          { "required": ["shell"] }
+          {
+            "required": [
+              "argv"
+            ]
+          },
+          {
+            "required": [
+              "command"
+            ]
+          },
+          {
+            "required": [
+              "executable"
+            ]
+          },
+          {
+            "required": [
+              "hdcArguments"
+            ]
+          },
+          {
+            "required": [
+              "shell"
+            ]
+          }
         ]
       }
     },
     "diagnosticsHilogParameters": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["durationSeconds", "filters", "byteBudget"],
+      "required": [
+        "durationSeconds",
+        "filters",
+        "byteBudget"
+      ],
       "properties": {
-        "durationSeconds": { "type": "integer", "minimum": 1, "maximum": 600 },
+        "durationSeconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 600
+        },
         "filters": {
           "type": "array",
           "maxItems": 16,
@@ -159,7 +220,9 @@
     "diagnosticsComponentTreeParameters": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["byteBudget"],
+      "required": [
+        "byteBudget"
+      ],
       "properties": {
         "byteBudget": {
           "type": "integer",
@@ -175,21 +238,45 @@
     "probeHostToolArguments": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["toolIdentity", "candidatePath"],
+      "required": [
+        "toolIdentity",
+        "candidatePath"
+      ],
       "properties": {
-        "toolIdentity": { "$ref": "#/$defs/id" },
-        "candidatePath": { "type": "string", "minLength": 1 },
-        "expectedSha256": { "$ref": "#/$defs/sha256" }
+        "toolIdentity": {
+          "$ref": "#/$defs/id"
+        },
+        "candidatePath": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expectedSha256": {
+          "$ref": "#/$defs/sha256"
+        }
       }
     },
     "probeHDCServerArguments": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["endpoint", "clientIdentity"],
+      "required": [
+        "endpoint",
+        "clientIdentity"
+      ],
       "properties": {
-        "endpoint": { "type": "string", "minLength": 1 },
-        "clientIdentity": { "$ref": "#/$defs/id" },
-        "expectedServerGeneration": { "type": ["integer", "null"], "minimum": 0 }
+        "endpoint": {
+          "type": "string",
+          "minLength": 1
+        },
+        "clientIdentity": {
+          "$ref": "#/$defs/id"
+        },
+        "expectedServerGeneration": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        }
       }
     },
     "hdcServerLifecycleArguments": {
@@ -211,39 +298,80 @@
             "restartConfirmedGeneration"
           ]
         },
-        "endpoint": { "type": "string", "minLength": 1 },
-        "expectedGeneration": { "type": ["integer", "null"], "minimum": 0 },
-        "expectedOwnership": {
-          "enum": ["absent", "arkDeckManaged", "external", "unknown"]
+        "endpoint": {
+          "type": "string",
+          "minLength": 1
         },
-        "impactSnapshotHash": { "$ref": "#/$defs/sha256" },
+        "expectedGeneration": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "expectedOwnership": {
+          "enum": [
+            "absent",
+            "arkDeckManaged",
+            "external",
+            "unknown"
+          ]
+        },
+        "impactSnapshotHash": {
+          "$ref": "#/$defs/sha256"
+        },
         "confirmationId": {
           "oneOf": [
-            { "$ref": "#/$defs/id" },
-            { "type": "null" }
+            {
+              "$ref": "#/$defs/id"
+            },
+            {
+              "type": "null"
+            }
           ]
         }
       },
       "allOf": [
         {
           "if": {
-            "properties": { "action": { "const": "startManaged" } },
-            "required": ["action"]
+            "properties": {
+              "action": {
+                "const": "startManaged"
+              }
+            },
+            "required": [
+              "action"
+            ]
           },
           "then": {
             "properties": {
-              "expectedGeneration": { "type": "null" },
-              "expectedOwnership": { "const": "absent" },
-              "confirmationId": { "type": "null" }
+              "expectedGeneration": {
+                "type": "null"
+              },
+              "expectedOwnership": {
+                "const": "absent"
+              },
+              "confirmationId": {
+                "type": "null"
+              }
             }
           },
           "else": {
             "properties": {
-              "expectedGeneration": { "type": "integer", "minimum": 0 },
-              "expectedOwnership": {
-                "enum": ["arkDeckManaged", "external", "unknown"]
+              "expectedGeneration": {
+                "type": "integer",
+                "minimum": 0
               },
-              "confirmationId": { "$ref": "#/$defs/id" }
+              "expectedOwnership": {
+                "enum": [
+                  "arkDeckManaged",
+                  "external",
+                  "unknown"
+                ]
+              },
+              "confirmationId": {
+                "$ref": "#/$defs/id"
+              }
             }
           }
         }
@@ -252,48 +380,95 @@
     "probeDeviceArguments": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["evidencePolicy"],
+      "required": [
+        "evidencePolicy"
+      ],
       "properties": {
-        "evidencePolicy": { "$ref": "#/$defs/id" }
+        "evidencePolicy": {
+          "$ref": "#/$defs/id"
+        }
       }
     },
     "catalogStdoutArguments": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["catalogId", "actionId", "parameters", "artifactId"],
+      "required": [
+        "catalogId",
+        "actionId",
+        "parameters",
+        "artifactId"
+      ],
       "properties": {
-        "catalogId": { "$ref": "#/$defs/catalogId" },
-        "actionId": { "$ref": "#/$defs/actionId" },
-        "parameters": { "$ref": "#/$defs/validatedOptions" },
-        "artifactId": { "$ref": "#/$defs/id" }
+        "catalogId": {
+          "$ref": "#/$defs/catalogId"
+        },
+        "actionId": {
+          "$ref": "#/$defs/actionId"
+        },
+        "parameters": {
+          "$ref": "#/$defs/validatedOptions"
+        },
+        "artifactId": {
+          "$ref": "#/$defs/id"
+        }
       },
       "oneOf": [
         {
           "properties": {
-            "catalogId": { "const": "arkui-ui-dump" },
-            "actionId": { "enum": ["nodeSummary", "elementTree", "fullDefaultTree", "componentDetail", "renderTreeLegacy"] },
-            "parameters": { "$ref": "#/$defs/validatedOptions" }
+            "catalogId": {
+              "const": "arkui-ui-dump"
+            },
+            "actionId": {
+              "enum": [
+                "nodeSummary",
+                "elementTree",
+                "fullDefaultTree",
+                "componentDetail",
+                "renderTreeLegacy"
+              ]
+            },
+            "parameters": {
+              "$ref": "#/$defs/validatedOptions"
+            }
           }
         },
         {
           "properties": {
-            "catalogId": { "const": "arkdeck-diagnostics" },
-            "actionId": { "const": "boundedHilog" },
-            "parameters": { "$ref": "#/$defs/diagnosticsHilogParameters" }
+            "catalogId": {
+              "const": "arkdeck-diagnostics"
+            },
+            "actionId": {
+              "const": "boundedHilog"
+            },
+            "parameters": {
+              "$ref": "#/$defs/diagnosticsHilogParameters"
+            }
           }
         },
         {
           "properties": {
-            "catalogId": { "const": "arkdeck-diagnostics" },
-            "actionId": { "const": "componentTree" },
-            "parameters": { "$ref": "#/$defs/diagnosticsComponentTreeParameters" }
+            "catalogId": {
+              "const": "arkdeck-diagnostics"
+            },
+            "actionId": {
+              "const": "componentTree"
+            },
+            "parameters": {
+              "$ref": "#/$defs/diagnosticsComponentTreeParameters"
+            }
           }
         },
         {
           "properties": {
-            "catalogId": { "const": "arkdeck-diagnostics" },
-            "actionId": { "const": "windowInventory" },
-            "parameters": { "$ref": "#/$defs/diagnosticsComponentTreeParameters" }
+            "catalogId": {
+              "const": "arkdeck-diagnostics"
+            },
+            "actionId": {
+              "const": "windowInventory"
+            },
+            "parameters": {
+              "$ref": "#/$defs/diagnosticsComponentTreeParameters"
+            }
           }
         }
       ]
@@ -301,30 +476,73 @@
     "catalogFileArguments": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["catalogId", "actionId", "parameters", "artifactId", "ownedRemotePath"],
+      "required": [
+        "catalogId",
+        "actionId",
+        "parameters",
+        "artifactId",
+        "ownedRemotePath"
+      ],
       "properties": {
-        "catalogId": { "$ref": "#/$defs/catalogId" },
-        "actionId": { "$ref": "#/$defs/actionId" },
-        "parameters": { "$ref": "#/$defs/validatedOptions" },
-        "artifactId": { "$ref": "#/$defs/id" },
-        "ownedRemotePath": { "$ref": "#/$defs/remoteAbsolutePath" }
+        "catalogId": {
+          "$ref": "#/$defs/catalogId"
+        },
+        "actionId": {
+          "$ref": "#/$defs/actionId"
+        },
+        "parameters": {
+          "$ref": "#/$defs/validatedOptions"
+        },
+        "artifactId": {
+          "$ref": "#/$defs/id"
+        },
+        "ownedRemotePath": {
+          "$ref": "#/$defs/remoteAbsolutePath"
+        }
       },
       "allOf": [
         {
           "oneOf": [
             {
               "properties": {
-                "catalogId": { "const": "arkui-ui-dump" },
-                "actionId": { "enum": ["nodeSummary", "elementTree", "fullDefaultTree", "componentDetail", "renderTreeLegacy"] }
+                "catalogId": {
+                  "const": "arkui-ui-dump"
+                },
+                "actionId": {
+                  "enum": [
+                    "nodeSummary",
+                    "elementTree",
+                    "fullDefaultTree",
+                    "componentDetail",
+                    "renderTreeLegacy"
+                  ]
+                }
               },
-              "required": ["catalogId", "actionId"]
+              "required": [
+                "catalogId",
+                "actionId"
+              ]
             },
             {
               "properties": {
-                "catalogId": { "const": "trace-presets" },
-                "actionId": { "enum": ["attachmentPanorama", "arkuiDeep", "renderAnimation", "schedulingIpc", "io", "custom"] }
+                "catalogId": {
+                  "const": "trace-presets"
+                },
+                "actionId": {
+                  "enum": [
+                    "attachmentPanorama",
+                    "arkuiDeep",
+                    "renderAnimation",
+                    "schedulingIpc",
+                    "io",
+                    "custom"
+                  ]
+                }
               },
-              "required": ["catalogId", "actionId"]
+              "required": [
+                "catalogId",
+                "actionId"
+              ]
             }
           ]
         }
@@ -333,9 +551,16 @@
     "approvedRemoteReadArguments": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["catalogId", "actionId", "parameters", "artifactId"],
+      "required": [
+        "catalogId",
+        "actionId",
+        "parameters",
+        "artifactId"
+      ],
       "properties": {
-        "catalogId": { "const": "arkdeck-remote-operations" },
+        "catalogId": {
+          "const": "arkdeck-remote-operations"
+        },
         "actionId": {
           "enum": [
             "deviceSummary",
@@ -347,326 +572,715 @@
             "firmwareBuild"
           ]
         },
-        "parameters": { "$ref": "#/$defs/validatedOptions" },
-        "artifactId": { "$ref": "#/$defs/id" },
-        "semanticResultPolicy": { "$ref": "#/$defs/id" }
+        "parameters": {
+          "$ref": "#/$defs/validatedOptions"
+        },
+        "artifactId": {
+          "$ref": "#/$defs/id"
+        },
+        "semanticResultPolicy": {
+          "$ref": "#/$defs/id"
+        }
       }
     },
     "approvedRemoteMutationArguments": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["catalogId", "actionId", "parameters", "artifactId", "confirmationId"],
+      "required": [
+        "catalogId",
+        "actionId",
+        "parameters",
+        "artifactId",
+        "confirmationId"
+      ],
       "properties": {
-        "catalogId": { "const": "arkdeck-remote-operations" },
-        "actionId": { "enum": ["requestRootMode"] },
-        "parameters": { "$ref": "#/$defs/validatedOptions" },
-        "artifactId": { "$ref": "#/$defs/id" },
-        "confirmationId": { "$ref": "#/$defs/id" },
-        "semanticResultPolicy": { "$ref": "#/$defs/id" }
+        "catalogId": {
+          "const": "arkdeck-remote-operations"
+        },
+        "actionId": {
+          "enum": [
+            "requestRootMode"
+          ]
+        },
+        "parameters": {
+          "$ref": "#/$defs/validatedOptions"
+        },
+        "artifactId": {
+          "$ref": "#/$defs/id"
+        },
+        "confirmationId": {
+          "$ref": "#/$defs/id"
+        },
+        "semanticResultPolicy": {
+          "$ref": "#/$defs/id"
+        }
       }
     },
     "stopCaptureArguments": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["captureStepId", "stopPolicy"],
+      "required": [
+        "captureStepId",
+        "stopPolicy"
+      ],
       "properties": {
-        "captureStepId": { "$ref": "#/$defs/id" },
-        "stopPolicy": { "$ref": "#/$defs/id" }
+        "captureStepId": {
+          "$ref": "#/$defs/id"
+        },
+        "stopPolicy": {
+          "$ref": "#/$defs/id"
+        }
       }
     },
     "sendFileArguments": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["sourceArtifactId", "remotePath", "sourceSha256"],
+      "required": [
+        "sourceArtifactId",
+        "remotePath",
+        "sourceSha256"
+      ],
       "properties": {
-        "sourceArtifactId": { "$ref": "#/$defs/id" },
-        "remotePath": { "$ref": "#/$defs/remoteAbsolutePath" },
-        "sourceSha256": { "$ref": "#/$defs/sha256" },
-        "overwritePolicy": { "enum": ["forbid", "replaceOwnedPath"] }
+        "sourceArtifactId": {
+          "$ref": "#/$defs/id"
+        },
+        "remotePath": {
+          "$ref": "#/$defs/remoteAbsolutePath"
+        },
+        "sourceSha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "overwritePolicy": {
+          "enum": [
+            "forbid",
+            "replaceOwnedPath"
+          ]
+        }
       }
     },
     "receiveFileArguments": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["remotePath", "artifactId", "localRelativePath"],
+      "required": [
+        "remotePath",
+        "artifactId",
+        "localRelativePath"
+      ],
       "properties": {
-        "remotePath": { "$ref": "#/$defs/remoteAbsolutePath" },
-        "artifactId": { "$ref": "#/$defs/id" },
-        "localRelativePath": { "$ref": "#/$defs/relativePath" },
-        "expectedSha256": { "$ref": "#/$defs/sha256" }
+        "remotePath": {
+          "$ref": "#/$defs/remoteAbsolutePath"
+        },
+        "artifactId": {
+          "$ref": "#/$defs/id"
+        },
+        "localRelativePath": {
+          "$ref": "#/$defs/relativePath"
+        },
+        "expectedSha256": {
+          "$ref": "#/$defs/sha256"
+        }
       }
     },
     "parameterNameArguments": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name"],
+      "required": [
+        "name"
+      ],
       "properties": {
-        "name": { "type": "string", "pattern": "^[A-Za-z0-9_.-]{1,255}$" }
+        "name": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.-]{1,255}$"
+        }
       }
     },
     "setParameterArguments": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name", "value", "readbackPolicy"],
+      "required": [
+        "name",
+        "value",
+        "readbackPolicy"
+      ],
       "properties": {
-        "name": { "type": "string", "pattern": "^[A-Za-z0-9_.-]{1,255}$" },
-        "value": { "type": "string", "maxLength": 4096 },
-        "readbackPolicy": { "const": "required" }
+        "name": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.-]{1,255}$"
+        },
+        "value": {
+          "type": "string",
+          "maxLength": 4096
+        },
+        "readbackPolicy": {
+          "const": "required"
+        }
       }
     },
     "restoreParameterArguments": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name", "snapshotStepId", "restorePolicy"],
+      "required": [
+        "name",
+        "snapshotStepId",
+        "restorePolicy"
+      ],
       "properties": {
-        "name": { "type": "string", "pattern": "^[A-Za-z0-9_.-]{1,255}$" },
-        "snapshotStepId": { "$ref": "#/$defs/id" },
-        "restorePolicy": { "enum": ["restoreKnownValue", "persistentChangeNoRestore"] }
+        "name": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.-]{1,255}$"
+        },
+        "snapshotStepId": {
+          "$ref": "#/$defs/id"
+        },
+        "restorePolicy": {
+          "enum": [
+            "restoreKnownValue",
+            "persistentChangeNoRestore"
+          ]
+        }
       }
     },
     "waitArguments": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["deadlineMilliseconds", "reason"],
+      "required": [
+        "deadlineMilliseconds",
+        "reason"
+      ],
       "properties": {
-        "deadlineMilliseconds": { "type": "integer", "minimum": 1, "maximum": 86400000 },
-        "reason": { "$ref": "#/$defs/id" }
+        "deadlineMilliseconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 86400000
+        },
+        "reason": {
+          "$ref": "#/$defs/id"
+        }
       }
     },
     "verifyRemoteStateArguments": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["probeId", "expectedState"],
+      "required": [
+        "probeId",
+        "expectedState"
+      ],
       "properties": {
-        "probeId": { "$ref": "#/$defs/id" },
-        "expectedState": { "type": "string", "minLength": 1, "maxLength": 256 }
+        "probeId": {
+          "$ref": "#/$defs/id"
+        },
+        "expectedState": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
       }
     },
     "artifactArguments": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["artifactId"],
+      "required": [
+        "artifactId"
+      ],
       "properties": {
-        "artifactId": { "$ref": "#/$defs/id" },
-        "validationPolicy": { "$ref": "#/$defs/id" }
+        "artifactId": {
+          "$ref": "#/$defs/id"
+        },
+        "validationPolicy": {
+          "$ref": "#/$defs/id"
+        }
       }
     },
     "postprocessArguments": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["inputArtifactIds", "outputArtifactId", "processorId", "parameters"],
+      "required": [
+        "inputArtifactIds",
+        "outputArtifactId",
+        "processorId",
+        "parameters"
+      ],
       "properties": {
         "inputArtifactIds": {
           "type": "array",
           "minItems": 1,
           "uniqueItems": true,
-          "items": { "$ref": "#/$defs/id" }
+          "items": {
+            "$ref": "#/$defs/id"
+          }
         },
-        "outputArtifactId": { "$ref": "#/$defs/id" },
-        "processorId": { "$ref": "#/$defs/id" },
-        "parameters": { "$ref": "#/$defs/validatedOptions" }
+        "outputArtifactId": {
+          "$ref": "#/$defs/id"
+        },
+        "processorId": {
+          "$ref": "#/$defs/id"
+        },
+        "parameters": {
+          "$ref": "#/$defs/validatedOptions"
+        }
       }
     },
     "hostStorageArguments": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["volumeIdentity", "requiredBytes", "metadataHeadroomBytes", "writerClass"],
+      "required": [
+        "volumeIdentity",
+        "requiredBytes",
+        "metadataHeadroomBytes",
+        "writerClass"
+      ],
       "properties": {
-        "volumeIdentity": { "$ref": "#/$defs/id" },
-        "requiredBytes": { "type": "integer", "minimum": 0 },
-        "metadataHeadroomBytes": { "type": "integer", "minimum": 1 },
-        "writerClass": { "enum": ["light", "heavy", "unknown"] }
+        "volumeIdentity": {
+          "$ref": "#/$defs/id"
+        },
+        "requiredBytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "metadataHeadroomBytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "writerClass": {
+          "enum": [
+            "light",
+            "heavy",
+            "unknown"
+          ]
+        }
       }
     },
     "deviceStorageArguments": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["remotePath", "requiredBytes"],
+      "required": [
+        "remotePath",
+        "requiredBytes"
+      ],
       "properties": {
-        "remotePath": { "$ref": "#/$defs/remoteAbsolutePath" },
-        "requiredBytes": { "type": "integer", "minimum": 0 }
+        "remotePath": {
+          "$ref": "#/$defs/remoteAbsolutePath"
+        },
+        "requiredBytes": {
+          "type": "integer",
+          "minimum": 0
+        }
       }
     },
     "cleanupArguments": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["remotePath", "ownershipEvidenceId"],
+      "required": [
+        "remotePath",
+        "ownershipEvidenceId"
+      ],
       "properties": {
-        "remotePath": { "$ref": "#/$defs/remoteAbsolutePath" },
-        "ownershipEvidenceId": { "$ref": "#/$defs/id" }
+        "remotePath": {
+          "$ref": "#/$defs/remoteAbsolutePath"
+        },
+        "ownershipEvidenceId": {
+          "$ref": "#/$defs/id"
+        }
       }
     },
     "confirmationArguments": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["confirmationId", "promptKey", "riskClass", "scopeHash"],
+      "required": [
+        "confirmationId",
+        "promptKey",
+        "riskClass",
+        "scopeHash"
+      ],
       "properties": {
-        "confirmationId": { "$ref": "#/$defs/id" },
-        "promptKey": { "$ref": "#/$defs/id" },
-        "riskClass": { "enum": ["deviceMutation", "destructive", "serverLifecycle", "recoveryAbandon", "securityBoundary"] },
-        "scopeHash": { "$ref": "#/$defs/sha256" }
+        "confirmationId": {
+          "$ref": "#/$defs/id"
+        },
+        "promptKey": {
+          "$ref": "#/$defs/id"
+        },
+        "riskClass": {
+          "enum": [
+            "deviceMutation",
+            "destructive",
+            "serverLifecycle",
+            "recoveryAbandon",
+            "securityBoundary"
+          ]
+        },
+        "scopeHash": {
+          "$ref": "#/$defs/sha256"
+        }
       }
     },
     "packageInstallArguments": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["packageArtifactId", "packageName", "replacePolicy"],
+      "required": [
+        "packageArtifactId",
+        "packageName",
+        "replacePolicy"
+      ],
       "properties": {
-        "packageArtifactId": { "$ref": "#/$defs/id" },
-        "packageName": { "type": "string", "minLength": 1, "maxLength": 255 },
-        "replacePolicy": { "enum": ["forbid", "allow"] }
+        "packageArtifactId": {
+          "$ref": "#/$defs/id"
+        },
+        "packageName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "replacePolicy": {
+          "enum": [
+            "forbid",
+            "allow"
+          ]
+        }
       }
     },
     "packageNameArguments": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["packageName"],
+      "required": [
+        "packageName"
+      ],
       "properties": {
-        "packageName": { "type": "string", "minLength": 1, "maxLength": 255 }
+        "packageName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
+        }
       }
     },
     "applicationArguments": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["bundleName", "abilityName"],
+      "required": [
+        "bundleName",
+        "abilityName"
+      ],
       "properties": {
-        "bundleName": { "type": "string", "minLength": 1, "maxLength": 255 },
-        "abilityName": { "type": "string", "minLength": 1, "maxLength": 255 },
-        "parameters": { "$ref": "#/$defs/validatedOptions" }
+        "bundleName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "abilityName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "parameters": {
+          "$ref": "#/$defs/validatedOptions"
+        }
       }
     },
     "portForwardArguments": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["forwardId", "hostEndpoint", "deviceEndpoint"],
+      "required": [
+        "forwardId",
+        "hostEndpoint",
+        "deviceEndpoint"
+      ],
       "properties": {
-        "forwardId": { "$ref": "#/$defs/id" },
-        "hostEndpoint": { "type": "string", "minLength": 1, "maxLength": 255 },
-        "deviceEndpoint": { "type": "string", "minLength": 1, "maxLength": 255 }
+        "forwardId": {
+          "$ref": "#/$defs/id"
+        },
+        "hostEndpoint": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "deviceEndpoint": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
+        }
       }
     },
     "removePortForwardArguments": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["forwardId"],
+      "required": [
+        "forwardId"
+      ],
       "properties": {
-        "forwardId": { "$ref": "#/$defs/id" }
+        "forwardId": {
+          "$ref": "#/$defs/id"
+        }
       }
     },
     "clearLogArguments": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["bufferId", "confirmationId"],
+      "required": [
+        "bufferId",
+        "confirmationId"
+      ],
       "properties": {
-        "bufferId": { "$ref": "#/$defs/id" },
-        "confirmationId": { "$ref": "#/$defs/id" }
+        "bufferId": {
+          "$ref": "#/$defs/id"
+        },
+        "confirmationId": {
+          "$ref": "#/$defs/id"
+        }
       }
     },
     "resizeLogArguments": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["bufferId", "sizeBytes", "restorePolicy"],
+      "required": [
+        "bufferId",
+        "sizeBytes",
+        "restorePolicy"
+      ],
       "properties": {
-        "bufferId": { "$ref": "#/$defs/id" },
-        "sizeBytes": { "type": "integer", "minimum": 1 },
-        "restorePolicy": { "enum": ["restoreSnapshot", "persistentChangeNoRestore"] }
+        "bufferId": {
+          "$ref": "#/$defs/id"
+        },
+        "sizeBytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "restorePolicy": {
+          "enum": [
+            "restoreSnapshot",
+            "persistentChangeNoRestore"
+          ]
+        }
       }
     },
     "logPersistArguments": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["profileId", "artifactSeriesId", "rotationBytes", "retainedSegments"],
+      "required": [
+        "profileId",
+        "artifactSeriesId",
+        "rotationBytes",
+        "retainedSegments"
+      ],
       "properties": {
-        "profileId": { "$ref": "#/$defs/id" },
-        "artifactSeriesId": { "$ref": "#/$defs/id" },
-        "rotationBytes": { "type": "integer", "minimum": 1 },
-        "retainedSegments": { "type": "integer", "minimum": 1, "maximum": 10000 }
+        "profileId": {
+          "$ref": "#/$defs/id"
+        },
+        "artifactSeriesId": {
+          "$ref": "#/$defs/id"
+        },
+        "rotationBytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "retainedSegments": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000
+        }
       }
     },
     "rebootArguments": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["targetMode", "reason"],
+      "required": [
+        "targetMode",
+        "reason"
+      ],
       "properties": {
-        "targetMode": { "enum": ["normal", "recovery", "updater", "providerDefined"] },
-        "reason": { "$ref": "#/$defs/id" }
+        "targetMode": {
+          "enum": [
+            "normal",
+            "recovery",
+            "updater",
+            "providerDefined"
+          ]
+        },
+        "reason": {
+          "$ref": "#/$defs/id"
+        }
       }
     },
     "enterUpdaterArguments": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["providerOperationId", "expectedMode", "reconnectDeadlineMilliseconds"],
+      "required": [
+        "providerOperationId",
+        "expectedMode",
+        "reconnectDeadlineMilliseconds"
+      ],
       "properties": {
-        "providerOperationId": { "$ref": "#/$defs/actionId" },
-        "expectedMode": { "type": "string", "minLength": 1, "maxLength": 128 },
-        "reconnectDeadlineMilliseconds": { "type": "integer", "minimum": 1, "maximum": 86400000 }
+        "providerOperationId": {
+          "$ref": "#/$defs/actionId"
+        },
+        "expectedMode": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "reconnectDeadlineMilliseconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 86400000
+        }
       }
     },
     "flashPartitionArguments": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["providerOperationId", "partition", "imageArtifactId", "imageSha256", "imageSize", "confirmationId", "safeBoundaryId"],
+      "required": [
+        "providerOperationId",
+        "partition",
+        "imageArtifactId",
+        "imageSha256",
+        "imageSize",
+        "confirmationId",
+        "safeBoundaryId"
+      ],
       "properties": {
-        "providerOperationId": { "$ref": "#/$defs/actionId" },
-        "partition": { "type": "string", "pattern": "^[A-Za-z0-9_.-]{1,128}$" },
-        "imageArtifactId": { "$ref": "#/$defs/id" },
-        "imageSha256": { "$ref": "#/$defs/sha256" },
-        "imageSize": { "type": "integer", "minimum": 1 },
-        "confirmationId": { "$ref": "#/$defs/id" },
-        "safeBoundaryId": { "$ref": "#/$defs/id" }
+        "providerOperationId": {
+          "$ref": "#/$defs/actionId"
+        },
+        "partition": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.-]{1,128}$"
+        },
+        "imageArtifactId": {
+          "$ref": "#/$defs/id"
+        },
+        "imageSha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "imageSize": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "confirmationId": {
+          "$ref": "#/$defs/id"
+        },
+        "safeBoundaryId": {
+          "$ref": "#/$defs/id"
+        }
       }
     },
     "updatePackageArguments": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["providerOperationId", "packageArtifactId", "packageSha256", "packageSize", "confirmationId", "safeBoundaryId"],
+      "required": [
+        "providerOperationId",
+        "packageArtifactId",
+        "packageSha256",
+        "packageSize",
+        "confirmationId",
+        "safeBoundaryId"
+      ],
       "properties": {
-        "providerOperationId": { "$ref": "#/$defs/actionId" },
-        "packageArtifactId": { "$ref": "#/$defs/id" },
-        "packageSha256": { "$ref": "#/$defs/sha256" },
-        "packageSize": { "type": "integer", "minimum": 1 },
-        "confirmationId": { "$ref": "#/$defs/id" },
-        "safeBoundaryId": { "$ref": "#/$defs/id" }
+        "providerOperationId": {
+          "$ref": "#/$defs/actionId"
+        },
+        "packageArtifactId": {
+          "$ref": "#/$defs/id"
+        },
+        "packageSha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "packageSize": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "confirmationId": {
+          "$ref": "#/$defs/id"
+        },
+        "safeBoundaryId": {
+          "$ref": "#/$defs/id"
+        }
       }
     },
     "partitionMutationArguments": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["providerOperationId", "partition", "confirmationId", "safeBoundaryId"],
+      "required": [
+        "providerOperationId",
+        "partition",
+        "confirmationId",
+        "safeBoundaryId"
+      ],
       "properties": {
-        "providerOperationId": { "$ref": "#/$defs/actionId" },
-        "partition": { "type": "string", "pattern": "^[A-Za-z0-9_.-]{1,128}$" },
-        "confirmationId": { "$ref": "#/$defs/id" },
-        "safeBoundaryId": { "$ref": "#/$defs/id" },
-        "formatType": { "type": "string", "minLength": 1, "maxLength": 64 }
+        "providerOperationId": {
+          "$ref": "#/$defs/actionId"
+        },
+        "partition": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.-]{1,128}$"
+        },
+        "confirmationId": {
+          "$ref": "#/$defs/id"
+        },
+        "safeBoundaryId": {
+          "$ref": "#/$defs/id"
+        },
+        "formatType": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        }
       }
     },
     "unlockArguments": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["providerOperationId", "confirmationId", "scopeHash", "safeBoundaryId"],
+      "required": [
+        "providerOperationId",
+        "confirmationId",
+        "scopeHash",
+        "safeBoundaryId"
+      ],
       "properties": {
-        "providerOperationId": { "$ref": "#/$defs/actionId" },
-        "confirmationId": { "$ref": "#/$defs/id" },
-        "scopeHash": { "$ref": "#/$defs/sha256" },
-        "safeBoundaryId": { "$ref": "#/$defs/id" }
+        "providerOperationId": {
+          "$ref": "#/$defs/actionId"
+        },
+        "confirmationId": {
+          "$ref": "#/$defs/id"
+        },
+        "scopeHash": {
+          "$ref": "#/$defs/sha256"
+        },
+        "safeBoundaryId": {
+          "$ref": "#/$defs/id"
+        }
       }
     },
     "finalizeArguments": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["sessionId", "publicationPolicy"],
+      "required": [
+        "sessionId",
+        "publicationPolicy"
+      ],
       "properties": {
-        "sessionId": { "$ref": "#/$defs/id" },
-        "publicationPolicy": { "const": "atomicAfterValidation" }
+        "sessionId": {
+          "$ref": "#/$defs/id"
+        },
+        "publicationPolicy": {
+          "const": "atomicAfterValidation"
+        }
       }
     },
     "compensationDescriptor": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "kind", "effect", "cancellation", "bindingRequirement", "trigger", "arguments", "argumentsHash"],
+      "required": [
+        "id",
+        "kind",
+        "effect",
+        "cancellation",
+        "bindingRequirement",
+        "trigger",
+        "arguments",
+        "argumentsHash"
+      ],
       "properties": {
-        "id": { "$ref": "#/$defs/id" },
+        "id": {
+          "$ref": "#/$defs/id"
+        },
         "kind": {
           "enum": [
             "stopRemoteCapture",
@@ -676,114 +1290,1130 @@
             "stopApplication"
           ]
         },
-        "effect": { "$ref": "#/$defs/effect" },
-        "cancellation": { "$ref": "#/$defs/cancellation" },
-        "bindingRequirement": { "$ref": "#/$defs/bindingRequirement" },
-        "trigger": {
-          "enum": ["onSuccess", "onFailure", "onCancel", "onAnyTerminal"]
+        "effect": {
+          "$ref": "#/$defs/effect"
         },
-        "arguments": { "type": "object" },
-        "argumentsHash": { "$ref": "#/$defs/sha256" }
+        "cancellation": {
+          "$ref": "#/$defs/cancellation"
+        },
+        "bindingRequirement": {
+          "$ref": "#/$defs/bindingRequirement"
+        },
+        "trigger": {
+          "enum": [
+            "onSuccess",
+            "onFailure",
+            "onCancel",
+            "onAnyTerminal"
+          ]
+        },
+        "arguments": {
+          "type": "object"
+        },
+        "argumentsHash": {
+          "$ref": "#/$defs/sha256"
+        }
       },
       "allOf": [
-        { "$ref": "#/$defs/typedStepInvariants" },
-        { "$ref": "#/$defs/typedArgumentsByKind" }
+        {
+          "$ref": "#/$defs/typedStepInvariants"
+        },
+        {
+          "$ref": "#/$defs/typedArgumentsByKind"
+        }
       ]
     },
     "typedStepInvariants": {
       "allOf": [
         {
-          "if": { "properties": { "kind": { "const": "mutateHDCServerLifecycle" } }, "required": ["kind"] },
-          "then": { "properties": { "effect": { "const": "destructive" }, "cancellation": { "enum": ["atSafeBoundary", "criticalNonInterruptible"] }, "bindingRequirement": { "const": "none" } } }
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "mutateHDCServerLifecycle"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "effect": {
+                "const": "destructive"
+              },
+              "cancellation": {
+                "enum": [
+                  "atSafeBoundary",
+                  "criticalNonInterruptible"
+                ]
+              },
+              "bindingRequirement": {
+                "const": "none"
+              }
+            }
+          }
         },
         {
-          "if": { "properties": { "kind": { "enum": ["probeHostTool", "probeHDCServer", "verifyArtifact", "preflightHostStorage", "hashFile", "postprocessArtifact", "requestConfirmation", "finalizeSession"] } }, "required": ["kind"] },
-          "then": { "properties": { "effect": { "enum": ["hostOnly", "readOnly", "deviceMutation", "destructive"] }, "bindingRequirement": { "enum": ["none", "confirmedDevice"] } } }
+          "if": {
+            "properties": {
+              "kind": {
+                "enum": [
+                  "probeHostTool",
+                  "probeHDCServer",
+                  "verifyArtifact",
+                  "preflightHostStorage",
+                  "hashFile",
+                  "postprocessArtifact",
+                  "requestConfirmation",
+                  "finalizeSession"
+                ]
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "effect": {
+                "enum": [
+                  "hostOnly",
+                  "readOnly",
+                  "deviceMutation",
+                  "destructive"
+                ]
+              },
+              "bindingRequirement": {
+                "enum": [
+                  "none",
+                  "confirmedDevice"
+                ]
+              }
+            }
+          }
         },
         {
-          "if": { "properties": { "kind": { "enum": ["probeDevice", "captureRemoteStdout", "receiveFile", "snapshotParameter", "waitForDisconnect", "waitForReconnect", "verifyRemoteState", "preflightDeviceStorage", "runApprovedRemoteRead"] } }, "required": ["kind"] },
-          "then": { "properties": { "effect": { "enum": ["readOnly", "deviceMutation", "destructive"] }, "bindingRequirement": { "const": "confirmedDevice" } } }
+          "if": {
+            "properties": {
+              "kind": {
+                "enum": [
+                  "probeDevice",
+                  "captureRemoteStdout",
+                  "receiveFile",
+                  "snapshotParameter",
+                  "waitForDisconnect",
+                  "waitForReconnect",
+                  "verifyRemoteState",
+                  "preflightDeviceStorage",
+                  "runApprovedRemoteRead"
+                ]
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "effect": {
+                "enum": [
+                  "readOnly",
+                  "deviceMutation",
+                  "destructive"
+                ]
+              },
+              "bindingRequirement": {
+                "const": "confirmedDevice"
+              }
+            }
+          }
         },
         {
-          "if": { "properties": { "kind": { "enum": ["captureRemoteFile", "stopRemoteCapture", "sendFile", "setParameter", "restoreParameter", "cleanupOwnedRemotePath", "installPackage", "uninstallPackage", "startApplication", "stopApplication", "createPortForward", "removePortForward", "clearLogBuffer", "resizeLogBuffer", "startDeviceLogPersist", "runApprovedRemoteMutation", "rebootDevice", "enterUpdater"] } }, "required": ["kind"] },
-          "then": { "properties": { "effect": { "enum": ["deviceMutation", "destructive"] }, "bindingRequirement": { "const": "confirmedDevice" } } }
+          "if": {
+            "properties": {
+              "kind": {
+                "enum": [
+                  "captureRemoteFile",
+                  "stopRemoteCapture",
+                  "sendFile",
+                  "setParameter",
+                  "restoreParameter",
+                  "cleanupOwnedRemotePath",
+                  "installPackage",
+                  "uninstallPackage",
+                  "startApplication",
+                  "stopApplication",
+                  "createPortForward",
+                  "removePortForward",
+                  "clearLogBuffer",
+                  "resizeLogBuffer",
+                  "startDeviceLogPersist",
+                  "runApprovedRemoteMutation",
+                  "rebootDevice",
+                  "enterUpdater"
+                ]
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "effect": {
+                "enum": [
+                  "deviceMutation",
+                  "destructive"
+                ]
+              },
+              "bindingRequirement": {
+                "const": "confirmedDevice"
+              }
+            }
+          }
         },
         {
-          "if": { "properties": { "kind": { "enum": ["flashPartition", "updatePackage", "erasePartition", "formatPartition", "unlockDevice"] } }, "required": ["kind"] },
-          "then": { "properties": { "effect": { "const": "destructive" }, "cancellation": { "const": "criticalNonInterruptible" }, "bindingRequirement": { "const": "confirmedDevice" } } }
+          "if": {
+            "properties": {
+              "kind": {
+                "enum": [
+                  "flashPartition",
+                  "updatePackage",
+                  "erasePartition",
+                  "formatPartition",
+                  "unlockDevice"
+                ]
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "effect": {
+                "const": "destructive"
+              },
+              "cancellation": {
+                "const": "criticalNonInterruptible"
+              },
+              "bindingRequirement": {
+                "const": "confirmedDevice"
+              }
+            }
+          }
         },
         {
-          "if": { "properties": { "kind": { "enum": ["probeHostTool", "probeHDCServer", "probeDevice", "captureRemoteStdout", "receiveFile", "snapshotParameter", "waitForDisconnect", "waitForReconnect", "verifyRemoteState", "verifyArtifact", "preflightHostStorage", "preflightDeviceStorage", "hashFile", "postprocessArtifact", "requestConfirmation", "runApprovedRemoteRead"] } }, "required": ["kind"] },
-          "then": { "properties": { "cancellation": { "enum": ["immediate", "atSafeBoundary", "criticalNonInterruptible"] } } }
+          "if": {
+            "properties": {
+              "kind": {
+                "enum": [
+                  "probeHostTool",
+                  "probeHDCServer",
+                  "probeDevice",
+                  "captureRemoteStdout",
+                  "receiveFile",
+                  "snapshotParameter",
+                  "waitForDisconnect",
+                  "waitForReconnect",
+                  "verifyRemoteState",
+                  "verifyArtifact",
+                  "preflightHostStorage",
+                  "preflightDeviceStorage",
+                  "hashFile",
+                  "postprocessArtifact",
+                  "requestConfirmation",
+                  "runApprovedRemoteRead"
+                ]
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "cancellation": {
+                "enum": [
+                  "immediate",
+                  "atSafeBoundary",
+                  "criticalNonInterruptible"
+                ]
+              }
+            }
+          }
         },
         {
-          "if": { "properties": { "kind": { "enum": ["captureRemoteFile", "stopRemoteCapture", "sendFile", "setParameter", "restoreParameter", "cleanupOwnedRemotePath", "installPackage", "uninstallPackage", "startApplication", "stopApplication", "createPortForward", "removePortForward", "clearLogBuffer", "resizeLogBuffer", "startDeviceLogPersist", "runApprovedRemoteMutation", "rebootDevice", "enterUpdater", "finalizeSession"] } }, "required": ["kind"] },
-          "then": { "properties": { "cancellation": { "enum": ["atSafeBoundary", "criticalNonInterruptible"] } } }
+          "if": {
+            "properties": {
+              "kind": {
+                "enum": [
+                  "captureRemoteFile",
+                  "stopRemoteCapture",
+                  "sendFile",
+                  "setParameter",
+                  "restoreParameter",
+                  "cleanupOwnedRemotePath",
+                  "installPackage",
+                  "uninstallPackage",
+                  "startApplication",
+                  "stopApplication",
+                  "createPortForward",
+                  "removePortForward",
+                  "clearLogBuffer",
+                  "resizeLogBuffer",
+                  "startDeviceLogPersist",
+                  "runApprovedRemoteMutation",
+                  "rebootDevice",
+                  "enterUpdater",
+                  "finalizeSession"
+                ]
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "cancellation": {
+                "enum": [
+                  "atSafeBoundary",
+                  "criticalNonInterruptible"
+                ]
+              }
+            }
+          }
         }
       ]
     },
     "typedArgumentsByKind": {
       "allOf": [
-        { "if": { "properties": { "kind": { "const": "probeHostTool" } }, "required": ["kind"] }, "then": { "properties": { "arguments": { "$ref": "#/$defs/probeHostToolArguments" } } } },
-        { "if": { "properties": { "kind": { "const": "probeHDCServer" } }, "required": ["kind"] }, "then": { "properties": { "arguments": { "$ref": "#/$defs/probeHDCServerArguments" } } } },
-        { "if": { "properties": { "kind": { "const": "mutateHDCServerLifecycle" } }, "required": ["kind"] }, "then": { "properties": { "arguments": { "$ref": "#/$defs/hdcServerLifecycleArguments" } } } },
-        { "if": { "properties": { "kind": { "const": "probeDevice" } }, "required": ["kind"] }, "then": { "properties": { "arguments": { "$ref": "#/$defs/probeDeviceArguments" } } } },
-        { "if": { "properties": { "kind": { "const": "captureRemoteStdout" } }, "required": ["kind"] }, "then": { "properties": { "arguments": { "$ref": "#/$defs/catalogStdoutArguments" } } } },
-        { "if": { "properties": { "kind": { "const": "captureRemoteFile" } }, "required": ["kind"] }, "then": { "properties": { "arguments": { "$ref": "#/$defs/catalogFileArguments" } } } },
-        { "if": { "properties": { "kind": { "const": "stopRemoteCapture" } }, "required": ["kind"] }, "then": { "properties": { "arguments": { "$ref": "#/$defs/stopCaptureArguments" } } } },
-        { "if": { "properties": { "kind": { "const": "sendFile" } }, "required": ["kind"] }, "then": { "properties": { "arguments": { "$ref": "#/$defs/sendFileArguments" } } } },
-        { "if": { "properties": { "kind": { "const": "receiveFile" } }, "required": ["kind"] }, "then": { "properties": { "arguments": { "$ref": "#/$defs/receiveFileArguments" } } } },
-        { "if": { "properties": { "kind": { "const": "snapshotParameter" } }, "required": ["kind"] }, "then": { "properties": { "arguments": { "$ref": "#/$defs/parameterNameArguments" } } } },
-        { "if": { "properties": { "kind": { "const": "setParameter" } }, "required": ["kind"] }, "then": { "properties": { "arguments": { "$ref": "#/$defs/setParameterArguments" } } } },
-        { "if": { "properties": { "kind": { "const": "restoreParameter" } }, "required": ["kind"] }, "then": { "properties": { "arguments": { "$ref": "#/$defs/restoreParameterArguments" } } } },
-        { "if": { "properties": { "kind": { "enum": ["waitForDisconnect", "waitForReconnect"] } }, "required": ["kind"] }, "then": { "properties": { "arguments": { "$ref": "#/$defs/waitArguments" } } } },
-        { "if": { "properties": { "kind": { "const": "verifyRemoteState" } }, "required": ["kind"] }, "then": { "properties": { "arguments": { "$ref": "#/$defs/verifyRemoteStateArguments" } } } },
-        { "if": { "properties": { "kind": { "enum": ["verifyArtifact", "hashFile"] } }, "required": ["kind"] }, "then": { "properties": { "arguments": { "$ref": "#/$defs/artifactArguments" } } } },
-        { "if": { "properties": { "kind": { "const": "postprocessArtifact" } }, "required": ["kind"] }, "then": { "properties": { "arguments": { "$ref": "#/$defs/postprocessArguments" } } } },
-        { "if": { "properties": { "kind": { "const": "preflightHostStorage" } }, "required": ["kind"] }, "then": { "properties": { "arguments": { "$ref": "#/$defs/hostStorageArguments" } } } },
-        { "if": { "properties": { "kind": { "const": "preflightDeviceStorage" } }, "required": ["kind"] }, "then": { "properties": { "arguments": { "$ref": "#/$defs/deviceStorageArguments" } } } },
-        { "if": { "properties": { "kind": { "const": "cleanupOwnedRemotePath" } }, "required": ["kind"] }, "then": { "properties": { "arguments": { "$ref": "#/$defs/cleanupArguments" } } } },
-        { "if": { "properties": { "kind": { "const": "requestConfirmation" } }, "required": ["kind"] }, "then": { "properties": { "arguments": { "$ref": "#/$defs/confirmationArguments" } } } },
-        { "if": { "properties": { "kind": { "const": "installPackage" } }, "required": ["kind"] }, "then": { "properties": { "arguments": { "$ref": "#/$defs/packageInstallArguments" } } } },
-        { "if": { "properties": { "kind": { "const": "uninstallPackage" } }, "required": ["kind"] }, "then": { "properties": { "arguments": { "$ref": "#/$defs/packageNameArguments" } } } },
-        { "if": { "properties": { "kind": { "enum": ["startApplication", "stopApplication"] } }, "required": ["kind"] }, "then": { "properties": { "arguments": { "$ref": "#/$defs/applicationArguments" } } } },
-        { "if": { "properties": { "kind": { "const": "createPortForward" } }, "required": ["kind"] }, "then": { "properties": { "arguments": { "$ref": "#/$defs/portForwardArguments" } } } },
-        { "if": { "properties": { "kind": { "const": "removePortForward" } }, "required": ["kind"] }, "then": { "properties": { "arguments": { "$ref": "#/$defs/removePortForwardArguments" } } } },
-        { "if": { "properties": { "kind": { "const": "clearLogBuffer" } }, "required": ["kind"] }, "then": { "properties": { "arguments": { "$ref": "#/$defs/clearLogArguments" } } } },
-        { "if": { "properties": { "kind": { "const": "resizeLogBuffer" } }, "required": ["kind"] }, "then": { "properties": { "arguments": { "$ref": "#/$defs/resizeLogArguments" } } } },
-        { "if": { "properties": { "kind": { "const": "startDeviceLogPersist" } }, "required": ["kind"] }, "then": { "properties": { "arguments": { "$ref": "#/$defs/logPersistArguments" } } } },
-        { "if": { "properties": { "kind": { "const": "runApprovedRemoteRead" } }, "required": ["kind"] }, "then": { "properties": { "arguments": { "$ref": "#/$defs/approvedRemoteReadArguments" } } } },
-        { "if": { "properties": { "kind": { "const": "runApprovedRemoteMutation" } }, "required": ["kind"] }, "then": { "properties": { "arguments": { "$ref": "#/$defs/approvedRemoteMutationArguments" } } } },
-        { "if": { "properties": { "kind": { "const": "rebootDevice" } }, "required": ["kind"] }, "then": { "properties": { "arguments": { "$ref": "#/$defs/rebootArguments" } } } },
-        { "if": { "properties": { "kind": { "const": "enterUpdater" } }, "required": ["kind"] }, "then": { "properties": { "arguments": { "$ref": "#/$defs/enterUpdaterArguments" } } } },
-        { "if": { "properties": { "kind": { "const": "flashPartition" } }, "required": ["kind"] }, "then": { "properties": { "arguments": { "$ref": "#/$defs/flashPartitionArguments" } } } },
-        { "if": { "properties": { "kind": { "const": "updatePackage" } }, "required": ["kind"] }, "then": { "properties": { "arguments": { "$ref": "#/$defs/updatePackageArguments" } } } },
-        { "if": { "properties": { "kind": { "enum": ["erasePartition", "formatPartition"] } }, "required": ["kind"] }, "then": { "properties": { "arguments": { "$ref": "#/$defs/partitionMutationArguments" } } } },
-        { "if": { "properties": { "kind": { "const": "erasePartition" } }, "required": ["kind"] }, "then": { "properties": { "arguments": { "not": { "required": ["formatType"] } } } } },
-        { "if": { "properties": { "kind": { "const": "formatPartition" } }, "required": ["kind"] }, "then": { "properties": { "arguments": { "required": ["formatType"] } } } },
-        { "if": { "properties": { "kind": { "const": "unlockDevice" } }, "required": ["kind"] }, "then": { "properties": { "arguments": { "$ref": "#/$defs/unlockArguments" } } } },
-        { "if": { "properties": { "kind": { "const": "finalizeSession" } }, "required": ["kind"] }, "then": { "properties": { "arguments": { "$ref": "#/$defs/finalizeArguments" } } } }
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "probeHostTool"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "arguments": {
+                "$ref": "#/$defs/probeHostToolArguments"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "probeHDCServer"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "arguments": {
+                "$ref": "#/$defs/probeHDCServerArguments"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "mutateHDCServerLifecycle"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "arguments": {
+                "$ref": "#/$defs/hdcServerLifecycleArguments"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "probeDevice"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "arguments": {
+                "$ref": "#/$defs/probeDeviceArguments"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "captureRemoteStdout"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "arguments": {
+                "$ref": "#/$defs/catalogStdoutArguments"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "captureRemoteFile"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "arguments": {
+                "$ref": "#/$defs/catalogFileArguments"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "stopRemoteCapture"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "arguments": {
+                "$ref": "#/$defs/stopCaptureArguments"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "sendFile"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "arguments": {
+                "$ref": "#/$defs/sendFileArguments"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "receiveFile"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "arguments": {
+                "$ref": "#/$defs/receiveFileArguments"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "snapshotParameter"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "arguments": {
+                "$ref": "#/$defs/parameterNameArguments"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "setParameter"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "arguments": {
+                "$ref": "#/$defs/setParameterArguments"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "restoreParameter"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "arguments": {
+                "$ref": "#/$defs/restoreParameterArguments"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "enum": [
+                  "waitForDisconnect",
+                  "waitForReconnect"
+                ]
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "arguments": {
+                "$ref": "#/$defs/waitArguments"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "verifyRemoteState"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "arguments": {
+                "$ref": "#/$defs/verifyRemoteStateArguments"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "enum": [
+                  "verifyArtifact",
+                  "hashFile"
+                ]
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "arguments": {
+                "$ref": "#/$defs/artifactArguments"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "postprocessArtifact"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "arguments": {
+                "$ref": "#/$defs/postprocessArguments"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "preflightHostStorage"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "arguments": {
+                "$ref": "#/$defs/hostStorageArguments"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "preflightDeviceStorage"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "arguments": {
+                "$ref": "#/$defs/deviceStorageArguments"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "cleanupOwnedRemotePath"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "arguments": {
+                "$ref": "#/$defs/cleanupArguments"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "requestConfirmation"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "arguments": {
+                "$ref": "#/$defs/confirmationArguments"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "installPackage"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "arguments": {
+                "$ref": "#/$defs/packageInstallArguments"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "uninstallPackage"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "arguments": {
+                "$ref": "#/$defs/packageNameArguments"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "enum": [
+                  "startApplication",
+                  "stopApplication"
+                ]
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "arguments": {
+                "$ref": "#/$defs/applicationArguments"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "createPortForward"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "arguments": {
+                "$ref": "#/$defs/portForwardArguments"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "removePortForward"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "arguments": {
+                "$ref": "#/$defs/removePortForwardArguments"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "clearLogBuffer"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "arguments": {
+                "$ref": "#/$defs/clearLogArguments"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "resizeLogBuffer"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "arguments": {
+                "$ref": "#/$defs/resizeLogArguments"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "startDeviceLogPersist"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "arguments": {
+                "$ref": "#/$defs/logPersistArguments"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "runApprovedRemoteRead"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "arguments": {
+                "$ref": "#/$defs/approvedRemoteReadArguments"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "runApprovedRemoteMutation"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "arguments": {
+                "$ref": "#/$defs/approvedRemoteMutationArguments"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "rebootDevice"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "arguments": {
+                "$ref": "#/$defs/rebootArguments"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "enterUpdater"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "arguments": {
+                "$ref": "#/$defs/enterUpdaterArguments"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "flashPartition"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "arguments": {
+                "$ref": "#/$defs/flashPartitionArguments"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "updatePackage"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "arguments": {
+                "$ref": "#/$defs/updatePackageArguments"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "enum": [
+                  "erasePartition",
+                  "formatPartition"
+                ]
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "arguments": {
+                "$ref": "#/$defs/partitionMutationArguments"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "erasePartition"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "arguments": {
+                "not": {
+                  "required": [
+                    "formatType"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "formatPartition"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "arguments": {
+                "required": [
+                  "formatType"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "unlockDevice"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "arguments": {
+                "$ref": "#/$defs/unlockArguments"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "finalizeSession"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "arguments": {
+                "$ref": "#/$defs/finalizeArguments"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "inspectWorkspaceSource"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "arguments": {
+                "$ref": "#/$defs/inspectWorkspaceSourceArguments"
+              }
+            }
+          }
+        }
       ]
     },
     "workflowStep": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "kind", "effect", "cancellation", "bindingRequirement", "arguments", "compensationDescriptors"],
+      "required": [
+        "id",
+        "kind",
+        "effect",
+        "cancellation",
+        "bindingRequirement",
+        "arguments",
+        "compensationDescriptors"
+      ],
       "properties": {
-        "id": { "$ref": "#/$defs/id" },
-        "kind": { "$ref": "#/$defs/kind" },
-        "effect": { "$ref": "#/$defs/effect" },
-        "cancellation": { "$ref": "#/$defs/cancellation" },
-        "bindingRequirement": { "$ref": "#/$defs/bindingRequirement" },
-        "arguments": { "type": "object" },
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "kind": {
+          "$ref": "#/$defs/kind"
+        },
+        "effect": {
+          "$ref": "#/$defs/effect"
+        },
+        "cancellation": {
+          "$ref": "#/$defs/cancellation"
+        },
+        "bindingRequirement": {
+          "$ref": "#/$defs/bindingRequirement"
+        },
+        "arguments": {
+          "type": "object"
+        },
         "compensationDescriptors": {
           "type": "array",
-          "items": { "$ref": "#/$defs/compensationDescriptor" }
+          "items": {
+            "$ref": "#/$defs/compensationDescriptor"
+          }
         }
       },
       "allOf": [
-        { "$ref": "#/$defs/typedStepInvariants" },
-        { "$ref": "#/$defs/typedArgumentsByKind" }
+        {
+          "$ref": "#/$defs/typedStepInvariants"
+        },
+        {
+          "$ref": "#/$defs/typedArgumentsByKind"
+        }
       ]
     },
     "executionRecord": {
@@ -806,69 +2436,286 @@
         "semanticResult"
       ],
       "properties": {
-        "id": { "$ref": "#/$defs/id" },
-        "kind": { "$ref": "#/$defs/kind" },
-        "effect": { "$ref": "#/$defs/effect" },
-        "cancellation": { "$ref": "#/$defs/cancellation" },
-        "bindingRequirement": { "$ref": "#/$defs/bindingRequirement" },
-        "arguments": { "type": "object" },
-        "argumentsHash": { "$ref": "#/$defs/sha256" },
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "kind": {
+          "$ref": "#/$defs/kind"
+        },
+        "effect": {
+          "$ref": "#/$defs/effect"
+        },
+        "cancellation": {
+          "$ref": "#/$defs/cancellation"
+        },
+        "bindingRequirement": {
+          "$ref": "#/$defs/bindingRequirement"
+        },
+        "arguments": {
+          "type": "object"
+        },
+        "argumentsHash": {
+          "$ref": "#/$defs/sha256"
+        },
         "compensationDescriptors": {
           "type": "array",
-          "items": { "$ref": "#/$defs/compensationDescriptor" }
+          "items": {
+            "$ref": "#/$defs/compensationDescriptor"
+          }
         },
         "sourceStepId": {
           "oneOf": [
-            { "$ref": "#/$defs/id" },
-            { "type": "null" }
+            {
+              "$ref": "#/$defs/id"
+            },
+            {
+              "type": "null"
+            }
           ]
         },
         "compensationTrigger": {
           "oneOf": [
-            { "enum": ["onSuccess", "onFailure", "onCancel", "onAnyTerminal"] },
-            { "type": "null" }
+            {
+              "enum": [
+                "onSuccess",
+                "onFailure",
+                "onCancel",
+                "onAnyTerminal"
+              ]
+            },
+            {
+              "type": "null"
+            }
           ]
         },
         "disposition": {
-          "enum": ["executed", "notExecuted(planned)", "skipped", "outcomeUnknown"]
+          "enum": [
+            "executed",
+            "notExecuted(planned)",
+            "skipped",
+            "outcomeUnknown"
+          ]
         },
         "outcomeCertainty": {
-          "enum": ["confirmed", "outcomeUnknown", "notApplicable"]
+          "enum": [
+            "confirmed",
+            "outcomeUnknown",
+            "notApplicable"
+          ]
         },
-        "bindingRevision": { "type": ["integer", "null"], "minimum": 1 },
-        "exitCode": { "type": ["integer", "null"] },
-        "durationNanoseconds": { "type": ["integer", "null"], "minimum": 0 },
-        "semanticResult": { "enum": ["succeeded", "failed", "notRun", "unknown"] }
+        "bindingRevision": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "exitCode": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "durationNanoseconds": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "semanticResult": {
+          "enum": [
+            "succeeded",
+            "failed",
+            "notRun",
+            "unknown"
+          ]
+        }
       },
       "allOf": [
-        { "$ref": "#/$defs/typedStepInvariants" },
-        { "$ref": "#/$defs/typedArgumentsByKind" },
         {
-          "if": { "properties": { "sourceStepId": { "type": "null" } }, "required": ["sourceStepId"] },
-          "then": { "properties": { "compensationTrigger": { "type": "null" } } },
-          "else": { "properties": { "compensationTrigger": { "enum": ["onSuccess", "onFailure", "onCancel", "onAnyTerminal"] } } }
+          "$ref": "#/$defs/typedStepInvariants"
         },
         {
-          "if": { "properties": { "bindingRequirement": { "const": "none" } }, "required": ["bindingRequirement"] },
-          "then": { "required": ["bindingRevision"], "properties": { "bindingRevision": { "type": "null" } } }
+          "$ref": "#/$defs/typedArgumentsByKind"
         },
         {
-          "if": { "properties": { "bindingRequirement": { "const": "confirmedDevice" } }, "required": ["bindingRequirement"] },
-          "then": { "required": ["bindingRevision"], "properties": { "bindingRevision": { "type": "integer", "minimum": 1 } } }
+          "if": {
+            "properties": {
+              "sourceStepId": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "sourceStepId"
+            ]
+          },
+          "then": {
+            "properties": {
+              "compensationTrigger": {
+                "type": "null"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "compensationTrigger": {
+                "enum": [
+                  "onSuccess",
+                  "onFailure",
+                  "onCancel",
+                  "onAnyTerminal"
+                ]
+              }
+            }
+          }
         },
         {
-          "if": { "properties": { "disposition": { "const": "outcomeUnknown" } }, "required": ["disposition"] },
-          "then": { "properties": { "outcomeCertainty": { "const": "outcomeUnknown" }, "semanticResult": { "const": "unknown" } } }
+          "if": {
+            "properties": {
+              "bindingRequirement": {
+                "const": "none"
+              }
+            },
+            "required": [
+              "bindingRequirement"
+            ]
+          },
+          "then": {
+            "required": [
+              "bindingRevision"
+            ],
+            "properties": {
+              "bindingRevision": {
+                "type": "null"
+              }
+            }
+          }
         },
         {
-          "if": { "properties": { "disposition": { "enum": ["notExecuted(planned)", "skipped"] } }, "required": ["disposition"] },
-          "then": { "properties": { "outcomeCertainty": { "const": "notApplicable" }, "semanticResult": { "const": "notRun" } } }
+          "if": {
+            "properties": {
+              "bindingRequirement": {
+                "const": "confirmedDevice"
+              }
+            },
+            "required": [
+              "bindingRequirement"
+            ]
+          },
+          "then": {
+            "required": [
+              "bindingRevision"
+            ],
+            "properties": {
+              "bindingRevision": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          }
         },
         {
-          "if": { "properties": { "disposition": { "const": "executed" } }, "required": ["disposition"] },
-          "then": { "properties": { "outcomeCertainty": { "const": "confirmed" }, "semanticResult": { "enum": ["succeeded", "failed"] } } }
+          "if": {
+            "properties": {
+              "disposition": {
+                "const": "outcomeUnknown"
+              }
+            },
+            "required": [
+              "disposition"
+            ]
+          },
+          "then": {
+            "properties": {
+              "outcomeCertainty": {
+                "const": "outcomeUnknown"
+              },
+              "semanticResult": {
+                "const": "unknown"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "disposition": {
+                "enum": [
+                  "notExecuted(planned)",
+                  "skipped"
+                ]
+              }
+            },
+            "required": [
+              "disposition"
+            ]
+          },
+          "then": {
+            "properties": {
+              "outcomeCertainty": {
+                "const": "notApplicable"
+              },
+              "semanticResult": {
+                "const": "notRun"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "disposition": {
+                "const": "executed"
+              }
+            },
+            "required": [
+              "disposition"
+            ]
+          },
+          "then": {
+            "properties": {
+              "outcomeCertainty": {
+                "const": "confirmed"
+              },
+              "semanticResult": {
+                "enum": [
+                  "succeeded",
+                  "failed"
+                ]
+              }
+            }
+          }
         }
       ]
+    },
+    "inspectWorkspaceSourceArguments": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "projectRef",
+        "symbol",
+        "fileScope",
+        "artifactId"
+      ],
+      "properties": {
+        "projectRef": {
+          "$ref": "#/$defs/id"
+        },
+        "symbol": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "fileScope": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "artifactId": {
+          "$ref": "#/$defs/id"
+        }
+      }
     }
   }
 }

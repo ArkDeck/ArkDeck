@@ -202,9 +202,48 @@ Task.detached {
       // belongs to the live dispatcher so an installed product component can
       // become visible without caching a startup-only rejection.
       availability: .available)
-    let providers = DeviceProviderRegistry(providers: [hdcProvider, rockchipProvider])
+    // Host-only workspace provider (CHG-2026-054 TASK-HTP-007). Both halves are
+    // explicit configuration and neither is guessed: with no inspector or no
+    // declared project the operation reports unavailable, so nothing is
+    // admitted and no capability is consumed.
+    //   ARKDECK_WORKSPACE_INSPECTOR=/usr/bin/grep
+    //   ARKDECK_WORKSPACE_PROJECTS=demo-app=/abs/path,other=/abs/other
+    let workspaceRoots = Dictionary(
+      uniqueKeysWithValues:
+        (ProcessInfo.processInfo.environment["ARKDECK_WORKSPACE_PROJECTS"] ?? "")
+        .split(separator: ",")
+        .compactMap { entry -> (String, String)? in
+          let parts = entry.split(separator: "=", maxSplits: 1).map {
+            $0.trimmingCharacters(in: .whitespaces)
+          }
+          guard parts.count == 2, !parts[0].isEmpty, parts[1].hasPrefix("/") else { return nil }
+          return (parts[0], parts[1])
+        })
+    let configuredInspector = ProcessInfo.processInfo.environment["ARKDECK_WORKSPACE_INSPECTOR"]
+    var workspaceTool: WorkspaceInspectorTool?
+    var workspaceDispatcher: any RuntimeProcessDispatching = RefusingDispatcher(
+      reason: "no workspace inspector configured (set ARKDECK_WORKSPACE_INSPECTOR)")
+    if let configuredInspector {
+      let resolver = try FixedExecutableResolver.hashing(
+        path: configuredInspector, providerID: "workspace")
+      let resolved = try resolver.resolveExecutable(providerID: "workspace")
+      workspaceTool = WorkspaceInspectorTool(
+        executablePath: resolved.path, executableSHA256: resolved.sha256)
+      workspaceDispatcher = DescriptorBoundProcessDispatcher(resolver: resolver)
+    }
+    let workspaceProvider = WorkspaceProvider(
+      registry: WorkspaceProjectRegistry(roots: workspaceRoots), tool: workspaceTool)
+    if workspaceTool != nil, !workspaceRoots.isEmpty {
+      print(
+        "workspace provider ready for \(workspaceRoots.keys.sorted().joined(separator: ","))")
+      fflush(stdout)
+    }
+
+    let providers = DeviceProviderRegistry(providers: [
+      hdcProvider, rockchipProvider, workspaceProvider,
+    ])
     let dispatcher = RuntimeProcessDispatcherRouter(
-      hdc: hdcDispatcher, rockchip: rockchipDispatcher)
+      hdc: hdcDispatcher, rockchip: rockchipDispatcher, workspace: workspaceDispatcher)
     let artifactStore = try RuntimeArtifactStore(
       rootURL: resolvedStateDirectory.appendingPathComponent("artifacts", isDirectory: true),
       nowUTC: utcNow)

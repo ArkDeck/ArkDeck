@@ -50,8 +50,8 @@ EFFECTS = ("hostOnly", "readOnly", "deviceMutation", "destructive")
 CANCELLATIONS = ("immediate", "atSafeBoundary", "criticalNonInterruptible")
 BINDINGS = ("none", "confirmedDevice")
 AUTHORIZATION_POLICIES = ("defaultReadOnly", "standingCapability", "oneShotExactPlan")
-PROVIDERS = ("hdc", "rockchip")
-CONCURRENCY_KEYS = ("device-exclusive", "device-shared-readonly")
+PROVIDERS = ("hdc", "rockchip", "workspace")
+CONCURRENCY_KEYS = ("device-exclusive", "device-shared-readonly", "host-exclusive")
 COMPENSATIONS = ("none", "bestEffortCleanup", "rollbackPublished")
 ACTION_REFERENCE_REQUIRED_OPERATIONS = frozenset(
     {"observe.device", "capture.diagnostics", "debug.hap"}
@@ -380,9 +380,9 @@ def validate_operation(
     for auth_effect, policy in authorization.items():
         _require_enum(auth_effect, EFFECTS, f"{where}.authorization key")
         _require_enum(policy, AUTHORIZATION_POLICIES, f"{where}.authorization.{auth_effect}")
-    if set(authorization) != set(permitted) - {"hostOnly"}:
+    if set(authorization) != set(permitted):
         raise CatalogError(
-            f"{where}.authorization: keys must cover exactly the permitted non-hostOnly "
+            f"{where}.authorization: keys must cover exactly the permitted "
             f"effects; got {sorted(authorization)} for permitted {sorted(permitted)}"
         )
     if "destructive" in authorization and authorization["destructive"] != "oneShotExactPlan":
@@ -652,7 +652,11 @@ def generate_swift(operations: list[dict], digest: str) -> str:
         )
         lines.append(f"      binding: .{doc['binding']},")
         concurrency = (
-            "deviceExclusive" if doc["concurrencyKey"] == "device-exclusive" else "deviceSharedReadOnly"
+            {
+                "device-exclusive": "deviceExclusive",
+                "device-shared-readonly": "deviceSharedReadOnly",
+                "host-exclusive": "hostExclusive",
+            }[doc["concurrencyKey"]]
         )
         lines.append(f"      concurrencyKey: .{concurrency},")
         input_fields = ",\n        ".join(

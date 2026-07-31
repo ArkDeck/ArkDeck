@@ -9,6 +9,9 @@
 public enum CatalogProvider: String, CaseIterable, Codable, Sendable {
   case hdc
   case rockchip
+  /// Host-only provider: source inspection, patching and builds on this
+  /// machine. It has no device target and no connect key by construction.
+  case workspace
 }
 
 public enum RuntimeOperationAuthorizationPolicy: String, CaseIterable, Codable, Sendable {
@@ -20,6 +23,9 @@ public enum RuntimeOperationAuthorizationPolicy: String, CaseIterable, Codable, 
 public enum CatalogConcurrencyKey: String, CaseIterable, Codable, Sendable {
   case deviceExclusive
   case deviceSharedReadOnly
+  /// Serialises host-only work against the same workspace; it says nothing
+  /// about any device and never reserves one.
+  case hostExclusive
 }
 
 public enum CatalogStepCompensation: String, CaseIterable, Codable, Sendable {

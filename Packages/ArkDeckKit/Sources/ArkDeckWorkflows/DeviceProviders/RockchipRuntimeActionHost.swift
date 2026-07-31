@@ -1373,6 +1373,9 @@ struct DurableRockchipRuntimeActionHost: RockchipRuntimeActionHosting {
         && descriptor.identifier == "rockchip.hdc.capture-post-flash-hilog.v1"
     case .hdc:
       return false
+    // A host-only action never runs inside the Rockchip host-managed executor.
+    case .workspace:
+      return false
     }
   }
 }

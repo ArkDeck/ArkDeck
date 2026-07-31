@@ -26,27 +26,49 @@
     "profiles"
   ],
   "properties": {
-    "schemaVersion": { "const": "1.0.0" },
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
     "id": {
       "type": "string",
       "pattern": "^[a-z][a-z0-9]*(?:[.-][a-z][a-z0-9]*)*$",
       "maxLength": 64
     },
-    "version": { "type": "integer", "minimum": 1 },
-    "title": { "type": "string", "minLength": 1, "maxLength": 200 },
-    "provider": { "enum": ["hdc", "rockchip"] },
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "provider": {
+      "enum": [
+        "hdc",
+        "rockchip",
+        "workspace"
+      ]
+    },
     "effect": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["minimum", "permitted"],
+      "required": [
+        "minimum",
+        "permitted"
+      ],
       "properties": {
-        "minimum": { "$ref": "#/$defs/effect" },
+        "minimum": {
+          "$ref": "#/$defs/effect"
+        },
         "permitted": {
           "type": "array",
           "minItems": 1,
           "maxItems": 4,
           "uniqueItems": true,
-          "items": { "$ref": "#/$defs/effect" }
+          "items": {
+            "$ref": "#/$defs/effect"
+          }
         }
       }
     },
@@ -56,34 +78,77 @@
       "additionalProperties": false,
       "minProperties": 1,
       "properties": {
-        "hostOnly": { "$ref": "#/$defs/authorizationPolicy" },
-        "readOnly": { "$ref": "#/$defs/authorizationPolicy" },
-        "deviceMutation": { "$ref": "#/$defs/authorizationPolicy" },
-        "destructive": { "const": "oneShotExactPlan" }
+        "hostOnly": {
+          "$ref": "#/$defs/authorizationPolicy"
+        },
+        "readOnly": {
+          "$ref": "#/$defs/authorizationPolicy"
+        },
+        "deviceMutation": {
+          "$ref": "#/$defs/authorizationPolicy"
+        },
+        "destructive": {
+          "const": "oneShotExactPlan"
+        }
       }
     },
     "defaultPolicyIssuance": {
       "description": "disabled: the default capability policy never issues this operation; an explicit experimental profile plus a maintainer-merged capability is required.",
-      "enum": ["enabled", "disabled"]
+      "enum": [
+        "enabled",
+        "disabled"
+      ]
     },
-    "binding": { "enum": ["none", "confirmedDevice"] },
-    "concurrencyKey": { "enum": ["device-exclusive", "device-shared-readonly"] },
-    "inputs": { "$ref": "#/$defs/fieldTable" },
-    "outputs": { "$ref": "#/$defs/fieldTable" },
+    "binding": {
+      "enum": [
+        "none",
+        "confirmedDevice"
+      ]
+    },
+    "concurrencyKey": {
+      "enum": [
+        "device-exclusive",
+        "device-shared-readonly",
+        "host-exclusive"
+      ]
+    },
+    "inputs": {
+      "$ref": "#/$defs/fieldTable"
+    },
+    "outputs": {
+      "$ref": "#/$defs/fieldTable"
+    },
     "steps": {
       "type": "array",
       "minItems": 1,
       "maxItems": 32,
-      "items": { "$ref": "#/$defs/step" }
+      "items": {
+        "$ref": "#/$defs/step"
+      }
     },
-    "timeoutSeconds": { "type": "integer", "minimum": 1, "maximum": 7200 },
-    "outputByteBudget": { "type": "integer", "minimum": 1024, "maximum": 1073741824 },
+    "timeoutSeconds": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 7200
+    },
+    "outputByteBudget": {
+      "type": "integer",
+      "minimum": 1024,
+      "maximum": 1073741824
+    },
     "retry": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["preflightAttempts", "mutationAttempts"],
+      "required": [
+        "preflightAttempts",
+        "mutationAttempts"
+      ],
       "properties": {
-        "preflightAttempts": { "type": "integer", "minimum": 1, "maximum": 3 },
+        "preflightAttempts": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3
+        },
         "mutationAttempts": {
           "description": "Structurally pinned: a mutating or destructive step is never automatically retried.",
           "const": 1
@@ -97,14 +162,19 @@
     "artifacts": {
       "type": "array",
       "maxItems": 16,
-      "items": { "$ref": "#/$defs/artifact" }
+      "items": {
+        "$ref": "#/$defs/artifact"
+      }
     },
     "profiles": {
       "type": "array",
       "minItems": 1,
       "maxItems": 8,
       "uniqueItems": true,
-      "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]*@[0-9]+$" }
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9-]*@[0-9]+$"
+      }
     }
   },
   "allOf": [
@@ -112,10 +182,16 @@
       "if": {
         "properties": {
           "id": {
-            "enum": ["observe.device", "capture.diagnostics", "debug.hap"]
+            "enum": [
+              "observe.device",
+              "capture.diagnostics",
+              "debug.hap"
+            ]
           }
         },
-        "required": ["id"]
+        "required": [
+          "id"
+        ]
       },
       "then": {
         "properties": {
@@ -123,11 +199,19 @@
             "items": {
               "if": {
                 "properties": {
-                  "kind": { "const": "runApprovedRemoteRead" }
+                  "kind": {
+                    "const": "runApprovedRemoteRead"
+                  }
                 },
-                "required": ["kind"]
+                "required": [
+                  "kind"
+                ]
               },
-              "then": { "required": ["actionRef"] }
+              "then": {
+                "required": [
+                  "actionRef"
+                ]
+              }
             }
           }
         }
@@ -135,43 +219,110 @@
     }
   ],
   "$defs": {
-    "effect": { "enum": ["hostOnly", "readOnly", "deviceMutation", "destructive"] },
-    "authorizationPolicy": { "enum": ["defaultReadOnly", "standingCapability", "oneShotExactPlan"] },
-    "cancellation": { "enum": ["immediate", "atSafeBoundary", "criticalNonInterruptible"] },
-    "binding": { "enum": ["none", "confirmedDevice"] },
-    "compensation": { "enum": ["none", "bestEffortCleanup", "rollbackPublished"] },
+    "effect": {
+      "enum": [
+        "hostOnly",
+        "readOnly",
+        "deviceMutation",
+        "destructive"
+      ]
+    },
+    "authorizationPolicy": {
+      "enum": [
+        "defaultReadOnly",
+        "standingCapability",
+        "oneShotExactPlan"
+      ]
+    },
+    "cancellation": {
+      "enum": [
+        "immediate",
+        "atSafeBoundary",
+        "criticalNonInterruptible"
+      ]
+    },
+    "binding": {
+      "enum": [
+        "none",
+        "confirmedDevice"
+      ]
+    },
+    "compensation": {
+      "enum": [
+        "none",
+        "bestEffortCleanup",
+        "rollbackPublished"
+      ]
+    },
     "step": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["stepID", "kind", "effect", "cancellation", "binding", "compensation"],
+      "required": [
+        "stepID",
+        "kind",
+        "effect",
+        "cancellation",
+        "binding",
+        "compensation"
+      ],
       "properties": {
-        "stepID": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$", "maxLength": 64 },
+        "stepID": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "maxLength": 64
+        },
         "kind": {
           "description": "Must be a kind registered in openspec/contracts/workflow-step-registry.yaml; the validator rejects unknown kinds and any effect/cancellation/binding below the registry minimum for the kind.",
           "type": "string",
           "pattern": "^[a-z][a-zA-Z0-9]*$"
         },
-        "actionRef": { "$ref": "#/$defs/actionRef" },
-        "effect": { "$ref": "#/$defs/effect" },
-        "cancellation": { "$ref": "#/$defs/cancellation" },
-        "binding": { "$ref": "#/$defs/binding" },
-        "optional": { "type": "boolean" },
-        "compensation": { "$ref": "#/$defs/compensation" },
-        "notes": { "type": "string", "maxLength": 400 }
+        "actionRef": {
+          "$ref": "#/$defs/actionRef"
+        },
+        "effect": {
+          "$ref": "#/$defs/effect"
+        },
+        "cancellation": {
+          "$ref": "#/$defs/cancellation"
+        },
+        "binding": {
+          "$ref": "#/$defs/binding"
+        },
+        "optional": {
+          "type": "boolean"
+        },
+        "compensation": {
+          "$ref": "#/$defs/compensation"
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 400
+        }
       },
       "allOf": [
         {
           "if": {
-            "properties": { "kind": { "const": "captureRemoteStdout" } },
-            "required": ["kind"]
+            "properties": {
+              "kind": {
+                "const": "captureRemoteStdout"
+              }
+            },
+            "required": [
+              "kind"
+            ]
           },
           "then": {
-            "required": ["actionRef"],
+            "required": [
+              "actionRef"
+            ],
             "properties": {
               "actionRef": {
                 "properties": {
                   "catalogId": {
-                    "enum": ["arkui-ui-dump", "arkdeck-diagnostics"]
+                    "enum": [
+                      "arkui-ui-dump",
+                      "arkdeck-diagnostics"
+                    ]
                   }
                 }
               }
@@ -179,19 +330,33 @@
           },
           "else": {
             "if": {
-              "properties": { "kind": { "const": "runApprovedRemoteRead" } },
-              "required": ["kind"]
+              "properties": {
+                "kind": {
+                  "const": "runApprovedRemoteRead"
+                }
+              },
+              "required": [
+                "kind"
+              ]
             },
             "then": {
               "properties": {
                 "actionRef": {
                   "properties": {
-                    "catalogId": { "const": "arkdeck-remote-operations" }
+                    "catalogId": {
+                      "const": "arkdeck-remote-operations"
+                    }
                   }
                 }
               }
             },
-            "else": { "not": { "required": ["actionRef"] } }
+            "else": {
+              "not": {
+                "required": [
+                  "actionRef"
+                ]
+              }
+            }
           }
         }
       ]
@@ -199,10 +364,17 @@
     "actionRef": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["catalogId", "actionId"],
+      "required": [
+        "catalogId",
+        "actionId"
+      ],
       "properties": {
         "catalogId": {
-          "enum": ["arkui-ui-dump", "arkdeck-diagnostics", "arkdeck-remote-operations"]
+          "enum": [
+            "arkui-ui-dump",
+            "arkdeck-diagnostics",
+            "arkdeck-remote-operations"
+          ]
         },
         "actionId": {
           "enum": [
@@ -227,7 +399,9 @@
       "oneOf": [
         {
           "properties": {
-            "catalogId": { "const": "arkui-ui-dump" },
+            "catalogId": {
+              "const": "arkui-ui-dump"
+            },
             "actionId": {
               "enum": [
                 "nodeSummary",
@@ -241,13 +415,23 @@
         },
         {
           "properties": {
-            "catalogId": { "const": "arkdeck-diagnostics" },
-            "actionId": { "enum": ["boundedHilog", "componentTree", "windowInventory"] }
+            "catalogId": {
+              "const": "arkdeck-diagnostics"
+            },
+            "actionId": {
+              "enum": [
+                "boundedHilog",
+                "componentTree",
+                "windowInventory"
+              ]
+            }
           }
         },
         {
           "properties": {
-            "catalogId": { "const": "arkdeck-remote-operations" },
+            "catalogId": {
+              "const": "arkdeck-remote-operations"
+            },
             "actionId": {
               "enum": [
                 "deviceSummary",
@@ -266,7 +450,9 @@
     "fieldTable": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["fields"],
+      "required": [
+        "fields"
+      ],
       "properties": {
         "fields": {
           "type": "object",
@@ -274,14 +460,19 @@
           "propertyNames": {
             "pattern": "^(?!argv$|shell$|exec$|command$|runHDC$|rawCommand$|executable$)[a-z][a-zA-Z0-9]*$"
           },
-          "additionalProperties": { "$ref": "#/$defs/field" }
+          "additionalProperties": {
+            "$ref": "#/$defs/field"
+          }
         }
       }
     },
     "field": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["type", "required"],
+      "required": [
+        "type",
+        "required"
+      ],
       "properties": {
         "type": {
           "enum": [
@@ -293,34 +484,91 @@
             "artifactReference"
           ]
         },
-        "required": { "type": "boolean" },
-        "description": { "type": "string", "maxLength": 400 },
+        "required": {
+          "type": "boolean"
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 400
+        },
         "enum": {
           "type": "array",
           "minItems": 1,
           "maxItems": 16,
           "uniqueItems": true,
-          "items": { "type": "string", "maxLength": 64 }
+          "items": {
+            "type": "string",
+            "maxLength": 64
+          }
         },
-        "pattern": { "type": "string", "maxLength": 200 },
-        "minimum": { "type": "integer" },
-        "maximum": { "type": "integer" },
-        "maxLength": { "type": "integer", "minimum": 1, "maximum": 4096 },
-        "maxItems": { "type": "integer", "minimum": 1, "maximum": 64 },
+        "pattern": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "minimum": {
+          "type": "integer"
+        },
+        "maximum": {
+          "type": "integer"
+        },
+        "maxLength": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4096
+        },
+        "maxItems": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64
+        },
         "default": {}
       }
     },
     "artifact": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name", "role", "mediaType", "privacy", "required"],
+      "required": [
+        "name",
+        "role",
+        "mediaType",
+        "privacy",
+        "required"
+      ],
       "properties": {
-        "name": { "type": "string", "pattern": "^[a-z][a-z0-9.-]*$", "maxLength": 100 },
-        "role": { "enum": ["raw", "derived", "log", "plan", "diagnostic"] },
-        "mediaType": { "type": "string", "maxLength": 100 },
-        "privacy": { "enum": ["standard", "sensitive"] },
-        "required": { "type": "boolean" },
-        "retentionClass": { "enum": ["default", "pinnedUntilVerified", "shortLived"] }
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9.-]*$",
+          "maxLength": 100
+        },
+        "role": {
+          "enum": [
+            "raw",
+            "derived",
+            "log",
+            "plan",
+            "diagnostic"
+          ]
+        },
+        "mediaType": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "privacy": {
+          "enum": [
+            "standard",
+            "sensitive"
+          ]
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "retentionClass": {
+          "enum": [
+            "default",
+            "pinnedUntilVerified",
+            "shortLived"
+          ]
+        }
       }
     }
   }

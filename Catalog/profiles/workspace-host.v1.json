@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "workspace-host",
+  "version": 1,
+  "provider": "workspace",
+  "title": "This host's declared source workspaces",
+  "constraints": {
+    "toolFamily": "host-inspector",
+    "writes": "none",
+    "notes": "Host-only profile: no device, no connect key, no binding revision. The inspector executable is resolved and hashed at startup; this profile never carries executable paths or argv."
+  },
+  "supportedOperations": [
+    "workspace.inspect-source@1"
+  ]
+}
