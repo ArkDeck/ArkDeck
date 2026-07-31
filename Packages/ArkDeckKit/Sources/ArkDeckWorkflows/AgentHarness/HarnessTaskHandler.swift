@@ -49,10 +49,16 @@ public protocol HarnessTaskHandler: Sendable {
 public struct DebugCrashTaskHandler: HarnessTaskHandler {
   public static let observeDevice = "observe.device@1"
   public static let captureDiagnostics = "capture.diagnostics@1"
-  /// The artifact `capture.diagnostics@1` declares for bounded HiLog. The
-  /// criteria name it, so a capture that did not publish it cannot support a
-  /// verdict about crashes.
+  /// The artifact `capture.diagnostics@1` declares for bounded HiLog. It
+  /// supports the *liveness* criterion only: TASK-HTP-006's r6 window
+  /// measured zero fault blocks in 887 KB of real `hilog -x` taken right
+  /// after a real crash, so a verdict about crashes cannot rest on it
+  /// (CHG-2026-055, TASK-HFA-001).
   public static let hilogArtifact = "hilog.txt"
+  /// The device's Faultlogger ledger, which is where the crash detail
+  /// actually is. The crash criteria name it, so a capture that did not
+  /// publish it cannot support any verdict about crashes.
+  public static let crashIndexArtifact = HarnessObservationBuilder.crashIndexArtifact
   /// `capture.diagnostics@1` declares `durationSeconds` **required**, so a
   /// step that omits it is refused at admission and the loop can never
   /// collect the evidence its own criteria demand. Twenty seconds is a
@@ -86,9 +92,10 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
         expected: .integer(0),
         mandatory: true,
         // Five clean runs, not one: a crash that reproduces intermittently
-        // would otherwise pass on the first quiet capture.
+        // would otherwise pass on the first quiet capture. The ledger's
+        // baseline round contributes no sample, so this needs six captures.
         minimumSamples: 5,
-        evidenceRequirements: [Self.hilogArtifact],
+        evidenceRequirements: [Self.crashIndexArtifact],
         inconclusivePolicy: .collectMoreEvidence),
       HarnessSuccessCriterion(
         criterionID: "DC-2-application-liveness",
@@ -106,7 +113,7 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
         expected: .integer(0),
         mandatory: true,
         minimumSamples: 1,
-        evidenceRequirements: [Self.hilogArtifact],
+        evidenceRequirements: [Self.crashIndexArtifact],
         inconclusivePolicy: .collectMoreEvidence),
     ]
   }
@@ -239,10 +246,30 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
   /// Inputs for the operations this type may submit. Every value here is a
   /// field the operation itself declares; nothing derived from a goal string
   /// or a model reaches this map.
-  static func typedInputs(for operationReference: String) -> [String: JSONValue] {
+  static func typedInputs(
+    for operationReference: String,
+    snapshot: HarnessTaskSnapshot? = nil
+  ) -> [String: JSONValue] {
     switch operationReference {
     case Self.captureDiagnostics:
-      return ["durationSeconds": .integer(Int64(Self.captureDurationSeconds))]
+      var inputs: [String: JSONValue] = [
+        "durationSeconds": .integer(Int64(Self.captureDurationSeconds)),
+        // The crash ledger is where the judging fields live. It is a
+        // read-only leg: unlike the trace, tree and screenshot legs its
+        // presence does not raise the effective effect, so an E0 task with
+        // `maxE1Mutations: 0` may ask for it.
+        "crashLogs": .bool(true),
+      ]
+      // Fetch one entry's body only when a previous round actually observed
+      // that entry. The name comes from verified ledger bytes - never from
+      // the goal string, a model, or a caller - and the operation validates
+      // it against the entry-name pattern besides.
+      if case .string(let entry)? = snapshot?.observed.measurements[
+        HarnessObservationBuilder.latestEntryMetric], !entry.isEmpty
+      {
+        inputs["crashLogName"] = .string(entry)
+      }
+      return inputs
     default:
       // `observe.device@1` declares no required input: the target it observes
       // comes from the request's target, not from an input field.
@@ -272,7 +299,7 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
         // here (HTP-INV-11). What the operation declares *required* has to be
         // present, or admission refuses the step: an empty map is not a
         // conservative default, it is an unrunnable one.
-        inputs: Self.typedInputs(for: operation),
+        inputs: Self.typedInputs(for: operation, snapshot: snapshot),
         hypothesis: hypothesis,
         reasonCode: reasonCode,
         producer: producerID,

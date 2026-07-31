@@ -13,25 +13,42 @@
 // differently: the first is an ERROR that needs a human, the second is
 // INCONCLUSIVE that another round may fix.
 //
-// The crash scan is pattern-based over hilog text and is documented as
-// such. It is written against the documented OpenHarmony cppcrash shape
-// (`Reason:Signal:SIG...`, `Fault thread info:`, `#NN pc ... (symbol+off)`)
-// and exercised by fixtures of that shape; validating it against bytes a
-// real device produced belongs to the hardware task, which is why the
-// run record does not claim device coverage for it.
+// Crashes are judged from the device's Faultlogger ledger, not from hilog
+// (CHG-2026-055, TASK-HFA-001). TASK-HTP-002 scanned `hilog.txt` for
+// cppcrash fault blocks against the documented OpenHarmony shape, with
+// fixtures hand-written to that shape and labelled as such. TASK-HTP-006's
+// r6 window disproved it on real hardware: after a real crash, 887 KB of
+// `hilog -x` carried zero fault blocks, because the detail is in
+// Faultlogger. So hilog now contributes *liveness only* and the ledger
+// owns crash counting - one source per question, so one crash cannot be
+// counted twice.
 
 import ArkDeckCore
 import CryptoKit
 import Foundation
 
 public struct HarnessCrashSignature: Equatable, Sendable {
+  /// The ledger entry's kind (`cppcrash`, `jscrash`, `appfreeze`, …). Kept
+  /// because the kinds carry different judging fields, and because a
+  /// signature rendered without it reads as a native crash whatever it was.
+  public let kind: String
+  /// The fault's reason token: a signal for `cppcrash`, an error name for
+  /// `jscrash`. Never fabricated - an entry with no reason yields no
+  /// signature at all.
   public let signal: String
   public let topFrame: String?
   public let blockText: String
 
+  public init(kind: String, signal: String, topFrame: String?, blockText: String) {
+    self.kind = kind
+    self.signal = signal
+    self.topFrame = topFrame
+    self.blockText = blockText
+  }
+
   public var rendered: String {
-    guard let topFrame else { return signal }
-    return "\(signal)+\(topFrame)"
+    guard let topFrame else { return "\(kind):\(signal)" }
+    return "\(kind):\(signal)+\(topFrame)"
   }
 }
 
@@ -66,11 +83,22 @@ public struct HarnessObservationBuilder: Sendable {
     self.sensitiveEvidenceAllowList = sensitiveEvidenceAllowList
   }
 
+  /// Artifact names `capture.diagnostics@1` publishes for the crash ledger.
+  public static let crashIndexArtifact = "crash-index.txt"
+  public static let crashLogArtifact = "crash-log.txt"
+  /// Measurement key carrying the device-local timestamp this task has
+  /// already accounted for. See `measureCrashLedger` for why it exists.
+  public static let watermarkMetric = "crashLedgerWatermark"
+  /// Measurement key carrying the newest un-accounted entry's name, which
+  /// is what the next round passes as `crashLogName` to fetch its body.
+  public static let latestEntryMetric = "latestCrashEntryName"
+
   public func observe(
     round: Int,
     jobID: String,
     declaredCrashSignature: String?,
-    requiredEvidence: Set<String>
+    requiredEvidence: Set<String>,
+    crashLedgerWatermark: String? = nil
   ) async throws -> HarnessRoundObservation {
     let inventory: [HarnessArtifactDescriptor]
     do {
@@ -148,8 +176,14 @@ public struct HarnessObservationBuilder: Sendable {
       collectionBlockers.append("artifactNotCollected:\(required)")
     }
 
-    let (measurements, samples) = measure(
-      verifiedBytes, declaredCrashSignature: declaredCrashSignature)
+    var (measurements, samples) = measure(verifiedBytes)
+    let ledger = measureCrashLedger(
+      verifiedBytes, declaredCrashSignature: declaredCrashSignature,
+      watermark: crashLedgerWatermark)
+    measurements.merge(ledger.measurements) { _, new in new }
+    samples.merge(ledger.samples) { _, new in new }
+    integrityBlockers.append(contentsOf: ledger.integrityBlockers)
+
     return HarnessRoundObservation(
       round: round,
       measurements: measurements,
@@ -173,122 +207,136 @@ public struct HarnessObservationBuilder: Sendable {
 
   // MARK: - Measurement
 
+  /// Hilog's one remaining measurement: whether the device produced log
+  /// output at all. It no longer contributes crash counts - the ledger owns
+  /// that question, and having both would let one crash be counted twice.
   private func measure(
-    _ verified: [(name: String, mediaType: String, data: Data)],
-    declaredCrashSignature: String?
+    _ verified: [(name: String, mediaType: String, data: Data)]
   ) -> ([String: JSONValue], [String: Int]) {
     let logs = verified.filter { $0.name.lowercased().contains("hilog") }
     guard !logs.isEmpty else { return ([:], [:]) }
 
-    var matching = 0
-    var others = 0
-    var latestSignature: String?
-    var sawApplicationOutput = false
-
-    for log in logs {
-      guard let text = String(data: log.data, encoding: .utf8) else {
-        // Not decodable as text: measured as nothing rather than as zero
-        // crashes. Zero would be a claim; nothing is the truth.
-        continue
-      }
-      sawApplicationOutput = sawApplicationOutput || Self.hasApplicationOutput(text)
-      for signature in Self.crashSignatures(in: text) {
-        latestSignature = signature.rendered
-        if let declaredCrashSignature,
-          Self.matches(declared: declaredCrashSignature, signature: signature)
-        {
-          matching += 1
-        } else {
-          others += 1
-        }
-      }
+    let sawApplicationOutput = logs.contains { log in
+      // Not decodable as text: measured as nothing rather than as silence.
+      guard let text = String(data: log.data, encoding: .utf8) else { return false }
+      return Self.hasApplicationOutput(text)
     }
-
-    var measurements: [String: JSONValue] = [
-      "matchingCrashCount": .integer(Int64(matching)),
-      "newFatalSignatureCount": .integer(Int64(others)),
-      "verificationRunCount": .integer(1),
-    ]
-    var samples: [String: Int] = [
-      "matchingCrashCount": 1,
-      "newFatalSignatureCount": 1,
-      "verificationRunCount": 1,
-    ]
-    if let latestSignature {
-      measurements["latestCrashSignature"] = .string(latestSignature)
-      samples["latestCrashSignature"] = 1
-    }
-    // Liveness is only asserted when the log actually shows the application
-    // running or crashing. A log with neither leaves the metric unobserved,
-    // which the evaluator reads as inconclusive.
-    if matching + others > 0 {
-      measurements["applicationLiveness"] = .string("unhealthy")
-      samples["applicationLiveness"] = 1
-    } else if sawApplicationOutput {
+    var measurements: [String: JSONValue] = ["verificationRunCount": .integer(1)]
+    var samples: [String: Int] = ["verificationRunCount": 1]
+    if sawApplicationOutput {
       measurements["applicationLiveness"] = .string("healthy")
       samples["applicationLiveness"] = 1
     }
     return (measurements, samples)
   }
 
-  /// Fault blocks in a hilog capture. A block starts at a fatal reason line
-  /// and continues through the frame list, which is what makes "the declared
-  /// tokens appear in this crash" a checkable statement.
-  public static func crashSignatures(in text: String) -> [HarnessCrashSignature] {
-    let lines = text.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
-    var signatures: [HarnessCrashSignature] = []
-    var index = 0
-    while index < lines.count {
-      guard let signal = fatalSignal(in: lines[index]) else {
-        index += 1
-        continue
-      }
-      var block = [lines[index]]
-      var cursor = index + 1
-      var topFrame: String?
-      while cursor < lines.count, fatalSignal(in: lines[cursor]) == nil {
-        block.append(lines[cursor])
-        if topFrame == nil, let frame = frameSymbol(in: lines[cursor]) {
-          topFrame = frame
-        }
-        cursor += 1
-      }
-      signatures.append(
-        HarnessCrashSignature(
-          signal: signal, topFrame: topFrame, blockText: block.joined(separator: "\n")))
-      index = cursor
+  /// Crash counting from the Faultlogger ledger.
+  ///
+  /// The watermark is the whole design. The ledger is cumulative device
+  /// state: a crash from last week is still listed, and a task that counted
+  /// the listing directly would report it every round, so
+  /// `matchingCrashCount == 0` could never pass and no fix could ever be
+  /// confirmed. So the first round with a readable ledger *sets* a
+  /// watermark and deliberately contributes no count and no sample - at
+  /// that point "since we last looked" has no meaning yet, and reporting
+  /// zero would be a claim this round has not earned. Later rounds count
+  /// only entries newer than the mark.
+  ///
+  /// The comparison is device-timestamp against device-timestamp. Entry
+  /// timestamps are device-local (`20260731162134` while the host clock
+  /// read 08:21 UTC), so seeding the mark from a host clock would be wrong
+  /// by whatever the device's offset happens to be.
+  private func measureCrashLedger(
+    _ verified: [(name: String, mediaType: String, data: Data)],
+    declaredCrashSignature: String?,
+    watermark: String?
+  ) -> (measurements: [String: JSONValue], samples: [String: Int], integrityBlockers: [String]) {
+    guard let index = verified.first(where: { $0.name == Self.crashIndexArtifact }) else {
+      // Not collected. The criteria name this artifact, so its absence is
+      // already an `artifactNotCollected` blocker upstream and the verdict
+      // is inconclusive; measuring zero here would overwrite that with a
+      // clean bill of health.
+      return ([:], [:], [])
     }
-    return signatures
+    guard let text = String(data: index.data, encoding: .utf8) else {
+      return ([:], [:], ["crashLedgerUnreadable:\(Self.crashIndexArtifact):invalidEncoding"])
+    }
+    let entries: [HarnessFaultLogEntry]
+    switch HarnessFaultLogLedger.readIndex(text) {
+    case .unreadable(let reason):
+      // An unreadable ledger is an integrity blocker, which the evaluator
+      // reads as ERROR and hands to a human. It is never an empty ledger:
+      // that would turn "we could not read it" into "there was no crash".
+      return ([:], [:], ["crashLedgerUnreadable:\(Self.crashIndexArtifact):\(reason)"])
+    case .answered(let read):
+      entries = read
+    }
+
+    let newest = entries.map(\.timestamp).max()
+    guard let watermark else {
+      var measurements: [String: JSONValue] = [
+        "crashLedgerBaselineEntryCount": .integer(Int64(entries.count))
+      ]
+      // An empty ledger still needs a mark, or the next round would read
+      // this one as its baseline too and never start counting.
+      measurements[Self.watermarkMetric] = .string(newest ?? "")
+      return (measurements, [:], [])
+    }
+
+    let fresh = entries.filter { $0.timestamp > watermark }
+    // The body of one entry, when the previous round named it. Without it
+    // matching falls back to the entry name, which carries kind and bundle
+    // but no frames - a coarser answer, never a more permissive one, since
+    // an unmatched fresh entry still fails `newFatalSignatureCount == 0`.
+    var detail: HarnessCrashSignature?
+    if let body = verified.first(where: { $0.name == Self.crashLogArtifact }),
+      let bodyText = String(data: body.data, encoding: .utf8),
+      let named = fresh.max(by: { $0.timestamp < $1.timestamp })
+    {
+      detail = HarnessFaultLogLedger.detail(inEntryBody: bodyText, kind: named.kind)
+    }
+
+    let newestFresh = fresh.max(by: { $0.timestamp < $1.timestamp })
+    var matching = 0
+    if let declaredCrashSignature {
+      for entry in fresh {
+        // The fetched body belongs to the newest fresh entry, so only that
+        // one may be judged on frames; the rest are judged on their names.
+        let signature =
+          entry.name == newestFresh?.name
+          ? (detail ?? Self.nameOnlySignature(entry)) : Self.nameOnlySignature(entry)
+        if Self.matches(declared: declaredCrashSignature, signature: signature) { matching += 1 }
+      }
+    }
+
+    var measurements: [String: JSONValue] = [
+      "matchingCrashCount": .integer(Int64(matching)),
+      "newFatalSignatureCount": .integer(Int64(fresh.count - matching)),
+      Self.watermarkMetric: .string(max(watermark, newest ?? watermark)),
+    ]
+    var samples: [String: Int] = [
+      "matchingCrashCount": 1,
+      "newFatalSignatureCount": 1,
+    ]
+    if let latest = newestFresh {
+      measurements[Self.latestEntryMetric] = .string(latest.name)
+      measurements["latestCrashSignature"] = .string(
+        detail?.rendered ?? Self.nameOnlySignature(latest).rendered)
+      // A fresh fault entry is the strongest liveness signal there is, and
+      // it must win over hilog's "the device produced log lines".
+      measurements["applicationLiveness"] = .string("unhealthy")
+      samples["applicationLiveness"] = 1
+    }
+    return (measurements, samples, [])
   }
 
-  private static let fatalSignals = [
-    "SIGABRT", "SIGSEGV", "SIGILL", "SIGBUS", "SIGFPE", "SIGTRAP", "SIGSYS",
-  ]
-
-  private static func fatalSignal(in line: String) -> String? {
-    let upper = line.uppercased()
-    guard upper.contains("REASON:") || upper.contains("SIGNAL:") || upper.contains("CPPCRASH")
-    else { return nil }
-    return fatalSignals.first { upper.contains($0) }
-  }
-
-  /// `#01 pc 000000000000abcd /system/lib64/libace.z.so(Symbol::Method()+72)`
-  /// -> `Symbol::Method()`. System allocator/abort frames are skipped so the
-  /// first *meaningful* frame is what names the crash.
-  private static func frameSymbol(in line: String) -> String? {
-    let trimmed = line.trimmingCharacters(in: .whitespaces)
-    guard trimmed.contains("#"), trimmed.contains(" pc ") else { return nil }
-    guard let open = trimmed.lastIndex(of: "("), let close = trimmed[open...].firstIndex(of: ")")
-    else { return nil }
-    var symbol = String(trimmed[trimmed.index(after: open)..<close])
-    if let plus = symbol.lastIndex(of: "+") {
-      symbol = String(symbol[..<plus])
-    }
-    symbol = symbol.trimmingCharacters(in: .whitespaces)
-    guard !symbol.isEmpty else { return nil }
-    let noise = ["abort", "raise", "pthread_kill", "__pthread_kill", "tgkill", "musl_abort"]
-    if noise.contains(where: { symbol.hasPrefix($0) }) { return nil }
-    return symbol
+  /// What an entry can say about itself from its listing line alone: its
+  /// kind and the bundle it belongs to, and no frames. Deliberately not a
+  /// fabricated signal - an entry whose body was never fetched must not
+  /// read downstream as a native crash with a known fault address.
+  private static func nameOnlySignature(_ entry: HarnessFaultLogEntry) -> HarnessCrashSignature {
+    HarnessCrashSignature(
+      kind: entry.kind, signal: entry.bundle, topFrame: nil, blockText: entry.name)
   }
 
   /// Token containment, not equality: a declared signature such as

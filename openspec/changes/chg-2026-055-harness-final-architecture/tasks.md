@@ -21,7 +21,23 @@
 
 ## TASK-HFA-001 — 崩溃判定源改为崩溃台账:criteria 与 observation 消费 faultlog 产物
 
-- Status:ready
+- Status:done
+- Done:2026-07-31;随本实现 PR 合入生效(维护者 review + merge 即批准)。
+  HFA-AC-1、HFA-AC-2 均 PASS,evidence = `evidence/runs/TASK-HFA-001/run-r1.md`
+  (库层 959 tests/1 skip/0 fail,新增 9 例;check_sdd 0/0/114;catalog_gen 39/39 +
+  零 drift,本任务未改 Catalog)。**Gate 已满足**:下方 Gate 行写的「#890 未合」
+  在本日失效——#890 已合入 `main@4eb14e2d`。
+  **如实登记未覆盖**:①cppcrash 与 appfreeze 两类条目正文仍无真机字节(设备当前只有
+  一条 jscrash;再取需真造 native abort 或冻屏,属设备状态改变,现场为 CHG-2026-054
+  窗口所留未动),故这两类 fixture 按文档形态手写并逐条标注来源;②真机端到端复验属
+  TASK-HFA-005;③DC-2 活性仍只断言「设备在产出日志」,要断言「应用活着」需 capture
+  带 `hilogFilters` 指名 bundle,属输入面变更不在本任务范围。
+  **scope 未点名但必须实现的语义**:台账是设备级累积状态,`matchingCrashCount` 又是
+  counter 指标,直接计数会让历史条目每轮重复计入、判据永不可达。故实现了水位线增量
+  (首轮只立水位、不产计数不产样本;之后只计时间戳大于水位者),用设备时间戳对设备
+  时间戳比较——条目名里的时间戳是设备本地时,与宿主 UTC 差一个未知时区偏移。
+  副作用:DC-1 的 5 个样本现在需 6 次采集,连同 observe 共 7 轮,仍在默认
+  `maxRounds: 8` 内。
 - Platform:macos
 - Requirements/AC:proposal What 1(判定源);change-local HFA-AC-1、HFA-AC-2,
   登记于 `verification.md`

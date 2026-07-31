@@ -17,6 +17,15 @@ private func digestHex(_ text: String) -> String {
   SHA256.hash(data: Data(text.utf8)).map { String(format: "%02x", $0) }.joined()
 }
 
+/// An empty Faultlogger ledger in the device's own words: the tool answered
+/// and there is nothing, which is the only shape that may support a verdict
+/// of "no crash" (CHG-2026-055, TASK-HFA-001).
+private let emptyLedgerBytes = """
+  Fault log list:
+  ******
+  ******
+  """
+
 private final class StubAvailabilityPort: HarnessOperationAvailabilityPort, @unchecked Sendable {
   private let lock = NSLock()
   private var unavailable: [String: String]
@@ -283,8 +292,9 @@ final class HarnessBoundsContractTests: XCTestCase {
         maxRounds: 8, maxWallClockSeconds: 900, maxArtifactBytes: 4096, maxE1Mutations: 0),
       criteria: [
         HarnessSuccessCriterion(
-          criterionID: "B-1", metric: "matchingCrashCount", comparator: .equalTo,
-          expected: .integer(0), minimumSamples: 3, evidenceRequirements: ["hilog.txt"])
+          criterionID: "B-1", metric: "applicationLiveness", comparator: .equalTo,
+          expected: .string("healthy"), minimumSamples: 3,
+          evidenceRequirements: ["hilog.txt"])
       ])
     let task = try await coordinator.submit(submission)
 
@@ -303,7 +313,7 @@ final class HarnessBoundsContractTests: XCTestCase {
     XCTAssertEqual(charged.reasonCode, "maxArtifactBytesExhausted")
     XCTAssertEqual(charged.snapshot.status, .failed)
     XCTAssertEqual(
-      charged.snapshot.observed.samples["matchingCrashCount"], 1,
+      charged.snapshot.observed.samples["applicationLiveness"], 1,
       "the sample it did collect is still on the record")
     XCTAssertEqual(jobs.submittedOperations.count, 2, "no capture is dispatched after the stop")
   }
@@ -736,16 +746,19 @@ final class HarnessBoundsContractTests: XCTestCase {
       criteria: [
         HarnessSuccessCriterion(
           criterionID: "B-1", metric: "matchingCrashCount", comparator: .equalTo,
-          expected: .integer(0), minimumSamples: 1, evidenceRequirements: ["hilog.txt"])
+          expected: .integer(0), minimumSamples: 1,
+          evidenceRequirements: ["crash-index.txt"])
       ])
     let task = try await coordinator.submit(submission)
     _ = try await coordinator.reconcile(task.htaskID)
     jobs.finish("JOB-1")
     _ = try await coordinator.reconcile(task.htaskID)
-    artifacts.stage(
-      jobID: "JOB-2", name: "hilog.txt",
-      text: "07-31 00:00:01.000 1 1 I A00000/Ace: scroll settled\n")
+    // The first readable ledger baselines; the second is counted against it.
+    artifacts.stage(jobID: "JOB-2", name: "crash-index.txt", text: emptyLedgerBytes)
     jobs.finish("JOB-2")
+    _ = try await coordinator.reconcile(task.htaskID)
+    artifacts.stage(jobID: "JOB-3", name: "crash-index.txt", text: emptyLedgerBytes)
+    jobs.finish("JOB-3")
     let succeeded = try await coordinator.reconcile(task.htaskID)
     XCTAssertEqual(succeeded.snapshot.status, .succeeded)
 

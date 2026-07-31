@@ -30,12 +30,24 @@ private func sha256Hex(_ data: Data) -> String {
   SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
 }
 
-/// A clean bounded HiLog: application output present, no fault block. Five of
-/// these satisfy the crash criteria's minimum-sample gate.
+/// A clean bounded HiLog: application output present. It carries the
+/// liveness measurement only - crashes are judged from the ledger below
+/// (CHG-2026-055, TASK-HFA-001).
 private let cleanHilog = """
   07-31 04:10:01.100  1401  1401 I A03d00/Ace: WaterFlow layout pass begin
   07-31 04:10:01.480  1401  1401 I A03d00/Ace: WaterFlow reached end of content
   07-31 04:10:02.010  1401  1401 I A03d00/Ace: scroll settled, no recovery needed
+  """
+
+/// An empty Faultlogger ledger in the device's own words. The first capture
+/// baselines on it and the rest count against that mark, so five *counting*
+/// captures satisfy the crash criteria's minimum-sample gate.
+private let emptyLedger = """
+  ----------------------------------HiviewService----------------------------------
+  No fault log exist.
+  Fault log list:
+  ******
+  ******
   """
 
 private struct StagedArtifact {
@@ -43,9 +55,10 @@ private struct StagedArtifact {
   let bytes: Data
 }
 
-/// Publishes one `hilog.txt` per *capture* job, the way
-/// `capture.diagnostics@1` declares it. `observe.device@1` publishes no hilog,
-/// so a sample count here means the same thing it means on a device.
+/// Publishes `hilog.txt` and `crash-index.txt` per *capture* job, the way
+/// `capture.diagnostics@1` declares them when the handler asks for the
+/// crash leg. `observe.device@1` publishes neither, so a sample count here
+/// means the same thing it means on a device.
 private final class ConvergenceArtifactPort: HarnessArtifactPort, @unchecked Sendable {
   private let lock = NSLock()
   private let sensitive: Bool
@@ -65,12 +78,13 @@ private final class ConvergenceArtifactPort: HarnessArtifactPort, @unchecked Sen
       staged[jobID] = []
       return
     }
-    let data = Data(cleanHilog.utf8)
-    staged[jobID] = [
-      StagedArtifact(
+    staged[jobID] = [("hilog.txt", cleanHilog), ("crash-index.txt", emptyLedger)].map {
+      name, text in
+      let data = Data(text.utf8)
+      return StagedArtifact(
         descriptor: HarnessArtifactDescriptor(
-          artifactID: "ART-\(jobID)-hilog.txt",
-          name: "hilog.txt",
+          artifactID: "ART-\(jobID)-\(name)",
+          name: name,
           mediaType: "text/plain",
           byteCount: data.count,
           sha256: sha256Hex(data),
@@ -78,7 +92,7 @@ private final class ConvergenceArtifactPort: HarnessArtifactPort, @unchecked Sen
           sensitive: sensitive,
           missingReason: nil),
         bytes: data)
-    ]
+    }
   }
 
   func inventory(jobID: String) async throws -> [HarnessArtifactDescriptor] {
@@ -268,7 +282,7 @@ final class HarnessConvergenceContractTests: XCTestCase {
   func testAutoDriveConvergesASubmittedTaskWithNoExternalReconcile() async throws {
     let jobPort = SucceedingJobPort(operations: OperationLedger())
     let harness = try coordinator(
-      sensitiveEvidence: ["hilog.txt"], sensitiveArtifacts: true, jobPort: jobPort)
+      sensitiveEvidence: ["hilog.txt", "crash-index.txt"], sensitiveArtifacts: true, jobPort: jobPort)
     let submitted = try await harness.submit(submission())
 
     let ticker = HarnessAutoDriveTicker(
@@ -399,12 +413,23 @@ final class HarnessConvergenceContractTests: XCTestCase {
       inputs["traceCategories"],
       "a trace leg escalates the effective effect to deviceMutation, and this task type "
         + "declares maxE1Mutations: 0")
+    XCTAssertEqual(
+      inputs["crashLogs"], .bool(true),
+      "the crash ledger is where the judging fields are (CHG-2026-055, TASK-HFA-001)")
+    for escalating in ["uiScreenshot", "uiComponentTree"] {
+      XCTAssertNil(
+        inputs[escalating],
+        "\(escalating) escalates to deviceMutation; the crash leg deliberately does not")
+    }
+    XCTAssertNil(
+      inputs["crashLogName"],
+      "no round has observed an entry yet, so no entry may be named")
   }
 
   func testThePlannedCaptureReachesTheEngineWithItsDeclaredInputs() async throws {
     let jobPort = SucceedingJobPort(operations: OperationLedger())
     let harness = try coordinator(
-      sensitiveEvidence: ["hilog.txt"], sensitiveArtifacts: true, jobPort: jobPort)
+      sensitiveEvidence: ["hilog.txt", "crash-index.txt"], sensitiveArtifacts: true, jobPort: jobPort)
     let submitted = try await harness.submit(submission())
     // observe, then capture: two reconciles reach the second dispatch.
     for _ in 0..<4 { _ = try? await harness.reconcile(submitted.htaskID) }
@@ -416,6 +441,7 @@ final class HarnessConvergenceContractTests: XCTestCase {
       captured["durationSeconds"],
       .integer(Int64(DebugCrashTaskHandler.captureDurationSeconds)),
       "the input the handler declares must survive the whole dispatch path")
+    XCTAssertEqual(captured["crashLogs"], .bool(true))
   }
 
   // MARK: - Defect 3: required evidence that could never be measured
@@ -427,14 +453,27 @@ final class HarnessConvergenceContractTests: XCTestCase {
     let closed = HarnessObservationBuilder(artifacts: port)
     let denied = try await closed.observe(
       round: 1, jobID: "JOB-1", declaredCrashSignature: nil, requiredEvidence: ["hilog.txt"])
-    XCTAssertEqual(denied.collectionBlockers, ["artifactSensitiveNotOptedIn:hilog.txt"])
+    XCTAssertEqual(
+      denied.collectionBlockers,
+      ["artifactSensitiveNotOptedIn:hilog.txt", "artifactSensitiveNotOptedIn:crash-index.txt"])
     XCTAssertTrue(denied.measurements.isEmpty)
     XCTAssertEqual(denied.evidence.first?.sensitiveOptIn, false)
 
-    let opened = HarnessObservationBuilder(
+    // Naming only the log buys only the log: liveness becomes measurable and
+    // the crash question stays unanswered, because its source was not opened.
+    let logOnly = HarnessObservationBuilder(
       artifacts: port, sensitiveEvidenceAllowList: ["hilog.txt"])
-    let allowed = try await opened.observe(
+    let partial = try await logOnly.observe(
       round: 1, jobID: "JOB-1", declaredCrashSignature: nil, requiredEvidence: ["hilog.txt"])
+    XCTAssertEqual(partial.collectionBlockers, ["artifactSensitiveNotOptedIn:crash-index.txt"])
+    XCTAssertEqual(partial.measurements["applicationLiveness"], .string("healthy"))
+    XCTAssertNil(partial.measurements["matchingCrashCount"])
+
+    let opened = HarnessObservationBuilder(
+      artifacts: port, sensitiveEvidenceAllowList: ["hilog.txt", "crash-index.txt"])
+    let allowed = try await opened.observe(
+      round: 1, jobID: "JOB-1", declaredCrashSignature: nil,
+      requiredEvidence: ["hilog.txt", "crash-index.txt"], crashLedgerWatermark: "")
     XCTAssertEqual(allowed.collectionBlockers, [])
     XCTAssertEqual(allowed.measurements["applicationLiveness"], .string("healthy"))
     XCTAssertEqual(allowed.measurements["matchingCrashCount"], .integer(0))
@@ -455,7 +494,8 @@ final class HarnessConvergenceContractTests: XCTestCase {
     let observation = try await builder.observe(
       round: 1, jobID: "JOB-1", declaredCrashSignature: nil, requiredEvidence: ["hilog.txt"])
     XCTAssertEqual(
-      observation.collectionBlockers, ["artifactSensitiveNotOptedIn:hilog.txt"],
+      observation.collectionBlockers,
+      ["artifactSensitiveNotOptedIn:hilog.txt", "artifactSensitiveNotOptedIn:crash-index.txt"],
       "the opt-in is per artifact name, not a blanket permission")
   }
 

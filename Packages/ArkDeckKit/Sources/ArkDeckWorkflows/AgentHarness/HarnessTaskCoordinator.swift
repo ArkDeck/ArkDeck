@@ -829,9 +829,18 @@ public actor HarnessTaskCoordinator {
       declaredSignature = value
     }
     let required = Set(snapshot.successCriteria.flatMap(\.evidenceRequirements))
+    // The crash ledger is cumulative device state, so the builder is told
+    // what this task has already accounted for. Absent on the first round
+    // with a readable ledger, which is what makes that round a baseline.
+    var watermark: String?
+    if case .string(let mark)? = snapshot.observed.measurements[
+      HarnessObservationBuilder.watermarkMetric]
+    {
+      watermark = mark
+    }
     let round = try await builder.observe(
       round: snapshot.activeRound, jobID: jobID, declaredCrashSignature: declaredSignature,
-      requiredEvidence: required)
+      requiredEvidence: required, crashLedgerWatermark: watermark)
 
     let merged = snapshot.observed.merging(round)
     let evaluation = HarnessCriteriaEvaluator.evaluate(
