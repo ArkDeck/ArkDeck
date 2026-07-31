@@ -179,6 +179,14 @@ final class AgentDaemonContractTests: XCTestCase {
     guard case .array(let flashReasons)? = flash?["reasons"] else {
       return XCTFail("unavailable operation must explain why")
     }
+    let flashReasonStrings = flashReasons.compactMap { value -> String? in
+      guard case .string(let reason) = value else { return nil }
+      return reason
+    }
+    XCTAssertEqual(flashReasonStrings.count, flashReasons.count)
+    XCTAssertEqual(
+      Set(flashReasonStrings).count, flashReasonStrings.count,
+      "operation.list must not repeat an identical availability reason")
     XCTAssertTrue(
       flashReasons.contains { value in
         guard case .string(let reason) = value else { return false }

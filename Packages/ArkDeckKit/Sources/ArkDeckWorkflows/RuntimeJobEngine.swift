@@ -463,7 +463,9 @@ public actor RuntimeJobEngine {
         reasons.append(reason)
       }
       if let reason = dispatcher.unavailableReason(providerID: descriptor.provider.rawValue) {
-        reasons.append(reason)
+        if !reasons.contains(reason) {
+          reasons.append(reason)
+        }
       }
       if descriptor.reference == "debug.hap@1"
         || descriptor.reference == "deploy.native-library.app-owned@1"

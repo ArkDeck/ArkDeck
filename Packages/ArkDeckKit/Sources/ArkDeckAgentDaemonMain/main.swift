@@ -195,16 +195,13 @@ Task.detached {
       rockchipDispatcher = BundledRockchipRuntimeDispatcher(
         resolver: rockchipResolver)
     }
-    let rockchipAvailability: ProviderOperationAvailability
-    if let reason = rockchipDispatcher.unavailableReason(providerID: "rockchip") {
-      rockchipAvailability = .unavailable(reason: reason)
-    } else {
-      rockchipAvailability = .available
-    }
     let rockchipProvider = RockchipFlashProviderAdapter(
       factsPort: TargetStoreRockchipRuntimeFactsPort(
         targetStore: targetStore, resolver: rockchipResolver, nowUTC: utcNow),
-      availability: rockchipAvailability)
+      // The closed typed plan is present. Executable/HDC/state availability
+      // belongs to the live dispatcher so an installed product component can
+      // become visible without caching a startup-only rejection.
+      availability: .available)
     let providers = DeviceProviderRegistry(providers: [hdcProvider, rockchipProvider])
     let dispatcher = RuntimeProcessDispatcherRouter(
       hdc: hdcDispatcher, rockchip: rockchipDispatcher)
