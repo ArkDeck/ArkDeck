@@ -1830,9 +1830,33 @@ public actor RuntimeJobEngine {
       guard let declaration = descriptor.artifacts.first(where: { $0.name == name }) else {
         continue
       }
-      let contents = Self.artifactContents(
-        name: name, summary: summary, receipt: receipt, descriptor: descriptor,
-        record: runtime.record)
+      // A file-backed product is the received bytes or it is nothing. The
+      // receipt's stdout for a receive step is hdc's progress line, so
+      // falling back to it would publish a text banner under a binary
+      // artifact name.
+      var landed: ProviderLandedArtifact?
+      if Self.fileBackedArtifacts.contains(name) {
+        guard let received = receipt.landedArtifact, received.sha256 != nil else {
+          let detail = "\(name) has no received host file to publish"
+          _ = try? await artifactStore.recordMissing(
+            jobID: jobID, sessionID: runtime.record.sessionID,
+            stepID: step.stepID, name: name,
+            mediaType: declaration.mediaType, privacy: declaration.privacy,
+            retentionClass: declaration.retentionClass,
+            sourceOperation: descriptor.reference,
+            providerID: descriptor.provider.rawValue,
+            bindingSnapshot: binding, reason: detail)
+          throw RuntimeArtifactPublicationFailure(detail: detail)
+        }
+        landed = received
+      }
+      let contents =
+        landed == nil
+        ? Self.artifactContents(
+          name: name, summary: summary, receipt: receipt, descriptor: descriptor,
+          record: runtime.record)
+        : Data()
+      let payloadByteCount = landed?.byteCount ?? contents.count
       if descriptor.reference == "capture.diagnostics@1" {
         let budget: Int
         if case .integer(let requested)? =
@@ -1851,7 +1875,7 @@ public actor RuntimeJobEngine {
         }
         let used = recorded.filter { $0.status.isPublished }
           .reduce(0) { $0 + $1.byteCount }
-        guard used <= budget, contents.count <= budget - used else {
+        guard used <= budget, payloadByteCount <= budget - used else {
           let detail =
             "job byte budget \(budget) exceeded while publishing \(name)"
           _ = try? await artifactStore.recordMissing(
@@ -1866,13 +1890,28 @@ public actor RuntimeJobEngine {
         }
       }
       do {
-        let metadata = try await artifactStore.publish(
-          RuntimeArtifactPublicationRequest(
-            jobID: jobID, sessionID: runtime.record.sessionID, stepID: step.stepID,
-            name: name, mediaType: declaration.mediaType, privacy: declaration.privacy,
-            retentionClass: declaration.retentionClass,
-            sourceOperation: descriptor.reference, providerID: descriptor.provider.rawValue,
-            bindingSnapshot: binding, contents: contents))
+        let metadata: RuntimeArtifactMetadata
+        if let landed, let sha256 = landed.sha256 {
+          metadata = try await artifactStore.publishFile(
+            RuntimeArtifactFilePublicationRequest(
+              jobID: jobID, sessionID: runtime.record.sessionID, stepID: step.stepID,
+              name: name, mediaType: declaration.mediaType, privacy: declaration.privacy,
+              retentionClass: declaration.retentionClass,
+              sourceOperation: descriptor.reference, providerID: descriptor.provider.rawValue,
+              bindingSnapshot: binding, sourceFileURL: landed.localURL,
+              expectedByteCount: landed.byteCount, expectedSHA256: sha256))
+          // The store now owns the bytes; the staging copy is sensitive
+          // capture data and does not outlive the publication.
+          try? FileManager.default.removeItem(at: landed.localURL)
+        } else {
+          metadata = try await artifactStore.publish(
+            RuntimeArtifactPublicationRequest(
+              jobID: jobID, sessionID: runtime.record.sessionID, stepID: step.stepID,
+              name: name, mediaType: declaration.mediaType, privacy: declaration.privacy,
+              retentionClass: declaration.retentionClass,
+              sourceOperation: descriptor.reference, providerID: descriptor.provider.rawValue,
+              bindingSnapshot: binding, contents: contents))
+        }
         appendTimeline(jobID: jobID, entry: "artifact \(name) -> \(metadata.artifactID)")
       } catch {
         // A publication failure is recorded, never swallowed: the index
@@ -1889,6 +1928,12 @@ public actor RuntimeJobEngine {
       }
     }
   }
+
+  /// Declared products whose bytes come from a device file transfer rather
+  /// than from a captured stream. They publish from the host file the
+  /// dispatcher measured, and a missing file is a recorded absence — there
+  /// is no path from "the step ran" to a published trace.
+  static let fileBackedArtifacts: Set<String> = ["trace.htrace"]
 
   /// Which step produces which declared artifact. Kept beside the engine
   /// rather than in the catalog schema because it is an implementation
@@ -2081,10 +2126,14 @@ public actor RuntimeJobEngine {
     record: RuntimeJobRecord
   ) -> Data {
     switch name {
-    case "hilog.txt", "ui-dump.json", "trace.htrace", "debug-hilog.txt":
+    case "hilog.txt", "ui-dump.json", "debug-hilog.txt":
       // Raw capture products are the bounded provider bytes themselves.
       // Encoding only the semantic byteCount here would fabricate a log
       // artifact while discarding the evidence the operation captured.
+      //
+      // `trace.htrace` is deliberately absent: it is produced by a device
+      // file transfer, not by stdout, and is published from the received
+      // file (`fileBackedArtifacts`).
       return receipt.stdout
     default:
       break

@@ -54,6 +54,9 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
       var portForwardPresent = false
       var cleanupExit: Int32 = 0
       var cleanupOutcomeUnknown = false
+      /// Bytes the simulated `file recv` leaves on the host. `nil` models
+      /// the version whose transfer lands nowhere the caller named.
+      var receivedTracePayload: Data? = Data("trace-bytes".utf8)
       var targetRows = "150100424a544e4600\t\tUSB\tConnected\tlocalhost\n"
       var modelValue = "DAYU200\n"
       var firmwareValue = "OpenHarmony-4.1-release\n"
@@ -114,9 +117,23 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
         return receipt("")
       case .receiveOwnedArtifact:
         note("receiveArtifact")
+        // Simulates the real leg rather than its verdict: hdc writes the
+        // file and prints a progress line, so the fixture writes bytes and
+        // lets the same `inspectLanded()` the production dispatcher calls
+        // measure them. A test cannot assert a size or hash the bytes on
+        // disk do not have.
+        guard let landing = plan.hostLanding else {
+          throw RuntimeDispatchFailure.failed(
+            "receive plan carried no host landing declaration")
+        }
+        try? landing.prepareDestination()
+        if let payload = script.receivedTracePayload {
+          try? payload.write(to: landing.destination)
+        }
         return ProviderProcessReceipt(
-          exitStatus: 0, stdout: Data("trace-bytes".utf8), stderr: Data(),
-          stdoutTruncated: false, durationSeconds: 0.01, hostManagedRecordID: "local-trace")
+          exitStatus: 0, stdout: Data("FileTransfer finish\n".utf8), stderr: Data(),
+          stdoutTruncated: false, durationSeconds: 0.01,
+          landedArtifact: landing.inspectLanded())
       case .cleanupOwnedRemotePath:
         note("cleanup")
         if script.cleanupOutcomeUnknown {
@@ -372,6 +389,27 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
     let capability = try await capabilities.inspect(capabilityID: "CAP-RT-CAPTURE-001")
     XCTAssertEqual(capability?.consumptionCount, 0)
     XCTAssertTrue(dispatcher.dispatchedActions.isEmpty, "zero dispatch on refusal")
+  }
+
+  /// D4: the trace product comes off the host file the receive leg measured,
+  /// never off a receipt. Publishing it from stdout would store hdc's
+  /// "FileTransfer finish" banner under the name `trace.htrace` — a binary
+  /// evidence artifact whose bytes are a progress message.
+  ///
+  /// This declaration is what the receive-step publication reads; the
+  /// publication itself stays unreachable while trace requests are refused
+  /// at admission above (the device-side existence/size readback for
+  /// `hitrace -o` is still unimplemented).
+  func testTraceIsDeclaredFileBackedSoItCannotBePublishedFromStdout() throws {
+    XCTAssertTrue(RuntimeJobEngine.fileBackedArtifacts.contains("trace.htrace"))
+    XCTAssertEqual(
+      RuntimeJobEngine.artifactMapping["capture.diagnostics@1"]?["receive-trace-artifact"],
+      ["trace.htrace"])
+    for streamed in ["hilog.txt", "ui-dump.json", "debug-hilog.txt"] {
+      XCTAssertFalse(
+        RuntimeJobEngine.fileBackedArtifacts.contains(streamed),
+        "\(streamed) is a captured stream and must keep publishing from the receipt")
+    }
   }
 
   func testUnimplementedStrictRedactionFailsClosedBeforeDispatch() async throws {

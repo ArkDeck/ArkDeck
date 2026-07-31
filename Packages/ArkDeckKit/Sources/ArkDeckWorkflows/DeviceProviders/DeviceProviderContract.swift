@@ -10,6 +10,7 @@
 // from "exit 0" to a verified outcome.
 
 import ArkDeckCore
+import CryptoKit
 import Foundation
 
 // MARK: - Typed actions (closed)
@@ -828,6 +829,100 @@ public struct HostManagedProcessDescriptor: Sendable, Equatable {
   }
 }
 
+/// What a plan must leave behind on the host, declared by the provider that
+/// also put the destination into the argv. A device-to-host transfer is the
+/// one case where the process receipt cannot carry the evidence: `hdc file
+/// recv` prints a progress line, and the bytes that matter land on disk.
+///
+/// The declaration is the provider's; reading the disk is the dispatcher's.
+/// Nothing here describes what *should* have landed as though it had.
+public struct HostLandingExpectation: Sendable, Equatable {
+  /// Absolute host path the argv names as the transfer destination.
+  public let destination: URL
+  /// Refuse anything larger rather than hash an unbounded file.
+  public let maximumBytes: Int
+  /// Pinned content hash when one is known before the transfer. Today's
+  /// trace leg has none (nothing computes a device-side digest first), so
+  /// this is `nil` in production and exercised by contract tests.
+  public let expectedSHA256: String?
+
+  public init(destination: URL, maximumBytes: Int, expectedSHA256: String? = nil) {
+    self.destination = destination
+    self.maximumBytes = maximumBytes
+    self.expectedSHA256 = expectedSHA256
+  }
+
+  /// Creates the destination directory and clears any stale file at the
+  /// destination. Without the removal a leftover file from an earlier
+  /// attempt could be inspected as though this transfer had produced it.
+  public func prepareDestination() throws {
+    try FileManager.default.createDirectory(
+      at: destination.deletingLastPathComponent(),
+      withIntermediateDirectories: true,
+      attributes: [.posixPermissions: 0o700])
+    if FileManager.default.fileExists(atPath: destination.path) {
+      try FileManager.default.removeItem(at: destination)
+    }
+  }
+
+  /// Reports what is actually at the destination, or `nil` when nothing
+  /// usable is: no file, a symlink, a non-regular file. `nil` is not a
+  /// verdict — the landing path of `hdc file recv` is not guaranteed across
+  /// versions (see `DEVICE-COMMAND-FACTS.md` §4), so absence here means the
+  /// outcome is unknown, never that the transfer failed.
+  public func inspectLanded() -> ProviderLandedArtifact? {
+    let descriptor = Darwin.open(destination.path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW)
+    guard descriptor >= 0 else { return nil }
+    defer { Darwin.close(descriptor) }
+    var info = stat()
+    guard fstat(descriptor, &info) == 0, info.st_mode & S_IFMT == S_IFREG else {
+      return nil
+    }
+    let byteCount = Int(info.st_size)
+    // An oversized or empty file is reported as found, with no digest: both
+    // are definite outcomes the classifier must be able to name, and
+    // hashing an over-budget file is exactly what the budget forbids.
+    guard byteCount > 0, byteCount <= maximumBytes else {
+      return ProviderLandedArtifact(
+        localURL: destination, byteCount: byteCount, sha256: nil)
+    }
+    var hasher = SHA256()
+    var buffer = [UInt8](repeating: 0, count: 256 * 1024)
+    var hashed = 0
+    while true {
+      let read = buffer.withUnsafeMutableBytes {
+        Darwin.read(descriptor, $0.baseAddress, $0.count)
+      }
+      if read < 0 { return nil }
+      if read == 0 { break }
+      hashed += read
+      guard hashed <= byteCount else { return nil }
+      buffer.withUnsafeBytes { hasher.update(bufferPointer: UnsafeRawBufferPointer(rebasing: $0.prefix(read))) }
+    }
+    guard hashed == byteCount else { return nil }
+    return ProviderLandedArtifact(
+      localURL: destination,
+      byteCount: byteCount,
+      sha256: hasher.finalize().map { String(format: "%02x", $0) }.joined())
+  }
+}
+
+/// Bytes observed on the host after a transfer. Every field is measured
+/// from the file, never copied from the request that asked for it.
+public struct ProviderLandedArtifact: Sendable, Equatable {
+  public let localURL: URL
+  public let byteCount: Int
+  /// Absent when the file was empty or over budget, i.e. when it was
+  /// deliberately not hashed.
+  public let sha256: String?
+
+  public init(localURL: URL, byteCount: Int, sha256: String?) {
+    self.localURL = localURL
+    self.byteCount = byteCount
+    self.sha256 = sha256
+  }
+}
+
 public struct TypedProcessPlan: Sendable, Equatable {
   public enum Kind: Sendable, Equatable {
     case process(executableSHA256: String, argumentSummary: [String], timeoutSeconds: Int?)
@@ -837,10 +932,18 @@ public struct TypedProcessPlan: Sendable, Equatable {
 
   public let action: TypedProviderAction
   public let kind: Kind
+  /// Set only by plans whose product is a host file. The dispatcher honours
+  /// it; no other plan gains host filesystem reach by declaring one.
+  public let hostLanding: HostLandingExpectation?
 
-  package init(action: TypedProviderAction, kind: Kind) {
+  package init(
+    action: TypedProviderAction,
+    kind: Kind,
+    hostLanding: HostLandingExpectation? = nil
+  ) {
     self.action = action
     self.kind = kind
+    self.hostLanding = hostLanding
   }
 }
 
@@ -875,6 +978,9 @@ public struct ProviderProcessReceipt: Sendable, Equatable {
   /// Present when the plan was host-managed: an opaque reference to the
   /// provider-owned durable record (e.g. Rockchip session manifest ID).
   public let hostManagedRecordID: String?
+  /// Present when the plan declared a `hostLanding` and the dispatcher found
+  /// a file there. Measured, never assumed.
+  public let landedArtifact: ProviderLandedArtifact?
   /// Ordered receipts for a provider-owned command/readback sequence. Empty
   /// for the existing single-process surface.
   public let subprocesses: [ProviderSubprocessReceipt]
@@ -886,6 +992,7 @@ public struct ProviderProcessReceipt: Sendable, Equatable {
     stdoutTruncated: Bool,
     durationSeconds: Double,
     hostManagedRecordID: String? = nil,
+    landedArtifact: ProviderLandedArtifact? = nil,
     subprocesses: [ProviderSubprocessReceipt] = []
   ) {
     self.exitStatus = exitStatus
@@ -894,6 +1001,7 @@ public struct ProviderProcessReceipt: Sendable, Equatable {
     self.stdoutTruncated = stdoutTruncated
     self.durationSeconds = durationSeconds
     self.hostManagedRecordID = hostManagedRecordID
+    self.landedArtifact = landedArtifact
     self.subprocesses = subprocesses
   }
 }

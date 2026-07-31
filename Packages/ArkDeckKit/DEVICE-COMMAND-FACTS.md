@@ -100,6 +100,9 @@ hdc -t <k> file recv <remotePath> <localDest>
   `recv <remote> .`(带 cwd)→ `recv <remote> <dir>` → `recv <remote> <dir>/<name>`,
   再**在接收目录里搜索实际落地的文件**并校验魔数。
   → 结论:不要假定 `recv` 会按给定路径落地;收完必须按内容校验(大小 + 魔数/可解析)。
+  ArkDeck 的做法(D4):**本地文件名取远端 basename**,使"目录形"与"文件形"
+  落到同一路径,再由 dispatcher 实测该路径的大小与 SHA-256;测不到就是
+  `.unknown`,不是失败——落地形态本身仍待真机窗口 pin。
 - 推送安装包的标准形态是"目录":`shell mkdir <dir>` → 逐个 `file send` 进该目录 →
   `bm install -p <dir>` → `shell rm -rf <dir>`。
 
@@ -219,7 +222,8 @@ hdc -t <k> shell rm -f <remote.png>
 | D3 | `param get` 结果直接 trim 后入 summary | 输出可能是 `key = value` | **本车已落地**(仅剥"请求键 + `=`"前缀) |
 | D1 | `capture-ui-dump` = `captureRemoteStdout` + `windowInventory`;`componentTree` lowering fail closed | `uitest dumpLayout` 写设备文件 + `file recv` | **需契约或 Catalog 变更**(本车只把拒绝原因从"无 windowId-free 形态"更正为"stdout 步骤形态无法承载文件型产物",并指向本文件 §7) |
 | D2 | `stopAbility` / `uninstallPackage` verify **仅**看 exit status 就判 `verified` | `aa`/`bm` 家族有短状态行可判;`bm uninstall` 有 `uninstall missing installed bundle` 这种"0 但没做" | **待真机证据**(`debug.hap@1` 在 stop/uninstall 之后没有 readback 步骤,直接改成 `.unknown` 会让每次运行都落 `reconcileRequired`;闭合路径二选一:设备窗口 pin 状态串,或加 readback 步骤=Catalog 变更) |
-| D4 | `receiveOwnedArtifact` lower 为 `["file","recv",<remote>]`(**无本地目标**),且其 verify 要求 `receipt.hostManagedRecordID`,而 process 收据从不携带该字段 → 永远 `.unknown` | recv 本地目标语义不稳,必须按内容校验 | **需契约或 Catalog 变更**(接收腿需要 host 侧目标路径 + 大小/哈希校验;是 GJ-2「抓取 Trace」的真实阻塞,建议独立一车) |
+| D4 | `receiveOwnedArtifact` lower 为 `["file","recv",<remote>]`(**无本地目标**),且其 verify 要求 `receipt.hostManagedRecordID`,而 process 收据从不携带该字段 → 永远 `.unknown` | recv 本地目标语义不稳,必须按内容校验 | **本车已落地**(argv 补 host 目标;dispatcher 按 `HostLandingExpectation` 实测落地文件的大小与 SHA-256;verdict 全部来自磁盘字节:无文件=`.unknown`、空=`.failed`、超预算=`.failed` 且不做哈希、pin 了哈希则真比对;`trace.htrace` 改从收到的文件发布,不再用 `receipt.stdout`) |
+| D10 | trace 腿在 `validateSupportedPlanInputs` 处按 `traceCategories` 整体拒绝(admission 前),D4 落地后该拒绝的接收侧理由已不成立 | `hitrace -o <file>` 的产物存在性/大小只能由设备侧 `ls -l` 第 5 字段判(同 §6) | 待真机证据(解除拒绝前需:设备侧 readback 落地 + 设备窗口 pin `file recv` 的实际落地形态;本车用"本地文件名 = 远端 basename"使目录形/文件形落到同一路径,但未经真机) |
 | D5 | `bm install -p <单文件> -r` | 多包必须同目录 + 一条 `bm install -p <dir>` | 待真机证据(单 HAP 之外未覆盖) |
 | D6 | retry 仅 `preflightAttempts: 2 / mutationAttempts: 1` | transient 串表 + 800/1500/2500 退避 | 待真机证据(transient 分类进判定前需 pin) |
 | D7 | 无签名前置判断 | host 侧判 `-signed.*` 后缀 | 待真机证据(后缀是构建约定,只能当提示) |

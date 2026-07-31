@@ -62,6 +62,30 @@ if endpointBoundArguments
 {
   FileHandle.standardError.write(Data("unregistered target/property fixture invocation\n".utf8))
   exit(23)
+} else if let receiveIndex = suppliedArguments.firstIndex(of: "recv"),
+  receiveIndex > 0, suppliedArguments[receiveIndex - 1] == "file",
+  suppliedArguments.count == receiveIndex + 3
+{
+  // `hdc file recv <remote> <local>` stand-in. The product is the file it
+  // writes; stdout is only a progress line, which is precisely why the
+  // receive verdict cannot be read off this process. The seam models the
+  // three real landings: bytes at the named path, an empty file, and a
+  // transfer that lands somewhere the caller did not name (DEVICE-COMMAND-
+  // FACTS.md §4).
+  let destination = URL(fileURLWithPath: suppliedArguments[receiveIndex + 2])
+  switch ProcessInfo.processInfo.environment["ARKDECK_FAKE_HDC_RECV_MODE"] {
+  case "nothing":
+    break
+  case "empty":
+    try? Data().write(to: destination)
+  default:
+    let payload =
+      ProcessInfo.processInfo.environment["ARKDECK_FAKE_HDC_RECV_PAYLOAD"]
+      ?? "htrace-fixture-bytes"
+    try? Data(payload.utf8).write(to: destination)
+  }
+  FileHandle.standardOutput.write(Data("FileTransfer finish, Size:0\n".utf8))
+  exit(0)
 } else if suppliedArguments.first == "uninstall" {
   mode = .success
 } else if suppliedArguments.first == "managed-server" {
