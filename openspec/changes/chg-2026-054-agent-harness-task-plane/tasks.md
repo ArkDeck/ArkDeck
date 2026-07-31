@@ -85,12 +85,17 @@
 
 ## TASK-HTP-003 — Policy & Budget Guard、Failure Memory 与 HumanActionRequired 生产者
 
-- Status:ready
+- Status:done
+- Done:2026-07-31;随本实现 PR 合入生效(维护者 review + merge 即批准)。
+  HTP-AC-8..11 全部 PASS,evidence = `evidence/runs/TASK-HTP-003/run-r1.md`
+  (库层 815 tests/1 skip/0 fail,新增 19 例;host 侧进程级实跑抓到并修了「失败记忆
+  被 try? 静默吞掉」的真缺陷)。真机 E1 消耗仍属 TASK-HTP-006。
 - Platform:macos
 - Requirements/AC:proposal What 4/8(policy guard、预算、失败指纹、no-progress、
   三层 memory、HumanActionRequired 首个生产者);change-local HTP-AC-8、HTP-AC-9、
   HTP-AC-10、HTP-AC-11,登记于 `verification.md`
-- Gate:同 TASK-HTP-001;且 TASK-HTP-001/002 已 done
+- Gate:**已满足**——同 TASK-HTP-001 的维护者提前解冻(2026-07-30);
+  TASK-HTP-001/002 已 done(#845/#848)
 - Depends on:TASK-HTP-001、TASK-HTP-002
 - Hardware required:no(授权缺失、outcomeUnknown、预算耗尽均可在 fake 面构造;真机
   E1 收敛在 TASK-HTP-006)
@@ -119,8 +124,8 @@
 - Platform:macos
 - Requirements/AC:proposal What 5(decision gateway、四类 decision、出站默认 deny);
   change-local HTP-AC-12、HTP-AC-13、HTP-AC-14,登记于 `verification.md`
-- Gate:同 TASK-HTP-001;且 TASK-HTP-003 已 done(decision 必须先有 Policy Guard 才能
-  被接受)
+- Gate:**已满足**——同 TASK-HTP-001 的维护者提前解冻;TASK-HTP-003 已 done
+  (decision 必须先有 Policy Guard 才能被接受)
 - Depends on:TASK-HTP-003
 - Hardware required:no
 - Scope:有界 `DecisionContext` 组装器(声明式裁剪 + 尺寸上限);`HarnessDecision`
@@ -148,8 +153,8 @@
 - Requirements/AC:proposal What 6(新 provider 与六个 workspace operation、preset
   lowering、patch 范围与回滚);change-local HTP-AC-15、HTP-AC-16、HTP-AC-17,
   登记于 `verification.md`
-- Gate:同 TASK-HTP-001;且 TASK-HTP-003 已 done(源码写入必须先有 Policy Guard 与
-  预算面)
+- Gate:**已满足**——同 TASK-HTP-001 的维护者提前解冻;TASK-HTP-003 已 done
+  (源码写入必须先有 Policy Guard 与预算面)
 - Depends on:TASK-HTP-003
 - Hardware required:no(host 面 provider;真机部署复验在 TASK-HTP-006)
 - Scope:`arkdeck-workspace` provider 与 `workspace.inspectSource / applyPatch /

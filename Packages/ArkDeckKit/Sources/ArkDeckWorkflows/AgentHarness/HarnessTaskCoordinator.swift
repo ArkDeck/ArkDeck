@@ -71,17 +71,20 @@ public enum HarnessCoordinatorError: Error, Equatable, Sendable {
 }
 
 public actor HarnessTaskCoordinator {
-  private let store: HarnessTaskStore
-  private let jobPort: any HarnessRuntimeJobPort
+  let store: HarnessTaskStore
+  let jobPort: any HarnessRuntimeJobPort
   /// Absent means no evidence can be read, so no task can ever be judged.
   /// The loop then stops honestly at the handler's "evaluation unavailable"
   /// step instead of pretending a verdict.
-  private let artifactPort: (any HarnessArtifactPort)?
-  private let handlers: [HarnessTaskType: any HarnessTaskHandler]
-  private let nowUTC: @Sendable () -> String
-  private let taskIDFactory: @Sendable () -> String
-  private let decisionIDFactory: @Sendable () -> String
-  private let evaluationIDFactory: @Sendable () -> String
+  let artifactPort: (any HarnessArtifactPort)?
+  let handlers: [HarnessTaskType: any HarnessTaskHandler]
+  let nowUTC: @Sendable () -> String
+  let taskIDFactory: @Sendable () -> String
+  let decisionIDFactory: @Sendable () -> String
+  let evaluationIDFactory: @Sendable () -> String
+  let actionIDFactory: @Sendable () -> String
+  let memoryIDFactory: @Sendable () -> String
+  let policyGuard: HarnessPolicyGuard
 
   public init(
     store: HarnessTaskStore,
@@ -95,7 +98,14 @@ public actor HarnessTaskCoordinator {
     },
     evaluationIDFactory: @escaping @Sendable () -> String = {
       HarnessTaskCoordinator.freshEvaluationID()
-    }
+    },
+    actionIDFactory: @escaping @Sendable () -> String = {
+      HarnessTaskCoordinator.freshActionID()
+    },
+    memoryIDFactory: @escaping @Sendable () -> String = {
+      HarnessTaskCoordinator.freshMemoryID()
+    },
+    policyGuard: HarnessPolicyGuard = HarnessPolicyGuard()
   ) {
     self.store = store
     self.jobPort = jobPort
@@ -106,6 +116,9 @@ public actor HarnessTaskCoordinator {
     self.taskIDFactory = taskIDFactory
     self.decisionIDFactory = decisionIDFactory
     self.evaluationIDFactory = evaluationIDFactory
+    self.actionIDFactory = actionIDFactory
+    self.memoryIDFactory = memoryIDFactory
+    self.policyGuard = policyGuard
   }
 
   public static func freshTaskID() -> String {
@@ -130,6 +143,14 @@ public actor HarnessTaskCoordinator {
   public static func freshEvaluationID() -> String {
     let hex = UUID().uuidString.replacingOccurrences(of: "-", with: "").uppercased()
     return "EVAL-\(hex.prefix(12))"
+  }
+
+  public static func freshActionID() -> String {
+    "har-\(UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased().prefix(12))"
+  }
+
+  public static func freshMemoryID() -> String {
+    "mem-\(UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased().prefix(12))"
   }
 
   // MARK: - Task lifecycle
@@ -207,13 +228,24 @@ public actor HarnessTaskCoordinator {
         transition(
           snapshot, causation: .resumeRequested, reasonCode: trimmed, status: .running))
     case .humanRequired:
-      // A typed resolution is the only way out of a human block. It is
-      // recorded as the causation of the transition, so "who unblocked
-      // this and on what grounds" survives in the event log.
+      // A typed resolution is the only way out of a human block. The open
+      // block record is closed by the same decision, and when it holds a
+      // HumanActionRequired that document's own state machine performs the
+      // transition - so a resolution its rules reject cannot be recorded.
+      let open = (try? await store.humanActions(snapshot.htaskID))?.last { $0.isOpen }
+      if let open {
+        let resolved = try HarnessHumanActionFactory.resolve(
+          open, resolution: trimmed, probeReceiptID: "\(open.actionID)-resolution",
+          nowUTC: nowUTC())
+        try await store.putHumanAction(resolved)
+      }
       return try await commit(
         snapshot,
         transition(
-          snapshot, causation: .humanResolved, reasonCode: trimmed, status: .running))
+          snapshot, causation: .humanResolved, reasonCode: trimmed, status: .running,
+          // A human decision clears the patience counter: the next round is
+          // acting on new information, not repeating the old one.
+          noProgressRounds: 0))
     default:
       throw HarnessCoordinatorError.notResumable(snapshot.status)
     }
@@ -309,19 +341,13 @@ public actor HarnessTaskCoordinator {
       }
     }
 
-    // 3. Budgets. Exhaustion is a stop, never a "try once more".
-    if let exhausted = budgetExhaustion(snapshot) {
-      let stopped = try await commit(
-        snapshot,
-        transition(
-          snapshot, causation: .budgetExhausted, reasonCode: exhausted, status: .failed,
-          activeJob: .cleared,
-          result: HarnessTaskResult(
-            outcome: .failed, reasonCode: exhausted,
-            summary: "Stopped: \(exhausted) reached before the criteria were met.",
-            artifactRefs: snapshot.artifactRefs)))
-      return HarnessReconcileOutcome(
-        snapshot: stopped, action: .stoppedBudgetExhausted, reasonCode: exhausted)
+    // 3. Budgets. Exhaustion is a stop, never a "try once more", and it is
+    //    checked before planning so an exhausted task cannot spend a decision.
+    if let refusal = HarnessPolicyGuard.budgetRefusal(
+      snapshot, elapsedSeconds: elapsedSeconds(since: snapshot.createdAtUTC))
+    {
+      return try await stop(
+        snapshot, refusal: refusal, round: snapshot.activeRound, requestID: nil, jobID: nil)
     }
 
     // 4. One step from the handler, validated before it can become a job.
@@ -368,27 +394,45 @@ public actor HarnessTaskCoordinator {
     handler: any HarnessTaskHandler
   ) async throws -> HarnessReconcileOutcome {
     let decision = step.decision
-    guard let operationReference = decision.operationReference,
-      snapshot.policy.allowedOperations.contains(operationReference),
-      handler.permittedOperations.contains(operationReference)
-    else {
-      // Fail closed rather than throwing: an out-of-policy proposal is a
+    guard let operationReference = decision.operationReference else {
+      // Fail closed rather than throwing: a proposal with no operation is a
       // stop condition for this task, not a daemon fault.
-      let reason = "operationNotPermitted:\(decision.operationReference ?? "-")"
-      let stopped = try await commit(
-        snapshot,
-        transition(
-          snapshot, causation: .noSafeAction, reasonCode: reason, status: .failed,
-          activeJob: .cleared,
-          result: HarnessTaskResult(
-            outcome: .failed, reasonCode: reason,
-            summary: "The proposed operation is outside this task's allowed set.",
-            artifactRefs: snapshot.artifactRefs)))
-      return HarnessReconcileOutcome(
-        snapshot: stopped, action: .stoppedNoSafeAction, reasonCode: reason)
+      return try await stop(
+        snapshot, refusal: .operationNotPermitted("-"), round: decision.round,
+        requestID: nil, jobID: nil)
     }
 
     let digest = HarnessRequestIdentity.inputsDigest(decision.inputs)
+
+    // Everything that can refuse this step, in one ordered pass: budgets,
+    // the closed allow-set, runtime availability, raw-surface screening,
+    // effect ceiling and authorization, failure memory, progress and the
+    // single-active-job rule (TASK-HTP-003).
+    let fingerprintForStep = fingerprint(
+      snapshot, operationReference: operationReference, inputsDigest: digest,
+      errorClassification: "operationFailed", semanticErrorCode: "priorAttempt")
+    let priorFailure = await failureRecord(for: fingerprintForStep)
+    let previousIntent = try? await store.intent(snapshot.htaskID, round: snapshot.activeRound)
+    let previousStrategy = previousIntent.map { intent in
+      HarnessStrategySignature(
+        operationReference: intent.operationReference, inputsDigest: intent.inputsDigestSHA256,
+        phase: snapshot.phase)
+    }
+    let verdict = await policyGuard.evaluate(
+      HarnessGuardInput(
+        snapshot: snapshot,
+        operationReference: operationReference,
+        inputs: decision.inputs,
+        inputsDigest: digest,
+        permittedOperations: handler.permittedOperations,
+        failureRecord: priorFailure,
+        previousStrategy: previousStrategy,
+        consecutiveNoProgressRounds: snapshot.noProgressRounds,
+        elapsedSeconds: elapsedSeconds(since: snapshot.createdAtUTC)))
+    if case .refuse(let refusal) = verdict {
+      return try await stop(
+        snapshot, refusal: refusal, round: decision.round, requestID: nil, jobID: nil)
+    }
     let identity = HarnessRequestIdentity.derive(
       htaskID: snapshot.htaskID, round: decision.round, decisionID: decision.decisionID,
       operationReference: operationReference, targetID: snapshot.target.targetID,
@@ -456,23 +500,26 @@ public actor HarnessTaskCoordinator {
       return .accepted(
         try await jobPort.submit(requestJSON: try requestBytes(intent, decision, snapshot)))
     } catch HarnessJobPortError.rejected(let message) {
-      // Admission refused. Zero side effect, and an identical retry would
-      // be refused identically - so the intent is closed as `rejected` and
+      // Admission refused. Zero side effect, and an identical retry would be
+      // refused identically - so the intent is closed as `rejected`, the
+      // failure is fingerprinted so a later task inherits the knowledge, and
       // the task stops for a human instead of spinning.
       try await store.putIntent(intent.withState(.rejected, atUTC: nowUTC()))
-      let reason = "submissionRejected"
-      let blocked = try await commit(
-        snapshot,
-        transition(
-          snapshot, causation: .humanBlocked, reasonCode: reason, status: .humanRequired,
-          activeJob: .cleared,
-          result: HarnessTaskResult(
-            outcome: .humanRequired, reasonCode: reason,
-            summary: "Runtime admission refused \(intent.operationReference): \(message)",
-            artifactRefs: snapshot.artifactRefs)))
+      let print = fingerprint(
+        snapshot, operationReference: intent.operationReference,
+        inputsDigest: intent.inputsDigestSHA256, errorClassification: "admissionRejected",
+        semanticErrorCode: Self.semanticCode(from: message))
+      _ = try await recordFailure(
+        snapshot, fingerprint: print, reasonCode: "submissionRejected", jobID: nil,
+        requestID: intent.requestID)
+      let blocked = try await recordBlock(
+        snapshot, block: .environmentUnavailable,
+        reasonCode: "submissionRejected:\(Self.semanticCode(from: message))",
+        round: intent.round, jobID: nil, requestID: intent.requestID)
       return .rejected(
         HarnessReconcileOutcome(
-          snapshot: blocked, action: .stoppedForHuman, reasonCode: reason))
+          snapshot: blocked.snapshot, action: .stoppedForHuman,
+          reasonCode: "submissionRejected"))
     }
     // Any other failure (transport, unknown) leaves the intent at
     // `submitted` and propagates: the next wake resolves it through the
@@ -534,22 +581,16 @@ public actor HarnessTaskCoordinator {
       ?? "-"
 
     if observation.outcomeUnknown {
-      // The one rule that has no exception: an unknown outcome stops the
-      // task and never re-sends the side effect (HTP-INV-5).
+      // The one rule that has no exception: an unknown outcome stops the task
+      // and never re-sends the side effect (HTP-INV-5). It is also the case
+      // the closed human-action vocabulary describes exactly, so a typed
+      // HumanActionRequired is produced with it.
       let reason = "outcomeUnknown:\(operationReference)"
-      let blocked = try await commit(
-        snapshot,
-        transition(
-          snapshot, causation: .humanBlocked, reasonCode: reason, status: .humanRequired,
-          activeJob: .cleared,
-          result: HarnessTaskResult(
-            outcome: .humanRequired, reasonCode: reason,
-            summary:
-              "Job \(observation.jobID) ended in state \(observation.state) with an unknown "
-              + "outcome; the harness will not re-send the original side effect.",
-            artifactRefs: snapshot.artifactRefs)))
+      let blocked = try await recordBlock(
+        snapshot, block: .outcomeUnknown, reasonCode: reason, round: snapshot.activeRound,
+        jobID: observation.jobID, requestID: nil)
       return HarnessReconcileOutcome(
-        snapshot: blocked, action: .stoppedForHuman, reasonCode: reason)
+        snapshot: blocked.snapshot, action: .stoppedForHuman, reasonCode: reason)
     }
 
     if snapshot.cancelRequested {
@@ -568,10 +609,29 @@ public actor HarnessTaskCoordinator {
     }
 
     guard observation.succeeded else {
-      // Retry policy, failure fingerprints and alternative strategies are
-      // TASK-HTP-003. Until they exist a failed operation stops the task
-      // with the real reason instead of being retried blindly.
+      // A failed operation is fingerprinted before anything else: the record
+      // is what stops the same attempt from being made a third time, in this
+      // task or the next one.
       let reason = "operationFailed:\(operationReference):\(observation.state)"
+      let digest =
+        (try? await store.intent(snapshot.htaskID, round: snapshot.activeRound))?
+        .inputsDigestSHA256 ?? HarnessRequestIdentity.inputsDigest([:])
+      let print = fingerprint(
+        snapshot, operationReference: operationReference, inputsDigest: digest,
+        errorClassification: "operationFailed", semanticErrorCode: observation.state)
+      let record = try await recordFailure(
+        snapshot, fingerprint: print, reasonCode: reason, jobID: observation.jobID)
+      if record.stance == .prohibited {
+        // Third time: the loop has nothing new to try, so it stops for a
+        // human rather than burning the rest of the budget on repetition.
+        let blocked = try await recordBlock(
+          snapshot, block: .strategyExhausted,
+          reasonCode: "repeatedFailureProhibited:\(record.digest):\(record.occurrences)",
+          round: snapshot.activeRound, jobID: observation.jobID, requestID: nil)
+        return HarnessReconcileOutcome(
+          snapshot: blocked.snapshot, action: .stoppedForHuman,
+          reasonCode: blocked.action.reasonCode)
+      }
       let stopped = try await commit(
         snapshot,
         transition(
@@ -579,8 +639,10 @@ public actor HarnessTaskCoordinator {
           activeJob: .cleared, jobID: observation.jobID,
           result: HarnessTaskResult(
             outcome: .failed, reasonCode: reason,
-            summary: "Job \(observation.jobID) ended in \(observation.state).",
-            artifactRefs: snapshot.artifactRefs)))
+            summary:
+              "Job \(observation.jobID) ended in \(observation.state); failure fingerprint "
+              + "\(record.digest) at \(record.occurrences) occurrence(s).",
+            evaluationID: snapshot.latestEvaluationID, artifactRefs: snapshot.artifactRefs)))
       return HarnessReconcileOutcome(
         snapshot: stopped, action: .stoppedJobFailed, reasonCode: reason)
     }
@@ -589,6 +651,12 @@ public actor HarnessTaskCoordinator {
       throw HarnessCoordinatorError.unsupportedTaskType(snapshot.type)
     }
     let nextPhase = handler.phase(afterSuccessOf: operationReference, in: snapshot.phase)
+    try await appendTaskMemory(
+      snapshot, kind: .observation,
+      summary: "\(operationReference) succeeded in phase \(snapshot.phase.rawValue)",
+      confidence: .observed,
+      evidence: HarnessMemoryEvidence(
+        jobIDs: [observation.jobID], artifactIDs: snapshot.artifactRefs))
     let advanced = try await commit(
       snapshot,
       transition(
@@ -665,38 +733,54 @@ public actor HarnessTaskCoordinator {
     let observedState = merged.recording(verdict: evaluation.verdict, blockers: evaluation.blockers)
 
     let artifactRefs = Self.mergedArtifactRefs(snapshot, round)
+    // Evidence costs budget: only bytes the harness actually verified and read
+    // are charged, and only once per artifact.
+    let newlyChargedBytes = round.evidence
+      .filter { $0.verified && !snapshot.artifactRefs.contains($0.artifactID) }
+      .reduce(0) { $0 + $1.byteCount }
+    let consumed = HarnessConsumedBudget(
+      rounds: snapshot.consumedBudget.rounds,
+      wallClockSeconds: elapsedSeconds(since: snapshot.createdAtUTC)
+        ?? snapshot.consumedBudget.wallClockSeconds,
+      artifactBytes: snapshot.consumedBudget.artifactBytes + newlyChargedBytes,
+      e1Mutations: snapshot.consumedBudget.e1Mutations)
     switch evaluation.verdict {
     case .pass:
       let succeeded = try await commit(
         snapshot,
         transition(
           snapshot, causation: .evaluation, reasonCode: "criteriaPassed",
-          status: .succeeded, activeJob: .cleared, evaluationID: evaluation.evaluationID,
+          status: .succeeded, activeJob: .cleared, consumedBudget: consumed,
+          evaluationID: evaluation.evaluationID,
           artifactRefs: artifactRefs, observedState: observedState.asJSON,
+          noProgressRounds: 0,
           result: HarnessTaskResult(
             outcome: .succeeded, reasonCode: "criteriaPassed",
             summary: Self.summary(of: evaluation), evaluationID: evaluation.evaluationID,
             artifactRefs: artifactRefs)))
+      // Promotion happens only here, behind a passing evaluation: project
+      // memory never receives an unverified belief (HTP-INV-1).
+      try await promoteProjectMemory(succeeded, evaluation: evaluation)
       return .ended(
         HarnessReconcileOutcome(
           snapshot: succeeded, action: .evaluatedSucceeded, reasonCode: "criteriaPassed"))
     case .error:
-      // Unverifiable evidence is not a product verdict. Stop for a human
-      // instead of letting a hash mismatch look like a failing fix.
+      // Unverifiable evidence is not a product verdict. Record the observation
+      // and stop for a human instead of letting a hash mismatch look like a
+      // failing fix.
       let reason = "evidenceIntegrity:\(evaluation.blockers.first ?? "unknown")"
-      let blocked = try await commit(
+      let recorded = try await commit(
         snapshot,
         transition(
-          snapshot, causation: .evaluation, reasonCode: reason, status: .humanRequired,
-          activeJob: .cleared, evaluationID: evaluation.evaluationID,
-          artifactRefs: artifactRefs, observedState: observedState.asJSON,
-          result: HarnessTaskResult(
-            outcome: .humanRequired, reasonCode: reason,
-            summary: Self.summary(of: evaluation), evaluationID: evaluation.evaluationID,
-            artifactRefs: artifactRefs)))
+          snapshot, causation: .evaluation, reasonCode: reason, status: .running,
+          consumedBudget: consumed, evaluationID: evaluation.evaluationID,
+          artifactRefs: artifactRefs, observedState: observedState.asJSON))
+      let blocked = try await recordBlock(
+        recorded, block: .evidenceIntegrity, reasonCode: reason, round: recorded.activeRound,
+        jobID: jobID, requestID: nil)
       return .ended(
         HarnessReconcileOutcome(
-          snapshot: blocked, action: .stoppedEvidenceIntegrity, reasonCode: reason))
+          snapshot: blocked.snapshot, action: .stoppedEvidenceIntegrity, reasonCode: reason))
     case .inconclusive:
       let escalation = HarnessCriteriaEvaluator.escalation(
         for: evaluation, criteria: snapshot.successCriteria)
@@ -708,7 +792,8 @@ public actor HarnessTaskCoordinator {
           snapshot,
           transition(
             snapshot, causation: .evaluation, reasonCode: reason, status: terminalStatus,
-            activeJob: .cleared, evaluationID: evaluation.evaluationID,
+            activeJob: .cleared, consumedBudget: consumed,
+            evaluationID: evaluation.evaluationID,
             artifactRefs: artifactRefs, observedState: observedState.asJSON,
             result: HarnessTaskResult(
               outcome: terminalStatus, reasonCode: reason,
@@ -724,8 +809,11 @@ public actor HarnessTaskCoordinator {
           snapshot,
           transition(
             snapshot, causation: .evaluation, reasonCode: "inconclusive:collectMoreEvidence",
-            status: .running, evaluationID: evaluation.evaluationID,
-            artifactRefs: artifactRefs, observedState: observedState.asJSON))
+            status: .running, consumedBudget: consumed,
+            evaluationID: evaluation.evaluationID,
+            artifactRefs: artifactRefs, observedState: observedState.asJSON,
+            noProgressRounds: Self.nextNoProgressRounds(before: snapshot, after: observedState,
+              artifactRefs: artifactRefs)))
         return .continues(updated)
       }
     case .fail:
@@ -735,10 +823,27 @@ public actor HarnessTaskCoordinator {
         snapshot,
         transition(
           snapshot, causation: .evaluation, reasonCode: "criteriaFailed", status: .running,
-          evaluationID: evaluation.evaluationID, artifactRefs: artifactRefs,
-          observedState: observedState.asJSON))
+          consumedBudget: consumed, evaluationID: evaluation.evaluationID,
+          artifactRefs: artifactRefs, observedState: observedState.asJSON,
+          noProgressRounds: Self.nextNoProgressRounds(before: snapshot, after: observedState,
+            artifactRefs: artifactRefs)))
       return .continues(updated)
     }
+  }
+
+  /// A round that added no verified evidence, no sample and no verdict change
+  /// increments the no-progress counter; anything measurable resets it.
+  static func nextNoProgressRounds(
+    before: HarnessTaskSnapshot,
+    after: HarnessObservedState,
+    artifactRefs: [String]
+  ) -> Int {
+    let previous = before.observed
+    let sampleDelta = after.samples.values.reduce(0, +) - previous.samples.values.reduce(0, +)
+    let newEvidence = Set(artifactRefs).subtracting(Set(before.artifactRefs)).count
+    let verdictChanged = previous.latestVerdict != after.latestVerdict
+    let progressed = sampleDelta > 0 || newEvidence > 0 || verdictChanged
+    return progressed ? 0 : before.noProgressRounds + 1
   }
 
   private static func mergedArtifactRefs(
@@ -752,7 +857,22 @@ public actor HarnessTaskCoordinator {
     return refs
   }
 
-  private static func summary(of evaluation: HarnessEvaluation) -> String {
+  /// Collapse a runtime rejection message into a stable, identifier-shaped
+  /// semantic code so a fingerprint does not vary with prose.
+  static func semanticCode(from message: String) -> String {
+    let lowered = message.lowercased()
+    if lowered.contains("has not been adopted") { return "targetNotAdopted" }
+    if lowered.contains("runtime unavailable") || lowered.contains("unavailable") {
+      return "operationUnavailable"
+    }
+    if lowered.contains("authorization") || lowered.contains("capability") {
+      return "authorizationRequired"
+    }
+    if lowered.contains("binding") { return "bindingMismatch" }
+    return "rejected"
+  }
+
+  static func summary(of evaluation: HarnessEvaluation) -> String {
     let parts = evaluation.criterionResults.map { result in
       "\(result.criterionID)=\(result.verdict.rawValue)"
         + (result.blockers.isEmpty ? "" : "(\(result.blockers.joined(separator: ";")))")
@@ -760,29 +880,9 @@ public actor HarnessTaskCoordinator {
     return "verdict=\(evaluation.verdict.rawValue) " + parts.joined(separator: " ")
   }
 
-  // MARK: - Budgets
+  // MARK: - Clock
 
-  private func budgetExhaustion(_ snapshot: HarnessTaskSnapshot) -> String? {
-    if snapshot.consumedBudget.rounds >= snapshot.budgets.maxRounds {
-      return "maxRoundsExhausted"
-    }
-    if let elapsed = elapsedSeconds(since: snapshot.createdAtUTC),
-      elapsed >= snapshot.budgets.maxWallClockSeconds
-    {
-      return "maxWallClockExhausted"
-    }
-    if snapshot.consumedBudget.artifactBytes >= snapshot.budgets.maxArtifactBytes {
-      return "maxArtifactBytesExhausted"
-    }
-    if snapshot.consumedBudget.e1Mutations >= snapshot.budgets.maxE1Mutations,
-      snapshot.budgets.maxE1Mutations > 0
-    {
-      return "maxE1MutationsExhausted"
-    }
-    return nil
-  }
-
-  private func elapsedSeconds(since startUTC: String) -> Int? {
+  func elapsedSeconds(since startUTC: String) -> Int? {
     let formatter = ISO8601DateFormatter()
     formatter.formatOptions = [.withInternetDateTime]
     guard let start = formatter.date(from: startUTC),
@@ -793,7 +893,7 @@ public actor HarnessTaskCoordinator {
 
   // MARK: - Transition plumbing
 
-  private func load(_ taskID: String) async throws -> HarnessTaskSnapshot {
+  func load(_ taskID: String) async throws -> HarnessTaskSnapshot {
     do {
       return try await store.load(taskID)
     } catch HarnessTaskStoreError.notFound(let id) {
@@ -805,7 +905,7 @@ public actor HarnessTaskCoordinator {
 
   /// Every state change in this file goes through here, and here calls the
   /// reducer. There is no second write path to audit.
-  private func commit(
+  func commit(
     _ snapshot: HarnessTaskSnapshot,
     _ transition: HarnessTaskTransition
   ) async throws -> HarnessTaskSnapshot {
@@ -818,7 +918,7 @@ public actor HarnessTaskCoordinator {
   /// Explicit three-way change so "clear the active job" cannot be
   /// confused with "leave it alone" - a double optional here would make
   /// `nil` mean both.
-  private enum ActiveJobChange {
+  enum ActiveJobChange {
     case unchanged
     case cleared
     case set(String)
@@ -832,7 +932,7 @@ public actor HarnessTaskCoordinator {
     }
   }
 
-  private func transition(
+  func transition(
     _ snapshot: HarnessTaskSnapshot,
     causation: HarnessTaskCausation,
     reasonCode: String,
@@ -846,6 +946,7 @@ public actor HarnessTaskCoordinator {
     evaluationID: String? = nil,
     artifactRefs: [String]? = nil,
     observedState: [String: JSONValue]? = nil,
+    noProgressRounds: Int? = nil,
     result: HarnessTaskResult? = nil
   ) -> HarnessTaskTransition {
     HarnessTaskTransition(
@@ -860,6 +961,7 @@ public actor HarnessTaskCoordinator {
       evaluationID: evaluationID,
       artifactRefs: artifactRefs ?? snapshot.artifactRefs,
       observedState: observedState,
+      noProgressRounds: noProgressRounds,
       cancelRequested: cancelRequested ?? snapshot.cancelRequested,
       result: result,
       atUTC: nowUTC())

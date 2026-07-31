@@ -563,8 +563,8 @@ struct ArkDeckCommandLine {
         arkdeck task submit --target <id> --goal <text> [--crash-signature <SIGx+Symbol>] \
       [--intake <text>] [--project <ref>] [--max-rounds <n>] \
       [--max-wall-clock-seconds <n>] [--json]
-        arkdeck task list|status|result|events|evaluations|reconcile|pause|cancel \
-      --task <HTASK-id> [--json]
+        arkdeck task list|status|result|events|evaluations|humanActions|memory|reconcile|\
+      pause|cancel --task <HTASK-id> [--json]
         arkdeck task resume --task <HTASK-id> --resolution <typed reason> [--json]
         arkdeck artifact list|inspect|read|export --job <id> [--artifact <id>] \
       [--destination <directory>] [--allow-sensitive]
