@@ -1,7 +1,7 @@
 ---
 schema_version: 1.0.0
 change_id: CHG-2026-049-diagnostics-and-hap
-change_revision: 2
+change_revision: 3
 platform: macos
 evidence_classes:
 - contract
@@ -87,3 +87,41 @@ cases:
     with readback evidence at each mutating step; the capability is
     consumed once for the whole recipe; without it the run dispatches
     nothing; no human substitutes as the host executor.
+- acceptance_id: DHA-RES-001
+  test_id: TEST-DHA-RES-001
+  method: >-
+    Scripted-dispatcher contract tests over debug.hap@1 with an
+    ineffective uninstall, on both the forward path and the
+    compensation path, asserting a durable residue record carrying the
+    exact persisted uninstall action, and asserting the existing
+    remote-path debt behaviour is unchanged.
+  expected_source: openspec/changes/chg-2026-049-diagnostics-and-hap/verification.md#dha-res-001
+  minimum_evidence: contract
+  expected_result: >-
+    A cleanup that ran and did not take effect is recorded as
+    outstanding residue on both paths, keyed by what was left behind
+    rather than by whether it happened to be a remote path.
+- acceptance_id: DHA-RES-002
+  test_id: TEST-DHA-RES-002
+  method: >-
+    Contract tests asserting the job stays succeeded while reporting a
+    non-zero outstanding-residue count, a clean control run reports
+    zero, and the job state machine's transitions and terminal set are
+    unchanged.
+  expected_source: openspec/changes/chg-2026-049-diagnostics-and-hap/verification.md#dha-res-002
+  minimum_evidence: contract
+  expected_result: >-
+    Succeeded keeps its meaning for the debug session while never
+    reading as a clean device; no terminal state is added.
+- acceptance_id: DHA-RES-003
+  test_id: TEST-DHA-RES-003
+  method: >-
+    Contract tests over cleanupDebt.continue for a bundle residue:
+    settle only when the readback says the package is gone, keep the
+    record when it is still installed, and refuse an identity that is
+    not in the ledger.
+  expected_source: openspec/changes/chg-2026-049-diagnostics-and-hap/verification.md#dha-res-003
+  minimum_evidence: contract
+  expected_result: >-
+    Settlement is decided by the readback, and the continue surface
+    cannot be used to name an arbitrary uninstall target.

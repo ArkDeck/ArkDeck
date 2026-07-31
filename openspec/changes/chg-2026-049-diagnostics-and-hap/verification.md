@@ -5,7 +5,7 @@
 > binding、typed inputs、plan digest、lineage 与 `outcomeUnknown` 门保持。
 > 下文 r2 的人工 capability 步骤是历史计划；E2 不变。
 
-> Change:CHG-2026-049-diagnostics-and-hap@r2
+> Change:CHG-2026-049-diagnostics-and-hap@r3
 > Status:planned
 > Core baseline:CORE-2.1.0 (canonical Core AC not claimed)
 
@@ -102,3 +102,32 @@
   cleanup 的真机执行必须另持 E1 capability,不得混入 E0 证据;
 - 连接键/序列号脱敏入仓;raw 采集产物留 daemon 私有目录;
 - 任一步失败如实记 blocked-attempt,不降级、不以 fixture 顶替。
+
+## `DHA-RES-001` 残留被记录,两条路径同等
+
+- 方法:scripted dispatcher 让 `cleanup-uninstall` 的 readback 判定为
+  `uninstallIneffective`,分别在(a)正向路径与(b)补偿路径(先让 `start-ability`
+  失败以触发 `compensateDebugHAP`)下断言:该 job 出现一条未结清残留记录,
+  其持久化 action 就是 `.uninstallPackage(<bundle>)`,理由非空;
+  且既有远端路径债务的记录行为逐条不变(同一套测试对 `cleanup-remote-staging`
+  失败仍断言原有记录)。
+- Evidence:实现 PR 内测试。
+- 结论:pending。
+
+## `DHA-RES-002` `succeeded` 不再读作"设备干净"
+
+- 方法:上述 job 的终态仍为 `succeeded`(主目的完成),但其状态必须携带未结清
+  残留计数 > 0;清理成功的对照组该计数为 0。断言 `JobStateMachine` 的转移表
+  与终态集合**零变化**(不新增 `succeededWithResidue` 之类)。
+- Evidence:实现 PR 内测试。
+- 结论:pending。
+
+## `DHA-RES-003` 结清由 readback 判定,且不接受任意目标
+
+- 方法:`cleanupDebt.continue` 对 bundle 残留重跑持久化的精确 action;
+  (a) readback 说包已不在 → 残留结清、计数归零;
+  (b) readback 说包仍在 → 不得结清,记录保留;
+  (c) 传入未登记的 bundle/路径 → 拒绝(与远端路径残留同一条查表键语义,
+  调用方不能借此指定任意卸载目标)。
+- Evidence:实现 PR 内测试。
+- 结论:pending。
