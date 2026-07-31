@@ -488,6 +488,72 @@ final class HarnessConvergenceContractTests: XCTestCase {
       "the reason must be legible in the record, not just in the outcome: \(recordedBlockers)")
   }
 
+  // MARK: - Defect 4: the operator's flag form could not run a device operation
+
+  func testTheFlagFormRefusesADeviceOperationWithNoPinnedBindingRevision() throws {
+    // Measured on the GJ-5 window's first leg: `job submit --target …
+    // --operation observe.device@1` reached the daemon and came back with
+    // `evidenceIncomplete: target/binding/routing/tool facts are absent or
+    // mismatched`, because the document carried no binding revision at all.
+    do {
+      _ = try RuntimeOperationRequest.operatorFlagForm(
+        targetID: "TGT-958780b2ffb7", expectedBindingRevision: nil,
+        operationID: "observe.device", version: 1,
+        requestID: "cli-test", idempotencyKey: "cli-test-idem-01")
+      XCTFail("a device-bound operation with no pinned revision must be refused before submit")
+    } catch let rejection as RuntimeOperationRequestRejection {
+      XCTAssertEqual(rejection.path, "$.target.expectedBindingRevision")
+      XCTAssertTrue(
+        rejection.message.contains("--expected-binding-revision"),
+        "the refusal has to name what the operator must pass: \(rejection.message)")
+    }
+  }
+
+  func testTheFlagFormCarriesThePinItWasGiven() throws {
+    let request = try RuntimeOperationRequest.operatorFlagForm(
+      targetID: "TGT-958780b2ffb7", expectedBindingRevision: 1,
+      operationID: "observe.device", version: 1,
+      requestID: "cli-test", idempotencyKey: "cli-test-idem-02")
+    XCTAssertEqual(request.target.expectedBindingRevision, 1)
+    XCTAssertEqual(request.target.targetID, "TGT-958780b2ffb7")
+    XCTAssertEqual(request.operation.reference, "observe.device@1")
+    XCTAssertTrue(request.inputs.isEmpty, "the flag form expresses no typed inputs")
+    XCTAssertNil(request.authorization, "and no authorization identifier")
+    let encoded = try JSONEncoder().encode(request)
+    let decoded = try JSONDecoder().decode(RuntimeOperationRequest.self, from: encoded)
+    XCTAssertEqual(decoded.target.expectedBindingRevision, 1, "the pin survives the wire")
+  }
+
+  func testTheFlagFormRefusesToPinARevisionOnAHostOnlyOperation() throws {
+    let hostOnly = try RuntimeOperationRequest.operatorFlagForm(
+      targetID: "demo-app", expectedBindingRevision: nil,
+      operationID: "workspace.inspect-source", version: 1,
+      requestID: "cli-test", idempotencyKey: "cli-test-idem-03")
+    XCTAssertNil(
+      hostOnly.target.expectedBindingRevision,
+      "a host-only operation has no binding to pin (HTP-AC-20)")
+    XCTAssertThrowsError(
+      try RuntimeOperationRequest.operatorFlagForm(
+        targetID: "demo-app", expectedBindingRevision: 1,
+        operationID: "workspace.inspect-source", version: 1,
+        requestID: "cli-test", idempotencyKey: "cli-test-idem-04"),
+      "pinning a revision on a host-only operation is refused before submit")
+  }
+
+  func testEveryDeviceBoundOperationIsReachableThroughTheFlagForm() throws {
+    // The point of the fix: with a revision pinned, the documented flag form
+    // builds a valid request for *every* device-bound operation, not just the
+    // one the window happened to run.
+    for descriptor in RuntimeOperationCatalog.operations
+    where descriptor.binding == .confirmedDevice {
+      let request = try RuntimeOperationRequest.operatorFlagForm(
+        targetID: "TGT-958780b2ffb7", expectedBindingRevision: 3,
+        operationID: descriptor.id, version: descriptor.version,
+        requestID: "cli-test", idempotencyKey: "cli-test-idem-\(descriptor.id)")
+      XCTAssertEqual(request.target.expectedBindingRevision, 3, descriptor.reference)
+    }
+  }
+
   func testAnEvidenceRecordWrittenBeforeTheOptInDecodesAsNotOptedIn() throws {
     let legacy = """
       {"artifactId":"ART-1","name":"hilog.txt","byteCount":12,

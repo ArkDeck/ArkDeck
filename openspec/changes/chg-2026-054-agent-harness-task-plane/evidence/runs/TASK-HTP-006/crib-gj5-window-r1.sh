@@ -138,12 +138,41 @@ printf 'sensitive opt-in: hilog.txt (measured on this host, never exported)\n'
 # The only place this script talks to hdc: refusing to run unattended against
 # an ambiguous or absent target. An availability probe, not part of any leg -
 # every device step the record claims is performed by the product.
-if [[ "${SELF_TEST}" -eq 0 ]]; then
+#
+# Written for bash 3.2, which is what macOS ships as /bin/bash: no `mapfile`,
+# no associative arrays. The first attempt used `mapfile` and died here with
+# "command not found" - on the real window run, because --self-test skipped
+# this block. The parser is now a function the self-test exercises.
+parse_targets() {
+  tr -d '\r' | grep -v '^\[Empty\]$' | grep -v '^[[:space:]]*$' || true
+}
+
+count_lines() {
+  local text="$1"
+  if [[ -z "${text}" ]]; then
+    printf '0\n'
+    return
+  fi
+  printf '%s\n' "${text}" | grep -c . || true
+}
+
+if [[ "${SELF_TEST}" -eq 1 ]]; then
+  say "probe parser self-check (fixtures, no device needed)"
+  one="$(printf '150100424a544434520325874bbf4900\r\n' | parse_targets)"
+  [[ "$(count_lines "${one}")" -eq 1 ]] || fail "parser lost a target line"
+  [[ "${one}" == "150100424a544434520325874bbf4900" ]] || fail "parser mangled the target"
+  [[ "$(count_lines "$(printf '[Empty]\n' | parse_targets)")" -eq 0 ]] \
+    || fail "parser counted [Empty] as a device"
+  [[ "$(count_lines "$(printf 'a\nb\n' | parse_targets)")" -eq 2 ]] \
+    || fail "parser miscounted two devices"
+  printf 'parser: one target, [Empty], and two targets all counted correctly\n'
+else
   say "attached devices (probe only)"
-  mapfile -t TARGETS < <("${HDC_PATH}" list targets 2>/dev/null | tr -d '\r' | grep -v '^\[Empty\]$' | grep -v '^$' || true)
-  [[ "${#TARGETS[@]}" -eq 1 ]] \
-    || fail "expected exactly one attached device, found ${#TARGETS[@]}; a window runs against one target"
-  SERIAL="${TARGETS[0]}"
+  TARGET_LIST="$("${HDC_PATH}" list targets 2>/dev/null | parse_targets)"
+  TARGET_COUNT="$(count_lines "${TARGET_LIST}")"
+  [[ "${TARGET_COUNT}" -eq 1 ]] \
+    || fail "expected exactly one attached device, found ${TARGET_COUNT}; a window runs against one target"
+  SERIAL="${TARGET_LIST}"
   printf 'one device attached: %s\n' "${SERIAL}" | mask
 fi
 
@@ -202,8 +231,12 @@ read -r TARGET_ID BINDING_REVISION < <(printf '%s' "${ADOPT_JSON}" \
 printf 'target %s at binding revision %s\n' "${TARGET_ID}" "${BINDING_REVISION}" | mask
 
 say "L1: observe.device@1 (E0, product-driven)"
+# The revision is pinned explicitly: admission requires it for every
+# device-bound operation, and pinning what adoption just reported keeps a
+# rebind between these two lines a refusal rather than a surprise.
 "${BIN_DIR}/arkdeck" job submit --socket "${SOCKET}" --target "${TARGET_ID}" \
-  --operation observe.device@1 --wait --json | tee "${STATE_DIR}/l1-observe.json" | mask
+  --operation observe.device@1 --expected-binding-revision "${BINDING_REVISION}" \
+  --wait --json | tee "${STATE_DIR}/l1-observe.json" | mask
 
 ############################ L2 — GJ-2 re-take ################################
 
@@ -310,7 +343,10 @@ print("%s %s round=%s job=%s v=%s" % (d["status"], d["phase"], d["activeRound"],
     case "${line}" in
       succeeded*|failed*|cancelled*|humanRequired*) break ;;
     esac
-    (( elapsed >= DEADLINE_SECONDS )) && { printf 'deadline reached at %ss\n' "${elapsed}"; break; }
+    if (( elapsed >= DEADLINE_SECONDS )); then
+      printf 'deadline reached at %ss\n' "${elapsed}"
+      break
+    fi
     sleep "${POLL_SECONDS}"
     elapsed=$((elapsed + POLL_SECONDS))
   done
@@ -361,7 +397,9 @@ say "L4: THE SECOND HANDOVER — one task submit, crash present"
 SUBMIT_ARGS=(task submit --socket "${SOCKET}" --target "${TARGET_ID}"
   --goal "The declared WaterFlow crash must be absent across five bounded captures"
   --expected-binding-revision "${BINDING_REVISION}" --json)
-[[ -n "${CRASH_SIGNATURE}" ]] && SUBMIT_ARGS+=(--crash-signature "${CRASH_SIGNATURE}")
+if [[ -n "${CRASH_SIGNATURE}" ]]; then
+  SUBMIT_ARGS+=(--crash-signature "${CRASH_SIGNATURE}")
+fi
 HTASK_CRASH="$("${BIN_DIR}/arkdeck" "${SUBMIT_ARGS[@]}" \
   | jsonq 'import json,sys; print(json.load(sys.stdin)["htaskId"])')"
 printf 'submitted %s. Reconcile calls from here: 0.\n' "${HTASK_CRASH}"

@@ -1,0 +1,52 @@
+{
+  "capabilityID": "CAP-RT-AUTO-20260731T061927Z-DAC082804598",
+  "effectCeiling": "deviceMutation",
+  "exactBindingRevision": 1,
+  "expiresAtUTC": "2026-07-31T10:19:27Z",
+  "inputConstraints": {
+    "abilityName": {
+      "kind": "exactString",
+      "value": "EntryAbility"
+    },
+    "bundleName": {
+      "kind": "exactString",
+      "value": "com.example.waterflowdemo"
+    },
+    "cleanupPolicy": {
+      "kind": "exactString",
+      "value": "retain"
+    },
+    "diagnosticsDurationSeconds": {
+      "kind": "integerRange",
+      "maximum": 5,
+      "minimum": 5
+    },
+    "hapArtifactLease": {
+      "kind": "exactString",
+      "value": "lease-v1:input-hap-TGT-958780b2ffb7-r1-9453a396e81d55ab:ART-8d5b85963670977fa1def2734b77fe67"
+    },
+    "installPolicy": {
+      "kind": "exactString",
+      "value": "installOrReplace"
+    }
+  },
+  "issuedAtUTC": "2026-07-31T06:19:27Z",
+  "issuer": {
+    "kind": "maintainerMergedPR",
+    "reference": "PR#875"
+  },
+  "maximumUses": 1,
+  "operationScope": [
+    {
+      "operationID": "debug.hap",
+      "version": 1
+    }
+  ],
+  "revocation": {
+    "state": "active"
+  },
+  "targetScope": {
+    "kind": "stablePhysicalIdentity",
+    "sha256": "958780b2ffb7090d4f22cdc1f547f9804ed0f0b605e3020f384e5d4823dc7a7e"
+  }
+}

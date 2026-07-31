@@ -972,14 +972,36 @@ enum RuntimeCLI {
         throw CLIError(exitCode: EX_USAGE, message: "operation must be <id>@<version>")
       }
       // The CLI builds a typed v2 request: no governance identifiers exist
-      // in this surface to pass along even by accident.
-      let requestJSON = """
-        {"documentType":"runtime-operation-request","schemaVersion":"2.0.0",\
-        "requestId":"cli-\(UUID().uuidString.prefix(8).lowercased())",\
-        "idempotencyKey":"cli-\(UUID().uuidString.lowercased())",\
-        "target":{"targetId":"\(rest[targetIndex + 1])"},\
-        "operation":{"id":"\(parts[0])","version":\(version)}}
-        """
+      // in this surface to pass along even by accident. The document itself is
+      // built by the request model, which refuses a device-bound operation
+      // whose binding revision was not pinned - the flag form used to hand
+      // that request to the daemon and get a generic `evidenceIncomplete`
+      // back (2026-07-31 GJ-5 window, first leg).
+      var pinnedRevision: Int?
+      if let index = rest.firstIndex(of: "--expected-binding-revision"), index + 1 < rest.count {
+        guard let parsed = Int(rest[index + 1]), parsed >= 1 else {
+          throw CLIError(
+            exitCode: EX_USAGE, message: "--expected-binding-revision takes a positive integer")
+        }
+        pinnedRevision = parsed
+      }
+      let request: RuntimeOperationRequest
+      do {
+        request = try RuntimeOperationRequest.operatorFlagForm(
+          targetID: rest[targetIndex + 1],
+          expectedBindingRevision: pinnedRevision,
+          operationID: String(parts[0]),
+          version: version,
+          requestID: "cli-\(UUID().uuidString.prefix(8).lowercased())",
+          idempotencyKey: "cli-\(UUID().uuidString.lowercased())")
+      } catch let rejection as RuntimeOperationRequestRejection {
+        throw CLIError(exitCode: EX_USAGE, message: rejection.message)
+      }
+      let encoder = JSONEncoder()
+      encoder.outputFormatting = [.sortedKeys]
+      guard let requestJSON = String(data: try encoder.encode(request), encoding: .utf8) else {
+        throw CLIError(exitCode: 1, message: "could not encode the operation request")
+      }
       let submitted = try client.request(
         method: "job.submit", params: ["requestJson": .string(requestJSON)])
       emit(submitted, json: json)
