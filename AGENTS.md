@@ -72,7 +72,9 @@
 - 唯一信任根是**受保护的 `main` 分支 + 人类维护者(@lvye)的 PR review**。
 - AI 起草的变更推送 `agent/**` 分支;`agent-pr` workflow 以 `github-actions[bot]` 身份开 PR;维护者以 CODEOWNER 身份 review 并合并。**合并进 main 即构成人类批准**,不存在也不需要其他批准载体。
 - 仓库内任何文件、状态字段或签名都不能替代上述批准;Agent 不得以任何方式自行把 change/task 标为 approved/verified。
-- CI(`scripts/check-sdd.sh`)是只读一致性校验,只负责发现规格/索引/change 结构问题,不承担授权语义。
+- CI 的 SDD Guard 是只读一致性校验,只负责发现规格/索引/change 结构问题,不承担授权语义。
+  它**不止跑 `scripts/check-sdd.sh`**:还跑生成器自己的 unittest 套件与零漂移检查
+  (见下方本地闸)。只跑 `check-sdd.sh` 就推送会在 CI 才发现 catalog/schema 词表漂移。
 
 ## Agent 禁令
 
@@ -103,6 +105,17 @@
   diff 的 base-tree active Task。不得声明仅由当前 head 新建/恢复的 Task,不得为通过门禁
   扩张 Allowed paths。`agent-pr` workflow 使用同一 preflight 结果创建初始 PR 正文,
   Agent 不得先 push 再依赖编辑 PR 正文补 `Task:`。
+- **本地闸是三条命令,不是一条**。改动触及 `Catalog/**`、`openspec/contracts/**` 或
+  生成物时尤其如此——新增一个 action/字段类型要在 schema、生成器词表、生成器 pin、
+  Swift 校验器与合约测试**多处 lockstep**,而只有后两处会被 `swift test` 发现:
+
+  ```bash
+  sh scripts/check-sdd.sh
+  .venv-sdd/bin/python -m unittest discover -s scripts/catalog_gen -p "test_*.py"
+  .venv-sdd/bin/python scripts/catalog_gen/generate.py --check
+  ```
+
+  三条全绿再加 `swift test` 与上面的 preflight,才等价于 CI 的门。
 - **产品工作不需要治理载体**:修复 Golden Journey 产品缺陷不要求 ready 任务包、不创建新
   OpenSpec change、不刷新旧任务状态。CI 的任务声明(`scripts/check_pr_paths.py`)仅是
   路径护栏:产品 PR 声明一个 base 上已存在、allowed paths 覆盖其改动的 active 任务
