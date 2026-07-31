@@ -2601,9 +2601,22 @@ public actor RuntimeJobEngine {
         : .confirmedNotExecuted
     } else if action.effect >= .deviceMutation {
       do {
+        let readbackContext = ProviderExecutionContext(
+          jobID: context.jobID,
+          stepID: Self.reconciliationStepID(
+            originalStepID: stepID,
+            recoveryAttemptID: recoveryAttemptID),
+          targetID: context.targetID,
+          bindingRevision: context.bindingRevision,
+          connectKey: context.connectKey,
+          expectedIdentitySHA256: context.expectedIdentitySHA256,
+          toolVersion: context.toolVersion,
+          toolSHA256: context.toolSHA256,
+          nowUTC: context.nowUTC,
+          resolvedInputArtifact: context.resolvedInputArtifact)
         guard
           let readback = try provider.reconciliationReadback(
-            intent: reference, context: context)
+            intent: reference, context: readbackContext)
         else {
           outcome = .stillUnknown(
             reason: "mutation has no dedicated readback; original not resent")
@@ -2619,7 +2632,7 @@ public actor RuntimeJobEngine {
         }
         let receipt = try await dispatcher.dispatch(readback)
         outcome = try provider.verifyReconciliationReadback(
-          receipt: receipt, intent: reference, context: context)
+          receipt: receipt, intent: reference, context: readbackContext)
       } catch {
         outcome = .stillUnknown(
           reason: "dedicated readback failed: \(error); original not resent")
@@ -2773,6 +2786,16 @@ public actor RuntimeJobEngine {
   }
 
   // MARK: Helpers
+
+  private static func reconciliationStepID(
+    originalStepID: String,
+    recoveryAttemptID: String
+  ) -> String {
+    let attemptDigest = SHA256.hash(data: Data(recoveryAttemptID.utf8))
+      .map { String(format: "%02x", $0) }.joined()
+    return
+      "reconcile-\(originalStepID.prefix(72))-\(attemptDigest.prefix(32))"
+  }
 
   private func verifyHostInputArtifact(
     jobID: String,

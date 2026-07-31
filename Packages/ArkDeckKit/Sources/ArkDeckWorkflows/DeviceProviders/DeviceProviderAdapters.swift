@@ -2165,6 +2165,53 @@ public struct RockchipFlashProviderAdapter: DeviceProvider {
     return .stillUnknown(reason: "Rockchip mutation has no completed dedicated readback")
   }
 
+  public func reconciliationReadback(
+    intent: ProviderDurableIntentReference,
+    context: ProviderExecutionContext
+  ) throws -> TypedProcessPlan? {
+    let action: TypedProviderAction
+    switch intent.action {
+    case .rockchip(.enterLoader):
+      guard let identity = context.expectedIdentitySHA256 else {
+        throw DeviceProviderError.factsUnavailable(
+          "Loader transition recovery has no stable target identity")
+      }
+      action = .rockchip(.waitForLoader(stableIdentitySHA256: identity))
+    case .rockchip(.flashPartitions(let bundle)):
+      action = .rockchip(.verifyFlashReadback(bundle))
+    case .rockchip(.rebootToNormal):
+      guard let connectKey = context.connectKey, !connectKey.isEmpty else {
+        throw DeviceProviderError.factsUnavailable(
+          "normal-mode recovery has no descriptor-bound connect key")
+      }
+      action = .rockchip(.waitForHDCReconnect(connectKey: connectKey))
+    default:
+      return nil
+    }
+    return try lower(action: action, context: context)
+  }
+
+  public func verifyReconciliationReadback(
+    receipt: ProviderProcessReceipt,
+    intent: ProviderDurableIntentReference,
+    context: ProviderExecutionContext
+  ) throws -> ProviderReconcileOutcome {
+    guard let plan = try reconciliationReadback(intent: intent, context: context) else {
+      return .stillUnknown(reason: "Rockchip mutation has no dedicated readback")
+    }
+    switch try verify(
+      receipt: receipt, action: plan.action, context: context)
+    {
+    case .verified(let summary):
+      return .confirmedCompleted(summary: summary)
+    case .failed(let code, let detail):
+      return .stillUnknown(
+        reason: "\(code): \(detail); destructive state is not safe to replay")
+    case .unknown(let reason), .unsupported(let reason):
+      return .stillUnknown(reason: reason)
+    }
+  }
+
   private func flashBundle(
     inputs: [String: JSONValue],
     context: ProviderExecutionContext

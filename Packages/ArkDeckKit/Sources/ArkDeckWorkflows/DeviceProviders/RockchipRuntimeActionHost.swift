@@ -875,7 +875,7 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
   }
 }
 
-private struct RockchipRuntimeHostIntentRecord: Codable {
+private struct RockchipRuntimeHostIntentRecord: Codable, Equatable {
   let schemaVersion: String
   let jobID: String
   let stepID: String
@@ -887,7 +887,7 @@ private struct RockchipRuntimeHostIntentRecord: Codable {
   let action: PersistedTypedProviderAction
 }
 
-private struct RockchipRuntimeHostReceiptRecord: Codable {
+private struct RockchipRuntimeHostReceiptRecord: Codable, Equatable {
   let schemaVersion: String
   let jobID: String
   let stepID: String
@@ -903,6 +903,41 @@ private struct RockchipRuntimeHostReceiptRecord: Codable {
   let stderrByteCount: Int
   let stdoutTruncated: Bool
   let subprocessCount: Int
+
+  func matches(
+    descriptor: HostManagedProcessDescriptor
+  ) -> Bool {
+    schemaVersion == "1.0.0"
+      && jobID == descriptor.jobID
+      && stepID == descriptor.stepID
+      && targetID == descriptor.targetID
+      && bindingRevision == descriptor.bindingRevision
+      && stableIdentitySHA256 == descriptor.expectedIdentitySHA256
+      && providerExecutableSHA256 == descriptor.providerExecutableSHA256
+      && actionSHA256 == descriptor.actionSHA256
+  }
+
+  var isWellFormed: Bool {
+    func validSHA256(_ value: String) -> Bool {
+      value.count == 64
+        && value.allSatisfy { $0.isHexDigit && !$0.isUppercase }
+    }
+    return validSHA256(stdoutSHA256)
+      && validSHA256(stderrSHA256)
+      && stdoutByteCount >= 0
+      && stderrByteCount >= 0
+      && subprocessCount >= 0
+      && !summary.isEmpty
+      && summary.count <= 64
+      && summary.allSatisfy {
+        !$0.key.isEmpty && $0.key.count <= 128 && $0.value.count <= 4_096
+      }
+  }
+}
+
+fileprivate enum RockchipRuntimeHostPreparation {
+  case execute(URL)
+  case replay(RockchipRuntimeActionExecutionResult)
 }
 
 struct RockchipRuntimeActionRecordStore: Sendable {
@@ -917,10 +952,10 @@ struct RockchipRuntimeActionRecordStore: Sendable {
     }
   }
 
-  func begin(
+  fileprivate func prepare(
     descriptor: HostManagedProcessDescriptor,
     action: TypedProviderAction
-  ) throws -> URL {
+  ) throws -> RockchipRuntimeHostPreparation {
     try validateComponent(descriptor.jobID, field: "jobID")
     try validateComponent(descriptor.stepID, field: "stepID")
     try prepareDirectory(rootURL, allowExisting: true)
@@ -929,7 +964,6 @@ struct RockchipRuntimeActionRecordStore: Sendable {
     try prepareDirectory(jobDirectory, allowExisting: true)
     let actionDirectory = jobDirectory.appendingPathComponent(
       descriptor.stepID, isDirectory: true)
-    try prepareDirectory(actionDirectory, allowExisting: false)
     let record = RockchipRuntimeHostIntentRecord(
       schemaVersion: "1.0.0",
       jobID: descriptor.jobID,
@@ -940,13 +974,85 @@ struct RockchipRuntimeActionRecordStore: Sendable {
       providerExecutableSHA256: descriptor.providerExecutableSHA256,
       actionSHA256: descriptor.actionSHA256,
       action: PersistedTypedProviderAction(action))
+    let created = Darwin.mkdir(actionDirectory.path, 0o700) == 0
+    if !created {
+      guard errno == EEXIST else {
+        throw RuntimeDispatchFailure.failed(
+          "cannot create Rockchip record directory (errno \(errno))")
+      }
+      try prepareDirectory(actionDirectory, allowExisting: true)
+      let existingIntent: RockchipRuntimeHostIntentRecord
+      do {
+        existingIntent = try read(
+          RockchipRuntimeHostIntentRecord.self,
+          from: actionDirectory.appendingPathComponent("intent.json"))
+      } catch {
+        if action.effect >= .deviceMutation {
+          throw RuntimeDispatchFailure.outcomeUnknown(
+            "durable Rockchip mutation intent cannot be recovered: \(error)")
+        }
+        throw RuntimeDispatchFailure.failed(
+          "durable Rockchip read-only intent cannot be recovered: \(error)")
+      }
+      guard existingIntent == record else {
+        if action.effect >= .deviceMutation {
+          throw RuntimeDispatchFailure.outcomeUnknown(
+            "durable Rockchip mutation intent identity drifted; original not resent")
+        }
+        throw RuntimeDispatchFailure.failed(
+          "durable Rockchip read-only intent identity drifted")
+      }
+      let receiptURL = actionDirectory.appendingPathComponent("receipt.json")
+      var receiptMetadata = stat()
+      if lstat(receiptURL.path, &receiptMetadata) == 0 {
+        let receipt: RockchipRuntimeHostReceiptRecord
+        do {
+          receipt = try read(
+            RockchipRuntimeHostReceiptRecord.self, from: receiptURL)
+        } catch {
+          if action.effect >= .deviceMutation {
+            throw RuntimeDispatchFailure.outcomeUnknown(
+              "durable Rockchip mutation receipt cannot be recovered: \(error)")
+          }
+          throw RuntimeDispatchFailure.failed(
+            "durable Rockchip read-only receipt cannot be recovered: \(error)")
+        }
+        guard receipt.matches(descriptor: descriptor), receipt.isWellFormed else {
+          if action.effect >= .deviceMutation {
+            throw RuntimeDispatchFailure.outcomeUnknown(
+              "durable Rockchip mutation receipt is invalid; original not resent")
+          }
+          throw RuntimeDispatchFailure.failed(
+            "durable Rockchip read-only receipt is invalid")
+        }
+        var summary = receipt.summary
+        summary["recordID"] = recordID(descriptor: descriptor)
+        return .replay(
+          RockchipRuntimeActionExecutionResult(
+            summary: summary,
+            stdout: Data(),
+            stderr: Data(),
+            stdoutTruncated: receipt.stdoutTruncated,
+            subprocesses: []))
+      }
+      guard errno == ENOENT else {
+        throw RuntimeDispatchFailure.failed(
+          "cannot inspect durable Rockchip receipt (errno \(errno))")
+      }
+      guard action.effect <= .readOnly else {
+        throw RuntimeDispatchFailure.outcomeUnknown(
+          "durable Rockchip mutation intent has no receipt; original not resent")
+      }
+      return .execute(actionDirectory)
+    }
+    try synchronizeDirectory(actionDirectory.deletingLastPathComponent())
     do {
       try write(record, to: actionDirectory.appendingPathComponent("intent.json"))
     } catch {
       throw RuntimeDispatchFailure.failed(
         "cannot persist Rockchip host intent before dispatch: \(error)")
     }
-    return actionDirectory
+    return .execute(actionDirectory)
   }
 
   func finish(
@@ -971,7 +1077,13 @@ struct RockchipRuntimeActionRecordStore: Sendable {
       stdoutTruncated: result.stdoutTruncated,
       subprocessCount: result.subprocesses.count)
     try write(record, to: actionDirectory.appendingPathComponent("receipt.json"))
-    return "rockchip-runtime/\(descriptor.jobID)/\(descriptor.stepID)/receipt.json"
+    return recordID(descriptor: descriptor)
+  }
+
+  private func recordID(
+    descriptor: HostManagedProcessDescriptor
+  ) -> String {
+    "rockchip-runtime/\(descriptor.jobID)/\(descriptor.stepID)/receipt.json"
   }
 
   private func prepareDirectory(
@@ -1070,6 +1182,48 @@ struct RockchipRuntimeActionRecordStore: Sendable {
     try synchronizeDirectory(url.deletingLastPathComponent())
   }
 
+  private func read<T: Decodable>(
+    _ type: T.Type,
+    from url: URL
+  ) throws -> T {
+    let descriptor = Darwin.open(
+      url.path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW)
+    guard descriptor >= 0 else {
+      throw RuntimeDispatchFailure.failed(
+        "cannot open Rockchip record (errno \(errno))")
+    }
+    defer { Darwin.close(descriptor) }
+    var metadata = stat()
+    guard fstat(descriptor, &metadata) == 0,
+      metadata.st_mode & S_IFMT == S_IFREG,
+      metadata.st_mode & 0o077 == 0,
+      metadata.st_size > 0,
+      metadata.st_size <= 1_048_576
+    else {
+      throw RuntimeDispatchFailure.failed(
+        "Rockchip record is not a bounded owner-only regular file")
+    }
+    var data = Data(count: Int(metadata.st_size))
+    try data.withUnsafeMutableBytes { bytes in
+      var offset = 0
+      while offset < bytes.count {
+        let count = Darwin.read(
+          descriptor,
+          bytes.baseAddress!.advanced(by: offset),
+          bytes.count - offset)
+        if count > 0 {
+          offset += count
+        } else if count < 0, errno == EINTR {
+          continue
+        } else {
+          throw RuntimeDispatchFailure.failed(
+            "cannot read complete Rockchip record (errno \(errno))")
+        }
+      }
+    }
+    return try JSONDecoder().decode(type, from: data)
+  }
+
   private func synchronizeDirectory(_ url: URL) throws {
     let directoryDescriptor = Darwin.open(
       url.path, O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW)
@@ -1115,8 +1269,15 @@ struct DurableRockchipRuntimeActionHost: RockchipRuntimeActionHosting {
       action: typedAction,
       descriptor: descriptor,
       executable: rockchipExecutable)
-    let actionDirectory = try records.begin(
+    let preparation = try records.prepare(
       descriptor: descriptor, action: typedAction)
+    if case .replay(let result) = preparation {
+      return result
+    }
+    guard case .execute(let actionDirectory) = preparation else {
+      throw RuntimeDispatchFailure.failed(
+        "Rockchip host preparation returned an invalid state")
+    }
     let result = try await executor.execute(
       action: action,
       descriptor: descriptor,

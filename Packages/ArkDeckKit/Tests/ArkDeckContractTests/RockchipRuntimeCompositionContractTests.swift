@@ -55,6 +55,26 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     }
   }
 
+  private struct InterruptedActionExecutor: RockchipRuntimeActionExecuting {
+    let log: ActionLog
+
+    func unavailableReason() -> String? { nil }
+
+    func execute(
+      action: RockchipProviderAction,
+      descriptor _: HostManagedProcessDescriptor,
+      rockchipExecutable _: ResolvedExecutable,
+      actionDirectory: URL
+    ) async throws -> RockchipRuntimeActionExecutionResult {
+      await log.append(
+        action,
+        intentExists: FileManager.default.fileExists(
+          atPath: actionDirectory.appendingPathComponent("intent.json").path))
+      throw RuntimeDispatchFailure.outcomeUnknown(
+        "fixture interrupted after durable host intent")
+    }
+  }
+
   private actor CommandLog {
     struct Invocation: Sendable, Equatable {
       let executable: String
@@ -555,7 +575,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       capability.exactPlanDigest, String(repeating: "b", count: 64))
   }
 
-  func testDurableHostCoversClosedActionSurfaceAndRefusesDuplicateStep() async throws {
+  func testDurableHostCoversClosedActionSurfaceAndReplaysDurableReceipt() async throws {
     let root = try temporaryDirectory()
     defer { try? FileManager.default.removeItem(at: root) }
     let componentSHA = Self.reviewedSignedComponentSHA256
@@ -621,15 +641,12 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     XCTAssertEqual(snapshot.0, actions)
     XCTAssertEqual(snapshot.1, Array(repeating: true, count: actions.count))
 
-    do {
-      _ = try await dispatcher.dispatch(try XCTUnwrap(firstPlan))
-      XCTFail("the same durable job/step must never dispatch twice")
-    } catch let failure as RuntimeDispatchFailure {
-      guard case .failed(let detail) = failure else {
-        return XCTFail("duplicate refusal must be definite, got \(failure)")
-      }
-      XCTAssertTrue(detail.contains("duplicate dispatch"), detail)
-    }
+    let replayed = try await dispatcher.dispatch(try XCTUnwrap(firstPlan))
+    XCTAssertEqual(
+      replayed.hostManagedRecordID,
+      "rockchip-runtime/job-host/step-0/receipt.json")
+    XCTAssertEqual(replayed.stdout, Data())
+    XCTAssertEqual(replayed.subprocesses, [])
     let snapshotAfterDuplicate = await log.snapshot()
     XCTAssertEqual(snapshotAfterDuplicate.0.count, actions.count)
 
@@ -658,6 +675,147 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     }
     let snapshotAfterDrift = await log.snapshot()
     XCTAssertEqual(snapshotAfterDrift.0.count, actions.count)
+  }
+
+  func testDurableHostNeverResendsInterruptedMutationWithoutReceipt() async throws {
+    let root = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let component = ResolvedExecutable(
+      path: "/product/Contents/MacOS/rkdeveloptool",
+      sha256: Self.reviewedSignedComponentSHA256)
+    let interruptedLog = ActionLog()
+    let recordRoot = root.appendingPathComponent(
+      "rockchip-runtime", isDirectory: true)
+    let interrupted = BundledRockchipRuntimeDispatcher(
+      resolver: FixedExecutableResolver(table: ["rockchip": component]),
+      host: DurableRockchipRuntimeActionHost(
+        executor: InterruptedActionExecutor(log: interruptedLog),
+        records: RockchipRuntimeActionRecordStore(rootURL: recordRoot)))
+    let plan = try rockchipPlan(
+      action: .flashPartitions(flashBundle()),
+      stepID: "interrupted-flash",
+      toolSHA256: component.sha256)
+
+    for dispatcher in [
+      interrupted,
+      BundledRockchipRuntimeDispatcher(
+        resolver: FixedExecutableResolver(table: ["rockchip": component]),
+        host: DurableRockchipRuntimeActionHost(
+          executor: SuccessfulActionExecutor(log: ActionLog()),
+          records: RockchipRuntimeActionRecordStore(rootURL: recordRoot))),
+    ] {
+      do {
+        _ = try await dispatcher.dispatch(plan)
+        XCTFail("a mutation intent without a receipt must never be resent")
+      } catch let failure as RuntimeDispatchFailure {
+        guard case .outcomeUnknown(let detail) = failure else {
+          return XCTFail("expected outcomeUnknown, got \(failure)")
+        }
+        XCTAssertTrue(detail.contains("intent"), detail)
+      }
+    }
+    let snapshot = await interruptedLog.snapshot()
+    XCTAssertEqual(snapshot.0, [.flashPartitions(flashBundle())])
+    XCTAssertEqual(snapshot.1, [true])
+  }
+
+  func testDurableHostResumesInterruptedReadbackAndThenReplaysReceipt() async throws {
+    let root = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let component = ResolvedExecutable(
+      path: "/product/Contents/MacOS/rkdeveloptool",
+      sha256: Self.reviewedSignedComponentSHA256)
+    let recordRoot = root.appendingPathComponent(
+      "rockchip-runtime", isDirectory: true)
+    let readback = RockchipProviderAction.verifyFlashReadback(flashBundle())
+    let plan = try rockchipPlan(
+      action: readback,
+      stepID: "interrupted-readback",
+      toolSHA256: component.sha256)
+    let interrupted = BundledRockchipRuntimeDispatcher(
+      resolver: FixedExecutableResolver(table: ["rockchip": component]),
+      host: DurableRockchipRuntimeActionHost(
+        executor: InterruptedActionExecutor(log: ActionLog()),
+        records: RockchipRuntimeActionRecordStore(rootURL: recordRoot)))
+    do {
+      _ = try await interrupted.dispatch(plan)
+      XCTFail("fixture must stop after its durable readback intent")
+    } catch let failure as RuntimeDispatchFailure {
+      guard case .outcomeUnknown = failure else {
+        return XCTFail("expected fixture interruption, got \(failure)")
+      }
+    }
+
+    let resumedLog = ActionLog()
+    let resumed = BundledRockchipRuntimeDispatcher(
+      resolver: FixedExecutableResolver(table: ["rockchip": component]),
+      host: DurableRockchipRuntimeActionHost(
+        executor: SuccessfulActionExecutor(log: resumedLog),
+        records: RockchipRuntimeActionRecordStore(rootURL: recordRoot)))
+    let completed = try await resumed.dispatch(plan)
+    let replayed = try await resumed.dispatch(plan)
+    XCTAssertEqual(completed.hostManagedRecordID, replayed.hostManagedRecordID)
+    let snapshot = await resumedLog.snapshot()
+    XCTAssertEqual(snapshot.0, [readback])
+    XCTAssertEqual(snapshot.1, [true])
+  }
+
+  func testRockchipMutationsMaterializeDedicatedReadOnlyReconciliation() throws {
+    let provider = RockchipFlashProviderAdapter(availability: .available)
+    let bundle = flashBundle()
+    let context = ProviderExecutionContext(
+      jobID: "job-reconcile",
+      stepID: "reconcile-flash-partitions-attempt",
+      targetID: "TGT-HOST",
+      bindingRevision: 7,
+      connectKey: "device-1",
+      expectedIdentitySHA256: String(repeating: "a", count: 64),
+      toolVersion: BundledRockchipComponent.reportedVersion,
+      toolSHA256: Self.reviewedSignedComponentSHA256,
+      nowUTC: "2026-07-31T00:00:00Z")
+    let cases: [(TypedProviderAction, TypedProviderAction)] = [
+      (
+        .rockchip(.enterLoader(connectKey: "device-1")),
+        .rockchip(.waitForLoader(
+          stableIdentitySHA256: String(repeating: "a", count: 64)))
+      ),
+      (
+        .rockchip(.flashPartitions(bundle)),
+        .rockchip(.verifyFlashReadback(bundle))
+      ),
+      (
+        .rockchip(.rebootToNormal(
+          stableIdentitySHA256: String(repeating: "a", count: 64))),
+        .rockchip(.waitForHDCReconnect(connectKey: "device-1"))
+      ),
+    ]
+
+    for (index, pair) in cases.enumerated() {
+      let reference = ProviderDurableIntentReference(
+        jobID: context.jobID,
+        stepID: "original-\(index)",
+        intentEventID: "intent-\(index)",
+        action: pair.0)
+      let plan = try XCTUnwrap(
+        provider.reconciliationReadback(
+          intent: reference, context: context))
+      XCTAssertEqual(plan.action, pair.1)
+      XCTAssertLessThanOrEqual(plan.action.effect, .readOnly)
+      let outcome = try provider.verifyReconciliationReadback(
+        receipt: ProviderProcessReceipt(
+          exitStatus: 0,
+          stdout: Data(),
+          stderr: Data(),
+          stdoutTruncated: false,
+          durationSeconds: 0,
+          hostManagedRecordID:
+            "rockchip-runtime/job-reconcile/\(context.stepID)/receipt.json"),
+        intent: reference,
+        context: context)
+      guard case .confirmedCompleted = outcome else {
+        return XCTFail("dedicated readback must confirm completion, got \(outcome)")
+      }
+    }
   }
 
   func testDurableHostIsUnavailableBeforeAdmissionWhenRecordRootCannotMaterialize()
