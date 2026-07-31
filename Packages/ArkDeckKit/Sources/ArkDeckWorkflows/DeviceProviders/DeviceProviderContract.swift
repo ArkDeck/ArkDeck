@@ -153,6 +153,11 @@ public enum WorkspaceProviderAction: Sendable, Equatable, Codable {
   case runTests(WorkspaceResolvedInvocation)
   case symbolizeCrash(WorkspaceResolvedInvocation)
   case revertPatch(WorkspaceRevertIntent)
+  /// Read-only source-control observations (CHG-2026-055, TASK-HFA-008).
+  case inspectGitStatus(WorkspaceResolvedInvocation)
+  case inspectDiff(WorkspaceResolvedInvocation)
+  case readSourceRange(WorkspaceResolvedInvocation)
+  case createCheckpoint(WorkspaceResolvedInvocation)
 }
 
 public enum TypedProviderAction: Sendable, Equatable {

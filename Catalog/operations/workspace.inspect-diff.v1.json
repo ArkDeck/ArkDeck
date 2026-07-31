@@ -1,0 +1,75 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "workspace.inspect-diff",
+  "version": 1,
+  "title": "Observe a bounded diff of declared workspace source",
+  "provider": "workspace",
+  "effect": {
+    "minimum": "hostOnly",
+    "permitted": [
+      "hostOnly"
+    ]
+  },
+  "authorization": {
+    "hostOnly": "defaultReadOnly"
+  },
+  "binding": "none",
+  "concurrencyKey": "host-exclusive",
+  "inputs": {
+    "fields": {
+      "projectRef": {
+        "type": "string",
+        "required": true,
+        "description": "Declared project this observation reads; the provider resolves its root."
+      },
+      "baseRevision": {
+        "type": "string",
+        "required": true,
+        "description": "Revision expression the diff is taken against; never a path."
+      },
+      "pathScope": {
+        "type": "string",
+        "required": true,
+        "description": "Pathspec the provider joins to the resolved project root; never a caller path."
+      }
+    }
+  },
+  "outputs": {
+    "fields": {
+      "inspection": {
+        "type": "artifactReference",
+        "required": true
+      }
+    }
+  },
+  "timeoutSeconds": 60,
+  "outputByteBudget": 1048576,
+  "retry": {
+    "preflightAttempts": 1,
+    "mutationAttempts": 1
+  },
+  "unknownOutcome": "reconcileRequired",
+  "artifacts": [
+    {
+      "name": "diff-summary.txt",
+      "role": "raw",
+      "mediaType": "text/plain",
+      "privacy": "standard",
+      "required": true
+    }
+  ],
+  "profiles": [
+    "workspace-host@1"
+  ],
+  "steps": [
+    {
+      "stepID": "inspect-diff",
+      "kind": "inspectWorkspaceDiff",
+      "effect": "hostOnly",
+      "cancellation": "immediate",
+      "binding": "none",
+      "compensation": "none",
+      "notes": "Reads a bounded diff inside the resolved project root; writes nothing."
+    }
+  ]
+}

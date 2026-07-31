@@ -1,0 +1,65 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "workspace.inspect-git-status",
+  "version": 1,
+  "title": "Observe declared workspace source-control status",
+  "provider": "workspace",
+  "effect": {
+    "minimum": "hostOnly",
+    "permitted": [
+      "hostOnly"
+    ]
+  },
+  "authorization": {
+    "hostOnly": "defaultReadOnly"
+  },
+  "binding": "none",
+  "concurrencyKey": "host-exclusive",
+  "inputs": {
+    "fields": {
+      "projectRef": {
+        "type": "string",
+        "required": true,
+        "description": "Declared project this observation reads; the provider resolves its root."
+      }
+    }
+  },
+  "outputs": {
+    "fields": {
+      "inspection": {
+        "type": "artifactReference",
+        "required": true
+      }
+    }
+  },
+  "timeoutSeconds": 60,
+  "outputByteBudget": 1048576,
+  "retry": {
+    "preflightAttempts": 1,
+    "mutationAttempts": 1
+  },
+  "unknownOutcome": "reconcileRequired",
+  "artifacts": [
+    {
+      "name": "git-status.txt",
+      "role": "raw",
+      "mediaType": "text/plain",
+      "privacy": "standard",
+      "required": true
+    }
+  ],
+  "profiles": [
+    "workspace-host@1"
+  ],
+  "steps": [
+    {
+      "stepID": "inspect-git-status",
+      "kind": "inspectWorkspaceGitStatus",
+      "effect": "hostOnly",
+      "cancellation": "immediate",
+      "binding": "none",
+      "compensation": "none",
+      "notes": "Reads source-control status inside the resolved project root; writes nothing."
+    }
+  ]
+}

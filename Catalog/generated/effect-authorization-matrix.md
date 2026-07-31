@@ -3,7 +3,7 @@
 
 # Operation effect / authorization matrix
 
-Catalog digest: `4803975b0b0f0c05201410ee3b9259b4be8723455f5109c568e69fd6ebf8d29c`
+Catalog digest: `8e8cde910fa791234b7516e6527ef5fe67d8ec63121498da74c10af5e1229715`
 
 | Operation | Provider | Effect (min → max) | Authorization | Default issuance | Binding | Concurrency | Timeout (s) | Output budget (bytes) |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -15,7 +15,11 @@ Catalog digest: `4803975b0b0f0c05201410ee3b9259b4be8723455f5109c568e69fd6ebf8d29
 | `observe.device@1` | hdc | readOnly | readOnly: defaultReadOnly | enabled | confirmedDevice | device-shared-readonly | 60 | 1048576 |
 | `workspace.apply-patch@1` | workspace | hostOnly | hostOnly: defaultReadOnly | enabled | none | host-exclusive | 180 | 16777216 |
 | `workspace.build-openharmony@1` | workspace | hostOnly | hostOnly: defaultReadOnly | enabled | none | host-exclusive | 900 | 134217728 |
+| `workspace.create-checkpoint@1` | workspace | hostOnly | hostOnly: defaultReadOnly | enabled | none | host-exclusive | 120 | 1048576 |
+| `workspace.inspect-diff@1` | workspace | hostOnly | hostOnly: defaultReadOnly | enabled | none | host-exclusive | 60 | 1048576 |
+| `workspace.inspect-git-status@1` | workspace | hostOnly | hostOnly: defaultReadOnly | enabled | none | host-exclusive | 60 | 1048576 |
 | `workspace.inspect-source@1` | workspace | hostOnly | hostOnly: defaultReadOnly | enabled | none | host-exclusive | 120 | 1048576 |
+| `workspace.read-source-range@1` | workspace | hostOnly | hostOnly: defaultReadOnly | enabled | none | host-exclusive | 60 | 1048576 |
 | `workspace.revert-patch@1` | workspace | hostOnly | hostOnly: defaultReadOnly | enabled | none | host-exclusive | 180 | 16777216 |
 | `workspace.run-tests@1` | workspace | hostOnly | hostOnly: defaultReadOnly | enabled | none | host-exclusive | 900 | 134217728 |
 | `workspace.symbolize-crash@1` | workspace | hostOnly | hostOnly: defaultReadOnly | enabled | none | host-exclusive | 300 | 67108864 |

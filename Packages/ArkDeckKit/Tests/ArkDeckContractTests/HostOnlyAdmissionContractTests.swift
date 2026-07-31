@@ -303,7 +303,11 @@ final class HostOnlyAdmissionContractTests: XCTestCase {
       [
         "workspace.apply-patch@1",
         "workspace.build-openharmony@1",
+        "workspace.create-checkpoint@1",
+        "workspace.inspect-diff@1",
+        "workspace.inspect-git-status@1",
         "workspace.inspect-source@1",
+        "workspace.read-source-range@1",
         "workspace.revert-patch@1",
         "workspace.run-tests@1",
         "workspace.symbolize-crash@1",

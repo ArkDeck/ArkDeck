@@ -2,8 +2,8 @@
 
 > Change:CHG-2026-055-harness-final-architecture@r1
 
-Status:in_progress # r1(2026-07-31):TASK-HFA-002 已 done,HFA-AC-3/4/5 有结论;
-其余 HFA-AC 仍 `pending`(未开工)。
+Status:in_progress # r1(2026-07-31):TASK-HFA-001/002/008 已 done,
+HFA-AC-1/2/3/4/5/17 有结论;其余 HFA-AC 仍 `pending`(未开工)。
 每条结论由其所属任务的实现 PR 写入本文件;维护者 review/merge 该实现 PR 即确认。
 不为本 change 追加独立 verification/archive 载体(`PRODUCT-LOOP.md` §4/§20)。
 
@@ -207,7 +207,30 @@ Status:in_progress # r1(2026-07-31):TASK-HFA-002 已 done,HFA-AC-3/4/5 有结论
   `writeFile` 在契约面不可表达(负例);scope 逃逸与 byte budget 超限 fail closed;
   `createCheckpoint@1` 有 readback 与 revert 配对。
 - Evidence:实现 PR 内测试 + catalog digest 更新 + 生成器零 drift。
-- **结论:pending**
+- **结论(2026-07-31):PASS,范围按实际能力交付** ——
+  `WorkspaceReadOnlyOperationsContractTests` 14 例:
+  `testGitStatusLowersRootBoundArgvTokenForToken` 与
+  `testDiffLowersRevisionAndScopeAfterTheOptionTerminator` 逐 token 断言生产 argv
+  (含 `-C <resolved root>` 前置与 `--` 终止符的**位置**);
+  `testARevisionOrScopeThatCouldBecomeAnOptionOrAPathIsRefused` 用 11 个负例钉死
+  「输入不得变成选项或路径」(`-f…`、`../etc`、`/etc/passwd`、`Sources/$(id)`、空串);
+  `testAnUnboundedOrEscapingReadRangeIsRefused` 断言超界跨度、倒置区间、traversal、
+  绝对路径、profile glob 外路径一律拒绝;
+  `testACheckpointLowersStashCreateAndMovesNothing` 断言 checkpoint 是
+  `stash create`(写对象、不动 ref/index/worktree),且 argv 里没有 `push`/`commit`;
+  `testACheckpointWithoutAnObjectIsAFailureNotASuccess` 断言空 checkpoint 判 failed
+  (否则修复腿会以为自己可以回滚);
+  `testWithoutAPinnedSourceControlToolBothOperationsReportUnavailable` 断言未配置
+  pinned 工具时 `UNAVAILABLE` + 机器可读原因且零 capability 消耗(§8);
+  `testTheForbiddenWorkspaceSurfacesAreNotExpressible` 断言
+  `run-shell`/`execute-command`/`run-git`/`write-file`/`run-arbitrary-script`
+  在已发布 catalog 中不存在。
+  **范围登记**:实交 4 个 operation。`searchSource` 已由 `workspace.inspect-source@1`
+  提供(重复能力不再造);`inspectSymbol` = inspect-source + read-source-range 的组合;
+  `parseBuildFailure`/`collectBuildOutputs` 移交 TASK-HFA-007(消费 artifact、发布
+  derived artifact,属 analyzer 流水线)。三条依据写在 `tasks.md` 的 Done 行。
+  **命名偏离**:产物用 `.txt` 而非终版 §18.3 的 `.json` —— git 的实际输出是文本,
+  命名为 json 会让下游按 JSON 解析并失败。
 
 ## HFA-AC-18 workspace 主体绑定 exact base revision(TASK-HFA-009)
 

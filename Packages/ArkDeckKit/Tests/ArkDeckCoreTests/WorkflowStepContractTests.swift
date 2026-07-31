@@ -544,7 +544,7 @@ final class WorkflowStepContractTests: XCTestCase {
     let integerKeys: Set<String> = [
       "deadlineMilliseconds", "requiredBytes", "metadataHeadroomBytes", "sizeBytes",
       "rotationBytes", "retainedSegments", "reconnectDeadlineMilliseconds", "imageSize",
-      "packageSize",
+      "packageSize", "lineStart", "lineEnd",
     ]
     var arguments = Dictionary(
       uniqueKeysWithValues: metadata.requiredArgumentKeys.map { key -> (String, JSONValue) in

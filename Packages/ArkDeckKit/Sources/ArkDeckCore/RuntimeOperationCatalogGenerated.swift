@@ -4,7 +4,7 @@
 // Drift is a check-sdd error (bidirectional byte comparison).
 
 extension RuntimeOperationCatalog {
-  public static let catalogDigest = "4803975b0b0f0c05201410ee3b9259b4be8723455f5109c568e69fd6ebf8d29c"
+  public static let catalogDigest = "8e8cde910fa791234b7516e6527ef5fe67d8ec63121498da74c10af5e1229715"
 
   public static let operations: [CatalogOperationDescriptor] = [
     CatalogOperationDescriptor(
@@ -364,6 +364,92 @@ extension RuntimeOperationCatalog {
       profiles: ["workspace-host@1"]
     ),
     CatalogOperationDescriptor(
+      id: "workspace.create-checkpoint",
+      version: 1,
+      title: "Create a rollback checkpoint object for declared workspace source",
+      provider: .workspace,
+      minimumEffect: .hostOnly,
+      permittedEffects: [.hostOnly],
+      authorization: [.hostOnly: .defaultReadOnly],
+      defaultPolicyIssuanceEnabled: true,
+      binding: .none,
+      concurrencyKey: .hostExclusive,
+      inputs: [
+        CatalogFieldDescriptor(name: "projectRef", type: .string, isRequired: true)
+      ],
+      outputs: [
+        CatalogFieldDescriptor(name: "inspection", type: .artifactReference, isRequired: true)
+      ],
+      steps: [
+        CatalogStepDescriptor(stepID: "create-checkpoint", kind: .createWorkspaceCheckpoint, effect: .hostOnly, cancellation: .atSafeBoundary, binding: .none, isOptional: false, compensation: .none)
+      ],
+      timeoutSeconds: 120,
+      outputByteBudget: 1048576,
+      preflightAttempts: 1,
+      artifacts: [
+        CatalogArtifactDescriptor(name: "checkpoint.txt", role: .raw, mediaType: "text/plain", privacy: .standard, isRequired: true, retentionClass: .default)
+      ],
+      profiles: ["workspace-host@1"]
+    ),
+    CatalogOperationDescriptor(
+      id: "workspace.inspect-diff",
+      version: 1,
+      title: "Observe a bounded diff of declared workspace source",
+      provider: .workspace,
+      minimumEffect: .hostOnly,
+      permittedEffects: [.hostOnly],
+      authorization: [.hostOnly: .defaultReadOnly],
+      defaultPolicyIssuanceEnabled: true,
+      binding: .none,
+      concurrencyKey: .hostExclusive,
+      inputs: [
+        CatalogFieldDescriptor(name: "baseRevision", type: .string, isRequired: true),
+        CatalogFieldDescriptor(name: "pathScope", type: .string, isRequired: true),
+        CatalogFieldDescriptor(name: "projectRef", type: .string, isRequired: true)
+      ],
+      outputs: [
+        CatalogFieldDescriptor(name: "inspection", type: .artifactReference, isRequired: true)
+      ],
+      steps: [
+        CatalogStepDescriptor(stepID: "inspect-diff", kind: .inspectWorkspaceDiff, effect: .hostOnly, cancellation: .immediate, binding: .none, isOptional: false, compensation: .none)
+      ],
+      timeoutSeconds: 60,
+      outputByteBudget: 1048576,
+      preflightAttempts: 1,
+      artifacts: [
+        CatalogArtifactDescriptor(name: "diff-summary.txt", role: .raw, mediaType: "text/plain", privacy: .standard, isRequired: true, retentionClass: .default)
+      ],
+      profiles: ["workspace-host@1"]
+    ),
+    CatalogOperationDescriptor(
+      id: "workspace.inspect-git-status",
+      version: 1,
+      title: "Observe declared workspace source-control status",
+      provider: .workspace,
+      minimumEffect: .hostOnly,
+      permittedEffects: [.hostOnly],
+      authorization: [.hostOnly: .defaultReadOnly],
+      defaultPolicyIssuanceEnabled: true,
+      binding: .none,
+      concurrencyKey: .hostExclusive,
+      inputs: [
+        CatalogFieldDescriptor(name: "projectRef", type: .string, isRequired: true)
+      ],
+      outputs: [
+        CatalogFieldDescriptor(name: "inspection", type: .artifactReference, isRequired: true)
+      ],
+      steps: [
+        CatalogStepDescriptor(stepID: "inspect-git-status", kind: .inspectWorkspaceGitStatus, effect: .hostOnly, cancellation: .immediate, binding: .none, isOptional: false, compensation: .none)
+      ],
+      timeoutSeconds: 60,
+      outputByteBudget: 1048576,
+      preflightAttempts: 1,
+      artifacts: [
+        CatalogArtifactDescriptor(name: "git-status.txt", role: .raw, mediaType: "text/plain", privacy: .standard, isRequired: true, retentionClass: .default)
+      ],
+      profiles: ["workspace-host@1"]
+    ),
+    CatalogOperationDescriptor(
       id: "workspace.inspect-source",
       version: 1,
       title: "Inspect declared workspace source for a symbol",
@@ -390,6 +476,37 @@ extension RuntimeOperationCatalog {
       preflightAttempts: 1,
       artifacts: [
         CatalogArtifactDescriptor(name: "source-inspection.txt", role: .raw, mediaType: "text/plain", privacy: .standard, isRequired: true, retentionClass: .default)
+      ],
+      profiles: ["workspace-host@1"]
+    ),
+    CatalogOperationDescriptor(
+      id: "workspace.read-source-range",
+      version: 1,
+      title: "Read a bounded line range of declared workspace source",
+      provider: .workspace,
+      minimumEffect: .hostOnly,
+      permittedEffects: [.hostOnly],
+      authorization: [.hostOnly: .defaultReadOnly],
+      defaultPolicyIssuanceEnabled: true,
+      binding: .none,
+      concurrencyKey: .hostExclusive,
+      inputs: [
+        CatalogFieldDescriptor(name: "filePath", type: .string, isRequired: true),
+        CatalogFieldDescriptor(name: "lineEnd", type: .integer, isRequired: true),
+        CatalogFieldDescriptor(name: "lineStart", type: .integer, isRequired: true),
+        CatalogFieldDescriptor(name: "projectRef", type: .string, isRequired: true)
+      ],
+      outputs: [
+        CatalogFieldDescriptor(name: "inspection", type: .artifactReference, isRequired: true)
+      ],
+      steps: [
+        CatalogStepDescriptor(stepID: "read-source-range", kind: .readWorkspaceSourceRange, effect: .hostOnly, cancellation: .immediate, binding: .none, isOptional: false, compensation: .none)
+      ],
+      timeoutSeconds: 60,
+      outputByteBudget: 1048576,
+      preflightAttempts: 1,
+      artifacts: [
+        CatalogArtifactDescriptor(name: "source-range.txt", role: .raw, mediaType: "text/plain", privacy: .standard, isRequired: true, retentionClass: .default)
       ],
       profiles: ["workspace-host@1"]
     ),

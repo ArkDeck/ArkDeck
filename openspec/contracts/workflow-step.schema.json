@@ -53,7 +53,11 @@
         "buildWorkspaceOpenHarmony",
         "runWorkspaceTests",
         "symbolizeWorkspaceCrash",
-        "revertWorkspacePatch"
+        "revertWorkspacePatch",
+        "inspectWorkspaceGitStatus",
+        "inspectWorkspaceDiff",
+        "readWorkspaceSourceRange",
+        "createWorkspaceCheckpoint"
       ]
     },
     "effect": {
@@ -2402,6 +2406,82 @@
           "if": {
             "properties": {
               "kind": {
+                "const": "inspectWorkspaceGitStatus"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "arguments": {
+                "$ref": "#/$defs/inspectWorkspaceGitStatusArguments"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "inspectWorkspaceDiff"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "arguments": {
+                "$ref": "#/$defs/inspectWorkspaceDiffArguments"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "readWorkspaceSourceRange"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "arguments": {
+                "$ref": "#/$defs/readWorkspaceSourceRangeArguments"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "createWorkspaceCheckpoint"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "arguments": {
+                "$ref": "#/$defs/createWorkspaceCheckpointArguments"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
                 "const": "applyWorkspacePatch"
               }
             },
@@ -2814,6 +2894,100 @@
           }
         }
       ]
+    },
+    "readWorkspaceSourceRangeArguments": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "projectRef",
+        "filePath",
+        "lineStart",
+        "lineEnd",
+        "artifactId"
+      ],
+      "properties": {
+        "projectRef": {
+          "$ref": "#/$defs/id"
+        },
+        "filePath": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 240
+        },
+        "lineStart": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000
+        },
+        "lineEnd": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000
+        },
+        "artifactId": {
+          "$ref": "#/$defs/id"
+        }
+      }
+    },
+    "createWorkspaceCheckpointArguments": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "projectRef",
+        "artifactId"
+      ],
+      "properties": {
+        "projectRef": {
+          "$ref": "#/$defs/id"
+        },
+        "artifactId": {
+          "$ref": "#/$defs/id"
+        }
+      }
+    },
+    "inspectWorkspaceGitStatusArguments": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "projectRef",
+        "artifactId"
+      ],
+      "properties": {
+        "projectRef": {
+          "$ref": "#/$defs/id"
+        },
+        "artifactId": {
+          "$ref": "#/$defs/id"
+        }
+      }
+    },
+    "inspectWorkspaceDiffArguments": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "projectRef",
+        "baseRevision",
+        "pathScope",
+        "artifactId"
+      ],
+      "properties": {
+        "projectRef": {
+          "$ref": "#/$defs/id"
+        },
+        "baseRevision": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "pathScope": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "artifactId": {
+          "$ref": "#/$defs/id"
+        }
+      }
     },
     "inspectWorkspaceSourceArguments": {
       "type": "object",
