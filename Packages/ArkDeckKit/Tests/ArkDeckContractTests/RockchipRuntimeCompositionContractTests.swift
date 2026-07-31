@@ -3,9 +3,13 @@ import XCTest
 
 @testable import ArkDeckCore
 @testable import ArkDeckOpenHarmony
+@testable import ArkDeckStorage
 @testable import ArkDeckWorkflows
 
 final class RockchipRuntimeCompositionContractTests: XCTestCase {
+  private static let reviewedSignedComponentSHA256 =
+    String(repeating: "c", count: 64)
+
   private actor ActionLog {
     private var actions: [RockchipProviderAction] = []
     private var intentWasDurable: [Bool] = []
@@ -340,6 +344,60 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     }
   }
 
+  func testBundledResolverFindsFixedInstalledProductWithoutCallerPath() throws {
+    let root = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let missingSibling = root.appendingPathComponent("missing/rkdeveloptool")
+    let installedComponent = root.appendingPathComponent(
+      "Applications/ArkDeck.app/Contents/MacOS/rkdeveloptool")
+    try FileManager.default.createDirectory(
+      at: installedComponent.deletingLastPathComponent(),
+      withIntermediateDirectories: true,
+      attributes: [.posixPermissions: 0o700])
+    let bytes = Data("reviewed-installed-component".utf8)
+    try bytes.write(to: installedComponent)
+    XCTAssertEqual(chmod(installedComponent.path, 0o700), 0)
+    let sha256 = SHA256.hash(data: bytes)
+      .map { String(format: "%02x", $0) }.joined()
+
+    let resolver = BundledRockchipExecutableResolver(
+      componentURLs: [missingSibling, installedComponent],
+      expectedSHA256: sha256)
+    XCTAssertEqual(
+      try resolver.resolveExecutable(providerID: "rockchip"),
+      ResolvedExecutable(path: installedComponent.path, sha256: sha256))
+  }
+
+  func testBundledResolverRejectsUnsignedInstalledProduct() throws {
+    let root = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let component = root.appendingPathComponent("rkdeveloptool")
+    try Data("unsigned-component".utf8).write(to: component)
+    XCTAssertEqual(chmod(component.path, 0o700), 0)
+
+    let resolver = BundledRockchipExecutableResolver(
+      componentURLs: [component])
+    XCTAssertThrowsError(
+      try resolver.resolveExecutable(providerID: "rockchip")
+    ) { error in
+      guard case BundledRockchipComponentError.codeSignatureInvalid = error else {
+        return XCTFail("expected codeSignatureInvalid, got \(error)")
+      }
+    }
+  }
+
+  func testBundledResolverRejectsSignedNonProductExecutable() throws {
+    let resolver = BundledRockchipExecutableResolver(
+      componentURLs: [URL(fileURLWithPath: "/usr/bin/true")])
+    XCTAssertThrowsError(
+      try resolver.resolveExecutable(providerID: "rockchip")
+    ) { error in
+      guard case BundledRockchipComponentError.codeSignatureInvalid = error else {
+        return XCTFail("expected product requirement rejection, got \(error)")
+      }
+    }
+  }
+
   func testFactsUseAdoptedIdentityBindingAndProductComponent() async throws {
     let root = try temporaryDirectory()
     defer { try? FileManager.default.removeItem(at: root) }
@@ -352,7 +410,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     ).record
     let component = ResolvedExecutable(
       path: "/product/Contents/MacOS/rkdeveloptool",
-      sha256: BundledRockchipComponent.signedExecutableSHA256)
+      sha256: Self.reviewedSignedComponentSHA256)
     let factsPort = TargetStoreRockchipRuntimeFactsPort(
       targetStore: targetStore,
       resolver: FixedExecutableResolver(table: ["rockchip": component]),
@@ -367,48 +425,140 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     XCTAssertEqual(facts.toolSHA256, component.sha256)
     XCTAssertEqual(
       facts.serverFacts["componentPackage"], BundledRockchipComponent.packageID)
+    XCTAssertEqual(
+      facts.serverFacts["componentSigningIdentifier"],
+      BundledRockchipComponent.signingIdentifier)
+    XCTAssertEqual(
+      facts.serverFacts["componentSigningTeam"],
+      BundledRockchipComponent.signingTeamIdentifier)
     XCTAssertEqual(facts.profileID, "dayu200@1")
   }
 
-  func testProductionRockchipRoutePublishesExactCompatibilityBlocker() async throws {
+  func testProductionRockchipRouteUsesReviewedSignedIdentityAndRejectsLegacyPlan()
+    async throws
+  {
+    let root = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let actionLog = ActionLog()
     let resolver = FixedExecutableResolver(
       table: [
         "rockchip": ResolvedExecutable(
           path: "/product/Contents/MacOS/rkdeveloptool",
-          sha256: BundledRockchipComponent.signedExecutableSHA256)
+          sha256: Self.reviewedSignedComponentSHA256)
       ])
-    let dispatcher = BundledRockchipRuntimeDispatcher(resolver: resolver)
-    let reason = try XCTUnwrap(dispatcher.unavailableReason(providerID: "rockchip"))
-    XCTAssertTrue(reason.contains(BundledRockchipComponent.packageID), reason)
-    XCTAssertTrue(
-      reason.contains(BundledRockchipComponent.signedExecutableSHA256), reason)
-    XCTAssertTrue(
-      reason.contains(BundledRockchipComponent.destructiveProfileExecutableSHA256), reason)
+    let dispatcher = BundledRockchipRuntimeDispatcher(
+      resolver: resolver,
+      host: DurableRockchipRuntimeActionHost(
+        executor: SuccessfulActionExecutor(log: actionLog),
+        records: RockchipRuntimeActionRecordStore(
+          rootURL: root.appendingPathComponent(
+            "rockchip-runtime", isDirectory: true))))
+    XCTAssertNil(dispatcher.unavailableReason(providerID: "rockchip"))
 
-    let provider = RockchipFlashProviderAdapter(availability: .available)
-    let plan = try provider.lower(
+    let signedPlan = try RockchipFlashProviderAdapter(availability: .available).lower(
       action: .rockchip(.enterLoader(connectKey: "device-1")),
       context: ProviderExecutionContext(
-        jobID: "job-1", stepID: "enter-loader", targetID: "TGT-1",
+        jobID: "job-signed", stepID: "enter-loader", targetID: "TGT-1",
         bindingRevision: 1, connectKey: "device-1",
         expectedIdentitySHA256: String(repeating: "a", count: 64),
-        toolSHA256: BundledRockchipComponent.signedExecutableSHA256,
+        toolSHA256: Self.reviewedSignedComponentSHA256,
+        nowUTC: "2026-07-31T00:00:00Z"))
+    let receipt = try await dispatcher.dispatch(signedPlan)
+    XCTAssertNotNil(receipt.hostManagedRecordID)
+    let signedSnapshot = await actionLog.snapshot()
+    XCTAssertEqual(signedSnapshot.0.count, 1)
+
+    let legacyPlan = try RockchipFlashProviderAdapter(availability: .available).lower(
+      action: .rockchip(.enterLoader(connectKey: "device-1")),
+      context: ProviderExecutionContext(
+        jobID: "job-legacy", stepID: "enter-loader", targetID: "TGT-1",
+        bindingRevision: 1, connectKey: "device-1",
+        expectedIdentitySHA256: String(repeating: "a", count: 64),
+        toolSHA256:
+          RockchipDiscoveryIntegrationProfile.pinnedProduction.executableSHA256,
         nowUTC: "2026-07-31T00:00:00Z"))
     do {
-      _ = try await dispatcher.dispatch(plan)
-      XCTFail("identity drift must dispatch zero processes")
+      _ = try await dispatcher.dispatch(legacyPlan)
+      XCTFail("a legacy external-tool plan must not authorize the bundled component")
     } catch let failure as RuntimeDispatchFailure {
       guard case .failed(let detail) = failure else {
         return XCTFail("expected definite pre-dispatch failure, got \(failure)")
       }
-      XCTAssertEqual(detail, reason)
+      XCTAssertTrue(
+        detail.contains("identity changed after availability materialization"),
+        detail)
     }
+    let legacySnapshot = await actionLog.snapshot()
+    XCTAssertEqual(legacySnapshot.0.count, 1)
+  }
+
+  func testReviewedProductComponentMakesFlashAvailableWithoutWeakeningE2()
+    async throws
+  {
+    let root = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let component = ResolvedExecutable(
+      path: "/Applications/ArkDeck.app/Contents/MacOS/rkdeveloptool",
+      sha256: Self.reviewedSignedComponentSHA256)
+    let dispatcher = BundledRockchipRuntimeDispatcher(
+      resolver: FixedExecutableResolver(table: ["rockchip": component]),
+      host: DurableRockchipRuntimeActionHost(
+        executor: SuccessfulActionExecutor(log: ActionLog()),
+        records: RockchipRuntimeActionRecordStore(
+          rootURL: root.appendingPathComponent(
+            "rockchip-runtime", isDirectory: true))))
+    let engine = try RuntimeJobEngine(
+      configuration: .init(
+        stateDirectory: root.appendingPathComponent("engine", isDirectory: true)),
+      providers: DeviceProviderRegistry(
+        providers: [
+          RockchipFlashProviderAdapter(availability: .available)
+        ]),
+      dispatcher: dispatcher,
+      capabilityStore: try RuntimeCapabilityStore(
+        directoryURL: root.appendingPathComponent(
+          "capabilities", isDirectory: true)),
+      artifactStore: try RuntimeArtifactStore(
+        rootURL: root.appendingPathComponent(
+          "artifacts", isDirectory: true),
+        nowUTC: { "2026-07-31T00:00:00Z" }),
+      nowUTC: { "2026-07-31T00:00:00Z" })
+
+    let availability = await engine.operationAvailability()
+    let flash = try XCTUnwrap(
+      availability.first {
+        $0.reference == "flash.dayu200@1"
+      })
+    XCTAssertEqual(flash.state, .available)
+    XCTAssertEqual(flash.reasons, [])
+
+    let capability = try RuntimeCapability(
+      capabilityID: "CAP-RT-GJ4-EXACT-PLAN",
+      targetScope: .stablePhysicalIdentity(
+        sha256: String(repeating: "a", count: 64)),
+      operationScope: [
+        RuntimeCapabilityOperationScope(
+          operationID: "flash.dayu200", version: 1)
+      ],
+      effectCeiling: .destructive,
+      issuedAtUTC: "2026-07-31T00:00:00Z",
+      expiresAtUTC: "2026-08-01T00:00:00Z",
+      maximumUses: 1,
+      issuer: RuntimeCapabilityIssuer(
+        kind: .maintainerMergedPR,
+        reference: "merged-pr:exact-gj4-plan"),
+      exactPlanDigest: String(repeating: "b", count: 64),
+      exactBindingRevision: 7)
+    XCTAssertEqual(capability.effectCeiling, .destructive)
+    XCTAssertEqual(capability.maximumUses, 1)
+    XCTAssertEqual(
+      capability.exactPlanDigest, String(repeating: "b", count: 64))
   }
 
   func testDurableHostCoversClosedActionSurfaceAndRefusesDuplicateStep() async throws {
     let root = try temporaryDirectory()
     defer { try? FileManager.default.removeItem(at: root) }
-    let componentSHA = String(repeating: "c", count: 64)
+    let componentSHA = Self.reviewedSignedComponentSHA256
     let component = ResolvedExecutable(
       path: "/product/Contents/MacOS/rkdeveloptool",
       sha256: componentSHA)
@@ -419,8 +569,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
         executor: SuccessfulActionExecutor(log: log),
         records: RockchipRuntimeActionRecordStore(
           rootURL: root.appendingPathComponent(
-            "rockchip-runtime", isDirectory: true))),
-      destructiveExecutableSHA256: componentSHA)
+            "rockchip-runtime", isDirectory: true))))
     let identity = String(repeating: "a", count: 64)
     let bundle = flashBundle()
     let actions: [RockchipProviderAction] = [
