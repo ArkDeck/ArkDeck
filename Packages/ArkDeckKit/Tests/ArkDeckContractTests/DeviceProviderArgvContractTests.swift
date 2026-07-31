@@ -50,6 +50,26 @@ final class DeviceProviderArgvContractTests: XCTestCase {
     XCTAssertEqual(timeout, 30)
   }
 
+  /// The lowering invents no trace category. `ohos` used to stand in as the
+  /// default and the 2026-07-31 device window found it absent from `hitrace
+  /// --list_categories` on OH 3.2 — a default that could only produce a
+  /// command the device rejects. No categories is now a refusal.
+  func testTraceLoweringRefusesRatherThanInventingACategory() throws {
+    let descriptor = try XCTUnwrap(
+      RuntimeOperationCatalog.descriptor(reference: "capture.diagnostics@1"))
+    let step = try XCTUnwrap(descriptor.steps.first { $0.stepID == "capture-trace" })
+    for inputs in [[:], ["traceCategories": JSONValue.array([])]] as [[String: JSONValue]] {
+      XCTAssertThrowsError(
+        try provider.action(
+          for: step, operation: descriptor, inputs: inputs, context: context),
+        "empty categories must refuse, not fall back to an invented tag")
+    }
+    XCTAssertNoThrow(
+      try provider.action(
+        for: step, operation: descriptor,
+        inputs: ["traceCategories": .array([.string("ability")])], context: context))
+  }
+
   /// Stop and uninstall carry the readback that decides them, using the same
   /// probes the reconcile path uses. The mutation leg must continue after a
   /// non-zero exit or the readback would never run for the exact case D2 was

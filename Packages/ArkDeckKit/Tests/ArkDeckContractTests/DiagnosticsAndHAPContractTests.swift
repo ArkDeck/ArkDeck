@@ -767,9 +767,12 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
 
     let capture = try XCTUnwrap(
       RuntimeOperationCatalog.descriptor(reference: "capture.diagnostics@1"))
+    // Categories are the caller's; the lowering invents none. `ability` is a
+    // tag the 2026-07-31 device window confirmed exists on OH 3.2.
+    let traceInputs: [String: JSONValue] = ["traceCategories": .array([.string("ability")])]
     let trace = try provider.action(
       for: XCTUnwrap(capture.steps.first { $0.stepID == "capture-trace" }),
-      operation: capture, inputs: [:], context: context)
+      operation: capture, inputs: traceInputs, context: context)
     let receive = try provider.action(
       for: XCTUnwrap(capture.steps.first { $0.stepID == "receive-trace-artifact" }),
       operation: capture, inputs: [:], context: context)

@@ -102,7 +102,9 @@ hdc -t <k> file recv <remotePath> <localDest>
   → 结论:不要假定 `recv` 会按给定路径落地;收完必须按内容校验(大小 + 魔数/可解析)。
   ArkDeck 的做法(D4):**本地文件名取远端 basename**,使"目录形"与"文件形"
   落到同一路径,再由 dispatcher 实测该路径的大小与 SHA-256;测不到就是
-  `.unknown`,不是失败——落地形态本身仍待真机窗口 pin。
+  `.unknown`,不是失败。
+  **该策略已在 hdc 3.2.0f 真机确认 `[R]`**(2026-07-31 窗口,12,456 字节 htrace
+  按声明路径落地并通过散列);其他 hdc 版本仍未测。
 - 推送安装包的标准形态是"目录":`shell mkdir <dir>` → 逐个 `file send` 进该目录 →
   `bm install -p <dir>` → `shell rm -rf <dir>`。
 
@@ -179,8 +181,16 @@ hdc -t <k> shell rm -f <remote.png>
 - **成功判据是远端文件大小 > 0,不是退出码**;deveco 在不带 `-t` 失败后重试一次
   `-t png`,最后校验本地 PNG 魔数 `89 50 4E 47 0D 0A 1A 0A`。
   ArkDeck 把这条"`ls -l` 第 5 字段判产物"复用到了 trace 腿(D10):`hitrace` 之后
-  紧跟一条 `ls -l`,由 listing 判 verified/failed/unknown。**复用的是 `ls` 的列序,
-  不是 hitrace 的证据** —— 该列序在 OH 3.2 toybox 上尚未真机确认(D11)。
+  紧跟一条 `ls -l`,由 listing 判 verified/failed/unknown。
+- **列序已真机确认 `[R]`**(2026-07-31,DAYU200 / toybox 0.8.12):
+
+  ```text
+  drwxr-xr-x 2 shell shell 3452 2017-08-06 18:53 debugserver
+  mode       links user  group size date       time  name
+  ```
+
+  即 size = 第 5 字段,首字符区分常规文件/目录。注意 `ls -l <目录>` 会先打一行
+  `total N`,解析器因此只对**文件路径**使用(`total` 不以 `-` 开头,会落 unknown)。
 - 注意 `-t` 的双重含义:`hdc -t <connectKey>` 与 `snapshot_display -t png` 不是
   同一个 `-t`,拼 argv 时不要复用常量。
 
@@ -215,6 +225,17 @@ hdc -t <k> shell rm -f <remote.png>
   `--product` 不带 `--modules` = 整产品 `assembleApp`(产物 `.app`);依赖模块按
   `oh-package.json5` 的本地 `file:` 依赖递归收集,`har` 不进安装集。
 
+## 9.1 hitrace tag 表 `[R]`
+
+`traceCategories` 的取值必须来自设备侧 `hitrace --list_categories`,**不要照抄
+仓内 fixture**。2026-07-31 DAYU200(OH 3.2)实测:`ability`、`app`、`ace`、
+`ark`、`animation`、`binder`、`disk`、`graphic` 等存在;**`ohos` 不存在**。
+
+`ohos` 曾是 provider lowering 里 `traceCategories` 缺省值,该缺省已删除(缺省
+只会产出设备拒绝的命令);现在无 category 即 fail closed。仓内测试与
+`TracePresetCatalog.logicalTags` 仍带 `ohos` —— 前者是 fixture,后者当前无消费
+方,两者都不产生设备命令,但**不可**被当作 tag 存在的依据。
+
 ## 10. 与 ArkDeck 现状的 delta 台账
 
 状态列只有三种:`本车已落地` / `需契约或 Catalog 变更` / `待真机证据`。
@@ -227,7 +248,7 @@ hdc -t <k> shell rm -f <remote.png>
 | D2 | `stopAbility` / `uninstallPackage` verify **仅**看 exit status 就判 `verified` | `aa`/`bm` 家族有短状态行可判;`bm uninstall` 有 `uninstall missing installed bundle` 这种"0 但没做" | **本车已落地**(两条 mutation 各自降为「mutation + presence readback」序列:stop 后 `pidof`、uninstall 后 `bm dump -n`,判据取 readback 三值——不在=verified、还在=`stopIneffective`/`uninstallIneffective` failed、读不出=unknown;**没有**去解析 `aa`/`bm` 的状态串,所以不占用"待真机证据"的额度。probe 解析与 reconcile 路径共用同一份 helper) |
 | D4 | `receiveOwnedArtifact` lower 为 `["file","recv",<remote>]`(**无本地目标**),且其 verify 要求 `receipt.hostManagedRecordID`,而 process 收据从不携带该字段 → 永远 `.unknown` | recv 本地目标语义不稳,必须按内容校验 | **本车已落地**(argv 补 host 目标;dispatcher 按 `HostLandingExpectation` 实测落地文件的大小与 SHA-256;verdict 全部来自磁盘字节:无文件=`.unknown`、空=`.failed`、超预算=`.failed` 且不做哈希、pin 了哈希则真比对;`trace.htrace` 改从收到的文件发布,不再用 `receipt.stdout`) |
 | D10 | trace 腿在 `validateSupportedPlanInputs` 处按 `traceCategories` 整体拒绝(admission 前) | `hitrace -o <file>` 的产物存在性/大小只能由设备侧 `ls -l` 第 5 字段判(同 §8) | **本车已落地**(`capture-trace` 降为 `hitrace` + `ls -l` 两段序列,判据取 listing 的 size 字段而非退出码:>0 verified、=0 `emptyTrace` failed、非常规文件/读不出 unknown;admission 拒绝解除,trace 腿改由 E1 授权路径管辖)|
-| D11 | trace 腿现在会真下发,但从未在真机上跑过;`ls -l` 字段序与 `file recv` 落地形态都只有 `[S]` 来源 | deveco 的 `ls -l` 第 5 字段判据取自截屏路径(§8),不是 hitrace 路径 | 待真机证据(DHA-HW 窗口:pin `ls -l` 在 OH 3.2 toybox 上的实际列序、pin `file recv` 的落地形态;两者不符时代码落 `.unknown` 而非误判,但仍是未验证) |
+| D11 | trace 腿现在会真下发,但从未在真机上跑过;`ls -l` 字段序与 `file recv` 落地形态都只有 `[S]` 来源 | deveco 的 `ls -l` 第 5 字段判据取自截屏路径(§8),不是 hitrace 路径 | **已真机确认**(2026-07-31 窗口:DAYU200 / hdc 3.2.0f / toybox 0.8.12,`capture.diagnostics@1` 带 `traceCategories` 一次跑通,`trace.htrace` 12,456 字节且首字节为 `# tracer: nop`;两项来源均由 `[S]` 升为 `[R]`。证据:`evidence/runs/TASK-DHA-001/trace-leg-window-2026-07-31.md`) |
 | D12 | `cleanup-uninstall` 在 catalog 里是 optional,所以卸载判失败后 job 仍记 `succeeded`(时间线有 `failed cleanup-uninstall: uninstallIneffective`) | — | 需契约或 Catalog 变更(要让"清理没做成"改变 job 结果,得动 `debug.hap@1` 的 step optional 语义;D2 只保证它不再冒充干净卸载) |
 | D5 | `bm install -p <单文件> -r` | 多包必须同目录 + 一条 `bm install -p <dir>` | 待真机证据(单 HAP 之外未覆盖) |
 | D6 | retry 仅 `preflightAttempts: 2 / mutationAttempts: 1` | transient 串表 + 800/1500/2500 退避 | 待真机证据(transient 分类进判定前需 pin) |
