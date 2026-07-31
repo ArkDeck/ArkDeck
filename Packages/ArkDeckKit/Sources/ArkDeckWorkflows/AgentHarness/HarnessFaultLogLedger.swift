@@ -33,7 +33,7 @@ import Foundation
 /// `<kind>-<bundle>-<uid>-<yyyyMMddHHmmss>` and are *not* file names: on
 /// disk each carries trailing milliseconds and `.log` that the listing
 /// omits.
-public struct HarnessFaultLogEntry: Equatable, Sendable {
+public struct HarnessFaultLogEntry: Codable, Equatable, Sendable {
   public let name: String
   /// `jscrash`, `cppcrash`, `appfreeze`, … Taken from the name rather than
   /// guessed from the body: the kinds carry different judging fields and
@@ -51,6 +51,110 @@ public struct HarnessFaultLogEntry: Equatable, Sendable {
     self.bundle = bundle
     self.uid = uid
     self.timestamp = timestamp
+  }
+}
+
+/// Stable payload emitted by the pinned crash-ledger analyzer.  The runtime
+/// wraps these bytes with source-artifact provenance before publishing the
+/// derived Artifact; the harness consumes this structure and no longer has
+/// to parse the raw ledger listing in-process (TASK-HFA-005).
+public struct HarnessCrashLedgerAnalysis: Codable, Equatable, Sendable {
+  public static let schemaVersion = "1.0.0"
+  public static let analyzerRef = "crash-signature@1"
+  public static let analyzerVersion = "arkdeck-fault-log-ledger@1"
+
+  public enum Status: String, Codable, Equatable, Sendable {
+    case answered
+    case unreadable
+  }
+
+  public let schemaVersion: String
+  public let analyzerRef: String
+  public let analyzerVersion: String
+  public let status: Status
+  public let entries: [HarnessFaultLogEntry]
+  public let unreadableReason: String?
+
+  public init(
+    status: Status,
+    entries: [HarnessFaultLogEntry] = [],
+    unreadableReason: String? = nil
+  ) {
+    self.schemaVersion = Self.schemaVersion
+    self.analyzerRef = Self.analyzerRef
+    self.analyzerVersion = Self.analyzerVersion
+    self.status = status
+    self.entries = entries
+    self.unreadableReason = unreadableReason
+  }
+}
+
+/// Published derived Artifact.  Unlike the analyzer's stdout payload, this
+/// envelope carries the immutable source identity and analyzer-output digest
+/// that the runtime verified.  Downstream code validates both before using
+/// `result`, so a structured-looking document cannot be detached from the
+/// bytes and tool that produced it.
+public struct HarnessCrashLedgerDerivedArtifact: Codable, Equatable, Sendable {
+  public let schemaVersion: String
+  public let analyzerRef: String
+  public let analyzerVersion: String
+  public let sourceArtifactID: String
+  public let sourceSHA256: String
+  public let sourceByteCount: Int
+  public let analyzerOutputSHA256: String
+  public let analyzerOutputByteCount: Int
+  public let result: HarnessCrashLedgerAnalysis
+
+  public init(
+    analyzerRef: String,
+    analyzerVersion: String,
+    sourceArtifactID: String,
+    sourceSHA256: String,
+    sourceByteCount: Int,
+    analyzerOutputSHA256: String,
+    analyzerOutputByteCount: Int,
+    result: HarnessCrashLedgerAnalysis
+  ) {
+    self.schemaVersion = HarnessCrashLedgerAnalysis.schemaVersion
+    self.analyzerRef = analyzerRef
+    self.analyzerVersion = analyzerVersion
+    self.sourceArtifactID = sourceArtifactID
+    self.sourceSHA256 = sourceSHA256
+    self.sourceByteCount = sourceByteCount
+    self.analyzerOutputSHA256 = analyzerOutputSHA256
+    self.analyzerOutputByteCount = analyzerOutputByteCount
+    self.result = result
+  }
+}
+
+/// Pure deterministic front-end used by the pinned analyzer executable and
+/// its contract tests.  Invalid input is a structured `unreadable` result,
+/// never an empty ledger: downstream evaluation therefore fails closed.
+public enum HarnessCrashLedgerDerivedAnalyzer {
+  public static func analyze(_ bytes: Data) throws -> Data {
+    let analysis: HarnessCrashLedgerAnalysis
+    guard let text = String(data: bytes, encoding: .utf8) else {
+      analysis = HarnessCrashLedgerAnalysis(
+        status: .unreadable, unreadableReason: "invalidEncoding")
+      return try canonicalData(analysis)
+    }
+    switch HarnessFaultLogLedger.readIndex(text) {
+    case .answered(let entries):
+      analysis = HarnessCrashLedgerAnalysis(status: .answered, entries: entries)
+    case .unreadable(let reason):
+      analysis = HarnessCrashLedgerAnalysis(
+        status: .unreadable, unreadableReason: reason)
+    }
+    return try canonicalData(analysis)
+  }
+
+  /// The bytes whose digest the runtime records in the derived envelope.
+  /// Keeping this encoder shared lets the evaluator recompute that digest
+  /// instead of trusting a structured-looking result and a detached hash.
+  public static func canonicalData(_ analysis: HarnessCrashLedgerAnalysis) throws -> Data {
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+    return try encoder.encode(analysis)
   }
 }
 

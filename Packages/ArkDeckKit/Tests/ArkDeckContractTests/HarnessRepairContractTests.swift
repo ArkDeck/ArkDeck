@@ -14,6 +14,7 @@ import XCTest
 private actor RepairJobPort: HarnessRuntimeJobPort {
   private var observations: [String: HarnessJobObservation]
   private var submitted: [String] = []
+  private var submittedRequests: [RuntimeOperationRequest] = []
   private var ordinal = 1
 
   init(observations: [String: HarnessJobObservation]) {
@@ -23,6 +24,7 @@ private actor RepairJobPort: HarnessRuntimeJobPort {
   func submit(requestJSON: Data) async throws -> HarnessJobAcceptance {
     let request = try JSONDecoder().decode(RuntimeOperationRequest.self, from: requestJSON)
     submitted.append(request.operation.reference)
+    submittedRequests.append(request)
     let jobID = "JOB-NEW-\(ordinal)"
     ordinal += 1
     observations[jobID] = HarnessJobObservation(
@@ -41,6 +43,7 @@ private actor RepairJobPort: HarnessRuntimeJobPort {
   func requestCancel(jobID: String) async throws {}
 
   func operations() -> [String] { submitted }
+  func requests() -> [RuntimeOperationRequest] { submittedRequests }
 }
 
 private struct RepairPortFixture: HarnessRepairPort {
@@ -387,12 +390,250 @@ final class HarnessRepairContractTests: XCTestCase {
 
     let outcome = try await coordinator.reconcile(snapshot.htaskID)
     let submitted = await jobs.operations()
+    let rollbackRequest = await jobs.requests().last
     XCTAssertEqual(outcome.action, .dispatched)
     XCTAssertEqual(submitted, [DebugCrashTaskHandler.revertPatch])
+    XCTAssertNil(
+      rollbackRequest?.target.expectedBindingRevision,
+      "workspace rollback is host-only and must not carry the device binding")
     XCTAssertEqual(outcome.snapshot.consumedBudget.e1Mutations, 2)
   }
 
+  func testVerifiedRepairDeploymentStartsAFreshCaptureEpochWithoutLosingTheLedgerMark()
+    async throws
+  {
+    let proposal = try proposal()
+    let digest = String(repeating: "c", count: 64)
+    let attempt = HarnessRepairAttempt(
+      proposal: proposal, patchAttemptRef: "patch-fixture",
+      patchRevision: String(repeating: "a", count: 64),
+      buildSourceRevision: String(repeating: "a", count: 64),
+      buildOutputDigest: digest,
+      buildOutputArtifactLease: "lease-v1:build:ART-build", testsPassed: true)
+    var failedEpoch = HarnessObservedState(
+      measurements: [
+        "matchingCrashCount": .integer(1),
+        "newFatalSignatureCount": .integer(0),
+        "applicationLiveness": .string("unhealthy"),
+        HarnessObservationBuilder.watermarkMetric: .string("20260731211730"),
+      ],
+      samples: [
+        "matchingCrashCount": 1, "newFatalSignatureCount": 1,
+        "applicationLiveness": 1,
+      ], latestVerdict: .fail).asJSON
+    failedEpoch[DebugCrashTaskHandler.baselineDeploymentMarker] = .bool(true)
+    let snapshot = makeSnapshot(
+      phase: .deploying, activeJobID: "JOB-DEPLOY", repair: attempt,
+      consumed: HarnessConsumedBudget(rounds: 5, e1Mutations: 2),
+      observedState: failedEpoch)
+    let decision = HarnessDecision(
+      decisionID: "dec-deploy", htaskID: snapshot.htaskID, round: 1,
+      kind: .invokeOperation, operationReference: DebugCrashTaskHandler.deployHAP,
+      inputs: ["hapArtifactLease": .string("lease-v1:build:ART-build")],
+      hypothesis: "deploy", reasonCode: "deploy", producer: "fixture", createdAtUTC: now)
+    let jobs = RepairJobPort(observations: [
+      "JOB-DEPLOY": observation("JOB-DEPLOY", succeeded: true)
+    ])
+    let (coordinator, _) = try await makeStack(
+      snapshot: snapshot, decision: decision,
+      operation: DebugCrashTaskHandler.deployHAP, jobs: jobs,
+      repair: repairFixture(deployed: digest, unknown: .stillUnknown))
+
+    let outcome = try await coordinator.reconcile(snapshot.htaskID)
+    let submittedOperations = await jobs.operations()
+    XCTAssertEqual(outcome.action, .dispatched)
+    XCTAssertEqual(submittedOperations, [DebugCrashTaskHandler.captureDiagnostics])
+    XCTAssertEqual(outcome.snapshot.phase, .verifying)
+    XCTAssertEqual(outcome.snapshot.observed.latestVerdict, nil)
+    XCTAssertNil(outcome.snapshot.observed.measurements["matchingCrashCount"])
+    XCTAssertNil(outcome.snapshot.observed.measurements["newFatalSignatureCount"])
+    XCTAssertNil(outcome.snapshot.observed.measurements["applicationLiveness"])
+    XCTAssertNil(outcome.snapshot.observed.samples["matchingCrashCount"])
+    XCTAssertEqual(
+      outcome.snapshot.observed.measurements[HarnessObservationBuilder.watermarkMetric],
+      .string("20260731211730"))
+    XCTAssertEqual(
+      outcome.snapshot.observedState[DebugCrashTaskHandler.baselineDeploymentMarker], .bool(true))
+    XCTAssertEqual(outcome.snapshot.repairAttempt?.deployedDigest, digest)
+    XCTAssertEqual(outcome.snapshot.noProgressRounds, 0)
+  }
+
+  func testCrashFixtureDeploysOnlyAfterLedgerBaselineAndReservesRepairBudget() throws {
+    let handler = DebugCrashTaskHandler()
+    let ready = baselineSnapshot(phase: .collecting, activeJobID: nil)
+    let planned = handler.plan(
+      for: ready, decisionID: "dec-baseline", nowUTC: now)
+    XCTAssertEqual(handler.offeredOperations(for: ready), [DebugCrashTaskHandler.deployHAP])
+    XCTAssertEqual(planned.decision.operationReference, DebugCrashTaskHandler.deployHAP)
+    XCTAssertEqual(planned.decision.reasonCode, "deployBaselineCrashFixture")
+    XCTAssertEqual(planned.phaseOnDispatch, .reproducing)
+    XCTAssertEqual(
+      planned.decision.inputs["hapArtifactLease"],
+      .string("lease-v1:input-hap:ART-crash-fixture"))
+    XCTAssertEqual(planned.decision.inputs["captureDiagnostics"], .bool(true))
+    XCTAssertEqual(planned.decision.inputs["diagnosticsDurationSeconds"], .integer(5))
+
+    let underBudgeted = baselineSnapshot(
+      phase: .collecting, activeJobID: nil, maxE1Mutations: 2)
+    let refused = handler.plan(
+      for: underBudgeted, decisionID: "dec-no-budget", nowUTC: now)
+    XCTAssertTrue(handler.offeredOperations(for: underBudgeted).isEmpty)
+    XCTAssertEqual(refused.decision.kind, .noSafeAction)
+    XCTAssertEqual(refused.decision.reasonCode, "baselineDeploymentRepairBudgetUnavailable")
+
+    let noWatermark = baselineSnapshot(
+      phase: .collecting, activeJobID: nil,
+      observedState: HarnessObservedState(latestVerdict: .inconclusive).asJSON)
+    XCTAssertEqual(
+      handler.plan(for: noWatermark, decisionID: "dec-no-mark", nowUTC: now)
+        .decision.operationReference,
+      DebugCrashTaskHandler.captureDiagnostics)
+
+    var alreadyDeployedState = ready.observedState
+    alreadyDeployedState[DebugCrashTaskHandler.baselineDeploymentMarker] = .bool(true)
+    let alreadyDeployed = baselineSnapshot(
+      phase: .collecting, activeJobID: nil, observedState: alreadyDeployedState,
+      consumed: HarnessConsumedBudget(rounds: 4, e1Mutations: 1))
+    XCTAssertEqual(
+      handler.plan(for: alreadyDeployed, decisionID: "dec-after-deploy", nowUTC: now)
+        .decision.operationReference,
+      DebugCrashTaskHandler.captureDiagnostics)
+  }
+
+  func testSuccessfulCrashFixtureDeploymentContinuesWithARealCaptureNotRepairReadback()
+    async throws
+  {
+    let snapshot = baselineSnapshot(
+      phase: .reproducing, activeJobID: "JOB-BASELINE", activeRound: 1,
+      consumed: HarnessConsumedBudget(rounds: 1, e1Mutations: 1))
+    let decision = HarnessDecision(
+      decisionID: "dec-baseline", htaskID: snapshot.htaskID, round: 1,
+      kind: .invokeOperation, operationReference: DebugCrashTaskHandler.deployHAP,
+      inputs: ["hapArtifactLease": .string("lease-v1:input-hap:ART-crash-fixture")],
+      hypothesis: "inject crash", reasonCode: "deployBaselineCrashFixture",
+      producer: "fixture", createdAtUTC: now)
+    let jobs = RepairJobPort(observations: [
+      "JOB-BASELINE": observation("JOB-BASELINE", succeeded: true)
+    ])
+    let (coordinator, store) = try await makeStack(
+      snapshot: snapshot, decision: decision,
+      operation: DebugCrashTaskHandler.deployHAP, jobs: jobs,
+      repair: repairFixture(unknown: .stillUnknown))
+
+    let outcome = try await coordinator.reconcile(snapshot.htaskID)
+    let submittedOperations = await jobs.operations()
+    let events = try await store.events(snapshot.htaskID)
+    XCTAssertEqual(outcome.action, .dispatched)
+    XCTAssertEqual(submittedOperations, [DebugCrashTaskHandler.captureDiagnostics])
+    XCTAssertEqual(outcome.snapshot.phase, .reproducing)
+    XCTAssertNil(outcome.snapshot.repairAttempt)
+    XCTAssertEqual(
+      outcome.snapshot.observedState[DebugCrashTaskHandler.baselineDeploymentMarker],
+      .bool(true))
+    XCTAssertEqual(outcome.snapshot.consumedBudget.e1Mutations, 1)
+    XCTAssertTrue(events.contains { $0.reasonCode == "baselineCrashFixtureDeployed" })
+  }
+
+  func testWorkspacePatchIsHostOnlyAndBuiltHAPInheritsTheAdmittedDeviceBinding()
+    async throws
+  {
+    let workspace = rootURL.appendingPathComponent("binding-workspace", isDirectory: true)
+    let sources = workspace.appendingPathComponent("Sources", isDirectory: true)
+    let outputs = workspace.appendingPathComponent("Outputs", isDirectory: true)
+    try FileManager.default.createDirectory(at: sources, withIntermediateDirectories: true)
+    try FileManager.default.createDirectory(at: outputs, withIntermediateDirectories: true)
+    try Data("let value = 0\n".utf8).write(to: sources.appendingPathComponent("A.swift"))
+    try Data("signed-hap".utf8).write(to: outputs.appendingPathComponent("app.hap"))
+
+    let executable = try WorkspaceExecutableIdentity.hashing(path: "/usr/bin/true")
+    let preset = try WorkspaceCommandPreset(
+      presetID: "demo-build", executable: executable, fixedArguments: [], timeoutSeconds: 10)
+    let profile = try WorkspaceProjectProfile(
+      profileID: "workspace-host@1", projectRef: "demo-app",
+      projectRoot: workspace.path, allowedFileGlobs: ["Sources/**"],
+      inspectionPreset: preset, patchPreset: preset,
+      buildPresets: [preset.presetID: preset], testPresets: [:], symbolPresets: [:],
+      buildProducts: [preset.presetID: "Outputs/app.hap"])
+    let artifactStore = try RuntimeArtifactStore(
+      rootURL: rootURL.appendingPathComponent("binding-artifacts", isDirectory: true),
+      nowUTC: { "2026-07-31T01:00:00Z" })
+    let baseline = try await artifactStore.publish(
+      RuntimeArtifactPublicationRequest(
+        jobID: "input-hap", sessionID: "HTASK-0123456789AB", stepID: "import",
+        name: "baseline.hap", mediaType: "application/octet-stream", privacy: .standard,
+        retentionClass: .pinnedUntilVerified, sourceOperation: "artifact.import-hap@1",
+        providerID: "artifact-import",
+        bindingSnapshot: ArtifactBindingSnapshot(
+          targetID: "TGT-1", bindingRevision: 1,
+          stableIdentitySHA256: String(repeating: "c", count: 64)),
+        contents: Data("baseline".utf8)))
+    let baselineLease = try await artifactStore.leaseReference(
+      jobID: baseline.jobID, artifactID: baseline.artifactID)
+    let attempts = try WorkspacePatchAttemptStore(
+      rootURL: rootURL.appendingPathComponent("binding-attempts", isDirectory: true))
+    let port = WorkspaceHarnessRepairPort(
+      profile: profile, attemptStore: attempts, artifactStore: artifactStore)
+    let revision = WorkspaceProviderSupport.revision(
+      try WorkspaceProviderSupport.snapshots(
+        relativePaths: ["Sources/A.swift"], root: workspace.path))
+    let patch = try proposal(path: "Sources/A.swift", base: revision)
+    let attempt = HarnessRepairAttempt(
+      proposal: patch, patchAttemptRef: "patch-fixture", patchRevision: revision)
+    let task = makeSnapshot(
+      phase: .building, activeJobID: nil, repair: attempt,
+      baselineLease: baselineLease)
+
+    let prepared = try await port.preparePatch(
+      patch, projectRef: "demo-app", task: task, decisionID: "dec-binding")
+    let patchArtifact = try await artifactStore.resolveLease(prepared.artifactLease)
+    XCTAssertEqual(patchArtifact.bindingSnapshot.targetID, "TGT-1")
+    XCTAssertNil(patchArtifact.bindingSnapshot.bindingRevision)
+    XCTAssertNil(patchArtifact.bindingSnapshot.stableIdentitySHA256)
+
+    let build = try await port.buildReadback(
+      jobID: "JOB-BUILD", attempt: attempt,
+      buildPresetRef: preset.presetID, task: task)
+    let builtHAP = try await artifactStore.resolveLease(build.outputArtifactLease)
+    XCTAssertEqual(builtHAP.bindingSnapshot, baseline.bindingSnapshot)
+    XCTAssertEqual(build.outputDigest, builtHAP.sha256)
+  }
+
   // MARK: - Fixtures
+
+  private func baselineSnapshot(
+    phase: HarnessTaskPhase,
+    activeJobID: String?,
+    activeRound: Int = 0,
+    maxE1Mutations: Int = 3,
+    observedState: [String: JSONValue]? = nil,
+    consumed: HarnessConsumedBudget = HarnessConsumedBudget()
+  ) -> HarnessTaskSnapshot {
+    let observed = observedState ?? HarnessObservedState(
+      measurements: [HarnessObservationBuilder.watermarkMetric: .string("")],
+      latestVerdict: .inconclusive).asJSON
+    return HarnessTaskSnapshot(
+      htaskID: "HTASK-0123456789AB", type: .debugCrash, intakeDescription: nil,
+      projectRef: "demo-app",
+      target: HarnessTaskTargetReference(targetID: "TGT-1", expectedBindingRevision: 1),
+      goal: HarnessTaskGoal(
+        summary: "inject and repair crash",
+        desiredState: [
+          "crashSignature": .string("SIGABRT+CrashProbe"),
+          "bundleName": .string("com.example.demo"),
+          "abilityName": .string("EntryAbility"),
+          "baselineHapArtifactLease": .string("lease-v1:input-hap:ART-crash-fixture"),
+          "buildPresetRef": .string("demo-build"),
+          "testPresetRef": .string("demo-tests"),
+        ]),
+      successCriteria: DebugCrashTaskHandler().defaultSuccessCriteria(),
+      budgets: HarnessTaskBudgets(
+        maxRounds: 12, maxWallClockSeconds: 900, maxArtifactBytes: 1 << 20,
+        maxE1Mutations: maxE1Mutations),
+      policy: HarnessTaskCoordinator.defaultPolicy(for: .debugCrash),
+      observedState: observed, createdAtUTC: now, updatedAtUTC: now,
+      status: .running, phase: phase, activeRound: activeRound,
+      activeJobID: activeJobID, consumedBudget: consumed)
+  }
 
   private func proposal() throws -> HarnessPatchProposal {
     let diff = """
@@ -435,9 +676,11 @@ final class HarnessRepairContractTests: XCTestCase {
     phase: HarnessTaskPhase,
     activeJobID: String?,
     repair: HarnessRepairAttempt,
-    consumed: HarnessConsumedBudget = HarnessConsumedBudget(rounds: 1)
+    consumed: HarnessConsumedBudget = HarnessConsumedBudget(rounds: 1),
+    baselineLease: String = "lease-v1:input-hap:ART-crash-fixture",
+    observedState: [String: JSONValue]? = nil
   ) -> HarnessTaskSnapshot {
-    var observed = HarnessObservedState(latestVerdict: .fail).asJSON
+    var observed = observedState ?? HarnessObservedState(latestVerdict: .fail).asJSON
     observed[HarnessRepairAttempt.observedStateKey] = repair.json
     return HarnessTaskSnapshot(
       htaskID: "HTASK-0123456789AB", type: .debugCrash, intakeDescription: nil,
@@ -450,6 +693,7 @@ final class HarnessRepairContractTests: XCTestCase {
           "testPresetRef": .string("demo-tests"),
           "bundleName": .string("com.example.demo"),
           "abilityName": .string("EntryAbility"),
+          "baselineHapArtifactLease": .string(baselineLease),
         ]),
       successCriteria: DebugCrashTaskHandler().defaultSuccessCriteria(),
       budgets: HarnessTaskBudgets(

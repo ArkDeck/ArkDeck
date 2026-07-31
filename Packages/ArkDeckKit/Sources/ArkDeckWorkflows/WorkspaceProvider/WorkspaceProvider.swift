@@ -164,11 +164,11 @@ public struct WorkspaceProvider: DeviceProvider {
       throw DeviceProviderError.unsupportedAction(
         "non-workspace action given to workspace provider")
     }
-    guard let tool else {
-      throw DeviceProviderError.unsupportedAction("no_workspace_inspector_configured")
-    }
     switch workspaceAction {
     case .inspectSource(let inspection):
+      guard let tool else {
+        throw DeviceProviderError.unsupportedAction("no_workspace_inspector_configured")
+      }
       // Exactly the argv the dispatcher spawns. `--` terminates options so a
       // symbol that begins with a dash can never become one, and the root is
       // the last element so the search cannot escape it.

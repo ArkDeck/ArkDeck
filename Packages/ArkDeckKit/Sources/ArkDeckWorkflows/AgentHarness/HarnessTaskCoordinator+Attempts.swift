@@ -89,6 +89,19 @@ extension HarnessTaskCoordinator {
     try await store.attempts(taskID).last(where: { $0.outcome == .active })
   }
 
+  /// A human resolution continues the same strategy; it does not mint a new
+  /// Attempt or erase the ActionRuns and evaluations already attached to it.
+  /// Reactivate the durable Attempt before the task becomes runnable so a
+  /// failed task-state commit can never leave an untracked running repair.
+  func reactivateHumanRequiredAttempt(_ taskID: String) async throws {
+    guard let attempt = try await store.attempts(taskID).last,
+      attempt.outcome == .humanRequired
+    else { return }
+    try await store.recordAttempt(
+      attempt.closing(.active, atUTC: nowUTC()), kind: .resumed,
+      reasonCode: "humanResolutionReactivatedAttempt")
+  }
+
   /// Associate a fresh runtime request with the active strategy before its
   /// dispatch intent can reach the engine. The pending intent is already
   /// durable, so a crash before this append can recover the same ActionRun
@@ -101,6 +114,20 @@ extension HarnessTaskCoordinator {
   ) async throws {
     guard let attempt = try await activeAttempt(snapshot.htaskID) else { return }
     if attempt.actionRunIDs.contains(actionRunID) { return }
+    // Verification explicitly requires multiple independent samples. The
+    // capture inputs are intentionally identical, but each invocation is a
+    // new observation in the same repair Attempt, not a replay of a failed
+    // ActionRun and not a second repair strategy.
+    if operationReference == DebugCrashTaskHandler.captureDiagnostics,
+      snapshot.phase == .verifying,
+      snapshot.repairAttempt?.deployedDigest != nil,
+      snapshot.observed.latestVerdict == .inconclusive
+    {
+      try await store.recordAttempt(
+        attempt.recordingActionRun(actionRunID, atUTC: nowUTC()),
+        kind: .actionRunRecorded, reasonCode: "verificationSamplePlanned")
+      return
+    }
     let intents = try await store.intents(snapshot.htaskID)
     let identical = intents.filter {
       attempt.actionRunIDs.contains($0.requestID)

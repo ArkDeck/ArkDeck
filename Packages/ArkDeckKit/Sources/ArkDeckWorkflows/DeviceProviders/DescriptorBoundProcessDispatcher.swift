@@ -121,7 +121,8 @@ public struct DescriptorBoundProcessDispatcher: RuntimeProcessDispatching {
     var anyTruncated = false
     for invocation in invocations {
       let subreceipt = try await execute(
-        invocation, executable: executable, argumentZero: plan.argumentZero)
+        invocation, executable: executable, argumentZero: plan.argumentZero,
+        workingDirectory: plan.workingDirectory)
       subprocesses.append(subreceipt)
       aggregateStdout.append(subreceipt.stdout)
       aggregateStderr.append(subreceipt.stderr)
@@ -147,12 +148,14 @@ public struct DescriptorBoundProcessDispatcher: RuntimeProcessDispatching {
   private func execute(
     _ invocation: TypedProcessInvocation,
     executable: ResolvedExecutable,
-    argumentZero: String?
+    argumentZero: String?,
+    workingDirectory: String?
   ) async throws -> ProviderSubprocessReceipt {
     let request = ProcessRequest(
       executable: URL(fileURLWithPath: executable.path),
       argumentZero: argumentZero,
       arguments: invocation.arguments,
+      workingDirectory: workingDirectory.map { URL(fileURLWithPath: $0, isDirectory: true) },
       timeout: invocation.timeoutSeconds.map(TimeInterval.init))
     let executor = FoundationProcessExecutor()
     let result: ProcessIdentityBoundExecutionResult

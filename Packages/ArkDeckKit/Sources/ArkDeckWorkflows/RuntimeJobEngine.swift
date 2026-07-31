@@ -397,6 +397,7 @@ public actor RuntimeJobEngine {
     let processKind: String
     let executableSHA256: String?
     let argumentZero: String?
+    let workingDirectory: String?
     let argumentSummary: [String]?
     let processInvocations: [MaterializedProcessInvocation]?
     let timeoutSeconds: Int?
@@ -985,9 +986,19 @@ public actor RuntimeJobEngine {
       do {
         resolvedArtifact =
           step.kind == .sendFile
+            // `debug.hap@1` proves the installed package by a later
+            // package-readback step.  That step must receive the same
+            // engine-resolved immutable Artifact facts as the send/install
+            // legs; otherwise the provider can prove only that a bundle name
+            // exists and the harness cannot bind deployment to the build
+            // digest it just verified.
+            || (descriptor.reference == "debug.hap@1"
+              && (step.kind == .installPackage
+                || step.kind == .runApprovedRemoteRead))
             || step.kind == .flashPartition
             || step.kind == .applyWorkspacePatch
             || step.kind == .symbolizeWorkspaceCrash
+            || step.kind == .runDeterministicAnalyzer
             || descriptor.reference == "flash.dayu200@1"
             || descriptor.reference == "deploy.native-library.app-owned@1"
           ? try await resolvedInputArtifact(jobID: jobID) : nil
@@ -2175,6 +2186,15 @@ public actor RuntimeJobEngine {
   /// rather than in the catalog schema because it is an implementation
   /// detail of the orchestration, not part of the published contract.
   static let artifactMapping: [String: [String: [String]]] = [
+    "analyzer.extract-crash-signature@1": [
+      "extract-crash-signature": ["crash-signature.json"]
+    ],
+    "analyzer.summarize-hilog@1": [
+      "summarize-hilog": ["hilog-summary.json"]
+    ],
+    "analyzer.summarize-trace@1": [
+      "summarize-trace": ["trace-summary.json"]
+    ],
     "workspace.inspect-source@1": [
       "inspect-workspace-source": ["source-inspection.txt"]
     ],
@@ -2434,6 +2454,30 @@ public actor RuntimeJobEngine {
       // hand the evaluator a description of evidence rather than evidence
       // (the #798 lesson, in a host-only shape).
       return receipt.stdout
+    case "crash-signature.json"
+    where descriptor.reference == AnalyzerProvider.crashSignature:
+      // The analyzer's stdout is the deterministic conclusion; the published
+      // Artifact additionally carries the exact source/tool provenance the
+      // provider verified. The harness consumes this envelope rather than
+      // reparsing the raw Faultlogger listing.
+      guard let result = try? JSONDecoder().decode(
+        HarnessCrashLedgerAnalysis.self, from: receipt.stdout),
+        let analyzerRef = summary["analyzerRef"],
+        let analyzerVersion = summary["analyzerVersion"],
+        let sourceArtifactID = summary["sourceArtifactId"],
+        let sourceSHA256 = summary["sourceSha256"],
+        let sourceByteCount = summary["sourceByteCount"].flatMap(Int.init),
+        let outputSHA256 = summary["derivedSha256"],
+        let outputByteCount = summary["derivedByteCount"].flatMap(Int.init)
+      else { return Data("{}".utf8) }
+      let envelope = HarnessCrashLedgerDerivedArtifact(
+        analyzerRef: analyzerRef, analyzerVersion: analyzerVersion,
+        sourceArtifactID: sourceArtifactID, sourceSHA256: sourceSHA256,
+        sourceByteCount: sourceByteCount, analyzerOutputSHA256: outputSHA256,
+        analyzerOutputByteCount: outputByteCount, result: result)
+      let encoder = JSONEncoder()
+      encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+      return (try? encoder.encode(envelope)) ?? Data("{}".utf8)
     case "build.log", "test-output.log":
       var output = receipt.stdout
       output.append(receipt.stderr)
@@ -3359,7 +3403,8 @@ public actor RuntimeJobEngine {
     try Self.validateArtifactBinding(
       resolved.bindingSnapshot, request: runtime.record.request,
       materializedStableIdentitySHA256:
-        runtime.record.materializedStableTargetIdentitySHA256)
+        runtime.record.materializedStableTargetIdentitySHA256,
+      allowDeviceBoundAnalyzerSource: runtime.record.providerID == CatalogProvider.analyzer.rawValue)
     return ProviderResolvedInputArtifact(
       artifactID: resolved.artifactID, fileURL: resolved.fileURL,
       sha256: resolved.sha256, byteCount: resolved.byteCount)
@@ -3368,8 +3413,19 @@ public actor RuntimeJobEngine {
   private static func validateArtifactBinding(
     _ binding: ArtifactBindingSnapshot,
     request: RuntimeOperationRequest,
-    materializedStableIdentitySHA256: String?
+    materializedStableIdentitySHA256: String?,
+    allowDeviceBoundAnalyzerSource: Bool = false
   ) throws {
+    if allowDeviceBoundAnalyzerSource,
+      request.target.expectedBindingRevision == nil,
+      binding.targetID == request.target.targetID
+    {
+      // The analyzer is host-only and cannot act on the device. It may read
+      // an immutable Artifact that was collected from that exact target;
+      // the source's binding revision and identity remain in its provenance
+      // rather than being erased to make the host-only request look bound.
+      return
+    }
     guard binding.targetID == request.target.targetID,
       binding.bindingRevision == request.target.expectedBindingRevision
     else {
@@ -3491,7 +3547,8 @@ public actor RuntimeJobEngine {
         let artifact = try await artifactStore.resolveLease(lease)
         try Self.validateArtifactBinding(
           artifact.bindingSnapshot, request: request,
-          materializedStableIdentitySHA256: facts?.deviceIdentitySHA256)
+          materializedStableIdentitySHA256: facts?.deviceIdentitySHA256,
+          allowDeviceBoundAnalyzerSource: descriptor.provider == .analyzer)
         resolved = ProviderResolvedInputArtifact(
           artifactID: artifact.artifactID, fileURL: artifact.fileURL,
           sha256: artifact.sha256, byteCount: artifact.byteCount)
@@ -3547,7 +3604,8 @@ public actor RuntimeJobEngine {
               effect: step.effect.rawValue, cancellation: step.cancellation.rawValue,
               binding: step.binding.rawValue, isOptional: step.isOptional,
               journalArguments: nil, processKind: "engine",
-              executableSHA256: nil, argumentZero: nil, argumentSummary: nil,
+              executableSHA256: nil, argumentZero: nil, workingDirectory: nil,
+              argumentSummary: nil,
               processInvocations: nil, timeoutSeconds: nil,
               hostManagedDescriptor: nil))
           continue
@@ -3590,6 +3648,7 @@ public actor RuntimeJobEngine {
               journalArguments: workflowStep.arguments, processKind: "process",
               executableSHA256: executableSHA256,
               argumentZero: plan.argumentZero,
+              workingDirectory: plan.workingDirectory,
               argumentSummary: argumentSummary, processInvocations: nil,
               timeoutSeconds: timeoutSeconds,
               hostManagedDescriptor: nil))
@@ -3601,6 +3660,7 @@ public actor RuntimeJobEngine {
               binding: step.binding.rawValue, isOptional: step.isOptional,
               journalArguments: workflowStep.arguments, processKind: "processSequence",
               executableSHA256: executableSHA256, argumentZero: plan.argumentZero,
+              workingDirectory: plan.workingDirectory,
               argumentSummary: nil,
               processInvocations: invocations.map {
                 MaterializedProcessInvocation(
@@ -3617,7 +3677,8 @@ public actor RuntimeJobEngine {
               binding: step.binding.rawValue, isOptional: step.isOptional,
               journalArguments: workflowStep.arguments, processKind: "hostManaged",
               executableSHA256: descriptor.providerExecutableSHA256,
-              argumentZero: nil, argumentSummary: nil, processInvocations: nil,
+              argumentZero: nil, workingDirectory: nil,
+              argumentSummary: nil, processInvocations: nil,
               timeoutSeconds: nil,
               hostManagedDescriptor:
                 "\(descriptor.identifier)#action-sha256:\(descriptor.actionSHA256)"))
@@ -3688,7 +3749,8 @@ public actor RuntimeJobEngine {
             journalArguments: workflowStep.arguments,
             processKind: "processSequence",
             executableSHA256: executableSHA256,
-            argumentZero: rollbackPlan.argumentZero, argumentSummary: nil,
+            argumentZero: rollbackPlan.argumentZero,
+            workingDirectory: rollbackPlan.workingDirectory, argumentSummary: nil,
             processInvocations: invocations.map {
               MaterializedProcessInvocation(
                 arguments: $0.arguments,

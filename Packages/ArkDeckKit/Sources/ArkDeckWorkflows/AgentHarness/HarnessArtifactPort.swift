@@ -53,6 +53,17 @@ public enum HarnessArtifactPortError: Error, Equatable, Sendable {
 public protocol HarnessArtifactPort: Sendable {
   func inventory(jobID: String) async throws -> [HarnessArtifactDescriptor]
   func read(jobID: String, artifactID: String, maximumBytes: Int) async throws -> Data
+  /// Mint the store's ID-only lease for a verified published Artifact.  The
+  /// coordinator uses it only to hand raw evidence to a typed analyzer job;
+  /// no host path crosses this boundary.
+  func leaseReference(jobID: String, artifactID: String) async throws -> String
+}
+
+extension HarnessArtifactPort {
+  public func leaseReference(jobID: String, artifactID: String) async throws -> String {
+    throw HarnessArtifactPortError.unavailable(
+      "artifact leases are unavailable in this composition")
+  }
 }
 
 public struct RuntimeArtifactStoreHarnessPort: HarnessArtifactPort {
@@ -110,6 +121,28 @@ public struct RuntimeArtifactStoreHarnessPort: HarnessArtifactPort {
         allowSensitive: allowSensitive)
     } catch {
       throw HarnessArtifactPortError.unreadable("\(error)")
+    }
+  }
+
+  public func leaseReference(jobID: String, artifactID: String) async throws -> String {
+    do {
+      let metadata = try await store.list(jobID: jobID).first {
+        $0.artifactID == artifactID
+      }
+      guard let metadata else {
+        throw HarnessArtifactPortError.unreadable(artifactID)
+      }
+      if metadata.privacy == .sensitive,
+        !sensitiveEvidenceAllowList.contains(metadata.name)
+      {
+        throw HarnessArtifactPortError.unavailable(
+          "sensitive analyzer source is not opted in: \(metadata.name)")
+      }
+      return try await store.leaseReference(jobID: jobID, artifactID: artifactID)
+    } catch let error as HarnessArtifactPortError {
+      throw error
+    } catch {
+      throw HarnessArtifactPortError.unavailable("\(error)")
     }
   }
 }

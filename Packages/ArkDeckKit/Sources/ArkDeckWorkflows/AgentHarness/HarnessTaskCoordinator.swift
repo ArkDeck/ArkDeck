@@ -295,6 +295,7 @@ public actor HarnessTaskCoordinator {
           nowUTC: nowUTC())
         try await store.putHumanAction(resolved)
       }
+      try await reactivateHumanRequiredAttempt(snapshot.htaskID)
       return try await commit(
         snapshot,
         transition(
@@ -893,7 +894,8 @@ public actor HarnessTaskCoordinator {
             wallClockSeconds: snapshot.consumedBudget.wallClockSeconds,
             artifactBytes: snapshot.consumedBudget.artifactBytes,
             e1Mutations: snapshot.consumedBudget.e1Mutations
-              + (Self.consumesHarnessE1Budget(intent.operationReference) ? 1 : 0)),
+              + (Self.consumesHarnessE1Budget(intent.operationReference) ? 1 : 0),
+            modelCalls: snapshot.consumedBudget.modelCalls),
           jobID: accepted.jobID))
       return HarnessReconcileOutcome(
         snapshot: linked, action: .recoveredIntent, dispatchedJobID: accepted.jobID,
@@ -1000,7 +1002,9 @@ public actor HarnessTaskCoordinator {
       let record = try await recordFailure(
         snapshot, fingerprint: print, reasonCode: reason, jobID: observation.jobID)
       let attemptOutcome: HarnessAttemptOutcome
-      if operationReference == DebugCrashTaskHandler.deployHAP {
+      if operationReference == DebugCrashTaskHandler.deployHAP,
+        snapshot.repairAttempt != nil
+      {
         // The same Attempt remains open until its required rollback is read
         // back; closing it now would orphan that ActionRun.
         attemptOutcome = .active
@@ -1105,6 +1109,32 @@ public actor HarnessTaskCoordinator {
     guard let handler = handlers[snapshot.type] else {
       throw HarnessCoordinatorError.unsupportedTaskType(snapshot.type)
     }
+    if operationReference == DebugCrashTaskHandler.deployHAP,
+      snapshot.repairAttempt == nil
+    {
+      // The first deployment is the declared crash fixture, not a repair
+      // output. The runtime operation already enforced the immutable lease,
+      // target binding and install/process readbacks. Keep the task in
+      // `reproducing` and let the next capture judge only ledger entries newer
+      // than the baseline; routing this through `applyRepairSuccess` would
+      // falsely require a build digest that cannot exist before a patch.
+      try await appendTaskMemory(
+        snapshot, kind: .observation,
+        summary: "baseline crash fixture deployed with typed runtime readback",
+        confidence: .observed,
+        evidence: HarnessMemoryEvidence(jobIDs: [observation.jobID]))
+      var observed = snapshot.observedState
+      observed[DebugCrashTaskHandler.baselineDeploymentMarker] = .bool(true)
+      let advanced = try await commit(
+        snapshot,
+        transition(
+          snapshot, causation: .jobObserved,
+          reasonCode: "baselineCrashFixtureDeployed",
+          status: .running, phase: .reproducing, activeJob: .cleared,
+          jobID: observation.jobID, observedState: observed))
+      return HarnessReconcileOutcome(
+        snapshot: advanced, action: .observedJob, reasonCode: observation.state)
+    }
     if [
       DebugCrashTaskHandler.applyPatch, DebugCrashTaskHandler.buildOpenHarmony,
       DebugCrashTaskHandler.runTests, DebugCrashTaskHandler.deployHAP,
@@ -1116,7 +1146,98 @@ public actor HarnessTaskCoordinator {
         observation, operationReference: operationReference,
         decision: decision, snapshot: snapshot)
     }
-    let nextPhase = handler.phase(afterSuccessOf: operationReference, in: snapshot.phase)
+    if operationReference == DebugCrashTaskHandler.captureDiagnostics,
+      let artifactPort
+    {
+      // A raw Faultlogger listing is a source Artifact, not an evaluator
+      // input. Persist its ID-only lease and let the next deterministic step
+      // run the pinned analyzer. If the optional capture product is absent,
+      // evaluate the collection blocker normally so another bounded capture
+      // may supply it; a published Artifact whose lease cannot be minted is
+      // an integrity stop, not permission to parse it in-process.
+      let inventory = (try? await artifactPort.inventory(jobID: observation.jobID)) ?? []
+      if let source = inventory.first(where: {
+        $0.name == HarnessObservationBuilder.crashIndexArtifact && $0.published
+      }) {
+        let lease: String?
+        do {
+          lease = try await artifactPort.leaseReference(
+            jobID: observation.jobID, artifactID: source.artifactID)
+        } catch HarnessArtifactPortError.unavailable(let reason)
+        where reason == "artifact leases are unavailable in this composition" {
+          // Forward-readable test/legacy compositions predate analyzer
+          // leases. Production RuntimeArtifactStoreHarnessPort always
+          // implements this method and never reaches this fallback.
+          lease = nil
+        } catch {
+          let reason = "analyzerSourceLeaseUnavailable"
+          let blocked = try await recordBlock(
+            snapshot, block: .evidenceIntegrity, reasonCode: reason,
+            round: snapshot.activeRound, jobID: observation.jobID, requestID: nil)
+          return HarnessReconcileOutcome(
+            snapshot: blocked.snapshot, action: .stoppedForHuman, reasonCode: reason)
+        }
+        if let lease {
+          var observed = snapshot.observedState
+          observed[DebugCrashTaskHandler.pendingAnalysisSourceJobKey] =
+            .string(observation.jobID)
+          observed[DebugCrashTaskHandler.pendingAnalysisSourceArtifactKey] =
+            .string(source.artifactID)
+          observed[DebugCrashTaskHandler.pendingAnalysisSourceLeaseKey] = .string(lease)
+          observed[DebugCrashTaskHandler.pendingAnalysisReturnPhaseKey] =
+            .string(Self.analysisReturnPhase(after: snapshot).rawValue)
+          try await appendTaskMemory(
+            snapshot, kind: .observation,
+            summary: "captured crash ledger queued for deterministic analyzer",
+            confidence: .observed,
+            evidence: HarnessMemoryEvidence(
+              jobIDs: [observation.jobID], artifactIDs: [source.artifactID]))
+          let staged = try await commit(
+            snapshot,
+            transition(
+              snapshot, causation: .jobObserved,
+              reasonCode: "crashLedgerAwaitingDerivedAnalysis",
+              status: .running,
+              phase: handler.phase(
+                afterSuccessOf: operationReference, in: snapshot.phase),
+              activeJob: .cleared,
+              jobID: observation.jobID, observedState: observed))
+          return HarnessReconcileOutcome(
+            snapshot: staged, action: .observedJob, reasonCode: observation.state)
+        }
+      }
+    }
+    let sourceEvidenceJobID: String?
+    let sourceArtifactID: String?
+    let analysisReturnPhase: HarnessTaskPhase?
+    if operationReference == DebugCrashTaskHandler.analyzeCrashLedger {
+      if case .string(let job)? = snapshot.observedState[
+        DebugCrashTaskHandler.pendingAnalysisSourceJobKey],
+        case .string(let artifact)? = snapshot.observedState[
+          DebugCrashTaskHandler.pendingAnalysisSourceArtifactKey],
+        case .string(let rawPhase)? = snapshot.observedState[
+          DebugCrashTaskHandler.pendingAnalysisReturnPhaseKey],
+        let returnPhase = HarnessTaskPhase(rawValue: rawPhase),
+        [.collecting, .analyzing, .verifying].contains(returnPhase)
+      {
+        sourceEvidenceJobID = job
+        sourceArtifactID = artifact
+        analysisReturnPhase = returnPhase
+      } else {
+        let reason = "analyzerSourceObservationUnavailable"
+        let blocked = try await recordBlock(
+          snapshot, block: .evidenceIntegrity, reasonCode: reason,
+          round: snapshot.activeRound, jobID: observation.jobID, requestID: nil)
+        return HarnessReconcileOutcome(
+          snapshot: blocked.snapshot, action: .stoppedForHuman, reasonCode: reason)
+      }
+    } else {
+      sourceEvidenceJobID = nil
+      sourceArtifactID = nil
+      analysisReturnPhase = nil
+    }
+    let nextPhase = analysisReturnPhase
+      ?? handler.phase(afterSuccessOf: operationReference, in: snapshot.phase)
     try await appendTaskMemory(
       snapshot, kind: .observation,
       summary: "\(operationReference) succeeded in phase \(snapshot.phase.rawValue)",
@@ -1131,7 +1252,11 @@ public actor HarnessTaskCoordinator {
     // Evidence exists now, so it gets judged now: the evaluator is the only
     // component that may end this task successfully, and it runs on the bytes
     // the job just published rather than on the decision that asked for them.
-    switch try await evaluate(advanced, jobID: observation.jobID) {
+    switch try await evaluate(
+      advanced, jobID: observation.jobID,
+      sourceEvidenceJobID: sourceEvidenceJobID,
+      expectedSourceArtifactID: sourceArtifactID
+    ) {
     case .ended(let outcome):
       return outcome
     case .continues(let evaluated):
@@ -1287,7 +1412,10 @@ public actor HarnessTaskCoordinator {
     guard let nextAttempt else {
       throw HarnessCoordinatorError.malformedRequest("repair attempt did not advance")
     }
-    var observed = snapshot.observedState
+    var observed =
+      operationReference == DebugCrashTaskHandler.deployHAP
+      ? Self.verificationEpochObservedState(snapshot)
+      : snapshot.observedState
     observed[HarnessRepairAttempt.observedStateKey] = nextAttempt.json
     try await appendTaskMemory(
       snapshot, kind: .observation,
@@ -1301,18 +1429,66 @@ public actor HarnessTaskCoordinator {
         reasonCode: "repairStageSucceeded:\(operationReference)",
         status: .running, phase: nextPhase, activeJob: .cleared,
         jobID: observation.jobID, observedState: observed,
-        noProgressRounds: operationReference == DebugCrashTaskHandler.applyPatch ? 0 : nil))
+        noProgressRounds:
+          operationReference == DebugCrashTaskHandler.applyPatch
+            || operationReference == DebugCrashTaskHandler.deployHAP ? 0 : nil))
 
-    guard operationReference == DebugCrashTaskHandler.deployHAP else {
-      return HarnessReconcileOutcome(
-        snapshot: advanced, action: .observedJob, reasonCode: observation.state)
+    // `debug.hap@1` proves that the exact built digest was installed; it is
+    // not a crash observation and publishes none of the evaluator's required
+    // evidence.  After that gate succeeds, begin a new verification epoch and
+    // let a real capture provide every sample.  Evaluating the install receipt
+    // here would both invent an irrelevant missing-evidence round and retain
+    // the injected crash's cumulative counter forever.
+    return HarnessReconcileOutcome(
+      snapshot: advanced, action: .observedJob, reasonCode: observation.state)
+  }
+
+  /// Keep device-local correlation such as the cumulative ledger watermark,
+  /// but clear every criterion's cumulative value and sample count after the
+  /// verified repair is deployed.  The injected failure belongs to the
+  /// reproduction epoch; carrying its `matchingCrashCount == 1` into
+  /// verification would make five later zero-increment captures add up to one
+  /// and render PASS mathematically unreachable.
+  private static func verificationEpochObservedState(
+    _ snapshot: HarnessTaskSnapshot
+  ) -> [String: JSONValue] {
+    var measurements: [String: JSONValue] = [:]
+    if let watermark = snapshot.observed.measurements[
+      HarnessObservationBuilder.watermarkMetric]
+    {
+      measurements[HarnessObservationBuilder.watermarkMetric] = watermark
     }
-    switch try await evaluate(advanced, jobID: observation.jobID) {
-    case .ended(let outcome): return outcome
-    case .continues(let evaluated):
-      return HarnessReconcileOutcome(
-        snapshot: evaluated, action: .observedJob, reasonCode: observation.state)
+    let epoch = HarnessObservedState(
+      measurements: measurements, samples: [:], latestVerdict: nil,
+      blockers: [], latestVerifiedEvidence: [])
+    var observed = snapshot.observedState
+    for key in [
+      HarnessObservedState.measurementsKey, HarnessObservedState.samplesKey,
+      HarnessObservedState.verdictKey, HarnessObservedState.blockersKey,
+      HarnessObservedState.evidenceNamesKey,
+    ] {
+      observed.removeValue(forKey: key)
     }
+    for (key, value) in epoch.asJSON { observed[key] = value }
+    return observed
+  }
+
+  /// The analyzer is a transient execution stage; its conclusion returns to
+  /// the product stage that requested it. Before fixture deployment, a first
+  /// readable ledger establishes the baseline in `collecting`. Once the
+  /// fixture has been injected, its next conclusion belongs to repair
+  /// analysis. After a verified repair deployment, every conclusion remains
+  /// in `verifying` until the evaluator passes or stops safely.
+  private static func analysisReturnPhase(
+    after snapshot: HarnessTaskSnapshot
+  ) -> HarnessTaskPhase {
+    if snapshot.phase == .verifying || snapshot.repairAttempt?.deployedDigest != nil {
+      return .verifying
+    }
+    if snapshot.observedState[DebugCrashTaskHandler.baselineDeploymentMarker] == .bool(true) {
+      return .analyzing
+    }
+    return .collecting
   }
 
   // MARK: - Evaluation
@@ -1327,7 +1503,9 @@ public actor HarnessTaskCoordinator {
 
   private func evaluate(
     _ snapshot: HarnessTaskSnapshot,
-    jobID: String
+    jobID: String,
+    sourceEvidenceJobID: String? = nil,
+    expectedSourceArtifactID: String? = nil
   ) async throws -> EvaluationStep {
     guard let artifactPort else {
       // No evidence port in this composition, so nothing can ever be judged.
@@ -1371,7 +1549,9 @@ public actor HarnessTaskCoordinator {
     }
     let round = try await builder.observe(
       round: snapshot.activeRound, jobID: jobID, declaredCrashSignature: declaredSignature,
-      requiredEvidence: required, crashLedgerWatermark: watermark)
+      requiredEvidence: required, crashLedgerWatermark: watermark,
+      sourceEvidenceJobID: sourceEvidenceJobID,
+      expectedSourceArtifactID: expectedSourceArtifactID)
 
     let merged = snapshot.observed.merging(round)
     let evaluation = HarnessCriteriaEvaluator.evaluate(
@@ -1385,6 +1565,9 @@ public actor HarnessTaskCoordinator {
     if let repair = snapshot.observedState[HarnessRepairAttempt.observedStateKey] {
       observedStateJSON[HarnessRepairAttempt.observedStateKey] = repair
     }
+    if let baseline = snapshot.observedState[DebugCrashTaskHandler.baselineDeploymentMarker] {
+      observedStateJSON[DebugCrashTaskHandler.baselineDeploymentMarker] = baseline
+    }
 
     let artifactRefs = Self.mergedArtifactRefs(snapshot, round)
     // Evidence costs budget: only bytes the harness actually verified and read
@@ -1397,7 +1580,8 @@ public actor HarnessTaskCoordinator {
       wallClockSeconds: elapsedSeconds(since: snapshot.createdAtUTC)
         ?? snapshot.consumedBudget.wallClockSeconds,
       artifactBytes: snapshot.consumedBudget.artifactBytes + newlyChargedBytes,
-      e1Mutations: snapshot.consumedBudget.e1Mutations)
+      e1Mutations: snapshot.consumedBudget.e1Mutations,
+      modelCalls: snapshot.consumedBudget.modelCalls)
     switch evaluation.verdict {
     case .pass:
       try await recordAttemptEvaluation(
@@ -1663,12 +1847,15 @@ public actor HarnessTaskCoordinator {
       throw HarnessCoordinatorError.malformedRequest(intent.operationReference)
     }
     do {
+      let descriptor = RuntimeOperationCatalog.descriptor(
+        reference: intent.operationReference)
       let request = try RuntimeOperationRequest(
         requestID: intent.requestID,
         idempotencyKey: intent.idempotencyKey,
         target: DurableTargetReference(
           targetID: snapshot.target.targetID,
-          expectedBindingRevision: snapshot.target.expectedBindingRevision),
+          expectedBindingRevision: descriptor?.binding == WorkflowBindingRequirement.none
+            ? nil : snapshot.target.expectedBindingRevision),
         operation: RuntimeOperationReference(id: String(parts[0]), version: version),
         inputs: decision.inputs,
         requestedOutputs: [.rawArtifacts, .derivedArtifacts],

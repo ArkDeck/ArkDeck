@@ -37,6 +37,20 @@ private actor FailingTransport: HarnessModelTransport {
   }
 }
 
+private actor RecordingCodexTransport: HarnessCodexTransport {
+  private let reply: Data
+  private var seen: [HarnessCodexProcessRequest] = []
+
+  init(reply: String) { self.reply = Data(reply.utf8) }
+
+  var requests: [HarnessCodexProcessRequest] { seen }
+
+  func send(_ request: HarnessCodexProcessRequest) async throws -> Data {
+    seen.append(request)
+    return reply
+  }
+}
+
 private actor VendorJobPort: HarnessRuntimeJobPort {
   private var observations: [String: HarnessJobObservation] = [:]
   private var submitted: [String] = []
@@ -82,6 +96,135 @@ final class HarnessVendorGatewayContractTests: XCTestCase {
   }
 
   // MARK: - What goes out
+
+  func testProductionConfigurationIsOffByDefaultAndFailsClosedWhenPartial() throws {
+    XCTAssertNil(try HarnessVendorConfiguration.gateway(environment: [:]))
+    XCTAssertThrowsError(
+      try HarnessVendorConfiguration.gateway(
+        environment: [HarnessVendorConfiguration.apiKeyKey: secretKey])
+    ) { error in
+      XCTAssertEqual(error as? HarnessVendorConfigurationError, .providerRequired)
+    }
+    XCTAssertThrowsError(
+      try HarnessVendorConfiguration.gateway(
+        environment: [
+          HarnessVendorConfiguration.providerKey: "openai",
+          HarnessVendorConfiguration.modelKey: "gpt-test",
+        ])) { error in
+          XCTAssertEqual(error as? HarnessVendorConfigurationError, .missingCredential)
+        }
+    XCTAssertThrowsError(
+      try HarnessVendorConfiguration.gateway(
+        environment: [
+          HarnessVendorConfiguration.providerKey: "openai",
+          HarnessVendorConfiguration.apiKeyKey: secretKey,
+          HarnessVendorConfiguration.modelKey: "gpt-test",
+          HarnessVendorConfiguration.endpointKey: "http://model.invalid/v1",
+        ])) { error in
+          XCTAssertEqual(error as? HarnessVendorConfigurationError, .malformedEndpoint)
+        }
+  }
+
+  func testProductionConfigurationSelectsOneAdapterWithoutExposingTheKey() throws {
+    let gateway = try XCTUnwrap(
+      HarnessVendorConfiguration.gateway(
+        environment: [
+          HarnessVendorConfiguration.providerKey: "gemini",
+          HarnessVendorConfiguration.apiKeyKey: secretKey,
+          HarnessVendorConfiguration.modelKey: "gemini-test",
+        ]))
+    XCTAssertEqual(gateway.producerID, "gemini-gateway@1")
+    XCTAssertEqual(gateway.modelDescriptor.provider, "google")
+    XCTAssertFalse(String(describing: gateway.modelDescriptor).contains(secretKey))
+  }
+
+  func testProductionConfigurationSelectsTheIdentityBoundCodexCLIWithoutAnAPIKey() throws {
+    let transport = RecordingCodexTransport(reply: #"{"kind":"noSafeAction"}"#)
+    let codexWorkdir = rootURL.resolvingSymlinksInPath().standardizedFileURL.path
+    let gateway = try XCTUnwrap(
+      HarnessVendorConfiguration.gateway(
+        environment: [
+          HarnessVendorConfiguration.providerKey: "codex",
+          HarnessVendorConfiguration.modelKey: "gpt-test",
+          HarnessVendorConfiguration.codexPathKey: "/bin/echo",
+          HarnessVendorConfiguration.codexWorkingDirectoryKey: codexWorkdir,
+        ],
+        codexTransport: transport))
+    XCTAssertEqual(gateway.producerID, "codex-cli-gateway@1")
+    XCTAssertEqual(gateway.modelDescriptor.provider, "openai-codex-cli")
+
+    XCTAssertThrowsError(
+      try HarnessVendorConfiguration.gateway(
+        environment: [
+          HarnessVendorConfiguration.providerKey: "codex",
+          HarnessVendorConfiguration.modelKey: "gpt-test",
+          HarnessVendorConfiguration.codexPathKey: "/bin/echo",
+        ],
+        codexTransport: transport)
+    ) { error in
+      XCTAssertEqual(
+        error as? HarnessVendorConfigurationError,
+        .missingCodexWorkingDirectory)
+    }
+
+    XCTAssertThrowsError(
+      try HarnessVendorConfiguration.gateway(
+        environment: [
+          HarnessVendorConfiguration.providerKey: "codex",
+          HarnessVendorConfiguration.modelKey: "gpt-test",
+          HarnessVendorConfiguration.codexPathKey: "/bin/echo",
+          HarnessVendorConfiguration.codexWorkingDirectoryKey: codexWorkdir,
+          HarnessVendorConfiguration.apiKeyKey: secretKey,
+        ],
+        codexTransport: transport)
+    ) { error in
+      XCTAssertEqual(
+        error as? HarnessVendorConfigurationError,
+        .unexpectedConfiguration("codexDoesNotAcceptVendorCredentialOrEndpoint"))
+    }
+  }
+
+  func testCodexCLIReceivesOnlyTheBoundedContextInAReadOnlyEphemeralInvocation() async throws {
+    let response =
+      #"{"kind":"noSafeAction","hypothesis":"bounded","reasonCode":"bounded"}"#
+    let transport = RecordingCodexTransport(reply: response)
+    let codexWorkdir = rootURL.resolvingSymlinksInPath().standardizedFileURL.path
+    let gateway = try CodexCLIDecisionGateway(
+      executablePath: "/bin/echo", modelName: "gpt-test",
+      workingDirectory: codexWorkdir, transport: transport)
+    let bytes = try await gateway.propose(sampleContext())
+    XCTAssertEqual(String(decoding: bytes, as: UTF8.self), response)
+
+    let requests = await transport.requests
+    let request = try XCTUnwrap(requests.first)
+    XCTAssertEqual(request.executablePath, "/bin/echo")
+    XCTAssertEqual(request.executableSHA256.count, 64)
+    XCTAssertEqual(request.workingDirectory, codexWorkdir)
+    XCTAssertTrue(request.arguments.contains("--ephemeral"))
+    XCTAssertTrue(request.arguments.contains("--ignore-user-config"))
+    XCTAssertTrue(request.arguments.contains("--ignore-rules"))
+    let sandbox = try XCTUnwrap(request.arguments.firstIndex(of: "--sandbox"))
+    XCTAssertEqual(request.arguments[sandbox + 1], "read-only")
+    let prompt = try XCTUnwrap(request.arguments.last)
+    XCTAssertTrue(
+      prompt.contains(String(decoding: sampleContext().transmittedBytes, as: UTF8.self)))
+    XCTAssertTrue(prompt.contains("Patch fields are top-level fields"))
+    XCTAssertTrue(prompt.contains("For proposePatch, omit operationRef and inputs"))
+    XCTAssertTrue(
+      prompt.contains(
+        "include baseWorkspaceRevision, patchSha256, unifiedDiff, touchedFiles, and "
+          + "expectedChangedSymbols"))
+    XCTAssertFalse(prompt.contains(secretKey))
+  }
+
+  func testSharedInstructionDoesNotTellPatchProposalsToSelectAnOperation() {
+    XCTAssertTrue(
+      HarnessVendorEnvelope.instruction.contains(
+        "For invokeOperation, include exactly one operationRef chosen from availableOperations"))
+    XCTAssertTrue(
+      HarnessVendorEnvelope.instruction.contains(
+        "For proposePatch, omit operationRef and inputs"))
+  }
 
   func testEveryAdapterSendsExactlyTheCanonicalContextBytes() async throws {
     let context = sampleContext()

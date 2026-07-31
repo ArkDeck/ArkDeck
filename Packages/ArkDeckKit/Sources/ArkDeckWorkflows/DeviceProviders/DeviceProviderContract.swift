@@ -1172,6 +1172,9 @@ public struct TypedProcessPlan: Sendable, Equatable {
   /// It is included in the materialized plan digest and never selects the
   /// executable descriptor.
   public let argumentZero: String?
+  /// Optional canonical child working directory. It is provider-owned plan
+  /// data and participates in the materialized plan digest.
+  public let workingDirectory: String?
   /// Set only by plans whose product is a host file. The dispatcher honours
   /// it; no other plan gains host filesystem reach by declaring one.
   public let hostLanding: HostLandingExpectation?
@@ -1180,11 +1183,13 @@ public struct TypedProcessPlan: Sendable, Equatable {
     action: TypedProviderAction,
     kind: Kind,
     argumentZero: String? = nil,
+    workingDirectory: String? = nil,
     hostLanding: HostLandingExpectation? = nil
   ) {
     self.action = action
     self.kind = kind
     self.argumentZero = argumentZero
+    self.workingDirectory = workingDirectory
     self.hostLanding = hostLanding
   }
 }

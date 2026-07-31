@@ -39,7 +39,11 @@ public struct HarnessDecisionContextLimits: Equatable, Sendable, Codable {
     maxMemories: Int = 8,
     maxArtifacts: Int = 12,
     maxOperations: Int = 16,
-    maxSummaryCharacters: Int = 480,
+    // A bounded repair goal may need an exact base revision, patch digest,
+    // touched path and unified diff. 480 characters truncated that closed
+    // proposal before the model could see it while the overall 32 KiB
+    // envelope still had ample room.
+    maxSummaryCharacters: Int = 2_048,
     maxEncodedBytes: Int = 32 * 1024
   ) {
     self.maxAttempts = maxAttempts

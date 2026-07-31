@@ -108,7 +108,9 @@ final class HarnessDecisionGatewayContractTests: XCTestCase {
     gateway: (any HarnessDecisionGateway)?,
     egress: HarnessEgressPolicy,
     jobs: GatewayJobPort,
-    projectRef: String? = "demo-app"
+    projectRef: String? = "demo-app",
+    desiredState: [String: JSONValue] = [:],
+    goalSummary: String = "No WaterFlow SIGABRT"
   ) throws -> (HarnessTaskCoordinator, HarnessTaskStore, HarnessTaskSubmission) {
     let store = try HarnessTaskStore(rootURL: rootURL)
     let coordinator = HarnessTaskCoordinator(
@@ -117,7 +119,7 @@ final class HarnessDecisionGatewayContractTests: XCTestCase {
     let submission = HarnessTaskSubmission(
       type: .debugCrash, projectRef: projectRef,
       target: HarnessTaskTargetReference(targetID: "TGT-958780b2ffb7"),
-      goal: HarnessTaskGoal(summary: "No WaterFlow SIGABRT"),
+      goal: HarnessTaskGoal(summary: goalSummary, desiredState: desiredState),
       budgets: HarnessTaskBudgets(
         maxRounds: 6, maxWallClockSeconds: 900, maxArtifactBytes: 1 << 20, maxE1Mutations: 0),
       policy: HarnessTaskCoordinator.defaultPolicy(for: .debugCrash))
@@ -311,8 +313,17 @@ final class HarnessDecisionGatewayContractTests: XCTestCase {
           "hypothesis": .string("Observe the target before collecting anything."),
         ]))
     ])
+    let repairTail =
+      "patchSha256=6b45f926b558c6075aa78fe533ca422574d982cd71d3c4cf3974186e36571c98"
+    let boundedRepairGoal = String(repeating: "bounded repair context ", count: 30) + repairTail
     let (coordinator, _, submission) = try makeStack(
-      gateway: gateway, egress: HarnessEgressPolicy(enabledProjects: ["demo-app"]), jobs: jobs)
+      gateway: gateway, egress: HarnessEgressPolicy(enabledProjects: ["demo-app"]), jobs: jobs,
+      desiredState: [
+        "crashSignature": .string("jscrash:com.example.waterflowdemo"),
+        "buildPresetRef": .string("waterflow-debug"),
+        "baselineHapArtifactLease": .string(
+          "lease-v1:input-hap-TGT-958780b2ffb7-r1-deadbeef:ART-baseline"),
+      ], goalSummary: boundedRepairGoal)
     let task = try await coordinator.submit(submission)
 
     let outcome = try await coordinator.reconcile(task.htaskID)
@@ -327,6 +338,19 @@ final class HarnessDecisionGatewayContractTests: XCTestCase {
     XCTAssertEqual(
       HarnessEgressScreen.violations(in: context, targetID: "TGT-958780b2ffb7"), [],
       "no target id, connect key, serial, identity digest or remote path may travel")
+    XCTAssertEqual(
+      context.desiredState["crashSignature"], .string("jscrash:com.example.waterflowdemo"))
+    XCTAssertEqual(context.desiredState["buildPresetRef"], .string("waterflow-debug"))
+    XCTAssertNil(
+      context.desiredState["baselineHapArtifactLease"],
+      "runtime-only artifact leases must not cross the model egress boundary")
+    XCTAssertTrue(
+      context.trimmed.contains("desiredState:omitted1OrchestrationFields"),
+      "omitting orchestration-only desired state must be visible in the context")
+    XCTAssertGreaterThan(context.goalSummary.count, 480)
+    XCTAssertTrue(
+      context.goalSummary.hasSuffix(repairTail),
+      "the exact patch digest at the end of a bounded repair goal must reach the model")
     XCTAssertEqual(Set(context.availableOperations), [DebugCrashTaskHandler.observeDevice])
     XCTAssertEqual(context.budget.roundsRemaining, 6)
     XCTAssertEqual(context.budget.e1MutationsRemaining, 0)
@@ -370,7 +394,7 @@ final class HarnessDecisionGatewayContractTests: XCTestCase {
     XCTAssertEqual(context.availableOperations.count, 1)
     XCTAssertEqual(context.goalSummary.count, 16)
     XCTAssertTrue(context.trimmed.contains("attempts:kept1of4"))
-    XCTAssertTrue(context.trimmed.contains("operations:kept1of7"))
+    XCTAssertTrue(context.trimmed.contains("operations:kept1of8"))
   }
 
   func testAnOversizedContextIsRefusedInsteadOfSent() async throws {
@@ -471,6 +495,47 @@ final class HarnessDecisionGatewayContractTests: XCTestCase {
     XCTAssertThrowsError(
       try HarnessTaskCoordinator.validateModelProposal(
         injectedDeploy, against: deterministic))
+
+    let contextualInput = HarnessDecisionProposal(
+      kind: .invokeOperation,
+      operationReference: DebugCrashTaskHandler.observeDevice,
+      inputs: ["targetPseudonym": .string("target-aeb60a604573")],
+      hypothesis: "observe", reasonCode: "observe", confidence: nil)
+    XCTAssertThrowsError(
+      try HarnessTaskCoordinator.validateModelProposal(
+        contextualInput, against: deterministic)
+    ) { error in
+      XCTAssertEqual(
+        error as? HarnessDecisionRejection,
+        .operationNotExpected(DebugCrashTaskHandler.observeDevice))
+    }
+
+    let exactAnalyzer = HarnessDecision(
+      decisionID: "dec-analyzer", htaskID: task.htaskID, round: 2,
+      kind: .invokeOperation,
+      operationReference: DebugCrashTaskHandler.analyzeCrashLedger,
+      inputs: ["sourceArtifactRef": .string("lease-v1:source:ART-source")],
+      hypothesis: "analyze", reasonCode: "analyze", producer: "fixture",
+      createdAtUTC: "2026-07-31T00:00:00Z")
+    let prematureStop = HarnessDecisionProposal(
+      kind: .requestHuman, operationReference: nil, inputs: [:],
+      hypothesis: "stop", reasonCode: "stop", confidence: nil)
+    let matchingAnalyzer = HarnessDecisionProposal(
+      kind: .invokeOperation,
+      operationReference: DebugCrashTaskHandler.analyzeCrashLedger,
+      inputs: exactAnalyzer.inputs,
+      hypothesis: "analyze", reasonCode: "analyze", confidence: nil)
+    XCTAssertNoThrow(
+      try HarnessTaskCoordinator.validateModelProposal(
+        matchingAnalyzer, against: exactAnalyzer))
+    XCTAssertThrowsError(
+      try HarnessTaskCoordinator.validateModelProposal(
+        prematureStop, against: exactAnalyzer)
+    ) { error in
+      XCTAssertEqual(
+        error as? HarnessDecisionRejection,
+        .operationNotExpected(DebugCrashTaskHandler.analyzeCrashLedger))
+    }
   }
 
   func testConclusionsFollowTheStepNotTheProducer() async throws {
@@ -487,8 +552,13 @@ final class HarnessDecisionGatewayContractTests: XCTestCase {
         gateway: gateway, egress: HarnessEgressPolicy(enabledProjects: ["demo-app"]), jobs: jobs)
       let task = try await coordinator.submit(submission)
       var trace: [String] = []
+      var priorModelCalls = 0
       for round in 1...4 {
         let outcome = try await coordinator.reconcile(task.htaskID)
+        XCTAssertGreaterThanOrEqual(
+          outcome.snapshot.consumedBudget.modelCalls, priorModelCalls,
+          "observing a completed runtime job must not erase already charged model calls")
+        priorModelCalls = outcome.snapshot.consumedBudget.modelCalls
         trace.append("\(outcome.action.rawValue)/\(jobs.submittedOperations.last ?? "-")")
         if outcome.snapshot.status != .running { break }
         jobs.finish("JOB-\(round)")

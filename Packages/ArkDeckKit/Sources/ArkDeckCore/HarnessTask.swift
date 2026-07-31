@@ -66,7 +66,12 @@ public enum HarnessTaskPhase: String, CaseIterable, Codable, Sendable {
     case .initializing: return [.deviceReady]
     case .deviceReady: return [.reproducing, .collecting]
     case .reproducing: return [.collecting, .analyzing]
-    case .collecting: return [.analyzing]
+    // A debug task may establish the cumulative crash-ledger watermark in
+    // `collecting` and only then inject its declared crash fixture. That
+    // transition is deliberately one-way back through `reproducing`; the
+    // fixture handler guards it with an immutable HAP lease and no repair
+    // attempt, so ordinary evidence collection cannot cycle here.
+    case .collecting: return [.reproducing, .analyzing]
     case .analyzing: return [.collecting, .patching, .verifying]
     case .patching: return [.building, .analyzing]
     case .building: return [.deploying, .analyzing]

@@ -13,7 +13,20 @@
 import XCTest
 
 @testable import ArkDeckCore
+@testable import ArkDeckStorage
 @testable import ArkDeckWorkflows
+
+private struct AnalyzerResultDispatcher: RuntimeProcessDispatching {
+  let output: Data
+
+  func unavailableReason(providerID: String) -> String? { nil }
+
+  func dispatch(_ plan: TypedProcessPlan) async throws -> ProviderProcessReceipt {
+    ProviderProcessReceipt(
+      exitStatus: 0, stdout: output, stderr: Data(), stdoutTruncated: false,
+      durationSeconds: 0.001)
+  }
+}
 
 final class AnalyzerProviderContractTests: XCTestCase {
   private var root: URL!
@@ -55,7 +68,8 @@ final class AnalyzerProviderContractTests: XCTestCase {
     let artifact = try sourceArtifact(contents: "Reason:Signal SIGABRT\n")
     let action = try provider.action(
       for: step(), operation: descriptor(), inputs: [:], context: context(artifact))
-    let result = #"{"signature":"SIGABRT"}"#
+    let result = try HarnessCrashLedgerDerivedAnalyzer.analyze(
+      Data("Fault log list:\n******\n******\n".utf8))
     let outcome = try provider.verify(
       receipt: receipt(exitStatus: 0, stdout: result),
       action: action, context: context(artifact))
@@ -63,10 +77,10 @@ final class AnalyzerProviderContractTests: XCTestCase {
       return XCTFail("a structured result is a successful analysis")
     }
     XCTAssertEqual(summary["analyzerRef"], "crash-signature@1")
-    XCTAssertEqual(summary["analyzerVersion"], "1.4.2")
+    XCTAssertEqual(summary["analyzerVersion"], HarnessCrashLedgerAnalysis.analyzerVersion)
     XCTAssertEqual(summary["sourceArtifactId"], artifact.artifactID)
     XCTAssertEqual(summary["sourceSha256"], artifact.sha256)
-    XCTAssertEqual(summary["derivedByteCount"], String(result.utf8.count))
+    XCTAssertEqual(summary["derivedByteCount"], String(result.count))
     // A conclusion has to be traceable to the exact bytes it came from and
     // the exact code that produced it, or it is only an opinion.
     XCTAssertEqual(summary["derivedSha256"]?.count, 64)
@@ -158,7 +172,8 @@ final class AnalyzerProviderContractTests: XCTestCase {
   func testAToolThatDriftedFromItsPinIsUnavailable() throws {
     let provider = AnalyzerProvider(profiles: [
       AnalyzerProfile(
-        analyzerRef: "crash-signature@1", analyzerVersion: "1.4.2",
+        analyzerRef: "crash-signature@1",
+        analyzerVersion: HarnessCrashLedgerAnalysis.analyzerVersion,
         executablePath: "/bin/cat", executableSHA256: String(repeating: "a", count: 64))
     ])
     let operation = try XCTUnwrap(
@@ -211,6 +226,76 @@ final class AnalyzerProviderContractTests: XCTestCase {
     }
   }
 
+  func testRuntimeAnalyzesADeviceBoundArtifactWithoutClaimingADeviceBoundJob()
+    async throws
+  {
+    let state = root.appendingPathComponent("runtime", isDirectory: true)
+    let artifactStore = try RuntimeArtifactStore(
+      rootURL: state.appendingPathComponent("artifacts", isDirectory: true),
+      nowUTC: { "2026-07-31T00:00:00Z" })
+    let raw = Data("Fault log list:\n******\n******\n".utf8)
+    let source = try await artifactStore.publish(
+      RuntimeArtifactPublicationRequest(
+        jobID: "JOB-CAPTURE", sessionID: "HTASK-0123456789AB",
+        stepID: "capture-crash-index", name: "crash-index.txt",
+        mediaType: "text/plain", privacy: .standard,
+        retentionClass: .pinnedUntilVerified,
+        sourceOperation: "capture.diagnostics@1", providerID: "hdc",
+        bindingSnapshot: ArtifactBindingSnapshot(
+          targetID: "TGT-1", bindingRevision: 7,
+          stableIdentitySHA256: String(repeating: "c", count: 64)),
+        contents: raw))
+    let lease = try await artifactStore.leaseReference(
+      jobID: source.jobID, artifactID: source.artifactID)
+    let output = try HarnessCrashLedgerDerivedAnalyzer.analyze(raw)
+    let provider = try makeProvider()
+    let capabilityStore = try RuntimeCapabilityStore(
+      directoryURL: state.appendingPathComponent("capabilities", isDirectory: true))
+    let engine = try RuntimeJobEngine(
+      configuration: .init(
+        stateDirectory: state.appendingPathComponent("engine", isDirectory: true)),
+      providers: DeviceProviderRegistry(providers: [provider]),
+      dispatcher: AnalyzerResultDispatcher(output: output),
+      capabilityStore: capabilityStore, artifactStore: artifactStore,
+      nowUTC: { "2026-07-31T00:00:00Z" })
+
+    func request(targetID: String) throws -> Data {
+      let request = try RuntimeOperationRequest(
+        requestID: "req-\(targetID.lowercased())",
+        idempotencyKey: "idem-\(UUID().uuidString.lowercased())",
+        target: DurableTargetReference(
+          targetID: targetID, expectedBindingRevision: nil),
+        operation: RuntimeOperationReference(
+          id: "analyzer.extract-crash-signature", version: 1),
+        inputs: ["sourceArtifactRef": .string(lease)])
+      return try JSONEncoder().encode(request)
+    }
+
+    do {
+      _ = try await engine.submit(try request(targetID: "TGT-OTHER"))
+      XCTFail("an analyzer may not detach an Artifact from its source target")
+    } catch let error as RuntimeJobEngineError {
+      guard case .rejected(_, let detail) = error else { return XCTFail("\(error)") }
+      XCTAssertTrue(detail.contains("not resolvable"), detail)
+    }
+
+    let acceptance = try await engine.submit(try request(targetID: "TGT-1"))
+    let status = try await engine.run(jobID: acceptance.jobID)
+    XCTAssertEqual(status.state, "succeeded", "timeline: \(status.timeline)")
+    let inventory = try await artifactStore.list(jobID: acceptance.jobID)
+    let derived = try XCTUnwrap(
+      inventory.first { $0.name == "crash-signature.json" && $0.status.isPublished })
+    XCTAssertNil(derived.bindingSnapshot.bindingRevision)
+    XCTAssertNil(derived.bindingSnapshot.stableIdentitySHA256)
+    let bytes = try await artifactStore.read(
+      jobID: acceptance.jobID, artifactID: derived.artifactID)
+    let envelope = try JSONDecoder().decode(
+      HarnessCrashLedgerDerivedArtifact.self, from: bytes)
+    XCTAssertEqual(envelope.sourceArtifactID, source.artifactID)
+    XCTAssertEqual(envelope.sourceSHA256, source.sha256)
+    XCTAssertEqual(envelope.result.status, .answered)
+  }
+
   // MARK: - Helpers
 
   private struct RefusingDispatcher: RuntimeProcessDispatching {
@@ -228,7 +313,8 @@ final class AnalyzerProviderContractTests: XCTestCase {
   private func makeProvider() throws -> AnalyzerProvider {
     AnalyzerProvider(profiles: [
       AnalyzerProfile(
-        analyzerRef: "crash-signature@1", analyzerVersion: "1.4.2",
+        analyzerRef: "crash-signature@1",
+        analyzerVersion: HarnessCrashLedgerAnalysis.analyzerVersion,
         executablePath: "/bin/cat", executableSHA256: try toolDigest(),
         fixedArguments: ["--emit-json"])
     ])
@@ -260,6 +346,12 @@ final class AnalyzerProviderContractTests: XCTestCase {
   private func receipt(exitStatus: Int32, stdout: String) -> ProviderProcessReceipt {
     ProviderProcessReceipt(
       exitStatus: exitStatus, stdout: Data(stdout.utf8), stderr: Data(),
+      stdoutTruncated: false, durationSeconds: 0.004)
+  }
+
+  private func receipt(exitStatus: Int32, stdout: Data) -> ProviderProcessReceipt {
+    ProviderProcessReceipt(
+      exitStatus: exitStatus, stdout: stdout, stderr: Data(),
       stdoutTruncated: false, durationSeconds: 0.004)
   }
 }

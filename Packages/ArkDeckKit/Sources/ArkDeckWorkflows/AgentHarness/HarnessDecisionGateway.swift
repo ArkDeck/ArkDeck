@@ -89,6 +89,15 @@ extension HarnessDecisionGateway {
 public struct HarnessDecisionContextAssembler: Sendable {
   private let limits: HarnessDecisionContextLimits
 
+  /// Desired-state fields that help a model reason about the product goal.
+  /// Runtime orchestration references (artifact leases, capabilities and
+  /// bindings) are deliberately absent: besides being outside the model's
+  /// authority, a device-bound lease can embed the raw target id that the
+  /// egress screen must refuse.
+  private static let modelVisibleDesiredStateKeys: Set<String> = [
+    "crashSignature", "bundleName", "abilityName", "buildPresetRef", "testPresetRef",
+  ]
+
   public init(limits: HarnessDecisionContextLimits = .default) {
     self.limits = limits
   }
@@ -111,6 +120,14 @@ public struct HarnessDecisionContextAssembler: Sendable {
     }
 
     let observed = snapshot.observed
+    let modelVisibleDesiredState = snapshot.goal.desiredState.filter {
+      Self.modelVisibleDesiredStateKeys.contains($0.key)
+    }
+    let omittedDesiredStateCount =
+      snapshot.goal.desiredState.count - modelVisibleDesiredState.count
+    if omittedDesiredStateCount > 0 {
+      trimmed.append("desiredState:omitted\(omittedDesiredStateCount)OrchestrationFields")
+    }
     let budget = HarnessContextBudget(
       roundsRemaining: max(0, snapshot.budgets.maxRounds - snapshot.consumedBudget.rounds),
       wallClockSecondsRemaining: max(0, snapshot.budgets.maxWallClockSeconds - elapsedSeconds),
@@ -129,7 +146,7 @@ public struct HarnessDecisionContextAssembler: Sendable {
       phase: snapshot.phase,
       round: snapshot.activeRound,
       goalSummary: String(snapshot.goal.summary.prefix(limits.maxSummaryCharacters)),
-      desiredState: snapshot.goal.desiredState,
+      desiredState: modelVisibleDesiredState,
       observedMeasurements: observed.measurements,
       observedSamples: observed.samples,
       latestVerdict: observed.latestVerdict,

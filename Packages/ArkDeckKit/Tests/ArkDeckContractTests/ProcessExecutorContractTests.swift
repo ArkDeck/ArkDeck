@@ -130,6 +130,36 @@ final class ProcessExecutorContractTests: XCTestCase {
     }
   }
 
+  func testWorkingDirectoryIsChildScopedAndValidatedBeforeLaunch() async throws {
+    let directory = try makeTemporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let canonicalDirectory = directory.resolvingSymlinksInPath().standardizedFileURL
+    let parent = FileManager.default.currentDirectoryPath
+    let result = try await executor.execute(
+      ProcessRequest(
+        executable: URL(fileURLWithPath: "/bin/pwd"),
+        workingDirectory: canonicalDirectory))
+    XCTAssertEqual(result.termination, .exited(0))
+    let reportedDirectory = String(decoding: result.stdout.data, as: UTF8.self)
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+    XCTAssertTrue(
+      reportedDirectory.hasSuffix("/\(canonicalDirectory.lastPathComponent)"),
+      "pwd may report macOS's /private/var spelling, but must identify the requested directory")
+    XCTAssertEqual(FileManager.default.currentDirectoryPath, parent)
+
+    do {
+      _ = try await executor.execute(
+        ProcessRequest(
+          executable: URL(fileURLWithPath: "/bin/pwd"),
+          workingDirectory: canonicalDirectory.appendingPathComponent("missing")))
+      XCTFail("an absent working directory must be refused before spawn")
+    } catch let error as ProcessExecutionError {
+      XCTAssertEqual(
+        error,
+        .workingDirectoryUnavailable(canonicalDirectory.appendingPathComponent("missing").path))
+    }
+  }
+
   func testTEST_AC_JOB_005_01_StreamsRemainSeparatedAndInvalidUTF8RoundTrips() async throws {
     let bytes = LockedStreamBytes()
     let invalidUTF8 = try await executor.execute(

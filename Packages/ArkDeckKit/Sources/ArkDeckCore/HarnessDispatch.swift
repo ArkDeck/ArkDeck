@@ -304,6 +304,7 @@ public enum HarnessTaskSubmissionError: Error, Equatable, Sendable {
   case emptyAllowedOperations
   case operationNotPermittedForType(String)
   case budgetOutOfRange(String)
+  case malformedDesiredState(String)
   case intakeTooLong
   case unsupportedTaskType(HarnessTaskType)
   case duplicateCriterionID(String)
@@ -386,6 +387,11 @@ public struct HarnessTaskSubmission: Equatable, Sendable, Codable {
       budgets.maxActionRetriesPerRun,
       ceiling: HarnessTaskBudgets.ceiling.maxActionRetriesPerRun,
       "maxActionRetriesPerRun")
+    guard budgets.maxModelCalls >= 0,
+      budgets.maxModelCalls <= HarnessTaskBudgets.ceiling.maxModelCalls
+    else {
+      throw HarnessTaskSubmissionError.budgetOutOfRange("maxModelCalls")
+    }
     var seen = Set<String>()
     for criterion in successCriteria {
       guard seen.insert(criterion.criterionID).inserted else {
