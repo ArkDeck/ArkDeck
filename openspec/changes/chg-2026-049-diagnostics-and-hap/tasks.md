@@ -270,3 +270,34 @@
 - Risk:medium(第三条文件型采集腿,形态与 r2/r4 已验证的两条相同;
   唯一新面是 PNG 魔数校验与"设备按后缀校验类型"这条真机约束。
   三层约束:未请求时逐字节不变、魔数不符不发布、清理失败按 r3 residue 记录)
+
+## TASK-DHA-005 — 崩溃日志作为一等 artifact(r6)
+
+- Status:ready
+- Platform:macos
+- Requirements:proposal r6 What 1-5(两个 readOnly stdout 步骤与对应契约 action、
+  `crashLogs`/`crashLogName` 输入与两个产物、effect 不变、`crashLogName` 的
+  pattern 收窄、空列表是正常结果而 `invalid parameters.` 是失败)
+- Acceptance:change-local `DHA-CRASH-001`..`DHA-CRASH-003`,登记于 `verification.md`
+- Depends on:TASK-DHA-004(done);r6 proposal 合入即 approved
+- Hardware required:no(contract 面即可交付)。`DHA-CRASH-003` 需一次真机运行,
+  **但设备当前被 CHG-2026-054 的 GJ-5 窗口占用** —— 真机复验须与那条道协调,
+  不得抢占;协调不成则如实保持 pending-hardware,不阻塞任务 done
+- Allowed paths:
+  - `Packages/ArkDeckKit/**`
+  - `Catalog/**`
+  - `openspec/contracts/catalogs/diagnostics-stdout.yaml`
+  - `openspec/contracts/workflow-step.schema.json`
+  - `scripts/catalog_gen/**`
+  - `openspec/changes/chg-2026-049-diagnostics-and-hap/**`
+  - `docs/adr/**`
+- Forbidden paths:
+  - `openspec/constitution.md`、`openspec/specs/**`、
+    `openspec/verification/**`(全局)、`openspec/baselines/**`、
+    `openspec/contracts/capability-registry.yaml`
+  - `scripts/**`(仅上列 `catalog_gen/**` 除外)、`.github/**`、`AGENTS.md`、
+    `PRODUCT-LOOP.md`、`ArkDeck.xcodeproj/**`、`ArkDeckApp/**`
+  - 其他 change 目录
+- Risk:low(唯一一条**不升 effect** 的新采集腿:两条命令均只读、实测不改设备状态。
+  唯一需要盯的是 `crashLogName` 这个调用方字符串 —— 以 pattern 收窄到条目名,
+  不含 `/`、不可为路径或 shell 片段)

@@ -5,7 +5,7 @@
 > binding、typed inputs、plan digest、lineage 与 `outcomeUnknown` 门保持。
 > 下文 r2 的人工 capability 步骤是历史计划；E2 不变。
 
-> Change:CHG-2026-049-diagnostics-and-hap@r5
+> Change:CHG-2026-049-diagnostics-and-hap@r6
 > Status:planned
 > Core baseline:CORE-2.1.0 (canonical Core AC not claimed)
 
@@ -236,3 +236,30 @@
   不再运行)、`testScreenshotPublishesTheReceivedPNG`。
   真机:`job-27e4878abde3c50814b6a788929e94a5` 三步全 verified,导出产物
   449,756 字节、魔数正确、720×1280,设备无残留。
+
+## `DHA-CRASH-001` 两条 argv 与只读 effect
+
+- 方法:contract 测试断言两步的**完整 argv** 为
+  `["-t", <k>, "shell", "hidumper", "-s", "1201", "-a", "-p Faultlogger"]` 与
+  `[..., "-a", "-p Faultlogger -f <name>"]`(`-p`/`-f` 整体是**一个** argv 元素);
+  断言这一腿被选中时 plan effect **仍为 readOnly**、授权仍走 `defaultReadOnly`、
+  capability 消耗为 0 —— 与 trace/组件树/截图三条腿相反。
+- Evidence:实现 PR 内测试 + 全量套件结果。
+- 结论:pending。
+
+## `DHA-CRASH-002` `crashLogName` 收窄且不可为路径
+
+- 方法:负例断言 `../`、含 `/`、超长、空串、非 `*crash-` 前缀的取值在
+  **admission 阶段**即拒(`invalidInput`),零 dispatch;正例断言实测过的真实条目名
+  (`jscrash-<bundle>-<uid>-<timestamp>`)被接受且逐 token 进入 argv。
+- Evidence:实现 PR 内测试。
+- 结论:pending。
+
+## `DHA-CRASH-003` 空列表是正常结果,取不到才是失败
+
+- 方法:(a) stdout 含 `No fault log exist.` → 判 verified,`crash-index.txt`
+  如实发布该内容(不是 missing、不是失败);(b) stdout 含 `invalid parameters.`
+  → 判 `.failed` 且**不发布** `crash-log.txt`;(c) 正常单条 → 发布,内容即收到的字节。
+  真机面:一次带 `crashLogs: true` 的 Agent 执行取回索引。
+- Evidence:实现 PR 内测试 +(可得时)`evidence/runs/TASK-DHA-005/`。
+- 结论:pending。

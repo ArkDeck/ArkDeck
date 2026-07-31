@@ -1,7 +1,7 @@
 ---
 schema_version: 1.0.0
 change_id: CHG-2026-049-diagnostics-and-hap
-change_revision: 5
+change_revision: 6
 platform: macos
 evidence_classes:
 - contract
@@ -197,3 +197,37 @@ cases:
   expected_result: >-
     A screenshot is published only when the device wrote bytes, the host
     measured them, and they begin with the PNG magic.
+- acceptance_id: DHA-CRASH-001
+  test_id: TEST-DHA-CRASH-001
+  method: >-
+    Argv contract tests pinning both Faultlogger invocations token for
+    token, with the -p/-f payload as a single argv element, plus
+    assertions that this leg leaves the plan effect readOnly and consumes
+    no capability.
+  expected_source: openspec/changes/chg-2026-049-diagnostics-and-hap/verification.md#dha-crash-001
+  minimum_evidence: contract
+  expected_result: >-
+    Crash capture is the one collection leg that reads without mutating,
+    so it stays E0.
+- acceptance_id: DHA-CRASH-002
+  test_id: TEST-DHA-CRASH-002
+  method: >-
+    Negative tests for path-shaped, oversized, empty and wrongly-prefixed
+    crash log names, asserting refusal at admission with zero dispatch,
+    and a positive test with a real measured entry name.
+  expected_source: openspec/changes/chg-2026-049-diagnostics-and-hap/verification.md#dha-crash-002
+  minimum_evidence: contract
+  expected_result: >-
+    The caller-supplied name can only ever be a Faultlogger entry name,
+    never a path or a shell fragment.
+- acceptance_id: DHA-CRASH-003
+  test_id: TEST-DHA-CRASH-003
+  method: >-
+    Contract tests for the empty list, the invalid-parameters answer and
+    a healthy single entry; plus a real-device agent run fetching the
+    index when the shared device is free.
+  expected_source: openspec/changes/chg-2026-049-diagnostics-and-hap/verification.md#dha-crash-003
+  minimum_evidence: contract
+  expected_result: >-
+    An empty fault log list is a truthful result, while a refused fetch
+    publishes nothing.
