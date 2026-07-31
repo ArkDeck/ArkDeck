@@ -22,8 +22,18 @@ Status:in_progress # r1(2026-07-31):TASK-HFA-002 已 done,HFA-AC-3/4/5 有结论
   observation builder,断言 crash signature、reason、进程/包名被正确提取,
   并与 goal 的 `crashSignature` 匹配计数;同一样本下 `matchingCrashCount > 0` 时
   mandatory criterion 不得 PASS。
-- Evidence:实现 PR 内测试 + 全量套件结果 + 使用的样本 hash。
-- **结论:pending**
+- Evidence:实现 PR 内测试 + 全量套件结果 + `evidence/runs/TASK-HFA-001/run-r1.md`。
+- **结论(2026-07-31):PASS** —— `testRealJsCrashEntryYieldsItsReasonAndSourceLocation`
+  用**真机字节**(DAYU200 / OH 3.2 / Build 7.0.0.36,`hidumper -s 1201 -a
+  "-p Faultlogger -f <条目名>"`)解出 `jscrash:TypeError+entry/src/main/ets/
+  crashprobe/CrashProbe.ets:36:16`,kind / bundle / uid / 时间戳逐字段断言
+  (`testEntryNameDecomposition`);`testAMatchingLedgerEntryKeepsTheMandatoryCriterion
+  FromPassing` 断言同一样本下 mandatory criterion 判 `fail` 而非 PASS。
+  另有 r6 回归 `testHilogNeverContributesCrashCountsAnyMore`:hilog 即便带 fault
+  block 也不再产出崩溃计数,故同一次崩溃不会被两个源各计一次。
+  **样本来源如实标注**:索引与 jscrash 正文为真机字节(fingerprint/unique id 已
+  mask、尾部 `HiLog:` 段截断);cppcrash 与 appfreeze 正文按文档形态手写,**非真机**
+  —— 设备当前只有一条 jscrash 条目,再取需真造崩溃(属设备状态改变,未做)。
 
 ## HFA-AC-2 证据缺席不得判成功(TASK-HFA-001)
 
@@ -32,7 +42,18 @@ Status:in_progress # r1(2026-07-31):TASK-HFA-002 已 done,HFA-AC-3/4/5 有结论
   ③条目不可解析 → `ERROR` + `evidenceIntegrity` 人工阻塞。并保留 r6 真实场景回归
   (真实 crash 之后不得出现 verdict `pass`)。
 - Evidence:实现 PR 内测试。
-- **结论:pending**
+- **结论(2026-07-31):PASS** —— 三条负例各有独立用例:
+  ①`testAbsentLedgerIsInconclusiveAndNeverPasses`(`artifactNotCollected:
+  crash-index.txt` → `INCONCLUSIVE`,且该轮不产出任何崩溃计数,故"没看"不会被写成
+  "没有");②`testEmptyLedgerAndMissingLedgerAreDifferentAnswers`(空台账 —— 设备
+  答了 `No fault log exist.` —— 计 0 且零 blocker;缺席则只有 blocker、无计数);
+  ③`testUnreadableLedgerIsAnIntegrityBlockerNotAnEmptyLedger`(非台账字节 →
+  `crashLedgerUnreadable:crash-index.txt:ledgerHeaderAbsent`;不可解析条目名 →
+  `…:entryNameUnparseable`;二者均进 `integrityBlockers` → `ERROR` + 人工阻塞,
+  **绝不退化成空台账**)。
+  另有水位线用例 `testHistoricEntriesAreNotCountedAndFreshOnesAreCountedOnce`:
+  设备上的历史条目连跑 5 轮累计仍为 0(否则 `== 0` 的判据永不可达、修好也判不出),
+  水位之后的新条目恰好计一次、再看一轮不重复计入。
 
 ## HFA-AC-3 Stale decision 不执行(TASK-HFA-002)
 
