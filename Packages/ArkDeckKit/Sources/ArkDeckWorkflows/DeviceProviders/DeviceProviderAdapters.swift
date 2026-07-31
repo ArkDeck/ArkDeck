@@ -608,23 +608,45 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
           argumentSummary: try deviceArguments(
             ["shell", "pidof", bundle.bundleName], context: context),
           timeoutSeconds: 30))
+    // Both mutations carry their own readback, for the same reason install
+    // and start have one: `hdc shell`'s exit status is the client's, and
+    // `bm uninstall` answers `uninstall missing installed bundle` on a clean
+    // exit when the bundle was never there. The probes are the ones the
+    // reconcile path already uses, so a forward verdict and a recovery
+    // verdict cannot disagree about what "gone" looks like.
     case .stopAbility(let ability):
       return TypedProcessPlan(
         action: action,
-        kind: .process(
+        kind: .processSequence(
           executableSHA256: "resolved-at-dispatch",
-          argumentSummary: try deviceArguments(
-            ["shell", "aa", "force-stop", ability.bundle.bundleName],
-            context: context),
-          timeoutSeconds: 60))
+          invocations: [
+            TypedProcessInvocation(
+              arguments: try deviceArguments(
+                ["shell", "aa", "force-stop", ability.bundle.bundleName],
+                context: context),
+              timeoutSeconds: 60,
+              continueAfterNonZero: true),
+            TypedProcessInvocation(
+              arguments: try deviceArguments(
+                ["shell", "pidof", ability.bundle.bundleName], context: context),
+              timeoutSeconds: 30),
+          ]))
     case .uninstallPackage(let bundle):
       return TypedProcessPlan(
         action: action,
-        kind: .process(
+        kind: .processSequence(
           executableSHA256: "resolved-at-dispatch",
-          argumentSummary: try deviceArguments(
-            ["uninstall", bundle.bundleName], context: context),
-          timeoutSeconds: 120))
+          invocations: [
+            TypedProcessInvocation(
+              arguments: try deviceArguments(
+                ["uninstall", bundle.bundleName], context: context),
+              timeoutSeconds: 120,
+              continueAfterNonZero: true),
+            TypedProcessInvocation(
+              arguments: try deviceArguments(
+                ["shell", "bm", "dump", "-n", bundle.bundleName], context: context),
+              timeoutSeconds: 30),
+          ]))
     case .createPortForward(let spec):
       return TypedProcessPlan(
         action: action,
@@ -1490,24 +1512,38 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
       }
       return .verified(summary: ["bundleName": bundle.bundleName, "running": "true"])
 
-    // Known-weak pair (D2 in `DEVICE-COMMAND-FACTS.md` §10): unlike install and
-    // start above, these two still believe the exit status alone, and the
-    // exit status of an `hdc shell aa`/`bm` invocation is the client's, not
-    // the remote command's. `bm uninstall` in particular answers
-    // `uninstall missing installed bundle` on a clean exit when the bundle
-    // was never there. Closing this needs one of: a device window that pins
-    // the status strings, or a readback step after stop/uninstall
-    // (debug.hap@1 has none today, so returning `.unknown` here would drive
-    // every run into reconcileRequired). Do not guess the strings.
+    // D2 in `DEVICE-COMMAND-FACTS.md` §10, closed by readback rather than by
+    // the status strings: absence is proven by the same probes reconcile
+    // uses, so neither verdict depends on parsing `aa`/`bm` prose that no
+    // device window has pinned.
     case .stopAbility(let ability):
-      guard receipt.exitStatus == 0 else {
-        return .failed(code: "stopFailed", detail: "could not stop \(ability.bundle.bundleName)")
+      guard receipt.subprocesses.count == 2 else {
+        return .unknown(reason: "stop did not produce its process readback")
+      }
+      guard let running = Self.processPresence(receipt.subprocesses[1]) else {
+        return .unknown(
+          reason: "process readback for \(ability.bundle.bundleName) is ambiguous")
+      }
+      guard !running else {
+        return .failed(
+          code: "stopIneffective",
+          detail: "\(ability.bundle.bundleName) is still running after force-stop")
       }
       return .verified(summary: ["stopped": ability.bundle.bundleName])
 
     case .uninstallPackage(let bundle):
-      guard receipt.exitStatus == 0 else {
-        return .failed(code: "uninstallFailed", detail: "could not uninstall \(bundle.bundleName)")
+      guard receipt.subprocesses.count == 2 else {
+        return .unknown(reason: "uninstall did not produce its package readback")
+      }
+      guard let installed = Self.packagePresence(
+        receipt.subprocesses[1], bundleName: bundle.bundleName)
+      else {
+        return .unknown(reason: "package readback for \(bundle.bundleName) is ambiguous")
+      }
+      guard !installed else {
+        return .failed(
+          code: "uninstallIneffective",
+          detail: "\(bundle.bundleName) is still installed after uninstall")
       }
       return .verified(summary: ["uninstalled": bundle.bundleName])
 
@@ -1517,36 +1553,17 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
       }
       return .verified(summary: ["localPort": String(spec.localPort)])
     case .readPackagePresence(let bundle):
-      guard receipt.exitStatus == 0, !receipt.stdoutTruncated,
-        let text = String(data: receipt.stdout, encoding: .utf8)
+      guard let present = Self.packagePresence(
+        Self.soleSubprocess(of: receipt), bundleName: bundle.bundleName)
       else {
         return .unknown(reason: "package presence readback is not trustworthy")
       }
-      let escaped = NSRegularExpression.escapedPattern(for: bundle.bundleName)
-      let present =
-        text.range(
-          of: "(^|[^A-Za-z0-9_.])\(escaped)([^A-Za-z0-9_.]|$)",
-          options: .regularExpression) != nil
       return .verified(summary: ["present": present ? "true" : "false"])
     case .readProcessPresence:
-      guard !receipt.stdoutTruncated,
-        let text = String(data: receipt.stdout, encoding: .utf8)
-      else {
-        return .unknown(reason: "process presence readback is not trustworthy")
-      }
-      let tokens = text.split(whereSeparator: \.isWhitespace)
-      if receipt.exitStatus == 1, tokens.isEmpty {
-        return .verified(summary: ["present": "false"])
-      }
-      guard receipt.exitStatus == 0, !tokens.isEmpty,
-        tokens.allSatisfy({ token in
-          guard let value = UInt32(token) else { return false }
-          return value > 0
-        })
-      else {
+      guard let present = Self.processPresence(Self.soleSubprocess(of: receipt)) else {
         return .unknown(reason: "process presence readback is ambiguous")
       }
-      return .verified(summary: ["present": "true"])
+      return .verified(summary: ["present": present ? "true" : "false"])
     case .readOwnedPathPresence:
       guard
         let present = pathPresence(
@@ -1861,6 +1878,64 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
       return nil
     }
     return false
+  }
+
+  /// Views a single-process receipt as the subprocess it is, so one probe
+  /// parser serves both the standalone reconcile probes and the readback leg
+  /// of a mutation sequence.
+  static func soleSubprocess(of receipt: ProviderProcessReceipt) -> ProviderSubprocessReceipt {
+    ProviderSubprocessReceipt(
+      exitStatus: receipt.exitStatus, stdout: receipt.stdout, stderr: receipt.stderr,
+      stdoutTruncated: receipt.stdoutTruncated, durationSeconds: receipt.durationSeconds)
+  }
+
+  /// Three-valued reading of a `pidof <bundleName>` probe: running, not
+  /// running, or `nil` when the output proves neither.
+  ///
+  /// `pidof` answers exit 1 with no output for a name it cannot find, which
+  /// is the only shape that proves absence. Anything else — noise, a partial
+  /// read, a non-numeric token — is ambiguous and must stay that way: a stop
+  /// that reports success because the probe was unreadable is the exact
+  /// failure this readback exists to prevent.
+  static func processPresence(_ receipt: ProviderSubprocessReceipt) -> Bool? {
+    guard !receipt.stdoutTruncated,
+      let text = String(data: receipt.stdout, encoding: .utf8)
+    else {
+      return nil
+    }
+    let tokens = text.split(whereSeparator: \.isWhitespace)
+    if receipt.exitStatus == 1, tokens.isEmpty { return false }
+    guard receipt.exitStatus == 0, !tokens.isEmpty,
+      tokens.allSatisfy({ token in
+        guard let value = UInt32(token) else { return false }
+        return value > 0
+      })
+    else {
+      return nil
+    }
+    return true
+  }
+
+  /// Three-valued reading of a `bm dump -n <bundleName>` probe. The bundle
+  /// name is matched on its own boundaries so `com.example.demo` is not
+  /// found inside `com.example.demo.helper`.
+  ///
+  /// Kept separate from `queryPackageReadback`'s verdict on purpose: that
+  /// one answers "did install put it there", where absence is a definite
+  /// failure. This one answers "is it there", where an unreadable probe is
+  /// not an answer at all.
+  static func packagePresence(
+    _ receipt: ProviderSubprocessReceipt, bundleName: String
+  ) -> Bool? {
+    guard receipt.exitStatus == 0, !receipt.stdoutTruncated,
+      let text = String(data: receipt.stdout, encoding: .utf8)
+    else {
+      return nil
+    }
+    let escaped = NSRegularExpression.escapedPattern(for: bundleName)
+    return text.range(
+      of: "(^|[^A-Za-z0-9_.])\(escaped)([^A-Za-z0-9_.]|$)",
+      options: .regularExpression) != nil
   }
 
   /// Size of a remote regular file from one `ls -l` line, or `nil` when the
