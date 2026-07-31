@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-049-diagnostics-and-hap
-revision: 3
-status: approved # r2 已交付；r3 携 approved 落地：维护者 review + merge 本 PR 即批准
+revision: 4
+status: approved # r2/r3 已交付；r4 携 approved 落地：维护者 review + merge 本 PR 即批准
 class: capability
 core_change_level: none
 owner: lvye
@@ -24,6 +24,73 @@ platforms: [macos]
 > diagnostics HiLog/component-tree pair 在 Catalog、generator、JSON Schema
 > 与 Swift validator 间闭合。r2 记录 fresh pins、草稿迁移约束和依赖复验；
 > 合入 r2 前 `TASK-DHA-001` 仍不得恢复实现。
+
+## r4(2026-07-31):多包应用按"一个目录、一条 install"安装
+
+### 现状与真机事实
+
+`debug.hap@1` 的 `hapArtifactLease` 是**标量** `artifactLease`,引擎的
+`resolvedInputArtifact(jobID:)` 也只解析一条,`ProviderExecutionContext`
+只带一条。于是 `send-hap` 只能推一个文件、`install-hap` 只能
+`bm install -p <该文件> -r`。
+
+2026-07-31 真机确认 `[R]`(见 `evidence/runs/TASK-DHA-001/d5-d9-window-2026-07-31.md`):
+`bm install -p <目录>` 与 `bm install -p <文件> -r` **都成立**,所以单 HAP 用
+现形态并没有错。缺的是**多模块应用**(entry + feature + 远端 HSP)——它们必须
+send 进同一目录,由**一条** `bm install -p <dir>` 安装,逐个装单文件不是等价操作。
+
+### 这一改比看上去便宜:两条关键先例已经在仓里
+
+台账 D5 原先按"需要新的设备变更形态"估价,读代码后不成立:
+
+1. **`mkdir -p <job-owned dir>` 已存在** ——
+   `deploy.native-library.app-owned@1` 的 `sendNativeLibraryToStaging` 就是
+   `mkdir -p` + **两次** `file send` 进同一目录(库 + 代码签名助手),都在**一个
+   step 的进程序列**里。多包的"N 次 send"不需要新 step kind。
+2. **目录清理已有安全形态** —— 同一族的 `cleanupNativeLibrary` 是逐个
+   `rm -f <file>` 之后 `rmdir <dir>`(受 `stagingDirectoryIsJobOwned` 约束),
+   **刻意不用 `rm -rf`**。
+
+→ 因此 r4 明确禁止引入 `rm -rf`:按名逐个删已 send 的 HAP,再 `rmdir` 该
+job-owned 目录。`rmdir` 在目录非空时失败,这个"删不干净就报错"正是要的性质。
+
+### What(r4 交付面)
+
+1. **输入面(唯一真正的契约变更)**:新增可选
+   `additionalHapArtifactLeases`,元素为 artifact lease、有 maxItems 上界。
+   `hapArtifactLease` 保持 required 且语义不变 = entry 包。未提供附加租约的
+   请求,其计划、授权面与 argv **逐字节不变**——与 r2 的 `uiComponentTree`、
+   r3 的残留同一形态:新能力一律 opt-in。
+   Catalog schema 目前的字段类型只有 `artifactLease` 标量,没有数组形,
+   故需在 `Catalog/schema/operation.schema.json` 增加数组型并同步生成器与
+   WorkflowStep validator(词表 lockstep,先例 CHG-2026-050/053)。
+2. **引擎按序解析 N 条租约**:每条都过既有 `validateArtifactBinding`
+   (target identity / binding revision 一致),任一条不匹配即 fail closed、
+   零 dispatch。`ProviderExecutionContext` 由一条 resolved artifact 扩展为
+   有序多条;单条路径保持原字段语义。
+3. **provider**:staged 目录值 mint-only(与 `HDCOwnedRemotePath` 同纪律,
+   调用方不能提供设备路径);`send-hap` lower 为
+   `[mkdir -p <dir>, file send ×N]` 一个序列;`install-hap` lower 为
+   `bm install -p <dir> -r`;`cleanup-remote-staging` lower 为
+   `[rm -f <each>, rmdir <dir>]`。
+4. **判定不放宽**:安装成功仍**只**由 `package-readback` 判定(D2/DHA-HAP-001
+   不变);send 的成功仍由既有 readback 判定,不看退出码。
+5. **残留**:目录与其中文件的清理失败,按 r3 的 residue 记录(远端路径形态,
+   无需新 residue 种类)。
+
+### 真机状态:这一条**没有**被上次窗口证明
+
+上次窗口只验证了"目录里放**一个** HAP 时 `bm install -p <dir>` 成功",
+**没有**验证 entry + feature 一起装成一个应用(手上只有单模块 demo)。
+故 r4 的真机 AC 依赖一个前置条件:**需要一套多模块签名 HAP**。在拿到之前,
+该 AC 如实保持 pending-hardware,contract 面照常交付 —— 不得以"目录形已验证"
+冒充"多包已验证"。
+
+## Out of scope(r4)
+
+- 远端 HSP / 共享包的依赖解析(调用方自己决定送哪几个包);
+- `installPolicy` 语义(`-r` 之外的策略不变);
+- 单 HAP 路径的任何行为改变。
 
 ## r3(2026-07-31):清理没做成时,`succeeded` 不得读作"设备干净"
 

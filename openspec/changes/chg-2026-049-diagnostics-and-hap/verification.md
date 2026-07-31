@@ -5,7 +5,7 @@
 > binding、typed inputs、plan digest、lineage 与 `outcomeUnknown` 门保持。
 > 下文 r2 的人工 capability 步骤是历史计划；E2 不变。
 
-> Change:CHG-2026-049-diagnostics-and-hap@r3
+> Change:CHG-2026-049-diagnostics-and-hap@r4
 > Status:planned
 > Core baseline:CORE-2.1.0 (canonical Core AC not claimed)
 
@@ -151,3 +151,33 @@
   实现层面,`.uninstallPackage` 的 reconcile readback(`readPackagePresence`,
   desiredPresence=false)与重试后的 verify 都早已是 readback 判定(D2),
   r3 未放宽其中任何一条。
+
+## `DHA-MULTI-001` 附加租约是唯一开关,单包路径逐字节不变
+
+- 方法:(a) 不带 `additionalHapArtifactLeases` 的请求,其 `send-hap` /
+  `install-hap` / `cleanup-remote-staging` 的**完整 argv** 与 r4 之前逐 token
+  相等(单文件 `bm install -p <file> -r`),授权面与选中步骤集不变;
+  (b) 带附加租约时,三条腿分别变为 `[mkdir -p <dir>, file send ×N]`、
+  `bm install -p <dir> -r`、`[rm -f ×N, rmdir <dir>]`,逐 token 断言;
+  (c) 断言全仓 lowering **不含 `rm -rf`**。
+- Evidence:实现 PR 内测试 + 全量套件结果。
+- 结论:pending。
+
+## `DHA-MULTI-002` N 条租约逐条过绑定校验,任一不符零 dispatch
+
+- 方法:附加租约中混入一条绑定到**另一 target identity / 另一 binding
+  revision** 的 artifact,断言请求在 dispatch 前被拒(`invalidInput` 类),
+  provider dispatch 计数为 0、capability 消耗为 0;正例断言 N 条全部匹配时
+  send 的顺序与租约顺序一致(entry 在先)。
+- Evidence:实现 PR 内测试。
+- 结论:pending。
+
+## `DHA-MULTI-003` 多模块真机安装(pending-hardware)
+
+- 方法:已接管设备上一次 `debug.hap@1`,输入为 entry + feature 两个签名 HAP
+  的租约:`package-readback` 判定安装成功、应用可启动、清理后
+  `bm dump -n` 判定包已不在且 job-owned 目录已被 `rmdir` 移除。
+- 前置条件:**需要一套多模块签名 HAP**;仓内与当前设备都没有。在拿到之前
+  如实保持 pending。上次窗口只证明了"目录里放一个 HAP 可装",**不构成**本条
+  的证据。
+- 结论:pending(hardware + 素材前置)。
