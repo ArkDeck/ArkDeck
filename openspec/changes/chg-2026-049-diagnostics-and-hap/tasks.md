@@ -241,7 +241,11 @@
 
 ## TASK-DHA-004 — 屏幕截图作为文件型产物(r5)
 
-- Status:ready
+- Status:done
+- Done:2026-07-31;随本实现 PR 合入生效(维护者 review + merge 即批准);
+  DHA-SHOT-001..003 **全部 PASS**,含真机(`job-27e4878a…`,`screenshot.png`
+  449,756 字节 / 720×1280 / PNG 魔数正确);顺带修复 r2 漏登记
+  `optionalStepUpstream` 的组件树腿;evidence = `evidence/runs/TASK-DHA-004/run-r5.md`
 - Platform:macos
 - Requirements:proposal r5 What 1-5(三个 optional 步骤、`uiScreenshot` 输入与
   `screenshot.png` 产物、`-t png` 的真机确认形式与 `.png` owned 后缀、

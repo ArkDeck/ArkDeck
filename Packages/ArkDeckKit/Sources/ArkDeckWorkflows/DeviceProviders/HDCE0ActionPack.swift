@@ -179,6 +179,10 @@ public struct HDCOwnedRemotePath: Sendable, Equatable {
       suffix = ".htrace"
     case "capture-ui-tree":
       suffix = ".json"
+    case "capture-screenshot":
+      // Not cosmetic: `snapshot_display` rejects a name whose suffix does
+      // not match the requested type (measured on OH 3.2, CHG-2026-049 r5).
+      suffix = ".png"
     default:
       suffix = ""
     }
@@ -197,12 +201,27 @@ public struct HDCOwnedRemoteArtifact: Sendable, Equatable {
   public let path: HDCOwnedRemotePath
   public let expectedSHA256: String?
   public let maximumBytes: Int
+  /// What the product's first bytes must be, when the format has a magic
+  /// worth checking. A screenshot that is not a PNG is a failure, not an
+  /// artifact — and the check is cheap enough to be unconditional.
+  public let expectedLeadingBytes: Data?
 
-  package init(path: HDCOwnedRemotePath, expectedSHA256: String?, maximumBytes: Int) {
+  package init(
+    path: HDCOwnedRemotePath,
+    expectedSHA256: String?,
+    maximumBytes: Int,
+    expectedLeadingBytes: Data? = nil
+  ) {
     self.path = path
     self.expectedSHA256 = expectedSHA256
     self.maximumBytes = maximumBytes
+    self.expectedLeadingBytes = expectedLeadingBytes
   }
+}
+
+public enum HDCFileMagic {
+  /// 89 50 4E 47 0D 0A 1A 0A — confirmed on a device-produced screenshot.
+  public static let png = Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])
 }
 
 public enum HDCArtifactReceiveOutcome: Sendable, Equatable {

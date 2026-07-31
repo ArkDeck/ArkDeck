@@ -187,11 +187,26 @@ hdc -t <k> shell rm -f <remote.json>
 ## 8. 截屏 `[S]`(ArkDeck 尚无此 operation)
 
 ```text
-hdc -t <k> shell snapshot_display [-i <displayId>] -f <remote.png> [-t png]
+hdc -t <k> shell snapshot_display -t png -f <remote.png>   # -t png 必需,见下
 hdc -t <k> shell ls -l <remote.png>      # 用第 5 字段(size)判是否真的生成
 hdc -t <k> file recv <remote.png> <local>
 hdc -t <k> shell rm -f <remote.png>
 ```
+
+- **`-t png` 是必需的,不是"失败后重试"** `[R]`(2026-07-31 实测,更正原 `[S]` 行):
+
+  ```text
+  usage: snapshot_display [-i displayId] [-f output_file] [-w width] [-h height] [-t type] [-m]
+  -f <x>.png          -> error: fileName … invalid, suffix must be .jpeg
+  -f <x>.jpeg         -> file type: jpeg,   40,941 B
+  -t png -f <x>.png   -> file type: png,   449,830 B,魔数 89 50 4E 47 0D 0A 1A 0A
+  ```
+
+  该 build **默认类型是 jpeg,且按文件名后缀校验类型**。deveco"先不带 `-t` 再重试"
+  是这条规则的症状,不是可选项;照原文写 lowering 第一次下发就会被拒。
+  → provider 铸的 owned path 后缀因此是判据的一部分。
+- PNG 450KB vs JPEG 41KB(同一屏,11 倍)。ArkDeck 只交付 PNG(无损 + 魔数可校验);
+  JPEG 与 `-w/-h` 缩放待有真实预算压力再议。`-m` 语义未探,不猜。
 
 - **成功判据是远端文件大小 > 0,不是退出码**;deveco 在不带 `-t` 失败后重试一次
   `-t png`,最后校验本地 PNG 魔数 `89 50 4E 47 0D 0A 1A 0A`。
@@ -268,7 +283,7 @@ hdc -t <k> shell rm -f <remote.png>
 | D5 | `bm install -p <单文件> -r`;`hapArtifactLease` 是标量,引擎与 context 都只解析一条 | 多包必须同目录 + 一条 `bm install -p <dir>` | **已落地并真机验证 `[R]`**(CHG-2026-049 r4:可选 `additionalHapArtifactLeases` + schema 数组型 + `[mkdir -p, send ×N]` / `bm install -p <dir> -r` / `[rm -f ×N, rmdir]` 的目录形 lowering;**不用 `rm -rf`**,沿用 native 族形态。2026-07-31 真机:entry + feature1 一次装成,设备读回 `installed modules: ['entry', 'feature1']`。附加租约在 admission 阶段逐条过绑定校验,不符即零 dispatch)|
 | D6 | retry 仅 `preflightAttempts: 2 / mutationAttempts: 1` | transient 串表 + 800/1500/2500 退避 | 待真机证据(transient 分类进判定前需 pin) |
 | D7 | 无签名前置判断 | host 侧判 `-signed.*` 后缀 | 待真机证据(后缀是构建约定,只能当提示) |
-| D8 | 无 screenshot operation | `snapshot_display` + size 判据 + PNG 魔数 | 需契约或 Catalog 变更(新 operation) |
+| D8 | 无 screenshot operation | `snapshot_display` + size 判据 + PNG 魔数 | **已落地并真机验证 `[R]`**(CHG-2026-049 r5:`uiScreenshot` 输入 + 三条 optional 腿,**不新增 operation**;lowering 用 `-t png`(必需)+ `.png` owned 后缀;三层判定 = 设备侧 size / host 侧 size+SHA-256 / PNG 魔数,魔数不符不发布。2026-07-31 真机:449,756 字节、720×1280、魔数正确)|
 | D9 | crash 采集形态未定(GJ-3 需要) | `hidumper -s 1201 -a "-p Faultlogger[ -f <file>]"` | 待真机证据(**命令形与空态输出已 pin `[R]`**:service 1201 = HiviewService,无崩溃时回 `No fault log exist.` 与 `******` 空列表;缺口收窄为需要一次真实崩溃才能 pin 条目格式与 `-f <file>` 形态 —— GJ-3 会自然产生,不必造崩溃) |
 
 ## 11. 明确不适用(不要抄进来)

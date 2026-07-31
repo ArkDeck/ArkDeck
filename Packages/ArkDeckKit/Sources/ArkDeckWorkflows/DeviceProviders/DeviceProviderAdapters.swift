@@ -129,6 +129,12 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
     case .captureRemoteStdout:
       return try captureAction(for: step, inputs: inputs)
     case .captureRemoteFile:
+      if step.stepID == "capture-screenshot" {
+        return .hdc(
+          .captureScreenshot(
+            into: try mintStableOwnedRemotePath(
+              jobID: context.jobID, stepID: "capture-screenshot")))
+      }
       if step.stepID == "capture-ui-tree" {
         return .hdc(
           .captureComponentTree(
@@ -148,7 +154,9 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
           HDCOwnedRemoteArtifact(
             path: try mintStableOwnedRemotePath(
               jobID: context.jobID, stepID: Self.fileProducerStepID(for: step.stepID)),
-            expectedSHA256: nil, maximumBytes: 64 * 1024 * 1024)))
+            expectedSHA256: nil, maximumBytes: 64 * 1024 * 1024,
+            expectedLeadingBytes: step.stepID == "receive-screenshot"
+              ? HDCFileMagic.png : nil)))
     case .cleanupOwnedRemotePath:
       let ownerStepID: String
       if operation.reference == "debug.hap@1" {
@@ -600,6 +608,26 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
                 context: context),
               timeoutSeconds: 60,
               continueAfterNonZero: true),
+            TypedProcessInvocation(
+              arguments: try deviceArguments(
+                ["shell", "ls", "-l", path.remotePath], context: context),
+              timeoutSeconds: 15),
+          ]))
+    case .captureScreenshot(let path):
+      // `-t png` is mandatory, not a retry: this build defaults to jpeg and
+      // refuses a name whose suffix disagrees with the type (OH 3.2,
+      // measured 2026-07-31). The status line it prints is not evidence —
+      // the `ls -l` readback is, same as every other file leg.
+      return TypedProcessPlan(
+        action: action,
+        kind: .processSequence(
+          executableSHA256: "resolved-at-dispatch",
+          invocations: [
+            TypedProcessInvocation(
+              arguments: try deviceArguments(
+                ["shell", "snapshot_display", "-t", "png", "-f", path.remotePath],
+                context: context),
+              timeoutSeconds: 60, continueAfterNonZero: true),
             TypedProcessInvocation(
               arguments: try deviceArguments(
                 ["shell", "ls", "-l", path.remotePath], context: context),
@@ -1136,6 +1164,8 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
     switch stepID {
     case "receive-ui-tree", "cleanup-ui-tree-temp":
       return "capture-ui-tree"
+    case "receive-screenshot", "cleanup-screenshot-temp":
+      return "capture-screenshot"
     default:
       return "capture-trace"
     }
@@ -1404,6 +1434,21 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
       }
       return .verified(summary: ["remoteByteCount": String(byteCount)])
 
+    case .captureScreenshot(let path):
+      guard receipt.subprocesses.count == 2 else {
+        return .unknown(reason: "screenshot did not produce its readback sequence")
+      }
+      guard let byteCount = Self.remoteRegularFileByteCount(receipt.subprocesses[1]) else {
+        return .unknown(
+          reason: "screenshot readback did not describe \(path.remotePath) as a regular file")
+      }
+      guard byteCount > 0 else {
+        return .failed(
+          code: "emptyScreenshot",
+          detail: "snapshot_display left a zero-byte file at \(path.remotePath)")
+      }
+      return .verified(summary: ["remoteByteCount": String(byteCount)])
+
     case .receiveOwnedArtifact(let artifact):
       // The step's whole purpose is host bytes, so the verdict is read off
       // the file the dispatcher measured. `file recv` exits 0 on forms that
@@ -1431,6 +1476,15 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
         return .failed(
           code: "hashMismatch",
           detail: "received bytes do not match the pinned content hash")
+      }
+      if let magic = artifact.expectedLeadingBytes,
+        !landed.leadingBytes.starts(with: magic)
+      {
+        // A device that answered with an error page, a truncated write or
+        // the wrong image type must not become a published artifact.
+        return .failed(
+          code: "unexpectedFormat",
+          detail: "received bytes do not begin with the pinned magic")
       }
       // The name, not the path: the summary is journalled and published, and
       // the host directory layout is not evidence.
@@ -2256,7 +2310,8 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
   ) throws -> TypedProcessPlan? {
     let readback: TypedProviderAction
     switch intent.action {
-    case .hdc(.captureTrace(_, let path)), .hdc(.cleanupOwnedRemotePath(let path)):
+    case .hdc(.captureTrace(_, let path)), .hdc(.cleanupOwnedRemotePath(let path)),
+      .hdc(.captureComponentTree(let path)), .hdc(.captureScreenshot(let path)):
       readback = .hdc(.readOwnedPathPresence(path))
     case .hdc(.sendArtifactToStaging(let staged)):
       readback = .hdc(.readOwnedPathPresence(staged.path))
@@ -2349,7 +2404,8 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
     }
     let desiredPresence: Bool
     switch intent.action {
-    case .hdc(.captureTrace), .hdc(.sendArtifactToStaging), .hdc(.installPackage),
+    case .hdc(.captureTrace), .hdc(.captureComponentTree), .hdc(.captureScreenshot),
+      .hdc(.sendArtifactToStaging), .hdc(.installPackage),
       .hdc(.startAbility), .hdc(.createPortForward),
       .hdc(.sendPackageSetToStaging), .hdc(.installPackageSet):
       desiredPresence = true
@@ -2380,7 +2436,8 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
       return .confirmedNotExecuted
     case .hdc(.queryPackageReadback), .hdc(.verifyProcessState):
       return .confirmedNotExecuted
-    case .hdc(.captureTrace), .hdc(.cleanupOwnedRemotePath):
+    case .hdc(.captureTrace), .hdc(.captureComponentTree), .hdc(.captureScreenshot),
+      .hdc(.cleanupOwnedRemotePath):
       // Remote-temp mutations reconcile by re-listing the owned path in a
       // later read; without that evidence the outcome stays unknown.
       return .stillUnknown(

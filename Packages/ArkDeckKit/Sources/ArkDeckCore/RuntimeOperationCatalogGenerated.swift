@@ -4,7 +4,7 @@
 // Drift is a check-sdd error (bidirectional byte comparison).
 
 extension RuntimeOperationCatalog {
-  public static let catalogDigest = "6b2191e87a71eb8a5bc11d3801c74d2ecf921261b9e7a836b57fc24ec894b076"
+  public static let catalogDigest = "1687061b76bb563b0c52bb182ca7081b59e32263ccd2f923c9036a47d2bc68a7"
 
   public static let operations: [CatalogOperationDescriptor] = [
     CatalogOperationDescriptor(
@@ -26,7 +26,8 @@ extension RuntimeOperationCatalog {
         CatalogFieldDescriptor(name: "traceBufferKB", type: .integer, isRequired: false, minimum: 1024, maximum: 65536),
         CatalogFieldDescriptor(name: "traceCategories", type: .stringArray, isRequired: false, maxLength: 64, maxItems: 24),
         CatalogFieldDescriptor(name: "uiComponentTree", type: .boolean, isRequired: false),
-        CatalogFieldDescriptor(name: "uiDump", type: .boolean, isRequired: false)
+        CatalogFieldDescriptor(name: "uiDump", type: .boolean, isRequired: false),
+        CatalogFieldDescriptor(name: "uiScreenshot", type: .boolean, isRequired: false)
       ],
       outputs: [
         CatalogFieldDescriptor(name: "artifactIndex", type: .artifactReference, isRequired: true),
@@ -43,6 +44,9 @@ extension RuntimeOperationCatalog {
         CatalogStepDescriptor(stepID: "capture-ui-tree", kind: .captureRemoteFile, effect: .deviceMutation, cancellation: .atSafeBoundary, binding: .confirmedDevice, isOptional: true, compensation: .bestEffortCleanup),
         CatalogStepDescriptor(stepID: "receive-ui-tree", kind: .receiveFile, effect: .readOnly, cancellation: .immediate, binding: .confirmedDevice, isOptional: true, compensation: .none),
         CatalogStepDescriptor(stepID: "cleanup-ui-tree-temp", kind: .cleanupOwnedRemotePath, effect: .deviceMutation, cancellation: .atSafeBoundary, binding: .confirmedDevice, isOptional: true, compensation: .bestEffortCleanup),
+        CatalogStepDescriptor(stepID: "capture-screenshot", kind: .captureRemoteFile, effect: .deviceMutation, cancellation: .atSafeBoundary, binding: .confirmedDevice, isOptional: true, compensation: .bestEffortCleanup),
+        CatalogStepDescriptor(stepID: "receive-screenshot", kind: .receiveFile, effect: .readOnly, cancellation: .immediate, binding: .confirmedDevice, isOptional: true, compensation: .none),
+        CatalogStepDescriptor(stepID: "cleanup-screenshot-temp", kind: .cleanupOwnedRemotePath, effect: .deviceMutation, cancellation: .atSafeBoundary, binding: .confirmedDevice, isOptional: true, compensation: .bestEffortCleanup),
         CatalogStepDescriptor(stepID: "capture-trace", kind: .captureRemoteFile, effect: .deviceMutation, cancellation: .atSafeBoundary, binding: .confirmedDevice, isOptional: true, compensation: .bestEffortCleanup),
         CatalogStepDescriptor(stepID: "receive-trace-artifact", kind: .receiveFile, effect: .readOnly, cancellation: .immediate, binding: .confirmedDevice, isOptional: true, compensation: .none),
         CatalogStepDescriptor(stepID: "cleanup-remote-temp", kind: .cleanupOwnedRemotePath, effect: .deviceMutation, cancellation: .atSafeBoundary, binding: .confirmedDevice, isOptional: true, compensation: .bestEffortCleanup),
@@ -56,6 +60,7 @@ extension RuntimeOperationCatalog {
         CatalogArtifactDescriptor(name: "hilog.txt", role: .raw, mediaType: "text/plain", privacy: .sensitive, isRequired: true, retentionClass: .default),
         CatalogArtifactDescriptor(name: "ui-dump.json", role: .raw, mediaType: "application/json", privacy: .sensitive, isRequired: false, retentionClass: .default),
         CatalogArtifactDescriptor(name: "ui-tree.json", role: .raw, mediaType: "application/json", privacy: .sensitive, isRequired: false, retentionClass: .default),
+        CatalogArtifactDescriptor(name: "screenshot.png", role: .raw, mediaType: "image/png", privacy: .sensitive, isRequired: false, retentionClass: .default),
         CatalogArtifactDescriptor(name: "trace.htrace", role: .raw, mediaType: "application/octet-stream", privacy: .sensitive, isRequired: false, retentionClass: .default),
         CatalogArtifactDescriptor(name: "artifact-index.json", role: .derived, mediaType: "application/json", privacy: .standard, isRequired: true, retentionClass: .default),
         CatalogArtifactDescriptor(name: "capture-summary.json", role: .derived, mediaType: "application/json", privacy: .standard, isRequired: true, retentionClass: .default)

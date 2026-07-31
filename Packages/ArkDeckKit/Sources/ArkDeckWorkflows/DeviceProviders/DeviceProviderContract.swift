@@ -33,6 +33,10 @@ public enum HDCProviderAction: Sendable, Equatable {
   /// than to stdout. That product shape — not a missing windowId — is why
   /// it cannot ride the stdout UI dump action (CHG-2026-053 r2).
   case captureComponentTree(into: HDCOwnedRemotePath)
+  /// A PNG of the display. `snapshot_display` defaults to jpeg and checks
+  /// the file suffix against the requested type, so the lowering carries
+  /// both `-t png` and a `.png` owned path (CHG-2026-049 r5).
+  case captureScreenshot(into: HDCOwnedRemotePath)
   case receiveOwnedArtifact(HDCOwnedRemoteArtifact)
   case cleanupOwnedRemotePath(HDCOwnedRemotePath)
   // E1 mutation family (T13). Success for the mutating members is decided
@@ -170,7 +174,8 @@ public enum TypedProviderAction: Sendable, Equatable {
       .hdc(.readPortForwardPresence),
       .hdc(.inspectNativeLibrary):
       return .readOnly
-    case .hdc(.captureTrace), .hdc(.captureComponentTree), .hdc(.cleanupOwnedRemotePath),
+    case .hdc(.captureTrace), .hdc(.captureComponentTree), .hdc(.captureScreenshot),
+      .hdc(.cleanupOwnedRemotePath),
       .hdc(.sendArtifactToStaging), .hdc(.installPackage), .hdc(.startAbility),
       .hdc(.sendPackageSetToStaging), .hdc(.installPackageSet),
       .hdc(.cleanupStagedPackageSet),
@@ -335,10 +340,16 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
       self.init(kind: "hdc.captureTrace", arguments: arguments)
     case .hdc(.captureComponentTree(let path)):
       self.init(kind: "hdc.captureComponentTree", arguments: pathArguments(path))
+    case .hdc(.captureScreenshot(let path)):
+      self.init(kind: "hdc.captureScreenshot", arguments: pathArguments(path))
     case .hdc(.receiveOwnedArtifact(let artifact)):
       var arguments = pathArguments(artifact.path)
       arguments["maximumBytes"] = .integer(Int64(artifact.maximumBytes))
       optional(artifact.expectedSHA256, into: &arguments, key: "expectedSha256")
+      if let magic = artifact.expectedLeadingBytes {
+        arguments["expectedLeadingBytes"] = .string(
+          magic.map { String(format: "%02x", $0) }.joined())
+      }
       self.init(kind: "hdc.receiveOwnedArtifact", arguments: arguments)
     case .hdc(.cleanupOwnedRemotePath(let path)):
       self.init(kind: "hdc.cleanupOwnedRemotePath", arguments: pathArguments(path))
@@ -761,11 +772,22 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
         into: try path()))
     case "hdc.captureComponentTree":
       return .hdc(.captureComponentTree(into: try path()))
+    case "hdc.captureScreenshot":
+      return .hdc(.captureScreenshot(into: try path()))
     case "hdc.receiveOwnedArtifact":
       return .hdc(.receiveOwnedArtifact(
         HDCOwnedRemoteArtifact(
           path: try path(), expectedSHA256: try optionalString("expectedSha256"),
-          maximumBytes: try integer("maximumBytes"))))
+          maximumBytes: try integer("maximumBytes"),
+          expectedLeadingBytes: try optionalString("expectedLeadingBytes").map { hex in
+            var bytes = Data()
+            var index = hex.startIndex
+            while index < hex.endIndex, let next = hex.index(index, offsetBy: 2, limitedBy: hex.endIndex) {
+              if let byte = UInt8(hex[index..<next], radix: 16) { bytes.append(byte) }
+              index = next
+            }
+            return bytes
+          })))
     case "hdc.cleanupOwnedRemotePath":
       return .hdc(.cleanupOwnedRemotePath(try path()))
     case "hdc.sendArtifactToStaging":
@@ -1047,6 +1069,7 @@ public struct HostLandingExpectation: Sendable, Equatable {
       return ProviderLandedArtifact(
         localURL: destination, byteCount: byteCount, sha256: nil)
     }
+    var leading = Data()
     var hasher = SHA256()
     var buffer = [UInt8](repeating: 0, count: 256 * 1024)
     var hashed = 0
@@ -1058,13 +1081,17 @@ public struct HostLandingExpectation: Sendable, Equatable {
       if read == 0 { break }
       hashed += read
       guard hashed <= byteCount else { return nil }
+      if leading.count < 8 {
+        leading.append(contentsOf: buffer.prefix(min(read, 8 - leading.count)))
+      }
       buffer.withUnsafeBytes { hasher.update(bufferPointer: UnsafeRawBufferPointer(rebasing: $0.prefix(read))) }
     }
     guard hashed == byteCount else { return nil }
     return ProviderLandedArtifact(
       localURL: destination,
       byteCount: byteCount,
-      sha256: hasher.finalize().map { String(format: "%02x", $0) }.joined())
+      sha256: hasher.finalize().map { String(format: "%02x", $0) }.joined(),
+      leadingBytes: leading)
   }
 }
 
@@ -1076,11 +1103,15 @@ public struct ProviderLandedArtifact: Sendable, Equatable {
   /// Absent when the file was empty or over budget, i.e. when it was
   /// deliberately not hashed.
   public let sha256: String?
+  /// The first bytes as they are on disk, so a format check needs no
+  /// second read and cannot be satisfied by anything but the real file.
+  public let leadingBytes: Data
 
-  public init(localURL: URL, byteCount: Int, sha256: String?) {
+  public init(localURL: URL, byteCount: Int, sha256: String?, leadingBytes: Data = Data()) {
     self.localURL = localURL
     self.byteCount = byteCount
     self.sha256 = sha256
+    self.leadingBytes = leadingBytes
   }
 }
 
