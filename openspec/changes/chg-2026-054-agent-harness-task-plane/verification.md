@@ -1,7 +1,10 @@
 # Verification — CHG-2026-054
 
-> Change:CHG-2026-054-agent-harness-task-plane@r2
-> Status:in_progress # 2026-07-31(r2):HTP-AC-1..22 全部有结论。AC-18 = PASS(有界
+> Change:CHG-2026-054-agent-harness-task-plane@r3
+> Status:in_progress # 2026-07-31(r3):HTP-AC-23..27 随 TASK-HTP-008/009 新增,承载
+> AC-18 如实登记的两条未覆盖面(crash 证据源被真机证伪、「部署修复」腿从未接线);
+> 在它们有结论之前 GJ-5 保持 `IMPLEMENTING`。
+> 2026-07-31(r2):HTP-AC-1..22 全部有结论。AC-18 = PASS(有界
 > 取证循环)+ 如实登记未覆盖「部署修复」腿;AC-19 = PASS;AC-7 的真机字节面已由
 > TASK-HTP-006 的窗口关闭(852,165 字节真机 hilog 驱动 observation builder)。每条结论由其所属任务的
 > 实现 PR 写入本文件;维护者 review/merge 该实现 PR 即确认。不为本 change 追加独立
@@ -401,3 +404,52 @@
   真机 fail 路径无证据、`applicationLiveness` 语义仍是「采集拿回了日志行」。
   另有一条授权面正例:应用重建后旧凭据以 `inputConstraintViolated` 被拒,**且拒绝发生在
   消耗之前**(旧凭据至今 `consumptionCount: 0`)。
+
+## HTP-AC-23 crash 判定的证据源是 Faultlogger,不是 hilog(TASK-HTP-008)
+
+- 方法:①断言 `DEBUG_CRASH` 的 typed inputs 发出 `crashLogs`,且 `DC-1`/`DC-3` 的
+  `evidenceRequirements` 指向 `crash-index.txt` —— 未采到该 artifact 时判定为
+  `INCONCLUSIVE`(而不是「没看到崩溃」的 PASS);②用**真机字节**的索引与条目样本驱动
+  observation builder,断言解析出的 kind/bundle/时间戳与签名匹配结果;③负例:把同一次
+  崩溃的 887 KB 真机 hilog 喂进去,断言它**不再**贡献 `matchingCrashCount` /
+  `newFatalSignatureCount`(只贡献 `applicationLiveness`),即同一次崩溃不会被计两次。
+- Evidence:实现 PR 内测试 + `evidence/runs/TASK-HTP-008/`。
+- 结论:pending
+
+## HTP-AC-24 水位线增量语义:历史条目不算本任务的崩溃(TASK-HTP-008,HTP-INV-13)
+
+- 方法:①基线轮断言**零计数、零样本**,只写水位;②设备上先存在 N 条历史条目时,断言
+  连续若干轮 `matchingCrashCount` 累计仍为 0(否则 `== 0` 的判据永不可能通过);
+  ③水位之后新增一条匹配条目,断言恰好 +1,再跑一轮断言不重复计入;④负例:未通过
+  digest 校验的 artifact 不得推进水位。
+- Evidence:实现 PR 内测试。
+- 结论:pending
+
+## HTP-AC-25 按 kind 分派解析,未知 kind 不伪装成崩溃(TASK-HTP-008)
+
+- 方法:jscrash 条目按 `Reason:`/`Error name:`/`Error message:`/`Stacktrace:` 解析出
+  签名;cppcrash 条目按 `Reason:Signal:` + 帧表解析;`appfreeze` 与未知 kind 断言
+  **不产出信号型签名**、不被计入 fatal 计数,而是如实记为该 kind 的条目。
+- Evidence:实现 PR 内测试。**样本来源必须逐例标注**:jscrash 与索引用真机字节
+  (设备当前只有这一条条目);cppcrash 与 appfreeze 在没有真机条目之前按**文档形态**
+  手写并如实标注 —— 这正是 TASK-HTP-002 栽过的地方(手写形态被真机证伪),故本任务
+  不得把手写样本说成真机样本,并在 evidence 里把「哪一类还缺真机字节」写清楚。
+- 结论:pending
+
+## HTP-AC-26 修复腿只在有候选补丁时可达,且失败必回滚(TASK-HTP-009,HTP-INV-14)
+
+- 方法:①提交面未声明候选补丁时,`.fail` 仍走既有交人路径(断言零 workspace 派发);
+  ②声明候选补丁时断言相位序 `analyzing → patching → building → deploying → verifying`
+  且每步只派发一个 effectful job;③构建或部署失败时断言回到 `analyzing` 并派发
+  `workspace.revertPatch@1`,工作区不留已打补丁未复验的状态;④断言 handler 永不自造
+  补丁字节(补丁内容只能来自声明的 artifact)。
+- Evidence:实现 PR 内测试 + `evidence/runs/TASK-HTP-009/`。
+- 结论:pending
+
+## HTP-AC-27 E1 无凭据时零消耗 fail closed(TASK-HTP-009,HTP-INV-6)
+
+- 方法:部署腿在没有维护者已签发 standing capability 时,断言 **零 capability 消耗**、
+  零设备副作用,并产出结构化 `HumanActionRequired`;断言 harness 不自签、不续期、
+  不扩范围;E1 消耗计入 `maxE1Mutations`,预算耗尽即安全停止。
+- Evidence:实现 PR 内测试;真机段凭据不到位时如实记 `pending-hardware`。
+- 结论:pending

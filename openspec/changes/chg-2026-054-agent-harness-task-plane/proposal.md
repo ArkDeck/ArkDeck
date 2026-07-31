@@ -1,7 +1,14 @@
 ---
 id: CHG-2026-054-agent-harness-task-plane
-revision: 2
+revision: 3
 status: approved # 携 approved 落地:维护者 review + merge 本 PR 即批准(enforcement 批准语义);merge 前任务不开工。范围过大时在 review 中要求削减并在同一 change 内修订,不新建 change。
+# r3(2026-07-31,维护者指示「GJ-5 直接当前会话接着实现」):TASK-HTP-006 的窗口如实登记了
+# 两条未覆盖面,r2 的任务集里没有承载它们的任务。① crash 判定的证据源在真机上被证伪 ——
+# 真实崩溃后 `hilog -x` 里零 fault block,判定字段只在 Faultlogger 条目里(CHG-2026-049
+# 已把命令面与输出形态 pin 死,并给 `capture.diagnostics@1` 加了 crash-index / crash-log
+# 两条 E0 腿);② GJ-5 的「部署修复」腿从未接线 —— handler 在 `.fail` 上直接交人,
+# TASK-HTP-005 的 workspace operation 一条都没被 plan 到。故拆出 TASK-HTP-008(证据源)
+# 与 TASK-HTP-009(修复腿)。见 What 10/11。
 # r2(2026-07-31,维护者决定):TASK-HTP-005 开工前发现 host-only(无 target)operation
 # 在引擎准入面并不存在 —— catalog schema 允许 operation 级 `binding: none`,准入却对每个
 # job 无条件校验设备事实。故拆出 TASK-HTP-007 先行(准入语义 + 唯一消费者
@@ -125,6 +132,28 @@ Framework、不新建第二套 Runtime、不新建守护进程**。
 9. **三层 Memory**:task / project / failure。写入需证据引用(jobId、artifactId、
    evaluationId、workspace revision);project memory 只接收 evaluator PASS 或人工
    确认过的结论。检索用精确指纹 + 既有文件索引,不引入检索基础设施。
+10. **crash 判定改用 Faultlogger 证据源**(r3 新增,TASK-HTP-008):TASK-HTP-002 的
+    observation builder 按「hilog 里含 cppcrash fault block」的形态写成,fixture 也按
+    文档形态手写。**TASK-HTP-006 的 r6 窗口在真机上证伪了这个假设**:同机同 digest、
+    真实崩溃之后,887 KB 的 `hilog -x` 里 `Reason:` / `Error message:` / `Stacktrace:`
+    计数为 0 —— 判定信息只在 Faultlogger 条目里。判定逻辑本身没问题(fail-closed、
+    样本门、digest 校验都按设计工作),**错的是证据源**。CHG-2026-049 的 D9/TASK-DHA-005
+    已把命令面、条目名形态 `<kind>-<bundle>-<uid>-<yyyyMMddHHmmss>` 与内容形态 pin 死,
+    并给 `capture.diagnostics@1` 加了 `crashLogs` / `crashLogName` 两条**只读**输入与
+    `crash-index.txt` / `crash-log.txt` 两个 artifact。本任务把 handler 的输入面、
+    criteria 的 `evidenceRequirements` 与扫描器改到这个源上,**按条目 kind 分派解析**
+    (jscrash / cppcrash / appfreeze 判定字段不同,不得假设只有一种)。
+    **不是加法**:Faultlogger 索引是设备级累积状态而非采集窗口,直接计数会把历史条目
+    每轮重复计入,故需要水位线语义(见 What 11 下方的不变量 HTP-INV-13)。
+11. **GJ-5「部署修复」腿接线**(r3 新增,TASK-HTP-009):`DEBUG_CRASH` handler 在
+    `.fail` 上一律 `requestHuman`,理由写的是「repairing it requires source and build
+    operations this task type cannot run」—— TASK-HTP-005 落地后这句话不再成立,但
+    handler 没有跟着改,`patching`/`building`/`deploying` 三个相位至今不可达。本任务
+    把 `analyzing --(fail)--> patching → building → deploying → verifying` 接上
+    `workspace.applyPatch / buildOpenHarmony / revertPatch` 与 HAP 部署。
+    **补丁来源不靠模型**:确定性 handler 写不出源码修复,出站又默认 deny,故修复腿
+    **只在提交面声明了候选补丁 artifact 时可达**,否则仍然如实交人 —— 这既保住
+    HTP-INV-2,也不需要为了跑通闭环而打开出站。
 
 ### 命名冲突必须先钉死
 
@@ -162,6 +191,14 @@ Framework、不新建第二套 Runtime、不新建守护进程**。
 - **HTP-INV-11**:harness 不新增 raw command 面。`workspace.*` 与设备 operation
   一样只经受版本控制的 provider lowering。
 - **HTP-INV-12**:`harnessTaskId` 不参与 runtime 授权(见上「命名冲突」)。
+- **HTP-INV-13**(r3):Faultlogger 索引是**设备级累积状态**,不是采集窗口。一个 task
+  只能把**本任务立起水位线之后新出现**的条目计为自己的崩溃;基线轮只立水位,
+  **不产出计数、不产出样本**(那一轮还没有「自上次以来」可言,报 0 是没挣到的断言)。
+  水位线只前进不后退,且必须来自被验证过的 artifact 字节。
+- **HTP-INV-14**(r3):修复腿的补丁内容**只能来自提交面声明的候选补丁 artifact**。
+  handler 不得自造补丁字节,不得因为「有补丁可打」就把未经 evaluator `PASS` 的状态
+  称为修复成功(HTP-INV-2 在修复腿上的实例化);构建或部署失败必须回到 `analyzing`
+  并可 `revertPatch`,不得留下已打补丁但未复验的工作区。
 
 ## 明确不做(§12 / §19 / §20 边界)
 
@@ -208,6 +245,18 @@ r2 交付顺序(001–004 已合入):
   → 005 其余 workspace.*(applyPatch / build / runTests / symbolize / revert)+ preset
   → 006 真机端到端 GJ-5 收敛(硬门:GJ-1/GJ-2 REAL_DEVICE_PASS)
 ```
+
+r3 交付顺序(001–007 已合入;006 已 done 并如实登记两条未覆盖面):
+
+```text
+008 crash 证据源改用 Faultlogger(E0-only,零设备 mutation)
+  → 009 「部署修复」腿接线(E1;补丁来自提交面声明的候选 artifact)
+```
+
+**008 的开工门已满足**:GJ-1/GJ-2 均 `REAL_DEVICE_PASS`(006 的硬门已判定通过),
+且 008 与 006 同为 E0-only。**009 的真机段需要维护者经 merged PR 已签发的 standing
+capability**(HTP-INV-6:harness 不得自签);该凭据不到位时 009 的产品代码与 host 面
+测试照常交付,真机结论如实记 `pending-hardware`,不得据此宣布 GJ-5 `REAL_DEVICE_PASS`。
 
 ## 重复搜索结论(§5)
 

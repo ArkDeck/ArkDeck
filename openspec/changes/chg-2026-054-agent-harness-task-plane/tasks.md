@@ -1,7 +1,8 @@
 # Tasks — CHG-2026-054
 
-六个垂直产品任务(PRODUCT-LOOP §4:一个问题、一个垂直任务、一个产品 PR)。全部映射
-**GJ-5 Bounded AI Debug Loop**。
+九个垂直产品任务(PRODUCT-LOOP §4:一个问题、一个垂直任务、一个产品 PR)。全部映射
+**GJ-5 Bounded AI Debug Loop**。r3 新增 008/009,承载 TASK-HTP-006 如实登记的两条
+未覆盖面(crash 证据源被真机证伪、「部署修复」腿从未接线)。
 
 共同规矩:
 
@@ -283,3 +284,70 @@
   - 其他 change 目录
 - Risk:high(首次无人值守多轮真机执行,含已授权 E1 mutation;停止条件、
   outcomeUnknown 与预算面必须在此之前全部有测试覆盖,且窗口内保留人工中断能力)
+
+## TASK-HTP-008 — crash 判定改用 Faultlogger 证据源(hilog 只留活性)
+
+- Status:ready
+- Platform:macos
+- Requirements/AC:proposal What 10、HTP-INV-13;change-local HTP-AC-23、HTP-AC-24、
+  HTP-AC-25,登记于 `verification.md`
+- Gate:**已满足**——GJ-1 与 GJ-2 均 `REAL_DEVICE_PASS`(TASK-HTP-006 的硬门已判定
+  通过);本任务与 006 同为 E0-only、零设备 mutation、零源码写入
+- Depends on:TASK-HTP-002、TASK-HTP-006;CHG-2026-049 的 TASK-DHA-005(已合入 #890,
+  提供 `crashLogs` / `crashLogName` 输入与 `crash-index.txt` / `crash-log.txt` artifact)
+- Hardware required:yes(判定改源必须在真机崩溃上复验一次;E0 只读,不需要 E1 凭据)
+- Scope:`DebugCrashTaskHandler` 的 typed inputs 增发 `crashLogs`,并在上一轮观测给出
+  条目名时增发 `crashLogName`(取值只来自被验证过的观测,不来自目标串或模型);
+  `DC-1`/`DC-3` 的 `evidenceRequirements` 指向 `crash-index.txt`,`DC-2`(活性)留在
+  `hilog.txt` 并如实说明它只断言「设备在产出日志」;`HarnessObservationBuilder` 新增
+  Faultlogger 解析 —— 索引条目名分解为 `<kind>-<bundle>-<uid>-<时间戳>`、按 kind 分派
+  正文解析(jscrash 用 `Reason:`/`Error name:`/`Error message:`/`Stacktrace:`;cppcrash
+  用既有 `Reason:Signal:` + 帧表;未知 kind 不得伪装成有信号的崩溃)、水位线增量语义
+  (HTP-INV-13:基线轮只立水位不产计数不产样本);hilog 不再供给 `matchingCrashCount` /
+  `newFatalSignatureCount`,只供给 `applicationLiveness`。**不做**:不改
+  `capture.diagnostics@1` 的输入面或步骤(#890 已交付),不改 criteria 模型,
+  不碰修复腿(TASK-HTP-009)
+- Allowed paths:
+  - `Packages/ArkDeckKit/**`
+  - `openspec/changes/chg-2026-054-agent-harness-task-plane/**`
+  - `docs/adr/**`
+- Forbidden paths:
+  - `openspec/constitution.md`、`openspec/specs/**`、`openspec/verification/**`、
+    `openspec/baselines/**`、`openspec/contracts/**`
+  - `Catalog/**`、`scripts/**`、`.github/**`、`AGENTS.md`、`PRODUCT-LOOP.md`、
+    `ArkDeck.xcodeproj/**`、`ArkDeckApp/**`
+  - 其他 change 目录
+- Risk:medium(判定源替换会改变既有 fixture 的含义 —— 按文档形态手写的 hilog fault
+  block fixture 必须换成真机 Faultlogger 字节形态,不得两源并存以致同一次崩溃被计两次)
+
+## TASK-HTP-009 — GJ-5「部署修复」腿接线:候选补丁 → 构建 → 部署 → 复验
+
+- Status:ready
+- Platform:macos
+- Requirements/AC:proposal What 11、HTP-INV-14;change-local HTP-AC-26、HTP-AC-27,
+  登记于 `verification.md`
+- Gate:**已满足**——同 TASK-HTP-006(GJ-1/GJ-2 均 `REAL_DEVICE_PASS`);但**真机段
+  另有一道凭据门**:E1 只能用维护者经 merged PR 已签发的 standing capability
+  (HTP-INV-6),凭据不到位时真机结论记 `pending-hardware`
+- Depends on:TASK-HTP-005、TASK-HTP-008
+- Hardware required:yes(部署与复验必须在真机上;需 E1 standing capability)
+- Scope:`DebugCrashTaskHandler` 在 `.fail` 且提交面声明了候选补丁 artifact 时,按
+  `analyzing → patching → building → deploying → verifying` 规划
+  `workspace.applyPatch@1` → `workspace.buildOpenHarmony@1` → HAP 部署 → 复验采集;
+  `permittedOperations` 相应扩张并与 `policy.allowedOperations` 一致;E1 消耗计入
+  `maxE1Mutations` 且在无凭据时 fail closed(零消耗 + 结构化 `HumanActionRequired`);
+  构建或部署失败回到 `analyzing` 并触发 `workspace.revertPatch@1`;未声明候选补丁时
+  维持既有交人路径(理由串改为如实描述)。**不做**:不打开出站、不让模型产补丁、
+  不做 `git push`/PR/merge、不新增 operation
+- Allowed paths:
+  - `Packages/ArkDeckKit/**`
+  - `openspec/changes/chg-2026-054-agent-harness-task-plane/**`
+  - `docs/adr/**`
+- Forbidden paths:
+  - `openspec/constitution.md`、`openspec/specs/**`、`openspec/verification/**`、
+    `openspec/baselines/**`、`openspec/contracts/**`
+  - `Catalog/**`、`scripts/**`、`.github/**`、`AGENTS.md`、`PRODUCT-LOOP.md`、
+    `ArkDeck.xcodeproj/**`、`ArkDeckApp/**`
+  - 其他 change 目录
+- Risk:high(首次由 harness 自主消耗 E1 完成设备部署;补丁来源、回滚路径与预算面
+  必须全部有测试覆盖,且无凭据时必须零消耗)
