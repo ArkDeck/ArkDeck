@@ -57,6 +57,15 @@ public struct HarnessDecision: Equatable, Sendable, Codable {
   public let reasonCode: String
   public let producer: String
   public let createdAtUTC: String
+  /// The task state version the producer read (CHG-2026-055, TASK-HFA-002).
+  /// Zero means "written before the guard existed", which the freshness
+  /// check treats as unverifiable rather than fresh.
+  public let observedStateVersion: Int
+  /// Digest of `HarnessDecisionBasis` at proposal time. This is the
+  /// `contextHash` position of the architecture's stale-decision guard; the
+  /// digest of the bytes a *model* actually received is a separate field on
+  /// `HarnessModelRun`, because they answer different questions.
+  public let basisDigest: String
 
   enum CodingKeys: String, CodingKey {
     case documentType
@@ -70,6 +79,8 @@ public struct HarnessDecision: Equatable, Sendable, Codable {
     case reasonCode
     case producer
     case createdAtUTC = "createdAtUtc"
+    case observedStateVersion
+    case basisDigest
   }
 
   public init(
@@ -82,7 +93,9 @@ public struct HarnessDecision: Equatable, Sendable, Codable {
     hypothesis: String,
     reasonCode: String,
     producer: String,
-    createdAtUTC: String
+    createdAtUTC: String,
+    observedStateVersion: Int = 0,
+    basisDigest: String = ""
   ) {
     self.documentType = Self.documentType
     self.decisionID = decisionID
@@ -95,6 +108,51 @@ public struct HarnessDecision: Equatable, Sendable, Codable {
     self.reasonCode = reasonCode
     self.producer = producer
     self.createdAtUTC = createdAtUTC
+    self.observedStateVersion = observedStateVersion
+    self.basisDigest = basisDigest
+  }
+
+  /// Decisions written before TASK-HFA-002 carry neither field. They decode
+  /// to the unverifiable pair rather than failing to decode: history stays
+  /// readable, and the guard still refuses to act on them.
+  public init(from decoder: any Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    self.documentType = try container.decode(String.self, forKey: .documentType)
+    self.decisionID = try container.decode(String.self, forKey: .decisionID)
+    self.htaskID = try container.decode(String.self, forKey: .htaskID)
+    self.round = try container.decode(Int.self, forKey: .round)
+    self.kind = try container.decode(HarnessDecisionKind.self, forKey: .kind)
+    self.operationReference = try container.decodeIfPresent(
+      String.self, forKey: .operationReference)
+    self.inputs =
+      try container.decodeIfPresent([String: JSONValue].self, forKey: .inputs) ?? [:]
+    self.hypothesis = try container.decode(String.self, forKey: .hypothesis)
+    self.reasonCode = try container.decode(String.self, forKey: .reasonCode)
+    self.producer = try container.decode(String.self, forKey: .producer)
+    self.createdAtUTC = try container.decode(String.self, forKey: .createdAtUTC)
+    self.observedStateVersion =
+      try container.decodeIfPresent(Int.self, forKey: .observedStateVersion) ?? 0
+    self.basisDigest = try container.decodeIfPresent(String.self, forKey: .basisDigest) ?? ""
+  }
+
+  /// The same decision, stamped with the basis its producer read. Kept as a
+  /// derivation rather than a mutable field so a producer cannot forge a
+  /// basis it did not observe: the coordinator stamps it, from the snapshot
+  /// it loaded, on the way out of planning.
+  public func stamped(with basis: HarnessDecisionBasis) -> HarnessDecision {
+    HarnessDecision(
+      decisionID: decisionID,
+      htaskID: htaskID,
+      round: round,
+      kind: kind,
+      operationReference: operationReference,
+      inputs: inputs,
+      hypothesis: hypothesis,
+      reasonCode: reasonCode,
+      producer: producer,
+      createdAtUTC: createdAtUTC,
+      observedStateVersion: basis.stateVersion,
+      basisDigest: basis.digest)
   }
 }
 

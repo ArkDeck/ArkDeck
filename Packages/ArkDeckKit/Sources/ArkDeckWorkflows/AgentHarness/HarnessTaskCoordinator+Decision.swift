@@ -38,7 +38,8 @@ extension HarnessTaskCoordinator {
 
   func plannedProposal(
     _ snapshot: HarnessTaskSnapshot,
-    handler: any HarnessTaskHandler
+    handler: any HarnessTaskHandler,
+    basis: HarnessDecisionBasis
   ) async -> PlannedProposal {
     let deterministic = handler.plan(
       for: snapshot, decisionID: decisionIDFactory(), nowUTC: nowUTC())
@@ -55,46 +56,85 @@ extension HarnessTaskCoordinator {
         step: deterministic, producer: deterministic.decision.producer,
         rejection: "egressDenied:\(reason)")
     case .allowed(let limits):
+      // Everything from here on is a model call that happened, whatever it
+      // returns. `record` writes the audit row exactly once per outcome
+      // (TASK-HFA-002) - a call that was refused by the parser is still a
+      // call that shipped a context off this host.
+      let startedAtUTC = nowUTC()
+      var contextDigest = ""
+      var contextBytes = 0
+      func record(_ outcome: HarnessModelRunOutcome) async {
+        let run = HarnessModelRun(
+          modelRunID: modelRunIDFactory(),
+          htaskID: snapshot.htaskID,
+          round: snapshot.activeRound + 1,
+          descriptor: decisionGateway.modelDescriptor,
+          observedStateVersion: basis.stateVersion,
+          contextDigest: contextDigest,
+          contextBytes: contextBytes,
+          responseBytes: 0,
+          outcome: outcome,
+          startedAtUTC: startedAtUTC,
+          finishedAtUTC: nowUTC())
+        try? await store.putModelRun(run)
+      }
       do {
         let context = try await assembleContext(snapshot, handler: handler, limits: limits)
         let violations = HarnessEgressScreen.violations(
           in: context, targetID: snapshot.target.targetID)
         guard violations.isEmpty else {
+          // Nothing left this host, so there is no model run to record.
           return PlannedProposal(
             step: deterministic, producer: deterministic.decision.producer,
             rejection: "egressScreen:\(violations.joined(separator: ","))")
         }
+        // Digest of what the adapter is about to receive - after trimming
+        // and screening, so it stands for the bytes that actually left.
+        contextDigest = context.transmittedDigest
+        contextBytes = context.transmittedByteCount
         let bytes = try await decisionGateway.propose(context)
-        let proposal = try HarnessDecisionProposal.parse(
-          bytes, offeredOperations: Set(context.availableOperations))
-        let decision = HarnessDecision(
-          decisionID: decisionIDFactory(),
-          htaskID: snapshot.htaskID,
-          round: snapshot.activeRound + 1,
-          kind: proposal.kind,
-          operationReference: proposal.operationReference,
-          inputs: proposal.inputs,
-          hypothesis: proposal.hypothesis,
-          reasonCode: proposal.reasonCode,
-          producer: decisionGateway.producerID,
-          createdAtUTC: nowUTC())
-        return PlannedProposal(
-          step: HarnessPlannedStep(
-            decision: decision,
-            // Phase movement stays the handler's: a producer proposes a step,
-            // not a debug-journey transition.
-            phaseOnDispatch: deterministic.phaseOnDispatch),
-          producer: decisionGateway.producerID,
-          rejection: nil)
-      } catch let rejection as HarnessDecisionRejection {
-        return PlannedProposal(
-          step: deterministic, producer: deterministic.decision.producer,
-          rejection: "proposalRejected:\(rejection.reasonCode)")
+        do {
+          let proposal = try HarnessDecisionProposal.parse(
+            bytes, offeredOperations: Set(context.availableOperations))
+          let decision = HarnessDecision(
+            decisionID: decisionIDFactory(),
+            htaskID: snapshot.htaskID,
+            round: snapshot.activeRound + 1,
+            kind: proposal.kind,
+            operationReference: proposal.operationReference,
+            inputs: proposal.inputs,
+            hypothesis: proposal.hypothesis,
+            reasonCode: proposal.reasonCode,
+            producer: decisionGateway.producerID,
+            createdAtUTC: nowUTC())
+          await record(.accepted(decisionID: decision.decisionID))
+          return PlannedProposal(
+            step: HarnessPlannedStep(
+              decision: decision,
+              // Phase movement stays the handler's: a producer proposes a step,
+              // not a debug-journey transition.
+              phaseOnDispatch: deterministic.phaseOnDispatch),
+            producer: decisionGateway.producerID,
+            rejection: nil)
+        } catch let rejection as HarnessDecisionRejection {
+          await record(.rejected(reasonCode: rejection.reasonCode))
+          return PlannedProposal(
+            step: deterministic, producer: deterministic.decision.producer,
+            rejection: "proposalRejected:\(rejection.reasonCode)")
+        }
       } catch let error as HarnessDecisionGatewayError {
+        if case .contextTooLarge = error {
+          // Assembly refused before any transport: no call happened.
+          return PlannedProposal(
+            step: deterministic, producer: deterministic.decision.producer,
+            rejection: "gatewayUnavailable:\(Self.describe(error))")
+        }
+        await record(.transportFailed(reasonCode: Self.describe(error)))
         return PlannedProposal(
           step: deterministic, producer: deterministic.decision.producer,
           rejection: "gatewayUnavailable:\(Self.describe(error))")
       } catch {
+        await record(.transportFailed(reasonCode: "gatewayFailure"))
         return PlannedProposal(
           step: deterministic, producer: deterministic.decision.producer,
           rejection: "gatewayFailure")

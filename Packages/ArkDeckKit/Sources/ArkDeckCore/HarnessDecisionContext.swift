@@ -213,6 +213,25 @@ public struct HarnessDecisionContext: Equatable, Sendable, Codable {
     self.trimmed = trimmed
   }
 
+  /// The canonical serialization of this context, and the only one an
+  /// adapter may put on the wire (CHG-2026-055, TASK-HFA-002). Sorted keys
+  /// and unescaped slashes make it byte-stable, which is what lets
+  /// `transmittedDigest` stand for "what the model received" rather than
+  /// "what the harness intended to send".
+  public var transmittedBytes: Data {
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+    return (try? encoder.encode(self)) ?? Data("{}".utf8)
+  }
+
+  /// Computed over the trimmed, screened context - so the digest represents
+  /// the bytes that left the host, after redaction, not before it.
+  public var transmittedDigest: String {
+    SHA256.hash(data: transmittedBytes).map { String(format: "%02x", $0) }.joined()
+  }
+
+  public var transmittedByteCount: Int { transmittedBytes.count }
+
   /// Stable pseudonym for a target id. Deterministic so the same device reads
   /// as the same device across rounds, one-way so the id cannot be recovered.
   public static func pseudonym(forTargetID targetID: String) -> String {
