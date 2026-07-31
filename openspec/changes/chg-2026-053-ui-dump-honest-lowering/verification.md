@@ -1,7 +1,9 @@
 # Verification — CHG-2026-053
 
-> Change:CHG-2026-053-ui-dump-honest-lowering@r1
-> Status:passed # 2026-07-30 UDR-AC-1..3 随实现 PR 通过;UDR-AC-4 如实保持
+> Change:CHG-2026-053-ui-dump-honest-lowering@r2
+> Status:partial # r1:UDR-AC-1..3 passed;r2:UDR-AC-5..8 pending(本 PR 是
+> 拆分/批准载体,结论由实现 PR 写入)。原 r1 状态行如下:
+> 2026-07-30 UDR-AC-1..3 随实现 PR 通过;UDR-AC-4 如实保持
 > pending-hardware(定义为不阻塞任务 done,见其节),待下一次已接管设备 E0
 > 运行补记;维护者 review/merge 实现 PR 即确认
 
@@ -53,3 +55,44 @@
 - **结论(2026-07-30):PENDING-HARDWARE** — 实现当日 E0 只读发现见一台
   DAYU200 候选经 USB 可见但 `Offline`(设备侧信任握手未完成,属 §14 首次
   接入人工预算);未执行任何设备命令,零 dispatch。
+
+## UDR-AC-5 dumpLayout 真实 argv(r2)
+
+- 方法:contract 测试断言 `capture-ui-tree` 步骤经 provider lowering 产出的
+  **完整 argv** 为 `["-t", <connectKey>, "shell", "uitest", "dumpLayout", "-p",
+  <provider-owned remote path>]` —— 逐 token,**不含 `-w`、不含 `-d`**
+  (2026-07-31 真机实测形态);远端路径必须是 provider 自铸的 owned path,
+  调用方无法提供;缺 connectKey 时 fail closed。
+- Evidence:实现 PR 内测试 + 全量套件结果。
+- 结论:pending。
+
+## UDR-AC-6 effect 随输入升级,且未请求时逐字节不变(r2)
+
+- 方法:(a) 不带 `uiComponentTree` 的请求,其 materialized plan effect、
+  授权路径与选中步骤集与 r2 之前**完全相同**(断言计划 digest 不因本次 catalog
+  变更而改变语义:E0 + `defaultReadOnly`,三个新步骤不被选中);
+  (b) 带 `uiComponentTree: true` 时 effect 升为 `deviceMutation`,走既有
+  capability 路径;缺授权时**零 dispatch**。
+- Evidence:实现 PR 内测试。
+- 结论:pending。
+
+## UDR-AC-7 组件树产物走脱敏发布,且收不到即记 missing(r2)
+
+- 方法:(a) `ui-tree.json` 由**接收到的字节**经会脱敏的 `publish` 路径发布,
+  断言 `RuntimeArtifactStore.publishFile` 对 `application/json` 仍然拒绝
+  (即不得复用 D4 的 file-backed 路径);(b) 接收腿没有落地文件时,
+  `ui-tree.json` 记 `missing` 且带原因,绝不发布 `DumpLayout saved to:` 这类
+  状态行冒充产物;(c) 超预算按既有 D4 语义 fail closed。
+- Evidence:实现 PR 内测试。
+- 结论:pending。
+
+## UDR-AC-8 真机端到端(r2,pending-hardware)
+
+- 方法:已接管设备上一次 `capture.diagnostics@1` 带 `uiComponentTree: true`
+  的 Agent 执行:`ui-tree.json` 发布且可解析为 `{attributes, children}` 树、
+  节点数 > 1、远端临时文件被清理、人工 HDC 命令为 0;窗口记录写入
+  `evidence/runs/TASK-UDR-002/`。
+- 说明:命令面已于 2026-07-31 实测为 `[R]`(见 proposal r2),**但 ArkDeck 的
+  lowering 与端到端未验证**;按 UDR-AC-4 先例,该 AC 保持 pending-hardware 且
+  不阻塞任务 done,不得以命令面的 `[R]` 冒充实现已验证。
+- 结论:pending。
