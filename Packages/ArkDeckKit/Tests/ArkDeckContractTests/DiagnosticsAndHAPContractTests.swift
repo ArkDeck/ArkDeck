@@ -63,6 +63,14 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
       var traceListing: String?
       /// hitrace's own exit status, which the verdict must ignore.
       var traceExit: Int32 = 0
+      /// Stop/uninstall are judged by their readback, so the fixture models
+      /// the device state after the mutation rather than its exit status.
+      var processRunningAfterStop = false
+      var packageInstalledAfterUninstall = false
+      var stopProbeText: String?
+      var uninstallProbeText: String?
+      /// `aa force-stop`'s own exit status, which the verdict must ignore.
+      var stopExit: Int32 = 0
       var targetRows = "150100424a544e4600\t\tUSB\tConnected\tlocalhost\n"
       var modelValue = "DAYU200\n"
       var firmwareValue = "OpenHarmony-4.1-release\n"
@@ -182,12 +190,40 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
         note("processReadback")
         return receipt(
           script.processReadbackText ?? (script.processRunning ? "3421\n" : ""))
-      case .stopAbility:
+      case .stopAbility(let ability):
         note("stopAbility")
-        return receipt("")
-      case .uninstallPackage:
+        // force-stop, then the `pidof` readback that decides the verdict.
+        // `pidof` answers exit 1 with no output for a name it cannot find.
+        func sub(_ stdout: String, exit: Int32 = 0) -> ProviderSubprocessReceipt {
+          ProviderSubprocessReceipt(
+            exitStatus: exit, stdout: Data(stdout.utf8), stderr: Data(),
+            stdoutTruncated: false, durationSeconds: 0.01)
+        }
+        let stopProbe =
+          script.stopProbeText.map { sub($0) }
+          ?? (script.processRunningAfterStop
+            ? sub("3421\n") : sub("", exit: 1))
+        return ProviderProcessReceipt(
+          exitStatus: stopProbe.exitStatus, stdout: Data(), stderr: Data(),
+          stdoutTruncated: false, durationSeconds: 0.02,
+          subprocesses: [
+            sub("force-stop \(ability.bundle.bundleName)", exit: script.stopExit), stopProbe,
+          ])
+      case .uninstallPackage(let bundle):
         note("uninstallPackage")
-        return receipt("")
+        func sub(_ stdout: String, exit: Int32 = 0) -> ProviderSubprocessReceipt {
+          ProviderSubprocessReceipt(
+            exitStatus: exit, stdout: Data(stdout.utf8), stderr: Data(),
+            stdoutTruncated: false, durationSeconds: 0.01)
+        }
+        let dump =
+          script.uninstallProbeText
+          ?? (script.packageInstalledAfterUninstall
+            ? "bundleName: \(bundle.bundleName)\n" : "")
+        return ProviderProcessReceipt(
+          exitStatus: 0, stdout: Data(), stderr: Data(),
+          stdoutTruncated: false, durationSeconds: 0.02,
+          subprocesses: [sub("uninstall bundle successfully"), sub(dump)])
       case .queryProperty(.productModel):
         note("evidenceModel")
         return receipt(script.modelValue)
@@ -954,6 +990,48 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
       hapRequest(lease: processLease, key: "idem-hap-pid-noise"))
     let processStatus = try await processEngine.run(jobID: processJob.jobID)
     XCTAssertEqual(processStatus.state, "failed")
+  }
+
+  /// D2 end to end: `aa force-stop` exits 0, the process is still there, and
+  /// the job must not report success. Before the readback this run was
+  /// indistinguishable from a clean stop.
+  func testHAPStopThatLeavesTheProcessRunningFailsTheJob() async throws {
+    var script = ScriptedDispatcher.Script()
+    script.processRunningAfterStop = true
+    let dispatcher = ScriptedDispatcher(script: script)
+    let (engine, capabilities, artifacts) = try makeEngine(dispatcher: dispatcher)
+    let lease = try await publishHAPLease(artifacts)
+    try await installE1Capability(capabilities)
+    let job = try await engine.submit(
+      hapRequest(lease: lease, key: "idem-hap-stop-ineffective"))
+    let status = try await engine.run(jobID: job.jobID)
+    XCTAssertEqual(status.state, "failed", status.timeline.joined(separator: " | "))
+    XCTAssertTrue(
+      status.timeline.contains { $0.contains("stopIneffective") },
+      status.timeline.joined(separator: " | "))
+  }
+
+  /// The same evidence for the optional uninstall leg. `cleanup-uninstall`
+  /// is optional, so the job still completes — but the ineffective uninstall
+  /// is now recorded as a failed step instead of passing for a clean one,
+  /// which is what a later run (or a reader) needs in order to know the
+  /// bundle is still on the device.
+  func testHAPUninstallThatLeavesThePackageInstalledIsRecordedAsFailed() async throws {
+    var script = ScriptedDispatcher.Script()
+    script.packageInstalledAfterUninstall = true
+    let dispatcher = ScriptedDispatcher(script: script)
+    let (engine, capabilities, artifacts) = try makeEngine(dispatcher: dispatcher)
+    let lease = try await publishHAPLease(artifacts)
+    try await installE1Capability(capabilities)
+    let job = try await engine.submit(
+      hapRequest(lease: lease, key: "idem-hap-uninstall-ineffective"))
+    let status = try await engine.run(jobID: job.jobID)
+    let timeline = status.timeline.joined(separator: " | ")
+    XCTAssertTrue(
+      status.timeline.contains {
+        $0.hasPrefix("failed cleanup-uninstall") && $0.contains("uninstallIneffective")
+      }, timeline)
+    XCTAssertEqual(status.state, "succeeded", "the uninstall leg is optional by catalog")
   }
 
   func testHAPWithoutCapabilityUsesAutomaticE1Policy() async throws {

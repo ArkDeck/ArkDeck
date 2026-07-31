@@ -346,6 +346,131 @@ final class DeviceProviderContractTests: XCTestCase {
       try hdc.lower(action: .hdc(.queryProperty(.productModel)), context: missingTarget))
   }
 
+  // MARK: - D2: stop/uninstall are judged by their readback
+
+  private func mutationReceipt(
+    mutation: String, mutationExit: Int32, probe: String, probeExit: Int32
+  ) -> ProviderProcessReceipt {
+    func sub(_ stdout: String, exit: Int32) -> ProviderSubprocessReceipt {
+      ProviderSubprocessReceipt(
+        exitStatus: exit, stdout: Data(stdout.utf8), stderr: Data(),
+        stdoutTruncated: false, durationSeconds: 0.01)
+    }
+    return ProviderProcessReceipt(
+      exitStatus: probeExit, stdout: Data(), stderr: Data(),
+      stdoutTruncated: false, durationSeconds: 0.02,
+      subprocesses: [sub(mutation, exit: mutationExit), sub(probe, exit: probeExit)])
+  }
+
+  /// The exact "exit 0 but nothing happened" shape D2 was filed for: `aa
+  /// force-stop` reports success while the process is still there.
+  func testCleanForceStopWithALiveProcessCannotVerify() throws {
+    let ability = try HDCAbilityReference(
+      bundle: try HDCBundleReference(bundleName: "com.example.demo"),
+      abilityName: "EntryAbility")
+    let outcome = try hdc.verify(
+      receipt: mutationReceipt(
+        mutation: "force-stop ok", mutationExit: 0, probe: "3421\n", probeExit: 0),
+      action: .hdc(.stopAbility(ability)), context: context)
+    guard case .failed(let code, _) = outcome else {
+      return XCTFail("a surviving process must fail the stop, got \(outcome)")
+    }
+    XCTAssertEqual(code, "stopIneffective")
+  }
+
+  /// And the converse: a non-zero force-stop whose process is gone is a
+  /// success, because the exit status was never the evidence.
+  func testStopVerifiesOnAnAbsentProcessEvenWhenForceStopReportsFailure() throws {
+    let ability = try HDCAbilityReference(
+      bundle: try HDCBundleReference(bundleName: "com.example.demo"),
+      abilityName: "EntryAbility")
+    let outcome = try hdc.verify(
+      receipt: mutationReceipt(
+        mutation: "error: no such ability", mutationExit: 1, probe: "", probeExit: 1),
+      action: .hdc(.stopAbility(ability)), context: context)
+    guard case .verified(let summary) = outcome else {
+      return XCTFail("an absent process is a stopped process, got \(outcome)")
+    }
+    XCTAssertEqual(summary["stopped"], "com.example.demo")
+  }
+
+  func testAmbiguousStopProbeStaysUnknown() throws {
+    let ability = try HDCAbilityReference(
+      bundle: try HDCBundleReference(bundleName: "com.example.demo"),
+      abilityName: "EntryAbility")
+    for (probe, exit) in [("error 404\n", Int32(0)), ("", Int32(0)), ("3421\n", Int32(1))] {
+      let outcome = try hdc.verify(
+        receipt: mutationReceipt(
+          mutation: "", mutationExit: 0, probe: probe, probeExit: exit),
+        action: .hdc(.stopAbility(ability)), context: context)
+      guard case .unknown = outcome else {
+        return XCTFail("probe \(probe.debugDescription)/\(exit) gave \(outcome)")
+      }
+    }
+  }
+
+  /// `bm uninstall` answers `uninstall missing installed bundle` on a clean
+  /// exit when the bundle was never there. The dump decides instead.
+  func testCleanUninstallWithASurvivingPackageCannotVerify() throws {
+    let bundle = try HDCBundleReference(bundleName: "com.example.demo")
+    let outcome = try hdc.verify(
+      receipt: mutationReceipt(
+        mutation: "uninstall missing installed bundle", mutationExit: 0,
+        probe: "bundleName: com.example.demo\n", probeExit: 0),
+      action: .hdc(.uninstallPackage(bundle)), context: context)
+    guard case .failed(let code, _) = outcome else {
+      return XCTFail("a surviving package must fail the uninstall, got \(outcome)")
+    }
+    XCTAssertEqual(code, "uninstallIneffective")
+  }
+
+  func testUninstallVerifiesOnlyWhenTheDumpNoLongerNamesTheBundle() throws {
+    let bundle = try HDCBundleReference(bundleName: "com.example.demo")
+    guard case .verified = try hdc.verify(
+      receipt: mutationReceipt(
+        mutation: "uninstall bundle successfully", mutationExit: 0,
+        probe: "", probeExit: 0),
+      action: .hdc(.uninstallPackage(bundle)), context: context)
+    else {
+      return XCTFail("an absent bundle is an uninstalled bundle")
+    }
+    // A neighbouring bundle name must not read as this one surviving.
+    guard case .verified = try hdc.verify(
+      receipt: mutationReceipt(
+        mutation: "", mutationExit: 0,
+        probe: "bundleName: com.example.demo.helper\n", probeExit: 0),
+      action: .hdc(.uninstallPackage(bundle)), context: context)
+    else {
+      return XCTFail("a longer neighbouring bundle name is not this bundle")
+    }
+    guard case .unknown = try hdc.verify(
+      receipt: mutationReceipt(
+        mutation: "", mutationExit: 0, probe: "", probeExit: 1),
+      action: .hdc(.uninstallPackage(bundle)), context: context)
+    else {
+      return XCTFail("an unreadable dump is not proof of removal")
+    }
+  }
+
+  /// Neither verdict may be reached from a bare single-process receipt: a
+  /// mutation with no readback leg has produced no evidence at all.
+  func testStopAndUninstallWithoutTheirReadbackLegStayUnknown() throws {
+    let bundle = try HDCBundleReference(bundleName: "com.example.demo")
+    let ability = try HDCAbilityReference(bundle: bundle, abilityName: "EntryAbility")
+    let bare = ProviderProcessReceipt(
+      exitStatus: 0, stdout: Data(), stderr: Data(),
+      stdoutTruncated: false, durationSeconds: 0.01)
+    for action in [
+      TypedProviderAction.hdc(.stopAbility(ability)),
+      TypedProviderAction.hdc(.uninstallPackage(bundle)),
+    ] {
+      guard case .unknown = try hdc.verify(receipt: bare, action: action, context: context)
+      else {
+        return XCTFail("\(action) must not verify without its readback")
+      }
+    }
+  }
+
   func testEveryDeviceScopedHDCPlanUsesDescriptorBoundTarget() throws {
     let artifactID = "ART-0123456789abcdef0123456789abcdef"
     let artifact = ProviderResolvedInputArtifact(

@@ -50,6 +50,40 @@ final class DeviceProviderArgvContractTests: XCTestCase {
     XCTAssertEqual(timeout, 30)
   }
 
+  /// Stop and uninstall carry the readback that decides them, using the same
+  /// probes the reconcile path uses. The mutation leg must continue after a
+  /// non-zero exit or the readback would never run for the exact case D2 was
+  /// filed for.
+  func testStopAndUninstallLowerToMutationThenPresenceReadback() throws {
+    let bundle = try HDCBundleReference(bundleName: "com.example.demo")
+    let ability = try HDCAbilityReference(bundle: bundle, abilityName: "EntryAbility")
+
+    let stop = try provider.lower(action: .hdc(.stopAbility(ability)), context: context)
+    guard case .processSequence(_, let stopLegs) = stop.kind else {
+      return XCTFail("stop must lower to a mutation + readback sequence")
+    }
+    XCTAssertEqual(
+      stopLegs.map(\.arguments),
+      [
+        ["-t", connectKey, "shell", "aa", "force-stop", "com.example.demo"],
+        ["-t", connectKey, "shell", "pidof", "com.example.demo"],
+      ])
+    XCTAssertTrue(stopLegs[0].continueAfterNonZero)
+
+    let uninstall = try provider.lower(
+      action: .hdc(.uninstallPackage(bundle)), context: context)
+    guard case .processSequence(_, let uninstallLegs) = uninstall.kind else {
+      return XCTFail("uninstall must lower to a mutation + readback sequence")
+    }
+    XCTAssertEqual(
+      uninstallLegs.map(\.arguments),
+      [
+        ["-t", connectKey, "uninstall", "com.example.demo"],
+        ["-t", connectKey, "shell", "bm", "dump", "-n", "com.example.demo"],
+      ])
+    XCTAssertTrue(uninstallLegs[0].continueAfterNonZero)
+  }
+
   /// The trace capture carries its own device-side readback: `hitrace` then
   /// `ls -l` on the file it was told to write. The readback must run even
   /// when hitrace reports non-zero, or a partial trace would be judged by
