@@ -166,10 +166,13 @@ public enum TypedProviderAction: Sendable, Equatable {
   /// Host-only: reads declared source on this machine. It can never carry a
   /// device effect, which is what lets the host-only admission path exist.
   case workspace(WorkspaceProviderAction)
+  /// Host-only: deterministic analysis of an artifact that already exists
+  /// (CHG-2026-055, TASK-HFA-007).
+  case analyzer(AnalyzerProviderAction)
 
   public var effect: WorkflowEffect {
     switch self {
-    case .workspace:
+    case .workspace, .analyzer:
       return .hostOnly
     case .hdc(.observeTool), .hdc(.observeServer):
       return .hostOnly
@@ -522,6 +525,18 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
           "durationSeconds": .integer(Int64(request.durationSeconds)),
           "filters": .array(request.filters.map(JSONValue.string)),
           "byteBudget": .integer(Int64(request.byteBudget)),
+        ])
+    case .analyzer(.analyze(let invocation)):
+      // The journal records which analyzer ran over which artifact, never
+      // the host path the bytes happened to live at.
+      self.init(
+        kind: "analyzer.analyze",
+        arguments: [
+          "analyzerRef": .string(invocation.analyzerRef),
+          "analyzerVersion": .string(invocation.analyzerVersion),
+          "sourceArtifactId": .string(invocation.sourceArtifactID),
+          "sourceSha256": .string(invocation.sourceSHA256),
+          "sourceByteCount": .integer(Int64(invocation.sourceByteCount)),
         ])
     }
   }

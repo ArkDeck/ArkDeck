@@ -1374,7 +1374,7 @@ struct DurableRockchipRuntimeActionHost: RockchipRuntimeActionHosting {
     case .hdc:
       return false
     // A host-only action never runs inside the Rockchip host-managed executor.
-    case .workspace:
+    case .workspace, .analyzer:
       return false
     }
   }

@@ -41,6 +41,9 @@ class RealCatalogTests(unittest.TestCase):
         self.assertEqual(
             sorted(f"{op['id']}@{op['version']}" for op in operations),
             [
+                "analyzer.extract-crash-signature@1",
+                "analyzer.summarize-hilog@1",
+                "analyzer.summarize-trace@1",
                 "capture.diagnostics@1",
                 "debug.hap@1",
                 "deploy.native-library.app-owned@1",

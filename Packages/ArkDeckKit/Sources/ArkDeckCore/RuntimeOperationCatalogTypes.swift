@@ -12,6 +12,11 @@ public enum CatalogProvider: String, CaseIterable, Codable, Sendable {
   /// Host-only provider: source inspection, patching and builds on this
   /// machine. It has no device target and no connect key by construction.
   case workspace
+  /// Host-only provider: deterministic, versioned analysis of artifacts that
+  /// already exist (CHG-2026-055, TASK-HFA-007). It reads one artifact and
+  /// publishes a derived one; it never touches a device and never writes to
+  /// the workspace.
+  case analyzer
 }
 
 public enum RuntimeOperationAuthorizationPolicy: String, CaseIterable, Codable, Sendable {

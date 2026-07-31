@@ -47,7 +47,8 @@
       "enum": [
         "hdc",
         "rockchip",
-        "workspace"
+        "workspace",
+        "analyzer"
       ]
     },
     "effect": {

@@ -551,6 +551,7 @@ final class WorkflowStepContractTests: XCTestCase {
         if key == "parameters" { return (key, .object([:])) }
         if key == "inputArtifactIds" { return (key, .array([.string("artifact-1")])) }
         if key == "allowedFileGlobs" { return (key, .array([.string("Sources/**")])) }
+        if key == "analyzerRef" { return (key, .string("crash-signature@1")) }
         if key == "localRelativePath" { return (key, .string("artifacts/output.bin")) }
         if key.lowercased().contains("remotepath") || key == "remotePath" {
           return (key, .string("/data/local/tmp/arkdeck"))

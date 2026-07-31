@@ -291,7 +291,8 @@ final class HostOnlyAdmissionContractTests: XCTestCase {
   }
 
   func testEveryDeviceBoundOperationStillDeclaresConfirmedBinding() {
-    for descriptor in RuntimeOperationCatalog.operations where descriptor.provider != .workspace {
+    for descriptor in RuntimeOperationCatalog.operations
+    where descriptor.provider != .workspace && descriptor.provider != .analyzer {
       XCTAssertEqual(
         descriptor.binding, .confirmedDevice,
         "\(descriptor.reference) must keep its device binding")
@@ -301,6 +302,9 @@ final class HostOnlyAdmissionContractTests: XCTestCase {
     XCTAssertEqual(
       RuntimeOperationCatalog.operations.filter { $0.binding == .none }.map(\.reference),
       [
+        "analyzer.extract-crash-signature@1",
+        "analyzer.summarize-hilog@1",
+        "analyzer.summarize-trace@1",
         "workspace.apply-patch@1",
         "workspace.build-openharmony@1",
         "workspace.create-checkpoint@1",

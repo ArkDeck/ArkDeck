@@ -4,9 +4,93 @@
 // Drift is a check-sdd error (bidirectional byte comparison).
 
 extension RuntimeOperationCatalog {
-  public static let catalogDigest = "8e8cde910fa791234b7516e6527ef5fe67d8ec63121498da74c10af5e1229715"
+  public static let catalogDigest = "ccff6242cb039aa4a013dcdd9973289e73781ede530e26d2f0cd4a4d1609aa93"
 
   public static let operations: [CatalogOperationDescriptor] = [
+    CatalogOperationDescriptor(
+      id: "analyzer.extract-crash-signature",
+      version: 1,
+      title: "Extract a crash signature from a collected artifact",
+      provider: .analyzer,
+      minimumEffect: .hostOnly,
+      permittedEffects: [.hostOnly],
+      authorization: [.hostOnly: .defaultReadOnly],
+      defaultPolicyIssuanceEnabled: true,
+      binding: .none,
+      concurrencyKey: .hostExclusive,
+      inputs: [
+        CatalogFieldDescriptor(name: "sourceArtifactRef", type: .artifactLease, isRequired: true)
+      ],
+      outputs: [
+        CatalogFieldDescriptor(name: "analysis", type: .artifactReference, isRequired: true)
+      ],
+      steps: [
+        CatalogStepDescriptor(stepID: "extract-crash-signature", kind: .runDeterministicAnalyzer, effect: .hostOnly, cancellation: .immediate, binding: .none, isOptional: false, compensation: .none)
+      ],
+      timeoutSeconds: 120,
+      outputByteBudget: 67108864,
+      preflightAttempts: 1,
+      artifacts: [
+        CatalogArtifactDescriptor(name: "crash-signature.json", role: .derived, mediaType: "application/json", privacy: .standard, isRequired: true, retentionClass: .default)
+      ],
+      profiles: ["workspace-host@1"]
+    ),
+    CatalogOperationDescriptor(
+      id: "analyzer.summarize-hilog",
+      version: 1,
+      title: "Summarize a collected HiLog artifact",
+      provider: .analyzer,
+      minimumEffect: .hostOnly,
+      permittedEffects: [.hostOnly],
+      authorization: [.hostOnly: .defaultReadOnly],
+      defaultPolicyIssuanceEnabled: true,
+      binding: .none,
+      concurrencyKey: .hostExclusive,
+      inputs: [
+        CatalogFieldDescriptor(name: "sourceArtifactRef", type: .artifactLease, isRequired: true)
+      ],
+      outputs: [
+        CatalogFieldDescriptor(name: "analysis", type: .artifactReference, isRequired: true)
+      ],
+      steps: [
+        CatalogStepDescriptor(stepID: "summarize-hilog", kind: .runDeterministicAnalyzer, effect: .hostOnly, cancellation: .immediate, binding: .none, isOptional: false, compensation: .none)
+      ],
+      timeoutSeconds: 120,
+      outputByteBudget: 67108864,
+      preflightAttempts: 1,
+      artifacts: [
+        CatalogArtifactDescriptor(name: "hilog-summary.json", role: .derived, mediaType: "application/json", privacy: .standard, isRequired: true, retentionClass: .default)
+      ],
+      profiles: ["workspace-host@1"]
+    ),
+    CatalogOperationDescriptor(
+      id: "analyzer.summarize-trace",
+      version: 1,
+      title: "Summarize a collected trace artifact",
+      provider: .analyzer,
+      minimumEffect: .hostOnly,
+      permittedEffects: [.hostOnly],
+      authorization: [.hostOnly: .defaultReadOnly],
+      defaultPolicyIssuanceEnabled: true,
+      binding: .none,
+      concurrencyKey: .hostExclusive,
+      inputs: [
+        CatalogFieldDescriptor(name: "sourceArtifactRef", type: .artifactLease, isRequired: true)
+      ],
+      outputs: [
+        CatalogFieldDescriptor(name: "analysis", type: .artifactReference, isRequired: true)
+      ],
+      steps: [
+        CatalogStepDescriptor(stepID: "summarize-trace", kind: .runDeterministicAnalyzer, effect: .hostOnly, cancellation: .immediate, binding: .none, isOptional: false, compensation: .none)
+      ],
+      timeoutSeconds: 120,
+      outputByteBudget: 67108864,
+      preflightAttempts: 1,
+      artifacts: [
+        CatalogArtifactDescriptor(name: "trace-summary.json", role: .derived, mediaType: "application/json", privacy: .standard, isRequired: true, retentionClass: .default)
+      ],
+      profiles: ["workspace-host@1"]
+    ),
     CatalogOperationDescriptor(
       id: "capture.diagnostics",
       version: 1,
