@@ -55,6 +55,7 @@ steps:
   - { kind: formatPartition, minimum_effect: destructive, cancellation: criticalNonInterruptible, binding: confirmedDevice, profile_exposable: true }
   - { kind: unlockDevice, minimum_effect: destructive, cancellation: criticalNonInterruptible, binding: confirmedDevice, profile_exposable: true }
   - { kind: finalizeSession, minimum_effect: hostOnly, cancellation: atSafeBoundary, binding: none, profile_exposable: false }
+  - { kind: inspectWorkspaceSource, minimum_effect: hostOnly, cancellation: immediate, binding: none, profile_exposable: false }
 
 adapter_rule: >-
   Adapters may translate a registered typed kind into HDC/tool argv only after

@@ -1,0 +1,75 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "workspace.inspect-source",
+  "version": 1,
+  "title": "Inspect declared workspace source for a symbol",
+  "provider": "workspace",
+  "effect": {
+    "minimum": "hostOnly",
+    "permitted": [
+      "hostOnly"
+    ]
+  },
+  "authorization": {
+    "hostOnly": "defaultReadOnly"
+  },
+  "binding": "none",
+  "concurrencyKey": "host-exclusive",
+  "inputs": {
+    "fields": {
+      "projectRef": {
+        "type": "string",
+        "required": true,
+        "description": "Declared project this inspection reads; the provider resolves its root."
+      },
+      "symbol": {
+        "type": "string",
+        "required": true,
+        "description": "Symbol or literal to locate in the declared source scope."
+      },
+      "fileScope": {
+        "type": "string",
+        "required": true,
+        "description": "Glob the provider joins to the resolved project root; never a caller path."
+      }
+    }
+  },
+  "outputs": {
+    "fields": {
+      "inspection": {
+        "type": "artifactReference",
+        "required": true
+      }
+    }
+  },
+  "timeoutSeconds": 120,
+  "outputByteBudget": 1048576,
+  "retry": {
+    "preflightAttempts": 1,
+    "mutationAttempts": 1
+  },
+  "unknownOutcome": "reconcileRequired",
+  "artifacts": [
+    {
+      "name": "source-inspection.txt",
+      "role": "raw",
+      "mediaType": "text/plain",
+      "privacy": "standard",
+      "required": true
+    }
+  ],
+  "profiles": [
+    "workspace-host@1"
+  ],
+  "steps": [
+    {
+      "stepID": "inspect-workspace-source",
+      "kind": "inspectWorkspaceSource",
+      "effect": "hostOnly",
+      "cancellation": "immediate",
+      "binding": "none",
+      "compensation": "none",
+      "notes": "Reads only inside the resolved project root; writes nothing."
+    }
+  ]
+}

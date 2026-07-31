@@ -47,11 +47,12 @@ class RealCatalogTests(unittest.TestCase):
                 "deploy.native-library.system@1",
                 "flash.dayu200@1",
                 "observe.device@1",
+                "workspace.inspect-source@1",
             ],
         )
         self.assertEqual(
             sorted(f"{p['id']}@{p['version']}" for p in profiles),
-            ["dayu200@1", "openharmony-standard@1"],
+            ["dayu200@1", "openharmony-standard@1", "workspace-host@1"],
         )
 
     def test_generation_is_deterministic(self):
@@ -254,8 +255,22 @@ class ValidatorNegativeTests(unittest.TestCase):
     def test_minimum_effect_must_match_required_steps(self):
         doc = _first_operation()
         doc["effect"] = {"minimum": "hostOnly", "permitted": ["hostOnly", "readOnly"]}
-        doc["authorization"] = {"readOnly": "defaultReadOnly"}
+        doc["authorization"] = {
+            "hostOnly": "defaultReadOnly",
+            "readOnly": "defaultReadOnly",
+        }
         self._assert_rejected(doc, "must equal the maximum")
+
+    def test_authorization_must_name_a_gate_for_host_only(self):
+        # A purely hostOnly operation used to be unconstructible: the coverage
+        # rule excluded hostOnly while also demanding a non-empty map. Every
+        # permitted effect now names its gate, host-only work included.
+        doc = _first_operation()
+        doc["effect"] = {"minimum": "hostOnly", "permitted": ["hostOnly"]}
+        doc["authorization"] = {}
+        self._assert_rejected(doc, "non-empty object")
+        doc["authorization"] = {"readOnly": "defaultReadOnly"}
+        self._assert_rejected(doc, "cover exactly")
 
     def test_permitted_effect_must_be_reachable(self):
         doc = _first_operation()

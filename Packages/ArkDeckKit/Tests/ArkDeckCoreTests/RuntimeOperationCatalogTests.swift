@@ -16,6 +16,7 @@ final class RuntimeOperationCatalogTests: XCTestCase {
         "deploy.native-library.system@1",
         "flash.dayu200@1",
         "observe.device@1",
+        "workspace.inspect-source@1",
       ])
     XCTAssertRegularExpression(
       RuntimeOperationCatalog.catalogDigest, pattern: "^[0-9a-f]{64}$")
@@ -66,9 +67,14 @@ final class RuntimeOperationCatalogTests: XCTestCase {
     }
   }
 
-  func testAuthorizationCoversPermittedNonHostOnlyEffects() {
+  /// Every permitted effect names its gate, host-only included. The earlier
+  /// rule excluded `hostOnly` while the contract also demanded a non-empty
+  /// authorization map, which made a purely host-only operation impossible to
+  /// express - the same contract/implementation gap as operation-level
+  /// `binding: none` (CHG-2026-054 TASK-HTP-007).
+  func testAuthorizationCoversEveryPermittedEffect() {
     for operation in RuntimeOperationCatalog.operations {
-      let expected = Set(operation.permittedEffects.filter { $0 != .hostOnly })
+      let expected = Set(operation.permittedEffects)
       XCTAssertEqual(
         Set(operation.authorization.keys), expected,
         "\(operation.reference): authorization keys must cover permitted effects")

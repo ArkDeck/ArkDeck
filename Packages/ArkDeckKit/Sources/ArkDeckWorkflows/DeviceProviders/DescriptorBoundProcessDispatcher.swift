@@ -91,6 +91,9 @@ public struct DescriptorBoundProcessDispatcher: RuntimeProcessDispatching {
     switch plan.action {
     case .hdc: providerID = "hdc"
     case .rockchip: providerID = "rockchip"
+    // Same descriptor-bound spawn as any other provider: the executable is
+    // resolved and hashed by this dispatcher, not named by the plan.
+    case .workspace: providerID = "workspace"
     }
     let executable = try resolver.resolveExecutable(providerID: providerID)
     if let landing = plan.hostLanding {
@@ -182,13 +185,18 @@ public struct DescriptorBoundProcessDispatcher: RuntimeProcessDispatching {
 public struct RuntimeProcessDispatcherRouter: RuntimeProcessDispatching {
   private let hdc: any RuntimeProcessDispatching
   private let rockchip: any RuntimeProcessDispatching
+  /// Absent means this composition has no host-only route: a workspace plan is
+  /// then refused, never silently sent somewhere else.
+  private let workspace: (any RuntimeProcessDispatching)?
 
   public init(
     hdc: any RuntimeProcessDispatching,
-    rockchip: any RuntimeProcessDispatching
+    rockchip: any RuntimeProcessDispatching,
+    workspace: (any RuntimeProcessDispatching)? = nil
   ) {
     self.hdc = hdc
     self.rockchip = rockchip
+    self.workspace = workspace
   }
 
   public func unavailableReason(providerID: String) -> String? {
@@ -197,6 +205,11 @@ public struct RuntimeProcessDispatcherRouter: RuntimeProcessDispatching {
       return hdc.unavailableReason(providerID: providerID)
     case "rockchip":
       return rockchip.unavailableReason(providerID: providerID)
+    case "workspace":
+      guard let workspace else {
+        return "no dispatcher route is registered for provider workspace"
+      }
+      return workspace.unavailableReason(providerID: providerID)
     default:
       return "no dispatcher route is registered for provider \(providerID)"
     }
@@ -208,6 +221,12 @@ public struct RuntimeProcessDispatcherRouter: RuntimeProcessDispatching {
       return try await hdc.dispatch(plan)
     case .rockchip:
       return try await rockchip.dispatch(plan)
+    case .workspace:
+      guard let workspace else {
+        throw RuntimeDispatchFailure.failed(
+          "no dispatcher route is registered for provider workspace")
+      }
+      return try await workspace.dispatch(plan)
     }
   }
 }

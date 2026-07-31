@@ -1,9 +1,9 @@
 # Verification — CHG-2026-054
 
 > Change:CHG-2026-054-agent-harness-task-plane@r2
-> Status:in_progress # 2026-07-31(r2):HTP-AC-1..14 通过(AC-7 的真机字节面如实
-> pending-hardware);AC-20..22 为 r2 新增的 host-only 准入面;AC-15..17 pending
-> (TASK-HTP-005 待 007 之后开工),AC-18/19 pending-hardware。每条结论由其所属任务的
+> Status:in_progress # 2026-07-31(r2):HTP-AC-1..14 与 AC-20..22 通过(AC-7 的真机
+> 字节面如实 pending-hardware);AC-15..17 pending(TASK-HTP-005 可开工,007 已 done),
+> AC-18/19 pending-hardware。每条结论由其所属任务的
 > 实现 PR 写入本文件;维护者 review/merge 该实现 PR 即确认。不为本 change 追加独立
 > verification/archive 载体(PRODUCT-LOOP §4/§20)。
 
@@ -250,8 +250,17 @@
   target store、不要求 connectKey/设备身份**;携带 `expectedBindingRevision` 的请求被
   拒(host-only 没有绑定可言);job 记录与 artifact 的 binding 快照不带 bindingRevision
   与 stableIdentity;journal 的 binding-none 步骤规则不被破坏。
-- Evidence:实现 PR 内测试 + 全量套件结果。
-- 结论:pending
+- Evidence:实现 PR 内测试 + `evidence/runs/TASK-HTP-007/run-r1.md`。
+- **结论(2026-07-31):PASS** — `testHostOnlyAdmissionNeverTouchesTheDeviceSurface` 用
+  一个「什么都没接管」的 facts witness 断言 submit 与 run 全程 **零次** facts 查询、job
+  成功、evidence 的 bindingRevision 为空、provider=workspace、effect=hostOnly;
+  `testAHostOnlyRequestMayNotPinABindingRevision` 断言携带 `expectedBindingRevision`
+  的请求被拒;`testReconcilingAHostOnlyJobNeverReachesADeviceReadback` 断言 reconcile
+  不解析设备 facts(要么无事可做,要么按引用拒绝);
+  `testDraftingACapabilityForAHostOnlyOperationIsRefused` 断言 capability draft 被拒;
+  `testTheInspectionArtifactHoldsTheRealBytesAndNoDeviceBinding` 断言 artifact 的
+  bindingSnapshot 无 revision、无设备身份。`MaterializedPlanDocument` 用
+  `encodeIfPresent`,设备计划字节与 plan digest 逐字节不变。
 
 ## HTP-AC-21 设备绑定准入逐条不变(TASK-HTP-007)
 
@@ -259,8 +268,15 @@
   不匹配/缺 `expectedBindingRevision`/缺 connectKey/身份摘要非法时仍以同样的
   `evidenceIncomplete` 语义拒绝,且拒绝发生在授权之前(capability 不被消耗)。
   新路径只对 `binding: none` 可达:断言设备 operation 走不进 host-only 分支。
-- Evidence:实现 PR 内测试(正反例)。
-- 结论:pending
+- Evidence:实现 PR 内测试(正反例)+ 全量套件结果。
+- **结论(2026-07-31):PASS** — 最强信号是全量 877 例(含全部既有设备绑定准入测试)在改动后
+  仍绿;另有三条显式回归:`testDeviceBoundAdmissionStillRequiresCompleteFacts`(无 facts
+  时仍以 `target facts cannot materialize` 拒,且确实查过 facts)、
+  `testDeviceBoundAdmissionStillRequiresAPinnedBindingRevision`(有 facts 但请求未 pin
+  binding revision 仍拒 —— 新分支放宽的只有 host-only)、
+  `testEveryDeviceBoundOperationStillDeclaresConfirmedBinding`(仓内除 workspace 外
+  每个 operation 仍 `confirmedDevice`,且 `binding: none` 的 operation 恰好只有一个,
+  新分支对设备面不可达)。
 
 ## HTP-AC-22 host-only operation 的双向 fail closed 与首个消费者(TASK-HTP-007)
 
@@ -270,8 +286,22 @@
   `operation.list` 返回 `UNAVAILABLE` + 机器可读原因且零 capability 消耗;
   ③三方词表(registry / workflow-step schema / Swift validator)与生成器 pin 同步、
   `generate.py --check` 零 drift、catalog digest 更新。
-- Evidence:实现 PR 内测试 + 生成器 `--check` 输出 + `operation.list` 输出。
-- 结论:pending
+- Evidence:实现 PR 内测试 + 生成器 `--check` 输出 + `operation.list` 输出 +
+  `evidence/runs/TASK-HTP-007/run-r1.md`。
+- **结论(2026-07-31):PASS** — ①`testAHostOnlyDescriptorWithADeviceStepIsRefused`
+  逐项断言 host-only operation 内的 `confirmedDevice` 步骤、`deviceMutation` step effect、
+  permitted 超过 hostOnly 三种情形均被 `validateHostOnlyDescriptor` 拒(生成器侧另有
+  schema/registry 静态校验);②`testInspectSourceLowersToAnExactArgv` 逐 token 断言
+  `["-r","-n","--include","*.cpp","--","WaterFlowPattern","/tmp/demo-app"]`(`--` 终止
+  选项、根在末位);`testTheProviderRefusesPathsUnknownProjectsAndDeviceFacts` 断言
+  路径形 glob、未注册项目、resolveFacts 三面拒绝;
+  `testUnconfiguredInspectorReportsUnavailableAndAdmitsNothing` 断言
+  `no_workspace_inspector_configured` / `no_workspace_project_registered` 且 submit 被拒
+  (零 capability 消耗);③三方词表 + 生成器 pin 同步,`generate.py --check` 零 drift,
+  catalog digest `ad5d5a34…`;进程级 `operation.list` 显示 workspace 面 available 而
+  设备面如实 unavailable。
+  **实跑抓到并修的缺陷**:声明的必需 artifact 无人发布 → `artifactMapping` 与
+  `artifactContents` 补齐(发布 stdout 原始字节,非摘要),并加字节级断言。
 
 ## HTP-AC-15 其余 workspace operation 的 availability 与零 raw 命令(TASK-HTP-005)
 

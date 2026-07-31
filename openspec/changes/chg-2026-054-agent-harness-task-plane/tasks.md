@@ -153,7 +153,12 @@
 
 ## TASK-HTP-007 — host-only 准入语义与首个 host-only operation
 
-- Status:ready
+- Status:done
+- Done:2026-07-31;随本实现 PR 合入生效(维护者 review + merge 即批准)。
+  HTP-AC-20..22 全部 PASS,evidence = `evidence/runs/TASK-HTP-007/run-r1.md`
+  (库层 877 tests/1 skip/0 fail,新增 15 例;catalog_gen 39/39 + 零 drift;
+  host 侧进程级实跑真 spawn 成功并抓到「声明的必需 artifact 没人发布」缺陷已修)。
+  catalog digest → `ad5d5a34…`。
 - Platform:macos
 - Requirements/AC:proposal What 6(host-only 准入语义 + 唯一消费者
   `workspace.inspectSource@1`);change-local HTP-AC-20、HTP-AC-21、HTP-AC-22,

@@ -4,7 +4,7 @@
 // Drift is a check-sdd error (bidirectional byte comparison).
 
 extension RuntimeOperationCatalog {
-  public static let catalogDigest = "1ee1c1a68486f45f8406fd362770655eb9d5dc983e1da27a87235d95eeb01a94"
+  public static let catalogDigest = "ad5d5a348af394ede7b6898008e6dff32b49f2e0cc8d569728066622e73876b4"
 
   public static let operations: [CatalogOperationDescriptor] = [
     CatalogOperationDescriptor(
@@ -284,6 +284,36 @@ extension RuntimeOperationCatalog {
         CatalogArtifactDescriptor(name: "binding-snapshot.json", role: .derived, mediaType: "application/json", privacy: .sensitive, isRequired: true, retentionClass: .default)
       ],
       profiles: ["openharmony-standard@1", "dayu200@1"]
+    ),
+    CatalogOperationDescriptor(
+      id: "workspace.inspect-source",
+      version: 1,
+      title: "Inspect declared workspace source for a symbol",
+      provider: .workspace,
+      minimumEffect: .hostOnly,
+      permittedEffects: [.hostOnly],
+      authorization: [.hostOnly: .defaultReadOnly],
+      defaultPolicyIssuanceEnabled: true,
+      binding: .none,
+      concurrencyKey: .hostExclusive,
+      inputs: [
+        CatalogFieldDescriptor(name: "fileScope", type: .string, isRequired: true),
+        CatalogFieldDescriptor(name: "projectRef", type: .string, isRequired: true),
+        CatalogFieldDescriptor(name: "symbol", type: .string, isRequired: true)
+      ],
+      outputs: [
+        CatalogFieldDescriptor(name: "inspection", type: .artifactReference, isRequired: true)
+      ],
+      steps: [
+        CatalogStepDescriptor(stepID: "inspect-workspace-source", kind: .inspectWorkspaceSource, effect: .hostOnly, cancellation: .immediate, binding: .none, isOptional: false, compensation: .none)
+      ],
+      timeoutSeconds: 120,
+      outputByteBudget: 1048576,
+      preflightAttempts: 1,
+      artifacts: [
+        CatalogArtifactDescriptor(name: "source-inspection.txt", role: .raw, mediaType: "text/plain", privacy: .standard, isRequired: true, retentionClass: .default)
+      ],
+      profiles: ["workspace-host@1"]
     ),
   ]
 }

@@ -3,7 +3,7 @@
 
 # Operation effect / authorization matrix
 
-Catalog digest: `1ee1c1a68486f45f8406fd362770655eb9d5dc983e1da27a87235d95eeb01a94`
+Catalog digest: `ad5d5a348af394ede7b6898008e6dff32b49f2e0cc8d569728066622e73876b4`
 
 | Operation | Provider | Effect (min → max) | Authorization | Default issuance | Binding | Concurrency | Timeout (s) | Output budget (bytes) |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -13,6 +13,7 @@ Catalog digest: `1ee1c1a68486f45f8406fd362770655eb9d5dc983e1da27a87235d95eeb01a9
 | `deploy.native-library.system@1` | hdc | destructive | destructive: oneShotExactPlan | disabled | confirmedDevice | device-exclusive | 1800 | 134217728 |
 | `flash.dayu200@1` | rockchip | destructive | destructive: oneShotExactPlan | enabled | confirmedDevice | device-exclusive | 1800 | 134217728 |
 | `observe.device@1` | hdc | readOnly | readOnly: defaultReadOnly | enabled | confirmedDevice | device-shared-readonly | 60 | 1048576 |
+| `workspace.inspect-source@1` | workspace | hostOnly | hostOnly: defaultReadOnly | enabled | none | host-exclusive | 120 | 1048576 |
 
 ## Profiles
 
@@ -20,3 +21,4 @@ Catalog digest: `1ee1c1a68486f45f8406fd362770655eb9d5dc983e1da27a87235d95eeb01a9
 | --- | --- | --- |
 | `dayu200@1` | rockchip | `observe.device@1`, `capture.diagnostics@1`, `debug.hap@1`, `deploy.native-library.app-owned@1`, `deploy.native-library.system@1`, `flash.dayu200@1` |
 | `openharmony-standard@1` | hdc | `observe.device@1`, `capture.diagnostics@1`, `debug.hap@1`, `deploy.native-library.app-owned@1`, `deploy.native-library.system@1` |
+| `workspace-host@1` | workspace | `workspace.inspect-source@1` |

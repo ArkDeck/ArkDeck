@@ -367,8 +367,9 @@ public actor RuntimeJobEngine {
   }
 
   private struct MaterializedAdmission: Sendable {
-    let stableTargetIdentitySHA256: String
-    let bindingRevision: Int
+    /// Absent for a host-only plan; a device-bound plan always carries both.
+    let stableTargetIdentitySHA256: String?
+    let bindingRevision: Int?
     let planDigest: String
   }
 
@@ -404,10 +405,38 @@ public actor RuntimeJobEngine {
     let catalogDigest: String
     let inputs: [String: JSONValue]
     let targetID: String
-    let stableTargetIdentitySHA256: String
-    let bindingRevision: Int
+    /// Absent for a host-only plan: there is no device to identify, and
+    /// omitting the field is what keeps the digest honest. Device-bound plans
+    /// still carry both, and `encodeIfPresent` leaves their bytes - and their
+    /// digests - unchanged.
+    let stableTargetIdentitySHA256: String?
+    let bindingRevision: Int?
     let providerID: String
     let steps: [MaterializedPlanStep]
+
+    enum CodingKeys: String, CodingKey {
+      case operationReference
+      case catalogDigest
+      case inputs
+      case targetID
+      case stableTargetIdentitySHA256
+      case bindingRevision
+      case providerID
+      case steps
+    }
+
+    func encode(to encoder: any Encoder) throws {
+      var container = encoder.container(keyedBy: CodingKeys.self)
+      try container.encode(operationReference, forKey: .operationReference)
+      try container.encode(catalogDigest, forKey: .catalogDigest)
+      try container.encode(inputs, forKey: .inputs)
+      try container.encode(targetID, forKey: .targetID)
+      try container.encodeIfPresent(
+        stableTargetIdentitySHA256, forKey: .stableTargetIdentitySHA256)
+      try container.encodeIfPresent(bindingRevision, forKey: .bindingRevision)
+      try container.encode(providerID, forKey: .providerID)
+      try container.encode(steps, forKey: .steps)
+    }
   }
 
   /// Authorization binds the typed plan template, not the per-execution
@@ -555,12 +584,19 @@ public actor RuntimeJobEngine {
     let materialized = try await materializeTypedPlanBeforeAuthorization(
       request: authorizedRequest, descriptor: descriptor,
       jobID: Self.authorizationPlanJobID)
+    guard let draftIdentity = materialized.stableTargetIdentitySHA256,
+      let draftBindingRevision = materialized.bindingRevision
+    else {
+      throw RuntimeJobEngineError.rejected(
+        .invalidRequest,
+        "\(descriptor.reference) is host-only: it is gated by the default read-only policy "
+          + "and has no device to scope a capability to")
+    }
     let capability: RuntimeCapability
     do {
       capability = try RuntimeCapability(
         capabilityID: capabilityID,
-        targetScope: .stablePhysicalIdentity(
-          sha256: materialized.stableTargetIdentitySHA256),
+        targetScope: .stablePhysicalIdentity(sha256: draftIdentity),
         operationScope: [
           RuntimeCapabilityOperationScope(
             operationID: descriptor.id, version: descriptor.version)
@@ -573,7 +609,7 @@ public actor RuntimeJobEngine {
         issuer: RuntimeCapabilityIssuer(
           kind: .maintainerMergedPR, reference: issuerReference),
         exactPlanDigest: nil,
-        exactBindingRevision: materialized.bindingRevision)
+        exactBindingRevision: draftBindingRevision)
     } catch {
       throw RuntimeJobEngineError.rejected(
         .invalidInput, "generated capability would be invalid: \(error)")
@@ -585,8 +621,8 @@ public actor RuntimeJobEngine {
       requestFingerprintSHA256: requestFingerprint,
       operationReference: descriptor.reference,
       targetID: request.target.targetID,
-      bindingRevision: materialized.bindingRevision,
-      stableIdentitySHA256: materialized.stableTargetIdentitySHA256,
+      bindingRevision: draftBindingRevision,
+      stableIdentitySHA256: draftIdentity,
       materializedPlanDigest: materialized.planDigest,
       catalogDigest: RuntimeOperationCatalog.catalogDigest)
   }
@@ -1384,6 +1420,34 @@ public actor RuntimeJobEngine {
     }
   }
 
+  /// A host-only operation must be host-only all the way down. A device step
+  /// or an effect above `hostOnly` inside one would reach the device through a
+  /// path that skipped facts, binding and identity - so it is refused here,
+  /// before anything is materialized, in addition to the generator's static
+  /// check.
+  static func validateHostOnlyDescriptor(_ descriptor: CatalogOperationDescriptor) throws {
+    guard descriptor.minimumEffect <= .hostOnly,
+      descriptor.permittedEffects.allSatisfy({ $0 <= .hostOnly })
+    else {
+      throw RuntimeJobEngineError.rejected(
+        .invalidInput,
+        "\(descriptor.reference) declares binding none but permits an effect above hostOnly")
+    }
+    for step in descriptor.steps {
+      guard step.binding == .none else {
+        throw RuntimeJobEngineError.rejected(
+          .invalidInput,
+          "\(descriptor.reference) is host-only but step \(step.stepID) requires a device binding")
+      }
+      guard step.effect <= .hostOnly else {
+        throw RuntimeJobEngineError.rejected(
+          .invalidInput,
+          "\(descriptor.reference) is host-only but step \(step.stepID) declares effect "
+            + step.effect.rawValue)
+      }
+    }
+  }
+
   private static func validateEvidenceFacts(
     _ facts: ProviderFacts?,
     targetID: String,
@@ -1939,6 +2003,9 @@ public actor RuntimeJobEngine {
   /// rather than in the catalog schema because it is an implementation
   /// detail of the orchestration, not part of the published contract.
   static let artifactMapping: [String: [String: [String]]] = [
+    "workspace.inspect-source@1": [
+      "inspect-workspace-source": ["source-inspection.txt"]
+    ],
     "observe.device@1": [
       "probe-host-tool": ["tool-facts.json"],
       "read-evidence-firmware": ["device-facts.json", "binding-snapshot.json"],
@@ -2126,6 +2193,11 @@ public actor RuntimeJobEngine {
     record: RuntimeJobRecord
   ) -> Data {
     switch name {
+    case "source-inspection.txt":
+      // The inspection *is* its stdout. Publishing a summary instead would
+      // hand the evaluator a description of evidence rather than evidence
+      // (the #798 lesson, in a host-only shape).
+      return receipt.stdout
     case "hilog.txt", "ui-dump.json", "debug-hilog.txt":
       // Raw capture products are the bounded provider bytes themselves.
       // Encoding only the semantic byteCount here would fabricate a log
@@ -2617,6 +2689,16 @@ public actor RuntimeJobEngine {
       inspection = try DurableJournalRecovery.inspect(url: journalURL)
     }
 
+    // Host-only jobs are not reconciled against a device: there is no readback
+    // to perform and no device outcome to confirm, so asking a provider for
+    // facts here would be asking it to invent them.
+    if let hostOnlyDescriptor = RuntimeOperationCatalog.descriptor(
+      reference: runtime.record.request.operation.reference),
+      hostOnlyDescriptor.binding == .none
+    {
+      throw RuntimeJobEngineError.jobNotRunnable(
+        "\(jobID) is host-only: it has no device outcome to reconcile")
+    }
     let facts = try await providers.resolveFacts(
       providerID: runtime.record.providerID,
       targetID: runtime.record.request.target.targetID)
@@ -2995,20 +3077,36 @@ public actor RuntimeJobEngine {
       !step.isOptional
         || Self.optionalStepIsSelected(step, descriptor: descriptor, inputs: request.inputs)
     }
-    let facts: ProviderFacts
-    do {
-      facts = try await providers.resolveFacts(
-        providerID: descriptor.provider.rawValue,
-        targetID: request.target.targetID)
-      try Self.validateEvidenceFacts(
-        facts,
-        targetID: request.target.targetID,
-        bindingRevision: request.target.expectedBindingRevision,
-        providerID: descriptor.provider.rawValue)
-    } catch {
-      throw RuntimeJobEngineError.rejected(
-        .invalidInput,
-        "target facts cannot materialize the typed plan before authorization: \(error)")
+    // A host-only operation has no device: no connect key, no identity digest,
+    // no binding revision. Resolving device facts for it would mean inventing
+    // them, so the admission path branches instead - and the branch is only
+    // reachable for a descriptor that declares `binding: none`, with the
+    // device-bound path below unchanged (CHG-2026-054 TASK-HTP-007).
+    let facts: ProviderFacts?
+    if descriptor.binding == .none {
+      try Self.validateHostOnlyDescriptor(descriptor)
+      guard request.target.expectedBindingRevision == nil else {
+        throw RuntimeJobEngineError.rejected(
+          .invalidRequest,
+          "\(descriptor.reference) is host-only: a request must not pin a binding revision")
+      }
+      facts = nil
+    } else {
+      do {
+        let resolved = try await providers.resolveFacts(
+          providerID: descriptor.provider.rawValue,
+          targetID: request.target.targetID)
+        try Self.validateEvidenceFacts(
+          resolved,
+          targetID: request.target.targetID,
+          bindingRevision: request.target.expectedBindingRevision,
+          providerID: descriptor.provider.rawValue)
+        facts = resolved
+      } catch {
+        throw RuntimeJobEngineError.rejected(
+          .invalidInput,
+          "target facts cannot materialize the typed plan before authorization: \(error)")
+      }
     }
     let resolved: ProviderResolvedInputArtifact?
     let leaseInputName: String?
@@ -3039,7 +3137,7 @@ public actor RuntimeJobEngine {
         let artifact = try await artifactStore.resolveLease(lease)
         try Self.validateArtifactBinding(
           artifact.bindingSnapshot, request: request,
-          materializedStableIdentitySHA256: facts.deviceIdentitySHA256)
+          materializedStableIdentitySHA256: facts?.deviceIdentitySHA256)
         resolved = ProviderResolvedInputArtifact(
           artifactID: artifact.artifactID, fileURL: artifact.fileURL,
           sha256: artifact.sha256, byteCount: artifact.byteCount)
@@ -3073,10 +3171,10 @@ public actor RuntimeJobEngine {
           jobID: jobID, stepID: step.stepID,
           targetID: request.target.targetID,
           bindingRevision: request.target.expectedBindingRevision,
-          connectKey: facts.executionConnectKey,
-          expectedIdentitySHA256: facts.deviceIdentitySHA256,
-          toolVersion: facts.toolVersion,
-          toolSHA256: facts.toolSHA256,
+          connectKey: facts?.executionConnectKey,
+          expectedIdentitySHA256: facts?.deviceIdentitySHA256,
+          toolVersion: facts?.toolVersion,
+          toolSHA256: facts?.toolSHA256,
           nowUTC: nowUTC(), resolvedInputArtifact: resolved)
         let action = try provider.action(
           for: step, operation: descriptor, inputs: request.inputs,
@@ -3142,6 +3240,13 @@ public actor RuntimeJobEngine {
           throw RuntimeJobEngineError.internalFailure(
             "native deployment catalog has no atomic publish step")
         }
+        // Device-bound by declaration, so facts exist here; state it rather
+        // than force-unwrapping, so a future host-only operation reaching this
+        // block fails closed instead of trapping.
+        guard let facts else {
+          throw RuntimeJobEngineError.internalFailure(
+            "\(descriptor.reference) requires device facts to materialize its rollback")
+        }
         let rollbackStep = CatalogStepDescriptor(
           stepID: "rollback-native-library",
           kind: .runApprovedRemoteMutation,
@@ -3202,11 +3307,20 @@ public actor RuntimeJobEngine {
             },
             timeoutSeconds: nil, hostManagedDescriptor: nil))
       }
-      guard let stableIdentity = facts.deviceIdentitySHA256,
-        let bindingRevision = facts.bindingRevision
-      else {
-        throw RuntimeJobEngineError.internalFailure(
-          "validated target facts lost identity or binding revision")
+      let stableIdentity: String?
+      let bindingRevision: Int?
+      if let facts {
+        guard let identity = facts.deviceIdentitySHA256, let revision = facts.bindingRevision
+        else {
+          throw RuntimeJobEngineError.internalFailure(
+            "validated target facts lost identity or binding revision")
+        }
+        stableIdentity = identity
+        bindingRevision = revision
+      } else {
+        // Host-only: nothing to bind, and nothing is claimed.
+        stableIdentity = nil
+        bindingRevision = nil
       }
       let document = MaterializedPlanDocument(
         operationReference: descriptor.reference,
@@ -3327,12 +3441,21 @@ public actor RuntimeJobEngine {
         .authorizationRequired,
         "catalog has no authorization policy for effect \(effect.rawValue)")
     }
+    guard let queryIdentity = materialized.stableTargetIdentitySHA256,
+      let queryBindingRevision = materialized.bindingRevision
+    else {
+      // Unreachable for a host-only plan: hostOnly <= readOnly short-circuits
+      // above. Refuse rather than query a capability with no device scope.
+      throw RuntimeJobEngineError.rejected(
+        .authorizationRequired,
+        "\(descriptor.reference) has no device binding to authorize effect \(effect.rawValue)")
+    }
     let query = RuntimeCapabilityAuthorizationQuery(
       operationID: descriptor.id,
       operationVersion: descriptor.version,
       effect: effect,
-      targetStableIdentitySHA256: materialized.stableTargetIdentitySHA256,
-      targetBindingRevision: materialized.bindingRevision,
+      targetStableIdentitySHA256: queryIdentity,
+      targetBindingRevision: queryBindingRevision,
       planDigest: materialized.planDigest,
       inputs: request.inputs)
 
@@ -4176,6 +4299,21 @@ public actor RuntimeJobEngine {
       arguments = [
         "targetMode": .string("normal"),
         "reason": .string("rockusbResetAfterFlash"),
+      ]
+    case .inspectWorkspaceSource:
+      // The journal records the declared inputs and the artifact they land in.
+      // The resolved project root is deliberately absent: it is host-private,
+      // and the durable record names what was inspected, not where this
+      // machine keeps it (CHG-2026-054 TASK-HTP-007).
+      guard case .workspace(.inspectSource(let inspection))? = action else {
+        throw RuntimeJobEngineError.internalFailure(
+          "\(step.stepID) requires a workspace inspection action")
+      }
+      arguments = [
+        "projectRef": .string(inspection.projectRef),
+        "symbol": .string(inspection.symbol),
+        "fileScope": .string(inspection.fileScope),
+        "artifactId": .string("source-inspection.txt"),
       ]
     default:
       throw RuntimeJobEngineError.internalFailure(

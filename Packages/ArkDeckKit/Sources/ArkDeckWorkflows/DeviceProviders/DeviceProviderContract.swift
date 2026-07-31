@@ -108,12 +108,38 @@ public enum RockchipProviderAction: Sendable, Equatable {
   case capturePostFlashDiagnostics(connectKey: String, request: HDCHilogCaptureRequest)
 }
 
+/// One host-only action family (CHG-2026-054 TASK-HTP-007). It carries a
+/// resolved project root, never a caller-supplied path, and a glob that the
+/// provider validated before it became part of an action.
+public struct WorkspaceSourceInspection: Sendable, Equatable {
+  public let projectRef: String
+  public let projectRoot: String
+  public let symbol: String
+  public let fileScope: String
+
+  public init(projectRef: String, projectRoot: String, symbol: String, fileScope: String) {
+    self.projectRef = projectRef
+    self.projectRoot = projectRoot
+    self.symbol = symbol
+    self.fileScope = fileScope
+  }
+}
+
+public enum WorkspaceProviderAction: Sendable, Equatable {
+  case inspectSource(WorkspaceSourceInspection)
+}
+
 public enum TypedProviderAction: Sendable, Equatable {
   case hdc(HDCProviderAction)
   case rockchip(RockchipProviderAction)
+  /// Host-only: reads declared source on this machine. It can never carry a
+  /// device effect, which is what lets the host-only admission path exist.
+  case workspace(WorkspaceProviderAction)
 
   public var effect: WorkflowEffect {
     switch self {
+    case .workspace(.inspectSource):
+      return .hostOnly
     case .hdc(.observeTool), .hdc(.observeServer):
       return .hostOnly
     case .hdc(.listDeviceCandidates), .hdc(.observeDevice), .hdc(.queryProperty),
@@ -215,6 +241,16 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
       return arguments
     }
     switch action {
+    case .workspace(.inspectSource(let inspection)):
+      // The journal records what was inspected, not where: the resolved root is
+      // host-private, so only the declared project reference travels.
+      self.init(
+        kind: "workspace.inspectSource",
+        arguments: [
+          "projectRef": .string(inspection.projectRef),
+          "symbol": .string(inspection.symbol),
+          "fileScope": .string(inspection.fileScope),
+        ])
     case .hdc(.observeTool):
       self.init(kind: "hdc.observeTool", arguments: [:])
     case .hdc(.observeServer):

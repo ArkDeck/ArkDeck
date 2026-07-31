@@ -143,6 +143,9 @@ public enum WorkflowStepKind: String, CaseIterable, Codable, Sendable {
   case formatPartition
   case unlockDevice
   case finalizeSession
+  /// Host-only: read declared workspace source. No device, no shell; the
+  /// provider joins the scope glob to the project root it resolved itself.
+  case inspectWorkspaceSource
 }
 
 public struct WorkflowStepMetadata: Equatable, Sendable {
@@ -322,6 +325,8 @@ public enum WorkflowStepRegistry {
       destructive(required: [
         "providerOperationId", "confirmationId", "scopeHash", "safeBoundaryId",
       ])
+    case .inspectWorkspaceSource:
+      host(required: ["projectRef", "symbol", "fileScope", "artifactId"])
     case .finalizeSession:
       metadata(.hostOnly, .atSafeBoundary, .none, required: ["sessionId", "publicationPolicy"])
     }
@@ -1080,6 +1085,13 @@ private enum WorkflowStepValidator {
       try reader.identifier("confirmationId")
       try reader.sha256("scopeHash")
       try reader.identifier("safeBoundaryId")
+    case .inspectWorkspaceSource:
+      try reader.identifier("projectRef")
+      _ = try reader.string("symbol", minimumLength: 1, maximumLength: 200)
+      // A glob, not a path: the provider joins it to the project root it
+      // resolved itself, so a caller cannot address the filesystem.
+      _ = try reader.string("fileScope", minimumLength: 1, maximumLength: 120)
+      try reader.identifier("artifactId")
     case .finalizeSession:
       try reader.identifier("sessionId")
       try reader.constant("publicationPolicy", value: "atomicAfterValidation")
