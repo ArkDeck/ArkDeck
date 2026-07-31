@@ -568,8 +568,9 @@ struct ArkDeckCommandLine {
         arkdeck artifact import-native-library --target <id> --file <libname.so> [--json]
         arkdeck task submit --target <id> --goal <text> [--crash-signature <SIGx+Symbol>] \
       [--intake <text>] [--project <ref>] [--max-rounds <n>] \
-      [--max-wall-clock-seconds <n>] [--json]
-        arkdeck task list|status|result|events|evaluations|humanActions|memory|reconcile|\
+      [--max-wall-clock-seconds <n>] [--max-no-progress-rounds <n>] \
+      [--max-action-retries-per-run <n>] [--json]
+        arkdeck task list|status|result|events|evaluations|attempts|humanActions|memory|reconcile|\
       pause|cancel --task <HTASK-id> [--json]
         arkdeck task resume --task <HTASK-id> --resolution <typed reason> [--json]
         arkdeck artifact list|inspect|read|export --job <id> [--artifact <id>] \

@@ -87,6 +87,8 @@ extension HarnessTaskCoordinator {
     jobID: String?,
     requestID: String?
   ) async throws -> (snapshot: HarnessTaskSnapshot, action: HarnessStoredHumanAction) {
+    try await closeAttempt(
+      snapshot.htaskID, outcome: .humanRequired, reason: reasonCode)
     let now = nowUTC()
     let action = HarnessHumanActionFactory.make(
       actionID: actionIDFactory(),
@@ -201,7 +203,9 @@ extension HarnessTaskCoordinator {
       sampleDelta: sampleDelta,
       phaseChanged: before.phase != after.phase,
       newFailureCount: newFailures,
-      resolvedFailureCount: 0)
+      resolvedFailureCount: 0,
+      workspaceRevisionChanged:
+        before.repairAttempt?.patchRevision != after.repairAttempt?.patchRevision)
   }
 
   // MARK: - Task and project memory

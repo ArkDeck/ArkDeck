@@ -126,17 +126,23 @@ public struct HarnessContextBudget: Equatable, Sendable, Codable {
   public let wallClockSecondsRemaining: Int
   public let artifactBytesRemaining: Int
   public let e1MutationsRemaining: Int
+  public let noProgressRoundsRemaining: Int
+  public let actionRetriesPerRun: Int
 
   public init(
     roundsRemaining: Int,
     wallClockSecondsRemaining: Int,
     artifactBytesRemaining: Int,
-    e1MutationsRemaining: Int
+    e1MutationsRemaining: Int,
+    noProgressRoundsRemaining: Int = 0,
+    actionRetriesPerRun: Int = 0
   ) {
     self.roundsRemaining = roundsRemaining
     self.wallClockSecondsRemaining = wallClockSecondsRemaining
     self.artifactBytesRemaining = artifactBytesRemaining
     self.e1MutationsRemaining = e1MutationsRemaining
+    self.noProgressRoundsRemaining = noProgressRoundsRemaining
+    self.actionRetriesPerRun = actionRetriesPerRun
   }
 }
 
@@ -284,6 +290,8 @@ public struct HarnessDecisionProposal: Equatable, Sendable {
   public let reasonCode: String
   public let confidence: Double?
   public let patchProposal: HarnessPatchProposal?
+  public let requiredArtifacts: [String]
+  public let expectedObservation: String?
 
   public static let allowedFields: Set<String> = [
     "kind", "operationRef", "operationReference", "inputs", "hypothesis", "reasonCode",
@@ -314,7 +322,9 @@ public struct HarnessDecisionProposal: Equatable, Sendable {
     hypothesis: String,
     reasonCode: String,
     confidence: Double?,
-    patchProposal: HarnessPatchProposal? = nil
+    patchProposal: HarnessPatchProposal? = nil,
+    requiredArtifacts: [String] = [],
+    expectedObservation: String? = nil
   ) {
     self.kind = kind
     self.operationReference = operationReference
@@ -323,6 +333,8 @@ public struct HarnessDecisionProposal: Equatable, Sendable {
     self.reasonCode = reasonCode
     self.confidence = confidence
     self.patchProposal = patchProposal
+    self.requiredArtifacts = requiredArtifacts
+    self.expectedObservation = expectedObservation
   }
 
   /// Parse and validate raw model bytes against one context's offer.
@@ -396,13 +408,52 @@ public struct HarnessDecisionProposal: Equatable, Sendable {
     default: confidence = nil
     }
 
+    var requiredArtifacts: [String] = []
+    if case .array(let values)? = fields["requiredArtifacts"] {
+      guard values.count <= 64 else {
+        throw HarnessDecisionRejection.oversizedField("requiredArtifacts")
+      }
+      requiredArtifacts = try values.map { value in
+        guard case .string(let text) = value,
+          !text.isEmpty, text.utf8.count <= 256,
+          !text.unicodeScalars.contains(where: {
+            CharacterSet.controlCharacters.contains($0)
+          })
+        else {
+          throw HarnessDecisionRejection.oversizedField("requiredArtifacts")
+        }
+        return text
+      }
+      guard Set(requiredArtifacts).count == requiredArtifacts.count else {
+        throw HarnessDecisionRejection.oversizedField("requiredArtifacts")
+      }
+    } else if fields["requiredArtifacts"] != nil {
+      throw HarnessDecisionRejection.oversizedField("requiredArtifacts")
+    }
+    var expectedObservation: String?
+    if case .string(let value)? = fields["expectedObservation"] {
+      guard !value.isEmpty, value.utf8.count <= 256,
+        !value.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) })
+      else {
+        throw HarnessDecisionRejection.oversizedField("expectedObservation")
+      }
+      expectedObservation = value
+    } else if fields["expectedObservation"] != nil {
+      throw HarnessDecisionRejection.oversizedField("expectedObservation")
+    }
+
     // Raw-surface screening applies to inputs *and* to every string the
     // proposal carries: a shell fragment smuggled through `hypothesis` is
     // still a shell fragment in the durable record.
     if let refusal = HarnessRawSurfaceScreen.screen(inputs) {
       throw HarnessDecisionRejection.rawCommandSurface(refusal.reasonCode)
     }
-    if let offending = HarnessRawSurfaceScreen.screen(["hypothesis": .string(hypothesis)]) {
+    let strategyStrings: [String: JSONValue] = [
+      "hypothesis": .string(hypothesis),
+      "requiredArtifacts": .array(requiredArtifacts.map(JSONValue.string)),
+      "expectedObservation": expectedObservation.map(JSONValue.string) ?? .null,
+    ]
+    if let offending = HarnessRawSurfaceScreen.screen(strategyStrings) {
       throw HarnessDecisionRejection.rawCommandSurface(offending.reasonCode)
     }
 
@@ -443,6 +494,7 @@ public struct HarnessDecisionProposal: Equatable, Sendable {
     return HarnessDecisionProposal(
       kind: kind, operationReference: operationReference, inputs: inputs,
       hypothesis: hypothesis, reasonCode: reasonCode, confidence: confidence,
-      patchProposal: patchProposal)
+      patchProposal: patchProposal, requiredArtifacts: requiredArtifacts,
+      expectedObservation: expectedObservation)
   }
 }
