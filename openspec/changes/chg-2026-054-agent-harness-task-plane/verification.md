@@ -125,10 +125,13 @@
   **真机字节面(2026-07-31,TASK-HTP-006 窗口关闭)**:builder 在真机 DAYU200 上以
   **852,165 字节真实 hilog**(sha256 `477b8a9a1cea9a0d…`,`verified=true`)驱动测量,
   五轮采集各一份,digest 逐份校验通过;crash 扫描在该字节面上给出
-  `matchingCrashCount=0 / newFatalSignatureCount=0`。**仍未覆盖**:真机上有 fault block
-  的字节形态 —— 所用 demo 工程无 crash 路径也无 native 模块,无法复现真实 cppcrash,
-  故「有崩溃时的提取」仍只由 host 侧 fixture 覆盖(见 `run-r4-window-final.md` §5)。
-  fixture 的性质照旧如实登记:它们按 OpenHarmony cppcrash 文档形态手写。
+  `matchingCrashCount=0 / newFatalSignatureCount=0`。**2026-07-31 补充实测,并证伪一个假设**:r6 轮在同一台设备上以注入的 native
+  abort 制造了一次真实崩溃,`hilog -x` 的 887 KB 真日志里 `Cppcrash` / `Reason:Signal` /
+  `Fault thread info` 计数**全为 0** —— cppcrash 明细在 faultlogger,不在 hilog。因此
+  builder 赖以工作的「hilog 含 fault block」这一前提**在真机上不成立**;host fixture
+  按文档形态手写(当时已如实标注),判定逻辑(fail-closed / 样本门 / digest 校验)仍
+  正确,**错的是证据源**。「有崩溃时的提取」在真机上待 faultlog 源到位后重测
+  (见 `run-r6-fail-path.md`)。
 
 ## HTP-AC-8 预算耗尽即安全停止(TASK-HTP-003)
 
@@ -364,10 +367,18 @@
   newFatalSignatureCount=0 / applicationLiveness=healthy`,verdict `pass`、
   reasonCode `criteriaPassed`。应用在采集期间**确实运行**(L2 的
   `process-readback verified [bundleName, running]` + `skipped stop-ability`)。
-  **未覆盖**:GJ-5 目标里的「部署修复」腿(handler 的 permittedOperations 仍不含
-  005 的五个 workspace operation),以及真机 fail → 交人路径(所用 demo 无任何 crash
-  路径与 native 模块,无法复现真实 crash;该判定由 host 侧 HTP-AC-5/6/7 覆盖)。
-  故 **GJ-5 状态不改为 `REAL_DEVICE_PASS`**。
+  **未覆盖,且其中一条已由后续实测升级为「以当前证据源不可达」**:
+  ①「部署修复」腿——handler 的 permittedOperations 仍不含 005 的五个 workspace operation;
+  ② 真机 fail → 交人路径——2026-07-31 的 r6 轮给 demo 注入真 native abort 后实测
+  (`evidence/runs/TASK-HTP-006/run-r6-fail-path.md`):探针确实开火
+  (`crash probe firing` 在缓冲里)、应用随后停止产出(五次采集应用行数恒为 69),
+  但五份真机 `hilog.txt`(870K–890K 字节,逐份 digest 校验)里
+  `Cppcrash` / `Reason:Signal` / `Fault thread info` / `SIGABRT` **均为 0 次** ——
+  cppcrash 明细落在 faultlogger,不进 `hilog -x`,而 `capture.diagnostics@1`
+  没有 faultlog 腿。故三条 criteria 全以 `hilog.txt` 为源时,**DC-1/DC-3 在真机上
+  不可能失败**:fail 路径不是「未测」,是**证据源缺失导致不可达**。
+  故 **GJ-5 状态不改为 `REAL_DEVICE_PASS`**,且下一个产品缺陷已定位为「给 harness 一个
+  faultlog 证据源」。
 
 ## HTP-AC-19 真机证据如实性(TASK-HTP-006)
 

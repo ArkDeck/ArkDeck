@@ -250,8 +250,10 @@
   零 `task reconcile`、接管后人工步骤 0、harness E1 消耗 0;窗口内抓到并修掉四个
   产品/工具缺陷(flag 形 job submit 不可用、sensitive opt-in 只接一半、产品无法把应用
   留在运行态、crib 的 bash 3.2 与 optional 误用)。
-  **如实登记未覆盖**:GJ-5 的「部署修复」腿(handler 未接 005 的 workspace operation)
-  与真机 fail → 交人路径(demo 无 crash 路径),**故 GJ-5 状态保持 `IMPLEMENTING`**;
+  **如实登记未覆盖**:GJ-5 的「部署修复」腿(handler 未接 005 的 workspace operation);
+  真机 fail → 交人路径经 r5/r6 两轮实测升级为**以当前证据源不可达** —— 注入真 native
+  abort 后 `hilog -x` 里零 fault block(cppcrash 明细在 faultlogger,而
+  `capture.diagnostics@1` 无 faultlog 腿),**故 GJ-5 状态保持 `IMPLEMENTING`**;
   设备上 `com.example.waterflowdemo` 仍已安装且在运行,恢复需一份
   `cleanupPolicy: uninstall` 凭据或人工卸载。
 - Platform:macos
