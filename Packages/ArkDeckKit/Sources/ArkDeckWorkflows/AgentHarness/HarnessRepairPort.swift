@@ -167,7 +167,10 @@ public struct WorkspaceHarnessRepairPort: HarnessRepairPort {
         providerID: "harness",
         bindingSnapshot: ArtifactBindingSnapshot(
           targetID: task.target.targetID,
-          bindingRevision: task.target.expectedBindingRevision,
+          // This lease is consumed by a host-only workspace operation. Keep
+          // the task target as correlation, but do not fabricate a device
+          // binding for a host-side patch.
+          bindingRevision: nil,
           stableIdentitySHA256: nil),
         contents: bytes))
     guard metadata.sha256 == proposal.patchSHA256 else {
@@ -240,16 +243,34 @@ public struct WorkspaceHarnessRepairPort: HarnessRepairPort {
       throw HarnessRepairPortError.missingBuildProduct(relativeProduct)
     }
     let bytes = try Data(contentsOf: productURL)
+    guard case .string(let baselineLease)? = task.goal.desiredState[
+      "baselineHapArtifactLease"]
+    else {
+      throw HarnessRepairPortError.malformedReadback("baselineHapArtifactLease")
+    }
+    let baseline = try await artifacts.resolveLease(baselineLease)
+    guard baseline.bindingSnapshot.targetID == task.target.targetID,
+      baseline.bindingSnapshot.bindingRevision == task.target.expectedBindingRevision,
+      baseline.bindingSnapshot.stableIdentitySHA256?.count == 64
+    else {
+      throw HarnessRepairPortError.stageGateMismatch(
+        stage: "buildOutputTargetBinding",
+        expected:
+          "\(task.target.targetID)@\(task.target.expectedBindingRevision.map(String.init) ?? "-")",
+        actual:
+          "\(baseline.bindingSnapshot.targetID)@"
+          + "\(baseline.bindingSnapshot.bindingRevision.map(String.init) ?? "-")")
+    }
     let metadata = try await artifacts.publish(
       RuntimeArtifactPublicationRequest(
         jobID: jobID, sessionID: task.htaskID, stepID: "harness-build-readback",
         name: "harness-build-output.hap", mediaType: "application/octet-stream",
         privacy: .standard, retentionClass: .pinnedUntilVerified,
         sourceOperation: "workspace.build-openharmony@1", providerID: "workspace",
-        bindingSnapshot: ArtifactBindingSnapshot(
-          targetID: task.target.targetID,
-          bindingRevision: task.target.expectedBindingRevision,
-          stableIdentitySHA256: nil),
+        // This HAP later enters device-bound `debug.hap@1`. Inherit the
+        // exact binding and stable identity of the immutable baseline HAP
+        // already admitted for this task; host code never invents identity.
+        bindingSnapshot: baseline.bindingSnapshot,
         contents: bytes))
     let lease = try await artifacts.leaseReference(
       jobID: jobID, artifactID: metadata.artifactID)

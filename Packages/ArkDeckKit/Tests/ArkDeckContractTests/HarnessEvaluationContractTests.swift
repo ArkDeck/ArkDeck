@@ -187,8 +187,11 @@ private final class StagingArtifactPort: HarnessArtifactPort, @unchecked Sendabl
   private var staged: [String: [StagedArtifact]] = [:]
   private var reads: [String] = []
   var inventoryFailure: String?
+  private var leasesEnabled = false
 
   var readArtifactIDs: [String] { lock.withLock { reads } }
+
+  func enableLeases() { lock.withLock { leasesEnabled = true } }
 
   func stage(
     jobID: String,
@@ -232,15 +235,36 @@ private final class StagingArtifactPort: HarnessArtifactPort, @unchecked Sendabl
       return match.bytes.prefix(maximumBytes)
     }
   }
+
+  func leaseReference(jobID: String, artifactID: String) async throws -> String {
+    try lock.withLock {
+      guard leasesEnabled else {
+        throw HarnessArtifactPortError.unavailable(
+          "artifact leases are unavailable in this composition")
+      }
+      guard (staged[jobID] ?? []).contains(where: {
+        $0.descriptor.artifactID == artifactID && $0.descriptor.published
+      }) else { throw HarnessArtifactPortError.unreadable(artifactID) }
+      return "lease-v1:\(jobID):\(artifactID)"
+    }
+  }
+
+  func descriptor(jobID: String, name: String) -> HarnessArtifactDescriptor? {
+    lock.withLock {
+      (staged[jobID] ?? []).first { $0.descriptor.name == name }?.descriptor
+    }
+  }
 }
 
 private final class ScriptedJobPort: HarnessRuntimeJobPort, @unchecked Sendable {
   private let lock = NSLock()
   private var observations: [String: HarnessJobObservation] = [:]
   private var submissions: [String] = []
+  private var requests: [RuntimeOperationRequest] = []
   private var nextOrdinal = 1
 
   var submittedOperations: [String] { lock.withLock { submissions } }
+  var submittedRequests: [RuntimeOperationRequest] { lock.withLock { requests } }
 
   func submit(requestJSON: Data) async throws -> HarnessJobAcceptance {
     let request = try JSONDecoder().decode(RuntimeOperationRequest.self, from: requestJSON)
@@ -248,6 +272,7 @@ private final class ScriptedJobPort: HarnessRuntimeJobPort, @unchecked Sendable 
       let jobID = "JOB-\(nextOrdinal)"
       nextOrdinal += 1
       submissions.append(request.operation.reference)
+      requests.append(request)
       observations[jobID] = HarnessJobObservation(
         jobID: jobID, state: "running", isTerminal: false, succeeded: false,
         outcomeUnknown: false, waitingForHuman: false, timeline: ["queued", "running"])
@@ -293,6 +318,40 @@ final class HarnessEvaluationContractTests: XCTestCase {
   }
 
   // MARK: - HTP-AC-7: observations come from verified bytes
+
+  func testSensitiveEvidenceLeaseRequiresTheSameExplicitOptInAsReading() async throws {
+    let store = try RuntimeArtifactStore(
+      rootURL: rootURL.appendingPathComponent("artifacts", isDirectory: true),
+      nowUTC: { "2026-07-31T00:00:00Z" })
+    let published = try await store.publish(
+      RuntimeArtifactPublicationRequest(
+        jobID: "JOB-sensitive", sessionID: "SESSION-sensitive", stepID: "capture",
+        name: "crash-index.txt", mediaType: "text/plain", privacy: .sensitive,
+        retentionClass: .pinnedUntilVerified, sourceOperation: "capture.diagnostics@1",
+        providerID: "hdc",
+        bindingSnapshot: ArtifactBindingSnapshot(
+          targetID: "TGT-1", bindingRevision: 1,
+          stableIdentitySHA256: String(repeating: "a", count: 64)),
+        contents: Data(LedgerFixture.oneEntryIndex.utf8)))
+
+    let closed = RuntimeArtifactStoreHarnessPort(store: store)
+    do {
+      _ = try await closed.leaseReference(
+        jobID: published.jobID, artifactID: published.artifactID)
+      XCTFail("sensitive evidence lease must remain closed without an explicit opt-in")
+    } catch {
+      XCTAssertEqual(
+        error as? HarnessArtifactPortError,
+        .unavailable("sensitive analyzer source is not opted in: crash-index.txt"))
+    }
+
+    let optedIn = RuntimeArtifactStoreHarnessPort(
+      store: store, sensitiveEvidenceAllowList: ["crash-index.txt"])
+    let lease = try await optedIn.leaseReference(
+      jobID: published.jobID, artifactID: published.artifactID)
+    XCTAssertTrue(lease.hasPrefix("lease-v1:"))
+    XCTAssertFalse(lease.contains(rootURL.path))
+  }
 
   func testMeasurementsComeFromVerifiedBytes() async throws {
     let port = StagingArtifactPort()
@@ -635,18 +694,30 @@ final class HarnessEvaluationContractTests: XCTestCase {
     artifacts: StagingArtifactPort,
     jobs: ScriptedJobPort,
     maxRounds: Int = 8,
-    minimumSamples: Int = 2
+    minimumSamples: Int = 2,
+    includeCrashFixture: Bool = false
   ) throws -> (HarnessTaskCoordinator, HarnessTaskStore, HarnessTaskSubmission) {
     let store = try HarnessTaskStore(rootURL: rootURL)
     let coordinator = HarnessTaskCoordinator(
       store: store, jobPort: jobs, artifactPort: artifacts,
       nowUTC: { "2026-07-30T00:00:00Z" })
+    var desiredState: [String: JSONValue] = [
+      "crashSignature": .string(LedgerFixture.declaredSignature)
+    ]
+    if includeCrashFixture {
+      desiredState["bundleName"] = .string("com.example.waterflowdemo")
+      desiredState["abilityName"] = .string("EntryAbility")
+      desiredState["baselineHapArtifactLease"] =
+        .string("lease-v1:input-hap:ART-crash-fixture")
+    }
     let submission = HarnessTaskSubmission(
       type: .debugCrash,
-      target: HarnessTaskTargetReference(targetID: "TGT-958780b2ffb7"),
+      target: HarnessTaskTargetReference(
+        targetID: "TGT-958780b2ffb7",
+        expectedBindingRevision: includeCrashFixture ? 1 : nil),
       goal: HarnessTaskGoal(
         summary: "No WaterFlow SIGABRT across runs",
-        desiredState: ["crashSignature": .string(LedgerFixture.declaredSignature)]),
+        desiredState: desiredState),
       successCriteria: [
         criterion(
           "DC-1", metric: "matchingCrashCount", expected: .integer(0),
@@ -655,7 +726,7 @@ final class HarnessEvaluationContractTests: XCTestCase {
       ],
       budgets: HarnessTaskBudgets(
         maxRounds: maxRounds, maxWallClockSeconds: 900, maxArtifactBytes: 1 << 20,
-        maxE1Mutations: 0),
+        maxE1Mutations: includeCrashFixture ? 3 : 0),
       policy: HarnessTaskCoordinator.defaultPolicy(for: .debugCrash))
     return (coordinator, store, submission)
   }
@@ -721,6 +792,121 @@ final class HarnessEvaluationContractTests: XCTestCase {
     XCTAssertEqual(
       events.filter { $0.toStatus == .succeeded }.map(\.causation), [.evaluation],
       "no other causation ever reaches succeeded")
+  }
+
+  func testProductionCaptureDispatchesPinnedAnalyzerAndConsumesItsDerivedArtifact()
+    async throws
+  {
+    let artifacts = StagingArtifactPort()
+    artifacts.enableLeases()
+    let jobs = ScriptedJobPort()
+    let (coordinator, _, submission) = try makeStack(
+      artifacts: artifacts, jobs: jobs, minimumSamples: 1,
+      includeCrashFixture: true)
+    let task = try await coordinator.submit(submission)
+
+    _ = try await coordinator.reconcile(task.htaskID)  // observe.device
+    jobs.finish("JOB-1")
+    _ = try await coordinator.reconcile(task.htaskID)  // capture.diagnostics
+
+    artifacts.stage(
+      jobID: "JOB-2", name: HarnessObservationBuilder.crashIndexArtifact,
+      text: LedgerFixture.emptyIndex)
+    jobs.finish("JOB-2")
+    let analysisDispatch = try await coordinator.reconcile(task.htaskID)
+    XCTAssertEqual(analysisDispatch.action, .dispatched)
+    XCTAssertEqual(
+      jobs.submittedOperations,
+      [
+        DebugCrashTaskHandler.observeDevice, DebugCrashTaskHandler.captureDiagnostics,
+        DebugCrashTaskHandler.analyzeCrashLedger,
+      ])
+    let analyzerRequest = try XCTUnwrap(jobs.submittedRequests.last)
+    XCTAssertNil(
+      analyzerRequest.target.expectedBindingRevision,
+      "a host-only analyzer request must not masquerade as device-bound")
+    guard case .string(let sourceLease)? = analyzerRequest.inputs["sourceArtifactRef"] else {
+      return XCTFail("the analyzer must receive the exact ID-only source lease")
+    }
+    XCTAssertTrue(sourceLease.hasPrefix("lease-v1:JOB-2:ART-JOB-2-crash-index.txt"))
+
+    let source = try XCTUnwrap(
+      artifacts.descriptor(
+        jobID: "JOB-2", name: HarnessObservationBuilder.crashIndexArtifact))
+    let analyzerOutput = try HarnessCrashLedgerDerivedAnalyzer.analyze(
+      Data(LedgerFixture.emptyIndex.utf8))
+    let envelope = HarnessCrashLedgerDerivedArtifact(
+      analyzerRef: HarnessCrashLedgerAnalysis.analyzerRef,
+      analyzerVersion: HarnessCrashLedgerAnalysis.analyzerVersion,
+      sourceArtifactID: source.artifactID, sourceSHA256: source.sha256,
+      sourceByteCount: source.byteCount,
+      analyzerOutputSHA256: sha256Hex(analyzerOutput),
+      analyzerOutputByteCount: analyzerOutput.count,
+      result: try JSONDecoder().decode(
+        HarnessCrashLedgerAnalysis.self, from: analyzerOutput))
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+    artifacts.stage(
+      jobID: "JOB-3", name: "crash-signature.json",
+      bytes: try encoder.encode(envelope), mediaType: "application/json")
+    jobs.finish("JOB-3")
+
+    let evaluated = try await coordinator.reconcile(task.htaskID)
+    XCTAssertEqual(
+      evaluated.action, .stoppedForHuman,
+      "this test composition has no E1 authorization port, so the fixture stops at its gate")
+    XCTAssertEqual(evaluated.snapshot.phase, .collecting)
+    XCTAssertEqual(
+      DebugCrashTaskHandler().plan(
+        for: evaluated.snapshot, decisionID: "dec-after-analysis",
+        nowUTC: "2026-07-30T00:00:00Z").decision.operationReference,
+      DebugCrashTaskHandler.deployHAP,
+      "the analyzed baseline must return to collecting and select the fixture deployment")
+    XCTAssertEqual(
+      evaluated.snapshot.observed.measurements[HarnessObservationBuilder.watermarkMetric],
+      .string(""))
+    XCTAssertTrue(evaluated.snapshot.artifactRefs.contains(source.artifactID))
+    XCTAssertTrue(
+      evaluated.snapshot.artifactRefs.contains("ART-JOB-3-crash-signature.json"))
+    XCTAssertNil(
+      evaluated.snapshot.observedState[DebugCrashTaskHandler.pendingAnalysisSourceLeaseKey],
+      "a consumed source lease must not schedule the analyzer twice")
+  }
+
+  func testDerivedAnalyzerResultMustMatchItsRecordedOutputDigest() async throws {
+    let artifacts = StagingArtifactPort()
+    artifacts.stage(
+      jobID: "JOB-source", name: HarnessObservationBuilder.crashIndexArtifact,
+      text: LedgerFixture.emptyIndex)
+    let source = try XCTUnwrap(
+      artifacts.descriptor(
+        jobID: "JOB-source", name: HarnessObservationBuilder.crashIndexArtifact))
+    let originalOutput = try HarnessCrashLedgerDerivedAnalyzer.analyze(
+      Data(LedgerFixture.emptyIndex.utf8))
+    let tamperedResult = HarnessCrashLedgerAnalysis(
+      status: .answered,
+      entries: [try XCTUnwrap(HarnessFaultLogLedger.parse(entryName: LedgerFixture.entryName))])
+    let envelope = HarnessCrashLedgerDerivedArtifact(
+      analyzerRef: HarnessCrashLedgerAnalysis.analyzerRef,
+      analyzerVersion: HarnessCrashLedgerAnalysis.analyzerVersion,
+      sourceArtifactID: source.artifactID, sourceSHA256: source.sha256,
+      sourceByteCount: source.byteCount,
+      analyzerOutputSHA256: sha256Hex(originalOutput),
+      analyzerOutputByteCount: originalOutput.count,
+      result: tamperedResult)
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+    artifacts.stage(
+      jobID: "JOB-derived", name: "crash-signature.json",
+      bytes: try encoder.encode(envelope), mediaType: "application/json")
+
+    let observed = try await HarnessObservationBuilder(artifacts: artifacts).observe(
+      round: 1, jobID: "JOB-derived", declaredCrashSignature: LedgerFixture.declaredSignature,
+      requiredEvidence: [HarnessObservationBuilder.crashIndexArtifact],
+      sourceEvidenceJobID: "JOB-source", expectedSourceArtifactID: source.artifactID)
+    XCTAssertTrue(
+      observed.integrityBlockers.contains("crashLedgerDerivedArtifactProvenanceMismatch"))
+    XCTAssertNil(observed.measurements[HarnessObservationBuilder.watermarkMetric])
   }
 
   func testAFailingCriterionHandsTheVerdictToAHumanAndNeverSucceeds() async throws {

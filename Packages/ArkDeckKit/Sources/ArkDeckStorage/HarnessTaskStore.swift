@@ -244,10 +244,12 @@ public actor HarnessTaskStore {
           throw HarnessTaskStoreError.corrupt("invalid created attempt \(attempt.attemptID)")
         }
       case .actionRunRecorded, .patchRevisionObserved, .failureRecorded, .evaluationRecorded,
-        .closed:
+        .resumed, .closed:
         guard let current else {
           throw HarnessTaskStoreError.corrupt("unknown attempt \(attempt.attemptID)")
         }
+        let validHumanResume =
+          kind == .resumed && current.outcome == .humanRequired && attempt.outcome == .active
         guard current.htaskID == attempt.htaskID,
           current.ordinal == attempt.ordinal,
           current.strategyFingerprint == attempt.strategyFingerprint,
@@ -256,7 +258,7 @@ public actor HarnessTaskStore {
           Set(current.evaluationIDs).isSubset(of: Set(attempt.evaluationIDs)),
           Set(current.confirmedFacts).isSubset(of: Set(attempt.confirmedFacts)),
           Set(current.disprovedFacts).isSubset(of: Set(attempt.disprovedFacts)),
-          !(current.outcome.isClosed && attempt.outcome == .active)
+          !(current.outcome.isClosed && attempt.outcome == .active) || validHumanResume
         else {
           throw HarnessTaskStoreError.corrupt(
             "attempt \(attempt.attemptID) update regressed an immutable field")

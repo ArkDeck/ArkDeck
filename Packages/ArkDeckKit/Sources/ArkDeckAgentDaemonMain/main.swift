@@ -10,6 +10,27 @@ import ArkDeckWorkflows
 import Darwin
 import Foundation
 
+/// The analyzer is the same signed executable in a closed, one-shot mode.
+/// It accepts exactly one engine-resolved artifact path and writes exactly
+/// one deterministic JSON document to stdout; normal daemon startup is never
+/// entered on this path.
+if CommandLine.arguments.dropFirst().first == "--analyze-crash-ledger" {
+  let values = Array(CommandLine.arguments.dropFirst(2))
+  guard values.count == 1, values[0].hasPrefix("/") else {
+    FileHandle.standardError.write(
+      Data("--analyze-crash-ledger requires one absolute artifact path\n".utf8))
+    exit(64)
+  }
+  do {
+    let source = try Data(contentsOf: URL(fileURLWithPath: values[0]))
+    FileHandle.standardOutput.write(try HarnessCrashLedgerDerivedAnalyzer.analyze(source))
+    exit(0)
+  } catch {
+    FileHandle.standardError.write(Data("crash-ledger analysis failed: \(error)\n".utf8))
+    exit(1)
+  }
+}
+
 func utcNow() -> String {
   let formatter = DateFormatter()
   formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss'Z'"
@@ -208,6 +229,7 @@ Task.detached {
     // unavailable, so nothing is admitted and no capability is consumed.
     //   ARKDECK_WORKSPACE_INSPECTOR=/usr/bin/grep
     //   ARKDECK_WORKSPACE_PROJECTS=demo-app=/abs/path,other=/abs/other
+    //   ARKDECK_WORKSPACE_ACTIVE_PROJECT=demo-app
     let workspaceRoots = Dictionary(
       uniqueKeysWithValues:
         (ProcessInfo.processInfo.environment["ARKDECK_WORKSPACE_PROJECTS"] ?? "")
@@ -237,10 +259,29 @@ Task.detached {
     var workspaceRepairConfiguration: (
       profile: WorkspaceProjectProfile, attempts: WorkspacePatchAttemptStore
     )?
-    if let arkDeckRoot = workspaceRoots["ArkDeck"] {
+    let configuredActiveProject =
+      ProcessInfo.processInfo.environment["ARKDECK_WORKSPACE_ACTIVE_PROJECT"]
+    let activeProjectRef = configuredActiveProject
+      ?? (workspaceRoots.count == 1 ? workspaceRoots.keys.first : nil)
+    if let activeProjectRef, let activeRoot = workspaceRoots[activeProjectRef] {
       do {
-        let profile = try WorkspaceProjectProfile.arkDeck(
-          rootURL: URL(fileURLWithPath: arkDeckRoot, isDirectory: true))
+        let profile: WorkspaceProjectProfile
+        switch activeProjectRef {
+        case "ArkDeck":
+          profile = try WorkspaceProjectProfile.arkDeck(
+            rootURL: URL(fileURLWithPath: activeRoot, isDirectory: true))
+        case "demo-app":
+          let node = ProcessInfo.processInfo.environment["ARKDECK_DEVECO_NODE_PATH"]
+            ?? "/Applications/DevEco-Studio.app/Contents/tools/node/bin/node"
+          let hvigor = ProcessInfo.processInfo.environment["ARKDECK_DEVECO_HVIGOR_PATH"]
+            ?? "/Applications/DevEco-Studio.app/Contents/tools/hvigor/bin/hvigorw.js"
+          profile = try WorkspaceProjectProfile.waterFlowDemo(
+            rootURL: URL(fileURLWithPath: activeRoot, isDirectory: true),
+            projectRef: activeProjectRef, nodePath: node, hvigorScriptPath: hvigor)
+        default:
+          throw DeviceProviderError.factsUnavailable(
+            "workspace.projectProfileUnavailable:\(activeProjectRef) is unsupported")
+        }
         let attempts = try WorkspacePatchAttemptStore(
           rootURL: resolvedStateDirectory.appendingPathComponent(
             "workspace-patch-attempts", isDirectory: true))
@@ -254,7 +295,8 @@ Task.detached {
       }
     } else {
       workspaceOperations = UnavailableWorkspaceOperationsProvider(
-        reason: "workspace.projectProfileUnavailable:ArkDeck is not registered")
+        reason:
+          "workspace.projectProfileUnavailable: select exactly one registered active project")
     }
     if let workspaceOperationResolver {
       workspaceDispatcher = DescriptorBoundProcessDispatcher(
@@ -265,15 +307,33 @@ Task.detached {
         resolver: FixedExecutableResolver(
           table: ["workspace": inspectorExecutable]))
     }
-    // No analyzer is configured by default. A host declares them explicitly;
-    // an absent analyzer is unavailable, never improvised.
-    let analyzerProfiles: [AnalyzerProfile] = []
+    // No analyzer is configured by default. A host declares the pinned
+    // executable explicitly; an absent analyzer is unavailable, never
+    // improvised.  The shipped daemon can serve the closed one-shot mode,
+    // but its path still has to be named so packaging drift fails closed.
+    //   ARKDECK_ANALYZER_PATH=/abs/path/to/arkdeck-agentd
+    let analyzerProfiles: [AnalyzerProfile]
+    if let analyzerPath = ProcessInfo.processInfo.environment["ARKDECK_ANALYZER_PATH"] {
+      let resolver = try FixedExecutableResolver.hashing(
+        path: analyzerPath, providerID: "analyzer")
+      let executable = try resolver.resolveExecutable(providerID: "analyzer")
+      analyzerProfiles = [
+        AnalyzerProfile(
+          analyzerRef: HarnessCrashLedgerAnalysis.analyzerRef,
+          analyzerVersion: HarnessCrashLedgerAnalysis.analyzerVersion,
+          executablePath: executable.path,
+          executableSHA256: executable.sha256,
+          fixedArguments: ["--analyze-crash-ledger"], timeoutSeconds: 30)
+      ]
+    } else {
+      analyzerProfiles = []
+    }
     let workspaceProvider = WorkspaceProvider(
       registry: WorkspaceProjectRegistry(roots: workspaceRoots),
       tool: workspaceTool, operations: workspaceOperations)
     if workspaceOperationResolver != nil {
       print(
-        "workspace ProjectProfile ready for ArkDeck")
+        "workspace ProjectProfile ready for \(activeProjectRef ?? "-")")
       fflush(stdout)
     }
 
@@ -341,6 +401,14 @@ Task.detached {
       print("harness decision egress enabled for \(egressProjects.sorted().joined(separator: ","))")
       fflush(stdout)
     }
+    let decisionGateway = try HarnessVendorConfiguration.gateway(
+      environment: ProcessInfo.processInfo.environment)
+    if let decisionGateway {
+      print(
+        "harness decision gateway ready: \(decisionGateway.producerID) "
+          + "model=\(decisionGateway.modelDescriptor.modelName)")
+      fflush(stdout)
+    }
     let harness = HarnessTaskCoordinator(
       store: harnessStore,
       jobPort: RuntimeJobEngineHarnessPort(engine: engine),
@@ -357,9 +425,7 @@ Task.detached {
         availability: RuntimeEngineAvailabilityPort(engine: engine),
         capabilities: RuntimeCapabilityStoreHarnessPort(
           store: capabilityStore, nowUTC: utcNow)),
-      // No adapter ships in this composition yet: the port exists, and a
-      // model-backed producer is configured by whoever supplies one.
-      decisionGateway: nil,
+      decisionGateway: decisionGateway,
       egressPolicy: HarnessEgressPolicy(enabledProjects: egressProjects),
       // Privacy-sensitive evidence the operator allows this run to measure,
       // by artifact name: `ARKDECK_HARNESS_SENSITIVE_EVIDENCE=hilog.txt`.

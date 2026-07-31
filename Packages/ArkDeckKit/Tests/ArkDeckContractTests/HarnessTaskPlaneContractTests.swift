@@ -498,6 +498,32 @@ final class HarnessTaskPlaneContractTests: XCTestCase {
     }
   }
 
+  func testReducerAllowsLedgerBaselineToEnterCrashReproduction() throws {
+    let base = HarnessTaskSnapshot(
+      htaskID: "HTASK-0123456789AB", type: .debugCrash,
+      intakeDescription: nil, projectRef: "demo-app",
+      target: HarnessTaskTargetReference(targetID: "TGT-1", expectedBindingRevision: 1),
+      goal: HarnessTaskGoal(summary: "inject crash after baseline"),
+      successCriteria: [],
+      budgets: HarnessTaskBudgets(
+        maxRounds: 8, maxWallClockSeconds: 60, maxArtifactBytes: 1024,
+        maxE1Mutations: 3),
+      policy: HarnessTaskCoordinator.defaultPolicy(for: .debugCrash),
+      createdAtUTC: "2026-07-31T00:00:00Z", updatedAtUTC: "2026-07-31T00:00:00Z",
+      status: .running, phase: .collecting)
+    let transition = HarnessTaskTransition(
+      causation: .jobDispatched, reasonCode: "deployBaselineCrashFixture",
+      status: .running, phase: .reproducing, activeRound: 3,
+      activeJobID: "JOB-BASELINE", consumedBudget: HarnessConsumedBudget(
+        rounds: 3, e1Mutations: 1), jobID: "JOB-BASELINE",
+      artifactRefs: [], cancelRequested: false,
+      atUTC: "2026-07-31T00:00:01Z")
+
+    let (advanced, _) = try HarnessTaskStateReducer.apply(transition, to: base)
+    XCTAssertEqual(advanced.phase, .reproducing)
+    XCTAssertEqual(advanced.activeJobID, "JOB-BASELINE")
+  }
+
   func testStaleVersionCommitIsRejected() async throws {
     let port = RecordingJobPort()
     let (coordinator, store) = try makeCoordinator(port: port)
@@ -787,16 +813,42 @@ final class HarnessTaskPlaneContractTests: XCTestCase {
       [
         "targetId": .string("TGT-958780b2ffb7"),
         "goal": .string("No SIGABRT in WaterFlow::RecoverBack across five runs."),
+        "projectRef": .string("demo-app"),
+        "crashSignature": .string("SIGABRT+WaterFlowCrashProbe_RecoverBack"),
+        "bundleName": .string("com.example.waterflowdemo"),
+        "abilityName": .string("EntryAbility"),
+        "baselineHapArtifactLease": .string("lease-v1:input-hap:ART-crash-fixture"),
+        "buildPresetRef": .string("waterflow-debug"),
+        "testPresetRef": .string("waterflow-tests"),
         "maxRounds": .integer(3),
+        "maxE1Mutations": .integer(3),
+        "maxModelCalls": .integer(4),
       ])
     let taskID = try XCTUnwrap({ () -> String? in
       if case .string(let value)? = field(submitted, "htaskId") { return value }
       return nil
     }())
     XCTAssertEqual(field(submitted, "status"), .string("created"))
+    XCTAssertEqual(field(submitted, "projectRef"), .string("demo-app"))
+    XCTAssertEqual(
+      field(submitted, "desiredState"),
+      .object([
+        "crashSignature": .string("SIGABRT+WaterFlowCrashProbe_RecoverBack"),
+        "bundleName": .string("com.example.waterflowdemo"),
+        "abilityName": .string("EntryAbility"),
+        "baselineHapArtifactLease": .string("lease-v1:input-hap:ART-crash-fixture"),
+        "buildPresetRef": .string("waterflow-debug"),
+        "testPresetRef": .string("waterflow-tests"),
+      ]))
+    guard case .object(let submittedBudgets)? = field(submitted, "budgets") else {
+      return XCTFail("task.submit must echo the admitted budgets")
+    }
+    XCTAssertEqual(submittedBudgets["maxE1Mutations"], .integer(3))
+    XCTAssertEqual(submittedBudgets["maxModelCalls"], .integer(4))
     XCTAssertEqual(
       field(submitted, "allowedOperations"),
       .array([
+        .string("analyzer.extract-crash-signature@1"),
         .string("capture.diagnostics@1"), .string("debug.hap@1"),
         .string("observe.device@1"), .string("workspace.apply-patch@1"),
         .string("workspace.build-openharmony@1"), .string("workspace.revert-patch@1"),
@@ -859,6 +911,59 @@ final class HarnessTaskPlaneContractTests: XCTestCase {
           id: "3", method: "task.status", params: ["htaskId": .string("HTASK-000000000000")])))
     XCTAssertFalse(unknown.ok)
     XCTAssertEqual(unknown.error?.code, AgentDaemonErrorCode.notFound.rawValue)
+  }
+
+  func testTaskSubmitRejectsMalformedDeploymentInputsAndModelBudget() async throws {
+    let port = RecordingJobPort()
+    let (coordinator, _) = try makeCoordinator(port: port)
+    let capabilityStore = try RuntimeCapabilityStore(
+      directoryURL: rootURL.appendingPathComponent("wire-capabilities", isDirectory: true))
+    let engine = try RuntimeJobEngine(
+      configuration: .init(
+        stateDirectory: rootURL.appendingPathComponent("wire-engine", isDirectory: true)),
+      providers: DeviceProviderRegistry(providers: []),
+      dispatcher: NeverDispatchingPort(reason: "wire rejection must not dispatch"),
+      capabilityStore: capabilityStore, artifactStore: nil,
+      nowUTC: { "2026-07-30T00:00:00Z" })
+    let handler = RuntimeControlPlaneHandler(
+      engine: engine, capabilityStore: capabilityStore, providerIDs: [],
+      nowUTC: { "2026-07-30T00:00:00Z" }, harnessCoordinator: coordinator)
+
+    func submit(_ fields: [String: JSONValue]) async throws -> AgentWireProtocol.Response {
+      await handler.handleFrame(
+        try JSONEncoder().encode(
+          AgentWireProtocol.Request(id: UUID().uuidString, method: "task.submit", params: fields)))
+    }
+    let base: [String: JSONValue] = [
+      "targetId": .string("TGT-958780b2ffb7"), "goal": .string("repair crash")
+    ]
+    let missingBundle = try await submit(
+      base.merging(["abilityName": .string("EntryAbility")]) { _, new in new })
+    XCTAssertFalse(missingBundle.ok)
+    XCTAssertEqual(missingBundle.error?.code, AgentDaemonErrorCode.invalidParams.rawValue)
+
+    let malformedBaselineLease = try await submit(
+      base.merging([
+        "bundleName": .string("com.example.demo"),
+        "abilityName": .string("EntryAbility"),
+        "baselineHapArtifactLease": .string("lease-v1:missing-artifact"),
+      ]) { _, new in new })
+    XCTAssertFalse(malformedBaselineLease.ok)
+    XCTAssertEqual(
+      malformedBaselineLease.error?.code, AgentDaemonErrorCode.invalidParams.rawValue)
+
+    let baselineWithoutComponent = try await submit(
+      base.merging([
+        "baselineHapArtifactLease": .string("lease-v1:input:ART-fixture")
+      ]) { _, new in new })
+    XCTAssertFalse(baselineWithoutComponent.ok)
+    XCTAssertEqual(
+      baselineWithoutComponent.error?.code, AgentDaemonErrorCode.invalidParams.rawValue)
+
+    let unboundedModel = try await submit(
+      base.merging(["maxModelCalls": .integer(129)]) { _, new in new })
+    XCTAssertFalse(unboundedModel.ok)
+    XCTAssertEqual(unboundedModel.error?.code, AgentDaemonErrorCode.invalidParams.rawValue)
   }
 
   func testTaskMethodsFailClosedWhenTheHarnessIsNotConfigured() async throws {

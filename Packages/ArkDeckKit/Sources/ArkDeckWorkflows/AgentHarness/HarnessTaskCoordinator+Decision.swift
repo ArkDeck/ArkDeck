@@ -157,10 +157,12 @@ extension HarnessTaskCoordinator {
     }
   }
 
-  /// Repair orchestration owns all typed inputs after a patch proposal. The
-  /// model may provide bounded patch data only when the handler is explicitly
-  /// asking for it; it cannot substitute another artifact lease, preset,
-  /// bundle, ability, or rollback reference.
+  /// Runtime orchestration owns every typed operation input. The model may
+  /// choose the handler's offered operation, but it cannot attach contextual
+  /// metadata (for example the target pseudonym) or substitute a lease,
+  /// preset, bundle, ability, duration, or rollback reference. Patch bytes
+  /// remain the one bounded exception, and only while the handler is
+  /// explicitly asking for a proposal.
   static func validateModelProposal(
     _ proposal: HarnessDecisionProposal,
     against deterministic: HarnessDecision
@@ -173,21 +175,25 @@ extension HarnessTaskCoordinator {
       }
       return
     }
+    if proposal.kind == .invokeOperation, let proposed = proposal.operationReference {
+      guard proposed != DebugCrashTaskHandler.applyPatch,
+        deterministic.kind == .invokeOperation,
+        deterministic.operationReference == proposed,
+        deterministic.inputs == proposal.inputs
+      else { throw HarnessDecisionRejection.operationNotExpected(proposed) }
+      return
+    }
     let orchestrated: Set<String> = [
       DebugCrashTaskHandler.applyPatch, DebugCrashTaskHandler.buildOpenHarmony,
       DebugCrashTaskHandler.runTests, DebugCrashTaskHandler.revertPatch,
-      DebugCrashTaskHandler.deployHAP,
+      DebugCrashTaskHandler.deployHAP, DebugCrashTaskHandler.analyzeCrashLedger,
     ]
-    guard proposal.kind == .invokeOperation,
-      let operation = proposal.operationReference,
-      orchestrated.contains(operation)
-    else { return }
-    guard operation != DebugCrashTaskHandler.applyPatch,
-      deterministic.kind == .invokeOperation,
-      deterministic.operationReference == operation,
-      deterministic.inputs == proposal.inputs
-    else {
-      throw HarnessDecisionRejection.operationNotExpected(operation)
+    if deterministic.kind == .invokeOperation,
+      let expected = deterministic.operationReference,
+      orchestrated.contains(expected)
+    {
+      throw HarnessDecisionRejection.operationNotExpected(
+        proposal.operationReference ?? expected)
     }
   }
 

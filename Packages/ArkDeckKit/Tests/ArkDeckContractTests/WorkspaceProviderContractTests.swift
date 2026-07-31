@@ -81,6 +81,9 @@ final class WorkspaceProviderContractTests: XCTestCase {
     XCTAssertEqual(
       try XCTUnwrap(build.operationInvocation).arguments,
       ["BUILD_OK\\n"])
+    XCTAssertEqual(
+      try provider.lower(action: .workspace(build), context: context).workingDirectory,
+      profile.projectRoot)
 
     let tests = try workspaceAction(
       "workspace.run-tests@1",
@@ -169,6 +172,45 @@ final class WorkspaceProviderContractTests: XCTestCase {
         "--skip",
         "ArkDeckContractTests.AgentDaemonContractTests/"
           + "testDaemonBinaryStaysAliveAndServesRequests",
+      ])
+  }
+
+  func testWaterFlowProfilePinsTheRealBuildTestAndDeployProduct() throws {
+    let project = root.appendingPathComponent("WaterFlow", isDirectory: true)
+    try FileManager.default.createDirectory(
+      at: project.appendingPathComponent("entry/src/main", isDirectory: true),
+      withIntermediateDirectories: true)
+    try Data("{}".utf8).write(to: project.appendingPathComponent("build-profile.json5"))
+    try Data("{}".utf8).write(
+      to: project.appendingPathComponent("entry/src/main/module.json5"))
+    let script = project.appendingPathComponent("hvigorw.js")
+    try Data("// fixture".utf8).write(to: script)
+
+    let production = try WorkspaceProjectProfile.waterFlowDemo(
+      rootURL: project, nodePath: "/usr/bin/true", hvigorScriptPath: script.path)
+    XCTAssertEqual(production.profileID, "waterflow-openharmony@1")
+    XCTAssertEqual(production.projectRef, "demo-app")
+    XCTAssertEqual(production.sourceReaderPreset?.executable.path, "/usr/bin/sed")
+    XCTAssertNil(production.sourceControlPreset, "the demo is not required to be a git checkout")
+    let build = try XCTUnwrap(production.buildPresets["waterflow-debug"])
+    XCTAssertEqual(
+      build.fixedArguments,
+      [
+        script.path, "assembleHap", "--mode", "module",
+        "-p", "module=entry@default", "-p", "product=default",
+        "-p", "buildMode=debug", "--analyze=normal", "--parallel",
+        "--incremental", "--no-daemon",
+      ])
+    let tests = try XCTUnwrap(production.testPresets["waterflow-tests"])
+    XCTAssertEqual(tests.fixedArguments[1], "test")
+    XCTAssertEqual(
+      production.buildProducts[build.presetID],
+      "entry/build/default/outputs/default/entry-default-signed.hap")
+    XCTAssertEqual(
+      production.allowedFileGlobs,
+      [
+        "entry/src/main/ets/**", "entry/src/main/cpp/**",
+        "entry/src/test/**", "entry/src/ohosTest/**",
       ])
   }
 
@@ -476,6 +518,23 @@ final class WorkspaceProviderContractTests: XCTestCase {
       return XCTFail("a truncated diagnostic stream must fail closed")
     }
     XCTAssertEqual(truncatedCode, "workspace.outputTruncated")
+  }
+
+  func testProfileOperationsDoNotDependOnTheOptionalSourceInspector() throws {
+    let combined = WorkspaceProvider(
+      registry: WorkspaceProjectRegistry(roots: ["TestProject": root.path]),
+      operations: provider)
+    let context = executionContext()
+    let descriptor = try XCTUnwrap(
+      RuntimeOperationCatalog.descriptor(reference: "workspace.run-tests@1"))
+    let action = try combined.action(
+      for: descriptor.steps[0], operation: descriptor,
+      inputs: [
+        "projectRef": .string("TestProject"),
+        "testPresetRef": .string("tests-ok"),
+      ], context: context)
+    let plan = try combined.lower(action: action, context: context)
+    XCTAssertEqual(plan.workingDirectory, profile.projectRoot)
   }
 
   func testUnavailableReasonIsMachineReadableAndRawArgvIsRejected() async throws {

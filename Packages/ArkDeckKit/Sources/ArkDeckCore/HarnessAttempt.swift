@@ -260,6 +260,7 @@ public enum HarnessAttemptEventKind: String, CaseIterable, Codable, Sendable {
   case patchRevisionObserved
   case failureRecorded
   case evaluationRecorded
+  case resumed
   case closed
 }
 

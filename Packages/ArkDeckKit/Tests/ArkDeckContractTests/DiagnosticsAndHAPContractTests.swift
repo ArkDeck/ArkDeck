@@ -970,6 +970,7 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
     let dispatcher = ScriptedDispatcher()
     let (engine, capabilities, artifacts) = try makeEngine(dispatcher: dispatcher)
     let lease = try await publishHAPLease(artifacts)
+    let resolved = try await artifacts.resolveLease(lease)
     try await installE1Capability(capabilities)
     let acceptance = try await engine.submit(hapRequest(lease: lease))
     let status = try await engine.run(jobID: acceptance.jobID)
@@ -980,7 +981,17 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
     // never as verified on their own.
     XCTAssertTrue(status.timeline.contains { $0.contains("awaiting readback") })
     let recorded = try await artifacts.list(jobID: acceptance.jobID)
-    XCTAssertTrue(recorded.contains { $0.name == "install-readback.json" })
+    let installReadback = try XCTUnwrap(
+      recorded.first { $0.name == "install-readback.json" && $0.status.isPublished })
+    let bytes = try await artifacts.read(
+      jobID: acceptance.jobID, artifactID: installReadback.artifactID,
+      maximumBytes: installReadback.byteCount)
+    guard case .object(let fields) = try JSONDecoder().decode(JSONValue.self, from: bytes) else {
+      return XCTFail("install readback must be a JSON object")
+    }
+    XCTAssertEqual(
+      fields["deployedArtifactSha256"], .string(resolved.sha256),
+      "package readback must bind the installed bundle to the exact immutable HAP")
   }
 
   func testHAPPreservesNonUTF8HilogAsSensitiveRawArtifact() async throws {

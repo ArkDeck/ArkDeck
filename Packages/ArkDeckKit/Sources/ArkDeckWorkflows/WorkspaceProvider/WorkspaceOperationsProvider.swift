@@ -221,6 +221,74 @@ public struct WorkspaceProjectProfile: Sendable, Equatable {
       symbolPresets: [:])
   }
 
+  /// Closed production profile for the real WaterFlow Golden Journey app.
+  /// The project root is configured by the operator, but every tool, task,
+  /// module, product and output path remains repository-owned vocabulary.
+  public static func waterFlowDemo(
+    rootURL: URL,
+    projectRef: String = "demo-app",
+    nodePath: String,
+    hvigorScriptPath: String
+  ) throws -> WorkspaceProjectProfile {
+    let root = rootURL.resolvingSymlinksInPath().standardizedFileURL.path
+    let canonicalScript = URL(fileURLWithPath: hvigorScriptPath)
+      .resolvingSymlinksInPath().standardizedFileURL.path
+    guard hvigorScriptPath.hasPrefix("/"),
+      FileManager.default.fileExists(atPath: canonicalScript),
+      FileManager.default.fileExists(
+        atPath: URL(fileURLWithPath: root).appendingPathComponent("build-profile.json5").path),
+      FileManager.default.fileExists(
+        atPath: URL(fileURLWithPath: root)
+          .appendingPathComponent("entry/src/main/module.json5").path)
+    else {
+      throw DeviceProviderError.factsUnavailable(
+        "workspace.projectProfileUnavailable: WaterFlow project or Hvigor is absent")
+    }
+    let grep = try WorkspaceExecutableIdentity.hashing(path: "/usr/bin/grep")
+    let sed = try WorkspaceExecutableIdentity.hashing(path: "/usr/bin/sed")
+    let patch = try WorkspaceExecutableIdentity.hashing(path: "/usr/bin/patch")
+    let node = try WorkspaceExecutableIdentity.hashing(path: nodePath)
+    let inspection = try WorkspaceCommandPreset(
+      presetID: "source-inspection", executable: grep,
+      fixedArguments: [], timeoutSeconds: 30)
+    let sourceReader = try WorkspaceCommandPreset(
+      presetID: "source-range", executable: sed,
+      fixedArguments: [], timeoutSeconds: 30)
+    let patching = try WorkspaceCommandPreset(
+      presetID: "unified-diff", executable: patch,
+      fixedArguments: [], timeoutSeconds: 120)
+    let commonHvigorArguments = [
+      "--mode", "module",
+      "-p", "module=entry@default",
+      "-p", "product=default",
+      "-p", "buildMode=debug",
+      "--analyze=normal", "--parallel", "--incremental", "--no-daemon",
+    ]
+    let build = try WorkspaceCommandPreset(
+      presetID: "waterflow-debug", executable: node,
+      fixedArguments: [canonicalScript, "assembleHap"] + commonHvigorArguments,
+      timeoutSeconds: 1_800)
+    let tests = try WorkspaceCommandPreset(
+      presetID: "waterflow-tests", executable: node,
+      fixedArguments: [canonicalScript, "test"] + commonHvigorArguments,
+      timeoutSeconds: 1_800)
+    return try WorkspaceProjectProfile(
+      profileID: "waterflow-openharmony@1", projectRef: projectRef,
+      projectRoot: root,
+      allowedFileGlobs: [
+        "entry/src/main/ets/**", "entry/src/main/cpp/**",
+        "entry/src/test/**", "entry/src/ohosTest/**",
+      ],
+      inspectionPreset: inspection, sourceReaderPreset: sourceReader,
+      patchPreset: patching,
+      buildPresets: [build.presetID: build],
+      testPresets: [tests.presetID: tests],
+      symbolPresets: [:],
+      buildProducts: [
+        build.presetID: "entry/build/default/outputs/default/entry-default-signed.hap"
+      ])
+  }
+
   fileprivate var executableIdentities: Set<WorkspaceExecutableIdentity> {
     var values: Set<WorkspaceExecutableIdentity> = [
       inspectionPreset.executable, patchPreset.executable,
@@ -813,7 +881,8 @@ public struct WorkspaceOperationsProvider: DeviceProvider {
         executableSHA256: invocation.executable.sha256,
         argumentSummary: invocation.arguments,
         timeoutSeconds: invocation.timeoutSeconds),
-      argumentZero: invocation.argumentZero)
+      argumentZero: invocation.argumentZero,
+      workingDirectory: invocation.projectRoot)
   }
 
   public func verify(

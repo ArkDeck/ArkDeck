@@ -27,6 +27,15 @@ import ArkDeckCore
 import CryptoKit
 import Foundation
 
+private struct HarnessVerifiedArtifact {
+  let jobID: String
+  let descriptor: HarnessArtifactDescriptor
+  let data: Data
+
+  var name: String { descriptor.name }
+  var mediaType: String { descriptor.mediaType }
+}
+
 public struct HarnessCrashSignature: Equatable, Sendable {
   /// The ledger entry's kind (`cppcrash`, `jscrash`, `appfreeze`, …). Kept
   /// because the kinds carry different judging fields, and because a
@@ -98,22 +107,32 @@ public struct HarnessObservationBuilder: Sendable {
     jobID: String,
     declaredCrashSignature: String?,
     requiredEvidence: Set<String>,
-    crashLedgerWatermark: String? = nil
+    crashLedgerWatermark: String? = nil,
+    sourceEvidenceJobID: String? = nil,
+    expectedSourceArtifactID: String? = nil
   ) async throws -> HarnessRoundObservation {
-    let inventory: [HarnessArtifactDescriptor]
-    do {
-      inventory = try await artifacts.inventory(jobID: jobID)
-    } catch {
-      return HarnessRoundObservation(
-        round: round, collectionBlockers: ["artifactInventoryUnavailable:\(jobID)"])
+    var jobIDs = [jobID]
+    if let sourceEvidenceJobID, sourceEvidenceJobID != jobID {
+      jobIDs.insert(sourceEvidenceJobID, at: 0)
+    }
+    var inventory: [(jobID: String, descriptor: HarnessArtifactDescriptor)] = []
+    for candidate in jobIDs {
+      do {
+        inventory.append(
+          contentsOf: try await artifacts.inventory(jobID: candidate).map { (candidate, $0) })
+      } catch {
+        return HarnessRoundObservation(
+          round: round, collectionBlockers: ["artifactInventoryUnavailable:\(candidate)"])
+      }
     }
 
     var evidence: [HarnessEvidenceRecord] = []
     var integrityBlockers: [String] = []
     var collectionBlockers: [String] = []
-    var verifiedBytes: [(name: String, mediaType: String, data: Data)] = []
+    var verifiedBytes: [HarnessVerifiedArtifact] = []
 
-    for descriptor in inventory {
+    for item in inventory {
+      let descriptor = item.descriptor
       if !descriptor.published {
         let blocker = "artifactMissing:\(descriptor.name):\(descriptor.missingReason ?? "unknown")"
         collectionBlockers.append(blocker)
@@ -149,7 +168,7 @@ public struct HarnessObservationBuilder: Sendable {
       let data: Data
       do {
         data = try await artifacts.read(
-          jobID: jobID, artifactID: descriptor.artifactID,
+          jobID: item.jobID, artifactID: descriptor.artifactID,
           maximumBytes: maximumEvaluationBytes)
       } catch {
         let blocker = "artifactUnreadable:\(descriptor.name)"
@@ -168,10 +187,11 @@ public struct HarnessObservationBuilder: Sendable {
       }
       evidence.append(
         record(descriptor, verified: true, blocker: nil, sensitiveOptIn: sensitiveOptIn))
-      verifiedBytes.append((descriptor.name, descriptor.mediaType, data))
+      verifiedBytes.append(
+        HarnessVerifiedArtifact(jobID: item.jobID, descriptor: descriptor, data: data))
     }
 
-    let inventoryNames = Set(inventory.map(\.name))
+    let inventoryNames = Set(inventory.map(\.descriptor.name))
     for required in requiredEvidence.subtracting(inventoryNames).sorted() {
       collectionBlockers.append("artifactNotCollected:\(required)")
     }
@@ -179,7 +199,8 @@ public struct HarnessObservationBuilder: Sendable {
     var (measurements, samples) = measure(verifiedBytes)
     let ledger = measureCrashLedger(
       verifiedBytes, declaredCrashSignature: declaredCrashSignature,
-      watermark: crashLedgerWatermark)
+      watermark: crashLedgerWatermark,
+      expectedSourceArtifactID: expectedSourceArtifactID)
     measurements.merge(ledger.measurements) { _, new in new }
     samples.merge(ledger.samples) { _, new in new }
     integrityBlockers.append(contentsOf: ledger.integrityBlockers)
@@ -211,7 +232,7 @@ public struct HarnessObservationBuilder: Sendable {
   /// output at all. It no longer contributes crash counts - the ledger owns
   /// that question, and having both would let one crash be counted twice.
   private func measure(
-    _ verified: [(name: String, mediaType: String, data: Data)]
+    _ verified: [HarnessVerifiedArtifact]
   ) -> ([String: JSONValue], [String: Int]) {
     let logs = verified.filter { $0.name.lowercased().contains("hilog") }
     guard !logs.isEmpty else { return ([:], [:]) }
@@ -247,9 +268,10 @@ public struct HarnessObservationBuilder: Sendable {
   /// read 08:21 UTC), so seeding the mark from a host clock would be wrong
   /// by whatever the device's offset happens to be.
   private func measureCrashLedger(
-    _ verified: [(name: String, mediaType: String, data: Data)],
+    _ verified: [HarnessVerifiedArtifact],
     declaredCrashSignature: String?,
-    watermark: String?
+    watermark: String?,
+    expectedSourceArtifactID: String?
   ) -> (measurements: [String: JSONValue], samples: [String: Int], integrityBlockers: [String]) {
     guard let index = verified.first(where: { $0.name == Self.crashIndexArtifact }) else {
       // Not collected. The criteria name this artifact, so its absence is
@@ -258,18 +280,50 @@ public struct HarnessObservationBuilder: Sendable {
       // clean bill of health.
       return ([:], [:], [])
     }
-    guard let text = String(data: index.data, encoding: .utf8) else {
-      return ([:], [:], ["crashLedgerUnreadable:\(Self.crashIndexArtifact):invalidEncoding"])
-    }
     let entries: [HarnessFaultLogEntry]
-    switch HarnessFaultLogLedger.readIndex(text) {
-    case .unreadable(let reason):
-      // An unreadable ledger is an integrity blocker, which the evaluator
-      // reads as ERROR and hands to a human. It is never an empty ledger:
-      // that would turn "we could not read it" into "there was no crash".
-      return ([:], [:], ["crashLedgerUnreadable:\(Self.crashIndexArtifact):\(reason)"])
-    case .answered(let read):
-      entries = read
+    if let derived = verified.first(where: { $0.name == "crash-signature.json" }) {
+      guard let envelope = try? JSONDecoder().decode(
+        HarnessCrashLedgerDerivedArtifact.self, from: derived.data),
+        let analyzerOutput = try? HarnessCrashLedgerDerivedAnalyzer.canonicalData(
+          envelope.result),
+        envelope.schemaVersion == HarnessCrashLedgerAnalysis.schemaVersion,
+        envelope.analyzerRef == HarnessCrashLedgerAnalysis.analyzerRef,
+        envelope.analyzerVersion == HarnessCrashLedgerAnalysis.analyzerVersion,
+        envelope.result.schemaVersion == HarnessCrashLedgerAnalysis.schemaVersion,
+        envelope.result.analyzerRef == envelope.analyzerRef,
+        envelope.result.analyzerVersion == envelope.analyzerVersion,
+        envelope.sourceArtifactID == index.descriptor.artifactID,
+        envelope.sourceSHA256 == index.descriptor.sha256,
+        envelope.sourceByteCount == index.descriptor.byteCount,
+        envelope.analyzerOutputByteCount == analyzerOutput.count,
+        envelope.analyzerOutputSHA256
+          == SHA256.hash(data: analyzerOutput).map({ String(format: "%02x", $0) }).joined(),
+        expectedSourceArtifactID == nil
+          || envelope.sourceArtifactID == expectedSourceArtifactID
+      else {
+        return ([:], [:], ["crashLedgerDerivedArtifactProvenanceMismatch"])
+      }
+      guard envelope.result.status == .answered else {
+        return (
+          [:], [:],
+          [
+            "crashLedgerUnreadable:\(Self.crashIndexArtifact):"
+              + (envelope.result.unreadableReason ?? "analyzerUnreadable")
+          ])
+      }
+      entries = envelope.result.entries
+    } else {
+      // Forward-readable fallback for tasks captured before the analyzer was
+      // connected. New production captures always take the branch above.
+      guard let text = String(data: index.data, encoding: .utf8) else {
+        return ([:], [:], ["crashLedgerUnreadable:\(Self.crashIndexArtifact):invalidEncoding"])
+      }
+      switch HarnessFaultLogLedger.readIndex(text) {
+      case .unreadable(let reason):
+        return ([:], [:], ["crashLedgerUnreadable:\(Self.crashIndexArtifact):\(reason)"])
+      case .answered(let read):
+        entries = read
+      }
     }
 
     let newest = entries.map(\.timestamp).max()

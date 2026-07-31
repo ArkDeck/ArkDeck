@@ -1060,6 +1060,13 @@ enum RuntimeCLI {
         params["crashSignature"] = .string(signature)
       }
       if let project = value("--project") { params["projectRef"] = .string(project) }
+      if let bundle = value("--bundle-name") { params["bundleName"] = .string(bundle) }
+      if let ability = value("--ability-name") { params["abilityName"] = .string(ability) }
+      if let lease = value("--baseline-hap-artifact-lease") {
+        params["baselineHapArtifactLease"] = .string(lease)
+      }
+      if let preset = value("--build-preset") { params["buildPresetRef"] = .string(preset) }
+      if let preset = value("--test-preset") { params["testPresetRef"] = .string(preset) }
       if let rounds = value("--max-rounds"), let parsed = Int64(rounds) {
         params["maxRounds"] = .integer(parsed)
       }
@@ -1071,6 +1078,12 @@ enum RuntimeCLI {
       }
       if let retries = value("--max-action-retries-per-run"), let parsed = Int64(retries) {
         params["maxActionRetriesPerRun"] = .integer(parsed)
+      }
+      if let mutations = value("--max-e1-mutations"), let parsed = Int64(mutations) {
+        params["maxE1Mutations"] = .integer(parsed)
+      }
+      if let calls = value("--max-model-calls"), let parsed = Int64(calls) {
+        params["maxModelCalls"] = .integer(parsed)
       }
       if let revision = value("--expected-binding-revision"), let parsed = Int64(revision) {
         params["expectedBindingRevision"] = .integer(parsed)

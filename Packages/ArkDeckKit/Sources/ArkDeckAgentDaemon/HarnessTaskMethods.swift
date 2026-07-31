@@ -18,7 +18,7 @@ import Foundation
 extension RuntimeControlPlaneHandler {
   static let harnessDefaultBudgets = HarnessTaskBudgets(
     maxRounds: 8, maxWallClockSeconds: 1800, maxArtifactBytes: 64 << 20, maxE1Mutations: 0,
-    maxNoProgressRounds: 2, maxActionRetriesPerRun: 2)
+    maxNoProgressRounds: 2, maxActionRetriesPerRun: 2, maxModelCalls: 24)
 
   func handleTaskMethod(
     _ method: String,
@@ -217,14 +217,57 @@ extension RuntimeControlPlaneHandler {
       maxE1Mutations: integer("maxE1Mutations") ?? defaults.maxE1Mutations,
       maxNoProgressRounds: integer("maxNoProgressRounds") ?? defaults.maxNoProgressRounds,
       maxActionRetriesPerRun: integer("maxActionRetriesPerRun")
-        ?? defaults.maxActionRetriesPerRun)
+        ?? defaults.maxActionRetriesPerRun,
+      maxModelCalls: integer("maxModelCalls") ?? defaults.maxModelCalls)
 
     // The declared crash signature is what makes "matching crash" a
     // checkable statement instead of a judgement call. Absent, the evaluator
     // counts every fatal as a new fatal and can never confirm a specific fix.
     var desiredState: [String: JSONValue] = [:]
     if let signature = text("crashSignature") {
+      guard !signature.isEmpty, signature.utf8.count <= 512,
+        !signature.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) })
+      else {
+        throw HarnessTaskSubmissionError.malformedDesiredState("crashSignature")
+      }
       desiredState["crashSignature"] = .string(signature)
+    }
+    let bundleName = text("bundleName")
+    let abilityName = text("abilityName")
+    if let bundleName {
+      do {
+        let bundle = try HDCBundleReference(bundleName: bundleName)
+        desiredState["bundleName"] = .string(bundleName)
+        if let abilityName {
+          _ = try HDCAbilityReference(bundle: bundle, abilityName: abilityName)
+          desiredState["abilityName"] = .string(abilityName)
+        }
+      } catch {
+        throw HarnessTaskSubmissionError.malformedDesiredState(
+          abilityName == nil ? "bundleName" : "bundleName/abilityName")
+      }
+    } else if abilityName != nil {
+      throw HarnessTaskSubmissionError.malformedDesiredState("abilityName requires bundleName")
+    }
+    for key in ["buildPresetRef", "testPresetRef"] {
+      guard let value = text(key) else { continue }
+      guard isWireIdentifier(value) else {
+        throw HarnessTaskSubmissionError.malformedDesiredState(key)
+      }
+      desiredState[key] = .string(value)
+    }
+    if let lease = text("baselineHapArtifactLease") {
+      guard isArtifactLeaseReference(lease) else {
+        throw HarnessTaskSubmissionError.malformedDesiredState("baselineHapArtifactLease")
+      }
+      guard bundleName != nil, abilityName != nil else {
+        throw HarnessTaskSubmissionError.malformedDesiredState(
+          "baselineHapArtifactLease requires bundleName/abilityName")
+      }
+      desiredState["baselineHapArtifactLease"] = .string(lease)
+    }
+    if let projectRef = text("projectRef"), !isWireIdentifier(projectRef) {
+      throw HarnessTaskSubmissionError.malformedDesiredState("projectRef")
     }
     return HarnessTaskSubmission(
       type: type,
@@ -237,6 +280,19 @@ extension RuntimeControlPlaneHandler {
       policy: policy)
   }
 
+  private static func isWireIdentifier(_ value: String) -> Bool {
+    !value.isEmpty && value.count <= 128
+      && value.allSatisfy {
+        $0.isASCII && ($0.isLetter || $0.isNumber || "._:@-".contains($0))
+      }
+  }
+
+  private static func isArtifactLeaseReference(_ value: String) -> Bool {
+    let parts = value.split(separator: ":", omittingEmptySubsequences: false)
+    return parts.count == 3 && parts[0] == "lease-v1"
+      && parts[1...].allSatisfy { isWireIdentifier(String($0)) }
+  }
+
   // MARK: - Wire encoding
 
   static func encodeTask(_ snapshot: HarnessTaskSnapshot) -> JSONValue {
@@ -247,6 +303,8 @@ extension RuntimeControlPlaneHandler {
       "phase": .string(snapshot.phase.rawValue),
       "targetId": .string(snapshot.target.targetID),
       "goal": .string(snapshot.goal.summary),
+      "projectRef": snapshot.projectRef.map(JSONValue.string) ?? .null,
+      "desiredState": .object(snapshot.goal.desiredState),
       "activeRound": .integer(Int64(snapshot.activeRound)),
       "activeJobId": snapshot.activeJobID.map(JSONValue.string) ?? .null,
       "cancelRequested": .bool(snapshot.cancelRequested),

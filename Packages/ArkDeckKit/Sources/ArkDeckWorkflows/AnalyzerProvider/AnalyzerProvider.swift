@@ -228,6 +228,18 @@ public struct AnalyzerProvider: DeviceProvider {
         code: "analyzer.malformedResult",
         detail: "\(invocation.analyzerRef) did not produce a structured result")
     }
+    if invocation.analyzerRef == HarnessCrashLedgerAnalysis.analyzerRef {
+      guard let result = try? JSONDecoder().decode(
+        HarnessCrashLedgerAnalysis.self, from: receipt.stdout),
+        result.schemaVersion == HarnessCrashLedgerAnalysis.schemaVersion,
+        result.analyzerRef == invocation.analyzerRef,
+        result.analyzerVersion == invocation.analyzerVersion
+      else {
+        return .failed(
+          code: "analyzer.schemaMismatch",
+          detail: "\(invocation.analyzerRef) produced JSON outside its versioned schema")
+      }
+    }
     // Provenance travels with the derived artifact: which artifact it came
     // from, that artifact's digest, which analyzer at which version, and the
     // digest of what was produced.

@@ -63,6 +63,18 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
   public static let runTests = "workspace.run-tests@1"
   public static let revertPatch = "workspace.revert-patch@1"
   public static let deployHAP = "debug.hap@1"
+  public static let analyzeCrashLedger = "analyzer.extract-crash-signature@1"
+  /// A successful capture is not evaluated until its raw ledger has passed
+  /// through the pinned analyzer. These ID-only facts survive a daemon
+  /// restart without exposing the artifact's host path.
+  public static let pendingAnalysisSourceJobKey = "pendingCrashAnalysisSourceJobId"
+  public static let pendingAnalysisSourceArtifactKey = "pendingCrashAnalysisSourceArtifactId"
+  public static let pendingAnalysisSourceLeaseKey = "pendingCrashAnalysisSourceLease"
+  public static let pendingAnalysisReturnPhaseKey = "pendingCrashAnalysisReturnPhase"
+  /// Durable observation written only after the typed crash-fixture
+  /// deployment succeeds. Phase alone cannot carry this fact because the
+  /// following capture legitimately moves `reproducing` back to `collecting`.
+  public static let baselineDeploymentMarker = "baselineCrashFixtureDeployed"
   /// The artifact `capture.diagnostics@1` declares for bounded HiLog. It
   /// supports the *liveness* criterion only: TASK-HTP-006's r6 window
   /// measured zero fault blocks in 887 KB of real `hilog -x` taken right
@@ -97,6 +109,7 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
     [
       Self.observeDevice, Self.captureDiagnostics, Self.applyPatch,
       Self.buildOpenHarmony, Self.runTests, Self.revertPatch, Self.deployHAP,
+      Self.analyzeCrashLedger,
     ]
   }
 
@@ -107,9 +120,14 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
     {
       return [Self.revertPatch]
     }
+    if pendingAnalysisLease(snapshot) != nil {
+      return [Self.analyzeCrashLedger]
+    }
     switch snapshot.phase {
     case .initializing:
       return [Self.observeDevice]
+    case .collecting where baselineDeploymentReady(snapshot):
+      return baselineDeploymentBudgetAvailable(snapshot) ? [Self.deployHAP] : []
     case .deviceReady, .reproducing, .collecting, .verifying:
       return [Self.captureDiagnostics]
     case .analyzing:
@@ -185,6 +203,16 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
           + "another strategy is considered.",
         reasonCode: "rollbackFailedRepair", phaseOnDispatch: .analyzing)
     }
+    if let lease = pendingAnalysisLease(snapshot) {
+      return invoke(
+        snapshot, decisionID: decisionID, round: round, nowUTC: nowUTC,
+        operation: Self.analyzeCrashLedger,
+        inputs: ["sourceArtifactRef": .string(lease)],
+        hypothesis:
+          "Parse the exact captured crash-ledger Artifact with the pinned deterministic "
+          + "analyzer before any criterion consumes it.",
+        reasonCode: "analyzeCapturedCrashLedger", phaseOnDispatch: .analyzing)
+    }
     switch snapshot.phase {
     case .initializing:
       return invoke(
@@ -202,6 +230,40 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
           + "any later analysis needs.",
         reasonCode: "collectDeclaredEvidence",
         phaseOnDispatch: nil)
+    case .collecting where baselineDeploymentReady(snapshot):
+      guard baselineDeploymentBudgetAvailable(snapshot) else {
+        return noSafeAction(
+          snapshot, decisionID: decisionID, round: round, nowUTC: nowUTC,
+          reasonCode: "baselineDeploymentRepairBudgetUnavailable",
+          hypothesis:
+            "Injecting the declared crash fixture is admitted only when the E1 budget also "
+            + "reserves the repair deployment and its possible rollback.")
+      }
+      guard let lease = desiredString("baselineHapArtifactLease", snapshot),
+        let bundle = desiredString("bundleName", snapshot),
+        let ability = desiredString("abilityName", snapshot)
+      else {
+        return noSafeAction(
+          snapshot, decisionID: decisionID, round: round, nowUTC: nowUTC,
+          reasonCode: "baselineDeploymentInputsUnavailable",
+          hypothesis:
+            "The immutable crash-fixture lease, bundle name and ability name are required "
+            + "before the task may inject its declared failure.")
+      }
+      return invoke(
+        snapshot, decisionID: decisionID, round: round, nowUTC: nowUTC,
+        operation: Self.deployHAP,
+        inputs: [
+          "hapArtifactLease": .string(lease), "bundleName": .string(bundle),
+          "abilityName": .string(ability), "cleanupPolicy": .string("retain"),
+          "postRunAbilityState": .string("running"), "captureDiagnostics": .bool(true),
+          "diagnosticsDurationSeconds": .integer(5),
+          "portForwardProfile": .string("none"),
+        ],
+        hypothesis:
+          "The crash ledger has a durable baseline; deploy the immutable declared fixture so "
+          + "the next bounded capture can distinguish a newly injected crash from history.",
+        reasonCode: "deployBaselineCrashFixture", phaseOnDispatch: .reproducing)
     case .collecting, .analyzing, .verifying:
       switch snapshot.observed.latestVerdict {
       case .inconclusive:
@@ -215,7 +277,7 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
             "The declared criteria are not yet decidable on the evidence collected so far; "
             + "another bounded capture adds the missing sample.",
           reasonCode: "collectAdditionalSample",
-          phaseOnDispatch: snapshot.phase == .collecting ? nil : .collecting)
+          phaseOnDispatch: snapshot.phase == .analyzing ? .collecting : nil)
       case .fail:
         // A model-backed producer may replace this deterministic fallback with
         // a strictly parsed PROPOSE_PATCH. Without patch bytes there is
@@ -242,7 +304,7 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
           operation: Self.captureDiagnostics,
           hypothesis: "No evidence has been evaluated yet for the declared criteria.",
           reasonCode: "collectDeclaredEvidence",
-          phaseOnDispatch: snapshot.phase == .collecting ? nil : .collecting)
+          phaseOnDispatch: snapshot.phase == .analyzing ? .collecting : nil)
       case .pass:
         // Unreachable in practice: a passing evaluation ends the task before
         // planning runs. Fail closed rather than invent a next step.
@@ -401,6 +463,35 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
       return nil
     }
     return value
+  }
+
+  private func pendingAnalysisLease(_ snapshot: HarnessTaskSnapshot) -> String? {
+    guard case .string(let value)? = snapshot.observedState[
+      Self.pendingAnalysisSourceLeaseKey], !value.isEmpty
+    else { return nil }
+    return value
+  }
+
+  /// A fixture is injected only after a readable Faultlogger round established
+  /// a device-local watermark. Otherwise an old crash could be attributed to
+  /// this task. `repairAttempt == nil` separates this one-time reproduction
+  /// deployment from the later verified-build deployment.
+  private func baselineDeploymentReady(_ snapshot: HarnessTaskSnapshot) -> Bool {
+    guard snapshot.phase == .collecting, snapshot.repairAttempt == nil,
+      snapshot.observed.latestVerdict == .inconclusive,
+      snapshot.observedState[Self.baselineDeploymentMarker] != .bool(true),
+      desiredString("baselineHapArtifactLease", snapshot) != nil,
+      desiredString("bundleName", snapshot) != nil,
+      desiredString("abilityName", snapshot) != nil,
+      case .string = snapshot.observed.measurements[HarnessObservationBuilder.watermarkMetric]
+    else { return false }
+    return true
+  }
+
+  /// One mutation injects the fault. Two more must remain available for the
+  /// verified repair deployment and its mandatory rollback reserve.
+  private func baselineDeploymentBudgetAvailable(_ snapshot: HarnessTaskSnapshot) -> Bool {
+    snapshot.consumedBudget.e1Mutations + 3 <= snapshot.budgets.maxE1Mutations
   }
 
   private func noSafeAction(

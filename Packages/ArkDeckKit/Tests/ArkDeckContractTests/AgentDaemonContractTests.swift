@@ -640,6 +640,49 @@ final class AgentDaemonContractTests: XCTestCase {
     XCTAssertFalse(process.isRunning, "SIGTERM must stop the daemon")
   }
 
+  func testWaterFlowProductionProfilePublishesTheClosedWorkspaceOperations() throws {
+    let binary = productsDirectory.appendingPathComponent("arkdeck-agentd")
+    guard FileManager.default.fileExists(atPath: binary.path) else {
+      throw XCTSkip("arkdeck-agentd binary not built")
+    }
+    let shortState = URL(fileURLWithPath: NSHomeDirectory())
+      .appendingPathComponent(".arkdeck-test-\(UInt32.random(in: 0..<100_000))", isDirectory: true)
+    let project = URL(fileURLWithPath: NSHomeDirectory())
+      .appendingPathComponent(".arkdeck-waterflow-\(UInt32.random(in: 0..<100_000))", isDirectory: true)
+    let module = project.appendingPathComponent("entry/src/main", isDirectory: true)
+    try FileManager.default.createDirectory(at: module, withIntermediateDirectories: true)
+    try Data("{}".utf8).write(to: project.appendingPathComponent("build-profile.json5"))
+    try Data("{}".utf8).write(to: module.appendingPathComponent("module.json5"))
+    let hvigor = project.appendingPathComponent("hvigorw.js")
+    try Data("// fixture".utf8).write(to: hvigor)
+    defer {
+      try? FileManager.default.removeItem(at: shortState)
+      try? FileManager.default.removeItem(at: project)
+    }
+
+    let process = try launchProductionDaemon(
+      binary: binary, stateDirectory: shortState,
+      extraEnvironment: [
+        "ARKDECK_WORKSPACE_PROJECTS": "demo-app=\(project.path)",
+        "ARKDECK_WORKSPACE_ACTIVE_PROJECT": "demo-app",
+        "ARKDECK_DEVECO_NODE_PATH": "/usr/bin/true",
+        "ARKDECK_DEVECO_HVIGOR_PATH": hvigor.path,
+      ])
+    defer { if process.isRunning { process.terminate() } }
+    let socketURL = shortState.appendingPathComponent("agentd.sock")
+    XCTAssertTrue(FileManager.default.fileExists(atPath: socketURL.path))
+    let operations = try listOperations(socketPath: socketURL.path)
+    for reference in [
+      "workspace.apply-patch@1", "workspace.build-openharmony@1",
+      "workspace.run-tests@1", "workspace.revert-patch@1",
+      "workspace.read-source-range@1",
+    ] {
+      XCTAssertEqual(
+        operations[reference]?.availability, "available",
+        "\(reference): \(operations[reference]?.reasons ?? [])")
+    }
+  }
+
   /// The two blockers the production Rockchip composition can publish with no
   /// HDC configured. Which one answers is host state this test does not own:
   /// where an ArkDeck product is installed (a Developer ID-signed
@@ -687,7 +730,8 @@ final class AgentDaemonContractTests: XCTestCase {
   /// happened to export, and the test states none of it. Every ARKDECK_ key
   /// is stripped; a case that needs one puts it back by name.
   private func launchProductionDaemon(
-    binary: URL, stateDirectory: URL, hdcPath: String? = nil
+    binary: URL, stateDirectory: URL, hdcPath: String? = nil,
+    extraEnvironment: [String: String] = [:]
   ) throws -> Process {
     let process = Process()
     process.executableURL = binary
@@ -696,6 +740,7 @@ final class AgentDaemonContractTests: XCTestCase {
       !$0.key.hasPrefix("ARKDECK_")
     }
     if let hdcPath { environment["ARKDECK_HDC_PATH"] = hdcPath }
+    environment.merge(extraEnvironment) { _, configured in configured }
     process.environment = environment
     let output = Pipe()
     process.standardOutput = output

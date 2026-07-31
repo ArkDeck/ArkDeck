@@ -117,6 +117,9 @@ public struct ProcessRequest: Sendable, Equatable {
   public let argumentZero: String?
   public let arguments: [String]
   public let environment: [String: String]
+  /// Child-only working directory applied by `posix_spawn` file actions.
+  /// The parent process never changes its global current directory.
+  public let workingDirectory: URL?
   public let timeout: TimeInterval?
 
   /// `environment` is overlaid only on this child process's inherited
@@ -126,12 +129,14 @@ public struct ProcessRequest: Sendable, Equatable {
     argumentZero: String? = nil,
     arguments: [String] = [],
     environment: [String: String] = [:],
+    workingDirectory: URL? = nil,
     timeout: TimeInterval? = nil
   ) {
     self.executable = executable
     self.argumentZero = argumentZero
     self.arguments = arguments
     self.environment = environment
+    self.workingDirectory = workingDirectory
     self.timeout = timeout
   }
 }
@@ -283,6 +288,7 @@ public enum ProcessExecutionError: Error, Equatable, LocalizedError {
   case invalidArgumentContainsNUL
   case invalidEnvironmentKey(String)
   case invalidEnvironmentValue(String)
+  case workingDirectoryUnavailable(String)
   case invalidTimeout(TimeInterval)
   case invalidExpectedSHA256
   case executableOpenFailed(String, Int32)
@@ -308,6 +314,8 @@ public enum ProcessExecutionError: Error, Equatable, LocalizedError {
       "Process environment key is invalid: \(key)"
     case .invalidEnvironmentValue(let key):
       "Process environment value contains a NUL byte for key: \(key)"
+    case .workingDirectoryUnavailable(let path):
+      "Process working directory must be an existing canonical absolute directory: \(path)"
     case .invalidTimeout(let timeout):
       "Process timeout must be finite and positive: \(timeout)"
     case .invalidExpectedSHA256:
@@ -609,6 +617,17 @@ public final class FoundationProcessExecutor: @unchecked Sendable {
         throw ProcessExecutionError.invalidEnvironmentValue(key)
       }
     }
+    if let directory = request.workingDirectory {
+      let path = directory.path
+      var isDirectory: ObjCBool = false
+      guard directory.isFileURL, path.hasPrefix("/"), !path.contains("\0"),
+        directory.resolvingSymlinksInPath().standardizedFileURL.path == path,
+        FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory),
+        isDirectory.boolValue
+      else {
+        throw ProcessExecutionError.workingDirectoryUnavailable(path)
+      }
+    }
   }
 
   private static func isValidSHA256(_ value: String) -> Bool {
@@ -750,6 +769,15 @@ public final class FoundationProcessExecutor: @unchecked Sendable {
       throw ProcessExecutionError.launchFailed("could not initialize posix_spawn file actions")
     }
     initializedFileActions = true
+    if let directory = request.workingDirectory {
+      let result = directory.path.withCString {
+        posix_spawn_file_actions_addchdir_np(&fileActions, $0)
+      }
+      guard result == 0 else {
+        throw ProcessExecutionError.launchFailed(
+          "could not bind working directory: \(String(cString: strerror(result)))")
+      }
+    }
     guard posix_spawn_file_actions_adddup2(&fileActions, stdoutDescriptors[1], STDOUT_FILENO) == 0,
       posix_spawn_file_actions_adddup2(&fileActions, stderrDescriptors[1], STDERR_FILENO) == 0,
       posix_spawn_file_actions_addclose(&fileActions, stdoutDescriptors[0]) == 0,

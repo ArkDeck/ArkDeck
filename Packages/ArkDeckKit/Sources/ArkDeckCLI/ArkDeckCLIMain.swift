@@ -568,8 +568,12 @@ struct ArkDeckCommandLine {
         arkdeck artifact import-native-library --target <id> --file <libname.so> [--json]
         arkdeck task submit --target <id> --goal <text> [--crash-signature <SIGx+Symbol>] \
       [--intake <text>] [--project <ref>] [--max-rounds <n>] \
+      [--bundle-name <reverse-dns>] [--ability-name <name>] \
+      [--baseline-hap-artifact-lease <lease-v1:job:artifact>] \
+      [--build-preset <ref>] [--test-preset <ref>] [--expected-binding-revision <n>] \
       [--max-wall-clock-seconds <n>] [--max-no-progress-rounds <n>] \
-      [--max-action-retries-per-run <n>] [--json]
+      [--max-action-retries-per-run <n>] [--max-e1-mutations <n>] \
+      [--max-model-calls <n>] [--json]
         arkdeck task list|status|result|events|evaluations|attempts|humanActions|memory|reconcile|\
       pause|cancel --task <HTASK-id> [--json]
         arkdeck task resume --task <HTASK-id> --resolution <typed reason> [--json]
