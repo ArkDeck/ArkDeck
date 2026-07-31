@@ -97,7 +97,39 @@ running -> humanRequired | operationUnavailable:observe.device@1
 曲柄自己转了(两条事件),且在 `humanRequired` 处**停住**而不是自旋 —— 这台 host 没配
 HDC,`observe.device@1` 如实 unavailable,正是 PRODUCT-LOOP §8 的行为。
 
-## 4. 交给设备窗口的 crib
+## 4. 窗口计划(维护者 2026-07-31 决定:同窗重取 GJ-1/GJ-2,装 demo 应用复现 WaterFlow crash)
+
+四腿一窗,顺序由一条**产品事实**决定:
+
+| 腿 | 内容 | 断言 |
+|---|---|---|
+| L1 | 接管 + `observe.device@1`(当前 digest) | GJ-1 在 `da101ab6…` 上重取 |
+| L2 | 导入签名 HAP + `debug.hap@1`(`cleanupPolicy: retain`) | GJ-2 在当前 digest 上重取,且包留在设备上 |
+| L3 | 应用在跑、**尚未** crash → 一次 `task submit` | GJ-5 的 PASS 路径(非空洞:有真实应用输出) |
+| L4 | 复现 WaterFlow crash 后 → 一次 `task submit` | GJ-5 的 fail→交人路径 + AC-7 真机字节面 |
+
+**L3 必须在触发 crash 之前**:`capture.diagnostics@1` 把 HiLog 降为 `hilog -x`
+(实测源码:`["shell", "hilog", "-x"] + filters`),它**dump 整个滚动缓冲**而不是 tail 一个
+窗口。fault block 一旦进缓冲,就会出现在**之后每一次**采集里,五个干净样本在缓冲滚掉之前
+不可达。两腿顺序颠倒就会白费窗口。
+
+**人工步骤(全部在交接之前,不在环里)**:
+
+1. **在设备上启动应用** —— 没有任何产品 operation 会把 ability 留在运行态:
+   `debug.hap@1` 的 `stop-ability` 步骤**不受 `cleanupPolicy` 门控**(只有
+   `cleanup-uninstall` 受),所以 `retain` 只保留安装、不保留运行;
+2. **做出复现 WaterFlow crash 的手势**(L4 之前);
+3. **两次 `task submit`** —— 它们**就是**交接点。
+
+**E1 授权是两趟**:capability 钉 `exactPlanDigest` 与逐输入的精确值(含只有导入后才存在的
+artifact lease),所以不可能预先写好。第一趟 `--hap` 跑到 `capability draft` 就停(draft 的
+`issuer.reference` 是 `PENDING-MAINTAINER-PR`,daemon 的 `capability.install` 只接受
+`PR#<数字>` —— 这条拒绝正是「签发是维护者的行为,不是 agent 的」的结构形式);维护者把
+draft 落到本 change 的 `evidence/capabilities/`、把 `issuer.reference` 改成
+`PR#<号>`、**合入即签发**;第二趟带 `--capability` 跑完 L1..L4。teardown 的
+`cleanupPolicy: uninstall` 是另一组输入,需要**第二份** capability。
+
+## 5. 交给设备窗口的 crib
 
 `crib-gj5-window-r1.sh`:唯一人工步骤是 `task submit`,之后脚本**只读**、
 **从不调用 `task reconcile`**(「收敛」因此不可能是操作员转的曲柄);从不读/导出
@@ -106,11 +138,23 @@ artifact 字节(HiLog 是 sensitive,窗口需要的是 harness 在本机**测量
 采集全部走产品;打印一律经 `mask()`,序列号不进 transcript。
 
 host 侧已自测:`bash -n` 通过;`--self-test --hdc /usr/bin/true` 跑通 daemon 启动、
-socket、`doctor`(digest = `da101ab6…`)、`operation list` 解析。**自测抓到一个脚本 bug**:
-初版从 `device list` 里读 candidate/connectKey,而 `device list` = `target.list`,只返回
-**已接管** target(`targetId`/`bindingRevision`/`toolVersion`/`adoptedAtUtc`),candidate 在
-`device adopt` 的 `needsSelection` 回复里。已按三种真实回复形态(`adopted` /
-`needsSelection` / `waitingForHuman`)分别处理 —— 这正是「窗口不该消耗在脚本 bug 上」。
+socket、`doctor`(digest = `da101ab6…`)、`operation list` 解析;`debug.hap@1` 的请求文档
+生成块单独跑通并逐键校验(`documentType`/`schemaVersion`/`requestId`/`idempotencyKey`/
+`target`/`operation`/`inputs`/`authorization.capabilityId`)。
+
+**自测抓到三个脚本 bug,全部按源码而非猜测修正**:
+
+1. 初版从 `device list` 读 candidate —— 而 `device list` = `target.list`,只返回**已接管**
+   target(`targetId`/`bindingRevision`/`toolVersion`/`adoptedAtUtc`);candidate 在
+   `device adopt` 的 `needsSelection` 回复里。已按三种真实回复形态(`adopted` /
+   `needsSelection` / `waitingForHuman`)分别处理;
+2. 初版手写的 `debug.hap@1` 请求缺 `documentType`/`schemaVersion`/`requestId`/
+   `idempotencyKey`,并把 capability 放在 `capabilityId` 顶层 —— 真实结构是
+   `authorization: {capabilityId}`(见 `RuntimeOperationRequest`);
+3. 初版把 `hapArtifactLease` 填成 `artifactId` —— 导入回复同时给 `artifactId` 与
+   `lease`,该输入要的是**lease**。
+
+这正是「窗口不该消耗在脚本 bug 上」。
 
 ## 5. 如实登记的边界(窗口前必须先看)
 
