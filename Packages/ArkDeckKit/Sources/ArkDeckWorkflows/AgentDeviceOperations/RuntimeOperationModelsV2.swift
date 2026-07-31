@@ -216,6 +216,53 @@ public struct RuntimeOperationRequest: Equatable, Sendable, Codable {
     try validate()
   }
 
+  /// The document an operator's flag-form submit builds
+  /// (`arkdeck job submit --target … --operation …`).
+  ///
+  /// It exists because the CLI hand-wrote this JSON and left the binding
+  /// revision out, which made the documented flag form unusable for every
+  /// device-bound operation in the catalog: admission requires a pinned
+  /// revision, so each attempt came back as a generic
+  /// `evidenceIncomplete: target/binding/routing/tool facts are absent or
+  /// mismatched` after a full round trip - measured on the 2026-07-31 GJ-5
+  /// window, on the first leg. The rule is enforced here instead, before
+  /// anything is submitted, and it names the missing flag.
+  ///
+  /// A host-only operation must *not* carry a revision: there is no binding to
+  /// pin, and the engine refuses a host-only request that pins one
+  /// (CHG-2026-054 HTP-AC-20).
+  public static func operatorFlagForm(
+    targetID: String,
+    expectedBindingRevision: Int?,
+    operationID: String,
+    version: Int,
+    requestID: String,
+    idempotencyKey: String
+  ) throws -> RuntimeOperationRequest {
+    let reference = "\(operationID)@\(version)"
+    let descriptor = RuntimeOperationCatalog.descriptor(reference: reference)
+    if descriptor?.binding == .confirmedDevice, expectedBindingRevision == nil {
+      throw RuntimeOperationRequestRejection(
+        code: .invalidRequest,
+        path: "$.target.expectedBindingRevision",
+        message:
+          "\(reference) is device-bound: pass --expected-binding-revision <n> "
+          + "(the revision `arkdeck device list` reports for this target)")
+    }
+    if descriptor?.binding == WorkflowBindingRequirement.none, expectedBindingRevision != nil {
+      throw RuntimeOperationRequestRejection(
+        code: .invalidRequest,
+        path: "$.target.expectedBindingRevision",
+        message: "\(reference) is host-only: it has no binding revision to pin")
+    }
+    return try RuntimeOperationRequest(
+      requestID: requestID,
+      idempotencyKey: idempotencyKey,
+      target: DurableTargetReference(
+        targetID: targetID, expectedBindingRevision: expectedBindingRevision),
+      operation: RuntimeOperationReference(id: operationID, version: version))
+  }
+
   public init(from decoder: Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
     let documentType = try container.decodeIfPresent(String.self, forKey: .documentType)

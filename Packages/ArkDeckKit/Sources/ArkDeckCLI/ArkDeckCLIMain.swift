@@ -551,7 +551,8 @@ struct ArkDeckCommandLine {
         arkdeck doctor [--socket <path>] [--json]
         arkdeck operation list [--socket <path>] [--json]
         arkdeck device list|show|adopt [--candidate <connect-key>] [--socket <path>] [--json]
-        arkdeck job submit --target <id> --operation <id@version> [--wait] [--json]
+        arkdeck job submit --target <id> --operation <id@version> \
+      [--expected-binding-revision <n>] [--wait] [--json]
         arkdeck job status --job <id> [--json] | arkdeck job list [--json]
         arkdeck job run --job <id> [--json] | arkdeck job reconcile --job <id> [--json]
         arkdeck cleanup-debt list [--json]
