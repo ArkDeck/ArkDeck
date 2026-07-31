@@ -396,7 +396,7 @@ final class RuntimeArtifactContractTests: XCTestCase {
     XCTAssertEqual(outstanding.count, 1)
     XCTAssertEqual(outstanding[0].remotePath, "/data/local/tmp/arkdeck/job-1/trace-abc")
     try await store.settleCleanupDebt(
-      jobID: "job-1", remotePath: "/data/local/tmp/arkdeck/job-1/trace-abc")
+      jobID: "job-1", identity: "/data/local/tmp/arkdeck/job-1/trace-abc")
     let settled = try await store.outstandingCleanupDebt()
     XCTAssertTrue(settled.isEmpty)
   }

@@ -1472,7 +1472,7 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
     let (recovered, _, _) = try makeEngine(dispatcher: continuationDispatcher)
     _ = try await recovered.recoverPersistedJobs()
     let result = try await recovered.continueCleanupDebt(
-      jobID: debt.jobID, remotePath: debt.remotePath)
+      jobID: debt.jobID, identity: debt.identity)
     XCTAssertEqual(result.state, .settled)
     XCTAssertEqual(
       continuationDispatcher.dispatchedActions,
@@ -1497,7 +1497,7 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
     let (firstRecovery, _, _) = try makeEngine(dispatcher: unknownDispatcher)
     _ = try await firstRecovery.recoverPersistedJobs()
     let unknown = try await firstRecovery.continueCleanupDebt(
-      jobID: debt.jobID, remotePath: debt.remotePath)
+      jobID: debt.jobID, identity: debt.identity)
     XCTAssertEqual(unknown.state, .outcomeUnknown)
     XCTAssertEqual(
       unknownDispatcher.dispatchedActions,
@@ -1507,7 +1507,7 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
     let (secondRecovery, _, _) = try makeEngine(dispatcher: noResendDispatcher)
     _ = try await secondRecovery.recoverPersistedJobs()
     let refused = try await secondRecovery.continueCleanupDebt(
-      jobID: debt.jobID, remotePath: debt.remotePath)
+      jobID: debt.jobID, identity: debt.identity)
     XCTAssertEqual(refused.state, .outcomeUnknown)
     XCTAssertEqual(
       noResendDispatcher.dispatchedActions, ["reconcileOwnedPathPresence"],
@@ -1611,5 +1611,136 @@ extension DiagnosticsAndHAPContractTests {
     if case .published? = recorded.first(where: { $0.name == "ui-tree.json" })?.status {
       XCTFail("nothing landed, so no tree artifact may be published")
     }
+  }
+}
+
+// MARK: - CHG-2026-049 r3: cleanup residue is a first-class record
+
+extension DiagnosticsAndHAPContractTests {
+  /// DHA-RES-001: an uninstall that ran and did not take effect is recorded
+  /// as residue, on the forward path and on the compensation path alike.
+  /// Before r3 the ledger was keyed by remote path, so a left-behind bundle
+  /// had nowhere to be written and the job simply reported success.
+  func testIneffectiveUninstallIsRecordedAsResidueOnTheForwardPath() async throws {
+    let dispatcher = ScriptedDispatcher(
+      script: .init(packageInstalledAfterUninstall: true))
+    let (engine, capabilities, artifacts) = try makeEngine(dispatcher: dispatcher)
+    let lease = try await publishHAPLease(artifacts)
+    try await installE1Capability(capabilities)
+    let acceptance = try await engine.submit(
+      hapRequest(lease: lease, key: "idem-residue-forward"))
+    let status = try await engine.run(jobID: acceptance.jobID)
+    XCTAssertEqual(status.state, "succeeded")
+
+    let debts = try await engine.listCleanupDebt()
+    let residue = try XCTUnwrap(debts.first { $0.bundleName != nil })
+    XCTAssertEqual(residue.jobID, acceptance.jobID)
+    XCTAssertEqual(residue.stepID, "cleanup-uninstall")
+    XCTAssertEqual(residue.bundleName, "com.example.demo")
+    XCTAssertEqual(residue.identity, "bundle:com.example.demo")
+    XCTAssertEqual(residue.remotePath, "", "a bundle residue names no path")
+    XCTAssertFalse(residue.reason.isEmpty)
+  }
+
+  func testIneffectiveUninstallIsRecordedAsResidueOnTheCompensationPath() async throws {
+    // start-ability fails, so compensation runs the cleanup legs; the
+    // uninstall among them does not take effect.
+    let dispatcher = ScriptedDispatcher(
+      script: .init(startExit: 1, packageInstalledAfterUninstall: true))
+    let (engine, capabilities, artifacts) = try makeEngine(dispatcher: dispatcher)
+    let lease = try await publishHAPLease(artifacts)
+    try await installE1Capability(capabilities)
+    let acceptance = try await engine.submit(
+      hapRequest(lease: lease, key: "idem-residue-compensation"))
+    _ = try? await engine.run(jobID: acceptance.jobID)
+
+    let debts = try await engine.listCleanupDebt()
+    let residue = try XCTUnwrap(debts.first { $0.bundleName == "com.example.demo" })
+    XCTAssertEqual(residue.jobID, acceptance.jobID)
+    XCTAssertFalse(residue.reason.isEmpty)
+  }
+
+  /// DHA-RES-002: `succeeded` keeps its meaning and stops reading as a
+  /// clean device. No terminal state is added to say so.
+  func testSucceededCarriesItsOutstandingResidueCount() async throws {
+    let dirty = ScriptedDispatcher(script: .init(packageInstalledAfterUninstall: true))
+    let (dirtyEngine, dirtyCapabilities, dirtyArtifacts) = try makeEngine(dispatcher: dirty)
+    let dirtyLease = try await publishHAPLease(dirtyArtifacts)
+    try await installE1Capability(dirtyCapabilities)
+    let dirtyJob = try await dirtyEngine.submit(
+      hapRequest(lease: dirtyLease, key: "idem-residue-count"))
+    let dirtyStatus = try await dirtyEngine.run(jobID: dirtyJob.jobID)
+    XCTAssertEqual(dirtyStatus.state, "succeeded")
+    XCTAssertEqual(dirtyStatus.outstandingResidueCount, 1)
+
+    let clean = ScriptedDispatcher()
+    let (cleanEngine, cleanCapabilities, cleanArtifacts) = try makeEngine(dispatcher: clean)
+    let cleanLease = try await publishHAPLease(cleanArtifacts)
+    try await installE1Capability(cleanCapabilities)
+    let cleanJob = try await cleanEngine.submit(
+      hapRequest(lease: cleanLease, key: "idem-residue-none"))
+    let cleanStatus = try await cleanEngine.run(jobID: cleanJob.jobID)
+    XCTAssertEqual(cleanStatus.state, "succeeded")
+    XCTAssertEqual(cleanStatus.outstandingResidueCount ?? 0, 0)
+
+    // The promise made in r3: visibility comes from the count, not from a
+    // new terminal state.
+    XCTAssertNil(JobState(rawValue: "succeededWithResidue"))
+  }
+
+  /// DHA-RES-003: settling is decided by the readback, and the continue
+  /// surface is a ledger lookup — not a way to name an uninstall target.
+  func testBundleResidueSettlesOnlyWhenTheReadbackSaysItIsGone() async throws {
+    let dispatcher = ScriptedDispatcher(
+      script: .init(packageInstalledAfterUninstall: true))
+    let (engine, capabilities, artifacts) = try makeEngine(dispatcher: dispatcher)
+    let lease = try await publishHAPLease(artifacts)
+    try await installE1Capability(capabilities)
+    let acceptance = try await engine.submit(
+      hapRequest(lease: lease, key: "idem-residue-settle"))
+    _ = try await engine.run(jobID: acceptance.jobID)
+    let recorded = try await engine.listCleanupDebt()
+    let residue = try XCTUnwrap(recorded.first { $0.bundleName != nil })
+
+    // Still installed: the record survives.
+    let stubborn = ScriptedDispatcher(
+      script: .init(packageInstalled: true, packageInstalledAfterUninstall: true))
+    let (stubbornEngine, _, _) = try makeEngine(dispatcher: stubborn)
+    _ = try await stubbornEngine.recoverPersistedJobs()
+    let unsettled = try await stubbornEngine.continueCleanupDebt(
+      jobID: residue.jobID, identity: residue.identity)
+    XCTAssertNotEqual(unsettled.state, .settled)
+    let stillRecorded = try await stubbornEngine.listCleanupDebt()
+    XCTAssertFalse(stillRecorded.isEmpty)
+
+    // Gone: the readback settles it without resending anything.
+    let gone = ScriptedDispatcher(script: .init(packageInstalled: false))
+    let (goneEngine, _, _) = try makeEngine(dispatcher: gone)
+    _ = try await goneEngine.recoverPersistedJobs()
+    let settled = try await goneEngine.continueCleanupDebt(
+      jobID: residue.jobID, identity: residue.identity)
+    XCTAssertEqual(settled.state, .settled)
+    XCTAssertEqual(settled.identity, "bundle:com.example.demo")
+    let remaining = try await goneEngine.listCleanupDebt()
+    XCTAssertTrue(remaining.isEmpty)
+  }
+
+  func testContinueRefusesAnIdentityThatIsNotInTheLedger() async throws {
+    let dispatcher = ScriptedDispatcher(
+      script: .init(packageInstalledAfterUninstall: true))
+    let (engine, capabilities, artifacts) = try makeEngine(dispatcher: dispatcher)
+    let lease = try await publishHAPLease(artifacts)
+    try await installE1Capability(capabilities)
+    let acceptance = try await engine.submit(
+      hapRequest(lease: lease, key: "idem-residue-unknown-identity"))
+    _ = try await engine.run(jobID: acceptance.jobID)
+
+    do {
+      _ = try await engine.continueCleanupDebt(
+        jobID: acceptance.jobID, identity: "bundle:com.example.somethingelse")
+      XCTFail("an unrecorded residue must not be actionable")
+    } catch {}
+    XCTAssertTrue(dispatcher.dispatchedActions.filter { $0 == "uninstallPackage" }.count == 1,
+      "the refusal must not dispatch a second uninstall")
   }
 }

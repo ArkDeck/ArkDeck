@@ -843,8 +843,9 @@ enum RuntimeCLI {
     arguments.contains("--json")
   }
 
-  /// `arkdeck cleanup-debt list|continue` — the operator surface for remote
-  /// cleanup that failed. The engine records the debt with the *exact typed
+  /// `arkdeck cleanup-debt list|continue` — the operator surface for cleanup
+  /// that ran and did not take effect, whether it left a remote file or an
+  /// installed bundle (CHG-2026-049 r3). The engine records the debt with the *exact typed
   /// action* it could not complete; `continue` only re-runs that recorded
   /// action, so `--remote-path` is a lookup key into the ledger, never a
   /// device path a caller gets to choose. The daemon has owned these two
@@ -861,19 +862,27 @@ enum RuntimeCLI {
     case "list":
       emit(try client.request(method: "cleanupDebt.list"), json: json)
     case "continue":
+      var residue: (key: String, value: String)?
+      if let index = rest.firstIndex(of: "--remote-path"), index + 1 < rest.count {
+        residue = ("remotePath", rest[index + 1])
+      } else if let index = rest.firstIndex(of: "--bundle"), index + 1 < rest.count {
+        residue = ("bundleName", rest[index + 1])
+      }
       guard let jobIndex = rest.firstIndex(of: "--job"), jobIndex + 1 < rest.count,
-        let pathIndex = rest.firstIndex(of: "--remote-path"), pathIndex + 1 < rest.count
+        let residue
       else {
         throw CLIError(
           exitCode: EX_USAGE,
-          message: "cleanup-debt continue requires --job <id> --remote-path <recorded path>")
+          message:
+            "cleanup-debt continue requires --job <id> and one of "
+            + "--remote-path <recorded path> / --bundle <recorded bundle>")
       }
       emit(
         try client.request(
           method: "cleanupDebt.continue",
           params: [
             "jobId": .string(rest[jobIndex + 1]),
-            "remotePath": .string(rest[pathIndex + 1]),
+            .init(residue.key): .string(residue.value),
           ]),
         json: json)
     default:

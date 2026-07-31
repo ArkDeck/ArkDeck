@@ -555,7 +555,7 @@ struct ArkDeckCommandLine {
         arkdeck job status --job <id> [--json] | arkdeck job list [--json]
         arkdeck job run --job <id> [--json] | arkdeck job reconcile --job <id> [--json]
         arkdeck cleanup-debt list [--json]
-        arkdeck cleanup-debt continue --job <id> --remote-path <recorded path> [--json]
+        arkdeck cleanup-debt continue --job <id> (--remote-path <path> | --bundle <name>) [--json]
         arkdeck job submit --request-file <request.json> [--wait] [--json]
         arkdeck capability list [--json]
         arkdeck capability inspect --capability <id> [--json]

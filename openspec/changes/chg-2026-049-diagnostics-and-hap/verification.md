@@ -112,7 +112,14 @@
   且既有远端路径债务的记录行为逐条不变(同一套测试对 `cleanup-remote-staging`
   失败仍断言原有记录)。
 - Evidence:实现 PR 内测试。
-- 结论:pending。
+- **结论(2026-07-31):PASS** —
+  `testIneffectiveUninstallIsRecordedAsResidueOnTheForwardPath` 与
+  `…OnTheCompensationPath` 分别断言两条路径都记录残留:`bundleName` 为该 bundle、
+  `identity` 为 `bundle:<name>`、`remotePath` 为空(bundle 残留不指向路径)、
+  `stepID` 为 `cleanup-uninstall`、理由非空。既有远端路径债务的行为由
+  `testCleanupDebtCanBeQueriedAndExplicitlyContinued`、
+  `testUnknownCleanupContinuationNeverResendsMutation` 与原生库那条继续覆盖,
+  全部不变(仅调用点改用 `identity:` 标签)。
 
 ## `DHA-RES-002` `succeeded` 不再读作"设备干净"
 
@@ -120,7 +127,12 @@
   残留计数 > 0;清理成功的对照组该计数为 0。断言 `JobStateMachine` 的转移表
   与终态集合**零变化**(不新增 `succeededWithResidue` 之类)。
 - Evidence:实现 PR 内测试。
-- 结论:pending。
+- **结论(2026-07-31):PASS** —
+  `testSucceededCarriesItsOutstandingResidueCount`:脏运行 state 仍为
+  `succeeded` 且 `outstandingResidueCount == 1`,干净对照组为 0;同一测试断言
+  `JobState(rawValue: "succeededWithResidue") == nil`,即可见性来自计数而非
+  新终态。计数由引擎在记录/结清时从债务台账**重算**(不是就地加减),
+  所以它与 `cleanup-debt list` 看到的一致。
 
 ## `DHA-RES-003` 结清由 readback 判定,且不接受任意目标
 
@@ -130,4 +142,12 @@
   (c) 传入未登记的 bundle/路径 → 拒绝(与远端路径残留同一条查表键语义,
   调用方不能借此指定任意卸载目标)。
 - Evidence:实现 PR 内测试。
-- 结论:pending。
+- **结论(2026-07-31):PASS** —
+  `testBundleResidueSettlesOnlyWhenTheReadbackSaysItIsGone`:包仍在时不结清、
+  记录保留;包已不在时由 readback 直接结清(不重发 mutation),
+  `identity` 回 `bundle:com.example.demo`。
+  `testContinueRefusesAnIdentityThatIsNotInTheLedger`:未登记的 identity 被拒,
+  且拒绝路径上没有第二次 `uninstallPackage` 下发。
+  实现层面,`.uninstallPackage` 的 reconcile readback(`readPackagePresence`,
+  desiredPresence=false)与重试后的 verify 都早已是 readback 判定(D2),
+  r3 未放宽其中任何一条。
