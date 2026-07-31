@@ -32,14 +32,18 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
   private let profile: HDCCompatibilityProfile
   private let appOwnedNativeLibraryAvailability: ProviderOperationAvailability
   private let nativeCodeSignHelper: HDCNativeCodeSignHelperArtifact?
+  private let hostReceiveRoot: URL
 
   public init(
     factsPort: any HDCObservationFactsPort,
     profile: HDCCompatibilityProfile = .openHarmony320Family,
-    appOwnedNativeLibraryAvailability: ProviderOperationAvailability? = nil
+    appOwnedNativeLibraryAvailability: ProviderOperationAvailability? = nil,
+    hostReceiveRoot: URL = FileManager.default.temporaryDirectory
+      .appendingPathComponent("arkdeck-receive", isDirectory: true)
   ) {
     self.factsPort = factsPort
     self.profile = profile
+    self.hostReceiveRoot = hostReceiveRoot
     let helper = try? HDCNativeCodeSignHelperArtifact.bundled()
     self.nativeCodeSignHelper = helper
     self.appOwnedNativeLibraryAvailability =
@@ -509,13 +513,25 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
             context: context),
           timeoutSeconds: request.durationSeconds + 30))
     case .receiveOwnedArtifact(let artifact):
+      // `file recv` takes both paths; with only the remote one hdc has no
+      // destination to write (DEVICE-COMMAND-FACTS.md §4). The local name is
+      // deliberately the remote basename: deveco has to try `recv <remote>
+      // <dir>` and `recv <remote> <dir>/<name>` separately because the
+      // landing form differs by version, and naming them alike makes both
+      // forms land on the same path instead of on a guess.
+      let destination = hostLandingURL(for: artifact.path)
       return TypedProcessPlan(
         action: action,
         kind: .process(
           executableSHA256: "resolved-at-dispatch",
           argumentSummary: try deviceArguments(
-            ["file", "recv", artifact.path.remotePath], context: context),
-          timeoutSeconds: 60))
+            ["file", "recv", artifact.path.remotePath, destination.path],
+            context: context),
+          timeoutSeconds: 60),
+        hostLanding: HostLandingExpectation(
+          destination: destination,
+          maximumBytes: artifact.maximumBytes,
+          expectedSHA256: artifact.expectedSHA256))
     case .cleanupOwnedRemotePath(let path):
       return TypedProcessPlan(
         action: action,
@@ -923,6 +939,15 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
     return remainder.dropFirst().trimmingCharacters(in: .whitespacesAndNewlines)
   }
 
+  /// The host path a received artifact must land on. Provider-owned exactly
+  /// like the remote path it mirrors: the basename already carries the
+  /// job/step/nonce tuple, so a fixed root cannot collide across jobs and no
+  /// caller input reaches this path.
+  func hostLandingURL(for remote: HDCOwnedRemotePath) -> URL {
+    hostReceiveRoot.appendingPathComponent(
+      URL(fileURLWithPath: remote.remotePath).lastPathComponent, isDirectory: false)
+  }
+
   /// Mints a provider-owned staging path for an artifact lease. As with
   /// remote temp paths, the caller never supplies a device location.
   public func mintStagedArtifact(
@@ -1149,15 +1174,40 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
       }
       return .verified(summary: ["remoteCaptured": "pending-receive"])
     case .receiveOwnedArtifact(let artifact):
-      guard let localReference = receipt.hostManagedRecordID else {
-        return .unknown(reason: "receive produced no local artifact reference")
+      // The step's whole purpose is host bytes, so the verdict is read off
+      // the file the dispatcher measured. `file recv` exits 0 on forms that
+      // transfer nothing, and its stdout is a progress line, so neither the
+      // exit status nor the receipt bytes can decide this.
+      guard let landed = receipt.landedArtifact else {
+        return .unknown(
+          reason: "receive left no file at the declared destination")
       }
-      if let expected = artifact.expectedSHA256 {
-        return .verified(summary: [
-          "localArtifact": localReference, "expectedSha256": expected,
-        ])
+      guard landed.byteCount > 0 else {
+        return .failed(
+          code: "emptyArtifact",
+          detail: "received file for \(artifact.path.remotePath) is empty")
       }
-      return .verified(summary: ["localArtifact": localReference])
+      guard landed.byteCount <= artifact.maximumBytes else {
+        return .failed(
+          code: "oversizedArtifact",
+          detail:
+            "received \(landed.byteCount) bytes over the \(artifact.maximumBytes) byte budget")
+      }
+      guard let sha256 = landed.sha256 else {
+        return .unknown(reason: "received file could not be digested")
+      }
+      if let expected = artifact.expectedSHA256, expected != sha256 {
+        return .failed(
+          code: "hashMismatch",
+          detail: "received bytes do not match the pinned content hash")
+      }
+      // The name, not the path: the summary is journalled and published, and
+      // the host directory layout is not evidence.
+      return .verified(summary: [
+        "localArtifact": landed.localURL.lastPathComponent,
+        "byteCount": String(landed.byteCount),
+        "sha256": sha256,
+      ])
     case .cleanupOwnedRemotePath(let path):
       guard receipt.exitStatus == 0 else {
         // Cleanup failure is debt, never silently dropped - the engine

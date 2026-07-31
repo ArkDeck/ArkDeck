@@ -93,6 +93,15 @@ public struct DescriptorBoundProcessDispatcher: RuntimeProcessDispatching {
     case .rockchip: providerID = "rockchip"
     }
     let executable = try resolver.resolveExecutable(providerID: providerID)
+    if let landing = plan.hostLanding {
+      do {
+        try landing.prepareDestination()
+      } catch {
+        // Nothing was spawned yet, so nothing external happened.
+        throw RuntimeDispatchFailure.failed(
+          "cannot prepare host landing destination: \(error)")
+      }
+    }
     var subprocesses: [ProviderSubprocessReceipt] = []
     var aggregateStdout = Data()
     var aggregateStderr = Data()
@@ -115,6 +124,10 @@ public struct DescriptorBoundProcessDispatcher: RuntimeProcessDispatching {
       stderr: aggregateStderr,
       stdoutTruncated: anyTruncated,
       durationSeconds: subprocesses.reduce(0) { $0 + $1.durationSeconds },
+      // Inspected even after a non-zero exit: a partial file that landed is
+      // a fact the classifier needs, and a clean exit is not evidence that
+      // anything landed at all.
+      landedArtifact: plan.hostLanding?.inspectLanded(),
       subprocesses: isSequence ? subprocesses : [])
   }
 
