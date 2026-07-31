@@ -1,7 +1,7 @@
 ---
 schema_version: 1.0.0
 change_id: CHG-2026-049-diagnostics-and-hap
-change_revision: 3
+change_revision: 4
 platform: macos
 evidence_classes:
 - contract
@@ -125,3 +125,41 @@ cases:
   expected_result: >-
     Settlement is decided by the readback, and the continue surface
     cannot be used to name an arbitrary uninstall target.
+- acceptance_id: DHA-MULTI-001
+  test_id: TEST-DHA-MULTI-001
+  method: >-
+    Argv contract tests over debug.hap@1 with and without additional HAP
+    leases, asserting the single-package argv is unchanged token for
+    token, the multi-package legs lower to mkdir/send-N, a directory
+    install and rm -f plus rmdir, and that no lowering anywhere emits
+    rm -rf.
+  expected_source: openspec/changes/chg-2026-049-diagnostics-and-hap/verification.md#dha-multi-001
+  minimum_evidence: contract
+  expected_result: >-
+    Multi-package is opt-in and the directory is cleaned by name and
+    rmdir, never recursively.
+- acceptance_id: DHA-MULTI-002
+  test_id: TEST-DHA-MULTI-002
+  method: >-
+    Contract tests where one additional lease is bound to a different
+    target identity or binding revision, asserting refusal before
+    dispatch with zero provider dispatches and zero capability
+    consumption, plus a positive case asserting send order follows lease
+    order.
+  expected_source: openspec/changes/chg-2026-049-diagnostics-and-hap/verification.md#dha-multi-002
+  minimum_evidence: contract
+  expected_result: >-
+    Every lease passes the existing binding validation individually, and
+    one bad lease stops the whole job before anything reaches the device.
+- acceptance_id: DHA-MULTI-003
+  test_id: TEST-DHA-MULTI-003
+  method: >-
+    One real-device debug.hap@1 run whose inputs are an entry plus a
+    feature signed HAP, asserting install readback, launch, and a
+    cleanup that leaves neither the bundle nor the job-owned directory.
+  expected_source: openspec/changes/chg-2026-049-diagnostics-and-hap/verification.md#dha-multi-003
+  minimum_evidence: realHardware
+  expected_result: >-
+    A multi-module app installs as one application from one directory;
+    the earlier window's single-HAP directory install is not evidence
+    for this.

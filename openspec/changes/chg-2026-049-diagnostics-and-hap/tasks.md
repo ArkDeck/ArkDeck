@@ -200,3 +200,36 @@
 - Risk:medium(触及持久化债务台账的形状与一个已发布 operation 的失败语义。
   三层约束:既有远端路径债务的行为逐条不变、`succeeded` 的含义不被悄悄收窄
   (残留另行可见而非改终态)、结清仍由 readback 判定而非退出码)
+
+## TASK-DHA-003 — 多包 HAP 按目录安装(r4)
+
+- Status:ready
+- Platform:macos
+- Requirements:proposal r4 What 1-5(可选 `additionalHapArtifactLeases` 与
+  schema 数组型、引擎按序解析 N 条租约并逐条校验绑定、staged 目录 mint-only 与
+  `mkdir -p`/`send ×N`/`bm install -p <dir>`/`rm -f ×N`+`rmdir` 的 lowering、
+  判定不放宽、清理失败按 r3 residue 记录)
+- Acceptance:change-local `DHA-MULTI-001`..`DHA-MULTI-003`,登记于 `verification.md`
+- Depends on:TASK-DHA-001、TASK-DHA-002(均 done);r4 proposal 合入即 approved
+- Hardware required:**部分**。contract 面不需要;`DHA-MULTI-003` 需要一套
+  **多模块签名 HAP**(entry + feature),仓内与当前设备都没有,故该 AC 如实保持
+  pending-hardware 且不阻塞任务 done(先例 UDR-AC-4)。**不得**以上次窗口
+  "目录里放一个 HAP 成功"冒充多包已验证
+- Allowed paths:
+  - `Packages/ArkDeckKit/**`
+  - `Catalog/**`
+  - `scripts/catalog_gen/**`(字段类型词表与生成器 pin 必须同 PR 更新)
+  - `openspec/contracts/workflow-step.schema.json`
+  - `openspec/changes/chg-2026-049-diagnostics-and-hap/**`
+  - `docs/adr/**`
+- Forbidden paths:
+  - `openspec/constitution.md`、`openspec/specs/**`、
+    `openspec/verification/**`(全局)、`openspec/baselines/**`、
+    `openspec/contracts/capability-registry.yaml`
+  - `scripts/**`(仅上列 `catalog_gen/**` 除外)、`.github/**`、`AGENTS.md`、
+    `PRODUCT-LOOP.md`、`ArkDeck.xcodeproj/**`、`ArkDeckApp/**`
+  - 其他 change 目录
+- Risk:high(唯一一次同时动**输入 schema 的字段类型**与一个已发布 E1
+  operation 的 send/install/cleanup 三条腿。三层约束:未提供附加租约时逐字节
+  不变、N 条租约逐条过既有绑定校验且任一不符即零 dispatch、清理只用
+  `rm -f`+`rmdir` —— **禁止 `rm -rf`**,沿用 native 族的既有安全形态)
