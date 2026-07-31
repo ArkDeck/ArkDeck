@@ -521,12 +521,18 @@ final class AgentDaemonContractTests: XCTestCase {
       return XCTFail("production daemon must publish flash.dayu200@1 availability")
     }
     XCTAssertEqual(flash["availability"], .string("unavailable"))
+    let reasonTexts = reasons.compactMap { reason -> String? in
+      guard case .string(let text) = reason else { return nil }
+      return text
+    }
+    XCTAssertEqual(reasonTexts.count, 1)
     XCTAssertTrue(
-      reasons.contains { reason in
-        guard case .string(let text) = reason else { return false }
-        return text.contains("product-owned Rockchip component")
+      reasonTexts.allSatisfy { reason in
+        reason.contains("product-owned Rockchip component")
+          || reason.contains("per-action RockUSB host requires descriptor-bound HDC")
       },
-      "production daemon must expose the bundled-component blocker, not provider_not_registered")
+      "production daemon must expose the missing product dependency, not provider_not_registered")
+    XCTAssertFalse(reasonTexts.contains { $0.contains("provider_not_registered") })
 
     let cliURL = productsDirectory.appendingPathComponent("arkdeck")
     XCTAssertTrue(
@@ -559,6 +565,7 @@ final class AgentDaemonContractTests: XCTestCase {
       return XCTFail("arkdeck operation list must expose daemon availability")
     }
     XCTAssertEqual(listedFlash["availability"], .string("unavailable"))
+    XCTAssertEqual(listedFlash["reasons"], .array(reasons))
 
     process.terminate()
     let stopDeadline = Date().addingTimeInterval(10)

@@ -269,12 +269,56 @@ class PackageSourceContractTests(ContractFixture):
                 runner.run(["/bin/sh", "-c", "true"], cwd=root, env=env)
 
     def test_sanitizer_removes_profile_and_user_paths(self) -> None:
-        runner = package.Runner({"secret-profile": "<NOTARY_PROFILE>"})
+        runner = package.Runner(
+            {
+                "secret-profile": "<NOTARY_PROFILE>",
+                "/Users/example/private/login.keychain-db": "<NOTARY_KEYCHAIN>",
+            }
+        )
         observed = runner.sanitize(
-            "secret-profile /Users/example/private/release/output"
+            "secret-profile /Users/example/private/login.keychain-db "
+            "/Users/example/private/release/output"
         )
         self.assertNotIn("secret-profile", observed)
         self.assertNotIn("/Users/example", observed)
+        self.assertIn("<NOTARY_KEYCHAIN>", observed)
+
+    def test_notary_preflight_binds_the_explicit_keychain(self) -> None:
+        class CapturingRunner:
+            def __init__(self) -> None:
+                self.arguments = []
+
+            def run(self, arguments, **_kwargs):
+                self.arguments = [str(argument) for argument in arguments]
+                return package.CommandResult(
+                    argv0="xcrun",
+                    exit_code=0,
+                    stdout="{}",
+                    stderr="",
+                )
+
+        runner = CapturingRunner()
+        package.preflight_notary_auth(
+            profile="opaque-profile",
+            keychain=Path("/Users/example/private/login.keychain-db"),
+            runner=runner,
+            env={},
+            cwd=Path("/private/tmp"),
+        )
+        self.assertEqual(
+            runner.arguments,
+            [
+                "/usr/bin/xcrun",
+                "notarytool",
+                "history",
+                "--keychain-profile",
+                "opaque-profile",
+                "--keychain",
+                "/Users/example/private/login.keychain-db",
+                "--output-format",
+                "json",
+            ],
+        )
 
     def test_regular_file_gate_rejects_symlink_and_nonregular_input(self) -> None:
         with tempfile.TemporaryDirectory(dir="/private/tmp") as temporary:
@@ -389,6 +433,47 @@ class UnsignedInputMutationTests(ContractFixture):
 
 
 class ArchiveMutationTests(ContractFixture):
+    def test_device_elf_resource_is_host_data_not_nested_macos_code(self) -> None:
+        helper = (
+            package.REPO_ROOT
+            / "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/Resources"
+            / "OpenHarmonyNativeCodeSign/arkdeck-code-sign-enable"
+        )
+        self.assertEqual(helper.stat().st_mode & 0o111, 0)
+
+        with tempfile.TemporaryDirectory() as temporary:
+            app = Path(temporary) / "ArkDeck.app"
+            app_binary = app / "Contents/MacOS/ArkDeck"
+            component = app / self.spec["component"]["bundlePath"]
+            bundled_helper = (
+                app
+                / "Contents/Resources/ArkDeckKit_ArkDeckWorkflows.bundle"
+                / "Contents/Resources/OpenHarmonyNativeCodeSign"
+                / "arkdeck-code-sign-enable"
+            )
+            for path in (app_binary, component, bundled_helper):
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(b"fixture")
+            app_binary.chmod(0o755)
+            component.chmod(0o755)
+            bundled_helper.chmod(0o644)
+
+            self.assertEqual(
+                package.nested_code_paths(app),
+                sorted(
+                    [
+                        "Contents/MacOS/ArkDeck",
+                        self.spec["component"]["bundlePath"],
+                    ]
+                ),
+            )
+
+            bundled_helper.chmod(0o755)
+            self.assertIn(
+                bundled_helper.relative_to(app).as_posix(),
+                package.nested_code_paths(app),
+            )
+
     def test_valid_archive_facts_pass(self) -> None:
         package.validate_archive_facts(self.valid_archive(), self.spec)
 
