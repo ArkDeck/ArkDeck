@@ -63,6 +63,11 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
       var traceListing: String?
       /// hitrace's own exit status, which the verdict must ignore.
       var traceExit: Int32 = 0
+      /// The `ls -l` line the device answers for the component tree file.
+      var uiTreeListing: String?
+      /// Bytes the simulated `file recv` leaves for the component tree leg.
+      var uiTreePayload: Data? = Data(
+        #"{"attributes":{"text":"hello"},"children":[]}"#.utf8)
       /// Stop/uninstall are judged by their readback, so the fixture models
       /// the device state after the mutation rather than its exit status.
       var processRunningAfterStop = false
@@ -126,6 +131,23 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
       case .captureUIDump:
         note("captureUIDump")
         return receipt("{\"windows\":[]}\n")
+      case .captureComponentTree:
+        note("captureComponentTree")
+        // Same shape as the trace leg: a status line plus the `ls -l`
+        // readback that actually decides the verdict.
+        func treeSub(_ stdout: String, exit: Int32 = 0) -> ProviderSubprocessReceipt {
+          ProviderSubprocessReceipt(
+            exitStatus: exit, stdout: Data(stdout.utf8), stderr: Data(),
+            stdoutTruncated: false, durationSeconds: 0.01)
+        }
+        let treeListing =
+          script.uiTreeListing
+          ?? "-rw-r--r-- 1 root root 26143 2026-07-31 00:00 /data/local/tmp/tree.json\n"
+        return ProviderProcessReceipt(
+          exitStatus: 0,
+          stdout: Data("DumpLayout saved to:/data/local/tmp/tree.json\n".utf8),
+          stderr: Data(), stdoutTruncated: false, durationSeconds: 0.02,
+          subprocesses: [treeSub(""), treeSub(treeListing)])
       case .captureTrace:
         note("captureTrace")
         // hitrace, then the `ls -l` readback that actually decides the
@@ -155,7 +177,10 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
             "receive plan carried no host landing declaration")
         }
         try? landing.prepareDestination()
-        if let payload = script.receivedTracePayload {
+        let payload =
+          landing.destination.pathExtension == "json"
+          ? script.uiTreePayload : script.receivedTracePayload
+        if let payload {
           try? payload.write(to: landing.destination)
         }
         return ProviderProcessReceipt(
@@ -293,9 +318,11 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
     key: String = "idem-capture-01",
     capability: String? = nil,
     totalArtifactByteBudget: Int? = nil,
-    redactionProfile: String? = nil
+    redactionProfile: String? = nil,
+    withComponentTree: Bool = false
   ) -> Data {
     let trace = withTrace ? "\"traceCategories\": [\"ohos\"]," : ""
+    let tree = withComponentTree ? "\"uiComponentTree\": true," : ""
     let auth = capability.map { "\"authorization\": { \"capabilityId\": \"\($0)\" }," } ?? ""
     let budget =
       totalArtifactByteBudget.map { "\"totalArtifactByteBudget\": \($0)," } ?? ""
@@ -311,7 +338,7 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
         "target": { "targetId": "TGT-1", "expectedBindingRevision": 7 },
         "operation": { "id": "capture.diagnostics", "version": 1 },
         \(auth)
-        "inputs": { \(trace) \(budget) \(redaction) "durationSeconds": 5 }
+        "inputs": { \(trace) \(tree) \(budget) \(redaction) "durationSeconds": 5 }
       }
       """.utf8)
   }
@@ -1485,5 +1512,104 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
     XCTAssertEqual(
       noResendDispatcher.dispatchedActions, ["reconcileOwnedPathPresence"],
       "an outcomeUnknown cleanup retry may only be read back, never resent")
+  }
+}
+
+// MARK: - CHG-2026-053 r2: the component tree as a file product
+
+extension DiagnosticsAndHAPContractTests {
+  /// UDR-AC-6: the input is the only thing that raises the plan. Without it
+  /// the operation stays exactly what it was — E0, default read-only policy,
+  /// no tree steps — and with it the file steps run under the same E1 path
+  /// the trace leg already uses.
+  func testComponentTreeInputIsWhatRaisesTheEffect() async throws {
+    let quiet = ScriptedDispatcher()
+    let (engineWithout, capabilitiesWithout, artifactsWithout) = try makeEngine(
+      dispatcher: quiet)
+    let plain = try await engineWithout.submit(
+      captureRequest(withTrace: false, key: "idem-tree-absent"))
+    let plainStatus = try await engineWithout.run(jobID: plain.jobID)
+    XCTAssertEqual(plainStatus.state, "succeeded")
+    XCTAssertFalse(
+      quiet.dispatchedActions.contains("captureComponentTree"),
+      "the tree leg must not run for a request that did not ask for it")
+    let plainEvidence = try await engineWithout.evidenceSnapshot(jobID: plain.jobID)
+    XCTAssertEqual(plainEvidence.authority?.kind, .defaultReadOnlyPolicy)
+    let issuedForPlain = try await capabilitiesWithout.list()
+    XCTAssertTrue(issuedForPlain.isEmpty, "an E0 plan issues no capability")
+    // The declared product is still indexed, with a reason — a partial
+    // capture may never look complete — but it is not published.
+    let plainTree = try await artifactsWithout.list(jobID: plain.jobID)
+      .first { $0.name == "ui-tree.json" }
+    if let plainTree, case .published = plainTree.status {
+      XCTFail("a request that did not ask for the tree cannot publish one")
+    }
+
+    let loud = ScriptedDispatcher()
+    let (engineWith, capabilitiesWith, _) = try makeEngine(dispatcher: loud)
+    let asked = try await engineWith.submit(
+      captureRequest(withTrace: false, key: "idem-tree-present", withComponentTree: true))
+    let askedStatus = try await engineWith.run(jobID: asked.jobID)
+    XCTAssertEqual(
+      askedStatus.state, "succeeded", askedStatus.timeline.joined(separator: " | "))
+    XCTAssertTrue(loud.dispatchedActions.contains("captureComponentTree"))
+    let askedEvidence = try await engineWith.evidenceSnapshot(jobID: asked.jobID)
+    XCTAssertEqual(askedEvidence.authority?.kind, .runtimeCapability)
+    let issued = try await capabilitiesWith.list()
+    XCTAssertEqual(issued.first?.capability.effectCeiling, .deviceMutation)
+  }
+
+  /// UDR-AC-7: the tree is the received bytes, published through the path
+  /// that redacts — never through `publishFile`, which refuses JSON exactly
+  /// because it would skip redaction.
+  func testComponentTreePublishesReceivedBytesThroughTheRedactingPath() async throws {
+    let dispatcher = ScriptedDispatcher()
+    let (engine, _, artifacts) = try makeEngine(dispatcher: dispatcher)
+    let acceptance = try await engine.submit(
+      captureRequest(withTrace: false, key: "idem-tree-publish", withComponentTree: true))
+    _ = try await engine.run(jobID: acceptance.jobID)
+
+    let recorded = try await artifacts.list(jobID: acceptance.jobID)
+    let tree = try XCTUnwrap(recorded.first { $0.name == "ui-tree.json" })
+    XCTAssertEqual(tree.status, .published)
+    XCTAssertEqual(tree.mediaType, "application/json")
+    let bytes = try await artifacts.read(
+      jobID: acceptance.jobID, artifactID: tree.artifactID, allowSensitive: true)
+    let decoded = try XCTUnwrap(
+      try JSONSerialization.jsonObject(with: bytes) as? [String: Any])
+    XCTAssertNotNil(decoded["children"], "the artifact must be the received tree")
+    XCTAssertNotNil(decoded["attributes"])
+    XCTAssertTrue(dispatcher.dispatchedActions.contains("cleanup"))
+
+    // And the file-backed route stays closed to this media type: it skips
+    // redaction, which is why the tree may not take it.
+    do {
+      _ = try await artifacts.publishFile(
+        RuntimeArtifactFilePublicationRequest(
+          jobID: acceptance.jobID, sessionID: "s", stepID: "receive-ui-tree",
+          name: "ui-tree-direct.json", mediaType: "application/json", privacy: .sensitive,
+          retentionClass: .default, sourceOperation: "capture.diagnostics@1",
+          providerID: "hdc",
+          bindingSnapshot: ArtifactBindingSnapshot(
+            targetID: "TGT-1", bindingRevision: 7, stableIdentitySHA256: nil),
+          sourceFileURL: URL(fileURLWithPath: "/private/tmp/whatever.json"),
+          expectedByteCount: 10, expectedSHA256: String(repeating: "a", count: 64)))
+      XCTFail("publishFile must keep refusing application/json")
+    } catch {}
+  }
+
+  /// A transfer that lands nothing may not become a published tree.
+  func testComponentTreeThatNeverLandsIsRecordedMissing() async throws {
+    var script = ScriptedDispatcher.Script()
+    script.uiTreePayload = nil
+    let dispatcher = ScriptedDispatcher(script: script)
+    let (engine, _, artifacts) = try makeEngine(dispatcher: dispatcher)
+    let acceptance = try await engine.submit(
+      captureRequest(withTrace: false, key: "idem-tree-nowhere", withComponentTree: true))
+    _ = try? await engine.run(jobID: acceptance.jobID)
+    let recorded = try await artifacts.list(jobID: acceptance.jobID)
+    if case .published? = recorded.first(where: { $0.name == "ui-tree.json" })?.status {
+      XCTFail("nothing landed, so no tree artifact may be published")
+    }
   }
 }

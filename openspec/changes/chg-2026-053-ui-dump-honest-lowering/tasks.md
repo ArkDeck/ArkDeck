@@ -39,7 +39,11 @@
 
 ## TASK-UDR-002 — 组件树按文件型产物交付(r2)
 
-- Status:ready
+- Status:done
+- Done:2026-07-31;随本实现 PR 合入生效(维护者 review + merge 即批准);
+  UDR-AC-5..7 PASS(contract 面),**UDR-AC-8 亦 PASS** —— 提案预期它是
+  pending-hardware,实际当天真机一次跑通(`job-cdeb06b6…`,`ui-tree.json`
+  26,143 字节 / 42 节点);evidence = `evidence/runs/TASK-UDR-002/run-r2.md`
 - Platform:macos
 - Requirements:proposal r2 What 1-5(三个 optional 步骤、`uiComponentTree` 输入与
   `ui-tree.json` 产物、effect 随输入升级、dumpLayout lowering 与既有接收/清理复用、

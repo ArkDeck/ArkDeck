@@ -1,8 +1,9 @@
 # Verification — CHG-2026-053
 
 > Change:CHG-2026-053-ui-dump-honest-lowering@r2
-> Status:partial # r1:UDR-AC-1..3 passed;r2:UDR-AC-5..8 pending(本 PR 是
-> 拆分/批准载体,结论由实现 PR 写入)。原 r1 状态行如下:
+> Status:passed # r1:UDR-AC-1..3 passed;r2:UDR-AC-5..8 全部 passed
+> (2026-07-31 实现 PR;AC-8 原定 pending-hardware,当天真机跑通故如实记 PASS)。
+> 原 r1 状态行如下:
 > 2026-07-30 UDR-AC-1..3 随实现 PR 通过;UDR-AC-4 如实保持
 > pending-hardware(定义为不阻塞任务 done,见其节),待下一次已接管设备 E0
 > 运行补记;维护者 review/merge 实现 PR 即确认
@@ -64,7 +65,15 @@
   (2026-07-31 真机实测形态);远端路径必须是 provider 自铸的 owned path,
   调用方无法提供;缺 connectKey 时 fail closed。
 - Evidence:实现 PR 内测试 + 全量套件结果。
-- 结论:pending。
+- **结论(2026-07-31):PASS** —
+  `DeviceProviderArgvContractTests.testComponentTreeLowersToTheWindowIdFreeDumpLayoutForm`
+  逐 token 断言两段序列(dumpLayout 无 `-w`/`-d`,随后 `ls -l`),并断言远端路径
+  以 `.json` 结尾;`testComponentTreeStepsShareOneOwnedRemotePath` 断言三步共享
+  同一条 owned path 且与 trace 腿不碰撞;
+  `testComponentTreeStdoutActionStaysRefusedAndNamesTheRealRoute` 断言 stdout
+  action 仍拒绝且拒绝理由点名 `uiComponentTree` / `capture-ui-tree`、不再出现
+  r1 那个错误的 windowId 说法。缺 connectKey 的负例由既有全 action 扫描覆盖。
+  全量 880 tests / 1 skipped / 0 failures。
 
 ## UDR-AC-6 effect 随输入升级,且未请求时逐字节不变(r2)
 
@@ -74,7 +83,12 @@
   (b) 带 `uiComponentTree: true` 时 effect 升为 `deviceMutation`,走既有
   capability 路径;缺授权时**零 dispatch**。
 - Evidence:实现 PR 内测试。
-- 结论:pending。
+- **结论(2026-07-31):PASS** —
+  `testComponentTreeInputIsWhatRaisesTheEffect`:不带输入时 job 成功、
+  `captureComponentTree` 零 dispatch、authority 为 `defaultReadOnlyPolicy`、
+  capability store 为空、`ui-tree.json` 不得 published(仍如实入索引为 missing);
+  带输入时 authority 为 `runtimeCapability` 且 effectCeiling 为 `deviceMutation`。
+  选择规则落在 `optionalStepIsSelected` 单点,授权与执行共用,二者不可能分歧。
 
 ## UDR-AC-7 组件树产物走脱敏发布,且收不到即记 missing(r2)
 
@@ -84,7 +98,15 @@
   `ui-tree.json` 记 `missing` 且带原因,绝不发布 `DumpLayout saved to:` 这类
   状态行冒充产物;(c) 超预算按既有 D4 语义 fail closed。
 - Evidence:实现 PR 内测试。
-- 结论:pending。
+- **结论(2026-07-31):PASS** —
+  `testComponentTreePublishesReceivedBytesThroughTheRedactingPath`:发布出的
+  `ui-tree.json` 可解析为 `{attributes, children}`、mediaType 为
+  `application/json`,同一测试断言 `publishFile` 对该 mediaType 仍然抛错
+  (即 file-backed 路径对它保持关闭);
+  `testComponentTreeThatNeverLandsIsRecordedMissing` 断言没有落地文件时不得
+  published。实现上 `receivedRedactedArtifacts` 与 `fileBackedArtifacts` 是两个
+  互斥集合,前者在预算判定之后读文件、重算 SHA-256 与 dispatcher 实测值比对,
+  不符即记 missing 并抛出。
 
 ## UDR-AC-8 真机端到端(r2,pending-hardware)
 
@@ -95,4 +117,8 @@
 - 说明:命令面已于 2026-07-31 实测为 `[R]`(见 proposal r2),**但 ArkDeck 的
   lowering 与端到端未验证**;按 UDR-AC-4 先例,该 AC 保持 pending-hardware 且
   不阻塞任务 done,不得以命令面的 `[R]` 冒充实现已验证。
-- 结论:pending。
+- **结论(2026-07-31):PASS** — 预期是 pending-hardware,实际当天设备在线并一次
+  跑通:`job-cdeb06b644bafa16ee65c3cdacb9d9be`,executor=agent、`actualEffect: E1`、
+  `humanActions: []`;`capture-ui-tree` / `receive-ui-tree` / `cleanup-ui-tree-temp`
+  三步均 verified,`ui-tree.json` 发布 26,143 字节并解析出 42 节点,
+  `/data/local/tmp` 无残留。记录:`evidence/runs/TASK-UDR-002/run-r2.md`。

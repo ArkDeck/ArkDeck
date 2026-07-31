@@ -149,10 +149,11 @@ final class DeviceProviderArgvContractTests: XCTestCase {
     XCTAssertEqual(request.scope, .windowList)
   }
 
-  // UDR-AC-2: componentTree's real forms are window-scoped and the published
-  // contract carries no windowId, so both the action mapping and the
-  // lowering refuse instead of inventing a command.
-  func testComponentTreeActionRefIsRejectedBeforeAnyIntentExists() throws {
+  // UDR-AC-5 (r2): the stdout action stays refused — a captureRemoteStdout
+  // step cannot carry a file product no matter which flags it gets — and the
+  // refusal must now point at the route that does work, or the next reader
+  // re-derives it from hidumper flags all over again.
+  func testComponentTreeStdoutActionStaysRefusedAndNamesTheRealRoute() throws {
     let descriptor = try XCTUnwrap(
       RuntimeOperationCatalog.descriptor(reference: "capture.diagnostics@1"))
     let synthetic = CatalogStepDescriptor(
@@ -164,49 +165,65 @@ final class DeviceProviderArgvContractTests: XCTestCase {
     XCTAssertThrowsError(
       try provider.action(for: synthetic, operation: descriptor, inputs: [:], context: context)
     ) { error in
-      XCTAssertTrue("\(error)".contains("windowId"), "unexpected reason: \(error)")
+      let reason = "\(error)"
+      XCTAssertTrue(reason.contains("uiComponentTree"), "must name the input: \(reason)")
+      XCTAssertTrue(reason.contains("capture-ui-tree"), "must name the steps: \(reason)")
+      XCTAssertFalse(
+        reason.contains("windowId"),
+        "r1's reason was wrong and must not come back: \(reason)")
     }
   }
 
-  func testComponentTreeScopeHasNoHonestLoweringAndFailsClosed() throws {
-    XCTAssertThrowsError(
-      try provider.lower(
-        action: .hdc(.captureUIDump(try HDCUIDumpRequest(scope: .componentTree))),
-        context: context)
-    ) { error in
-      XCTAssertTrue("\(error)".contains("windowId"), "unexpected reason: \(error)")
+  /// UDR-AC-5: the exact form measured on DAYU200 (OH 3.2, 2026-07-31) —
+  /// no `-w`, no `-d`, and a provider-owned remote path the caller cannot
+  /// supply. The `ls -l` readback follows because `DumpLayout saved to:` is
+  /// a status line from a device mutation, not evidence of the file.
+  func testComponentTreeLowersToTheWindowIdFreeDumpLayoutForm() throws {
+    let path = try HDCOwnedRemotePath(
+      jobID: "job-argv-1", stepID: "capture-ui-tree", nonce: "n1")
+    let plan = try provider.lower(
+      action: .hdc(.captureComponentTree(into: path)), context: context)
+    guard case .processSequence(_, let invocations) = plan.kind else {
+      return XCTFail("expected a dump + readback sequence")
     }
+    XCTAssertEqual(
+      invocations.map(\.arguments),
+      [
+        ["-t", connectKey, "shell", "uitest", "dumpLayout", "-p", path.remotePath],
+        ["-t", connectKey, "shell", "ls", "-l", path.remotePath],
+      ])
+    XCTAssertTrue(path.remotePath.hasSuffix(".json"))
+    XCTAssertTrue(invocations[0].continueAfterNonZero)
   }
 
-  // The refusal is permanent only for the stdout step shape. Naming the
-  // file-producing dumpLayout route in the reason is what stops the next
-  // reader from re-deriving it from hidumper flags (DEVICE-COMMAND-FACTS.md
-  // §7); losing that pointer is a silent regression, so pin it.
-  func testComponentTreeRefusalNamesTheFileProducingRoute() throws {
+  /// The three file steps must all resolve to the *same* owned remote path:
+  /// the dump writes it, the receive reads it, the cleanup removes it.
+  func testComponentTreeStepsShareOneOwnedRemotePath() throws {
     let descriptor = try XCTUnwrap(
       RuntimeOperationCatalog.descriptor(reference: "capture.diagnostics@1"))
-    let synthetic = CatalogStepDescriptor(
-      stepID: "capture-ui-dump", kind: .captureRemoteStdout, effect: .readOnly,
-      cancellation: .immediate, binding: .confirmedDevice, isOptional: true,
-      compensation: .none,
-      actionReference: CatalogActionReference(
-        catalogID: "arkdeck-diagnostics", actionID: "componentTree"))
-    for refusal in [
-      { _ = try self.provider.action(
-        for: synthetic, operation: descriptor, inputs: [:], context: self.context) },
-      { _ = try self.provider.lower(
-        action: .hdc(.captureUIDump(try HDCUIDumpRequest(scope: .componentTree))),
-        context: self.context) },
-    ] as [() throws -> Void] {
-      XCTAssertThrowsError(try refusal()) { error in
-        let reason = "\(error)"
-        XCTAssertTrue(
-          reason.contains("dumpLayout"),
-          "refusal must name the known route: \(reason)")
-        XCTAssertTrue(
-          reason.lowercased().contains("stdout"),
-          "refusal must name the product-shape blocker: \(reason)")
-      }
+    let inputs: [String: JSONValue] = ["uiComponentTree": .bool(true)]
+    func action(_ stepID: String) throws -> TypedProviderAction {
+      try provider.action(
+        for: XCTUnwrap(descriptor.steps.first { $0.stepID == stepID }),
+        operation: descriptor, inputs: inputs, context: context)
     }
+    guard case .hdc(.captureComponentTree(let dumpPath)) = try action("capture-ui-tree"),
+      case .hdc(.receiveOwnedArtifact(let received)) = try action("receive-ui-tree"),
+      case .hdc(.cleanupOwnedRemotePath(let cleanupPath)) = try action("cleanup-ui-tree-temp")
+    else {
+      return XCTFail("the ui-tree steps must keep their typed path payloads")
+    }
+    XCTAssertEqual(dumpPath, received.path)
+    XCTAssertEqual(dumpPath, cleanupPath)
+
+    // And they must not collide with the trace leg's path in the same job.
+    guard case .hdc(.captureTrace(_, let tracePath)) = try provider.action(
+      for: XCTUnwrap(descriptor.steps.first { $0.stepID == "capture-trace" }),
+      operation: descriptor,
+      inputs: ["traceCategories": .array([.string("ability")])], context: context)
+    else {
+      return XCTFail("trace action")
+    }
+    XCTAssertNotEqual(dumpPath.remotePath, tracePath.remotePath)
   }
 }

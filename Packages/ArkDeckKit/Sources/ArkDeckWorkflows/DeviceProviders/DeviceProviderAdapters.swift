@@ -129,21 +129,33 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
     case .captureRemoteStdout:
       return try captureAction(for: step, inputs: inputs)
     case .captureRemoteFile:
+      if step.stepID == "capture-ui-tree" {
+        return .hdc(
+          .captureComponentTree(
+            into: try mintStableOwnedRemotePath(
+              jobID: context.jobID, stepID: "capture-ui-tree")))
+      }
       return .hdc(
         .captureTrace(
           try traceRequest(from: inputs),
           into: try mintStableOwnedRemotePath(
             jobID: context.jobID, stepID: "capture-trace")))
     case .receiveFile:
+      // Each receive leg re-mints its own producer's owned path, which is
+      // what keeps the received bytes bound to the step that wrote them.
       return .hdc(
         .receiveOwnedArtifact(
           HDCOwnedRemoteArtifact(
             path: try mintStableOwnedRemotePath(
-              jobID: context.jobID, stepID: "capture-trace"),
+              jobID: context.jobID, stepID: Self.fileProducerStepID(for: step.stepID)),
             expectedSHA256: nil, maximumBytes: 64 * 1024 * 1024)))
     case .cleanupOwnedRemotePath:
-      let ownerStepID =
-        operation.reference == "debug.hap@1" ? "send-hap" : "capture-trace"
+      let ownerStepID: String
+      if operation.reference == "debug.hap@1" {
+        ownerStepID = "send-hap"
+      } else {
+        ownerStepID = Self.fileProducerStepID(for: step.stepID)
+      }
       return .hdc(
         .cleanupOwnedRemotePath(
           try mintStableOwnedRemotePath(jobID: context.jobID, stepID: ownerStepID)))
@@ -211,20 +223,18 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
     case "windowInventory":
       return .hdc(.captureUIDump(try HDCUIDumpRequest(scope: .windowList)))
     case "componentTree":
-      // No hidumper component-tree form is windowId-free, and the published
-      // contract carries no windowId (diagnostics-stdout.yaml, CHG-2026-053).
-      // The known windowId-free route is `uitest dumpLayout -p <remote.json>`,
-      // which writes a device-side file rather than stdout, so it cannot be
-      // expressed by a captureRemoteStdout step at all: adopting it needs a
-      // captureRemoteFile + receiveFile + cleanup step shape, i.e. a contract
-      // and Catalog change. See `DEVICE-COMMAND-FACTS.md` §7 before spending
-      // another round on hidumper flag archaeology. Refusing here keeps the
-      // journal from recording an intent no honest command can execute.
+      // The component tree is delivered — by the `capture-ui-tree` /
+      // `receive-ui-tree` / `cleanup-ui-tree-temp` steps, selected by the
+      // `uiComponentTree` input (CHG-2026-053 r2). What stays refused is
+      // this *stdout* action: `uitest dumpLayout` writes a device file, and
+      // a captureRemoteStdout step cannot carry a file product no matter
+      // which flags it is given. The contract keeps the action; nothing may
+      // reach it. Do not spend another round on hidumper flag archaeology —
+      // a windowId is not what was ever missing (DEVICE-COMMAND-FACTS.md §7).
       throw DeviceProviderError.unsupportedAction(
-        "componentTree has no windowId-free hidumper form and the published "
-          + "contract carries no windowId; the windowId-free dumpLayout route "
-          + "produces a device file, which a captureRemoteStdout step cannot "
-          + "carry — capture windowInventory instead")
+        "componentTree is a file product, not stdout: use the uiComponentTree "
+          + "input, which selects the capture-ui-tree file steps; a "
+          + "captureRemoteStdout step cannot carry it")
     case "boundedHilog":
       var duration = 30
       if case .integer(let requested)? = inputs["durationSeconds"] {
@@ -495,17 +505,6 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
               ["shell", "hidumper", "-s", "WindowManagerService", "-a", "-a"],
               context: context),
             timeoutSeconds: 30))
-      case .componentTree:
-        // The hidumper forms are window-scoped (-w <windowId> …) and the
-        // published contract carries no windowId; a scope.rawValue service
-        // name is not a hidumper service and would capture error text. The
-        // windowId-free alternative (`uitest dumpLayout`) is file-producing,
-        // not stdout-producing, so it needs a different step kind — see
-        // `DEVICE-COMMAND-FACTS.md` §7 and D1 in its §10 ledger.
-        throw DeviceProviderError.unsupportedAction(
-          "componentTree UI dump has no honest windowId-free stdout lowering; "
-            + "use windowList until the windowId contract revision or a "
-            + "file-producing dumpLayout step shape lands")
       }
     case .captureTrace(let request, let path):
       // hitrace's own exit status is the hdc client's, not the remote
@@ -525,6 +524,29 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
                   String(request.bufferKB)] + request.categories + ["-o", path.remotePath],
                 context: context),
               timeoutSeconds: request.durationSeconds + 30,
+              continueAfterNonZero: true),
+            TypedProcessInvocation(
+              arguments: try deviceArguments(
+                ["shell", "ls", "-l", path.remotePath], context: context),
+              timeoutSeconds: 15),
+          ]))
+    case .captureComponentTree(let path):
+      // Measured on DAYU200 / OH 3.2 (CHG-2026-053 r2): `uitest dumpLayout
+      // -p <file>` needs neither `-w` nor `-d`, and answers `DumpLayout
+      // saved to:<path>`. That answer is a status line from a command that
+      // mutates the device, so the file — not the line — is the evidence,
+      // and the `ls -l` readback is what reads it (same shape as the trace
+      // leg, DEVICE-COMMAND-FACTS.md §8).
+      return TypedProcessPlan(
+        action: action,
+        kind: .processSequence(
+          executableSHA256: "resolved-at-dispatch",
+          invocations: [
+            TypedProcessInvocation(
+              arguments: try deviceArguments(
+                ["shell", "uitest", "dumpLayout", "-p", path.remotePath],
+                context: context),
+              timeoutSeconds: 60,
               continueAfterNonZero: true),
             TypedProcessInvocation(
               arguments: try deviceArguments(
@@ -980,6 +1002,18 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
     return remainder.dropFirst().trimmingCharacters(in: .whitespacesAndNewlines)
   }
 
+  /// Which step wrote the file a receive/cleanup step is talking about.
+  /// The owned remote path is minted from the *producer's* step ID, so the
+  /// two legs of a file product cannot drift onto different paths.
+  static func fileProducerStepID(for stepID: String) -> String {
+    switch stepID {
+    case "receive-ui-tree", "cleanup-ui-tree-temp":
+      return "capture-ui-tree"
+    default:
+      return "capture-trace"
+    }
+  }
+
   /// The host path a received artifact must land on. Provider-owned exactly
   /// like the remote path it mirrors: the basename already carries the
   /// job/step/nonce tuple, so a fixed root cannot collide across jobs and no
@@ -1228,6 +1262,21 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
           detail: "hitrace left a zero-byte file at \(path.remotePath)")
       }
       return .verified(summary: ["remoteByteCount": String(byteCount)])
+    case .captureComponentTree(let path):
+      guard receipt.subprocesses.count == 2 else {
+        return .unknown(reason: "component tree dump did not produce its readback sequence")
+      }
+      guard let byteCount = Self.remoteRegularFileByteCount(receipt.subprocesses[1]) else {
+        return .unknown(
+          reason: "tree readback did not describe \(path.remotePath) as a regular file")
+      }
+      guard byteCount > 0 else {
+        return .failed(
+          code: "emptyComponentTree",
+          detail: "uitest left a zero-byte file at \(path.remotePath)")
+      }
+      return .verified(summary: ["remoteByteCount": String(byteCount)])
+
     case .receiveOwnedArtifact(let artifact):
       // The step's whole purpose is host bytes, so the verdict is read off
       // the file the dispatcher measured. `file recv` exits 0 on forms that
