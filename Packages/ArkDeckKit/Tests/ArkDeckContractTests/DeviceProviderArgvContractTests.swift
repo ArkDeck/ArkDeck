@@ -351,3 +351,83 @@ extension DeviceProviderArgvContractTests {
     XCTAssertTrue(good.remotePath.hasPrefix(directory.remotePath + "/"))
   }
 }
+
+// MARK: - CHG-2026-049 r5: screenshot
+
+extension DeviceProviderArgvContractTests {
+  /// DHA-SHOT-001: `-t png` is mandatory and the `.png` suffix is
+  /// load-bearing. Measured on OH 3.2: this build defaults to jpeg and
+  /// rejects `-f <x>.png` outright unless the type is requested.
+  func testScreenshotLowersToTheTypedPNGFormAndItsReadback() throws {
+    let path = try HDCOwnedRemotePath(
+      jobID: "job-argv-1", stepID: "capture-screenshot", nonce: "n1")
+    XCTAssertTrue(path.remotePath.hasSuffix(".png"), "the device validates the suffix")
+    let plan = try provider.lower(
+      action: .hdc(.captureScreenshot(into: path)), context: context)
+    guard case .processSequence(_, let invocations) = plan.kind else {
+      return XCTFail("expected a capture + readback sequence")
+    }
+    XCTAssertEqual(
+      invocations.map(\.arguments),
+      [
+        ["-t", connectKey, "shell", "snapshot_display", "-t", "png", "-f", path.remotePath],
+        ["-t", connectKey, "shell", "ls", "-l", path.remotePath],
+      ])
+    XCTAssertTrue(invocations[0].continueAfterNonZero)
+  }
+
+  /// The receive leg for a screenshot carries the PNG magic; the other file
+  /// legs carry none, because their formats have nothing cheap to check.
+  func testOnlyTheScreenshotReceivePinsAMagic() throws {
+    let descriptor = try XCTUnwrap(
+      RuntimeOperationCatalog.descriptor(reference: "capture.diagnostics@1"))
+    func receiveAction(_ stepID: String, inputs: [String: JSONValue]) throws
+      -> HDCOwnedRemoteArtifact
+    {
+      let step = try XCTUnwrap(descriptor.steps.first { $0.stepID == stepID })
+      guard case .hdc(.receiveOwnedArtifact(let artifact)) = try provider.action(
+        for: step, operation: descriptor, inputs: inputs, context: context)
+      else {
+        throw XCTSkip("expected a receive action")
+      }
+      return artifact
+    }
+    let shot = try receiveAction("receive-screenshot", inputs: ["uiScreenshot": .bool(true)])
+    XCTAssertEqual(shot.expectedLeadingBytes, HDCFileMagic.png)
+    XCTAssertTrue(shot.path.remotePath.hasSuffix(".png"))
+
+    let tree = try receiveAction("receive-ui-tree", inputs: ["uiComponentTree": .bool(true)])
+    XCTAssertNil(tree.expectedLeadingBytes)
+  }
+
+  /// DHA-SHOT-003 (contract half): the magic decides, and a file that is
+  /// not a PNG fails rather than publishing.
+  func testReceivedScreenshotMustBeginWithThePNGMagic() throws {
+    let path = try HDCOwnedRemotePath(
+      jobID: "job-argv-1", stepID: "capture-screenshot", nonce: "n1")
+    let artifact = HDCOwnedRemoteArtifact(
+      path: path, expectedSHA256: nil, maximumBytes: 64 * 1024 * 1024,
+      expectedLeadingBytes: HDCFileMagic.png)
+    func verdict(leading: Data) throws -> ProviderSemanticOutcome {
+      try provider.verify(
+        receipt: ProviderProcessReceipt(
+          exitStatus: 0, stdout: Data("FileTransfer finish".utf8), stderr: Data(),
+          stdoutTruncated: false, durationSeconds: 0.01,
+          landedArtifact: ProviderLandedArtifact(
+            localURL: URL(fileURLWithPath: "/private/tmp/shot.png"),
+            byteCount: 1024, sha256: String(repeating: "a", count: 64),
+            leadingBytes: leading)),
+        action: .hdc(.receiveOwnedArtifact(artifact)), context: context)
+    }
+    guard case .verified = try verdict(leading: HDCFileMagic.png) else {
+      return XCTFail("a real PNG must verify")
+    }
+    // An HTML error page, a JPEG, a truncated write: all the same answer.
+    for wrong in [Data("<html".utf8), Data([0xFF, 0xD8, 0xFF, 0xE0]), Data([0x89, 0x50])] {
+      guard case .failed(let code, _) = try verdict(leading: wrong) else {
+        return XCTFail("bytes that are not a PNG must fail")
+      }
+      XCTAssertEqual(code, "unexpectedFormat")
+    }
+  }
+}

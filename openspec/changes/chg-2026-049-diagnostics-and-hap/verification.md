@@ -202,7 +202,12 @@
   —— 逐 token,`-t png` 必须在场(设备按后缀校验类型,缺它会被拒);断言 owned
   path 以 `.png` 结尾且由 provider 自铸;缺 connectKey fail closed。
 - Evidence:实现 PR 内测试 + 全量套件结果。
-- 结论:pending。
+- **结论(2026-07-31):PASS** —
+  `testScreenshotLowersToTheTypedPNGFormAndItsReadback` 逐 token 断言
+  `["-t", <key>, "shell", "snapshot_display", "-t", "png", "-f", <owned>.png]`
+  与随后的 `ls -l`,并断言 owned path 以 `.png` 结尾;
+  `testOnlyTheScreenshotReceivePinsAMagic` 断言只有截图的接收腿带 PNG 魔数,
+  组件树那条不带。
 
 ## `DHA-SHOT-002` 未请求即逐字节不变,请求则升 E1
 
@@ -210,7 +215,11 @@
   r5 之前相同,`screenshot.png` 不得 published;(b) 带 `uiScreenshot: true` 时
   effect 升 `deviceMutation` 并走既有 capability 路径。
 - Evidence:实现 PR 内测试。
-- 结论:pending。
+- **结论(2026-07-31):PASS** —
+  `testScreenshotInputIsWhatRaisesTheEffect`:不带 `uiScreenshot` 时零 dispatch、
+  authority 为 `defaultReadOnlyPolicy`、capability store 为空、`screenshot.png`
+  不得 published;带上时 authority 为 `runtimeCapability`、effectCeiling
+  为 `deviceMutation`。
 
 ## `DHA-SHOT-003` 三层判定与魔数把关(含真机)
 
@@ -219,5 +228,11 @@
   (c) 正常路径 → `screenshot.png` published 且字节即收到的字节。
   真机面:一次 `capture.diagnostics@1` 带 `uiScreenshot: true` 的 Agent 执行,
   产物可解析为 PNG、远端临时文件被清理、人工步骤 0。
-- Evidence:实现 PR 内测试 + `evidence/runs/TASK-DHA-004/`。
-- 结论:pending。
+- Evidence:实现 PR 内测试 + `evidence/runs/TASK-DHA-004/run-r5.md`。
+- **结论(2026-07-31):PASS** —
+  contract:`testReceivedScreenshotMustBeginWithThePNGMagic`(HTML/JPEG/截断三种
+  非 PNG 前缀均判 `unexpectedFormat`)、`testNonPNGScreenshotIsNotPublished`、
+  `testZeroByteScreenshotFailsOnTheDeviceReadback`(设备侧 size=0 即止,接收腿
+  不再运行)、`testScreenshotPublishesTheReceivedPNG`。
+  真机:`job-27e4878abde3c50814b6a788929e94a5` 三步全 verified,导出产物
+  449,756 字节、魔数正确、720×1280,设备无残留。

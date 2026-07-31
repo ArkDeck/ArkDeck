@@ -67,6 +67,12 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
       var stagedDirectoryRemains = false
       /// The `ls -l` line the device answers for the component tree file.
       var uiTreeListing: String?
+      /// The `ls -l` line for the screenshot file.
+      var screenshotListing: String?
+      /// Bytes the simulated `file recv` leaves for the screenshot leg.
+      /// Defaults to a real PNG header so the magic gate sees a valid file.
+      var screenshotPayload: Data? = Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])
+        + Data("fake-png-body".utf8)
       /// Bytes the simulated `file recv` leaves for the component tree leg.
       var uiTreePayload: Data? = Data(
         #"{"attributes":{"text":"hello"},"children":[]}"#.utf8)
@@ -133,6 +139,21 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
       case .captureUIDump:
         note("captureUIDump")
         return receipt("{\"windows\":[]}\n")
+      case .captureScreenshot:
+        note("captureScreenshot")
+        func shotSub(_ stdout: String, exit: Int32 = 0) -> ProviderSubprocessReceipt {
+          ProviderSubprocessReceipt(
+            exitStatus: exit, stdout: Data(stdout.utf8), stderr: Data(),
+            stdoutTruncated: false, durationSeconds: 0.01)
+        }
+        let shotListing =
+          script.screenshotListing
+          ?? "-rw-r--r-- 1 root root 449830 2026-07-31 00:00 /data/local/tmp/shot.png\n"
+        return ProviderProcessReceipt(
+          exitStatus: 0,
+          stdout: Data("process: display 0, file type: png, width: 720, height: 1280\n".utf8),
+          stderr: Data(), stdoutTruncated: false, durationSeconds: 0.02,
+          subprocesses: [shotSub(""), shotSub(shotListing)])
       case .captureComponentTree:
         note("captureComponentTree")
         // Same shape as the trace leg: a status line plus the `ls -l`
@@ -179,9 +200,12 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
             "receive plan carried no host landing declaration")
         }
         try? landing.prepareDestination()
-        let payload =
-          landing.destination.pathExtension == "json"
-          ? script.uiTreePayload : script.receivedTracePayload
+        let payload: Data?
+        switch landing.destination.pathExtension {
+        case "json": payload = script.uiTreePayload
+        case "png": payload = script.screenshotPayload
+        default: payload = script.receivedTracePayload
+        }
         if let payload {
           try? payload.write(to: landing.destination)
         }
@@ -358,10 +382,12 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
     capability: String? = nil,
     totalArtifactByteBudget: Int? = nil,
     redactionProfile: String? = nil,
-    withComponentTree: Bool = false
+    withComponentTree: Bool = false,
+    withScreenshot: Bool = false
   ) -> Data {
     let trace = withTrace ? "\"traceCategories\": [\"ohos\"]," : ""
     let tree = withComponentTree ? "\"uiComponentTree\": true," : ""
+    let shot = withScreenshot ? "\"uiScreenshot\": true," : ""
     let auth = capability.map { "\"authorization\": { \"capabilityId\": \"\($0)\" }," } ?? ""
     let budget =
       totalArtifactByteBudget.map { "\"totalArtifactByteBudget\": \($0)," } ?? ""
@@ -377,7 +403,7 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
         "target": { "targetId": "TGT-1", "expectedBindingRevision": 7 },
         "operation": { "id": "capture.diagnostics", "version": 1 },
         \(auth)
-        "inputs": { \(trace) \(tree) \(budget) \(redaction) "durationSeconds": 5 }
+        "inputs": { \(trace) \(tree) \(shot) \(budget) \(redaction) "durationSeconds": 5 }
       }
       """.utf8)
   }
@@ -1912,5 +1938,117 @@ extension DiagnosticsAndHAPContractTests {
     XCTAssertFalse(
       dispatcher.dispatchedActions.contains("sendArtifact"),
       "the single-package leg must not also run")
+  }
+}
+
+// MARK: - CHG-2026-049 r5: screenshot
+
+extension DiagnosticsAndHAPContractTests {
+  /// DHA-SHOT-002: opt-in, like every capture leg added since r2.
+  func testScreenshotInputIsWhatRaisesTheEffect() async throws {
+    let quiet = ScriptedDispatcher()
+    let (plainEngine, plainCapabilities, plainArtifacts) = try makeEngine(dispatcher: quiet)
+    let plain = try await plainEngine.submit(
+      captureRequest(withTrace: false, key: "idem-shot-absent"))
+    let plainStatus = try await plainEngine.run(jobID: plain.jobID)
+    XCTAssertEqual(plainStatus.state, "succeeded")
+    XCTAssertFalse(quiet.dispatchedActions.contains("captureScreenshot"))
+    let plainEvidence = try await plainEngine.evidenceSnapshot(jobID: plain.jobID)
+    XCTAssertEqual(plainEvidence.authority?.kind, .defaultReadOnlyPolicy)
+    let issuedForPlain = try await plainCapabilities.list()
+    XCTAssertTrue(issuedForPlain.isEmpty)
+    let plainShot = try await plainArtifacts.list(jobID: plain.jobID)
+      .first { $0.name == "screenshot.png" }
+    if let plainShot, case .published = plainShot.status {
+      XCTFail("a request that did not ask for a screenshot cannot publish one")
+    }
+
+    let loud = ScriptedDispatcher()
+    let (engine, capabilities, _) = try makeEngine(dispatcher: loud)
+    let asked = try await engine.submit(
+      captureRequest(withTrace: false, key: "idem-shot-present", withScreenshot: true))
+    let status = try await engine.run(jobID: asked.jobID)
+    XCTAssertEqual(status.state, "succeeded", status.timeline.joined(separator: " | "))
+    XCTAssertTrue(loud.dispatchedActions.contains("captureScreenshot"))
+    let evidence = try await engine.evidenceSnapshot(jobID: asked.jobID)
+    XCTAssertEqual(evidence.authority?.kind, .runtimeCapability)
+    let issued = try await capabilities.list()
+    XCTAssertEqual(issued.first?.capability.effectCeiling, .deviceMutation)
+  }
+
+  /// DHA-SHOT-003 (engine half): published bytes are the received bytes and
+  /// they begin with the PNG magic; a non-PNG never becomes an artifact.
+  func testScreenshotPublishesTheReceivedPNG() async throws {
+    let dispatcher = ScriptedDispatcher()
+    let (engine, _, artifacts) = try makeEngine(dispatcher: dispatcher)
+    let acceptance = try await engine.submit(
+      captureRequest(withTrace: false, key: "idem-shot-publish", withScreenshot: true))
+    _ = try await engine.run(jobID: acceptance.jobID)
+
+    let recorded = try await artifacts.list(jobID: acceptance.jobID)
+    let shot = try XCTUnwrap(recorded.first { $0.name == "screenshot.png" })
+    XCTAssertEqual(shot.status, .published)
+    XCTAssertEqual(shot.mediaType, "image/png")
+    let bytes = try await artifacts.read(
+      jobID: acceptance.jobID, artifactID: shot.artifactID, allowSensitive: true)
+    XCTAssertEqual(
+      Array(bytes.prefix(8)), [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])
+    XCTAssertTrue(dispatcher.dispatchedActions.contains("cleanup"))
+  }
+
+  func testNonPNGScreenshotIsNotPublished() async throws {
+    var script = ScriptedDispatcher.Script()
+    script.screenshotPayload = Data("<html>error</html>".utf8)
+    let dispatcher = ScriptedDispatcher(script: script)
+    let (engine, _, artifacts) = try makeEngine(dispatcher: dispatcher)
+    let acceptance = try await engine.submit(
+      captureRequest(withTrace: false, key: "idem-shot-badmagic", withScreenshot: true))
+    _ = try? await engine.run(jobID: acceptance.jobID)
+    let recorded = try await artifacts.list(jobID: acceptance.jobID)
+    if case .published? = recorded.first(where: { $0.name == "screenshot.png" })?.status {
+      XCTFail("bytes that are not a PNG must not be published as a screenshot")
+    }
+  }
+
+  /// A device that wrote nothing fails on its own readback, before the
+  /// receive leg ever runs.
+  func testZeroByteScreenshotFailsOnTheDeviceReadback() async throws {
+    var script = ScriptedDispatcher.Script()
+    script.screenshotListing =
+      "-rw-r--r-- 1 root root 0 2026-07-31 00:00 /data/local/tmp/shot.png\n"
+    let dispatcher = ScriptedDispatcher(script: script)
+    let (engine, _, artifacts) = try makeEngine(dispatcher: dispatcher)
+    let acceptance = try await engine.submit(
+      captureRequest(withTrace: false, key: "idem-shot-empty", withScreenshot: true))
+    _ = try? await engine.run(jobID: acceptance.jobID)
+    XCTAssertFalse(
+      dispatcher.dispatchedActions.contains("receiveArtifact"),
+      "an empty capture must not proceed to the receive leg")
+    let recorded = try await artifacts.list(jobID: acceptance.jobID)
+    if case .published? = recorded.first(where: { $0.name == "screenshot.png" })?.status {
+      XCTFail("a zero-byte capture must not publish")
+    }
+  }
+}
+
+extension DiagnosticsAndHAPContractTests {
+  /// The same hole the screenshot leg exposed, on the leg r2 added: a
+  /// capture that failed must not be followed by its receive.
+  func testFailedComponentTreeCaptureSkipsItsReceive() async throws {
+    var script = ScriptedDispatcher.Script()
+    script.uiTreeListing =
+      "-rw-r--r-- 1 root root 0 2026-07-31 00:00 /data/local/tmp/tree.json\n"
+    let dispatcher = ScriptedDispatcher(script: script)
+    let (engine, _, artifacts) = try makeEngine(dispatcher: dispatcher)
+    let acceptance = try await engine.submit(
+      captureRequest(withTrace: false, key: "idem-tree-empty", withComponentTree: true))
+    _ = try? await engine.run(jobID: acceptance.jobID)
+    XCTAssertFalse(
+      dispatcher.dispatchedActions.contains("receiveArtifact"),
+      "a tree capture that failed must not be followed by its receive")
+    let recorded = try await artifacts.list(jobID: acceptance.jobID)
+    if case .published? = recorded.first(where: { $0.name == "ui-tree.json" })?.status {
+      XCTFail("a zero-byte tree capture must not publish")
+    }
   }
 }

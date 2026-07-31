@@ -42,6 +42,12 @@
         "default": 8192
       },
       "uiDump": { "type": "boolean", "required": false, "default": true },
+      "uiScreenshot": {
+        "type": "boolean",
+        "required": false,
+        "default": false,
+        "description": "Capture a PNG screenshot of the display. Presence selects the file-producing snapshot_display leg and escalates the effective effect to deviceMutation; absent or false leaves the plan unchanged."
+      },
       "uiComponentTree": {
         "type": "boolean",
         "required": false,
@@ -175,6 +181,36 @@
       "notes": "Failure records cleanup debt for later reconcile; never silently dropped."
     },
     {
+      "stepID": "capture-screenshot",
+      "kind": "captureRemoteFile",
+      "effect": "deviceMutation",
+      "cancellation": "atSafeBoundary",
+      "binding": "confirmedDevice",
+      "optional": true,
+      "compensation": "bestEffortCleanup",
+      "notes": "snapshot_display writes a provider-owned remote PNG; the device validates the file suffix against the requested type, so both are load-bearing."
+    },
+    {
+      "stepID": "receive-screenshot",
+      "kind": "receiveFile",
+      "effect": "readOnly",
+      "cancellation": "immediate",
+      "binding": "confirmedDevice",
+      "optional": true,
+      "compensation": "none",
+      "notes": "Size, hash and PNG magic verified on receive; a file that is not a PNG is not published."
+    },
+    {
+      "stepID": "cleanup-screenshot-temp",
+      "kind": "cleanupOwnedRemotePath",
+      "effect": "deviceMutation",
+      "cancellation": "atSafeBoundary",
+      "binding": "confirmedDevice",
+      "optional": true,
+      "compensation": "bestEffortCleanup",
+      "notes": "Failure records cleanup residue for later reconcile; never silently dropped."
+    },
+    {
       "stepID": "capture-trace",
       "kind": "captureRemoteFile",
       "effect": "deviceMutation",
@@ -229,6 +265,7 @@
     { "name": "hilog.txt", "role": "raw", "mediaType": "text/plain", "privacy": "sensitive", "required": true },
     { "name": "ui-dump.json", "role": "raw", "mediaType": "application/json", "privacy": "sensitive", "required": false },
     { "name": "ui-tree.json", "role": "raw", "mediaType": "application/json", "privacy": "sensitive", "required": false },
+    { "name": "screenshot.png", "role": "raw", "mediaType": "image/png", "privacy": "sensitive", "required": false },
     { "name": "trace.htrace", "role": "raw", "mediaType": "application/octet-stream", "privacy": "sensitive", "required": false },
     { "name": "artifact-index.json", "role": "derived", "mediaType": "application/json", "privacy": "standard", "required": true },
     { "name": "capture-summary.json", "role": "derived", "mediaType": "application/json", "privacy": "standard", "required": true }

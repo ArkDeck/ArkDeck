@@ -1441,6 +1441,11 @@ public actor RuntimeJobEngine {
     case "capture-ui-dump":
       if case .bool(let enabled)? = inputs["uiDump"] { return enabled }
       return true  // the catalog default
+    case "capture-screenshot", "receive-screenshot", "cleanup-screenshot-temp":
+      // Off unless asked for, like the tree: these three are what raise the
+      // plan from readOnly to deviceMutation.
+      if case .bool(let enabled)? = inputs["uiScreenshot"] { return enabled }
+      return false  // the catalog default
     case "capture-ui-tree", "receive-ui-tree", "cleanup-ui-tree-temp":
       // Off unless asked for: these three are what raise the plan from
       // readOnly to deviceMutation, so the default has to be the quiet one.
@@ -1625,6 +1630,14 @@ public actor RuntimeJobEngine {
     "capture.diagnostics@1": [
       "receive-trace-artifact": "capture-trace",
       "cleanup-remote-temp": "capture-trace",
+      // r2 added the tree legs and missed this table, so a failed
+      // `capture-ui-tree` still ran its receive. Registering a new file leg
+      // here is not optional bookkeeping: it is what stops a product being
+      // published out of thin air.
+      "receive-ui-tree": "capture-ui-tree",
+      "cleanup-ui-tree-temp": "capture-ui-tree",
+      "receive-screenshot": "capture-screenshot",
+      "cleanup-screenshot-temp": "capture-screenshot",
     ]
   ]
 
@@ -2118,7 +2131,7 @@ public actor RuntimeJobEngine {
   /// than from a captured stream. They publish from the host file the
   /// dispatcher measured, and a missing file is a recorded absence — there
   /// is no path from "the step ran" to a published trace.
-  static let fileBackedArtifacts: Set<String> = ["trace.htrace"]
+  static let fileBackedArtifacts: Set<String> = ["trace.htrace", "screenshot.png"]
 
   /// A confirmed process failure still owns useful bounded diagnostics.
   /// Publishing those bytes does not turn the Job into success; it prevents
@@ -2174,6 +2187,7 @@ public actor RuntimeJobEngine {
       "capture-ui-dump": ["ui-dump.json"],
       "receive-trace-artifact": ["trace.htrace"],
       "receive-ui-tree": ["ui-tree.json"],
+      "receive-screenshot": ["screenshot.png"],
     ],
     "debug.hap@1": [
       "package-readback": ["install-readback.json"],
@@ -4338,7 +4352,15 @@ public actor RuntimeJobEngine {
         "artifactId": .string("artifact-\(step.stepID)"),
       ]
     case .captureRemoteFile:
-      if case .hdc(.captureComponentTree(let path))? = action {
+      if case .hdc(.captureScreenshot(let path))? = action {
+        arguments = [
+          "catalogId": .string("trace-presets"),
+          "actionId": .string("custom"),
+          "parameters": .object([:]),
+          "artifactId": .string("artifact-\(step.stepID)"),
+          "ownedRemotePath": .string(path.remotePath),
+        ]
+      } else if case .hdc(.captureComponentTree(let path))? = action {
         arguments = [
           "catalogId": .string("trace-presets"),
           "actionId": .string("custom"),
@@ -4369,7 +4391,12 @@ public actor RuntimeJobEngine {
         ]
       }
     case .receiveFile:
-      let localName = step.stepID == "receive-ui-tree" ? "ui-tree.json" : "trace.htrace"
+      let localName: String
+      switch step.stepID {
+      case "receive-ui-tree": localName = "ui-tree.json"
+      case "receive-screenshot": localName = "screenshot.png"
+      default: localName = "trace.htrace"
+      }
       if case .hdc(.receiveOwnedArtifact(let artifact))? = action {
         var exact: [String: JSONValue] = [
           "remotePath": .string(artifact.path.remotePath),
@@ -4399,12 +4426,14 @@ public actor RuntimeJobEngine {
         switch step.stepID {
         case "cleanup-remote-staging": ownerStep = "send-hap"
         case "cleanup-ui-tree-temp": ownerStep = "capture-ui-tree"
+        case "cleanup-screenshot-temp": ownerStep = "capture-screenshot"
         default: ownerStep = "capture-trace"
         }
         let suffix: String
         switch ownerStep {
         case "send-hap": suffix = ".hap"
         case "capture-ui-tree": suffix = ".json"
+        case "capture-screenshot": suffix = ".png"
         default: suffix = ".htrace"
         }
         path = "/data/local/tmp/arkdeck-\(jobID)-\(ownerStep)-owned\(suffix)"
