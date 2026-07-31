@@ -204,6 +204,67 @@ public actor HarnessTaskStore {
     try intents(taskID).filter { $0.state == .pending || $0.state == .submitted }
   }
 
+  // MARK: - Evaluations
+
+  /// Evaluations are immutable records: the id is the file name and its
+  /// grammar excludes separators, so an evaluation cannot be written outside
+  /// its own task directory.
+  public static func isWellFormed(evaluationID: String) -> Bool {
+    guard evaluationID.hasPrefix("EVAL-"), evaluationID.count <= 40 else { return false }
+    let body = evaluationID.dropFirst("EVAL-".count)
+    guard !body.isEmpty else { return false }
+    return body.allSatisfy { character in
+      character.isASCII && (character.isNumber || ("A"..."F").contains(String(character)))
+    }
+  }
+
+  public func putEvaluation(_ evaluation: HarnessEvaluation) throws {
+    guard Self.isWellFormed(evaluationID: evaluation.evaluationID) else {
+      throw HarnessTaskStoreError.corrupt("malformed evaluation id \(evaluation.evaluationID)")
+    }
+    let directoryURL = try existingDirectory(evaluation.htaskID)
+    try withLock(directoryURL) {
+      let evaluationsURL = directoryURL.appendingPathComponent("evaluations", isDirectory: true)
+      do {
+        try FileManager.default.createDirectory(
+          at: evaluationsURL, withIntermediateDirectories: true,
+          attributes: [.posixPermissions: 0o700])
+      } catch {
+        throw HarnessTaskStoreError.ioFailure("cannot create evaluations directory: \(error)")
+      }
+      try writeJSON(
+        evaluation,
+        to: evaluationsURL.appendingPathComponent("\(evaluation.evaluationID).json"))
+    }
+  }
+
+  public func evaluation(_ taskID: String, evaluationID: String) throws -> HarnessEvaluation? {
+    guard Self.isWellFormed(evaluationID: evaluationID) else {
+      throw HarnessTaskStoreError.corrupt("malformed evaluation id \(evaluationID)")
+    }
+    let directoryURL = try existingDirectory(taskID)
+    return try withLock(directoryURL) {
+      let url = directoryURL.appendingPathComponent("evaluations/\(evaluationID).json")
+      guard FileManager.default.fileExists(atPath: url.path) else { return nil }
+      return try readJSON(HarnessEvaluation.self, from: url)
+    }
+  }
+
+  public func evaluations(_ taskID: String) throws -> [HarnessEvaluation] {
+    let directoryURL = try existingDirectory(taskID)
+    return try withLock(directoryURL) {
+      let evaluationsURL = directoryURL.appendingPathComponent("evaluations", isDirectory: true)
+      let names = (try? FileManager.default.contentsOfDirectory(atPath: evaluationsURL.path)) ?? []
+      var found: [HarnessEvaluation] = []
+      for name in names.sorted() where name.hasSuffix(".json") {
+        found.append(
+          try readJSON(
+            HarnessEvaluation.self, from: evaluationsURL.appendingPathComponent(name)))
+      }
+      return found.sorted { ($0.round, $0.evaluationID) < ($1.round, $1.evaluationID) }
+    }
+  }
+
   // MARK: - Locked helpers
 
   private func loadLocked(_ directoryURL: URL, taskID: String) throws -> HarnessTaskSnapshot {

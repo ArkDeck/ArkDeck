@@ -95,6 +95,10 @@ public struct HarnessSuccessCriterion: Equatable, Sendable, Codable {
   public let expected: JSONValue
   public let mandatory: Bool
   public let minimumSamples: Int
+  /// Artifact names whose bytes must verify before this criterion may be
+  /// judged at all. Absent evidence is inconclusive, never a pass.
+  public let evidenceRequirements: [String]
+  public let inconclusivePolicy: HarnessInconclusivePolicy
 
   enum CodingKeys: String, CodingKey {
     case criterionID = "criterionId"
@@ -103,6 +107,8 @@ public struct HarnessSuccessCriterion: Equatable, Sendable, Codable {
     case expected
     case mandatory
     case minimumSamples
+    case evidenceRequirements
+    case inconclusivePolicy
   }
 
   public init(
@@ -111,7 +117,9 @@ public struct HarnessSuccessCriterion: Equatable, Sendable, Codable {
     comparator: HarnessCriterionComparator,
     expected: JSONValue,
     mandatory: Bool = true,
-    minimumSamples: Int = 1
+    minimumSamples: Int = 1,
+    evidenceRequirements: [String] = [],
+    inconclusivePolicy: HarnessInconclusivePolicy = .collectMoreEvidence
   ) {
     self.criterionID = criterionID
     self.metric = metric
@@ -119,6 +127,26 @@ public struct HarnessSuccessCriterion: Equatable, Sendable, Codable {
     self.expected = expected
     self.mandatory = mandatory
     self.minimumSamples = minimumSamples
+    self.evidenceRequirements = evidenceRequirements
+    self.inconclusivePolicy = inconclusivePolicy
+  }
+
+  /// Explicit decoding: a task.json written before the evidence and policy
+  /// fields existed must still load, and it must load as the strict default
+  /// (evidence required by name where declared, otherwise collect more).
+  public init(from decoder: any Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    self.criterionID = try container.decode(String.self, forKey: .criterionID)
+    self.metric = try container.decode(String.self, forKey: .metric)
+    self.comparator = try container.decode(HarnessCriterionComparator.self, forKey: .comparator)
+    self.expected = try container.decode(JSONValue.self, forKey: .expected)
+    self.mandatory = try container.decodeIfPresent(Bool.self, forKey: .mandatory) ?? true
+    self.minimumSamples = try container.decodeIfPresent(Int.self, forKey: .minimumSamples) ?? 1
+    self.evidenceRequirements =
+      try container.decodeIfPresent([String].self, forKey: .evidenceRequirements) ?? []
+    self.inconclusivePolicy =
+      try container.decodeIfPresent(HarnessInconclusivePolicy.self, forKey: .inconclusivePolicy)
+      ?? .collectMoreEvidence
   }
 }
 
@@ -268,6 +296,10 @@ public struct HarnessTaskProjection: Equatable, Sendable, Codable {
   public let activeJobID: String?
   public let consumedBudget: HarnessConsumedBudget
   public let artifactRefs: [String]
+  /// Cumulative observed state. Only an observation or an evaluation may
+  /// write it (validated below), so a decision cannot describe the world.
+  public let observedState: [String: JSONValue]
+  public let latestEvaluationID: String?
   /// A cancel that arrived while an effectful job was still in flight.
   /// Cancellation completes only once that job is observed terminal: the
   /// harness never reports a task cancelled while a side effect it started
@@ -283,6 +315,8 @@ public struct HarnessTaskProjection: Equatable, Sendable, Codable {
     case activeJobID = "activeJobId"
     case consumedBudget
     case artifactRefs
+    case observedState
+    case latestEvaluationID = "latestEvaluationId"
     case cancelRequested
     case result
     case version
@@ -295,6 +329,8 @@ public struct HarnessTaskProjection: Equatable, Sendable, Codable {
     activeJobID: String?,
     consumedBudget: HarnessConsumedBudget,
     artifactRefs: [String],
+    observedState: [String: JSONValue] = [:],
+    latestEvaluationID: String? = nil,
     cancelRequested: Bool,
     result: HarnessTaskResult?,
     version: Int
@@ -305,9 +341,30 @@ public struct HarnessTaskProjection: Equatable, Sendable, Codable {
     self.activeJobID = activeJobID
     self.consumedBudget = consumedBudget
     self.artifactRefs = artifactRefs
+    self.observedState = observedState
+    self.latestEvaluationID = latestEvaluationID
     self.cancelRequested = cancelRequested
     self.result = result
     self.version = version
+  }
+
+  public init(from decoder: any Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    self.status = try container.decode(HarnessTaskStatus.self, forKey: .status)
+    self.phase = try container.decode(HarnessTaskPhase.self, forKey: .phase)
+    self.activeRound = try container.decode(Int.self, forKey: .activeRound)
+    self.activeJobID = try container.decodeIfPresent(String.self, forKey: .activeJobID)
+    self.consumedBudget = try container.decode(
+      HarnessConsumedBudget.self, forKey: .consumedBudget)
+    self.artifactRefs = try container.decodeIfPresent([String].self, forKey: .artifactRefs) ?? []
+    self.observedState =
+      try container.decodeIfPresent([String: JSONValue].self, forKey: .observedState) ?? [:]
+    self.latestEvaluationID = try container.decodeIfPresent(
+      String.self, forKey: .latestEvaluationID)
+    self.cancelRequested =
+      try container.decodeIfPresent(Bool.self, forKey: .cancelRequested) ?? false
+    self.result = try container.decodeIfPresent(HarnessTaskResult.self, forKey: .result)
+    self.version = try container.decode(Int.self, forKey: .version)
   }
 }
 
@@ -324,6 +381,7 @@ public struct HarnessTaskTransition: Equatable, Sendable {
   public let jobID: String?
   public let evaluationID: String?
   public let artifactRefs: [String]
+  public let observedState: [String: JSONValue]?
   public let cancelRequested: Bool
   public let result: HarnessTaskResult?
   public let atUTC: String
@@ -339,6 +397,7 @@ public struct HarnessTaskTransition: Equatable, Sendable {
     jobID: String? = nil,
     evaluationID: String? = nil,
     artifactRefs: [String] = [],
+    observedState: [String: JSONValue]? = nil,
     cancelRequested: Bool = false,
     result: HarnessTaskResult? = nil,
     atUTC: String
@@ -353,6 +412,7 @@ public struct HarnessTaskTransition: Equatable, Sendable {
     self.jobID = jobID
     self.evaluationID = evaluationID
     self.artifactRefs = artifactRefs
+    self.observedState = observedState
     self.cancelRequested = cancelRequested
     self.result = result
     self.atUTC = atUTC
@@ -452,6 +512,7 @@ public struct HarnessTaskSnapshot: Equatable, Sendable, Codable {
   public let activeJobID: String?
   public let consumedBudget: HarnessConsumedBudget
   public let artifactRefs: [String]
+  public let latestEvaluationID: String?
   public let cancelRequested: Bool
   public let result: HarnessTaskResult?
   public let version: Int
@@ -477,6 +538,7 @@ public struct HarnessTaskSnapshot: Equatable, Sendable, Codable {
     case activeJobID = "activeJobId"
     case consumedBudget
     case artifactRefs
+    case latestEvaluationID = "latestEvaluationId"
     case cancelRequested
     case result
     case version
@@ -501,6 +563,7 @@ public struct HarnessTaskSnapshot: Equatable, Sendable, Codable {
     activeJobID: String? = nil,
     consumedBudget: HarnessConsumedBudget = HarnessConsumedBudget(),
     artifactRefs: [String] = [],
+    latestEvaluationID: String? = nil,
     cancelRequested: Bool = false,
     result: HarnessTaskResult? = nil,
     version: Int = 1
@@ -525,6 +588,7 @@ public struct HarnessTaskSnapshot: Equatable, Sendable, Codable {
     self.activeJobID = activeJobID
     self.consumedBudget = consumedBudget
     self.artifactRefs = artifactRefs
+    self.latestEvaluationID = latestEvaluationID
     self.cancelRequested = cancelRequested
     self.result = result
     self.version = version
@@ -533,8 +597,14 @@ public struct HarnessTaskSnapshot: Equatable, Sendable, Codable {
   public var projection: HarnessTaskProjection {
     HarnessTaskProjection(
       status: status, phase: phase, activeRound: activeRound, activeJobID: activeJobID,
-      consumedBudget: consumedBudget, artifactRefs: artifactRefs,
-      cancelRequested: cancelRequested, result: result, version: version)
+      consumedBudget: consumedBudget, artifactRefs: artifactRefs, observedState: observedState,
+      latestEvaluationID: latestEvaluationID, cancelRequested: cancelRequested, result: result,
+      version: version)
+  }
+
+  /// Typed view of the cumulative observed state.
+  public var observed: HarnessObservedState {
+    HarnessObservedState(json: observedState)
   }
 
   /// Rebuild a snapshot from an event's resulting projection. Used by the
@@ -544,12 +614,13 @@ public struct HarnessTaskSnapshot: Equatable, Sendable, Codable {
     HarnessTaskSnapshot(
       htaskID: htaskID, type: type, intakeDescription: intakeDescription,
       projectRef: projectRef, target: target, goal: goal, successCriteria: successCriteria,
-      budgets: budgets, policy: policy, observedState: observedState,
+      budgets: budgets, policy: policy, observedState: projection.observedState,
       createdAtUTC: createdAtUTC, updatedAtUTC: atUTC, status: projection.status,
       phase: projection.phase, activeRound: projection.activeRound,
       activeJobID: projection.activeJobID, consumedBudget: projection.consumedBudget,
-      artifactRefs: projection.artifactRefs, cancelRequested: projection.cancelRequested,
-      result: projection.result, version: projection.version)
+      artifactRefs: projection.artifactRefs, latestEvaluationID: projection.latestEvaluationID,
+      cancelRequested: projection.cancelRequested, result: projection.result,
+      version: projection.version)
   }
 }
 
@@ -570,6 +641,7 @@ public enum HarnessTaskTransitionError: Error, Equatable, Sendable {
   case activeJobOnTerminalTask
   case cancelPending
   case cancelRequestWithdrawn
+  case observedStateRequiresEvidence(HarnessTaskCausation)
 }
 
 /// The only component allowed to change a task's state.
@@ -589,6 +661,7 @@ public enum HarnessTaskStateReducer {
     try validatePhase(transition, snapshot)
     try validateJob(transition, snapshot)
     try validateProgress(transition, snapshot)
+    try validateObservation(transition, snapshot)
     try validateResult(transition)
 
     let projection = HarnessTaskProjection(
@@ -598,6 +671,8 @@ public enum HarnessTaskStateReducer {
       activeJobID: transition.activeJobID,
       consumedBudget: transition.consumedBudget,
       artifactRefs: transition.artifactRefs,
+      observedState: transition.observedState ?? snapshot.observedState,
+      latestEvaluationID: transition.evaluationID ?? snapshot.latestEvaluationID,
       cancelRequested: transition.cancelRequested,
       result: transition.result,
       version: snapshot.version + 1)
@@ -751,6 +826,21 @@ public enum HarnessTaskStateReducer {
     }
     guard Set(snapshot.artifactRefs).isSubset(of: Set(transition.artifactRefs)) else {
       throw HarnessTaskTransitionError.artifactRefsShrank
+    }
+  }
+
+  private static func validateObservation(
+    _ transition: HarnessTaskTransition,
+    _ snapshot: HarnessTaskSnapshot
+  ) throws {
+    guard let observed = transition.observedState, observed != snapshot.observedState else {
+      return
+    }
+    // Observed state is evidence-derived by construction: only an observation
+    // of a real job or an evaluation of real artifacts may write it. A
+    // decision, a resume note or a cancel cannot (HTP-INV-1).
+    guard [.jobObserved, .evaluation, .recovery].contains(transition.causation) else {
+      throw HarnessTaskTransitionError.observedStateRequiresEvidence(transition.causation)
     }
   }
 

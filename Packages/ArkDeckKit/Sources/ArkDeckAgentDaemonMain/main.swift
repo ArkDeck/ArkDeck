@@ -232,6 +232,9 @@ Task.detached {
     let harness = HarnessTaskCoordinator(
       store: harnessStore,
       jobPort: RuntimeJobEngineHarnessPort(engine: engine),
+      // Evidence access is what makes a verdict possible at all; without it
+      // the loop stops honestly instead of guessing (CHG-2026-054 TASK-HTP-002).
+      artifactPort: RuntimeArtifactStoreHarnessPort(store: artifactStore),
       nowUTC: utcNow)
     // Recovery resolves dispatch intents whose outcome was lost; it starts
     // no new work, so a restart cannot become a burst of dispatches.

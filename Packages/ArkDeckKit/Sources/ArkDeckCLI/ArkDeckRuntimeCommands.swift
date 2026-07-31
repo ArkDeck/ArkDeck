@@ -910,7 +910,9 @@ enum RuntimeCLI {
     guard let subcommand = arguments.first else {
       throw CLIError(
         exitCode: EX_USAGE,
-        message: "missing task subcommand (submit|list|status|result|events|reconcile|pause|resume|cancel)")
+        message:
+          "missing task subcommand "
+          + "(submit|list|status|result|events|evaluations|reconcile|pause|resume|cancel)")
     }
     var rest = Array(arguments.dropFirst())
     let json = rest.contains("--json")
@@ -938,6 +940,9 @@ enum RuntimeCLI {
         "goal": .string(goal),
       ]
       if let intake = value("--intake") { params["intake"] = .string(intake) }
+      if let signature = value("--crash-signature") {
+        params["crashSignature"] = .string(signature)
+      }
       if let project = value("--project") { params["projectRef"] = .string(project) }
       if let rounds = value("--max-rounds"), let parsed = Int64(rounds) {
         params["maxRounds"] = .integer(parsed)
@@ -951,7 +956,7 @@ enum RuntimeCLI {
       emit(try client.request(method: "task.submit", params: params), json: json)
     case "list":
       emit(try client.request(method: "task.list"), json: json)
-    case "status", "result", "events", "reconcile", "pause", "cancel":
+    case "status", "result", "events", "evaluations", "reconcile", "pause", "cancel":
       emit(
         try client.request(
           method: "task.\(subcommand)", params: ["htaskId": .string(try requiredTask())]),

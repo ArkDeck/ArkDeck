@@ -1,10 +1,11 @@
 # Verification — CHG-2026-054
 
 > Change:CHG-2026-054-agent-harness-task-plane@r1
-> Status:in_progress # 2026-07-30:HTP-AC-1..4 随 TASK-HTP-001 实现 PR 通过;
-> AC-5..17 pending(各自任务未开工),AC-18/19 pending-hardware。每条结论由其所属
-> 任务的实现 PR 写入本文件;维护者 review/merge 该实现 PR 即确认。不为本 change
-> 追加独立 verification/archive 载体(PRODUCT-LOOP §4/§20)。
+> Status:in_progress # 2026-07-30:HTP-AC-1..6 通过,AC-7 的判定/fail-closed 面通过
+> 且真机字节面如实 pending-hardware;AC-8..17 pending(各自任务未开工),
+> AC-18/19 pending-hardware。每条结论由其所属任务的实现 PR 写入本文件;维护者
+> review/merge 该实现 PR 即确认。不为本 change 追加独立 verification/archive 载体
+> (PRODUCT-LOOP §4/§20)。
 
 约定:
 
@@ -81,22 +82,47 @@
 - 方法:构造 decision 自述"crash 已修复"/"build succeeded",断言 task 不进入
   `SUCCEEDED`;仅当全部 mandatory criteria 由真实证据判定 `PASS` 时才成功。
 - Evidence:实现 PR 内负例测试。
-- 结论:pending
+- **结论(2026-07-30):PASS** — `testSuccessIsReachableOnlyThroughAPassingEvaluation`
+  断言只有 verdict `pass` 的 evaluation 能把 task 带进 `succeeded`,且终态事件的
+  causation 恒为 `evaluation`、带 evaluationId,result.evaluationId 与之一致;
+  `events.filter { toStatus == .succeeded }.map(causation) == [.evaluation]` 断言没有
+  第二条路径。reducer 侧 `successRequiresEvaluation`(TASK-HTP-001)是同一不变量的
+  结构形式;`testAFailingCriterionHandsTheVerdictToAHumanAndNeverSucceeds` 断言
+  verified 证据判 fail 时任务转 humanRequired(`criteriaFailedNoRepairCapability`)
+  而非成功;`testObservedStateCannotBeWrittenWithoutEvidence` 断言非证据 causation
+  (如 humanResolved「操作员说修好了」)不能写 observedState。
 
 ## HTP-AC-6 INCONCLUSIVE 不等于成功(TASK-HTP-002)
 
 - 方法:样本不足/观测窗口不满/声明证据缺失 → verdict `INCONCLUSIVE`;断言其只能触发
   补采集或消耗下一轮,预算不足时转 `HUMAN_REQUIRED`/`FAILED`,永不 `SUCCEEDED`。
 - Evidence:实现 PR 内测试。
-- 结论:pending
-
-## HTP-AC-7 observation 来自真实字节且缺证据 fail closed(TASK-HTP-002)
+- **结论(2026-07-30):PASS** — `testSampleGateAndIntegrityDominateTheVerdict` 断言
+  样本不足 → `inconclusive` + `insufficientSamples:2/5`,补足后才 `pass`;
+  `testNoMandatoryCriterionIsInconclusiveNotPass` 断言「无 mandatory criterion」
+  = `inconclusive`,不是 pass;`testInconclusiveNeverSucceedsAndTheBudgetStopsTheLoop`
+  端到端断言 5 样本要求 + 3 轮预算 → 任务以 `maxRoundsExhausted` 转 `failed`、
+  全程未进 `succeeded`、最终 verdict 仍 `inconclusive`;
+  `testComparatorsAndEscalationSelection`(escalation 取最严策略)断言
+  requestHuman 不被 collectMoreEvidence 稀释。 observation 来自真实字节且缺证据 fail closed(TASK-HTP-002)
 
 - 方法:用真机已产出的 hilog/ui-dump/build 产物字节样本驱动 observation builder,
   断言 crash signature、liveness、artifact digest 一致性的提取结果;artifact 为空、
   缺失或 hash 不符时 fail closed(不得产出"看起来完整"的观测)。
-- Evidence:实现 PR 内测试 + 样本 hash。
-- 结论:pending
+- Evidence:实现 PR 内测试 + `evidence/runs/TASK-HTP-002/run-r1.md`。
+- **结论(2026-07-30):PASS(判定与 fail-closed 面)+ pending-hardware(真机字节面)** —
+  `HarnessObservationBuilder` 先验后测:读满字节、重算 SHA-256 与 store 记录比对,
+  只有 verified 字节参与测量。逐情形断言(`testAbsentEmptyOversizeAndSensitive…`、
+  `testHashMismatchIsAnIntegrityBlockerAndYieldsNoMeasurement`、
+  `testRequiredEvidenceThatWasNeverCollectedIsABlocker`、
+  `testUnavailableInventoryIsABlockerNotAnEmptyObservation`):未发布 / 零字节 /
+  超读取上限 / sensitive 未 opt-in / 未采集 / inventory 不可用 → blocker 且零 measurement;
+  hash 不符 → integrity blocker → verdict `error`。crash signature 与 liveness 提取由
+  `testMeasurementsComeFromVerifiedBytes`、`testCleanLogMeasuresHealthyAndZeroCounts`
+  断言(matching / newFatal 不混淆)。
+  **如实分类**:这些 hilog 是按 OpenHarmony cppcrash 文档形态 host 手写的 fixture,
+  仓内无真机 hilog/crash 字节样本;「真机已产出字节驱动 builder」这一半保持
+  pending-hardware,由 TASK-HTP-006 设备窗口关闭,不以 fixture 顶替。
 
 ## HTP-AC-8 预算耗尽即安全停止(TASK-HTP-003)
 

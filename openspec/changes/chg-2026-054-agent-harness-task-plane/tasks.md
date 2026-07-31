@@ -51,7 +51,12 @@
 
 ## TASK-HTP-002 — Evaluation Engine:唯一成功判定权与真实字节 observation
 
-- Status:ready
+- Status:done
+- Done:2026-07-30;随本实现 PR 合入生效(维护者 review + merge 即批准)。
+  HTP-AC-5、HTP-AC-6 PASS;HTP-AC-7 PASS(fail-closed 与判定面全绿)+ 其「真机字节」
+  一半如实保持 pending-hardware(仓内无真机 hilog/crash 字节样本,由 TASK-HTP-006
+  的设备窗口关闭)。evidence = `evidence/runs/TASK-HTP-002/run-r1.md`
+  (库层 763 tests/1 skip/0 fail,新增 15 例)。
 - Platform:macos
 - Requirements/AC:proposal What 3(evaluation engine、criterion 模型、observation
   builder);change-local HTP-AC-5、HTP-AC-6、HTP-AC-7,登记于 `verification.md`

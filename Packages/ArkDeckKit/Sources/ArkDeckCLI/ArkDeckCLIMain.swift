@@ -557,9 +557,11 @@ struct ArkDeckCommandLine {
         arkdeck artifact import-hap --target <id> --file <signed.hap> [--json]
         arkdeck artifact import-flash-bundle --target <id> --file <images.tar.gz> [--json]
         arkdeck artifact import-native-library --target <id> --file <libname.so> [--json]
-        arkdeck task submit --target <id> --goal <text> [--intake <text>] [--project <ref>] \
-      [--max-rounds <n>] [--max-wall-clock-seconds <n>] [--json]
-        arkdeck task list|status|result|events|reconcile|pause|cancel --task <HTASK-id> [--json]
+        arkdeck task submit --target <id> --goal <text> [--crash-signature <SIGx+Symbol>] \
+      [--intake <text>] [--project <ref>] [--max-rounds <n>] \
+      [--max-wall-clock-seconds <n>] [--json]
+        arkdeck task list|status|result|events|evaluations|reconcile|pause|cancel \
+      --task <HTASK-id> [--json]
         arkdeck task resume --task <HTASK-id> --resolution <typed reason> [--json]
         arkdeck artifact list|inspect|read|export --job <id> [--artifact <id>] \
       [--destination <directory>] [--allow-sensitive]
