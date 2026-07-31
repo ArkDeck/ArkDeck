@@ -258,9 +258,87 @@ public actor HarnessTaskCoordinator {
     try await load(taskID).result
   }
 
+  /// Record a typed target/binding observation without moving the product
+  /// stage. A changed binding is deliberately UNKNOWN until an operator or
+  /// runtime capability confirms it; the version increment also invalidates
+  /// every decision made on the previous binding facts.
+  public func recordTargetObservation(
+    _ taskID: String,
+    currentBindingRevision: Int?,
+    deviceReady: Bool,
+    evidenceArtifactIDs: [String] = []
+  ) async throws -> HarnessTaskSnapshot {
+    let snapshot = try await load(taskID)
+    guard !snapshot.status.isTerminal, snapshot.status != .humanRequired else {
+      return snapshot
+    }
+    let expected = snapshot.target.expectedBindingRevision
+    let bindingMatches = currentBindingRevision != nil
+      && (expected == nil || expected == currentBindingRevision)
+    let target = HarnessTaskCondition(
+      name: .targetResolved,
+      state: currentBindingRevision == nil ? .falseValue : .trueValue,
+      reasonCode: currentBindingRevision == nil ? "targetUnavailable" : "targetResolved",
+      message: "observed binding revision \(currentBindingRevision.map(String.init) ?? "none")",
+      evidenceArtifactIDs: evidenceArtifactIDs, observedAt: nowUTC(),
+      observedRevision: snapshot.version + 1)
+    let bound = HarnessTaskCondition(
+      name: .deviceBound, state: bindingMatches ? .trueValue : .unknown,
+      reasonCode: bindingMatches ? "bindingRevisionMatched" : "bindingRevisionUnconfirmed",
+      message:
+        "expected \(expected.map(String.init) ?? "any"), observed "
+        + "\(currentBindingRevision.map(String.init) ?? "none")",
+      evidenceArtifactIDs: evidenceArtifactIDs, observedAt: nowUTC(),
+      observedRevision: snapshot.version + 1)
+    let readyState: HarnessTriState = bindingMatches
+      ? (deviceReady ? .trueValue : .falseValue) : .unknown
+    let ready = HarnessTaskCondition(
+      name: .deviceReady, state: readyState,
+      reasonCode: bindingMatches
+        ? (deviceReady ? "deviceReady" : "deviceUnavailable")
+        : "bindingRevisionUnconfirmed",
+      message:
+        "expected \(expected.map(String.init) ?? "any"), observed "
+        + "\(currentBindingRevision.map(String.init) ?? "none")",
+      evidenceArtifactIDs: evidenceArtifactIDs, observedAt: nowUTC(),
+      observedRevision: snapshot.version + 1)
+    let conditions = HarnessTaskConditionSet.replacing(
+      snapshot.conditions, with: [target, bound, ready])
+
+    let lifecycle: HarnessTaskLifecycle
+    let waitReason: HarnessTaskWaitReason?
+    if snapshot.lifecycle == .created {
+      lifecycle = .created
+      waitReason = nil
+    } else if snapshot.waitReason == .userSuspended {
+      lifecycle = .waiting
+      waitReason = .userSuspended
+    } else if snapshot.activeJobID != nil {
+      lifecycle = .waiting
+      waitReason = bindingMatches && deviceReady ? .activeJob : .deviceUnavailable
+    } else if bindingMatches && deviceReady {
+      lifecycle = .running
+      waitReason = nil
+    } else {
+      lifecycle = .waiting
+      waitReason = .deviceUnavailable
+    }
+    return try await commit(
+      snapshot,
+      transition(
+        snapshot, causation: .conditionObserved,
+        reasonCode: bindingMatches
+          ? (deviceReady ? "deviceObservationReady" : "deviceObservationUnavailable")
+          : "bindingRevisionUnconfirmed",
+        status: lifecycle, activeJob: .unchanged, waitReason: waitReason,
+        conditions: conditions))
+  }
+
   public func pause(_ taskID: String) async throws -> HarnessTaskSnapshot {
     let snapshot = try await load(taskID)
-    guard snapshot.status == .running || snapshot.status == .created else {
+    guard snapshot.status == .running || snapshot.status == .created
+      || (snapshot.status == .waiting && snapshot.waitReason != .userSuspended)
+    else {
       throw HarnessCoordinatorError.notPausable(snapshot.status)
     }
     // Pausing does not abandon an in-flight job: it stops the harness from
@@ -269,8 +347,8 @@ public actor HarnessTaskCoordinator {
     return try await commit(
       snapshot,
       transition(
-        snapshot, causation: .pauseRequested, reasonCode: "operatorPause", status: .paused,
-        activeJob: .unchanged))
+        snapshot, causation: .pauseRequested, reasonCode: "operatorPause", status: .waiting,
+        activeJob: .unchanged, waitReason: .userSuspended))
   }
 
   public func resume(_ taskID: String, resolution: String) async throws -> HarnessTaskSnapshot {
@@ -278,11 +356,13 @@ public actor HarnessTaskCoordinator {
     guard !trimmed.isEmpty else { throw HarnessCoordinatorError.emptyResolution }
     let snapshot = try await load(taskID)
     switch snapshot.status {
-    case .paused:
+    case .waiting where snapshot.waitReason == .userSuspended:
       return try await commit(
         snapshot,
         transition(
-          snapshot, causation: .resumeRequested, reasonCode: trimmed, status: .running))
+          snapshot, causation: .resumeRequested, reasonCode: trimmed,
+          status: snapshot.activeJobID == nil ? .running : .waiting,
+          waitReason: snapshot.activeJobID == nil ? nil : .activeJob))
     case .humanRequired:
       // A typed resolution is the only way out of a human block. The open
       // block record is closed by the same decision, and when it holds a
@@ -332,7 +412,8 @@ public actor HarnessTaskCoordinator {
       snapshot,
       transition(
         snapshot, causation: .cancelRequested, reasonCode: "operatorCancelPendingActiveJob",
-        status: .running, activeJob: .set(activeJobID), cancelRequested: true))
+        status: .waiting, activeJob: .set(activeJobID), cancelRequested: true,
+        waitReason: .activeJob))
     try? await jobPort.requestCancel(jobID: activeJobID)
     return marked
   }
@@ -367,7 +448,7 @@ public actor HarnessTaskCoordinator {
       return HarnessReconcileOutcome(
         snapshot: snapshot, action: .terminal, reasonCode: snapshot.status.rawValue)
     }
-    if snapshot.status == .paused {
+    if snapshot.status == .waiting, snapshot.waitReason == .userSuspended {
       return HarnessReconcileOutcome(
         snapshot: snapshot, action: .paused, reasonCode: "operatorPause")
     }
@@ -397,8 +478,9 @@ public actor HarnessTaskCoordinator {
     if let activeJobID = snapshot.activeJobID {
       let observation = try await jobPort.observe(jobID: activeJobID)
       guard observation.isTerminal else {
+        let waiting = try await recordRuntimeWait(observation, snapshot: snapshot)
         return HarnessReconcileOutcome(
-          snapshot: snapshot, action: .waitedForActiveJob, reasonCode: observation.state)
+          snapshot: waiting, action: .waitedForActiveJob, reasonCode: observation.state)
       }
       let outcome = try await apply(observation, to: snapshot)
       snapshot = outcome.snapshot
@@ -734,7 +816,7 @@ public actor HarnessTaskCoordinator {
         snapshot,
         transition(
           snapshot, causation: .jobDispatched, reasonCode: decision.reasonCode,
-          status: .running, phase: step.phaseOnDispatch ?? snapshot.phase,
+          status: .waiting, phase: step.phaseOnDispatch ?? snapshot.phase,
           activeRound: decision.round, activeJob: .set(accepted.jobID),
           consumedBudget: charging(
             HarnessConsumedBudget(
@@ -745,7 +827,9 @@ public actor HarnessTaskCoordinator {
                 + (Self.consumesHarnessE1Budget(operationReference) ? 1 : 0),
               modelCalls: snapshot.consumedBudget.modelCalls),
             modelCalls: modelCallsSpent),
-          jobID: accepted.jobID))
+          jobID: accepted.jobID, waitReason: .activeJob,
+          conditions: conditionsAfterDispatch(
+            operationReference, snapshot: snapshot)))
       return HarnessReconcileOutcome(
         snapshot: dispatched, action: .dispatched, dispatchedJobID: accepted.jobID,
         reasonCode: decision.reasonCode)
@@ -887,7 +971,7 @@ public actor HarnessTaskCoordinator {
         transition(
           snapshot, causation: .jobDispatched,
           reasonCode: "recoveredDispatchIntent:\(accepted.deduplicated ? "deduplicated" : "fresh")",
-          status: .running, activeRound: max(snapshot.activeRound, intent.round),
+          status: .waiting, activeRound: max(snapshot.activeRound, intent.round),
           activeJob: .set(accepted.jobID),
           consumedBudget: HarnessConsumedBudget(
             rounds: max(snapshot.consumedBudget.rounds, intent.round),
@@ -896,7 +980,9 @@ public actor HarnessTaskCoordinator {
             e1Mutations: snapshot.consumedBudget.e1Mutations
               + (Self.consumesHarnessE1Budget(intent.operationReference) ? 1 : 0),
             modelCalls: snapshot.consumedBudget.modelCalls),
-          jobID: accepted.jobID))
+          jobID: accepted.jobID, waitReason: .activeJob,
+          conditions: conditionsAfterDispatch(
+            intent.operationReference, snapshot: snapshot)))
       return HarnessReconcileOutcome(
         snapshot: linked, action: .recoveredIntent, dispatchedJobID: accepted.jobID,
         reasonCode: accepted.deduplicated ? "deduplicated" : "fresh")
@@ -1131,7 +1217,9 @@ public actor HarnessTaskCoordinator {
           snapshot, causation: .jobObserved,
           reasonCode: "baselineCrashFixtureDeployed",
           status: .running, phase: .reproducing, activeJob: .cleared,
-          jobID: observation.jobID, observedState: observed))
+          jobID: observation.jobID, observedState: observed,
+          conditions: conditionsAfterSuccess(
+            operationReference, snapshot: snapshot)))
       return HarnessReconcileOutcome(
         snapshot: advanced, action: .observedJob, reasonCode: observation.state)
     }
@@ -1201,7 +1289,10 @@ public actor HarnessTaskCoordinator {
               phase: handler.phase(
                 afterSuccessOf: operationReference, in: snapshot.phase),
               activeJob: .cleared,
-              jobID: observation.jobID, observedState: observed))
+              jobID: observation.jobID, observedState: observed,
+              conditions: conditionsAfterSuccess(
+                operationReference, snapshot: snapshot,
+                evidenceArtifactIDs: [source.artifactID])))
           return HarnessReconcileOutcome(
             snapshot: staged, action: .observedJob, reasonCode: observation.state)
         }
@@ -1248,7 +1339,10 @@ public actor HarnessTaskCoordinator {
       snapshot,
       transition(
         snapshot, causation: .jobObserved, reasonCode: "operationSucceeded:\(operationReference)",
-        status: .running, phase: nextPhase, activeJob: .cleared, jobID: observation.jobID))
+        status: .running, phase: nextPhase, activeJob: .cleared, jobID: observation.jobID,
+        conditions: conditionsAfterSuccess(
+          operationReference, snapshot: snapshot,
+          evidenceArtifactIDs: sourceArtifactID.map { [$0] } ?? [])))
     // Evidence exists now, so it gets judged now: the evaluator is the only
     // component that may end this task successfully, and it runs on the bytes
     // the job just published rather than on the decision that asked for them.
@@ -1431,7 +1525,9 @@ public actor HarnessTaskCoordinator {
         jobID: observation.jobID, observedState: observed,
         noProgressRounds:
           operationReference == DebugCrashTaskHandler.applyPatch
-            || operationReference == DebugCrashTaskHandler.deployHAP ? 0 : nil))
+            || operationReference == DebugCrashTaskHandler.deployHAP ? 0 : nil,
+        conditions: conditionsAfterSuccess(
+          operationReference, snapshot: snapshot)))
 
     // `debug.hap@1` proves that the exact built digest was installed; it is
     // not a crash observation and publishes none of the evaluator's required
@@ -1570,6 +1666,8 @@ public actor HarnessTaskCoordinator {
     }
 
     let artifactRefs = Self.mergedArtifactRefs(snapshot, round)
+    let evaluationConditions = conditionsAfterEvaluation(
+      evaluation.verdict, snapshot: snapshot, evidenceArtifactIDs: artifactRefs)
     // Evidence costs budget: only bytes the harness actually verified and read
     // are charged, and only once per artifact.
     let newlyChargedBytes = round.evidence
@@ -1597,7 +1695,8 @@ public actor HarnessTaskCoordinator {
           result: HarnessTaskResult(
             outcome: .succeeded, reasonCode: "criteriaPassed",
             summary: Self.summary(of: evaluation), evaluationID: evaluation.evaluationID,
-            artifactRefs: artifactRefs)))
+            artifactRefs: artifactRefs),
+          conditions: evaluationConditions))
       // Promotion happens only here, behind a passing evaluation: project
       // memory never receives an unverified belief (HTP-INV-1).
       try await promoteProjectMemory(succeeded, evaluation: evaluation)
@@ -1616,7 +1715,8 @@ public actor HarnessTaskCoordinator {
         transition(
           snapshot, causation: .evaluation, reasonCode: reason, status: .running,
           consumedBudget: consumed, evaluationID: evaluation.evaluationID,
-          artifactRefs: artifactRefs, observedState: observedStateJSON))
+          artifactRefs: artifactRefs, observedState: observedStateJSON,
+          conditions: evaluationConditions))
       let blocked = try await recordBlock(
         recorded, block: .evidenceIntegrity, reasonCode: reason, round: recorded.activeRound,
         jobID: jobID, requestID: nil)
@@ -1643,7 +1743,8 @@ public actor HarnessTaskCoordinator {
             result: HarnessTaskResult(
               outcome: terminalStatus, reasonCode: reason,
               summary: Self.summary(of: evaluation), evaluationID: evaluation.evaluationID,
-              artifactRefs: artifactRefs)))
+              artifactRefs: artifactRefs),
+            conditions: evaluationConditions))
         return .ended(
           HarnessReconcileOutcome(
             snapshot: stopped,
@@ -1661,7 +1762,7 @@ public actor HarnessTaskCoordinator {
             status: .running, consumedBudget: consumed,
             evaluationID: evaluation.evaluationID,
             artifactRefs: artifactRefs, observedState: observedStateJSON,
-            noProgressRounds: noProgress))
+            noProgressRounds: noProgress, conditions: evaluationConditions))
         if noProgress >= snapshot.budgets.maxNoProgressRounds,
           snapshot.repairAttempt?.deployedDigest == nil
         {
@@ -1682,7 +1783,7 @@ public actor HarnessTaskCoordinator {
           snapshot, causation: .evaluation, reasonCode: "criteriaFailed", status: .running,
           consumedBudget: consumed, evaluationID: evaluation.evaluationID,
           artifactRefs: artifactRefs, observedState: observedStateJSON,
-          noProgressRounds: noProgress))
+          noProgressRounds: noProgress, conditions: evaluationConditions))
       if noProgress >= snapshot.budgets.maxNoProgressRounds,
         snapshot.repairAttempt?.deployedDigest == nil
       {
@@ -1793,6 +1894,237 @@ public actor HarnessTaskCoordinator {
     }
   }
 
+  private func observedCondition(
+    _ name: HarnessTaskConditionName,
+    state: HarnessTriState,
+    reasonCode: String,
+    snapshot: HarnessTaskSnapshot,
+    evidenceArtifactIDs: [String] = []
+  ) -> HarnessTaskCondition {
+    let previous = snapshot.condition(name)
+    if previous.state == state, previous.reasonCode == reasonCode,
+      previous.evidenceArtifactIDs == evidenceArtifactIDs
+    {
+      return previous
+    }
+    return HarnessTaskCondition(
+      name: name, state: state, reasonCode: reasonCode,
+      evidenceArtifactIDs: evidenceArtifactIDs, observedAt: nowUTC(),
+      observedRevision: snapshot.version + 1)
+  }
+
+  private func replacingConditions(
+    _ snapshot: HarnessTaskSnapshot,
+    _ observations: [(HarnessTaskConditionName, HarnessTriState, String)]
+  ) -> [HarnessTaskCondition] {
+    HarnessTaskConditionSet.replacing(
+      snapshot.conditions,
+      with: observations.map {
+        observedCondition(
+          $0.0, state: $0.1, reasonCode: $0.2, snapshot: snapshot)
+      })
+  }
+
+  private func conditionsAfterDispatch(
+    _ operationReference: String,
+    snapshot: HarnessTaskSnapshot
+  ) -> [HarnessTaskCondition] {
+    var observations: [(HarnessTaskConditionName, HarnessTriState, String)] = []
+    let admitted = "runtimeAdmissionAccepted"
+    if [
+      DebugCrashTaskHandler.captureDiagnostics, DebugCrashTaskHandler.deployHAP,
+    ].contains(operationReference) {
+      observations += [
+        (.targetResolved, .trueValue, admitted),
+        (.deviceBound, .trueValue, admitted),
+        (.deviceReady, .trueValue, admitted),
+      ]
+    }
+    if [
+      DebugCrashTaskHandler.applyPatch, DebugCrashTaskHandler.buildOpenHarmony,
+      DebugCrashTaskHandler.runTests, DebugCrashTaskHandler.revertPatch,
+    ].contains(operationReference) {
+      observations.append((.workspaceReady, .trueValue, admitted))
+    }
+    switch operationReference {
+    case DebugCrashTaskHandler.applyPatch:
+      observations += [
+        (.reproductionConfirmed, .trueValue, "verifiedCriteriaFailure"),
+        (.analysisReady, .trueValue, "boundedPatchDecision"),
+        (.patchProposalReady, .trueValue, "preparedPatchLease"),
+      ]
+    case DebugCrashTaskHandler.buildOpenHarmony:
+      observations.append((.patchApplied, .trueValue, "patchReadbackMatched"))
+    case DebugCrashTaskHandler.runTests:
+      observations.append((.buildOutputsReady, .trueValue, "buildReadbackMatched"))
+    case DebugCrashTaskHandler.deployHAP:
+      if snapshot.repairAttempt != nil {
+        observations += [
+          (.patchApplied, .trueValue, "patchReadbackMatched"),
+          (.buildPassed, .trueValue, "testsPassed"),
+          (.buildOutputsReady, .trueValue, "buildReadbackMatched"),
+        ]
+      }
+    case DebugCrashTaskHandler.revertPatch:
+      observations += [
+        (.artifactsReady, .trueValue, "verifiedFailureTriggeredRollback"),
+        (.verificationEvidenceReady, .trueValue, "verifiedFailureTriggeredRollback"),
+      ]
+    case DebugCrashTaskHandler.analyzeCrashLedger:
+      observations.append((.artifactsReady, .trueValue, "verifiedAnalyzerSourceLease"))
+    default:
+      break
+    }
+    return replacingConditions(snapshot, observations)
+  }
+
+  private func conditionsAfterSuccess(
+    _ operationReference: String,
+    snapshot: HarnessTaskSnapshot,
+    evidenceArtifactIDs: [String] = []
+  ) -> [HarnessTaskCondition] {
+    var observations: [(HarnessTaskConditionName, HarnessTriState, String)] = []
+    switch operationReference {
+    case DebugCrashTaskHandler.observeDevice:
+      observations = [
+        (.targetResolved, .trueValue, "targetObservationSucceeded"),
+        (.deviceBound, .trueValue, "targetObservationSucceeded"),
+        (.deviceReady, .trueValue, "targetObservationSucceeded"),
+      ]
+    case DebugCrashTaskHandler.captureDiagnostics:
+      observations = [
+        (.targetResolved, .trueValue, "diagnosticCaptureSucceeded"),
+        (.deviceBound, .trueValue, "diagnosticCaptureSucceeded"),
+        (.deviceReady, .trueValue, "diagnosticCaptureSucceeded"),
+        (.artifactsReady, .trueValue, "diagnosticArtifactsPublished"),
+      ]
+    case DebugCrashTaskHandler.analyzeCrashLedger:
+      observations = [
+        (.artifactsReady, .trueValue, "derivedArtifactVerified"),
+        (.analysisReady, .trueValue, "deterministicAnalysisSucceeded"),
+        (.verificationEvidenceReady, .trueValue, "derivedArtifactVerified"),
+      ]
+    case DebugCrashTaskHandler.applyPatch:
+      observations = [
+        (.workspaceReady, .trueValue, "patchReadbackMatched"),
+        (.patchProposalReady, .trueValue, "preparedPatchLease"),
+        (.patchApplied, .trueValue, "patchReadbackMatched"),
+      ]
+    case DebugCrashTaskHandler.buildOpenHarmony:
+      observations = [
+        (.workspaceReady, .trueValue, "buildReadbackMatched"),
+        (.patchApplied, .trueValue, "buildSourceRevisionMatched"),
+        (.buildOutputsReady, .trueValue, "buildOutputPublished"),
+      ]
+    case DebugCrashTaskHandler.runTests:
+      observations = [
+        (.workspaceReady, .trueValue, "testReadbackMatched"),
+        (.buildPassed, .trueValue, "testsPassed"),
+        (.buildOutputsReady, .trueValue, "buildOutputPublished"),
+      ]
+    case DebugCrashTaskHandler.deployHAP:
+      observations = [
+        (.targetResolved, .trueValue, "deploymentReadbackMatched"),
+        (.deviceBound, .trueValue, "deploymentReadbackMatched"),
+        (.deviceReady, .trueValue, "deploymentReadbackMatched"),
+        (.deploymentObserved, .trueValue, "deploymentReadbackMatched"),
+      ]
+    case DebugCrashTaskHandler.revertPatch:
+      observations = [
+        (.workspaceReady, .trueValue, "rollbackReadbackMatched"),
+        (.patchApplied, .falseValue, "rollbackReadbackMatched"),
+      ]
+    default:
+      break
+    }
+    let replacements = observations.map {
+      observedCondition(
+        $0.0, state: $0.1, reasonCode: $0.2, snapshot: snapshot,
+        evidenceArtifactIDs: evidenceArtifactIDs)
+    }
+    return HarnessTaskConditionSet.replacing(snapshot.conditions, with: replacements)
+  }
+
+  private func conditionsAfterEvaluation(
+    _ verdict: HarnessEvaluationVerdict,
+    snapshot: HarnessTaskSnapshot,
+    evidenceArtifactIDs: [String]
+  ) -> [HarnessTaskCondition] {
+    let observations: [(HarnessTaskConditionName, HarnessTriState, String)]
+    switch verdict {
+    case .pass:
+      observations = [
+        (.analysisReady, .trueValue, "criteriaEvaluated"),
+        (.verificationEvidenceReady, .trueValue, "criteriaEvidenceVerified"),
+        (.criteriaSatisfied, .trueValue, "criteriaPassed"),
+      ]
+    case .fail:
+      observations = [
+        (.reproductionConfirmed, .trueValue, "criteriaFailedOnVerifiedEvidence"),
+        (.analysisReady, .trueValue, "criteriaEvaluated"),
+        (.verificationEvidenceReady, .trueValue, "criteriaEvidenceVerified"),
+        (.criteriaSatisfied, .falseValue, "criteriaFailed"),
+      ]
+    case .inconclusive:
+      observations = [
+        (.analysisReady, .trueValue, "criteriaEvaluated"),
+        (.verificationEvidenceReady, .falseValue, "criteriaEvidenceIncomplete"),
+        (.criteriaSatisfied, .unknown, "criteriaInconclusive"),
+      ]
+    case .error:
+      observations = [
+        (.analysisReady, .falseValue, "criteriaEvidenceIntegrityError"),
+        (.verificationEvidenceReady, .falseValue, "criteriaEvidenceIntegrityError"),
+        (.criteriaSatisfied, .unknown, "criteriaEvidenceIntegrityError"),
+      ]
+    }
+    let replacements = observations.map {
+      observedCondition(
+        $0.0, state: $0.1, reasonCode: $0.2, snapshot: snapshot,
+        evidenceArtifactIDs: evidenceArtifactIDs)
+    }
+    return HarnessTaskConditionSet.replacing(snapshot.conditions, with: replacements)
+  }
+
+  private func recordRuntimeWait(
+    _ observation: HarnessJobObservation,
+    snapshot: HarnessTaskSnapshot
+  ) async throws -> HarnessTaskSnapshot {
+    let waitReason: HarnessTaskWaitReason
+    let conditions: [HarnessTaskCondition]
+    switch observation.state {
+    case JobState.waitingForDevice.rawValue:
+      waitReason = .deviceUnavailable
+      conditions = replacingConditions(
+        snapshot, [(.deviceReady, .falseValue, "runtimeDeviceDisconnected")])
+    case JobState.awaitingRebindConfirmation.rawValue:
+      waitReason = .deviceUnavailable
+      conditions = replacingConditions(
+        snapshot,
+        [
+          (.deviceBound, .unknown, "bindingRevisionRequiresConfirmation"),
+          (.deviceReady, .unknown, "bindingRevisionRequiresConfirmation"),
+        ])
+    case JobState.waitingForRecovery.rawValue:
+      waitReason = .observationWindow
+      conditions = snapshot.conditions
+    default:
+      waitReason = .activeJob
+      conditions = snapshot.conditions
+    }
+    guard snapshot.status != .waiting || snapshot.waitReason != waitReason
+      || snapshot.conditions != conditions
+    else {
+      return snapshot
+    }
+    return try await commit(
+      snapshot,
+      transition(
+        snapshot, causation: .jobObserved, reasonCode: observation.state,
+        status: .waiting, activeJob: .set(observation.jobID), jobID: observation.jobID,
+        waitReason: waitReason, conditions: conditions))
+  }
+
   func transition(
     _ snapshot: HarnessTaskSnapshot,
     causation: HarnessTaskCausation,
@@ -1808,7 +2140,9 @@ public actor HarnessTaskCoordinator {
     artifactRefs: [String]? = nil,
     observedState: [String: JSONValue]? = nil,
     noProgressRounds: Int? = nil,
-    result: HarnessTaskResult? = nil
+    result: HarnessTaskResult? = nil,
+    waitReason: HarnessTaskWaitReason? = nil,
+    conditions: [HarnessTaskCondition]? = nil
   ) -> HarnessTaskTransition {
     HarnessTaskTransition(
       causation: causation,
@@ -1825,7 +2159,9 @@ public actor HarnessTaskCoordinator {
       noProgressRounds: noProgressRounds,
       cancelRequested: cancelRequested ?? snapshot.cancelRequested,
       result: result,
-      atUTC: nowUTC())
+      atUTC: nowUTC(),
+      waitReason: status == .waiting ? (waitReason ?? snapshot.waitReason) : nil,
+      conditions: conditions ?? snapshot.conditions)
   }
 
   /// Device deployment is E1 by its catalog effect. TASK-HFA-003 also charges

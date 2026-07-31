@@ -356,7 +356,8 @@ final class HarnessConvergenceContractTests: XCTestCase {
     _ = await ticker.run(maximumWakes: 3)
     let after = try await harness.status(paused.htaskID)
     XCTAssertEqual(after.version, before, "a paused task is untouched by the driver")
-    XCTAssertEqual(after.status, .paused)
+    XCTAssertEqual(after.lifecycle, .waiting)
+    XCTAssertEqual(after.waitReason, .userSuspended)
   }
 
   func testAutoDriveStopsDrivingATaskWhoseEveryStepFails() async {

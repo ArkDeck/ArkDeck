@@ -152,7 +152,7 @@ public struct HarnessContextBudget: Equatable, Sendable, Codable {
 
 public struct HarnessDecisionContext: Equatable, Sendable, Codable {
   public static let documentType = "harness-decision-context"
-  public static let schemaVersion = "1.0.0"
+  public static let schemaVersion = "2.0.0"
 
   public let documentType: String
   public let schemaVersion: String
@@ -162,6 +162,10 @@ public struct HarnessDecisionContext: Equatable, Sendable, Codable {
   public let taskType: HarnessTaskType
   public let status: HarnessTaskStatus
   public let phase: HarnessTaskPhase
+  public let lifecycle: HarnessTaskLifecycle
+  public let stage: HarnessTaskStage
+  public let waitReason: HarnessTaskWaitReason?
+  public let conditions: [HarnessTaskCondition]
   public let round: Int
   public let goalSummary: String
   public let desiredState: [String: JSONValue]
@@ -198,7 +202,9 @@ public struct HarnessDecisionContext: Equatable, Sendable, Codable {
     availableOperations: [String],
     budget: HarnessContextBudget,
     blockers: [String],
-    trimmed: [String]
+    trimmed: [String],
+    waitReason: HarnessTaskWaitReason? = nil,
+    conditions: [HarnessTaskCondition] = HarnessTaskConditionSet.unknown()
   ) {
     self.documentType = Self.documentType
     self.schemaVersion = Self.schemaVersion
@@ -206,6 +212,10 @@ public struct HarnessDecisionContext: Equatable, Sendable, Codable {
     self.taskType = taskType
     self.status = status
     self.phase = phase
+    self.lifecycle = status
+    self.stage = phase
+    self.waitReason = waitReason
+    self.conditions = HarnessTaskConditionSet.normalized(conditions)
     self.round = round
     self.goalSummary = goalSummary
     self.desiredState = desiredState

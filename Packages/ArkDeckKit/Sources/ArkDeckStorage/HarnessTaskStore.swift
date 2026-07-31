@@ -605,6 +605,7 @@ public actor HarnessTaskStore {
       throw HarnessTaskStoreError.notFound(taskID)
     }
     let snapshot = try readJSON(HarnessTaskSnapshot.self, from: snapshotURL)
+    let requiresForwardMigration = snapshot.schemaVersion != HarnessTaskSnapshot.schemaVersion
     let events = try readEvents(in: directoryURL)
     var rebuilt = snapshot
     for event in events where event.sequence >= snapshot.version {
@@ -613,6 +614,12 @@ public actor HarnessTaskStore {
           "event sequence \(event.sequence) does not follow version \(rebuilt.version)")
       }
       rebuilt = rebuilt.applying(event.resulting, atUTC: event.atUTC)
+    }
+    if requiresForwardMigration {
+      // Only the replaceable cache is migrated. The append-only timeline is
+      // the truth and its bytes are never opened for writing here.
+      rebuilt = rebuilt.migratedToCurrentSchema()
+      try writeSnapshot(rebuilt, in: directoryURL)
     }
     return rebuilt
   }

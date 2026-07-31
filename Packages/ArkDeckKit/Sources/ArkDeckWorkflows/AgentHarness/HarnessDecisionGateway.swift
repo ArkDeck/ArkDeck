@@ -161,7 +161,9 @@ public struct HarnessDecisionContextAssembler: Sendable {
         availableOperations, to: limits.maxOperations, label: "operations"),
       budget: budget,
       blockers: observed.blockers,
-      trimmed: trimmed)
+      trimmed: trimmed,
+      waitReason: snapshot.waitReason,
+      conditions: snapshot.conditions)
 
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]

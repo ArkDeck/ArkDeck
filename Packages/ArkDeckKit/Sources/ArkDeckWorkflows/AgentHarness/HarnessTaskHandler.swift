@@ -128,7 +128,7 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
       return [Self.observeDevice]
     case .collecting where baselineDeploymentReady(snapshot):
       return baselineDeploymentBudgetAvailable(snapshot) ? [Self.deployHAP] : []
-    case .deviceReady, .reproducing, .collecting, .verifying:
+    case .reproducing, .collecting, .verifying:
       return [Self.captureDiagnostics]
     case .analyzing:
       return snapshot.observed.latestVerdict == .fail
@@ -221,7 +221,7 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
         hypothesis: "The target must be observable before any evidence is worth collecting.",
         reasonCode: "baselineTargetObservation",
         phaseOnDispatch: nil)
-    case .deviceReady, .reproducing:
+    case .reproducing:
       return invoke(
         snapshot, decisionID: decisionID, round: round, nowUTC: nowUTC,
         operation: Self.captureDiagnostics,
@@ -412,8 +412,7 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
     in phase: HarnessTaskPhase
   ) -> HarnessTaskPhase {
     switch (operationReference, phase) {
-    case (Self.observeDevice, .initializing): return .deviceReady
-    case (Self.captureDiagnostics, .deviceReady): return .collecting
+    case (Self.observeDevice, .initializing): return .reproducing
     case (Self.captureDiagnostics, .reproducing): return .collecting
     case (Self.applyPatch, .patching): return .building
     case (Self.deployHAP, .deploying): return .verifying
