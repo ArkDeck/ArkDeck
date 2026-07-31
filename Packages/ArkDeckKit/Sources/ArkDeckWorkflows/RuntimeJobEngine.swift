@@ -3237,12 +3237,17 @@ public actor RuntimeJobEngine {
     descriptor: CatalogOperationDescriptor
   ) throws {
     if descriptor.reference == "capture.diagnostics@1" {
-      if case .array(let categories)? = inputs["traceCategories"], !categories.isEmpty {
-        throw RuntimeJobEngineError.rejected(
-          .invalidInput,
-          "remote trace has no published host-managed receive/stat verification path; "
-            + "refusing before authorization")
-      }
+      // The trace leg used to be refused here because neither half of its
+      // verification existed. Both are published now: `capture-trace` is
+      // judged by a device-side `ls -l` readback of the file hitrace was
+      // asked to write, and `receive-trace-artifact` by the size/SHA-256 of
+      // the bytes that landed on the host. Neither can reach `.verified`
+      // without evidence, and an unrecognised landing leaves the job
+      // outstanding for reconcile rather than publishing something false —
+      // which is what makes running it before the DHA-HW device window
+      // honest rather than optimistic. DHA-CAP-001 specifies this
+      // orchestration; the E1 capability, not this refusal, is what gates
+      // the device mutation.
       if inputs["redactionProfile"] == .string("strict") {
         throw RuntimeJobEngineError.rejected(
           .invalidInput,

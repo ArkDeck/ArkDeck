@@ -225,6 +225,107 @@ final class ArtifactReceiveLegContractTests: XCTestCase {
     }
   }
 
+  // MARK: - The capture leg's device-side readback
+
+  private func traceAction() throws -> TypedProviderAction {
+    .hdc(
+      .captureTrace(
+        try HDCTraceCaptureRequest(durationSeconds: 5, categories: ["ohos"]),
+        into: try HDCOwnedRemotePath(
+          jobID: "job-receive-1", stepID: "capture-trace", nonce: "n1")))
+  }
+
+  private func captureReceipt(listing: String, exit: Int32 = 0) -> ProviderProcessReceipt {
+    func sub(_ stdout: String, exit: Int32 = 0) -> ProviderSubprocessReceipt {
+      ProviderSubprocessReceipt(
+        exitStatus: exit, stdout: Data(stdout.utf8), stderr: Data(),
+        stdoutTruncated: false, durationSeconds: 0.01)
+    }
+    return ProviderProcessReceipt(
+      exitStatus: 0, stdout: Data(), stderr: Data(),
+      stdoutTruncated: false, durationSeconds: 0.02,
+      subprocesses: [sub("", exit: exit), sub(listing)])
+  }
+
+  /// `hdc shell` reports the client's exit status, not the remote command's,
+  /// so a clean hitrace exit is worth nothing. The listing decides.
+  func testTraceVerdictComesFromTheListingNotTheCaptureExitStatus() throws {
+    let verified = try provider.verify(
+      receipt: captureReceipt(
+        listing: "-rw-r--r-- 1 root root 4096 2026-07-31 00:00 /data/local/tmp/t.htrace\n",
+        exit: 1),
+      action: try traceAction(), context: context)
+    guard case .verified(let summary) = verified else {
+      return XCTFail("a written trace must verify even when hitrace exits non-zero, got \(verified)")
+    }
+    XCTAssertEqual(summary["remoteByteCount"], "4096")
+
+    let cleanExitNoFile = try provider.verify(
+      receipt: captureReceipt(
+        listing: "ls: /data/local/tmp/t.htrace: No such file or directory\n"),
+      action: try traceAction(), context: context)
+    guard case .unknown = cleanExitNoFile else {
+      return XCTFail("a clean exit with no file cannot be a verdict, got \(cleanExitNoFile)")
+    }
+  }
+
+  func testZeroByteTraceIsAFailureNotAnEmptyArtifact() throws {
+    let outcome = try provider.verify(
+      receipt: captureReceipt(
+        listing: "-rw-r--r-- 1 root root 0 2026-07-31 00:00 /data/local/tmp/t.htrace\n"),
+      action: try traceAction(), context: context)
+    guard case .failed(let code, _) = outcome else {
+      return XCTFail("a zero-byte trace must fail, got \(outcome)")
+    }
+    XCTAssertEqual(code, "emptyTrace")
+  }
+
+  func testNonRegularOrMissingReadbackStaysUnknown() throws {
+    for listing in [
+      "drwxr-xr-x 2 root root 4096 2026-07-31 00:00 /data/local/tmp\n",
+      "\n",
+      "-rw-r--r-- 1 root root\n",
+    ] {
+      let outcome = try provider.verify(
+        receipt: captureReceipt(listing: listing), action: try traceAction(),
+        context: context)
+      guard case .unknown = outcome else {
+        return XCTFail("unreadable listing \(listing.debugDescription) gave \(outcome)")
+      }
+    }
+  }
+
+  /// Without both invocations there is no readback to judge, and a truncated
+  /// listing is not a listing.
+  func testMissingOrTruncatedReadbackStaysUnknown() throws {
+    let single = ProviderProcessReceipt(
+      exitStatus: 0, stdout: Data(), stderr: Data(),
+      stdoutTruncated: false, durationSeconds: 0.01)
+    guard case .unknown = try provider.verify(
+      receipt: single, action: try traceAction(), context: context)
+    else {
+      return XCTFail("a capture with no readback sequence must be unknown")
+    }
+
+    let truncated = ProviderProcessReceipt(
+      exitStatus: 0, stdout: Data(), stderr: Data(),
+      stdoutTruncated: false, durationSeconds: 0.02,
+      subprocesses: [
+        ProviderSubprocessReceipt(
+          exitStatus: 0, stdout: Data(), stderr: Data(),
+          stdoutTruncated: false, durationSeconds: 0.01),
+        ProviderSubprocessReceipt(
+          exitStatus: 0,
+          stdout: Data("-rw-r--r-- 1 root root 4096 2026".utf8), stderr: Data(),
+          stdoutTruncated: true, durationSeconds: 0.01),
+      ])
+    guard case .unknown = try provider.verify(
+      receipt: truncated, action: try traceAction(), context: context)
+    else {
+      return XCTFail("a truncated listing must not be parsed as a size")
+    }
+  }
+
   // MARK: - Through the production dispatcher and a real child process
 
   /// The whole leg for real: the descriptor-bound dispatcher spawns a child
