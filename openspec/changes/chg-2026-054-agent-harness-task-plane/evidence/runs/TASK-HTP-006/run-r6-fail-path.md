@@ -16,7 +16,21 @@
 | 应用自崩 | **发生了**(见 §2 的计数证据) |
 | L4 一次 submit(`HTASK-23821B743072`) | **succeeded**,verdict `pass`,`matchingCrashCount=0`、`newFatalSignatureCount=0` |
 
-**根因:cppcrash 的 fault block 根本不在 harness 采集的字节里。**
+> **2026-07-31 08:30Z 更正(r7 的实测推翻了本节最初的归因)**:本轮探针**没有**走到
+> native abort。设备上的 fault log 是 **`jscrash`**,原因是
+> `Error message:Cannot read property triggerNativeCrash of undefined` +
+> `NativeModuleErrorInfo: #4 ModuleName:crashprobe Reason:app lib path not registered in
+> namespace 'default'` —— native 模块**没能加载**,ETS 调用抛了 TypeError。所以
+> hilog 里没有 `Reason:Signal`/`SIGABRT`,首要原因是**根本没有 cppcrash**,而不是
+> 「cppcrash 明细不在 hilog」。下面这一节最初写成了后者,现更正。
+>
+> 不受影响的部分(仍然成立且更普适):**崩溃明细在 faultlogger,不在 hilog**——
+> 本轮 jscrash 的全部判定信息(Reason / Error name / Error message / Stacktrace)只在
+> `/data/log/faultlog/faultlogger/` 的那份 108,974 字节文件里;harness 采到的 887 KB
+> hilog 里只有应用自己的日志行。因此结论不变:**三条 criteria 全以 `hilog.txt` 为源时,
+> DC-1/DC-3 在真机上不可能失败**,fail 路径以当前证据源不可达。详见 `run-r7-faultlog-source.md`。
+
+**根因(更正后):崩溃的判定信息不在 harness 采集的字节里。**
 `capture.diagnostics@1` 的 HiLog 腿降为 `hilog -x`(dump 整个滚动缓冲),而 OpenHarmony 的
 cppcrash 明细落在 **faultlogger**,不进 hilog 流。`capture.diagnostics@1` 里没有任何
 faultlog 腿(实测:该 operation 文档中 `faultlog|Faultlogger` 出现 **0** 次)。
@@ -43,7 +57,8 @@ faultlog 腿(实测:该 operation 文档中 `faultlog|Faultlogger` 出现 **0** 
 
 两点推断,各有依据:
 
-- **探针确实开火**:`crash probe firing` 在缓冲里(它是 abort 前最后一条 ETS 日志);
+- **探针确实开火**:`crash probe firing` 在缓冲里(它是崩溃前最后一条 ETS 日志);
+  ——但它随后抛的是 **TypeError**(native 模块未加载),不是 native abort(见本节顶部更正);
 - **应用随后停止产出**:五次跨约 40 秒的采集里,应用行数**恒为 69** —— 活着的应用不会一行不增。
   (进程是否已消失需要一次设备读回才能断言,本轮没有为此再消耗授权,故只写到「停止产出」。)
 
