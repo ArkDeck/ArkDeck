@@ -171,13 +171,14 @@ hdc -t <k> shell rm -f <remote.json>
 - 窗口表解析:表头行以 `WindowName` 开头,列序 `WindowName DisplayId Pid WinId Type`,
   遇 `----`/`Focus window`/`total window` 结束;聚焦窗口来自尾部 `Focus window: <id>`;
   应用窗口 = `Type == 1`。
-- **组件树的已知路线是 `uitest dumpLayout` 写设备端 JSON 文件,再 `file recv` 解析**,
-  不是 `hidumper -s WindowManagerService -a "-w <id> -element -c"` 的 stdout。
-  deveco 的 `-w` 是**可选**参数(按显示屏 dump 时只带 `-d`),所以"组件树必须先有
-  windowId"这一诊断并不完整;真正的阻塞是**产物形态**:dumpLayout 产出设备文件,
-  而 `capture.diagnostics@1` 的 `capture-ui-dump` 步骤 kind 是 `captureRemoteStdout`。
-  换成这条路线需要 `captureRemoteFile` + `receiveFile` + `cleanupOwnedRemotePath`
-  的步骤形态,即契约 + Catalog 变更(已发布 operation 的修改,走 OpenSpec)。
+- **组件树的路线是 `uitest dumpLayout` 写设备端 JSON 文件,再 `file recv` 解析** `[R]`。
+  2026-07-31 DAYU200 实测:`uitest` 在 `/bin/uitest`,`dumpLayout -p <file>`
+  **不带 `-w`、不带 `-d`** 即成功,回 `DumpLayout saved to:<path>`。
+  即"组件树必须先有 windowId"这一诊断**是错的**——CHG-2026-053 r1 据此拒绝,
+  r2 予以更正。真正的阻塞有两层:(a) 产物是设备文件而 `capture-ui-dump` 的 kind
+  是 `captureRemoteStdout`;(b) 更关键的是该步骤声明 `effect: readOnly`,而**往设备
+  写文件是 deviceMutation**——第二层不是 lowering 能藏的,藏了就等于绕过副作用授权。
+  已由 CHG-2026-053 r2 以新增步骤 + `uiComponentTree` 输入的形态交付。
 - 节点 `bounds` = `[left, top, right, bottom]`,中心点 `ceil((l+r)/2), ceil((t+b)/2)`。
 - **只包含屏幕内可见节点**;视口外的节点 dump 不出来。
 - UI 输入(如需):`uitest uiInput click|doubleClick|longClick|swipe|fling|drag|dircFling|inputText|text`;
@@ -258,7 +259,7 @@ hdc -t <k> shell rm -f <remote.png>
 | # | ArkDeck 现状 | 外部事实 | 状态 |
 | --- | --- | --- | --- |
 | D3 | `param get` 结果直接 trim 后入 summary | 输出可能是 `key = value` | **本车已落地**(仅剥"请求键 + `=`"前缀) |
-| D1 | `capture-ui-dump` = `captureRemoteStdout` + `windowInventory`;`componentTree` lowering fail closed | `uitest dumpLayout` 写设备文件 + `file recv` | **需契约或 Catalog 变更**(本车只把拒绝原因从"无 windowId-free 形态"更正为"stdout 步骤形态无法承载文件型产物",并指向本文件 §7) |
+| D1 | `capture-ui-dump` = `captureRemoteStdout` + `windowInventory`;`componentTree` lowering fail closed | `uitest dumpLayout` 写设备文件 + `file recv` | **已落地并真机验证 `[R]`**(CHG-2026-053 r2:新增 `uiComponentTree` 输入与 `capture-ui-tree` / `receive-ui-tree` / `cleanup-ui-tree-temp` 三个 optional 步骤,effect 随输入升级;2026-07-31 真机一次跑通,`ui-tree.json` 26,143 字节 / 42 节点。**注意**:该产物是含屏幕文本的 JSON,走会脱敏的 `publish`,**不**走 D4 给 trace 铺的 file-backed 路径) |
 | D2 | `stopAbility` / `uninstallPackage` verify **仅**看 exit status 就判 `verified` | `aa`/`bm` 家族有短状态行可判;`bm uninstall` 有 `uninstall missing installed bundle` 这种"0 但没做" | **本车已落地**(两条 mutation 各自降为「mutation + presence readback」序列:stop 后 `pidof`、uninstall 后 `bm dump -n`,判据取 readback 三值——不在=verified、还在=`stopIneffective`/`uninstallIneffective` failed、读不出=unknown;**没有**去解析 `aa`/`bm` 的状态串,所以不占用"待真机证据"的额度。probe 解析与 reconcile 路径共用同一份 helper。**2026-07-31 真机修正**:首版 `processPresence` 要求 `exitStatus == 1` 才判进程不在,而 `hdc shell` 只回客户端退出码,该 shape 生产上永不出现 —— 每次成功的 stop 都落 `.unknown`。已改为按**空输出**判不在、完全不看退出码,并经真机 reconcile 复验) |
 | D4 | `receiveOwnedArtifact` lower 为 `["file","recv",<remote>]`(**无本地目标**),且其 verify 要求 `receipt.hostManagedRecordID`,而 process 收据从不携带该字段 → 永远 `.unknown` | recv 本地目标语义不稳,必须按内容校验 | **本车已落地**(argv 补 host 目标;dispatcher 按 `HostLandingExpectation` 实测落地文件的大小与 SHA-256;verdict 全部来自磁盘字节:无文件=`.unknown`、空=`.failed`、超预算=`.failed` 且不做哈希、pin 了哈希则真比对;`trace.htrace` 改从收到的文件发布,不再用 `receipt.stdout`) |
 | D10 | trace 腿在 `validateSupportedPlanInputs` 处按 `traceCategories` 整体拒绝(admission 前) | `hitrace -o <file>` 的产物存在性/大小只能由设备侧 `ls -l` 第 5 字段判(同 §8) | **本车已落地**(`capture-trace` 降为 `hitrace` + `ls -l` 两段序列,判据取 listing 的 size 字段而非退出码:>0 verified、=0 `emptyTrace` failed、非常规文件/读不出 unknown;admission 拒绝解除,trace 腿改由 E1 授权路径管辖)|

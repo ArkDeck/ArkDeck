@@ -42,6 +42,12 @@
         "default": 8192
       },
       "uiDump": { "type": "boolean", "required": false, "default": true },
+      "uiComponentTree": {
+        "type": "boolean",
+        "required": false,
+        "default": false,
+        "description": "Capture the on-screen component tree. Presence selects the file-producing dumpLayout leg and escalates the effective effect to deviceMutation; absent or false leaves the plan unchanged."
+      },
       "totalArtifactByteBudget": {
         "type": "integer",
         "required": false,
@@ -139,6 +145,36 @@
       "compensation": "none"
     },
     {
+      "stepID": "capture-ui-tree",
+      "kind": "captureRemoteFile",
+      "effect": "deviceMutation",
+      "cancellation": "atSafeBoundary",
+      "binding": "confirmedDevice",
+      "optional": true,
+      "compensation": "bestEffortCleanup",
+      "notes": "Writes the component tree to a provider-owned remote JSON path; selected only by uiComponentTree, which is what raises the plan's effect."
+    },
+    {
+      "stepID": "receive-ui-tree",
+      "kind": "receiveFile",
+      "effect": "readOnly",
+      "cancellation": "immediate",
+      "binding": "confirmedDevice",
+      "optional": true,
+      "compensation": "none",
+      "notes": "Size/hash verified on receive. The artifact is published from the received bytes through the redacting path - the tree carries on-screen text."
+    },
+    {
+      "stepID": "cleanup-ui-tree-temp",
+      "kind": "cleanupOwnedRemotePath",
+      "effect": "deviceMutation",
+      "cancellation": "atSafeBoundary",
+      "binding": "confirmedDevice",
+      "optional": true,
+      "compensation": "bestEffortCleanup",
+      "notes": "Failure records cleanup debt for later reconcile; never silently dropped."
+    },
+    {
       "stepID": "capture-trace",
       "kind": "captureRemoteFile",
       "effect": "deviceMutation",
@@ -192,6 +228,7 @@
   "artifacts": [
     { "name": "hilog.txt", "role": "raw", "mediaType": "text/plain", "privacy": "sensitive", "required": true },
     { "name": "ui-dump.json", "role": "raw", "mediaType": "application/json", "privacy": "sensitive", "required": false },
+    { "name": "ui-tree.json", "role": "raw", "mediaType": "application/json", "privacy": "sensitive", "required": false },
     { "name": "trace.htrace", "role": "raw", "mediaType": "application/octet-stream", "privacy": "sensitive", "required": false },
     { "name": "artifact-index.json", "role": "derived", "mediaType": "application/json", "privacy": "standard", "required": true },
     { "name": "capture-summary.json", "role": "derived", "mediaType": "application/json", "privacy": "standard", "required": true }

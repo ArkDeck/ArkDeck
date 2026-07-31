@@ -4,7 +4,7 @@
 // Drift is a check-sdd error (bidirectional byte comparison).
 
 extension RuntimeOperationCatalog {
-  public static let catalogDigest = "da101ab62ec92f524b0a961a9bb91d0b436126a5a6aaa67626e1f86730988945"
+  public static let catalogDigest = "17bd5443d0a660a8d657b5ba9fb15017252f42f88714bc4bc3e4e22ff76bdaff"
 
   public static let operations: [CatalogOperationDescriptor] = [
     CatalogOperationDescriptor(
@@ -25,6 +25,7 @@ extension RuntimeOperationCatalog {
         CatalogFieldDescriptor(name: "totalArtifactByteBudget", type: .integer, isRequired: false, minimum: 1048576, maximum: 536870912),
         CatalogFieldDescriptor(name: "traceBufferKB", type: .integer, isRequired: false, minimum: 1024, maximum: 65536),
         CatalogFieldDescriptor(name: "traceCategories", type: .stringArray, isRequired: false, maxLength: 64, maxItems: 24),
+        CatalogFieldDescriptor(name: "uiComponentTree", type: .boolean, isRequired: false),
         CatalogFieldDescriptor(name: "uiDump", type: .boolean, isRequired: false)
       ],
       outputs: [
@@ -39,6 +40,9 @@ extension RuntimeOperationCatalog {
         CatalogStepDescriptor(stepID: "preflight-device-storage", kind: .preflightDeviceStorage, effect: .readOnly, cancellation: .immediate, binding: .confirmedDevice, isOptional: false, compensation: .none),
         CatalogStepDescriptor(stepID: "capture-hilog", kind: .captureRemoteStdout, effect: .readOnly, cancellation: .immediate, binding: .confirmedDevice, isOptional: false, compensation: .none, actionReference: CatalogActionReference(catalogID: "arkdeck-diagnostics", actionID: "boundedHilog")),
         CatalogStepDescriptor(stepID: "capture-ui-dump", kind: .captureRemoteStdout, effect: .readOnly, cancellation: .immediate, binding: .confirmedDevice, isOptional: true, compensation: .none, actionReference: CatalogActionReference(catalogID: "arkdeck-diagnostics", actionID: "windowInventory")),
+        CatalogStepDescriptor(stepID: "capture-ui-tree", kind: .captureRemoteFile, effect: .deviceMutation, cancellation: .atSafeBoundary, binding: .confirmedDevice, isOptional: true, compensation: .bestEffortCleanup),
+        CatalogStepDescriptor(stepID: "receive-ui-tree", kind: .receiveFile, effect: .readOnly, cancellation: .immediate, binding: .confirmedDevice, isOptional: true, compensation: .none),
+        CatalogStepDescriptor(stepID: "cleanup-ui-tree-temp", kind: .cleanupOwnedRemotePath, effect: .deviceMutation, cancellation: .atSafeBoundary, binding: .confirmedDevice, isOptional: true, compensation: .bestEffortCleanup),
         CatalogStepDescriptor(stepID: "capture-trace", kind: .captureRemoteFile, effect: .deviceMutation, cancellation: .atSafeBoundary, binding: .confirmedDevice, isOptional: true, compensation: .bestEffortCleanup),
         CatalogStepDescriptor(stepID: "receive-trace-artifact", kind: .receiveFile, effect: .readOnly, cancellation: .immediate, binding: .confirmedDevice, isOptional: true, compensation: .none),
         CatalogStepDescriptor(stepID: "cleanup-remote-temp", kind: .cleanupOwnedRemotePath, effect: .deviceMutation, cancellation: .atSafeBoundary, binding: .confirmedDevice, isOptional: true, compensation: .bestEffortCleanup),
@@ -51,6 +55,7 @@ extension RuntimeOperationCatalog {
       artifacts: [
         CatalogArtifactDescriptor(name: "hilog.txt", role: .raw, mediaType: "text/plain", privacy: .sensitive, isRequired: true, retentionClass: .default),
         CatalogArtifactDescriptor(name: "ui-dump.json", role: .raw, mediaType: "application/json", privacy: .sensitive, isRequired: false, retentionClass: .default),
+        CatalogArtifactDescriptor(name: "ui-tree.json", role: .raw, mediaType: "application/json", privacy: .sensitive, isRequired: false, retentionClass: .default),
         CatalogArtifactDescriptor(name: "trace.htrace", role: .raw, mediaType: "application/octet-stream", privacy: .sensitive, isRequired: false, retentionClass: .default),
         CatalogArtifactDescriptor(name: "artifact-index.json", role: .derived, mediaType: "application/json", privacy: .standard, isRequired: true, retentionClass: .default),
         CatalogArtifactDescriptor(name: "capture-summary.json", role: .derived, mediaType: "application/json", privacy: .standard, isRequired: true, retentionClass: .default)

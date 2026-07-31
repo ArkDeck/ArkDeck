@@ -87,15 +87,20 @@ public struct HDCHilogCaptureRequest: Sendable, Equatable {
 }
 
 public struct HDCUIDumpRequest: Sendable, Equatable {
+  /// Kept as an enum with one case on purpose: the wire form stays stable
+  /// and the type keeps saying that a UI dump has a scope. `componentTree`
+  /// is gone from it because that scope is not a stdout capture at all —
+  /// it is the `captureComponentTree` file action (CHG-2026-053 r2). No
+  /// persisted journal can name it: its lowering refused from the day it
+  /// was introduced, so nothing was ever dispatched under it.
   public enum Scope: String, CaseIterable, Sendable {
     case windowList
-    case componentTree
   }
 
   public let scope: Scope
   public let byteBudget: Int
 
-  public init(scope: Scope = .componentTree, byteBudget: Int = 8 * 1024 * 1024) throws {
+  public init(scope: Scope = .windowList, byteBudget: Int = 8 * 1024 * 1024) throws {
     guard (1024...(64 * 1024 * 1024)).contains(byteBudget) else {
       throw HDCE0RequestError.outOfBounds(field: "byteBudget", detail: "1024...64MiB")
     }
@@ -172,6 +177,8 @@ public struct HDCOwnedRemotePath: Sendable, Equatable {
       suffix = ".hap"
     case "capture-trace":
       suffix = ".htrace"
+    case "capture-ui-tree":
+      suffix = ".json"
     default:
       suffix = ""
     }

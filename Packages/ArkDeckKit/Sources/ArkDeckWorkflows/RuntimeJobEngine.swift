@@ -1358,6 +1358,11 @@ public actor RuntimeJobEngine {
     case "capture-ui-dump":
       if case .bool(let enabled)? = inputs["uiDump"] { return enabled }
       return true  // the catalog default
+    case "capture-ui-tree", "receive-ui-tree", "cleanup-ui-tree-temp":
+      // Off unless asked for: these three are what raise the plan from
+      // readOnly to deviceMutation, so the default has to be the quiet one.
+      if case .bool(let enabled)? = inputs["uiComponentTree"] { return enabled }
+      return false  // the catalog default
     case "capture-diagnostics":
       if case .bool(let enabled)? = inputs["captureDiagnostics"] { return enabled }
       return true
@@ -1907,12 +1912,12 @@ public actor RuntimeJobEngine {
       guard let declaration = descriptor.artifacts.first(where: { $0.name == name }) else {
         continue
       }
-      // A file-backed product is the received bytes or it is nothing. The
+      // A received product is the received bytes or it is nothing. The
       // receipt's stdout for a receive step is hdc's progress line, so
-      // falling back to it would publish a text banner under a binary
-      // artifact name.
+      // falling back to it would publish a transfer banner under the
+      // artifact's name.
       var landed: ProviderLandedArtifact?
-      if Self.fileBackedArtifacts.contains(name) {
+      if Self.fileBackedArtifacts.contains(name) || Self.receivedRedactedArtifacts.contains(name) {
         guard let received = receipt.landedArtifact, received.sha256 != nil else {
           let detail = "\(name) has no received host file to publish"
           _ = try? await artifactStore.recordMissing(
@@ -1927,7 +1932,10 @@ public actor RuntimeJobEngine {
         }
         landed = received
       }
-      let contents =
+      // Sized before it is read: a received file's byte count is already
+      // known from the receive, so the budget guard below runs without
+      // pulling the bytes into memory first.
+      var contents =
         landed == nil
         ? Self.artifactContents(
           name: name, summary: summary, receipt: receipt, descriptor: descriptor,
@@ -1968,7 +1976,7 @@ public actor RuntimeJobEngine {
       }
       do {
         let metadata: RuntimeArtifactMetadata
-        if let landed, let sha256 = landed.sha256 {
+        if let landed, Self.fileBackedArtifacts.contains(name), let sha256 = landed.sha256 {
           metadata = try await artifactStore.publishFile(
             RuntimeArtifactFilePublicationRequest(
               jobID: jobID, sessionID: runtime.record.sessionID, stepID: step.stepID,
@@ -1981,6 +1989,22 @@ public actor RuntimeJobEngine {
           // capture data and does not outlive the publication.
           try? FileManager.default.removeItem(at: landed.localURL)
         } else {
+          if let landed {
+            // A received product whose media type carries text goes through
+            // the redacting publish path — `publishFile` refuses text/JSON
+            // precisely because it skips redaction, and this tree carries
+            // on-screen strings. Re-hashed after the read: the bytes that
+            // get published must be the bytes the dispatcher measured.
+            let received = try Data(contentsOf: landed.localURL, options: [.uncached])
+            guard received.count == landed.byteCount,
+              SHA256.hash(data: received).map({ String(format: "%02x", $0) }).joined()
+                == landed.sha256
+            else {
+              throw RuntimeArtifactPublicationFailure(
+                detail: "\(name) changed between receive and publication")
+            }
+            contents = received
+          }
           metadata = try await artifactStore.publish(
             RuntimeArtifactPublicationRequest(
               jobID: jobID, sessionID: runtime.record.sessionID, stepID: step.stepID,
@@ -1988,6 +2012,7 @@ public actor RuntimeJobEngine {
               retentionClass: declaration.retentionClass,
               sourceOperation: descriptor.reference, providerID: descriptor.provider.rawValue,
               bindingSnapshot: binding, contents: contents))
+          if let landed { try? FileManager.default.removeItem(at: landed.localURL) }
         }
         appendTimeline(jobID: jobID, entry: "artifact \(name) -> \(metadata.artifactID)")
       } catch {
@@ -2028,6 +2053,13 @@ public actor RuntimeJobEngine {
     "workspace.symbolize-crash@1",
   ]
 
+  /// Received products that must NOT take the file-backed route. The store
+  /// refuses `text/*` and `application/json` there because file-backed
+  /// publication skips redaction, and these carry on-screen strings — the
+  /// component tree's nodes include `text` and `description`. They are read
+  /// after the budget guard and published through the redacting path.
+  static let receivedRedactedArtifacts: Set<String> = ["ui-tree.json"]
+
   /// Which step produces which declared artifact. Kept beside the engine
   /// rather than in the catalog schema because it is an implementation
   /// detail of the orchestration, not part of the published contract.
@@ -2058,6 +2090,7 @@ public actor RuntimeJobEngine {
       "capture-hilog": ["hilog.txt"],
       "capture-ui-dump": ["ui-dump.json"],
       "receive-trace-artifact": ["trace.htrace"],
+      "receive-ui-tree": ["ui-tree.json"],
     ],
     "debug.hap@1": [
       "package-readback": ["install-readback.json"],
@@ -4154,7 +4187,15 @@ public actor RuntimeJobEngine {
         "artifactId": .string("artifact-\(step.stepID)"),
       ]
     case .captureRemoteFile:
-      if case .hdc(.captureTrace(let request, let path))? = action {
+      if case .hdc(.captureComponentTree(let path))? = action {
+        arguments = [
+          "catalogId": .string("trace-presets"),
+          "actionId": .string("custom"),
+          "parameters": .object([:]),
+          "artifactId": .string("artifact-\(step.stepID)"),
+          "ownedRemotePath": .string(path.remotePath),
+        ]
+      } else if case .hdc(.captureTrace(let request, let path))? = action {
         arguments = [
           "catalogId": .string("trace-presets"),
           "actionId": .string("custom"),
@@ -4177,11 +4218,12 @@ public actor RuntimeJobEngine {
         ]
       }
     case .receiveFile:
+      let localName = step.stepID == "receive-ui-tree" ? "ui-tree.json" : "trace.htrace"
       if case .hdc(.receiveOwnedArtifact(let artifact))? = action {
         var exact: [String: JSONValue] = [
           "remotePath": .string(artifact.path.remotePath),
           "artifactId": .string("artifact-\(step.stepID)"),
-          "localRelativePath": .string("artifacts/raw/trace.htrace"),
+          "localRelativePath": .string("artifacts/raw/\(localName)"),
         ]
         if let expected = artifact.expectedSHA256 {
           exact["expectedSha256"] = .string(expected)
@@ -4192,7 +4234,7 @@ public actor RuntimeJobEngine {
           "remotePath": .string(
             "/data/local/tmp/arkdeck-\(jobID)-capture-trace-owned.htrace"),
           "artifactId": .string("artifact-\(step.stepID)"),
-          "localRelativePath": .string("artifacts/raw/trace.htrace"),
+          "localRelativePath": .string("artifacts/raw/\(localName)"),
         ]
       }
     case .cleanupOwnedRemotePath:
@@ -4202,8 +4244,18 @@ public actor RuntimeJobEngine {
       } else if case .hdc(.cleanupNativeLibrary(let deployment))? = action {
         path = deployment.stagingPath
       } else {
-        let ownerStep = step.stepID == "cleanup-remote-staging" ? "send-hap" : "capture-trace"
-        let suffix = ownerStep == "send-hap" ? ".hap" : ".htrace"
+        let ownerStep: String
+        switch step.stepID {
+        case "cleanup-remote-staging": ownerStep = "send-hap"
+        case "cleanup-ui-tree-temp": ownerStep = "capture-ui-tree"
+        default: ownerStep = "capture-trace"
+        }
+        let suffix: String
+        switch ownerStep {
+        case "send-hap": suffix = ".hap"
+        case "capture-ui-tree": suffix = ".json"
+        default: suffix = ".htrace"
+        }
         path = "/data/local/tmp/arkdeck-\(jobID)-\(ownerStep)-owned\(suffix)"
       }
       arguments = [

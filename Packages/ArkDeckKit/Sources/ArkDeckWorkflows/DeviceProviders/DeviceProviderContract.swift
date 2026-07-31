@@ -29,6 +29,10 @@ public enum HDCProviderAction: Sendable, Equatable {
   case captureHilog(HDCHilogCaptureRequest)
   case captureUIDump(HDCUIDumpRequest)
   case captureTrace(HDCTraceCaptureRequest, into: HDCOwnedRemotePath)
+  /// The component tree, which `uitest` writes to a device file rather
+  /// than to stdout. That product shape — not a missing windowId — is why
+  /// it cannot ride the stdout UI dump action (CHG-2026-053 r2).
+  case captureComponentTree(into: HDCOwnedRemotePath)
   case receiveOwnedArtifact(HDCOwnedRemoteArtifact)
   case cleanupOwnedRemotePath(HDCOwnedRemotePath)
   // E1 mutation family (T13). Success for the mutating members is decided
@@ -157,7 +161,7 @@ public enum TypedProviderAction: Sendable, Equatable {
       .hdc(.readOwnedPathPresence), .hdc(.readPortForwardPresence),
       .hdc(.inspectNativeLibrary):
       return .readOnly
-    case .hdc(.captureTrace), .hdc(.cleanupOwnedRemotePath),
+    case .hdc(.captureTrace), .hdc(.captureComponentTree), .hdc(.cleanupOwnedRemotePath),
       .hdc(.sendArtifactToStaging), .hdc(.installPackage), .hdc(.startAbility),
       .hdc(.stopAbility), .hdc(.uninstallPackage), .hdc(.createPortForward),
       .hdc(.removePortForward), .hdc(.sendNativeLibraryToStaging),
@@ -302,6 +306,8 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
       arguments["categories"] = .array(request.categories.map(JSONValue.string))
       arguments["bufferKB"] = .integer(Int64(request.bufferKB))
       self.init(kind: "hdc.captureTrace", arguments: arguments)
+    case .hdc(.captureComponentTree(let path)):
+      self.init(kind: "hdc.captureComponentTree", arguments: pathArguments(path))
     case .hdc(.receiveOwnedArtifact(let artifact)):
       var arguments = pathArguments(artifact.path)
       arguments["maximumBytes"] = .integer(Int64(artifact.maximumBytes))
@@ -682,6 +688,8 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
           durationSeconds: integer("durationSeconds"),
           categories: stringArray("categories"), bufferKB: integer("bufferKB")),
         into: try path()))
+    case "hdc.captureComponentTree":
+      return .hdc(.captureComponentTree(into: try path()))
     case "hdc.receiveOwnedArtifact":
       return .hdc(.receiveOwnedArtifact(
         HDCOwnedRemoteArtifact(
