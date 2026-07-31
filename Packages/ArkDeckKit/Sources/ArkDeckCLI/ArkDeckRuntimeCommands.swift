@@ -843,6 +843,44 @@ enum RuntimeCLI {
     arguments.contains("--json")
   }
 
+  /// `arkdeck cleanup-debt list|continue` — the operator surface for remote
+  /// cleanup that failed. The engine records the debt with the *exact typed
+  /// action* it could not complete; `continue` only re-runs that recorded
+  /// action, so `--remote-path` is a lookup key into the ledger, never a
+  /// device path a caller gets to choose. The daemon has owned these two
+  /// methods since MU-4 and nothing could call them.
+  static func runCleanupDebt(_ arguments: [String]) throws {
+    guard let subcommand = arguments.first else {
+      throw CLIError(
+        exitCode: EX_USAGE, message: "missing cleanup-debt subcommand (list|continue)")
+    }
+    var rest = Array(arguments.dropFirst())
+    let json = rest.contains("--json")
+    let client = client(&rest)
+    switch subcommand {
+    case "list":
+      emit(try client.request(method: "cleanupDebt.list"), json: json)
+    case "continue":
+      guard let jobIndex = rest.firstIndex(of: "--job"), jobIndex + 1 < rest.count,
+        let pathIndex = rest.firstIndex(of: "--remote-path"), pathIndex + 1 < rest.count
+      else {
+        throw CLIError(
+          exitCode: EX_USAGE,
+          message: "cleanup-debt continue requires --job <id> --remote-path <recorded path>")
+      }
+      emit(
+        try client.request(
+          method: "cleanupDebt.continue",
+          params: [
+            "jobId": .string(rest[jobIndex + 1]),
+            "remotePath": .string(rest[pathIndex + 1]),
+          ]),
+        json: json)
+    default:
+      throw CLIError(exitCode: EX_USAGE, message: "unsupported cleanup-debt subcommand")
+    }
+  }
+
   static func runJob(_ arguments: [String]) throws {
     guard let subcommand = arguments.first else {
       throw CLIError(
