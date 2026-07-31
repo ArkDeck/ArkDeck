@@ -1,0 +1,47 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "workspace.symbolize-crash",
+  "version": 1,
+  "title": "Symbolize an Artifact-backed crash through an exact ProjectProfile preset",
+  "provider": "workspace",
+  "effect": { "minimum": "hostOnly", "permitted": ["hostOnly"] },
+  "authorization": { "hostOnly": "defaultReadOnly" },
+  "binding": "none",
+  "concurrencyKey": "host-exclusive",
+  "inputs": {
+    "fields": {
+      "projectRef": { "type": "string", "required": true, "maxLength": 128 },
+      "dumpArtifactRef": { "type": "artifactLease", "required": true },
+      "symbolPresetRef": { "type": "string", "required": true, "maxLength": 128 }
+    }
+  },
+  "outputs": {
+    "fields": {
+      "symbolizedCrash": { "type": "artifactReference", "required": true }
+    }
+  },
+  "steps": [
+    {
+      "stepID": "symbolize-crash",
+      "kind": "symbolizeWorkspaceCrash",
+      "effect": "hostOnly",
+      "cancellation": "immediate",
+      "binding": "none",
+      "compensation": "none"
+    }
+  ],
+  "timeoutSeconds": 300,
+  "outputByteBudget": 67108864,
+  "retry": { "preflightAttempts": 1, "mutationAttempts": 1 },
+  "unknownOutcome": "reconcileRequired",
+  "artifacts": [
+    {
+      "name": "symbolized-crash.txt",
+      "role": "derived",
+      "mediaType": "text/plain",
+      "privacy": "sensitive",
+      "required": true
+    }
+  ],
+  "profiles": ["workspace-host@1"]
+}

@@ -388,6 +388,7 @@ public actor RuntimeJobEngine {
     let journalArguments: [String: JSONValue]?
     let processKind: String
     let executableSHA256: String?
+    let argumentZero: String?
     let argumentSummary: [String]?
     let processInvocations: [MaterializedProcessInvocation]?
     let timeoutSeconds: Int?
@@ -498,10 +499,11 @@ public actor RuntimeJobEngine {
       }
       if descriptor.reference == "debug.hap@1"
         || descriptor.reference == "deploy.native-library.app-owned@1"
-        || descriptor.reference == "flash.dayu200@1",
+        || descriptor.reference == "flash.dayu200@1"
+        || Self.workspaceOperationReferences.contains(descriptor.reference),
         artifactStore == nil
       {
-        reasons.append("Artifact lease store is not configured")
+        reasons.append("runtime.artifactStoreUnavailable")
       }
       return RuntimeOperationAvailability(
         reference: descriptor.reference,
@@ -971,6 +973,8 @@ public actor RuntimeJobEngine {
         resolvedArtifact =
           step.kind == .sendFile
             || step.kind == .flashPartition
+            || step.kind == .applyWorkspacePatch
+            || step.kind == .symbolizeWorkspaceCrash
             || descriptor.reference == "flash.dayu200@1"
             || descriptor.reference == "deploy.native-library.app-owned@1"
           ? try await resolvedInputArtifact(jobID: jobID) : nil
@@ -1599,7 +1603,7 @@ public actor RuntimeJobEngine {
         ? (runtime.record.request.target.expectedBindingRevision ?? 1) : nil)
     runtime.record.recoveryStepID = step.stepID
     runtime.record.recoveryIntentEventID = intentEventID
-    runtime.record.recoveryAction = PersistedTypedProviderAction(action)
+    runtime.record.recoveryAction = try PersistedTypedProviderAction(action)
     // Persist the exact typed action before the write-ahead intent can
     // become dispatchable. A crash can leave an unused pending record, but
     // it can never leave a durable external intent whose action recovery
@@ -1706,6 +1710,15 @@ public actor RuntimeJobEngine {
       current.record.timeline.append(
         "failed \(step.stepID): \(code): \(detail)")
       jobs[jobID] = current
+      if Self.failedDiagnosticArtifactOperations.contains(descriptor.reference) {
+        try await publishDeclaredArtifacts(
+          jobID: jobID, step: step,
+          summary: [
+            "failureCode": code,
+            "failureDetail": detail,
+          ],
+          receipt: receipt)
+      }
       throw RuntimeDispatchFailure.failed("\(code): \(detail)")
     case .unknown(let reason), .unsupported(let reason):
       // A mutation whose truth is delegated to a paired readback is not an
@@ -1999,12 +2012,43 @@ public actor RuntimeJobEngine {
   /// is no path from "the step ran" to a published trace.
   static let fileBackedArtifacts: Set<String> = ["trace.htrace"]
 
+  /// A confirmed process failure still owns useful bounded diagnostics.
+  /// Publishing those bytes does not turn the Job into success; it prevents
+  /// the failure path from discarding the only actionable build/test output.
+  static let failedDiagnosticArtifactOperations: Set<String> = [
+    "workspace.build-openharmony@1",
+    "workspace.run-tests@1",
+  ]
+
+  static let workspaceOperationReferences: Set<String> = [
+    "workspace.apply-patch@1",
+    "workspace.build-openharmony@1",
+    "workspace.revert-patch@1",
+    "workspace.run-tests@1",
+    "workspace.symbolize-crash@1",
+  ]
+
   /// Which step produces which declared artifact. Kept beside the engine
   /// rather than in the catalog schema because it is an implementation
   /// detail of the orchestration, not part of the published contract.
   static let artifactMapping: [String: [String: [String]]] = [
     "workspace.inspect-source@1": [
       "inspect-workspace-source": ["source-inspection.txt"]
+    ],
+    "workspace.apply-patch@1": [
+      "apply-patch": ["applied-patch.json"]
+    ],
+    "workspace.build-openharmony@1": [
+      "build-project": ["build.log"]
+    ],
+    "workspace.run-tests@1": [
+      "run-tests": ["test-output.log"]
+    ],
+    "workspace.symbolize-crash@1": [
+      "symbolize-crash": ["symbolized-crash.txt"]
+    ],
+    "workspace.revert-patch@1": [
+      "revert-patch": ["revert-report.json"]
     ],
     "observe.device@1": [
       "probe-host-tool": ["tool-facts.json"],
@@ -2193,11 +2237,15 @@ public actor RuntimeJobEngine {
     record: RuntimeJobRecord
   ) -> Data {
     switch name {
-    case "source-inspection.txt":
+    case "source-inspection.txt", "symbolized-crash.txt":
       // The inspection *is* its stdout. Publishing a summary instead would
       // hand the evaluator a description of evidence rather than evidence
       // (the #798 lesson, in a host-only shape).
       return receipt.stdout
+    case "build.log", "test-output.log":
+      var output = receipt.stdout
+      output.append(receipt.stderr)
+      return output
     case "hilog.txt", "ui-dump.json", "debug-hilog.txt":
       // Raw capture products are the bounded provider bytes themselves.
       // Encoding only the semantic byteCount here would fabricate a log
@@ -3027,6 +3075,16 @@ public actor RuntimeJobEngine {
         runtime.record.request.inputs["imageBundleLease"]
       else { return nil }
       lease = value
+    case "workspace.apply-patch@1":
+      guard case .string(let value)? =
+        runtime.record.request.inputs["patchArtifactRef"]
+      else { return nil }
+      lease = value
+    case "workspace.symbolize-crash@1":
+      guard case .string(let value)? =
+        runtime.record.request.inputs["dumpArtifactRef"]
+      else { return nil }
+      lease = value
     default:
       return nil
     }
@@ -3046,13 +3104,26 @@ public actor RuntimeJobEngine {
     materializedStableIdentitySHA256: String?
   ) throws {
     guard binding.targetID == request.target.targetID,
-      binding.bindingRevision == request.target.expectedBindingRevision,
-      let expectedIdentity = materializedStableIdentitySHA256,
-      binding.stableIdentitySHA256 == expectedIdentity
+      binding.bindingRevision == request.target.expectedBindingRevision
     else {
       throw RuntimeJobEngineError.rejected(
         .invalidInput,
         "Artifact lease target/binding/identity does not match the materialized request")
+    }
+    if let expectedIdentity = materializedStableIdentitySHA256 {
+      guard binding.stableIdentitySHA256 == expectedIdentity else {
+        throw RuntimeJobEngineError.rejected(
+          .invalidInput,
+          "Artifact lease target/binding/identity does not match the materialized request")
+      }
+    } else {
+      guard request.target.expectedBindingRevision == nil,
+        binding.stableIdentitySHA256 == nil
+      else {
+        throw RuntimeJobEngineError.rejected(
+          .invalidInput,
+          "host-only Artifact lease must not claim a device binding or identity")
+      }
     }
   }
 
@@ -3072,6 +3143,13 @@ public actor RuntimeJobEngine {
     if let reason = dispatcher.unavailableReason(providerID: descriptor.provider.rawValue) {
       throw RuntimeJobEngineError.rejected(
         .invalidInput, "\(descriptor.reference) is runtime unavailable: \(reason)")
+    }
+    if Self.workspaceOperationReferences.contains(descriptor.reference),
+      artifactStore == nil
+    {
+      throw RuntimeJobEngineError.rejected(
+        .invalidInput,
+        "\(descriptor.reference) is runtime unavailable: runtime.artifactStoreUnavailable")
     }
     let selectedSteps = descriptor.steps.filter { step in
       !step.isOptional
@@ -3121,6 +3199,12 @@ public actor RuntimeJobEngine {
     case "flash.dayu200@1":
       leaseInputName = "imageBundleLease"
       artifactLabel = "flash bundle"
+    case "workspace.apply-patch@1":
+      leaseInputName = "patchArtifactRef"
+      artifactLabel = "workspace patch"
+    case "workspace.symbolize-crash@1":
+      leaseInputName = "dumpArtifactRef"
+      artifactLabel = "workspace crash dump"
     default:
       leaseInputName = nil
       artifactLabel = "input"
@@ -3160,7 +3244,7 @@ public actor RuntimeJobEngine {
               effect: step.effect.rawValue, cancellation: step.cancellation.rawValue,
               binding: step.binding.rawValue, isOptional: step.isOptional,
               journalArguments: nil, processKind: "engine",
-              executableSHA256: nil, argumentSummary: nil,
+              executableSHA256: nil, argumentZero: nil, argumentSummary: nil,
               processInvocations: nil, timeoutSeconds: nil,
               hostManagedDescriptor: nil))
           continue
@@ -3201,6 +3285,7 @@ public actor RuntimeJobEngine {
               binding: step.binding.rawValue, isOptional: step.isOptional,
               journalArguments: workflowStep.arguments, processKind: "process",
               executableSHA256: executableSHA256,
+              argumentZero: plan.argumentZero,
               argumentSummary: argumentSummary, processInvocations: nil,
               timeoutSeconds: timeoutSeconds,
               hostManagedDescriptor: nil))
@@ -3211,7 +3296,8 @@ public actor RuntimeJobEngine {
               effect: step.effect.rawValue, cancellation: step.cancellation.rawValue,
               binding: step.binding.rawValue, isOptional: step.isOptional,
               journalArguments: workflowStep.arguments, processKind: "processSequence",
-              executableSHA256: executableSHA256, argumentSummary: nil,
+              executableSHA256: executableSHA256, argumentZero: plan.argumentZero,
+              argumentSummary: nil,
               processInvocations: invocations.map {
                 MaterializedProcessInvocation(
                   arguments: $0.arguments,
@@ -3227,7 +3313,7 @@ public actor RuntimeJobEngine {
               binding: step.binding.rawValue, isOptional: step.isOptional,
               journalArguments: workflowStep.arguments, processKind: "hostManaged",
               executableSHA256: descriptor.providerExecutableSHA256,
-              argumentSummary: nil, processInvocations: nil,
+              argumentZero: nil, argumentSummary: nil, processInvocations: nil,
               timeoutSeconds: nil,
               hostManagedDescriptor:
                 "\(descriptor.identifier)#action-sha256:\(descriptor.actionSHA256)"))
@@ -3298,7 +3384,7 @@ public actor RuntimeJobEngine {
             journalArguments: workflowStep.arguments,
             processKind: "processSequence",
             executableSHA256: executableSHA256,
-            argumentSummary: nil,
+            argumentZero: rollbackPlan.argumentZero, argumentSummary: nil,
             processInvocations: invocations.map {
               MaterializedProcessInvocation(
                 arguments: $0.arguments,
@@ -4314,6 +4400,65 @@ public actor RuntimeJobEngine {
         "symbol": .string(inspection.symbol),
         "fileScope": .string(inspection.fileScope),
         "artifactId": .string("source-inspection.txt"),
+      ]
+    case .applyWorkspacePatch:
+      guard case .workspace(.applyPatch(let patch))? = action else {
+        throw RuntimeJobEngineError.internalFailure(
+          "\(step.stepID) has no exact typed workspace patch action")
+      }
+      arguments = [
+        "projectRef": .string(patch.invocation.projectRef),
+        "patchArtifactId": .string(patch.patchArtifactID),
+        "patchSha256": .string(patch.patchSHA256),
+        "allowedFileGlobs": .array(patch.allowedFileGlobs.map(JSONValue.string)),
+        "patchAttemptRef": .string(patch.patchAttemptRef),
+      ]
+    case .buildWorkspaceOpenHarmony:
+      guard case .string(let projectRef)? = inputs["projectRef"],
+        case .string(let preset)? = inputs["buildPresetRef"]
+      else {
+        throw RuntimeJobEngineError.internalFailure(
+          "\(step.stepID) has incomplete workspace build inputs")
+      }
+      arguments = [
+        "projectRef": .string(projectRef),
+        "buildPresetRef": .string(preset),
+      ]
+    case .runWorkspaceTests:
+      guard case .string(let projectRef)? = inputs["projectRef"],
+        case .string(let preset)? = inputs["testPresetRef"]
+      else {
+        throw RuntimeJobEngineError.internalFailure(
+          "\(step.stepID) has incomplete workspace test inputs")
+      }
+      arguments = [
+        "projectRef": .string(projectRef),
+        "testPresetRef": .string(preset),
+      ]
+    case .symbolizeWorkspaceCrash:
+      guard case .string(let projectRef)? = inputs["projectRef"],
+        case .string(let preset)? = inputs["symbolPresetRef"],
+        let resolvedInputArtifact
+      else {
+        throw RuntimeJobEngineError.internalFailure(
+          "\(step.stepID) has incomplete workspace symbolization inputs")
+      }
+      arguments = [
+        "projectRef": .string(projectRef),
+        "dumpArtifactId": .string(resolvedInputArtifact.artifactID),
+        "dumpSha256": .string(resolvedInputArtifact.sha256),
+        "symbolPresetRef": .string(preset),
+      ]
+    case .revertWorkspacePatch:
+      guard case .string(let projectRef)? = inputs["projectRef"],
+        case .string(let reference)? = inputs["patchAttemptRef"]
+      else {
+        throw RuntimeJobEngineError.internalFailure(
+          "\(step.stepID) has incomplete workspace revert inputs")
+      }
+      arguments = [
+        "projectRef": .string(projectRef),
+        "patchAttemptRef": .string(reference),
       ]
     default:
       throw RuntimeJobEngineError.internalFailure(

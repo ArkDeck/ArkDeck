@@ -4,7 +4,7 @@
 // Drift is a check-sdd error (bidirectional byte comparison).
 
 extension RuntimeOperationCatalog {
-  public static let catalogDigest = "ad5d5a348af394ede7b6898008e6dff32b49f2e0cc8d569728066622e73876b4"
+  public static let catalogDigest = "da101ab62ec92f524b0a961a9bb91d0b436126a5a6aaa67626e1f86730988945"
 
   public static let operations: [CatalogOperationDescriptor] = [
     CatalogOperationDescriptor(
@@ -286,6 +286,66 @@ extension RuntimeOperationCatalog {
       profiles: ["openharmony-standard@1", "dayu200@1"]
     ),
     CatalogOperationDescriptor(
+      id: "workspace.apply-patch",
+      version: 1,
+      title: "Apply an Artifact-backed patch inside declared ProjectProfile globs",
+      provider: .workspace,
+      minimumEffect: .hostOnly,
+      permittedEffects: [.hostOnly],
+      authorization: [.hostOnly: .defaultReadOnly],
+      defaultPolicyIssuanceEnabled: true,
+      binding: .none,
+      concurrencyKey: .hostExclusive,
+      inputs: [
+        CatalogFieldDescriptor(name: "allowedFileGlobs", type: .stringArray, isRequired: true, maxLength: 512, maxItems: 64),
+        CatalogFieldDescriptor(name: "patchArtifactRef", type: .artifactLease, isRequired: true),
+        CatalogFieldDescriptor(name: "projectRef", type: .string, isRequired: true, maxLength: 128)
+      ],
+      outputs: [
+        CatalogFieldDescriptor(name: "appliedPatch", type: .artifactReference, isRequired: true),
+        CatalogFieldDescriptor(name: "patchAttemptRef", type: .string, isRequired: true, maxLength: 64)
+      ],
+      steps: [
+        CatalogStepDescriptor(stepID: "apply-patch", kind: .applyWorkspacePatch, effect: .hostOnly, cancellation: .atSafeBoundary, binding: .none, isOptional: false, compensation: .rollbackPublished)
+      ],
+      timeoutSeconds: 180,
+      outputByteBudget: 16777216,
+      preflightAttempts: 1,
+      artifacts: [
+        CatalogArtifactDescriptor(name: "applied-patch.json", role: .derived, mediaType: "application/json", privacy: .standard, isRequired: true, retentionClass: .pinnedUntilVerified)
+      ],
+      profiles: ["workspace-host@1"]
+    ),
+    CatalogOperationDescriptor(
+      id: "workspace.build-openharmony",
+      version: 1,
+      title: "Build through an exact repository-managed ProjectProfile preset",
+      provider: .workspace,
+      minimumEffect: .hostOnly,
+      permittedEffects: [.hostOnly],
+      authorization: [.hostOnly: .defaultReadOnly],
+      defaultPolicyIssuanceEnabled: true,
+      binding: .none,
+      concurrencyKey: .hostExclusive,
+      inputs: [
+        CatalogFieldDescriptor(name: "buildPresetRef", type: .string, isRequired: true, maxLength: 128),
+        CatalogFieldDescriptor(name: "projectRef", type: .string, isRequired: true, maxLength: 128)
+      ],
+      outputs: [
+        CatalogFieldDescriptor(name: "buildLog", type: .artifactReference, isRequired: true)
+      ],
+      steps: [
+        CatalogStepDescriptor(stepID: "build-project", kind: .buildWorkspaceOpenHarmony, effect: .hostOnly, cancellation: .immediate, binding: .none, isOptional: false, compensation: .none)
+      ],
+      timeoutSeconds: 900,
+      outputByteBudget: 134217728,
+      preflightAttempts: 1,
+      artifacts: [
+        CatalogArtifactDescriptor(name: "build.log", role: .log, mediaType: "text/plain", privacy: .standard, isRequired: true, retentionClass: .default)
+      ],
+      profiles: ["workspace-host@1"]
+    ),
+    CatalogOperationDescriptor(
       id: "workspace.inspect-source",
       version: 1,
       title: "Inspect declared workspace source for a symbol",
@@ -312,6 +372,94 @@ extension RuntimeOperationCatalog {
       preflightAttempts: 1,
       artifacts: [
         CatalogArtifactDescriptor(name: "source-inspection.txt", role: .raw, mediaType: "text/plain", privacy: .standard, isRequired: true, retentionClass: .default)
+      ],
+      profiles: ["workspace-host@1"]
+    ),
+    CatalogOperationDescriptor(
+      id: "workspace.revert-patch",
+      version: 1,
+      title: "Revert an exact durable workspace patch attempt",
+      provider: .workspace,
+      minimumEffect: .hostOnly,
+      permittedEffects: [.hostOnly],
+      authorization: [.hostOnly: .defaultReadOnly],
+      defaultPolicyIssuanceEnabled: true,
+      binding: .none,
+      concurrencyKey: .hostExclusive,
+      inputs: [
+        CatalogFieldDescriptor(name: "patchAttemptRef", type: .string, isRequired: true, maxLength: 64),
+        CatalogFieldDescriptor(name: "projectRef", type: .string, isRequired: true, maxLength: 128)
+      ],
+      outputs: [
+        CatalogFieldDescriptor(name: "revertReport", type: .artifactReference, isRequired: true)
+      ],
+      steps: [
+        CatalogStepDescriptor(stepID: "revert-patch", kind: .revertWorkspacePatch, effect: .hostOnly, cancellation: .atSafeBoundary, binding: .none, isOptional: false, compensation: .none)
+      ],
+      timeoutSeconds: 180,
+      outputByteBudget: 16777216,
+      preflightAttempts: 1,
+      artifacts: [
+        CatalogArtifactDescriptor(name: "revert-report.json", role: .derived, mediaType: "application/json", privacy: .standard, isRequired: true, retentionClass: .default)
+      ],
+      profiles: ["workspace-host@1"]
+    ),
+    CatalogOperationDescriptor(
+      id: "workspace.run-tests",
+      version: 1,
+      title: "Run tests through an exact repository-managed ProjectProfile preset",
+      provider: .workspace,
+      minimumEffect: .hostOnly,
+      permittedEffects: [.hostOnly],
+      authorization: [.hostOnly: .defaultReadOnly],
+      defaultPolicyIssuanceEnabled: true,
+      binding: .none,
+      concurrencyKey: .hostExclusive,
+      inputs: [
+        CatalogFieldDescriptor(name: "projectRef", type: .string, isRequired: true, maxLength: 128),
+        CatalogFieldDescriptor(name: "testPresetRef", type: .string, isRequired: true, maxLength: 128)
+      ],
+      outputs: [
+        CatalogFieldDescriptor(name: "testOutput", type: .artifactReference, isRequired: true)
+      ],
+      steps: [
+        CatalogStepDescriptor(stepID: "run-tests", kind: .runWorkspaceTests, effect: .hostOnly, cancellation: .immediate, binding: .none, isOptional: false, compensation: .none)
+      ],
+      timeoutSeconds: 900,
+      outputByteBudget: 134217728,
+      preflightAttempts: 1,
+      artifacts: [
+        CatalogArtifactDescriptor(name: "test-output.log", role: .log, mediaType: "text/plain", privacy: .standard, isRequired: true, retentionClass: .default)
+      ],
+      profiles: ["workspace-host@1"]
+    ),
+    CatalogOperationDescriptor(
+      id: "workspace.symbolize-crash",
+      version: 1,
+      title: "Symbolize an Artifact-backed crash through an exact ProjectProfile preset",
+      provider: .workspace,
+      minimumEffect: .hostOnly,
+      permittedEffects: [.hostOnly],
+      authorization: [.hostOnly: .defaultReadOnly],
+      defaultPolicyIssuanceEnabled: true,
+      binding: .none,
+      concurrencyKey: .hostExclusive,
+      inputs: [
+        CatalogFieldDescriptor(name: "dumpArtifactRef", type: .artifactLease, isRequired: true),
+        CatalogFieldDescriptor(name: "projectRef", type: .string, isRequired: true, maxLength: 128),
+        CatalogFieldDescriptor(name: "symbolPresetRef", type: .string, isRequired: true, maxLength: 128)
+      ],
+      outputs: [
+        CatalogFieldDescriptor(name: "symbolizedCrash", type: .artifactReference, isRequired: true)
+      ],
+      steps: [
+        CatalogStepDescriptor(stepID: "symbolize-crash", kind: .symbolizeWorkspaceCrash, effect: .hostOnly, cancellation: .immediate, binding: .none, isOptional: false, compensation: .none)
+      ],
+      timeoutSeconds: 300,
+      outputByteBudget: 67108864,
+      preflightAttempts: 1,
+      artifacts: [
+        CatalogArtifactDescriptor(name: "symbolized-crash.txt", role: .derived, mediaType: "text/plain", privacy: .sensitive, isRequired: true, retentionClass: .default)
       ],
       profiles: ["workspace-host@1"]
     ),

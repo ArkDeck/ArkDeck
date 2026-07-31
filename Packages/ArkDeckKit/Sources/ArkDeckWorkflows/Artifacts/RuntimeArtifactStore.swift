@@ -784,7 +784,7 @@ public actor RuntimeArtifactStore {
         jobID: jobID, stepID: stepID, remotePath: remotePath, reason: reason,
         recordedAtUTC: nowUTC(), settledAtUTC: nil,
         retryAttemptStartedAtUTC: nil, retryOutcomeUnknown: nil,
-        persistedAction: action.map(PersistedTypedProviderAction.init)))
+        persistedAction: try action.map { try PersistedTypedProviderAction($0) }))
     try persistCleanupDebt(debts)
   }
 

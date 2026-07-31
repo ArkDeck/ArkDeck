@@ -1,0 +1,54 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "workspace.apply-patch",
+  "version": 1,
+  "title": "Apply an Artifact-backed patch inside declared ProjectProfile globs",
+  "provider": "workspace",
+  "effect": { "minimum": "hostOnly", "permitted": ["hostOnly"] },
+  "authorization": { "hostOnly": "defaultReadOnly" },
+  "binding": "none",
+  "concurrencyKey": "host-exclusive",
+  "inputs": {
+    "fields": {
+      "projectRef": { "type": "string", "required": true, "maxLength": 128 },
+      "patchArtifactRef": { "type": "artifactLease", "required": true },
+      "allowedFileGlobs": {
+        "type": "stringArray",
+        "required": true,
+        "maxItems": 64,
+        "maxLength": 512
+      }
+    }
+  },
+  "outputs": {
+    "fields": {
+      "appliedPatch": { "type": "artifactReference", "required": true },
+      "patchAttemptRef": { "type": "string", "required": true, "maxLength": 64 }
+    }
+  },
+  "steps": [
+    {
+      "stepID": "apply-patch",
+      "kind": "applyWorkspacePatch",
+      "effect": "hostOnly",
+      "cancellation": "atSafeBoundary",
+      "binding": "none",
+      "compensation": "rollbackPublished"
+    }
+  ],
+  "timeoutSeconds": 180,
+  "outputByteBudget": 16777216,
+  "retry": { "preflightAttempts": 1, "mutationAttempts": 1 },
+  "unknownOutcome": "reconcileRequired",
+  "artifacts": [
+    {
+      "name": "applied-patch.json",
+      "role": "derived",
+      "mediaType": "application/json",
+      "privacy": "standard",
+      "required": true,
+      "retentionClass": "pinnedUntilVerified"
+    }
+  ],
+  "profiles": ["workspace-host@1"]
+}

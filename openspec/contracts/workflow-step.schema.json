@@ -48,7 +48,12 @@
         "formatPartition",
         "unlockDevice",
         "finalizeSession",
-        "inspectWorkspaceSource"
+        "inspectWorkspaceSource",
+        "applyWorkspacePatch",
+        "buildWorkspaceOpenHarmony",
+        "runWorkspaceTests",
+        "symbolizeWorkspaceCrash",
+        "revertWorkspacePatch"
       ]
     },
     "effect": {
@@ -2366,6 +2371,101 @@
               }
             }
           }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "applyWorkspacePatch"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "arguments": {
+                "$ref": "#/$defs/workspaceApplyArguments"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "buildWorkspaceOpenHarmony"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "arguments": {
+                "$ref": "#/$defs/workspaceBuildArguments"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "runWorkspaceTests"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "arguments": {
+                "$ref": "#/$defs/workspaceTestArguments"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "symbolizeWorkspaceCrash"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "arguments": {
+                "$ref": "#/$defs/workspaceSymbolizeArguments"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "revertWorkspacePatch"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "arguments": {
+                "$ref": "#/$defs/workspaceRevertArguments"
+              }
+            }
+          }
         }
       ]
     },
@@ -2713,6 +2813,116 @@
           "maxLength": 120
         },
         "artifactId": {
+          "$ref": "#/$defs/id"
+        }
+      }
+    },
+    "workspaceStringArray": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 512
+      }
+    },
+    "workspaceApplyArguments": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "projectRef",
+        "patchArtifactId",
+        "patchSha256",
+        "allowedFileGlobs",
+        "patchAttemptRef"
+      ],
+      "properties": {
+        "projectRef": {
+          "$ref": "#/$defs/id"
+        },
+        "patchArtifactId": {
+          "$ref": "#/$defs/id"
+        },
+        "patchSha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "allowedFileGlobs": {
+          "$ref": "#/$defs/workspaceStringArray"
+        },
+        "patchAttemptRef": {
+          "$ref": "#/$defs/id"
+        }
+      }
+    },
+    "workspaceBuildArguments": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "projectRef",
+        "buildPresetRef"
+      ],
+      "properties": {
+        "projectRef": {
+          "$ref": "#/$defs/id"
+        },
+        "buildPresetRef": {
+          "$ref": "#/$defs/id"
+        }
+      }
+    },
+    "workspaceTestArguments": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "projectRef",
+        "testPresetRef"
+      ],
+      "properties": {
+        "projectRef": {
+          "$ref": "#/$defs/id"
+        },
+        "testPresetRef": {
+          "$ref": "#/$defs/id"
+        }
+      }
+    },
+    "workspaceSymbolizeArguments": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "projectRef",
+        "dumpArtifactId",
+        "dumpSha256",
+        "symbolPresetRef"
+      ],
+      "properties": {
+        "projectRef": {
+          "$ref": "#/$defs/id"
+        },
+        "dumpArtifactId": {
+          "$ref": "#/$defs/id"
+        },
+        "dumpSha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "symbolPresetRef": {
+          "$ref": "#/$defs/id"
+        }
+      }
+    },
+    "workspaceRevertArguments": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "projectRef",
+        "patchAttemptRef"
+      ],
+      "properties": {
+        "projectRef": {
+          "$ref": "#/$defs/id"
+        },
+        "patchAttemptRef": {
           "$ref": "#/$defs/id"
         }
       }

@@ -973,7 +973,7 @@ struct RockchipRuntimeActionRecordStore: Sendable {
       stableIdentitySHA256: descriptor.expectedIdentitySHA256,
       providerExecutableSHA256: descriptor.providerExecutableSHA256,
       actionSHA256: descriptor.actionSHA256,
-      action: PersistedTypedProviderAction(action))
+      action: try PersistedTypedProviderAction(action))
     let created = Darwin.mkdir(actionDirectory.path, 0o700) == 0
     if !created {
       guard errno == EEXIST else {
@@ -1323,7 +1323,7 @@ struct DurableRockchipRuntimeActionHost: RockchipRuntimeActionHosting {
     }
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-    let encoded = try encoder.encode(PersistedTypedProviderAction(action))
+    let encoded = try encoder.encode(try PersistedTypedProviderAction(action))
     let digest = SHA256.hash(data: encoded)
       .map { String(format: "%02x", $0) }.joined()
     guard digest == descriptor.actionSHA256 else {

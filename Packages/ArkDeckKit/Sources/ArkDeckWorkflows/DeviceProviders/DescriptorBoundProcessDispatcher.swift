@@ -26,6 +26,22 @@ public struct ResolvedExecutable: Sendable, Equatable {
 /// composes discovery; tests point at a fixture binary.
 public protocol RuntimeExecutableResolving: Sendable {
   func resolveExecutable(providerID: String) throws -> ResolvedExecutable
+  func resolveExecutable(for action: TypedProviderAction) throws -> ResolvedExecutable
+}
+
+extension RuntimeExecutableResolving {
+  public func resolveExecutable(for action: TypedProviderAction) throws -> ResolvedExecutable {
+    let providerID: String
+    switch action {
+    case .hdc:
+      providerID = "hdc"
+    case .rockchip:
+      providerID = "rockchip"
+    case .workspace:
+      providerID = "workspace"
+    }
+    return try resolveExecutable(providerID: providerID)
+  }
 }
 
 public struct FixedExecutableResolver: RuntimeExecutableResolving {
@@ -87,15 +103,7 @@ public struct DescriptorBoundProcessDispatcher: RuntimeProcessDispatching {
       throw RuntimeDispatchFailure.failed(
         "hostManaged plans execute inside their own host, not this dispatcher")
     }
-    let providerID: String
-    switch plan.action {
-    case .hdc: providerID = "hdc"
-    case .rockchip: providerID = "rockchip"
-    // Same descriptor-bound spawn as any other provider: the executable is
-    // resolved and hashed by this dispatcher, not named by the plan.
-    case .workspace: providerID = "workspace"
-    }
-    let executable = try resolver.resolveExecutable(providerID: providerID)
+    let executable = try resolver.resolveExecutable(for: plan.action)
     if let landing = plan.hostLanding {
       do {
         try landing.prepareDestination()
@@ -111,7 +119,7 @@ public struct DescriptorBoundProcessDispatcher: RuntimeProcessDispatching {
     var anyTruncated = false
     for invocation in invocations {
       let subreceipt = try await execute(
-        invocation, executable: executable)
+        invocation, executable: executable, argumentZero: plan.argumentZero)
       subprocesses.append(subreceipt)
       aggregateStdout.append(subreceipt.stdout)
       aggregateStderr.append(subreceipt.stderr)
@@ -136,10 +144,12 @@ public struct DescriptorBoundProcessDispatcher: RuntimeProcessDispatching {
 
   private func execute(
     _ invocation: TypedProcessInvocation,
-    executable: ResolvedExecutable
+    executable: ResolvedExecutable,
+    argumentZero: String?
   ) async throws -> ProviderSubprocessReceipt {
     let request = ProcessRequest(
       executable: URL(fileURLWithPath: executable.path),
+      argumentZero: argumentZero,
       arguments: invocation.arguments,
       timeout: invocation.timeoutSeconds.map(TimeInterval.init))
     let executor = FoundationProcessExecutor()
@@ -164,7 +174,8 @@ public struct DescriptorBoundProcessDispatcher: RuntimeProcessDispatching {
         exitStatus: status,
         stdout: execution.stdout.data,
         stderr: execution.stderr.data,
-        stdoutTruncated: execution.stdout.wasTruncated,
+        stdoutTruncated:
+          execution.stdout.wasTruncated || execution.stderr.wasTruncated,
         durationSeconds: 0)
     case .timedOut:
       throw RuntimeDispatchFailure.outcomeUnknown("process timed out before completion")

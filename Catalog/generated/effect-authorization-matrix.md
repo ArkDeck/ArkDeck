@@ -3,7 +3,7 @@
 
 # Operation effect / authorization matrix
 
-Catalog digest: `ad5d5a348af394ede7b6898008e6dff32b49f2e0cc8d569728066622e73876b4`
+Catalog digest: `da101ab62ec92f524b0a961a9bb91d0b436126a5a6aaa67626e1f86730988945`
 
 | Operation | Provider | Effect (min → max) | Authorization | Default issuance | Binding | Concurrency | Timeout (s) | Output budget (bytes) |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -13,7 +13,12 @@ Catalog digest: `ad5d5a348af394ede7b6898008e6dff32b49f2e0cc8d569728066622e73876b
 | `deploy.native-library.system@1` | hdc | destructive | destructive: oneShotExactPlan | disabled | confirmedDevice | device-exclusive | 1800 | 134217728 |
 | `flash.dayu200@1` | rockchip | destructive | destructive: oneShotExactPlan | enabled | confirmedDevice | device-exclusive | 1800 | 134217728 |
 | `observe.device@1` | hdc | readOnly | readOnly: defaultReadOnly | enabled | confirmedDevice | device-shared-readonly | 60 | 1048576 |
+| `workspace.apply-patch@1` | workspace | hostOnly | hostOnly: defaultReadOnly | enabled | none | host-exclusive | 180 | 16777216 |
+| `workspace.build-openharmony@1` | workspace | hostOnly | hostOnly: defaultReadOnly | enabled | none | host-exclusive | 900 | 134217728 |
 | `workspace.inspect-source@1` | workspace | hostOnly | hostOnly: defaultReadOnly | enabled | none | host-exclusive | 120 | 1048576 |
+| `workspace.revert-patch@1` | workspace | hostOnly | hostOnly: defaultReadOnly | enabled | none | host-exclusive | 180 | 16777216 |
+| `workspace.run-tests@1` | workspace | hostOnly | hostOnly: defaultReadOnly | enabled | none | host-exclusive | 900 | 134217728 |
+| `workspace.symbolize-crash@1` | workspace | hostOnly | hostOnly: defaultReadOnly | enabled | none | host-exclusive | 300 | 67108864 |
 
 ## Profiles
 
@@ -21,4 +26,4 @@ Catalog digest: `ad5d5a348af394ede7b6898008e6dff32b49f2e0cc8d569728066622e73876b
 | --- | --- | --- |
 | `dayu200@1` | rockchip | `observe.device@1`, `capture.diagnostics@1`, `debug.hap@1`, `deploy.native-library.app-owned@1`, `deploy.native-library.system@1`, `flash.dayu200@1` |
 | `openharmony-standard@1` | hdc | `observe.device@1`, `capture.diagnostics@1`, `debug.hap@1`, `deploy.native-library.app-owned@1`, `deploy.native-library.system@1` |
-| `workspace-host@1` | workspace | `workspace.inspect-source@1` |
+| `workspace-host@1` | workspace | `workspace.inspect-source@1`, `workspace.apply-patch@1`, `workspace.build-openharmony@1`, `workspace.run-tests@1`, `workspace.symbolize-crash@1`, `workspace.revert-patch@1` |

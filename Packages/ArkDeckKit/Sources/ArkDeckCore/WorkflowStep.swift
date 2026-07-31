@@ -146,6 +146,11 @@ public enum WorkflowStepKind: String, CaseIterable, Codable, Sendable {
   /// Host-only: read declared workspace source. No device, no shell; the
   /// provider joins the scope glob to the project root it resolved itself.
   case inspectWorkspaceSource
+  case applyWorkspacePatch
+  case buildWorkspaceOpenHarmony
+  case runWorkspaceTests
+  case symbolizeWorkspaceCrash
+  case revertWorkspacePatch
 }
 
 public struct WorkflowStepMetadata: Equatable, Sendable {
@@ -327,6 +332,25 @@ public enum WorkflowStepRegistry {
       ])
     case .inspectWorkspaceSource:
       host(required: ["projectRef", "symbol", "fileScope", "artifactId"])
+    case .applyWorkspacePatch:
+      metadata(
+        .hostOnly, .atSafeBoundary, .none,
+        required: [
+          "projectRef", "patchArtifactId", "patchSha256",
+          "allowedFileGlobs", "patchAttemptRef",
+        ])
+    case .buildWorkspaceOpenHarmony:
+      host(required: ["projectRef", "buildPresetRef"])
+    case .runWorkspaceTests:
+      host(required: ["projectRef", "testPresetRef"])
+    case .symbolizeWorkspaceCrash:
+      host(required: [
+        "projectRef", "dumpArtifactId", "dumpSha256", "symbolPresetRef",
+      ])
+    case .revertWorkspacePatch:
+      metadata(
+        .hostOnly, .atSafeBoundary, .none,
+        required: ["projectRef", "patchAttemptRef"])
     case .finalizeSession:
       metadata(.hostOnly, .atSafeBoundary, .none, required: ["sessionId", "publicationPolicy"])
     }
@@ -1092,6 +1116,26 @@ private enum WorkflowStepValidator {
       // resolved itself, so a caller cannot address the filesystem.
       _ = try reader.string("fileScope", minimumLength: 1, maximumLength: 120)
       try reader.identifier("artifactId")
+    case .applyWorkspacePatch:
+      try reader.identifier("projectRef")
+      try reader.identifier("patchArtifactId")
+      try reader.sha256("patchSha256")
+      try reader.boundedStringArray("allowedFileGlobs", minimumCount: 1)
+      try reader.identifier("patchAttemptRef")
+    case .buildWorkspaceOpenHarmony:
+      try reader.identifier("projectRef")
+      try reader.identifier("buildPresetRef")
+    case .runWorkspaceTests:
+      try reader.identifier("projectRef")
+      try reader.identifier("testPresetRef")
+    case .symbolizeWorkspaceCrash:
+      try reader.identifier("projectRef")
+      try reader.identifier("dumpArtifactId")
+      try reader.sha256("dumpSha256")
+      try reader.identifier("symbolPresetRef")
+    case .revertWorkspacePatch:
+      try reader.identifier("projectRef")
+      try reader.identifier("patchAttemptRef")
     case .finalizeSession:
       try reader.identifier("sessionId")
       try reader.constant("publicationPolicy", value: "atomicAfterValidation")
@@ -1269,6 +1313,31 @@ private enum WorkflowStepValidator {
       }
       if unique && Set(identifiers).count != identifiers.count {
         throw invalid(key, "unique identifier array")
+      }
+    }
+
+    func boundedStringArray(
+      _ key: String,
+      minimumCount: Int,
+      maximumCount: Int = 64,
+      maximumItemLength: Int = 512
+    ) throws {
+      guard case .array(let values) = arguments[key],
+        (minimumCount...maximumCount).contains(values.count)
+      else {
+        throw invalid(
+          key, "array containing \(minimumCount)...\(maximumCount) bounded strings")
+      }
+      for (index, value) in values.enumerated() {
+        guard case .string(let string) = value,
+          !string.isEmpty,
+          string.utf8.count <= maximumItemLength,
+          !string.contains("\0")
+        else {
+          throw invalid(
+            "\(key)[\(index)]",
+            "non-empty string of at most \(maximumItemLength) UTF-8 bytes")
+        }
       }
     }
 

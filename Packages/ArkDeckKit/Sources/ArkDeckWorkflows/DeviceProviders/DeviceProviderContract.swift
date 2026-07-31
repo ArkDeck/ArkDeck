@@ -111,7 +111,7 @@ public enum RockchipProviderAction: Sendable, Equatable {
 /// One host-only action family (CHG-2026-054 TASK-HTP-007). It carries a
 /// resolved project root, never a caller-supplied path, and a glob that the
 /// provider validated before it became part of an action.
-public struct WorkspaceSourceInspection: Sendable, Equatable {
+public struct WorkspaceSourceInspection: Sendable, Equatable, Codable {
   public let projectRef: String
   public let projectRoot: String
   public let symbol: String
@@ -125,8 +125,13 @@ public struct WorkspaceSourceInspection: Sendable, Equatable {
   }
 }
 
-public enum WorkspaceProviderAction: Sendable, Equatable {
+public enum WorkspaceProviderAction: Sendable, Equatable, Codable {
   case inspectSource(WorkspaceSourceInspection)
+  case applyPatch(WorkspacePatchIntent)
+  case buildOpenHarmony(WorkspaceResolvedInvocation)
+  case runTests(WorkspaceResolvedInvocation)
+  case symbolizeCrash(WorkspaceResolvedInvocation)
+  case revertPatch(WorkspaceRevertIntent)
 }
 
 public enum TypedProviderAction: Sendable, Equatable {
@@ -138,7 +143,7 @@ public enum TypedProviderAction: Sendable, Equatable {
 
   public var effect: WorkflowEffect {
     switch self {
-    case .workspace(.inspectSource):
+    case .workspace:
       return .hostOnly
     case .hdc(.observeTool), .hdc(.observeServer):
       return .hostOnly
@@ -183,7 +188,7 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
   let kind: String
   let arguments: [String: JSONValue]
 
-  init(_ action: TypedProviderAction) {
+  init(_ action: TypedProviderAction) throws {
     func pathArguments(_ path: HDCOwnedRemotePath) -> [String: JSONValue] {
       [
         "jobId": .string(path.jobID),
@@ -250,6 +255,15 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
           "projectRef": .string(inspection.projectRef),
           "symbol": .string(inspection.symbol),
           "fileScope": .string(inspection.fileScope),
+        ])
+    case .workspace(let workspace):
+      let encoder = JSONEncoder()
+      encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+      self.init(
+        kind: "workspace.action",
+        arguments: [
+          "payload": .string(
+            try encoder.encode(workspace).base64EncodedString())
         ])
     case .hdc(.observeTool):
       self.init(kind: "hdc.observeTool", arguments: [:])
@@ -618,6 +632,27 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
     }
 
     switch kind {
+    case "workspace.inspectSource":
+      return .workspace(
+        .inspectSource(
+          WorkspaceSourceInspection(
+            projectRef: try string("projectRef"),
+            projectRoot: "",
+            symbol: try string("symbol"),
+            fileScope: try string("fileScope"))))
+    case "workspace.action":
+      let payload = try string("payload")
+      guard let data = Data(base64Encoded: payload) else {
+        throw DeviceProviderError.unsupportedAction(
+          "persisted workspace action payload is not base64")
+      }
+      do {
+        return .workspace(
+          try JSONDecoder().decode(WorkspaceProviderAction.self, from: data))
+      } catch {
+        throw DeviceProviderError.unsupportedAction(
+          "persisted workspace action payload is invalid: \(error)")
+      }
     case "hdc.observeTool": return .hdc(.observeTool)
     case "hdc.observeServer": return .hdc(.observeServer)
     case "hdc.listDeviceCandidates": return .hdc(.listDeviceCandidates)
@@ -968,6 +1003,10 @@ public struct TypedProcessPlan: Sendable, Equatable {
 
   public let action: TypedProviderAction
   public let kind: Kind
+  /// Optional semantic `argv[0]` for a descriptor-bound multi-call binary.
+  /// It is included in the materialized plan digest and never selects the
+  /// executable descriptor.
+  public let argumentZero: String?
   /// Set only by plans whose product is a host file. The dispatcher honours
   /// it; no other plan gains host filesystem reach by declaring one.
   public let hostLanding: HostLandingExpectation?
@@ -975,10 +1014,12 @@ public struct TypedProcessPlan: Sendable, Equatable {
   package init(
     action: TypedProviderAction,
     kind: Kind,
+    argumentZero: String? = nil,
     hostLanding: HostLandingExpectation? = nil
   ) {
     self.action = action
     self.kind = kind
+    self.argumentZero = argumentZero
     self.hostLanding = hostLanding
   }
 }

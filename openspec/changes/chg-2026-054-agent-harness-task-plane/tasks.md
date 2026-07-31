@@ -200,7 +200,7 @@
 
 ## TASK-HTP-005 — `arkdeck-workspace` 的其余 workspace.* typed operations
 
-- Status:ready
+- Status:done
 - Platform:macos
 - Requirements/AC:proposal What 7(其余五个 workspace operation、preset
   lowering、patch 范围与回滚);change-local HTP-AC-15、HTP-AC-16、HTP-AC-17,
@@ -235,6 +235,10 @@
   - 其他 change 目录
 - Risk:high(首个会写入源码并执行构建的 provider;action 集变更命中 stdout/词表
   lockstep 六处,必须同 PR 更新生成器 pin 并断言零 drift——CHG-2026-050/053 先例)
+- Done:2026-07-31 — 五个 host-only workspace operation、ProjectProfile
+  preset、Artifact-bound patch/readback/revert、exact action recovery 与失败诊断同车
+  交付；production daemon 的 build/test Job 成功且重启后 journal clean，详见
+  `evidence/runs/TASK-HTP-005/run-r1.md`。
 
 ## TASK-HTP-006 — GJ-5 真机端到端:一次 submit 自动收敛,接管后人工步骤 0
 
