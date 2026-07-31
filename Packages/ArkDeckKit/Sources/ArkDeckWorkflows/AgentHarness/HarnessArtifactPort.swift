@@ -57,9 +57,23 @@ public protocol HarnessArtifactPort: Sendable {
 
 public struct RuntimeArtifactStoreHarnessPort: HarnessArtifactPort {
   private let store: RuntimeArtifactStore
+  /// The operator's sensitive-evidence opt-in, by artifact name, enforced here
+  /// as well as in the observation builder.
+  ///
+  /// Two gates on purpose. The builder decides *what to consider*; this port
+  /// decides *what may actually be read*, so a future builder change cannot
+  /// widen access on its own. Measured need: with the opt-in wired only into
+  /// the builder, the 2026-07-31 GJ-5 window captured real HiLog, was allowed
+  /// to look at it, and then failed with
+  /// `evidenceIntegrity:artifactUnreadable:hilog.txt` - the store's own
+  /// `allowSensitive` defaults to false, so the read was refused after the
+  /// decision to read it had already been made. A half-wired opt-in is a
+  /// stop, not a leak, but it is still a stop.
+  private let sensitiveEvidenceAllowList: Set<String>
 
-  public init(store: RuntimeArtifactStore) {
+  public init(store: RuntimeArtifactStore, sensitiveEvidenceAllowList: Set<String> = []) {
     self.store = store
+    self.sensitiveEvidenceAllowList = sensitiveEvidenceAllowList
   }
 
   public func inventory(jobID: String) async throws -> [HarnessArtifactDescriptor] {
@@ -84,8 +98,16 @@ public struct RuntimeArtifactStoreHarnessPort: HarnessArtifactPort {
 
   public func read(jobID: String, artifactID: String, maximumBytes: Int) async throws -> Data {
     do {
+      // The name, not the caller's word, decides: an artifact is readable as
+      // sensitive only if the operator named it. Anything else keeps the
+      // store's default refusal.
+      let metadata = try await store.list(jobID: jobID)
+        .first { $0.artifactID == artifactID }
+      let allowSensitive =
+        metadata.map { sensitiveEvidenceAllowList.contains($0.name) } ?? false
       return try await store.read(
-        jobID: jobID, artifactID: artifactID, maximumBytes: maximumBytes)
+        jobID: jobID, artifactID: artifactID, maximumBytes: maximumBytes,
+        allowSensitive: allowSensitive)
     } catch {
       throw HarnessArtifactPortError.unreadable("\(error)")
     }

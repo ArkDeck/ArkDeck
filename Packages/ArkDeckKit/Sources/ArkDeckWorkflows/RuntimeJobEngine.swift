@@ -961,7 +961,11 @@ public actor RuntimeJobEngine {
       // run or fails, the job continues and the products it owned are
       // recorded as missing with a reason. A required step failing still
       // fails the job.
-      if step.isOptional, !isOptionalStepSelected(step, jobID: jobID, descriptor: descriptor) {
+      // `isOptionalStepSelected` also answers for the mandatory steps a typed
+      // input can switch off (today: `stop-ability`). Keeping the optionality
+      // check out of this condition is the point: such a step is never
+      // *tolerated* when it fails, it is only sometimes not asked for.
+      if !isOptionalStepSelected(step, jobID: jobID, descriptor: descriptor) {
         // Name the real cause: "its upstream failed" and "you did not ask
         // for it" are different facts, and evidence must not blur them.
         let reason: String
@@ -1373,12 +1377,51 @@ public actor RuntimeJobEngine {
   ) -> WorkflowEffect {
     var effect = descriptor.minimumEffect
     for step in descriptor.steps {
-      if step.isOptional && !optionalStepIsSelected(step, descriptor: descriptor, inputs: inputs) {
+      if !stepIsRequested(step, descriptor: descriptor, inputs: inputs) {
         continue
       }
       if step.effect > effect { effect = step.effect }
     }
     return effect
+  }
+
+  /// Whether the request asks for this step at all.
+  ///
+  /// Two rules, deliberately separate. A step declared `optional` is one whose
+  /// *failure* the run tolerates - the engine records it as skipped and carries
+  /// on. A step switched off by a typed input is not the same thing: it never
+  /// runs, but if it does run and fails, the job fails.
+  ///
+  /// `stop-ability` is the case that forced the distinction. GJ-5 needs the
+  /// application under debug to still be alive while something else observes
+  /// it, and no request could leave it that way, because this step ran
+  /// unconditionally (measured on the 2026-07-31 window: the harness then
+  /// measured "liveness" on a device whose application was not running).
+  /// Declaring it `optional` did switch it off - and also made a stop that
+  /// reported `stopIneffective` a tolerable skip, so a job that left a process
+  /// running reported success. The contract test for that caught it. So the
+  /// step stays mandatory and the input decides only whether it is requested.
+  ///
+  /// Success path only: `compensateDebugHAP` still stops an ability it started
+  /// when the job then failed. A request may keep an application running when
+  /// the run worked, never as the residue of a failure.
+  static func stepIsRequested(
+    _ step: CatalogStepDescriptor,
+    descriptor: CatalogOperationDescriptor,
+    inputs: [String: JSONValue]
+  ) -> Bool {
+    if step.isOptional {
+      return optionalStepIsSelected(step, descriptor: descriptor, inputs: inputs)
+    }
+    switch step.stepID {
+    case "stop-ability":
+      if case .string(let state)? = inputs["postRunAbilityState"] {
+        return state == "stopped"
+      }
+      return true  // the catalog default
+    default:
+      return true
+    }
   }
 
   /// Pure selection rule, shared by authorization (before a job exists)
@@ -1572,7 +1615,7 @@ public actor RuntimeJobEngine {
       return false
     }
     let inputs = jobs[jobID]?.record.request.inputs ?? [:]
-    return Self.optionalStepIsSelected(step, descriptor: descriptor, inputs: inputs)
+    return Self.stepIsRequested(step, descriptor: descriptor, inputs: inputs)
   }
 
   /// Which optional step depends on which. Kept explicit rather than
@@ -3259,8 +3302,7 @@ public actor RuntimeJobEngine {
         "\(descriptor.reference) is runtime unavailable: runtime.artifactStoreUnavailable")
     }
     let selectedSteps = descriptor.steps.filter { step in
-      !step.isOptional
-        || Self.optionalStepIsSelected(step, descriptor: descriptor, inputs: request.inputs)
+      Self.stepIsRequested(step, descriptor: descriptor, inputs: request.inputs)
     }
     // A host-only operation has no device: no connect key, no identity digest,
     // no binding revision. Resolving device facts for it would mean inventing

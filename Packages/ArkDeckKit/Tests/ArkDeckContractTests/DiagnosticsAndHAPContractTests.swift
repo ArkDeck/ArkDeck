@@ -1338,6 +1338,57 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
     XCTAssertTrue(dispatcher.dispatchedActions.contains("cleanup"))
   }
 
+  /// CHG-2026-054 TASK-HTP-006: GJ-5 needs the application under debug to be
+  /// alive while something else observes it, and until now no request could
+  /// leave it that way - `stop-ability` ran unconditionally, so every
+  /// successful run ended with the ability stopped. Measured on the
+  /// 2026-07-31 device window, where the harness then measured "liveness" on a
+  /// device whose application was not running.
+  func testPostRunAbilityStateRunningSkipsOnlyTheStopStep() async throws {
+    let dispatcher = ScriptedDispatcher()
+    let (engine, capabilities, artifacts) = try makeEngine(dispatcher: dispatcher)
+    let lease = try await publishHAPLease(artifacts)
+    try await installE1Capability(capabilities)
+    let acceptance = try await engine.submit(
+      hapRequest(
+        lease: lease, key: "idem-hap-keep-running",
+        extraInputs: """
+          ,
+          "cleanupPolicy": "retain",
+          "postRunAbilityState": "running"
+          """))
+    let status = try await engine.run(jobID: acceptance.jobID)
+
+    XCTAssertEqual(status.state, "succeeded", status.timeline.joined(separator: " | "))
+    XCTAssertTrue(
+      dispatcher.dispatchedActions.contains("startAbility"),
+      "the ability still has to be started and read back")
+    XCTAssertFalse(
+      dispatcher.dispatchedActions.contains("stopAbility"),
+      "the request asked for it to stay running")
+    XCTAssertTrue(
+      status.timeline.contains { $0.contains("skipped stop-ability") },
+      "the skip is journalled, not silent: \(status.timeline.joined(separator: " | "))")
+    XCTAssertTrue(
+      dispatcher.dispatchedActions.contains("cleanup"),
+      "remote staging is still cleaned up")
+  }
+
+  func testTheDefaultStillStopsTheAbility() async throws {
+    let dispatcher = ScriptedDispatcher()
+    let (engine, capabilities, artifacts) = try makeEngine(dispatcher: dispatcher)
+    let lease = try await publishHAPLease(artifacts)
+    try await installE1Capability(capabilities)
+    let acceptance = try await engine.submit(
+      hapRequest(lease: lease, key: "idem-hap-default-stop"))
+    let status = try await engine.run(jobID: acceptance.jobID)
+
+    XCTAssertEqual(status.state, "succeeded", status.timeline.joined(separator: " | "))
+    XCTAssertTrue(
+      dispatcher.dispatchedActions.contains("stopAbility"),
+      "a request that says nothing gets the catalog default, which stops it")
+  }
+
   func testUnsupportedHAPModesFailBeforeCapabilityConsumption() async throws {
     let dispatcher = ScriptedDispatcher()
     let (engine, capabilities, artifacts) = try makeEngine(dispatcher: dispatcher)

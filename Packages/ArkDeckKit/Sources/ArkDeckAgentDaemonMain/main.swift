@@ -328,7 +328,8 @@ Task.detached {
       jobPort: RuntimeJobEngineHarnessPort(engine: engine),
       // Evidence access is what makes a verdict possible at all; without it
       // the loop stops honestly instead of guessing (CHG-2026-054 TASK-HTP-002).
-      artifactPort: RuntimeArtifactStoreHarnessPort(store: artifactStore),
+      artifactPort: RuntimeArtifactStoreHarnessPort(
+        store: artifactStore, sensitiveEvidenceAllowList: sensitiveEvidence),
       nowUTC: utcNow,
       policyGuard: HarnessPolicyGuard(
         availability: RuntimeEngineAvailabilityPort(engine: engine),
