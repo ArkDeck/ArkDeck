@@ -551,6 +551,7 @@ struct ArkDeckCommandLine {
         arkdeck device list|show|adopt [--candidate <connect-key>] [--socket <path>] [--json]
         arkdeck job submit --target <id> --operation <id@version> [--wait] [--json]
         arkdeck job status --job <id> [--json] | arkdeck job list [--json]
+        arkdeck job reconcile --job <id> [--json]
         arkdeck job submit --request-file <request.json> [--wait] [--json]
         arkdeck capability list [--json]
         arkdeck capability inspect --capability <id> [--json]
