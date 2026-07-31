@@ -1,8 +1,9 @@
 # Verification — CHG-2026-054
 
 > Change:CHG-2026-054-agent-harness-task-plane@r2
-> Status:in_progress # 2026-07-31(r2):HTP-AC-1..17 与 AC-20..22 通过(AC-7 的真机
-> 字节面如实 pending-hardware);AC-18/19 pending-hardware。每条结论由其所属任务的
+> Status:in_progress # 2026-07-31(r2):HTP-AC-1..22 全部有结论。AC-18 = PASS(有界
+> 取证循环)+ 如实登记未覆盖「部署修复」腿;AC-19 = PASS;AC-7 的真机字节面已由
+> TASK-HTP-006 的窗口关闭(852,165 字节真机 hilog 驱动 observation builder)。每条结论由其所属任务的
 > 实现 PR 写入本文件;维护者 review/merge 该实现 PR 即确认。不为本 change 追加独立
 > verification/archive 载体(PRODUCT-LOOP §4/§20)。
 
@@ -111,7 +112,7 @@
   断言 crash signature、liveness、artifact digest 一致性的提取结果;artifact 为空、
   缺失或 hash 不符时 fail closed(不得产出"看起来完整"的观测)。
 - Evidence:实现 PR 内测试 + `evidence/runs/TASK-HTP-002/run-r1.md`。
-- **结论(2026-07-30):PASS(判定与 fail-closed 面)+ pending-hardware(真机字节面)** —
+- **结论(2026-07-30 判定面 PASS;2026-07-31 真机字节面 PASS,有崩溃时的字节形态仍未覆盖)** —
   `HarnessObservationBuilder` 先验后测:读满字节、重算 SHA-256 与 store 记录比对,
   只有 verified 字节参与测量。逐情形断言(`testAbsentEmptyOversizeAndSensitive…`、
   `testHashMismatchIsAnIntegrityBlockerAndYieldsNoMeasurement`、
@@ -121,9 +122,13 @@
   hash 不符 → integrity blocker → verdict `error`。crash signature 与 liveness 提取由
   `testMeasurementsComeFromVerifiedBytes`、`testCleanLogMeasuresHealthyAndZeroCounts`
   断言(matching / newFatal 不混淆)。
-  **如实分类**:这些 hilog 是按 OpenHarmony cppcrash 文档形态 host 手写的 fixture,
-  仓内无真机 hilog/crash 字节样本;「真机已产出字节驱动 builder」这一半保持
-  pending-hardware,由 TASK-HTP-006 设备窗口关闭,不以 fixture 顶替。
+  **真机字节面(2026-07-31,TASK-HTP-006 窗口关闭)**:builder 在真机 DAYU200 上以
+  **852,165 字节真实 hilog**(sha256 `477b8a9a1cea9a0d…`,`verified=true`)驱动测量,
+  五轮采集各一份,digest 逐份校验通过;crash 扫描在该字节面上给出
+  `matchingCrashCount=0 / newFatalSignatureCount=0`。**仍未覆盖**:真机上有 fault block
+  的字节形态 —— 所用 demo 工程无 crash 路径也无 native 模块,无法复现真实 cppcrash,
+  故「有崩溃时的提取」仍只由 host 侧 fixture 覆盖(见 `run-r4-window-final.md` §5)。
+  fixture 的性质照旧如实登记:它们按 OpenHarmony cppcrash 文档形态手写。
 
 ## HTP-AC-8 预算耗尽即安全停止(TASK-HTP-003)
 
@@ -343,14 +348,45 @@
   采集 → 分析 → (可选 patch → build → 部署) → 复验,直到 evaluator `PASS` 或安全
   停止;记录接管后人工步骤计数(E0 与已授权 E1 目标 = 0)、每轮 decision/job/artifact
   链、预算消耗与停止原因。
-- Evidence:runtime job/artifact 真实记录 + run 记录(`evidence/runs/TASK-HTP-006/`)。
-- 结论:pending-hardware(需设备窗口;E1 段另需维护者经 merged PR 签发的 standing
-  capability)
+- Evidence:runtime job/artifact 真实记录 + run 记录
+  (`evidence/runs/TASK-HTP-006/run-r4-window-final.md`,前置记录 r1/r2/r3 同目录)。
+- **结论(2026-07-31):PASS(有界取证循环)+ 未覆盖「部署修复」腿(如实登记)** —
+  真机 DAYU200 `TGT-958780b2ffb7` rev 1、catalog digest
+  `6b2191e87a71eb8a5bc11d3801c74d2ecf921261b9e7a836b57fc24ec894b076`(当前)上,一次
+  `arkdeck task submit`(`HTASK-8B0A5F8D2A2C`)在 **40 秒**内自动完成 运行 → 采集 →
+  分析 → 生成下一次 typed request → 重新准入 → 复验 → `succeeded`,**全程零
+  `task reconcile` 调用**(crib 提交后只读)、**接管后人工步骤 0**、harness task
+  **E1 消耗 0**(`maxE1Mutations: 0`)。harness 自派 job 全部 succeeded:
+  `observe.device@1` ×1 + `capture.diagnostics@1` ×5。样本门逐轮如实推进
+  (DC-1 在 1/2/3/4 样本时均 `inconclusive`,**第 5 个样本才 pass**),末轮
+  `hilog.txt` **852,165 字节真机日志**、`verified=true`、`sensitiveOptIn=true`、
+  sha256 `477b8a9a1cea9a0d…`,measurements `matchingCrashCount=0 /
+  newFatalSignatureCount=0 / applicationLiveness=healthy`,verdict `pass`、
+  reasonCode `criteriaPassed`。应用在采集期间**确实运行**(L2 的
+  `process-readback verified [bundleName, running]` + `skipped stop-ability`)。
+  **未覆盖**:GJ-5 目标里的「部署修复」腿(handler 的 permittedOperations 仍不含
+  005 的五个 workspace operation),以及真机 fail → 交人路径(所用 demo 无任何 crash
+  路径与 native 模块,无法复现真实 crash;该判定由 host 侧 HTP-AC-5/6/7 覆盖)。
+  故 **GJ-5 状态不改为 `REAL_DEVICE_PASS`**。
 
 ## HTP-AC-19 真机证据如实性(TASK-HTP-006)
 
 - 方法:真机结论包含命令、退出码、artifact ID 与 hash、脱敏设备标识、executor 身份
   (agent)与按实际 effect 匹配的 authority reference;断言 fake/simulation 结果未被
   记为真机结果;若任一环节为 simulation,结论必须相应降级。
-- Evidence:run 记录 + artifact 索引。
-- 结论:pending-hardware
+- Evidence:run 记录 + artifact 索引 + capability store 实读。
+- **结论(2026-07-31):PASS** — 真机结论逐项可复查:命令与步骤由 job timeline 逐条记录
+  (`intent`/`verified`/`skipped` + 原因),job 与 artifact 均有 ID 与 sha256
+  (`hilog.txt` 852,165B `477b8a9a…`;L2 的 `install-readback.json` /
+  `process-readback.json` / `debug-hilog.txt`),设备标识只以脱敏形式出现
+  (`TGT-958780b2ffb7` + 稳定身份 sha256,序列号字节从不入仓,crib 全程 `mask()`),
+  executor 记为 agent(维护者指示),authority 按实际 effect 匹配:E0 段
+  `defaultReadOnlyPolicy`,E1 段 `CAP-RT-AUTO-20260731T072452Z-DA607C97EE79`
+  (经 PR#881 合入签发),capability store 实读为 `remainingUses: 0` + 一条
+  consumption(`effect: deviceMutation`、`jobID: job-ad0d2d2930b47def800909773694b6fa`、
+  `consumedAtUTC: 2026-07-31T07:47:30Z`)。**无 fake/simulation 被记为真机结果**:本轮
+  未使用任何 fake provider,唯一非产品的设备调用是 crib 数设备台数的可用性探针,已在
+  run 记录中声明且不属任何一条腿。降级项亦如实记录:GJ-5 的「部署修复」腿未覆盖、
+  真机 fail 路径无证据、`applicationLiveness` 语义仍是「采集拿回了日志行」。
+  另有一条授权面正例:应用重建后旧凭据以 `inputConstraintViolated` 被拒,**且拒绝发生在
+  消耗之前**(旧凭据至今 `consumptionCount: 0`)。

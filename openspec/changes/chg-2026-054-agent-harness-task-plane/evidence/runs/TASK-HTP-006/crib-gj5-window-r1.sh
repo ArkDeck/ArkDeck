@@ -360,7 +360,7 @@ json.dump(document, open(f"{state}/l2-request.json", "w"), indent=2, sort_keys=T
 PYEOF
 "${BIN_DIR}/arkdeck" job submit --socket "${SOCKET}" --request-file "${STATE_DIR}/l2-request.json" \
   --wait --json | tee "${STATE_DIR}/l2-debug-hap.json" | mask
-printf 'the package is retained; debug.hap@1 always runs stop-ability, so the app is installed and not running.\n'
+printf 'the package is retained and, with postRunAbilityState=running, the ability is left running.\n'
 
   if [[ "${PHASE}" == "l1l2" ]]; then
     say "phase l1l2 complete"

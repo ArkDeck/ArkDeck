@@ -242,7 +242,18 @@
 
 ## TASK-HTP-006 — GJ-5 真机端到端:一次 submit 自动收敛,接管后人工步骤 0
 
-- Status:ready
+- Status:done
+- Done:2026-07-31;随本实现 PR 合入生效(维护者 review + merge 即批准)。
+  HTP-AC-18 = **PASS(有界取证循环)**、HTP-AC-19 = **PASS**,evidence =
+  `evidence/runs/TASK-HTP-006/run-r4-window-final.md`(前置 r1/r2/r3 同目录)。
+  真机 DAYU200、catalog digest `6b2191e8…`:一次 `task submit` 40 秒自动收敛,
+  零 `task reconcile`、接管后人工步骤 0、harness E1 消耗 0;窗口内抓到并修掉四个
+  产品/工具缺陷(flag 形 job submit 不可用、sensitive opt-in 只接一半、产品无法把应用
+  留在运行态、crib 的 bash 3.2 与 optional 误用)。
+  **如实登记未覆盖**:GJ-5 的「部署修复」腿(handler 未接 005 的 workspace operation)
+  与真机 fail → 交人路径(demo 无 crash 路径),**故 GJ-5 状态保持 `IMPLEMENTING`**;
+  设备上 `com.example.waterflowdemo` 仍已安装且在运行,恢复需一份
+  `cleanupPolicy: uninstall` 凭据或人工卸载。
 - Platform:macos
 - Requirements/AC:proposal 全部交付面的真机复验;change-local HTP-AC-18、
   HTP-AC-19,登记于 `verification.md`
