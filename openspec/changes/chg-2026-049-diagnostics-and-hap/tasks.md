@@ -169,3 +169,31 @@
 - Risk:high(首个 Agent-operated E1 mutation 面——以 plan effective effect、
   capability fail-closed、readback 判定、unknown 即停四层约束;artifact
   面触及磁盘与隐私——以 quota、redaction、privacy class 三层约束)
+
+## TASK-DHA-002 — 清理残留成为一等记录(r3)
+
+- Status:ready
+- Platform:macos
+- Requirements:proposal r3 What 1-5(债务身份推广为残留、记录门改为清理职责且
+  覆盖补偿路径、`cleanupDebt.continue` 对 bundle 残留复用 D2 readback、
+  job 状态暴露未结清残留、`cleanup-uninstall` 保持 optional)
+- Acceptance:change-local `DHA-RES-001`..`DHA-RES-003`,登记于 `verification.md`
+- Depends on:TASK-DHA-001(done);r3 proposal 合入即 approved
+- Hardware required:no。真机复验**不单开窗口**:该失败模式(uninstall 跑了但
+  没生效)难以在真机上稳定构造,contract 面用 scripted dispatcher 覆盖即可;
+  若后续窗口自然撞上,按既有先例补记
+- Allowed paths:
+  - `Packages/ArkDeckKit/**`
+  - `Catalog/**`(仅在实现确证需要时;proposal r3 判断大概率不需要)
+  - `openspec/changes/chg-2026-049-diagnostics-and-hap/**`
+  - `docs/adr/**`
+- Forbidden paths:
+  - `openspec/constitution.md`、`openspec/specs/**`、
+    `openspec/verification/**`(全局)、`openspec/baselines/**`、
+    `openspec/contracts/**`
+  - `scripts/**`、`.github/**`、`AGENTS.md`、`PRODUCT-LOOP.md`、
+    `ArkDeck.xcodeproj/**`、`ArkDeckApp/**`
+  - 其他 change 目录
+- Risk:medium(触及持久化债务台账的形状与一个已发布 operation 的失败语义。
+  三层约束:既有远端路径债务的行为逐条不变、`succeeded` 的含义不被悄悄收窄
+  (残留另行可见而非改终态)、结清仍由 readback 判定而非退出码)

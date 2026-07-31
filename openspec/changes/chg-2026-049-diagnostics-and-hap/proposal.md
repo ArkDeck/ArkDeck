@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-049-diagnostics-and-hap
-revision: 2
-status: approved # r2 合并即批准 blocker 关闭后的 fresh readiness；合并前任务仍 blocked
+revision: 3
+status: approved # r2 已交付；r3 携 approved 落地：维护者 review + merge 本 PR 即批准
 class: capability
 core_change_level: none
 owner: lvye
@@ -24,6 +24,59 @@ platforms: [macos]
 > diagnostics HiLog/component-tree pair 在 Catalog、generator、JSON Schema
 > 与 Swift validator 间闭合。r2 记录 fresh pins、草稿迁移约束和依赖复验；
 > 合入 r2 前 `TASK-DHA-001` 仍不得恢复实现。
+
+## r3(2026-07-31):清理没做成时,`succeeded` 不得读作"设备干净"
+
+### 现状(实测代码,非推测)
+
+`debug.hap@1` 的 `cleanup-uninstall` 失败后,job 仍记 `succeeded`,设备上留着
+这次 job 自己装的应用,而**唯一的痕迹是一行时间线**:
+
+- 正向路径:`recordSkippedOptionalStep` → `skipped cleanup-uninstall: failed("uninstallIneffective: … is still installed after uninstall")`;
+- 补偿路径(`compensateDebugHAP`):`compensation failed cleanup-uninstall: …`。
+
+两条路径都**不记 cleanup debt**,因为记录的门是
+`step.kind == .cleanupOwnedRemotePath`,而键是 `remotePath`
+(`cleanupDebtRemotePath(for:)` 只认 `.cleanupOwnedRemotePath` 与
+`.cleanupNativeLibrary`)。`debug.hap@1` 也没有 summary 类 artifact,
+`cleanup-uninstall` 不在 `artifactMapping` 里,所以连 `recordMissing` 都不会触发。
+
+结果:一个 E1 job 可以留下**设备可见的残留**并对外报成功,既无持久记录、
+也无操作员出路 —— 与 remote path 的残留形成不对称,后者早就有 debt 记录、
+`cleanupDebt.list` 与 `cleanupDebt.continue`(CLI 入口见 #866)。
+
+> 台账 D12 原先写的是"要动 `debug.hap@1` 的 step optional 语义"。**那个判断是错的**,
+> 与 D1 同类:把症状当成了成因。真正的不对称在**债务的键**上,不在步骤的可选性上。
+
+### What(r3 交付面)
+
+1. **债务的身份从"远端路径"推广为"残留"**:记录可以指向 provider-owned 远端路径
+   **或**一个仍然装着的 bundle。既有存储字段保持兼容(路径是其中一种残留)。
+2. **记录的门改成"这一步的职责是清理"**,而不是"这个 action 带远端路径";正向与
+   补偿两条路径同等对待 —— 补偿路径更重要,因为它恰好在别的事已经出错时才跑。
+3. **`cleanupDebt.continue` 对 bundle 残留同样只重跑那条持久化的精确 typed action**,
+   并沿用 D2 给 uninstall 的 readback:"结清"意味着 readback 说包没了,
+   不是命令退出码为 0。
+4. **job 的终态报告不得读作"设备干净"**:`RuntimeJobStatus` 增加该 job 的未结清
+   残留计数。`succeeded` 保持原义(这次调试会话做完了要求的事),残留另行可见。
+   **不新增终态**,`JobStateMachine` 的转移表保持不动。
+5. **`cleanup-uninstall` 仍然是 optional**:`cleanupPolicy: keep` 必须继续把它选出去。
+   变的是"跑了但失败"的待遇 —— 今天它与"根本没选中"在记录上无法区分。
+
+### 关于 Catalog
+
+**本 r3 很可能不需要改 `Catalog/**`。** 步骤的 optional/compensation 声明都不变,
+改的是引擎与债务台账。之所以仍走 OpenSpec:它改的是一个**已发布 operation 的
+失败语义**——`debug.hap@1` 报 `succeeded` 时对调用方的承诺——以及持久化的债务
+台账形状,属 AGENTS.md 的安全内核面。实现任务若发现确需 Catalog 变更,按其
+allowed paths 处理并在实现 PR 内如实说明。
+
+## Out of scope(r3)
+
+- `cleanupPolicy` 语义本身(`keep` / `uninstall` 的选择规则不变);
+- 新增终态(如 `succeededWithResidue`)——需要动 `JobStateMachine` 的转移表,
+  收益不抵风险;
+- job 内自动重试清理——结清仍是显式操作员动作,与远端路径残留一致。
 
 ## Why
 
