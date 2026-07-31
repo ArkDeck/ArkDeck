@@ -265,6 +265,179 @@ public actor HarnessTaskStore {
     }
   }
 
+  // MARK: - Memory and human actions (TASK-HTP-003)
+
+  /// Failure memory is cross-task on purpose: the second task to attempt the
+  /// same doomed thing must inherit the first one's evidence. The record is
+  /// named after the fingerprint digest, whose grammar has no separators.
+  public func failureRecord(digest: String) throws -> HarnessFailureRecord? {
+    guard Self.isWellFormed(failureDigest: digest) else {
+      throw HarnessTaskStoreError.corrupt("malformed failure digest \(digest)")
+    }
+    let url = failureURL(digest)
+    guard FileManager.default.fileExists(atPath: url.path) else { return nil }
+    return try withLock(memoryDirectory("failure")) {
+      try readJSON(HarnessFailureRecord.self, from: url)
+    }
+  }
+
+  public func putFailureRecord(_ record: HarnessFailureRecord) throws {
+    guard Self.isWellFormed(failureDigest: record.digest) else {
+      throw HarnessTaskStoreError.corrupt("malformed failure digest \(record.digest)")
+    }
+    let directoryURL = try memoryDirectoryCreating("failure")
+    try withLock(directoryURL) {
+      try writeJSON(record, to: failureURL(record.digest))
+    }
+  }
+
+  public func appendMemory(_ entry: HarnessMemoryEntry) throws {
+    let scope = entry.scope.rawValue
+    let directoryURL = try memoryDirectoryCreating(scope)
+    let name: String
+    switch entry.scope {
+    case .task:
+      name = "\(entry.htaskID).jsonl"
+    case .project:
+      // Project memory is keyed by project, not by the task that earned it.
+      guard let projectRef = entry.projectRef,
+        projectRef.allSatisfy({
+          $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "-" || $0 == "_" || $0 == ".")
+        }), !projectRef.isEmpty, !projectRef.hasPrefix(".")
+      else {
+        throw HarnessTaskStoreError.corrupt("malformed project ref for memory promotion")
+      }
+      name = "\(projectRef).jsonl"
+    case .failure:
+      throw HarnessTaskStoreError.corrupt("failure memory uses putFailureRecord")
+    }
+    try withLock(directoryURL) {
+      try appendJSONLine(entry, to: directoryURL.appendingPathComponent(name))
+    }
+  }
+
+  public func memory(scope: HarnessMemoryScope, key: String) throws -> [HarnessMemoryEntry] {
+    let directoryURL = memoryDirectory(scope.rawValue)
+    let url = directoryURL.appendingPathComponent("\(key).jsonl")
+    guard FileManager.default.fileExists(atPath: url.path) else { return [] }
+    return try withLock(directoryURL) {
+      try readJSONLines(HarnessMemoryEntry.self, from: url)
+    }
+  }
+
+  /// Human actions live under the task they block, so reading a task's state
+  /// and reading why it is blocked never diverge.
+  public func putHumanAction(_ action: HarnessStoredHumanAction) throws {
+    let directoryURL = try existingDirectory(action.htaskID)
+    try withLock(directoryURL) {
+      let actionsURL = directoryURL.appendingPathComponent("humanActions", isDirectory: true)
+      do {
+        try FileManager.default.createDirectory(
+          at: actionsURL, withIntermediateDirectories: true,
+          attributes: [.posixPermissions: 0o700])
+      } catch {
+        throw HarnessTaskStoreError.ioFailure("cannot create humanActions directory: \(error)")
+      }
+      try writeJSON(action, to: actionsURL.appendingPathComponent("\(action.actionID).json"))
+    }
+  }
+
+  public func humanActions(_ taskID: String) throws -> [HarnessStoredHumanAction] {
+    let directoryURL = try existingDirectory(taskID)
+    return try withLock(directoryURL) {
+      let actionsURL = directoryURL.appendingPathComponent("humanActions", isDirectory: true)
+      let names = (try? FileManager.default.contentsOfDirectory(atPath: actionsURL.path)) ?? []
+      var found: [HarnessStoredHumanAction] = []
+      for name in names.sorted() where name.hasSuffix(".json") {
+        found.append(
+          try readJSON(
+            HarnessStoredHumanAction.self, from: actionsURL.appendingPathComponent(name)))
+      }
+      return found.sorted { $0.generatedAtUTC < $1.generatedAtUTC }
+    }
+  }
+
+  public static func isWellFormed(failureDigest digest: String) -> Bool {
+    guard digest.hasPrefix("FAIL-"), digest.count <= 40 else { return false }
+    let body = digest.dropFirst("FAIL-".count)
+    guard !body.isEmpty else { return false }
+    return body.allSatisfy { character in
+      character.isASCII && (character.isNumber || ("A"..."F").contains(String(character)))
+    }
+  }
+
+  private func memoryDirectory(_ scope: String) -> URL {
+    rootURL.appendingPathComponent("memory/\(scope)", isDirectory: true)
+  }
+
+  private func memoryDirectoryCreating(_ scope: String) throws -> URL {
+    let url = memoryDirectory(scope)
+    do {
+      try FileManager.default.createDirectory(
+        at: url, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+    } catch {
+      throw HarnessTaskStoreError.ioFailure("cannot create memory directory: \(error)")
+    }
+    return url
+  }
+
+  private func failureURL(_ digest: String) -> URL {
+    memoryDirectory("failure").appendingPathComponent("\(digest).json")
+  }
+
+  private func appendJSONLine<T: Encodable>(_ value: T, to url: URL) throws {
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+    guard let encoded = try? encoder.encode(value) else {
+      throw HarnessTaskStoreError.ioFailure("cannot encode \(url.lastPathComponent)")
+    }
+    let payload = encoded + Data("\n".utf8)
+    let fd = open(url.path, O_WRONLY | O_CREAT | O_APPEND | O_CLOEXEC | O_NOFOLLOW, 0o600)
+    guard fd >= 0 else {
+      throw HarnessTaskStoreError.ioFailure("cannot open \(url.lastPathComponent)")
+    }
+    defer { close(fd) }
+    let written = payload.withUnsafeBytes { buffer -> Int in
+      guard let base = buffer.baseAddress else { return 0 }
+      var total = 0
+      while total < buffer.count {
+        let result = write(fd, base + total, buffer.count - total)
+        if result <= 0 { return total }
+        total += result
+      }
+      return total
+    }
+    guard written == payload.count else {
+      throw HarnessTaskStoreError.ioFailure("short write to \(url.lastPathComponent)")
+    }
+    guard fsync(fd) == 0 else {
+      throw HarnessTaskStoreError.ioFailure("fsync of \(url.lastPathComponent) failed")
+    }
+  }
+
+  private func readJSONLines<T: Decodable>(_ type: T.Type, from url: URL) throws -> [T] {
+    guard let data = FileManager.default.contents(atPath: url.path) else { return [] }
+    guard let text = String(data: data, encoding: .utf8) else {
+      throw HarnessTaskStoreError.corrupt("\(url.lastPathComponent) is not UTF-8")
+    }
+    let decoder = JSONDecoder()
+    let lines = text.split(separator: "\n", omittingEmptySubsequences: true)
+    var values: [T] = []
+    for (index, line) in lines.enumerated() {
+      guard let lineData = line.data(using: .utf8) else { continue }
+      do {
+        values.append(try decoder.decode(type, from: lineData))
+      } catch {
+        // Only a torn final line is tolerated, exactly as in the event log.
+        guard index == lines.count - 1 else {
+          throw HarnessTaskStoreError.corrupt(
+            "undecodable line \(index) in \(url.lastPathComponent)")
+        }
+      }
+    }
+    return values
+  }
+
   // MARK: - Locked helpers
 
   private func loadLocked(_ directoryURL: URL, taskID: String) throws -> HarnessTaskSnapshot {

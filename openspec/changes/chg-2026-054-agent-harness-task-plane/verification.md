@@ -1,9 +1,8 @@
 # Verification — CHG-2026-054
 
 > Change:CHG-2026-054-agent-harness-task-plane@r1
-> Status:in_progress # 2026-07-30:HTP-AC-1..6 通过,AC-7 的判定/fail-closed 面通过
-> 且真机字节面如实 pending-hardware;AC-8..17 pending(各自任务未开工),
-> AC-18/19 pending-hardware。每条结论由其所属任务的实现 PR 写入本文件;维护者
+> Status:in_progress # 2026-07-31:HTP-AC-1..11 通过(AC-7 的真机字节面如实
+> pending-hardware);AC-12..17 pending(各自任务未开工),AC-18/19 pending-hardware。每条结论由其所属任务的实现 PR 写入本文件;维护者
 > review/merge 该实现 PR 即确认。不为本 change 追加独立 verification/archive 载体
 > (PRODUCT-LOOP §4/§20)。
 
@@ -130,7 +129,13 @@
   用例,断言不再派发任何 job、task 进入 `FAILED` 并带机器可读 reason code、
   consumedBudget 如实记录。
 - Evidence:实现 PR 内测试。
-- 结论:pending
+- **结论(2026-07-31):PASS** — `testEveryBudgetKindStopsTheTask` 对 rounds /
+  wallClock / artifactBytes / e1Mutations 四类各断言 `budgetRefusal` 与机器可读
+  reason code;`testWallClockExhaustionStopsBeforeDispatchingAnything` 端到端断言时钟
+  跨过预算时**零 dispatch**、task `failed`、reason `maxWallClockExhausted`(只查轮数的
+  实现会漏这条);`testArtifactBytesAreChargedOncePerVerifiedArtifact` 断言只有验证通过
+  并读满的字节计费、每 artifact 只计一次、耗尽即停且已得样本保留。consumedBudget 如实
+  记录并随 projection 持久化。
 
 ## HTP-AC-9 失败指纹与 no-progress 收敛(TASK-HTP-003)
 
@@ -138,15 +143,36 @@
   patch region/hypothesis/artifact 来源/profile/recovery path 之一);≥3 次 →
   `HUMAN_REQUIRED`/`FAILED`;无进展轮不产生新的 effectful job。
 - Evidence:实现 PR 内测试。
-- 结论:pending
+- **结论(2026-07-31):PASS** — 指纹 = operationRef + phase + provider(取自 catalog
+  descriptor)+ targetProfile + 归一化 inputs hash + errorClassification +
+  semanticErrorCode,摘要即文件名(`FAIL-<16 hex>`,分隔符不可表达)。
+  `testSecondIdenticalStrategyIsRefusedAndThirdIsProhibited`:第 1 次允许原策略、
+  第 2 次拒绝完全相同的 decision、**改 typed inputs 即算新策略**(正例)、第 3 次
+  一律拒;`testStanceTableMatchesTheThreeStrikeRule` 钉住 stance 表;
+  `testFailureMemoryIsCrossTaskAndDrivesTheThirdStrikeStop` 用三个不同 task 命中同一
+  指纹,断言记录只有一条、`observedByTasks` 三个、第三个 task 停在
+  `strategyExhausted`。无进展:`noProgressRounds` 进 projection 且只有证据类 causation
+  可写;`testNoProgressRoundsAccumulateAndStopTheLoop` 端到端停止并用新 store 读回同一
+  计数;`testProgressVectorIgnoresProseAndCountsEvidence` 断言只多分析文字不算进展。
 
 ## HTP-AC-10 outcomeUnknown 停止并产出结构化人工阻塞(TASK-HTP-003)
 
 - 方法:构造 `outcomeUnknown` job 结果,断言零自动重发原副作用、产出
   `HumanActionRequired`(category `outcomeUnknownDecision`,含 reasonCode、
   evidenceRefs、resume 状态),typed resolution 后可恢复到原 phase。
-- Evidence:实现 PR 内测试。
-- 结论:pending
+- Evidence:实现 PR 内测试 + `evidence/runs/TASK-HTP-003/run-r1.md`。
+- **结论(2026-07-31):PASS** —
+  `testOutcomeUnknownProducesATypedHumanActionAndResumesOnlyOnAResolution` 断言产出的
+  文档 category `outcomeUnknownDecision`、reasonCode `recovery.outcomeUnknown`、
+  minimumActionKey `human.reconcileOrAbandon`、prohibitedAutomation `[outcomeGuess]`、
+  resumeProbe `reconcileOutcome`、jobId = 真实 job、status `waiting`;零自动重发
+  (后续唤醒 `awaitingHuman`、submit 计数不变);空 resolution 被拒;typed resolution 后
+  **文档自身状态机**翻为 `resolvedByFreshProbe` 且 phase 不回退;
+  `testResolvingAnAlreadyResolvedBlockIsRefused` 断言重复解锁被拒。
+  **如实边界**:封闭词表只准确覆盖 `authorizationApproval` 与 `outcomeUnknown`;
+  `strategyExhausted`/`evidenceIntegrity`/`environmentUnavailable` 不产出文档
+  (`document: nil`),只带 status + reasonCode + 证据引用 —— 硬凑 category 等于往证据级
+  文档写不实的最小人工动作(CHG-2026-050 教训)。扩词表需自己的契约载体。
 
 ## HTP-AC-11 E2 永不自动化、E1 只用既有 capability(TASK-HTP-003)
 
@@ -154,7 +180,19 @@
   draft/install/consume E2 的路径);E1 capability 缺失/过期/范围不符时 fail closed,
   零 dispatch、零 capability 消耗;capability 在 provider 或 plan 不可用时不被消耗。
 - Evidence:实现 PR 内负例测试。
-- 结论:pending
+- **结论(2026-07-31):PASS** — `testDestructiveOperationsAreNeverAutomated`:
+  `flash.dayu200@1` 在「预算 8 次 mutation + capability 在手」下仍被
+  `destructiveEffectNeverAutomated` 拒,且断言 debugCrash 默认策略不含它;
+  `testDeviceMutationNeedsBudgetAndAnExistingCapability`:`debug.hap@1`(effect 地板
+  = deviceMutation)无预算拒、有预算无 capability 拒、两者齐备才让路(harness 从不
+  draft/install/consume,授权判定权仍在引擎 admission);
+  `testAnUnavailableOperationIsRefusedBeforeAuthorizationIsConsulted` 断言不可用 plan
+  下 capability port **一次都没被问**(PRODUCT-LOOP §8:plan 不可用不得消耗 capability);
+  `testRawCommandSurfaceIsRefusedInTypedInputs` 断言 argv/远端路径被逐字段拒。
+  **实现期修正**:第一版按 effect **上限**授权,把 GJ-1 的 E0 采集误拒
+  (`capture.diagnostics@1` 上限含 deviceMutation);正确划分是 guard 只守「地板已 mutate」
+  与「destructive 上限」,有效 effect 由引擎的选择规则决定 —— 否则就是第二份会漂移的
+  实现(`testReadOnlyCeilingOperationsAreLeftToTheEngine` 钉住此取舍)。
 
 ## HTP-AC-12 decision 严格 schema 与拒绝面(TASK-HTP-004)
 

@@ -929,8 +929,8 @@ enum RuntimeCLI {
       throw CLIError(
         exitCode: EX_USAGE,
         message:
-          "missing task subcommand "
-          + "(submit|list|status|result|events|evaluations|reconcile|pause|resume|cancel)")
+          "missing task subcommand (submit|list|status|result|events|evaluations|"
+          + "humanActions|memory|reconcile|pause|resume|cancel)")
     }
     var rest = Array(arguments.dropFirst())
     let json = rest.contains("--json")
@@ -974,7 +974,8 @@ enum RuntimeCLI {
       emit(try client.request(method: "task.submit", params: params), json: json)
     case "list":
       emit(try client.request(method: "task.list"), json: json)
-    case "status", "result", "events", "evaluations", "reconcile", "pause", "cancel":
+    case "status", "result", "events", "evaluations", "humanActions", "memory", "reconcile",
+      "pause", "cancel":
       emit(
         try client.request(
           method: "task.\(subcommand)", params: ["htaskId": .string(try requiredTask())]),

@@ -300,6 +300,9 @@ public struct HarnessTaskProjection: Equatable, Sendable, Codable {
   /// write it (validated below), so a decision cannot describe the world.
   public let observedState: [String: JSONValue]
   public let latestEvaluationID: String?
+  /// Consecutive rounds that changed nothing measurable. Durable because a
+  /// restart must not reset the loop's patience.
+  public let noProgressRounds: Int
   /// A cancel that arrived while an effectful job was still in flight.
   /// Cancellation completes only once that job is observed terminal: the
   /// harness never reports a task cancelled while a side effect it started
@@ -317,6 +320,7 @@ public struct HarnessTaskProjection: Equatable, Sendable, Codable {
     case artifactRefs
     case observedState
     case latestEvaluationID = "latestEvaluationId"
+    case noProgressRounds
     case cancelRequested
     case result
     case version
@@ -331,6 +335,7 @@ public struct HarnessTaskProjection: Equatable, Sendable, Codable {
     artifactRefs: [String],
     observedState: [String: JSONValue] = [:],
     latestEvaluationID: String? = nil,
+    noProgressRounds: Int = 0,
     cancelRequested: Bool,
     result: HarnessTaskResult?,
     version: Int
@@ -343,6 +348,7 @@ public struct HarnessTaskProjection: Equatable, Sendable, Codable {
     self.artifactRefs = artifactRefs
     self.observedState = observedState
     self.latestEvaluationID = latestEvaluationID
+    self.noProgressRounds = noProgressRounds
     self.cancelRequested = cancelRequested
     self.result = result
     self.version = version
@@ -361,6 +367,7 @@ public struct HarnessTaskProjection: Equatable, Sendable, Codable {
       try container.decodeIfPresent([String: JSONValue].self, forKey: .observedState) ?? [:]
     self.latestEvaluationID = try container.decodeIfPresent(
       String.self, forKey: .latestEvaluationID)
+    self.noProgressRounds = try container.decodeIfPresent(Int.self, forKey: .noProgressRounds) ?? 0
     self.cancelRequested =
       try container.decodeIfPresent(Bool.self, forKey: .cancelRequested) ?? false
     self.result = try container.decodeIfPresent(HarnessTaskResult.self, forKey: .result)
@@ -382,6 +389,7 @@ public struct HarnessTaskTransition: Equatable, Sendable {
   public let evaluationID: String?
   public let artifactRefs: [String]
   public let observedState: [String: JSONValue]?
+  public let noProgressRounds: Int?
   public let cancelRequested: Bool
   public let result: HarnessTaskResult?
   public let atUTC: String
@@ -398,6 +406,7 @@ public struct HarnessTaskTransition: Equatable, Sendable {
     evaluationID: String? = nil,
     artifactRefs: [String] = [],
     observedState: [String: JSONValue]? = nil,
+    noProgressRounds: Int? = nil,
     cancelRequested: Bool = false,
     result: HarnessTaskResult? = nil,
     atUTC: String
@@ -413,6 +422,7 @@ public struct HarnessTaskTransition: Equatable, Sendable {
     self.evaluationID = evaluationID
     self.artifactRefs = artifactRefs
     self.observedState = observedState
+    self.noProgressRounds = noProgressRounds
     self.cancelRequested = cancelRequested
     self.result = result
     self.atUTC = atUTC
@@ -513,6 +523,7 @@ public struct HarnessTaskSnapshot: Equatable, Sendable, Codable {
   public let consumedBudget: HarnessConsumedBudget
   public let artifactRefs: [String]
   public let latestEvaluationID: String?
+  public let noProgressRounds: Int
   public let cancelRequested: Bool
   public let result: HarnessTaskResult?
   public let version: Int
@@ -539,6 +550,7 @@ public struct HarnessTaskSnapshot: Equatable, Sendable, Codable {
     case consumedBudget
     case artifactRefs
     case latestEvaluationID = "latestEvaluationId"
+    case noProgressRounds
     case cancelRequested
     case result
     case version
@@ -564,6 +576,7 @@ public struct HarnessTaskSnapshot: Equatable, Sendable, Codable {
     consumedBudget: HarnessConsumedBudget = HarnessConsumedBudget(),
     artifactRefs: [String] = [],
     latestEvaluationID: String? = nil,
+    noProgressRounds: Int = 0,
     cancelRequested: Bool = false,
     result: HarnessTaskResult? = nil,
     version: Int = 1
@@ -589,6 +602,7 @@ public struct HarnessTaskSnapshot: Equatable, Sendable, Codable {
     self.consumedBudget = consumedBudget
     self.artifactRefs = artifactRefs
     self.latestEvaluationID = latestEvaluationID
+    self.noProgressRounds = noProgressRounds
     self.cancelRequested = cancelRequested
     self.result = result
     self.version = version
@@ -598,8 +612,8 @@ public struct HarnessTaskSnapshot: Equatable, Sendable, Codable {
     HarnessTaskProjection(
       status: status, phase: phase, activeRound: activeRound, activeJobID: activeJobID,
       consumedBudget: consumedBudget, artifactRefs: artifactRefs, observedState: observedState,
-      latestEvaluationID: latestEvaluationID, cancelRequested: cancelRequested, result: result,
-      version: version)
+      latestEvaluationID: latestEvaluationID, noProgressRounds: noProgressRounds,
+      cancelRequested: cancelRequested, result: result, version: version)
   }
 
   /// Typed view of the cumulative observed state.
@@ -619,6 +633,7 @@ public struct HarnessTaskSnapshot: Equatable, Sendable, Codable {
       phase: projection.phase, activeRound: projection.activeRound,
       activeJobID: projection.activeJobID, consumedBudget: projection.consumedBudget,
       artifactRefs: projection.artifactRefs, latestEvaluationID: projection.latestEvaluationID,
+      noProgressRounds: projection.noProgressRounds,
       cancelRequested: projection.cancelRequested, result: projection.result,
       version: projection.version)
   }
@@ -673,6 +688,7 @@ public enum HarnessTaskStateReducer {
       artifactRefs: transition.artifactRefs,
       observedState: transition.observedState ?? snapshot.observedState,
       latestEvaluationID: transition.evaluationID ?? snapshot.latestEvaluationID,
+      noProgressRounds: transition.noProgressRounds ?? snapshot.noProgressRounds,
       cancelRequested: transition.cancelRequested,
       result: transition.result,
       version: snapshot.version + 1)

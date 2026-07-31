@@ -81,6 +81,20 @@ extension RuntimeControlPlaneHandler {
         let evaluations = try await harness.evaluations(id)
         return success(id: request.id, result: .array(evaluations.map(Self.encode)))
 
+      case "task.humanActions":
+        guard let id = taskID() else {
+          return failure(id: request.id, code: .invalidParams, message: "htaskId is required")
+        }
+        let actions = try await harness.humanActions(id)
+        return success(id: request.id, result: .array(actions.map(Self.encode)))
+
+      case "task.memory":
+        guard let id = taskID() else {
+          return failure(id: request.id, code: .invalidParams, message: "htaskId is required")
+        }
+        let entries = try await harness.taskMemory(id)
+        return success(id: request.id, result: .array(entries.map(Self.encode)))
+
       case "task.reconcile":
         guard let id = taskID() else {
           return failure(id: request.id, code: .invalidParams, message: "htaskId is required")
