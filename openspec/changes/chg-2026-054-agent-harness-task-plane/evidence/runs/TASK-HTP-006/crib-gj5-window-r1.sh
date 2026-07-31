@@ -62,7 +62,11 @@ HAP_PATH=""
 CAPABILITY_FILE=""
 BUNDLE="com.example.waterflowdemo"
 ABILITY="EntryAbility"
-CRASH_SIGNATURE=""
+# The signature the demo's built-in crash probe produces
+# (entry/src/main/ets/crashprobe/CrashProbe.ets). Declaring it makes DC-1, the
+# "this exact crash is absent" criterion, the one that decides L4 - not merely
+# DC-3's "some new fatal signature appeared".
+CRASH_SIGNATURE="SIGABRT+WaterFlowCrashProbe_RecoverBack"
 AUTODRIVE_INTERVAL=5
 POLL_SECONDS=10
 DEADLINE_SECONDS=1200
@@ -462,7 +466,7 @@ fi
 ############################ L4 — GJ-5, crash present #########################
 
 if [[ "${PHASE}" == "all" ]]; then
-  pause_for_human "reproduce the WaterFlow crash on the device now (the fault block enters the HiLog buffer that 'hilog -x' dumps)"
+  pause_for_human "make sure the WaterFlow crash has been reproduced (with the launch crash probe built in, the application aborts itself ~12s after start and nothing needs doing)"
 fi
 
 say "L4: THE SECOND HANDOVER — one task submit, crash present"
