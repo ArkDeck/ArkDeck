@@ -156,6 +156,11 @@ public struct HarnessPolicyGuard: Sendable {
     if budgets.maxE1Mutations > 0, consumed.e1Mutations >= budgets.maxE1Mutations {
       return .budgetExhausted(.e1Mutations)
     }
+    if consumed.modelCalls >= budgets.maxModelCalls {
+      // Exhaustion stops the model path, not the task: the deterministic
+      // handler still converges, so this is a ceiling on spend, not a halt.
+      return .budgetExhausted(.modelCalls)
+    }
     return nil
   }
 

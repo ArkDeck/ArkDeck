@@ -264,7 +264,29 @@ HFA-AC-1/2/3/4/5/17 有结论;其余 HFA-AC 仍 `pending`(未开工)。
   整条拒绝;出站内容断言不含设备标识、未脱敏字节与凭据;`maxModelCalls` 耗尽后安全停止;
   模型不可用时闭环退化为确定性路径而非停摆。
 - Evidence:实现 PR 内测试(不含真实网络调用的密钥)。
-- **结论:pending**
+- **结论(2026-07-31):PASS,三处如实登记的未覆盖** ——
+  `HarnessVendorGatewayContractTests` 10 例,全部经 fake transport,零网络:
+  `testEveryAdapterSendsExactlyTheCanonicalContextBytes` 断言三家 adapter 的请求体都
+  携带 `context.transmittedBytes` 的**同一份**规范字节(这正是 ModelRun digest 的取值
+  对象,否则 digest 记录的是没发生过的事);
+  `testTheCredentialNeverLeavesTheHeaderSet` 用一个哨兵密钥断言它**不在** body、
+  不在 URL、不在 modelDescriptor,只在 header;
+  `testTheOutboundContextCarriesNoDeviceIdentity` 断言出站字节里没有 targetID、
+  connectKey、远端路径;
+  `testEachVendorEnvelopeIsDecodedToTheSameProposalBytes` 断言三家 envelope 解出**同一份**
+  proposal 字节(adapter 只搬运,不解释);
+  `testAVendorErrorOrGarbageIsATransportFailureAndNotAProposal` 覆盖 500/401/非 JSON/
+  空 envelope 四种,一律 `transportFailure`,绝不变成 proposal;
+  `testSwappingAdaptersDoesNotChangeWhatTheStateMachineConcludes` 用同一份回复跑三家,
+  断言 action 与派发的 operation 完全相同 —— 这是「可替换端口」的可检验形式;
+  `testAnExhaustedModelBudgetStopsTheModelPathAndNotTheTask` 断言 `maxModelCalls: 0` 时
+  **零请求到达 vendor**、reasonCode `maxModelCallsExhausted`;
+  `testAModelCallIsChargedEvenWhenItsProposalIsRefused` 断言被解析器拒绝的调用照样
+  计入 `consumedBudget.modelCalls` 且 ModelRun 的 responseBytes > 0;
+  `testBudgetsPersistedBeforeThisCeilingStillLoad` 断言旧 daemon 写下的预算文档仍能解码
+  (缺字段取默认,不是解码失败)。
+  **未覆盖(如实)**:①无真实厂商端点调用;②不记 token usage(三家 envelope 形态不同、
+  当前无消费者,故记实测字节数而非半可信 token);③密钥来源由 composition root 决定。
 
 ## HFA-AC-22 SQLite 迁移可逐字回读且崩溃可重入(TASK-HFA-012)
 

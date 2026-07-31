@@ -419,7 +419,27 @@
 
 ## TASK-HFA-011 — 真实厂商 LLM adapter 与 model call 预算
 
-- Status:ready
+- Status:done
+- Done:2026-07-31;随本实现 PR 合入生效(维护者 review + merge 即批准)。
+  HFA-AC-21 PASS,evidence = `evidence/runs/TASK-HFA-011/run-r1.md`
+  (库层 978 tests/1 skip/0 fail,新增 10 例)。
+  **Gate**:§20 冻结门由维护者 2026-07-31 显式提前解冻(指令:完成全部 HFA);
+  出站默认 deny **不变**——配置 adapter 不等于开启出站,开启仍要项目级显式配置。
+  **交付**:`HarnessModelTransport` 端口(生产 = `URLSessionModelTransport`,仅 https)
+  + Claude / OpenAI / Gemini 三个 gateway;`maxModelCalls` 预算(含 legacy 解码默认)
+  与 `HarnessBudgetKind.modelCalls` 安全停止;model call 在**每条出口路径**上计费
+  (dispatch / patch / 交人 / noSafeAction / stale),计费折进同一次 transition ——
+  规划中途提交会移动 state version,把自己的 decision 变成 stale(TASK-HFA-002 的闸)。
+  顺带把 `HarnessModelRun.responseBytes` 从占位 0 改为实测字节数。
+  **一处必须记的连带修正**:TASK-HFA-002 的
+  `testAStaleWakeChargesNoFailureNoProgressAndNoBudget` 原断言「预算全零」,
+  是因为当时没有 model call 预算可计。本任务落地后该断言改为
+  `HarnessConsumedBudget(modelCalls: 1)` —— 这正是 HFA-AC-4 原文要求的
+  「stale 不计策略失败,但已发生的 model call 仍计入预算」,是收紧不是放宽。
+  **如实登记未覆盖**:①真实厂商端点未做真调用(测试全部经 fake transport,
+  零网络、零密钥入仓);②token usage 仍不记——三家 envelope 的 usage 字段形态不同,
+  且当前无消费者,记实测字节数而不是半可信的 token;③密钥来源(keychain/env/配置)
+  由 composition root 决定,本任务只定义 `HarnessVendorCredential` 的形状。
 - Platform:macos
 - Requirements/AC:proposal What 11(厂商 adapter);change-local HFA-AC-21,
   登记于 `verification.md`

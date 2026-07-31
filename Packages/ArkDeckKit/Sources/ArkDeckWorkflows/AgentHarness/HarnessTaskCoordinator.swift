@@ -455,6 +455,8 @@ public actor HarnessTaskCoordinator {
         transition(
           snapshot, causation: .humanBlocked, reasonCode: step.decision.reasonCode,
           status: .humanRequired, activeJob: .cleared,
+          consumedBudget: charging(
+            snapshot.consumedBudget, modelCalls: proposal.modelCallsSpent),
           result: HarnessTaskResult(
             outcome: .humanRequired, reasonCode: step.decision.reasonCode,
             summary: step.decision.hypothesis, artifactRefs: snapshot.artifactRefs)))
@@ -469,6 +471,8 @@ public actor HarnessTaskCoordinator {
         transition(
           snapshot, causation: .noSafeAction, reasonCode: step.decision.reasonCode,
           status: .failed, activeJob: .cleared,
+          consumedBudget: charging(
+            snapshot.consumedBudget, modelCalls: proposal.modelCallsSpent),
           result: HarnessTaskResult(
             outcome: .failed, reasonCode: step.decision.reasonCode,
             summary: step.decision.hypothesis, artifactRefs: snapshot.artifactRefs)))
@@ -476,10 +480,12 @@ public actor HarnessTaskCoordinator {
         snapshot: stopped, action: .stoppedNoSafeAction, reasonCode: step.decision.reasonCode)
     case .proposePatch:
       return try await dispatchPatch(
-        step, snapshotAtPlanning: snapshot, handler: handler)
+        step, snapshotAtPlanning: snapshot, handler: handler,
+        modelCallsSpent: proposal.modelCallsSpent)
     case .invokeOperation:
       let outcome = try await dispatch(
-        step, snapshotAtPlanning: snapshot, handler: handler)
+        step, snapshotAtPlanning: snapshot, handler: handler,
+        modelCallsSpent: proposal.modelCallsSpent)
       guard let rejection = proposal.rejection, outcome.action == .dispatched else {
         return outcome
       }
@@ -490,12 +496,26 @@ public actor HarnessTaskCoordinator {
     }
   }
 
+  /// A model call is spent whatever came back, so every path out of a wake
+  /// that made one has to charge it (CHG-2026-055, TASK-HFA-011). Folding it
+  /// into the transition's budget keeps the single write path intact.
+  private func charging(
+    _ budget: HarnessConsumedBudget, modelCalls: Int
+  ) -> HarnessConsumedBudget {
+    guard modelCalls > 0 else { return budget }
+    return HarnessConsumedBudget(
+      rounds: budget.rounds, wallClockSeconds: budget.wallClockSeconds,
+      artifactBytes: budget.artifactBytes, e1Mutations: budget.e1Mutations,
+      modelCalls: budget.modelCalls + modelCalls)
+  }
+
   // MARK: - Dispatch and recovery
 
   private func dispatchPatch(
     _ step: HarnessPlannedStep,
     snapshotAtPlanning: HarnessTaskSnapshot,
-    handler: any HarnessTaskHandler
+    handler: any HarnessTaskHandler,
+    modelCallsSpent: Int = 0
   ) async throws -> HarnessReconcileOutcome {
     let proposalDecision = step.decision
     let snapshot = try await load(snapshotAtPlanning.htaskID)
@@ -505,7 +525,8 @@ public actor HarnessTaskCoordinator {
       of: proposalDecision, against: currentBasis)
     {
       return try await recordStale(
-        proposalDecision, staleness: staleness, snapshot: snapshot)
+        proposalDecision, staleness: staleness, snapshot: snapshot,
+        modelCallsSpent: modelCallsSpent)
     }
     guard let proposal = proposalDecision.patchProposal,
       let projectRef = snapshot.projectRef,
@@ -578,13 +599,14 @@ public actor HarnessTaskCoordinator {
     try await store.putDecision(executable)
     return try await dispatch(
       HarnessPlannedStep(decision: executable, phaseOnDispatch: .patching),
-      snapshotAtPlanning: snapshot, handler: handler)
+      snapshotAtPlanning: snapshot, handler: handler, modelCallsSpent: modelCallsSpent)
   }
 
   private func dispatch(
     _ step: HarnessPlannedStep,
     snapshotAtPlanning: HarnessTaskSnapshot,
-    handler: any HarnessTaskHandler
+    handler: any HarnessTaskHandler,
+    modelCallsSpent: Int = 0
   ) async throws -> HarnessReconcileOutcome {
     let decision = step.decision
 
@@ -599,7 +621,8 @@ public actor HarnessTaskCoordinator {
     let currentBasis = HarnessDecisionBasis(
       snapshot: snapshot, offeredOperations: offeredOperations(snapshot, handler: handler))
     if let staleness = HarnessDecisionFreshness.staleness(of: decision, against: currentBasis) {
-      return try await recordStale(decision, staleness: staleness, snapshot: snapshot)
+      return try await recordStale(
+        decision, staleness: staleness, snapshot: snapshot, modelCallsSpent: modelCallsSpent)
     }
 
     guard let operationReference = decision.operationReference else {
@@ -712,12 +735,15 @@ public actor HarnessTaskCoordinator {
           snapshot, causation: .jobDispatched, reasonCode: decision.reasonCode,
           status: .running, phase: step.phaseOnDispatch ?? snapshot.phase,
           activeRound: decision.round, activeJob: .set(accepted.jobID),
-          consumedBudget: HarnessConsumedBudget(
-            rounds: max(snapshot.consumedBudget.rounds, decision.round),
-            wallClockSeconds: snapshot.consumedBudget.wallClockSeconds,
-            artifactBytes: snapshot.consumedBudget.artifactBytes,
-            e1Mutations: snapshot.consumedBudget.e1Mutations
-              + (Self.consumesHarnessE1Budget(operationReference) ? 1 : 0)),
+          consumedBudget: charging(
+            HarnessConsumedBudget(
+              rounds: max(snapshot.consumedBudget.rounds, decision.round),
+              wallClockSeconds: snapshot.consumedBudget.wallClockSeconds,
+              artifactBytes: snapshot.consumedBudget.artifactBytes,
+              e1Mutations: snapshot.consumedBudget.e1Mutations
+                + (Self.consumesHarnessE1Budget(operationReference) ? 1 : 0),
+              modelCalls: snapshot.consumedBudget.modelCalls),
+            modelCalls: modelCallsSpent),
           jobID: accepted.jobID))
       return HarnessReconcileOutcome(
         snapshot: dispatched, action: .dispatched, dispatchedJobID: accepted.jobID,
@@ -732,7 +758,8 @@ public actor HarnessTaskCoordinator {
   private func recordStale(
     _ decision: HarnessDecision,
     staleness: HarnessDecisionStaleness,
-    snapshot: HarnessTaskSnapshot
+    snapshot: HarnessTaskSnapshot,
+    modelCallsSpent: Int = 0
   ) async throws -> HarnessReconcileOutcome {
     // The task may already have moved somewhere a transition is illegal -
     // a cancel that landed during planning leaves it terminal. There is
@@ -745,7 +772,9 @@ public actor HarnessTaskCoordinator {
       snapshot,
       transition(
         snapshot, causation: .decisionStale, reasonCode: staleness.reasonCode,
-        status: .running))
+        status: .running,
+        consumedBudget: charging(
+          snapshot.consumedBudget, modelCalls: modelCallsSpent)))
     try await appendTaskMemory(
       updated, kind: .attempt,
       summary:

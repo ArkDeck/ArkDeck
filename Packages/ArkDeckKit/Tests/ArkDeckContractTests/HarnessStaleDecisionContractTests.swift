@@ -289,7 +289,10 @@ final class HarnessStaleDecisionContractTests: XCTestCase {
     // None of the three counters that can stop a task may move: the facts
     // changed, the strategy did not fail.
     XCTAssertEqual(stale.snapshot.noProgressRounds, 0)
-    XCTAssertEqual(stale.snapshot.consumedBudget, HarnessConsumedBudget())
+    // The one thing staleness *does* cost is the model call that produced
+    // the refused proposal: it happened, and it shipped a context off this
+    // host (CHG-2026-055, TASK-HFA-011 gave that its own ceiling).
+    XCTAssertEqual(stale.snapshot.consumedBudget, HarnessConsumedBudget(modelCalls: 1))
     let failures = try await store.failureRecords()
     XCTAssertTrue(failures.isEmpty)
 
