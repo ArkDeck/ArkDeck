@@ -53,6 +53,18 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
   /// criteria name it, so a capture that did not publish it cannot support a
   /// verdict about crashes.
   public static let hilogArtifact = "hilog.txt"
+  /// `capture.diagnostics@1` declares `durationSeconds` **required**, so a
+  /// step that omits it is refused at admission and the loop can never
+  /// collect the evidence its own criteria demand. Twenty seconds is a
+  /// declared bound, not a guess: long enough for a live application to emit
+  /// output the liveness measurement can see, and short enough that five
+  /// samples cost well under two minutes of device time.
+  ///
+  /// `traceCategories` is deliberately *not* sent. Its presence escalates the
+  /// effective effect to `deviceMutation`, and this task type declares
+  /// `maxE1Mutations: 0` - an E0 task must not smuggle an E1 leg into its own
+  /// evidence collection.
+  public static let captureDurationSeconds = 20
 
   public init() {}
 
@@ -224,6 +236,20 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
 
   private var producerID: String { "debug-crash-handler@1" }
 
+  /// Inputs for the operations this type may submit. Every value here is a
+  /// field the operation itself declares; nothing derived from a goal string
+  /// or a model reaches this map.
+  static func typedInputs(for operationReference: String) -> [String: JSONValue] {
+    switch operationReference {
+    case Self.captureDiagnostics:
+      return ["durationSeconds": .integer(Int64(Self.captureDurationSeconds))]
+    default:
+      // `observe.device@1` declares no required input: the target it observes
+      // comes from the request's target, not from an input field.
+      return [:]
+    }
+  }
+
   private func invoke(
     _ snapshot: HarnessTaskSnapshot,
     decisionID: String,
@@ -243,8 +269,10 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
         operationReference: operation,
         // Typed inputs only, and only ones this operation declares. No
         // argv, no remote path, no target selection flag can be expressed
-        // here (HTP-INV-11).
-        inputs: [:],
+        // here (HTP-INV-11). What the operation declares *required* has to be
+        // present, or admission refuses the step: an empty map is not a
+        // conservative default, it is an unrunnable one.
+        inputs: Self.typedInputs(for: operation),
         hypothesis: hypothesis,
         reasonCode: reasonCode,
         producer: producerID,
