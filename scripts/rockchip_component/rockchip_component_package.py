@@ -942,17 +942,23 @@ def preflight_identity(
 def preflight_notary_auth(
     *,
     profile: str,
+    keychain: Path | None,
     runner: Runner,
     env: Mapping[str, str],
     cwd: Path,
 ) -> None:
+    credential_arguments: list[str | Path] = [
+        "--keychain-profile",
+        profile,
+    ]
+    if keychain is not None:
+        credential_arguments.extend(["--keychain", keychain])
     result = runner.run(
         [
             SYSTEM_TOOLS["xcrun"],
             "notarytool",
             "history",
-            "--keychain-profile",
-            profile,
+            *credential_arguments,
             "--output-format",
             "json",
         ],
@@ -1104,6 +1110,7 @@ def build_release(
     *,
     component_input: Path,
     notary_profile: str,
+    notary_keychain: Path | None = None,
     output_root: Path,
 ) -> dict[str, Any]:
     spec = load_json(PACKAGE_SPEC_PATH)
@@ -1133,6 +1140,10 @@ def build_release(
     )
     ensure_outside_repository(component_input, "component input")
     ensure_outside_repository(output_root, "release output")
+    if notary_keychain is not None:
+        require(notary_keychain.is_absolute(), "notary keychain must be an absolute path")
+        ensure_outside_repository(notary_keychain, "notary keychain")
+        ensure_regular_no_symlink(notary_keychain, "notary keychain")
     require(not output_root.exists(), "release output must be a fresh path")
 
     created_output = False
@@ -1151,6 +1162,9 @@ def build_release(
                     str(work_root): "<WORK_ROOT>",
                     str(output_root): "<OUTPUT_ROOT>",
                     notary_profile: "<NOTARY_PROFILE>",
+                    str(notary_keychain) if notary_keychain is not None else "": (
+                        "<NOTARY_KEYCHAIN>"
+                    ),
                 }
             )
 
@@ -1165,7 +1179,11 @@ def build_release(
                 runner=runner, env=env, spec=spec, cwd=work_root
             )
             preflight_notary_auth(
-                profile=notary_profile, runner=runner, env=env, cwd=work_root
+                profile=notary_profile,
+                keychain=notary_keychain,
+                runner=runner,
+                env=env,
+                cwd=work_root,
             )
 
             staged_component = work_root / "stage/rkdeveloptool"
@@ -1352,16 +1370,27 @@ def build_release(
             validate_dmg_facts(dmg_facts, spec)
 
             preflight_notary_auth(
-                profile=notary_profile, runner=runner, env=env, cwd=work_root
+                profile=notary_profile,
+                keychain=notary_keychain,
+                runner=runner,
+                env=env,
+                cwd=work_root,
             )
+            notary_credential_arguments: list[str | Path] = [
+                "--keychain-profile",
+                notary_profile,
+            ]
+            if notary_keychain is not None:
+                notary_credential_arguments.extend(
+                    ["--keychain", notary_keychain]
+                )
             submit_result = runner.run(
                 [
                     SYSTEM_TOOLS["xcrun"],
                     "notarytool",
                     "submit",
                     str(dmg),
-                    "--keychain-profile",
-                    notary_profile,
+                    *notary_credential_arguments,
                     "--wait",
                     "--output-format",
                     "json",
@@ -1386,8 +1415,7 @@ def build_release(
                     "log",
                     submission_id,
                     str(raw_log_path),
-                    "--keychain-profile",
-                    notary_profile,
+                    *notary_credential_arguments,
                 ],
                 cwd=work_root,
                 env=env,
@@ -1570,6 +1598,14 @@ def parse_arguments(argv: Sequence[str]) -> argparse.Namespace:
         help="Keychain profile name; treated as a secret and never persisted.",
     )
     parser.add_argument(
+        "--notary-keychain",
+        type=Path,
+        help=(
+            "Optional absolute local Keychain file containing the profile; "
+            "the path is treated as a secret and never persisted."
+        ),
+    )
+    parser.add_argument(
         "--output",
         required=True,
         type=Path,
@@ -1585,10 +1621,16 @@ def main(argv: Sequence[str] | None = None) -> int:
             arguments.component.is_absolute(),
             "--component must be an absolute path",
         )
+        if arguments.notary_keychain is not None:
+            require(
+                arguments.notary_keychain.is_absolute(),
+                "--notary-keychain must be an absolute path",
+            )
         require(arguments.output.is_absolute(), "--output must be an absolute path")
         receipt = build_release(
             component_input=arguments.component,
             notary_profile=arguments.notary_profile,
+            notary_keychain=arguments.notary_keychain,
             output_root=arguments.output,
         )
     except (OSError, PackageError, subprocess.SubprocessError) as error:

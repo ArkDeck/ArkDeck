@@ -30,8 +30,16 @@ Example, with local values supplied only by the release operator:
 python3 -B scripts/rockchip_component/rockchip_component_package.py \
   --component /private/tmp/<fresh-artifact-root>/rkdeveloptool \
   --notary-profile '<opaque-keychain-profile>' \
+  --notary-keychain '<absolute-local-keychain-path>' \
   --output /private/tmp/<fresh-release-output>
 ```
+
+Use `--notary-keychain` when the release profile is stored in an explicit local
+Keychain instead of the default Data Protection Keychain. The packager verifies
+that the path is an absolute, regular, non-symlink file outside the repository
+and passes it to every notary preflight, submission, and log request. Both the
+profile and Keychain path are redacted from command failures and never enter the
+package receipt or evidence.
 
 The command uses absolute system/Xcode executables and argument arrays. It
 performs this fixed sequence:

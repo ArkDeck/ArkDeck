@@ -314,11 +314,19 @@ final class NativeLibraryDeploymentContractTests: XCTestCase {
   func testBundledCodeSignHelperIsAValidatedStaticArm64Executable() throws {
     let helper = try HDCNativeCodeSignHelperArtifact.bundled()
     let contents = try Data(contentsOf: helper.fileURL)
+    let attributes = try FileManager.default.attributesOfItem(
+      atPath: helper.fileURL.path)
+    let permissions = try XCTUnwrap(
+      (attributes[.posixPermissions] as? NSNumber)?.intValue)
 
     XCTAssertEqual(helper.facts.abi, .arm64)
     XCTAssertEqual(helper.facts.byteCount, contents.count)
     XCTAssertEqual(helper.facts.sha256, NativeLibraryTestFixture.sha256(contents))
     XCTAssertEqual(helper.facts.buildID.count, 40)
+    XCTAssertEqual(
+      permissions & 0o111, 0,
+      "the host bundle must carry the device helper as data; "
+        + "the typed send plan chmods it remotely")
   }
 
   func testNativeProviderPlanIsAvailablePathClosedAndDescriptorBound() throws {
