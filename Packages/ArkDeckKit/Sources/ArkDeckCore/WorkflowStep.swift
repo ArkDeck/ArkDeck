@@ -922,10 +922,15 @@ private enum WorkflowStepValidator {
         try reader.validatedOptions("parameters")
       } else {
         let action = try reader.enumeration(
-          "actionId", allowed: ["boundedHilog", "componentTree", "windowInventory"])
+          "actionId",
+          allowed: [
+            "boundedHilog", "componentTree", "crashIndex", "crashLog", "windowInventory",
+          ])
         let parameters = try reader.validatedOptions("parameters")
         if action == "boundedHilog" {
           try reader.diagnosticsHilogParameters(parameters, key: "parameters")
+        } else if action == "crashLog" {
+          try reader.diagnosticsCrashLogParameters(parameters, key: "parameters")
         } else {
           // componentTree and windowInventory share the byteBudget-only
           // parameter contract (diagnostics-stdout.yaml).
@@ -1403,6 +1408,27 @@ private enum WorkflowStepValidator {
       try exactOptionKeys(options, key: key, required: ["byteBudget"])
       try optionInteger(
         options, key: key, name: "byteBudget", minimum: 1024, maximum: 67_108_864)
+    }
+
+    /// The crash-log fetch carries the entry name as a typed parameter.
+    /// It is narrowed to a Faultlogger entry name — no separator, so it
+    /// can never be a path — because it is the one caller-supplied string
+    /// in this family that reaches an argv (CHG-2026-049 r6).
+    func diagnosticsCrashLogParameters(
+      _ options: [String: JSONValue],
+      key: String
+    ) throws {
+      try exactOptionKeys(options, key: key, required: ["byteBudget", "faultLogName"])
+      try optionInteger(
+        options, key: key, name: "byteBudget", minimum: 1024, maximum: 67_108_864)
+      guard case .string(let name)? = options["faultLogName"],
+        name.count <= 200,
+        name.range(
+          of: #"^[a-z]+-[A-Za-z0-9._-]{1,180}$"#, options: .regularExpression) != nil
+      else {
+        throw invalid(
+          "\(key).faultLogName", "a Faultlogger entry name, never a path")
+      }
     }
 
     private func exactOptionKeys(

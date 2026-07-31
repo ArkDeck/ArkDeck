@@ -219,6 +219,32 @@ public struct HDCOwnedRemoteArtifact: Sendable, Equatable {
   }
 }
 
+/// One Faultlogger entry name. The device's index prints these; a caller
+/// may pass one back to fetch that entry.
+///
+/// The constraint is the *shape*, not a type vocabulary: a lowercase
+/// prefix, then bounded name characters, and **no separator**, so the
+/// value can never become a path or a shell fragment. r6 proposed
+/// `^[a-z]+crash-…`, which would have rejected `appfreeze-…` — Faultlogger
+/// holds more than crashes, and only `jscrash` has been measured on a
+/// device. Enumerating types nobody has seen is the mistake this ledger
+/// exists to prevent, so the prefix stays open: a name the device does not
+/// have simply answers `invalid parameters.`
+public struct HDCFaultLogName: Sendable, Equatable {
+  public let value: String
+
+  public init(_ value: String) throws {
+    guard value.count <= 200,
+      value.range(
+        of: #"^[a-z]+-[A-Za-z0-9._-]{1,180}$"#, options: .regularExpression) != nil
+    else {
+      throw HDCE0RequestError.malformed(
+        field: "faultLogName", detail: "a Faultlogger entry name, never a path")
+    }
+    self.value = value
+  }
+}
+
 public enum HDCFileMagic {
   /// 89 50 4E 47 0D 0A 1A 0A — confirmed on a device-produced screenshot.
   public static let png = Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])

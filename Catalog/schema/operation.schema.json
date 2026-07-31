@@ -385,6 +385,8 @@
             "renderTreeLegacy",
             "boundedHilog",
             "componentTree",
+            "crashIndex",
+            "crashLog",
             "windowInventory",
             "deviceSummary",
             "systemProperties",
@@ -422,6 +424,8 @@
               "enum": [
                 "boundedHilog",
                 "componentTree",
+                "crashIndex",
+                "crashLog",
                 "windowInventory"
               ]
             }

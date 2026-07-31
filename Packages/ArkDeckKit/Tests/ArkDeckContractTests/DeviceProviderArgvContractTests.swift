@@ -431,3 +431,89 @@ extension DeviceProviderArgvContractTests {
     }
   }
 }
+
+// MARK: - CHG-2026-049 r6: crash ledger
+
+extension DeviceProviderArgvContractTests {
+  /// DHA-CRASH-001: both invocations, token for token. The `-p …` payload
+  /// is one argv element after `-a`, which is what §6 records and what the
+  /// device parses.
+  func testCrashLedgerLowersToTheTwoFaultloggerForms() throws {
+    guard case .process(_, let index, _) = try provider.lower(
+      action: .hdc(.captureCrashIndex(byteBudget: 8 * 1024 * 1024)), context: context
+    ).kind else {
+      return XCTFail("expected a process plan")
+    }
+    XCTAssertEqual(
+      index,
+      ["-t", connectKey, "shell", "hidumper", "-s", "1201", "-a", "-p Faultlogger -l"])
+
+    let name = try HDCFaultLogName("jscrash-com.example.demo-20010056-20260731161809")
+    guard case .process(_, let entry, _) = try provider.lower(
+      action: .hdc(.captureCrashLog(name, byteBudget: 8 * 1024 * 1024)), context: context
+    ).kind else {
+      return XCTFail("expected a process plan")
+    }
+    XCTAssertEqual(
+      entry,
+      [
+        "-t", connectKey, "shell", "hidumper", "-s", "1201", "-a",
+        "-p Faultlogger -f jscrash-com.example.demo-20010056-20260731161809",
+      ])
+  }
+
+  /// DHA-CRASH-001: this is the only collection leg that never leaves
+  /// readOnly, because both commands only read.
+  func testCrashLedgerStaysReadOnly() throws {
+    XCTAssertEqual(
+      TypedProviderAction.hdc(.captureCrashIndex(byteBudget: 1024)).effect, .readOnly)
+    let name = try HDCFaultLogName("cppcrash-com.example.demo-20010056-20260731161809")
+    XCTAssertEqual(
+      TypedProviderAction.hdc(.captureCrashLog(name, byteBudget: 1024)).effect, .readOnly)
+  }
+
+  /// DHA-CRASH-002: the one caller-supplied string in this family can only
+  /// ever be an entry name.
+  func testFaultLogNameRejectsAnythingPathShaped() throws {
+    for bad in [
+      "../../etc/passwd", "jscrash-a/b", "/data/log/faultlog/x", "no separator",
+      "", "jscrash-" + String(repeating: "a", count: 200), "JSCRASH-upper",
+    ] {
+      XCTAssertThrowsError(try HDCFaultLogName(bad), "must reject \(bad.prefix(24))")
+    }
+    // The exact shape measured on the device.
+    XCTAssertNoThrow(
+      try HDCFaultLogName("jscrash-com.example.waterflowdemo-20010056-20260731161809"))
+    XCTAssertNoThrow(
+      try HDCFaultLogName("cppcrash-com.example.waterflowdemo-20010056-20260731161809014.log"))
+    // Faultlogger holds more than crashes; the shape must not exclude them.
+    XCTAssertNoThrow(
+      try HDCFaultLogName("appfreeze-com.example.waterflowdemo-20010056-20260731161809"))
+  }
+
+  /// DHA-CRASH-003 (parser half): the index's entries sit between the two
+  /// marker lines, and an empty ledger yields none.
+  func testFaultLogIndexParsesEntriesBetweenTheMarkers() {
+    let populated = """
+
+      -------------------------------[ability]-------------------------------
+
+      ----------------------------------HiviewService----------------------------------
+      Fault log list:
+      ******
+      jscrash-com.example.waterflowdemo-20010056-20260731161809
+      ******
+      """
+    XCTAssertEqual(
+      HDCObservationProviderAdapter.faultLogEntries(in: populated),
+      ["jscrash-com.example.waterflowdemo-20010056-20260731161809"])
+
+    let empty = """
+      No fault log exist.
+      Fault log list:
+      ******
+      ******
+      """
+    XCTAssertTrue(HDCObservationProviderAdapter.faultLogEntries(in: empty).isEmpty)
+  }
+}
