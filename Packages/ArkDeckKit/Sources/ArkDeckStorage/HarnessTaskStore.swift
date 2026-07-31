@@ -204,6 +204,53 @@ public actor HarnessTaskStore {
     try intents(taskID).filter { $0.state == .pending || $0.state == .submitted }
   }
 
+  // MARK: - Model runs
+
+  /// A model run id is a file name, so its grammar excludes separators for
+  /// the same reason an evaluation id does: a record cannot be written
+  /// outside its own task directory (CHG-2026-055, TASK-HFA-002).
+  public static func isWellFormed(modelRunID: String) -> Bool {
+    guard modelRunID.hasPrefix("MRUN-"), modelRunID.count <= 40 else { return false }
+    let body = modelRunID.dropFirst("MRUN-".count)
+    guard !body.isEmpty else { return false }
+    return body.allSatisfy { character in
+      character.isASCII && (character.isNumber || ("A"..."F").contains(String(character)))
+    }
+  }
+
+  /// Several runs can belong to one round - a refused proposal is still a
+  /// call that happened - so they are files under the round, not one file
+  /// per round that a later run would overwrite.
+  public func putModelRun(_ run: HarnessModelRun) throws {
+    guard Self.isWellFormed(modelRunID: run.modelRunID) else {
+      throw HarnessTaskStoreError.malformedTaskID(run.modelRunID)
+    }
+    let directoryURL = try existingDirectory(run.htaskID)
+    try withLock(directoryURL) {
+      let roundURL = try roundDirectory(directoryURL, round: run.round)
+      let runsURL = roundURL.appendingPathComponent("model-runs", isDirectory: true)
+      try FileManager.default.createDirectory(at: runsURL, withIntermediateDirectories: true)
+      try writeJSON(run, to: runsURL.appendingPathComponent("\(run.modelRunID).json"))
+    }
+  }
+
+  public func modelRuns(_ taskID: String) throws -> [HarnessModelRun] {
+    let directoryURL = try existingDirectory(taskID)
+    return try withLock(directoryURL) {
+      let roundsURL = directoryURL.appendingPathComponent("rounds", isDirectory: true)
+      let rounds = (try? FileManager.default.contentsOfDirectory(atPath: roundsURL.path)) ?? []
+      var found: [HarnessModelRun] = []
+      for round in rounds.compactMap(Int.init).sorted() {
+        let runsURL = roundsURL.appendingPathComponent("\(round)/model-runs", isDirectory: true)
+        let names = (try? FileManager.default.contentsOfDirectory(atPath: runsURL.path)) ?? []
+        for name in names.sorted() where name.hasSuffix(".json") {
+          found.append(try readJSON(HarnessModelRun.self, from: runsURL.appendingPathComponent(name)))
+        }
+      }
+      return found
+    }
+  }
+
   // MARK: - Evaluations
 
   /// Evaluations are immutable records: the id is the file name and its

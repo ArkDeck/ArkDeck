@@ -55,7 +55,16 @@
 
 ## TASK-HFA-002 — Stale Decision Guard:state version、context digest、revision 前置与 ModelRun
 
-- Status:ready
+- Status:done
+- Done:2026-07-31;随本实现 PR 合入生效(维护者 review + merge 即批准)。
+  HFA-AC-3、HFA-AC-4、HFA-AC-5 全部 PASS,evidence =
+  `evidence/runs/TASK-HFA-002/run-r1.md`(库层 950 tests/1 skip/0 fail,新增 10 例;
+  变异对照实测:去掉 guard 后同一竞态里 job **照样被派发**)。
+  两处如实登记的偏离:①decision 上的字段名为 `basisDigest`(§11.4 的 contextHash 位),
+  模型实收字节的 digest 单独记在 `HarnessModelRun.contextDigest`(§12.9);②ModelRun 记
+  **实测字节数**而非 token —— 决策端口返回 `Data`,token 是端口看不见的厂商概念,
+  待 TASK-HFA-011 接真实 adapter 时再补 usage。
+  workspace/build/deploy 前置的**消费者**在 TASK-HFA-003/009,本任务不写空校验占位。
 - Platform:macos
 - Requirements/AC:proposal What 2(防陈旧闸);change-local HFA-AC-3、HFA-AC-4、HFA-AC-5,
   登记于 `verification.md`

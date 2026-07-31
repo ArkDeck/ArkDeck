@@ -284,6 +284,11 @@ public enum HarnessTaskCausation: String, CaseIterable, Codable, Sendable {
   case cancelRequested
   case budgetExhausted
   case noSafeAction
+  /// A proposal was refused at the dispatch boundary because the facts it
+  /// was made on had moved (CHG-2026-055, TASK-HFA-002). It is recorded as
+  /// its own causation so a reader can tell "we declined to act on stale
+  /// facts" from "the strategy failed" - they have different consequences.
+  case decisionStale
 }
 
 /// The reducer-owned part of a task: everything a transition may change.

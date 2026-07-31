@@ -39,6 +39,10 @@ public enum HarnessReconcileAction: String, Sendable, Codable {
   case evaluatedFailedCriteria
   case evaluatedInconclusive
   case stoppedEvidenceIntegrity
+  /// The proposal was refused at the dispatch boundary because the facts it
+  /// stood on had moved (CHG-2026-055, TASK-HFA-002). Nothing was
+  /// submitted; the next wake plans again on current facts.
+  case staleDecision
 }
 
 public struct HarnessReconcileOutcome: Sendable, Equatable {
@@ -84,6 +88,7 @@ public actor HarnessTaskCoordinator {
   let evaluationIDFactory: @Sendable () -> String
   let actionIDFactory: @Sendable () -> String
   let memoryIDFactory: @Sendable () -> String
+  let modelRunIDFactory: @Sendable () -> String
   let policyGuard: HarnessPolicyGuard
   /// Absent means no model path exists in this composition at all.
   let decisionGateway: (any HarnessDecisionGateway)?
@@ -112,6 +117,9 @@ public actor HarnessTaskCoordinator {
     memoryIDFactory: @escaping @Sendable () -> String = {
       HarnessTaskCoordinator.freshMemoryID()
     },
+    modelRunIDFactory: @escaping @Sendable () -> String = {
+      HarnessTaskCoordinator.freshModelRunID()
+    },
     policyGuard: HarnessPolicyGuard = HarnessPolicyGuard(),
     decisionGateway: (any HarnessDecisionGateway)? = nil,
     egressPolicy: HarnessEgressPolicy = .deniedByDefault,
@@ -128,6 +136,7 @@ public actor HarnessTaskCoordinator {
     self.evaluationIDFactory = evaluationIDFactory
     self.actionIDFactory = actionIDFactory
     self.memoryIDFactory = memoryIDFactory
+    self.modelRunIDFactory = modelRunIDFactory
     self.policyGuard = policyGuard
     self.decisionGateway = decisionGateway
     self.egressPolicy = egressPolicy
@@ -164,6 +173,14 @@ public actor HarnessTaskCoordinator {
 
   public static func freshMemoryID() -> String {
     "mem-\(UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased().prefix(12))"
+  }
+
+  /// Uppercase hex, like an evaluation id: the value becomes a file name,
+  /// and the store's grammar check is what keeps it inside its own task
+  /// directory (TASK-HFA-002).
+  public static func freshModelRunID() -> String {
+    let hex = UUID().uuidString.replacingOccurrences(of: "-", with: "").uppercased()
+    return "MRUN-\(hex.prefix(12))"
   }
 
   // MARK: - Task lifecycle
@@ -370,8 +387,17 @@ public actor HarnessTaskCoordinator {
     // One proposal per wake, from the model path when it is enabled and
     // healthy, otherwise from the deterministic handler - and the record says
     // which, and why (TASK-HTP-004).
-    let proposal = await plannedProposal(snapshot, handler: handler)
-    let step = proposal.step
+    //
+    // The basis is taken *before* the proposal, from the snapshot the
+    // producer is about to read, and stamped onto whatever comes back. A
+    // producer therefore cannot claim facts it did not see, and the
+    // dispatch boundary can check the claim (TASK-HFA-002).
+    let basis = HarnessDecisionBasis(
+      snapshot: snapshot, offeredOperations: offeredOperations(snapshot, handler: handler))
+    let proposal = await plannedProposal(snapshot, handler: handler, basis: basis)
+    let step = HarnessPlannedStep(
+      decision: proposal.step.decision.stamped(with: basis),
+      phaseOnDispatch: proposal.step.phaseOnDispatch)
     try await store.putDecision(step.decision)
     if let rejection = proposal.rejection {
       // Visible, not swallowed: the fallback is narrower than the model path,
@@ -408,7 +434,8 @@ public actor HarnessTaskCoordinator {
       return HarnessReconcileOutcome(
         snapshot: stopped, action: .stoppedNoSafeAction, reasonCode: step.decision.reasonCode)
     case .invokeOperation:
-      let outcome = try await dispatch(step, snapshot: snapshot, handler: handler)
+      let outcome = try await dispatch(
+        step, snapshotAtPlanning: snapshot, handler: handler)
       guard let rejection = proposal.rejection, outcome.action == .dispatched else {
         return outcome
       }
@@ -423,10 +450,25 @@ public actor HarnessTaskCoordinator {
 
   private func dispatch(
     _ step: HarnessPlannedStep,
-    snapshot: HarnessTaskSnapshot,
+    snapshotAtPlanning: HarnessTaskSnapshot,
     handler: any HarnessTaskHandler
   ) async throws -> HarnessReconcileOutcome {
     let decision = step.decision
+
+    // Freshness before anything that writes (TASK-HFA-002). Planning
+    // suspends this actor - the model call is a network round trip - so
+    // `resume`, `pause` and `cancel` can land in between. Reload, rebuild
+    // the basis, and refuse the step if either moved. The optimistic lock
+    // in `commit` would also catch it, but only after the job had been
+    // submitted: the side effect would already exist and only the
+    // bookkeeping would fail.
+    let snapshot = try await load(snapshotAtPlanning.htaskID)
+    let currentBasis = HarnessDecisionBasis(
+      snapshot: snapshot, offeredOperations: offeredOperations(snapshot, handler: handler))
+    if let staleness = HarnessDecisionFreshness.staleness(of: decision, against: currentBasis) {
+      return try await recordStale(decision, staleness: staleness, snapshot: snapshot)
+    }
+
     guard let operationReference = decision.operationReference else {
       // Fail closed rather than throwing: a proposal with no operation is a
       // stop condition for this task, not a daemon fault.
@@ -518,6 +560,37 @@ public actor HarnessTaskCoordinator {
         snapshot: dispatched, action: .dispatched, dispatchedJobID: accepted.jobID,
         reasonCode: decision.reasonCode)
     }
+  }
+
+  /// A stale proposal costs the model call that produced it and nothing
+  /// else: no failure fingerprint, no no-progress round, no budget movement
+  /// (TASK-HFA-002). Charging it as a strategy failure would let an
+  /// operator's own resolution walk a task toward `strategyExhausted`.
+  private func recordStale(
+    _ decision: HarnessDecision,
+    staleness: HarnessDecisionStaleness,
+    snapshot: HarnessTaskSnapshot
+  ) async throws -> HarnessReconcileOutcome {
+    // The task may already have moved somewhere a transition is illegal -
+    // a cancel that landed during planning leaves it terminal. There is
+    // nothing to record on the task then; the refusal still stands.
+    guard snapshot.status == .running else {
+      return HarnessReconcileOutcome(
+        snapshot: snapshot, action: .staleDecision, reasonCode: staleness.reasonCode)
+    }
+    let updated = try await commit(
+      snapshot,
+      transition(
+        snapshot, causation: .decisionStale, reasonCode: staleness.reasonCode,
+        status: .running))
+    try await appendTaskMemory(
+      updated, kind: .attempt,
+      summary:
+        "decision \(decision.decisionID) was not dispatched: \(staleness.reasonCode)",
+      confidence: .observed,
+      evidence: HarnessMemoryEvidence(requestIDs: [decision.decisionID]))
+    return HarnessReconcileOutcome(
+      snapshot: updated, action: .staleDecision, reasonCode: staleness.reasonCode)
   }
 
   private enum SubmitResult {

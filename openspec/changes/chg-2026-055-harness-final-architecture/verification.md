@@ -2,7 +2,8 @@
 
 > Change:CHG-2026-055-harness-final-architecture@r1
 
-Status:pending # r1(2026-07-31):十三个任务尚未开工,HFA-AC-1..23 全部 `pending`。
+Status:in_progress # r1(2026-07-31):TASK-HFA-002 已 done,HFA-AC-3/4/5 有结论;
+其余 HFA-AC 仍 `pending`(未开工)。
 每条结论由其所属任务的实现 PR 写入本文件;维护者 review/merge 该实现 PR 即确认。
 不为本 change 追加独立 verification/archive 载体(`PRODUCT-LOOP.md` §4/§20)。
 
@@ -39,14 +40,31 @@ Status:pending # r1(2026-07-31):十三个任务尚未开工,HFA-AC-1..23 全部 
   人工 resolution 之后、binding revision 变化后,旧 decision 一律被拒且零副作用;
   同一事务内校验(并发 accept 只有一条成功)。
 - Evidence:实现 PR 内测试。
-- **结论:pending**
+- **结论(2026-07-31):PASS** —— 闸门落在 `dispatch()` 的第一句(重新 load → 重建 basis →
+  `HarnessDecisionFreshness.staleness()`),因此拒绝发生在 `putIntent`/`submit` **之前**。
+  `testAHumanResolutionDuringPlanningStopsTheDispatch` 用真实竞态:fake gateway 在
+  `propose()` 里回调 `coordinator.pause` + `resume`(这正是 actor 在网络往返处被挂起的窗口),
+  断言 action=`staleDecision`、reasonCode 前缀 `decisionStale:stateVersion`、
+  **提交给引擎的请求为 0**、`decisionStale` 事件恰一条且无 `jobDispatched`。
+  `testACancelDuringPlanningStopsTheDispatch` 覆盖窗口内取消(任务已终态,不再写状态,
+  仍零提交)。`testAChangedBasisIsStaleEvenWhenTheVersionHeld` 覆盖 version 未动而
+  offered operation 收窄的情形——version 计数器单独抓不到这一类。
+  `testAnActiveJobAppearingUnderAProposalIsStale` 与
+  `testADecisionWithoutABasisIsUnverifiableRatherThanFresh`(旧记录 fail closed)补齐负例。
+  **变异对照**:把 freshness 检查改为 `if false, ...` 后,同一用例得到
+  `("dispatched") is not equal to ("staleDecision")` 且请求真的提交 —— 这条 guard 挡的是
+  实存缺陷,不是理论风险。
 
 ## HFA-AC-4 Stale 的代价语义与失败区分(TASK-HFA-002)
 
 - 方法:断言 stale 不计策略失败、不增 no-progress 轮次、不写 failure fingerprint,
   但已发生的 model call 计入预算;stale 之后重新组装 context 产生**不同** digest。
 - Evidence:实现 PR 内测试。
-- **结论:pending**
+- **结论(2026-07-31):PASS** —— `testAStaleWakeChargesNoFailureNoProgressAndNoBudget`
+  断言陈旧轮之后 `noProgressRounds == 0`、`consumedBudget == HarnessConsumedBudget()`(全 0)、
+  `store.failureRecords()` 为空;随后**下一轮正常派发**(闭环没有被自己的陈旧决策毒化)。
+  代价语义写在 `HarnessDecisionStaleness` 的类型注释里:陈旧不是策略失败,把它记成失败
+  会让操作员自己的 resolution 把任务推向 `strategyExhausted`。
 
 ## HFA-AC-5 Context digest 可复算且 ModelRun 完整(TASK-HFA-002)
 
@@ -54,7 +72,22 @@ Status:pending # r1(2026-07-31):十三个任务尚未开工,HFA-AC-1..23 全部 
   digest 在脱敏之后计算(含未脱敏字节的输入不会产生相同 digest);ModelRun 记录字段齐全
   (provider/model/adapterVersion/observedStateVersion/contextDigest/tokens/schema 校验/decisionId)。
 - Evidence:实现 PR 内测试。
-- **结论:pending**
+- **结论(2026-07-31):PASS,含两处如实登记的偏离** ——
+  `testTheBasisDigestIsReproducibleAndMovesOnlyWithPersistedFacts`:同一 snapshot 两次取
+  basis digest 相同、长度 64;offered 集合的**顺序**不是事实(digest 不变);`observedState`
+  变化则 digest 变化。时钟类字段一律不进 basis —— 否则每个决策一秒后都会"陈旧",那是
+  停摆不是护栏。`testAnAcceptedProposalRecordsTheModelCallItCameFrom` 断言 ModelRun 与它
+  产出的 decision 的 `observedStateVersion` 相等、`contextDigest` 等于 gateway 实收 context 的
+  `transmittedDigest`(该 digest 在裁剪与出站筛查**之后**计算,代表真正离开本机的字节);
+  `testARefusedProposalStillRecordsTheModelCall` 断言被解析器整条拒绝的调用同样留有记录
+  (调用发生过、context 出过站,这是事实);`testAModelRunIdCannotEscapeItsTaskDirectory`
+  钉死文件名文法。
+  **偏离一(命名)**:decision 上的字段叫 `basisDigest`(§11.4 的 contextHash 位置),
+  模型实收字节的 digest 是 `HarnessModelRun.contextDigest`(§12.9)。二者回答不同问题,
+  共用一个名字会让后者消失。
+  **偏离二(token)**:决策端口返回 `Data`,token 是端口看不见的厂商概念,故记**实测字节数**
+  (`contextBytes`/`responseBytes`)而不是猜的 token;`HarnessModelDescriptor` 默认只写端口
+  真正知道的 producerID,其余标 `unspecified`。真实 usage 待 TASK-HFA-011。
 
 ## HFA-AC-6 `PROPOSE_PATCH` 越界整条拒绝(TASK-HFA-003)
 

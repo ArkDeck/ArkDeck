@@ -62,7 +62,18 @@ public enum HarnessDecisionGatewayError: Error, Equatable, Sendable {
 /// the harness's job, so no adapter can widen what a decision may say.
 public protocol HarnessDecisionGateway: Sendable {
   var producerID: String { get }
+  /// What to record about the model behind this port (CHG-2026-055,
+  /// TASK-HFA-002). The default says only what the port itself can know -
+  /// the producer id - and marks the rest unspecified rather than guessing
+  /// a vendor or a version. Real adapters override it.
+  var modelDescriptor: HarnessModelDescriptor { get }
   func propose(_ context: HarnessDecisionContext) async throws -> Data
+}
+
+extension HarnessDecisionGateway {
+  public var modelDescriptor: HarnessModelDescriptor {
+    HarnessModelDescriptor(provider: producerID)
+  }
 }
 
 // There is deliberately no "deterministic gateway" adapter here. The built-in
