@@ -33,6 +33,8 @@ struct ArkDeckCommandLine {
         try RuntimeCLI.runDevice(Array(arguments.dropFirst()))
       case "job":
         try RuntimeCLI.runJob(Array(arguments.dropFirst()))
+      case "cleanup-debt":
+        try RuntimeCLI.runCleanupDebt(Array(arguments.dropFirst()))
       case "agent":
         try RuntimeCLI.runAgent(Array(arguments.dropFirst()))
       case "capability":
@@ -551,7 +553,9 @@ struct ArkDeckCommandLine {
         arkdeck device list|show|adopt [--candidate <connect-key>] [--socket <path>] [--json]
         arkdeck job submit --target <id> --operation <id@version> [--wait] [--json]
         arkdeck job status --job <id> [--json] | arkdeck job list [--json]
-        arkdeck job reconcile --job <id> [--json]
+        arkdeck job run --job <id> [--json] | arkdeck job reconcile --job <id> [--json]
+        arkdeck cleanup-debt list [--json]
+        arkdeck cleanup-debt continue --job <id> --remote-path <recorded path> [--json]
         arkdeck job submit --request-file <request.json> [--wait] [--json]
         arkdeck capability list [--json]
         arkdeck capability inspect --capability <id> [--json]
