@@ -24,6 +24,10 @@ public enum HarnessBudgetKind: String, CaseIterable, Codable, Sendable {
   case rounds
   case wallClock
   case artifactBytes
+  /// Model calls are their own ceiling (CHG-2026-055, TASK-HFA-011): a loop
+  /// that stops making progress can still burn a vendor bill, and rounds do
+  /// not bound it - one round can spend a call and dispatch nothing.
+  case modelCalls
   case e1Mutations
   case noProgressRounds
   case actionRetriesPerRun
@@ -36,6 +40,7 @@ public enum HarnessBudgetKind: String, CaseIterable, Codable, Sendable {
     case .e1Mutations: return "maxE1MutationsExhausted"
     case .noProgressRounds: return "maxNoProgressRoundsExhausted"
     case .actionRetriesPerRun: return "maxActionRetriesPerRunExhausted"
+    case .modelCalls: return "maxModelCallsExhausted"
     }
   }
 }

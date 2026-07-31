@@ -20,6 +20,11 @@ extension HarnessTaskCoordinator {
   struct PlannedProposal {
     let step: HarnessPlannedStep
     let producer: String
+    /// Model calls this wake spent, whatever came back. It is applied by the
+    /// caller's transition rather than committed here: a commit inside
+    /// planning would move the state version the freshness guard checks
+    /// (TASK-HFA-002), turning every model-backed decision stale.
+    var modelCallsSpent: Int = 0
     /// Non-nil when a model path was attempted and refused.
     let rejection: String?
   }
@@ -63,7 +68,7 @@ extension HarnessTaskCoordinator {
       let startedAtUTC = nowUTC()
       var contextDigest = ""
       var contextBytes = 0
-      func record(_ outcome: HarnessModelRunOutcome) async {
+      func record(_ outcome: HarnessModelRunOutcome, responseBytes: Int = 0) async {
         let run = HarnessModelRun(
           modelRunID: modelRunIDFactory(),
           htaskID: snapshot.htaskID,
@@ -72,7 +77,7 @@ extension HarnessTaskCoordinator {
           observedStateVersion: basis.stateVersion,
           contextDigest: contextDigest,
           contextBytes: contextBytes,
-          responseBytes: 0,
+          responseBytes: responseBytes,
           outcome: outcome,
           startedAtUTC: startedAtUTC,
           finishedAtUTC: nowUTC())
@@ -111,7 +116,7 @@ extension HarnessTaskCoordinator {
             reasonCode: proposal.reasonCode,
             producer: decisionGateway.producerID,
             createdAtUTC: nowUTC())
-          await record(.accepted(decisionID: decision.decisionID))
+          await record(.accepted(decisionID: decision.decisionID), responseBytes: bytes.count)
           return PlannedProposal(
             step: HarnessPlannedStep(
               decision: decision,
@@ -120,11 +125,14 @@ extension HarnessTaskCoordinator {
               phaseOnDispatch: proposal.kind == .proposePatch
                 ? .patching : deterministic.phaseOnDispatch),
             producer: decisionGateway.producerID,
+            modelCallsSpent: 1,
             rejection: nil)
         } catch let rejection as HarnessDecisionRejection {
-          await record(.rejected(reasonCode: rejection.reasonCode))
+          await record(
+            .rejected(reasonCode: rejection.reasonCode), responseBytes: bytes.count)
           return PlannedProposal(
             step: deterministic, producer: deterministic.decision.producer,
+            modelCallsSpent: 1,
             rejection: "proposalRejected:\(rejection.reasonCode)")
         }
       } catch let error as HarnessDecisionGatewayError {
@@ -137,11 +145,13 @@ extension HarnessTaskCoordinator {
         await record(.transportFailed(reasonCode: Self.describe(error)))
         return PlannedProposal(
           step: deterministic, producer: deterministic.decision.producer,
+          modelCallsSpent: 1,
           rejection: "gatewayUnavailable:\(Self.describe(error))")
       } catch {
         await record(.transportFailed(reasonCode: "gatewayFailure"))
         return PlannedProposal(
           step: deterministic, producer: deterministic.decision.producer,
+          modelCallsSpent: 1,
           rejection: "gatewayFailure")
       }
     }

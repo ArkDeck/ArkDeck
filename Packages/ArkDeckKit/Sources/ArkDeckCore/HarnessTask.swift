@@ -190,6 +190,10 @@ public struct HarnessTaskBudgets: Equatable, Sendable, Codable {
   /// Confirmed retries of one identical ActionRun. The first dispatch is not
   /// a retry; crash recovery reuses it and therefore does not consume this.
   public let maxActionRetriesPerRun: Int
+  /// Ceiling on model calls (CHG-2026-055, TASK-HFA-011). Zero means the
+  /// loop may not call a model at all, which is a legitimate configuration:
+  /// the deterministic handler converges without one.
+  public let maxModelCalls: Int
 
   enum CodingKeys: String, CodingKey {
     case maxRounds
@@ -198,6 +202,7 @@ public struct HarnessTaskBudgets: Equatable, Sendable, Codable {
     case maxE1Mutations
     case maxNoProgressRounds
     case maxActionRetriesPerRun
+    case maxModelCalls
   }
 
   public init(
@@ -206,7 +211,8 @@ public struct HarnessTaskBudgets: Equatable, Sendable, Codable {
     maxArtifactBytes: Int,
     maxE1Mutations: Int,
     maxNoProgressRounds: Int = 2,
-    maxActionRetriesPerRun: Int = 2
+    maxActionRetriesPerRun: Int = 2,
+    maxModelCalls: Int = 24
   ) {
     self.maxRounds = maxRounds
     self.maxWallClockSeconds = maxWallClockSeconds
@@ -214,11 +220,12 @@ public struct HarnessTaskBudgets: Equatable, Sendable, Codable {
     self.maxE1Mutations = maxE1Mutations
     self.maxNoProgressRounds = maxNoProgressRounds
     self.maxActionRetriesPerRun = maxActionRetriesPerRun
+    self.maxModelCalls = maxModelCalls
   }
 
-  /// Historical task snapshots predate the two strategy budgets. They remain
-  /// readable under the strict defaults instead of silently becoming
-  /// unbounded or failing recovery.
+  /// Historical task snapshots predate these ceilings. They remain readable
+  /// under the strict defaults instead of silently becoming unbounded or
+  /// failing recovery.
   public init(from decoder: any Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
     self.maxRounds = try container.decode(Int.self, forKey: .maxRounds)
@@ -229,6 +236,7 @@ public struct HarnessTaskBudgets: Equatable, Sendable, Codable {
       try container.decodeIfPresent(Int.self, forKey: .maxNoProgressRounds) ?? 2
     self.maxActionRetriesPerRun =
       try container.decodeIfPresent(Int.self, forKey: .maxActionRetriesPerRun) ?? 2
+    self.maxModelCalls = try container.decodeIfPresent(Int.self, forKey: .maxModelCalls) ?? 24
   }
 
   /// Ceilings are part of the model, not of a caller's judgement: an
@@ -236,7 +244,8 @@ public struct HarnessTaskBudgets: Equatable, Sendable, Codable {
   /// whole plane exists to prevent.
   public static let ceiling = HarnessTaskBudgets(
     maxRounds: 64, maxWallClockSeconds: 24 * 3600, maxArtifactBytes: 2 << 30,
-    maxE1Mutations: 32, maxNoProgressRounds: 32, maxActionRetriesPerRun: 16)
+    maxE1Mutations: 32, maxNoProgressRounds: 32, maxActionRetriesPerRun: 16,
+    maxModelCalls: 128)
 }
 
 public struct HarnessConsumedBudget: Equatable, Sendable, Codable {
@@ -244,22 +253,35 @@ public struct HarnessConsumedBudget: Equatable, Sendable, Codable {
   public let wallClockSeconds: Int
   public let artifactBytes: Int
   public let e1Mutations: Int
+  public let modelCalls: Int
 
   public init(
     rounds: Int = 0,
     wallClockSeconds: Int = 0,
     artifactBytes: Int = 0,
-    e1Mutations: Int = 0
+    e1Mutations: Int = 0,
+    modelCalls: Int = 0
   ) {
     self.rounds = rounds
     self.wallClockSeconds = wallClockSeconds
     self.artifactBytes = artifactBytes
     self.e1Mutations = e1Mutations
+    self.modelCalls = modelCalls
+  }
+
+  public init(from decoder: any Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    self.rounds = try container.decode(Int.self, forKey: .rounds)
+    self.wallClockSeconds = try container.decode(Int.self, forKey: .wallClockSeconds)
+    self.artifactBytes = try container.decode(Int.self, forKey: .artifactBytes)
+    self.e1Mutations = try container.decode(Int.self, forKey: .e1Mutations)
+    self.modelCalls = try container.decodeIfPresent(Int.self, forKey: .modelCalls) ?? 0
   }
 
   func isMonotonic(from previous: HarnessConsumedBudget) -> Bool {
     rounds >= previous.rounds && wallClockSeconds >= previous.wallClockSeconds
       && artifactBytes >= previous.artifactBytes && e1Mutations >= previous.e1Mutations
+      && modelCalls >= previous.modelCalls
   }
 }
 
