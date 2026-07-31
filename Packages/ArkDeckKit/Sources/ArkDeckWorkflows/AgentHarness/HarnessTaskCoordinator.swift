@@ -85,6 +85,10 @@ public actor HarnessTaskCoordinator {
   let actionIDFactory: @Sendable () -> String
   let memoryIDFactory: @Sendable () -> String
   let policyGuard: HarnessPolicyGuard
+  /// Absent means no model path exists in this composition at all.
+  let decisionGateway: (any HarnessDecisionGateway)?
+  /// Denied by default: enabling egress is an explicit per-project act.
+  let egressPolicy: HarnessEgressPolicy
 
   public init(
     store: HarnessTaskStore,
@@ -105,7 +109,9 @@ public actor HarnessTaskCoordinator {
     memoryIDFactory: @escaping @Sendable () -> String = {
       HarnessTaskCoordinator.freshMemoryID()
     },
-    policyGuard: HarnessPolicyGuard = HarnessPolicyGuard()
+    policyGuard: HarnessPolicyGuard = HarnessPolicyGuard(),
+    decisionGateway: (any HarnessDecisionGateway)? = nil,
+    egressPolicy: HarnessEgressPolicy = .deniedByDefault
   ) {
     self.store = store
     self.jobPort = jobPort
@@ -119,6 +125,8 @@ public actor HarnessTaskCoordinator {
     self.actionIDFactory = actionIDFactory
     self.memoryIDFactory = memoryIDFactory
     self.policyGuard = policyGuard
+    self.decisionGateway = decisionGateway
+    self.egressPolicy = egressPolicy
   }
 
   public static func freshTaskID() -> String {
@@ -354,9 +362,22 @@ public actor HarnessTaskCoordinator {
     guard let handler = handlers[snapshot.type] else {
       throw HarnessCoordinatorError.unsupportedTaskType(snapshot.type)
     }
-    let step = handler.plan(
-      for: snapshot, decisionID: decisionIDFactory(), nowUTC: nowUTC())
+    // One proposal per wake, from the model path when it is enabled and
+    // healthy, otherwise from the deterministic handler - and the record says
+    // which, and why (TASK-HTP-004).
+    let proposal = await plannedProposal(snapshot, handler: handler)
+    let step = proposal.step
     try await store.putDecision(step.decision)
+    if let rejection = proposal.rejection {
+      // Visible, not swallowed: the fallback is narrower than the model path,
+      // but a reader must be able to see that it happened and why.
+      try await appendTaskMemory(
+        snapshot, kind: .attempt,
+        summary:
+          "decision producer fell back to \(step.decision.producer): \(rejection)",
+        confidence: .observed,
+        evidence: HarnessMemoryEvidence(requestIDs: [step.decision.decisionID]))
+    }
 
     switch step.decision.kind {
     case .requestHuman:
@@ -382,7 +403,14 @@ public actor HarnessTaskCoordinator {
       return HarnessReconcileOutcome(
         snapshot: stopped, action: .stoppedNoSafeAction, reasonCode: step.decision.reasonCode)
     case .invokeOperation:
-      return try await dispatch(step, snapshot: snapshot, handler: handler)
+      let outcome = try await dispatch(step, snapshot: snapshot, handler: handler)
+      guard let rejection = proposal.rejection, outcome.action == .dispatched else {
+        return outcome
+      }
+      return HarnessReconcileOutcome(
+        snapshot: outcome.snapshot, action: outcome.action,
+        dispatchedJobID: outcome.dispatchedJobID,
+        reasonCode: "\(outcome.reasonCode)|\(rejection)")
     }
   }
 
@@ -399,7 +427,7 @@ public actor HarnessTaskCoordinator {
       // stop condition for this task, not a daemon fault.
       return try await stop(
         snapshot, refusal: .operationNotPermitted("-"), round: decision.round,
-        requestID: nil, jobID: nil)
+        requestID: nil, jobID: nil, decisionID: decision.decisionID)
     }
 
     let digest = HarnessRequestIdentity.inputsDigest(decision.inputs)
@@ -431,7 +459,8 @@ public actor HarnessTaskCoordinator {
         elapsedSeconds: elapsedSeconds(since: snapshot.createdAtUTC)))
     if case .refuse(let refusal) = verdict {
       return try await stop(
-        snapshot, refusal: refusal, round: decision.round, requestID: nil, jobID: nil)
+        snapshot, refusal: refusal, round: decision.round, requestID: nil, jobID: nil,
+        decisionID: decision.decisionID)
     }
     let identity = HarnessRequestIdentity.derive(
       htaskID: snapshot.htaskID, round: decision.round, decisionID: decision.decisionID,

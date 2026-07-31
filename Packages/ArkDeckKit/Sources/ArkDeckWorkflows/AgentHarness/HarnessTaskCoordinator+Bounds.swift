@@ -26,9 +26,23 @@ extension HarnessTaskCoordinator {
     refusal: HarnessGuardRefusal,
     round: Int?,
     requestID: String?,
-    jobID: String?
+    jobID: String?,
+    decisionID: String? = nil
   ) async throws -> HarnessReconcileOutcome {
     let reason = refusal.reasonCode
+    // A refused step is still an attempt: "we were going to do X and did not,
+    // because Y" belongs in the task's memory for the same reason a failed job
+    // does. Without this, guard refusals were the one class of non-event the
+    // record could not explain afterwards.
+    if let evidenceID = decisionID ?? requestID ?? jobID {
+      try await appendTaskMemory(
+        snapshot, kind: .attempt,
+        summary: "guard refused the proposed step: \(reason)",
+        confidence: .observed,
+        evidence: HarnessMemoryEvidence(
+          jobIDs: [jobID].compactMap { $0 }, requestIDs: [evidenceID],
+          artifactIDs: snapshot.artifactRefs))
+    }
     if let blockKind = refusal.humanCategory {
       let blocked = try await recordBlock(
         snapshot, block: blockKind, reasonCode: reason, round: round, jobID: jobID,

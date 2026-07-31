@@ -1,8 +1,8 @@
 # Verification — CHG-2026-054
 
 > Change:CHG-2026-054-agent-harness-task-plane@r1
-> Status:in_progress # 2026-07-31:HTP-AC-1..11 通过(AC-7 的真机字节面如实
-> pending-hardware);AC-12..17 pending(各自任务未开工),AC-18/19 pending-hardware。每条结论由其所属任务的实现 PR 写入本文件;维护者
+> Status:in_progress # 2026-07-31:HTP-AC-1..14 通过(AC-7 的真机字节面如实
+> pending-hardware);AC-15..17 pending(TASK-HTP-005 未开工),AC-18/19 pending-hardware。每条结论由其所属任务的实现 PR 写入本文件;维护者
 > review/merge 该实现 PR 即确认。不为本 change 追加独立 verification/archive 载体
 > (PRODUCT-LOOP §4/§20)。
 
@@ -200,23 +200,46 @@
   字段、retry 计数、成功结论、授权结果、catalog 外 operationRef、typed inputs 越界;
   正例只接受四类 decision。
 - Evidence:实现 PR 内测试(负例逐项)。
-- 结论:pending
+- **结论(2026-07-31):PASS** — `HarnessDecisionProposal.parse` 用封闭键集解码 +
+  显式禁止键集。`testStateRetryAndSuccessFieldsAreRejectedNotIgnored` 逐字段断言
+  status/phase/result/retryCount/verdict/succeeded/authorization/capabilityId/effect/
+  budget/activeJobId/version 共 12 键一律 `forbiddenField` **拒绝而非忽略**;
+  `testUnknownFieldsAndKindsAreRefused`(未知键/未知 kind/非 JSON)、
+  `testRawCommandSurfacesAreRefusedInInputsAndInProse`(inputs 与 hypothesis 双面)、
+  `testAnOperationOutsideTheOfferIsRefused`(`operationNotOffered` / `operationRequired`)、
+  `testEmptyAndOversizedFieldsAreRefused` 各自覆盖;正例只接受四类 decision。
+  端到端:`testARejectedProposalFallsBackVisiblyAndChangesNothingElse` 断言模型宣称
+  `status: succeeded` 时整条被拒、任务不成功、回退可见(reasonCode + task memory)。
 
 ## HTP-AC-13 出站默认 deny 与脱敏有界(TASK-HTP-004)
 
 - 方法:默认配置下断言零出站(无 adapter 调用);显式开启后断言 `DecisionContext`
   仅含脱敏、有界摘要与 artifact 引用——不含未脱敏字节、设备标识、凭据,且总尺寸
-  在声明上限内;超限时裁剪并记录,而非静默发送。
-- Evidence:实现 PR 内测试。
-- 结论:pending
+  在声明上限内;超限时拒发并记录,而非静默发送。
+- Evidence:实现 PR 内测试 + `evidence/runs/TASK-HTP-004/run-r1.md`。
+- **结论(2026-07-31):PASS** — `testEgressIsDeniedByDefaultAndNoContextLeavesTheHost`
+  断言默认配置下 gateway **零调用**、loop 仍照常推进(内建 handler)、回退写入 task
+  memory;`testEgressWithoutAProjectRefIsDenied` 断言无 projectRef / 未登记项目均拒;
+  `testAnEnabledContextIsBoundedPseudonymousAndFreeOfDeviceIdentity` 断言 target 以单向
+  摘要出现(≠ 原 id)、`HarnessEgressScreen` 扫不到 targetID/connectKey/serial/
+  stablePhysicalIdentity/远端路径、artifact 只带 id+size+digest 前缀+verified(无内容)、
+  编码尺寸在上限内;`testContextTrimmingIsRecordedRatherThanSilent` 断言裁剪逐项记录;
+  `testAnOversizedContextIsRefusedInsteadOfSent` 断言超限**拒发**(context 从未交给
+  adapter)并退回确定性策略。生产开关 = `ARKDECK_HARNESS_EGRESS_PROJECTS`,未设即 deny。
 
 ## HTP-AC-14 决策端口可替换且状态不依赖模型会话(TASK-HTP-004)
 
-- 方法:同一 `DecisionContext` 分别经离线确定性 adapter 与真实 adapter,断言状态机
-  结论路径等价(接受/拒绝/停止的判定不依赖 adapter 身份);断言 task 状态不保存任何
-  模型会话句柄。
+- 方法:同一批步骤分别由内建 handler 与经端口的模型提出,断言状态机结论路径等价
+  (接受/拒绝/停止的判定不依赖提出者身份);断言 task 状态不保存任何模型会话句柄。
 - Evidence:实现 PR 内测试。
-- 结论:pending
+- **结论(2026-07-31):PASS** — `testConclusionsFollowTheStepNotTheProducer`:同样两步
+  (observe → capture)一次由内建 handler 提出、一次经端口由脚本化模型提出(第三拍模型
+  不可达),两条 trace 逐项相等且都以 `stoppedForHuman` 收尾;
+  `testTaskStateHoldsNoModelSessionHandle` 断言 decision 记录有 producer id 而 task 快照
+  扫不到 session/conversation/messages/apiKey/token。
+  **方法修正**:原计划的"离线确定性 adapter"被删除 —— 它是 handler 策略的第二份实现
+  (第一版实际会在设备未观测前先跑 capture,被本 AC 的等价性测试照出),内建生产者就是
+  handler 本身,端口只留给仓外生产者;文件内注明理由防止回退。
 
 ## HTP-AC-15 workspace provider availability 与零 raw 命令(TASK-HTP-005)
 

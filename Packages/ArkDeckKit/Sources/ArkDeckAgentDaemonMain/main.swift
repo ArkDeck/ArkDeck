@@ -229,13 +229,34 @@ Task.detached {
     // daemon. It reaches execution only through the engine port below.
     let harnessStore = try HarnessTaskStore(
       rootURL: resolvedStateDirectory.appendingPathComponent("harness", isDirectory: true))
+    // Model egress is opt-in per project and off unless the operator names
+    // them: `ARKDECK_HARNESS_EGRESS_PROJECTS=app-a,app-b`. With none named no
+    // decision context leaves this host and the loop runs on the built-in
+    // deterministic handler (CHG-2026-054 HTP-INV-10).
+    let egressProjects = Set(
+      (ProcessInfo.processInfo.environment["ARKDECK_HARNESS_EGRESS_PROJECTS"] ?? "")
+        .split(separator: ",")
+        .map { $0.trimmingCharacters(in: .whitespaces) }
+        .filter { !$0.isEmpty })
+    if !egressProjects.isEmpty {
+      print("harness decision egress enabled for \(egressProjects.sorted().joined(separator: ","))")
+      fflush(stdout)
+    }
     let harness = HarnessTaskCoordinator(
       store: harnessStore,
       jobPort: RuntimeJobEngineHarnessPort(engine: engine),
       // Evidence access is what makes a verdict possible at all; without it
       // the loop stops honestly instead of guessing (CHG-2026-054 TASK-HTP-002).
       artifactPort: RuntimeArtifactStoreHarnessPort(store: artifactStore),
-      nowUTC: utcNow)
+      nowUTC: utcNow,
+      policyGuard: HarnessPolicyGuard(
+        availability: RuntimeEngineAvailabilityPort(engine: engine),
+        capabilities: RuntimeCapabilityStoreHarnessPort(
+          store: capabilityStore, nowUTC: utcNow)),
+      // No adapter ships in this composition yet: the port exists, and a
+      // model-backed producer is configured by whoever supplies one.
+      decisionGateway: nil,
+      egressPolicy: HarnessEgressPolicy(enabledProjects: egressProjects))
     // Recovery resolves dispatch intents whose outcome was lost; it starts
     // no new work, so a restart cannot become a burst of dispatches.
     let recoveredTasks = try await harness.recoverTasks()
