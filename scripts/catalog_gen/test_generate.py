@@ -47,7 +47,12 @@ class RealCatalogTests(unittest.TestCase):
                 "deploy.native-library.system@1",
                 "flash.dayu200@1",
                 "observe.device@1",
+                "workspace.apply-patch@1",
+                "workspace.build-openharmony@1",
                 "workspace.inspect-source@1",
+                "workspace.revert-patch@1",
+                "workspace.run-tests@1",
+                "workspace.symbolize-crash@1",
             ],
         )
         self.assertEqual(

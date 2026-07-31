@@ -5,11 +5,16 @@
   "provider": "workspace",
   "title": "This host's declared source workspaces",
   "constraints": {
-    "toolFamily": "host-inspector",
-    "writes": "none",
-    "notes": "Host-only profile: no device, no connect key, no binding revision. The inspector executable is resolved and hashed at startup; this profile never carries executable paths or argv."
+    "toolFamily": "descriptor-bound-workspace-tools",
+    "writes": "ProjectProfile-glob-bounded",
+    "notes": "Host-only profile: no device, no connect key, no binding revision. Executable identities and full argv are repository-owned presets; patch writes are Artifact-backed, read back, durable and exactly revertible."
   },
   "supportedOperations": [
-    "workspace.inspect-source@1"
+    "workspace.inspect-source@1",
+    "workspace.apply-patch@1",
+    "workspace.build-openharmony@1",
+    "workspace.run-tests@1",
+    "workspace.symbolize-crash@1",
+    "workspace.revert-patch@1"
   ]
 }

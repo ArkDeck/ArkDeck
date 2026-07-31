@@ -202,10 +202,10 @@ Task.detached {
       // belongs to the live dispatcher so an installed product component can
       // become visible without caching a startup-only rejection.
       availability: .available)
-    // Host-only workspace provider (CHG-2026-054 TASK-HTP-007). Both halves are
-    // explicit configuration and neither is guessed: with no inspector or no
-    // declared project the operation reports unavailable, so nothing is
-    // admitted and no capability is consumed.
+    // Host-only workspace provider (CHG-2026-054 TASK-HTP-007/005). Project
+    // roots and the optional inspector are explicit configuration; operation
+    // presets come from the built-in ProjectProfile. Missing pieces report
+    // unavailable, so nothing is admitted and no capability is consumed.
     //   ARKDECK_WORKSPACE_INSPECTOR=/usr/bin/grep
     //   ARKDECK_WORKSPACE_PROJECTS=demo-app=/abs/path,other=/abs/other
     let workspaceRoots = Dictionary(
@@ -221,21 +221,52 @@ Task.detached {
         })
     let configuredInspector = ProcessInfo.processInfo.environment["ARKDECK_WORKSPACE_INSPECTOR"]
     var workspaceTool: WorkspaceInspectorTool?
+    var inspectorExecutable: ResolvedExecutable?
     var workspaceDispatcher: any RuntimeProcessDispatching = RefusingDispatcher(
-      reason: "no workspace inspector configured (set ARKDECK_WORKSPACE_INSPECTOR)")
+      reason: "no workspace ProjectProfile is configured")
     if let configuredInspector {
       let resolver = try FixedExecutableResolver.hashing(
         path: configuredInspector, providerID: "workspace")
       let resolved = try resolver.resolveExecutable(providerID: "workspace")
+      inspectorExecutable = resolved
       workspaceTool = WorkspaceInspectorTool(
         executablePath: resolved.path, executableSHA256: resolved.sha256)
-      workspaceDispatcher = DescriptorBoundProcessDispatcher(resolver: resolver)
+    }
+    let workspaceOperations: any DeviceProvider
+    var workspaceOperationResolver: WorkspaceActionExecutableResolver?
+    if let arkDeckRoot = workspaceRoots["ArkDeck"] {
+      do {
+        let profile = try WorkspaceProjectProfile.arkDeck(
+          rootURL: URL(fileURLWithPath: arkDeckRoot, isDirectory: true))
+        let attempts = try WorkspacePatchAttemptStore(
+          rootURL: resolvedStateDirectory.appendingPathComponent(
+            "workspace-patch-attempts", isDirectory: true))
+        workspaceOperations = WorkspaceOperationsProvider(
+          profile: profile, attemptStore: attempts, nowUTC: utcNow)
+        workspaceOperationResolver = WorkspaceActionExecutableResolver(profile: profile)
+      } catch {
+        workspaceOperations = UnavailableWorkspaceOperationsProvider(
+          reason: "workspace.projectProfileUnavailable:\(error)")
+      }
+    } else {
+      workspaceOperations = UnavailableWorkspaceOperationsProvider(
+        reason: "workspace.projectProfileUnavailable:ArkDeck is not registered")
+    }
+    if let workspaceOperationResolver {
+      workspaceDispatcher = DescriptorBoundProcessDispatcher(
+        resolver: CombinedWorkspaceExecutableResolver(
+          inspector: inspectorExecutable, operations: workspaceOperationResolver))
+    } else if let inspectorExecutable {
+      workspaceDispatcher = DescriptorBoundProcessDispatcher(
+        resolver: FixedExecutableResolver(
+          table: ["workspace": inspectorExecutable]))
     }
     let workspaceProvider = WorkspaceProvider(
-      registry: WorkspaceProjectRegistry(roots: workspaceRoots), tool: workspaceTool)
-    if workspaceTool != nil, !workspaceRoots.isEmpty {
+      registry: WorkspaceProjectRegistry(roots: workspaceRoots),
+      tool: workspaceTool, operations: workspaceOperations)
+    if workspaceOperationResolver != nil {
       print(
-        "workspace provider ready for \(workspaceRoots.keys.sorted().joined(separator: ","))")
+        "workspace ProjectProfile ready for ArkDeck")
       fflush(stdout)
     }
 

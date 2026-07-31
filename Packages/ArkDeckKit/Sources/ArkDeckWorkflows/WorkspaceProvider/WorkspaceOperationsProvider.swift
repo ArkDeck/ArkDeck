@@ -1,0 +1,1144 @@
+// Repository-managed workspace operation extension (CHG-2026-054, TASK-HTP-005).
+//
+// Runtime callers select only a project/preset and bounded typed inputs.
+// Executable identities and complete argument arrays belong to the
+// ProjectProfile. Patch paths come from resolved Artifact leases, are parsed
+// and scope-checked before dispatch, and every successful write has an exact
+// before/after readback record that can be reconciled or reverted.
+
+import ArkDeckCore
+import CryptoKit
+import Foundation
+
+public struct WorkspaceExecutableIdentity: Sendable, Equatable, Hashable, Codable {
+  public let path: String
+  public let sha256: String
+
+  public init(path: String, sha256: String) throws {
+    guard path.hasPrefix("/"), URL(fileURLWithPath: path).standardizedFileURL.path == path else {
+      throw DeviceProviderError.factsUnavailable(
+        "workspace executable path must be canonical and absolute")
+    }
+    guard WorkspaceProviderSupport.isSHA256(sha256) else {
+      throw DeviceProviderError.factsUnavailable(
+        "workspace executable identity must be a lowercase SHA-256")
+    }
+    self.path = path
+    self.sha256 = sha256
+  }
+
+  public static func hashing(path: String) throws -> WorkspaceExecutableIdentity {
+    let canonical = URL(fileURLWithPath: path).standardizedFileURL.path
+    let bytes = try Data(contentsOf: URL(fileURLWithPath: canonical))
+    return try WorkspaceExecutableIdentity(
+      path: canonical, sha256: WorkspaceProviderSupport.sha256(bytes))
+  }
+}
+
+public struct WorkspaceCommandPreset: Sendable, Equatable {
+  public let presetID: String
+  public let executable: WorkspaceExecutableIdentity
+  public let argumentZero: String?
+  public let fixedArguments: [String]
+  public let timeoutSeconds: Int
+
+  public init(
+    presetID: String,
+    executable: WorkspaceExecutableIdentity,
+    argumentZero: String? = nil,
+    fixedArguments: [String],
+    timeoutSeconds: Int
+  ) throws {
+    guard WorkspaceProviderSupport.isIdentifier(presetID) else {
+      throw DeviceProviderError.factsUnavailable("workspace preset id is malformed")
+    }
+    guard (1...7_200).contains(timeoutSeconds) else {
+      throw DeviceProviderError.factsUnavailable("workspace preset timeout is outside 1...7200")
+    }
+    guard argumentZero.map({
+      !$0.isEmpty && !$0.contains("\0") && $0.utf8.count <= 4_096
+    }) ?? true,
+      fixedArguments.count <= 128,
+      fixedArguments.allSatisfy({
+        !$0.contains("\0") && $0.utf8.count <= 4_096
+      })
+    else {
+      throw DeviceProviderError.factsUnavailable("workspace preset arguments are not bounded")
+    }
+    self.presetID = presetID
+    self.executable = executable
+    self.argumentZero = argumentZero
+    self.fixedArguments = fixedArguments
+    self.timeoutSeconds = timeoutSeconds
+  }
+}
+
+public struct WorkspaceProjectProfile: Sendable, Equatable {
+  public let profileID: String
+  public let projectRef: String
+  public let projectRoot: String
+  public let allowedFileGlobs: [String]
+  public let inspectionPreset: WorkspaceCommandPreset
+  public let patchPreset: WorkspaceCommandPreset
+  public let buildPresets: [String: WorkspaceCommandPreset]
+  public let testPresets: [String: WorkspaceCommandPreset]
+  public let symbolPresets: [String: WorkspaceCommandPreset]
+
+  public init(
+    profileID: String,
+    projectRef: String,
+    projectRoot: String,
+    allowedFileGlobs: [String],
+    inspectionPreset: WorkspaceCommandPreset,
+    patchPreset: WorkspaceCommandPreset,
+    buildPresets: [String: WorkspaceCommandPreset],
+    testPresets: [String: WorkspaceCommandPreset],
+    symbolPresets: [String: WorkspaceCommandPreset]
+  ) throws {
+    let canonical = URL(fileURLWithPath: projectRoot)
+      .resolvingSymlinksInPath().standardizedFileURL.path
+    var isDirectory: ObjCBool = false
+    guard projectRoot.hasPrefix("/"),
+      FileManager.default.fileExists(atPath: canonical, isDirectory: &isDirectory),
+      isDirectory.boolValue
+    else {
+      throw DeviceProviderError.factsUnavailable(
+        "workspace project root must be an existing canonical directory")
+    }
+    guard WorkspaceProviderSupport.isIdentifier(profileID),
+      WorkspaceProviderSupport.isIdentifier(projectRef),
+      !allowedFileGlobs.isEmpty,
+      allowedFileGlobs.count <= 64,
+      allowedFileGlobs.allSatisfy(WorkspaceProviderSupport.isSafeGlob),
+      buildPresets.allSatisfy({ $0.key == $0.value.presetID }),
+      testPresets.allSatisfy({ $0.key == $0.value.presetID }),
+      symbolPresets.allSatisfy({ $0.key == $0.value.presetID })
+    else {
+      throw DeviceProviderError.factsUnavailable("workspace ProjectProfile is malformed")
+    }
+    self.profileID = profileID
+    self.projectRef = projectRef
+    self.projectRoot = canonical
+    self.allowedFileGlobs = allowedFileGlobs
+    self.inspectionPreset = inspectionPreset
+    self.patchPreset = patchPreset
+    self.buildPresets = buildPresets
+    self.testPresets = testPresets
+    self.symbolPresets = symbolPresets
+  }
+
+  /// Built-in profile for this repository. An explicit root override is
+  /// configuration, not authority; the closed preset vocabulary stays here.
+  public static func arkDeck(rootURL: URL) throws -> WorkspaceProjectProfile {
+    let root = rootURL.resolvingSymlinksInPath().standardizedFileURL.path
+    let grep = try WorkspaceExecutableIdentity.hashing(path: "/usr/bin/grep")
+    let patch = try WorkspaceExecutableIdentity.hashing(path: "/usr/bin/patch")
+    let swiftPackagePaths = [
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/"
+        + "XcodeDefault.xctoolchain/usr/bin/swift-package",
+      "/Library/Developer/CommandLineTools/usr/bin/swift-package",
+    ]
+    guard let swiftPackagePath = swiftPackagePaths.first(where: {
+      FileManager.default.isExecutableFile(atPath: $0)
+    }) else {
+      throw DeviceProviderError.factsUnavailable(
+        "workspace.toolchainUnavailable: no fixed SwiftPM executable exists")
+    }
+    let swiftPackage = try WorkspaceExecutableIdentity.hashing(path: swiftPackagePath)
+    let swiftBin = URL(fileURLWithPath: swiftPackagePath).deletingLastPathComponent()
+    let swiftBuildRole = swiftBin.appendingPathComponent("swift-build").path
+    let swiftTestRole = swiftBin.appendingPathComponent("swift-test").path
+    guard FileManager.default.fileExists(atPath: swiftBuildRole),
+      FileManager.default.fileExists(atPath: swiftTestRole)
+    else {
+      throw DeviceProviderError.factsUnavailable(
+        "workspace.toolchainUnavailable: SwiftPM role links are absent")
+    }
+    let inspection = try WorkspaceCommandPreset(
+      presetID: "source-inspection", executable: grep,
+      fixedArguments: [], timeoutSeconds: 30)
+    let patching = try WorkspaceCommandPreset(
+      presetID: "unified-diff", executable: patch,
+      fixedArguments: [], timeoutSeconds: 120)
+    let packagePath = URL(fileURLWithPath: root)
+      .appendingPathComponent("Packages/ArkDeckKit").path
+    guard FileManager.default.fileExists(
+      atPath: URL(fileURLWithPath: packagePath)
+        .appendingPathComponent("Package.swift").path)
+    else {
+      throw DeviceProviderError.factsUnavailable(
+        "workspace.projectProfileUnavailable: ArkDeck Package.swift is absent")
+    }
+    let build = try WorkspaceCommandPreset(
+      presetID: "arkdeck-debug", executable: swiftPackage,
+      argumentZero: swiftBuildRole,
+      fixedArguments: ["--package-path", packagePath],
+      timeoutSeconds: 900)
+    let tests = try WorkspaceCommandPreset(
+      presetID: "arkdeck-tests", executable: swiftPackage,
+      argumentZero: swiftTestRole,
+      fixedArguments: [
+        "--package-path", packagePath,
+        // A daemon cannot safely run the contract that launches and
+        // terminates another copy of its own composition-root binary. That
+        // lifecycle test remains in CI/full developer runs; this preset
+        // excludes only the self-termination shape.
+        "--skip",
+        "ArkDeckContractTests.AgentDaemonContractTests/"
+          + "testDaemonBinaryStaysAliveAndServesRequests",
+      ],
+      timeoutSeconds: 900)
+    return try WorkspaceProjectProfile(
+      profileID: "workspace-host@1", projectRef: "ArkDeck",
+      projectRoot: root,
+      allowedFileGlobs: [
+        "Packages/ArkDeckKit/**", "Catalog/**", "docs/**",
+      ],
+      inspectionPreset: inspection, patchPreset: patching,
+      buildPresets: [build.presetID: build],
+      testPresets: [tests.presetID: tests],
+      // No generic symbolizer is guessed. A profile without an exact symbol
+      // preset publishes workspace.symbolize-crash as UNAVAILABLE.
+      symbolPresets: [:])
+  }
+
+  fileprivate var executableIdentities: Set<WorkspaceExecutableIdentity> {
+    var values: Set<WorkspaceExecutableIdentity> = [
+      inspectionPreset.executable, patchPreset.executable,
+    ]
+    for preset in buildPresets.values { values.insert(preset.executable) }
+    for preset in testPresets.values { values.insert(preset.executable) }
+    for preset in symbolPresets.values { values.insert(preset.executable) }
+    return values
+  }
+}
+
+public struct UnavailableWorkspaceOperationsProvider: DeviceProvider {
+  public let providerID = "workspace"
+  private let reason: String
+
+  public init(reason: String) {
+    self.reason = reason
+  }
+
+  public func runtimeAvailability(
+    for operation: CatalogOperationDescriptor
+  ) -> ProviderOperationAvailability {
+    .unavailable(reason: reason)
+  }
+
+  public func resolveFacts(targetID: String) async throws -> ProviderFacts {
+    throw DeviceProviderError.factsUnavailable(reason)
+  }
+
+  public func action(
+    for step: CatalogStepDescriptor,
+    operation: CatalogOperationDescriptor,
+    inputs: [String: JSONValue]
+  ) throws -> TypedProviderAction {
+    throw DeviceProviderError.factsUnavailable(reason)
+  }
+
+  public func lower(
+    action: TypedProviderAction,
+    context: ProviderExecutionContext
+  ) throws -> TypedProcessPlan {
+    throw DeviceProviderError.factsUnavailable(reason)
+  }
+
+  public func verify(
+    receipt: ProviderProcessReceipt,
+    action: TypedProviderAction,
+    context: ProviderExecutionContext
+  ) throws -> ProviderSemanticOutcome {
+    .unsupported(reason: reason)
+  }
+
+  public func reconcile(
+    intent: ProviderDurableIntentReference,
+    context: ProviderExecutionContext
+  ) async throws -> ProviderReconcileOutcome {
+    .stillUnknown(reason: reason)
+  }
+}
+
+public struct WorkspaceResolvedInvocation: Sendable, Equatable, Codable {
+  public let operation: String
+  public let projectRef: String
+  public let projectRoot: String
+  public let presetID: String
+  public let executable: WorkspaceExecutableIdentity
+  public let argumentZero: String?
+  public let arguments: [String]
+  public let timeoutSeconds: Int
+}
+
+public struct WorkspaceFileSnapshot: Sendable, Equatable, Codable {
+  public let relativePath: String
+  public let sha256: String?
+}
+
+public struct WorkspacePatchIntent: Sendable, Equatable, Codable {
+  public let invocation: WorkspaceResolvedInvocation
+  public let patchAttemptRef: String
+  public let patchArtifactID: String
+  public let patchFilePath: String
+  public let patchSHA256: String
+  public let allowedFileGlobs: [String]
+  public let before: [WorkspaceFileSnapshot]
+}
+
+public struct WorkspacePatchAttempt: Sendable, Equatable, Codable {
+  public let patchAttemptRef: String
+  public let projectRef: String
+  public let projectRoot: String
+  public let patchArtifactID: String
+  public let patchFilePath: String
+  public let patchSHA256: String
+  public let allowedFileGlobs: [String]
+  public let before: [WorkspaceFileSnapshot]
+  public let after: [WorkspaceFileSnapshot]
+  public let appliedAtUTC: String
+  public let revertedAtUTC: String?
+
+  fileprivate func markingReverted(atUTC: String) -> WorkspacePatchAttempt {
+    WorkspacePatchAttempt(
+      patchAttemptRef: patchAttemptRef, projectRef: projectRef,
+      projectRoot: projectRoot, patchArtifactID: patchArtifactID,
+      patchFilePath: patchFilePath, patchSHA256: patchSHA256,
+      allowedFileGlobs: allowedFileGlobs, before: before, after: after,
+      appliedAtUTC: appliedAtUTC, revertedAtUTC: atUTC)
+  }
+}
+
+public struct WorkspaceRevertIntent: Sendable, Equatable, Codable {
+  public let invocation: WorkspaceResolvedInvocation
+  public let attempt: WorkspacePatchAttempt
+}
+
+extension WorkspaceProviderAction {
+  var operationInvocation: WorkspaceResolvedInvocation? {
+    switch self {
+    case .inspectSource:
+      return nil
+    case .buildOpenHarmony(let value), .runTests(let value),
+      .symbolizeCrash(let value):
+      return value
+    case .applyPatch(let value):
+      return value.invocation
+    case .revertPatch(let value):
+      return value.invocation
+    }
+  }
+}
+
+public final class WorkspacePatchAttemptStore: @unchecked Sendable {
+  private let rootURL: URL
+  private let lock = NSLock()
+
+  public init(rootURL: URL) throws {
+    self.rootURL = rootURL
+    try FileManager.default.createDirectory(
+      at: rootURL, withIntermediateDirectories: true,
+      attributes: [.posixPermissions: 0o700])
+  }
+
+  public func load(_ reference: String) throws -> WorkspacePatchAttempt {
+    try lock.withLock {
+      try JSONDecoder().decode(
+        WorkspacePatchAttempt.self, from: Data(contentsOf: url(for: reference)))
+    }
+  }
+
+  public func save(_ attempt: WorkspacePatchAttempt) throws {
+    try lock.withLock {
+      let encoder = JSONEncoder()
+      encoder.outputFormatting = [.sortedKeys, .prettyPrinted, .withoutEscapingSlashes]
+      let data = try encoder.encode(attempt)
+      let destination = try url(for: attempt.patchAttemptRef)
+      let temporary = rootURL.appendingPathComponent(
+        ".\(attempt.patchAttemptRef).tmp.\(getpid())")
+      try data.write(to: temporary, options: [])
+      let handle = try FileHandle(forWritingTo: temporary)
+      try handle.synchronize()
+      try handle.close()
+      if FileManager.default.fileExists(atPath: destination.path) {
+        _ = try FileManager.default.replaceItemAt(destination, withItemAt: temporary)
+      } else {
+        try FileManager.default.moveItem(at: temporary, to: destination)
+      }
+    }
+  }
+
+  /// Copies the leased patch bytes into the provider-owned attempt store.
+  /// Artifact leases may expire after the apply Job finishes; revert must
+  /// remain possible from the durable patchAttemptRef alone.
+  public func persistPatch(
+    reference: String, sourceURL: URL, expectedSHA256: String
+  ) throws -> String {
+    try lock.withLock {
+      let destination = try patchURL(for: reference)
+      if FileManager.default.fileExists(atPath: destination.path) {
+        let existing = try Data(contentsOf: destination)
+        guard WorkspaceProviderSupport.sha256(existing) == expectedSHA256 else {
+          throw DeviceProviderError.factsUnavailable(
+            "workspace durable patch bytes do not match the attempt digest")
+        }
+        return destination.path
+      }
+      let bytes = try Data(contentsOf: sourceURL)
+      guard WorkspaceProviderSupport.sha256(bytes) == expectedSHA256 else {
+        throw DeviceProviderError.factsUnavailable(
+          "workspace leased patch bytes changed before durable persistence")
+      }
+      let temporary = rootURL.appendingPathComponent(
+        ".\(reference).patch.tmp.\(getpid())")
+      try bytes.write(to: temporary, options: [])
+      let handle = try FileHandle(forWritingTo: temporary)
+      try handle.synchronize()
+      try handle.close()
+      try FileManager.default.moveItem(at: temporary, to: destination)
+      return destination.path
+    }
+  }
+
+  private func url(for reference: String) throws -> URL {
+    try validate(reference)
+    return rootURL.appendingPathComponent("\(reference).json")
+  }
+
+  private func patchURL(for reference: String) throws -> URL {
+    try validate(reference)
+    return rootURL.appendingPathComponent("\(reference).patch")
+  }
+
+  private func validate(_ reference: String) throws {
+    guard reference.hasPrefix("patch-"), reference.count == 38,
+      reference.dropFirst(6).allSatisfy({ $0.isHexDigit && !$0.isUppercase })
+    else {
+      throw DeviceProviderError.unsupportedAction("workspace patch attempt ref is malformed")
+    }
+  }
+}
+
+/// Dispatcher resolver that accepts only executable identities in the same
+/// ProjectProfile as the provider. The executor performs the final identity
+/// check again atomically at spawn.
+public struct WorkspaceActionExecutableResolver: RuntimeExecutableResolving {
+  private let allowed: Set<WorkspaceExecutableIdentity>
+
+  public init(profile: WorkspaceProjectProfile) {
+    self.allowed = profile.executableIdentities
+  }
+
+  public func resolveExecutable(providerID: String) throws -> ResolvedExecutable {
+    guard providerID == "workspace" else {
+      throw RuntimeDispatchFailure.failed(
+        "workspace resolver cannot serve provider \(providerID)")
+    }
+    for identity in allowed {
+      _ = try validated(identity)
+    }
+    guard let first = allowed.sorted(by: { $0.path < $1.path }).first else {
+      throw RuntimeDispatchFailure.failed("workspace profile has no executable presets")
+    }
+    return try validated(first)
+  }
+
+  public func resolveExecutable(for action: TypedProviderAction) throws -> ResolvedExecutable {
+    guard case .workspace(let workspace) = action,
+      let invocation = workspace.operationInvocation,
+      allowed.contains(invocation.executable)
+    else {
+      throw RuntimeDispatchFailure.failed(
+        "workspace action executable is not owned by the active ProjectProfile")
+    }
+    return try validated(invocation.executable)
+  }
+
+  private func validated(_ identity: WorkspaceExecutableIdentity) throws -> ResolvedExecutable {
+    let bytes = try Data(contentsOf: URL(fileURLWithPath: identity.path))
+    guard WorkspaceProviderSupport.sha256(bytes) == identity.sha256 else {
+      throw RuntimeDispatchFailure.failed(
+        "workspace executable identity drifted: \(identity.path)")
+    }
+    return ResolvedExecutable(path: identity.path, sha256: identity.sha256)
+  }
+}
+
+/// One dispatcher route serves both the TASK-HTP-007 inspector and the five
+/// ProjectProfile operations. Selection is made only from the exact typed
+/// action; callers cannot name an executable.
+public struct CombinedWorkspaceExecutableResolver: RuntimeExecutableResolving {
+  private let inspector: ResolvedExecutable?
+  private let operations: WorkspaceActionExecutableResolver
+
+  public init(
+    inspector: ResolvedExecutable?,
+    operations: WorkspaceActionExecutableResolver
+  ) {
+    self.inspector = inspector
+    self.operations = operations
+  }
+
+  public func resolveExecutable(providerID: String) throws -> ResolvedExecutable {
+    guard providerID == "workspace" else {
+      throw RuntimeDispatchFailure.failed(
+        "workspace resolver cannot serve provider \(providerID)")
+    }
+    return try operations.resolveExecutable(providerID: providerID)
+  }
+
+  public func resolveExecutable(for action: TypedProviderAction) throws -> ResolvedExecutable {
+    guard case .workspace(let workspace) = action else {
+      throw RuntimeDispatchFailure.failed(
+        "workspace resolver received a foreign typed action")
+    }
+    if case .inspectSource = workspace {
+      guard let inspector else {
+        throw RuntimeDispatchFailure.failed(
+          "no workspace inspector executable is configured")
+      }
+      return inspector
+    }
+    return try operations.resolveExecutable(for: action)
+  }
+}
+
+public struct WorkspaceOperationsProvider: DeviceProvider {
+  public let providerID = "workspace"
+  private let profile: WorkspaceProjectProfile
+  private let attempts: WorkspacePatchAttemptStore
+  private let nowUTC: @Sendable () -> String
+
+  public init(
+    profile: WorkspaceProjectProfile,
+    attemptStore: WorkspacePatchAttemptStore,
+    nowUTC: @escaping @Sendable () -> String
+  ) {
+    self.profile = profile
+    self.attempts = attemptStore
+    self.nowUTC = nowUTC
+  }
+
+  public func runtimeAvailability(
+    for operation: CatalogOperationDescriptor
+  ) -> ProviderOperationAvailability {
+    guard operation.provider == .workspace else {
+      return .unavailable(reason: "workspace.unsupportedProvider")
+    }
+    let hasPreset: Bool
+    switch operation.reference {
+    case "workspace.apply-patch@1", "workspace.revert-patch@1":
+      hasPreset = true
+    case "workspace.build-openharmony@1":
+      hasPreset = !profile.buildPresets.isEmpty
+    case "workspace.run-tests@1":
+      hasPreset = !profile.testPresets.isEmpty
+    case "workspace.symbolize-crash@1":
+      hasPreset = !profile.symbolPresets.isEmpty
+    default:
+      return .unavailable(reason: "workspace.unsupportedOperation")
+    }
+    guard hasPreset else {
+      return .unavailable(reason: "workspace.presetUnavailable")
+    }
+    do {
+      for identity in profile.executableIdentities {
+        let bytes = try Data(contentsOf: URL(fileURLWithPath: identity.path))
+        guard WorkspaceProviderSupport.sha256(bytes) == identity.sha256 else {
+          return .unavailable(reason: "workspace.toolIdentityDrift")
+        }
+      }
+      return .available
+    } catch {
+      return .unavailable(reason: "workspace.toolchainUnavailable")
+    }
+  }
+
+  public func resolveFacts(targetID: String) async throws -> ProviderFacts {
+    throw DeviceProviderError.factsUnavailable(
+      "workspace provider is host-only: it has no device facts for \(targetID)")
+  }
+
+  public func action(
+    for step: CatalogStepDescriptor,
+    operation: CatalogOperationDescriptor,
+    inputs: [String: JSONValue]
+  ) throws -> TypedProviderAction {
+    throw DeviceProviderError.factsUnavailable(
+      "workspace action materialization requires a job context")
+  }
+
+  public func action(
+    for step: CatalogStepDescriptor,
+    operation: CatalogOperationDescriptor,
+    inputs: [String: JSONValue],
+    context: ProviderExecutionContext
+  ) throws -> TypedProviderAction {
+    let projectRef = try string("projectRef", in: inputs)
+    guard projectRef == profile.projectRef else {
+      throw DeviceProviderError.unsupportedAction(
+        "workspace.projectProfileUnavailable:\(projectRef)")
+    }
+    switch (operation.reference, step.kind) {
+    case ("workspace.apply-patch@1", .applyWorkspacePatch):
+      guard let artifact = context.resolvedInputArtifact else {
+        throw DeviceProviderError.unsupportedAction(
+          "workspace patch Artifact lease was not resolved before materialization")
+      }
+      let requestGlobs = try stringArray("allowedFileGlobs", in: inputs)
+      let patch = try Data(contentsOf: artifact.fileURL)
+      guard patch.count == artifact.byteCount,
+        patch.count <= 4 * 1024 * 1024,
+        WorkspaceProviderSupport.sha256(patch) == artifact.sha256
+      else {
+        throw DeviceProviderError.unsupportedAction(
+          "workspace patch Artifact bytes do not match their lease")
+      }
+      let paths = try WorkspaceProviderSupport.patchPaths(from: patch)
+      try WorkspaceProviderSupport.validate(
+        relativePaths: paths, root: profile.projectRoot,
+        profileGlobs: profile.allowedFileGlobs, requestGlobs: requestGlobs)
+      let before = try WorkspaceProviderSupport.snapshots(
+        relativePaths: paths, root: profile.projectRoot)
+      let attemptDigest = WorkspaceProviderSupport.sha256(
+        Data("\(context.jobID)\n\(artifact.sha256)\n\(projectRef)".utf8))
+      let reference = "patch-\(attemptDigest.prefix(32))"
+      let arguments =
+        profile.patchPreset.fixedArguments
+        + ["-f", "-p1", "-d", profile.projectRoot, "-i", artifact.fileURL.path]
+      let invocation = resolved(
+        operation: operation.reference, preset: profile.patchPreset,
+        arguments: arguments)
+      return .workspace(
+        .applyPatch(
+          WorkspacePatchIntent(
+            invocation: invocation, patchAttemptRef: reference,
+            patchArtifactID: artifact.artifactID,
+            patchFilePath: artifact.fileURL.path,
+            patchSHA256: artifact.sha256, allowedFileGlobs: requestGlobs,
+            before: before)))
+
+    case ("workspace.build-openharmony@1", .buildWorkspaceOpenHarmony):
+      let presetID = try string("buildPresetRef", in: inputs)
+      guard let preset = profile.buildPresets[presetID] else {
+        throw DeviceProviderError.unsupportedAction(
+          "workspace.buildPresetUnavailable:\(presetID)")
+      }
+      return .workspace(
+        .buildOpenHarmony(
+          resolved(
+            operation: operation.reference, preset: preset,
+            arguments: preset.fixedArguments)))
+
+    case ("workspace.run-tests@1", .runWorkspaceTests):
+      let presetID = try string("testPresetRef", in: inputs)
+      guard let preset = profile.testPresets[presetID] else {
+        throw DeviceProviderError.unsupportedAction(
+          "workspace.testPresetUnavailable:\(presetID)")
+      }
+      return .workspace(
+        .runTests(
+          resolved(
+            operation: operation.reference, preset: preset,
+            arguments: preset.fixedArguments)))
+
+    case ("workspace.symbolize-crash@1", .symbolizeWorkspaceCrash):
+      guard let artifact = context.resolvedInputArtifact else {
+        throw DeviceProviderError.unsupportedAction(
+          "workspace crash Artifact lease was not resolved before materialization")
+      }
+      let presetID = try string("symbolPresetRef", in: inputs)
+      guard let preset = profile.symbolPresets[presetID] else {
+        throw DeviceProviderError.unsupportedAction(
+          "workspace.symbolPresetUnavailable:\(presetID)")
+      }
+      return .workspace(
+        .symbolizeCrash(
+          resolved(
+            operation: operation.reference, preset: preset,
+            arguments: preset.fixedArguments + [artifact.fileURL.path])))
+
+    case ("workspace.revert-patch@1", .revertWorkspacePatch):
+      let reference = try string("patchAttemptRef", in: inputs)
+      let attempt = try attempts.load(reference)
+      guard attempt.projectRef == profile.projectRef,
+        attempt.projectRoot == profile.projectRoot,
+        attempt.revertedAtUTC == nil
+      else {
+        throw DeviceProviderError.unsupportedAction(
+          "workspace patch attempt is not active in this ProjectProfile")
+      }
+      let bytes = try Data(contentsOf: URL(fileURLWithPath: attempt.patchFilePath))
+      guard WorkspaceProviderSupport.sha256(bytes) == attempt.patchSHA256 else {
+        throw DeviceProviderError.unsupportedAction(
+          "workspace original patch bytes are unavailable or changed")
+      }
+      let arguments =
+        profile.patchPreset.fixedArguments
+        + [
+          "-f", "-R", "-p1", "-d", profile.projectRoot,
+          "-i", attempt.patchFilePath,
+        ]
+      let invocation = resolved(
+        operation: operation.reference, preset: profile.patchPreset,
+        arguments: arguments)
+      return .workspace(
+        .revertPatch(WorkspaceRevertIntent(invocation: invocation, attempt: attempt)))
+
+    default:
+      throw DeviceProviderError.unsupportedStepKind(
+        "\(operation.reference)/\(step.kind.rawValue)")
+    }
+  }
+
+  public func lower(
+    action: TypedProviderAction,
+    context: ProviderExecutionContext
+  ) throws -> TypedProcessPlan {
+    guard case .workspace(let workspace) = action,
+      let invocation = workspace.operationInvocation,
+      profile.executableIdentities.contains(invocation.executable)
+    else {
+      throw DeviceProviderError.unsupportedAction(
+        "workspace provider received a foreign action or executable")
+    }
+    switch workspace {
+    case .applyPatch(let intent):
+      try WorkspaceProviderSupport.require(
+        snapshots: intent.before, root: profile.projectRoot)
+    case .revertPatch(let intent):
+      try WorkspaceProviderSupport.require(
+        snapshots: intent.attempt.after, root: profile.projectRoot)
+    default:
+      break
+    }
+    return TypedProcessPlan(
+      action: action,
+      kind: .process(
+        executableSHA256: invocation.executable.sha256,
+        argumentSummary: invocation.arguments,
+        timeoutSeconds: invocation.timeoutSeconds),
+      argumentZero: invocation.argumentZero)
+  }
+
+  public func verify(
+    receipt: ProviderProcessReceipt,
+    action: TypedProviderAction,
+    context: ProviderExecutionContext
+  ) throws -> ProviderSemanticOutcome {
+    guard case .workspace(let workspace) = action else {
+      return .unsupported(reason: "workspace provider received a foreign action")
+    }
+    guard !receipt.stdoutTruncated else {
+      return .failed(
+        code: "workspace.outputTruncated",
+        detail: "bounded output was truncated; semantic result is incomplete")
+    }
+    switch workspace {
+    case .inspectSource:
+      return .unsupported(reason: "inspection belongs to TASK-HTP-007 provider path")
+    case .buildOpenHarmony:
+      guard receipt.exitStatus == 0 else {
+        return failed("workspace.buildFailed", receipt)
+      }
+      return .verified(summary: outputSummary(receipt))
+    case .runTests:
+      guard receipt.exitStatus == 0 else {
+        return failed("workspace.testsFailed", receipt)
+      }
+      return .verified(summary: outputSummary(receipt))
+    case .symbolizeCrash:
+      guard receipt.exitStatus == 0, !receipt.stdout.isEmpty else {
+        return failed("workspace.symbolizationFailed", receipt)
+      }
+      return .verified(summary: outputSummary(receipt))
+    case .applyPatch(let intent):
+      guard receipt.exitStatus == 0 else {
+        return failed("workspace.patchFailed", receipt)
+      }
+      let after = try WorkspaceProviderSupport.snapshots(
+        relativePaths: intent.before.map(\.relativePath), root: profile.projectRoot)
+      guard after != intent.before else {
+        return .failed(
+          code: "workspace.patchReadbackFailed",
+          detail: "patch reported success but no declared file changed")
+      }
+      let durablePatchPath = try attempts.persistPatch(
+        reference: intent.patchAttemptRef,
+        sourceURL: URL(fileURLWithPath: intent.patchFilePath),
+        expectedSHA256: intent.patchSHA256)
+      let attempt = WorkspacePatchAttempt(
+        patchAttemptRef: intent.patchAttemptRef,
+        projectRef: profile.projectRef, projectRoot: profile.projectRoot,
+        patchArtifactID: intent.patchArtifactID,
+        patchFilePath: durablePatchPath, patchSHA256: intent.patchSHA256,
+        allowedFileGlobs: intent.allowedFileGlobs,
+        before: intent.before, after: after,
+        appliedAtUTC: context.nowUTC, revertedAtUTC: nil)
+      try attempts.save(attempt)
+      var summary = outputSummary(receipt)
+      summary["patchAttemptRef"] = intent.patchAttemptRef
+      summary["workspaceRevision"] = WorkspaceProviderSupport.revision(after)
+      summary["previousWorkspaceRevision"] = WorkspaceProviderSupport.revision(intent.before)
+      summary["touchedFiles"] = after.map(\.relativePath).joined(separator: ",")
+      return .verified(summary: summary)
+    case .revertPatch(let intent):
+      guard receipt.exitStatus == 0 else {
+        return failed("workspace.revertFailed", receipt)
+      }
+      do {
+        try WorkspaceProviderSupport.require(
+          snapshots: intent.attempt.before, root: profile.projectRoot)
+      } catch {
+        return .failed(
+          code: "workspace.revertReadbackFailed",
+          detail: "workspace did not return to the exact original revision: \(error)")
+      }
+      try attempts.save(intent.attempt.markingReverted(atUTC: context.nowUTC))
+      var summary = outputSummary(receipt)
+      summary["patchAttemptRef"] = intent.attempt.patchAttemptRef
+      summary["workspaceRevision"] = WorkspaceProviderSupport.revision(intent.attempt.before)
+      return .verified(summary: summary)
+    }
+  }
+
+  public func reconcile(
+    intent: ProviderDurableIntentReference,
+    context: ProviderExecutionContext
+  ) async throws -> ProviderReconcileOutcome {
+    guard case .workspace(let workspace) = intent.action else {
+      return .stillUnknown(reason: "workspace reconcile received a foreign action")
+    }
+    switch workspace {
+    case .applyPatch(let patch):
+      let current = try WorkspaceProviderSupport.snapshots(
+        relativePaths: patch.before.map(\.relativePath), root: profile.projectRoot)
+      if current == patch.before { return .confirmedNotExecuted }
+      if let attempt = try? attempts.load(patch.patchAttemptRef), current == attempt.after {
+        return .confirmedCompleted(summary: [
+          "patchAttemptRef": attempt.patchAttemptRef,
+          "workspaceRevision": WorkspaceProviderSupport.revision(current),
+        ])
+      }
+      return .stillUnknown(
+        reason: "workspace patch files are neither the exact preimage nor a durable postimage")
+    case .revertPatch(let revert):
+      let current = try WorkspaceProviderSupport.snapshots(
+        relativePaths: revert.attempt.before.map(\.relativePath),
+        root: profile.projectRoot)
+      if current == revert.attempt.before {
+        // Receipt loss after a successful revert must close the durable
+        // attempt before recovery reports completion. Otherwise a later
+        // request could materialize and dispatch the same mutation again.
+        try attempts.save(
+          revert.attempt.markingReverted(atUTC: context.nowUTC))
+        return .confirmedCompleted(summary: [
+          "patchAttemptRef": revert.attempt.patchAttemptRef,
+          "workspaceRevision": WorkspaceProviderSupport.revision(current),
+        ])
+      }
+      if current == revert.attempt.after { return .confirmedNotExecuted }
+      return .stillUnknown(
+        reason: "workspace revert files are neither the exact postimage nor original preimage")
+    case .inspectSource:
+      return .confirmedNotExecuted
+    case .buildOpenHarmony, .runTests, .symbolizeCrash:
+      return .stillUnknown(
+        reason: "read/build process completion is not inferable after receipt loss")
+    }
+  }
+
+  private func resolved(
+    operation: String,
+    preset: WorkspaceCommandPreset,
+    arguments: [String]
+  ) -> WorkspaceResolvedInvocation {
+    WorkspaceResolvedInvocation(
+      operation: operation, projectRef: profile.projectRef,
+      projectRoot: profile.projectRoot, presetID: preset.presetID,
+      executable: preset.executable, argumentZero: preset.argumentZero,
+      arguments: arguments,
+      timeoutSeconds: preset.timeoutSeconds)
+  }
+
+  private func string(
+    _ key: String, in inputs: [String: JSONValue]
+  ) throws -> String {
+    guard case .string(let value)? = inputs[key] else {
+      throw DeviceProviderError.unsupportedAction("workspace input \(key) is missing")
+    }
+    return value
+  }
+
+  private func stringArray(
+    _ key: String, in inputs: [String: JSONValue]
+  ) throws -> [String] {
+    guard case .array(let values)? = inputs[key] else {
+      throw DeviceProviderError.unsupportedAction("workspace input \(key) is missing")
+    }
+    return try values.map {
+      guard case .string(let value) = $0 else {
+        throw DeviceProviderError.unsupportedAction(
+          "workspace input \(key) contains a non-string")
+      }
+      return value
+    }
+  }
+
+  private func outputSummary(_ receipt: ProviderProcessReceipt) -> [String: String] {
+    [
+      "exitStatus": receipt.exitStatus.map(String.init) ?? "missing",
+      "stdoutByteCount": String(receipt.stdout.count),
+      "stderrByteCount": String(receipt.stderr.count),
+      "stdoutSHA256": WorkspaceProviderSupport.sha256(receipt.stdout),
+      "stderrSHA256": WorkspaceProviderSupport.sha256(receipt.stderr),
+    ]
+  }
+
+  private func failed(
+    _ code: String, _ receipt: ProviderProcessReceipt
+  ) -> ProviderSemanticOutcome {
+    .failed(
+      code: code,
+      detail:
+        "real process exit=\(receipt.exitStatus.map(String.init) ?? "missing") "
+        + "stdoutBytes=\(receipt.stdout.count) stderrBytes=\(receipt.stderr.count)")
+  }
+}
+
+enum WorkspaceProviderSupport {
+  static func sha256(_ data: Data) -> String {
+    SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+  }
+
+  static func isSHA256(_ value: String) -> Bool {
+    value.count == 64
+      && value.allSatisfy {
+        $0.isNumber || ("a"..."f").contains(String($0))
+      }
+  }
+
+  static func isIdentifier(_ value: String) -> Bool {
+    !value.isEmpty && value.count <= 128
+      && value.allSatisfy {
+        $0.isASCII && ($0.isLetter || $0.isNumber || "._:@-".contains($0))
+      }
+  }
+
+  static func isSafeGlob(_ value: String) -> Bool {
+    !value.isEmpty && value.utf8.count <= 512
+      && !value.hasPrefix("/") && !value.contains("\\")
+      && !value.split(separator: "/", omittingEmptySubsequences: false)
+        .contains(where: { $0 == ".." || $0.isEmpty })
+      && !value.hasPrefix(".git") && !value.contains("/.git/")
+  }
+
+  static func matches(_ path: String, glob: String) -> Bool {
+    guard isSafeGlob(glob) else { return false }
+    var pattern = "^"
+    let characters = Array(glob)
+    var index = 0
+    while index < characters.count {
+      let character = characters[index]
+      if character == "*" {
+        if index + 1 < characters.count, characters[index + 1] == "*" {
+          pattern += ".*"
+          index += 2
+          continue
+        }
+        pattern += "[^/]*"
+      } else if character == "?" {
+        pattern += "[^/]"
+      } else {
+        pattern += NSRegularExpression.escapedPattern(for: String(character))
+      }
+      index += 1
+    }
+    pattern += "$"
+    return path.range(of: pattern, options: .regularExpression) != nil
+  }
+
+  static func files(
+    root: String, profileGlobs: [String], requestGlobs: [String]
+  ) throws -> [String] {
+    guard !requestGlobs.isEmpty, requestGlobs.count <= 64,
+      requestGlobs.allSatisfy(isSafeGlob)
+    else {
+      throw DeviceProviderError.unsupportedAction(
+        "workspace file scope globs are empty or unsafe")
+    }
+    let rootURL = URL(fileURLWithPath: root)
+      .resolvingSymlinksInPath().standardizedFileURL
+    let canonicalRoot = rootURL.path
+    guard let enumerator = FileManager.default.enumerator(
+      at: rootURL, includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey],
+      options: [.skipsHiddenFiles, .skipsPackageDescendants])
+    else {
+      throw DeviceProviderError.factsUnavailable("workspace source tree cannot be enumerated")
+    }
+    var result: [String] = []
+    for case let fileURL as URL in enumerator {
+      let values = try fileURL.resourceValues(
+        forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
+      guard values.isRegularFile == true, values.isSymbolicLink != true else { continue }
+      let canonicalFile = fileURL.resolvingSymlinksInPath().standardizedFileURL.path
+      guard canonicalFile.hasPrefix(canonicalRoot + "/") else {
+        throw DeviceProviderError.factsUnavailable(
+          "workspace source path escapes the canonical project root")
+      }
+      let relative = String(canonicalFile.dropFirst(canonicalRoot.count + 1))
+      if profileGlobs.contains(where: { matches(relative, glob: $0) }),
+        requestGlobs.contains(where: { matches(relative, glob: $0) })
+      {
+        result.append(canonicalFile)
+        guard result.count <= 2_000 else {
+          throw DeviceProviderError.unsupportedAction(
+            "workspace inspection scope exceeds 2000 files")
+        }
+      }
+    }
+    return result.sorted()
+  }
+
+  static func patchPaths(from data: Data) throws -> [String] {
+    guard let text = String(data: data, encoding: .utf8), !text.contains("\0") else {
+      throw DeviceProviderError.unsupportedAction(
+        "workspace patch must be bounded UTF-8 unified diff")
+    }
+    var paths: Set<String> = []
+    for line in text.split(separator: "\n", omittingEmptySubsequences: false).map(String.init) {
+      if line.hasPrefix("GIT binary patch") || line.hasPrefix("Binary files ")
+        || line.hasPrefix("rename from ") || line.hasPrefix("rename to ")
+        || line.hasPrefix("copy from ") || line.hasPrefix("copy to ")
+      {
+        throw DeviceProviderError.unsupportedAction(
+          "workspace binary/rename/copy patches are not supported")
+      }
+      if line.hasPrefix("diff --git ") {
+        let fields = line.split(separator: " ")
+        guard fields.count == 4,
+          let old = normalizedPatchPath(String(fields[2]), prefix: "a/"),
+          let new = normalizedPatchPath(String(fields[3]), prefix: "b/")
+        else {
+          throw DeviceProviderError.unsupportedAction(
+            "workspace diff header carries an unsafe path")
+        }
+        paths.insert(old)
+        paths.insert(new)
+      } else if line.hasPrefix("--- ") || line.hasPrefix("+++ ") {
+        let raw = String(line.dropFirst(4)).split(separator: "\t").first.map(String.init) ?? ""
+        if raw != "/dev/null" {
+          let prefix = line.hasPrefix("--- ") ? "a/" : "b/"
+          guard let path = normalizedPatchPath(raw, prefix: prefix) else {
+            throw DeviceProviderError.unsupportedAction(
+              "workspace unified diff carries an unsafe path")
+          }
+          paths.insert(path)
+        }
+      }
+    }
+    guard !paths.isEmpty, paths.count <= 128 else {
+      throw DeviceProviderError.unsupportedAction(
+        "workspace patch must touch 1...128 declared files")
+    }
+    return paths.sorted()
+  }
+
+  private static func normalizedPatchPath(
+    _ raw: String, prefix: String
+  ) -> String? {
+    guard raw.hasPrefix(prefix) else { return nil }
+    let path = String(raw.dropFirst(prefix.count))
+    guard !path.isEmpty, !path.hasPrefix("/"), !path.contains("\\"),
+      !path.split(separator: "/", omittingEmptySubsequences: false)
+        .contains(where: { $0 == "." || $0 == ".." || $0.isEmpty }),
+      !path.hasPrefix(".git/"), path != ".git"
+    else { return nil }
+    return path
+  }
+
+  static func validate(
+    relativePaths: [String],
+    root: String,
+    profileGlobs: [String],
+    requestGlobs: [String]
+  ) throws {
+    guard !requestGlobs.isEmpty, requestGlobs.count <= 64,
+      requestGlobs.allSatisfy(isSafeGlob)
+    else {
+      throw DeviceProviderError.unsupportedAction(
+        "workspace patch allowedFileGlobs are empty or unsafe")
+    }
+    for path in relativePaths {
+      guard profileGlobs.contains(where: { matches(path, glob: $0) }),
+        requestGlobs.contains(where: { matches(path, glob: $0) })
+      else {
+        throw DeviceProviderError.unsupportedAction(
+          "workspace.patchScopeViolation:\(path)")
+      }
+      try validatePath(path, root: root)
+    }
+  }
+
+  private static func validatePath(_ relativePath: String, root: String) throws {
+    let candidate = URL(fileURLWithPath: root).appendingPathComponent(relativePath)
+      .standardizedFileURL.path
+    guard candidate.hasPrefix(root + "/") else {
+      throw DeviceProviderError.unsupportedAction(
+        "workspace path escapes the ProjectProfile root")
+    }
+    var cursor = URL(fileURLWithPath: root)
+    for component in relativePath.split(separator: "/").dropLast() {
+      cursor.appendPathComponent(String(component))
+      if FileManager.default.fileExists(atPath: cursor.path) {
+        let values = try cursor.resourceValues(forKeys: [.isSymbolicLinkKey])
+        guard values.isSymbolicLink != true else {
+          throw DeviceProviderError.unsupportedAction(
+            "workspace path traverses a symbolic link")
+        }
+      }
+    }
+    if FileManager.default.fileExists(atPath: candidate) {
+      let values = try URL(fileURLWithPath: candidate).resourceValues(
+        forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
+      guard values.isRegularFile == true, values.isSymbolicLink != true else {
+        throw DeviceProviderError.unsupportedAction(
+          "workspace patch target is not a regular file")
+      }
+    }
+  }
+
+  static func snapshots(
+    relativePaths: [String], root: String
+  ) throws -> [WorkspaceFileSnapshot] {
+    try relativePaths.sorted().map { path in
+      try validatePath(path, root: root)
+      let url = URL(fileURLWithPath: root).appendingPathComponent(path)
+      guard FileManager.default.fileExists(atPath: url.path) else {
+        return WorkspaceFileSnapshot(relativePath: path, sha256: nil)
+      }
+      return WorkspaceFileSnapshot(
+        relativePath: path, sha256: sha256(try Data(contentsOf: url)))
+    }
+  }
+
+  static func require(
+    snapshots expected: [WorkspaceFileSnapshot], root: String
+  ) throws {
+    let current = try snapshots(
+      relativePaths: expected.map(\.relativePath), root: root)
+    guard current == expected else {
+      throw DeviceProviderError.unsupportedAction(
+        "workspace revision drifted before descriptor-bound dispatch")
+    }
+  }
+
+  static func revision(_ snapshots: [WorkspaceFileSnapshot]) -> String {
+    let material = snapshots.sorted { $0.relativePath < $1.relativePath }
+      .map { "\($0.relativePath)\t\($0.sha256 ?? "absent")" }
+      .joined(separator: "\n")
+    return sha256(Data(material.utf8))
+  }
+}

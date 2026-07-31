@@ -1,9 +1,8 @@
 # Verification — CHG-2026-054
 
 > Change:CHG-2026-054-agent-harness-task-plane@r2
-> Status:in_progress # 2026-07-31(r2):HTP-AC-1..14 与 AC-20..22 通过(AC-7 的真机
-> 字节面如实 pending-hardware);AC-15..17 pending(TASK-HTP-005 可开工,007 已 done),
-> AC-18/19 pending-hardware。每条结论由其所属任务的
+> Status:in_progress # 2026-07-31(r2):HTP-AC-1..17 与 AC-20..22 通过(AC-7 的真机
+> 字节面如实 pending-hardware);AC-18/19 pending-hardware。每条结论由其所属任务的
 > 实现 PR 写入本文件;维护者 review/merge 该实现 PR 即确认。不为本 change 追加独立
 > verification/archive 载体(PRODUCT-LOOP §4/§20)。
 
@@ -310,24 +309,33 @@
   `DeviceProviderArgvContractTests` 同范式);LLM/CLI 提交 argv 一律被拒;
   preset 或工具链缺失时 `operation.list` 返回 `UNAVAILABLE` + 机器可读 reasonCode,
   且 capability 不被消耗。
-- Evidence:实现 PR 内测试 + `operation.list` 输出。
-- 结论:pending
+- Evidence:`WorkspaceProviderContractTests` 14/14、
+  `HostOnlyAdmissionContractTests` 15/15、production `operation.list` 与
+  `evidence/runs/TASK-HTP-005/run-r1.md`。
+- 结论:PASS
 
 ## HTP-AC-16 patch 范围受限、可回滚、零 push(TASK-HTP-005)
 
 - 方法:`applyPatch` 越出声明 glob 时 fail closed(零写入);apply 产出
   applied-patch artifact 且 `revertPatch` 回到原 workspace revision;断言 provider
   不存在 `git push`/`merge`/force 或 PR 创建路径。
-- Evidence:实现 PR 内测试。
-- 结论:pending
+- Evidence:
+  `testRuntimeConsumesHostBoundPatchLeaseAndRevertsExactAttempt`、
+  `testPatchScopeApplyArtifactReadbackAndExactRevert`、
+  `testOutOfGlobPatchFailsBeforeSpawnAndLeavesWorkspaceUntouched` 与
+  `testPatchPrefixCannotChangeThePathAfterP1ScopeValidation`。
+- 结论:PASS
 
 ## HTP-AC-17 build/test 真实执行与如实分类(TASK-HTP-005)
 
 - 方法:`buildOpenHarmony`/`runTests` 经 descriptor-bound dispatcher 真 spawn,产出
   build log / test output artifact 与真实 exit code;失败如实分类(不得把失败构建的
   下游步骤记为成功——CHG-2026-049 trace 教训的同类防线)。
-- Evidence:实现 PR 内测试 + 真实构建输出 hash。
-- 结论:pending
+- Evidence:`WorkspaceProviderContractTests` 的真实 process/失败日志用例；production
+  daemon Job `job-a72404f84a7b3c1cbd040ab95de07a38` 与
+  `job-837a2602a7b90fe6351a1a2c30a06576`、Artifact hash 及重启回读见
+  `evidence/runs/TASK-HTP-005/run-r1.md`。
+- 结论:PASS
 
 ## HTP-AC-18 GJ-5 真机自动收敛、人工步骤 0(TASK-HTP-006)
 

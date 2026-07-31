@@ -2315,7 +2315,8 @@ public struct RockchipFlashProviderAdapter: DeviceProvider {
     }
     let actionEncoder = JSONEncoder()
     actionEncoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-    let encodedAction = try actionEncoder.encode(PersistedTypedProviderAction(action))
+    let encodedAction = try actionEncoder.encode(
+      try PersistedTypedProviderAction(action))
     let actionSHA256 = SHA256.hash(data: encodedAction)
       .map { String(format: "%02x", $0) }.joined()
     return TypedProcessPlan(

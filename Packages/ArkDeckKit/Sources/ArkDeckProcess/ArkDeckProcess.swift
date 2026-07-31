@@ -111,6 +111,10 @@ extension SemanticallyEvaluatedProcessResult: Equatable where SemanticResult: Eq
 
 public struct ProcessRequest: Sendable, Equatable {
   public let executable: URL
+  /// Optional semantic `argv[0]` for a descriptor-bound multi-call binary.
+  /// It never selects the executable: `executable` remains the identity-bound
+  /// file handed to `posix_spawn`.
+  public let argumentZero: String?
   public let arguments: [String]
   public let environment: [String: String]
   public let timeout: TimeInterval?
@@ -119,11 +123,13 @@ public struct ProcessRequest: Sendable, Equatable {
   /// environment. It never writes a user or system-wide environment value.
   public init(
     executable: URL,
+    argumentZero: String? = nil,
     arguments: [String] = [],
     environment: [String: String] = [:],
     timeout: TimeInterval? = nil
   ) {
     self.executable = executable
+    self.argumentZero = argumentZero
     self.arguments = arguments
     self.environment = environment
     self.timeout = timeout
@@ -590,7 +596,9 @@ public final class FoundationProcessExecutor: @unchecked Sendable {
     guard request.timeout.map({ $0.isFinite && $0 > 0 }) ?? true else {
       throw ProcessExecutionError.invalidTimeout(request.timeout ?? 0)
     }
-    guard !request.arguments.contains(where: { $0.contains("\0") }) else {
+    guard request.argumentZero.map({ !$0.isEmpty && !$0.contains("\0") }) ?? true,
+      !request.arguments.contains(where: { $0.contains("\0") })
+    else {
       throw ProcessExecutionError.invalidArgumentContainsNUL
     }
     for (key, value) in request.environment {
@@ -702,7 +710,8 @@ public final class FoundationProcessExecutor: @unchecked Sendable {
     _ request: ProcessRequest,
     executablePath: String? = nil
   ) throws -> SpawnedProcess {
-    var arguments = try makeCStringVector([request.executable.path] + request.arguments)
+    var arguments = try makeCStringVector(
+      [request.argumentZero ?? request.executable.path] + request.arguments)
     defer { freeCStringVector(arguments) }
     var environment = try makeCStringVector(
       ProcessInfo.processInfo.environment

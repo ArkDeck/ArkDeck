@@ -1,0 +1,46 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "workspace.revert-patch",
+  "version": 1,
+  "title": "Revert an exact durable workspace patch attempt",
+  "provider": "workspace",
+  "effect": { "minimum": "hostOnly", "permitted": ["hostOnly"] },
+  "authorization": { "hostOnly": "defaultReadOnly" },
+  "binding": "none",
+  "concurrencyKey": "host-exclusive",
+  "inputs": {
+    "fields": {
+      "projectRef": { "type": "string", "required": true, "maxLength": 128 },
+      "patchAttemptRef": { "type": "string", "required": true, "maxLength": 64 }
+    }
+  },
+  "outputs": {
+    "fields": {
+      "revertReport": { "type": "artifactReference", "required": true }
+    }
+  },
+  "steps": [
+    {
+      "stepID": "revert-patch",
+      "kind": "revertWorkspacePatch",
+      "effect": "hostOnly",
+      "cancellation": "atSafeBoundary",
+      "binding": "none",
+      "compensation": "none"
+    }
+  ],
+  "timeoutSeconds": 180,
+  "outputByteBudget": 16777216,
+  "retry": { "preflightAttempts": 1, "mutationAttempts": 1 },
+  "unknownOutcome": "reconcileRequired",
+  "artifacts": [
+    {
+      "name": "revert-report.json",
+      "role": "derived",
+      "mediaType": "application/json",
+      "privacy": "standard",
+      "required": true
+    }
+  ],
+  "profiles": ["workspace-host@1"]
+}

@@ -65,10 +65,22 @@ public struct WorkspaceProvider: DeviceProvider {
   /// Absent means the host has no configured inspector: the operation reports
   /// unavailable rather than degrading to something else.
   private let tool: WorkspaceInspectorTool?
+  private let operations: (any DeviceProvider)?
 
   public init(registry: WorkspaceProjectRegistry, tool: WorkspaceInspectorTool? = nil) {
     self.registry = registry
     self.tool = tool
+    self.operations = nil
+  }
+
+  public init(
+    registry: WorkspaceProjectRegistry,
+    tool: WorkspaceInspectorTool? = nil,
+    operations: any DeviceProvider
+  ) {
+    self.registry = registry
+    self.tool = tool
+    self.operations = operations
   }
 
   public var providerID: String { CatalogProvider.workspace.rawValue }
@@ -77,8 +89,9 @@ public struct WorkspaceProvider: DeviceProvider {
     for operation: CatalogOperationDescriptor
   ) -> ProviderOperationAvailability {
     guard operation.reference == Self.inspectSourceReference else {
-      return .unavailable(
-        reason: "workspace provider has no production typed plan for \(operation.reference)")
+      return operations?.runtimeAvailability(for: operation)
+        ?? .unavailable(
+          reason: "workspace provider has no production typed plan for \(operation.reference)")
     }
     guard tool != nil else {
       return .unavailable(reason: "no_workspace_inspector_configured")
@@ -115,9 +128,15 @@ public struct WorkspaceProvider: DeviceProvider {
     inputs: [String: JSONValue],
     context: ProviderExecutionContext
   ) throws -> TypedProviderAction {
-    guard operation.reference == Self.inspectSourceReference,
-      step.kind == .inspectWorkspaceSource
-    else {
+    guard operation.reference == Self.inspectSourceReference else {
+      guard let operations else {
+        throw DeviceProviderError.unsupportedAction(
+          "workspace provider does not implement \(operation.reference)/\(step.stepID)")
+      }
+      return try operations.action(
+        for: step, operation: operation, inputs: inputs, context: context)
+    }
+    guard step.kind == .inspectWorkspaceSource else {
       throw DeviceProviderError.unsupportedAction(
         "workspace provider does not implement \(operation.reference)/\(step.stepID)")
     }
@@ -162,6 +181,12 @@ public struct WorkspaceProvider: DeviceProvider {
             inspection.projectRoot,
           ],
           timeoutSeconds: 120))
+    case .applyPatch, .buildOpenHarmony, .runTests, .symbolizeCrash, .revertPatch:
+      guard let operations else {
+        throw DeviceProviderError.unsupportedAction(
+          "workspace operation presets are unavailable")
+      }
+      return try operations.lower(action: action, context: context)
     }
   }
 
@@ -198,9 +223,16 @@ public struct WorkspaceProvider: DeviceProvider {
           ])
       default:
         return .failed(
-          code: "inspectorExit\(receipt.exitStatus)",
+          code:
+            "inspectorExit\(receipt.exitStatus.map(String.init) ?? "missing")",
           detail: "workspace inspector failed for \(inspection.projectRef)")
       }
+    case .applyPatch, .buildOpenHarmony, .runTests, .symbolizeCrash, .revertPatch:
+      guard let operations else {
+        return .unsupported(reason: "workspace operation presets are unavailable")
+      }
+      return try operations.verify(
+        receipt: receipt, action: action, context: context)
     }
   }
 
@@ -210,7 +242,18 @@ public struct WorkspaceProvider: DeviceProvider {
     intent: ProviderDurableIntentReference,
     context: ProviderExecutionContext
   ) async throws -> ProviderReconcileOutcome {
-    .confirmedNotExecuted
+    guard case .workspace(let action) = intent.action else {
+      return .stillUnknown(reason: "workspace reconcile received a foreign action")
+    }
+    switch action {
+    case .inspectSource:
+      return .confirmedNotExecuted
+    case .applyPatch, .buildOpenHarmony, .runTests, .symbolizeCrash, .revertPatch:
+      guard let operations else {
+        return .stillUnknown(reason: "workspace operation presets are unavailable")
+      }
+      return try await operations.reconcile(intent: intent, context: context)
+    }
   }
 
   /// No readback plan: there is no device state to read back, and inventing a

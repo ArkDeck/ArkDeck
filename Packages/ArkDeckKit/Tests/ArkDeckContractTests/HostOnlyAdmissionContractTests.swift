@@ -296,11 +296,18 @@ final class HostOnlyAdmissionContractTests: XCTestCase {
         descriptor.binding, .confirmedDevice,
         "\(descriptor.reference) must keep its device binding")
     }
-    // Exactly one host-only operation exists today; the branch cannot be
-    // reached by anything else.
+    // Only the explicitly published workspace family may reach the host-only
+    // branch; every other operation remains device-bound.
     XCTAssertEqual(
       RuntimeOperationCatalog.operations.filter { $0.binding == .none }.map(\.reference),
-      ["workspace.inspect-source@1"])
+      [
+        "workspace.apply-patch@1",
+        "workspace.build-openharmony@1",
+        "workspace.inspect-source@1",
+        "workspace.revert-patch@1",
+        "workspace.run-tests@1",
+        "workspace.symbolize-crash@1",
+      ])
   }
 
   // MARK: - HTP-AC-22: fail closed both ways, and the first consumer
@@ -450,7 +457,7 @@ final class HostOnlyAdmissionContractTests: XCTestCase {
         "symbol": .string("WaterFlowPattern"),
         "fileScope": .string("*.swift"),
       ])
-    let identity = PersistedTypedProviderAction(action)
+    let identity = try PersistedTypedProviderAction(action)
     XCTAssertEqual(identity.kind, "workspace.inspectSource")
     XCTAssertEqual(identity.arguments["projectRef"], JSONValue.string("demo-app"))
     XCTAssertEqual(identity.arguments["fileScope"], JSONValue.string("*.swift"))

@@ -282,7 +282,7 @@ final class DeviceProviderContractTests: XCTestCase {
   }
 
   func testRockchipRecoveryRejectsNonCanonicalArtifactPath() throws {
-    let persisted = PersistedTypedProviderAction(
+    let persisted = try PersistedTypedProviderAction(
       .rockchip(.flashPartitions(flashBundle)))
     let encoded = try JSONEncoder().encode(persisted)
     var object = try XCTUnwrap(
