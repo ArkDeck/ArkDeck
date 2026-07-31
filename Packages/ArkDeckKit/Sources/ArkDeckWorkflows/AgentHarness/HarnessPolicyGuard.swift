@@ -169,7 +169,6 @@ public struct HarnessPolicyGuard: Sendable {
     if let refusal = Self.budgetRefusal(snapshot, elapsedSeconds: input.elapsedSeconds) {
       return .refuse(refusal)
     }
-
     // 2. The closed allow-set: task policy ∩ task-type permitted.
     guard snapshot.policy.allowedOperations.contains(input.operationReference),
       input.permittedOperations.contains(input.operationReference)

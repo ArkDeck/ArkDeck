@@ -374,9 +374,14 @@ final class HarnessConvergenceContractTests: XCTestCase {
 
   // MARK: - Defect 2: required typed inputs were never sent
 
-  func testEveryPlannedStepSatisfiesTheRequiredInputsItsOperationDeclares() throws {
-    let handler = DebugCrashTaskHandler()
-    for reference in handler.permittedOperations.sorted() {
+  func testEveryBuiltInEvidenceStepSatisfiesTheRequiredInputsItsOperationDeclares() throws {
+    // Repair operations derive their required inputs from a bounded patch,
+    // readback state and ProjectProfile; HarnessRepairContractTests exercise
+    // those concrete plans. This table covers the state-independent evidence
+    // steps the deterministic handler can plan from an empty snapshot.
+    for reference in [
+      DebugCrashTaskHandler.observeDevice, DebugCrashTaskHandler.captureDiagnostics,
+    ] {
       let descriptor = try XCTUnwrap(
         RuntimeOperationCatalog.descriptor(reference: reference),
         "\(reference) must exist in the catalog this build ships")

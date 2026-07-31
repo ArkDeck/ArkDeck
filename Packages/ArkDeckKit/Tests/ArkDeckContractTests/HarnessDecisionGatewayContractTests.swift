@@ -102,9 +102,7 @@ final class HarnessDecisionGatewayContractTests: XCTestCase {
     if let rootURL { try? FileManager.default.removeItem(at: rootURL) }
   }
 
-  private let offered: Set<String> = [
-    DebugCrashTaskHandler.observeDevice, DebugCrashTaskHandler.captureDiagnostics,
-  ]
+  private let offered = DebugCrashTaskHandler().permittedOperations
 
   private func makeStack(
     gateway: (any HarnessDecisionGateway)?,
@@ -329,7 +327,7 @@ final class HarnessDecisionGatewayContractTests: XCTestCase {
     XCTAssertEqual(
       HarnessEgressScreen.violations(in: context, targetID: "TGT-958780b2ffb7"), [],
       "no target id, connect key, serial, identity digest or remote path may travel")
-    XCTAssertEqual(Set(context.availableOperations), offered)
+    XCTAssertEqual(Set(context.availableOperations), [DebugCrashTaskHandler.observeDevice])
     XCTAssertEqual(context.budget.roundsRemaining, 6)
     XCTAssertEqual(context.budget.e1MutationsRemaining, 0)
 
@@ -372,7 +370,7 @@ final class HarnessDecisionGatewayContractTests: XCTestCase {
     XCTAssertEqual(context.availableOperations.count, 1)
     XCTAssertEqual(context.goalSummary.count, 16)
     XCTAssertTrue(context.trimmed.contains("attempts:kept1of4"))
-    XCTAssertTrue(context.trimmed.contains("operations:kept1of2"))
+    XCTAssertTrue(context.trimmed.contains("operations:kept1of7"))
   }
 
   func testAnOversizedContextIsRefusedInsteadOfSent() async throws {
@@ -427,6 +425,52 @@ final class HarnessDecisionGatewayContractTests: XCTestCase {
     XCTAssertEqual(decision?.producer, "debug-crash-handler@1")
     let memory = try await store.memory(scope: .task, key: task.htaskID)
     XCTAssertTrue(memory.contains { $0.summary.contains("proposalRejected:forbiddenField:status") })
+  }
+
+  func testRepairOperationsArePhaseBoundAndCannotReplaceHandlerOwnedInputs() async throws {
+    let diff = """
+      diff --git a/Sources/A.swift b/Sources/A.swift
+      --- a/Sources/A.swift
+      +++ b/Sources/A.swift
+      @@ -1 +1 @@
+      -let value = 0
+      +let value = 1
+      """
+    let digest = SHA256.hash(data: Data(diff.utf8))
+      .map { String(format: "%02x", $0) }.joined()
+    let jobs = GatewayJobPort()
+    let gateway = ScriptedGateway(replies: [
+      .success(
+        encodeProposal([
+          "kind": .string("proposePatch"),
+          "hypothesis": .string("Patch before any evidence exists."),
+          "baseWorkspaceRevision": .string(String(repeating: "1", count: 64)),
+          "patchSha256": .string(digest), "unifiedDiff": .string(diff),
+          "touchedFiles": .array([.string("Sources/A.swift")]),
+          "expectedChangedSymbols": .array([.string("value")]),
+        ]))
+    ])
+    let (coordinator, _, submission) = try makeStack(
+      gateway: gateway, egress: HarnessEgressPolicy(enabledProjects: ["demo-app"]), jobs: jobs)
+    let task = try await coordinator.submit(submission)
+
+    let outcome = try await coordinator.reconcile(task.htaskID)
+    XCTAssertEqual(outcome.action, .dispatched)
+    XCTAssertEqual(jobs.submittedOperations, [DebugCrashTaskHandler.observeDevice])
+    XCTAssertEqual(
+      Set(try XCTUnwrap(gateway.seenContexts.first).availableOperations),
+      [DebugCrashTaskHandler.observeDevice])
+    XCTAssertTrue(outcome.reasonCode.contains("operationNotOffered:workspace.apply-patch@1"))
+
+    let deterministic = DebugCrashTaskHandler().plan(
+      for: task, decisionID: "dec-fixture", nowUTC: "2026-07-31T00:00:00Z").decision
+    let injectedDeploy = HarnessDecisionProposal(
+      kind: .invokeOperation, operationReference: DebugCrashTaskHandler.deployHAP,
+      inputs: ["hapArtifactLease": .string("lease-v1:foreign:ART-1")],
+      hypothesis: "deploy", reasonCode: "deploy", confidence: nil)
+    XCTAssertThrowsError(
+      try HarnessTaskCoordinator.validateModelProposal(
+        injectedDeploy, against: deterministic))
   }
 
   func testConclusionsFollowTheStepNotTheProducer() async throws {

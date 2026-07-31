@@ -234,6 +234,9 @@ Task.detached {
     }
     let workspaceOperations: any DeviceProvider
     var workspaceOperationResolver: WorkspaceActionExecutableResolver?
+    var workspaceRepairConfiguration: (
+      profile: WorkspaceProjectProfile, attempts: WorkspacePatchAttemptStore
+    )?
     if let arkDeckRoot = workspaceRoots["ArkDeck"] {
       do {
         let profile = try WorkspaceProjectProfile.arkDeck(
@@ -244,6 +247,7 @@ Task.detached {
         workspaceOperations = WorkspaceOperationsProvider(
           profile: profile, attemptStore: attempts, nowUTC: utcNow)
         workspaceOperationResolver = WorkspaceActionExecutableResolver(profile: profile)
+        workspaceRepairConfiguration = (profile, attempts)
       } catch {
         workspaceOperations = UnavailableWorkspaceOperationsProvider(
           reason: "workspace.projectProfileUnavailable:\(error)")
@@ -330,6 +334,10 @@ Task.detached {
       // the loop stops honestly instead of guessing (CHG-2026-054 TASK-HTP-002).
       artifactPort: RuntimeArtifactStoreHarnessPort(
         store: artifactStore, sensitiveEvidenceAllowList: sensitiveEvidence),
+      repairPort: workspaceRepairConfiguration.map {
+        WorkspaceHarnessRepairPort(
+          profile: $0.profile, attemptStore: $0.attempts, artifactStore: artifactStore)
+      },
       nowUTC: utcNow,
       policyGuard: HarnessPolicyGuard(
         availability: RuntimeEngineAvailabilityPort(engine: engine),

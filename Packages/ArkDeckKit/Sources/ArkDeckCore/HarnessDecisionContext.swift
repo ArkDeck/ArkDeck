@@ -250,9 +250,11 @@ public enum HarnessDecisionRejection: Error, Equatable, Sendable {
   case unknownKind(String)
   case operationRequired
   case operationNotOffered(String)
+  case operationNotExpected(String)
   case rawCommandSurface(String)
   case oversizedField(String)
   case emptyHypothesis
+  case invalidPatch(String)
 
   public var reasonCode: String {
     switch self {
@@ -262,9 +264,11 @@ public enum HarnessDecisionRejection: Error, Equatable, Sendable {
     case .unknownKind(let kind): return "unknownKind:\(kind)"
     case .operationRequired: return "operationRequired"
     case .operationNotOffered(let reference): return "operationNotOffered:\(reference)"
+    case .operationNotExpected(let reference): return "operationNotExpected:\(reference)"
     case .rawCommandSurface(let field): return "rawCommandSurface:\(field)"
     case .oversizedField(let field): return "oversizedField:\(field)"
     case .emptyHypothesis: return "emptyHypothesis"
+    case .invalidPatch(let reason): return reason
     }
   }
 }
@@ -279,10 +283,18 @@ public struct HarnessDecisionProposal: Equatable, Sendable {
   public let hypothesis: String
   public let reasonCode: String
   public let confidence: Double?
+  public let patchProposal: HarnessPatchProposal?
 
   public static let allowedFields: Set<String> = [
     "kind", "operationRef", "operationReference", "inputs", "hypothesis", "reasonCode",
     "confidence", "requiredArtifacts", "expectedObservation",
+    "baseWorkspaceRevision", "patchSha256", "unifiedDiff", "touchedFiles",
+    "expectedChangedSymbols",
+  ]
+
+  private static let patchFields: Set<String> = [
+    "baseWorkspaceRevision", "patchSha256", "unifiedDiff", "touchedFiles",
+    "expectedChangedSymbols",
   ]
 
   /// Keys a proposal may never carry. Each one is a decision the harness or
@@ -301,7 +313,8 @@ public struct HarnessDecisionProposal: Equatable, Sendable {
     inputs: [String: JSONValue],
     hypothesis: String,
     reasonCode: String,
-    confidence: Double?
+    confidence: Double?,
+    patchProposal: HarnessPatchProposal? = nil
   ) {
     self.kind = kind
     self.operationReference = operationReference
@@ -309,6 +322,7 @@ public struct HarnessDecisionProposal: Equatable, Sendable {
     self.hypothesis = hypothesis
     self.reasonCode = reasonCode
     self.confidence = confidence
+    self.patchProposal = patchProposal
   }
 
   /// Parse and validate raw model bytes against one context's offer.
@@ -392,20 +406,43 @@ public struct HarnessDecisionProposal: Equatable, Sendable {
       throw HarnessDecisionRejection.rawCommandSurface(offending.reasonCode)
     }
 
+    var patchProposal: HarnessPatchProposal?
     switch kind {
     case .invokeOperation:
+      if let field = patchFields.first(where: { fields[$0] != nil }) {
+        throw HarnessDecisionRejection.invalidPatch("patchFieldRequiresProposePatch:\(field)")
+      }
       guard let operationReference else { throw HarnessDecisionRejection.operationRequired }
       guard offeredOperations.contains(operationReference) else {
         // Not merely "not permitted": the model was told exactly which
         // operations were on the table this round.
         throw HarnessDecisionRejection.operationNotOffered(operationReference)
       }
+    case .proposePatch:
+      if fields["operationRef"] != nil || fields["operationReference"] != nil {
+        throw HarnessDecisionRejection.invalidPatch("proposePatchCannotSelectOperation")
+      }
+      if fields["inputs"] != nil {
+        throw HarnessDecisionRejection.invalidPatch("proposePatchCannotDeclareInputs")
+      }
+      guard offeredOperations.contains("workspace.apply-patch@1") else {
+        throw HarnessDecisionRejection.operationNotOffered("workspace.apply-patch@1")
+      }
+      do {
+        patchProposal = try HarnessPatchProposal.parse(fields)
+      } catch let error as HarnessPatchProposalError {
+        throw HarnessDecisionRejection.invalidPatch(error.reasonCode)
+      }
     case .requestHuman, .noSafeAction:
+      if let field = patchFields.first(where: { fields[$0] != nil }) {
+        throw HarnessDecisionRejection.invalidPatch("patchFieldRequiresProposePatch:\(field)")
+      }
       break
     }
 
     return HarnessDecisionProposal(
       kind: kind, operationReference: operationReference, inputs: inputs,
-      hypothesis: hypothesis, reasonCode: reasonCode, confidence: confidence)
+      hypothesis: hypothesis, reasonCode: reasonCode, confidence: confidence,
+      patchProposal: patchProposal)
   }
 }
