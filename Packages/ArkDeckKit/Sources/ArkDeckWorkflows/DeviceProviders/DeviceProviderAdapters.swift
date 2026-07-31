@@ -248,13 +248,18 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
   }
 
   private func traceRequest(from inputs: [String: JSONValue]) throws -> HDCTraceCaptureRequest {
-    var categories = ["ohos"]
+    // No invented default. The 2026-07-31 device window found `ohos` — the
+    // value that used to stand in here — absent from `hitrace
+    // --list_categories` on OH 3.2 (DAYU200), so the fallback could only ever
+    // have produced a command the device rejects. The trace leg is selected
+    // by the caller's own non-empty `traceCategories`, so an empty list here
+    // is a contradiction; `HDCTraceCaptureRequest` refuses it.
+    var categories: [String] = []
     if case .array(let requested)? = inputs["traceCategories"] {
-      let parsed = requested.compactMap { value -> String? in
+      categories = requested.compactMap { value -> String? in
         if case .string(let text) = value { return text }
         return nil
       }
-      if !parsed.isEmpty { categories = parsed }
     }
     var duration = 10
     if case .integer(let requested)? = inputs["durationSeconds"] {
