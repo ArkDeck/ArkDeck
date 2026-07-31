@@ -31,6 +31,12 @@ public struct RuntimeJobStatus: Sendable, Equatable, Codable {
   public let state: String
   public let waitingForHuman: Bool
   public let outcomeUnknown: Bool
+  /// How much of this job's device residue is still outstanding. A
+  /// `succeeded` job with a non-zero count did what was asked and left the
+  /// device dirty; `succeeded` must never be read as "device clean"
+  /// (CHG-2026-049 r3). Optional so a status decoded from before r3 keeps
+  /// decoding.
+  public var outstandingResidueCount: Int?
   public let timeline: [String]
 }
 
@@ -235,7 +241,9 @@ public enum RuntimeCleanupDebtState: String, Sendable, Equatable {
 
 public struct RuntimeCleanupDebtContinuation: Sendable, Equatable {
   public let jobID: String
-  public let remotePath: String
+  /// The ledger key that was settled or left outstanding: a remote path,
+  /// or `bundle:<name>` for an installed-bundle residue.
+  public let identity: String
   public let state: RuntimeCleanupDebtState
   public let detail: String
 }
@@ -1073,13 +1081,14 @@ public actor RuntimeJobEngine {
         if step.isOptional {
           try await recordSkippedOptionalStep(
             jobID: jobID, step: step, descriptor: descriptor, reason: "\(failure)")
-          if step.kind == .cleanupOwnedRemotePath,
-            let artifactStore,
-            let remotePath = Self.cleanupDebtRemotePath(for: action)
-          {
+          // The gate is what the step was trying to remove, not whether
+          // that happened to be a remote path: an optional cleanup that ran
+          // and failed owes a record either way.
+          if let artifactStore, let residue = Self.cleanupResidue(for: action) {
             try? await artifactStore.recordCleanupDebt(
-              jobID: jobID, stepID: step.stepID, remotePath: remotePath,
+              jobID: jobID, stepID: step.stepID, residue: residue,
               reason: "\(failure)", action: action)
+            await refreshResidueCount(jobID: jobID)
           }
           continue
         }
@@ -1192,8 +1201,9 @@ public actor RuntimeJobEngine {
       if let artifactStore {
         try? await artifactStore.recordCleanupDebt(
           jobID: jobID, stepID: cleanupStep.stepID,
-          remotePath: deployment.stagingPath,
+          residue: .remotePath(deployment.stagingPath),
           reason: "\(cleanupFailure)", action: cleanupAction)
+        await refreshResidueCount(jobID: jobID)
       }
       appendTimeline(
         jobID: jobID, entry: "native compensation cleanup debt: \(cleanupFailure)")
@@ -1224,14 +1234,37 @@ public actor RuntimeJobEngine {
     }
   }
 
-  private static func cleanupDebtRemotePath(
+  /// Recomputes this job's outstanding residue from the ledger, which is
+  /// the authority. Deliberately not incremented in place: the count must
+  /// agree with what `cleanup-debt list` shows, not with the engine's idea
+  /// of how many times it recorded something.
+  private func refreshResidueCount(jobID: String) async {
+    guard let artifactStore, var runtime = jobs[jobID] else { return }
+    let outstanding = (try? await artifactStore.outstandingCleanupDebt()) ?? []
+    runtime.record.outstandingResidueCount =
+      outstanding.filter { $0.jobID == jobID }.count
+    jobs[jobID] = runtime
+    try? runtime.record.persist(into: jobDirectory(for: jobID))
+  }
+
+  /// What this action was supposed to remove, when it is a cleanup-class
+  /// action. `nil` means the action leaves nothing to owe.
+  ///
+  /// `uninstallPackage` joined the list in r3: an uninstall that ran and
+  /// did not take effect leaves an installed bundle behind, which is the
+  /// same class of fact as an un-removed remote path. Keying the ledger by
+  /// path was the whole of D12 — a bundle simply had nowhere to be
+  /// recorded, so a job could report success with a device it had dirtied.
+  private static func cleanupResidue(
     for action: TypedProviderAction
-  ) -> String? {
+  ) -> CleanupResidue? {
     switch action {
     case .hdc(.cleanupOwnedRemotePath(let path)):
-      return path.remotePath
+      return .remotePath(path.remotePath)
     case .hdc(.cleanupNativeLibrary(let deployment)):
-      return deployment.stagingPath
+      return .remotePath(deployment.stagingPath)
+    case .hdc(.uninstallPackage(let bundle)):
+      return .installedBundle(bundle.bundleName)
     default:
       return nil
     }
@@ -1301,13 +1334,14 @@ public actor RuntimeJobEngine {
         appendTimeline(
           jobID: jobID,
           entry: "compensation failed \(step.stepID): \(failure)")
-        if step.kind == .cleanupOwnedRemotePath,
-          let artifactStore,
-          case .hdc(.cleanupOwnedRemotePath(let path)) = action
-        {
+        // Same gate on the compensation path, which matters more: it runs
+        // precisely when something else already went wrong, and before r3
+        // a failed uninstall here left no record at all.
+        if let artifactStore, let residue = Self.cleanupResidue(for: action) {
           try? await artifactStore.recordCleanupDebt(
-            jobID: jobID, stepID: step.stepID, remotePath: path.remotePath,
+            jobID: jobID, stepID: step.stepID, residue: residue,
             reason: "\(failure)", action: action)
+          await refreshResidueCount(jobID: jobID)
         }
       }
     }
@@ -2417,24 +2451,24 @@ public actor RuntimeJobEngine {
   /// this bounded retry. If the retry becomes unobservable, later calls may
   /// only run the read-only path judgement and must never resend cleanup.
   public func continueCleanupDebt(
-    jobID: String, remotePath: String
+    jobID: String, identity: String
   ) async throws -> RuntimeCleanupDebtContinuation {
     guard let artifactStore else {
       throw RuntimeJobEngineError.internalFailure("Artifact store is not configured")
     }
     guard
       let debt = try await artifactStore.outstandingCleanupDebt().first(where: {
-        $0.jobID == jobID && $0.remotePath == remotePath
+        $0.jobID == jobID && $0.identity == identity
       })
     else {
-      throw RuntimeJobEngineError.jobNotFound("cleanup-debt:\(jobID):\(remotePath)")
+      throw RuntimeJobEngineError.jobNotFound("cleanup-debt:\(jobID):\(identity)")
     }
     guard let runtime = jobs[jobID] else {
       throw RuntimeJobEngineError.jobNotFound(jobID)
     }
     guard !runtime.record.outcomeUnknown else {
       return RuntimeCleanupDebtContinuation(
-        jobID: jobID, remotePath: remotePath, state: .outcomeUnknown,
+        jobID: jobID, identity: identity, state: .outcomeUnknown,
         detail: "job has an unresolved outcome; cleanup mutation is not resent")
     }
     guard let persisted = debt.persistedAction else {
@@ -2442,10 +2476,10 @@ public actor RuntimeJobEngine {
         "cleanup debt has no persisted exact typed action")
     }
     let action = try persisted.materialize()
-    guard Self.cleanupDebtRemotePath(for: action) == remotePath
+    guard Self.cleanupResidue(for: action)?.identity == identity
     else {
       throw RuntimeJobEngineError.internalFailure(
-        "cleanup debt action does not match its recorded remote path")
+        "cleanup debt action does not match its recorded residue")
     }
     guard let provider = providers.provider(id: runtime.record.providerID) else {
       throw RuntimeJobEngineError.internalFailure(
@@ -2486,30 +2520,31 @@ public actor RuntimeJobEngine {
         receipt: receipt, intent: reference, context: context)
       {
       case .confirmedCompleted:
-        try await artifactStore.settleCleanupDebt(jobID: jobID, remotePath: remotePath)
+        try await artifactStore.settleCleanupDebt(jobID: jobID, identity: identity)
+        await refreshResidueCount(jobID: jobID)
         return RuntimeCleanupDebtContinuation(
-          jobID: jobID, remotePath: remotePath, state: .settled,
+          jobID: jobID, identity: identity, state: .settled,
           detail: "readback confirmed the owned path is already absent")
       case .confirmedNotExecuted:
         break  // path still exists; an initial confirmed-failure debt may retry below
       case .stillUnknown(let reason):
         return RuntimeCleanupDebtContinuation(
-          jobID: jobID, remotePath: remotePath, state: .outstanding,
+          jobID: jobID, identity: identity, state: .outstanding,
           detail: "path readback inconclusive: \(reason)")
       }
     } catch {
       return RuntimeCleanupDebtContinuation(
-        jobID: jobID, remotePath: remotePath, state: .outstanding,
+        jobID: jobID, identity: identity, state: .outstanding,
         detail: "path readback failed: \(error)")
     }
 
     if debt.retryOutcomeUnknown == true || debt.retryAttemptStartedAtUTC != nil {
       return RuntimeCleanupDebtContinuation(
-        jobID: jobID, remotePath: remotePath, state: .outcomeUnknown,
+        jobID: jobID, identity: identity, state: .outcomeUnknown,
         detail: "earlier cleanup retry is outcomeUnknown; mutation resend is forbidden")
     }
     _ = try await artifactStore.beginCleanupDebtRetry(
-      jobID: jobID, remotePath: remotePath)
+      jobID: jobID, identity: identity)
     let plan = try provider.lower(action: action, context: context)
     guard plan.action == action, plan.action.effect == .deviceMutation else {
       throw RuntimeJobEngineError.internalFailure(
@@ -2519,30 +2554,31 @@ public actor RuntimeJobEngine {
       let receipt = try await dispatcher.dispatch(plan)
       switch try provider.verify(receipt: receipt, action: action, context: context) {
       case .verified:
-        try await artifactStore.settleCleanupDebt(jobID: jobID, remotePath: remotePath)
+        try await artifactStore.settleCleanupDebt(jobID: jobID, identity: identity)
+        await refreshResidueCount(jobID: jobID)
         return RuntimeCleanupDebtContinuation(
-          jobID: jobID, remotePath: remotePath, state: .settled,
+          jobID: jobID, identity: identity, state: .settled,
           detail: "exact typed cleanup completed")
       case .failed(let code, let detail):
         try await artifactStore.completeCleanupDebtRetry(
-          jobID: jobID, remotePath: remotePath, outcomeUnknown: false)
+          jobID: jobID, identity: identity, outcomeUnknown: false)
         return RuntimeCleanupDebtContinuation(
-          jobID: jobID, remotePath: remotePath, state: .outstanding,
+          jobID: jobID, identity: identity, state: .outstanding,
           detail: "\(code): \(detail)")
       case .unknown(let reason), .unsupported(let reason):
         try await artifactStore.completeCleanupDebtRetry(
-          jobID: jobID, remotePath: remotePath, outcomeUnknown: true)
+          jobID: jobID, identity: identity, outcomeUnknown: true)
         return RuntimeCleanupDebtContinuation(
-          jobID: jobID, remotePath: remotePath, state: .outcomeUnknown,
+          jobID: jobID, identity: identity, state: .outcomeUnknown,
           detail: "\(reason); mutation resend is forbidden")
       }
     } catch let failure as RuntimeDispatchFailure {
       let unknown: Bool
       if case .outcomeUnknown = failure { unknown = true } else { unknown = false }
       try await artifactStore.completeCleanupDebtRetry(
-        jobID: jobID, remotePath: remotePath, outcomeUnknown: unknown)
+        jobID: jobID, identity: identity, outcomeUnknown: unknown)
       return RuntimeCleanupDebtContinuation(
-        jobID: jobID, remotePath: remotePath,
+        jobID: jobID, identity: identity,
         state: unknown ? .outcomeUnknown : .outstanding,
         detail: "\(failure)")
     }
@@ -3975,6 +4011,7 @@ public actor RuntimeJobEngine {
       state: record.state,
       waitingForHuman: record.state == "waitingForRecovery",
       outcomeUnknown: record.outcomeUnknown,
+      outstandingResidueCount: record.outstandingResidueCount,
       timeline: record.timeline)
   }
 
@@ -4564,6 +4601,10 @@ public struct RuntimeJobRecord: Codable, Sendable, Equatable {
   /// Why a step did not run, keyed by step id, so a downstream skip can
   /// cite the original cause instead of restating its own condition.
   public var skipReasons: [String: String] = [:]
+  /// Device residue this job left and has not settled. Recomputed from the
+  /// debt ledger whenever the engine records or settles one, so a
+  /// `succeeded` job can never be read as a clean device (CHG-2026-049 r3).
+  public var outstandingResidueCount: Int?
 
   public var sessionID: String { "session-\(jobID)" }
 

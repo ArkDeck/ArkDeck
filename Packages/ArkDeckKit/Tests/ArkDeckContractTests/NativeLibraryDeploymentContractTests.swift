@@ -710,7 +710,7 @@ final class NativeLibraryDeploymentContractTests: XCTestCase {
       suffix: "cleanup-debt", dispatcher: continuationDispatcher)
     _ = try await recovered.recoverPersistedJobs()
     let continuation = try await recovered.continueCleanupDebt(
-      jobID: debt.jobID, remotePath: debt.remotePath)
+      jobID: debt.jobID, identity: debt.remotePath)
     XCTAssertEqual(continuation.state, .settled)
     XCTAssertEqual(
       continuationDispatcher.actionNames(),

@@ -439,21 +439,32 @@ public struct RuntimeControlPlaneHandler: Sendable {
       }
 
     case "cleanupDebt.continue":
+      // Either shape of residue, one ledger key. `bundleName` is not a
+      // free-form uninstall target: the engine refuses any identity that is
+      // not already an outstanding record for this job.
+      let residueIdentity: String?
+      if case .string(let path)? = request.params?["remotePath"] {
+        residueIdentity = path
+      } else if case .string(let bundle)? = request.params?["bundleName"] {
+        residueIdentity = CleanupResidue.installedBundle(bundle).identity
+      } else {
+        residueIdentity = nil
+      }
       guard case .string(let jobID)? = request.params?["jobId"],
-        case .string(let remotePath)? = request.params?["remotePath"]
+        let identity = residueIdentity
       else {
         return failure(
           id: request.id, code: .invalidParams,
-          message: "jobId and remotePath are required")
+          message: "jobId and one of remotePath / bundleName are required")
       }
       do {
         let result = try await engine.continueCleanupDebt(
-          jobID: jobID, remotePath: remotePath)
+          jobID: jobID, identity: identity)
         return success(
           id: request.id,
           result: .object([
             "jobId": .string(result.jobID),
-            "remotePath": .string(result.remotePath),
+            "identity": .string(result.identity),
             "state": .string(result.state.rawValue),
             "detail": .string(result.detail),
           ]))
@@ -1124,6 +1135,8 @@ public struct RuntimeControlPlaneHandler: Sendable {
       "jobId": .string(debt.jobID),
       "stepId": .string(debt.stepID),
       "remotePath": .string(debt.remotePath),
+      "bundleName": debt.bundleName.map(JSONValue.string) ?? .null,
+      "identity": .string(debt.identity),
       "reason": .string(debt.reason),
       "recordedAtUtc": .string(debt.recordedAtUTC),
       "retryOutcomeUnknown": .bool(
@@ -1139,6 +1152,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
       "state": .string(status.state),
       "waitingForHuman": .bool(status.waitingForHuman),
       "outcomeUnknown": .bool(status.outcomeUnknown),
+      "outstandingResidueCount": .integer(Int64(status.outstandingResidueCount ?? 0)),
       "timeline": .array(status.timeline.map(JSONValue.string)),
     ])
   }

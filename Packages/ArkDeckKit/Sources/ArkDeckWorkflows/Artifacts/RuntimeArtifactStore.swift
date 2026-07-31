@@ -307,16 +307,55 @@ public struct RuntimeArtifactLeaseResolution: Sendable, Equatable {
 
 /// Remote cleanup that failed is debt, never silence: it is recorded so a
 /// later reconcile can settle it.
+/// What a job left on the device and could not undo. The remote-path case
+/// is the original; the bundle case is the same fact for an uninstall that
+/// ran without taking effect (CHG-2026-049 r3). Both are recorded, queried
+/// and settled through one ledger — the asymmetry between them was the
+/// whole of D12.
+public enum CleanupResidue: Sendable, Equatable {
+  case remotePath(String)
+  case installedBundle(String)
+
+  /// Ledger key. The path case keeps the bare path so records written
+  /// before r3 keep their identity; the bundle case is prefixed so a
+  /// bundle can never collide with a path.
+  public var identity: String {
+    switch self {
+    case .remotePath(let path): return path
+    case .installedBundle(let bundle): return "bundle:\(bundle)"
+    }
+  }
+
+  public var description: String {
+    switch self {
+    case .remotePath(let path): return "remote path \(path)"
+    case .installedBundle(let bundle): return "installed bundle \(bundle)"
+    }
+  }
+}
+
 public struct CleanupDebtRecord: Sendable, Equatable, Codable {
   public let jobID: String
   public let stepID: String
+  /// The path case's identity. Empty when the residue is not a path —
+  /// kept under this name so records written before r3 decode unchanged.
   public let remotePath: String
+  /// Set only for a bundle residue. Absent in every pre-r3 record, which
+  /// is what makes those records decode as the path case.
+  public var bundleName: String?
   public let reason: String
   public let recordedAtUTC: String
   public var settledAtUTC: String?
   public var retryAttemptStartedAtUTC: String?
   public var retryOutcomeUnknown: Bool?
   var persistedAction: PersistedTypedProviderAction?
+
+  public var residue: CleanupResidue {
+    if let bundleName { return .installedBundle(bundleName) }
+    return .remotePath(remotePath)
+  }
+
+  public var identity: String { residue.identity }
 }
 
 public actor RuntimeArtifactStore {
@@ -775,27 +814,47 @@ public actor RuntimeArtifactStore {
   }
 
   public func recordCleanupDebt(
-    jobID: String, stepID: String, remotePath: String, reason: String,
+    jobID: String, stepID: String, residue: CleanupResidue, reason: String,
     action: TypedProviderAction? = nil
   ) throws {
+    let path: String
+    let bundle: String?
+    switch residue {
+    case .remotePath(let remotePath):
+      path = remotePath
+      bundle = nil
+    case .installedBundle(let bundleName):
+      path = ""
+      bundle = bundleName
+    }
     var debts = try loadCleanupDebt()
     debts.append(
       CleanupDebtRecord(
-        jobID: jobID, stepID: stepID, remotePath: remotePath, reason: reason,
+        jobID: jobID, stepID: stepID, remotePath: path, bundleName: bundle,
+        reason: reason,
         recordedAtUTC: nowUTC(), settledAtUTC: nil,
         retryAttemptStartedAtUTC: nil, retryOutcomeUnknown: nil,
         persistedAction: try action.map { try PersistedTypedProviderAction($0) }))
     try persistCleanupDebt(debts)
   }
 
+  public func recordCleanupDebt(
+    jobID: String, stepID: String, remotePath: String, reason: String,
+    action: TypedProviderAction? = nil
+  ) throws {
+    try recordCleanupDebt(
+      jobID: jobID, stepID: stepID, residue: .remotePath(remotePath),
+      reason: reason, action: action)
+  }
+
   public func outstandingCleanupDebt() throws -> [CleanupDebtRecord] {
     try loadCleanupDebt().filter { $0.settledAtUTC == nil }
   }
 
-  public func settleCleanupDebt(jobID: String, remotePath: String) throws {
+  public func settleCleanupDebt(jobID: String, identity: String) throws {
     var debts = try loadCleanupDebt()
     for index in debts.indices
-    where debts[index].jobID == jobID && debts[index].remotePath == remotePath
+    where debts[index].jobID == jobID && debts[index].identity == identity
       && debts[index].settledAtUTC == nil
     {
       debts[index].settledAtUTC = nowUTC()
@@ -803,14 +862,14 @@ public actor RuntimeArtifactStore {
     try persistCleanupDebt(debts)
   }
 
-  func beginCleanupDebtRetry(jobID: String, remotePath: String) throws
+  func beginCleanupDebtRetry(jobID: String, identity: String) throws
     -> CleanupDebtRecord
   {
     var debts = try loadCleanupDebt()
     guard let index = debts.firstIndex(where: {
-      $0.jobID == jobID && $0.remotePath == remotePath && $0.settledAtUTC == nil
+      $0.jobID == jobID && $0.identity == identity && $0.settledAtUTC == nil
     }) else {
-      throw RuntimeArtifactError.artifactNotFound("cleanup-debt:\(jobID):\(remotePath)")
+      throw RuntimeArtifactError.artifactNotFound("cleanup-debt:\(jobID):\(identity)")
     }
     guard debts[index].retryOutcomeUnknown != true,
       debts[index].retryAttemptStartedAtUTC == nil
@@ -824,13 +883,13 @@ public actor RuntimeArtifactStore {
   }
 
   func completeCleanupDebtRetry(
-    jobID: String, remotePath: String, outcomeUnknown: Bool
+    jobID: String, identity: String, outcomeUnknown: Bool
   ) throws {
     var debts = try loadCleanupDebt()
     guard let index = debts.firstIndex(where: {
-      $0.jobID == jobID && $0.remotePath == remotePath && $0.settledAtUTC == nil
+      $0.jobID == jobID && $0.identity == identity && $0.settledAtUTC == nil
     }) else {
-      throw RuntimeArtifactError.artifactNotFound("cleanup-debt:\(jobID):\(remotePath)")
+      throw RuntimeArtifactError.artifactNotFound("cleanup-debt:\(jobID):\(identity)")
     }
     debts[index].retryOutcomeUnknown = outcomeUnknown
     if !outcomeUnknown {

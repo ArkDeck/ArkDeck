@@ -172,7 +172,10 @@
 
 ## TASK-DHA-002 — 清理残留成为一等记录(r3)
 
-- Status:ready
+- Status:done
+- Done:2026-07-31;随本实现 PR 合入生效(维护者 review + merge 即批准);
+  DHA-RES-001..003 全部 PASS(contract 面,912 tests / 1 skipped / 0 failures);
+  **未动 `Catalog/**`** —— proposal r3 的判断成立,没有任何步骤声明变化
 - Platform:macos
 - Requirements:proposal r3 What 1-5(债务身份推广为残留、记录门改为清理职责且
   覆盖补偿路径、`cleanupDebt.continue` 对 bundle 残留复用 D2 readback、
