@@ -404,12 +404,22 @@ final class DeviceProviderContractTests: XCTestCase {
 
     for action in actions {
       let plan = try hdc.lower(action: action, context: boundContext)
-      guard case .process(_, let argv, _) = plan.kind else {
+      // A readback-carrying action lowers to a sequence; every invocation in
+      // it reaches the device, so every one of them must be target-bound.
+      let invocations: [[String]]
+      switch plan.kind {
+      case .process(_, let argv, _):
+        invocations = [argv]
+      case .processSequence(_, let sequence):
+        invocations = sequence.map(\.arguments)
+      case .hostManaged:
         return XCTFail("\(action) must lower to a process plan")
       }
-      XCTAssertEqual(
-        Array(argv.prefix(2)), ["-t", "150100424a544e4600"],
-        "\(action) must not depend on HDC's default device")
+      for argv in invocations {
+        XCTAssertEqual(
+          Array(argv.prefix(2)), ["-t", "150100424a544e4600"],
+          "\(action) must not depend on HDC's default device")
+      }
       XCTAssertThrowsError(
         try hdc.lower(action: action, context: missingBinding),
         "\(action) must fail before process launch when no descriptor-bound connect key exists")

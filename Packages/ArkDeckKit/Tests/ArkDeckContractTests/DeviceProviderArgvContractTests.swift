@@ -50,6 +50,36 @@ final class DeviceProviderArgvContractTests: XCTestCase {
     XCTAssertEqual(timeout, 30)
   }
 
+  /// The trace capture carries its own device-side readback: `hitrace` then
+  /// `ls -l` on the file it was told to write. The readback must run even
+  /// when hitrace reports non-zero, or a partial trace would be judged by
+  /// the exit status the whole design refuses to trust.
+  func testTraceCaptureLowersToCaptureThenListingReadback() throws {
+    let path = try HDCOwnedRemotePath(
+      jobID: "job-argv-1", stepID: "capture-trace", nonce: "n1")
+    let plan = try provider.lower(
+      action: .hdc(
+        .captureTrace(
+          try HDCTraceCaptureRequest(
+            durationSeconds: 5, categories: ["ohos", "ability"], bufferKB: 8192),
+          into: path)),
+      context: context)
+    guard case .processSequence(_, let invocations) = plan.kind else {
+      return XCTFail("expected a capture + readback sequence")
+    }
+    XCTAssertEqual(
+      invocations.map(\.arguments),
+      [
+        [
+          "-t", connectKey, "shell", "hitrace", "-t", "5", "-b", "8192",
+          "ohos", "ability", "-o", path.remotePath,
+        ],
+        ["-t", connectKey, "shell", "ls", "-l", path.remotePath],
+      ])
+    XCTAssertTrue(invocations[0].continueAfterNonZero)
+    XCTAssertFalse(invocations[1].continueAfterNonZero)
+  }
+
   func testCaptureUIDumpStepMapsToWindowInventoryAction() throws {
     let descriptor = try XCTUnwrap(
       RuntimeOperationCatalog.descriptor(reference: "capture.diagnostics@1"))

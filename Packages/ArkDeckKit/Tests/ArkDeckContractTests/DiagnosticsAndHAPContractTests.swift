@@ -57,6 +57,12 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
       /// Bytes the simulated `file recv` leaves on the host. `nil` models
       /// the version whose transfer lands nowhere the caller named.
       var receivedTracePayload: Data? = Data("trace-bytes".utf8)
+      /// The `ls -l` line the device answers for the captured trace. `nil`
+      /// uses a written 4096-byte file; the string form models an empty
+      /// capture or an absent path.
+      var traceListing: String?
+      /// hitrace's own exit status, which the verdict must ignore.
+      var traceExit: Int32 = 0
       var targetRows = "150100424a544e4600\t\tUSB\tConnected\tlocalhost\n"
       var modelValue = "DAYU200\n"
       var firmwareValue = "OpenHarmony-4.1-release\n"
@@ -114,7 +120,21 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
         return receipt("{\"windows\":[]}\n")
       case .captureTrace:
         note("captureTrace")
-        return receipt("")
+        // hitrace, then the `ls -l` readback that actually decides the
+        // verdict. The listing is what a device answers for a written
+        // trace; the capture's own exit status is deliberately useless.
+        func sub(_ stdout: String, exit: Int32 = 0) -> ProviderSubprocessReceipt {
+          ProviderSubprocessReceipt(
+            exitStatus: exit, stdout: Data(stdout.utf8), stderr: Data(),
+            stdoutTruncated: false, durationSeconds: 0.01)
+        }
+        let listing =
+          script.traceListing
+          ?? "-rw-r--r-- 1 root root 4096 2026-07-31 00:00 /data/local/tmp/trace.htrace\n"
+        return ProviderProcessReceipt(
+          exitStatus: 0, stdout: Data(), stderr: Data(),
+          stdoutTruncated: false, durationSeconds: 0.02,
+          subprocesses: [sub("", exit: script.traceExit), sub(listing)])
       case .receiveOwnedArtifact:
         note("receiveArtifact")
         // Simulates the real leg rather than its verdict: hdc writes the
@@ -370,25 +390,114 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
     XCTAssertTrue(status.outcomeUnknown || status.state == "failed", status.state)
   }
 
-  func testRemoteTraceFailsClosedBeforeCapabilityConsumptionOrDispatch() async throws {
+  /// The trace leg used to be refused at admission because neither half of
+  /// its verification existed. Both halves are published now, so the leg is
+  /// governed by the same authorization path as every other E1 step —
+  /// including this engine's automatic issuance, which is what a trace
+  /// request without an explicit capability actually gets. Pinned because
+  /// lifting the refusal is what makes it reachable for `traceCategories`.
+  func testTraceEscalatesToE1AndUsesTheAutomaticPolicyWhenUncapped() async throws {
     let dispatcher = ScriptedDispatcher()
     let (engine, capabilities, _) = try makeEngine(dispatcher: dispatcher)
+    let acceptance = try await engine.submit(
+      captureRequest(withTrace: true, key: "idem-trace-uncapped"))
+    XCTAssertTrue(
+      dispatcher.dispatchedActions.isEmpty,
+      "issuance happens after materialization but before any dispatch")
+
+    let issued = try await capabilities.list()
+    let automatic = try XCTUnwrap(issued.first)
+    XCTAssertEqual(automatic.capability.issuer.kind, .runtimeDefaultPolicy)
+    XCTAssertEqual(automatic.capability.effectCeiling, .deviceMutation)
+
+    let status = try await engine.run(jobID: acceptance.jobID)
+    XCTAssertEqual(status.state, "succeeded")
+    let evidence = try await engine.evidenceSnapshot(jobID: acceptance.jobID)
+    XCTAssertEqual(evidence.authority?.kind, .runtimeCapability)
+    let consumed = try await capabilities.inspect(
+      capabilityID: automatic.capability.capabilityID)
+    XCTAssertEqual(consumed?.consumptionCount, 1)
+  }
+
+  /// DHA-CAP-001's orchestration, end to end over the fake device: the trace
+  /// is captured, read back, received, published from the received bytes and
+  /// cleaned up. The published artifact must be the transferred file — the
+  /// receive step's stdout is hdc's progress banner.
+  func testTraceRunPublishesTheReceivedBytesAndCleansUp() async throws {
+    let dispatcher = ScriptedDispatcher()
+    let (engine, capabilities, artifacts) = try makeEngine(dispatcher: dispatcher)
     try await installCaptureCapability(capabilities)
-    do {
-      _ = try await engine.submit(
-        captureRequest(
-          withTrace: true, key: "idem-trace-unimplemented",
-          capability: "CAP-RT-CAPTURE-001"))
-      XCTFail("trace cannot run without a verified host-managed receive path")
-    } catch let error as RuntimeJobEngineError {
-      guard case .rejected(.invalidInput, let message) = error else {
-        return XCTFail("expected invalidInput, got \(error)")
-      }
-      XCTAssertTrue(message.contains("host-managed receive"), message)
+
+    let acceptance = try await engine.submit(
+      captureRequest(
+        withTrace: true, key: "idem-trace-ok", capability: "CAP-RT-CAPTURE-001"))
+    let status = try await engine.run(jobID: acceptance.jobID)
+    XCTAssertEqual(status.state, "succeeded")
+    for leg in ["captureTrace", "receiveArtifact", "cleanup"] {
+      XCTAssertTrue(dispatcher.dispatchedActions.contains(leg), "missing \(leg)")
     }
+
+    let recorded = try await artifacts.list(jobID: acceptance.jobID)
+    let trace = try XCTUnwrap(recorded.first { $0.name == "trace.htrace" })
+    XCTAssertEqual(trace.status, .published)
+    let bytes = try await artifacts.read(
+      jobID: acceptance.jobID, artifactID: trace.artifactID, allowSensitive: true)
+    XCTAssertEqual(bytes, Data("trace-bytes".utf8))
+    XCTAssertFalse(
+      String(data: bytes, encoding: .utf8)!.contains("FileTransfer"),
+      "the trace artifact must be the received file, never the transfer banner")
+
     let capability = try await capabilities.inspect(capabilityID: "CAP-RT-CAPTURE-001")
-    XCTAssertEqual(capability?.consumptionCount, 0)
-    XCTAssertTrue(dispatcher.dispatchedActions.isEmpty, "zero dispatch on refusal")
+    XCTAssertEqual(capability?.consumptionCount, 1)
+  }
+
+  /// A transfer that lands nowhere the caller named cannot be laundered into
+  /// a published trace: the job stops with its intent outstanding.
+  func testTraceThatNeverLandsStopsInsteadOfPublishing() async throws {
+    var script = ScriptedDispatcher.Script()
+    script.receivedTracePayload = nil
+    let dispatcher = ScriptedDispatcher(script: script)
+    let (engine, capabilities, artifacts) = try makeEngine(dispatcher: dispatcher)
+    try await installCaptureCapability(capabilities)
+
+    let acceptance = try await engine.submit(
+      captureRequest(
+        withTrace: true, key: "idem-trace-nowhere", capability: "CAP-RT-CAPTURE-001"))
+    let status = try? await engine.run(jobID: acceptance.jobID)
+    XCTAssertNotEqual(status?.state, "succeeded")
+    let recorded = try await artifacts.list(jobID: acceptance.jobID)
+    let trace = recorded.first { $0.name == "trace.htrace" }
+    if case .published? = trace?.status {
+      XCTFail("nothing landed, so no trace artifact may be published")
+    }
+  }
+
+  /// hitrace can exit cleanly and write nothing. The readback, not the exit
+  /// status, is what says so — and the trace is an optional product, so the
+  /// job keeps its partial-success semantics while recording the absence.
+  func testZeroByteTraceFailsOnTheDeviceSideReadback() async throws {
+    var script = ScriptedDispatcher.Script()
+    script.traceListing =
+      "-rw-r--r-- 1 root root 0 2026-07-31 00:00 /data/local/tmp/trace.htrace\n"
+    let dispatcher = ScriptedDispatcher(script: script)
+    let (engine, capabilities, artifacts) = try makeEngine(dispatcher: dispatcher)
+    try await installCaptureCapability(capabilities)
+
+    let acceptance = try await engine.submit(
+      captureRequest(
+        withTrace: true, key: "idem-trace-empty", capability: "CAP-RT-CAPTURE-001"))
+    _ = try await engine.run(jobID: acceptance.jobID)
+    XCTAssertFalse(
+      dispatcher.dispatchedActions.contains("receiveArtifact"),
+      "an empty capture must not proceed to the receive leg")
+
+    let recorded = try await artifacts.list(jobID: acceptance.jobID)
+    guard case .missing(let reason)? = recorded.first(where: { $0.name == "trace.htrace" })?
+      .status
+    else {
+      return XCTFail("a zero-byte capture must record the trace as missing")
+    }
+    XCTAssertFalse(reason.isEmpty)
   }
 
   /// D4: the trace product comes off the host file the receive leg measured,

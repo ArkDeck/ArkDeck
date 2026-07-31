@@ -178,6 +178,9 @@ hdc -t <k> shell rm -f <remote.png>
 
 - **成功判据是远端文件大小 > 0,不是退出码**;deveco 在不带 `-t` 失败后重试一次
   `-t png`,最后校验本地 PNG 魔数 `89 50 4E 47 0D 0A 1A 0A`。
+  ArkDeck 把这条"`ls -l` 第 5 字段判产物"复用到了 trace 腿(D10):`hitrace` 之后
+  紧跟一条 `ls -l`,由 listing 判 verified/failed/unknown。**复用的是 `ls` 的列序,
+  不是 hitrace 的证据** —— 该列序在 OH 3.2 toybox 上尚未真机确认(D11)。
 - 注意 `-t` 的双重含义:`hdc -t <connectKey>` 与 `snapshot_display -t png` 不是
   同一个 `-t`,拼 argv 时不要复用常量。
 
@@ -223,7 +226,8 @@ hdc -t <k> shell rm -f <remote.png>
 | D1 | `capture-ui-dump` = `captureRemoteStdout` + `windowInventory`;`componentTree` lowering fail closed | `uitest dumpLayout` 写设备文件 + `file recv` | **需契约或 Catalog 变更**(本车只把拒绝原因从"无 windowId-free 形态"更正为"stdout 步骤形态无法承载文件型产物",并指向本文件 §7) |
 | D2 | `stopAbility` / `uninstallPackage` verify **仅**看 exit status 就判 `verified` | `aa`/`bm` 家族有短状态行可判;`bm uninstall` 有 `uninstall missing installed bundle` 这种"0 但没做" | **待真机证据**(`debug.hap@1` 在 stop/uninstall 之后没有 readback 步骤,直接改成 `.unknown` 会让每次运行都落 `reconcileRequired`;闭合路径二选一:设备窗口 pin 状态串,或加 readback 步骤=Catalog 变更) |
 | D4 | `receiveOwnedArtifact` lower 为 `["file","recv",<remote>]`(**无本地目标**),且其 verify 要求 `receipt.hostManagedRecordID`,而 process 收据从不携带该字段 → 永远 `.unknown` | recv 本地目标语义不稳,必须按内容校验 | **本车已落地**(argv 补 host 目标;dispatcher 按 `HostLandingExpectation` 实测落地文件的大小与 SHA-256;verdict 全部来自磁盘字节:无文件=`.unknown`、空=`.failed`、超预算=`.failed` 且不做哈希、pin 了哈希则真比对;`trace.htrace` 改从收到的文件发布,不再用 `receipt.stdout`) |
-| D10 | trace 腿在 `validateSupportedPlanInputs` 处按 `traceCategories` 整体拒绝(admission 前),D4 落地后该拒绝的接收侧理由已不成立 | `hitrace -o <file>` 的产物存在性/大小只能由设备侧 `ls -l` 第 5 字段判(同 §6) | 待真机证据(解除拒绝前需:设备侧 readback 落地 + 设备窗口 pin `file recv` 的实际落地形态;本车用"本地文件名 = 远端 basename"使目录形/文件形落到同一路径,但未经真机) |
+| D10 | trace 腿在 `validateSupportedPlanInputs` 处按 `traceCategories` 整体拒绝(admission 前) | `hitrace -o <file>` 的产物存在性/大小只能由设备侧 `ls -l` 第 5 字段判(同 §8) | **本车已落地**(`capture-trace` 降为 `hitrace` + `ls -l` 两段序列,判据取 listing 的 size 字段而非退出码:>0 verified、=0 `emptyTrace` failed、非常规文件/读不出 unknown;admission 拒绝解除,trace 腿改由 E1 授权路径管辖)|
+| D11 | trace 腿现在会真下发,但从未在真机上跑过;`ls -l` 字段序与 `file recv` 落地形态都只有 `[S]` 来源 | deveco 的 `ls -l` 第 5 字段判据取自截屏路径(§8),不是 hitrace 路径 | 待真机证据(DHA-HW 窗口:pin `ls -l` 在 OH 3.2 toybox 上的实际列序、pin `file recv` 的落地形态;两者不符时代码落 `.unknown` 而非误判,但仍是未验证) |
 | D5 | `bm install -p <单文件> -r` | 多包必须同目录 + 一条 `bm install -p <dir>` | 待真机证据(单 HAP 之外未覆盖) |
 | D6 | retry 仅 `preflightAttempts: 2 / mutationAttempts: 1` | transient 串表 + 800/1500/2500 退避 | 待真机证据(transient 分类进判定前需 pin) |
 | D7 | 无签名前置判断 | host 侧判 `-signed.*` 后缀 | 待真机证据(后缀是构建约定,只能当提示) |

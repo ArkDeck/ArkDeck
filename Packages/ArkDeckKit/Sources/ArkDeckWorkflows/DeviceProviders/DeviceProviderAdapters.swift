@@ -503,15 +503,29 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
             + "file-producing dumpLayout step shape lands")
       }
     case .captureTrace(let request, let path):
+      // hitrace's own exit status is the hdc client's, not the remote
+      // command's, so the capture is judged by the file it was supposed to
+      // write. `ls -l` is the pinned way to ask (DEVICE-COMMAND-FACTS.md §8:
+      // the size field, not the exit code, is what deveco believes) and it
+      // runs even when hitrace reports non-zero — a partial trace is still a
+      // fact the readback should report.
       return TypedProcessPlan(
         action: action,
-        kind: .process(
+        kind: .processSequence(
           executableSHA256: "resolved-at-dispatch",
-          argumentSummary: try deviceArguments(
-            ["shell", "hitrace", "-t", String(request.durationSeconds), "-b",
-              String(request.bufferKB)] + request.categories + ["-o", path.remotePath],
-            context: context),
-          timeoutSeconds: request.durationSeconds + 30))
+          invocations: [
+            TypedProcessInvocation(
+              arguments: try deviceArguments(
+                ["shell", "hitrace", "-t", String(request.durationSeconds), "-b",
+                  String(request.bufferKB)] + request.categories + ["-o", path.remotePath],
+                context: context),
+              timeoutSeconds: request.durationSeconds + 30,
+              continueAfterNonZero: true),
+            TypedProcessInvocation(
+              arguments: try deviceArguments(
+                ["shell", "ls", "-l", path.remotePath], context: context),
+              timeoutSeconds: 15),
+          ]))
     case .receiveOwnedArtifact(let artifact):
       // `file recv` takes both paths; with only the remote one hdc has no
       // destination to write (DEVICE-COMMAND-FACTS.md §4). The local name is
@@ -1166,13 +1180,27 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
         return .unknown(reason: "empty capture output")
       }
       return .verified(summary: ["byteCount": String(receipt.stdout.count)])
-    case .captureTrace:
-      // Trace success is decided by the subsequent artifact receive with
-      // its size/hash checks; here only process-level sanity applies.
-      guard receipt.exitStatus == 0 else {
-        return .unknown(reason: "trace capture process did not report clean completion")
+    case .captureTrace(_, let path):
+      // Judged by the paired `ls -l` readback, never by hitrace's exit
+      // status: `hdc shell` reports the client's status, so a clean exit
+      // says nothing about whether the device wrote a trace.
+      guard receipt.subprocesses.count == 2 else {
+        return .unknown(reason: "trace capture did not produce its readback sequence")
       }
-      return .verified(summary: ["remoteCaptured": "pending-receive"])
+      guard let byteCount = Self.remoteRegularFileByteCount(receipt.subprocesses[1]) else {
+        // Includes `ls: ...: No such file or directory`. The mutation ran,
+        // so this is genuinely unknown rather than a clean failure: the
+        // engine keeps the intent outstanding for reconcile instead of
+        // guessing which side the truth is on.
+        return .unknown(
+          reason: "trace readback did not describe \(path.remotePath) as a regular file")
+      }
+      guard byteCount > 0 else {
+        return .failed(
+          code: "emptyTrace",
+          detail: "hitrace left a zero-byte file at \(path.remotePath)")
+      }
+      return .verified(summary: ["remoteByteCount": String(byteCount)])
     case .receiveOwnedArtifact(let artifact):
       // The step's whole purpose is host bytes, so the verdict is read off
       // the file the dispatcher measured. `file recv` exits 0 on forms that
@@ -1833,6 +1861,29 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
       return nil
     }
     return false
+  }
+
+  /// Size of a remote regular file from one `ls -l` line, or `nil` when the
+  /// line does not describe one (`ls: …: No such file or directory`, a
+  /// directory, truncated output).
+  ///
+  /// Read from stdout, never from the exit status: `hdc shell` reports the
+  /// client's status, so a missing file can still arrive with exit 0. Field
+  /// order is the pinned one (`-rw-r--r-- 1 user group <size> …`,
+  /// DEVICE-COMMAND-FACTS.md §8); the size column is field 5.
+  static func remoteRegularFileByteCount(
+    _ receipt: ProviderSubprocessReceipt
+  ) -> Int? {
+    guard !receipt.stdoutTruncated,
+      let text = String(data: receipt.stdout, encoding: .utf8)
+    else {
+      return nil
+    }
+    let fields = text.split(whereSeparator: \.isWhitespace)
+    guard fields.count >= 5, fields[0].first == "-", let size = Int(fields[4]) else {
+      return nil
+    }
+    return size
   }
 
   private func isDirectoryListing(_ receipt: ProviderSubprocessReceipt) -> Bool {
