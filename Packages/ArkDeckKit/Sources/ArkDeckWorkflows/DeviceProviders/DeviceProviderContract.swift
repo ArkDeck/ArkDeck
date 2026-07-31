@@ -28,6 +28,11 @@ public enum HDCProviderAction: Sendable, Equatable {
   case observeStorage(HDCStoragePreflightRequest)
   case captureHilog(HDCHilogCaptureRequest)
   case captureUIDump(HDCUIDumpRequest)
+  /// The device's own crash ledger. Both members are reads — measured, not
+  /// assumed — so this is the one collection family that stays readOnly
+  /// (CHG-2026-049 r6).
+  case captureCrashIndex(byteBudget: Int)
+  case captureCrashLog(HDCFaultLogName, byteBudget: Int)
   case captureTrace(HDCTraceCaptureRequest, into: HDCOwnedRemotePath)
   /// The component tree, which `uitest` writes to a device file rather
   /// than to stdout. That product shape — not a missing windowId — is why
@@ -165,7 +170,8 @@ public enum TypedProviderAction: Sendable, Equatable {
       return .hostOnly
     case .hdc(.listDeviceCandidates), .hdc(.observeDevice), .hdc(.queryProperty),
       .hdc(.observeStorage),
-      .hdc(.captureHilog), .hdc(.captureUIDump), .hdc(.receiveOwnedArtifact):
+      .hdc(.captureHilog), .hdc(.captureUIDump), .hdc(.receiveOwnedArtifact),
+      .hdc(.captureCrashIndex), .hdc(.captureCrashLog):
       return .readOnly
     case .hdc(.queryPackageReadback), .hdc(.verifyProcessState):
       return .readOnly
@@ -331,6 +337,17 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
         arguments: [
           "scope": .string(request.scope.rawValue),
           "byteBudget": .integer(Int64(request.byteBudget)),
+        ])
+    case .hdc(.captureCrashIndex(let byteBudget)):
+      self.init(
+        kind: "hdc.captureCrashIndex",
+        arguments: ["byteBudget": .integer(Int64(byteBudget))])
+    case .hdc(.captureCrashLog(let name, let byteBudget)):
+      self.init(
+        kind: "hdc.captureCrashLog",
+        arguments: [
+          "faultLogName": .string(name.value),
+          "byteBudget": .integer(Int64(byteBudget)),
         ])
     case .hdc(.captureTrace(let request, let path)):
       var arguments = pathArguments(path)
@@ -764,6 +781,13 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
       }
       return .hdc(.captureUIDump(try HDCUIDumpRequest(
         scope: scope, byteBudget: integer("byteBudget"))))
+    case "hdc.captureCrashIndex":
+      return .hdc(.captureCrashIndex(byteBudget: try integer("byteBudget")))
+    case "hdc.captureCrashLog":
+      return .hdc(
+        .captureCrashLog(
+          try HDCFaultLogName(try string("faultLogName")),
+          byteBudget: try integer("byteBudget")))
     case "hdc.captureTrace":
       return .hdc(.captureTrace(
         try HDCTraceCaptureRequest(

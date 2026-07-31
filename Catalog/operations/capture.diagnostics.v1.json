@@ -42,6 +42,19 @@
         "default": 8192
       },
       "uiDump": { "type": "boolean", "required": false, "default": true },
+      "crashLogs": {
+        "type": "boolean",
+        "required": false,
+        "default": false,
+        "description": "Capture the device's Faultlogger index. Read-only: unlike the trace, tree and screenshot legs this does not raise the effective effect."
+      },
+      "crashLogName": {
+        "type": "string",
+        "required": false,
+        "pattern": "^[a-z]+-[A-Za-z0-9._-]{1,180}$",
+        "maxLength": 200,
+        "description": "One Faultlogger entry to fetch, named exactly as the index lists it. An entry name, never a path."
+      },
       "uiScreenshot": {
         "type": "boolean",
         "required": false,
@@ -149,6 +162,34 @@
       "binding": "confirmedDevice",
       "optional": true,
       "compensation": "none"
+    },
+    {
+      "stepID": "capture-crash-index",
+      "kind": "captureRemoteStdout",
+      "actionRef": {
+        "catalogId": "arkdeck-diagnostics",
+        "actionId": "crashIndex"
+      },
+      "effect": "readOnly",
+      "cancellation": "immediate",
+      "binding": "confirmedDevice",
+      "optional": true,
+      "compensation": "none",
+      "notes": "Lists the device's own crash ledger. An empty list is a truthful result, not a failure."
+    },
+    {
+      "stepID": "capture-crash-log",
+      "kind": "captureRemoteStdout",
+      "actionRef": {
+        "catalogId": "arkdeck-diagnostics",
+        "actionId": "crashLog"
+      },
+      "effect": "readOnly",
+      "cancellation": "immediate",
+      "binding": "confirmedDevice",
+      "optional": true,
+      "compensation": "none",
+      "notes": "Fetches one entry by the name the index gave; selected only when crashLogName is present."
     },
     {
       "stepID": "capture-ui-tree",
@@ -266,6 +307,8 @@
     { "name": "ui-dump.json", "role": "raw", "mediaType": "application/json", "privacy": "sensitive", "required": false },
     { "name": "ui-tree.json", "role": "raw", "mediaType": "application/json", "privacy": "sensitive", "required": false },
     { "name": "screenshot.png", "role": "raw", "mediaType": "image/png", "privacy": "sensitive", "required": false },
+    { "name": "crash-index.txt", "role": "raw", "mediaType": "text/plain", "privacy": "sensitive", "required": false },
+    { "name": "crash-log.txt", "role": "raw", "mediaType": "text/plain", "privacy": "sensitive", "required": false },
     { "name": "trace.htrace", "role": "raw", "mediaType": "application/octet-stream", "privacy": "sensitive", "required": false },
     { "name": "artifact-index.json", "role": "derived", "mediaType": "application/json", "privacy": "standard", "required": true },
     { "name": "capture-summary.json", "role": "derived", "mediaType": "application/json", "privacy": "standard", "required": true }

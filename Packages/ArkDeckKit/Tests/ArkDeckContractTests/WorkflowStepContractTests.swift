@@ -204,6 +204,8 @@ final class DiagnosticsWorkflowStepContractTests: XCTestCase {
         "boundedHilog": "#/$defs/diagnosticsHilogParameters",
         "componentTree": "#/$defs/diagnosticsComponentTreeParameters",
         "windowInventory": "#/$defs/diagnosticsComponentTreeParameters",
+        "crashIndex": "#/$defs/diagnosticsComponentTreeParameters",
+        "crashLog": "#/$defs/diagnosticsCrashLogParameters",
       ])
 
     let hilog = try XCTUnwrap(definitions["diagnosticsHilogParameters"] as? [String: Any])

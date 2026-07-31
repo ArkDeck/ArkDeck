@@ -1441,6 +1441,14 @@ public actor RuntimeJobEngine {
     case "capture-ui-dump":
       if case .bool(let enabled)? = inputs["uiDump"] { return enabled }
       return true  // the catalog default
+    case "capture-crash-index":
+      if case .bool(let enabled)? = inputs["crashLogs"] { return enabled }
+      return false  // the catalog default
+    case "capture-crash-log":
+      // Selected by having something to fetch, not by a separate flag: a
+      // name is the whole request.
+      if case .string(let name)? = inputs["crashLogName"] { return !name.isEmpty }
+      return false
     case "capture-screenshot", "receive-screenshot", "cleanup-screenshot-temp":
       // Off unless asked for, like the tree: these three are what raise the
       // plan from readOnly to deviceMutation.
@@ -2188,6 +2196,8 @@ public actor RuntimeJobEngine {
       "receive-trace-artifact": ["trace.htrace"],
       "receive-ui-tree": ["ui-tree.json"],
       "receive-screenshot": ["screenshot.png"],
+      "capture-crash-index": ["crash-index.txt"],
+      "capture-crash-log": ["crash-log.txt"],
     ],
     "debug.hap@1": [
       "package-readback": ["install-readback.json"],
@@ -2376,7 +2386,7 @@ public actor RuntimeJobEngine {
       var output = receipt.stdout
       output.append(receipt.stderr)
       return output
-    case "hilog.txt", "ui-dump.json", "debug-hilog.txt":
+    case "hilog.txt", "ui-dump.json", "debug-hilog.txt", "crash-index.txt", "crash-log.txt":
       // Raw capture products are the bounded provider bytes themselves.
       // Encoding only the semantic byteCount here would fabricate a log
       // artifact while discarding the evidence the operation captured.
@@ -4339,8 +4349,17 @@ public actor RuntimeJobEngine {
           "filters": .array(Array(filters.prefix(16))),
           "byteBudget": .integer(Int64(budget)),
         ]
-      case "componentTree", "windowInventory":
+      case "componentTree", "windowInventory", "crashIndex":
         parameters = ["byteBudget": .integer(8 * 1024 * 1024)]
+      case "crashLog":
+        guard case .string(let name)? = inputs["crashLogName"] else {
+          throw RuntimeJobEngineError.internalFailure(
+            "crash log step selected without its entry name")
+        }
+        parameters = [
+          "byteBudget": .integer(8 * 1024 * 1024),
+          "faultLogName": .string(name),
+        ]
       default:
         throw RuntimeJobEngineError.internalFailure(
           "unregistered stdout action \(reference.actionID) for \(step.stepID)")

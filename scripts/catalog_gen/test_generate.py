@@ -113,6 +113,12 @@ class RealCatalogTests(unittest.TestCase):
                 "capture.diagnostics@1/capture-ui-dump": (
                     "arkdeck-diagnostics", "windowInventory"
                 ),
+                "capture.diagnostics@1/capture-crash-index": (
+                    "arkdeck-diagnostics", "crashIndex"
+                ),
+                "capture.diagnostics@1/capture-crash-log": (
+                    "arkdeck-diagnostics", "crashLog"
+                ),
                 "debug.hap@1/capture-diagnostics": (
                     "arkdeck-diagnostics", "boundedHilog"
                 ),

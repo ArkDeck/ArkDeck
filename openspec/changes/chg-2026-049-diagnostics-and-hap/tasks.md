@@ -273,7 +273,12 @@
 
 ## TASK-DHA-005 — 崩溃日志作为一等 artifact(r6)
 
-- Status:ready
+- Status:done
+- Done:2026-07-31;随本实现 PR 合入生效(维护者 review + merge 即批准);
+  DHA-CRASH-001..003 **全部 PASS**,含真机两次请求闭环(`job-0a7bc0f8…` 取索引、
+  `job-62961c6f…` 按条目名取单条,两次均 E0 / defaultReadOnlyPolicy);
+  实现对 r6 的 `crashLogName` pattern 有一处偏离(放宽为只约束形状,见 evidence);
+  evidence = `evidence/runs/TASK-DHA-005/run-r6.md`
 - Platform:macos
 - Requirements:proposal r6 What 1-5(两个 readOnly stdout 步骤与对应契约 action、
   `crashLogs`/`crashLogName` 输入与两个产物、effect 不变、`crashLogName` 的

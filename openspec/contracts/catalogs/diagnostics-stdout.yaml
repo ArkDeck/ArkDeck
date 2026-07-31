@@ -28,6 +28,26 @@ actions:
     limits:
       byteBudget: { type: integer, minimum: 1024, maximum: 67108864 }
 
+  # Faultlogger is the device's own crash ledger. Both invocations are
+  # reads - measured 2026-07-31: `ls` before and after is identical - so
+  # this pair is the only diagnostics family that never leaves readOnly.
+  - id: crashIndex
+    step_kind: captureRemoteStdout
+    output_mode: stdout
+    required_inputs: [byteBudget]
+    limits:
+      byteBudget: { type: integer, minimum: 1024, maximum: 67108864 }
+  - id: crashLog
+    step_kind: captureRemoteStdout
+    output_mode: stdout
+    required_inputs: [byteBudget, faultLogName]
+    limits:
+      byteBudget: { type: integer, minimum: 1024, maximum: 67108864 }
+      # A Faultlogger entry name, never a path: no separator is admitted.
+      faultLogName:
+        { type: string, maximum_length: 200,
+          token_pattern: "^[a-z]+-[A-Za-z0-9._-]{1,180}$" }
+
 rules:
   unknown_action: reject
   executable_fields: forbidden
