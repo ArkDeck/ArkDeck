@@ -120,7 +120,12 @@
 
 ## TASK-HTP-004 — LLM Decision Gateway:可替换端口、严格结构化输出与出站边界
 
-- Status:ready
+- Status:done
+- Done:2026-07-31;随本实现 PR 合入生效(维护者 review + merge 即批准)。
+  HTP-AC-12..14 全部 PASS,evidence = `evidence/runs/TASK-HTP-004/run-r1.md`
+  (库层 843 tests/1 skip/0 fail,新增 14 例;删除了会与 handler 漂移的
+  `DeterministicDecisionGateway`,并补上 guard 拒绝的 task-memory 记录)。
+  真实厂商 adapter 不在本任务范围(端口与解析面已冻结)。
 - Platform:macos
 - Requirements/AC:proposal What 5(decision gateway、四类 decision、出站默认 deny);
   change-local HTP-AC-12、HTP-AC-13、HTP-AC-14,登记于 `verification.md`

@@ -291,6 +291,22 @@ public actor HarnessTaskStore {
     }
   }
 
+  /// Every failure record, so a decision context can carry "these approaches
+  /// are already known bad" instead of letting a producer rediscover them.
+  public func failureRecords() throws -> [HarnessFailureRecord] {
+    let directoryURL = memoryDirectory("failure")
+    let names = (try? FileManager.default.contentsOfDirectory(atPath: directoryURL.path)) ?? []
+    guard !names.isEmpty else { return [] }
+    return try withLock(directoryURL) {
+      var found: [HarnessFailureRecord] = []
+      for name in names.sorted() where name.hasSuffix(".json") {
+        found.append(
+          try readJSON(HarnessFailureRecord.self, from: directoryURL.appendingPathComponent(name)))
+      }
+      return found.sorted { $0.lastSeenUTC < $1.lastSeenUTC }
+    }
+  }
+
   public func appendMemory(_ entry: HarnessMemoryEntry) throws {
     let scope = entry.scope.rawValue
     let directoryURL = try memoryDirectoryCreating(scope)

@@ -673,6 +673,37 @@ final class HarnessBoundsContractTests: XCTestCase {
       "no closed category describes an unavailable environment, so none is invented")
   }
 
+  func testAGuardRefusalIsRecordedInTaskMemory() async throws {
+    // A step the guard refused never reaches the engine, so nothing else would
+    // record it: without this the task's memory could not explain the stop.
+    let jobs = BoundsJobPort()
+    let store = try HarnessTaskStore(rootURL: rootURL)
+    let coordinator = HarnessTaskCoordinator(
+      store: store, jobPort: jobs, nowUTC: { "2026-07-31T00:00:00Z" },
+      policyGuard: HarnessPolicyGuard(
+        availability: StubAvailabilityPort(
+          unavailable: [DebugCrashTaskHandler.observeDevice: "provider_not_registered"])))
+    let task = try await coordinator.submit(
+      HarnessTaskSubmission(
+        type: .debugCrash, projectRef: "demo-app",
+        target: HarnessTaskTargetReference(targetID: "TGT-1"),
+        goal: HarnessTaskGoal(summary: "goal"),
+        budgets: HarnessTaskBudgets(
+          maxRounds: 4, maxWallClockSeconds: 900, maxArtifactBytes: 1024, maxE1Mutations: 0),
+        policy: HarnessTaskCoordinator.defaultPolicy(for: .debugCrash)))
+
+    let outcome = try await coordinator.reconcile(task.htaskID)
+    XCTAssertEqual(outcome.action, .stoppedForHuman)
+    XCTAssertEqual(outcome.reasonCode, "operationUnavailable:observe.device@1")
+    XCTAssertEqual(jobs.submittedOperations, [], "a refused step never reaches the engine")
+
+    let memory = try await store.memory(scope: .task, key: task.htaskID)
+    let attempt = try XCTUnwrap(memory.first { $0.kind == .attempt })
+    XCTAssertTrue(attempt.summary.contains("guard refused"))
+    XCTAssertTrue(attempt.summary.contains("operationUnavailable:observe.device@1"))
+    XCTAssertFalse(attempt.evidence.requestIDs.isEmpty)
+  }
+
   // MARK: - Memory promotion
 
   func testProjectMemoryOnlyAcceptsVerifiedKnowledge() throws {
