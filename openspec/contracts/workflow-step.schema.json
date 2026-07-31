@@ -57,7 +57,8 @@
         "inspectWorkspaceGitStatus",
         "inspectWorkspaceDiff",
         "readWorkspaceSourceRange",
-        "createWorkspaceCheckpoint"
+        "createWorkspaceCheckpoint",
+        "runDeterministicAnalyzer"
       ]
     },
     "effect": {
@@ -2482,6 +2483,25 @@
           "if": {
             "properties": {
               "kind": {
+                "const": "runDeterministicAnalyzer"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "arguments": {
+                "$ref": "#/$defs/runDeterministicAnalyzerArguments"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
                 "const": "applyWorkspacePatch"
               }
             },
@@ -2923,6 +2943,30 @@
           "type": "integer",
           "minimum": 1,
           "maximum": 1000000
+        },
+        "artifactId": {
+          "$ref": "#/$defs/id"
+        }
+      }
+    },
+    "runDeterministicAnalyzerArguments": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "analyzerRef",
+        "inputArtifactId",
+        "artifactId"
+      ],
+      "properties": {
+        "analyzerRef": {
+          "enum": [
+            "crash-signature@1",
+            "hilog-summary@1",
+            "trace-summary@1"
+          ]
+        },
+        "inputArtifactId": {
+          "$ref": "#/$defs/id"
         },
         "artifactId": {
           "$ref": "#/$defs/id"

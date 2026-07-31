@@ -65,6 +65,7 @@ steps:
   - { kind: inspectWorkspaceDiff, minimum_effect: hostOnly, cancellation: immediate, binding: none, profile_exposable: false }
   - { kind: readWorkspaceSourceRange, minimum_effect: hostOnly, cancellation: immediate, binding: none, profile_exposable: false }
   - { kind: createWorkspaceCheckpoint, minimum_effect: hostOnly, cancellation: atSafeBoundary, binding: none, profile_exposable: false }
+  - { kind: runDeterministicAnalyzer, minimum_effect: hostOnly, cancellation: immediate, binding: none, profile_exposable: false }
 
 adapter_rule: >-
   Adapters may translate a registered typed kind into HDC/tool argv only after

@@ -3,10 +3,13 @@
 
 # Operation effect / authorization matrix
 
-Catalog digest: `8e8cde910fa791234b7516e6527ef5fe67d8ec63121498da74c10af5e1229715`
+Catalog digest: `ccff6242cb039aa4a013dcdd9973289e73781ede530e26d2f0cd4a4d1609aa93`
 
 | Operation | Provider | Effect (min → max) | Authorization | Default issuance | Binding | Concurrency | Timeout (s) | Output budget (bytes) |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `analyzer.extract-crash-signature@1` | analyzer | hostOnly | hostOnly: defaultReadOnly | enabled | none | host-exclusive | 120 | 67108864 |
+| `analyzer.summarize-hilog@1` | analyzer | hostOnly | hostOnly: defaultReadOnly | enabled | none | host-exclusive | 120 | 67108864 |
+| `analyzer.summarize-trace@1` | analyzer | hostOnly | hostOnly: defaultReadOnly | enabled | none | host-exclusive | 120 | 67108864 |
 | `capture.diagnostics@1` | hdc | readOnly → deviceMutation | readOnly: defaultReadOnly; deviceMutation: standingCapability | enabled | confirmedDevice | device-exclusive | 900 | 536870912 |
 | `debug.hap@1` | hdc | deviceMutation | deviceMutation: standingCapability | enabled | confirmedDevice | device-exclusive | 600 | 67108864 |
 | `deploy.native-library.app-owned@1` | hdc | deviceMutation | deviceMutation: standingCapability | enabled | confirmedDevice | device-exclusive | 600 | 134217728 |

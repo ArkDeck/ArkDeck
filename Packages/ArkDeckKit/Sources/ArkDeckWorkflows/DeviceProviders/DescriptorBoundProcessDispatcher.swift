@@ -39,6 +39,8 @@ extension RuntimeExecutableResolving {
       providerID = "rockchip"
     case .workspace:
       providerID = "workspace"
+    case .analyzer:
+      providerID = "analyzer"
     }
     return try resolveExecutable(providerID: providerID)
   }
@@ -199,15 +201,21 @@ public struct RuntimeProcessDispatcherRouter: RuntimeProcessDispatching {
   /// Absent means this composition has no host-only route: a workspace plan is
   /// then refused, never silently sent somewhere else.
   private let workspace: (any RuntimeProcessDispatching)?
+  /// Absent means this composition has no analyzer route: an analysis plan is
+  /// refused rather than sent down the workspace route, which owns a
+  /// different executable set (CHG-2026-055, TASK-HFA-007).
+  private let analyzer: (any RuntimeProcessDispatching)?
 
   public init(
     hdc: any RuntimeProcessDispatching,
     rockchip: any RuntimeProcessDispatching,
-    workspace: (any RuntimeProcessDispatching)? = nil
+    workspace: (any RuntimeProcessDispatching)? = nil,
+    analyzer: (any RuntimeProcessDispatching)? = nil
   ) {
     self.hdc = hdc
     self.rockchip = rockchip
     self.workspace = workspace
+    self.analyzer = analyzer
   }
 
   public func unavailableReason(providerID: String) -> String? {
@@ -221,6 +229,11 @@ public struct RuntimeProcessDispatcherRouter: RuntimeProcessDispatching {
         return "no dispatcher route is registered for provider workspace"
       }
       return workspace.unavailableReason(providerID: providerID)
+    case "analyzer":
+      guard let analyzer else {
+        return "no dispatcher route is registered for provider analyzer"
+      }
+      return analyzer.unavailableReason(providerID: providerID)
     default:
       return "no dispatcher route is registered for provider \(providerID)"
     }
@@ -238,6 +251,12 @@ public struct RuntimeProcessDispatcherRouter: RuntimeProcessDispatching {
           "no dispatcher route is registered for provider workspace")
       }
       return try await workspace.dispatch(plan)
+    case .analyzer:
+      guard let analyzer else {
+        throw RuntimeDispatchFailure.failed(
+          "no dispatcher route is registered for provider analyzer")
+      }
+      return try await analyzer.dispatch(plan)
     }
   }
 }

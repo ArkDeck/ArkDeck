@@ -189,7 +189,18 @@ HFA-AC-1/2/3/4/5/17 有结论;其余 HFA-AC 仍 `pending`(未开工)。
   带 sourceArtifactIds/hashes、analyzerRef@version、revision 作用域、redaction 状态、
   content hash;分析结论不改变 task 状态(负例)。
 - Evidence:实现 PR 内测试 + catalog digest 更新 + 生成器零 drift。
-- **结论:pending**
+- **结论(2026-07-31):PASS** —— `AnalyzerProviderContractTests` 9 例:
+  `testTheSameArtifactProducesTheSameActionAndTheSamePlan` 断言同一输入两次得到**相同**
+  action 与相同 argv(pinned 可执行 + 固定参数 + 引擎已解析的 artifact 路径);
+  `testTheDerivedResultCarriesItsWholeProvenance` 断言 verify summary 携带
+  analyzerRef、analyzerVersion、sourceArtifactId、sourceSha256、derivedSha256(64 位)
+  与字节数 —— 一条结论必须能追到它来自哪份字节、由哪个版本的代码产出;
+  `testAnArtifactThatDoesNotMatchItsLeaseIsRefused` 断言 lease 与字节不符即拒绝;
+  `testAnEmptyOrUnstructuredResultIsAFailureAndNotAConclusion` 三条负例(空输出、
+  非 JSON、非零退出)各自判 failed;
+  `testRecoveryOfAnAnalysisConfirmsNothingHappened` 断言分析不留外部副作用;
+  `testTheCatalogPublishesAnalyzersAsHostOnlyReads` 断言三个 operation 都是
+  `provider: analyzer` / `binding: none` / `hostOnly`,且产物名与引擎物化用的是**同一张表**。
 
 ## HFA-AC-16 外部工具不得走 engine-internal 例外(TASK-HFA-007)
 
@@ -198,7 +209,16 @@ HFA-AC-1/2/3/4/5/17 有结论;其余 HFA-AC 仍 `pending`(未开工)。
   `DescriptorBoundProcessDispatcher`;provider/工具未配置 → `UNAVAILABLE` 带机器可读原因
   且零 capability 消耗。
 - Evidence:实现 PR 内测试。
-- **结论:pending**
+- **结论(2026-07-31):PASS** ——
+  `testAnUnconfiguredAnalyzerIsUnavailableRatherThanImprovised` 断言未注册 profile 时
+  三个 operation 一律 `UNAVAILABLE` + 机器可读原因 `analyzer.profileUnavailable`,
+  零 capability 消耗(§8);`testAToolThatDriftedFromItsPinIsUnavailable` 断言二进制
+  与 pin 漂移即不可用;`testAnAnalysisPlanIsRefusedWhenNoAnalyzerRouteIsRegistered`
+  断言 analyzer 计划**不会**被送进 workspace 路由(那条路由拥有另一组可执行文件),
+  无独立路由即拒绝。step kind 的 `analyzerRef` 是封闭枚举,任意程序不可被命名。
+  **未覆盖(如实)**:engine-internal 例外(纯内存转换)本身没有新增负例 —— 本任务没有
+  引入该例外的实现,TASK-HFA-001 的就地解析仍在原位、尚未改接 derived artifact,
+  改接属规划面变更,留待 TASK-HFA-005 的真机链路一并验证。
 
 ## HFA-AC-17 workspace 只读族 typed-only 且 argv 逐 token 正确(TASK-HFA-008)
 

@@ -160,6 +160,10 @@ public enum WorkflowStepKind: String, CaseIterable, Codable, Sendable {
   /// Writes a git object and moves nothing: no ref, no index, no worktree.
   /// It is the least invasive checkpoint the repair leg can roll back to.
   case createWorkspaceCheckpoint
+  /// One deterministic, versioned analyzer over one existing artifact
+  /// (CHG-2026-055, TASK-HFA-007). The analyzer is named by a closed
+  /// reference, never by a path or a command.
+  case runDeterministicAnalyzer
 }
 
 public struct WorkflowStepMetadata: Equatable, Sendable {
@@ -347,6 +351,8 @@ public enum WorkflowStepRegistry {
       host(required: ["projectRef", "baseRevision", "pathScope", "artifactId"])
     case .readWorkspaceSourceRange:
       host(required: ["projectRef", "filePath", "lineStart", "lineEnd", "artifactId"])
+    case .runDeterministicAnalyzer:
+      host(required: ["analyzerRef", "inputArtifactId", "artifactId"])
     case .createWorkspaceCheckpoint:
       metadata(
         .hostOnly, .atSafeBoundary, .none,
@@ -1154,6 +1160,13 @@ private enum WorkflowStepValidator {
       try reader.identifier("artifactId")
     case .createWorkspaceCheckpoint:
       try reader.identifier("projectRef")
+      try reader.identifier("artifactId")
+    case .runDeterministicAnalyzer:
+      // A closed vocabulary: an analyzer that is not registered here cannot
+      // be named, so no input can select an arbitrary program.
+      _ = try reader.enumeration(
+        "analyzerRef", allowed: ["crash-signature@1", "hilog-summary@1", "trace-summary@1"])
+      try reader.identifier("inputArtifactId")
       try reader.identifier("artifactId")
     case .inspectWorkspaceSource:
       try reader.identifier("projectRef")

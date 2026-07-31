@@ -1,0 +1,65 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "analyzer.summarize-hilog",
+  "version": 1,
+  "title": "Summarize a collected HiLog artifact",
+  "provider": "analyzer",
+  "effect": {
+    "minimum": "hostOnly",
+    "permitted": [
+      "hostOnly"
+    ]
+  },
+  "authorization": {
+    "hostOnly": "defaultReadOnly"
+  },
+  "binding": "none",
+  "concurrencyKey": "host-exclusive",
+  "inputs": {
+    "fields": {
+      "sourceArtifactRef": {
+        "type": "artifactLease",
+        "required": true,
+        "description": "Existing artifact this analysis reads; the engine resolves its lease."
+      }
+    }
+  },
+  "outputs": {
+    "fields": {
+      "analysis": {
+        "type": "artifactReference",
+        "required": true
+      }
+    }
+  },
+  "steps": [
+    {
+      "stepID": "summarize-hilog",
+      "kind": "runDeterministicAnalyzer",
+      "effect": "hostOnly",
+      "cancellation": "immediate",
+      "binding": "none",
+      "compensation": "none",
+      "notes": "Reads one collected artifact and publishes a derived summary; writes nothing else."
+    }
+  ],
+  "timeoutSeconds": 120,
+  "outputByteBudget": 67108864,
+  "retry": {
+    "preflightAttempts": 1,
+    "mutationAttempts": 1
+  },
+  "unknownOutcome": "reconcileRequired",
+  "artifacts": [
+    {
+      "name": "hilog-summary.json",
+      "role": "derived",
+      "mediaType": "application/json",
+      "privacy": "standard",
+      "required": true
+    }
+  ],
+  "profiles": [
+    "workspace-host@1"
+  ]
+}

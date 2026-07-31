@@ -251,7 +251,37 @@
 
 ## TASK-HFA-007 — 确定性 Analyzer:新 provider `arkdeck-analyzer` 与 derived artifact 流水线
 
-- Status:ready
+- Status:done
+- Done:2026-07-31;随本实现 PR 合入生效(维护者 review + merge 即批准)。
+  HFA-AC-15、HFA-AC-16 PASS,evidence = `evidence/runs/TASK-HFA-007/run-r1.md`
+  (库层 1010+ tests/1 skip/0 fail,新增 9 例;catalog_gen 39/39 零 drift;
+  check-sdd 0/0/114;catalog digest 更新)。
+  **Gate**:§20 冻结门由维护者 2026-07-31 显式提前解冻(指令:完成全部 HFA);
+  本任务 host-only、零设备命令、零源码写入。
+  **交付**:新 provider `analyzer`(CatalogProvider 枚举 + 生成器/schema 词表 +
+  dispatcher 独立路由 + daemon 组合注册)、封闭 step kind `runDeterministicAnalyzer`
+  (`analyzerRef` 是枚举,不能指向任意程序)、三个 operation
+  (`analyzer.extract-crash-signature@1` / `summarize-hilog@1` / `summarize-trace@1`)、
+  derived artifact provenance(sourceArtifactId + sourceSha256 + analyzerRef +
+  analyzerVersion + derivedSha256 + byteCount)。
+  **三条 fail-closed**:输入字节与 lease 不符即拒绝(lease 是声称,字节是事实);
+  空输出判 failed(「分析器什么都没产出」不等于「没发现问题」);
+  声明 `.json` 却不是 JSON 判 `analyzer.malformedResult`(名字是被检查的承诺,不是标签)。
+  **两处如实登记的未交付**:
+  ① `workspace.collect-build-outputs@1` **未交付**。它不是分析,是构建产物收集;
+  而 `workspace.build-openharmony@1` 今天只发布 `build.log`,没有 output manifest ——
+  正确的归属是**补构建腿自己的产物声明**,不是 analyzer 面。本 change 不为它新建任务;
+  TASK-HFA-005 的真机端到端若因缺 output manifest 无法做「部署 digest == build output
+  digest」的相等判定(HFA-AC-11/12),应在那条任务里同车补齐;
+  ② `workspace.parse-build-failure@1` 同理未交付 —— 它消费 build.log,一旦构建腿
+  发布了结构化产物,它要么变成第四个 analyzer profile(零新机制),要么根本不需要。
+  先把机制做实,不先造它的壳。
+  **一条设计约束**:每台主机一个 pinned analyzer 二进制,各 analyzer 用 `fixedArguments`
+  选行为。dispatcher 按 provider 解析可执行文件,两个不同二进制会被对方的 digest 拒掉
+  (fail closed),因此该形态不可表达 —— 写在 `AnalyzerExecutableResolver` 的注释里。
+  **harness 内解析尚未改接 derived artifact**:TASK-HFA-001 的就地解析仍在原位,
+  改接需要 handler 先派发 analyzer job 再消费其产物,属规划面变更(TASK-HFA-003 的
+  handler 已交付,接线留给 TASK-HFA-005 的真机链路一并验证)。
 - Platform:macos
 - Requirements/AC:proposal What 7(Analyzer 面);change-local HFA-AC-15、HFA-AC-16,
   登记于 `verification.md`

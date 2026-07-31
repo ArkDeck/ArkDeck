@@ -3259,6 +3259,12 @@ public actor RuntimeJobEngine {
         runtime.record.request.inputs["dumpArtifactRef"]
       else { return nil }
       lease = value
+    case "analyzer.extract-crash-signature@1", "analyzer.summarize-hilog@1",
+      "analyzer.summarize-trace@1":
+      guard case .string(let value)? =
+        runtime.record.request.inputs["sourceArtifactRef"]
+      else { return nil }
+      lease = value
     default:
       return nil
     }
@@ -3378,6 +3384,10 @@ public actor RuntimeJobEngine {
     case "workspace.symbolize-crash@1":
       leaseInputName = "dumpArtifactRef"
       artifactLabel = "workspace crash dump"
+    case "analyzer.extract-crash-signature@1", "analyzer.summarize-hilog@1",
+      "analyzer.summarize-trace@1":
+      leaseInputName = "sourceArtifactRef"
+      artifactLabel = "analyzer source artifact"
     default:
       leaseInputName = nil
       artifactLabel = "input"
@@ -4636,6 +4646,16 @@ public actor RuntimeJobEngine {
       arguments = [
         "targetMode": .string("normal"),
         "reason": .string("rockusbResetAfterFlash"),
+      ]
+    case .runDeterministicAnalyzer:
+      guard case .analyzer(.analyze(let invocation))? = action else {
+        throw RuntimeJobEngineError.internalFailure(
+          "\(step.stepID) requires a deterministic analyzer action")
+      }
+      arguments = [
+        "analyzerRef": .string(invocation.analyzerRef),
+        "inputArtifactId": .string(invocation.sourceArtifactID),
+        "artifactId": .string(AnalyzerProvider.derivedArtifactName(invocation.analyzerRef)),
       ]
     case .inspectWorkspaceSource:
       // The journal records the declared inputs and the artifact they land in.

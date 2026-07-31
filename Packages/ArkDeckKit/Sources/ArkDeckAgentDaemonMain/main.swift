@@ -265,6 +265,9 @@ Task.detached {
         resolver: FixedExecutableResolver(
           table: ["workspace": inspectorExecutable]))
     }
+    // No analyzer is configured by default. A host declares them explicitly;
+    // an absent analyzer is unavailable, never improvised.
+    let analyzerProfiles: [AnalyzerProfile] = []
     let workspaceProvider = WorkspaceProvider(
       registry: WorkspaceProjectRegistry(roots: workspaceRoots),
       tool: workspaceTool, operations: workspaceOperations)
@@ -274,11 +277,22 @@ Task.detached {
       fflush(stdout)
     }
 
+    // Registered with no profiles until a host declares them: the analyzer
+    // operations then report UNAVAILABLE with a machine-readable reason
+    // instead of being absent from `operation.list` (PRODUCT-LOOP §8,
+    // CHG-2026-055 TASK-HFA-007).
+    let analyzerProvider = AnalyzerProvider(profiles: analyzerProfiles)
+    var analyzerDispatcher: DescriptorBoundProcessDispatcher?
+    if !analyzerProfiles.isEmpty {
+      analyzerDispatcher = DescriptorBoundProcessDispatcher(
+        resolver: AnalyzerExecutableResolver(profiles: analyzerProfiles))
+    }
     let providers = DeviceProviderRegistry(providers: [
-      hdcProvider, rockchipProvider, workspaceProvider,
+      hdcProvider, rockchipProvider, workspaceProvider, analyzerProvider,
     ])
     let dispatcher = RuntimeProcessDispatcherRouter(
-      hdc: hdcDispatcher, rockchip: rockchipDispatcher, workspace: workspaceDispatcher)
+      hdc: hdcDispatcher, rockchip: rockchipDispatcher, workspace: workspaceDispatcher,
+      analyzer: analyzerDispatcher)
     let artifactStore = try RuntimeArtifactStore(
       rootURL: resolvedStateDirectory.appendingPathComponent("artifacts", isDirectory: true),
       nowUTC: utcNow)
