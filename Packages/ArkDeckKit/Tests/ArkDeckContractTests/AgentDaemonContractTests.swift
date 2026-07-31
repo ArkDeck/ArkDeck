@@ -528,6 +528,38 @@ final class AgentDaemonContractTests: XCTestCase {
       },
       "production daemon must expose the bundled-component blocker, not provider_not_registered")
 
+    let cliURL = productsDirectory.appendingPathComponent("arkdeck")
+    XCTAssertTrue(
+      FileManager.default.isExecutableFile(atPath: cliURL.path),
+      "the production CLI must be built beside the daemon")
+    let cli = Process()
+    cli.executableURL = cliURL
+    cli.arguments = [
+      "operation", "list", "--socket", socketURL.path, "--json",
+    ]
+    let cliOutput = Pipe()
+    let cliError = Pipe()
+    cli.standardOutput = cliOutput
+    cli.standardError = cliError
+    try cli.run()
+    cli.waitUntilExit()
+    let cliOutputData = cliOutput.fileHandleForReading.readDataToEndOfFile()
+    let cliErrorData = cliError.fileHandleForReading.readDataToEndOfFile()
+    XCTAssertEqual(
+      cli.terminationStatus, 0,
+      String(decoding: cliErrorData, as: UTF8.self))
+    guard
+      case .array(let listedOperations) = try JSONDecoder().decode(
+        JSONValue.self, from: cliOutputData),
+      case .object(let listedFlash)? = listedOperations.first(where: { item in
+        guard case .object(let fields) = item else { return false }
+        return fields["reference"] == .string("flash.dayu200@1")
+      })
+    else {
+      return XCTFail("arkdeck operation list must expose daemon availability")
+    }
+    XCTAssertEqual(listedFlash["availability"], .string("unavailable"))
+
     process.terminate()
     let stopDeadline = Date().addingTimeInterval(10)
     while process.isRunning && Date() < stopDeadline { usleep(50_000) }

@@ -1,6 +1,6 @@
 // Runtime client commands (CHG-2026-048, T09/T11).
 //
-// `arkdeck doctor`, `arkdeck device list|adopt|show` and
+// `arkdeck doctor`, `arkdeck operation list`, `arkdeck device list|adopt|show` and
 // `arkdeck job submit|status` are thin daemon clients: they construct a
 // typed request or a control-plane call and print the response. No HDC,
 // no argv, no executor lives here - the CLI cannot execute a device
@@ -65,6 +65,24 @@ enum RuntimeCLI {
     let json = rest.contains("--json")
     let client = client(&rest)
     emit(try client.request(method: "doctor"), json: json)
+  }
+
+  static func runOperation(_ arguments: [String]) throws {
+    guard arguments.first == "list" else {
+      throw CLIError(
+        exitCode: EX_USAGE,
+        message: "usage: arkdeck operation list [--socket <path>] [--json]")
+    }
+    var rest = Array(arguments.dropFirst())
+    let json = rest.contains("--json")
+    rest.removeAll { $0 == "--json" }
+    let client = client(&rest)
+    guard rest.isEmpty else {
+      throw CLIError(
+        exitCode: EX_USAGE,
+        message: "operation list received unsupported arguments")
+    }
+    emit(try client.request(method: "operation.list"), json: json)
   }
 
   static func runDevice(_ arguments: [String]) throws {
