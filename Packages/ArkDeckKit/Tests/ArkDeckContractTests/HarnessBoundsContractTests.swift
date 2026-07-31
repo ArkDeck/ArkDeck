@@ -158,7 +158,7 @@ final class HarnessBoundsContractTests: XCTestCase {
   // MARK: - Fixtures
 
   private func snapshot(
-    phase: HarnessTaskPhase = .deviceReady,
+    phase: HarnessTaskPhase = .reproducing,
     allowed: [String] = [
       DebugCrashTaskHandler.observeDevice, DebugCrashTaskHandler.captureDiagnostics,
     ],
@@ -202,7 +202,7 @@ final class HarnessBoundsContractTests: XCTestCase {
   private func failureRecord(occurrences: Int) -> HarnessFailureRecord {
     HarnessFailureRecord(
       fingerprint: HarnessFailureFingerprint(
-        operationReference: DebugCrashTaskHandler.captureDiagnostics, phase: .deviceReady,
+        operationReference: DebugCrashTaskHandler.captureDiagnostics, phase: .reproducing,
         providerID: "hdc", targetProfile: "TGT-1", normalizedInputsSHA256: digestHex("{}"),
         errorClassification: "operationFailed", semanticErrorCode: "failed"),
       occurrences: occurrences, firstSeenUTC: "2026-07-31T00:00:00Z",
@@ -324,7 +324,7 @@ final class HarnessBoundsContractTests: XCTestCase {
     let policyGuard = HarnessPolicyGuard()
     let strategy = HarnessStrategySignature(
       operationReference: DebugCrashTaskHandler.captureDiagnostics,
-      inputsDigest: digestHex("{}"), phase: .deviceReady)
+      inputsDigest: digestHex("{}"), phase: .reproducing)
 
     // First occurrence: the same strategy may be tried again.
     let first = await policyGuard.evaluate(
@@ -433,7 +433,9 @@ final class HarnessBoundsContractTests: XCTestCase {
     for round in 1...6 {
       let outcome = try await coordinator.reconcile(task.htaskID)
       lastOutcome = outcome
-      if outcome.snapshot.status != .running { break }
+      if ![HarnessTaskLifecycle.running, .waiting, .created].contains(
+        outcome.snapshot.lifecycle)
+      { break }
       jobs.finish("JOB-\(round)")
     }
     let outcome = try XCTUnwrap(lastOutcome)

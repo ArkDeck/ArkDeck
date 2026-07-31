@@ -17,10 +17,10 @@
 //     inner spin. The coordinator's "at most one effectful job per wake"
 //     invariant (HTP-AC-1) stays the unit of progress, and one task cannot
 //     starve another;
-//   * only `created` and `running` tasks are driven. `humanRequired` is not
-//     terminal but it is not drivable either: a person must resolve it, and
-//     re-reconciling it would spin forever producing `awaitingHuman`. Paused
-//     means an operator stopped it on purpose.
+//   * `created`, `running` and non-user waiting tasks are driven. An active
+//     Runtime Job and a temporarily unavailable device must be observed to
+//     make progress. `humanRequired` and `waiting + USER_SUSPENDED` are not
+//     drivable: a person must resolve either one.
 //
 // It adds no authority. Every step still goes through the coordinator, which
 // still goes through the policy guard and the engine; the ticker cannot widen
@@ -43,7 +43,10 @@ extension HarnessTaskCoordinator: HarnessAutoDriveTarget {
   /// any state of its own.
   public func drivableTaskIDs() async throws -> [String] {
     try await list()
-      .filter { $0.status == .created || $0.status == .running }
+      .filter {
+        $0.status == .created || $0.status == .running
+          || ($0.status == .waiting && $0.waitReason != .userSuspended)
+      }
       .map(\.htaskID)
   }
 }

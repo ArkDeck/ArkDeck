@@ -560,7 +560,9 @@ final class HarnessDecisionGatewayContractTests: XCTestCase {
           "observing a completed runtime job must not erase already charged model calls")
         priorModelCalls = outcome.snapshot.consumedBudget.modelCalls
         trace.append("\(outcome.action.rawValue)/\(jobs.submittedOperations.last ?? "-")")
-        if outcome.snapshot.status != .running { break }
+        if ![HarnessTaskLifecycle.running, .waiting, .created].contains(
+          outcome.snapshot.lifecycle)
+        { break }
         jobs.finish("JOB-\(round)")
       }
       return trace

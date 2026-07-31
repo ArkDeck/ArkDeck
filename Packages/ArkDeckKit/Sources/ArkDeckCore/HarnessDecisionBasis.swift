@@ -27,6 +27,10 @@ public struct HarnessDecisionBasis: Equatable, Sendable, Codable {
   public let stateVersion: Int
   public let status: HarnessTaskStatus
   public let phase: HarnessTaskPhase
+  public let lifecycle: HarnessTaskLifecycle
+  public let stage: HarnessTaskStage
+  public let waitReason: HarnessTaskWaitReason?
+  public let conditions: [HarnessTaskCondition]
   public let activeRound: Int
   public let activeJobID: String?
   public let cancelRequested: Bool
@@ -45,6 +49,10 @@ public struct HarnessDecisionBasis: Equatable, Sendable, Codable {
     case stateVersion
     case status
     case phase
+    case lifecycle
+    case stage
+    case waitReason
+    case conditions
     case activeRound
     case activeJobID = "activeJobId"
     case cancelRequested
@@ -61,6 +69,10 @@ public struct HarnessDecisionBasis: Equatable, Sendable, Codable {
     self.stateVersion = snapshot.version
     self.status = snapshot.status
     self.phase = snapshot.phase
+    self.lifecycle = snapshot.lifecycle
+    self.stage = snapshot.stage
+    self.waitReason = snapshot.waitReason
+    self.conditions = snapshot.conditions
     self.activeRound = snapshot.activeRound
     self.activeJobID = snapshot.activeJobID
     self.cancelRequested = snapshot.cancelRequested

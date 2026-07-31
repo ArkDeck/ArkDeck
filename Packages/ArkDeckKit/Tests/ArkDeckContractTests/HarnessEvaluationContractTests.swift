@@ -751,7 +751,8 @@ final class HarnessEvaluationContractTests: XCTestCase {
     jobs.finish("JOB-2")
     let baseline = try await coordinator.reconcile(task.htaskID)
     XCTAssertEqual(baseline.action, .dispatched, "an inconclusive verdict buys another round")
-    XCTAssertEqual(baseline.snapshot.status, .running)
+    XCTAssertEqual(baseline.snapshot.lifecycle, .waiting)
+    XCTAssertEqual(baseline.snapshot.waitReason, .activeJob)
     XCTAssertNil(baseline.snapshot.observed.samples["matchingCrashCount"])
     XCTAssertEqual(
       baseline.snapshot.observed.measurements["crashLedgerWatermark"],
