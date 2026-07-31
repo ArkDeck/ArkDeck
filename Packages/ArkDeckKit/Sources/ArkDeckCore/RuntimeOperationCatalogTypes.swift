@@ -50,6 +50,7 @@ public enum CatalogFieldType: String, CaseIterable, Codable, Sendable {
   case boolean
   case stringArray
   case artifactLease
+  case artifactLeaseArray
   case artifactReference
 }
 

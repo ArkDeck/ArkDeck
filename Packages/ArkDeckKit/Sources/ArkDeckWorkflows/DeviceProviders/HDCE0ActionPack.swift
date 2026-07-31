@@ -233,6 +233,102 @@ public struct HDCStagedArtifact: Sendable, Equatable {
   }
 }
 
+/// A provider-owned remote directory. Same discipline as
+/// `HDCOwnedRemotePath`: only this module can mint one, the job/step/nonce
+/// tuple makes collisions structurally impossible, and no caller can supply
+/// a device location.
+public struct HDCOwnedRemoteDirectory: Sendable, Equatable {
+  public let jobID: String
+  public let stepID: String
+  public let nonce: String
+  public let remotePath: String
+
+  package init(jobID: String, stepID: String, nonce: String) throws {
+    let componentPattern = #"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"#
+    for (field, value) in [("jobID", jobID), ("stepID", stepID), ("nonce", nonce)] {
+      guard value.range(of: componentPattern, options: .regularExpression) != nil else {
+        throw HDCE0RequestError.malformed(
+          field: field, detail: "provider-owned path components must be bounded identifiers")
+      }
+    }
+    self.jobID = jobID
+    self.stepID = stepID
+    self.nonce = nonce
+    let remotePath = "/data/local/tmp/arkdeck-\(jobID)-\(stepID)-\(nonce)-packages"
+    guard remotePath.utf8.count <= 255 else {
+      throw HDCE0RequestError.outOfBounds(
+        field: "remotePath", detail: "provider-owned path must be at most 255 bytes")
+    }
+    self.remotePath = remotePath
+  }
+
+  /// Where one package lands inside this directory. The file name comes from
+  /// the artifact ID, never from a caller string, so a lease cannot name a
+  /// path component.
+  package func packagePath(artifactID: String) throws -> String {
+    guard artifactID.range(of: #"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"#, options: .regularExpression)
+      != nil
+    else {
+      throw HDCE0RequestError.malformed(
+        field: "artifactID", detail: "package file names are bounded identifiers")
+    }
+    return "\(remotePath)/\(artifactID).hap"
+  }
+}
+
+/// One package inside a staged set. Its remote path is derived from the
+/// owning directory and the artifact ID — a lease cannot name a path
+/// component, and the type cannot be built outside this module.
+public struct HDCStagedPackage: Sendable, Equatable {
+  public let remotePath: String
+  public let artifactLeaseID: String
+  /// Absent while the plan is only being materialized for admission, which
+  /// happens before any lease is resolved. `lower` refuses to send without
+  /// it, so the nil case can never reach a device.
+  public let expectedSHA256: String?
+
+  package init(
+    directory: HDCOwnedRemoteDirectory,
+    artifactID: String,
+    artifactLeaseID: String,
+    expectedSHA256: String?
+  ) throws {
+    self.remotePath = try directory.packagePath(artifactID: artifactID)
+    self.artifactLeaseID = artifactLeaseID
+    self.expectedSHA256 = expectedSHA256
+  }
+}
+
+/// Several packages of one bundle staged in one provider-owned directory:
+/// the shape `bm install -p <dir>` requires for a multi-module application.
+/// A single-package install does not use this type at all, which is what
+/// keeps its plan unchanged (CHG-2026-049 r4).
+public struct HDCStagedPackageSet: Sendable, Equatable {
+  public let directory: HDCOwnedRemoteDirectory
+  /// Entry package first, then the caller's order. Never fewer than two.
+  public let packages: [HDCStagedPackage]
+
+  package init(directory: HDCOwnedRemoteDirectory, packages: [HDCStagedPackage]) throws {
+    guard packages.count >= 2, packages.count <= 17 else {
+      throw HDCE0RequestError.outOfBounds(
+        field: "packages", detail: "a staged package set holds 2...17 packages")
+    }
+    var seen = Set<String>()
+    for package in packages {
+      guard seen.insert(package.remotePath).inserted else {
+        throw HDCE0RequestError.malformed(
+          field: "packages", detail: "two packages cannot stage to one path")
+      }
+      guard package.remotePath.hasPrefix(directory.remotePath + "/") else {
+        throw HDCE0RequestError.malformed(
+          field: "packages", detail: "every package must stage inside the owned directory")
+      }
+    }
+    self.directory = directory
+    self.packages = packages
+  }
+}
+
 public struct HDCBundleReference: Sendable, Equatable {
   public let bundleName: String
 

@@ -62,6 +62,10 @@ FIELD_TYPES = (
     "boolean",
     "stringArray",
     "artifactLease",
+    # An ordered list of artifact leases. Introduced for multi-package HAP
+    # install (CHG-2026-049 r4): one operation input naming several packages
+    # that must land in one directory and install as one application.
+    "artifactLeaseArray",
     "artifactReference",
 )
 ARTIFACT_ROLES = ("raw", "derived", "log", "plan", "diagnostic")

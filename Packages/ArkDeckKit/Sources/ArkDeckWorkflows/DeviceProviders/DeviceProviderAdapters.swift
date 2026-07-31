@@ -152,6 +152,9 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
     case .cleanupOwnedRemotePath:
       let ownerStepID: String
       if operation.reference == "debug.hap@1" {
+        if let packageSet = try stagedPackageSet(inputs: inputs, context: context) {
+          return .hdc(.cleanupStagedPackageSet(packageSet))
+        }
         ownerStepID = "send-hap"
       } else {
         ownerStepID = Self.fileProducerStepID(for: step.stepID)
@@ -283,6 +286,50 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
       durationSeconds: duration, categories: categories, bufferKB: buffer)
   }
 
+  /// Builds the staged package set when — and only when — the request
+  /// carried additional leases. Every remote path is minted here; the
+  /// leases contribute identity and hashes, never a path component.
+  private func stagedPackageSet(
+    inputs: [String: JSONValue], context: ProviderExecutionContext
+  ) throws -> HDCStagedPackageSet? {
+    guard case .array(let raw)? = inputs["additionalHapArtifactLeases"], !raw.isEmpty else {
+      return nil
+    }
+    guard case .string(let entryLease)? = inputs["hapArtifactLease"] else {
+      throw DeviceProviderError.unsupportedAction("hapArtifactLease input is required")
+    }
+    var leases = [entryLease]
+    for value in raw {
+      guard case .string(let lease) = value else {
+        throw DeviceProviderError.unsupportedAction(
+          "additionalHapArtifactLeases must be artifact leases")
+      }
+      leases.append(lease)
+    }
+    // Admission materializes this plan before any lease is resolved, so the
+    // hashes may be absent here. The identity comes from the lease either
+    // way — `lease-v1:<job>:<artifactID>` — and `lower` is where the
+    // resolved bytes must match before anything is sent.
+    let resolved =
+      [context.resolvedInputArtifact].compactMap { $0 } + context.additionalInputArtifacts
+    let directory = try HDCOwnedRemoteDirectory(
+      jobID: context.jobID, stepID: "send-hap", nonce: "owned")
+    let packages = try leases.enumerated().map { index, lease -> HDCStagedPackage in
+      guard let artifactID = lease.split(separator: ":").last.map(String.init) else {
+        throw DeviceProviderError.unsupportedAction("malformed artifact lease")
+      }
+      let artifact = index < resolved.count ? resolved[index] : nil
+      if let artifact, artifact.artifactID != artifactID {
+        throw DeviceProviderError.unsupportedAction(
+          "resolved Artifact does not match the lease at position \(index)")
+      }
+      return try HDCStagedPackage(
+        directory: directory, artifactID: artifactID,
+        artifactLeaseID: lease, expectedSHA256: artifact?.sha256)
+    }
+    return try HDCStagedPackageSet(directory: directory, packages: packages)
+  }
+
   /// Maps debug.hap@1's steps onto typed actions. The inputs are the
   /// catalog-declared ones; nothing here accepts a device path.
   private func debugHAPAction(
@@ -294,8 +341,12 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
       throw DeviceProviderError.unsupportedAction("bundleName input is required")
     }
     let bundle = try HDCBundleReference(bundleName: bundleName)
+    // The additional leases are the only thing that selects the directory
+    // form. Absent, every leg below is exactly what it was (r4).
+    let packageSet = try stagedPackageSet(inputs: inputs, context: context)
     switch step.kind {
     case .sendFile:
+      if let packageSet { return .hdc(.sendPackageSetToStaging(packageSet)) }
       guard case .string(let lease)? = inputs["hapArtifactLease"] else {
         throw DeviceProviderError.unsupportedAction("hapArtifactLease input is required")
       }
@@ -307,6 +358,7 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
             artifactLeaseID: lease,
             expectedSHA256: context.resolvedInputArtifact?.sha256)))
     case .installPackage:
+      if let packageSet { return .hdc(.installPackageSet(packageSet, bundle: bundle)) }
       guard case .string(let lease)? = inputs["hapArtifactLease"] else {
         throw DeviceProviderError.unsupportedAction("hapArtifactLease input is required")
       }
@@ -597,6 +649,73 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
             ["file", "send", resolved.fileURL.path, staged.path.remotePath],
             context: context),
           timeoutSeconds: 300))
+    case .sendPackageSetToStaging(let set):
+      // One directory, then one send per package. Same shape the native
+      // family already uses (mkdir -p + several sends in one sequence);
+      // multi-package needed no new step kind for it.
+      guard context.additionalInputArtifacts.count + 1 == set.packages.count,
+        let entry = context.resolvedInputArtifact
+      else {
+        throw DeviceProviderError.unsupportedAction(
+          "package-set send requires the engine-resolved lease for every package")
+      }
+      let resolved = [entry] + context.additionalInputArtifacts
+      var invocations: [TypedProcessInvocation] = [
+        TypedProcessInvocation(
+          arguments: try deviceArguments(
+            ["shell", "mkdir", "-p", set.directory.remotePath], context: context),
+          timeoutSeconds: 30)
+      ]
+      for (artifact, package) in zip(resolved, set.packages) {
+        guard package.expectedSHA256 == artifact.sha256 else {
+          throw DeviceProviderError.unsupportedAction(
+            "staged package does not match its engine-resolved Artifact")
+        }
+        invocations.append(
+          TypedProcessInvocation(
+            arguments: try deviceArguments(
+              ["file", "send", artifact.fileURL.path, package.remotePath],
+              context: context),
+            timeoutSeconds: 300))
+      }
+      return TypedProcessPlan(
+        action: action,
+        kind: .processSequence(
+          executableSHA256: "resolved-at-dispatch", invocations: invocations))
+    case .installPackageSet(let set, _):
+      // The whole point of the directory form: one install for the set.
+      return TypedProcessPlan(
+        action: action,
+        kind: .process(
+          executableSHA256: "resolved-at-dispatch",
+          argumentSummary: try deviceArguments(
+            ["shell", "bm", "install", "-p", set.directory.remotePath, "-r"],
+            context: context),
+          timeoutSeconds: 300))
+    case .cleanupStagedPackageSet(let set):
+      // Each package by name, then `rmdir` — never `rm -rf`. `rmdir` fails
+      // on a non-empty directory, so a cleanup that did not fully clean
+      // reports instead of deleting something it was not asked to.
+      var commands: [TypedProcessInvocation] = try set.packages.map { package in
+        TypedProcessInvocation(
+          arguments: try deviceArguments(
+            ["shell", "rm", "-f", package.remotePath], context: context),
+          timeoutSeconds: 30, continueAfterNonZero: true)
+      }
+      commands.append(
+        TypedProcessInvocation(
+          arguments: try deviceArguments(
+            ["shell", "rmdir", set.directory.remotePath], context: context),
+          timeoutSeconds: 30))
+      commands.append(
+        TypedProcessInvocation(
+          arguments: try deviceArguments(
+            ["shell", "ls", "-ld", set.directory.remotePath], context: context),
+          timeoutSeconds: 15))
+      return TypedProcessPlan(
+        action: action,
+        kind: .processSequence(
+          executableSHA256: "resolved-at-dispatch", invocations: commands))
     case .installPackage(let staged, _):
       return TypedProcessPlan(
         action: action,
@@ -707,6 +826,14 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
           argumentSummary: try deviceArguments(
             ["shell", "pidof", bundle.bundleName], context: context),
           timeoutSeconds: 30))
+    case .readOwnedDirectoryPresence(let directory):
+      return TypedProcessPlan(
+        action: action,
+        kind: .process(
+          executableSHA256: "resolved-at-dispatch",
+          argumentSummary: try deviceArguments(
+            ["shell", "ls", "-ld", directory.remotePath], context: context),
+          timeoutSeconds: 15))
     case .readOwnedPathPresence(let path):
       return TypedProcessPlan(
         action: action,
@@ -1320,6 +1447,46 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
       }
       return .verified(summary: ["cleaned": path.remotePath])
 
+    case .sendPackageSetToStaging(let set):
+      guard receipt.subprocesses.count == set.packages.count + 1 else {
+        return .unknown(reason: "package-set send did not produce one result per package")
+      }
+      guard receipt.subprocesses.allSatisfy({ $0.exitStatus == 0 }) else {
+        return .failed(
+          code: "sendFailed", detail: "one package of the set did not transfer cleanly")
+      }
+      return .verified(summary: [
+        "stagedAt": set.directory.remotePath,
+        "packageCount": String(set.packages.count),
+      ])
+
+    case .installPackageSet:
+      // Same rule as the single-package install: the readback decides.
+      guard let exitStatus = receipt.exitStatus else {
+        return .unknown(reason: "install produced no process result")
+      }
+      guard exitStatus == 0 else {
+        return .failed(code: "installFailed", detail: "install process reported failure")
+      }
+      return .unknown(reason: "install requires package readback before it can be believed")
+
+    case .cleanupStagedPackageSet(let set):
+      // `ls -d` on the directory is the evidence: absent means the whole
+      // set is gone, present means something is still staged.
+      guard let listing = receipt.subprocesses.last,
+        let present = pathPresence(
+          exitStatus: listing.exitStatus, stdout: listing.stdout,
+          stderr: listing.stderr, stdoutTruncated: listing.stdoutTruncated)
+      else {
+        return .unknown(reason: "staged directory readback has no definite result")
+      }
+      guard !present else {
+        return .failed(
+          code: "cleanupDebt",
+          detail: "staged package directory \(set.directory.remotePath) still exists")
+      }
+      return .verified(summary: ["cleaned": set.directory.remotePath])
+
     case .sendArtifactToStaging(let staged):
       guard receipt.exitStatus == 0 else {
         return .failed(code: "sendFailed", detail: "artifact transfer did not complete")
@@ -1616,6 +1783,15 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
     case .readProcessPresence:
       guard let present = Self.processPresence(Self.soleSubprocess(of: receipt)) else {
         return .unknown(reason: "process presence readback is ambiguous")
+      }
+      return .verified(summary: ["present": present ? "true" : "false"])
+    case .readOwnedDirectoryPresence:
+      guard
+        let present = pathPresence(
+          exitStatus: receipt.exitStatus, stdout: receipt.stdout,
+          stderr: receipt.stderr, stdoutTruncated: receipt.stdoutTruncated)
+      else {
+        return .unknown(reason: "owned-directory presence readback has no definite result")
       }
       return .verified(summary: ["present": present ? "true" : "false"])
     case .readOwnedPathPresence:
@@ -2084,8 +2260,11 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
       readback = .hdc(.readOwnedPathPresence(path))
     case .hdc(.sendArtifactToStaging(let staged)):
       readback = .hdc(.readOwnedPathPresence(staged.path))
-    case .hdc(.installPackage(_, let bundle)), .hdc(.uninstallPackage(let bundle)):
+    case .hdc(.installPackage(_, let bundle)), .hdc(.uninstallPackage(let bundle)),
+      .hdc(.installPackageSet(_, let bundle)):
       readback = .hdc(.readPackagePresence(bundle))
+    case .hdc(.sendPackageSetToStaging(let set)), .hdc(.cleanupStagedPackageSet(let set)):
+      readback = .hdc(.readOwnedDirectoryPresence(set.directory))
     case .hdc(.startAbility(let ability)), .hdc(.stopAbility(let ability)):
       readback = .hdc(.readProcessPresence(ability.bundle))
     case .hdc(.createPortForward(let spec)), .hdc(.removePortForward(let spec)):
@@ -2171,10 +2350,11 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
     let desiredPresence: Bool
     switch intent.action {
     case .hdc(.captureTrace), .hdc(.sendArtifactToStaging), .hdc(.installPackage),
-      .hdc(.startAbility), .hdc(.createPortForward):
+      .hdc(.startAbility), .hdc(.createPortForward),
+      .hdc(.sendPackageSetToStaging), .hdc(.installPackageSet):
       desiredPresence = true
     case .hdc(.cleanupOwnedRemotePath), .hdc(.stopAbility), .hdc(.uninstallPackage),
-      .hdc(.removePortForward):
+      .hdc(.removePortForward), .hdc(.cleanupStagedPackageSet):
       desiredPresence = false
     default:
       return .stillUnknown(reason: "readback was not paired with a mutation")
@@ -2207,6 +2387,8 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
         reason: "owned-path mutation needs a re-observation pass to conclude")
     case .hdc(.sendArtifactToStaging), .hdc(.installPackage), .hdc(.startAbility),
       .hdc(.stopAbility), .hdc(.uninstallPackage), .hdc(.createPortForward),
+      .hdc(.sendPackageSetToStaging), .hdc(.installPackageSet),
+      .hdc(.cleanupStagedPackageSet),
       .hdc(.removePortForward), .hdc(.sendNativeLibraryToStaging),
       .hdc(.backupNativeLibrary), .hdc(.publishNativeLibrary),
       .hdc(.stopNativeTarget), .hdc(.startNativeTarget),

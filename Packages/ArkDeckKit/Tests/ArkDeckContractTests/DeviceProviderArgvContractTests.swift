@@ -227,3 +227,127 @@ final class DeviceProviderArgvContractTests: XCTestCase {
     XCTAssertNotEqual(dumpPath.remotePath, tracePath.remotePath)
   }
 }
+
+// MARK: - CHG-2026-049 r4: multi-package install
+
+extension DeviceProviderArgvContractTests {
+  private func hapInputs(additional: [String] = []) -> [String: JSONValue] {
+    var inputs: [String: JSONValue] = [
+      "hapArtifactLease": .string("lease-v1:job-input:ART-aaaa"),
+      "bundleName": .string("com.example.demo"),
+      "abilityName": .string("EntryAbility"),
+    ]
+    if !additional.isEmpty {
+      inputs["additionalHapArtifactLeases"] = .array(additional.map(JSONValue.string))
+    }
+    return inputs
+  }
+
+  private func hapContext(
+    entry: ProviderResolvedInputArtifact, extras: [ProviderResolvedInputArtifact] = []
+  ) -> ProviderExecutionContext {
+    ProviderExecutionContext(
+      jobID: "job-argv-1", stepID: "send-hap", targetID: "TGT-1",
+      bindingRevision: 7, connectKey: connectKey, nowUTC: "2026-07-30T00:00:00Z",
+      resolvedInputArtifact: entry, additionalInputArtifacts: extras)
+  }
+
+  private func artifact(_ id: String, _ path: String) -> ProviderResolvedInputArtifact {
+    ProviderResolvedInputArtifact(
+      artifactID: id, fileURL: URL(fileURLWithPath: path),
+      sha256: String(repeating: id.last.map(String.init) ?? "a", count: 64), byteCount: 128)
+  }
+
+  /// DHA-MULTI-001: without additional leases nothing about the single
+  /// package plan moves. This is the promise r4 makes to existing callers.
+  func testSinglePackageArgvIsUnchangedWithoutAdditionalLeases() throws {
+    let descriptor = try XCTUnwrap(
+      RuntimeOperationCatalog.descriptor(reference: "debug.hap@1"))
+    let entry = artifact("ART-aaaa", "/private/tmp/entry.hap")
+    let context = hapContext(entry: entry)
+    func plan(_ stepID: String) throws -> TypedProcessPlan {
+      let step = try XCTUnwrap(descriptor.steps.first { $0.stepID == stepID })
+      let action = try provider.action(
+        for: step, operation: descriptor, inputs: hapInputs(), context: context)
+      return try provider.lower(action: action, context: context)
+    }
+    guard case .process(_, let send, _) = try plan("send-hap").kind,
+      case .process(_, let install, _) = try plan("install-hap").kind,
+      case .process(_, let cleanup, _) = try plan("cleanup-remote-staging").kind
+    else {
+      return XCTFail("the single-package legs must stay single-process plans")
+    }
+    let owned = "/data/local/tmp/arkdeck-job-argv-1-send-hap-owned.hap"
+    XCTAssertEqual(send, ["-t", connectKey, "file", "send", "/private/tmp/entry.hap", owned])
+    XCTAssertEqual(
+      install, ["-t", connectKey, "shell", "bm", "install", "-p", owned, "-r"])
+    XCTAssertEqual(cleanup, ["-t", connectKey, "shell", "rm", "-f", owned])
+  }
+
+  /// DHA-MULTI-001: with them, one directory carries every package and one
+  /// install covers the set. Cleanup removes each package by name and then
+  /// `rmdir`s — never `rm -rf`.
+  func testMultiPackageLowersToOneDirectoryAndOneInstall() throws {
+    let descriptor = try XCTUnwrap(
+      RuntimeOperationCatalog.descriptor(reference: "debug.hap@1"))
+    let entry = artifact("ART-aaaa", "/private/tmp/entry.hap")
+    let feature = artifact("ART-bbbb", "/private/tmp/feature1.hap")
+    let context = hapContext(entry: entry, extras: [feature])
+    let inputs = hapInputs(additional: ["lease-v1:job-input:ART-bbbb"])
+    func plan(_ stepID: String) throws -> TypedProcessPlan {
+      let step = try XCTUnwrap(descriptor.steps.first { $0.stepID == stepID })
+      let action = try provider.action(
+        for: step, operation: descriptor, inputs: inputs, context: context)
+      return try provider.lower(action: action, context: context)
+    }
+    let dir = "/data/local/tmp/arkdeck-job-argv-1-send-hap-owned-packages"
+
+    guard case .processSequence(_, let send) = try plan("send-hap").kind else {
+      return XCTFail("multi-package send must be a sequence")
+    }
+    XCTAssertEqual(
+      send.map(\.arguments),
+      [
+        ["-t", connectKey, "shell", "mkdir", "-p", dir],
+        ["-t", connectKey, "file", "send", "/private/tmp/entry.hap", "\(dir)/ART-aaaa.hap"],
+        ["-t", connectKey, "file", "send", "/private/tmp/feature1.hap", "\(dir)/ART-bbbb.hap"],
+      ])
+
+    guard case .process(_, let install, _) = try plan("install-hap").kind else {
+      return XCTFail("install must stay a single process")
+    }
+    XCTAssertEqual(install, ["-t", connectKey, "shell", "bm", "install", "-p", dir, "-r"])
+
+    guard case .processSequence(_, let cleanup) = try plan("cleanup-remote-staging").kind else {
+      return XCTFail("multi-package cleanup must be a sequence")
+    }
+    XCTAssertEqual(
+      cleanup.map(\.arguments),
+      [
+        ["-t", connectKey, "shell", "rm", "-f", "\(dir)/ART-aaaa.hap"],
+        ["-t", connectKey, "shell", "rm", "-f", "\(dir)/ART-bbbb.hap"],
+        ["-t", connectKey, "shell", "rmdir", dir],
+        ["-t", connectKey, "shell", "ls", "-ld", dir],
+      ])
+    for invocation in cleanup {
+      XCTAssertFalse(
+        invocation.arguments.contains("-rf"),
+        "cleanup must never recurse: \(invocation.arguments)")
+    }
+  }
+
+  /// A staged package's remote name comes from the artifact ID, so a lease
+  /// string cannot contribute a path component.
+  func testStagedPackagePathsRejectCallerShapedNames() throws {
+    let directory = try HDCOwnedRemoteDirectory(
+      jobID: "job-argv-1", stepID: "send-hap", nonce: "owned")
+    XCTAssertThrowsError(
+      try HDCStagedPackage(
+        directory: directory, artifactID: "../../etc/passwd",
+        artifactLeaseID: "lease-v1:x:y", expectedSHA256: String(repeating: "a", count: 64)))
+    let good = try HDCStagedPackage(
+      directory: directory, artifactID: "ART-aaaa",
+      artifactLeaseID: "lease-v1:x:y", expectedSHA256: String(repeating: "a", count: 64))
+    XCTAssertTrue(good.remotePath.hasPrefix(directory.remotePath + "/"))
+  }
+}

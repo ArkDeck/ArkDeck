@@ -203,7 +203,12 @@
 
 ## TASK-DHA-003 — 多包 HAP 按目录安装(r4)
 
-- Status:ready
+- Status:done
+- Done:2026-07-31;随本实现 PR 合入生效(维护者 review + merge 即批准);
+  DHA-MULTI-001..003 **全部 PASS** —— 其中 003 原定 pending(缺多模块签名 HAP),
+  素材当天构建出来后真机跑通(`job-42c0ab9d…`,设备读回
+  `installed modules: ['entry', 'feature1']`);
+  evidence = `evidence/runs/TASK-DHA-003/run-r4.md`
 - Platform:macos
 - Requirements:proposal r4 What 1-5(可选 `additionalHapArtifactLeases` 与
   schema 数组型、引擎按序解析 N 条租约并逐条校验绑定、staged 目录 mint-only 与

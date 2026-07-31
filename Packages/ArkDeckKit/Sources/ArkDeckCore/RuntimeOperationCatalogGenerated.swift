@@ -4,7 +4,7 @@
 // Drift is a check-sdd error (bidirectional byte comparison).
 
 extension RuntimeOperationCatalog {
-  public static let catalogDigest = "17bd5443d0a660a8d657b5ba9fb15017252f42f88714bc4bc3e4e22ff76bdaff"
+  public static let catalogDigest = "cefdc81da7e765fd75e54b70ee67c3e211c978872b8e472d840e3a457e6010ae"
 
   public static let operations: [CatalogOperationDescriptor] = [
     CatalogOperationDescriptor(
@@ -75,6 +75,7 @@ extension RuntimeOperationCatalog {
       concurrencyKey: .deviceExclusive,
       inputs: [
         CatalogFieldDescriptor(name: "abilityName", type: .string, isRequired: true, pattern: "^[a-zA-Z][a-zA-Z0-9_.]*$", maxLength: 200),
+        CatalogFieldDescriptor(name: "additionalHapArtifactLeases", type: .artifactLeaseArray, isRequired: false, maxItems: 16),
         CatalogFieldDescriptor(name: "bundleName", type: .string, isRequired: true, pattern: "^[a-zA-Z][a-zA-Z0-9_]*(?:\\.[a-zA-Z][a-zA-Z0-9_]*)+$", maxLength: 200),
         CatalogFieldDescriptor(name: "captureDiagnostics", type: .boolean, isRequired: false),
         CatalogFieldDescriptor(name: "cleanupPolicy", type: .string, isRequired: false, enumValues: ["uninstall", "retain", "restorePrevious"]),

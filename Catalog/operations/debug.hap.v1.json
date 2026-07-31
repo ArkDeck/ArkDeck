@@ -13,7 +13,13 @@
       "hapArtifactLease": {
         "type": "artifactLease",
         "required": true,
-        "description": "HAP must come from an artifact lease; arbitrary local paths are rejected."
+        "description": "Entry HAP; must come from an artifact lease, arbitrary local paths are rejected."
+      },
+      "additionalHapArtifactLeases": {
+        "type": "artifactLeaseArray",
+        "required": false,
+        "maxItems": 16,
+        "description": "Feature HAPs and HSPs of the same bundle. Present means the packages are sent into one provider-owned directory and installed by a single bm install -p <dir>; absent leaves the single-package plan unchanged."
       },
       "bundleName": {
         "type": "string",
