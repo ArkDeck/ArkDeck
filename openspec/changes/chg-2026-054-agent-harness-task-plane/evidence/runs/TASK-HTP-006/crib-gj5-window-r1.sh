@@ -68,6 +68,8 @@ POLL_SECONDS=10
 DEADLINE_SECONDS=1200
 SELF_TEST=0
 SERIAL=""
+PHASE="all"
+REQUESTED_STATE_DIR=""
 
 fail() { printf 'ERROR: %s\n' "$1" >&2; exit 1; }
 say() { printf '\n=== %s ===\n' "$1"; }
@@ -81,6 +83,8 @@ pause_for_human() {
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --self-test) SELF_TEST=1; shift ;;
+    --phase) PHASE="${2:?--phase needs l1l2|l3|l4|all}"; shift 2 ;;
+    --state-dir) REQUESTED_STATE_DIR="${2:?--state-dir needs a path}"; shift 2 ;;
     --hdc) HDC_PATH="${2:?--hdc needs a path}"; shift 2 ;;
     --hap) HAP_PATH="${2:?--hap needs a path}"; shift 2 ;;
     --capability) CAPABILITY_FILE="${2:?--capability needs a path}"; shift 2 ;;
@@ -98,19 +102,34 @@ done
   || fail "build first: swift build --package-path Packages/ArkDeckKit"
 [[ -x "${BIN_DIR}/arkdeck" ]] || fail "missing ${BIN_DIR}/arkdeck"
 [[ -x "${HDC_PATH}" ]] || fail "hdc is not executable at ${HDC_PATH} (pass --hdc)"
-if [[ "${SELF_TEST}" -eq 0 ]]; then
-  [[ -f "${HAP_PATH}" ]] || fail "--hap <signed.hap> is required for a real window"
+if [[ "${SELF_TEST}" -eq 0 && ( "${PHASE}" == "all" || "${PHASE}" == "l1l2" ) ]]; then
+  [[ -f "${HAP_PATH}" ]] || fail "--hap <signed.hap> is required for the l1l2 phase"
   if [[ -n "${CAPABILITY_FILE}" ]]; then
     [[ -f "${CAPABILITY_FILE}" ]] || fail "--capability points at no file: ${CAPABILITY_FILE}"
   fi
 fi
+
+case "${PHASE}" in
+  all|l1l2|l3|l4) ;;
+  *) fail "--phase must be one of: all l1l2 l3 l4" ;;
+esac
 
 PY="${REPO_ROOT}/.venv-sdd/bin/python"
 [[ -x "${PY}" ]] || PY="$(command -v python3)"
 [[ -x "${PY}" ]] || fail "no python3 available for reading JSON replies"
 jsonq() { "${PY}" -c "$1"; }
 
-STATE_DIR="$(mktemp -d /private/tmp/arkdeck-gj5-window.XXXXXX)"
+if [[ -n "${REQUESTED_STATE_DIR}" ]]; then
+  # Phases share one daemon-owned directory: adoption, the imported artifact
+  # and the installed capability all live in it, so a later phase must reuse
+  # it rather than start clean.
+  STATE_DIR="${REQUESTED_STATE_DIR}"
+  mkdir -p "${STATE_DIR}"
+else
+  [[ "${PHASE}" == "all" ]] \
+    || fail "--phase ${PHASE} needs --state-dir <the directory the earlier phase used>"
+  STATE_DIR="$(mktemp -d /private/tmp/arkdeck-gj5-window.XXXXXX)"
+fi
 chmod 700 "${STATE_DIR}"
 SOCKET="${STATE_DIR}/agentd.sock"
 DAEMON_LOG="${STATE_DIR}/daemon.log"
@@ -206,6 +225,8 @@ fi
 
 ############################ L1 — GJ-1 re-take ################################
 
+if [[ "${PHASE}" == "all" || "${PHASE}" == "l1l2" ]]; then
+
 say "L1: adopting the attached device (product-driven)"
 ADOPT_JSON="$("${BIN_DIR}/arkdeck" device adopt --socket "${SOCKET}" --json)"
 printf '%s\n' "${ADOPT_JSON}" | mask
@@ -291,6 +312,21 @@ if [[ -z "${CAPABILITY_FILE}" ]]; then
   fail "no issued capability yet; the window pauses here by design"
 fi
 
+# A capability pins the exact lease, which encodes the exact HAP bytes. If the
+# application was rebuilt since the draft, the kernel denies the request with
+# `inputConstraintViolated` - correct, but only after a round trip. Measured on
+# the 2026-07-31 window: the demo app was rebuilt ten minutes after the draft
+# was taken, and the denial was the first sign of it. Say it here instead.
+CAP_PINNED_LEASE="$(jsonq 'import json,sys
+d=json.load(open("'"${CAPABILITY_FILE}"'"))
+print(((d.get("inputConstraints") or {}).get("hapArtifactLease") or {}).get("value") or "")')"
+if [[ -n "${CAP_PINNED_LEASE}" && "${CAP_PINNED_LEASE}" != "${LEASE}" ]]; then
+  printf 'capability pins lease: %s\n' "${CAP_PINNED_LEASE}"
+  printf 'this run imported:     %s\n' "${LEASE}"
+  fail "the HAP on disk is not the one this capability authorizes (it was rebuilt); \
+re-run --phase l1l2 without --capability to draft against the current bytes"
+fi
+
 say "L2: installing the maintainer-issued capability"
 CAP_ISSUER="$(jsonq 'import json,sys; print(json.load(open("'"${CAPABILITY_FILE}"'"))["issuer"]["reference"])')"
 [[ "${CAP_ISSUER}" == PR#* ]] \
@@ -325,9 +361,32 @@ PYEOF
   --wait --json | tee "${STATE_DIR}/l2-debug-hap.json" | mask
 printf 'the package is retained; debug.hap@1 always runs stop-ability, so the app is installed and not running.\n'
 
+  if [[ "${PHASE}" == "l1l2" ]]; then
+    say "phase l1l2 complete"
+    printf 'state dir (pass it to the next phase): %s\n' "${STATE_DIR}"
+    printf '\nHUMAN STEP before --phase l3: start %s on the device and leave it on the\n' "${BUNDLE}"
+    printf 'WaterFlow screen WITHOUT reproducing the crash.\n'
+    exit 0
+  fi
+else
+  say "reusing the adopted target from ${STATE_DIR}"
+  read -r TARGET_ID BINDING_REVISION < <("${BIN_DIR}/arkdeck" device list --socket "${SOCKET}" --json \
+    | jsonq 'import json,sys
+rows=json.load(sys.stdin)
+rows=rows if isinstance(rows,list) else (rows.get("targets") or [])
+if len(rows) != 1:
+    raise SystemExit("expected exactly one adopted target, found %d" % len(rows))
+print(rows[0]["targetId"], rows[0]["bindingRevision"])')
+  [[ -n "${TARGET_ID:-}" && -n "${BINDING_REVISION:-}" ]] \
+    || fail "no adopted target in ${STATE_DIR}; run --phase l1l2 first"
+  printf 'target %s at binding revision %s\n' "${TARGET_ID}" "${BINDING_REVISION}" | mask
+fi
+
 ############################ L3 — GJ-5, clean #################################
 
-pause_for_human "start ${BUNDLE} on the device and leave it on the WaterFlow screen WITHOUT reproducing the crash"
+if [[ "${PHASE}" == "all" ]]; then
+  pause_for_human "start ${BUNDLE} on the device and leave it on the WaterFlow screen WITHOUT reproducing the crash"
+fi
 
 watch_task() {
   local htask="$1" elapsed=0 last="" line
@@ -379,6 +438,9 @@ for r in rows:
       done
 }
 
+if [[ "${PHASE}" == "l4" ]]; then
+  say "skipping L3 (already run in its own phase)"
+else
 say "L3: THE HANDOVER — one task submit, application live, no crash yet"
 HTASK_CLEAN="$("${BIN_DIR}/arkdeck" task submit --socket "${SOCKET}" --target "${TARGET_ID}" \
   --goal "No fatal signature and a live application across five bounded captures" \
@@ -388,10 +450,19 @@ printf 'submitted %s. Reconcile calls from here: 0.\n' "${HTASK_CLEAN}"
 watch_task "${HTASK_CLEAN}"
 printf 'expected: succeeded, via five clean captures and an evaluator PASS.\n'
 dump_task "${HTASK_CLEAN}" "l3-clean"
+if [[ "${PHASE}" == "l3" ]]; then
+  say "phase l3 complete"
+  printf 'state dir (pass it to the next phase): %s\n' "${STATE_DIR}"
+  printf '\nHUMAN STEP before --phase l4: reproduce the WaterFlow crash on the device.\n'
+  exit 0
+fi
+fi
 
 ############################ L4 — GJ-5, crash present #########################
 
-pause_for_human "reproduce the WaterFlow crash on the device now (the fault block enters the HiLog buffer that 'hilog -x' dumps)"
+if [[ "${PHASE}" == "all" ]]; then
+  pause_for_human "reproduce the WaterFlow crash on the device now (the fault block enters the HiLog buffer that 'hilog -x' dumps)"
+fi
 
 say "L4: THE SECOND HANDOVER — one task submit, crash present"
 SUBMIT_ARGS=(task submit --socket "${SOCKET}" --target "${TARGET_ID}"
@@ -418,7 +489,7 @@ grep -E 'auto-drive|harness|sensitive' "${DAEMON_LOG}" | tail -60 | mask
 
 say "window summary"
 printf 'target:            %s at binding revision %s\n' "${TARGET_ID}" "${BINDING_REVISION}"
-printf 'L3 clean task:     %s\n' "${HTASK_CLEAN}"
+printf 'L3 clean task:     %s\n' "${HTASK_CLEAN:-<its own phase>}"
 printf 'L4 crash task:     %s\n' "${HTASK_CRASH}"
 printf 'reconcile calls:   0 (auto-drive only)\n'
 printf 'human steps:       app start, crash gesture, two submits - all before a handover\n'
