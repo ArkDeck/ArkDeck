@@ -471,6 +471,12 @@ final class AgentDaemonContractTests: XCTestCase {
   /// `dispatchMain()` pthread_exits the main thread out from under an
   /// async top level. Only running the actual binary catches that class of
   /// defect, so this test spawns it and talks to it over the socket.
+  ///
+  /// The daemon runs here with no ARKDECK_* configuration at all - see
+  /// `launchProductionDaemon`, which declares that instead of inheriting it -
+  /// so the operation availability asserted below is the unconfigured
+  /// composition's. `testConfiguredHDCFlipsTheDescriptorBoundBlockers` covers
+  /// the configured one.
   func testDaemonBinaryStaysAliveAndServesRequests() throws {
     let binary = productsDirectory.appendingPathComponent("arkdeck-agentd")
     guard FileManager.default.fileExists(atPath: binary.path) else {
@@ -482,23 +488,12 @@ final class AgentDaemonContractTests: XCTestCase {
       .appendingPathComponent(".arkdeck-test-\(UInt32.random(in: 0..<100_000))", isDirectory: true)
     defer { try? FileManager.default.removeItem(at: shortState) }
 
-    let process = Process()
-    process.executableURL = binary
-    process.arguments = ["--state-dir", shortState.path]
-    let output = Pipe()
-    process.standardOutput = output
-    process.standardError = output
-    try process.run()
+    let process = try launchProductionDaemon(binary: binary, stateDirectory: shortState)
     defer {
       if process.isRunning { process.terminate() }
     }
 
     let socketURL = shortState.appendingPathComponent("agentd.sock")
-    let deadline = Date().addingTimeInterval(20)
-    while !FileManager.default.fileExists(atPath: socketURL.path) {
-      guard Date() < deadline, process.isRunning else { break }
-      usleep(50_000)
-    }
     XCTAssertTrue(
       FileManager.default.fileExists(atPath: socketURL.path), "daemon never created its socket")
 
@@ -511,28 +506,24 @@ final class AgentDaemonContractTests: XCTestCase {
       return XCTFail("health must answer from the real binary")
     }
     XCTAssertEqual(health["status"], .string("ok"))
-    guard case .array(let operations) = try client.request(method: "operation.list"),
-      case .object(let flash)? = operations.first(where: { item in
-        guard case .object(let fields) = item else { return false }
-        return fields["reference"] == .string("flash.dayu200@1")
-      }),
-      case .array(let reasons)? = flash["reasons"]
-    else {
+    guard let flash = try listOperations(socketPath: socketURL.path)["flash.dayu200@1"] else {
       return XCTFail("production daemon must publish flash.dayu200@1 availability")
     }
-    XCTAssertEqual(flash["availability"], .string("unavailable"))
-    let reasonTexts = reasons.compactMap { reason -> String? in
-      guard case .string(let text) = reason else { return nil }
-      return text
-    }
-    XCTAssertEqual(reasonTexts.count, 1)
+    XCTAssertEqual(flash.availability, "unavailable")
+    XCTAssertEqual(flash.reasons.count, 1, "\(flash.reasons)")
     XCTAssertTrue(
-      reasonTexts.allSatisfy { reason in
-        reason.contains("product-owned Rockchip component")
-          || reason.contains("per-action RockUSB host requires descriptor-bound HDC")
+      flash.reasons.allSatisfy { text in
+        Self.unconfiguredRockchipBlockers.contains { text.contains($0) }
       },
-      "production daemon must expose the missing product dependency, not provider_not_registered")
-    XCTAssertFalse(reasonTexts.contains { $0.contains("provider_not_registered") })
+      "the Rockchip route must refuse through its own composition: \(flash.reasons)")
+    // The defect this whole assertion exists for: a composition that forgot to
+    // register the provider reports a generic blocker and still looks
+    // "unavailable" for the right-looking reason. Matched on the engine's own
+    // wording - it says "provider rockchip is not registered", so the
+    // `provider_not_registered` spelling this replaces could never fire.
+    XCTAssertFalse(
+      flash.reasons.contains { $0.contains("is not registered") },
+      "the production daemon must register the rockchip provider: \(flash.reasons)")
 
     let cliURL = productsDirectory.appendingPathComponent("arkdeck")
     XCTAssertTrue(
@@ -565,7 +556,7 @@ final class AgentDaemonContractTests: XCTestCase {
       return XCTFail("arkdeck operation list must expose daemon availability")
     }
     XCTAssertEqual(listedFlash["availability"], .string("unavailable"))
-    XCTAssertEqual(listedFlash["reasons"], .array(reasons))
+    XCTAssertEqual(listedFlash["reasons"], .array(flash.reasons.map(JSONValue.string)))
 
     process.terminate()
     let stopDeadline = Date().addingTimeInterval(10)
@@ -580,6 +571,144 @@ final class AgentDaemonContractTests: XCTestCase {
       process.terminationReason, .exit,
       "SIGTERM must be a clean shutdown, not a signal death")
     XCTAssertEqual(process.terminationStatus, 0, "clean shutdown exits zero")
+  }
+
+  /// The companion case. An "unavailable, and here is the blocker" assertion
+  /// is only worth anything if configuring the missing piece removes that
+  /// blocker; otherwise the test passes on a daemon that is permanently
+  /// refusing for some unrelated reason. Same binary, one declared
+  /// environment difference.
+  func testConfiguredHDCFlipsTheDescriptorBoundBlockers() throws {
+    let binary = productsDirectory.appendingPathComponent("arkdeck-agentd")
+    guard FileManager.default.fileExists(atPath: binary.path) else {
+      throw XCTSkip("arkdeck-agentd binary not built")
+    }
+    let shortState = URL(fileURLWithPath: NSHomeDirectory())
+      .appendingPathComponent(".arkdeck-test-\(UInt32.random(in: 0..<100_000))", isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: shortState) }
+    // A file, not a real HDC. The composition hashes the configured path to
+    // bind an executable identity and nothing runs it while answering
+    // operation.list, so what this case supplies is exactly what it is about:
+    // the presence of configuration.
+    let hdcFixture = URL(fileURLWithPath: NSHomeDirectory())
+      .appendingPathComponent(".arkdeck-test-hdc-\(UInt32.random(in: 0..<100_000))")
+    try Data("#!/bin/sh\nexit 0\n".utf8).write(to: hdcFixture)
+    try FileManager.default.setAttributes(
+      [.posixPermissions: 0o700], ofItemAtPath: hdcFixture.path)
+    defer { try? FileManager.default.removeItem(at: hdcFixture) }
+
+    let process = try launchProductionDaemon(
+      binary: binary, stateDirectory: shortState, hdcPath: hdcFixture.path)
+    defer {
+      if process.isRunning { process.terminate() }
+    }
+    let socketURL = shortState.appendingPathComponent("agentd.sock")
+    XCTAssertTrue(
+      FileManager.default.fileExists(atPath: socketURL.path), "daemon never created its socket")
+    let operations = try listOperations(socketPath: socketURL.path)
+
+    // Depends on nothing but the variable this case sets: the HDC provider's
+    // own availability is unconditional, so the refusing dispatcher is the
+    // only thing that can block observation.
+    guard let observe = operations["observe.device@1"] else {
+      return XCTFail("production daemon must publish observe.device@1 availability")
+    }
+    XCTAssertEqual(
+      observe.availability, "available",
+      "a configured ARKDECK_HDC_PATH must admit observation: \(observe.reasons)")
+
+    // The Rockchip half. Whether flash.dayu200@1 becomes available also
+    // depends on the installed product component, which no test can install
+    // (production trust is a Developer ID signature) or uninstall. What is
+    // host-independent is the direction: configuring HDC must retire the
+    // descriptor-bound blocker, leaving at most the component one.
+    guard let flash = operations["flash.dayu200@1"] else {
+      return XCTFail("production daemon must publish flash.dayu200@1 availability")
+    }
+    XCTAssertFalse(
+      flash.reasons.contains { $0.contains("requires descriptor-bound HDC") },
+      "configuring HDC must retire the descriptor-bound blocker: \(flash.reasons)")
+    XCTAssertTrue(
+      flash.reasons.allSatisfy { $0.contains("product-owned Rockchip component is unavailable") },
+      "the only blocker left for flash must be the product component: \(flash.reasons)")
+    XCTAssertEqual(
+      flash.availability, flash.reasons.isEmpty ? "available" : "unavailable")
+
+    process.terminate()
+    let stopDeadline = Date().addingTimeInterval(10)
+    while process.isRunning && Date() < stopDeadline { usleep(50_000) }
+    XCTAssertFalse(process.isRunning, "SIGTERM must stop the daemon")
+  }
+
+  /// The two blockers the production Rockchip composition can publish with no
+  /// HDC configured. Which one answers is host state this test does not own:
+  /// where an ArkDeck product is installed (a Developer ID-signed
+  /// rkdeveloptool under /Applications or ~/Applications) the resolver
+  /// succeeds and the refusing per-action host answers; with no product
+  /// installed the resolver's own blocker answers first. Both prove the
+  /// contract the case is about - the route is installed and refuses
+  /// concretely - so it accepts either and names what it will not accept.
+  /// Asserting only the resolver's blocker is what made this test pass or
+  /// fail on whether an app happened to be installed.
+  private static let unconfiguredRockchipBlockers = [
+    "product-owned Rockchip component is unavailable",
+    "the per-action RockUSB host requires descriptor-bound HDC and a product state directory",
+  ]
+
+  private struct DaemonOperation {
+    let availability: String
+    let reasons: [String]
+  }
+
+  private func listOperations(socketPath: String) throws -> [String: DaemonOperation] {
+    let client = AgentClient(socketPath: socketPath)
+    guard case .array(let operations) = try client.request(method: "operation.list") else {
+      return [:]
+    }
+    return operations.reduce(into: [:]) { table, item in
+      guard case .object(let fields) = item,
+        case .string(let reference)? = fields["reference"],
+        case .string(let availability)? = fields["availability"],
+        case .array(let reasons)? = fields["reasons"]
+      else { return }
+      table[reference] = DaemonOperation(
+        availability: availability,
+        reasons: reasons.compactMap { reason in
+          guard case .string(let text) = reason else { return nil }
+          return text
+        })
+    }
+  }
+
+  /// Spawns the real daemon with a *declared* environment. `Process` inherits
+  /// the caller's environment, and the composition root branches on
+  /// ARKDECK_* keys to decide which dispatcher, host and provider it builds -
+  /// so a daemon spawned bare answers according to whatever the developer
+  /// happened to export, and the test states none of it. Every ARKDECK_ key
+  /// is stripped; a case that needs one puts it back by name.
+  private func launchProductionDaemon(
+    binary: URL, stateDirectory: URL, hdcPath: String? = nil
+  ) throws -> Process {
+    let process = Process()
+    process.executableURL = binary
+    process.arguments = ["--state-dir", stateDirectory.path]
+    var environment = ProcessInfo.processInfo.environment.filter {
+      !$0.key.hasPrefix("ARKDECK_")
+    }
+    if let hdcPath { environment["ARKDECK_HDC_PATH"] = hdcPath }
+    process.environment = environment
+    let output = Pipe()
+    process.standardOutput = output
+    process.standardError = output
+    try process.run()
+
+    let socketURL = stateDirectory.appendingPathComponent("agentd.sock")
+    let deadline = Date().addingTimeInterval(20)
+    while !FileManager.default.fileExists(atPath: socketURL.path) {
+      guard Date() < deadline, process.isRunning else { break }
+      usleep(50_000)
+    }
+    return process
   }
 
   private var productsDirectory: URL {
