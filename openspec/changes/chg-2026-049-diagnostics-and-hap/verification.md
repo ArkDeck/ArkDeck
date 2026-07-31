@@ -161,7 +161,14 @@
   `bm install -p <dir> -r`、`[rm -f ×N, rmdir <dir>]`,逐 token 断言;
   (c) 断言全仓 lowering **不含 `rm -rf`**。
 - Evidence:实现 PR 内测试 + 全量套件结果。
-- 结论:pending。
+- **结论(2026-07-31):PASS** —
+  `testSinglePackageArgvIsUnchangedWithoutAdditionalLeases` 逐 token 断言三条腿
+  与 r4 之前相同(`file send <local> <owned.hap>`、`bm install -p <owned.hap> -r`、
+  `rm -f <owned.hap>`);`testMultiPackageLowersToOneDirectoryAndOneInstall` 断言
+  目录形为 `[mkdir -p <dir>, file send ×2]`、`bm install -p <dir> -r`、
+  `[rm -f ×2, rmdir <dir>, ls -ld <dir>]`,并逐条断言 argv 不含 `-rf`。
+  `testStagedPackagePathsRejectCallerShapedNames` 断言包名来自 artifact ID,
+  `../../etc/passwd` 这类被拒。
 
 ## `DHA-MULTI-002` N 条租约逐条过绑定校验,任一不符零 dispatch
 
@@ -180,4 +187,10 @@
 - 前置条件:**需要一套多模块签名 HAP**;仓内与当前设备都没有。在拿到之前
   如实保持 pending。上次窗口只证明了"目录里放一个 HAP 可装",**不构成**本条
   的证据。
-- 结论:pending(hardware + 素材前置)。
+- **结论(2026-07-31):PASS** —— 素材前置当天解除(给 WaterFlowLayoutDemo 手加
+  `feature1` 模块并用其既有签名配置构建,详见 evidence)。真机
+  `job-42c0ab9d8cceb99709cb8dfd26474510`:`send-hap` 判 verified 且带
+  `packageCount`、install 经 `package-readback` 判定、start/stop/uninstall 齐全、
+  `cleanup-remote-staging` 判 `cleaned`,`outstandingResidueCount: 0`。
+  **设备读回 `installed modules: ['entry', 'feature1']`** —— 两个模块作为一个应用
+  从一个目录装成。窗口结束设备已还原。

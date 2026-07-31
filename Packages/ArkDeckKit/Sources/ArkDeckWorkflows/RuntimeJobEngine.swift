@@ -977,6 +977,7 @@ public actor RuntimeJobEngine {
         continue
       }
       let resolvedArtifact: ProviderResolvedInputArtifact?
+      let additionalArtifacts: [ProviderResolvedInputArtifact]
       do {
         resolvedArtifact =
           step.kind == .sendFile
@@ -986,6 +987,10 @@ public actor RuntimeJobEngine {
             || descriptor.reference == "flash.dayu200@1"
             || descriptor.reference == "deploy.native-library.app-owned@1"
           ? try await resolvedInputArtifact(jobID: jobID) : nil
+        additionalArtifacts =
+          step.kind == .sendFile ? try await resolvedAdditionalInputArtifacts(jobID: jobID) : []
+      } catch let rejection as RuntimeJobEngineError {
+        throw RuntimeDispatchFailure.failed("\(rejection)")
       } catch {
         throw RuntimeDispatchFailure.failed(
           "input Artifact lease became unreadable before \(step.stepID): \(error)")
@@ -1032,7 +1037,8 @@ public actor RuntimeJobEngine {
         toolVersion: resolvedFacts?.toolVersion,
         toolSHA256: resolvedFacts?.toolSHA256,
         nowUTC: nowUTC(),
-        resolvedInputArtifact: resolvedArtifact)
+        resolvedInputArtifact: resolvedArtifact,
+        additionalInputArtifacts: additionalArtifacts)
       let action: TypedProviderAction
       do {
         action = try provider.action(
@@ -3121,6 +3127,38 @@ public actor RuntimeJobEngine {
         + "buildId=\(facts.buildID) sha256=\(facts.sha256)")
   }
 
+  /// The additional packages of a multi-package install, in the order the
+  /// caller listed them. Each one goes through the same lease resolution and
+  /// the same binding validation as the entry package — a set is not a
+  /// weaker check, it is the same check N times (CHG-2026-049 r4).
+  private func resolvedAdditionalInputArtifacts(jobID: String) async throws
+    -> [ProviderResolvedInputArtifact]
+  {
+    guard let runtime = jobs[jobID], let artifactStore,
+      runtime.record.operationReference == "debug.hap@1",
+      case .array(let raw)? = runtime.record.request.inputs["additionalHapArtifactLeases"]
+    else {
+      return []
+    }
+    var resolved: [ProviderResolvedInputArtifact] = []
+    for value in raw {
+      guard case .string(let lease) = value else {
+        throw RuntimeJobEngineError.rejected(
+          .invalidInput, "additionalHapArtifactLeases must be artifact leases")
+      }
+      let artifact = try await artifactStore.resolveLease(lease)
+      try Self.validateArtifactBinding(
+        artifact.bindingSnapshot, request: runtime.record.request,
+        materializedStableIdentitySHA256:
+          runtime.record.materializedStableTargetIdentitySHA256)
+      resolved.append(
+        ProviderResolvedInputArtifact(
+          artifactID: artifact.artifactID, fileURL: artifact.fileURL,
+          sha256: artifact.sha256, byteCount: artifact.byteCount))
+    }
+    return resolved
+  }
+
   private func resolvedInputArtifact(jobID: String) async throws
     -> ProviderResolvedInputArtifact?
   {
@@ -3301,6 +3339,39 @@ public actor RuntimeJobEngine {
     } else {
       resolved = nil
     }
+    // Multi-package: the additional leases are resolved and bound-checked
+    // here too, so a lease belonging to another target is refused before
+    // authorization — no capability is consumed and nothing reaches the
+    // device (CHG-2026-049 r4).
+    var additionalResolved: [ProviderResolvedInputArtifact] = []
+    if descriptor.reference == "debug.hap@1",
+      case .array(let rawLeases)? = request.inputs["additionalHapArtifactLeases"],
+      !rawLeases.isEmpty
+    {
+      guard let artifactStore else {
+        throw RuntimeJobEngineError.rejected(
+          .invalidInput, "additional HAP leases require a configured Artifact lease store")
+      }
+      for value in rawLeases {
+        guard case .string(let lease) = value else {
+          throw RuntimeJobEngineError.rejected(
+            .invalidInput, "additionalHapArtifactLeases must be artifact leases")
+        }
+        do {
+          let artifact = try await artifactStore.resolveLease(lease)
+          try Self.validateArtifactBinding(
+            artifact.bindingSnapshot, request: request,
+            materializedStableIdentitySHA256: facts?.deviceIdentitySHA256)
+          additionalResolved.append(
+            ProviderResolvedInputArtifact(
+              artifactID: artifact.artifactID, fileURL: artifact.fileURL,
+              sha256: artifact.sha256, byteCount: artifact.byteCount))
+        } catch {
+          throw RuntimeJobEngineError.rejected(
+            .invalidInput, "additional HAP Artifact lease is not resolvable: \(error)")
+        }
+      }
+    }
     do {
       var materializedSteps: [MaterializedPlanStep] = []
       for step in selectedSteps {
@@ -3328,7 +3399,8 @@ public actor RuntimeJobEngine {
           expectedIdentitySHA256: facts?.deviceIdentitySHA256,
           toolVersion: facts?.toolVersion,
           toolSHA256: facts?.toolSHA256,
-          nowUTC: nowUTC(), resolvedInputArtifact: resolved)
+          nowUTC: nowUTC(), resolvedInputArtifact: resolved,
+          additionalInputArtifacts: additionalResolved)
         let action = try provider.action(
           for: step, operation: descriptor, inputs: request.inputs,
           context: context)
@@ -3905,7 +3977,7 @@ public actor RuntimeJobEngine {
         matches = true
       case (.boolean, .bool):
         matches = true
-      case (.stringArray, .array(let items)):
+      case (.stringArray, .array(let items)), (.artifactLeaseArray, .array(let items)):
         matches = items.allSatisfy {
           if case .string = $0 { return true }
           return false

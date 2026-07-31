@@ -481,6 +481,7 @@
             "boolean",
             "stringArray",
             "artifactLease",
+            "artifactLeaseArray",
             "artifactReference"
           ]
         },

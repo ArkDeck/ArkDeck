@@ -63,6 +63,8 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
       var traceListing: String?
       /// hitrace's own exit status, which the verdict must ignore.
       var traceExit: Int32 = 0
+      /// Whether the staged package directory survives its cleanup.
+      var stagedDirectoryRemains = false
       /// The `ls -l` line the device answers for the component tree file.
       var uiTreeListing: String?
       /// Bytes the simulated `file recv` leaves for the component tree leg.
@@ -193,6 +195,43 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
           throw RuntimeDispatchFailure.outcomeUnknown("cleanup completion is unobservable")
         }
         return receipt("", exit: script.cleanupExit)
+      case .sendPackageSetToStaging(let set):
+        note("sendPackageSet")
+        func sub(_ stdout: String, exit: Int32 = 0) -> ProviderSubprocessReceipt {
+          ProviderSubprocessReceipt(
+            exitStatus: exit, stdout: Data(stdout.utf8), stderr: Data(),
+            stdoutTruncated: false, durationSeconds: 0.01)
+        }
+        return ProviderProcessReceipt(
+          exitStatus: 0, stdout: Data(), stderr: Data(),
+          stdoutTruncated: false, durationSeconds: 0.05,
+          subprocesses: [sub("")] + set.packages.map { _ in sub("FileTransfer finish") })
+      case .installPackageSet:
+        note("installPackageSet")
+        return receipt("install bundle", exit: script.installExit)
+      case .cleanupStagedPackageSet(let set):
+        note("cleanupPackageSet")
+        func sub(_ stdout: String, exit: Int32 = 0) -> ProviderSubprocessReceipt {
+          ProviderSubprocessReceipt(
+            exitStatus: exit, stdout: Data(stdout.utf8), stderr: Data(),
+            stdoutTruncated: false, durationSeconds: 0.01)
+        }
+        // Exactly the two shapes `pathPresence` reads: an `ls -ld` line, or
+        // the single-line absence message. `hdc shell` returns exit 0 either
+        // way, which is why neither shape may depend on the status.
+        let listing =
+          script.stagedDirectoryRemains
+          ? sub("drwxr-xr-x 2 shell shell 3452 2026-07-31 00:00 \(set.directory.remotePath)\n")
+          : sub("ls: \(set.directory.remotePath): No such file or directory\n")
+        return ProviderProcessReceipt(
+          exitStatus: 0, stdout: Data(), stderr: Data(),
+          stdoutTruncated: false, durationSeconds: 0.05,
+          subprocesses: set.packages.map { _ in sub("") } + [sub(""), listing])
+      case .readOwnedDirectoryPresence(let directory):
+        note("reconcileDirectoryPresence")
+        return script.stagedDirectoryRemains
+          ? receipt("drwxr-xr-x 2 shell shell 3452 2026-07-31 00:00 \(directory.remotePath)\n")
+          : receipt("ls: \(directory.remotePath): No such file or directory\n")
       case .sendArtifactToStaging:
         note("sendArtifact")
         if script.sendOutcomeUnknown {
@@ -1742,5 +1781,85 @@ extension DiagnosticsAndHAPContractTests {
     } catch {}
     XCTAssertTrue(dispatcher.dispatchedActions.filter { $0 == "uninstallPackage" }.count == 1,
       "the refusal must not dispatch a second uninstall")
+  }
+}
+
+// MARK: - CHG-2026-049 r4: multi-package leases
+
+extension DiagnosticsAndHAPContractTests {
+  /// DHA-MULTI-002: a set is not a weaker check. Every additional lease goes
+  /// through the same binding validation as the entry package, and one that
+  /// belongs to another target stops the job before anything is dispatched.
+  func testAdditionalLeaseBoundToAnotherTargetStopsBeforeDispatch() async throws {
+    let dispatcher = ScriptedDispatcher()
+    let (engine, capabilities, artifacts) = try makeEngine(dispatcher: dispatcher)
+    let entryLease = try await publishHAPLease(artifacts)
+    let foreign = try await artifacts.publish(
+      RuntimeArtifactPublicationRequest(
+        jobID: "job-input-foreign", sessionID: "session-input-foreign",
+        stepID: "publish-hap", name: "feature.hap",
+        mediaType: "application/octet-stream", privacy: .standard,
+        retentionClass: .pinnedUntilVerified,
+        sourceOperation: "build.hap@1", providerID: "host",
+        bindingSnapshot: ArtifactBindingSnapshot(
+          targetID: "TGT-OTHER", bindingRevision: 7,
+          stableIdentitySHA256: String(repeating: "e", count: 64)),
+        contents: Data("foreign-feature".utf8)))
+    let foreignLease = try await artifacts.leaseReference(
+      jobID: foreign.jobID, artifactID: foreign.artifactID)
+    try await installE1Capability(capabilities)
+
+    do {
+      _ = try await engine.submit(
+        hapRequest(
+          lease: entryLease, key: "idem-multi-foreign",
+          extraInputs: ",\n          \"additionalHapArtifactLeases\": [\"\(foreignLease)\"]"))
+      XCTFail("a lease bound to another target must not be admitted")
+    } catch let error as RuntimeJobEngineError {
+      guard case .rejected(let code, _) = error else {
+        return XCTFail("expected a rejection, got \(error)")
+      }
+      XCTAssertEqual(code, .invalidInput)
+    }
+    // Refused before authorization: nothing dispatched, nothing consumed.
+    XCTAssertTrue(dispatcher.dispatchedActions.isEmpty)
+    let issued = try await capabilities.inspect(capabilityID: "CAP-RT-HAP-001")
+    XCTAssertEqual(issued?.consumptionCount, 0)
+  }
+
+  /// The positive shape: two matching leases send in order into one
+  /// directory, install once, and clean up to nothing.
+  func testMatchingLeasesSendInOrderAndInstallOnce() async throws {
+    let dispatcher = ScriptedDispatcher()
+    let (engine, capabilities, artifacts) = try makeEngine(dispatcher: dispatcher)
+    let entryLease = try await publishHAPLease(artifacts)
+    let feature = try await artifacts.publish(
+      RuntimeArtifactPublicationRequest(
+        jobID: "job-input-hap", sessionID: "session-input-hap",
+        stepID: "publish-hap", name: "feature1.hap",
+        mediaType: "application/octet-stream", privacy: .standard,
+        retentionClass: .pinnedUntilVerified,
+        sourceOperation: "build.hap@1", providerID: "host",
+        bindingSnapshot: ArtifactBindingSnapshot(
+          targetID: "TGT-1", bindingRevision: 7,
+          stableIdentitySHA256:
+            "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1"),
+        contents: Data("feature-module".utf8)))
+    let featureLease = try await artifacts.leaseReference(
+      jobID: feature.jobID, artifactID: feature.artifactID)
+    try await installE1Capability(capabilities)
+
+    let acceptance = try await engine.submit(
+      hapRequest(
+        lease: entryLease, key: "idem-multi-ok",
+        extraInputs: ",\n          \"additionalHapArtifactLeases\": [\"\(featureLease)\"]"))
+    let status = try await engine.run(jobID: acceptance.jobID)
+    XCTAssertEqual(status.state, "succeeded", status.timeline.joined(separator: " | "))
+    XCTAssertTrue(dispatcher.dispatchedActions.contains("sendPackageSet"))
+    XCTAssertTrue(dispatcher.dispatchedActions.contains("installPackageSet"))
+    XCTAssertTrue(dispatcher.dispatchedActions.contains("cleanupPackageSet"))
+    XCTAssertFalse(
+      dispatcher.dispatchedActions.contains("sendArtifact"),
+      "the single-package leg must not also run")
   }
 }

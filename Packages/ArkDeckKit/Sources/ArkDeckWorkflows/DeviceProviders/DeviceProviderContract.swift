@@ -39,6 +39,13 @@ public enum HDCProviderAction: Sendable, Equatable {
   // by their paired readback, never by the mutation's own exit code.
   case sendArtifactToStaging(HDCStagedArtifact)
   case installPackage(HDCStagedArtifact, bundle: HDCBundleReference)
+  // Multi-package install (CHG-2026-049 r4). Separate cases rather than an
+  // optional field on the single ones: a set has a directory to create and
+  // to remove, and conflating the two shapes is how a single-package plan
+  // would start drifting.
+  case sendPackageSetToStaging(HDCStagedPackageSet)
+  case installPackageSet(HDCStagedPackageSet, bundle: HDCBundleReference)
+  case cleanupStagedPackageSet(HDCStagedPackageSet)
   case queryPackageReadback(HDCBundleReference)
   case startAbility(HDCAbilityReference)
   case verifyProcessState(HDCBundleReference)
@@ -64,6 +71,7 @@ public enum HDCProviderAction: Sendable, Equatable {
   case readPackagePresence(HDCBundleReference)
   case readProcessPresence(HDCBundleReference)
   case readOwnedPathPresence(HDCOwnedRemotePath)
+  case readOwnedDirectoryPresence(HDCOwnedRemoteDirectory)
   case readPortForwardPresence(HDCPortForwardSpec)
 }
 
@@ -158,11 +166,14 @@ public enum TypedProviderAction: Sendable, Equatable {
     case .hdc(.queryPackageReadback), .hdc(.verifyProcessState):
       return .readOnly
     case .hdc(.readPackagePresence), .hdc(.readProcessPresence),
-      .hdc(.readOwnedPathPresence), .hdc(.readPortForwardPresence),
+      .hdc(.readOwnedPathPresence), .hdc(.readOwnedDirectoryPresence),
+      .hdc(.readPortForwardPresence),
       .hdc(.inspectNativeLibrary):
       return .readOnly
     case .hdc(.captureTrace), .hdc(.captureComponentTree), .hdc(.cleanupOwnedRemotePath),
       .hdc(.sendArtifactToStaging), .hdc(.installPackage), .hdc(.startAbility),
+      .hdc(.sendPackageSetToStaging), .hdc(.installPackageSet),
+      .hdc(.cleanupStagedPackageSet),
       .hdc(.stopAbility), .hdc(.uninstallPackage), .hdc(.createPortForward),
       .hdc(.removePortForward), .hdc(.sendNativeLibraryToStaging),
       .hdc(.backupNativeLibrary), .hdc(.publishNativeLibrary),
@@ -203,6 +214,22 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
     }
     func optional(_ value: String?, into arguments: inout [String: JSONValue], key: String) {
       if let value { arguments[key] = .string(value) }
+    }
+    func packageSetArguments(_ set: HDCStagedPackageSet) -> [String: JSONValue] {
+      [
+        "jobId": .string(set.directory.jobID),
+        "stepId": .string(set.directory.stepID),
+        "nonce": .string(set.directory.nonce),
+        "directoryPath": .string(set.directory.remotePath),
+        "packages": .array(
+          set.packages.map { package in
+            .object([
+              "remotePath": .string(package.remotePath),
+              "artifactLeaseId": .string(package.artifactLeaseID),
+              "sha256": package.expectedSHA256.map(JSONValue.string) ?? .null,
+            ])
+          }),
+      ]
     }
     func nativeArguments(
       _ deployment: HDCAppOwnedNativeLibraryDeployment
@@ -320,6 +347,23 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
       arguments["artifactLeaseId"] = .string(artifact.artifactLeaseID)
       optional(artifact.expectedSHA256, into: &arguments, key: "expectedSha256")
       self.init(kind: "hdc.sendArtifactToStaging", arguments: arguments)
+    case .hdc(.sendPackageSetToStaging(let set)):
+      self.init(kind: "hdc.sendPackageSetToStaging", arguments: packageSetArguments(set))
+    case .hdc(.installPackageSet(let set, let bundle)):
+      var arguments = packageSetArguments(set)
+      arguments["bundleName"] = .string(bundle.bundleName)
+      self.init(kind: "hdc.installPackageSet", arguments: arguments)
+    case .hdc(.cleanupStagedPackageSet(let set)):
+      self.init(kind: "hdc.cleanupStagedPackageSet", arguments: packageSetArguments(set))
+    case .hdc(.readOwnedDirectoryPresence(let directory)):
+      self.init(
+        kind: "hdc.readOwnedDirectoryPresence",
+        arguments: [
+          "jobId": .string(directory.jobID),
+          "stepId": .string(directory.stepID),
+          "nonce": .string(directory.nonce),
+          "directoryPath": .string(directory.remotePath),
+        ])
     case .hdc(.installPackage(let artifact, let bundle)):
       var arguments = pathArguments(artifact.path)
       arguments["artifactLeaseId"] = .string(artifact.artifactLeaseID)
@@ -555,6 +599,33 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
         path: try path(), artifactLeaseID: try string("artifactLeaseId"),
         expectedSHA256: try optionalString("expectedSha256"))
     }
+    func packageSet() throws -> HDCStagedPackageSet {
+      let directory = try HDCOwnedRemoteDirectory(
+        jobID: string("jobId"), stepID: string("stepId"), nonce: string("nonce"))
+      guard case .array(let raw)? = arguments["packages"] else {
+        throw DeviceProviderError.unsupportedAction(
+          "persisted \(kind) carries no staged package list")
+      }
+      var packages: [HDCStagedPackage] = []
+      for entry in raw {
+        guard case .object(let fields) = entry,
+          case .string(let remotePath)? = fields["remotePath"],
+          case .string(let lease)? = fields["artifactLeaseId"],
+          let artifactID = remotePath.split(separator: "/").last?
+            .replacingOccurrences(of: ".hap", with: "")
+        else {
+          throw DeviceProviderError.unsupportedAction(
+            "persisted \(kind) carries a malformed staged package")
+        }
+        var sha: String?
+        if case .string(let value)? = fields["sha256"] { sha = value }
+        packages.append(
+          try HDCStagedPackage(
+            directory: directory, artifactID: String(artifactID),
+            artifactLeaseID: lease, expectedSHA256: sha))
+      }
+      return try HDCStagedPackageSet(directory: directory, packages: packages)
+    }
     func nativeDeployment() throws -> HDCAppOwnedNativeLibraryDeployment {
       guard let abi = HDCNativeLibraryABI(rawValue: try string("abi")),
         let restart = HDCNativeRestartProfile(rawValue: try string("restartProfile")),
@@ -701,6 +772,17 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
       return .hdc(.sendArtifactToStaging(try staged()))
     case "hdc.installPackage":
       return .hdc(.installPackage(try staged(), bundle: try bundle()))
+    case "hdc.sendPackageSetToStaging":
+      return .hdc(.sendPackageSetToStaging(try packageSet()))
+    case "hdc.installPackageSet":
+      return .hdc(.installPackageSet(try packageSet(), bundle: try bundle()))
+    case "hdc.cleanupStagedPackageSet":
+      return .hdc(.cleanupStagedPackageSet(try packageSet()))
+    case "hdc.readOwnedDirectoryPresence":
+      return .hdc(
+        .readOwnedDirectoryPresence(
+          try HDCOwnedRemoteDirectory(
+            jobID: string("jobId"), stepID: string("stepId"), nonce: string("nonce"))))
     case "hdc.queryPackageReadback":
       return .hdc(.queryPackageReadback(try bundle()))
     case "hdc.startAbility":
@@ -1119,6 +1201,10 @@ public struct ProviderExecutionContext: Sendable, Equatable {
   public let toolSHA256: String?
   public let nowUTC: String
   public let resolvedInputArtifact: ProviderResolvedInputArtifact?
+  /// Further packages of a multi-package install, in the caller's order.
+  /// Empty for every single-package request, which is what keeps those
+  /// plans byte-identical (CHG-2026-049 r4).
+  public let additionalInputArtifacts: [ProviderResolvedInputArtifact]
 
   public init(
     jobID: String,
@@ -1130,7 +1216,8 @@ public struct ProviderExecutionContext: Sendable, Equatable {
     toolVersion: String? = nil,
     toolSHA256: String? = nil,
     nowUTC: String,
-    resolvedInputArtifact: ProviderResolvedInputArtifact? = nil
+    resolvedInputArtifact: ProviderResolvedInputArtifact? = nil,
+    additionalInputArtifacts: [ProviderResolvedInputArtifact] = []
   ) {
     self.jobID = jobID
     self.stepID = stepID
@@ -1142,6 +1229,7 @@ public struct ProviderExecutionContext: Sendable, Equatable {
     self.toolSHA256 = toolSHA256
     self.nowUTC = nowUTC
     self.resolvedInputArtifact = resolvedInputArtifact
+    self.additionalInputArtifacts = additionalInputArtifacts
   }
 }
 
