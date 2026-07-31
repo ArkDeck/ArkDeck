@@ -2004,12 +2004,19 @@ public actor RuntimeJobEngine {
     summary: [String: String],
     receipt: ProviderProcessReceipt
   ) async throws {
-    guard let artifactStore, let runtime = jobs[jobID],
+    guard let runtime = jobs[jobID],
       let descriptor = RuntimeOperationCatalog.descriptor(
         reference: runtime.record.operationReference)
     else { return }
     guard let mapping = Self.artifactMapping[descriptor.reference]?[step.stepID] else {
       return  // this step owns no declared product
+    }
+    guard let artifactStore else {
+      if descriptor.reference == "flash.dayu200@1" {
+        throw RuntimeArtifactPublicationFailure(
+          detail: "Artifact store is required for \(descriptor.reference)")
+      }
+      return
     }
     let binding = Self.artifactBindingSnapshot(for: runtime.record)
     for name in mapping {
@@ -2208,12 +2215,17 @@ public actor RuntimeJobEngine {
       "atomic-publish": ["publish-report.json"],
       "verify-loaded-library": ["verification-report.json"],
     ],
+    "flash.dayu200@1": [
+      "rebind-and-verify-build": ["post-flash-facts.json"],
+      "capture-post-flash-diagnostics": ["post-flash-hilog.txt"],
+    ],
   ]
 
   /// Products the engine synthesises at finalize time rather than from a
   /// single step: the index and summary describe the run as a whole.
   static let finalizeArtifacts: [String: [String]] = [
-    "capture.diagnostics@1": ["artifact-index.json", "capture-summary.json"]
+    "capture.diagnostics@1": ["artifact-index.json", "capture-summary.json"],
+    "flash.dayu200@1": ["flash-report.json"],
   ]
 
   /// Writes the run-level index and summary. The summary states every
@@ -2223,9 +2235,16 @@ public actor RuntimeJobEngine {
   private func publishFinalizeArtifacts(
     jobID: String, descriptor: CatalogOperationDescriptor
   ) async throws {
-    guard let artifactStore, let runtime = jobs[jobID],
+    guard let runtime = jobs[jobID],
       let names = Self.finalizeArtifacts[descriptor.reference]
     else { return }
+    guard let artifactStore else {
+      if descriptor.reference == "flash.dayu200@1" {
+        throw RuntimeArtifactPublicationFailure(
+          detail: "Artifact store is required for \(descriptor.reference)")
+      }
+      return
+    }
     let binding = Self.artifactBindingSnapshot(for: runtime.record)
 
     // Backstop: every declared product that never reached the index gets
@@ -2263,65 +2282,21 @@ public actor RuntimeJobEngine {
         detail: "cannot reopen Artifact index during finalization: \(error)")
     }
 
-    var perArtifact: [String: JSONValue] = [:]
-    for declaration in descriptor.artifacts where !names.contains(declaration.name) {
-      let match = recorded.first { $0.name == declaration.name }
-      let state: String
-      var detail: String?
-      switch match?.status {
-      case .some(.published): state = "published"
-      case .some(.missing(let reason)):
-        state = "missing"
-        detail = reason
-      case .some(.truncated(let atBytes)):
-        state = "truncated"
-        detail = "at \(atBytes) bytes"
-      case nil:
-        state = "missing"
-        detail = "never produced"
-      }
-      var entry: [String: JSONValue] = [
-        "status": .string(state),
-        "required": .bool(declaration.isRequired),
-      ]
-      if let detail { entry["detail"] = .string(detail) }
-      if let match, match.status.isPublished {
-        entry["artifactId"] = .string(match.artifactID)
-        entry["byteCount"] = .integer(Int64(match.byteCount))
-      }
-      perArtifact[declaration.name] = .object(entry)
-    }
-
     let missingRequired = descriptor.artifacts.filter { declaration in
       guard declaration.isRequired, !names.contains(declaration.name) else { return false }
       return recorded.first { $0.name == declaration.name }?.status.isPublished != true
     }
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .prettyPrinted, .withoutEscapingSlashes]
 
     for name in names {
       guard let declaration = descriptor.artifacts.first(where: { $0.name == name }) else {
         continue
       }
-      let payload: [String: JSONValue]
-      if name.contains("index") {
-        payload = [
-          "operation": .string(descriptor.reference),
-          "jobId": .string(jobID),
-          "artifacts": .object(perArtifact),
-        ]
-      } else {
-        payload = [
-          "operation": .string(descriptor.reference),
-          "jobId": .string(jobID),
-          "completeness": .string(missingRequired.isEmpty ? "complete" : "incomplete"),
-          "missingRequired": .array(missingRequired.map { .string($0.name) }),
-          "artifacts": .object(perArtifact),
-        ]
-      }
       let contents: Data
       do {
-        contents = try encoder.encode(payload)
+        contents = try Self.finalArtifactContents(
+          name: name, descriptor: descriptor, record: runtime.record,
+          recorded: recorded, finalizeArtifactNames: names,
+          completedStepIDs: runtime.completedStepIDs)
       } catch {
         throw RuntimeArtifactPublicationFailure(
           detail: "cannot encode final Artifact \(name): \(error)")
@@ -2366,10 +2341,87 @@ public actor RuntimeJobEngine {
       appendTimeline(
         jobID: jobID,
         entry: "incomplete: missing required \(missingRequired.map(\.name).sorted())")
+      if descriptor.reference == "flash.dayu200@1" {
+        throw RuntimeArtifactPublicationFailure(
+          detail: "required Flash artifacts are missing: "
+            + missingRequired.map(\.name).sorted().joined(separator: ", "))
+      }
     }
   }
 
-  private static func artifactContents(
+  static func finalArtifactContents(
+    name: String,
+    descriptor: CatalogOperationDescriptor,
+    record: RuntimeJobRecord,
+    recorded: [RuntimeArtifactMetadata],
+    finalizeArtifactNames: [String],
+    completedStepIDs: Set<String>
+  ) throws -> Data {
+    var perArtifact: [String: JSONValue] = [:]
+    for declaration in descriptor.artifacts
+    where !finalizeArtifactNames.contains(declaration.name) {
+      let match = recorded.first { $0.name == declaration.name }
+      let state: String
+      var detail: String?
+      switch match?.status {
+      case .some(.published): state = "published"
+      case .some(.missing(let reason)):
+        state = "missing"
+        detail = reason
+      case .some(.truncated(let atBytes)):
+        state = "truncated"
+        detail = "at \(atBytes) bytes"
+      case nil:
+        state = "missing"
+        detail = "never produced"
+      }
+      var entry: [String: JSONValue] = [
+        "status": .string(state),
+        "required": .bool(declaration.isRequired),
+      ]
+      if let detail { entry["detail"] = .string(detail) }
+      if let match, match.status.isPublished {
+        entry["artifactId"] = .string(match.artifactID)
+        entry["byteCount"] = .integer(Int64(match.byteCount))
+        entry["sha256"] = .string(match.sha256)
+      }
+      perArtifact[declaration.name] = .object(entry)
+    }
+    let missingRequired = descriptor.artifacts.filter { declaration in
+      guard declaration.isRequired,
+        !finalizeArtifactNames.contains(declaration.name)
+      else { return false }
+      return recorded.first { $0.name == declaration.name }?.status.isPublished != true
+    }
+    var payload: [String: JSONValue] = [
+      "operation": .string(descriptor.reference),
+      "jobId": .string(record.jobID),
+      "artifacts": .object(perArtifact),
+    ]
+    if !name.contains("index") {
+      payload["completeness"] = .string(
+        missingRequired.isEmpty ? "complete" : "incomplete")
+      payload["missingRequired"] = .array(
+        missingRequired.map { .string($0.name) })
+    }
+    if descriptor.reference == "flash.dayu200@1" {
+      appendFlashArtifactLineage(to: &payload, record: record)
+      payload["verifiedSteps"] = .array(
+        completedStepIDs.sorted().map { .string($0) })
+      var requestFields: [String: JSONValue] = [:]
+      for key in ["deviceProfile", "partitionPlan", "postFlashVerification"] {
+        if let value = record.request.inputs[key] {
+          requestFields[key] = value
+        }
+      }
+      payload["request"] = .object(requestFields)
+    }
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys, .prettyPrinted, .withoutEscapingSlashes]
+    return try encoder.encode(payload)
+  }
+
+  static func artifactContents(
     name: String,
     summary: [String: String],
     receipt: ProviderProcessReceipt,
@@ -2386,7 +2438,8 @@ public actor RuntimeJobEngine {
       var output = receipt.stdout
       output.append(receipt.stderr)
       return output
-    case "hilog.txt", "ui-dump.json", "debug-hilog.txt", "crash-index.txt", "crash-log.txt":
+    case "hilog.txt", "ui-dump.json", "debug-hilog.txt", "post-flash-hilog.txt",
+      "crash-index.txt", "crash-log.txt":
       // Raw capture products are the bounded provider bytes themselves.
       // Encoding only the semantic byteCount here would fabricate a log
       // artifact while discarding the evidence the operation captured.
@@ -2404,9 +2457,6 @@ public actor RuntimeJobEngine {
       "jobId": .string(record.jobID),
       "catalogDigest": .string(record.catalogDigest),
     ]
-    for (key, value) in summary {
-      fields[key] = .string(value)
-    }
     if let observation = record.evidenceObservation {
       if let model = observation.model { fields["model"] = .string(model) }
       if let firmware = observation.firmware { fields["firmware"] = .string(firmware) }
@@ -2415,15 +2465,52 @@ public actor RuntimeJobEngine {
         fields["stableIdentitySha256"] = .string(identity)
       }
     }
+    // The verified step's summary is the product being published. It must
+    // win over the admission-time observation for post-mutation facts.
+    for (key, value) in summary {
+      fields[key] = .string(value)
+    }
     if name == "binding-snapshot.json" {
       fields["targetId"] = .string(record.request.target.targetID)
       if let revision = record.request.target.expectedBindingRevision {
         fields["expectedBindingRevision"] = .integer(Int64(revision))
       }
     }
+    if descriptor.reference == "flash.dayu200@1" {
+      appendFlashArtifactLineage(to: &fields, record: record)
+    }
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.sortedKeys, .prettyPrinted, .withoutEscapingSlashes]
     return (try? encoder.encode(fields)) ?? Data("{}".utf8)
+  }
+
+  private static func appendFlashArtifactLineage(
+    to fields: inout [String: JSONValue], record: RuntimeJobRecord
+  ) {
+    fields["catalogDigest"] = .string(record.catalogDigest)
+    fields["providerId"] = .string(record.providerID)
+    fields["targetId"] = .string(record.request.target.targetID)
+    if let revision = record.request.target.expectedBindingRevision {
+      fields["expectedBindingRevision"] = .integer(Int64(revision))
+    }
+    if let identity = record.evidenceObservation?.stableIdentitySHA256
+      ?? record.materializedStableTargetIdentitySHA256
+    {
+      fields["stableIdentitySha256"] = .string(identity)
+    }
+    if let digest = record.materializedPlanDigest {
+      fields["materializedPlanDigest"] = .string(digest)
+    }
+    if let evidence = record.admissionEvidence {
+      var authority: [String: JSONValue] = [
+        "kind": .string(evidence.kind.rawValue),
+        "reference": .string(evidence.reference),
+      ]
+      if let fingerprint = evidence.consumptionFingerprintSHA256 {
+        authority["consumptionFingerprintSha256"] = .string(fingerprint)
+      }
+      fields["authority"] = .object(authority)
+    }
   }
 
   private static func artifactBindingSnapshot(
