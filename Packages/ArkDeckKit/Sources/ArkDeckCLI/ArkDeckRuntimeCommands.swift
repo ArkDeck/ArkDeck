@@ -296,10 +296,13 @@ enum RuntimeCLI {
       let request = try RuntimeOperationRequest(
         requestID: "agent-request-\(executionID)",
         idempotencyKey: "agent-execution-\(executionID)",
-        target: DurableTargetReference(
+        target: try RuntimeOperationRequest.capabilityDraftTarget(
           targetID: rest[targetIndex + 1],
-          expectedBindingRevision: try bindingRevision(
-            targetID: rest[targetIndex + 1], client: client)),
+          operationID: String(operationParts[0]),
+          version: operationVersion,
+          currentDeviceBindingRevision: {
+            try bindingRevision(targetID: rest[targetIndex + 1], client: client)
+          }),
         operation: RuntimeOperationReference(
           id: String(operationParts[0]), version: operationVersion),
         inputs: inputs)

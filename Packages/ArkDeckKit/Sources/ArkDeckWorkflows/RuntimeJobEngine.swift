@@ -188,8 +188,11 @@ public struct RuntimeCapabilityDraft: Sendable, Equatable, Codable {
   public let requestFingerprintSHA256: String
   public let operationReference: String
   public let targetID: String
-  public let bindingRevision: Int
-  public let stableIdentitySHA256: String
+  public let bindingRevision: Int?
+  public let stableIdentitySHA256: String?
+  public let workspaceIdentitySHA256: String?
+  public let workspaceRevision: String?
+  public let workspaceFileScopesDigest: String?
   public let materializedPlanDigest: String
   public let catalogDigest: String
 
@@ -200,8 +203,11 @@ public struct RuntimeCapabilityDraft: Sendable, Equatable, Codable {
     requestFingerprintSHA256: String,
     operationReference: String,
     targetID: String,
-    bindingRevision: Int,
-    stableIdentitySHA256: String,
+    bindingRevision: Int?,
+    stableIdentitySHA256: String?,
+    workspaceIdentitySHA256: String? = nil,
+    workspaceRevision: String? = nil,
+    workspaceFileScopesDigest: String? = nil,
     materializedPlanDigest: String,
     catalogDigest: String
   ) {
@@ -213,8 +219,57 @@ public struct RuntimeCapabilityDraft: Sendable, Equatable, Codable {
     self.targetID = targetID
     self.bindingRevision = bindingRevision
     self.stableIdentitySHA256 = stableIdentitySHA256
+    self.workspaceIdentitySHA256 = workspaceIdentitySHA256
+    self.workspaceRevision = workspaceRevision
+    self.workspaceFileScopesDigest = workspaceFileScopesDigest
     self.materializedPlanDigest = materializedPlanDigest
     self.catalogDigest = catalogDigest
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case capability, requestID, idempotencyKey, requestFingerprintSHA256
+    case operationReference, targetID, bindingRevision, stableIdentitySHA256
+    case workspaceIdentitySHA256, workspaceRevision, workspaceFileScopesDigest
+    case materializedPlanDigest, catalogDigest
+  }
+
+  public init(from decoder: any Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    capability = try container.decode(RuntimeCapability.self, forKey: .capability)
+    requestID = try container.decode(String.self, forKey: .requestID)
+    idempotencyKey = try container.decode(String.self, forKey: .idempotencyKey)
+    requestFingerprintSHA256 = try container.decode(
+      String.self, forKey: .requestFingerprintSHA256)
+    operationReference = try container.decode(String.self, forKey: .operationReference)
+    targetID = try container.decode(String.self, forKey: .targetID)
+    bindingRevision = try container.decodeIfPresent(Int.self, forKey: .bindingRevision)
+    stableIdentitySHA256 = try container.decodeIfPresent(
+      String.self, forKey: .stableIdentitySHA256)
+    workspaceIdentitySHA256 = try container.decodeIfPresent(
+      String.self, forKey: .workspaceIdentitySHA256)
+    workspaceRevision = try container.decodeIfPresent(String.self, forKey: .workspaceRevision)
+    workspaceFileScopesDigest = try container.decodeIfPresent(
+      String.self, forKey: .workspaceFileScopesDigest)
+    materializedPlanDigest = try container.decode(String.self, forKey: .materializedPlanDigest)
+    catalogDigest = try container.decode(String.self, forKey: .catalogDigest)
+  }
+
+  public func encode(to encoder: any Encoder) throws {
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    try container.encode(capability, forKey: .capability)
+    try container.encode(requestID, forKey: .requestID)
+    try container.encode(idempotencyKey, forKey: .idempotencyKey)
+    try container.encode(requestFingerprintSHA256, forKey: .requestFingerprintSHA256)
+    try container.encode(operationReference, forKey: .operationReference)
+    try container.encode(targetID, forKey: .targetID)
+    try container.encodeIfPresent(bindingRevision, forKey: .bindingRevision)
+    try container.encodeIfPresent(stableIdentitySHA256, forKey: .stableIdentitySHA256)
+    try container.encodeIfPresent(workspaceIdentitySHA256, forKey: .workspaceIdentitySHA256)
+    try container.encodeIfPresent(workspaceRevision, forKey: .workspaceRevision)
+    try container.encodeIfPresent(
+      workspaceFileScopesDigest, forKey: .workspaceFileScopesDigest)
+    try container.encode(materializedPlanDigest, forKey: .materializedPlanDigest)
+    try container.encode(catalogDigest, forKey: .catalogDigest)
   }
 }
 
@@ -597,19 +652,53 @@ public actor RuntimeJobEngine {
     let materialized = try await materializeTypedPlanBeforeAuthorization(
       request: authorizedRequest, descriptor: descriptor,
       jobID: Self.authorizationPlanJobID)
-    guard let draftIdentity = materialized.stableTargetIdentitySHA256,
-      let draftBindingRevision = materialized.bindingRevision
-    else {
+    let query = try authorizationQuery(
+      request: authorizedRequest, descriptor: descriptor,
+      effect: effect, materialized: materialized)
+    let targetScope: RuntimeCapabilityTargetScope
+    let draftBindingRevision: Int?
+    let draftIdentity: String?
+    let workspaceIdentity: String?
+    let workspaceRevision: String?
+    let workspaceScopes: String?
+    if let identity = query.targetStableIdentitySHA256,
+      let bindingRevision = query.targetBindingRevision
+    {
+      targetScope = .stablePhysicalIdentity(sha256: identity)
+      draftBindingRevision = bindingRevision
+      draftIdentity = identity
+      workspaceIdentity = nil
+      workspaceRevision = nil
+      workspaceScopes = nil
+    } else if let identity = query.workspaceIdentitySHA256,
+      let revision = query.workspaceRevision,
+      let scopes = query.workspaceFileScopesDigest
+    {
+      // A standing grant names the tree and its maximum writable scopes, but
+      // does not pin the tree to the revision at draft time: patch, build,
+      // test and revert each move it. The review payload still carries the
+      // observed revision below, and an operation request that declares
+      // `expectedWorkspaceRevision` remains exactly constrained by its typed
+      // input (TASK-HFA-009 r3).
+      targetScope = .workspaceIdentity(
+        sha256: identity, expectedWorkspaceRevision: "",
+        allowedFileScopesDigest: scopes)
+      draftBindingRevision = nil
+      draftIdentity = nil
+      workspaceIdentity = identity
+      workspaceRevision = revision
+      workspaceScopes = scopes
+    } else {
       throw RuntimeJobEngineError.rejected(
         .invalidRequest,
-        "\(descriptor.reference) is host-only: it is gated by the default read-only policy "
-          + "and has no device to scope a capability to")
+        "\(descriptor.reference) has neither a device nor a workspace subject "
+          + "to scope a capability to")
     }
     let capability: RuntimeCapability
     do {
       capability = try RuntimeCapability(
         capabilityID: capabilityID,
-        targetScope: .stablePhysicalIdentity(sha256: draftIdentity),
+        targetScope: targetScope,
         operationScope: [
           RuntimeCapabilityOperationScope(
             operationID: descriptor.id, version: descriptor.version)
@@ -636,6 +725,9 @@ public actor RuntimeJobEngine {
       targetID: request.target.targetID,
       bindingRevision: draftBindingRevision,
       stableIdentitySHA256: draftIdentity,
+      workspaceIdentitySHA256: workspaceIdentity,
+      workspaceRevision: workspaceRevision,
+      workspaceFileScopesDigest: workspaceScopes,
       materializedPlanDigest: materialized.planDigest,
       catalogDigest: RuntimeOperationCatalog.catalogDigest)
   }
@@ -3869,6 +3961,54 @@ public actor RuntimeJobEngine {
     }
   }
 
+  /// Builds the single authorization subject used by drafting, submit-time
+  /// validation and dispatch-time revalidation. Keeping the device/workspace
+  /// split in one place prevents the operator draft surface from lagging the
+  /// admission surface again (TASK-HFA-009 r3).
+  private func authorizationQuery(
+    request: RuntimeOperationRequest,
+    descriptor: CatalogOperationDescriptor,
+    effect: WorkflowEffect,
+    materialized: MaterializedAdmission
+  ) throws -> RuntimeCapabilityAuthorizationQuery {
+    if let identity = materialized.stableTargetIdentitySHA256,
+      let bindingRevision = materialized.bindingRevision
+    {
+      return RuntimeCapabilityAuthorizationQuery(
+        operationID: descriptor.id,
+        operationVersion: descriptor.version,
+        effect: effect,
+        targetStableIdentitySHA256: identity,
+        targetBindingRevision: bindingRevision,
+        planDigest: materialized.planDigest,
+        inputs: request.inputs)
+    }
+
+    // A workspace mutation above read-only has no device to name. The
+    // provider owns the tree identity, current revision and maximum writable
+    // scopes; an absent fact is a refusal, never a generic host grant.
+    guard let provider = providers.provider(id: descriptor.provider.rawValue),
+      let workspace = try provider.workspaceAuthorizationFacts(
+        for: descriptor, inputs: request.inputs)
+    else {
+      throw RuntimeJobEngineError.rejected(
+        .authorizationRequired,
+        "\(descriptor.reference) has neither a device binding nor workspace facts "
+          + "to authorize effect \(effect.rawValue)")
+    }
+    return RuntimeCapabilityAuthorizationQuery(
+      operationID: descriptor.id,
+      operationVersion: descriptor.version,
+      effect: effect,
+      targetStableIdentitySHA256: nil,
+      targetBindingRevision: nil,
+      planDigest: materialized.planDigest,
+      inputs: request.inputs,
+      workspaceIdentitySHA256: workspace.identitySHA256,
+      workspaceRevision: workspace.revision,
+      workspaceFileScopesDigest: workspace.fileScopesDigest)
+  }
+
   /// Performs every pure authorization check at submit, after the complete
   /// typed plan has materialized. Published E1 operations with default policy
   /// issuance enabled receive a deterministic runtime-owned capability when
@@ -3912,45 +4052,9 @@ public actor RuntimeJobEngine {
         .authorizationRequired,
         "catalog has no authorization policy for effect \(effect.rawValue)")
     }
-    let query: RuntimeCapabilityAuthorizationQuery
-    if let queryIdentity = materialized.stableTargetIdentitySHA256,
-      let queryBindingRevision = materialized.bindingRevision
-    {
-      query = RuntimeCapabilityAuthorizationQuery(
-        operationID: descriptor.id,
-        operationVersion: descriptor.version,
-        effect: effect,
-        targetStableIdentitySHA256: queryIdentity,
-        targetBindingRevision: queryBindingRevision,
-        planDigest: materialized.planDigest,
-        inputs: request.inputs)
-    } else {
-      // A workspace mutation above read-only (CHG-2026-055, TASK-HFA-009 r2).
-      // It has no device to name, so the capability is matched against the
-      // tree instead: which workspace, at which revision, with which writable
-      // scopes. The provider owns those facts; the engine refuses rather than
-      // authorize a change to a workspace it cannot identify.
-      guard let provider = providers.provider(id: descriptor.provider.rawValue),
-        let workspace = try provider.workspaceAuthorizationFacts(
-          for: descriptor, inputs: request.inputs)
-      else {
-        throw RuntimeJobEngineError.rejected(
-          .authorizationRequired,
-          "\(descriptor.reference) has neither a device binding nor workspace facts "
-            + "to authorize effect \(effect.rawValue)")
-      }
-      query = RuntimeCapabilityAuthorizationQuery(
-        operationID: descriptor.id,
-        operationVersion: descriptor.version,
-        effect: effect,
-        targetStableIdentitySHA256: nil,
-        targetBindingRevision: nil,
-        planDigest: materialized.planDigest,
-        inputs: request.inputs,
-        workspaceIdentitySHA256: workspace.identitySHA256,
-        workspaceRevision: workspace.revision,
-        workspaceFileScopesDigest: workspace.fileScopesDigest)
-    }
+    let query = try authorizationQuery(
+      request: request, descriptor: descriptor,
+      effect: effect, materialized: materialized)
 
     let authorization: RuntimeCapabilityReference
     if let supplied = request.authorization {
