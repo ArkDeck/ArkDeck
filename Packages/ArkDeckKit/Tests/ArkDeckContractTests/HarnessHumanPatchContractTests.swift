@@ -225,6 +225,12 @@ final class HarnessHumanPatchContractTests: XCTestCase {
     XCTAssertEqual(
       requests[0].authorization?.capabilityID, "CAP-RT-WORKSPACE-HUMAN-PATCH")
     XCTAssertEqual(
+      requests[0].inputs["expectedWorkspaceRevision"],
+      .string(proposal.baseWorkspaceRevision))
+    XCTAssertEqual(
+      requests[0].inputs["checkpointFilePaths"],
+      .array(proposal.touchedFiles.map(JSONValue.string)))
+    XCTAssertEqual(
       storedApply?.inputs["patchArtifactRef"],
       .string("lease-v1:patch:ART-human-patch"))
     XCTAssertNil(requests[0].inputs["patchArtifactRef"])

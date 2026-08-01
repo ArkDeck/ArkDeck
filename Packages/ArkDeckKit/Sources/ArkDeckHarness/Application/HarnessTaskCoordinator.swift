@@ -938,6 +938,10 @@ public actor HarnessTaskCoordinator {
       inputs: [
         "projectRef": .string(projectRef),
         "expectedWorkspaceRevision": .string(proposal.baseWorkspaceRevision),
+        // Non-Git production workspaces seal exactly the files named by the
+        // already-validated patch proposal. Git profiles may ignore this
+        // additive field while preserving the same decision identity.
+        "checkpointFilePaths": .array(proposal.touchedFiles.map(JSONValue.string)),
       ],
       patchProposal: proposal,
       requiredArtifacts: proposalDecision.requiredArtifacts,
