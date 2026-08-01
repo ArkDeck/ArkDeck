@@ -833,6 +833,9 @@ final class HarnessTaskPlaneContractTests: XCTestCase {
         "baselineHapArtifactLease": .string("lease-v1:input-hap:ART-crash-fixture"),
         "buildPresetRef": .string("waterflow-debug"),
         "testPresetRef": .string("waterflow-tests"),
+        "deviceProfile": .string("dayu200@1"),
+        "baseWorkspaceRevision": .string(String(repeating: "c", count: 64)),
+        "component": .string("WaterFlow.RecoverBack"),
         "maxRounds": .integer(3),
         "maxE1Mutations": .integer(3),
         "maxModelCalls": .integer(4),
@@ -860,6 +863,9 @@ final class HarnessTaskPlaneContractTests: XCTestCase {
         "baselineHapArtifactLease": .string("lease-v1:input-hap:ART-crash-fixture"),
         "buildPresetRef": .string("waterflow-debug"),
         "testPresetRef": .string("waterflow-tests"),
+        "deviceProfile": .string("dayu200@1"),
+        "baseWorkspaceRevision": .string(String(repeating: "c", count: 64)),
+        "component": .string("WaterFlow.RecoverBack"),
       ]))
     guard case .object(let submittedBudgets)? = field(submitted, "budgets") else {
       return XCTFail("task.submit must echo the admitted budgets")
@@ -988,6 +994,12 @@ final class HarnessTaskPlaneContractTests: XCTestCase {
       base.merging(["maxModelCalls": .integer(129)]) { _, new in new })
     XCTAssertFalse(unboundedModel.ok)
     XCTAssertEqual(unboundedModel.error?.code, AgentDaemonErrorCode.invalidParams.rawValue)
+
+    let malformedMemoryRevision = try await submit(
+      base.merging(["baseWorkspaceRevision": .string("main")]) { _, new in new })
+    XCTAssertFalse(malformedMemoryRevision.ok)
+    XCTAssertEqual(
+      malformedMemoryRevision.error?.code, AgentDaemonErrorCode.invalidParams.rawValue)
   }
 
   func testTaskMethodsFailClosedWhenTheHarnessIsNotConfigured() async throws {

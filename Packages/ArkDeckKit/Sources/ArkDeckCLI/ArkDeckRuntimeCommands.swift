@@ -1067,6 +1067,15 @@ enum RuntimeCLI {
       }
       if let preset = value("--build-preset") { params["buildPresetRef"] = .string(preset) }
       if let preset = value("--test-preset") { params["testPresetRef"] = .string(preset) }
+      if let profile = value("--device-profile") {
+        params["deviceProfile"] = .string(profile)
+      }
+      if let revision = value("--base-workspace-revision") {
+        params["baseWorkspaceRevision"] = .string(revision)
+      }
+      if let component = value("--component") {
+        params["component"] = .string(component)
+      }
       if let rounds = value("--max-rounds"), let parsed = Int64(rounds) {
         params["maxRounds"] = .integer(parsed)
       }

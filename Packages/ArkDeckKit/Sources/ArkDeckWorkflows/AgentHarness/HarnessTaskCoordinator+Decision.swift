@@ -228,8 +228,9 @@ extension HarnessTaskCoordinator {
           reasonCode: event.reasonCode.replacingOccurrences(of: jobID, with: "job"))
       }
     }
-    let failures = ((try? await store.failureRecords()) ?? [])
+    let failureRecords = ((try? await store.failureRecords()) ?? [])
       .filter { offered.contains($0.fingerprint.operationReference) }
+    let failures = failureRecords
       .map { record in
         HarnessContextFailure(
           digest: record.digest,
@@ -237,7 +238,9 @@ extension HarnessTaskCoordinator {
           occurrences: record.occurrences,
           stance: record.stance,
           errorClassification: record.fingerprint.errorClassification,
-          semanticErrorCode: record.fingerprint.semanticErrorCode)
+          semanticErrorCode: record.fingerprint.semanticErrorCode,
+          retryDisposition: record.retryDisposition,
+          alternativeHints: record.alternativeHints)
       }
     var memory = (try? await store.memory(scope: .task, key: snapshot.htaskID)) ?? []
     if let projectRef = snapshot.projectRef {
@@ -254,6 +257,28 @@ extension HarnessTaskCoordinator {
         // shipping its contents.
         sha256Prefix: String(record.sha256.prefix(12)), verified: record.verified)
     }
+    func desiredText(_ key: String) -> String? {
+      guard case .string(let value)? = snapshot.goal.desiredState[key] else { return nil }
+      return value
+    }
+    let repair = snapshot.repairAttempt
+    let memoryQuery = HarnessMemoryQuery(
+      htaskID: snapshot.htaskID,
+      projectRef: snapshot.projectRef,
+      failureFingerprints: failureRecords.map(\.digest)
+        + durableAttempts.compactMap(\.failureFingerprint),
+      components: [snapshot.type.rawValue, desiredText("component")].compactMap { $0 },
+      filePaths: repair?.proposal.touchedFiles ?? [],
+      symbols: repair?.proposal.expectedChangedSymbols ?? [],
+      operationReferences: offered + durableAttempts.map {
+        $0.strategy.selectedOperationFamily
+      },
+      revision: durableAttempts.last?.patchRevision ?? durableAttempts.last?.baseRevision
+        ?? repair?.patchRevision ?? repair?.proposal.baseWorkspaceRevision
+        ?? desiredText("baseWorkspaceRevision"),
+      deviceProfiles: [desiredText("deviceProfile")].compactMap { $0 },
+      toolchainProfiles: durableAttempts.map { $0.strategy.executionExpectation.toolchainProfile }
+        + [desiredText("buildPresetRef"), desiredText("testPresetRef")].compactMap { $0 })
     return try HarnessDecisionContextAssembler(limits: limits).assemble(
       snapshot: snapshot,
       availableOperations: offered,
@@ -262,7 +287,8 @@ extension HarnessTaskCoordinator {
       failures: failures,
       memory: memory,
       artifacts: artifacts,
-      elapsedSeconds: elapsedSeconds(since: snapshot.createdAtUTC) ?? 0)
+      elapsedSeconds: elapsedSeconds(since: snapshot.createdAtUTC) ?? 0,
+      memoryQuery: memoryQuery)
   }
 
   static func operationReference(fromReason reason: String) -> String? {

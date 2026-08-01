@@ -480,6 +480,22 @@ public actor HarnessTaskStore {
     let url = directoryURL.appendingPathComponent("\(key).jsonl")
     guard FileManager.default.fileExists(atPath: url.path) else { return [] }
     return try withLock(directoryURL) {
+      // JSONL remains append-only audit history. Consumers see the latest
+      // lifecycle row per memory identity, so SUPERSEDED/INVALIDATED cannot
+      // be shadowed by an older VERIFIED row after restart.
+      HarnessMemorySelector.collapse(
+        try readJSONLines(HarnessMemoryEntry.self, from: url))
+    }
+  }
+
+  public func memoryHistory(
+    scope: HarnessMemoryScope,
+    key: String
+  ) throws -> [HarnessMemoryEntry] {
+    let directoryURL = memoryDirectory(scope.rawValue)
+    let url = directoryURL.appendingPathComponent("\(key).jsonl")
+    guard FileManager.default.fileExists(atPath: url.path) else { return [] }
+    return try withLock(directoryURL) {
       try readJSONLines(HarnessMemoryEntry.self, from: url)
     }
   }

@@ -79,6 +79,8 @@ public struct HarnessContextFailure: Equatable, Sendable, Codable {
   public let stance: HarnessRetryStance
   public let errorClassification: String
   public let semanticErrorCode: String
+  public let retryDisposition: HarnessFailureRetryDisposition
+  public let alternativeHints: [String]
 
   public init(
     digest: String,
@@ -86,7 +88,9 @@ public struct HarnessContextFailure: Equatable, Sendable, Codable {
     occurrences: Int,
     stance: HarnessRetryStance,
     errorClassification: String,
-    semanticErrorCode: String
+    semanticErrorCode: String,
+    retryDisposition: HarnessFailureRetryDisposition = .actionRetryAllowed,
+    alternativeHints: [String] = []
   ) {
     self.digest = digest
     self.operationReference = operationReference
@@ -94,6 +98,19 @@ public struct HarnessContextFailure: Equatable, Sendable, Codable {
     self.stance = stance
     self.errorClassification = errorClassification
     self.semanticErrorCode = semanticErrorCode
+    self.retryDisposition = retryDisposition
+    self.alternativeHints = alternativeHints
+  }
+}
+
+/// Facts split by authority. `current` may contain current evaluator PASS
+/// facts and in-scope VERIFIED memory. CANDIDATE memory remains advice in
+/// `relevantMemory` and never crosses this boundary.
+public struct HarnessContextConfirmedFacts: Equatable, Sendable, Codable {
+  public let current: [String]
+
+  public init(current: [String] = []) {
+    self.current = Array(Set(current)).sorted()
   }
 }
 
@@ -152,7 +169,7 @@ public struct HarnessContextBudget: Equatable, Sendable, Codable {
 
 public struct HarnessDecisionContext: Equatable, Sendable, Codable {
   public static let documentType = "harness-decision-context"
-  public static let schemaVersion = "2.0.0"
+  public static let schemaVersion = "2.1.0"
 
   public let documentType: String
   public let schemaVersion: String
@@ -176,6 +193,8 @@ public struct HarnessDecisionContext: Equatable, Sendable, Codable {
   public let recentAttempts: [HarnessContextAttempt]
   public let unresolvedFailures: [HarnessContextFailure]
   public let relevantMemory: [String]
+  public let confirmedFacts: HarnessContextConfirmedFacts
+  public let memorySelectionManifest: HarnessMemorySelectionManifest
   public let artifacts: [HarnessContextArtifact]
   public let availableOperations: [String]
   public let budget: HarnessContextBudget
@@ -198,6 +217,8 @@ public struct HarnessDecisionContext: Equatable, Sendable, Codable {
     recentAttempts: [HarnessContextAttempt],
     unresolvedFailures: [HarnessContextFailure],
     relevantMemory: [String],
+    confirmedFacts: HarnessContextConfirmedFacts = .init(),
+    memorySelectionManifest: HarnessMemorySelectionManifest = .empty,
     artifacts: [HarnessContextArtifact],
     availableOperations: [String],
     budget: HarnessContextBudget,
@@ -226,6 +247,8 @@ public struct HarnessDecisionContext: Equatable, Sendable, Codable {
     self.recentAttempts = recentAttempts
     self.unresolvedFailures = unresolvedFailures
     self.relevantMemory = relevantMemory
+    self.confirmedFacts = confirmedFacts
+    self.memorySelectionManifest = memorySelectionManifest
     self.artifacts = artifacts
     self.availableOperations = availableOperations
     self.budget = budget

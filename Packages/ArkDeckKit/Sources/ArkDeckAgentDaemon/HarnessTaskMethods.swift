@@ -253,12 +253,32 @@ extension RuntimeControlPlaneHandler {
     } else if abilityName != nil {
       throw HarnessTaskSubmissionError.malformedDesiredState("abilityName requires bundleName")
     }
-    for key in ["buildPresetRef", "testPresetRef"] {
+    for key in ["deviceProfile", "buildPresetRef", "testPresetRef"] {
       guard let value = text(key) else { continue }
       guard isWireIdentifier(value) else {
         throw HarnessTaskSubmissionError.malformedDesiredState(key)
       }
       desiredState[key] = .string(value)
+    }
+    if let revision = text("baseWorkspaceRevision") {
+      guard revision.utf8.count == 64,
+        revision.utf8.allSatisfy({
+          (48...57).contains($0) || (97...102).contains($0)
+        })
+      else {
+        throw HarnessTaskSubmissionError.malformedDesiredState("baseWorkspaceRevision")
+      }
+      desiredState["baseWorkspaceRevision"] = .string(revision)
+    }
+    if let component = text("component") {
+      guard !component.isEmpty, component.utf8.count <= 256,
+        !component.unicodeScalars.contains(where: {
+          CharacterSet.controlCharacters.contains($0)
+        })
+      else {
+        throw HarnessTaskSubmissionError.malformedDesiredState("component")
+      }
+      desiredState["component"] = .string(component)
     }
     if let lease = text("baselineHapArtifactLease") {
       guard isArtifactLeaseReference(lease) else {
