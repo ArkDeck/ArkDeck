@@ -47,14 +47,17 @@ protocol RockchipExecutePlanFactPort: Sendable {
 }
 
 struct RockchipProductExecutePlanFactPort: RockchipExecutePlanFactPort {
-  private let provider: RockchipRockUSBFlashProvider
-
-  init(provider: RockchipRockUSBFlashProvider = RockchipRockUSBFlashProvider()) {
-    self.provider = provider
-  }
-
   func makeValidatedExecutePlan(archiveURL: URL) async throws -> RockchipFlashPlan {
     let summary = try GzipTarArchiveReader.summarize(fileAt: archiveURL)
+    return try makeValidatedExecutePlan(summary: summary)
+  }
+
+  func makeValidatedExecutePlan(summary: GzipTarArchiveSummary) throws -> RockchipFlashPlan {
+    guard
+      let profile = RockchipFlashProfile.profile(
+        archiveSHA256: summary.archiveSHA256, byteCount: Int(summary.archiveSizeBytes))
+    else { throw RockchipAuthorizationFactError.archiveValidationFailed }
+    let provider = RockchipRockUSBFlashProvider(profile: profile)
     let verdict = provider.profile.validate(summary.archiveObservation())
     guard verdict == .valid else { throw RockchipAuthorizationFactError.archiveValidationFailed }
     return try provider.makePlan(mode: .execute, archiveValidation: verdict)

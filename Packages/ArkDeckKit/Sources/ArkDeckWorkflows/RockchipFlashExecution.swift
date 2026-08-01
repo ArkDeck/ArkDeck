@@ -235,7 +235,7 @@ struct RockchipFlashExecutionDependencies: Sendable {
   let makePersistence:
     @Sendable (String, String, RockchipFlashPlan) async throws -> any RockchipExecutionPersistence
   let stage: @Sendable (URL, URL, RockchipFlashProfile) throws -> [String: StagedRockchipImage]
-  let profile: RockchipFlashProfile
+  let profiles: [RockchipFlashProfile]
   let makeID: @Sendable (String) -> String
 
   init(
@@ -253,6 +253,7 @@ struct RockchipFlashExecutionDependencies: Sendable {
           archiveURL: archive, sessionRoot: root, profile: profile)
       },
     profile: RockchipFlashProfile = .dayu200,
+    profiles: [RockchipFlashProfile]? = nil,
     lifecycle: any RockchipExecutionLifecyclePort = RockchipInertExecutionLifecyclePort(),
     makeID: @escaping @Sendable (String) -> String = { prefix in
       "\(prefix)-\(UUID().uuidString.lowercased())"
@@ -265,7 +266,7 @@ struct RockchipFlashExecutionDependencies: Sendable {
     self.lifecycle = lifecycle
     self.makePersistence = makePersistence
     self.stage = stage
-    self.profile = profile
+    self.profiles = profiles ?? [profile]
     self.makeID = makeID
   }
 }
@@ -327,6 +328,17 @@ actor RockchipFlashExecutor {
       admission.targetID == targetID,
       admission.usbTopology == request.targetLocationSelector
     else { throw RockchipFlashExecutionError.admissionRejected("fact correlation drift") }
+    guard
+      let executionProfile = dependencies.profiles.first(where: {
+        $0.archiveSHA256 == admission.plan.archiveSHA256
+          && $0.archiveSizeBytes == admission.plan.archiveSizeBytes
+      })
+    else {
+      try? dependencies.admission.closeUsage(
+        admission: admission, status: .failed, destructiveIntentEventIDs: [])
+      throw RockchipFlashExecutionError.admissionRejected(
+        "execute plan has no exact published profile")
+    }
 
     let persistence: any RockchipExecutionPersistence
     do {
@@ -347,7 +359,7 @@ actor RockchipFlashExecutor {
     let stagedImages: [String: StagedRockchipImage]
     do {
       stagedImages = try dependencies.stage(
-        request.archiveURL, persistence.sessionRoot, dependencies.profile)
+        request.archiveURL, persistence.sessionRoot, executionProfile)
     } catch {
       try? dependencies.admission.closeUsage(
         admission: admission, status: .failed, destructiveIntentEventIDs: [])

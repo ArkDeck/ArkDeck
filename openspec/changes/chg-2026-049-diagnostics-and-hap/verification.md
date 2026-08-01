@@ -5,7 +5,7 @@
 > binding、typed inputs、plan digest、lineage 与 `outcomeUnknown` 门保持。
 > 下文 r2 的人工 capability 步骤是历史计划；E2 不变。
 
-> Change:CHG-2026-049-diagnostics-and-hap@r7
+> Change:CHG-2026-049-diagnostics-and-hap@r8
 > Status:planned
 > Core baseline:CORE-2.1.0 (canonical Core AC not claimed)
 
@@ -30,6 +30,7 @@
 | `DHA-HW-002` | Device Runtime Agent + 维护者签发的 E1 capability:真机 debug.hap@1 | Agent 一次执行 install→start→capture→stop;readback 齐全;capability 消耗一次;缺 capability 零 dispatch;人类不代跑 host CLI | realHardware(Agent 执行后补记) |
 | `DHA-GJ4-PROFILE-001` | v2 profile/Catalog/Provider drift contract + real archive summary | archive 与 17 members 的 size/SHA-256 全匹配；Catalog 只开放 dayu200@1/@2；Provider 对 v2 exact 九分区成功，换序和跨版本 archive 拒绝 | contract + realInput |
 | `DHA-GJ4-PLAN-002` | RuntimeJobEngine.planOnly + job.plan wire contract | 复用生产 materialization 产出 digest/选中步骤；不建 Job、不创建/安装/消费 capability、dispatch=0；错误 plan 同样零副作用 | contract + realInput |
+| `DHA-GJ4-HANDOFF-003` | v2 human handoff + trusted execute profile selection contract | human execute 生成 v2 exact commands 且 dispatch=0；authorized path 只按 archive pins 选择 profile，unknown/member drift 拒绝；executor 在授权消费前拒绝无匹配 profile | contract + realInput |
 
 ## `DHA-AGENT-001`
 
@@ -99,6 +100,19 @@
 - real-input gate 使用 sealed facts 与“调用即失败”的 dispatcher；执行期间禁止
   USB/HDC/RockUSB，禁止 E2 capability 与真实 Flash，结果分类为 realInput/hostOnly，
   不得记为 realHardware。
+
+## `DHA-GJ4-HANDOFF-003`
+
+- human execute 显式选择 `dayu200@2` 后，execute plan 的 archive、plan digest 与 step-set
+  digest 必须来自 v2；handoff 只能含 `ld`、`ppt`、九条顺序固定的 `wlx` 与 `rd`，
+  ArkDeck dispatch snapshot 保持 0；
+- authorization-ID 路径拒绝 caller-supplied `--device-profile`，trusted fact port 只按实际
+  archive size/SHA-256 选择 published profile，并对 17 个 member 再校验；未知 archive
+  与任一 member hash 漂移均为 `archiveValidationFailed`；
+- admitted execute plan 必须在 persistence、authorization consumption 与 staging 前匹配
+  executor 的 published profile 集合；无匹配时关闭 reservation，零 destructive intent；
+- real-input CLI gate 只能运行到 non-TTY policy-blocked human handoff，验证 v2 execute
+  digest/commands 后停止；不得连接设备、读取 standing authorization 或执行 handoff 命令。
 
 ## `DHA-HAP-001`
 

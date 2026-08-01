@@ -685,15 +685,22 @@ private enum RockchipProductionExecutionComposition {
     let postflight = RockchipProductPostflightPort(probe: usbProbe)
     let coordinator = storage.context.coordinator
     let storageProbe = SystemHostStorageProbe()
-    let requiredGrowth =
-      UInt64(
-        RockchipFlashProfile.dayu200.mappedPartitions.compactMap {
-          RockchipFlashProfile.dayu200.member(named: $0.imageMemberName)?.sizeBytes
-        }.reduce(Int64(0), +)) + 64 * 1_024 * 1_024
     return RockchipFlashExecutionDependencies(
       admission: admission, process: process, postflight: postflight,
       power: ProductRockchipPowerActivityController(),
-      makePersistence: { sessionID, jobID, _ in
+      makePersistence: { sessionID, jobID, plan in
+        guard
+          let profile = RockchipFlashProfile.profile(
+            archiveSHA256: plan.archiveSHA256, byteCount: Int(plan.archiveSizeBytes))
+        else {
+          throw RockchipFlashExecutionError.storageRejected(
+            "execute plan has no exact published profile")
+        }
+        let requiredGrowth =
+          UInt64(
+            profile.mappedPartitions.compactMap {
+              profile.member(named: $0.imageMemberName)?.sizeBytes
+            }.reduce(Int64(0), +)) + 64 * 1_024 * 1_024
         let admission = try await storage.context.prepareHeavyWriterAdmission()
         let snapshot = try storageProbe.snapshot(for: storage.context.rootLease.url)
         guard snapshot.volumeIdentity == admission.volumeIdentity else {
@@ -716,7 +723,8 @@ private enum RockchipProductionExecutionComposition {
         return try RockchipDurableExecutionPersistence(
           layout: layout, claim: claim, coordinator: coordinator,
           storageContext: storage.context)
-      }, lifecycle: ProductRockchipExecutionLifecyclePort())
+      }, profiles: RockchipFlashProfile.supportedDAYU200Profiles,
+      lifecycle: ProductRockchipExecutionLifecyclePort())
   }
 }
 
