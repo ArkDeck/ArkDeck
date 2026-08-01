@@ -20,6 +20,9 @@ final class Dayu20070035AuthorizedFlashWrapperContractTests: XCTestCase {
       source.contains(
         "c8bdce2a137690081c1dd5ca38f91f25399c63778ab18b4f94000b127382fa14"))
     XCTAssertTrue(source.contains("\"$ARKDECK_BIN\" flash execute"))
+    XCTAssertTrue(source.contains("\"$ARKDECK_BIN\" flash install-tool"))
+    XCTAssertTrue(source.contains("\"$ARKDECK_BIN\" flash install-binding"))
+    XCTAssertTrue(source.contains("--prepare"))
     XCTAssertTrue(source.contains("--chat-confirmation-digest-sha256"))
     XCTAssertTrue(source.contains("--chat-confirmed-target-sha256"))
     XCTAssertTrue(source.contains("ARKDECK_CHAT_CONFIRMATION_CONTEXT=supervisedInteractiveAgent"))
@@ -57,7 +60,7 @@ final class Dayu20070035AuthorizedFlashWrapperContractTests: XCTestCase {
 
   func testInteractiveTriggerRequiresTTYBeforeHostChecks() throws {
     let result = try runScript([
-      "--interactive-trigger",
+      "--interactive-trigger"
     ])
 
     XCTAssertEqual(result.status, 2)

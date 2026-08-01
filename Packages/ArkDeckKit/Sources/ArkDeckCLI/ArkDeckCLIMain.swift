@@ -63,6 +63,10 @@ struct ArkDeckCommandLine {
     switch subcommand {
     case "install-tool":
       try runInstallTool(Array(arguments.dropFirst()))
+    case "trust-tool":
+      try runTrustTool(Array(arguments.dropFirst()))
+    case "install-binding":
+      try runInstallBinding(Array(arguments.dropFirst()))
     case "plan":
       try runPlan(Array(arguments.dropFirst()))
     case "execute":
@@ -84,8 +88,43 @@ struct ArkDeckCommandLine {
         exitCode: EX_USAGE,
         message: "install-tool requires --path with a canonical absolute file path")
     }
-    try RockchipToolInstallation.install(executableURL: URL(fileURLWithPath: path))
-    print("pinned rkdeveloptool ordinary bookmark installed")
+    let receipt = try RockchipToolInstallation.install(
+      executableURL: URL(fileURLWithPath: path))
+    print("pinned rkdeveloptool ordinary bookmark and live trust facts installed")
+    print("tool sha256: \(receipt.executableSHA256)")
+    print("code trust: \(receipt.codeTrust.rawValue)")
+    print("quarantine present: \(receipt.quarantinePresent)")
+  }
+
+  static func runTrustTool(_ arguments: [String]) throws {
+    let options = try CLIOptions(arguments)
+    try options.validateAllowed(["--path", "--expected-sha256"])
+    guard let path = options.value("--path"), path.hasPrefix("/"),
+      let expectedSHA256 = options.value("--expected-sha256")
+    else {
+      throw CLIError(
+        exitCode: EX_USAGE,
+        message: "trust-tool requires --path and the full --expected-sha256 product pin")
+    }
+    let receipt = try RockchipToolInstallation.trustAndInstall(
+      executableURL: URL(fileURLWithPath: path),
+      expectedSHA256: expectedSHA256)
+    print("exact pinned rkdeveloptool trusted and installed")
+    print("tool sha256: \(receipt.executableSHA256)")
+    print("code trust: \(receipt.codeTrust.rawValue)")
+    print("quarantine present: \(receipt.quarantinePresent)")
+  }
+
+  static func runInstallBinding(_ arguments: [String]) throws {
+    let options = try CLIOptions(arguments)
+    try options.validateAllowed([])
+    let receipt = try RockchipDeviceBindingInstallation.installCurrentLoader()
+    print(
+      receipt.created ? "durable Rockchip binding installed" : "durable Rockchip binding unchanged")
+    print("binding revision: \(receipt.revision)")
+    print("USB topology: \(receipt.usbTopology)")
+    print("serial sha256: \(receipt.serialDigestSHA256)")
+    print("device mutation dispatch: 0")
   }
 
   // MARK: plan
@@ -637,6 +676,9 @@ struct ArkDeckCommandLine {
     let usage = """
       usage:
         arkdeck flash install-tool --path <absolute-rkdeveloptool-path>
+        arkdeck flash trust-tool --path <absolute-rkdeveloptool-path> \
+      --expected-sha256 <full-product-pin>
+        arkdeck flash install-binding
         arkdeck flash plan --images <images.tar.gz> \
       [--device-profile <dayu200@1|dayu200@2>] [--mode planOnly|simulated] [--out <dir>]
         arkdeck flash execute --images <images.tar.gz> --target-location-id <usb-location> \

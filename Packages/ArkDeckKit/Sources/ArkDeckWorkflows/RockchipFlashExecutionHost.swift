@@ -7,9 +7,76 @@ import Foundation
 import IOKit
 import Security
 
+public struct RockchipToolInstallationReceipt: Sendable, Equatable {
+  public let executableSHA256: String
+  public let codeTrust: RockchipPlatformCodeTrust
+  public let quarantinePresent: Bool
+
+  public init(
+    executableSHA256: String,
+    codeTrust: RockchipPlatformCodeTrust,
+    quarantinePresent: Bool
+  ) {
+    self.executableSHA256 = executableSHA256
+    self.codeTrust = codeTrust
+    self.quarantinePresent = quarantinePresent
+  }
+}
+
 public enum RockchipToolInstallation {
-  public static func install(executableURL: URL) throws {
-    try RockchipProductToolBookmarkStore.production.install(executableURL: executableURL)
+  /// Installs the pinned ordinary bookmark and records a fresh platform-trust assessment.
+  /// A quarantined tool remains blocked; this entry point never removes quarantine implicitly.
+  @discardableResult
+  public static func install(executableURL: URL) throws -> RockchipToolInstallationReceipt {
+    try RockchipProductToolInstaller.production.install(executableURL: executableURL)
+  }
+
+  /// Performs the explicit host trust transition for the one reviewed executable identity.
+  /// The caller must repeat the full pinned digest; no arbitrary executable can be de-quarantined.
+  @discardableResult
+  public static func trustAndInstall(
+    executableURL: URL,
+    expectedSHA256: String
+  ) throws -> RockchipToolInstallationReceipt {
+    try RockchipProductToolInstaller.production.trustAndInstall(
+      executableURL: executableURL,
+      expectedSHA256: expectedSHA256)
+  }
+}
+
+public struct RockchipDeviceBindingInstallationReceipt: Sendable, Equatable {
+  public let revision: Int
+  public let usbTopology: String
+  public let serialDigestSHA256: String
+  public let created: Bool
+
+  public init(
+    revision: Int,
+    usbTopology: String,
+    serialDigestSHA256: String,
+    created: Bool
+  ) {
+    self.revision = revision
+    self.usbTopology = usbTopology
+    self.serialDigestSHA256 = serialDigestSHA256
+    self.created = created
+  }
+}
+
+public enum RockchipDeviceBindingInstallation {
+  /// Reads IOKit only, requires exactly one DAYU200 Loader, and durably adopts that identity.
+  /// This entry point never launches rkdeveloptool and has no device-mutation surface.
+  @discardableResult
+  public static func installCurrentLoader() throws -> RockchipDeviceBindingInstallationReceipt {
+    let manager = FileManager.default
+    let applicationSupport = try manager.url(
+      for: .applicationSupportDirectory, in: .userDomainMask,
+      appropriateFor: nil, create: true)
+    let root = applicationSupport.appending(path: "ArkDeck", directoryHint: .isDirectory)
+    return try RockchipProductBindingBootstrap(
+      probe: { try RockchipProductUSBProbe().singleLoader() },
+      store: RockchipProductBindingStore(rootURL: root)
+    ).installCurrentLoader()
   }
 }
 
@@ -764,11 +831,260 @@ struct RockchipProductionStorageComposition: Sendable {
   }
 }
 
-private struct RockchipProductBindingSnapshot: Codable, Sendable {
+struct RockchipProductBindingSnapshot: Codable, Sendable, Equatable {
   let revision: Int
   let serial: String
   let usbTopology: String
   let evidence: [String]
+}
+
+struct RockchipProductBindingStore: Sendable {
+  static let bindingFileName = "rockchip-binding.json"
+  static let lockFileName = ".rockchip-binding.lock"
+  static let maximumDocumentBytes = 64 * 1_024
+
+  let rootURL: URL
+
+  func loadExisting() throws -> RockchipProductBindingSnapshot {
+    try prepareRoot()
+    let rootDescriptor = Darwin.open(
+      rootURL.path, O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW)
+    guard rootDescriptor >= 0 else { throw configurationError("binding root cannot be opened") }
+    defer { Darwin.close(rootDescriptor) }
+    guard let snapshot = try load(rootDescriptor: rootDescriptor) else {
+      throw configurationError("durable Rockchip binding is not installed")
+    }
+    return snapshot
+  }
+
+  func install(_ candidate: RockchipProductBindingSnapshot)
+    throws -> (snapshot: RockchipProductBindingSnapshot, created: Bool)
+  {
+    try validate(candidate)
+    try prepareRoot()
+    let rootDescriptor = Darwin.open(
+      rootURL.path, O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW)
+    guard rootDescriptor >= 0 else { throw configurationError("binding root cannot be opened") }
+    defer { Darwin.close(rootDescriptor) }
+
+    let lockDescriptor = Darwin.openat(
+      rootDescriptor, Self.lockFileName,
+      O_CREAT | O_RDWR | O_CLOEXEC | O_NOFOLLOW, S_IRUSR | S_IWUSR)
+    guard lockDescriptor >= 0 else { throw configurationError("binding lock cannot be opened") }
+    defer { Darwin.close(lockDescriptor) }
+    try validateOwnedRegularFile(lockDescriptor, permissions: 0o600, label: "binding lock")
+    guard flock(lockDescriptor, LOCK_EX) == 0 else {
+      throw configurationError("binding lock cannot be acquired")
+    }
+    defer { _ = flock(lockDescriptor, LOCK_UN) }
+
+    if let existing = try load(rootDescriptor: rootDescriptor) {
+      guard existing.serial == candidate.serial,
+        existing.usbTopology == candidate.usbTopology
+      else {
+        throw configurationError(
+          "durable binding differs from the only connected Loader; explicit rebind is required")
+      }
+      return (existing, false)
+    }
+
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys]
+    var document = try encoder.encode(candidate)
+    document.append(0x0A)
+    guard document.count <= Self.maximumDocumentBytes else {
+      throw configurationError("binding document exceeds its product limit")
+    }
+
+    let temporaryName = ".rockchip-binding.\(UUID().uuidString.lowercased()).part"
+    let temporaryDescriptor = Darwin.openat(
+      rootDescriptor, temporaryName,
+      O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, S_IRUSR | S_IWUSR)
+    guard temporaryDescriptor >= 0 else {
+      throw configurationError("binding temporary file cannot be created")
+    }
+    var temporaryOpen = true
+    defer {
+      if temporaryOpen { Darwin.close(temporaryDescriptor) }
+      _ = unlinkat(rootDescriptor, temporaryName, 0)
+    }
+    do {
+      try writeAll(document, descriptor: temporaryDescriptor)
+      guard fchmod(temporaryDescriptor, S_IRUSR | S_IWUSR) == 0,
+        Darwin.fsync(temporaryDescriptor) == 0,
+        Darwin.fcntl(temporaryDescriptor, F_FULLFSYNC) == 0
+      else { throw configurationError("binding temporary file cannot be synchronized") }
+      guard Darwin.close(temporaryDescriptor) == 0 else {
+        throw configurationError("binding temporary file cannot be closed")
+      }
+      temporaryOpen = false
+      guard
+        renameatx_np(
+          rootDescriptor, temporaryName, rootDescriptor, Self.bindingFileName,
+          UInt32(RENAME_EXCL)) == 0
+      else { throw configurationError("binding publication cannot be committed") }
+      guard Darwin.fsync(rootDescriptor) == 0 else {
+        throw configurationError("binding directory cannot be synchronized")
+      }
+    } catch let error as RockchipFlashExecutionError {
+      throw error
+    } catch {
+      throw configurationError("binding publication failed")
+    }
+
+    guard let readback = try load(rootDescriptor: rootDescriptor), readback == candidate else {
+      throw configurationError("binding write-readback failed")
+    }
+    return (readback, true)
+  }
+
+  private func prepareRoot() throws {
+    guard rootURL.isFileURL, rootURL.path.hasPrefix("/") else {
+      throw configurationError("binding root must be an absolute file URL")
+    }
+    var existing = stat()
+    if lstat(rootURL.path, &existing) == 0, existing.st_mode & S_IFMT == S_IFLNK {
+      throw configurationError("binding root cannot be a symbolic link")
+    }
+    do {
+      try FileManager.default.createDirectory(
+        at: rootURL, withIntermediateDirectories: true,
+        attributes: [.posixPermissions: 0o700])
+    } catch {
+      throw configurationError("binding root cannot be created")
+    }
+    guard chmod(rootURL.path, 0o700) == 0 else {
+      throw configurationError("binding root must be owner-only")
+    }
+  }
+
+  private func load(rootDescriptor: Int32) throws -> RockchipProductBindingSnapshot? {
+    let descriptor = Darwin.openat(
+      rootDescriptor, Self.bindingFileName, O_RDONLY | O_CLOEXEC | O_NOFOLLOW)
+    if descriptor < 0 {
+      if errno == ENOENT { return nil }
+      throw configurationError("durable binding cannot be opened")
+    }
+    defer { Darwin.close(descriptor) }
+    try validateOwnedRegularFile(descriptor, permissions: 0o600, label: "durable binding")
+    var metadata = stat()
+    guard fstat(descriptor, &metadata) == 0,
+      metadata.st_size > 0,
+      metadata.st_size <= Self.maximumDocumentBytes
+    else { throw configurationError("durable binding size is invalid") }
+    let document = try readAll(descriptor: descriptor, byteCount: Int(metadata.st_size))
+    guard
+      let object = try JSONSerialization.jsonObject(with: document) as? [String: Any],
+      Set(object.keys) == ["revision", "serial", "usbTopology", "evidence"]
+    else { throw configurationError("durable binding schema is invalid") }
+    let snapshot: RockchipProductBindingSnapshot
+    do {
+      snapshot = try JSONDecoder().decode(RockchipProductBindingSnapshot.self, from: document)
+    } catch {
+      throw configurationError("durable binding cannot be decoded")
+    }
+    try validate(snapshot)
+    return snapshot
+  }
+
+  private func validate(_ snapshot: RockchipProductBindingSnapshot) throws {
+    guard snapshot.revision > 0,
+      !snapshot.serial.isEmpty,
+      !snapshot.usbTopology.isEmpty,
+      snapshot.usbTopology.utf8.allSatisfy({ (48...57).contains($0) }),
+      !snapshot.evidence.isEmpty,
+      snapshot.evidence.allSatisfy({ !$0.isEmpty && !$0.contains(snapshot.serial) })
+    else { throw configurationError("durable binding snapshot is invalid") }
+  }
+
+  private func validateOwnedRegularFile(
+    _ descriptor: Int32,
+    permissions: mode_t,
+    label: String
+  ) throws {
+    var metadata = stat()
+    guard fstat(descriptor, &metadata) == 0,
+      metadata.st_mode & S_IFMT == S_IFREG,
+      metadata.st_nlink == 1,
+      metadata.st_uid == getuid(),
+      metadata.st_mode & 0o777 == permissions
+    else { throw configurationError("\(label) must be an owner-only regular file") }
+  }
+
+  private func readAll(descriptor: Int32, byteCount: Int) throws -> Data {
+    var result = Data()
+    result.reserveCapacity(byteCount)
+    var buffer = [UInt8](repeating: 0, count: min(4_096, byteCount))
+    while result.count < byteCount {
+      let count = Darwin.read(descriptor, &buffer, min(buffer.count, byteCount - result.count))
+      if count < 0 {
+        if errno == EINTR { continue }
+        throw configurationError("durable binding cannot be read")
+      }
+      guard count > 0 else { throw configurationError("durable binding was truncated") }
+      result.append(contentsOf: buffer.prefix(count))
+    }
+    return result
+  }
+
+  private func writeAll(_ data: Data, descriptor: Int32) throws {
+    try data.withUnsafeBytes { bytes in
+      guard let base = bytes.baseAddress else { return }
+      var offset = 0
+      while offset < bytes.count {
+        let written = Darwin.write(descriptor, base.advanced(by: offset), bytes.count - offset)
+        if written < 0 {
+          if errno == EINTR { continue }
+          throw configurationError("binding temporary file cannot be written")
+        }
+        guard written > 0 else {
+          throw configurationError("binding temporary file cannot be written")
+        }
+        offset += written
+      }
+    }
+  }
+
+  private func configurationError(_ detail: String) -> RockchipFlashExecutionError {
+    .productionConfigurationUnavailable(detail)
+  }
+}
+
+struct RockchipProductBindingBootstrap: Sendable {
+  let probe: @Sendable () throws -> RockchipProductUSBIdentity
+  let store: RockchipProductBindingStore
+
+  func installCurrentLoader() throws -> RockchipDeviceBindingInstallationReceipt {
+    let identity = try probe()
+    guard identity.vendorID == RockchipProbeEvidence.rockUSBVendorID,
+      identity.productID == RockchipProbeEvidence.dayu200LoaderProductID,
+      !identity.serial.isEmpty,
+      !identity.topology.isEmpty,
+      identity.topology.utf8.allSatisfy({ (48...57).contains($0) })
+    else {
+      throw RockchipFlashExecutionError.admissionRejected(
+        "the single USB identity is not a valid DAYU200 Loader")
+    }
+    let serialDigest = SHA256.hash(data: Data(identity.serial.utf8))
+      .map { String(format: "%02x", $0) }.joined()
+    let candidate = RockchipProductBindingSnapshot(
+      revision: 1,
+      serial: identity.serial,
+      usbTopology: identity.topology,
+      evidence: [
+        "product:e0-iokit-single-loader-readback",
+        "usb:vendor=8711,product=13578",
+        "identity:serial-sha256=\(serialDigest)",
+      ])
+    let result = try store.install(candidate)
+    let storedDigest = SHA256.hash(data: Data(result.snapshot.serial.utf8))
+      .map { String(format: "%02x", $0) }.joined()
+    return RockchipDeviceBindingInstallationReceipt(
+      revision: result.snapshot.revision,
+      usbTopology: result.snapshot.usbTopology,
+      serialDigestSHA256: storedDigest,
+      created: result.created)
+  }
 }
 
 struct RockchipToolBookmarkPreferences {
@@ -815,6 +1131,116 @@ struct RockchipPinnedExecutableVerifier: Sendable {
       expectedSHA256: RockchipDiscoveryIntegrationProfile.pinnedProduction.executableSHA256)
     let prepared = try FoundationProcessExecutor().prepareIdentityBoundLaunch(request)
     prepared.close()
+  }
+}
+
+struct RockchipProductToolTrustInspector: Sendable {
+  let assess: @Sendable (URL) throws -> RockchipPlatformTrustReceipt
+  let clearQuarantine: @Sendable (URL) throws -> Void
+
+  static let production = RockchipProductToolTrustInspector(
+    assess: { executableURL in
+      let quarantinePresent: Bool
+      errno = 0
+      let size = getxattr(
+        executableURL.path, "com.apple.quarantine", nil, 0, 0, XATTR_NOFOLLOW)
+      if size >= 0 {
+        quarantinePresent = true
+      } else if errno == ENOATTR {
+        quarantinePresent = false
+      } else {
+        throw RockchipFlashExecutionError.productionConfigurationUnavailable(
+          "rkdeveloptool quarantine cannot be assessed")
+      }
+
+      var staticCode: SecStaticCode?
+      var status = SecStaticCodeCreateWithPath(
+        executableURL as CFURL, SecCSFlags(), &staticCode)
+      guard status == errSecSuccess, let staticCode else {
+        return RockchipPlatformTrustReceipt(
+          codeTrust: .unsigned, quarantinePresent: quarantinePresent)
+      }
+      status = SecStaticCodeCheckValidity(
+        staticCode,
+        SecCSFlags(rawValue: kSecCSStrictValidate | kSecCSCheckAllArchitectures),
+        nil)
+      guard status == errSecSuccess else {
+        return RockchipPlatformTrustReceipt(
+          codeTrust: .rejected, quarantinePresent: quarantinePresent)
+      }
+      var rawInformation: CFDictionary?
+      status = SecCodeCopySigningInformation(
+        staticCode, SecCSFlags(rawValue: kSecCSSigningInformation), &rawInformation)
+      guard status == errSecSuccess,
+        let information = rawInformation as? [CFString: Any],
+        let flags = information[kSecCodeInfoFlags] as? NSNumber
+      else {
+        return RockchipPlatformTrustReceipt(
+          codeTrust: .unknown, quarantinePresent: quarantinePresent)
+      }
+      let codeTrust: RockchipPlatformCodeTrust
+      if flags.uint32Value & 0x0000_0002 != 0 {
+        codeTrust = .adHoc
+      } else if let team = information[kSecCodeInfoTeamIdentifier] as? String,
+        !team.isEmpty
+      {
+        codeTrust = .developerID
+      } else {
+        codeTrust = .unknown
+      }
+      return RockchipPlatformTrustReceipt(
+        codeTrust: codeTrust, quarantinePresent: quarantinePresent)
+    },
+    clearQuarantine: { executableURL in
+      guard
+        removexattr(
+          executableURL.path, "com.apple.quarantine", XATTR_NOFOLLOW) == 0
+          || errno == ENOATTR
+      else {
+        throw RockchipFlashExecutionError.productionConfigurationUnavailable(
+          "rkdeveloptool quarantine could not be removed")
+      }
+    })
+}
+
+struct RockchipToolTrustFactStore {
+  static let codeTrustKey = "ArkDeck.Rockchip.ToolCodeTrust"
+  static let quarantineKey = "ArkDeck.Rockchip.ToolQuarantinePresent"
+
+  let preferences: RockchipToolBookmarkPreferences
+
+  func persist(_ receipt: RockchipPlatformTrustReceipt) throws {
+    guard receipt.permitsPinnedDiscovery,
+      let quarantinePresent = receipt.quarantinePresent
+    else {
+      throw configurationError("rkdeveloptool platform trust is not permitted")
+    }
+    let previousCodeTrust = preferences.object(Self.codeTrustKey)
+    let previousQuarantine = preferences.object(Self.quarantineKey)
+    do {
+      try preferences.setObject(receipt.codeTrust.rawValue, Self.codeTrustKey)
+      try preferences.setObject(quarantinePresent, Self.quarantineKey)
+      guard preferences.object(Self.codeTrustKey) as? String == receipt.codeTrust.rawValue,
+        preferences.object(Self.quarantineKey) as? Bool == quarantinePresent
+      else { throw configurationError("tool trust facts failed write-readback") }
+    } catch {
+      restore(previousCodeTrust, key: Self.codeTrustKey)
+      restore(previousQuarantine, key: Self.quarantineKey)
+      if let error = error as? RockchipFlashExecutionError { throw error }
+      throw configurationError("tool trust facts could not be persisted")
+    }
+  }
+
+  private func restore(_ value: Any?, key: String) {
+    if let value {
+      try? preferences.setObject(value, key)
+    } else {
+      try? preferences.removeObject(key)
+    }
+  }
+
+  private func configurationError(_ detail: String) -> RockchipFlashExecutionError {
+    .productionConfigurationUnavailable(detail)
   }
 }
 
@@ -953,6 +1379,72 @@ struct RockchipProductToolBookmarkStore {
   }
 }
 
+struct RockchipProductToolInstaller {
+  let bookmarks: RockchipProductToolBookmarkStore
+  let trustInspector: RockchipProductToolTrustInspector
+  let trustFacts: RockchipToolTrustFactStore
+
+  static var production: RockchipProductToolInstaller {
+    let preferences = RockchipToolBookmarkPreferences.userDefaults(.standard)
+    return RockchipProductToolInstaller(
+      bookmarks: RockchipProductToolBookmarkStore(
+        preferences: preferences,
+        codec: .foundation,
+        verifier: .production),
+      trustInspector: .production,
+      trustFacts: RockchipToolTrustFactStore(preferences: preferences))
+  }
+
+  func install(executableURL: URL) throws -> RockchipToolInstallationReceipt {
+    try bookmarks.install(executableURL: executableURL)
+    let assessment = try trustInspector.assess(executableURL)
+    guard assessment.quarantinePresent == false else {
+      throw configurationError(
+        "rkdeveloptool is quarantined; use the exact-digest trust-tool entry after explicit trust")
+    }
+    try trustFacts.persist(assessment)
+    return receipt(assessment)
+  }
+
+  func trustAndInstall(
+    executableURL: URL,
+    expectedSHA256: String
+  ) throws -> RockchipToolInstallationReceipt {
+    let pinned = RockchipDiscoveryIntegrationProfile.pinnedProduction.executableSHA256
+    guard expectedSHA256 == pinned else {
+      throw configurationError("trust-tool digest does not equal the product pin")
+    }
+    // The first install is an identity-bound, prepared-only hash check. Quarantine removal is
+    // unreachable until that exact descriptor identity has passed the product pin.
+    try bookmarks.install(executableURL: executableURL)
+    let before = try trustInspector.assess(executableURL)
+    if before.quarantinePresent == true {
+      try trustInspector.clearQuarantine(executableURL)
+    }
+    // Re-verify the post-transition file and assess the platform facts from live metadata.
+    try bookmarks.install(executableURL: executableURL)
+    let after = try trustInspector.assess(executableURL)
+    guard after.quarantinePresent == false else {
+      throw configurationError("rkdeveloptool remains quarantined after trust transition")
+    }
+    try trustFacts.persist(after)
+    return receipt(after)
+  }
+
+  private func receipt(_ assessment: RockchipPlatformTrustReceipt)
+    -> RockchipToolInstallationReceipt
+  {
+    RockchipToolInstallationReceipt(
+      executableSHA256: RockchipDiscoveryIntegrationProfile.pinnedProduction.executableSHA256,
+      codeTrust: assessment.codeTrust,
+      quarantinePresent: assessment.quarantinePresent ?? true)
+  }
+
+  private func configurationError(_ detail: String) -> RockchipFlashExecutionError {
+    .productionConfigurationUnavailable(detail)
+  }
+}
+
 private final class RockchipProductExecutionSettings: @unchecked Sendable {
   let usageRoot: URL
   let tool: RockchipSelectedDiscoveryTool
@@ -995,13 +1487,21 @@ private final class RockchipProductExecutionSettings: @unchecked Sendable {
       verifier: .production
     ).load()
     let executableURL = locator.executableURL
-    let trustRaw = defaults.string(forKey: "ArkDeck.Rockchip.ToolCodeTrust")
+    let trustRaw = defaults.string(forKey: RockchipToolTrustFactStore.codeTrustKey)
     let trust = trustRaw.flatMap(RockchipPlatformCodeTrust.init(rawValue:)) ?? .unknown
-    guard defaults.object(forKey: "ArkDeck.Rockchip.ToolQuarantinePresent") != nil else {
+    guard defaults.object(forKey: RockchipToolTrustFactStore.quarantineKey) != nil else {
       throw RockchipFlashExecutionError.productionConfigurationUnavailable(
         "tool quarantine assessment is absent")
     }
-    let quarantine = defaults.bool(forKey: "ArkDeck.Rockchip.ToolQuarantinePresent")
+    let quarantine = defaults.bool(forKey: RockchipToolTrustFactStore.quarantineKey)
+    let liveTrust = try RockchipProductToolTrustInspector.production.assess(executableURL)
+    guard liveTrust.codeTrust == trust,
+      liveTrust.quarantinePresent == quarantine,
+      liveTrust.permitsPinnedDiscovery
+    else {
+      throw RockchipFlashExecutionError.productionConfigurationUnavailable(
+        "live rkdeveloptool platform trust differs from its installed facts")
+    }
     let selectedTool = RockchipSelectedDiscoveryTool(
       executableURL: executableURL, pathSource: .installedOrdinaryBookmark,
       bookmarkData: locator.bookmarkData,
@@ -1010,17 +1510,7 @@ private final class RockchipProductExecutionSettings: @unchecked Sendable {
       platformTrust: RockchipPlatformTrustReceipt(
         codeTrust: trust, quarantinePresent: quarantine))
     let token = try productKeychainToken().flatMap { $0.isEmpty ? nil : $0 }
-    let bindingURL = root.appending(path: "rockchip-binding.json")
-    let bindingData = try Data(contentsOf: bindingURL, options: [.mappedIfSafe])
-    let binding = try JSONDecoder().decode(RockchipProductBindingSnapshot.self, from: bindingData)
-    guard binding.revision > 0, !binding.serial.isEmpty,
-      !binding.usbTopology.isEmpty,
-      binding.usbTopology.utf8.allSatisfy({ (48...57).contains($0) }),
-      !binding.evidence.isEmpty, binding.evidence.allSatisfy({ !$0.isEmpty })
-    else {
-      throw RockchipFlashExecutionError.productionConfigurationUnavailable(
-        "durable Rockchip binding snapshot is invalid")
-    }
+    let binding = try RockchipProductBindingStore(rootURL: root).loadExisting()
     return RockchipProductExecutionSettings(
       usageRoot: usage, tool: selectedTool,
       githubToken: token, binding: binding)

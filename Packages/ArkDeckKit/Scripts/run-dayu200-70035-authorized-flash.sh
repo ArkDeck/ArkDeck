@@ -21,6 +21,7 @@ readonly EXPECTED_STEP_SET_SHA256="c8bdce2a137690081c1dd5ca38f91f25399c63778ab18
 
 usage() {
   printf 'Usage:\n' >&2
+  printf '  %s --prepare\n' "$0" >&2
   printf '  %s --check\n' "$0" >&2
   printf '  %s --interactive-trigger\n' "$0" >&2
   printf '  %s --chat-trigger --confirm-plan-sha256 SHA256 --confirmation-digest-sha256 SHA256\n' "$0" >&2
@@ -41,7 +42,7 @@ confirmation_digest_sha256=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --check|--interactive-trigger|--chat-trigger)
+    --prepare|--check|--interactive-trigger|--chat-trigger)
       [[ -z "$mode" ]] || fail "exactly one execution mode is required"
       mode="$1"
       shift
@@ -72,6 +73,9 @@ done
 }
 
 case "$mode" in
+  --prepare)
+    [[ -z "$confirmed_plan_sha256" && -z "$confirmation_digest_sha256" ]] || fail "--prepare does not accept confirmation values"
+    ;;
   --check)
     [[ -z "$confirmed_plan_sha256" && -z "$confirmation_digest_sha256" ]] || fail "--check does not accept confirmation values"
     ;;
@@ -89,12 +93,21 @@ esac
 
 [[ -f "$ARCHIVE" ]] || fail "pinned 7.0.0.35 archive is missing"
 [[ -f "$TOOL" && -x "$TOOL" ]] || fail "pinned rkdeveloptool is missing or not executable"
-[[ -f "$BINDING" ]] || fail "durable Rockchip binding is missing: $BINDING"
-
 archive_sha256="$(sha256_file "$ARCHIVE")"
 [[ "$archive_sha256" == "$EXPECTED_ARCHIVE_SHA256" ]] || fail "archive SHA-256 drift"
 tool_sha256="$(sha256_file "$TOOL")"
 [[ "$tool_sha256" == "$EXPECTED_TOOL_SHA256" ]] || fail "rkdeveloptool SHA-256 drift"
+
+if [[ ! -x "$ARKDECK_BIN" ]]; then
+  /usr/bin/swift build --package-path "$PACKAGE_DIR" -c release --product arkdeck
+fi
+
+if [[ "$mode" == "--prepare" ]]; then
+  "$ARKDECK_BIN" flash install-tool --path "$TOOL"
+  "$ARKDECK_BIN" flash install-binding
+fi
+
+[[ -f "$BINDING" ]] || fail "durable Rockchip binding is missing: $BINDING"
 
 if /usr/bin/xattr -p com.apple.quarantine "$TOOL" >/dev/null 2>&1; then
   fail "rkdeveloptool is quarantined; the maintainer must personally decide whether to trust it"
@@ -119,11 +132,7 @@ binding_serial_sha256="$(printf '%s' "$binding_serial" | /usr/bin/shasum -a 256 
 target_digest_sha256="$(printf '%s' "dayu200|${binding_serial_sha256}|${binding_revision}|${target_location_id}|8711|13578" | /usr/bin/shasum -a 256 | /usr/bin/awk '{print $1}')"
 unset binding_serial
 
-if [[ ! -x "$ARKDECK_BIN" ]]; then
-  /usr/bin/swift build --package-path "$PACKAGE_DIR" -c release --product arkdeck
-fi
-
-printf 'READY: host-only checks passed\n'
+printf 'READY: product prerequisite checks passed\n'
 printf '  authority: chatConfirmation (one-shot; no AUTH-ID)\n'
 printf '  execution authority: authorizedAgent\n'
 printf '  profile: dayu200@2 / OpenHarmony 7.0.0.35-20260728_180253\n'
@@ -134,6 +143,11 @@ printf '  binding revision: %s\n' "$binding_revision"
 printf '  USB topology: %s\n' "$target_location_id"
 printf '  target sha256: %s\n' "$target_digest_sha256"
 printf '  impact: all 9 mapped partitions, including userdata, will be overwritten\n'
+
+if [[ "$mode" == "--prepare" ]]; then
+  printf 'PREPARED: tool trust facts and E0 Loader binding are installed; no device command was dispatched\n'
+  exit 0
+fi
 
 if [[ "$mode" == "--check" ]]; then
   printf 'CHECK ONLY: no device command was dispatched\n'
