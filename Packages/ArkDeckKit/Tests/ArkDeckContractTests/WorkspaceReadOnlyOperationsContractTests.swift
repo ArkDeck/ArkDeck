@@ -257,6 +257,11 @@ final class WorkspaceReadOnlyOperationsContractTests: XCTestCase {
     else {
       return XCTFail("a non-Git profile must lower an exact sealed archive checkpoint")
     }
+    let journalStep = try RuntimeJobEngine.journalStep(
+      for: descriptor.steps[0], jobID: context().jobID,
+      inputs: ["projectRef": .string("TestProject")], action: action)
+    XCTAssertEqual(journalStep.arguments["projectRef"], .string("TestProject"))
+    XCTAssertEqual(journalStep.arguments["artifactId"], .string("checkpoint.txt"))
     let archivePath = checkpoint.archivePath
     XCTAssertEqual(
       checkpoint.invocation.arguments,
