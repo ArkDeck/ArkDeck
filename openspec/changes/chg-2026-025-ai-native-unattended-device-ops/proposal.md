@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-025-ai-native-unattended-device-ops
-revision: 6
-status: approved # r1 经 #281 正式批准；r2-r5 已合入；r6 contract ownership transfer 以维护者 review/merge 本修订 PR 生效
+revision: 7
+status: approved # r1 经 #281 正式批准；r2-r6 已合入；r7 chat-confirmed E2 authority 以维护者 review/merge 本修订 PR 生效
 class: core
 core_change_level: major
 owner: lvye
@@ -10,6 +10,16 @@ platforms: [macos]
 ---
 
 # AI Native 无人值守设备操作:授权从"人类亲手执行"上移为"人类批准计划"
+
+> r7 chat-confirmed E2 authority（2026-08-01）：维护者要求 GJ-4 的用户监督式
+> Agent 会话不再额外索取 `AUTH-ID`。本 revision 新增一次性
+> `chatConfirmation` authority：Agent 先向用户呈现完整 canonical plan digest、archive/
+> step-set digest、目标 binding 与数据影响，用户在同一交互会话明确确认后，产品可对该
+> exact plan 执行一次 E2。它不具备 merged standing authorization 的密码学 provenance；
+> 维护者 merge 本 revision 即明确接受“产品信任交互式 Agent 如实转交确认 assertion”这一
+> residual risk。CI、后台无人值守、自动重试、不同 plan/target 复用及
+> `outcomeUnknown` 恢复全部 fail closed。本 revision 只批准 scope/契约；合入前代码、设备
+> dispatch 与授权实例均为 0。
 
 > r6 hardware-evidence ownership transfer（2026-07-29）：`CHG-2026-049`
 > `DHA-HW-001` 已证明 Agent E0 Runtime 可成功执行，但 current V2 schema 与
@@ -79,9 +89,12 @@ plan、gate 或人工 harness，没有统一的 journal-backed production execut
 使 AI 只能生成 crib 再等待人类照抄执行，不能完成“采集 → 分析 → 部署 → 重启/复验 →
 证据归档”的自动调试循环。
 
-不变的前提:威胁模型仍是"自主 Agent 可能伪造证据、静默扩权、绕过验收"。因此本
-change **只移动执行权,不移动批准权**——唯一信任根(受保护 main + 维护者
-CODEOWNER review,merge 即批准)与 `POL-AGENT-001`(Agent 不得自批规则)零改动。
+不变的前提:威胁模型仍是"自主 Agent 可能伪造证据、静默扩权、绕过验收"。r1-r6
+因此只移动执行权、不移动批准权。r7 是维护者明确要求的有限例外：用户在受监督的
+交互式 Agent 会话内对 exact plan 作出的聊天确认可作为一次性 E2 authority；产品无法
+独立证明该消息的账号或传输 provenance，只能验证 Agent 转交的确认 assertion 与现场
+重算计划/目标完全一致。唯一信任根仍负责批准这项策略本身，Agent 不得把未发生的聊天
+确认记为已发生，也不得将一次确认复用于其他执行。
 
 ## What changes
 
@@ -106,6 +119,22 @@ In scope:
   standing-authorization 校验路径;无授权/不匹配仍 policyBlocked。
 - **首次无人值守真机验收**(TASK-AIN-004):agent 无人值守执行日志采集 + pinned
   plan 刷机,产出首份 `executor.kind=agent` 的 realHardware evidence。
+
+### r7 chat-confirmed E2 authority
+
+- **一次聊天、一次 exact plan**：用户无需提供或查找 `AUTH-ID`。Agent 必须先展示完整
+  plan/archive/step-set digest、目标 binding 摘要与数据影响，再在同一交互会话获得明确
+  确认；产品只接受与现场重算值逐项相同的 typed confirmation assertion。
+- **不冒充 standing authorization**：Journal/Manifest/evidence 使用独立
+  `chatConfirmation` authority kind，记录 confirmation digest、plan/target correlation 与
+  时间；不得伪写 `standingAuthorization` 或维护者授权 carrier。
+- **单次、非恢复型**：confirmation 在首次 admission 后永久消费；失败、取消、crash 或
+  outcomeUnknown 均不退款、不自动重放。再次执行必须取得新的聊天确认。
+- **交互边界**：ordinary CI、后台 daemon、无人值守 scheduler、没有新用户消息的 Agent
+  continuation 均不能使用该 authority。caller-supplied raw shell/argv/executable 继续拒绝。
+- **产品闭环**：TASK-AIN-018 同一实现 PR 修改 `AGENTS.md`、typed admission/executor、
+  最终一命令 wrapper、durable authority evidence 与正负 contract/fault tests；PR 合入前不
+  连接设备、不 dispatch Flash。
 
 ### r2 security-remediation additions
 

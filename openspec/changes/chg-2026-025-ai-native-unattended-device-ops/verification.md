@@ -1,6 +1,6 @@
 # Verification Plan
 
-> Change:CHG-2026-025-ai-native-unattended-device-ops@r6
+> Change:CHG-2026-025-ai-native-unattended-device-ops@r7
 > Status:planned # 结论经维护者在 PR 中确认
 > Revision review:2026-07-22 已逐项对照 r2 security-remediation、TASK-AIN-005/006/
 > 008/007 与 AIN-004 stop gate;本计划不复用 superseded #296 readiness/authorization。
@@ -17,6 +17,9 @@
 > r6 ownership transfer:hardware-evidence current V3 与 Runtime receipt/projection
 > 转交 CHG-2026-051；AIN-002 历史 bytes 保留，010P/016 等待其 archive 后消费
 > current V3，不再借用本 scoped draft。
+> r7 authority expansion:新增 TASK-AIN-018，验证同会话一次性 chat confirmation 可在
+> 无 `AUTH-ID` 时驱动 exact E2 plan，同时对伪确认、digest/target 漂移、CI、复用、crash/
+> outcomeUnknown 自动重放保持零 dispatch；实现 PR 合入前不运行真实设备。
 
 ## Environment
 
@@ -71,11 +74,16 @@
 | AIN-E0-CAPTURE-001(change-local,r5) | typed registration runner contract/fault matrix + Agent real-device E0 run + V3 schema/privacy/effect audit；人工仅做 allowlisted 物理/配置动作 | passed | TASK-AIN-010P run + 脱敏 V3 hardware evidence；raw Artifact 受控本地引用 |
 | AIN-CONTROL-001(change-local,r3) | submit/status/cancel/reconcile/result 与 bounded debug DAG 端到端；network/shell/raw path surface=0 | passed | TASK-AIN-015 run 记录 |
 | AIN-MANUAL-GAP-001(change-local,r3) | 活跃 change/runbook grep 与 dependency audit；非 allowlisted human-only seam=0 | passed | TASK-AIN-017 run 记录 |
+| AIN-CHAT-AUTH-001(change-local,r7) | typed chat confirmation 正向一次消费；缺失/伪造 shape/digest-target 漂移/CI/复用/recovery replay 负向全为 dispatch=0 | passed | TASK-AIN-018 contract/fault tests + run 记录 |
 
 ## Negative and recovery tests
 
 - 授权缺失/过期/超次、plan hash 漂移、binding revision 不符、身份读回不匹配 →
   一律 dispatch=0(contract + 真机负探针双面);
+- chat confirmation 缺失、非当前 invocation、plan/archive/step-set/target digest 漂移、CI/
+  后台调用、已消费、并发复用、失败/crash/outcomeUnknown 后重放 → dispatch=0；
+- chat 正向只用 fake descriptor 证明 typed admission→durable consume→intent→dispatch 一次，
+  evidence authority kind 为 chatConfirmation 且不含伪造 Git/PR standing provenance；
 - caller 提供的 authorization bytes/context/revision/readback/usage 一律不成为可信输入；
   local worktree/main ref 篡改与伪造 GitHub carrier 均 dispatch=0；
 - `maxRuns` 并发 reservation 与 intent/outcome crash window 做确定性 fault injection，证明
@@ -119,7 +127,7 @@
 ## Result gate
 
 - [ ] TASK-AIN-001/002/003/003R/BKMK-001/005/006/008/007/004/009/009R/010/010P/011/012/
-  013/014/015/016/017 全部 done，且 AIN-004
+  013/014/015/016/017/018 全部 done，且 AIN-004
   使用四项 host remediation 的 fresh main OID 重新 readiness（不复用 #296）
 - [ ] 所有适用 AC passed 且 evidence 可复查
 - [ ] Simulation/fake 未计入硬件支持
@@ -130,6 +138,8 @@
   且 AIN-008 的 2.1 persistence/descriptor-identity regression evidence 在案
 - [ ] standardAgent/ordinary CI 与 caller-supplied context 的 destructive dispatch 恒为 0
 - [ ] AIN-004 使用的新 authorization 在执行时 fresh、未超次且由产品 executor 消费
+- [ ] AIN-CHAT-AUTH-001 正负矩阵全绿；chat path 不要求 AUTH-ID，不伪装 standing
+  authorization，且一个 confirmation 最多产生一次 destructive admission
 - [ ] E0/E1 真机 evidence 的 executor.kind=agent，人工动作全部属于 human-boundary
   registry，且没有人类代跑 device command
 - [ ] TASK-AIN-010P 的 raw registration Artifact 不入仓、V3 evidence 可解引用且

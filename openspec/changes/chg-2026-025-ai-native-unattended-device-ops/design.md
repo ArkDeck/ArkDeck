@@ -8,6 +8,11 @@
 > E0/E1/E2 execution、capability、standing authorization 与 human-boundary，
 > hardware-evidence current contract/Runtime projection 以 CHG-2026-051 archived
 > V3 为准。
+>
+> r7 authority note（2026-08-01）：§1—§3 的 E2 authority 由单一 standing
+> authorization 扩展为 `standingAuthorization | chatConfirmation`。后者是用户监督式
+> 交互会话的一次性 authority，不具有 GitHub/签名 provenance；维护者批准本 revision 即
+> 接受该 residual risk。它不得用于 CI、后台无人值守、自动重试或 recovery replay。
 
 ## §0 设计原则
 
@@ -28,13 +33,15 @@
 | --- | --- | --- | --- |
 | **E0 只读** | `list targets`、readonly probe registry 命令面、hilog/hitrace/hidumper 采集到 owned 路径、artifact 拉取、host 侧分析 | approved change 的 ready 任务(现行机制,无新增载体) | 是,随时可执行,无窗口概念 |
 | **E1 可逆 mutation** | `setParameter`(snapshot/readback/结束恢复)、send file 到 owned 路径、rebootDevice、启停采集 | ready 任务 + per-device typed capability evidence(TR-002R 门原样保留) | 是 |
-| **E2 destructive** | flash/erase/format/unlock/真实 update dispatch | ready 任务 + **standing authorization**(§2) | 是,在授权有效期/次数内 |
+| **E2 destructive** | flash/erase/format/unlock/真实 update dispatch | ready 任务 + **standing authorization** 或同会话一次性 **chat confirmation**(§2) | standing authorization 可无人值守；chat confirmation 仅用户监督式会话 |
 
 E0/E1 的既有约束原样保留:owned-path UUID 隔离与 verified-before-cleanup
 (REQ-TRACE-006)、序列号字节不入仓(redaction 工具链)、ownership unknown 即
 fail closed(POL-HDC-001/POL-SAFETY-001)。
 
-## §2 standing authorization(E2 授权载体)
+## §2 E2 authority 载体
+
+### §2.1 standing authorization
 
 **形态 = readiness PR 中的机器可读授权块**。本仓库 readiness PR 本就 pin 全套执行
 前提(全 OID/全 hash 惯例),standing authorization 只是把这套 pins 收敛成一个
@@ -71,17 +78,38 @@ authorization:
 - 吊销 = 维护者 merge 删除/作废该授权块的 PR;git 历史即授权审计账本;
 - 序列号等设备敏感字节按现行 redaction 规则只入摘要。
 
+### §2.2 chat confirmation
+
+chat confirmation 不创建 registry 文件，也不要求用户提供 `AUTH-ID`。顺序固定为：
+
+1. 产品现场构造 canonical typed plan，重算 plan/archive/step-set digest，并取得 fresh durable
+   binding + live identity readback；
+2. Agent 在聊天中展示上述完整 digest、脱敏 target/binding 与 userdata erase 等数据影响；
+3. 用户在同一交互会话明确确认；Agent 只把 typed confirmation assertion 传给产品，不能
+   传 raw executable/argv/shell；
+4. 产品再次重算并逐项比较，生成 invocation-scoped、one-shot、non-Codable admission；
+5. 首次 admission durable consume 后才可写 destructive intent，任一失败不退款。
+
+confirmation reference 至少携带 authority kind、confirmation digest、canonical plan digest、
+target digest 与 confirmed-at audit time；不得伪造 Git OID、PR number 或
+`standingAuthorization`。产品当前没有可信 conversation receipt port，因而无法证明消息账号/
+transport provenance，也无法从纯 CLI bytes 区分 Agent 如实转交与 Agent 自行合成。这是 r7
+经维护者显式接受的 residual risk，不得在 evidence 中隐藏。后续若引入签名 conversation
+receipt，可在不改变用户交互的前提下收紧 provenance。
+
 ## §3 执行门校验序列(E2,首个真实设备 Step 前)
 
-1. 定位授权块(main 上存在、未过期、未超次);缺失 → policyBlocked;
+1. 定位并验证 authority：standing authorization 必须来自 main 且未过期/超次；chat
+   confirmation 必须来自当前交互 invocation、未消费且非 CI/后台/recovery；缺失 →
+   policyBlocked;
 2. 逐项比对:model/serial 摘要/binding revision/firmware hash/transport/
-   hdc version/provider/step 集合/plan hash,任一不符 → 零 dispatch +
-   blocked-attempt 记录;
+   hdc version/provider/step 集合/plan hash；chat confirmation 还须匹配 archive/step-set/
+   target digest，任一不符 → 零 dispatch + blocked-attempt 记录;
 3. 设备身份读回:向目标设备实际读取身份并与授权 target 比对(机器版"物理目标
    确认");
 4. durable 写入 intent(含 authorizationRef)→ dispatch → durable outcome;
-5. evidence 落盘:executor(kind=agent, id)、authorizationRef、目标读回、时间、
-   恢复路径;schema v3。
+5. evidence 落盘:executor(kind=agent, id)、实际 authority kind/reference、目标读回、时间、
+   恢复路径;schema v3。chat confirmation 不能伪写 standing authorization provenance。
 
 失败注入要求:门 2/3 的每个比对分支都必须有 contract test 用真实(非 fake 常量)
 不一致输入证伪(TR-002R real-fault 注入先例)。
