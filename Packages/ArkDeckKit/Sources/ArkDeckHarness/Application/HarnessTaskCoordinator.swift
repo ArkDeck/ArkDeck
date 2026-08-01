@@ -71,6 +71,9 @@ public enum HarnessCoordinatorError: Error, Equatable, Sendable {
   case notPausable(HarnessTaskStatus)
   case notResumable(HarnessTaskStatus)
   case emptyResolution
+  case malformedPatchProposal(String)
+  case patchProposalNotAllowed(String)
+  case patchProposalMismatch
   case missingDecisionRecord(round: Int)
   case malformedRequest(String)
 }
@@ -79,8 +82,8 @@ public actor HarnessTaskCoordinator {
   /// Swift actors are reentrant at `await`: without an explicit gate, several
   /// concurrent wakes can all plan from the same version and submit distinct
   /// idempotency keys before only one wins the optimistic state commit.
-  private var reconcilingTaskIDs: Set<String> = []
-  private let reconcileLeaseHolderID = "HCOORD-\(UUID().uuidString)"
+  var reconcilingTaskIDs: Set<String> = []
+  let reconcileLeaseHolderID = "HCOORD-\(UUID().uuidString)"
   let store: HarnessTaskStore
   let jobPort: any HarnessRuntimeJobPort
   /// Absent means no evidence can be read, so no task can ever be judged.
@@ -712,7 +715,7 @@ public actor HarnessTaskCoordinator {
 
   // MARK: - Dispatch and recovery
 
-  private func dispatchPatch(
+  func dispatchPatch(
     _ step: HarnessPlannedStep,
     snapshotAtPlanning: HarnessTaskSnapshot,
     handler: any HarnessTaskHandler,
@@ -808,7 +811,7 @@ public actor HarnessTaskCoordinator {
       snapshotAtPlanning: snapshot, handler: handler, modelCallsSpent: modelCallsSpent)
   }
 
-  private func dispatch(
+  func dispatch(
     _ step: HarnessPlannedStep,
     snapshotAtPlanning: HarnessTaskSnapshot,
     handler: any HarnessTaskHandler,

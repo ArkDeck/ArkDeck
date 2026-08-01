@@ -153,6 +153,28 @@ package struct HarnessTaskMethodService: Sendable {
             "task": Self.encodeTask(outcome.snapshot),
           ]))
 
+      case "task.proposePatch":
+        guard let id = taskID() else {
+          return failure(id: request.id, code: .invalidParams, message: "htaskId is required")
+        }
+        guard case .string(let proposalJSON)? = request.params?["proposalJson"],
+          !proposalJSON.isEmpty
+        else {
+          return failure(
+            id: request.id, code: .invalidParams,
+            message: "proposalJson is required")
+        }
+        let outcome = try await harness.proposePatch(
+          id, proposalJSON: Data(proposalJSON.utf8))
+        return success(
+          id: request.id,
+          result: .object([
+            "action": .string(outcome.action.rawValue),
+            "reasonCode": .string(outcome.reasonCode),
+            "dispatchedJobId": outcome.dispatchedJobID.map(JSONValue.string) ?? .null,
+            "task": Self.encodeTask(outcome.snapshot),
+          ]))
+
       case "task.pause":
         guard let id = taskID() else {
           return failure(id: request.id, code: .invalidParams, message: "htaskId is required")
@@ -186,6 +208,8 @@ package struct HarnessTaskMethodService: Sendable {
       switch error {
       case .notFound(let id):
         return failure(id: request.id, code: .notFound, message: "unknown task \(id)")
+      case .malformedPatchProposal(let reason):
+        return failure(id: request.id, code: .invalidParams, message: reason)
       default:
         return failure(id: request.id, code: .rejected, message: "\(error)")
       }
