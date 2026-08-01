@@ -248,3 +248,94 @@ public enum RuntimeOperationCatalog {
     return descriptor(id: String(parts[0]), version: version)
   }
 }
+
+/// Resolves the effect of the exact typed request the runtime will
+/// materialize. Keeping this rule in `ArkDeckCore` gives authorization,
+/// execution and higher-level bounded-budget accounting one source of truth.
+public enum CatalogOperationEffectResolver {
+  /// The maximum effect over the steps selected by these exact inputs.
+  /// Optional steps that will not run do not raise the result.
+  public static func effectiveEffect(
+    descriptor: CatalogOperationDescriptor, inputs: [String: JSONValue]
+  ) -> WorkflowEffect {
+    var effect = descriptor.minimumEffect
+    for step in descriptor.steps where stepIsSelected(step, descriptor: descriptor, inputs: inputs) {
+      if step.effect > effect { effect = step.effect }
+    }
+    return effect
+  }
+
+  /// Whether a catalog step participates in the exact materialized plan.
+  /// A step can be mandatory when selected yet switched off by a typed input;
+  /// that is distinct from an optional step whose failure may be tolerated.
+  public static func stepIsSelected(
+    _ step: CatalogStepDescriptor,
+    descriptor: CatalogOperationDescriptor,
+    inputs: [String: JSONValue]
+  ) -> Bool {
+    if step.isOptional {
+      return optionalStepIsSelected(step, descriptor: descriptor, inputs: inputs)
+    }
+    switch step.stepID {
+    case "stop-ability":
+      if case .string(let state)? = inputs["postRunAbilityState"] {
+        return state == "stopped"
+      }
+      return true
+    default:
+      return true
+    }
+  }
+
+  /// Typed selection rules for published optional steps. Defaults mirror the
+  /// catalog operation's input defaults and therefore fail closed with the
+  /// same plan the runtime will execute.
+  public static func optionalStepIsSelected(
+    _ step: CatalogStepDescriptor,
+    descriptor: CatalogOperationDescriptor,
+    inputs: [String: JSONValue]
+  ) -> Bool {
+    switch step.stepID {
+    case "capture-trace", "receive-trace-artifact", "cleanup-remote-temp":
+      if case .array(let categories)? = inputs["traceCategories"] {
+        return !categories.isEmpty
+      }
+      return false
+    case "capture-ui-dump":
+      if case .bool(let enabled)? = inputs["uiDump"] { return enabled }
+      return true
+    case "capture-crash-index":
+      if case .bool(let enabled)? = inputs["crashLogs"] { return enabled }
+      return false
+    case "capture-crash-log":
+      if case .string(let name)? = inputs["crashLogName"] { return !name.isEmpty }
+      return false
+    case "observe-application-liveness":
+      if case .string(let bundleName)? = inputs["bundleName"] {
+        return !bundleName.isEmpty
+      }
+      return false
+    case "capture-screenshot", "receive-screenshot", "cleanup-screenshot-temp":
+      if case .bool(let enabled)? = inputs["uiScreenshot"] { return enabled }
+      return false
+    case "capture-ui-tree", "receive-ui-tree", "cleanup-ui-tree-temp":
+      if case .bool(let enabled)? = inputs["uiComponentTree"] { return enabled }
+      return false
+    case "capture-diagnostics":
+      if case .bool(let enabled)? = inputs["captureDiagnostics"] { return enabled }
+      return true
+    case "cleanup-uninstall":
+      if case .string(let policy)? = inputs["cleanupPolicy"] {
+        return policy == "uninstall"
+      }
+      return true
+    case "capture-post-flash-diagnostics":
+      if case .string(let profile)? = inputs["postFlashVerification"] {
+        return profile == "full"
+      }
+      return true
+    default:
+      return true
+    }
+  }
+}

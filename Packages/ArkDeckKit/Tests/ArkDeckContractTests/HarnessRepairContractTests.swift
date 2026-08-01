@@ -238,6 +238,74 @@ final class HarnessRepairContractTests: XCTestCase {
     }
   }
 
+  func testHarnessChargesTheExactMaterializedCatalogEffect() {
+    let capture = DebugCrashTaskHandler.typedInputs(
+      for: DebugCrashTaskHandler.captureDiagnostics)
+    XCTAssertFalse(
+      HarnessTaskCoordinator.consumesHarnessE1Budget(
+        DebugCrashTaskHandler.captureDiagnostics, inputs: capture))
+    XCTAssertTrue(
+      HarnessTaskCoordinator.consumesHarnessE1Budget(
+        DebugCrashTaskHandler.captureDiagnostics,
+        inputs: capture.merging(["traceCategories": .array([.string("sched")])]) {
+          _, new in new
+        }))
+    for operation in [
+      DebugCrashTaskHandler.applyPatch, DebugCrashTaskHandler.buildOpenHarmony,
+      DebugCrashTaskHandler.runTests, DebugCrashTaskHandler.deployHAP,
+      DebugCrashTaskHandler.revertPatch,
+    ] {
+      XCTAssertTrue(
+        HarnessTaskCoordinator.consumesHarnessE1Budget(operation, inputs: [:]),
+        "\(operation) is a published E1 mutation and must never be omitted")
+    }
+  }
+
+  func testAcceptedWorkspaceBuildAndTestsEachChargeExactlyOnce() async throws {
+    let patch = try proposal()
+    let revision = String(repeating: "a", count: 64)
+    let cases: [(String, HarnessRepairAttempt, Int)] = [
+      (
+        DebugCrashTaskHandler.buildOpenHarmony,
+        HarnessRepairAttempt(
+          proposal: patch, patchAttemptRef: "patch-fixture", patchRevision: revision),
+        2
+      ),
+      (
+        DebugCrashTaskHandler.runTests,
+        HarnessRepairAttempt(
+          proposal: patch, patchAttemptRef: "patch-fixture", patchRevision: revision,
+          buildSourceRevision: revision),
+        3
+      ),
+    ]
+
+    for (index, item) in cases.enumerated() {
+      let snapshot = makeSnapshot(
+        phase: .building, activeJobID: nil, repair: item.1,
+        consumed: HarnessConsumedBudget(rounds: 1, e1Mutations: item.2))
+      let store = try HarnessTaskStore(
+        rootURL: rootURL.appendingPathComponent("accepted-e1-\(index)", isDirectory: true))
+      try await store.create(snapshot)
+      let jobs = RepairJobPort(observations: [:])
+      let fixedNow = now
+      let coordinator = HarnessTaskCoordinator(
+        store: store, jobPort: jobs,
+        repairPort: repairFixture(unknown: .stillUnknown), nowUTC: { fixedNow },
+        policyGuard: HarnessPolicyGuard(
+          capabilities: IssuedWorkspaceGrant(covered: workspaceMutations)))
+
+      let outcome = try await coordinator.reconcile(snapshot.htaskID)
+      let operations = await jobs.operations()
+      XCTAssertEqual(outcome.action, .dispatched)
+      XCTAssertEqual(operations, [item.0])
+      XCTAssertEqual(outcome.snapshot.consumedBudget.e1Mutations, item.2 + 1)
+      let waiting = try await coordinator.reconcile(snapshot.htaskID)
+      XCTAssertEqual(waiting.action, .waitedForActiveJob)
+      XCTAssertEqual(waiting.snapshot.consumedBudget.e1Mutations, item.2 + 1)
+    }
+  }
+
   func testWorkspaceProfileGlobSymlinkAndBaseMismatchPublishNoPatchArtifact() async throws {
     let workspace = rootURL.appendingPathComponent("workspace", isDirectory: true)
     let sources = workspace.appendingPathComponent("Sources", isDirectory: true)
@@ -301,7 +369,8 @@ final class HarnessRepairContractTests: XCTestCase {
     let proposal = try proposal()
     let attempt = HarnessRepairAttempt(proposal: proposal)
     let snapshot = makeSnapshot(
-      phase: .patching, activeJobID: "JOB-APPLY", repair: attempt)
+      phase: .patching, activeJobID: "JOB-APPLY", repair: attempt,
+      consumed: HarnessConsumedBudget(rounds: 1, e1Mutations: 1))
     let decision = HarnessDecision(
       decisionID: "dec-apply", htaskID: snapshot.htaskID, round: 1,
       kind: .proposePatch, operationReference: DebugCrashTaskHandler.applyPatch,
@@ -323,6 +392,7 @@ final class HarnessRepairContractTests: XCTestCase {
     XCTAssertEqual(outcome.reasonCode, "patchOutcomeReadback:PATCH_NOT_APPLIED")
     XCTAssertEqual(submitted, [], "unknown apply must never dispatch apply again")
     XCTAssertEqual(intents.count, 1)
+    XCTAssertEqual(outcome.snapshot.consumedBudget.e1Mutations, 1)
   }
 
   func testBuildSourceRevisionMustEqualPatchRevisionBeforeTestsDispatch() async throws {
@@ -498,7 +568,7 @@ final class HarnessRepairContractTests: XCTestCase {
     XCTAssertEqual(planned.decision.inputs["diagnosticsDurationSeconds"], .integer(5))
 
     let underBudgeted = baselineSnapshot(
-      phase: .collecting, activeJobID: nil, maxE1Mutations: 2)
+      phase: .collecting, activeJobID: nil, maxE1Mutations: 5)
     let refused = handler.plan(
       for: underBudgeted, decisionID: "dec-no-budget", nowUTC: now)
     XCTAssertTrue(handler.offeredOperations(for: underBudgeted).isEmpty)
@@ -522,6 +592,42 @@ final class HarnessRepairContractTests: XCTestCase {
       handler.plan(for: alreadyDeployed, decisionID: "dec-after-deploy", nowUTC: now)
         .decision.operationReference,
       DebugCrashTaskHandler.captureDiagnostics)
+  }
+
+  func testLegacyPositiveBudgetStopsBeforePatchAndDeploymentReserveIsExact() throws {
+    let handler = DebugCrashTaskHandler()
+    let underBudgetedRepair = baselineSnapshot(
+      phase: .analyzing, activeJobID: nil, maxE1Mutations: 3,
+      observedState: HarnessObservedState(latestVerdict: .fail).asJSON,
+      consumed: HarnessConsumedBudget(rounds: 4, e1Mutations: 1))
+    XCTAssertTrue(handler.offeredOperations(for: underBudgetedRepair).isEmpty)
+    XCTAssertEqual(
+      handler.plan(
+        for: underBudgetedRepair, decisionID: "dec-under-budget", nowUTC: now
+      ).decision.reasonCode,
+      "repairMutationBudgetUnavailable")
+
+    let patch = try proposal()
+    let revision = String(repeating: "a", count: 64)
+    let ready = HarnessRepairAttempt(
+      proposal: patch, patchAttemptRef: "patch-fixture", patchRevision: revision,
+      buildSourceRevision: revision, buildOutputDigest: String(repeating: "b", count: 64),
+      buildOutputArtifactLease: "lease-v1:build:ART-build", testsPassed: true)
+    let exact = makeSnapshot(
+      phase: .building, activeJobID: nil, repair: ready,
+      consumed: HarnessConsumedBudget(rounds: 5, e1Mutations: 4), maxE1Mutations: 6)
+    XCTAssertEqual(
+      handler.plan(for: exact, decisionID: "dec-exact", nowUTC: now)
+        .decision.operationReference,
+      DebugCrashTaskHandler.deployHAP)
+
+    let short = makeSnapshot(
+      phase: .building, activeJobID: nil, repair: ready,
+      consumed: HarnessConsumedBudget(rounds: 5, e1Mutations: 4), maxE1Mutations: 5)
+    XCTAssertEqual(
+      handler.plan(for: short, decisionID: "dec-short", nowUTC: now)
+        .decision.reasonCode,
+      "repairMutationBudgetUnavailable")
   }
 
   func testSuccessfulCrashFixtureDeploymentContinuesWithARealCaptureNotRepairReadback()
@@ -628,7 +734,7 @@ final class HarnessRepairContractTests: XCTestCase {
     phase: HarnessTaskPhase,
     activeJobID: String?,
     activeRound: Int = 0,
-    maxE1Mutations: Int = 3,
+    maxE1Mutations: Int = 6,
     observedState: [String: JSONValue]? = nil,
     consumed: HarnessConsumedBudget = HarnessConsumedBudget()
   ) -> HarnessTaskSnapshot {
@@ -702,7 +808,8 @@ final class HarnessRepairContractTests: XCTestCase {
     repair: HarnessRepairAttempt,
     consumed: HarnessConsumedBudget = HarnessConsumedBudget(rounds: 1),
     baselineLease: String = "lease-v1:input-hap:ART-crash-fixture",
-    observedState: [String: JSONValue]? = nil
+    observedState: [String: JSONValue]? = nil,
+    maxE1Mutations: Int = 6
   ) -> HarnessTaskSnapshot {
     var observed = observedState ?? HarnessObservedState(latestVerdict: .fail).asJSON
     observed[HarnessRepairAttempt.observedStateKey] = repair.json
@@ -722,7 +829,7 @@ final class HarnessRepairContractTests: XCTestCase {
       successCriteria: DebugCrashTaskHandler().defaultSuccessCriteria(),
       budgets: HarnessTaskBudgets(
         maxRounds: 8, maxWallClockSeconds: 900, maxArtifactBytes: 1 << 20,
-        maxE1Mutations: 3),
+        maxE1Mutations: maxE1Mutations),
       policy: HarnessTaskPolicy(
         allowedOperations: DebugCrashTaskHandler().permittedOperations.sorted()),
       observedState: observed, createdAtUTC: now, updatedAtUTC: now,

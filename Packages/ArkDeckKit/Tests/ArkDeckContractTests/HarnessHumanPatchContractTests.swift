@@ -42,6 +42,33 @@ private actor HumanPatchJobPort: HarnessRuntimeJobPort {
   func requests() -> [RuntimeOperationRequest] { submittedRequests }
 }
 
+private actor DeduplicatingHumanPatchJobPort: HarnessRuntimeJobPort {
+  private var acceptedByKey: [String: String] = [:]
+  private var submittedRequests: [RuntimeOperationRequest] = []
+
+  func submit(requestJSON: Data) async throws -> HarnessJobAcceptance {
+    let request = try JSONDecoder().decode(RuntimeOperationRequest.self, from: requestJSON)
+    submittedRequests.append(request)
+    if let jobID = acceptedByKey[request.idempotencyKey] {
+      return HarnessJobAcceptance(jobID: jobID, deduplicated: true)
+    }
+    acceptedByKey[request.idempotencyKey] = "JOB-HUMAN-PATCH-DEDUP"
+    throw HarnessJobPortError.transportFailure("answer lost after engine acceptance")
+  }
+
+  func startRun(jobID: String) async throws {}
+
+  func observe(jobID: String) async throws -> HarnessJobObservation {
+    HarnessJobObservation(
+      jobID: jobID, state: "running", isTerminal: false, succeeded: false,
+      outcomeUnknown: false, waitingForHuman: false, timeline: ["running"])
+  }
+
+  func requestCancel(jobID: String) async throws {}
+
+  func requests() -> [RuntimeOperationRequest] { submittedRequests }
+}
+
 private actor HumanPatchRepairPort: HarnessRepairPort {
   private var prepareCount = 0
 
@@ -140,6 +167,7 @@ final class HarnessHumanPatchContractTests: XCTestCase {
     XCTAssertEqual(outcome.action, .dispatched)
     XCTAssertEqual(outcome.snapshot.phase, .patching)
     XCTAssertEqual(outcome.snapshot.consumedBudget.modelCalls, 0)
+    XCTAssertEqual(outcome.snapshot.consumedBudget.e1Mutations, 1)
     XCTAssertEqual(prepareCount, 1)
     XCTAssertEqual(requests.count, 1)
     XCTAssertEqual(requests[0].operation.reference, DebugCrashTaskHandler.applyPatch)
@@ -311,17 +339,53 @@ final class HarnessHumanPatchContractTests: XCTestCase {
       first.reasonCode,
       "submissionRejected:authorizationRequired:\(DebugCrashTaskHandler.applyPatch)")
     XCTAssertEqual(firstRequests.count, 1)
+    XCTAssertEqual(first.snapshot.consumedBudget.e1Mutations, 0)
 
     await jobs.acceptAuthorization()
     let retried = try await coordinator.proposePatch(taskID, proposalJSON: bytes)
     let allRequests = await jobs.requests()
     let prepareCount = await repair.preparations()
     XCTAssertEqual(retried.action, .dispatched)
+    XCTAssertEqual(retried.snapshot.consumedBudget.e1Mutations, 1)
     XCTAssertEqual(allRequests.count, 2)
     XCTAssertEqual(allRequests[0].requestID, allRequests[1].requestID)
     XCTAssertEqual(allRequests[0].idempotencyKey, allRequests[1].idempotencyKey)
     XCTAssertEqual(allRequests[0].inputs, allRequests[1].inputs)
     XCTAssertEqual(prepareCount, 1)
+  }
+
+  func testDeduplicatedPatchRecoveryChargesTheAcceptedEffectOnce() async throws {
+    let proposal = try makeProposal()
+    let repair = HumanPatchRepairPort()
+    let grant = HumanPatchGrant(enabled: true)
+    let jobs = DeduplicatingHumanPatchJobPort()
+    let (coordinator, _) = try await makeStack(
+      jobs: jobs, repair: repair, capabilities: grant)
+
+    _ = try await coordinator.reconcile(taskID)
+    do {
+      _ = try await coordinator.proposePatch(
+        taskID, proposalJSON: proposalJSON(proposal))
+      XCTFail("the first engine answer is deliberately lost")
+    } catch {
+      XCTAssertEqual(
+        error as? HarnessJobPortError,
+        .transportFailure("answer lost after engine acceptance"))
+    }
+    let unresolved = try await coordinator.status(taskID)
+    XCTAssertEqual(unresolved.consumedBudget.e1Mutations, 0)
+
+    let recovered = try await coordinator.reconcile(taskID)
+    XCTAssertEqual(recovered.action, .recoveredIntent)
+    XCTAssertEqual(recovered.reasonCode, "deduplicated")
+    XCTAssertEqual(recovered.snapshot.consumedBudget.e1Mutations, 1)
+    let waiting = try await coordinator.reconcile(taskID)
+    XCTAssertEqual(waiting.action, .waitedForActiveJob)
+    XCTAssertEqual(waiting.snapshot.consumedBudget.e1Mutations, 1)
+
+    let requests = await jobs.requests()
+    XCTAssertEqual(requests.count, 2)
+    XCTAssertEqual(requests[0].idempotencyKey, requests[1].idempotencyKey)
   }
 
   func testWrongStateAndChangedAuthorizationRetryHaveNoEffect() async throws {
@@ -437,7 +501,7 @@ final class HarnessHumanPatchContractTests: XCTestCase {
       successCriteria: DebugCrashTaskHandler().defaultSuccessCriteria(),
       budgets: HarnessTaskBudgets(
         maxRounds: 8, maxWallClockSeconds: 900, maxArtifactBytes: 1 << 20,
-        maxE1Mutations: 3),
+        maxE1Mutations: 6),
       policy: HarnessTaskPolicy(
         allowedOperations: DebugCrashTaskHandler().permittedOperations.sorted()),
       observedState: HarnessObservedState(latestVerdict: .fail).asJSON,
