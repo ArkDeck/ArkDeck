@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-049-diagnostics-and-hap
-revision: 8
-status: approved # r2..r7 已交付；r8 仅在维护者 review/merge 本 PR 后生效
+revision: 9
+status: approved # r2..r8 已交付；r9 仅在维护者 review/merge 本 PR 后生效
 class: capability
 core_change_level: none
 owner: lvye
@@ -24,6 +24,37 @@ platforms: [macos]
 > diagnostics HiLog/component-tree pair 在 Catalog、generator、JSON Schema
 > 与 Swift validator 间闭合。r2 记录 fresh pins、草稿迁移约束和依赖复验；
 > 合入 r2 前 `TASK-DHA-001` 仍不得恢复实现。
+
+## r9(2026-08-01):聊天只触发 exact standing-authorization executor
+
+### 为什么现在做
+
+r8 已让 `dayu200@2` 到达 trusted `--authorization-id` 执行入口，但实际使用仍要人工拼接
+archive、binding selector、plan digest、工具与宿主前置。聊天 Agent 若照着多段 runbook 临时组装，
+容易把旧 profile 或截断 digest 带入执行；只保留 TTY prompt 又使已经批准的
+`authorizedAgent` E2 路径无法成为单命令自动化入口。
+
+### What(r9 交付面)
+
+1. 在 ArkDeckKit 内版本化一个只服务 7.0.0.35/dayu200@2 的 Bash 入口，固定 archive/tool
+   SHA-256、execute plan digest 与 step-set digest；从 durable binding 只读取得 topology，
+   不接受 caller 提供设备、工具、archive、argv 或 profile。
+2. 入口提供 `--check`、`--interactive-trigger` 与 `--chat-trigger`。聊天触发必须同时提供
+   strict `AUTH-ID` 和完整 64-hex exact plan digest；普通 CI/GitHub Actions 即使两者齐全仍拒绝。
+3. trigger 不携带 authority。唯一 E2 authority 仍是受保护 main 中维护者 merged PR 签发的
+   exact standing authorization；脚本最终只以 argument array 委托现有
+   `arkdeck flash execute --authorization-id` trusted host，后者 fresh admission、identity
+   readback、usage reservation 与逐项 plan correlation 任一失败都零 destructive dispatch。
+4. host-only contract 覆盖 fixed pins、typed-only delegation、截断/错误 digest、CI 与 non-TTY
+   负例；所有测试都在 archive、binding、USB/HDC/RockUSB 访问前结束。
+
+## Out of scope(r9)
+
+- 创建、修改、批准、安装或吊销 standing authorization / Runtime capability；
+- 替维护者移除 quarantine、创建 durable binding 或配置 Keychain/defaults；
+- 本 PR 中连接设备、执行真实 Flash、erase 或 recovery，或宣称 GJ-4 `REAL_DEVICE_PASS`；
+- 把聊天文本、TTY confirmation、Task/PR 状态升级为 authority，或放宽 authorization 的
+  target/binding/archive/tool/provider/plan/step-set/validity/maxRuns 任一 pin。
 
 ## r8(2026-08-01):让已发布的 7.0.0.35 profile 到达人类 Flash handoff
 
