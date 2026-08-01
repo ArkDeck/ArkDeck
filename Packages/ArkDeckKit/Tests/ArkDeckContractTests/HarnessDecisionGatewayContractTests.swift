@@ -90,6 +90,23 @@ private final class GatewayJobPort: HarnessRuntimeJobPort, @unchecked Sendable {
   }
 }
 
+private struct GatewayAvailability: HarnessOperationAvailabilityPort {
+  let unavailable: [String: String]
+
+  func availability(of reference: String) async -> (available: Bool, reason: String) {
+    if let reason = unavailable[reference] { return (false, reason) }
+    return (true, "available")
+  }
+}
+
+private struct GatewayCapabilities: HarnessCapabilityPort {
+  let covered: Set<String>
+
+  func hasStandingCapability(operationReference: String, targetID: String) async -> Bool {
+    covered.contains(operationReference)
+  }
+}
+
 final class HarnessDecisionGatewayContractTests: XCTestCase {
   private var rootURL: URL!
 
@@ -112,15 +129,19 @@ final class HarnessDecisionGatewayContractTests: XCTestCase {
     jobs: GatewayJobPort,
     projectRef: String? = "demo-app",
     desiredState: [String: JSONValue] = [:],
-    goalSummary: String = "No WaterFlow SIGABRT"
+    goalSummary: String = "No WaterFlow SIGABRT",
+    expectedBindingRevision: Int? = nil,
+    policyGuard: HarnessPolicyGuard = HarnessPolicyGuard()
   ) throws -> (HarnessTaskCoordinator, HarnessTaskStore, HarnessTaskSubmission) {
     let store = try HarnessTaskStore(rootURL: rootURL)
     let coordinator = HarnessTaskCoordinator(
       store: store, jobPort: jobs, nowUTC: { "2026-07-31T00:00:00Z" },
-      decisionGateway: gateway, egressPolicy: egress)
+      policyGuard: policyGuard, decisionGateway: gateway, egressPolicy: egress)
     let submission = HarnessTaskSubmission(
       type: .debugCrash, projectRef: projectRef,
-      target: HarnessTaskTargetReference(targetID: "TGT-958780b2ffb7"),
+      target: HarnessTaskTargetReference(
+        targetID: "TGT-958780b2ffb7",
+        expectedBindingRevision: expectedBindingRevision),
       goal: HarnessTaskGoal(summary: goalSummary, desiredState: desiredState),
       budgets: HarnessTaskBudgets(
         maxRounds: 6, maxWallClockSeconds: 900, maxArtifactBytes: 1 << 20, maxE1Mutations: 0),
@@ -397,6 +418,201 @@ final class HarnessDecisionGatewayContractTests: XCTestCase {
     XCTAssertEqual(context.goalSummary.count, 16)
     XCTAssertTrue(context.trimmed.contains("attempts:kept1of4"))
     XCTAssertTrue(context.trimmed.contains("operations:kept1of9"))
+  }
+
+  func testRevisionAwareExecutionStateIsCanonicalBoundedAndTraceable() throws {
+    let baseRevision = String(repeating: "a", count: 64)
+    let patchRevision = String(repeating: "b", count: 64)
+    let deployedDigest = String(repeating: "c", count: 64)
+    let artifactDigest = String(repeating: "d", count: 64)
+    let strategy = try HarnessStrategyDescriptor(
+      hypothesisClass: "modelProposal",
+      selectedOperationFamily: DebugCrashTaskHandler.applyPatch,
+      patchFingerprint: String(repeating: "e", count: 64),
+      baseWorkspaceRevision: baseRevision,
+      artifactSourceSet: ["ART-SOURCE"],
+      prerequisiteSet: ["checkpointPublished"],
+      executionExpectation: HarnessStrategyExecutionExpectation(
+        targetProfile: "target-profile",
+        toolchainProfile: "waterflow-debug",
+        expectedNextObservation: "PATCH_APPLIED"))
+    let attempt = HarnessAttempt(
+      attemptID: "ATTEMPT-000000000001", htaskID: "HTASK-0123456789AB", ordinal: 2,
+      hypothesis: "free-form prose is intentionally absent from the summary",
+      strategy: strategy, patchRevision: patchRevision,
+      disprovedFacts: ["criterion:DC-2=fail"],
+      createdAtUTC: "2026-08-01T00:00:00Z", updatedAtUTC: "2026-08-01T00:00:01Z")
+    let derived = HarnessDerivedArtifactSummary(
+      artifactID: "ART-DERIVED", name: "crash-signature.json",
+      sourceArtifactIDs: ["ART-RAW"],
+      analyzerReference: HarnessCrashLedgerAnalysis.analyzerRef,
+      analyzerVersion: HarnessCrashLedgerAnalysis.analyzerVersion,
+      revisionScope: HarnessContextRevisionScope(
+        workspaceRevision: patchRevision,
+        deployedArtifactDigest: deployedDigest,
+        deviceBindingRevision: 7),
+      redactionStatus: "standard", contentSHA256: artifactDigest, byteCount: 412,
+      measurements: ["matchingCrashCount": .integer(0)])
+    let snapshot = HarnessTaskSnapshot(
+      htaskID: "HTASK-0123456789AB", type: .debugCrash, intakeDescription: nil,
+      projectRef: "demo-app",
+      target: HarnessTaskTargetReference(targetID: "TGT-1", expectedBindingRevision: 7),
+      goal: HarnessTaskGoal(summary: "repair"), successCriteria: [],
+      budgets: HarnessTaskBudgets(
+        maxRounds: 12, maxWallClockSeconds: 600, maxArtifactBytes: 4096,
+        maxE1Mutations: 4, maxModelCalls: 10),
+      policy: HarnessTaskPolicy(allowedOperations: Array(offered)),
+      createdAtUTC: "2026-08-01T00:00:00Z", updatedAtUTC: "2026-08-01T00:00:01Z",
+      status: .running, phase: .patching, activeRound: 4,
+      consumedBudget: HarnessConsumedBudget(
+        rounds: 4, wallClockSeconds: 10, artifactBytes: 100, e1Mutations: 1,
+        modelCalls: 3),
+      version: 9)
+    let unavailable = HarnessContextUnavailableOperation(
+      operationReference: DebugCrashTaskHandler.runTests,
+      reasonCode: "presetUnavailable")
+    let execution = HarnessContextExecutionState(
+      activeAttempt: attempt,
+      currentWorkspaceRevision: patchRevision,
+      currentDeployedArtifactDigest: deployedDigest,
+      currentDeviceBindingRevision: 7,
+      disprovedHypotheses: ["ATTEMPT-000000000001:criterion:DC-2=fail"],
+      unavailableOperations: [unavailable],
+      authorizedOperationReferences: [
+        DebugCrashTaskHandler.applyPatch, DebugCrashTaskHandler.runTests,
+      ],
+      currentCapabilityEffectCeiling: .deviceMutation,
+      allowedFileScopes: [
+        "entry/src/main/ets/crashprobe/CrashProbe.ets", "/Users/operator/secret",
+        "../outside",
+      ],
+      derivedArtifactSummaries: [derived])
+    let assembler = HarnessDecisionContextAssembler()
+    let first = try assembler.assemble(
+      snapshot: snapshot, availableOperations: [DebugCrashTaskHandler.applyPatch],
+      evaluation: nil, attempts: [], failures: [], memory: [], artifacts: [],
+      elapsedSeconds: 10, executionState: execution)
+
+    XCTAssertEqual(first.currentTaskStateVersion, 9)
+    XCTAssertEqual(first.activeAttemptID, attempt.attemptID)
+    XCTAssertEqual(first.activeAttemptSummary?.strategyFingerprint, attempt.strategyFingerprint)
+    XCTAssertEqual(first.activeAttemptSummary?.baseWorkspaceRevision, baseRevision)
+    XCTAssertEqual(first.currentWorkspaceRevision, patchRevision)
+    XCTAssertEqual(first.currentDeployedArtifactDigest, deployedDigest)
+    XCTAssertEqual(first.currentDeviceBindingRevision, 7)
+    XCTAssertEqual(first.expectedNextObservation, "PATCH_APPLIED")
+    XCTAssertEqual(first.disprovedHypotheses, ["ATTEMPT-000000000001:criterion:DC-2=fail"])
+    XCTAssertEqual(first.unavailableOperationsAndReasons, [unavailable])
+    XCTAssertEqual(first.currentCapabilityEffectCeiling, .deviceMutation)
+    XCTAssertEqual(
+      first.allowedFileScopes, ["entry/src/main/ets/crashprobe/CrashProbe.ets"],
+      "host-absolute and escaping scopes must not cross egress")
+    XCTAssertEqual(first.budget.modelCallsRemaining, 7)
+    XCTAssertEqual(first.derivedArtifactSummaries.first?.sourceArtifactIDs, ["ART-RAW"])
+    XCTAssertEqual(first.derivedArtifactSummaries.first?.contentSHA256, artifactDigest)
+    XCTAssertLessThanOrEqual(
+      first.transmittedByteCount, HarnessDecisionContextLimits.default.maxEncodedBytes)
+
+    let second = try assembler.assemble(
+      snapshot: snapshot, availableOperations: [DebugCrashTaskHandler.applyPatch],
+      evaluation: nil, attempts: [], failures: [], memory: [], artifacts: [],
+      elapsedSeconds: 10,
+      executionState: HarnessContextExecutionState(
+        activeAttempt: attempt,
+        currentWorkspaceRevision: String(repeating: "f", count: 64),
+        currentDeployedArtifactDigest: deployedDigest,
+        currentDeviceBindingRevision: 7))
+    XCTAssertNotEqual(
+      first.transmittedDigest, second.transmittedDigest,
+      "an exact revision change must change the hash of what the model receives")
+
+    let unsafeReason = HarnessContextUnavailableOperation(
+      operationReference: DebugCrashTaskHandler.runTests,
+      reasonCode: "missing preset at /Users/operator/project")
+    XCTAssertEqual(unsafeReason.reasonCode, "operationUnavailable")
+    let unsafeContext = try assembler.assemble(
+      snapshot: snapshot, availableOperations: [], evaluation: nil, attempts: [],
+      failures: [], memory: [], artifacts: [], elapsedSeconds: 10,
+      executionState: HarnessContextExecutionState(
+        disprovedHypotheses: ["source:/Users/operator/project/build.log"]))
+    XCTAssertTrue(
+      HarnessEgressScreen.violations(in: unsafeContext, targetID: "TGT-1").contains("/Users/"),
+      "a host absolute path in any future summary must fail the final egress screen")
+  }
+
+  func testCoordinatorSeparatesUnavailableOperationsFromTheOffer() async throws {
+    let jobs = GatewayJobPort()
+    let gateway = ScriptedGateway(replies: [
+      .success(
+        encodeProposal([
+          "kind": .string("noSafeAction"),
+          "hypothesis": .string("No currently available operation is safe."),
+        ]))
+    ])
+    let availability = GatewayAvailability(unavailable: [
+      DebugCrashTaskHandler.observeDevice: "providerUnavailable"
+    ])
+    let (coordinator, _, submission) = try makeStack(
+      gateway: gateway, egress: HarnessEgressPolicy(enabledProjects: ["demo-app"]),
+      jobs: jobs, expectedBindingRevision: 7,
+      policyGuard: HarnessPolicyGuard(availability: availability))
+    let task = try await coordinator.submit(submission)
+
+    _ = try await coordinator.reconcile(task.htaskID)
+    let context = try XCTUnwrap(gateway.seenContexts.first)
+    XCTAssertEqual(context.currentTaskStateVersion, 2)
+    XCTAssertEqual(context.currentDeviceBindingRevision, 7)
+    XCTAssertTrue(context.availableOperations.isEmpty)
+    XCTAssertEqual(
+      context.unavailableOperationsAndReasons,
+      [
+        HarnessContextUnavailableOperation(
+          operationReference: DebugCrashTaskHandler.observeDevice,
+          reasonCode: "providerUnavailable")
+      ])
+    XCTAssertFalse(context.authorizedOperationRefs.contains(DebugCrashTaskHandler.observeDevice))
+    XCTAssertTrue(jobs.submittedOperations.isEmpty, "an unavailable operation must reach zero dispatch")
+  }
+
+  func testCoordinatorProjectsStandingCapabilityWithoutExposingItsIdentifier() async throws {
+    let jobs = GatewayJobPort()
+    let gateway = ScriptedGateway(replies: [
+      .success(
+        encodeProposal([
+          "kind": .string("invokeOperation"),
+          "operationRef": .string(DebugCrashTaskHandler.observeDevice),
+          "hypothesis": .string("Observe the bound target."),
+        ])),
+      .success(
+        encodeProposal([
+          "kind": .string("invokeOperation"),
+          "operationRef": .string(DebugCrashTaskHandler.captureDiagnostics),
+          "hypothesis": .string("Capture the declared evidence."),
+        ])),
+    ])
+    let capabilities = GatewayCapabilities(covered: [
+      DebugCrashTaskHandler.captureDiagnostics
+    ])
+    let (coordinator, _, submission) = try makeStack(
+      gateway: gateway, egress: HarnessEgressPolicy(enabledProjects: ["demo-app"]),
+      jobs: jobs, expectedBindingRevision: 7,
+      policyGuard: HarnessPolicyGuard(capabilities: capabilities))
+    let task = try await coordinator.submit(submission)
+
+    let first = try await coordinator.reconcile(task.htaskID)
+    let firstJob = try XCTUnwrap(first.snapshot.activeJobID)
+    jobs.finish(firstJob)
+    _ = try await coordinator.reconcile(task.htaskID)
+    _ = try await coordinator.reconcile(task.htaskID)
+
+    let context = try XCTUnwrap(gateway.seenContexts.last)
+    XCTAssertEqual(context.availableOperations, [DebugCrashTaskHandler.captureDiagnostics])
+    XCTAssertEqual(context.currentCapabilityEffectCeiling, .deviceMutation)
+    XCTAssertEqual(
+      context.authorizedOperationRefs, [DebugCrashTaskHandler.captureDiagnostics])
+    let wire = try XCTUnwrap(String(data: context.transmittedBytes, encoding: .utf8))
+    XCTAssertFalse(wire.localizedCaseInsensitiveContains("capabilityId"))
+    XCTAssertFalse(wire.contains("CAP-"))
   }
 
   func testAnOversizedContextIsRefusedInsteadOfSent() async throws {

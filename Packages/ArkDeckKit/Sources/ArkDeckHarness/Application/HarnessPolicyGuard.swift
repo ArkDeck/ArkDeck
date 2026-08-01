@@ -100,6 +100,25 @@ public struct HarnessPolicyGuard: Sendable {
     self.capabilities = capabilities
   }
 
+  /// Read-only context projection of the same ports the guard will consult
+  /// before dispatch. These helpers never reserve or consume a capability;
+  /// they let the model see why a published operation is currently absent
+  /// without exposing a capability identifier or secret.
+  func contextAvailability(
+    of operationReference: String
+  ) async -> (available: Bool, reason: String) {
+    guard let availability else { return (true, "availabilityNotConfigured") }
+    return await availability.availability(of: operationReference)
+  }
+
+  func contextHasStandingCapability(
+    operationReference: String, targetID: String
+  ) async -> Bool {
+    guard let capabilities else { return false }
+    return await capabilities.hasStandingCapability(
+      operationReference: operationReference, targetID: targetID)
+  }
+
   /// Budget-only screen, used before a decision even exists: a task with an
   /// exhausted budget must not spend a model call or a planning round.
   public static func budgetRefusal(
