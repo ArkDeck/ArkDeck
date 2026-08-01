@@ -928,6 +928,14 @@ final class HarnessTaskPlaneContractTests: XCTestCase {
     XCTAssertFalse(missingResolution.ok)
     XCTAssertEqual(missingResolution.error?.code, AgentDaemonErrorCode.invalidParams.rawValue)
 
+    let missingProposal = await handler.handleFrame(
+      try JSONEncoder().encode(
+        AgentWireProtocol.Request(
+          id: "2b", method: "task.proposePatch",
+          params: ["htaskId": .string(taskID)])))
+    XCTAssertFalse(missingProposal.ok)
+    XCTAssertEqual(missingProposal.error?.code, AgentDaemonErrorCode.invalidParams.rawValue)
+
     let unknown = await handler.handleFrame(
       try JSONEncoder().encode(
         AgentWireProtocol.Request(
