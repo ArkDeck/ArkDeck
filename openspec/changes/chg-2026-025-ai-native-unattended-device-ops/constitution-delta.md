@@ -15,22 +15,29 @@
 满足:
 
 1. 操作属于 approved change 中状态为 ready 的任务范围;
-2. `destructive` Step 存在维护者经 merged PR 预先批准、与待执行计划逐项精确一致
-   的 standing authorization(目标设备身份/binding revision、固件、transport、
-   HDC、Provider、Step 集合、恢复路径、有效期与次数上限);
+2. `destructive` Step 具备以下一种 E2 authority:
+   - 维护者经 merged PR 预先批准、与待执行计划逐项精确一致的 standing
+     authorization(目标设备身份/binding revision、固件、transport、HDC、Provider、
+     Step 集合、恢复路径、有效期与次数上限);或
+   - 用户监督式交互 Agent 会话中的一次性 chat confirmation：Agent 已展示完整 canonical
+     plan/archive/step-set digest、目标 binding 摘要与数据影响，用户在同一会话明确确认，
+     且产品收到的 typed confirmation assertion 与现场重算值逐项一致;
 3. 执行门在首个真实设备 Step 前完成逐项校验与目标设备身份读回,任一缺失或不一致
    SHALL fail closed(零 dispatch,记录 blocked-attempt);
-4. evidence 如实记录 executor 身份(human 或 agent)、authorizationRef(agent 执行
-   必填)、目标确认、执行时间与恢复路径。
+4. evidence 如实记录 executor 身份(human 或 agent)、实际 authority kind/reference、目标
+   确认、执行时间与恢复路径；chat confirmation 不得记成 standing authorization。
 
 只读采集与 host 侧分析在 ready 任务范围内 MAY 无人值守执行;可逆 deviceMutation
 另需 per-device typed capability evidence。普通 CI 不持 standing authorization,
 SHALL 仍只运行 schema/contract tests、fake/simulation 与 plan-only。
 
-聊天中的"继续"、已连接 USB、Task 标为 high risk 或事后补记 SHALL NOT 构成或追认
-standing authorization;Agent SHALL NOT 自行创建、修改或批准 standing
-authorization(POL-AGENT-001 适用)。人类操作者亲手执行仍为有效执行路径,其
-evidence 以 executor.kind=human 记录。
+chat confirmation 只对同一交互会话、同一 exact plan/target 的一次 admission 生效，
+SHALL NOT 变成 standing authorization；CI、后台无人值守、自动重试、不同计划/目标复用
+及 outcomeUnknown 恢复 SHALL fail closed。产品无法密码学证明聊天账号/传输 provenance，
+本策略显式信任交互式 Agent 如实转交用户确认；Agent SHALL NOT 伪造未发生的确认，亦
+SHALL NOT 自行创建、修改或批准 standing authorization(POL-AGENT-001 适用)。已连接
+USB、Task 风险标记或事后补记仍不构成或追认任何 E2 authority。人类操作者亲手执行仍为
+有效执行路径，其 evidence 以 executor.kind=human 记录。
 
 ## 保持不变
 

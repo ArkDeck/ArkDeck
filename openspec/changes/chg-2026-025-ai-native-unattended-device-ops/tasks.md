@@ -3223,3 +3223,78 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
 - 全仓 grep + task dependency/status review + SDD guard；
 - 历史 evidence/raw/golden hash 零改写；未取得产品真机 evidence 的 capability 不提前
   标 ready/done/verified。
+
+## TASK-AIN-018 — 用户监督式一次性 chat-confirmed E2 authority
+
+- Status:ready（仅在维护者 review/merge CHG-2026-025 r7 amendment 后生效；合入前为
+  blocked，代码、设备 dispatch 与授权实例均为 0）
+- Platform:macos
+- Requirements:POL-AGENT-002(MODIFIED)、REQ-FLASH-015(MODIFIED)、
+  POL-WORKFLOW-001、POL-RECOVERY-001、POL-TARGET-001
+- Acceptance:AC-FLASH-015-01/02/03、AIN-CHAT-AUTH-001(change-local)
+- Depends on:CHG-2026-025 r7 amendment 经维护者 merged PR 批准
+- Applicable failure patterns:AF-001、AF-002、AF-004、AF-006、AF-007、AF-010、
+  AF-013、AF-015、AF-017
+- Production reachability:`run-dayu200-70035-authorized-flash.sh --chat-trigger` →
+  `arkdeck flash execute --chat-confirmed-plan-sha256` → typed chat admission → fresh
+  Rockchip facts/binding/live identity → durable one-shot consume → existing descriptor-bound
+  executor。实现/测试 PR 仅 fake/host-only，不连接设备。
+- Trusted fact sources:archive/tool/profile digest 由产品现场 hash/plan 产生；binding/target/
+  device identity 由 durable binding + live probe 产生；chat confirmation 是交互式 Agent
+  转交的 caller assertion，**没有密码学 conversation provenance**，其 residual risk 由
+  维护者 merge r7 显式接受，且 evidence 必须如实分类。
+- Allowed paths:
+  - `AGENTS.md`
+  - `openspec/changes/chg-2026-025-ai-native-unattended-device-ops/**`
+  - `Packages/ArkDeckKit/Sources/ArkDeckCLI/ArkDeckCLIMain.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckStorage/AuthorizationUsageLedger.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckStorage/JournalEvent.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckStorage/JournalEventValidation.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckStorage/JournalReplay.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckStorage/SessionManifest.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckStorage/RetentionAndExport.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/ChatConfirmationAuthority.swift`（new）
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/AuthorizationAdmission.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipAuthorizationFacts.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipFlashExecution.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipFlashExecutionHost.swift`
+  - `Packages/ArkDeckKit/Scripts/run-dayu200-70035-authorized-flash.sh`
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/ChatConfirmationAuthorityContractTests.swift`（new）
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/AuthorizationUsageLedgerContractTests.swift`
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/AuthorizationAdmissionContractTests.swift`
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/JournalRecoveryContractTests.swift`
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/SessionArtifactStorageContractTests.swift`
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/RockchipFlashExecutionContractTests.swift`
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/RockchipFlashExecutionFaultContractTests.swift`
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/Dayu20070035AuthorizedFlashWrapperContractTests.swift`
+- Forbidden paths:
+  - `openspec/constitution.md`、`openspec/specs/**`、`openspec/contracts/**`、
+    `openspec/baselines/**`（current 正本只在后续 archive/ratification 合入）
+  - `Catalog/**`、`openspec/integrations/**`、`openspec/platforms/**`
+  - standing authorization registry/evidence 实例（不得创建、修改或冒充 `AUTH-ID`）
+  - caller executable/argv/shell/raw device command 注入面
+  - 实现/测试 PR 中的真实 USB/HDC/RockUSB/Flash dispatch
+- Risk:destructive（显式弱化 E2 authority provenance；以 exact plan/target、用户监督式
+  会话、单次 durable consume、CI/replay 禁止、truthful evidence 与维护者 review 控制）
+- Hardware required:no（实现与验证使用 fake descriptor；真实 GJ-4 另在本任务合入后的
+  用户聊天确认中执行并如实记录）
+- Decision-Grade:D2
+
+### Deliverables
+
+- `AGENTS.md` 与 r7 approved delta 同步：聊天确认本身可成为一次性 E2 authority，不再
+  要求额外 `AUTH-ID`，但不放宽 exact plan/target、fail-closed 与 recovery 不重放；
+- typed、closed chat confirmation request/reference/admission；confirmation digest、plan/
+  archive/step-set/target correlation 与 one-shot durable consumption；
+- CLI/wrapper 最终入口只需一个 chat-trigger 命令，仍只进入 product-owned typed executor；
+- Manifest/Journal/export 如实区分 `chatConfirmation` 与 `standingAuthorization`；
+- contract/fault matrix 覆盖正向一次 dispatch 与所有负向零 dispatch。
+
+### Verification
+
+- `AIN-CHAT-AUTH-001`：exact assertion + fresh facts 的 fake product-path 只消费/dispatch
+  一次；缺失、unknown/duplicate、缩写 digest、任一 digest/target drift、CI/daemon、并发
+  复用、失败/crash/outcomeUnknown replay 全拒绝且 process/device dispatch=0；
+- existing standing authorization 路径与 AC-FLASH-015-01/02 canonical 回归不退化；
+- 三条 SDD/Catalog 闸、全量并行 Swift、preflight 全绿；run evidence 如实记录
+  `real device=0, Flash=0`。
