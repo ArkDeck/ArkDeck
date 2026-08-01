@@ -1683,7 +1683,9 @@ public actor HarnessTaskCoordinator {
       round: snapshot.activeRound, jobID: jobID, declaredCrashSignature: declaredSignature,
       requiredEvidence: required, crashLedgerWatermark: watermark,
       sourceEvidenceJobID: sourceEvidenceJobID,
-      expectedSourceArtifactID: expectedSourceArtifactID)
+      expectedSourceArtifactID: expectedSourceArtifactID,
+      expectedBindingRevision: snapshot.target.expectedBindingRevision,
+      expectedDeployedArtifactDigest: snapshot.repairAttempt?.deployedDigest)
 
     let merged = snapshot.observed.merging(round)
     let evaluation = HarnessCriteriaEvaluator.evaluate(

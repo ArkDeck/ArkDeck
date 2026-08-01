@@ -273,6 +273,7 @@ package struct HarnessTaskMethodService: Sendable {
     }
     let bundleName = text("bundleName")
     let abilityName = text("abilityName")
+    let processName = text("processName")
     if let bundleName {
       do {
         try applicationReferenceValidator(bundleName, abilityName)
@@ -286,6 +287,20 @@ package struct HarnessTaskMethodService: Sendable {
       }
     } else if abilityName != nil {
       throw HarnessTaskSubmissionError.malformedDesiredState("abilityName requires bundleName")
+    }
+    if let processName {
+      guard bundleName != nil, !processName.isEmpty, processName.count <= 200,
+        processName.first?.isASCII == true,
+        processName.first?.isLetter == true,
+        processName.allSatisfy({
+          $0.isASCII
+            && ($0.isLetter || $0.isNumber || $0 == "." || $0 == "_" || $0 == ":")
+        })
+      else {
+        throw HarnessTaskSubmissionError.malformedDesiredState(
+          bundleName == nil ? "processName requires bundleName" : "processName")
+      }
+      desiredState["processName"] = .string(processName)
     }
     for key in ["deviceProfile", "buildPresetRef", "testPresetRef"] {
       guard let value = text(key) else { continue }

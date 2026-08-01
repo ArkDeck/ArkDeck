@@ -111,11 +111,16 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
       }
       return try approvedRemoteReadAction(for: step, inputs: inputs)
     case .verifyRemoteState:
-      guard descriptorIsDebugHAP(operation) else {
-        throw DeviceProviderError.unsupportedStepKind(
-          "\(step.kind.rawValue) has no registered action for \(operation.reference)")
+      if descriptorIsDebugHAP(operation) {
+        return try debugHAPAction(for: step, inputs: inputs, context: context)
       }
-      return try debugHAPAction(for: step, inputs: inputs, context: context)
+      if operation.reference == "capture.diagnostics@1",
+        step.stepID == "observe-application-liveness"
+      {
+        return try applicationLivenessAction(inputs: inputs)
+      }
+      throw DeviceProviderError.unsupportedStepKind(
+        "\(step.kind.rawValue) has no registered action for \(operation.reference)")
     case .preflightDeviceStorage:
       let requiredBytes: Int
       if case .integer(let requested)? = inputs["totalArtifactByteBudget"] {
@@ -301,6 +306,35 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
     }
     return try HDCTraceCaptureRequest(
       durationSeconds: duration, categories: categories, bufferKB: buffer)
+  }
+
+  private func applicationLivenessAction(
+    inputs: [String: JSONValue]
+  ) throws -> TypedProviderAction {
+    guard case .string(let bundleName)? = inputs["bundleName"] else {
+      throw DeviceProviderError.unsupportedAction(
+        "bundleName is required for application liveness")
+    }
+    let abilityName: String?
+    if case .string(let value)? = inputs["abilityName"] { abilityName = value } else {
+      abilityName = nil
+    }
+    let processName: String?
+    if case .string(let value)? = inputs["processName"] { processName = value } else {
+      processName = nil
+    }
+    let deployedDigest: String?
+    if case .string(let value)? = inputs["expectedDeployedArtifactDigest"] {
+      deployedDigest = value
+    } else {
+      deployedDigest = nil
+    }
+    return .hdc(
+      .observeApplicationLiveness(
+        try HDCApplicationLivenessRequest(
+          bundle: HDCBundleReference(bundleName: bundleName),
+          abilityName: abilityName, processName: processName,
+          expectedDeployedArtifactDigest: deployedDigest)))
   }
 
   /// Builds the staged package set when — and only when — the request
@@ -817,6 +851,14 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
           executableSHA256: "resolved-at-dispatch",
           argumentSummary: try deviceArguments(
             ["shell", "pidof", bundle.bundleName], context: context),
+          timeoutSeconds: 30))
+    case .observeApplicationLiveness(let request):
+      return TypedProcessPlan(
+        action: action,
+        kind: .process(
+          executableSHA256: "resolved-at-dispatch",
+          argumentSummary: try deviceArguments(
+            ["shell", "pidof", request.processName], context: context),
           timeoutSeconds: 30))
     // Both mutations carry their own readback, for the same reason install
     // and start have one: `hdc shell`'s exit status is the client's, and
@@ -1865,6 +1907,54 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
       }
       return .verified(summary: ["bundleName": bundle.bundleName, "running": "true"])
 
+    case .observeApplicationLiveness(let request):
+      let identityMaterial = [
+        request.bundle.bundleName, request.abilityName ?? "", request.processName,
+      ].joined(separator: "|")
+      let applicationRef = SHA256.hash(data: Data(identityMaterial.utf8))
+        .map { String(format: "%02x", $0) }.joined()
+      var summary: [String: String] = [
+        "applicationRef": applicationRef,
+        "abilityState": "UNKNOWN",
+        "observedAtUtc": context.nowUTC,
+      ]
+      if let digest = request.expectedDeployedArtifactDigest {
+        summary["deployedArtifactDigest"] = digest
+      }
+      guard receipt.exitStatus == 0, !receipt.stdoutTruncated,
+        let text = String(data: receipt.stdout, encoding: .utf8)
+      else {
+        summary["state"] = "UNKNOWN"
+        summary["processState"] = "UNKNOWN"
+        summary["pidObserved"] = "false"
+        summary["reasonCode"] = receipt.stdoutTruncated
+          ? "processReadbackTruncated" : "processReadbackUnavailable"
+        return .verified(summary: summary)
+      }
+      let tokens = text.split(whereSeparator: \.isWhitespace)
+      if tokens.isEmpty {
+        summary["state"] = "UNHEALTHY"
+        summary["processState"] = "STOPPED"
+        summary["pidObserved"] = "false"
+        summary["reasonCode"] = "targetProcessNotRunning"
+        return .verified(summary: summary)
+      }
+      guard tokens.allSatisfy({ token in
+        guard let value = UInt32(token) else { return false }
+        return value > 0
+      }) else {
+        summary["state"] = "UNKNOWN"
+        summary["processState"] = "UNKNOWN"
+        summary["pidObserved"] = "false"
+        summary["reasonCode"] = "processReadbackAmbiguous"
+        return .verified(summary: summary)
+      }
+      summary["state"] = "HEALTHY"
+      summary["processState"] = "RUNNING"
+      summary["pidObserved"] = "true"
+      summary["reasonCode"] = "targetProcessRunning"
+      return .verified(summary: summary)
+
     // D2 in `DEVICE-COMMAND-FACTS.md` §10, closed by readback rather than by
     // the status strings: absence is proven by the same probes reconcile
     // uses, so neither verdict depends on parsing `aa`/`bm` prose that no
@@ -2531,7 +2621,8 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
       .hdc(.captureUIDump), .hdc(.receiveOwnedArtifact):
       // Read-only families: re-observation is always safe.
       return .confirmedNotExecuted
-    case .hdc(.queryPackageReadback), .hdc(.verifyProcessState):
+    case .hdc(.queryPackageReadback), .hdc(.verifyProcessState),
+      .hdc(.observeApplicationLiveness):
       return .confirmedNotExecuted
     case .hdc(.captureTrace), .hdc(.captureComponentTree), .hdc(.captureScreenshot),
       .hdc(.cleanupOwnedRemotePath):

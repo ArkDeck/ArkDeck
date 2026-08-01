@@ -528,6 +528,9 @@ final class DeviceProviderContractTests: XCTestCase {
       expectedSHA256: artifact.sha256)
     let bundle = try HDCBundleReference(bundleName: "com.example.demo")
     let ability = try HDCAbilityReference(bundle: bundle, abilityName: "EntryAbility")
+    let applicationLiveness = try HDCApplicationLivenessRequest(
+      bundle: bundle, abilityName: "EntryAbility",
+      expectedDeployedArtifactDigest: String(repeating: "d", count: 64))
     let port = try HDCPortForwardSpec(localPort: 2345, remotePort: 3456)
     let actions: [TypedProviderAction] = [
       .hdc(.queryProperty(.productModel)),
@@ -548,6 +551,7 @@ final class DeviceProviderContractTests: XCTestCase {
       .hdc(.queryPackageReadback(bundle)),
       .hdc(.startAbility(ability)),
       .hdc(.verifyProcessState(bundle)),
+      .hdc(.observeApplicationLiveness(applicationLiveness)),
       .hdc(.stopAbility(ability)),
       .hdc(.uninstallPackage(bundle)),
       .hdc(.createPortForward(port)),

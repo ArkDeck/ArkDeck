@@ -75,12 +75,12 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
   /// deployment succeeds. Phase alone cannot carry this fact because the
   /// following capture legitimately moves `reproducing` back to `collecting`.
   public static let baselineDeploymentMarker = "baselineCrashFixtureDeployed"
-  /// The artifact `capture.diagnostics@1` declares for bounded HiLog. It
-  /// supports the *liveness* criterion only: TASK-HTP-006's r6 window
-  /// measured zero fault blocks in 887 KB of real `hilog -x` taken right
-  /// after a real crash, so a verdict about crashes cannot rest on it
-  /// (CHG-2026-055, TASK-HFA-001).
+  /// Bounded HiLog remains diagnostic context only. It proves neither a
+  /// crash nor that the declared application is alive.
   public static let hilogArtifact = "hilog.txt"
+  /// Derived from the same capture Job's typed process readback. This is the
+  /// only Artifact allowed to support DC-2.
+  public static let applicationLivenessArtifact = "application-liveness.json"
   /// The device's Faultlogger ledger, which is where the crash detail
   /// actually is. The crash criteria name it, so a capture that did not
   /// publish it cannot support any verdict about crashes.
@@ -165,8 +165,11 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
         comparator: .equalTo,
         expected: .string("healthy"),
         mandatory: true,
-        minimumSamples: 1,
-        evidenceRequirements: [Self.hilogArtifact],
+        // Every clean verification run must also prove that the exact
+        // deployed application is alive; one old liveness observation may
+        // not bless the other four crash-ledger samples.
+        minimumSamples: 5,
+        evidenceRequirements: [Self.applicationLivenessArtifact],
         inconclusivePolicy: .collectMoreEvidence),
       HarnessSuccessCriterion(
         criterionID: "DC-3-no-new-fatal-signature",
@@ -448,6 +451,39 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
         HarnessObservationBuilder.latestEntryMetric], !entry.isEmpty
       {
         inputs["crashLogName"] = .string(entry)
+      }
+      // The first capture of a task that owns a crash fixture establishes a
+      // ledger watermark before the fixture is injected. Sampling liveness
+      // there would turn the expected stopped process into a product failure
+      // and prevent the injection. Every post-injection/ordinary capture is
+      // application-specific.
+      let baselineLeasePresent: Bool
+      if case .string(let lease)? = snapshot?.goal.desiredState["baselineHapArtifactLease"] {
+        baselineLeasePresent = !lease.isEmpty
+      } else {
+        baselineLeasePresent = false
+      }
+      let baselineInjected =
+        snapshot?.observedState[Self.baselineDeploymentMarker] == .bool(true)
+      let shouldObserveApplication =
+        !baselineLeasePresent || baselineInjected || snapshot?.repairAttempt?.deployedDigest != nil
+      if shouldObserveApplication,
+        case .string(let bundle)? = snapshot?.goal.desiredState["bundleName"], !bundle.isEmpty
+      {
+        inputs["bundleName"] = .string(bundle)
+        if case .string(let ability)? = snapshot?.goal.desiredState["abilityName"],
+          !ability.isEmpty
+        {
+          inputs["abilityName"] = .string(ability)
+        }
+        if case .string(let process)? = snapshot?.goal.desiredState["processName"],
+          !process.isEmpty
+        {
+          inputs["processName"] = .string(process)
+        }
+        if let digest = snapshot?.repairAttempt?.deployedDigest {
+          inputs["expectedDeployedArtifactDigest"] = .string(digest)
+        }
       }
       return inputs
     default:

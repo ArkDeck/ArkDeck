@@ -58,6 +58,7 @@ public enum HDCProviderAction: Sendable, Equatable {
   case queryPackageReadback(HDCBundleReference)
   case startAbility(HDCAbilityReference)
   case verifyProcessState(HDCBundleReference)
+  case observeApplicationLiveness(HDCApplicationLivenessRequest)
   case stopAbility(HDCAbilityReference)
   case uninstallPackage(HDCBundleReference)
   case createPortForward(HDCPortForwardSpec)
@@ -226,7 +227,8 @@ public enum TypedProviderAction: Sendable, Equatable {
       .hdc(.captureHilog), .hdc(.captureUIDump), .hdc(.receiveOwnedArtifact),
       .hdc(.captureCrashIndex), .hdc(.captureCrashLog):
       return .readOnly
-    case .hdc(.queryPackageReadback), .hdc(.verifyProcessState):
+    case .hdc(.queryPackageReadback), .hdc(.verifyProcessState),
+      .hdc(.observeApplicationLiveness):
       return .readOnly
     case .hdc(.readPackagePresence), .hdc(.readProcessPresence),
       .hdc(.readOwnedPathPresence), .hdc(.readOwnedDirectoryPresence),
@@ -466,6 +468,16 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
       self.init(
         kind: "hdc.verifyProcessState",
         arguments: ["bundleName": .string(bundle.bundleName)])
+    case .hdc(.observeApplicationLiveness(let request)):
+      var arguments: [String: JSONValue] = [
+        "bundleName": .string(request.bundle.bundleName),
+        "processName": .string(request.processName),
+      ]
+      optional(request.abilityName, into: &arguments, key: "abilityName")
+      optional(
+        request.expectedDeployedArtifactDigest, into: &arguments,
+        key: "expectedDeployedArtifactDigest")
+      self.init(kind: "hdc.observeApplicationLiveness", arguments: arguments)
     case .hdc(.stopAbility(let ability)):
       self.init(
         kind: "hdc.stopAbility",
@@ -900,6 +912,15 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
       return .hdc(.startAbility(try ability()))
     case "hdc.verifyProcessState":
       return .hdc(.verifyProcessState(try bundle()))
+    case "hdc.observeApplicationLiveness":
+      return .hdc(
+        .observeApplicationLiveness(
+          try HDCApplicationLivenessRequest(
+            bundle: bundle(),
+            abilityName: optionalString("abilityName"),
+            processName: optionalString("processName"),
+            expectedDeployedArtifactDigest: optionalString(
+              "expectedDeployedArtifactDigest"))))
     case "hdc.stopAbility":
       return .hdc(.stopAbility(try ability()))
     case "hdc.uninstallPackage":

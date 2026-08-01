@@ -23,6 +23,19 @@ private func sha256Hex(_ data: Data) -> String {
   SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
 }
 
+private func applicationLivenessJSON(
+  jobID: String,
+  state: String,
+  reasonCode: String,
+  processState: String,
+  pidObserved: Bool,
+  bindingRevision: Int = 7,
+  deployedDigest: String? = nil
+) -> String {
+  let digest = deployedDigest.map { #", "deployedArtifactDigest":"\#($0)""# } ?? ""
+  return #"{"documentType":"arkdeck-application-liveness","schemaVersion":"1.0.0","applicationRef":"\#(String(repeating: "a", count: 64))","state":"\#(state)","reasonCode":"\#(reasonCode)","abilityState":"UNKNOWN","processState":"\#(processState)","pidObserved":\#(pidObserved),"targetBindingRevision":\#(bindingRevision)\#(digest),"sourceRuntimeJobId":"\#(jobID)","sourceOperationRef":"capture.diagnostics@1","observationWindow":{"startedAtUtc":"2026-08-01T00:00:00Z","endedAtUtc":"2026-08-01T00:00:00Z"},"observedAtUtc":"2026-08-01T00:00:00Z"}"#
+}
+
 private enum HilogFixture {
   /// One matching fault (the declared WaterFlow signature) and one unrelated
   /// fatal, so "matching" and "new fatal" cannot be conflated.
@@ -372,10 +385,10 @@ final class HarnessEvaluationContractTests: XCTestCase {
 
     XCTAssertEqual(observation.measurements["matchingCrashCount"], .integer(1))
     XCTAssertEqual(observation.measurements["newFatalSignatureCount"], .integer(0))
-    XCTAssertEqual(observation.measurements["verificationRunCount"], .integer(1))
-    XCTAssertEqual(
-      observation.measurements["applicationLiveness"], .string("unhealthy"),
-      "a fresh fault entry outranks hilog's 'the device is logging'")
+    XCTAssertNil(observation.measurements["verificationRunCount"])
+    XCTAssertNil(
+      observation.measurements["applicationLiveness"],
+      "a crash and unrelated HiLog cannot invent an application-state readback")
     XCTAssertEqual(
       observation.measurements["latestCrashEntryName"], .string(LedgerFixture.laterEntryName))
     if case .string(let signature)? = observation.measurements["latestCrashSignature"] {
@@ -403,7 +416,9 @@ final class HarnessEvaluationContractTests: XCTestCase {
     XCTAssertNil(observation.measurements["matchingCrashCount"])
     XCTAssertNil(observation.measurements["newFatalSignatureCount"])
     XCTAssertNil(observation.measurements["latestCrashSignature"])
-    XCTAssertEqual(observation.measurements["applicationLiveness"], .string("healthy"))
+    XCTAssertNil(
+      observation.measurements["applicationLiveness"],
+      "HiLog is diagnostic context only, even when it contains application-looking lines")
   }
 
   func testEmptyLedgerIsPositiveEvidenceOfNoCrash() async throws {
@@ -426,8 +441,123 @@ final class HarnessEvaluationContractTests: XCTestCase {
       requiredEvidence: ["crash-index.txt"], crashLedgerWatermark: "")
     XCTAssertEqual(counted.measurements["matchingCrashCount"], .integer(0))
     XCTAssertEqual(counted.measurements["newFatalSignatureCount"], .integer(0))
-    XCTAssertEqual(counted.measurements["applicationLiveness"], .string("healthy"))
+    XCTAssertNil(counted.measurements["applicationLiveness"])
     XCTAssertNil(counted.measurements["latestCrashSignature"])
+  }
+
+  func testApplicationLivenessComesOnlyFromCurrentTypedReadback() async throws {
+    let digest = String(repeating: "d", count: 64)
+    let port = StagingArtifactPort()
+    port.stage(jobID: "JOB-1", name: "hilog.txt", text: HilogFixture.clean)
+    port.stage(
+      jobID: "JOB-1", name: "application-liveness.json",
+      text: applicationLivenessJSON(
+        jobID: "JOB-1", state: "HEALTHY", reasonCode: "targetProcessRunning",
+        processState: "RUNNING", pidObserved: true, deployedDigest: digest))
+    let builder = HarnessObservationBuilder(artifacts: port)
+
+    let observation = try await builder.observe(
+      round: 3, jobID: "JOB-1", declaredCrashSignature: nil,
+      requiredEvidence: ["application-liveness.json"], expectedBindingRevision: 7,
+      expectedDeployedArtifactDigest: digest)
+
+    XCTAssertEqual(observation.measurements["applicationLiveness"], .string("healthy"))
+    XCTAssertEqual(observation.sampleContribution["applicationLiveness"], 1)
+    XCTAssertEqual(observation.integrityBlockers, [])
+    XCTAssertEqual(observation.collectionBlockers, [])
+  }
+
+  func testStoppedApplicationCannotBeMadeHealthyBySystemHiLog() async throws {
+    let port = StagingArtifactPort()
+    port.stage(jobID: "JOB-1", name: "hilog.txt", text: HilogFixture.clean)
+    port.stage(
+      jobID: "JOB-1", name: "application-liveness.json",
+      text: applicationLivenessJSON(
+        jobID: "JOB-1", state: "UNHEALTHY", reasonCode: "targetProcessNotRunning",
+        processState: "STOPPED", pidObserved: false))
+    let observation = try await HarnessObservationBuilder(artifacts: port).observe(
+      round: 1, jobID: "JOB-1", declaredCrashSignature: nil,
+      requiredEvidence: ["application-liveness.json"], expectedBindingRevision: 7)
+
+    XCTAssertEqual(observation.measurements["applicationLiveness"], .string("unhealthy"))
+    XCTAssertEqual(observation.sampleContribution["applicationLiveness"], 1)
+  }
+
+  func testUnknownAndRevisionDriftContributeNoLivenessSample() async throws {
+    let digest = String(repeating: "d", count: 64)
+    let port = StagingArtifactPort()
+    port.stage(
+      jobID: "JOB-unknown", name: "application-liveness.json",
+      text: applicationLivenessJSON(
+        jobID: "JOB-unknown", state: "UNKNOWN", reasonCode: "processReadbackAmbiguous",
+        processState: "UNKNOWN", pidObserved: false, deployedDigest: digest))
+    let builder = HarnessObservationBuilder(artifacts: port)
+    let unknown = try await builder.observe(
+      round: 1, jobID: "JOB-unknown", declaredCrashSignature: nil,
+      requiredEvidence: ["application-liveness.json"], expectedBindingRevision: 7,
+      expectedDeployedArtifactDigest: digest)
+    XCTAssertNil(unknown.measurements["applicationLiveness"])
+    XCTAssertNil(unknown.sampleContribution["applicationLiveness"])
+    XCTAssertEqual(
+      unknown.collectionBlockers,
+      ["applicationLivenessUnknown:processReadbackAmbiguous"])
+
+    let stale = try await builder.observe(
+      round: 2, jobID: "JOB-unknown", declaredCrashSignature: nil,
+      requiredEvidence: ["application-liveness.json"], expectedBindingRevision: 8,
+      expectedDeployedArtifactDigest: digest)
+    XCTAssertNil(stale.measurements["applicationLiveness"])
+    XCTAssertEqual(stale.collectionBlockers, ["applicationLivenessBindingRevisionChanged"])
+
+    let differentDeployment = try await builder.observe(
+      round: 3, jobID: "JOB-unknown", declaredCrashSignature: nil,
+      requiredEvidence: ["application-liveness.json"], expectedBindingRevision: 7,
+      expectedDeployedArtifactDigest: String(repeating: "e", count: 64))
+    XCTAssertNil(differentDeployment.measurements["applicationLiveness"])
+    XCTAssertEqual(
+      differentDeployment.collectionBlockers,
+      ["applicationLivenessDeployedArtifactChanged"])
+  }
+
+  func testApplicationLivenessHashMismatchIsAnErrorNotANewSample() async throws {
+    let port = StagingArtifactPort()
+    port.stage(
+      jobID: "JOB-1", name: "application-liveness.json",
+      text: applicationLivenessJSON(
+        jobID: "JOB-1", state: "HEALTHY", reasonCode: "targetProcessRunning",
+        processState: "RUNNING", pidObserved: true),
+      sha256Override: String(repeating: "0", count: 64))
+    let observation = try await HarnessObservationBuilder(artifacts: port).observe(
+      round: 1, jobID: "JOB-1", declaredCrashSignature: nil,
+      requiredEvidence: ["application-liveness.json"], expectedBindingRevision: 7)
+
+    XCTAssertEqual(
+      observation.integrityBlockers,
+      ["artifactHashMismatch:application-liveness.json"])
+    XCTAssertNil(observation.measurements["applicationLiveness"])
+    XCTAssertNil(observation.sampleContribution["applicationLiveness"])
+  }
+
+  func testCrashStillFailsWhenTheApplicationHasAlreadyRestartedHealthy() async throws {
+    let port = StagingArtifactPort()
+    port.stage(jobID: "JOB-1", name: "crash-index.txt", text: LedgerFixture.twoEntryIndex)
+    port.stage(jobID: "JOB-1", name: "crash-log.txt", text: LedgerFixture.cppCrashBody)
+    port.stage(
+      jobID: "JOB-1", name: "application-liveness.json",
+      text: applicationLivenessJSON(
+        jobID: "JOB-1", state: "HEALTHY", reasonCode: "targetProcessRunning",
+        processState: "RUNNING", pidObserved: true))
+    let observation = try await HarnessObservationBuilder(artifacts: port).observe(
+      round: 2, jobID: "JOB-1",
+      declaredCrashSignature: "SIGABRT+WaterFlowPattern::RecoverBack",
+      requiredEvidence: ["crash-index.txt", "application-liveness.json"],
+      crashLedgerWatermark: LedgerFixture.baselineWatermark,
+      expectedBindingRevision: 7)
+
+    XCTAssertEqual(observation.measurements["matchingCrashCount"], .integer(1))
+    XCTAssertEqual(observation.measurements["applicationLiveness"], .string("healthy"))
+    XCTAssertEqual(observation.sampleContribution["matchingCrashCount"], 1)
+    XCTAssertEqual(observation.sampleContribution["applicationLiveness"], 1)
   }
 
   func testHashMismatchIsAnIntegrityBlockerAndYieldsNoMeasurement() async throws {

@@ -32,9 +32,8 @@ private func sha256Hex(_ data: Data) -> String {
   SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
 }
 
-/// A clean bounded HiLog: application output present. It carries the
-/// liveness measurement only - crashes are judged from the ledger below
-/// (CHG-2026-055, TASK-HFA-001).
+/// A clean bounded HiLog retained as diagnostic context. It deliberately
+/// carries no liveness or crash measurement.
 private let cleanHilog = """
   07-31 04:10:01.100  1401  1401 I A03d00/Ace: WaterFlow layout pass begin
   07-31 04:10:01.480  1401  1401 I A03d00/Ace: WaterFlow reached end of content
@@ -57,10 +56,9 @@ private struct StagedArtifact {
   let bytes: Data
 }
 
-/// Publishes `hilog.txt` and `crash-index.txt` per *capture* job, the way
-/// `capture.diagnostics@1` declares them when the handler asks for the
-/// crash leg. `observe.device@1` publishes neither, so a sample count here
-/// means the same thing it means on a device.
+/// Publishes the products selected by each *capture* request. App liveness
+/// appears only when the handler supplied a typed Bundle identity;
+/// `observe.device@1` publishes none of these products.
 private final class ConvergenceArtifactPort: HarnessArtifactPort, @unchecked Sendable {
   private let lock = NSLock()
   private let sensitive: Bool
@@ -80,18 +78,34 @@ private final class ConvergenceArtifactPort: HarnessArtifactPort, @unchecked Sen
       staged[jobID] = []
       return
     }
-    staged[jobID] = [("hilog.txt", cleanHilog), ("crash-index.txt", emptyLedger)].map {
-      name, text in
+    var products: [(name: String, text: String, mediaType: String, sensitive: Bool)] = [
+      ("hilog.txt", cleanHilog, "text/plain", sensitive),
+      ("crash-index.txt", emptyLedger, "text/plain", sensitive),
+    ]
+    let inputs = operations.inputs(forJob: jobID)
+    if case .string(let bundle)? = inputs["bundleName"] {
+      let ability: String
+      if case .string(let value)? = inputs["abilityName"] { ability = value } else { ability = "" }
+      let process: String
+      if case .string(let value)? = inputs["processName"] { process = value } else { process = bundle }
+      let applicationRef = sha256Hex(Data("\(bundle)|\(ability)|\(process)".utf8))
+      let liveness =
+        #"{"documentType":"arkdeck-application-liveness","schemaVersion":"1.0.0","applicationRef":"\#(applicationRef)","state":"HEALTHY","reasonCode":"targetProcessRunning","abilityState":"UNKNOWN","processState":"RUNNING","pidObserved":true,"targetBindingRevision":1,"sourceRuntimeJobId":"\#(jobID)","sourceOperationRef":"capture.diagnostics@1","observationWindow":{"startedAtUtc":"2026-07-31T04:00:00Z","endedAtUtc":"2026-07-31T04:00:00Z"},"observedAtUtc":"2026-07-31T04:00:00Z"}"#
+      products.append(("application-liveness.json", liveness, "application/json", false))
+    }
+    staged[jobID] = products.map { product in
+      let name = product.name
+      let text = product.text
       let data = Data(text.utf8)
       return StagedArtifact(
         descriptor: HarnessArtifactDescriptor(
           artifactID: "ART-\(jobID)-\(name)",
           name: name,
-          mediaType: "text/plain",
+          mediaType: product.mediaType,
           byteCount: data.count,
           sha256: sha256Hex(data),
           published: true,
-          sensitive: sensitive,
+          sensitive: product.sensitive,
           missingReason: nil),
         bytes: data)
     }
@@ -122,12 +136,23 @@ private final class ConvergenceArtifactPort: HarnessArtifactPort, @unchecked Sen
 private final class OperationLedger: @unchecked Sendable {
   private let lock = NSLock()
   private var byJob: [String: String] = [:]
+  private var inputsByJob: [String: [String: JSONValue]] = [:]
 
-  func record(jobID: String, operation: String) {
-    lock.withLock { byJob[jobID] = operation }
+  func record(
+    jobID: String,
+    operation: String,
+    inputs: [String: JSONValue] = [:]
+  ) {
+    lock.withLock {
+      byJob[jobID] = operation
+      inputsByJob[jobID] = inputs
+    }
   }
 
   func operation(forJob jobID: String) -> String? { lock.withLock { byJob[jobID] } }
+  func inputs(forJob jobID: String) -> [String: JSONValue] {
+    lock.withLock { inputsByJob[jobID] ?? [:] }
+  }
 }
 
 /// Every submitted job succeeds immediately, so what the tests observe is the
@@ -157,7 +182,8 @@ private final class SucceedingJobPort: HarnessRuntimeJobPort, @unchecked Sendabl
       inputsByOperation[request.operation.reference] = request.inputs
       return id
     }
-    operations.record(jobID: jobID, operation: request.operation.reference)
+    operations.record(
+      jobID: jobID, operation: request.operation.reference, inputs: request.inputs)
     return HarnessJobAcceptance(jobID: jobID, deduplicated: false)
   }
 
@@ -251,7 +277,12 @@ final class HarnessConvergenceContractTests: XCTestCase {
       type: .debugCrash,
       target: HarnessTaskTargetReference(
         targetID: "TGT-convergence", expectedBindingRevision: 1),
-      goal: HarnessTaskGoal(summary: "converge without a human poke", desiredState: [:]),
+      goal: HarnessTaskGoal(
+        summary: "converge without a human poke",
+        desiredState: [
+          "bundleName": .string("com.example.waterflowdemo"),
+          "abilityName": .string("EntryAbility"),
+        ]),
       // The handler's own defaults: five clean samples plus liveness, which is
       // exactly what a real crash task submits.
       successCriteria: DebugCrashTaskHandler().defaultSuccessCriteria(),
@@ -450,6 +481,8 @@ final class HarnessConvergenceContractTests: XCTestCase {
       .integer(Int64(DebugCrashTaskHandler.captureDurationSeconds)),
       "the input the handler declares must survive the whole dispatch path")
     XCTAssertEqual(captured["crashLogs"], .bool(true))
+    XCTAssertEqual(captured["bundleName"], .string("com.example.waterflowdemo"))
+    XCTAssertEqual(captured["abilityName"], .string("EntryAbility"))
   }
 
   // MARK: - Defect 3: required evidence that could never be measured
@@ -467,14 +500,14 @@ final class HarnessConvergenceContractTests: XCTestCase {
     XCTAssertTrue(denied.measurements.isEmpty)
     XCTAssertEqual(denied.evidence.first?.sensitiveOptIn, false)
 
-    // Naming only the log buys only the log: liveness becomes measurable and
-    // the crash question stays unanswered, because its source was not opened.
+    // Naming only the log buys only the log. It cannot answer either the
+    // application-state or crash-ledger question.
     let logOnly = HarnessObservationBuilder(
       artifacts: port, sensitiveEvidenceAllowList: ["hilog.txt"])
     let partial = try await logOnly.observe(
       round: 1, jobID: "JOB-1", declaredCrashSignature: nil, requiredEvidence: ["hilog.txt"])
     XCTAssertEqual(partial.collectionBlockers, ["artifactSensitiveNotOptedIn:crash-index.txt"])
-    XCTAssertEqual(partial.measurements["applicationLiveness"], .string("healthy"))
+    XCTAssertNil(partial.measurements["applicationLiveness"])
     XCTAssertNil(partial.measurements["matchingCrashCount"])
 
     let opened = HarnessObservationBuilder(
@@ -483,7 +516,7 @@ final class HarnessConvergenceContractTests: XCTestCase {
       round: 1, jobID: "JOB-1", declaredCrashSignature: nil,
       requiredEvidence: ["hilog.txt", "crash-index.txt"], crashLedgerWatermark: "")
     XCTAssertEqual(allowed.collectionBlockers, [])
-    XCTAssertEqual(allowed.measurements["applicationLiveness"], .string("healthy"))
+    XCTAssertNil(allowed.measurements["applicationLiveness"])
     XCTAssertEqual(allowed.measurements["matchingCrashCount"], .integer(0))
     let record = try XCTUnwrap(allowed.evidence.first)
     XCTAssertTrue(record.verified)

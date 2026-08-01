@@ -378,9 +378,14 @@ public struct HDCBundleReference: Sendable, Equatable {
   public let bundleName: String
 
   public init(bundleName: String) throws {
-    guard !bundleName.isEmpty, bundleName.count <= 200,
-      bundleName.contains("."),
-      bundleName.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "." || $0 == "_") })
+    let components = bundleName.split(separator: ".", omittingEmptySubsequences: false)
+    guard !bundleName.isEmpty, bundleName.count <= 200, components.count >= 2,
+      components.allSatisfy({ component in
+        component.first?.isASCII == true && component.first?.isLetter == true
+          && component.allSatisfy({
+            $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "_")
+          })
+      })
     else {
       throw HDCE0RequestError.malformed(
         field: "bundleName", detail: "reverse-DNS identifier expected")
@@ -395,12 +400,62 @@ public struct HDCAbilityReference: Sendable, Equatable {
 
   public init(bundle: HDCBundleReference, abilityName: String) throws {
     guard !abilityName.isEmpty, abilityName.count <= 200,
+      abilityName.first?.isASCII == true,
+      abilityName.first?.isLetter == true,
       abilityName.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "." || $0 == "_") })
     else {
       throw HDCE0RequestError.malformed(field: "abilityName", detail: "identifier expected")
     }
     self.bundle = bundle
     self.abilityName = abilityName
+  }
+}
+
+/// Typed identity for an application-specific liveness observation.
+///
+/// The caller supplies identifiers, never a PID or argv. The provider owns
+/// the `pidof` lowering and derives the pseudonymous application reference
+/// that is published in the result Artifact.
+public struct HDCApplicationLivenessRequest: Sendable, Equatable {
+  public let bundle: HDCBundleReference
+  public let abilityName: String?
+  public let processName: String
+  public let expectedDeployedArtifactDigest: String?
+
+  public init(
+    bundle: HDCBundleReference,
+    abilityName: String? = nil,
+    processName: String? = nil,
+    expectedDeployedArtifactDigest: String? = nil
+  ) throws {
+    if let abilityName {
+      _ = try HDCAbilityReference(bundle: bundle, abilityName: abilityName)
+    }
+    let resolvedProcessName = processName ?? bundle.bundleName
+    guard !resolvedProcessName.isEmpty, resolvedProcessName.count <= 200,
+      resolvedProcessName.first?.isASCII == true,
+      resolvedProcessName.first?.isLetter == true,
+      resolvedProcessName.allSatisfy({
+        $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "." || $0 == "_" || $0 == ":")
+      })
+    else {
+      throw HDCE0RequestError.malformed(
+        field: "processName", detail: "application process identifier expected")
+    }
+    if let digest = expectedDeployedArtifactDigest {
+      guard digest.utf8.count == 64,
+        digest.utf8.allSatisfy({
+          (48...57).contains($0) || (97...102).contains($0)
+        })
+      else {
+        throw HDCE0RequestError.malformed(
+          field: "expectedDeployedArtifactDigest", detail: "lowercase SHA-256 expected")
+      }
+    }
+    self.bundle = bundle
+    self.abilityName = abilityName
+    self.processName = resolvedProcessName
+    self.expectedDeployedArtifactDigest = expectedDeployedArtifactDigest
   }
 }
 

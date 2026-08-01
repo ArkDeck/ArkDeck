@@ -832,6 +832,7 @@ final class HarnessTaskPlaneContractTests: XCTestCase {
         "crashSignature": .string("SIGABRT+WaterFlowCrashProbe_RecoverBack"),
         "bundleName": .string("com.example.waterflowdemo"),
         "abilityName": .string("EntryAbility"),
+        "processName": .string("com.example.waterflowdemo:entry"),
         "baselineHapArtifactLease": .string("lease-v1:input-hap:ART-crash-fixture"),
         "buildPresetRef": .string("waterflow-debug"),
         "testPresetRef": .string("waterflow-tests"),
@@ -862,6 +863,7 @@ final class HarnessTaskPlaneContractTests: XCTestCase {
         "crashSignature": .string("SIGABRT+WaterFlowCrashProbe_RecoverBack"),
         "bundleName": .string("com.example.waterflowdemo"),
         "abilityName": .string("EntryAbility"),
+        "processName": .string("com.example.waterflowdemo:entry"),
         "baselineHapArtifactLease": .string("lease-v1:input-hap:ART-crash-fixture"),
         "buildPresetRef": .string("waterflow-debug"),
         "testPresetRef": .string("waterflow-tests"),
@@ -973,6 +975,21 @@ final class HarnessTaskPlaneContractTests: XCTestCase {
       base.merging(["abilityName": .string("EntryAbility")]) { _, new in new })
     XCTAssertFalse(missingBundle.ok)
     XCTAssertEqual(missingBundle.error?.code, AgentDaemonErrorCode.invalidParams.rawValue)
+
+    let processWithoutBundle = try await submit(
+      base.merging(["processName": .string("com.example.demo")]) { _, new in new })
+    XCTAssertFalse(processWithoutBundle.ok)
+    XCTAssertEqual(
+      processWithoutBundle.error?.code, AgentDaemonErrorCode.invalidParams.rawValue)
+
+    let commandShapedProcess = try await submit(
+      base.merging([
+        "bundleName": .string("com.example.demo"),
+        "processName": .string("1;pidof.other"),
+      ]) { _, new in new })
+    XCTAssertFalse(commandShapedProcess.ok)
+    XCTAssertEqual(
+      commandShapedProcess.error?.code, AgentDaemonErrorCode.invalidParams.rawValue)
 
     let malformedBaselineLease = try await submit(
       base.merging([
