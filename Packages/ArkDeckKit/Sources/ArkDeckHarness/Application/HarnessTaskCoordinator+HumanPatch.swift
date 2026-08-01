@@ -91,6 +91,16 @@ extension HarnessTaskCoordinator {
         throw HarnessCoordinatorError.malformedPatchProposal(rejection.reasonCode)
       }
 
+      // `reconcile` checks the hard task budget before it creates a decision.
+      // This typed human entry must preserve the same ordering: a proposal
+      // arriving after the deadline may be parsed and validated, but it must
+      // not resume the task, create Attempt history, or publish patch bytes.
+      if let stopped = try await stopForExhaustedHumanPatchBudget(
+        blocked, round: nextRound)
+      {
+        return stopped
+      }
+
       // A task persisted before execution-fact envelopes existed may already
       // be sitting at this human boundary without Attempt history. Establish
       // the same journey identity reconcile would have created, then resume
@@ -130,6 +140,15 @@ extension HarnessTaskCoordinator {
       throw HarnessCoordinatorError.patchProposalNotAllowed(reason)
     }
 
+    // A maintainer grant can arrive long after patch preparation. Recheck the
+    // overall task deadline before resolving the human block so an expired
+    // retry cannot dispatch the already-prepared mutation.
+    if let stopped = try await stopForExhaustedHumanPatchBudget(
+      blocked, round: nextRound)
+    {
+      return stopped
+    }
+
     // Authorization changes outside the task state. Re-stamp the exact
     // already-prepared decision on the human resolution, then re-enter the
     // ordinary dispatch boundary with its original identity.
@@ -141,6 +160,18 @@ extension HarnessTaskCoordinator {
     return try await dispatch(
       HarnessPlannedStep(decision: restamped, phaseOnDispatch: .patching),
       snapshotAtPlanning: resumed, handler: handler)
+  }
+
+  private func stopForExhaustedHumanPatchBudget(
+    _ snapshot: HarnessTaskSnapshot,
+    round: Int
+  ) async throws -> HarnessReconcileOutcome? {
+    guard
+      let refusal = HarnessPolicyGuard.budgetRefusal(
+        snapshot, elapsedSeconds: elapsedSeconds(since: snapshot.createdAtUTC))
+    else { return nil }
+    return try await stop(
+      snapshot, refusal: refusal, round: round, requestID: nil, jobID: nil)
   }
 
   private static func isWorkspaceAuthorizationStop(_ reason: String) -> Bool {
