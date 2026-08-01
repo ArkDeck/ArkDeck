@@ -79,7 +79,10 @@ final class Dayu20070035AuthorizedFlashWrapperContractTests: XCTestCase {
     process.standardInput = Pipe()
     process.standardOutput = output
     process.standardError = output
-    process.environment = ProcessInfo.processInfo.environment.merging(additions) { _, new in new }
+    var environment = ProcessInfo.processInfo.environment
+    environment.removeValue(forKey: "CI")
+    environment.removeValue(forKey: "GITHUB_ACTIONS")
+    process.environment = environment.merging(additions) { _, new in new }
     try process.run()
     process.waitUntilExit()
     let data = output.fileHandleForReading.readDataToEndOfFile()
