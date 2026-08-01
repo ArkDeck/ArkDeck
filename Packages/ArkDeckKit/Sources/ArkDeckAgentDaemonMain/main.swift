@@ -231,6 +231,7 @@ Task.detached {
     //   ARKDECK_WORKSPACE_INSPECTOR=/usr/bin/grep
     //   ARKDECK_WORKSPACE_PROJECTS=demo-app=/abs/path,other=/abs/other
     //   ARKDECK_WORKSPACE_ACTIVE_PROJECT=demo-app
+    //   ARKDECK_DEVECO_SDK_HOME=/Applications/DevEco-Studio.app/Contents/sdk
     let workspaceRoots = Dictionary(
       uniqueKeysWithValues:
         (ProcessInfo.processInfo.environment["ARKDECK_WORKSPACE_PROJECTS"] ?? "")
@@ -247,6 +248,7 @@ Task.detached {
     var inspectorExecutable: ResolvedExecutable?
     var workspaceDispatcher: any RuntimeProcessDispatching = RefusingDispatcher(
       reason: "no workspace ProjectProfile is configured")
+    var workspaceChildEnvironment: [String: String] = [:]
     if let configuredInspector {
       let resolver = try FixedExecutableResolver.hashing(
         path: configuredInspector, providerID: "workspace")
@@ -276,9 +278,30 @@ Task.detached {
             ?? "/Applications/DevEco-Studio.app/Contents/tools/node/bin/node"
           let hvigor = ProcessInfo.processInfo.environment["ARKDECK_DEVECO_HVIGOR_PATH"]
             ?? "/Applications/DevEco-Studio.app/Contents/tools/hvigor/bin/hvigorw.js"
+          let configuredSDK =
+            ProcessInfo.processInfo.environment["ARKDECK_DEVECO_SDK_HOME"]
+            ?? ProcessInfo.processInfo.environment["DEVECO_SDK_HOME"]
+            ?? "/Applications/DevEco-Studio.app/Contents/sdk"
+          let sdk = URL(fileURLWithPath: configuredSDK, isDirectory: true)
+            .resolvingSymlinksInPath().standardizedFileURL
+          var sdkIsDirectory: ObjCBool = false
+          let openHarmonySDK = sdk.appendingPathComponent(
+            "default/openharmony", isDirectory: true)
+          guard configuredSDK.hasPrefix("/"),
+            FileManager.default.fileExists(
+              atPath: openHarmonySDK.path, isDirectory: &sdkIsDirectory),
+            sdkIsDirectory.boolValue
+          else {
+            throw DeviceProviderError.factsUnavailable(
+              "workspace.projectProfileUnavailable: DevEco OpenHarmony SDK is absent")
+          }
           profile = try WorkspaceProjectProfile.waterFlowDemo(
             rootURL: URL(fileURLWithPath: activeRoot, isDirectory: true),
             projectRef: activeProjectRef, nodePath: node, hvigorScriptPath: hvigor)
+          // Hvigor rejects a missing or stale inherited DEVECO_SDK_HOME with
+          // configuration error 00303217. Pin the validated profile SDK on
+          // this child route instead of depending on the daemon launcher.
+          workspaceChildEnvironment = ["DEVECO_SDK_HOME": sdk.path]
         default:
           throw DeviceProviderError.factsUnavailable(
             "workspace.projectProfileUnavailable:\(activeProjectRef) is unsupported")
@@ -302,7 +325,8 @@ Task.detached {
     if let workspaceOperationResolver {
       workspaceDispatcher = DescriptorBoundProcessDispatcher(
         resolver: CombinedWorkspaceExecutableResolver(
-          inspector: inspectorExecutable, operations: workspaceOperationResolver))
+          inspector: inspectorExecutable, operations: workspaceOperationResolver),
+        childEnvironment: workspaceChildEnvironment)
     } else if let inspectorExecutable {
       workspaceDispatcher = DescriptorBoundProcessDispatcher(
         resolver: FixedExecutableResolver(

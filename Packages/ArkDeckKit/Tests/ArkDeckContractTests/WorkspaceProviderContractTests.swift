@@ -215,6 +215,44 @@ final class WorkspaceProviderContractTests: XCTestCase {
       ])
   }
 
+  func testDispatcherOverlaysProfileEnvironmentOnlyOnTheChild() async throws {
+    let key = "ARKDECK_TEST_CHILD_SDK_HOME"
+    let value = "/private/tmp/arkdeck-sdk"
+    let inheritedValue = ProcessInfo.processInfo.environment[key]
+    let env = try WorkspaceExecutableIdentity.hashing(path: "/usr/bin/env")
+    let build = try WorkspaceCommandPreset(
+      presetID: "print-environment", executable: env,
+      fixedArguments: [], timeoutSeconds: 10)
+    let environmentProfile = try WorkspaceProjectProfile(
+      profileID: "environment-test@1", projectRef: "TestProject",
+      projectRoot: root.path, allowedFileGlobs: ["Sources/**"],
+      inspectionPreset: profile.inspectionPreset,
+      patchPreset: profile.patchPreset,
+      buildPresets: [build.presetID: build], testPresets: [:], symbolPresets: [:])
+    let environmentProvider = WorkspaceOperationsProvider(
+      profile: environmentProfile,
+      attemptStore: try WorkspacePatchAttemptStore(
+        rootURL: state.appendingPathComponent("environment-attempts", isDirectory: true)),
+      nowUTC: { "2026-08-01T00:00:00Z" })
+    let descriptor = try XCTUnwrap(
+      RuntimeOperationCatalog.descriptor(reference: "workspace.build-openharmony@1"))
+    let action = try environmentProvider.action(
+      for: descriptor.steps[0], operation: descriptor,
+      inputs: [
+        "projectRef": .string("TestProject"),
+        "buildPresetRef": .string(build.presetID),
+      ], context: executionContext())
+    let environmentDispatcher = DescriptorBoundProcessDispatcher(
+      resolver: WorkspaceActionExecutableResolver(profile: environmentProfile),
+      childEnvironment: [key: value])
+    let receipt = try await environmentDispatcher.dispatch(
+      try environmentProvider.lower(action: action, context: executionContext()))
+    let lines = String(decoding: receipt.stdout, as: UTF8.self).split(separator: "\n")
+
+    XCTAssertTrue(lines.contains(Substring("\(key)=\(value)")))
+    XCTAssertEqual(ProcessInfo.processInfo.environment[key], inheritedValue)
+  }
+
   func testPatchScopeApplyArtifactReadbackAndExactRevert() async throws {
     let original = try Data(contentsOf: root.appendingPathComponent("Sources/App.txt"))
     let originalRevision = sha(original)
