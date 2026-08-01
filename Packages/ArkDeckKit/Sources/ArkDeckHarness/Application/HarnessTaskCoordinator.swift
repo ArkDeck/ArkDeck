@@ -912,24 +912,37 @@ public actor HarnessTaskCoordinator {
       // failure is fingerprinted so a later task inherits the knowledge, and
       // the task stops for a human instead of spinning.
       try await store.putIntent(intent.withState(.rejected, atUTC: nowUTC()))
+      let semanticCode = Self.semanticCode(from: message)
       let print = fingerprint(
         snapshot, operationReference: intent.operationReference,
         inputsDigest: intent.inputsDigestSHA256, errorClassification: "admissionRejected",
-        semanticErrorCode: Self.semanticCode(from: message))
+        semanticErrorCode: semanticCode)
       let record = try await recordFailure(
         snapshot, fingerprint: print, reasonCode: "submissionRejected", jobID: nil,
         requestID: intent.requestID)
       try await recordAttemptFailure(
         taskID: snapshot.htaskID, fingerprint: record.fingerprint,
         outcome: .humanRequired)
+      // Authorization is not an unavailable environment. It maps exactly to
+      // the closed impact-approval HumanActionRequired category, and the
+      // operation reference is the minimum durable context a maintainer needs
+      // to prepare the matching typed grant. Keep other admission failures on
+      // the existing environment-unavailable path.
+      let isAuthorizationRequired = semanticCode == "authorizationRequired"
+      let block: HarnessHumanBlock =
+        isAuthorizationRequired ? .authorizationApproval : .environmentUnavailable
+      let blockReason =
+        isAuthorizationRequired
+        ? "submissionRejected:authorizationRequired:\(intent.operationReference)"
+        : "submissionRejected:\(semanticCode)"
       let blocked = try await recordBlock(
-        snapshot, block: .environmentUnavailable,
-        reasonCode: "submissionRejected:\(Self.semanticCode(from: message))",
+        snapshot, block: block,
+        reasonCode: blockReason,
         round: intent.round, jobID: nil, requestID: intent.requestID)
       return .rejected(
         HarnessReconcileOutcome(
           snapshot: blocked.snapshot, action: .stoppedForHuman,
-          reasonCode: "submissionRejected"))
+          reasonCode: isAuthorizationRequired ? blockReason : "submissionRejected"))
     }
     // Any other failure (transport, unknown) leaves the intent at
     // `submitted` and propagates: the next wake resolves it through the
