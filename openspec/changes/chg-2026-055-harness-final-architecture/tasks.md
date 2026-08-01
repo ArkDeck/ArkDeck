@@ -191,7 +191,7 @@
 
 ## TASK-HFA-005 — GJ-5 真机端到端 r2:含修复腿的一次 submit 自动收敛
 
-- Status:ready
+- Status:done
 - r1 台账补记(2026-08-01,第三方):产品代码经 #902 合入 `main@fe8972a2`(daemon `task.*` 面、
   CLI、handler 与 provider 侧多处修复),但**该 PR 零 `openspec/` 改动,且仓内没有任何设备窗口
   run 记录** —— 无命令、无退出码、无 artifact hash、无脱敏设备标识、无 catalog digest。
@@ -202,6 +202,12 @@
   终态 `humanRequired` / `submissionRejected:rejected`,rounds/artifactBytes/e1Mutations/modelCalls
   全零 —— 提交阶段即被拒。它不证明 GJ-5 失败,但它是现有唯一真实记录且显示的是停止。
   关闭本任务需要跑窗口的人补一份真实 run 记录,或维护者直接判定结果。方法见 `evidence/runs/LEDGER-BACKFILL/2026-08-01.md`。
+- r2 真机闭环(2026-08-01):`evidence/runs/TASK-HFA-005/run-r2.md` 在当前 catalog
+  digest `44b6728d…af5ec6` 上记录 `HTASK-89586A62D3CD` 一次 submit 自动收敛:
+  round 6 的真实崩溃 `EVAL-202905F2F681=fail`,精确一行 patch 后 build/test 与
+  两次 capability-bound E1 deploy 均成功,round 20 的 `EVAL-64B95811F714=pass`
+  (连续 5 个 clean 样本);build/deploy digest 相等,human actions `[]`,窗口清理
+  succeeded 且 residue `0`。HFA-AC-11/12 均 PASS,GJ-5=`REAL_DEVICE_PASS`。
 - Platform:macos
 - Requirements/AC:proposal Wave A 全部交付面的真机复验;change-local HFA-AC-11、HFA-AC-12,
   登记于 `verification.md`

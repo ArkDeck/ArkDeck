@@ -71,10 +71,16 @@ public struct FixedExecutableResolver: RuntimeExecutableResolving {
 public struct DescriptorBoundProcessDispatcher: RuntimeProcessDispatching {
   private let resolver: any RuntimeExecutableResolving
   private let outputByteBudget: Int
+  private let childEnvironment: [String: String]
 
-  public init(resolver: any RuntimeExecutableResolving, outputByteBudget: Int = 8 * 1024 * 1024) {
+  public init(
+    resolver: any RuntimeExecutableResolving,
+    outputByteBudget: Int = 8 * 1024 * 1024,
+    childEnvironment: [String: String] = [:]
+  ) {
     self.resolver = resolver
     self.outputByteBudget = outputByteBudget
+    self.childEnvironment = childEnvironment
   }
 
   public func unavailableReason(providerID: String) -> String? {
@@ -155,6 +161,7 @@ public struct DescriptorBoundProcessDispatcher: RuntimeProcessDispatching {
       executable: URL(fileURLWithPath: executable.path),
       argumentZero: argumentZero,
       arguments: invocation.arguments,
+      environment: childEnvironment,
       workingDirectory: workingDirectory.map { URL(fileURLWithPath: $0, isDirectory: true) },
       timeout: invocation.timeoutSeconds.map(TimeInterval.init))
     let executor = FoundationProcessExecutor()

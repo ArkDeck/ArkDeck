@@ -656,6 +656,8 @@ final class AgentDaemonContractTests: XCTestCase {
     try Data("{}".utf8).write(to: module.appendingPathComponent("module.json5"))
     let hvigor = project.appendingPathComponent("hvigorw.js")
     try Data("// fixture".utf8).write(to: hvigor)
+    let sdk = project.appendingPathComponent("sdk/default/openharmony", isDirectory: true)
+    try FileManager.default.createDirectory(at: sdk, withIntermediateDirectories: true)
     defer {
       try? FileManager.default.removeItem(at: shortState)
       try? FileManager.default.removeItem(at: project)
@@ -668,6 +670,7 @@ final class AgentDaemonContractTests: XCTestCase {
         "ARKDECK_WORKSPACE_ACTIVE_PROJECT": "demo-app",
         "ARKDECK_DEVECO_NODE_PATH": "/usr/bin/true",
         "ARKDECK_DEVECO_HVIGOR_PATH": hvigor.path,
+        "ARKDECK_DEVECO_SDK_HOME": project.appendingPathComponent("sdk").path,
       ])
     defer { if process.isRunning { process.terminate() } }
     let socketURL = shortState.appendingPathComponent("agentd.sock")
@@ -682,6 +685,47 @@ final class AgentDaemonContractTests: XCTestCase {
         operations[reference]?.availability, "available",
         "\(reference): \(operations[reference]?.reasons ?? [])")
     }
+  }
+
+  func testWaterFlowProductionProfileFailsClosedWhenItsSDKIsAbsent() throws {
+    let binary = productsDirectory.appendingPathComponent("arkdeck-agentd")
+    guard FileManager.default.fileExists(atPath: binary.path) else {
+      throw XCTSkip("arkdeck-agentd binary not built")
+    }
+    let shortState = URL(fileURLWithPath: NSHomeDirectory())
+      .appendingPathComponent(".arkdeck-test-\(UInt32.random(in: 0..<100_000))", isDirectory: true)
+    let project = URL(fileURLWithPath: NSHomeDirectory())
+      .appendingPathComponent(
+        ".arkdeck-waterflow-\(UInt32.random(in: 0..<100_000))", isDirectory: true)
+    let module = project.appendingPathComponent("entry/src/main", isDirectory: true)
+    try FileManager.default.createDirectory(at: module, withIntermediateDirectories: true)
+    try Data("{}".utf8).write(to: project.appendingPathComponent("build-profile.json5"))
+    try Data("{}".utf8).write(to: module.appendingPathComponent("module.json5"))
+    let hvigor = project.appendingPathComponent("hvigorw.js")
+    try Data("// fixture".utf8).write(to: hvigor)
+    defer {
+      try? FileManager.default.removeItem(at: shortState)
+      try? FileManager.default.removeItem(at: project)
+    }
+
+    let process = try launchProductionDaemon(
+      binary: binary, stateDirectory: shortState,
+      extraEnvironment: [
+        "ARKDECK_WORKSPACE_PROJECTS": "demo-app=\(project.path)",
+        "ARKDECK_WORKSPACE_ACTIVE_PROJECT": "demo-app",
+        "ARKDECK_DEVECO_NODE_PATH": "/usr/bin/true",
+        "ARKDECK_DEVECO_HVIGOR_PATH": hvigor.path,
+        "ARKDECK_DEVECO_SDK_HOME": project.appendingPathComponent("missing-sdk").path,
+      ])
+    defer { if process.isRunning { process.terminate() } }
+    let operations = try listOperations(
+      socketPath: shortState.appendingPathComponent("agentd.sock").path)
+    let build = try XCTUnwrap(operations["workspace.build-openharmony@1"])
+
+    XCTAssertEqual(build.availability, "unavailable")
+    XCTAssertTrue(
+      build.reasons.contains { $0.contains("DevEco OpenHarmony SDK is absent") },
+      "missing SDK must be a startup availability blocker: \(build.reasons)")
   }
 
   /// The two blockers the production Rockchip composition can publish with no

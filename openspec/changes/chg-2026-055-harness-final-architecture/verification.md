@@ -4,6 +4,8 @@
 
 Status:in_progress # r1(2026-07-31):TASK-HFA-001/002/008 已 done,
 HFA-AC-1/2/3/4/5/17 有结论;其余 HFA-AC 仍 `pending`(未开工)。
+r2(2026-08-01):TASK-HFA-005 真机闭环完成,HFA-AC-11/12=`PASS`,GJ-5=
+`REAL_DEVICE_PASS`;其余结论见各 AC 段。
 每条结论由其所属任务的实现 PR 写入本文件;维护者 review/merge 该实现 PR 即确认。
 不为本 change 追加独立 verification/archive 载体(`PRODUCT-LOOP.md` §4/§20)。
 
@@ -183,23 +185,25 @@ HFA-AC-1/2/3/4/5/17 有结论;其余 HFA-AC 仍 `pending`(未开工)。
   运行 → 采集 → 判定 → patch → build → 部署 → 复验;记录人工步骤计数、每轮
   decision/attempt/job/artifact 链、预算消耗与停止原因。
 - Evidence:设备窗口 run 记录(命令、退出码、artifact hash、脱敏设备标识、capability ID)。
-- **结论(2026-08-01,第三方补记 —— 方法见 `evidence/runs/LEDGER-BACKFILL/2026-08-01.md`):pending-hardware** ——
-  仓内**没有任何设备窗口 run 记录**:#902(`fe8972a2`)零 `openspec/` 改动,PR 正文为模板文,
-  无命令、无退出码、无 artifact hash、无脱敏设备标识、无 catalog digest。
-  按本文件约定,缺设备窗口只能如实分类,不得以 fake/simulation 顶替,故不写 PASS 也不写 FAIL。
-  **另有一份反向证据**:TASK-HFA-012 为迁移测试提交的真实历史任务目录
-  (`Fixtures/Harness/HFA012/tasks/HTASK-265D25D3E0F9`,测试名 `testRealHFA005DirectoryMigrates…`)
-  终态为 `humanRequired` / `submissionRejected:rejected`,consumed 全零 —— 提交阶段即被拒的
-  一次运行,不是收敛的闭环。**GJ-5 因此不得写 `REAL_DEVICE_PASS`**(§6)。
+- **结论(2026-08-01,`evidence/runs/TASK-HFA-005/run-r2.md`):PASS** ——
+  `HTASK-89586A62D3CD` 在当前 catalog digest `44b6728d…af5ec6` 上由一次 submit
+  自动收敛到 `succeeded/criteriaPassed`:20 rounds / 416s / 20 model calls /
+  2 E1 mutations,human actions `[]`。精确 patch 后 build/test succeeded,构建产物与
+  部署读回 SHA-256 同为 `6263bb8a…87e8`;两次设备 mutation 均有 exact-input、
+  binding-revision-1 的 RuntimeCapability consumption,终态后 typed cleanup 也 succeeded、
+  residue `0`。故人工步骤计数为 0,GJ-5 可如实写 `REAL_DEVICE_PASS`。
 
 ## HFA-AC-12 真机:注入真实崩溃后不得判 PASS(TASK-HFA-005)
 
 - 方法:在真机上注入可复现的目标崩溃,断言 verdict 不是 `pass`(关闭 r6 假阳性);
   修复后复验 `PASS`。两条证据缺一不可,缺则 GJ-5 不得写 `REAL_DEVICE_PASS`。
 - Evidence:同上窗口记录 + 两轮 verdict 的 evaluation ID。
-- **结论(2026-08-01,第三方补记 —— 方法见 `evidence/runs/LEDGER-BACKFILL/2026-08-01.md`):pending-hardware** ——
-  同 HFA-AC-11:需要「注入真实崩溃后 verdict 不是 pass」与「修复后复验 PASS」两条真机证据,
-  仓内一条都没有。要关闭这条,只能由跑窗口的人补一份真实 run 记录。
+- **结论(2026-08-01,`evidence/runs/TASK-HFA-005/run-r2.md`):PASS** ——
+  baseline crash fixture 部署后,round 6 `EVAL-202905F2F681=fail`:
+  `applicationLiveness=unhealthy`,`matchingCrashCount=1`,且目标签名为
+  `jscrash:com.example.waterflowdemo`,没有假阳性 PASS。修复、构建、测试并部署同一
+  digest 后,round 20 `EVAL-64B95811F714=pass`;连续 5 个样本均为
+  `healthy / matchingCrashCount=0 / newFatalSignatureCount=0`。两条证据完整。
 
 ## HFA-AC-13 设备瞬断不回退业务进度(TASK-HFA-006)
 
