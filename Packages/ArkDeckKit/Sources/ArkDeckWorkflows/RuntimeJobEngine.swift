@@ -2223,6 +2223,7 @@ public actor RuntimeJobEngine {
   static let workspaceOperationReferences: Set<String> = [
     "workspace.apply-patch@1",
     "workspace.build-openharmony@1",
+    "workspace.create-checkpoint@1",
     "workspace.revert-patch@1",
     "workspace.run-tests@1",
     "workspace.symbolize-crash@1",
@@ -2256,6 +2257,9 @@ public actor RuntimeJobEngine {
     ],
     "workspace.build-openharmony@1": [
       "build-project": ["build.log"]
+    ],
+    "workspace.create-checkpoint@1": [
+      "create-checkpoint": ["checkpoint.txt"]
     ],
     "workspace.run-tests@1": [
       "run-tests": ["test-output.log"]
@@ -4990,6 +4994,15 @@ public actor RuntimeJobEngine {
         "symbol": .string(inspection.symbol),
         "fileScope": .string(inspection.fileScope),
         "artifactId": .string("source-inspection.txt"),
+      ]
+    case .createWorkspaceCheckpoint:
+      guard case .string(let projectRef)? = inputs["projectRef"] else {
+        throw RuntimeJobEngineError.internalFailure(
+          "\(step.stepID) has incomplete workspace checkpoint inputs")
+      }
+      arguments = [
+        "projectRef": .string(projectRef),
+        "artifactId": .string("checkpoint.txt"),
       ]
     case .applyWorkspacePatch:
       guard case .workspace(.applyPatch(let patch))? = action else {

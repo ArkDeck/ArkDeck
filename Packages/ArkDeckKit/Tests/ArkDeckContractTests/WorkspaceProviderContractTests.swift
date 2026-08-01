@@ -893,6 +893,83 @@ final class WorkspaceProviderContractTests: XCTestCase {
     XCTAssertEqual(try Data(contentsOf: resolved.fileURL), Data("BUILD_OK\n".utf8))
   }
 
+  func testCatalogToRuntimeArchiveCheckpointMaterializesJournalAndPublishesReceipt()
+    async throws
+  {
+    let checkpointPreset = try WorkspaceCommandPreset(
+      presetID: "checkpoint", executable: try WorkspaceExecutableIdentity.hashing(
+        path: "/usr/bin/bsdtar"), fixedArguments: [], timeoutSeconds: 10)
+    let checkpointProfile = try WorkspaceProjectProfile(
+      profileID: profile.profileID, projectRef: profile.projectRef,
+      projectRoot: profile.projectRoot,
+      allowedFileGlobs: profile.allowedFileGlobs,
+      inspectionPreset: profile.inspectionPreset,
+      archiveCheckpointPreset: checkpointPreset,
+      patchPreset: profile.patchPreset,
+      buildPresets: profile.buildPresets,
+      testPresets: profile.testPresets,
+      symbolPresets: profile.symbolPresets)
+    let checkpointProvider = WorkspaceOperationsProvider(
+      profile: checkpointProfile,
+      attemptStore: try WorkspacePatchAttemptStore(
+        rootURL: state.appendingPathComponent("checkpoint-attempts", isDirectory: true)),
+      nowUTC: { "2026-07-31T00:00:00Z" })
+    let checkpointDispatcher = DescriptorBoundProcessDispatcher(
+      resolver: WorkspaceActionExecutableResolver(profile: checkpointProfile))
+    let capabilityStore = try RuntimeCapabilityStore(
+      directoryURL: state.appendingPathComponent("checkpoint-capabilities"))
+    let artifactStore = try RuntimeArtifactStore(
+      rootURL: state.appendingPathComponent("checkpoint-artifacts"),
+      nowUTC: { "2026-07-31T00:00:00Z" })
+    try await installWorkspaceGrant(
+      into: capabilityStore, operations: ["workspace.create-checkpoint"],
+      profile: checkpointProfile)
+    let engine = try RuntimeJobEngine(
+      configuration: .init(
+        stateDirectory: state.appendingPathComponent("checkpoint-engine")),
+      providers: DeviceProviderRegistry(providers: [checkpointProvider]),
+      dispatcher: RuntimeProcessDispatcherRouter(
+        hdc: checkpointDispatcher, rockchip: checkpointDispatcher,
+        workspace: checkpointDispatcher),
+      capabilityStore: capabilityStore,
+      artifactStore: artifactStore,
+      nowUTC: { "2026-07-31T00:00:00Z" })
+    let relativePath = "Sources/App.txt"
+    let snapshots = try WorkspaceProviderSupport.snapshots(
+      relativePaths: [relativePath], root: checkpointProfile.projectRoot)
+    let request = try operationRequest(
+      id: "workspace.create-checkpoint",
+      inputs: [
+        "projectRef": .string(checkpointProfile.projectRef),
+        "expectedWorkspaceRevision": .string(
+          WorkspaceProviderSupport.revision(snapshots)),
+        "checkpointFilePaths": .array([.string(relativePath)]),
+      ],
+      requestID: "request-runtime-checkpoint",
+      idempotencyKey: "idempotency-runtime-checkpoint")
+
+    let acceptance = try await engine.submit(try JSONEncoder().encode(request))
+    let status = try await engine.run(jobID: acceptance.jobID)
+    XCTAssertEqual(status.state, "succeeded", status.timeline.joined(separator: " | "))
+
+    let artifacts = try await artifactStore.list(jobID: acceptance.jobID)
+    let checkpoint = try XCTUnwrap(artifacts.first { $0.name == "checkpoint.txt" })
+    XCTAssertTrue(checkpoint.status.isPublished)
+    let lease = try await artifactStore.leaseReference(
+      jobID: acceptance.jobID, artifactID: checkpoint.artifactID)
+    let resolved = try await artifactStore.resolveLease(lease)
+    let receipt = try JSONDecoder().decode(
+      [String: JSONValue].self, from: Data(contentsOf: resolved.fileURL))
+    XCTAssertEqual(receipt["checkpointKind"], .string("sealedArchive"))
+    XCTAssertNotNil(receipt["checkpointObject"])
+
+    let inspectedGrant = try await capabilityStore.inspect(
+      capabilityID: Self.workspaceGrantID)
+    let grant = try XCTUnwrap(inspectedGrant)
+    XCTAssertEqual(grant.consumptionCount, 1)
+    XCTAssertEqual(grant.lineage.map(\.outcome), [.confirmed])
+  }
+
   func testWorkspaceIsUnavailableWithoutArtifactStoreBeforeAdmission() async throws {
     let grantStore2 = try RuntimeCapabilityStore(
       directoryURL: state.appendingPathComponent("workspace-grant-2"))
