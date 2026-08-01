@@ -1,12 +1,25 @@
 ---
 schema_version: 1.0.0
 change_id: CHG-2026-049-diagnostics-and-hap
-change_revision: 8
+change_revision: 9
 platform: macos
 evidence_classes:
 - contract
 - realHardware
 cases:
+- acceptance_id: DHA-GJ4-TRIGGER-004
+  test_id: TEST-DHA-GJ4-TRIGGER-004
+  method: >-
+    Versioned Bash source contract plus host-only executions of truncated-plan,
+    ordinary-CI and non-TTY negative paths.
+  expected_source: openspec/changes/chg-2026-049-diagnostics-and-hap/verification.md#dha-gj4-trigger-004
+  minimum_evidence: contract
+  expected_result: >-
+    Chat is only a trigger: the wrapper requires the full exact plan digest and
+    a strict authorization ID, rejects CI and non-TTY interactive use before
+    host prerequisites, and can delegate execution only to the existing typed
+    trusted executor whose protected-main standing authorization remains the
+    sole E2 authority.
 - acceptance_id: DHA-GJ4-HANDOFF-003
   test_id: TEST-DHA-GJ4-HANDOFF-003
   method: >-

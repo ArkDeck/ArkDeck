@@ -5,7 +5,7 @@
 > binding、typed inputs、plan digest、lineage 与 `outcomeUnknown` 门保持。
 > 下文 r2 的人工 capability 步骤是历史计划；E2 不变。
 
-> Change:CHG-2026-049-diagnostics-and-hap@r8
+> Change:CHG-2026-049-diagnostics-and-hap@r9
 > Status:planned
 > Core baseline:CORE-2.1.0 (canonical Core AC not claimed)
 
@@ -31,6 +31,7 @@
 | `DHA-GJ4-PROFILE-001` | v2 profile/Catalog/Provider drift contract + real archive summary | archive 与 17 members 的 size/SHA-256 全匹配；Catalog 只开放 dayu200@1/@2；Provider 对 v2 exact 九分区成功，换序和跨版本 archive 拒绝 | contract + realInput |
 | `DHA-GJ4-PLAN-002` | RuntimeJobEngine.planOnly + job.plan wire contract | 复用生产 materialization 产出 digest/选中步骤；不建 Job、不创建/安装/消费 capability、dispatch=0；错误 plan 同样零副作用 | contract + realInput |
 | `DHA-GJ4-HANDOFF-003` | v2 human handoff + trusted execute profile selection contract | human execute 生成 v2 exact commands 且 dispatch=0；authorized path 只按 archive pins 选择 profile，unknown/member drift 拒绝；executor 在授权消费前拒绝无匹配 profile | contract + realInput |
+| `DHA-GJ4-TRIGGER-004` | versioned Bash trigger source contract + host-only negative execution | wrapper 固定 v2 archive/tool/plan/step-set，chat 需 full digest + AUTH-ID；CI、截断 digest、non-TTY interactive 全部在 host prerequisites 前阻断；唯一执行委托为 typed trusted executor | contract |
 
 ## `DHA-AGENT-001`
 
@@ -113,6 +114,18 @@
   executor 的 published profile 集合；无匹配时关闭 reservation，零 destructive intent；
 - real-input CLI gate 只能运行到 non-TTY policy-blocked human handoff，验证 v2 execute
   digest/commands 后停止；不得连接设备、读取 standing authorization 或执行 handoff 命令。
+
+## `DHA-GJ4-TRIGGER-004`
+
+- script source contract 逐字断言 7.0.0.35 archive/tool SHA-256、execute plan digest 与
+  step-set digest，且最终 delegation 只包含 fixed ArkDeck binary、`flash execute`、archive、
+  durable-binding topology 与 strict authorization ID；禁止 `eval`、`sudo` 或直接执行 tool；
+- `--chat-trigger` 必须携完整 exact plan digest，截断或任一 byte 漂移均在 archive、binding、
+  defaults 与 binary 读取前退出 2，`READY` 不得出现；
+- `CI=true`/GitHub Actions 即使持 exact digest 也在同一位置拒绝；interactive trigger 在无 TTY
+  时同样拒绝；以上 contract 进程不连接 USB/HDC/RockUSB，不产生任何 device dispatch；
+- 正式执行仍由 protected-main resolver fresh 解析 `AUTH-ID`。聊天只表示本次触发意图，缺失、
+  过期、超次或任一 plan/target/tool fact 不一致时 trusted host 保持零 destructive dispatch。
 
 ## `DHA-HAP-001`
 
