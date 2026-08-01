@@ -64,20 +64,40 @@ public struct RockchipDeviceBindingInstallationReceipt: Sendable, Equatable {
 }
 
 public enum RockchipDeviceBindingInstallation {
-  /// Reads IOKit only, requires exactly one DAYU200 Loader, and durably adopts that identity.
+  /// Reads IOKit only, requires exactly one DAYU200 in registered HDC-normal or Loader mode,
+  /// and durably adopts that cross-mode identity.  The HDC-normal branch does not reboot here:
+  /// the transition remains inside the later authorized `enterUpdater` intent.
   /// This entry point never launches rkdeveloptool and has no device-mutation surface.
   @discardableResult
-  public static func installCurrentLoader() throws -> RockchipDeviceBindingInstallationReceipt {
+  public static func installCurrentTarget() throws -> RockchipDeviceBindingInstallationReceipt {
     let manager = FileManager.default
     let applicationSupport = try manager.url(
       for: .applicationSupportDirectory, in: .userDomainMask,
       appropriateFor: nil, create: true)
     let root = applicationSupport.appending(path: "ArkDeck", directoryHint: .isDirectory)
     return try RockchipProductBindingBootstrap(
-      probe: { try RockchipProductUSBProbe().singleLoader() },
+      probe: { try RockchipProductUSBProbe().singleDAYU200() },
       store: RockchipProductBindingStore(rootURL: root)
-    ).installCurrentLoader()
+    ).installCurrentTarget()
   }
+
+  /// Source-compatible name retained for clients built against the Loader-only bootstrap.
+  @discardableResult
+  public static func installCurrentLoader() throws -> RockchipDeviceBindingInstallationReceipt {
+    try installCurrentTarget()
+  }
+}
+
+/// Protected-main HDC tuple already registered by the Rockchip Loader-transition integration.
+/// It is deliberately not configurable by CLI/environment/PATH.
+enum RockchipHDCIntegrationProfile {
+  static let executableURL = URL(
+    fileURLWithPath:
+      "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/toolchains/hdc")
+  static let executableSHA256 =
+    "05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83"
+  static let reportedVersion = "3.2.0f"
+  static let dayu200NormalProductID: UInt16 = 0x5000
 }
 
 public struct RockchipFlashExecutionHost: Sendable {
@@ -247,15 +267,92 @@ private final class ProductRockchipExecutionLifecyclePort: @unchecked Sendable,
 
 // MARK: - Descriptor-bound process port
 
+enum RockchipHDCTransitionError: Error, Equatable, Sendable {
+  case outputTooLarge
+  case unexpectedStandardError
+  case processDidNotExitSuccessfully
+  case identityDrift
+  case loaderUnavailable
+}
+
+private enum RockchipHDCTransitionSemanticResult: Sendable, Equatable {
+  case succeeded
+  case failed(RockchipHDCTransitionError)
+}
+
+private struct RockchipHDCTransitionSemanticEvaluator: ProcessSemanticEvaluating {
+  typealias SemanticResult = RockchipHDCTransitionSemanticResult
+
+  private static let maximumOutputBytes = 64 * 1_024
+  private var stdout = Data()
+  private var stderr = Data()
+  private var exceededLimit = false
+
+  mutating func consume(_ chunk: ProcessOutputChunk) {
+    let current = stdout.count + stderr.count
+    guard current <= Self.maximumOutputBytes else {
+      exceededLimit = true
+      return
+    }
+    let remaining = Self.maximumOutputBytes + 1 - current
+    let bytes = chunk.bytes.prefix(max(0, remaining))
+    if bytes.count < chunk.bytes.count { exceededLimit = true }
+    switch chunk.stream {
+    case .stdout: stdout.append(bytes)
+    case .stderr: stderr.append(bytes)
+    }
+  }
+
+  mutating func finish(execution: ProcessExecutionResult) -> RockchipHDCTransitionSemanticResult {
+    guard !exceededLimit, stdout.count + stderr.count <= Self.maximumOutputBytes else {
+      return .failed(.outputTooLarge)
+    }
+    guard stderr.isEmpty else { return .failed(.unexpectedStandardError) }
+    guard execution.termination == .exited(0) else {
+      return .failed(.processDidNotExitSuccessfully)
+    }
+    return .succeeded
+  }
+}
+
+/// Closed production seam for the already-published `rockusb.enter-loader`
+/// step.  The raw HDC connect key never comes from CLI argv: it is the serial
+/// retained by the durable binding.  Readback closures are injected only so
+/// the same serial/topology transition can be proven without attaching IOKit
+/// to process-executor contract tests.
+struct RockchipHDCTransitionConfiguration: Sendable {
+  let executableURL: URL
+  let executableSHA256: String
+  let connectKey: String
+  let stableIdentitySHA256: String
+  let usbTopology: String
+  let currentIdentity: @Sendable () throws -> RockchipProductUSBIdentity
+  let waitForLoader: @Sendable () async throws -> RockchipProductUSBIdentity
+
+  var arguments: [String] {
+    ["-t", connectKey, "shell", "reboot", "loader"]
+  }
+}
+
 final class FoundationRockchipExecutionProcessPort: @unchecked Sendable,
   RockchipExecutionProcessPort
 {
   private let executableURL: URL
+  private let executableSHA256: String
   private let executor: FoundationProcessExecutor
+  private let hdcTransition: RockchipHDCTransitionConfiguration?
 
-  init(executableURL: URL, executor: FoundationProcessExecutor) {
+  init(
+    executableURL: URL,
+    executor: FoundationProcessExecutor,
+    executableSHA256: String = RockchipDiscoveryIntegrationProfile.pinnedProduction
+      .executableSHA256,
+    hdcTransition: RockchipHDCTransitionConfiguration? = nil
+  ) {
     self.executableURL = executableURL
+    self.executableSHA256 = executableSHA256
     self.executor = executor
+    self.hdcTransition = hdcTransition
   }
 
   func prepare(
@@ -266,18 +363,64 @@ final class FoundationRockchipExecutionProcessPort: @unchecked Sendable,
       process: ProcessRequest(
         executable: executableURL, arguments: command.arguments, environment: [:],
         timeout: command.isCriticalWrite ? nil : 15),
-      expectedSHA256: RockchipDiscoveryIntegrationProfile.pinnedProduction.executableSHA256)
+      expectedSHA256: executableSHA256)
     let prepared = try executor.prepareIdentityBoundLaunch(request)
     guard Self.sameDescriptor(prepared.executableIdentity, admissionIdentity) else {
       prepared.close()
       throw RockchipFlashExecutionError.executableIdentityDrift
     }
+    guard case .loaderGate = command, let hdcTransition else {
+      return RockchipPreparedCommand(executableIdentity: prepared.executableIdentity) {
+        let result = try await self.executor.executePreparedIdentityBoundLaunch(
+          prepared, evaluating: RockchipCommandSemanticEvaluator(command: command))
+        return RockchipExecutionAttempt(
+          execution: result.execution, semantic: result.semantic,
+          executableIdentity: result.executableIdentity)
+      }
+    }
+
+    let hdcPrepared: ProcessPreparedIdentityBoundLaunch
+    do {
+      hdcPrepared = try executor.prepareIdentityBoundLaunch(
+        ProcessIdentityBoundRequest(
+          process: ProcessRequest(
+            executable: hdcTransition.executableURL,
+            arguments: hdcTransition.arguments,
+            environment: [:], timeout: 20),
+          expectedSHA256: hdcTransition.executableSHA256))
+    } catch {
+      prepared.close()
+      throw error
+    }
     return RockchipPreparedCommand(executableIdentity: prepared.executableIdentity) {
+      defer { hdcPrepared.close() }
+      let current = try hdcTransition.currentIdentity()
+      guard Self.matches(current, transition: hdcTransition) else {
+        throw RockchipHDCTransitionError.identityDrift
+      }
+      if current.isHDCNormal {
+        let transition = try await self.executor.executePreparedIdentityBoundLaunch(
+          hdcPrepared, evaluating: RockchipHDCTransitionSemanticEvaluator())
+        guard transition.semantic == .succeeded else {
+          if case .failed(let failure) = transition.semantic { throw failure }
+          throw RockchipHDCTransitionError.processDidNotExitSuccessfully
+        }
+        let loader = try await hdcTransition.waitForLoader()
+        guard loader.isLoader, Self.matches(loader, transition: hdcTransition) else {
+          throw RockchipHDCTransitionError.loaderUnavailable
+        }
+      } else {
+        // The device may already have reached Loader between admission and
+        // the durable step boundary.  In that case the HDC descriptor is
+        // closed unused and no duplicate reboot command is dispatched.
+        guard current.isLoader else { throw RockchipHDCTransitionError.identityDrift }
+      }
       let result = try await self.executor.executePreparedIdentityBoundLaunch(
         prepared, evaluating: RockchipCommandSemanticEvaluator(command: command))
       return RockchipExecutionAttempt(
         execution: result.execution, semantic: result.semantic,
-        executableIdentity: result.executableIdentity)
+        executableIdentity: result.executableIdentity,
+        semanticCode: "rockchip.enter-loader.readback-confirmed")
     }
   }
 
@@ -287,6 +430,17 @@ final class FoundationRockchipExecutionProcessPort: @unchecked Sendable,
   ) -> Bool {
     lhs.device == rhs.device && lhs.inode == rhs.inode && lhs.fileSize == rhs.fileSize
       && lhs.mode == rhs.mode && lhs.sha256 == rhs.sha256
+  }
+
+  private static func matches(
+    _ identity: RockchipProductUSBIdentity,
+    transition: RockchipHDCTransitionConfiguration
+  ) -> Bool {
+    let digest = SHA256.hash(data: Data(identity.serial.utf8))
+      .map { String(format: "%02x", $0) }.joined()
+    return digest == transition.stableIdentitySHA256
+      && identity.topology == transition.usbTopology
+      && identity.isRegisteredDAYU200Mode
   }
 }
 
@@ -772,9 +926,37 @@ private enum RockchipProductionExecutionComposition {
       provenance: provenance, usageLedger: ledger, agentUsageLedger: agentLedger,
       binding: settings.binding,
       tool: settings.tool, clock: clock, usbProbe: usbProbe)
+    let bindingSerialDigest = SHA256.hash(data: Data(settings.binding.serial.utf8))
+      .map { String(format: "%02x", $0) }.joined()
+    let hdcTransition = RockchipHDCTransitionConfiguration(
+      executableURL: RockchipHDCIntegrationProfile.executableURL,
+      executableSHA256: RockchipHDCIntegrationProfile.executableSHA256,
+      connectKey: settings.binding.serial,
+      stableIdentitySHA256: bindingSerialDigest,
+      usbTopology: settings.binding.usbTopology,
+      currentIdentity: {
+        try usbProbe.singleDAYU200(
+          selector: settings.binding.usbTopology,
+          stableIdentitySHA256: bindingSerialDigest)
+      },
+      waitForLoader: {
+        let clock = ContinuousClock()
+        let deadline = clock.now.advanced(by: .seconds(45))
+        repeat {
+          if let identity = try? usbProbe.singleLoader(
+            selector: settings.binding.usbTopology,
+            stableIdentitySHA256: bindingSerialDigest)
+          {
+            return identity
+          }
+          try await Task.sleep(for: .milliseconds(250))
+        } while clock.now < deadline
+        throw RockchipHDCTransitionError.loaderUnavailable
+      })
     let process = FoundationRockchipExecutionProcessPort(
       executableURL: settings.tool.executableURL,
-      executor: FoundationProcessExecutor())
+      executor: FoundationProcessExecutor(),
+      hdcTransition: hdcTransition)
     let postflight = RockchipProductPostflightPort(probe: usbProbe)
     let coordinator = storage.context.coordinator
     let storageProbe = SystemHostStorageProbe()
@@ -1054,16 +1236,15 @@ struct RockchipProductBindingBootstrap: Sendable {
   let probe: @Sendable () throws -> RockchipProductUSBIdentity
   let store: RockchipProductBindingStore
 
-  func installCurrentLoader() throws -> RockchipDeviceBindingInstallationReceipt {
+  func installCurrentTarget() throws -> RockchipDeviceBindingInstallationReceipt {
     let identity = try probe()
-    guard identity.vendorID == RockchipProbeEvidence.rockUSBVendorID,
-      identity.productID == RockchipProbeEvidence.dayu200LoaderProductID,
+    guard identity.isRegisteredDAYU200Mode,
       !identity.serial.isEmpty,
       !identity.topology.isEmpty,
       identity.topology.utf8.allSatisfy({ (48...57).contains($0) })
     else {
       throw RockchipFlashExecutionError.admissionRejected(
-        "the single USB identity is not a valid DAYU200 Loader")
+        "the single USB identity is not a registered DAYU200 mode")
     }
     let serialDigest = SHA256.hash(data: Data(identity.serial.utf8))
       .map { String(format: "%02x", $0) }.joined()
@@ -1072,8 +1253,8 @@ struct RockchipProductBindingBootstrap: Sendable {
       serial: identity.serial,
       usbTopology: identity.topology,
       evidence: [
-        "product:e0-iokit-single-loader-readback",
-        "usb:vendor=8711,product=13578",
+        "product:e0-iokit-single-dayu200-readback",
+        "usb:vendor=\(RockchipProbeEvidence.rockUSBVendorID),profile=dayu200-cross-mode",
         "identity:serial-sha256=\(serialDigest)",
       ])
     let result = try store.install(candidate)
@@ -1084,6 +1265,12 @@ struct RockchipProductBindingBootstrap: Sendable {
       usbTopology: result.snapshot.usbTopology,
       serialDigestSHA256: storedDigest,
       created: result.created)
+  }
+
+  /// Compatibility seam retained for existing contracts and callers.  It now
+  /// has the same cross-mode behavior as the product entry point.
+  func installCurrentLoader() throws -> RockchipDeviceBindingInstallationReceipt {
+    try installCurrentTarget()
   }
 }
 
@@ -1540,11 +1727,47 @@ struct RockchipProductUSBIdentity: Sendable, Equatable {
   let vendorID: UInt16
   let productID: UInt16
   let topology: String
+  let productName: String?
+
+  init(
+    serial: String,
+    vendorID: UInt16,
+    productID: UInt16,
+    topology: String,
+    productName: String? = nil
+  ) {
+    self.serial = serial
+    self.vendorID = vendorID
+    self.productID = productID
+    self.topology = topology
+    self.productName = productName
+  }
+
+  var isLoader: Bool {
+    vendorID == RockchipProbeEvidence.rockUSBVendorID
+      && productID == RockchipProbeEvidence.dayu200LoaderProductID
+  }
+
+  var isHDCNormal: Bool {
+    guard vendorID == RockchipProbeEvidence.rockUSBVendorID,
+      productID == RockchipHDCIntegrationProfile.dayu200NormalProductID,
+      let productName
+    else { return false }
+    return productName.trimmingCharacters(in: CharacterSet(charactersIn: "\" ")) == "HDC Device"
+  }
+
+  var isRegisteredDAYU200Mode: Bool { isLoader || isHDCNormal }
 }
 
 struct RockchipProductUSBProbe: Sendable {
+  private enum Requirement {
+    case loader
+    case hdcNormal
+    case registeredDAYU200
+  }
+
   func singleLoader(selector: String? = nil) throws -> RockchipProductUSBIdentity {
-    try single(selector: selector, serialDigestSHA256: nil, requiresLoader: true)
+    try single(selector: selector, serialDigestSHA256: nil, requirement: .loader)
   }
 
   func singleLoader(
@@ -1552,17 +1775,37 @@ struct RockchipProductUSBProbe: Sendable {
   ) throws -> RockchipProductUSBIdentity {
     try single(
       selector: nil, serialDigestSHA256: stableIdentitySHA256,
-      requiresLoader: true)
+      requirement: .loader)
+  }
+
+  func singleLoader(
+    selector: String,
+    stableIdentitySHA256: String
+  ) throws -> RockchipProductUSBIdentity {
+    try single(
+      selector: selector, serialDigestSHA256: stableIdentitySHA256,
+      requirement: .loader)
+  }
+
+  func singleDAYU200(
+    selector: String? = nil,
+    stableIdentitySHA256: String? = nil
+  ) throws -> RockchipProductUSBIdentity {
+    try single(
+      selector: selector, serialDigestSHA256: stableIdentitySHA256,
+      requirement: .registeredDAYU200)
   }
 
   func singleConnected(selector: String) throws -> RockchipProductUSBIdentity {
-    try single(selector: selector, serialDigestSHA256: nil, requiresLoader: false)
+    try single(
+      selector: selector, serialDigestSHA256: nil,
+      requirement: .hdcNormal)
   }
 
   private func single(
     selector: String?,
     serialDigestSHA256: String?,
-    requiresLoader: Bool
+    requirement: Requirement
   ) throws
     -> RockchipProductUSBIdentity
   {
@@ -1581,14 +1824,19 @@ struct RockchipProductUSBProbe: Sendable {
         let product = number(service, "idProduct"),
         let location = number(service, "locationID"),
         let serial = string(service, "USB Serial Number")
-          ?? string(service, "kUSBSerialNumberString"),
-        !requiresLoader
-          || (vendor.uint16Value == RockchipProbeEvidence.rockUSBVendorID
-            && product.uint16Value == RockchipProbeEvidence.dayu200LoaderProductID)
+          ?? string(service, "kUSBSerialNumberString")
       else { continue }
       let identity = RockchipProductUSBIdentity(
         serial: serial, vendorID: vendor.uint16Value,
-        productID: product.uint16Value, topology: String(location.uint64Value))
+        productID: product.uint16Value, topology: String(location.uint64Value),
+        productName: string(service, "USB Product Name"))
+      let modeMatches: Bool
+      switch requirement {
+      case .loader: modeMatches = identity.isLoader
+      case .hdcNormal: modeMatches = identity.isHDCNormal
+      case .registeredDAYU200: modeMatches = identity.isRegisteredDAYU200Mode
+      }
+      guard modeMatches else { continue }
       let digest = SHA256.hash(data: Data(serial.utf8))
         .map { String(format: "%02x", $0) }.joined()
       if (selector == nil || selector == identity.topology)
@@ -1599,7 +1847,7 @@ struct RockchipProductUSBProbe: Sendable {
     }
     guard matches.count == 1, let match = matches.first else {
       throw RockchipFlashExecutionError.admissionRejected(
-        matches.isEmpty ? "Loader target unavailable" : "Loader target ambiguous")
+        matches.isEmpty ? "DAYU200 target unavailable" : "DAYU200 target ambiguous")
     }
     return match
   }
@@ -1683,6 +1931,183 @@ private struct RockchipProductIdentityReadbackPort: RockchipIdentityReadbackFact
   }
 }
 
+/// Admission collector for the normal HDC USB personality.  No mutation is
+/// performed here: it proves the durable serial/topology, the exact external
+/// Rockchip and HDC executable descriptors, and that the already-published
+/// execute plan contains the closed `rockusb.enter-loader` intent.  The
+/// reboot itself happens only after the one-shot E2 token is consumed and the
+/// step intent is durable.
+private struct RockchipProductHDCNormalAuthorizationFactCollector:
+  RockchipAuthorizationFactCollecting
+{
+  let planPort: RockchipProductExecutePlanFactPort
+  let bindingPort: RockchipProductBindingPort
+  let tool: RockchipSelectedDiscoveryTool
+  let selector: String
+  let usbProbe: RockchipProductUSBProbe
+  let clock: any RockchipAdmissionClock
+
+  func collect(
+    request: RockchipAuthorizationFactRequest,
+    grant: VerifiedAuthorizationGrant
+  ) async throws -> RockchipTrustedAuthorizationFacts {
+    try await collect(
+      request: request,
+      expectation: RockchipAuthorizationFactExpectation(
+        standingAuthorization: grant.authorization))
+  }
+
+  func collect(
+    request: RockchipAuthorizationFactRequest,
+    expectation: RockchipAuthorizationFactExpectation
+  ) async throws -> RockchipTrustedAuthorizationFacts {
+    for (field, value) in [
+      ("sessionID", request.sessionID), ("jobID", request.jobID),
+      ("targetID", request.targetID),
+    ] where !Self.isIdentifier(value) {
+      throw RockchipAuthorizationFactError.invalidRequest(field: field)
+    }
+    guard request.archiveURL.isFileURL, request.archiveURL.path.hasPrefix("/") else {
+      throw RockchipAuthorizationFactError.invalidRequest(field: "archiveURL")
+    }
+
+    let plan: RockchipFlashPlan
+    let binding: RockchipTrustedDurableBindingFact
+    do { plan = try await planPort.makeValidatedExecutePlan(archiveURL: request.archiveURL) } catch
+    {
+      throw RockchipAuthorizationFactError.factPortFailed(name: "plan")
+    }
+    do { binding = try await bindingPort.currentDurableBinding() } catch {
+      throw RockchipAuthorizationFactError.factPortFailed(name: "binding")
+    }
+    guard plan.executionMode == .execute,
+      plan.steps.contains(where: {
+        $0.kind == .enterUpdater
+          && $0.arguments["providerOperationId"] == .string("rockusb.enter-loader")
+      })
+    else { throw RockchipAuthorizationFactError.planMismatch(field: "enterUpdater") }
+    for (field, matches) in [
+      ("targetModel", expectation.targetModel == RockchipFlashProfile.targetDeviceModel),
+      ("firmwareArchiveSHA256", expectation.firmwareArchiveSHA256 == plan.archiveSHA256),
+      ("transport", expectation.transport == "usb"),
+      (
+        "toolchainFingerprint",
+        expectation.toolchainFingerprint == RockchipFlashProfile.pinnedToolchainFingerprint
+      ),
+      (
+        "providerIdentity",
+        expectation.providerIdentity == RockchipRockUSBFlashProvider.providerIdentity
+      ),
+      ("planDigestSHA256", expectation.planDigestSHA256 == plan.planDigestSHA256),
+      ("stepSetDigestSHA256", expectation.stepSetDigestSHA256 == plan.stepSetDigestSHA256),
+    ] where !matches {
+      throw RockchipAuthorizationFactError.planMismatch(field: field)
+    }
+
+    guard binding.sessionID == request.sessionID,
+      binding.jobID == request.jobID,
+      binding.targetID == request.targetID,
+      binding.receipt.reference.targetID == request.targetID,
+      binding.receipt.reference.revision == expectation.bindingRevision,
+      binding.receipt.binding.transport == .usb,
+      case .string(let serial)? =
+        binding.receipt.binding.identitySnapshot.attributes["serial"],
+      case .string(let topology)? =
+        binding.receipt.binding.identitySnapshot.attributes["usbTopology"],
+      Self.isCanonicalTopology(topology), topology == selector,
+      request.targetLocationSelector == nil || request.targetLocationSelector == topology
+    else { throw RockchipAuthorizationFactError.bindingMismatch(field: "binding") }
+    let serialDigest = Self.sha256Hex(Data(serial.utf8))
+    guard serialDigest == expectation.serialDigestSHA256 else {
+      throw RockchipAuthorizationFactError.bindingMismatch(field: "serialDigestSHA256")
+    }
+
+    let liveIdentity: RockchipProductUSBIdentity
+    do {
+      liveIdentity = try usbProbe.singleDAYU200(
+        selector: topology, stableIdentitySHA256: serialDigest)
+    } catch {
+      throw RockchipAuthorizationFactError.factPortFailed(name: "normalModeUSBReadback")
+    }
+    guard liveIdentity.isHDCNormal, liveIdentity.serial == serial,
+      liveIdentity.topology == topology
+    else { throw RockchipAuthorizationFactError.readbackMismatch(field: "normalModeIdentity") }
+
+    let processExecutor = FoundationProcessExecutor()
+    let toolPrepared: ProcessPreparedIdentityBoundLaunch
+    do {
+      toolPrepared = try processExecutor.prepareIdentityBoundLaunch(
+        ProcessIdentityBoundRequest(
+          process: ProcessRequest(executable: tool.executableURL, arguments: ["ld"], timeout: 5),
+          expectedSHA256: RockchipDiscoveryIntegrationProfile.pinnedProduction.executableSHA256))
+    } catch {
+      throw RockchipAuthorizationFactError.factPortFailed(name: "rockchipExecutableIdentity")
+    }
+    let executableIdentity = toolPrepared.executableIdentity
+    toolPrepared.close()
+    guard
+      executableIdentity.sha256
+        == RockchipDiscoveryIntegrationProfile.pinnedProduction.executableSHA256
+    else { throw RockchipAuthorizationFactError.toolMismatch(field: "executableIdentity") }
+
+    // Open and hash the exact HDC descriptor before an authority reservation.
+    // It is opened again at the durable step boundary; this early check keeps
+    // a missing/drifted HDC installation at zero device dispatch and zero
+    // chat-confirmation consumption.
+    let hdcPrepared: ProcessPreparedIdentityBoundLaunch
+    do {
+      hdcPrepared = try processExecutor.prepareIdentityBoundLaunch(
+        ProcessIdentityBoundRequest(
+          process: ProcessRequest(
+            executable: RockchipHDCIntegrationProfile.executableURL,
+            arguments: ["-t", serial, "shell", "reboot", "loader"], timeout: 20),
+          expectedSHA256: RockchipHDCIntegrationProfile.executableSHA256))
+    } catch {
+      throw RockchipAuthorizationFactError.factPortFailed(name: "hdcExecutableIdentity")
+    }
+    hdcPrepared.close()
+
+    let reading = clock.now()
+    guard RockchipStandingAuthorization.isCanonicalTimestamp(reading.auditTimestamp),
+      let now = RockchipStandingAuthorization.parseTimestamp(reading.auditTimestamp),
+      let validUntil = RockchipStandingAuthorization.parseTimestamp(expectation.validUntil),
+      now < validUntil
+    else { throw RockchipAuthorizationFactError.authorizationExpired }
+    let targetDigest = Self.sha256Hex(
+      Data(
+        [
+          expectation.targetModel, serialDigest,
+          String(binding.receipt.reference.revision), topology,
+          String(RockchipProbeEvidence.rockUSBVendorID),
+          String(RockchipProbeEvidence.dayu200LoaderProductID),
+        ].joined(separator: "|").utf8))
+    return RockchipTrustedAuthorizationFacts(
+      plan: plan, executableIdentity: executableIdentity,
+      bindingReference: binding.receipt.reference,
+      targetDigestSHA256: targetDigest, serialDigestSHA256: serialDigest,
+      usbTopology: topology, observationSequence: 1,
+      readbackDeadlineMonotonicNanoseconds: reading.monotonicNanoseconds
+        + RockchipAuthorizationFactCollector.maximumReadbackLifetimeNanoseconds,
+      authorizationValidUntil: expectation.validUntil,
+      collectedAtTimestamp: reading.auditTimestamp)
+  }
+
+  private static func isIdentifier(_ value: String) -> Bool {
+    value.range(
+      of: #"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"#, options: .regularExpression)
+      == value.startIndex..<value.endIndex
+  }
+
+  private static func isCanonicalTopology(_ value: String) -> Bool {
+    !value.isEmpty && value.utf8.allSatisfy({ (48...57).contains($0) })
+      && (value == "0" || value.first != "0")
+  }
+
+  private static func sha256Hex(_ data: Data) -> String {
+    SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+  }
+}
+
 private struct RockchipProductPostflightPort: RockchipExecutionPostflightPort {
   let probe: RockchipProductUSBProbe
 
@@ -1756,23 +2181,41 @@ private final class RockchipProductionAdmissionPort: @unchecked Sendable,
     targetID: String
   ) async throws -> RockchipExecutionAdmission {
     let sequence: UInt64 = 1
-    let collector = RockchipAuthorizationFactCollector(
-      planPort: RockchipProductExecutePlanFactPort(),
-      bindingPort: RockchipProductBindingPort(
-        sessionID: sessionID, jobID: jobID, targetID: targetID, snapshot: binding),
-      toolDevicePort: RockchipDiscoveryToolDeviceFactPort(
-        sessionID: sessionID, jobID: jobID, targetID: targetID,
-        observationSequence: sequence,
-        adapter: RockchipProductionDiscoveryComposition.admissionDiscoveryAdapter(),
-        tool: tool, clock: clock),
-      prerequisitePort: RockchipProductPrerequisitePort(
-        sessionID: sessionID, jobID: jobID, targetID: targetID,
-        selector: request.targetLocationSelector, probe: usbProbe),
-      identityReadbackPort: RockchipProductIdentityReadbackPort(
-        sessionID: sessionID, jobID: jobID, targetID: targetID,
-        selector: request.targetLocationSelector, observationSequence: sequence,
-        probe: usbProbe, clock: clock),
-      clock: clock)
+    let serialDigest = SHA256.hash(data: Data(binding.serial.utf8)).map {
+      String(format: "%02x", $0)
+    }.joined()
+    let liveIdentity = try usbProbe.singleDAYU200(
+      selector: request.targetLocationSelector,
+      stableIdentitySHA256: serialDigest)
+    let bindingPort = RockchipProductBindingPort(
+      sessionID: sessionID, jobID: jobID, targetID: targetID, snapshot: binding)
+    let collector: any RockchipAuthorizationFactCollecting
+    if liveIdentity.isLoader {
+      collector = RockchipAuthorizationFactCollector(
+        planPort: RockchipProductExecutePlanFactPort(),
+        bindingPort: bindingPort,
+        toolDevicePort: RockchipDiscoveryToolDeviceFactPort(
+          sessionID: sessionID, jobID: jobID, targetID: targetID,
+          observationSequence: sequence,
+          adapter: RockchipProductionDiscoveryComposition.admissionDiscoveryAdapter(),
+          tool: tool, clock: clock),
+        prerequisitePort: RockchipProductPrerequisitePort(
+          sessionID: sessionID, jobID: jobID, targetID: targetID,
+          selector: request.targetLocationSelector, probe: usbProbe),
+        identityReadbackPort: RockchipProductIdentityReadbackPort(
+          sessionID: sessionID, jobID: jobID, targetID: targetID,
+          selector: request.targetLocationSelector, observationSequence: sequence,
+          probe: usbProbe, clock: clock),
+        clock: clock)
+    } else if liveIdentity.isHDCNormal {
+      collector = RockchipProductHDCNormalAuthorizationFactCollector(
+        planPort: RockchipProductExecutePlanFactPort(), bindingPort: bindingPort,
+        tool: tool, selector: request.targetLocationSelector,
+        usbProbe: usbProbe, clock: clock)
+    } else {
+      throw RockchipFlashExecutionError.admissionRejected(
+        "durably bound DAYU200 is not in a registered execution mode")
+    }
     let factRequest = RockchipAuthorizationFactRequest(
       archiveURL: request.archiveURL, sessionID: sessionID, jobID: jobID,
       targetID: targetID, targetLocationSelector: request.targetLocationSelector)
@@ -1799,9 +2242,6 @@ private final class RockchipProductionAdmissionPort: @unchecked Sendable,
         executableIdentity: token.facts.executableIdentity,
         evidenceClass: .production)
     case .chatConfirmation(let assertion):
-      let serialDigest = SHA256.hash(data: Data(binding.serial.utf8)).map {
-        String(format: "%02x", $0)
-      }.joined()
       let service = ChatConfirmationAdmissionService(
         factCollector: collector, usageLedger: agentUsageLedger, clock: clock,
         bindingSerialDigestSHA256: serialDigest, bindingRevision: binding.revision)

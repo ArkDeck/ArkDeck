@@ -22,10 +22,11 @@ public struct RockchipChatConfirmationAssertion: Sendable, Equatable {
     targetDigestSHA256: String,
     bindingRevision: Int
   ) throws {
-    guard [
-      confirmationDigestSHA256, planDigestSHA256, archiveDigestSHA256,
-      stepSetDigestSHA256, targetDigestSHA256,
-    ].allSatisfy(Self.isCanonicalSHA256), bindingRevision > 0
+    guard
+      [
+        confirmationDigestSHA256, planDigestSHA256, archiveDigestSHA256,
+        stepSetDigestSHA256, targetDigestSHA256,
+      ].allSatisfy(Self.isCanonicalSHA256), bindingRevision > 0
     else {
       throw RockchipFlashExecutionError.invalidRequest("chatConfirmation")
     }
@@ -96,14 +97,14 @@ final class RockchipChatConfirmedAdmission: @unchecked Sendable {
 }
 
 actor ChatConfirmationAdmissionService {
-  private let factCollector: RockchipAuthorizationFactCollector
+  private let factCollector: any RockchipAuthorizationFactCollecting
   private let usageLedger: AgentAuthorityUsageLedger
   private let clock: any RockchipAdmissionClock
   private let bindingSerialDigestSHA256: String
   private let bindingRevision: Int
 
   init(
-    factCollector: RockchipAuthorizationFactCollector,
+    factCollector: any RockchipAuthorizationFactCollecting,
     usageLedger: AgentAuthorityUsageLedger,
     clock: any RockchipAdmissionClock,
     bindingSerialDigestSHA256: String,

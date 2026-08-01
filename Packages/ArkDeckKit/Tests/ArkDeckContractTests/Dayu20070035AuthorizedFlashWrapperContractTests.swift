@@ -15,6 +15,9 @@ final class Dayu20070035AuthorizedFlashWrapperContractTests: XCTestCase {
     XCTAssertTrue(
       source.contains(
         "038a8a0ea26ef7eb77451789f310c0c9fbeaf43a78af1d6146e02311a9c23611"))
+    XCTAssertTrue(
+      source.contains(
+        "05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83"))
     XCTAssertTrue(source.contains(Self.planDigest))
     XCTAssertTrue(
       source.contains(
@@ -27,6 +30,7 @@ final class Dayu20070035AuthorizedFlashWrapperContractTests: XCTestCase {
     XCTAssertTrue(source.contains("--chat-confirmed-target-sha256"))
     XCTAssertTrue(source.contains("ARKDECK_CHAT_CONFIRMATION_CONTEXT=supervisedInteractiveAgent"))
     XCTAssertTrue(source.contains("ARKDECK_EXECUTION_AUTHORITY=standardAgent"))
+    XCTAssertTrue(source.contains("typed hdc shell reboot loader"))
     XCTAssertFalse(source.contains("--authorization-id"))
     XCTAssertFalse(source.contains("AUTH-ID must match"))
     XCTAssertFalse(source.contains("eval "))

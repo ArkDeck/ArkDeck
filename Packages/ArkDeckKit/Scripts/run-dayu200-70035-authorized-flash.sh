@@ -12,10 +12,12 @@ readonly PACKAGE_DIR="$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd -P)"
 readonly ARKDECK_BIN="$PACKAGE_DIR/.build/release/arkdeck"
 readonly ARCHIVE="/Users/fuhanfeng/Downloads/version-Daily_Version-OpenHarmony_7.0.0.35-20260728_180253-dayu200_img.tar.gz"
 readonly TOOL="/Users/fuhanfeng/dayu200-rehearsal/rkdeveloptool/rkdeveloptool"
+readonly HDC="/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/toolchains/hdc"
 readonly BINDING="/Users/fuhanfeng/Library/Application Support/ArkDeck/rockchip-binding.json"
 
 readonly EXPECTED_ARCHIVE_SHA256="6a023c738ac585b8a6f537c99f2ab2df95a5359fd6d4dd33150fad62e71f064e"
 readonly EXPECTED_TOOL_SHA256="038a8a0ea26ef7eb77451789f310c0c9fbeaf43a78af1d6146e02311a9c23611"
+readonly EXPECTED_HDC_SHA256="05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83"
 readonly EXPECTED_PLAN_SHA256="3922f6a22401a624dd393932bbfc7d3774953be79aaece08961a8bbfb77dc2b8"
 readonly EXPECTED_STEP_SET_SHA256="c8bdce2a137690081c1dd5ca38f91f25399c63778ab18b4f94000b127382fa14"
 
@@ -93,10 +95,13 @@ esac
 
 [[ -f "$ARCHIVE" ]] || fail "pinned 7.0.0.35 archive is missing"
 [[ -f "$TOOL" && -x "$TOOL" ]] || fail "pinned rkdeveloptool is missing or not executable"
+[[ -f "$HDC" && -x "$HDC" ]] || fail "pinned HDC 3.2.0f executable is missing or not executable"
 archive_sha256="$(sha256_file "$ARCHIVE")"
 [[ "$archive_sha256" == "$EXPECTED_ARCHIVE_SHA256" ]] || fail "archive SHA-256 drift"
 tool_sha256="$(sha256_file "$TOOL")"
 [[ "$tool_sha256" == "$EXPECTED_TOOL_SHA256" ]] || fail "rkdeveloptool SHA-256 drift"
+hdc_sha256="$(sha256_file "$HDC")"
+[[ "$hdc_sha256" == "$EXPECTED_HDC_SHA256" ]] || fail "HDC 3.2.0f SHA-256 drift"
 
 if [[ ! -x "$ARKDECK_BIN" ]]; then
   /usr/bin/swift build --package-path "$PACKAGE_DIR" -c release --product arkdeck
@@ -137,15 +142,17 @@ printf '  authority: chatConfirmation (one-shot; no AUTH-ID)\n'
 printf '  execution authority: authorizedAgent\n'
 printf '  profile: dayu200@2 / OpenHarmony 7.0.0.35-20260728_180253\n'
 printf '  archive sha256: %s\n' "$EXPECTED_ARCHIVE_SHA256"
+printf '  HDC 3.2.0f sha256: %s\n' "$EXPECTED_HDC_SHA256"
 printf '  plan sha256: %s\n' "$EXPECTED_PLAN_SHA256"
 printf '  step-set sha256: %s\n' "$EXPECTED_STEP_SET_SHA256"
 printf '  binding revision: %s\n' "$binding_revision"
 printf '  USB topology: %s\n' "$target_location_id"
 printf '  target sha256: %s\n' "$target_digest_sha256"
 printf '  impact: all 9 mapped partitions, including userdata, will be overwritten\n'
+printf '  transition: normal mode enters Loader through typed hdc shell reboot loader; already-Loader dispatches no HDC reboot\n'
 
 if [[ "$mode" == "--prepare" ]]; then
-  printf 'PREPARED: tool trust facts and E0 Loader binding are installed; no device command was dispatched\n'
+  printf 'PREPARED: tool trust facts and E0 DAYU200 cross-mode binding are installed; no device command was dispatched\n'
   exit 0
 fi
 

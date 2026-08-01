@@ -74,13 +74,13 @@ final class RockchipAuthorizedAgentAdmission: @unchecked Sendable {
 
 actor AuthorizationAdmissionService {
   private let resolver: MaintainerMergedAuthorizationResolver
-  private let factCollector: RockchipAuthorizationFactCollector
+  private let factCollector: any RockchipAuthorizationFactCollecting
   private let usageLedger: AuthorizationUsageLedger
   private let clock: any RockchipAdmissionClock
 
   init(
     resolver: MaintainerMergedAuthorizationResolver,
-    factCollector: RockchipAuthorizationFactCollector,
+    factCollector: any RockchipAuthorizationFactCollecting,
     usageLedger: AuthorizationUsageLedger,
     clock: any RockchipAdmissionClock
   ) {

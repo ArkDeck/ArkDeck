@@ -130,15 +130,15 @@ final class RockchipFlashExecutionContractTests: XCTestCase {
       true)
   }
 
-  func testTypedE0LoaderBootstrapPublishesOwnerOnlyBindingAndRejectsDrift() throws {
+  func testTypedE0CrossModeBootstrapPublishesOwnerOnlyBindingAndRejectsDrift() throws {
     let root = FileManager.default.temporaryDirectory
       .appending(path: "arkdeck-binding-\(UUID().uuidString)", directoryHint: .isDirectory)
     defer { try? FileManager.default.removeItem(at: root) }
     let identity = RockchipProductUSBIdentity(
       serial: "sensitive-loader-serial",
       vendorID: RockchipProbeEvidence.rockUSBVendorID,
-      productID: RockchipProbeEvidence.dayu200LoaderProductID,
-      topology: "336592896")
+      productID: RockchipHDCIntegrationProfile.dayu200NormalProductID,
+      topology: "336592896", productName: "HDC Device")
     let store = RockchipProductBindingStore(rootURL: root)
     let bootstrap = RockchipProductBindingBootstrap(probe: { identity }, store: store)
 
@@ -157,7 +157,14 @@ final class RockchipFlashExecutionContractTests: XCTestCase {
     XCTAssertEqual(snapshot.serial, identity.serial)
     XCTAssertFalse(snapshot.evidence.contains { $0.contains(identity.serial) })
 
-    let second = try bootstrap.installCurrentLoader()
+    let loaderIdentity = RockchipProductUSBIdentity(
+      serial: identity.serial,
+      vendorID: RockchipProbeEvidence.rockUSBVendorID,
+      productID: RockchipProbeEvidence.dayu200LoaderProductID,
+      topology: identity.topology)
+    let second = try RockchipProductBindingBootstrap(
+      probe: { loaderIdentity }, store: store
+    ).installCurrentLoader()
     XCTAssertFalse(second.created)
     XCTAssertEqual(second.serialDigestSHA256, first.serialDigestSHA256)
 
@@ -167,11 +174,187 @@ final class RockchipFlashExecutionContractTests: XCTestCase {
           serial: identity.serial,
           vendorID: identity.vendorID,
           productID: identity.productID,
-          topology: "336592897")
+          topology: "336592897", productName: identity.productName)
       },
       store: store)
     XCTAssertThrowsError(try drifted.installCurrentLoader())
     XCTAssertEqual(try store.loadExisting(), snapshot)
+
+    let spoofedNormal = RockchipProductBindingBootstrap(
+      probe: {
+        RockchipProductUSBIdentity(
+          serial: identity.serial,
+          vendorID: identity.vendorID,
+          productID: identity.productID,
+          topology: identity.topology, productName: "Maskrom Device")
+      },
+      store: store)
+    XCTAssertThrowsError(try spoofedNormal.installCurrentLoader())
+  }
+
+  func testChatConfirmedNormalModeDispatchesExactHDCOnceBeforeClosedRockUSBSequence()
+    async throws
+  {
+    let fixture = try RockchipExecutionTestFixture.make()
+    defer { try? FileManager.default.removeItem(at: fixture.base) }
+    let persistence = try await fixture.makePersistence()
+    let admission = RecordingRockchipAdmissionPort(
+      plan: fixture.plan, receipt: fixture.executableReceipt)
+    let packageRoot = URL(fileURLWithPath: #filePath)
+      .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+    let hdcExecutable = packageRoot.appending(path: ".build/debug/ArkDeckFakeHDCFixture")
+    let hdcSHA256 = RockchipExecutionTestFixture.sha256(try Data(contentsOf: hdcExecutable))
+    let spawnLog = RockchipSpawnLog()
+    let processExecutor = FoundationProcessExecutor(
+      identityBoundPreSpawnHook: { _ in },
+      launchObserver: { _ in },
+      identityBoundSpawnObserver: { _, request, _ in spawnLog.append(request) })
+    let serial = "cross-mode-connect-key"
+    let serialDigest = RockchipExecutionTestFixture.sha256(Data(serial.utf8))
+    let normal = RockchipProductUSBIdentity(
+      serial: serial, vendorID: RockchipProbeEvidence.rockUSBVendorID,
+      productID: RockchipHDCIntegrationProfile.dayu200NormalProductID,
+      topology: "42", productName: "HDC Device")
+    let loader = RockchipProductUSBIdentity(
+      serial: serial, vendorID: RockchipProbeEvidence.rockUSBVendorID,
+      productID: RockchipProbeEvidence.dayu200LoaderProductID, topology: "42")
+    let process = FoundationRockchipExecutionProcessPort(
+      executableURL: fixture.executable, executor: processExecutor,
+      executableSHA256: fixture.executableSHA256,
+      hdcTransition: RockchipHDCTransitionConfiguration(
+        executableURL: hdcExecutable, executableSHA256: hdcSHA256,
+        connectKey: serial, stableIdentitySHA256: serialDigest, usbTopology: "42",
+        currentIdentity: { normal }, waitForLoader: { loader }))
+    let host = RockchipFlashExecutionHost(
+      dependencies: RockchipFlashExecutionDependencies(
+        admission: admission, process: process,
+        postflight: FixedRockchipPostflightPort(
+          serialDigest: String(repeating: "a", count: 64), topology: "42"),
+        power: RecordingPowerBackend(),
+        makePersistence: { _, _, _ in persistence },
+        profiles: [.dayu200, fixture.profile],
+        makeID: RockchipExecutionTestFixture.deterministicID))
+    let assertion = try RockchipChatConfirmationAssertion(
+      confirmationDigestSHA256: String(repeating: "c", count: 64),
+      planDigestSHA256: fixture.plan.planDigestSHA256,
+      archiveDigestSHA256: fixture.plan.archiveSHA256,
+      stepSetDigestSHA256: fixture.plan.stepSetDigestSHA256,
+      targetDigestSHA256: String(repeating: "b", count: 64), bindingRevision: 1)
+
+    let result = try await host.execute(
+      RockchipFlashExecutionRequest(
+        chatConfirmation: assertion, archiveURL: fixture.archive,
+        targetLocationSelector: "42"))
+
+    XCTAssertEqual(result.status, .succeeded)
+    let requests = spawnLog.requests
+    XCTAssertEqual(requests.count, 13)
+    XCTAssertEqual(requests[0].executable, hdcExecutable)
+    XCTAssertEqual(requests[0].arguments, ["-t", serial, "shell", "reboot", "loader"])
+    XCTAssertEqual(requests[1].arguments, ["ld"])
+    XCTAssertEqual(requests[2].arguments, ["ppt"])
+    XCTAssertEqual(requests[3...11].map { $0.arguments.first }, Array(repeating: "wlx", count: 9))
+    XCTAssertEqual(requests[12].arguments, ["rd"])
+    let replay = try DurableJournalRecovery.inspect(
+      url: persistence.sessionRoot.appending(path: "journal.jsonl"))
+    let loaderOutcome = try XCTUnwrap(
+      replay.events.first(where: {
+        $0.kind == .stepOutcome
+          && $0.stepID == fixture.plan.steps.first(where: { $0.kind == .enterUpdater })?.id
+      }))
+    XCTAssertEqual(
+      loaderOutcome.payload["semanticCode"],
+      .string("rockchip.enter-loader.readback-confirmed"))
+  }
+
+  func testHDCTransitionWithoutMatchingLoaderBlocksAllRockUSBDispatch() async throws {
+    let fixture = try RockchipExecutionTestFixture.make()
+    defer { try? FileManager.default.removeItem(at: fixture.base) }
+    let packageRoot = URL(fileURLWithPath: #filePath)
+      .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+    let hdcExecutable = packageRoot.appending(path: ".build/debug/ArkDeckFakeHDCFixture")
+    let hdcSHA256 = RockchipExecutionTestFixture.sha256(try Data(contentsOf: hdcExecutable))
+    let spawnLog = RockchipSpawnLog()
+    let executor = FoundationProcessExecutor(
+      identityBoundPreSpawnHook: { _ in }, launchObserver: { _ in },
+      identityBoundSpawnObserver: { _, request, _ in spawnLog.append(request) })
+    let serial = "cross-mode-connect-key"
+    let serialDigest = RockchipExecutionTestFixture.sha256(Data(serial.utf8))
+    let normal = RockchipProductUSBIdentity(
+      serial: serial, vendorID: RockchipProbeEvidence.rockUSBVendorID,
+      productID: RockchipHDCIntegrationProfile.dayu200NormalProductID,
+      topology: "42", productName: "HDC Device")
+    let process = FoundationRockchipExecutionProcessPort(
+      executableURL: fixture.executable, executor: executor,
+      executableSHA256: fixture.executableSHA256,
+      hdcTransition: RockchipHDCTransitionConfiguration(
+        executableURL: hdcExecutable, executableSHA256: hdcSHA256,
+        connectKey: serial, stableIdentitySHA256: serialDigest, usbTopology: "42",
+        currentIdentity: { normal },
+        waitForLoader: { throw RockchipHDCTransitionError.loaderUnavailable }))
+    let command = try XCTUnwrap(
+      RockchipFlashExecutionLowering.commands(
+        plan: fixture.plan,
+        stagedImages: RockchipFlashExecutionStager.stage(
+          archiveURL: fixture.archive, sessionRoot: fixture.base, profile: fixture.profile)
+      ).first)
+    let prepared = try process.prepare(
+      command: command, admissionIdentity: fixture.executableReceipt)
+
+    do {
+      _ = try await prepared.launch(criticalNonInterruptible: false)
+      XCTFail("missing same-device Loader readback must fail closed")
+    } catch {
+      XCTAssertEqual(error as? RockchipHDCTransitionError, .loaderUnavailable)
+    }
+    XCTAssertEqual(spawnLog.requests.count, 1)
+    XCTAssertEqual(
+      spawnLog.requests.first?.arguments,
+      ["-t", serial, "shell", "reboot", "loader"])
+    XCTAssertFalse(spawnLog.requests.contains(where: { $0.arguments.first == "ld" }))
+    XCTAssertFalse(spawnLog.requests.contains(where: { $0.arguments.first == "wlx" }))
+  }
+
+  func testAlreadyLoaderSkipsHDCRebootAndRunsOnlyLoaderReadback() async throws {
+    let fixture = try RockchipExecutionTestFixture.make()
+    defer { try? FileManager.default.removeItem(at: fixture.base) }
+    let packageRoot = URL(fileURLWithPath: #filePath)
+      .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+    let hdcExecutable = packageRoot.appending(path: ".build/debug/ArkDeckFakeHDCFixture")
+    let hdcSHA256 = RockchipExecutionTestFixture.sha256(try Data(contentsOf: hdcExecutable))
+    let spawnLog = RockchipSpawnLog()
+    let executor = FoundationProcessExecutor(
+      identityBoundPreSpawnHook: { _ in }, launchObserver: { _ in },
+      identityBoundSpawnObserver: { _, request, _ in spawnLog.append(request) })
+    let serial = "already-loader-connect-key"
+    let serialDigest = RockchipExecutionTestFixture.sha256(Data(serial.utf8))
+    let loader = RockchipProductUSBIdentity(
+      serial: serial, vendorID: RockchipProbeEvidence.rockUSBVendorID,
+      productID: RockchipProbeEvidence.dayu200LoaderProductID, topology: "42")
+    let process = FoundationRockchipExecutionProcessPort(
+      executableURL: fixture.executable, executor: executor,
+      executableSHA256: fixture.executableSHA256,
+      hdcTransition: RockchipHDCTransitionConfiguration(
+        executableURL: hdcExecutable, executableSHA256: hdcSHA256,
+        connectKey: serial, stableIdentitySHA256: serialDigest, usbTopology: "42",
+        currentIdentity: { loader },
+        waitForLoader: {
+          XCTFail("already-Loader path must not wait for an HDC transition")
+          return loader
+        }))
+    let command = try XCTUnwrap(
+      RockchipFlashExecutionLowering.commands(
+        plan: fixture.plan,
+        stagedImages: RockchipFlashExecutionStager.stage(
+          archiveURL: fixture.archive, sessionRoot: fixture.base, profile: fixture.profile)
+      ).first)
+    let prepared = try process.prepare(
+      command: command, admissionIdentity: fixture.executableReceipt)
+
+    let attempt = try await prepared.launch(criticalNonInterruptible: false)
+
+    XCTAssertEqual(attempt.semantic, .succeeded)
+    XCTAssertEqual(spawnLog.requests.map(\.arguments), [["ld"]])
   }
 
   func testChatConfirmedFakeExecutesOnceAndPublishesTruthfulV22Authority() async throws {
@@ -390,6 +573,17 @@ final class RockchipFlashExecutionContractTests: XCTestCase {
     XCTAssertThrowsError(
       try RockchipFlashExecutionLowering.commands(plan: plan, stagedImages: [:]))
     XCTAssertFalse(RockchipRockUSBFlashProvider.closedCommandSurface.isEmpty)
+  }
+}
+
+private final class RockchipSpawnLog: @unchecked Sendable {
+  private let lock = NSLock()
+  private var stored: [ProcessRequest] = []
+
+  var requests: [ProcessRequest] { lock.withLock { stored } }
+
+  func append(_ request: ProcessRequest) {
+    lock.withLock { stored.append(request) }
   }
 }
 
