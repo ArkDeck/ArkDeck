@@ -105,7 +105,7 @@
   diff 的 base-tree active Task。不得声明仅由当前 head 新建/恢复的 Task,不得为通过门禁
   扩张 Allowed paths。`agent-pr` workflow 使用同一 preflight 结果创建初始 PR 正文,
   Agent 不得先 push 再依赖编辑 PR 正文补 `Task:`。
-- **本地闸是三条命令,不是一条**。改动触及 `Catalog/**`、`openspec/contracts/**` 或
+- **本地闸是四条命令,不是一条**。改动触及 `Catalog/**`、`openspec/contracts/**` 或
   生成物时尤其如此——新增一个 action/字段类型要在 schema、生成器词表、生成器 pin、
   Swift 校验器与合约测试**多处 lockstep**,而只有后两处会被 `swift test` 发现:
 
@@ -115,7 +115,14 @@
   .venv-sdd/bin/python scripts/catalog_gen/generate.py --check
   ```
 
-  三条全绿再加 `swift test` 与上面的 preflight,才等价于 CI 的门。
+  三条全绿后还必须执行本地并行全量 Swift 门(`--num-workers` 控制测试执行并发;
+  `--filter`/`--skip-build` 只用于开发反馈,不得替代本门):
+
+  ```bash
+  swift test --package-path Packages/ArkDeckKit --parallel --num-workers 8
+  ```
+
+  四条全绿再加上面的 preflight,才等价于 CI 的门。
 - **产品工作不需要治理载体**:修复 Golden Journey 产品缺陷不要求 ready 任务包、不创建新
   OpenSpec change、不刷新旧任务状态。CI 的任务声明(`scripts/check_pr_paths.py`)仅是
   路径护栏:产品 PR 声明一个 base 上已存在、allowed paths 覆盖其改动的 active 任务
