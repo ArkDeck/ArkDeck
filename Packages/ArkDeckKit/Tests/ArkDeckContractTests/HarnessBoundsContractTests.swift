@@ -688,6 +688,30 @@ final class HarnessBoundsContractTests: XCTestCase {
       "no closed category describes an unavailable environment, so none is invented")
   }
 
+  func testAuthorizationAdmissionRejectionProducesTypedApprovalAction() async throws {
+    let jobs = BoundsJobPort()
+    jobs.rejectionMessage =
+      "authorizationRequired: mutation has no runtime capability reference"
+    let (coordinator, _, submission) = try makeStack(jobs: jobs)
+    let task = try await coordinator.submit(submission)
+
+    let outcome = try await coordinator.reconcile(task.htaskID)
+    let expectedReason =
+      "submissionRejected:authorizationRequired:observe.device@1"
+    XCTAssertEqual(outcome.action, .stoppedForHuman)
+    XCTAssertEqual(outcome.reasonCode, expectedReason)
+    XCTAssertEqual(outcome.snapshot.result?.reasonCode, expectedReason)
+
+    let actions = try await coordinator.humanActions(task.htaskID)
+    let action = try XCTUnwrap(actions.last)
+    XCTAssertEqual(action.block, .authorizationApproval)
+    XCTAssertEqual(action.reasonCode, expectedReason)
+    XCTAssertTrue(action.requestID?.hasPrefix("htask-") == true)
+    let document = try HarnessHumanActionFactory.decode(try XCTUnwrap(action.document))
+    XCTAssertEqual(document.category, .impactApproval)
+    XCTAssertEqual(document.jobID, action.requestID)
+  }
+
   func testAGuardRefusalIsRecordedInTaskMemory() async throws {
     // A step the guard refused never reaches the engine, so nothing else would
     // record it: without this the task's memory could not explain the stop.
