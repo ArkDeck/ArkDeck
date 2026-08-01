@@ -255,6 +255,102 @@ extension HarnessTaskCoordinator {
     if let evaluationID = snapshot.latestEvaluationID {
       evaluation = try? await store.evaluation(snapshot.htaskID, evaluationID: evaluationID)
     }
+    let activeAttempt = durableAttempts.last { !$0.outcome.isClosed }
+    var currentWorkspaceRevision: String?
+    if let repairPort, let projectRef = snapshot.projectRef,
+      let proposal = snapshot.repairAttempt?.proposal
+    {
+      currentWorkspaceRevision = try? await repairPort.currentWorkspaceRevision(
+        relativePaths: proposal.touchedFiles, projectRef: projectRef, task: snapshot)
+    }
+    var availabilityByReference: [String: Bool] = [:]
+    var unavailableOperations: [HarnessContextUnavailableOperation] = []
+    let availabilityStates = await withTaskGroup(
+      of: (reference: String, available: Bool, reason: String).self,
+      returning: [(reference: String, available: Bool, reason: String)].self
+    ) { group in
+      for reference in snapshot.policy.allowedOperations.sorted() {
+        group.addTask {
+          let state = await self.policyGuard.contextAvailability(of: reference)
+          return (reference, state.available, state.reason)
+        }
+      }
+      var states: [(reference: String, available: Bool, reason: String)] = []
+      for await state in group { states.append(state) }
+      return states.sorted { $0.reference < $1.reference }
+    }
+    for state in availabilityStates {
+      let reference = state.reference
+      availabilityByReference[reference] = state.available
+      if !state.available {
+        unavailableOperations.append(
+          HarnessContextUnavailableOperation(
+            operationReference: reference, reasonCode: state.reason))
+      }
+    }
+    let contextAvailableOperations = offered.filter {
+      availabilityByReference[$0] != false
+    }
+    var authorizedOperationReferences: [String] = []
+    var capabilityEffectCeiling: WorkflowEffect?
+    for reference in offered where availabilityByReference[reference] != false {
+      guard let descriptor = RuntimeOperationCatalog.descriptor(reference: reference),
+        !descriptor.permittedEffects.contains(.destructive)
+      else { continue }
+      let mayMutate = descriptor.permittedEffects.contains(.deviceMutation)
+      if !mayMutate {
+        authorizedOperationReferences.append(reference)
+        continue
+      }
+      if await policyGuard.contextHasStandingCapability(
+        operationReference: reference, targetID: snapshot.target.targetID)
+      {
+        authorizedOperationReferences.append(reference)
+        capabilityEffectCeiling = .deviceMutation
+      }
+    }
+    let revisionScope = HarnessContextRevisionScope(
+      workspaceRevision: currentWorkspaceRevision,
+      deployedArtifactDigest: snapshot.repairAttempt?.deployedDigest,
+      deviceBindingRevision: snapshot.target.expectedBindingRevision)
+    let derivedArtifactSummaries: [HarnessDerivedArtifactSummary]
+    if let evaluation,
+      let derived = evaluation.evidence.first(where: {
+        $0.verified && $0.name == "crash-signature.json"
+      }),
+      let source = evaluation.evidence.first(where: {
+        $0.verified && $0.name == HarnessObservationBuilder.crashIndexArtifact
+      })
+    {
+      derivedArtifactSummaries = [
+        HarnessDerivedArtifactSummary(
+          artifactID: derived.artifactID,
+          name: derived.name,
+          sourceArtifactIDs: [source.artifactID],
+          analyzerReference: HarnessCrashLedgerAnalysis.analyzerRef,
+          analyzerVersion: HarnessCrashLedgerAnalysis.analyzerVersion,
+          revisionScope: revisionScope,
+          redactionStatus: derived.sensitiveOptIn ? "sensitiveOptIn" : "standard",
+          contentSHA256: derived.sha256,
+          byteCount: derived.byteCount,
+          measurements: evaluation.measurements)
+      ]
+    } else {
+      derivedArtifactSummaries = []
+    }
+    let executionState = HarnessContextExecutionState(
+      activeAttempt: activeAttempt,
+      currentWorkspaceRevision: currentWorkspaceRevision,
+      currentDeployedArtifactDigest: snapshot.repairAttempt?.deployedDigest,
+      currentDeviceBindingRevision: snapshot.target.expectedBindingRevision,
+      disprovedHypotheses: durableAttempts.flatMap { attempt in
+        attempt.disprovedFacts.map { "\(attempt.attemptID):\($0)" }
+      },
+      unavailableOperations: unavailableOperations,
+      authorizedOperationReferences: authorizedOperationReferences,
+      currentCapabilityEffectCeiling: capabilityEffectCeiling,
+      allowedFileScopes: snapshot.repairAttempt?.proposal.touchedFiles ?? [],
+      derivedArtifactSummaries: derivedArtifactSummaries)
     let artifacts = (evaluation?.evidence ?? []).map { record in
       HarnessContextArtifact(
         artifactID: record.artifactID, name: record.name, byteCount: record.byteCount,
@@ -275,7 +371,7 @@ extension HarnessTaskCoordinator {
       components: [snapshot.type.rawValue, desiredText("component")].compactMap { $0 },
       filePaths: repair?.proposal.touchedFiles ?? [],
       symbols: repair?.proposal.expectedChangedSymbols ?? [],
-      operationReferences: offered + durableAttempts.map {
+      operationReferences: contextAvailableOperations + durableAttempts.map {
         $0.strategy.selectedOperationFamily
       },
       revision: durableAttempts.last?.patchRevision
@@ -287,14 +383,15 @@ extension HarnessTaskCoordinator {
         + [desiredText("buildPresetRef"), desiredText("testPresetRef")].compactMap { $0 })
     return try HarnessDecisionContextAssembler(limits: limits).assemble(
       snapshot: snapshot,
-      availableOperations: offered,
+      availableOperations: contextAvailableOperations,
       evaluation: evaluation,
       attempts: attempts,
       failures: failures,
       memory: memory,
       artifacts: artifacts,
       elapsedSeconds: elapsedSeconds(since: snapshot.createdAtUTC) ?? 0,
-      memoryQuery: memoryQuery)
+      memoryQuery: memoryQuery,
+      executionState: executionState)
   }
 
   static func operationReference(fromReason reason: String) -> String? {

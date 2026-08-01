@@ -110,7 +110,8 @@ public struct HarnessDecisionContextAssembler: Sendable {
     memory: [HarnessMemoryEntry],
     artifacts: [HarnessContextArtifact],
     elapsedSeconds: Int,
-    memoryQuery explicitMemoryQuery: HarnessMemoryQuery? = nil
+    memoryQuery explicitMemoryQuery: HarnessMemoryQuery? = nil,
+    executionState: HarnessContextExecutionState = .empty
   ) throws -> HarnessDecisionContext {
     var trimmed: [String] = []
     func trim<T>(_ values: [T], to limit: Int, label: String) -> [T] {
@@ -168,7 +169,30 @@ public struct HarnessDecisionContextAssembler: Sendable {
         0, snapshot.budgets.maxE1Mutations - snapshot.consumedBudget.e1Mutations),
       noProgressRoundsRemaining: max(
         0, snapshot.budgets.maxNoProgressRounds - snapshot.noProgressRounds),
-      actionRetriesPerRun: snapshot.budgets.maxActionRetriesPerRun)
+      actionRetriesPerRun: snapshot.budgets.maxActionRetriesPerRun,
+      modelCallsRemaining: max(
+        0, snapshot.budgets.maxModelCalls - snapshot.consumedBudget.modelCalls))
+    let boundedExecutionState = HarnessContextExecutionState(
+      activeAttempt: executionState.activeAttempt,
+      currentWorkspaceRevision: executionState.currentWorkspaceRevision,
+      currentDeployedArtifactDigest: executionState.currentDeployedArtifactDigest,
+      currentDeviceBindingRevision: executionState.currentDeviceBindingRevision,
+      disprovedHypotheses: trim(
+        executionState.disprovedHypotheses, to: limits.maxMemories,
+        label: "disprovedHypotheses"),
+      unavailableOperations: trim(
+        executionState.unavailableOperations, to: limits.maxOperations,
+        label: "unavailableOperations"),
+      authorizedOperationReferences: trim(
+        executionState.authorizedOperationReferences, to: limits.maxOperations,
+        label: "authorizedOperations"),
+      currentCapabilityEffectCeiling: executionState.currentCapabilityEffectCeiling,
+      allowedFileScopes: trim(
+        executionState.allowedFileScopes, to: limits.maxArtifacts,
+        label: "allowedFileScopes"),
+      derivedArtifactSummaries: trim(
+        executionState.derivedArtifactSummaries, to: limits.maxArtifacts,
+        label: "derivedArtifactSummaries"))
 
     let context = HarnessDecisionContext(
       targetPseudonym: HarnessDecisionContext.pseudonym(forTargetID: snapshot.target.targetID),
@@ -176,6 +200,7 @@ public struct HarnessDecisionContextAssembler: Sendable {
       status: snapshot.status,
       phase: snapshot.phase,
       round: snapshot.activeRound,
+      currentTaskStateVersion: snapshot.version,
       goalSummary: String(snapshot.goal.summary.prefix(limits.maxSummaryCharacters)),
       desiredState: modelVisibleDesiredState,
       observedMeasurements: observed.measurements,
@@ -197,7 +222,8 @@ public struct HarnessDecisionContextAssembler: Sendable {
       blockers: observed.blockers,
       trimmed: trimmed,
       waitReason: snapshot.waitReason,
-      conditions: snapshot.conditions)
+      conditions: snapshot.conditions,
+      executionState: boundedExecutionState)
 
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
@@ -224,7 +250,10 @@ public enum HarnessEgressScreen {
     else { return ["contextNotEncodable"] }
     var found: [String] = []
     if text.contains(targetID) { found.append("targetId") }
-    for marker in ["connectKey", "serial", "stablePhysicalIdentity", "/data/local/tmp"] {
+    for marker in [
+      "connectKey", "serial", "stablePhysicalIdentity", "/data/local/tmp", "/Users/",
+      "/home/", "/private/", "/tmp/", "file://",
+    ] {
       if text.localizedCaseInsensitiveContains(marker) { found.append(marker) }
     }
     return found

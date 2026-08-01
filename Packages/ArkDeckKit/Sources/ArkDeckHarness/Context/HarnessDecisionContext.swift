@@ -143,6 +143,183 @@ public struct HarnessContextArtifact: Equatable, Sendable, Codable {
   }
 }
 
+/// Revision-aware strategy facts sent to a model. The summary deliberately
+/// excludes free-form hypothesis prose, capability identifiers and ActionRun
+/// inputs: it describes which durable Attempt is active without turning the
+/// context into a second execution surface.
+public struct HarnessContextActiveAttemptSummary: Equatable, Sendable, Codable {
+  public let attemptID: String
+  public let ordinal: Int
+  public let strategyFingerprint: String
+  public let operationReference: String
+  public let outcome: HarnessAttemptOutcome
+  public let baseWorkspaceRevision: String?
+  public let patchRevision: String?
+  public let expectedNextObservation: String
+
+  enum CodingKeys: String, CodingKey {
+    case attemptID = "attemptId"
+    case ordinal
+    case strategyFingerprint
+    case operationReference
+    case outcome
+    case baseWorkspaceRevision
+    case patchRevision
+    case expectedNextObservation
+  }
+
+  public init(_ attempt: HarnessAttempt) {
+    self.attemptID = attempt.attemptID
+    self.ordinal = attempt.ordinal
+    self.strategyFingerprint = attempt.strategyFingerprint
+    self.operationReference = attempt.strategy.selectedOperationFamily
+    self.outcome = attempt.outcome
+    self.baseWorkspaceRevision = attempt.applicableBaseRevision
+    self.patchRevision = attempt.patchRevision
+    self.expectedNextObservation = attempt.strategy.executionExpectation.expectedNextObservation
+  }
+}
+
+public struct HarnessContextUnavailableOperation: Equatable, Sendable, Codable {
+  public let operationReference: String
+  public let reasonCode: String
+
+  public init(operationReference: String, reasonCode: String) {
+    self.operationReference = operationReference
+    // Availability ports promise a machine reason. Keep that property true
+    // at the egress boundary even if a provider accidentally returns prose
+    // containing a host path or diagnostic output.
+    let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "._:-@"))
+    let scalarSafe = reasonCode.unicodeScalars.allSatisfy { allowed.contains($0) }
+    self.reasonCode = scalarSafe && !reasonCode.isEmpty
+      ? String(reasonCode.prefix(160)) : "operationUnavailable"
+  }
+}
+
+public struct HarnessContextRevisionScope: Equatable, Sendable, Codable {
+  public let workspaceRevision: String?
+  public let deployedArtifactDigest: String?
+  public let deviceBindingRevision: Int?
+
+  public init(
+    workspaceRevision: String? = nil,
+    deployedArtifactDigest: String? = nil,
+    deviceBindingRevision: Int? = nil
+  ) {
+    self.workspaceRevision = workspaceRevision
+    self.deployedArtifactDigest = deployedArtifactDigest
+    self.deviceBindingRevision = deviceBindingRevision
+  }
+}
+
+/// A bounded semantic view of a deterministic analyzer output. Raw bytes do
+/// not travel; the source Artifact identity, pinned producer, applicable
+/// revision and full content digest do, so the summary remains auditable.
+public struct HarnessDerivedArtifactSummary: Equatable, Sendable, Codable {
+  public let artifactID: String
+  public let name: String
+  public let sourceArtifactIDs: [String]
+  public let analyzerReference: String
+  public let analyzerVersion: String
+  public let revisionScope: HarnessContextRevisionScope
+  public let redactionStatus: String
+  public let contentSHA256: String
+  public let byteCount: Int
+  public let measurements: [String: JSONValue]
+
+  enum CodingKeys: String, CodingKey {
+    case artifactID = "artifactId"
+    case name
+    case sourceArtifactIDs = "sourceArtifactIds"
+    case analyzerReference
+    case analyzerVersion
+    case revisionScope
+    case redactionStatus
+    case contentSHA256 = "contentSha256"
+    case byteCount
+    case measurements
+  }
+
+  public init(
+    artifactID: String,
+    name: String,
+    sourceArtifactIDs: [String],
+    analyzerReference: String,
+    analyzerVersion: String,
+    revisionScope: HarnessContextRevisionScope,
+    redactionStatus: String,
+    contentSHA256: String,
+    byteCount: Int,
+    measurements: [String: JSONValue]
+  ) {
+    self.artifactID = artifactID
+    self.name = name
+    self.sourceArtifactIDs = Array(Set(sourceArtifactIDs)).sorted()
+    self.analyzerReference = analyzerReference
+    self.analyzerVersion = analyzerVersion
+    self.revisionScope = revisionScope
+    self.redactionStatus = redactionStatus
+    self.contentSHA256 = contentSHA256
+    self.byteCount = byteCount
+    self.measurements = measurements
+  }
+}
+
+/// Facts whose authority lives outside the task snapshot but which are safe
+/// and useful in the outbound context. The coordinator rebuilds this value on
+/// every wake; it is never accepted from a model or persisted as task state.
+public struct HarnessContextExecutionState: Equatable, Sendable {
+  public let activeAttempt: HarnessAttempt?
+  public let currentWorkspaceRevision: String?
+  public let currentDeployedArtifactDigest: String?
+  public let currentDeviceBindingRevision: Int?
+  public let disprovedHypotheses: [String]
+  public let unavailableOperations: [HarnessContextUnavailableOperation]
+  public let authorizedOperationReferences: [String]
+  public let currentCapabilityEffectCeiling: WorkflowEffect?
+  public let allowedFileScopes: [String]
+  public let derivedArtifactSummaries: [HarnessDerivedArtifactSummary]
+
+  public init(
+    activeAttempt: HarnessAttempt? = nil,
+    currentWorkspaceRevision: String? = nil,
+    currentDeployedArtifactDigest: String? = nil,
+    currentDeviceBindingRevision: Int? = nil,
+    disprovedHypotheses: [String] = [],
+    unavailableOperations: [HarnessContextUnavailableOperation] = [],
+    authorizedOperationReferences: [String] = [],
+    currentCapabilityEffectCeiling: WorkflowEffect? = nil,
+    allowedFileScopes: [String] = [],
+    derivedArtifactSummaries: [HarnessDerivedArtifactSummary] = []
+  ) {
+    self.activeAttempt = activeAttempt
+    self.currentWorkspaceRevision = currentWorkspaceRevision
+    self.currentDeployedArtifactDigest = currentDeployedArtifactDigest
+    self.currentDeviceBindingRevision = currentDeviceBindingRevision
+    self.disprovedHypotheses = Array(Set(disprovedHypotheses)).sorted()
+    self.unavailableOperations = unavailableOperations.sorted {
+      $0.operationReference < $1.operationReference
+    }
+    self.authorizedOperationReferences = Array(Set(authorizedOperationReferences)).sorted()
+    self.currentCapabilityEffectCeiling = currentCapabilityEffectCeiling
+    self.allowedFileScopes = Array(Set(allowedFileScopes.filter(Self.isLogicalScope))).sorted()
+    self.derivedArtifactSummaries = derivedArtifactSummaries.sorted {
+      $0.artifactID < $1.artifactID
+    }
+  }
+
+  public static let empty = HarnessContextExecutionState()
+
+  private static func isLogicalScope(_ value: String) -> Bool {
+    let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty, trimmed == value, !trimmed.hasPrefix("/"),
+      !trimmed.hasPrefix("~"), !trimmed.contains("\\"),
+      !trimmed.split(separator: "/").contains("..")
+    else { return false }
+    return true
+  }
+}
+
 public struct HarnessContextBudget: Equatable, Sendable, Codable {
   public let roundsRemaining: Int
   public let wallClockSecondsRemaining: Int
@@ -150,6 +327,7 @@ public struct HarnessContextBudget: Equatable, Sendable, Codable {
   public let e1MutationsRemaining: Int
   public let noProgressRoundsRemaining: Int
   public let actionRetriesPerRun: Int
+  public let modelCallsRemaining: Int
 
   public init(
     roundsRemaining: Int,
@@ -157,7 +335,8 @@ public struct HarnessContextBudget: Equatable, Sendable, Codable {
     artifactBytesRemaining: Int,
     e1MutationsRemaining: Int,
     noProgressRoundsRemaining: Int = 0,
-    actionRetriesPerRun: Int = 0
+    actionRetriesPerRun: Int = 0,
+    modelCallsRemaining: Int = 0
   ) {
     self.roundsRemaining = roundsRemaining
     self.wallClockSecondsRemaining = wallClockSecondsRemaining
@@ -165,12 +344,13 @@ public struct HarnessContextBudget: Equatable, Sendable, Codable {
     self.e1MutationsRemaining = e1MutationsRemaining
     self.noProgressRoundsRemaining = noProgressRoundsRemaining
     self.actionRetriesPerRun = actionRetriesPerRun
+    self.modelCallsRemaining = modelCallsRemaining
   }
 }
 
 public struct HarnessDecisionContext: Equatable, Sendable, Codable {
   public static let documentType = "harness-decision-context"
-  public static let schemaVersion = "2.1.0"
+  public static let schemaVersion = "2.2.0"
 
   public let documentType: String
   public let schemaVersion: String
@@ -185,6 +365,19 @@ public struct HarnessDecisionContext: Equatable, Sendable, Codable {
   public let waitReason: HarnessTaskWaitReason?
   public let conditions: [HarnessTaskCondition]
   public let round: Int
+  public let currentTaskStateVersion: Int
+  public let activeAttemptID: String?
+  public let activeAttemptSummary: HarnessContextActiveAttemptSummary?
+  public let currentWorkspaceRevision: String?
+  public let currentDeployedArtifactDigest: String?
+  public let currentDeviceBindingRevision: Int?
+  public let disprovedHypotheses: [String]
+  public let unavailableOperationsAndReasons: [HarnessContextUnavailableOperation]
+  public let currentCapabilityEffectCeiling: WorkflowEffect?
+  public let authorizedOperationRefs: [String]
+  public let allowedFileScopes: [String]
+  public let expectedNextObservation: String?
+  public let derivedArtifactSummaries: [HarnessDerivedArtifactSummary]
   public let goalSummary: String
   public let desiredState: [String: JSONValue]
   public let observedMeasurements: [String: JSONValue]
@@ -209,6 +402,7 @@ public struct HarnessDecisionContext: Equatable, Sendable, Codable {
     status: HarnessTaskStatus,
     phase: HarnessTaskPhase,
     round: Int,
+    currentTaskStateVersion: Int = 0,
     goalSummary: String,
     desiredState: [String: JSONValue],
     observedMeasurements: [String: JSONValue],
@@ -226,7 +420,8 @@ public struct HarnessDecisionContext: Equatable, Sendable, Codable {
     blockers: [String],
     trimmed: [String],
     waitReason: HarnessTaskWaitReason? = nil,
-    conditions: [HarnessTaskCondition] = HarnessTaskConditionSet.unknown()
+    conditions: [HarnessTaskCondition] = HarnessTaskConditionSet.unknown(),
+    executionState: HarnessContextExecutionState = .empty
   ) {
     self.documentType = Self.documentType
     self.schemaVersion = Self.schemaVersion
@@ -239,6 +434,21 @@ public struct HarnessDecisionContext: Equatable, Sendable, Codable {
     self.waitReason = waitReason
     self.conditions = HarnessTaskConditionSet.normalized(conditions)
     self.round = round
+    self.currentTaskStateVersion = currentTaskStateVersion
+    self.activeAttemptID = executionState.activeAttempt?.attemptID
+    self.activeAttemptSummary = executionState.activeAttempt.map(
+      HarnessContextActiveAttemptSummary.init)
+    self.currentWorkspaceRevision = executionState.currentWorkspaceRevision
+    self.currentDeployedArtifactDigest = executionState.currentDeployedArtifactDigest
+    self.currentDeviceBindingRevision = executionState.currentDeviceBindingRevision
+    self.disprovedHypotheses = executionState.disprovedHypotheses
+    self.unavailableOperationsAndReasons = executionState.unavailableOperations
+    self.currentCapabilityEffectCeiling = executionState.currentCapabilityEffectCeiling
+    self.authorizedOperationRefs = executionState.authorizedOperationReferences
+    self.allowedFileScopes = executionState.allowedFileScopes
+    self.expectedNextObservation =
+      executionState.activeAttempt?.strategy.executionExpectation.expectedNextObservation
+    self.derivedArtifactSummaries = executionState.derivedArtifactSummaries
     self.goalSummary = goalSummary
     self.desiredState = desiredState
     self.observedMeasurements = observedMeasurements
