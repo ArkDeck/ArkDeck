@@ -1032,7 +1032,7 @@ enum RuntimeCLI {
         exitCode: EX_USAGE,
         message:
           "missing task subcommand (submit|list|status|result|events|evaluations|"
-          + "attempts|humanActions|memory|reconcile|pause|resume|cancel)")
+          + "attempts|humanActions|memory|reconcile|propose-patch|pause|resume|cancel)")
     }
     var rest = Array(arguments.dropFirst())
     let json = rest.contains("--json")
@@ -1123,6 +1123,33 @@ enum RuntimeCLI {
           method: "task.resume",
           params: [
             "htaskId": .string(try requiredTask()), "resolution": .string(resolution),
+          ]),
+        json: json)
+    case "propose-patch":
+      let maximumProposalBytes = 512 * 1024
+      guard let path = value("--proposal-file") else {
+        throw CLIError(
+          exitCode: EX_USAGE,
+          message: "task propose-patch requires --proposal-file <proposal.json>")
+      }
+      let url = URL(fileURLWithPath: path).standardizedFileURL
+      let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey])
+      guard values?.isRegularFile == true,
+        let size = values?.fileSize, size > 0,
+        size <= maximumProposalBytes,
+        let proposalJSON = try? String(contentsOf: url, encoding: .utf8)
+      else {
+        throw CLIError(
+          exitCode: EX_USAGE,
+          message: "proposal must be a non-empty regular UTF-8 JSON file no larger than "
+            + "\(maximumProposalBytes) bytes")
+      }
+      emit(
+        try client.request(
+          method: "task.proposePatch",
+          params: [
+            "htaskId": .string(try requiredTask()),
+            "proposalJson": .string(proposalJSON),
           ]),
         json: json)
     default:
