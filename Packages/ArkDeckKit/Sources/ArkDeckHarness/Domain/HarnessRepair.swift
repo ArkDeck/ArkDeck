@@ -8,6 +8,7 @@
 // facts; all syntax and size checks live here so malformed proposals cannot
 // become durable dispatch intents in any composition.
 
+import ArkDeckCore
 import CryptoKit
 import Foundation
 

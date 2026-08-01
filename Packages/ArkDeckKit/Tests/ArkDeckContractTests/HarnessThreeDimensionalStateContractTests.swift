@@ -7,6 +7,7 @@
 import XCTest
 
 @testable import ArkDeckCore
+@testable import ArkDeckHarness
 @testable import ArkDeckStorage
 @testable import ArkDeckWorkflows
 

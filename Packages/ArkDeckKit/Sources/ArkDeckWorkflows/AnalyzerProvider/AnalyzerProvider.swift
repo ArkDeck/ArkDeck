@@ -27,6 +27,7 @@
 // a tool comes here.
 
 import ArkDeckCore
+import ArkDeckHarness
 import CryptoKit
 import Foundation
 

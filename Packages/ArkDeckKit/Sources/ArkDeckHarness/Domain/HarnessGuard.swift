@@ -17,6 +17,7 @@
 // Everything here is pure so the same history always yields the same
 // stance, in a test and in the daemon.
 
+import ArkDeckCore
 import CryptoKit
 import Foundation
 

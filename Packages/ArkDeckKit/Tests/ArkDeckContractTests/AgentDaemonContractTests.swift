@@ -4,6 +4,7 @@ import CryptoKit
 @testable import ArkDeckAgentClient
 @testable import ArkDeckAgentDaemon
 @testable import ArkDeckCore
+@testable import ArkDeckRuntime
 @testable import ArkDeckOpenHarmony
 @testable import ArkDeckStorage
 @testable import ArkDeckWorkflows

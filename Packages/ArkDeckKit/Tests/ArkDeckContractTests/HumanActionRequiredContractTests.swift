@@ -1,4 +1,5 @@
 import ArkDeckWorkflows
+@testable import ArkDeckHarness
 import Foundation
 import XCTest
 

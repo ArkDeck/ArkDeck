@@ -1,19 +1,19 @@
 import Foundation
 
-enum AgentStrictJSONError: Error, Equatable, Sendable {
+package enum AgentStrictJSONError: Error, Equatable, Sendable {
   case duplicateMemberName(path: String)
   case malformed(String)
 }
 
-struct AgentStrictJSONDuplicateValidator {
+package struct AgentStrictJSONDuplicateValidator {
   private let bytes: [UInt8]
   private var index = 0
 
-  init(data: Data) {
+  package init(data: Data) {
     bytes = Array(data)
   }
 
-  mutating func validate() throws {
+  package mutating func validate() throws {
     skipWhitespace()
     try parseValue(path: "$", depth: 0)
     skipWhitespace()

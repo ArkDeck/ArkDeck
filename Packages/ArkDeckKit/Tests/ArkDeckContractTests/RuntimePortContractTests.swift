@@ -1,4 +1,5 @@
 import ArkDeckCore
+@testable import ArkDeckHarness
 import ArkDeckRuntime
 import ArkDeckStorage
 import Darwin

@@ -1,4 +1,5 @@
 import ArkDeckCore
+import ArkDeckHarness
 import ArkDeckProcess
 import ArkDeckRuntime
 import ArkDeckStorage
@@ -21,8 +22,10 @@ final class ArkDeckContractTests: XCTestCase {
     "ArkDeckProcess": ["ArkDeckCore"],
     "ArkDeckRuntime": ["ArkDeckCore"],
     "ArkDeckOpenHarmony": ["ArkDeckCore", "ArkDeckProcess"],
+    "ArkDeckHarness": ["ArkDeckCore", "ArkDeckProcess", "ArkDeckRuntime"],
     "ArkDeckWorkflows": [
-      "ArkDeckCore", "ArkDeckOpenHarmony", "ArkDeckProcess", "ArkDeckRuntime", "ArkDeckStorage",
+      "ArkDeckCore", "ArkDeckHarness", "ArkDeckOpenHarmony", "ArkDeckProcess", "ArkDeckRuntime",
+      "ArkDeckStorage",
     ],
     "ArkDeckStorage": ["ArkDeckCore"],
   ]
@@ -34,6 +37,7 @@ final class ArkDeckContractTests: XCTestCase {
         ArkDeckProcessModule.identifier,
         ArkDeckRuntimeModule.identifier,
         ArkDeckOpenHarmonyModule.identifier,
+        ArkDeckHarnessModule.identifier,
         ArkDeckWorkflowsModule.identifier,
         ArkDeckStorageModule.identifier,
       ],
@@ -42,6 +46,7 @@ final class ArkDeckContractTests: XCTestCase {
         "ArkDeckProcess",
         "ArkDeckRuntime",
         "ArkDeckOpenHarmony",
+        "ArkDeckHarness",
         "ArkDeckWorkflows",
         "ArkDeckStorage",
       ]
@@ -61,6 +66,8 @@ final class ArkDeckContractTests: XCTestCase {
         }
       }
     }
+
+    try assertHarnessModuleBoundary()
   }
 
   func testPackageTargetsDoNotImportUIFrameworks() throws {
@@ -119,6 +126,94 @@ final class ArkDeckContractTests: XCTestCase {
     }
     XCTAssertFalse(results.isEmpty, "no Swift sources found under \(directory.path)")
     return results
+  }
+
+  private func assertHarnessModuleBoundary() throws {
+    let sourcesRoot = packageRoot.appending(path: "Sources")
+    let harnessRoot = sourcesRoot.appending(path: "ArkDeckHarness")
+    let requiredLayers = [
+      "Domain", "Application", "Context", "Evaluation", "Memory", "Persistence", "Ports", "LLM",
+      "Tasks",
+    ]
+    for layer in requiredLayers {
+      let files = try swiftSourceURLs(under: harnessRoot.appending(path: layer))
+      XCTAssertFalse(files.isEmpty, "ArkDeckHarness/\(layer) must own at least one Swift source")
+    }
+
+    for legacyTarget in ["ArkDeckCore", "ArkDeckStorage"] {
+      let legacyFiles = try swiftSourceURLs(under: sourcesRoot.appending(path: legacyTarget))
+      XCTAssertFalse(
+        legacyFiles.contains { $0.lastPathComponent.hasPrefix("Harness") },
+        "\(legacyTarget) must not retain harness implementation files")
+    }
+    XCTAssertFalse(
+      FileManager.default.fileExists(
+        atPath: sourcesRoot.appending(path: "ArkDeckWorkflows/AgentHarness").path),
+      "ArkDeckWorkflows/AgentHarness must be replaced by the ArkDeckHarness target")
+
+    let platformImplementationSurfaces = [
+      "HDCBundleReference(", "HDCAbilityReference(", "HDCProviderAction.", "HDCDeviceCommand(",
+      "WorkspaceProviderSupport(", "RuntimeJobEngine(", "RuntimeArtifactStore(",
+      "RuntimeCapabilityStore(",
+    ]
+    let commandConstructionSurfaces = [
+      "ProcessRequest(", "ProcessExecutable", "ProcessRunner", "arguments:",
+    ]
+    for file in try swiftSourceURLs(under: harnessRoot) {
+      let source = try String(contentsOf: file, encoding: .utf8)
+      for surface in platformImplementationSurfaces {
+        XCTAssertFalse(
+          source.contains(surface),
+          "ArkDeckHarness must depend on ports, not concrete platform surface \(surface) "
+            + "(\(file.lastPathComponent))")
+      }
+      if !file.pathComponents.contains("LLM") {
+        for commandSurface in commandConstructionSurfaces {
+          XCTAssertFalse(
+            source.contains(commandSurface),
+            "ArkDeckHarness must not construct Git/HDC/build argv through \(commandSurface) "
+              + "(\(file.lastPathComponent))")
+        }
+      }
+    }
+
+    let daemonAdapter = try String(
+      contentsOf: sourcesRoot.appending(path: "ArkDeckAgentDaemon/HarnessTaskMethods.swift"),
+      encoding: .utf8)
+    XCTAssertTrue(daemonAdapter.contains("HarnessTaskMethodService"))
+    let daemonForbiddenBusinessSymbols = [
+      "HarnessTaskBudgets", "decodeSubmission", "encodeTask", "switch method",
+    ]
+    for businessSymbol in daemonForbiddenBusinessSymbols {
+      XCTAssertFalse(
+        daemonAdapter.contains(businessSymbol),
+        "daemon task adapter must not own harness business logic: \(businessSymbol)")
+    }
+
+    let manifest = try String(
+      contentsOf: packageRoot.appending(path: "Package.swift"), encoding: .utf8)
+    XCTAssertEqual(
+      manifest.components(separatedBy: #".executable(name: "arkdeck-agentd""#).count - 1, 1,
+      "the package must keep exactly one arkdeck-agentd executable product")
+    XCTAssertTrue(
+      manifest.contains(
+        #"dependencies: ["ArkDeckCore", "ArkDeckProcess", "ArkDeckRuntime"]"#),
+      "ArkDeckHarness must point inward to Core/Process/Runtime only")
+  }
+
+  private func swiftSourceURLs(under directory: URL) throws -> [URL] {
+    var isDirectory: ObjCBool = false
+    guard FileManager.default.fileExists(atPath: directory.path, isDirectory: &isDirectory),
+      isDirectory.boolValue,
+      let enumerator = FileManager.default.enumerator(
+        at: directory, includingPropertiesForKeys: nil)
+    else {
+      return []
+    }
+    return enumerator.compactMap { entry in
+      guard let url = entry as? URL, url.pathExtension == "swift" else { return nil }
+      return url
+    }
   }
 
   /// Matches plain, attributed (`@testable`, `@preconcurrency`, …),

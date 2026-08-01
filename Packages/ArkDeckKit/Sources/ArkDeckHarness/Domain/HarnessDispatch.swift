@@ -14,6 +14,7 @@
 // to the same job, so the side effect happens once (HTP-INV-4). Recovery
 // never invents a new key, and never substitutes a different operation.
 
+import ArkDeckCore
 import CryptoKit
 import Foundation
 

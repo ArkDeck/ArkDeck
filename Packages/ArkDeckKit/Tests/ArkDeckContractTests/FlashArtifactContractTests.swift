@@ -3,6 +3,7 @@ import Foundation
 import XCTest
 
 @testable import ArkDeckCore
+@testable import ArkDeckRuntime
 @testable import ArkDeckWorkflows
 
 final class FlashArtifactContractTests: XCTestCase {

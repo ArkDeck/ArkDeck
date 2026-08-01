@@ -16,6 +16,7 @@
 //     and marks the rest unspecified. Real vendor adapters (TASK-HFA-011)
 //     override it with what they actually know.
 
+import ArkDeckCore
 import Foundation
 
 public struct HarnessModelDescriptor: Equatable, Sendable, Codable {

@@ -5,6 +5,7 @@
 // like a new strategy, and prevents the same failed patch from looking new
 // merely because its free-text hypothesis was rewritten.
 
+import ArkDeckCore
 import CryptoKit
 import Foundation
 

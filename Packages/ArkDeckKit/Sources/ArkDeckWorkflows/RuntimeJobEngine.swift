@@ -9,6 +9,8 @@
 // waitingForRecovery; there is no automatic replay anywhere in this file.
 
 import ArkDeckCore
+import ArkDeckHarness
+import ArkDeckRuntime
 import ArkDeckStorage
 import CryptoKit
 import Foundation

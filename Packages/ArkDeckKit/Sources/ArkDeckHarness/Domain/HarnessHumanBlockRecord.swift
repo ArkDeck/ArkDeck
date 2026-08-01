@@ -16,6 +16,7 @@
 // The document is held as JSON rather than as a typed field so this layer
 // stays free of a dependency on the workflow module that owns it.
 
+import ArkDeckCore
 import Foundation
 
 public struct HarnessStoredHumanAction: Equatable, Sendable, Codable {
