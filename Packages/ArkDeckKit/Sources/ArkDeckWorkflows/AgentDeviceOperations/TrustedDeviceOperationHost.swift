@@ -547,6 +547,10 @@ public actor TrustedDeviceOperationHost {
     case .standingAuthorization:
       return authority.usageReservationID != nil
         && request.authorizationID == authority.reference.sourceIdentifier
+    case .chatConfirmation:
+      // Chat E2 is invocation-scoped to the Rockchip Flash product host and is never reusable by
+      // the generic Agent Device Operation plane.
+      return false
     }
   }
 

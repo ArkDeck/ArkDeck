@@ -239,6 +239,47 @@ final class AuthorizationUsageLedgerContractTests: XCTestCase {
     XCTAssertThrowsError(try ledger.load())
   }
 
+  func testChatAuthorityRoundTripsClosedShapeAndConsumesExactlyOnce() throws {
+    let directory = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let ledger = try AgentAuthorityUsageLedger(root: directory)
+    let reference = try AgentExecutionAuthorityReference.validatedChatConfirmation(
+      confirmationDigestSHA256: String(repeating: "1", count: 64),
+      planDigestSHA256: String(repeating: "2", count: 64),
+      archiveDigestSHA256: String(repeating: "3", count: 64),
+      stepSetDigestSHA256: String(repeating: "4", count: 64),
+      targetDigestSHA256: String(repeating: "5", count: 64),
+      confirmedAt: "2026-08-01T12:00:00Z")
+    let reservationID = try AgentAuthorityUsageReservation.canonicalReservationID(
+      authorizationRef: reference, jobID: "job-chat",
+      operationDigestSHA256: String(repeating: "2", count: 64),
+      targetDigestSHA256: String(repeating: "5", count: 64))
+    XCTAssertTrue(reservationID.hasPrefix("ain018-"))
+    let reservation = try AgentAuthorityUsageReservation(
+      reservationID: reservationID, authorizationRef: reference,
+      ordinal: 1, maximumUses: 1, jobID: "job-chat",
+      operationDigestSHA256: String(repeating: "2", count: 64),
+      targetDigestSHA256: String(repeating: "5", count: 64),
+      reservedAt: "2026-08-01T12:00:00Z",
+      forwardLeaseExpiresAt: "2026-08-01T12:01:00Z",
+      compensationLeaseExpiresAt: "2026-08-01T12:02:00Z")
+    XCTAssertEqual(try ledger.reserve(reservation), reservation)
+    XCTAssertEqual(try ledger.load().reservations, [reservation])
+    XCTAssertThrowsError(
+      try ledger.reserve(reservation))
+
+    let url = directory.appending(path: AgentAuthorityUsageLedger.ledgerFileName)
+    var root = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
+    var reservations = try XCTUnwrap(root["reservations"] as? [[String: Any]])
+    var storedReference = try XCTUnwrap(reservations[0]["authorizationRef"] as? [String: Any])
+    storedReference["approvalPRNumber"] = 945
+    reservations[0]["authorizationRef"] = storedReference
+    root["reservations"] = reservations
+    try JSONSerialization.data(withJSONObject: root).write(to: url)
+    XCTAssertThrowsError(try ledger.load(), "chatConfirmation is a closed non-Git shape")
+  }
+
   private func reservation(
     id: String,
     ordinal: Int,

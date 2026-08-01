@@ -571,10 +571,17 @@ private struct AgentAuthorityReferenceDocument: Codable {
         mainCommitOID: container.decode(String.self, forKey: .mainCommitOID),
         authorizationBlobOID: container.decode(String.self, forKey: .authorizationBlobOID),
         approvalPRNumber: container.decode(Int.self, forKey: .approvalPRNumber))
+    case .chatConfirmation:
+      // This generic operation surface cannot establish the Rockchip-specific live target and
+      // invocation facts required by CHG-2026-025 r7. Only the closed Flash host may decode it.
+      throw AgentDeviceOperationSubmissionError.malformed("$.authorizationRef.kind")
     }
   }
 
   func encode(to encoder: Encoder) throws {
+    guard value.kind != .chatConfirmation else {
+      throw AgentDeviceOperationSubmissionError.malformed("$.authorizationRef.kind")
+    }
     try value.encode(to: encoder)
   }
 }

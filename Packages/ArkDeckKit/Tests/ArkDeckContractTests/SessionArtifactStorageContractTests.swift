@@ -6,11 +6,14 @@ import Foundation
 import XCTest
 
 final class SessionArtifactStorageContractTests: XCTestCase {
-  func testAgentAuthorityV22ManifestRoundTripsUnionAndBindsJournalIntentSet() async throws {
-    let reference = try AgentExecutionAuthorityReference.validatedStandingAuthorization(
-      authorizationID: "AUTH-FIXTURE",
-      mainCommitOID: String(repeating: "a", count: 40),
-      authorizationBlobOID: String(repeating: "b", count: 40), approvalPRNumber: 754)
+  func testChatAuthorityV22ManifestJournalAndExportRemainTruthful() async throws {
+    let reference = try AgentExecutionAuthorityReference.validatedChatConfirmation(
+      confirmationDigestSHA256: String(repeating: "a", count: 64),
+      planDigestSHA256: String(repeating: "b", count: 64),
+      archiveDigestSHA256: String(repeating: "c", count: 64),
+      stepSetDigestSHA256: String(repeating: "d", count: 64),
+      targetDigestSHA256: String(repeating: "e", count: 64),
+      confirmedAt: SessionStorageFixtures.timestamp)
     let arguments: [String: JSONValue] = [
       "providerOperationId": .string("fixtureFlash"),
       "partition": .string("system"),
@@ -40,9 +43,7 @@ final class SessionArtifactStorageContractTests: XCTestCase {
         externalIntentEventIDs: ["agent-intent"], includeConfirmation: true))
     XCTAssertEqual(manifest.schemaVersion, JournalEvent.agentAuthoritySchemaVersion)
     XCTAssertEqual(manifest.authorization?.agentExecutionAuthorityReference, reference)
-    XCTAssertEqual(
-      manifest.authorization?.authorizationReference, reference.legacyStandingAuthorizationReference
-    )
+    XCTAssertNil(manifest.authorization?.authorizationReference)
     XCTAssertEqual(manifest.authorization?.externalIntentEventIDs, ["agent-intent"])
     XCTAssertEqual(
       manifest.confirmations.first?.actorAgentExecutionAuthorityReference, reference)
@@ -118,6 +119,20 @@ final class SessionArtifactStorageContractTests: XCTestCase {
     XCTAssertThrowsError(
       try AtomicSessionManifestPublisher(layout: fixture.layout).publish(ghostManifest))
     XCTAssertNoThrow(try AtomicSessionManifestPublisher(layout: fixture.layout).publish(manifest))
+    let (_, exportClaim) = try await admittedClaim(
+      claimID: "chat-v22-export", jobID: fixture.layout.jobID,
+      layout: fixture.layout, writer: .heavy)
+    let exportURL = fixture.base.appending(path: "chat-v22-export")
+    _ = try SessionDiagnosticExporter().export(
+      layout: fixture.layout, artifacts: [], claim: exportClaim, to: exportURL,
+      deviceIdentifierPolicy: .redact)
+    let exportedData = try Data(contentsOf: exportURL.appending(path: "manifest.json"))
+    let exportedManifest = try SessionManifestDocument(data: exportedData)
+    XCTAssertEqual(exportedManifest.authorization?.agentExecutionAuthorityReference, reference)
+    XCTAssertEqual(
+      exportedManifest.confirmations.first?.actorAgentExecutionAuthorityReference, reference)
+    XCTAssertNil(exportedManifest.authorization?.authorizationReference)
+    XCTAssertFalse(String(decoding: exportedData, as: UTF8.self).contains("AUTH-"))
   }
 
   func testAuthorizedAgentV2ManifestJournalRoundTripAndGhostActorDriftRejection() async throws {
@@ -6225,6 +6240,18 @@ extension SessionArtifactStorageContractTests {
         "kind": "standingAuthorization", "authorizationId": authorizationID,
         "mainCommitOID": mainCommitOID, "authorizationBlobOID": authorizationBlobOID,
         "approvalPRNumber": approvalPRNumber,
+      ]
+    case .chatConfirmation(
+      let confirmationDigestSHA256, let planDigestSHA256, let archiveDigestSHA256,
+      let stepSetDigestSHA256, let targetDigestSHA256, let confirmedAt):
+      [
+        "kind": "chatConfirmation",
+        "confirmationDigestSHA256": confirmationDigestSHA256,
+        "planDigestSHA256": planDigestSHA256,
+        "archiveDigestSHA256": archiveDigestSHA256,
+        "stepSetDigestSHA256": stepSetDigestSHA256,
+        "targetDigestSHA256": targetDigestSHA256,
+        "confirmedAt": confirmedAt,
       ]
     }
   }

@@ -7,6 +7,7 @@ public enum AgentExecutionAuthorityKind: String, Codable, CaseIterable, Sendable
   case readyTask
   case deviceCapability
   case standingAuthorization
+  case chatConfirmation
 }
 
 /// Durable audit identity for an Agent admission. These values deliberately carry no executable
@@ -31,6 +32,14 @@ public enum AgentExecutionAuthorityReference: Equatable, Hashable, Sendable, Cod
     authorizationBlobOID: String,
     approvalPRNumber: Int
   )
+  case chatConfirmation(
+    confirmationDigestSHA256: String,
+    planDigestSHA256: String,
+    archiveDigestSHA256: String,
+    stepSetDigestSHA256: String,
+    targetDigestSHA256: String,
+    confirmedAt: String
+  )
 
   private enum CodingKeys: String, CodingKey {
     case kind
@@ -43,6 +52,12 @@ public enum AgentExecutionAuthorityReference: Equatable, Hashable, Sendable, Cod
     case capabilityBlobOID
     case authorizationBlobOID
     case approvalPRNumber
+    case confirmationDigestSHA256
+    case planDigestSHA256
+    case archiveDigestSHA256
+    case stepSetDigestSHA256
+    case targetDigestSHA256
+    case confirmedAt
   }
 
   public static func validatedReadyTask(
@@ -99,6 +114,32 @@ public enum AgentExecutionAuthorityReference: Equatable, Hashable, Sendable, Cod
       authorizationBlobOID: authorizationBlobOID, approvalPRNumber: approvalPRNumber)
   }
 
+  public static func validatedChatConfirmation(
+    confirmationDigestSHA256: String,
+    planDigestSHA256: String,
+    archiveDigestSHA256: String,
+    stepSetDigestSHA256: String,
+    targetDigestSHA256: String,
+    confirmedAt: String
+  ) throws -> AgentExecutionAuthorityReference {
+    guard [
+      confirmationDigestSHA256, planDigestSHA256, archiveDigestSHA256,
+      stepSetDigestSHA256, targetDigestSHA256,
+    ].allSatisfy({ $0.agentAuthorityMatches(#"^[a-f0-9]{64}$"#) }),
+      AuthorizationUsageValidation.isTimestamp(confirmedAt)
+    else {
+      throw AuthorizationUsageLedgerError.invalidRecord(
+        "chat confirmation requires canonical digests and confirmedAt")
+    }
+    return .chatConfirmation(
+      confirmationDigestSHA256: confirmationDigestSHA256,
+      planDigestSHA256: planDigestSHA256,
+      archiveDigestSHA256: archiveDigestSHA256,
+      stepSetDigestSHA256: stepSetDigestSHA256,
+      targetDigestSHA256: targetDigestSHA256,
+      confirmedAt: confirmedAt)
+  }
+
   public init(from decoder: Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
     let dynamic = try decoder.container(keyedBy: AgentAuthorityDynamicCodingKey.self)
@@ -148,6 +189,24 @@ public enum AgentExecutionAuthorityReference: Equatable, Hashable, Sendable, Cod
         mainCommitOID: container.decode(String.self, forKey: .mainCommitOID),
         authorizationBlobOID: container.decode(String.self, forKey: .authorizationBlobOID),
         approvalPRNumber: container.decode(Int.self, forKey: .approvalPRNumber))
+    case .chatConfirmation:
+      guard
+        actualKeys == [
+          "kind", "confirmationDigestSHA256", "planDigestSHA256", "archiveDigestSHA256",
+          "stepSetDigestSHA256", "targetDigestSHA256", "confirmedAt",
+        ]
+      else {
+        throw AuthorizationUsageLedgerError.invalidRecord(
+          "chatConfirmation shape is not closed")
+      }
+      self = try Self.validatedChatConfirmation(
+        confirmationDigestSHA256: container.decode(
+          String.self, forKey: .confirmationDigestSHA256),
+        planDigestSHA256: container.decode(String.self, forKey: .planDigestSHA256),
+        archiveDigestSHA256: container.decode(String.self, forKey: .archiveDigestSHA256),
+        stepSetDigestSHA256: container.decode(String.self, forKey: .stepSetDigestSHA256),
+        targetDigestSHA256: container.decode(String.self, forKey: .targetDigestSHA256),
+        confirmedAt: container.decode(String.self, forKey: .confirmedAt))
     }
   }
 
@@ -174,6 +233,15 @@ public enum AgentExecutionAuthorityReference: Equatable, Hashable, Sendable, Cod
       try container.encode(mainCommitOID, forKey: .mainCommitOID)
       try container.encode(authorizationBlobOID, forKey: .authorizationBlobOID)
       try container.encode(approvalPRNumber, forKey: .approvalPRNumber)
+    case .chatConfirmation(
+      let confirmationDigestSHA256, let planDigestSHA256, let archiveDigestSHA256,
+      let stepSetDigestSHA256, let targetDigestSHA256, let confirmedAt):
+      try container.encode(confirmationDigestSHA256, forKey: .confirmationDigestSHA256)
+      try container.encode(planDigestSHA256, forKey: .planDigestSHA256)
+      try container.encode(archiveDigestSHA256, forKey: .archiveDigestSHA256)
+      try container.encode(stepSetDigestSHA256, forKey: .stepSetDigestSHA256)
+      try container.encode(targetDigestSHA256, forKey: .targetDigestSHA256)
+      try container.encode(confirmedAt, forKey: .confirmedAt)
     }
   }
 
@@ -182,6 +250,7 @@ public enum AgentExecutionAuthorityReference: Equatable, Hashable, Sendable, Cod
     case .readyTask: .readyTask
     case .deviceCapability: .deviceCapability
     case .standingAuthorization: .standingAuthorization
+    case .chatConfirmation: .chatConfirmation
     }
   }
 
@@ -190,6 +259,7 @@ public enum AgentExecutionAuthorityReference: Equatable, Hashable, Sendable, Cod
     case .readyTask: .readOnly
     case .deviceCapability: .deviceMutation
     case .standingAuthorization: .destructive
+    case .chatConfirmation: .destructive
     }
   }
 
@@ -198,6 +268,8 @@ public enum AgentExecutionAuthorityReference: Equatable, Hashable, Sendable, Cod
     case .readyTask(_, let taskID, _, _, _): taskID
     case .deviceCapability(let capabilityID, _, _, _): capabilityID
     case .standingAuthorization(let authorizationID, _, _, _): authorizationID
+    case .chatConfirmation(let confirmationDigestSHA256, _, _, _, _, _):
+      "CHAT-\(confirmationDigestSHA256.uppercased())"
     }
   }
 
@@ -226,11 +298,14 @@ public enum AgentExecutionAuthorityReference: Equatable, Hashable, Sendable, Cod
       }
       return value
     }
-    guard
-      let approvalPRNumber = object[CodingKeys.approvalPRNumber.rawValue]?.authorizationInteger
-    else {
-      throw AuthorizationUsageLedgerError.invalidRecord(
-        "\(context).approvalPRNumber must be integer")
+    func approvalPRNumber() throws -> Int {
+      guard
+        let value = object[CodingKeys.approvalPRNumber.rawValue]?.authorizationInteger
+      else {
+        throw AuthorizationUsageLedgerError.invalidRecord(
+          "\(context).approvalPRNumber must be integer")
+      }
+      return value
     }
     switch kind {
     case .readyTask:
@@ -244,7 +319,7 @@ public enum AgentExecutionAuthorityReference: Equatable, Hashable, Sendable, Cod
       self = try Self.validatedReadyTask(
         changeID: string(.changeID), taskID: string(.taskID),
         mainCommitOID: string(.mainCommitOID), taskBlobOID: string(.taskBlobOID),
-        approvalPRNumber: approvalPRNumber)
+        approvalPRNumber: approvalPRNumber())
     case .deviceCapability:
       guard
         Set(object.keys) == [
@@ -256,7 +331,7 @@ public enum AgentExecutionAuthorityReference: Equatable, Hashable, Sendable, Cod
       self = try Self.validatedDeviceCapability(
         capabilityID: string(.capabilityID), mainCommitOID: string(.mainCommitOID),
         capabilityBlobOID: string(.capabilityBlobOID),
-        approvalPRNumber: approvalPRNumber)
+        approvalPRNumber: approvalPRNumber())
     case .standingAuthorization:
       guard
         Set(object.keys) == [
@@ -268,7 +343,31 @@ public enum AgentExecutionAuthorityReference: Equatable, Hashable, Sendable, Cod
       self = try Self.validatedStandingAuthorization(
         authorizationID: string(.authorizationID), mainCommitOID: string(.mainCommitOID),
         authorizationBlobOID: string(.authorizationBlobOID),
-        approvalPRNumber: approvalPRNumber)
+        approvalPRNumber: approvalPRNumber())
+    case .chatConfirmation:
+      guard
+        Set(object.keys) == [
+          "kind", "confirmationDigestSHA256", "planDigestSHA256", "archiveDigestSHA256",
+          "stepSetDigestSHA256", "targetDigestSHA256", "confirmedAt",
+        ],
+        case .string(let confirmationDigestSHA256)? =
+          object[CodingKeys.confirmationDigestSHA256.rawValue],
+        case .string(let planDigestSHA256)? = object[CodingKeys.planDigestSHA256.rawValue],
+        case .string(let archiveDigestSHA256)? = object[CodingKeys.archiveDigestSHA256.rawValue],
+        case .string(let stepSetDigestSHA256)? = object[CodingKeys.stepSetDigestSHA256.rawValue],
+        case .string(let targetDigestSHA256)? = object[CodingKeys.targetDigestSHA256.rawValue],
+        case .string(let confirmedAt)? = object[CodingKeys.confirmedAt.rawValue]
+      else {
+        throw AuthorizationUsageLedgerError.invalidRecord(
+          "\(context) chatConfirmation shape")
+      }
+      self = try Self.validatedChatConfirmation(
+        confirmationDigestSHA256: confirmationDigestSHA256,
+        planDigestSHA256: planDigestSHA256,
+        archiveDigestSHA256: archiveDigestSHA256,
+        stepSetDigestSHA256: stepSetDigestSHA256,
+        targetDigestSHA256: targetDigestSHA256,
+        confirmedAt: confirmedAt)
     }
   }
 
@@ -911,7 +1010,7 @@ public struct AgentAuthorityUsageTerminal: Codable, Equatable, Sendable {
       Set(externalIntentEventIDs).count == externalIntentEventIDs.count,
       externalIntentEventIDs.allSatisfy(AuthorizationUsageValidation.isIdentifier)
     else {
-      throw AuthorizationUsageLedgerError.invalidRecord("invalid E1 terminal")
+      throw AuthorizationUsageLedgerError.invalidRecord("invalid Agent authority terminal")
     }
     self.status = status
     self.closedAt = closedAt
@@ -962,24 +1061,40 @@ public struct AgentAuthorityUsageReservation: Codable, Equatable, Sendable {
     operationDigestSHA256: String,
     targetDigestSHA256: String
   ) throws -> String {
-    guard
-      case .deviceCapability(
-        let capabilityID, let mainCommitOID, let capabilityBlobOID, let approvalPRNumber
-      ) = authorizationRef,
-      AuthorizationUsageValidation.isIdentifier(jobID),
+    guard AuthorizationUsageValidation.isIdentifier(jobID),
       AuthorizationUsageValidation.isSHA256(operationDigestSHA256),
       AuthorizationUsageValidation.isSHA256(targetDigestSHA256)
     else {
       throw AuthorizationUsageLedgerError.invalidRecord(
-        "E1 reservation identity requires a deviceCapability and canonical digests")
+        "agent authority reservation requires canonical digests")
     }
-    let input = [
-      capabilityID, mainCommitOID, capabilityBlobOID, String(approvalPRNumber), jobID,
-      operationDigestSHA256, targetDigestSHA256,
-    ].joined(separator: "|")
+    let identity: [String]
+    let identifierPrefix: String
+    switch authorizationRef {
+    case .deviceCapability(
+      let capabilityID, let mainCommitOID, let capabilityBlobOID, let approvalPRNumber):
+      identity = [
+        "deviceCapability", capabilityID, mainCommitOID, capabilityBlobOID,
+        String(approvalPRNumber),
+      ]
+      identifierPrefix = "ain010"
+    case .chatConfirmation(
+      let confirmationDigestSHA256, let planDigestSHA256, let archiveDigestSHA256,
+      let stepSetDigestSHA256, let targetDigestSHA256, let confirmedAt):
+      identity = [
+        "chatConfirmation", confirmationDigestSHA256, planDigestSHA256,
+        archiveDigestSHA256, stepSetDigestSHA256, targetDigestSHA256, confirmedAt,
+      ]
+      identifierPrefix = "ain018"
+    case .readyTask, .standingAuthorization:
+      throw AuthorizationUsageLedgerError.invalidRecord(
+        "authority kind does not use the agent authority ledger")
+    }
+    let input = (identity + [jobID, operationDigestSHA256, targetDigestSHA256])
+      .joined(separator: "|")
     let digest = SHA256.hash(data: Data(input.utf8))
       .map { String(format: "%02x", $0) }.joined()
-    return "ain010-\(digest.prefix(32))"
+    return "\(identifierPrefix)-\(digest.prefix(32))"
   }
 
   public init(
@@ -1000,11 +1115,20 @@ public struct AgentAuthorityUsageReservation: Codable, Equatable, Sendable {
       authorizationRef: authorizationRef, jobID: jobID,
       operationDigestSHA256: operationDigestSHA256,
       targetDigestSHA256: targetDigestSHA256)
-    guard authorizationRef.kind == .deviceCapability,
+    let validLimits: Bool
+    switch authorizationRef.kind {
+    case .deviceCapability:
+      validLimits = (1...32).contains(maximumUses) && maximumConcurrentJobs == 1
+    case .chatConfirmation:
+      validLimits = maximumUses == 1 && maximumConcurrentJobs == 1
+    case .readyTask, .standingAuthorization:
+      validLimits = false
+    }
+    guard validLimits,
       AuthorizationUsageValidation.isIdentifier(reservationID),
       reservationID == canonicalReservationID,
       AuthorizationUsageValidation.isIdentifier(jobID),
-      ordinal > 0, (1...32).contains(maximumUses), maximumConcurrentJobs == 1,
+      ordinal > 0,
       AuthorizationUsageValidation.isSHA256(operationDigestSHA256),
       AuthorizationUsageValidation.isSHA256(targetDigestSHA256),
       AuthorizationUsageValidation.isTimestamp(reservedAt),
@@ -1015,7 +1139,7 @@ public struct AgentAuthorityUsageReservation: Codable, Equatable, Sendable {
       let compensationDate = AuthorizationUsageValidation.date(compensationLeaseExpiresAt),
       reservedDate < forwardDate, forwardDate <= compensationDate
     else {
-      throw AuthorizationUsageLedgerError.invalidRecord("invalid E1 authority reservation")
+      throw AuthorizationUsageLedgerError.invalidRecord("invalid Agent authority reservation")
     }
     self.reservationID = reservationID
     self.authorizationRef = authorizationRef
@@ -1098,8 +1222,8 @@ public struct AgentAuthorityUsageLedgerDocument: Codable, Equatable, Sendable {
   }
 }
 
-/// Independent consume-on-reserve ledger for E1 capabilities. The E2 ledger above remains the
-/// only standing-authorization usage store.
+/// Independent consume-on-reserve ledger for E1 capabilities and one-shot chat-confirmed E2
+/// authorities. The legacy E2 ledger above remains the standing-authorization usage store.
 public final class AgentAuthorityUsageLedger: @unchecked Sendable {
   public static let ledgerFileName = "agent-authority-usage.json"
   public static let lockFileName = ".agent-authority-usage.lock"
@@ -1128,16 +1252,21 @@ public final class AgentAuthorityUsageLedger: @unchecked Sendable {
   {
     guard request.terminal == nil else {
       throw AuthorizationUsageLedgerError.invalidRecord(
-        "E1 reserve request must not carry terminal")
+        "Agent authority reserve request must not carry terminal")
     }
     return try withLockedRoot { rootDescriptor in
       var document = try loadLocked(rootDescriptor: rootDescriptor)
       if let existing = document.reservations.first(where: {
         $0.reservationID == request.reservationID
       }) {
+        guard request.authorizationRef.kind != .chatConfirmation else {
+          throw AuthorizationUsageLedgerError.usageLimitExceeded(
+            authorizationID: request.authorizationRef.sourceIdentifier,
+            maxRuns: request.maximumUses)
+        }
         guard existing == request else {
           throw AuthorizationUsageLedgerError.reservationConflict(
-            "E1 reservation retry fields drifted")
+          "Agent authority reservation retry fields drifted")
         }
         return existing
       }
@@ -1152,12 +1281,12 @@ public final class AgentAuthorityUsageLedger: @unchecked Sendable {
         })
       else {
         throw AuthorizationUsageLedgerError.reservationConflict(
-          "E1 authority identity or limits drifted")
+          "Agent authority identity or limits drifted")
       }
       let expectedOrdinal = (sameAuthority.map(\.ordinal).max() ?? 0) + 1
       guard request.ordinal == expectedOrdinal else {
         throw AuthorizationUsageLedgerError.reservationConflict(
-          "E1 ordinal must be \(expectedOrdinal)")
+          "Agent authority ordinal must be \(expectedOrdinal)")
       }
       guard request.ordinal <= request.maximumUses else {
         throw AuthorizationUsageLedgerError.usageLimitExceeded(
@@ -1169,7 +1298,7 @@ public final class AgentAuthorityUsageLedger: @unchecked Sendable {
       }
       guard activeForTarget.isEmpty else {
         throw AuthorizationUsageLedgerError.reservationConflict(
-          "E1 target already has an active reservation")
+          "Agent authority target already has an active reservation")
       }
       document = try AgentAuthorityUsageLedgerDocument(
         reservations: document.reservations + [request])
@@ -1196,7 +1325,7 @@ public final class AgentAuthorityUsageLedger: @unchecked Sendable {
       if let current = existing.terminal {
         guard current == terminal else {
           throw AuthorizationUsageLedgerError.reservationConflict(
-            "E1 terminal retry fields drifted")
+            "Agent authority terminal retry fields drifted")
         }
         return existing
       }
@@ -1217,7 +1346,7 @@ public final class AgentAuthorityUsageLedger: @unchecked Sendable {
     let rootDescriptor = Darwin.open(
       root.path, O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW)
     guard rootDescriptor >= 0 else {
-      throw AuthorizationUsageLedgerError.unsafePath("cannot open E1 ledger root")
+      throw AuthorizationUsageLedgerError.unsafePath("cannot open Agent authority ledger root")
     }
     defer { Darwin.close(rootDescriptor) }
     try validateRootBinding(rootDescriptor)
@@ -1229,10 +1358,10 @@ public final class AgentAuthorityUsageLedger: @unchecked Sendable {
       rootDescriptor, Self.lockFileName,
       O_RDWR | O_CREAT | O_CLOEXEC | O_NOFOLLOW, 0o600)
     guard lockDescriptor >= 0 else {
-      throw AuthorizationUsageLedgerError.unsafePath("cannot open E1 usage lock")
+      throw AuthorizationUsageLedgerError.unsafePath("cannot open Agent authority usage lock")
     }
     defer { Darwin.close(lockDescriptor) }
-    try validateOwnerSafeRegularFile(lockDescriptor, context: "E1 usage lock")
+    try validateOwnerSafeRegularFile(lockDescriptor, context: "Agent authority usage lock")
     if lockWasAbsent {
       try DurableFilePrimitives.fullSync(
         lockDescriptor, path: root.appending(path: Self.lockFileName).path)
@@ -1240,12 +1369,12 @@ public final class AgentAuthorityUsageLedger: @unchecked Sendable {
     }
     while flock(lockDescriptor, LOCK_EX) != 0 {
       if errno == EINTR { continue }
-      throw AuthorizationUsageLedgerError.unsafePath("cannot acquire E1 usage lock")
+      throw AuthorizationUsageLedgerError.unsafePath("cannot acquire Agent authority usage lock")
     }
     defer { flock(lockDescriptor, LOCK_UN) }
     try validatePathBinding(
       descriptor: lockDescriptor, rootDescriptor: rootDescriptor,
-      name: Self.lockFileName, context: "E1 usage lock")
+      name: Self.lockFileName, context: "Agent authority usage lock")
     try validateRootBinding(rootDescriptor)
     let result = try body(rootDescriptor)
     try validateRootBinding(rootDescriptor)
@@ -1258,21 +1387,22 @@ public final class AgentAuthorityUsageLedger: @unchecked Sendable {
       O_RDONLY | O_NONBLOCK | O_CLOEXEC | O_NOFOLLOW)
     if descriptor < 0 {
       guard errno == ENOENT else {
-        throw AuthorizationUsageLedgerError.unsafePath("cannot open E1 usage ledger")
+        throw AuthorizationUsageLedgerError.unsafePath("cannot open Agent authority usage ledger")
       }
       return try AgentAuthorityUsageLedgerDocument(reservations: [])
     }
     defer { Darwin.close(descriptor) }
-    try validateOwnerSafeRegularFile(descriptor, context: "E1 usage ledger")
+    try validateOwnerSafeRegularFile(descriptor, context: "Agent authority usage ledger")
     var metadata = stat()
     guard fstat(descriptor, &metadata) == 0, metadata.st_size > 0,
       metadata.st_size <= Self.maximumBytes
     else {
-      throw AuthorizationUsageLedgerError.invalidRecord("E1 usage ledger size is invalid")
+      throw AuthorizationUsageLedgerError.invalidRecord(
+        "Agent authority usage ledger size is invalid")
     }
     try validatePathBinding(
       descriptor: descriptor, rootDescriptor: rootDescriptor,
-      name: Self.ledgerFileName, context: "E1 usage ledger")
+      name: Self.ledgerFileName, context: "Agent authority usage ledger")
     var data = Data(count: Int(metadata.st_size))
     var offset = 0
     while offset < data.count {
@@ -1283,13 +1413,14 @@ public final class AgentAuthorityUsageLedger: @unchecked Sendable {
       }
       if count < 0, errno == EINTR { continue }
       guard count > 0 else {
-        throw AuthorizationUsageLedgerError.invalidRecord("E1 usage ledger read failed")
+        throw AuthorizationUsageLedgerError.invalidRecord(
+          "Agent authority usage ledger read failed")
       }
       offset += count
     }
     try validatePathBinding(
       descriptor: descriptor, rootDescriptor: rootDescriptor,
-      name: Self.ledgerFileName, context: "E1 usage ledger")
+      name: Self.ledgerFileName, context: "Agent authority usage ledger")
     return try AgentAuthorityUsageValidation.decode(data)
   }
 
@@ -1301,7 +1432,8 @@ public final class AgentAuthorityUsageLedger: @unchecked Sendable {
     encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
     let data = try encoder.encode(document)
     guard !data.isEmpty, data.count <= Self.maximumBytes else {
-      throw AuthorizationUsageLedgerError.invalidRecord("E1 usage ledger exceeds size limit")
+      throw AuthorizationUsageLedgerError.invalidRecord(
+        "Agent authority usage ledger exceeds size limit")
     }
     let temporaryName = ".agent-authority-usage.\(UUID().uuidString).tmp"
     let temporaryURL = root.appending(path: temporaryName)
@@ -1310,35 +1442,38 @@ public final class AgentAuthorityUsageLedger: @unchecked Sendable {
       O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, 0o600)
     guard descriptor >= 0 else {
       throw AuthorizationUsageLedgerError.unsafePath(
-        "cannot create E1 usage temporary file")
+        "cannot create Agent authority usage temporary file")
     }
     var descriptorIsOpen = true
     defer {
       if descriptorIsOpen { Darwin.close(descriptor) }
       _ = Darwin.unlinkat(rootDescriptor, temporaryName, 0)
     }
-    try validateOwnerSafeRegularFile(descriptor, context: "E1 usage temporary file")
+    try validateOwnerSafeRegularFile(
+      descriptor, context: "Agent authority usage temporary file")
     try faultInjector.check(.beforeTemporaryWrite)
     try DurableFilePrimitives.writeAll(data, descriptor: descriptor, path: temporaryURL.path)
     try DurableFilePrimitives.fullSync(descriptor, path: temporaryURL.path)
     try faultInjector.check(.afterFileSync)
     var temporaryMetadata = stat()
     guard fstat(descriptor, &temporaryMetadata) == 0 else {
-      throw AuthorizationUsageLedgerError.unsafePath("cannot inspect E1 usage temporary file")
+      throw AuthorizationUsageLedgerError.unsafePath(
+        "cannot inspect Agent authority usage temporary file")
     }
     guard Darwin.close(descriptor) == 0 else {
       descriptorIsOpen = false
-      throw AuthorizationUsageLedgerError.unsafePath("cannot close E1 usage temporary file")
+      throw AuthorizationUsageLedgerError.unsafePath(
+        "cannot close Agent authority usage temporary file")
     }
     descriptorIsOpen = false
     try validateExistingLedgerPath(rootDescriptor)
     guard renameat(rootDescriptor, temporaryName, rootDescriptor, Self.ledgerFileName) == 0 else {
       throw AuthorizationUsageLedgerError.unsafePath(
-        "cannot atomically replace E1 usage ledger")
+        "cannot atomically replace Agent authority usage ledger")
     }
     try validatePathBinding(
       metadata: temporaryMetadata, rootDescriptor: rootDescriptor,
-      name: Self.ledgerFileName, context: "replaced E1 usage ledger")
+      name: Self.ledgerFileName, context: "replaced Agent authority usage ledger")
     try faultInjector.check(.afterReplace)
     try faultInjector.check(.beforeDirectorySync)
     try DurableFilePrimitives.syncDirectory(root)
@@ -1349,7 +1484,7 @@ public final class AgentAuthorityUsageLedger: @unchecked Sendable {
     if fstatat(rootDescriptor, Self.ledgerFileName, &metadata, AT_SYMLINK_NOFOLLOW) != 0 {
       guard errno == ENOENT else {
         throw AuthorizationUsageLedgerError.unsafePath(
-          "E1 usage ledger path inspection failed")
+          "Agent authority usage ledger path inspection failed")
       }
       return
     }
@@ -1357,7 +1492,7 @@ public final class AgentAuthorityUsageLedger: @unchecked Sendable {
       metadata.st_nlink == 1, metadata.st_mode & (S_IWGRP | S_IWOTH) == 0
     else {
       throw AuthorizationUsageLedgerError.unsafePath(
-        "unsafe E1 usage ledger replacement target")
+        "unsafe Agent authority usage ledger replacement target")
     }
   }
 
@@ -1373,7 +1508,7 @@ public final class AgentAuthorityUsageLedger: @unchecked Sendable {
       descriptorMetadata.st_ino == pathMetadata.st_ino
     else {
       throw AuthorizationUsageLedgerError.unsafePath(
-        "E1 ledger root path changed or is unsafe")
+        "Agent authority ledger root path changed or is unsafe")
     }
   }
 
@@ -1422,7 +1557,8 @@ private enum AgentAuthorityUsageValidation {
     guard document.documentType == AgentAuthorityUsageLedgerDocument.documentType,
       document.schemaVersion == AgentAuthorityUsageLedgerDocument.schemaVersion
     else {
-      throw AuthorizationUsageLedgerError.invalidRecord("unsupported E1 usage document")
+      throw AuthorizationUsageLedgerError.invalidRecord(
+        "unsupported Agent authority usage document")
     }
     var reservationIDs = Set<String>()
     var ordinals: [String: Set<Int>] = [:]
@@ -1430,7 +1566,8 @@ private enum AgentAuthorityUsageValidation {
     var activeTargets = Set<String>()
     for reservation in document.reservations {
       guard reservationIDs.insert(reservation.reservationID).inserted else {
-        throw AuthorizationUsageLedgerError.invalidRecord("duplicate E1 reservationId")
+        throw AuthorizationUsageLedgerError.invalidRecord(
+          "duplicate Agent authority reservationId")
       }
       let authorityID = reservation.authorizationRef.sourceIdentifier
       if let identity = identities[authorityID] {
@@ -1438,7 +1575,7 @@ private enum AgentAuthorityUsageValidation {
           identity.1 == reservation.maximumUses
         else {
           throw AuthorizationUsageLedgerError.invalidRecord(
-            "E1 authority identity or limit drift")
+            "Agent authority identity or limit drift")
         }
       } else {
         identities[authorityID] = (reservation.authorizationRef, reservation.maximumUses)
@@ -1447,21 +1584,22 @@ private enum AgentAuthorityUsageValidation {
       guard seen.insert(reservation.ordinal).inserted,
         reservation.ordinal <= reservation.maximumUses
       else {
-        throw AuthorizationUsageLedgerError.invalidRecord("invalid E1 authority ordinal")
+        throw AuthorizationUsageLedgerError.invalidRecord(
+          "invalid Agent authority ordinal")
       }
       ordinals[authorityID] = seen
       if reservation.terminal == nil,
         !activeTargets.insert(reservation.targetDigestSHA256).inserted
       {
         throw AuthorizationUsageLedgerError.invalidRecord(
-          "multiple active E1 reservations for one target")
+          "multiple active Agent authority reservations for one target")
       }
     }
     for seen in ordinals.values {
       let maximum = seen.max() ?? 0
       guard seen == Set(1...maximum) else {
         throw AuthorizationUsageLedgerError.invalidRecord(
-          "E1 authority ordinals are not contiguous")
+          "Agent authority ordinals are not contiguous")
       }
     }
   }
@@ -1473,14 +1611,16 @@ private enum AgentAuthorityUsageValidation {
     }
     let root: JSONValue
     do { root = try JSONDecoder().decode(JSONValue.self, from: data) } catch {
-      throw AuthorizationUsageLedgerError.invalidRecord("E1 usage ledger is not valid JSON")
+      throw AuthorizationUsageLedgerError.invalidRecord(
+        "Agent authority usage ledger is not valid JSON")
     }
     try validateClosedShape(root)
     let document: AgentAuthorityUsageLedgerDocument
     do {
       document = try JSONDecoder().decode(AgentAuthorityUsageLedgerDocument.self, from: data)
     } catch {
-      throw AuthorizationUsageLedgerError.invalidRecord("E1 usage fields are invalid")
+      throw AuthorizationUsageLedgerError.invalidRecord(
+        "Agent authority usage fields are invalid")
     }
     try validateDocument(document)
     return document
@@ -1493,7 +1633,8 @@ private enum AgentAuthorityUsageValidation {
       object["schemaVersion"] == .string(AgentAuthorityUsageLedgerDocument.schemaVersion),
       case .array(let reservations)? = object["reservations"]
     else {
-      throw AuthorizationUsageLedgerError.invalidRecord("E1 usage root shape is invalid")
+      throw AuthorizationUsageLedgerError.invalidRecord(
+        "Agent authority usage root shape is invalid")
     }
     let reservationKeys = Set(AgentAuthorityUsageReservation.CodingKeys.allCases.map(\.rawValue))
     let terminalKeys = Set(AgentAuthorityUsageTerminal.CodingKeys.allCases.map(\.rawValue))
@@ -1503,21 +1644,22 @@ private enum AgentAuthorityUsageValidation {
         let authority = reservation["authorizationRef"]
       else {
         throw AuthorizationUsageLedgerError.invalidRecord(
-          "E1 reservation shape is not closed")
+          "Agent authority reservation shape is not closed")
       }
       let reference = try AgentExecutionAuthorityReference(
         jsonValue: authority, context: "reservation.authorizationRef")
-      guard reference.kind == .deviceCapability else {
+      guard reference.kind == .deviceCapability || reference.kind == .chatConfirmation else {
         throw AuthorizationUsageLedgerError.invalidRecord(
-          "E1 usage requires deviceCapability")
+          "Agent authority usage requires deviceCapability or chatConfirmation")
       }
       if case .object(let terminal)? = reservation["terminal"] {
         guard Set(terminal.keys) == terminalKeys else {
-          throw AuthorizationUsageLedgerError.invalidRecord("E1 terminal shape is not closed")
+          throw AuthorizationUsageLedgerError.invalidRecord(
+            "Agent authority terminal shape is not closed")
         }
       } else if reservation["terminal"] != .null {
         throw AuthorizationUsageLedgerError.invalidRecord(
-          "E1 terminal must be object or null")
+          "Agent authority terminal must be object or null")
       }
     }
   }

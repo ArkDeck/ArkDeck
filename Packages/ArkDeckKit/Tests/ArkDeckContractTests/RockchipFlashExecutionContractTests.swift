@@ -10,6 +10,61 @@ import XCTest
 @testable import ArkDeckWorkflows
 
 final class RockchipFlashExecutionContractTests: XCTestCase {
+  func testChatConfirmedFakeExecutesOnceAndPublishesTruthfulV22Authority() async throws {
+    let fixture = try RockchipExecutionTestFixture.make()
+    defer { try? FileManager.default.removeItem(at: fixture.base) }
+    let persistence = try await fixture.makePersistence()
+    let admission = RecordingRockchipAdmissionPort(
+      plan: fixture.plan, receipt: fixture.executableReceipt)
+    let process = RecordingRockchipProcessPort(
+      executable: fixture.executable, sha256: fixture.executableSHA256)
+    let host = RockchipFlashExecutionHost(
+      dependencies: RockchipFlashExecutionDependencies(
+        admission: admission, process: process,
+        postflight: FixedRockchipPostflightPort(
+          serialDigest: String(repeating: "a", count: 64), topology: "42"),
+        power: RecordingPowerBackend(),
+        makePersistence: { _, _, _ in persistence },
+        profiles: [.dayu200, fixture.profile],
+        makeID: RockchipExecutionTestFixture.deterministicID))
+    let assertion = try RockchipChatConfirmationAssertion(
+      confirmationDigestSHA256: String(repeating: "c", count: 64),
+      planDigestSHA256: fixture.plan.planDigestSHA256,
+      archiveDigestSHA256: fixture.plan.archiveSHA256,
+      stepSetDigestSHA256: fixture.plan.stepSetDigestSHA256,
+      targetDigestSHA256: String(repeating: "b", count: 64), bindingRevision: 1)
+
+    let result = try await host.execute(
+      RockchipFlashExecutionRequest(
+        chatConfirmation: assertion, archiveURL: fixture.archive,
+        targetLocationSelector: "42"))
+
+    XCTAssertEqual(result.status, .succeeded)
+    XCTAssertEqual(process.arguments.count, 12)
+    let replay = try DurableJournalRecovery.inspect(
+      url: persistence.sessionRoot.appending(path: "journal.jsonl"))
+    XCTAssertEqual(replay.events.first?.schemaVersion, JournalEvent.agentAuthoritySchemaVersion)
+    XCTAssertNil(replay.authorizationReference)
+    XCTAssertEqual(replay.agentExecutionAuthorityReference?.kind, .chatConfirmation)
+    let externalIntents = replay.events.filter {
+      $0.kind == .stepIntent && ($0.stepEffect ?? .hostOnly) >= .readOnly
+    }
+    XCTAssertEqual(externalIntents.count, 13)
+    XCTAssertTrue(externalIntents.allSatisfy {
+      $0.agentExecutionAuthorityReference?.kind == .chatConfirmation
+        && $0.usageReservationID == "reservation-ain-007"
+    })
+    let manifest = try SessionManifestDocument(
+      data: Data(contentsOf: try XCTUnwrap(result.manifestURL)))
+    XCTAssertEqual(manifest.schemaVersion, JournalEvent.agentAuthoritySchemaVersion)
+    XCTAssertNil(manifest.authorization?.authorizationReference)
+    XCTAssertEqual(
+      manifest.authorization?.agentExecutionAuthorityReference?.kind, .chatConfirmation)
+    XCTAssertEqual(manifest.authorization?.externalIntentEventIDs.count, 13)
+    XCTAssertEqual(admission.closedIntentIDs.count, 13)
+    XCTAssertEqual(admission.authorizeAndConsumeCount, 1)
+  }
+
   func testAuthorizedFakeDescriptorExecutesExactClosedSequenceAndPublishesV21Manifest()
     async throws
   {
@@ -194,13 +249,28 @@ final class RecordingRockchipAdmissionPort: @unchecked Sendable, RockchipExecuti
     jobID _: String,
     targetID: String
   ) async throws -> RockchipExecutionAdmission {
-    RockchipExecutionAdmission(
+    let authorityReference: RockchipExecutionAdmission.AuthorityReference
+    switch request.authority {
+    case .standingAuthorization(let authorizationID):
+      authorityReference = .standingAuthorization(
+        try AuthorizationReference(
+          authorizationID: authorizationID,
+          mainCommitOID: String(repeating: "1", count: 40),
+          authorizationBlobOID: String(repeating: "2", count: 40),
+          approvalPRNumber: 314))
+    case .chatConfirmation(let assertion):
+      authorityReference = .agent(
+        try .validatedChatConfirmation(
+          confirmationDigestSHA256: assertion.confirmationDigestSHA256,
+          planDigestSHA256: assertion.planDigestSHA256,
+          archiveDigestSHA256: assertion.archiveDigestSHA256,
+          stepSetDigestSHA256: assertion.stepSetDigestSHA256,
+          targetDigestSHA256: assertion.targetDigestSHA256,
+          confirmedAt: "2026-08-01T12:00:00Z"))
+    }
+    return RockchipExecutionAdmission(
       backing: .contractFake, plan: plan,
-      authorizationReference: try AuthorizationReference(
-        authorizationID: request.authorizationID,
-        mainCommitOID: String(repeating: "1", count: 40),
-        authorizationBlobOID: String(repeating: "2", count: 40),
-        approvalPRNumber: 314),
+      authorityReference: authorityReference,
       usageReservationID: "reservation-ain-007", targetID: targetID,
       bindingRevision: 1, targetDigestSHA256: String(repeating: "b", count: 64),
       serialDigestSHA256: String(repeating: "a", count: 64), usbTopology: "42",

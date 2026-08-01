@@ -4,7 +4,7 @@ import XCTest
 final class Dayu20070035AuthorizedFlashWrapperContractTests: XCTestCase {
   private static let planDigest =
     "3922f6a22401a624dd393932bbfc7d3774953be79aaece08961a8bbfb77dc2b8"
-  private static let authorizationID = "AUTH-2026-025-DAYU200-TEST"
+  private static let confirmationDigest = String(repeating: "a", count: 64)
 
   func testWrapperPinsExactV2FactsAndDelegatesOnlyToTypedExecutor() throws {
     let source = try String(contentsOf: Self.scriptURL, encoding: .utf8)
@@ -20,8 +20,12 @@ final class Dayu20070035AuthorizedFlashWrapperContractTests: XCTestCase {
       source.contains(
         "c8bdce2a137690081c1dd5ca38f91f25399c63778ab18b4f94000b127382fa14"))
     XCTAssertTrue(source.contains("\"$ARKDECK_BIN\" flash execute"))
-    XCTAssertTrue(source.contains("--authorization-id \"$authorization_id\""))
+    XCTAssertTrue(source.contains("--chat-confirmation-digest-sha256"))
+    XCTAssertTrue(source.contains("--chat-confirmed-target-sha256"))
+    XCTAssertTrue(source.contains("ARKDECK_CHAT_CONFIRMATION_CONTEXT=supervisedInteractiveAgent"))
     XCTAssertTrue(source.contains("ARKDECK_EXECUTION_AUTHORITY=standardAgent"))
+    XCTAssertFalse(source.contains("--authorization-id"))
+    XCTAssertFalse(source.contains("AUTH-ID must match"))
     XCTAssertFalse(source.contains("eval "))
     XCTAssertFalse(source.contains("sudo "))
     XCTAssertFalse(source.contains("exec \"$TOOL\""))
@@ -29,7 +33,7 @@ final class Dayu20070035AuthorizedFlashWrapperContractTests: XCTestCase {
 
   func testChatTriggerRejectsAnythingButTheFullPinnedPlanBeforeHostChecks() throws {
     let result = try runScript([
-      "--chat-trigger", "--authorization-id", Self.authorizationID,
+      "--chat-trigger", "--confirmation-digest-sha256", Self.confirmationDigest,
       "--confirm-plan-sha256", String(Self.planDigest.prefix(12)),
     ])
 
@@ -41,7 +45,7 @@ final class Dayu20070035AuthorizedFlashWrapperContractTests: XCTestCase {
   func testOrdinaryCICannotUseChatTriggerEvenWithExactPlan() throws {
     let result = try runScript(
       [
-        "--chat-trigger", "--authorization-id", Self.authorizationID,
+        "--chat-trigger", "--confirmation-digest-sha256", Self.confirmationDigest,
         "--confirm-plan-sha256", Self.planDigest,
       ],
       environment: ["CI": "true"])
@@ -53,7 +57,7 @@ final class Dayu20070035AuthorizedFlashWrapperContractTests: XCTestCase {
 
   func testInteractiveTriggerRequiresTTYBeforeHostChecks() throws {
     let result = try runScript([
-      "--interactive-trigger", "--authorization-id", Self.authorizationID,
+      "--interactive-trigger",
     ])
 
     XCTAssertEqual(result.status, 2)
