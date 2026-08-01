@@ -80,6 +80,7 @@ public actor HarnessTaskCoordinator {
   /// concurrent wakes can all plan from the same version and submit distinct
   /// idempotency keys before only one wins the optimistic state commit.
   private var reconcilingTaskIDs: Set<String> = []
+  private let reconcileLeaseHolderID = "HCOORD-\(UUID().uuidString)"
   let store: HarnessTaskStore
   let jobPort: any HarnessRuntimeJobPort
   /// Absent means no evidence can be read, so no task can ever be judged.
@@ -442,6 +443,28 @@ public actor HarnessTaskCoordinator {
         reasonCode: "reconcileInProgress")
     }
     defer { reconcilingTaskIDs.remove(taskID) }
+    guard
+      try await store.acquireReconcileLease(
+        taskID: taskID, holderID: reconcileLeaseHolderID)
+    else {
+      let snapshot = try await load(taskID)
+      return HarnessReconcileOutcome(
+        snapshot: snapshot, action: .reconcileInProgress,
+        reasonCode: "reconcileLeaseHeld")
+    }
+    do {
+      let outcome = try await reconcileWithLease(taskID)
+      try? await store.releaseReconcileLease(
+        taskID: taskID, holderID: reconcileLeaseHolderID)
+      return outcome
+    } catch {
+      try? await store.releaseReconcileLease(
+        taskID: taskID, holderID: reconcileLeaseHolderID)
+      throw error
+    }
+  }
+
+  private func reconcileWithLease(_ taskID: String) async throws -> HarnessReconcileOutcome {
     var snapshot = try await load(taskID)
 
     if snapshot.status.isTerminal {
