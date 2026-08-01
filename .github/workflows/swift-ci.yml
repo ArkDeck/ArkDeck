@@ -81,7 +81,6 @@ jobs:
           --package-path Packages/ArkDeckKit
           --parallel
           --num-workers 4
-          --disable-index-store
 
       - name: Job summary
         if: always()
@@ -90,7 +89,7 @@ jobs:
             echo "### Swift CI"
             echo "- Path decision: \`${{ steps.paths.outputs.reason }}\`"
             if [ "${{ steps.paths.outputs.swift }}" = "true" ]; then
-              echo "- Ran the full ArkDeckKit test suite with 4 test workers and no index store."
+              echo "- Ran the full ArkDeckKit test suite with 4 test workers."
             else
               echo "- Skipped swift test: diff touches neither Swift surface (Packages/**, Package.*) nor this workflow."
             fi
