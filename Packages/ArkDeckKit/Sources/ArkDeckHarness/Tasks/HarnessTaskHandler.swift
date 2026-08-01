@@ -40,6 +40,9 @@ public protocol HarnessTaskHandler: Sendable {
   /// Default criteria for a submission that declares none. They are
   /// recorded, not evaluated, until TASK-HTP-002 lands the evaluator.
   func defaultSuccessCriteria() -> [HarnessSuccessCriterion]
+  /// Positive E1 tasks must reserve this complete bounded route at intake.
+  /// A zero budget remains a deliberate evidence-only task.
+  func requiredE1MutationBudget(goal: HarnessTaskGoal, policy: HarnessTaskPolicy) -> Int
   /// The next step, given only persisted state. Pure: same snapshot in,
   /// same step out, so a replay after a crash proposes the same thing.
   func plan(for snapshot: HarnessTaskSnapshot, decisionID: String, nowUTC: String)
@@ -53,6 +56,10 @@ extension HarnessTaskHandler {
   public func offeredOperations(for snapshot: HarnessTaskSnapshot) -> Set<String> {
     permittedOperations
   }
+
+  public func requiredE1MutationBudget(
+    goal: HarnessTaskGoal, policy: HarnessTaskPolicy
+  ) -> Int { 0 }
 }
 
 public struct DebugCrashTaskHandler: HarnessTaskHandler {
@@ -118,7 +125,8 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
       repair.rollbackRequired
         || (repair.deployedDigest != nil && snapshot.observed.latestVerdict == .fail)
     {
-      return [Self.revertPatch]
+      return mutationBudgetAvailable(snapshot, operations: [Self.revertPatch])
+        ? [Self.revertPatch] : []
     }
     if pendingAnalysisLease(snapshot) != nil {
       return [Self.analyzeCrashLedger]
@@ -131,12 +139,15 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
     case .reproducing, .collecting, .verifying:
       return [Self.captureDiagnostics]
     case .analyzing:
-      return snapshot.observed.latestVerdict == .fail
-        ? [Self.applyPatch] : [Self.captureDiagnostics]
+      if snapshot.observed.latestVerdict == .fail {
+        return repairRouteBudgetAvailable(snapshot) ? [Self.applyPatch] : []
+      }
+      return [Self.captureDiagnostics]
     case .patching:
       return []
     case .building:
       guard let repair = snapshot.repairAttempt else { return [] }
+      guard repairRouteBudgetAvailable(snapshot) else { return [] }
       if repair.buildSourceRevision == nil { return [Self.buildOpenHarmony] }
       if !repair.testsPassed { return [Self.runTests] }
       return [Self.deployHAP]
@@ -183,6 +194,12 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
     ]
   }
 
+  public func requiredE1MutationBudget(
+    goal: HarnessTaskGoal, policy: HarnessTaskPolicy
+  ) -> Int {
+    Self.requiredE1MutationBudget(goal: goal, policy: policy)
+  }
+
   public func plan(
     for snapshot: HarnessTaskSnapshot,
     decisionID: String,
@@ -194,6 +211,14 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
       repair.rollbackRequired
         || (repair.deployedDigest != nil && snapshot.observed.latestVerdict == .fail)
     {
+      guard mutationBudgetAvailable(snapshot, operations: [Self.revertPatch]) else {
+        return noSafeAction(
+          snapshot, decisionID: decisionID, round: round, nowUTC: nowUTC,
+          reasonCode: "rollbackMutationBudgetUnavailable",
+          hypothesis:
+            "The repair requires rollback, but no bounded E1 mutation remains for the exact "
+            + "published revert operation.")
+      }
       return invoke(
         snapshot, decisionID: decisionID, round: round, nowUTC: nowUTC,
         operation: Self.revertPatch,
@@ -285,6 +310,14 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
         // A model-backed producer may replace this deterministic fallback with
         // a strictly parsed PROPOSE_PATCH. Without patch bytes there is
         // nothing safe for the built-in strategy to invent.
+        guard repairRouteBudgetAvailable(snapshot) else {
+          return noSafeAction(
+            snapshot, decisionID: decisionID, round: round, nowUTC: nowUTC,
+            reasonCode: "repairMutationBudgetUnavailable",
+            hypothesis:
+              "A positive E1 task may request a patch only when its remaining budget covers "
+              + "apply, build, tests, verified deployment and mandatory rollback reserve.")
+        }
         return HarnessPlannedStep(
           decision: HarnessDecision(
             decisionID: decisionID,
@@ -348,6 +381,14 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
           snapshot, decisionID: decisionID, round: round, nowUTC: nowUTC,
           reasonCode: "repairAttemptUnavailable",
           hypothesis: "Build cannot start without an evidence-derived patch attempt.")
+      }
+      guard repairRouteBudgetAvailable(snapshot) else {
+        return noSafeAction(
+          snapshot, decisionID: decisionID, round: round, nowUTC: nowUTC,
+          reasonCode: "repairMutationBudgetUnavailable",
+          hypothesis:
+            "The remaining E1 budget cannot finish the admitted repair route and retain its "
+            + "mandatory rollback reserve.")
       }
       if repair.buildSourceRevision == nil {
         return invoke(
@@ -523,10 +564,90 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
     return true
   }
 
-  /// One mutation injects the fault. Two more must remain available for the
-  /// verified repair deployment and its mandatory rollback reserve.
+  /// The fault injection is admitted only when the same bounded budget can
+  /// finish every currently published E1 repair leg and retain rollback.
   private func baselineDeploymentBudgetAvailable(_ snapshot: HarnessTaskSnapshot) -> Bool {
-    snapshot.consumedBudget.e1Mutations + 3 <= snapshot.budgets.maxE1Mutations
+    let required = Self.requiredE1MutationBudget(
+      goal: snapshot.goal, policy: snapshot.policy)
+    return snapshot.consumedBudget.e1Mutations + required
+      <= snapshot.budgets.maxE1Mutations
+  }
+
+  /// Current published route: optional fault-fixture deployment, then patch,
+  /// build, tests, repaired deployment and one mandatory rollback reserve.
+  /// Each reference is counted from its Catalog effect floor; dispatch-time
+  /// charging below uses the exact selected-step effect for the real inputs.
+  static func requiredE1MutationBudget(
+    goal: HarnessTaskGoal, policy: HarnessTaskPolicy
+  ) -> Int {
+    let allowed = Set(policy.allowedOperations)
+    var route: [String] = []
+    if allowed.contains(Self.deployHAP),
+      case .string(let lease)? = goal.desiredState["baselineHapArtifactLease"],
+      !lease.isEmpty
+    {
+      route.append(Self.deployHAP)
+    }
+    if allowed.contains(Self.applyPatch) {
+      route.append(Self.applyPatch)
+      if allowed.contains(Self.buildOpenHarmony) { route.append(Self.buildOpenHarmony) }
+      if allowed.contains(Self.runTests) { route.append(Self.runTests) }
+      if allowed.contains(Self.deployHAP) { route.append(Self.deployHAP) }
+      if allowed.contains(Self.revertPatch) { route.append(Self.revertPatch) }
+    }
+    return Self.e1MutationCost(route)
+  }
+
+  private static func e1MutationCost(_ operations: [String]) -> Int {
+    operations.reduce(into: 0) { count, reference in
+      guard let descriptor = RuntimeOperationCatalog.descriptor(reference: reference) else {
+        // A handler route may never become cheaper because its Catalog entry
+        // disappeared. Admission elsewhere rejects it; accounting stays
+        // conservative in the meantime.
+        count += 1
+        return
+      }
+      if descriptor.minimumEffect >= .deviceMutation { count += 1 }
+    }
+  }
+
+  /// A positive mutation budget promises a complete route, rather than a
+  /// task that predictably stops after one or two accepted effects. Zero is
+  /// intentionally different: it is an evidence-only task that may still
+  /// surface a typed proposal boundary but can dispatch no E1 operation.
+  private func repairRouteBudgetAvailable(_ snapshot: HarnessTaskSnapshot) -> Bool {
+    guard snapshot.budgets.maxE1Mutations > 0 else { return true }
+    return mutationBudgetAvailable(
+      snapshot, operations: remainingRepairOperations(snapshot))
+  }
+
+  private func mutationBudgetAvailable(
+    _ snapshot: HarnessTaskSnapshot, operations: [String]
+  ) -> Bool {
+    snapshot.consumedBudget.e1Mutations + Self.e1MutationCost(operations)
+      <= snapshot.budgets.maxE1Mutations
+  }
+
+  private func remainingRepairOperations(_ snapshot: HarnessTaskSnapshot) -> [String] {
+    let allowed = Set(snapshot.policy.allowedOperations)
+    let repair = snapshot.repairAttempt?.reverted == false ? snapshot.repairAttempt : nil
+    var route: [String] = []
+    if repair?.patchAttemptRef == nil, allowed.contains(Self.applyPatch) {
+      route.append(Self.applyPatch)
+    }
+    if repair?.buildSourceRevision == nil, allowed.contains(Self.buildOpenHarmony) {
+      route.append(Self.buildOpenHarmony)
+    }
+    if repair?.testsPassed != true, allowed.contains(Self.runTests) {
+      route.append(Self.runTests)
+    }
+    if repair?.deployedDigest == nil, allowed.contains(Self.deployHAP) {
+      route.append(Self.deployHAP)
+    }
+    if repair?.reverted != true, allowed.contains(Self.revertPatch) {
+      route.append(Self.revertPatch)
+    }
+    return route
   }
 
   private func noSafeAction(

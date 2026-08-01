@@ -214,6 +214,14 @@ public actor HarnessTaskCoordinator {
       throw HarnessCoordinatorError.unsupportedTaskType(submission.type)
     }
     try submission.validate(permittedOperations: handler.permittedOperations)
+    let requiredE1Mutations = handler.requiredE1MutationBudget(
+      goal: submission.goal, policy: submission.policy)
+    if submission.budgets.maxE1Mutations > 0,
+      submission.budgets.maxE1Mutations < requiredE1Mutations
+    {
+      throw HarnessTaskSubmissionError.insufficientE1MutationBudget(
+        required: requiredE1Mutations, actual: submission.budgets.maxE1Mutations)
+    }
     let now = nowUTC()
     let snapshot = HarnessTaskSnapshot(
       htaskID: taskIDFactory(),
@@ -954,7 +962,8 @@ public actor HarnessTaskCoordinator {
               wallClockSeconds: snapshot.consumedBudget.wallClockSeconds,
               artifactBytes: snapshot.consumedBudget.artifactBytes,
               e1Mutations: snapshot.consumedBudget.e1Mutations
-                + (Self.consumesHarnessE1Budget(operationReference) ? 1 : 0),
+                + (Self.consumesHarnessE1Budget(
+                  operationReference, inputs: decision.inputs) ? 1 : 0),
               modelCalls: snapshot.consumedBudget.modelCalls),
             modelCalls: modelCallsSpent),
           jobID: accepted.jobID, waitReason: .activeJob,
@@ -1163,7 +1172,8 @@ public actor HarnessTaskCoordinator {
             wallClockSeconds: snapshot.consumedBudget.wallClockSeconds,
             artifactBytes: snapshot.consumedBudget.artifactBytes,
             e1Mutations: snapshot.consumedBudget.e1Mutations
-              + (Self.consumesHarnessE1Budget(intent.operationReference) ? 1 : 0),
+              + (Self.consumesHarnessE1Budget(
+                intent.operationReference, inputs: decision.inputs) ? 1 : 0),
             modelCalls: snapshot.consumedBudget.modelCalls),
           jobID: accepted.jobID, waitReason: .activeJob,
           conditions: conditionsAfterDispatch(
@@ -2352,13 +2362,20 @@ public actor HarnessTaskCoordinator {
       conditions: conditions ?? snapshot.conditions)
   }
 
-  /// Device deployment is E1 by its catalog effect. TASK-HFA-003 also charges
-  /// the source rollback against the same mutation budget, even though the
-  /// published workspace operation is hostOnly, so a failed repair cannot
-  /// acquire an unbounded cleanup tail.
-  static func consumesHarnessE1Budget(_ operationReference: String) -> Bool {
-    operationReference == DebugCrashTaskHandler.deployHAP
-      || operationReference == DebugCrashTaskHandler.revertPatch
+  /// Charge the effect of the exact Catalog steps selected by the typed
+  /// request. Workspace mutations and device deployment share this one
+  /// bounded E1 ledger; rejected or stale requests never reach this point.
+  static func consumesHarnessE1Budget(
+    _ operationReference: String, inputs: [String: JSONValue]
+  ) -> Bool {
+    guard let descriptor = RuntimeOperationCatalog.descriptor(reference: operationReference)
+    else {
+      // Dispatch rejects an unknown operation elsewhere. If that invariant
+      // ever regresses, accounting must not make the unknown plan cheaper.
+      return true
+    }
+    return CatalogOperationEffectResolver.effectiveEffect(
+      descriptor: descriptor, inputs: inputs) >= .deviceMutation
   }
 
   private func requestBytes(

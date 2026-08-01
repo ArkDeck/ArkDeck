@@ -1480,14 +1480,7 @@ public actor RuntimeJobEngine {
   static func effectiveEffect(
     descriptor: CatalogOperationDescriptor, inputs: [String: JSONValue]
   ) -> WorkflowEffect {
-    var effect = descriptor.minimumEffect
-    for step in descriptor.steps {
-      if !stepIsRequested(step, descriptor: descriptor, inputs: inputs) {
-        continue
-      }
-      if step.effect > effect { effect = step.effect }
-    }
-    return effect
+    CatalogOperationEffectResolver.effectiveEffect(descriptor: descriptor, inputs: inputs)
   }
 
   /// Whether the request asks for this step at all.
@@ -1515,18 +1508,8 @@ public actor RuntimeJobEngine {
     descriptor: CatalogOperationDescriptor,
     inputs: [String: JSONValue]
   ) -> Bool {
-    if step.isOptional {
-      return optionalStepIsSelected(step, descriptor: descriptor, inputs: inputs)
-    }
-    switch step.stepID {
-    case "stop-ability":
-      if case .string(let state)? = inputs["postRunAbilityState"] {
-        return state == "stopped"
-      }
-      return true  // the catalog default
-    default:
-      return true
-    }
+    CatalogOperationEffectResolver.stepIsSelected(
+      step, descriptor: descriptor, inputs: inputs)
   }
 
   /// Pure selection rule, shared by authorization (before a job exists)
@@ -1537,54 +1520,8 @@ public actor RuntimeJobEngine {
     descriptor: CatalogOperationDescriptor,
     inputs: [String: JSONValue]
   ) -> Bool {
-    switch step.stepID {
-    case "capture-trace", "receive-trace-artifact", "cleanup-remote-temp":
-      if case .array(let categories)? = inputs["traceCategories"] {
-        return !categories.isEmpty
-      }
-      return false
-    case "capture-ui-dump":
-      if case .bool(let enabled)? = inputs["uiDump"] { return enabled }
-      return true  // the catalog default
-    case "capture-crash-index":
-      if case .bool(let enabled)? = inputs["crashLogs"] { return enabled }
-      return false  // the catalog default
-    case "capture-crash-log":
-      // Selected by having something to fetch, not by a separate flag: a
-      // name is the whole request.
-      if case .string(let name)? = inputs["crashLogName"] { return !name.isEmpty }
-      return false
-    case "observe-application-liveness":
-      if case .string(let bundleName)? = inputs["bundleName"] {
-        return !bundleName.isEmpty
-      }
-      return false
-    case "capture-screenshot", "receive-screenshot", "cleanup-screenshot-temp":
-      // Off unless asked for, like the tree: these three are what raise the
-      // plan from readOnly to deviceMutation.
-      if case .bool(let enabled)? = inputs["uiScreenshot"] { return enabled }
-      return false  // the catalog default
-    case "capture-ui-tree", "receive-ui-tree", "cleanup-ui-tree-temp":
-      // Off unless asked for: these three are what raise the plan from
-      // readOnly to deviceMutation, so the default has to be the quiet one.
-      if case .bool(let enabled)? = inputs["uiComponentTree"] { return enabled }
-      return false  // the catalog default
-    case "capture-diagnostics":
-      if case .bool(let enabled)? = inputs["captureDiagnostics"] { return enabled }
-      return true
-    case "cleanup-uninstall":
-      if case .string(let policy)? = inputs["cleanupPolicy"] {
-        return policy == "uninstall"
-      }
-      return true
-    case "capture-post-flash-diagnostics":
-      if case .string(let profile)? = inputs["postFlashVerification"] {
-        return profile == "full"
-      }
-      return true
-    default:
-      return true
-    }
+    CatalogOperationEffectResolver.optionalStepIsSelected(
+      step, descriptor: descriptor, inputs: inputs)
   }
 
   /// Steps whose success is decided by a paired readback rather than by

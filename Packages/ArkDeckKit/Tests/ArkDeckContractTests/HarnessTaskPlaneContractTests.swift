@@ -170,17 +170,21 @@ final class HarnessTaskPlaneContractTests: XCTestCase {
 
   private func submission(
     maxRounds: Int = 8,
-    allowedOperations: [String]? = nil
+    allowedOperations: [String]? = nil,
+    maxE1Mutations: Int = 0,
+    desiredState: [String: JSONValue] = [:]
   ) -> HarnessTaskSubmission {
     HarnessTaskSubmission(
       type: .debugCrash,
       intakeDescription: "WaterFlow crashes when scrolled to the end.",
       projectRef: "demo-app",
       target: HarnessTaskTargetReference(targetID: "TGT-958780b2ffb7", expectedBindingRevision: 7),
-      goal: HarnessTaskGoal(summary: "No SIGABRT in WaterFlow::RecoverBack across five runs."),
+      goal: HarnessTaskGoal(
+        summary: "No SIGABRT in WaterFlow::RecoverBack across five runs.",
+        desiredState: desiredState),
       budgets: HarnessTaskBudgets(
         maxRounds: maxRounds, maxWallClockSeconds: 900, maxArtifactBytes: 1 << 20,
-        maxE1Mutations: 0),
+        maxE1Mutations: maxE1Mutations),
       policy: allowedOperations.map(HarnessTaskPolicy.init(allowedOperations:))
         ?? HarnessTaskCoordinator.defaultPolicy(for: .debugCrash))
   }
@@ -781,6 +785,33 @@ final class HarnessTaskPlaneContractTests: XCTestCase {
     }
   }
 
+  func testPositiveE1AdmissionRequiresTheCompleteBoundedRepairRoute() async throws {
+    let port = RecordingJobPort()
+    let (coordinator, _) = try makeCoordinator(port: port)
+    let fixture: [String: JSONValue] = [
+      "baselineHapArtifactLease": .string("lease-v1:input-hap:ART-crash-fixture")
+    ]
+
+    do {
+      _ = try await coordinator.submit(
+        submission(maxE1Mutations: 5, desiredState: fixture))
+      XCTFail("a positive budget that cannot finish the route must be refused at intake")
+    } catch {
+      XCTAssertEqual(
+        error as? HarnessTaskSubmissionError,
+        .insufficientE1MutationBudget(required: 6, actual: 5))
+    }
+
+    let admitted = try await coordinator.submit(
+      submission(maxE1Mutations: 6, desiredState: fixture))
+    XCTAssertEqual(admitted.budgets.maxE1Mutations, 6)
+
+    let evidenceOnly = try await coordinator.submit(submission(maxE1Mutations: 0))
+    XCTAssertEqual(
+      evidenceOnly.budgets.maxE1Mutations, 0,
+      "zero remains an intentional E0 diagnostic task, not an incomplete E1 promise")
+  }
+
   func testStoreRefusesTaskIdentifiersThatAreNotItsOwnGrammar() async throws {
     let store = try HarnessTaskStore(rootURL: rootURL)
     for candidate in ["../escape", "HTASK-../x", "htask-lowercase", "HTASK-ZZZZ", "HTASK-"] {
@@ -840,7 +871,7 @@ final class HarnessTaskPlaneContractTests: XCTestCase {
         "baseWorkspaceRevision": .string(String(repeating: "c", count: 64)),
         "component": .string("WaterFlow.RecoverBack"),
         "maxRounds": .integer(3),
-        "maxE1Mutations": .integer(3),
+        "maxE1Mutations": .integer(6),
         "maxModelCalls": .integer(4),
       ])
     let taskID = try XCTUnwrap({ () -> String? in
@@ -874,7 +905,7 @@ final class HarnessTaskPlaneContractTests: XCTestCase {
     guard case .object(let submittedBudgets)? = field(submitted, "budgets") else {
       return XCTFail("task.submit must echo the admitted budgets")
     }
-    XCTAssertEqual(submittedBudgets["maxE1Mutations"], .integer(3))
+    XCTAssertEqual(submittedBudgets["maxE1Mutations"], .integer(6))
     XCTAssertEqual(submittedBudgets["maxModelCalls"], .integer(4))
     XCTAssertEqual(
       field(submitted, "allowedOperations"),

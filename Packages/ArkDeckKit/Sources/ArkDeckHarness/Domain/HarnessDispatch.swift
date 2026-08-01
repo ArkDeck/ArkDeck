@@ -457,6 +457,7 @@ public enum HarnessTaskSubmissionError: Error, Equatable, Sendable {
   case emptyAllowedOperations
   case operationNotPermittedForType(String)
   case budgetOutOfRange(String)
+  case insufficientE1MutationBudget(required: Int, actual: Int)
   case malformedDesiredState(String)
   case intakeTooLong
   case unsupportedTaskType(HarnessTaskType)

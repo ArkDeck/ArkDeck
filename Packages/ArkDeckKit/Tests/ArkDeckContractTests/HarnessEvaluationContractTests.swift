@@ -858,7 +858,7 @@ final class HarnessEvaluationContractTests: XCTestCase {
       ],
       budgets: HarnessTaskBudgets(
         maxRounds: maxRounds, maxWallClockSeconds: 900, maxArtifactBytes: 1 << 20,
-        maxE1Mutations: includeCrashFixture ? 3 : 0),
+        maxE1Mutations: includeCrashFixture ? 6 : 0),
       policy: HarnessTaskCoordinator.defaultPolicy(for: .debugCrash))
     return (coordinator, store, submission)
   }

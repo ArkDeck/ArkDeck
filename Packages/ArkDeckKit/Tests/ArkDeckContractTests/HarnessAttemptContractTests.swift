@@ -655,7 +655,7 @@ final class HarnessAttemptContractTests: XCTestCase {
       ],
       budgets: HarnessTaskBudgets(
         maxRounds: 8, maxWallClockSeconds: 60, maxArtifactBytes: 1024,
-        maxE1Mutations: 2, maxNoProgressRounds: maxNoProgressRounds,
+        maxE1Mutations: 6, maxNoProgressRounds: maxNoProgressRounds,
         maxActionRetriesPerRun: 2),
       policy: HarnessTaskCoordinator.defaultPolicy(for: .debugCrash),
       observedState: observedState, createdAtUTC: now, updatedAtUTC: now,
