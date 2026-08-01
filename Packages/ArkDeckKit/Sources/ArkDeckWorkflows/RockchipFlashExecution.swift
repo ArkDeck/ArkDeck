@@ -4,9 +4,24 @@ import ArkDeckStorage
 import Foundation
 
 public struct RockchipFlashExecutionRequest: Sendable, Equatable {
-  public let authorizationID: String
+  enum Authority: Sendable, Equatable {
+    case standingAuthorization(String)
+    case chatConfirmation(RockchipChatConfirmationAssertion)
+  }
+
+  let authority: Authority
   public let archiveURL: URL
   public let targetLocationSelector: String
+
+  public var authorizationID: String? {
+    guard case .standingAuthorization(let value) = authority else { return nil }
+    return value
+  }
+
+  public var chatConfirmation: RockchipChatConfirmationAssertion? {
+    guard case .chatConfirmation(let value) = authority else { return nil }
+    return value
+  }
 
   public init(
     authorizationID: String,
@@ -23,7 +38,24 @@ public struct RockchipFlashExecutionRequest: Sendable, Equatable {
       targetLocationSelector.utf8.allSatisfy({ (48...57).contains($0) }),
       targetLocationSelector == "0" || targetLocationSelector.first != "0"
     else { throw RockchipFlashExecutionError.invalidRequest("targetLocationSelector") }
-    self.authorizationID = authorizationID
+    authority = .standingAuthorization(authorizationID)
+    self.archiveURL = archiveURL.standardizedFileURL
+    self.targetLocationSelector = targetLocationSelector
+  }
+
+  public init(
+    chatConfirmation: RockchipChatConfirmationAssertion,
+    archiveURL: URL,
+    targetLocationSelector: String
+  ) throws {
+    guard archiveURL.isFileURL, archiveURL.path.hasPrefix("/") else {
+      throw RockchipFlashExecutionError.invalidRequest("archiveURL")
+    }
+    guard !targetLocationSelector.isEmpty,
+      targetLocationSelector.utf8.allSatisfy({ (48...57).contains($0) }),
+      targetLocationSelector == "0" || targetLocationSelector.first != "0"
+    else { throw RockchipFlashExecutionError.invalidRequest("targetLocationSelector") }
+    authority = .chatConfirmation(chatConfirmation)
     self.archiveURL = archiveURL.standardizedFileURL
     self.targetLocationSelector = targetLocationSelector
   }
@@ -88,13 +120,19 @@ public enum RockchipFlashExecutionError: Error, Sendable, Equatable, LocalizedEr
 
 struct RockchipExecutionAdmission: @unchecked Sendable {
   enum Backing: @unchecked Sendable {
-    case production(RockchipAuthorizedAgentAdmission)
+    case standingAuthorization(RockchipAuthorizedAgentAdmission)
+    case chatConfirmation(RockchipChatConfirmedAdmission)
     case contractFake
+  }
+
+  enum AuthorityReference: Sendable, Equatable {
+    case standingAuthorization(AuthorizationReference)
+    case agent(AgentExecutionAuthorityReference)
   }
 
   let backing: Backing
   let plan: RockchipFlashPlan
-  let authorizationReference: AuthorizationReference
+  let authorityReference: AuthorityReference
   let usageReservationID: String
   let targetID: String
   let bindingRevision: Int
@@ -103,6 +141,46 @@ struct RockchipExecutionAdmission: @unchecked Sendable {
   let usbTopology: String
   let executableIdentity: ProcessExecutableIdentityReceipt
   let evidenceClass: RockchipExecutionEvidenceClass
+
+  var journalSchemaVersion: String {
+    switch authorityReference {
+    case .standingAuthorization: JournalEvent.rockchipAuthorizedAgentSchemaVersion
+    case .agent: JournalEvent.agentAuthoritySchemaVersion
+    }
+  }
+
+  var authorityKind: String {
+    switch authorityReference {
+    case .standingAuthorization: "standingAuthorization"
+    case .agent(let reference): reference.kind.rawValue
+    }
+  }
+
+  var confirmationDecidedAt: String? {
+    guard
+      case .agent(
+        .chatConfirmation(_, _, _, _, _, let confirmedAt)
+      ) = authorityReference
+    else { return nil }
+    return confirmedAt
+  }
+
+  var legacyAuthorizationReference: AuthorizationReference? {
+    guard case .standingAuthorization(let reference) = authorityReference else { return nil }
+    return reference
+  }
+
+  var agentAuthorizationReference: AgentExecutionAuthorityReference? {
+    guard case .agent(let reference) = authorityReference else { return nil }
+    return reference
+  }
+
+  func correlatesAuthority(for effect: WorkflowEffect) -> Bool {
+    switch authorityReference {
+    case .standingAuthorization: effect == .destructive
+    case .agent: effect >= .readOnly
+    }
+  }
 }
 
 protocol RockchipExecutionAdmissionPort: Sendable {
@@ -451,7 +529,9 @@ actor RockchipFlashExecutor {
           destructiveIntentEventIDs: destructiveIntentIDs)
         throw RockchipFlashExecutionError.persistenceRejected(String(describing: error))
       }
-      if command.step.effect == .destructive { destructiveIntentIDs.append(intentID) }
+      if admission.correlatesAuthority(for: command.step.effect) {
+        destructiveIntentIDs.append(intentID)
+      }
       let attempt: RockchipExecutionAttempt
       do {
         attempt = try await prepared.launch(criticalNonInterruptible: command.isCriticalWrite)
@@ -551,6 +631,9 @@ actor RockchipFlashExecutor {
         destructiveIntentEventIDs: destructiveIntentIDs)
       throw RockchipFlashExecutionError.recoveryRequired(
         stepID: postflightStep.id, detail: "postflight intent durability failure")
+    }
+    if admission.correlatesAuthority(for: postflightStep.effect) {
+      destructiveIntentIDs.append(postflightIntent)
     }
     let postflight: RockchipPostflightReceipt
     do {

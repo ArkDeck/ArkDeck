@@ -29,6 +29,16 @@ final class JournalRecoveryContractTests: XCTestCase {
           authorizationBlobOID: String(repeating: "f", count: 40), approvalPRNumber: 700),
         "reservation-fixture", .destructive
       ),
+      (
+        try .validatedChatConfirmation(
+          confirmationDigestSHA256: String(repeating: "1", count: 64),
+          planDigestSHA256: String(repeating: "2", count: 64),
+          archiveDigestSHA256: String(repeating: "3", count: 64),
+          stepSetDigestSHA256: String(repeating: "4", count: 64),
+          targetDigestSHA256: String(repeating: "5", count: 64),
+          confirmedAt: timestamp),
+        "chat-reservation-fixture", .destructive
+      ),
     ]
     for (offset, item) in references.enumerated() {
       let directory = try temporaryDirectory()

@@ -215,6 +215,53 @@ struct RockchipTrustedAuthorizationFacts: Sendable, Equatable {
   let collectedAtTimestamp: String
 }
 
+/// Exact inputs against which fresh product facts are checked. This is deliberately authority-
+/// neutral: a merged standing authorization and a current chat confirmation can both provide the
+/// same plan/target expectation without one authority kind impersonating the other.
+struct RockchipAuthorizationFactExpectation: Sendable, Equatable {
+  let targetModel: String
+  let serialDigestSHA256: String
+  let bindingRevision: Int
+  let firmwareArchiveSHA256: String
+  let transport: String
+  let toolchainFingerprint: String
+  let providerIdentity: String
+  let planDigestSHA256: String
+  let stepSetDigestSHA256: String
+  let validUntil: String
+
+  init(standingAuthorization authorization: RockchipStandingAuthorization) {
+    targetModel = authorization.target.model
+    serialDigestSHA256 = authorization.target.serialSHA256
+    bindingRevision = authorization.target.bindingRevision
+    firmwareArchiveSHA256 = authorization.firmwareArchiveSHA256
+    transport = authorization.transport
+    toolchainFingerprint = authorization.toolchainFingerprint
+    providerIdentity = authorization.providerIdentity
+    planDigestSHA256 = authorization.planDigestSHA256
+    stepSetDigestSHA256 = authorization.stepSetDigestSHA256
+    validUntil = authorization.validUntil
+  }
+
+  init(
+    targetModel: String, serialDigestSHA256: String, bindingRevision: Int,
+    firmwareArchiveSHA256: String, transport: String, toolchainFingerprint: String,
+    providerIdentity: String, planDigestSHA256: String, stepSetDigestSHA256: String,
+    validUntil: String
+  ) {
+    self.targetModel = targetModel
+    self.serialDigestSHA256 = serialDigestSHA256
+    self.bindingRevision = bindingRevision
+    self.firmwareArchiveSHA256 = firmwareArchiveSHA256
+    self.transport = transport
+    self.toolchainFingerprint = toolchainFingerprint
+    self.providerIdentity = providerIdentity
+    self.planDigestSHA256 = planDigestSHA256
+    self.stepSetDigestSHA256 = stepSetDigestSHA256
+    self.validUntil = validUntil
+  }
+}
+
 struct RockchipAuthorizationFactCollector: Sendable {
   static let maximumReadbackLifetimeNanoseconds: UInt64 = 30_000_000_000
 
@@ -248,6 +295,16 @@ struct RockchipAuthorizationFactCollector: Sendable {
     request: RockchipAuthorizationFactRequest,
     grant: VerifiedAuthorizationGrant
   ) async throws -> RockchipTrustedAuthorizationFacts {
+    try await collect(
+      request: request,
+      expectation: RockchipAuthorizationFactExpectation(
+        standingAuthorization: grant.authorization))
+  }
+
+  func collect(
+    request: RockchipAuthorizationFactRequest,
+    expectation: RockchipAuthorizationFactExpectation
+  ) async throws -> RockchipTrustedAuthorizationFacts {
     for (field, value) in [
       ("sessionID", request.sessionID), ("jobID", request.jobID),
       ("targetID", request.targetID),
@@ -278,11 +335,9 @@ struct RockchipAuthorizationFactCollector: Sendable {
       throw RockchipAuthorizationFactError.factPortFailed(name: "identityReadback")
     }
     let current = clock.now()
-    let authorization = grant.authorization
-
     guard RockchipStandingAuthorization.isCanonicalTimestamp(current.auditTimestamp),
       let nowDate = RockchipStandingAuthorization.parseTimestamp(current.auditTimestamp),
-      let validUntil = RockchipStandingAuthorization.parseTimestamp(authorization.validUntil),
+      let validUntil = RockchipStandingAuthorization.parseTimestamp(expectation.validUntil),
       nowDate < validUntil
     else { throw RockchipAuthorizationFactError.authorizationExpired }
 
@@ -290,19 +345,19 @@ struct RockchipAuthorizationFactCollector: Sendable {
       throw RockchipAuthorizationFactError.planMismatch(field: "executionMode")
     }
     for (field, matches) in [
-      ("targetModel", authorization.target.model == RockchipFlashProfile.targetDeviceModel),
-      ("firmwareArchiveSHA256", authorization.firmwareArchiveSHA256 == plan.archiveSHA256),
-      ("transport", authorization.transport == "usb"),
+      ("targetModel", expectation.targetModel == RockchipFlashProfile.targetDeviceModel),
+      ("firmwareArchiveSHA256", expectation.firmwareArchiveSHA256 == plan.archiveSHA256),
+      ("transport", expectation.transport == "usb"),
       (
         "toolchainFingerprint",
-        authorization.toolchainFingerprint == RockchipFlashProfile.pinnedToolchainFingerprint
+        expectation.toolchainFingerprint == RockchipFlashProfile.pinnedToolchainFingerprint
       ),
       (
         "providerIdentity",
-        authorization.providerIdentity == RockchipRockUSBFlashProvider.providerIdentity
+        expectation.providerIdentity == RockchipRockUSBFlashProvider.providerIdentity
       ),
-      ("planDigestSHA256", authorization.planDigestSHA256 == plan.planDigestSHA256),
-      ("stepSetDigestSHA256", authorization.stepSetDigestSHA256 == plan.stepSetDigestSHA256),
+      ("planDigestSHA256", expectation.planDigestSHA256 == plan.planDigestSHA256),
+      ("stepSetDigestSHA256", expectation.stepSetDigestSHA256 == plan.stepSetDigestSHA256),
     ] where !matches {
       throw RockchipAuthorizationFactError.planMismatch(field: field)
     }
@@ -321,7 +376,7 @@ struct RockchipAuthorizationFactCollector: Sendable {
     guard durable.reference.targetID == request.targetID else {
       throw RockchipAuthorizationFactError.bindingMismatch(field: "targetID")
     }
-    guard durable.reference.revision == authorization.target.bindingRevision else {
+    guard durable.reference.revision == expectation.bindingRevision else {
       throw RockchipAuthorizationFactError.bindingMismatch(field: "revision")
     }
     guard durable.binding.transport == .usb else {
@@ -336,7 +391,7 @@ struct RockchipAuthorizationFactCollector: Sendable {
       Self.isCanonicalTopology(topology)
     else { throw RockchipAuthorizationFactError.bindingMismatch(field: "usbTopology") }
     let durableSerialDigest = Self.sha256Hex(Data(serial.utf8))
-    guard durableSerialDigest == authorization.target.serialSHA256 else {
+    guard durableSerialDigest == expectation.serialDigestSHA256 else {
       throw RockchipAuthorizationFactError.bindingMismatch(field: "serialDigestSHA256")
     }
 
@@ -374,7 +429,7 @@ struct RockchipAuthorizationFactCollector: Sendable {
     else { throw RockchipAuthorizationFactError.prerequisiteMismatch }
 
     guard RockchipStandingAuthorization.isCanonicalSHA256(readback.serialDigestSHA256),
-      readback.serialDigestSHA256 == authorization.target.serialSHA256,
+      readback.serialDigestSHA256 == expectation.serialDigestSHA256,
       readback.serialDigestSHA256 == durableSerialDigest
     else { throw RockchipAuthorizationFactError.readbackMismatch(field: "serialDigestSHA256") }
     guard readback.usbVendorID == observation.usbVendorID,
@@ -397,8 +452,8 @@ struct RockchipAuthorizationFactCollector: Sendable {
     let targetDigest = Self.sha256Hex(
       Data(
         [
-          authorization.target.model, authorization.target.serialSHA256,
-          String(durable.reference.revision), request.targetID, topology,
+          expectation.targetModel, expectation.serialDigestSHA256,
+          String(durable.reference.revision), topology,
           String(observation.usbVendorID), String(observation.usbProductID),
         ].joined(separator: "|").utf8))
     return RockchipTrustedAuthorizationFacts(
@@ -407,7 +462,7 @@ struct RockchipAuthorizationFactCollector: Sendable {
       serialDigestSHA256: durableSerialDigest, usbTopology: topology,
       observationSequence: readback.observationSequence,
       readbackDeadlineMonotonicNanoseconds: readback.deadlineMonotonicNanoseconds,
-      authorizationValidUntil: authorization.validUntil,
+      authorizationValidUntil: expectation.validUntil,
       collectedAtTimestamp: current.auditTimestamp)
   }
 

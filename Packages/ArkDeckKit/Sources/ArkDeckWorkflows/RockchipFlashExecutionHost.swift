@@ -243,6 +243,7 @@ final class RockchipDurableExecutionPersistence: @unchecked Sendable,
   private var stepRecords: [String: RockchipPersistedStepResult] = [:]
   private var artifacts: [ArtifactRecord] = []
   private var waitingForRecovery = false
+  private var activeSchemaVersion = JournalEvent.rockchipAuthorizedAgentSchemaVersion
 
   init(
     layout: SessionLayout,
@@ -264,14 +265,16 @@ final class RockchipDurableExecutionPersistence: @unchecked Sendable,
 
   func appendJobCreated(admission: RockchipExecutionAdmission) throws {
     try locked {
+      activeSchemaVersion = admission.journalSchemaVersion
       try append(
         JournalEvent.jobCreated(
           eventID: eventID("created"), sequence: sequence,
           sessionID: layout.sessionID, jobID: layout.jobID,
           timestamp: Self.timestamp(), executionMode: "execute",
           executionAuthority: "authorizedAgent", coreBaseline: "CORE-2.0.0",
-          schemaVersion: JournalEvent.rockchipAuthorizedAgentSchemaVersion,
-          authorizationRef: admission.authorizationReference,
+          schemaVersion: activeSchemaVersion,
+          authorizationRef: admission.legacyAuthorizationReference,
+          agentAuthorizationRef: admission.agentAuthorizationReference,
           usageReservationID: admission.usageReservationID))
     }
   }
@@ -284,14 +287,14 @@ final class RockchipDurableExecutionPersistence: @unchecked Sendable,
           sessionID: layout.sessionID, jobID: layout.jobID,
           timestamp: Self.timestamp(), from: .queued, to: .preflight,
           reason: "trusted admission consumed and staging validated",
-          schemaVersion: JournalEvent.rockchipAuthorizedAgentSchemaVersion))
+          schemaVersion: activeSchemaVersion))
       try append(
         JournalEvent.stateTransition(
           eventID: eventID("running"), sequence: sequence,
           sessionID: layout.sessionID, jobID: layout.jobID,
           timestamp: Self.timestamp(), from: .preflight, to: .running,
           reason: "closed Rockchip command sequence ready",
-          schemaVersion: JournalEvent.rockchipAuthorizedAgentSchemaVersion))
+          schemaVersion: activeSchemaVersion))
     }
   }
 
@@ -302,6 +305,7 @@ final class RockchipDurableExecutionPersistence: @unchecked Sendable,
   ) throws -> String {
     try locked {
       let identifier = eventID("intent-\(step.id)")
+      let correlated = admission.correlatesAuthority(for: step.effect)
       try append(
         JournalEvent.stepIntent(
           eventID: identifier, sequence: sequence,
@@ -312,9 +316,10 @@ final class RockchipDurableExecutionPersistence: @unchecked Sendable,
             connectKey: admission.usbTopology,
             identitySnapshotHash: admission.targetDigestSHA256),
           attempt: 1, bindingRevision: admission.bindingRevision,
-          schemaVersion: JournalEvent.rockchipAuthorizedAgentSchemaVersion,
-          authorizationRef: isDestructive ? admission.authorizationReference : nil,
-          usageReservationID: isDestructive ? admission.usageReservationID : nil))
+          schemaVersion: activeSchemaVersion,
+          authorizationRef: correlated ? admission.legacyAuthorizationReference : nil,
+          agentAuthorizationRef: correlated ? admission.agentAuthorizationReference : nil,
+          usageReservationID: correlated ? admission.usageReservationID : nil))
       return identifier
     }
   }
@@ -332,7 +337,7 @@ final class RockchipDurableExecutionPersistence: @unchecked Sendable,
       if let execution {
         try persistRawStreams(stepID: step.id, execution: execution)
       }
-      let destructive = step.effect == .destructive
+      let correlated = admission.correlatesAuthority(for: step.effect)
       try append(
         JournalEvent.stepOutcome(
           eventID: eventID("outcome-\(step.id)"), sequence: sequence,
@@ -341,9 +346,10 @@ final class RockchipDurableExecutionPersistence: @unchecked Sendable,
           correlatesToIntentEventID: intentEventID, result: result,
           outcomeCertainty: certainty, semanticCode: semanticCode,
           summary: result == "succeeded" ? "typed semantic marker confirmed" : "fail closed",
-          schemaVersion: JournalEvent.rockchipAuthorizedAgentSchemaVersion,
-          authorizationRef: destructive ? admission.authorizationReference : nil,
-          usageReservationID: destructive ? admission.usageReservationID : nil))
+          schemaVersion: activeSchemaVersion,
+          authorizationRef: correlated ? admission.legacyAuthorizationReference : nil,
+          agentAuthorizationRef: correlated ? admission.agentAuthorizationReference : nil,
+          usageReservationID: correlated ? admission.usageReservationID : nil))
       stepRecords[step.id] = RockchipPersistedStepResult(
         disposition: certainty == .confirmed ? "executed" : "outcomeUnknown",
         outcomeCertainty: certainty.rawValue,
@@ -362,7 +368,7 @@ final class RockchipDurableExecutionPersistence: @unchecked Sendable,
           sessionID: layout.sessionID, jobID: layout.jobID,
           timestamp: Self.timestamp(), from: .running, to: .waitingForRecovery,
           reason: "\(stepID):\(reason)",
-          schemaVersion: JournalEvent.rockchipAuthorizedAgentSchemaVersion))
+          schemaVersion: activeSchemaVersion))
       waitingForRecovery = true
     }
   }
@@ -389,7 +395,7 @@ final class RockchipDurableExecutionPersistence: @unchecked Sendable,
       }
       try append(
         JournalEvent(
-          schemaVersion: JournalEvent.rockchipAuthorizedAgentSchemaVersion,
+          schemaVersion: activeSchemaVersion,
           eventID: event.eventID, sequence: sequence,
           sessionID: layout.sessionID, jobID: layout.jobID,
           timestamp: Self.timestamp(), kind: event.kind == .sleep ? .sleep : .wake,
@@ -412,17 +418,17 @@ final class RockchipDurableExecutionPersistence: @unchecked Sendable,
           sessionID: layout.sessionID, jobID: layout.jobID,
           timestamp: Self.timestamp(), from: .running, to: .finalizing,
           reason: "all typed outcomes and postflight confirmed",
-          schemaVersion: JournalEvent.rockchipAuthorizedAgentSchemaVersion))
+          schemaVersion: activeSchemaVersion))
       try append(
         JournalEvent.stateTransition(
           eventID: eventID("succeeded"), sequence: sequence,
           sessionID: layout.sessionID, jobID: layout.jobID,
           timestamp: Self.timestamp(), from: .finalizing, to: .succeeded,
           reason: "terminal manifest graph ready",
-          schemaVersion: JournalEvent.rockchipAuthorizedAgentSchemaVersion))
+          schemaVersion: activeSchemaVersion))
       try append(
         JournalEvent(
-          schemaVersion: JournalEvent.rockchipAuthorizedAgentSchemaVersion,
+          schemaVersion: activeSchemaVersion,
           eventID: eventID("finalized"), sequence: sequence,
           sessionID: layout.sessionID, jobID: layout.jobID,
           timestamp: Self.timestamp(), kind: .finalized,
@@ -441,6 +447,7 @@ final class RockchipDurableExecutionPersistence: @unchecked Sendable,
       category: .outcome, timestamp: Self.timestamp(),
       details: [
         "status": .string("succeeded"),
+        "authorityKind": .string(admission.authorityKind),
         "evidenceClass": .string("\(admission.evidenceClass.rawValue)"),
         "hardwareSupportEligible": .bool(admission.evidenceClass == .production),
       ])
@@ -483,15 +490,29 @@ final class RockchipDurableExecutionPersistence: @unchecked Sendable,
       if let exitCode = record?.exitCode { declaration["exitCode"] = .integer(Int64(exitCode)) }
       return .object(declaration)
     }
-    let authorizationReference = Self.authorizationReference(admission.authorizationReference)
+    let authorizationReference = try Self.authorizationReference(admission.authorityReference)
     let relatedConfirmationSteps = plan.steps.filter {
       $0.arguments["confirmationId"] == .string(plan.confirmationID)
     }.map { JSONValue.string($0.id) }
     let artifactValues = try artifacts.map {
       try JSONDecoder().decode(JSONValue.self, from: JSONEncoder().encode($0))
     }
+    let authorization: JSONValue
+    if admission.journalSchemaVersion == JournalEvent.agentAuthoritySchemaVersion {
+      authorization = .object([
+        "authorizationRef": authorizationReference,
+        "usageReservationId": .string(admission.usageReservationID),
+        "externalIntentEventIds": .array(destructiveIntentEventIDs.map(JSONValue.string)),
+      ])
+    } else {
+      authorization = .object([
+        "authorizationRef": authorizationReference,
+        "usageReservationId": .string(admission.usageReservationID),
+        "destructiveIntentEventIds": .array(destructiveIntentEventIDs.map(JSONValue.string)),
+      ])
+    }
     let root: JSONValue = .object([
-      "schemaVersion": .string("2.1.0"),
+      "schemaVersion": .string(admission.journalSchemaVersion),
       "appVersion": .string("ArkDeckKit-1.0.0"),
       "coreSpecBaseline": .string("CORE-2.0.0"),
       "platformProfile": .string("macos-1.0.0"),
@@ -500,11 +521,7 @@ final class RockchipDurableExecutionPersistence: @unchecked Sendable,
       "status": .string("succeeded"),
       "executionMode": .string("execute"),
       "executionAuthority": .string("authorizedAgent"),
-      "authorization": .object([
-        "authorizationRef": authorizationReference,
-        "usageReservationId": .string(admission.usageReservationID),
-        "destructiveIntentEventIds": .array(destructiveIntentEventIDs.map(JSONValue.string)),
-      ]),
+      "authorization": authorization,
       "outcomeCertainty": .string("confirmed"),
       "sessionDisposition": .string("finalized"),
       "createdAt": .string(createdAt),
@@ -565,7 +582,7 @@ final class RockchipDurableExecutionPersistence: @unchecked Sendable,
             "kind": .string("authorizedAgent"),
             "authorizationRef": authorizationReference,
           ]),
-          "decidedAt": .string(createdAt),
+          "decidedAt": .string(admission.confirmationDecidedAt ?? createdAt),
           "relatedStepIds": .array(relatedConfirmationSteps),
         ])
       ]),
@@ -616,13 +633,20 @@ final class RockchipDurableExecutionPersistence: @unchecked Sendable,
     return nil
   }
 
-  private static func authorizationReference(_ reference: AuthorizationReference) -> JSONValue {
-    .object([
-      "authorizationId": .string(reference.authorizationID),
-      "mainCommitOID": .string(reference.mainCommitOID),
-      "authorizationBlobOID": .string(reference.authorizationBlobOID),
-      "approvalPRNumber": .integer(Int64(reference.approvalPRNumber)),
-    ])
+  private static func authorizationReference(
+    _ reference: RockchipExecutionAdmission.AuthorityReference
+  ) throws -> JSONValue {
+    switch reference {
+    case .standingAuthorization(let legacy):
+      return .object([
+        "authorizationId": .string(legacy.authorizationID),
+        "mainCommitOID": .string(legacy.mainCommitOID),
+        "authorizationBlobOID": .string(legacy.authorizationBlobOID),
+        "approvalPRNumber": .integer(Int64(legacy.approvalPRNumber)),
+      ])
+    case .agent(let agent):
+      return try JSONDecoder().decode(JSONValue.self, from: JSONEncoder().encode(agent))
+    }
   }
 
   private static func timestamp() -> String {
@@ -674,10 +698,12 @@ private enum RockchipProductionExecutionComposition {
     let storage = try RockchipProductionStorageComposition.make()
     let clock = RockchipContinuousAdmissionClock()
     let usbProbe = RockchipProductUSBProbe()
-    let provenance = GitHubProtectedMainAuthorizationPort(token: settings.githubToken)
+    let provenance = settings.githubToken.map(GitHubProtectedMainAuthorizationPort.init(token:))
     let ledger = try AuthorizationUsageLedger(root: settings.usageRoot)
+    let agentLedger = try AgentAuthorityUsageLedger(root: settings.usageRoot)
     let admission = RockchipProductionAdmissionPort(
-      provenance: provenance, usageLedger: ledger, binding: settings.binding,
+      provenance: provenance, usageLedger: ledger, agentUsageLedger: agentLedger,
+      binding: settings.binding,
       tool: settings.tool, clock: clock, usbProbe: usbProbe)
     let process = FoundationRockchipExecutionProcessPort(
       executableURL: settings.tool.executableURL,
@@ -930,13 +956,13 @@ struct RockchipProductToolBookmarkStore {
 private final class RockchipProductExecutionSettings: @unchecked Sendable {
   let usageRoot: URL
   let tool: RockchipSelectedDiscoveryTool
-  let githubToken: String
+  let githubToken: String?
   let binding: RockchipProductBindingSnapshot
 
   private init(
     usageRoot: URL,
     tool: RockchipSelectedDiscoveryTool,
-    githubToken: String,
+    githubToken: String?,
     binding: RockchipProductBindingSnapshot
   ) {
     self.usageRoot = usageRoot
@@ -983,10 +1009,7 @@ private final class RockchipProductExecutionSettings: @unchecked Sendable {
       sha256: RockchipDiscoveryIntegrationProfile.pinnedProduction.executableSHA256,
       platformTrust: RockchipPlatformTrustReceipt(
         codeTrust: trust, quarantinePresent: quarantine))
-    guard let token = try productKeychainToken(), !token.isEmpty else {
-      throw RockchipFlashExecutionError.productionConfigurationUnavailable(
-        "product GitHub provenance credential is not installed in Keychain")
-    }
+    let token = try productKeychainToken().flatMap { $0.isEmpty ? nil : $0 }
     let bindingURL = root.appending(path: "rockchip-binding.json")
     let bindingData = try Data(contentsOf: bindingURL, options: [.mappedIfSafe])
     let binding = try JSONDecoder().decode(RockchipProductBindingSnapshot.self, from: bindingData)
@@ -1210,16 +1233,18 @@ enum RockchipProductionDiscoveryComposition {
 private final class RockchipProductionAdmissionPort: @unchecked Sendable,
   RockchipExecutionAdmissionPort
 {
-  private let provenance: GitHubProtectedMainAuthorizationPort
+  private let provenance: GitHubProtectedMainAuthorizationPort?
   private let usageLedger: AuthorizationUsageLedger
+  private let agentUsageLedger: AgentAuthorityUsageLedger
   private let binding: RockchipProductBindingSnapshot
   private let tool: RockchipSelectedDiscoveryTool
   private let clock: any RockchipAdmissionClock
   private let usbProbe: RockchipProductUSBProbe
 
   init(
-    provenance: GitHubProtectedMainAuthorizationPort,
+    provenance: GitHubProtectedMainAuthorizationPort?,
     usageLedger: AuthorizationUsageLedger,
+    agentUsageLedger: AgentAuthorityUsageLedger,
     binding: RockchipProductBindingSnapshot,
     tool: RockchipSelectedDiscoveryTool,
     clock: any RockchipAdmissionClock,
@@ -1227,6 +1252,7 @@ private final class RockchipProductionAdmissionPort: @unchecked Sendable,
   ) {
     self.provenance = provenance
     self.usageLedger = usageLedger
+    self.agentUsageLedger = agentUsageLedger
     self.binding = binding
     self.tool = tool
     self.clock = clock
@@ -1257,45 +1283,78 @@ private final class RockchipProductionAdmissionPort: @unchecked Sendable,
         selector: request.targetLocationSelector, observationSequence: sequence,
         probe: usbProbe, clock: clock),
       clock: clock)
-    let service = AuthorizationAdmissionService(
-      resolver: MaintainerMergedAuthorizationResolver(port: provenance),
-      factCollector: collector, usageLedger: usageLedger, clock: clock)
-    let token = try await service.admit(
-      AuthorizationAdmissionRequest(
-        authorizationID: request.authorizationID,
-        facts: RockchipAuthorizationFactRequest(
-          archiveURL: request.archiveURL, sessionID: sessionID, jobID: jobID,
-          targetID: targetID, targetLocationSelector: request.targetLocationSelector)))
-    return RockchipExecutionAdmission(
-      backing: .production(token), plan: token.facts.plan,
-      authorizationReference: token.authorizationReference,
-      usageReservationID: token.usageReservation.reservationID,
-      targetID: targetID, bindingRevision: token.facts.bindingReference.revision,
-      targetDigestSHA256: token.facts.targetDigestSHA256,
-      serialDigestSHA256: token.facts.serialDigestSHA256,
-      usbTopology: token.facts.usbTopology,
-      executableIdentity: token.facts.executableIdentity,
-      evidenceClass: .production)
+    let factRequest = RockchipAuthorizationFactRequest(
+      archiveURL: request.archiveURL, sessionID: sessionID, jobID: jobID,
+      targetID: targetID, targetLocationSelector: request.targetLocationSelector)
+    switch request.authority {
+    case .standingAuthorization(let authorizationID):
+      guard let provenance else {
+        throw RockchipFlashExecutionError.productionConfigurationUnavailable(
+          "product GitHub provenance credential is not installed in Keychain")
+      }
+      let service = AuthorizationAdmissionService(
+        resolver: MaintainerMergedAuthorizationResolver(port: provenance),
+        factCollector: collector, usageLedger: usageLedger, clock: clock)
+      let token = try await service.admit(
+        AuthorizationAdmissionRequest(
+          authorizationID: authorizationID, facts: factRequest))
+      return RockchipExecutionAdmission(
+        backing: .standingAuthorization(token), plan: token.facts.plan,
+        authorityReference: .standingAuthorization(token.authorizationReference),
+        usageReservationID: token.usageReservation.reservationID,
+        targetID: targetID, bindingRevision: token.facts.bindingReference.revision,
+        targetDigestSHA256: token.facts.targetDigestSHA256,
+        serialDigestSHA256: token.facts.serialDigestSHA256,
+        usbTopology: token.facts.usbTopology,
+        executableIdentity: token.facts.executableIdentity,
+        evidenceClass: .production)
+    case .chatConfirmation(let assertion):
+      let serialDigest = SHA256.hash(data: Data(binding.serial.utf8)).map {
+        String(format: "%02x", $0)
+      }.joined()
+      let service = ChatConfirmationAdmissionService(
+        factCollector: collector, usageLedger: agentUsageLedger, clock: clock,
+        bindingSerialDigestSHA256: serialDigest, bindingRevision: binding.revision)
+      let token = try await service.admit(assertion: assertion, facts: factRequest)
+      return RockchipExecutionAdmission(
+        backing: .chatConfirmation(token), plan: token.facts.plan,
+        authorityReference: .agent(token.authorizationReference),
+        usageReservationID: token.usageReservation.reservationID,
+        targetID: targetID, bindingRevision: token.facts.bindingReference.revision,
+        targetDigestSHA256: token.facts.targetDigestSHA256,
+        serialDigestSHA256: token.facts.serialDigestSHA256,
+        usbTopology: token.facts.usbTopology,
+        executableIdentity: token.facts.executableIdentity,
+        evidenceClass: .production)
+    }
   }
 
   func authorizeAndConsume(_ admission: RockchipExecutionAdmission) async throws {
-    guard case .production(let token) = admission.backing else {
+    switch admission.backing {
+    case .standingAuthorization(let token):
+      let decision = await RockchipFlashAuthorizationGate().authorizeUnattended(
+        admission: token, plan: admission.plan, monitor: RockchipFlashDispatchMonitor())
+      guard case .authorizedAgentAdmissionAccepted(let reservationID) = decision.outcome,
+        reservationID == admission.usageReservationID,
+        decision.authorizationRef == admission.legacyAuthorizationReference,
+        decision.dispatchSnapshot.totalDispatchCount == 0
+      else {
+        throw RockchipFlashExecutionError.authorizationGateRejected(decision.jobMarker)
+      }
+      let consumed = try token.consume(at: clock.now())
+      guard consumed.authorizationReference == admission.legacyAuthorizationReference,
+        consumed.usageReservation.reservationID == admission.usageReservationID,
+        consumed.facts.executableIdentity == admission.executableIdentity
+      else { throw RockchipFlashExecutionError.authorizationGateRejected("consume correlation") }
+    case .chatConfirmation(let token):
+      let consumed = try token.consume(at: clock.now())
+      guard consumed.authorizationReference == admission.agentAuthorizationReference,
+        consumed.usageReservation.reservationID == admission.usageReservationID,
+        consumed.facts.executableIdentity == admission.executableIdentity
+      else { throw RockchipFlashExecutionError.authorizationGateRejected("consume correlation") }
+    case .contractFake:
       throw RockchipFlashExecutionError.authorizationGateRejected("production token missing")
     }
-    let decision = await RockchipFlashAuthorizationGate().authorizeUnattended(
-      admission: token, plan: admission.plan, monitor: RockchipFlashDispatchMonitor())
-    guard case .authorizedAgentAdmissionAccepted(let reservationID) = decision.outcome,
-      reservationID == admission.usageReservationID,
-      decision.authorizationRef == admission.authorizationReference,
-      decision.dispatchSnapshot.totalDispatchCount == 0
-    else {
-      throw RockchipFlashExecutionError.authorizationGateRejected(decision.jobMarker)
-    }
-    let consumed = try token.consume(at: clock.now())
-    guard consumed.authorizationReference == admission.authorizationReference,
-      consumed.usageReservation.reservationID == admission.usageReservationID,
-      consumed.facts.executableIdentity == admission.executableIdentity
-    else { throw RockchipFlashExecutionError.authorizationGateRejected("consume correlation") }
   }
 
   func closeUsage(
@@ -1303,11 +1362,20 @@ private final class RockchipProductionAdmissionPort: @unchecked Sendable,
     status: AuthorizationUsageTerminalStatus,
     destructiveIntentEventIDs: [String]
   ) throws {
-    let terminal = try AuthorizationUsageTerminal(
-      status: status, closedAt: clock.now().auditTimestamp,
-      destructiveIntentEventIDs: destructiveIntentEventIDs)
-    _ = try usageLedger.close(
-      reservationID: admission.usageReservationID, terminal: terminal)
+    switch admission.authorityReference {
+    case .standingAuthorization:
+      let terminal = try AuthorizationUsageTerminal(
+        status: status, closedAt: clock.now().auditTimestamp,
+        destructiveIntentEventIDs: destructiveIntentEventIDs)
+      _ = try usageLedger.close(
+        reservationID: admission.usageReservationID, terminal: terminal)
+    case .agent:
+      let terminal = try AgentAuthorityUsageTerminal(
+        status: status, closedAt: clock.now().auditTimestamp,
+        externalIntentEventIDs: destructiveIntentEventIDs)
+      _ = try agentUsageLedger.close(
+        reservationID: admission.usageReservationID, terminal: terminal)
+    }
   }
 }
 

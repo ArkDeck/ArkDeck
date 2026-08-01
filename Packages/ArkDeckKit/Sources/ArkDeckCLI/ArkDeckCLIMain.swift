@@ -112,7 +112,10 @@ struct ArkDeckCommandLine {
     let options = try CLIOptions(arguments)
     try options.validateAllowed([
       "--images", "--device-profile", "--target-location-id", "--operator",
-      "--authorization-id", "--out",
+      "--authorization-id", "--out", "--chat-confirmation-digest-sha256",
+      "--chat-confirmed-plan-sha256", "--chat-confirmed-archive-sha256",
+      "--chat-confirmed-step-set-sha256", "--chat-confirmed-target-sha256",
+      "--chat-confirmed-binding-revision",
     ])
     let operatorIdentity = options.value("--operator")
     let authority = RockchipExecutionAuthorityResolver.resolve(
@@ -120,8 +123,23 @@ struct ArkDeckCommandLine {
       standardInputIsInteractive: isatty(FileHandle.standardInput.fileDescriptor) == 1,
       environmentOverride: ProcessInfo.processInfo.environment["ARKDECK_EXECUTION_AUTHORITY"])
 
-    if let authorizationID = options.value("--authorization-id") {
-      guard RockchipStandingAuthorizationIdentifier.isValid(authorizationID) else {
+    let chatOptionNames = [
+      "--chat-confirmation-digest-sha256", "--chat-confirmed-plan-sha256",
+      "--chat-confirmed-archive-sha256", "--chat-confirmed-step-set-sha256",
+      "--chat-confirmed-target-sha256", "--chat-confirmed-binding-revision",
+    ]
+    let hasChatConfirmation = chatOptionNames.contains { options.value($0) != nil }
+    let authorizationID = options.value("--authorization-id")
+    guard authorizationID == nil || !hasChatConfirmation else {
+      throw CLIError(
+        exitCode: EX_USAGE,
+        message: "--authorization-id and chat confirmation are mutually exclusive")
+    }
+
+    if authorizationID != nil || hasChatConfirmation {
+      if let authorizationID,
+        !RockchipStandingAuthorizationIdentifier.isValid(authorizationID)
+      {
         throw CLIError(
           exitCode: EX_USAGE,
           message: "invalid --authorization-id; expected strict AUTH-[A-Z0-9-] identifier")
@@ -129,12 +147,12 @@ struct ArkDeckCommandLine {
       guard authority != .humanOperator, operatorIdentity == nil else {
         throw CLIError(
           exitCode: EX_USAGE,
-          message: "--operator and --authorization-id are mutually exclusive")
+          message: "--operator and Agent E2 authority are mutually exclusive")
       }
       guard options.value("--out") == nil else {
         throw CLIError(
           exitCode: EX_USAGE,
-          message: "--out is unavailable with --authorization-id; the trusted host owns "
+          message: "--out is unavailable with Agent E2 authority; the trusted host owns "
             + "Session storage")
       }
       guard options.value("--device-profile") == nil else {
@@ -150,10 +168,48 @@ struct ArkDeckCommandLine {
           exitCode: EX_USAGE,
           message: "authorized execution requires --images and --target-location-id")
       }
-      let request = try RockchipFlashExecutionRequest(
-        authorizationID: authorizationID,
-        archiveURL: URL(fileURLWithPath: imagesPath),
-        targetLocationSelector: location)
+      let request: RockchipFlashExecutionRequest
+      if let authorizationID {
+        request = try RockchipFlashExecutionRequest(
+          authorizationID: authorizationID,
+          archiveURL: URL(fileURLWithPath: imagesPath),
+          targetLocationSelector: location)
+      } else {
+        let environment = ProcessInfo.processInfo.environment
+        guard authority == .standardAgent,
+          environment["ARKDECK_CHAT_CONFIRMATION_CONTEXT"] == "supervisedInteractiveAgent",
+          environment["CI"] != "true", environment["GITHUB_ACTIONS"] != "true"
+        else {
+          throw CLIError(
+            exitCode: EX_USAGE,
+            message: "chat confirmation requires a supervised interactive Agent invocation; "
+              + "CI, daemon, scheduler and human-operator modes are rejected")
+        }
+        guard let confirmationDigest = options.value("--chat-confirmation-digest-sha256"),
+          let planDigest = options.value("--chat-confirmed-plan-sha256"),
+          let archiveDigest = options.value("--chat-confirmed-archive-sha256"),
+          let stepSetDigest = options.value("--chat-confirmed-step-set-sha256"),
+          let targetDigest = options.value("--chat-confirmed-target-sha256"),
+          let rawBindingRevision = options.value("--chat-confirmed-binding-revision"),
+          let bindingRevision = Int(rawBindingRevision), bindingRevision > 0,
+          rawBindingRevision == String(bindingRevision)
+        else {
+          throw CLIError(
+            exitCode: EX_USAGE,
+            message: "chat confirmation requires the complete closed digest/binding assertion")
+        }
+        let assertion = try RockchipChatConfirmationAssertion(
+          confirmationDigestSHA256: confirmationDigest,
+          planDigestSHA256: planDigest,
+          archiveDigestSHA256: archiveDigest,
+          stepSetDigestSHA256: stepSetDigest,
+          targetDigestSHA256: targetDigest,
+          bindingRevision: bindingRevision)
+        request = try RockchipFlashExecutionRequest(
+          chatConfirmation: assertion,
+          archiveURL: URL(fileURLWithPath: imagesPath),
+          targetLocationSelector: location)
+      }
       let result = try await RockchipFlashExecutionHost().execute(request)
       print("session: \(result.sessionID)")
       print("job: \(result.jobID)")
@@ -189,7 +245,8 @@ struct ArkDeckCommandLine {
       print("Job marker: \(decision.jobMarker)")
       print(
         "execute requires a human operator at an interactive terminal (--operator plus a "
-          + "TTY); an AI caller must present --authorization-id to the trusted executor. "
+          + "TTY); an AI caller must present either --authorization-id or a complete current "
+          + "chat-confirmation assertion to the trusted executor. "
           + "This run is \(authority.rawValue) and real destructive dispatch stays 0.")
       try writeHandoff(handoff, options: options)
       exit(3)
@@ -586,6 +643,10 @@ struct ArkDeckCommandLine {
       --operator <name> [--device-profile <dayu200@1|dayu200@2>] [--out <dir>]
         arkdeck flash execute --images <images.tar.gz> --target-location-id <usb-location> \
       --authorization-id <AUTH-ID>
+        arkdeck flash execute --images <images.tar.gz> --target-location-id <usb-location> \
+      --chat-confirmation-digest-sha256 <SHA256> --chat-confirmed-plan-sha256 <SHA256> \
+      --chat-confirmed-archive-sha256 <SHA256> --chat-confirmed-step-set-sha256 <SHA256> \
+      --chat-confirmed-target-sha256 <SHA256> --chat-confirmed-binding-revision <n>
         arkdeck flash postflight --observation <observation.json> \
       [--device-profile <dayu200@1|dayu200@2>]
         arkdeck update-feed prepare --sequence <n> --version <x.y.z> \
@@ -636,8 +697,9 @@ struct ArkDeckCommandLine {
       this CLI holds no HDC or Rockchip executor and cannot build a device command itself.
 
       A human operator at a TTY gets a handoff whose commands they run personally. The AI
-      surface accepts only an authorization ID, archive path and target-location selector; the
-      product-owned host performs fresh protected-main admission, durable usage reservation,
+      surface accepts either an authorization ID or a closed one-shot chat confirmation assertion,
+      plus archive path and target-location selector; the product-owned host performs fresh
+      admission, durable usage reservation,
       descriptor-bound typed execution and terminal persistence. Caller-provided authorization
       files, fact/context documents, executables, argv and storage roots are rejected.
 

@@ -435,32 +435,32 @@ final class AuthorizationAdmissionContractTests: XCTestCase {
   }
 }
 
-private struct FixedPlanFactPort: RockchipExecutePlanFactPort {
+struct FixedPlanFactPort: RockchipExecutePlanFactPort {
   let plan: RockchipFlashPlan
   func makeValidatedExecutePlan(archiveURL: URL) async throws -> RockchipFlashPlan { plan }
 }
 
-private struct FixedBindingFactPort: RockchipDurableBindingFactPort {
+struct FixedBindingFactPort: RockchipDurableBindingFactPort {
   let value: RockchipTrustedDurableBindingFact
   func currentDurableBinding() async throws -> RockchipTrustedDurableBindingFact { value }
 }
 
-private struct FixedToolFactPort: RockchipToolDeviceFactPort {
+struct FixedToolFactPort: RockchipToolDeviceFactPort {
   let value: RockchipTrustedToolDeviceFact
   func observeToolAndDevice() async throws -> RockchipTrustedToolDeviceFact { value }
 }
 
-private struct FixedPrerequisiteFactPort: RockchipPrerequisiteFactPort {
+struct FixedPrerequisiteFactPort: RockchipPrerequisiteFactPort {
   let value: RockchipTrustedPrerequisiteFact
   func probePrerequisites() async throws -> RockchipTrustedPrerequisiteFact { value }
 }
 
-private struct FixedReadbackFactPort: RockchipIdentityReadbackFactPort {
+struct FixedReadbackFactPort: RockchipIdentityReadbackFactPort {
   let value: RockchipTrustedIdentityReadbackFact
   func readIdentity() async throws -> RockchipTrustedIdentityReadbackFact { value }
 }
 
-private struct FixedAdmissionClock: RockchipAdmissionClock {
+struct FixedAdmissionClock: RockchipAdmissionClock {
   let reading: RockchipTrustedClockReading
   func now() -> RockchipTrustedClockReading { reading }
 }
