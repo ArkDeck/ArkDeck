@@ -414,9 +414,14 @@ final class HarnessAttemptContractTests: XCTestCase {
       decisionGateway: gateway,
       egressPolicy: HarnessEgressPolicy(enabledProjects: ["fixture-project"]))
 
+    let checkpointed = try await coordinator.reconcile(failing.htaskID)
+    XCTAssertEqual(checkpointed.action, .dispatched)
+    XCTAssertEqual(checkpointed.reasonCode, "patchModelProposal")
+    let checkpointJob = try XCTUnwrap(checkpointed.dispatchedJobID)
+    await jobs.finish(checkpointJob, succeeded: true, state: "succeeded")
+
     let applied = try await coordinator.reconcile(failing.htaskID)
     XCTAssertEqual(applied.action, .dispatched)
-    XCTAssertEqual(applied.reasonCode, "patchModelProposal")
     let applyJob = try XCTUnwrap(applied.dispatchedJobID)
     await jobs.finish(applyJob, succeeded: true, state: "succeeded")
 
@@ -431,7 +436,10 @@ final class HarnessAttemptContractTests: XCTestCase {
     let operations = await jobs.operations()
     XCTAssertEqual(
       operations,
-      [DebugCrashTaskHandler.applyPatch, DebugCrashTaskHandler.buildOpenHarmony])
+      [
+        DebugCrashTaskHandler.createCheckpoint, DebugCrashTaskHandler.applyPatch,
+        DebugCrashTaskHandler.buildOpenHarmony,
+      ])
     let attempts = try await coordinator.attempts(failing.htaskID)
     XCTAssertEqual(attempts.count, 2)
     XCTAssertEqual(attempts[0].outcome, .superseded)
@@ -655,7 +663,7 @@ final class HarnessAttemptContractTests: XCTestCase {
       ],
       budgets: HarnessTaskBudgets(
         maxRounds: 8, maxWallClockSeconds: 60, maxArtifactBytes: 1024,
-        maxE1Mutations: 6, maxNoProgressRounds: maxNoProgressRounds,
+        maxE1Mutations: 7, maxNoProgressRounds: maxNoProgressRounds,
         maxActionRetriesPerRun: 2),
       policy: HarnessTaskCoordinator.defaultPolicy(for: .debugCrash),
       observedState: observedState, createdAtUTC: now, updatedAtUTC: now,

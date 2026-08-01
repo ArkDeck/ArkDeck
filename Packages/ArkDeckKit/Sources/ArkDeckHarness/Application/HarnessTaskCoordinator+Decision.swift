@@ -188,7 +188,8 @@ extension HarnessTaskCoordinator {
       return
     }
     let orchestrated: Set<String> = [
-      DebugCrashTaskHandler.applyPatch, DebugCrashTaskHandler.buildOpenHarmony,
+      DebugCrashTaskHandler.createCheckpoint, DebugCrashTaskHandler.applyPatch,
+      DebugCrashTaskHandler.buildOpenHarmony,
       DebugCrashTaskHandler.runTests, DebugCrashTaskHandler.revertPatch,
       DebugCrashTaskHandler.deployHAP, DebugCrashTaskHandler.analyzeCrashLedger,
     ]

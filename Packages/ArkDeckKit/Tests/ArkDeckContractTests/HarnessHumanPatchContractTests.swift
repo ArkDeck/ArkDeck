@@ -69,6 +69,47 @@ private actor DeduplicatingHumanPatchJobPort: HarnessRuntimeJobPort {
   func requests() -> [RuntimeOperationRequest] { submittedRequests }
 }
 
+private actor CheckpointSequenceJobPort: HarnessRuntimeJobPort {
+  private let checkpointOutcomeUnknown: Bool
+  private var submittedRequests: [RuntimeOperationRequest] = []
+  private var requestsByJobID: [String: RuntimeOperationRequest] = [:]
+
+  init(checkpointOutcomeUnknown: Bool = false) {
+    self.checkpointOutcomeUnknown = checkpointOutcomeUnknown
+  }
+
+  func submit(requestJSON: Data) async throws -> HarnessJobAcceptance {
+    let request = try JSONDecoder().decode(RuntimeOperationRequest.self, from: requestJSON)
+    submittedRequests.append(request)
+    let jobID = "JOB-HUMAN-SEQUENCE-\(submittedRequests.count)"
+    requestsByJobID[jobID] = request
+    return HarnessJobAcceptance(jobID: jobID, deduplicated: false)
+  }
+
+  func startRun(jobID: String) async throws {}
+
+  func observe(jobID: String) async throws -> HarnessJobObservation {
+    guard let request = requestsByJobID[jobID] else {
+      throw HarnessJobPortError.unknownJob(jobID)
+    }
+    if request.operation.reference == DebugCrashTaskHandler.createCheckpoint {
+      return HarnessJobObservation(
+        jobID: jobID,
+        state: checkpointOutcomeUnknown ? "outcomeUnknown" : "succeeded",
+        isTerminal: true, succeeded: !checkpointOutcomeUnknown,
+        outcomeUnknown: checkpointOutcomeUnknown, waitingForHuman: false,
+        timeline: ["checkpoint terminal"])
+    }
+    return HarnessJobObservation(
+      jobID: jobID, state: "running", isTerminal: false, succeeded: false,
+      outcomeUnknown: false, waitingForHuman: false, timeline: ["running"])
+  }
+
+  func requestCancel(jobID: String) async throws {}
+
+  func requests() -> [RuntimeOperationRequest] { submittedRequests }
+}
+
 private actor HumanPatchRepairPort: HarnessRepairPort {
   private var prepareCount = 0
 
@@ -115,18 +156,26 @@ private actor HumanPatchRepairPort: HarnessRepairPort {
 }
 
 private actor HumanPatchGrant: HarnessCapabilityPort {
-  private var enabled: Bool
+  private var covered: Set<String>
 
-  init(enabled: Bool) { self.enabled = enabled }
+  init(enabled: Bool) {
+    covered = enabled
+      ? [DebugCrashTaskHandler.createCheckpoint, DebugCrashTaskHandler.applyPatch] : []
+  }
 
-  func setEnabled(_ value: Bool) { enabled = value }
+  func setEnabled(_ value: Bool) {
+    covered = value
+      ? [DebugCrashTaskHandler.createCheckpoint, DebugCrashTaskHandler.applyPatch] : []
+  }
+
+  func setCovered(_ operations: Set<String>) { covered = operations }
 
   func hasStandingCapability(operationReference: String, targetID: String) async -> Bool {
-    enabled && operationReference == DebugCrashTaskHandler.applyPatch
+    covered.contains(operationReference)
   }
 
   func standingCapabilityID(operationReference: String, targetID: String) async -> String? {
-    enabled && operationReference == DebugCrashTaskHandler.applyPatch
+    covered.contains(operationReference)
       ? "CAP-RT-WORKSPACE-HUMAN-PATCH" : nil
   }
 }
@@ -162,7 +211,8 @@ final class HarnessHumanPatchContractTests: XCTestCase {
 
     let outcome = try await coordinator.proposePatch(taskID, proposalJSON: bytes)
     let requests = await jobs.requests()
-    let stored = try await store.decision(taskID, round: 2)
+    let storedCheckpoint = try await store.decision(taskID, round: 2)
+    let storedApply = try await store.decision(taskID, round: 3)
     let prepareCount = await repair.preparations()
     XCTAssertEqual(outcome.action, .dispatched)
     XCTAssertEqual(outcome.snapshot.phase, .patching)
@@ -170,14 +220,112 @@ final class HarnessHumanPatchContractTests: XCTestCase {
     XCTAssertEqual(outcome.snapshot.consumedBudget.e1Mutations, 1)
     XCTAssertEqual(prepareCount, 1)
     XCTAssertEqual(requests.count, 1)
-    XCTAssertEqual(requests[0].operation.reference, DebugCrashTaskHandler.applyPatch)
+    XCTAssertEqual(
+      requests[0].operation.reference, DebugCrashTaskHandler.createCheckpoint)
     XCTAssertEqual(
       requests[0].authorization?.capabilityID, "CAP-RT-WORKSPACE-HUMAN-PATCH")
     XCTAssertEqual(
-      requests[0].inputs["patchArtifactRef"],
+      storedApply?.inputs["patchArtifactRef"],
       .string("lease-v1:patch:ART-human-patch"))
-    XCTAssertEqual(stored?.producer, HarnessTaskCoordinator.humanPatchProducer)
-    XCTAssertEqual(stored?.patchProposal, proposal)
+    XCTAssertNil(requests[0].inputs["patchArtifactRef"])
+    XCTAssertEqual(storedCheckpoint?.producer, HarnessTaskCoordinator.humanPatchProducer)
+    XCTAssertEqual(storedCheckpoint?.patchProposal, proposal)
+    XCTAssertEqual(storedApply?.producer, HarnessTaskCoordinator.humanPatchProducer)
+    XCTAssertEqual(storedApply?.patchProposal, proposal)
+  }
+
+  func testCheckpointSuccessDispatchesPreparedApplyAsTheNextActionRun() async throws {
+    let proposal = try makeProposal()
+    let repair = HumanPatchRepairPort()
+    let grant = HumanPatchGrant(enabled: true)
+    let jobs = CheckpointSequenceJobPort()
+    let (coordinator, store) = try await makeStack(
+      jobs: jobs, repair: repair, capabilities: grant)
+
+    _ = try await coordinator.reconcile(taskID)
+    let checkpoint = try await coordinator.proposePatch(
+      taskID, proposalJSON: proposalJSON(proposal))
+    XCTAssertEqual(checkpoint.action, .dispatched)
+    XCTAssertEqual(checkpoint.snapshot.consumedBudget.e1Mutations, 1)
+
+    let applied = try await coordinator.reconcile(taskID)
+    let requests = await jobs.requests()
+    let prepareCount = await repair.preparations()
+    let attempts = try await store.attempts(taskID)
+    XCTAssertEqual(applied.action, .dispatched)
+    XCTAssertEqual(applied.snapshot.phase, .patching)
+    XCTAssertEqual(applied.snapshot.consumedBudget.e1Mutations, 2)
+    XCTAssertEqual(applied.snapshot.repairAttempt?.checkpointJobID, "JOB-HUMAN-SEQUENCE-1")
+    XCTAssertNil(applied.snapshot.repairAttempt?.patchAttemptRef)
+    XCTAssertEqual(
+      requests.map(\.operation.reference),
+      [DebugCrashTaskHandler.createCheckpoint, DebugCrashTaskHandler.applyPatch])
+    XCTAssertNil(requests[0].inputs["patchArtifactRef"])
+    XCTAssertEqual(
+      requests[1].inputs["patchArtifactRef"],
+      .string("lease-v1:patch:ART-human-patch"))
+    XCTAssertEqual(prepareCount, 1)
+    XCTAssertEqual(attempts.last?.actionRunIDs.count, 2)
+  }
+
+  func testCheckpointOutcomeUnknownStopsBeforeApplyWithoutReplay() async throws {
+    let proposal = try makeProposal()
+    let repair = HumanPatchRepairPort()
+    let grant = HumanPatchGrant(enabled: true)
+    let jobs = CheckpointSequenceJobPort(checkpointOutcomeUnknown: true)
+    let (coordinator, _) = try await makeStack(
+      jobs: jobs, repair: repair, capabilities: grant)
+
+    _ = try await coordinator.reconcile(taskID)
+    _ = try await coordinator.proposePatch(
+      taskID, proposalJSON: proposalJSON(proposal))
+    let stopped = try await coordinator.reconcile(taskID)
+    let stillStopped = try await coordinator.reconcile(taskID)
+    let requests = await jobs.requests()
+
+    XCTAssertEqual(stopped.action, .stoppedForHuman)
+    XCTAssertEqual(
+      stopped.reasonCode,
+      "outcomeUnknown:\(DebugCrashTaskHandler.createCheckpoint)")
+    XCTAssertEqual(stopped.snapshot.consumedBudget.e1Mutations, 1)
+    XCTAssertNil(stopped.snapshot.repairAttempt)
+    XCTAssertEqual(stillStopped.action, .awaitingHuman)
+    XCTAssertEqual(requests.map(\.operation.reference), [DebugCrashTaskHandler.createCheckpoint])
+  }
+
+  func testApplyAuthorizationRetryReusesThePreparedPostCheckpointDecision() async throws {
+    let proposal = try makeProposal()
+    let bytes = try proposalJSON(proposal)
+    let repair = HumanPatchRepairPort()
+    let grant = HumanPatchGrant(enabled: false)
+    await grant.setCovered([DebugCrashTaskHandler.createCheckpoint])
+    let jobs = CheckpointSequenceJobPort()
+    let (coordinator, store) = try await makeStack(
+      jobs: jobs, repair: repair, capabilities: grant)
+
+    _ = try await coordinator.reconcile(taskID)
+    _ = try await coordinator.proposePatch(taskID, proposalJSON: bytes)
+    let blockedApply = try await coordinator.reconcile(taskID)
+    let storedBefore = try await store.decision(taskID, round: 3)
+    let applyBefore = try XCTUnwrap(storedBefore)
+    XCTAssertEqual(blockedApply.action, .stoppedForHuman)
+    XCTAssertTrue(blockedApply.reasonCode.contains(DebugCrashTaskHandler.applyPatch))
+    XCTAssertEqual(blockedApply.snapshot.consumedBudget.e1Mutations, 1)
+
+    await grant.setEnabled(true)
+    let retried = try await coordinator.proposePatch(taskID, proposalJSON: bytes)
+    let storedAfter = try await store.decision(taskID, round: 3)
+    let applyAfter = try XCTUnwrap(storedAfter)
+    let requests = await jobs.requests()
+    let prepareCount = await repair.preparations()
+    XCTAssertEqual(retried.action, .dispatched)
+    XCTAssertEqual(retried.snapshot.consumedBudget.e1Mutations, 2)
+    XCTAssertEqual(applyBefore.decisionID, applyAfter.decisionID)
+    XCTAssertEqual(applyBefore.inputs, applyAfter.inputs)
+    XCTAssertEqual(
+      requests.map(\.operation.reference),
+      [DebugCrashTaskHandler.createCheckpoint, DebugCrashTaskHandler.applyPatch])
+    XCTAssertEqual(prepareCount, 1)
   }
 
   func testMethodSurfaceRequiresProposalJSON() async throws {
@@ -337,7 +485,7 @@ final class HarnessHumanPatchContractTests: XCTestCase {
     XCTAssertEqual(first.action, .stoppedForHuman)
     XCTAssertEqual(
       first.reasonCode,
-      "submissionRejected:authorizationRequired:\(DebugCrashTaskHandler.applyPatch)")
+      "submissionRejected:authorizationRequired:\(DebugCrashTaskHandler.createCheckpoint)")
     XCTAssertEqual(firstRequests.count, 1)
     XCTAssertEqual(first.snapshot.consumedBudget.e1Mutations, 0)
 
@@ -501,7 +649,7 @@ final class HarnessHumanPatchContractTests: XCTestCase {
       successCriteria: DebugCrashTaskHandler().defaultSuccessCriteria(),
       budgets: HarnessTaskBudgets(
         maxRounds: 8, maxWallClockSeconds: 900, maxArtifactBytes: 1 << 20,
-        maxE1Mutations: 6),
+        maxE1Mutations: 7),
       policy: HarnessTaskPolicy(
         allowedOperations: DebugCrashTaskHandler().permittedOperations.sorted()),
       observedState: HarnessObservedState(latestVerdict: .fail).asJSON,

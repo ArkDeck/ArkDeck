@@ -15,10 +15,11 @@ extension HarnessTaskCoordinator {
   /// Accept one strict PROPOSE_PATCH document at the existing human boundary.
   ///
   /// The first call prepares an immutable patch Artifact before normal policy
-  /// admission. If admission stops for a maintainer-issued workspace grant, a
-  /// semantically identical parsed proposal may be submitted again after that grant lands.
-  /// The retry reuses the prepared inputs, decision id, request id and
-  /// idempotency key; it never republishes or silently replaces patch bytes.
+  /// admission. It then schedules checkpoint and apply as separate durable
+  /// Decisions. If either admission stops for a maintainer-issued workspace
+  /// grant, a semantically identical parsed proposal may be submitted again.
+  /// The retry reuses the prepared inputs and that stage's decision/request/
+  /// idempotency identity; it never republishes or replaces patch bytes.
   public func proposePatch(
     _ taskID: String,
     proposalJSON: Data
@@ -157,9 +158,19 @@ extension HarnessTaskCoordinator {
       snapshot: resumed, offeredOperations: offeredOperations(resumed, handler: handler))
     let restamped = executable.stamped(with: basis)
     try await store.putDecision(restamped)
+    let step = HarnessPlannedStep(decision: restamped, phaseOnDispatch: .patching)
+    if restamped.operationReference == DebugCrashTaskHandler.createCheckpoint
+      || (restamped.operationReference == DebugCrashTaskHandler.applyPatch
+        && resumed.repairAttempt?.checkpointJobID == nil)
+    {
+      // Forward-migrate a prepared apply Decision written before checkpoint
+      // became explicit. Reuse its Artifact lease and proposal identity, but
+      // never let it bypass the new checkpoint ActionRun.
+      return try await dispatchPatch(
+        step, snapshotAtPlanning: resumed, handler: handler)
+    }
     return try await dispatch(
-      HarnessPlannedStep(decision: restamped, phaseOnDispatch: .patching),
-      snapshotAtPlanning: resumed, handler: handler)
+      step, snapshotAtPlanning: resumed, handler: handler)
   }
 
   private func stopForExhaustedHumanPatchBudget(
@@ -177,7 +188,8 @@ extension HarnessTaskCoordinator {
   private static func isWorkspaceAuthorizationStop(_ reason: String) -> Bool {
     let lowered = reason.lowercased()
     return lowered.contains("authorization")
-      && lowered.contains(DebugCrashTaskHandler.applyPatch.lowercased())
+      && [DebugCrashTaskHandler.createCheckpoint, DebugCrashTaskHandler.applyPatch]
+        .contains { lowered.contains($0.lowercased()) }
   }
 
   private static func matches(
@@ -186,7 +198,10 @@ extension HarnessTaskCoordinator {
   ) -> Bool {
     executableDecision.kind == .proposePatch
       && executableDecision.producer == humanPatchProducer
-      && executableDecision.operationReference == DebugCrashTaskHandler.applyPatch
+      && executableDecision.operationReference.map {
+        [DebugCrashTaskHandler.createCheckpoint, DebugCrashTaskHandler.applyPatch]
+          .contains($0)
+      } == true
       && executableDecision.patchProposal == proposal.patchProposal
       && executableDecision.requiredArtifacts == proposal.requiredArtifacts
       && executableDecision.expectedObservation == proposal.expectedObservation

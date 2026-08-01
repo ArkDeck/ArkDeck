@@ -251,7 +251,8 @@ final class HarnessRepairContractTests: XCTestCase {
           _, new in new
         }))
     for operation in [
-      DebugCrashTaskHandler.applyPatch, DebugCrashTaskHandler.buildOpenHarmony,
+      DebugCrashTaskHandler.createCheckpoint, DebugCrashTaskHandler.applyPatch,
+      DebugCrashTaskHandler.buildOpenHarmony,
       DebugCrashTaskHandler.runTests, DebugCrashTaskHandler.deployHAP,
       DebugCrashTaskHandler.revertPatch,
     ] {
@@ -568,7 +569,7 @@ final class HarnessRepairContractTests: XCTestCase {
     XCTAssertEqual(planned.decision.inputs["diagnosticsDurationSeconds"], .integer(5))
 
     let underBudgeted = baselineSnapshot(
-      phase: .collecting, activeJobID: nil, maxE1Mutations: 5)
+      phase: .collecting, activeJobID: nil, maxE1Mutations: 6)
     let refused = handler.plan(
       for: underBudgeted, decisionID: "dec-no-budget", nowUTC: now)
     XCTAssertTrue(handler.offeredOperations(for: underBudgeted).isEmpty)
@@ -734,7 +735,7 @@ final class HarnessRepairContractTests: XCTestCase {
     phase: HarnessTaskPhase,
     activeJobID: String?,
     activeRound: Int = 0,
-    maxE1Mutations: Int = 6,
+    maxE1Mutations: Int = 7,
     observedState: [String: JSONValue]? = nil,
     consumed: HarnessConsumedBudget = HarnessConsumedBudget()
   ) -> HarnessTaskSnapshot {

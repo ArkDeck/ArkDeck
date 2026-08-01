@@ -396,7 +396,7 @@ final class HarnessDecisionGatewayContractTests: XCTestCase {
     XCTAssertEqual(context.availableOperations.count, 1)
     XCTAssertEqual(context.goalSummary.count, 16)
     XCTAssertTrue(context.trimmed.contains("attempts:kept1of4"))
-    XCTAssertTrue(context.trimmed.contains("operations:kept1of8"))
+    XCTAssertTrue(context.trimmed.contains("operations:kept1of9"))
   }
 
   func testAnOversizedContextIsRefusedInsteadOfSent() async throws {
