@@ -194,6 +194,37 @@ final class HarnessHumanPatchContractTests: XCTestCase {
     XCTAssertEqual(stored?.expectedWorkspaceRevision, proposal.baseWorkspaceRevision)
   }
 
+  func testExpiredInitialProposalStopsBeforeAttemptDecisionPreparationOrDispatch() async throws {
+    let proposal = try makeProposal()
+    let repair = HumanPatchRepairPort()
+    let grant = HumanPatchGrant(enabled: true)
+    let jobs = HumanPatchJobPort()
+    let historical = snapshot(
+      status: .humanRequired,
+      result: HarnessTaskResult(
+        outcome: .humanRequired, reasonCode: "patchProposalRequired",
+        summary: "A bounded source patch must be supplied."),
+      createdAtUTC: "2026-07-31T00:00:00Z")
+    let (coordinator, store) = try await makeStack(
+      jobs: jobs, repair: repair, capabilities: grant,
+      initialSnapshot: historical)
+
+    let outcome = try await coordinator.proposePatch(
+      taskID, proposalJSON: proposalJSON(proposal))
+    let prepareCount = await repair.preparations()
+    let requests = await jobs.requests()
+    let stored = try await store.decision(taskID, round: 2)
+    let attempts = try await store.attempts(taskID)
+
+    XCTAssertEqual(outcome.action, .stoppedBudgetExhausted)
+    XCTAssertEqual(outcome.reasonCode, "maxWallClockExhausted")
+    XCTAssertEqual(outcome.snapshot.status, .failed)
+    XCTAssertEqual(prepareCount, 0)
+    XCTAssertTrue(requests.isEmpty)
+    XCTAssertNil(stored)
+    XCTAssertTrue(attempts.isEmpty)
+  }
+
   func testPolicyAuthorizationRetryReusesDecisionAndPreparedLease() async throws {
     let proposal = try makeProposal()
     let bytes = try proposalJSON(proposal)
@@ -225,6 +256,42 @@ final class HarnessHumanPatchContractTests: XCTestCase {
     XCTAssertEqual(firstDecision.decisionID, retriedDecision.decisionID)
     XCTAssertEqual(firstDecision.inputs, retriedDecision.inputs)
     XCTAssertEqual(requests.count, 1)
+  }
+
+  func testExpiredAuthorizationRetryDoesNotResumePrepareOrDispatch() async throws {
+    let proposal = try makeProposal()
+    let bytes = try proposalJSON(proposal)
+    let repair = HumanPatchRepairPort()
+    let grant = HumanPatchGrant(enabled: false)
+    let jobs = HumanPatchJobPort()
+    let (coordinator, store) = try await makeStack(
+      jobs: jobs, repair: repair, capabilities: grant)
+
+    _ = try await coordinator.reconcile(taskID)
+    let first = try await coordinator.proposePatch(taskID, proposalJSON: bytes)
+    XCTAssertEqual(first.action, .stoppedForHuman)
+    let decisionBefore = try await store.decision(taskID, round: 2)
+    let attemptsBefore = try await store.attempts(taskID)
+
+    await grant.setEnabled(true)
+    let expiredCoordinator = HarnessTaskCoordinator(
+      store: store, jobPort: jobs, repairPort: repair,
+      nowUTC: { "2026-07-31T02:00:00Z" },
+      policyGuard: HarnessPolicyGuard(capabilities: grant))
+    let retried = try await expiredCoordinator.proposePatch(
+      taskID, proposalJSON: bytes)
+    let prepareCount = await repair.preparations()
+    let requests = await jobs.requests()
+    let decisionAfter = try await store.decision(taskID, round: 2)
+    let attemptsAfter = try await store.attempts(taskID)
+
+    XCTAssertEqual(retried.action, .stoppedBudgetExhausted)
+    XCTAssertEqual(retried.reasonCode, "maxWallClockExhausted")
+    XCTAssertEqual(retried.snapshot.status, .failed)
+    XCTAssertEqual(prepareCount, 1)
+    XCTAssertTrue(requests.isEmpty)
+    XCTAssertEqual(decisionAfter, decisionBefore)
+    XCTAssertEqual(attemptsAfter, attemptsBefore)
   }
 
   func testRuntimeAuthorizationRejectionRetriesTheSameRequestIdentity() async throws {
@@ -350,7 +417,8 @@ final class HarnessHumanPatchContractTests: XCTestCase {
 
   private func snapshot(
     status: HarnessTaskStatus = .running,
-    result: HarnessTaskResult? = nil
+    result: HarnessTaskResult? = nil,
+    createdAtUTC: String? = nil
   ) -> HarnessTaskSnapshot {
     HarnessTaskSnapshot(
       htaskID: taskID, type: .debugCrash, intakeDescription: nil,
@@ -373,7 +441,8 @@ final class HarnessHumanPatchContractTests: XCTestCase {
       policy: HarnessTaskPolicy(
         allowedOperations: DebugCrashTaskHandler().permittedOperations.sorted()),
       observedState: HarnessObservedState(latestVerdict: .fail).asJSON,
-      createdAtUTC: now, updatedAtUTC: now, status: status, phase: .analyzing,
+      createdAtUTC: createdAtUTC ?? now, updatedAtUTC: now,
+      status: status, phase: .analyzing,
       activeRound: 1, activeJobID: nil,
       consumedBudget: HarnessConsumedBudget(rounds: 1), result: result)
   }
