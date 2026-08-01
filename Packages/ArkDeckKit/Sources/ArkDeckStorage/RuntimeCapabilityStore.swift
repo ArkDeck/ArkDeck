@@ -565,6 +565,14 @@ public actor RuntimeCapabilityStore {
       "effect=\(query.effect.rawValue)",
       "target=\(query.targetStableIdentitySHA256 ?? "-")",
       "bindingRevision=\(query.targetBindingRevision.map(String.init) ?? "-")",
+      // Identity and scopes, but deliberately **not** the revision. A second
+      // use against a different tree, or with wider write scopes, must not
+      // fingerprint like the first. The revision, by contrast, changes after
+      // every legitimate mutation — putting it here would make a standing
+      // grant single-use, which is the failure this task set out to avoid.
+      // Two different patches are already distinguished by `inputs`.
+      "workspace=\(query.workspaceIdentitySHA256 ?? "-")",
+      "workspaceScopes=\(query.workspaceFileScopesDigest ?? "-")",
     ]
     if includePlan {
       components.append("plan=\(query.planDigest ?? "-")")
@@ -586,16 +594,25 @@ public actor RuntimeCapabilityStore {
     query: RuntimeCapabilityAuthorizationQuery,
     nowUTC: String
   ) throws {
-    guard
-      let stableIdentity = query.targetStableIdentitySHA256,
-      isLowercaseSHA256(stableIdentity),
-      let bindingRevision = query.targetBindingRevision,
-      bindingRevision > 0
-    else {
+    // A consumption must name the subject it acts on. Until CHG-2026-055
+    // TASK-HFA-009 r2 that could only be a device; a workspace mutation is
+    // E1 without a device, so the ledger accepts either a device pair or a
+    // workspace triple — and still nothing else. Absent both, the capability
+    // would be spent against a subject the ledger cannot identify.
+    let deviceSubject =
+      query.targetStableIdentitySHA256.map(isLowercaseSHA256) == true
+      && (query.targetBindingRevision ?? 0) > 0
+    let workspaceSubject =
+      query.workspaceIdentitySHA256.map(isLowercaseSHA256) == true
+      && query.workspaceRevision.map(isLowercaseSHA256) == true
+      && query.workspaceFileScopesDigest.map(isLowercaseSHA256) == true
+    guard deviceSubject || workspaceSubject else {
       throw RuntimeCapabilityStoreError.denied(
         RuntimeCapabilityDenial(
           reason: .targetIdentityRequired,
-          detail: "stable target identity and binding revision are required"))
+          detail:
+            "a device (stable identity + binding revision) or workspace "
+            + "(identity + revision + scope digest) subject is required"))
     }
     guard let planDigest = query.planDigest, isLowercaseSHA256(planDigest) else {
       throw RuntimeCapabilityStoreError.denied(

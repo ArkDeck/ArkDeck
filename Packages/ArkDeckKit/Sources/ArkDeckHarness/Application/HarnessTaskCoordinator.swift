@@ -905,7 +905,7 @@ public actor HarnessTaskCoordinator {
   ) async throws -> SubmitResult {
     do {
       return .accepted(
-        try await jobPort.submit(requestJSON: try requestBytes(intent, decision, snapshot)))
+        try await jobPort.submit(requestJSON: try await requestBytes(intent, decision, snapshot)))
     } catch HarnessJobPortError.rejected(let message) {
       // Admission refused. Zero side effect, and an identical retry would be
       // refused identically - so the intent is closed as `rejected`, the
@@ -2200,7 +2200,7 @@ public actor HarnessTaskCoordinator {
     _ intent: HarnessDispatchIntent,
     _ decision: HarnessDecision,
     _ snapshot: HarnessTaskSnapshot
-  ) throws -> Data {
+  ) async throws -> Data {
     let parts = intent.operationReference.split(separator: "@")
     guard parts.count == 2, let version = Int(parts[1]) else {
       throw HarnessCoordinatorError.malformedRequest(intent.operationReference)
@@ -2208,6 +2208,14 @@ public actor HarnessTaskCoordinator {
     do {
       let descriptor = RuntimeOperationCatalog.descriptor(
         reference: intent.operationReference)
+      var authorizationReference: RuntimeCapabilityReference?
+      if let descriptor, descriptor.minimumEffect >= .deviceMutation,
+        let capabilityID = await policyGuard.capabilityPort?.standingCapabilityID(
+          operationReference: intent.operationReference,
+          targetID: snapshot.target.targetID) ?? nil
+      {
+        authorizationReference = RuntimeCapabilityReference(capabilityID: capabilityID)
+      }
       let request = try RuntimeOperationRequest(
         requestID: intent.requestID,
         idempotencyKey: intent.idempotencyKey,
@@ -2218,9 +2226,13 @@ public actor HarnessTaskCoordinator {
         operation: RuntimeOperationReference(id: String(parts[0]), version: version),
         inputs: decision.inputs,
         requestedOutputs: [.rawArtifacts, .derivedArtifacts],
-        // No authorization reference: this task type is E0 only, and the
-        // harness never mints or selects a capability (HTP-INV-6).
-        authorization: nil,
+        // Names an installed grant when the step needs one (CHG-2026-055,
+        // TASK-HFA-009 r2). The harness still never mints, drafts or widens a
+        // capability — it points at one a maintainer issued, and the engine
+        // re-checks scope, revision, expiry and plan before consuming it. An
+        // E0 step names nothing, which is why this is nil far more often than
+        // not.
+        authorization: authorizationReference,
         // Correlation only. The runtime derives no authority, scope or
         // identity from provenance, which is exactly why the harness id may
         // travel here and nowhere else (HTP-INV-12).

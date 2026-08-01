@@ -5,13 +5,13 @@
   "title": "Revert an exact durable workspace patch attempt",
   "provider": "workspace",
   "effect": {
-    "minimum": "hostOnly",
+    "minimum": "deviceMutation",
     "permitted": [
-      "hostOnly"
+      "deviceMutation"
     ]
   },
   "authorization": {
-    "hostOnly": "defaultReadOnly"
+    "deviceMutation": "standingCapability"
   },
   "binding": "none",
   "concurrencyKey": "host-exclusive",
@@ -47,7 +47,7 @@
     {
       "stepID": "revert-patch",
       "kind": "revertWorkspacePatch",
-      "effect": "hostOnly",
+      "effect": "deviceMutation",
       "cancellation": "atSafeBoundary",
       "binding": "none",
       "compensation": "none"
@@ -71,5 +71,6 @@
   ],
   "profiles": [
     "workspace-host@1"
-  ]
+  ],
+  "defaultPolicyIssuance": "disabled"
 }

@@ -330,14 +330,25 @@ final class WorkspaceProviderContractTests: XCTestCase {
         contents: patchBytes))
     let patchLease = try await artifactStore.leaseReference(
       jobID: imported.jobID, artifactID: imported.artifactID)
+    let grantStore1 = try RuntimeCapabilityStore(
+      directoryURL: state.appendingPathComponent("workspace-grant-1"))
+    // One grant per operation: a capability's lineage is tied to the
+    // operation and typed inputs of its first use, so a single grant cannot
+    // cover apply-patch *and* revert-patch. That is the model the device side
+    // already uses; TASK-HFA-009 r2 makes it visible for workspaces too.
+    try await installWorkspaceGrant(
+      into: grantStore1, operations: ["workspace.apply-patch"],
+      capabilityID: "CAP-RT-WORKSPACE-APPLY")
+    try await installWorkspaceGrant(
+      into: grantStore1, operations: ["workspace.revert-patch"],
+      capabilityID: "CAP-RT-WORKSPACE-REVERT")
     let engine = try RuntimeJobEngine(
       configuration: .init(
         stateDirectory: state.appendingPathComponent("patch-runtime-engine")),
       providers: DeviceProviderRegistry(providers: [provider]),
       dispatcher: RuntimeProcessDispatcherRouter(
         hdc: dispatcher, rockchip: dispatcher, workspace: dispatcher),
-      capabilityStore: try RuntimeCapabilityStore(
-        directoryURL: state.appendingPathComponent("patch-runtime-capabilities")),
+      capabilityStore: grantStore1,
       artifactStore: artifactStore,
       nowUTC: { "2026-07-31T00:00:00Z" })
 
@@ -349,7 +360,8 @@ final class WorkspaceProviderContractTests: XCTestCase {
         "allowedFileGlobs": .array([.string("Sources/**")]),
       ],
       requestID: "request-runtime-apply",
-      idempotencyKey: "idempotency-runtime-apply")
+      idempotencyKey: "idempotency-runtime-apply",
+      authorization: RuntimeCapabilityReference(capabilityID: "CAP-RT-WORKSPACE-APPLY"))
     let applyAcceptance = try await engine.submit(try JSONEncoder().encode(apply))
     let applyStatus = try await engine.run(jobID: applyAcceptance.jobID)
     XCTAssertEqual(applyStatus.state, "succeeded")
@@ -376,7 +388,8 @@ final class WorkspaceProviderContractTests: XCTestCase {
         "patchAttemptRef": .string(patchAttemptRef),
       ],
       requestID: "request-runtime-revert",
-      idempotencyKey: "idempotency-runtime-revert")
+      idempotencyKey: "idempotency-runtime-revert",
+      authorization: RuntimeCapabilityReference(capabilityID: "CAP-RT-WORKSPACE-REVERT"))
     let revertAcceptance = try await engine.submit(try JSONEncoder().encode(revert))
     let revertStatus = try await engine.run(jobID: revertAcceptance.jobID)
     XCTAssertEqual(revertStatus.state, "succeeded")
@@ -686,14 +699,20 @@ final class WorkspaceProviderContractTests: XCTestCase {
       let variantDispatcher = DescriptorBoundProcessDispatcher(
         resolver: WorkspaceActionExecutableResolver(profile: variant))
       let engineRoot = state.appendingPathComponent("digest-engine-\(index)")
+      // The variant profile is a *different* tree, so its grant must be
+      // issued against that identity — a capability for one workspace does
+      // not authorize another (CHG-2026-055, TASK-HFA-009 r2).
+      let variantGrants = try RuntimeCapabilityStore(
+        directoryURL: state.appendingPathComponent("digest-capabilities-\(index)"))
+      try await installWorkspaceGrant(
+        into: variantGrants, operations: ["workspace.build-openharmony"], profile: variant)
       let engine = try RuntimeJobEngine(
         configuration: .init(stateDirectory: engineRoot),
         providers: DeviceProviderRegistry(providers: [variantProvider]),
         dispatcher: RuntimeProcessDispatcherRouter(
           hdc: variantDispatcher, rockchip: variantDispatcher,
           workspace: variantDispatcher),
-        capabilityStore: try RuntimeCapabilityStore(
-          directoryURL: state.appendingPathComponent("digest-capabilities-\(index)")),
+        capabilityStore: variantGrants,
         artifactStore: try RuntimeArtifactStore(
           rootURL: state.appendingPathComponent("digest-artifacts-\(index)"),
           nowUTC: { "2026-07-31T00:00:00Z" }),
@@ -721,6 +740,8 @@ final class WorkspaceProviderContractTests: XCTestCase {
     let artifactStore = try RuntimeArtifactStore(
       rootURL: state.appendingPathComponent("runtime-artifacts"),
       nowUTC: { "2026-07-31T00:00:00Z" })
+    try await installWorkspaceGrant(
+      into: capabilityStore, operations: ["workspace.build-openharmony"])
     let engineRoot = state.appendingPathComponent("runtime-engine")
     let engine = try RuntimeJobEngine(
       configuration: .init(stateDirectory: engineRoot),
@@ -765,14 +786,16 @@ final class WorkspaceProviderContractTests: XCTestCase {
   }
 
   func testWorkspaceIsUnavailableWithoutArtifactStoreBeforeAdmission() async throws {
+    let grantStore2 = try RuntimeCapabilityStore(
+      directoryURL: state.appendingPathComponent("workspace-grant-2"))
+    try await installWorkspaceGrant(into: grantStore2, operations: ["workspace.apply-patch", "workspace.build-openharmony", "workspace.revert-patch", "workspace.run-tests", "workspace.create-checkpoint"])
     let engine = try RuntimeJobEngine(
       configuration: .init(
         stateDirectory: state.appendingPathComponent("missing-artifact-engine")),
       providers: DeviceProviderRegistry(providers: [provider]),
       dispatcher: RuntimeProcessDispatcherRouter(
         hdc: dispatcher, rockchip: dispatcher, workspace: dispatcher),
-      capabilityStore: try RuntimeCapabilityStore(
-        directoryURL: state.appendingPathComponent("missing-artifact-capabilities")),
+      capabilityStore: grantStore2,
       nowUTC: { "2026-07-31T00:00:00Z" })
     let operationAvailability = await engine.operationAvailability()
     let availability = try XCTUnwrap(
@@ -812,6 +835,9 @@ final class WorkspaceProviderContractTests: XCTestCase {
     let artifactStore = try RuntimeArtifactStore(
       rootURL: state.appendingPathComponent("runtime-failure-artifacts"),
       nowUTC: { "2026-07-31T00:00:00Z" })
+    let grantStore3 = try RuntimeCapabilityStore(
+      directoryURL: state.appendingPathComponent("workspace-grant-3"))
+    try await installWorkspaceGrant(into: grantStore3, operations: ["workspace.apply-patch", "workspace.build-openharmony", "workspace.revert-patch", "workspace.run-tests", "workspace.create-checkpoint"])
     let engine = try RuntimeJobEngine(
       configuration: .init(
         stateDirectory: state.appendingPathComponent("runtime-failure-engine")),
@@ -819,8 +845,7 @@ final class WorkspaceProviderContractTests: XCTestCase {
       dispatcher: RuntimeProcessDispatcherRouter(
         hdc: failureDispatcher, rockchip: failureDispatcher,
         workspace: failureDispatcher),
-      capabilityStore: try RuntimeCapabilityStore(
-        directoryURL: state.appendingPathComponent("runtime-failure-capabilities")),
+      capabilityStore: grantStore3,
       artifactStore: artifactStore,
       nowUTC: { "2026-07-31T00:00:00Z" })
 
@@ -868,7 +893,8 @@ final class WorkspaceProviderContractTests: XCTestCase {
     id: String,
     inputs: [String: JSONValue],
     requestID: String,
-    idempotencyKey: String
+    idempotencyKey: String,
+    authorization: RuntimeCapabilityReference? = workspaceGrantReference
   ) throws -> RuntimeOperationRequest {
     try RuntimeOperationRequest(
       requestID: requestID,
@@ -876,8 +902,46 @@ final class WorkspaceProviderContractTests: XCTestCase {
       target: DurableTargetReference(
         targetID: "workspace-test"),
       operation: RuntimeOperationReference(id: id, version: 1),
-      inputs: inputs)
+      inputs: inputs,
+      authorization: authorization)
   }
+
+  /// The grant a maintainer would have issued for this tree (CHG-2026-055,
+  /// TASK-HFA-009 r2). Since r2 a workspace mutation is E1: it needs a
+  /// capability scoped to this workspace identity and these writable scopes,
+  /// and the runtime will not mint one for itself.
+  private func installWorkspaceGrant(
+    into store: RuntimeCapabilityStore, operations: [String],
+    profile grantProfile: WorkspaceProjectProfile? = nil,
+    capabilityID: String = WorkspaceProviderContractTests.workspaceGrantID
+  ) async throws {
+    let profile = grantProfile ?? self.profile!
+    let capability = try RuntimeCapability(
+      capabilityID: capabilityID,
+      targetScope: .workspaceIdentity(
+        sha256: WorkspaceProviderSupport.workspaceIdentity(
+          root: profile.projectRoot, profileID: profile.profileID),
+        // Empty: a standing grant for this tree, not a one-shot pinned to the
+        // revision it happened to be at when it was issued.
+        expectedWorkspaceRevision: "",
+        allowedFileScopesDigest: WorkspaceProviderSupport.sha256(
+          Data(profile.allowedFileGlobs.sorted().joined(separator: "\n").utf8))),
+      operationScope: operations.map {
+        RuntimeCapabilityOperationScope(operationID: $0, version: 1)
+      },
+      effectCeiling: .deviceMutation,
+      issuedAtUTC: "2026-07-30T00:00:00Z",
+      expiresAtUTC: "2026-12-31T00:00:00Z",
+      maximumUses: 16,
+      issuer: RuntimeCapabilityIssuer(
+        kind: .maintainerMergedPR,
+        reference: "test-fixture:workspace-grant"))
+    try await store.install(capability)
+  }
+
+  private static let workspaceGrantID = "CAP-RT-WORKSPACE-TESTFIXTURE"
+  private static let workspaceGrantReference = RuntimeCapabilityReference(
+    capabilityID: workspaceGrantID)
 
   private func executionContext(
     artifact: ProviderResolvedInputArtifact? = nil

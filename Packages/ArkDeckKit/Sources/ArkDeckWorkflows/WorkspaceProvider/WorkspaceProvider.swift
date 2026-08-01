@@ -110,6 +110,15 @@ public struct WorkspaceProvider: DeviceProvider {
       "workspace provider is host-only: it has no device facts for \(targetID)")
   }
 
+  /// Forwarded: the ProjectProfile that owns the tree lives in the operations
+  /// provider, so it is the only thing that can answer.
+  public func workspaceAuthorizationFacts(
+    for operation: CatalogOperationDescriptor,
+    inputs: [String: JSONValue]
+  ) throws -> WorkspaceAuthorizationFacts? {
+    try operations?.workspaceAuthorizationFacts(for: operation, inputs: inputs)
+  }
+
   public func action(
     for step: CatalogStepDescriptor,
     operation: CatalogOperationDescriptor,

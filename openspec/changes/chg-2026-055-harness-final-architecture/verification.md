@@ -192,6 +192,12 @@ r2(2026-08-01):TASK-HFA-005 真机闭环完成,HFA-AC-11/12=`PASS`,GJ-5=
   部署读回 SHA-256 同为 `6263bb8a…87e8`;两次设备 mutation 均有 exact-input、
   binding-revision-1 的 RuntimeCapability consumption,终态后 typed cleanup 也 succeeded、
   residue `0`。故人工步骤计数为 0,GJ-5 可如实写 `REAL_DEVICE_PASS`。
+  **⚠ digest 变动(TASK-HFA-009 r2,同一 change 内):** 本结论取得于 catalog digest
+  `44b6728d…af5ec6`。r2 把五个 workspace 变更 operation 升为 E1(effect / authorization /
+  defaultPolicyIssuance 三处描述符改动),digest 因此移动到 `577a8ca1…19b8`。按
+  `PRODUCT-LOOP.md` §6「`REAL_DEVICE_PASS` 必须在**当前** catalog digest 上取得,旧 digest
+  的真机记录只证明历史」,**r2 合入后 GJ-5 需在新 digest 上重取**;本条结论作为历史记录保留,
+  不撤销、不追认。维护者 2026-08-01 决定:先合 r2,窗口另行安排。
 
 ## HFA-AC-12 真机:注入真实崩溃后不得判 PASS(TASK-HFA-005)
 
@@ -204,6 +210,12 @@ r2(2026-08-01):TASK-HFA-005 真机闭环完成,HFA-AC-11/12=`PASS`,GJ-5=
   `jscrash:com.example.waterflowdemo`,没有假阳性 PASS。修复、构建、测试并部署同一
   digest 后,round 20 `EVAL-64B95811F714=pass`;连续 5 个样本均为
   `healthy / matchingCrashCount=0 / newFatalSignatureCount=0`。两条证据完整。
+  **⚠ digest 变动(TASK-HFA-009 r2,同一 change 内):** 本结论取得于 catalog digest
+  `44b6728d…af5ec6`。r2 把五个 workspace 变更 operation 升为 E1(effect / authorization /
+  defaultPolicyIssuance 三处描述符改动),digest 因此移动到 `577a8ca1…19b8`。按
+  `PRODUCT-LOOP.md` §6「`REAL_DEVICE_PASS` 必须在**当前** catalog digest 上取得,旧 digest
+  的真机记录只证明历史」,**r2 合入后 GJ-5 需在新 digest 上重取**;本条结论作为历史记录保留,
+  不撤销、不追认。维护者 2026-08-01 决定:先合 r2,窗口另行安排。
 
 ## HFA-AC-13 设备瞬断不回退业务进度(TASK-HFA-006)
 
@@ -325,8 +337,14 @@ r2(2026-08-01):TASK-HFA-005 真机闭环完成,HFA-AC-11/12=`PASS`,GJ-5=
   (读 tree OID 要解析 git 二进制索引;文件摘要随索引变动,正是所用性质);submodule OID 未纳入
   (本 provider 尚无 submodule 面,不可变动的成分不是证据)。全部为文件读取,不 spawn git ——
   准入需要在任何进程启动之前拿到答案。
-  **capability 半边为何未交付**:见 `tasks.md` 的 r1 记录 —— 引擎对 `hostOnly` 忽略 capability,
-  主体扩展在翻闸前不可达。
+  **capability 半边(r2,2026-08-01):PASS** —— `WorkspaceCapabilityGateContractTests` 8 例:
+  `testAWorkspaceGrantDoesNotAuthorizeADeviceMutation` 与
+  `testADeviceGrantDoesNotAuthorizeAWorkspaceMutation` 双向断言一个主体的 grant 不能授权另一个
+  (失败原因是 `targetIdentityRequired` —— 两者是不同**种类**的主体,不是同种类的不同取值);
+  `testAGrantForAnotherTreeIsRefused` 与 `testAWiderWriteScopeThanTheGrantIsRefused` 断言
+  换棵树、放宽可写范围一律拒绝;`testAPinnedGrantIsRefusedOnceTheTreeMoves` 与
+  `testAStandingGrantSurvivesTheRevisionsItsOwnMutationsProduce` 钉住 pinned 与 standing 两种形态。
+  引擎侧由 `WorkspaceProviderContractTests` 端到端覆盖(准入 + 派发时二次确立主体)。
 
 ## HFA-AC-19 device 主体准入逐条不变、capability 只收窄(TASK-HFA-009)
 
@@ -334,7 +352,18 @@ r2(2026-08-01):TASK-HFA-005 真机闭环完成,HFA-AC-11/12=`PASS`,GJ-5=
   负例——workspace 主体的 capability 不能授予 runtime 不具备的能力、不能自签、不能续期、
   不能扩范围;复用同一 reservation/consumption/outcome 账本(不出现第二套账本)。
 - Evidence:实现 PR 内测试。
-- **结论:pending**
+- **结论(2026-08-01,r2):PASS** ——
+  **device 半边逐条不变**:`testMutatingOperationsCarryTheGuardsOfTheirOwnSubject` 的 else 分支
+  保留原断言(deviceExclusive + confirmedDevice),`testOnlyWorkspaceMutationsMayBeUnbound`
+  额外钉住"只有 workspace 变更可以无绑定"—— 该测试是**重述**不是放宽,原本禁止的
+  「无绑定的设备变更」仍然被禁;E2 exact-plan 语义未触及。
+  **capability 只能收窄**:`testEveryWorkspaceMutationRequiresAGrantAndForbidsSelfIssuance`
+  断言五个变更 operation 都要求 standingCapability 且**两层**禁止运行时自签
+  (描述符 `defaultPolicyIssuance: disabled` + 引擎 issuance 分支);
+  `testTheReadOnlyWorkspaceFamilyStillNeedsNoGrant` 断言只读族**没有**被顺手升级 ——
+  把读也升上去会让闸看起来更安全,却让闭环什么都看不了。
+  **复用同一账本**:consumption 走既有 `RuntimeCapabilityStore`,未新建第二套;
+  其主体校验从"必须有设备"改为"必须有设备**或** workspace 主体",两者都没有即拒绝。
 
 ## HFA-AC-20 Memory 晋升条件与作用域过滤(TASK-HFA-010)
 

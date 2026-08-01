@@ -414,11 +414,27 @@
 
 ## TASK-HFA-009 — Workspace 执行主体:capability subject 扩展与 exact base revision 绑定
 
-- Status:blocked(r2 等两件不在实现方手上的事:①维护者对「workspace 变更是否/何时开始
-  要求 capability」的决定 —— 那是把四个已发布 operation 的 effect 从 `hostOnly` 提到 E1 的
-  破坏性修改,会让 GJ-5 修复腿停到 workspace capability 签发为止(HTP-INV-6 禁止 harness
-  自签);②TASK-HFA-005 的真机证据落定 —— 仓内当前没有任何 run 记录支撑 GJ-5 的
-  `REAL_DEVICE_PASS`。r1 已交付且可独立评审,见下)
+- Status:done
+- Done:2026-08-01(r2,维护者当日决定立即翻闸)。HFA-AC-18、HFA-AC-19 均 PASS,
+  evidence = `evidence/runs/TASK-HFA-009/run-r2.md`(库层 1074 tests/1 skip/0 fail,新增 8 例门用例;
+  catalog_gen 39/39 零 drift;check-sdd 0/0/114)。
+  **五个 workspace 变更 operation 升 E1**(apply-patch / build-openharmony / run-tests /
+  revert-patch / create-checkpoint):`effect: deviceMutation` + `authorization:
+  standingCapability` + `defaultPolicyIssuance: disabled`,capability 主体为
+  `.workspaceIdentity(identity, expectedWorkspaceRevision, allowedFileScopesDigest)`。
+  **翻闸时堵掉的真漏洞**:升 E1 后 workspace 变更会被路由进运行时的**自动 E1 签发**路径
+  (当时只因设备身份为空而偶然失败)。已在**两层**关闭——描述符 `defaultPolicyIssuance:
+  disabled` 与引擎的 `query.workspaceIdentitySHA256 == nil` 条件。自己发钥匙的闸不是闸。
+  **既有不变量已重述而非放宽**:`testMutatingOperationsAreDeviceExclusiveWithConfirmedBinding`
+  → `testMutatingOperationsCarryTheGuardsOfTheirOwnSubject`,设备半边逐条不变,
+  workspace 半边要求 host-exclusive + 无绑定 + standingCapability + 禁自签 + 零设备 step;
+  另加 `testOnlyWorkspaceMutationsMayBeUnbound` 钉住"只有 workspace 变更可以无绑定"。
+  **⚠ 本任务使 GJ-5 的 `REAL_DEVICE_PASS` 需要重取**:TASK-HFA-005 r2 的真机结论取得于
+  catalog digest `44b6728d…af5ec6`,而本任务改了五个描述符,digest 移动到 `577a8ca1…19b8`。
+  按 §6,旧 digest 的真机记录只证明历史。维护者 2026-08-01 决定**先合本任务,窗口另行安排**。
+  **重跑窗口必须多验一件事**:#915 那次跑的是**无授权**的 workspace 变更;新窗口要验证
+  「维护者签发 workspace grant → 修复腿用它跑通 patch/build/revert」,那才是本次翻闸的实证。
+  注意 grant 的世系绑定一个 operation + typed inputs,patch → build → revert 需**分别**签发。
 - r1(2026-08-01):**交付 exact base revision 绑定**,evidence =
   `evidence/runs/TASK-HFA-009/run-r1.md`(库层 1058 tests/1 skip/0 fail,新增 9 例)。
   HFA-AC-18 的 revision 半边 PASS;capability subject 半边与 HFA-AC-19 **保持 pending**。

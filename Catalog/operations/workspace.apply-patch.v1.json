@@ -5,13 +5,13 @@
   "title": "Apply an Artifact-backed patch inside declared ProjectProfile globs",
   "provider": "workspace",
   "effect": {
-    "minimum": "hostOnly",
+    "minimum": "deviceMutation",
     "permitted": [
-      "hostOnly"
+      "deviceMutation"
     ]
   },
   "authorization": {
-    "hostOnly": "defaultReadOnly"
+    "deviceMutation": "standingCapability"
   },
   "binding": "none",
   "concurrencyKey": "host-exclusive",
@@ -57,7 +57,7 @@
     {
       "stepID": "apply-patch",
       "kind": "applyWorkspacePatch",
-      "effect": "hostOnly",
+      "effect": "deviceMutation",
       "cancellation": "atSafeBoundary",
       "binding": "none",
       "compensation": "rollbackPublished"
@@ -82,5 +82,6 @@
   ],
   "profiles": [
     "workspace-host@1"
-  ]
+  ],
+  "defaultPolicyIssuance": "disabled"
 }

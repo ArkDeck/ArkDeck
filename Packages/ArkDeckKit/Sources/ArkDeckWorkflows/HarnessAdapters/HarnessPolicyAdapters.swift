@@ -61,4 +61,31 @@ public struct RuntimeCapabilityStoreHarnessPort: HarnessCapabilityPort {
     }
     return false
   }
+
+  /// The same scan, returning the id so a request can name it. Selection is
+  /// deterministic — first by expiry, then by id — so two wakes on the same
+  /// installed set choose the same grant and a replay stays identical.
+  public func standingCapabilityID(
+    operationReference: String, targetID: String
+  ) async -> String? {
+    let installed: [RuntimeCapabilityStatus]
+    do {
+      installed = try await store.list()
+    } catch {
+      return nil
+    }
+    let now = nowUTC()
+    return installed
+      .filter { status in
+        status.remainingUses > 0 && status.lineageAllowsNewExecution
+          && status.capability.expiresAtUTC > now
+          && status.capability.effectCeiling >= WorkflowEffect.deviceMutation
+          && status.capability.operationScope.contains { $0.reference == operationReference }
+      }
+      .sorted {
+        ($0.capability.expiresAtUTC, $0.capability.capabilityID)
+          < ($1.capability.expiresAtUTC, $1.capability.capabilityID)
+      }
+      .first?.capability.capabilityID
+  }
 }

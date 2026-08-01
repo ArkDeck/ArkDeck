@@ -64,10 +64,19 @@ public enum RuntimeCapabilityTargetScope: Equatable, Sendable, Codable {
   /// Exactly one physical device, addressed by its stable physical
   /// identity digest (see `DeviceIdentitySnapshot.stablePhysicalIdentitySha256`).
   case stablePhysicalIdentity(sha256: String)
+  /// Exactly one workspace, at exactly one revision, for exactly one set of
+  /// writable scopes (CHG-2026-055, TASK-HFA-009 r2). All three belong to the
+  /// identity: an authorization to change *this tree as it stands* must not
+  /// survive the tree moving, and must not silently widen to files the grant
+  /// never named.
+  case workspaceIdentity(
+    sha256: String, expectedWorkspaceRevision: String, allowedFileScopesDigest: String)
 
   enum CodingKeys: String, CodingKey {
     case kind
     case sha256
+    case expectedWorkspaceRevision
+    case allowedFileScopesDigest
   }
 
   public init(from decoder: Decoder) throws {
@@ -78,6 +87,13 @@ public enum RuntimeCapabilityTargetScope: Equatable, Sendable, Codable {
       self = .anyTarget
     case "stablePhysicalIdentity":
       self = .stablePhysicalIdentity(sha256: try container.decode(String.self, forKey: .sha256))
+    case "workspaceIdentity":
+      self = .workspaceIdentity(
+        sha256: try container.decode(String.self, forKey: .sha256),
+        expectedWorkspaceRevision: try container.decode(
+          String.self, forKey: .expectedWorkspaceRevision),
+        allowedFileScopesDigest: try container.decode(
+          String.self, forKey: .allowedFileScopesDigest))
     default:
       throw DecodingError.dataCorruptedError(
         forKey: .kind, in: container, debugDescription: "unknown target scope kind \(kind)")
@@ -92,6 +108,11 @@ public enum RuntimeCapabilityTargetScope: Equatable, Sendable, Codable {
     case .stablePhysicalIdentity(let sha256):
       try container.encode("stablePhysicalIdentity", forKey: .kind)
       try container.encode(sha256, forKey: .sha256)
+    case .workspaceIdentity(let sha256, let revision, let scopes):
+      try container.encode("workspaceIdentity", forKey: .kind)
+      try container.encode(sha256, forKey: .sha256)
+      try container.encode(revision, forKey: .expectedWorkspaceRevision)
+      try container.encode(scopes, forKey: .allowedFileScopesDigest)
     }
   }
 }
@@ -263,6 +284,12 @@ public struct RuntimeCapabilityAuthorizationQuery: Sendable {
   public let targetBindingRevision: Int?
   public let planDigest: String?
   public let inputs: [String: JSONValue]
+  /// Workspace facts, present only for a host-bound workspace plan. A device
+  /// query leaves them absent, so a workspace-scoped capability fails closed
+  /// against it instead of matching by omission.
+  public let workspaceIdentitySHA256: String?
+  public let workspaceRevision: String?
+  public let workspaceFileScopesDigest: String?
 
   public init(
     operationID: String,
@@ -271,7 +298,10 @@ public struct RuntimeCapabilityAuthorizationQuery: Sendable {
     targetStableIdentitySHA256: String?,
     targetBindingRevision: Int?,
     planDigest: String?,
-    inputs: [String: JSONValue]
+    inputs: [String: JSONValue],
+    workspaceIdentitySHA256: String? = nil,
+    workspaceRevision: String? = nil,
+    workspaceFileScopesDigest: String? = nil
   ) {
     self.operationID = operationID
     self.operationVersion = operationVersion
@@ -280,6 +310,9 @@ public struct RuntimeCapabilityAuthorizationQuery: Sendable {
     self.targetBindingRevision = targetBindingRevision
     self.planDigest = planDigest
     self.inputs = inputs
+    self.workspaceIdentitySHA256 = workspaceIdentitySHA256
+    self.workspaceRevision = workspaceRevision
+    self.workspaceFileScopesDigest = workspaceFileScopesDigest
   }
 }
 
@@ -519,6 +552,45 @@ public struct RuntimeCapability: Equatable, Sendable, Codable {
       guard actual == expected else {
         return .failure(
           .init(reason: .targetScopeMismatch, detail: "stable identity does not match scope"))
+      }
+    case .workspaceIdentity(let expectedIdentity, let expectedRevision, let expectedScopes):
+      // Three equalities, each closing a way the grant could otherwise outlive
+      // what it authorized: a different tree, the same tree after it moved, or
+      // the same tree with a wider write scope than the one granted.
+      guard let identity = query.workspaceIdentitySHA256,
+        let revision = query.workspaceRevision,
+        let scopes = query.workspaceFileScopesDigest
+      else {
+        return .failure(
+          .init(
+            reason: .targetIdentityRequired,
+            detail: "query carries no workspace identity, revision or scope digest"))
+      }
+      guard identity == expectedIdentity else {
+        return .failure(
+          .init(reason: .targetScopeMismatch, detail: "workspace identity does not match scope"))
+      }
+      // An empty expected revision is a standing grant: it says "this tree,
+      // these scopes", not "this tree at this instant". Pinning a revision
+      // makes the grant single-use by construction — patch, build, test and
+      // revert each move the revision, so a pinned standing capability would
+      // need four grants whose values nobody can know in advance. When the
+      // issuer does pin one, it is enforced exactly.
+      //
+      // The per-request binding from r1 still applies either way: a caller
+      // that states the revision it decided against is refused if the tree
+      // moved (`workspace.revisionConflict`).
+      guard expectedRevision.isEmpty || revision == expectedRevision else {
+        return .failure(
+          .init(
+            reason: .targetScopeMismatch,
+            detail: "workspace revision moved since this capability was issued"))
+      }
+      guard scopes == expectedScopes else {
+        return .failure(
+          .init(
+            reason: .targetScopeMismatch,
+            detail: "workspace writable scopes differ from the authorized set"))
       }
     }
     if let expectedBindingRevision = exactBindingRevision {
