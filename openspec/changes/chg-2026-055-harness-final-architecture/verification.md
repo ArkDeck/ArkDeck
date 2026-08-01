@@ -116,7 +116,11 @@ HFA-AC-1/2/3/4/5/17 有结论;其余 HFA-AC 仍 `pending`(未开工)。
   二进制 patch、符号链接、`..` 路径逃逸、`.git` 内部修改、base revision 失配,
   各自断言整条 decision 被拒且零 ActionRun、零 apply。
 - Evidence:实现 PR 内测试。
-- **结论:pending**
+- **结论(2026-08-01,第三方补记 —— 由非实现方核验已合入的代码与测试,方法见 `evidence/runs/LEDGER-BACKFILL/2026-08-01.md`):PASS** ——
+  `HarnessRepairContractTests.testProposePatchSchemaRejectsEverySyntacticEscapeBeforeDispatch`
+  覆盖 schema 面的整条拒绝;`testWorkspaceProfileGlobSymlinkAndBaseMismatchPublishNoPatchArtifact`
+  覆盖 glob 越界、symlink 与 base 失配三类,并断言**不发布 patch artifact**
+  —— 即拒绝发生在产出之前,而不是产出后再回收。(TASK-HFA-003,合入 `4cec8b87`)
 
 ## HFA-AC-7 三条 stage gate 是结构性相等判定(TASK-HFA-003)
 
@@ -124,7 +128,11 @@ HFA-AC-1/2/3/4/5/17 有结论;其余 HFA-AC 仍 `pending`(未开工)。
   ②build source revision ≠ 当前 patch revision、③部署 readback digest ≠ build output digest,
   断言各自不得进入下一 stage;相等时才推进。
 - Evidence:实现 PR 内测试。
-- **结论:pending**
+- **结论(2026-08-01,第三方补记 —— 由非实现方核验已合入的代码与测试,方法见 `evidence/runs/LEDGER-BACKFILL/2026-08-01.md`):PASS** ——
+  `HarnessRepairContractTests.testAllThreeStageGatesRequireStructuralEquality` 逐条覆盖三条 gate;
+  `testBuildSourceRevisionMustEqualPatchRevisionBeforeTestsDispatch` 单独钉住
+  「build 的 source revision 必须等于当前 patch revision」这条最容易被"看起来成功"绕过的相等判定。
+  (TASK-HFA-003)
 
 ## HFA-AC-8 未知结果不重复 apply、失败必回滚(TASK-HFA-003)
 
@@ -132,7 +140,13 @@ HFA-AC-1/2/3/4/5/17 有结论;其余 HFA-AC 仍 `pending`(未开工)。
   `STILL_UNKNOWN`/`PARTIALLY_APPLIED`),断言零第二次 apply;部署或复验失败触发
   `workspace.revertPatch@1` 且回滚消耗 E1 预算;回滚结果未知 → 人工阻塞,不重复回滚。
 - Evidence:实现 PR 内测试。
-- **结论:pending**
+- **结论(2026-08-01,第三方补记 —— 由非实现方核验已合入的代码与测试,方法见 `evidence/runs/LEDGER-BACKFILL/2026-08-01.md`):PASS** ——
+  `testUnknownApplyUsesFourStateReadbackAndNeverSubmitsASecondApply` 断言未知结果只走四态
+  readback 且**零第二次 apply**;`testDeploymentDigestMismatchDispatchesTypedRollbackAndChargesBudget`
+  与 `testVerificationFailureDispatchesTypedRollbackAndChargesBudget` 断言部署 digest 不符与
+  复验失败各自触发 typed 回滚**并计入预算**(回滚本身也是 E1,不白送)。
+  `testSemanticRepairFailuresRequireAnAlternativeStrategy` 补上「语义失败要求新策略而非原样重试」。
+  (TASK-HFA-003)
 
 ## HFA-AC-9 重复策略不得伪装成新 Attempt(TASK-HFA-004)
 
@@ -140,7 +154,13 @@ HFA-AC-1/2/3/4/5/17 有结论;其余 HFA-AC 仍 `pending`(未开工)。
   仅改写 hypothesis 文本,断言 `DUPLICATE_STRATEGY` 拒绝、不新建 Attempt、不派发 job;
   七要素任一变化则允许新 Attempt(正例)。
 - Evidence:实现 PR 内测试。
-- **结论:pending**
+- **结论(2026-08-01,第三方补记 —— 由非实现方核验已合入的代码与测试,方法见 `evidence/runs/LEDGER-BACKFILL/2026-08-01.md`):PASS** ——
+  `HarnessAttemptContractTests.testStrategyFingerprintUsesTheSevenCanonicalElementsButNotHypothesisProse`
+  正面钉住七要素参与、hypothesis 散文不参与;
+  `testRewordedFailedPatchIsRejectedBeforeAnotherAttemptOrDispatch` 与
+  `testCoordinatorRejectsRewordedPatchAfterBuildFailureWithoutSecondApply` 从两个层面
+  (决策面与 coordinator 面)断言「改写措辞的同一补丁」被拒且**不产生第二次 apply**。
+  (TASK-HFA-004,合入 `ba5b21ec`)
 
 ## HFA-AC-10 Action Retry 与 Strategy Attempt 分离、无进展可停止(TASK-HFA-004)
 
@@ -149,7 +169,13 @@ HFA-AC-1/2/3/4/5/17 有结论;其余 HFA-AC 仍 `pending`(未开工)。
   连续 `maxNoProgressRounds` 后关闭当前 Attempt 并要求新 strategy fingerprint,
   无安全替代 → 人工阻塞或 FAILED。
 - Evidence:实现 PR 内测试。
-- **结论:pending**
+- **结论(2026-08-01,第三方补记 —— 由非实现方核验已合入的代码与测试,方法见 `evidence/runs/LEDGER-BACKFILL/2026-08-01.md`):PASS** ——
+  `testActionRetryCrashReplayAndSemanticAlternativeAreDifferentRoutes` 把三条路径分开钉死;
+  `testPendingIntentCrashWindowRestoresOriginalActionRunBeforeDispatch` 覆盖崩溃重放走**原**
+  ActionRun;`testRepeatedVerificationCapturesAreSamplesNotDuplicateStrategies` 覆盖「复验采样
+  不是重复策略」这条最容易误杀的边界;`testAttemptEventsAreDurableAndRejectRegression` 与
+  `testHumanResolutionReactivatesTheSameAttemptWithoutLosingItsHistory` 覆盖持久化与人工恢复。
+  (TASK-HFA-004)
 
 ## HFA-AC-11 真机:一次 submit 完成含修复腿的收敛,人工步骤 0(TASK-HFA-005)
 
@@ -157,14 +183,23 @@ HFA-AC-1/2/3/4/5/17 有结论;其余 HFA-AC 仍 `pending`(未开工)。
   运行 → 采集 → 判定 → patch → build → 部署 → 复验;记录人工步骤计数、每轮
   decision/attempt/job/artifact 链、预算消耗与停止原因。
 - Evidence:设备窗口 run 记录(命令、退出码、artifact hash、脱敏设备标识、capability ID)。
-- **结论:pending**
+- **结论(2026-08-01,第三方补记 —— 方法见 `evidence/runs/LEDGER-BACKFILL/2026-08-01.md`):pending-hardware** ——
+  仓内**没有任何设备窗口 run 记录**:#902(`fe8972a2`)零 `openspec/` 改动,PR 正文为模板文,
+  无命令、无退出码、无 artifact hash、无脱敏设备标识、无 catalog digest。
+  按本文件约定,缺设备窗口只能如实分类,不得以 fake/simulation 顶替,故不写 PASS 也不写 FAIL。
+  **另有一份反向证据**:TASK-HFA-012 为迁移测试提交的真实历史任务目录
+  (`Fixtures/Harness/HFA012/tasks/HTASK-265D25D3E0F9`,测试名 `testRealHFA005DirectoryMigrates…`)
+  终态为 `humanRequired` / `submissionRejected:rejected`,consumed 全零 —— 提交阶段即被拒的
+  一次运行,不是收敛的闭环。**GJ-5 因此不得写 `REAL_DEVICE_PASS`**(§6)。
 
 ## HFA-AC-12 真机:注入真实崩溃后不得判 PASS(TASK-HFA-005)
 
 - 方法:在真机上注入可复现的目标崩溃,断言 verdict 不是 `pass`(关闭 r6 假阳性);
   修复后复验 `PASS`。两条证据缺一不可,缺则 GJ-5 不得写 `REAL_DEVICE_PASS`。
 - Evidence:同上窗口记录 + 两轮 verdict 的 evaluation ID。
-- **结论:pending**
+- **结论(2026-08-01,第三方补记 —— 方法见 `evidence/runs/LEDGER-BACKFILL/2026-08-01.md`):pending-hardware** ——
+  同 HFA-AC-11:需要「注入真实崩溃后 verdict 不是 pass」与「修复后复验 PASS」两条真机证据,
+  仓内一条都没有。要关闭这条,只能由跑窗口的人补一份真实 run 记录。
 
 ## HFA-AC-13 设备瞬断不回退业务进度(TASK-HFA-006)
 
@@ -173,7 +208,15 @@ HFA-AC-1/2/3/4/5/17 有结论;其余 HFA-AC 仍 `pending`(未开工)。
   binding revision 变化未确认 → `DeviceBound=UNKNOWN` 且旧 decision 全部 stale;
   stage gate 表逐格负例。
 - Evidence:实现 PR 内测试。
-- **结论:pending**
+- **结论(2026-08-01,第三方补记 —— 方法见 `evidence/runs/LEDGER-BACKFILL/2026-08-01.md`):PASS** ——
+  `HarnessThreeDimensionalStateContractTests.testTransientDisconnectRecoveryAndBindingDriftNeverRewindStage`
+  正是本条的核心断言:瞬断恢复与 binding 漂移都**不回退 stage**;
+  `testEveryRequiredStageGateCellRejectsFalseAndUnknown` 覆盖 gate 表**逐格**对 FALSE 与
+  UNKNOWN 的拒绝(UNKNOWN 与 FALSE 分开处理是三态模型的要害);
+  `testConditionChangesParticipateInTheDecisionBasis` 把 condition 变化接进 TASK-HFA-002 的
+  防陈旧基线 —— condition 动了,旧决策即陈旧;
+  `testCanonicalWaitingRecordsFailClosedWithoutAnExactReason` 断言 waiting 必须带确切 reason,
+  不接受笼统等待。(TASK-HFA-006,合入 `0c537d82`)
 
 ## HFA-AC-14 既有任务前向迁移逐字保持(TASK-HFA-006)
 
@@ -181,7 +224,10 @@ HFA-AC-1/2/3/4/5/17 有结论;其余 HFA-AC 仍 `pending`(未开工)。
   `task.status`/`task.events`/`task.result` 逐字保持,`paused` → `waiting +
   USER_SUSPENDED`、历史 `deviceReady` phase → `stage=REPRODUCING + DeviceReady=UNKNOWN`。
 - Evidence:实现 PR 内测试 + 使用的历史任务目录标识。
-- **结论:pending**
+- **结论(2026-08-01,第三方补记 —— 方法见 `evidence/runs/LEDGER-BACKFILL/2026-08-01.md`):PASS** ——
+  `testHistoricalSchemaOneDirectoryMigratesWithoutChangingTimelineBytes` 断言历史目录迁移后
+  **时间线字节不变**;`testHistoricalResultSurvivesForwardMigration` 断言 result 存活。
+  这两条正是本 AC 要的「逐字保持」。(TASK-HFA-006)
 
 ## HFA-AC-15 Analyzer 确定性、版本化且 provenance 完整(TASK-HFA-007)
 
@@ -292,7 +338,16 @@ HFA-AC-1/2/3/4/5/17 有结论;其余 HFA-AC 仍 `pending`(未开工)。
   超出 revision/device/toolchain 作用域的 memory 不得进入 `confirmedFacts.current`;
   未验证 memory 的检索得分低于当前 task evidence;`SUPERSEDED`/`INVALIDATED` 不再被选入。
 - Evidence:实现 PR 内测试。
-- **结论:pending**
+- **结论(2026-08-01,第三方补记 —— 方法见 `evidence/runs/LEDGER-BACKFILL/2026-08-01.md`):PASS** ——
+  `HarnessMemoryContractTests.testVerifiedMemoryRequiresAPassOrHumanReceiptAndExactScope`
+  钉住晋升条件(PASS 或人工回执)与精确作用域;
+  `testDecodedVerifiedMemoryCannotBypassPromotionAuthority` 堵住「直接反序列化一条 VERIFIED
+  绕过晋升」这条最实际的旁路;`testExactScopeFiltersBeforeRankingAndCandidatesStayBelowCurrentEvidence`
+  断言先精确过滤再排序、未验证 memory 得分低于当前证据;
+  `testContextConfirmedFactsContainOnlyInScopeVerifiedMemory` 断言超作用域者进不了
+  `confirmedFacts`;`testLegacyProjectMemoryLoadsFailClosedInsteadOfGainingScope` 断言旧数据
+  fail closed 而不是凭空获得作用域;`testFailureMemoryCarriesFiveClosedDispositionsAndTypedAlternatives`
+  覆盖五态 retryDisposition。(TASK-HFA-010,合入 `bbaa50e7`)
 
 ## HFA-AC-21 厂商 adapter 可替换且出站受限(TASK-HFA-011)
 
@@ -331,7 +386,16 @@ HFA-AC-1/2/3/4/5/17 有结论;其余 HFA-AC 仍 `pending`(未开工)。
   迁移中断后重入不产生重复或丢失;WAL + 外键 ON + 同事务 snapshot/event + 乐观锁
   各有用例;失败时停在旧存储且不损坏。
 - Evidence:实现 PR 内测试 + 迁移前后逐字对照。
-- **结论:pending**
+- **结论(2026-08-01,第三方补记 —— 方法见 `evidence/runs/LEDGER-BACKFILL/2026-08-01.md`):PASS** ——
+  `HarnessSQLiteMigrationContractTests.testSQLiteEnablesWALForeignKeysVersionedSchemaAndEveryRequiredTable`
+  覆盖 WAL、外键、schema 版本与全部必需表;
+  `testRealHFA005DirectoryMigratesWithByteEquivalentEventsAndResult` 用**真实历史任务目录**
+  断言事件与 result 字节等价、且**原文件未被改写**;
+  `testBothMigrationCrashWindowsRollBackAndReenterWithoutLegacyDamage` 覆盖两个迁移崩溃窗口
+  可回滚可重入且不损坏旧数据;`testEventAndSnapshotRollbackTogetherAndCASReportsThePersistedVersion`
+  覆盖同事务与乐观锁;`testCanonicalJSONDigestMismatchFailsClosed` 与
+  `testReconcileLeaseIsExclusiveOwnerBoundAndExpiresAfterCrash` 补齐 digest 与 lease。
+  (TASK-HFA-012,合入 `960e2bb2`)
 
 ## HFA-AC-23 module 抽取是纯移动且依赖方向单向(TASK-HFA-013)
 
