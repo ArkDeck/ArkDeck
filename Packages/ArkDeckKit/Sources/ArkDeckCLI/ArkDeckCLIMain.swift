@@ -118,9 +118,11 @@ struct ArkDeckCommandLine {
   static func runInstallBinding(_ arguments: [String]) throws {
     let options = try CLIOptions(arguments)
     try options.validateAllowed([])
-    let receipt = try RockchipDeviceBindingInstallation.installCurrentLoader()
+    let receipt = try RockchipDeviceBindingInstallation.installCurrentTarget()
     print(
-      receipt.created ? "durable Rockchip binding installed" : "durable Rockchip binding unchanged")
+      receipt.created
+        ? "durable DAYU200 cross-mode binding installed"
+        : "durable DAYU200 cross-mode binding unchanged")
     print("binding revision: \(receipt.revision)")
     print("USB topology: \(receipt.usbTopology)")
     print("serial sha256: \(receipt.serialDigestSHA256)")

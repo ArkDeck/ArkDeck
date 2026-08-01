@@ -185,6 +185,24 @@ protocol RockchipIdentityReadbackFactPort: Sendable {
   func readIdentity() async throws -> RockchipTrustedIdentityReadbackFact
 }
 
+/// Shared admission seam for the two real DAYU200 starting modes.  The
+/// historical collector below proves an already-Loader target through
+/// `rkdeveloptool ld`; the production host may instead prove the same durable
+/// target while it is still reachable through the registered HDC transport.
+/// Both collectors return the identical closed fact shape consumed by the
+/// standing-authorization and one-shot chat-confirmation gates.
+protocol RockchipAuthorizationFactCollecting: Sendable {
+  func collect(
+    request: RockchipAuthorizationFactRequest,
+    grant: VerifiedAuthorizationGrant
+  ) async throws -> RockchipTrustedAuthorizationFacts
+
+  func collect(
+    request: RockchipAuthorizationFactRequest,
+    expectation: RockchipAuthorizationFactExpectation
+  ) async throws -> RockchipTrustedAuthorizationFacts
+}
+
 enum RockchipAuthorizationFactError: Error, Sendable, Equatable {
   case invalidRequest(field: String)
   case archiveValidationFailed
@@ -262,7 +280,7 @@ struct RockchipAuthorizationFactExpectation: Sendable, Equatable {
   }
 }
 
-struct RockchipAuthorizationFactCollector: Sendable {
+struct RockchipAuthorizationFactCollector: RockchipAuthorizationFactCollecting {
   static let maximumReadbackLifetimeNanoseconds: UInt64 = 30_000_000_000
 
   private let planPort: any RockchipExecutePlanFactPort

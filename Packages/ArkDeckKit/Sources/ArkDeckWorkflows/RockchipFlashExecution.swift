@@ -202,6 +202,19 @@ struct RockchipExecutionAttempt: Sendable {
   let execution: ProcessExecutionResult
   let semantic: RockchipCommandSemanticResult
   let executableIdentity: ProcessExecutableIdentityReceipt
+  let semanticCode: String
+
+  init(
+    execution: ProcessExecutionResult,
+    semantic: RockchipCommandSemanticResult,
+    executableIdentity: ProcessExecutableIdentityReceipt,
+    semanticCode: String = "rockchip.marker.confirmed"
+  ) {
+    self.execution = execution
+    self.semantic = semantic
+    self.executableIdentity = executableIdentity
+    self.semanticCode = semanticCode
+  }
 }
 
 final class RockchipPreparedCommand: @unchecked Sendable {
@@ -558,7 +571,7 @@ actor RockchipFlashExecutor {
         do {
           try persistence.appendOutcome(
             step: command.step, intentEventID: intentID, admission: admission,
-            result: "succeeded", certainty: .confirmed, semanticCode: "rockchip.marker.confirmed",
+            result: "succeeded", certainty: .confirmed, semanticCode: attempt.semanticCode,
             execution: attempt.execution)
         } catch {
           try? persistence.appendWaitingForRecovery(
