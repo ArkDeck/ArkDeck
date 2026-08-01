@@ -345,6 +345,13 @@ r2(2026-08-01):TASK-HFA-005 真机闭环完成,HFA-AC-11/12=`PASS`,GJ-5=
   换棵树、放宽可写范围一律拒绝;`testAPinnedGrantIsRefusedOnceTheTreeMoves` 与
   `testAStandingGrantSurvivesTheRevisionsItsOwnMutationsProduce` 钉住 pinned 与 standing 两种形态。
   引擎侧由 `WorkspaceProviderContractTests` 端到端覆盖(准入 + 派发时二次确立主体)。
+  **签发可达性(r3,2026-08-01):PASS** —— r2 的准入闸合入后实测发现生产 CLI 与 draft
+  engine 都仍假定 capability 主体必为设备,维护者无法得到 workspace grant 草稿。
+  `testCapabilityDraftDoesNotAskTheDeviceStoreForAWorkspaceSubject` 钉住 CLI target 解析不查询
+  device store;`testRuntimeDraftsAReviewableWorkspaceCapabilityWithoutInstallingOrDispatching`
+  断言草稿精确携带 workspace identity、观测 revision、scope digest 与 typed input constraints,
+  同时 capability store 为空、Job 为零、workspace 字节不变。草稿中的 standing target 不固定
+  revision,request 自己声明的 `expectedWorkspaceRevision` 仍被 exact input constraint 固定。
 
 ## HFA-AC-19 device 主体准入逐条不变、capability 只收窄(TASK-HFA-009)
 
@@ -364,6 +371,10 @@ r2(2026-08-01):TASK-HFA-005 真机闭环完成,HFA-AC-11/12=`PASS`,GJ-5=
   把读也升上去会让闸看起来更安全,却让闭环什么都看不了。
   **复用同一账本**:consumption 走既有 `RuntimeCapabilityStore`,未新建第二套;
   其主体校验从"必须有设备"改为"必须有设备**或** workspace 主体",两者都没有即拒绝。
+  **device draft 回归(r3,2026-08-01):PASS** ——
+  `testCapabilityDraftStillPinsADeviceSubjectToItsCurrentBinding` 保留 device store lookup 与 exact
+  binding;既有 daemon draft 测试仍验证 `bindingRevision`/`stableIdentitySHA256`,新增 workspace
+  字段在 device wire payload 中用 `encodeIfPresent` 省略,未把旧消费者改成接收 `null`。
 
 ## HFA-AC-20 Memory 晋升条件与作用域过滤(TASK-HFA-010)
 

@@ -398,6 +398,90 @@ final class WorkspaceProviderContractTests: XCTestCase {
       Data("old\n".utf8))
   }
 
+  func testRuntimeDraftsAReviewableWorkspaceCapabilityWithoutInstallingOrDispatching()
+    async throws
+  {
+    let artifactStore = try RuntimeArtifactStore(
+      rootURL: state.appendingPathComponent("workspace-draft-artifacts"),
+      nowUTC: { "2026-08-01T00:00:00Z" })
+    let capabilityStore = try RuntimeCapabilityStore(
+      directoryURL: state.appendingPathComponent("workspace-draft-capabilities"))
+    let engine = try RuntimeJobEngine(
+      configuration: .init(
+        stateDirectory: state.appendingPathComponent("workspace-draft-engine")),
+      providers: DeviceProviderRegistry(providers: [provider]),
+      dispatcher: RuntimeProcessDispatcherRouter(
+        hdc: dispatcher, rockchip: dispatcher, workspace: dispatcher),
+      capabilityStore: capabilityStore,
+      artifactStore: artifactStore,
+      nowUTC: { "2026-08-01T00:00:00Z" })
+    let observedRevision = try WorkspaceProviderSupport.workspaceRevision(
+      root: profile.projectRoot, profileVersion: profile.profileID,
+      globs: profile.allowedFileGlobs)
+    let request = try operationRequest(
+      id: "workspace.build-openharmony",
+      inputs: [
+        "projectRef": .string("TestProject"),
+        "buildPresetRef": .string("build-ok"),
+        "expectedWorkspaceRevision": .string(observedRevision),
+      ],
+      requestID: "request-workspace-draft",
+      idempotencyKey: "idempotency-workspace-draft",
+      authorization: nil)
+
+    let draft = try await engine.draftCapability(
+      try JSONEncoder().encode(request),
+      issuedAtUTC: "2026-08-01T00:00:00Z",
+      expiresAtUTC: "2026-08-01T01:00:00Z",
+      issuerReference: "PENDING-MAINTAINER-PR",
+      maximumUses: 4)
+
+    let expectedIdentity = WorkspaceProviderSupport.workspaceIdentity(
+      root: profile.projectRoot, profileID: profile.profileID)
+    let expectedScopes = WorkspaceProviderSupport.sha256(
+      Data(profile.allowedFileGlobs.sorted().joined(separator: "\n").utf8))
+    guard
+      case .workspaceIdentity(let identity, let pinnedRevision, let scopes) =
+        draft.capability.targetScope
+    else {
+      return XCTFail("workspace draft must carry a workspace target scope")
+    }
+    XCTAssertEqual(identity, expectedIdentity)
+    XCTAssertEqual(pinnedRevision, "", "a standing grant survives its own mutations")
+    XCTAssertEqual(scopes, expectedScopes)
+    XCTAssertNil(draft.bindingRevision)
+    XCTAssertNil(draft.stableIdentitySHA256)
+    XCTAssertEqual(draft.workspaceIdentitySHA256, expectedIdentity)
+    XCTAssertEqual(draft.workspaceRevision, observedRevision)
+    XCTAssertEqual(draft.workspaceFileScopesDigest, expectedScopes)
+    XCTAssertEqual(draft.capability.exactBindingRevision, nil)
+    XCTAssertEqual(
+      draft.capability.operationScope.map(\.reference),
+      ["workspace.build-openharmony@1"])
+    XCTAssertEqual(
+      draft.capability.inputConstraints["projectRef"],
+      .exactString("TestProject"))
+    XCTAssertEqual(
+      draft.capability.inputConstraints["expectedWorkspaceRevision"],
+      .exactString(observedRevision))
+    let installedCapabilities = try await capabilityStore.list()
+    let jobs = await engine.listJobs()
+    XCTAssertTrue(installedCapabilities.isEmpty)
+    XCTAssertTrue(jobs.isEmpty)
+    XCTAssertEqual(
+      try Data(contentsOf: root.appendingPathComponent("Sources/App.txt")),
+      Data("old\n".utf8),
+      "drafting materializes the plan but dispatches no workspace process")
+
+    let encoded = try JSONEncoder().encode(draft)
+    let fields = try JSONDecoder().decode([String: JSONValue].self, from: encoded)
+    XCTAssertNil(fields["bindingRevision"])
+    XCTAssertNil(fields["stableIdentitySHA256"])
+    XCTAssertEqual(fields["workspaceIdentitySHA256"], .string(expectedIdentity))
+    XCTAssertEqual(fields["workspaceRevision"], .string(observedRevision))
+    XCTAssertEqual(fields["workspaceFileScopesDigest"], .string(expectedScopes))
+  }
+
   func testReceiptLostRevertReconcilesOnceAndClosesAttempt() async throws {
     let patchURL = try writePatch(relativePath: "Sources/App.txt")
     let patchContext = executionContext(

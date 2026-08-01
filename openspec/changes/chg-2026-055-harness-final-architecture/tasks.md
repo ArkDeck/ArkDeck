@@ -415,6 +415,17 @@
 ## TASK-HFA-009 — Workspace 执行主体:capability subject 扩展与 exact base revision 绑定
 
 - Status:done
+- r3 follow-up(2026-08-01):r2 把 workspace 变更翻到 standing capability 后,
+  生产签发入口仍把 `--target demo-app` 无条件当作已收养设备查询 binding revision,
+  daemon 的 draft engine 也只接受 device identity + binding。结果是安全闸能拒绝,维护者却
+  **无法起草可 review 的 workspace grant**,GJ-5 在当前 digest 上没有合法修复腿。
+  r3 让 CLI 按 operation binding 选择 device/workspace target,并让 draft 与 submit 复用
+  同一个 authorization subject query;workspace review payload 带 identity、观测 revision、
+  scopes digest,但不安装 capability、不创建 Job、不 dispatch。device draft 的 binding 与
+  既有 JSON 形态保持不变。evidence = `evidence/runs/TASK-HFA-009/run-r3.md`
+  (库层 1079 tests/1 skip/0 fail,新增 3 例;catalog_gen 39/39 零 drift;
+  check-sdd 0/0/114)。**这只是补齐维护者签发前的草稿路径,不是 Agent 代签**;
+  当前 digest 的 DAYU200 复验仍须等维护者 merged PR grant。
 - Done:2026-08-01(r2,维护者当日决定立即翻闸)。HFA-AC-18、HFA-AC-19 均 PASS,
   evidence = `evidence/runs/TASK-HFA-009/run-r2.md`(库层 1074 tests/1 skip/0 fail,新增 8 例门用例;
   catalog_gen 39/39 零 drift;check-sdd 0/0/114)。
