@@ -4991,6 +4991,21 @@ public actor RuntimeJobEngine {
         "fileScope": .string(inspection.fileScope),
         "artifactId": .string("source-inspection.txt"),
       ]
+    case .createWorkspaceCheckpoint:
+      let projectRef: String
+      switch action {
+      case .workspace(.createCheckpoint(let invocation)):
+        projectRef = invocation.projectRef
+      case .workspace(.createArchiveCheckpoint(let checkpoint)):
+        projectRef = checkpoint.invocation.projectRef
+      default:
+        throw RuntimeJobEngineError.internalFailure(
+          "\(step.stepID) has no exact typed workspace checkpoint action")
+      }
+      arguments = [
+        "projectRef": .string(projectRef),
+        "artifactId": .string("checkpoint.txt"),
+      ]
     case .applyWorkspacePatch:
       guard case .workspace(.applyPatch(let patch))? = action else {
         throw RuntimeJobEngineError.internalFailure(
