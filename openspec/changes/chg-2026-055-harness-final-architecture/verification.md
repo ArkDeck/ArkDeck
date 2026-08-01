@@ -403,4 +403,19 @@ HFA-AC-1/2/3/4/5/17 有结论;其余 HFA-AC 仍 `pending`(未开工)。
   不 import OpenHarmony 设备参数、不持远端路径、不构造 Git/HDC/build argv;
   仍是单 `arkdeck-agentd` executable。
 - Evidence:实现 PR 内测试 + 前后套件计数对照。
-- **结论:pending**
+- **结论(2026-08-01,第三方补记 —— 方法见 `%s`):PASS** ——
+  **依赖方向**:`Package.swift` 声明 `ArkDeckHarness` 的依赖恰为
+  `["ArkDeckCore", "ArkDeckProcess", "ArkDeckRuntime"]`(不含 Workflows / OpenHarmony,
+  即单向);`ArkDeckContractTests.testPackageTargetsImportOnlyDeclaredArkDeckModules` 断言每个
+  target 的 import 不超出 `Package.swift` 声明,其中 `assertHarnessModuleBoundary()` 进一步断言
+  九个分层(Domain/Application/Context/Evaluation/Memory/Persistence/Ports/LLM/Tasks)各自
+  拥有源文件、旧 target 不再保留 `Harness*` 文件、`ArkDeckWorkflows/AgentHarness` 目录已消失,
+  且平台实现面(`HDCProviderAction.`、`RuntimeJobEngine(`、`RuntimeArtifactStore(`、
+  `RuntimeCapabilityStore(` 等)不出现在 harness 内 —— 这正是「不 import 设备参数、不构造 argv」
+  的可检验形式。
+  **纯移动**:#911(`cdabd9ac`)的 diff 中新增测试函数 **0** 条、删除 **0** 条
+  (`git show cdabd9ac | grep -cE '^[+-]  func test'` 各为 0),迁移后全量套件
+  **1064 tests / 1 skipped / 0 failures**,与迁移前同数 —— 即行为面既没丢也没被顺手改。
+  **未覆盖(如实)**:仓内没有一条断言把「测试数不变」本身钉住(它由本次逐项对照得出,
+  不是自动回归);单 `arkdeck-agentd` executable 的拓扑由 `Package.swift` 保证,无独立断言。
+  (TASK-HFA-013,合入 `cdabd9ac`)
