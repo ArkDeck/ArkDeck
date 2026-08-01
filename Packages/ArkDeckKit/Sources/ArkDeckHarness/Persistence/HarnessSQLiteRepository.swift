@@ -161,6 +161,18 @@ final class HarnessSQLiteRepository: @unchecked Sendable {
 
   func putDecision(_ decision: HarnessDecision) throws {
     try requireTask(decision.htaskID)
+    if let intent = try intent(decision.htaskID, round: decision.round),
+      intent.state == .pending || intent.state == .submitted || intent.state == .linked
+    {
+      guard let stored = try self.decision(decision.htaskID, round: decision.round),
+        stored == decision,
+        intent.decisionID == decision.decisionID
+      else {
+        throw HarnessTaskStoreError.corrupt(
+          "decision \(intent.decisionID) is owned by \(intent.state.rawValue) intent "
+            + "\(intent.requestID)")
+      }
+    }
     let data = try canonical(decision)
     try database.run(
       """
@@ -193,6 +205,28 @@ final class HarnessSQLiteRepository: @unchecked Sendable {
 
   func putIntent(_ intent: HarnessDispatchIntent) throws {
     try requireTask(intent.htaskID)
+    if let stored = try self.intent(intent.htaskID, round: intent.round),
+      stored.state == .pending || stored.state == .submitted || stored.state == .linked
+    {
+      let sameExecutionIdentity =
+        stored.schemaVersion == intent.schemaVersion
+        && stored.decisionID == intent.decisionID
+        && stored.attemptID == intent.attemptID
+        && stored.modelRunID == intent.modelRunID
+        && stored.operationReference == intent.operationReference
+        && stored.targetID == intent.targetID
+        && stored.expectedBindingRevision == intent.expectedBindingRevision
+        && stored.expectedWorkspaceRevision == intent.expectedWorkspaceRevision
+        && stored.expectedDeployedArtifactDigest == intent.expectedDeployedArtifactDigest
+        && stored.inputsDigestSHA256 == intent.inputsDigestSHA256
+        && stored.requestID == intent.requestID
+        && stored.idempotencyKey == intent.idempotencyKey
+        && stored.createdAtUTC == intent.createdAtUTC
+      guard sameExecutionIdentity else {
+        throw HarnessTaskStoreError.corrupt(
+          "\(stored.state.rawValue) intent \(stored.requestID) execution identity is immutable")
+      }
+    }
     let data = try canonical(intent)
     try database.transaction {
       try database.run(

@@ -74,6 +74,20 @@ final class HarnessSQLiteMigrationContractTests: XCTestCase {
     XCTAssertEqual(humanActions.count, 1)
     XCTAssertEqual(memoryHistory.count, 1)
     XCTAssertEqual(searchResults.count, 1)
+    // JSON envelope evolution requires no lossy SQL rewrite: historical rows
+    // decode, remain queryable, and are explicitly non-executable when their
+    // v2 preconditions are absent.
+    XCTAssertEqual(decision?.envelopeVersion, "1.0.0")
+    XCTAssertEqual(intents.first?.schemaVersion, "1.0.0")
+    XCTAssertEqual(
+      intents.first?.withState(.linked, atUTC: "2026-07-31T00:00:00Z").schemaVersion,
+      "1.0.0")
+    if let decision {
+      let basis = HarnessDecisionBasis(
+        snapshot: migrated, offeredOperations: [decision.operationReference].compactMap { $0 })
+      XCTAssertEqual(
+        HarnessDecisionFreshness.staleness(of: decision, against: basis), .unverifiable)
+    }
 
     let expectedCounts: [String: Int] = [
       "harness_task": 1,

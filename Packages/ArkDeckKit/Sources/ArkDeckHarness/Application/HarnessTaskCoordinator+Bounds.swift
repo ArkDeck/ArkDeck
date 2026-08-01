@@ -245,7 +245,7 @@ extension HarnessTaskCoordinator {
     let attempts = try await store.attempts(snapshot.htaskID)
     let lastAttempt = attempts.last
     let revision = snapshot.repairAttempt?.patchRevision ?? lastAttempt?.patchRevision
-      ?? lastAttempt?.baseRevision ?? desiredText("baseWorkspaceRevision")
+      ?? lastAttempt?.applicableBaseRevision ?? desiredText("baseWorkspaceRevision")
     let deviceProfiles = [desiredText("deviceProfile")].compactMap { $0 }
     let toolchainProfiles = [
       lastAttempt?.strategy.executionExpectation.toolchainProfile,

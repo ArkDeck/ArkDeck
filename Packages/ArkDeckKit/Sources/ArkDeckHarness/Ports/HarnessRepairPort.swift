@@ -86,6 +86,14 @@ public enum HarnessPatchApplicationReadback: Equatable, Sendable {
 }
 
 public protocol HarnessRepairPort: Sendable {
+  /// Reload the exact live workspace fact used by a Decision immediately
+  /// before a pending intent may be submitted.
+  func currentWorkspaceRevision(
+    relativePaths: [String],
+    projectRef: String,
+    task: HarnessTaskSnapshot
+  ) async throws -> String
+
   func preparePatch(
     _ proposal: HarnessPatchProposal,
     projectRef: String,
@@ -109,4 +117,18 @@ public protocol HarnessRepairPort: Sendable {
   func reconcileUnknownPatch(
     jobID: String, proposal: HarnessPatchProposal
   ) async throws -> HarnessPatchApplicationReadback
+}
+
+public extension HarnessRepairPort {
+  /// Compatibility seam for in-memory/non-production fixtures. The production
+  /// workspace adapter overrides this with a live filesystem readback.
+  func currentWorkspaceRevision(
+    relativePaths: [String], projectRef: String, task: HarnessTaskSnapshot
+  ) async throws -> String {
+    if let revision = task.repairAttempt?.patchRevision { return revision }
+    if case .string(let revision)? = task.goal.desiredState["baseWorkspaceRevision"] {
+      return revision
+    }
+    throw HarnessRepairPortError.malformedReadback("baseWorkspaceRevision")
+  }
 }

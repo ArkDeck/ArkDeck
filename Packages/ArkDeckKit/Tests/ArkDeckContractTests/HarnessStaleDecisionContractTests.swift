@@ -11,6 +11,7 @@
 // The gateways below use exactly that window: they call back into the
 // coordinator while the harness waits for their answer.
 
+import CryptoKit
 import XCTest
 
 @testable import ArkDeckCore
@@ -72,13 +73,19 @@ private actor FixedReplyGateway: HarnessDecisionGateway {
 private actor CountingJobPort: HarnessRuntimeJobPort {
   private var observations: [String: HarnessJobObservation] = [:]
   private var submitted: [String] = []
+  private var keys: [String] = []
+  private var bindingRevisions: [Int?] = []
   private var ordinal = 1
 
   var submittedOperations: [String] { submitted }
+  var submittedKeys: [String] { keys }
+  var submittedBindingRevisions: [Int?] { bindingRevisions }
 
   func submit(requestJSON: Data) async throws -> HarnessJobAcceptance {
     let request = try JSONDecoder().decode(RuntimeOperationRequest.self, from: requestJSON)
     submitted.append(request.operation.reference)
+    keys.append(request.idempotencyKey)
+    bindingRevisions.append(request.target.expectedBindingRevision)
     let jobID = "JOB-\(ordinal)"
     ordinal += 1
     observations[jobID] = HarnessJobObservation(
@@ -97,6 +104,44 @@ private actor CountingJobPort: HarnessRuntimeJobPort {
   }
 
   func requestCancel(jobID: String) async throws {}
+}
+
+private struct DriftingWorkspacePort: HarnessRepairPort {
+  let liveRevision: String
+
+  func currentWorkspaceRevision(
+    relativePaths: [String], projectRef: String, task: HarnessTaskSnapshot
+  ) async throws -> String { liveRevision }
+
+  func preparePatch(
+    _ proposal: HarnessPatchProposal, projectRef: String,
+    task: HarnessTaskSnapshot, decisionID: String
+  ) async throws -> HarnessPreparedPatch {
+    throw HarnessRepairPortError.unavailable("notExpected")
+  }
+
+  func appliedPatchReadback(
+    jobID: String, proposal: HarnessPatchProposal
+  ) async throws -> HarnessAppliedPatchReadback {
+    throw HarnessRepairPortError.unavailable("notExpected")
+  }
+
+  func buildReadback(
+    jobID: String, attempt: HarnessRepairAttempt, buildPresetRef: String,
+    task: HarnessTaskSnapshot
+  ) async throws -> HarnessBuildReadback {
+    throw HarnessRepairPortError.unavailable("notExpected")
+  }
+
+  func deployedArtifactDigest(jobID: String) async throws -> String {
+    throw HarnessRepairPortError.unavailable("notExpected")
+  }
+
+  func reconcileUnknownPatch(
+    jobID: String, proposal: HarnessPatchProposal
+  ) async throws -> HarnessPatchApplicationReadback {
+    throw HarnessRepairPortError.unavailable("notExpected")
+  }
 }
 
 final class HarnessStaleDecisionContractTests: XCTestCase {
@@ -138,14 +183,16 @@ final class HarnessStaleDecisionContractTests: XCTestCase {
     version: Int,
     observedState: [String: JSONValue] = [:],
     activeJobID: String? = nil,
-    cancelRequested: Bool = false
+    cancelRequested: Bool = false,
+    bindingRevision: Int? = nil
   ) -> HarnessTaskSnapshot {
     HarnessTaskSnapshot(
       htaskID: "HTASK-0123456789AB",
       type: .debugCrash,
       intakeDescription: nil,
       projectRef: "demo-app",
-      target: HarnessTaskTargetReference(targetID: "TGT-958780b2ffb7"),
+      target: HarnessTaskTargetReference(
+        targetID: "TGT-958780b2ffb7", expectedBindingRevision: bindingRevision),
       goal: HarnessTaskGoal(summary: "No WaterFlow SIGABRT"),
       successCriteria: [],
       budgets: HarnessTaskBudgets(
@@ -158,6 +205,47 @@ final class HarnessStaleDecisionContractTests: XCTestCase {
       activeJobID: activeJobID,
       cancelRequested: cancelRequested,
       version: version)
+  }
+
+  private func decision(
+    basis: HarnessDecisionBasis,
+    operation: String = DebugCrashTaskHandler.buildOpenHarmony,
+    attemptID: String? = "ATTEMPT-000000000001",
+    modelRunID: String? = nil,
+    contextDigest: String? = nil,
+    workspaceRevision: String? = nil,
+    deployedDigest: String? = nil,
+    bindingRevision: Int? = nil,
+    patchProposal: HarnessPatchProposal? = nil
+  ) -> HarnessDecision {
+    HarnessDecision(
+      decisionID: "dec-envelope", htaskID: basis.htaskID, round: basis.activeRound + 1,
+      kind: .invokeOperation, operationReference: operation, patchProposal: patchProposal,
+      hypothesis: "execute only against exact facts", reasonCode: "envelopeFixture",
+      producer: modelRunID == nil ? "deterministic@1" : "model@1",
+      createdAtUTC: "2026-07-31T00:00:00Z", modelRunID: modelRunID,
+      contextDigest: contextDigest
+    ).stamped(
+      with: basis, attemptID: attemptID,
+      expectedWorkspaceRevision: workspaceRevision,
+      expectedDeployedArtifactDigest: deployedDigest,
+      expectedBindingRevision: bindingRevision)
+  }
+
+  private func proposal(baseRevision: String) throws -> HarnessPatchProposal {
+    let diff = """
+      diff --git a/Sources/A.swift b/Sources/A.swift
+      --- a/Sources/A.swift
+      +++ b/Sources/A.swift
+      @@ -1 +1 @@
+      -let value = 0
+      +let value = 1
+      """
+    let digest = SHA256.hash(data: Data(diff.utf8))
+      .map { String(format: "%02x", $0) }.joined()
+    return try HarnessPatchProposal(
+      baseWorkspaceRevision: baseRevision, patchSHA256: digest, unifiedDiff: diff,
+      touchedFiles: ["Sources/A.swift"], expectedChangedSymbols: ["value"])
   }
 
   // MARK: - HFA-AC-3: a stale decision is not executed
@@ -179,7 +267,7 @@ final class HarnessStaleDecisionContractTests: XCTestCase {
 
     XCTAssertEqual(outcome.action, .staleDecision)
     XCTAssertTrue(
-      outcome.reasonCode.hasPrefix("decisionStale:stateVersion"),
+      outcome.reasonCode.hasPrefix("STALE_DECISION:taskStateChanged"),
       "expected a state-version staleness, got \(outcome.reasonCode)")
     // The property that matters: nothing was handed to the engine.
     let submitted = await jobs.submittedOperations
@@ -248,7 +336,8 @@ final class HarnessStaleDecisionContractTests: XCTestCase {
     let narrowed = HarnessDecisionBasis(
       snapshot: snapshot(version: 4),
       offeredOperations: [DebugCrashTaskHandler.observeDevice])
-    guard case .basisChanged? = HarnessDecisionFreshness.staleness(of: decision, against: narrowed)
+    guard case .basisMismatch? = HarnessDecisionFreshness.staleness(
+      of: decision, against: narrowed)
     else {
       return XCTFail("a narrowed operation set must read as a changed basis")
     }
@@ -346,6 +435,9 @@ final class HarnessStaleDecisionContractTests: XCTestCase {
     let run = try XCTUnwrap(runs.first)
     let storedDecision = try await store.decision(task.htaskID, round: 1)
     let decision = try XCTUnwrap(storedDecision)
+    let attempts = try await store.attempts(task.htaskID)
+    let activeAttempt = try XCTUnwrap(attempts.last)
+    let storedIntent = try await store.intent(task.htaskID, round: 1)
 
     XCTAssertEqual(run.outcome, .accepted(decisionID: decision.decisionID))
     XCTAssertEqual(run.descriptor.provider, gateway.producerID)
@@ -357,6 +449,11 @@ final class HarnessStaleDecisionContractTests: XCTestCase {
     XCTAssertEqual(run.contextDigest, seen.first?.transmittedDigest)
     XCTAssertEqual(run.contextBytes, seen.first?.transmittedByteCount)
     XCTAssertGreaterThan(run.contextBytes, 0)
+    XCTAssertEqual(decision.modelRunID, run.modelRunID)
+    XCTAssertEqual(decision.contextDigest, run.contextDigest)
+    XCTAssertNotEqual(decision.basisDigest, decision.contextDigest)
+    XCTAssertEqual(decision.attemptID, activeAttempt.attemptID)
+    XCTAssertEqual(storedIntent?.attemptID, activeAttempt.attemptID)
   }
 
   func testARefusedProposalStillRecordsTheModelCall() async throws {
@@ -393,5 +490,342 @@ final class HarnessStaleDecisionContractTests: XCTestCase {
         HarnessTaskStore.isWellFormed(modelRunID: malformed),
         "\(malformed) must not be accepted as a file name")
     }
+  }
+
+  // MARK: - WP-02 execution-envelope matrix
+
+  func testTaskStateAndHumanResolutionInvalidateTheEnvelope() {
+    let planned = HarnessDecisionBasis(
+      snapshot: snapshot(version: 3), offeredOperations: [DebugCrashTaskHandler.buildOpenHarmony])
+    let envelope = decision(basis: planned, attemptID: nil)
+    let resolved = HarnessDecisionBasis(
+      snapshot: snapshot(version: 4), offeredOperations: [DebugCrashTaskHandler.buildOpenHarmony])
+    XCTAssertEqual(
+      HarnessDecisionFreshness.staleness(of: envelope, against: resolved),
+      .taskStateChanged(observed: 3, current: 4))
+  }
+
+  func testActiveAttemptChangeInvalidatesInvokeAndProposalStrategies() throws {
+    let planned = HarnessDecisionBasis(
+      snapshot: snapshot(version: 3), offeredOperations: [DebugCrashTaskHandler.buildOpenHarmony])
+    let envelope = decision(basis: planned)
+    let facts = HarnessDecisionExecutionFacts(activeAttemptID: "ATTEMPT-000000000002")
+    XCTAssertEqual(
+      HarnessDecisionFreshness.staleness(
+        of: envelope, against: planned, executionFacts: facts),
+      .attemptChanged(
+        observed: "ATTEMPT-000000000001", current: "ATTEMPT-000000000002"))
+    let patch = HarnessDecision(
+      decisionID: "dec-patch-envelope", htaskID: planned.htaskID,
+      round: planned.activeRound + 1, kind: .proposePatch,
+      patchProposal: try proposal(baseRevision: String(repeating: "a", count: 64)),
+      hypothesis: "repair", reasonCode: "patch", producer: "model@1",
+      createdAtUTC: "2026-07-31T00:00:00Z"
+    ).stamped(with: planned, attemptID: "ATTEMPT-000000000001")
+    XCTAssertEqual(
+      HarnessDecisionFreshness.staleness(
+        of: patch, against: planned, executionFacts: facts),
+      .attemptChanged(
+        observed: "ATTEMPT-000000000001", current: "ATTEMPT-000000000002"))
+  }
+
+  func testOldPatchAndBuildWorkspaceRevisionsAreIndependentlyStale() {
+    let old = String(repeating: "1", count: 64)
+    let current = String(repeating: "2", count: 64)
+    let planned = HarnessDecisionBasis(
+      snapshot: snapshot(version: 3), offeredOperations: [DebugCrashTaskHandler.applyPatch])
+    for operation in [DebugCrashTaskHandler.applyPatch, DebugCrashTaskHandler.buildOpenHarmony] {
+      let envelope = decision(
+        basis: planned, operation: operation, workspaceRevision: old)
+      let facts = HarnessDecisionExecutionFacts(
+        activeAttemptID: "ATTEMPT-000000000001", workspaceRevision: current)
+      XCTAssertEqual(
+        HarnessDecisionFreshness.staleness(
+          of: envelope, against: planned, executionFacts: facts),
+        .workspaceRevisionChanged(observed: old, current: current), operation)
+    }
+  }
+
+  func testOldDeploymentAndBindingRevisionsAreStale() {
+    let deployed = String(repeating: "a", count: 64)
+    let replacement = String(repeating: "b", count: 64)
+    let planned = HarnessDecisionBasis(
+      snapshot: snapshot(version: 3), offeredOperations: [DebugCrashTaskHandler.captureDiagnostics])
+    let deploymentEnvelope = decision(
+      basis: planned, operation: DebugCrashTaskHandler.captureDiagnostics,
+      deployedDigest: deployed)
+    XCTAssertEqual(
+      HarnessDecisionFreshness.staleness(
+        of: deploymentEnvelope, against: planned,
+        executionFacts: HarnessDecisionExecutionFacts(
+          activeAttemptID: "ATTEMPT-000000000001", deployedArtifactDigest: replacement)),
+      .deployedArtifactChanged(observed: deployed, current: replacement))
+
+    let bindingEnvelope = decision(
+      basis: planned, operation: DebugCrashTaskHandler.captureDiagnostics, bindingRevision: 7)
+    XCTAssertEqual(
+      HarnessDecisionFreshness.staleness(
+        of: bindingEnvelope, against: planned,
+        executionFacts: HarnessDecisionExecutionFacts(
+          activeAttemptID: "ATTEMPT-000000000001", bindingRevision: 8)),
+      .bindingRevisionChanged(observed: 7, current: 8))
+  }
+
+  func testModelContextMismatchAndMissingRunFailClosed() {
+    let context = String(repeating: "c", count: 64)
+    let planned = HarnessDecisionBasis(
+      snapshot: snapshot(version: 3), offeredOperations: [DebugCrashTaskHandler.buildOpenHarmony])
+    let envelope = decision(
+      basis: planned, modelRunID: "MRUN-000000000001", contextDigest: context)
+    XCTAssertEqual(
+      HarnessDecisionFreshness.staleness(
+        of: envelope, against: planned,
+        executionFacts: HarnessDecisionExecutionFacts(
+          activeAttemptID: "ATTEMPT-000000000001")),
+      .modelRunMissing("MRUN-000000000001"))
+    XCTAssertEqual(
+      HarnessDecisionFreshness.staleness(
+        of: envelope, against: planned,
+        executionFacts: HarnessDecisionExecutionFacts(
+          activeAttemptID: "ATTEMPT-000000000001", modelRunID: "MRUN-000000000001",
+          modelContextDigest: String(repeating: "d", count: 64),
+          modelDecisionID: envelope.decisionID)),
+      .contextMismatch)
+  }
+
+  func testDeterministicEnvelopeHasNoModelLinkButStillChecksAttemptAndRevision() {
+    let revision = String(repeating: "e", count: 64)
+    let planned = HarnessDecisionBasis(
+      snapshot: snapshot(version: 3), offeredOperations: [DebugCrashTaskHandler.buildOpenHarmony])
+    let envelope = decision(basis: planned, workspaceRevision: revision)
+    XCTAssertNil(envelope.modelRunID)
+    XCTAssertNil(envelope.contextDigest)
+    XCTAssertNil(
+      HarnessDecisionFreshness.staleness(
+        of: envelope, against: planned,
+        executionFacts: HarnessDecisionExecutionFacts(
+          activeAttemptID: "ATTEMPT-000000000001", workspaceRevision: revision)))
+    XCTAssertEqual(
+      HarnessDecisionFreshness.staleness(
+        of: envelope, against: planned,
+        executionFacts: HarnessDecisionExecutionFacts(
+          activeAttemptID: "ATTEMPT-000000000002", workspaceRevision: revision)),
+      .attemptChanged(
+        observed: "ATTEMPT-000000000001", current: "ATTEMPT-000000000002"))
+  }
+
+  func testLegacyEnvelopeIsReadableQueryableAndNeverFresh() throws {
+    let legacy = Data(
+      """
+      {"documentType":"harness-decision","decisionId":"dec-legacy-envelope",\
+      "htaskId":"HTASK-0123456789AB","round":1,"kind":"invokeOperation",\
+      "operationReference":"observe.device@1","inputs":{},"hypothesis":"legacy",\
+      "reasonCode":"legacy","producer":"legacy@1","createdAtUtc":"2026-07-30T00:00:00Z",\
+      "observedStateVersion":3,"basisDigest":"\(String(repeating: "f", count: 64))"}
+      """.utf8)
+    let decoded = try JSONDecoder().decode(HarnessDecision.self, from: legacy)
+    XCTAssertEqual(decoded.envelopeVersion, "1.0.0")
+    let current = HarnessDecisionBasis(
+      snapshot: snapshot(version: 3), offeredOperations: [DebugCrashTaskHandler.observeDevice])
+    XCTAssertEqual(
+      HarnessDecisionFreshness.staleness(of: decoded, against: current), .unverifiable)
+  }
+
+  func testPendingWorkspaceDriftClosesIntentWithoutProviderE1OrNoProgress() async throws {
+    let old = String(repeating: "1", count: 64)
+    let live = String(repeating: "2", count: 64)
+    let current = snapshot(version: 3)
+    let basis = HarnessDecisionBasis(
+      snapshot: current, offeredOperations: [DebugCrashTaskHandler.buildOpenHarmony])
+    let envelope = decision(
+      basis: basis, workspaceRevision: old,
+      patchProposal: try proposal(baseRevision: old))
+    let store = try HarnessTaskStore(rootURL: rootURL)
+    try await store.create(current)
+    let strategy = try HarnessStrategyDescriptor(
+      hypothesisClass: "repair", selectedOperationFamily: "workspace.build-openharmony",
+      patchFingerprint: String(repeating: "a", count: 64), baseWorkspaceRevision: old,
+      artifactSourceSet: [], prerequisiteSet: [],
+      executionExpectation: HarnessStrategyExecutionExpectation(
+        targetProfile: current.target.targetID, toolchainProfile: "debug",
+        expectedNextObservation: "BUILD_COMPLETE"))
+    try await store.recordAttempt(
+      HarnessAttempt(
+        attemptID: "ATTEMPT-000000000001", htaskID: current.htaskID, ordinal: 1,
+        hypothesis: "build", strategy: strategy,
+        createdAtUTC: "2026-07-31T00:00:00Z", updatedAtUTC: "2026-07-31T00:00:00Z"),
+      kind: .created, reasonCode: "fixture")
+    try await store.putDecision(envelope)
+    let intent = HarnessDispatchIntent(
+      htaskID: current.htaskID, round: envelope.round, decisionID: envelope.decisionID,
+      attemptID: envelope.attemptID,
+      operationReference: DebugCrashTaskHandler.buildOpenHarmony,
+      targetID: current.target.targetID, expectedBindingRevision: nil,
+      expectedWorkspaceRevision: old,
+      inputsDigestSHA256: HarnessRequestIdentity.inputsDigest(envelope.inputs),
+      requestID: "request-original", idempotencyKey: "idempotency-original",
+      state: .pending, jobID: nil, createdAtUTC: "2026-07-31T00:00:00Z",
+      updatedAtUTC: "2026-07-31T00:00:00Z")
+    try await store.putIntent(intent)
+    let jobs = CountingJobPort()
+    let coordinator = HarnessTaskCoordinator(
+      store: store, jobPort: jobs,
+      repairPort: DriftingWorkspacePort(liveRevision: live),
+      nowUTC: { "2026-07-31T00:00:01Z" })
+
+    let outcome = try await coordinator.reconcile(current.htaskID)
+    let closedIntent = try await store.intent(current.htaskID, round: 1)
+    let submissions = await jobs.submittedOperations
+    let failures = try await store.failureRecords()
+
+    XCTAssertEqual(outcome.action, .staleDecision)
+    XCTAssertTrue(outcome.reasonCode.contains("workspaceRevisionChanged"))
+    XCTAssertEqual(closedIntent?.state, .stale)
+    XCTAssertTrue(submissions.isEmpty, "stale intent must call no provider")
+    XCTAssertEqual(outcome.snapshot.consumedBudget.e1Mutations, 0)
+    XCTAssertEqual(outcome.snapshot.noProgressRounds, 0)
+    XCTAssertTrue(failures.isEmpty)
+  }
+
+  func testSubmittedIntentUsesOriginalKeyEvenAfterDecisionBecomesStale() async throws {
+    let plannedSnapshot = snapshot(version: 3, bindingRevision: 7)
+    let current = snapshot(version: 4, bindingRevision: 8)
+    let planned = HarnessDecisionBasis(
+      snapshot: plannedSnapshot, offeredOperations: [DebugCrashTaskHandler.observeDevice])
+    let envelope = decision(
+      basis: planned, operation: DebugCrashTaskHandler.observeDevice, attemptID: nil,
+      bindingRevision: 7)
+    let store = try HarnessTaskStore(rootURL: rootURL)
+    try await store.create(current)
+    try await store.putDecision(envelope)
+    let originalKey = "idempotency-key-from-original-submit"
+    try await store.putIntent(
+      HarnessDispatchIntent(
+        htaskID: current.htaskID, round: 1, decisionID: envelope.decisionID,
+        operationReference: DebugCrashTaskHandler.observeDevice,
+        targetID: current.target.targetID, expectedBindingRevision: 7,
+        inputsDigestSHA256: HarnessRequestIdentity.inputsDigest(envelope.inputs),
+        requestID: "request-original", idempotencyKey: originalKey,
+        state: .submitted, jobID: nil, createdAtUTC: "2026-07-31T00:00:00Z",
+        updatedAtUTC: "2026-07-31T00:00:00Z"))
+    let replacement = HarnessDecision(
+      decisionID: "dec-replacement", htaskID: current.htaskID, round: 1,
+      kind: .invokeOperation, operationReference: DebugCrashTaskHandler.observeDevice,
+      hypothesis: "replacement", reasonCode: "replacement", producer: "deterministic@1",
+      createdAtUTC: "2026-07-31T00:00:01Z"
+    ).stamped(with: HarnessDecisionBasis(
+      snapshot: current, offeredOperations: [DebugCrashTaskHandler.observeDevice]))
+    do {
+      try await store.putDecision(replacement)
+      XCTFail("an unresolved submitted intent must own its original decision")
+    } catch let error as HarnessTaskStoreError {
+      guard case .corrupt(let reason) = error else {
+        return XCTFail("unexpected store error: \(error)")
+      }
+      XCTAssertTrue(reason.contains("submitted intent"))
+    }
+    let sameIDReplacement = HarnessDecision(
+      decisionID: envelope.decisionID, htaskID: current.htaskID, round: 1,
+      kind: .invokeOperation, operationReference: DebugCrashTaskHandler.observeDevice,
+      hypothesis: "same id, different facts", reasonCode: "replacement",
+      producer: "deterministic@1", createdAtUTC: "2026-07-31T00:00:01Z"
+    ).stamped(
+      with: HarnessDecisionBasis(
+        snapshot: current, offeredOperations: [DebugCrashTaskHandler.observeDevice]),
+      expectedBindingRevision: 8)
+    do {
+      try await store.putDecision(sameIDReplacement)
+      XCTFail("a submitted decision id must not permit content replacement")
+    } catch let error as HarnessTaskStoreError {
+      guard case .corrupt = error else { return XCTFail("unexpected store error: \(error)") }
+    }
+    do {
+      try await store.putIntent(
+        HarnessDispatchIntent(
+          htaskID: current.htaskID, round: 1, decisionID: envelope.decisionID,
+          operationReference: DebugCrashTaskHandler.observeDevice,
+          targetID: current.target.targetID, expectedBindingRevision: 7,
+          inputsDigestSHA256: HarnessRequestIdentity.inputsDigest(envelope.inputs),
+          requestID: "request-original", idempotencyKey: "replacement-key",
+          state: .submitted, jobID: nil, createdAtUTC: "2026-07-31T00:00:00Z",
+          updatedAtUTC: "2026-07-31T00:00:01Z"))
+      XCTFail("a submitted intent must not permit idempotency-key replacement")
+    } catch let error as HarnessTaskStoreError {
+      guard case .corrupt = error else { return XCTFail("unexpected store error: \(error)") }
+    }
+    let jobs = CountingJobPort()
+    let coordinator = HarnessTaskCoordinator(
+      store: store, jobPort: jobs, nowUTC: { "2026-07-31T00:00:01Z" })
+
+    let outcome = try await coordinator.reconcile(current.htaskID)
+    let submittedKeys = await jobs.submittedKeys
+    let submittedBindings = await jobs.submittedBindingRevisions
+
+    XCTAssertEqual(outcome.action, .recoveredIntent)
+    XCTAssertEqual(submittedKeys, [originalKey])
+    XCTAssertEqual(submittedBindings, [7], "recovery must not adopt binding revision 8")
+    let recovered = try await store.intent(current.htaskID, round: 1)
+    XCTAssertEqual(recovered?.state, .linked)
+    XCTAssertEqual(recovered?.idempotencyKey, originalKey)
+  }
+
+  func testRestartRecoversDecisionModelRunAttemptAndIntentAssociations() async throws {
+    let current = snapshot(version: 3)
+    let store = try HarnessTaskStore(rootURL: rootURL)
+    try await store.create(current)
+    let strategy = try HarnessStrategyDescriptor(
+      hypothesisClass: "repair", selectedOperationFamily: "workspace.apply-patch",
+      patchFingerprint: String(repeating: "a", count: 64),
+      baseWorkspaceRevision: String(repeating: "b", count: 64),
+      artifactSourceSet: [], prerequisiteSet: [],
+      executionExpectation: HarnessStrategyExecutionExpectation(
+        targetProfile: current.target.targetID, toolchainProfile: "debug",
+        expectedNextObservation: "PATCH_APPLIED"))
+    let attempt = HarnessAttempt(
+      attemptID: "ATTEMPT-000000000001", htaskID: current.htaskID, ordinal: 1,
+      hypothesis: "repair", strategy: strategy,
+      createdAtUTC: "2026-07-31T00:00:00Z", updatedAtUTC: "2026-07-31T00:00:00Z")
+    try await store.recordAttempt(attempt, kind: .created, reasonCode: "fixture")
+    let context = String(repeating: "c", count: 64)
+    let basis = HarnessDecisionBasis(
+      snapshot: current, offeredOperations: [DebugCrashTaskHandler.buildOpenHarmony])
+    let envelope = decision(
+      basis: basis, modelRunID: "MRUN-000000000001", contextDigest: context,
+      workspaceRevision: strategy.baseWorkspaceRevision)
+    try await store.putModelRun(
+      HarnessModelRun(
+        modelRunID: "MRUN-000000000001", htaskID: current.htaskID, round: 1,
+        descriptor: HarnessModelDescriptor(provider: "fixture"),
+        observedStateVersion: current.version, contextDigest: context,
+        contextBytes: 32, responseBytes: 16,
+        outcome: .accepted(decisionID: envelope.decisionID),
+        startedAtUTC: "2026-07-31T00:00:00Z", finishedAtUTC: "2026-07-31T00:00:01Z"))
+    try await store.putDecision(envelope)
+    try await store.putIntent(
+      HarnessDispatchIntent(
+        htaskID: current.htaskID, round: 1, decisionID: envelope.decisionID,
+        attemptID: attempt.attemptID, modelRunID: envelope.modelRunID,
+        operationReference: DebugCrashTaskHandler.buildOpenHarmony,
+        targetID: current.target.targetID, expectedBindingRevision: nil,
+        expectedWorkspaceRevision: envelope.expectedWorkspaceRevision,
+        inputsDigestSHA256: String(repeating: "0", count: 64),
+        requestID: "request-original", idempotencyKey: "idempotency-original",
+        state: .pending, jobID: nil, createdAtUTC: "2026-07-31T00:00:00Z",
+        updatedAtUTC: "2026-07-31T00:00:00Z"))
+
+    let reopened = try HarnessTaskStore(rootURL: rootURL)
+    let reopenedDecision = try await reopened.decision(current.htaskID, round: 1)
+    let reopenedIntent = try await reopened.intent(current.htaskID, round: 1)
+    let reopenedRuns = try await reopened.modelRuns(current.htaskID)
+    let reopenedAttempts = try await reopened.attempts(current.htaskID)
+    let restoredDecision = try XCTUnwrap(reopenedDecision)
+    let restoredIntent = try XCTUnwrap(reopenedIntent)
+    let restoredRun = try XCTUnwrap(reopenedRuns.first)
+    let restoredAttempt = try XCTUnwrap(reopenedAttempts.first)
+    XCTAssertEqual(restoredDecision.attemptID, restoredAttempt.attemptID)
+    XCTAssertEqual(restoredDecision.modelRunID, restoredRun.modelRunID)
+    XCTAssertEqual(restoredIntent.attemptID, restoredAttempt.attemptID)
+    XCTAssertEqual(restoredIntent.modelRunID, restoredRun.modelRunID)
+    XCTAssertEqual(restoredRun.outcome.decisionID, restoredDecision.decisionID)
   }
 }

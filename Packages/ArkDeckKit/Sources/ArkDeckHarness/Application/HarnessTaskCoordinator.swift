@@ -525,6 +525,7 @@ public actor HarnessTaskCoordinator {
     guard let handler = handlers[snapshot.type] else {
       throw HarnessCoordinatorError.unsupportedTaskType(snapshot.type)
     }
+    try await ensureInitialJourneyAttempt(snapshot)
     // One proposal per wake, from the model path when it is enabled and
     // healthy, otherwise from the deterministic handler - and the record says
     // which, and why (TASK-HTP-004).
@@ -536,8 +537,18 @@ public actor HarnessTaskCoordinator {
     let basis = HarnessDecisionBasis(
       snapshot: snapshot, offeredOperations: offeredOperations(snapshot, handler: handler))
     let proposal = await plannedProposal(snapshot, handler: handler, basis: basis)
+    let currentAttemptID = try await activeAttempt(snapshot.htaskID)?.attemptID
+    let proposedDecision = proposal.step.decision
     let step = HarnessPlannedStep(
-      decision: proposal.step.decision.stamped(with: basis),
+      decision: proposedDecision.stamped(
+        with: basis,
+        attemptID: currentAttemptID,
+        expectedWorkspaceRevision: expectedWorkspaceRevision(
+          for: proposedDecision, snapshot: snapshot),
+        expectedDeployedArtifactDigest: expectedDeployedArtifactDigest(
+          for: proposedDecision, snapshot: snapshot),
+        expectedBindingRevision: expectedBindingRevision(
+          for: proposedDecision, snapshot: snapshot)),
       phaseOnDispatch: proposal.step.phaseOnDispatch)
     try await store.putDecision(step.decision)
     if let rejection = proposal.rejection {
@@ -615,6 +626,90 @@ public actor HarnessTaskCoordinator {
       modelCalls: budget.modelCalls + modelCalls)
   }
 
+  private func expectedWorkspaceRevision(
+    for decision: HarnessDecision,
+    snapshot: HarnessTaskSnapshot
+  ) -> String? {
+    if let proposal = decision.patchProposal { return proposal.baseWorkspaceRevision }
+    let workspaceOperations: Set<String> = [
+      DebugCrashTaskHandler.applyPatch, DebugCrashTaskHandler.buildOpenHarmony,
+      DebugCrashTaskHandler.runTests, DebugCrashTaskHandler.revertPatch,
+      DebugCrashTaskHandler.deployHAP,
+    ]
+    guard let operation = decision.operationReference, workspaceOperations.contains(operation)
+    else { return nil }
+    return snapshot.repairAttempt?.patchRevision
+      ?? snapshot.repairAttempt?.proposal.baseWorkspaceRevision
+  }
+
+  private func expectedDeployedArtifactDigest(
+    for decision: HarnessDecision,
+    snapshot: HarnessTaskSnapshot
+  ) -> String? {
+    guard decision.operationReference != DebugCrashTaskHandler.deployHAP else { return nil }
+    return snapshot.repairAttempt?.deployedDigest
+  }
+
+  private func expectedBindingRevision(
+    for decision: HarnessDecision,
+    snapshot: HarnessTaskSnapshot
+  ) -> Int? {
+    guard let operation = decision.operationReference,
+      let descriptor = RuntimeOperationCatalog.descriptor(reference: operation),
+      descriptor.binding != .none
+    else { return nil }
+    return snapshot.target.expectedBindingRevision
+  }
+
+  private func executionFacts(
+    for decision: HarnessDecision,
+    snapshot: HarnessTaskSnapshot
+  ) async -> HarnessDecisionExecutionFacts {
+    let attemptID = try? await activeAttempt(snapshot.htaskID)?.attemptID
+    var workspaceRevision: String?
+    if decision.expectedWorkspaceRevision != nil,
+      let repairPort,
+      let projectRef = snapshot.projectRef
+    {
+      let proposal = decision.patchProposal ?? snapshot.repairAttempt?.proposal
+      if let proposal {
+        workspaceRevision = try? await repairPort.currentWorkspaceRevision(
+          relativePaths: proposal.touchedFiles, projectRef: projectRef, task: snapshot)
+      }
+    }
+    let run: HarnessModelRun?
+    if let modelRunID = decision.modelRunID {
+      run = (try? await store.modelRuns(snapshot.htaskID))?.first {
+        $0.modelRunID == modelRunID
+      }
+    } else {
+      run = nil
+    }
+    return HarnessDecisionExecutionFacts(
+      activeAttemptID: attemptID,
+      workspaceRevision: workspaceRevision,
+      deployedArtifactDigest: snapshot.repairAttempt?.deployedDigest,
+      bindingRevision: snapshot.target.expectedBindingRevision,
+      modelRunID: run?.modelRunID,
+      modelContextDigest: run?.contextDigest,
+      modelDecisionID: run?.outcome.decisionID)
+  }
+
+  private func decisionStaleness(
+    _ decision: HarnessDecision,
+    snapshot: HarnessTaskSnapshot,
+    handler: any HarnessTaskHandler
+  ) async -> HarnessDecisionStaleness? {
+    if decision.kind == .invokeOperation, decision.attemptID == nil {
+      return .attemptChanged(observed: nil, current: nil)
+    }
+    let basis = HarnessDecisionBasis(
+      snapshot: snapshot, offeredOperations: offeredOperations(snapshot, handler: handler))
+    let facts = await executionFacts(for: decision, snapshot: snapshot)
+    return HarnessDecisionFreshness.staleness(
+      of: decision, against: basis, executionFacts: facts)
+  }
+
   // MARK: - Dispatch and recovery
 
   private func dispatchPatch(
@@ -625,10 +720,8 @@ public actor HarnessTaskCoordinator {
   ) async throws -> HarnessReconcileOutcome {
     let proposalDecision = step.decision
     let snapshot = try await load(snapshotAtPlanning.htaskID)
-    let currentBasis = HarnessDecisionBasis(
-      snapshot: snapshot, offeredOperations: offeredOperations(snapshot, handler: handler))
-    if let staleness = HarnessDecisionFreshness.staleness(
-      of: proposalDecision, against: currentBasis)
+    if let staleness = await decisionStaleness(
+      proposalDecision, snapshot: snapshot, handler: handler)
     {
       return try await recordStale(
         proposalDecision, staleness: staleness, snapshot: snapshot,
@@ -645,8 +738,9 @@ public actor HarnessTaskCoordinator {
       return HarnessReconcileOutcome(
         snapshot: blocked.snapshot, action: .stoppedForHuman, reasonCode: reason)
     }
+    let attempt: HarnessAttempt
     do {
-      _ = try await beginStrategyAttempt(
+      attempt = try await beginStrategyAttempt(
         decision: proposalDecision, proposal: proposal, snapshot: snapshot)
     } catch let error as HarnessAttemptAdmissionError {
       let blocked = try await recordBlock(
@@ -701,7 +795,13 @@ public actor HarnessTaskCoordinator {
       producer: proposalDecision.producer,
       createdAtUTC: proposalDecision.createdAtUTC,
       observedStateVersion: proposalDecision.observedStateVersion,
-      basisDigest: proposalDecision.basisDigest)
+      basisDigest: proposalDecision.basisDigest,
+      attemptID: attempt.attemptID,
+      modelRunID: proposalDecision.modelRunID,
+      contextDigest: proposalDecision.contextDigest,
+      expectedWorkspaceRevision: proposal.baseWorkspaceRevision,
+      expectedDeployedArtifactDigest: proposalDecision.expectedDeployedArtifactDigest,
+      expectedBindingRevision: proposalDecision.expectedBindingRevision)
     try await store.putDecision(executable)
     return try await dispatch(
       HarnessPlannedStep(decision: executable, phaseOnDispatch: .patching),
@@ -724,9 +824,9 @@ public actor HarnessTaskCoordinator {
     // submitted: the side effect would already exist and only the
     // bookkeeping would fail.
     let snapshot = try await load(snapshotAtPlanning.htaskID)
-    let currentBasis = HarnessDecisionBasis(
-      snapshot: snapshot, offeredOperations: offeredOperations(snapshot, handler: handler))
-    if let staleness = HarnessDecisionFreshness.staleness(of: decision, against: currentBasis) {
+    if let staleness = await decisionStaleness(
+      decision, snapshot: snapshot, handler: handler)
+    {
       return try await recordStale(
         decision, staleness: staleness, snapshot: snapshot, modelCallsSpent: modelCallsSpent)
     }
@@ -780,9 +880,13 @@ public actor HarnessTaskCoordinator {
       htaskID: snapshot.htaskID,
       round: decision.round,
       decisionID: decision.decisionID,
+      attemptID: decision.attemptID,
+      modelRunID: decision.modelRunID,
       operationReference: operationReference,
       targetID: snapshot.target.targetID,
-      expectedBindingRevision: snapshot.target.expectedBindingRevision,
+      expectedBindingRevision: decision.expectedBindingRevision,
+      expectedWorkspaceRevision: decision.expectedWorkspaceRevision,
+      expectedDeployedArtifactDigest: decision.expectedDeployedArtifactDigest,
       inputsDigestSHA256: digest,
       requestID: identity.requestID,
       idempotencyKey: identity.idempotencyKey,
@@ -956,30 +1060,72 @@ public actor HarnessTaskCoordinator {
     guard let decision = try await store.decision(snapshot.htaskID, round: intent.round) else {
       throw HarnessCoordinatorError.missingDecisionRecord(round: intent.round)
     }
+    let v2AssociationsMatch =
+      decision.envelopeVersion == HarnessDecision.envelopeVersion
+      && intent.schemaVersion == HarnessDispatchIntent.schemaVersion
+      && decision.attemptID == intent.attemptID
+      && decision.modelRunID == intent.modelRunID
+      && decision.expectedBindingRevision == intent.expectedBindingRevision
+      && decision.expectedWorkspaceRevision == intent.expectedWorkspaceRevision
+      && decision.expectedDeployedArtifactDigest == intent.expectedDeployedArtifactDigest
+    let legacyAssociationsMatch =
+      decision.envelopeVersion != HarnessDecision.envelopeVersion
+      && intent.schemaVersion != HarnessDispatchIntent.schemaVersion
+    guard decision.decisionID == intent.decisionID,
+      decision.htaskID == intent.htaskID,
+      decision.round == intent.round,
+      decision.operationReference == intent.operationReference,
+      HarnessRequestIdentity.inputsDigest(decision.inputs) == intent.inputsDigestSHA256,
+      v2AssociationsMatch || legacyAssociationsMatch
+    else {
+      throw HarnessTaskStoreError.corrupt(
+        "intent \(intent.requestID) no longer matches decision \(intent.decisionID)")
+    }
+    if intent.state == .pending {
+      guard let handler = handlers[snapshot.type] else {
+        throw HarnessCoordinatorError.unsupportedTaskType(snapshot.type)
+      }
+      if let staleness = await decisionStaleness(
+        decision, snapshot: snapshot, handler: handler)
+      {
+        // Pending proves the request never crossed the engine boundary. Close
+        // it durably, record a stale wake, and replan on the next reconcile.
+        try await store.putIntent(intent.withState(.stale, atUTC: nowUTC()))
+        // The v2 Intent carries the exact model association. Counting every
+        // run in the round would double-charge an earlier stale replan that
+        // reused the same product round.
+        let modelCallsSpent = intent.modelRunID == nil ? 0 : 1
+        return try await recordStale(
+          decision, staleness: staleness, snapshot: snapshot,
+          modelCallsSpent: modelCallsSpent)
+      }
+    }
     // A pending intent may be the crash window between intent persistence
     // and Attempt association. Replaying this append is idempotent and keeps
     // the original ActionRun/key; it is not a confirmed retry.
-    do {
-      try await recordAttemptActionRun(
-        snapshot: snapshot, operationReference: intent.operationReference,
-        inputsDigest: intent.inputsDigestSHA256, actionRunID: intent.requestID)
-    } catch let error as HarnessAttemptAdmissionError {
-      try await store.putIntent(intent.withState(.rejected, atUTC: nowUTC()))
-      switch error {
-      case .duplicateStrategy:
-        let blocked = try await recordBlock(
-          snapshot, block: .strategyExhausted, reasonCode: error.reasonCode,
-          round: intent.round, jobID: nil, requestID: intent.requestID)
-        return HarnessReconcileOutcome(
-          snapshot: blocked.snapshot, action: .stoppedForHuman,
-          reasonCode: error.reasonCode)
-      case .actionRetryBudgetExhausted:
-        try await closeAttempt(
-          snapshot.htaskID, outcome: .failed, reason: error.reasonCode)
-        return try await stop(
-          snapshot, refusal: .budgetExhausted(.actionRetriesPerRun),
-          round: intent.round, requestID: intent.requestID, jobID: nil,
-          decisionID: intent.decisionID)
+    if intent.state == .pending {
+      do {
+        try await recordAttemptActionRun(
+          snapshot: snapshot, operationReference: intent.operationReference,
+          inputsDigest: intent.inputsDigestSHA256, actionRunID: intent.requestID)
+      } catch let error as HarnessAttemptAdmissionError {
+        try await store.putIntent(intent.withState(.rejected, atUTC: nowUTC()))
+        switch error {
+        case .duplicateStrategy:
+          let blocked = try await recordBlock(
+            snapshot, block: .strategyExhausted, reasonCode: error.reasonCode,
+            round: intent.round, jobID: nil, requestID: intent.requestID)
+          return HarnessReconcileOutcome(
+            snapshot: blocked.snapshot, action: .stoppedForHuman,
+            reasonCode: error.reasonCode)
+        case .actionRetryBudgetExhausted:
+          try await closeAttempt(
+            snapshot.htaskID, outcome: .failed, reason: error.reasonCode)
+          return try await stop(
+            snapshot, refusal: .budgetExhausted(.actionRetriesPerRun),
+            round: intent.round, requestID: intent.requestID, jobID: nil,
+            decisionID: intent.decisionID)
+        }
       }
     }
     let submitting =
@@ -1135,7 +1281,8 @@ public actor HarnessTaskCoordinator {
       {
         attemptOutcome = .humanRequired
       } else if record.fingerprint.retryDisposition == .actionRetryAllowed,
-        Self.isActionRetrySafe(operationReference)
+        Self.isActionRetrySafe(operationReference),
+        try await activeAttemptSupportsActionRetry(snapshot.htaskID)
       {
         attemptOutcome = .active
       } else {
@@ -1201,7 +1348,7 @@ public actor HarnessTaskCoordinator {
       }
       if record.fingerprint.retryDisposition == .actionRetryAllowed,
         Self.isActionRetrySafe(operationReference),
-        try await activeAttempt(snapshot.htaskID) != nil
+        try await activeAttemptSupportsActionRetry(snapshot.htaskID)
       {
         let retryable = try await commit(
           snapshot,
@@ -2227,7 +2374,7 @@ public actor HarnessTaskCoordinator {
       if let descriptor, descriptor.minimumEffect >= .deviceMutation,
         let capabilityID = await policyGuard.capabilityPort?.standingCapabilityID(
           operationReference: intent.operationReference,
-          targetID: snapshot.target.targetID) ?? nil
+          targetID: intent.targetID) ?? nil
       {
         authorizationReference = RuntimeCapabilityReference(capabilityID: capabilityID)
       }
@@ -2235,9 +2382,9 @@ public actor HarnessTaskCoordinator {
         requestID: intent.requestID,
         idempotencyKey: intent.idempotencyKey,
         target: DurableTargetReference(
-          targetID: snapshot.target.targetID,
+          targetID: intent.targetID,
           expectedBindingRevision: descriptor?.binding == WorkflowBindingRequirement.none
-            ? nil : snapshot.target.expectedBindingRevision),
+            ? nil : intent.expectedBindingRevision),
         operation: RuntimeOperationReference(id: String(parts[0]), version: version),
         inputs: decision.inputs,
         requestedOutputs: [.rawArtifacts, .derivedArtifacts],

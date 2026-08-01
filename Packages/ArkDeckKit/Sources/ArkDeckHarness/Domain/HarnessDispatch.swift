@@ -31,6 +31,9 @@ public enum HarnessDispatchState: String, CaseIterable, Codable, Sendable {
   /// same reason, which is exactly the loop a bounded harness must not
   /// enter. Resolving it is a human or policy decision.
   case rejected
+  /// A pending (never submitted) intent whose decision envelope no longer
+  /// matches current facts. It is terminal and must never reach the engine.
+  case stale
 }
 
 public enum HarnessDecisionKind: String, CaseIterable, Codable, Sendable {
@@ -47,8 +50,12 @@ public enum HarnessDecisionKind: String, CaseIterable, Codable, Sendable {
 /// which is what makes HTP-INV-1 structural instead of advisory.
 public struct HarnessDecision: Equatable, Sendable, Codable {
   public static let documentType = "harness-decision"
+  public static let envelopeVersion = "2.0.0"
 
   public let documentType: String
+  /// Version 2 is the first executable decision envelope. Historical records
+  /// without this field remain queryable but are unverifiable.
+  public let envelopeVersion: String
   public let decisionID: String
   public let htaskID: String
   public let round: Int
@@ -68,14 +75,26 @@ public struct HarnessDecision: Equatable, Sendable, Codable {
   /// Zero means "written before the guard existed", which the freshness
   /// check treats as unverifiable rather than fresh.
   public let observedStateVersion: Int
-  /// Digest of `HarnessDecisionBasis` at proposal time. This is the
-  /// `contextHash` position of the architecture's stale-decision guard; the
-  /// digest of the bytes a *model* actually received is a separate field on
-  /// `HarnessModelRun`, because they answer different questions.
+  /// Digest of `HarnessDecisionBasis` at proposal time. This describes the
+  /// Harness facts used to plan. The digest of bytes a model actually received
+  /// is `contextDigest`; the two answer different questions and never alias.
   public let basisDigest: String
+  /// Strategy identity is Harness-owned. `nil` is valid only before a repair
+  /// strategy exists (for example the initial read-only target observation).
+  public let attemptID: String?
+  /// A model-backed decision links to the exact durable run and the digest of
+  /// the bytes actually transmitted. Deterministic decisions carry neither.
+  public let modelRunID: String?
+  public let contextDigest: String?
+  /// Explicit execution preconditions. Applicability is operation-specific;
+  /// an unrelated dimension is represented by `nil`, not a wildcard string.
+  public let expectedWorkspaceRevision: String?
+  public let expectedDeployedArtifactDigest: String?
+  public let expectedBindingRevision: Int?
 
   enum CodingKeys: String, CodingKey {
     case documentType
+    case envelopeVersion
     case decisionID = "decisionId"
     case htaskID = "htaskId"
     case round
@@ -91,6 +110,12 @@ public struct HarnessDecision: Equatable, Sendable, Codable {
     case createdAtUTC = "createdAtUtc"
     case observedStateVersion
     case basisDigest
+    case attemptID = "attemptId"
+    case modelRunID = "modelRunId"
+    case contextDigest
+    case expectedWorkspaceRevision
+    case expectedDeployedArtifactDigest
+    case expectedBindingRevision
   }
 
   public init(
@@ -108,9 +133,16 @@ public struct HarnessDecision: Equatable, Sendable, Codable {
     producer: String,
     createdAtUTC: String,
     observedStateVersion: Int = 0,
-    basisDigest: String = ""
+    basisDigest: String = "",
+    attemptID: String? = nil,
+    modelRunID: String? = nil,
+    contextDigest: String? = nil,
+    expectedWorkspaceRevision: String? = nil,
+    expectedDeployedArtifactDigest: String? = nil,
+    expectedBindingRevision: Int? = nil
   ) {
     self.documentType = Self.documentType
+    self.envelopeVersion = Self.envelopeVersion
     self.decisionID = decisionID
     self.htaskID = htaskID
     self.round = round
@@ -126,6 +158,12 @@ public struct HarnessDecision: Equatable, Sendable, Codable {
     self.createdAtUTC = createdAtUTC
     self.observedStateVersion = observedStateVersion
     self.basisDigest = basisDigest
+    self.attemptID = attemptID
+    self.modelRunID = modelRunID
+    self.contextDigest = contextDigest
+    self.expectedWorkspaceRevision = expectedWorkspaceRevision
+    self.expectedDeployedArtifactDigest = expectedDeployedArtifactDigest
+    self.expectedBindingRevision = expectedBindingRevision
   }
 
   /// Decisions written before TASK-HFA-002 carry neither field. They decode
@@ -134,6 +172,8 @@ public struct HarnessDecision: Equatable, Sendable, Codable {
   public init(from decoder: any Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
     self.documentType = try container.decode(String.self, forKey: .documentType)
+    self.envelopeVersion =
+      try container.decodeIfPresent(String.self, forKey: .envelopeVersion) ?? "1.0.0"
     self.decisionID = try container.decode(String.self, forKey: .decisionID)
     self.htaskID = try container.decode(String.self, forKey: .htaskID)
     self.round = try container.decode(Int.self, forKey: .round)
@@ -155,13 +195,28 @@ public struct HarnessDecision: Equatable, Sendable, Codable {
     self.observedStateVersion =
       try container.decodeIfPresent(Int.self, forKey: .observedStateVersion) ?? 0
     self.basisDigest = try container.decodeIfPresent(String.self, forKey: .basisDigest) ?? ""
+    self.attemptID = try container.decodeIfPresent(String.self, forKey: .attemptID)
+    self.modelRunID = try container.decodeIfPresent(String.self, forKey: .modelRunID)
+    self.contextDigest = try container.decodeIfPresent(String.self, forKey: .contextDigest)
+    self.expectedWorkspaceRevision = try container.decodeIfPresent(
+      String.self, forKey: .expectedWorkspaceRevision)
+    self.expectedDeployedArtifactDigest = try container.decodeIfPresent(
+      String.self, forKey: .expectedDeployedArtifactDigest)
+    self.expectedBindingRevision = try container.decodeIfPresent(
+      Int.self, forKey: .expectedBindingRevision)
   }
 
   /// The same decision, stamped with the basis its producer read. Kept as a
   /// derivation rather than a mutable field so a producer cannot forge a
   /// basis it did not observe: the coordinator stamps it, from the snapshot
   /// it loaded, on the way out of planning.
-  public func stamped(with basis: HarnessDecisionBasis) -> HarnessDecision {
+  public func stamped(
+    with basis: HarnessDecisionBasis,
+    attemptID: String? = nil,
+    expectedWorkspaceRevision: String? = nil,
+    expectedDeployedArtifactDigest: String? = nil,
+    expectedBindingRevision: Int? = nil
+  ) -> HarnessDecision {
     HarnessDecision(
       decisionID: decisionID,
       htaskID: htaskID,
@@ -177,22 +232,33 @@ public struct HarnessDecision: Equatable, Sendable, Codable {
       producer: producer,
       createdAtUTC: createdAtUTC,
       observedStateVersion: basis.stateVersion,
-      basisDigest: basis.digest)
+      basisDigest: basis.digest,
+      attemptID: attemptID ?? self.attemptID,
+      modelRunID: modelRunID,
+      contextDigest: contextDigest,
+      expectedWorkspaceRevision: expectedWorkspaceRevision ?? self.expectedWorkspaceRevision,
+      expectedDeployedArtifactDigest:
+        expectedDeployedArtifactDigest ?? self.expectedDeployedArtifactDigest,
+      expectedBindingRevision: expectedBindingRevision ?? self.expectedBindingRevision)
   }
 }
 
 public struct HarnessDispatchIntent: Equatable, Sendable, Codable {
   public static let documentType = "harness-dispatch-intent"
-  public static let schemaVersion = "1.0.0"
+  public static let schemaVersion = "2.0.0"
 
   public let documentType: String
   public let schemaVersion: String
   public let htaskID: String
   public let round: Int
   public let decisionID: String
+  public let attemptID: String?
+  public let modelRunID: String?
   public let operationReference: String
   public let targetID: String
   public let expectedBindingRevision: Int?
+  public let expectedWorkspaceRevision: String?
+  public let expectedDeployedArtifactDigest: String?
   public let inputsDigestSHA256: String
   public let requestID: String
   public let idempotencyKey: String
@@ -207,9 +273,13 @@ public struct HarnessDispatchIntent: Equatable, Sendable, Codable {
     case htaskID = "htaskId"
     case round
     case decisionID = "decisionId"
+    case attemptID = "attemptId"
+    case modelRunID = "modelRunId"
     case operationReference
     case targetID = "targetId"
     case expectedBindingRevision
+    case expectedWorkspaceRevision
+    case expectedDeployedArtifactDigest
     case inputsDigestSHA256 = "inputsDigestSha256"
     case requestID = "requestId"
     case idempotencyKey
@@ -223,9 +293,13 @@ public struct HarnessDispatchIntent: Equatable, Sendable, Codable {
     htaskID: String,
     round: Int,
     decisionID: String,
+    attemptID: String? = nil,
+    modelRunID: String? = nil,
     operationReference: String,
     targetID: String,
     expectedBindingRevision: Int?,
+    expectedWorkspaceRevision: String? = nil,
+    expectedDeployedArtifactDigest: String? = nil,
     inputsDigestSHA256: String,
     requestID: String,
     idempotencyKey: String,
@@ -239,9 +313,13 @@ public struct HarnessDispatchIntent: Equatable, Sendable, Codable {
     self.htaskID = htaskID
     self.round = round
     self.decisionID = decisionID
+    self.attemptID = attemptID
+    self.modelRunID = modelRunID
     self.operationReference = operationReference
     self.targetID = targetID
     self.expectedBindingRevision = expectedBindingRevision
+    self.expectedWorkspaceRevision = expectedWorkspaceRevision
+    self.expectedDeployedArtifactDigest = expectedDeployedArtifactDigest
     self.inputsDigestSHA256 = inputsDigestSHA256
     self.requestID = requestID
     self.idempotencyKey = idempotencyKey
@@ -251,15 +329,89 @@ public struct HarnessDispatchIntent: Equatable, Sendable, Codable {
     self.updatedAtUTC = updatedAtUTC
   }
 
+  private init(
+    schemaVersion: String,
+    htaskID: String,
+    round: Int,
+    decisionID: String,
+    attemptID: String?,
+    modelRunID: String?,
+    operationReference: String,
+    targetID: String,
+    expectedBindingRevision: Int?,
+    expectedWorkspaceRevision: String?,
+    expectedDeployedArtifactDigest: String?,
+    inputsDigestSHA256: String,
+    requestID: String,
+    idempotencyKey: String,
+    state: HarnessDispatchState,
+    jobID: String?,
+    createdAtUTC: String,
+    updatedAtUTC: String
+  ) {
+    self.documentType = Self.documentType
+    self.schemaVersion = schemaVersion
+    self.htaskID = htaskID
+    self.round = round
+    self.decisionID = decisionID
+    self.attemptID = attemptID
+    self.modelRunID = modelRunID
+    self.operationReference = operationReference
+    self.targetID = targetID
+    self.expectedBindingRevision = expectedBindingRevision
+    self.expectedWorkspaceRevision = expectedWorkspaceRevision
+    self.expectedDeployedArtifactDigest = expectedDeployedArtifactDigest
+    self.inputsDigestSHA256 = inputsDigestSHA256
+    self.requestID = requestID
+    self.idempotencyKey = idempotencyKey
+    self.state = state
+    self.jobID = jobID
+    self.createdAtUTC = createdAtUTC
+    self.updatedAtUTC = updatedAtUTC
+  }
+
+  /// Schema-1 intents remain readable for audit and submitted-intent recovery.
+  /// Their associated legacy decision envelope decides executability.
+  public init(from decoder: any Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    self.documentType = try container.decode(String.self, forKey: .documentType)
+    self.schemaVersion =
+      try container.decodeIfPresent(String.self, forKey: .schemaVersion) ?? "1.0.0"
+    self.htaskID = try container.decode(String.self, forKey: .htaskID)
+    self.round = try container.decode(Int.self, forKey: .round)
+    self.decisionID = try container.decode(String.self, forKey: .decisionID)
+    self.attemptID = try container.decodeIfPresent(String.self, forKey: .attemptID)
+    self.modelRunID = try container.decodeIfPresent(String.self, forKey: .modelRunID)
+    self.operationReference = try container.decode(String.self, forKey: .operationReference)
+    self.targetID = try container.decode(String.self, forKey: .targetID)
+    self.expectedBindingRevision = try container.decodeIfPresent(
+      Int.self, forKey: .expectedBindingRevision)
+    self.expectedWorkspaceRevision = try container.decodeIfPresent(
+      String.self, forKey: .expectedWorkspaceRevision)
+    self.expectedDeployedArtifactDigest = try container.decodeIfPresent(
+      String.self, forKey: .expectedDeployedArtifactDigest)
+    self.inputsDigestSHA256 = try container.decode(String.self, forKey: .inputsDigestSHA256)
+    self.requestID = try container.decode(String.self, forKey: .requestID)
+    self.idempotencyKey = try container.decode(String.self, forKey: .idempotencyKey)
+    self.state = try container.decode(HarnessDispatchState.self, forKey: .state)
+    self.jobID = try container.decodeIfPresent(String.self, forKey: .jobID)
+    self.createdAtUTC = try container.decode(String.self, forKey: .createdAtUTC)
+    self.updatedAtUTC = try container.decode(String.self, forKey: .updatedAtUTC)
+  }
+
   public func withState(
     _ state: HarnessDispatchState,
     jobID: String? = nil,
     atUTC: String
   ) -> HarnessDispatchIntent {
     HarnessDispatchIntent(
+      schemaVersion: schemaVersion,
       htaskID: htaskID, round: round, decisionID: decisionID,
+      attemptID: attemptID, modelRunID: modelRunID,
       operationReference: operationReference, targetID: targetID,
       expectedBindingRevision: expectedBindingRevision,
+      expectedWorkspaceRevision: expectedWorkspaceRevision,
+      expectedDeployedArtifactDigest: expectedDeployedArtifactDigest,
       inputsDigestSHA256: inputsDigestSHA256, requestID: requestID,
       idempotencyKey: idempotencyKey, state: state, jobID: jobID ?? self.jobID,
       createdAtUTC: createdAtUTC, updatedAtUTC: atUTC)

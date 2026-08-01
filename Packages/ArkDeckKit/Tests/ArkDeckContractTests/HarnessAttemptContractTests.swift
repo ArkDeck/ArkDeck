@@ -63,6 +63,16 @@ private actor AttemptGateway: HarnessDecisionGateway {
 private struct AttemptRepairPort: HarnessRepairPort {
   let patchRevision: String
 
+  func currentWorkspaceRevision(
+    relativePaths: [String], projectRef: String, task: HarnessTaskSnapshot
+  ) async throws -> String {
+    if let revision = task.repairAttempt?.patchRevision { return revision }
+    if case .string(let revision)? = task.goal.desiredState["baseWorkspaceRevision"] {
+      return revision
+    }
+    return String(repeating: "1", count: 64)
+  }
+
   func preparePatch(
     _ proposal: HarnessPatchProposal, projectRef: String,
     task: HarnessTaskSnapshot, decisionID: String
@@ -276,13 +286,19 @@ final class HarnessAttemptContractTests: XCTestCase {
     let inputs = DebugCrashTaskHandler.typedInputs(
       for: DebugCrashTaskHandler.captureDiagnostics, snapshot: snapshot)
     let digest = HarnessRequestIdentity.inputsDigest(inputs)
+    let basis = HarnessDecisionBasis(
+      snapshot: snapshot,
+      offeredOperations: [DebugCrashTaskHandler.captureDiagnostics])
     let decision = HarnessDecision(
       decisionID: "dec-recover", htaskID: snapshot.htaskID, round: 1,
       kind: .invokeOperation,
       operationReference: DebugCrashTaskHandler.captureDiagnostics,
       inputs: inputs, hypothesis: "collect the diagnostic artifact",
       reasonCode: "captureDiagnostics", producer: "fixture-model",
-      createdAtUTC: now)
+      createdAtUTC: now
+    ).stamped(
+      with: basis, attemptID: attempt.attemptID,
+      expectedBindingRevision: snapshot.target.expectedBindingRevision)
     try await store.putDecision(decision)
     let identity = HarnessRequestIdentity.derive(
       htaskID: snapshot.htaskID, round: decision.round,
@@ -292,6 +308,7 @@ final class HarnessAttemptContractTests: XCTestCase {
     let pending = HarnessDispatchIntent(
       htaskID: snapshot.htaskID, round: decision.round,
       decisionID: decision.decisionID,
+      attemptID: attempt.attemptID,
       operationReference: DebugCrashTaskHandler.captureDiagnostics,
       targetID: snapshot.target.targetID,
       expectedBindingRevision: snapshot.target.expectedBindingRevision,
@@ -408,18 +425,18 @@ final class HarnessAttemptContractTests: XCTestCase {
     let buildJob = try XCTUnwrap(built.dispatchedJobID)
     await jobs.finish(buildJob, succeeded: false, state: "compileFailed")
 
-    let duplicate = try await coordinator.reconcile(failing.htaskID)
-    XCTAssertEqual(duplicate.action, .stoppedForHuman)
-    XCTAssertEqual(
-      duplicate.reasonCode, "DUPLICATE_STRATEGY:ATTEMPT-000000000001")
+    let stale = try await coordinator.reconcile(failing.htaskID)
+    XCTAssertEqual(stale.action, .staleDecision)
+    XCTAssertTrue(stale.reasonCode.contains("workspaceRevisionChanged"))
     let operations = await jobs.operations()
     XCTAssertEqual(
       operations,
       [DebugCrashTaskHandler.applyPatch, DebugCrashTaskHandler.buildOpenHarmony])
     let attempts = try await coordinator.attempts(failing.htaskID)
-    XCTAssertEqual(attempts.count, 1)
-    XCTAssertEqual(attempts[0].outcome, .failed)
-    XCTAssertNotNil(attempts[0].failureFingerprint)
+    XCTAssertEqual(attempts.count, 2)
+    XCTAssertEqual(attempts[0].outcome, .superseded)
+    XCTAssertEqual(attempts[1].outcome, .failed)
+    XCTAssertNotNil(attempts[1].failureFingerprint)
   }
 
   func testActionRetryCrashReplayAndSemanticAlternativeAreDifferentRoutes() throws {

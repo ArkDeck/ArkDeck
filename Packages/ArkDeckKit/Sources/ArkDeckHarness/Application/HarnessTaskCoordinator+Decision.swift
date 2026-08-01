@@ -65,11 +65,14 @@ extension HarnessTaskCoordinator {
       // (TASK-HFA-002) - a call that was refused by the parser is still a
       // call that shipped a context off this host.
       let startedAtUTC = nowUTC()
+      // Allocate once so the accepted Decision and durable ModelRun have one
+      // immutable join key. A producer never sees or supplies this value.
+      let modelRunID = modelRunIDFactory()
       var contextDigest = ""
       var contextBytes = 0
       func record(_ outcome: HarnessModelRunOutcome, responseBytes: Int = 0) async {
         let run = HarnessModelRun(
-          modelRunID: modelRunIDFactory(),
+          modelRunID: modelRunID,
           htaskID: snapshot.htaskID,
           round: snapshot.activeRound + 1,
           descriptor: decisionGateway.modelDescriptor,
@@ -114,7 +117,9 @@ extension HarnessTaskCoordinator {
             hypothesis: proposal.hypothesis,
             reasonCode: proposal.reasonCode,
             producer: decisionGateway.producerID,
-            createdAtUTC: nowUTC())
+            createdAtUTC: nowUTC(),
+            modelRunID: modelRunID,
+            contextDigest: contextDigest)
           await record(.accepted(decisionID: decision.decisionID), responseBytes: bytes.count)
           return PlannedProposal(
             step: HarnessPlannedStep(
@@ -272,7 +277,8 @@ extension HarnessTaskCoordinator {
       operationReferences: offered + durableAttempts.map {
         $0.strategy.selectedOperationFamily
       },
-      revision: durableAttempts.last?.patchRevision ?? durableAttempts.last?.baseRevision
+      revision: durableAttempts.last?.patchRevision
+        ?? durableAttempts.last?.applicableBaseRevision
         ?? repair?.patchRevision ?? repair?.proposal.baseWorkspaceRevision
         ?? desiredText("baseWorkspaceRevision"),
       deviceProfiles: [desiredText("deviceProfile")].compactMap { $0 },

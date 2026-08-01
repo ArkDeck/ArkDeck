@@ -10,10 +10,10 @@
 // submit: the job would already be dispatched, and only the bookkeeping
 // would fail.
 //
-// So a decision now carries two things it can be checked against later:
-// the task's state version, and a digest of the basis below. The guard
-// recomputes the basis from a freshly loaded snapshot and refuses to
-// dispatch when either moved (HFA-INV-2).
+// So a decision carries the task version and basis digest below, plus an
+// execution envelope for Attempt, model context, workspace, deployment and
+// binding facts. The guard reloads those facts and refuses a never-submitted
+// intent when any applicable dimension moved (HFA-INV-2).
 //
 // Only persisted facts belong here. Anything that moves on its own - wall
 // clock, elapsed seconds, timestamps - would make every decision stale a
@@ -102,25 +102,74 @@ public struct HarnessDecisionBasis: Equatable, Sendable, Codable {
 /// else - no failure fingerprint, no no-progress round, no budget beyond
 /// what was already spent. Charging it as a failure would let an operator's
 /// own resolution push a task toward `strategyExhausted`.
+public struct HarnessDecisionExecutionFacts: Equatable, Sendable {
+  public let activeAttemptID: String?
+  public let workspaceRevision: String?
+  public let deployedArtifactDigest: String?
+  public let bindingRevision: Int?
+  public let modelRunID: String?
+  public let modelContextDigest: String?
+  public let modelDecisionID: String?
+
+  public init(
+    activeAttemptID: String? = nil,
+    workspaceRevision: String? = nil,
+    deployedArtifactDigest: String? = nil,
+    bindingRevision: Int? = nil,
+    modelRunID: String? = nil,
+    modelContextDigest: String? = nil,
+    modelDecisionID: String? = nil
+  ) {
+    self.activeAttemptID = activeAttemptID
+    self.workspaceRevision = workspaceRevision
+    self.deployedArtifactDigest = deployedArtifactDigest
+    self.bindingRevision = bindingRevision
+    self.modelRunID = modelRunID
+    self.modelContextDigest = modelContextDigest
+    self.modelDecisionID = modelDecisionID
+  }
+}
+
 public enum HarnessDecisionStaleness: Equatable, Sendable {
-  case stateVersionMoved(observed: Int, current: Int)
-  case basisChanged(observed: String, current: String)
+  case taskStateChanged(observed: Int, current: Int)
+  case attemptChanged(observed: String?, current: String?)
+  case workspaceRevisionChanged(observed: String, current: String?)
+  case deployedArtifactChanged(observed: String, current: String?)
+  case bindingRevisionChanged(observed: Int, current: Int?)
+  case contextMismatch
+  case basisMismatch(observed: String, current: String)
+  case modelRunMissing(String?)
   case activeJobAppeared(String)
   case cancelRequested
   case unverifiable
 
   public var reasonCode: String {
     switch self {
-    case .stateVersionMoved(let observed, let current):
-      return "decisionStale:stateVersion:\(observed)->\(current)"
-    case .basisChanged(let observed, let current):
-      return "decisionStale:basis:\(observed.prefix(12))->\(current.prefix(12))"
+    case .taskStateChanged(let observed, let current):
+      return "STALE_DECISION:taskStateChanged:\(observed)->\(current)"
+    case .attemptChanged(let observed, let current):
+      return "STALE_DECISION:attemptChanged:\(observed ?? "none")->\(current ?? "none")"
+    case .workspaceRevisionChanged(let observed, let current):
+      return "STALE_DECISION:workspaceRevisionChanged:\(observed.prefix(12))->"
+        + "\((current ?? "none").prefix(12))"
+    case .deployedArtifactChanged(let observed, let current):
+      return "STALE_DECISION:deployedArtifactChanged:\(observed.prefix(12))->"
+        + "\((current ?? "none").prefix(12))"
+    case .bindingRevisionChanged(let observed, let current):
+      return "STALE_DECISION:bindingRevisionChanged:\(observed)->"
+        + "\(current.map(String.init) ?? "none")"
+    case .contextMismatch:
+      return "STALE_DECISION:contextMismatch"
+    case .basisMismatch(let observed, let current):
+      return "STALE_DECISION:basisMismatch:\(observed.prefix(12))->\(current.prefix(12))"
+    case .modelRunMissing(let modelRunID):
+      return "STALE_DECISION:modelRunMissing:\(modelRunID ?? "none")"
     case .activeJobAppeared(let jobID):
-      return "decisionStale:activeJob:\(jobID)"
+      return "STALE_DECISION:taskStateChanged:activeJob:\(jobID)"
     case .cancelRequested:
-      return "decisionStale:cancelRequested"
+      return "STALE_DECISION:taskStateChanged:cancelRequested"
     case .unverifiable:
-      return "decisionStale:unverifiable"
+      return "STALE_DECISION:unverifiable"
     }
   }
 }
@@ -133,14 +182,17 @@ public enum HarnessDecisionFreshness {
   /// guard existed) is `unverifiable`, not "probably fine": fail closed.
   public static func staleness(
     of decision: HarnessDecision,
-    against current: HarnessDecisionBasis
+    against current: HarnessDecisionBasis,
+    executionFacts: HarnessDecisionExecutionFacts? = nil
   ) -> HarnessDecisionStaleness? {
-    guard decision.observedStateVersion > 0, !decision.basisDigest.isEmpty else {
+    guard decision.envelopeVersion == HarnessDecision.envelopeVersion,
+      decision.observedStateVersion > 0, !decision.basisDigest.isEmpty
+    else {
       return .unverifiable
     }
     guard decision.htaskID == current.htaskID else { return .unverifiable }
     guard decision.observedStateVersion == current.stateVersion else {
-      return .stateVersionMoved(
+      return .taskStateChanged(
         observed: decision.observedStateVersion, current: current.stateVersion)
     }
     if let activeJobID = current.activeJobID {
@@ -150,9 +202,44 @@ public enum HarnessDecisionFreshness {
       return .activeJobAppeared(activeJobID)
     }
     if current.cancelRequested { return .cancelRequested }
+    if let facts = executionFacts {
+      if decision.attemptID != facts.activeAttemptID {
+        return .attemptChanged(observed: decision.attemptID, current: facts.activeAttemptID)
+      }
+      if let expected = decision.expectedWorkspaceRevision,
+        expected != facts.workspaceRevision
+      {
+        return .workspaceRevisionChanged(
+          observed: expected, current: facts.workspaceRevision)
+      }
+      if let expected = decision.expectedDeployedArtifactDigest,
+        expected != facts.deployedArtifactDigest
+      {
+        return .deployedArtifactChanged(
+          observed: expected, current: facts.deployedArtifactDigest)
+      }
+      if let expected = decision.expectedBindingRevision,
+        expected != facts.bindingRevision
+      {
+        return .bindingRevisionChanged(observed: expected, current: facts.bindingRevision)
+      }
+      switch (decision.modelRunID, decision.contextDigest) {
+      case (nil, nil):
+        break
+      case (let modelRunID?, let contextDigest?):
+        guard facts.modelRunID == modelRunID else {
+          return .modelRunMissing(modelRunID)
+        }
+        guard facts.modelContextDigest == contextDigest,
+          facts.modelDecisionID == decision.decisionID
+        else { return .contextMismatch }
+      case (let modelRunID, _):
+        return .modelRunMissing(modelRunID)
+      }
+    }
     let currentDigest = current.digest
     guard decision.basisDigest == currentDigest else {
-      return .basisChanged(observed: decision.basisDigest, current: currentDigest)
+      return .basisMismatch(observed: decision.basisDigest, current: currentDigest)
     }
     return nil
   }
