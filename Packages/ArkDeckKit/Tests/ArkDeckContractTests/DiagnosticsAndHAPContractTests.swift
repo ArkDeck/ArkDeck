@@ -50,6 +50,7 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
       var hilogPayload: Data?
       var packageReadbackText: String?
       var processReadbackText: String?
+      var processReadbackExit: Int32 = 0
       var ownedPathPresent = true
       var portForwardPresent = false
       var cleanupExit: Int32 = 0
@@ -300,6 +301,11 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
         note("processReadback")
         return receipt(
           script.processReadbackText ?? (script.processRunning ? "3421\n" : ""))
+      case .observeApplicationLiveness:
+        note("applicationLivenessReadback")
+        return receipt(
+          script.processReadbackText ?? (script.processRunning ? "3421\n" : ""),
+          exit: script.processReadbackExit)
       case .stopAbility(let ability):
         note("stopAbility")
         // force-stop, then the `pidof` readback that decides the verdict.
@@ -407,7 +413,11 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
     withComponentTree: Bool = false,
     withScreenshot: Bool = false,
     withCrashLogs: Bool = false,
-    crashLogName: String? = nil
+    crashLogName: String? = nil,
+    bundleName: String? = nil,
+    abilityName: String? = nil,
+    processName: String? = nil,
+    expectedDeployedArtifactDigest: String? = nil
   ) -> Data {
     let trace = withTrace ? "\"traceCategories\": [\"ohos\"]," : ""
     let tree = withComponentTree ? "\"uiComponentTree\": true," : ""
@@ -419,6 +429,12 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
       totalArtifactByteBudget.map { "\"totalArtifactByteBudget\": \($0)," } ?? ""
     let redaction =
       redactionProfile.map { "\"redactionProfile\": \"\($0)\"," } ?? ""
+    let bundle = bundleName.map { "\"bundleName\": \"\($0)\"," } ?? ""
+    let ability = abilityName.map { "\"abilityName\": \"\($0)\"," } ?? ""
+    let process = processName.map { "\"processName\": \"\($0)\"," } ?? ""
+    let digest = expectedDeployedArtifactDigest.map {
+      "\"expectedDeployedArtifactDigest\": \"\($0)\","
+    } ?? ""
     return Data(
       """
       {
@@ -429,9 +445,22 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
         "target": { "targetId": "TGT-1", "expectedBindingRevision": 7 },
         "operation": { "id": "capture.diagnostics", "version": 1 },
         \(auth)
-        "inputs": { \(trace) \(tree) \(shot) \(crash) \(crashName) \(budget) \(redaction) "durationSeconds": 5 }
+        "inputs": { \(trace) \(tree) \(shot) \(crash) \(crashName) \(budget) \(redaction) \(bundle) \(ability) \(process) \(digest) "durationSeconds": 5 }
       }
       """.utf8)
+  }
+
+  private func publishedJSON(
+    named name: String,
+    jobID: String,
+    artifacts: RuntimeArtifactStore
+  ) async throws -> [String: Any] {
+    let inventory = try await artifacts.list(jobID: jobID)
+    let record = try XCTUnwrap(inventory.first { $0.name == name })
+    XCTAssertEqual(record.status, .published)
+    let data = try await artifacts.read(jobID: jobID, artifactID: record.artifactID)
+    return try XCTUnwrap(
+      JSONSerialization.jsonObject(with: data) as? [String: Any])
   }
 
   private func hapRequest(
@@ -495,6 +524,217 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
   }
 
   // MARK: - DHA-CAP-001
+
+  func testApplicationLivenessUsesAnExactTypedPidofPlan() throws {
+    let provider = HDCObservationProviderAdapter(factsPort: FactsPort())
+    let descriptor = try XCTUnwrap(
+      RuntimeOperationCatalog.descriptor(reference: "capture.diagnostics@1"))
+    let step = try XCTUnwrap(
+      descriptor.steps.first { $0.stepID == "observe-application-liveness" })
+    let digest = String(repeating: "d", count: 64)
+    let context = ProviderExecutionContext(
+      jobID: "JOB-LIVE-1", stepID: step.stepID, targetID: "TGT-1",
+      bindingRevision: 7, connectKey: "150100424a544e4600",
+      expectedIdentitySHA256:
+        "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+      toolVersion: "3.2.0f", toolSHA256: String(repeating: "a", count: 64),
+      nowUTC: "2026-07-29T00:00:00Z")
+    let action = try provider.action(
+      for: step, operation: descriptor,
+      inputs: [
+        "bundleName": .string("com.example.demo"),
+        "abilityName": .string("EntryAbility"),
+        "processName": .string("com.example.demo:worker"),
+        "expectedDeployedArtifactDigest": .string(digest),
+      ],
+      context: context)
+    guard case .hdc(.observeApplicationLiveness(let request)) = action else {
+      return XCTFail("the catalog step must materialize a typed app-liveness action")
+    }
+    XCTAssertEqual(request.bundle.bundleName, "com.example.demo")
+    XCTAssertEqual(request.abilityName, "EntryAbility")
+    XCTAssertEqual(request.processName, "com.example.demo:worker")
+    XCTAssertEqual(request.expectedDeployedArtifactDigest, digest)
+    XCTAssertEqual(try PersistedTypedProviderAction(action).materialize(), action)
+
+    let plan = try provider.lower(action: action, context: context)
+    guard case .process(_, let argv, let timeout) = plan.kind else {
+      return XCTFail("app liveness must lower to one bounded process readback")
+    }
+    XCTAssertEqual(
+      argv,
+      ["-t", "150100424a544e4600", "shell", "pidof", "com.example.demo:worker"])
+    XCTAssertEqual(timeout, 30)
+
+    let artifact = try XCTUnwrap(
+      descriptor.artifacts.first { $0.name == "application-liveness.json" })
+    XCTAssertEqual(artifact.mediaType, "application/json")
+    XCTAssertEqual(artifact.privacy, .standard)
+    XCTAssertFalse(artifact.isRequired)
+  }
+
+  func testApplicationLivenessPublishesHealthyRevisionBoundEvidence() async throws {
+    let dispatcher = ScriptedDispatcher(script: .init(processReadbackText: "3421 3422\n"))
+    let (engine, _, artifacts) = try makeEngine(dispatcher: dispatcher)
+    let digest = String(repeating: "d", count: 64)
+    let acceptance = try await engine.submit(
+      captureRequest(
+        withTrace: false, key: "idem-app-live-healthy",
+        bundleName: "com.example.demo", abilityName: "EntryAbility",
+        expectedDeployedArtifactDigest: digest))
+
+    let status = try await engine.run(jobID: acceptance.jobID)
+
+    XCTAssertEqual(status.state, "succeeded", status.timeline.joined(separator: " | "))
+    XCTAssertTrue(dispatcher.dispatchedActions.contains("applicationLivenessReadback"))
+    let payload = try await publishedJSON(
+      named: "application-liveness.json", jobID: acceptance.jobID, artifacts: artifacts)
+    XCTAssertEqual(payload["documentType"] as? String, "arkdeck-application-liveness")
+    XCTAssertEqual(payload["state"] as? String, "HEALTHY")
+    XCTAssertEqual(payload["processState"] as? String, "RUNNING")
+    XCTAssertEqual(payload["pidObserved"] as? Bool, true)
+    XCTAssertEqual(payload["sourceRuntimeJobId"] as? String, acceptance.jobID)
+    XCTAssertEqual(payload["sourceOperationRef"] as? String, "capture.diagnostics@1")
+    XCTAssertEqual(payload["targetBindingRevision"] as? Int, 7)
+    XCTAssertEqual(payload["deployedArtifactDigest"] as? String, digest)
+    let applicationRef = try XCTUnwrap(payload["applicationRef"] as? String)
+    XCTAssertEqual(applicationRef.count, 64)
+    XCTAssertFalse(
+      String(data: try JSONSerialization.data(withJSONObject: payload), encoding: .utf8)!
+        .contains("com.example.demo"),
+      "the derived Artifact must carry only the pseudonymous application reference")
+  }
+
+  func testStoppedTargetStaysUnhealthyDespiteUnrelatedSystemHilog() async throws {
+    let dispatcher = ScriptedDispatcher(
+      script: .init(
+        processRunning: false,
+        hilogPayload: Data("01-01 00:00:00 I system_server: still busy\n".utf8)))
+    let (engine, _, artifacts) = try makeEngine(dispatcher: dispatcher)
+    let acceptance = try await engine.submit(
+      captureRequest(
+        withTrace: false, key: "idem-app-live-stopped",
+        bundleName: "com.example.demo"))
+
+    let status = try await engine.run(jobID: acceptance.jobID)
+    XCTAssertEqual(status.state, "succeeded", status.timeline.joined(separator: " | "))
+    let payload = try await publishedJSON(
+      named: "application-liveness.json", jobID: acceptance.jobID, artifacts: artifacts)
+    XCTAssertEqual(payload["state"] as? String, "UNHEALTHY")
+    XCTAssertEqual(payload["processState"] as? String, "STOPPED")
+    XCTAssertEqual(payload["pidObserved"] as? Bool, false)
+  }
+
+  func testUnavailableOrAmbiguousAppReadbackPublishesUnknownWithoutBlessingIt() async throws {
+    let scripts: [(String, ScriptedDispatcher.Script, String)] = [
+      (
+        "unavailable",
+        .init(processReadbackText: "", processReadbackExit: 1),
+        "processReadbackUnavailable"),
+      (
+        "ambiguous",
+        .init(processReadbackText: "some-other-process\n"),
+        "processReadbackAmbiguous"),
+    ]
+    for (suffix, script, reason) in scripts {
+      let dispatcher = ScriptedDispatcher(script: script)
+      let (engine, _, artifacts) = try makeEngine(dispatcher: dispatcher)
+      let acceptance = try await engine.submit(
+        captureRequest(
+          withTrace: false, key: "idem-app-live-\(suffix)",
+          bundleName: "com.example.demo"))
+      let status = try await engine.run(jobID: acceptance.jobID)
+      XCTAssertEqual(status.state, "succeeded", status.timeline.joined(separator: " | "))
+      let payload = try await publishedJSON(
+        named: "application-liveness.json", jobID: acceptance.jobID, artifacts: artifacts)
+      XCTAssertEqual(payload["state"] as? String, "UNKNOWN")
+      XCTAssertEqual(payload["reasonCode"] as? String, reason)
+    }
+  }
+
+  func testInvalidApplicationIdentityIsRejectedBeforeProviderDispatch() async throws {
+    let dispatcher = ScriptedDispatcher()
+    let (engine, _, _) = try makeEngine(dispatcher: dispatcher)
+    do {
+      _ = try await engine.submit(
+        captureRequest(
+          withTrace: false, key: "idem-app-live-invalid",
+          bundleName: "com.example.demo;pidof.other"))
+      XCTFail("a command-shaped application identity must not be admitted")
+    } catch let error as RuntimeJobEngineError {
+      guard case .rejected(let code, _) = error else {
+        return XCTFail("expected invalidInput, got \(error)")
+      }
+      XCTAssertEqual(code, .invalidInput)
+    }
+    XCTAssertTrue(dispatcher.dispatchedActions.isEmpty)
+  }
+
+  func testPartialApplicationIdentityIsRejectedBeforeProviderDispatch() async throws {
+    let requests = [
+      captureRequest(
+        withTrace: false, key: "idem-app-live-ability-only",
+        abilityName: "EntryAbility"),
+      captureRequest(
+        withTrace: false, key: "idem-app-live-process-only",
+        processName: "com.example.demo"),
+      captureRequest(
+        withTrace: false, key: "idem-app-live-digest-only",
+        expectedDeployedArtifactDigest: String(repeating: "d", count: 64)),
+    ]
+    for request in requests {
+      let dispatcher = ScriptedDispatcher()
+      let (engine, _, _) = try makeEngine(dispatcher: dispatcher)
+      do {
+        _ = try await engine.submit(request)
+        XCTFail("a partial application identity must not be admitted")
+      } catch let error as RuntimeJobEngineError {
+        guard case .rejected(let code, _) = error else {
+          return XCTFail("expected invalidInput, got \(error)")
+        }
+        XCTAssertEqual(code, .invalidInput)
+      }
+      XCTAssertTrue(dispatcher.dispatchedActions.isEmpty)
+    }
+  }
+
+  func testCaptureWithoutApplicationIdentityDoesNotDispatchTheOptionalReadback() async throws {
+    let dispatcher = ScriptedDispatcher()
+    let (engine, _, artifacts) = try makeEngine(dispatcher: dispatcher)
+    let acceptance = try await engine.submit(
+      captureRequest(withTrace: false, key: "idem-app-live-absent"))
+    let status = try await engine.run(jobID: acceptance.jobID)
+    XCTAssertEqual(status.state, "succeeded")
+    XCTAssertFalse(dispatcher.dispatchedActions.contains("applicationLivenessReadback"))
+    let inventory = try await artifacts.list(jobID: acceptance.jobID)
+    let record = try XCTUnwrap(
+      inventory.first { $0.name == "application-liveness.json" })
+    guard case .missing = record.status else {
+      return XCTFail("an unselected optional observation must be recorded as missing")
+    }
+  }
+
+  func testPublishedApplicationLivenessSurvivesRuntimeRestart() async throws {
+    let dispatcher = ScriptedDispatcher()
+    let (engine, _, artifacts) = try makeEngine(dispatcher: dispatcher)
+    let acceptance = try await engine.submit(
+      captureRequest(
+        withTrace: false, key: "idem-app-live-restart",
+        bundleName: "com.example.demo"))
+    _ = try await engine.run(jobID: acceptance.jobID)
+    let before = try await publishedJSON(
+      named: "application-liveness.json", jobID: acceptance.jobID, artifacts: artifacts)
+
+    let (recoveredEngine, _, recoveredArtifacts) = try makeEngine(
+      dispatcher: ScriptedDispatcher())
+    _ = try await recoveredEngine.recoverPersistedJobs()
+    let after = try await publishedJSON(
+      named: "application-liveness.json", jobID: acceptance.jobID,
+      artifacts: recoveredArtifacts)
+    XCTAssertEqual(
+      try JSONSerialization.data(withJSONObject: before, options: [.sortedKeys]),
+      try JSONSerialization.data(withJSONObject: after, options: [.sortedKeys]))
+  }
 
   func testCaptureWithoutTraceRecordsTheTraceAsMissingNotAsSuccess() async throws {
     let dispatcher = ScriptedDispatcher()

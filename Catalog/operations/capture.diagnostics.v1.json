@@ -20,6 +20,34 @@
         "maximum": 600,
         "description": "Bounded HiLog capture window."
       },
+      "bundleName": {
+        "type": "string",
+        "required": false,
+        "pattern": "^[a-zA-Z][a-zA-Z0-9_]*(?:\\.[a-zA-Z][a-zA-Z0-9_]*)+$",
+        "maxLength": 200,
+        "description": "Optional typed application identity. When present, the same bounded job publishes an application-specific process readback."
+      },
+      "abilityName": {
+        "type": "string",
+        "required": false,
+        "pattern": "^[a-zA-Z][a-zA-Z0-9_.]*$",
+        "maxLength": 200,
+        "description": "Optional ability identity carried into the liveness artifact; never lowered as caller-supplied argv."
+      },
+      "processName": {
+        "type": "string",
+        "required": false,
+        "pattern": "^[a-zA-Z][a-zA-Z0-9_.:]*$",
+        "maxLength": 200,
+        "description": "Optional process identity. Defaults to bundleName and is lowered only by the HDC provider."
+      },
+      "expectedDeployedArtifactDigest": {
+        "type": "string",
+        "required": false,
+        "pattern": "^[0-9a-f]{64}$",
+        "maxLength": 64,
+        "description": "Harness-owned expected digest of the deployment whose liveness is being sampled."
+      },
       "hilogFilters": {
         "type": "stringArray",
         "required": false,
@@ -85,7 +113,8 @@
   "outputs": {
     "fields": {
       "artifactIndex": { "type": "artifactReference", "required": true },
-      "captureSummary": { "type": "artifactReference", "required": true }
+      "captureSummary": { "type": "artifactReference", "required": true },
+      "applicationLiveness": { "type": "artifactReference", "required": false }
     }
   },
   "steps": [
@@ -136,6 +165,16 @@
       "cancellation": "immediate",
       "binding": "confirmedDevice",
       "compensation": "none"
+    },
+    {
+      "stepID": "observe-application-liveness",
+      "kind": "verifyRemoteState",
+      "effect": "readOnly",
+      "cancellation": "immediate",
+      "binding": "confirmedDevice",
+      "optional": true,
+      "compensation": "none",
+      "notes": "Selected only when bundleName is present. The provider lowers a typed process readback and publishes HEALTHY, UNHEALTHY or UNKNOWN without treating unrelated HiLog as application evidence."
     },
     {
       "stepID": "capture-hilog",
@@ -309,6 +348,7 @@
     { "name": "screenshot.png", "role": "raw", "mediaType": "image/png", "privacy": "sensitive", "required": false },
     { "name": "crash-index.txt", "role": "raw", "mediaType": "text/plain", "privacy": "sensitive", "required": false },
     { "name": "crash-log.txt", "role": "raw", "mediaType": "text/plain", "privacy": "sensitive", "required": false },
+    { "name": "application-liveness.json", "role": "derived", "mediaType": "application/json", "privacy": "standard", "required": false },
     { "name": "trace.htrace", "role": "raw", "mediaType": "application/octet-stream", "privacy": "sensitive", "required": false },
     { "name": "artifact-index.json", "role": "derived", "mediaType": "application/json", "privacy": "standard", "required": true },
     { "name": "capture-summary.json", "role": "derived", "mediaType": "application/json", "privacy": "standard", "required": true }

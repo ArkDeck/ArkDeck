@@ -1554,6 +1554,11 @@ public actor RuntimeJobEngine {
       // name is the whole request.
       if case .string(let name)? = inputs["crashLogName"] { return !name.isEmpty }
       return false
+    case "observe-application-liveness":
+      if case .string(let bundleName)? = inputs["bundleName"] {
+        return !bundleName.isEmpty
+      }
+      return false
     case "capture-screenshot", "receive-screenshot", "cleanup-screenshot-temp":
       // Off unless asked for, like the tree: these three are what raise the
       // plan from readOnly to deviceMutation.
@@ -2329,6 +2334,7 @@ public actor RuntimeJobEngine {
       "read-evidence-firmware": ["device-facts.json", "binding-snapshot.json"],
     ],
     "capture.diagnostics@1": [
+      "observe-application-liveness": ["application-liveness.json"],
       "capture-hilog": ["hilog.txt"],
       "capture-ui-dump": ["ui-dump.json"],
       "receive-trace-artifact": ["trace.htrace"],
@@ -2560,6 +2566,33 @@ public actor RuntimeJobEngine {
     record: RuntimeJobRecord
   ) -> Data {
     switch name {
+    case "application-liveness.json":
+      var fields: [String: JSONValue] = [
+        "documentType": .string("arkdeck-application-liveness"),
+        "schemaVersion": .string("1.0.0"),
+        "applicationRef": .string(summary["applicationRef"] ?? ""),
+        "state": .string(summary["state"] ?? "UNKNOWN"),
+        "reasonCode": .string(summary["reasonCode"] ?? "processReadbackUnavailable"),
+        "abilityState": .string(summary["abilityState"] ?? "UNKNOWN"),
+        "processState": .string(summary["processState"] ?? "UNKNOWN"),
+        "pidObserved": .bool(summary["pidObserved"] == "true"),
+        "sourceRuntimeJobId": .string(record.jobID),
+        "sourceOperationRef": .string(descriptor.reference),
+        "observedAtUtc": .string(summary["observedAtUtc"] ?? ""),
+      ]
+      if let revision = record.request.target.expectedBindingRevision {
+        fields["targetBindingRevision"] = .integer(Int64(revision))
+      }
+      if let digest = summary["deployedArtifactDigest"] {
+        fields["deployedArtifactDigest"] = .string(digest)
+      }
+      fields["observationWindow"] = .object([
+        "startedAtUtc": .string(summary["observedAtUtc"] ?? ""),
+        "endedAtUtc": .string(summary["observedAtUtc"] ?? ""),
+      ])
+      let encoder = JSONEncoder()
+      encoder.outputFormatting = [.sortedKeys, .prettyPrinted, .withoutEscapingSlashes]
+      return (try? encoder.encode(fields)) ?? Data("{}".utf8)
     case "source-inspection.txt", "symbolized-crash.txt":
       // The inspection *is* its stdout. Publishing a summary instead would
       // hand the evaluator a description of evidence rather than evidence
@@ -3929,6 +3962,15 @@ public actor RuntimeJobEngine {
         throw RuntimeJobEngineError.rejected(
           .invalidInput,
           "strict redaction has no published implementation; refusing before authorization")
+      }
+      if inputs["bundleName"] == nil,
+        ["abilityName", "processName", "expectedDeployedArtifactDigest"].contains(where: {
+          inputs[$0] != nil
+        })
+      {
+        throw RuntimeJobEngineError.rejected(
+          .invalidInput,
+          "application liveness fields require bundleName; refusing before authorization")
       }
       return
     }

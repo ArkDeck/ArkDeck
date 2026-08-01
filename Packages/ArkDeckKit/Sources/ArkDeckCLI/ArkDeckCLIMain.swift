@@ -568,7 +568,7 @@ struct ArkDeckCommandLine {
         arkdeck artifact import-native-library --target <id> --file <libname.so> [--json]
         arkdeck task submit --target <id> --goal <text> [--crash-signature <SIGx+Symbol>] \
       [--intake <text>] [--project <ref>] [--max-rounds <n>] \
-      [--bundle-name <reverse-dns>] [--ability-name <name>] \
+      [--bundle-name <reverse-dns>] [--ability-name <name>] [--process-name <name>] \
       [--baseline-hap-artifact-lease <lease-v1:job:artifact>] \
       [--build-preset <ref>] [--test-preset <ref>] [--device-profile <ref>] \
       [--base-workspace-revision <sha256>] [--component <name>] \

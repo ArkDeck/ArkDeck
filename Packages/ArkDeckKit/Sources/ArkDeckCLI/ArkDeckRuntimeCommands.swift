@@ -1066,6 +1066,7 @@ enum RuntimeCLI {
       if let project = value("--project") { params["projectRef"] = .string(project) }
       if let bundle = value("--bundle-name") { params["bundleName"] = .string(bundle) }
       if let ability = value("--ability-name") { params["abilityName"] = .string(ability) }
+      if let process = value("--process-name") { params["processName"] = .string(process) }
       if let lease = value("--baseline-hap-artifact-lease") {
         params["baselineHapArtifactLease"] = .string(lease)
       }

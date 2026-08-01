@@ -288,22 +288,25 @@ final class HarnessBoundsContractTests: XCTestCase {
   func testArtifactBytesAreChargedOncePerVerifiedArtifact() async throws {
     let jobs = BoundsJobPort()
     let artifacts = BoundsArtifactPort()
-    let payload = String(repeating: "x", count: 4096)
+    let payload =
+      #"{"documentType":"arkdeck-application-liveness","schemaVersion":"1.0.0","applicationRef":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","state":"HEALTHY","reasonCode":"targetProcessRunning","abilityState":"UNKNOWN","processState":"RUNNING","pidObserved":true,"sourceRuntimeJobId":"JOB-2","sourceOperationRef":"capture.diagnostics@1","observationWindow":{"startedAtUtc":"2026-07-31T00:00:00Z","endedAtUtc":"2026-07-31T00:00:00Z"},"observedAtUtc":"2026-07-31T00:00:00Z"}"#
+    let byteBudget = payload.utf8.count
     let (coordinator, _, submission) = try makeStack(
       jobs: jobs, artifacts: artifacts,
       budgets: HarnessTaskBudgets(
-        maxRounds: 8, maxWallClockSeconds: 900, maxArtifactBytes: 4096, maxE1Mutations: 0),
+        maxRounds: 8, maxWallClockSeconds: 900, maxArtifactBytes: byteBudget,
+        maxE1Mutations: 0),
       criteria: [
         HarnessSuccessCriterion(
           criterionID: "B-1", metric: "applicationLiveness", comparator: .equalTo,
           expected: .string("healthy"), minimumSamples: 3,
-          evidenceRequirements: ["hilog.txt"])
+          evidenceRequirements: ["application-liveness.json"])
       ])
     let task = try await coordinator.submit(submission)
 
     _ = try await coordinator.reconcile(task.htaskID)
     jobs.finish("JOB-1")
-    artifacts.stage(jobID: "JOB-2", name: "hilog.txt", text: payload)
+    artifacts.stage(jobID: "JOB-2", name: "application-liveness.json", text: payload)
     _ = try await coordinator.reconcile(task.htaskID)
     jobs.finish("JOB-2")
 
@@ -311,7 +314,7 @@ final class HarnessBoundsContractTests: XCTestCase {
     // the way to planning the next capture: three samples were required, the
     // first one already spent the byte budget, so the loop stops there.
     let charged = try await coordinator.reconcile(task.htaskID)
-    XCTAssertEqual(charged.snapshot.consumedBudget.artifactBytes, 4096)
+    XCTAssertEqual(charged.snapshot.consumedBudget.artifactBytes, byteBudget)
     XCTAssertEqual(charged.action, .stoppedBudgetExhausted)
     XCTAssertEqual(charged.reasonCode, "maxArtifactBytesExhausted")
     XCTAssertEqual(charged.snapshot.status, .failed)

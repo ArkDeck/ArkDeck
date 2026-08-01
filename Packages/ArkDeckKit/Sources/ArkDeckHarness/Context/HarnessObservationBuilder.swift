@@ -19,9 +19,9 @@
 // fixtures hand-written to that shape and labelled as such. TASK-HTP-006's
 // r6 window disproved it on real hardware: after a real crash, 887 KB of
 // `hilog -x` carried zero fault blocks, because the detail is in
-// Faultlogger. So hilog now contributes *liveness only* and the ledger
-// owns crash counting - one source per question, so one crash cannot be
-// counted twice.
+// Faultlogger. HiLog is diagnostic context only; the typed application
+// readback owns liveness and the ledger owns crash counting - one source
+// per question, so one crash cannot be counted twice.
 
 import ArkDeckCore
 import CryptoKit
@@ -34,6 +34,40 @@ private struct HarnessVerifiedArtifact {
 
   var name: String { descriptor.name }
   var mediaType: String { descriptor.mediaType }
+}
+
+private struct HarnessApplicationLivenessArtifact: Decodable {
+  struct ObservationWindow: Decodable {
+    let startedAtUTC: String
+    let endedAtUTC: String
+
+    enum CodingKeys: String, CodingKey {
+      case startedAtUTC = "startedAtUtc"
+      case endedAtUTC = "endedAtUtc"
+    }
+  }
+
+  let documentType: String
+  let schemaVersion: String
+  let applicationRef: String
+  let state: String
+  let reasonCode: String
+  let processState: String
+  let pidObserved: Bool
+  let targetBindingRevision: Int?
+  let deployedArtifactDigest: String?
+  let sourceRuntimeJobID: String
+  let sourceOperationRef: String
+  let observedAtUTC: String
+  let observationWindow: ObservationWindow
+
+  enum CodingKeys: String, CodingKey {
+    case documentType, schemaVersion, applicationRef, state, reasonCode, processState
+    case pidObserved, targetBindingRevision, deployedArtifactDigest, sourceOperationRef
+    case observationWindow
+    case sourceRuntimeJobID = "sourceRuntimeJobId"
+    case observedAtUTC = "observedAtUtc"
+  }
 }
 
 public struct HarnessCrashSignature: Equatable, Sendable {
@@ -95,6 +129,7 @@ public struct HarnessObservationBuilder: Sendable {
   /// Artifact names `capture.diagnostics@1` publishes for the crash ledger.
   public static let crashIndexArtifact = "crash-index.txt"
   public static let crashLogArtifact = "crash-log.txt"
+  public static let applicationLivenessArtifact = "application-liveness.json"
   /// Measurement key carrying the device-local timestamp this task has
   /// already accounted for. See `measureCrashLedger` for why it exists.
   public static let watermarkMetric = "crashLedgerWatermark"
@@ -109,7 +144,9 @@ public struct HarnessObservationBuilder: Sendable {
     requiredEvidence: Set<String>,
     crashLedgerWatermark: String? = nil,
     sourceEvidenceJobID: String? = nil,
-    expectedSourceArtifactID: String? = nil
+    expectedSourceArtifactID: String? = nil,
+    expectedBindingRevision: Int? = nil,
+    expectedDeployedArtifactDigest: String? = nil
   ) async throws -> HarnessRoundObservation {
     var jobIDs = [jobID]
     if let sourceEvidenceJobID, sourceEvidenceJobID != jobID {
@@ -196,7 +233,14 @@ public struct HarnessObservationBuilder: Sendable {
       collectionBlockers.append("artifactNotCollected:\(required)")
     }
 
-    var (measurements, samples) = measure(verifiedBytes)
+    let evidenceJobID = sourceEvidenceJobID ?? jobID
+    var (measurements, samples, livenessIntegrity, livenessCollection) =
+      measureApplicationLiveness(
+        verifiedBytes, evidenceJobID: evidenceJobID,
+        expectedBindingRevision: expectedBindingRevision,
+        expectedDeployedArtifactDigest: expectedDeployedArtifactDigest)
+    integrityBlockers.append(contentsOf: livenessIntegrity)
+    collectionBlockers.append(contentsOf: livenessCollection)
     let ledger = measureCrashLedger(
       verifiedBytes, declaredCrashSignature: declaredCrashSignature,
       watermark: crashLedgerWatermark,
@@ -228,27 +272,82 @@ public struct HarnessObservationBuilder: Sendable {
 
   // MARK: - Measurement
 
-  /// Hilog's one remaining measurement: whether the device produced log
-  /// output at all. It no longer contributes crash counts - the ledger owns
-  /// that question, and having both would let one crash be counted twice.
-  private func measure(
-    _ verified: [HarnessVerifiedArtifact]
-  ) -> ([String: JSONValue], [String: Int]) {
-    let logs = verified.filter { $0.name.lowercased().contains("hilog") }
-    guard !logs.isEmpty else { return ([:], [:]) }
+  private func measureApplicationLiveness(
+    _ verified: [HarnessVerifiedArtifact],
+    evidenceJobID: String,
+    expectedBindingRevision: Int?,
+    expectedDeployedArtifactDigest: String?
+  ) -> (
+    measurements: [String: JSONValue], samples: [String: Int],
+    integrityBlockers: [String], collectionBlockers: [String]
+  ) {
+    guard let artifact = verified.first(where: {
+      $0.jobID == evidenceJobID && $0.name == Self.applicationLivenessArtifact
+    }) else { return ([:], [:], [], []) }
+    guard let envelope = try? JSONDecoder().decode(
+      HarnessApplicationLivenessArtifact.self, from: artifact.data),
+      envelope.documentType == "arkdeck-application-liveness",
+      envelope.schemaVersion == "1.0.0",
+      envelope.sourceRuntimeJobID == evidenceJobID,
+      envelope.sourceOperationRef == "capture.diagnostics@1",
+      envelope.applicationRef.utf8.count == 64,
+      envelope.applicationRef.utf8.allSatisfy({
+        (48...57).contains($0) || (97...102).contains($0)
+      }),
+      Self.isValidObservationWindow(envelope)
+    else {
+      return ([:], [:], ["applicationLivenessProvenanceMismatch"], [])
+    }
+    if let expectedBindingRevision,
+      envelope.targetBindingRevision != expectedBindingRevision
+    {
+      return (
+        [:], [:], [],
+        ["applicationLivenessBindingRevisionChanged"])
+    }
+    if let expectedDeployedArtifactDigest,
+      envelope.deployedArtifactDigest != expectedDeployedArtifactDigest
+    {
+      return (
+        [:], [:], [],
+        ["applicationLivenessDeployedArtifactChanged"])
+    }
+    switch envelope.state {
+    case "HEALTHY":
+      guard envelope.processState == "RUNNING", envelope.pidObserved else {
+        return ([:], [:], ["applicationLivenessStateContradiction"], [])
+      }
+      return (
+        [
+          "verificationRunCount": .integer(1),
+          "applicationLiveness": .string("healthy"),
+        ],
+        ["verificationRunCount": 1, "applicationLiveness": 1], [], [])
+    case "UNHEALTHY":
+      return (
+        [
+          "verificationRunCount": .integer(1),
+          "applicationLiveness": .string("unhealthy"),
+        ],
+        ["verificationRunCount": 1, "applicationLiveness": 1], [], [])
+    case "UNKNOWN":
+      return (
+        [:], [:], [],
+        ["applicationLivenessUnknown:\(envelope.reasonCode)"])
+    default:
+      return ([:], [:], ["applicationLivenessStateInvalid"], [])
+    }
+  }
 
-    let sawApplicationOutput = logs.contains { log in
-      // Not decodable as text: measured as nothing rather than as silence.
-      guard let text = String(data: log.data, encoding: .utf8) else { return false }
-      return Self.hasApplicationOutput(text)
-    }
-    var measurements: [String: JSONValue] = ["verificationRunCount": .integer(1)]
-    var samples: [String: Int] = ["verificationRunCount": 1]
-    if sawApplicationOutput {
-      measurements["applicationLiveness"] = .string("healthy")
-      samples["applicationLiveness"] = 1
-    }
-    return (measurements, samples)
+  private static func isValidObservationWindow(
+    _ envelope: HarnessApplicationLivenessArtifact
+  ) -> Bool {
+    let formatter = ISO8601DateFormatter()
+    guard let started = formatter.date(from: envelope.observationWindow.startedAtUTC),
+      let ended = formatter.date(from: envelope.observationWindow.endedAtUTC),
+      let observed = formatter.date(from: envelope.observedAtUTC)
+    else { return false }
+    return started <= observed && observed <= ended
   }
 
   /// Crash counting from the Faultlogger ledger.
@@ -368,7 +467,7 @@ public struct HarnessObservationBuilder: Sendable {
       "newFatalSignatureCount": .integer(Int64(fresh.count - matching)),
       Self.watermarkMetric: .string(max(watermark, newest ?? watermark)),
     ]
-    var samples: [String: Int] = [
+    let samples: [String: Int] = [
       "matchingCrashCount": 1,
       "newFatalSignatureCount": 1,
     ]
@@ -376,10 +475,6 @@ public struct HarnessObservationBuilder: Sendable {
       measurements[Self.latestEntryMetric] = .string(latest.name)
       measurements["latestCrashSignature"] = .string(
         detail?.rendered ?? Self.nameOnlySignature(latest).rendered)
-      // A fresh fault entry is the strongest liveness signal there is, and
-      // it must win over hilog's "the device produced log lines".
-      measurements["applicationLiveness"] = .string("unhealthy")
-      samples["applicationLiveness"] = 1
     }
     return (measurements, samples, [])
   }
@@ -407,19 +502,4 @@ public struct HarnessObservationBuilder: Sendable {
     return tokens.allSatisfy { haystack.contains($0) }
   }
 
-  private static func hasApplicationOutput(_ text: String) -> Bool {
-    // Any hilog line at all counts as output. Stated precisely, because the
-    // earlier comment here claimed more than the code does: this measures
-    // "the capture came back with log lines", and `capture.diagnostics@1`
-    // scopes a capture to an application only when the caller passes
-    // `hilogFilters`, which the debug-crash handler does not. On an idle
-    // device with the application under debug not running,
-    // `applicationLiveness` reports `healthy` from unrelated output - so a
-    // criterion built on it says "the device is logging", not "my app is
-    // alive". A criterion that needs the stronger claim has to name the
-    // application, which is an input-surface change, not a scan change.
-    text.split(separator: "\n").contains { line in
-      !line.trimmingCharacters(in: .whitespaces).isEmpty
-    }
-  }
 }
