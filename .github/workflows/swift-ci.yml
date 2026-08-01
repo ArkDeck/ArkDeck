@@ -4,7 +4,8 @@ name: Swift CI
 # 授权语义不变:CI 红 = 不能合并;CI 绿 ≠ 批准(enforcement"CI 校验"节)。
 # 零 secret;只读权限。覆盖边界:仅 Packages/ArkDeckKit 全量 swift test;
 # ArkDeckApp 与 XCUITest 面不在本 job(见 job summary,不伪装覆盖)。
-# 路径感知:diff 未触碰 Swift 面(Packages/**、Package.*)时秒级 success;
+# 路径感知:diff 同时未触碰 Swift 面(Packages/**、Package.*)和本 workflow 时秒级 success;
+# workflow 自身变更必须跑全量,确保新的编译/测试参数经过同一 exact-head 验证;
 # diff 基准不可得时 fail closed = 跑全量(宁多跑不漏跑)。
 
 on:
@@ -40,9 +41,10 @@ jobs:
             # 无可靠 diff 基准(分支新建/force 场景)→ fail closed:跑全量
             echo "swift=true" >> "$GITHUB_OUTPUT"
             echo "reason=no-diff-base-fail-closed" >> "$GITHUB_OUTPUT"
-          elif git diff --name-only "$BASE" "${{ github.sha }}" | grep -qE '^(Packages/|Package\.)'; then
+          elif git diff --name-only "$BASE" "${{ github.sha }}" \
+            | grep -qE '^(Packages/|Package\.|\.github/workflows/swift-ci\.yml$)'; then
             echo "swift=true" >> "$GITHUB_OUTPUT"
-            echo "reason=swift-surface-touched" >> "$GITHUB_OUTPUT"
+            echo "reason=swift-surface-or-workflow-touched" >> "$GITHUB_OUTPUT"
           else
             echo "swift=false" >> "$GITHUB_OUTPUT"
             echo "reason=no-swift-surface" >> "$GITHUB_OUTPUT"
@@ -72,9 +74,14 @@ jobs:
           xcodebuild -version
           swift --version
 
-      - name: swift test (ArkDeckKit full suite)
+      - name: swift test (ArkDeckKit full suite, 4 workers)
         if: steps.paths.outputs.swift == 'true'
-        run: swift test --package-path Packages/ArkDeckKit
+        run: >-
+          swift test
+          --package-path Packages/ArkDeckKit
+          --parallel
+          --num-workers 4
+          --disable-index-store
 
       - name: Job summary
         if: always()
@@ -83,9 +90,9 @@ jobs:
             echo "### Swift CI"
             echo "- Path decision: \`${{ steps.paths.outputs.reason }}\`"
             if [ "${{ steps.paths.outputs.swift }}" = "true" ]; then
-              echo "- Ran the full ArkDeckKit test suite."
+              echo "- Ran the full ArkDeckKit test suite with 4 test workers and no index store."
             else
-              echo "- Skipped swift test: diff touches no Swift surface (Packages/**, Package.*)."
+              echo "- Skipped swift test: diff touches neither Swift surface (Packages/**, Package.*) nor this workflow."
             fi
             echo "- Coverage boundary: Packages/ArkDeckKit only. ArkDeckApp and XCUITest surfaces are NOT covered by this job."
             echo "- CI green is not approval; authorization stays with maintainer PR review (governance/enforcement.md)."
