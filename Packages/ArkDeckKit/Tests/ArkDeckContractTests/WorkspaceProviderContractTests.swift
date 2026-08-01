@@ -332,16 +332,12 @@ final class WorkspaceProviderContractTests: XCTestCase {
       jobID: imported.jobID, artifactID: imported.artifactID)
     let grantStore1 = try RuntimeCapabilityStore(
       directoryURL: state.appendingPathComponent("workspace-grant-1"))
-    // One grant per operation: a capability's lineage is tied to the
-    // operation and typed inputs of its first use, so a single grant cannot
-    // cover apply-patch *and* revert-patch. That is the model the device side
-    // already uses; TASK-HFA-009 r2 makes it visible for workspaces too.
+    // One bounded workspace standing grant covers the approved route. Each
+    // exact operation and its typed inputs are still materialized, authorized,
+    // consumed and outcome-recorded independently.
     try await installWorkspaceGrant(
-      into: grantStore1, operations: ["workspace.apply-patch"],
-      capabilityID: "CAP-RT-WORKSPACE-APPLY")
-    try await installWorkspaceGrant(
-      into: grantStore1, operations: ["workspace.revert-patch"],
-      capabilityID: "CAP-RT-WORKSPACE-REVERT")
+      into: grantStore1,
+      operations: ["workspace.apply-patch", "workspace.revert-patch"])
     let engine = try RuntimeJobEngine(
       configuration: .init(
         stateDirectory: state.appendingPathComponent("patch-runtime-engine")),
@@ -361,7 +357,7 @@ final class WorkspaceProviderContractTests: XCTestCase {
       ],
       requestID: "request-runtime-apply",
       idempotencyKey: "idempotency-runtime-apply",
-      authorization: RuntimeCapabilityReference(capabilityID: "CAP-RT-WORKSPACE-APPLY"))
+      authorization: Self.workspaceGrantReference)
     let applyAcceptance = try await engine.submit(try JSONEncoder().encode(apply))
     let applyStatus = try await engine.run(jobID: applyAcceptance.jobID)
     XCTAssertEqual(applyStatus.state, "succeeded")
@@ -389,13 +385,21 @@ final class WorkspaceProviderContractTests: XCTestCase {
       ],
       requestID: "request-runtime-revert",
       idempotencyKey: "idempotency-runtime-revert",
-      authorization: RuntimeCapabilityReference(capabilityID: "CAP-RT-WORKSPACE-REVERT"))
+      authorization: Self.workspaceGrantReference)
     let revertAcceptance = try await engine.submit(try JSONEncoder().encode(revert))
     let revertStatus = try await engine.run(jobID: revertAcceptance.jobID)
     XCTAssertEqual(revertStatus.state, "succeeded")
     XCTAssertEqual(
       try Data(contentsOf: root.appendingPathComponent("Sources/App.txt")),
       Data("old\n".utf8))
+    let inspectedGrant = try await grantStore1.inspect(
+      capabilityID: Self.workspaceGrantID)
+    let grantStatus = try XCTUnwrap(inspectedGrant)
+    XCTAssertEqual(grantStatus.consumptionCount, 2)
+    XCTAssertEqual(
+      grantStatus.lineage.map(\.operationReference),
+      ["workspace.apply-patch@1", "workspace.revert-patch@1"])
+    XCTAssertEqual(grantStatus.lineage.map(\.outcome), [.confirmed, .confirmed])
   }
 
   func testRuntimeDraftsAReviewableWorkspaceCapabilityWithoutInstallingOrDispatching()
@@ -654,6 +658,26 @@ final class WorkspaceProviderContractTests: XCTestCase {
       return XCTFail("a truncated diagnostic stream must fail closed")
     }
     XCTAssertEqual(truncatedCode, "workspace.outputTruncated")
+  }
+
+  func testUnapprovedBuildAndTestPresetsFailBeforeMaterialization() throws {
+    for (reference, inputKey, preset) in [
+      ("workspace.build-openharmony@1", "buildPresetRef", "build-not-approved"),
+      ("workspace.run-tests@1", "testPresetRef", "tests-not-approved"),
+    ] {
+      let descriptor = try XCTUnwrap(
+        RuntimeOperationCatalog.descriptor(reference: reference))
+      XCTAssertThrowsError(
+        try provider.action(
+          for: descriptor.steps[0], operation: descriptor,
+          inputs: [
+            "projectRef": .string("TestProject"),
+            inputKey: .string(preset),
+          ], context: executionContext())
+      ) { error in
+        XCTAssertTrue("\(error)".contains("PresetUnavailable"), reference)
+      }
+    }
   }
 
   func testProfileOperationsDoNotDependOnTheOptionalSourceInspector() throws {

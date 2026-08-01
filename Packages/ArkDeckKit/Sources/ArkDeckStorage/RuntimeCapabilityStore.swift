@@ -1,13 +1,15 @@
 // Durable Runtime Capability store (CHG-2026-046, T03).
 //
 // A capability is installed once as a bounded authorization envelope.
-// Every use appends a hash-linked execution node. E1 standing envelopes
-// may admit a newly materialized plan while operation, effect, target,
-// binding and typed inputs stay identical; every node still binds its exact
-// plan digest. A different reservation may consume the next use only after
-// the preceding node has a confirmed outcome. A pending, legacy-unverified
-// or outcomeUnknown node therefore fails closed, while retrying the same
-// reservation remains idempotent.
+// Every use appends a hash-linked execution node. Device envelopes may admit
+// a newly materialized plan while operation, effect, target, binding and typed
+// inputs stay identical. A maintainer-issued E1 workspace standing grant may
+// instead authorize different typed operations and inputs inside its bounded
+// target, operation and input-constraint envelope. Every node still binds its
+// exact query and plan digest. A different reservation may consume the next
+// use only after the preceding node has a confirmed outcome. A pending,
+// legacy-unverified or outcomeUnknown node therefore fails closed, while
+// retrying the same reservation remains idempotent.
 //
 // All writes are atomic (temp + fsync + rename + directory sync) under an
 // exclusive flock, so a crash between any two syscalls leaves either the
@@ -627,7 +629,9 @@ public actor RuntimeCapabilityStore {
         "previous use \(unresolved.ordinal) is \(unresolved.currentOutcome.rawValue); "
           + "new mutation dispatch is forbidden")
     }
-    if let first = record.consumptions.first {
+    if let first = record.consumptions.first,
+      !permitsWorkspaceStandingMaterialization(record.capability)
+    {
       if let expectedScope = first.authorizationScopeFingerprintSHA256 {
         guard expectedScope == authorizationScopeFingerprint(of: query) else {
           throw RuntimeCapabilityStoreError.lineageBlocked(
@@ -648,6 +652,18 @@ public actor RuntimeCapabilityStore {
     {
       throw RuntimeCapabilityStoreError.denied(denial)
     }
+  }
+
+  private static func permitsWorkspaceStandingMaterialization(
+    _ capability: RuntimeCapability
+  ) -> Bool {
+    guard capability.effectCeiling == .deviceMutation,
+      capability.issuer.kind == .maintainerMergedPR,
+      case .workspaceIdentity(_, let expectedRevision, _) = capability.targetScope
+    else {
+      return false
+    }
+    return expectedRevision.isEmpty
   }
 
   private static func isLowercaseSHA256(_ value: String) -> Bool {

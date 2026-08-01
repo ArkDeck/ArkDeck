@@ -55,6 +55,44 @@ final class RuntimeCapabilityStoreContractTests: XCTestCase {
       inputs: inputs)
   }
 
+  private func workspaceStandingCapability() throws -> RuntimeCapability {
+    try RuntimeCapability(
+      capabilityID: "CAP-RT-WORKSPACE-ROUTE",
+      targetScope: .workspaceIdentity(
+        sha256: String(repeating: "d", count: 64),
+        expectedWorkspaceRevision: "",
+        allowedFileScopesDigest: String(repeating: "e", count: 64)),
+      operationScope: [
+        .init(operationID: "workspace.apply-patch", version: 1),
+        .init(operationID: "workspace.build-openharmony", version: 1),
+      ],
+      effectCeiling: .deviceMutation,
+      inputConstraints: ["projectRef": .exactString("demo-app")],
+      issuedAtUTC: "2026-07-01T00:00:00Z",
+      expiresAtUTC: "2026-12-31T00:00:00Z",
+      maximumUses: 4,
+      issuer: .init(kind: .maintainerMergedPR, reference: "PR#test workspace route"))
+  }
+
+  private func workspaceQuery(
+    operationID: String,
+    revision: String,
+    planDigest: String,
+    inputs: [String: JSONValue]
+  ) -> RuntimeCapabilityAuthorizationQuery {
+    .init(
+      operationID: operationID,
+      operationVersion: 1,
+      effect: .deviceMutation,
+      targetStableIdentitySHA256: nil,
+      targetBindingRevision: nil,
+      planDigest: planDigest,
+      inputs: inputs,
+      workspaceIdentitySHA256: String(repeating: "d", count: 64),
+      workspaceRevision: revision,
+      workspaceFileScopesDigest: String(repeating: "e", count: 64))
+  }
+
   func testInstallListInspectRoundTrip() async throws {
     let store = try makeStore()
     let capability = try e1Capability()
@@ -227,6 +265,151 @@ final class RuntimeCapabilityStoreContractTests: XCTestCase {
       status.lineage[0].queryFingerprintSHA256,
       status.lineage[1].queryFingerprintSHA256)
     XCTAssertEqual(status.remainingUses, 1)
+  }
+
+  func testMaintainerWorkspaceStandingGrantAllowsDifferentPatchesAndBuild() async throws {
+    let store = try makeStore()
+    try await store.install(try workspaceStandingCapability())
+    let baseInputs: [String: JSONValue] = ["projectRef": .string("demo-app")]
+    let steps: [(String, String, String, [String: JSONValue])] = [
+      (
+        "workspace.apply-patch", String(repeating: "1", count: 64),
+        String(repeating: "a", count: 64),
+        baseInputs.merging([
+          "patchArtifactRef": .string("lease-v1:patch:ART-A"),
+          "allowedFileGlobs": .array([.string("entry/src/main/ets/**")]),
+        ]) { _, new in new }
+      ),
+      (
+        "workspace.apply-patch", String(repeating: "2", count: 64),
+        String(repeating: "b", count: 64),
+        baseInputs.merging([
+          "patchArtifactRef": .string("lease-v1:patch:ART-B"),
+          "allowedFileGlobs": .array([.string("entry/src/main/ets/**")]),
+        ]) { _, new in new }
+      ),
+      (
+        "workspace.build-openharmony", String(repeating: "3", count: 64),
+        String(repeating: "c", count: 64),
+        baseInputs.merging(["buildPresetRef": .string("debug-hap")]) { _, new in new }
+      ),
+    ]
+
+    for (offset, step) in steps.enumerated() {
+      let ordinal = offset + 1
+      _ = try await store.consume(
+        capabilityID: "CAP-RT-WORKSPACE-ROUTE",
+        reservationID: "res-workspace-\(ordinal)",
+        jobID: "job-workspace-\(ordinal)",
+        query: workspaceQuery(
+          operationID: step.0, revision: step.1, planDigest: step.2, inputs: step.3),
+        nowUTC: "2026-08-01T00:0\(offset):00Z")
+      try await store.recordOutcome(
+        capabilityID: "CAP-RT-WORKSPACE-ROUTE",
+        reservationID: "res-workspace-\(ordinal)",
+        jobID: "job-workspace-\(ordinal)",
+        outcome: .confirmed,
+        terminalState: "succeeded",
+        atUTC: "2026-08-01T00:0\(offset):30Z")
+    }
+
+    do {
+      _ = try await store.consume(
+        capabilityID: "CAP-RT-WORKSPACE-ROUTE",
+        reservationID: "res-workspace-out-of-scope",
+        jobID: "job-workspace-out-of-scope",
+        query: workspaceQuery(
+          operationID: "workspace.run-tests",
+          revision: String(repeating: "4", count: 64),
+          planDigest: String(repeating: "f", count: 64),
+          inputs: baseInputs.merging(["testPresetRef": .string("demo-tests")]) {
+            _, new in new
+          }),
+        nowUTC: "2026-08-01T00:03:00Z")
+      XCTFail("a standing grant must reauthorize every operation against its envelope")
+    } catch let error as RuntimeCapabilityStoreError {
+      guard case .denied(let denial) = error else {
+        return XCTFail("expected operation-scope denial, got \(error)")
+      }
+      XCTAssertEqual(denial.reason, .operationScopeMismatch)
+    }
+
+    do {
+      _ = try await store.consume(
+        capabilityID: "CAP-RT-WORKSPACE-ROUTE",
+        reservationID: "res-workspace-input-out-of-scope",
+        jobID: "job-workspace-input-out-of-scope",
+        query: workspaceQuery(
+          operationID: "workspace.apply-patch",
+          revision: String(repeating: "4", count: 64),
+          planDigest: String(repeating: "f", count: 64),
+          inputs: [
+            "projectRef": .string("other-app"),
+            "patchArtifactRef": .string("lease-v1:patch:ART-C"),
+            "allowedFileGlobs": .array([.string("entry/src/main/ets/**")]),
+          ]),
+        nowUTC: "2026-08-01T00:03:00Z")
+      XCTFail("changed inputs must still satisfy the standing grant constraints")
+    } catch let error as RuntimeCapabilityStoreError {
+      guard case .denied(let denial) = error else {
+        return XCTFail("expected input-constraint denial, got \(error)")
+      }
+      XCTAssertEqual(denial.reason, .inputConstraintViolated)
+    }
+
+    do {
+      _ = try await store.consume(
+        capabilityID: "CAP-RT-WORKSPACE-ROUTE",
+        reservationID: "res-workspace-expired",
+        jobID: "job-workspace-expired",
+        query: workspaceQuery(
+          operationID: "workspace.apply-patch",
+          revision: String(repeating: "4", count: 64),
+          planDigest: String(repeating: "f", count: 64),
+          inputs: steps[0].3),
+        nowUTC: "2027-01-01T00:00:00Z")
+      XCTFail("an expired standing grant must not authorize a new materialization")
+    } catch let error as RuntimeCapabilityStoreError {
+      guard case .denied(let denial) = error else {
+        return XCTFail("expected expiry denial, got \(error)")
+      }
+      XCTAssertEqual(denial.reason, .expired)
+    }
+
+    try await store.revoke(
+      capabilityID: "CAP-RT-WORKSPACE-ROUTE",
+      atUTC: "2026-08-01T00:04:00Z",
+      reason: "route closed")
+    do {
+      _ = try await store.consume(
+        capabilityID: "CAP-RT-WORKSPACE-ROUTE",
+        reservationID: "res-workspace-revoked",
+        jobID: "job-workspace-revoked",
+        query: workspaceQuery(
+          operationID: "workspace.apply-patch",
+          revision: String(repeating: "4", count: 64),
+          planDigest: String(repeating: "f", count: 64),
+          inputs: steps[0].3),
+        nowUTC: "2026-08-01T00:05:00Z")
+      XCTFail("a revoked standing grant must not authorize a new materialization")
+    } catch let error as RuntimeCapabilityStoreError {
+      guard case .denied(let denial) = error else {
+        return XCTFail("expected revocation denial, got \(error)")
+      }
+      XCTAssertEqual(denial.reason, .revoked)
+    }
+
+    let inspected = try await store.inspect(capabilityID: "CAP-RT-WORKSPACE-ROUTE")
+    let status = try XCTUnwrap(inspected)
+    XCTAssertEqual(
+      status.lineage.map(\.operationReference),
+      ["workspace.apply-patch@1", "workspace.apply-patch@1", "workspace.build-openharmony@1"])
+    XCTAssertEqual(Set(status.lineage.compactMap(\.authorizationScopeFingerprintSHA256)).count, 3)
+    XCTAssertEqual(status.remainingUses, 1)
+    XCTAssertEqual(status.consumptionCount, 3)
+    guard case .revoked = status.capability.revocation else {
+      return XCTFail("the final status must retain the durable revocation")
+    }
   }
 
   func testDedicatedReadbackCanResolveUnknownWithoutASecondConsumption() async throws {
