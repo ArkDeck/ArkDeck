@@ -3255,6 +3255,8 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
   - `Packages/ArkDeckKit/Sources/ArkDeckStorage/RetentionAndExport.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/ChatConfirmationAuthority.swift`（new）
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/AuthorizationAdmission.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/AgentDeviceOperations/AgentDeviceOperationModels.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/AgentDeviceOperations/TrustedDeviceOperationHost.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipAuthorizationFacts.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipFlashExecution.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipFlashExecutionHost.swift`
@@ -3286,6 +3288,8 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
   要求额外 `AUTH-ID`，但不放宽 exact plan/target、fail-closed 与 recovery 不重放；
 - typed、closed chat confirmation request/reference/admission；confirmation digest、plan/
   archive/step-set/target correlation 与 one-shot durable consumption；
+- generic Agent Device Operation authority decoder/host 对新 kind 显式 fail closed，避免
+  Rockchip 专属 chat authority 被其他 operation surface 误接收；
 - CLI/wrapper 最终入口只需一个 chat-trigger 命令，仍只进入 product-owned typed executor；
 - Manifest/Journal/export 如实区分 `chatConfirmation` 与 `standingAuthorization`；
 - contract/fault matrix 覆盖正向一次 dispatch 与所有负向零 dispatch。
