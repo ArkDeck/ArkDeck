@@ -92,7 +92,7 @@ struct ArkDeckCommandLine {
 
   static func runPlan(_ arguments: [String]) throws {
     let options = try CLIOptions(arguments)
-    try options.validateAllowed(["--images", "--mode", "--out"])
+    try options.validateAllowed(["--images", "--device-profile", "--mode", "--out"])
     let modeName = options.value("--mode") ?? "planOnly"
     guard let mode = RockchipFlashExecutionMode(rawValue: modeName), mode != .execute else {
       throw CLIError(
@@ -442,7 +442,13 @@ struct ArkDeckCommandLine {
     }
     print("validating \(imagesPath) (streaming SHA-256; this can take a while)…")
     let summary = try GzipTarArchiveReader.summarize(fileAt: URL(fileURLWithPath: imagesPath))
-    let provider = RockchipRockUSBFlashProvider()
+    let profileReference = options.value("--device-profile") ?? "dayu200@1"
+    guard let profile = RockchipFlashProfile.profile(reference: profileReference) else {
+      throw CLIError(
+        exitCode: EX_USAGE,
+        message: "unsupported DAYU200 device profile \(profileReference)")
+    }
+    let provider = RockchipRockUSBFlashProvider(profile: profile)
     let verdict = provider.profile.validate(summary.archiveObservation())
     if case .blocked(let violations) = verdict {
       for violation in violations {
@@ -491,6 +497,11 @@ struct ArkDeckCommandLine {
   static func printExactPlan(_ plan: RockchipFlashPlan) {
     print("\nExact plan (\(plan.executionMode.rawValue))")
     print("  provider: \(RockchipRockUSBFlashProvider.providerIdentity)")
+    if let profile = RockchipFlashProfile.supportedDAYU200Profiles.first(where: {
+      $0.archiveSHA256 == plan.archiveSHA256
+    }) {
+      print("  profile: \(profile.catalogReference) (\(profile.firmwareVersion))")
+    }
     print("  target: \(RockchipFlashProfile.targetDeviceModel)")
     print("  archive: sha256 \(plan.archiveSHA256) (\(plan.archiveSizeBytes) bytes)")
     print("  plan digest: \(plan.planDigestSHA256)")
@@ -504,7 +515,14 @@ struct ArkDeckCommandLine {
   }
 
   static func writePlanDocument(_ plan: RockchipFlashPlan, options: CLIOptions) throws {
-    let document = RockchipRockUSBFlashProvider().planDocument(for: plan)
+    guard
+      let profile = RockchipFlashProfile.supportedDAYU200Profiles.first(where: {
+        $0.archiveSHA256 == plan.archiveSHA256
+      })
+    else {
+      throw CLIError(exitCode: EX_DATAERR, message: "plan has no published DAYU200 profile")
+    }
+    let document = RockchipRockUSBFlashProvider(profile: profile).planDocument(for: plan)
     let url = outputURL(options, fileName: "arkdeck-flash-plan.json")
     try document.canonicalData().write(to: url, options: .atomic)
     print("plan document: \(url.path)")
@@ -537,7 +555,8 @@ struct ArkDeckCommandLine {
     let usage = """
       usage:
         arkdeck flash install-tool --path <absolute-rkdeveloptool-path>
-        arkdeck flash plan --images <images.tar.gz> [--mode planOnly|simulated] [--out <dir>]
+        arkdeck flash plan --images <images.tar.gz> \
+      [--device-profile <dayu200@1|dayu200@2>] [--mode planOnly|simulated] [--out <dir>]
         arkdeck flash execute --images <images.tar.gz> --target-location-id <usb-location> \
       --operator <name> [--out <dir>]
         arkdeck flash execute --images <images.tar.gz> --target-location-id <usb-location> \
@@ -551,6 +570,7 @@ struct ArkDeckCommandLine {
         arkdeck doctor [--socket <path>] [--json]
         arkdeck operation list [--socket <path>] [--json]
         arkdeck device list|show|adopt [--candidate <connect-key>] [--socket <path>] [--json]
+        arkdeck job plan --request-file <request.json> [--socket <path>] [--json]
         arkdeck job submit --target <id> --operation <id@version> \
       [--expected-binding-revision <n>] [--wait] [--json]
         arkdeck job status --job <id> [--json] | arkdeck job list [--json]
@@ -564,7 +584,8 @@ struct ArkDeckCommandLine {
         arkdeck capability install --file <cap.json> [--json]
         arkdeck capability revoke --capability <id> [--json]
         arkdeck artifact import-hap --target <id> --file <signed.hap> [--json]
-        arkdeck artifact import-flash-bundle --target <id> --file <images.tar.gz> [--json]
+        arkdeck artifact import-flash-bundle --target <id> --file <images.tar.gz> \
+      [--device-profile <dayu200@1|dayu200@2>] [--json]
         arkdeck artifact import-native-library --target <id> --file <libname.so> [--json]
         arkdeck task submit --target <id> --goal <text> [--crash-signature <SIGx+Symbol>] \
       [--intake <text>] [--project <ref>] [--max-rounds <n>] \

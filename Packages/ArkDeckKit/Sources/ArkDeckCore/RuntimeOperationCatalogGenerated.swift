@@ -4,7 +4,7 @@
 // Drift is a check-sdd error (bidirectional byte comparison).
 
 extension RuntimeOperationCatalog {
-  public static let catalogDigest = "7a4c0081f1ae653ce1201d779ae8465b2a3bd7cad2583b4cae3a7d7e7469c33f"
+  public static let catalogDigest = "e2f8eb6592aaeeec37c63a01708db2325b38c798b0f8272228ba0fccc2cfd0aa"
 
   public static let operations: [CatalogOperationDescriptor] = [
     CatalogOperationDescriptor(
@@ -322,7 +322,7 @@ extension RuntimeOperationCatalog {
       binding: .confirmedDevice,
       concurrencyKey: .deviceExclusive,
       inputs: [
-        CatalogFieldDescriptor(name: "deviceProfile", type: .string, isRequired: true, enumValues: ["dayu200@1"]),
+        CatalogFieldDescriptor(name: "deviceProfile", type: .string, isRequired: true, enumValues: ["dayu200@1", "dayu200@2"]),
         CatalogFieldDescriptor(name: "imageBundleLease", type: .artifactLease, isRequired: true),
         CatalogFieldDescriptor(name: "partitionPlan", type: .stringArray, isRequired: true, maxLength: 32, maxItems: 16),
         CatalogFieldDescriptor(name: "postFlashVerification", type: .string, isRequired: false, enumValues: ["basic", "full"])
@@ -355,7 +355,7 @@ extension RuntimeOperationCatalog {
         CatalogArtifactDescriptor(name: "post-flash-facts.json", role: .raw, mediaType: "application/json", privacy: .sensitive, isRequired: true, retentionClass: .default),
         CatalogArtifactDescriptor(name: "post-flash-hilog.txt", role: .raw, mediaType: "text/plain", privacy: .sensitive, isRequired: false, retentionClass: .default)
       ],
-      profiles: ["dayu200@1"]
+      profiles: ["dayu200@1", "dayu200@2"]
     ),
     CatalogOperationDescriptor(
       id: "observe.device",

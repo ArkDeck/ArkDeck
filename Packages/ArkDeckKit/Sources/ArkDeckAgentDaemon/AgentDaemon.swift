@@ -334,6 +334,21 @@ public struct RuntimeControlPlaneHandler: Sendable {
         return failure(id: request.id, code: .internalError, message: "\(error)")
       }
 
+    case "job.plan":
+      guard case .string(let requestJson)? = request.params?["requestJson"] else {
+        return failure(id: request.id, code: .invalidParams, message: "requestJson is required")
+      }
+      do {
+        let preview = try await engine.planOnly(Data(requestJson.utf8))
+        let encoded = try JSONEncoder().encode(preview)
+        let json = try JSONDecoder().decode(JSONValue.self, from: encoded)
+        return success(id: request.id, result: json)
+      } catch let error as RuntimeJobEngineError {
+        return failure(id: request.id, code: .rejected, message: "\(error)")
+      } catch {
+        return failure(id: request.id, code: .internalError, message: "\(error)")
+      }
+
     case "job.submit":
       guard case .string(let requestJson)? = request.params?["requestJson"] else {
         return failure(id: request.id, code: .invalidParams, message: "requestJson is required")

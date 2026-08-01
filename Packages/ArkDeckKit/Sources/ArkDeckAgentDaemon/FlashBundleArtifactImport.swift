@@ -23,8 +23,7 @@ enum FlashBundleArtifactImportError: Error, Equatable, CustomStringConvertible {
       return "flash bundle name must be images.tar.gz"
     case .invalidByteCount:
       return
-        "flash bundle byteCount must equal the pinned DAYU200 archive size "
-        + "\(RockchipFlashProfile.dayu200.archiveSizeBytes)"
+        "flash bundle byteCount must equal a pinned DAYU200 profile archive size"
     case .invalidSHA256:
       return "flash bundle sha256 must equal the pinned DAYU200 archive digest"
     case .unknownUpload:
@@ -53,32 +52,62 @@ struct FlashBundleImportValidation: Sendable, Equatable {
 }
 
 struct FlashBundleImportPolicy: Sendable {
-  let expectedByteCount: Int
-  let expectedSHA256: String
-  let validate: @Sendable (URL) throws -> FlashBundleImportValidation
+  struct Candidate: Sendable {
+    let expectedByteCount: Int
+    let expectedSHA256: String
+    let validate: @Sendable (URL) throws -> FlashBundleImportValidation
+  }
+
+  let candidates: [Candidate]
+
+  init(
+    expectedByteCount: Int,
+    expectedSHA256: String,
+    validate: @escaping @Sendable (URL) throws -> FlashBundleImportValidation
+  ) {
+    candidates = [
+      Candidate(
+        expectedByteCount: expectedByteCount,
+        expectedSHA256: expectedSHA256,
+        validate: validate)
+    ]
+  }
+
+  init(candidates: [Candidate]) {
+    precondition(!candidates.isEmpty)
+    self.candidates = candidates
+  }
+
+  func candidate(byteCount: Int, sha256: String) -> Candidate? {
+    candidates.first {
+      $0.expectedByteCount == byteCount && $0.expectedSHA256 == sha256
+    }
+  }
 
   static let production: FlashBundleImportPolicy = {
-    let profile = RockchipFlashProfile.dayu200
-    return FlashBundleImportPolicy(
-      expectedByteCount: Int(profile.archiveSizeBytes),
-      expectedSHA256: profile.archiveSHA256
-    ) { url in
-      let summary: GzipTarArchiveSummary
-      do {
-        summary = try GzipTarArchiveReader.summarize(fileAt: url)
-      } catch {
-        throw FlashBundleArtifactImportError.invalidBundle("\(error)")
-      }
-      switch profile.validate(summary.archiveObservation()) {
-      case .valid:
-        return FlashBundleImportValidation(
-          byteCount: Int(summary.archiveSizeBytes),
-          sha256: summary.archiveSHA256)
-      case .blocked(let violations):
-        throw FlashBundleArtifactImportError.invalidBundle(
-          violations.map(\.description).joined(separator: "; "))
-      }
-    }
+    FlashBundleImportPolicy(
+      candidates: RockchipFlashProfile.supportedDAYU200Profiles.map { profile in
+        Candidate(
+          expectedByteCount: Int(profile.archiveSizeBytes),
+          expectedSHA256: profile.archiveSHA256
+        ) { url in
+          let summary: GzipTarArchiveSummary
+          do {
+            summary = try GzipTarArchiveReader.summarize(fileAt: url)
+          } catch {
+            throw FlashBundleArtifactImportError.invalidBundle("\(error)")
+          }
+          switch profile.validate(summary.archiveObservation()) {
+          case .valid:
+            return FlashBundleImportValidation(
+              byteCount: Int(summary.archiveSizeBytes),
+              sha256: summary.archiveSHA256)
+          case .blocked(let violations):
+            throw FlashBundleArtifactImportError.invalidBundle(
+              violations.map(\.description).joined(separator: "; "))
+          }
+        }
+      })
   }()
 }
 
@@ -103,6 +132,7 @@ actor FlashBundleArtifactImportCoordinator {
     let name: String
     let expectedByteCount: Int
     let expectedSHA256: String
+    let validate: @Sendable (URL) throws -> FlashBundleImportValidation
     let createdAt: Date
     let fileURL: URL
     var descriptor: Int32
@@ -171,10 +201,10 @@ actor FlashBundleArtifactImportCoordinator {
     guard name == "images.tar.gz" else {
       throw FlashBundleArtifactImportError.invalidName
     }
-    guard byteCount == policy.expectedByteCount else {
+    guard policy.candidates.contains(where: { $0.expectedByteCount == byteCount }) else {
       throw FlashBundleArtifactImportError.invalidByteCount
     }
-    guard sha256 == policy.expectedSHA256 else {
+    guard let candidate = policy.candidate(byteCount: byteCount, sha256: sha256) else {
       throw FlashBundleArtifactImportError.invalidSHA256
     }
     let uploadID = "FLASH-\(UUID().uuidString.lowercased())"
@@ -187,7 +217,8 @@ actor FlashBundleArtifactImportCoordinator {
     }
     sessions[uploadID] = Session(
       target: target, name: name, expectedByteCount: byteCount,
-      expectedSHA256: sha256, createdAt: now, fileURL: fileURL,
+      expectedSHA256: sha256, validate: candidate.validate,
+      createdAt: now, fileURL: fileURL,
       descriptor: descriptor, receivedByteCount: 0)
     return uploadID
   }
@@ -254,7 +285,7 @@ actor FlashBundleArtifactImportCoordinator {
     Darwin.close(session.descriptor)
     session.descriptor = -1
     do {
-      let receipt = try policy.validate(session.fileURL)
+      let receipt = try session.validate(session.fileURL)
       guard receipt.byteCount == session.expectedByteCount,
         receipt.sha256 == session.expectedSHA256
       else {

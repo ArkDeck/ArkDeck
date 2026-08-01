@@ -249,6 +249,20 @@ final class AgentDaemonContractTests: XCTestCase {
     encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
     let operationData = try encoder.encode(operationRequest)
     let operationJSON = try XCTUnwrap(String(data: operationData, encoding: .utf8))
+    let planned = try await request(
+      handler, method: "job.plan",
+      params: ["requestJson": .string(operationJSON)])
+    XCTAssertTrue(planned.ok, planned.error?.message ?? "-")
+    guard case .object(let plan)? = planned.result else {
+      return XCTFail("job.plan must return a Runtime plan-only preview")
+    }
+    XCTAssertEqual(plan["executionMode"], .string("planOnly"))
+    XCTAssertEqual(plan["jobAdmitted"], .bool(false))
+    XCTAssertEqual(plan["dispatchDisposition"], .string("notDispatched"))
+    XCTAssertNil(plan["capability"])
+    let jobsAfterPlan = await engine.listJobs()
+    XCTAssertTrue(jobsAfterPlan.isEmpty)
+
     let drafted = try await request(
       handler, method: "capability.draft",
       params: [
@@ -1049,6 +1063,25 @@ final class AgentDaemonContractTests: XCTestCase {
       + String(digest.prefix(16))
     let artifacts = try await artifactStore.list(jobID: expectedJob)
     XCTAssertTrue(artifacts.isEmpty)
+  }
+
+  func testProductionFlashImportPolicyPinsBothPublishedDAYU200Archives() {
+    let candidates = FlashBundleImportPolicy.production.candidates
+    XCTAssertEqual(candidates.count, 2)
+    XCTAssertEqual(
+      Set(candidates.map(\.expectedByteCount)),
+      Set(RockchipFlashProfile.supportedDAYU200Profiles.map { Int($0.archiveSizeBytes) }))
+    XCTAssertEqual(
+      Set(candidates.map(\.expectedSHA256)),
+      Set(RockchipFlashProfile.supportedDAYU200Profiles.map(\.archiveSHA256)))
+    let v2 = RockchipFlashProfile.dayu200OpenHarmony70035
+    XCTAssertNotNil(
+      FlashBundleImportPolicy.production.candidate(
+        byteCount: Int(v2.archiveSizeBytes), sha256: v2.archiveSHA256))
+    XCTAssertNil(
+      FlashBundleImportPolicy.production.candidate(
+        byteCount: Int(v2.archiveSizeBytes),
+        sha256: String(repeating: "0", count: 64)))
   }
 
   func testChunkedFlashBundleImportPublishesATargetBoundFileLease() async throws {

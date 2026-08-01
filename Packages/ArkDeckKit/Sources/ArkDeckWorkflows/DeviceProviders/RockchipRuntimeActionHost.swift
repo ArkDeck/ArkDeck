@@ -346,10 +346,17 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
     usbProbe: any RockchipRuntimeUSBProbing = ProductRockchipRuntimeUSBProbe(),
     readback: (any RockchipRuntimePartitionReadbackVerifying)? = nil,
     stage: @escaping RockchipRuntimeStaging = { bundle, sessionRoot in
+      guard
+        let profile = RockchipFlashProfile.profile(
+          archiveSHA256: bundle.sha256, byteCount: bundle.byteCount)
+      else {
+        throw RuntimeDispatchFailure.failed(
+          "RockUSB staging received an unpublished DAYU200 bundle")
+      }
       let staged = try RockchipFlashExecutionStager.stage(
         archiveURL: bundle.fileURL,
         sessionRoot: sessionRoot,
-        profile: .dayu200)
+        profile: profile)
       return Dictionary(
         uniqueKeysWithValues: staged.map { memberName, image in
           (
@@ -438,10 +445,10 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
         actionDirectory: actionDirectory)
 
     case .verifyFlashReadback(let bundle):
-      guard bundle.sha256 == RockchipFlashProfile.dayu200.archiveSHA256,
-        bundle.byteCount == Int(RockchipFlashProfile.dayu200.archiveSizeBytes),
-        bundle.partitionNames
-          == RockchipFlashProfile.dayu200.mappedPartitions.map(\.partitionName)
+      guard
+        let profile = RockchipFlashProfile.profile(
+          archiveSHA256: bundle.sha256, byteCount: bundle.byteCount),
+        bundle.partitionNames == profile.mappedPartitions.map(\.partitionName)
       else {
         throw RuntimeDispatchFailure.failed(
           "readback action drifted from the pinned DAYU200 bundle/profile")
@@ -463,9 +470,10 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
           "cannot create job-owned partition readback directory: \(error)")
       }
       var receipts = [loader, partitionTable]
-      for mapping in RockchipFlashProfile.dayu200.mappedPartitions {
-        guard let member = RockchipFlashProfile.dayu200.member(
-          named: mapping.imageMemberName)
+      for mapping in profile.mappedPartitions {
+        guard
+          let member = profile.member(
+            named: mapping.imageMemberName)
         else {
           throw RuntimeDispatchFailure.failed(
             "pinned readback member is missing for \(mapping.partitionName)")
@@ -566,10 +574,10 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
     rockchipExecutable: ResolvedExecutable,
     actionDirectory: URL
   ) async throws -> RockchipRuntimeActionExecutionResult {
-    guard bundle.sha256 == RockchipFlashProfile.dayu200.archiveSHA256,
-      bundle.byteCount == Int(RockchipFlashProfile.dayu200.archiveSizeBytes),
-      bundle.partitionNames
-        == RockchipFlashProfile.dayu200.mappedPartitions.map(\.partitionName)
+    guard
+      let profile = RockchipFlashProfile.profile(
+        archiveSHA256: bundle.sha256, byteCount: bundle.byteCount),
+      bundle.partitionNames == profile.mappedPartitions.map(\.partitionName)
     else {
       throw RuntimeDispatchFailure.failed(
         "flash action drifted from the pinned DAYU200 bundle/profile")
@@ -598,9 +606,9 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
     var receipts: [ProviderSubprocessReceipt] = []
     receipts.append(try await observeLoader(executable: rockchipExecutable))
     receipts.append(try await observePartitionTable(executable: rockchipExecutable))
-    for mapping in RockchipFlashProfile.dayu200.mappedPartitions {
+    for mapping in profile.mappedPartitions {
       guard
-        let member = RockchipFlashProfile.dayu200.member(
+        let member = profile.member(
           named: mapping.imageMemberName),
         let image = staged[mapping.imageMemberName],
         image.memberName == member.name,

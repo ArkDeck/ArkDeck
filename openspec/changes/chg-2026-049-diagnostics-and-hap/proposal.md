@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-049-diagnostics-and-hap
-revision: 6
-status: approved # r2..r5 已交付；r6 携 approved 落地：维护者 review + merge 本 PR 即批准
+revision: 7
+status: approved # r2..r6 已交付；r7 仅在维护者 review/merge 本 PR 后生效
 class: capability
 core_change_level: none
 owner: lvye
@@ -24,6 +24,44 @@ platforms: [macos]
 > diagnostics HiLog/component-tree pair 在 Catalog、generator、JSON Schema
 > 与 Swift validator 间闭合。r2 记录 fresh pins、草稿迁移约束和依赖复验；
 > 合入 r2 前 `TASK-DHA-001` 仍不得恢复实现。
+
+## r7(2026-08-01):7.0.0.35 固件必须先成为可审查的 Runtime plan
+
+### 为什么现在做
+
+GJ-4 的候选包
+`version-Daily_Version-OpenHarmony_7.0.0.35-20260728_180253-dayu200_img.tar.gz`
+已到手，但生产面只认识旧 `dayu200@1` 的单一 archive pin。Catalog 即使接受一个
+新字符串，daemon import、Provider materialization、staging/readback 仍会按旧 digest
+拒绝或错选；同时现有 `capability.draft` 按设计只允许 E1，不能拿来预览 E2 Flash。
+直接创建 E2 capability 来“试计划”违反安全边界，也无法证明零 dispatch。
+
+### What(r7 交付面)
+
+1. 新增 `dayu200@2` device profile，绑定固件版本
+   `OpenHarmony-7.0.0.35-20260728_180253`、archive size/SHA-256 与 17 个 tar member
+   的逐项 size/SHA-256；未知、缺失、重复、跨版本成员一律 fail closed。
+2. `flash.dayu200@1` 以向后兼容方式同时接受 `dayu200@1`/`dayu200@2`。两版都只能
+   materialize 同一九分区顺序：`uboot → resource → boot_linux → ramdisk → system →
+   vendor → updater → chip_ckm → userdata`；`chip_prod`/`sys_prod`、memberless
+   partition 与 sector gap 仍禁止写入。
+3. CLI import 要求显式 `--device-profile` 选择新 pin（缺省仍为 v1）；daemon 只接受
+   两组精确 archive facts，并把选中的 validator 固定到 upload session，不能在 begin
+   与 commit 之间换 profile。
+4. Runtime 新增 `job.plan` / `RuntimeJobEngine.planOnly`：复用 submit 的 Catalog、typed
+   input、target facts、Artifact lease、Provider action/lowering 全 materialization，返回
+   plan digest 与选中步骤后停止。它拒绝 capability reference，不建 Job、不动
+   idempotency/capability ledger、永不调用 dispatcher；E2 policy 与 execute path 不变。
+5. real-input gate 用候选 archive 和 sealed host facts 跑 Runtime plan-only 正向，以及
+   分区换序/跨版本 archive 两条负向；dispatcher 若被调用测试立即失败。该 gate 不连接
+   USB/HDC/RockUSB，不创建/安装 E2 capability，不构成真机或 Flash 验收。
+
+## Out of scope(r7)
+
+- 真实 Flash、erase/format/unlock/update 或任何 device dispatch；
+- 创建、安装、修改或批准 E2 capability/standing authorization；
+- 宣称 GJ-4 `REAL_DEVICE_PASS`；本修订只把候选输入与 exact plan 审查面闭合；
+- 改变现有九分区、offset、prerequisite 或 E2 one-shot exact-plan 安全策略。
 
 ## r6(2026-07-31):崩溃日志作为一等 artifact,而不是从 HiLog 里刮
 

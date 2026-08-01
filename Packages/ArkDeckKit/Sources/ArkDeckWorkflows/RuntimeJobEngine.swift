@@ -23,6 +23,46 @@ public enum RuntimeJobEngineError: Error, Equatable, Sendable {
   case internalFailure(String)
 }
 
+public struct RuntimePlanOnlyStep: Sendable, Equatable, Codable {
+  public let stepID: String
+  public let kind: String
+  public let effect: String
+  public let cancellation: String
+  public let binding: String
+  public let isOptional: Bool
+
+  public init(
+    stepID: String, kind: String, effect: String, cancellation: String,
+    binding: String, isOptional: Bool
+  ) {
+    self.stepID = stepID
+    self.kind = kind
+    self.effect = effect
+    self.cancellation = cancellation
+    self.binding = binding
+    self.isOptional = isOptional
+  }
+}
+
+/// A fully materialized Runtime preview. It is deliberately not a Job or a
+/// capability document: producing it performs no admission, authorization
+/// consumption or provider dispatch, including for E2 operations.
+public struct RuntimePlanOnlyPreview: Sendable, Equatable, Codable {
+  public let executionMode: String
+  public let operationReference: String
+  public let targetID: String
+  public let bindingRevision: Int?
+  public let stableIdentitySHA256: String?
+  public let providerID: String
+  public let catalogDigest: String
+  public let requestFingerprintSHA256: String
+  public let materializedPlanDigest: String
+  public let inputs: [String: JSONValue]
+  public let steps: [RuntimePlanOnlyStep]
+  public let jobAdmitted: Bool
+  public let dispatchDisposition: String
+}
+
 /// Presented status: the persisted JobStateMachine state plus the
 /// waitingForHuman view (open human action against a non-terminal job).
 /// The persisted 18-state graph is unchanged.
@@ -576,6 +616,69 @@ public actor RuntimeJobEngine {
         state: reasons.isEmpty ? .available : .unavailable,
         reasons: reasons)
     }.sorted { $0.reference < $1.reference }
+  }
+
+  /// Materializes the exact typed plan through the same provider, target
+  /// facts and Artifact lease path used by admission, then stops. This is the
+  /// E2-safe review surface: no capability may be supplied, no Job is
+  /// admitted, and no dispatcher method is called.
+  public func planOnly(_ requestData: Data) async throws -> RuntimePlanOnlyPreview {
+    let request: RuntimeOperationRequest
+    do {
+      request = try RuntimeOperationCodec.decodeRequest(requestData)
+    } catch let rejection as RuntimeOperationRequestRejection {
+      throw RuntimeJobEngineError.rejected(rejection.code, rejection.message)
+    }
+    guard request.authorization == nil else {
+      throw RuntimeJobEngineError.rejected(
+        .invalidRequest,
+        "planOnly does not accept or consume a Runtime capability")
+    }
+    guard
+      let descriptor = RuntimeOperationCatalog.descriptor(
+        id: request.operation.id, version: request.operation.version)
+    else {
+      throw RuntimeJobEngineError.rejected(
+        .unknownOperation, "operation \(request.operation.reference) is not in the catalog")
+    }
+    try validateInputs(request.inputs, against: descriptor)
+    try validateSupportedPlanInputs(request.inputs, descriptor: descriptor)
+
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+    let canonicalRequestData: Data
+    do {
+      canonicalRequestData = try encoder.encode(request)
+    } catch {
+      throw RuntimeJobEngineError.internalFailure(
+        "cannot canonicalize the typed plan-only request: \(error)")
+    }
+    let materialized = try await materializeTypedPlanBeforeAuthorization(
+      request: request, descriptor: descriptor,
+      jobID: Self.authorizationPlanJobID)
+    let selectedSteps = descriptor.steps.filter {
+      Self.stepIsRequested($0, descriptor: descriptor, inputs: request.inputs)
+    }
+    return RuntimePlanOnlyPreview(
+      executionMode: "planOnly",
+      operationReference: descriptor.reference,
+      targetID: request.target.targetID,
+      bindingRevision: materialized.bindingRevision,
+      stableIdentitySHA256: materialized.stableTargetIdentitySHA256,
+      providerID: descriptor.provider.rawValue,
+      catalogDigest: RuntimeOperationCatalog.catalogDigest,
+      requestFingerprintSHA256: Self.fingerprint(of: canonicalRequestData),
+      materializedPlanDigest: materialized.planDigest,
+      inputs: request.inputs,
+      steps: selectedSteps.map {
+        RuntimePlanOnlyStep(
+          stepID: $0.stepID, kind: $0.kind.rawValue,
+          effect: $0.effect.rawValue,
+          cancellation: $0.cancellation.rawValue,
+          binding: $0.binding.rawValue, isOptional: $0.isOptional)
+      },
+      jobAdmitted: false,
+      dispatchDisposition: "notDispatched")
   }
 
   /// Produces a reviewable E1 standing authorization envelope without
@@ -3357,12 +3460,19 @@ public actor RuntimeJobEngine {
         throw RuntimeDispatchFailure.failed(
           "flash bundle bytes drifted from the leased hash/size")
       }
-      switch RockchipFlashProfile.dayu200.validate(summary.archiveObservation()) {
+      guard case .string(let profileReference)? =
+        jobs[jobID]?.record.request.inputs["deviceProfile"],
+        let profile = RockchipFlashProfile.profile(reference: profileReference)
+      else {
+        throw RuntimeDispatchFailure.failed(
+          "flash request has no published versioned DAYU200 profile")
+      }
+      switch profile.validate(summary.archiveObservation()) {
       case .valid:
         appendTimeline(
           jobID: jobID,
           entry:
-            "\(step.stepID) profile=dayu200@1 "
+            "\(step.stepID) profile=\(profile.catalogReference) "
             + "sha256=\(summary.archiveSHA256)")
         return
       case .blocked(let violations):
