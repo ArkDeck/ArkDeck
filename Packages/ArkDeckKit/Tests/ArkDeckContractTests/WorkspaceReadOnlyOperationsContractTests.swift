@@ -237,6 +237,92 @@ final class WorkspaceReadOnlyOperationsContractTests: XCTestCase {
     XCTAssertEqual(summary["checkpointObject"], oid)
   }
 
+  func testANonGitCheckpointSealsExactFilesAndCanBeReconciled() async throws {
+    let source = root.appendingPathComponent("Sources/App.txt")
+    try Data("old\n".utf8).write(to: source)
+    let archiveProfile = try makeArchiveProfile()
+    let archiveProvider = makeProvider(archiveProfile)
+    let descriptor = try XCTUnwrap(
+      RuntimeOperationCatalog.descriptor(reference: "workspace.create-checkpoint@1"))
+    let snapshots = try WorkspaceProviderSupport.snapshots(
+      relativePaths: ["Sources/App.txt"], root: archiveProfile.projectRoot)
+    let action = try archiveProvider.action(
+      for: descriptor.steps[0], operation: descriptor,
+      inputs: [
+        "projectRef": .string("TestProject"),
+        "expectedWorkspaceRevision": .string(WorkspaceProviderSupport.revision(snapshots)),
+        "checkpointFilePaths": .array([.string("Sources/App.txt")]),
+      ], context: context())
+    guard case .workspace(.createArchiveCheckpoint(let checkpoint)) = action
+    else {
+      return XCTFail("a non-Git profile must lower an exact sealed archive checkpoint")
+    }
+    let archivePath = checkpoint.archivePath
+    XCTAssertEqual(
+      checkpoint.invocation.arguments,
+      [
+        "-c", "-f", archivePath, "-C", archiveProfile.projectRoot, "--",
+        "Sources/App.txt",
+      ])
+
+    let dispatcher = DescriptorBoundProcessDispatcher(
+      resolver: WorkspaceActionExecutableResolver(profile: archiveProfile))
+    let receipt = try await dispatcher.dispatch(
+      try archiveProvider.lower(action: action, context: context()))
+    guard case .verified(let summary) = try archiveProvider.verify(
+      receipt: receipt, action: action, context: context())
+    else {
+      return XCTFail("the archive must exist and preserve the exact source snapshot")
+    }
+    XCTAssertEqual(summary["checkpointKind"], "sealedArchive")
+    XCTAssertTrue(FileManager.default.fileExists(atPath: archivePath))
+    XCTAssertEqual(try Data(contentsOf: source), Data("old\n".utf8))
+
+    let recovered = try await archiveProvider.reconcile(
+      intent: ProviderDurableIntentReference(
+        jobID: context().jobID, stepID: context().stepID,
+        intentEventID: "evt-checkpoint", action: action),
+      context: context())
+    guard case .confirmedCompleted(let recoveredSummary) = recovered else {
+      return XCTFail("a durable provider-owned archive must be recoverable after restart")
+    }
+    XCTAssertEqual(
+      recoveredSummary["checkpointObject"], summary["checkpointObject"])
+
+    let handle = try FileHandle(forWritingTo: URL(fileURLWithPath: archivePath))
+    try handle.truncate(atOffset: 512)
+    try handle.close()
+    let partial = try await archiveProvider.reconcile(
+      intent: ProviderDurableIntentReference(
+        jobID: context().jobID, stepID: context().stepID,
+        intentEventID: "evt-checkpoint", action: action),
+      context: context())
+    guard case .stillUnknown = partial else {
+      return XCTFail("a receipt-lost partial archive must never be reported completed")
+    }
+  }
+
+  func testWaterFlowPublishesThePinnedNonGitCheckpointRoute() throws {
+    let project = root.appendingPathComponent("WaterFlow", isDirectory: true)
+    try FileManager.default.createDirectory(
+      at: project.appendingPathComponent("entry/src/main", isDirectory: true),
+      withIntermediateDirectories: true)
+    try Data("{}".utf8).write(to: project.appendingPathComponent("build-profile.json5"))
+    try Data("{}".utf8).write(
+      to: project.appendingPathComponent("entry/src/main/module.json5"))
+    let script = project.appendingPathComponent("hvigorw.js")
+    try Data("// fixture".utf8).write(to: script)
+
+    let production = try WorkspaceProjectProfile.waterFlowDemo(
+      rootURL: project, nodePath: "/usr/bin/true", hvigorScriptPath: script.path)
+    XCTAssertNil(production.sourceControlPreset)
+    XCTAssertEqual(production.archiveCheckpointPreset?.executable.path, "/usr/bin/bsdtar")
+    XCTAssertEqual(production.archiveCheckpointPreset?.presetID, "sealed-source-archive")
+    let checkpoint = try XCTUnwrap(
+      RuntimeOperationCatalog.descriptor(reference: "workspace.create-checkpoint@1"))
+    XCTAssertEqual(makeProvider(production).runtimeAvailability(for: checkpoint), .available)
+  }
+
   // MARK: - The published surface stays closed
 
   func testTheCheckpointIsAnAuthorizedMutationNotARead() throws {
@@ -302,6 +388,25 @@ final class WorkspaceReadOnlyOperationsContractTests: XCTestCase {
         ? try WorkspaceCommandPreset(
           presetID: "read", executable: sed, fixedArguments: [], timeoutSeconds: 10)
         : nil,
+      patchPreset: patching,
+      buildPresets: [:], testPresets: [:], symbolPresets: [:])
+  }
+
+  private func makeArchiveProfile() throws -> WorkspaceProjectProfile {
+    let grep = try WorkspaceExecutableIdentity.hashing(path: "/usr/bin/grep")
+    let patch = try WorkspaceExecutableIdentity.hashing(path: "/usr/bin/patch")
+    let tar = try WorkspaceExecutableIdentity.hashing(path: "/usr/bin/bsdtar")
+    let inspection = try WorkspaceCommandPreset(
+      presetID: "inspect", executable: grep, fixedArguments: [], timeoutSeconds: 10)
+    let patching = try WorkspaceCommandPreset(
+      presetID: "patch", executable: patch, fixedArguments: [], timeoutSeconds: 10)
+    let checkpointing = try WorkspaceCommandPreset(
+      presetID: "sealed-source-archive", executable: tar,
+      fixedArguments: [], timeoutSeconds: 10)
+    return try WorkspaceProjectProfile(
+      profileID: "test-workspace@1", projectRef: "TestProject",
+      projectRoot: root.path, allowedFileGlobs: ["Sources/**"],
+      inspectionPreset: inspection, archiveCheckpointPreset: checkpointing,
       patchPreset: patching,
       buildPresets: [:], testPresets: [:], symbolPresets: [:])
   }

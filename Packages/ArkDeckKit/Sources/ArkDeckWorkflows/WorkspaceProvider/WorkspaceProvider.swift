@@ -191,7 +191,8 @@ public struct WorkspaceProvider: DeviceProvider {
           ],
           timeoutSeconds: 120))
     case .applyPatch, .buildOpenHarmony, .runTests, .symbolizeCrash, .revertPatch,
-      .inspectGitStatus, .inspectDiff, .readSourceRange, .createCheckpoint:
+      .inspectGitStatus, .inspectDiff, .readSourceRange, .createCheckpoint,
+      .createArchiveCheckpoint:
       guard let operations else {
         throw DeviceProviderError.unsupportedAction(
           "workspace operation presets are unavailable")
@@ -238,7 +239,8 @@ public struct WorkspaceProvider: DeviceProvider {
           detail: "workspace inspector failed for \(inspection.projectRef)")
       }
     case .applyPatch, .buildOpenHarmony, .runTests, .symbolizeCrash, .revertPatch,
-      .inspectGitStatus, .inspectDiff, .readSourceRange, .createCheckpoint:
+      .inspectGitStatus, .inspectDiff, .readSourceRange, .createCheckpoint,
+      .createArchiveCheckpoint:
       guard let operations else {
         return .unsupported(reason: "workspace operation presets are unavailable")
       }
@@ -260,7 +262,8 @@ public struct WorkspaceProvider: DeviceProvider {
     case .inspectSource:
       return .confirmedNotExecuted
     case .applyPatch, .buildOpenHarmony, .runTests, .symbolizeCrash, .revertPatch,
-      .inspectGitStatus, .inspectDiff, .readSourceRange, .createCheckpoint:
+      .inspectGitStatus, .inspectDiff, .readSourceRange, .createCheckpoint,
+      .createArchiveCheckpoint:
       guard let operations else {
         return .stillUnknown(reason: "workspace operation presets are unavailable")
       }

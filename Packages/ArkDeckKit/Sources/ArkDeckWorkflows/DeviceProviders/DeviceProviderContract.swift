@@ -158,7 +158,8 @@ extension WorkspaceProviderAction {
   /// read-only workspace family still does not.
   public var mutatesWorkspace: Bool {
     switch self {
-    case .applyPatch, .buildOpenHarmony, .runTests, .revertPatch, .createCheckpoint:
+    case .applyPatch, .buildOpenHarmony, .runTests, .revertPatch,
+      .createCheckpoint, .createArchiveCheckpoint:
       return true
     case .inspectSource, .symbolizeCrash, .inspectGitStatus, .inspectDiff, .readSourceRange:
       return false
@@ -192,7 +193,9 @@ public enum WorkspaceProviderAction: Sendable, Equatable, Codable {
   case inspectGitStatus(WorkspaceResolvedInvocation)
   case inspectDiff(WorkspaceResolvedInvocation)
   case readSourceRange(WorkspaceResolvedInvocation)
+  /// The original Git-object payload stays stable for journal compatibility.
   case createCheckpoint(WorkspaceResolvedInvocation)
+  case createArchiveCheckpoint(WorkspaceArchiveCheckpointIntent)
 }
 
 extension DeviceProvider {

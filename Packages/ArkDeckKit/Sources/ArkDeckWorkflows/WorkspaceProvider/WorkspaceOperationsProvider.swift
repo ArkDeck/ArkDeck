@@ -86,6 +86,10 @@ public struct WorkspaceProjectProfile: Sendable, Equatable {
   /// Pinned reader for bounded source ranges. Absent means the operation is
   /// unavailable rather than falling back to reading files in-process.
   public let sourceReaderPreset: WorkspaceCommandPreset?
+  /// Pinned archive writer for workspaces that are intentionally not Git
+  /// checkouts. It can only seal exact, profile-scoped files into the
+  /// provider-owned attempt store.
+  public let archiveCheckpointPreset: WorkspaceCommandPreset?
   public let patchPreset: WorkspaceCommandPreset
   public let buildPresets: [String: WorkspaceCommandPreset]
   public let testPresets: [String: WorkspaceCommandPreset]
@@ -103,6 +107,7 @@ public struct WorkspaceProjectProfile: Sendable, Equatable {
     inspectionPreset: WorkspaceCommandPreset,
     sourceControlPreset: WorkspaceCommandPreset? = nil,
     sourceReaderPreset: WorkspaceCommandPreset? = nil,
+    archiveCheckpointPreset: WorkspaceCommandPreset? = nil,
     patchPreset: WorkspaceCommandPreset,
     buildPresets: [String: WorkspaceCommandPreset],
     testPresets: [String: WorkspaceCommandPreset],
@@ -139,6 +144,7 @@ public struct WorkspaceProjectProfile: Sendable, Equatable {
     self.inspectionPreset = inspectionPreset
     self.sourceControlPreset = sourceControlPreset
     self.sourceReaderPreset = sourceReaderPreset
+    self.archiveCheckpointPreset = archiveCheckpointPreset
     self.patchPreset = patchPreset
     self.buildPresets = buildPresets
     self.testPresets = testPresets
@@ -152,6 +158,16 @@ public struct WorkspaceProjectProfile: Sendable, Equatable {
     let root = rootURL.resolvingSymlinksInPath().standardizedFileURL.path
     let grep = try WorkspaceExecutableIdentity.hashing(path: "/usr/bin/grep")
     let patch = try WorkspaceExecutableIdentity.hashing(path: "/usr/bin/patch")
+    let sourceControl: WorkspaceCommandPreset?
+    if FileManager.default.fileExists(
+      atPath: URL(fileURLWithPath: root).appendingPathComponent(".git").path)
+    {
+      let git = try WorkspaceExecutableIdentity.hashing(path: "/usr/bin/git")
+      sourceControl = try WorkspaceCommandPreset(
+        presetID: "git", executable: git, fixedArguments: [], timeoutSeconds: 120)
+    } else {
+      sourceControl = nil
+    }
     let swiftPackagePaths = [
       "/Applications/Xcode.app/Contents/Developer/Toolchains/"
         + "XcodeDefault.xctoolchain/usr/bin/swift-package",
@@ -213,7 +229,8 @@ public struct WorkspaceProjectProfile: Sendable, Equatable {
       allowedFileGlobs: [
         "Packages/ArkDeckKit/**", "Catalog/**", "docs/**",
       ],
-      inspectionPreset: inspection, patchPreset: patching,
+      inspectionPreset: inspection, sourceControlPreset: sourceControl,
+      patchPreset: patching,
       buildPresets: [build.presetID: build],
       testPresets: [tests.presetID: tests],
       // No generic symbolizer is guessed. A profile without an exact symbol
@@ -247,6 +264,7 @@ public struct WorkspaceProjectProfile: Sendable, Equatable {
     let grep = try WorkspaceExecutableIdentity.hashing(path: "/usr/bin/grep")
     let sed = try WorkspaceExecutableIdentity.hashing(path: "/usr/bin/sed")
     let patch = try WorkspaceExecutableIdentity.hashing(path: "/usr/bin/patch")
+    let tar = try WorkspaceExecutableIdentity.hashing(path: "/usr/bin/bsdtar")
     let node = try WorkspaceExecutableIdentity.hashing(path: nodePath)
     let inspection = try WorkspaceCommandPreset(
       presetID: "source-inspection", executable: grep,
@@ -256,6 +274,9 @@ public struct WorkspaceProjectProfile: Sendable, Equatable {
       fixedArguments: [], timeoutSeconds: 30)
     let patching = try WorkspaceCommandPreset(
       presetID: "unified-diff", executable: patch,
+      fixedArguments: [], timeoutSeconds: 120)
+    let checkpointing = try WorkspaceCommandPreset(
+      presetID: "sealed-source-archive", executable: tar,
       fixedArguments: [], timeoutSeconds: 120)
     let commonHvigorArguments = [
       "--mode", "module",
@@ -280,6 +301,7 @@ public struct WorkspaceProjectProfile: Sendable, Equatable {
         "entry/src/test/**", "entry/src/ohosTest/**",
       ],
       inspectionPreset: inspection, sourceReaderPreset: sourceReader,
+      archiveCheckpointPreset: checkpointing,
       patchPreset: patching,
       buildPresets: [build.presetID: build],
       testPresets: [tests.presetID: tests],
@@ -295,6 +317,9 @@ public struct WorkspaceProjectProfile: Sendable, Equatable {
     ]
     if let sourceControl = sourceControlPreset { values.insert(sourceControl.executable) }
     if let sourceReader = sourceReaderPreset { values.insert(sourceReader.executable) }
+    if let archiveCheckpoint = archiveCheckpointPreset {
+      values.insert(archiveCheckpoint.executable)
+    }
     for preset in buildPresets.values { values.insert(preset.executable) }
     for preset in testPresets.values { values.insert(preset.executable) }
     for preset in symbolPresets.values { values.insert(preset.executable) }
@@ -377,6 +402,24 @@ public struct WorkspacePatchIntent: Sendable, Equatable, Codable {
   public let before: [WorkspaceFileSnapshot]
 }
 
+public struct WorkspaceArchiveCheckpointIntent: Sendable, Equatable, Codable {
+  public let invocation: WorkspaceResolvedInvocation
+  /// The path is derived from the runtime
+  /// Job identity inside the provider-owned 0700 attempt store.
+  public let archivePath: String
+  public let sourceSnapshots: [WorkspaceFileSnapshot]
+
+  public init(
+    invocation: WorkspaceResolvedInvocation,
+    archivePath: String,
+    sourceSnapshots: [WorkspaceFileSnapshot]
+  ) {
+    self.invocation = invocation
+    self.archivePath = archivePath
+    self.sourceSnapshots = sourceSnapshots
+  }
+}
+
 public struct WorkspacePatchAttempt: Sendable, Equatable, Codable {
   public let patchAttemptRef: String
   public let projectRef: String
@@ -414,6 +457,8 @@ extension WorkspaceProviderAction {
       .symbolizeCrash(let value), .inspectGitStatus(let value), .inspectDiff(let value),
       .readSourceRange(let value), .createCheckpoint(let value):
       return value
+    case .createArchiveCheckpoint(let value):
+      return value.invocation
     case .applyPatch(let value):
       return value.invocation
     case .revertPatch(let value):
@@ -490,6 +535,13 @@ public final class WorkspacePatchAttemptStore: @unchecked Sendable {
       try FileManager.default.moveItem(at: temporary, to: destination)
       return destination.path
     }
+  }
+
+  /// Returns a provider-owned destination for one Job's pre-patch source
+  /// archive. Hashing the opaque Job id keeps it from becoming a path surface.
+  public func checkpointArchiveURL(jobID: String) -> URL {
+    let digest = WorkspaceProviderSupport.sha256(Data(jobID.utf8))
+    return rootURL.appendingPathComponent("checkpoint-\(digest).tar")
   }
 
   private func url(for reference: String) throws -> URL {
@@ -627,9 +679,10 @@ public struct WorkspaceOperationsProvider: DeviceProvider {
       hasPreset = !profile.testPresets.isEmpty
     case "workspace.symbolize-crash@1":
       hasPreset = !profile.symbolPresets.isEmpty
-    case "workspace.inspect-git-status@1", "workspace.inspect-diff@1",
-      "workspace.create-checkpoint@1":
+    case "workspace.inspect-git-status@1", "workspace.inspect-diff@1":
       hasPreset = profile.sourceControlPreset != nil
+    case "workspace.create-checkpoint@1":
+      hasPreset = profile.sourceControlPreset != nil || profile.archiveCheckpointPreset != nil
     case "workspace.read-source-range@1":
       hasPreset = profile.sourceReaderPreset != nil
     default:
@@ -700,9 +753,22 @@ public struct WorkspaceOperationsProvider: DeviceProvider {
     // moved between the decision and this materialization, the change is
     // refused rather than applied to a workspace nobody looked at.
     if case .string(let declared)? = inputs["expectedWorkspaceRevision"] {
-      let actual = try WorkspaceProviderSupport.workspaceRevision(
-        root: profile.projectRoot, profileVersion: profile.profileID,
-        globs: profile.allowedFileGlobs)
+      let actual: String
+      if operation.reference == "workspace.create-checkpoint@1",
+        inputs["checkpointFilePaths"] != nil
+      {
+        let paths = try stringArray("checkpointFilePaths", in: inputs)
+        try WorkspaceProviderSupport.validate(
+          relativePaths: paths, root: profile.projectRoot,
+          profileGlobs: profile.allowedFileGlobs, requestGlobs: paths)
+        actual = WorkspaceProviderSupport.revision(
+          try WorkspaceProviderSupport.snapshots(
+            relativePaths: paths, root: profile.projectRoot))
+      } else {
+        actual = try WorkspaceProviderSupport.workspaceRevision(
+          root: profile.projectRoot, profileVersion: profile.profileID,
+          globs: profile.allowedFileGlobs)
+      }
       guard actual == declared else {
         throw DeviceProviderError.unsupportedAction(
           "workspace.revisionConflict:\(declared.prefix(12))!=\(actual.prefix(12))")
@@ -841,17 +907,48 @@ public struct WorkspaceOperationsProvider: DeviceProvider {
             arguments: preset.fixedArguments + ["-n", "\(start),\(end)p", resolvedPath])))
 
     case ("workspace.create-checkpoint@1", .createWorkspaceCheckpoint):
-      guard let preset = profile.sourceControlPreset else {
-        throw DeviceProviderError.unsupportedAction("workspace.sourceControlPresetUnavailable")
+      if let preset = profile.sourceControlPreset {
+        // `stash create` writes a commit object and moves nothing - no ref,
+        // index or worktree - so a Git checkpoint cannot disturb the tree.
+        return .workspace(
+          .createCheckpoint(
+            resolved(
+              operation: operation.reference, preset: preset,
+              arguments: preset.fixedArguments
+                + ["-C", profile.projectRoot, "stash", "create"])))
       }
-      // `stash create` writes a commit object and moves nothing - no ref, no
-      // index, no worktree - so a checkpoint cannot disturb the tree the
-      // repair leg is about to patch.
+      guard let preset = profile.archiveCheckpointPreset else {
+        throw DeviceProviderError.unsupportedAction("workspace.checkpointPresetUnavailable")
+      }
+      let paths = try stringArray("checkpointFilePaths", in: inputs)
+      try WorkspaceProviderSupport.validate(
+        relativePaths: paths, root: profile.projectRoot,
+        profileGlobs: profile.allowedFileGlobs, requestGlobs: paths)
+      let snapshots = try WorkspaceProviderSupport.snapshots(
+        relativePaths: paths, root: profile.projectRoot)
+      guard snapshots.allSatisfy({ $0.sha256 != nil }) else {
+        throw DeviceProviderError.unsupportedAction(
+          "workspace checkpoint cannot seal a missing source file")
+      }
+      try WorkspaceProviderSupport.requireBoundedCheckpointSources(
+        relativePaths: paths, root: profile.projectRoot)
+      let archiveURL = attempts.checkpointArchiveURL(jobID: context.jobID)
+      guard !FileManager.default.fileExists(atPath: archiveURL.path) else {
+        throw DeviceProviderError.unsupportedAction(
+          "workspace checkpoint destination already exists")
+      }
+      // bsdtar receives only provider-owned paths and exact profile-scoped
+      // files. `--` ensures no relative source name can become an option.
       return .workspace(
-        .createCheckpoint(
-          resolved(
-            operation: operation.reference, preset: preset,
-            arguments: preset.fixedArguments + ["-C", profile.projectRoot, "stash", "create"])))
+        .createArchiveCheckpoint(
+          WorkspaceArchiveCheckpointIntent(
+            invocation: resolved(
+              operation: operation.reference, preset: preset,
+              arguments: preset.fixedArguments
+                + ["-c", "-f", archiveURL.path, "-C", profile.projectRoot, "--"]
+                + paths.sorted()),
+            archivePath: archiveURL.path,
+            sourceSnapshots: snapshots)))
 
     case ("workspace.revert-patch@1", .revertWorkspacePatch):
       let reference = try string("patchAttemptRef", in: inputs)
@@ -901,6 +998,15 @@ public struct WorkspaceOperationsProvider: DeviceProvider {
     case .applyPatch(let intent):
       try WorkspaceProviderSupport.require(
         snapshots: intent.before, root: profile.projectRoot)
+    case .createArchiveCheckpoint(let intent):
+      guard intent.archivePath == attempts.checkpointArchiveURL(jobID: context.jobID).path,
+        !FileManager.default.fileExists(atPath: intent.archivePath)
+      else {
+        throw DeviceProviderError.unsupportedAction(
+          "workspace checkpoint destination is not fresh and provider-owned")
+      }
+      try WorkspaceProviderSupport.require(
+        snapshots: intent.sourceSnapshots, root: profile.projectRoot)
     case .revertPatch(let intent):
       try WorkspaceProviderSupport.require(
         snapshots: intent.attempt.after, root: profile.projectRoot)
@@ -973,6 +1079,42 @@ public struct WorkspaceOperationsProvider: DeviceProvider {
       }
       var checkpointSummary = outputSummary(receipt)
       checkpointSummary["checkpointObject"] = oid
+      checkpointSummary["checkpointKind"] = "gitObject"
+      return .verified(summary: checkpointSummary)
+    case .createArchiveCheckpoint(let intent):
+      guard receipt.exitStatus == 0 else {
+        return failed("workspace.checkpointFailed", receipt)
+      }
+      guard intent.archivePath == attempts.checkpointArchiveURL(jobID: context.jobID).path
+      else {
+        return .failed(
+          code: "workspace.checkpointReadbackFailed",
+          detail: "checkpoint archive path is not provider-owned")
+      }
+      let archiveURL = URL(fileURLWithPath: intent.archivePath)
+      let evidence: (byteCount: Int, sha256: String)
+      do {
+        let handle = try FileHandle(forWritingTo: archiveURL)
+        try handle.synchronize()
+        try handle.close()
+        evidence = try WorkspaceProviderSupport.sealedArchiveEvidence(at: archiveURL)
+      } catch {
+        return .failed(
+          code: "workspace.checkpointReadbackFailed",
+          detail: "checkpoint archive is absent, unsafe, incomplete or oversized: \(error)")
+      }
+      do {
+        try WorkspaceProviderSupport.require(
+          snapshots: intent.sourceSnapshots, root: profile.projectRoot)
+      } catch {
+        return .failed(
+          code: "workspace.checkpointSourceDrift",
+          detail: "declared source changed while the checkpoint was written: \(error)")
+      }
+      var checkpointSummary = outputSummary(receipt)
+      checkpointSummary["checkpointObject"] = evidence.sha256
+      checkpointSummary["checkpointKind"] = "sealedArchive"
+      checkpointSummary["checkpointByteCount"] = String(evidence.byteCount)
       return .verified(summary: checkpointSummary)
     case .buildOpenHarmony:
       guard receipt.exitStatus == 0 else {
@@ -1057,6 +1199,28 @@ public struct WorkspaceOperationsProvider: DeviceProvider {
       // still not "not executed", so recovery must not claim either way.
       return .stillUnknown(
         reason: "workspace checkpoint object cannot be observed without re-reading git")
+    case .createArchiveCheckpoint(let checkpoint):
+      guard checkpoint.archivePath == attempts.checkpointArchiveURL(jobID: intent.jobID).path
+      else {
+        return .stillUnknown(reason: "workspace checkpoint archive path is not provider-owned")
+      }
+      guard FileManager.default.fileExists(atPath: checkpoint.archivePath) else {
+        return .confirmedNotExecuted
+      }
+      do {
+        try WorkspaceProviderSupport.require(
+          snapshots: checkpoint.sourceSnapshots, root: profile.projectRoot)
+        let evidence = try WorkspaceProviderSupport.sealedArchiveEvidence(
+          at: URL(fileURLWithPath: checkpoint.archivePath))
+        return .confirmedCompleted(summary: [
+          "checkpointObject": evidence.sha256,
+          "checkpointKind": "sealedArchive",
+          "checkpointByteCount": String(evidence.byteCount),
+        ])
+      } catch {
+        return .stillUnknown(
+          reason: "workspace checkpoint archive cannot be proven against source: \(error)")
+      }
     case .applyPatch(let patch):
       let current = try WorkspaceProviderSupport.snapshots(
         relativePaths: patch.before.map(\.relativePath), root: profile.projectRoot)
@@ -1496,6 +1660,45 @@ enum WorkspaceProviderSupport {
       return WorkspaceFileSnapshot(
         relativePath: path, sha256: sha256(try Data(contentsOf: url)))
     }
+  }
+
+  static func requireBoundedCheckpointSources(
+    relativePaths: [String], root: String
+  ) throws {
+    var totalBytes = 0
+    for path in relativePaths {
+      let url = URL(fileURLWithPath: root).appendingPathComponent(path)
+      let values = try url.resourceValues(forKeys: [.fileSizeKey])
+      totalBytes += values.fileSize ?? 0
+      guard totalBytes <= 60 * 1024 * 1024 else {
+        throw DeviceProviderError.unsupportedAction(
+          "workspace checkpoint sources exceed the 60 MiB bound")
+      }
+    }
+  }
+
+  /// A complete uncompressed tar ends with at least two 512-byte zero
+  /// records. That footer distinguishes a completed provider dispatch from
+  /// a receipt-lost partial write during recovery.
+  static func sealedArchiveEvidence(at url: URL) throws -> (byteCount: Int, sha256: String) {
+    let values = try url.resourceValues(
+      forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey])
+    let byteCount = values.fileSize ?? 0
+    guard values.isRegularFile == true, values.isSymbolicLink != true,
+      byteCount >= 1_024, byteCount <= 64 * 1024 * 1024,
+      byteCount.isMultiple(of: 512)
+    else {
+      throw DeviceProviderError.factsUnavailable(
+        "workspace checkpoint archive metadata is unsafe")
+    }
+    let bytes = try Data(contentsOf: url)
+    guard bytes.count == byteCount,
+      bytes.suffix(1_024).allSatisfy({ $0 == 0 })
+    else {
+      throw DeviceProviderError.factsUnavailable(
+        "workspace checkpoint archive footer is incomplete")
+    }
+    return (byteCount, sha256(bytes))
   }
 
   static func require(

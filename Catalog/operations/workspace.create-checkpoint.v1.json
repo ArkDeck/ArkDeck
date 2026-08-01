@@ -27,6 +27,13 @@
         "required": false,
         "maxLength": 128,
         "description": "Workspace revision the caller decided against; the provider refuses if the tree moved."
+      },
+      "checkpointFilePaths": {
+        "type": "stringArray",
+        "required": false,
+        "maxItems": 64,
+        "maxLength": 512,
+        "description": "Exact profile-scoped files to seal when the ProjectProfile uses an archive checkpoint instead of Git."
       }
     }
   },
@@ -65,7 +72,7 @@
       "cancellation": "atSafeBoundary",
       "binding": "none",
       "compensation": "none",
-      "notes": "Writes a git object and moves no ref, index or worktree."
+      "notes": "Writes either a Git object or a provider-owned archive and never changes declared workspace source."
     }
   ],
   "defaultPolicyIssuance": "disabled"
