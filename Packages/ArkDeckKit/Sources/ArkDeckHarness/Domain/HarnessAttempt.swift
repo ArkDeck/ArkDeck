@@ -38,6 +38,11 @@ public struct HarnessStrategyExecutionExpectation: Equatable, Sendable, Codable 
 /// `hypothesis` prose is deliberately absent. `hypothesisClass` is the
 /// stable machine reason (for example `modelProposal`), not model prose.
 public struct HarnessStrategyDescriptor: Equatable, Sendable, Codable {
+  /// Explicit non-applicability marker for a task-journey Attempt that exists
+  /// before any source-repair strategy. It is a non-claim, never a fabricated
+  /// patch or workspace revision.
+  public static let notApplicableDigest = String(repeating: "0", count: 64)
+
   public let hypothesisClass: String
   public let selectedOperationFamily: String
   public let patchFingerprint: String
@@ -133,6 +138,10 @@ public struct HarnessAttempt: Equatable, Sendable, Codable {
   public let disprovedFacts: [String]
   public let createdAtUTC: String
   public let updatedAtUTC: String
+
+  public var applicableBaseRevision: String? {
+    baseRevision == HarnessStrategyDescriptor.notApplicableDigest ? nil : baseRevision
+  }
 
   enum CodingKeys: String, CodingKey {
     case documentType

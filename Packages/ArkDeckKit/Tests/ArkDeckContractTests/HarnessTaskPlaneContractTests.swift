@@ -904,19 +904,8 @@ final class HarnessTaskPlaneContractTests: XCTestCase {
     } else {
       XCTFail("task.events must return an array")
     }
-    let strategy = try HarnessStrategyDescriptor(
-      hypothesisClass: "repairPatch", selectedOperationFamily: "workspace.repair",
-      patchFingerprint: String(repeating: "a", count: 64),
-      baseWorkspaceRevision: String(repeating: "b", count: 64),
-      artifactSourceSet: [], prerequisiteSet: ["failed:DC-1"],
-      executionExpectation: HarnessStrategyExecutionExpectation(
-        targetProfile: "TGT-958780b2ffb7", toolchainProfile: "arkdeck-debug",
-        expectedNextObservation: "PATCH_APPLIED"))
-    let attempt = HarnessAttempt(
-      attemptID: "ATTEMPT-000000000001", htaskID: taskID, ordinal: 1,
-      hypothesis: "bounded repair", strategy: strategy,
-      createdAtUTC: "2026-07-30T00:00:00Z", updatedAtUTC: "2026-07-30T00:00:00Z")
-    try await store.recordAttempt(attempt, kind: .created, reasonCode: "strategyAccepted")
+    let storedAttempts = try await store.attempts(taskID)
+    let attempt = try XCTUnwrap(storedAttempts.first)
     if case .array(let attempts) = try await call(
       "task.attempts", ["htaskId": .string(taskID)])
     {
@@ -924,8 +913,8 @@ final class HarnessTaskPlaneContractTests: XCTestCase {
       guard case .object(let fields) = attempts[0] else {
         return XCTFail("task.attempts entries must be objects")
       }
-      XCTAssertEqual(fields["attemptId"], .string("ATTEMPT-000000000001"))
-      XCTAssertEqual(fields["strategyFingerprint"], .string(strategy.fingerprint))
+      XCTAssertEqual(fields["attemptId"], .string(attempt.attemptID))
+      XCTAssertEqual(fields["strategyFingerprint"], .string(attempt.strategyFingerprint))
     } else {
       XCTFail("task.attempts must return an array")
     }

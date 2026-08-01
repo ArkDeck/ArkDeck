@@ -21,6 +21,17 @@ public struct WorkspaceHarnessRepairPort: HarnessRepairPort {
     self.artifacts = artifactStore
   }
 
+  public func currentWorkspaceRevision(
+    relativePaths: [String], projectRef: String, task: HarnessTaskSnapshot
+  ) async throws -> String {
+    guard projectRef == profile.projectRef else {
+      throw HarnessRepairPortError.proposalRejected("projectProfileMismatch")
+    }
+    let current = try WorkspaceProviderSupport.snapshots(
+      relativePaths: relativePaths, root: profile.projectRoot)
+    return WorkspaceProviderSupport.revision(current)
+  }
+
   public func preparePatch(
     _ proposal: HarnessPatchProposal,
     projectRef: String,

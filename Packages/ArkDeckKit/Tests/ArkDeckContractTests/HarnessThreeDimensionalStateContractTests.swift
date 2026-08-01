@@ -130,7 +130,7 @@ final class HarnessThreeDimensionalStateContractTests: XCTestCase {
         against: HarnessDecisionBasis(
           snapshot: changedBinding,
           offeredOperations: [DebugCrashTaskHandler.captureDiagnostics])),
-      .stateVersionMoved(observed: recovered.version, current: changedBinding.version))
+      .taskStateChanged(observed: recovered.version, current: changedBinding.version))
     let submissions = await port.submissions
     XCTAssertEqual(submissions, 0)
   }
