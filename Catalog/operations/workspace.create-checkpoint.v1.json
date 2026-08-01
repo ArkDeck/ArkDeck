@@ -5,13 +5,13 @@
   "title": "Create a rollback checkpoint object for declared workspace source",
   "provider": "workspace",
   "effect": {
-    "minimum": "hostOnly",
+    "minimum": "deviceMutation",
     "permitted": [
-      "hostOnly"
+      "deviceMutation"
     ]
   },
   "authorization": {
-    "hostOnly": "defaultReadOnly"
+    "deviceMutation": "standingCapability"
   },
   "binding": "none",
   "concurrencyKey": "host-exclusive",
@@ -61,11 +61,12 @@
     {
       "stepID": "create-checkpoint",
       "kind": "createWorkspaceCheckpoint",
-      "effect": "hostOnly",
+      "effect": "deviceMutation",
       "cancellation": "atSafeBoundary",
       "binding": "none",
       "compensation": "none",
       "notes": "Writes a git object and moves no ref, index or worktree."
     }
-  ]
+  ],
+  "defaultPolicyIssuance": "disabled"
 }

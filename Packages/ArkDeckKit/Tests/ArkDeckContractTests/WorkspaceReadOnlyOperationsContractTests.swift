@@ -239,6 +239,16 @@ final class WorkspaceReadOnlyOperationsContractTests: XCTestCase {
 
   // MARK: - The published surface stays closed
 
+  func testTheCheckpointIsAnAuthorizedMutationNotARead() throws {
+    let descriptor = try XCTUnwrap(
+      RuntimeOperationCatalog.descriptor(reference: "workspace.create-checkpoint@1"))
+    // It writes a git object. Publishing it as a read would let it run under
+    // the default read-only policy, which is what r2 closed.
+    XCTAssertEqual(descriptor.minimumEffect, .deviceMutation)
+    XCTAssertEqual(descriptor.authorization[.deviceMutation], .standingCapability)
+    XCTAssertFalse(descriptor.defaultPolicyIssuanceEnabled)
+  }
+
   func testTheForbiddenWorkspaceSurfacesAreNotExpressible() {
     for forbidden in [
       "workspace.run-shell@1", "workspace.execute-command@1", "workspace.run-git@1",
@@ -251,9 +261,12 @@ final class WorkspaceReadOnlyOperationsContractTests: XCTestCase {
   }
 
   func testBothNewOperationsAreHostOnlyReadsInTheCatalog() throws {
+    // create-checkpoint left this family in TASK-HFA-009 r2: it writes a git
+    // object, so it is now E1 and needs a workspace-scoped capability. The
+    // three reads below still write nothing.
     for reference in [
       "workspace.inspect-git-status@1", "workspace.inspect-diff@1",
-      "workspace.read-source-range@1", "workspace.create-checkpoint@1",
+      "workspace.read-source-range@1",
     ] {
       let descriptor = try XCTUnwrap(RuntimeOperationCatalog.descriptor(reference: reference))
       XCTAssertEqual(descriptor.provider, .workspace)

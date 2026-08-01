@@ -3,7 +3,7 @@
 
 # Operation effect / authorization matrix
 
-Catalog digest: `44b6728d798dae80f2beaeef7b69b902140217847aa15814d213b04890af5ec6`
+Catalog digest: `577a8ca1884ce79e0136bc236638fa142ebe963f1be23b2d756f8b0eb85919b8`
 
 | Operation | Provider | Effect (min → max) | Authorization | Default issuance | Binding | Concurrency | Timeout (s) | Output budget (bytes) |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -16,15 +16,15 @@ Catalog digest: `44b6728d798dae80f2beaeef7b69b902140217847aa15814d213b04890af5ec
 | `deploy.native-library.system@1` | hdc | destructive | destructive: oneShotExactPlan | disabled | confirmedDevice | device-exclusive | 1800 | 134217728 |
 | `flash.dayu200@1` | rockchip | destructive | destructive: oneShotExactPlan | enabled | confirmedDevice | device-exclusive | 1800 | 134217728 |
 | `observe.device@1` | hdc | readOnly | readOnly: defaultReadOnly | enabled | confirmedDevice | device-shared-readonly | 60 | 1048576 |
-| `workspace.apply-patch@1` | workspace | hostOnly | hostOnly: defaultReadOnly | enabled | none | host-exclusive | 180 | 16777216 |
-| `workspace.build-openharmony@1` | workspace | hostOnly | hostOnly: defaultReadOnly | enabled | none | host-exclusive | 900 | 134217728 |
-| `workspace.create-checkpoint@1` | workspace | hostOnly | hostOnly: defaultReadOnly | enabled | none | host-exclusive | 120 | 1048576 |
+| `workspace.apply-patch@1` | workspace | deviceMutation | deviceMutation: standingCapability | disabled | none | host-exclusive | 180 | 16777216 |
+| `workspace.build-openharmony@1` | workspace | deviceMutation | deviceMutation: standingCapability | disabled | none | host-exclusive | 900 | 134217728 |
+| `workspace.create-checkpoint@1` | workspace | deviceMutation | deviceMutation: standingCapability | disabled | none | host-exclusive | 120 | 1048576 |
 | `workspace.inspect-diff@1` | workspace | hostOnly | hostOnly: defaultReadOnly | enabled | none | host-exclusive | 60 | 1048576 |
 | `workspace.inspect-git-status@1` | workspace | hostOnly | hostOnly: defaultReadOnly | enabled | none | host-exclusive | 60 | 1048576 |
 | `workspace.inspect-source@1` | workspace | hostOnly | hostOnly: defaultReadOnly | enabled | none | host-exclusive | 120 | 1048576 |
 | `workspace.read-source-range@1` | workspace | hostOnly | hostOnly: defaultReadOnly | enabled | none | host-exclusive | 60 | 1048576 |
-| `workspace.revert-patch@1` | workspace | hostOnly | hostOnly: defaultReadOnly | enabled | none | host-exclusive | 180 | 16777216 |
-| `workspace.run-tests@1` | workspace | hostOnly | hostOnly: defaultReadOnly | enabled | none | host-exclusive | 900 | 134217728 |
+| `workspace.revert-patch@1` | workspace | deviceMutation | deviceMutation: standingCapability | disabled | none | host-exclusive | 180 | 16777216 |
+| `workspace.run-tests@1` | workspace | deviceMutation | deviceMutation: standingCapability | disabled | none | host-exclusive | 900 | 134217728 |
 | `workspace.symbolize-crash@1` | workspace | hostOnly | hostOnly: defaultReadOnly | enabled | none | host-exclusive | 300 | 67108864 |
 
 ## Profiles

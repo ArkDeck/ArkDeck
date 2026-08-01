@@ -656,6 +656,25 @@ public struct WorkspaceOperationsProvider: DeviceProvider {
       "workspace provider is host-only: it has no device facts for \(targetID)")
   }
 
+  /// The three facts a workspace-scoped capability is matched against
+  /// (CHG-2026-055, TASK-HFA-009 r2). All are computed here, from files, at
+  /// admission time — the engine cannot derive them and a stale value would
+  /// be exactly the drift the grant exists to prevent.
+  public func workspaceAuthorizationFacts(
+    for operation: CatalogOperationDescriptor,
+    inputs: [String: JSONValue]
+  ) throws -> WorkspaceAuthorizationFacts? {
+    guard operation.provider == .workspace else { return nil }
+    return WorkspaceAuthorizationFacts(
+      identitySHA256: WorkspaceProviderSupport.workspaceIdentity(
+        root: profile.projectRoot, profileID: profile.profileID),
+      revision: try WorkspaceProviderSupport.workspaceRevision(
+        root: profile.projectRoot, profileVersion: profile.profileID,
+        globs: profile.allowedFileGlobs),
+      fileScopesDigest: WorkspaceProviderSupport.sha256(
+        Data(profile.allowedFileGlobs.sorted().joined(separator: "\n").utf8)))
+  }
+
   public func action(
     for step: CatalogStepDescriptor,
     operation: CatalogOperationDescriptor,

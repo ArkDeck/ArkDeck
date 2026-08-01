@@ -4,7 +4,7 @@
 // Drift is a check-sdd error (bidirectional byte comparison).
 
 extension RuntimeOperationCatalog {
-  public static let catalogDigest = "44b6728d798dae80f2beaeef7b69b902140217847aa15814d213b04890af5ec6"
+  public static let catalogDigest = "577a8ca1884ce79e0136bc236638fa142ebe963f1be23b2d756f8b0eb85919b8"
 
   public static let operations: [CatalogOperationDescriptor] = [
     CatalogOperationDescriptor(
@@ -392,10 +392,10 @@ extension RuntimeOperationCatalog {
       version: 1,
       title: "Apply an Artifact-backed patch inside declared ProjectProfile globs",
       provider: .workspace,
-      minimumEffect: .hostOnly,
-      permittedEffects: [.hostOnly],
-      authorization: [.hostOnly: .defaultReadOnly],
-      defaultPolicyIssuanceEnabled: true,
+      minimumEffect: .deviceMutation,
+      permittedEffects: [.deviceMutation],
+      authorization: [.deviceMutation: .standingCapability],
+      defaultPolicyIssuanceEnabled: false,
       binding: .none,
       concurrencyKey: .hostExclusive,
       inputs: [
@@ -409,7 +409,7 @@ extension RuntimeOperationCatalog {
         CatalogFieldDescriptor(name: "patchAttemptRef", type: .string, isRequired: true, maxLength: 64)
       ],
       steps: [
-        CatalogStepDescriptor(stepID: "apply-patch", kind: .applyWorkspacePatch, effect: .hostOnly, cancellation: .atSafeBoundary, binding: .none, isOptional: false, compensation: .rollbackPublished)
+        CatalogStepDescriptor(stepID: "apply-patch", kind: .applyWorkspacePatch, effect: .deviceMutation, cancellation: .atSafeBoundary, binding: .none, isOptional: false, compensation: .rollbackPublished)
       ],
       timeoutSeconds: 180,
       outputByteBudget: 16777216,
@@ -424,10 +424,10 @@ extension RuntimeOperationCatalog {
       version: 1,
       title: "Build through an exact repository-managed ProjectProfile preset",
       provider: .workspace,
-      minimumEffect: .hostOnly,
-      permittedEffects: [.hostOnly],
-      authorization: [.hostOnly: .defaultReadOnly],
-      defaultPolicyIssuanceEnabled: true,
+      minimumEffect: .deviceMutation,
+      permittedEffects: [.deviceMutation],
+      authorization: [.deviceMutation: .standingCapability],
+      defaultPolicyIssuanceEnabled: false,
       binding: .none,
       concurrencyKey: .hostExclusive,
       inputs: [
@@ -439,7 +439,7 @@ extension RuntimeOperationCatalog {
         CatalogFieldDescriptor(name: "buildLog", type: .artifactReference, isRequired: true)
       ],
       steps: [
-        CatalogStepDescriptor(stepID: "build-project", kind: .buildWorkspaceOpenHarmony, effect: .hostOnly, cancellation: .immediate, binding: .none, isOptional: false, compensation: .none)
+        CatalogStepDescriptor(stepID: "build-project", kind: .buildWorkspaceOpenHarmony, effect: .deviceMutation, cancellation: .immediate, binding: .none, isOptional: false, compensation: .none)
       ],
       timeoutSeconds: 900,
       outputByteBudget: 134217728,
@@ -454,10 +454,10 @@ extension RuntimeOperationCatalog {
       version: 1,
       title: "Create a rollback checkpoint object for declared workspace source",
       provider: .workspace,
-      minimumEffect: .hostOnly,
-      permittedEffects: [.hostOnly],
-      authorization: [.hostOnly: .defaultReadOnly],
-      defaultPolicyIssuanceEnabled: true,
+      minimumEffect: .deviceMutation,
+      permittedEffects: [.deviceMutation],
+      authorization: [.deviceMutation: .standingCapability],
+      defaultPolicyIssuanceEnabled: false,
       binding: .none,
       concurrencyKey: .hostExclusive,
       inputs: [
@@ -468,7 +468,7 @@ extension RuntimeOperationCatalog {
         CatalogFieldDescriptor(name: "inspection", type: .artifactReference, isRequired: true)
       ],
       steps: [
-        CatalogStepDescriptor(stepID: "create-checkpoint", kind: .createWorkspaceCheckpoint, effect: .hostOnly, cancellation: .atSafeBoundary, binding: .none, isOptional: false, compensation: .none)
+        CatalogStepDescriptor(stepID: "create-checkpoint", kind: .createWorkspaceCheckpoint, effect: .deviceMutation, cancellation: .atSafeBoundary, binding: .none, isOptional: false, compensation: .none)
       ],
       timeoutSeconds: 120,
       outputByteBudget: 1048576,
@@ -602,10 +602,10 @@ extension RuntimeOperationCatalog {
       version: 1,
       title: "Revert an exact durable workspace patch attempt",
       provider: .workspace,
-      minimumEffect: .hostOnly,
-      permittedEffects: [.hostOnly],
-      authorization: [.hostOnly: .defaultReadOnly],
-      defaultPolicyIssuanceEnabled: true,
+      minimumEffect: .deviceMutation,
+      permittedEffects: [.deviceMutation],
+      authorization: [.deviceMutation: .standingCapability],
+      defaultPolicyIssuanceEnabled: false,
       binding: .none,
       concurrencyKey: .hostExclusive,
       inputs: [
@@ -617,7 +617,7 @@ extension RuntimeOperationCatalog {
         CatalogFieldDescriptor(name: "revertReport", type: .artifactReference, isRequired: true)
       ],
       steps: [
-        CatalogStepDescriptor(stepID: "revert-patch", kind: .revertWorkspacePatch, effect: .hostOnly, cancellation: .atSafeBoundary, binding: .none, isOptional: false, compensation: .none)
+        CatalogStepDescriptor(stepID: "revert-patch", kind: .revertWorkspacePatch, effect: .deviceMutation, cancellation: .atSafeBoundary, binding: .none, isOptional: false, compensation: .none)
       ],
       timeoutSeconds: 180,
       outputByteBudget: 16777216,
@@ -632,13 +632,14 @@ extension RuntimeOperationCatalog {
       version: 1,
       title: "Run tests through an exact repository-managed ProjectProfile preset",
       provider: .workspace,
-      minimumEffect: .hostOnly,
-      permittedEffects: [.hostOnly],
-      authorization: [.hostOnly: .defaultReadOnly],
-      defaultPolicyIssuanceEnabled: true,
+      minimumEffect: .deviceMutation,
+      permittedEffects: [.deviceMutation],
+      authorization: [.deviceMutation: .standingCapability],
+      defaultPolicyIssuanceEnabled: false,
       binding: .none,
       concurrencyKey: .hostExclusive,
       inputs: [
+        CatalogFieldDescriptor(name: "expectedWorkspaceRevision", type: .string, isRequired: false, maxLength: 128),
         CatalogFieldDescriptor(name: "projectRef", type: .string, isRequired: true, maxLength: 128),
         CatalogFieldDescriptor(name: "testPresetRef", type: .string, isRequired: true, maxLength: 128)
       ],
@@ -646,7 +647,7 @@ extension RuntimeOperationCatalog {
         CatalogFieldDescriptor(name: "testOutput", type: .artifactReference, isRequired: true)
       ],
       steps: [
-        CatalogStepDescriptor(stepID: "run-tests", kind: .runWorkspaceTests, effect: .hostOnly, cancellation: .immediate, binding: .none, isOptional: false, compensation: .none)
+        CatalogStepDescriptor(stepID: "run-tests", kind: .runWorkspaceTests, effect: .deviceMutation, cancellation: .immediate, binding: .none, isOptional: false, compensation: .none)
       ],
       timeoutSeconds: 900,
       outputByteBudget: 134217728,

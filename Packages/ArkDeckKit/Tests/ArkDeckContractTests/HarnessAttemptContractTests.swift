@@ -100,6 +100,23 @@ private struct AttemptRepairPort: HarnessRepairPort {
   ) async throws -> HarnessPatchApplicationReadback { .stillUnknown }
 }
 
+/// A grant a maintainer issued: the harness may ask for it and name it, and
+/// may do nothing else with it (CHG-2026-055, TASK-HFA-009 r2).
+private struct AttemptWorkspaceGrant: HarnessCapabilityPort {
+  let covered: Set<String>
+  func hasStandingCapability(operationReference: String, targetID: String) async -> Bool {
+    covered.contains(operationReference)
+  }
+  func standingCapabilityID(operationReference: String, targetID: String) async -> String? {
+    covered.contains(operationReference) ? "CAP-RT-WORKSPACE-FIXTURE" : nil
+  }
+}
+
+private let attemptWorkspaceMutations: Set<String> = [
+  "workspace.apply-patch@1", "workspace.build-openharmony@1", "workspace.run-tests@1",
+  "workspace.revert-patch@1", "workspace.create-checkpoint@1",
+]
+
 final class HarnessAttemptContractTests: XCTestCase {
   private var rootURL: URL!
   private let now = "2026-07-31T12:00:00Z"
@@ -375,6 +392,8 @@ final class HarnessAttemptContractTests: XCTestCase {
       repairPort: AttemptRepairPort(patchRevision: String(repeating: "f", count: 64)),
       nowUTC: { timestamp },
       attemptIDFactory: { "ATTEMPT-000000000001" },
+      policyGuard: HarnessPolicyGuard(
+        capabilities: AttemptWorkspaceGrant(covered: attemptWorkspaceMutations)),
       decisionGateway: gateway,
       egressPolicy: HarnessEgressPolicy(enabledProjects: ["fixture-project"]))
 

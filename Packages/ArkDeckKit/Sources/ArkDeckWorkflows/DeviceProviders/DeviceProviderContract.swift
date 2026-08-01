@@ -146,6 +146,40 @@ public struct WorkspaceSourceInspection: Sendable, Equatable, Codable {
   }
 }
 
+extension WorkspaceProviderAction {
+  /// Whether this action changes the workspace (CHG-2026-055, TASK-HFA-009 r2).
+  ///
+  /// A true value raises the action to `deviceMutation`, which since the
+  /// architecture's §17.3 is read as the **E1 mutation risk class** rather
+  /// than as a statement about devices — the name is historical and renaming
+  /// the wire vocabulary would break journals for no safety gain. What it
+  /// buys here is real: these five now require a capability, and the
+  /// read-only workspace family still does not.
+  public var mutatesWorkspace: Bool {
+    switch self {
+    case .applyPatch, .buildOpenHarmony, .runTests, .revertPatch, .createCheckpoint:
+      return true
+    case .inspectSource, .symbolizeCrash, .inspectGitStatus, .inspectDiff, .readSourceRange:
+      return false
+    }
+  }
+}
+
+/// What a workspace-scoped capability is matched against (CHG-2026-055,
+/// TASK-HFA-009 r2). The provider owns all three: the engine cannot compute
+/// them and must not guess.
+public struct WorkspaceAuthorizationFacts: Sendable, Equatable {
+  public let identitySHA256: String
+  public let revision: String
+  public let fileScopesDigest: String
+
+  public init(identitySHA256: String, revision: String, fileScopesDigest: String) {
+    self.identitySHA256 = identitySHA256
+    self.revision = revision
+    self.fileScopesDigest = fileScopesDigest
+  }
+}
+
 public enum WorkspaceProviderAction: Sendable, Equatable, Codable {
   case inspectSource(WorkspaceSourceInspection)
   case applyPatch(WorkspacePatchIntent)
@@ -160,6 +194,15 @@ public enum WorkspaceProviderAction: Sendable, Equatable, Codable {
   case createCheckpoint(WorkspaceResolvedInvocation)
 }
 
+extension DeviceProvider {
+  /// Default: this provider has no workspace to authorize. Admission then
+  /// refuses rather than matching a capability against absent facts.
+  public func workspaceAuthorizationFacts(
+    for operation: CatalogOperationDescriptor,
+    inputs: [String: JSONValue]
+  ) throws -> WorkspaceAuthorizationFacts? { nil }
+}
+
 public enum TypedProviderAction: Sendable, Equatable {
   case hdc(HDCProviderAction)
   case rockchip(RockchipProviderAction)
@@ -172,7 +215,9 @@ public enum TypedProviderAction: Sendable, Equatable {
 
   public var effect: WorkflowEffect {
     switch self {
-    case .workspace, .analyzer:
+    case .workspace(let workspace):
+      return workspace.mutatesWorkspace ? .deviceMutation : .hostOnly
+    case .analyzer:
       return .hostOnly
     case .hdc(.observeTool), .hdc(.observeServer):
       return .hostOnly
@@ -1415,6 +1460,14 @@ public protocol DeviceProvider: Sendable {
     intent: ProviderDurableIntentReference,
     context: ProviderExecutionContext
   ) throws -> ProviderReconcileOutcome
+
+  /// Facts a workspace-scoped capability is checked against; `nil` when this
+  /// provider has no workspace (CHG-2026-055, TASK-HFA-009 r2).
+  func workspaceAuthorizationFacts(
+    for operation: CatalogOperationDescriptor,
+    inputs: [String: JSONValue]
+  ) throws -> WorkspaceAuthorizationFacts?
+
 }
 
 extension DeviceProvider {

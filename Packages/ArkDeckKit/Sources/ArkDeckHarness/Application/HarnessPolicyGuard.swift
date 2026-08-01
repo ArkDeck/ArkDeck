@@ -31,6 +31,20 @@ public protocol HarnessCapabilityPort: Sendable {
   /// on this target? The harness never mints, drafts or installs one - it
   /// only asks (HTP-INV-6).
   func hasStandingCapability(operationReference: String, targetID: String) async -> Bool
+
+  /// The id of an installed capability that covers this operation, so a
+  /// request can name it (CHG-2026-055, TASK-HFA-009 r2). Selecting a grant
+  /// a maintainer already issued is not minting one: HTP-INV-6 forbids the
+  /// harness from creating, drafting or widening a capability, and this can
+  /// do none of those. The engine still re-checks scope, revision and
+  /// expiry, and refuses a reference that does not fit the plan.
+  func standingCapabilityID(operationReference: String, targetID: String) async -> String?
+}
+
+extension HarnessCapabilityPort {
+  public func standingCapabilityID(
+    operationReference: String, targetID: String
+  ) async -> String? { nil }
 }
 
 public struct HarnessGuardInput: Sendable {
@@ -70,6 +84,13 @@ public struct HarnessGuardInput: Sendable {
 public struct HarnessPolicyGuard: Sendable {
   private let availability: (any HarnessOperationAvailabilityPort)?
   private let capabilities: (any HarnessCapabilityPort)?
+
+  /// The port the guard consulted, so the dispatcher can name the grant the
+  /// guard just verified (CHG-2026-055, TASK-HFA-009 r2). Looking it up twice
+  /// leaves a window where a grant expires in between; the engine closes it
+  /// by re-validating scope, revision and expiry at consumption, so a stale
+  /// id is refused there rather than acted on.
+  public var capabilityPort: (any HarnessCapabilityPort)? { capabilities }
 
   public init(
     availability: (any HarnessOperationAvailabilityPort)? = nil,

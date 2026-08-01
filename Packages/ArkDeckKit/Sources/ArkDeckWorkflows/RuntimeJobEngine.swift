@@ -1544,20 +1544,37 @@ public actor RuntimeJobEngine {
   /// before anything is materialized, in addition to the generator's static
   /// check.
   static func validateHostOnlyDescriptor(_ descriptor: CatalogOperationDescriptor) throws {
-    guard descriptor.minimumEffect <= .hostOnly,
-      descriptor.permittedEffects.allSatisfy({ $0 <= .hostOnly })
+    // A workspace mutation is the one thing without a device binding that may
+    // exceed `hostOnly` (CHG-2026-055, TASK-HFA-009 r2). It is the E1 risk
+    // class applied to a tree instead of a device, and it is only reachable
+    // with a workspace-scoped standing capability. Everything else keeps the
+    // original rule.
+    let mutatingWorkspace =
+      descriptor.provider == .workspace
+      && descriptor.permittedEffects.allSatisfy({ $0 <= .deviceMutation })
+      && descriptor.authorization[.deviceMutation] == .standingCapability
+    guard descriptor.minimumEffect <= .hostOnly
+      || (mutatingWorkspace && descriptor.minimumEffect == .deviceMutation)
     else {
       throw RuntimeJobEngineError.rejected(
         .invalidInput,
         "\(descriptor.reference) declares binding none but permits an effect above hostOnly")
     }
+    guard descriptor.permittedEffects.allSatisfy({ $0 <= .hostOnly }) || mutatingWorkspace else {
+      throw RuntimeJobEngineError.rejected(
+        .invalidInput,
+        "\(descriptor.reference) declares binding none but permits an effect above hostOnly")
+    }
     for step in descriptor.steps {
+      // Unchanged, and the part that actually protects a device: nothing
+      // inside an unbound operation may require a device binding.
       guard step.binding == .none else {
         throw RuntimeJobEngineError.rejected(
           .invalidInput,
           "\(descriptor.reference) is host-only but step \(step.stepID) requires a device binding")
       }
-      guard step.effect <= .hostOnly else {
+      guard step.effect <= .hostOnly || (mutatingWorkspace && step.effect == .deviceMutation)
+      else {
         throw RuntimeJobEngineError.rejected(
           .invalidInput,
           "\(descriptor.reference) is host-only but step \(step.stepID) declares effect "
@@ -3895,30 +3912,59 @@ public actor RuntimeJobEngine {
         .authorizationRequired,
         "catalog has no authorization policy for effect \(effect.rawValue)")
     }
-    guard let queryIdentity = materialized.stableTargetIdentitySHA256,
+    let query: RuntimeCapabilityAuthorizationQuery
+    if let queryIdentity = materialized.stableTargetIdentitySHA256,
       let queryBindingRevision = materialized.bindingRevision
-    else {
-      // Unreachable for a host-only plan: hostOnly <= readOnly short-circuits
-      // above. Refuse rather than query a capability with no device scope.
-      throw RuntimeJobEngineError.rejected(
-        .authorizationRequired,
-        "\(descriptor.reference) has no device binding to authorize effect \(effect.rawValue)")
+    {
+      query = RuntimeCapabilityAuthorizationQuery(
+        operationID: descriptor.id,
+        operationVersion: descriptor.version,
+        effect: effect,
+        targetStableIdentitySHA256: queryIdentity,
+        targetBindingRevision: queryBindingRevision,
+        planDigest: materialized.planDigest,
+        inputs: request.inputs)
+    } else {
+      // A workspace mutation above read-only (CHG-2026-055, TASK-HFA-009 r2).
+      // It has no device to name, so the capability is matched against the
+      // tree instead: which workspace, at which revision, with which writable
+      // scopes. The provider owns those facts; the engine refuses rather than
+      // authorize a change to a workspace it cannot identify.
+      guard let provider = providers.provider(id: descriptor.provider.rawValue),
+        let workspace = try provider.workspaceAuthorizationFacts(
+          for: descriptor, inputs: request.inputs)
+      else {
+        throw RuntimeJobEngineError.rejected(
+          .authorizationRequired,
+          "\(descriptor.reference) has neither a device binding nor workspace facts "
+            + "to authorize effect \(effect.rawValue)")
+      }
+      query = RuntimeCapabilityAuthorizationQuery(
+        operationID: descriptor.id,
+        operationVersion: descriptor.version,
+        effect: effect,
+        targetStableIdentitySHA256: nil,
+        targetBindingRevision: nil,
+        planDigest: materialized.planDigest,
+        inputs: request.inputs,
+        workspaceIdentitySHA256: workspace.identitySHA256,
+        workspaceRevision: workspace.revision,
+        workspaceFileScopesDigest: workspace.fileScopesDigest)
     }
-    let query = RuntimeCapabilityAuthorizationQuery(
-      operationID: descriptor.id,
-      operationVersion: descriptor.version,
-      effect: effect,
-      targetStableIdentitySHA256: queryIdentity,
-      targetBindingRevision: queryBindingRevision,
-      planDigest: materialized.planDigest,
-      inputs: request.inputs)
 
     let authorization: RuntimeCapabilityReference
     if let supplied = request.authorization {
       authorization = supplied
     } else if effect == .deviceMutation,
       policy == .standingCapability,
-      descriptor.defaultPolicyIssuanceEnabled
+      descriptor.defaultPolicyIssuanceEnabled,
+      // Automatic issuance is a *device* policy. A workspace mutation must
+      // carry a grant a maintainer issued against this tree, this revision and
+      // these writable scopes (CHG-2026-055 TASK-HFA-009 r2, HTP-INV-6): a
+      // runtime that mints its own workspace capability is a gate authorizing
+      // itself. Without this clause the path below would try, and would only
+      // fail because the device identity it needs happens to be empty.
+      query.workspaceIdentitySHA256 == nil
     {
       authorization = try await automaticE1Capability(
         descriptor: descriptor, query: query)
@@ -4087,36 +4133,75 @@ public actor RuntimeJobEngine {
       throw RuntimeDispatchFailure.failed(
         "authorizationRequired: mutation has no runtime capability reference")
     }
-    guard
-      let stableIdentity = runtime.record.materializedStableTargetIdentitySHA256,
-      Self.isLowercaseSHA256(stableIdentity),
-      let bindingRevision = runtime.record.materializedBindingRevision,
-      bindingRevision > 0,
-      let planDigest = runtime.record.materializedPlanDigest,
-      Self.isLowercaseSHA256(planDigest),
-      runtime.record.request.target.expectedBindingRevision == bindingRevision,
-      validatedFacts?.targetID == runtime.record.request.target.targetID,
-      validatedFacts?.bindingRevision == bindingRevision,
-      validatedFacts?.deviceIdentitySHA256 == stableIdentity,
-      validatedFacts?.providerID == descriptor.provider.rawValue
+    guard let planDigest = runtime.record.materializedPlanDigest,
+      Self.isLowercaseSHA256(planDigest)
     else {
       throw RuntimeDispatchFailure.failed(
         "authorizationRequired: materialized plan or verified target binding is absent or drifted")
     }
-    let query = RuntimeCapabilityAuthorizationQuery(
-      operationID: descriptor.id,
-      operationVersion: descriptor.version,
-      effect: effect,
-      targetStableIdentitySHA256: stableIdentity,
-      targetBindingRevision: bindingRevision,
-      planDigest: planDigest,
-      inputs: runtime.record.request.inputs)
+    // The subject is re-established here, at the moment of the effect, not
+    // trusted from admission. A device mutation re-proves identity and
+    // binding; a workspace mutation re-reads the tree, so a workspace that
+    // moved between admission and dispatch is caught here rather than
+    // changed anyway (CHG-2026-055, TASK-HFA-009 r2).
+    let query: RuntimeCapabilityAuthorizationQuery
+    var deviceLineage: (identity: String, bindingRevision: Int)?
+    if descriptor.binding == .confirmedDevice {
+      guard
+        let stableIdentity = runtime.record.materializedStableTargetIdentitySHA256,
+        Self.isLowercaseSHA256(stableIdentity),
+        let bindingRevision = runtime.record.materializedBindingRevision,
+        bindingRevision > 0,
+        runtime.record.request.target.expectedBindingRevision == bindingRevision,
+        validatedFacts?.targetID == runtime.record.request.target.targetID,
+        validatedFacts?.bindingRevision == bindingRevision,
+        validatedFacts?.deviceIdentitySHA256 == stableIdentity,
+        validatedFacts?.providerID == descriptor.provider.rawValue
+      else {
+        throw RuntimeDispatchFailure.failed(
+          "authorizationRequired: materialized plan or verified target binding is absent or drifted"
+        )
+      }
+      deviceLineage = (stableIdentity, bindingRevision)
+      query = RuntimeCapabilityAuthorizationQuery(
+        operationID: descriptor.id,
+        operationVersion: descriptor.version,
+        effect: effect,
+        targetStableIdentitySHA256: stableIdentity,
+        targetBindingRevision: bindingRevision,
+        planDigest: planDigest,
+        inputs: runtime.record.request.inputs)
+    } else {
+      guard let provider = providers.provider(id: descriptor.provider.rawValue),
+        let workspace = try provider.workspaceAuthorizationFacts(
+          for: descriptor, inputs: runtime.record.request.inputs)
+      else {
+        throw RuntimeDispatchFailure.failed(
+          "authorizationRequired: no workspace subject to authorize this mutation against")
+      }
+      query = RuntimeCapabilityAuthorizationQuery(
+        operationID: descriptor.id,
+        operationVersion: descriptor.version,
+        effect: effect,
+        targetStableIdentitySHA256: nil,
+        targetBindingRevision: nil,
+        planDigest: planDigest,
+        inputs: runtime.record.request.inputs,
+        workspaceIdentitySHA256: workspace.identitySHA256,
+        workspaceRevision: workspace.revision,
+        workspaceFileScopesDigest: workspace.fileScopesDigest)
+    }
     do {
-      try await validateNoUnresolvedMutationLineage(
-        stableIdentitySHA256: stableIdentity,
-        bindingRevision: bindingRevision,
-        reservationID: runtime.record.request.idempotencyKey,
-        jobID: jobID)
+      if let deviceLineage {
+        // Device lineage guards one device against a second mutation while an
+        // earlier one is unresolved. A workspace has no device to protect, and
+        // the capability record's own lineage check still applies to both.
+        try await validateNoUnresolvedMutationLineage(
+          stableIdentitySHA256: deviceLineage.identity,
+          bindingRevision: deviceLineage.bindingRevision,
+          reservationID: runtime.record.request.idempotencyKey,
+          jobID: jobID)
+      }
       guard
         let status = try await capabilityStore.inspect(
           capabilityID: authorization.capabilityID)

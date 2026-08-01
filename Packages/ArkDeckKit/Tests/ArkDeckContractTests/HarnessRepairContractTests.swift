@@ -83,6 +83,26 @@ private struct RepairPortFixture: HarnessRepairPort {
   ) async throws -> HarnessPatchApplicationReadback { unknown }
 }
 
+/// A maintainer-issued workspace grant, from the harness's point of view: it
+/// can ask whether one exists and name it, and it can do nothing else
+/// (CHG-2026-055, TASK-HFA-009 r2 — HTP-INV-6 forbids minting, not using).
+private struct IssuedWorkspaceGrant: HarnessCapabilityPort {
+  let covered: Set<String>
+
+  func hasStandingCapability(operationReference: String, targetID: String) async -> Bool {
+    covered.contains(operationReference)
+  }
+
+  func standingCapabilityID(operationReference: String, targetID: String) async -> String? {
+    covered.contains(operationReference) ? "CAP-RT-WORKSPACE-FIXTURE" : nil
+  }
+}
+
+private let workspaceMutations: Set<String> = [
+  "workspace.apply-patch@1", "workspace.build-openharmony@1", "workspace.run-tests@1",
+  "workspace.revert-patch@1", "workspace.create-checkpoint@1",
+]
+
 final class HarnessRepairContractTests: XCTestCase {
   private var rootURL: URL!
   private let now = "2026-07-31T01:00:00Z"
@@ -388,7 +408,9 @@ final class HarnessRepairContractTests: XCTestCase {
     let fixedNow = now
     let coordinator = HarnessTaskCoordinator(
       store: store, jobPort: jobs,
-      repairPort: repairFixture(unknown: .stillUnknown), nowUTC: { fixedNow })
+      repairPort: repairFixture(unknown: .stillUnknown), nowUTC: { fixedNow },
+      policyGuard: HarnessPolicyGuard(
+        capabilities: IssuedWorkspaceGrant(covered: workspaceMutations)))
 
     let outcome = try await coordinator.reconcile(snapshot.htaskID)
     let submitted = await jobs.operations()
@@ -729,7 +751,9 @@ final class HarnessRepairContractTests: XCTestCase {
     let fixedNow = now
     return (
       HarnessTaskCoordinator(
-        store: store, jobPort: jobs, repairPort: repair, nowUTC: { fixedNow }),
+        store: store, jobPort: jobs, repairPort: repair, nowUTC: { fixedNow },
+        policyGuard: HarnessPolicyGuard(
+          capabilities: IssuedWorkspaceGrant(covered: workspaceMutations))),
       store)
   }
 

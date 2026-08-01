@@ -114,15 +114,61 @@ final class RuntimeOperationCatalogTests: XCTestCase {
     XCTAssertTrue(flash.steps.contains { $0.kind == .flashPartition })
   }
 
-  func testMutatingOperationsAreDeviceExclusiveWithConfirmedBinding() {
+  /// Restated, not relaxed (CHG-2026-055, TASK-HFA-009 r2).
+  ///
+  /// What this test was written to forbid is a mutation that reaches a device
+  /// without a confirmed binding, and that is asserted below exactly as
+  /// before. What it also assumed — that every E1 effect *is* a device effect
+  /// — stopped being true when workspace mutations became E1: they change a
+  /// tree on this host, have no device to bind to, and are gated by a
+  /// workspace-scoped capability instead.
+  ///
+  /// So the rule splits by subject, and each half must be complete on its own
+  /// terms. Deleting the workspace half, or widening the device half to admit
+  /// an unbound device mutation, would give back exactly the protection this
+  /// test exists for.
+  func testMutatingOperationsCarryTheGuardsOfTheirOwnSubject() {
     for operation in RuntimeOperationCatalog.operations
     where operation.permittedEffects.contains(where: { $0 >= .deviceMutation }) {
+      if operation.provider == .workspace {
+        // A workspace mutation: no device, serialized against the tree, and
+        // unreachable without a grant a maintainer issued for that tree.
+        XCTAssertEqual(
+          operation.concurrencyKey, .hostExclusive,
+          "\(operation.reference): a workspace mutation is serialized on the host")
+        XCTAssertEqual(
+          operation.binding, WorkflowBindingRequirement.none,
+          "\(operation.reference): a workspace mutation has no device to bind")
+        XCTAssertEqual(
+          operation.authorization[.deviceMutation], .standingCapability,
+          "\(operation.reference): a workspace mutation must require a capability")
+        XCTAssertFalse(
+          operation.defaultPolicyIssuanceEnabled,
+          "\(operation.reference): the runtime must not issue its own workspace grant")
+        XCTAssertFalse(
+          operation.steps.contains { $0.binding == .confirmedDevice },
+          "\(operation.reference): an unbound operation must contain no device step")
+      } else {
+        XCTAssertEqual(
+          operation.concurrencyKey, .deviceExclusive,
+          "\(operation.reference): mutating operations must be device-exclusive")
+        XCTAssertEqual(
+          operation.binding, .confirmedDevice,
+          "\(operation.reference): mutating operations require a confirmed binding")
+      }
+    }
+  }
+
+  /// The half that would otherwise be easy to lose: nothing outside the
+  /// workspace provider may mutate without a device binding.
+  func testOnlyWorkspaceMutationsMayBeUnbound() {
+    for operation in RuntimeOperationCatalog.operations
+    where operation.permittedEffects.contains(where: { $0 >= .deviceMutation })
+      && operation.binding == WorkflowBindingRequirement.none
+    {
       XCTAssertEqual(
-        operation.concurrencyKey, .deviceExclusive,
-        "\(operation.reference): mutating operations must be device-exclusive")
-      XCTAssertEqual(
-        operation.binding, .confirmedDevice,
-        "\(operation.reference): mutating operations require a confirmed binding")
+        operation.provider, .workspace,
+        "\(operation.reference): only a workspace mutation may be unbound")
     }
   }
 
