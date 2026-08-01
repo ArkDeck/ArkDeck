@@ -402,8 +402,12 @@
   `applyPatch`/`buildOpenHarmony`/`revertPatch` 的准入前置;revision 失配 =
   `WORKSPACE_REVISION_CONFLICT`,fail closed 不 apply;`device` 主体的既有准入与
   E2 exact-plan 语义**逐条不变**(回归断言);capability 只能收窄不能放宽的性质有负例
-- Allowed paths:
+- Allowed paths(2026-08-01 修订:r1 要让四个 workspace 变更 operation 能**声明**自己的
+  base revision,那是 descriptor 的可选输入字段 —— 不放开 `Catalog/**` 与生成器,
+  绑定就只能停在够不着的代码里):
   - `Packages/ArkDeckKit/**`
+  - `Catalog/**`
+  - `scripts/catalog_gen/**`
   - `openspec/contracts/capability-registry.yaml`
   - `openspec/contracts/provider-contracts.md`
   - `openspec/changes/chg-2026-055-harness-final-architecture/**`
