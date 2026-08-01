@@ -594,7 +594,15 @@
 
 ## TASK-HFA-013 — 抽取 `ArkDeckHarness` module(终版 §30)
 
-- Status:ready
+- Status:done
+- Done:2026-08-01,**台账由第三方补记**。产品代码经 #911 合入 `main@cdabd9ac`,该 PR 零
+  `openspec/` 改动 —— 与 003/004/005/006/010/012 同一类缺口,按维护者 2026-08-01 对那六条的
+  授权类推补齐。HFA-AC-23 的结论已写入 `verification.md`,标注了 `Package.swift` 的依赖声明、
+  `assertHarnessModuleBoundary()` 的逐项断言,以及「diff 中测试函数净增删各为 0、迁移后
+  1064 tests/1 skip/0 fail 与迁移前同数」这条纯移动证据。方法见 `evidence/runs/LEDGER-BACKFILL/2026-08-01.md`。
+  **门的如实登记**:本任务 Gate 写的是「Wave A 全部 done 且 GJ-5 `REAL_DEVICE_PASS`」。
+  Wave A 已全 done,但 **GJ-5 仍无真机证据**(见 TASK-HFA-005),故该门在合入时**并未满足**。
+  与 TASK-HFA-012 同,补记不追认。
 - Platform:macos
 - Requirements/AC:proposal What 13(module 抽取);change-local HFA-AC-23,
   登记于 `verification.md`
