@@ -304,8 +304,17 @@ CHANGE_CLASSES = {"core", "capability", "integration", "platform", "implementati
 # existed; `[:：]` is what the sibling guard in check_pr_paths.py accepts.
 # The trailing boundary is what stops `- Status:readyish` and
 # `- Status:done_later` from counting as legal status lines.
+#
+# The in-progress value is hyphenated because two guards read these lines and
+# only one spelling satisfies both. `scripts/host_loop` requires a bare status
+# word (`^[a-z][a-z-]*$`) and extracts it with `([a-z][a-z-]*)`, so an
+# underscored value both fails its vocabulary assertion and truncates to `in`
+# in its independent extraction — which is how `- Status:in_progress` passed
+# check-sdd and turned the guard job red (CHG-2026-055 TASK-HFA-009 r1).
+# No task in the repository used the underscored form, so this narrows the
+# accepted vocabulary rather than migrating any file.
 TASK_STATUS_RE = re.compile(
-    r"^- Status[:：][ \t]*(ready|in_progress|done|blocked)(?![A-Za-z0-9_-])")
+    r"^- Status[:：][ \t]*(ready|in-progress|done|blocked)(?![A-Za-z0-9_-])")
 REQUIREMENTS_AC_PREFIX = "- Requirements/AC:"
 # A claim surface ends at the next top-level bullet OR at any heading.
 _CLAIM_SURFACE_END_RE = re.compile(r"^(?:- |#{1,6}[ \t])")

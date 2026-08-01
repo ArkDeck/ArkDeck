@@ -1245,5 +1245,56 @@ class OperationCatalogFamilyTests(unittest.TestCase):
         self.assertIn("check_operation_catalog()", main_body)
 
 
+class StatusVocabularyAgreementTests(unittest.TestCase):
+    """The two guards that read `- Status:` lines must accept the same words.
+
+    They disagreed once, and the disagreement was invisible until a task used
+    the value neither side shared: check-sdd accepted `in_progress` while the
+    host-loop discovery contract asserted a bare `[a-z][a-z-]*` word and
+    truncated the underscored value to `in`. check-sdd was green, the guard
+    job was red, and nothing in either suite said why.
+    """
+
+    def _check_sdd_vocabulary(self) -> set[str]:
+        import re
+        source = (check_sdd.REPO / "scripts" / "check_sdd.py").read_text(encoding="utf-8")
+        match = re.search(
+            r"TASK_STATUS_RE = re\.compile\(\s*r\"\^- Status\[:：\]\[ \\t\]\*\(([^)]*)\)",
+            source)
+        self.assertIsNotNone(match, "the status pattern must stay machine-readable")
+        return set(match.group(1).split("|"))
+
+    def _host_loop_vocabulary(self) -> set[str]:
+        import re
+        source = (
+            check_sdd.REPO / "scripts" / "host_loop" / "test_discovery_contract.py"
+        ).read_text(encoding="utf-8")
+        match = re.search(
+            r"self\.assertLessEqual\(\{c\.status for c in self\.found\},\s*\{([^}]*)\}",
+            source)
+        self.assertIsNotNone(match, "the host-loop vocabulary must stay machine-readable")
+        return {token.strip().strip('"\'') for token in match.group(1).split(",") if token.strip()}
+
+    def test_every_status_check_sdd_accepts_is_one_host_loop_accepts(self):
+        self.assertLessEqual(self._check_sdd_vocabulary(), self._host_loop_vocabulary())
+
+    def test_every_accepted_status_is_a_bare_lowercase_word(self):
+        # The host-loop contract also requires the value to match
+        # `^[a-z][a-z-]*$`; a word this side accepts but that side cannot
+        # parse is the same defect in a different disguise.
+        for status in self._check_sdd_vocabulary():
+            with self.subTest(status=status):
+                self.assertRegex(status, r"^[a-z][a-z-]*$")
+
+    def test_the_pattern_still_rejects_a_suffixed_status(self):
+        for illegal in ("- Status:readyish", "- Status:done_later", "- Status:in_progress"):
+            with self.subTest(line=illegal):
+                self.assertIsNone(check_sdd.TASK_STATUS_RE.match(illegal))
+        for legal in ("- Status:ready", "- Status:in-progress", "- Status:done",
+                      "- Status:blocked"):
+            with self.subTest(line=legal):
+                self.assertIsNotNone(check_sdd.TASK_STATUS_RE.match(legal))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
