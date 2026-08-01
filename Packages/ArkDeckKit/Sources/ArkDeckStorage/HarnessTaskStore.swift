@@ -1,21 +1,10 @@
-// Durable harness task store (CHG-2026-054, TASK-HTP-001).
+// Durable harness task store (TASK-HFA-012).
 //
-// Deliberately built on the same primitives the rest of this package uses -
-// exclusive flock, temp file + fsync + rename + directory fsync, and an
-// append-only fsync'd log - rather than on a new database. A second
-// persistence engine would mean a second set of durability semantics to
-// audit next to the journal; the proposal records that trade explicitly.
-//
-// Two documents per task with one truth between them:
-//
-//   events.jsonl  append-only, fsync'd, one event per version. The truth.
-//   task.json     atomically replaced snapshot. A cache of the log.
-//
-// A crash between the two writes leaves a snapshot one or more versions
-// behind, never ahead: `load` replays the trailing events through the
-// reducer's own projection, so the observable state is identical either
-// way. The task id is the directory name and its grammar excludes `/` and
-// `.`, so traversal is not expressible rather than filtered.
+// SQLite is authoritative: event append and snapshot CAS share one
+// transaction, WAL and foreign keys are mandatory, and every typed document
+// is held as canonical JSON plus its digest. The old durable-file helpers at
+// the bottom remain only for one-time import and a non-authoritative mirror
+// consumed by older diagnostics. Import never deletes the legacy tree.
 
 import ArkDeckCore
 import Darwin
@@ -33,8 +22,16 @@ public enum HarnessTaskStoreError: Error, Equatable, Sendable {
 public actor HarnessTaskStore {
   private let rootURL: URL
   private let tasksURL: URL
+  private let repository: HarnessSQLiteRepository
 
   public init(rootURL: URL) throws {
+    try self.init(rootURL: rootURL, migrationFault: nil)
+  }
+
+  init(
+    rootURL: URL,
+    migrationFault: HarnessTaskStoreMigrationFault?
+  ) throws {
     self.rootURL = rootURL
     self.tasksURL = rootURL.appendingPathComponent("tasks", isDirectory: true)
     do {
@@ -44,6 +41,8 @@ public actor HarnessTaskStore {
     } catch {
       throw HarnessTaskStoreError.ioFailure("cannot create harness task root: \(error)")
     }
+    self.repository = try HarnessSQLiteRepository(
+      rootURL: rootURL, migrationFault: migrationFault)
   }
 
   // MARK: - Task identity
@@ -80,120 +79,84 @@ public actor HarnessTaskStore {
   // MARK: - Task lifecycle
 
   public func create(_ snapshot: HarnessTaskSnapshot) throws {
+    try repository.create(snapshot)
     let directoryURL = try directory(snapshot.htaskID)
-    guard !FileManager.default.fileExists(atPath: directoryURL.path) else {
-      throw HarnessTaskStoreError.alreadyExists(snapshot.htaskID)
-    }
     do {
       try FileManager.default.createDirectory(
         at: directoryURL.appendingPathComponent("rounds", isDirectory: true),
         withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
     } catch {
-      throw HarnessTaskStoreError.ioFailure("cannot create task directory: \(error)")
+      // SQLite already committed. The legacy directory is only a mirror and
+      // cannot be allowed to redefine the durable outcome.
+      return
     }
-    try withLock(directoryURL) {
+    try? withLock(directoryURL) {
       try writeSnapshot(snapshot, in: directoryURL)
     }
   }
 
   public func load(_ taskID: String) throws -> HarnessTaskSnapshot {
-    let directoryURL = try existingDirectory(taskID)
-    return try withLock(directoryURL) {
-      try loadLocked(directoryURL, taskID: taskID)
-    }
+    try ensureSQLiteTask(taskID)
+    return try repository.load(taskID)
   }
 
   public func list() throws -> [HarnessTaskSnapshot] {
-    let names: [String]
-    do {
-      names = try FileManager.default.contentsOfDirectory(atPath: tasksURL.path)
-    } catch {
-      return []
+    let names = (try? FileManager.default.contentsOfDirectory(atPath: tasksURL.path)) ?? []
+    for name in names where Self.isWellFormed(taskID: name) {
+      try ensureSQLiteTask(name)
     }
-    var snapshots: [HarnessTaskSnapshot] = []
-    for name in names.sorted() where Self.isWellFormed(taskID: name) {
-      snapshots.append(try load(name))
-    }
-    return snapshots
+    return try repository.list()
   }
 
-  /// Append the event, then replace the snapshot. The order is what makes
-  /// a torn write recoverable: an appended event with a stale snapshot is
-  /// replayable, the reverse would lose the causation record of a state
-  /// the task is already in.
+  /// Append the event and replace the snapshot with a CAS in one SQLite
+  /// transaction. The legacy durable-file mirror below is best-effort and
+  /// never authoritative.
   public func commit(
     event: HarnessTaskEvent,
     snapshot: HarnessTaskSnapshot,
     expectedVersion: Int
   ) throws {
-    let directoryURL = try existingDirectory(snapshot.htaskID)
-    try withLock(directoryURL) {
-      let current = try loadLocked(directoryURL, taskID: snapshot.htaskID)
-      guard current.version == expectedVersion else {
-        throw HarnessTaskStoreError.versionConflict(
-          expected: expectedVersion, actual: current.version)
+    try ensureSQLiteTask(snapshot.htaskID)
+    try repository.commit(
+      event: event, snapshot: snapshot, expectedVersion: expectedVersion)
+    if let directoryURL = try? existingDirectory(snapshot.htaskID) {
+      try? withLock(directoryURL) {
+        try appendEvent(event, in: directoryURL)
+        try writeSnapshot(snapshot, in: directoryURL)
       }
-      try appendEvent(event, in: directoryURL)
-      try writeSnapshot(snapshot, in: directoryURL)
     }
   }
 
   public func events(_ taskID: String) throws -> [HarnessTaskEvent] {
-    let directoryURL = try existingDirectory(taskID)
-    return try withLock(directoryURL) {
-      try readEvents(in: directoryURL)
-    }
+    try ensureSQLiteTask(taskID)
+    return try repository.events(taskID)
   }
 
   // MARK: - Round records
 
   public func putDecision(_ decision: HarnessDecision) throws {
-    let directoryURL = try existingDirectory(decision.htaskID)
-    try withLock(directoryURL) {
-      let roundURL = try roundDirectory(directoryURL, round: decision.round)
-      try writeJSON(decision, to: roundURL.appendingPathComponent("decision.json"))
-    }
+    try ensureSQLiteTask(decision.htaskID)
+    try repository.putDecision(decision)
   }
 
   public func decision(_ taskID: String, round: Int) throws -> HarnessDecision? {
-    let directoryURL = try existingDirectory(taskID)
-    return try withLock(directoryURL) {
-      let url = directoryURL.appendingPathComponent("rounds/\(round)/decision.json")
-      guard FileManager.default.fileExists(atPath: url.path) else { return nil }
-      return try readJSON(HarnessDecision.self, from: url)
-    }
+    try ensureSQLiteTask(taskID)
+    return try repository.decision(taskID, round: round)
   }
 
   public func putIntent(_ intent: HarnessDispatchIntent) throws {
-    let directoryURL = try existingDirectory(intent.htaskID)
-    try withLock(directoryURL) {
-      let roundURL = try roundDirectory(directoryURL, round: intent.round)
-      try writeJSON(intent, to: roundURL.appendingPathComponent("dispatch-intent.json"))
-    }
+    try ensureSQLiteTask(intent.htaskID)
+    try repository.putIntent(intent)
   }
 
   public func intent(_ taskID: String, round: Int) throws -> HarnessDispatchIntent? {
-    let directoryURL = try existingDirectory(taskID)
-    return try withLock(directoryURL) {
-      let url = directoryURL.appendingPathComponent("rounds/\(round)/dispatch-intent.json")
-      guard FileManager.default.fileExists(atPath: url.path) else { return nil }
-      return try readJSON(HarnessDispatchIntent.self, from: url)
-    }
+    try ensureSQLiteTask(taskID)
+    return try repository.intent(taskID, round: round)
   }
 
   public func intents(_ taskID: String) throws -> [HarnessDispatchIntent] {
-    let directoryURL = try existingDirectory(taskID)
-    return try withLock(directoryURL) {
-      let roundsURL = directoryURL.appendingPathComponent("rounds", isDirectory: true)
-      let names = (try? FileManager.default.contentsOfDirectory(atPath: roundsURL.path)) ?? []
-      var found: [HarnessDispatchIntent] = []
-      for round in names.compactMap(Int.init).sorted() {
-        let url = roundsURL.appendingPathComponent("\(round)/dispatch-intent.json")
-        guard FileManager.default.fileExists(atPath: url.path) else { continue }
-        found.append(try readJSON(HarnessDispatchIntent.self, from: url))
-      }
-      return found
-    }
+    try ensureSQLiteTask(taskID)
+    return try repository.intents(taskID)
   }
 
   /// Intents recovery must still resolve before a task may dispatch
@@ -226,78 +189,18 @@ public actor HarnessTaskStore {
     guard Self.isWellFormed(attemptID: attempt.attemptID) else {
       throw HarnessTaskStoreError.corrupt("malformed attempt id \(attempt.attemptID)")
     }
-    let directoryURL = try existingDirectory(attempt.htaskID)
-    try withLock(directoryURL) {
-      let events = try readAttemptEventsLocked(directoryURL)
-      let current = events.last(where: { $0.attemptID == attempt.attemptID })?.resulting
-      switch kind {
-      case .created:
-        guard current == nil else {
-          throw HarnessTaskStoreError.corrupt("attempt \(attempt.attemptID) already exists")
-        }
-        guard attempt.ordinal >= 1,
-          !events.contains(where: { $0.resulting.ordinal == attempt.ordinal }),
-          attempt.outcome == .active,
-          attempt.strategyFingerprint == attempt.strategy.fingerprint,
-          attempt.baseRevision == attempt.strategy.baseWorkspaceRevision
-        else {
-          throw HarnessTaskStoreError.corrupt("invalid created attempt \(attempt.attemptID)")
-        }
-      case .actionRunRecorded, .patchRevisionObserved, .failureRecorded, .evaluationRecorded,
-        .resumed, .closed:
-        guard let current else {
-          throw HarnessTaskStoreError.corrupt("unknown attempt \(attempt.attemptID)")
-        }
-        let validHumanResume =
-          kind == .resumed && current.outcome == .humanRequired && attempt.outcome == .active
-        guard current.htaskID == attempt.htaskID,
-          current.ordinal == attempt.ordinal,
-          current.strategyFingerprint == attempt.strategyFingerprint,
-          current.baseRevision == attempt.baseRevision,
-          Set(current.actionRunIDs).isSubset(of: Set(attempt.actionRunIDs)),
-          Set(current.evaluationIDs).isSubset(of: Set(attempt.evaluationIDs)),
-          Set(current.confirmedFacts).isSubset(of: Set(attempt.confirmedFacts)),
-          Set(current.disprovedFacts).isSubset(of: Set(attempt.disprovedFacts)),
-          !(current.outcome.isClosed && attempt.outcome == .active) || validHumanResume
-        else {
-          throw HarnessTaskStoreError.corrupt(
-            "attempt \(attempt.attemptID) update regressed an immutable field")
-        }
-      }
-      let event = HarnessAttemptEvent(
-        sequence: (events.last?.sequence ?? 0) + 1,
-        kind: kind,
-        reasonCode: reasonCode,
-        atUTC: attempt.updatedAtUTC,
-        resulting: attempt)
-      try appendJSONLine(
-        event, to: directoryURL.appendingPathComponent("attempt-events.jsonl"))
-    }
+    try ensureSQLiteTask(attempt.htaskID)
+    try repository.recordAttempt(attempt, kind: kind, reasonCode: reasonCode)
   }
 
   public func attemptEvents(_ taskID: String) throws -> [HarnessAttemptEvent] {
-    let directoryURL = try existingDirectory(taskID)
-    return try withLock(directoryURL) {
-      try readAttemptEventsLocked(directoryURL)
-    }
+    try ensureSQLiteTask(taskID)
+    return try repository.attemptEvents(taskID)
   }
 
   public func attempts(_ taskID: String) throws -> [HarnessAttempt] {
-    let events = try attemptEvents(taskID)
-    var latest: [String: HarnessAttempt] = [:]
-    for event in events { latest[event.attemptID] = event.resulting }
-    return latest.values.sorted { ($0.ordinal, $0.attemptID) < ($1.ordinal, $1.attemptID) }
-  }
-
-  private func readAttemptEventsLocked(_ directoryURL: URL) throws -> [HarnessAttemptEvent] {
-    let events: [HarnessAttemptEvent] = try readJSONLines(
-      HarnessAttemptEvent.self,
-      from: directoryURL.appendingPathComponent("attempt-events.jsonl"))
-    for (index, event) in events.enumerated() where event.sequence != index + 1 {
-      throw HarnessTaskStoreError.corrupt(
-        "attempt event sequence \(event.sequence) does not follow \(index)")
-    }
-    return events
+    try ensureSQLiteTask(taskID)
+    return try repository.attempts(taskID)
   }
 
   // MARK: - Model runs
@@ -321,30 +224,13 @@ public actor HarnessTaskStore {
     guard Self.isWellFormed(modelRunID: run.modelRunID) else {
       throw HarnessTaskStoreError.malformedTaskID(run.modelRunID)
     }
-    let directoryURL = try existingDirectory(run.htaskID)
-    try withLock(directoryURL) {
-      let roundURL = try roundDirectory(directoryURL, round: run.round)
-      let runsURL = roundURL.appendingPathComponent("model-runs", isDirectory: true)
-      try FileManager.default.createDirectory(at: runsURL, withIntermediateDirectories: true)
-      try writeJSON(run, to: runsURL.appendingPathComponent("\(run.modelRunID).json"))
-    }
+    try ensureSQLiteTask(run.htaskID)
+    try repository.putModelRun(run)
   }
 
   public func modelRuns(_ taskID: String) throws -> [HarnessModelRun] {
-    let directoryURL = try existingDirectory(taskID)
-    return try withLock(directoryURL) {
-      let roundsURL = directoryURL.appendingPathComponent("rounds", isDirectory: true)
-      let rounds = (try? FileManager.default.contentsOfDirectory(atPath: roundsURL.path)) ?? []
-      var found: [HarnessModelRun] = []
-      for round in rounds.compactMap(Int.init).sorted() {
-        let runsURL = roundsURL.appendingPathComponent("\(round)/model-runs", isDirectory: true)
-        let names = (try? FileManager.default.contentsOfDirectory(atPath: runsURL.path)) ?? []
-        for name in names.sorted() where name.hasSuffix(".json") {
-          found.append(try readJSON(HarnessModelRun.self, from: runsURL.appendingPathComponent(name)))
-        }
-      }
-      return found
-    }
+    try ensureSQLiteTask(taskID)
+    return try repository.modelRuns(taskID)
   }
 
   // MARK: - Evaluations
@@ -365,47 +251,21 @@ public actor HarnessTaskStore {
     guard Self.isWellFormed(evaluationID: evaluation.evaluationID) else {
       throw HarnessTaskStoreError.corrupt("malformed evaluation id \(evaluation.evaluationID)")
     }
-    let directoryURL = try existingDirectory(evaluation.htaskID)
-    try withLock(directoryURL) {
-      let evaluationsURL = directoryURL.appendingPathComponent("evaluations", isDirectory: true)
-      do {
-        try FileManager.default.createDirectory(
-          at: evaluationsURL, withIntermediateDirectories: true,
-          attributes: [.posixPermissions: 0o700])
-      } catch {
-        throw HarnessTaskStoreError.ioFailure("cannot create evaluations directory: \(error)")
-      }
-      try writeJSON(
-        evaluation,
-        to: evaluationsURL.appendingPathComponent("\(evaluation.evaluationID).json"))
-    }
+    try ensureSQLiteTask(evaluation.htaskID)
+    try repository.putEvaluation(evaluation)
   }
 
   public func evaluation(_ taskID: String, evaluationID: String) throws -> HarnessEvaluation? {
     guard Self.isWellFormed(evaluationID: evaluationID) else {
       throw HarnessTaskStoreError.corrupt("malformed evaluation id \(evaluationID)")
     }
-    let directoryURL = try existingDirectory(taskID)
-    return try withLock(directoryURL) {
-      let url = directoryURL.appendingPathComponent("evaluations/\(evaluationID).json")
-      guard FileManager.default.fileExists(atPath: url.path) else { return nil }
-      return try readJSON(HarnessEvaluation.self, from: url)
-    }
+    try ensureSQLiteTask(taskID)
+    return try repository.evaluation(taskID, evaluationID: evaluationID)
   }
 
   public func evaluations(_ taskID: String) throws -> [HarnessEvaluation] {
-    let directoryURL = try existingDirectory(taskID)
-    return try withLock(directoryURL) {
-      let evaluationsURL = directoryURL.appendingPathComponent("evaluations", isDirectory: true)
-      let names = (try? FileManager.default.contentsOfDirectory(atPath: evaluationsURL.path)) ?? []
-      var found: [HarnessEvaluation] = []
-      for name in names.sorted() where name.hasSuffix(".json") {
-        found.append(
-          try readJSON(
-            HarnessEvaluation.self, from: evaluationsURL.appendingPathComponent(name)))
-      }
-      return found.sorted { ($0.round, $0.evaluationID) < ($1.round, $1.evaluationID) }
-    }
+    try ensureSQLiteTask(taskID)
+    return try repository.evaluations(taskID)
   }
 
   // MARK: - Memory and human actions (TASK-HTP-003)
@@ -417,46 +277,26 @@ public actor HarnessTaskStore {
     guard Self.isWellFormed(failureDigest: digest) else {
       throw HarnessTaskStoreError.corrupt("malformed failure digest \(digest)")
     }
-    let url = failureURL(digest)
-    guard FileManager.default.fileExists(atPath: url.path) else { return nil }
-    return try withLock(memoryDirectory("failure")) {
-      try readJSON(HarnessFailureRecord.self, from: url)
-    }
+    return try repository.failureRecord(digest: digest)
   }
 
   public func putFailureRecord(_ record: HarnessFailureRecord) throws {
     guard Self.isWellFormed(failureDigest: record.digest) else {
       throw HarnessTaskStoreError.corrupt("malformed failure digest \(record.digest)")
     }
-    let directoryURL = try memoryDirectoryCreating("failure")
-    try withLock(directoryURL) {
-      try writeJSON(record, to: failureURL(record.digest))
-    }
+    try repository.putFailureRecord(record)
   }
 
   /// Every failure record, so a decision context can carry "these approaches
   /// are already known bad" instead of letting a producer rediscover them.
   public func failureRecords() throws -> [HarnessFailureRecord] {
-    let directoryURL = memoryDirectory("failure")
-    let names = (try? FileManager.default.contentsOfDirectory(atPath: directoryURL.path)) ?? []
-    guard !names.isEmpty else { return [] }
-    return try withLock(directoryURL) {
-      var found: [HarnessFailureRecord] = []
-      for name in names.sorted() where name.hasSuffix(".json") {
-        found.append(
-          try readJSON(HarnessFailureRecord.self, from: directoryURL.appendingPathComponent(name)))
-      }
-      return found.sorted { $0.lastSeenUTC < $1.lastSeenUTC }
-    }
+    try repository.failureRecords()
   }
 
   public func appendMemory(_ entry: HarnessMemoryEntry) throws {
-    let scope = entry.scope.rawValue
-    let directoryURL = try memoryDirectoryCreating(scope)
-    let name: String
     switch entry.scope {
     case .task:
-      name = "\(entry.htaskID).jsonl"
+      break
     case .project:
       // Project memory is keyed by project, not by the task that earned it.
       guard let projectRef = entry.projectRef,
@@ -466,70 +306,33 @@ public actor HarnessTaskStore {
       else {
         throw HarnessTaskStoreError.corrupt("malformed project ref for memory promotion")
       }
-      name = "\(projectRef).jsonl"
     case .failure:
       throw HarnessTaskStoreError.corrupt("failure memory uses putFailureRecord")
     }
-    try withLock(directoryURL) {
-      try appendJSONLine(entry, to: directoryURL.appendingPathComponent(name))
-    }
+    try repository.appendMemory(entry)
   }
 
   public func memory(scope: HarnessMemoryScope, key: String) throws -> [HarnessMemoryEntry] {
-    let directoryURL = memoryDirectory(scope.rawValue)
-    let url = directoryURL.appendingPathComponent("\(key).jsonl")
-    guard FileManager.default.fileExists(atPath: url.path) else { return [] }
-    return try withLock(directoryURL) {
-      // JSONL remains append-only audit history. Consumers see the latest
-      // lifecycle row per memory identity, so SUPERSEDED/INVALIDATED cannot
-      // be shadowed by an older VERIFIED row after restart.
-      HarnessMemorySelector.collapse(
-        try readJSONLines(HarnessMemoryEntry.self, from: url))
-    }
+    try repository.memory(scope: scope, key: key)
   }
 
   public func memoryHistory(
     scope: HarnessMemoryScope,
     key: String
   ) throws -> [HarnessMemoryEntry] {
-    let directoryURL = memoryDirectory(scope.rawValue)
-    let url = directoryURL.appendingPathComponent("\(key).jsonl")
-    guard FileManager.default.fileExists(atPath: url.path) else { return [] }
-    return try withLock(directoryURL) {
-      try readJSONLines(HarnessMemoryEntry.self, from: url)
-    }
+    try repository.memoryHistory(scope: scope, key: key)
   }
 
   /// Human actions live under the task they block, so reading a task's state
   /// and reading why it is blocked never diverge.
   public func putHumanAction(_ action: HarnessStoredHumanAction) throws {
-    let directoryURL = try existingDirectory(action.htaskID)
-    try withLock(directoryURL) {
-      let actionsURL = directoryURL.appendingPathComponent("humanActions", isDirectory: true)
-      do {
-        try FileManager.default.createDirectory(
-          at: actionsURL, withIntermediateDirectories: true,
-          attributes: [.posixPermissions: 0o700])
-      } catch {
-        throw HarnessTaskStoreError.ioFailure("cannot create humanActions directory: \(error)")
-      }
-      try writeJSON(action, to: actionsURL.appendingPathComponent("\(action.actionID).json"))
-    }
+    try ensureSQLiteTask(action.htaskID)
+    try repository.putHumanAction(action)
   }
 
   public func humanActions(_ taskID: String) throws -> [HarnessStoredHumanAction] {
-    let directoryURL = try existingDirectory(taskID)
-    return try withLock(directoryURL) {
-      let actionsURL = directoryURL.appendingPathComponent("humanActions", isDirectory: true)
-      let names = (try? FileManager.default.contentsOfDirectory(atPath: actionsURL.path)) ?? []
-      var found: [HarnessStoredHumanAction] = []
-      for name in names.sorted() where name.hasSuffix(".json") {
-        found.append(
-          try readJSON(
-            HarnessStoredHumanAction.self, from: actionsURL.appendingPathComponent(name)))
-      }
-      return found.sorted { $0.generatedAtUTC < $1.generatedAtUTC }
-    }
+    try ensureSQLiteTask(taskID)
+    return try repository.humanActions(taskID)
   }
 
   public static func isWellFormed(failureDigest digest: String) -> Bool {
@@ -541,76 +344,73 @@ public actor HarnessTaskStore {
     }
   }
 
-  private func memoryDirectory(_ scope: String) -> URL {
-    rootURL.appendingPathComponent("memory/\(scope)", isDirectory: true)
+  /// Full-text lookup is scoped before ranking. It cannot make project
+  /// memory applicable by itself; callers still run the typed exact-scope
+  /// selector over these candidates.
+  public func searchMemory(
+    scope: HarnessMemoryScope,
+    key: String,
+    query: String,
+    limit: Int = 50
+  ) throws -> [HarnessMemoryEntry] {
+    try repository.searchMemory(scope: scope, key: key, query: query, limit: limit)
   }
 
-  private func memoryDirectoryCreating(_ scope: String) throws -> URL {
-    let url = memoryDirectory(scope)
-    do {
-      try FileManager.default.createDirectory(
-        at: url, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
-    } catch {
-      throw HarnessTaskStoreError.ioFailure("cannot create memory directory: \(error)")
-    }
-    return url
+  /// A database lease complements the actor-local reentrancy gate. It keeps
+  /// two daemon processes from reconciling the same task concurrently and
+  /// expires after a crash.
+  public func acquireReconcileLease(
+    taskID: String,
+    holderID: String,
+    now: Date = Date(),
+    ttl: TimeInterval = 300
+  ) throws -> Bool {
+    try ensureSQLiteTask(taskID)
+    return try repository.acquireReconcileLease(
+      taskID: taskID, holderID: holderID, now: now, ttl: ttl)
   }
 
-  private func failureURL(_ digest: String) -> URL {
-    memoryDirectory("failure").appendingPathComponent("\(digest).json")
+  public func releaseReconcileLease(taskID: String, holderID: String) throws {
+    try repository.releaseReconcileLease(taskID: taskID, holderID: holderID)
   }
 
-  private func appendJSONLine<T: Encodable>(_ value: T, to url: URL) throws {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-    guard let encoded = try? encoder.encode(value) else {
-      throw HarnessTaskStoreError.ioFailure("cannot encode \(url.lastPathComponent)")
-    }
-    let payload = encoded + Data("\n".utf8)
-    let fd = open(url.path, O_WRONLY | O_CREAT | O_APPEND | O_CLOEXEC | O_NOFOLLOW, 0o600)
-    guard fd >= 0 else {
-      throw HarnessTaskStoreError.ioFailure("cannot open \(url.lastPathComponent)")
-    }
-    defer { close(fd) }
-    let written = payload.withUnsafeBytes { buffer -> Int in
-      guard let base = buffer.baseAddress else { return 0 }
-      var total = 0
-      while total < buffer.count {
-        let result = write(fd, base + total, buffer.count - total)
-        if result <= 0 { return total }
-        total += result
-      }
-      return total
-    }
-    guard written == payload.count else {
-      throw HarnessTaskStoreError.ioFailure("short write to \(url.lastPathComponent)")
-    }
-    guard fsync(fd) == 0 else {
-      throw HarnessTaskStoreError.ioFailure("fsync of \(url.lastPathComponent) failed")
-    }
+  func sqliteConfiguration() throws -> HarnessSQLiteConfiguration {
+    try repository.configuration()
   }
 
-  private func readJSONLines<T: Decodable>(_ type: T.Type, from url: URL) throws -> [T] {
-    guard let data = FileManager.default.contents(atPath: url.path) else { return [] }
-    guard let text = String(data: data, encoding: .utf8) else {
-      throw HarnessTaskStoreError.corrupt("\(url.lastPathComponent) is not UTF-8")
+  func sqliteRowCount(_ table: String) throws -> Int {
+    try repository.rowCount(table: table)
+  }
+
+  func commitForTesting(
+    event: HarnessTaskEvent,
+    snapshot: HarnessTaskSnapshot,
+    expectedVersion: Int,
+    failAfterEvent: Bool
+  ) throws {
+    try ensureSQLiteTask(snapshot.htaskID)
+    try repository.commit(
+      event: event, snapshot: snapshot, expectedVersion: expectedVersion,
+      failAfterEvent: failAfterEvent)
+  }
+
+  private func ensureSQLiteTask(_ taskID: String) throws {
+    guard Self.isWellFormed(taskID: taskID) else {
+      throw HarnessTaskStoreError.malformedTaskID(taskID)
     }
-    let decoder = JSONDecoder()
-    let lines = text.split(separator: "\n", omittingEmptySubsequences: true)
-    var values: [T] = []
-    for (index, line) in lines.enumerated() {
-      guard let lineData = line.data(using: .utf8) else { continue }
-      do {
-        values.append(try decoder.decode(type, from: lineData))
-      } catch {
-        // Only a torn final line is tolerated, exactly as in the event log.
-        guard index == lines.count - 1 else {
-          throw HarnessTaskStoreError.corrupt(
-            "undecodable line \(index) in \(url.lastPathComponent)")
-        }
-      }
+    if try repository.containsTask(taskID) { return }
+
+    // This path exists for a legacy directory that appeared after store
+    // startup (including restore tools). Replaying through the old reducer
+    // first preserves the historical forward-migration behavior; the
+    // repository then imports the resulting typed state atomically.
+    let directoryURL = try existingDirectory(taskID)
+    _ = try withLock(directoryURL) {
+      try loadLocked(directoryURL, taskID: taskID)
     }
-    return values
+    guard try repository.importLegacyTaskIfPresent(taskID) else {
+      throw HarnessTaskStoreError.notFound(taskID)
+    }
   }
 
   // MARK: - Locked helpers
@@ -638,18 +438,6 @@ public actor HarnessTaskStore {
       try writeSnapshot(rebuilt, in: directoryURL)
     }
     return rebuilt
-  }
-
-  private func roundDirectory(_ directoryURL: URL, round: Int) throws -> URL {
-    guard round >= 0 else { throw HarnessTaskStoreError.corrupt("negative round \(round)") }
-    let url = directoryURL.appendingPathComponent("rounds/\(round)", isDirectory: true)
-    do {
-      try FileManager.default.createDirectory(
-        at: url, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
-    } catch {
-      throw HarnessTaskStoreError.ioFailure("cannot create round directory: \(error)")
-    }
-    return url
   }
 
   private func readEvents(in directoryURL: URL) throws -> [HarnessTaskEvent] {

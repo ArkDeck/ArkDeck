@@ -1,0 +1,15 @@
+{
+  "actionId" : "har-e459276d7515",
+  "block" : "environmentUnavailable",
+  "documentType" : "harness-human-action",
+  "evidenceRefs" : [
+
+  ],
+  "generatedAtUtc" : "2026-07-31T15:55:50Z",
+  "htaskId" : "HTASK-265D25D3E0F9",
+  "reasonCode" : "submissionRejected:rejected",
+  "requestId" : "htask-dc07430825cf6301c246b25f",
+  "resumePhase" : "initializing",
+  "resumeStatus" : "running",
+  "round" : 1
+}

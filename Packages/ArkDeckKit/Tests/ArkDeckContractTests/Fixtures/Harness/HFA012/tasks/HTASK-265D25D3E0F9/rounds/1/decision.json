@@ -1,0 +1,24 @@
+{
+  "basisDigest" : "30e3b1158557355e80be27efd8987eab0eb7eb95898b2ab654f9d851bc069a62",
+  "createdAtUtc" : "2026-07-31T15:55:49Z",
+  "decisionId" : "dec-71040eac6601",
+  "documentType" : "harness-decision",
+  "expectedObservation" : "A reachable DAYU200 with sufficient identity and baseline crash-ledger data to begin the signed crash-fixture workflow.",
+  "htaskId" : "HTASK-265D25D3E0F9",
+  "hypothesis" : "The real DAYU200 target is connected and ready for building, testing, deploying, and collecting crash-ledger evidence.",
+  "inputs" : {
+    "targetPseudonym" : "target-aeb60a604573"
+  },
+  "kind" : "invokeOperation",
+  "observedStateVersion" : 2,
+  "operationReference" : "observe.device@1",
+  "producer" : "codex-cli-gateway@1",
+  "reasonCode" : "modelProposal",
+  "requiredArtifacts" : [
+    "device connection state",
+    "device identity",
+    "installed bundle state",
+    "crash-ledger baseline"
+  ],
+  "round" : 1
+}

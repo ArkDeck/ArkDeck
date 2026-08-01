@@ -1,0 +1,111 @@
+{
+  "activeRound" : 0,
+  "artifactRefs" : [
+
+  ],
+  "budgets" : {
+    "maxActionRetriesPerRun" : 2,
+    "maxArtifactBytes" : 67108864,
+    "maxE1Mutations" : 3,
+    "maxModelCalls" : 24,
+    "maxNoProgressRounds" : 6,
+    "maxRounds" : 30,
+    "maxWallClockSeconds" : 3600
+  },
+  "cancelRequested" : false,
+  "consumedBudget" : {
+    "artifactBytes" : 0,
+    "e1Mutations" : 0,
+    "modelCalls" : 0,
+    "rounds" : 0,
+    "wallClockSeconds" : 0
+  },
+  "createdAtUtc" : "2026-07-31T15:55:39Z",
+  "documentType" : "harness-task",
+  "goal" : {
+    "desiredState" : {
+      "abilityName" : "EntryAbility",
+      "baselineHapArtifactLease" : "lease-v1:input-hap-TGT-958780b2ffb7-r1-8abc989e25ced9ca:ART-4424fa7d60c1e102cf542020309b253b",
+      "buildPresetRef" : "waterflow-debug",
+      "bundleName" : "com.example.waterflowdemo",
+      "crashSignature" : "jscrash:com.example.waterflowdemo",
+      "testPresetRef" : "waterflow-tests"
+    },
+    "summary" : "On real DAYU200, deploy the signed crash fixture and prove a new jscrash:com.example.waterflowdemo entry. Then propose only the one-line true-to-false repair in entry/src/main/ets/crashprobe/CrashProbe.ets. The exact proposal must use baseWorkspaceRevision 8b98e5d5f316bc9b2c05e9e2462b48b912ba0b9a28d3c9896bdbf35ffe8ced0c, patchSha256 6b45f926b558c6075aa78fe533ca422574d982cd71d3c4cf3974186e36571c98, touchedFiles containing only entry/src/main/ets/crashprobe/CrashProbe.ets, expectedChangedSymbols containing ENABLED, and this unifiedDiff decoded with LF and a final LF: diff --git a/entry/src/main/ets/crashprobe/CrashProbe.ets b/entry/src/main/ets/crashprobe/CrashProbe.ets\\n--- a/entry/src/main/ets/crashprobe/CrashProbe.ets\\n+++ b/entry/src/main/ets/crashprobe/CrashProbe.ets\\n@@ -22 +22 @@\\n-export const ENABLED: boolean = true;\\n+export const ENABLED: boolean = false;\\n. Build waterflow-debug, run waterflow-tests, deploy the exact build output, and verify five clean crash-ledger samples. No other file may change."
+  },
+  "htaskId" : "HTASK-265D25D3E0F9",
+  "intakeDescription" : "HFA-005 real-device retry after product fix: debug.hap package readback now binds the installed bundle to the exact engine-resolved HAP digest. Operator approved redacted model egress and reversible DAYU200 E1 deployment verification; no E2.",
+  "noProgressRounds" : 0,
+  "observedState" : {
+
+  },
+  "phase" : "initializing",
+  "policy" : {
+    "allowedOperations" : [
+      "analyzer.extract-crash-signature@1",
+      "capture.diagnostics@1",
+      "debug.hap@1",
+      "observe.device@1",
+      "workspace.apply-patch@1",
+      "workspace.build-openharmony@1",
+      "workspace.revert-patch@1",
+      "workspace.run-tests@1"
+    ]
+  },
+  "projectRef" : "demo-app",
+  "result" : {
+    "artifactRefs" : [
+
+    ],
+    "outcome" : "humanRequired",
+    "reasonCode" : "submissionRejected:rejected",
+    "summary" : "environmentUnavailable: submissionRejected:rejected (no closed HumanActionRequired category describes this block; resume in initializing)"
+  },
+  "schemaVersion" : "1.0.0",
+  "status" : "humanRequired",
+  "successCriteria" : [
+    {
+      "comparator" : "equalTo",
+      "criterionId" : "DC-1-crash-signature-absent",
+      "evidenceRequirements" : [
+        "crash-index.txt"
+      ],
+      "expected" : 0,
+      "inconclusivePolicy" : "collectMoreEvidence",
+      "mandatory" : true,
+      "metric" : "matchingCrashCount",
+      "minimumSamples" : 5
+    },
+    {
+      "comparator" : "equalTo",
+      "criterionId" : "DC-2-application-liveness",
+      "evidenceRequirements" : [
+        "hilog.txt"
+      ],
+      "expected" : "healthy",
+      "inconclusivePolicy" : "collectMoreEvidence",
+      "mandatory" : true,
+      "metric" : "applicationLiveness",
+      "minimumSamples" : 1
+    },
+    {
+      "comparator" : "equalTo",
+      "criterionId" : "DC-3-no-new-fatal-signature",
+      "evidenceRequirements" : [
+        "crash-index.txt"
+      ],
+      "expected" : 0,
+      "inconclusivePolicy" : "collectMoreEvidence",
+      "mandatory" : true,
+      "metric" : "newFatalSignatureCount",
+      "minimumSamples" : 1
+    }
+  ],
+  "target" : {
+    "expectedBindingRevision" : 1,
+    "targetId" : "TGT-958780b2ffb7"
+  },
+  "type" : "debugCrash",
+  "updatedAtUtc" : "2026-07-31T15:55:50Z",
+  "version" : 3
+}
