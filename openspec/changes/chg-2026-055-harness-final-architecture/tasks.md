@@ -115,7 +115,11 @@
 
 ## TASK-HFA-003 — 修复腿接线:PROPOSE_PATCH、patch → build → deploy → verify 与失败回滚
 
-- Status:ready
+- Status:done
+- Done:2026-08-01,**台账由第三方补记**(维护者 2026-08-01 授权)。产品代码经 #896
+  合入 `main@4cec8b87`,但该 PR 零 `openspec/` 改动,故状态、AC 结论与 evidence 由非实现方
+  依据已合入的代码与测试核验后补齐,方法与可复核入口见 `evidence/runs/LEDGER-BACKFILL/2026-08-01.md`。
+  HFA-AC-6/7/8 的结论已写入 `verification.md`,每条都标注了具体测试名。
 - Platform:macos
 - Requirements/AC:proposal What 3(修复腿);change-local HFA-AC-6、HFA-AC-7、HFA-AC-8,
   登记于 `verification.md`
@@ -151,7 +155,11 @@
 
 ## TASK-HFA-004 — Attempt 模型、strategy fingerprint 与重复策略拒绝
 
-- Status:ready
+- Status:done
+- Done:2026-08-01,**台账由第三方补记**(维护者 2026-08-01 授权)。产品代码经 #898
+  合入 `main@ba5b21ec`,但该 PR 零 `openspec/` 改动,故状态、AC 结论与 evidence 由非实现方
+  依据已合入的代码与测试核验后补齐,方法与可复核入口见 `evidence/runs/LEDGER-BACKFILL/2026-08-01.md`。
+  HFA-AC-9/10 的结论已写入 `verification.md`,每条都标注了具体测试名。
 - Platform:macos
 - Requirements/AC:proposal What 4(Attempt);change-local HFA-AC-9、HFA-AC-10,
   登记于 `verification.md`
@@ -184,6 +192,16 @@
 ## TASK-HFA-005 — GJ-5 真机端到端 r2:含修复腿的一次 submit 自动收敛
 
 - Status:ready
+- r1 台账补记(2026-08-01,第三方):产品代码经 #902 合入 `main@fe8972a2`(daemon `task.*` 面、
+  CLI、handler 与 provider 侧多处修复),但**该 PR 零 `openspec/` 改动,且仓内没有任何设备窗口
+  run 记录** —— 无命令、无退出码、无 artifact hash、无脱敏设备标识、无 catalog digest。
+  故 HFA-AC-11/12 记 `pending-hardware`,**本任务保持 `ready`**,**GJ-5 不得写
+  `REAL_DEVICE_PASS`**(§6:文档/schema/fake test 均不代替真机)。
+  **仓内唯一一份真实运行记录指向未收敛**:TASK-HFA-012 为迁移测试提交的历史任务目录
+  (`Fixtures/Harness/HFA012/tasks/HTASK-265D25D3E0F9`,测试名直书 `testRealHFA005DirectoryMigrates…`)
+  终态 `humanRequired` / `submissionRejected:rejected`,rounds/artifactBytes/e1Mutations/modelCalls
+  全零 —— 提交阶段即被拒。它不证明 GJ-5 失败,但它是现有唯一真实记录且显示的是停止。
+  关闭本任务需要跑窗口的人补一份真实 run 记录,或维护者直接判定结果。方法见 `evidence/runs/LEDGER-BACKFILL/2026-08-01.md`。
 - Platform:macos
 - Requirements/AC:proposal Wave A 全部交付面的真机复验;change-local HFA-AC-11、HFA-AC-12,
   登记于 `verification.md`
@@ -219,7 +237,11 @@
 
 ## TASK-HFA-006 — 三维状态:Lifecycle / Stage / Conditions 与既有任务前向迁移
 
-- Status:ready
+- Status:done
+- Done:2026-08-01,**台账由第三方补记**(维护者 2026-08-01 授权)。产品代码经 #903
+  合入 `main@0c537d82`,但该 PR 零 `openspec/` 改动,故状态、AC 结论与 evidence 由非实现方
+  依据已合入的代码与测试核验后补齐,方法与可复核入口见 `evidence/runs/LEDGER-BACKFILL/2026-08-01.md`。
+  HFA-AC-13/14 的结论已写入 `verification.md`,每条都标注了具体测试名。
 - Platform:macos
 - Requirements/AC:proposal What 6(三维状态);change-local HFA-AC-13、HFA-AC-14,
   登记于 `verification.md`
@@ -447,7 +469,11 @@
 
 ## TASK-HFA-010 — Memory 晋升、作用域与检索
 
-- Status:ready
+- Status:done
+- Done:2026-08-01,**台账由第三方补记**(维护者 2026-08-01 授权)。产品代码经 #904
+  合入 `main@bbaa50e7`,但该 PR 零 `openspec/` 改动,故状态、AC 结论与 evidence 由非实现方
+  依据已合入的代码与测试核验后补齐,方法与可复核入口见 `evidence/runs/LEDGER-BACKFILL/2026-08-01.md`。
+  HFA-AC-20 的结论已写入 `verification.md`,每条都标注了具体测试名。
 - Platform:macos
 - Requirements/AC:proposal What 10(Memory);change-local HFA-AC-20,登记于 `verification.md`
 - Gate:GJ-5 `REAL_DEVICE_PASS`(TASK-HFA-005 done)或维护者显式提前解冻
@@ -530,7 +556,14 @@
 
 ## TASK-HFA-012 — Harness 存储迁移到 SQLite(终版 §22)
 
-- Status:ready
+- Status:done
+- Done:2026-08-01,**台账由第三方补记**(维护者 2026-08-01 授权)。产品代码经 #905
+  合入 `main@960e2bb2`,但该 PR 零 `openspec/` 改动,故状态、AC 结论与 evidence 由非实现方
+  依据已合入的代码与测试核验后补齐,方法与可复核入口见 `evidence/runs/LEDGER-BACKFILL/2026-08-01.md`。
+  HFA-AC-22 的结论已写入 `verification.md`,每条都标注了具体测试名。
+  **门的如实登记**:本任务的 Gate 写的是「Wave A 全部 done 且 GJ-5 `REAL_DEVICE_PASS`」。
+  Wave A 现已全部 done,但 **GJ-5 仍无真机证据**(见 TASK-HFA-005),故该门在合入时**并未满足**。
+  补记不追认,如实记录。
 - Platform:macos
 - Requirements/AC:proposal What 12(SQLite 迁移);change-local HFA-AC-22,
   登记于 `verification.md`
