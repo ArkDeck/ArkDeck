@@ -203,10 +203,17 @@ private final class StagingArtifactPort: HarnessArtifactPort, @unchecked Sendabl
   private var reads: [String] = []
   var inventoryFailure: String?
   private var leasesEnabled = false
+  private var leaseFailure: HarnessArtifactPortError?
 
   var readArtifactIDs: [String] { lock.withLock { reads } }
 
   func enableLeases() { lock.withLock { leasesEnabled = true } }
+
+  func failLeases(_ reason: String) {
+    lock.withLock {
+      leaseFailure = .unavailable(reason)
+    }
+  }
 
   func stage(
     jobID: String,
@@ -253,6 +260,7 @@ private final class StagingArtifactPort: HarnessArtifactPort, @unchecked Sendabl
 
   func leaseReference(jobID: String, artifactID: String) async throws -> String {
     try lock.withLock {
+      if let leaseFailure { throw leaseFailure }
       guard leasesEnabled else {
         throw HarnessArtifactPortError.unavailable(
           "artifact leases are unavailable in this composition")
@@ -1004,6 +1012,47 @@ final class HarnessEvaluationContractTests: XCTestCase {
     XCTAssertNil(
       evaluated.snapshot.observedState[DebugCrashTaskHandler.pendingAnalysisSourceLeaseKey],
       "a consumed source lease must not schedule the analyzer twice")
+  }
+
+  func testSensitiveAnalyzerSourceStopNamesTheExactMissingOptIn() async throws {
+    let artifacts = StagingArtifactPort()
+    let jobs = ScriptedJobPort()
+    let (coordinator, _, submission) = try makeStack(
+      artifacts: artifacts, jobs: jobs, minimumSamples: 1,
+      includeCrashFixture: true)
+    let task = try await coordinator.submit(submission)
+
+    _ = try await coordinator.reconcile(task.htaskID)  // observe.device
+    jobs.finish("JOB-1")
+    _ = try await coordinator.reconcile(task.htaskID)  // capture.diagnostics
+
+    artifacts.stage(
+      jobID: "JOB-2", name: HarnessObservationBuilder.crashIndexArtifact,
+      text: LedgerFixture.emptyIndex, sensitive: true)
+    artifacts.failLeases(
+      "sensitive analyzer source is not opted in: "
+        + HarnessObservationBuilder.crashIndexArtifact)
+    jobs.finish("JOB-2")
+
+    let blocked = try await coordinator.reconcile(task.htaskID)
+    let expected = "artifactSensitiveNotOptedIn:crash-index.txt"
+    XCTAssertEqual(blocked.action, .stoppedForHuman)
+    XCTAssertEqual(blocked.reasonCode, expected)
+    XCTAssertEqual(blocked.snapshot.status, .humanRequired)
+    XCTAssertEqual(blocked.snapshot.result?.reasonCode, expected)
+    XCTAssertTrue(blocked.snapshot.result?.summary.contains(expected) == true)
+    XCTAssertEqual(
+      jobs.submittedOperations,
+      [DebugCrashTaskHandler.observeDevice, DebugCrashTaskHandler.captureDiagnostics],
+      "missing privacy opt-in must dispatch neither analyzer nor mutation")
+
+    let actions = try await coordinator.humanActions(task.htaskID)
+    let action = try XCTUnwrap(actions.last)
+    XCTAssertEqual(action.block, .evidenceIntegrity)
+    XCTAssertEqual(action.reasonCode, expected)
+    XCTAssertNil(
+      action.document,
+      "the existing closed HumanActionRequired vocabulary has no privacy-opt-in category")
   }
 
   func testDerivedAnalyzerResultMustMatchItsRecordedOutputDigest() async throws {
