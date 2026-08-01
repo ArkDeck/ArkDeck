@@ -386,7 +386,29 @@
 
 ## TASK-HFA-009 — Workspace 执行主体:capability subject 扩展与 exact base revision 绑定
 
-- Status:ready
+- Status:blocked(r2 等两件不在实现方手上的事:①维护者对「workspace 变更是否/何时开始
+  要求 capability」的决定 —— 那是把四个已发布 operation 的 effect 从 `hostOnly` 提到 E1 的
+  破坏性修改,会让 GJ-5 修复腿停到 workspace capability 签发为止(HTP-INV-6 禁止 harness
+  自签);②TASK-HFA-005 的真机证据落定 —— 仓内当前没有任何 run 记录支撑 GJ-5 的
+  `REAL_DEVICE_PASS`。r1 已交付且可独立评审,见下)
+- r1(2026-08-01):**交付 exact base revision 绑定**,evidence =
+  `evidence/runs/TASK-HFA-009/run-r1.md`(库层 1058 tests/1 skip/0 fail,新增 9 例)。
+  HFA-AC-18 的 revision 半边 PASS;capability subject 半边与 HFA-AC-19 **保持 pending**。
+  **为什么拆**:实测发现引擎的 `preauthorize` 在 `effect <= .readOnly` 时直接返回默认只读
+  授权并**忽略请求携带的 capability**,而全部 `workspace.*` operation 都声明 `hostOnly` ——
+  也就是说 capability 的 workspace 主体**在 effect 重分类之前没有任何路径可达**,落地即死代码
+  (TASK-HFA-002 已立规矩:不写够不着的空校验)。主体扩展与「workspace 变更必须授权」的
+  翻闸是同一件事,必须同车。
+  **翻闸是对已发布 operation 的破坏性修改**(四个 workspace 变更 operation 的 effect 从
+  `hostOnly` 提到 E1),会让 GJ-5 的修复腿在维护者签发 workspace capability 前停止 ——
+  按 HTP-INV-6,harness 不得自签。**该决定权在维护者**,r1 不代为行使。
+  **r2 的前置**:①维护者对翻闸时机的决定;②TASK-HFA-005 的真机证据补齐、GJ-5 状态如实落定
+  (当前仓内无任何真机 run 记录可支撑 `REAL_DEVICE_PASS`)。
+  **顺带记一个仓内缺陷(本任务不修,超出 allowed paths)**:`scripts/check_sdd.py` 的状态
+  词表是 `ready|in_progress|done|blocked`(下划线),而 `scripts/host_loop/
+  test_discovery_contract.py` 断言的是 `ready|done|blocked|in-progress`(连字符),且
+  host_loop 的解析器把 `in_progress` 截成 `in`。**两种拼法都不可能同时过两道门**,
+  实际可用状态只有 `ready`/`done`/`blocked`。本任务因此用 `blocked` 而不是 in-progress。
 - Platform:macos
 - Requirements/AC:proposal What 9(workspace 主体与 capability);change-local HFA-AC-18、
   HFA-AC-19,登记于 `verification.md`

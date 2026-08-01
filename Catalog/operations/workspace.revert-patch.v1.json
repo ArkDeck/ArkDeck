@@ -4,19 +4,43 @@
   "version": 1,
   "title": "Revert an exact durable workspace patch attempt",
   "provider": "workspace",
-  "effect": { "minimum": "hostOnly", "permitted": ["hostOnly"] },
-  "authorization": { "hostOnly": "defaultReadOnly" },
+  "effect": {
+    "minimum": "hostOnly",
+    "permitted": [
+      "hostOnly"
+    ]
+  },
+  "authorization": {
+    "hostOnly": "defaultReadOnly"
+  },
   "binding": "none",
   "concurrencyKey": "host-exclusive",
   "inputs": {
     "fields": {
-      "projectRef": { "type": "string", "required": true, "maxLength": 128 },
-      "patchAttemptRef": { "type": "string", "required": true, "maxLength": 64 }
+      "projectRef": {
+        "type": "string",
+        "required": true,
+        "maxLength": 128
+      },
+      "patchAttemptRef": {
+        "type": "string",
+        "required": true,
+        "maxLength": 64
+      },
+      "expectedWorkspaceRevision": {
+        "type": "string",
+        "required": false,
+        "maxLength": 128,
+        "description": "Workspace revision the caller decided against; the provider refuses if the tree moved."
+      }
     }
   },
   "outputs": {
     "fields": {
-      "revertReport": { "type": "artifactReference", "required": true }
+      "revertReport": {
+        "type": "artifactReference",
+        "required": true
+      }
     }
   },
   "steps": [
@@ -31,7 +55,10 @@
   ],
   "timeoutSeconds": 180,
   "outputByteBudget": 16777216,
-  "retry": { "preflightAttempts": 1, "mutationAttempts": 1 },
+  "retry": {
+    "preflightAttempts": 1,
+    "mutationAttempts": 1
+  },
   "unknownOutcome": "reconcileRequired",
   "artifacts": [
     {
@@ -42,5 +69,7 @@
       "required": true
     }
   ],
-  "profiles": ["workspace-host@1"]
+  "profiles": [
+    "workspace-host@1"
+  ]
 }

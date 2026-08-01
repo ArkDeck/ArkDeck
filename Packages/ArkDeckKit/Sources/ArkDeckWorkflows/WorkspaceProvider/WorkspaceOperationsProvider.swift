@@ -676,6 +676,19 @@ public struct WorkspaceOperationsProvider: DeviceProvider {
       throw DeviceProviderError.unsupportedAction(
         "workspace.projectProfileUnavailable:\(projectRef)")
     }
+    // Exact base revision (CHG-2026-055, TASK-HFA-009). A caller that states
+    // which tree it decided against gets that statement enforced: if the tree
+    // moved between the decision and this materialization, the change is
+    // refused rather than applied to a workspace nobody looked at.
+    if case .string(let declared)? = inputs["expectedWorkspaceRevision"] {
+      let actual = try WorkspaceProviderSupport.workspaceRevision(
+        root: profile.projectRoot, profileVersion: profile.profileID,
+        globs: profile.allowedFileGlobs)
+      guard actual == declared else {
+        throw DeviceProviderError.unsupportedAction(
+          "workspace.revisionConflict:\(declared.prefix(12))!=\(actual.prefix(12))")
+      }
+    }
     switch (operation.reference, step.kind) {
     case ("workspace.apply-patch@1", .applyWorkspacePatch):
       guard let artifact = context.resolvedInputArtifact else {
@@ -1131,6 +1144,73 @@ public struct WorkspaceOperationsProvider: DeviceProvider {
 }
 
 enum WorkspaceProviderSupport {
+  /// The workspace's identity: which tree this is, independent of what it
+  /// currently contains (CHG-2026-055, TASK-HFA-009).
+  static func workspaceIdentity(root: String, profileID: String) -> String {
+    sha256(Data("arkdeck-workspace|\(profileID)|\(root)".utf8))
+  }
+
+  /// The workspace's revision: what this tree currently *is*.
+  ///
+  /// The architecture's §18.2 formula is HEAD OID + index tree OID + changed
+  /// path digests + submodule OIDs + profile version. Two deliberate
+  /// substitutions, both named rather than hidden:
+  ///
+  ///   * the index contributes the digest of the index *file*, not the tree
+  ///     OID it encodes. Reading the tree OID means parsing git's binary
+  ///     index; the file digest moves whenever the index does, which is the
+  ///     property being used;
+  ///   * submodule OIDs are not included. This provider has no submodule
+  ///     surface yet, and a component nothing can change is not evidence.
+  ///
+  /// Everything here is a file read. Computing a revision must not depend on
+  /// spawning git, because admission needs the answer before any process
+  /// runs.
+  static func workspaceRevision(
+    root: String, profileVersion: String, globs: [String]
+  ) throws -> String {
+    let rootURL = URL(fileURLWithPath: root, isDirectory: true)
+    let gitURL = rootURL.appendingPathComponent(".git", isDirectory: true)
+    var material = "profileVersion\t\(profileVersion)\n"
+    material += "head\t\(headOID(gitDirectory: gitURL) ?? "absent")\n"
+    let indexURL = gitURL.appendingPathComponent("index")
+    let indexDigest = (try? Data(contentsOf: indexURL)).map(sha256) ?? "absent"
+    material += "index\t\(indexDigest)\n"
+    let paths = try files(root: root, profileGlobs: globs, requestGlobs: globs)
+    for path in paths.sorted() {
+      let relative = String(path.dropFirst(root.count).drop(while: { $0 == "/" }))
+      let digest = (try? Data(contentsOf: URL(fileURLWithPath: path))).map(sha256) ?? "absent"
+      material += "file\t\(relative)\t\(digest)\n"
+    }
+    return sha256(Data(material.utf8))
+  }
+
+  /// HEAD as an object id, read from files. A detached HEAD holds the id
+  /// directly; a symbolic HEAD points at a ref file, and a packed ref is
+  /// resolved from `packed-refs`.
+  private static func headOID(gitDirectory: URL) -> String? {
+    guard let head = try? String(
+      contentsOf: gitDirectory.appendingPathComponent("HEAD"), encoding: .utf8)
+    else { return nil }
+    let trimmed = head.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard trimmed.hasPrefix("ref: ") else {
+      return trimmed.isEmpty ? nil : trimmed
+    }
+    let ref = String(trimmed.dropFirst("ref: ".count))
+    if let loose = try? String(
+      contentsOf: gitDirectory.appendingPathComponent(ref), encoding: .utf8) {
+      let value = loose.trimmingCharacters(in: .whitespacesAndNewlines)
+      if !value.isEmpty { return value }
+    }
+    guard let packed = try? String(
+      contentsOf: gitDirectory.appendingPathComponent("packed-refs"), encoding: .utf8)
+    else { return nil }
+    for line in packed.split(separator: "\n") where line.hasSuffix(" " + ref) {
+      return String(line.prefix(while: { $0 != " " }))
+    }
+    return nil
+  }
+
   static func sha256(_ data: Data) -> String {
     SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
   }

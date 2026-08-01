@@ -4,7 +4,7 @@
 // Drift is a check-sdd error (bidirectional byte comparison).
 
 extension RuntimeOperationCatalog {
-  public static let catalogDigest = "ccff6242cb039aa4a013dcdd9973289e73781ede530e26d2f0cd4a4d1609aa93"
+  public static let catalogDigest = "44b6728d798dae80f2beaeef7b69b902140217847aa15814d213b04890af5ec6"
 
   public static let operations: [CatalogOperationDescriptor] = [
     CatalogOperationDescriptor(
@@ -400,6 +400,7 @@ extension RuntimeOperationCatalog {
       concurrencyKey: .hostExclusive,
       inputs: [
         CatalogFieldDescriptor(name: "allowedFileGlobs", type: .stringArray, isRequired: true, maxLength: 512, maxItems: 64),
+        CatalogFieldDescriptor(name: "expectedWorkspaceRevision", type: .string, isRequired: false, maxLength: 128),
         CatalogFieldDescriptor(name: "patchArtifactRef", type: .artifactLease, isRequired: true),
         CatalogFieldDescriptor(name: "projectRef", type: .string, isRequired: true, maxLength: 128)
       ],
@@ -431,6 +432,7 @@ extension RuntimeOperationCatalog {
       concurrencyKey: .hostExclusive,
       inputs: [
         CatalogFieldDescriptor(name: "buildPresetRef", type: .string, isRequired: true, maxLength: 128),
+        CatalogFieldDescriptor(name: "expectedWorkspaceRevision", type: .string, isRequired: false, maxLength: 128),
         CatalogFieldDescriptor(name: "projectRef", type: .string, isRequired: true, maxLength: 128)
       ],
       outputs: [
@@ -459,6 +461,7 @@ extension RuntimeOperationCatalog {
       binding: .none,
       concurrencyKey: .hostExclusive,
       inputs: [
+        CatalogFieldDescriptor(name: "expectedWorkspaceRevision", type: .string, isRequired: false, maxLength: 128),
         CatalogFieldDescriptor(name: "projectRef", type: .string, isRequired: true)
       ],
       outputs: [
@@ -606,6 +609,7 @@ extension RuntimeOperationCatalog {
       binding: .none,
       concurrencyKey: .hostExclusive,
       inputs: [
+        CatalogFieldDescriptor(name: "expectedWorkspaceRevision", type: .string, isRequired: false, maxLength: 128),
         CatalogFieldDescriptor(name: "patchAttemptRef", type: .string, isRequired: true, maxLength: 64),
         CatalogFieldDescriptor(name: "projectRef", type: .string, isRequired: true, maxLength: 128)
       ],
