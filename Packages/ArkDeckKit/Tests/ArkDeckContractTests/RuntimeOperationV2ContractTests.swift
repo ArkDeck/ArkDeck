@@ -1,6 +1,7 @@
 import XCTest
 
 @testable import ArkDeckCore
+@testable import ArkDeckRuntime
 @testable import ArkDeckWorkflows
 
 final class RuntimeOperationV2ContractTests: XCTestCase {

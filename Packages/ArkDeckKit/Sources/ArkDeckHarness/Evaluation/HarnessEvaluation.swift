@@ -16,6 +16,7 @@
 // (HarnessArtifactPort); deriving measurements is the observation
 // builder's; this file only says what the numbers mean.
 
+import ArkDeckCore
 import Foundation
 
 public enum HarnessEvaluationVerdict: String, CaseIterable, Codable, Sendable {

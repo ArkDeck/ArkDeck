@@ -1,3 +1,4 @@
+import ArkDeckRuntime
 import Foundation
 
 public enum HumanActionCategory: String, CaseIterable, Codable, Sendable {

@@ -1,4 +1,5 @@
 import ArkDeckCore
+@testable import ArkDeckHarness
 import ArkDeckStorage
 import Foundation
 import XCTest

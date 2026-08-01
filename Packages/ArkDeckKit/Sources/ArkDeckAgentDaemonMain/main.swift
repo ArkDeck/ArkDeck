@@ -5,6 +5,7 @@
 // tests and never widens permissions.
 
 import ArkDeckAgentDaemon
+import ArkDeckHarness
 import ArkDeckStorage
 import ArkDeckWorkflows
 import Darwin

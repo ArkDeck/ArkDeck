@@ -18,6 +18,7 @@
 // Nothing here talks to a model. Transport is a port in the workflow module;
 // this file is the contract both sides are held to.
 
+import ArkDeckCore
 import CryptoKit
 import Foundation
 

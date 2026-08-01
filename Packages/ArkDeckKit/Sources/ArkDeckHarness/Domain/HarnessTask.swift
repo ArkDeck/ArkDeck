@@ -21,6 +21,7 @@
 // exists yet (that is TASK-HTP-002). A model, a decision, or a caller
 // cannot reach this state by asserting it (HTP-INV-1, HTP-INV-2).
 
+import ArkDeckCore
 import Foundation
 
 public enum HarnessTaskType: String, CaseIterable, Codable, Sendable {

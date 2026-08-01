@@ -10,6 +10,7 @@ let package = Package(
     .library(name: "ArkDeckProcess", targets: ["ArkDeckProcess"]),
     .library(name: "ArkDeckRuntime", targets: ["ArkDeckRuntime"]),
     .library(name: "ArkDeckOpenHarmony", targets: ["ArkDeckOpenHarmony"]),
+    .library(name: "ArkDeckHarness", targets: ["ArkDeckHarness"]),
     .library(name: "ArkDeckWorkflows", targets: ["ArkDeckWorkflows"]),
     .library(name: "ArkDeckStorage", targets: ["ArkDeckStorage"]),
     .executable(name: "arkdeck", targets: ["ArkDeckCLI"]),
@@ -28,26 +29,27 @@ let package = Package(
     .target(name: "ArkDeckRuntime", dependencies: ["ArkDeckCore"]),
     .target(name: "ArkDeckOpenHarmony", dependencies: ["ArkDeckCore", "ArkDeckProcess"]),
     .target(
+      name: "ArkDeckHarness",
+      dependencies: ["ArkDeckCore", "ArkDeckProcess", "ArkDeckRuntime"],
+      linkerSettings: [.linkedLibrary("sqlite3")]
+    ),
+    .target(
       name: "ArkDeckWorkflows",
       dependencies: [
         "ArkDeckCore", "ArkDeckProcess", "ArkDeckRuntime", "ArkDeckOpenHarmony",
-        "ArkDeckStorage",
+        "ArkDeckStorage", "ArkDeckHarness",
       ],
       resources: [
-        .copy("Resources/OpenHarmonyNativeCodeSign"),
+        .copy("Resources/OpenHarmonyNativeCodeSign")
       ]),
-    .target(
-      name: "ArkDeckStorage",
-      dependencies: ["ArkDeckCore"],
-      linkerSettings: [.linkedLibrary("sqlite3")]
-    ),
+    .target(name: "ArkDeckStorage", dependencies: ["ArkDeckCore"]),
     .executableTarget(
       name: "ArkDeckCLI",
-      dependencies: ["ArkDeckCore", "ArkDeckWorkflows", "ArkDeckAgentClient"]
+      dependencies: ["ArkDeckCore", "ArkDeckRuntime", "ArkDeckWorkflows", "ArkDeckAgentClient"]
     ),
     .target(
       name: "ArkDeckAgentDaemon",
-      dependencies: ["ArkDeckCore", "ArkDeckStorage", "ArkDeckWorkflows"]
+      dependencies: ["ArkDeckCore", "ArkDeckHarness", "ArkDeckStorage", "ArkDeckWorkflows"]
     ),
     .target(
       name: "ArkDeckAgentClient",
@@ -55,7 +57,7 @@ let package = Package(
     ),
     .executableTarget(
       name: "ArkDeckAgentDaemonMain",
-      dependencies: ["ArkDeckAgentDaemon", "ArkDeckStorage", "ArkDeckWorkflows"]
+      dependencies: ["ArkDeckAgentDaemon", "ArkDeckHarness", "ArkDeckStorage", "ArkDeckWorkflows"]
     ),
     .executableTarget(
       name: "ArkDeckJournalCrashFixture",
@@ -88,6 +90,7 @@ let package = Package(
         "ArkDeckProcess",
         "ArkDeckRuntime",
         "ArkDeckOpenHarmony",
+        "ArkDeckHarness",
         "ArkDeckWorkflows",
         "ArkDeckStorage",
         "ArkDeckAgentDaemon",

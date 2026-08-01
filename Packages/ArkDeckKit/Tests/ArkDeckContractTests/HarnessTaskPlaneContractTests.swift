@@ -13,6 +13,8 @@ import XCTest
 
 @testable import ArkDeckAgentDaemon
 @testable import ArkDeckCore
+@testable import ArkDeckHarness
+@testable import ArkDeckRuntime
 @testable import ArkDeckOpenHarmony
 @testable import ArkDeckStorage
 @testable import ArkDeckWorkflows

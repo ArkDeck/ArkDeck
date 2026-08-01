@@ -8,6 +8,7 @@
 // no published composite operation yet, instead of inventing one.
 
 import ArkDeckCore
+import ArkDeckRuntime
 import Foundation
 
 public struct RuntimeUpgradedRequest: Sendable {

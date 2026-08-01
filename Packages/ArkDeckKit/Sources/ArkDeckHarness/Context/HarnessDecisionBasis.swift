@@ -19,6 +19,7 @@
 // clock, elapsed seconds, timestamps - would make every decision stale a
 // second after it was made, which is not a guard, it is an outage.
 
+import ArkDeckCore
 import CryptoKit
 import Foundation
 

@@ -6,6 +6,7 @@
 // confirmed - may be written to project memory. An unverified guess never
 // becomes long-lived knowledge (CHG-2026-054 HTP-INV-1/HTP-INV-2).
 
+import ArkDeckCore
 import CryptoKit
 import Foundation
 

@@ -8,6 +8,7 @@
 // start returns the existing instance's info instead of competing.
 
 import ArkDeckCore
+import ArkDeckHarness
 import ArkDeckStorage
 import ArkDeckWorkflows
 import Darwin

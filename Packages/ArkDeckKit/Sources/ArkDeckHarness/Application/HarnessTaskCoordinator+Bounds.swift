@@ -12,7 +12,6 @@
 //   * task and project memory writes, with evidence attached to every entry.
 
 import ArkDeckCore
-import ArkDeckStorage
 import Foundation
 
 extension HarnessTaskCoordinator {
