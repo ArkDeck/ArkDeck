@@ -284,7 +284,8 @@ extension HarnessTaskCoordinator {
     // Mutations with unknown or failed outcomes are reconciled/read back;
     // they are never confirmed retries under a new key.
     return descriptor.minimumEffect <= .readOnly
-      && ![DebugCrashTaskHandler.applyPatch, DebugCrashTaskHandler.revertPatch,
-        DebugCrashTaskHandler.deployHAP].contains(operationReference)
+      && ![DebugCrashTaskHandler.createCheckpoint, DebugCrashTaskHandler.applyPatch,
+        DebugCrashTaskHandler.revertPatch, DebugCrashTaskHandler.deployHAP]
+        .contains(operationReference)
   }
 }

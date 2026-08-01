@@ -251,6 +251,10 @@ public struct HarnessRepairAttempt: Equatable, Sendable {
   public static let observedStateKey = "repairAttempt"
 
   public let proposal: HarnessPatchProposal
+  /// The succeeded checkpoint ActionRun that made the following patch
+  /// application eligible. `nil` remains readable for historical attempts
+  /// that predate the explicit checkpoint leg.
+  public let checkpointJobID: String?
   public let patchAttemptRef: String?
   public let patchRevision: String?
   public let buildSourceRevision: String?
@@ -263,6 +267,7 @@ public struct HarnessRepairAttempt: Equatable, Sendable {
 
   public init(
     proposal: HarnessPatchProposal,
+    checkpointJobID: String? = nil,
     patchAttemptRef: String? = nil,
     patchRevision: String? = nil,
     buildSourceRevision: String? = nil,
@@ -274,6 +279,7 @@ public struct HarnessRepairAttempt: Equatable, Sendable {
     reverted: Bool = false
   ) {
     self.proposal = proposal
+    self.checkpointJobID = checkpointJobID
     self.patchAttemptRef = patchAttemptRef
     self.patchRevision = patchRevision
     self.buildSourceRevision = buildSourceRevision
@@ -296,6 +302,7 @@ public struct HarnessRepairAttempt: Equatable, Sendable {
       "rollbackRequired": .bool(rollbackRequired),
       "reverted": .bool(reverted),
     ]
+    if let checkpointJobID { values["checkpointJobId"] = .string(checkpointJobID) }
     if let patchAttemptRef { values["patchAttemptRef"] = .string(patchAttemptRef) }
     if let patchRevision { values["patchRevision"] = .string(patchRevision) }
     if let buildSourceRevision { values["buildSourceRevision"] = .string(buildSourceRevision) }
@@ -321,6 +328,7 @@ public struct HarnessRepairAttempt: Equatable, Sendable {
     }
     self.init(
       proposal: proposal,
+      checkpointJobID: string("checkpointJobId"),
       patchAttemptRef: string("patchAttemptRef"),
       patchRevision: string("patchRevision"),
       buildSourceRevision: string("buildSourceRevision"),
@@ -333,6 +341,7 @@ public struct HarnessRepairAttempt: Equatable, Sendable {
   }
 
   public func updating(
+    checkpointJobID: String? = nil,
     patchAttemptRef: String? = nil,
     patchRevision: String? = nil,
     buildSourceRevision: String? = nil,
@@ -345,6 +354,7 @@ public struct HarnessRepairAttempt: Equatable, Sendable {
   ) -> HarnessRepairAttempt {
     HarnessRepairAttempt(
       proposal: proposal,
+      checkpointJobID: checkpointJobID ?? self.checkpointJobID,
       patchAttemptRef: patchAttemptRef ?? self.patchAttemptRef,
       patchRevision: patchRevision ?? self.patchRevision,
       buildSourceRevision: buildSourceRevision ?? self.buildSourceRevision,

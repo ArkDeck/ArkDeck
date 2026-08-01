@@ -65,6 +65,7 @@ extension HarnessTaskHandler {
 public struct DebugCrashTaskHandler: HarnessTaskHandler {
   public static let observeDevice = "observe.device@1"
   public static let captureDiagnostics = "capture.diagnostics@1"
+  public static let createCheckpoint = "workspace.create-checkpoint@1"
   public static let applyPatch = "workspace.apply-patch@1"
   public static let buildOpenHarmony = "workspace.build-openharmony@1"
   public static let runTests = "workspace.run-tests@1"
@@ -109,12 +110,13 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
 
   public var type: HarnessTaskType { .debugCrash }
 
-  /// The repair leg remains closed: source changes use the published
-  /// workspace operations and the only device mutation is the existing typed
-  /// HAP deployment, still guarded by the runtime capability store.
+  /// The repair leg remains closed: source changes use published workspace
+  /// operations and the physical-device install uses the existing typed HAP
+  /// deployment. Every E1 leg remains guarded by the runtime capability store.
   public var permittedOperations: Set<String> {
     [
       Self.observeDevice, Self.captureDiagnostics, Self.applyPatch,
+      Self.createCheckpoint,
       Self.buildOpenHarmony, Self.runTests, Self.revertPatch, Self.deployHAP,
       Self.analyzeCrashLedger,
     ]
@@ -144,7 +146,10 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
       }
       return [Self.captureDiagnostics]
     case .patching:
-      return []
+      guard let repair = snapshot.repairAttempt,
+        repair.checkpointJobID != nil, repair.patchAttemptRef == nil
+      else { return [] }
+      return repairRouteBudgetAvailable(snapshot) ? [Self.applyPatch] : []
     case .building:
       guard let repair = snapshot.repairAttempt else { return [] }
       guard repairRouteBudgetAvailable(snapshot) else { return [] }
@@ -573,8 +578,8 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
       <= snapshot.budgets.maxE1Mutations
   }
 
-  /// Current published route: optional fault-fixture deployment, then patch,
-  /// build, tests, repaired deployment and one mandatory rollback reserve.
+  /// Current published route: optional fault-fixture deployment, checkpoint,
+  /// patch, build, tests, repaired deployment and one mandatory rollback reserve.
   /// Each reference is counted from its Catalog effect floor; dispatch-time
   /// charging below uses the exact selected-step effect for the real inputs.
   static func requiredE1MutationBudget(
@@ -589,6 +594,7 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
       route.append(Self.deployHAP)
     }
     if allowed.contains(Self.applyPatch) {
+      if allowed.contains(Self.createCheckpoint) { route.append(Self.createCheckpoint) }
       route.append(Self.applyPatch)
       if allowed.contains(Self.buildOpenHarmony) { route.append(Self.buildOpenHarmony) }
       if allowed.contains(Self.runTests) { route.append(Self.runTests) }
@@ -633,6 +639,9 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
     let repair = snapshot.repairAttempt?.reverted == false ? snapshot.repairAttempt : nil
     var route: [String] = []
     if repair?.patchAttemptRef == nil, allowed.contains(Self.applyPatch) {
+      if repair?.checkpointJobID == nil, allowed.contains(Self.createCheckpoint) {
+        route.append(Self.createCheckpoint)
+      }
       route.append(Self.applyPatch)
     }
     if repair?.buildSourceRevision == nil, allowed.contains(Self.buildOpenHarmony) {

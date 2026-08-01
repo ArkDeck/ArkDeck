@@ -547,7 +547,12 @@ public actor HarnessTaskCoordinator {
     // dispatch boundary can check the claim (TASK-HFA-002).
     let basis = HarnessDecisionBasis(
       snapshot: snapshot, offeredOperations: offeredOperations(snapshot, handler: handler))
-    let proposal = await plannedProposal(snapshot, handler: handler, basis: basis)
+    let proposal: PlannedProposal
+    if let prepared = try await preparedPatchProposal(snapshot) {
+      proposal = prepared
+    } else {
+      proposal = await plannedProposal(snapshot, handler: handler, basis: basis)
+    }
     let currentAttemptID = try await activeAttempt(snapshot.htaskID)?.attemptID
     let proposedDecision = proposal.step.decision
     let step = HarnessPlannedStep(
@@ -643,7 +648,8 @@ public actor HarnessTaskCoordinator {
   ) -> String? {
     if let proposal = decision.patchProposal { return proposal.baseWorkspaceRevision }
     let workspaceOperations: Set<String> = [
-      DebugCrashTaskHandler.applyPatch, DebugCrashTaskHandler.buildOpenHarmony,
+      DebugCrashTaskHandler.createCheckpoint, DebugCrashTaskHandler.applyPatch,
+      DebugCrashTaskHandler.buildOpenHarmony,
       DebugCrashTaskHandler.runTests, DebugCrashTaskHandler.revertPatch,
       DebugCrashTaskHandler.deployHAP,
     ]
@@ -721,6 +727,55 @@ public actor HarnessTaskCoordinator {
       of: decision, against: basis, executionFacts: facts)
   }
 
+  /// Resume an already prepared patch route before asking any producer for a
+  /// new decision. The current round owns checkpoint; the following round
+  /// owns apply. Both records are durable before checkpoint can reach the
+  /// runtime, so daemon recovery never republishes patch bytes or skips the
+  /// checkpoint ActionRun.
+  private func preparedPatchProposal(
+    _ snapshot: HarnessTaskSnapshot
+  ) async throws -> PlannedProposal? {
+    let round = snapshot.activeRound + 1
+    guard let current = try await store.decision(snapshot.htaskID, round: round),
+      current.kind == .proposePatch, current.patchProposal != nil
+    else { return nil }
+    let preparedApply = try await store.decision(snapshot.htaskID, round: round + 1)
+    // In the narrow crash window after the future apply write but before the
+    // current proposal is replaced by checkpoint, `current` still carries
+    // the superseded journey Attempt. The future decision owns the repair
+    // Attempt and is validated against that live identity in `dispatchPatch`.
+    let hasPreparedApply =
+      preparedApply.map { candidate in
+        candidate.kind == .proposePatch
+          && candidate.operationReference == DebugCrashTaskHandler.applyPatch
+          && candidate.patchProposal == current.patchProposal
+          && (current.operationReference == nil
+            || candidate.attemptID == current.attemptID)
+          && !candidate.inputs.isEmpty
+      } ?? false
+
+    let resumesPreparedRoute: Bool
+    switch snapshot.phase {
+    case .analyzing:
+      resumesPreparedRoute = snapshot.observed.latestVerdict == .fail
+        && (hasPreparedApply
+          || (current.operationReference == DebugCrashTaskHandler.applyPatch
+            && !current.inputs.isEmpty))
+    case .patching:
+      resumesPreparedRoute = snapshot.repairAttempt?.checkpointJobID != nil
+        && snapshot.repairAttempt?.patchAttemptRef == nil
+        && current.operationReference == DebugCrashTaskHandler.applyPatch
+        && current.patchProposal == snapshot.repairAttempt?.proposal
+        && !current.inputs.isEmpty
+    default:
+      resumesPreparedRoute = false
+    }
+    guard resumesPreparedRoute else { return nil }
+    return PlannedProposal(
+      step: HarnessPlannedStep(decision: current, phaseOnDispatch: .patching),
+      producer: current.producer, rejection: nil)
+  }
+
   // MARK: - Dispatch and recovery
 
   func dispatchPatch(
@@ -738,6 +793,31 @@ public actor HarnessTaskCoordinator {
         proposalDecision, staleness: staleness, snapshot: snapshot,
         modelCallsSpent: modelCallsSpent)
     }
+    if proposalDecision.operationReference == DebugCrashTaskHandler.createCheckpoint {
+      guard
+        let preparedApply = try await store.decision(
+          snapshot.htaskID, round: proposalDecision.round + 1),
+        preparedApply.operationReference == DebugCrashTaskHandler.applyPatch,
+        preparedApply.patchProposal == proposalDecision.patchProposal,
+        preparedApply.attemptID == proposalDecision.attemptID,
+        !preparedApply.inputs.isEmpty
+      else {
+        throw HarnessCoordinatorError.malformedRequest("preparedApplyDecisionUnavailable")
+      }
+      return try await dispatch(
+        HarnessPlannedStep(decision: proposalDecision, phaseOnDispatch: .patching),
+        snapshotAtPlanning: snapshot, handler: handler,
+        modelCallsSpent: modelCallsSpent)
+    }
+    if proposalDecision.operationReference == DebugCrashTaskHandler.applyPatch,
+      snapshot.repairAttempt?.checkpointJobID != nil,
+      snapshot.repairAttempt?.proposal == proposalDecision.patchProposal
+    {
+      return try await dispatch(
+        HarnessPlannedStep(decision: proposalDecision, phaseOnDispatch: .patching),
+        snapshotAtPlanning: snapshot, handler: handler,
+        modelCallsSpent: modelCallsSpent)
+    }
     guard let proposal = proposalDecision.patchProposal,
       let projectRef = snapshot.projectRef,
       let repairPort
@@ -749,55 +829,116 @@ public actor HarnessTaskCoordinator {
       return HarnessReconcileOutcome(
         snapshot: blocked.snapshot, action: .stoppedForHuman, reasonCode: reason)
     }
+    let futureRound = proposalDecision.round + 1
+    let storedApply = try await store.decision(snapshot.htaskID, round: futureRound)
+    let reusableApply = storedApply.flatMap { candidate -> HarnessDecision? in
+      guard candidate.kind == .proposePatch,
+        candidate.operationReference == DebugCrashTaskHandler.applyPatch,
+        candidate.patchProposal == proposal, !candidate.inputs.isEmpty
+      else { return nil }
+      return candidate
+    }
     let attempt: HarnessAttempt
-    do {
-      attempt = try await beginStrategyAttempt(
-        decision: proposalDecision, proposal: proposal, snapshot: snapshot)
-    } catch let error as HarnessAttemptAdmissionError {
-      let blocked = try await recordBlock(
-        snapshot, block: .strategyExhausted, reasonCode: error.reasonCode,
-        round: proposalDecision.round, jobID: nil,
-        requestID: proposalDecision.decisionID)
-      return HarnessReconcileOutcome(
-        snapshot: blocked.snapshot, action: .stoppedForHuman,
-        reasonCode: error.reasonCode)
+    if let preparedAttemptID = reusableApply?.attemptID,
+      let active = try await activeAttempt(snapshot.htaskID),
+      active.attemptID == preparedAttemptID
+    {
+      attempt = active
+    } else if proposalDecision.operationReference == DebugCrashTaskHandler.applyPatch,
+      let decisionAttemptID = proposalDecision.attemptID,
+      let active = try await activeAttempt(snapshot.htaskID),
+      active.attemptID == decisionAttemptID
+    {
+      // Forward migration for a prepared apply Decision persisted before the
+      // checkpoint leg existed. Keep its lease and strategy identity, but
+      // interpose checkpoint before it can reach the runtime.
+      attempt = active
+    } else if reusableApply != nil {
+      throw HarnessCoordinatorError.malformedRequest("preparedApplyAttemptMismatch")
+    } else {
+      do {
+        attempt = try await beginStrategyAttempt(
+          decision: proposalDecision, proposal: proposal, snapshot: snapshot)
+      } catch let error as HarnessAttemptAdmissionError {
+        let blocked = try await recordBlock(
+          snapshot, block: .strategyExhausted, reasonCode: error.reasonCode,
+          round: proposalDecision.round, jobID: nil,
+          requestID: proposalDecision.decisionID)
+        return HarnessReconcileOutcome(
+          snapshot: blocked.snapshot, action: .stoppedForHuman,
+          reasonCode: error.reasonCode)
+      }
     }
-    let prepared: HarnessPreparedPatch
-    do {
-      prepared = try await repairPort.preparePatch(
-        proposal, projectRef: projectRef, task: snapshot,
-        decisionID: proposalDecision.decisionID)
-    } catch let error as HarnessRepairPortError {
-      let print = fingerprint(
-        snapshot, operationReference: DebugCrashTaskHandler.applyPatch,
-        inputsDigest: proposal.patchSHA256,
-        errorClassification: error.reasonCode == "WORKSPACE_REVISION_CONFLICT"
-          ? "WORKSPACE_REVISION_CONFLICT" : "patchProposalRejected",
-        semanticErrorCode: error.reasonCode)
-      let record = try await recordFailure(
-        snapshot, fingerprint: print, reasonCode: error.reasonCode,
-        jobID: nil, requestID: nil)
-      try await recordAttemptFailure(
-        taskID: snapshot.htaskID, fingerprint: record.fingerprint,
-        outcome: .failed)
-      let blocked = try await recordBlock(
-        snapshot, block: .environmentUnavailable, reasonCode: error.reasonCode,
-        round: proposalDecision.round, jobID: nil, requestID: nil)
-      return HarnessReconcileOutcome(
-        snapshot: blocked.snapshot, action: .stoppedForHuman,
-        reasonCode: error.reasonCode)
+    let preparedInputs: [String: JSONValue]
+    if let reusableApply {
+      preparedInputs = reusableApply.inputs
+    } else if proposalDecision.operationReference == DebugCrashTaskHandler.applyPatch,
+      !proposalDecision.inputs.isEmpty
+    {
+      preparedInputs = proposalDecision.inputs
+    } else {
+      do {
+        let prepared = try await repairPort.preparePatch(
+          proposal, projectRef: projectRef, task: snapshot,
+          decisionID: proposalDecision.decisionID)
+        preparedInputs = prepared.inputs
+      } catch let error as HarnessRepairPortError {
+        let print = fingerprint(
+          snapshot, operationReference: DebugCrashTaskHandler.applyPatch,
+          inputsDigest: proposal.patchSHA256,
+          errorClassification: error.reasonCode == "WORKSPACE_REVISION_CONFLICT"
+            ? "WORKSPACE_REVISION_CONFLICT" : "patchProposalRejected",
+          semanticErrorCode: error.reasonCode)
+        let record = try await recordFailure(
+          snapshot, fingerprint: print, reasonCode: error.reasonCode,
+          jobID: nil, requestID: nil)
+        try await recordAttemptFailure(
+          taskID: snapshot.htaskID, fingerprint: record.fingerprint,
+          outcome: .failed)
+        let blocked = try await recordBlock(
+          snapshot, block: .environmentUnavailable, reasonCode: error.reasonCode,
+          round: proposalDecision.round, jobID: nil, requestID: nil)
+        return HarnessReconcileOutcome(
+          snapshot: blocked.snapshot, action: .stoppedForHuman,
+          reasonCode: error.reasonCode)
+      }
     }
-    // Preserve the PROPOSE_PATCH kind in the durable record while replacing
-    // its non-executable payload with the exact typed apply inputs minted by
-    // the host-fact port. Recovery therefore replays one immutable lease and
-    // one idempotency key, never the inline diff.
-    let executable = HarnessDecision(
+
+    // Persist apply in the following product round before checkpoint can be
+    // dispatched. A crash after this write can recover the immutable lease;
+    // a crash after checkpoint submission recovers its original intent/key.
+    let preparedApply =
+      reusableApply
+      ?? HarnessDecision(
+        decisionID: decisionIDFactory(),
+        htaskID: proposalDecision.htaskID,
+        round: futureRound,
+        kind: .proposePatch,
+        operationReference: DebugCrashTaskHandler.applyPatch,
+        inputs: preparedInputs,
+        patchProposal: proposal,
+        requiredArtifacts: proposalDecision.requiredArtifacts,
+        expectedObservation: proposalDecision.expectedObservation,
+        hypothesis: proposalDecision.hypothesis,
+        reasonCode: proposalDecision.reasonCode,
+        producer: proposalDecision.producer,
+        createdAtUTC: proposalDecision.createdAtUTC,
+        attemptID: attempt.attemptID,
+        expectedWorkspaceRevision: proposal.baseWorkspaceRevision,
+        expectedDeployedArtifactDigest: proposalDecision.expectedDeployedArtifactDigest,
+        expectedBindingRevision: proposalDecision.expectedBindingRevision)
+    try await store.putDecision(preparedApply)
+
+    let checkpoint = HarnessDecision(
       decisionID: proposalDecision.decisionID,
       htaskID: proposalDecision.htaskID,
       round: proposalDecision.round,
       kind: .proposePatch,
-      operationReference: DebugCrashTaskHandler.applyPatch,
-      inputs: prepared.inputs,
+      operationReference: DebugCrashTaskHandler.createCheckpoint,
+      inputs: [
+        "projectRef": .string(projectRef),
+        "expectedWorkspaceRevision": .string(proposal.baseWorkspaceRevision),
+      ],
       patchProposal: proposal,
       requiredArtifacts: proposalDecision.requiredArtifacts,
       expectedObservation: proposalDecision.expectedObservation,
@@ -813,9 +954,9 @@ public actor HarnessTaskCoordinator {
       expectedWorkspaceRevision: proposal.baseWorkspaceRevision,
       expectedDeployedArtifactDigest: proposalDecision.expectedDeployedArtifactDigest,
       expectedBindingRevision: proposalDecision.expectedBindingRevision)
-    try await store.putDecision(executable)
+    try await store.putDecision(checkpoint)
     return try await dispatch(
-      HarnessPlannedStep(decision: executable, phaseOnDispatch: .patching),
+      HarnessPlannedStep(decision: checkpoint, phaseOnDispatch: .patching),
       snapshotAtPlanning: snapshot, handler: handler, modelCallsSpent: modelCallsSpent)
   }
 
@@ -1289,7 +1430,8 @@ public actor HarnessTaskCoordinator {
         // The same Attempt remains open until its required rollback is read
         // back; closing it now would orphan that ActionRun.
         attemptOutcome = .active
-      } else if operationReference == DebugCrashTaskHandler.applyPatch
+      } else if operationReference == DebugCrashTaskHandler.createCheckpoint
+        || operationReference == DebugCrashTaskHandler.applyPatch
         || operationReference == DebugCrashTaskHandler.revertPatch
       {
         attemptOutcome = .humanRequired
@@ -1348,7 +1490,8 @@ public actor HarnessTaskCoordinator {
           snapshot: rollbackPending, action: .observedJob,
           reasonCode: "deploymentFailed:rollbackRequired")
       }
-      if operationReference == DebugCrashTaskHandler.applyPatch
+      if operationReference == DebugCrashTaskHandler.createCheckpoint
+        || operationReference == DebugCrashTaskHandler.applyPatch
         || operationReference == DebugCrashTaskHandler.revertPatch
       {
         let blocked = try await recordBlock(
@@ -1420,7 +1563,8 @@ public actor HarnessTaskCoordinator {
         snapshot: advanced, action: .observedJob, reasonCode: observation.state)
     }
     if [
-      DebugCrashTaskHandler.applyPatch, DebugCrashTaskHandler.buildOpenHarmony,
+      DebugCrashTaskHandler.createCheckpoint, DebugCrashTaskHandler.applyPatch,
+      DebugCrashTaskHandler.buildOpenHarmony,
       DebugCrashTaskHandler.runTests, DebugCrashTaskHandler.deployHAP,
       DebugCrashTaskHandler.revertPatch,
     ].contains(operationReference),
@@ -1577,14 +1721,32 @@ public actor HarnessTaskCoordinator {
     var nextPhase = snapshot.phase
     do {
       switch operationReference {
+      case DebugCrashTaskHandler.createCheckpoint:
+        guard let proposal = decision.patchProposal,
+          let preparedApply = try await store.decision(
+            snapshot.htaskID, round: decision.round + 1),
+          preparedApply.operationReference == DebugCrashTaskHandler.applyPatch,
+          preparedApply.patchProposal == proposal,
+          preparedApply.attemptID == decision.attemptID,
+          !preparedApply.inputs.isEmpty
+        else {
+          throw HarnessRepairPortError.malformedReadback("preparedApplyDecision")
+        }
+        nextAttempt = HarnessRepairAttempt(
+          proposal: proposal, checkpointJobID: observation.jobID)
+        nextPhase = .patching
+
       case DebugCrashTaskHandler.applyPatch:
-        guard let proposal = decision.patchProposal else {
-          throw HarnessRepairPortError.malformedReadback("patchProposal")
+        guard let proposal = decision.patchProposal,
+          let current = snapshot.repairAttempt,
+          current.checkpointJobID != nil, current.proposal == proposal
+        else {
+          throw HarnessRepairPortError.malformedReadback("checkpointAttempt")
         }
         let readback = try await repairPort.appliedPatchReadback(
           jobID: observation.jobID, proposal: proposal)
-        nextAttempt = HarnessRepairAttempt(
-          proposal: proposal, patchAttemptRef: readback.patchAttemptRef,
+        nextAttempt = current.updating(
+          patchAttemptRef: readback.patchAttemptRef,
           patchRevision: readback.patchRevision)
         try await recordAttemptPatchRevision(
           readback.patchRevision, taskID: snapshot.htaskID)
@@ -2139,12 +2301,19 @@ public actor HarnessTaskCoordinator {
       ]
     }
     if [
-      DebugCrashTaskHandler.applyPatch, DebugCrashTaskHandler.buildOpenHarmony,
+      DebugCrashTaskHandler.createCheckpoint, DebugCrashTaskHandler.applyPatch,
+      DebugCrashTaskHandler.buildOpenHarmony,
       DebugCrashTaskHandler.runTests, DebugCrashTaskHandler.revertPatch,
     ].contains(operationReference) {
       observations.append((.workspaceReady, .trueValue, admitted))
     }
     switch operationReference {
+    case DebugCrashTaskHandler.createCheckpoint:
+      observations += [
+        (.reproductionConfirmed, .trueValue, "verifiedCriteriaFailure"),
+        (.analysisReady, .trueValue, "boundedPatchDecision"),
+        (.patchProposalReady, .trueValue, "preparedPatchLease"),
+      ]
     case DebugCrashTaskHandler.applyPatch:
       observations += [
         (.reproductionConfirmed, .trueValue, "verifiedCriteriaFailure"),
@@ -2201,6 +2370,11 @@ public actor HarnessTaskCoordinator {
         (.artifactsReady, .trueValue, "derivedArtifactVerified"),
         (.analysisReady, .trueValue, "deterministicAnalysisSucceeded"),
         (.verificationEvidenceReady, .trueValue, "derivedArtifactVerified"),
+      ]
+    case DebugCrashTaskHandler.createCheckpoint:
+      observations = [
+        (.workspaceReady, .trueValue, "checkpointPublished"),
+        (.patchProposalReady, .trueValue, "preparedPatchLease"),
       ]
     case DebugCrashTaskHandler.applyPatch:
       observations = [

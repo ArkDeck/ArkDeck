@@ -794,17 +794,17 @@ final class HarnessTaskPlaneContractTests: XCTestCase {
 
     do {
       _ = try await coordinator.submit(
-        submission(maxE1Mutations: 5, desiredState: fixture))
+        submission(maxE1Mutations: 6, desiredState: fixture))
       XCTFail("a positive budget that cannot finish the route must be refused at intake")
     } catch {
       XCTAssertEqual(
         error as? HarnessTaskSubmissionError,
-        .insufficientE1MutationBudget(required: 6, actual: 5))
+        .insufficientE1MutationBudget(required: 7, actual: 6))
     }
 
     let admitted = try await coordinator.submit(
-      submission(maxE1Mutations: 6, desiredState: fixture))
-    XCTAssertEqual(admitted.budgets.maxE1Mutations, 6)
+      submission(maxE1Mutations: 7, desiredState: fixture))
+    XCTAssertEqual(admitted.budgets.maxE1Mutations, 7)
 
     let evidenceOnly = try await coordinator.submit(submission(maxE1Mutations: 0))
     XCTAssertEqual(
@@ -871,7 +871,7 @@ final class HarnessTaskPlaneContractTests: XCTestCase {
         "baseWorkspaceRevision": .string(String(repeating: "c", count: 64)),
         "component": .string("WaterFlow.RecoverBack"),
         "maxRounds": .integer(3),
-        "maxE1Mutations": .integer(6),
+        "maxE1Mutations": .integer(7),
         "maxModelCalls": .integer(4),
       ])
     let taskID = try XCTUnwrap({ () -> String? in
@@ -905,7 +905,7 @@ final class HarnessTaskPlaneContractTests: XCTestCase {
     guard case .object(let submittedBudgets)? = field(submitted, "budgets") else {
       return XCTFail("task.submit must echo the admitted budgets")
     }
-    XCTAssertEqual(submittedBudgets["maxE1Mutations"], .integer(6))
+    XCTAssertEqual(submittedBudgets["maxE1Mutations"], .integer(7))
     XCTAssertEqual(submittedBudgets["maxModelCalls"], .integer(4))
     XCTAssertEqual(
       field(submitted, "allowedOperations"),
@@ -913,7 +913,8 @@ final class HarnessTaskPlaneContractTests: XCTestCase {
         .string("analyzer.extract-crash-signature@1"),
         .string("capture.diagnostics@1"), .string("debug.hap@1"),
         .string("observe.device@1"), .string("workspace.apply-patch@1"),
-        .string("workspace.build-openharmony@1"), .string("workspace.revert-patch@1"),
+        .string("workspace.build-openharmony@1"),
+        .string("workspace.create-checkpoint@1"), .string("workspace.revert-patch@1"),
         .string("workspace.run-tests@1"),
       ]))
 
