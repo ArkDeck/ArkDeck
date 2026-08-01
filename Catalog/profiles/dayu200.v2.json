@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "dayu200",
+  "version": 2,
+  "provider": "rockchip",
+  "title": "DAYU200 (RK3568) with OpenHarmony 7.0.0.35 daily image (2026-07-28)",
+  "constraints": {
+    "deviceModel": "DAYU200 (RK3568)",
+    "loaderTransport": ["usb"],
+    "partitionVocabulary": [
+      "uboot",
+      "resource",
+      "boot_linux",
+      "ramdisk",
+      "system",
+      "vendor",
+      "updater",
+      "chip_ckm",
+      "userdata"
+    ],
+    "notes": "OpenHarmony 7.0.0.35 archive and all 17 members are pinned in RockchipFlashProfile. The plan writes exactly uboot, resource, boot_linux, ramdisk, system, vendor, updater, chip_ckm and userdata in offset order; chip_prod/sys_prod and all memberless partitions remain write-forbidden. E2 authorization still pins the exact Runtime plan digest."
+  },
+  "supportedOperations": [
+    "flash.dayu200@1"
+  ]
+}

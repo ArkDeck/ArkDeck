@@ -501,7 +501,7 @@ public struct RockchipRockUSBFlashProvider: Sendable {
         [
           "mode=\(mode.rawValue)",
           "provider=\(Self.providerIdentity)@\(Self.providerVersion)",
-          "profile=\(RockchipFlashProfile.profileIdentity)@\(RockchipFlashProfile.profileVersion)",
+          "profile=\(RockchipFlashProfile.profileIdentity)@\(profile.planDocumentVersion)",
           "archive=\(profile.archiveSHA256)",
           "stepSet=\(stepSetDigest)",
           "target=\(RockchipFlashProfile.targetDeviceModel)",
@@ -529,7 +529,7 @@ public struct RockchipRockUSBFlashProvider: Sendable {
       providerIdentity: Self.providerIdentity,
       providerVersion: Self.providerVersion,
       profileIdentity: RockchipFlashProfile.profileIdentity,
-      profileVersion: RockchipFlashProfile.profileVersion,
+      profileVersion: profile.planDocumentVersion,
       targetDeviceModel: RockchipFlashProfile.targetDeviceModel,
       archiveSHA256: plan.archiveSHA256,
       archiveSizeBytes: plan.archiveSizeBytes,

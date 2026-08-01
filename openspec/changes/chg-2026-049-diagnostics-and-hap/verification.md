@@ -5,7 +5,7 @@
 > binding、typed inputs、plan digest、lineage 与 `outcomeUnknown` 门保持。
 > 下文 r2 的人工 capability 步骤是历史计划；E2 不变。
 
-> Change:CHG-2026-049-diagnostics-and-hap@r6
+> Change:CHG-2026-049-diagnostics-and-hap@r7
 > Status:planned
 > Core baseline:CORE-2.1.0 (canonical Core AC not claimed)
 
@@ -28,6 +28,8 @@
 | `DHA-HAP-001` | debug.hap@1 编排契约 + E1 授权/补偿矩阵 | install 成功仅由 **package readback** 判定、start 成功仅由 **process/ability readback** 判定(exit 0 + 无 readback ⇒ 不得 succeeded);缺/错 capability fail-closed;失败按 cleanup policy 补偿;unknown 即停后续 mutation 并 reconcile;HAP 只能来自 artifact lease | contract |
 | `DHA-HW-001` | Device Runtime Agent:真机 E0 capture.diagnostics@1 | Agent 一次执行产出只读 artifact 集合并经 `artifact.*` 读取;receipt 记录 executor=agent/default-readonly authority;除结构化 physical assistance 外零人工 host 命令 | realHardware(Agent 执行后补记) |
 | `DHA-HW-002` | Device Runtime Agent + 维护者签发的 E1 capability:真机 debug.hap@1 | Agent 一次执行 install→start→capture→stop;readback 齐全;capability 消耗一次;缺 capability 零 dispatch;人类不代跑 host CLI | realHardware(Agent 执行后补记) |
+| `DHA-GJ4-PROFILE-001` | v2 profile/Catalog/Provider drift contract + real archive summary | archive 与 17 members 的 size/SHA-256 全匹配；Catalog 只开放 dayu200@1/@2；Provider 对 v2 exact 九分区成功，换序和跨版本 archive 拒绝 | contract + realInput |
+| `DHA-GJ4-PLAN-002` | RuntimeJobEngine.planOnly + job.plan wire contract | 复用生产 materialization 产出 digest/选中步骤；不建 Job、不创建/安装/消费 capability、dispatch=0；错误 plan 同样零副作用 | contract + realInput |
 
 ## `DHA-AGENT-001`
 
@@ -75,6 +77,28 @@
 - 预算:超总 byte budget → 有序截断并标注,或失败;两种都不得写满磁盘;
 - 远端:temp 路径由 provider 铸造;清理失败 → cleanup debt 记录并可被
   后续 reconcile 消费(测试驱动一次消费)。
+
+## `DHA-GJ4-PROFILE-001`
+
+- 候选 archive 固定为 size `730769584`、SHA-256
+  `6a023c738ac585b8a6f537c99f2ab2df95a5359fd6d4dd33150fad62e71f064e`；
+- 对实际 gzip tar 单遍汇总，17 个 member 的 name/size/SHA-256 必须与
+  `dayu200@2` pin 全等；缺失、额外、重复或任一 byte/hash 漂移均 blocked；
+- Catalog `flash.dayu200@1.deviceProfile` 与 `profiles` 同时列出 v1/v2；v1 默认行为不变；
+- Provider 对 v2 Artifact exact facts 只接受九分区 offset 顺序；reverse order 与
+  v2 lease + v1 profile 各一条负向，均在 action/lowering 前拒绝。
+
+## `DHA-GJ4-PLAN-002`
+
+- `job.plan` 接受完整 typed request file，调用与 submit 相同的 input validation、
+  target facts、Artifact lease binding、provider action/lowering materialization；
+- 返回 `executionMode=planOnly`、catalog/plan/request digest、target binding 与选中步骤，
+  且 `jobAdmitted=false`、`dispatchDisposition=notDispatched`；
+- plan-only request 携 capability reference 必须拒绝；成功与失败均不产生 Job、
+  capability/usage/idempotency 记录，也不调用 `RuntimeProcessDispatching.dispatch`；
+- real-input gate 使用 sealed facts 与“调用即失败”的 dispatcher；执行期间禁止
+  USB/HDC/RockUSB，禁止 E2 capability 与真实 Flash，结果分类为 realInput/hostOnly，
+  不得记为 realHardware。
 
 ## `DHA-HAP-001`
 

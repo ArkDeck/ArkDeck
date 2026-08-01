@@ -64,7 +64,7 @@ class RealCatalogTests(unittest.TestCase):
         )
         self.assertEqual(
             sorted(f"{p['id']}@{p['version']}" for p in profiles),
-            ["dayu200@1", "openharmony-standard@1", "workspace-host@1"],
+            ["dayu200@1", "dayu200@2", "openharmony-standard@1", "workspace-host@1"],
         )
 
     def test_generation_is_deterministic(self):

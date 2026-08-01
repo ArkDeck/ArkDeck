@@ -586,7 +586,8 @@ enum RuntimeCLI {
         exitCode: EX_USAGE,
         message:
           "artifact import-flash-bundle requires "
-          + "--target <id> --file <images.tar.gz>")
+          + "--target <id> --file <images.tar.gz> "
+          + "[--device-profile <dayu200@1|dayu200@2>]")
     }
     let targetID = arguments[targetIndex + 1]
     let url = URL(fileURLWithPath: arguments[fileIndex + 1]).standardizedFileURL
@@ -602,7 +603,19 @@ enum RuntimeCLI {
         message: "cannot open flash bundle file (errno \(errno))")
     }
     defer { Darwin.close(descriptor) }
-    let profile = RockchipFlashProfile.dayu200
+    let profileReference: String
+    if let profileIndex = arguments.firstIndex(of: "--device-profile"),
+      profileIndex + 1 < arguments.count
+    {
+      profileReference = arguments[profileIndex + 1]
+    } else {
+      profileReference = "dayu200@1"
+    }
+    guard let profile = RockchipFlashProfile.profile(reference: profileReference) else {
+      throw CLIError(
+        exitCode: EX_USAGE,
+        message: "unsupported DAYU200 device profile \(profileReference)")
+    }
     var before = stat()
     guard fstat(descriptor, &before) == 0,
       before.st_mode & S_IFMT == S_IFREG,
@@ -898,12 +911,28 @@ enum RuntimeCLI {
     guard let subcommand = arguments.first else {
       throw CLIError(
         exitCode: EX_USAGE,
-        message: "missing job subcommand (submit|status|list|run|reconcile)")
+        message: "missing job subcommand (plan|submit|status|list|run|reconcile)")
     }
     var rest = Array(arguments.dropFirst())
     let json = rest.contains("--json")
     let client = client(&rest)
     switch subcommand {
+    case "plan":
+      guard let fileIndex = rest.firstIndex(of: "--request-file"),
+        fileIndex + 1 < rest.count
+      else {
+        throw CLIError(
+          exitCode: EX_USAGE,
+          message: "job plan requires --request-file <typed-request.json>")
+      }
+      let url = URL(fileURLWithPath: rest[fileIndex + 1])
+      guard let requestJSON = try? String(contentsOf: url, encoding: .utf8) else {
+        throw CLIError(exitCode: EX_USAGE, message: "cannot read \(url.path)")
+      }
+      emit(
+        try client.request(
+          method: "job.plan", params: ["requestJson": .string(requestJSON)]),
+        json: json)
     case "list":
       emit(try client.request(method: "job.list"), json: json)
     case "status":

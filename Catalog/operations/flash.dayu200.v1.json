@@ -18,7 +18,7 @@
       "deviceProfile": {
         "type": "string",
         "required": true,
-        "enum": ["dayu200@1"]
+        "enum": ["dayu200@1", "dayu200@2"]
       },
       "partitionPlan": {
         "type": "stringArray",
@@ -174,5 +174,5 @@
     { "name": "post-flash-facts.json", "role": "raw", "mediaType": "application/json", "privacy": "sensitive", "required": true },
     { "name": "post-flash-hilog.txt", "role": "raw", "mediaType": "text/plain", "privacy": "sensitive", "required": false }
   ],
-  "profiles": ["dayu200@1"]
+  "profiles": ["dayu200@1", "dayu200@2"]
 }

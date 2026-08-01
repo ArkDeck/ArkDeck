@@ -84,6 +84,8 @@ public struct RockchipFlashProfile: Sendable {
   public static let pinnedToolchainFingerprint =
     "rkdeveloptool-1.32@038a8a0ea26ef7eb77451789f310c0c9fbeaf43a78af1d6146e02311a9c23611"
 
+  public let catalogReference: String
+  public let firmwareVersion: String
   public let archiveSizeBytes: Int64
   public let archiveSHA256: String
   public let members: [RockchipImagesArchiveMember]
@@ -99,8 +101,18 @@ public struct RockchipFlashProfile: Sendable {
     members: [RockchipImagesArchiveMember],
     mappedPartitions: [RockchipMappedPartition],
     membershiplessPartitionsWriteForbidden: [String],
-    prerequisites: [RockchipPrerequisiteIdentifier: RockchipPrerequisiteRequirement]
+    prerequisites: [RockchipPrerequisiteIdentifier: RockchipPrerequisiteRequirement],
+    catalogReference: String = "dayu200@1",
+    firmwareVersion: String = "legacy-pinned-build"
   ) throws {
+    guard
+      catalogReference.range(
+        of: #"^dayu200@[1-9][0-9]*$"#, options: .regularExpression) != nil,
+      !firmwareVersion.isEmpty
+    else {
+      throw RockchipFlashProfileError.invalidProfileDefinition(
+        "profile reference and firmware version must be versioned")
+    }
     guard members.count == Set(members.map(\.name)).count else {
       throw RockchipFlashProfileError.invalidProfileDefinition("duplicate archive member name")
     }
@@ -129,6 +141,8 @@ public struct RockchipFlashProfile: Sendable {
       throw RockchipFlashProfileError.invalidProfileDefinition(
         "mapped partition references an undeclared member")
     }
+    self.catalogReference = catalogReference
+    self.firmwareVersion = firmwareVersion
     self.archiveSizeBytes = archiveSizeBytes
     self.archiveSHA256 = archiveSHA256.lowercased()
     self.members = members
@@ -263,9 +277,121 @@ public struct RockchipFlashProfile: Sendable {
         // prerequisite is always required for this profile, not only for explicit erase.
         .unlocked: .required,
         .stablePower: .optional,
-      ]
+      ],
+      catalogReference: "dayu200@1",
+      firmwareVersion: "legacy-pinned-build"
     )
   }()
+
+  /// OpenHarmony 7.0.0.35 daily image published on 2026-07-28. The archive
+  /// and every member are independently pinned; only the nine mapped images
+  /// participate in the write plan, while the two orphan images remain
+  /// explicitly write-forbidden.
+  public static let dayu200OpenHarmony70035: RockchipFlashProfile = {
+    // swift-format-ignore: NeverForceUnwrap
+    try! RockchipFlashProfile(
+      archiveSizeBytes: 730_769_584,
+      archiveSHA256: "6a023c738ac585b8a6f537c99f2ab2df95a5359fd6d4dd33150fad62e71f064e",
+      members: [
+        .init(
+          name: "boot_linux.img", sizeBytes: 67_108_864,
+          sha256: "1202a1ba694aaa3d53f104e6374a9aaffd0dba048c3122cf9f4704c4063bd757",
+          classification: .mappedPartitionImage),
+        .init(
+          name: "chip_ckm.img", sizeBytes: 33_554_432,
+          sha256: "f99c14c2520f618c721c963307ddc72ec47aefb5a71c7b29b268b1b33edcc0db",
+          classification: .mappedPartitionImage),
+        .init(
+          name: "chip_prod.img", sizeBytes: 52_428_800,
+          sha256: "44797e1616481c6211526358c11056862e04a3595dd81f59e41aec03a384ad29",
+          classification: .orphanImageWriteForbidden),
+        .init(
+          name: "config.cfg", sizeBytes: 10_399,
+          sha256: "4d06d303faff1d3e530a9d2c9bb22073427b0b498bb4bb438b5177897d86f33c",
+          classification: .nonPartitionMetadata),
+        .init(
+          name: "daily_build.log", sizeBytes: 24_507_809,
+          sha256: "8454628003ab59a4edf28c073b39ec3891cad925283244c3bed0b754ecf35503",
+          classification: .nonPartitionMetadata),
+        .init(
+          name: "manifest_tag.xml", sizeBytes: 115_118,
+          sha256: "71f9293a21d21fb1da67d27b0482b198c62ce042bb80326d62e1a0f35ee12691",
+          classification: .nonPartitionMetadata),
+        .init(
+          name: "MiniLoaderAll.bin", sizeBytes: 455_104,
+          sha256: "1cdd418032195210f191445ed96e2da5ea83d2cfe880c912ebec635839d76542",
+          classification: .loaderMaskromBranchOnly),
+        .init(
+          name: "parameter.txt", sizeBytes: 788,
+          sha256: "35464e3f0b883a8a043dd45ae7ab2342c86b7aa27f24aa1e5a0ccfb6f442d048",
+          classification: .partitionTable),
+        .init(
+          name: "ramdisk.img", sizeBytes: 2_366_141,
+          sha256: "c7e94434b4624ef70a5b9472d4848212a79c89b7a8cb5a453262e56a72e5dec9",
+          classification: .mappedPartitionImage),
+        .init(
+          name: "resource.img", sizeBytes: 5_652_480,
+          sha256: "208ceef6be9ba6d5781033bf00718b15f54d0210ae2f0e8134d4a5e40a9c13e7",
+          classification: .mappedPartitionImage),
+        .init(
+          name: "sys_prod.img", sizeBytes: 52_428_800,
+          sha256: "631845214a4ca4da44094165e30509eb2254a601350b56f90197bf78c3aa85d7",
+          classification: .orphanImageWriteForbidden),
+        .init(
+          name: "system.img", sizeBytes: 2_147_483_648,
+          sha256: "86357e57a183278e1662d55c2d560a35e8e685613bd270f62df42bdf783f0650",
+          classification: .mappedPartitionImage),
+        .init(
+          name: "uboot.img", sizeBytes: 4_194_304,
+          sha256: "c1c801e45cbb92ee63e14df3dda5d819792e02295525bd53dbf750efb645916d",
+          classification: .mappedPartitionImage),
+        .init(
+          name: "updater_binary", sizeBytes: 3_248_972,
+          sha256: "250b6ebc32f33088a328804cc918766aa6ea30f1c0acc8e2d08cf3ec7cf8f23f",
+          classification: .nonPartitionMetadata),
+        .init(
+          name: "updater.img", sizeBytes: 20_688_145,
+          sha256: "907076f10bc295a3712a911c31c7c8f83bb164cdff4d8d9c1c62d3e91c0f637a",
+          classification: .mappedPartitionImage),
+        .init(
+          name: "userdata.img", sizeBytes: 1_468_006_400,
+          sha256: "ea60e842586208b660b72ae4b507a1f4cabb397e912156f342f30f21907e1255",
+          classification: .mappedPartitionImage),
+        .init(
+          name: "vendor.img", sizeBytes: 268_431_360,
+          sha256: "b3ffda2b6dbae220361721ee6b78d25e2055ab506e5480b17eacf477ea482360",
+          classification: .mappedPartitionImage),
+      ],
+      mappedPartitions: dayu200.mappedPartitions,
+      membershiplessPartitionsWriteForbidden:
+        dayu200.membershiplessPartitionsWriteForbidden,
+      prerequisites: dayu200.prerequisites,
+      catalogReference: "dayu200@2",
+      firmwareVersion: "OpenHarmony-7.0.0.35-20260728_180253"
+    )
+  }()
+
+  public static let supportedDAYU200Profiles: [RockchipFlashProfile] = [
+    .dayu200, .dayu200OpenHarmony70035,
+  ]
+
+  public static func profile(reference: String) -> RockchipFlashProfile? {
+    supportedDAYU200Profiles.first { $0.catalogReference == reference }
+  }
+
+  public static func profile(archiveSHA256: String, byteCount: Int) -> RockchipFlashProfile? {
+    supportedDAYU200Profiles.first {
+      $0.archiveSHA256 == archiveSHA256.lowercased()
+        && $0.archiveSizeBytes == Int64(byteCount)
+    }
+  }
+
+  public var planDocumentVersion: String {
+    guard let version = catalogReference.split(separator: "@").last else {
+      return Self.profileVersion
+    }
+    return "\(version).0.0"
+  }
 }
 
 // MARK: - Archive validation (REQ-FLASH-003 face used by TASK-RF-002)

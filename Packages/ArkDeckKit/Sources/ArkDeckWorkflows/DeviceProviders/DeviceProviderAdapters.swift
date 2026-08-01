@@ -2887,9 +2887,11 @@ public struct RockchipFlashProviderAdapter: DeviceProvider {
     inputs: [String: JSONValue],
     context: ProviderExecutionContext
   ) throws -> RockchipRuntimeFlashBundle {
-    guard case .string("dayu200@1")? = inputs["deviceProfile"] else {
+    guard case .string(let profileReference)? = inputs["deviceProfile"],
+      let profile = RockchipFlashProfile.profile(reference: profileReference)
+    else {
       throw DeviceProviderError.unsupportedAction(
-        "flash requires the exact dayu200@1 device profile")
+        "flash requires a published versioned DAYU200 device profile")
     }
     guard case .string(let artifactLeaseID)? = inputs["imageBundleLease"],
       !artifactLeaseID.isEmpty
@@ -2908,14 +2910,14 @@ public struct RockchipFlashProviderAdapter: DeviceProvider {
       }
       return name
     }
-    let expected = RockchipFlashProfile.dayu200.mappedPartitions.map(\.partitionName)
+    let expected = profile.mappedPartitions.map(\.partitionName)
     guard partitions == expected else {
       throw DeviceProviderError.unsupportedAction(
         "partitionPlan must exactly match the pinned DAYU200 order")
     }
     guard let artifact = context.resolvedInputArtifact,
-      artifact.sha256 == RockchipFlashProfile.dayu200.archiveSHA256,
-      artifact.byteCount == Int(RockchipFlashProfile.dayu200.archiveSizeBytes)
+      artifact.sha256 == profile.archiveSHA256,
+      artifact.byteCount == Int(profile.archiveSizeBytes)
     else {
       throw DeviceProviderError.unsupportedAction(
         "flash requires the engine-resolved pinned DAYU200 image bundle")

@@ -105,9 +105,10 @@ enum RockchipFlashExecutionLowering {
         throw RockchipFlashExecutionLoweringError.unsupportedStep(step.id)
       }
     }
-    let expectedPartitions = RockchipFlashProfile.dayu200.mappedPartitions.map(\.partitionName)
-    if plan.archiveSHA256 == RockchipFlashProfile.dayu200.archiveSHA256 {
-      guard partitions == expectedPartitions else {
+    if let profile = RockchipFlashProfile.supportedDAYU200Profiles.first(where: {
+      $0.archiveSHA256 == plan.archiveSHA256
+    }) {
+      guard partitions == profile.mappedPartitions.map(\.partitionName) else {
         throw RockchipFlashExecutionLoweringError.malformedStep("partitionOrder")
       }
     } else {
