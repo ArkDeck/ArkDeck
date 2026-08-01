@@ -111,7 +111,8 @@ struct ArkDeckCommandLine {
   static func runExecute(_ arguments: [String]) async throws {
     let options = try CLIOptions(arguments)
     try options.validateAllowed([
-      "--images", "--target-location-id", "--operator", "--authorization-id", "--out",
+      "--images", "--device-profile", "--target-location-id", "--operator",
+      "--authorization-id", "--out",
     ])
     let operatorIdentity = options.value("--operator")
     let authority = RockchipExecutionAuthorityResolver.resolve(
@@ -135,6 +136,12 @@ struct ArkDeckCommandLine {
           exitCode: EX_USAGE,
           message: "--out is unavailable with --authorization-id; the trusted host owns "
             + "Session storage")
+      }
+      guard options.value("--device-profile") == nil else {
+        throw CLIError(
+          exitCode: EX_USAGE,
+          message: "authorized execution derives the published device profile from the "
+            + "pinned archive; --device-profile is unavailable")
       }
       guard let imagesPath = options.value("--images"),
         let location = options.value("--target-location-id")
@@ -160,8 +167,9 @@ struct ArkDeckCommandLine {
     try writePlanDocument(plan, options: options)
     printExactPlan(plan)
 
-    let provider = RockchipRockUSBFlashProvider()
-    let gate = RockchipFlashAuthorizationGate()
+    let profile = try publishedProfile(for: plan)
+    let provider = RockchipRockUSBFlashProvider(profile: profile)
+    let gate = RockchipFlashAuthorizationGate(profile: profile)
     let monitor = RockchipFlashDispatchMonitor()
 
     guard authority == .humanOperator, let operatorIdentity else {
@@ -251,7 +259,7 @@ struct ArkDeckCommandLine {
 
   static func runPostflight(_ arguments: [String]) throws {
     let options = try CLIOptions(arguments)
-    try options.validateAllowed(["--observation"])
+    try options.validateAllowed(["--observation", "--device-profile"])
     guard let observationPath = options.value("--observation") else {
       throw CLIError(
         exitCode: EX_USAGE,
@@ -259,7 +267,7 @@ struct ArkDeckCommandLine {
     }
     let data = try Data(contentsOf: URL(fileURLWithPath: observationPath))
     let observation = try JSONDecoder().decode(CLIRunObservation.self, from: data)
-    let provider = RockchipRockUSBFlashProvider()
+    let provider = RockchipRockUSBFlashProvider(profile: try selectedProfile(options: options))
     let plan = try provider.makePlan(mode: .execute, archiveValidation: .valid)
     let assessment = provider.assessOutcome(plan: plan, observation: observation.observation())
 
@@ -442,12 +450,7 @@ struct ArkDeckCommandLine {
     }
     print("validating \(imagesPath) (streaming SHA-256; this can take a while)…")
     let summary = try GzipTarArchiveReader.summarize(fileAt: URL(fileURLWithPath: imagesPath))
-    let profileReference = options.value("--device-profile") ?? "dayu200@1"
-    guard let profile = RockchipFlashProfile.profile(reference: profileReference) else {
-      throw CLIError(
-        exitCode: EX_USAGE,
-        message: "unsupported DAYU200 device profile \(profileReference)")
-    }
+    let profile = try selectedProfile(options: options)
     let provider = RockchipRockUSBFlashProvider(profile: profile)
     let verdict = provider.profile.validate(summary.archiveObservation())
     if case .blocked(let violations) = verdict {
@@ -459,6 +462,28 @@ struct ArkDeckCommandLine {
         message: "archive validation failed; execute and planned-success are both blocked")
     }
     return try provider.makePlan(mode: mode, archiveValidation: verdict)
+  }
+
+  static func selectedProfile(options: CLIOptions) throws -> RockchipFlashProfile {
+    let profileReference = options.value("--device-profile") ?? "dayu200@1"
+    guard let profile = RockchipFlashProfile.profile(reference: profileReference) else {
+      throw CLIError(
+        exitCode: EX_USAGE,
+        message: "unsupported DAYU200 device profile \(profileReference)")
+    }
+    return profile
+  }
+
+  static func publishedProfile(for plan: RockchipFlashPlan) throws -> RockchipFlashProfile {
+    guard
+      let profile = RockchipFlashProfile.profile(
+        archiveSHA256: plan.archiveSHA256, byteCount: Int(plan.archiveSizeBytes))
+    else {
+      throw CLIError(
+        exitCode: EX_DATAERR,
+        message: "execute plan has no exact published DAYU200 profile")
+    }
+    return profile
   }
 
   static func bindingState(_ options: CLIOptions) -> RockchipDeviceBindingState {
@@ -558,10 +583,11 @@ struct ArkDeckCommandLine {
         arkdeck flash plan --images <images.tar.gz> \
       [--device-profile <dayu200@1|dayu200@2>] [--mode planOnly|simulated] [--out <dir>]
         arkdeck flash execute --images <images.tar.gz> --target-location-id <usb-location> \
-      --operator <name> [--out <dir>]
+      --operator <name> [--device-profile <dayu200@1|dayu200@2>] [--out <dir>]
         arkdeck flash execute --images <images.tar.gz> --target-location-id <usb-location> \
       --authorization-id <AUTH-ID>
-        arkdeck flash postflight --observation <observation.json>
+        arkdeck flash postflight --observation <observation.json> \
+      [--device-profile <dayu200@1|dayu200@2>]
         arkdeck update-feed prepare --sequence <n> --version <x.y.z> \
       --minimum-system <x.y.z> --issued-at <RFC3339> --expires-at <RFC3339> \
       --artifact <ArkDeck.dmg> --artifact-url <https-url> --notes <summary> --out <dir>

@@ -175,6 +175,92 @@ final class Dayu20070035RuntimePlanOnlyContractTests: XCTestCase {
         for: step, operation: descriptor, inputs: wrongVersion, context: context))
   }
 
+  func testAuthorizedExecutePlanFactsSelectV2FromExactArchiveAndRejectDrift() throws {
+    let profile = RockchipFlashProfile.dayu200OpenHarmony70035
+    let summary = GzipTarArchiveSummary(
+      archiveSizeBytes: profile.archiveSizeBytes,
+      archiveSHA256: profile.archiveSHA256,
+      members: profile.members.map {
+        GzipTarMemberSummary(name: $0.name, sizeBytes: $0.sizeBytes, sha256: $0.sha256)
+      })
+    let port = RockchipProductExecutePlanFactPort()
+    let plan = try port.makeValidatedExecutePlan(summary: summary)
+    let expected = try RockchipRockUSBFlashProvider(profile: profile).makePlan(
+      mode: .execute, archiveValidation: .valid)
+    XCTAssertEqual(plan, expected)
+    XCTAssertEqual(plan.archiveSHA256, profile.archiveSHA256)
+
+    let unknownArchive = GzipTarArchiveSummary(
+      archiveSizeBytes: summary.archiveSizeBytes,
+      archiveSHA256: String(repeating: "0", count: 64),
+      members: summary.members)
+    XCTAssertThrowsError(try port.makeValidatedExecutePlan(summary: unknownArchive)) { error in
+      XCTAssertEqual(error as? RockchipAuthorizationFactError, .archiveValidationFailed)
+    }
+
+    var driftedMembers = summary.members
+    driftedMembers[0] = GzipTarMemberSummary(
+      name: driftedMembers[0].name,
+      sizeBytes: driftedMembers[0].sizeBytes,
+      sha256: String(repeating: "f", count: 64))
+    let memberDrift = GzipTarArchiveSummary(
+      archiveSizeBytes: summary.archiveSizeBytes,
+      archiveSHA256: summary.archiveSHA256,
+      members: driftedMembers)
+    XCTAssertThrowsError(try port.makeValidatedExecutePlan(summary: memberDrift)) { error in
+      XCTAssertEqual(error as? RockchipAuthorizationFactError, .archiveValidationFailed)
+    }
+  }
+
+  func testHumanExecuteGateProducesExactV2HandoffWithZeroDispatch() async throws {
+    let profile = RockchipFlashProfile.dayu200OpenHarmony70035
+    let provider = RockchipRockUSBFlashProvider(profile: profile)
+    let plan = try provider.makePlan(mode: .execute, archiveValidation: .valid)
+    let binding = RockchipRealDeviceBinding(
+      usbVendorID: RockchipProbeEvidence.rockUSBVendorID,
+      usbProductID: RockchipProbeEvidence.dayu200LoaderProductID,
+      usbLocationID: "42")
+    let prerequisites = provider.evaluatePrerequisites([
+      RockchipPrerequisiteObservation(identifier: .loader, status: .satisfied),
+      RockchipPrerequisiteObservation(identifier: .recoveryPath, status: .satisfied),
+      RockchipPrerequisiteObservation(identifier: .unlocked, status: .satisfied),
+    ])
+    let confirmation = RockchipManualFlashConfirmation(
+      operatorIdentity: "lvye",
+      targetBindingDigestSHA256: binding.identityDigestSHA256,
+      firmwareArchiveSHA256: profile.archiveSHA256,
+      transport: "usb",
+      toolchainFingerprint: RockchipFlashProfile.pinnedToolchainFingerprint,
+      providerIdentity: RockchipRockUSBFlashProvider.providerIdentity,
+      planDigestSHA256: plan.planDigestSHA256,
+      stepSetDigestSHA256: plan.stepSetDigestSHA256,
+      confirmedAtTimestamp: "2026-08-01T00:00:00Z")
+    let monitor = RockchipFlashDispatchMonitor()
+    let decision = await RockchipFlashAuthorizationGate(profile: profile).authorize(
+      authority: .humanOperator,
+      binding: .realDevice(binding),
+      plan: plan,
+      prerequisites: prerequisites,
+      destructiveConfirmationAccepted: true,
+      manualConfirmation: confirmation,
+      monitor: monitor)
+    guard case .authorizedForHumanExecution(let handoff) = decision.outcome else {
+      return XCTFail("dayu200@2 must produce a human-only exact handoff")
+    }
+    XCTAssertEqual(handoff.planDigestSHA256, plan.planDigestSHA256)
+    XCTAssertEqual(handoff.stepSetDigestSHA256, plan.stepSetDigestSHA256)
+    XCTAssertEqual(
+      handoff.commandLines,
+      ["sudo rkdeveloptool ld", "sudo rkdeveloptool ppt"]
+        + profile.mappedPartitions.map {
+          "sudo rkdeveloptool wlx \($0.partitionName) \($0.imageMemberName)"
+        }
+        + ["sudo rkdeveloptool rd"])
+    XCTAssertEqual(decision.evidenceEligibility, .humanExecutedRunMayProduceRealHardwareEvidence)
+    let dispatch = await monitor.snapshot()
+    XCTAssertEqual(dispatch.totalDispatchCount, 0)
+  }
+
   /// Manual real-input gate. CI has no 730 MB firmware archive and skips it;
   /// release verification supplies ARKDECK_DAYU200_70035_IMAGE. The test uses
   /// sealed target facts and a dispatcher that fails if called, so it never
@@ -189,6 +275,11 @@ final class Dayu20070035RuntimePlanOnlyContractTests: XCTestCase {
     let profile = RockchipFlashProfile.dayu200OpenHarmony70035
     let summary = try GzipTarArchiveReader.summarize(fileAt: archiveURL)
     XCTAssertEqual(profile.validate(summary.archiveObservation()), .valid)
+    let executePlan = try RockchipProductExecutePlanFactPort().makeValidatedExecutePlan(
+      summary: summary)
+    XCTAssertEqual(executePlan.executionMode, .execute)
+    XCTAssertEqual(executePlan.archiveSHA256, profile.archiveSHA256)
+    XCTAssertEqual(executePlan.planDigestSHA256.count, 64)
 
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(
       "arkdeck-dayu200-70035-plan-only-\(UUID().uuidString.lowercased())",

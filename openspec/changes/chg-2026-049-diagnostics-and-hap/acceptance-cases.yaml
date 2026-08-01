@@ -1,12 +1,24 @@
 ---
 schema_version: 1.0.0
 change_id: CHG-2026-049-diagnostics-and-hap
-change_revision: 7
+change_revision: 8
 platform: macos
 evidence_classes:
 - contract
 - realHardware
 cases:
+- acceptance_id: DHA-GJ4-HANDOFF-003
+  test_id: TEST-DHA-GJ4-HANDOFF-003
+  method: >-
+    Contract and host-only real-input verification of dayu200@2 human handoff,
+    trusted execute-plan profile selection and pre-consumption profile closure.
+  expected_source: openspec/changes/chg-2026-049-diagnostics-and-hap/verification.md#dha-gj4-handoff-003
+  minimum_evidence: contract
+  expected_result: >-
+    Human execute emits only the exact v2 handoff with zero dispatch; authorized
+    execution derives the profile from exact archive pins, rejects caller profile,
+    unknown archives and member drift, and cannot consume authorization or stage
+    when the admitted plan has no published profile.
 - acceptance_id: DHA-GJ4-PROFILE-001
   test_id: TEST-DHA-GJ4-PROFILE-001
   method: >-

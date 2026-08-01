@@ -28,7 +28,7 @@ final class RockchipFlashExecutionContractTests: XCTestCase {
           serialDigest: String(repeating: "a", count: 64), topology: "42"),
         power: powerBackend,
         makePersistence: { _, _, _ in persistence },
-        profile: fixture.profile,
+        profiles: [.dayu200, fixture.profile],
         makeID: RockchipExecutionTestFixture.deterministicID))
     let request = try RockchipFlashExecutionRequest(
       authorizationID: "AUTH-TEST-AIN-007", archiveURL: fixture.archive,
@@ -126,6 +126,44 @@ final class RockchipFlashExecutionContractTests: XCTestCase {
     }
   }
 
+  func testUnpublishedExecuteProfileStopsBeforePersistenceAuthorizationOrDispatch() async throws {
+    let fixture = try RockchipExecutionTestFixture.make()
+    defer { try? FileManager.default.removeItem(at: fixture.base) }
+    let admission = RecordingRockchipAdmissionPort(
+      plan: fixture.plan, receipt: fixture.executableReceipt)
+    let process = RecordingRockchipProcessPort(
+      executable: fixture.executable, sha256: fixture.executableSHA256)
+    let host = RockchipFlashExecutionHost(
+      dependencies: RockchipFlashExecutionDependencies(
+        admission: admission, process: process,
+        postflight: FixedRockchipPostflightPort(
+          serialDigest: String(repeating: "a", count: 64), topology: "42"),
+        power: RecordingPowerBackend(),
+        makePersistence: { _, _, _ in
+          throw RockchipFlashExecutionError.storageRejected(
+            "persistence must not start for an unpublished profile")
+        },
+        profiles: [.dayu200],
+        makeID: RockchipExecutionTestFixture.deterministicID))
+    let request = try RockchipFlashExecutionRequest(
+      authorizationID: "AUTH-TEST-UNPUBLISHED-PROFILE",
+      archiveURL: fixture.archive,
+      targetLocationSelector: "42")
+
+    do {
+      _ = try await host.execute(request)
+      XCTFail("an admitted plan without an exact published profile must fail closed")
+    } catch {
+      XCTAssertEqual(
+        error as? RockchipFlashExecutionError,
+        .admissionRejected("execute plan has no exact published profile"))
+    }
+    XCTAssertEqual(admission.authorizeAndConsumeCount, 0)
+    XCTAssertEqual(admission.closedStatus, .failed)
+    XCTAssertTrue(admission.closedIntentIDs.isEmpty)
+    XCTAssertTrue(process.arguments.isEmpty)
+  }
+
   func testLoweringRejectsMissingStagedImageAndNeverOffersWLFallback() throws {
     let provider = RockchipRockUSBFlashProvider()
     let plan = try provider.makePlan(mode: .execute, archiveValidation: .valid)
@@ -141,6 +179,9 @@ final class RecordingRockchipAdmissionPort: @unchecked Sendable, RockchipExecuti
   let receipt: ProcessExecutableIdentityReceipt
   private(set) var closedStatus: AuthorizationUsageTerminalStatus?
   private(set) var closedIntentIDs: [String] = []
+  private var consumeCount = 0
+
+  var authorizeAndConsumeCount: Int { lock.withLock { consumeCount } }
 
   init(plan: RockchipFlashPlan, receipt: ProcessExecutableIdentityReceipt) {
     self.plan = plan
@@ -166,7 +207,9 @@ final class RecordingRockchipAdmissionPort: @unchecked Sendable, RockchipExecuti
       executableIdentity: receipt, evidenceClass: .contractFake)
   }
 
-  func authorizeAndConsume(_: RockchipExecutionAdmission) async throws {}
+  func authorizeAndConsume(_: RockchipExecutionAdmission) async throws {
+    lock.withLock { consumeCount += 1 }
+  }
 
   func closeUsage(
     admission _: RockchipExecutionAdmission,

@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-049-diagnostics-and-hap
-revision: 7
-status: approved # r2..r6 已交付；r7 仅在维护者 review/merge 本 PR 后生效
+revision: 8
+status: approved # r2..r7 已交付；r8 仅在维护者 review/merge 本 PR 后生效
 class: capability
 core_change_level: none
 owner: lvye
@@ -24,6 +24,36 @@ platforms: [macos]
 > diagnostics HiLog/component-tree pair 在 Catalog、generator、JSON Schema
 > 与 Swift validator 间闭合。r2 记录 fresh pins、草稿迁移约束和依赖复验；
 > 合入 r2 前 `TASK-DHA-001` 仍不得恢复实现。
+
+## r8(2026-08-01):让已发布的 7.0.0.35 profile 到达人类 Flash handoff
+
+### 为什么现在做
+
+r7 已把 `dayu200@2` 的 archive、17 个 member 与 Runtime plan-only 闭合，但真实执行
+入口仍有两处旧单 profile 假设：human `flash execute` 不接受 `--device-profile`，trusted
+execute plan/staging/host-storage 仍默认 `dayu200@1`。因此 7.0.0.35 会在 destructive
+confirmation 或授权消费前被旧 pin 拒绝；为它创建 standing authorization 仍然不可达。
+
+### What(r8 交付面)
+
+1. human `flash execute` 接受显式 `--device-profile dayu200@2`，用同一 exact profile
+   生成 execute plan、双重强确认与九条 `wlx` handoff；ArkDeck 本身仍不 dispatch。
+2. `--authorization-id` 路径不接受 caller profile。trusted plan fact port 必须从 archive
+   的精确 size/SHA-256 选择一个已发布 profile，再逐 member 校验；未知或漂移 archive
+   在 admission 前拒绝。
+3. executor 在持久化或消费授权前按 admitted plan 的 archive facts 重新选择 exact
+   published profile；staging 与 host-storage growth 使用同一 profile，找不到即关闭
+   reservation 并 fail closed。postflight 同样可显式选择 v2。
+4. contract 覆盖 v2 trusted execute-plan 物化、未知/archive-member 漂移负例、v2 human
+   handoff exact commands 与 dispatch=0，并让完整 fake executor 从候选 profile 集合中
+   选择实际 plan 对应项。
+
+## Out of scope(r8)
+
+- 创建、修改、批准或吊销任何 `AUTH-*.json` standing authorization；
+- 连接 USB/HDC/RockUSB、执行 Flash 或声称 GJ-4 `REAL_DEVICE_PASS`；
+- 放宽 target/binding/tool/provider/plan/step-set/validity/maxRuns 任一 E2 pin；
+- 为 autonomous Agent 开放 destructive 执行；真实 Flash 仍只由人类操作者亲自执行。
 
 ## r7(2026-08-01):7.0.0.35 固件必须先成为可审查的 Runtime plan
 
