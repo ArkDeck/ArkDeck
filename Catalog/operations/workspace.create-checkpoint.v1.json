@@ -21,6 +21,12 @@
         "type": "string",
         "required": true,
         "description": "Declared project to checkpoint; the provider resolves its root."
+      },
+      "expectedWorkspaceRevision": {
+        "type": "string",
+        "required": false,
+        "maxLength": 128,
+        "description": "Workspace revision the caller decided against; the provider refuses if the tree moved."
       }
     }
   },

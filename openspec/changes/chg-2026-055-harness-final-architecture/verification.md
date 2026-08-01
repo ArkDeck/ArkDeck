@@ -259,7 +259,24 @@ HFA-AC-1/2/3/4/5/17 有结论;其余 HFA-AC 仍 `pending`(未开工)。
   (同一 HEAD、不同工作区内容 → 不同 revision);capability 绑定 workspace identity +
   expectedWorkspaceRevision + allowedFileScopesDigest。
 - Evidence:实现 PR 内测试。
-- **结论:pending**
+- **结论(2026-08-01):PARTIAL —— revision 半边 PASS,capability 半边 pending**。
+  `WorkspaceRevisionBindingContractTests` 9 例:`testTheRevisionIsStableForAnUnchangedTree`
+  (同一棵树两次同值、64 位);`testAWorkingTreeEditMovesTheRevision`(dirty worktree 被识别
+  —— 这正是只看 HEAD 会漏掉、而又最要命的一类:决策是对着这些字节做的);
+  `testHeadAndIndexBothParticipate`(文件未变但 HEAD 移动 → revision 变;index 变 → revision 变);
+  `testAPackedRefResolvesRatherThanReadingAsAbsent`(packed ref 的仓库不是"没有 HEAD"的仓库);
+  `testTheIdentityIsTheTreeAndNotItsContents`(identity 与 revision 是两件事);
+  `testAMutationDeclaringAMovedRevisionIsRefused` 断言声明了陈旧 revision 的变更被
+  `workspace.revisionConflict` 拒绝(命名的,不是泛化错误);
+  `testAMutationDeclaringTheCurrentRevisionProceeds` 与 `testAnUndeclaredRevisionIsNotSilentlyInvented`
+  钉住正例与「不声明即维持既有行为」;`testTheMutatingOperationsAllDeclareTheField` 断言四个
+  变更 operation 都能声明该字段且为可选(非破坏性)。
+  **§18.2 的两处替换已如实登记在代码注释里**:index 贡献的是 index **文件**摘要而非 tree OID
+  (读 tree OID 要解析 git 二进制索引;文件摘要随索引变动,正是所用性质);submodule OID 未纳入
+  (本 provider 尚无 submodule 面,不可变动的成分不是证据)。全部为文件读取,不 spawn git ——
+  准入需要在任何进程启动之前拿到答案。
+  **capability 半边为何未交付**:见 `tasks.md` 的 r1 记录 —— 引擎对 `hostOnly` 忽略 capability,
+  主体扩展在翻闸前不可达。
 
 ## HFA-AC-19 device 主体准入逐条不变、capability 只收窄(TASK-HFA-009)
 
