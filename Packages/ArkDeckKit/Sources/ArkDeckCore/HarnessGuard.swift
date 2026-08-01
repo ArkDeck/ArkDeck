@@ -104,15 +104,45 @@ public struct HarnessFailureFingerprint: Equatable, Sendable, Codable {
     switch errorClassification {
     case "BUILD_SEMANTIC_FAILURE", "TEST_FAILURE", "WORKSPACE_REVISION_CONFLICT":
       return .alternativeRequired
+    case "RATE_LIMITED", "SERVICE_UNAVAILABLE":
+      return .retryAfterBackoff
+    case "DEVICE_UNAVAILABLE", "OBSERVATION_INCOMPLETE":
+      return .retryAfterObservation
+    case "POLICY_DENIED", "AUTHORIZATION_REQUIRED", "UNSUPPORTED":
+      return .doNotRetry
     default:
       return .actionRetryAllowed
+    }
+  }
+
+  /// Typed next directions, never executable text. They explain what must
+  /// change when the same action is not a valid retry.
+  public var alternativeHints: [String] {
+    switch errorClassification {
+    case "BUILD_SEMANTIC_FAILURE":
+      return ["inspectBuildFailure", "changePatchStrategy", "changeToolchainPreset"]
+    case "TEST_FAILURE":
+      return ["inspectTestEvidence", "changePatchStrategy"]
+    case "WORKSPACE_REVISION_CONFLICT":
+      return ["refreshWorkspaceRevision", "replanAgainstExactRevision"]
+    case "RATE_LIMITED", "SERVICE_UNAVAILABLE":
+      return ["waitForBackoff"]
+    case "DEVICE_UNAVAILABLE", "OBSERVATION_INCOMPLETE":
+      return ["refreshObservation"]
+    case "POLICY_DENIED", "AUTHORIZATION_REQUIRED", "UNSUPPORTED":
+      return ["requestHumanReview"]
+    default:
+      return []
     }
   }
 }
 
 public enum HarnessFailureRetryDisposition: String, CaseIterable, Codable, Sendable {
   case actionRetryAllowed = "ACTION_RETRY_ALLOWED"
+  case retryAfterBackoff = "RETRY_AFTER_BACKOFF"
+  case retryAfterObservation = "RETRY_AFTER_OBSERVATION"
   case alternativeRequired = "ALTERNATIVE_REQUIRED"
+  case doNotRetry = "DO_NOT_RETRY"
 }
 
 public enum HarnessRetryStance: String, CaseIterable, Codable, Sendable {
@@ -145,6 +175,8 @@ public struct HarnessFailureRecord: Equatable, Sendable, Codable {
   public let firstSeenUTC: String
   public let lastSeenUTC: String
   public let lastReasonCode: String
+  public let retryDisposition: HarnessFailureRetryDisposition
+  public let alternativeHints: [String]
   /// Task ids that hit this failure. Cross-task on purpose: the second task
   /// to try the same doomed thing should not have to rediscover it.
   public let observedByTasks: [String]
@@ -157,6 +189,8 @@ public struct HarnessFailureRecord: Equatable, Sendable, Codable {
     case firstSeenUTC = "firstSeenUtc"
     case lastSeenUTC = "lastSeenUtc"
     case lastReasonCode
+    case retryDisposition
+    case alternativeHints
     case observedByTasks
   }
 
@@ -166,7 +200,9 @@ public struct HarnessFailureRecord: Equatable, Sendable, Codable {
     firstSeenUTC: String,
     lastSeenUTC: String,
     lastReasonCode: String,
-    observedByTasks: [String]
+    observedByTasks: [String],
+    retryDisposition: HarnessFailureRetryDisposition? = nil,
+    alternativeHints: [String]? = nil
   ) {
     self.documentType = Self.documentType
     self.digest = fingerprint.digest
@@ -175,7 +211,32 @@ public struct HarnessFailureRecord: Equatable, Sendable, Codable {
     self.firstSeenUTC = firstSeenUTC
     self.lastSeenUTC = lastSeenUTC
     self.lastReasonCode = lastReasonCode
+    self.retryDisposition = retryDisposition ?? fingerprint.retryDisposition
+    self.alternativeHints = Array(Set(alternativeHints ?? fingerprint.alternativeHints)).sorted()
     self.observedByTasks = observedByTasks
+  }
+
+  /// Old failure rows derive the new closed guidance from their immutable
+  /// fingerprint. Nothing is guessed from the free-text reason.
+  public init(from decoder: any Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    let fingerprint = try container.decode(HarnessFailureFingerprint.self, forKey: .fingerprint)
+    self.documentType =
+      try container.decodeIfPresent(String.self, forKey: .documentType) ?? Self.documentType
+    self.digest = try container.decodeIfPresent(String.self, forKey: .digest)
+      ?? fingerprint.digest
+    self.fingerprint = fingerprint
+    self.occurrences = try container.decode(Int.self, forKey: .occurrences)
+    self.firstSeenUTC = try container.decode(String.self, forKey: .firstSeenUTC)
+    self.lastSeenUTC = try container.decode(String.self, forKey: .lastSeenUTC)
+    self.lastReasonCode = try container.decode(String.self, forKey: .lastReasonCode)
+    self.retryDisposition =
+      try container.decodeIfPresent(HarnessFailureRetryDisposition.self, forKey: .retryDisposition)
+      ?? fingerprint.retryDisposition
+    self.alternativeHints =
+      try container.decodeIfPresent([String].self, forKey: .alternativeHints)
+      ?? fingerprint.alternativeHints
+    self.observedByTasks = try container.decode([String].self, forKey: .observedByTasks)
   }
 
   public var stance: HarnessRetryStance {
@@ -190,7 +251,9 @@ public struct HarnessFailureRecord: Equatable, Sendable, Codable {
       lastSeenUTC: atUTC,
       lastReasonCode: reasonCode,
       observedByTasks: observedByTasks.contains(taskID)
-        ? observedByTasks : observedByTasks + [taskID])
+        ? observedByTasks : observedByTasks + [taskID],
+      retryDisposition: retryDisposition,
+      alternativeHints: alternativeHints)
   }
 }
 

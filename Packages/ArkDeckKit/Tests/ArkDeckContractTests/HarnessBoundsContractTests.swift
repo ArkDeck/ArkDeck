@@ -216,7 +216,8 @@ final class HarnessBoundsContractTests: XCTestCase {
     clock: @escaping @Sendable () -> String = { "2026-07-31T00:00:00Z" },
     budgets: HarnessTaskBudgets = HarnessTaskBudgets(
       maxRounds: 8, maxWallClockSeconds: 900, maxArtifactBytes: 1 << 20, maxE1Mutations: 0),
-    criteria: [HarnessSuccessCriterion] = []
+    criteria: [HarnessSuccessCriterion] = [],
+    desiredState: [String: JSONValue] = [:]
   ) throws -> (HarnessTaskCoordinator, HarnessTaskStore, HarnessTaskSubmission) {
     let store = try HarnessTaskStore(rootURL: rootURL)
     let coordinator = HarnessTaskCoordinator(
@@ -224,7 +225,7 @@ final class HarnessBoundsContractTests: XCTestCase {
     let submission = HarnessTaskSubmission(
       type: .debugCrash, projectRef: "demo-app",
       target: HarnessTaskTargetReference(targetID: "TGT-1"),
-      goal: HarnessTaskGoal(summary: "No WaterFlow SIGABRT"),
+      goal: HarnessTaskGoal(summary: "No WaterFlow SIGABRT", desiredState: desiredState),
       successCriteria: criteria,
       budgets: budgets,
       policy: HarnessTaskCoordinator.defaultPolicy(for: .debugCrash))
@@ -750,6 +751,11 @@ final class HarnessBoundsContractTests: XCTestCase {
           criterionID: "B-1", metric: "matchingCrashCount", comparator: .equalTo,
           expected: .integer(0), minimumSamples: 1,
           evidenceRequirements: ["crash-index.txt"])
+      ],
+      desiredState: [
+        "baseWorkspaceRevision": .string(String(repeating: "a", count: 64)),
+        "deviceProfile": .string("dayu200@1"),
+        "buildPresetRef": .string("waterflow-debug@1"),
       ])
     let task = try await coordinator.submit(submission)
     _ = try await coordinator.reconcile(task.htaskID)
@@ -768,6 +774,7 @@ final class HarnessBoundsContractTests: XCTestCase {
     let entry = try XCTUnwrap(project.last)
     XCTAssertEqual(entry.scope, .project)
     XCTAssertEqual(entry.kind, .verifiedKnowledge)
+    XCTAssertEqual(entry.lifecycle, .verified)
     XCTAssertEqual(entry.confidence, .evaluated)
     XCTAssertEqual(entry.evaluationID, succeeded.snapshot.latestEvaluationID)
     XCTAssertFalse(entry.evidence.artifactIDs.isEmpty)

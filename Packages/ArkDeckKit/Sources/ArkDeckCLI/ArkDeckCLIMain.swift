@@ -570,7 +570,9 @@ struct ArkDeckCommandLine {
       [--intake <text>] [--project <ref>] [--max-rounds <n>] \
       [--bundle-name <reverse-dns>] [--ability-name <name>] \
       [--baseline-hap-artifact-lease <lease-v1:job:artifact>] \
-      [--build-preset <ref>] [--test-preset <ref>] [--expected-binding-revision <n>] \
+      [--build-preset <ref>] [--test-preset <ref>] [--device-profile <ref>] \
+      [--base-workspace-revision <sha256>] [--component <name>] \
+      [--expected-binding-revision <n>] \
       [--max-wall-clock-seconds <n>] [--max-no-progress-rounds <n>] \
       [--max-action-retries-per-run <n>] [--max-e1-mutations <n>] \
       [--max-model-calls <n>] [--json]

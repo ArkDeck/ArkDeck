@@ -239,8 +239,44 @@ extension HarnessTaskCoordinator {
     evaluation: HarnessEvaluation
   ) async throws {
     guard evaluation.verdict == .pass, let projectRef = snapshot.projectRef else { return }
+    func desiredText(_ key: String) -> String? {
+      guard case .string(let value)? = snapshot.goal.desiredState[key] else { return nil }
+      return value
+    }
+    let attempts = try await store.attempts(snapshot.htaskID)
+    let lastAttempt = attempts.last
+    let revision = snapshot.repairAttempt?.patchRevision ?? lastAttempt?.patchRevision
+      ?? lastAttempt?.baseRevision ?? desiredText("baseWorkspaceRevision")
+    let deviceProfiles = [desiredText("deviceProfile")].compactMap { $0 }
+    let toolchainProfiles = [
+      lastAttempt?.strategy.executionExpectation.toolchainProfile,
+      desiredText("buildPresetRef"), desiredText("testPresetRef"),
+    ].compactMap { $0 }
+    // PASS without exact revision/device/toolchain facts remains task-local.
+    // Promoting it cross-task would turn missing scope into a wildcard.
+    guard let revision, !deviceProfiles.isEmpty, !toolchainProfiles.isEmpty else { return }
     let criteria = evaluation.criterionResults.map { "\($0.criterionID)=\($0.verdict.rawValue)" }
       .joined(separator: " ")
+    let applicability = HarnessMemoryApplicability(
+      component: desiredText("component") ?? snapshot.type.rawValue,
+      symbols: snapshot.repairAttempt?.proposal.expectedChangedSymbols ?? [],
+      filePaths: snapshot.repairAttempt?.proposal.touchedFiles ?? [],
+      failureFingerprints: attempts.compactMap(\.failureFingerprint),
+      operationReferences: attempts.map { $0.strategy.selectedOperationFamily },
+      revisionScope: HarnessMemoryRevisionScope(exactRevision: revision),
+      deviceProfiles: deviceProfiles,
+      toolchainProfiles: toolchainProfiles)
+    let invalidationConditions = [
+      HarnessMemoryInvalidationCondition(
+        kind: .revisionLeavesScope, expectedValues: [revision]),
+      HarnessMemoryInvalidationCondition(
+        kind: .deviceProfileLeavesScope, expectedValues: deviceProfiles),
+      HarnessMemoryInvalidationCondition(
+        kind: .toolchainProfileLeavesScope, expectedValues: toolchainProfiles),
+      HarnessMemoryInvalidationCondition(
+        kind: .evidenceUnavailable, expectedValues: [evaluation.evaluationID]),
+    ]
+    let now = nowUTC()
     let entry = try HarnessMemoryEntry(
       memoryID: memoryIDFactory(),
       scope: .project,
@@ -254,14 +290,105 @@ extension HarnessTaskCoordinator {
       evidence: HarnessMemoryEvidence(
         jobIDs: [],
         artifactIDs: evaluation.evidence.filter(\.verified).map(\.artifactID),
-        evaluationID: evaluation.evaluationID),
-      createdAtUTC: nowUTC())
+        evaluationID: evaluation.evaluationID,
+        workspaceRevision: revision),
+      lifecycle: .verified,
+      applicability: applicability,
+      invalidationConditions: invalidationConditions,
+      verification: HarnessMemoryVerification(
+        source: .evaluatorPass, evidenceID: evaluation.evaluationID,
+        verifiedAtUTC: now),
+      createdAtUTC: now)
     try await store.appendMemory(entry)
   }
 
+  /// Explicit human promotion. The caller must name a closed, durable human
+  /// action; resolution prose or a bare memory id cannot confer VERIFIED.
+  public func promoteMemory(
+    taskID: String,
+    memoryID: String,
+    humanActionID: String,
+    applicability: HarnessMemoryApplicability,
+    invalidationConditions: [HarnessMemoryInvalidationCondition]
+  ) async throws -> HarnessMemoryEntry {
+    let snapshot = try await status(taskID)
+    guard let projectRef = snapshot.projectRef else {
+      throw HarnessMemoryError.projectScopeRequiresProjectRef
+    }
+    let actions = try await store.humanActions(taskID)
+    guard actions.contains(where: { $0.actionID == humanActionID && !$0.isOpen }) else {
+      throw HarnessMemoryError.verificationEvidenceMismatch
+    }
+    let taskEntries = try await store.memory(scope: .task, key: taskID)
+    guard let candidate = taskEntries.first(where: { $0.memoryID == memoryID }) else {
+      throw HarnessTaskStoreError.notFound(memoryID)
+    }
+    let now = nowUTC()
+    let promoted = try candidate.promoting(
+      toProjectRef: projectRef,
+      verification: HarnessMemoryVerification(
+        source: .humanConfirmation, evidenceID: humanActionID, verifiedAtUTC: now),
+      applicability: applicability,
+      invalidationConditions: invalidationConditions,
+      additionalEvidence: HarnessMemoryEvidence(humanActionIDs: [humanActionID]),
+      atUTC: now)
+    try await store.appendMemory(promoted)
+    return promoted
+  }
+
+  public func supersedeProjectMemory(
+    projectRef: String,
+    memoryID: String,
+    by replacementMemoryID: String,
+    humanActionID: String
+  ) async throws -> HarnessMemoryEntry {
+    let entries = try await store.memory(scope: .project, key: projectRef)
+    guard let entry = entries.first(where: { $0.memoryID == memoryID }) else {
+      throw HarnessTaskStoreError.notFound(memoryID)
+    }
+    try await requireClosedHumanAction(humanActionID, taskID: entry.htaskID)
+    let updated = try entry.superseding(
+      by: replacementMemoryID,
+      evidence: HarnessMemoryEvidence(humanActionIDs: [humanActionID]),
+      atUTC: nowUTC())
+    try await store.appendMemory(updated)
+    return updated
+  }
+
+  public func invalidateProjectMemory(
+    projectRef: String,
+    memoryID: String,
+    reason: String,
+    humanActionID: String
+  ) async throws -> HarnessMemoryEntry {
+    let entries = try await store.memory(scope: .project, key: projectRef)
+    guard let entry = entries.first(where: { $0.memoryID == memoryID }) else {
+      throw HarnessTaskStoreError.notFound(memoryID)
+    }
+    try await requireClosedHumanAction(humanActionID, taskID: entry.htaskID)
+    let updated = try entry.invalidating(
+      reason: reason,
+      evidence: HarnessMemoryEvidence(humanActionIDs: [humanActionID]),
+      atUTC: nowUTC())
+    try await store.appendMemory(updated)
+    return updated
+  }
+
+  private func requireClosedHumanAction(_ actionID: String, taskID: String) async throws {
+    let actions = try await store.humanActions(taskID)
+    guard actions.contains(where: { $0.actionID == actionID && !$0.isOpen }) else {
+      throw HarnessMemoryError.verificationEvidenceMismatch
+    }
+  }
+
   public func taskMemory(_ taskID: String) async throws -> [HarnessMemoryEntry] {
-    _ = try await status(taskID)
-    return try await store.memory(scope: .task, key: taskID)
+    let snapshot = try await status(taskID)
+    var entries = try await store.memory(scope: .task, key: taskID)
+    if let projectRef = snapshot.projectRef {
+      entries += try await store.memory(scope: .project, key: projectRef)
+        .filter { $0.htaskID == taskID }
+    }
+    return HarnessMemorySelector.collapse(entries)
   }
 
   public func projectMemory(_ projectRef: String) async throws -> [HarnessMemoryEntry] {

@@ -110,7 +110,8 @@ public struct HarnessDecisionContextAssembler: Sendable {
     failures: [HarnessContextFailure],
     memory: [HarnessMemoryEntry],
     artifacts: [HarnessContextArtifact],
-    elapsedSeconds: Int
+    elapsedSeconds: Int,
+    memoryQuery explicitMemoryQuery: HarnessMemoryQuery? = nil
   ) throws -> HarnessDecisionContext {
     var trimmed: [String] = []
     func trim<T>(_ values: [T], to limit: Int, label: String) -> [T] {
@@ -127,6 +128,37 @@ public struct HarnessDecisionContextAssembler: Sendable {
       snapshot.goal.desiredState.count - modelVisibleDesiredState.count
     if omittedDesiredStateCount > 0 {
       trimmed.append("desiredState:omitted\(omittedDesiredStateCount)OrchestrationFields")
+    }
+    func desiredText(_ key: String) -> String? {
+      guard case .string(let value)? = snapshot.goal.desiredState[key] else { return nil }
+      return value
+    }
+    let repair = snapshot.repairAttempt
+    let memoryQuery = explicitMemoryQuery ?? HarnessMemoryQuery(
+      htaskID: snapshot.htaskID,
+      projectRef: snapshot.projectRef,
+      components: [snapshot.type.rawValue, desiredText("component")].compactMap { $0 },
+      filePaths: repair?.proposal.touchedFiles ?? [],
+      symbols: repair?.proposal.expectedChangedSymbols ?? [],
+      operationReferences: availableOperations,
+      revision: repair?.patchRevision ?? repair?.proposal.baseWorkspaceRevision
+        ?? desiredText("baseWorkspaceRevision"),
+      deviceProfiles: [desiredText("deviceProfile")].compactMap { $0 },
+      toolchainProfiles: [desiredText("buildPresetRef"), desiredText("testPresetRef")]
+        .compactMap { $0 })
+    let memorySelection = HarnessMemorySelector.select(
+      memory, matching: memoryQuery, limit: limits.maxMemories)
+    if memorySelection.manifest.trimmedCount > 0 {
+      trimmed.append(
+        "memory:kept\(memorySelection.entries.count)of"
+          + "\(memorySelection.entries.count + memorySelection.manifest.trimmedCount)")
+    }
+    let currentEvaluationFacts = (evaluation?.criterionResults ?? []).compactMap { result in
+      result.verdict == .pass ? "criterion:\(result.criterionID)=pass" : nil
+    }
+    let verifiedMemoryFacts = memorySelection.entries.compactMap { entry in
+      entry.lifecycle == .verified
+        ? "memory:\(entry.memoryID): \(entry.summary)" : nil
     }
     let budget = HarnessContextBudget(
       roundsRemaining: max(0, snapshot.budgets.maxRounds - snapshot.consumedBudget.rounds),
@@ -153,9 +185,12 @@ public struct HarnessDecisionContextAssembler: Sendable {
       criterionResults: evaluation?.criterionResults ?? [],
       recentAttempts: trim(attempts, to: limits.maxAttempts, label: "attempts"),
       unresolvedFailures: trim(failures, to: limits.maxFailures, label: "failures"),
-      relevantMemory: trim(
-        memory.map { "\($0.kind.rawValue)/\($0.confidence.rawValue): \($0.summary)" },
-        to: limits.maxMemories, label: "memory"),
+      relevantMemory: memorySelection.entries.map {
+        "\($0.lifecycle.rawValue)/\($0.kind.rawValue)/\($0.confidence.rawValue): \($0.summary)"
+      },
+      confirmedFacts: HarnessContextConfirmedFacts(
+        current: currentEvaluationFacts + verifiedMemoryFacts),
+      memorySelectionManifest: memorySelection.manifest,
       artifacts: trim(artifacts, to: limits.maxArtifacts, label: "artifacts"),
       availableOperations: trim(
         availableOperations, to: limits.maxOperations, label: "operations"),
