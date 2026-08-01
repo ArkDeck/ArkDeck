@@ -1601,6 +1601,19 @@ public actor HarnessTaskCoordinator {
           // leases. Production RuntimeArtifactStoreHarnessPort always
           // implements this method and never reaches this fallback.
           lease = nil
+        } catch HarnessArtifactPortError.unavailable(let reason)
+        where reason == "sensitive analyzer source is not opted in: \(source.name)" {
+          // Preserve the privacy gate as an actionable, closed reason without
+          // exposing artifact bytes or an implementation error. The artifact
+          // name is already part of the published inventory; naming it tells
+          // the operator which exact opt-in is missing while the task remains
+          // fail-closed with zero analyzer dispatch.
+          let reasonCode = "artifactSensitiveNotOptedIn:\(source.name)"
+          let blocked = try await recordBlock(
+            snapshot, block: .evidenceIntegrity, reasonCode: reasonCode,
+            round: snapshot.activeRound, jobID: observation.jobID, requestID: nil)
+          return HarnessReconcileOutcome(
+            snapshot: blocked.snapshot, action: .stoppedForHuman, reasonCode: reasonCode)
         } catch {
           let reason = "analyzerSourceLeaseUnavailable"
           let blocked = try await recordBlock(
