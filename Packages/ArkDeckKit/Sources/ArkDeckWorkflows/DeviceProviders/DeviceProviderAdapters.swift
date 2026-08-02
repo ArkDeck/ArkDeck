@@ -74,7 +74,7 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
     }
   }
 
-  public func action(
+  package func action(
     for step: CatalogStepDescriptor,
     operation: CatalogOperationDescriptor,
     inputs: [String: JSONValue]
@@ -86,7 +86,7 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
         bindingRevision: nil, nowUTC: "1970-01-01T00:00:00Z"))
   }
 
-  public func action(
+  package func action(
     for step: CatalogStepDescriptor,
     operation: CatalogOperationDescriptor,
     inputs: [String: JSONValue],
@@ -542,7 +542,7 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
     }
   }
 
-  public func lower(
+  package func lower(
     action: TypedProviderAction,
     context: ProviderExecutionContext
   ) throws -> TypedProcessPlan {
@@ -1284,7 +1284,7 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
     try HDCOwnedRemotePath(jobID: jobID, stepID: stepID, nonce: "owned")
   }
 
-  public func verify(
+  package func verify(
     receipt: ProviderProcessReceipt,
     action: TypedProviderAction,
     context: ProviderExecutionContext
@@ -2688,7 +2688,7 @@ public struct RockchipFlashProviderAdapter: DeviceProvider {
     return try await factsPort.currentFacts(targetID: targetID)
   }
 
-  public func action(
+  package func action(
     for step: CatalogStepDescriptor,
     operation: CatalogOperationDescriptor,
     inputs: [String: JSONValue]
@@ -2697,7 +2697,7 @@ public struct RockchipFlashProviderAdapter: DeviceProvider {
       "\(step.stepID) requires engine-resolved target and Artifact facts")
   }
 
-  public func action(
+  package func action(
     for step: CatalogStepDescriptor,
     operation: CatalogOperationDescriptor,
     inputs: [String: JSONValue],
@@ -2747,7 +2747,7 @@ public struct RockchipFlashProviderAdapter: DeviceProvider {
     }
   }
 
-  public func lower(
+  package func lower(
     action: TypedProviderAction,
     context: ProviderExecutionContext
   ) throws -> TypedProcessPlan {
@@ -2810,7 +2810,7 @@ public struct RockchipFlashProviderAdapter: DeviceProvider {
           actionSHA256: actionSHA256)))
   }
 
-  public func verify(
+  package func verify(
     receipt: ProviderProcessReceipt,
     action: TypedProviderAction,
     context: ProviderExecutionContext

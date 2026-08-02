@@ -73,7 +73,7 @@ public struct WorkspaceProvider: DeviceProvider {
     self.operations = nil
   }
 
-  public init(
+  package init(
     registry: WorkspaceProjectRegistry,
     tool: WorkspaceInspectorTool? = nil,
     operations: any DeviceProvider
@@ -119,7 +119,7 @@ public struct WorkspaceProvider: DeviceProvider {
     try operations?.workspaceAuthorizationFacts(for: operation, inputs: inputs)
   }
 
-  public func action(
+  package func action(
     for step: CatalogStepDescriptor,
     operation: CatalogOperationDescriptor,
     inputs: [String: JSONValue]
@@ -131,7 +131,7 @@ public struct WorkspaceProvider: DeviceProvider {
         nowUTC: "1970-01-01T00:00:00Z"))
   }
 
-  public func action(
+  package func action(
     for step: CatalogStepDescriptor,
     operation: CatalogOperationDescriptor,
     inputs: [String: JSONValue],
@@ -165,7 +165,7 @@ public struct WorkspaceProvider: DeviceProvider {
           projectRef: projectRef, projectRoot: root, symbol: symbol, fileScope: fileScope)))
   }
 
-  public func lower(
+  package func lower(
     action: TypedProviderAction,
     context: ProviderExecutionContext
   ) throws -> TypedProcessPlan {
@@ -201,7 +201,7 @@ public struct WorkspaceProvider: DeviceProvider {
     }
   }
 
-  public func verify(
+  package func verify(
     receipt: ProviderProcessReceipt,
     action: TypedProviderAction,
     context: ProviderExecutionContext

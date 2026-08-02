@@ -415,7 +415,7 @@ public struct UnavailableWorkspaceOperationsProvider: DeviceProvider {
     throw DeviceProviderError.factsUnavailable(reason)
   }
 
-  public func action(
+  package func action(
     for step: CatalogStepDescriptor,
     operation: CatalogOperationDescriptor,
     inputs: [String: JSONValue]
@@ -423,14 +423,14 @@ public struct UnavailableWorkspaceOperationsProvider: DeviceProvider {
     throw DeviceProviderError.factsUnavailable(reason)
   }
 
-  public func lower(
+  package func lower(
     action: TypedProviderAction,
     context: ProviderExecutionContext
   ) throws -> TypedProcessPlan {
     throw DeviceProviderError.factsUnavailable(reason)
   }
 
-  public func verify(
+  package func verify(
     receipt: ProviderProcessReceipt,
     action: TypedProviderAction,
     context: ProviderExecutionContext
@@ -446,7 +446,7 @@ public struct UnavailableWorkspaceOperationsProvider: DeviceProvider {
   }
 }
 
-public struct WorkspaceResolvedInvocation: Sendable, Equatable, Codable {
+package struct WorkspaceResolvedInvocation: Sendable, Equatable, Codable {
   public let operation: String
   public let projectRef: String
   public let projectRoot: String
@@ -463,7 +463,7 @@ public struct WorkspaceFileSnapshot: Sendable, Equatable, Codable {
 }
 
 public struct WorkspacePatchIntent: Sendable, Equatable, Codable {
-  public let invocation: WorkspaceResolvedInvocation
+  package let invocation: WorkspaceResolvedInvocation
   public let patchAttemptRef: String
   public let patchArtifactID: String
   public let patchFilePath: String
@@ -474,7 +474,7 @@ public struct WorkspacePatchIntent: Sendable, Equatable, Codable {
   /// than only the files the diff happens to touch.
   public let previousWorkspaceRevision: String?
 
-  public init(
+  package init(
     invocation: WorkspaceResolvedInvocation,
     patchAttemptRef: String,
     patchArtifactID: String,
@@ -496,13 +496,13 @@ public struct WorkspacePatchIntent: Sendable, Equatable, Codable {
 }
 
 public struct WorkspaceArchiveCheckpointIntent: Sendable, Equatable, Codable {
-  public let invocation: WorkspaceResolvedInvocation
+  package let invocation: WorkspaceResolvedInvocation
   /// The path is derived from the runtime
   /// Job identity inside the provider-owned 0700 attempt store.
   public let archivePath: String
   public let sourceSnapshots: [WorkspaceFileSnapshot]
 
-  public init(
+  package init(
     invocation: WorkspaceResolvedInvocation,
     archivePath: String,
     sourceSnapshots: [WorkspaceFileSnapshot]
@@ -541,7 +541,7 @@ public struct WorkspacePatchAttempt: Sendable, Equatable, Codable {
 }
 
 public struct WorkspaceRevertIntent: Sendable, Equatable, Codable {
-  public let invocation: WorkspaceResolvedInvocation
+  package let invocation: WorkspaceResolvedInvocation
   public let attempt: WorkspacePatchAttempt
 }
 
@@ -684,7 +684,7 @@ public struct WorkspaceActionExecutableResolver: RuntimeExecutableResolving {
     return try validated(first)
   }
 
-  public func resolveExecutable(for action: TypedProviderAction) throws -> ResolvedExecutable {
+  package func resolveExecutable(for action: TypedProviderAction) throws -> ResolvedExecutable {
     guard case .workspace(let workspace) = action,
       let invocation = workspace.operationInvocation,
       allowed.contains(invocation.executable)
@@ -728,7 +728,7 @@ public struct CombinedWorkspaceExecutableResolver: RuntimeExecutableResolving {
     return try operations.resolveExecutable(providerID: providerID)
   }
 
-  public func resolveExecutable(for action: TypedProviderAction) throws -> ResolvedExecutable {
+  package func resolveExecutable(for action: TypedProviderAction) throws -> ResolvedExecutable {
     guard case .workspace(let workspace) = action else {
       throw RuntimeDispatchFailure.failed(
         "workspace resolver received a foreign typed action")
@@ -851,7 +851,7 @@ public struct WorkspaceOperationsProvider: DeviceProvider {
         Data(profile.allowedFileGlobs.sorted().joined(separator: "\n").utf8)))
   }
 
-  public func action(
+  package func action(
     for step: CatalogStepDescriptor,
     operation: CatalogOperationDescriptor,
     inputs: [String: JSONValue]
@@ -860,7 +860,7 @@ public struct WorkspaceOperationsProvider: DeviceProvider {
       "workspace action materialization requires a job context")
   }
 
-  public func action(
+  package func action(
     for step: CatalogStepDescriptor,
     operation: CatalogOperationDescriptor,
     inputs: [String: JSONValue],
@@ -1118,7 +1118,7 @@ public struct WorkspaceOperationsProvider: DeviceProvider {
     }
   }
 
-  public func lower(
+  package func lower(
     action: TypedProviderAction,
     context: ProviderExecutionContext
   ) throws -> TypedProcessPlan {
@@ -1171,7 +1171,7 @@ public struct WorkspaceOperationsProvider: DeviceProvider {
       workingDirectory: invocation.projectRoot)
   }
 
-  public func verify(
+  package func verify(
     receipt: ProviderProcessReceipt,
     action: TypedProviderAction,
     context: ProviderExecutionContext

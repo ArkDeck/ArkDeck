@@ -182,7 +182,7 @@ public struct WorkspaceAuthorizationFacts: Sendable, Equatable {
   }
 }
 
-public enum WorkspaceProviderAction: Sendable, Equatable, Codable {
+package enum WorkspaceProviderAction: Sendable, Equatable, Codable {
   case inspectSource(WorkspaceSourceInspection)
   case applyPatch(WorkspacePatchIntent)
   case buildOpenHarmony(WorkspaceResolvedInvocation)
@@ -207,7 +207,7 @@ extension DeviceProvider {
   ) throws -> WorkspaceAuthorizationFacts? { nil }
 }
 
-public enum TypedProviderAction: Sendable, Equatable {
+package enum TypedProviderAction: Sendable, Equatable {
   case hdc(HDCProviderAction)
   case rockchip(RockchipProviderAction)
   /// Host-only: reads declared source on this machine. It can never carry a
@@ -1069,7 +1069,7 @@ public struct ProviderFacts: Sendable, Equatable {
 /// (descriptor-bound); `hostManaged` marks an adapter-compat execution the
 /// provider runs under its own proven host (Rockchip migration mode).
 /// Construction is package-only: clients cannot mint plans.
-public struct TypedProcessInvocation: Sendable, Equatable {
+package struct TypedProcessInvocation: Sendable, Equatable {
   public let arguments: [String]
   public let timeoutSeconds: Int?
   /// A mutating command can report non-zero after partially taking effect.
@@ -1229,14 +1229,14 @@ public struct ProviderLandedArtifact: Sendable, Equatable {
 }
 
 public struct TypedProcessPlan: Sendable, Equatable {
-  public enum Kind: Sendable, Equatable {
+  package enum Kind: Sendable, Equatable {
     case process(executableSHA256: String, argumentSummary: [String], timeoutSeconds: Int?)
     case processSequence(executableSHA256: String, invocations: [TypedProcessInvocation])
     case hostManaged(HostManagedProcessDescriptor)
   }
 
-  public let action: TypedProviderAction
-  public let kind: Kind
+  package let action: TypedProviderAction
+  package let kind: Kind
   /// Optional semantic `argv[0]` for a descriptor-bound multi-call binary.
   /// It is included in the materialized plan digest and never selects the
   /// executable descriptor.
@@ -1403,9 +1403,9 @@ public struct ProviderDurableIntentReference: Sendable, Equatable {
   public let jobID: String
   public let stepID: String
   public let intentEventID: String
-  public let action: TypedProviderAction
+  package let action: TypedProviderAction
 
-  public init(jobID: String, stepID: String, intentEventID: String, action: TypedProviderAction) {
+  package init(jobID: String, stepID: String, intentEventID: String, action: TypedProviderAction) {
     self.jobID = jobID
     self.stepID = stepID
     self.intentEventID = intentEventID
@@ -1426,7 +1426,7 @@ public enum ProviderOperationAvailability: Sendable, Equatable {
   case unavailable(reason: String)
 }
 
-public protocol DeviceProvider: Sendable {
+package protocol DeviceProvider: Sendable {
   var providerID: String { get }
 
   /// Catalog presence is only a description. A provider must separately
@@ -1503,7 +1503,7 @@ extension DeviceProvider {
         + "for \(operation.reference)")
   }
 
-  public func action(
+  package func action(
     for step: CatalogStepDescriptor,
     operation: CatalogOperationDescriptor,
     inputs: [String: JSONValue],
@@ -1532,7 +1532,7 @@ extension DeviceProvider {
 public struct DeviceProviderRegistry: Sendable {
   private let providers: [String: any DeviceProvider]
 
-  public init(providers: [any DeviceProvider]) {
+  package init(providers: [any DeviceProvider]) {
     var table: [String: any DeviceProvider] = [:]
     for provider in providers {
       table[provider.providerID] = provider
@@ -1540,7 +1540,7 @@ public struct DeviceProviderRegistry: Sendable {
     self.providers = table
   }
 
-  public func provider(id: String) -> (any DeviceProvider)? {
+  package func provider(id: String) -> (any DeviceProvider)? {
     providers[id]
   }
 
