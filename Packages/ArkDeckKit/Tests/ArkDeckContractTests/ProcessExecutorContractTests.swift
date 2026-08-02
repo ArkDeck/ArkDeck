@@ -103,6 +103,67 @@ final class ProcessExecutorContractTests: XCTestCase {
     XCTAssertFalse(FileManager.default.fileExists(atPath: launchSentinel.path))
   }
 
+  /// The base allowlist is the entire inheritance contract. Adding a key here
+  /// republishes that parent variable to every spawned tool child, so the set
+  /// only grows together with this assertion.
+  func testBaseChildEnvironmentAllowlistIsClosed() {
+    XCTAssertEqual(
+      FoundationProcessExecutor.baseChildEnvironmentKeys,
+      ["PATH", "HOME", "TMPDIR", "LANG"])
+  }
+
+  func testSpawnedChildSeesOnlyTheBaseAllowlistPlusTheRequestEnvironment() async throws {
+    let secretKey = "ARKDECK_CONTRACT_PARENT_SECRET"
+    let previousSecret = ProcessInfo.processInfo.environment[secretKey]
+    setenv(secretKey, "must-not-reach-children", 1)
+    defer {
+      if let previousSecret {
+        setenv(secretKey, previousSecret, 1)
+      } else {
+        unsetenv(secretKey)
+      }
+    }
+
+    let requestEnvironment = [
+      "ARKDECK_CONTRACT_CHILD_ONLY": "explicit-value",
+      "LANG": "xx_ARKDECK.UTF-8",
+    ]
+    let result = try await executor.execute(
+      ProcessRequest(
+        executable: URL(fileURLWithPath: "/usr/bin/env"),
+        arguments: ["-0"],
+        environment: requestEnvironment
+      )
+    )
+    XCTAssertEqual(result.termination, .exited(0))
+
+    var childEnvironment: [String: String] = [:]
+    for entry in String(decoding: result.stdout.data, as: UTF8.self)
+      .split(separator: "\0", omittingEmptySubsequences: true)
+    {
+      guard let separator = entry.firstIndex(of: "=") else {
+        return XCTFail("child environment entry without '=': \(entry)")
+      }
+      childEnvironment[String(entry[..<separator])] =
+        String(entry[entry.index(after: separator)...])
+    }
+
+    XCTAssertNil(childEnvironment[secretKey])
+    XCTAssertEqual(childEnvironment["PATH"], ProcessInfo.processInfo.environment["PATH"])
+    XCTAssertEqual(childEnvironment["ARKDECK_CONTRACT_CHILD_ONLY"], "explicit-value")
+    XCTAssertEqual(childEnvironment["LANG"], "xx_ARKDECK.UTF-8")
+    let allowedKeys = FoundationProcessExecutor.baseChildEnvironmentKeys
+      .union(requestEnvironment.keys)
+    let unexpectedKeys = Set(childEnvironment.keys).subtracting(allowedKeys)
+    XCTAssertEqual(
+      unexpectedKeys, [],
+      "child inherited keys outside the closed base allowlist")
+    print(
+      "M1_PROCESS child_environment_keys=\(childEnvironment.count) "
+        + "unexpected_inherited_keys=\(unexpectedKeys.count)"
+    )
+  }
+
   func testTEST_AC_JOB_005_01_LaunchExitAndSignalHaveIndependentClassifications() async throws {
     let nonzeroExit = try await executor.execute(
       ProcessRequest(executable: URL(fileURLWithPath: "/usr/bin/false"))

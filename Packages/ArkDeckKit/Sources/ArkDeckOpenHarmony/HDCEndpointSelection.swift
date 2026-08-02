@@ -85,6 +85,22 @@ public enum HDCServerEndpointSelector {
     )
   }
 
+  /// Explicit pass-through of an inherited `OHOS_HDC_SERVER_PORT` for hdc
+  /// dispatch that runs outside a selected endpoint (runtime actions, flash
+  /// loader transitions). The spawn base environment is a closed allowlist,
+  /// so the port has to be named here or the child would silently address
+  /// the default server. An invalid inherited value is dropped, not
+  /// forwarded: these callers must keep dispatching against the documented
+  /// default rather than exporting a value the selector would reject.
+  public static func inheritedPortChildEnvironment(
+    inheritedEnvironment: [String: String] = ProcessInfo.processInfo.environment
+  ) -> [String: String] {
+    guard let inherited = inheritedEnvironment["OHOS_HDC_SERVER_PORT"],
+      let port = validPort(inherited)
+    else { return [:] }
+    return ["OHOS_HDC_SERVER_PORT": String(port)]
+  }
+
   private static func port(in endpoint: String) -> Int? {
     guard !endpoint.contains("\0"),
       let separator = endpoint.lastIndex(of: ":"),

@@ -75,7 +75,10 @@ struct FoundationRockchipRuntimeCommandRunner: RockchipRuntimeCommandRunning {
         process: ProcessRequest(
           executable: URL(fileURLWithPath: executable.path),
           arguments: arguments,
-          environment: [:],
+          // This runner serves both the RockUSB tool and hdc transitions.
+          // The spawn base allowlist drops an inherited HDC port, so it is
+          // named explicitly; the RockUSB tool ignores it.
+          environment: HDCServerEndpointSelector.inheritedPortChildEnvironment(),
           timeout: timeoutSeconds.map(TimeInterval.init)),
         expectedSHA256: executable.sha256)
       let result: ProcessIdentityBoundExecutionResult
