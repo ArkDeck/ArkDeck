@@ -63,7 +63,6 @@ public final class ProductRockchipEvolutionCandidateBuilder: @unchecked Sendable
   private let stateRoot: URL
   private let executor: FoundationProcessExecutor
   private let gitURL = URL(fileURLWithPath: "/usr/bin/git")
-  private let xcrunURL = URL(fileURLWithPath: "/usr/bin/xcrun")
   private let sandboxURL = URL(fileURLWithPath: "/usr/bin/sandbox-exec")
 
   public convenience init(stateRoot: URL) throws {
@@ -97,8 +96,8 @@ public final class ProductRockchipEvolutionCandidateBuilder: @unchecked Sendable
       throw RockchipEvolutionCampaignError.expired
     }
     let gitSHA = try Self.executableSHA256(gitURL)
-    let xcrunSHA = try Self.executableSHA256(xcrunURL)
     let sandboxSHA = try Self.executableSHA256(sandboxURL)
+    let swiftBuild = try Self.swiftBuildPreset(sourceRoot: sourceRoot)
     let topLevel = try await runText(
       executable: gitURL, sha256: gitSHA,
       arguments: ["rev-parse", "--show-toplevel"], timeout: 15)
@@ -181,7 +180,7 @@ public final class ProductRockchipEvolutionCandidateBuilder: @unchecked Sendable
     let candidateID = "ECAND-\(candidateDigest.prefix(24).uppercased())"
 
     let toolchainDigest = try await Self.toolchainDigest(
-      executor: executor, sourceRoot: sourceRoot, xcrunURL: xcrunURL, xcrunSHA: xcrunSHA)
+      executor: executor, sourceRoot: sourceRoot, swiftBuild: swiftBuild)
     guard toolchainDigest == assertion.candidateToolchainDigestSHA256 else {
       throw RockchipEvolutionCampaignError.candidateRejected("toolchainDrift")
     }
@@ -194,11 +193,10 @@ public final class ProductRockchipEvolutionCandidateBuilder: @unchecked Sendable
     try FileManager.default.createDirectory(
       at: scratch, withIntermediateDirectories: true,
       attributes: [.posixPermissions: 0o700])
-    let packagePath = sourceRoot.appending(path: "Packages/ArkDeckKit", directoryHint: .isDirectory)
     let build = try await run(
-      executable: xcrunURL, sha256: xcrunSHA,
-      arguments: [
-        "swift", "build", "--package-path", packagePath.path,
+      executable: URL(fileURLWithPath: swiftBuild.executable.path),
+      sha256: swiftBuild.executable.sha256, argumentZero: swiftBuild.argumentZero,
+      arguments: swiftBuild.fixedArguments + [
         "--scratch-path", scratch.path, "--product",
         RockchipEvolutionCampaignConfirmationAssertion.candidateBuildTarget,
       ], timeout: 900, captureLimit: 1 * 1_024 * 1_024)
@@ -206,9 +204,9 @@ public final class ProductRockchipEvolutionCandidateBuilder: @unchecked Sendable
       !build.stderr.wasTruncated
     else { throw RockchipEvolutionCampaignError.candidateRejected("buildFailed") }
     let binPath = try await runText(
-      executable: xcrunURL, sha256: xcrunSHA,
-      arguments: [
-        "swift", "build", "--package-path", packagePath.path,
+      executable: URL(fileURLWithPath: swiftBuild.executable.path),
+      sha256: swiftBuild.executable.sha256, argumentZero: swiftBuild.argumentZero,
+      arguments: swiftBuild.fixedArguments + [
         "--scratch-path", scratch.path, "--show-bin-path",
       ], timeout: 120)
     let candidateURL = URL(fileURLWithPath: binPath, isDirectory: true)
@@ -283,10 +281,14 @@ public final class ProductRockchipEvolutionCandidateBuilder: @unchecked Sendable
       fileURLWithPath: FileManager.default.currentDirectoryPath, isDirectory: true
     )
     .standardizedFileURL
-    let xcrun = URL(fileURLWithPath: "/usr/bin/xcrun")
+    return try await currentToolchainDigest(sourceRoot: root)
+  }
+
+  package static func currentToolchainDigest(sourceRoot: URL) async throws -> String {
+    let root = sourceRoot.resolvingSymlinksInPath().standardizedFileURL
     return try await toolchainDigest(
-      executor: FoundationProcessExecutor(), sourceRoot: root, xcrunURL: xcrun,
-      xcrunSHA: executableSHA256(xcrun))
+      executor: FoundationProcessExecutor(), sourceRoot: root,
+      swiftBuild: swiftBuildPreset(sourceRoot: root))
   }
 
   public static func currentProtectedMainBaseCommitOID() async throws -> String {
@@ -329,25 +331,56 @@ public final class ProductRockchipEvolutionCandidateBuilder: @unchecked Sendable
   private static func toolchainDigest(
     executor: FoundationProcessExecutor,
     sourceRoot: URL,
-    xcrunURL: URL,
-    xcrunSHA: String
+    swiftBuild: WorkspaceCommandPreset
   ) async throws -> String {
     let result = try await executor.executeIdentityBound(
       ProcessIdentityBoundRequest(
         process: ProcessRequest(
-          executable: xcrunURL, arguments: ["swift", "--version"],
+          executable: URL(fileURLWithPath: swiftBuild.executable.path),
+          argumentZero: swiftBuild.argumentZero, arguments: ["--version"],
           environment: ["NO_COLOR": "1"], workingDirectory: sourceRoot, timeout: 30),
-        expectedSHA256: xcrunSHA), captureLimit: 64 * 1_024)
+        expectedSHA256: swiftBuild.executable.sha256), captureLimit: 64 * 1_024)
     guard result.execution.termination == .exited(0), !result.execution.stdout.wasTruncated else {
       throw RockchipEvolutionCampaignError.candidateRejected("toolchainUnavailable")
     }
     return RockchipEvolutionCampaignConfirmationAssertion.sha256(
-      Data(xcrunSHA.utf8) + result.execution.stdout.data)
+      RockchipEvolutionCampaignConfirmationAssertion.canonicalData([
+        "argumentZero": .string(swiftBuild.argumentZero ?? ""),
+        "executablePath": .string(swiftBuild.executable.path),
+        "executableSHA256": .string(swiftBuild.executable.sha256),
+        "versionOutput": .string(
+          String(decoding: result.execution.stdout.data, as: UTF8.self)),
+      ]))
+  }
+
+  /// Reuse the repository profile's fixed SwiftPM executable and role link.
+  /// Apple's xcrun derives its dispatch role from the executable image path,
+  /// so launching it through the identity-bound `/.vol` path makes it treat
+  /// the inode as a tool name. swift-package supports the already-published
+  /// argv[0] role contract and remains protected by the same SHA/inode gate.
+  private static func swiftBuildPreset(sourceRoot: URL) throws -> WorkspaceCommandPreset {
+    do {
+      guard
+        let preset = try WorkspaceProjectProfile.arkDeck(rootURL: sourceRoot)
+          .buildPresets["arkdeck-debug"],
+        let argumentZero = preset.argumentZero,
+        URL(fileURLWithPath: argumentZero).resolvingSymlinksInPath().standardizedFileURL
+          == URL(fileURLWithPath: preset.executable.path).standardizedFileURL
+      else {
+        throw RockchipEvolutionCampaignError.candidateRejected("toolchainUnavailable")
+      }
+      return preset
+    } catch let error as RockchipEvolutionCampaignError {
+      throw error
+    } catch {
+      throw RockchipEvolutionCampaignError.candidateRejected("toolchainUnavailable")
+    }
   }
 
   private func run(
     executable: URL,
     sha256: String,
+    argumentZero: String? = nil,
     arguments: [String],
     timeout: TimeInterval,
     captureLimit: Int = 256 * 1_024
@@ -355,7 +388,7 @@ public final class ProductRockchipEvolutionCandidateBuilder: @unchecked Sendable
     let result = try await executor.executeIdentityBound(
       ProcessIdentityBoundRequest(
         process: ProcessRequest(
-          executable: executable, arguments: arguments,
+          executable: executable, argumentZero: argumentZero, arguments: arguments,
           environment: ["NO_COLOR": "1"], workingDirectory: sourceRoot, timeout: timeout),
         expectedSHA256: sha256), captureLimit: captureLimit)
     guard result.execution.termination == .exited(0) else {
@@ -366,10 +399,12 @@ public final class ProductRockchipEvolutionCandidateBuilder: @unchecked Sendable
   }
 
   private func runText(
-    executable: URL, sha256: String, arguments: [String], timeout: TimeInterval
+    executable: URL, sha256: String, argumentZero: String? = nil,
+    arguments: [String], timeout: TimeInterval
   ) async throws -> String {
     let result = try await run(
-      executable: executable, sha256: sha256, arguments: arguments, timeout: timeout)
+      executable: executable, sha256: sha256, argumentZero: argumentZero,
+      arguments: arguments, timeout: timeout)
     guard !result.stdout.wasTruncated else {
       throw RockchipEvolutionCampaignError.candidateRejected("processOutput")
     }

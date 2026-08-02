@@ -64,6 +64,23 @@ final class EvolutionCampaignContractTests: XCTestCase {
     }
   }
 
+  func testProductCandidateToolchainProbeUsesIdentityBoundSwiftPMRole() async throws {
+    let repositoryRoot = URL(fileURLWithPath: #filePath)
+      .deletingLastPathComponent().deletingLastPathComponent()
+      .deletingLastPathComponent().deletingLastPathComponent()
+      .deletingLastPathComponent()
+    let first =
+      try await ProductRockchipEvolutionCandidateBuilder.currentToolchainDigest(
+        sourceRoot: repositoryRoot)
+    let second =
+      try await ProductRockchipEvolutionCandidateBuilder.currentToolchainDigest(
+        sourceRoot: repositoryRoot)
+
+    XCTAssertEqual(first, second)
+    XCTAssertEqual(first.count, 64)
+    XCTAssertTrue(first.allSatisfy { $0.isHexDigit && !$0.isUppercase })
+  }
+
   func testConfirmationIsClosedExactAndHardBoundedToEightAttemptsFourHoursOneConcurrency()
     throws
   {
