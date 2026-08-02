@@ -197,8 +197,8 @@ SHA256(HEAD OID + index tree OID + 已变更路径内容 digest(排序) + submod
 
 | 终版要求 | 本 change 的处理 | 依据 |
 | --- | --- | --- |
-| §22 SQLite 存储 | 保留 durable files;迁移排 TASK-HFA-012(队尾,Wave A 完成且 GJ-5 PASS 后) | `PRODUCT-LOOP.md` §12:结构性改动须与 GJ 同车且非阻塞不做 |
-| §30 独立 `ArkDeckHarness` module | 保留四处分布;抽取排 TASK-HFA-013(队尾) | 同上 |
+| §22 SQLite 存储 | 已交付:TASK-HFA-012 done(SQLite 迁移合入,含历史 durable file 一次性迁移) | `PRODUCT-LOOP.md` §12:结构性改动须与 GJ 同车且非阻塞不做 |
+| §30 独立 `ArkDeckHarness` module | 已交付:TASK-HFA-013 done(独立 SwiftPM target);Harness✂️Process、Workflows✂️Harness 两条边由 #962 在 Package.swift 层删除并由 `ArchitectureBoundaryContractTests` 钉死 | 同上 |
 | §17.2 Runtime Request V3 `subject` | 只做 workspace 主体的窄化扩展(009),不做通用 Resource DSL;host-only 已由 `binding: none` 准入路径(TASK-HTP-007)承担 | 终版 §27 风险表自身的缓解方案 |
 | §17.3 `WorkflowEffect` 重命名 | 不重命名;按 `effectRiskClass` + `executionDomain` 计算属性兼容 | 终版 §17.3 明文建议 |
 | §18.3 `analyzer.symbolizeCrash@1` | 保持 `workspace.symbolizeCrash@1` | 见 §7 |

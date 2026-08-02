@@ -3306,8 +3306,10 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
 ## TASK-AIN-019 — 默认 Evolution 路径与未合入候选的 bounded E2 Flash campaign
 
 - Status:in-progress（r8 产品实现已由 #957 合入；r9 默认入口已由 #958 合入；r10 已由
-  #959 删除活跃 Harness 模式投影与旧 wire/public factory；r11 实现 autonomous
-  safe-repair loop，本实现 PR 中授权实例、USB/HDC/RockUSB 与真实 Flash dispatch 均为 0）
+  #959 删除活跃 Harness 模式投影与旧 wire/public factory；r11 autonomous safe-repair loop
+  已由 #960 合入，该实现 PR 中授权实例、USB/HDC/RockUSB 与真实 Flash dispatch 均为 0；
+  候选构建绑定 SwiftPM role 已由 #961 合入；搭车的平面边界 target 化(Workflows✂️Harness、
+  Harness✂️Process、ArkDeckAgentComposition 接缝)已由 #962 合入）
 - Platform:macos
 - Requirements:POL-AGENT-002(MODIFIED)、REQ-FLASH-015(MODIFIED)、POL-AGENT-001、
   POL-WORKFLOW-001、POL-RECOVERY-001、POL-TARGET-001
