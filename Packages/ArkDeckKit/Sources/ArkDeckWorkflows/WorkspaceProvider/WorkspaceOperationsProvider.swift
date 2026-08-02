@@ -385,6 +385,16 @@ public final class WorkspaceProjectProfileRegistry: @unchecked Sendable {
   public func profiles() -> [WorkspaceProjectProfile] {
     lock.withLock { profilesByRef.values.sorted { $0.projectRef < $1.projectRef } }
   }
+
+  /// Removes a derived evolution profile once its isolated tree is destroyed,
+  /// so a stale reference fails at resolution instead of mid-operation. The
+  /// primary profile is not removable through this seam.
+  public func unregisterEvolutionProfile(projectRef: String) {
+    lock.withLock {
+      guard profilesByRef[projectRef]?.kind == .evolution else { return }
+      profilesByRef.removeValue(forKey: projectRef)
+    }
+  }
 }
 
 public struct UnavailableWorkspaceOperationsProvider: DeviceProvider {

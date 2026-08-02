@@ -514,6 +514,304 @@ final class HarnessEvolutionContractTests: XCTestCase {
         from: JSONSerialization.data(withJSONObject: object)))
   }
 
+  func testWorkspaceGCDestroysOnlyTerminalTreesAndKeepsAuditMetadata() async throws {
+    let fixture = try gcFixture("gc-basic")
+    let terminal = try await fixture.prepare("HTASK-GC0000000001")
+    let active = try await fixture.prepare("HTASK-GC0000000002")
+    let unknown = try await fixture.prepare("HTASK-GC0000000003")
+    try await fixture.manager.prepareAttemptDirectory(
+      workspace: terminal, attemptID: "ATTEMPT-001", ordinal: 1, createdAtUTC: timestamp)
+
+    let findings = try await fixture.manager.sweepTerminalWorkspaces(
+      tasks: [
+        HarnessEvolutionWorkspaceGCTaskReference(
+          workspaceID: terminal.workspaceID, htaskID: terminal.htaskID,
+          lifecycle: .succeeded, updatedAtUTC: "2026-08-01T00:00:00Z"),
+        HarnessEvolutionWorkspaceGCTaskReference(
+          workspaceID: active.workspaceID, htaskID: active.htaskID,
+          lifecycle: .running, updatedAtUTC: "2026-08-01T00:00:00Z"),
+      ],
+      retention: try HarnessEvolutionWorkspaceRetention(
+        minimumTerminalAgeSeconds: 0, retainLatestTerminalCount: 0),
+      nowUTC: "2026-08-02T12:00:00Z")
+
+    let byWorkspace = Dictionary(
+      uniqueKeysWithValues: findings.map { ($0.workspaceID, $0) })
+    XCTAssertEqual(byWorkspace[terminal.workspaceID]?.disposition, .destroyed)
+    XCTAssertEqual(byWorkspace[active.workspaceID]?.disposition, .activeRetained)
+    XCTAssertEqual(byWorkspace[unknown.workspaceID]?.disposition, .unknownTaskRetained)
+    XCTAssertGreaterThan(
+      try XCTUnwrap(byWorkspace[terminal.workspaceID]).reclaimedBytes, 0)
+
+    // The isolated tree is gone; the audit metadata and the attempt
+    // manifests survive, and a teardown record now exists.
+    let terminalRoot = fixture.workspaceRoot(terminal)
+    XCTAssertFalse(
+      FileManager.default.fileExists(
+        atPath: terminalRoot.appendingPathComponent("workspace").path))
+    XCTAssertTrue(
+      FileManager.default.fileExists(
+        atPath: terminalRoot.appendingPathComponent("workspace.json").path))
+    XCTAssertTrue(
+      FileManager.default.fileExists(
+        atPath: terminalRoot.appendingPathComponent("attempts/attempt-001/attempt.json").path))
+    let teardown = try XCTUnwrap(
+      try JSONSerialization.jsonObject(
+        with: Data(contentsOf: terminalRoot.appendingPathComponent("teardown.json")))
+        as? [String: Any])
+    XCTAssertEqual(teardown["documentType"] as? String, "evolution-workspace-teardown")
+    XCTAssertEqual(teardown["htaskID"] as? String, terminal.htaskID)
+    XCTAssertEqual(teardown["lifecycle"] as? String, "succeeded")
+
+    // The derived profile of the destroyed tree fails at resolution; the
+    // active and unknown ones keep resolving, and their trees are intact.
+    XCTAssertNil(fixture.registry.profile(for: terminal.projectRef))
+    XCTAssertNotNil(fixture.registry.profile(for: active.projectRef))
+    XCTAssertTrue(
+      FileManager.default.fileExists(
+        atPath: fixture.workspaceRoot(active).appendingPathComponent("workspace").path))
+    XCTAssertTrue(
+      FileManager.default.fileExists(
+        atPath: fixture.workspaceRoot(unknown).appendingPathComponent("workspace").path))
+
+    // Recoverability: the active workspace still reopens idempotently; the
+    // destroyed one refuses to impersonate a live tree.
+    let reopened = try await fixture.prepare(active.htaskID)
+    XCTAssertEqual(reopened, active)
+    do {
+      _ = try await fixture.prepare(terminal.htaskID)
+      XCTFail("a swept workspace must not reopen")
+    } catch let error as EvolutionWorkspaceError {
+      XCTAssertEqual(error, .workspaceAlreadyDestroyed(terminal.workspaceID))
+    }
+
+    // A second sweep is idempotent: nothing new to reclaim.
+    let second = try await fixture.manager.sweepTerminalWorkspaces(
+      tasks: [
+        HarnessEvolutionWorkspaceGCTaskReference(
+          workspaceID: terminal.workspaceID, htaskID: terminal.htaskID,
+          lifecycle: .succeeded, updatedAtUTC: "2026-08-01T00:00:00Z")
+      ],
+      retention: try HarnessEvolutionWorkspaceRetention(
+        minimumTerminalAgeSeconds: 0, retainLatestTerminalCount: 0),
+      nowUTC: "2026-08-02T13:00:00Z")
+    XCTAssertEqual(
+      second.first { $0.workspaceID == terminal.workspaceID }?.disposition,
+      .alreadyDestroyed)
+  }
+
+  func testWorkspaceGCRetentionKeepsLatestAndYoungTerminalTrees() async throws {
+    let fixture = try gcFixture("gc-retention")
+    let oldest = try await fixture.prepare("HTASK-GCAGE0000001")
+    let young = try await fixture.prepare("HTASK-GCAGE0000002")
+    let newest = try await fixture.prepare("HTASK-GCAGE0000003")
+    let references = [
+      HarnessEvolutionWorkspaceGCTaskReference(
+        workspaceID: oldest.workspaceID, htaskID: oldest.htaskID,
+        lifecycle: .failed, updatedAtUTC: "2026-07-20T00:00:00Z"),
+      HarnessEvolutionWorkspaceGCTaskReference(
+        workspaceID: young.workspaceID, htaskID: young.htaskID,
+        lifecycle: .cancelled, updatedAtUTC: "2026-07-30T00:00:00Z"),
+      HarnessEvolutionWorkspaceGCTaskReference(
+        workspaceID: newest.workspaceID, htaskID: newest.htaskID,
+        lifecycle: .succeeded, updatedAtUTC: "2026-08-02T11:00:00Z"),
+    ]
+    let retention = try HarnessEvolutionWorkspaceRetention(
+      minimumTerminalAgeSeconds: 7 * 86_400, retainLatestTerminalCount: 1)
+
+    // Dry run decides identically but touches nothing.
+    let preview = try await fixture.manager.sweepTerminalWorkspaces(
+      tasks: references,
+      retention: try HarnessEvolutionWorkspaceRetention(
+        minimumTerminalAgeSeconds: retention.minimumTerminalAgeSeconds,
+        retainLatestTerminalCount: retention.retainLatestTerminalCount, dryRun: true),
+      nowUTC: "2026-08-02T12:00:00Z")
+    let previewed = Dictionary(uniqueKeysWithValues: preview.map { ($0.workspaceID, $0) })
+    XCTAssertEqual(previewed[oldest.workspaceID]?.disposition, .wouldDestroy)
+    XCTAssertEqual(previewed[young.workspaceID]?.disposition, .retainedByPolicy)
+    XCTAssertEqual(previewed[newest.workspaceID]?.disposition, .retainedByPolicy)
+    for workspace in [oldest, young, newest] {
+      XCTAssertTrue(
+        FileManager.default.fileExists(
+          atPath: fixture.workspaceRoot(workspace).appendingPathComponent("workspace").path))
+    }
+
+    let findings = try await fixture.manager.sweepTerminalWorkspaces(
+      tasks: references, retention: retention, nowUTC: "2026-08-02T12:00:00Z")
+    let byWorkspace = Dictionary(uniqueKeysWithValues: findings.map { ($0.workspaceID, $0) })
+    // Only the tree both older than the age floor and outside the
+    // latest-count window is reclaimed.
+    XCTAssertEqual(byWorkspace[oldest.workspaceID]?.disposition, .destroyed)
+    XCTAssertEqual(byWorkspace[young.workspaceID]?.disposition, .retainedByPolicy)
+    XCTAssertEqual(byWorkspace[newest.workspaceID]?.disposition, .retainedByPolicy)
+    XCTAssertFalse(
+      FileManager.default.fileExists(
+        atPath: fixture.workspaceRoot(oldest).appendingPathComponent("workspace").path))
+    for workspace in [young, newest] {
+      XCTAssertTrue(
+        FileManager.default.fileExists(
+          atPath: fixture.workspaceRoot(workspace).appendingPathComponent("workspace").path))
+    }
+  }
+
+  func testWorkspaceGCResumesInterruptedTeardownAndRemovesStaleTemporaries() async throws {
+    let fixture = try gcFixture("gc-resume")
+    let workspace = try await fixture.prepare("HTASK-GCRESUME001")
+    let taskRoot = fixture.workspaceRoot(workspace)
+    // Simulate a teardown that crashed between the rename and the removal,
+    // with a stale copy temporary from an interrupted prepare next to it.
+    try FileManager.default.moveItem(
+      at: taskRoot.appendingPathComponent("workspace"),
+      to: taskRoot.appendingPathComponent(".workspace.doomed"))
+    try FileManager.default.createDirectory(
+      at: taskRoot.appendingPathComponent(".workspace.tmp"), withIntermediateDirectories: false)
+    try Data("stale\n".utf8).write(
+      to: taskRoot.appendingPathComponent(".workspace.tmp/leftover.txt"))
+
+    let findings = try await fixture.manager.sweepTerminalWorkspaces(
+      tasks: [
+        HarnessEvolutionWorkspaceGCTaskReference(
+          workspaceID: workspace.workspaceID, htaskID: workspace.htaskID,
+          lifecycle: .failed, updatedAtUTC: "2026-08-01T00:00:00Z")
+      ],
+      retention: try HarnessEvolutionWorkspaceRetention(
+        minimumTerminalAgeSeconds: 0, retainLatestTerminalCount: 0),
+      nowUTC: "2026-08-02T12:00:00Z")
+
+    XCTAssertEqual(findings.first?.disposition, .destroyed)
+    XCTAssertGreaterThan(try XCTUnwrap(findings.first).reclaimedBytes, 0)
+    for doomed in ["workspace", ".workspace.doomed", ".workspace.tmp"] {
+      XCTAssertFalse(
+        FileManager.default.fileExists(atPath: taskRoot.appendingPathComponent(doomed).path))
+    }
+    XCTAssertTrue(
+      FileManager.default.fileExists(atPath: taskRoot.appendingPathComponent("teardown.json").path))
+  }
+
+  func testTaskWorkspaceGCWireSweepsCancelledTaskAndValidatesBounds() async throws {
+    let source = try temporaryDirectory("gc-wire-source")
+    let state = try temporaryDirectory("gc-wire-state")
+    try FileManager.default.createDirectory(
+      at: source.appendingPathComponent("Sources"), withIntermediateDirectories: true)
+    try Data("old\n".utf8).write(to: source.appendingPathComponent("Sources/App.txt"))
+    let profile = try workspaceProfile(root: source)
+    let registry = WorkspaceProjectProfileRegistry(profile: profile)
+    let base = try WorkspaceProviderSupport.workspaceRevision(
+      root: profile.projectRoot, profileVersion: profile.profileID,
+      globs: ["Sources/**"])
+    let manager = try EvolutionWorkspaceManager(
+      rootURL: state.appendingPathComponent("evolution"), profileRegistry: registry)
+    let coordinator = HarnessTaskCoordinator(
+      store: try HarnessTaskStore(rootURL: state.appendingPathComponent("harness")),
+      jobPort: EvolutionNoopJobPort(), evolutionWorkspacePort: manager,
+      nowUTC: { "2026-08-02T00:00:00Z" },
+      taskIDFactory: { "HTASK-ABCDEF0123AA" })
+    let service = HarnessTaskMethodService(
+      coordinator: coordinator, applicationReferenceValidator: { _, _ in })
+    let submission = HarnessTaskSubmission(
+      type: .debugCrash, projectRef: profile.projectRef,
+      target: HarnessTaskTargetReference(targetID: "device"),
+      goal: HarnessTaskGoal(
+        summary: "fix crash",
+        desiredState: ["baseWorkspaceRevision": .string(base)]),
+      budgets: budgets, policy: HarnessTaskPolicy(allowedOperations: evolutionOperations),
+      evolutionPolicy: try HarnessEvolutionPolicy(
+        baseRevision: base, allowedPaths: ["Sources/**"], maxAttempts: 3,
+        maxChangedFiles: 2, maxDiffLines: 20,
+        allowedOperations: evolutionOperations))
+    let snapshot = try await coordinator.submit(submission)
+    let workspaceID = try XCTUnwrap(snapshot.evolutionWorkspace?.workspaceID)
+
+    // Default retention keeps the freshly terminal tree (latest-count 2).
+    _ = try await coordinator.cancel(snapshot.htaskID)
+    let retainedResponse = await service.handle(
+      "task.workspaceGC", requestID: "gc-default", params: nil)
+    XCTAssertNil(retainedResponse.errorCode)
+    guard case .object(let retainedFields)? = retainedResponse.result,
+      case .array(let retainedRows)? = retainedFields["workspaces"],
+      case .object(let retainedRow)? = retainedRows.first
+    else { return XCTFail("task.workspaceGC must report per-workspace findings") }
+    XCTAssertEqual(retainedRow["workspaceId"], .string(workspaceID))
+    XCTAssertEqual(retainedRow["disposition"], .string("retainedByPolicy"))
+
+    // An explicit zero-retention sweep reclaims it and reports the bytes.
+    let response = await service.handle(
+      "task.workspaceGC", requestID: "gc-now",
+      params: ["retainDays": .integer(0), "retainLast": .integer(0)])
+    XCTAssertNil(response.errorCode)
+    guard case .object(let fields)? = response.result,
+      case .array(let rows)? = fields["workspaces"],
+      case .object(let row)? = rows.first
+    else { return XCTFail("task.workspaceGC must report per-workspace findings") }
+    XCTAssertEqual(row["workspaceId"], .string(workspaceID))
+    XCTAssertEqual(row["htaskId"], .string(snapshot.htaskID))
+    XCTAssertEqual(row["disposition"], .string("destroyed"))
+    guard case .integer(let reclaimed)? = fields["reclaimedBytes"] else {
+      return XCTFail("task.workspaceGC must report reclaimed bytes")
+    }
+    XCTAssertGreaterThan(reclaimed, 0)
+
+    // Bounds are validated at the wire, and a composition without the
+    // workspace port fails closed instead of pretending to sweep.
+    let malformed = await service.handle(
+      "task.workspaceGC", requestID: "gc-bad", params: ["retainDays": .integer(-1)])
+    XCTAssertEqual(malformed.errorCode, .invalidParams)
+    let portless = HarnessTaskMethodService(
+      coordinator: HarnessTaskCoordinator(
+        store: try HarnessTaskStore(rootURL: state.appendingPathComponent("harness-portless")),
+        jobPort: EvolutionNoopJobPort(),
+        nowUTC: { "2026-08-02T00:00:00Z" },
+        taskIDFactory: { "HTASK-ABCDEF0123AB" }),
+      applicationReferenceValidator: { _, _ in })
+    let unavailable = await portless.handle(
+      "task.workspaceGC", requestID: "gc-portless", params: nil)
+    XCTAssertEqual(unavailable.errorCode, .rejected)
+  }
+
+  private struct EvolutionGCFixture {
+    let manager: EvolutionWorkspaceManager
+    let registry: WorkspaceProjectProfileRegistry
+    let managerRoot: URL
+    let sourceProjectRef: String
+    let policy: HarnessEvolutionPolicy
+    let createdAtUTC: String
+
+    func prepare(_ htaskID: String) async throws -> HarnessEvolutionWorkspace {
+      try await manager.prepareWorkspace(
+        htaskID: htaskID, sourceProjectRef: sourceProjectRef,
+        policy: policy, createdAtUTC: createdAtUTC)
+    }
+
+    func workspaceRoot(_ workspace: HarnessEvolutionWorkspace) -> URL {
+      managerRoot.appendingPathComponent(workspace.workspaceID, isDirectory: true)
+    }
+  }
+
+  private func gcFixture(_ prefix: String) throws -> EvolutionGCFixture {
+    let source = try temporaryDirectory("\(prefix)-source")
+    let state = try temporaryDirectory("\(prefix)-state")
+    try FileManager.default.createDirectory(
+      at: source.appendingPathComponent("Sources"), withIntermediateDirectories: true)
+    try Data("payload\n".utf8).write(to: source.appendingPathComponent("Sources/App.txt"))
+    let profile = try workspaceProfile(root: source)
+    let registry = WorkspaceProjectProfileRegistry(profile: profile)
+    let base = try WorkspaceProviderSupport.workspaceRevision(
+      root: profile.projectRoot, profileVersion: profile.profileID,
+      globs: ["Sources/**"])
+    let managerRoot = state.appendingPathComponent("evolution", isDirectory: true)
+    return EvolutionGCFixture(
+      manager: try EvolutionWorkspaceManager(
+        rootURL: managerRoot, profileRegistry: registry),
+      registry: registry,
+      managerRoot: managerRoot,
+      sourceProjectRef: profile.projectRef,
+      policy: try HarnessEvolutionPolicy(
+        baseRevision: base, allowedPaths: ["Sources/**"], maxAttempts: 3,
+        maxChangedFiles: 2, maxDiffLines: 20,
+        allowedOperations: evolutionOperations),
+      createdAtUTC: timestamp)
+  }
+
   private var timestamp: String { "2026-08-02T00:00:00Z" }
   private var evolutionOperations: [String] {
     [

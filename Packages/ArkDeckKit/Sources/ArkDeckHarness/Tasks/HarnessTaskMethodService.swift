@@ -200,6 +200,31 @@ package struct HarnessTaskMethodService: Sendable {
         }
         return success(id: request.id, result: Self.encodeTask(try await harness.cancel(id)))
 
+      case "task.workspaceGC":
+        let retention = try Self.decodeRetention(request.params)
+        let findings = try await harness.sweepEvolutionWorkspaces(retention: retention)
+        return success(
+          id: request.id,
+          result: .object([
+            "dryRun": .bool(retention.dryRun),
+            "reclaimedBytes": .integer(
+              findings.reduce(Int64(0)) {
+                switch $1.disposition {
+                case .destroyed, .wouldDestroy: $0 + $1.reclaimedBytes
+                default: $0
+                }
+              }),
+            "workspaces": .array(
+              findings.map { finding in
+                .object([
+                  "workspaceId": .string(finding.workspaceID),
+                  "htaskId": finding.htaskID.map(JSONValue.string) ?? .null,
+                  "disposition": .string(finding.disposition.rawValue),
+                  "reclaimedBytes": .integer(finding.reclaimedBytes),
+                ])
+              }),
+          ]))
+
       default:
         return failure(
           id: request.id, code: .unknownMethod, message: "unknown method \(method)")
@@ -215,6 +240,8 @@ package struct HarnessTaskMethodService: Sendable {
       }
     } catch let error as HarnessTaskSubmissionError {
       return failure(id: request.id, code: .invalidParams, message: "\(error)")
+    } catch let error as HarnessEvolutionWorkspaceRetentionError {
+      return failure(id: request.id, code: .invalidParams, message: "\(error)")
     } catch let error as HarnessTaskStoreError {
       if case .notFound(let id) = error {
         return failure(id: request.id, code: .notFound, message: "unknown task \(id)")
@@ -226,6 +253,28 @@ package struct HarnessTaskMethodService: Sendable {
   }
 
   // MARK: - Wire decoding
+
+  /// Default retention: a week of post-mortem lifetime and the two most
+  /// recently terminal trees. A caller can only narrow or widen how long
+  /// terminal trees linger — active and unknown workspaces stay untouchable.
+  private static func decodeRetention(
+    _ params: [String: JSONValue]?
+  ) throws -> HarnessEvolutionWorkspaceRetention {
+    func integer(_ key: String) throws -> Int? {
+      switch params?[key] {
+      case .integer(let value): return Int(value)
+      case .unsignedInteger(let value): return Int(value)
+      case .none, .null: return nil
+      default: throw HarnessEvolutionWorkspaceRetentionError.malformedBound(key)
+      }
+    }
+    var dryRun = false
+    if case .bool(let value)? = params?["dryRun"] { dryRun = value }
+    return try HarnessEvolutionWorkspaceRetention(
+      minimumTerminalAgeSeconds: (try integer("retainDays") ?? 7) * 86_400,
+      retainLatestTerminalCount: try integer("retainLast") ?? 2,
+      dryRun: dryRun)
+  }
 
   private static func decodeSubmission(
     _ params: [String: JSONValue]?,

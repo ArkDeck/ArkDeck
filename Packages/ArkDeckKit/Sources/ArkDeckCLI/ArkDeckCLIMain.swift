@@ -943,6 +943,7 @@ struct ArkDeckCommandLine {
       [--max-model-calls <n>] [--json]
         arkdeck task list|status|result|events|evaluations|attempts|humanActions|memory|reconcile|\
       pause|cancel --task <HTASK-id> [--json]
+        arkdeck task workspace-gc [--retain-days <n>] [--retain-last <n>] [--dry-run] [--json]
         arkdeck task resume --task <HTASK-id> --resolution <typed reason> [--json]
         arkdeck artifact list|inspect|read|export --job <id> [--artifact <id>] \
       [--destination <directory>] [--allow-sensitive]

@@ -259,6 +259,110 @@ public protocol HarnessEvolutionWorkspacePort: Sendable {
     ordinal: Int,
     createdAtUTC: String
   ) async throws
+
+  /// Destroys the isolated trees of terminal tasks according to `retention`.
+  /// Audit metadata (workspace manifest, attempt manifests, teardown record)
+  /// always survives; workspaces of non-terminal tasks and workspaces the
+  /// caller cannot vouch for are never touched.
+  func sweepTerminalWorkspaces(
+    tasks: [HarnessEvolutionWorkspaceGCTaskReference],
+    retention: HarnessEvolutionWorkspaceRetention,
+    nowUTC: String
+  ) async throws -> [HarnessEvolutionWorkspaceGCFinding]
+}
+
+public enum HarnessEvolutionWorkspaceRetentionError: Error, Equatable, Sendable {
+  case negativeBound(String)
+  case malformedBound(String)
+}
+
+/// Bounds for the terminal-workspace sweep. The policy can only choose how
+/// long destroyed-eligible trees linger; it cannot widen the sweep to active
+/// or unknown workspaces.
+public struct HarnessEvolutionWorkspaceRetention: Equatable, Codable, Sendable {
+  /// A terminal task's tree is destroyed only after its last transition is
+  /// at least this old.
+  public let minimumTerminalAgeSeconds: Int
+  /// The most recently terminal trees stay for post-mortem regardless of age.
+  public let retainLatestTerminalCount: Int
+  /// Report what would be destroyed without touching the filesystem.
+  public let dryRun: Bool
+
+  public init(
+    minimumTerminalAgeSeconds: Int,
+    retainLatestTerminalCount: Int,
+    dryRun: Bool = false
+  ) throws {
+    guard minimumTerminalAgeSeconds >= 0 else {
+      throw HarnessEvolutionWorkspaceRetentionError.negativeBound("minimumTerminalAgeSeconds")
+    }
+    guard retainLatestTerminalCount >= 0 else {
+      throw HarnessEvolutionWorkspaceRetentionError.negativeBound("retainLatestTerminalCount")
+    }
+    self.minimumTerminalAgeSeconds = minimumTerminalAgeSeconds
+    self.retainLatestTerminalCount = retainLatestTerminalCount
+    self.dryRun = dryRun
+  }
+}
+
+/// What the task store can vouch for about one evolution workspace: the
+/// authoritative lifecycle and its last transition time. Terminal lifecycles
+/// are absorbing, so a reference computed before the sweep cannot go stale in
+/// the destructive direction.
+public struct HarnessEvolutionWorkspaceGCTaskReference: Equatable, Codable, Sendable {
+  public let workspaceID: String
+  public let htaskID: String
+  public let lifecycle: HarnessTaskLifecycle
+  public let updatedAtUTC: String
+
+  public init(
+    workspaceID: String,
+    htaskID: String,
+    lifecycle: HarnessTaskLifecycle,
+    updatedAtUTC: String
+  ) {
+    self.workspaceID = workspaceID
+    self.htaskID = htaskID
+    self.lifecycle = lifecycle
+    self.updatedAtUTC = updatedAtUTC
+  }
+}
+
+public enum HarnessEvolutionWorkspaceGCDisposition: String, CaseIterable, Codable, Sendable {
+  /// The owning task is not terminal; recoverability is untouched.
+  case activeRetained
+  /// Terminal, but inside the retention window (age or latest-count).
+  case retainedByPolicy
+  /// The isolated tree was removed this sweep; metadata survives.
+  case destroyed
+  /// Dry run: the tree would have been removed.
+  case wouldDestroy
+  /// A previous sweep already removed the tree; nothing left to reclaim.
+  case alreadyDestroyed
+  /// The on-disk workspace has no matching store reference (or the manifest
+  /// disagrees with it), so the sweep fails closed and keeps it.
+  case unknownTaskRetained
+}
+
+public struct HarnessEvolutionWorkspaceGCFinding: Equatable, Codable, Sendable {
+  public let workspaceID: String
+  public let htaskID: String?
+  public let disposition: HarnessEvolutionWorkspaceGCDisposition
+  /// Bytes removed by this sweep (or measured for `wouldDestroy`); zero for
+  /// every retaining disposition.
+  public let reclaimedBytes: Int64
+
+  public init(
+    workspaceID: String,
+    htaskID: String?,
+    disposition: HarnessEvolutionWorkspaceGCDisposition,
+    reclaimedBytes: Int64
+  ) {
+    self.workspaceID = workspaceID
+    self.htaskID = htaskID
+    self.disposition = disposition
+    self.reclaimedBytes = reclaimedBytes
+  }
 }
 
 public enum HarnessCandidatePatchCreator: String, Codable, Sendable {

@@ -18,6 +18,7 @@ public enum EvolutionWorkspaceError: Error, Equatable, Sendable {
   case unsafeSourceEntry(String)
   case workspaceManifestConflict
   case attemptManifestConflict
+  case workspaceAlreadyDestroyed(String)
 }
 
 public final class EvolutionWorkspaceManager: HarnessEvolutionWorkspacePort, @unchecked Sendable {
@@ -30,6 +31,25 @@ public final class EvolutionWorkspaceManager: HarnessEvolutionWorkspacePort, @un
     let ordinal: Int
     let workspaceID: String
     let createdAtUTC: String
+  }
+
+  /// Written once when the isolated tree is destroyed; together with the
+  /// surviving workspace and attempt manifests it is the audit record of a
+  /// swept workspace.
+  private struct TeardownRecord: Codable, Equatable {
+    static let currentDocumentType = "evolution-workspace-teardown"
+    static let currentSchemaVersion = "1.0.0"
+
+    let documentType: String
+    let schemaVersion: String
+    let workspaceID: String
+    let htaskID: String
+    let projectRef: String
+    let lifecycle: String
+    let destroyedAtUTC: String
+    let reclaimedBytes: Int64
+    let minimumTerminalAgeSeconds: Int
+    let retainLatestTerminalCount: Int
   }
 
   private let rootURL: URL
@@ -90,9 +110,19 @@ public final class EvolutionWorkspaceManager: HarnessEvolutionWorkspacePort, @un
       if FileManager.default.fileExists(atPath: manifestURL.path) {
         let stored = try JSONDecoder().decode(
           Manifest.self, from: Data(contentsOf: manifestURL))
-        guard stored.workspace == workspace,
-          FileManager.default.fileExists(atPath: workspaceRoot.path)
-        else { throw EvolutionWorkspaceError.workspaceManifestConflict }
+        guard stored.workspace == workspace else {
+          throw EvolutionWorkspaceError.workspaceManifestConflict
+        }
+        guard FileManager.default.fileExists(atPath: workspaceRoot.path) else {
+          // A swept workspace keeps its manifest for audit. Reopening it is a
+          // terminal-task identity being reused, never a recovery path.
+          if FileManager.default.fileExists(
+            atPath: taskRoot.appendingPathComponent("teardown.json").path)
+          {
+            throw EvolutionWorkspaceError.workspaceAlreadyDestroyed(workspace.workspaceID)
+          }
+          throw EvolutionWorkspaceError.workspaceManifestConflict
+        }
         let profile = try Self.derivedProfile(
           from: source, workspaceRoot: workspaceRoot,
           projectRef: projectRef, allowedPaths: policy.allowedPaths)
@@ -174,6 +204,195 @@ public final class EvolutionWorkspaceManager: HarnessEvolutionWorkspacePort, @un
         attributes: [.posixPermissions: 0o700])
       try Self.write(manifest, to: manifestURL)
     }
+  }
+
+  public func sweepTerminalWorkspaces(
+    tasks: [HarnessEvolutionWorkspaceGCTaskReference],
+    retention: HarnessEvolutionWorkspaceRetention,
+    nowUTC: String
+  ) async throws -> [HarnessEvolutionWorkspaceGCFinding] {
+    try lock.withLock {
+      // A workspaceID the store claims twice is vouched for by nobody.
+      var references: [String: HarnessEvolutionWorkspaceGCTaskReference] = [:]
+      var conflicted: Set<String> = []
+      for task in tasks where references.updateValue(task, forKey: task.workspaceID) != nil {
+        conflicted.insert(task.workspaceID)
+      }
+
+      struct Candidate {
+        let taskRoot: URL
+        let reference: HarnessEvolutionWorkspaceGCTaskReference
+        let projectRef: String
+        let hasMaterial: Bool
+      }
+      var findings: [HarnessEvolutionWorkspaceGCFinding] = []
+      var candidates: [Candidate] = []
+
+      let entries =
+        (try? FileManager.default.contentsOfDirectory(
+          at: rootURL, includingPropertiesForKeys: [.isDirectoryKey], options: []))
+        ?? []
+      for entry in entries {
+        let name = entry.lastPathComponent
+        guard name.hasPrefix("evo-"),
+          (try? entry.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true
+        else { continue }
+        guard !conflicted.contains(name),
+          let reference = references[name],
+          let manifest = try? JSONDecoder().decode(
+            Manifest.self,
+            from: Data(contentsOf: entry.appendingPathComponent("workspace.json"))),
+          manifest.workspace.workspaceID == name,
+          manifest.workspace.htaskID == reference.htaskID
+        else {
+          findings.append(
+            HarnessEvolutionWorkspaceGCFinding(
+              workspaceID: name, htaskID: references[name]?.htaskID,
+              disposition: .unknownTaskRetained, reclaimedBytes: 0))
+          continue
+        }
+        guard reference.lifecycle.isTerminal else {
+          findings.append(
+            HarnessEvolutionWorkspaceGCFinding(
+              workspaceID: name, htaskID: reference.htaskID,
+              disposition: .activeRetained, reclaimedBytes: 0))
+          continue
+        }
+        let hasMaterial = Self.destroyableEntries(under: entry)
+          .contains { FileManager.default.fileExists(atPath: $0.path) }
+        if !hasMaterial,
+          FileManager.default.fileExists(
+            atPath: entry.appendingPathComponent("teardown.json").path)
+        {
+          findings.append(
+            HarnessEvolutionWorkspaceGCFinding(
+              workspaceID: name, htaskID: reference.htaskID,
+              disposition: .alreadyDestroyed, reclaimedBytes: 0))
+          continue
+        }
+        candidates.append(
+          Candidate(
+            taskRoot: entry, reference: reference,
+            projectRef: manifest.workspace.projectRef, hasMaterial: hasMaterial))
+      }
+
+      // Retention ranks only trees that still exist: an interrupted teardown
+      // must not occupy a post-mortem slot it can no longer provide.
+      let ranked = candidates.filter(\.hasMaterial).sorted {
+        ($0.reference.updatedAtUTC, $0.reference.workspaceID)
+          > ($1.reference.updatedAtUTC, $1.reference.workspaceID)
+      }
+      var retained = Set(
+        ranked.prefix(retention.retainLatestTerminalCount).map(\.reference.workspaceID))
+      let now = Self.parseUTC(nowUTC)
+      for candidate in ranked.dropFirst(retention.retainLatestTerminalCount) {
+        guard let now,
+          let terminalAt = Self.parseUTC(candidate.reference.updatedAtUTC),
+          now.timeIntervalSince(terminalAt)
+            >= TimeInterval(retention.minimumTerminalAgeSeconds)
+        else {
+          // An unreadable clock or timestamp can only fail toward keeping.
+          retained.insert(candidate.reference.workspaceID)
+          continue
+        }
+      }
+
+      for candidate in candidates {
+        if candidate.hasMaterial, retained.contains(candidate.reference.workspaceID) {
+          findings.append(
+            HarnessEvolutionWorkspaceGCFinding(
+              workspaceID: candidate.reference.workspaceID,
+              htaskID: candidate.reference.htaskID,
+              disposition: .retainedByPolicy, reclaimedBytes: 0))
+          continue
+        }
+        let reclaimed = Self.measureBytes(Self.destroyableEntries(under: candidate.taskRoot))
+        if retention.dryRun {
+          findings.append(
+            HarnessEvolutionWorkspaceGCFinding(
+              workspaceID: candidate.reference.workspaceID,
+              htaskID: candidate.reference.htaskID,
+              disposition: .wouldDestroy, reclaimedBytes: reclaimed))
+          continue
+        }
+        try Self.destroyIsolatedTree(under: candidate.taskRoot)
+        profiles.unregisterEvolutionProfile(projectRef: candidate.projectRef)
+        let teardownURL = candidate.taskRoot.appendingPathComponent("teardown.json")
+        if !FileManager.default.fileExists(atPath: teardownURL.path) {
+          try Self.write(
+            TeardownRecord(
+              documentType: TeardownRecord.currentDocumentType,
+              schemaVersion: TeardownRecord.currentSchemaVersion,
+              workspaceID: candidate.reference.workspaceID,
+              htaskID: candidate.reference.htaskID,
+              projectRef: candidate.projectRef,
+              lifecycle: candidate.reference.lifecycle.rawValue,
+              destroyedAtUTC: nowUTC,
+              reclaimedBytes: reclaimed,
+              minimumTerminalAgeSeconds: retention.minimumTerminalAgeSeconds,
+              retainLatestTerminalCount: retention.retainLatestTerminalCount),
+            to: teardownURL)
+        }
+        findings.append(
+          HarnessEvolutionWorkspaceGCFinding(
+            workspaceID: candidate.reference.workspaceID,
+            htaskID: candidate.reference.htaskID,
+            disposition: .destroyed, reclaimedBytes: reclaimed))
+      }
+
+      return findings.sorted { $0.workspaceID < $1.workspaceID }
+    }
+  }
+
+  /// Everything a sweep may remove under one task root. The workspace
+  /// manifest, the attempt manifests and the teardown record are never here.
+  private static func destroyableEntries(under taskRoot: URL) -> [URL] {
+    [
+      taskRoot.appendingPathComponent("workspace", isDirectory: true),
+      taskRoot.appendingPathComponent(".workspace.doomed", isDirectory: true),
+      taskRoot.appendingPathComponent(".workspace.tmp", isDirectory: true),
+    ]
+  }
+
+  private static func destroyIsolatedTree(under taskRoot: URL) throws {
+    let workspaceRoot = taskRoot.appendingPathComponent("workspace", isDirectory: true)
+    let doomed = taskRoot.appendingPathComponent(".workspace.doomed", isDirectory: true)
+    // The rename makes the tree disappear from its addressable path first, so
+    // a crash mid-removal leaves a resumable `.workspace.doomed`, never a
+    // half-deleted `workspace/` that still looks reopenable.
+    if FileManager.default.fileExists(atPath: workspaceRoot.path) {
+      if FileManager.default.fileExists(atPath: doomed.path) {
+        try FileManager.default.removeItem(at: doomed)
+      }
+      try FileManager.default.moveItem(at: workspaceRoot, to: doomed)
+    }
+    for entry in destroyableEntries(under: taskRoot)
+    where FileManager.default.fileExists(atPath: entry.path) {
+      try FileManager.default.removeItem(at: entry)
+    }
+  }
+
+  private static func measureBytes(_ entries: [URL]) -> Int64 {
+    var total: Int64 = 0
+    for entry in entries {
+      guard FileManager.default.fileExists(atPath: entry.path) else { continue }
+      guard
+        let enumerator = FileManager.default.enumerator(
+          at: entry, includingPropertiesForKeys: [.isRegularFileKey, .fileSizeKey],
+          options: [], errorHandler: { _, _ in true })
+      else { continue }
+      for case let file as URL in enumerator {
+        let values = try? file.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey])
+        if values?.isRegularFile == true { total += Int64(values?.fileSize ?? 0) }
+      }
+    }
+    return total
+  }
+
+  private static func parseUTC(_ value: String) -> Date? {
+    let fractional = ISO8601DateFormatter()
+    fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    return fractional.date(from: value) ?? ISO8601DateFormatter().date(from: value)
   }
 
   private static func derivedProfile(

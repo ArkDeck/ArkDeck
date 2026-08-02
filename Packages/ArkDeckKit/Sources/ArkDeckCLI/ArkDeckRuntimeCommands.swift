@@ -1064,7 +1064,8 @@ enum RuntimeCLI {
         exitCode: EX_USAGE,
         message:
           "missing task subcommand (submit|list|status|result|events|evaluations|"
-          + "attempts|humanActions|memory|reconcile|propose-patch|pause|resume|cancel)")
+          + "attempts|humanActions|memory|reconcile|propose-patch|pause|resume|cancel|"
+          + "workspace-gc)")
     }
     var rest = Array(arguments.dropFirst())
     let json = rest.contains("--json")
@@ -1172,6 +1173,27 @@ enum RuntimeCLI {
         try client.request(
           method: "task.\(subcommand)", params: ["htaskId": .string(try requiredTask())]),
         json: json)
+    case "workspace-gc":
+      // Reclaims the isolated trees of terminal evolution tasks. Audit
+      // metadata survives daemon-side; active tasks are untouchable, so the
+      // widest possible request is still bounded to terminal trees.
+      var params: [String: JSONValue] = [:]
+      if let days = value("--retain-days") {
+        guard let parsed = Int64(days), parsed >= 0 else {
+          throw CLIError(
+            exitCode: EX_USAGE, message: "--retain-days requires a nonnegative integer")
+        }
+        params["retainDays"] = .integer(parsed)
+      }
+      if let last = value("--retain-last") {
+        guard let parsed = Int64(last), parsed >= 0 else {
+          throw CLIError(
+            exitCode: EX_USAGE, message: "--retain-last requires a nonnegative integer")
+        }
+        params["retainLast"] = .integer(parsed)
+      }
+      if rest.contains("--dry-run") { params["dryRun"] = .bool(true) }
+      emit(try client.request(method: "task.workspaceGC", params: params), json: json)
     case "resume":
       guard let resolution = value("--resolution") else {
         throw CLIError(
