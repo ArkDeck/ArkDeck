@@ -129,6 +129,21 @@ struct ArkDeckCommandLine {
     if mode == "close" {
       findings = try reconciler.scan()
       guard !findings.isEmpty else { return }
+      // Exit 4 while closable debt remains; exit 6 when everything left
+      // needs a different verb (campaign lane, corrupt journal, missing
+      // reservation) so scripts can tell "run close again" from "this
+      // tool cannot drain the rest".
+      let closable = findings.contains { finding in
+        if case .openStandingReservation = finding.ledgerState { return true }
+        return false
+      }
+      guard closable else {
+        throw CLIError(
+          exitCode: 6,
+          message:
+            "\(findings.count) unresolved flash session(s) need another verb "
+            + "(campaign lane or unreadable linkage)")
+      }
     }
     throw CLIError(
       exitCode: 4, message: "\(findings.count) unresolved flash session(s)")
@@ -140,7 +155,11 @@ struct ArkDeckCommandLine {
     header.append("state: \(finding.currentState?.rawValue ?? "unknown")")
     header.append("finalized: \(finding.finalized)")
     if finding.hasTornTail { header.append("tornTail: true") }
+    if finding.isLive { header.append("live: true") }
     print(header.joined(separator: " "))
+    if finding.isLive {
+      print("  a live run owns this session; its own terminal is authoritative")
+    }
     if let journalError = finding.journalError {
       print("  journal unreadable: \(journalError)")
     }
@@ -184,6 +203,8 @@ struct ArkDeckCommandLine {
       print("  closed: \(reservationID) (already terminal)")
     case .agentLaneDeferred(let reservationID):
       print("  deferred: \(reservationID) belongs to the campaign lane (flash continue)")
+    case .sessionLive:
+      print("  refused: a live run owns this session")
     case .nothingToClose:
       print("  nothing to close")
     }

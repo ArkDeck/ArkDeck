@@ -757,6 +757,8 @@ final class RockchipDurableExecutionPersistence: @unchecked Sendable,
   private var waitingForRecovery = false
   private var activeSchemaVersion = JournalEvent.rockchipAuthorizedAgentSchemaVersion
 
+  private let runLockDescriptor: Int32
+
   init(
     layout: SessionLayout,
     claim: StorageClaim,
@@ -768,12 +770,17 @@ final class RockchipDurableExecutionPersistence: @unchecked Sendable,
     self.claim = claim
     self.coordinator = coordinator
     self.storageContext = storageContext
+    // Held for the whole run so `flash reconcile` can tell a live session
+    // from a crashed one; the kernel releases it on any process death.
+    runLockDescriptor = try RockchipFlashSessionRunLock.acquire(sessionRoot: layout.root)
     journal = try FileDurableJournal(url: layout.journalURL)
     audit = try FileDurableSessionAuditStore(layout: layout)
     artifactStore = SessionArtifactStore(layout: layout)
     publisher = AtomicSessionManifestPublisher(layout: layout)
     createdAt = Self.timestamp()
   }
+
+  deinit { RockchipFlashSessionRunLock.release(runLockDescriptor) }
 
   func appendJobCreated(admission: RockchipExecutionAdmission) throws {
     try locked {

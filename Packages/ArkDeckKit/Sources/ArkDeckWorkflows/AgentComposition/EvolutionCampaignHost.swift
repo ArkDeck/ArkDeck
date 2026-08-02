@@ -309,6 +309,22 @@ public final class RockchipEvolutionCampaignHost: @unchecked Sendable {
       // unknown even if the current process happens to remember an error.
       intents = []
       disposition = .outcomeUnknown
+      // Close the usage reservation too, or the target stays blocked
+      // forever: the ledger admits one open reservation per target, and a
+      // crashed attempt's reservation had no other closer (adversarial
+      // review C3). `outcomeUnknown` mirrors the attempt tombstone below.
+      if usage != nil {
+        do {
+          _ = try usageLedger.close(
+            reservationID: reservationID,
+            terminal: AgentAuthorityUsageTerminal(
+              status: .outcomeUnknown, closedAt: nowUTC(),
+              externalIntentEventIDs: []))
+        } catch AuthorizationUsageLedgerError.reservationConflict {
+          // Raced the dying process's own close; whoever wrote a terminal
+          // won, and the re-read on the next continue sees it.
+        }
+      }
     }
     return try ledger.closeAttempt(
       campaignID: document.campaignID, ordinal: ordinal,

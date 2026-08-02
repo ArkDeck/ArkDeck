@@ -378,6 +378,98 @@ final class EvolutionCampaignContractTests: XCTestCase {
         from: JSONSerialization.data(withJSONObject: strategy)))
   }
 
+  func testUnresolvedAttemptReconciliationAlsoClosesTheUsageReservation() async throws {
+    // Adversarial review C3: tombstoning the campaign attempt while leaving
+    // the usage reservation open blocked the target forever — the ledger
+    // admits one open reservation per target and nothing else ever closed
+    // a crashed attempt's. Reconciliation must close both.
+    let root = temporaryDirectory("campaign-usage-close")
+    defer { try? FileManager.default.removeItem(at: root) }
+    let campaignRoot = root.appending(path: "campaign")
+    let usageRoot = root.appending(path: "usage")
+    let ledger = try RockchipEvolutionCampaignLedger(root: campaignRoot)
+    let usageLedger = try AgentAuthorityUsageLedger(root: usageRoot)
+    let assertion = try makeAssertion()
+    let pins = try makePins(assertion: assertion, ordinal: 1)
+    _ = try ledger.create(assertion)
+    _ = try ledger.appendCandidate(
+      campaignID: assertion.campaignID, candidate: pins.candidate,
+      review: pins.review, at: Self.confirmedAt)
+
+    let authorityRef = AgentExecutionAuthorityReference.evolutionCampaignConfirmation(
+      campaignDigestSHA256: String(repeating: "f", count: 64),
+      baseCommitOID: String(repeating: "a", count: 40),
+      planDigestSHA256: String(repeating: "b", count: 64),
+      archiveDigestSHA256: String(repeating: "c", count: 64),
+      stepSetDigestSHA256: String(repeating: "d", count: 64),
+      targetStableIdentitySHA256: String(repeating: "e", count: 64),
+      bindingLineageRootRevision: 1,
+      confirmedAt: Self.confirmedAt,
+      validUntil: "2026-08-02T12:00:00Z",
+      maximumAttempts: 8)
+    let operationDigest = String(repeating: "1", count: 64)
+    let targetDigest = String(repeating: "2", count: 64)
+    let reservationID = try AgentAuthorityUsageReservation.canonicalReservationID(
+      authorizationRef: authorityRef, jobID: "job-crashed",
+      operationDigestSHA256: operationDigest, targetDigestSHA256: targetDigest)
+    _ = try usageLedger.reserve(
+      AgentAuthorityUsageReservation(
+        reservationID: reservationID, authorizationRef: authorityRef, ordinal: 1,
+        maximumUses: 8, maximumConcurrentJobs: 1, jobID: "job-crashed",
+        operationDigestSHA256: operationDigest, targetDigestSHA256: targetDigest,
+        reservedAt: Self.confirmedAt,
+        forwardLeaseExpiresAt: "2026-08-02T23:00:00Z",
+        compensationLeaseExpiresAt: "2026-08-02T23:30:00Z",
+        terminal: nil))
+    _ = try ledger.reserveAttempt(
+      campaignID: assertion.campaignID, candidateID: pins.candidate.candidateID,
+      reviewID: pins.review.reviewID, ordinal: 1, reservationID: reservationID,
+      jobID: "job-crashed", sessionID: "session-crashed", at: Self.confirmedAt)
+
+    let flash = CountingEvolutionFlash()
+    let host = try RockchipEvolutionCampaignHost(
+      ledger: ledger, usageLedger: usageLedger,
+      repairer: FixedEvolutionRepairer(strategy: pins.candidate.strategy),
+      builder: FixedEvolutionBuilder(
+        build: RockchipEvolutionCandidateBuild(
+          pin: pins.candidate, reviewDiff: Data("diff".utf8))),
+      reviewer: RejectingEvolutionReviewer(), flash: flash,
+      nowUTC: { Self.confirmedAt })
+    await ain019AssertThrowsAsync(
+      try await host.continueCampaign(
+        campaignID: assertion.campaignID,
+        archiveURL: URL(fileURLWithPath: "/tmp/images.tar.gz"),
+        targetLocationSelector: "42"))
+    let dispatches = await flash.dispatchCount()
+    XCTAssertEqual(dispatches, 0)
+
+    // Campaign tombstoned as before…
+    let terminalDocument = try ledger.load(assertion.campaignID)
+    XCTAssertTrue(terminalDocument.isTerminal)
+    let attemptTerminal = terminalDocument.events.first { $0.ordinal == 1 && $0.disposition != nil }
+    XCTAssertEqual(attemptTerminal?.disposition, .outcomeUnknown)
+    // …and, new, the usage reservation carries the matching terminal, so
+    // the target is no longer host-wide blocked: a fresh reservation for
+    // the same target succeeds.
+    let usageTerminal = try XCTUnwrap(
+      usageLedger.load().reservations.first { $0.reservationID == reservationID }?.terminal)
+    XCTAssertEqual(usageTerminal.status, .outcomeUnknown)
+    XCTAssertEqual(usageTerminal.externalIntentEventIDs, [])
+    let nextID = try AgentAuthorityUsageReservation.canonicalReservationID(
+      authorizationRef: authorityRef, jobID: "job-next",
+      operationDigestSHA256: operationDigest, targetDigestSHA256: targetDigest)
+    XCTAssertNoThrow(
+      try usageLedger.reserve(
+        AgentAuthorityUsageReservation(
+          reservationID: nextID, authorizationRef: authorityRef, ordinal: 2,
+          maximumUses: 8, maximumConcurrentJobs: 1, jobID: "job-next",
+          operationDigestSHA256: operationDigest, targetDigestSHA256: targetDigest,
+          reservedAt: Self.confirmedAt,
+          forwardLeaseExpiresAt: "2026-08-02T23:00:00Z",
+          compensationLeaseExpiresAt: "2026-08-02T23:30:00Z",
+          terminal: nil)))
+  }
+
   func testLedgerRejectsUnknownFieldsAndUnresolvedAttemptBecomesTerminalBeforeDispatch()
     async throws
   {
