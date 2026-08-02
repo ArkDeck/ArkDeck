@@ -31,13 +31,6 @@ public enum DeviceBindingRejectionReason: String, Codable, Equatable, Sendable {
   case policyBlocked
 }
 
-public enum DeviceBindingReconcileTrigger: String, Codable, Equatable, Sendable {
-  case startup
-  case manual
-  case deviceReturned
-  case providerRecovery
-}
-
 public struct DeviceBindingManifestSnapshot: Equatable, Sendable {
   public let originalTarget: JSONValue
   public let bindingHistory: [JSONValue]
@@ -528,40 +521,6 @@ public actor DeviceBindingJournalAdapter: HDCDeviceCommandExecuting {
       throw DeviceBindingJournalAdapterError.unsupportedStateTransition(currentState ?? .queued)
     }
     return try HDCDeviceCommandMaterializer.materialize(durableIntent, from: currentBinding)
-  }
-
-  public func recordReconcileAwaiting(
-    recoveryAttemptID: String,
-    trigger: DeviceBindingReconcileTrigger,
-    evidence: [String]
-  ) throws {
-    try synchronizeDurableAuthority()
-    let lastDurableSequence = max(nextSequence - 1, 0)
-    try append(
-      JournalEvent.reconcileStarted(
-        eventID: eventID(),
-        sequence: nextSequence,
-        sessionID: auditStore.layout.sessionID,
-        jobID: auditStore.layout.jobID,
-        timestamp: timestamp(),
-        recoveryAttemptID: recoveryAttemptID,
-        sourceState: .waitingForRecovery,
-        lastDurableSequence: lastDurableSequence,
-        trigger: trigger.rawValue))
-    try append(
-      JournalEvent.reconcileOutcome(
-        eventID: eventID(),
-        sequence: nextSequence,
-        sessionID: auditStore.layout.sessionID,
-        jobID: auditStore.layout.jobID,
-        timestamp: timestamp(),
-        bindingRevision: nil,
-        recoveryAttemptID: recoveryAttemptID,
-        result: "waitingForRecovery",
-        nextState: .waitingForRecovery,
-        outcomeCertainty: .confirmed,
-        safeBoundaryConfirmed: false,
-        evidence: evidence))
   }
 
   public func currentDurableBinding() throws -> DurableCurrentDeviceBinding {

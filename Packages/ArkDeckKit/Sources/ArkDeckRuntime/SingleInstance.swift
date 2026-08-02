@@ -50,19 +50,6 @@ public final class SingleInstanceGuard: @unchecked Sendable {
     }
   }
 
-  public static func defaultLockFileURL(fileManager: FileManager = .default) throws -> URL {
-    let applicationSupport = try fileManager.url(
-      for: .applicationSupportDirectory,
-      in: .userDomainMask,
-      appropriateFor: nil,
-      create: true
-    )
-    return
-      applicationSupport
-      .appending(path: "ArkDeck", directoryHint: .isDirectory)
-      .appending(path: "single-writer.lock", directoryHint: .notDirectory)
-  }
-
   private static func validateLockFile(descriptor: Int32, url: URL) throws {
     var metadata = stat()
     guard Darwin.fstat(descriptor, &metadata) == 0 else {

@@ -39,12 +39,6 @@ public enum HarnessTaskLifecycle: String, CaseIterable, Sendable {
   case failed
   case cancelled
 
-  /// Source compatibility for callers compiled against the two-axis model.
-  /// It is deliberately not a case, so new records can never encode
-  /// `paused`; legacy decoding maps that spelling to `waiting`.
-  @available(*, deprecated, message: "Use waiting with USER_SUSPENDED")
-  public static let paused = Self.waiting
-
   public var isTerminal: Bool {
     switch self {
     case .succeeded, .failed, .cancelled: return true
@@ -89,11 +83,6 @@ public enum HarnessTaskStage: String, CaseIterable, Sendable {
   case building
   case deploying
   case verifying
-
-  /// Source compatibility only. Old persisted `deviceReady` values decode
-  /// to `reproducing`; readiness itself lives in the DeviceReady condition.
-  @available(*, deprecated, message: "Use reproducing and the DeviceReady condition")
-  public static let deviceReady = Self.reproducing
 
   /// Legal successors, excluding "stays in the same phase" which every
   /// phase allows.

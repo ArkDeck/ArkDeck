@@ -250,17 +250,6 @@ public enum HDCFileMagic {
   public static let png = Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])
 }
 
-public enum HDCArtifactReceiveOutcome: Sendable, Equatable {
-  case received(byteCount: Int, sha256: String, remoteCleanup: HDCRemoteCleanupState)
-  case hashMismatch(expected: String, actual: String)
-  case oversized(limit: Int)
-}
-
-public enum HDCRemoteCleanupState: Sendable, Equatable {
-  case cleaned
-  case cleanupDebt(reason: String)
-}
-
 // MARK: - E1 mutation surface (CHG-2026-049, T13)
 
 /// A HAP staged under a provider-owned path. As with the E0 pack, the
@@ -474,16 +463,3 @@ public struct HDCPortForwardSpec: Sendable, Equatable {
   }
 }
 
-/// What a package readback found. `installed == false` with a clean exit
-/// is exactly the case that must never be reported as a successful
-/// install - real hardware has shown `hdc install` exiting zero without
-/// having installed anything.
-public struct HDCPackageReadback: Sendable, Equatable {
-  public let bundleName: String
-  public let installed: Bool
-}
-
-public struct HDCProcessReadback: Sendable, Equatable {
-  public let bundleName: String
-  public let running: Bool
-}

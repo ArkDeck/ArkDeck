@@ -385,10 +385,14 @@ extension DeviceProviderArgvContractTests {
       -> HDCOwnedRemoteArtifact
     {
       let step = try XCTUnwrap(descriptor.steps.first { $0.stepID == stepID })
-      guard case .hdc(.receiveOwnedArtifact(let artifact)) = try provider.action(
+      let action = try provider.action(
         for: step, operation: descriptor, inputs: inputs, context: context)
-      else {
-        throw XCTSkip("expected a receive action")
+      guard case .hdc(.receiveOwnedArtifact(let artifact)) = action else {
+        // A descriptor drifting away from a receive action is a catalog
+        // defect, never a reason to skip the assertion.
+        XCTFail("expected a receive action for \(stepID), got \(action)")
+        struct UnexpectedProviderAction: Error {}
+        throw UnexpectedProviderAction()
       }
       return artifact
     }
