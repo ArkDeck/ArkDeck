@@ -3305,13 +3305,14 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
 
 ## TASK-AIN-019 — 默认 Evolution 路径与未合入候选的 bounded E2 Flash campaign
 
-- Status:in-progress（r8 产品实现已由 #957 合入；r9 默认入口已由 #958 合入；r10 删除
-  活跃 Harness 模式投影与旧 wire/public factory，本实现 PR 中授权实例、USB/HDC/RockUSB
-  与真实 Flash dispatch 均为 0）
+- Status:in-progress（r8 产品实现已由 #957 合入；r9 默认入口已由 #958 合入；r10 已由
+  #959 删除活跃 Harness 模式投影与旧 wire/public factory；r11 实现 autonomous
+  safe-repair loop，本实现 PR 中授权实例、USB/HDC/RockUSB 与真实 Flash dispatch 均为 0）
 - Platform:macos
 - Requirements:POL-AGENT-002(MODIFIED)、REQ-FLASH-015(MODIFIED)、POL-AGENT-001、
   POL-WORKFLOW-001、POL-RECOVERY-001、POL-TARGET-001
-- Acceptance:AC-FLASH-015-01/02/03、AIN-EVOLUTION-E2-001(change-local,r8)
+- Acceptance:AC-FLASH-015-01/02/03、AIN-EVOLUTION-E2-001(change-local,r8)、
+  AIN-EVOLUTION-REPAIR-001(change-local,r11)
 - Depends on:CHG-2026-025 r8 经维护者 merged PR 批准；TASK-HFA-005 done(#955)；
   TASK-AIN-018 done(#947)
 - Applicable failure patterns:AF-001、AF-002、AF-004、AF-006、AF-007、AF-010、
@@ -3379,6 +3380,13 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
 - r10：删除 `HarnessExecutionMode`、snapshot/status mode 编码和 coordinator mode 分支；
   workspace policy 直接驱动 isolation/review/promotion。旧 snapshot mode 只做一致性解码，
   新 wire 使用 `workspaceAllowedPaths|workspaceAllowedOperations`，历史 chat 无 public factory。
+- r11：`flash execute|continue` 在同一 invocation 中自动消费全部安全预算；normalized failure
+  进入 read-only Codex strategy repairer，closed candidate target 与独立 reviewer 双重验证后，
+  merged broker 重新 fresh admission。strategy 只允许 registered mode 与 Loader/HDC/read-only
+  timeout/poll 参数；candidate/repairer device capability=0。
+- r11：Loader transition failure 只有重新读到同一 durable target 的 registered mode 才可
+  `safeToReflash`；无新增 reservation 的 admission/target failure、unknown/unresolved/unsafe
+  partial、重复 strategy、repair/review rejection、budget/expiry/drift 均永久停止。
 
 ### Verification
 
@@ -3398,3 +3406,7 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
 - r10 single-model/migration tests：活跃 source 无 `HarnessExecutionMode`/mode branch，3.0
   snapshot 一致时迁移到无 mode 的 3.1、冲突时拒绝；status 不输出 mode；旧 wire 拒绝，
   historical chat fixture 只能通过 production decoder 建立。
+- r11 autonomous repair tests：第 1 attempt safe failure 后同一 host 自动生成不同 strategy、
+  build/review 并成功执行第 2 ordinal；closed repair JSON 的 extra command/argv/path、重复或越界
+  值全拒绝；legacy strategy defaults 可读。未新增 reservation 的 failure 只 dispatch 一次并
+  terminal，same-target registered-mode readback 正例可重试，跨 topology/identity 负例永久停止。

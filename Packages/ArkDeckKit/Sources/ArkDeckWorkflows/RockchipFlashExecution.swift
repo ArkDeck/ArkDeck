@@ -142,6 +142,37 @@ struct RockchipExecutionAdmission: @unchecked Sendable {
   let postflightIdentities: [RockchipPostflightIdentity]
   let executableIdentity: ProcessExecutableIdentityReceipt
   let evidenceClass: RockchipExecutionEvidenceClass
+  let evolutionStrategy: RockchipEvolutionTypedStrategy?
+
+  init(
+    backing: Backing,
+    plan: RockchipFlashPlan,
+    authorityReference: AuthorityReference,
+    usageReservationID: String,
+    targetID: String,
+    bindingRevision: Int,
+    targetDigestSHA256: String,
+    serialDigestSHA256: String,
+    usbTopology: String,
+    postflightIdentities: [RockchipPostflightIdentity],
+    executableIdentity: ProcessExecutableIdentityReceipt,
+    evidenceClass: RockchipExecutionEvidenceClass,
+    evolutionStrategy: RockchipEvolutionTypedStrategy? = nil
+  ) {
+    self.backing = backing
+    self.plan = plan
+    self.authorityReference = authorityReference
+    self.usageReservationID = usageReservationID
+    self.targetID = targetID
+    self.bindingRevision = bindingRevision
+    self.targetDigestSHA256 = targetDigestSHA256
+    self.serialDigestSHA256 = serialDigestSHA256
+    self.usbTopology = usbTopology
+    self.postflightIdentities = postflightIdentities
+    self.executableIdentity = executableIdentity
+    self.evidenceClass = evidenceClass
+    self.evolutionStrategy = evolutionStrategy
+  }
 
   func matchesPostflight(_ receipt: RockchipPostflightReceipt) -> Bool {
     guard receipt.connected else { return false }
@@ -248,11 +279,31 @@ final class RockchipPreparedCommand: @unchecked Sendable {
   }
 }
 
+enum RockchipPreparedCommandFailure: Error, Equatable, Sendable {
+  case confirmedSafeToRetry(String)
+}
+
 protocol RockchipExecutionProcessPort: Sendable {
   func prepare(
     command: RockchipClosedCommand,
     admissionIdentity: ProcessExecutableIdentityReceipt
   ) throws -> RockchipPreparedCommand
+
+  func prepare(
+    command: RockchipClosedCommand,
+    admissionIdentity: ProcessExecutableIdentityReceipt,
+    evolutionStrategy: RockchipEvolutionTypedStrategy?
+  ) throws -> RockchipPreparedCommand
+}
+
+extension RockchipExecutionProcessPort {
+  func prepare(
+    command: RockchipClosedCommand,
+    admissionIdentity: ProcessExecutableIdentityReceipt,
+    evolutionStrategy _: RockchipEvolutionTypedStrategy?
+  ) throws -> RockchipPreparedCommand {
+    try prepare(command: command, admissionIdentity: admissionIdentity)
+  }
 }
 
 struct RockchipPostflightReceipt: Sendable, Equatable {
@@ -528,7 +579,8 @@ actor RockchipFlashExecutor {
       let prepared: RockchipPreparedCommand
       do {
         prepared = try dependencies.process.prepare(
-          command: command, admissionIdentity: admission.executableIdentity)
+          command: command, admissionIdentity: admission.executableIdentity,
+          evolutionStrategy: admission.evolutionStrategy)
       } catch {
         try? dependencies.admission.closeUsage(
           admission: admission, status: .failed,
@@ -563,6 +615,18 @@ actor RockchipFlashExecutor {
       let attempt: RockchipExecutionAttempt
       do {
         attempt = try await prepared.launch(criticalNonInterruptible: command.isCriticalWrite)
+      } catch RockchipPreparedCommandFailure.confirmedSafeToRetry(let detail) {
+        try? persistence.appendOutcome(
+          step: command.step, intentEventID: intentID, admission: admission,
+          result: "failed", certainty: .confirmed,
+          semanticCode: "rockchip.safe-retry.readback-confirmed", execution: nil)
+        try? dependencies.admission.closeUsage(
+          admission: admission, status: .failed,
+          destructiveIntentEventIDs: destructiveIntentIDs)
+        try? persistence.appendWaitingForRecovery(
+          stepID: command.step.id, reason: "safe-retry-readback-confirmed")
+        throw RockchipFlashExecutionError.semanticFailure(
+          stepID: command.step.id, detail: detail)
       } catch {
         try? persistence.appendWaitingForRecovery(
           stepID: command.step.id, reason: "launch-or-outcome-unknown")

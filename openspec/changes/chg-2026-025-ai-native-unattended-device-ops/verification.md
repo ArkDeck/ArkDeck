@@ -1,6 +1,6 @@
 # Verification Plan
 
-> Change:CHG-2026-025-ai-native-unattended-device-ops@r10
+> Change:CHG-2026-025-ai-native-unattended-device-ops@r11
 > Status:planned # 结论经维护者在 PR 中确认
 > Revision review:2026-07-22 已逐项对照 r2 security-remediation、TASK-AIN-005/006/
 > 008/007 与 AIN-004 stop gate;本计划不复用 superseded #296 readiness/authorization。
@@ -33,6 +33,10 @@
 > r10 active-model removal:验证 Harness 不再持久化、输出或基于 normal/evolution 分支；旧
 > snapshot mode 仅作一致性解码并迁移到 3.1 无 mode 形态。task wire 只接受 workspace 命名，
 > 历史 chat validated factory 不再公开，但 decoder/export compatibility 保留。
+> r11 autonomous repair:验证一次 campaign confirmation 在同一 invocation 内自动完成最多
+> 8 轮 closed strategy repair/build/test/review/broker execution；只把标准化 safe failure 交给
+> read-only repairer。fresh reservation 缺失、漂移、unknown/unsafe、repair/review 拒绝或成功
+> 均封口，candidate 仍无设备能力，Provider exact argv 不变；实现 PR 真实设备 dispatch=0。
 
 ## Environment
 
@@ -90,6 +94,7 @@
 | AIN-CHAT-AUTH-001(change-local,r7) | typed chat confirmation 正向一次消费；缺失/伪造 shape/digest-target 漂移/CI/复用/recovery replay 负向全为 dispatch=0 | passed | TASK-AIN-018 contract/fault tests + run 记录 |
 | AIN-EVOLUTION-E2-001(change-local,r8) | 未合入 candidate 的 base/scope/build/test/review 派生 pins；candidate capability=0、merged broker 独占 transport；逐 attempt fresh facts/ordinal/session 与 success/unknown/unsafe/drift 封口 | planned | TASK-AIN-019 contract/fault tests；提案 PR 仅 SDD/生成器闸，real device=0 |
 | AIN-EVOLUTION-DEFAULT-001(change-local,r9-r10) | workspace task 无 mode 类型/持久字段/status/分支自动进入 Evolution；默认 Flash campaign CLI；旧 wire 与 one-shot 新建/dispatch=0，历史 bytes 可读；standing/human 保留 | planned | TASK-AIN-019 single-model/migration/source-surface tests；real device=0 |
+| AIN-EVOLUTION-REPAIR-001(change-local,r11) | 同一 invocation 自动 safe repair；repairer 仅见标准化失败并输出 bounded closed strategy；synthetic candidate diff 经 review；fresh reservation correlation 防止旧 terminal 重放；unknown/unsafe/drift 永久停止且 exact argv 不变 | planned | TASK-AIN-019 autonomous-loop/repair-shape/loader-readback/dispatch-regression tests；real device=0 |
 
 ## Negative and recovery tests
 
@@ -112,6 +117,11 @@
 - missing terminal、broker/reviewer crash、cancel-with-intent、postflight lineage mismatch、
   outcomeUnknown/recovery replay → campaign 永久封口；known partial 仅在所有 destructive
   outcome confirmed 且 broker 专用 readback 分类 safeToReflash 时可继续；
+- repairer extra/unknown key、越界 timeout/poll、重复 strategy、argv/operation/partition 等扩权
+  提议、candidate 非精确回显、candidate/review budget 耗尽 → 新 reservation 与 dispatch=0；
+- Loader transition 失败但 fresh readback 仍为同一 durable target 的 registered mode → 允许
+  `safeToReflash`；target/topology 漂移、fresh readback 不可得或本轮未新增 reservation → campaign
+  封口且不自动重试；
 - local worktree/PR head/AI review/ordinary CI 单独不能构造 E2 authority；只有用户确认的
   campaign envelope + 全部派生 pins + merged broker admission 才可执行未合入 candidate；
 - chat 正向只用 fake descriptor 证明 typed admission→durable consume→intent→dispatch 一次，
@@ -172,10 +182,12 @@
 - [ ] AIN-004 使用的新 authorization 在执行时 fresh、未超次且由产品 executor 消费
 - [ ] AIN-CHAT-AUTH-001 历史 bytes 兼容矩阵全绿；r9 后新 chat usage/admission/dispatch 恒拒绝，
   且不得伪装或升级为 standing/campaign authority
-- [ ] AIN-EVOLUTION-E2-001/AIN-EVOLUTION-DEFAULT-001 正负矩阵全绿；campaign 硬上限
+- [ ] AIN-EVOLUTION-E2-001/AIN-EVOLUTION-DEFAULT-001/AIN-EVOLUTION-REPAIR-001 正负矩阵
+  全绿；campaign 硬上限
   8 attempts/4 hours/1 concurrency；candidate 无 device capability、merged broker 独占真实
-  transport；默认 CLI 与 workspace task 无 mode 分叉；每次派生 pins/fresh readback，
-  success/unknown/unsafe partial/drift 永久封口
+  transport；默认 CLI 与 workspace task 无 mode 分叉；每次派生 pins/fresh readback；同一
+  invocation 的 safe failure 自动产生 reviewed closed strategy，success/unknown/unsafe partial/
+  drift/无 fresh reservation 永久封口
 - [ ] E0/E1 真机 evidence 的 executor.kind=agent，人工动作全部属于 human-boundary
   registry，且没有人类代跑 device command
 - [ ] TASK-AIN-010P 的 raw registration Artifact 不入仓、V3 evidence 可解引用且

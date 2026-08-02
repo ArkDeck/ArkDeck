@@ -30,6 +30,11 @@
 > 字段与 coordinator 分支。workspace policy 直接决定是否需要 isolation；旧 snapshot mode
 > 仅是 decoder-only consistency check，迁移后不再写回。task wire 只使用 workspace vocabulary，
 > 历史 chat authority 不再提供 public validated creation factory。
+>
+> r11 autonomous-repair note（2026-08-02）：同一 invocation 在 `safeToReflash` 后自动产生
+> 下一份 closed typed strategy、完成 candidate build/test/adversarial review，并由 merged broker
+> 取得 fresh reservation 后继续；用户无需逐次确认。unknown/unresolved/unsafe partial、身份或
+> admission 漂移、无新 reservation、repair/review 拒绝、success、超时或超次仍永久停止。
 
 ## §0 设计原则
 
@@ -150,6 +155,32 @@ toolchain/base/allowed-path envelope 漂移使 campaign 整体失效。
 campaign 不是 standing authorization，ordinary CI/daemon/scheduler 不能自行 mint 或扩大。
 未合入 candidate code 可以在上述 sandbox 中运行并影响 typed strategy，但真实 transport 与
 destructive dispatch 永远属于 protected-main broker；candidate 不能替换或动态加载 broker。
+
+#### Autonomous safe-repair loop
+
+同一交互 invocation 消费一次有效 campaign confirmation 后，产品 SHALL 自行推进
+`repair → candidate build/test → adversarial review → fresh reservation → broker execute →
+durable terminal classification`，直至 success 或 campaign 停止条件成立。第一个 candidate
+使用 protected-main 默认策略；仅当前一 attempt 的 durable terminal 被 broker 分类为
+`safeToReflash`，repairer 才能接收标准化失败码、ordinal 与至多 8 个既往策略摘要。repairer
+运行在 owner-only、read-only、无仓库内容、无 network/device/Runtime/authority port 的目录，
+只能返回 closed strategy：`allowedStartingModes` 及 Loader/HDC/read-only 的有界 timeout/poll。
+它不得提出或修改 argv、operation、partition、archive、step-set、plan、target、broker 或
+authorization。
+
+candidate target SHALL 再次严格解码并回显 proposed strategy；即便源码树无变化，builder 也
+必须将 canonical strategy 作为 immutable synthetic diff/test artifact 纳入 candidate digest 与
+独立 adversarial review。broker 只能消费与 assertion、candidate、review 完全一致的 strategy，
+并保持 Provider 生成的 exact argv 不变。candidate evaluation 次数与 Flash reservation 次数均受
+`maxAttempts` 约束；相同 strategy 不得重复。
+
+自动 continuation 必须以本轮新增的 durable reservation 与 terminal correlation 为依据，不能
+复用旧 attempt 的 `safeToReflash`。admission/fresh-target fault 导致未创建 reservation 时，campaign
+以 `admissionOrTargetDrift` 封口。Loader transition 失败只有在 destructive intent 前，且 merged
+broker 现场重新读到同一 durable target 仍处于 registered HDC-normal/Loader mode 时，才可记为
+known failure 并自动修复；target/topology 漂移、timeout/disconnect 且无法完成该证明时保持
+outcomeUnknown/unsafe，永久停止且不得猜测重试。旧 strategy bytes 缺少 r11 tuning 字段时仅按
+固定默认值兼容解码，新的输出必须是完整 closed shape。
 
 ## §3 执行门校验序列(E2,首个真实设备 Step 前)
 

@@ -85,6 +85,17 @@ final class RockchipFlashExecutionContractTests: XCTestCase {
     }
   }
 
+  private final class LoaderWaitTuningBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stored: (Int, Int)?
+
+    func record(timeoutSeconds: Int, pollMilliseconds: Int) {
+      lock.withLock { stored = (timeoutSeconds, pollMilliseconds) }
+    }
+
+    var value: (Int, Int)? { lock.withLock { stored } }
+  }
+
   func testPostflightAcceptsOnlyWholeCurrentOrConfirmedPreviousModeIdentityTuple()
     async throws
   {
@@ -324,7 +335,7 @@ final class RockchipFlashExecutionContractTests: XCTestCase {
         executableURL: hdcExecutable, executableSHA256: hdcSHA256,
         connectKey: serial, stableIdentitySHA256: serialDigest, usbTopology: "42",
         alternateModeIdentities: [previousModeIdentity],
-        currentIdentity: { identityProbe.current() }, waitForLoader: { loader }))
+        currentIdentity: { identityProbe.current() }, waitForLoader: { _, _ in loader }))
     let host = RockchipFlashExecutionHost(
       dependencies: RockchipFlashExecutionDependencies(
         admission: admission, process: process,
@@ -385,7 +396,7 @@ final class RockchipFlashExecutionContractTests: XCTestCase {
         executableURL: hdcExecutable, executableSHA256: hdcSHA256,
         connectKey: serial, stableIdentitySHA256: serialDigest, usbTopology: "42",
         currentIdentity: { normal },
-        waitForLoader: { throw RockchipHDCTransitionError.loaderUnavailable }))
+        waitForLoader: { _, _ in throw RockchipHDCTransitionError.loaderUnavailable }))
     let command = try XCTUnwrap(
       RockchipFlashExecutionLowering.commands(
         plan: fixture.plan,
@@ -399,7 +410,9 @@ final class RockchipFlashExecutionContractTests: XCTestCase {
       _ = try await prepared.launch(criticalNonInterruptible: false)
       XCTFail("missing same-device Loader readback must fail closed")
     } catch {
-      XCTAssertEqual(error as? RockchipHDCTransitionError, .loaderUnavailable)
+      guard case .confirmedSafeToRetry? = error as? RockchipPreparedCommandFailure else {
+        return XCTFail("bound HDC-normal readback should be classified safe to retry: \(error)")
+      }
     }
     XCTAssertEqual(spawnLog.requests.count, 1)
     XCTAssertEqual(
@@ -445,7 +458,7 @@ final class RockchipFlashExecutionContractTests: XCTestCase {
         alternateModeIdentities: [
           RockchipPostflightIdentity(serialDigestSHA256: loaderDigest, usbTopology: "42")
         ],
-        currentIdentity: { identityProbe.current() }, waitForLoader: { movedLoader }))
+        currentIdentity: { identityProbe.current() }, waitForLoader: { _, _ in movedLoader }))
     let command = try XCTUnwrap(
       RockchipFlashExecutionLowering.commands(
         plan: fixture.plan,
@@ -489,7 +502,7 @@ final class RockchipFlashExecutionContractTests: XCTestCase {
         executableURL: hdcExecutable, executableSHA256: hdcSHA256,
         connectKey: serial, stableIdentitySHA256: serialDigest, usbTopology: "42",
         currentIdentity: { loader },
-        waitForLoader: {
+        waitForLoader: { _, _ in
           XCTFail("already-Loader path must not wait for an HDC transition")
           return RockchipDeviceObservation(
             deviceNumber: 0, usbVendorID: RockchipProbeEvidence.rockUSBVendorID,
@@ -509,6 +522,71 @@ final class RockchipFlashExecutionContractTests: XCTestCase {
 
     XCTAssertEqual(attempt.semantic, .succeeded)
     XCTAssertEqual(spawnLog.requests.map(\.arguments), [["ld"]])
+  }
+
+  func testEvolutionStrategyControlsOnlyBoundedTransitionAndReadOnlyTimeouts() async throws {
+    let fixture = try RockchipExecutionTestFixture.make()
+    defer { try? FileManager.default.removeItem(at: fixture.base) }
+    let packageRoot = URL(fileURLWithPath: #filePath)
+      .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+    let hdcExecutable = packageRoot.appending(path: ".build/debug/ArkDeckFakeHDCFixture")
+    let hdcSHA256 = RockchipExecutionTestFixture.sha256(try Data(contentsOf: hdcExecutable))
+    let spawnLog = RockchipSpawnLog()
+    let executor = FoundationProcessExecutor(
+      identityBoundPreSpawnHook: { _ in }, launchObserver: { _ in },
+      identityBoundSpawnObserver: { _, request, _ in spawnLog.append(request) })
+    let serial = "strategy-timeout-connect-key"
+    let serialDigest = RockchipExecutionTestFixture.sha256(Data(serial.utf8))
+    let normal = RockchipProductUSBIdentity(
+      serial: serial, vendorID: RockchipProbeEvidence.rockUSBVendorID,
+      productID: RockchipHDCIntegrationProfile.dayu200NormalProductID,
+      topology: "42", productName: "HDC Device")
+    let loaderIdentity = RockchipProductUSBIdentity(
+      serial: serial, vendorID: RockchipProbeEvidence.rockUSBVendorID,
+      productID: RockchipProbeEvidence.dayu200LoaderProductID, topology: "42")
+    let identityProbe = ModeTransitionIdentityProbe(before: normal, after: loaderIdentity)
+    let tuning = LoaderWaitTuningBox()
+    let loader = RockchipDeviceObservation(
+      deviceNumber: 0, usbVendorID: RockchipProbeEvidence.rockUSBVendorID,
+      usbProductID: RockchipProbeEvidence.dayu200LoaderProductID,
+      locationID: 42, mode: .loader)
+    let process = FoundationRockchipExecutionProcessPort(
+      executableURL: fixture.executable, executor: executor,
+      executableSHA256: fixture.executableSHA256,
+      hdcTransition: RockchipHDCTransitionConfiguration(
+        executableURL: hdcExecutable, executableSHA256: hdcSHA256,
+        connectKey: serial, stableIdentitySHA256: serialDigest, usbTopology: "42",
+        currentIdentity: { identityProbe.current() },
+        waitForLoader: { timeout, poll in
+          tuning.record(timeoutSeconds: timeout, pollMilliseconds: poll)
+          return loader
+        }))
+    let command = try XCTUnwrap(
+      RockchipFlashExecutionLowering.commands(
+        plan: fixture.plan,
+        stagedImages: RockchipFlashExecutionStager.stage(
+          archiveURL: fixture.archive, sessionRoot: fixture.base, profile: fixture.profile)
+      ).first)
+    let strategy = try RockchipEvolutionTypedStrategy(
+      operationReference: RockchipEvolutionCampaignConfirmationAssertion.operationReference,
+      deviceProfileReference: "dayu200@2",
+      archiveDigestSHA256: fixture.plan.archiveSHA256,
+      stepSetDigestSHA256: String(repeating: "a", count: 64),
+      allowedStartingModes: [.hdcNormal, .loader], loaderDiscoveryTimeoutSeconds: 90,
+      loaderPollIntervalMilliseconds: 250, hdcCommandTimeoutSeconds: 45,
+      readOnlyCommandTimeoutSeconds: 30, userdataImpact: "ERASE-USERDATA")
+    let prepared = try process.prepare(
+      command: command, admissionIdentity: fixture.executableReceipt,
+      evolutionStrategy: strategy)
+
+    _ = try await prepared.launch(criticalNonInterruptible: false)
+
+    XCTAssertEqual(tuning.value?.0, 90)
+    XCTAssertEqual(tuning.value?.1, 250)
+    XCTAssertEqual(spawnLog.requests.map(\.timeout), [45, 30])
+    XCTAssertEqual(spawnLog.requests.map(\.arguments), [
+      ["-t", serial, "shell", "reboot", "loader"], ["ld"],
+    ])
   }
 
   func testAuthorizedFakeDescriptorExecutesExactClosedSequenceAndPublishesV21Manifest()

@@ -43,6 +43,21 @@ candidate/reviewer 不能提供该分类。outcomeUnknown、unresolved intent、
 reviewer crash、取消时已有 destructive intent、无法证明安全的 partial write、postflight
 lineage mismatch、成功、过期、超次、并发或 envelope drift 均终止 campaign，禁止 replay。
 
+同一 invocation 中，产品 SHALL 在每个 `safeToReflash` terminal 后自动执行下一轮 bounded
+repair/build/test/review/fresh-reservation/broker execution，无需新的用户消息。repairer 只能看到
+标准化失败码、attempt ordinal 与既往 strategy 摘要，运行在 read-only、owner-only、无源码/
+network/device/Runtime/authority port 的目录，并只能返回 starting modes 与有界 Loader/HDC/
+read-only timeout/poll 的 closed strategy；额外 key、越界值、重复 strategy 或任何 argv/
+operation/partition/plan/target/authority 提议均 SHALL 拒绝。strategy 必须作为 immutable
+synthetic candidate artifact 纳入 digest 和 adversarial review，即使 source diff 为空。
+
+自动 continuation SHALL 证明本轮产生了新的 durable reservation，不能借旧 terminal 重放。
+Loader transition 失败仅在 destructive intent 前且 merged broker fresh readback 证明同一 durable
+target 仍处于 registered HDC-normal/Loader mode 时，MAY 分类 `safeToReflash`；fresh readback
+缺失、target/topology 漂移、未新增 reservation 或任何不确定状态 SHALL 永久停止。candidate
+evaluation 与 Flash attempt 均不得超过 campaign `maxAttempts`，exact Provider argv 不得因策略
+修复改变。
+
 evidence SHALL 记录 executor、实际 authority kind/reference、attempt ordinal、candidate/
 review/broker pins、fresh target readback、执行时间与 retry disposition；chat authority 不得
 伪装成 standing authorization。AI review 是已确认 campaign 内必要且不充分的 candidate gate，
@@ -118,3 +133,15 @@ SHALL 拒绝加载。task submit current wire 只接受 `workspaceAllowedPaths` 
   打开 USB/HDC/RockUSB、执行 raw shell、读取 authority 或替换 broker
 - AND 只有 protected-main broker 可在重算 candidate pins、计划和 fresh target readback 后
   reserve ordinal 并 dispatch；任一越界或 review 非 PASS 时 destructive dispatch=0
+
+#### Scenario: AIN-EVOLUTION-REPAIR-001 同一 invocation 自动安全修复
+
+- GIVEN 用户已确认一个未过期且仍有 attempt 预算的 campaign，前一 attempt 的 durable terminal
+  由 merged broker 分类为 `safeToReflash`
+- WHEN 默认 Flash 入口继续该 invocation
+- THEN read-only repairer 仅基于标准化失败提出新的 bounded closed strategy，candidate target
+  精确校验并回显，独立 adversarial review PASS 后 merged broker 才可 fresh reserve/execute
+- AND 若 Loader transition 失败但 fresh readback 证明同一 durable target 仍在 registered mode，
+  产品自动进入下一轮；success、unknown/unsafe、漂移、无新 reservation 或预算耗尽立即封口
+- AND 任一轮的 Provider operation/partition/argv、plan/archive/step-set、target 与 authority pins
+  均保持不变，candidate/repairer 从不接触真实设备
