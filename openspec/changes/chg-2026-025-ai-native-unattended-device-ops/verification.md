@@ -1,6 +1,6 @@
 # Verification Plan
 
-> Change:CHG-2026-025-ai-native-unattended-device-ops@r9
+> Change:CHG-2026-025-ai-native-unattended-device-ops@r10
 > Status:planned # 结论经维护者在 PR 中确认
 > Revision review:2026-07-22 已逐项对照 r2 security-remediation、TASK-AIN-005/006/
 > 008/007 与 AIN-004 stop gate;本计划不复用 superseded #296 readiness/authorization。
@@ -30,6 +30,9 @@
 > 自动进入 Evolution，device-only task 保持同一 Runtime。Flash 默认命令直接承载 campaign，
 > 旧 `evolution-*`/one-shot Agent admission 全部拒绝；历史 chat authority bytes 仍可读/export，
 > standing/human 路径不回归。实现 PR 中真实设备与 Flash dispatch 仍为 0。
+> r10 active-model removal:验证 Harness 不再持久化、输出或基于 normal/evolution 分支；旧
+> snapshot mode 仅作一致性解码并迁移到 3.1 无 mode 形态。task wire 只接受 workspace 命名，
+> 历史 chat validated factory 不再公开，但 decoder/export compatibility 保留。
 
 ## Environment
 
@@ -86,7 +89,7 @@
 | AIN-MANUAL-GAP-001(change-local,r3) | 活跃 change/runbook grep 与 dependency audit；非 allowlisted human-only seam=0 | passed | TASK-AIN-017 run 记录 |
 | AIN-CHAT-AUTH-001(change-local,r7) | typed chat confirmation 正向一次消费；缺失/伪造 shape/digest-target 漂移/CI/复用/recovery replay 负向全为 dispatch=0 | passed | TASK-AIN-018 contract/fault tests + run 记录 |
 | AIN-EVOLUTION-E2-001(change-local,r8) | 未合入 candidate 的 base/scope/build/test/review 派生 pins；candidate capability=0、merged broker 独占 transport；逐 attempt fresh facts/ordinal/session 与 success/unknown/unsafe/drift 封口 | planned | TASK-AIN-019 contract/fault tests；提案 PR 仅 SDD/生成器闸，real device=0 |
-| AIN-EVOLUTION-DEFAULT-001(change-local,r9) | workspace task 无 mode 开关自动进入 Evolution；默认 Flash campaign CLI；one-shot 新建/dispatch=0 且历史 bytes 可读；standing/human 保留 | planned | TASK-AIN-019 default-path/migration/source-surface tests；real device=0 |
+| AIN-EVOLUTION-DEFAULT-001(change-local,r9-r10) | workspace task 无 mode 类型/持久字段/status/分支自动进入 Evolution；默认 Flash campaign CLI；旧 wire 与 one-shot 新建/dispatch=0，历史 bytes 可读；standing/human 保留 | planned | TASK-AIN-019 single-model/migration/source-surface tests；real device=0 |
 
 ## Negative and recovery tests
 

@@ -7,7 +7,7 @@ import XCTest
 
 final class SessionArtifactStorageContractTests: XCTestCase {
   func testChatAuthorityV22ManifestJournalAndExportRemainTruthful() async throws {
-    let reference = try AgentExecutionAuthorityReference.validatedChatConfirmation(
+    let reference = try historicalChatAuthority(
       confirmationDigestSHA256: String(repeating: "a", count: 64),
       planDigestSHA256: String(repeating: "b", count: 64),
       archiveDigestSHA256: String(repeating: "c", count: 64),

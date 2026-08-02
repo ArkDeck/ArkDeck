@@ -366,13 +366,14 @@ package struct HarnessTaskMethodService: Sendable {
     if let projectRef = text("projectRef"), !isWireIdentifier(projectRef) {
       throw HarnessTaskSubmissionError.malformedDesiredState("projectRef")
     }
-    // r9 removes the caller-controlled normal/evolution switch. Reject the obsolete wire
-    // surface instead of silently translating it into a different safety policy.
-    if params?["executionMode"] != nil {
-      throw HarnessTaskSubmissionError.malformedEvolutionPolicy("executionMode")
+    // r10 removes the mode-shaped wire vocabulary. Reject obsolete fields instead of silently
+    // translating them into the workspace policy that now drives the single Agent path.
+    for obsolete in ["executionMode", "allowedPaths", "evolutionAllowedOperations"]
+    where params?[obsolete] != nil {
+      throw HarnessTaskSubmissionError.malformedEvolutionPolicy(obsolete)
     }
     let evolutionPolicy: HarnessEvolutionPolicy?
-    if params?["allowedPaths"] != nil || params?["evolutionAllowedOperations"] != nil
+    if params?["workspaceAllowedPaths"] != nil || params?["workspaceAllowedOperations"] != nil
       || params?["maxAttempts"] != nil || params?["maxChangedFiles"] != nil
       || params?["maxDiffLines"] != nil
     {
@@ -382,25 +383,25 @@ package struct HarnessTaskMethodService: Sendable {
       guard let baseRevision = text("baseWorkspaceRevision") else {
         throw HarnessTaskSubmissionError.malformedEvolutionPolicy("baseRevision")
       }
-      guard case .array(let pathValues)? = params?["allowedPaths"] else {
-        throw HarnessTaskSubmissionError.malformedEvolutionPolicy("allowedPaths")
+      guard case .array(let pathValues)? = params?["workspaceAllowedPaths"] else {
+        throw HarnessTaskSubmissionError.malformedEvolutionPolicy("workspaceAllowedPaths")
       }
       let paths = pathValues.compactMap { value -> String? in
         guard case .string(let path) = value else { return nil }
         return path
       }
       guard paths.count == pathValues.count else {
-        throw HarnessTaskSubmissionError.malformedEvolutionPolicy("allowedPaths")
+        throw HarnessTaskSubmissionError.malformedEvolutionPolicy("workspaceAllowedPaths")
       }
       let evolutionOperations: [String]
-      if case .array(let values)? = params?["evolutionAllowedOperations"] {
+      if case .array(let values)? = params?["workspaceAllowedOperations"] {
         evolutionOperations = values.compactMap { value in
           guard case .string(let operation) = value else { return nil }
           return operation
         }
         guard evolutionOperations.count == values.count else {
           throw HarnessTaskSubmissionError.malformedEvolutionPolicy(
-            "evolutionAllowedOperations")
+            "workspaceAllowedOperations")
         }
       } else {
         evolutionOperations = policy.allowedOperations
@@ -459,7 +460,6 @@ package struct HarnessTaskMethodService: Sendable {
       "targetId": .string(snapshot.target.targetID),
       "goal": .string(snapshot.goal.summary),
       "projectRef": snapshot.projectRef.map(JSONValue.string) ?? .null,
-      "executionMode": .string(snapshot.executionMode.rawValue),
       "evolutionPolicy": snapshot.evolutionPolicy.map(encode) ?? .null,
       "evolutionWorkspace": snapshot.evolutionWorkspace.map(encode) ?? .null,
       "desiredState": .object(snapshot.goal.desiredState),

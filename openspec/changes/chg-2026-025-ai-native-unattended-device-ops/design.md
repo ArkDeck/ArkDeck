@@ -25,6 +25,11 @@
 > 默认入口；standing authorization 继续服务 protected-main 后台执行。r7 chat reference 只保留
 > 历史 decoder/Journal/Manifest/export compatibility，不再允许新 reservation、admission 或
 > dispatch。Harness workspace policy 自动选择 isolation/review，caller 不再选择 mode。
+>
+> r10 single-model note（2026-08-02）：删除活跃 Harness execution-mode 类型、snapshot/status
+> 字段与 coordinator 分支。workspace policy 直接决定是否需要 isolation；旧 snapshot mode
+> 仅是 decoder-only consistency check，迁移后不再写回。task wire 只使用 workspace vocabulary，
+> 历史 chat authority 不再提供 public validated creation factory。
 
 ## §0 设计原则
 

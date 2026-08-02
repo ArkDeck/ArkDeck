@@ -888,6 +888,7 @@ final class HarnessTaskPlaneContractTests: XCTestCase {
       XCTFail("task.submit must expose the complete condition set")
     }
     XCTAssertEqual(field(submitted, "projectRef"), .string("demo-app"))
+    XCTAssertNil(field(submitted, "executionMode"))
     XCTAssertEqual(
       field(submitted, "desiredState"),
       .object([
@@ -1046,6 +1047,14 @@ final class HarnessTaskPlaneContractTests: XCTestCase {
     for obsoleteMode in ["normal", "evolution"] {
       let obsolete = try await submit(
         base.merging(["executionMode": .string(obsoleteMode)]) { _, new in new })
+      XCTAssertFalse(obsolete.ok)
+      XCTAssertEqual(obsolete.error?.code, AgentDaemonErrorCode.invalidParams.rawValue)
+    }
+    for obsoleteWorkspaceField in ["allowedPaths", "evolutionAllowedOperations"] {
+      let obsolete = try await submit(
+        base.merging([obsoleteWorkspaceField: .array([.string("Sources/**")])]) {
+          _, new in new
+        })
       XCTAssertFalse(obsolete.ok)
       XCTAssertEqual(obsolete.error?.code, AgentDaemonErrorCode.invalidParams.rawValue)
     }

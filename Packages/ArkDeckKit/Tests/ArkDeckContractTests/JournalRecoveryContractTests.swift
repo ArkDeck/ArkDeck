@@ -30,7 +30,7 @@ final class JournalRecoveryContractTests: XCTestCase {
         "reservation-fixture", .destructive
       ),
       (
-        try .validatedChatConfirmation(
+        try historicalChatAuthority(
           confirmationDigestSHA256: String(repeating: "1", count: 64),
           planDigestSHA256: String(repeating: "2", count: 64),
           archiveDigestSHA256: String(repeating: "3", count: 64),

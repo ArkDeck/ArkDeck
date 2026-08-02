@@ -264,7 +264,7 @@ extension HarnessTaskCoordinator {
       currentWorkspaceRevision = try? await repairPort.currentWorkspaceRevision(
         relativePaths: proposal.touchedFiles, projectRef: projectRef, task: snapshot)
     }
-    if currentWorkspaceRevision == nil, snapshot.executionMode == .evolution {
+    if currentWorkspaceRevision == nil, snapshot.requiresWorkspaceIsolation {
       currentWorkspaceRevision = snapshot.evolutionPolicy?.baseRevision
     }
     var availabilityByReference: [String: Bool] = [:]

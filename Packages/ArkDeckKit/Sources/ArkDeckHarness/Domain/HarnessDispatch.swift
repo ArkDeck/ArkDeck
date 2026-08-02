@@ -477,7 +477,6 @@ public struct HarnessTaskSubmission: Equatable, Sendable, Codable {
   public let successCriteria: [HarnessSuccessCriterion]
   public let budgets: HarnessTaskBudgets
   public let policy: HarnessTaskPolicy
-  public let executionMode: HarnessExecutionMode
   public let evolutionPolicy: HarnessEvolutionPolicy?
 
   public init(
@@ -500,10 +499,11 @@ public struct HarnessTaskSubmission: Equatable, Sendable, Codable {
     self.budgets = budgets
     self.policy = policy
     self.evolutionPolicy = evolutionPolicy
-    // Execution mode is a persisted projection, not a caller-selected switch. A typed
-    // workspace envelope always enters the bounded Evolution path.
-    self.executionMode = evolutionPolicy == nil ? .normal : .evolution
   }
+
+  /// Workspace isolation is a fact derived from the typed policy envelope. It is not a
+  /// caller-selectable execution mode.
+  public var requiresWorkspaceIsolation: Bool { evolutionPolicy != nil }
 
   public func validate(permittedOperations: Set<String>) throws {
     let targetID = target.targetID

@@ -161,13 +161,51 @@ final class HarnessEvolutionContractTests: XCTestCase {
       evolutionPolicy: evolutionPolicy)
 
     let snapshot = try await coordinator.submit(submission)
-    XCTAssertEqual(snapshot.executionMode, .evolution)
+    XCTAssertTrue(snapshot.requiresWorkspaceIsolation)
     XCTAssertEqual(snapshot.evolutionPolicy, evolutionPolicy)
     XCTAssertEqual(snapshot.executionProjectRef, snapshot.evolutionWorkspace?.projectRef)
     XCTAssertNotEqual(snapshot.executionProjectRef, snapshot.projectRef)
     XCTAssertNotNil(registry.profile(for: try XCTUnwrap(snapshot.executionProjectRef)))
     let attempts = try await coordinator.attempts(snapshot.htaskID)
     XCTAssertTrue(attempts.isEmpty)
+  }
+
+  func testCurrentWorkspaceWireCreatesIsolatedTaskWithoutModeFields() async throws {
+    let source = try temporaryDirectory("workspace-wire-source")
+    let state = try temporaryDirectory("workspace-wire-state")
+    try FileManager.default.createDirectory(
+      at: source.appendingPathComponent("Sources"), withIntermediateDirectories: true)
+    try Data("old\n".utf8).write(to: source.appendingPathComponent("Sources/App.txt"))
+    let profile = try workspaceProfile(root: source)
+    let registry = WorkspaceProjectProfileRegistry(profile: profile)
+    let base = try WorkspaceProviderSupport.workspaceRevision(
+      root: profile.projectRoot, profileVersion: profile.profileID,
+      globs: ["Sources/**"])
+    let manager = try EvolutionWorkspaceManager(
+      rootURL: state.appendingPathComponent("workspace"), profileRegistry: registry)
+    let coordinator = HarnessTaskCoordinator(
+      store: try HarnessTaskStore(rootURL: state.appendingPathComponent("harness")),
+      jobPort: EvolutionNoopJobPort(), evolutionWorkspacePort: manager,
+      nowUTC: { "2026-08-02T00:00:00Z" },
+      taskIDFactory: { "HTASK-ABCDEF012346" })
+    let service = HarnessTaskMethodService(
+      coordinator: coordinator, applicationReferenceValidator: { _, _ in })
+
+    let response = await service.handle(
+      "task.submit", requestID: "wire-current",
+      params: [
+        "targetId": .string("device"), "goal": .string("repair"),
+        "projectRef": .string(profile.projectRef), "baseWorkspaceRevision": .string(base),
+        "workspaceAllowedPaths": .array([.string("Sources/**")]),
+        "workspaceAllowedOperations": .array([.string("workspace.apply-patch@1")]),
+      ])
+    XCTAssertNil(response.errorCode, response.errorMessage ?? "unexpected task.submit error")
+    guard case .object(let fields)? = response.result else {
+      return XCTFail("task.submit must return the task object")
+    }
+    XCTAssertNil(fields["executionMode"])
+    XCTAssertNotEqual(fields["evolutionPolicy"], .null)
+    XCTAssertNotEqual(fields["evolutionWorkspace"], .null)
   }
 
   func testTaskAttemptPatchBuildEvaluationReviewAndPromotionPipeline() throws {
@@ -409,16 +447,16 @@ final class HarnessEvolutionContractTests: XCTestCase {
     }
   }
 
-  func testWorkspacePolicySelectsEvolutionWithoutCallerMode() throws {
+  func testWorkspacePolicyDirectlyDrivesIsolationWithoutAModeProjection() throws {
     let base = String(repeating: "a", count: 64)
-    let normal = HarnessTaskSubmission(
+    let deviceOnly = HarnessTaskSubmission(
       type: .debugCrash, projectRef: "TestProject",
       target: HarnessTaskTargetReference(targetID: "device"),
-      goal: HarnessTaskGoal(summary: "normal"), budgets: budgets,
+      goal: HarnessTaskGoal(summary: "device-only"), budgets: budgets,
       policy: HarnessTaskPolicy(allowedOperations: ["debug.observe-device@1"]))
-    XCTAssertEqual(normal.executionMode, .normal)
+    XCTAssertFalse(deviceOnly.requiresWorkspaceIsolation)
     XCTAssertNoThrow(
-      try normal.validate(permittedOperations: ["debug.observe-device@1"]))
+      try deviceOnly.validate(permittedOperations: ["debug.observe-device@1"]))
 
     let evolutionPolicy = try HarnessEvolutionPolicy(
       baseRevision: base, allowedPaths: ["Sources/**"],
@@ -429,7 +467,7 @@ final class HarnessEvolutionContractTests: XCTestCase {
       goal: HarnessTaskGoal(summary: "evolve"), budgets: budgets,
       policy: HarnessTaskPolicy(allowedOperations: ["workspace.apply-patch@1"]),
       evolutionPolicy: evolutionPolicy)
-    XCTAssertEqual(evolution.executionMode, .evolution)
+    XCTAssertTrue(evolution.requiresWorkspaceIsolation)
     XCTAssertNoThrow(
       try evolution.validate(permittedOperations: ["workspace.apply-patch@1"]))
     XCTAssertThrowsError(
@@ -441,6 +479,38 @@ final class HarnessEvolutionContractTests: XCTestCase {
         error as? HarnessEvolutionPolicyError,
         .destructiveOperationNotAllowed("flash.dayu200@1"))
     }
+  }
+
+  func testLegacyExecutionModeIsDecoderOnlyAndMustAgreeWithWorkspacePolicy() throws {
+    let base = String(repeating: "a", count: 64)
+    let policy = try HarnessEvolutionPolicy(
+      baseRevision: base, allowedPaths: ["Sources/**"],
+      allowedOperations: evolutionOperations)
+    let current = try taskSnapshot(baseRevision: base, policy: policy)
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys]
+    let currentData = try encoder.encode(current)
+    var object = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: currentData) as? [String: Any])
+    XCTAssertNil(object["executionMode"])
+    XCTAssertEqual(object["schemaVersion"] as? String, "3.1.0")
+
+    object["schemaVersion"] = "3.0.0"
+    object["executionMode"] = "evolution"
+    let legacyData = try JSONSerialization.data(withJSONObject: object)
+    let decoded = try JSONDecoder().decode(HarnessTaskSnapshot.self, from: legacyData)
+    XCTAssertTrue(decoded.requiresWorkspaceIsolation)
+    let migrated = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: encoder.encode(decoded.migratedToCurrentSchema()))
+        as? [String: Any])
+    XCTAssertNil(migrated["executionMode"])
+    XCTAssertEqual(migrated["schemaVersion"] as? String, "3.1.0")
+
+    object["executionMode"] = "normal"
+    XCTAssertThrowsError(
+      try JSONDecoder().decode(
+        HarnessTaskSnapshot.self,
+        from: JSONSerialization.data(withJSONObject: object)))
   }
 
   private var timestamp: String { "2026-08-02T00:00:00Z" }
@@ -540,7 +610,7 @@ final class HarnessEvolutionContractTests: XCTestCase {
         desiredState: ["baseWorkspaceRevision": .string(baseRevision)]),
       successCriteria: [], budgets: budgets,
       policy: HarnessTaskPolicy(allowedOperations: evolutionOperations),
-      executionMode: .evolution, evolutionPolicy: policy,
+      evolutionPolicy: policy,
       evolutionWorkspace: HarnessEvolutionWorkspace(
         workspaceID: "evo-test", htaskID: "HTASK-EVOLUTION",
         sourceProjectRef: "TestProject", projectRef: "evolution-test",
