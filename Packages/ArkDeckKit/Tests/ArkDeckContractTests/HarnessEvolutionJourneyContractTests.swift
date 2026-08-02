@@ -291,6 +291,16 @@ private final class JourneyWorkspacePort: HarnessEvolutionWorkspacePort, @unchec
   ) async throws {
     lock.withLock { attemptDirectories.append((attemptID, ordinal)) }
   }
+
+  // The journey never reaches teardown; a sweep here would be a test
+  // defect, so record nothing and report no findings.
+  func sweepTerminalWorkspaces(
+    tasks _: [HarnessEvolutionWorkspaceGCTaskReference],
+    retention _: HarnessEvolutionWorkspaceRetention,
+    nowUTC _: String
+  ) async throws -> [HarnessEvolutionWorkspaceGCFinding] {
+    []
+  }
 }
 
 /// Proposes the bounded patch exactly when the loop's offer narrows to the
