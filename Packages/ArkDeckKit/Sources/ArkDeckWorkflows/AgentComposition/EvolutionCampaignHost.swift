@@ -43,7 +43,10 @@ extension RockchipFlashExecutionHost: RockchipEvolutionFlashDispatching {}
 /// E0 preview. It hashes the complete published archive, protected-main base,
 /// candidate toolchain, running broker and durable stable target. It creates a
 /// non-authoritative draft ledger only; no usage reservation or device process
-/// exists on this path.
+/// exists on this path. The draft expires with its assertion: a preview that
+/// is never confirmed leaves a zero-event document that any later preview or
+/// admission sweeps away once `validUntil` passes, so unconfirmed previews
+/// accumulate no permanent campaign documents.
 public enum RockchipEvolutionCampaignPlanning {
   public static func preview(
     archiveURL: URL,
@@ -84,7 +87,9 @@ public enum RockchipEvolutionCampaignPlanning {
       targetStableIdentitySHA256: stableIdentity,
       bindingLineageRootRevision: binding.revision,
       maxAttempts: maxAttempts, confirmedAt: confirmedAt, validUntil: validUntil)
-    _ = try RockchipEvolutionCampaignLedger(root: roots.campaignLedgerRoot).create(assertion)
+    let ledger = try RockchipEvolutionCampaignLedger(root: roots.campaignLedgerRoot)
+    _ = try? ledger.collectExpiredZeroEventDrafts(at: confirmedAt)
+    _ = try ledger.create(assertion)
     return RockchipEvolutionCampaignPreview(assertion: assertion, deviceMutationDispatchCount: 0)
   }
 }
@@ -144,6 +149,10 @@ public final class RockchipEvolutionCampaignHost: @unchecked Sendable {
         confirmationDigestSHA256)
     else { throw RockchipEvolutionCampaignError.invalidAssertion("confirmationDigest") }
     let campaignID = "ECAMP-\(confirmationDigestSHA256.prefix(24).uppercased())"
+    // Best-effort sweep of expired zero-event preview drafts. If the target
+    // campaign itself is such a draft it becomes campaignNotFound here, which
+    // is the same fail-closed outcome expiry would have forced below.
+    _ = try? ledger.collectExpiredZeroEventDrafts(at: nowUTC())
     let document = try ledger.load(campaignID)
     guard document.assertion.confirmationDigestSHA256 == confirmationDigestSHA256 else {
       throw RockchipEvolutionCampaignError.confirmationDigestMismatch
@@ -162,6 +171,7 @@ public final class RockchipEvolutionCampaignHost: @unchecked Sendable {
     archiveURL: URL,
     targetLocationSelector: String
   ) async throws -> RockchipEvolutionCampaignExecutionResult {
+    _ = try? ledger.collectExpiredZeroEventDrafts(at: nowUTC())
     let document = try ledger.load(campaignID)
     return try await execute(
       document: document, archiveURL: archiveURL,

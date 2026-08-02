@@ -3314,7 +3314,9 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
   `HarnessAdversarialReviewing` 无 conformer 且 daemon 注入 nil，评审→promotion 腿
   生产不可达，且首次可达即暴露 humanRequired 分支 causation 非法、REJECT 后 rollback
   孤儿化两处必然故障；r12 后 GJ-5 的 AI Verification Gate + Adversarial Review Gate
-  在 host 侧闭合，真实设备 dispatch 仍为 0）
+  在 host 侧闭合，真实设备 dispatch 仍为 0；r13 收口 preview 残留——`flash preview`
+  的零事件草稿 ledger 文档随 assertion 过期显式 GC，preview 与 execute/continue 入口
+  机会式清扫，append-only/single-writer 不变量保持，设备 dispatch 仍为 0）
 - Platform:macos
 - Requirements:POL-AGENT-002(MODIFIED)、REQ-FLASH-015(MODIFIED)、POL-AGENT-001、
   POL-WORKFLOW-001、POL-RECOVERY-001、POL-TARGET-001
@@ -3406,6 +3408,13 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
   `conditionChangeRequiresEvidence`）；REJECT 不再关闭 Attempt，镜像 deployment-failure
   先例保持 active 直至 typed rollback 读回以 `.reverted` 收口（原 `.failed` 关闭使后续
   revert decision 无 active attempt 可盖章，dispatch freshness gate 永远 staleDecision）。
+- r13：`flash preview` 不再留下永久 campaign 文档。过期且零事件的草稿由
+  `RockchipEvolutionCampaignLedger.collectExpiredZeroEventDrafts` 在原 per-campaign
+  临界区内整档删除：有任何事件的文档永不回收，undecodable 文件留作检验证据，
+  per-campaign lock 文件不删（避免并发 writer 拿到同名新 inode 破坏 single-writer）；
+  preview 与 execute/continue 入口机会式清扫，status 保持纯读；contract tests 覆盖
+  过期草稿回收、fresh 草稿/带历史文档保留、execute/continue 清扫后仍找到自身文档、
+  设备 dispatch 0。
 
 ### Verification
 
