@@ -6253,6 +6253,24 @@ extension SessionArtifactStorageContractTests {
         "targetDigestSHA256": targetDigestSHA256,
         "confirmedAt": confirmedAt,
       ]
+    case .evolutionCampaignConfirmation(
+      let campaignDigestSHA256, let baseCommitOID, let planDigestSHA256,
+      let archiveDigestSHA256, let stepSetDigestSHA256,
+      let targetStableIdentitySHA256, let bindingLineageRootRevision,
+      let confirmedAt, let validUntil, let maximumAttempts):
+      [
+        "kind": "evolutionCampaignConfirmation",
+        "campaignDigestSHA256": campaignDigestSHA256,
+        "baseCommitOID": baseCommitOID,
+        "planDigestSHA256": planDigestSHA256,
+        "archiveDigestSHA256": archiveDigestSHA256,
+        "stepSetDigestSHA256": stepSetDigestSHA256,
+        "targetStableIdentitySHA256": targetStableIdentitySHA256,
+        "bindingLineageRootRevision": bindingLineageRootRevision,
+        "confirmedAt": confirmedAt,
+        "validUntil": validUntil,
+        "maximumAttempts": maximumAttempts,
+      ]
     }
   }
 

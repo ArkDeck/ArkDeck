@@ -7,6 +7,7 @@ public struct RockchipFlashExecutionRequest: Sendable, Equatable {
   enum Authority: Sendable, Equatable {
     case standingAuthorization(String)
     case chatConfirmation(RockchipChatConfirmationAssertion)
+    case evolutionCampaign(RockchipEvolutionCampaignAttemptPermit)
   }
 
   let authority: Authority
@@ -21,6 +22,11 @@ public struct RockchipFlashExecutionRequest: Sendable, Equatable {
   public var chatConfirmation: RockchipChatConfirmationAssertion? {
     guard case .chatConfirmation(let value) = authority else { return nil }
     return value
+  }
+
+  public var evolutionCampaignID: String? {
+    guard case .evolutionCampaign(let permit) = authority else { return nil }
+    return permit.assertion.campaignID
   }
 
   public init(
@@ -56,6 +62,23 @@ public struct RockchipFlashExecutionRequest: Sendable, Equatable {
       targetLocationSelector == "0" || targetLocationSelector.first != "0"
     else { throw RockchipFlashExecutionError.invalidRequest("targetLocationSelector") }
     authority = .chatConfirmation(chatConfirmation)
+    self.archiveURL = archiveURL.standardizedFileURL
+    self.targetLocationSelector = targetLocationSelector
+  }
+
+  public init(
+    evolutionCampaignAttempt permit: RockchipEvolutionCampaignAttemptPermit,
+    archiveURL: URL,
+    targetLocationSelector: String
+  ) throws {
+    guard archiveURL.isFileURL, archiveURL.path.hasPrefix("/") else {
+      throw RockchipFlashExecutionError.invalidRequest("archiveURL")
+    }
+    guard !targetLocationSelector.isEmpty,
+      targetLocationSelector.utf8.allSatisfy({ (48...57).contains($0) }),
+      targetLocationSelector == "0" || targetLocationSelector.first != "0"
+    else { throw RockchipFlashExecutionError.invalidRequest("targetLocationSelector") }
+    authority = .evolutionCampaign(permit)
     self.archiveURL = archiveURL.standardizedFileURL
     self.targetLocationSelector = targetLocationSelector
   }
@@ -122,6 +145,7 @@ struct RockchipExecutionAdmission: @unchecked Sendable {
   enum Backing: @unchecked Sendable {
     case standingAuthorization(RockchipAuthorizedAgentAdmission)
     case chatConfirmation(RockchipChatConfirmedAdmission)
+    case evolutionCampaign(RockchipEvolutionCampaignAdmission)
     case contractFake
   }
 
@@ -166,12 +190,13 @@ struct RockchipExecutionAdmission: @unchecked Sendable {
   }
 
   var confirmationDecidedAt: String? {
-    guard
-      case .agent(
-        .chatConfirmation(_, _, _, _, _, let confirmedAt)
-      ) = authorityReference
-    else { return nil }
-    return confirmedAt
+    guard case .agent(let reference) = authorityReference else { return nil }
+    switch reference {
+    case .chatConfirmation(_, _, _, _, _, let confirmedAt): return confirmedAt
+    case .evolutionCampaignConfirmation(_, _, _, _, _, _, _, let confirmedAt, _, _):
+      return confirmedAt
+    case .readyTask, .deviceCapability, .standingAuthorization: return nil
+    }
   }
 
   var legacyAuthorizationReference: AuthorizationReference? {

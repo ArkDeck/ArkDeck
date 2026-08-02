@@ -8,6 +8,7 @@ public enum AgentExecutionAuthorityKind: String, Codable, CaseIterable, Sendable
   case deviceCapability
   case standingAuthorization
   case chatConfirmation
+  case evolutionCampaignConfirmation
 }
 
 /// Durable audit identity for an Agent admission. These values deliberately carry no executable
@@ -40,6 +41,18 @@ public enum AgentExecutionAuthorityReference: Equatable, Hashable, Sendable, Cod
     targetDigestSHA256: String,
     confirmedAt: String
   )
+  case evolutionCampaignConfirmation(
+    campaignDigestSHA256: String,
+    baseCommitOID: String,
+    planDigestSHA256: String,
+    archiveDigestSHA256: String,
+    stepSetDigestSHA256: String,
+    targetStableIdentitySHA256: String,
+    bindingLineageRootRevision: Int,
+    confirmedAt: String,
+    validUntil: String,
+    maximumAttempts: Int
+  )
 
   private enum CodingKeys: String, CodingKey {
     case kind
@@ -57,6 +70,12 @@ public enum AgentExecutionAuthorityReference: Equatable, Hashable, Sendable, Cod
     case archiveDigestSHA256
     case stepSetDigestSHA256
     case targetDigestSHA256
+    case campaignDigestSHA256
+    case baseCommitOID
+    case targetStableIdentitySHA256
+    case bindingLineageRootRevision
+    case validUntil
+    case maximumAttempts
     case confirmedAt
   }
 
@@ -140,6 +159,48 @@ public enum AgentExecutionAuthorityReference: Equatable, Hashable, Sendable, Cod
       confirmedAt: confirmedAt)
   }
 
+  public static func validatedEvolutionCampaignConfirmation(
+    campaignDigestSHA256: String,
+    baseCommitOID: String,
+    planDigestSHA256: String,
+    archiveDigestSHA256: String,
+    stepSetDigestSHA256: String,
+    targetStableIdentitySHA256: String,
+    bindingLineageRootRevision: Int,
+    confirmedAt: String,
+    validUntil: String,
+    maximumAttempts: Int
+  ) throws -> AgentExecutionAuthorityReference {
+    guard [
+      campaignDigestSHA256, planDigestSHA256, archiveDigestSHA256,
+      stepSetDigestSHA256, targetStableIdentitySHA256,
+    ].allSatisfy({ $0.agentAuthorityMatches(#"^[a-f0-9]{64}$"#) }),
+      baseCommitOID.agentAuthorityMatches(#"^[a-f0-9]{40}$"#),
+      bindingLineageRootRevision > 0,
+      (1...8).contains(maximumAttempts),
+      AuthorizationUsageValidation.isTimestamp(confirmedAt),
+      AuthorizationUsageValidation.isTimestamp(validUntil),
+      let confirmedDate = AuthorizationUsageValidation.date(confirmedAt),
+      let validUntilDate = AuthorizationUsageValidation.date(validUntil),
+      confirmedDate < validUntilDate,
+      validUntilDate.timeIntervalSince(confirmedDate) <= 4 * 60 * 60
+    else {
+      throw AuthorizationUsageLedgerError.invalidRecord(
+        "evolution campaign confirmation requires closed pins and an 8 attempt/4 hour envelope")
+    }
+    return .evolutionCampaignConfirmation(
+      campaignDigestSHA256: campaignDigestSHA256,
+      baseCommitOID: baseCommitOID,
+      planDigestSHA256: planDigestSHA256,
+      archiveDigestSHA256: archiveDigestSHA256,
+      stepSetDigestSHA256: stepSetDigestSHA256,
+      targetStableIdentitySHA256: targetStableIdentitySHA256,
+      bindingLineageRootRevision: bindingLineageRootRevision,
+      confirmedAt: confirmedAt,
+      validUntil: validUntil,
+      maximumAttempts: maximumAttempts)
+  }
+
   public init(from decoder: Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
     let dynamic = try decoder.container(keyedBy: AgentAuthorityDynamicCodingKey.self)
@@ -207,6 +268,30 @@ public enum AgentExecutionAuthorityReference: Equatable, Hashable, Sendable, Cod
         stepSetDigestSHA256: container.decode(String.self, forKey: .stepSetDigestSHA256),
         targetDigestSHA256: container.decode(String.self, forKey: .targetDigestSHA256),
         confirmedAt: container.decode(String.self, forKey: .confirmedAt))
+    case .evolutionCampaignConfirmation:
+      guard
+        actualKeys == [
+          "kind", "campaignDigestSHA256", "baseCommitOID", "planDigestSHA256",
+          "archiveDigestSHA256", "stepSetDigestSHA256", "targetStableIdentitySHA256",
+          "bindingLineageRootRevision", "confirmedAt", "validUntil", "maximumAttempts",
+        ]
+      else {
+        throw AuthorizationUsageLedgerError.invalidRecord(
+          "evolutionCampaignConfirmation shape is not closed")
+      }
+      self = try Self.validatedEvolutionCampaignConfirmation(
+        campaignDigestSHA256: container.decode(String.self, forKey: .campaignDigestSHA256),
+        baseCommitOID: container.decode(String.self, forKey: .baseCommitOID),
+        planDigestSHA256: container.decode(String.self, forKey: .planDigestSHA256),
+        archiveDigestSHA256: container.decode(String.self, forKey: .archiveDigestSHA256),
+        stepSetDigestSHA256: container.decode(String.self, forKey: .stepSetDigestSHA256),
+        targetStableIdentitySHA256: container.decode(
+          String.self, forKey: .targetStableIdentitySHA256),
+        bindingLineageRootRevision: container.decode(
+          Int.self, forKey: .bindingLineageRootRevision),
+        confirmedAt: container.decode(String.self, forKey: .confirmedAt),
+        validUntil: container.decode(String.self, forKey: .validUntil),
+        maximumAttempts: container.decode(Int.self, forKey: .maximumAttempts))
     }
   }
 
@@ -242,6 +327,20 @@ public enum AgentExecutionAuthorityReference: Equatable, Hashable, Sendable, Cod
       try container.encode(stepSetDigestSHA256, forKey: .stepSetDigestSHA256)
       try container.encode(targetDigestSHA256, forKey: .targetDigestSHA256)
       try container.encode(confirmedAt, forKey: .confirmedAt)
+    case .evolutionCampaignConfirmation(
+      let campaignDigestSHA256, let baseCommitOID, let planDigestSHA256,
+      let archiveDigestSHA256, let stepSetDigestSHA256, let targetStableIdentitySHA256,
+      let bindingLineageRootRevision, let confirmedAt, let validUntil, let maximumAttempts):
+      try container.encode(campaignDigestSHA256, forKey: .campaignDigestSHA256)
+      try container.encode(baseCommitOID, forKey: .baseCommitOID)
+      try container.encode(planDigestSHA256, forKey: .planDigestSHA256)
+      try container.encode(archiveDigestSHA256, forKey: .archiveDigestSHA256)
+      try container.encode(stepSetDigestSHA256, forKey: .stepSetDigestSHA256)
+      try container.encode(targetStableIdentitySHA256, forKey: .targetStableIdentitySHA256)
+      try container.encode(bindingLineageRootRevision, forKey: .bindingLineageRootRevision)
+      try container.encode(confirmedAt, forKey: .confirmedAt)
+      try container.encode(validUntil, forKey: .validUntil)
+      try container.encode(maximumAttempts, forKey: .maximumAttempts)
     }
   }
 
@@ -251,6 +350,7 @@ public enum AgentExecutionAuthorityReference: Equatable, Hashable, Sendable, Cod
     case .deviceCapability: .deviceCapability
     case .standingAuthorization: .standingAuthorization
     case .chatConfirmation: .chatConfirmation
+    case .evolutionCampaignConfirmation: .evolutionCampaignConfirmation
     }
   }
 
@@ -260,6 +360,7 @@ public enum AgentExecutionAuthorityReference: Equatable, Hashable, Sendable, Cod
     case .deviceCapability: .deviceMutation
     case .standingAuthorization: .destructive
     case .chatConfirmation: .destructive
+    case .evolutionCampaignConfirmation: .destructive
     }
   }
 
@@ -270,6 +371,8 @@ public enum AgentExecutionAuthorityReference: Equatable, Hashable, Sendable, Cod
     case .standingAuthorization(let authorizationID, _, _, _): authorizationID
     case .chatConfirmation(let confirmationDigestSHA256, _, _, _, _, _):
       "CHAT-\(confirmationDigestSHA256.uppercased())"
+    case .evolutionCampaignConfirmation(let campaignDigestSHA256, _, _, _, _, _, _, _, _, _):
+      "CAMPAIGN-\(campaignDigestSHA256.uppercased())"
     }
   }
 
@@ -368,6 +471,31 @@ public enum AgentExecutionAuthorityReference: Equatable, Hashable, Sendable, Cod
         stepSetDigestSHA256: stepSetDigestSHA256,
         targetDigestSHA256: targetDigestSHA256,
         confirmedAt: confirmedAt)
+    case .evolutionCampaignConfirmation:
+      guard
+        Set(object.keys) == [
+          "kind", "campaignDigestSHA256", "baseCommitOID", "planDigestSHA256",
+          "archiveDigestSHA256", "stepSetDigestSHA256", "targetStableIdentitySHA256",
+          "bindingLineageRootRevision", "confirmedAt", "validUntil", "maximumAttempts",
+        ],
+        let bindingLineageRootRevision =
+          object[CodingKeys.bindingLineageRootRevision.rawValue]?.authorizationInteger,
+        let maximumAttempts = object[CodingKeys.maximumAttempts.rawValue]?.authorizationInteger
+      else {
+        throw AuthorizationUsageLedgerError.invalidRecord(
+          "\(context) evolutionCampaignConfirmation shape")
+      }
+      self = try Self.validatedEvolutionCampaignConfirmation(
+        campaignDigestSHA256: string(.campaignDigestSHA256),
+        baseCommitOID: string(.baseCommitOID),
+        planDigestSHA256: string(.planDigestSHA256),
+        archiveDigestSHA256: string(.archiveDigestSHA256),
+        stepSetDigestSHA256: string(.stepSetDigestSHA256),
+        targetStableIdentitySHA256: string(.targetStableIdentitySHA256),
+        bindingLineageRootRevision: bindingLineageRootRevision,
+        confirmedAt: string(.confirmedAt),
+        validUntil: string(.validUntil),
+        maximumAttempts: maximumAttempts)
     }
   }
 
@@ -1086,6 +1214,17 @@ public struct AgentAuthorityUsageReservation: Codable, Equatable, Sendable {
         archiveDigestSHA256, stepSetDigestSHA256, targetDigestSHA256, confirmedAt,
       ]
       identifierPrefix = "ain018"
+    case .evolutionCampaignConfirmation(
+      let campaignDigestSHA256, let baseCommitOID, let planDigestSHA256,
+      let archiveDigestSHA256, let stepSetDigestSHA256, let targetStableIdentitySHA256,
+      let bindingLineageRootRevision, let confirmedAt, let validUntil, let maximumAttempts):
+      identity = [
+        "evolutionCampaignConfirmation", campaignDigestSHA256, baseCommitOID,
+        planDigestSHA256, archiveDigestSHA256, stepSetDigestSHA256,
+        targetStableIdentitySHA256, String(bindingLineageRootRevision), confirmedAt,
+        validUntil, String(maximumAttempts),
+      ]
+      identifierPrefix = "ain019"
     case .readyTask, .standingAuthorization:
       throw AuthorizationUsageLedgerError.invalidRecord(
         "authority kind does not use the agent authority ledger")
@@ -1121,6 +1260,8 @@ public struct AgentAuthorityUsageReservation: Codable, Equatable, Sendable {
       validLimits = (1...32).contains(maximumUses) && maximumConcurrentJobs == 1
     case .chatConfirmation:
       validLimits = maximumUses == 1 && maximumConcurrentJobs == 1
+    case .evolutionCampaignConfirmation:
+      validLimits = (1...8).contains(maximumUses) && maximumConcurrentJobs == 1
     case .readyTask, .standingAuthorization:
       validLimits = false
     }
@@ -1648,9 +1789,12 @@ private enum AgentAuthorityUsageValidation {
       }
       let reference = try AgentExecutionAuthorityReference(
         jsonValue: authority, context: "reservation.authorizationRef")
-      guard reference.kind == .deviceCapability || reference.kind == .chatConfirmation else {
+      guard reference.kind == .deviceCapability || reference.kind == .chatConfirmation
+        || reference.kind == .evolutionCampaignConfirmation
+      else {
         throw AuthorizationUsageLedgerError.invalidRecord(
-          "Agent authority usage requires deviceCapability or chatConfirmation")
+          "Agent authority usage requires deviceCapability, chatConfirmation or "
+            + "evolutionCampaignConfirmation")
       }
       if case .object(let terminal)? = reservation["terminal"] {
         guard Set(terminal.keys) == terminalKeys else {

@@ -1071,9 +1071,12 @@ private enum RockchipProductionExecutionComposition {
       loadToken: { try RockchipProductExecutionSettings.productKeychainToken() })
     let ledger = try AuthorizationUsageLedger(root: settings.usageRoot)
     let agentLedger = try AgentAuthorityUsageLedger(root: settings.usageRoot)
+    let campaignLedger = try RockchipEvolutionCampaignLedger(
+      root: settings.usageRoot.appending(path: "evolution-campaigns", directoryHint: .isDirectory))
     let postflightIdentities = try settings.binding.postflightIdentities()
     let admission = RockchipProductionAdmissionPort(
       provenance: provenance, usageLedger: ledger, agentUsageLedger: agentLedger,
+      campaignLedger: campaignLedger,
       binding: settings.binding,
       postflightIdentities: postflightIdentities,
       tool: settings.tool, clock: clock, usbProbe: usbProbe)
@@ -2582,6 +2585,7 @@ private final class RockchipProductionAdmissionPort: @unchecked Sendable,
   private let provenance: RockchipProductionProvenanceTokenLoader
   private let usageLedger: AuthorizationUsageLedger
   private let agentUsageLedger: AgentAuthorityUsageLedger
+  private let campaignLedger: RockchipEvolutionCampaignLedger
   private let binding: RockchipProductBindingSnapshot
   private let postflightIdentities: [RockchipPostflightIdentity]
   private let tool: RockchipSelectedDiscoveryTool
@@ -2592,6 +2596,7 @@ private final class RockchipProductionAdmissionPort: @unchecked Sendable,
     provenance: RockchipProductionProvenanceTokenLoader,
     usageLedger: AuthorizationUsageLedger,
     agentUsageLedger: AgentAuthorityUsageLedger,
+    campaignLedger: RockchipEvolutionCampaignLedger,
     binding: RockchipProductBindingSnapshot,
     postflightIdentities: [RockchipPostflightIdentity],
     tool: RockchipSelectedDiscoveryTool,
@@ -2601,6 +2606,7 @@ private final class RockchipProductionAdmissionPort: @unchecked Sendable,
     self.provenance = provenance
     self.usageLedger = usageLedger
     self.agentUsageLedger = agentUsageLedger
+    self.campaignLedger = campaignLedger
     self.binding = binding
     self.postflightIdentities = postflightIdentities
     self.tool = tool
@@ -2693,6 +2699,26 @@ private final class RockchipProductionAdmissionPort: @unchecked Sendable,
         postflightIdentities: postflightIdentities,
         executableIdentity: token.facts.executableIdentity,
         evidenceClass: .production)
+    case .evolutionCampaign(let permit):
+      let startingMode: RockchipEvolutionStartingMode = liveIdentity.isLoader ? .loader : .hdcNormal
+      let service = RockchipEvolutionCampaignAdmissionService(
+        factCollector: collector, usageLedger: agentUsageLedger,
+        campaignLedger: campaignLedger, clock: clock,
+        bindingSerialDigestSHA256: serialDigest, bindingRevision: binding.revision)
+      let token = try await service.admit(
+        permit: permit, facts: factRequest, sessionID: sessionID,
+        startingMode: startingMode)
+      return RockchipExecutionAdmission(
+        backing: .evolutionCampaign(token), plan: token.facts.plan,
+        authorityReference: .agent(token.authorizationReference),
+        usageReservationID: token.usageReservation.reservationID,
+        targetID: targetID, bindingRevision: token.facts.bindingReference.revision,
+        targetDigestSHA256: token.facts.targetDigestSHA256,
+        serialDigestSHA256: token.facts.serialDigestSHA256,
+        usbTopology: token.facts.usbTopology,
+        postflightIdentities: postflightIdentities,
+        executableIdentity: token.facts.executableIdentity,
+        evidenceClass: .production)
     }
   }
 
@@ -2714,6 +2740,12 @@ private final class RockchipProductionAdmissionPort: @unchecked Sendable,
         consumed.facts.executableIdentity == admission.executableIdentity
       else { throw RockchipFlashExecutionError.authorizationGateRejected("consume correlation") }
     case .chatConfirmation(let token):
+      let consumed = try token.consume(at: clock.now())
+      guard consumed.authorizationReference == admission.agentAuthorizationReference,
+        consumed.usageReservation.reservationID == admission.usageReservationID,
+        consumed.facts.executableIdentity == admission.executableIdentity
+      else { throw RockchipFlashExecutionError.authorizationGateRejected("consume correlation") }
+    case .evolutionCampaign(let token):
       let consumed = try token.consume(at: clock.now())
       guard consumed.authorizationReference == admission.agentAuthorizationReference,
         consumed.usageReservation.reservationID == admission.usageReservationID,
@@ -2742,6 +2774,24 @@ private final class RockchipProductionAdmissionPort: @unchecked Sendable,
         externalIntentEventIDs: destructiveIntentEventIDs)
       _ = try agentUsageLedger.close(
         reservationID: admission.usageReservationID, terminal: terminal)
+      if case .evolutionCampaign(let token) = admission.backing {
+        let disposition: RockchipEvolutionAttemptDisposition
+        if status == .succeeded {
+          disposition = .succeeded
+        } else if status == .outcomeUnknown {
+          disposition = .outcomeUnknown
+        } else if destructiveIntentEventIDs.isEmpty {
+          disposition = .safeToReflash
+        } else {
+          disposition = .unsafePartial
+        }
+        _ = try campaignLedger.closeAttempt(
+          campaignID: token.campaignID, ordinal: token.ordinal,
+          jobID: token.jobID, sessionID: token.sessionID,
+          disposition: disposition,
+          destructiveIntentEventIDs: destructiveIntentEventIDs,
+          at: clock.now().auditTimestamp)
+      }
     }
   }
 }

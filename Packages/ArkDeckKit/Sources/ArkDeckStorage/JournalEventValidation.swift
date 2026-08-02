@@ -578,7 +578,8 @@ extension JournalEvent {
         throw JournalEventValidationError.malformedPayload(
           kind: kind, detail: "\(context) readyTask cannot carry usageReservationId")
       }
-    case .deviceCapability, .standingAuthorization, .chatConfirmation:
+    case .deviceCapability, .standingAuthorization, .chatConfirmation,
+      .evolutionCampaignConfirmation:
       guard reservationID != nil else {
         throw JournalEventValidationError.malformedPayload(
           kind: kind, detail: "\(context) is missing usageReservationId")

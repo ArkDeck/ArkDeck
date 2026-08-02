@@ -75,6 +75,14 @@ struct ArkDeckCommandLine {
       try runPlan(Array(arguments.dropFirst()))
     case "execute":
       try await runExecute(Array(arguments.dropFirst()))
+    case "evolution-preview":
+      try await runEvolutionPreview(Array(arguments.dropFirst()))
+    case "evolution-execute":
+      try await runEvolutionExecute(Array(arguments.dropFirst()))
+    case "evolution-continue":
+      try await runEvolutionContinue(Array(arguments.dropFirst()))
+    case "evolution-status":
+      try runEvolutionStatus(Array(arguments.dropFirst()))
     case "postflight":
       try runPostflight(Array(arguments.dropFirst()))
     default:
@@ -407,6 +415,159 @@ struct ArkDeckCommandLine {
       stepSetDigestSHA256: stepSetDigest,
       targetDigestSHA256: targetDigest,
       bindingRevision: bindingRevision)
+  }
+
+  // MARK: bounded Evolution E2 campaign
+
+  static func runEvolutionPreview(_ arguments: [String]) async throws {
+    let options = try CLIOptions(arguments)
+    try options.validateAllowed([
+      "--images", "--max-attempts", "--max-changed-files", "--max-diff-lines",
+      "--validity-seconds",
+    ])
+    guard let images = options.value("--images"), images.hasPrefix("/"),
+      let maxAttempts = strictPositiveInt(options.value("--max-attempts") ?? "8"),
+      let maxChangedFiles = strictPositiveInt(options.value("--max-changed-files") ?? "8"),
+      let maxDiffLines = strictPositiveInt(options.value("--max-diff-lines") ?? "2000"),
+      let validitySeconds = strictPositiveInt(options.value("--validity-seconds") ?? "14400")
+    else {
+      throw CLIError(
+        exitCode: EX_USAGE,
+        message: "evolution-preview requires absolute --images and canonical positive budgets")
+    }
+    let preview = try await RockchipEvolutionCampaignPlanning.preview(
+      archiveURL: URL(fileURLWithPath: images), maxAttempts: maxAttempts,
+      maxChangedFiles: maxChangedFiles, maxDiffLines: maxDiffLines,
+      validitySeconds: validitySeconds)
+    let assertion = preview.assertion
+    print("bounded Evolution Flash campaign preview")
+    print("campaign: \(assertion.campaignID)")
+    print("confirmation digest: \(assertion.confirmationDigestSHA256)")
+    print("protected-main base: \(assertion.baseCommitOID)")
+    print(
+      "candidate build target: "
+        + RockchipEvolutionCampaignConfirmationAssertion.candidateBuildTarget)
+    print("candidate toolchain: \(assertion.candidateToolchainDigestSHA256)")
+    print("merged broker executable: \(assertion.brokerExecutableDigestSHA256)")
+    print("allowed candidate paths: \(assertion.allowedPaths.joined(separator: ","))")
+    print(
+      "candidate budget: files<=\(assertion.maxChangedFiles), "
+        + "diff-lines<=\(assertion.maxDiffLines)")
+    print("plan: \(assertion.planDigestSHA256)")
+    print("archive: \(assertion.archiveDigestSHA256)")
+    print("step-set: \(assertion.stepSetDigestSHA256)")
+    print("target stable identity: \(assertion.targetStableIdentitySHA256)")
+    print("binding lineage root revision: \(assertion.bindingLineageRootRevision)")
+    print("data impact: \(assertion.userdataImpact)")
+    print("hard budget: attempts<=\(assertion.maxAttempts), concurrency=1")
+    print("valid until: \(assertion.validUntil)")
+    print("device mutation dispatch: \(preview.deviceMutationDispatchCount)")
+    print("")
+    print(
+      "确认本次 Evolution Flash campaign：campaign=\(assertion.confirmationDigestSHA256)，"
+        + "base=\(assertion.baseCommitOID)，plan=\(assertion.planDigestSHA256)，"
+        + "archive=\(assertion.archiveDigestSHA256)，step-set=\(assertion.stepSetDigestSHA256)，"
+        + "target=\(assertion.targetStableIdentitySHA256)，"
+        + "bindingRevision=\(assertion.bindingLineageRootRevision)，"
+        + "最多 \(assertion.maxAttempts) 次、并发 1、有效至 \(assertion.validUntil)，"
+        + "ERASE-USERDATA；unknown/unsafe partial 不重试。")
+  }
+
+  static func runEvolutionExecute(_ arguments: [String]) async throws {
+    let options = try CLIOptions(arguments)
+    try options.validateAllowed([
+      "--images", "--target-location-id", "--campaign-confirmation-digest-sha256",
+    ])
+    guard let images = options.value("--images"), images.hasPrefix("/"),
+      let location = options.value("--target-location-id"),
+      let digest = options.value("--campaign-confirmation-digest-sha256")
+    else {
+      throw CLIError(
+        exitCode: EX_USAGE,
+        message: "evolution-execute requires --images, --target-location-id and the exact "
+          + "campaign confirmation digest")
+    }
+    try requireEvolutionAgentContext(firstAdmission: true)
+    let result = try await RockchipEvolutionCampaignHost().executeConfirmedCampaign(
+      confirmationDigestSHA256: digest,
+      archiveURL: URL(fileURLWithPath: images), targetLocationSelector: location)
+    printEvolutionResult(result)
+  }
+
+  static func runEvolutionContinue(_ arguments: [String]) async throws {
+    let options = try CLIOptions(arguments)
+    try options.validateAllowed(["--images", "--target-location-id", "--campaign-id"])
+    guard let images = options.value("--images"), images.hasPrefix("/"),
+      let location = options.value("--target-location-id"),
+      let campaignID = options.value("--campaign-id")
+    else {
+      throw CLIError(
+        exitCode: EX_USAGE,
+        message: "evolution-continue requires --images, --target-location-id and --campaign-id")
+    }
+    try requireEvolutionAgentContext(firstAdmission: false)
+    let result = try await RockchipEvolutionCampaignHost().continueCampaign(
+      campaignID: campaignID, archiveURL: URL(fileURLWithPath: images),
+      targetLocationSelector: location)
+    printEvolutionResult(result)
+  }
+
+  static func runEvolutionStatus(_ arguments: [String]) throws {
+    let options = try CLIOptions(arguments)
+    try options.validateAllowed(["--campaign-id"])
+    guard let campaignID = options.value("--campaign-id") else {
+      throw CLIError(exitCode: EX_USAGE, message: "evolution-status requires --campaign-id")
+    }
+    let document = try RockchipEvolutionCampaignHost().status(campaignID)
+    print("campaign: \(document.campaignID)")
+    print("terminal: \(document.isTerminal)")
+    print("reserved attempts: \(document.reservedAttemptCount)/\(document.assertion.maxAttempts)")
+    for event in document.events {
+      var fields = ["#\(event.sequence)", event.kind.rawValue, event.at]
+      if let ordinal = event.ordinal { fields.append("ordinal=\(ordinal)") }
+      if let candidate = event.candidate { fields.append("candidate=\(candidate.candidateID)") }
+      if let review = event.review { fields.append("review=\(review.reviewID)") }
+      if let disposition = event.disposition {
+        fields.append("disposition=\(disposition.rawValue)")
+      }
+      if let reason = event.reasonCode { fields.append("reason=\(reason)") }
+      print(fields.joined(separator: " "))
+    }
+  }
+
+  static func requireEvolutionAgentContext(firstAdmission: Bool) throws {
+    let environment = ProcessInfo.processInfo.environment
+    let authority = RockchipExecutionAuthorityResolver.resolve(
+      operatorProvided: false,
+      standardInputIsInteractive: isatty(FileHandle.standardInput.fileDescriptor) == 1,
+      environmentOverride: environment["ARKDECK_EXECUTION_AUTHORITY"])
+    let expected = firstAdmission ? "supervisedInteractiveAgent" : "boundedEvolutionAgent"
+    guard authority == .standardAgent,
+      environment["ARKDECK_EVOLUTION_CAMPAIGN_CONTEXT"] == expected,
+      environment["CI"] != "true", environment["GITHUB_ACTIONS"] != "true"
+    else {
+      throw CLIError(
+        exitCode: EX_USAGE,
+        message: firstAdmission
+          ? "first campaign admission requires the current supervised interactive Agent "
+            + "confirmation context; CI/daemon/scheduler are rejected"
+          : "campaign continuation requires boundedEvolutionAgent context; CI is rejected")
+    }
+  }
+
+  static func printEvolutionResult(_ result: RockchipEvolutionCampaignExecutionResult) {
+    print("campaign: \(result.campaignID)")
+    print("attempt ordinal: \(result.attemptOrdinal)")
+    print("session: \(result.flash.sessionID)")
+    print("job: \(result.flash.jobID)")
+    print("terminal status: \(result.flash.status.rawValue)")
+    print("evidence class: \(result.flash.evidenceClass.rawValue)")
+    if let manifest = result.flash.manifestURL { print("manifest: \(manifest.path)") }
+  }
+
+  static func strictPositiveInt(_ raw: String) -> Int? {
+    guard let value = Int(raw), value > 0, raw == String(value) else { return nil }
+    return value
   }
 
   // MARK: postflight
@@ -752,6 +913,13 @@ struct ArkDeckCommandLine {
       --chat-confirmation-digest-sha256 <SHA256> --chat-confirmed-plan-sha256 <SHA256> \
       --chat-confirmed-archive-sha256 <SHA256> --chat-confirmed-step-set-sha256 <SHA256> \
       --chat-confirmed-target-sha256 <SHA256> --chat-confirmed-binding-revision <n>
+        arkdeck flash evolution-preview --images <images.tar.gz> [--max-attempts <1...8>] \
+      [--max-changed-files <n>] [--max-diff-lines <n>] [--validity-seconds <1...14400>]
+        arkdeck flash evolution-execute --images <images.tar.gz> \
+      --target-location-id <usb-location> --campaign-confirmation-digest-sha256 <SHA256>
+        arkdeck flash evolution-continue --images <images.tar.gz> \
+      --target-location-id <usb-location> --campaign-id <ECAMP-id>
+        arkdeck flash evolution-status --campaign-id <ECAMP-id>
         arkdeck flash postflight --observation <observation.json> \
       [--device-profile <dayu200@1|dayu200@2>]
         arkdeck update-feed prepare --sequence <n> --version <x.y.z> \

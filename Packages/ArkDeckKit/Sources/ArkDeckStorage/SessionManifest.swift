@@ -87,7 +87,8 @@ public struct SessionManifestAuthorization: Equatable, Sendable {
             "readyTask authorization requires null usageReservationId")
         }
         usageReservationID = nil
-      case .deviceCapability, .standingAuthorization, .chatConfirmation:
+      case .deviceCapability, .standingAuthorization, .chatConfirmation,
+        .evolutionCampaignConfirmation:
         let identifier = try object.manifestString("usageReservationId")
         try SessionStorageValidation.identifier(
           identifier, field: "authorization.usageReservationId")

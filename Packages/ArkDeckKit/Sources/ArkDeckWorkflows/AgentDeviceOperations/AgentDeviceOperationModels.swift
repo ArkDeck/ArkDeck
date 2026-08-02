@@ -575,11 +575,16 @@ private struct AgentAuthorityReferenceDocument: Codable {
       // This generic operation surface cannot establish the Rockchip-specific live target and
       // invocation facts required by CHG-2026-025 r7. Only the closed Flash host may decode it.
       throw AgentDeviceOperationSubmissionError.malformed("$.authorizationRef.kind")
+    case .evolutionCampaignConfirmation:
+      // Campaign bytes are likewise confined to the merged Rockchip broker.
+      throw AgentDeviceOperationSubmissionError.malformed("$.authorizationRef.kind")
     }
   }
 
   func encode(to encoder: Encoder) throws {
-    guard value.kind != .chatConfirmation else {
+    guard value.kind != .chatConfirmation,
+      value.kind != .evolutionCampaignConfirmation
+    else {
       throw AgentDeviceOperationSubmissionError.malformed("$.authorizationRef.kind")
     }
     try value.encode(to: encoder)

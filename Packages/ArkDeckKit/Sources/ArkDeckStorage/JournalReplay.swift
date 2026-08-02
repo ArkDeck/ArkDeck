@@ -1037,7 +1037,8 @@ private func validateAuthorizationCorrelation(
         throw DurableFileError.sequenceViolation(
           "readyTask intent cannot consume a usage reservation")
       }
-    case .deviceCapability, .standingAuthorization, .chatConfirmation:
+    case .deviceCapability, .standingAuthorization, .chatConfirmation,
+      .evolutionCampaignConfirmation:
       guard usageReservationID != nil else {
         throw DurableFileError.sequenceViolation(
           "device-mutating intent requires a usage reservation")

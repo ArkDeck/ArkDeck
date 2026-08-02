@@ -551,6 +551,9 @@ public actor TrustedDeviceOperationHost {
       // Chat E2 is invocation-scoped to the Rockchip Flash product host and is never reusable by
       // the generic Agent Device Operation plane.
       return false
+    case .evolutionCampaignConfirmation:
+      // Bounded campaign continuations are admitted only by the merged Rockchip broker.
+      return false
     }
   }
 
