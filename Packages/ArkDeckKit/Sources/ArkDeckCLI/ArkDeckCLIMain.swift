@@ -945,6 +945,7 @@ struct ArkDeckCommandLine {
       pause|cancel --task <HTASK-id> [--json]
         arkdeck task workspace-gc [--retain-days <n>] [--retain-last <n>] [--dry-run] [--json]
         arkdeck task resume --task <HTASK-id> --resolution <typed reason> [--json]
+        arkdeck task promotion --task <HTASK-id> [--destination <directory>] [--json]
         arkdeck artifact list|inspect|read|export --job <id> [--artifact <id>] \
       [--destination <directory>] [--allow-sensitive]
         arkdeck agent run --operation <id@version> [--target <id>] [--inputs-file <path>] \

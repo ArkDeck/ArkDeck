@@ -3426,6 +3426,18 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
   retainLast 2）与 `arkdeck task workspace-gc [--retain-days] [--retain-last]
   [--dry-run]`；无 workspace port 的组合 fail-closed；无 on-terminal 自动清扫
   （显式 CLI/cron 即有界，failed 树的 post-mortem 价值由保留策略守护）。
+- promotion 导出面（#975）：READY_FOR_NORMAL_PR 候选此前只持久化在 attempt 上、无
+  下游消费者。新增只读 `task.promotion` wire 方法与 `arkdeck task promotion --task
+  <HTASK-id> [--destination <dir>]`：`HarnessPromotionExport`（Harness/Tasks 纯投影）
+  选出唯一 promoted attempt，逐链 fail-closed 校验
+  promotion→candidatePatch→review PASS→evaluation PASS，diff 字节与评审腿同源
+  （repair proposal 且 `namesDiff` 摘要必须命中，缺失/漂移拒绝导出），渲染 PR-ready
+  文档包：PROMOTION.md、final.patch、promotion-candidate/candidate-patch/evaluation/
+  adversarial-review 四份 JSON 文档、artifacts.json 角色化引用清单（evidence
+  名称/字节数/摘要随车）；CLI 落盘前复核 sha256(final.patch)==diffDigest（双侧校验），
+  目录 0700、拒绝覆盖与 symlink；无 promotion 记录 notFound、事实不一致
+  internalError，绝不产出部分包。promotion 保持文档、永不 merge
+  （docs/ArchitectureRules.md §3），CLI 仍不 import ArkDeckHarness。
 
 ### Verification
 
@@ -3461,3 +3473,7 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
   retain-last 与 age 双轴保留及 dry-run 零变更；中断 teardown 的 `.workspace.doomed`/
   `.workspace.tmp` 幂等续删；wire 端默认保留、显式清零销毁并报回收字节、负参数
   invalidParams、无 port rejected；设备 dispatch=0。
+- promotion export tests（#975）：service 绿路（final.patch 字节精确、promotion/
+  candidate/review 文档 round-trip、manifest 角色分类）+ 无 promotion 记录 notFound +
+  篡改 diff/异 review/重复 promotion/缺 evaluation 逐一 fail-closed + control-plane
+  线路负例 + CLI 词表与缺 `--task` EX_USAGE fail-closed；设备 dispatch=0。

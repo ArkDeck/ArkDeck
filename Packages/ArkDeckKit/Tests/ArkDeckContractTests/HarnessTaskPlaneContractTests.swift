@@ -969,6 +969,17 @@ final class HarnessTaskPlaneContractTests: XCTestCase {
     XCTAssertFalse(missingProposal.ok)
     XCTAssertEqual(missingProposal.error?.code, AgentDaemonErrorCode.invalidParams.rawValue)
 
+    // task.promotion is a read-only projection: a task that never recorded a
+    // promotion candidate gets a refusal, not a partial bundle.
+    let promotionMissing = await handler.handleFrame(
+      try JSONEncoder().encode(
+        AgentWireProtocol.Request(
+          id: "2c", method: "task.promotion", params: ["htaskId": .string(taskID)])))
+    XCTAssertFalse(promotionMissing.ok)
+    XCTAssertEqual(promotionMissing.error?.code, AgentDaemonErrorCode.notFound.rawValue)
+    XCTAssertTrue(
+      promotionMissing.error?.message.contains("no recorded promotion candidate") == true)
+
     let unknown = await handler.handleFrame(
       try JSONEncoder().encode(
         AgentWireProtocol.Request(

@@ -402,6 +402,206 @@ final class HarnessEvolutionReviewContractTests: XCTestCase {
     XCTAssertNil(attempt.promotionCandidate)
   }
 
+  // MARK: Promotion export (task.promotion)
+
+  func testTaskPromotionServesThePRReadyBundleOverTheTaskPlane() async throws {
+    let stack = try await makeReviewStack(reviewer: ScriptedReviewer(.verdict(.pass, [])))
+    _ = try await stack.coordinator.reconcile(stack.taskID)
+    let attempt = try await lastAttempt(stack)
+    let promotion = try XCTUnwrap(attempt.promotionCandidate)
+    let candidate = try XCTUnwrap(attempt.candidatePatch)
+
+    let service = HarnessTaskMethodService(
+      coordinator: stack.coordinator, applicationReferenceValidator: { _, _ in })
+    let response = await service.handle(
+      "task.promotion", requestID: "rq-promotion",
+      params: ["htaskId": .string(stack.taskID)])
+
+    XCTAssertNil(response.errorCode, response.errorMessage ?? "")
+    guard case .object(let fields)? = response.result else {
+      return XCTFail("task.promotion must return an object")
+    }
+    XCTAssertEqual(fields["htaskId"], .string(stack.taskID))
+    XCTAssertEqual(fields["attemptId"], .string(attempt.attemptID))
+    XCTAssertEqual(
+      fields["promotionCandidateId"], .string(promotion.promotionCandidateID))
+    XCTAssertEqual(fields["disposition"], .string("READY_FOR_NORMAL_PR"))
+    XCTAssertEqual(fields["taskStatus"], .string("succeeded"))
+    XCTAssertEqual(fields["diffDigest"], .string(candidate.diffDigest))
+    XCTAssertEqual(
+      fields["artifactIds"], .array(promotion.artifactIDs.map(JSONValue.string)))
+
+    guard case .array(let fileValues)? = fields["files"] else {
+      return XCTFail("task.promotion must return the rendered bundle files")
+    }
+    var files: [String: String] = [:]
+    for value in fileValues {
+      guard case .object(let file) = value,
+        case .string(let name)? = file["name"],
+        case .string(let contents)? = file["contents"]
+      else { return XCTFail("bundle files must carry name and contents") }
+      files[name] = contents
+    }
+    XCTAssertEqual(
+      Set(files.keys),
+      [
+        HarnessPromotionExport.summaryFileName, HarnessPromotionExport.patchFileName,
+        HarnessPromotionExport.promotionFileName, HarnessPromotionExport.candidateFileName,
+        HarnessPromotionExport.evaluationFileName, HarnessPromotionExport.reviewFileName,
+        HarnessPromotionExport.manifestFileName,
+      ])
+
+    // final.patch is byte-exact: the export carries the reviewed diff, and
+    // its digest is the one the candidate metadata names.
+    let patch = try XCTUnwrap(files[HarnessPromotionExport.patchFileName])
+    XCTAssertEqual(patch, stack.unifiedDiff)
+    let patchDigest = SHA256.hash(data: Data(patch.utf8))
+      .map { String(format: "%02x", $0) }.joined()
+    XCTAssertEqual(patchDigest, candidate.diffDigest)
+
+    // The JSON documents round-trip to the recorded facts, not summaries.
+    XCTAssertEqual(
+      try JSONDecoder().decode(
+        HarnessPromotionCandidate.self,
+        from: Data(try XCTUnwrap(files[HarnessPromotionExport.promotionFileName]).utf8)),
+      promotion)
+    XCTAssertEqual(
+      try JSONDecoder().decode(
+        HarnessCandidatePatch.self,
+        from: Data(try XCTUnwrap(files[HarnessPromotionExport.candidateFileName]).utf8)),
+      candidate)
+    XCTAssertEqual(
+      try JSONDecoder().decode(
+        HarnessAdversarialReview.self,
+        from: Data(try XCTUnwrap(files[HarnessPromotionExport.reviewFileName]).utf8)),
+      try XCTUnwrap(attempt.review))
+
+    let summary = try XCTUnwrap(files[HarnessPromotionExport.summaryFileName])
+    XCTAssertTrue(summary.contains(stack.taskID))
+    XCTAssertTrue(summary.contains("READY_FOR_NORMAL_PR"))
+    XCTAssertTrue(summary.contains("never a merge claim"))
+    XCTAssertTrue(summary.contains(promotion.baseRevision))
+
+    // The manifest covers every promotion artifact reference with its roles.
+    let manifest = try JSONDecoder().decode(
+      JSONValue.self,
+      from: Data(try XCTUnwrap(files[HarnessPromotionExport.manifestFileName]).utf8))
+    guard case .object(let manifestFields) = manifest,
+      case .array(let entries)? = manifestFields["artifacts"]
+    else { return XCTFail("artifacts.json must carry an artifacts array") }
+    XCTAssertEqual(entries.count, promotion.artifactIDs.count)
+    func roles(of artifactID: String) -> JSONValue? {
+      for entry in entries {
+        guard case .object(let entryFields) = entry else { continue }
+        if entryFields["artifactId"] == .string(artifactID) {
+          return entryFields["roles"]
+        }
+      }
+      return nil
+    }
+    XCTAssertEqual(roles(of: candidate.diffArtifactID), .array([.string("diff")]))
+    XCTAssertEqual(
+      roles(of: try XCTUnwrap(candidate.metadataArtifactID)),
+      .array([.string("candidateMetadata")]))
+    XCTAssertEqual(roles(of: "ART-BUILD"), .array([.string("build")]))
+  }
+
+  func testTaskPromotionRefusesATaskWithoutARecordedPromotion() async throws {
+    let stack = try await makeReviewStack(reviewer: ScriptedReviewer(.verdict(.pass, [])))
+    let service = HarnessTaskMethodService(
+      coordinator: stack.coordinator, applicationReferenceValidator: { _, _ in })
+
+    // No reconcile ran: the seeded task never recorded a promotion.
+    let missing = await service.handle(
+      "task.promotion", requestID: "rq-missing",
+      params: ["htaskId": .string(stack.taskID)])
+    XCTAssertEqual(missing.errorCode, .notFound)
+    XCTAssertTrue(
+      try XCTUnwrap(missing.errorMessage).contains("no recorded promotion candidate"))
+
+    let noTask = await service.handle(
+      "task.promotion", requestID: "rq-no-task", params: [:])
+    XCTAssertEqual(noTask.errorCode, .invalidParams)
+  }
+
+  func testPromotionExportFailsClosedOnDriftedOrInconsistentFacts() async throws {
+    let stack = try await makeReviewStack(reviewer: ScriptedReviewer(.verdict(.pass, [])))
+    _ = try await stack.coordinator.reconcile(stack.taskID)
+    let snapshot = try await stack.store.load(stack.taskID)
+    let attempts = try await stack.store.attempts(stack.taskID)
+    let evaluations = try await stack.store.evaluations(stack.taskID)
+    let attempt = try XCTUnwrap(attempts.last(where: { $0.promotionCandidate != nil }))
+    let promotion = try XCTUnwrap(attempt.promotionCandidate)
+
+    // The repair attempt now carries bytes that do not hash to the digest the
+    // candidate metadata names: export must refuse rather than substitute.
+    let tamperedStack = try await makeReviewStack(
+      reviewer: ScriptedReviewer(.verdict(.pass, [])), repairDiffTampered: true)
+    let tamperedSnapshot = try await tamperedStack.store.load(tamperedStack.taskID)
+    XCTAssertThrowsError(
+      try HarnessPromotionExport.assemble(
+        snapshot: tamperedSnapshot, attempts: attempts, evaluations: evaluations)
+    ) { error in
+      guard case HarnessPromotionExportError.diffUnavailable? =
+        error as? HarnessPromotionExportError
+      else { return XCTFail("unexpected \(error)") }
+    }
+
+    // A promotion naming a review that was never recorded on the attempt.
+    let foreignReview = HarnessPromotionCandidate(
+      promotionCandidateID: promotion.promotionCandidateID, htaskID: promotion.htaskID,
+      attemptID: promotion.attemptID, candidatePatchID: promotion.candidatePatchID,
+      baseRevision: promotion.baseRevision, workspaceRevision: promotion.workspaceRevision,
+      evaluationID: promotion.evaluationID, reviewID: "HREVIEW-FOREIGN",
+      artifactIDs: promotion.artifactIDs, createdAtUTC: promotion.createdAtUTC)
+    XCTAssertThrowsError(
+      try HarnessPromotionExport.assemble(
+        snapshot: snapshot,
+        attempts: [replacing(promotion: foreignReview, on: attempt)],
+        evaluations: evaluations)
+    ) { error in
+      XCTAssertEqual(
+        error as? HarnessPromotionExportError, .inconsistentFacts("review"))
+    }
+
+    // Two recorded promotions can never both be "the" candidate.
+    XCTAssertThrowsError(
+      try HarnessPromotionExport.assemble(
+        snapshot: snapshot, attempts: [attempt, attempt], evaluations: evaluations)
+    ) { error in
+      XCTAssertEqual(
+        error as? HarnessPromotionExportError,
+        .inconsistentFacts("multiplePromotionCandidates"))
+    }
+
+    // The evaluation the promotion names must exist among the task's records.
+    XCTAssertThrowsError(
+      try HarnessPromotionExport.assemble(
+        snapshot: snapshot, attempts: attempts, evaluations: [])
+    ) { error in
+      XCTAssertEqual(
+        error as? HarnessPromotionExportError, .inconsistentFacts("evaluation"))
+    }
+  }
+
+  private func replacing(
+    promotion: HarnessPromotionCandidate?, on attempt: HarnessAttempt
+  ) -> HarnessAttempt {
+    HarnessAttempt(
+      attemptID: attempt.attemptID, htaskID: attempt.htaskID, ordinal: attempt.ordinal,
+      hypothesis: attempt.hypothesis, strategy: attempt.strategy,
+      patchRevision: attempt.patchRevision, outcome: attempt.outcome,
+      failureFingerprint: attempt.failureFingerprint, actionRunIDs: attempt.actionRunIDs,
+      evaluationIDs: attempt.evaluationIDs, confirmedFacts: attempt.confirmedFacts,
+      disprovedFacts: attempt.disprovedFacts,
+      evolutionWorkspace: attempt.evolutionWorkspace,
+      candidatePatch: attempt.candidatePatch, buildArtifactIDs: attempt.buildArtifactIDs,
+      runtimeArtifactIDs: attempt.runtimeArtifactIDs,
+      latestEvaluationVerdict: attempt.latestEvaluationVerdict, review: attempt.review,
+      promotionCandidate: promotion, createdAtUTC: attempt.createdAtUTC,
+      updatedAtUTC: attempt.updatedAtUTC)
+  }
+
   // MARK: Codex adapter
 
   func testCodexReviewerParsesAClosedPassVerdictAndBindsIdentityFromTheRequest() async throws {

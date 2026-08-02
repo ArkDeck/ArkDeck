@@ -65,6 +65,25 @@ final class EvolutionCampaignContractTests: XCTestCase {
     }
   }
 
+  func testTaskPromotionCLIExportsOverTheTaskPlaneAndFailsClosedWithoutATask() throws {
+    let packageRoot = URL(fileURLWithPath: #filePath)
+      .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+    let taskCLI = try String(
+      contentsOf: packageRoot.appending(path: "Sources/ArkDeckCLI/ArkDeckRuntimeCommands.swift"),
+      encoding: .utf8)
+    // The exporter is a thin task-plane client: it calls task.promotion and
+    // writes the daemon-rendered bundle; it re-verifies the patch digest and
+    // never overwrites what a maintainer already has.
+    XCTAssertTrue(taskCLI.contains("case \"promotion\":"))
+    XCTAssertTrue(taskCLI.contains("method: \"task.promotion\""))
+    XCTAssertTrue(taskCLI.contains("refusing to overwrite existing"))
+    XCTAssertTrue(taskCLI.contains("refusing to write final.patch"))
+
+    let missingTask = try runCLI(["task", "promotion"])
+    XCTAssertEqual(missingTask.status, 64, missingTask.output)
+    XCTAssertTrue(missingTask.output.contains("--task"), missingTask.output)
+  }
+
   func testProductCandidateToolchainProbeUsesIdentityBoundSwiftPMRole() async throws {
     let repositoryRoot = URL(fileURLWithPath: #filePath)
       .deletingLastPathComponent().deletingLastPathComponent()
