@@ -270,7 +270,10 @@ public struct RockchipEvolutionCampaignDocument: Equatable, Codable, Sendable {
 
 /// Host-wide, file-locked campaign ledger. Every public mutation can only
 /// append an event to the validated prior history; no API can edit or remove
-/// a candidate, reservation or terminal event.
+/// a candidate, reservation or terminal event. The single removal surface,
+/// `collectExpiredZeroEventDrafts`, deletes whole documents that never
+/// accrued any event once their confirmation window has expired — it can
+/// never touch a document that holds attempt history.
 public final class RockchipEvolutionCampaignLedger: @unchecked Sendable {
   public static let maximumBytes = 16 * 1_024 * 1_024
 
@@ -313,6 +316,60 @@ public final class RockchipEvolutionCampaignLedger: @unchecked Sendable {
       try persistLocked(document, rootDescriptor: rootDescriptor)
       return document
     }
+  }
+
+  /// Deletes campaign documents that hold zero events and whose confirmation
+  /// assertion expired strictly before `timestamp`. A zero-event document is a
+  /// preview draft: nothing was ever prepared, reserved or dispatched under
+  /// it, and once expired it can never be admitted again, so removing the
+  /// whole document erases no attempt history. Documents with any event are
+  /// never candidates, regardless of age.
+  ///
+  /// Each candidate is re-validated and unlinked inside the same per-campaign
+  /// critical section every writer uses. Entries that fail to load are left
+  /// in place for inspection rather than deleted, and per-campaign lock files
+  /// always survive: unlinking a lock inode a concurrent process already
+  /// opened would let two writers hold the same campaign critical section.
+  /// Sweeps are opportunistic hygiene — callers may treat failures as
+  /// non-fatal because the subsequent create/load surfaces any real fault.
+  @discardableResult
+  public func collectExpiredZeroEventDrafts(at timestamp: String) throws -> [String] {
+    guard RockchipEvolutionCampaignConfirmationAssertion.date(timestamp) != nil else {
+      throw RockchipEvolutionCampaignError.persistenceRejected("collectTimestamp")
+    }
+    let names = (try? FileManager.default.contentsOfDirectory(atPath: root.path)) ?? []
+    var collected: [String] = []
+    for name in names.sorted() {
+      guard name.hasSuffix(".json") else { continue }
+      let campaignID = String(name.dropLast(".json".count))
+      guard
+        campaignID.range(of: #"^ECAMP-[A-F0-9]{24}$"#, options: .regularExpression)
+          == campaignID.startIndex..<campaignID.endIndex
+      else { continue }
+      let didCollect = (try? locked(campaignID) { rootDescriptor -> Bool in
+        guard let document = try loadLocked(campaignID, rootDescriptor: rootDescriptor),
+          document.events.isEmpty,
+          Self.isExpired(document.assertion, at: timestamp)
+        else { return false }
+        guard Darwin.unlinkat(rootDescriptor, name, 0) == 0,
+          Darwin.fsync(rootDescriptor) == 0
+        else { throw RockchipEvolutionCampaignError.persistenceRejected("collectDraft") }
+        return true
+      }) ?? false
+      if didCollect { collected.append(campaignID) }
+    }
+    return collected
+  }
+
+  private static func isExpired(
+    _ assertion: RockchipEvolutionCampaignConfirmationAssertion, at timestamp: String
+  ) -> Bool {
+    // Only a validity window that has strictly closed is permanent death;
+    // unparseable input keeps the document (never delete when unsure).
+    guard let now = RockchipEvolutionCampaignConfirmationAssertion.date(timestamp),
+      let expiry = RockchipEvolutionCampaignConfirmationAssertion.date(assertion.validUntil)
+    else { return false }
+    return expiry < now
   }
 
   public func load(_ campaignID: String) throws -> RockchipEvolutionCampaignDocument {

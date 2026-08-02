@@ -577,6 +577,116 @@ final class EvolutionCampaignContractTests: XCTestCase {
     XCTAssertFalse(profile.lowercased().contains("rockusb"))
   }
 
+  func testExpiredZeroEventPreviewDraftIsCollectedWhileHistoryAndFreshDraftsSurvive() throws {
+    let root = temporaryDirectory("campaign-draft-gc")
+    defer { try? FileManager.default.removeItem(at: root) }
+    let ledger = try RockchipEvolutionCampaignLedger(root: root)
+
+    let expiredDraft = try makeAssertion(seed: "1", validUntil: "2026-08-02T08:01:00Z")
+    _ = try ledger.create(expiredDraft)
+    let freshDraft = try makeAssertion(seed: "2")
+    _ = try ledger.create(freshDraft)
+    let historical = try makeAssertion(seed: "3", validUntil: "2026-08-02T08:01:00Z")
+    let pins = try makePins(assertion: historical, ordinal: 1)
+    _ = try ledger.create(historical)
+    _ = try ledger.appendCandidate(
+      campaignID: historical.campaignID, candidate: pins.candidate,
+      review: pins.review, at: Self.confirmedAt)
+    let corruptURL = root.appending(path: "ECAMP-\(String(repeating: "C", count: 24)).json")
+    try Data("{\"broken\":true}".utf8).write(to: corruptURL)
+    try FileManager.default.setAttributes(
+      [.posixPermissions: 0o600], ofItemAtPath: corruptURL.path)
+    let foreignURL = root.appending(path: "notes.txt")
+    try Data("operator notes".utf8).write(to: foreignURL)
+
+    XCTAssertEqual(
+      try ledger.collectExpiredZeroEventDrafts(at: "2026-08-02T08:00:30Z"), [],
+      "no draft may be collected while its confirmation window is still open")
+
+    let collected = try ledger.collectExpiredZeroEventDrafts(at: "2026-08-02T08:30:00Z")
+    XCTAssertEqual(collected, [expiredDraft.campaignID])
+    XCTAssertFalse(
+      FileManager.default.fileExists(
+        atPath: root.appending(path: "\(expiredDraft.campaignID).json").path),
+      "an expired zero-event preview draft must not remain durable")
+    XCTAssertThrowsError(try ledger.load(expiredDraft.campaignID)) { error in
+      XCTAssertEqual(
+        error as? RockchipEvolutionCampaignError,
+        .campaignNotFound(expiredDraft.campaignID))
+    }
+    XCTAssertEqual(try ledger.load(freshDraft.campaignID).events, [])
+    XCTAssertEqual(
+      try ledger.load(historical.campaignID).events.count, 1,
+      "a document with history is retained even after expiry")
+    XCTAssertTrue(FileManager.default.fileExists(atPath: corruptURL.path))
+    XCTAssertTrue(FileManager.default.fileExists(atPath: foreignURL.path))
+    XCTAssertEqual(try ledger.collectExpiredZeroEventDrafts(at: "2026-08-02T08:30:00Z"), [])
+    XCTAssertThrowsError(try ledger.collectExpiredZeroEventDrafts(at: "not-a-timestamp"))
+  }
+
+  func testExecuteAndContinueSweepExpiredSiblingDraftsAndStillFindTheirOwnDocument()
+    async throws
+  {
+    let root = temporaryDirectory("campaign-execute-gc")
+    defer { try? FileManager.default.removeItem(at: root) }
+    let ledger = try RockchipEvolutionCampaignLedger(root: root.appending(path: "campaign"))
+    let expiredDraft = try makeAssertion(seed: "1", validUntil: "2026-08-02T08:01:00Z")
+    _ = try ledger.create(expiredDraft)
+    let assertion = try makeAssertion(seed: "2")
+    _ = try ledger.create(assertion)
+    let pins = try makePins(assertion: assertion, ordinal: 1)
+    let flash = CountingEvolutionFlash()
+    let host = try RockchipEvolutionCampaignHost(
+      ledger: ledger,
+      usageLedger: AgentAuthorityUsageLedger(root: root.appending(path: "usage")),
+      repairer: FixedEvolutionRepairer(strategy: pins.candidate.strategy),
+      builder: FixedEvolutionBuilder(
+        build: RockchipEvolutionCandidateBuild(
+          pin: pins.candidate, reviewDiff: Data("diff".utf8))),
+      reviewer: RejectingEvolutionReviewer(), flash: flash,
+      nowUTC: { "2026-08-02T08:30:00Z" })
+
+    await ain019AssertThrowsAsync(
+      try await host.executeConfirmedCampaign(
+        confirmationDigestSHA256: assertion.confirmationDigestSHA256,
+        archiveURL: URL(fileURLWithPath: "/tmp/images.tar.gz"),
+        targetLocationSelector: "42"))
+    XCTAssertThrowsError(
+      try ledger.load(expiredDraft.campaignID),
+      "first admission must sweep expired zero-event sibling drafts")
+    XCTAssertTrue(
+      try ledger.load(assertion.campaignID).isTerminal,
+      "execute must still find its own document after the sweep")
+
+    let secondExpired = try makeAssertion(seed: "4", validUntil: "2026-08-02T08:02:00Z")
+    _ = try ledger.create(secondExpired)
+    await ain019AssertThrowsAsync(
+      try await host.continueCampaign(
+        campaignID: assertion.campaignID,
+        archiveURL: URL(fileURLWithPath: "/tmp/images.tar.gz"),
+        targetLocationSelector: "42"))
+    XCTAssertThrowsError(try ledger.load(secondExpired.campaignID))
+
+    let dispatches = await flash.dispatchCount()
+    XCTAssertEqual(dispatches, 0)
+  }
+
+  func testPreviewSourceSweepsExpiredDraftsBeforePersistingItsOwnDraft() throws {
+    let packageRoot = URL(fileURLWithPath: #filePath)
+      .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+    let source = try String(
+      contentsOf: packageRoot.appending(
+        path: "Sources/ArkDeckWorkflows/AgentComposition/EvolutionCampaignHost.swift"),
+      encoding: .utf8)
+    let sweep = try XCTUnwrap(
+      source.range(of: "ledger.collectExpiredZeroEventDrafts(at: confirmedAt)"),
+      "preview must sweep expired zero-event drafts")
+    let create = try XCTUnwrap(source.range(of: "try ledger.create(assertion)"))
+    XCTAssertTrue(
+      sweep.lowerBound < create.lowerBound,
+      "preview sweeps before persisting its own draft")
+  }
+
   private func makeAssertion(
     seed: Character = "0", maxAttempts: Int = 8,
     validUntil: String = "2026-08-02T12:00:00Z"
