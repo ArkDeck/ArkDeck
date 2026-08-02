@@ -656,6 +656,126 @@ final class RuntimeJobEngineContractTests: XCTestCase {
       "journal-confirmed typed provider actions must not be dispatched again")
   }
 
+  func testQuietCrashInLanelessStatesRecoversToHonestTerminalState() async throws {
+    // The quiet crash window: a process killed between one durable event and
+    // the next leaves a clean journal — no torn tail, no outstanding intent,
+    // no unknown outcome — whose final state never advances on its own. For
+    // preflight/running/resumeAtConfirmedSafeBoundary that is the designed
+    // explicit resume lane (see the clean-crash test above). But
+    // cancelRequested, cancellingAtSafeBoundary and finalizing have no
+    // post-restart lane at all: `run` rejects them and `reconcile` is a no-op
+    // without an unknown outcome. Recovery must finish the already-durable
+    // decision journal-only instead of presenting the job as healthy
+    // in-flight forever.
+    struct Window {
+      let name: String
+      let cancelBeforeRun: Bool
+      let truncateAfterTransitionTo: JobState
+      let expectedTerminalState: String
+      let expectedTimelineEntry: String
+    }
+    let windows: [Window] = [
+      Window(
+        name: "cancelRequested",
+        cancelBeforeRun: true,
+        truncateAfterTransitionTo: .cancelRequested,
+        expectedTerminalState: "cancelled",
+        expectedTimelineEntry:
+          "recovered: completed durable cancellation at journal-confirmed safe boundary; no redispatch"
+      ),
+      Window(
+        name: "cancellingAtSafeBoundary",
+        cancelBeforeRun: true,
+        truncateAfterTransitionTo: .cancellingAtSafeBoundary,
+        expectedTerminalState: "cancelled",
+        expectedTimelineEntry:
+          "recovered: completed durable cancellation at journal-confirmed safe boundary; no redispatch"
+      ),
+      Window(
+        name: "finalizing",
+        cancelBeforeRun: false,
+        truncateAfterTransitionTo: .finalizing,
+        expectedTerminalState: "failed",
+        expectedTimelineEntry:
+          "recovered: finalization interrupted before terminal transition; failed without redispatch"
+      ),
+    ]
+    for window in windows {
+      stateDirectory = FileManager.default.temporaryDirectory
+        .appendingPathComponent("arkdeck-engine-tests", isDirectory: true)
+        .appendingPathComponent(UUID().uuidString, isDirectory: true)
+      defer { try? FileManager.default.removeItem(at: stateDirectory) }
+
+      let originalDispatcher = ScriptedDispatcher(script: .observationHappy)
+      let (original, _) = try makeEngine(dispatcher: originalDispatcher)
+      let acceptance = try await original.submit(
+        observeRequest(idempotencyKey: "idem-quiet-\(window.name)"))
+      if window.cancelBeforeRun {
+        try await original.requestCancel(jobID: acceptance.jobID)
+        let cancelled = try await original.run(jobID: acceptance.jobID)
+        XCTAssertEqual(cancelled.state, "cancelled", window.name)
+      } else {
+        let completed = try await original.run(jobID: acceptance.jobID)
+        XCTAssertEqual(completed.state, "succeeded", window.name)
+      }
+
+      // Recreate the exact durable bytes of a process loss immediately after
+      // the transition into the window's state became durable.
+      let journalURL =
+        stateDirectory
+        .appendingPathComponent("jobs/\(acceptance.jobID)/journal.jsonl")
+      let fullReplay = try DurableJournalRecovery.inspect(url: journalURL)
+      let boundary = try XCTUnwrap(
+        fullReplay.events.first {
+          $0.kind == .stateTransition
+            && $0.stateTransition?.to == window.truncateAfterTransitionTo
+        }?.sequence, window.name)
+      let lines = try String(contentsOf: journalURL, encoding: .utf8)
+        .split(separator: "\n", omittingEmptySubsequences: false)
+      let durablePrefix = lines.prefix(boundary + 1).joined(separator: "\n") + "\n"
+      try Data(durablePrefix.utf8).write(to: journalURL)
+
+      // The window really is quiet: nothing dangling, nothing unknown — only
+      // a non-terminal state that nothing will ever advance.
+      let truncated = try DurableJournalRecovery.inspect(url: journalURL)
+      XCTAssertEqual(truncated.currentState, window.truncateAfterTransitionTo, window.name)
+      XCTAssertFalse(truncated.hasTornTail, window.name)
+      XCTAssertTrue(truncated.outstandingIntents.isEmpty, window.name)
+      XCTAssertTrue(truncated.unknownOutcomes.isEmpty, window.name)
+
+      let recoveredDispatcher = ScriptedDispatcher(script: .observationHappy)
+      let (recoveredEngine, _) = try makeEngine(dispatcher: recoveredDispatcher)
+      let recovered = try await recoveredEngine.recoverPersistedJobs()
+      XCTAssertEqual(recovered.count, 1, window.name)
+      let status = try XCTUnwrap(recovered.first, window.name)
+      XCTAssertEqual(
+        status.state, window.expectedTerminalState,
+        "\(window.name): a clean journal stranded in a state with no resume "
+          + "lane must recover to its honest terminal, not present as healthy")
+      XCTAssertFalse(status.outcomeUnknown, window.name)
+      XCTAssertTrue(
+        status.timeline.contains(window.expectedTimelineEntry),
+        "\(window.name): \(status.timeline.joined(separator: " | "))")
+      XCTAssertEqual(
+        recoveredDispatcher.dispatchCount, 0,
+        "\(window.name): recovery must never redispatch")
+
+      // The resolution is durable in the journal, not only in the record.
+      let resolved = try DurableJournalRecovery.inspect(url: journalURL)
+      XCTAssertEqual(
+        resolved.currentState?.rawValue, window.expectedTerminalState, window.name)
+
+      // A second restart over the resolved state is a stable no-op.
+      let secondDispatcher = ScriptedDispatcher(script: .observationHappy)
+      let (secondEngine, _) = try makeEngine(dispatcher: secondDispatcher)
+      let second = try await secondEngine.recoverPersistedJobs()
+      XCTAssertEqual(second.map(\.state), [window.expectedTerminalState], window.name)
+      XCTAssertEqual(secondDispatcher.dispatchCount, 0, window.name)
+      let stable = try DurableJournalRecovery.inspect(url: journalURL)
+      XCTAssertEqual(stable.lastDurableSequence, resolved.lastDurableSequence, window.name)
+    }
+  }
+
   private var productsDirectory: URL {
     #if os(macOS)
       for bundle in Bundle.allBundles where bundle.bundlePath.hasSuffix(".xctest") {
