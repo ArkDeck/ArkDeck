@@ -196,16 +196,10 @@ final class RockchipFlashExecutionFaultContractTests: XCTestCase {
       process: process, power: power,
       postflight: FixedRockchipPostflightPort(
         serialDigest: String(repeating: "a", count: 64), topology: "42"))
-    let chatAssertion = try RockchipChatConfirmationAssertion(
-      confirmationDigestSHA256: String(repeating: "1", count: 64),
-      planDigestSHA256: String(repeating: "2", count: 64),
-      archiveDigestSHA256: String(repeating: "3", count: 64),
-      stepSetDigestSHA256: String(repeating: "4", count: 64),
-      targetDigestSHA256: String(repeating: "5", count: 64), bindingRevision: 1)
     do {
       _ = try await host.execute(
         RockchipFlashExecutionRequest(
-          chatConfirmation: chatAssertion, archiveURL: fixture.archive,
+          authorizationID: "AUTH-TEST-AIN-019", archiveURL: fixture.archive,
           targetLocationSelector: "42"))
       XCTFail("unknown destructive outcome must not succeed")
     } catch let error as RockchipFlashExecutionError {
@@ -214,9 +208,11 @@ final class RockchipFlashExecutionFaultContractTests: XCTestCase {
       }
       XCTAssertTrue(stepID.contains("partition2"))
     }
-    XCTAssertEqual(process.arguments.count, 5)
+    XCTAssertEqual(process.arguments.count, 5, "partition2 failure must stop every later command")
     XCTAssertEqual(admission.closedStatus, .outcomeUnknown)
-    XCTAssertEqual(admission.closedIntentIDs.count, 5)
+    XCTAssertEqual(
+      admission.closedIntentIDs.count, 3,
+      "standing authority correlates destructive intents")
     XCTAssertEqual(power.activeCount, 0)
     XCTAssertFalse(
       FileManager.default.fileExists(

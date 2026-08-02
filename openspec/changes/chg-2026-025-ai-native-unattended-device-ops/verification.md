@@ -1,6 +1,6 @@
 # Verification Plan
 
-> Change:CHG-2026-025-ai-native-unattended-device-ops@r8
+> Change:CHG-2026-025-ai-native-unattended-device-ops@r9
 > Status:planned # 结论经维护者在 PR 中确认
 > Revision review:2026-07-22 已逐项对照 r2 security-remediation、TASK-AIN-005/006/
 > 008/007 与 AIN-004 stop gate;本计划不复用 superseded #296 readiness/authorization。
@@ -26,6 +26,10 @@
 > 每个 tree/diff/executable digest 经确定性门与独立 AI 对抗审查成为派生 pin；只有
 > protected-main broker 可 fresh readback、reserve 与 dispatch。unknown/unresolved/unsafe
 > partial/drift/success 立即终止。维护者 merge 本 revision 前实现和设备 dispatch=0。
+> r9 default-path refactor:验证 caller 不再选择 Harness normal/evolution；workspace envelope
+> 自动进入 Evolution，device-only task 保持同一 Runtime。Flash 默认命令直接承载 campaign，
+> 旧 `evolution-*`/one-shot Agent admission 全部拒绝；历史 chat authority bytes 仍可读/export，
+> standing/human 路径不回归。实现 PR 中真实设备与 Flash dispatch 仍为 0。
 
 ## Environment
 
@@ -82,6 +86,7 @@
 | AIN-MANUAL-GAP-001(change-local,r3) | 活跃 change/runbook grep 与 dependency audit；非 allowlisted human-only seam=0 | passed | TASK-AIN-017 run 记录 |
 | AIN-CHAT-AUTH-001(change-local,r7) | typed chat confirmation 正向一次消费；缺失/伪造 shape/digest-target 漂移/CI/复用/recovery replay 负向全为 dispatch=0 | passed | TASK-AIN-018 contract/fault tests + run 记录 |
 | AIN-EVOLUTION-E2-001(change-local,r8) | 未合入 candidate 的 base/scope/build/test/review 派生 pins；candidate capability=0、merged broker 独占 transport；逐 attempt fresh facts/ordinal/session 与 success/unknown/unsafe/drift 封口 | planned | TASK-AIN-019 contract/fault tests；提案 PR 仅 SDD/生成器闸，real device=0 |
+| AIN-EVOLUTION-DEFAULT-001(change-local,r9) | workspace task 无 mode 开关自动进入 Evolution；默认 Flash campaign CLI；one-shot 新建/dispatch=0 且历史 bytes 可读；standing/human 保留 | planned | TASK-AIN-019 default-path/migration/source-surface tests；real device=0 |
 
 ## Negative and recovery tests
 
@@ -89,6 +94,9 @@
   一律 dispatch=0(contract + 真机负探针双面);
 - chat confirmation 缺失、非当前 invocation、plan/archive/step-set/target digest 漂移、CI/
   后台调用、已消费、并发复用、失败/crash/outcomeUnknown 后重放 → dispatch=0；
+- r9 后 caller 提供旧 `--execution-mode`、`--evolution-allowed-*`、`evolution-*` 或 one-shot
+  chat execution flags → usage/admission 拒绝且 dispatch=0；历史 chat Journal/Manifest/ledger
+  bytes 只读 round-trip；
 - evolution campaign confirmation unknown/duplicate/oversized budget、超过 4 小时、并发、
   one-shot record 升级、ordinal 跳号/复用、base/path/diff/toolchain/executable/binding/plan/
   target drift、candidate/review pin 缺失 → 后续 attempt/process/device dispatch=0；
@@ -159,11 +167,12 @@
   且 AIN-008 的 2.1 persistence/descriptor-identity regression evidence 在案
 - [ ] standardAgent/ordinary CI 与 caller-supplied context 的 destructive dispatch 恒为 0
 - [ ] AIN-004 使用的新 authorization 在执行时 fresh、未超次且由产品 executor 消费
-- [ ] AIN-CHAT-AUTH-001 正负矩阵全绿；chat path 不要求 AUTH-ID，不伪装 standing
-  authorization，且一个 confirmation 最多产生一次 destructive admission
-- [ ] AIN-EVOLUTION-E2-001 正负矩阵全绿；旧 one-shot 语义零漂移，campaign 硬上限
+- [ ] AIN-CHAT-AUTH-001 历史 bytes 兼容矩阵全绿；r9 后新 chat usage/admission/dispatch 恒拒绝，
+  且不得伪装或升级为 standing/campaign authority
+- [ ] AIN-EVOLUTION-E2-001/AIN-EVOLUTION-DEFAULT-001 正负矩阵全绿；campaign 硬上限
   8 attempts/4 hours/1 concurrency；candidate 无 device capability、merged broker 独占真实
-  transport；每次派生 pins/fresh readback，success/unknown/unsafe partial/drift 永久封口
+  transport；默认 CLI 与 workspace task 无 mode 分叉；每次派生 pins/fresh readback，
+  success/unknown/unsafe partial/drift 永久封口
 - [ ] E0/E1 真机 evidence 的 executor.kind=agent，人工动作全部属于 human-boundary
   registry，且没有人类代跑 device command
 - [ ] TASK-AIN-010P 的 raw registration Artifact 不入仓、V3 evidence 可解引用且

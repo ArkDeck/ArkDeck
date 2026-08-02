@@ -9,6 +9,45 @@ final class EvolutionCampaignContractTests: XCTestCase {
   private static let validUntil = "2026-08-02T12:00:00Z"
   private static let targetDigest = String(repeating: "a", count: 64)
 
+  func testFlashCLIDefaultsToCampaignAndRemovesLegacySelectors() throws {
+    let sourceURL = URL(fileURLWithPath: #filePath)
+      .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+      .appending(path: "Sources/ArkDeckCLI/ArkDeckCLIMain.swift")
+    let source = try String(contentsOf: sourceURL, encoding: .utf8)
+
+    for subcommand in ["preview", "execute", "continue", "status"] {
+      XCTAssertTrue(source.contains("case \"\(subcommand)\":"))
+    }
+    for obsolete in [
+      "case \"evolution-preview\":", "case \"evolution-execute\":",
+      "case \"evolution-continue\":", "case \"evolution-status\":",
+      "--chat-confirmation-digest-sha256", "--chat-confirmed-plan-sha256",
+      "case \"binding-preview\":", "case \"rebind-binding\":",
+    ] {
+      XCTAssertFalse(source.contains(obsolete), "obsolete CLI surface remains: \(obsolete)")
+    }
+    XCTAssertTrue(source.contains("--campaign-confirmation-digest-sha256"))
+  }
+
+  func testLegacyCLISurfacesFailClosedBeforeRuntimeOrDeviceAccess() throws {
+    let obsoleteInvocations = [
+      ["flash", "evolution-status", "--campaign-id", "ECAMP-obsolete"],
+      ["flash", "execute", "--chat-confirmation-digest-sha256", digest("a")],
+      [
+        "task", "submit", "--target", "device", "--goal", "repair",
+        "--execution-mode", "evolution",
+      ],
+      [
+        "task", "submit", "--target", "device", "--goal", "repair",
+        "--evolution-allowed-paths", "Sources/**",
+      ],
+    ]
+    for arguments in obsoleteInvocations {
+      let result = try runCLI(arguments)
+      XCTAssertEqual(result.status, 64, "\(arguments): \(result.output)")
+    }
+  }
+
   func testConfirmationIsClosedExactAndHardBoundedToEightAttemptsFourHoursOneConcurrency()
     throws
   {
@@ -60,6 +99,24 @@ final class EvolutionCampaignContractTests: XCTestCase {
     let roundTrippedEvent = try JournalEventCodec.decode(JournalEventCodec.encode(event))
     XCTAssertEqual(roundTrippedEvent.agentExecutionAuthorityReference, reference)
     XCTAssertEqual(roundTrippedEvent.usageReservationID, "reservation-campaign")
+  }
+
+  private func runCLI(_ arguments: [String]) throws -> (status: Int32, output: String) {
+    let packageRoot = URL(fileURLWithPath: #filePath)
+      .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+    let process = Process()
+    let output = Pipe()
+    process.executableURL = packageRoot.appending(path: ".build/debug/arkdeck")
+    process.arguments = arguments
+    process.standardInput = Pipe()
+    process.standardOutput = output
+    process.standardError = output
+    try process.run()
+    process.waitUntilExit()
+    return (
+      process.terminationStatus,
+      String(
+        decoding: output.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self))
   }
 
   func testCampaignLedgerAllowsExactlyEightSerialSafeAttemptsAndRejectsNinthOrConcurrent()

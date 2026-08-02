@@ -1043,6 +1043,13 @@ final class HarnessTaskPlaneContractTests: XCTestCase {
     XCTAssertFalse(unboundedModel.ok)
     XCTAssertEqual(unboundedModel.error?.code, AgentDaemonErrorCode.invalidParams.rawValue)
 
+    for obsoleteMode in ["normal", "evolution"] {
+      let obsolete = try await submit(
+        base.merging(["executionMode": .string(obsoleteMode)]) { _, new in new })
+      XCTAssertFalse(obsolete.ok)
+      XCTAssertEqual(obsolete.error?.code, AgentDaemonErrorCode.invalidParams.rawValue)
+    }
+
     let malformedMemoryRevision = try await submit(
       base.merging(["baseWorkspaceRevision": .string("main")]) { _, new in new })
     XCTAssertFalse(malformedMemoryRevision.ok)

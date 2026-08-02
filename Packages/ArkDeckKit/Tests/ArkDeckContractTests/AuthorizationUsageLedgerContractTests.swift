@@ -239,7 +239,7 @@ final class AuthorizationUsageLedgerContractTests: XCTestCase {
     XCTAssertThrowsError(try ledger.load())
   }
 
-  func testChatAuthorityRoundTripsClosedShapeAndConsumesExactlyOnce() throws {
+  func testHistoricalChatAuthorityRemainsClosedButCannotReserve() throws {
     let directory = try temporaryDirectory()
     defer { try? FileManager.default.removeItem(at: directory) }
     let ledger = try AgentAuthorityUsageLedger(root: directory)
@@ -263,21 +263,16 @@ final class AuthorizationUsageLedgerContractTests: XCTestCase {
       reservedAt: "2026-08-01T12:00:00Z",
       forwardLeaseExpiresAt: "2026-08-01T12:01:00Z",
       compensationLeaseExpiresAt: "2026-08-01T12:02:00Z")
-    XCTAssertEqual(try ledger.reserve(reservation), reservation)
-    XCTAssertEqual(try ledger.load().reservations, [reservation])
-    XCTAssertThrowsError(
-      try ledger.reserve(reservation))
-
-    let url = directory.appending(path: AgentAuthorityUsageLedger.ledgerFileName)
-    var root = try XCTUnwrap(
-      JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
-    var reservations = try XCTUnwrap(root["reservations"] as? [[String: Any]])
-    var storedReference = try XCTUnwrap(reservations[0]["authorizationRef"] as? [String: Any])
-    storedReference["approvalPRNumber"] = 945
-    reservations[0]["authorizationRef"] = storedReference
-    root["reservations"] = reservations
-    try JSONSerialization.data(withJSONObject: root).write(to: url)
-    XCTAssertThrowsError(try ledger.load(), "chatConfirmation is a closed non-Git shape")
+    XCTAssertThrowsError(try ledger.reserve(reservation)) { error in
+      guard case .invalidRecord(let detail) = error as? AuthorizationUsageLedgerError else {
+        return XCTFail("unexpected error: \(error)")
+      }
+      XCTAssertTrue(detail.contains("historical read-only"))
+    }
+    XCTAssertTrue(try ledger.load().reservations.isEmpty)
+    XCTAssertEqual(
+      try JSONDecoder().decode(
+        AgentExecutionAuthorityReference.self, from: JSONEncoder().encode(reference)), reference)
   }
 
   private func reservation(

@@ -366,17 +366,19 @@ package struct HarnessTaskMethodService: Sendable {
     if let projectRef = text("projectRef"), !isWireIdentifier(projectRef) {
       throw HarnessTaskSubmissionError.malformedDesiredState("projectRef")
     }
-    let executionMode: HarnessExecutionMode
-    switch (text("executionMode") ?? HarnessExecutionMode.normal.rawValue).lowercased() {
-    case HarnessExecutionMode.normal.rawValue:
-      executionMode = .normal
-    case HarnessExecutionMode.evolution.rawValue:
-      executionMode = .evolution
-    default:
+    // r9 removes the caller-controlled normal/evolution switch. Reject the obsolete wire
+    // surface instead of silently translating it into a different safety policy.
+    if params?["executionMode"] != nil {
       throw HarnessTaskSubmissionError.malformedEvolutionPolicy("executionMode")
     }
     let evolutionPolicy: HarnessEvolutionPolicy?
-    if executionMode == .evolution {
+    if params?["allowedPaths"] != nil || params?["evolutionAllowedOperations"] != nil
+      || params?["maxAttempts"] != nil || params?["maxChangedFiles"] != nil
+      || params?["maxDiffLines"] != nil
+    {
+      guard text("projectRef") != nil else {
+        throw HarnessTaskSubmissionError.evolutionProjectRequired
+      }
       guard let baseRevision = text("baseWorkspaceRevision") else {
         throw HarnessTaskSubmissionError.malformedEvolutionPolicy("baseRevision")
       }
@@ -426,7 +428,6 @@ package struct HarnessTaskMethodService: Sendable {
       goal: HarnessTaskGoal(summary: goal, desiredState: desiredState),
       budgets: budgets,
       policy: policy,
-      executionMode: executionMode,
       evolutionPolicy: evolutionPolicy)
   }
 

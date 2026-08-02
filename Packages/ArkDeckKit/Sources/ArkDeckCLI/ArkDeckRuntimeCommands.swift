@@ -1091,16 +1091,21 @@ enum RuntimeCLI {
         "targetId": .string(target),
         "goal": .string(goal),
       ]
-      if let mode = value("--execution-mode") {
-        params["executionMode"] = .string(mode)
+      let obsoleteWorkspaceFlags = [
+        "--execution-mode", "--evolution-allowed-paths", "--evolution-allowed-operations",
+      ]
+      if let obsolete = obsoleteWorkspaceFlags.first(where: rest.contains) {
+        throw CLIError(
+          exitCode: EX_USAGE,
+          message: "\(obsolete) was removed; workspace policy is now the default Agent path")
       }
-      if let paths = value("--evolution-allowed-paths") {
+      if let paths = value("--workspace-allowed-paths") {
         params["allowedPaths"] = .array(
           paths.split(separator: ",").map {
             .string($0.trimmingCharacters(in: .whitespaces))
           })
       }
-      if let operations = value("--evolution-allowed-operations") {
+      if let operations = value("--workspace-allowed-operations") {
         params["evolutionAllowedOperations"] = .array(
           operations.split(separator: ",").map {
             .string($0.trimmingCharacters(in: .whitespaces))

@@ -462,8 +462,6 @@ public enum HarnessTaskSubmissionError: Error, Equatable, Sendable {
   case intakeTooLong
   case unsupportedTaskType(HarnessTaskType)
   case duplicateCriterionID(String)
-  case evolutionPolicyRequired
-  case evolutionPolicyNotAllowed
   case evolutionProjectRequired
   case malformedEvolutionPolicy(String)
 }
@@ -491,7 +489,6 @@ public struct HarnessTaskSubmission: Equatable, Sendable, Codable {
     successCriteria: [HarnessSuccessCriterion] = [],
     budgets: HarnessTaskBudgets,
     policy: HarnessTaskPolicy,
-    executionMode: HarnessExecutionMode = .normal,
     evolutionPolicy: HarnessEvolutionPolicy? = nil
   ) {
     self.type = type
@@ -502,8 +499,10 @@ public struct HarnessTaskSubmission: Equatable, Sendable, Codable {
     self.successCriteria = successCriteria
     self.budgets = budgets
     self.policy = policy
-    self.executionMode = executionMode
     self.evolutionPolicy = evolutionPolicy
+    // Execution mode is a persisted projection, not a caller-selected switch. A typed
+    // workspace envelope always enters the bounded Evolution path.
+    self.executionMode = evolutionPolicy == nil ? .normal : .evolution
   }
 
   public func validate(permittedOperations: Set<String>) throws {
@@ -530,17 +529,9 @@ public struct HarnessTaskSubmission: Equatable, Sendable, Codable {
     for reference in policy.allowedOperations where !permittedOperations.contains(reference) {
       throw HarnessTaskSubmissionError.operationNotPermittedForType(reference)
     }
-    switch executionMode {
-    case .normal:
-      guard evolutionPolicy == nil else {
-        throw HarnessTaskSubmissionError.evolutionPolicyNotAllowed
-      }
-    case .evolution:
+    if let evolutionPolicy {
       guard projectRef != nil else {
         throw HarnessTaskSubmissionError.evolutionProjectRequired
-      }
-      guard let evolutionPolicy else {
-        throw HarnessTaskSubmissionError.evolutionPolicyRequired
       }
       do {
         try evolutionPolicy.validate(taskPolicy: policy)

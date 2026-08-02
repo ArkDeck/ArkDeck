@@ -189,8 +189,8 @@ protocol RockchipIdentityReadbackFactPort: Sendable {
 /// historical collector below proves an already-Loader target through
 /// `rkdeveloptool ld`; the production host may instead prove the same durable
 /// target while it is still reachable through the registered HDC transport.
-/// Both collectors return the identical closed fact shape consumed by the
-/// standing-authorization and one-shot chat-confirmation gates.
+/// Both collectors return the identical closed fact shape consumed by the standing-authorization
+/// and bounded-campaign gates.
 protocol RockchipAuthorizationFactCollecting: Sendable {
   func collect(
     request: RockchipAuthorizationFactRequest,
@@ -234,7 +234,7 @@ struct RockchipTrustedAuthorizationFacts: Sendable, Equatable {
 }
 
 /// Exact inputs against which fresh product facts are checked. This is deliberately authority-
-/// neutral: a merged standing authorization and a current chat confirmation can both provide the
+/// neutral: a merged standing authorization and a bounded campaign attempt can both provide the
 /// same plan/target expectation without one authority kind impersonating the other.
 struct RockchipAuthorizationFactExpectation: Sendable, Equatable {
   let targetModel: String

@@ -1,16 +1,18 @@
-// Evolution-mode domain model.
+// Bounded Evolution domain model.
 //
-// Evolution is a task execution mode, not another runtime.  It reuses the
+// Evolution is the automatic workspace-backed task path, not another runtime. It reuses the
 // existing Harness -> RuntimeJobEngine -> Catalog -> Provider path and adds
-// only the isolation, review and promotion facts that a normal task does not
-// need.  None of the types in this file can execute a command, push a branch
+// only the isolation, review and promotion facts that a device-only task does not
+// need. None of the types in this file can execute a command, push a branch
 // or merge code.
 
 import ArkDeckCore
 import CryptoKit
 import Foundation
 
-public enum HarnessExecutionMode: String, CaseIterable, Codable, Sendable {
+/// Persisted compatibility projection. Callers cannot select this value; a workspace policy
+/// derives `evolution`, while a device-only task derives `normal`.
+public enum HarnessExecutionMode: String, Codable, Sendable {
   case normal
   case evolution
 }
