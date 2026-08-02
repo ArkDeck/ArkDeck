@@ -3044,6 +3044,69 @@ public actor RuntimeJobEngine {
         }
         record.timeline.append("recovered: outstanding intents or unknown outcomes; no redispatch")
       } else {
+        // The quiet crash window: a process killed between one durable event
+        // and the next leaves a clean journal whose non-terminal state never
+        // advances on its own. preflight/running/resumeAtConfirmedSafeBoundary
+        // keep their explicit `run` resume lane below, and
+        // waitingForRecovery/reconciling keep the reconcile lane. But
+        // cancelRequested, cancellingAtSafeBoundary and finalizing have no
+        // post-restart lane at all — `run` rejects them and `reconcile` only
+        // answers unknown outcomes — so leaving them in place presents a dead
+        // run as healthy forever. Each of these states is an already-durable
+        // decision, so recovery finishes it journal-only: a clean journal
+        // proves no step was in flight, which is exactly the cancel lane's
+        // safe boundary; and a job that never durably reached its terminal
+        // transition did not complete finalization, which is failed, never
+        // succeeded. No dispatch happens in any branch.
+        switch inspection.currentState {
+        case .cancelRequested, .cancellingAtSafeBoundary:
+          if inspection.currentState == .cancelRequested {
+            try journal.appendAndSynchronize(
+              JournalEvent.stateTransition(
+                eventID: "recovery-t-\(nextSequence)", sequence: nextSequence,
+                sessionID: record.sessionID, jobID: jobID, timestamp: nowUTC(),
+                from: .cancelRequested, to: .cancellingAtSafeBoundary,
+                reason: "process loss with no outstanding intent is a confirmed safe boundary"))
+            nextSequence += 1
+          }
+          try journal.appendAndSynchronize(
+            JournalEvent.stateTransition(
+              eventID: "recovery-t-\(nextSequence)", sequence: nextSequence,
+              sessionID: record.sessionID, jobID: jobID, timestamp: nowUTC(),
+              from: .cancellingAtSafeBoundary, to: .cancelled,
+              reason: "complete durable cancellation after restart"))
+          nextSequence += 1
+          inspection = try DurableJournalRecovery.inspect(url: journalURL)
+          record.finishedAtUTC = nowUTC()
+          record.timeline.append(
+            "recovered: completed durable cancellation at journal-confirmed safe boundary; no redispatch"
+          )
+        case .finalizing:
+          try journal.appendAndSynchronize(
+            JournalEvent.stateTransition(
+              eventID: "recovery-t-\(nextSequence)", sequence: nextSequence,
+              sessionID: record.sessionID, jobID: jobID, timestamp: nowUTC(),
+              from: .finalizing, to: .failed,
+              reason: "finalization was interrupted before its terminal transition"))
+          nextSequence += 1
+          inspection = try DurableJournalRecovery.inspect(url: journalURL)
+          record.finishedAtUTC = nowUTC()
+          // A clean finalizing journal that carries outcomeUnknown got here
+          // through a durable confirmed reconcile decision; mirror the
+          // in-session reconcile lane, which clears the flag on this exact
+          // finalizing->failed completion.
+          if inspection.lastReconcileOutcomeCertainty == .confirmed {
+            record.outcomeUnknown = false
+            record.recoveryStepID = nil
+            record.recoveryIntentEventID = nil
+            record.recoveryAction = nil
+          }
+          record.timeline.append(
+            "recovered: finalization interrupted before terminal transition; failed without redispatch"
+          )
+        default:
+          record.timeline.append("recovered: journal clean")
+        }
         if let currentState = inspection.currentState {
           record.state = currentState.rawValue
         }
@@ -3055,7 +3118,6 @@ public actor RuntimeJobEngine {
           record.recoveryIntentEventID = nil
           record.recoveryAction = nil
         }
-        record.timeline.append("recovered: journal clean")
       }
       try record.persist(into: entry)
       recovered.append(status(of: record))
