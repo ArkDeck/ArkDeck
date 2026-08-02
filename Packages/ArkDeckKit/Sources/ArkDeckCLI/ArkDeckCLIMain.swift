@@ -79,8 +79,113 @@ struct ArkDeckCommandLine {
       try runCampaignStatus(Array(arguments.dropFirst()))
     case "postflight":
       try runPostflight(Array(arguments.dropFirst()))
+    case "reconcile":
+      try runFlashReconcile(Array(arguments.dropFirst()))
     default:
       throw CLIError(exitCode: EX_USAGE, message: "unsupported flash subcommand")
+    }
+  }
+
+  // MARK: reconcile
+
+  /// Host-side recovery report for interrupted flash sessions. Zero device
+  /// dispatch: reads session journals and the usage ledgers, and in
+  /// `--mode close` writes only the honest terminal on an orphaned
+  /// standing-authorization reservation. Exit 4 while anything stays
+  /// unresolved so scripts can observe the recovery debt.
+  static func runFlashReconcile(_ arguments: [String]) throws {
+    let options = try CLIOptions(arguments)
+    try options.validateAllowed(["--mode", "--session"])
+    let mode = options.value("--mode") ?? "report"
+    guard mode == "report" || mode == "close" else {
+      throw CLIError(exitCode: EX_USAGE, message: "--mode must be report or close")
+    }
+    let reconciler = try RockchipFlashSessionReconciler.production()
+
+    if let sessionID = options.value("--session") {
+      var finding = try reconciler.inspect(sessionID: sessionID)
+      printFlashFinding(finding)
+      if mode == "close", finding.requiresAttention {
+        printFlashClosure(try reconciler.close(finding))
+        finding = try reconciler.inspect(sessionID: sessionID)
+      }
+      guard !finding.requiresAttention else {
+        throw CLIError(exitCode: 4, message: "unresolved flash session \(sessionID)")
+      }
+      return
+    }
+
+    var findings = try reconciler.scan()
+    guard !findings.isEmpty else {
+      print("no unresolved flash sessions")
+      return
+    }
+    for finding in findings {
+      printFlashFinding(finding)
+      if mode == "close" {
+        printFlashClosure(try reconciler.close(finding))
+      }
+    }
+    if mode == "close" {
+      findings = try reconciler.scan()
+      guard !findings.isEmpty else { return }
+    }
+    throw CLIError(
+      exitCode: 4, message: "\(findings.count) unresolved flash session(s)")
+  }
+
+  private static func printFlashFinding(_ finding: RockchipFlashSessionFinding) {
+    var header = ["session: \(finding.sessionID)"]
+    if let jobID = finding.jobID { header.append("job: \(jobID)") }
+    header.append("state: \(finding.currentState?.rawValue ?? "unknown")")
+    header.append("finalized: \(finding.finalized)")
+    if finding.hasTornTail { header.append("tornTail: true") }
+    print(header.joined(separator: " "))
+    if let journalError = finding.journalError {
+      print("  journal unreadable: \(journalError)")
+    }
+    for intent in finding.outstandingIntents {
+      print(
+        "  outstanding intent: \(intent.eventID) step=\(intent.stepID) "
+          + "attempt=\(intent.attempt) effect=\(intent.effect.rawValue)")
+    }
+    for outcome in finding.unknownOutcomes {
+      print(
+        "  unknown outcome: \(outcome.correlatedIntentEventID) step=\(outcome.stepID) "
+          + "effect=\(outcome.effect.rawValue)")
+    }
+    if let lastConfirmed = finding.lastConfirmedStepID {
+      print("  last confirmed step: \(lastConfirmed)")
+    }
+    switch finding.ledgerState {
+    case .openStandingReservation(let reservationID):
+      print("  authority: standing reservation=\(reservationID) (open)")
+      print("  next: arkdeck flash reconcile --mode close")
+    case .openAgentReservation(let reservationID):
+      print("  authority: campaign reservation=\(reservationID) (open)")
+      if let campaignID = finding.campaignID {
+        print("  next: arkdeck flash continue … (campaign \(campaignID)) or")
+        print("        arkdeck flash status --campaign-id \(campaignID)")
+      }
+    case .closed(let reservationID):
+      print("  authority: reservation=\(reservationID) (closed)")
+    case .missing(let reservationID):
+      print("  authority: reservation=\(reservationID) missing from ledger")
+    case .none:
+      print("  authority: no usage reservation recorded")
+    }
+  }
+
+  private static func printFlashClosure(_ closure: RockchipFlashSessionClosure) {
+    switch closure.disposition {
+    case .closedStandingReservation(let reservationID, let status):
+      print("  closed: \(reservationID) terminal=\(status.rawValue)")
+    case .alreadyClosed(let reservationID):
+      print("  closed: \(reservationID) (already terminal)")
+    case .agentLaneDeferred(let reservationID):
+      print("  deferred: \(reservationID) belongs to the campaign lane (flash continue)")
+    case .nothingToClose:
+      print("  nothing to close")
     }
   }
 
