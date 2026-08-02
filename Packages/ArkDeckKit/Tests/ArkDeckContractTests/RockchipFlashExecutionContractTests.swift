@@ -234,6 +234,73 @@ final class RockchipFlashExecutionContractTests: XCTestCase {
     XCTAssertThrowsError(try spoofedNormal.installCurrentLoader())
   }
 
+  func testChatConfirmedCurrentLoaderRebindAdvancesExactlyOnceBeforeExecutionHostLoads()
+    throws
+  {
+    let root = FileManager.default.temporaryDirectory
+      .appending(path: "arkdeck-loader-rebind-\(UUID().uuidString)", directoryHint: .isDirectory)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let store = RockchipProductBindingStore(rootURL: root)
+    let normal = RockchipProductUSBIdentity(
+      serial: "normal-hdc-identity", vendorID: RockchipProbeEvidence.rockUSBVendorID,
+      productID: RockchipHDCIntegrationProfile.dayu200NormalProductID,
+      topology: "18874368", productName: "HDC Device")
+    _ = try RockchipProductBindingBootstrap(probe: { normal }, store: store)
+      .installCurrentTarget()
+    let loader = RockchipProductUSBIdentity(
+      serial: "loader-rockusb-identity", vendorID: RockchipProbeEvidence.rockUSBVendorID,
+      productID: RockchipProbeEvidence.dayu200LoaderProductID,
+      topology: "17956864")
+    let rebinder = RockchipProductBindingRebinder(probe: { loader }, store: store)
+
+    let preview = try rebinder.previewCurrentLoader()
+    XCTAssertEqual(preview.currentRevision, 1)
+    XCTAssertEqual(preview.prospectiveRevision, 2)
+    XCTAssertTrue(preview.requiresRebind)
+    XCTAssertEqual(preview.usbTopology, loader.topology)
+
+    let plan = try RockchipRockUSBFlashProvider(profile: .dayu200OpenHarmony70035)
+      .makePlan(mode: .execute, archiveValidation: .valid)
+    let assertion = try RockchipChatConfirmationAssertion(
+      confirmationDigestSHA256: String(repeating: "c", count: 64),
+      planDigestSHA256: plan.planDigestSHA256,
+      archiveDigestSHA256: plan.archiveSHA256,
+      stepSetDigestSHA256: plan.stepSetDigestSHA256,
+      targetDigestSHA256: preview.targetDigestSHA256,
+      bindingRevision: preview.prospectiveRevision)
+    let receipt = try rebinder.confirmCurrentLoader(chatConfirmation: assertion)
+    XCTAssertTrue(receipt.changed)
+    XCTAssertEqual(receipt.previousRevision, 1)
+    XCTAssertEqual(receipt.revision, 2)
+    XCTAssertEqual(receipt.targetDigestSHA256, preview.targetDigestSHA256)
+
+    let stored = try store.loadExisting()
+    XCTAssertEqual(stored.revision, 2)
+    XCTAssertEqual(stored.serial, loader.serial)
+    XCTAssertEqual(stored.usbTopology, loader.topology)
+    XCTAssertTrue(stored.evidence.contains("binding:previous-revision=1"))
+    XCTAssertTrue(stored.evidence.contains("binding:previous-usb-topology=18874368"))
+    XCTAssertFalse(stored.evidence.contains { $0.contains(normal.serial) || $0.contains(loader.serial) })
+    var metadata = stat()
+    let bindingURL = root.appending(path: RockchipProductBindingStore.bindingFileName)
+    XCTAssertEqual(lstat(bindingURL.path, &metadata), 0)
+    XCTAssertEqual(metadata.st_mode & 0o777, 0o600)
+
+    let replay = try rebinder.confirmCurrentLoader(chatConfirmation: assertion)
+    XCTAssertFalse(replay.changed)
+    XCTAssertEqual(replay.previousRevision, 2)
+    XCTAssertEqual(replay.revision, 2)
+
+    let mismatched = try RockchipChatConfirmationAssertion(
+      confirmationDigestSHA256: String(repeating: "d", count: 64),
+      planDigestSHA256: plan.planDigestSHA256,
+      archiveDigestSHA256: plan.archiveSHA256,
+      stepSetDigestSHA256: plan.stepSetDigestSHA256,
+      targetDigestSHA256: String(repeating: "0", count: 64), bindingRevision: 2)
+    XCTAssertThrowsError(try rebinder.confirmCurrentLoader(chatConfirmation: mismatched))
+    XCTAssertEqual(try store.loadExisting(), stored)
+  }
+
   func testChatConfirmedNormalModeDispatchesExactHDCOnceBeforeClosedRockUSBSequence()
     async throws
   {
