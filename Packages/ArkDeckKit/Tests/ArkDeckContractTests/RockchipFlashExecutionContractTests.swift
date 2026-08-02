@@ -257,9 +257,13 @@ final class RockchipFlashExecutionContractTests: XCTestCase {
       serial: serial, vendorID: RockchipProbeEvidence.rockUSBVendorID,
       productID: RockchipHDCIntegrationProfile.dayu200NormalProductID,
       topology: "42", productName: "HDC Device")
-    let loader = RockchipProductUSBIdentity(
-      serial: serial, vendorID: RockchipProbeEvidence.rockUSBVendorID,
-      productID: RockchipProbeEvidence.dayu200LoaderProductID, topology: "42")
+    // `rkdeveloptool ld` reports VID/PID/LocationID/mode, not the normal-mode USB serial.
+    // The transition must therefore correlate the semantic Loader observation without
+    // inventing a cross-mode serial readback.
+    let loader = RockchipDeviceObservation(
+      deviceNumber: 0, usbVendorID: RockchipProbeEvidence.rockUSBVendorID,
+      usbProductID: RockchipProbeEvidence.dayu200LoaderProductID,
+      locationID: 42, mode: .loader)
     let process = FoundationRockchipExecutionProcessPort(
       executableURL: fixture.executable, executor: processExecutor,
       executableSHA256: fixture.executableSHA256,
@@ -357,6 +361,54 @@ final class RockchipFlashExecutionContractTests: XCTestCase {
     XCTAssertFalse(spawnLog.requests.contains(where: { $0.arguments.first == "wlx" }))
   }
 
+  func testHDCTransitionRejectsLoaderAtAnotherTopologyBeforeRockUSBDispatch() async throws {
+    let fixture = try RockchipExecutionTestFixture.make()
+    defer { try? FileManager.default.removeItem(at: fixture.base) }
+    let packageRoot = URL(fileURLWithPath: #filePath)
+      .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+    let hdcExecutable = packageRoot.appending(path: ".build/debug/ArkDeckFakeHDCFixture")
+    let hdcSHA256 = RockchipExecutionTestFixture.sha256(try Data(contentsOf: hdcExecutable))
+    let spawnLog = RockchipSpawnLog()
+    let executor = FoundationProcessExecutor(
+      identityBoundPreSpawnHook: { _ in }, launchObserver: { _ in },
+      identityBoundSpawnObserver: { _, request, _ in spawnLog.append(request) })
+    let serial = "cross-mode-connect-key"
+    let serialDigest = RockchipExecutionTestFixture.sha256(Data(serial.utf8))
+    let normal = RockchipProductUSBIdentity(
+      serial: serial, vendorID: RockchipProbeEvidence.rockUSBVendorID,
+      productID: RockchipHDCIntegrationProfile.dayu200NormalProductID,
+      topology: "42", productName: "HDC Device")
+    let movedLoader = RockchipDeviceObservation(
+      deviceNumber: 0, usbVendorID: RockchipProbeEvidence.rockUSBVendorID,
+      usbProductID: RockchipProbeEvidence.dayu200LoaderProductID,
+      locationID: 43, mode: .loader)
+    let process = FoundationRockchipExecutionProcessPort(
+      executableURL: fixture.executable, executor: executor,
+      executableSHA256: fixture.executableSHA256,
+      hdcTransition: RockchipHDCTransitionConfiguration(
+        executableURL: hdcExecutable, executableSHA256: hdcSHA256,
+        connectKey: serial, stableIdentitySHA256: serialDigest, usbTopology: "42",
+        currentIdentity: { normal }, waitForLoader: { movedLoader }))
+    let command = try XCTUnwrap(
+      RockchipFlashExecutionLowering.commands(
+        plan: fixture.plan,
+        stagedImages: RockchipFlashExecutionStager.stage(
+          archiveURL: fixture.archive, sessionRoot: fixture.base, profile: fixture.profile)
+      ).first)
+    let prepared = try process.prepare(
+      command: command, admissionIdentity: fixture.executableReceipt)
+
+    do {
+      _ = try await prepared.launch(criticalNonInterruptible: false)
+      XCTFail("a Loader at another topology must require an explicit rebind")
+    } catch {
+      XCTAssertEqual(error as? RockchipHDCTransitionError, .identityDrift)
+    }
+    XCTAssertEqual(spawnLog.requests.map(\.arguments), [
+      ["-t", serial, "shell", "reboot", "loader"]
+    ])
+  }
+
   func testAlreadyLoaderSkipsHDCRebootAndRunsOnlyLoaderReadback() async throws {
     let fixture = try RockchipExecutionTestFixture.make()
     defer { try? FileManager.default.removeItem(at: fixture.base) }
@@ -382,7 +434,10 @@ final class RockchipFlashExecutionContractTests: XCTestCase {
         currentIdentity: { loader },
         waitForLoader: {
           XCTFail("already-Loader path must not wait for an HDC transition")
-          return loader
+          return RockchipDeviceObservation(
+            deviceNumber: 0, usbVendorID: RockchipProbeEvidence.rockUSBVendorID,
+            usbProductID: RockchipProbeEvidence.dayu200LoaderProductID,
+            locationID: 42, mode: .loader)
         }))
     let command = try XCTUnwrap(
       RockchipFlashExecutionLowering.commands(
