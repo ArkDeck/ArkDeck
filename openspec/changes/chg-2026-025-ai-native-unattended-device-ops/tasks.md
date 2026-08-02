@@ -3309,7 +3309,12 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
   #959 删除活跃 Harness 模式投影与旧 wire/public factory；r11 autonomous safe-repair loop
   已由 #960 合入，该实现 PR 中授权实例、USB/HDC/RockUSB 与真实 Flash dispatch 均为 0；
   候选构建绑定 SwiftPM role 已由 #961 合入；搭车的平面边界 target 化(Workflows✂️Harness、
-  Harness✂️Process、ArkDeckAgentComposition 接缝)已由 #962 合入）
+  Harness✂️Process、ArkDeckAgentComposition 接缝)已由 #962 合入；
+  r12 接线 Harness Evolution 对抗审阅生产实现并修复评审腿三缺陷——此前
+  `HarnessAdversarialReviewing` 无 conformer 且 daemon 注入 nil，评审→promotion 腿
+  生产不可达，且首次可达即暴露 humanRequired 分支 causation 非法、REJECT 后 rollback
+  孤儿化两处必然故障；r12 后 GJ-5 的 AI Verification Gate + Adversarial Review Gate
+  在 host 侧闭合，真实设备 dispatch 仍为 0）
 - Platform:macos
 - Requirements:POL-AGENT-002(MODIFIED)、REQ-FLASH-015(MODIFIED)、POL-AGENT-001、
   POL-WORKFLOW-001、POL-RECOVERY-001、POL-TARGET-001
@@ -3389,6 +3394,18 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
 - r11：Loader transition failure 只有重新读到同一 durable target 的 registered mode 才可
   `safeToReflash`；无新增 reservation 的 admission/target failure、unknown/unresolved/unsafe
   partial、重复 strategy、repair/review rejection、budget/expiry/drift 均永久停止。
+- r12：`HarnessAdversarialReviewing` 获得生产 conformer——AgentComposition 的
+  `CodexHarnessAdversarialReviewer`（identity-bound codex 可执行、read-only ephemeral
+  sandbox、闭合 `{result,issues}` shape、verdict 身份字段一律取自请求而非模型输出）；
+  `ARKDECK_HARNESS_REVIEWER_*` 环境组合 + daemon 注入，未配置时保持
+  `adversarialReviewerUnavailable` fail-closed。review request 携带 immutable unified
+  diff 并在 coordinator 与 adapter 双侧校验 `sha256(diff) == candidate.diffDigest`，
+  缺失/漂移停为 `candidateDiffUnavailableAtReview`。
+- r12：修复评审腿两处首次可达即触发的必然故障：humanRequired 分支改用 evaluation
+  causation（原 humanBlocked 不得携带 evaluation 产生的 condition 变化，reducer 必抛
+  `conditionChangeRequiresEvidence`）；REJECT 不再关闭 Attempt，镜像 deployment-failure
+  先例保持 active 直至 typed rollback 读回以 `.reverted` 收口（原 `.failed` 关闭使后续
+  revert decision 无 active attempt 可盖章，dispatch freshness gate 永远 staleDecision）。
 
 ### Verification
 
@@ -3412,3 +3429,10 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
   build/review 并成功执行第 2 ordinal；closed repair JSON 的 extra command/argv/path、重复或越界
   值全拒绝；legacy strategy defaults 可读。未新增 reservation 的 failure 只 dispatch 一次并
   terminal，same-target registered-mode readback 正例可重试，跨 topology/identity 负例永久停止。
+- r12 review-leg tests（`HarnessEvolutionReviewContractTests`，13 例，经公开 reconcile 面驱动）：
+  无 reviewer/无 candidate/无 immutable diff/model 预算耗尽均 humanRequired 且零 promotion；
+  REJECT 同 wake 派发 `workspace.revert-patch@1` 且 Attempt 经 `.reverted` 收口；COMMENT
+  humanRequired；malformed verdict（pass+issues、异身份、transport 异常）零 promotion；PASS
+  全门通过产生 `READY_FOR_NORMAL_PR` 且 promotion artifact 引用并入任务；review 时工作区
+  revision 漂移拒绝 promotion。adapter 正负例覆盖闭合 shape、`--sandbox read-only` argv、
+  oversized/mismatched diff 在任何模型调用前拒绝；env 组合 fail-closed 正负例。

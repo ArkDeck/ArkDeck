@@ -2291,7 +2291,7 @@ public actor HarnessTaskCoordinator {
       let blocked = try await commit(
         snapshot,
         transition(
-          snapshot, causation: .humanBlocked, reasonCode: reason,
+          snapshot, causation: .evaluation, reasonCode: reason,
           status: .humanRequired, activeJob: .cleared,
           consumedBudget: consumed, evaluationID: evaluation.evaluationID,
           artifactRefs: artifactRefs, observedState: observedState,
@@ -2313,7 +2313,7 @@ public actor HarnessTaskCoordinator {
       let blocked = try await commit(
         snapshot,
         transition(
-          snapshot, causation: .humanBlocked, reasonCode: reason,
+          snapshot, causation: .evaluation, reasonCode: reason,
           status: .humanRequired, activeJob: .cleared,
           consumedBudget: consumed, evaluationID: evaluation.evaluationID,
           artifactRefs: artifactRefs, observedState: observedState,
@@ -2327,8 +2327,34 @@ public actor HarnessTaskCoordinator {
           snapshot: blocked, action: .stoppedForHuman, reasonCode: reason))
     }
 
+    // The reviewer reads the exact immutable bytes the candidate metadata
+    // names. The live repair attempt carries them; absence or a digest
+    // mismatch is an integrity stop, never a review with less input.
+    guard let reviewedDiff = snapshot.repairAttempt?.proposal.unifiedDiff,
+      candidate.namesDiff(reviewedDiff)
+    else {
+      let reason = "candidateDiffUnavailableAtReview"
+      try await closeAttempt(snapshot.htaskID, outcome: .humanRequired, reason: reason)
+      let blocked = try await commit(
+        snapshot,
+        transition(
+          snapshot, causation: .evaluation, reasonCode: reason,
+          status: .humanRequired, activeJob: .cleared,
+          consumedBudget: consumed, evaluationID: evaluation.evaluationID,
+          artifactRefs: artifactRefs, observedState: observedState,
+          result: HarnessTaskResult(
+            outcome: .humanRequired, reasonCode: reason,
+            summary: "Evaluation passed, but the immutable diff named by the candidate "
+              + "metadata is not available to review.",
+            evaluationID: evaluation.evaluationID, artifactRefs: artifactRefs),
+          conditions: conditions))
+      return .ended(
+        HarnessReconcileOutcome(
+          snapshot: blocked, action: .stoppedForHuman, reasonCode: reason))
+    }
     let request = HarnessAdversarialReviewRequest(
       originalProblem: snapshot.goal.summary, candidatePatch: candidate,
+      unifiedDiff: reviewedDiff,
       attemptHistory: history, evaluation: evaluation,
       artifactIDs: artifactRefs + attempt.buildArtifactIDs + attempt.runtimeArtifactIDs)
     guard consumed.modelCalls < snapshot.budgets.maxModelCalls else {
@@ -2337,7 +2363,7 @@ public actor HarnessTaskCoordinator {
       let blocked = try await commit(
         snapshot,
         transition(
-          snapshot, causation: .humanBlocked, reasonCode: reason,
+          snapshot, causation: .evaluation, reasonCode: reason,
           status: .humanRequired, activeJob: .cleared,
           consumedBudget: consumed, evaluationID: evaluation.evaluationID,
           artifactRefs: artifactRefs, observedState: observedState,
@@ -2375,7 +2401,7 @@ public actor HarnessTaskCoordinator {
       let blocked = try await commit(
         snapshot,
         transition(
-          snapshot, causation: .humanBlocked, reasonCode: reason,
+          snapshot, causation: .evaluation, reasonCode: reason,
           status: .humanRequired, activeJob: .cleared,
           consumedBudget: reviewConsumed, evaluationID: evaluation.evaluationID,
           artifactRefs: artifactRefs, observedState: observedState,
@@ -2392,8 +2418,14 @@ public actor HarnessTaskCoordinator {
 
     switch review.result {
     case .reject:
-      try await closeAttempt(
-        snapshot.htaskID, outcome: .failed, reason: "adversarialReviewRejected")
+      // A review rejection is a strategy verdict, but the applied candidate
+      // still owes its typed rollback. Mirror the deployment-failure leg:
+      // the Attempt stays active so the owed revert dispatches under the
+      // same identity and closes it as `.reverted` on the rollback readback;
+      // duplicate-strategy admission then refuses the same fingerprint for
+      // the rest of the task. Closing the Attempt here would orphan the
+      // rollback - a planned revert with no active Attempt can never pass
+      // the dispatch freshness gate.
       var rejectedState = observedState
       if let repair = snapshot.repairAttempt {
         rejectedState[HarnessRepairAttempt.observedStateKey] =
@@ -2415,7 +2447,7 @@ public actor HarnessTaskCoordinator {
       let blocked = try await commit(
         snapshot,
         transition(
-          snapshot, causation: .humanBlocked, reasonCode: reason,
+          snapshot, causation: .evaluation, reasonCode: reason,
           status: .humanRequired, activeJob: .cleared, consumedBudget: reviewConsumed,
           evaluationID: evaluation.evaluationID, artifactRefs: artifactRefs,
           observedState: observedState,
@@ -2452,7 +2484,7 @@ public actor HarnessTaskCoordinator {
         let blocked = try await commit(
           snapshot,
           transition(
-            snapshot, causation: .humanBlocked, reasonCode: reason,
+            snapshot, causation: .evaluation, reasonCode: reason,
             status: .humanRequired, activeJob: .cleared, consumedBudget: reviewConsumed,
             evaluationID: evaluation.evaluationID, artifactRefs: artifactRefs,
             observedState: observedState,
