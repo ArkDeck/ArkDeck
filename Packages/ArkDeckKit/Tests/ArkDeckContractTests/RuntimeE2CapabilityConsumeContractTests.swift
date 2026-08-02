@@ -1,0 +1,299 @@
+import Foundation
+import XCTest
+
+@testable import ArkDeckCore
+@testable import ArkDeckRuntime
+@testable import ArkDeckStorage
+@testable import ArkDeckWorkflows
+
+/// Drives the engine-lane E2 consume path end to end for the first time:
+/// an installed exact-plan destructive capability admits a real-archive
+/// flash submit, is consumed exactly once before the first mutation, and
+/// the refusing dispatcher proves the job reached — and only reached — the
+/// dispatch boundary. Until now this chain was inferred from store-level
+/// tests; nothing had ever driven `submit → admission → consume` through
+/// `RuntimeJobEngine` for a destructive operation.
+///
+/// The capability document is constructed exactly as the maintainer flow
+/// produces it (the draft shape with the placeholder issuer reference
+/// replaced by a merged-PR reference) and installed through the same store
+/// API the daemon uses. No device, no real process: the dispatcher records
+/// and refuses, so a consumed-but-refused job terminates `failed` with a
+/// confirmed outcome — burning the single use is the intended
+/// intent-before-effect behavior, not a defect.
+final class RuntimeE2CapabilityConsumeContractTests: XCTestCase {
+  private static let archiveEnvironmentKey = "ARKDECK_DAYU200_70035_IMAGE"
+  private static let targetIdentity = String(repeating: "a", count: 64)
+  private static let toolIdentity = String(repeating: "b", count: 64)
+
+  private actor DispatchLog {
+    private(set) var effects: [String] = []
+
+    func record(_ effect: String) { effects.append(effect) }
+    func snapshot() -> [String] { effects }
+  }
+
+  /// Records every dispatch attempt, then refuses before any spawn. The
+  /// consume e2e must reach this boundary exactly once and never cross it.
+  private struct RecordingRefusingDispatcher: RuntimeProcessDispatching {
+    let log: DispatchLog
+
+    func unavailableReason(providerID _: String) -> String? { nil }
+
+    func dispatch(_ plan: TypedProcessPlan) async throws -> ProviderProcessReceipt {
+      await log.record(plan.action.effect.rawValue)
+      throw RuntimeDispatchFailure.failed(
+        "the consume e2e never spawns a real process")
+    }
+  }
+
+  private struct FactsPort: RockchipRuntimeFactsPort {
+    func currentFacts(targetID: String) async throws -> ProviderFacts {
+      ProviderFacts(
+        providerID: "rockchip",
+        toolVersion: BundledRockchipComponent.reportedVersion,
+        toolSHA256: RuntimeE2CapabilityConsumeContractTests.toolIdentity,
+        serverFacts: [:], targetID: targetID, bindingRevision: 7,
+        deviceIdentitySHA256:
+          RuntimeE2CapabilityConsumeContractTests.targetIdentity,
+        executionConnectKey: "sealed-consume-e2e-connect-key",
+        deviceModel: "DAYU200 (RK3568)", deviceMode: "sealed-facts",
+        buildFingerprint: "preflight-only",
+        transport: "sealed-fixture",
+        profileID: "dayu200@2", collectedAtUTC: "2026-08-01T00:00:00Z")
+    }
+  }
+
+  func testInstalledExactPlanCapabilityAdmitsConsumesOnceAndNeverSpawns() async throws {
+    guard let archivePath = ProcessInfo.processInfo.environment[Self.archiveEnvironmentKey]
+    else {
+      throw XCTSkip("set \(Self.archiveEnvironmentKey) for the 7.0.0.35 real-input gate")
+    }
+    let archiveURL = URL(fileURLWithPath: archivePath).standardizedFileURL
+    let profile = RockchipFlashProfile.dayu200OpenHarmony70035
+
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(
+      "arkdeck-e2-consume-\(UUID().uuidString.lowercased())", isDirectory: true)
+    try FileManager.default.createDirectory(
+      at: root, withIntermediateDirectories: true,
+      attributes: [.posixPermissions: 0o700])
+    defer { try? FileManager.default.removeItem(at: root) }
+
+    let artifactStore = try RuntimeArtifactStore(
+      rootURL: root.appendingPathComponent("artifacts", isDirectory: true),
+      nowUTC: { "2026-08-01T00:00:00Z" })
+    let artifact = try await artifactStore.publishFile(
+      RuntimeArtifactFilePublicationRequest(
+        jobID: "input-e2-consume", sessionID: "session-input-e2-consume",
+        stepID: "import-flash-bundle", name: "images.tar.gz",
+        mediaType: "application/gzip", privacy: .standard,
+        retentionClass: .pinnedUntilVerified,
+        sourceOperation: "artifact.import-flash-bundle", providerID: "host",
+        bindingSnapshot: ArtifactBindingSnapshot(
+          targetID: "TGT-DAYU200-70035", bindingRevision: 7,
+          stableIdentitySHA256: Self.targetIdentity),
+        sourceFileURL: archiveURL,
+        expectedByteCount: Int(profile.archiveSizeBytes),
+        expectedSHA256: profile.archiveSHA256))
+    let lease = try await artifactStore.leaseReference(
+      jobID: artifact.jobID, artifactID: artifact.artifactID)
+    let capabilityStore = try RuntimeCapabilityStore(
+      directoryURL: root.appendingPathComponent("capabilities", isDirectory: true))
+    let dispatchLog = DispatchLog()
+    let engine = try RuntimeJobEngine(
+      configuration: .init(
+        stateDirectory: root.appendingPathComponent("engine", isDirectory: true)),
+      providers: DeviceProviderRegistry(providers: [
+        RockchipFlashProviderAdapter(
+          factsPort: FactsPort(), availability: .available)
+      ]),
+      dispatcher: RecordingRefusingDispatcher(log: dispatchLog),
+      capabilityStore: capabilityStore, artifactStore: artifactStore,
+      nowUTC: { "2026-08-01T00:00:00Z" })
+
+    let inputs = flashInputs(lease: lease, profile: profile)
+
+    // The exact plan digest comes from the engine's own materialization,
+    // the same digest a capability draft would pin.
+    let preview = try await engine.planOnly(
+      encoded(try flashRequest(requestID: "e2-consume-plan", inputs: inputs)))
+    XCTAssertEqual(preview.materializedPlanDigest.count, 64)
+
+    // 1. Destructive without a capability: refused at authorization, before
+    //    any dispatch.
+    do {
+      let acceptance = try await engine.submit(
+        encoded(try flashRequest(requestID: "e2-consume-noauth", inputs: inputs)))
+      _ = try await engine.run(jobID: acceptance.jobID)
+      XCTFail("a destructive submit without a capability must be refused")
+    } catch let error as RuntimeJobEngineError {
+      guard case .rejected(let code, let detail) = error else {
+        return XCTFail("unexpected rejection shape: \(error)")
+      }
+      XCTAssertEqual(code, .authorizationRequired, detail)
+    }
+    var dispatched = await dispatchLog.snapshot()
+    XCTAssertTrue(dispatched.isEmpty, "refusal must precede any dispatch")
+
+    // 2. A wrong-plan capability: installable (it is a valid document), but
+    //    it must never admit this request's materialized plan, and it must
+    //    never be consumed.
+    let wrongPlan = try RuntimeCapability(
+      capabilityID: "CAP-RT-E2-WRONGPLAN-970",
+      targetScope: .stablePhysicalIdentity(sha256: Self.targetIdentity),
+      operationScope: [
+        RuntimeCapabilityOperationScope(operationID: "flash.dayu200", version: 1)
+      ],
+      effectCeiling: .destructive,
+      inputConstraints: exactStringConstraints(from: inputs),
+      issuedAtUTC: "2026-08-01T00:00:00Z",
+      expiresAtUTC: "2026-08-01T02:00:00Z",
+      maximumUses: 1,
+      issuer: RuntimeCapabilityIssuer(
+        kind: .maintainerMergedPR, reference: "PR#970 wrong-plan negative"),
+      exactPlanDigest: String(repeating: "f", count: 64),
+      exactBindingRevision: 7)
+    try await capabilityStore.install(wrongPlan)
+    do {
+      let acceptance = try await engine.submit(
+        encoded(
+          try flashRequest(
+            requestID: "e2-consume-wrongplan", inputs: inputs,
+            capabilityID: wrongPlan.capabilityID)))
+      _ = try await engine.run(jobID: acceptance.jobID)
+      XCTFail("a wrong-plan capability must never admit this request")
+    } catch {
+      // Refusal may surface at submit or at run depending on where the
+      // digest is compared; either way nothing may dispatch or consume.
+    }
+    dispatched = await dispatchLog.snapshot()
+    XCTAssertTrue(dispatched.isEmpty)
+    let wrongInspection = try await capabilityStore.inspect(
+      capabilityID: wrongPlan.capabilityID)
+    let wrongStatus = try XCTUnwrap(wrongInspection)
+    XCTAssertEqual(wrongStatus.consumptionCount, 0)
+    XCTAssertEqual(wrongStatus.remainingUses, 1)
+
+    // 3. The maintainer-shaped capability: the draft envelope with the
+    //    placeholder reference replaced by a merged-PR reference.
+    let capability = try RuntimeCapability(
+      capabilityID: "CAP-RT-E2-CONSUME-970",
+      targetScope: .stablePhysicalIdentity(sha256: Self.targetIdentity),
+      operationScope: [
+        RuntimeCapabilityOperationScope(operationID: "flash.dayu200", version: 1)
+      ],
+      effectCeiling: .destructive,
+      inputConstraints: exactStringConstraints(from: inputs),
+      issuedAtUTC: "2026-08-01T00:00:00Z",
+      expiresAtUTC: "2026-08-01T02:00:00Z",
+      maximumUses: 1,
+      issuer: RuntimeCapabilityIssuer(
+        kind: .maintainerMergedPR, reference: "PR#970 e2 exact-plan consume e2e"),
+      exactPlanDigest: preview.materializedPlanDigest,
+      exactBindingRevision: 7)
+    try await capabilityStore.install(capability)
+
+    let acceptance = try await engine.submit(
+      encoded(
+        try flashRequest(
+          requestID: "e2-consume-positive", inputs: inputs,
+          capabilityID: capability.capabilityID)))
+    let status = try await engine.run(jobID: acceptance.jobID)
+
+    // The dispatcher refused before any spawn, so the job terminates failed
+    // with a confirmed outcome — never outcomeUnknown, never a human gate.
+    XCTAssertEqual(status.state, "failed")
+    XCTAssertFalse(status.outcomeUnknown)
+    XCTAssertFalse(status.waitingForHuman)
+    XCTAssertTrue(
+      status.timeline.contains("capability consumed before first mutation"),
+      "\(status.timeline)")
+
+    // Exactly one dispatch attempt was made, and it carried a mutating
+    // effect: the E2 gate genuinely opened.
+    dispatched = await dispatchLog.snapshot()
+    XCTAssertEqual(dispatched.count, 1, "\(dispatched)")
+    let dispatchedEffect = try XCTUnwrap(
+      dispatched.first.flatMap { WorkflowEffect(rawValue: $0) })
+    XCTAssertGreaterThanOrEqual(dispatchedEffect, .deviceMutation)
+
+    // The single use is burned with a confirmed terminal outcome recorded
+    // in the lineage. Intent-before-effect: a refused dispatch still
+    // consumed the authority.
+    let consumedInspection = try await capabilityStore.inspect(
+      capabilityID: capability.capabilityID)
+    let consumed = try XCTUnwrap(consumedInspection)
+    XCTAssertEqual(consumed.consumptionCount, 1)
+    XCTAssertEqual(consumed.remainingUses, 0)
+    XCTAssertEqual(consumed.lineage.count, 1)
+
+    // 4. The consumed capability admits nothing further: a second submit is
+    //    refused without another dispatch.
+    do {
+      let second = try await engine.submit(
+        encoded(
+          try flashRequest(
+            requestID: "e2-consume-second", inputs: inputs,
+            capabilityID: capability.capabilityID)))
+      _ = try await engine.run(jobID: second.jobID)
+      XCTFail("a consumed single-use capability must not admit a second run")
+    } catch {
+      // Refused at submit or run; the assertions below are the contract.
+    }
+    dispatched = await dispatchLog.snapshot()
+    XCTAssertEqual(dispatched.count, 1, "no second dispatch: \(dispatched)")
+    let finalInspection = try await capabilityStore.inspect(
+      capabilityID: capability.capabilityID)
+    let final = try XCTUnwrap(finalInspection)
+    XCTAssertEqual(final.consumptionCount, 1)
+    XCTAssertEqual(final.remainingUses, 0)
+  }
+
+  // MARK: - Fixtures
+
+  private func flashInputs(
+    lease: String, profile: RockchipFlashProfile
+  ) -> [String: JSONValue] {
+    [
+      "imageBundleLease": .string(lease),
+      "deviceProfile": .string(profile.catalogReference),
+      "partitionPlan": .array(
+        profile.mappedPartitions.map { .string($0.partitionName) }),
+      "postFlashVerification": .string("basic"),
+    ]
+  }
+
+  /// Mirrors the draft path's exact-input constraint derivation: strings
+  /// pin exactly, arrays stay unconstrained (there is no array constraint
+  /// kind), so the capability document matches what a maintainer reviews.
+  private func exactStringConstraints(
+    from inputs: [String: JSONValue]
+  ) -> [String: RuntimeCapabilityInputConstraint] {
+    var constraints: [String: RuntimeCapabilityInputConstraint] = [:]
+    for (key, value) in inputs {
+      if case .string(let text) = value {
+        constraints[key] = .exactString(text)
+      }
+    }
+    return constraints
+  }
+
+  private func flashRequest(
+    requestID: String, inputs: [String: JSONValue], capabilityID: String? = nil
+  ) throws -> RuntimeOperationRequest {
+    try RuntimeOperationRequest(
+      requestID: requestID,
+      idempotencyKey: "idem-\(requestID)",
+      target: DurableTargetReference(
+        targetID: "TGT-DAYU200-70035", expectedBindingRevision: 7),
+      operation: RuntimeOperationReference(id: "flash.dayu200", version: 1),
+      inputs: inputs,
+      authorization: capabilityID.map(RuntimeCapabilityReference.init))
+  }
+
+  private func encoded(_ request: RuntimeOperationRequest) throws -> Data {
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+    return try encoder.encode(request)
+  }
+}
