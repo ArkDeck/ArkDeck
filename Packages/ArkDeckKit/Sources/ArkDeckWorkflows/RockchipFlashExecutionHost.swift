@@ -272,6 +272,7 @@ enum RockchipHDCTransitionError: Error, Equatable, Sendable {
   case unexpectedStandardError
   case processDidNotExitSuccessfully
   case identityDrift
+  case loaderObservationRejected
   case loaderUnavailable
 }
 
@@ -327,7 +328,7 @@ struct RockchipHDCTransitionConfiguration: Sendable {
   let stableIdentitySHA256: String
   let usbTopology: String
   let currentIdentity: @Sendable () throws -> RockchipProductUSBIdentity
-  let waitForLoader: @Sendable () async throws -> RockchipProductUSBIdentity
+  let waitForLoader: @Sendable () async throws -> RockchipDeviceObservation
 
   var arguments: [String] {
     ["-t", connectKey, "shell", "reboot", "loader"]
@@ -406,8 +407,8 @@ final class FoundationRockchipExecutionProcessPort: @unchecked Sendable,
           throw RockchipHDCTransitionError.processDidNotExitSuccessfully
         }
         let loader = try await hdcTransition.waitForLoader()
-        guard loader.isLoader, Self.matches(loader, transition: hdcTransition) else {
-          throw RockchipHDCTransitionError.loaderUnavailable
+        guard Self.matches(loader, transition: hdcTransition) else {
+          throw RockchipHDCTransitionError.identityDrift
         }
       } else {
         // The device may already have reached Loader between admission and
@@ -441,6 +442,16 @@ final class FoundationRockchipExecutionProcessPort: @unchecked Sendable,
     return digest == transition.stableIdentitySHA256
       && identity.topology == transition.usbTopology
       && identity.isRegisteredDAYU200Mode
+  }
+
+  private static func matches(
+    _ observation: RockchipDeviceObservation,
+    transition: RockchipHDCTransitionConfiguration
+  ) -> Bool {
+    observation.usbVendorID == RockchipProbeEvidence.rockUSBVendorID
+      && observation.usbProductID == RockchipProbeEvidence.dayu200LoaderProductID
+      && observation.mode == .loader
+      && String(observation.locationID) == transition.usbTopology
   }
 }
 
@@ -946,6 +957,7 @@ private enum RockchipProductionExecutionComposition {
       tool: settings.tool, clock: clock, usbProbe: usbProbe)
     let bindingSerialDigest = SHA256.hash(data: Data(settings.binding.serial.utf8))
       .map { String(format: "%02x", $0) }.joined()
+    let loaderDiscovery = RockchipProductionDiscoveryComposition.admissionDiscoveryAdapter()
     let hdcTransition = RockchipHDCTransitionConfiguration(
       executableURL: RockchipHDCIntegrationProfile.executableURL,
       executableSHA256: RockchipHDCIntegrationProfile.executableSHA256,
@@ -961,13 +973,22 @@ private enum RockchipProductionExecutionComposition {
         let clock = ContinuousClock()
         let deadline = clock.now.advanced(by: .seconds(45))
         repeat {
-          if let identity = try? usbProbe.singleLoader(
-            selector: settings.binding.usbTopology,
-            stableIdentitySHA256: bindingSerialDigest)
-          {
-            return identity
+          let attempt = await loaderDiscovery.discover(using: settings.tool)
+          if attempt.diagnostic == .offline {
+            try await Task.sleep(for: .milliseconds(500))
+            continue
           }
-          try await Task.sleep(for: .milliseconds(250))
+          guard attempt.diagnostic == nil,
+            attempt.execution != nil,
+            attempt.executableIdentity?.sha256
+              == RockchipDiscoveryIntegrationProfile.pinnedProduction.executableSHA256,
+            attempt.observations.count == 1,
+            let observation = attempt.observations.first,
+            observation.usbVendorID == RockchipProbeEvidence.rockUSBVendorID,
+            observation.usbProductID == RockchipProbeEvidence.dayu200LoaderProductID,
+            observation.mode == .loader
+          else { throw RockchipHDCTransitionError.loaderObservationRejected }
+          return observation
         } while clock.now < deadline
         throw RockchipHDCTransitionError.loaderUnavailable
       })
