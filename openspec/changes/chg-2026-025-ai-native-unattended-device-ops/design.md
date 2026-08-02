@@ -13,6 +13,13 @@
 > authorization 扩展为 `standingAuthorization | chatConfirmation`。后者是用户监督式
 > 交互会话的一次性 authority，不具有 GitHub/签名 provenance；维护者批准本 revision 即
 > 接受该 residual risk。它不得用于 CI、后台无人值守、自动重试或 recovery replay。
+>
+> r8 campaign note（2026-08-02）：在不改变 r7 one-shot bytes 的前提下新增
+> `evolutionCampaignConfirmation`。用户一次确认 delegated envelope；最多 8 attempts/
+> 4 hours/1 concurrency。未合入候选在隔离、无设备 capability 的固定 target 中运行，
+> 每个 candidate identity 经确定性门与独立 AI 对抗审查后成为 attempt 派生 pin；只有
+> protected-main broker 可以 preflight/readback/reserve 并执行 closed typed action。
+> AI review 不能单独成为 authority，任何 unknown destructive outcome 永久终止 campaign。
 
 ## §0 设计原则
 
@@ -33,7 +40,7 @@
 | --- | --- | --- | --- |
 | **E0 只读** | `list targets`、readonly probe registry 命令面、hilog/hitrace/hidumper 采集到 owned 路径、artifact 拉取、host 侧分析 | approved change 的 ready 任务(现行机制,无新增载体) | 是,随时可执行,无窗口概念 |
 | **E1 可逆 mutation** | `setParameter`(snapshot/readback/结束恢复)、send file 到 owned 路径、rebootDevice、启停采集 | ready 任务 + per-device typed capability evidence(TR-002R 门原样保留) | 是 |
-| **E2 destructive** | flash/erase/format/unlock/真实 update dispatch | ready 任务 + **standing authorization** 或同会话一次性 **chat confirmation**(§2) | standing authorization 可无人值守；chat confirmation 仅用户监督式会话 |
+| **E2 destructive** | flash/erase/format/unlock/真实 update dispatch | ready 任务 + **standing authorization**、同会话一次性 **chat confirmation** 或硬预算 **evolution campaign confirmation**(§2) | standing authorization 可无人值守；chat authority 由用户监督式会话签发，evolution campaign 只允许 merged broker 在闭合委托内 continuation |
 
 E0/E1 的既有约束原样保留:owned-path UUID 隔离与 verified-before-cleanup
 (REQ-TRACE-006)、序列号字节不入仓(redaction 工具链)、ownership unknown 即
@@ -97,11 +104,60 @@ transport provenance，也无法从纯 CLI bytes 区分 Agent 如实转交与 Ag
 经维护者显式接受的 residual risk，不得在 evidence 中隐藏。后续若引入签名 conversation
 receipt，可在不改变用户交互的前提下收紧 provenance。
 
+### §2.3 bounded evolution campaign confirmation
+
+evolution campaign 使用新 authority kind，不解释或迁移 §2.2 的 one-shot reference。用户
+确认前展示的 canonical envelope 至少包含：protected-main base OID、fixed candidate build
+target/toolchain、allowed source paths、`maxChangedFiles`/`maxDiffLines`、plan/archive/step-set、
+target stable identity 与 binding lineage root、userdata impact、`maxAttempts` 与 `validUntil`。
+MVP validator 硬上限：`maxAttempts <= 8`、有效期不超过 4 小时、并发 attempt = 1；更大或
+缺失字段整体拒绝，不能静默截断。
+
+#### Candidate / broker 分权
+
+candidate 由 task-owned workspace 的 base + immutable patch 构建。固定 builder 记录 source
+tree、diff、allowed-path set、executable 与 toolchain digest；sandbox 拒绝 network、USB、HDC、
+RockUSB、raw shell、任意 executable/argv、host path 与 authority bytes。candidate 唯一输出是
+现有 Catalog operation 可表示的 typed strategy bundle。protected-main broker 重新 materialize
+计划并拒绝以下任一项：非既有 operation/step/actionRef、plan/archive/step-set 漂移、Catalog/
+profile/broker/authorization 文件变更、raw surface、目标或预算扩张。
+
+与 patch producer 不同的 read-only adversarial reviewer 读取 immutable diff、构建/测试证据、
+materialized plan 与历史 attempt；只有 PASS 且没有 HIGH/CRITICAL issue 才能写入派生 candidate
+pin。reviewer 没有 repair、Runtime、device 或 authority port。AI verdict 不是 E2 authority，
+只能作为已确认 campaign 的必要且不充分 admission fact。
+
+产品持久化 campaign reference 与 append-only attempt ledger。每个 attempt 有独立 ordinal、
+candidate pins、review receipt、Job、Session、usage reservation、stepIntent/outcome 和 terminal
+correlation；ordinal 一经 reserve 不退款。reserve 发生在以下 E0/host-only deep preflight
+全绿之后：
+
+1. reconcile 已中断 session，并确认没有 unresolved destructive intent/outcomeUnknown；
+2. retention/heavy-writer admission 与 finalization headroom 可用；
+3. archive 与 published members、candidate/build/test/review pins 校验成功；
+4. staging、closed lowering、power/lifecycle prerequisite 与 merged broker identity 有效；
+5. fresh target readback 匹配 stable identity，binding revision 只沿 broker 已确认的 campaign
+   lineage 单调推进。
+
+只有上一 ordinal 已 durable terminal，且 merged broker 根据完整 intent/outcome/readback 给出
+`safeToReflash`，才可进入下一 ordinal。该分类仅允许 destructive intent 前的明确失败，或每个
+已发出的 destructive step 都有 confirmed outcome 且专用 readback 证明可重新执行的已知失败；
+candidate/reviewer 不能提供或覆盖分类。process timeout/disconnect、outcome 持久化失败、
+unresolved intent、identity uncertainty、broker/reviewer crash、取消时已有 destructive intent、
+postflight lineage mismatch 与 recovery-required 一律终止 campaign。成功也终止并禁止剩余
+额度复用。每次 continuation 重算全部 trusted facts；plan/archive/step-set/stable target/
+toolchain/base/allowed-path envelope 漂移使 campaign 整体失效。
+
+campaign 不是 standing authorization，ordinary CI/daemon/scheduler 不能自行 mint 或扩大。
+未合入 candidate code 可以在上述 sandbox 中运行并影响 typed strategy，但真实 transport 与
+destructive dispatch 永远属于 protected-main broker；candidate 不能替换或动态加载 broker。
+
 ## §3 执行门校验序列(E2,首个真实设备 Step 前)
 
-1. 定位并验证 authority：standing authorization 必须来自 main 且未过期/超次；chat
-   confirmation 必须来自当前交互 invocation、未消费且非 CI/后台/recovery；缺失 →
-   policyBlocked;
+1. 定位并验证 authority：standing authorization 必须来自 main 且未过期/超次；one-shot
+   chat confirmation 必须来自当前交互 invocation、未消费且非 CI/后台/recovery；evolution
+   campaign 必须由当前会话确认，且 durable ledger/budget/base/allowed-path envelope、candidate
+   派生 pins、adversarial review 与前序 terminal correlation 全有效；缺失 → policyBlocked;
 2. 逐项比对:model/serial 摘要/binding revision/firmware hash/transport/
    hdc version/provider/step 集合/plan hash；chat confirmation 还须匹配 archive/step-set/
    target digest，任一不符 → 零 dispatch + blocked-attempt 记录;
@@ -109,7 +165,8 @@ receipt，可在不改变用户交互的前提下收紧 provenance。
    确认");
 4. durable 写入 intent(含 authorizationRef)→ dispatch → durable outcome;
 5. evidence 落盘:executor(kind=agent, id)、实际 authority kind/reference、目标读回、时间、
-   恢复路径;schema v3。chat confirmation 不能伪写 standing authorization provenance。
+   恢复路径;schema v3。campaign 另记 ordinal、candidate/review/broker pins 与 terminal/retry
+   disposition；chat authority 不能伪写 standing authorization provenance。
 
 失败注入要求:门 2/3 的每个比对分支都必须有 contract test 用真实(非 fake 常量)
 不一致输入证伪(TR-002R real-fault 注入先例)。
@@ -130,6 +187,8 @@ receipt，可在不改变用户交互的前提下收紧 provenance。
 
 - 受保护 main + CODEOWNER review;merge 即批准;凭据分离(Agent 限 `agent/**`);
 - POL-AGENT-001:Agent 不得自批规则、范围、Safety、baseline、授权;
+- protected main + CODEOWNER review 仍是 policy/broker/Catalog/profile 的唯一发布信任根；
+  AI review 仅能在用户确认的 campaign envelope 中缩小未合入 candidate，不能自行授权;
 - POL-SAFETY-001 / POL-TARGET-001 / POL-HDC-001 / POL-WORKFLOW-001 /
   POL-RECOVERY-001 / POL-MODE-001 / POL-ARTIFACT-001 / POL-STORAGE-001 /
   POL-PRIVACY-001 / POL-VERIFY-001 全部原文不动;
