@@ -291,6 +291,14 @@ private final class JourneyWorkspacePort: HarnessEvolutionWorkspacePort, @unchec
   ) async throws {
     lock.withLock { attemptDirectories.append((attemptID, ordinal)) }
   }
+
+  // GC never runs inside these journeys; an explicit empty sweep keeps the
+  // fake honest about that instead of inheriting behavior it does not model.
+  func sweepTerminalWorkspaces(
+    tasks: [HarnessEvolutionWorkspaceGCTaskReference],
+    retention: HarnessEvolutionWorkspaceRetention,
+    nowUTC: String
+  ) async throws -> [HarnessEvolutionWorkspaceGCFinding] { [] }
 }
 
 /// Proposes the bounded patch exactly when the loop's offer narrows to the

@@ -3461,3 +3461,19 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
   retain-last 与 age 双轴保留及 dry-run 零变更；中断 teardown 的 `.workspace.doomed`/
   `.workspace.tmp` 幂等续删；wire 端默认保留、显式清零销毁并报回收字节、负参数
   invalidParams、无 port rejected；设备 dispatch=0。
+- attempt-budget 与 journey E2E tests（#974，`HarnessEvolutionJourneyContractTests` 2 例，
+  全部从 `coordinator.submit` 经真实 reconcile 循环驱动、fake 面断言 production
+  `RuntimeOperationRequest` typed 形态）：①`maxEvolutionAttemptsExhausted` 首次经
+  决策/派发路径实际触发——maxAttempts=1 下首条策略走完
+  checkpoint→apply→build→tests 后 deploy 失败，欠账 rollback 以 `.reverted` 收口
+  Attempt，同 wake 第二个 PROPOSE_PATCH 在 `beginStrategyAttempt` 被拒
+  （预算门先于 duplicate 门），断言 stoppedForHuman + humanRequired 收口 + typed
+  `strategyExhausted` HumanActionRequired + 零新 Attempt/零新 dispatch + 无自动逃逸；
+  ②submit→promotion 多轮 fake E2E 覆盖 observe→capture→pinned analyzer→baseline
+  fixture 注入→崩溃证据（FAIL）→model PROPOSE_PATCH→checkpoint→applyPatch→build→
+  run-tests→deploy（digest 门）→verification capture→analyzer→PASS 评估→adversarial
+  review PASS→promotion 全链，钉 13-operation 序列、immutable lease/capability
+  reference/隔离 workspace projectRef/E1 恰好计费 6、watermark 退休注入崩溃、
+  journey Attempt superseded 与 strategy Attempt 携带 candidate/review/promotion、
+  `READY_FOR_NORMAL_PR`；两测试均经变异对照证伪（放宽预算门、删 promotion 记录
+  各自打红）；设备 dispatch=0。
