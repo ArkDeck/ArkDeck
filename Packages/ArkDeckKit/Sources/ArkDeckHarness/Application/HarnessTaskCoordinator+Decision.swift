@@ -235,7 +235,8 @@ extension HarnessTaskCoordinator {
     }
     let failureRecords = ((try? await store.failureRecords()) ?? [])
       .filter { offered.contains($0.fingerprint.operationReference) }
-    let failures = failureRecords
+    let failures =
+      failureRecords
       .map { record in
         HarnessContextFailure(
           digest: record.digest,
@@ -257,11 +258,14 @@ extension HarnessTaskCoordinator {
     }
     let activeAttempt = durableAttempts.last { !$0.outcome.isClosed }
     var currentWorkspaceRevision: String?
-    if let repairPort, let projectRef = snapshot.projectRef,
+    if let repairPort, let projectRef = snapshot.executionProjectRef,
       let proposal = snapshot.repairAttempt?.proposal
     {
       currentWorkspaceRevision = try? await repairPort.currentWorkspaceRevision(
         relativePaths: proposal.touchedFiles, projectRef: projectRef, task: snapshot)
+    }
+    if currentWorkspaceRevision == nil, snapshot.executionMode == .evolution {
+      currentWorkspaceRevision = snapshot.evolutionPolicy?.baseRevision
     }
     var availabilityByReference: [String: Bool] = [:]
     var unavailableOperations: [HarnessContextUnavailableOperation] = []
@@ -349,7 +353,8 @@ extension HarnessTaskCoordinator {
       unavailableOperations: unavailableOperations,
       authorizedOperationReferences: authorizedOperationReferences,
       currentCapabilityEffectCeiling: capabilityEffectCeiling,
-      allowedFileScopes: snapshot.repairAttempt?.proposal.touchedFiles ?? [],
+      allowedFileScopes: snapshot.evolutionPolicy?.allowedPaths
+        ?? snapshot.repairAttempt?.proposal.touchedFiles ?? [],
       derivedArtifactSummaries: derivedArtifactSummaries)
     let artifacts = (evaluation?.evidence ?? []).map { record in
       HarnessContextArtifact(
@@ -371,9 +376,10 @@ extension HarnessTaskCoordinator {
       components: [snapshot.type.rawValue, desiredText("component")].compactMap { $0 },
       filePaths: repair?.proposal.touchedFiles ?? [],
       symbols: repair?.proposal.expectedChangedSymbols ?? [],
-      operationReferences: contextAvailableOperations + durableAttempts.map {
-        $0.strategy.selectedOperationFamily
-      },
+      operationReferences: contextAvailableOperations
+        + durableAttempts.map {
+          $0.strategy.selectedOperationFamily
+        },
       revision: durableAttempts.last?.patchRevision
         ?? durableAttempts.last?.applicableBaseRevision
         ?? repair?.patchRevision ?? repair?.proposal.baseWorkspaceRevision

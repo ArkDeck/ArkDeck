@@ -8,6 +8,7 @@ import Foundation
 
 public struct WorkspaceHarnessRepairPort: HarnessRepairPort {
   private let profile: WorkspaceProjectProfile
+  private let profileRegistry: WorkspaceProjectProfileRegistry
   private let attempts: WorkspacePatchAttemptStore
   private let artifacts: RuntimeArtifactStore
 
@@ -17,6 +18,19 @@ public struct WorkspaceHarnessRepairPort: HarnessRepairPort {
     artifactStore: RuntimeArtifactStore
   ) {
     self.profile = profile
+    self.profileRegistry = WorkspaceProjectProfileRegistry(profile: profile)
+    self.attempts = attemptStore
+    self.artifacts = artifactStore
+  }
+
+  public init(
+    profile: WorkspaceProjectProfile,
+    profileRegistry: WorkspaceProjectProfileRegistry,
+    attemptStore: WorkspacePatchAttemptStore,
+    artifactStore: RuntimeArtifactStore
+  ) {
+    self.profile = profile
+    self.profileRegistry = profileRegistry
     self.attempts = attemptStore
     self.artifacts = artifactStore
   }
@@ -24,8 +38,13 @@ public struct WorkspaceHarnessRepairPort: HarnessRepairPort {
   public func currentWorkspaceRevision(
     relativePaths: [String], projectRef: String, task: HarnessTaskSnapshot
   ) async throws -> String {
-    guard projectRef == profile.projectRef else {
+    guard let profile = profileRegistry.profile(for: projectRef) else {
       throw HarnessRepairPortError.proposalRejected("projectProfileMismatch")
+    }
+    if profile.kind == .evolution {
+      return try WorkspaceProviderSupport.workspaceRevision(
+        root: profile.projectRoot, profileVersion: profile.profileID,
+        globs: profile.allowedFileGlobs)
     }
     let current = try WorkspaceProviderSupport.snapshots(
       relativePaths: relativePaths, root: profile.projectRoot)
@@ -38,7 +57,7 @@ public struct WorkspaceHarnessRepairPort: HarnessRepairPort {
     task: HarnessTaskSnapshot,
     decisionID: String
   ) async throws -> HarnessPreparedPatch {
-    guard projectRef == profile.projectRef else {
+    guard let profile = profileRegistry.profile(for: projectRef) else {
       throw HarnessRepairPortError.proposalRejected("projectProfileMismatch")
     }
     let bytes = Data(proposal.unifiedDiff.utf8)
@@ -56,9 +75,16 @@ public struct WorkspaceHarnessRepairPort: HarnessRepairPort {
     } catch {
       throw HarnessRepairPortError.proposalRejected("\(error)")
     }
-    let current = try WorkspaceProviderSupport.snapshots(
-      relativePaths: proposal.touchedFiles, root: profile.projectRoot)
-    let revision = WorkspaceProviderSupport.revision(current)
+    let revision: String
+    if profile.kind == .evolution {
+      revision = try WorkspaceProviderSupport.workspaceRevision(
+        root: profile.projectRoot, profileVersion: profile.profileID,
+        globs: profile.allowedFileGlobs)
+    } else {
+      let current = try WorkspaceProviderSupport.snapshots(
+        relativePaths: proposal.touchedFiles, root: profile.projectRoot)
+      revision = WorkspaceProviderSupport.revision(current)
+    }
     guard revision == proposal.baseWorkspaceRevision else {
       throw HarnessRepairPortError.workspaceRevisionConflict(
         expected: proposal.baseWorkspaceRevision, actual: revision)
@@ -92,7 +118,40 @@ public struct WorkspaceHarnessRepairPort: HarnessRepairPort {
         // diff again and requires every touched path to match both sets.
         "allowedFileGlobs": .array(proposal.touchedFiles.map(JSONValue.string)),
       ],
-      artifactLease: lease)
+      artifactLease: lease,
+      artifactID: metadata.artifactID)
+  }
+
+  public func candidatePatch(
+    proposal: HarnessPatchProposal,
+    prepared: HarnessPreparedPatch,
+    task: HarnessTaskSnapshot,
+    attemptID: String,
+    createdBy: HarnessCandidatePatchCreator,
+    createdAtUTC: String
+  ) async throws -> HarnessCandidatePatch {
+    guard let diffArtifactID = prepared.artifactID else {
+      throw HarnessRepairPortError.malformedReadback("candidatePatch.diffArtifactId")
+    }
+    let candidate = HarnessCandidatePatch.create(
+      proposal: proposal, diffArtifactID: diffArtifactID,
+      htaskID: task.htaskID, attemptID: attemptID,
+      createdBy: createdBy, createdAtUTC: createdAtUTC)
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+    let bytes = try encoder.encode(candidate)
+    let metadata = try await artifacts.publish(
+      RuntimeArtifactPublicationRequest(
+        jobID: "hcandidate-\(attemptID.lowercased())", sessionID: task.htaskID,
+        stepID: "candidate-patch", name: "candidate-patch.json",
+        mediaType: "application/json", privacy: .standard,
+        retentionClass: .pinnedUntilVerified,
+        sourceOperation: "harness.candidate-patch@1", providerID: "harness",
+        bindingSnapshot: ArtifactBindingSnapshot(
+          targetID: task.target.targetID, bindingRevision: nil,
+          stableIdentitySHA256: nil),
+        contents: bytes))
+    return candidate.recordingMetadataArtifact(metadata.artifactID)
   }
 
   public func appliedPatchReadback(
@@ -109,7 +168,9 @@ public struct WorkspaceHarnessRepairPort: HarnessRepairPort {
       stage: "patchBaseRevision", expected: proposal.baseWorkspaceRevision,
       actual: previousRevision)
     let durable = try attempts.load(reference)
-    let patchRevision = WorkspaceProviderSupport.revision(durable.after)
+    let patchRevision =
+      durable.workspaceRevisionAfter
+      ?? WorkspaceProviderSupport.revision(durable.after)
     try HarnessRepairStageGate.requireEqual(
       stage: "appliedPatchRevision", expected: patchRevision, actual: reportedRevision)
     guard Set(durable.after.map(\.relativePath)) == Set(proposal.touchedFiles),
@@ -132,9 +193,21 @@ public struct WorkspaceHarnessRepairPort: HarnessRepairPort {
     guard let patchRevision = attempt.patchRevision else {
       throw HarnessRepairPortError.malformedReadback("missingPatchRevision")
     }
-    let current = try WorkspaceProviderSupport.snapshots(
-      relativePaths: attempt.proposal.touchedFiles, root: profile.projectRoot)
-    let sourceRevision = WorkspaceProviderSupport.revision(current)
+    guard let projectRef = task.executionProjectRef,
+      let profile = profileRegistry.profile(for: projectRef)
+    else {
+      throw HarnessRepairPortError.proposalRejected("projectProfileMismatch")
+    }
+    let sourceRevision: String
+    if profile.kind == .evolution {
+      sourceRevision = try WorkspaceProviderSupport.workspaceRevision(
+        root: profile.projectRoot, profileVersion: profile.profileID,
+        globs: profile.allowedFileGlobs)
+    } else {
+      let current = try WorkspaceProviderSupport.snapshots(
+        relativePaths: attempt.proposal.touchedFiles, root: profile.projectRoot)
+      sourceRevision = WorkspaceProviderSupport.revision(current)
+    }
     try HarnessRepairStageGate.requireEqual(
       stage: "buildSourceRevision", expected: patchRevision, actual: sourceRevision)
     guard let relativeProduct = profile.buildProducts[buildPresetRef] else {
@@ -144,13 +217,15 @@ public struct WorkspaceHarnessRepairPort: HarnessRepairPort {
     // patching before the product bytes are opened.
     _ = try WorkspaceProviderSupport.snapshots(
       relativePaths: [relativeProduct], root: profile.projectRoot)
-    let productURL = URL(fileURLWithPath: profile.projectRoot).appendingPathComponent(relativeProduct)
+    let productURL = URL(fileURLWithPath: profile.projectRoot).appendingPathComponent(
+      relativeProduct)
     guard FileManager.default.fileExists(atPath: productURL.path) else {
       throw HarnessRepairPortError.missingBuildProduct(relativeProduct)
     }
     let bytes = try Data(contentsOf: productURL)
-    guard case .string(let baselineLease)? = task.goal.desiredState[
-      "baselineHapArtifactLease"]
+    guard
+      case .string(let baselineLease)? = task.goal.desiredState[
+        "baselineHapArtifactLease"]
     else {
       throw HarnessRepairPortError.malformedReadback("baselineHapArtifactLease")
     }
@@ -201,9 +276,23 @@ public struct WorkspaceHarnessRepairPort: HarnessRepairPort {
     if let applied = try? await appliedPatchReadback(jobID: jobID, proposal: proposal) {
       return .patchApplied(applied)
     }
-    let current = try WorkspaceProviderSupport.snapshots(
-      relativePaths: proposal.touchedFiles, root: profile.projectRoot)
-    let revision = WorkspaceProviderSupport.revision(current)
+    let fields = try await readJSONArtifact(named: "applied-patch.json", jobID: jobID)
+    guard case .string(let reference)? = fields["patchAttemptRef"] else {
+      return .stillUnknown
+    }
+    let durable = try attempts.load(reference)
+    let revision: String
+    if let profile = profileRegistry.profile(for: durable.projectRef),
+      profile.kind == .evolution
+    {
+      revision = try WorkspaceProviderSupport.workspaceRevision(
+        root: profile.projectRoot, profileVersion: profile.profileID,
+        globs: profile.allowedFileGlobs)
+    } else {
+      let current = try WorkspaceProviderSupport.snapshots(
+        relativePaths: proposal.touchedFiles, root: durable.projectRoot)
+      revision = WorkspaceProviderSupport.revision(current)
+    }
     if revision == proposal.baseWorkspaceRevision { return .patchNotApplied }
     // Some bytes changed, but there is no exact durable provider postimage.
     // That is not success and not permission to run the patch again.

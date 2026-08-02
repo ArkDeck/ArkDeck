@@ -606,7 +606,6 @@ public struct HarnessTaskProjection: Equatable, Sendable, Codable {
 
   public var lifecycle: HarnessTaskLifecycle { status }
   public var stage: HarnessTaskStage { phase }
-
   enum CodingKeys: String, CodingKey {
     case lifecycle
     case stage
@@ -644,7 +643,8 @@ public struct HarnessTaskProjection: Equatable, Sendable, Codable {
   ) {
     self.status = status
     self.phase = phase
-    self.waitReason = status == .waiting
+    self.waitReason =
+      status == .waiting
       ? (waitReason ?? (activeJobID == nil ? .userSuspended : .activeJob)) : nil
     self.conditions = HarnessTaskConditionSet.normalized(conditions)
     self.activeRound = activeRound
@@ -679,7 +679,8 @@ public struct HarnessTaskProjection: Equatable, Sendable, Codable {
         forKey: .lifecycle, in: container,
         debugDescription: "unknown lifecycle \(lifecycleRaw)")
     }
-    let decodedLifecycle = legacyPaused
+    let decodedLifecycle =
+      legacyPaused
       ? HarnessTaskLifecycle.waiting : HarnessTaskLifecycle(rawValue: lifecycleRaw)!
     let stageRaw =
       try container.decodeIfPresent(String.self, forKey: .stage)
@@ -918,14 +919,18 @@ public struct HarnessTaskEvent: Equatable, Sendable, Codable {
       HarnessTaskLifecycle.self, forKey: .toStatus)
     let legacyFromStage = try container.decode(HarnessTaskStage.self, forKey: .fromPhase)
     let legacyToStage = try container.decode(HarnessTaskStage.self, forKey: .toPhase)
-    self.fromStatus = try container.decodeIfPresent(
-      HarnessTaskLifecycle.self, forKey: .fromLifecycle) ?? legacyFromLifecycle
-    self.toStatus = try container.decodeIfPresent(
-      HarnessTaskLifecycle.self, forKey: .toLifecycle) ?? legacyToLifecycle
-    self.fromPhase = try container.decodeIfPresent(
-      HarnessTaskStage.self, forKey: .fromStage) ?? legacyFromStage
-    self.toPhase = try container.decodeIfPresent(
-      HarnessTaskStage.self, forKey: .toStage) ?? legacyToStage
+    self.fromStatus =
+      try container.decodeIfPresent(
+        HarnessTaskLifecycle.self, forKey: .fromLifecycle) ?? legacyFromLifecycle
+    self.toStatus =
+      try container.decodeIfPresent(
+        HarnessTaskLifecycle.self, forKey: .toLifecycle) ?? legacyToLifecycle
+    self.fromPhase =
+      try container.decodeIfPresent(
+        HarnessTaskStage.self, forKey: .fromStage) ?? legacyFromStage
+    self.toPhase =
+      try container.decodeIfPresent(
+        HarnessTaskStage.self, forKey: .toStage) ?? legacyToStage
     guard fromStatus == legacyFromLifecycle, toStatus == legacyToLifecycle,
       fromPhase == legacyFromStage, toPhase == legacyToStage
     else {
@@ -963,7 +968,7 @@ public struct HarnessTaskEvent: Equatable, Sendable, Codable {
 
 public struct HarnessTaskSnapshot: Equatable, Sendable, Codable {
   public static let documentType = "harness-task"
-  public static let schemaVersion = "2.0.0"
+  public static let schemaVersion = "3.0.0"
 
   public let documentType: String
   public let schemaVersion: String
@@ -978,6 +983,9 @@ public struct HarnessTaskSnapshot: Equatable, Sendable, Codable {
   public let successCriteria: [HarnessSuccessCriterion]
   public let budgets: HarnessTaskBudgets
   public let policy: HarnessTaskPolicy
+  public let executionMode: HarnessExecutionMode
+  public let evolutionPolicy: HarnessEvolutionPolicy?
+  public let evolutionWorkspace: HarnessEvolutionWorkspace?
   public let observedState: [String: JSONValue]
   public let createdAtUTC: String
   public let updatedAtUTC: String
@@ -1007,6 +1015,9 @@ public struct HarnessTaskSnapshot: Equatable, Sendable, Codable {
     case successCriteria
     case budgets
     case policy
+    case executionMode
+    case evolutionPolicy
+    case evolutionWorkspace
     case observedState
     case createdAtUTC = "createdAtUtc"
     case updatedAtUTC = "updatedAtUtc"
@@ -1037,6 +1048,9 @@ public struct HarnessTaskSnapshot: Equatable, Sendable, Codable {
     successCriteria: [HarnessSuccessCriterion],
     budgets: HarnessTaskBudgets,
     policy: HarnessTaskPolicy,
+    executionMode: HarnessExecutionMode = .normal,
+    evolutionPolicy: HarnessEvolutionPolicy? = nil,
+    evolutionWorkspace: HarnessEvolutionWorkspace? = nil,
     observedState: [String: JSONValue] = [:],
     createdAtUTC: String,
     updatedAtUTC: String,
@@ -1065,12 +1079,16 @@ public struct HarnessTaskSnapshot: Equatable, Sendable, Codable {
     self.successCriteria = successCriteria
     self.budgets = budgets
     self.policy = policy
+    self.executionMode = executionMode
+    self.evolutionPolicy = evolutionPolicy
+    self.evolutionWorkspace = evolutionWorkspace
     self.observedState = observedState
     self.createdAtUTC = createdAtUTC
     self.updatedAtUTC = updatedAtUTC
     self.status = status
     self.phase = phase
-    self.waitReason = status == .waiting
+    self.waitReason =
+      status == .waiting
       ? (waitReason ?? (activeJobID == nil ? .userSuspended : .activeJob)) : nil
     self.conditions = HarnessTaskConditionSet.normalized(conditions)
     self.activeRound = activeRound
@@ -1101,6 +1119,13 @@ public struct HarnessTaskSnapshot: Equatable, Sendable, Codable {
       try container.decodeIfPresent([HarnessSuccessCriterion].self, forKey: .successCriteria) ?? []
     self.budgets = try container.decode(HarnessTaskBudgets.self, forKey: .budgets)
     self.policy = try container.decode(HarnessTaskPolicy.self, forKey: .policy)
+    self.executionMode =
+      try container.decodeIfPresent(
+        HarnessExecutionMode.self, forKey: .executionMode) ?? .normal
+    self.evolutionPolicy = try container.decodeIfPresent(
+      HarnessEvolutionPolicy.self, forKey: .evolutionPolicy)
+    self.evolutionWorkspace = try container.decodeIfPresent(
+      HarnessEvolutionWorkspace.self, forKey: .evolutionWorkspace)
     self.observedState =
       try container.decodeIfPresent([String: JSONValue].self, forKey: .observedState) ?? [:]
     self.createdAtUTC = try container.decode(String.self, forKey: .createdAtUTC)
@@ -1124,7 +1149,8 @@ public struct HarnessTaskSnapshot: Equatable, Sendable, Codable {
         forKey: .lifecycle, in: container,
         debugDescription: "unknown lifecycle \(lifecycleRaw)")
     }
-    let decodedLifecycle = legacyPaused
+    let decodedLifecycle =
+      legacyPaused
       ? HarnessTaskLifecycle.waiting : HarnessTaskLifecycle(rawValue: lifecycleRaw)!
     let stageRaw =
       try container.decodeIfPresent(String.self, forKey: .stage)
@@ -1180,10 +1206,12 @@ public struct HarnessTaskSnapshot: Equatable, Sendable, Codable {
     self.artifactRefs = try container.decodeIfPresent([String].self, forKey: .artifactRefs) ?? []
     self.latestEvaluationID = try container.decodeIfPresent(
       String.self, forKey: .latestEvaluationID)
-    self.noProgressRounds = try container.decodeIfPresent(
-      Int.self, forKey: .noProgressRounds) ?? 0
-    self.cancelRequested = try container.decodeIfPresent(
-      Bool.self, forKey: .cancelRequested) ?? false
+    self.noProgressRounds =
+      try container.decodeIfPresent(
+        Int.self, forKey: .noProgressRounds) ?? 0
+    self.cancelRequested =
+      try container.decodeIfPresent(
+        Bool.self, forKey: .cancelRequested) ?? false
     self.result = try container.decodeIfPresent(HarnessTaskResult.self, forKey: .result)
     self.version = try container.decode(Int.self, forKey: .version)
   }
@@ -1201,6 +1229,9 @@ public struct HarnessTaskSnapshot: Equatable, Sendable, Codable {
     try container.encode(successCriteria, forKey: .successCriteria)
     try container.encode(budgets, forKey: .budgets)
     try container.encode(policy, forKey: .policy)
+    try container.encode(executionMode, forKey: .executionMode)
+    try container.encodeIfPresent(evolutionPolicy, forKey: .evolutionPolicy)
+    try container.encodeIfPresent(evolutionWorkspace, forKey: .evolutionWorkspace)
     try container.encode(observedState, forKey: .observedState)
     try container.encode(createdAtUTC, forKey: .createdAtUTC)
     try container.encode(updatedAtUTC, forKey: .updatedAtUTC)
@@ -1223,6 +1254,11 @@ public struct HarnessTaskSnapshot: Equatable, Sendable, Codable {
 
   public var lifecycle: HarnessTaskLifecycle { status }
   public var stage: HarnessTaskStage { phase }
+  /// Source project identity remains stable for memory/egress. Typed
+  /// workspace operations use the isolated provider reference in Evolution.
+  public var executionProjectRef: String? {
+    evolutionWorkspace?.projectRef ?? projectRef
+  }
 
   public func condition(_ name: HarnessTaskConditionName) -> HarnessTaskCondition {
     HarnessTaskConditionSet.value(name, in: conditions)
@@ -1249,7 +1285,9 @@ public struct HarnessTaskSnapshot: Equatable, Sendable, Codable {
     HarnessTaskSnapshot(
       htaskID: htaskID, type: type, intakeDescription: intakeDescription,
       projectRef: projectRef, target: target, goal: goal, successCriteria: successCriteria,
-      budgets: budgets, policy: policy, observedState: projection.observedState,
+      budgets: budgets, policy: policy, executionMode: executionMode,
+      evolutionPolicy: evolutionPolicy, evolutionWorkspace: evolutionWorkspace,
+      observedState: projection.observedState,
       createdAtUTC: createdAtUTC, updatedAtUTC: atUTC, status: projection.status,
       phase: projection.phase, activeRound: projection.activeRound,
       activeJobID: projection.activeJobID, consumedBudget: projection.consumedBudget,
@@ -1267,7 +1305,9 @@ public struct HarnessTaskSnapshot: Equatable, Sendable, Codable {
     HarnessTaskSnapshot(
       htaskID: htaskID, type: type, intakeDescription: intakeDescription,
       projectRef: projectRef, target: target, goal: goal, successCriteria: successCriteria,
-      budgets: budgets, policy: policy, observedState: observedState,
+      budgets: budgets, policy: policy, executionMode: executionMode,
+      evolutionPolicy: evolutionPolicy, evolutionWorkspace: evolutionWorkspace,
+      observedState: observedState,
       createdAtUTC: createdAtUTC, updatedAtUTC: updatedAtUTC, status: status,
       phase: phase, activeRound: activeRound, activeJobID: activeJobID,
       consumedBudget: consumedBudget, artifactRefs: artifactRefs,
@@ -1279,7 +1319,8 @@ public struct HarnessTaskSnapshot: Equatable, Sendable, Codable {
 
 public enum HarnessTaskTransitionError: Error, Equatable, Sendable {
   case terminal(HarnessTaskStatus)
-  case illegalStatus(from: HarnessTaskStatus, to: HarnessTaskStatus, causation: HarnessTaskCausation)
+  case illegalStatus(
+    from: HarnessTaskStatus, to: HarnessTaskStatus, causation: HarnessTaskCausation)
   case illegalPhase(from: HarnessTaskPhase, to: HarnessTaskPhase)
   case phaseChangeOutsideRunning(HarnessTaskStatus)
   case dispatchRequiresRunning(HarnessTaskStatus)
@@ -1495,7 +1536,8 @@ public enum HarnessTaskStateReducer {
     }
     if transition.status == .succeeded {
       let actual = HarnessTaskConditionSet.value(
-        .criteriaSatisfied, in: transition.conditions).state
+        .criteriaSatisfied, in: transition.conditions
+      ).state
       guard actual == .trueValue else {
         throw HarnessTaskTransitionError.successRequiresCriteriaSatisfied(actual)
       }

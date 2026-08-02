@@ -366,6 +366,57 @@ package struct HarnessTaskMethodService: Sendable {
     if let projectRef = text("projectRef"), !isWireIdentifier(projectRef) {
       throw HarnessTaskSubmissionError.malformedDesiredState("projectRef")
     }
+    let executionMode: HarnessExecutionMode
+    switch (text("executionMode") ?? HarnessExecutionMode.normal.rawValue).lowercased() {
+    case HarnessExecutionMode.normal.rawValue:
+      executionMode = .normal
+    case HarnessExecutionMode.evolution.rawValue:
+      executionMode = .evolution
+    default:
+      throw HarnessTaskSubmissionError.malformedEvolutionPolicy("executionMode")
+    }
+    let evolutionPolicy: HarnessEvolutionPolicy?
+    if executionMode == .evolution {
+      guard let baseRevision = text("baseWorkspaceRevision") else {
+        throw HarnessTaskSubmissionError.malformedEvolutionPolicy("baseRevision")
+      }
+      guard case .array(let pathValues)? = params?["allowedPaths"] else {
+        throw HarnessTaskSubmissionError.malformedEvolutionPolicy("allowedPaths")
+      }
+      let paths = pathValues.compactMap { value -> String? in
+        guard case .string(let path) = value else { return nil }
+        return path
+      }
+      guard paths.count == pathValues.count else {
+        throw HarnessTaskSubmissionError.malformedEvolutionPolicy("allowedPaths")
+      }
+      let evolutionOperations: [String]
+      if case .array(let values)? = params?["evolutionAllowedOperations"] {
+        evolutionOperations = values.compactMap { value in
+          guard case .string(let operation) = value else { return nil }
+          return operation
+        }
+        guard evolutionOperations.count == values.count else {
+          throw HarnessTaskSubmissionError.malformedEvolutionPolicy(
+            "evolutionAllowedOperations")
+        }
+      } else {
+        evolutionOperations = policy.allowedOperations
+      }
+      do {
+        evolutionPolicy = try HarnessEvolutionPolicy(
+          baseRevision: baseRevision,
+          allowedPaths: paths,
+          maxAttempts: integer("maxAttempts") ?? 20,
+          maxChangedFiles: integer("maxChangedFiles") ?? 20,
+          maxDiffLines: integer("maxDiffLines") ?? 2_000,
+          allowedOperations: evolutionOperations)
+      } catch {
+        throw HarnessTaskSubmissionError.malformedEvolutionPolicy("\(error)")
+      }
+    } else {
+      evolutionPolicy = nil
+    }
     return HarnessTaskSubmission(
       type: type,
       intakeDescription: text("intake"),
@@ -374,7 +425,9 @@ package struct HarnessTaskMethodService: Sendable {
         targetID: targetID, expectedBindingRevision: integer("expectedBindingRevision")),
       goal: HarnessTaskGoal(summary: goal, desiredState: desiredState),
       budgets: budgets,
-      policy: policy)
+      policy: policy,
+      executionMode: executionMode,
+      evolutionPolicy: evolutionPolicy)
   }
 
   private static func isWireIdentifier(_ value: String) -> Bool {
@@ -405,6 +458,9 @@ package struct HarnessTaskMethodService: Sendable {
       "targetId": .string(snapshot.target.targetID),
       "goal": .string(snapshot.goal.summary),
       "projectRef": snapshot.projectRef.map(JSONValue.string) ?? .null,
+      "executionMode": .string(snapshot.executionMode.rawValue),
+      "evolutionPolicy": snapshot.evolutionPolicy.map(encode) ?? .null,
+      "evolutionWorkspace": snapshot.evolutionWorkspace.map(encode) ?? .null,
       "desiredState": .object(snapshot.goal.desiredState),
       "activeRound": .integer(Int64(snapshot.activeRound)),
       "activeJobId": snapshot.activeJobID.map(JSONValue.string) ?? .null,

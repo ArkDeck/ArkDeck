@@ -55,9 +55,10 @@ public struct WorkspaceCommandPreset: Sendable, Equatable {
     guard (1...7_200).contains(timeoutSeconds) else {
       throw DeviceProviderError.factsUnavailable("workspace preset timeout is outside 1...7200")
     }
-    guard argumentZero.map({
-      !$0.isEmpty && !$0.contains("\0") && $0.utf8.count <= 4_096
-    }) ?? true,
+    guard
+      argumentZero.map({
+        !$0.isEmpty && !$0.contains("\0") && $0.utf8.count <= 4_096
+      }) ?? true,
       fixedArguments.count <= 128,
       fixedArguments.allSatisfy({
         !$0.contains("\0") && $0.utf8.count <= 4_096
@@ -71,6 +72,11 @@ public struct WorkspaceCommandPreset: Sendable, Equatable {
     self.fixedArguments = fixedArguments
     self.timeoutSeconds = timeoutSeconds
   }
+}
+
+public enum WorkspaceProjectProfileKind: String, Sendable, Equatable {
+  case primary
+  case evolution
 }
 
 public struct WorkspaceProjectProfile: Sendable, Equatable {
@@ -98,6 +104,7 @@ public struct WorkspaceProjectProfile: Sendable, Equatable {
   /// back after a successful build.  The path belongs to repository-managed
   /// configuration, never to a model proposal or task input.
   public let buildProducts: [String: String]
+  public let kind: WorkspaceProjectProfileKind
 
   public init(
     profileID: String,
@@ -112,7 +119,8 @@ public struct WorkspaceProjectProfile: Sendable, Equatable {
     buildPresets: [String: WorkspaceCommandPreset],
     testPresets: [String: WorkspaceCommandPreset],
     symbolPresets: [String: WorkspaceCommandPreset],
-    buildProducts: [String: String] = [:]
+    buildProducts: [String: String] = [:],
+    kind: WorkspaceProjectProfileKind = .primary
   ) throws {
     let canonical = URL(fileURLWithPath: projectRoot)
       .resolvingSymlinksInPath().standardizedFileURL.path
@@ -150,6 +158,7 @@ public struct WorkspaceProjectProfile: Sendable, Equatable {
     self.testPresets = testPresets
     self.symbolPresets = symbolPresets
     self.buildProducts = buildProducts
+    self.kind = kind
   }
 
   /// Built-in profile for this repository. An explicit root override is
@@ -173,9 +182,11 @@ public struct WorkspaceProjectProfile: Sendable, Equatable {
         + "XcodeDefault.xctoolchain/usr/bin/swift-package",
       "/Library/Developer/CommandLineTools/usr/bin/swift-package",
     ]
-    guard let swiftPackagePath = swiftPackagePaths.first(where: {
-      FileManager.default.isExecutableFile(atPath: $0)
-    }) else {
+    guard
+      let swiftPackagePath = swiftPackagePaths.first(where: {
+        FileManager.default.isExecutableFile(atPath: $0)
+      })
+    else {
       throw DeviceProviderError.factsUnavailable(
         "workspace.toolchainUnavailable: no fixed SwiftPM executable exists")
     }
@@ -197,9 +208,10 @@ public struct WorkspaceProjectProfile: Sendable, Equatable {
       fixedArguments: [], timeoutSeconds: 120)
     let packagePath = URL(fileURLWithPath: root)
       .appendingPathComponent("Packages/ArkDeckKit").path
-    guard FileManager.default.fileExists(
-      atPath: URL(fileURLWithPath: packagePath)
-        .appendingPathComponent("Package.swift").path)
+    guard
+      FileManager.default.fileExists(
+        atPath: URL(fileURLWithPath: packagePath)
+          .appendingPathComponent("Package.swift").path)
     else {
       throw DeviceProviderError.factsUnavailable(
         "workspace.projectProfileUnavailable: ArkDeck Package.swift is absent")
@@ -327,6 +339,54 @@ public struct WorkspaceProjectProfile: Sendable, Equatable {
   }
 }
 
+/// Thread-safe project identity registry shared by the existing Workspace
+/// provider and repair adapter. Evolution registers isolated profiles here;
+/// it does not create another provider, engine or daemon.
+public final class WorkspaceProjectProfileRegistry: @unchecked Sendable {
+  private let lock = NSLock()
+  private var profilesByRef: [String: WorkspaceProjectProfile]
+
+  public init(profiles: [WorkspaceProjectProfile]) throws {
+    guard !profiles.isEmpty else {
+      throw DeviceProviderError.factsUnavailable("workspace profile registry is empty")
+    }
+    var indexed: [String: WorkspaceProjectProfile] = [:]
+    for profile in profiles {
+      guard indexed[profile.projectRef] == nil else {
+        throw DeviceProviderError.factsUnavailable(
+          "duplicate workspace projectRef \(profile.projectRef)")
+      }
+      indexed[profile.projectRef] = profile
+    }
+    self.profilesByRef = indexed
+  }
+
+  public convenience init(profile: WorkspaceProjectProfile) {
+    try! self.init(profiles: [profile])
+  }
+
+  public func profile(for projectRef: String) -> WorkspaceProjectProfile? {
+    lock.withLock { profilesByRef[projectRef] }
+  }
+
+  public func register(_ profile: WorkspaceProjectProfile) throws {
+    try lock.withLock {
+      if let existing = profilesByRef[profile.projectRef] {
+        guard existing == profile else {
+          throw DeviceProviderError.factsUnavailable(
+            "workspace projectRef already resolves to another profile")
+        }
+        return
+      }
+      profilesByRef[profile.projectRef] = profile
+    }
+  }
+
+  public func profiles() -> [WorkspaceProjectProfile] {
+    lock.withLock { profilesByRef.values.sorted { $0.projectRef < $1.projectRef } }
+  }
+}
+
 public struct UnavailableWorkspaceOperationsProvider: DeviceProvider {
   public let providerID = "workspace"
   private let reason: String
@@ -400,6 +460,29 @@ public struct WorkspacePatchIntent: Sendable, Equatable, Codable {
   public let patchSHA256: String
   public let allowedFileGlobs: [String]
   public let before: [WorkspaceFileSnapshot]
+  /// Evolution binds the patch to the complete policy-scoped tree rather
+  /// than only the files the diff happens to touch.
+  public let previousWorkspaceRevision: String?
+
+  public init(
+    invocation: WorkspaceResolvedInvocation,
+    patchAttemptRef: String,
+    patchArtifactID: String,
+    patchFilePath: String,
+    patchSHA256: String,
+    allowedFileGlobs: [String],
+    before: [WorkspaceFileSnapshot],
+    previousWorkspaceRevision: String? = nil
+  ) {
+    self.invocation = invocation
+    self.patchAttemptRef = patchAttemptRef
+    self.patchArtifactID = patchArtifactID
+    self.patchFilePath = patchFilePath
+    self.patchSHA256 = patchSHA256
+    self.allowedFileGlobs = allowedFileGlobs
+    self.before = before
+    self.previousWorkspaceRevision = previousWorkspaceRevision
+  }
 }
 
 public struct WorkspaceArchiveCheckpointIntent: Sendable, Equatable, Codable {
@@ -430,6 +513,8 @@ public struct WorkspacePatchAttempt: Sendable, Equatable, Codable {
   public let allowedFileGlobs: [String]
   public let before: [WorkspaceFileSnapshot]
   public let after: [WorkspaceFileSnapshot]
+  public let workspaceRevisionBefore: String?
+  public let workspaceRevisionAfter: String?
   public let appliedAtUTC: String
   public let revertedAtUTC: String?
 
@@ -439,6 +524,8 @@ public struct WorkspacePatchAttempt: Sendable, Equatable, Codable {
       projectRoot: projectRoot, patchArtifactID: patchArtifactID,
       patchFilePath: patchFilePath, patchSHA256: patchSHA256,
       allowedFileGlobs: allowedFileGlobs, before: before, after: after,
+      workspaceRevisionBefore: workspaceRevisionBefore,
+      workspaceRevisionAfter: workspaceRevisionAfter,
       appliedAtUTC: appliedAtUTC, revertedAtUTC: atUTC)
   }
 }
@@ -650,6 +737,7 @@ public struct CombinedWorkspaceExecutableResolver: RuntimeExecutableResolving {
 public struct WorkspaceOperationsProvider: DeviceProvider {
   public let providerID = "workspace"
   private let profile: WorkspaceProjectProfile
+  private let profileRegistry: WorkspaceProjectProfileRegistry
   private let attempts: WorkspacePatchAttemptStore
   private let nowUTC: @Sendable () -> String
 
@@ -659,6 +747,19 @@ public struct WorkspaceOperationsProvider: DeviceProvider {
     nowUTC: @escaping @Sendable () -> String
   ) {
     self.profile = profile
+    self.profileRegistry = WorkspaceProjectProfileRegistry(profile: profile)
+    self.attempts = attemptStore
+    self.nowUTC = nowUTC
+  }
+
+  public init(
+    profile: WorkspaceProjectProfile,
+    profileRegistry: WorkspaceProjectProfileRegistry,
+    attemptStore: WorkspacePatchAttemptStore,
+    nowUTC: @escaping @Sendable () -> String
+  ) {
+    self.profile = profile
+    self.profileRegistry = profileRegistry
     self.attempts = attemptStore
     self.nowUTC = nowUTC
   }
@@ -718,6 +819,18 @@ public struct WorkspaceOperationsProvider: DeviceProvider {
     inputs: [String: JSONValue]
   ) throws -> WorkspaceAuthorizationFacts? {
     guard operation.provider == .workspace else { return nil }
+    if case .string(let requestedRef)? = inputs["projectRef"],
+      requestedRef != profile.projectRef
+    {
+      guard let selected = profileRegistry.profile(for: requestedRef) else {
+        throw DeviceProviderError.factsUnavailable(
+          "workspace.projectProfileUnavailable:\(requestedRef)")
+      }
+      return try WorkspaceOperationsProvider(
+        profile: selected, profileRegistry: profileRegistry,
+        attemptStore: attempts, nowUTC: nowUTC
+      ).workspaceAuthorizationFacts(for: operation, inputs: inputs)
+    }
     return WorkspaceAuthorizationFacts(
       identitySHA256: WorkspaceProviderSupport.workspaceIdentity(
         root: profile.projectRoot, profileID: profile.profileID),
@@ -744,6 +857,16 @@ public struct WorkspaceOperationsProvider: DeviceProvider {
     context: ProviderExecutionContext
   ) throws -> TypedProviderAction {
     let projectRef = try string("projectRef", in: inputs)
+    if projectRef != profile.projectRef {
+      guard let selected = profileRegistry.profile(for: projectRef) else {
+        throw DeviceProviderError.unsupportedAction(
+          "workspace.projectProfileUnavailable:\(projectRef)")
+      }
+      return try WorkspaceOperationsProvider(
+        profile: selected, profileRegistry: profileRegistry,
+        attemptStore: attempts, nowUTC: nowUTC
+      ).action(for: step, operation: operation, inputs: inputs, context: context)
+    }
     guard projectRef == profile.projectRef else {
       throw DeviceProviderError.unsupportedAction(
         "workspace.projectProfileUnavailable:\(projectRef)")
@@ -811,7 +934,9 @@ public struct WorkspaceOperationsProvider: DeviceProvider {
             patchArtifactID: artifact.artifactID,
             patchFilePath: artifact.fileURL.path,
             patchSHA256: artifact.sha256, allowedFileGlobs: requestGlobs,
-            before: before)))
+            before: before,
+            previousWorkspaceRevision: profile.kind == .evolution
+              ? try string("expectedWorkspaceRevision", in: inputs) : nil)))
 
     case ("workspace.build-openharmony@1", .buildWorkspaceOpenHarmony):
       let presetID = try string("buildPresetRef", in: inputs)
@@ -987,6 +1112,19 @@ public struct WorkspaceOperationsProvider: DeviceProvider {
     action: TypedProviderAction,
     context: ProviderExecutionContext
   ) throws -> TypedProcessPlan {
+    if case .workspace(let workspace) = action,
+      let invocation = workspace.operationInvocation,
+      invocation.projectRef != profile.projectRef
+    {
+      guard let selected = profileRegistry.profile(for: invocation.projectRef) else {
+        throw DeviceProviderError.unsupportedAction(
+          "workspace.projectProfileUnavailable:\(invocation.projectRef)")
+      }
+      return try WorkspaceOperationsProvider(
+        profile: selected, profileRegistry: profileRegistry,
+        attemptStore: attempts, nowUTC: nowUTC
+      ).lower(action: action, context: context)
+    }
     guard case .workspace(let workspace) = action,
       let invocation = workspace.operationInvocation,
       profile.executableIdentities.contains(invocation.executable)
@@ -1028,6 +1166,19 @@ public struct WorkspaceOperationsProvider: DeviceProvider {
     action: TypedProviderAction,
     context: ProviderExecutionContext
   ) throws -> ProviderSemanticOutcome {
+    if case .workspace(let workspace) = action,
+      let invocation = workspace.operationInvocation,
+      invocation.projectRef != profile.projectRef
+    {
+      guard let selected = profileRegistry.profile(for: invocation.projectRef) else {
+        return .unsupported(
+          reason: "workspace.projectProfileUnavailable:\(invocation.projectRef)")
+      }
+      return try WorkspaceOperationsProvider(
+        profile: selected, profileRegistry: profileRegistry,
+        attemptStore: attempts, nowUTC: nowUTC
+      ).verify(receipt: receipt, action: action, context: context)
+    }
     guard case .workspace(let workspace) = action else {
       return .unsupported(reason: "workspace provider received a foreign action")
     }
@@ -1146,6 +1297,12 @@ public struct WorkspaceOperationsProvider: DeviceProvider {
         reference: intent.patchAttemptRef,
         sourceURL: URL(fileURLWithPath: intent.patchFilePath),
         expectedSHA256: intent.patchSHA256)
+      let workspaceRevisionAfter =
+        profile.kind == .evolution
+        ? try WorkspaceProviderSupport.workspaceRevision(
+          root: profile.projectRoot, profileVersion: profile.profileID,
+          globs: profile.allowedFileGlobs)
+        : nil
       let attempt = WorkspacePatchAttempt(
         patchAttemptRef: intent.patchAttemptRef,
         projectRef: profile.projectRef, projectRoot: profile.projectRoot,
@@ -1153,12 +1310,18 @@ public struct WorkspaceOperationsProvider: DeviceProvider {
         patchFilePath: durablePatchPath, patchSHA256: intent.patchSHA256,
         allowedFileGlobs: intent.allowedFileGlobs,
         before: intent.before, after: after,
+        workspaceRevisionBefore: intent.previousWorkspaceRevision,
+        workspaceRevisionAfter: workspaceRevisionAfter,
         appliedAtUTC: context.nowUTC, revertedAtUTC: nil)
       try attempts.save(attempt)
       var summary = outputSummary(receipt)
       summary["patchAttemptRef"] = intent.patchAttemptRef
-      summary["workspaceRevision"] = WorkspaceProviderSupport.revision(after)
-      summary["previousWorkspaceRevision"] = WorkspaceProviderSupport.revision(intent.before)
+      summary["workspaceRevision"] =
+        workspaceRevisionAfter
+        ?? WorkspaceProviderSupport.revision(after)
+      summary["previousWorkspaceRevision"] =
+        intent.previousWorkspaceRevision
+        ?? WorkspaceProviderSupport.revision(intent.before)
       summary["touchedFiles"] = after.map(\.relativePath).joined(separator: ",")
       return .verified(summary: summary)
     case .revertPatch(let intent):
@@ -1176,7 +1339,9 @@ public struct WorkspaceOperationsProvider: DeviceProvider {
       try attempts.save(intent.attempt.markingReverted(atUTC: context.nowUTC))
       var summary = outputSummary(receipt)
       summary["patchAttemptRef"] = intent.attempt.patchAttemptRef
-      summary["workspaceRevision"] = WorkspaceProviderSupport.revision(intent.attempt.before)
+      summary["workspaceRevision"] =
+        intent.attempt.workspaceRevisionBefore
+        ?? WorkspaceProviderSupport.revision(intent.attempt.before)
       return .verified(summary: summary)
     }
   }
@@ -1185,6 +1350,19 @@ public struct WorkspaceOperationsProvider: DeviceProvider {
     intent: ProviderDurableIntentReference,
     context: ProviderExecutionContext
   ) async throws -> ProviderReconcileOutcome {
+    if case .workspace(let workspace) = intent.action,
+      let invocation = workspace.operationInvocation,
+      invocation.projectRef != profile.projectRef
+    {
+      guard let selected = profileRegistry.profile(for: invocation.projectRef) else {
+        return .stillUnknown(
+          reason: "workspace.projectProfileUnavailable:\(invocation.projectRef)")
+      }
+      return try await WorkspaceOperationsProvider(
+        profile: selected, profileRegistry: profileRegistry,
+        attemptStore: attempts, nowUTC: nowUTC
+      ).reconcile(intent: intent, context: context)
+    }
     guard case .workspace(let workspace) = intent.action else {
       return .stillUnknown(reason: "workspace reconcile received a foreign action")
     }
@@ -1372,8 +1550,9 @@ enum WorkspaceProviderSupport {
   /// directly; a symbolic HEAD points at a ref file, and a packed ref is
   /// resolved from `packed-refs`.
   private static func headOID(gitDirectory: URL) -> String? {
-    guard let head = try? String(
-      contentsOf: gitDirectory.appendingPathComponent("HEAD"), encoding: .utf8)
+    guard
+      let head = try? String(
+        contentsOf: gitDirectory.appendingPathComponent("HEAD"), encoding: .utf8)
     else { return nil }
     let trimmed = head.trimmingCharacters(in: .whitespacesAndNewlines)
     guard trimmed.hasPrefix("ref: ") else {
@@ -1381,12 +1560,14 @@ enum WorkspaceProviderSupport {
     }
     let ref = String(trimmed.dropFirst("ref: ".count))
     if let loose = try? String(
-      contentsOf: gitDirectory.appendingPathComponent(ref), encoding: .utf8) {
+      contentsOf: gitDirectory.appendingPathComponent(ref), encoding: .utf8)
+    {
       let value = loose.trimmingCharacters(in: .whitespacesAndNewlines)
       if !value.isEmpty { return value }
     }
-    guard let packed = try? String(
-      contentsOf: gitDirectory.appendingPathComponent("packed-refs"), encoding: .utf8)
+    guard
+      let packed = try? String(
+        contentsOf: gitDirectory.appendingPathComponent("packed-refs"), encoding: .utf8)
     else { return nil }
     for line in packed.split(separator: "\n") where line.hasSuffix(" " + ref) {
       return String(line.prefix(while: { $0 != " " }))
@@ -1466,9 +1647,10 @@ enum WorkspaceProviderSupport {
     let rootURL = URL(fileURLWithPath: root)
       .resolvingSymlinksInPath().standardizedFileURL
     let canonicalRoot = rootURL.path
-    guard let enumerator = FileManager.default.enumerator(
-      at: rootURL, includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey],
-      options: [.skipsHiddenFiles, .skipsPackageDescendants])
+    guard
+      let enumerator = FileManager.default.enumerator(
+        at: rootURL, includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey],
+        options: [.skipsHiddenFiles, .skipsPackageDescendants])
     else {
       throw DeviceProviderError.factsUnavailable("workspace source tree cannot be enumerated")
     }

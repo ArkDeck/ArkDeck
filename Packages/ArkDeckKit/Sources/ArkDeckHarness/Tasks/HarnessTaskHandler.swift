@@ -228,7 +228,7 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
         snapshot, decisionID: decisionID, round: round, nowUTC: nowUTC,
         operation: Self.revertPatch,
         inputs: [
-          "projectRef": .string(snapshot.projectRef ?? ""),
+          "projectRef": .string(snapshot.executionProjectRef ?? ""),
           "patchAttemptRef": .string(patchAttemptRef),
         ],
         hypothesis:
@@ -400,7 +400,7 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
           snapshot, decisionID: decisionID, round: round, nowUTC: nowUTC,
           operation: Self.buildOpenHarmony,
           inputs: [
-            "projectRef": .string(snapshot.projectRef ?? ""),
+            "projectRef": .string(snapshot.executionProjectRef ?? ""),
             "buildPresetRef": .string(desiredString("buildPresetRef", snapshot) ?? "arkdeck-debug"),
           ],
           hypothesis:
@@ -413,7 +413,7 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
           snapshot, decisionID: decisionID, round: round, nowUTC: nowUTC,
           operation: Self.runTests,
           inputs: [
-            "projectRef": .string(snapshot.projectRef ?? ""),
+            "projectRef": .string(snapshot.executionProjectRef ?? ""),
             "testPresetRef": .string(desiredString("testPresetRef", snapshot) ?? "arkdeck-tests"),
           ],
           hypothesis: "Run the declared tests against the same patch revision before deployment.",
@@ -547,8 +547,9 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
   }
 
   private func pendingAnalysisLease(_ snapshot: HarnessTaskSnapshot) -> String? {
-    guard case .string(let value)? = snapshot.observedState[
-      Self.pendingAnalysisSourceLeaseKey], !value.isEmpty
+    guard
+      case .string(let value)? = snapshot.observedState[
+        Self.pendingAnalysisSourceLeaseKey], !value.isEmpty
     else { return nil }
     return value
   }

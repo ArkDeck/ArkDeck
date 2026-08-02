@@ -233,8 +233,7 @@ Task.detached {
     //   ARKDECK_WORKSPACE_ACTIVE_PROJECT=demo-app
     //   ARKDECK_DEVECO_SDK_HOME=/Applications/DevEco-Studio.app/Contents/sdk
     let workspaceRoots = Dictionary(
-      uniqueKeysWithValues:
-        (ProcessInfo.processInfo.environment["ARKDECK_WORKSPACE_PROJECTS"] ?? "")
+      uniqueKeysWithValues: (ProcessInfo.processInfo.environment["ARKDECK_WORKSPACE_PROJECTS"] ?? "")
         .split(separator: ",")
         .compactMap { entry -> (String, String)? in
           let parts = entry.split(separator: "=", maxSplits: 1).map {
@@ -259,12 +258,17 @@ Task.detached {
     }
     let workspaceOperations: any DeviceProvider
     var workspaceOperationResolver: WorkspaceActionExecutableResolver?
-    var workspaceRepairConfiguration: (
-      profile: WorkspaceProjectProfile, attempts: WorkspacePatchAttemptStore
-    )?
+    var workspaceRepairConfiguration:
+      (
+        profile: WorkspaceProjectProfile,
+        profiles: WorkspaceProjectProfileRegistry,
+        attempts: WorkspacePatchAttemptStore,
+        evolution: EvolutionWorkspaceManager
+      )?
     let configuredActiveProject =
       ProcessInfo.processInfo.environment["ARKDECK_WORKSPACE_ACTIVE_PROJECT"]
-    let activeProjectRef = configuredActiveProject
+    let activeProjectRef =
+      configuredActiveProject
       ?? (workspaceRoots.count == 1 ? workspaceRoots.keys.first : nil)
     if let activeProjectRef, let activeRoot = workspaceRoots[activeProjectRef] {
       do {
@@ -274,9 +278,11 @@ Task.detached {
           profile = try WorkspaceProjectProfile.arkDeck(
             rootURL: URL(fileURLWithPath: activeRoot, isDirectory: true))
         case "demo-app":
-          let node = ProcessInfo.processInfo.environment["ARKDECK_DEVECO_NODE_PATH"]
+          let node =
+            ProcessInfo.processInfo.environment["ARKDECK_DEVECO_NODE_PATH"]
             ?? "/Applications/DevEco-Studio.app/Contents/tools/node/bin/node"
-          let hvigor = ProcessInfo.processInfo.environment["ARKDECK_DEVECO_HVIGOR_PATH"]
+          let hvigor =
+            ProcessInfo.processInfo.environment["ARKDECK_DEVECO_HVIGOR_PATH"]
             ?? "/Applications/DevEco-Studio.app/Contents/tools/hvigor/bin/hvigorw.js"
           let configuredSDK =
             ProcessInfo.processInfo.environment["ARKDECK_DEVECO_SDK_HOME"]
@@ -309,10 +315,16 @@ Task.detached {
         let attempts = try WorkspacePatchAttemptStore(
           rootURL: resolvedStateDirectory.appendingPathComponent(
             "workspace-patch-attempts", isDirectory: true))
+        let profiles = WorkspaceProjectProfileRegistry(profile: profile)
+        let evolution = try EvolutionWorkspaceManager(
+          rootURL: resolvedStateDirectory.appendingPathComponent(
+            "evolution-workspaces", isDirectory: true),
+          profileRegistry: profiles)
         workspaceOperations = WorkspaceOperationsProvider(
-          profile: profile, attemptStore: attempts, nowUTC: utcNow)
+          profile: profile, profileRegistry: profiles,
+          attemptStore: attempts, nowUTC: utcNow)
         workspaceOperationResolver = WorkspaceActionExecutableResolver(profile: profile)
-        workspaceRepairConfiguration = (profile, attempts)
+        workspaceRepairConfiguration = (profile, profiles, attempts, evolution)
       } catch {
         workspaceOperations = UnavailableWorkspaceOperationsProvider(
           reason: "workspace.projectProfileUnavailable:\(error)")
@@ -443,8 +455,10 @@ Task.detached {
         store: artifactStore, sensitiveEvidenceAllowList: sensitiveEvidence),
       repairPort: workspaceRepairConfiguration.map {
         WorkspaceHarnessRepairPort(
-          profile: $0.profile, attemptStore: $0.attempts, artifactStore: artifactStore)
+          profile: $0.profile, profileRegistry: $0.profiles,
+          attemptStore: $0.attempts, artifactStore: artifactStore)
       },
+      evolutionWorkspacePort: workspaceRepairConfiguration?.evolution,
       nowUTC: utcNow,
       policyGuard: HarnessPolicyGuard(
         availability: RuntimeEngineAvailabilityPort(engine: engine),

@@ -50,8 +50,10 @@ enum RuntimeCLI {
       }.joined(separator: "\n")
     case .array(let items):
       if items.isEmpty { return "\(pad)(none)" }
-      return items.map { "\(pad)- \(render($0, indent: indent + 1).trimmingCharacters(in: .whitespaces))" }
-        .joined(separator: "\n")
+      return items.map {
+        "\(pad)- \(render($0, indent: indent + 1).trimmingCharacters(in: .whitespaces))"
+      }
+      .joined(separator: "\n")
     case .string(let text): return "\(pad)\(text)"
     case .integer(let number): return "\(pad)\(number)"
     case .unsignedInteger(let number): return "\(pad)\(number)"
@@ -114,7 +116,8 @@ enum RuntimeCLI {
     guard let subcommand = arguments.first, subcommand == "run" || subcommand == "resume" else {
       throw CLIError(
         exitCode: EX_USAGE,
-        message: "usage: arkdeck agent run --operation <id@v> | agent resume --resume-token <token>")
+        message: "usage: arkdeck agent run --operation <id@v> | agent resume --resume-token <token>"
+      )
     }
     var rest = Array(arguments.dropFirst())
     let json = rest.contains("--json")
@@ -1088,6 +1091,30 @@ enum RuntimeCLI {
         "targetId": .string(target),
         "goal": .string(goal),
       ]
+      if let mode = value("--execution-mode") {
+        params["executionMode"] = .string(mode)
+      }
+      if let paths = value("--evolution-allowed-paths") {
+        params["allowedPaths"] = .array(
+          paths.split(separator: ",").map {
+            .string($0.trimmingCharacters(in: .whitespaces))
+          })
+      }
+      if let operations = value("--evolution-allowed-operations") {
+        params["evolutionAllowedOperations"] = .array(
+          operations.split(separator: ",").map {
+            .string($0.trimmingCharacters(in: .whitespaces))
+          })
+      }
+      if let attempts = value("--max-attempts"), let parsed = Int64(attempts) {
+        params["maxAttempts"] = .integer(parsed)
+      }
+      if let files = value("--max-changed-files"), let parsed = Int64(files) {
+        params["maxChangedFiles"] = .integer(parsed)
+      }
+      if let lines = value("--max-diff-lines"), let parsed = Int64(lines) {
+        params["maxDiffLines"] = .integer(parsed)
+      }
       if let intake = value("--intake") { params["intake"] = .string(intake) }
       if let signature = value("--crash-signature") {
         params["crashSignature"] = .string(signature)

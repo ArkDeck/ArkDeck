@@ -74,6 +74,7 @@ public enum HarnessCoordinatorError: Error, Equatable, Sendable {
   case malformedPatchProposal(String)
   case patchProposalNotAllowed(String)
   case patchProposalMismatch
+  case evolutionWorkspaceUnavailable
   case missingDecisionRecord(round: Int)
   case malformedRequest(String)
 }
@@ -93,6 +94,12 @@ public actor HarnessTaskCoordinator {
   /// Absent means source repair is unavailable in this composition. It never
   /// falls back to opening workspace paths in the coordinator.
   let repairPort: (any HarnessRepairPort)?
+  /// Evolution isolation is a Workspace lifecycle extension. Absent keeps
+  /// Normal Mode unchanged and makes Evolution admission fail closed.
+  let evolutionWorkspacePort: (any HarnessEvolutionWorkspacePort)?
+  /// A read-only second AI role. It receives evidence but has no operation or
+  /// patch-writing port, so review cannot mutate the candidate under review.
+  let adversarialReviewer: (any HarnessAdversarialReviewing)?
   let handlers: [HarnessTaskType: any HarnessTaskHandler]
   let nowUTC: @Sendable () -> String
   let taskIDFactory: @Sendable () -> String
@@ -102,6 +109,7 @@ public actor HarnessTaskCoordinator {
   let memoryIDFactory: @Sendable () -> String
   let modelRunIDFactory: @Sendable () -> String
   let attemptIDFactory: @Sendable () -> String
+  let promotionCandidateIDFactory: @Sendable () -> String
   let policyGuard: HarnessPolicyGuard
   /// Absent means no model path exists in this composition at all.
   let decisionGateway: (any HarnessDecisionGateway)?
@@ -116,6 +124,8 @@ public actor HarnessTaskCoordinator {
     jobPort: any HarnessRuntimeJobPort,
     artifactPort: (any HarnessArtifactPort)? = nil,
     repairPort: (any HarnessRepairPort)? = nil,
+    evolutionWorkspacePort: (any HarnessEvolutionWorkspacePort)? = nil,
+    adversarialReviewer: (any HarnessAdversarialReviewing)? = nil,
     handlers: [any HarnessTaskHandler] = [DebugCrashTaskHandler()],
     nowUTC: @escaping @Sendable () -> String,
     taskIDFactory: @escaping @Sendable () -> String = { HarnessTaskCoordinator.freshTaskID() },
@@ -137,6 +147,9 @@ public actor HarnessTaskCoordinator {
     attemptIDFactory: @escaping @Sendable () -> String = {
       HarnessTaskCoordinator.freshAttemptID()
     },
+    promotionCandidateIDFactory: @escaping @Sendable () -> String = {
+      HarnessTaskCoordinator.freshPromotionCandidateID()
+    },
     policyGuard: HarnessPolicyGuard = HarnessPolicyGuard(),
     decisionGateway: (any HarnessDecisionGateway)? = nil,
     egressPolicy: HarnessEgressPolicy = .deniedByDefault,
@@ -146,6 +159,8 @@ public actor HarnessTaskCoordinator {
     self.jobPort = jobPort
     self.artifactPort = artifactPort
     self.repairPort = repairPort
+    self.evolutionWorkspacePort = evolutionWorkspacePort
+    self.adversarialReviewer = adversarialReviewer
     self.handlers = Dictionary(
       handlers.map { ($0.type, $0) }, uniquingKeysWith: { first, _ in first })
     self.nowUTC = nowUTC
@@ -156,6 +171,7 @@ public actor HarnessTaskCoordinator {
     self.memoryIDFactory = memoryIDFactory
     self.modelRunIDFactory = modelRunIDFactory
     self.attemptIDFactory = attemptIDFactory
+    self.promotionCandidateIDFactory = promotionCandidateIDFactory
     self.policyGuard = policyGuard
     self.decisionGateway = decisionGateway
     self.egressPolicy = egressPolicy
@@ -207,6 +223,11 @@ public actor HarnessTaskCoordinator {
     return "ATTEMPT-\(hex.prefix(12))"
   }
 
+  public static func freshPromotionCandidateID() -> String {
+    let hex = UUID().uuidString.replacingOccurrences(of: "-", with: "").uppercased()
+    return "PROMOTION-\(hex.prefix(12))"
+  }
+
   // MARK: - Task lifecycle
 
   public func submit(_ submission: HarnessTaskSubmission) async throws -> HarnessTaskSnapshot {
@@ -223,8 +244,21 @@ public actor HarnessTaskCoordinator {
         required: requiredE1Mutations, actual: submission.budgets.maxE1Mutations)
     }
     let now = nowUTC()
+    let htaskID = taskIDFactory()
+    let evolutionWorkspace: HarnessEvolutionWorkspace?
+    if submission.executionMode == .evolution {
+      guard let port = evolutionWorkspacePort,
+        let sourceProjectRef = submission.projectRef,
+        let policy = submission.evolutionPolicy
+      else { throw HarnessCoordinatorError.evolutionWorkspaceUnavailable }
+      evolutionWorkspace = try await port.prepareWorkspace(
+        htaskID: htaskID, sourceProjectRef: sourceProjectRef,
+        policy: policy, createdAtUTC: now)
+    } else {
+      evolutionWorkspace = nil
+    }
     let snapshot = HarnessTaskSnapshot(
-      htaskID: taskIDFactory(),
+      htaskID: htaskID,
       type: submission.type,
       intakeDescription: submission.intakeDescription,
       projectRef: submission.projectRef,
@@ -234,6 +268,9 @@ public actor HarnessTaskCoordinator {
         ? handler.defaultSuccessCriteria() : submission.successCriteria,
       budgets: submission.budgets,
       policy: submission.policy,
+      executionMode: submission.executionMode,
+      evolutionPolicy: submission.evolutionPolicy,
+      evolutionWorkspace: evolutionWorkspace,
       createdAtUTC: now,
       updatedAtUTC: now)
     try await store.create(snapshot)
@@ -285,7 +322,8 @@ public actor HarnessTaskCoordinator {
       return snapshot
     }
     let expected = snapshot.target.expectedBindingRevision
-    let bindingMatches = currentBindingRevision != nil
+    let bindingMatches =
+      currentBindingRevision != nil
       && (expected == nil || expected == currentBindingRevision)
     let target = HarnessTaskCondition(
       name: .targetResolved,
@@ -302,7 +340,8 @@ public actor HarnessTaskCoordinator {
         + "\(currentBindingRevision.map(String.init) ?? "none")",
       evidenceArtifactIDs: evidenceArtifactIDs, observedAt: nowUTC(),
       observedRevision: snapshot.version + 1)
-    let readyState: HarnessTriState = bindingMatches
+    let readyState: HarnessTriState =
+      bindingMatches
       ? (deviceReady ? .trueValue : .falseValue) : .unknown
     let ready = HarnessTaskCondition(
       name: .deviceReady, state: readyState,
@@ -348,8 +387,9 @@ public actor HarnessTaskCoordinator {
 
   public func pause(_ taskID: String) async throws -> HarnessTaskSnapshot {
     let snapshot = try await load(taskID)
-    guard snapshot.status == .running || snapshot.status == .created
-      || (snapshot.status == .waiting && snapshot.waitReason != .userSuspended)
+    guard
+      snapshot.status == .running || snapshot.status == .created
+        || (snapshot.status == .waiting && snapshot.waitReason != .userSuspended)
     else {
       throw HarnessCoordinatorError.notPausable(snapshot.status)
     }
@@ -686,7 +726,7 @@ public actor HarnessTaskCoordinator {
     var workspaceRevision: String?
     if decision.expectedWorkspaceRevision != nil,
       let repairPort,
-      let projectRef = snapshot.projectRef
+      let projectRef = snapshot.executionProjectRef
     {
       let proposal = decision.patchProposal ?? snapshot.repairAttempt?.proposal
       if let proposal {
@@ -757,12 +797,14 @@ public actor HarnessTaskCoordinator {
     let resumesPreparedRoute: Bool
     switch snapshot.phase {
     case .analyzing:
-      resumesPreparedRoute = snapshot.observed.latestVerdict == .fail
+      resumesPreparedRoute =
+        snapshot.observed.latestVerdict == .fail
         && (hasPreparedApply
           || (current.operationReference == DebugCrashTaskHandler.applyPatch
             && !current.inputs.isEmpty))
     case .patching:
-      resumesPreparedRoute = snapshot.repairAttempt?.checkpointJobID != nil
+      resumesPreparedRoute =
+        snapshot.repairAttempt?.checkpointJobID != nil
         && snapshot.repairAttempt?.patchAttemptRef == nil
         && current.operationReference == DebugCrashTaskHandler.applyPatch
         && current.patchProposal == snapshot.repairAttempt?.proposal
@@ -819,7 +861,7 @@ public actor HarnessTaskCoordinator {
         modelCallsSpent: modelCallsSpent)
     }
     guard let proposal = proposalDecision.patchProposal,
-      let projectRef = snapshot.projectRef,
+      let projectRef = snapshot.executionProjectRef,
       let repairPort
     else {
       let reason = "patchProposalUnavailable"
@@ -870,6 +912,7 @@ public actor HarnessTaskCoordinator {
       }
     }
     let preparedInputs: [String: JSONValue]
+    var newlyPreparedPatch: HarnessPreparedPatch?
     if let reusableApply {
       preparedInputs = reusableApply.inputs
     } else if proposalDecision.operationReference == DebugCrashTaskHandler.applyPatch,
@@ -882,6 +925,7 @@ public actor HarnessTaskCoordinator {
           proposal, projectRef: projectRef, task: snapshot,
           decisionID: proposalDecision.decisionID)
         preparedInputs = prepared.inputs
+        newlyPreparedPatch = prepared
       } catch let error as HarnessRepairPortError {
         let print = fingerprint(
           snapshot, operationReference: DebugCrashTaskHandler.applyPatch,
@@ -901,6 +945,44 @@ public actor HarnessTaskCoordinator {
         return HarnessReconcileOutcome(
           snapshot: blocked.snapshot, action: .stoppedForHuman,
           reasonCode: error.reasonCode)
+      }
+    }
+
+    if snapshot.executionMode == .evolution, attempt.candidatePatch == nil {
+      guard let evolutionPolicy = snapshot.evolutionPolicy,
+        case .string(let artifactLease)? = preparedInputs["patchArtifactRef"]
+      else {
+        let reason = "candidatePatchArtifactUnavailable"
+        let blocked = try await recordBlock(
+          snapshot, block: .environmentUnavailable, reasonCode: reason,
+          round: proposalDecision.round, jobID: nil,
+          requestID: proposalDecision.decisionID)
+        return HarnessReconcileOutcome(
+          snapshot: blocked.snapshot, action: .stoppedForHuman, reasonCode: reason)
+      }
+      let leaseParts = artifactLease.split(separator: ":", omittingEmptySubsequences: false)
+      let prepared =
+        newlyPreparedPatch
+        ?? HarnessPreparedPatch(
+          inputs: preparedInputs, artifactLease: artifactLease,
+          artifactID: leaseParts.count == 3 ? String(leaseParts[2]) : nil)
+      do {
+        let creator: HarnessCandidatePatchCreator =
+          proposalDecision.producer == Self.humanPatchProducer ? .human : .agent
+        let candidate = try await repairPort.candidatePatch(
+          proposal: proposal, prepared: prepared, task: snapshot,
+          attemptID: attempt.attemptID, createdBy: creator,
+          createdAtUTC: nowUTC())
+        try evolutionPolicy.validate(candidate: candidate)
+        try await recordAttemptCandidatePatch(candidate, taskID: snapshot.htaskID)
+      } catch {
+        let reason = "candidatePatchRejected:\(error)"
+        let blocked = try await recordBlock(
+          snapshot, block: .strategyExhausted, reasonCode: reason,
+          round: proposalDecision.round, jobID: nil,
+          requestID: proposalDecision.decisionID)
+        return HarnessReconcileOutcome(
+          snapshot: blocked.snapshot, action: .stoppedForHuman, reasonCode: reason)
       }
     }
 
@@ -1063,7 +1145,7 @@ public actor HarnessTaskCoordinator {
       // intent so recovery cannot later turn this refusal into an effect.
       try await store.putIntent(intent.withState(.rejected, atUTC: nowUTC()))
       switch error {
-      case .duplicateStrategy:
+      case .duplicateStrategy, .strategyAttemptBudgetExhausted:
         let blocked = try await recordBlock(
           snapshot, block: .strategyExhausted, reasonCode: error.reasonCode,
           round: decision.round, jobID: nil, requestID: decision.decisionID)
@@ -1268,7 +1350,7 @@ public actor HarnessTaskCoordinator {
       } catch let error as HarnessAttemptAdmissionError {
         try await store.putIntent(intent.withState(.rejected, atUTC: nowUTC()))
         switch error {
-        case .duplicateStrategy:
+        case .duplicateStrategy, .strategyAttemptBudgetExhausted:
           let blocked = try await recordBlock(
             snapshot, block: .strategyExhausted, reasonCode: error.reasonCode,
             round: intent.round, jobID: nil, requestID: intent.requestID)
@@ -1464,7 +1546,8 @@ public actor HarnessTaskCoordinator {
       if operationReference == DebugCrashTaskHandler.buildOpenHarmony
         || operationReference == DebugCrashTaskHandler.runTests
       {
-        let classification = operationReference == DebugCrashTaskHandler.buildOpenHarmony
+        let classification =
+          operationReference == DebugCrashTaskHandler.buildOpenHarmony
           ? "BUILD_SEMANTIC_FAILURE" : "TEST_FAILURE"
         let alternative = try await commit(
           snapshot,
@@ -1481,8 +1564,10 @@ public actor HarnessTaskCoordinator {
         let repair = snapshot.repairAttempt
       {
         var observed = snapshot.observedState
-        observed[HarnessRepairAttempt.observedStateKey] = repair.updating(
-          rollbackRequired: true).json
+        observed[HarnessRepairAttempt.observedStateKey] =
+          repair.updating(
+            rollbackRequired: true
+          ).json
         let rollbackPending = try await commit(
           snapshot,
           transition(
@@ -1596,13 +1681,15 @@ public actor HarnessTaskCoordinator {
           lease = try await artifactPort.leaseReference(
             jobID: observation.jobID, artifactID: source.artifactID)
         } catch HarnessArtifactPortError.unavailable(let reason)
-        where reason == "artifact leases are unavailable in this composition" {
+          where reason == "artifact leases are unavailable in this composition"
+        {
           // Forward-readable test/legacy compositions predate analyzer
           // leases. Production RuntimeArtifactStoreHarnessPort always
           // implements this method and never reaches this fallback.
           lease = nil
         } catch HarnessArtifactPortError.unavailable(let reason)
-        where reason == "sensitive analyzer source is not opted in: \(source.name)" {
+          where reason == "sensitive analyzer source is not opted in: \(source.name)"
+        {
           // Preserve the privacy gate as an actionable, closed reason without
           // exposing artifact bytes or an implementation error. The artifact
           // name is already part of the published inventory; naming it tells
@@ -1684,7 +1771,8 @@ public actor HarnessTaskCoordinator {
       sourceArtifactID = nil
       analysisReturnPhase = nil
     }
-    let nextPhase = analysisReturnPhase
+    let nextPhase =
+      analysisReturnPhase
       ?? handler.phase(afterSuccessOf: operationReference, in: snapshot.phase)
     try await appendTaskMemory(
       snapshot, kind: .observation,
@@ -1785,6 +1873,12 @@ public actor HarnessTaskCoordinator {
           buildSourceRevision: readback.sourceRevision,
           buildOutputDigest: readback.outputDigest,
           buildOutputArtifactLease: readback.outputArtifactLease)
+        let leaseParts = readback.outputArtifactLease.split(
+          separator: ":", omittingEmptySubsequences: false)
+        if leaseParts.count == 3 {
+          try await recordAttemptBuildArtifacts(
+            [String(leaseParts[2])], taskID: snapshot.htaskID)
+        }
 
       case DebugCrashTaskHandler.runTests:
         guard let current = snapshot.repairAttempt,
@@ -1826,8 +1920,9 @@ public actor HarnessTaskCoordinator {
       if operationReference == DebugCrashTaskHandler.buildOpenHarmony
         || operationReference == DebugCrashTaskHandler.runTests
       {
-        let classification = error.reasonCode == "WORKSPACE_REVISION_CONFLICT"
-          || error.reasonCode.hasPrefix("stageGateMismatch")
+        let classification =
+          error.reasonCode == "WORKSPACE_REVISION_CONFLICT"
+            || error.reasonCode.hasPrefix("stageGateMismatch")
           ? "WORKSPACE_REVISION_CONFLICT"
           : (operationReference == DebugCrashTaskHandler.buildOpenHarmony
             ? "BUILD_SEMANTIC_FAILURE" : "TEST_FAILURE")
@@ -1857,8 +1952,10 @@ public actor HarnessTaskCoordinator {
         let current = snapshot.repairAttempt
       {
         var observed = snapshot.observedState
-        observed[HarnessRepairAttempt.observedStateKey] = current.updating(
-          rollbackRequired: true).json
+        observed[HarnessRepairAttempt.observedStateKey] =
+          current.updating(
+            rollbackRequired: true
+          ).json
         let rollbackPending = try await commit(
           snapshot,
           transition(
@@ -1900,7 +1997,7 @@ public actor HarnessTaskCoordinator {
         jobID: observation.jobID, observedState: observed,
         noProgressRounds:
           operationReference == DebugCrashTaskHandler.applyPatch
-            || operationReference == DebugCrashTaskHandler.deployHAP ? 0 : nil,
+          || operationReference == DebugCrashTaskHandler.deployHAP ? 0 : nil,
         conditions: conditionsAfterSuccess(
           operationReference, snapshot: snapshot)))
 
@@ -2043,6 +2140,11 @@ public actor HarnessTaskCoordinator {
     }
 
     let artifactRefs = Self.mergedArtifactRefs(snapshot, round)
+    if snapshot.executionMode == .evolution {
+      try await recordAttemptRuntimeArtifacts(
+        round.evidence.filter(\.verified).map(\.artifactID),
+        taskID: snapshot.htaskID)
+    }
     let evaluationConditions = conditionsAfterEvaluation(
       evaluation.verdict, snapshot: snapshot, evidenceArtifactIDs: artifactRefs)
     // Evidence costs budget: only bytes the harness actually verified and read
@@ -2059,6 +2161,12 @@ public actor HarnessTaskCoordinator {
       modelCalls: snapshot.consumedBudget.modelCalls)
     switch evaluation.verdict {
     case .pass:
+      if snapshot.executionMode == .evolution {
+        return try await finishEvolutionEvaluation(
+          snapshot: snapshot, evaluation: evaluation, consumed: consumed,
+          artifactRefs: artifactRefs, observedState: observedStateJSON,
+          conditions: evaluationConditions)
+      }
       try await recordAttemptEvaluation(
         taskID: snapshot.htaskID, evaluation: evaluation, outcome: .succeeded)
       let succeeded = try await commit(
@@ -2167,6 +2275,221 @@ public actor HarnessTaskCoordinator {
         try await closeAttemptForNoProgress(snapshot.htaskID, rounds: noProgress)
       }
       return .continues(updated)
+    }
+  }
+
+  private func finishEvolutionEvaluation(
+    snapshot: HarnessTaskSnapshot,
+    evaluation: HarnessEvaluation,
+    consumed: HarnessConsumedBudget,
+    artifactRefs: [String],
+    observedState: [String: JSONValue],
+    conditions: [HarnessTaskCondition]
+  ) async throws -> EvaluationStep {
+    try await recordAttemptEvaluation(taskID: snapshot.htaskID, evaluation: evaluation)
+    guard let reviewer = adversarialReviewer else {
+      let reason = "adversarialReviewerUnavailable"
+      try await closeAttempt(snapshot.htaskID, outcome: .humanRequired, reason: reason)
+      let blocked = try await commit(
+        snapshot,
+        transition(
+          snapshot, causation: .humanBlocked, reasonCode: reason,
+          status: .humanRequired, activeJob: .cleared,
+          consumedBudget: consumed, evaluationID: evaluation.evaluationID,
+          artifactRefs: artifactRefs, observedState: observedState,
+          result: HarnessTaskResult(
+            outcome: .humanRequired, reasonCode: reason,
+            summary: "Evaluation passed, but no independent reviewer is configured.",
+            evaluationID: evaluation.evaluationID, artifactRefs: artifactRefs),
+          conditions: conditions))
+      return .ended(
+        HarnessReconcileOutcome(
+          snapshot: blocked, action: .stoppedForHuman, reasonCode: reason))
+    }
+    let history = try await store.attempts(snapshot.htaskID)
+    guard let attempt = history.last(where: { $0.outcome == .active }),
+      let candidate = attempt.candidatePatch
+    else {
+      let reason = "candidatePatchUnavailableAtReview"
+      try await closeAttempt(snapshot.htaskID, outcome: .humanRequired, reason: reason)
+      let blocked = try await commit(
+        snapshot,
+        transition(
+          snapshot, causation: .humanBlocked, reasonCode: reason,
+          status: .humanRequired, activeJob: .cleared,
+          consumedBudget: consumed, evaluationID: evaluation.evaluationID,
+          artifactRefs: artifactRefs, observedState: observedState,
+          result: HarnessTaskResult(
+            outcome: .humanRequired, reasonCode: reason,
+            summary: "Evaluation passed without a durable CandidatePatch Artifact.",
+            evaluationID: evaluation.evaluationID, artifactRefs: artifactRefs),
+          conditions: conditions))
+      return .ended(
+        HarnessReconcileOutcome(
+          snapshot: blocked, action: .stoppedForHuman, reasonCode: reason))
+    }
+
+    let request = HarnessAdversarialReviewRequest(
+      originalProblem: snapshot.goal.summary, candidatePatch: candidate,
+      attemptHistory: history, evaluation: evaluation,
+      artifactIDs: artifactRefs + attempt.buildArtifactIDs + attempt.runtimeArtifactIDs)
+    guard consumed.modelCalls < snapshot.budgets.maxModelCalls else {
+      let reason = "adversarialReviewModelBudgetExhausted"
+      try await closeAttempt(snapshot.htaskID, outcome: .humanRequired, reason: reason)
+      let blocked = try await commit(
+        snapshot,
+        transition(
+          snapshot, causation: .humanBlocked, reasonCode: reason,
+          status: .humanRequired, activeJob: .cleared,
+          consumedBudget: consumed, evaluationID: evaluation.evaluationID,
+          artifactRefs: artifactRefs, observedState: observedState,
+          result: HarnessTaskResult(
+            outcome: .humanRequired, reasonCode: reason,
+            summary: "Evaluation passed, but no model-call budget remains for independent review.",
+            evaluationID: evaluation.evaluationID, artifactRefs: artifactRefs),
+          conditions: conditions))
+      return .ended(
+        HarnessReconcileOutcome(
+          snapshot: blocked, action: .stoppedForHuman, reasonCode: reason))
+    }
+    // The independent reviewer is an AI role, even though it is exposed as a
+    // narrow Harness capability rather than a multi-agent framework. Charge
+    // its call on every outcome, including transport errors and rejection.
+    let reviewConsumed = charging(consumed, modelCalls: 1)
+    let review: HarnessAdversarialReview
+    do {
+      review = try await reviewer.review(request)
+      guard review.reviewerID == reviewer.reviewerID,
+        !review.reviewID.isEmpty,
+        review.reviewID.utf8.count <= 128,
+        review.candidatePatchID == candidate.candidatePatchID,
+        review.evaluationID == evaluation.evaluationID,
+        review.issues.count <= 128,
+        review.issues.allSatisfy({
+          !$0.description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && $0.description.utf8.count <= 2_048
+        }),
+        review.result == .pass ? review.issues.isEmpty : !review.issues.isEmpty
+      else { throw HarnessCoordinatorError.malformedRequest("malformedAdversarialReview") }
+    } catch {
+      let reason = "adversarialReviewUnavailable:\(error)"
+      try await closeAttempt(snapshot.htaskID, outcome: .humanRequired, reason: reason)
+      let blocked = try await commit(
+        snapshot,
+        transition(
+          snapshot, causation: .humanBlocked, reasonCode: reason,
+          status: .humanRequired, activeJob: .cleared,
+          consumedBudget: reviewConsumed, evaluationID: evaluation.evaluationID,
+          artifactRefs: artifactRefs, observedState: observedState,
+          result: HarnessTaskResult(
+            outcome: .humanRequired, reasonCode: reason,
+            summary: "The adversarial review did not produce a valid bounded verdict.",
+            evaluationID: evaluation.evaluationID, artifactRefs: artifactRefs),
+          conditions: conditions))
+      return .ended(
+        HarnessReconcileOutcome(
+          snapshot: blocked, action: .stoppedForHuman, reasonCode: reason))
+    }
+    try await recordAttemptReview(review, taskID: snapshot.htaskID)
+
+    switch review.result {
+    case .reject:
+      try await closeAttempt(
+        snapshot.htaskID, outcome: .failed, reason: "adversarialReviewRejected")
+      var rejectedState = observedState
+      if let repair = snapshot.repairAttempt {
+        rejectedState[HarnessRepairAttempt.observedStateKey] =
+          repair.updating(
+            rollbackRequired: true
+          ).json
+      }
+      let updated = try await commit(
+        snapshot,
+        transition(
+          snapshot, causation: .evaluation, reasonCode: "adversarialReviewRejected",
+          status: .running, activeJob: .cleared, consumedBudget: reviewConsumed,
+          evaluationID: evaluation.evaluationID, artifactRefs: artifactRefs,
+          observedState: rejectedState, noProgressRounds: 0, conditions: conditions))
+      return .continues(updated)
+    case .comment:
+      let reason = "adversarialReviewComment"
+      try await closeAttempt(snapshot.htaskID, outcome: .humanRequired, reason: reason)
+      let blocked = try await commit(
+        snapshot,
+        transition(
+          snapshot, causation: .humanBlocked, reasonCode: reason,
+          status: .humanRequired, activeJob: .cleared, consumedBudget: reviewConsumed,
+          evaluationID: evaluation.evaluationID, artifactRefs: artifactRefs,
+          observedState: observedState,
+          result: HarnessTaskResult(
+            outcome: .humanRequired, reasonCode: reason,
+            summary: "Reviewer comments require human disposition before promotion.",
+            evaluationID: evaluation.evaluationID, artifactRefs: artifactRefs),
+          conditions: conditions))
+      return .ended(
+        HarnessReconcileOutcome(
+          snapshot: blocked, action: .stoppedForHuman, reasonCode: reason))
+    case .pass:
+      let reviewedAttempt =
+        try await store.attempts(snapshot.htaskID).last {
+          $0.attemptID == attempt.attemptID
+        } ?? attempt.recordingReview(review, atUTC: nowUTC())
+      let promotion: HarnessPromotionCandidate
+      do {
+        guard let repairPort, let projectRef = snapshot.executionProjectRef,
+          let repair = snapshot.repairAttempt, let patchRevision = repair.patchRevision
+        else { throw HarnessPromotionGateFailure.stalePatch }
+        let liveRevision = try await repairPort.currentWorkspaceRevision(
+          relativePaths: candidate.files, projectRef: projectRef, task: snapshot)
+        guard liveRevision == patchRevision else {
+          throw HarnessPromotionGateFailure.stalePatch
+        }
+        promotion = try HarnessPromotionGate.evaluate(
+          snapshot: snapshot, attempt: reviewedAttempt, evaluation: evaluation,
+          review: review, promotionCandidateID: promotionCandidateIDFactory(),
+          createdAtUTC: nowUTC())
+      } catch {
+        let reason = "promotionGateRejected:\(error)"
+        try await closeAttempt(snapshot.htaskID, outcome: .humanRequired, reason: reason)
+        let blocked = try await commit(
+          snapshot,
+          transition(
+            snapshot, causation: .humanBlocked, reasonCode: reason,
+            status: .humanRequired, activeJob: .cleared, consumedBudget: reviewConsumed,
+            evaluationID: evaluation.evaluationID, artifactRefs: artifactRefs,
+            observedState: observedState,
+            result: HarnessTaskResult(
+              outcome: .humanRequired, reasonCode: reason,
+              summary: "Promotion facts drifted or did not satisfy every required gate.",
+              evaluationID: evaluation.evaluationID, artifactRefs: artifactRefs),
+            conditions: conditions))
+        return .ended(
+          HarnessReconcileOutcome(
+            snapshot: blocked, action: .stoppedForHuman, reasonCode: reason))
+      }
+      try await recordAttemptPromotion(promotion, taskID: snapshot.htaskID)
+      try await closeAttempt(
+        snapshot.htaskID, outcome: .succeeded, reason: "promotionCandidateReady")
+      let promotedArtifacts = Array(Set(artifactRefs + promotion.artifactIDs)).sorted()
+      let succeeded = try await commit(
+        snapshot,
+        transition(
+          snapshot, causation: .evaluation, reasonCode: "promotionCandidateReady",
+          status: .succeeded, activeJob: .cleared, consumedBudget: reviewConsumed,
+          evaluationID: evaluation.evaluationID,
+          artifactRefs: promotedArtifacts, observedState: observedState,
+          noProgressRounds: 0,
+          result: HarnessTaskResult(
+            outcome: .succeeded, reasonCode: "promotionCandidateReady",
+            summary:
+              "Evaluation and adversarial review passed; candidate is ready for a normal PR.",
+            evaluationID: evaluation.evaluationID, artifactRefs: promotedArtifacts),
+          conditions: conditions))
+      try await promoteProjectMemory(succeeded, evaluation: evaluation)
+      return .ended(
+        HarnessReconcileOutcome(
+          snapshot: succeeded, action: .evaluatedSucceeded,
+          reasonCode: "promotionCandidateReady"))
     }
   }
 
@@ -2501,8 +2824,9 @@ public actor HarnessTaskCoordinator {
       waitReason = .activeJob
       conditions = snapshot.conditions
     }
-    guard snapshot.status != .waiting || snapshot.waitReason != waitReason
-      || snapshot.conditions != conditions
+    guard
+      snapshot.status != .waiting || snapshot.waitReason != waitReason
+        || snapshot.conditions != conditions
     else {
       return snapshot
     }
