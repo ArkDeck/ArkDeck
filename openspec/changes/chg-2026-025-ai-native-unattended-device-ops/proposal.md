@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-025-ai-native-unattended-device-ops
-revision: 14
-status: proposed # r1 经 #281 正式批准；r2-r13 已合入；r14 GJ-4 full verification 待维护者 review/merge
+revision: 15
+status: approved # r1 经 #281 正式批准；r2-r14 已合入；r15 由维护者 review/merge 显式恢复 approved scoped-delta 状态
 class: core
 core_change_level: major
 owner: lvye
@@ -10,6 +10,17 @@ platforms: [macos]
 ---
 
 # AI Native 无人值守设备操作:授权从"人类亲手执行"上移为"人类批准计划"
+
+> r15 D2 policy approval closure（2026-08-03）：r8 引入 bounded Evolution E2
+> campaign 时把 change 状态置回 `proposed`，其后 r9-r14 的维护者合入虽批准并发布了
+> 默认 campaign、safe repair 与 full postflight 实现，却未把状态字段恢复为
+> `approved`。按 `openspec/changes/README.md`，状态字段是 approved scoped delta
+> overlay 的事实源；保持 `proposed` 会使现行 Constitution `POL-AGENT-002` 的
+> human-only 文本继续优先，并要求真实 Agent Flash fail closed。本 D2 PR 不改实现、
+> budget、plan、target 或 safety invariant 文本，只恢复 r14 已评审 scope/delta 的
+> `approved` 状态；维护者 merge 即构成对 16-attempt/4-hours/concurrency-1 campaign
+> policy 的显式批准。合入前 authority instance、USB/HDC/RockUSB 与真实 Flash dispatch
+> 均为 0；合入后每次运行仍必须取得新的 exact campaign confirmation。
 
 > r14 GJ-4 full verification（2026-08-03）：默认 Flash campaign 在九分区写入后增加
 > exact prefix SHA-256 readback，重启后由 descriptor-bound HDC 精确比较 profile 的型号与
