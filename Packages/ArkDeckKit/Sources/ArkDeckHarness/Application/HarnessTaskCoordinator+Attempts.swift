@@ -7,6 +7,7 @@ import Foundation
 enum HarnessAttemptAdmissionError: Error, Equatable, Sendable {
   case duplicateStrategy(String)
   case actionRetryBudgetExhausted(attemptID: String, retries: Int)
+  case strategyAttemptBudgetExhausted(limit: Int)
 
   var reasonCode: String {
     switch self {
@@ -14,6 +15,8 @@ enum HarnessAttemptAdmissionError: Error, Equatable, Sendable {
       return "DUPLICATE_STRATEGY:\(attemptID)"
     case .actionRetryBudgetExhausted(let attemptID, let retries):
       return "maxActionRetriesPerRunExhausted:\(attemptID):\(retries)"
+    case .strategyAttemptBudgetExhausted(let limit):
+      return "maxEvolutionAttemptsExhausted:\(limit)"
     }
   }
 }
@@ -66,11 +69,28 @@ extension HarnessTaskCoordinator {
     let strategy = try await strategyDescriptor(
       decision: decision, proposal: proposal, snapshot: snapshot)
     var attempts = try await store.attempts(snapshot.htaskID)
+    if let policy = snapshot.evolutionPolicy {
+      let strategyAttempts = attempts.filter { $0.strategy.hypothesisClass != "taskJourney" }
+      guard strategyAttempts.count < policy.maxAttempts else {
+        throw HarnessAttemptAdmissionError.strategyAttemptBudgetExhausted(
+          limit: policy.maxAttempts)
+      }
+    }
     if let same = attempts.last(where: { $0.strategyFingerprint == strategy.fingerprint }) {
       // A crash after the Attempt event but before the first ActionRun may
       // resume that empty Attempt. Once an action exists, rewording the
       // hypothesis cannot mint another try.
-      if same.outcome == .active, same.actionRunIDs.isEmpty { return same }
+      if same.outcome == .active, same.actionRunIDs.isEmpty {
+        if let workspace = same.evolutionWorkspace {
+          guard let evolutionWorkspacePort else {
+            throw HarnessCoordinatorError.evolutionWorkspaceUnavailable
+          }
+          try await evolutionWorkspacePort.prepareAttemptDirectory(
+            workspace: workspace, attemptID: same.attemptID,
+            ordinal: same.ordinal, createdAtUTC: same.createdAtUTC)
+        }
+        return same
+      }
       throw HarnessAttemptAdmissionError.duplicateStrategy(same.attemptID)
     }
     if let active = attempts.last(where: { $0.outcome == .active }) {
@@ -80,10 +100,29 @@ extension HarnessTaskCoordinator {
       attempts = try await store.attempts(snapshot.htaskID)
     }
     let now = nowUTC()
+    let ordinal = (attempts.map(\.ordinal).max() ?? 0) + 1
+    let attemptID: String
+    if snapshot.executionMode == .evolution {
+      let material = Data(
+        "\(snapshot.htaskID)|\(ordinal)|\(strategy.fingerprint)".utf8)
+      let digest = SHA256.hash(data: material).map { String(format: "%02X", $0) }.joined()
+      attemptID = "ATTEMPT-\(digest.prefix(16))"
+    } else {
+      attemptID = attemptIDFactory()
+    }
+    if let workspace = snapshot.evolutionWorkspace {
+      guard let evolutionWorkspacePort else {
+        throw HarnessCoordinatorError.evolutionWorkspaceUnavailable
+      }
+      try await evolutionWorkspacePort.prepareAttemptDirectory(
+        workspace: workspace, attemptID: attemptID, ordinal: ordinal,
+        createdAtUTC: now)
+    }
     let attempt = HarnessAttempt(
-      attemptID: attemptIDFactory(), htaskID: snapshot.htaskID,
-      ordinal: (attempts.map(\.ordinal).max() ?? 0) + 1,
+      attemptID: attemptID, htaskID: snapshot.htaskID,
+      ordinal: ordinal,
       hypothesis: decision.hypothesis, strategy: strategy,
+      evolutionWorkspace: snapshot.evolutionWorkspace,
       createdAtUTC: now, updatedAtUTC: now)
     try await store.recordAttempt(
       attempt, kind: .created, reasonCode: "strategyAccepted")
@@ -254,10 +293,52 @@ extension HarnessTaskCoordinator {
     }
     let updated = attempt.recordingEvaluation(
       evaluation.evaluationID, confirmedFacts: confirmed, disprovedFacts: disproved,
-      outcome: outcome, atUTC: nowUTC())
+      verdict: evaluation.verdict, outcome: outcome, atUTC: nowUTC())
     try await store.recordAttempt(
       updated, kind: .evaluationRecorded,
       reasonCode: "evaluation:\(evaluation.verdict.rawValue)")
+  }
+
+  func recordAttemptCandidatePatch(
+    _ candidate: HarnessCandidatePatch, taskID: String
+  ) async throws {
+    guard let attempt = try await activeAttempt(taskID) else { return }
+    let updated = attempt.recordingCandidatePatch(candidate, atUTC: nowUTC())
+    try await store.recordAttempt(
+      updated, kind: .candidatePatchRecorded, reasonCode: "candidatePatchPublished")
+  }
+
+  func recordAttemptReview(
+    _ review: HarnessAdversarialReview, taskID: String
+  ) async throws {
+    guard let attempt = try await activeAttempt(taskID) else { return }
+    let updated = attempt.recordingReview(review, atUTC: nowUTC())
+    try await store.recordAttempt(
+      updated, kind: .reviewRecorded,
+      reasonCode: "adversarialReview:\(review.result.rawValue)")
+  }
+
+  func recordAttemptBuildArtifacts(_ artifactIDs: [String], taskID: String) async throws {
+    guard !artifactIDs.isEmpty, let attempt = try await activeAttempt(taskID) else { return }
+    let updated = attempt.recordingBuildArtifacts(artifactIDs, atUTC: nowUTC())
+    try await store.recordAttempt(
+      updated, kind: .buildArtifactsRecorded, reasonCode: "buildArtifactsPublished")
+  }
+
+  func recordAttemptRuntimeArtifacts(_ artifactIDs: [String], taskID: String) async throws {
+    guard !artifactIDs.isEmpty, let attempt = try await activeAttempt(taskID) else { return }
+    let updated = attempt.recordingRuntimeArtifacts(artifactIDs, atUTC: nowUTC())
+    try await store.recordAttempt(
+      updated, kind: .runtimeArtifactsRecorded, reasonCode: "runtimeArtifactsVerified")
+  }
+
+  func recordAttemptPromotion(
+    _ promotion: HarnessPromotionCandidate, taskID: String
+  ) async throws {
+    guard let attempt = try await activeAttempt(taskID) else { return }
+    let updated = attempt.recordingPromotion(promotion, atUTC: nowUTC())
+    try await store.recordAttempt(
+      updated, kind: .promotionRecorded, reasonCode: "promotionCandidateReady")
   }
 
   func closeAttemptForNoProgress(_ taskID: String, rounds: Int) async throws {
@@ -284,8 +365,10 @@ extension HarnessTaskCoordinator {
     // Mutations with unknown or failed outcomes are reconciled/read back;
     // they are never confirmed retries under a new key.
     return descriptor.minimumEffect <= .readOnly
-      && ![DebugCrashTaskHandler.createCheckpoint, DebugCrashTaskHandler.applyPatch,
-        DebugCrashTaskHandler.revertPatch, DebugCrashTaskHandler.deployHAP]
-        .contains(operationReference)
+      && ![
+        DebugCrashTaskHandler.createCheckpoint, DebugCrashTaskHandler.applyPatch,
+        DebugCrashTaskHandler.revertPatch, DebugCrashTaskHandler.deployHAP,
+      ]
+      .contains(operationReference)
   }
 }

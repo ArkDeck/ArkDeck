@@ -97,9 +97,10 @@ public struct HarnessStrategyDescriptor: Equatable, Sendable, Codable {
   }
 
   private static func isSHA256(_ value: String) -> Bool {
-    value.utf8.count == 64 && value.utf8.allSatisfy {
-      (48...57).contains($0) || (97...102).contains($0)
-    }
+    value.utf8.count == 64
+      && value.utf8.allSatisfy {
+        (48...57).contains($0) || (97...102).contains($0)
+      }
   }
 }
 
@@ -118,7 +119,7 @@ public enum HarnessAttemptOutcome: String, CaseIterable, Codable, Sendable {
 
 public struct HarnessAttempt: Equatable, Sendable, Codable {
   public static let documentType = "harness-attempt"
-  public static let schemaVersion = "1.0.0"
+  public static let schemaVersion = "2.0.0"
 
   public let documentType: String
   public let schemaVersion: String
@@ -136,6 +137,15 @@ public struct HarnessAttempt: Equatable, Sendable, Codable {
   public let evaluationIDs: [String]
   public let confirmedFacts: [String]
   public let disprovedFacts: [String]
+  /// Evolution-only facts remain on the existing strategy Attempt.  A
+  /// second attempt model would make retry/deduplication semantics diverge.
+  public let evolutionWorkspace: HarnessEvolutionWorkspace?
+  public let candidatePatch: HarnessCandidatePatch?
+  public let buildArtifactIDs: [String]
+  public let runtimeArtifactIDs: [String]
+  public let latestEvaluationVerdict: HarnessEvaluationVerdict?
+  public let review: HarnessAdversarialReview?
+  public let promotionCandidate: HarnessPromotionCandidate?
   public let createdAtUTC: String
   public let updatedAtUTC: String
 
@@ -160,6 +170,13 @@ public struct HarnessAttempt: Equatable, Sendable, Codable {
     case evaluationIDs = "evaluationIds"
     case confirmedFacts
     case disprovedFacts
+    case evolutionWorkspace
+    case candidatePatch
+    case buildArtifactIDs = "buildArtifactIds"
+    case runtimeArtifactIDs = "runtimeArtifactIds"
+    case latestEvaluationVerdict
+    case review
+    case promotionCandidate
     case createdAtUTC = "createdAtUtc"
     case updatedAtUTC = "updatedAtUtc"
   }
@@ -177,6 +194,13 @@ public struct HarnessAttempt: Equatable, Sendable, Codable {
     evaluationIDs: [String] = [],
     confirmedFacts: [String] = [],
     disprovedFacts: [String] = [],
+    evolutionWorkspace: HarnessEvolutionWorkspace? = nil,
+    candidatePatch: HarnessCandidatePatch? = nil,
+    buildArtifactIDs: [String] = [],
+    runtimeArtifactIDs: [String] = [],
+    latestEvaluationVerdict: HarnessEvaluationVerdict? = nil,
+    review: HarnessAdversarialReview? = nil,
+    promotionCandidate: HarnessPromotionCandidate? = nil,
     createdAtUTC: String,
     updatedAtUTC: String
   ) {
@@ -196,8 +220,68 @@ public struct HarnessAttempt: Equatable, Sendable, Codable {
     self.evaluationIDs = Self.unique(evaluationIDs)
     self.confirmedFacts = Self.unique(confirmedFacts).sorted()
     self.disprovedFacts = Self.unique(disprovedFacts).sorted()
+    self.evolutionWorkspace = evolutionWorkspace
+    self.candidatePatch = candidatePatch
+    self.buildArtifactIDs = Self.unique(buildArtifactIDs).sorted()
+    self.runtimeArtifactIDs = Self.unique(runtimeArtifactIDs).sorted()
+    self.latestEvaluationVerdict = latestEvaluationVerdict
+    self.review = review
+    self.promotionCandidate = promotionCandidate
     self.createdAtUTC = createdAtUTC
     self.updatedAtUTC = updatedAtUTC
+  }
+
+  /// Forward-read v1 Attempt rows without manufacturing Evolution evidence.
+  public init(from decoder: any Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    let strategy = try container.decode(HarnessStrategyDescriptor.self, forKey: .strategy)
+    self.documentType =
+      try container.decodeIfPresent(String.self, forKey: .documentType) ?? Self.documentType
+    self.schemaVersion =
+      try container.decodeIfPresent(String.self, forKey: .schemaVersion) ?? "1.0.0"
+    self.attemptID = try container.decode(String.self, forKey: .attemptID)
+    self.htaskID = try container.decode(String.self, forKey: .htaskID)
+    self.ordinal = try container.decode(Int.self, forKey: .ordinal)
+    self.hypothesis = try container.decode(String.self, forKey: .hypothesis)
+    self.strategy = strategy
+    self.strategyFingerprint =
+      try container.decodeIfPresent(String.self, forKey: .strategyFingerprint)
+      ?? strategy.fingerprint
+    self.baseRevision =
+      try container.decodeIfPresent(String.self, forKey: .baseRevision)
+      ?? strategy.baseWorkspaceRevision
+    self.patchRevision = try container.decodeIfPresent(String.self, forKey: .patchRevision)
+    self.outcome = try container.decode(HarnessAttemptOutcome.self, forKey: .outcome)
+    self.failureFingerprint = try container.decodeIfPresent(
+      String.self, forKey: .failureFingerprint)
+    self.actionRunIDs = Self.unique(
+      try container.decodeIfPresent([String].self, forKey: .actionRunIDs) ?? [])
+    self.evaluationIDs = Self.unique(
+      try container.decodeIfPresent([String].self, forKey: .evaluationIDs) ?? [])
+    self.confirmedFacts = Self.unique(
+      try container.decodeIfPresent([String].self, forKey: .confirmedFacts) ?? []
+    ).sorted()
+    self.disprovedFacts = Self.unique(
+      try container.decodeIfPresent([String].self, forKey: .disprovedFacts) ?? []
+    ).sorted()
+    self.evolutionWorkspace = try container.decodeIfPresent(
+      HarnessEvolutionWorkspace.self, forKey: .evolutionWorkspace)
+    self.candidatePatch = try container.decodeIfPresent(
+      HarnessCandidatePatch.self, forKey: .candidatePatch)
+    self.buildArtifactIDs = Self.unique(
+      try container.decodeIfPresent([String].self, forKey: .buildArtifactIDs) ?? []
+    ).sorted()
+    self.runtimeArtifactIDs = Self.unique(
+      try container.decodeIfPresent([String].self, forKey: .runtimeArtifactIDs) ?? []
+    ).sorted()
+    self.latestEvaluationVerdict = try container.decodeIfPresent(
+      HarnessEvaluationVerdict.self, forKey: .latestEvaluationVerdict)
+    self.review = try container.decodeIfPresent(
+      HarnessAdversarialReview.self, forKey: .review)
+    self.promotionCandidate = try container.decodeIfPresent(
+      HarnessPromotionCandidate.self, forKey: .promotionCandidate)
+    self.createdAtUTC = try container.decode(String.self, forKey: .createdAtUTC)
+    self.updatedAtUTC = try container.decode(String.self, forKey: .updatedAtUTC)
   }
 
   public func recordingActionRun(_ actionRunID: String, atUTC: String) -> HarnessAttempt {
@@ -206,6 +290,36 @@ public struct HarnessAttempt: Equatable, Sendable, Codable {
 
   public func recordingPatchRevision(_ revision: String, atUTC: String) -> HarnessAttempt {
     derived(patchRevision: revision, updatedAtUTC: atUTC)
+  }
+
+  public func recordingCandidatePatch(
+    _ candidatePatch: HarnessCandidatePatch, atUTC: String
+  ) -> HarnessAttempt {
+    derived(candidatePatch: candidatePatch, updatedAtUTC: atUTC)
+  }
+
+  public func recordingBuildArtifacts(
+    _ artifactIDs: [String], atUTC: String
+  ) -> HarnessAttempt {
+    derived(buildArtifactIDs: buildArtifactIDs + artifactIDs, updatedAtUTC: atUTC)
+  }
+
+  public func recordingRuntimeArtifacts(
+    _ artifactIDs: [String], atUTC: String
+  ) -> HarnessAttempt {
+    derived(runtimeArtifactIDs: runtimeArtifactIDs + artifactIDs, updatedAtUTC: atUTC)
+  }
+
+  public func recordingReview(
+    _ review: HarnessAdversarialReview, atUTC: String
+  ) -> HarnessAttempt {
+    derived(review: review, updatedAtUTC: atUTC)
+  }
+
+  public func recordingPromotion(
+    _ candidate: HarnessPromotionCandidate, atUTC: String
+  ) -> HarnessAttempt {
+    derived(promotionCandidate: candidate, updatedAtUTC: atUTC)
   }
 
   public func recordingFailure(
@@ -220,6 +334,7 @@ public struct HarnessAttempt: Equatable, Sendable, Codable {
     _ evaluationID: String,
     confirmedFacts: [String],
     disprovedFacts: [String],
+    verdict: HarnessEvaluationVerdict? = nil,
     outcome: HarnessAttemptOutcome? = nil,
     atUTC: String
   ) -> HarnessAttempt {
@@ -228,6 +343,7 @@ public struct HarnessAttempt: Equatable, Sendable, Codable {
       evaluationIDs: evaluationIDs + [evaluationID],
       confirmedFacts: self.confirmedFacts + confirmedFacts,
       disprovedFacts: self.disprovedFacts + disprovedFacts,
+      latestEvaluationVerdict: verdict,
       updatedAtUTC: atUTC)
   }
 
@@ -243,6 +359,12 @@ public struct HarnessAttempt: Equatable, Sendable, Codable {
     evaluationIDs: [String]? = nil,
     confirmedFacts: [String]? = nil,
     disprovedFacts: [String]? = nil,
+    candidatePatch: HarnessCandidatePatch? = nil,
+    buildArtifactIDs: [String]? = nil,
+    runtimeArtifactIDs: [String]? = nil,
+    latestEvaluationVerdict: HarnessEvaluationVerdict? = nil,
+    review: HarnessAdversarialReview? = nil,
+    promotionCandidate: HarnessPromotionCandidate? = nil,
     updatedAtUTC: String
   ) -> HarnessAttempt {
     HarnessAttempt(
@@ -255,6 +377,13 @@ public struct HarnessAttempt: Equatable, Sendable, Codable {
       evaluationIDs: evaluationIDs ?? self.evaluationIDs,
       confirmedFacts: confirmedFacts ?? self.confirmedFacts,
       disprovedFacts: disprovedFacts ?? self.disprovedFacts,
+      evolutionWorkspace: evolutionWorkspace,
+      candidatePatch: candidatePatch ?? self.candidatePatch,
+      buildArtifactIDs: buildArtifactIDs ?? self.buildArtifactIDs,
+      runtimeArtifactIDs: runtimeArtifactIDs ?? self.runtimeArtifactIDs,
+      latestEvaluationVerdict: latestEvaluationVerdict ?? self.latestEvaluationVerdict,
+      review: review ?? self.review,
+      promotionCandidate: promotionCandidate ?? self.promotionCandidate,
       createdAtUTC: createdAtUTC, updatedAtUTC: updatedAtUTC)
   }
 
@@ -268,8 +397,13 @@ public enum HarnessAttemptEventKind: String, CaseIterable, Codable, Sendable {
   case created
   case actionRunRecorded
   case patchRevisionObserved
+  case candidatePatchRecorded
+  case buildArtifactsRecorded
+  case runtimeArtifactsRecorded
   case failureRecorded
   case evaluationRecorded
+  case reviewRecorded
+  case promotionRecorded
   case resumed
   case closed
 }
@@ -347,9 +481,11 @@ public enum HarnessAttemptPlanner {
       return .crashReplay(
         attemptID: active.attemptID, actionRunID: originalUnresolvedActionRunID)
     }
-    guard let existing = attempts.last(where: {
-      $0.strategyFingerprint == candidateStrategyFingerprint
-    }) else {
+    guard
+      let existing = attempts.last(where: {
+        $0.strategyFingerprint == candidateStrategyFingerprint
+      })
+    else {
       return .newAttempt(ordinal: (attempts.map(\.ordinal).max() ?? 0) + 1)
     }
     guard existing.outcome == .active else {

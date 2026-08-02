@@ -462,6 +462,10 @@ public enum HarnessTaskSubmissionError: Error, Equatable, Sendable {
   case intakeTooLong
   case unsupportedTaskType(HarnessTaskType)
   case duplicateCriterionID(String)
+  case evolutionPolicyRequired
+  case evolutionPolicyNotAllowed
+  case evolutionProjectRequired
+  case malformedEvolutionPolicy(String)
 }
 
 /// Typed submission input. Natural language is admitted only as
@@ -475,6 +479,8 @@ public struct HarnessTaskSubmission: Equatable, Sendable, Codable {
   public let successCriteria: [HarnessSuccessCriterion]
   public let budgets: HarnessTaskBudgets
   public let policy: HarnessTaskPolicy
+  public let executionMode: HarnessExecutionMode
+  public let evolutionPolicy: HarnessEvolutionPolicy?
 
   public init(
     type: HarnessTaskType,
@@ -484,7 +490,9 @@ public struct HarnessTaskSubmission: Equatable, Sendable, Codable {
     goal: HarnessTaskGoal,
     successCriteria: [HarnessSuccessCriterion] = [],
     budgets: HarnessTaskBudgets,
-    policy: HarnessTaskPolicy
+    policy: HarnessTaskPolicy,
+    executionMode: HarnessExecutionMode = .normal,
+    evolutionPolicy: HarnessEvolutionPolicy? = nil
   ) {
     self.type = type
     self.intakeDescription = intakeDescription
@@ -494,6 +502,8 @@ public struct HarnessTaskSubmission: Equatable, Sendable, Codable {
     self.successCriteria = successCriteria
     self.budgets = budgets
     self.policy = policy
+    self.executionMode = executionMode
+    self.evolutionPolicy = evolutionPolicy
   }
 
   public func validate(permittedOperations: Set<String>) throws {
@@ -520,7 +530,26 @@ public struct HarnessTaskSubmission: Equatable, Sendable, Codable {
     for reference in policy.allowedOperations where !permittedOperations.contains(reference) {
       throw HarnessTaskSubmissionError.operationNotPermittedForType(reference)
     }
-    try validateBudget(budgets.maxRounds, ceiling: HarnessTaskBudgets.ceiling.maxRounds, "maxRounds")
+    switch executionMode {
+    case .normal:
+      guard evolutionPolicy == nil else {
+        throw HarnessTaskSubmissionError.evolutionPolicyNotAllowed
+      }
+    case .evolution:
+      guard projectRef != nil else {
+        throw HarnessTaskSubmissionError.evolutionProjectRequired
+      }
+      guard let evolutionPolicy else {
+        throw HarnessTaskSubmissionError.evolutionPolicyRequired
+      }
+      do {
+        try evolutionPolicy.validate(taskPolicy: policy)
+      } catch {
+        throw HarnessTaskSubmissionError.malformedEvolutionPolicy("\(error)")
+      }
+    }
+    try validateBudget(
+      budgets.maxRounds, ceiling: HarnessTaskBudgets.ceiling.maxRounds, "maxRounds")
     try validateBudget(
       budgets.maxWallClockSeconds, ceiling: HarnessTaskBudgets.ceiling.maxWallClockSeconds,
       "maxWallClockSeconds")

@@ -832,8 +832,9 @@ final class HarnessSQLiteRepository: @unchecked Sendable {
       else {
         throw HarnessTaskStoreError.corrupt("invalid created attempt \(attempt.attemptID)")
       }
-    case .actionRunRecorded, .patchRevisionObserved, .failureRecorded, .evaluationRecorded,
-      .resumed, .closed:
+    case .actionRunRecorded, .patchRevisionObserved, .candidatePatchRecorded,
+      .buildArtifactsRecorded, .runtimeArtifactsRecorded, .failureRecorded,
+      .evaluationRecorded, .reviewRecorded, .promotionRecorded, .resumed, .closed:
       guard let current else {
         throw HarnessTaskStoreError.corrupt("unknown attempt \(attempt.attemptID)")
       }
@@ -847,6 +848,14 @@ final class HarnessSQLiteRepository: @unchecked Sendable {
         Set(current.evaluationIDs).isSubset(of: Set(attempt.evaluationIDs)),
         Set(current.confirmedFacts).isSubset(of: Set(attempt.confirmedFacts)),
         Set(current.disprovedFacts).isSubset(of: Set(attempt.disprovedFacts)),
+        Set(current.buildArtifactIDs).isSubset(of: Set(attempt.buildArtifactIDs)),
+        Set(current.runtimeArtifactIDs).isSubset(of: Set(attempt.runtimeArtifactIDs)),
+        current.evolutionWorkspace == nil
+          || current.evolutionWorkspace == attempt.evolutionWorkspace,
+        current.candidatePatch == nil || current.candidatePatch == attempt.candidatePatch,
+        current.review == nil || current.review == attempt.review,
+        current.promotionCandidate == nil
+          || current.promotionCandidate == attempt.promotionCandidate,
         !(current.outcome.isClosed && attempt.outcome == .active) || validHumanResume
       else {
         throw HarnessTaskStoreError.corrupt(

@@ -49,10 +49,16 @@ public enum HarnessRepairStageGate {
 public struct HarnessPreparedPatch: Equatable, Sendable {
   public let inputs: [String: JSONValue]
   public let artifactLease: String
+  /// Immutable diff Artifact identity. Historical/fake adapters may omit it;
+  /// production Evolution promotion requires an exact Artifact id.
+  public let artifactID: String?
 
-  public init(inputs: [String: JSONValue], artifactLease: String) {
+  public init(
+    inputs: [String: JSONValue], artifactLease: String, artifactID: String? = nil
+  ) {
     self.inputs = inputs
     self.artifactLease = artifactLease
+    self.artifactID = artifactID
   }
 }
 
@@ -101,6 +107,19 @@ public protocol HarnessRepairPort: Sendable {
     decisionID: String
   ) async throws -> HarnessPreparedPatch
 
+  /// Materialises the typed CandidatePatch metadata after the strategy
+  /// Attempt has a durable identity. Production adapters also publish this
+  /// document to the immutable Artifact Store; fixtures retain a safe default
+  /// so Normal Mode compositions remain source compatible.
+  func candidatePatch(
+    proposal: HarnessPatchProposal,
+    prepared: HarnessPreparedPatch,
+    task: HarnessTaskSnapshot,
+    attemptID: String,
+    createdBy: HarnessCandidatePatchCreator,
+    createdAtUTC: String
+  ) async throws -> HarnessCandidatePatch
+
   func appliedPatchReadback(
     jobID: String, proposal: HarnessPatchProposal
   ) async throws -> HarnessAppliedPatchReadback
@@ -119,10 +138,10 @@ public protocol HarnessRepairPort: Sendable {
   ) async throws -> HarnessPatchApplicationReadback
 }
 
-public extension HarnessRepairPort {
+extension HarnessRepairPort {
   /// Compatibility seam for in-memory/non-production fixtures. The production
   /// workspace adapter overrides this with a live filesystem readback.
-  func currentWorkspaceRevision(
+  public func currentWorkspaceRevision(
     relativePaths: [String], projectRef: String, task: HarnessTaskSnapshot
   ) async throws -> String {
     if let revision = task.repairAttempt?.patchRevision { return revision }
@@ -130,5 +149,22 @@ public extension HarnessRepairPort {
       return revision
     }
     throw HarnessRepairPortError.malformedReadback("baseWorkspaceRevision")
+  }
+
+  public func candidatePatch(
+    proposal: HarnessPatchProposal,
+    prepared: HarnessPreparedPatch,
+    task: HarnessTaskSnapshot,
+    attemptID: String,
+    createdBy: HarnessCandidatePatchCreator,
+    createdAtUTC: String
+  ) async throws -> HarnessCandidatePatch {
+    HarnessCandidatePatch.create(
+      proposal: proposal,
+      diffArtifactID: prepared.artifactID ?? prepared.artifactLease,
+      htaskID: task.htaskID,
+      attemptID: attemptID,
+      createdBy: createdBy,
+      createdAtUTC: createdAtUTC)
   }
 }

@@ -786,6 +786,10 @@ struct ArkDeckCommandLine {
       [--build-preset <ref>] [--test-preset <ref>] [--device-profile <ref>] \
       [--base-workspace-revision <sha256>] [--component <name>] \
       [--expected-binding-revision <n>] \
+      [--execution-mode normal|evolution] \
+      [--evolution-allowed-paths <glob,...>] \
+      [--evolution-allowed-operations <id@v,...>] [--max-attempts <n>] \
+      [--max-changed-files <n>] [--max-diff-lines <n>] \
       [--max-wall-clock-seconds <n>] [--max-no-progress-rounds <n>] \
       [--max-action-retries-per-run <n>] [--max-e1-mutations <n>] \
       [--max-model-calls <n>] [--json]
