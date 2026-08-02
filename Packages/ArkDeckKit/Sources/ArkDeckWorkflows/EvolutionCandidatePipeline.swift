@@ -96,7 +96,8 @@ public final class ProductRockchipEvolutionCandidateBuilder: @unchecked Sendable
     }
     let gitSHA = try Self.executableSHA256(gitURL)
     let sandboxSHA = try Self.executableSHA256(sandboxURL)
-    let swiftBuild = try Self.swiftBuildPreset(sourceRoot: sourceRoot)
+    let swiftBuild = try await Self.swiftBuildPreset(
+      executor: executor, sourceRoot: sourceRoot)
     let topLevel = try await runText(
       executable: gitURL, sha256: gitSHA,
       arguments: ["rev-parse", "--show-toplevel"], timeout: 15)
@@ -285,9 +286,10 @@ public final class ProductRockchipEvolutionCandidateBuilder: @unchecked Sendable
 
   package static func currentToolchainDigest(sourceRoot: URL) async throws -> String {
     let root = sourceRoot.resolvingSymlinksInPath().standardizedFileURL
+    let executor = FoundationProcessExecutor()
+    let swiftBuild = try await swiftBuildPreset(executor: executor, sourceRoot: root)
     return try await toolchainDigest(
-      executor: FoundationProcessExecutor(), sourceRoot: root,
-      swiftBuild: swiftBuildPreset(sourceRoot: root))
+      executor: executor, sourceRoot: root, swiftBuild: swiftBuild)
   }
 
   public static func currentProtectedMainBaseCommitOID() async throws -> String {
@@ -352,23 +354,68 @@ public final class ProductRockchipEvolutionCandidateBuilder: @unchecked Sendable
       ]))
   }
 
-  /// Reuse the repository profile's fixed SwiftPM executable and role link.
+  /// Resolve the system-selected Developer root with a fixed identity-bound
+  /// command, then pin only the SwiftPM executable and role beneath that root.
   /// Apple's xcrun derives its dispatch role from the executable image path,
   /// so launching it through the identity-bound `/.vol` path makes it treat
-  /// the inode as a tool name. swift-package supports the already-published
-  /// argv[0] role contract and remains protected by the same SHA/inode gate.
-  private static func swiftBuildPreset(sourceRoot: URL) throws -> WorkspaceCommandPreset {
+  /// the inode as a tool name. `xcode-select` and `swift-package` both support
+  /// the identity-bound launch contract; no caller can supply either path.
+  private static func swiftBuildPreset(
+    executor: FoundationProcessExecutor,
+    sourceRoot: URL
+  ) async throws -> WorkspaceCommandPreset {
     do {
-      guard
-        let preset = try WorkspaceProjectProfile.arkDeck(rootURL: sourceRoot)
-          .buildPresets["arkdeck-debug"],
-        let argumentZero = preset.argumentZero,
-        URL(fileURLWithPath: argumentZero).resolvingSymlinksInPath().standardizedFileURL
-          == URL(fileURLWithPath: preset.executable.path).standardizedFileURL
+      let xcodeSelect = URL(fileURLWithPath: "/usr/bin/xcode-select")
+      let selected = try await executor.executeIdentityBound(
+        ProcessIdentityBoundRequest(
+          process: ProcessRequest(
+            executable: xcodeSelect, arguments: ["-p"],
+            environment: ["NO_COLOR": "1"], workingDirectory: sourceRoot, timeout: 30),
+          expectedSHA256: executableSHA256(xcodeSelect)), captureLimit: 16 * 1_024)
+      let selectedPath = String(decoding: selected.execution.stdout.data, as: UTF8.self)
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+      guard selected.execution.termination == .exited(0),
+        !selected.execution.stdout.wasTruncated, selectedPath.hasPrefix("/"),
+        !selectedPath.contains("\0")
       else {
         throw RockchipEvolutionCampaignError.candidateRejected("toolchainUnavailable")
       }
-      return preset
+      let developerRoot = URL(fileURLWithPath: selectedPath, isDirectory: true)
+        .resolvingSymlinksInPath().standardizedFileURL
+      var isDirectory: ObjCBool = false
+      guard FileManager.default.fileExists(
+        atPath: developerRoot.path, isDirectory: &isDirectory), isDirectory.boolValue
+      else {
+        throw RockchipEvolutionCampaignError.candidateRejected("toolchainUnavailable")
+      }
+      let candidates = [
+        developerRoot.appending(
+          path: "Toolchains/XcodeDefault.xctoolchain/usr/bin/swift-package"),
+        developerRoot.appending(path: "usr/bin/swift-package"),
+      ]
+      guard
+        let executable = candidates.first(where: {
+          FileManager.default.isExecutableFile(atPath: $0.path)
+        })?.standardizedFileURL
+      else {
+        throw RockchipEvolutionCampaignError.candidateRejected("toolchainUnavailable")
+      }
+      let argumentZero = executable.deletingLastPathComponent().appending(path: "swift-build")
+      guard FileManager.default.fileExists(atPath: argumentZero.path),
+        argumentZero.resolvingSymlinksInPath().standardizedFileURL
+          == executable.resolvingSymlinksInPath().standardizedFileURL
+      else {
+        throw RockchipEvolutionCampaignError.candidateRejected("toolchainUnavailable")
+      }
+      return try WorkspaceCommandPreset(
+        presetID: "arkdeck-debug",
+        executable: WorkspaceExecutableIdentity.hashing(path: executable.path),
+        argumentZero: argumentZero.path,
+        fixedArguments: [
+          "--package-path",
+          sourceRoot.appending(path: "Packages/ArkDeckKit", directoryHint: .isDirectory).path,
+        ],
+        timeoutSeconds: 900)
     } catch let error as RockchipEvolutionCampaignError {
       throw error
     } catch {
