@@ -133,9 +133,9 @@ public enum AgentExecutionAuthorityReference: Equatable, Hashable, Sendable, Cod
       authorizationBlobOID: authorizationBlobOID, approvalPRNumber: approvalPRNumber)
   }
 
-  /// Historical decoder/source-compatibility validation only. New products must use bounded
-  /// campaign confirmation, and the usage ledger rejects this kind on reserve.
-  public static func validatedChatConfirmation(
+  /// Historical decoder validation only. New products must use bounded campaign confirmation,
+  /// and the usage ledger rejects this kind on reserve.
+  private static func validatedChatConfirmation(
     confirmationDigestSHA256: String,
     planDigestSHA256: String,
     archiveDigestSHA256: String,

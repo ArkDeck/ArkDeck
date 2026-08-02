@@ -968,7 +968,7 @@ public struct HarnessTaskEvent: Equatable, Sendable, Codable {
 
 public struct HarnessTaskSnapshot: Equatable, Sendable, Codable {
   public static let documentType = "harness-task"
-  public static let schemaVersion = "3.0.0"
+  public static let schemaVersion = "3.1.0"
 
   public let documentType: String
   public let schemaVersion: String
@@ -983,7 +983,6 @@ public struct HarnessTaskSnapshot: Equatable, Sendable, Codable {
   public let successCriteria: [HarnessSuccessCriterion]
   public let budgets: HarnessTaskBudgets
   public let policy: HarnessTaskPolicy
-  public let executionMode: HarnessExecutionMode
   public let evolutionPolicy: HarnessEvolutionPolicy?
   public let evolutionWorkspace: HarnessEvolutionWorkspace?
   public let observedState: [String: JSONValue]
@@ -1015,6 +1014,7 @@ public struct HarnessTaskSnapshot: Equatable, Sendable, Codable {
     case successCriteria
     case budgets
     case policy
+    // Decoder-only r8/r9 compatibility key. Current snapshots never encode it.
     case executionMode
     case evolutionPolicy
     case evolutionWorkspace
@@ -1038,6 +1038,11 @@ public struct HarnessTaskSnapshot: Equatable, Sendable, Codable {
     case version
   }
 
+  private enum LegacyExecutionMode: String, Decodable {
+    case normal
+    case evolution
+  }
+
   public init(
     htaskID: String,
     type: HarnessTaskType,
@@ -1048,7 +1053,6 @@ public struct HarnessTaskSnapshot: Equatable, Sendable, Codable {
     successCriteria: [HarnessSuccessCriterion],
     budgets: HarnessTaskBudgets,
     policy: HarnessTaskPolicy,
-    executionMode: HarnessExecutionMode = .normal,
     evolutionPolicy: HarnessEvolutionPolicy? = nil,
     evolutionWorkspace: HarnessEvolutionWorkspace? = nil,
     observedState: [String: JSONValue] = [:],
@@ -1079,7 +1083,6 @@ public struct HarnessTaskSnapshot: Equatable, Sendable, Codable {
     self.successCriteria = successCriteria
     self.budgets = budgets
     self.policy = policy
-    self.executionMode = executionMode
     self.evolutionPolicy = evolutionPolicy
     self.evolutionWorkspace = evolutionWorkspace
     self.observedState = observedState
@@ -1119,13 +1122,25 @@ public struct HarnessTaskSnapshot: Equatable, Sendable, Codable {
       try container.decodeIfPresent([HarnessSuccessCriterion].self, forKey: .successCriteria) ?? []
     self.budgets = try container.decode(HarnessTaskBudgets.self, forKey: .budgets)
     self.policy = try container.decode(HarnessTaskPolicy.self, forKey: .policy)
-    self.executionMode =
-      try container.decodeIfPresent(
-        HarnessExecutionMode.self, forKey: .executionMode) ?? .normal
+    let legacyExecutionMode = try container.decodeIfPresent(
+      LegacyExecutionMode.self, forKey: .executionMode)
     self.evolutionPolicy = try container.decodeIfPresent(
       HarnessEvolutionPolicy.self, forKey: .evolutionPolicy)
     self.evolutionWorkspace = try container.decodeIfPresent(
       HarnessEvolutionWorkspace.self, forKey: .evolutionWorkspace)
+    if let legacyExecutionMode {
+      let legacyRequiresWorkspace = legacyExecutionMode == .evolution
+      guard legacyRequiresWorkspace == (evolutionPolicy != nil) else {
+        throw DecodingError.dataCorruptedError(
+          forKey: .executionMode, in: container,
+          debugDescription: "legacy executionMode disagrees with evolutionPolicy")
+      }
+    }
+    guard (evolutionPolicy == nil) == (evolutionWorkspace == nil) else {
+      throw DecodingError.dataCorruptedError(
+        forKey: .evolutionWorkspace, in: container,
+        debugDescription: "evolutionPolicy and evolutionWorkspace must appear together")
+    }
     self.observedState =
       try container.decodeIfPresent([String: JSONValue].self, forKey: .observedState) ?? [:]
     self.createdAtUTC = try container.decode(String.self, forKey: .createdAtUTC)
@@ -1229,7 +1244,6 @@ public struct HarnessTaskSnapshot: Equatable, Sendable, Codable {
     try container.encode(successCriteria, forKey: .successCriteria)
     try container.encode(budgets, forKey: .budgets)
     try container.encode(policy, forKey: .policy)
-    try container.encode(executionMode, forKey: .executionMode)
     try container.encodeIfPresent(evolutionPolicy, forKey: .evolutionPolicy)
     try container.encodeIfPresent(evolutionWorkspace, forKey: .evolutionWorkspace)
     try container.encode(observedState, forKey: .observedState)
@@ -1254,6 +1268,9 @@ public struct HarnessTaskSnapshot: Equatable, Sendable, Codable {
 
   public var lifecycle: HarnessTaskLifecycle { status }
   public var stage: HarnessTaskStage { phase }
+  /// The current product has no normal/evolution switch. A workspace policy is the single
+  /// source of truth for isolation, review and promotion behavior.
+  public var requiresWorkspaceIsolation: Bool { evolutionPolicy != nil }
   /// Source project identity remains stable for memory/egress. Typed
   /// workspace operations use the isolated provider reference in Evolution.
   public var executionProjectRef: String? {
@@ -1285,7 +1302,7 @@ public struct HarnessTaskSnapshot: Equatable, Sendable, Codable {
     HarnessTaskSnapshot(
       htaskID: htaskID, type: type, intakeDescription: intakeDescription,
       projectRef: projectRef, target: target, goal: goal, successCriteria: successCriteria,
-      budgets: budgets, policy: policy, executionMode: executionMode,
+      budgets: budgets, policy: policy,
       evolutionPolicy: evolutionPolicy, evolutionWorkspace: evolutionWorkspace,
       observedState: projection.observedState,
       createdAtUTC: createdAtUTC, updatedAtUTC: atUTC, status: projection.status,
@@ -1305,7 +1322,7 @@ public struct HarnessTaskSnapshot: Equatable, Sendable, Codable {
     HarnessTaskSnapshot(
       htaskID: htaskID, type: type, intakeDescription: intakeDescription,
       projectRef: projectRef, target: target, goal: goal, successCriteria: successCriteria,
-      budgets: budgets, policy: policy, executionMode: executionMode,
+      budgets: budgets, policy: policy,
       evolutionPolicy: evolutionPolicy, evolutionWorkspace: evolutionWorkspace,
       observedState: observedState,
       createdAtUTC: createdAtUTC, updatedAtUTC: updatedAtUTC, status: status,

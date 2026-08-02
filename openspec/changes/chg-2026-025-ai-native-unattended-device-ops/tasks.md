@@ -3305,8 +3305,9 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
 
 ## TASK-AIN-019 — 默认 Evolution 路径与未合入候选的 bounded E2 Flash campaign
 
-- Status:in-progress（r8 产品实现已由 #957 合入；r9 删除模式分叉与 one-shot 新执行面，
-  本实现 PR 中授权实例、USB/HDC/RockUSB 与真实 Flash dispatch 均为 0）
+- Status:in-progress（r8 产品实现已由 #957 合入；r9 默认入口已由 #958 合入；r10 删除
+  活跃 Harness 模式投影与旧 wire/public factory，本实现 PR 中授权实例、USB/HDC/RockUSB
+  与真实 Flash dispatch 均为 0）
 - Platform:macos
 - Requirements:POL-AGENT-002(MODIFIED)、REQ-FLASH-015(MODIFIED)、POL-AGENT-001、
   POL-WORKFLOW-001、POL-RECOVERY-001、POL-TARGET-001
@@ -3315,7 +3316,7 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
   TASK-AIN-018 done(#947)
 - Applicable failure patterns:AF-001、AF-002、AF-004、AF-006、AF-007、AF-010、
   AF-013、AF-015、AF-017
-- Production reachability:`arkdeck harness submit --execution-mode evolution` → isolated
+- Production reachability:`arkdeck task submit --workspace-allowed-paths ...` → isolated
   candidate patch/build/test → immutable candidate pins → independent read-only adversarial
   review → protected-main E2 broker → fresh target/binding lineage readback → durable campaign
   ordinal → existing `flash.dayu200@1` typed provider → artifact/evaluation → next candidate or
@@ -3375,6 +3376,9 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
 - r9：默认 `flash preview/execute/continue/status` 承载 campaign，删除 `evolution-*` 特殊命名、
   one-shot chat request/admission/Loader-confirm/dispatch 生产路径；历史 authority decoder、
   Journal/Manifest/export 只读兼容保留，standing/human 路径保留。
+- r10：删除 `HarnessExecutionMode`、snapshot/status mode 编码和 coordinator mode 分支；
+  workspace policy 直接驱动 isolation/review/promotion。旧 snapshot mode 只做一致性解码，
+  新 wire 使用 `workspaceAllowedPaths|workspaceAllowedOperations`，历史 chat 无 public factory。
 
 ### Verification
 
@@ -3391,3 +3395,6 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
 - r9 默认路径/source-surface/migration tests：旧 execution-mode/evolution workspace flags/
   evolution alias/chat flags 全拒绝，新 workspace/Flash 默认正例通过，历史 chat bytes 可读但
   新 reserve 与 device dispatch=0。
+- r10 single-model/migration tests：活跃 source 无 `HarnessExecutionMode`/mode branch，3.0
+  snapshot 一致时迁移到无 mode 的 3.1、冲突时拒绝；status 不输出 mode；旧 wire 拒绝，
+  historical chat fixture 只能通过 production decoder 建立。

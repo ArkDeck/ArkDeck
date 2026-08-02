@@ -54,6 +54,14 @@ review/broker pins、fresh target readback、执行时间与 retry disposition�
 authorization 与 human handoff SHALL 保留。旧 `evolution-*`/one-shot surface 必须在任何
 usage reservation、intent 或 device process 前拒绝。
 
+Harness 活跃 domain、snapshot 与 status wire SHALL NOT 保存、输出或基于
+`normal|evolution` 分支；workspace policy 直接决定 isolation/review/promotion。旧 snapshot
+mode 只可作为 decoder-only 一致性证据并在迁移后删除，且 mode/policy/workspace 任一冲突
+SHALL 拒绝加载。task submit current wire 只接受 `workspaceAllowedPaths` 与
+`workspaceAllowedOperations`；旧 `executionMode`、`allowedPaths`、
+`evolutionAllowedOperations` SHALL 在建立 workspace/job 前拒绝。历史 chat authority 只可
+从既有 bytes 解码/export，不得暴露新的 validated creation factory。
+
 #### Scenario: AC-FLASH-015-01 无 E2 authority 的真实刷写请求
 
 - GIVEN 一个 Agent/CI 任务拥有真实设备 binding,并生成含 flashPartition 的
@@ -98,6 +106,7 @@ usage reservation、intent 或 device process 前拒绝。
   `--workspace-allowed-*` envelope
 - THEN workspace task 自动进入 bounded Evolution，Flash 默认入口产生或消费 exact campaign
 - AND 旧 surface 在 reservation/intent/device process 前拒绝，历史 chat evidence 仍可读取
+- AND snapshot/status 不含 mode 字段，legacy mode 仅在与 workspace policy 一致时可迁移
 - AND standing authorization 与 human handoff 的独立生产路径保持可用
 
 #### Scenario: AIN-EVOLUTION-E2-001 未合入候选的分权执行

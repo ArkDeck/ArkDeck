@@ -246,10 +246,9 @@ public actor HarnessTaskCoordinator {
     let now = nowUTC()
     let htaskID = taskIDFactory()
     let evolutionWorkspace: HarnessEvolutionWorkspace?
-    if submission.executionMode == .evolution {
+    if let policy = submission.evolutionPolicy {
       guard let port = evolutionWorkspacePort,
-        let sourceProjectRef = submission.projectRef,
-        let policy = submission.evolutionPolicy
+        let sourceProjectRef = submission.projectRef
       else { throw HarnessCoordinatorError.evolutionWorkspaceUnavailable }
       evolutionWorkspace = try await port.prepareWorkspace(
         htaskID: htaskID, sourceProjectRef: sourceProjectRef,
@@ -268,7 +267,6 @@ public actor HarnessTaskCoordinator {
         ? handler.defaultSuccessCriteria() : submission.successCriteria,
       budgets: submission.budgets,
       policy: submission.policy,
-      executionMode: submission.executionMode,
       evolutionPolicy: submission.evolutionPolicy,
       evolutionWorkspace: evolutionWorkspace,
       createdAtUTC: now,
@@ -948,7 +946,7 @@ public actor HarnessTaskCoordinator {
       }
     }
 
-    if snapshot.executionMode == .evolution, attempt.candidatePatch == nil {
+    if snapshot.requiresWorkspaceIsolation, attempt.candidatePatch == nil {
       guard let evolutionPolicy = snapshot.evolutionPolicy,
         case .string(let artifactLease)? = preparedInputs["patchArtifactRef"]
       else {
@@ -2140,7 +2138,7 @@ public actor HarnessTaskCoordinator {
     }
 
     let artifactRefs = Self.mergedArtifactRefs(snapshot, round)
-    if snapshot.executionMode == .evolution {
+    if snapshot.requiresWorkspaceIsolation {
       try await recordAttemptRuntimeArtifacts(
         round.evidence.filter(\.verified).map(\.artifactID),
         taskID: snapshot.htaskID)
@@ -2161,7 +2159,7 @@ public actor HarnessTaskCoordinator {
       modelCalls: snapshot.consumedBudget.modelCalls)
     switch evaluation.verdict {
     case .pass:
-      if snapshot.executionMode == .evolution {
+      if snapshot.requiresWorkspaceIsolation {
         return try await finishEvolutionEvaluation(
           snapshot: snapshot, evaluation: evaluation, consumed: consumed,
           artifactRefs: artifactRefs, observedState: observedStateJSON,

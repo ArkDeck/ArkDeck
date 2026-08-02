@@ -102,7 +102,7 @@ extension HarnessTaskCoordinator {
     let now = nowUTC()
     let ordinal = (attempts.map(\.ordinal).max() ?? 0) + 1
     let attemptID: String
-    if snapshot.executionMode == .evolution {
+    if snapshot.requiresWorkspaceIsolation {
       let material = Data(
         "\(snapshot.htaskID)|\(ordinal)|\(strategy.fingerprint)".utf8)
       let digest = SHA256.hash(data: material).map { String(format: "%02X", $0) }.joined()

@@ -243,7 +243,7 @@ final class AuthorizationUsageLedgerContractTests: XCTestCase {
     let directory = try temporaryDirectory()
     defer { try? FileManager.default.removeItem(at: directory) }
     let ledger = try AgentAuthorityUsageLedger(root: directory)
-    let reference = try AgentExecutionAuthorityReference.validatedChatConfirmation(
+    let reference = try historicalChatAuthority(
       confirmationDigestSHA256: String(repeating: "1", count: 64),
       planDigestSHA256: String(repeating: "2", count: 64),
       archiveDigestSHA256: String(repeating: "3", count: 64),

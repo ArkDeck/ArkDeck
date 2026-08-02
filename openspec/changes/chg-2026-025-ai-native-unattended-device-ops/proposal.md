@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-025-ai-native-unattended-device-ops
-revision: 9
-status: proposed # r1 经 #281 正式批准；r2-r8 已合入；r9 default Evolution 路径待维护者 review/merge
+revision: 10
+status: proposed # r1 经 #281 正式批准；r2-r9 已合入；r10 active-mode removal 待维护者 review/merge
 class: core
 core_change_level: major
 owner: lvye
@@ -10,6 +10,17 @@ platforms: [macos]
 ---
 
 # AI Native 无人值守设备操作:授权从"人类亲手执行"上移为"人类批准计划"
+
+> r10 active-mode removal（2026-08-02）：r9 已由维护者通过 #958 合入，但内部 Harness
+> snapshot/status/coordinator 仍持久化、输出并分支 `normal|evolution`，CLI 的新 workspace
+> flags 仍翻译成旧 `evolutionAllowedOperations` wire，历史 chat authority 仍有 public validated
+> constructor。这使“默认路径”继续依赖旧模式投影。r10 删除活跃 `HarnessExecutionMode`、
+> snapshot/status mode 字段和 mode 分支，直接以 workspace policy 驱动 isolation/review/
+> promotion；snapshot 3.1 只把旧字段作为 decoder-only 一致性证据，字段与 policy/workspace
+> 冲突即拒绝。wire 统一为 `workspaceAllowedPaths|workspaceAllowedOperations`，旧字段拒绝；
+> chat 只允许从历史 bytes 解码，不再提供 public validated factory。standing authorization、
+> human handoff、历史 Journal/Manifest/ledger round-trip 与 generic job 的 planOnly/execute
+> execution mode 均不属于本删除范围。
 
 > r9 default Evolution path（2026-08-02）：r8 产品实现已由维护者通过 #957 合入，
 > 但产品仍暴露 `normal|evolution` 双 Harness 模式、`evolution-*` 特殊 Flash CLI 与可新建的
@@ -210,6 +221,19 @@ In scope:
 - **迁移 fail closed**：旧 `--execution-mode`、`--evolution-allowed-*`、`evolution-*` 与
   one-shot chat execution flags 返回 usage error，不做静默映射；旧持久记录可读但不可继续
   destructive execution。
+
+### r10 single active Harness model
+
+- **policy 直接驱动**：活跃 Harness domain、snapshot 与 status wire 不再存在
+  `normal|evolution` 类型/字段/分支；workspace policy 存在即要求隔离 workspace 并进入
+  review/promotion，缺失则是 device-only task。
+- **decoder-only 迁移**：3.0 及更早 snapshot 的 `executionMode` 只用于验证其与 policy 一致，
+  迁移到 3.1 后不再编码；policy/workspace 或 legacy mode/policy 不一致直接拒绝加载。
+- **current wire 命名**：task submit 只接受 `workspaceAllowedPaths` 与
+  `workspaceAllowedOperations`；`executionMode`、`allowedPaths`、
+  `evolutionAllowedOperations` 不做翻译。
+- **历史 authority 只读**：删除 `validatedChatConfirmation` 的 public creation surface；
+  decoder/Journal/Manifest/export compatibility 与所有新 reserve/dispatch 拒绝保持不变。
 
 ### r2 security-remediation additions
 

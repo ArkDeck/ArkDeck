@@ -63,6 +63,10 @@ executor.kind=human 记录。
 不得再由 caller 选择 normal/evolution mode；交互式 Agent Flash 默认 CLI 直接进入 campaign
 preview/execute/continue/status。standing authorization 与人类 handoff 是不同信任/执行用途，
 不得因默认化删除。旧 mode/CLI/chat execution surface SHALL fail closed，不得静默回退。
+活跃 Harness domain、snapshot 与 status wire SHALL NOT 持久化、输出或基于
+`normal|evolution` 分支；workspace policy 是 isolation/review/promotion 的唯一事实源。旧
+snapshot mode 只可作为 decoder-only 一致性证据，且与 policy/workspace 冲突时 SHALL
+fail closed。历史 chat authority SHALL NOT 暴露新的 validated creation factory。
 
 ## 保持不变
 

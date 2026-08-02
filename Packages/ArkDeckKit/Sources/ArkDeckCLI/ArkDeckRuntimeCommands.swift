@@ -1100,13 +1100,13 @@ enum RuntimeCLI {
           message: "\(obsolete) was removed; workspace policy is now the default Agent path")
       }
       if let paths = value("--workspace-allowed-paths") {
-        params["allowedPaths"] = .array(
+        params["workspaceAllowedPaths"] = .array(
           paths.split(separator: ",").map {
             .string($0.trimmingCharacters(in: .whitespaces))
           })
       }
       if let operations = value("--workspace-allowed-operations") {
-        params["evolutionAllowedOperations"] = .array(
+        params["workspaceAllowedOperations"] = .array(
           operations.split(separator: ",").map {
             .string($0.trimmingCharacters(in: .whitespaces))
           })

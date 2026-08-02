@@ -10,13 +10,6 @@ import ArkDeckCore
 import CryptoKit
 import Foundation
 
-/// Persisted compatibility projection. Callers cannot select this value; a workspace policy
-/// derives `evolution`, while a device-only task derives `normal`.
-public enum HarnessExecutionMode: String, Codable, Sendable {
-  case normal
-  case evolution
-}
-
 public enum HarnessEvolutionPolicyError: Error, Equatable, Sendable {
   case invalidBaseRevision
   case emptyAllowedPaths
@@ -451,7 +444,6 @@ public protocol HarnessAdversarialReviewing: Sendable {
 }
 
 public enum HarnessPromotionGateFailure: Error, Equatable, Sendable {
-  case notEvolutionTask
   case evolutionPolicyMissing
   case candidatePatchMissing
   case candidateArtifactMissing
@@ -522,9 +514,6 @@ public enum HarnessPromotionGate {
     promotionCandidateID: String,
     createdAtUTC: String
   ) throws -> HarnessPromotionCandidate {
-    guard snapshot.executionMode == .evolution else {
-      throw HarnessPromotionGateFailure.notEvolutionTask
-    }
     guard let policy = snapshot.evolutionPolicy else {
       throw HarnessPromotionGateFailure.evolutionPolicyMissing
     }

@@ -10,9 +10,9 @@ final class EvolutionCampaignContractTests: XCTestCase {
   private static let targetDigest = String(repeating: "a", count: 64)
 
   func testFlashCLIDefaultsToCampaignAndRemovesLegacySelectors() throws {
-    let sourceURL = URL(fileURLWithPath: #filePath)
+    let packageRoot = URL(fileURLWithPath: #filePath)
       .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-      .appending(path: "Sources/ArkDeckCLI/ArkDeckCLIMain.swift")
+    let sourceURL = packageRoot.appending(path: "Sources/ArkDeckCLI/ArkDeckCLIMain.swift")
     let source = try String(contentsOf: sourceURL, encoding: .utf8)
 
     for subcommand in ["preview", "execute", "continue", "status"] {
@@ -27,6 +27,21 @@ final class EvolutionCampaignContractTests: XCTestCase {
       XCTAssertFalse(source.contains(obsolete), "obsolete CLI surface remains: \(obsolete)")
     }
     XCTAssertTrue(source.contains("--campaign-confirmation-digest-sha256"))
+
+    let taskCLI = try String(
+      contentsOf: packageRoot.appending(path: "Sources/ArkDeckCLI/ArkDeckRuntimeCommands.swift"),
+      encoding: .utf8)
+    XCTAssertTrue(taskCLI.contains("params[\"workspaceAllowedPaths\"]"))
+    XCTAssertTrue(taskCLI.contains("params[\"workspaceAllowedOperations\"]"))
+    XCTAssertFalse(taskCLI.contains("params[\"evolutionAllowedOperations\"]"))
+
+    let authoritySource = try String(
+      contentsOf: packageRoot.appending(
+        path: "Sources/ArkDeckStorage/AuthorizationUsageLedger.swift"),
+      encoding: .utf8)
+    XCTAssertFalse(
+      authoritySource.contains("public static func validatedChatConfirmation"),
+      "historical chat authority must not retain a public creation factory")
   }
 
   func testLegacyCLISurfacesFailClosedBeforeRuntimeOrDeviceAccess() throws {
@@ -80,7 +95,7 @@ final class EvolutionCampaignContractTests: XCTestCase {
         RockchipEvolutionCampaignConfirmationAssertion.self,
         from: JSONSerialization.data(withJSONObject: object)))
 
-    let oldChat = try AgentExecutionAuthorityReference.validatedChatConfirmation(
+    let oldChat = try historicalChatAuthority(
       confirmationDigestSHA256: digest("b"), planDigestSHA256: digest("c"),
       archiveDigestSHA256: digest("d"), stepSetDigestSHA256: digest("e"),
       targetDigestSHA256: digest("f"), confirmedAt: Self.confirmedAt)
