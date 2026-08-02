@@ -1,8 +1,42 @@
 import AppKit
-import ArkDeckCore
 import ArkDeckWorkflows
 import Combine
 import SwiftUI
+
+/// Shell navigation is presentation vocabulary owned by the App target; the
+/// domain package deliberately knows nothing about it.
+private enum ArkDeckNavigationItem: String, CaseIterable, Hashable, Identifiable, Sendable {
+  case overview
+  case flash
+  case debug
+  case uiDump
+  case trace
+  case history
+
+  var id: String { rawValue }
+
+  var localizationKey: String {
+    switch self {
+    case .overview: "app.navigation.overview"
+    case .flash: "app.navigation.flash"
+    case .debug: "app.navigation.debug"
+    case .uiDump: "app.navigation.uiDump"
+    case .trace: "app.navigation.trace"
+    case .history: "app.navigation.history"
+    }
+  }
+
+  var systemImageName: String {
+    switch self {
+    case .overview: "rectangle.grid.2x2"
+    case .flash: "bolt.fill"
+    case .debug: "ladybug"
+    case .uiDump: "rectangle.3.group"
+    case .trace: "waveform.path.ecg"
+    case .history: "clock.arrow.circlepath"
+    }
+  }
+}
 
 @main
 struct ArkDeckApp: App {
