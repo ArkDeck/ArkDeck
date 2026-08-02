@@ -59,7 +59,7 @@ public struct AnalyzerProfile: Sendable, Equatable {
   }
 }
 
-public struct AnalyzerInvocation: Sendable, Equatable, Codable {
+package struct AnalyzerInvocation: Sendable, Equatable, Codable {
   public let analyzerRef: String
   public let analyzerVersion: String
   public let executableSHA256: String
@@ -70,7 +70,7 @@ public struct AnalyzerInvocation: Sendable, Equatable, Codable {
   public let sourceByteCount: Int
 }
 
-public enum AnalyzerProviderAction: Sendable, Equatable, Codable {
+package enum AnalyzerProviderAction: Sendable, Equatable, Codable {
   case analyze(AnalyzerInvocation)
 }
 
@@ -135,7 +135,7 @@ public struct AnalyzerProvider: DeviceProvider {
       "analyzer provider is host-only: it has no device facts for \(targetID)")
   }
 
-  public func action(
+  package func action(
     for step: CatalogStepDescriptor,
     operation: CatalogOperationDescriptor,
     inputs: [String: JSONValue]
@@ -144,7 +144,7 @@ public struct AnalyzerProvider: DeviceProvider {
       "analyzer action materialization requires a resolved input artifact")
   }
 
-  public func action(
+  package func action(
     for step: CatalogStepDescriptor,
     operation: CatalogOperationDescriptor,
     inputs: [String: JSONValue],
@@ -185,7 +185,7 @@ public struct AnalyzerProvider: DeviceProvider {
           sourceByteCount: artifact.byteCount)))
   }
 
-  public func lower(
+  package func lower(
     action: TypedProviderAction,
     context: ProviderExecutionContext
   ) throws -> TypedProcessPlan {
@@ -200,7 +200,7 @@ public struct AnalyzerProvider: DeviceProvider {
         timeoutSeconds: invocation.timeoutSeconds))
   }
 
-  public func verify(
+  package func verify(
     receipt: ProviderProcessReceipt,
     action: TypedProviderAction,
     context: ProviderExecutionContext

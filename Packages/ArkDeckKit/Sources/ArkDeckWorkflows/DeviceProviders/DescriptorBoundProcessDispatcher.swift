@@ -24,13 +24,13 @@ public struct ResolvedExecutable: Sendable, Equatable {
 
 /// Resolves the tool binary for a provider at dispatch time. Production
 /// composes discovery; tests point at a fixture binary.
-public protocol RuntimeExecutableResolving: Sendable {
+package protocol RuntimeExecutableResolving: Sendable {
   func resolveExecutable(providerID: String) throws -> ResolvedExecutable
   func resolveExecutable(for action: TypedProviderAction) throws -> ResolvedExecutable
 }
 
 extension RuntimeExecutableResolving {
-  public func resolveExecutable(for action: TypedProviderAction) throws -> ResolvedExecutable {
+  package func resolveExecutable(for action: TypedProviderAction) throws -> ResolvedExecutable {
     let providerID: String
     switch action {
     case .hdc:
@@ -73,7 +73,7 @@ public struct DescriptorBoundProcessDispatcher: RuntimeProcessDispatching {
   private let outputByteBudget: Int
   private let childEnvironment: [String: String]
 
-  public init(
+  package init(
     resolver: any RuntimeExecutableResolving,
     outputByteBudget: Int = 8 * 1024 * 1024,
     childEnvironment: [String: String] = [:]

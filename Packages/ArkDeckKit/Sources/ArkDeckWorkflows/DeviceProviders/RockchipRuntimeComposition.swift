@@ -228,7 +228,7 @@ public struct TargetStoreRockchipRuntimeFactsPort: RockchipRuntimeFactsPort {
   private let resolver: any RuntimeExecutableResolving
   private let nowUTC: @Sendable () -> String
 
-  public init(
+  package init(
     targetStore: RuntimeTargetStore,
     resolver: any RuntimeExecutableResolving,
     nowUTC: @escaping @Sendable () -> String
@@ -278,14 +278,14 @@ public struct BundledRockchipRuntimeDispatcher: RuntimeProcessDispatching {
   private let resolver: any RuntimeExecutableResolving
   private let host: any RockchipRuntimeActionHosting
 
-  public init(resolver: any RuntimeExecutableResolving) {
+  package init(resolver: any RuntimeExecutableResolving) {
     self.resolver = resolver
     host = RefusingRockchipRuntimeActionHost(
       reason:
         "the per-action RockUSB host requires descriptor-bound HDC and a product state directory")
   }
 
-  public init(
+  package init(
     resolver: any RuntimeExecutableResolving,
     hdcResolver: any RuntimeExecutableResolving,
     stateDirectory: URL

@@ -813,7 +813,7 @@ public actor RuntimeArtifactStore {
     return removed
   }
 
-  public func recordCleanupDebt(
+  package func recordCleanupDebt(
     jobID: String, stepID: String, residue: CleanupResidue, reason: String,
     action: TypedProviderAction? = nil
   ) throws {
@@ -838,7 +838,7 @@ public actor RuntimeArtifactStore {
     try persistCleanupDebt(debts)
   }
 
-  public func recordCleanupDebt(
+  package func recordCleanupDebt(
     jobID: String, stepID: String, remotePath: String, reason: String,
     action: TypedProviderAction? = nil
   ) throws {
