@@ -3415,6 +3415,17 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
   preview 与 execute/continue 入口机会式清扫，status 保持纯读；contract tests 覆盖
   过期草稿回收、fresh 草稿/带历史文档保留、execute/continue 清扫后仍找到自身文档、
   设备 dispatch 0。
+- workspace 有界销毁（#972）：`HarnessEvolutionWorkspacePort.sweepTerminalWorkspaces`
+  + `HarnessEvolutionWorkspaceRetention`（终态最短存活 + 最近 K 棵 + dry-run）。
+  终态（succeeded/failed/cancelled）任务的隔离树按保留策略销毁：只删 `workspace/`
+  与 `.workspace.tmp`/`.workspace.doomed` 残留（rename→remove，崩溃后幂等续删），
+  `workspace.json`/`attempts/` 清单保留并新增 `teardown.json` 审计档；活跃任务与
+  store 无法担保的目录（未知/重复/manifest 不符）fail-closed 保留；销毁后 reopen
+  抛 `workspaceAlreadyDestroyed`，派生 profile 注销（仅限 evolution kind，主
+  profile 不可经此移除）。入口 = `task.workspaceGC` wire 方法（默认 retainDays 7/
+  retainLast 2）与 `arkdeck task workspace-gc [--retain-days] [--retain-last]
+  [--dry-run]`；无 workspace port 的组合 fail-closed；无 on-terminal 自动清扫
+  （显式 CLI/cron 即有界，failed 树的 post-mortem 价值由保留策略守护）。
 
 ### Verification
 
@@ -3445,3 +3456,8 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
   全门通过产生 `READY_FOR_NORMAL_PR` 且 promotion artifact 引用并入任务；review 时工作区
   revision 漂移拒绝 promotion。adapter 正负例覆盖闭合 shape、`--sandbox read-only` argv、
   oversized/mismatched diff 在任何模型调用前拒绝；env 组合 fail-closed 正负例。
+- workspace GC tests（#972，`HarnessEvolutionContractTests` 4 例）：终态销毁 + 元数据/
+  审计档存留 + 活跃与未知 fail-closed 保留 + 二次 sweep 幂等 + 销毁后 reopen fail-closed；
+  retain-last 与 age 双轴保留及 dry-run 零变更；中断 teardown 的 `.workspace.doomed`/
+  `.workspace.tmp` 幂等续删；wire 端默认保留、显式清零销毁并报回收字节、负参数
+  invalidParams、无 port rejected；设备 dispatch=0。

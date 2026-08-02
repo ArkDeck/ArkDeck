@@ -283,6 +283,28 @@ public actor HarnessTaskCoordinator {
     try await store.list()
   }
 
+  /// Destroys the isolated trees of terminal evolution tasks per `retention`.
+  /// The store is the only authority on lifecycle: the port receives exactly
+  /// the workspaces the store can vouch for, and terminal lifecycles are
+  /// absorbing, so nothing active can be swept. Audit metadata survives on
+  /// the provider side; no host path enters or leaves this call.
+  public func sweepEvolutionWorkspaces(
+    retention: HarnessEvolutionWorkspaceRetention
+  ) async throws -> [HarnessEvolutionWorkspaceGCFinding] {
+    guard let port = evolutionWorkspacePort else {
+      throw HarnessCoordinatorError.evolutionWorkspaceUnavailable
+    }
+    let references = try await store.list().compactMap { snapshot in
+      snapshot.evolutionWorkspace.map {
+        HarnessEvolutionWorkspaceGCTaskReference(
+          workspaceID: $0.workspaceID, htaskID: snapshot.htaskID,
+          lifecycle: snapshot.lifecycle, updatedAtUTC: snapshot.updatedAtUTC)
+      }
+    }
+    return try await port.sweepTerminalWorkspaces(
+      tasks: references, retention: retention, nowUTC: nowUTC())
+  }
+
   public func events(_ taskID: String) async throws -> [HarnessTaskEvent] {
     _ = try await load(taskID)
     return try await store.events(taskID)
