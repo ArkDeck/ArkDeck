@@ -1064,8 +1064,8 @@ enum RuntimeCLI {
         exitCode: EX_USAGE,
         message:
           "missing task subcommand (submit|list|status|result|events|evaluations|"
-          + "attempts|humanActions|memory|reconcile|propose-patch|pause|resume|cancel|"
-          + "workspace-gc)")
+          + "attempts|humanActions|memory|reconcile|propose-patch|promotion|pause|"
+          + "resume|cancel|workspace-gc)")
     }
     var rest = Array(arguments.dropFirst())
     let json = rest.contains("--json")
@@ -1208,6 +1208,19 @@ enum RuntimeCLI {
             "htaskId": .string(try requiredTask()), "resolution": .string(resolution),
           ]),
         json: json)
+    case "promotion":
+      // Read-only export of a recorded promotion candidate: the daemon
+      // assembles the persisted facts and the rendered PR-ready documents;
+      // this command only prints them or writes them into a maintainer-chosen
+      // directory. Promotion stays a document - nothing here can push a
+      // branch, create a commit or merge.
+      let response = try client.request(
+        method: "task.promotion", params: ["htaskId": .string(try requiredTask())])
+      if let destination = value("--destination") {
+        emit(try writePromotionBundle(response, destinationPath: destination), json: json)
+      } else {
+        emit(response, json: json)
+      }
     case "propose-patch":
       let maximumProposalBytes = 512 * 1024
       guard let path = value("--proposal-file") else {
@@ -1237,6 +1250,97 @@ enum RuntimeCLI {
         json: json)
     default:
       throw CLIError(exitCode: EX_USAGE, message: "unsupported task subcommand")
+    }
+  }
+
+  /// Writes the daemon-rendered promotion bundle verbatim into a new or
+  /// empty-enough destination directory. The daemon already verified the
+  /// diff bytes against the candidate metadata; this side re-hashes
+  /// `final.patch` before writing anything, so the maintainer's bundle can
+  /// never contain bytes the wire mangled (the same both-sides digest check
+  /// the adversarial review leg performs).
+  private static func writePromotionBundle(
+    _ response: JSONValue, destinationPath: String
+  ) throws -> JSONValue {
+    guard case .object(let fields) = response,
+      case .string(let diffDigest)? = fields["diffDigest"],
+      case .array(let fileValues)? = fields["files"], !fileValues.isEmpty
+    else {
+      throw AgentClientError.malformedResponse(
+        "task.promotion returned no exportable bundle")
+    }
+    var files: [(name: String, contents: String)] = []
+    for value in fileValues {
+      guard case .object(let file) = value,
+        case .string(let name)? = file["name"],
+        case .string(let contents)? = file["contents"],
+        isSafePromotionFileName(name)
+      else {
+        throw AgentClientError.malformedResponse(
+          "task.promotion returned a bundle file with an unsafe name")
+      }
+      files.append((name, contents))
+    }
+    guard let patch = files.first(where: { $0.name == "final.patch" }) else {
+      throw AgentClientError.malformedResponse(
+        "task.promotion returned a bundle without final.patch")
+    }
+    let patchDigest = SHA256.hash(data: Data(patch.contents.utf8))
+      .map { String(format: "%02x", $0) }.joined()
+    guard patchDigest == diffDigest else {
+      throw AgentClientError.malformedResponse(
+        "refusing to write final.patch: bytes hash to \(patchDigest) "
+          + "but the candidate metadata names \(diffDigest)")
+    }
+    let directory = URL(fileURLWithPath: destinationPath, isDirectory: true)
+      .standardizedFileURL
+    var isDirectory: ObjCBool = false
+    if FileManager.default.fileExists(atPath: directory.path, isDirectory: &isDirectory) {
+      guard isDirectory.boolValue,
+        (try? FileManager.default.attributesOfItem(atPath: directory.path))?[.type]
+          as? FileAttributeType != .typeSymbolicLink
+      else {
+        throw CLIError(
+          exitCode: EX_CANTCREAT,
+          message: "--destination must be a directory (not a symlink): \(directory.path)")
+      }
+    } else {
+      try FileManager.default.createDirectory(
+        at: directory, withIntermediateDirectories: true,
+        attributes: [.posixPermissions: 0o700])
+    }
+    // Refuse every collision before writing anything: a bundle is delivered
+    // whole or not at all.
+    for (name, _) in files {
+      let target = directory.appendingPathComponent(name)
+      guard !FileManager.default.fileExists(atPath: target.path) else {
+        throw CLIError(
+          exitCode: EX_CANTCREAT,
+          message: "refusing to overwrite existing \(target.path)")
+      }
+    }
+    var written: [String] = []
+    for (name, contents) in files {
+      try Data(contents.utf8).write(
+        to: directory.appendingPathComponent(name), options: [.atomic])
+      written.append(name)
+    }
+    return .object([
+      "htaskId": fields["htaskId"] ?? .null,
+      "promotionCandidateId": fields["promotionCandidateId"] ?? .null,
+      "disposition": fields["disposition"] ?? .null,
+      "diffDigest": .string(diffDigest),
+      "destinationDirectory": .string(directory.path),
+      "writtenFiles": .array(written.map(JSONValue.string)),
+    ])
+  }
+
+  private static func isSafePromotionFileName(_ name: String) -> Bool {
+    guard !name.isEmpty, name.utf8.count <= 128,
+      let first = name.first, first.isASCII, first.isLetter || first.isNumber
+    else { return false }
+    return name.allSatisfy {
+      $0.isASCII && ($0.isLetter || $0.isNumber || "._-".contains($0))
     }
   }
 }

@@ -125,6 +125,33 @@ package struct HarnessTaskMethodService: Sendable {
         let attempts = try await harness.attempts(id)
         return success(id: request.id, result: .array(attempts.map(Self.encode)))
 
+      case "task.promotion":
+        guard let id = taskID() else {
+          return failure(id: request.id, code: .invalidParams, message: "htaskId is required")
+        }
+        let snapshot = try await harness.status(id)
+        let attempts = try await harness.attempts(id)
+        let evaluations = try await harness.evaluations(id)
+        do {
+          let bundle = try HarnessPromotionExport.assemble(
+            snapshot: snapshot, attempts: attempts, evaluations: evaluations)
+          return success(
+            id: request.id, result: Self.encodePromotionExport(bundle, snapshot: snapshot))
+        } catch let error as HarnessPromotionExportError {
+          switch error {
+          case .promotionNotRecorded:
+            return failure(
+              id: request.id, code: .notFound,
+              message: "task \(id) has no recorded promotion candidate")
+          case .inconsistentFacts(let fact):
+            return failure(
+              id: request.id, code: .internalError,
+              message: "promotion facts failed integrity verification: \(fact)")
+          case .diffUnavailable(let reason):
+            return failure(id: request.id, code: .internalError, message: reason)
+          }
+        }
+
       case "task.humanActions":
         guard let id = taskID() else {
           return failure(id: request.id, code: .invalidParams, message: "htaskId is required")
@@ -524,6 +551,35 @@ package struct HarnessTaskMethodService: Sendable {
       "successCriteria": .array(snapshot.successCriteria.map(encode)),
       "artifactRefs": .array(snapshot.artifactRefs.map(JSONValue.string)),
       "result": snapshot.result.map(encode) ?? .null,
+    ])
+  }
+
+  /// The PR-ready promotion bundle: the identity facts a caller filters on,
+  /// the recorded documents, and the rendered files a client writes to a
+  /// maintainer-chosen directory verbatim. `diffDigest` travels beside the
+  /// files so the client can re-verify `final.patch` before writing it,
+  /// mirroring the review leg's both-sides digest check.
+  static func encodePromotionExport(
+    _ bundle: HarnessPromotionExportBundle, snapshot: HarnessTaskSnapshot
+  ) -> JSONValue {
+    .object([
+      "htaskId": .string(bundle.htaskID),
+      "goal": .string(snapshot.goal.summary),
+      "targetId": .string(snapshot.target.targetID),
+      "taskStatus": .string(snapshot.status.rawValue),
+      "attemptId": .string(bundle.attemptID),
+      "promotionCandidateId": .string(bundle.promotion.promotionCandidateID),
+      "disposition": .string(bundle.promotion.disposition),
+      "promotionCandidate": encode(bundle.promotion),
+      "candidatePatch": encode(bundle.candidate),
+      "evaluation": encode(bundle.evaluation),
+      "review": encode(bundle.review),
+      "diffDigest": .string(bundle.candidate.diffDigest),
+      "artifactIds": .array(bundle.promotion.artifactIDs.map(JSONValue.string)),
+      "files": .array(
+        bundle.files.map {
+          .object(["name": .string($0.name), "contents": .string($0.contents)])
+        }),
     ])
   }
 

@@ -291,6 +291,18 @@ private final class JourneyWorkspacePort: HarnessEvolutionWorkspacePort, @unchec
   ) async throws {
     lock.withLock { attemptDirectories.append((attemptID, ordinal)) }
   }
+
+  /// The journey never runs workspace GC. Failing loud here beats a silent
+  /// swept-nothing answer: if a future test routes `task.workspaceGC`
+  /// through this fake, it must stage real expectations instead.
+  struct SweepUnsupported: Error {}
+  func sweepTerminalWorkspaces(
+    tasks: [HarnessEvolutionWorkspaceGCTaskReference],
+    retention: HarnessEvolutionWorkspaceRetention,
+    nowUTC: String
+  ) async throws -> [HarnessEvolutionWorkspaceGCFinding] {
+    throw SweepUnsupported()
+  }
 }
 
 /// Proposes the bounded patch exactly when the loop's offer narrows to the
