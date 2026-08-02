@@ -353,6 +353,12 @@ public struct HarnessCandidatePatch: Equatable, Codable, Sendable {
       diffArtifactID: diffArtifactID, metadataArtifactID: artifactID,
       createdAtUTC: createdAtUTC)
   }
+
+  /// True exactly when `text` is the immutable diff this metadata names.
+  public func namesDiff(_ text: String) -> Bool {
+    SHA256.hash(data: Data(text.utf8))
+      .map { String(format: "%02x", $0) }.joined() == diffDigest
+  }
 }
 
 public enum HarnessAdversarialReviewVerdict: String, CaseIterable, Codable, Sendable {
@@ -378,11 +384,19 @@ public struct HarnessReviewIssue: Equatable, Codable, Sendable {
   }
 }
 
-/// The reviewer receives evidence and metadata only.  There is deliberately
-/// no patch proposal or operation output in this protocol.
+/// The reviewer receives evidence and metadata only: the immutable unified
+/// diff (the bytes the candidate metadata's `diffDigest` names), the attempt
+/// history and the evaluation.  There is deliberately no patch *proposal*
+/// envelope and no operation output in this protocol, and the reviewer holds
+/// no operation or patch-writing port, so review cannot mutate the candidate
+/// under review.
 public struct HarnessAdversarialReviewRequest: Equatable, Codable, Sendable {
   public let originalProblem: String
   public let candidatePatch: HarnessCandidatePatch
+  /// The exact reviewed bytes.  The coordinator verifies this text hashes to
+  /// `candidatePatch.diffDigest` before review, so a reviewer verdict always
+  /// names the diff it actually read.
+  public let unifiedDiff: String
   public let attemptHistory: [HarnessAttempt]
   public let evaluation: HarnessEvaluation
   public let artifactIDs: [String]
@@ -390,12 +404,14 @@ public struct HarnessAdversarialReviewRequest: Equatable, Codable, Sendable {
   public init(
     originalProblem: String,
     candidatePatch: HarnessCandidatePatch,
+    unifiedDiff: String,
     attemptHistory: [HarnessAttempt],
     evaluation: HarnessEvaluation,
     artifactIDs: [String]
   ) {
     self.originalProblem = originalProblem
     self.candidatePatch = candidatePatch
+    self.unifiedDiff = unifiedDiff
     self.attemptHistory = attemptHistory
     self.evaluation = evaluation
     self.artifactIDs = Array(Set(artifactIDs)).sorted()

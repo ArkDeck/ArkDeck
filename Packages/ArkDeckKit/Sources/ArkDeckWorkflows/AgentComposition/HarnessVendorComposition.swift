@@ -107,6 +107,50 @@ public enum HarnessVendorConfiguration {
     }
   }
 
+  public static let reviewerProviderKey = "ARKDECK_HARNESS_REVIEWER_PROVIDER"
+  public static let reviewerModelKey = "ARKDECK_HARNESS_REVIEWER_MODEL"
+  public static let reviewerCodexPathKey = "ARKDECK_HARNESS_REVIEWER_CODEX_PATH"
+  public static let reviewerCodexWorkingDirectoryKey = "ARKDECK_HARNESS_REVIEWER_CODEX_WORKDIR"
+
+  /// The independent adversarial reviewer for the Evolution path. Absent
+  /// configuration returns nil and the coordinator fails closed at review
+  /// time (`adversarialReviewerUnavailable`); it is never silently replaced
+  /// by the decision gateway, because the builder reviewing its own patch
+  /// would not be a review.
+  public static func adversarialReviewer(
+    environment: [String: String],
+    transport: any HarnessCodexTransport = CodexCLIProcessTransport()
+  ) throws -> (any HarnessAdversarialReviewing)? {
+    let configuredKeys = [
+      reviewerModelKey, reviewerCodexPathKey, reviewerCodexWorkingDirectoryKey,
+    ]
+    guard let rawProvider = nonempty(environment[reviewerProviderKey]) else {
+      guard !configuredKeys.contains(where: { nonempty(environment[$0]) != nil }) else {
+        throw HarnessVendorConfigurationError.providerRequired
+      }
+      return nil
+    }
+    guard rawProvider.lowercased() == "codex" else {
+      throw HarnessVendorConfigurationError.unsupportedProvider(rawProvider)
+    }
+    guard let model = nonempty(environment[reviewerModelKey]), model.utf8.count <= 200,
+      model.allSatisfy({
+        $0.isASCII && ($0.isLetter || $0.isNumber || "._:-".contains($0))
+      })
+    else {
+      throw HarnessVendorConfigurationError.malformedModelName
+    }
+    guard let path = nonempty(environment[reviewerCodexPathKey]), path.hasPrefix("/") else {
+      throw HarnessVendorConfigurationError.malformedExecutable
+    }
+    guard let workingDirectory = nonempty(environment[reviewerCodexWorkingDirectoryKey]) else {
+      throw HarnessVendorConfigurationError.missingCodexWorkingDirectory
+    }
+    return try CodexHarnessAdversarialReviewer(
+      executablePath: path, modelName: model, workingDirectory: workingDirectory,
+      transport: transport)
+  }
+
   private static func nonempty(_ value: String?) -> String? {
     guard let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines),
       !trimmed.isEmpty
