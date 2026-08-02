@@ -27,7 +27,7 @@ usage() {
   printf '  %s --prepare\n' "$0" >&2
   printf '  %s --check\n' "$0" >&2
   printf '  %s --interactive-trigger\n' "$0" >&2
-  printf '  %s --chat-trigger --confirm-plan-sha256 SHA256 --confirmation-digest-sha256 SHA256\n' "$0" >&2
+  printf '  %s --chat-trigger --confirm-plan-sha256 SHA256 --confirm-target-sha256 SHA256 --confirm-binding-revision N --confirmation-digest-sha256 SHA256\n' "$0" >&2
 }
 
 fail() {
@@ -41,6 +41,8 @@ sha256_file() {
 
 mode=""
 confirmed_plan_sha256=""
+confirmed_target_sha256=""
+confirmed_binding_revision=""
 confirmation_digest_sha256=""
 
 while [[ $# -gt 0 ]]; do
@@ -53,6 +55,16 @@ while [[ $# -gt 0 ]]; do
     --confirm-plan-sha256)
       [[ $# -ge 2 && -z "$confirmed_plan_sha256" ]] || fail "--confirm-plan-sha256 requires one value"
       confirmed_plan_sha256="$2"
+      shift 2
+      ;;
+    --confirm-target-sha256)
+      [[ $# -ge 2 && -z "$confirmed_target_sha256" ]] || fail "--confirm-target-sha256 requires one value"
+      confirmed_target_sha256="$2"
+      shift 2
+      ;;
+    --confirm-binding-revision)
+      [[ $# -ge 2 && -z "$confirmed_binding_revision" ]] || fail "--confirm-binding-revision requires one value"
+      confirmed_binding_revision="$2"
       shift 2
       ;;
     --confirmation-digest-sha256)
@@ -77,19 +89,21 @@ done
 
 case "$mode" in
   --prepare)
-    [[ -z "$confirmed_plan_sha256" && -z "$confirmation_digest_sha256" ]] || fail "--prepare does not accept confirmation values"
+    [[ -z "$confirmed_plan_sha256" && -z "$confirmed_target_sha256" && -z "$confirmed_binding_revision" && -z "$confirmation_digest_sha256" ]] || fail "--prepare does not accept confirmation values"
     ;;
   --check)
-    [[ -z "$confirmed_plan_sha256" && -z "$confirmation_digest_sha256" ]] || fail "--check does not accept confirmation values"
+    [[ -z "$confirmed_plan_sha256" && -z "$confirmed_target_sha256" && -z "$confirmed_binding_revision" && -z "$confirmation_digest_sha256" ]] || fail "--check does not accept confirmation values"
     ;;
   --interactive-trigger)
-    [[ -z "$confirmed_plan_sha256" && -z "$confirmation_digest_sha256" ]] || fail "interactive mode creates its assertion from the TTY confirmation"
+    [[ -z "$confirmed_plan_sha256" && -z "$confirmed_target_sha256" && -z "$confirmed_binding_revision" && -z "$confirmation_digest_sha256" ]] || fail "interactive mode creates its assertion from the TTY confirmation"
     [[ "${CI:-}" != "true" && "${GITHUB_ACTIONS:-}" != "true" ]] || fail "CI cannot trigger real Flash"
     [[ -t 0 && -t 1 ]] || fail "interactive trigger requires stdin and stdout attached to a TTY"
     ;;
   --chat-trigger)
     [[ "${CI:-}" != "true" && "${GITHUB_ACTIONS:-}" != "true" ]] || fail "CI cannot trigger real Flash"
     [[ "$confirmed_plan_sha256" == "$EXPECTED_PLAN_SHA256" ]] || fail "chat trigger does not confirm the exact pinned plan digest"
+    [[ "$confirmed_target_sha256" =~ ^[a-f0-9]{64}$ ]] || fail "chat trigger requires the full prospective target digest"
+    [[ "$confirmed_binding_revision" =~ ^[1-9][0-9]*$ ]] || fail "chat trigger requires the prospective binding revision"
     [[ "$confirmation_digest_sha256" =~ ^[a-f0-9]{64}$ ]] || fail "chat confirmation digest must be full lowercase SHA-256"
     ;;
 esac
@@ -104,9 +118,8 @@ tool_sha256="$(sha256_file "$TOOL")"
 hdc_sha256="$(sha256_file "$HDC")"
 [[ "$hdc_sha256" == "$EXPECTED_HDC_SHA256" ]] || fail "HDC 3.2.0f SHA-256 drift"
 
-if [[ ! -x "$ARKDECK_BIN" ]]; then
-  /usr/bin/swift build --package-path "$PACKAGE_DIR" -c release --product arkdeck
-fi
+/usr/bin/swift build --package-path "$PACKAGE_DIR" -c release --product arkdeck
+[[ -x "$ARKDECK_BIN" ]] || fail "release arkdeck product was not built"
 
 if [[ "$mode" == "--prepare" ]]; then
   "$ARKDECK_BIN" flash install-tool --path "$TOOL"
@@ -126,6 +139,36 @@ quarantine_fact="$(/usr/bin/defaults read arkdeck ArkDeck.Rockchip.ToolQuarantin
 code_trust="$(/usr/bin/defaults read arkdeck ArkDeck.Rockchip.ToolCodeTrust 2>/dev/null || true)"
 [[ "$code_trust" == "adHoc" || "$code_trust" == "developerID" ]] || fail "recorded code trust is not permitted"
 
+if [[ "$mode" == "--check" ]]; then
+  printf 'READY: product host and archive prerequisite checks passed\n'
+  printf '  authority: chatConfirmation (one-shot; no AUTH-ID)\n'
+  printf '  execution authority: authorizedAgent\n'
+  printf '  profile: dayu200@2 / OpenHarmony 7.0.0.35-20260728_180253\n'
+  printf '  archive sha256: %s\n' "$EXPECTED_ARCHIVE_SHA256"
+  printf '  HDC 3.2.0f sha256: %s\n' "$EXPECTED_HDC_SHA256"
+  printf '  plan sha256: %s\n' "$EXPECTED_PLAN_SHA256"
+  printf '  step-set sha256: %s\n' "$EXPECTED_STEP_SET_SHA256"
+  "$ARKDECK_BIN" flash binding-preview
+  printf '  impact: all 9 mapped partitions, including userdata, will be overwritten\n'
+  printf '  transition: current Loader skips HDC reboot and enters the pinned ld gate directly\n'
+  printf 'CHECK ONLY: no device mutation or destructive command was dispatched\n'
+  exit 0
+fi
+
+if [[ "$mode" == "--chat-trigger" ]]; then
+  rebind_command=(
+    "$ARKDECK_BIN" flash rebind-binding
+    --chat-confirmation-digest-sha256 "$confirmation_digest_sha256"
+    --chat-confirmed-plan-sha256 "$EXPECTED_PLAN_SHA256"
+    --chat-confirmed-archive-sha256 "$EXPECTED_ARCHIVE_SHA256"
+    --chat-confirmed-step-set-sha256 "$EXPECTED_STEP_SET_SHA256"
+    --chat-confirmed-target-sha256 "$confirmed_target_sha256"
+    --chat-confirmed-binding-revision "$confirmed_binding_revision"
+  )
+  /usr/bin/env ARKDECK_EXECUTION_AUTHORITY=standardAgent \
+    ARKDECK_CHAT_CONFIRMATION_CONTEXT=supervisedInteractiveAgent "${rebind_command[@]}"
+fi
+
 binding_mode="$(/usr/bin/stat -f '%Lp' "$BINDING")"
 [[ "$binding_mode" == "600" ]] || fail "binding permissions must be 0600"
 binding_revision="$(/usr/bin/plutil -extract revision raw -o - "$BINDING" 2>/dev/null || true)"
@@ -137,6 +180,11 @@ binding_serial="$(/usr/bin/plutil -extract serial raw -o - "$BINDING" 2>/dev/nul
 binding_serial_sha256="$(printf '%s' "$binding_serial" | /usr/bin/shasum -a 256 | /usr/bin/awk '{print $1}')"
 target_digest_sha256="$(printf '%s' "${TARGET_MODEL}|${binding_serial_sha256}|${binding_revision}|${target_location_id}|8711|13578" | /usr/bin/shasum -a 256 | /usr/bin/awk '{print $1}')"
 unset binding_serial
+
+if [[ "$mode" == "--chat-trigger" ]]; then
+  [[ "$binding_revision" == "$confirmed_binding_revision" ]] || fail "persisted binding revision differs from the confirmed prospective revision"
+  [[ "$target_digest_sha256" == "$confirmed_target_sha256" ]] || fail "persisted target digest differs from the confirmed prospective target"
+fi
 
 printf 'READY: product prerequisite checks passed\n'
 printf '  authority: chatConfirmation (one-shot; no AUTH-ID)\n'
@@ -154,11 +202,6 @@ printf '  transition: normal mode enters Loader through typed hdc shell reboot l
 
 if [[ "$mode" == "--prepare" ]]; then
   printf 'PREPARED: tool trust facts and E0 DAYU200 cross-mode binding are installed; no device command was dispatched\n'
-  exit 0
-fi
-
-if [[ "$mode" == "--check" ]]; then
-  printf 'CHECK ONLY: no device command was dispatched\n'
   exit 0
 fi
 

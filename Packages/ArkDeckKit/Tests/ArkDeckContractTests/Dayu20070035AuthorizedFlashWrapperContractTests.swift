@@ -28,7 +28,15 @@ final class Dayu20070035AuthorizedFlashWrapperContractTests: XCTestCase {
     XCTAssertTrue(source.contains("\"$ARKDECK_BIN\" flash execute"))
     XCTAssertTrue(source.contains("\"$ARKDECK_BIN\" flash install-tool"))
     XCTAssertTrue(source.contains("\"$ARKDECK_BIN\" flash install-binding"))
+    XCTAssertTrue(source.contains("\"$ARKDECK_BIN\" flash binding-preview"))
+    XCTAssertTrue(source.contains("\"$ARKDECK_BIN\" flash rebind-binding"))
+    XCTAssertTrue(
+      source.contains(
+        "/usr/bin/swift build --package-path \"$PACKAGE_DIR\" -c release --product arkdeck"))
+    XCTAssertFalse(source.contains("if [[ ! -x \"$ARKDECK_BIN\" ]]"))
     XCTAssertTrue(source.contains("--prepare"))
+    XCTAssertTrue(source.contains("--confirm-target-sha256"))
+    XCTAssertTrue(source.contains("--confirm-binding-revision"))
     XCTAssertTrue(source.contains("--chat-confirmation-digest-sha256"))
     XCTAssertTrue(source.contains("--chat-confirmed-target-sha256"))
     XCTAssertTrue(source.contains("ARKDECK_CHAT_CONFIRMATION_CONTEXT=supervisedInteractiveAgent"))
@@ -39,6 +47,9 @@ final class Dayu20070035AuthorizedFlashWrapperContractTests: XCTestCase {
     XCTAssertFalse(source.contains("eval "))
     XCTAssertFalse(source.contains("sudo "))
     XCTAssertFalse(source.contains("exec \"$TOOL\""))
+    XCTAssertLessThan(
+      try XCTUnwrap(source.range(of: "flash rebind-binding")?.lowerBound),
+      try XCTUnwrap(source.range(of: "flash execute")?.lowerBound))
   }
 
   func testWrapperTargetDigestUsesTheCanonicalProductModel() throws {
@@ -70,6 +81,19 @@ final class Dayu20070035AuthorizedFlashWrapperContractTests: XCTestCase {
 
     XCTAssertEqual(result.status, 2)
     XCTAssertTrue(result.output.contains("does not confirm the exact pinned plan digest"))
+    XCTAssertFalse(result.output.contains("READY:"))
+  }
+
+  func testChatTriggerRequiresProspectiveTargetAndBindingBeforeHostChecks() throws {
+    let result = try runScript([
+      "--chat-trigger", "--confirmation-digest-sha256", Self.confirmationDigest,
+      "--confirm-plan-sha256", Self.planDigest,
+      "--confirm-target-sha256", String(repeating: "b", count: 63),
+      "--confirm-binding-revision", "2",
+    ])
+
+    XCTAssertEqual(result.status, 2)
+    XCTAssertTrue(result.output.contains("full prospective target digest"))
     XCTAssertFalse(result.output.contains("READY:"))
   }
 

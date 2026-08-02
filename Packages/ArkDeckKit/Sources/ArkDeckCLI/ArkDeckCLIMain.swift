@@ -67,6 +67,10 @@ struct ArkDeckCommandLine {
       try runTrustTool(Array(arguments.dropFirst()))
     case "install-binding":
       try runInstallBinding(Array(arguments.dropFirst()))
+    case "binding-preview":
+      try runBindingPreview(Array(arguments.dropFirst()))
+    case "rebind-binding":
+      try runRebindBinding(Array(arguments.dropFirst()))
     case "plan":
       try runPlan(Array(arguments.dropFirst()))
     case "execute":
@@ -126,6 +130,52 @@ struct ArkDeckCommandLine {
     print("binding revision: \(receipt.revision)")
     print("USB topology: \(receipt.usbTopology)")
     print("serial sha256: \(receipt.serialDigestSHA256)")
+    print("device mutation dispatch: 0")
+  }
+
+  static func runBindingPreview(_ arguments: [String]) throws {
+    let options = try CLIOptions(arguments)
+    try options.validateAllowed([])
+    let preview = try RockchipDeviceBindingRebinding.previewCurrentLoader()
+    print("current Loader binding preview")
+    print("current binding revision: \(preview.currentRevision)")
+    print("prospective binding revision: \(preview.prospectiveRevision)")
+    print("rebind required: \(preview.requiresRebind)")
+    print("USB topology: \(preview.usbTopology)")
+    print("serial sha256: \(preview.serialDigestSHA256)")
+    print("target sha256: \(preview.targetDigestSHA256)")
+    print("device mutation dispatch: 0")
+  }
+
+  static func runRebindBinding(_ arguments: [String]) throws {
+    let options = try CLIOptions(arguments)
+    try options.validateAllowed([
+      "--chat-confirmation-digest-sha256", "--chat-confirmed-plan-sha256",
+      "--chat-confirmed-archive-sha256", "--chat-confirmed-step-set-sha256",
+      "--chat-confirmed-target-sha256", "--chat-confirmed-binding-revision",
+    ])
+    let environment = ProcessInfo.processInfo.environment
+    let authority = RockchipExecutionAuthorityResolver.resolve(
+      operatorProvided: false,
+      standardInputIsInteractive: isatty(FileHandle.standardInput.fileDescriptor) == 1,
+      environmentOverride: environment["ARKDECK_EXECUTION_AUTHORITY"])
+    guard authority == .standardAgent,
+      environment["ARKDECK_CHAT_CONFIRMATION_CONTEXT"] == "supervisedInteractiveAgent",
+      environment["CI"] != "true", environment["GITHUB_ACTIONS"] != "true"
+    else {
+      throw CLIError(
+        exitCode: EX_USAGE,
+        message: "binding rebind requires a supervised interactive Agent chat assertion")
+    }
+    let assertion = try chatConfirmationAssertion(options)
+    let receipt = try RockchipDeviceBindingRebinding.confirmCurrentLoader(
+      chatConfirmation: assertion)
+    print(receipt.changed ? "durable Loader binding rebound" : "durable Loader binding unchanged")
+    print("previous binding revision: \(receipt.previousRevision)")
+    print("binding revision: \(receipt.revision)")
+    print("USB topology: \(receipt.usbTopology)")
+    print("serial sha256: \(receipt.serialDigestSHA256)")
+    print("target sha256: \(receipt.targetDigestSHA256)")
     print("device mutation dispatch: 0")
   }
 
@@ -226,26 +276,7 @@ struct ArkDeckCommandLine {
             message: "chat confirmation requires a supervised interactive Agent invocation; "
               + "CI, daemon, scheduler and human-operator modes are rejected")
         }
-        guard let confirmationDigest = options.value("--chat-confirmation-digest-sha256"),
-          let planDigest = options.value("--chat-confirmed-plan-sha256"),
-          let archiveDigest = options.value("--chat-confirmed-archive-sha256"),
-          let stepSetDigest = options.value("--chat-confirmed-step-set-sha256"),
-          let targetDigest = options.value("--chat-confirmed-target-sha256"),
-          let rawBindingRevision = options.value("--chat-confirmed-binding-revision"),
-          let bindingRevision = Int(rawBindingRevision), bindingRevision > 0,
-          rawBindingRevision == String(bindingRevision)
-        else {
-          throw CLIError(
-            exitCode: EX_USAGE,
-            message: "chat confirmation requires the complete closed digest/binding assertion")
-        }
-        let assertion = try RockchipChatConfirmationAssertion(
-          confirmationDigestSHA256: confirmationDigest,
-          planDigestSHA256: planDigest,
-          archiveDigestSHA256: archiveDigest,
-          stepSetDigestSHA256: stepSetDigest,
-          targetDigestSHA256: targetDigest,
-          bindingRevision: bindingRevision)
+        let assertion = try chatConfirmationAssertion(options)
         request = try RockchipFlashExecutionRequest(
           chatConfirmation: assertion,
           archiveURL: URL(fileURLWithPath: imagesPath),
@@ -351,6 +382,31 @@ struct ArkDeckCommandLine {
     default:
       exit(4)
     }
+  }
+
+  static func chatConfirmationAssertion(
+    _ options: CLIOptions
+  ) throws -> RockchipChatConfirmationAssertion {
+    guard let confirmationDigest = options.value("--chat-confirmation-digest-sha256"),
+      let planDigest = options.value("--chat-confirmed-plan-sha256"),
+      let archiveDigest = options.value("--chat-confirmed-archive-sha256"),
+      let stepSetDigest = options.value("--chat-confirmed-step-set-sha256"),
+      let targetDigest = options.value("--chat-confirmed-target-sha256"),
+      let rawBindingRevision = options.value("--chat-confirmed-binding-revision"),
+      let bindingRevision = Int(rawBindingRevision), bindingRevision > 0,
+      rawBindingRevision == String(bindingRevision)
+    else {
+      throw CLIError(
+        exitCode: EX_USAGE,
+        message: "chat confirmation requires the complete closed digest/binding assertion")
+    }
+    return try RockchipChatConfirmationAssertion(
+      confirmationDigestSHA256: confirmationDigest,
+      planDigestSHA256: planDigest,
+      archiveDigestSHA256: archiveDigest,
+      stepSetDigestSHA256: stepSetDigest,
+      targetDigestSHA256: targetDigest,
+      bindingRevision: bindingRevision)
   }
 
   // MARK: postflight
@@ -681,6 +737,11 @@ struct ArkDeckCommandLine {
         arkdeck flash trust-tool --path <absolute-rkdeveloptool-path> \
       --expected-sha256 <full-product-pin>
         arkdeck flash install-binding
+        arkdeck flash binding-preview
+        arkdeck flash rebind-binding \
+      --chat-confirmation-digest-sha256 <SHA256> --chat-confirmed-plan-sha256 <SHA256> \
+      --chat-confirmed-archive-sha256 <SHA256> --chat-confirmed-step-set-sha256 <SHA256> \
+      --chat-confirmed-target-sha256 <SHA256> --chat-confirmed-binding-revision <n>
         arkdeck flash plan --images <images.tar.gz> \
       [--device-profile <dayu200@1|dayu200@2>] [--mode planOnly|simulated] [--out <dir>]
         arkdeck flash execute --images <images.tar.gz> --target-location-id <usb-location> \
