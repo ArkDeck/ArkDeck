@@ -67,7 +67,7 @@ platforms: [macos]
 | §13.2 Memory 晋升与作用域 | `HarnessMemoryModel.swift` 有 scope/kind/confidence,**无** CANDIDATE/VERIFIED/SUPERSEDED/INVALIDATED 生命周期,**无** revision/device/toolchain 作用域 | 旧知识可能污染新 revision 的决策 |
 | §9.2 预算面 | `HarnessTaskBudgets` 四项(`HarnessTask.swift:181-196`),缺 `maxModelCalls`、`maxNoProgressRounds`、`maxActionRetriesPerRun` | 模型调用与重试无独立上限 |
 | §30 LLM adapter | 只有端口与离线确定性路径,零厂商 adapter;出站默认 deny | 决策面还没有真实模型可换 |
-| §22 SQLite / §30 独立 `ArkDeckHarness` module | 存储 = `ArkDeckStorage` durable files;代码分布在 Core/Storage/Workflows/Daemon 四处 | 与终版目标结构不一致(见「结构性偏离」) |
+| §22 SQLite / §30 独立 `ArkDeckHarness` module | 存储 = `ArkDeckStorage` durable files;代码分布在 Core/Storage/Workflows/Daemon 四处 | 与终版目标结构不一致(见「结构性偏离」;已由 TASK-HFA-012/013 关闭) |
 
 一句话:CHG-2026-054 交付了**控制面骨架与取证半环**;本 change 交付**修复半环 + 让判定与决策站在正确证据和正确版本上**,并把终版要求的确定性分析面、workspace 主体绑定与知识作用域补齐。
 
@@ -124,7 +124,8 @@ platforms: [macos]
     乐观锁、schema migration)与 §13.4 的 FTS 检索;既有 durable file 数据一次性迁移且可回读。
 13. **抽取 `ArkDeckHarness` module**(TASK-HFA-013):终版 §30 目录结构;依赖方向单向
     (Harness → Runtime 协议/Catalog 查询),harness 不 import 设备参数、不持远端路径、
-    不构造 argv。
+    不构造 argv。交付后 #962 进一步在 target 层钉死:Workflows 不见 Harness,
+    Harness 不见 Process;`ArkDeckAgentComposition` 是唯一双平面 library 接缝。
 
 ## 结构性偏离的处理(维护者 2026-07-31 决定)
 
@@ -133,6 +134,9 @@ platforms: [macos]
 只在「模块边界导致无法完成真实闭环」时才允许结构性改动;当前 durable file 存储与四处分布
 并没有阻塞 GJ-5,先迁移只会推迟修复腿。两个任务的门都写明:**Wave A 全部 done 且 GJ-5 达
 `REAL_DEVICE_PASS` 之后才开工**。
+
+> 更新(2026-08-02):TASK-HFA-012/013 均已 done,GJ-5 已于 2026-08-01 r2 真机闭环取得
+> `REAL_DEVICE_PASS`(evidence/runs/TASK-HFA-005/run-r2.md);本节自此转为历史记录。
 
 ## 安全边界与新增不变量
 
