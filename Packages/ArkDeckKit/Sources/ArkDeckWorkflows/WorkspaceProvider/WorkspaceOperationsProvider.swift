@@ -1504,10 +1504,10 @@ public struct WorkspaceOperationsProvider: DeviceProvider {
   }
 }
 
-enum WorkspaceProviderSupport {
+package enum WorkspaceProviderSupport {
   /// The workspace's identity: which tree this is, independent of what it
   /// currently contains (CHG-2026-055, TASK-HFA-009).
-  static func workspaceIdentity(root: String, profileID: String) -> String {
+  package static func workspaceIdentity(root: String, profileID: String) -> String {
     sha256(Data("arkdeck-workspace|\(profileID)|\(root)".utf8))
   }
 
@@ -1527,7 +1527,7 @@ enum WorkspaceProviderSupport {
   /// Everything here is a file read. Computing a revision must not depend on
   /// spawning git, because admission needs the answer before any process
   /// runs.
-  static func workspaceRevision(
+  package static func workspaceRevision(
     root: String, profileVersion: String, globs: [String]
   ) throws -> String {
     let rootURL = URL(fileURLWithPath: root, isDirectory: true)
@@ -1575,18 +1575,18 @@ enum WorkspaceProviderSupport {
     return nil
   }
 
-  static func sha256(_ data: Data) -> String {
+  package static func sha256(_ data: Data) -> String {
     SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
   }
 
-  static func isSHA256(_ value: String) -> Bool {
+  package static func isSHA256(_ value: String) -> Bool {
     value.count == 64
       && value.allSatisfy {
         $0.isNumber || ("a"..."f").contains(String($0))
       }
   }
 
-  static func isIdentifier(_ value: String) -> Bool {
+  package static func isIdentifier(_ value: String) -> Bool {
     !value.isEmpty && value.count <= 128
       && value.allSatisfy {
         $0.isASCII && ($0.isLetter || $0.isNumber || "._:@-".contains($0))
@@ -1678,7 +1678,7 @@ enum WorkspaceProviderSupport {
     return result.sorted()
   }
 
-  static func patchPaths(from data: Data) throws -> [String] {
+  package static func patchPaths(from data: Data) throws -> [String] {
     guard let text = String(data: data, encoding: .utf8), !text.contains("\0") else {
       throw DeviceProviderError.unsupportedAction(
         "workspace patch must be bounded UTF-8 unified diff")
@@ -1779,7 +1779,7 @@ enum WorkspaceProviderSupport {
     }
   }
 
-  static func validate(
+  package static func validate(
     relativePaths: [String],
     root: String,
     profileGlobs: [String],
@@ -1830,7 +1830,7 @@ enum WorkspaceProviderSupport {
     }
   }
 
-  static func snapshots(
+  package static func snapshots(
     relativePaths: [String], root: String
   ) throws -> [WorkspaceFileSnapshot] {
     try relativePaths.sorted().map { path in
@@ -1894,7 +1894,7 @@ enum WorkspaceProviderSupport {
     }
   }
 
-  static func revision(_ snapshots: [WorkspaceFileSnapshot]) -> String {
+  package static func revision(_ snapshots: [WorkspaceFileSnapshot]) -> String {
     let material = snapshots.sorted { $0.relativePath < $1.relativePath }
       .map { "\($0.relativePath)\t\($0.sha256 ?? "absent")" }
       .joined(separator: "\n")

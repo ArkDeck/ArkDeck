@@ -12,6 +12,7 @@
 //   * task and project memory writes, with evidence attached to every entry.
 
 import ArkDeckCore
+import ArkDeckRuntime
 import Foundation
 
 extension HarnessTaskCoordinator {

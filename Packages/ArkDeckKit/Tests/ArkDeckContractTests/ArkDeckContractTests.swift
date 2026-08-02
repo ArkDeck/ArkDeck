@@ -17,17 +17,28 @@ import XCTest
 final class ArkDeckContractTests: XCTestCase {
   private static let uiFrameworks: Set<String> = ["SwiftUI", "AppKit", "UIKit", "Cocoa"]
 
+  // The full layer matrix (every target, carve-outs included) lives in
+  // ArchitectureBoundaryContractTests.allowedImports; this table restates the
+  // subset these older assertions walk. Keep the two in agreement.
   private static let declaredPackageDependencies: [String: Set<String>] = [
     "ArkDeckCore": [],
     "ArkDeckProcess": ["ArkDeckCore"],
     "ArkDeckRuntime": ["ArkDeckCore"],
     "ArkDeckOpenHarmony": ["ArkDeckCore", "ArkDeckProcess"],
-    "ArkDeckHarness": ["ArkDeckCore", "ArkDeckProcess", "ArkDeckRuntime"],
+    "ArkDeckHarness": ["ArkDeckCore", "ArkDeckRuntime"],
     "ArkDeckWorkflows": [
-      "ArkDeckCore", "ArkDeckHarness", "ArkDeckOpenHarmony", "ArkDeckProcess", "ArkDeckRuntime",
+      "ArkDeckCore", "ArkDeckOpenHarmony", "ArkDeckProcess", "ArkDeckRuntime",
       "ArkDeckStorage",
     ],
     "ArkDeckStorage": ["ArkDeckCore"],
+  ]
+
+  /// Directories inside a target's source root that belong to a different,
+  /// carved-out target (`path:` + `exclude:` in Package.swift) and must be
+  /// judged under that target's own dependency set instead.
+  private static let carvedOutSubdirectories: [String: [String]] = [
+    "ArkDeckHarness": ["Candidate"],
+    "ArkDeckWorkflows": ["AgentComposition"],
   ]
 
   func testPackageModulesRemainIndependentlyAddressable() {
@@ -54,9 +65,22 @@ final class ArkDeckContractTests: XCTestCase {
   }
 
   func testPackageTargetsImportOnlyDeclaredArkDeckModules() throws {
+    var scans: [(target: String, path: String, allowed: Set<String>)] = []
     for (target, allowed) in Self.declaredPackageDependencies.sorted(by: { $0.key < $1.key }) {
+      scans.append((target, "Sources/\(target)", allowed))
+    }
+    scans.append(
+      (
+        "ArkDeckAgentComposition", "Sources/ArkDeckWorkflows/AgentComposition",
+        [
+          "ArkDeckCore", "ArkDeckProcess", "ArkDeckRuntime", "ArkDeckStorage", "ArkDeckHarness",
+          "ArkDeckWorkflows",
+        ]
+      ))
+    for (target, path, allowed) in scans {
       for (file, modules) in try importsByFile(
-        under: packageRoot.appending(path: "Sources/\(target)"))
+        under: packageRoot.appending(path: path),
+        skippingSubdirectories: Self.carvedOutSubdirectories[target] ?? [])
       {
         for module in modules where module.hasPrefix("ArkDeck") && module != target {
           XCTAssertTrue(
@@ -109,7 +133,12 @@ final class ArkDeckContractTests: XCTestCase {
       .deletingLastPathComponent()  // repo root
   }
 
-  private func importsByFile(under directory: URL) throws -> [(file: String, modules: [String])] {
+  private func importsByFile(
+    under directory: URL, skippingSubdirectories: [String] = []
+  ) throws -> [(file: String, modules: [String])] {
+    let skipped = skippingSubdirectories.map {
+      directory.appending(path: $0).standardizedFileURL.path + "/"
+    }
     var isDirectory: ObjCBool = false
     guard FileManager.default.fileExists(atPath: directory.path, isDirectory: &isDirectory),
       isDirectory.boolValue,
@@ -121,6 +150,8 @@ final class ArkDeckContractTests: XCTestCase {
     }
     var results: [(file: String, modules: [String])] = []
     for case let url as URL in enumerator where url.pathExtension == "swift" {
+      let standardizedPath = url.standardizedFileURL.path
+      if skipped.contains(where: { standardizedPath.hasPrefix($0) }) { continue }
       let source = try String(contentsOf: url, encoding: .utf8)
       results.append((file: url.lastPathComponent, modules: importedModules(in: source)))
     }
@@ -167,13 +198,14 @@ final class ArkDeckContractTests: XCTestCase {
           "ArkDeckHarness must depend on ports, not concrete platform surface \(surface) "
             + "(\(file.lastPathComponent))")
       }
-      if !file.pathComponents.contains("LLM") {
-        for commandSurface in commandConstructionSurfaces {
-          XCTAssertFalse(
-            source.contains(commandSurface),
-            "ArkDeckHarness must not construct Git/HDC/build argv through \(commandSurface) "
-              + "(\(file.lastPathComponent))")
-        }
+      // No exemptions: since the Codex CLI transport moved to
+      // ArkDeckAgentComposition, no harness file — LLM/ included — may
+      // construct process argv.
+      for commandSurface in commandConstructionSurfaces {
+        XCTAssertFalse(
+          source.contains(commandSurface),
+          "ArkDeckHarness must not construct Git/HDC/build argv through \(commandSurface) "
+            + "(\(file.lastPathComponent))")
       }
     }
 
@@ -197,8 +229,8 @@ final class ArkDeckContractTests: XCTestCase {
       "the package must keep exactly one arkdeck-agentd executable product")
     XCTAssertTrue(
       manifest.contains(
-        #"dependencies: ["ArkDeckCore", "ArkDeckProcess", "ArkDeckRuntime"]"#),
-      "ArkDeckHarness must point inward to Core/Process/Runtime only")
+        #"dependencies: ["ArkDeckCore", "ArkDeckRuntime"]"#),
+      "ArkDeckHarness must point inward to Core/Runtime only — never ArkDeckProcess")
   }
 
   private func swiftSourceURLs(under directory: URL) throws -> [URL] {

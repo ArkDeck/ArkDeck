@@ -29,28 +29,52 @@ let package = Package(
     .target(name: "ArkDeckProcess", dependencies: ["ArkDeckCore"]),
     .target(name: "ArkDeckRuntime", dependencies: ["ArkDeckCore"]),
     .target(name: "ArkDeckOpenHarmony", dependencies: ["ArkDeckCore", "ArkDeckProcess"]),
+    // Dependency direction is load-bearing (see ArchitectureBoundaryContractTests):
+    // the harness plane decides, the runtime plane executes, and only the
+    // composition target below may see both. ArkDeckHarness deliberately does
+    // not depend on ArkDeckProcess — the harness cannot spawn a process.
     .target(
       name: "ArkDeckHarness",
-      dependencies: ["ArkDeckCore", "ArkDeckProcess", "ArkDeckRuntime"],
+      dependencies: ["ArkDeckCore", "ArkDeckRuntime"],
       exclude: ["Candidate"],
       linkerSettings: [.linkedLibrary("sqlite3")]
     ),
     .executableTarget(
       name: "ArkDeckEvolutionCandidate",
       path: "Sources/ArkDeckHarness/Candidate"),
+    // The runtime control plane and providers. Deliberately does not depend on
+    // ArkDeckHarness: the engine and providers must not understand the plane
+    // that drives them.
     .target(
       name: "ArkDeckWorkflows",
       dependencies: [
         "ArkDeckCore", "ArkDeckProcess", "ArkDeckRuntime", "ArkDeckOpenHarmony",
-        "ArkDeckStorage", "ArkDeckHarness",
+        "ArkDeckStorage",
       ],
+      exclude: ["AgentComposition"],
       resources: [
         .copy("Resources/OpenHarmonyNativeCodeSign")
       ]),
+    // Harness <-> runtime glue: harness port adapters, the evolution workspace
+    // and campaign hosts, and the LLM gateway composition (including the
+    // process-executing Codex CLI transport). This is the only library target
+    // allowed to import both ArkDeckHarness and ArkDeckWorkflows. It lives
+    // under Sources/ArkDeckWorkflows/AgentComposition (same carve-out pattern
+    // as ArkDeckEvolutionCandidate inside ArkDeckHarness).
+    .target(
+      name: "ArkDeckAgentComposition",
+      dependencies: [
+        "ArkDeckCore", "ArkDeckProcess", "ArkDeckRuntime", "ArkDeckStorage",
+        "ArkDeckHarness", "ArkDeckWorkflows",
+      ],
+      path: "Sources/ArkDeckWorkflows/AgentComposition"),
     .target(name: "ArkDeckStorage", dependencies: ["ArkDeckCore"]),
     .executableTarget(
       name: "ArkDeckCLI",
-      dependencies: ["ArkDeckCore", "ArkDeckRuntime", "ArkDeckWorkflows", "ArkDeckAgentClient"]
+      dependencies: [
+        "ArkDeckCore", "ArkDeckRuntime", "ArkDeckWorkflows", "ArkDeckAgentComposition",
+        "ArkDeckAgentClient",
+      ]
     ),
     .target(
       name: "ArkDeckAgentDaemon",
@@ -62,7 +86,10 @@ let package = Package(
     ),
     .executableTarget(
       name: "ArkDeckAgentDaemonMain",
-      dependencies: ["ArkDeckAgentDaemon", "ArkDeckHarness", "ArkDeckStorage", "ArkDeckWorkflows"]
+      dependencies: [
+        "ArkDeckAgentDaemon", "ArkDeckAgentComposition", "ArkDeckHarness", "ArkDeckRuntime",
+        "ArkDeckStorage", "ArkDeckWorkflows",
+      ]
     ),
     .executableTarget(
       name: "ArkDeckJournalCrashFixture",
@@ -97,6 +124,7 @@ let package = Package(
         "ArkDeckOpenHarmony",
         "ArkDeckHarness",
         "ArkDeckWorkflows",
+        "ArkDeckAgentComposition",
         "ArkDeckStorage",
         "ArkDeckAgentDaemon",
         "ArkDeckAgentClient",

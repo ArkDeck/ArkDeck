@@ -13,6 +13,7 @@
 // be is invisible, which is why nothing here swallows a rejection.
 
 import ArkDeckCore
+import ArkDeckRuntime
 import Foundation
 
 extension HarnessTaskCoordinator {

@@ -2,6 +2,7 @@
 
 import ArkDeckCore
 import ArkDeckHarness
+import ArkDeckWorkflows
 import ArkDeckStorage
 import CryptoKit
 import Foundation

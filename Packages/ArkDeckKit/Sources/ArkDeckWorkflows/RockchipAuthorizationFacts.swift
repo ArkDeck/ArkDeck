@@ -46,8 +46,10 @@ protocol RockchipExecutePlanFactPort: Sendable {
   func makeValidatedExecutePlan(archiveURL: URL) async throws -> RockchipFlashPlan
 }
 
-struct RockchipProductExecutePlanFactPort: RockchipExecutePlanFactPort {
-  func makeValidatedExecutePlan(archiveURL: URL) async throws -> RockchipFlashPlan {
+package struct RockchipProductExecutePlanFactPort: RockchipExecutePlanFactPort {
+  package init() {}
+
+  package func makeValidatedExecutePlan(archiveURL: URL) async throws -> RockchipFlashPlan {
     let summary = try GzipTarArchiveReader.summarize(fileAt: archiveURL)
     return try makeValidatedExecutePlan(summary: summary)
   }

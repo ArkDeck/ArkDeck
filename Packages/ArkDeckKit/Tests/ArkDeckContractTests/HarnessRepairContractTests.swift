@@ -8,6 +8,7 @@ import CryptoKit
 import XCTest
 
 @testable import ArkDeckCore
+@testable import ArkDeckAgentComposition
 @testable import ArkDeckHarness
 @testable import ArkDeckRuntime
 @testable import ArkDeckStorage

@@ -17,6 +17,7 @@
 // stays free of a dependency on the workflow module that owns it.
 
 import ArkDeckCore
+import ArkDeckRuntime
 import Foundation
 
 public struct HarnessStoredHumanAction: Equatable, Sendable, Codable {

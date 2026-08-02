@@ -18,6 +18,7 @@
 //     nearest available identity).
 
 import ArkDeckCore
+import ArkDeckRuntime
 import Foundation
 
 public enum HarnessHumanActionFactory {
