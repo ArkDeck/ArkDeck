@@ -17,6 +17,7 @@ let package = Package(
     .library(name: "ArkDeckAgentDaemon", targets: ["ArkDeckAgentDaemon"]),
     .library(name: "ArkDeckAgentClient", targets: ["ArkDeckAgentClient"]),
     .executable(name: "arkdeck-agentd", targets: ["ArkDeckAgentDaemonMain"]),
+    .executable(name: "ArkDeckEvolutionCandidate", targets: ["ArkDeckEvolutionCandidate"]),
     .executable(name: "ArkDeckJournalCrashFixture", targets: ["ArkDeckJournalCrashFixture"]),
     .executable(name: "ArkDeckRuntimePortFixture", targets: ["ArkDeckRuntimePortFixture"]),
     .executable(name: "ArkDeckFakeHDCFixture", targets: ["ArkDeckFakeHDCFixture"]),
@@ -31,8 +32,12 @@ let package = Package(
     .target(
       name: "ArkDeckHarness",
       dependencies: ["ArkDeckCore", "ArkDeckProcess", "ArkDeckRuntime"],
+      exclude: ["Candidate"],
       linkerSettings: [.linkedLibrary("sqlite3")]
     ),
+    .executableTarget(
+      name: "ArkDeckEvolutionCandidate",
+      path: "Sources/ArkDeckHarness/Candidate"),
     .target(
       name: "ArkDeckWorkflows",
       dependencies: [

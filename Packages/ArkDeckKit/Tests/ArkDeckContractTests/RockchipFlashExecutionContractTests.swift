@@ -922,6 +922,8 @@ final class RecordingRockchipAdmissionPort: @unchecked Sendable, RockchipExecuti
           stepSetDigestSHA256: assertion.stepSetDigestSHA256,
           targetDigestSHA256: assertion.targetDigestSHA256,
           confirmedAt: "2026-08-01T12:00:00Z"))
+    case .evolutionCampaign(let permit):
+      authorityReference = .agent(try permit.assertion.authorityReference())
     }
     return RockchipExecutionAdmission(
       backing: .contractFake, plan: plan,
